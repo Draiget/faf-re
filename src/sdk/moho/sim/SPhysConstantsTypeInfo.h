@@ -81,14 +81,6 @@ namespace moho
   static_assert(sizeof(SPhysConstantsTypeInfo) == 0x64, "SPhysConstantsTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00BFD400 (FUN_00BFD400, cleanup_SPhysConstantsTypeInfo)
-   *
-   * What it does:
-   * Releases `SPhysConstantsTypeInfo` storage and restores the base RTTI lane.
-   */
-  void cleanup_SPhysConstantsTypeInfo();
-
-  /**
    * Address: 0x00BD6030 (FUN_00BD6030, register_SPhysConstantsTypeInfo)
    *
    * What it does:

@@ -9,17 +9,13 @@
 
 namespace
 {
-  alignas(moho::CEffectImplTypeInfo) unsigned char gCEffectImplTypeInfoStorage[sizeof(moho::CEffectImplTypeInfo)] = {};
-  bool gCEffectImplTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFB9C0 (FUN_00BFB9C0, atexit destructor of the moho::CEffectImplTypeInfo object)
+   */
   [[nodiscard]] moho::CEffectImplTypeInfo* AcquireCEffectImplTypeInfo()
   {
-    if (!gCEffectImplTypeInfoConstructed) {
-      new (gCEffectImplTypeInfoStorage) moho::CEffectImplTypeInfo();
-      gCEffectImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CEffectImplTypeInfo*>(gCEffectImplTypeInfoStorage);
+    static moho::CEffectImplTypeInfo sInstance;
+    return &sInstance;
   }
 
   struct CEffectImplTypeInfoBootstrap
@@ -88,31 +84,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFB9C0 (FUN_00BFB9C0, cleanup_CEffectImplTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `CEffectImplTypeInfo` reflection storage.
-   */
-  void cleanup_CEffectImplTypeInfo()
-  {
-    if (!gCEffectImplTypeInfoConstructed) {
-      return;
-    }
-
-    static_cast<gpg::RType*>(AcquireCEffectImplTypeInfo())->~RType();
-    gCEffectImplTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD40C0 (FUN_00BD40C0, register_CEffectImplTypeInfo_AtExit)
    *
    * What it does:
    * Registers `CEffectImpl` RTTI bootstrap and installs process-exit cleanup.
    */
-  int register_CEffectImplTypeInfo_AtExit()
+  void register_CEffectImplTypeInfo_AtExit()
   {
     (void)register_CEffectImplTypeInfo_00();
-    return std::atexit(&cleanup_CEffectImplTypeInfo);
   }
 } // namespace moho
 

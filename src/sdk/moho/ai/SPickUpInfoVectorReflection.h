@@ -106,5 +106,5 @@ namespace moho
    * Runs the vector<SPickUpInfo> preregistration at process static-init and
    * registers the descriptor teardown with `atexit`.
    */
-  int register_VectorSPickUpInfoTypeAtexit();
+  void register_VectorSPickUpInfoTypeAtexit();
 } // namespace moho

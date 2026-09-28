@@ -12,17 +12,13 @@ namespace
 {
   using TypeInfo = moho::HSoundTypeInfo;
 
-  alignas(TypeInfo) unsigned char gHSoundTypeInfoStorage[sizeof(TypeInfo)];
-  bool gHSoundTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF10B0 (FUN_00BF10B0, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& GetHSoundTypeInfo() noexcept
   {
-    if (!gHSoundTypeInfoConstructed) {
-      new (gHSoundTypeInfoStorage) TypeInfo();
-      gHSoundTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gHSoundTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -70,25 +66,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF10B0 (FUN_00BF10B0, cleanup_HSoundTypeInfo)
-   */
-  void cleanup_HSoundTypeInfo()
-  {
-    if (!gHSoundTypeInfoConstructed) {
-      return;
-    }
-
-    GetHSoundTypeInfo().~HSoundTypeInfo();
-    gHSoundTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC6AB0 (FUN_00BC6AB0, register_HSoundTypeInfo)
    */
-  int register_HSoundTypeInfo()
+  void register_HSoundTypeInfo()
   {
     (void)GetHSoundTypeInfo();
-    return std::atexit(&cleanup_HSoundTypeInfo);
   }
 } // namespace moho
 
@@ -104,7 +86,6 @@ namespace
 
   [[maybe_unused]] HSoundTypeInfoBootstrap gHSoundTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

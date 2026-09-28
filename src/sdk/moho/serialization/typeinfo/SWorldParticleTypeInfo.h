@@ -38,20 +38,12 @@ namespace moho
   static_assert(sizeof(SWorldParticle_BlendModeTypeInfo) == 0x78, "SWorldParticle_BlendModeTypeInfo size must be 0x78");
 
   /**
-   * Address: 0x00BEFF00 (FUN_00BEFF00, cleanup_SWorldParticle_BlendModeTypeInfo)
-   *
-   * What it does:
-   * Tears down the cached `SWorldParticle::BlendMode` reflection descriptor at process exit.
-   */
-  void cleanup_SWorldParticle_BlendModeTypeInfo();
-
-  /**
    * Address: 0x00BC53A0 (FUN_00BC53A0, register_SWorldParticle_BlendModeTypeInfo)
    *
    * What it does:
    * Constructs and preregisters the cached `SWorldParticle::BlendMode` reflection descriptor.
    */
-  int register_SWorldParticle_BlendModeTypeInfo();
+  void register_SWorldParticle_BlendModeTypeInfo();
 
   /**
    * Address: 0x0048F660 (FUN_0048F660, Moho::SWorldParticle_ZModeTypeInfo::SWorldParticle_ZModeTypeInfo)
@@ -84,14 +76,6 @@ namespace moho
   };
 
   static_assert(sizeof(SWorldParticle_ZModeTypeInfo) == 0x78, "SWorldParticle_ZModeTypeInfo size must be 0x78");
-
-  /**
-   * Address: 0x00BEFF40 (FUN_00BEFF40, cleanup_SWorldParticle_ZModeTypeInfo)
-   *
-   * What it does:
-   * Tears down the cached `SWorldParticle::ZMode` reflection descriptor at process exit.
-   */
-  void cleanup_SWorldParticle_ZModeTypeInfo();
 
   /**
    * Address: 0x00BC5400 (FUN_00BC5400, register_SWorldParticle_ZModeTypeInfo)
@@ -134,18 +118,10 @@ namespace moho
   static_assert(sizeof(SWorldParticleTypeInfo) == 0x64, "SWorldParticleTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00BEFF80 (FUN_00BEFF80, cleanup_SWorldParticleTypeInfo)
-   *
-   * What it does:
-   * Tears down the cached `SWorldParticle` reflection descriptor at process exit.
-   */
-  void cleanup_SWorldParticleTypeInfo();
-
-  /**
    * Address: 0x00BC5460 (FUN_00BC5460, register_SWorldParticleTypeInfo)
    *
    * What it does:
    * Constructs and preregisters the cached `SWorldParticle` reflection descriptor.
    */
-  int register_SWorldParticleTypeInfo();
+  void register_SWorldParticleTypeInfo();
 } // namespace moho

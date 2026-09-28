@@ -36,52 +36,25 @@ namespace
 
   static_assert(sizeof(CAiBuilderRebuildMapTypeInfo) == 0x64, "CAiBuilderRebuildMapTypeInfo size must be 0x64");
 
-  alignas(CAiBuilderImplTypeInfo) unsigned char gCAiBuilderImplTypeInfoStorage[sizeof(CAiBuilderImplTypeInfo)] = {};
-  bool gCAiBuilderImplTypeInfoConstructed = false;
-
-  alignas(CAiBuilderRebuildMapTypeInfo)
-  unsigned char gCAiBuilderRebuildMapTypeInfoStorage[sizeof(CAiBuilderRebuildMapTypeInfo)] = {};
-  bool gCAiBuilderRebuildMapTypeInfoConstructed = false;
-
-
-
   msvc8::string gCAiBuilderRebuildMapTypeName;
   bool gCAiBuilderRebuildMapTypeNameInitialized = false;
 
+  /**
+   * Address: 0x00BF6A60 (FUN_00BF6A60, atexit destructor of the CAiBuilderImplTypeInfo object)
+   */
   [[nodiscard]] CAiBuilderImplTypeInfo* AcquireCAiBuilderImplTypeInfo()
   {
-    if (!gCAiBuilderImplTypeInfoConstructed) {
-      new (gCAiBuilderImplTypeInfoStorage) CAiBuilderImplTypeInfo();
-      gCAiBuilderImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiBuilderImplTypeInfo*>(gCAiBuilderImplTypeInfoStorage);
-  }
-
-  [[nodiscard]] CAiBuilderRebuildMapTypeInfo* AcquireCAiBuilderRebuildMapTypeInfo()
-  {
-    if (!gCAiBuilderRebuildMapTypeInfoConstructed) {
-      new (gCAiBuilderRebuildMapTypeInfoStorage) CAiBuilderRebuildMapTypeInfo();
-      gCAiBuilderRebuildMapTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiBuilderRebuildMapTypeInfo*>(gCAiBuilderRebuildMapTypeInfoStorage);
+    static CAiBuilderImplTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
-   * Address: 0x00BF6A60 (FUN_00BF6A60)
-   *
-   * What it does:
-   * Tears down startup-owned `CAiBuilderImplTypeInfo` storage.
+   * Address: 0x00BF6BE0 (FUN_00BF6BE0, atexit destructor of the CAiBuilderRebuildMapTypeInfo object)
    */
-  void cleanup_CAiBuilderImplTypeInfo()
+  [[nodiscard]] CAiBuilderRebuildMapTypeInfo* AcquireCAiBuilderRebuildMapTypeInfo()
   {
-    if (!gCAiBuilderImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiBuilderImplTypeInfo()->~CAiBuilderImplTypeInfo();
-    gCAiBuilderImplTypeInfoConstructed = false;
+    static CAiBuilderRebuildMapTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedIAiBuilderType()
@@ -290,22 +263,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x00BF6BE0 (FUN_00BF6BE0)
-   *
-   * What it does:
-   * Tears down startup-owned builder rebuild-map reflection storage.
-   */
-  void cleanup_CAiBuilderRebuildMapTypeInfo()
-  {
-    if (!gCAiBuilderRebuildMapTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiBuilderRebuildMapTypeInfo()->~CAiBuilderRebuildMapTypeInfo();
-    gCAiBuilderRebuildMapTypeInfoConstructed = false;
-  }
-
 } // namespace
 
 /**
@@ -393,7 +350,6 @@ void CAiBuilderRebuildMapTypeInfo::Init()
 void moho::register_CAiBuilderImplTypeInfo()
 {
   (void)AcquireCAiBuilderImplTypeInfo();
-  (void)std::atexit(&cleanup_CAiBuilderImplTypeInfo);
 }
 
 /**
@@ -416,10 +372,9 @@ gpg::RType* moho::preregister_CAiBuilderRebuildMapTypeInfo()
  * What it does:
  * Preregisters builder rebuild-map RTTI and installs process-exit cleanup.
  */
-int moho::register_CAiBuilderRebuildMapTypeInfo()
+void moho::register_CAiBuilderRebuildMapTypeInfo()
 {
   (void)preregister_CAiBuilderRebuildMapTypeInfo();
-  return std::atexit(&cleanup_CAiBuilderRebuildMapTypeInfo);
 }
 
 namespace
@@ -435,7 +390,6 @@ namespace
 
   [[maybe_unused]] CAiBuilderImplTypeInfoBootstrap gCAiBuilderImplTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

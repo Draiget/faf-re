@@ -200,31 +200,13 @@ namespace
     return categorySet;
   }
 
-  alignas(moho::EntityCategoryHelperTypeInfo)
-    unsigned char gEntityCategoryHelperTypeInfoStorage[sizeof(moho::EntityCategoryHelperTypeInfo)];
-  bool gEntityCategoryHelperTypeInfoConstructed = false;
-
   // Address: 0x010ABA0C -- process-global `EntityCategoryHelperSerializer` singleton.
   moho::EntityCategoryHelperSerializer gEntityCategoryHelperSerializer;
 
   [[nodiscard]] moho::EntityCategoryHelperTypeInfo& AcquireEntityCategoryHelperTypeInfo()
   {
-    if (!gEntityCategoryHelperTypeInfoConstructed) {
-      new (gEntityCategoryHelperTypeInfoStorage) moho::EntityCategoryHelperTypeInfo();
-      gEntityCategoryHelperTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::EntityCategoryHelperTypeInfo*>(gEntityCategoryHelperTypeInfoStorage);
-  }
-
-  void cleanup_EntityCategoryHelperTypeInfo()
-  {
-    if (!gEntityCategoryHelperTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEntityCategoryHelperTypeInfo().~EntityCategoryHelperTypeInfo();
-    gEntityCategoryHelperTypeInfoConstructed = false;
+    static moho::EntityCategoryHelperTypeInfo sInstance;
+    return sInstance;
   }
 
   struct EntityCategoryHelperRegistration
@@ -875,10 +857,9 @@ namespace
   /**
    * Address: 0x00BC8F10 (FUN_00BC8F10, register_EntityCategoryHelperTypeInfoStartup)
    */
-  int register_EntityCategoryHelperTypeInfoStartup()
+  void register_EntityCategoryHelperTypeInfoStartup()
   {
     (void)AcquireEntityCategoryHelperTypeInfo();
-    return std::atexit(&cleanup_EntityCategoryHelperTypeInfo);
   }
 
   /**
@@ -890,7 +871,6 @@ namespace
     , mSerSaveFunc(&EntityCategory::SerSave)
   {}
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

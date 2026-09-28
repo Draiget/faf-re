@@ -11,17 +11,13 @@ namespace
 {
   using TypeInfo = moho::ISoundManagerTypeInfo;
 
-  alignas(TypeInfo) unsigned char gISoundManagerTypeInfoStorage[sizeof(TypeInfo)];
-  bool gISoundManagerTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C01470 (FUN_00C01470, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& GetISoundManagerTypeInfo() noexcept
   {
-    if (!gISoundManagerTypeInfoConstructed) {
-      new (gISoundManagerTypeInfoStorage) TypeInfo();
-      gISoundManagerTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gISoundManagerTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -60,32 +56,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00C01470 (FUN_00C01470, cleanup_ISoundManagerTypeInfo)
-   *
-   * What it does:
-   * Releases process-exit ISoundManagerTypeInfo storage.
-   */
-  void cleanup_ISoundManagerTypeInfo()
-  {
-    if (!gISoundManagerTypeInfoConstructed) {
-      return;
-    }
-
-    GetISoundManagerTypeInfo().~ISoundManagerTypeInfo();
-    gISoundManagerTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BDC4A0 (FUN_00BDC4A0, register_ISoundManagerTypeInfo)
    *
    * What it does:
    * Forces ISoundManagerTypeInfo startup construction and installs process-exit
    * cleanup.
    */
-  int register_ISoundManagerTypeInfo()
+  void register_ISoundManagerTypeInfo()
   {
     (void)GetISoundManagerTypeInfo();
-    return std::atexit(&cleanup_ISoundManagerTypeInfo);
   }
 } // namespace moho
 
@@ -101,7 +80,6 @@ namespace
 
   [[maybe_unused]] ISoundManagerTypeInfoBootstrap gISoundManagerTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

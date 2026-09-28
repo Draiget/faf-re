@@ -5,24 +5,21 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiPathSpline.h"
+#include "moho/ai/CAiPathSpline.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
 namespace
 {
-  alignas(CAiPathSplineTypeInfo) unsigned char gCAiPathSplineTypeInfoStorage[sizeof(CAiPathSplineTypeInfo)] = {};
-  bool gCAiPathSplineTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF74E0 (FUN_00BF74E0, atexit destructor of the CAiPathSplineTypeInfo object)
+   */
   [[nodiscard]] CAiPathSplineTypeInfo* AcquireCAiPathSplineTypeInfo()
   {
-    if (!gCAiPathSplineTypeInfoConstructed) {
-      new (gCAiPathSplineTypeInfoStorage) CAiPathSplineTypeInfo();
-      gCAiPathSplineTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiPathSplineTypeInfo*>(gCAiPathSplineTypeInfoStorage);
+    static CAiPathSplineTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -163,21 +160,6 @@ namespace
     return typeInfo;
   }
 
-  /**
-   * Address: 0x00BF74E0 (FUN_00BF74E0, cleanup_CAiPathSplineTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `CAiPathSplineTypeInfo` reflection storage.
-   */
-  void cleanup_CAiPathSplineTypeInfo()
-  {
-    if (!gCAiPathSplineTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiPathSplineTypeInfo()->~CAiPathSplineTypeInfo();
-    gCAiPathSplineTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -211,10 +193,9 @@ void CAiPathSplineTypeInfo::Init()
  * Constructs/preregisters startup RTTI descriptor for `CAiPathSpline` and
  * installs process-exit cleanup.
  */
-int moho::register_CAiPathSplineTypeInfo()
+void moho::register_CAiPathSplineTypeInfo()
 {
   (void)preregister_CAiPathSplineTypeInfo();
-  return std::atexit(&cleanup_CAiPathSplineTypeInfo);
 }
 
 namespace
@@ -229,7 +210,6 @@ namespace
 
   [[maybe_unused]] CAiPathSplineTypeInfoBootstrap gCAiPathSplineTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

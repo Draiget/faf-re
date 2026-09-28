@@ -4,23 +4,19 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/effects/rendering/CEfxEmitter.h"
+#include "moho/effects/rendering/CEfxEmitter.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(moho::CEfxEmitterTypeInfo)
-    unsigned char gCEfxEmitterTypeInfoStorage[sizeof(moho::CEfxEmitterTypeInfo)] = {};
-  bool gCEfxEmitterTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFBD50 (FUN_00BFBD50, atexit destructor of the moho::CEfxEmitterTypeInfo object)
+   */
   [[nodiscard]] moho::CEfxEmitterTypeInfo* AcquireCEfxEmitterTypeInfo()
   {
-    if (!gCEfxEmitterTypeInfoConstructed) {
-      new (gCEfxEmitterTypeInfoStorage) moho::CEfxEmitterTypeInfo();
-      gCEfxEmitterTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CEfxEmitterTypeInfo*>(gCEfxEmitterTypeInfoStorage);
+    static moho::CEfxEmitterTypeInfo sInstance;
+    return &sInstance;
   }
 
   struct CEfxEmitterTypeInfoBootstrap
@@ -191,31 +187,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFBD50 (FUN_00BFBD50, cleanup_CEfxEmitterTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `CEfxEmitterTypeInfo` reflection storage.
-   */
-  void cleanup_CEfxEmitterTypeInfo()
-  {
-    if (!gCEfxEmitterTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCEfxEmitterTypeInfo()->~CEfxEmitterTypeInfo();
-    gCEfxEmitterTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD42F0 (FUN_00BD42F0, register_CEfxEmitterTypeInfo)
    *
    * What it does:
    * Registers `CEfxEmitter` RTTI bootstrap and installs process-exit cleanup.
    */
-  int register_CEfxEmitterTypeInfo_AtExit()
+  void register_CEfxEmitterTypeInfo_AtExit()
   {
     (void)register_CEfxEmitterTypeInfo_00();
-    return std::atexit(&cleanup_CEfxEmitterTypeInfo);
   }
 } // namespace moho
 

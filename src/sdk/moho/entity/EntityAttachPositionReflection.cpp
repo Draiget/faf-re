@@ -352,16 +352,6 @@ namespace moho
 
 namespace
 {
-  alignas(moho::SEntAttachInfoTypeInfo) unsigned char gSEntAttachInfoTypeInfoStorage[sizeof(moho::SEntAttachInfoTypeInfo)];
-  bool gSEntAttachInfoTypeInfoConstructed = false;
-
-  alignas(moho::PositionHistoryTypeInfo)
-    unsigned char gPositionHistoryTypeInfoStorage[sizeof(moho::PositionHistoryTypeInfo)];
-  bool gPositionHistoryTypeInfoConstructed = false;
-
-  alignas(moho::EntityTypeInfo) unsigned char gEntityTypeInfoStorage[sizeof(moho::EntityTypeInfo)];
-  bool gEntityTypeInfoConstructed = false;
-
   // Address: 0x010B4384 -- process-global `SEntAttachInfoSerializer` singleton.
   moho::SEntAttachInfoSerializer gSEntAttachInfoSerializer;
 
@@ -621,31 +611,31 @@ namespace
     return &owner->fields_.back();
   }
 
+  /**
+   * Address: 0x00BFC690 (FUN_00BFC690, atexit destructor of the moho::SEntAttachInfoTypeInfo object)
+   */
   [[nodiscard]] moho::SEntAttachInfoTypeInfo& AcquireSEntAttachInfoTypeInfo()
   {
-    if (!gSEntAttachInfoTypeInfoConstructed) {
-      new (gSEntAttachInfoTypeInfoStorage) moho::SEntAttachInfoTypeInfo();
-      gSEntAttachInfoTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<moho::SEntAttachInfoTypeInfo*>(gSEntAttachInfoTypeInfoStorage);
+    static moho::SEntAttachInfoTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFC720 (FUN_00BFC720, atexit destructor of the moho::PositionHistoryTypeInfo object)
+   */
   [[nodiscard]] moho::PositionHistoryTypeInfo& AcquirePositionHistoryTypeInfo()
   {
-    if (!gPositionHistoryTypeInfoConstructed) {
-      new (gPositionHistoryTypeInfoStorage) moho::PositionHistoryTypeInfo();
-      gPositionHistoryTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<moho::PositionHistoryTypeInfo*>(gPositionHistoryTypeInfoStorage);
+    static moho::PositionHistoryTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFC7B0 (FUN_00BFC7B0, atexit destructor of the moho::EntityTypeInfo object)
+   */
   [[nodiscard]] moho::EntityTypeInfo& AcquireEntityTypeInfo()
   {
-    if (!gEntityTypeInfoConstructed) {
-      new (gEntityTypeInfoStorage) moho::EntityTypeInfo();
-      gEntityTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<moho::EntityTypeInfo*>(gEntityTypeInfoStorage);
+    static moho::EntityTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -1249,54 +1239,14 @@ namespace moho
   EntityConstruct::~EntityConstruct() = default;
 
   /**
-   * Address: 0x00BFC690 (FUN_00BFC690, cleanup_SEntAttachInfoTypeInfo)
-   */
-  void cleanup_SEntAttachInfoTypeInfo()
-  {
-    if (!gSEntAttachInfoTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSEntAttachInfoTypeInfo().~SEntAttachInfoTypeInfo();
-    gSEntAttachInfoTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BFC720 (FUN_00BFC720, cleanup_PositionHistoryTypeInfo)
-   */
-  void cleanup_PositionHistoryTypeInfo()
-  {
-    if (!gPositionHistoryTypeInfoConstructed) {
-      return;
-    }
-
-    AcquirePositionHistoryTypeInfo().~PositionHistoryTypeInfo();
-    gPositionHistoryTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BFC7B0 (FUN_00BFC7B0, cleanup_EntityTypeInfo)
-   */
-  void cleanup_EntityTypeInfo()
-  {
-    if (!gEntityTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEntityTypeInfo().~EntityTypeInfo();
-    gEntityTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4F00 (FUN_00BD4F00, register_SEntAttachInfoTypeInfo)
    *
    * What it does:
    * Constructs global `SEntAttachInfoTypeInfo` and registers exit cleanup.
    */
-  int register_SEntAttachInfoTypeInfo()
+  void register_SEntAttachInfoTypeInfo()
   {
     (void)AcquireSEntAttachInfoTypeInfo();
-    return std::atexit(&cleanup_SEntAttachInfoTypeInfo);
   }
 
   /**
@@ -1305,10 +1255,9 @@ namespace moho
    * What it does:
    * Constructs global `PositionHistoryTypeInfo` and registers exit cleanup.
    */
-  int register_PositionHistoryTypeInfo()
+  void register_PositionHistoryTypeInfo()
   {
     (void)AcquirePositionHistoryTypeInfo();
-    return std::atexit(&cleanup_PositionHistoryTypeInfo);
   }
 
   /**
@@ -1317,10 +1266,9 @@ namespace moho
    * What it does:
    * Constructs global `EntityTypeInfo` and registers exit cleanup.
    */
-  int register_EntityTypeInfo()
+  void register_EntityTypeInfo()
   {
     (void)AcquireEntityTypeInfo();
-    return std::atexit(&cleanup_EntityTypeInfo);
   }
 } // namespace moho
 
@@ -1338,7 +1286,6 @@ namespace
 
   [[maybe_unused]] EntityAttachPositionReflectionBootstrap gEntityAttachPositionReflectionBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

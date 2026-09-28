@@ -17,44 +17,35 @@ namespace
   using EntitySet = moho::EntitySetTemplate<moho::Entity>;
   using WeakEntitySet = moho::WeakEntitySetTemplate<moho::Entity>;
 
-  alignas(moho::EntitySetBaseTypeInfo) unsigned char gEntitySetBaseTypeInfoStorage[sizeof(moho::EntitySetBaseTypeInfo)];
-  bool gEntitySetBaseTypeInfoConstructed = false;
-
-  alignas(moho::EntitySetTypeInfo) unsigned char gEntitySetTypeInfoStorage[sizeof(moho::EntitySetTypeInfo)];
-  bool gEntitySetTypeInfoConstructed = false;
-
-  alignas(moho::WeakEntitySetTypeInfo) unsigned char gWeakEntitySetTypeInfoStorage[sizeof(moho::WeakEntitySetTypeInfo)];
-  bool gWeakEntitySetTypeInfoConstructed = false;
-
   moho::EntitySetBaseSerializer gEntitySetBaseSerializer;
   moho::EntitySetSerializer gEntitySetSerializer;
   moho::WeakEntitySetSerializer gWeakEntitySetSerializer;
 
+  /**
+   * Address: 0x00BFCCC0 (FUN_00BFCCC0, atexit destructor of the moho::EntitySetBaseTypeInfo object)
+   */
   [[nodiscard]] moho::EntitySetBaseTypeInfo& AcquireEntitySetBaseTypeInfo()
   {
-    if (!gEntitySetBaseTypeInfoConstructed) {
-      new (gEntitySetBaseTypeInfoStorage) moho::EntitySetBaseTypeInfo();
-      gEntitySetBaseTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<moho::EntitySetBaseTypeInfo*>(gEntitySetBaseTypeInfoStorage);
+    static moho::EntitySetBaseTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFCD50 (FUN_00BFCD50, atexit destructor of the moho::EntitySetTypeInfo object)
+   */
   [[nodiscard]] moho::EntitySetTypeInfo& AcquireEntitySetTypeInfo()
   {
-    if (!gEntitySetTypeInfoConstructed) {
-      new (gEntitySetTypeInfoStorage) moho::EntitySetTypeInfo();
-      gEntitySetTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<moho::EntitySetTypeInfo*>(gEntitySetTypeInfoStorage);
+    static moho::EntitySetTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFCDE0 (FUN_00BFCDE0, atexit destructor of the moho::WeakEntitySetTypeInfo object)
+   */
   [[nodiscard]] moho::WeakEntitySetTypeInfo& AcquireWeakEntitySetTypeInfo()
   {
-    if (!gWeakEntitySetTypeInfoConstructed) {
-      new (gWeakEntitySetTypeInfoStorage) moho::WeakEntitySetTypeInfo();
-      gWeakEntitySetTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<moho::WeakEntitySetTypeInfo*>(gWeakEntitySetTypeInfoStorage);
+    static moho::WeakEntitySetTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -718,28 +709,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFCCC0 (FUN_00BFCCC0, sub_BFCCC0)
-   *
-   * What it does:
-   * Tears down global `EntitySetBaseTypeInfo` storage at process exit.
-   */
-  void cleanup_EntitySetBaseTypeInfo()
-  {
-    if (!gEntitySetBaseTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEntitySetBaseTypeInfo().~EntitySetBaseTypeInfo();
-    gEntitySetBaseTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD5770 (FUN_00BD5770, sub_BD5770)
    */
-  int register_EntitySetBaseTypeInfo()
+  void register_EntitySetBaseTypeInfo()
   {
     (void)AcquireEntitySetBaseTypeInfo();
-    return std::atexit(&cleanup_EntitySetBaseTypeInfo);
   }
 
   /**
@@ -773,28 +747,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFCD50 (FUN_00BFCD50, sub_BFCD50)
-   *
-   * What it does:
-   * Tears down global `EntitySetTypeInfo` storage at process exit.
-   */
-  void cleanup_EntitySetTypeInfo()
-  {
-    if (!gEntitySetTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEntitySetTypeInfo().~EntitySetTypeInfo();
-    gEntitySetTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD57D0 (FUN_00BD57D0, sub_BD57D0)
    */
-  int register_EntitySetTypeInfo()
+  void register_EntitySetTypeInfo()
   {
     (void)AcquireEntitySetTypeInfo();
-    return std::atexit(&cleanup_EntitySetTypeInfo);
   }
 
   /**
@@ -828,28 +785,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFCDE0 (FUN_00BFCDE0, sub_BFCDE0)
-   *
-   * What it does:
-   * Tears down global `WeakEntitySetTypeInfo` storage at process exit.
-   */
-  void cleanup_WeakEntitySetTypeInfo()
-  {
-    if (!gWeakEntitySetTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireWeakEntitySetTypeInfo().~WeakEntitySetTypeInfo();
-    gWeakEntitySetTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD5830 (FUN_00BD5830, sub_BD5830)
    */
-  int register_WeakEntitySetTypeInfo()
+  void register_WeakEntitySetTypeInfo()
   {
     (void)AcquireWeakEntitySetTypeInfo();
-    return std::atexit(&cleanup_WeakEntitySetTypeInfo);
   }
 
   /**
@@ -900,7 +840,6 @@ namespace
 
   EntitySetReflectionBootstrap gEntitySetReflectionBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

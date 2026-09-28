@@ -104,7 +104,6 @@ namespace moho
    * What it does:
    * Releases startup-owned `fastvector<SAniManipBinding>` reflection storage.
    */
-  void cleanup_FastVectorSAniManipBindingType();
 
   /**
    * Address: 0x00BD2CC0 (FUN_00BD2CC0, register_FastVectorSAniManipBindingTypeAtexit)
@@ -112,7 +111,7 @@ namespace moho
    * What it does:
    * Preregisters `fastvector<SAniManipBinding>` RTTI and installs process-exit cleanup.
    */
-  int register_FastVectorSAniManipBindingTypeAtexit();
+  void register_FastVectorSAniManipBindingTypeAtexit();
 } // namespace moho
 
 namespace gpg
@@ -156,10 +155,6 @@ namespace
   // Address: 0x010B28C8 -- process-global `SAniManipBindingSerializer` singleton.
   SAniManipBindingSerializer gSAniManipBindingSerializer;
 
-  alignas(FastVectorSAniManipBindingType)
-    unsigned char gFastVectorSAniManipBindingTypeStorage[sizeof(FastVectorSAniManipBindingType)]{};
-  bool gFastVectorSAniManipBindingTypeConstructed = false;
-
   msvc8::string gFastVectorSAniManipBindingTypeName;
   bool gFastVectorSAniManipBindingTypeNameCleanupRegistered = false;
 
@@ -173,14 +168,13 @@ namespace
     return reinterpret_cast<SAniManipBindingTypeInfo*>(gSAniManipBindingTypeInfoStorage);
   }
 
+  /**
+   * Address: 0x00BFAE80 (FUN_00BFAE80, atexit destructor of the FastVectorSAniManipBindingType object)
+   */
   [[nodiscard]] FastVectorSAniManipBindingType* AcquireFastVectorSAniManipBindingType()
   {
-    if (!gFastVectorSAniManipBindingTypeConstructed) {
-      new (gFastVectorSAniManipBindingTypeStorage) FastVectorSAniManipBindingType();
-      gFastVectorSAniManipBindingTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorSAniManipBindingType*>(gFastVectorSAniManipBindingTypeStorage);
+    static FastVectorSAniManipBindingType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedSAniManipBindingType()
@@ -578,25 +572,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFAE80 (FUN_00BFAE80, cleanup_FastVectorSAniManipBindingType)
-   */
-  void cleanup_FastVectorSAniManipBindingType()
-  {
-    if (!gFastVectorSAniManipBindingTypeConstructed) {
-      return;
-    }
-
-    AcquireFastVectorSAniManipBindingType()->~FastVectorSAniManipBindingType();
-    gFastVectorSAniManipBindingTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD2CC0 (FUN_00BD2CC0, register_FastVectorSAniManipBindingTypeAtexit)
    */
-  int register_FastVectorSAniManipBindingTypeAtexit()
+  void register_FastVectorSAniManipBindingTypeAtexit()
   {
     (void)preregister_FastVectorSAniManipBindingType();
-    return std::atexit(&cleanup_FastVectorSAniManipBindingType);
   }
 } // namespace moho
 

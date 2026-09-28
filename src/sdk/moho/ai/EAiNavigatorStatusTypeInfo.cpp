@@ -12,34 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(EAiNavigatorStatusTypeInfo)
-    unsigned char gEAiNavigatorStatusTypeInfoStorage[sizeof(EAiNavigatorStatusTypeInfo)] = {};
-  bool gEAiNavigatorStatusTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6C50 (FUN_00BF6C50, atexit destructor of the EAiNavigatorStatusTypeInfo object)
+   */
   [[nodiscard]] EAiNavigatorStatusTypeInfo* AcquireEAiNavigatorStatusTypeInfo()
   {
-    if (!gEAiNavigatorStatusTypeInfoConstructed) {
-      new (gEAiNavigatorStatusTypeInfoStorage) EAiNavigatorStatusTypeInfo();
-      gEAiNavigatorStatusTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<EAiNavigatorStatusTypeInfo*>(gEAiNavigatorStatusTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF6C50 (FUN_00BF6C50, cleanup_EAiNavigatorStatusTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `EAiNavigatorStatusTypeInfo` storage.
-   */
-  void cleanup_EAiNavigatorStatusTypeInfo()
-  {
-    if (!gEAiNavigatorStatusTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEAiNavigatorStatusTypeInfo()->~EAiNavigatorStatusTypeInfo();
-    gEAiNavigatorStatusTypeInfoConstructed = false;
+    static EAiNavigatorStatusTypeInfo sInstance;
+    return &sInstance;
   }
 
   // Address: 0x010AE774 -- process-global `PrimitiveSerHelper<EAiNavigatorStatus,int>`
@@ -126,7 +105,6 @@ void EAiNavigatorStatusTypeInfo::Init()
 void moho::register_EAiNavigatorStatusTypeInfo()
 {
   (void)AcquireEAiNavigatorStatusTypeInfo();
-  (void)std::atexit(&cleanup_EAiNavigatorStatusTypeInfo);
 }
 
 namespace
@@ -141,7 +119,6 @@ namespace
 
   [[maybe_unused]] EAiNavigatorStatusTypeInfoBootstrap gEAiNavigatorStatusTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

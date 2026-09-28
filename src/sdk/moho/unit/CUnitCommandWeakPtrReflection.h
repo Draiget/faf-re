@@ -59,7 +59,7 @@ namespace moho
    * Registers `WeakPtr<CUnitCommand>` reflection and installs process-exit
    * teardown via `atexit`.
    */
-  int register_WeakPtr_CUnitCommand_Type_AtExit();
+  void register_WeakPtr_CUnitCommand_Type_AtExit();
 } // namespace moho
 
 namespace gpg
@@ -135,5 +135,5 @@ namespace moho
    * Registers `vector<WeakPtr<CUnitCommand>>` reflection and installs process-exit
    * teardown via `atexit`.
    */
-  int register_WeakPtr_CUnitCommand_VectorType_AtExit();
+  void register_WeakPtr_CUnitCommand_VectorType_AtExit();
 } // namespace moho

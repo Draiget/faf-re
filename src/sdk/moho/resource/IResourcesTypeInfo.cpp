@@ -4,32 +4,16 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/resource/IResources.h"
+#include "moho/resource/IResources.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(moho::IResourcesTypeInfo) unsigned char gIResourcesTypeInfoStorage[sizeof(moho::IResourcesTypeInfo)];
-  bool gIResourcesTypeInfoConstructed = false;
-
   [[nodiscard]] moho::IResourcesTypeInfo& AcquireIResourcesTypeInfo()
   {
-    if (!gIResourcesTypeInfoConstructed) {
-      new (gIResourcesTypeInfoStorage) moho::IResourcesTypeInfo();
-      gIResourcesTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::IResourcesTypeInfo*>(gIResourcesTypeInfoStorage);
-  }
-
-  void cleanup_IResourcesTypeInfo()
-  {
-    if (!gIResourcesTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireIResourcesTypeInfo().~IResourcesTypeInfo();
-    gIResourcesTypeInfoConstructed = false;
+    static moho::IResourcesTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -100,10 +84,8 @@ namespace moho
   void register_IResourcesTypeInfo()
   {
     (void)AcquireIResourcesTypeInfo();
-    (void)std::atexit(&cleanup_IResourcesTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

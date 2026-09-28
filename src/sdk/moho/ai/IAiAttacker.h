@@ -119,7 +119,7 @@ namespace moho
    * Registers the broadcaster reflection lane for `EAiAttackerEvent` and
    * installs process-exit cleanup.
    */
-  int register_RBroadcasterRType_EAiAttackerEvent();
+  void register_RBroadcasterRType_EAiAttackerEvent();
 
   /**
    * Address: 0x00BCEAC0 (FUN_00BCEAC0, register_RListenerRType_EAiAttackerEvent)
@@ -128,7 +128,7 @@ namespace moho
    * Registers the listener reflection lane for `EAiAttackerEvent` and installs
    * process-exit cleanup.
    */
-  int register_RListenerRType_EAiAttackerEvent();
+  void register_RListenerRType_EAiAttackerEvent();
 
   /**
    * Address: 0x005DF920 (FUN_005DF920, preregister_RVectorType_UnitWeaponPtr)
@@ -155,7 +155,7 @@ namespace moho
    * Registers `msvc8::vector<UnitWeapon*>` reflection metadata and installs
    * process-exit cleanup.
    */
-  int register_RVectorType_UnitWeaponPtr();
+  void register_RVectorType_UnitWeaponPtr();
 
   /**
    * Address: 0x00BCEB00 (FUN_00BCEB00, sub_BCEB00)
@@ -164,5 +164,5 @@ namespace moho
    * Registers `msvc8::vector<CAcquireTargetTask*>` reflection metadata and
    * installs process-exit cleanup.
    */
-  int register_RVectorType_CAcquireTargetTaskPtr();
+  void register_RVectorType_CAcquireTargetTaskPtr();
 } // namespace moho

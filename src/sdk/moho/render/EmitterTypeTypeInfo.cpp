@@ -14,9 +14,6 @@
 
 namespace
 {
-  alignas(moho::EmitterTypeTypeInfo) unsigned char gEmitterTypeTypeInfoStorage[sizeof(moho::EmitterTypeTypeInfo)] = {};
-  bool gEmitterTypeTypeInfoConstructed = false;
-
   /**
    * Address: 0x00BD42B0 (FUN_00BD42B0, dynamic initializer for the global
    * `PrimitiveSerHelper<EmitterType,int>` singleton)
@@ -32,14 +29,13 @@ namespace
    */
   moho::EmitterTypePrimitiveSerializer gEmitterTypePrimitiveSerializer;
 
+  /**
+   * Address: 0x00BFBD10 (FUN_00BFBD10, atexit destructor of the moho::EmitterTypeTypeInfo object)
+   */
   [[nodiscard]] moho::EmitterTypeTypeInfo* AcquireEmitterTypeTypeInfo()
   {
-    if (!gEmitterTypeTypeInfoConstructed) {
-      new (gEmitterTypeTypeInfoStorage) moho::EmitterTypeTypeInfo();
-      gEmitterTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::EmitterTypeTypeInfo*>(gEmitterTypeTypeInfoStorage);
+    static moho::EmitterTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
 } // namespace
@@ -89,31 +85,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFBD10 (FUN_00BFBD10, cleanup_EmitterTypeTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `EmitterTypeTypeInfo` reflection storage.
-   */
-  void cleanup_EmitterTypeTypeInfo()
-  {
-    if (!gEmitterTypeTypeInfoConstructed) {
-      return;
-    }
-
-    static_cast<gpg::REnumType*>(AcquireEmitterTypeTypeInfo())->~REnumType();
-    gEmitterTypeTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4290 (FUN_00BD4290, register_EmitterTypeTypeInfo_AtExit)
    *
    * What it does:
    * Registers `EmitterType` RTTI bootstrap and installs process-exit cleanup.
    */
-  int register_EmitterTypeTypeInfo_AtExit()
+  void register_EmitterTypeTypeInfo_AtExit()
   {
     (void)register_EmitterTypeTypeInfo_00();
-    return std::atexit(&cleanup_EmitterTypeTypeInfo);
   }
 } // namespace moho
 

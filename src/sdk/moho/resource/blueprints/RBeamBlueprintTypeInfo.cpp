@@ -6,34 +6,18 @@
 #include <typeinfo>
 
 #include "moho/resource/blueprints/RBeamBlueprint.h"
-#include "moho/resource/blueprints/REffectBlueprint.h"
+#include "moho/resource/blueprints/REffectBlueprint.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::RBeamBlueprintTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRBeamBlueprintTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRBeamBlueprintTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRBeamBlueprintTypeInfo()
   {
-    if (!gRBeamBlueprintTypeInfoConstructed) {
-      new (gRBeamBlueprintTypeInfoStorage) TypeInfo();
-      gRBeamBlueprintTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRBeamBlueprintTypeInfoStorage);
-  }
-
-  void cleanup_RBeamBlueprintTypeInfo()
-  {
-    if (!gRBeamBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRBeamBlueprintTypeInfo().~TypeInfo();
-    gRBeamBlueprintTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedBeamBlueprintType()
@@ -92,7 +76,6 @@ namespace
     typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
     return &typeInfo->fields_.back();
   }
-
 
   [[nodiscard]] gpg::RRef MakeBeamBlueprintRef(moho::RBeamBlueprint* object)
   {
@@ -242,10 +225,8 @@ void RBeamBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo
   void register_RBeamBlueprintTypeInfo()
   {
     (void)AcquireRBeamBlueprintTypeInfo();
-    (void)std::atexit(&cleanup_RBeamBlueprintTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

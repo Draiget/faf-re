@@ -51,5 +51,5 @@ namespace moho
    * What it does:
    * Registers the `CSquad` type-info object and installs process-exit cleanup.
    */
-  int register_CSquadTypeInfo();
+  void register_CSquadTypeInfo();
 } // namespace moho

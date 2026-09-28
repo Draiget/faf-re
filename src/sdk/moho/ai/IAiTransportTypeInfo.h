@@ -52,7 +52,7 @@ namespace moho
    * Registers `IAiTransport` type-info object and installs process-exit
    * cleanup.
    */
-  int register_IAiTransportTypeInfo();
+  void register_IAiTransportTypeInfo();
 
   static_assert(sizeof(IAiTransportTypeInfo) == 0x64, "IAiTransportTypeInfo size must be 0x64");
 } // namespace moho

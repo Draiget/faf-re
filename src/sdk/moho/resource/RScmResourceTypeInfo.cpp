@@ -11,27 +11,10 @@ namespace
 {
   using TypeInfo = moho::RScmResourceTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRScmResourceTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRScmResourceTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRScmResourceTypeInfo()
   {
-    if (!gRScmResourceTypeInfoConstructed) {
-      new (gRScmResourceTypeInfoStorage) TypeInfo();
-      gRScmResourceTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRScmResourceTypeInfoStorage);
-  }
-
-  void cleanup_RScmResourceTypeInfo()
-  {
-    if (!gRScmResourceTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRScmResourceTypeInfo().~TypeInfo();
-    gRScmResourceTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   struct RScmResourceTypeInfoBootstrap
@@ -89,10 +72,8 @@ namespace moho
   void register_RScmResourceTypeInfo()
   {
     (void)AcquireRScmResourceTypeInfo();
-    (void)std::atexit(&cleanup_RScmResourceTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

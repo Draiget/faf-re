@@ -128,59 +128,34 @@ namespace
 
   using moho::ReconBlipTypeInfo;
 
-  alignas(moho::ReconBlipTypeInfo) unsigned char gReconBlipTypeInfoStorage[sizeof(moho::ReconBlipTypeInfo)];
-  bool gReconBlipTypeInfoConstructed = false;
-  alignas(SPerArmyReconInfoTypeInfoRuntime) unsigned char gSPerArmyReconInfoTypeInfoStorage[sizeof(SPerArmyReconInfoTypeInfoRuntime)];
-  bool gSPerArmyReconInfoTypeInfoConstructed = false;
-  alignas(SPerArmyReconInfoVectorTypeRuntime) unsigned char gSPerArmyReconInfoVectorTypeStorage[sizeof(SPerArmyReconInfoVectorTypeRuntime)];
-  bool gSPerArmyReconInfoVectorTypeConstructed = false;
   msvc8::string gSPerArmyReconInfoVectorTypeName;
   bool gSPerArmyReconInfoVectorTypeNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BF7870 (FUN_00BF7870, atexit destructor of the moho::ReconBlipTypeInfo object)
+   */
   [[nodiscard]] moho::ReconBlipTypeInfo* AcquireReconBlipTypeInfo()
   {
-    if (!gReconBlipTypeInfoConstructed) {
-      new (gReconBlipTypeInfoStorage) moho::ReconBlipTypeInfo();
-      gReconBlipTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::ReconBlipTypeInfo*>(gReconBlipTypeInfoStorage);
-  }
-
-  [[nodiscard]] SPerArmyReconInfoTypeInfoRuntime* AcquireSPerArmyReconInfoTypeInfo()
-  {
-    if (!gSPerArmyReconInfoTypeInfoConstructed) {
-      new (gSPerArmyReconInfoTypeInfoStorage) SPerArmyReconInfoTypeInfoRuntime();
-      gSPerArmyReconInfoTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<SPerArmyReconInfoTypeInfoRuntime*>(gSPerArmyReconInfoTypeInfoStorage);
-  }
-
-  [[nodiscard]] SPerArmyReconInfoVectorTypeRuntime* AcquireSPerArmyReconInfoVectorType()
-  {
-    if (!gSPerArmyReconInfoVectorTypeConstructed) {
-      new (gSPerArmyReconInfoVectorTypeStorage) SPerArmyReconInfoVectorTypeRuntime();
-      gSPerArmyReconInfoVectorTypeConstructed = true;
-    }
-
-    return reinterpret_cast<SPerArmyReconInfoVectorTypeRuntime*>(gSPerArmyReconInfoVectorTypeStorage);
+    static moho::ReconBlipTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
-   * Address: 0x00BF7870 (FUN_00BF7870, cleanup_ReconBlipTypeInfo)
-   *
-   * What it does:
-   * Tears down recovered static `ReconBlipTypeInfo` storage.
+   * Address: 0x00BF77E0 (FUN_00BF77E0, atexit destructor of the SPerArmyReconInfoTypeInfoRuntime object)
    */
-  void cleanup_ReconBlipTypeInfo()
+  [[nodiscard]] SPerArmyReconInfoTypeInfoRuntime* AcquireSPerArmyReconInfoTypeInfo()
   {
-    if (!gReconBlipTypeInfoConstructed) {
-      return;
-    }
+    static SPerArmyReconInfoTypeInfoRuntime sInstance;
+    return &sInstance;
+  }
 
-    AcquireReconBlipTypeInfo()->~ReconBlipTypeInfo();
-    gReconBlipTypeInfoConstructed = false;
+  /**
+   * Address: 0x00BF7D20 (FUN_00BF7D20, atexit destructor of the SPerArmyReconInfoVectorTypeRuntime object)
+   */
+  [[nodiscard]] SPerArmyReconInfoVectorTypeRuntime* AcquireSPerArmyReconInfoVectorType()
+  {
+    static SPerArmyReconInfoVectorTypeRuntime sInstance;
+    return &sInstance;
   }
 
   void cleanup_SPerArmyReconInfoVectorTypeName()
@@ -287,7 +262,6 @@ namespace moho
   void register_ReconBlipTypeInfo()
   {
     (void)AcquireReconBlipTypeInfo();
-    (void)std::atexit(&cleanup_ReconBlipTypeInfo);
   }
 
   /**
@@ -304,31 +278,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF77E0 (FUN_00BF77E0, sub_BF77E0)
-   *
-   * What it does:
-   * Tears down startup-owned `SPerArmyReconInfo` RTTI storage.
-   */
-  void cleanup_SPerArmyReconInfoTypeInfo()
-  {
-    if (!gSPerArmyReconInfoTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSPerArmyReconInfoTypeInfo()->~SPerArmyReconInfoTypeInfoRuntime();
-    gSPerArmyReconInfoTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BCDBB0 (FUN_00BCDBB0, sub_BCDBB0)
    *
    * What it does:
    * Registers `SPerArmyReconInfo` RTTI and installs process-exit cleanup.
    */
-  int register_SPerArmyReconInfoTypeInfo()
+  void register_SPerArmyReconInfoTypeInfo()
   {
     (void)preregister_SPerArmyReconInfoTypeInfo();
-    return std::atexit(&cleanup_SPerArmyReconInfoTypeInfo);
   }
 
   /**
@@ -346,35 +303,17 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF7D20 (FUN_00BF7D20, sub_BF7D20)
-   *
-   * What it does:
-   * Tears down startup-owned `vector<SPerArmyReconInfo>` reflection storage.
-   */
-  void cleanup_RVectorType_SPerArmyReconInfo()
-  {
-    if (!gSPerArmyReconInfoVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireSPerArmyReconInfoVectorType()->~SPerArmyReconInfoVectorTypeRuntime();
-    gSPerArmyReconInfoVectorTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BCDF00 (FUN_00BCDF00, sub_BCDF00)
    *
    * What it does:
    * Registers `vector<SPerArmyReconInfo>` reflection metadata and installs
    * process-exit cleanup.
    */
-  int register_RVectorType_SPerArmyReconInfo()
+  void register_RVectorType_SPerArmyReconInfo()
   {
     (void)preregister_RVectorType_SPerArmyReconInfo();
-    return std::atexit(&cleanup_RVectorType_SPerArmyReconInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

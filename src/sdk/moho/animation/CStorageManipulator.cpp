@@ -612,35 +612,15 @@ namespace moho
 
 namespace
 {
-  alignas(moho::CStorageManipulatorTypeInfo)
-  unsigned char gCStorageManipulatorTypeInfoStorage[sizeof(moho::CStorageManipulatorTypeInfo)] = {};
-  bool gCStorageManipulatorTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFB310 (FUN_00BFB310, atexit destructor of the moho::CStorageManipulatorTypeInfo object)
+   */
   [[nodiscard]] moho::CStorageManipulatorTypeInfo* AcquireCStorageManipulatorTypeInfo()
   {
-    if (!gCStorageManipulatorTypeInfoConstructed) {
-      new (gCStorageManipulatorTypeInfoStorage) moho::CStorageManipulatorTypeInfo();
-      gCStorageManipulatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CStorageManipulatorTypeInfo*>(gCStorageManipulatorTypeInfoStorage);
+    static moho::CStorageManipulatorTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00BFB310 (FUN_00BFB310, cleanup_CStorageManipulatorTypeInfo)
-   *
-   * What it does:
-   * Tears down static `CStorageManipulatorTypeInfo` storage at process exit.
-   */
-  void cleanup_CStorageManipulatorTypeInfo()
-  {
-    if (!gCStorageManipulatorTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCStorageManipulatorTypeInfo()->~CStorageManipulatorTypeInfo();
-    gCStorageManipulatorTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -657,7 +637,6 @@ namespace moho
   void register_CStorageManipulatorTypeInfo()
   {
     (void)AcquireCStorageManipulatorTypeInfo();
-    (void)std::atexit(&cleanup_CStorageManipulatorTypeInfo);
   }
 
   /**

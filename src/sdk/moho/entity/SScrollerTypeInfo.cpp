@@ -12,35 +12,15 @@
 // objects query SScroller RTTI during static initialization.
 namespace
 {
-  alignas(moho::SScrollerTypeInfo) unsigned char gSScrollerTypeInfoStorage[sizeof(moho::SScrollerTypeInfo)];
-  bool gSScrollerTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02680 (FUN_00C02680, atexit destructor of the moho::SScrollerTypeInfo object)
+   */
   [[nodiscard]] moho::SScrollerTypeInfo* AcquireSScrollerTypeInfo()
   {
-    if (!gSScrollerTypeInfoConstructed) {
-      new (gSScrollerTypeInfoStorage) moho::SScrollerTypeInfo();
-      gSScrollerTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::SScrollerTypeInfo*>(gSScrollerTypeInfoStorage);
+    static moho::SScrollerTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00C02680 (FUN_00C02680)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `SScroller` descriptor,
-   * releasing its reflected field/base lanes.
-   */
-  void cleanup_SScrollerTypeInfo()
-  {
-    if (!gSScrollerTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSScrollerTypeInfo()->~SScrollerTypeInfo();
-    gSScrollerTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -92,10 +72,9 @@ namespace moho
    * What it does:
    * Registers the `SScroller` type-info object and installs process-exit cleanup.
    */
-  int register_SScrollerTypeInfo()
+  void register_SScrollerTypeInfo()
   {
     (void)AcquireSScrollerTypeInfo();
-    return std::atexit(&cleanup_SScrollerTypeInfo);
   }
 } // namespace moho
 
@@ -111,7 +90,6 @@ namespace
 
   [[maybe_unused]] SScrollerTypeInfoRegistration gSScrollerTypeInfoRegistration;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

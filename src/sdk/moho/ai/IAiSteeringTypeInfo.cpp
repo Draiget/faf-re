@@ -11,17 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiSteeringTypeInfo) unsigned char gIAiSteeringTypeInfoStorage[sizeof(IAiSteeringTypeInfo)];
-  bool gIAiSteeringTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF80D0 (FUN_00BF80D0, atexit destructor of the IAiSteeringTypeInfo object)
+   */
   [[nodiscard]] IAiSteeringTypeInfo* AcquireIAiSteeringTypeInfo()
   {
-    if (!gIAiSteeringTypeInfoConstructed) {
-      new (gIAiSteeringTypeInfoStorage) IAiSteeringTypeInfo();
-      gIAiSteeringTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<IAiSteeringTypeInfo*>(gIAiSteeringTypeInfoStorage);
+    static IAiSteeringTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -36,22 +32,6 @@ namespace
     auto* const typeInfo = AcquireIAiSteeringTypeInfo();
     gpg::PreRegisterRType(typeid(IAiSteering), typeInfo);
     return typeInfo;
-  }
-
-  /**
-   * Address: 0x00BF80D0 (FUN_00BF80D0, cleanup_IAiSteeringTypeInfo)
-   *
-   * What it does:
-   * Tears down recovered static `IAiSteeringTypeInfo` storage.
-   */
-  void cleanup_IAiSteeringTypeInfo()
-  {
-    if (!gIAiSteeringTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireIAiSteeringTypeInfo()->~IAiSteeringTypeInfo();
-    gIAiSteeringTypeInfoConstructed = false;
   }
 
   struct IAiSteeringTypeInfoBootstrap
@@ -95,13 +75,11 @@ void IAiSteeringTypeInfo::Init()
  * Registers the `IAiSteering` RTTI type-info object and installs process-exit
  * cleanup.
  */
-int moho::register_IAiSteeringTypeInfo()
+void moho::register_IAiSteeringTypeInfo()
 {
   auto* const typeInfo = static_cast<IAiSteeringTypeInfo*>(preregister_IAiSteeringTypeInfoStartup());
   IAiSteering::sType = typeInfo;
-  return std::atexit(&cleanup_IAiSteeringTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

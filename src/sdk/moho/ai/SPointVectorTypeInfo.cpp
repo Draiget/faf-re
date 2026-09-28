@@ -17,9 +17,6 @@ namespace
   using SPointVectorVector = msvc8::vector<moho::SPointVector>;
   using SPointVectorVectorType = gpg::RVectorType<moho::SPointVector>;
 
-  alignas(SPointVectorTypeInfo) unsigned char gSPointVectorTypeInfoStorage[sizeof(SPointVectorTypeInfo)] = {};
-  bool gSPointVectorTypeInfoConstructed = false;
-
   // Address: 0x010AA230 -- process-global `SPointVectorSerializer` singleton.
   // Constructing it runs SPointVectorSerializer::SPointVectorSerializer()
   // (0x00BC7E00), which splices this helper into
@@ -38,12 +35,8 @@ namespace
 
   [[nodiscard]] SPointVectorTypeInfo& AcquireSPointVectorTypeInfo()
   {
-    if (!gSPointVectorTypeInfoConstructed) {
-      new (gSPointVectorTypeInfoStorage) SPointVectorTypeInfo();
-      gSPointVectorTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<SPointVectorTypeInfo*>(gSPointVectorTypeInfoStorage);
+    static SPointVectorTypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] SPointVectorVectorType& AcquireSPointVectorVectorType()
@@ -240,16 +233,6 @@ namespace
 
     typeInfo->fields_ = msvc8::vector<gpg::RField>{};
     typeInfo->bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void cleanup_SPointVectorTypeInfo()
-  {
-    if (!gSPointVectorTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSPointVectorTypeInfo().~SPointVectorTypeInfo();
-    gSPointVectorTypeInfoConstructed = false;
   }
 
   /**
@@ -621,10 +604,9 @@ void gpg::RVectorType<moho::SPointVector>::SetCount(void* const obj, const int c
  * Constructs the startup-owned `SPointVectorTypeInfo` descriptor and installs
  * process-exit cleanup.
  */
-int moho::register_SPointVectorTypeInfo()
+void moho::register_SPointVectorTypeInfo()
 {
   (void)AcquireSPointVectorTypeInfo();
-  return std::atexit(&cleanup_SPointVectorTypeInfo);
 }
 
 /**
@@ -676,7 +658,6 @@ namespace
   [[maybe_unused]] SPointVectorTypeInfoBootstrap gSPointVectorTypeInfoBootstrap;
   [[maybe_unused]] SPointVectorVectorTypeBootstrap gSPointVectorVectorTypeBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

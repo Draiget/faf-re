@@ -55,15 +55,6 @@ namespace
 
   static_assert(sizeof(CurveKeyVectorTypeInfo) == 0x68, "CurveKeyVectorTypeInfo size must be 0x68");
 
-  alignas(CurveTypeInfo) unsigned char gREmitterBlueprintCurveTypeInfoStorage[sizeof(CurveTypeInfo)];
-  bool gREmitterBlueprintCurveTypeInfoConstructed = false;
-
-  alignas(CurveKeyTypeInfo) unsigned char gREmitterCurveKeyTypeInfoStorage[sizeof(CurveKeyTypeInfo)];
-  bool gREmitterCurveKeyTypeInfoConstructed = false;
-
-  alignas(CurveKeyVectorTypeInfo) unsigned char gREmitterCurveKeyVectorTypeStorage[sizeof(CurveKeyVectorTypeInfo)];
-  bool gREmitterCurveKeyVectorTypeConstructed = false;
-
   [[nodiscard]] gpg::RType* CachedRObjectType()
   {
     static gpg::RType* cached = nullptr;
@@ -605,62 +596,20 @@ namespace
 
   [[nodiscard]] CurveTypeInfo& AcquireREmitterBlueprintCurveTypeInfo()
   {
-    if (!gREmitterBlueprintCurveTypeInfoConstructed) {
-      new (gREmitterBlueprintCurveTypeInfoStorage) CurveTypeInfo();
-      gREmitterBlueprintCurveTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<CurveTypeInfo*>(gREmitterBlueprintCurveTypeInfoStorage);
+    static CurveTypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] CurveKeyTypeInfo& AcquireREmitterCurveKeyTypeInfo()
   {
-    if (!gREmitterCurveKeyTypeInfoConstructed) {
-      new (gREmitterCurveKeyTypeInfoStorage) CurveKeyTypeInfo();
-      gREmitterCurveKeyTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<CurveKeyTypeInfo*>(gREmitterCurveKeyTypeInfoStorage);
+    static CurveKeyTypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] CurveKeyVectorTypeInfo& AcquireREmitterCurveKeyVectorTypeInfo()
   {
-    if (!gREmitterCurveKeyVectorTypeConstructed) {
-      new (gREmitterCurveKeyVectorTypeStorage) CurveKeyVectorTypeInfo();
-      gREmitterCurveKeyVectorTypeConstructed = true;
-    }
-
-    return *reinterpret_cast<CurveKeyVectorTypeInfo*>(gREmitterCurveKeyVectorTypeStorage);
-  }
-
-  void cleanup_REmitterBlueprintCurveTypeInfo()
-  {
-    if (!gREmitterBlueprintCurveTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireREmitterBlueprintCurveTypeInfo().~CurveTypeInfo();
-    gREmitterBlueprintCurveTypeInfoConstructed = false;
-  }
-
-  void cleanup_REmitterCurveKeyTypeInfo()
-  {
-    if (!gREmitterCurveKeyTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireREmitterCurveKeyTypeInfo().~CurveKeyTypeInfo();
-    gREmitterCurveKeyTypeInfoConstructed = false;
-  }
-
-  void cleanup_VectorREmitterCurveKeyType()
-  {
-    if (!gREmitterCurveKeyVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireREmitterCurveKeyVectorTypeInfo().~CurveKeyVectorTypeInfo();
-    gREmitterCurveKeyVectorTypeConstructed = false;
+    static CurveKeyVectorTypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RRef MakeEmitterCurveRef(moho::REmitterBlueprintCurve* object)
@@ -941,19 +890,17 @@ namespace moho
   /**
    * Address: 0x00BC8480 (FUN_00BC8480, register_REmitterBlueprintCurveTypeInfo)
    */
-  int register_REmitterBlueprintCurveTypeInfo()
+  void register_REmitterBlueprintCurveTypeInfo()
   {
     (void)AcquireREmitterBlueprintCurveTypeInfo();
-    return std::atexit(&cleanup_REmitterBlueprintCurveTypeInfo);
   }
 
   /**
    * Address: 0x00BC84A0 (FUN_00BC84A0, register_REmitterCurveKeyTypeInfo)
    */
-  int register_REmitterCurveKeyTypeInfo()
+  void register_REmitterCurveKeyTypeInfo()
   {
     (void)AcquireREmitterCurveKeyTypeInfo();
-    return std::atexit(&cleanup_REmitterCurveKeyTypeInfo);
   }
 
   /**
@@ -976,13 +923,11 @@ namespace moho
    * Registers `vector<REmitterCurveKey>` reflection and installs `atexit`
    * teardown.
    */
-  int register_VectorREmitterCurveKeyTypeAtexit()
+  void register_VectorREmitterCurveKeyTypeAtexit()
   {
     (void)preregister_VectorREmitterCurveKeyType();
-    return std::atexit(&cleanup_VectorREmitterCurveKeyType);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

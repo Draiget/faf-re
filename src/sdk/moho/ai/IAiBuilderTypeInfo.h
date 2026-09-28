@@ -53,5 +53,5 @@ namespace moho
    * Constructs startup-owned `IAiBuilderTypeInfo` storage and installs
    * process-exit cleanup.
    */
-  int register_IAiBuilderTypeInfo();
+  void register_IAiBuilderTypeInfo();
 } // namespace moho

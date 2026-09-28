@@ -29,7 +29,6 @@ namespace moho
     ENTITYTYPE_Projectile = 0x0800,
   };
 
-
   struct EntityLineCollision
   {
     Entity* entity;                    // +0x00
@@ -49,7 +48,6 @@ namespace moho
     offsetof(EntityLineCollision, distanceFromLineStart) == 0x1C,
     "EntityLineCollision::distanceFromLineStart offset must be 0x1C"
   );
-
 
   /**
    * The 4x4-cell collision bucket grid every entity's `CollisionShape<Entity>`
@@ -503,7 +501,7 @@ namespace moho
    * What it does:
    * Materializes startup `COGridTypeInfo` storage and installs process-exit cleanup.
    */
-  int register_COGridTypeInfo();
+  void register_COGridTypeInfo();
 
   static_assert(sizeof(COGridTypeInfo) == 0x64, "COGridTypeInfo size must be 0x64");
 } // namespace moho

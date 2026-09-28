@@ -54,5 +54,5 @@ namespace moho
    * Constructs startup-owned `CAiNavigatorLandTypeInfo` storage and installs
    * process-exit cleanup.
    */
-  int register_CAiNavigatorLandTypeInfo();
+  void register_CAiNavigatorLandTypeInfo();
 } // namespace moho

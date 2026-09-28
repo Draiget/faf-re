@@ -44,12 +44,6 @@ namespace
 
   static_assert(sizeof(VectorTypeInfo) == 0x68, "VectorTypeInfo size must be 0x68");
 
-  alignas(TypeInfo) unsigned char gRMeshBlueprintLODTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRMeshBlueprintLODTypeInfoConstructed = false;
-
-  alignas(VectorTypeInfo) unsigned char gRMeshBlueprintLODVectorTypeStorage[sizeof(VectorTypeInfo)];
-  bool gRMeshBlueprintLODVectorTypeConstructed = false;
-
   [[nodiscard]] gpg::RType* CachedStringType()
   {
     static gpg::RType* cached = nullptr;
@@ -309,42 +303,14 @@ namespace
 
   [[nodiscard]] TypeInfo& AcquireRMeshBlueprintLODTypeInfo()
   {
-    if (!gRMeshBlueprintLODTypeInfoConstructed) {
-      new (gRMeshBlueprintLODTypeInfoStorage) TypeInfo();
-      gRMeshBlueprintLODTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRMeshBlueprintLODTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] VectorTypeInfo& AcquireRMeshBlueprintLODVectorType()
   {
-    if (!gRMeshBlueprintLODVectorTypeConstructed) {
-      new (gRMeshBlueprintLODVectorTypeStorage) VectorTypeInfo();
-      gRMeshBlueprintLODVectorTypeConstructed = true;
-    }
-
-    return *reinterpret_cast<VectorTypeInfo*>(gRMeshBlueprintLODVectorTypeStorage);
-  }
-
-  void cleanup_RMeshBlueprintLODTypeInfoStorage()
-  {
-    if (!gRMeshBlueprintLODTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRMeshBlueprintLODTypeInfo().~TypeInfo();
-    gRMeshBlueprintLODTypeInfoConstructed = false;
-  }
-
-  void cleanup_VectorRMeshBlueprintLODTypeStorage()
-  {
-    if (!gRMeshBlueprintLODVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireRMeshBlueprintLODVectorType().~VectorTypeInfo();
-    gRMeshBlueprintLODVectorTypeConstructed = false;
+    static VectorTypeInfo sInstance;
+    return sInstance;
   }
 
   void AddFieldWithDescription(
@@ -459,10 +425,9 @@ namespace moho
    * Materializes and startup-registers `RMeshBlueprintLODTypeInfo`, then
    * installs process-exit cleanup.
    */
-  int register_RMeshBlueprintLODTypeInfo()
+  void register_RMeshBlueprintLODTypeInfo()
   {
     (void)AcquireRMeshBlueprintLODTypeInfo();
-    return std::atexit(&cleanup_RMeshBlueprintLODTypeInfoStorage);
   }
 
   /**
@@ -485,13 +450,11 @@ namespace moho
    * Registers `vector<RMeshBlueprintLOD>` reflection and installs process-exit
    * teardown.
    */
-  int register_VectorRMeshBlueprintLODTypeAtexit()
+  void register_VectorRMeshBlueprintLODTypeAtexit()
   {
     (void)preregister_VectorRMeshBlueprintLODType();
-    return std::atexit(&cleanup_VectorRMeshBlueprintLODTypeStorage);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

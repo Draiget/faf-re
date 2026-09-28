@@ -10,30 +10,22 @@ namespace
   using SWorldBeamBlendModeTypeInfo = moho::SWorldBeam_BlendModeTypeInfo;
   using SWorldBeamTypeInfo = moho::SWorldBeamTypeInfo;
 
-  alignas(SWorldBeamBlendModeTypeInfo)
-    unsigned char gSWorldBeamBlendModeTypeInfoStorage[sizeof(SWorldBeamBlendModeTypeInfo)];
-  alignas(SWorldBeamTypeInfo) unsigned char gSWorldBeamTypeInfoStorage[sizeof(SWorldBeamTypeInfo)];
-  bool gSWorldBeamBlendModeTypeInfoConstructed = false;
-  bool gSWorldBeamTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BEFE30 (FUN_00BEFE30, atexit destructor of the SWorldBeamBlendModeTypeInfo object)
+   */
   [[nodiscard]] SWorldBeamBlendModeTypeInfo& AcquireSWorldBeamBlendModeTypeInfo()
   {
-    if (!gSWorldBeamBlendModeTypeInfoConstructed) {
-      new (gSWorldBeamBlendModeTypeInfoStorage) SWorldBeamBlendModeTypeInfo();
-      gSWorldBeamBlendModeTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<SWorldBeamBlendModeTypeInfo*>(gSWorldBeamBlendModeTypeInfoStorage);
+    static SWorldBeamBlendModeTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BEFE70 (FUN_00BEFE70, atexit destructor of the SWorldBeamTypeInfo object)
+   */
   [[nodiscard]] SWorldBeamTypeInfo& AcquireSWorldBeamTypeInfo()
   {
-    if (!gSWorldBeamTypeInfoConstructed) {
-      new (gSWorldBeamTypeInfoStorage) SWorldBeamTypeInfo();
-      gSWorldBeamTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<SWorldBeamTypeInfo*>(gSWorldBeamTypeInfoStorage);
+    static SWorldBeamTypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -72,25 +64,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BEFE30 (FUN_00BEFE30, cleanup_SWorldBeam_BlendModeTypeInfo)
-   */
-  void cleanup_SWorldBeam_BlendModeTypeInfo()
-  {
-    if (!gSWorldBeamBlendModeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSWorldBeamBlendModeTypeInfo().~SWorldBeam_BlendModeTypeInfo();
-    gSWorldBeamBlendModeTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC52E0 (FUN_00BC52E0, register_SWorldBeam_BlendModeTypeInfo)
    */
   void register_SWorldBeam_BlendModeTypeInfo()
   {
     (void)AcquireSWorldBeamBlendModeTypeInfo();
-    (void)std::atexit(&cleanup_SWorldBeam_BlendModeTypeInfo);
   }
 
   /**
@@ -130,25 +108,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BEFE70 (FUN_00BEFE70, cleanup_SWorldBeamTypeInfo)
-   */
-  void cleanup_SWorldBeamTypeInfo()
-  {
-    if (!gSWorldBeamTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSWorldBeamTypeInfo().~SWorldBeamTypeInfo();
-    gSWorldBeamTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC5340 (FUN_00BC5340, register_SWorldBeamTypeInfo)
    */
-  int register_SWorldBeamTypeInfo()
+  void register_SWorldBeamTypeInfo()
   {
     (void)AcquireSWorldBeamTypeInfo();
-    return std::atexit(&cleanup_SWorldBeamTypeInfo);
   }
 } // namespace moho
 
@@ -165,7 +129,6 @@ namespace
 
   SWorldBeamTypeInfoBootstrap gSWorldBeamTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

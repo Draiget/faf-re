@@ -9,34 +9,15 @@ namespace
 {
   using EUnitCommandQueueStatusTypeInfo = moho::EUnitCommandQueueStatusTypeInfo;
 
-  alignas(EUnitCommandQueueStatusTypeInfo) unsigned char gEUnitCommandQueueStatusTypeInfoStorage[sizeof(EUnitCommandQueueStatusTypeInfo)];
-  bool gEUnitCommandQueueStatusTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFEEA0 (FUN_00BFEEA0, atexit destructor of the EUnitCommandQueueStatusTypeInfo object)
+   */
   [[nodiscard]] EUnitCommandQueueStatusTypeInfo& GetEUnitCommandQueueStatusTypeInfo() noexcept
   {
-    if (!gEUnitCommandQueueStatusTypeInfoConstructed) {
-      new (gEUnitCommandQueueStatusTypeInfoStorage) EUnitCommandQueueStatusTypeInfo();
-      gEUnitCommandQueueStatusTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<EUnitCommandQueueStatusTypeInfo*>(gEUnitCommandQueueStatusTypeInfoStorage);
+    static EUnitCommandQueueStatusTypeInfo sInstance;
+    return sInstance;
   }
 
-  /**
-   * Address: 0x00BFEEA0 (FUN_00BFEEA0, Moho::EUnitCommandQueueStatusTypeInfo::dtr)
-   *
-   * What it does:
-   * Tears down the enum descriptor at process exit.
-   */
-  void cleanup_EUnitCommandQueueStatusTypeInfo()
-  {
-    if (!gEUnitCommandQueueStatusTypeInfoConstructed) {
-      return;
-    }
-
-    GetEUnitCommandQueueStatusTypeInfo().~EUnitCommandQueueStatusTypeInfo();
-    gEUnitCommandQueueStatusTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -89,7 +70,6 @@ namespace moho
   void register_EUnitCommandQueueStatusTypeInfo()
   {
     (void)GetEUnitCommandQueueStatusTypeInfo();
-    (void)std::atexit(&cleanup_EUnitCommandQueueStatusTypeInfo);
   }
 } // namespace moho
 
@@ -105,8 +85,6 @@ namespace
 
   EUnitCommandQueueStatusTypeInfoBootstrap gEUnitCommandQueueStatusTypeInfoBootstrap;
 } // namespace
-
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

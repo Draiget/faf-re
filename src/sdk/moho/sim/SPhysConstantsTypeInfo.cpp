@@ -4,24 +4,21 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/sim/SPhysConstants.h"
+#include "moho/sim/SPhysConstants.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::SPhysConstantsTypeInfo;
 
-  alignas(TypeInfo) unsigned char gSPhysConstantsTypeInfoStorage[sizeof(TypeInfo)];
-  bool gSPhysConstantsTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFD400 (FUN_00BFD400, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& GetSPhysConstantsTypeInfo() noexcept
   {
-    if (!gSPhysConstantsTypeInfoConstructed) {
-      new (gSPhysConstantsTypeInfoStorage) TypeInfo();
-      gSPhysConstantsTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gSPhysConstantsTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* gSPhysConstantsPrimaryType = nullptr;
@@ -277,25 +274,11 @@ namespace moho
   {}
 
   /**
-   * Address: 0x00BFD400 (FUN_00BFD400, cleanup_SPhysConstantsTypeInfo)
-   */
-  void cleanup_SPhysConstantsTypeInfo()
-  {
-    if (!gSPhysConstantsTypeInfoConstructed) {
-      return;
-    }
-
-    GetSPhysConstantsTypeInfo().~SPhysConstantsTypeInfo();
-    gSPhysConstantsTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD6030 (FUN_00BD6030, register_SPhysConstantsTypeInfo)
    */
   void register_SPhysConstantsTypeInfo()
   {
     (void)GetSPhysConstantsTypeInfo();
-    (void)std::atexit(&cleanup_SPhysConstantsTypeInfo);
   }
 } // namespace moho
 
@@ -311,7 +294,6 @@ namespace
 
   [[maybe_unused]] SPhysConstantsTypeInfoBootstrap gSPhysConstantsTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

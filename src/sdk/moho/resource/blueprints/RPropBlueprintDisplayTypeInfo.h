@@ -47,7 +47,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RPropBlueprintDisplayTypeInfo`.
    */
-  int register_RPropBlueprintDisplayTypeInfo();
+  void register_RPropBlueprintDisplayTypeInfo();
 
   static_assert(sizeof(RPropBlueprintDisplayTypeInfo) == 0x64, "RPropBlueprintDisplayTypeInfo size must be 0x64");
 } // namespace moho

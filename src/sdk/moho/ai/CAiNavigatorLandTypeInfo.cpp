@@ -11,17 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiNavigatorLandTypeInfo) unsigned char gCAiNavigatorLandTypeInfoStorage[sizeof(CAiNavigatorLandTypeInfo)] = {};
-  bool gCAiNavigatorLandTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6E20 (FUN_00BF6E20, atexit destructor of the CAiNavigatorLandTypeInfo object)
+   */
   [[nodiscard]] CAiNavigatorLandTypeInfo* AcquireCAiNavigatorLandTypeInfo()
   {
-    if (!gCAiNavigatorLandTypeInfoConstructed) {
-      new (gCAiNavigatorLandTypeInfoStorage) CAiNavigatorLandTypeInfo();
-      gCAiNavigatorLandTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiNavigatorLandTypeInfo*>(gCAiNavigatorLandTypeInfoStorage);
+    static CAiNavigatorLandTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
@@ -54,21 +50,6 @@ namespace
     typeInfo.AddBase(baseField);
   }
 
-  /**
-   * Address: 0x00BF6E20 (FUN_00BF6E20)
-   *
-   * What it does:
-   * Tears down startup-owned `CAiNavigatorLandTypeInfo` storage.
-   */
-  void cleanup_CAiNavigatorLandTypeInfo()
-  {
-    if (!gCAiNavigatorLandTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiNavigatorLandTypeInfo()->~CAiNavigatorLandTypeInfo();
-    gCAiNavigatorLandTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -115,10 +96,9 @@ void CAiNavigatorLandTypeInfo::Init()
  * Constructs startup-owned `CAiNavigatorLandTypeInfo` storage and installs
  * process-exit cleanup.
  */
-int moho::register_CAiNavigatorLandTypeInfo()
+void moho::register_CAiNavigatorLandTypeInfo()
 {
   (void)AcquireCAiNavigatorLandTypeInfo();
-  return std::atexit(&cleanup_CAiNavigatorLandTypeInfo);
 }
 
 namespace
@@ -133,7 +113,6 @@ namespace
 
   [[maybe_unused]] CAiNavigatorLandTypeInfoBootstrap gCAiNavigatorLandTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

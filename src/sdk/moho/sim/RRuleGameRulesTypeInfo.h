@@ -54,7 +54,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RRuleGameRulesTypeInfo`.
    */
-  int register_RRuleGameRulesTypeInfoStartup();
+  void register_RRuleGameRulesTypeInfoStartup();
 
   static_assert(sizeof(RRuleGameRulesTypeInfo) == 0x64, "RRuleGameRulesTypeInfo size must be 0x64");
 } // namespace moho

@@ -14,17 +14,13 @@ namespace
 {
   using TypeInfo = moho::CUnitCommandTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCUnitCommandTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCUnitCommandTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFEB80 (FUN_00BFEB80, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& GetCUnitCommandTypeInfo() noexcept
   {
-    if (!gCUnitCommandTypeInfoConstructed) {
-      new (gCUnitCommandTypeInfoStorage) TypeInfo();
-      gCUnitCommandTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCUnitCommandTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* gLegacyCUnitCommandSecondaryType = nullptr;
@@ -45,21 +41,6 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00BFEB80 (FUN_00BFEB80, ??1CUnitCommandTypeInfo@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Tears down recovered `CUnitCommand` type-info storage at process exit.
-   */
-  void cleanup_CUnitCommandTypeInfo()
-  {
-    if (!gCUnitCommandTypeInfoConstructed) {
-      return;
-    }
-
-    GetCUnitCommandTypeInfo().~CUnitCommandTypeInfo();
-    gCUnitCommandTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -269,10 +250,9 @@ namespace moho
   /**
    * Address: 0x00BD8F30 (FUN_00BD8F30, register_CUnitCommandTypeInfo)
    */
-  int register_CUnitCommandTypeInfo()
+  void register_CUnitCommandTypeInfo()
   {
     (void)GetCUnitCommandTypeInfo();
-    return std::atexit(&cleanup_CUnitCommandTypeInfo);
   }
 } // namespace moho
 
@@ -288,7 +268,6 @@ namespace
 
   CUnitCommandTypeInfoBootstrap gCUnitCommandTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

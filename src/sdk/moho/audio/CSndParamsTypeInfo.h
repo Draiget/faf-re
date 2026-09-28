@@ -32,11 +32,6 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BF0F60 (FUN_00BF0F60, cleanup_CSndParamsTypeInfo)
-   */
-  void cleanup_CSndParamsTypeInfo();
-
-  /**
    * Address: 0x00BC69A0 (FUN_00BC69A0, register_CSndParamsTypeInfo)
    */
   void register_CSndParamsTypeInfo();

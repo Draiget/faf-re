@@ -4,34 +4,18 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/unit/tasks/CAcquireTargetTask.h"
+#include "moho/unit/tasks/CAcquireTargetTask.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::CAcquireTargetTaskTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCAcquireTargetTaskTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCAcquireTargetTaskTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gCAcquireTargetTaskTypeInfoConstructed) {
-      new (gCAcquireTargetTaskTypeInfoStorage) TypeInfo();
-      gCAcquireTargetTaskTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCAcquireTargetTaskTypeInfoStorage);
-  }
-
-  void cleanup_CAcquireTargetTaskTypeInfo()
-  {
-    if (!gCAcquireTargetTaskTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CAcquireTargetTaskTypeInfo();
-    gCAcquireTargetTaskTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -210,13 +194,11 @@ namespace moho
   /**
    * Address: 0x00BCE910 (FUN_00BCE910, register_CAcquireTargetTaskTypeInfo)
    */
-  int register_CAcquireTargetTaskTypeInfo()
+  void register_CAcquireTargetTaskTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup_CAcquireTargetTaskTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

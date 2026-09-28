@@ -12,34 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(EAiNavigatorEventTypeInfo)
-    unsigned char gEAiNavigatorEventTypeInfoStorage[sizeof(EAiNavigatorEventTypeInfo)] = {};
-  bool gEAiNavigatorEventTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6C70 (FUN_00BF6C70, atexit destructor of the EAiNavigatorEventTypeInfo object)
+   */
   [[nodiscard]] EAiNavigatorEventTypeInfo* AcquireEAiNavigatorEventTypeInfo()
   {
-    if (!gEAiNavigatorEventTypeInfoConstructed) {
-      new (gEAiNavigatorEventTypeInfoStorage) EAiNavigatorEventTypeInfo();
-      gEAiNavigatorEventTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<EAiNavigatorEventTypeInfo*>(gEAiNavigatorEventTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF6C70 (FUN_00BF6C70, cleanup_EAiNavigatorEventTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `EAiNavigatorEventTypeInfo` storage.
-   */
-  void cleanup_EAiNavigatorEventTypeInfo()
-  {
-    if (!gEAiNavigatorEventTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEAiNavigatorEventTypeInfo()->~EAiNavigatorEventTypeInfo();
-    gEAiNavigatorEventTypeInfoConstructed = false;
+    static EAiNavigatorEventTypeInfo sInstance;
+    return &sInstance;
   }
 
   // Address: 0x010AE6EC -- process-global `PrimitiveSerHelper<EAiNavigatorEvent,int>`
@@ -124,7 +103,6 @@ void EAiNavigatorEventTypeInfo::Init()
 void moho::register_EAiNavigatorEventTypeInfo()
 {
   (void)AcquireEAiNavigatorEventTypeInfo();
-  (void)std::atexit(&cleanup_EAiNavigatorEventTypeInfo);
 }
 
 namespace
@@ -139,7 +117,6 @@ namespace
 
   [[maybe_unused]] EAiNavigatorEventTypeInfoBootstrap gEAiNavigatorEventTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

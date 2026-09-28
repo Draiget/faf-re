@@ -63,6 +63,6 @@ namespace moho
    * Constructs startup-owned `IAiNavigatorTypeInfo` storage and installs
    * process-exit cleanup.
    */
-  int register_IAiNavigatorTypeInfo();
+  void register_IAiNavigatorTypeInfo();
 } // namespace moho
 

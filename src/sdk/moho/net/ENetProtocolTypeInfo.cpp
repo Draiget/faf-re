@@ -10,34 +10,15 @@
 
 namespace
 {
-  alignas(moho::ENetProtocolTypeInfo) unsigned char gENetProtocolTypeInfoStorage[sizeof(moho::ENetProtocolTypeInfo)];
-  bool gENetProtocolTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BEF9E0 (FUN_00BEF9E0, atexit destructor of the moho::ENetProtocolTypeInfo object)
+   */
   [[nodiscard]] moho::ENetProtocolTypeInfo& GetENetProtocolTypeInfo() noexcept
   {
-    if (!gENetProtocolTypeInfoConstructed) {
-      new (gENetProtocolTypeInfoStorage) moho::ENetProtocolTypeInfo();
-      gENetProtocolTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::ENetProtocolTypeInfo*>(gENetProtocolTypeInfoStorage);
+    static moho::ENetProtocolTypeInfo sInstance;
+    return sInstance;
   }
 
-  /**
-   * Address: 0x00BEF9E0 (??1ENetProtocolTypeInfo@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Runs process-exit teardown for recovered ENetProtocol type-info singleton.
-   */
-  void cleanup_ENetProtocolTypeInfo()
-  {
-    if (!gENetProtocolTypeInfoConstructed) {
-      return;
-    }
-
-    GetENetProtocolTypeInfo().~ENetProtocolTypeInfo();
-    gENetProtocolTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -92,7 +73,6 @@ namespace moho
   void register_ENetProtocolTypeInfo()
   {
     (void)GetENetProtocolTypeInfo();
-    (void)std::atexit(&cleanup_ENetProtocolTypeInfo);
   }
 } // namespace moho
 
@@ -108,8 +88,6 @@ namespace
 
   ENetProtocolTypeInfoBootstrap gENetProtocolTypeInfoBootstrap;
 } // namespace
-
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

@@ -11,17 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiNavigatorImplTypeInfo) unsigned char gCAiNavigatorImplTypeInfoStorage[sizeof(CAiNavigatorImplTypeInfo)] = {};
-  bool gCAiNavigatorImplTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6D50 (FUN_00BF6D50, atexit destructor of the CAiNavigatorImplTypeInfo object)
+   */
   [[nodiscard]] CAiNavigatorImplTypeInfo* AcquireCAiNavigatorImplTypeInfo()
   {
-    if (!gCAiNavigatorImplTypeInfoConstructed) {
-      new (gCAiNavigatorImplTypeInfoStorage) CAiNavigatorImplTypeInfo();
-      gCAiNavigatorImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiNavigatorImplTypeInfo*>(gCAiNavigatorImplTypeInfoStorage);
+    static CAiNavigatorImplTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedIAiNavigatorType()
@@ -109,21 +105,6 @@ namespace
     typeInfo.AddBase(baseField);
   }
 
-  /**
-   * Address: 0x00BF6D50 (FUN_00BF6D50)
-   *
-   * What it does:
-   * Tears down startup-owned `CAiNavigatorImplTypeInfo` storage.
-   */
-  void cleanup_CAiNavigatorImplTypeInfo()
-  {
-    if (!gCAiNavigatorImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiNavigatorImplTypeInfo()->~CAiNavigatorImplTypeInfo();
-    gCAiNavigatorImplTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -176,7 +157,6 @@ void CAiNavigatorImplTypeInfo::Init()
 void moho::register_CAiNavigatorImplTypeInfo()
 {
   (void)AcquireCAiNavigatorImplTypeInfo();
-  (void)std::atexit(&cleanup_CAiNavigatorImplTypeInfo);
 }
 
 namespace
@@ -191,8 +171,6 @@ namespace
 
   [[maybe_unused]] CAiNavigatorImplTypeInfoBootstrap gCAiNavigatorImplTypeInfoBootstrap;
 } // namespace
-
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

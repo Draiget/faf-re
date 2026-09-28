@@ -48,7 +48,7 @@ namespace moho
    * What it does:
    * Registers `CAiTarget` type-info object and installs process-exit cleanup.
    */
-  int register_CAiTargetTypeInfo();
+  void register_CAiTargetTypeInfo();
 
   static_assert(sizeof(CAiTargetTypeInfo) == 0x64, "CAiTargetTypeInfo size must be 0x64");
 } // namespace moho

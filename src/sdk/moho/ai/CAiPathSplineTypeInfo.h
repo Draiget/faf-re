@@ -47,5 +47,5 @@ namespace moho
    * Constructs/preregisters startup RTTI descriptor for `CAiPathSpline` and
    * installs process-exit cleanup.
    */
-  int register_CAiPathSplineTypeInfo();
+  void register_CAiPathSplineTypeInfo();
 } // namespace moho

@@ -80,20 +80,12 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_SPerArmyReconInfoTypeInfo();
 
   /**
-   * Address: 0x00BF77E0 (FUN_00BF77E0, sub_BF77E0)
-   *
-   * What it does:
-   * Tears down startup-owned `SPerArmyReconInfo` RTTI storage.
-   */
-  void cleanup_SPerArmyReconInfoTypeInfo();
-
-  /**
    * Address: 0x00BCDBB0 (FUN_00BCDBB0, sub_BCDBB0)
    *
    * What it does:
    * Registers `SPerArmyReconInfo` RTTI and installs process-exit cleanup.
    */
-  int register_SPerArmyReconInfoTypeInfo();
+  void register_SPerArmyReconInfoTypeInfo();
 
   /**
    * Address: 0x005CA510 (FUN_005CA510, sub_5CA510)
@@ -105,19 +97,11 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_RVectorType_SPerArmyReconInfo();
 
   /**
-   * Address: 0x00BF7D20 (FUN_00BF7D20, sub_BF7D20)
-   *
-   * What it does:
-   * Tears down startup-owned `vector<SPerArmyReconInfo>` reflection storage.
-   */
-  void cleanup_RVectorType_SPerArmyReconInfo();
-
-  /**
    * Address: 0x00BCDF00 (FUN_00BCDF00, sub_BCDF00)
    *
    * What it does:
    * Registers `vector<SPerArmyReconInfo>` reflection metadata and installs
    * process-exit cleanup.
    */
-  int register_RVectorType_SPerArmyReconInfo();
+  void register_RVectorType_SPerArmyReconInfo();
 } // namespace moho

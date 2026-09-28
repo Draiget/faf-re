@@ -359,7 +359,7 @@ namespace moho
    * Registers the broadcaster reflection lane for `EAiNavigatorEvent` and
    * installs process-exit cleanup.
    */
-  int register_RBroadcasterRType_EAiNavigatorEvent();
+  void register_RBroadcasterRType_EAiNavigatorEvent();
 
   /**
    * Address: 0x00BCC9C0 (FUN_00BCC9C0)
@@ -368,7 +368,7 @@ namespace moho
    * Registers the listener reflection lane for `EAiNavigatorEvent` and installs
    * process-exit cleanup.
    */
-  int register_RListenerRType_EAiNavigatorEvent();
+  void register_RListenerRType_EAiNavigatorEvent();
 
   // 0x10, not the 0x0C `IAiNavigatorTypeInfo::Init` registers: see `mPad0C`.
   static_assert(sizeof(IAiNavigator) == 0x10, "IAiNavigator size must be 0x10");

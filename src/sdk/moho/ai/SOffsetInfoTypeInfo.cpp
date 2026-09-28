@@ -12,35 +12,15 @@
 // objects query SOffsetInfo RTTI during static initialization.
 namespace
 {
-  alignas(moho::SOffsetInfoTypeInfo) unsigned char gSOffsetInfoTypeInfoStorage[sizeof(moho::SOffsetInfoTypeInfo)];
-  bool gSOffsetInfoTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF5890 (FUN_00BF5890, atexit destructor of the moho::SOffsetInfoTypeInfo object)
+   */
   [[nodiscard]] moho::SOffsetInfoTypeInfo* AcquireSOffsetInfoTypeInfo()
   {
-    if (!gSOffsetInfoTypeInfoConstructed) {
-      new (gSOffsetInfoTypeInfoStorage) moho::SOffsetInfoTypeInfo();
-      gSOffsetInfoTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::SOffsetInfoTypeInfo*>(gSOffsetInfoTypeInfoStorage);
+    static moho::SOffsetInfoTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00BF5890 (FUN_00BF5890)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `SOffsetInfo` descriptor,
-   * releasing its reflected field/base lanes.
-   */
-  void cleanup_SOffsetInfoTypeInfo()
-  {
-    if (!gSOffsetInfoTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSOffsetInfoTypeInfo()->~SOffsetInfoTypeInfo();
-    gSOffsetInfoTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -92,10 +72,9 @@ namespace moho
    * What it does:
    * Registers the `SOffsetInfo` type-info object and installs process-exit cleanup.
    */
-  int register_SOffsetInfoTypeInfo()
+  void register_SOffsetInfoTypeInfo()
   {
     (void)AcquireSOffsetInfoTypeInfo();
-    return std::atexit(&cleanup_SOffsetInfoTypeInfo);
   }
 } // namespace moho
 
@@ -111,7 +90,6 @@ namespace
 
   [[maybe_unused]] SOffsetInfoTypeInfoRegistration gSOffsetInfoTypeInfoRegistration;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

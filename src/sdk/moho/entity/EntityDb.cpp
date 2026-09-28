@@ -841,8 +841,6 @@ namespace
     return *outPosition;
   }
 
-
-
   struct BackRefListNodeRuntime
   {
     BackRefListNodeRuntime* next;
@@ -1432,17 +1430,10 @@ namespace
     }
   }
 
-  alignas(EntityDbTypeInfo) std::byte gEntityDbTypeInfoStorage[sizeof(EntityDbTypeInfo)]{};
-  bool gEntityDbTypeInfoConstructed = false;
-  alignas(EntityDbIdPoolMapTypeInfo) std::byte gEntityDbIdPoolMapTypeInfoStorage[sizeof(EntityDbIdPoolMapTypeInfo)]{};
-  bool gEntityDbIdPoolMapTypeInfoConstructed = false;
   msvc8::string gEntityDbIdPoolMapTypeName{};
   std::uint32_t gEntityDbIdPoolMapTypeNameInitGuard = 0u;
   msvc8::string gEntityDbEntityListTypeName{};
   std::uint32_t gEntityDbEntityListTypeNameInitGuard = 0u;
-  alignas(EntityDbEntityListTypeInfo)
-    std::byte gEntityDbEntityListTypeInfoStorage[sizeof(EntityDbEntityListTypeInfo)]{};
-  bool gEntityDbEntityListTypeInfoConstructed = false;
 
   /**
    * Address: 0x00BFCB90 (FUN_00BFCB90)
@@ -1468,31 +1459,31 @@ namespace
     gEntityDbEntityListTypeNameInitGuard = 0u;
   }
 
+  /**
+   * Address: 0x00BFCA70 (FUN_00BFCA70, atexit destructor of the EntityDbTypeInfo object)
+   */
   [[nodiscard]] EntityDbTypeInfo& AcquireEntityDbTypeInfo()
   {
-    if (!gEntityDbTypeInfoConstructed) {
-      new (gEntityDbTypeInfoStorage) EntityDbTypeInfo();
-      gEntityDbTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<EntityDbTypeInfo*>(gEntityDbTypeInfoStorage);
+    static EntityDbTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFCC20 (FUN_00BFCC20, atexit destructor of the EntityDbIdPoolMapTypeInfo object)
+   */
   [[nodiscard]] EntityDbIdPoolMapTypeInfo& AcquireEntityDbIdPoolMapTypeInfo()
   {
-    if (!gEntityDbIdPoolMapTypeInfoConstructed) {
-      new (gEntityDbIdPoolMapTypeInfoStorage) EntityDbIdPoolMapTypeInfo();
-      gEntityDbIdPoolMapTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<EntityDbIdPoolMapTypeInfo*>(gEntityDbIdPoolMapTypeInfoStorage);
+    static EntityDbIdPoolMapTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFCBC0 (FUN_00BFCBC0, atexit destructor of the EntityDbEntityListTypeInfo object)
+   */
   [[nodiscard]] EntityDbEntityListTypeInfo& AcquireEntityDbEntityListTypeInfo()
   {
-    if (!gEntityDbEntityListTypeInfoConstructed) {
-      new (gEntityDbEntityListTypeInfoStorage) EntityDbEntityListTypeInfo();
-      gEntityDbEntityListTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<EntityDbEntityListTypeInfo*>(gEntityDbEntityListTypeInfoStorage);
+    static EntityDbEntityListTypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -2366,31 +2357,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFCA70 (FUN_00BFCA70, cleanup_EntityDbTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned RTTI metadata for `EntityDB`.
-   */
-  void cleanup_EntityDbTypeInfo()
-  {
-    if (!gEntityDbTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEntityDbTypeInfo().~EntityDbTypeInfo();
-    gEntityDbTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD5180 (FUN_00BD5180, register_EntityDbTypeInfoAtexit)
    *
    * What it does:
    * Preregisters `EntityDB` RTTI and installs process-exit cleanup.
    */
-  int register_EntityDbTypeInfoAtexit()
+  void register_EntityDbTypeInfoAtexit()
   {
     (void)preregister_EntityDbTypeInfo();
-    return std::atexit(&cleanup_EntityDbTypeInfo);
   }
 
   /**
@@ -2407,33 +2381,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFCC20 (FUN_00BFCC20, cleanup_EntityDbIdPoolMapTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned RTTI metadata for
-   * `std::map<unsigned int,Moho::IdPool>`.
-   */
-  void cleanup_EntityDbIdPoolMapTypeInfo()
-  {
-    if (!gEntityDbIdPoolMapTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEntityDbIdPoolMapTypeInfo().~EntityDbIdPoolMapTypeInfo();
-    gEntityDbIdPoolMapTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD5250 (FUN_00BD5250, register_EntityDbIdPoolMapTypeInfoAtexit)
    *
    * What it does:
    * Preregisters `std::map<unsigned int,Moho::IdPool>` RTTI and installs
    * process-exit cleanup.
    */
-  int register_EntityDbIdPoolMapTypeInfoAtexit()
+  void register_EntityDbIdPoolMapTypeInfoAtexit()
   {
     (void)preregister_EntityDbIdPoolMapTypeInfo();
-    return std::atexit(&cleanup_EntityDbIdPoolMapTypeInfo);
   }
 
   /**
@@ -2450,32 +2406,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFCBC0 (FUN_00BFCBC0, cleanup_EntityDbEntityListTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned RTTI metadata for `std::list<Moho::Entity *>`.
-   */
-  void cleanup_EntityDbEntityListTypeInfo()
-  {
-    if (!gEntityDbEntityListTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEntityDbEntityListTypeInfo().~EntityDbEntityListTypeInfo();
-    gEntityDbEntityListTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD5270 (FUN_00BD5270, register_EntityDbEntityListTypeInfoAtexit)
    *
    * What it does:
    * Preregisters `std::list<Moho::Entity *>` RTTI and installs process-exit
    * cleanup.
    */
-  int register_EntityDbEntityListTypeInfoAtexit()
+  void register_EntityDbEntityListTypeInfoAtexit()
   {
     (void)preregister_EntityDbEntityListTypeInfo();
-    return std::atexit(&cleanup_EntityDbEntityListTypeInfo);
   }
 } // namespace moho
 

@@ -44,7 +44,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `SEfxCurveTypeInfo`.
    */
-  int register_SEfxCurveTypeInfo();
+  void register_SEfxCurveTypeInfo();
 
   static_assert(sizeof(SEfxCurveTypeInfo) == 0x64, "SEfxCurveTypeInfo size must be 0x64");
 } // namespace moho

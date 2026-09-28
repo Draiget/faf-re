@@ -11,34 +11,15 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiBuilderTypeInfo) unsigned char gIAiBuilderTypeInfoStorage[sizeof(IAiBuilderTypeInfo)] = {};
-  bool gIAiBuilderTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6A00 (FUN_00BF6A00, atexit destructor of the IAiBuilderTypeInfo object)
+   */
   [[nodiscard]] IAiBuilderTypeInfo* AcquireIAiBuilderTypeInfo()
   {
-    if (!gIAiBuilderTypeInfoConstructed) {
-      new (gIAiBuilderTypeInfoStorage) IAiBuilderTypeInfo();
-      gIAiBuilderTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<IAiBuilderTypeInfo*>(gIAiBuilderTypeInfoStorage);
+    static IAiBuilderTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00BF6A00 (FUN_00BF6A00)
-   *
-   * What it does:
-   * Tears down startup-owned `IAiBuilderTypeInfo` storage.
-   */
-  void cleanup_IAiBuilderTypeInfo()
-  {
-    if (!gIAiBuilderTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireIAiBuilderTypeInfo()->~IAiBuilderTypeInfo();
-    gIAiBuilderTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -82,10 +63,9 @@ void IAiBuilderTypeInfo::Init()
  * Constructs startup-owned `IAiBuilderTypeInfo` storage and installs
  * process-exit cleanup.
  */
-int moho::register_IAiBuilderTypeInfo()
+void moho::register_IAiBuilderTypeInfo()
 {
   (void)AcquireIAiBuilderTypeInfo();
-  return std::atexit(&cleanup_IAiBuilderTypeInfo);
 }
 
 namespace
@@ -100,7 +80,6 @@ namespace
 
   [[maybe_unused]] IAiBuilderTypeInfoBootstrap gIAiBuilderTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

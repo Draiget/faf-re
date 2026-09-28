@@ -9,17 +9,10 @@ namespace
 {
   using TypeInfo = moho::CollisionBeamEntityTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCollisionBeamEntityTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCollisionBeamEntityTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& GetCollisionBeamEntityTypeInfo() noexcept
   {
-    if (!gCollisionBeamEntityTypeInfoConstructed) {
-      new (gCollisionBeamEntityTypeInfoStorage) TypeInfo();
-      gCollisionBeamEntityTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCollisionBeamEntityTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -88,26 +81,11 @@ namespace moho
   }
 
   /**
-   * What it does:
-   * Releases startup-owned `CollisionBeamEntityTypeInfo` storage at process teardown.
-   */
-  void cleanup_CollisionBeamEntityTypeInfo()
-  {
-    if (!gCollisionBeamEntityTypeInfoConstructed) {
-      return;
-    }
-
-    GetCollisionBeamEntityTypeInfo().~CollisionBeamEntityTypeInfo();
-    gCollisionBeamEntityTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4C40 (FUN_00BD4C40, register_CollisionBeamEntityTypeInfo)
    */
-  int register_CollisionBeamEntityTypeInfo()
+  void register_CollisionBeamEntityTypeInfo()
   {
     (void)GetCollisionBeamEntityTypeInfo();
-    return std::atexit(&cleanup_CollisionBeamEntityTypeInfo);
   }
 } // namespace moho
 
@@ -123,7 +101,6 @@ namespace
 
   [[maybe_unused]] CollisionBeamEntityTypeInfoBootstrap gCollisionBeamEntityTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

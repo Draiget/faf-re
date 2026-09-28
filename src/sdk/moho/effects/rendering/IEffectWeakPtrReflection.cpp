@@ -16,19 +16,16 @@ namespace
 {
   using WeakPtrIEffectType = moho::RWeakPtrType<moho::IEffect>;
 
-  alignas(WeakPtrIEffectType) unsigned char gWeakPtrIEffectTypeStorage[sizeof(WeakPtrIEffectType)];
-  bool gWeakPtrIEffectTypeConstructed = false;
-
   msvc8::string gWeakPtrIEffectTypeName;
   bool gWeakPtrIEffectTypeNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BFC4F0 (FUN_00BFC4F0, atexit destructor of the WeakPtrIEffectType object)
+   */
   [[nodiscard]] WeakPtrIEffectType* AcquireWeakPtrIEffectType()
   {
-    if (!gWeakPtrIEffectTypeConstructed) {
-      new (gWeakPtrIEffectTypeStorage) WeakPtrIEffectType();
-      gWeakPtrIEffectTypeConstructed = true;
-    }
-    return reinterpret_cast<WeakPtrIEffectType*>(gWeakPtrIEffectTypeStorage);
+    static WeakPtrIEffectType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedIEffectType()
@@ -256,25 +253,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFC4F0 (FUN_00BFC4F0, cleanup_WeakPtr_IEffect_Type)
-   */
-  void cleanup_WeakPtr_IEffect_Type()
-  {
-    if (!gWeakPtrIEffectTypeConstructed) {
-      return;
-    }
-
-    AcquireWeakPtrIEffectType()->~WeakPtrIEffectType();
-    gWeakPtrIEffectTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4DD0 (FUN_00BD4DD0, register_WeakPtr_IEffect_Type_AtExit)
    */
-  int register_WeakPtr_IEffect_Type_AtExit()
+  void register_WeakPtr_IEffect_Type_AtExit()
   {
     (void)register_WeakPtr_IEffect_Type_00();
-    return std::atexit(&cleanup_WeakPtr_IEffect_Type);
   }
 } // namespace moho
 

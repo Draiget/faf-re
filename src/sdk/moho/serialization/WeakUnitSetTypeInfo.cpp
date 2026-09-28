@@ -4,24 +4,21 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/entity/Entity.h"
+#include "moho/entity/Entity.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::WeakUnitSetTypeInfo;
 
-  alignas(TypeInfo) unsigned char gWeakUnitSetTypeInfoStorage[sizeof(TypeInfo)];
-  bool gWeakUnitSetTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFE480 (FUN_00BFE480, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireWeakUnitSetTypeInfo()
   {
-    if (!gWeakUnitSetTypeInfoConstructed) {
-      new (gWeakUnitSetTypeInfoStorage) TypeInfo();
-      gWeakUnitSetTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gWeakUnitSetTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -111,25 +108,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE480 (FUN_00BFE480, sub_BFE480)
-   */
-  void cleanup_WeakUnitSetTypeInfo()
-  {
-    if (!gWeakUnitSetTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireWeakUnitSetTypeInfo().~WeakUnitSetTypeInfo();
-    gWeakUnitSetTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD84C0 (FUN_00BD84C0, sub_BD84C0)
    */
-  int register_WeakUnitSetTypeInfo()
+  void register_WeakUnitSetTypeInfo()
   {
     (void)AcquireWeakUnitSetTypeInfo();
-    return std::atexit(&cleanup_WeakUnitSetTypeInfo);
   }
 } // namespace moho
 
@@ -145,7 +128,6 @@ namespace
 
   WeakUnitSetTypeInfoBootstrap gWeakUnitSetTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

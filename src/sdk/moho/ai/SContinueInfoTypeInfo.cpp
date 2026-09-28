@@ -4,41 +4,23 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiPathSpline.h"
+#include "moho/ai/CAiPathSpline.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
 namespace
 {
-  alignas(SContinueInfoTypeInfo) unsigned char gSContinueInfoTypeInfoStorage[sizeof(SContinueInfoTypeInfo)] = {};
-  bool gSContinueInfoTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF7450 (FUN_00BF7450, atexit destructor of the SContinueInfoTypeInfo object)
+   */
   [[nodiscard]] SContinueInfoTypeInfo* AcquireSContinueInfoTypeInfo()
   {
-    if (!gSContinueInfoTypeInfoConstructed) {
-      new (gSContinueInfoTypeInfoStorage) SContinueInfoTypeInfo();
-      gSContinueInfoTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<SContinueInfoTypeInfo*>(gSContinueInfoTypeInfoStorage);
+    static SContinueInfoTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00BF7450 (FUN_00BF7450, cleanup_SContinueInfoTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `SContinueInfoTypeInfo` reflection storage.
-   */
-  void cleanup_SContinueInfoTypeInfo()
-  {
-    if (!gSContinueInfoTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSContinueInfoTypeInfo()->~SContinueInfoTypeInfo();
-    gSContinueInfoTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -83,10 +65,9 @@ void SContinueInfoTypeInfo::Init()
  * Constructs startup-owned `SContinueInfoTypeInfo` storage and installs
  * process-exit cleanup.
  */
-int moho::register_SContinueInfoTypeInfo()
+void moho::register_SContinueInfoTypeInfo()
 {
   (void)AcquireSContinueInfoTypeInfo();
-  return std::atexit(&cleanup_SContinueInfoTypeInfo);
 }
 
 namespace
@@ -101,7 +82,6 @@ namespace
 
   [[maybe_unused]] SContinueInfoTypeInfoBootstrap gSContinueInfoTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

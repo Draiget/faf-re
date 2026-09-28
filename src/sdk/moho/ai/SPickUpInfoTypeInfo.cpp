@@ -12,35 +12,15 @@
 // objects query SPickUpInfo RTTI during static initialization.
 namespace
 {
-  alignas(moho::SPickUpInfoTypeInfo) unsigned char gSPickUpInfoTypeInfoStorage[sizeof(moho::SPickUpInfoTypeInfo)];
-  bool gSPickUpInfoTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFA4C0 (FUN_00BFA4C0, atexit destructor of the moho::SPickUpInfoTypeInfo object)
+   */
   [[nodiscard]] moho::SPickUpInfoTypeInfo* AcquireSPickUpInfoTypeInfo()
   {
-    if (!gSPickUpInfoTypeInfoConstructed) {
-      new (gSPickUpInfoTypeInfoStorage) moho::SPickUpInfoTypeInfo();
-      gSPickUpInfoTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::SPickUpInfoTypeInfo*>(gSPickUpInfoTypeInfoStorage);
+    static moho::SPickUpInfoTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00BFA4C0 (FUN_00BFA4C0)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `SPickUpInfo` descriptor,
-   * releasing its reflected field/base lanes.
-   */
-  void cleanup_SPickUpInfoTypeInfo()
-  {
-    if (!gSPickUpInfoTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSPickUpInfoTypeInfo()->~SPickUpInfoTypeInfo();
-    gSPickUpInfoTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -92,10 +72,9 @@ namespace moho
    * What it does:
    * Registers the `SPickUpInfo` type-info object and installs process-exit cleanup.
    */
-  int register_SPickUpInfoTypeInfo()
+  void register_SPickUpInfoTypeInfo()
   {
     (void)AcquireSPickUpInfoTypeInfo();
-    return std::atexit(&cleanup_SPickUpInfoTypeInfo);
   }
 } // namespace moho
 
@@ -111,7 +90,6 @@ namespace
 
   [[maybe_unused]] SPickUpInfoTypeInfoRegistration gSPickUpInfoTypeInfoRegistration;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

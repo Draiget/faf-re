@@ -5,32 +5,16 @@
 #include <typeinfo>
 
 #include "moho/resource/ISimResources.h"
-#include "moho/resource/ResourceReflectionHelpers.h"
+#include "moho/resource/ResourceReflectionHelpers.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(moho::ISimResourcesTypeInfo) unsigned char gISimResourcesTypeInfoStorage[sizeof(moho::ISimResourcesTypeInfo)];
-  bool gISimResourcesTypeInfoConstructed = false;
-
   [[nodiscard]] moho::ISimResourcesTypeInfo& AcquireISimResourcesTypeInfo()
   {
-    if (!gISimResourcesTypeInfoConstructed) {
-      new (gISimResourcesTypeInfoStorage) moho::ISimResourcesTypeInfo();
-      gISimResourcesTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::ISimResourcesTypeInfo*>(gISimResourcesTypeInfoStorage);
-  }
-
-  void cleanup_ISimResourcesTypeInfo()
-  {
-    if (!gISimResourcesTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireISimResourcesTypeInfo().~ISimResourcesTypeInfo();
-    gISimResourcesTypeInfoConstructed = false;
+    static moho::ISimResourcesTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -122,10 +106,8 @@ namespace moho
   void register_ISimResourcesTypeInfo()
   {
     (void)AcquireISimResourcesTypeInfo();
-    (void)std::atexit(&cleanup_ISimResourcesTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

@@ -86,7 +86,7 @@ namespace moho
    * What it does:
    * Constructs the global type-info owner and schedules process-exit cleanup.
    */
-  int register_CAcquireTargetTaskTypeInfo();
+  void register_CAcquireTargetTaskTypeInfo();
 
   static_assert(sizeof(CAcquireTargetTaskTypeInfo) == 0x64, "CAcquireTargetTaskTypeInfo size must be 0x64");
 } // namespace moho

@@ -519,9 +519,6 @@ namespace
 
   using FastVectorFloatType = gpg::RFastVectorType<float>;
 
-  alignas(FastVectorFloatType) unsigned char gFastVectorFloatTypeStorage[sizeof(FastVectorFloatType)]{};
-  bool gFastVectorFloatTypeConstructed = false;
-
   msvc8::string gFastVectorFloatTypeName;
   bool gFastVectorFloatTypeNameCleanupRegistered = false;
 
@@ -530,15 +527,12 @@ namespace
    *
    * What it does:
    * Acquires startup-owned storage for `RFastVectorType<float>`.
+   * Address: 0x00BFBC30 (FUN_00BFBC30, atexit destructor of the FastVectorFloatType object)
    */
   [[nodiscard]] FastVectorFloatType* AcquireFastVectorFloatType()
   {
-    if (!gFastVectorFloatTypeConstructed) {
-      new (gFastVectorFloatTypeStorage) FastVectorFloatType();
-      gFastVectorFloatTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorFloatType*>(gFastVectorFloatTypeStorage);
+    static FastVectorFloatType sInstance;
+    return &sInstance;
   }
 
   using FastVectorSSTIEntityAttachInfoType = gpg::RFastVectorType<moho::SSTIEntityAttachInfo>;
@@ -709,20 +703,16 @@ namespace
 
   using FastVectorStringType = gpg::RFastVectorType<msvc8::string>;
 
-  alignas(FastVectorStringType) unsigned char gFastVectorStringTypeStorage[sizeof(FastVectorStringType)]{};
-  bool gFastVectorStringTypeConstructed = false;
-
   msvc8::string gFastVectorStringTypeName;
   bool gFastVectorStringTypeNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BFBB10 (FUN_00BFBB10, atexit destructor of the FastVectorStringType object)
+   */
   [[nodiscard]] FastVectorStringType* AcquireFastVectorStringType()
   {
-    if (!gFastVectorStringTypeConstructed) {
-      new (gFastVectorStringTypeStorage) FastVectorStringType();
-      gFastVectorStringTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorStringType*>(gFastVectorStringTypeStorage);
+    static FastVectorStringType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedStringType()
@@ -800,20 +790,16 @@ namespace
 
   using FastVectorVector3fType = gpg::RFastVectorType<Wm3::Vector3f>;
 
-  alignas(FastVectorVector3fType) unsigned char gFastVectorVector3fTypeStorage[sizeof(FastVectorVector3fType)]{};
-  bool gFastVectorVector3fTypeConstructed = false;
-
   msvc8::string gFastVectorVector3fTypeName;
   bool gFastVectorVector3fTypeNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BF2B80 (FUN_00BF2B80, atexit destructor of the FastVectorVector3fType object)
+   */
   [[nodiscard]] FastVectorVector3fType* AcquireFastVectorVector3fType()
   {
-    if (!gFastVectorVector3fTypeConstructed) {
-      new (gFastVectorVector3fTypeStorage) FastVectorVector3fType();
-      gFastVectorVector3fTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorVector3fType*>(gFastVectorVector3fTypeStorage);
+    static FastVectorVector3fType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedVector3fType()
@@ -1418,32 +1404,15 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00BFBC30 (FUN_00BFBC30, cleanup_FastVectorFloatType)
-   *
-   * What it does:
-   * Process-exit teardown for startup-owned `gpg::fastvector<float>` descriptor storage.
-   */
-  void cleanup_FastVectorFloatType()
-  {
-    if (!gFastVectorFloatTypeConstructed) {
-      return;
-    }
-
-    AcquireFastVectorFloatType()->~FastVectorFloatType();
-    gFastVectorFloatTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4120 (FUN_00BD4120, register_FastVectorFloatTypeAtexit)
    *
    * What it does:
    * Startup wrapper that preregisters `gpg::fastvector<float>` and installs
    * process-exit teardown through `atexit`.
    */
-  int register_FastVectorFloatTypeAtexit()
+  void register_FastVectorFloatTypeAtexit()
   {
     (void)preregister_FastVectorFloatType();
-    return std::atexit(&cleanup_FastVectorFloatType);
   }
 } // namespace gpg
 
@@ -2118,32 +2087,15 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00BFBB10 (FUN_00BFBB10, cleanup_FastVectorStringType)
-   *
-   * What it does:
-   * Process-exit teardown for startup-owned `gpg::fastvector<msvc8::string>` descriptor storage.
-   */
-  void cleanup_FastVectorStringType()
-  {
-    if (!gFastVectorStringTypeConstructed) {
-      return;
-    }
-
-    AcquireFastVectorStringType()->~FastVectorStringType();
-    gFastVectorStringTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4180 (FUN_00BD4180, register_FastVectorStringTypeAtexit)
    *
    * What it does:
    * Startup wrapper that preregisters `gpg::fastvector<msvc8::string>` and installs
    * process-exit teardown through `atexit`.
    */
-  int register_FastVectorStringTypeAtexit()
+  void register_FastVectorStringTypeAtexit()
   {
     (void)preregister_FastVectorStringType();
-    return std::atexit(&cleanup_FastVectorStringType);
   }
 } // namespace gpg
 
@@ -2299,33 +2251,15 @@ gpg::RType* preregister_FastVectorVector3fType()
 }
 
 /**
- * Address: 0x00BF2B80 (FUN_00BF2B80, cleanup_FastVectorVector3fType)
- *
- * What it does:
- * Process-exit teardown for startup-owned
- * `gpg::fastvector<Wm3::Vector3<float>>` descriptor storage.
- */
-void cleanup_FastVectorVector3fType()
-{
-  if (!gFastVectorVector3fTypeConstructed) {
-    return;
-  }
-
-  AcquireFastVectorVector3fType()->~FastVectorVector3fType();
-  gFastVectorVector3fTypeConstructed = false;
-}
-
-/**
  * Address: 0x00BC84C0 (FUN_00BC84C0, register_FastVectorVector3fTypeAtexit)
  *
  * What it does:
  * Startup wrapper that preregisters `gpg::fastvector<Wm3::Vector3<float>>`
  * and installs process-exit teardown through `atexit`.
  */
-int register_FastVectorVector3fTypeAtexit()
+void register_FastVectorVector3fTypeAtexit()
 {
   (void)preregister_FastVectorVector3fType();
-  return std::atexit(&cleanup_FastVectorVector3fType);
 }
 } // namespace gpg
 
@@ -2533,7 +2467,6 @@ namespace
 
   [[maybe_unused]] FastVectorSAssignedLocInfoReflectionBootstrap gFastVectorSAssignedLocInfoReflectionBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

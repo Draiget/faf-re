@@ -4,35 +4,20 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiTarget.h"
+#include "moho/ai/CAiTarget.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
 namespace
 {
-  alignas(CAiTargetTypeInfo) unsigned char gCAiTargetTypeInfoStorage[sizeof(CAiTargetTypeInfo)];
-  bool gCAiTargetTypeInfoConstructed = false;
-
   [[nodiscard]] CAiTargetTypeInfo* AcquireCAiTargetTypeInfo()
   {
-    if (!gCAiTargetTypeInfoConstructed) {
-      new (gCAiTargetTypeInfoStorage) CAiTargetTypeInfo();
-      gCAiTargetTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiTargetTypeInfo*>(gCAiTargetTypeInfoStorage);
+    static CAiTargetTypeInfo sInstance;
+    return &sInstance;
   }
 
-  void cleanup_CAiTargetTypeInfo()
-  {
-    if (!gCAiTargetTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiTargetTypeInfo()->~CAiTargetTypeInfo();
-    gCAiTargetTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -82,12 +67,10 @@ void CAiTargetTypeInfo::Init()
  * What it does:
  * Registers `CAiTarget` type-info object and installs process-exit cleanup.
  */
-int moho::register_CAiTargetTypeInfo()
+void moho::register_CAiTargetTypeInfo()
 {
   (void)AcquireCAiTargetTypeInfo();
-  return std::atexit(&cleanup_CAiTargetTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

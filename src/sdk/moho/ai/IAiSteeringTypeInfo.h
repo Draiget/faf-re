@@ -43,7 +43,7 @@ namespace moho
    * Registers the `IAiSteering` RTTI type-info object and installs process-exit
    * cleanup.
    */
-  int register_IAiSteeringTypeInfo();
+  void register_IAiSteeringTypeInfo();
 
   static_assert(sizeof(IAiSteeringTypeInfo) == 0x64, "IAiSteeringTypeInfo size must be 0x64");
 } // namespace moho

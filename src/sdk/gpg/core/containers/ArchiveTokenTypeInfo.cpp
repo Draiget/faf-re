@@ -2,14 +2,12 @@
 
 #include <cstdlib>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(gpg::ArchiveTokenTypeInfo) unsigned char gArchiveTokenTypeInfoStorage[sizeof(gpg::ArchiveTokenTypeInfo)];
-  bool gArchiveTokenTypeInfoConstructed = false;
-
   /**
    * Address: 0x0094F4D0 (FUN_0094F4D0)
    *
@@ -25,14 +23,13 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x00C0A210 (FUN_00C0A210, atexit destructor of the gpg::ArchiveTokenTypeInfo object)
+   */
   [[nodiscard]] gpg::ArchiveTokenTypeInfo* AcquireArchiveTokenTypeInfo()
   {
-    if (!gArchiveTokenTypeInfoConstructed) {
-      new (gArchiveTokenTypeInfoStorage) gpg::ArchiveTokenTypeInfo();
-      gArchiveTokenTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::ArchiveTokenTypeInfo*>(gArchiveTokenTypeInfoStorage);
+    static gpg::ArchiveTokenTypeInfo sInstance;
+    return &sInstance;
   }
 
   struct ArchiveTokenTypeInfoBootstrap
@@ -113,28 +110,13 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00C0A210 (FUN_00C0A210, ArchiveTokenTypeInfo::~ArchiveTokenTypeInfo)
-   */
-  void cleanup_ArchiveTokenTypeInfo()
-  {
-    if (!gArchiveTokenTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireArchiveTokenTypeInfo()->gpg::REnumType::~REnumType();
-    gArchiveTokenTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BEAAB0 (FUN_00BEAAB0, register_ArchiveTokenTypeInfo)
    */
-  int register_ArchiveTokenTypeInfoStartup()
+  void register_ArchiveTokenTypeInfoStartup()
   {
     (void)AcquireArchiveTokenTypeInfo();
-    return std::atexit(&cleanup_ArchiveTokenTypeInfo);
   }
 } // namespace gpg
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

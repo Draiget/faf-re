@@ -96,50 +96,16 @@ namespace
     bool initialized = false;
   };
 
-  alignas(BroadcasterNavigatorType) unsigned char gBroadcasterNavigatorTypeStorage[sizeof(BroadcasterNavigatorType)];
-  bool gBroadcasterNavigatorTypeConstructed = false;
-
-  alignas(ListenerNavigatorType) unsigned char gListenerNavigatorTypeStorage[sizeof(ListenerNavigatorType)];
-  bool gListenerNavigatorTypeConstructed = false;
-
   [[nodiscard]] BroadcasterNavigatorType* AcquireBroadcasterNavigatorType()
   {
-    if (!gBroadcasterNavigatorTypeConstructed) {
-      new (gBroadcasterNavigatorTypeStorage) BroadcasterNavigatorType();
-      gBroadcasterNavigatorTypeConstructed = true;
-    }
-
-    return reinterpret_cast<BroadcasterNavigatorType*>(gBroadcasterNavigatorTypeStorage);
+    static BroadcasterNavigatorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] ListenerNavigatorType* AcquireListenerNavigatorType()
   {
-    if (!gListenerNavigatorTypeConstructed) {
-      new (gListenerNavigatorTypeStorage) ListenerNavigatorType();
-      gListenerNavigatorTypeConstructed = true;
-    }
-
-    return reinterpret_cast<ListenerNavigatorType*>(gListenerNavigatorTypeStorage);
-  }
-
-  void cleanup_RBroadcasterRType_EAiNavigatorEvent()
-  {
-    if (!gBroadcasterNavigatorTypeConstructed) {
-      return;
-    }
-
-    AcquireBroadcasterNavigatorType()->~BroadcasterNavigatorType();
-    gBroadcasterNavigatorTypeConstructed = false;
-  }
-
-  void cleanup_RListenerRType_EAiNavigatorEvent()
-  {
-    if (!gListenerNavigatorTypeConstructed) {
-      return;
-    }
-
-    AcquireListenerNavigatorType()->~ListenerNavigatorType();
-    gListenerNavigatorTypeConstructed = false;
+    static ListenerNavigatorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* ResolveEAiNavigatorEventType()
@@ -1417,10 +1383,9 @@ void IAiNavigator::MemberSerialize(const IAiNavigator* const object, gpg::WriteA
  * Registers the broadcaster reflection lane for `EAiNavigatorEvent` and
  * installs process-exit cleanup.
  */
-int moho::register_RBroadcasterRType_EAiNavigatorEvent()
+void moho::register_RBroadcasterRType_EAiNavigatorEvent()
 {
   (void)RegisterBroadcasterEAiNavigatorEventType();
-  return std::atexit(&cleanup_RBroadcasterRType_EAiNavigatorEvent);
 }
 
 /**
@@ -1430,10 +1395,9 @@ int moho::register_RBroadcasterRType_EAiNavigatorEvent()
  * Registers the listener reflection lane for `EAiNavigatorEvent` and installs
  * process-exit cleanup.
  */
-int moho::register_RListenerRType_EAiNavigatorEvent()
+void moho::register_RListenerRType_EAiNavigatorEvent()
 {
   (void)RegisterListenerEAiNavigatorEventType();
-  return std::atexit(&cleanup_RListenerRType_EAiNavigatorEvent);
 }
 
 namespace

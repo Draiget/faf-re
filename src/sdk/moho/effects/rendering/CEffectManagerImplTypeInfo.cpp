@@ -10,18 +10,13 @@
 
 namespace
 {
-  alignas(moho::CEffectManagerImplTypeInfo)
-    unsigned char gCEffectManagerImplTypeInfoStorage[sizeof(moho::CEffectManagerImplTypeInfo)] = {};
-  bool gCEffectManagerImplTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFBFA0 (FUN_00BFBFA0, atexit destructor of the moho::CEffectManagerImplTypeInfo object)
+   */
   [[nodiscard]] moho::CEffectManagerImplTypeInfo* AcquireCEffectManagerImplTypeInfo()
   {
-    if (!gCEffectManagerImplTypeInfoConstructed) {
-      new (gCEffectManagerImplTypeInfoStorage) moho::CEffectManagerImplTypeInfo();
-      gCEffectManagerImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CEffectManagerImplTypeInfo*>(gCEffectManagerImplTypeInfoStorage);
+    static moho::CEffectManagerImplTypeInfo sInstance;
+    return &sInstance;
   }
 } // namespace
 
@@ -92,31 +87,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFBFA0 (FUN_00BFBFA0, cleanup_CEffectManagerImplTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `CEffectManagerImplTypeInfo` reflection storage.
-   */
-  void cleanup_CEffectManagerImplTypeInfo()
-  {
-    if (!gCEffectManagerImplTypeInfoConstructed) {
-      return;
-    }
-
-    static_cast<gpg::RType*>(AcquireCEffectManagerImplTypeInfo())->~RType();
-    gCEffectManagerImplTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4570 (FUN_00BD4570, register_CEffectManagerImplTypeInfo_AtExit)
    *
    * What it does:
    * Registers `CEffectManagerImpl` RTTI bootstrap and installs process-exit cleanup.
    */
-  int register_CEffectManagerImplTypeInfo_AtExit()
+  void register_CEffectManagerImplTypeInfo_AtExit()
   {
     (void)register_CEffectManagerImplTypeInfo_00();
-    return std::atexit(&cleanup_CEffectManagerImplTypeInfo);
   }
 } // namespace moho
 

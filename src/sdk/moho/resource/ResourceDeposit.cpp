@@ -72,10 +72,6 @@ namespace
     return cached;
   }
 
-  alignas(moho::ResourceDepositTypeInfo) unsigned char
-    gResourceDepositTypeInfoStorage[sizeof(moho::ResourceDepositTypeInfo)]{};
-  bool gResourceDepositTypeInfoConstructed = false;
-
   /**
    * Demangled: Moho::ResourceDepositSerializer
    *
@@ -198,22 +194,8 @@ namespace
 
   [[nodiscard]] moho::ResourceDepositTypeInfo& AcquireResourceDepositTypeInfo()
   {
-    if (!gResourceDepositTypeInfoConstructed) {
-      new (gResourceDepositTypeInfoStorage) moho::ResourceDepositTypeInfo();
-      gResourceDepositTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::ResourceDepositTypeInfo*>(gResourceDepositTypeInfoStorage);
-  }
-
-  void cleanup_ResourceDepositTypeInfo()
-  {
-    if (!gResourceDepositTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireResourceDepositTypeInfo().~ResourceDepositTypeInfo();
-    gResourceDepositTypeInfoConstructed = false;
+    static moho::ResourceDepositTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -376,10 +358,8 @@ namespace moho
   void register_ResourceDepositTypeInfo()
   {
     (void)AcquireResourceDepositTypeInfo();
-    (void)std::atexit(&cleanup_ResourceDepositTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

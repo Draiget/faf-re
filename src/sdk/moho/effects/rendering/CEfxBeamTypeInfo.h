@@ -61,18 +61,10 @@ namespace moho
   gpg::RType* register_CEfxBeamTypeInfo_00();
 
   /**
-   * Address: 0x00BFB8B0 (FUN_00BFB8B0)
-   *
-   * What it does:
-   * Tears down startup-owned `CEfxBeamTypeInfo` reflection storage.
-   */
-  void cleanup_CEfxBeamTypeInfo();
-
-  /**
    * Address: 0x00BD3F30 (FUN_00BD3F30)
    *
    * What it does:
    * Registers `CEfxBeam` RTTI bootstrap and installs process-exit cleanup.
    */
-  int register_CEfxBeamTypeInfo_AtExit();
+  void register_CEfxBeamTypeInfo_AtExit();
 } // namespace moho

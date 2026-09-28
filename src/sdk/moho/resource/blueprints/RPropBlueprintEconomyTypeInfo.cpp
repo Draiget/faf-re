@@ -11,30 +11,13 @@ namespace
 {
   using TypeInfo = moho::RPropBlueprintEconomyTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRPropBlueprintEconomyTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRPropBlueprintEconomyTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF3090 (FUN_00BF3090, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireRPropBlueprintEconomyTypeInfo()
   {
-    if (!gRPropBlueprintEconomyTypeInfoConstructed) {
-      new (gRPropBlueprintEconomyTypeInfoStorage) TypeInfo();
-      gRPropBlueprintEconomyTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRPropBlueprintEconomyTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF3090 (FUN_00BF3090)
-   */
-  void cleanup_RPropBlueprintEconomyTypeInfo()
-  {
-    if (!gRPropBlueprintEconomyTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRPropBlueprintEconomyTypeInfo().~TypeInfo();
-    gRPropBlueprintEconomyTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* CachedFloatType()
@@ -97,13 +80,11 @@ namespace moho
   /**
    * Address: 0x00BC87F0 (FUN_00BC87F0)
    */
-  int register_RPropBlueprintEconomyTypeInfo()
+  void register_RPropBlueprintEconomyTypeInfo()
   {
     (void)AcquireRPropBlueprintEconomyTypeInfo();
-    return std::atexit(&cleanup_RPropBlueprintEconomyTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

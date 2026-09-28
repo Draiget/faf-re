@@ -10,33 +10,15 @@ namespace
 {
   using TypeInfo = moho::RResIdType;
 
-  alignas(TypeInfo) unsigned char gRResIdTypeStorage[sizeof(TypeInfo)];
-  bool gRResIdTypeConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRResIdType()
   {
-    if (!gRResIdTypeConstructed) {
-      new (gRResIdTypeStorage) TypeInfo();
-      gRResIdTypeConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRResIdTypeStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
-  void cleanup_RResIdType_00BC5A60_Impl()
-  {
-    if (!gRResIdTypeConstructed) {
-      return;
-    }
-
-    AcquireRResIdType().~TypeInfo();
-    gRResIdTypeConstructed = false;
-  }
-
-  int register_RResIdType_00BC5A60_Impl()
+  void register_RResIdType_00BC5A60_Impl()
   {
     (void)AcquireRResIdType();
-    return std::atexit(&cleanup_RResIdType_00BC5A60_Impl);
   }
 
   struct RResIdTypeBootstrap

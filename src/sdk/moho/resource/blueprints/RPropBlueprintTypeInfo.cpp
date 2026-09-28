@@ -5,40 +5,21 @@
 #include <typeinfo>
 
 #include "moho/entity/REntityBlueprint.h"
-#include "moho/resource/blueprints/RPropBlueprint.h"
+#include "moho/resource/blueprints/RPropBlueprint.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::RPropBlueprintTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRPropBlueprintTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRPropBlueprintTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF30F0 (FUN_00BF30F0, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireRPropBlueprintTypeInfo()
   {
-    if (!gRPropBlueprintTypeInfoConstructed) {
-      new (gRPropBlueprintTypeInfoStorage) TypeInfo();
-      gRPropBlueprintTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRPropBlueprintTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF30F0 (FUN_00BF30F0, Moho::RPropBlueprintTypeInfo::~RPropBlueprintTypeInfo)
-   *
-   * What it does:
-   * Tears down process-global `RPropBlueprintTypeInfo` storage.
-   */
-  void cleanup_RPropBlueprintTypeInfo()
-  {
-    if (!gRPropBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRPropBlueprintTypeInfo().~TypeInfo();
-    gRPropBlueprintTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedEntityBlueprintType()
@@ -255,10 +236,8 @@ namespace moho
     (void)preregister_RPropBlueprintDefenseTypeInfo();
     (void)preregister_RPropBlueprintEconomyTypeInfo();
     (void)AcquireRPropBlueprintTypeInfo();
-    (void)std::atexit(&cleanup_RPropBlueprintTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

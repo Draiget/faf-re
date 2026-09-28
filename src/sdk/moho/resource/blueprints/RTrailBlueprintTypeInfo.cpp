@@ -7,34 +7,18 @@
 
 #include "moho/resource/blueprints/REffectBlueprint.h"
 #include "moho/resource/blueprints/RTrailBlueprint.h"
-#include "moho/resource/RResId.h"
+#include "moho/resource/RResId.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::RTrailBlueprintTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRTrailBlueprintTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRTrailBlueprintTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRTrailBlueprintTypeInfo()
   {
-    if (!gRTrailBlueprintTypeInfoConstructed) {
-      new (gRTrailBlueprintTypeInfoStorage) TypeInfo();
-      gRTrailBlueprintTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRTrailBlueprintTypeInfoStorage);
-  }
-
-  void cleanup_RTrailBlueprintTypeInfo()
-  {
-    if (!gRTrailBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRTrailBlueprintTypeInfo().~TypeInfo();
-    gRTrailBlueprintTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -113,7 +97,6 @@ namespace
   {
     typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
   }
-
 
   gpg::RRef MakeTrailBlueprintRef(moho::RTrailBlueprint* object)
   {
@@ -268,10 +251,8 @@ void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
   void register_RTrailBlueprintTypeInfo()
   {
     (void)AcquireRTrailBlueprintTypeInfo();
-    (void)std::atexit(&cleanup_RTrailBlueprintTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

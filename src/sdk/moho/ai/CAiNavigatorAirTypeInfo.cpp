@@ -11,17 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiNavigatorAirTypeInfo) unsigned char gCAiNavigatorAirTypeInfoStorage[sizeof(CAiNavigatorAirTypeInfo)] = {};
-  bool gCAiNavigatorAirTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6EE0 (FUN_00BF6EE0, atexit destructor of the CAiNavigatorAirTypeInfo object)
+   */
   [[nodiscard]] CAiNavigatorAirTypeInfo* AcquireCAiNavigatorAirTypeInfo()
   {
-    if (!gCAiNavigatorAirTypeInfoConstructed) {
-      new (gCAiNavigatorAirTypeInfoStorage) CAiNavigatorAirTypeInfo();
-      gCAiNavigatorAirTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiNavigatorAirTypeInfo*>(gCAiNavigatorAirTypeInfoStorage);
+    static CAiNavigatorAirTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
@@ -54,21 +50,6 @@ namespace
     typeInfo.AddBase(baseField);
   }
 
-  /**
-   * Address: 0x00BF6EE0 (FUN_00BF6EE0)
-   *
-   * What it does:
-   * Tears down startup-owned `CAiNavigatorAirTypeInfo` storage.
-   */
-  void cleanup_CAiNavigatorAirTypeInfo()
-  {
-    if (!gCAiNavigatorAirTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiNavigatorAirTypeInfo()->~CAiNavigatorAirTypeInfo();
-    gCAiNavigatorAirTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -115,10 +96,9 @@ void CAiNavigatorAirTypeInfo::Init()
  * Constructs startup-owned `CAiNavigatorAirTypeInfo` storage and installs
  * process-exit cleanup.
  */
-int moho::register_CAiNavigatorAirTypeInfo()
+void moho::register_CAiNavigatorAirTypeInfo()
 {
   (void)AcquireCAiNavigatorAirTypeInfo();
-  return std::atexit(&cleanup_CAiNavigatorAirTypeInfo);
 }
 
 namespace
@@ -133,8 +113,6 @@ namespace
 
   [[maybe_unused]] CAiNavigatorAirTypeInfoBootstrap gCAiNavigatorAirTypeInfoBootstrap;
 } // namespace
-
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

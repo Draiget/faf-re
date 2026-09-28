@@ -73,7 +73,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RMeshBlueprintTypeInfo`.
    */
-  int register_RMeshBlueprintTypeInfo();
+  void register_RMeshBlueprintTypeInfo();
 
   static_assert(sizeof(RMeshBlueprintTypeInfo) == 0x64, "RMeshBlueprintTypeInfo size must be 0x64");
 } // namespace moho

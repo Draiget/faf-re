@@ -54,6 +54,6 @@ namespace moho
    * Constructs startup-owned `CAiNavigatorAirTypeInfo` storage and installs
    * process-exit cleanup.
    */
-  int register_CAiNavigatorAirTypeInfo();
+  void register_CAiNavigatorAirTypeInfo();
 } // namespace moho
 

@@ -7,17 +7,10 @@
 
 namespace
 {
-  alignas(moho::Sphere3fTypeInfo) unsigned char gSphere3fTypeInfoStorage[sizeof(moho::Sphere3fTypeInfo)] = {};
-  bool gSphere3fTypeInfoConstructed = false;
-
   [[nodiscard]] moho::Sphere3fTypeInfo& AcquireSphere3fTypeInfo()
   {
-    if (!gSphere3fTypeInfoConstructed) {
-      new (gSphere3fTypeInfoStorage) moho::Sphere3fTypeInfo();
-      gSphere3fTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::Sphere3fTypeInfo*>(gSphere3fTypeInfoStorage);
+    static moho::Sphere3fTypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -60,26 +53,11 @@ namespace moho
   }
 
   /**
-   * What it does:
-   * Tears down startup-owned Sphere3f type metadata singleton storage.
-   */
-  static void cleanup_Sphere3fTypeInfo()
-  {
-    if (!gSphere3fTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSphere3fTypeInfo().~Sphere3fTypeInfo();
-    gSphere3fTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC4950 (FUN_00BC4950, register_Sphere3fTypeInfo)
    */
-  int register_Sphere3fTypeInfo()
+  void register_Sphere3fTypeInfo()
   {
     (void)AcquireSphere3fTypeInfo();
-    return std::atexit(&cleanup_Sphere3fTypeInfo);
   }
 } // namespace moho
 
@@ -95,7 +73,6 @@ namespace
 
   [[maybe_unused]] Sphere3fTypeInfoBootstrap gSphere3fTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

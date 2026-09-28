@@ -11,17 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiAttackerTypeInfo) unsigned char gIAiAttackerTypeInfoStorage[sizeof(IAiAttackerTypeInfo)];
-  bool gIAiAttackerTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF8280 (FUN_00BF8280, atexit destructor of the IAiAttackerTypeInfo object)
+   */
   [[nodiscard]] IAiAttackerTypeInfo* AcquireIAiAttackerTypeInfo()
   {
-    if (!gIAiAttackerTypeInfoConstructed) {
-      new (gIAiAttackerTypeInfoStorage) IAiAttackerTypeInfo();
-      gIAiAttackerTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<IAiAttackerTypeInfo*>(gIAiAttackerTypeInfoStorage);
+    static IAiAttackerTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -38,21 +34,6 @@ namespace
     return typeInfo;
   }
 
-  /**
-   * Address: 0x00BF8280 (FUN_00BF8280, sub_BF8280)
-   *
-   * What it does:
-   * Tears down recovered static `IAiAttackerTypeInfo` storage.
-   */
-  void cleanup_IAiAttackerTypeInfo()
-  {
-    if (!gIAiAttackerTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireIAiAttackerTypeInfo()->~IAiAttackerTypeInfo();
-    gIAiAttackerTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -122,13 +103,11 @@ void IAiAttackerTypeInfo::AddBase_Broadcaster_EAiAttackerEvent(gpg::RType* const
  * What it does:
  * Registers `IAiAttacker` type-info object and installs process-exit cleanup.
  */
-int moho::register_IAiAttackerTypeInfo()
+void moho::register_IAiAttackerTypeInfo()
 {
   auto* const type = static_cast<IAiAttackerTypeInfo*>(preregister_IAiAttackerTypeInfoStartup());
   IAiAttacker::sType = type;
-  return std::atexit(&cleanup_IAiAttackerTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

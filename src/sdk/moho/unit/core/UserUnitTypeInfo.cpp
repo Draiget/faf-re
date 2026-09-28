@@ -21,35 +21,15 @@ namespace
   constexpr int kUserUnitCScriptObjectBaseOffset = 0x150;
   constexpr int kUserUnitIUnitBaseOffset = 0x148;
 
-  alignas(moho::UserUnitTypeInfo) unsigned char gUserUnitTypeInfoStorage[sizeof(moho::UserUnitTypeInfo)];
-  bool gUserUnitTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C08780 (FUN_00C08780, atexit destructor of the moho::UserUnitTypeInfo object)
+   */
   [[nodiscard]] moho::UserUnitTypeInfo* AcquireUserUnitTypeInfo()
   {
-    if (!gUserUnitTypeInfoConstructed) {
-      new (gUserUnitTypeInfoStorage) moho::UserUnitTypeInfo();
-      gUserUnitTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::UserUnitTypeInfo*>(gUserUnitTypeInfoStorage);
+    static moho::UserUnitTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00C08780 (FUN_00C08780)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `UserUnit` descriptor,
-   * releasing its reflected field/base lanes.
-   */
-  void cleanup_UserUnitTypeInfo()
-  {
-    if (!gUserUnitTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireUserUnitTypeInfo()->~UserUnitTypeInfo();
-    gUserUnitTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -142,10 +122,9 @@ namespace moho
    * What it does:
    * Registers the `UserUnit` type-info object and installs process-exit cleanup.
    */
-  int register_UserUnitTypeInfo()
+  void register_UserUnitTypeInfo()
   {
     (void)AcquireUserUnitTypeInfo();
-    return std::atexit(&cleanup_UserUnitTypeInfo);
   }
 } // namespace moho
 
@@ -161,7 +140,6 @@ namespace
 
   [[maybe_unused]] UserUnitTypeInfoRegistration gUserUnitTypeInfoRegistration;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

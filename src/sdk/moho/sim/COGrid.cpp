@@ -373,17 +373,10 @@ namespace
 
   using TypeInfo = moho::COGridTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCOGridTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCOGridTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& GetCOGridTypeInfo() noexcept
   {
-    if (!gCOGridTypeInfoConstructed) {
-      new (gCOGridTypeInfoStorage) TypeInfo();
-      gCOGridTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCOGridTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] std::uint32_t GetCoGridMapWidthMinusOne(const moho::Sim* const sim) noexcept
@@ -852,26 +845,11 @@ namespace moho
   }
 
   /**
-   * What it does:
-   * Releases startup-owned `COGridTypeInfo` storage at process teardown.
-   */
-  void cleanup_COGridTypeInfo()
-  {
-    if (!gCOGridTypeInfoConstructed) {
-      return;
-    }
-
-    GetCOGridTypeInfo().~COGridTypeInfo();
-    gCOGridTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BDAA90 (FUN_00BDAA90, register_COGridTypeInfo)
    */
-  int register_COGridTypeInfo()
+  void register_COGridTypeInfo()
   {
     (void)GetCOGridTypeInfo();
-    return std::atexit(&cleanup_COGridTypeInfo);
   }
 
   namespace
@@ -1768,7 +1746,6 @@ namespace
 
   [[maybe_unused]] COGridTypeInfoBootstrap gCOGridTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

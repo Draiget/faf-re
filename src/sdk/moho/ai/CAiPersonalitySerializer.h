@@ -90,5 +90,5 @@ namespace moho
    * Preregisters startup RTTI for the legacy AI `SValuePair` lane and installs
    * process-exit cleanup.
    */
-  int register_SValuePairTypeInfo();
+  void register_SValuePairTypeInfo();
 } // namespace moho

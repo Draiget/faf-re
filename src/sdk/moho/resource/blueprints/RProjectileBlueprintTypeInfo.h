@@ -90,7 +90,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RProjectileBlueprintTypeInfo`.
    */
-  int register_RProjectileBlueprintTypeInfo();
+  void register_RProjectileBlueprintTypeInfo();
 
   static_assert(sizeof(RProjectileBlueprintTypeInfo) == 0x64, "RProjectileBlueprintTypeInfo size must be 0x64");
 } // namespace moho

@@ -132,9 +132,6 @@ namespace
   static_assert(offsetof(SValuePairSerializer, mSerialize) == 0x10, "SValuePairSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(SValuePairSerializer) == 0x14, "SValuePairSerializer size must be 0x14");
 
-  alignas(SValuePairTypeInfo) unsigned char gSValuePairTypeInfoStorage[sizeof(SValuePairTypeInfo)];
-  bool gSValuePairTypeInfoConstructed = false;
-
   /**
    * Address: 0x005B95F0 (FUN_005B95F0, j_Moho::CAiPersonality::MemberSerialize)
    * Address: 0x0087CF70 (FUN_0087CF70)
@@ -170,14 +167,13 @@ namespace
     personality->MemberSerialize(archive);
   }
 
+  /**
+   * Address: 0x00BF7620 (FUN_00BF7620, atexit destructor of the SValuePairTypeInfo object)
+   */
   [[nodiscard]] SValuePairTypeInfo* AcquireSValuePairTypeInfo()
   {
-    if (!gSValuePairTypeInfoConstructed) {
-      new (gSValuePairTypeInfoStorage) SValuePairTypeInfo();
-      gSValuePairTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<SValuePairTypeInfo*>(gSValuePairTypeInfoStorage);
+    static SValuePairTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedSValuePairType()
@@ -200,22 +196,6 @@ namespace
     SValuePairTypeInfo* const typeInfo = AcquireSValuePairTypeInfo();
     gpg::PreRegisterRType(typeid(SValuePair), typeInfo);
     return typeInfo;
-  }
-
-  /**
-   * Address: 0x00BF7620 (FUN_00BF7620, cleanup_SValuePairTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `SValuePair` reflection type descriptor.
-   */
-  void cleanup_SValuePairTypeInfo()
-  {
-    if (!gSValuePairTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSValuePairTypeInfo()->~SValuePairTypeInfo();
-    gSValuePairTypeInfoConstructed = false;
   }
 
   [[nodiscard]] gpg::RType* CachedCAiPersonalityType()
@@ -317,10 +297,9 @@ void SValuePairSerializer::Init()
  * Preregisters startup RTTI for the legacy AI `SValuePair` lane and installs
  * process-exit cleanup.
  */
-int moho::register_SValuePairTypeInfo()
+void moho::register_SValuePairTypeInfo()
 {
   (void)preregister_SValuePairTypeInfo();
-  return std::atexit(&cleanup_SValuePairTypeInfo);
 }
 
 /**

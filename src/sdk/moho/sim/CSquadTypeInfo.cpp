@@ -12,35 +12,15 @@
 // objects query CSquad RTTI during static initialization.
 namespace
 {
-  alignas(moho::CSquadTypeInfo) unsigned char gCSquadTypeInfoStorage[sizeof(moho::CSquadTypeInfo)];
-  bool gCSquadTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C00470 (FUN_00C00470, atexit destructor of the moho::CSquadTypeInfo object)
+   */
   [[nodiscard]] moho::CSquadTypeInfo* AcquireCSquadTypeInfo()
   {
-    if (!gCSquadTypeInfoConstructed) {
-      new (gCSquadTypeInfoStorage) moho::CSquadTypeInfo();
-      gCSquadTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CSquadTypeInfo*>(gCSquadTypeInfoStorage);
+    static moho::CSquadTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00C00470 (FUN_00C00470)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `CSquad` descriptor,
-   * releasing its reflected field/base lanes.
-   */
-  void cleanup_CSquadTypeInfo()
-  {
-    if (!gCSquadTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCSquadTypeInfo()->~CSquadTypeInfo();
-    gCSquadTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -92,10 +72,9 @@ namespace moho
    * What it does:
    * Registers the `CSquad` type-info object and installs process-exit cleanup.
    */
-  int register_CSquadTypeInfo()
+  void register_CSquadTypeInfo()
   {
     (void)AcquireCSquadTypeInfo();
-    return std::atexit(&cleanup_CSquadTypeInfo);
   }
 } // namespace moho
 
@@ -111,7 +90,6 @@ namespace
 
   [[maybe_unused]] CSquadTypeInfoRegistration gCSquadTypeInfoRegistration;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

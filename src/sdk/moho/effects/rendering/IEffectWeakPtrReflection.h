@@ -89,18 +89,10 @@ namespace moho
   [[nodiscard]] gpg::RType* register_WeakPtr_IEffect_Type_00();
 
   /**
-   * Address: 0x00BFC4F0 (FUN_00BFC4F0, cleanup_WeakPtr_IEffect_Type)
-   *
-   * What it does:
-   * Tears down startup-owned `WeakPtr<IEffect>` reflection storage.
-   */
-  void cleanup_WeakPtr_IEffect_Type();
-
-  /**
    * Address: 0x00BD4DD0 (FUN_00BD4DD0, register_WeakPtr_IEffect_Type_AtExit)
    *
    * What it does:
    * Registers `WeakPtr<IEffect>` reflection and installs process-exit teardown.
    */
-  int register_WeakPtr_IEffect_Type_AtExit();
+  void register_WeakPtr_IEffect_Type_AtExit();
 } // namespace moho

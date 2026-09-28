@@ -17,8 +17,6 @@ using namespace moho;
 
 namespace
 {
-
-
   /**
    * Address: 0x005C58E0 (FUN_005C58E0)
    */
@@ -111,8 +109,6 @@ namespace
   };
   static_assert(sizeof(ReconBlipMapTypeRuntime) == 0x64, "ReconBlipMapTypeRuntime size must be 0x64");
 
-  alignas(CAiReconDBImplTypeInfo) unsigned char gCAiReconDBImplTypeInfoStorage[sizeof(CAiReconDBImplTypeInfo)];
-  bool gCAiReconDBImplTypeInfoConstructed = false;
   alignas(ReconBlipPointerVectorTypeRuntime)
   unsigned char gReconBlipPtrVectorTypeStorage[sizeof(ReconBlipPointerVectorTypeRuntime)];
   bool gReconBlipPtrVectorTypeConstructed = false;
@@ -128,14 +124,13 @@ namespace
   gpg::RType* gReconBlipPtrType = nullptr;
   gpg::RType* gSReconKeyType = nullptr;
 
+  /**
+   * Address: 0x00BF7A50 (FUN_00BF7A50, atexit destructor of the CAiReconDBImplTypeInfo object)
+   */
   [[nodiscard]] CAiReconDBImplTypeInfo* AcquireCAiReconDBImplTypeInfo()
   {
-    if (!gCAiReconDBImplTypeInfoConstructed) {
-      new (gCAiReconDBImplTypeInfoStorage) CAiReconDBImplTypeInfo();
-      gCAiReconDBImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiReconDBImplTypeInfo*>(gCAiReconDBImplTypeInfoStorage);
+    static CAiReconDBImplTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] ReconBlipPointerVectorTypeRuntime* AcquireReconBlipPtrVectorType()
@@ -398,22 +393,6 @@ namespace
     field.v4 = 0;
     field.mDesc = nullptr;
     typeInfo->AddBase(field);
-  }
-
-  /**
-   * Address: 0x00BF7A50 (FUN_00BF7A50, cleanup_CAiReconDBImplTypeInfo)
-   *
-   * What it does:
-   * Tears down recovered static `CAiReconDBImplTypeInfo` storage.
-   */
-  void cleanup_CAiReconDBImplTypeInfo()
-  {
-    if (!gCAiReconDBImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiReconDBImplTypeInfo()->~CAiReconDBImplTypeInfo();
-    gCAiReconDBImplTypeInfoConstructed = false;
   }
 
   /**
@@ -760,7 +739,6 @@ void CAiReconDBImplTypeInfo::BindFactoryCallbacks() noexcept
 void moho::register_CAiReconDBImplTypeInfo()
 {
   (void)AcquireCAiReconDBImplTypeInfo();
-  (void)std::atexit(&cleanup_CAiReconDBImplTypeInfo);
 }
 
 /**
@@ -837,7 +815,6 @@ int moho::register_RMultiMapType_SReconKey_ReconBlipPtr()
   (void)preregister_RMultiMapType_SReconKey_ReconBlipPtr();
   return std::atexit(&cleanup_RMultiMapType_SReconKey_ReconBlipPtr_Impl);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

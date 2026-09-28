@@ -12,27 +12,10 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiTransportTypeInfo) unsigned char gIAiTransportTypeInfoStorage[sizeof(IAiTransportTypeInfo)];
-  bool gIAiTransportTypeInfoConstructed = false;
-
   [[nodiscard]] IAiTransportTypeInfo* AcquireIAiTransportTypeInfo()
   {
-    if (!gIAiTransportTypeInfoConstructed) {
-      new (gIAiTransportTypeInfoStorage) IAiTransportTypeInfo();
-      gIAiTransportTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<IAiTransportTypeInfo*>(gIAiTransportTypeInfoStorage);
-  }
-
-  void cleanup_IAiTransportTypeInfo()
-  {
-    if (!gIAiTransportTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireIAiTransportTypeInfo()->~IAiTransportTypeInfo();
-    gIAiTransportTypeInfoConstructed = false;
+    static IAiTransportTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -116,12 +99,10 @@ void IAiTransportTypeInfo::Init()
  * Registers `IAiTransport` type-info object and installs process-exit
  * cleanup.
  */
-int moho::register_IAiTransportTypeInfo()
+void moho::register_IAiTransportTypeInfo()
 {
   (void)AcquireIAiTransportTypeInfo();
-  return std::atexit(&cleanup_IAiTransportTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

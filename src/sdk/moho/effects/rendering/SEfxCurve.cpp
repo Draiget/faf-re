@@ -12,7 +12,8 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/math/MathReflection.h"
-#include "moho/resource/blueprints/REmitterBlueprint.h"
+#include "moho/resource/blueprints/REmitterBlueprint.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -83,18 +84,16 @@ namespace
 {
   using FastVectorSEfxCurveType = gpg::RFastVectorType<moho::SEfxCurve>;
 
-  alignas(FastVectorSEfxCurveType) unsigned char gFastVectorSEfxCurveTypeStorage[sizeof(FastVectorSEfxCurveType)]{};
-  bool gFastVectorSEfxCurveTypeConstructed = false;
   msvc8::string gFastVectorSEfxCurveTypeName;
   bool gFastVectorSEfxCurveTypeNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BFBED0 (FUN_00BFBED0, atexit destructor of the FastVectorSEfxCurveType object)
+   */
   [[nodiscard]] FastVectorSEfxCurveType* AcquireFastVectorSEfxCurveType()
   {
-    if (!gFastVectorSEfxCurveTypeConstructed) {
-      new (gFastVectorSEfxCurveTypeStorage) FastVectorSEfxCurveType();
-      gFastVectorSEfxCurveTypeConstructed = true;
-    }
-    return reinterpret_cast<FastVectorSEfxCurveType*>(gFastVectorSEfxCurveTypeStorage);
+    static FastVectorSEfxCurveType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedSEfxCurveType()
@@ -580,31 +579,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFBED0 (FUN_00BFBED0, cleanup_FastVectorSEfxCurveType)
-   *
-   * What it does:
-   * Tears down startup-owned `fastvector<SEfxCurve>` reflection storage.
-   */
-  void cleanup_FastVectorSEfxCurveType()
-  {
-    if (!gFastVectorSEfxCurveTypeConstructed) {
-      return;
-    }
-
-    AcquireFastVectorSEfxCurveType()->~FastVectorSEfxCurveType();
-    gFastVectorSEfxCurveTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4430 (FUN_00BD4430, register_FastVectorSEfxCurveTypeAtexit)
    *
    * What it does:
    * Registers `fastvector<SEfxCurve>` reflection and installs process-exit teardown.
    */
-  int register_FastVectorSEfxCurveTypeAtexit()
+  void register_FastVectorSEfxCurveTypeAtexit()
   {
     (void)preregister_FastVectorSEfxCurveType();
-    return std::atexit(&cleanup_FastVectorSEfxCurveType);
   }
 } // namespace moho
 

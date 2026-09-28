@@ -51,5 +51,5 @@ namespace moho
    * What it does:
    * Registers the `HPathCell` type-info object and installs process-exit cleanup.
    */
-  int register_HPathCellTypeInfo();
+  void register_HPathCellTypeInfo();
 } // namespace moho

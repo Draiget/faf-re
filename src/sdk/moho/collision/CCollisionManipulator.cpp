@@ -49,10 +49,6 @@ namespace
   constexpr float kOrientationCollisionThreshold = 0.1f;
   constexpr int kCollisionManipulatorPrecedence = 99;
 
-  alignas(moho::CCollisionManipulatorTypeInfo)
-    std::byte gCCollisionManipulatorTypeInfoStorage[sizeof(moho::CCollisionManipulatorTypeInfo)]{};
-  bool gCCollisionManipulatorTypeInfoConstructed = false;
-
   // Address: 0x00BD2720 (dynamic initializer for the global
   // `CCollisionManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's
   // own compiler-generated dynamic initializer for this global runs the real
@@ -76,14 +72,13 @@ namespace
     return fallbackSet;
   }
 
+  /**
+   * Address: 0x00BFAB10 (FUN_00BFAB10, atexit destructor of the moho::CCollisionManipulatorTypeInfo object)
+   */
   [[nodiscard]] moho::CCollisionManipulatorTypeInfo& AcquireCCollisionManipulatorTypeInfo()
   {
-    if (!gCCollisionManipulatorTypeInfoConstructed) {
-      new (gCCollisionManipulatorTypeInfoStorage) moho::CCollisionManipulatorTypeInfo();
-      gCCollisionManipulatorTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::CCollisionManipulatorTypeInfo*>(gCCollisionManipulatorTypeInfoStorage);
+    static moho::CCollisionManipulatorTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -953,22 +948,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFAB10 (FUN_00BFAB10, cleanup_CCollisionManipulatorTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned RTTI metadata for `CCollisionManipulator`.
-   */
-  void cleanup_CCollisionManipulatorTypeInfo()
-  {
-    if (!gCCollisionManipulatorTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCCollisionManipulatorTypeInfo().~CCollisionManipulatorTypeInfo();
-    gCCollisionManipulatorTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD2720 (FUN_00BD2720, register_CCollisionManipulatorSerializer)
    *
    * What it does:
@@ -989,10 +968,9 @@ namespace moho
    * What it does:
    * Preregisters `CCollisionManipulator` RTTI and installs process-exit cleanup.
    */
-  int register_CCollisionManipulatorTypeInfoAtexit()
+  void register_CCollisionManipulatorTypeInfoAtexit()
   {
     (void)preregister_CCollisionManipulatorTypeInfo();
-    return std::atexit(&cleanup_CCollisionManipulatorTypeInfo);
   }
 } // namespace moho
 

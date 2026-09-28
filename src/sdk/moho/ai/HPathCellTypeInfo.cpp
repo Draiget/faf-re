@@ -12,35 +12,15 @@
 // objects query HPathCell RTTI during static initialization.
 namespace
 {
-  alignas(moho::HPathCellTypeInfo) unsigned char gHPathCellTypeInfoStorage[sizeof(moho::HPathCellTypeInfo)];
-  bool gHPathCellTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C01680 (FUN_00C01680, atexit destructor of the moho::HPathCellTypeInfo object)
+   */
   [[nodiscard]] moho::HPathCellTypeInfo* AcquireHPathCellTypeInfo()
   {
-    if (!gHPathCellTypeInfoConstructed) {
-      new (gHPathCellTypeInfoStorage) moho::HPathCellTypeInfo();
-      gHPathCellTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::HPathCellTypeInfo*>(gHPathCellTypeInfoStorage);
+    static moho::HPathCellTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00C01680 (FUN_00C01680)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `HPathCell` descriptor,
-   * releasing its reflected field/base lanes.
-   */
-  void cleanup_HPathCellTypeInfo()
-  {
-    if (!gHPathCellTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireHPathCellTypeInfo()->~HPathCellTypeInfo();
-    gHPathCellTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -92,10 +72,9 @@ namespace moho
    * What it does:
    * Registers the `HPathCell` type-info object and installs process-exit cleanup.
    */
-  int register_HPathCellTypeInfo()
+  void register_HPathCellTypeInfo()
   {
     (void)AcquireHPathCellTypeInfo();
-    return std::atexit(&cleanup_HPathCellTypeInfo);
   }
 } // namespace moho
 
@@ -111,7 +90,6 @@ namespace
 
   [[maybe_unused]] HPathCellTypeInfoRegistration gHPathCellTypeInfoRegistration;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

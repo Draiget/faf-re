@@ -94,9 +94,6 @@ namespace
   alignas(CountedPtrType) unsigned char gCountedPtrCParticleTextureTypeStorage[sizeof(CountedPtrType)]{};
   bool gCountedPtrCParticleTextureTypeConstructed = false;
 
-  alignas(CountedPtrFastVectorType) unsigned char gCountedPtrFastVectorTypeStorage[sizeof(CountedPtrFastVectorType)]{};
-  bool gCountedPtrFastVectorTypeConstructed = false;
-
   msvc8::string gCountedPtrCParticleTextureTypeName;
   bool gCountedPtrCParticleTextureTypeNameCleanupRegistered = false;
 
@@ -113,14 +110,13 @@ namespace
     return reinterpret_cast<CountedPtrType*>(gCountedPtrCParticleTextureTypeStorage);
   }
 
+  /**
+   * Address: 0x00BFBB70 (FUN_00BFBB70, atexit destructor of the CountedPtrFastVectorType object)
+   */
   [[nodiscard]] CountedPtrFastVectorType* AcquireCountedPtrFastVectorType()
   {
-    if (!gCountedPtrFastVectorTypeConstructed) {
-      new (gCountedPtrFastVectorTypeStorage) CountedPtrFastVectorType();
-      gCountedPtrFastVectorTypeConstructed = true;
-    }
-
-    return reinterpret_cast<CountedPtrFastVectorType*>(gCountedPtrFastVectorTypeStorage);
+    static CountedPtrFastVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCParticleTextureType()
@@ -209,7 +205,6 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Shared, owner);
   }
-
 
   /**
    * Address: 0x0065A4C0 (FUN_0065A4C0, gpg::RFastVectorType_CountedPtr_CParticleTexture::SerLoad)
@@ -546,31 +541,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFBB70 (FUN_00BFBB70, cleanup_FastVectorCountedPtrCParticleTextureType)
-   *
-   * What it does:
-   * Tears down startup-owned `fastvector<CountedPtr<CParticleTexture>>` reflection storage.
-   */
-  void cleanup_FastVectorCountedPtrCParticleTextureType()
-  {
-    if (!gCountedPtrFastVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireCountedPtrFastVectorType()->~CountedPtrFastVectorType();
-    gCountedPtrFastVectorTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4160 (FUN_00BD4160, register_FastVectorCountedPtrCParticleTextureTypeAtexit)
    *
    * What it does:
    * Registers `fastvector<CountedPtr<CParticleTexture>>` reflection and installs process-exit teardown.
    */
-  int register_FastVectorCountedPtrCParticleTextureTypeAtexit()
+  void register_FastVectorCountedPtrCParticleTextureTypeAtexit()
   {
     (void)preregister_FastVectorCountedPtrCParticleTextureType();
-    return std::atexit(&cleanup_FastVectorCountedPtrCParticleTextureType);
   }
 } // namespace moho
 

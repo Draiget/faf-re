@@ -50,18 +50,10 @@ namespace moho
   static_assert(sizeof(WeakUnitSetTypeInfo) == 0x64, "WeakUnitSetTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00BFE480 (FUN_00BFE480, sub_BFE480)
-   *
-   * What it does:
-   * Tears down global `WeakUnitSetTypeInfo` storage at process exit.
-   */
-  void cleanup_WeakUnitSetTypeInfo();
-
-  /**
    * Address: 0x00BD84C0 (FUN_00BD84C0, sub_BD84C0)
    *
    * What it does:
    * Constructs global `WeakUnitSetTypeInfo` and registers exit cleanup.
    */
-  int register_WeakUnitSetTypeInfo();
+  void register_WeakUnitSetTypeInfo();
 } // namespace moho

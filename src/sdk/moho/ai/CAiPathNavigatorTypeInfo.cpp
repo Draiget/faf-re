@@ -12,8 +12,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiPathNavigatorTypeInfo) unsigned char gCAiPathNavigatorTypeInfoStorage[sizeof(CAiPathNavigatorTypeInfo)] = {};
-  bool gCAiPathNavigatorTypeInfoConstructed = false;
   gpg::RType* gListenerNavPathType = nullptr;
 
   /**
@@ -61,14 +59,13 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x00BF7360 (FUN_00BF7360, atexit destructor of the CAiPathNavigatorTypeInfo object)
+   */
   [[nodiscard]] CAiPathNavigatorTypeInfo* AcquireCAiPathNavigatorTypeInfo()
   {
-    if (!gCAiPathNavigatorTypeInfoConstructed) {
-      new (gCAiPathNavigatorTypeInfoStorage) CAiPathNavigatorTypeInfo();
-      gCAiPathNavigatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiPathNavigatorTypeInfo*>(gCAiPathNavigatorTypeInfoStorage);
+    static CAiPathNavigatorTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedListenerNavPathType()
@@ -79,21 +76,6 @@ namespace
     return gListenerNavPathType;
   }
 
-  /**
-   * Address: 0x00BF7360 (FUN_00BF7360, cleanup_CAiPathNavigatorTypeInfo)
-   *
-   * What it does:
-   * Tears down the recovered static `CAiPathNavigatorTypeInfo` storage.
-   */
-  void cleanup_CAiPathNavigatorTypeInfo()
-  {
-    if (!gCAiPathNavigatorTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiPathNavigatorTypeInfo()->~CAiPathNavigatorTypeInfo();
-    gCAiPathNavigatorTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -210,7 +192,6 @@ void CAiPathNavigatorTypeInfo::Destruct(void* const objectStorage)
 void moho::register_CAiPathNavigatorTypeInfo()
 {
   (void)AcquireCAiPathNavigatorTypeInfo();
-  (void)std::atexit(&cleanup_CAiPathNavigatorTypeInfo);
 }
 
 namespace
@@ -225,7 +206,6 @@ namespace
 
   [[maybe_unused]] CAiPathNavigatorTypeInfoBootstrap gCAiPathNavigatorTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

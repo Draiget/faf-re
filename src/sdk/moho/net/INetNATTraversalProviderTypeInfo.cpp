@@ -9,29 +9,12 @@
 
 namespace
 {
-  alignas(moho::INetNATTraversalProviderTypeInfo)
-  unsigned char gINetNATTraversalProviderTypeInfoStorage[sizeof(moho::INetNATTraversalProviderTypeInfo)];
-  bool gINetNATTraversalProviderTypeInfoConstructed = false;
-
   [[nodiscard]] moho::INetNATTraversalProviderTypeInfo& GetINetNATTraversalProviderTypeInfo() noexcept
   {
-    if (!gINetNATTraversalProviderTypeInfoConstructed) {
-      new (gINetNATTraversalProviderTypeInfoStorage) moho::INetNATTraversalProviderTypeInfo();
-      gINetNATTraversalProviderTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::INetNATTraversalProviderTypeInfo*>(gINetNATTraversalProviderTypeInfoStorage);
+    static moho::INetNATTraversalProviderTypeInfo sInstance;
+    return sInstance;
   }
 
-  void cleanup_INetNATTraversalProviderTypeInfo()
-  {
-    if (!gINetNATTraversalProviderTypeInfoConstructed) {
-      return;
-    }
-
-    GetINetNATTraversalProviderTypeInfo().~INetNATTraversalProviderTypeInfo();
-    gINetNATTraversalProviderTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -80,7 +63,6 @@ namespace moho
   void register_INetNATTraversalProviderTypeInfo()
   {
     (void)GetINetNATTraversalProviderTypeInfo();
-    (void)std::atexit(&cleanup_INetNATTraversalProviderTypeInfo);
   }
 } // namespace moho
 
@@ -96,7 +78,6 @@ namespace
 
   INetNATTraversalProviderTypeInfoBootstrap gINetNATTraversalProviderTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

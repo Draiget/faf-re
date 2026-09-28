@@ -612,10 +612,6 @@ namespace moho
 
 namespace
 {
-  alignas(moho::CThrustManipulatorTypeInfo)
-  unsigned char gCThrustManipulatorTypeInfoStorage[sizeof(moho::CThrustManipulatorTypeInfo)] = {};
-  bool gCThrustManipulatorTypeInfoConstructed = false;
-
   // Address: 0x00BD37A0 (dynamic initializer for the global
   // `CThrustManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's own
   // compiler-generated dynamic initializer for this global runs the real
@@ -628,31 +624,15 @@ namespace
   // per-instantiation address list.
   moho::CThrustManipulatorSerializer gCThrustManipulatorSerializer;
 
+  /**
+   * Address: 0x00BFB3C0 (FUN_00BFB3C0, atexit destructor of the moho::CThrustManipulatorTypeInfo object)
+   */
   [[nodiscard]] moho::CThrustManipulatorTypeInfo* AcquireCThrustManipulatorTypeInfo()
   {
-    if (!gCThrustManipulatorTypeInfoConstructed) {
-      new (gCThrustManipulatorTypeInfoStorage) moho::CThrustManipulatorTypeInfo();
-      gCThrustManipulatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CThrustManipulatorTypeInfo*>(gCThrustManipulatorTypeInfoStorage);
+    static moho::CThrustManipulatorTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00BFB3C0 (FUN_00BFB3C0, cleanup_CThrustManipulatorTypeInfo)
-   *
-   * What it does:
-   * Tears down static `CThrustManipulatorTypeInfo` storage at process exit.
-   */
-  void cleanup_CThrustManipulatorTypeInfo()
-  {
-    if (!gCThrustManipulatorTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCThrustManipulatorTypeInfo()->~CThrustManipulatorTypeInfo();
-    gCThrustManipulatorTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -669,7 +649,6 @@ namespace moho
   void register_CThrustManipulatorTypeInfo()
   {
     (void)AcquireCThrustManipulatorTypeInfo();
-    (void)std::atexit(&cleanup_CThrustManipulatorTypeInfo);
   }
 } // namespace moho
 

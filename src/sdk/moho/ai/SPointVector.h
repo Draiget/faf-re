@@ -169,7 +169,7 @@ namespace moho
    * Constructs the startup-owned `SPointVectorTypeInfo` descriptor and installs
    * process-exit cleanup.
    */
-  int register_SPointVectorTypeInfo();
+  void register_SPointVectorTypeInfo();
 
   /**
    * Address: 0x005825A0 (FUN_005825A0, register_SPointVectorVectorType)

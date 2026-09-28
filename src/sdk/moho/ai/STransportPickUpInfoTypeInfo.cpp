@@ -4,36 +4,20 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiTransportImpl.h"
+#include "moho/ai/CAiTransportImpl.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
 namespace
 {
-  alignas(STransportPickUpInfoTypeInfo)
-    unsigned char gSTransportPickUpInfoTypeInfoStorage[sizeof(STransportPickUpInfoTypeInfo)];
-  bool gSTransportPickUpInfoTypeInfoConstructed = false;
-
   [[nodiscard]] STransportPickUpInfoTypeInfo* AcquireSTransportPickUpInfoTypeInfo()
   {
-    if (!gSTransportPickUpInfoTypeInfoConstructed) {
-      new (gSTransportPickUpInfoTypeInfoStorage) STransportPickUpInfoTypeInfo();
-      gSTransportPickUpInfoTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<STransportPickUpInfoTypeInfo*>(gSTransportPickUpInfoTypeInfoStorage);
+    static STransportPickUpInfoTypeInfo sInstance;
+    return &sInstance;
   }
 
-  void cleanup_STransportPickUpInfoTypeInfo()
-  {
-    if (!gSTransportPickUpInfoTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSTransportPickUpInfoTypeInfo()->~STransportPickUpInfoTypeInfo();
-    gSTransportPickUpInfoTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -79,12 +63,10 @@ void STransportPickUpInfoTypeInfo::Init()
  * Registers `STransportPickUpInfo` type-info and installs process-exit
  * cleanup.
  */
-int moho::register_STransportPickUpInfoTypeInfo()
+void moho::register_STransportPickUpInfoTypeInfo()
 {
   (void)AcquireSTransportPickUpInfoTypeInfo();
-  return std::atexit(&cleanup_STransportPickUpInfoTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

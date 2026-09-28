@@ -107,6 +107,6 @@ namespace moho
    * Preregisters reflected `gpg::fastvector<IFormationInstance*>` type info
    * and installs process-exit cleanup for that descriptor storage.
    */
-  int register_FastVectorIFormationInstanceTypeAtexit();
+  void register_FastVectorIFormationInstanceTypeAtexit();
 
 } // namespace moho

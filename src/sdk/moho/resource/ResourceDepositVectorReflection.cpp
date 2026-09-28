@@ -15,10 +15,6 @@ namespace
 {
   using ResourceDepositVector = msvc8::vector<moho::ResourceDeposit>;
 
-  alignas(gpg::RVectorType_ResourceDeposit) unsigned char
-    gResourceDepositVectorTypeStorage[sizeof(gpg::RVectorType_ResourceDeposit)];
-  bool gResourceDepositVectorTypeConstructed = false;
-
   [[nodiscard]] gpg::RType* CachedResourceDepositType()
   {
     static gpg::RType* cached = nullptr;
@@ -90,22 +86,8 @@ namespace
 
   [[nodiscard]] gpg::RVectorType_ResourceDeposit& AcquireResourceDepositVectorType()
   {
-    if (!gResourceDepositVectorTypeConstructed) {
-      new (gResourceDepositVectorTypeStorage) gpg::RVectorType_ResourceDeposit();
-      gResourceDepositVectorTypeConstructed = true;
-    }
-
-    return *reinterpret_cast<gpg::RVectorType_ResourceDeposit*>(gResourceDepositVectorTypeStorage);
-  }
-
-  void cleanup_VectorResourceDepositTypeStorage()
-  {
-    if (!gResourceDepositVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireResourceDepositVectorType().~RVectorType_ResourceDeposit();
-    gResourceDepositVectorTypeConstructed = false;
+    static gpg::RVectorType_ResourceDeposit sInstance;
+    return sInstance;
   }
 
   struct ResourceDepositVectorReflectionBootstrap
@@ -307,12 +289,10 @@ gpg::RType* moho::preregister_VectorResourceDepositType()
   return typeInfo;
 }
 
-int moho::register_VectorResourceDepositTypeAtexit()
+void moho::register_VectorResourceDepositTypeAtexit()
 {
   (void)preregister_VectorResourceDepositType();
-  return std::atexit(&cleanup_VectorResourceDepositTypeStorage);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

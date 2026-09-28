@@ -14,27 +14,10 @@ namespace
 {
   using TypeInfo = moho::RUnitBlueprintTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRUnitBlueprintTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRUnitBlueprintTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRUnitBlueprintTypeInfo()
   {
-    if (!gRUnitBlueprintTypeInfoConstructed) {
-      new (gRUnitBlueprintTypeInfoStorage) TypeInfo();
-      gRUnitBlueprintTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRUnitBlueprintTypeInfoStorage);
-  }
-
-  void cleanup_RUnitBlueprintTypeInfo()
-  {
-    if (!gRUnitBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRUnitBlueprintTypeInfo().~TypeInfo();
-    gRUnitBlueprintTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* CachedEntityBlueprintType()
@@ -447,10 +430,8 @@ namespace moho
   void register_RUnitBlueprintTypeInfo()
   {
     (void)AcquireRUnitBlueprintTypeInfo();
-    (void)std::atexit(&cleanup_RUnitBlueprintTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

@@ -4,34 +4,18 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/RRuleGameRules.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::RRuleGameRulesImplTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRRuleGameRulesImplTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRRuleGameRulesImplTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRRuleGameRulesImplTypeInfo()
   {
-    if (!gRRuleGameRulesImplTypeInfoConstructed) {
-      new (gRRuleGameRulesImplTypeInfoStorage) TypeInfo();
-      gRRuleGameRulesImplTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRRuleGameRulesImplTypeInfoStorage);
-  }
-
-  void cleanup_RRuleGameRulesImplTypeInfo()
-  {
-    if (!gRRuleGameRulesImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRRuleGameRulesImplTypeInfo().~TypeInfo();
-    gRRuleGameRulesImplTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   struct RRuleGameRulesImplTypeInfoBootstrap
@@ -110,13 +94,11 @@ namespace moho
   /**
    * Address: 0x00BC8EF0 (FUN_00BC8EF0, register_RRuleGameRulesImplTypeInfoStartup)
    */
-  int register_RRuleGameRulesImplTypeInfoStartup()
+  void register_RRuleGameRulesImplTypeInfoStartup()
   {
     (void)AcquireRRuleGameRulesImplTypeInfo();
-    return std::atexit(&cleanup_RRuleGameRulesImplTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

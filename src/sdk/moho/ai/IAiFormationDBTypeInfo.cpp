@@ -11,34 +11,15 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiFormationDBTypeInfo) unsigned char gIAiFormationDBTypeInfoStorage[sizeof(IAiFormationDBTypeInfo)] = {};
-  bool gIAiFormationDBTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF67D0 (FUN_00BF67D0, atexit destructor of the IAiFormationDBTypeInfo object)
+   */
   [[nodiscard]] IAiFormationDBTypeInfo* AcquireIAiFormationDBTypeInfo()
   {
-    if (!gIAiFormationDBTypeInfoConstructed) {
-      new (gIAiFormationDBTypeInfoStorage) IAiFormationDBTypeInfo();
-      gIAiFormationDBTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<IAiFormationDBTypeInfo*>(gIAiFormationDBTypeInfoStorage);
+    static IAiFormationDBTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00BF67D0 (FUN_00BF67D0)
-   *
-   * What it does:
-   * Tears down startup-owned `IAiFormationDBTypeInfo` storage.
-   */
-  void cleanup_IAiFormationDBTypeInfo()
-  {
-    if (!gIAiFormationDBTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireIAiFormationDBTypeInfo()->~IAiFormationDBTypeInfo();
-    gIAiFormationDBTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -82,10 +63,9 @@ void IAiFormationDBTypeInfo::Init()
  * Constructs startup-owned `IAiFormationDBTypeInfo` storage and installs
  * process-exit cleanup.
  */
-int moho::register_IAiFormationDBTypeInfo()
+void moho::register_IAiFormationDBTypeInfo()
 {
   (void)AcquireIAiFormationDBTypeInfo();
-  return std::atexit(&cleanup_IAiFormationDBTypeInfo);
 }
 
 namespace
@@ -100,7 +80,6 @@ namespace
 
   [[maybe_unused]] IAiFormationDBTypeInfoBootstrap gIAiFormationDBTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

@@ -43,18 +43,10 @@ namespace gpg
   static_assert(sizeof(ArchiveTokenTypeInfo) == 0x78, "ArchiveTokenTypeInfo size must be 0x78");
 
   /**
-   * Address: 0x00C0A210 (FUN_00C0A210, ArchiveTokenTypeInfo::~ArchiveTokenTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `ArchiveTokenTypeInfo` storage at process exit.
-   */
-  void cleanup_ArchiveTokenTypeInfo();
-
-  /**
    * Address: 0x00BEAAB0 (FUN_00BEAAB0, register_ArchiveTokenTypeInfo)
    *
    * What it does:
    * Runs preregistration for `ArchiveTokenTypeInfo` and installs exit cleanup.
    */
-  int register_ArchiveTokenTypeInfoStartup();
+  void register_ArchiveTokenTypeInfoStartup();
 } // namespace gpg

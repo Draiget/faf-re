@@ -12,27 +12,10 @@ namespace
 {
   using TypeInfo = moho::CAniResourceSkelTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCAniResourceSkelTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCAniResourceSkelTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireCAniResourceSkelTypeInfo()
   {
-    if (!gCAniResourceSkelTypeInfoConstructed) {
-      new (gCAniResourceSkelTypeInfoStorage) TypeInfo();
-      gCAniResourceSkelTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCAniResourceSkelTypeInfoStorage);
-  }
-
-  void cleanup_CAniResourceSkelTypeInfo()
-  {
-    if (!gCAniResourceSkelTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAniResourceSkelTypeInfo().~TypeInfo();
-    gCAniResourceSkelTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   struct CAniResourceSkelTypeInfoBootstrap
@@ -104,10 +87,8 @@ void CAniResourceSkelTypeInfo::AddBase_CAniSkel(gpg::RType* const typeInfo)
   void register_CAniResourceSkelTypeInfo()
   {
     (void)AcquireCAniResourceSkelTypeInfo();
-    (void)std::atexit(&cleanup_CAniResourceSkelTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

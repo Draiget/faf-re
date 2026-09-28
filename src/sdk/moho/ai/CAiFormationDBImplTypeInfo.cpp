@@ -41,25 +41,16 @@ namespace
     "IFormationInstanceFastVectorTypeInfo size must be 0x68"
   );
 
-  alignas(CAiFormationDBImplTypeInfo)
-  unsigned char gCAiFormationDBImplTypeInfoStorage[sizeof(CAiFormationDBImplTypeInfo)] = {};
-  bool gCAiFormationDBImplTypeInfoConstructed = false;
-
-  alignas(IFormationInstanceFastVectorTypeInfo)
-  unsigned char
-    gFastVectorIFormationInstanceTypeStorage[sizeof(IFormationInstanceFastVectorTypeInfo)] = {};
-  bool gFastVectorIFormationInstanceTypeConstructed = false;
   msvc8::string gFastVectorIFormationInstanceTypeName;
   bool gFastVectorIFormationInstanceTypeNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BF6830 (FUN_00BF6830, atexit destructor of the CAiFormationDBImplTypeInfo object)
+   */
   [[nodiscard]] CAiFormationDBImplTypeInfo* AcquireCAiFormationDBImplTypeInfo()
   {
-    if (!gCAiFormationDBImplTypeInfoConstructed) {
-      new (gCAiFormationDBImplTypeInfoStorage) CAiFormationDBImplTypeInfo();
-      gCAiFormationDBImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiFormationDBImplTypeInfo*>(gCAiFormationDBImplTypeInfoStorage);
+    static CAiFormationDBImplTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RRef MakeCAiFormationDBImplRef(CAiFormationDBImpl* const object) noexcept
@@ -69,14 +60,13 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x00BF6980 (FUN_00BF6980, atexit destructor of the IFormationInstanceFastVectorTypeInfo object)
+   */
   [[nodiscard]] IFormationInstanceFastVectorTypeInfo* AcquireFastVectorIFormationInstanceType()
   {
-    if (!gFastVectorIFormationInstanceTypeConstructed) {
-      new (gFastVectorIFormationInstanceTypeStorage) IFormationInstanceFastVectorTypeInfo();
-      gFastVectorIFormationInstanceTypeConstructed = true;
-    }
-
-    return reinterpret_cast<IFormationInstanceFastVectorTypeInfo*>(gFastVectorIFormationInstanceTypeStorage);
+    static IFormationInstanceFastVectorTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedIFormationInstanceType()
@@ -214,39 +204,6 @@ namespace
     IFormationInstanceFastVectorTypeInfo* const type = AcquireFastVectorIFormationInstanceType();
     gpg::PreRegisterRType(typeid(gpg::fastvector<IFormationInstance*>), type);
     return type;
-  }
-
-  /**
-   * Address: 0x00BF6830 (FUN_00BF6830)
-   *
-   * What it does:
-   * Tears down startup-owned `CAiFormationDBImplTypeInfo` storage.
-   */
-  void cleanup_CAiFormationDBImplTypeInfo()
-  {
-    if (!gCAiFormationDBImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiFormationDBImplTypeInfo()->~CAiFormationDBImplTypeInfo();
-    gCAiFormationDBImplTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BF6980 (FUN_00BF6980, cleanup_FastVectorIFormationInstanceType)
-   *
-   * What it does:
-   * Tears down startup-owned `gpg::fastvector<IFormationInstance*>`
-   * reflection storage.
-   */
-  void cleanup_FastVectorIFormationInstanceType()
-  {
-    if (!gFastVectorIFormationInstanceTypeConstructed) {
-      return;
-    }
-
-    AcquireFastVectorIFormationInstanceType()->~IFormationInstanceFastVectorTypeInfo();
-    gFastVectorIFormationInstanceTypeConstructed = false;
   }
 
   void cleanup_FastVectorIFormationInstanceTypeName()
@@ -498,7 +455,6 @@ void CAiFormationDBImplTypeInfo::Destruct(void* const objectStorage)
 void moho::register_CAiFormationDBImplTypeInfo()
 {
   (void)AcquireCAiFormationDBImplTypeInfo();
-  (void)std::atexit(&cleanup_CAiFormationDBImplTypeInfo);
 }
 
 /**
@@ -508,10 +464,9 @@ void moho::register_CAiFormationDBImplTypeInfo()
  * Preregisters reflected `gpg::fastvector<IFormationInstance*>` type info and
  * installs process-exit cleanup for that descriptor storage.
  */
-int moho::register_FastVectorIFormationInstanceTypeAtexit()
+void moho::register_FastVectorIFormationInstanceTypeAtexit()
 {
   (void)preregister_FastVectorIFormationInstanceType();
-  return std::atexit(&cleanup_FastVectorIFormationInstanceType);
 }
 
 namespace
@@ -527,7 +482,6 @@ namespace
 
   [[maybe_unused]] CAiFormationDBImplTypeInfoBootstrap gCAiFormationDBImplTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

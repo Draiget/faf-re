@@ -13,27 +13,10 @@ namespace
 {
   using TypeInfo = moho::RMeshBlueprintTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRMeshBlueprintTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRMeshBlueprintTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRMeshBlueprintTypeInfo()
   {
-    if (!gRMeshBlueprintTypeInfoConstructed) {
-      new (gRMeshBlueprintTypeInfoStorage) TypeInfo();
-      gRMeshBlueprintTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRMeshBlueprintTypeInfoStorage);
-  }
-
-  void cleanup_RMeshBlueprintTypeInfo()
-  {
-    if (!gRMeshBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRMeshBlueprintTypeInfo().~TypeInfo();
-    gRMeshBlueprintTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* CachedRBlueprintType()
@@ -195,13 +178,11 @@ namespace moho
   /**
    * Address: 0x00BC8530 (FUN_00BC8530, register_RMeshBlueprintTypeInfo)
    */
-  int register_RMeshBlueprintTypeInfo()
+  void register_RMeshBlueprintTypeInfo()
   {
     (void)AcquireRMeshBlueprintTypeInfo();
-    return std::atexit(&cleanup_RMeshBlueprintTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

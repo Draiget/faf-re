@@ -34,14 +34,9 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BF1020 (FUN_00BF1020, cleanup_SAudioRequestTypeInfo)
-   */
-  void cleanup_SAudioRequestTypeInfo();
-
-  /**
    * Address: 0x00BC6A30 (FUN_00BC6A30, register_SAudioRequestTypeInfo)
    */
-  int register_SAudioRequestTypeInfo();
+  void register_SAudioRequestTypeInfo();
 
   static_assert(sizeof(SAudioRequestTypeInfo) == 0x64, "SAudioRequestTypeInfo size must be 0x64");
 } // namespace moho

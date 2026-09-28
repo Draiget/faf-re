@@ -7,8 +7,6 @@ namespace moho
 {
   struct RMeshBlueprintLOD;
 
-
-
   /**
    * VFTABLE: 0x00E0FE1C
    * COL: 0x00E692FC
@@ -64,7 +62,7 @@ namespace moho
    * Materializes and startup-registers `RMeshBlueprintLODTypeInfo`, then
    * installs process-exit cleanup.
    */
-  int register_RMeshBlueprintLODTypeInfo();
+  void register_RMeshBlueprintLODTypeInfo();
 
   /**
    * Address: 0x0051A6D0 (FUN_0051A6D0)
@@ -81,7 +79,7 @@ namespace moho
    * Registers `vector<RMeshBlueprintLOD>` reflection and installs process-exit
    * teardown.
    */
-  int register_VectorRMeshBlueprintLODTypeAtexit();
+  void register_VectorRMeshBlueprintLODTypeAtexit();
 
   static_assert(sizeof(RMeshBlueprintLODTypeInfo) == 0x64, "RMeshBlueprintLODTypeInfo size must be 0x64");
 } // namespace moho

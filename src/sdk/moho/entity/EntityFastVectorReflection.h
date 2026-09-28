@@ -194,20 +194,12 @@ namespace moho
   [[nodiscard]] gpg::RType* register_WeakPtr_Entity_Type_00();
 
   /**
-   * Address: 0x00BFC9F0 (FUN_00BFC9F0, cleanup_WeakPtr_Entity_Type)
-   *
-   * What it does:
-   * Tears down startup-owned `WeakPtr<Entity>` reflection storage.
-   */
-  void cleanup_WeakPtr_Entity_Type();
-
-  /**
    * Address: 0x00BD5090 (FUN_00BD5090, register_WeakPtr_Entity_Type_AtExit)
    *
    * What it does:
    * Registers `WeakPtr<Entity>` reflection and installs process-exit cleanup.
    */
-  int register_WeakPtr_Entity_Type_AtExit();
+  void register_WeakPtr_Entity_Type_AtExit();
 
   /**
    * Address: 0x0067FF70 (FUN_0067FF70, register_VectorEntityPtr_Type_00)
@@ -218,20 +210,12 @@ namespace moho
   [[nodiscard]] gpg::RType* register_VectorEntityPtr_Type_00();
 
   /**
-   * Address: 0x00BFC990 (FUN_00BFC990, cleanup_VectorEntityPtr_Type)
-   *
-   * What it does:
-   * Tears down startup-owned `vector<Entity*>` reflection storage.
-   */
-  void cleanup_VectorEntityPtr_Type();
-
-  /**
    * Address: 0x00BD50B0 (FUN_00BD50B0, register_VectorEntityPtr_Type_AtExit)
    *
    * What it does:
    * Registers `vector<Entity*>` reflection and installs process-exit cleanup.
    */
-  int register_VectorEntityPtr_Type_AtExit();
+  void register_VectorEntityPtr_Type_AtExit();
 
   /**
     * Alias of FUN_00694380 (non-canonical helper lane).

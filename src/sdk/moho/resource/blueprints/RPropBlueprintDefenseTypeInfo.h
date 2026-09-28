@@ -53,5 +53,5 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RPropBlueprintDefenseTypeInfo`.
    */
-  int register_RPropBlueprintDefenseTypeInfo();
+  void register_RPropBlueprintDefenseTypeInfo();
 } // namespace moho

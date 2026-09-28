@@ -321,70 +321,34 @@ namespace
   using ReservedTransportBoneVector = msvc8::vector<moho::SAiReservedTransportBone>;
   using AttachPointVector = msvc8::vector<moho::SAttachPoint>;
 
-  alignas(BroadcasterTransportType) unsigned char gBroadcasterTransportTypeStorage[sizeof(BroadcasterTransportType)];
-  bool gBroadcasterTransportTypeConstructed = false;
-
-  alignas(ListenerTransportType) unsigned char gListenerTransportTypeStorage[sizeof(ListenerTransportType)];
-  bool gListenerTransportTypeConstructed = false;
-
-  alignas(IntVectorType) unsigned char gIntVectorTypeStorage[sizeof(IntVectorType)];
-  bool gIntVectorTypeConstructed = false;
-
-  alignas(ReservedTransportBoneVectorType)
-    unsigned char gReservedTransportBoneVectorTypeStorage[sizeof(ReservedTransportBoneVectorType)];
-  bool gReservedTransportBoneVectorTypeConstructed = false;
-
-  alignas(AttachPointVectorType) unsigned char gAttachPointVectorTypeStorage[sizeof(AttachPointVectorType)];
-  bool gAttachPointVectorTypeConstructed = false;
-
   [[nodiscard]] BroadcasterTransportType* AcquireBroadcasterTransportType()
   {
-    if (!gBroadcasterTransportTypeConstructed) {
-      new (gBroadcasterTransportTypeStorage) BroadcasterTransportType();
-      gBroadcasterTransportTypeConstructed = true;
-    }
-
-    return reinterpret_cast<BroadcasterTransportType*>(gBroadcasterTransportTypeStorage);
+    static BroadcasterTransportType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] ListenerTransportType* AcquireListenerTransportType()
   {
-    if (!gListenerTransportTypeConstructed) {
-      new (gListenerTransportTypeStorage) ListenerTransportType();
-      gListenerTransportTypeConstructed = true;
-    }
-
-    return reinterpret_cast<ListenerTransportType*>(gListenerTransportTypeStorage);
+    static ListenerTransportType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] IntVectorType* AcquireIntVectorType()
   {
-    if (!gIntVectorTypeConstructed) {
-      new (gIntVectorTypeStorage) IntVectorType();
-      gIntVectorTypeConstructed = true;
-    }
-
-    return reinterpret_cast<IntVectorType*>(gIntVectorTypeStorage);
+    static IntVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] ReservedTransportBoneVectorType* AcquireReservedTransportBoneVectorType()
   {
-    if (!gReservedTransportBoneVectorTypeConstructed) {
-      new (gReservedTransportBoneVectorTypeStorage) ReservedTransportBoneVectorType();
-      gReservedTransportBoneVectorTypeConstructed = true;
-    }
-
-    return reinterpret_cast<ReservedTransportBoneVectorType*>(gReservedTransportBoneVectorTypeStorage);
+    static ReservedTransportBoneVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] AttachPointVectorType* AcquireAttachPointVectorType()
   {
-    if (!gAttachPointVectorTypeConstructed) {
-      new (gAttachPointVectorTypeStorage) AttachPointVectorType();
-      gAttachPointVectorTypeConstructed = true;
-    }
-
-    return reinterpret_cast<AttachPointVectorType*>(gAttachPointVectorTypeStorage);
+    static AttachPointVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* ResolveIntType()
@@ -483,56 +447,6 @@ namespace
     const msvc8::string base = ownerType != nullptr ? ownerType->gpg::RType::GetLexical(ref) : msvc8::string("vector");
     const int size = vec ? static_cast<int>(vec->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
-  }
-
-  void cleanup_RBroadcasterRType_EAiTransportEvent()
-  {
-    if (!gBroadcasterTransportTypeConstructed) {
-      return;
-    }
-
-    AcquireBroadcasterTransportType()->~BroadcasterTransportType();
-    gBroadcasterTransportTypeConstructed = false;
-  }
-
-  void cleanup_RListenerRType_EAiTransportEvent()
-  {
-    if (!gListenerTransportTypeConstructed) {
-      return;
-    }
-
-    AcquireListenerTransportType()->~ListenerTransportType();
-    gListenerTransportTypeConstructed = false;
-  }
-
-  void cleanup_RVectorType_int()
-  {
-    if (!gIntVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireIntVectorType()->~IntVectorType();
-    gIntVectorTypeConstructed = false;
-  }
-
-  void cleanup_RVectorType_SAiReservedTransportBone()
-  {
-    if (!gReservedTransportBoneVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireReservedTransportBoneVectorType()->~ReservedTransportBoneVectorType();
-    gReservedTransportBoneVectorTypeConstructed = false;
-  }
-
-  void cleanup_RVectorType_SAttachPoint()
-  {
-    if (!gAttachPointVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireAttachPointVectorType()->~AttachPointVectorType();
-    gAttachPointVectorTypeConstructed = false;
   }
 
   void cleanup_RBroadcasterRType_EAiTransportEvent_GetName()
@@ -1240,10 +1154,9 @@ Unit* IAiTransport::TransportGetTeleportBeaconForSync() const
  * Registers the broadcaster reflection lane for `EAiTransportEvent` and
  * installs process-exit cleanup.
  */
-int moho::register_RBroadcasterRType_EAiTransportEvent()
+void moho::register_RBroadcasterRType_EAiTransportEvent()
 {
   (void)AcquireBroadcasterTransportType();
-  return std::atexit(&cleanup_RBroadcasterRType_EAiTransportEvent);
 }
 
 /**
@@ -1253,10 +1166,9 @@ int moho::register_RBroadcasterRType_EAiTransportEvent()
  * Registers the listener reflection lane for `EAiTransportEvent` and installs
  * process-exit cleanup.
  */
-int moho::register_RListenerRType_EAiTransportEvent()
+void moho::register_RListenerRType_EAiTransportEvent()
 {
   (void)AcquireListenerTransportType();
-  return std::atexit(&cleanup_RListenerRType_EAiTransportEvent);
 }
 
 /**
@@ -1266,10 +1178,9 @@ int moho::register_RListenerRType_EAiTransportEvent()
  * Constructs/preregisters the `msvc8::vector<int>` reflection type and
  * installs process-exit cleanup.
  */
-int moho::register_RVectorType_int()
+void moho::register_RVectorType_int()
 {
   (void)AcquireIntVectorType();
-  return std::atexit(&cleanup_RVectorType_int);
 }
 
 /**
@@ -1279,10 +1190,9 @@ int moho::register_RVectorType_int()
  * Constructs/preregisters the `msvc8::vector<SAiReservedTransportBone>`
  * reflection type and installs process-exit cleanup.
  */
-int moho::register_RVectorType_SAiReservedTransportBone()
+void moho::register_RVectorType_SAiReservedTransportBone()
 {
   (void)AcquireReservedTransportBoneVectorType();
-  return std::atexit(&cleanup_RVectorType_SAiReservedTransportBone);
 }
 
 /**
@@ -1292,10 +1202,9 @@ int moho::register_RVectorType_SAiReservedTransportBone()
  * Constructs/preregisters the `msvc8::vector<SAttachPoint>` reflection type
  * and installs process-exit cleanup.
  */
-int moho::register_RVectorType_SAttachPoint()
+void moho::register_RVectorType_SAttachPoint()
 {
   (void)AcquireAttachPointVectorType();
-  return std::atexit(&cleanup_RVectorType_SAttachPoint);
 }
 
 namespace

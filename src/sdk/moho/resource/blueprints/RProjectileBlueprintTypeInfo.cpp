@@ -13,27 +13,10 @@ namespace
 {
   using TypeInfo = moho::RProjectileBlueprintTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRProjectileBlueprintTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRProjectileBlueprintTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRProjectileBlueprintTypeInfo()
   {
-    if (!gRProjectileBlueprintTypeInfoConstructed) {
-      new (gRProjectileBlueprintTypeInfoStorage) TypeInfo();
-      gRProjectileBlueprintTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRProjectileBlueprintTypeInfoStorage);
-  }
-
-  void cleanup_RProjectileBlueprintTypeInfo()
-  {
-    if (!gRProjectileBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRProjectileBlueprintTypeInfo().~TypeInfo();
-    gRProjectileBlueprintTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* CachedEntityBlueprintType()
@@ -237,13 +220,11 @@ namespace moho
   /**
    * Address: 0x00BC86B0 (FUN_00BC86B0, register_RProjectileBlueprintTypeInfo)
    */
-  int register_RProjectileBlueprintTypeInfo()
+  void register_RProjectileBlueprintTypeInfo()
   {
     (void)AcquireRProjectileBlueprintTypeInfo();
-    return std::atexit(&cleanup_RProjectileBlueprintTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

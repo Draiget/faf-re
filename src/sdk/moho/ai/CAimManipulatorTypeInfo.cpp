@@ -6,22 +6,19 @@
 #include <typeinfo>
 
 #include "moho/ai/CAimManipulator.h"
-#include "moho/animation/IAniManipulator.h"
+#include "moho/animation/IAniManipulator.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(moho::CAimManipulatorTypeInfo) unsigned char gCAimManipulatorTypeInfoStorage[sizeof(moho::CAimManipulatorTypeInfo)] = {};
-  bool gCAimManipulatorTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFA900 (FUN_00BFA900, atexit destructor of the moho::CAimManipulatorTypeInfo object)
+   */
   [[nodiscard]] moho::CAimManipulatorTypeInfo* AcquireCAimManipulatorTypeInfo()
   {
-    if (!gCAimManipulatorTypeInfoConstructed) {
-      new (gCAimManipulatorTypeInfoStorage) moho::CAimManipulatorTypeInfo();
-      gCAimManipulatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CAimManipulatorTypeInfo*>(gCAimManipulatorTypeInfoStorage);
+    static moho::CAimManipulatorTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCAimManipulatorType()
@@ -52,21 +49,6 @@ namespace
     return out;
   }
 
-  /**
-   * Address: 0x00BFA900 (FUN_00BFA900, cleanup_CAimManipulatorTypeInfo)
-   *
-   * What it does:
-   * Tears down static `CAimManipulatorTypeInfo` storage at process exit.
-   */
-  void cleanup_CAimManipulatorTypeInfo()
-  {
-    if (!gCAimManipulatorTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAimManipulatorTypeInfo()->~CAimManipulatorTypeInfo();
-    gCAimManipulatorTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -183,10 +165,8 @@ namespace moho
   void register_CAimManipulatorTypeInfo()
   {
     (void)AcquireCAimManipulatorTypeInfo();
-    (void)std::atexit(&cleanup_CAimManipulatorTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

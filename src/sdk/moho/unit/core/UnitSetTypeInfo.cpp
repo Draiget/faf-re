@@ -4,24 +4,21 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/entity/Entity.h"
+#include "moho/entity/Entity.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::UnitSetTypeInfo;
 
-  alignas(TypeInfo) unsigned char gUnitSetTypeInfoStorage[sizeof(TypeInfo)];
-  bool gUnitSetTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFE3F0 (FUN_00BFE3F0, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireUnitSetTypeInfo()
   {
-    if (!gUnitSetTypeInfoConstructed) {
-      new (gUnitSetTypeInfoStorage) TypeInfo();
-      gUnitSetTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gUnitSetTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -111,25 +108,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE3F0 (FUN_00BFE3F0, sub_BFE3F0)
-   */
-  void cleanup_UnitSetTypeInfo()
-  {
-    if (!gUnitSetTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireUnitSetTypeInfo().~UnitSetTypeInfo();
-    gUnitSetTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD8460 (FUN_00BD8460, sub_BD8460)
    */
-  int register_UnitSetTypeInfo()
+  void register_UnitSetTypeInfo()
   {
     (void)AcquireUnitSetTypeInfo();
-    return std::atexit(&cleanup_UnitSetTypeInfo);
   }
 } // namespace moho
 
@@ -145,7 +128,6 @@ namespace
 
   UnitSetTypeInfoBootstrap gUnitSetTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

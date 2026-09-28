@@ -44,21 +44,13 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BFE010 (FUN_00BFE010, cleanup_CUnitMotionTypeInfo)
-   *
-   * What it does:
-   * Releases process-exit `CUnitMotionTypeInfo` field/base vector storage.
-   */
-  void cleanup_CUnitMotionTypeInfo();
-
-  /**
    * Address: 0x00BD7220 (FUN_00BD7220, register_CUnitMotionTypeInfo)
    *
    * What it does:
    * Forces `CUnitMotionTypeInfo` startup construction and installs `atexit`
    * cleanup.
    */
-  int register_CUnitMotionTypeInfo();
+  void register_CUnitMotionTypeInfo();
 
   static_assert(sizeof(CUnitMotionTypeInfo) == 0x64, "CUnitMotionTypeInfo size must be 0x64");
 } // namespace moho

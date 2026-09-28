@@ -51,5 +51,5 @@ namespace moho
    * What it does:
    * Registers the `SScroller` type-info object and installs process-exit cleanup.
    */
-  int register_SScrollerTypeInfo();
+  void register_SScrollerTypeInfo();
 } // namespace moho

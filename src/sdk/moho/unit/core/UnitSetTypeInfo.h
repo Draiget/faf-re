@@ -50,18 +50,10 @@ namespace moho
   static_assert(sizeof(UnitSetTypeInfo) == 0x64, "UnitSetTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00BFE3F0 (FUN_00BFE3F0, sub_BFE3F0)
-   *
-   * What it does:
-   * Tears down the global `UnitSetTypeInfo` storage at process exit.
-   */
-  void cleanup_UnitSetTypeInfo();
-
-  /**
    * Address: 0x00BD8460 (FUN_00BD8460, sub_BD8460)
    *
    * What it does:
    * Constructs global `UnitSetTypeInfo` and registers exit cleanup.
    */
-  int register_UnitSetTypeInfo();
+  void register_UnitSetTypeInfo();
 } // namespace moho

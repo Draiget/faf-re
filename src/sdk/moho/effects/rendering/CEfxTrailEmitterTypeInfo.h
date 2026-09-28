@@ -61,19 +61,11 @@ namespace moho
   gpg::RType* register_CEfxTrailEmitterTypeInfo_00();
 
   /**
-   * Address: 0x00BFC1F0 (FUN_00BFC1F0)
-   *
-   * What it does:
-   * Tears down startup-owned `CEfxTrailEmitterTypeInfo` reflection storage.
-   */
-  void cleanup_CEfxTrailEmitterTypeInfo();
-
-  /**
    * Address: 0x00BD4950 (FUN_00BD4950)
    *
    * What it does:
    * Registers `CEfxTrailEmitter` RTTI bootstrap and installs process-exit
    * cleanup.
    */
-  int register_CEfxTrailEmitterTypeInfo_AtExit();
+  void register_CEfxTrailEmitterTypeInfo_AtExit();
 } // namespace moho

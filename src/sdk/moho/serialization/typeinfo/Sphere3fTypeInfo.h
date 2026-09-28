@@ -54,5 +54,5 @@ namespace moho
    * Constructs startup-owned Sphere3f type metadata and installs process-exit
    * teardown.
    */
-  int register_Sphere3fTypeInfo();
+  void register_Sphere3fTypeInfo();
 } // namespace moho

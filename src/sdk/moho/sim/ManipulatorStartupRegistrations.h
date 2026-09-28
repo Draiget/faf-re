@@ -32,8 +32,6 @@ namespace moho
    */
   CScrLuaInitForm* register_CAimManipulatorLuaBaseClass();
 
-
-
   /**
    * Address: 0x00BD2270 (FUN_00BD2270, register_CAimManipulatorTypeInfo)
    *
@@ -195,7 +193,7 @@ namespace moho
    * Registers startup reflection metadata for `std::vector<bool>` and installs
    * process-exit cleanup.
    */
-  int register_RVectorType_bool();
+  void register_RVectorType_bool();
 
   /**
    * Address: 0x00BD2F20 (FUN_00BD2F20, sub_BD2F20)

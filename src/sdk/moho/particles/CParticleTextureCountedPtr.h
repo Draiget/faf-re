@@ -135,12 +135,7 @@ namespace moho
   gpg::RType* preregister_FastVectorCountedPtrCParticleTextureType();
 
   /**
-   * Address: 0x00BFBB70 (FUN_00BFBB70, cleanup_FastVectorCountedPtrCParticleTextureType)
-   */
-  void cleanup_FastVectorCountedPtrCParticleTextureType();
-
-  /**
    * Address: 0x00BD4160 (FUN_00BD4160, register_FastVectorCountedPtrCParticleTextureTypeAtexit)
    */
-  int register_FastVectorCountedPtrCParticleTextureTypeAtexit();
+  void register_FastVectorCountedPtrCParticleTextureTypeAtexit();
 } // namespace moho

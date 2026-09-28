@@ -22,33 +22,27 @@ namespace
   using WeakPtrVector = msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>;
   using WeakPtrVectorType = gpg::RVectorType<moho::WeakPtr<moho::CUnitCommand>>;
 
-  alignas(WeakPtrType) unsigned char gWeakPtrTypeStorage[sizeof(WeakPtrType)];
-  bool gWeakPtrTypeConstructed = false;
-
-  alignas(WeakPtrVectorType) unsigned char gWeakPtrVectorTypeStorage[sizeof(WeakPtrVectorType)];
-  bool gWeakPtrVectorTypeConstructed = false;
-
   msvc8::string gWeakPtrTypeName;
   msvc8::string gWeakPtrVectorTypeName;
   bool gWeakPtrTypeNameCleanupRegistered = false;
   bool gWeakPtrVectorTypeNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BFEDC0 (FUN_00BFEDC0, atexit destructor of the WeakPtrType object)
+   */
   [[nodiscard]] WeakPtrType* AcquireWeakPtrType()
   {
-    if (!gWeakPtrTypeConstructed) {
-      new (gWeakPtrTypeStorage) WeakPtrType();
-      gWeakPtrTypeConstructed = true;
-    }
-    return reinterpret_cast<WeakPtrType*>(gWeakPtrTypeStorage);
+    static WeakPtrType sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BFED60 (FUN_00BFED60, atexit destructor of the WeakPtrVectorType object)
+   */
   [[nodiscard]] WeakPtrVectorType* AcquireWeakPtrVectorType()
   {
-    if (!gWeakPtrVectorTypeConstructed) {
-      new (gWeakPtrVectorTypeStorage) WeakPtrVectorType();
-      gWeakPtrVectorTypeConstructed = true;
-    }
-    return reinterpret_cast<WeakPtrVectorType*>(gWeakPtrVectorTypeStorage);
+    static WeakPtrVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCUnitCommandType()
@@ -165,32 +159,6 @@ namespace
   {
     gWeakPtrVectorTypeName = msvc8::string{};
     gWeakPtrVectorTypeNameCleanupRegistered = false;
-  }
-
-  /**
-   * Address: 0x00BFEDC0 (FUN_00BFEDC0, sub_BFEDC0)
-   */
-  void cleanup_WeakPtr_CUnitCommand_Type()
-  {
-    if (!gWeakPtrTypeConstructed) {
-      return;
-    }
-
-    AcquireWeakPtrType()->~WeakPtrType();
-    gWeakPtrTypeConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BFED60 (FUN_00BFED60, sub_BFED60)
-   */
-  void cleanup_WeakPtr_CUnitCommand_VectorType()
-  {
-    if (!gWeakPtrVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireWeakPtrVectorType()->~WeakPtrVectorType();
-    gWeakPtrVectorTypeConstructed = false;
   }
 
   /**
@@ -376,10 +344,9 @@ namespace moho
   /**
    * Address: 0x00BD8FF0 (FUN_00BD8FF0, sub_BD8FF0)
    */
-  int register_WeakPtr_CUnitCommand_Type_AtExit()
+  void register_WeakPtr_CUnitCommand_Type_AtExit()
   {
     (void)register_WeakPtr_CUnitCommand_Type_00();
-    return std::atexit(&cleanup_WeakPtr_CUnitCommand_Type);
   }
 
   /**
@@ -395,10 +362,9 @@ namespace moho
   /**
    * Address: 0x00BD9010 (FUN_00BD9010, sub_BD9010)
    */
-  int register_WeakPtr_CUnitCommand_VectorType_AtExit()
+  void register_WeakPtr_CUnitCommand_VectorType_AtExit()
   {
     (void)register_WeakPtr_CUnitCommand_VectorType_00();
-    return std::atexit(&cleanup_WeakPtr_CUnitCommand_VectorType);
   }
 } // namespace moho
 

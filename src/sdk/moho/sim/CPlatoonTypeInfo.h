@@ -64,5 +64,5 @@ namespace moho
    * What it does:
    * Registers the `CPlatoon` type-info object and installs process-exit cleanup.
    */
-  int register_CPlatoonTypeInfo();
+  void register_CPlatoonTypeInfo();
 } // namespace moho

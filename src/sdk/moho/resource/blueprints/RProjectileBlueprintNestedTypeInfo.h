@@ -151,7 +151,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RProjectileBlueprintDisplayTypeInfo`.
    */
-  int register_RProjectileBlueprintDisplayTypeInfo();
+  void register_RProjectileBlueprintDisplayTypeInfo();
 
   /**
    * Address: 0x00BC8670 (FUN_00BC8670, register_RProjectileBlueprintEconomyTypeInfo)
@@ -159,7 +159,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RProjectileBlueprintEconomyTypeInfo`.
    */
-  int register_RProjectileBlueprintEconomyTypeInfo();
+  void register_RProjectileBlueprintEconomyTypeInfo();
 
   /**
    * Address: 0x00BC8690 (FUN_00BC8690, register_RProjectileBlueprintPhysicsTypeInfo)

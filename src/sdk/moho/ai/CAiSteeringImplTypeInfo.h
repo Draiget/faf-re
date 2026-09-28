@@ -77,7 +77,7 @@ namespace moho
    * Constructs startup-owned `CAiSteeringImplTypeInfo` storage and installs
    * process-exit cleanup.
    */
-  int register_CAiSteeringImplTypeInfo();
+  void register_CAiSteeringImplTypeInfo();
 
   static_assert(sizeof(CAiSteeringImplTypeInfo) == 0x64, "CAiSteeringImplTypeInfo size must be 0x64");
 } // namespace moho

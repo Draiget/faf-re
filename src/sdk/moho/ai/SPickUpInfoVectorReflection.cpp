@@ -22,10 +22,6 @@ namespace
   // (grow FUN_006275D0 dispatches to gpg::CopyWeakPtrFloatPayloadRangeStdOrder).
   using SPickUpInfoVector = msvc8::vector<moho::SPickUpInfo>;
 
-  alignas(gpg::RVectorType_SPickUpInfo) unsigned char
-    gSPickUpInfoVectorTypeStorage[sizeof(gpg::RVectorType_SPickUpInfo)];
-  bool gSPickUpInfoVectorTypeConstructed = false;
-
   [[nodiscard]] gpg::RType* CachedSPickUpInfoType()
   {
     gpg::RType* type = moho::SPickUpInfo::sType;
@@ -83,22 +79,8 @@ namespace
 
   [[nodiscard]] gpg::RVectorType_SPickUpInfo& AcquireSPickUpInfoVectorType()
   {
-    if (!gSPickUpInfoVectorTypeConstructed) {
-      new (gSPickUpInfoVectorTypeStorage) gpg::RVectorType_SPickUpInfo();
-      gSPickUpInfoVectorTypeConstructed = true;
-    }
-
-    return *reinterpret_cast<gpg::RVectorType_SPickUpInfo*>(gSPickUpInfoVectorTypeStorage);
-  }
-
-  void cleanup_VectorSPickUpInfoTypeStorage()
-  {
-    if (!gSPickUpInfoVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireSPickUpInfoVectorType().~RVectorType_SPickUpInfo();
-    gSPickUpInfoVectorTypeConstructed = false;
+    static gpg::RVectorType_SPickUpInfo sInstance;
+    return sInstance;
   }
 
   struct SPickUpInfoVectorReflectionBootstrap
@@ -334,10 +316,9 @@ gpg::RType* moho::preregister_VectorSPickUpInfoType()
  * via the CRT static-init array (the db-note edge into CUnitLoadUnits ctor is
  * a phantom edge — the real runtime consumers look the type up by typeid).
  */
-int moho::register_VectorSPickUpInfoTypeAtexit()
+void moho::register_VectorSPickUpInfoTypeAtexit()
 {
   (void)preregister_VectorSPickUpInfoType();
-  return std::atexit(&cleanup_VectorSPickUpInfoTypeStorage);
 }
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

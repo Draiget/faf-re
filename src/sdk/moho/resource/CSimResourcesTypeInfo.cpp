@@ -8,32 +8,16 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/resource/CSimResources.h"
-#include "moho/resource/ResourceReflectionHelpers.h"
+#include "moho/resource/ResourceReflectionHelpers.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(moho::CSimResourcesTypeInfo) unsigned char gCSimResourcesTypeInfoStorage[sizeof(moho::CSimResourcesTypeInfo)];
-  bool gCSimResourcesTypeInfoConstructed = false;
-
   [[nodiscard]] moho::CSimResourcesTypeInfo& AcquireCSimResourcesTypeInfo()
   {
-    if (!gCSimResourcesTypeInfoConstructed) {
-      new (gCSimResourcesTypeInfoStorage) moho::CSimResourcesTypeInfo();
-      gCSimResourcesTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::CSimResourcesTypeInfo*>(gCSimResourcesTypeInfoStorage);
-  }
-
-  void cleanup_CSimResourcesTypeInfo()
-  {
-    if (!gCSimResourcesTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCSimResourcesTypeInfo().~CSimResourcesTypeInfo();
-    gCSimResourcesTypeInfoConstructed = false;
+    static moho::CSimResourcesTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -312,10 +296,8 @@ namespace moho
   void register_CSimResourcesTypeInfo()
   {
     (void)AcquireCSimResourcesTypeInfo();
-    (void)std::atexit(&cleanup_CSimResourcesTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

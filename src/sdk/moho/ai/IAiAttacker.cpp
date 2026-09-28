@@ -211,57 +211,28 @@ namespace
     return reinterpret_cast<TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
   }
 
-  alignas(BroadcasterAttackerType) unsigned char gBroadcasterAttackerTypeStorage[sizeof(BroadcasterAttackerType)];
-  bool gBroadcasterAttackerTypeConstructed = false;
-
-  alignas(ListenerAttackerType) unsigned char gListenerAttackerTypeStorage[sizeof(ListenerAttackerType)];
-  bool gListenerAttackerTypeConstructed = false;
-
-  alignas(UnitWeaponPtrVectorType) unsigned char gUnitWeaponPtrVectorTypeStorage[sizeof(UnitWeaponPtrVectorType)];
-  bool gUnitWeaponPtrVectorTypeConstructed = false;
-
-  alignas(CAcquireTargetTaskPtrVectorType)
-    unsigned char gCAcquireTargetTaskPtrVectorTypeStorage[sizeof(CAcquireTargetTaskPtrVectorType)];
-  bool gCAcquireTargetTaskPtrVectorTypeConstructed = false;
-
   [[nodiscard]] BroadcasterAttackerType* AcquireBroadcasterAttackerType()
   {
-    if (!gBroadcasterAttackerTypeConstructed) {
-      new (gBroadcasterAttackerTypeStorage) BroadcasterAttackerType();
-      gBroadcasterAttackerTypeConstructed = true;
-    }
-
-    return reinterpret_cast<BroadcasterAttackerType*>(gBroadcasterAttackerTypeStorage);
+    static BroadcasterAttackerType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] ListenerAttackerType* AcquireListenerAttackerType()
   {
-    if (!gListenerAttackerTypeConstructed) {
-      new (gListenerAttackerTypeStorage) ListenerAttackerType();
-      gListenerAttackerTypeConstructed = true;
-    }
-
-    return reinterpret_cast<ListenerAttackerType*>(gListenerAttackerTypeStorage);
+    static ListenerAttackerType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] UnitWeaponPtrVectorType* AcquireUnitWeaponPtrVectorType()
   {
-    if (!gUnitWeaponPtrVectorTypeConstructed) {
-      new (gUnitWeaponPtrVectorTypeStorage) UnitWeaponPtrVectorType();
-      gUnitWeaponPtrVectorTypeConstructed = true;
-    }
-
-    return reinterpret_cast<UnitWeaponPtrVectorType*>(gUnitWeaponPtrVectorTypeStorage);
+    static UnitWeaponPtrVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] CAcquireTargetTaskPtrVectorType* AcquireCAcquireTargetTaskPtrVectorType()
   {
-    if (!gCAcquireTargetTaskPtrVectorTypeConstructed) {
-      new (gCAcquireTargetTaskPtrVectorTypeStorage) CAcquireTargetTaskPtrVectorType();
-      gCAcquireTargetTaskPtrVectorTypeConstructed = true;
-    }
-
-    return reinterpret_cast<CAcquireTargetTaskPtrVectorType*>(gCAcquireTargetTaskPtrVectorTypeStorage);
+    static CAcquireTargetTaskPtrVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* ResolveUnitWeaponPtrType()
@@ -332,26 +303,6 @@ namespace
     return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
   }
 
-  void cleanup_RBroadcasterRType_EAiAttackerEvent()
-  {
-    if (!gBroadcasterAttackerTypeConstructed) {
-      return;
-    }
-
-    AcquireBroadcasterAttackerType()->~BroadcasterAttackerType();
-    gBroadcasterAttackerTypeConstructed = false;
-  }
-
-  void cleanup_RListenerRType_EAiAttackerEvent()
-  {
-    if (!gListenerAttackerTypeConstructed) {
-      return;
-    }
-
-    AcquireListenerAttackerType()->~ListenerAttackerType();
-    gListenerAttackerTypeConstructed = false;
-  }
-
   void cleanup_RBroadcasterRType_EAiAttackerEvent_GetName()
   {
     CachedTypeName& cache = CachedBroadcasterEAiAttackerEventTypeName();
@@ -380,25 +331,6 @@ namespace
     cache.initialized = false;
   }
 
-  void cleanup_RVectorType_UnitWeaponPtr()
-  {
-    if (!gUnitWeaponPtrVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireUnitWeaponPtrVectorType()->~UnitWeaponPtrVectorType();
-    gUnitWeaponPtrVectorTypeConstructed = false;
-  }
-
-  void cleanup_RVectorType_CAcquireTargetTaskPtr()
-  {
-    if (!gCAcquireTargetTaskPtrVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireCAcquireTargetTaskPtrVectorType()->~CAcquireTargetTaskPtrVectorType();
-    gCAcquireTargetTaskPtrVectorTypeConstructed = false;
-  }
 } // namespace
 
 /**
@@ -851,10 +783,9 @@ gpg::RType* moho::preregister_RBroadcasterRType_EAiAttackerEvent()
  * Registers the broadcaster reflection lane for `EAiAttackerEvent` and
  * installs process-exit cleanup.
  */
-int moho::register_RBroadcasterRType_EAiAttackerEvent()
+void moho::register_RBroadcasterRType_EAiAttackerEvent()
 {
   (void)preregister_RBroadcasterRType_EAiAttackerEvent();
-  return std::atexit(&cleanup_RBroadcasterRType_EAiAttackerEvent);
 }
 
 /**
@@ -864,10 +795,9 @@ int moho::register_RBroadcasterRType_EAiAttackerEvent()
  * Registers the listener reflection lane for `EAiAttackerEvent` and installs
  * process-exit cleanup.
  */
-int moho::register_RListenerRType_EAiAttackerEvent()
+void moho::register_RListenerRType_EAiAttackerEvent()
 {
   (void)AcquireListenerAttackerType();
-  return std::atexit(&cleanup_RListenerRType_EAiAttackerEvent);
 }
 
 /**
@@ -905,10 +835,9 @@ gpg::RType* moho::preregister_RVectorType_CAcquireTargetTaskPtr()
  * Registers `msvc8::vector<UnitWeapon*>` reflection metadata and installs
  * process-exit cleanup.
  */
-int moho::register_RVectorType_UnitWeaponPtr()
+void moho::register_RVectorType_UnitWeaponPtr()
 {
   (void)preregister_RVectorType_UnitWeaponPtr();
-  return std::atexit(&cleanup_RVectorType_UnitWeaponPtr);
 }
 
 /**
@@ -918,10 +847,9 @@ int moho::register_RVectorType_UnitWeaponPtr()
  * Registers `msvc8::vector<CAcquireTargetTask*>` reflection metadata and
  * installs process-exit cleanup.
  */
-int moho::register_RVectorType_CAcquireTargetTaskPtr()
+void moho::register_RVectorType_CAcquireTargetTaskPtr()
 {
   (void)preregister_RVectorType_CAcquireTargetTaskPtr();
-  return std::atexit(&cleanup_RVectorType_CAcquireTargetTaskPtr);
 }
 
 namespace

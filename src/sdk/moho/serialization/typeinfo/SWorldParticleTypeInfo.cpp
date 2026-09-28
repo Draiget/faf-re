@@ -11,43 +11,31 @@ namespace
   using SWorldParticleZModeTypeInfo = moho::SWorldParticle_ZModeTypeInfo;
   using SWorldParticleTypeInfo = moho::SWorldParticleTypeInfo;
 
-  alignas(SWorldParticleBlendModeTypeInfo)
-    unsigned char gSWorldParticleBlendModeTypeInfoStorage[sizeof(SWorldParticleBlendModeTypeInfo)];
-  alignas(SWorldParticleZModeTypeInfo)
-    unsigned char gSWorldParticleZModeTypeInfoStorage[sizeof(SWorldParticleZModeTypeInfo)];
-  alignas(SWorldParticleTypeInfo) unsigned char gSWorldParticleTypeInfoStorage[sizeof(SWorldParticleTypeInfo)];
-  bool gSWorldParticleBlendModeTypeInfoConstructed = false;
-  bool gSWorldParticleZModeTypeInfoConstructed = false;
-  bool gSWorldParticleTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BEFF00 (FUN_00BEFF00, atexit destructor of the SWorldParticleBlendModeTypeInfo object)
+   */
   [[nodiscard]] SWorldParticleBlendModeTypeInfo& AcquireSWorldParticleBlendModeTypeInfo()
   {
-    if (!gSWorldParticleBlendModeTypeInfoConstructed) {
-      new (gSWorldParticleBlendModeTypeInfoStorage) SWorldParticleBlendModeTypeInfo();
-      gSWorldParticleBlendModeTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<SWorldParticleBlendModeTypeInfo*>(gSWorldParticleBlendModeTypeInfoStorage);
+    static SWorldParticleBlendModeTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BEFF40 (FUN_00BEFF40, atexit destructor of the SWorldParticleZModeTypeInfo object)
+   */
   [[nodiscard]] SWorldParticleZModeTypeInfo& AcquireSWorldParticleZModeTypeInfo()
   {
-    if (!gSWorldParticleZModeTypeInfoConstructed) {
-      new (gSWorldParticleZModeTypeInfoStorage) SWorldParticleZModeTypeInfo();
-      gSWorldParticleZModeTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<SWorldParticleZModeTypeInfo*>(gSWorldParticleZModeTypeInfoStorage);
+    static SWorldParticleZModeTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BEFF80 (FUN_00BEFF80, atexit destructor of the SWorldParticleTypeInfo object)
+   */
   [[nodiscard]] SWorldParticleTypeInfo& AcquireSWorldParticleTypeInfo()
   {
-    if (!gSWorldParticleTypeInfoConstructed) {
-      new (gSWorldParticleTypeInfoStorage) SWorldParticleTypeInfo();
-      gSWorldParticleTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<SWorldParticleTypeInfo*>(gSWorldParticleTypeInfoStorage);
+    static SWorldParticleTypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -86,25 +74,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BEFF00 (FUN_00BEFF00, cleanup_SWorldParticle_BlendModeTypeInfo)
-   */
-  void cleanup_SWorldParticle_BlendModeTypeInfo()
-  {
-    if (!gSWorldParticleBlendModeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSWorldParticleBlendModeTypeInfo().~SWorldParticle_BlendModeTypeInfo();
-    gSWorldParticleBlendModeTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC53A0 (FUN_00BC53A0, register_SWorldParticle_BlendModeTypeInfo)
    */
-  int register_SWorldParticle_BlendModeTypeInfo()
+  void register_SWorldParticle_BlendModeTypeInfo()
   {
     (void)AcquireSWorldParticleBlendModeTypeInfo();
-    return std::atexit(&cleanup_SWorldParticle_BlendModeTypeInfo);
   }
 
   /**
@@ -140,25 +114,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BEFF40 (FUN_00BEFF40, cleanup_SWorldParticle_ZModeTypeInfo)
-   */
-  void cleanup_SWorldParticle_ZModeTypeInfo()
-  {
-    if (!gSWorldParticleZModeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSWorldParticleZModeTypeInfo().~SWorldParticle_ZModeTypeInfo();
-    gSWorldParticleZModeTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC5400 (FUN_00BC5400, register_SWorldParticle_ZModeTypeInfo)
    */
   void register_SWorldParticle_ZModeTypeInfo()
   {
     (void)AcquireSWorldParticleZModeTypeInfo();
-    (void)std::atexit(&cleanup_SWorldParticle_ZModeTypeInfo);
   }
 
   /**
@@ -198,25 +158,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BEFF80 (FUN_00BEFF80, cleanup_SWorldParticleTypeInfo)
-   */
-  void cleanup_SWorldParticleTypeInfo()
-  {
-    if (!gSWorldParticleTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSWorldParticleTypeInfo().~SWorldParticleTypeInfo();
-    gSWorldParticleTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC5460 (FUN_00BC5460, register_SWorldParticleTypeInfo)
    */
-  int register_SWorldParticleTypeInfo()
+  void register_SWorldParticleTypeInfo()
   {
     (void)AcquireSWorldParticleTypeInfo();
-    return std::atexit(&cleanup_SWorldParticleTypeInfo);
   }
 } // namespace moho
 
@@ -234,7 +180,6 @@ namespace
 
   SWorldParticleTypeInfoBootstrap gSWorldParticleTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

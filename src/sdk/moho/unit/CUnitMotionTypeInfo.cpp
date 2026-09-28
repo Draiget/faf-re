@@ -11,17 +11,13 @@ namespace
 {
   using TypeInfo = moho::CUnitMotionTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCUnitMotionTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCUnitMotionTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFE010 (FUN_00BFE010, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& GetCUnitMotionTypeInfo() noexcept
   {
-    if (!gCUnitMotionTypeInfoConstructed) {
-      new (gCUnitMotionTypeInfoStorage) TypeInfo();
-      gCUnitMotionTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCUnitMotionTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -73,32 +69,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE010 (FUN_00BFE010, cleanup_CUnitMotionTypeInfo)
-   *
-   * What it does:
-   * Releases process-exit CUnitMotionTypeInfo storage.
-   */
-  void cleanup_CUnitMotionTypeInfo()
-  {
-    if (!gCUnitMotionTypeInfoConstructed) {
-      return;
-    }
-
-    GetCUnitMotionTypeInfo().~CUnitMotionTypeInfo();
-    gCUnitMotionTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD7220 (FUN_00BD7220, register_CUnitMotionTypeInfo)
    *
    * What it does:
    * Forces CUnitMotionTypeInfo startup construction and registers process-exit
    * cleanup.
    */
-  int register_CUnitMotionTypeInfo()
+  void register_CUnitMotionTypeInfo()
   {
     (void)GetCUnitMotionTypeInfo();
-    return std::atexit(&cleanup_CUnitMotionTypeInfo);
   }
 } // namespace moho
 
@@ -114,7 +93,6 @@ namespace
 
   [[maybe_unused]] CUnitMotionTypeInfoBootstrap gCUnitMotionTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

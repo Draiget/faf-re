@@ -393,7 +393,7 @@ namespace moho
    * Registers the broadcaster reflection lane for `EAiTransportEvent` and
    * installs process-exit cleanup.
    */
-  int register_RBroadcasterRType_EAiTransportEvent();
+  void register_RBroadcasterRType_EAiTransportEvent();
 
   /**
    * Address: 0x00BCEFC0 (FUN_00BCEFC0, register_RListenerRType_EAiTransportEvent)
@@ -402,7 +402,7 @@ namespace moho
    * Registers the listener reflection lane for `EAiTransportEvent` and
    * installs process-exit cleanup.
    */
-  int register_RListenerRType_EAiTransportEvent();
+  void register_RListenerRType_EAiTransportEvent();
 
   /**
    * Address: 0x00BCEFE0 (FUN_00BCEFE0, register_RVectorType_int)
@@ -410,7 +410,7 @@ namespace moho
    * What it does:
    * Registers `msvc8::vector<int>` reflection metadata and installs cleanup.
    */
-  int register_RVectorType_int();
+  void register_RVectorType_int();
 
   /**
    * Address: 0x00BCF000 (FUN_00BCF000, register_RVectorType_SAiReservedTransportBone)
@@ -419,7 +419,7 @@ namespace moho
    * Registers `msvc8::vector<SAiReservedTransportBone>` reflection metadata and
    * installs cleanup.
    */
-  int register_RVectorType_SAiReservedTransportBone();
+  void register_RVectorType_SAiReservedTransportBone();
 
   /**
    * Address: 0x00BCF020 (FUN_00BCF020, register_RVectorType_SAttachPoint)
@@ -428,7 +428,7 @@ namespace moho
    * Registers `msvc8::vector<SAttachPoint>` reflection metadata and installs
    * cleanup.
    */
-  int register_RVectorType_SAttachPoint();
+  void register_RVectorType_SAttachPoint();
 
   static_assert(sizeof(IAiTransport) == 0x0C, "IAiTransport size must be 0x0C");
 } // namespace moho

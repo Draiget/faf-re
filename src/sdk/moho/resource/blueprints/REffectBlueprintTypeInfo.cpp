@@ -5,34 +5,18 @@
 #include <typeinfo>
 
 #include "moho/resource/blueprints/REffectBlueprint.h"
-#include "moho/resource/RResId.h"
+#include "moho/resource/RResId.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::REffectBlueprintTypeInfo;
 
-  alignas(TypeInfo) unsigned char gREffectBlueprintTypeInfoStorage[sizeof(TypeInfo)];
-  bool gREffectBlueprintTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireREffectBlueprintTypeInfo()
   {
-    if (!gREffectBlueprintTypeInfoConstructed) {
-      new (gREffectBlueprintTypeInfoStorage) TypeInfo();
-      gREffectBlueprintTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gREffectBlueprintTypeInfoStorage);
-  }
-
-  void cleanup_REffectBlueprintTypeInfo()
-  {
-    if (!gREffectBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireREffectBlueprintTypeInfo().~TypeInfo();
-    gREffectBlueprintTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* CachedRObjectType()
@@ -68,7 +52,6 @@ namespace
   {
     typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
   }
-
 
   /**
    * Address: 0x0050F120 (FUN_0050F120)
@@ -172,10 +155,8 @@ void REffectBlueprintTypeInfo::AddBase_RObject(gpg::RType* typeInfo)
   void register_REffectBlueprintTypeInfo()
   {
     (void)AcquireREffectBlueprintTypeInfo();
-    (void)std::atexit(&cleanup_REffectBlueprintTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

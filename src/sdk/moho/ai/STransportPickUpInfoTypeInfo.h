@@ -50,7 +50,7 @@ namespace moho
    * Registers `STransportPickUpInfo` type-info and installs process-exit
    * cleanup.
    */
-  int register_STransportPickUpInfoTypeInfo();
+  void register_STransportPickUpInfoTypeInfo();
 
   static_assert(sizeof(STransportPickUpInfoTypeInfo) == 0x64, "STransportPickUpInfoTypeInfo size must be 0x64");
 } // namespace moho

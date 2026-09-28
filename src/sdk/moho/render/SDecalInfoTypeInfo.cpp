@@ -12,35 +12,15 @@
 // objects query SDecalInfo RTTI during static initialization.
 namespace
 {
-  alignas(moho::SDecalInfoTypeInfo) unsigned char gSDecalInfoTypeInfoStorage[sizeof(moho::SDecalInfoTypeInfo)];
-  bool gSDecalInfoTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C027C0 (FUN_00C027C0, atexit destructor of the moho::SDecalInfoTypeInfo object)
+   */
   [[nodiscard]] moho::SDecalInfoTypeInfo* AcquireSDecalInfoTypeInfo()
   {
-    if (!gSDecalInfoTypeInfoConstructed) {
-      new (gSDecalInfoTypeInfoStorage) moho::SDecalInfoTypeInfo();
-      gSDecalInfoTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::SDecalInfoTypeInfo*>(gSDecalInfoTypeInfoStorage);
+    static moho::SDecalInfoTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00C027C0 (FUN_00C027C0)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `SDecalInfo` descriptor,
-   * releasing its reflected field/base lanes.
-   */
-  void cleanup_SDecalInfoTypeInfo()
-  {
-    if (!gSDecalInfoTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSDecalInfoTypeInfo()->~SDecalInfoTypeInfo();
-    gSDecalInfoTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -92,10 +72,9 @@ namespace moho
    * What it does:
    * Registers the `SDecalInfo` type-info object and installs process-exit cleanup.
    */
-  int register_SDecalInfoTypeInfo()
+  void register_SDecalInfoTypeInfo()
   {
     (void)AcquireSDecalInfoTypeInfo();
-    return std::atexit(&cleanup_SDecalInfoTypeInfo);
   }
 } // namespace moho
 
@@ -111,7 +90,6 @@ namespace
 
   [[maybe_unused]] SDecalInfoTypeInfoRegistration gSDecalInfoTypeInfoRegistration;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

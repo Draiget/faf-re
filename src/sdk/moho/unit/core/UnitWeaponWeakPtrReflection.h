@@ -80,19 +80,11 @@ namespace moho
   [[nodiscard]] gpg::RType* register_WeakPtr_UnitWeapon_Type_00();
 
   /**
-   * Address: 0x00BFC490 (FUN_00BFC490, cleanup_WeakPtr_UnitWeapon_Type)
-   *
-   * What it does:
-   * Tears down startup-owned `WeakPtr<UnitWeapon>` reflection storage.
-   */
-  void cleanup_WeakPtr_UnitWeapon_Type();
-
-  /**
    * Address: 0x00BD4DF0 (FUN_00BD4DF0, register_WeakPtr_UnitWeapon_Type_AtExit)
    *
    * What it does:
    * Registers `WeakPtr<UnitWeapon>` reflection and installs process-exit teardown.
    */
-  int register_WeakPtr_UnitWeapon_Type_AtExit();
+  void register_WeakPtr_UnitWeapon_Type_AtExit();
 } // namespace moho
 

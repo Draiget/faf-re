@@ -12,35 +12,15 @@
 // objects query PathTables RTTI during static initialization.
 namespace
 {
-  alignas(moho::PathTablesTypeInfo) unsigned char gPathTablesTypeInfoStorage[sizeof(moho::PathTablesTypeInfo)];
-  bool gPathTablesTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C01C20 (FUN_00C01C20, atexit destructor of the moho::PathTablesTypeInfo object)
+   */
   [[nodiscard]] moho::PathTablesTypeInfo* AcquirePathTablesTypeInfo()
   {
-    if (!gPathTablesTypeInfoConstructed) {
-      new (gPathTablesTypeInfoStorage) moho::PathTablesTypeInfo();
-      gPathTablesTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::PathTablesTypeInfo*>(gPathTablesTypeInfoStorage);
+    static moho::PathTablesTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00C01C20 (FUN_00C01C20)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `PathTables` descriptor,
-   * releasing its reflected field/base lanes.
-   */
-  void cleanup_PathTablesTypeInfo()
-  {
-    if (!gPathTablesTypeInfoConstructed) {
-      return;
-    }
-
-    AcquirePathTablesTypeInfo()->~PathTablesTypeInfo();
-    gPathTablesTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -92,10 +72,9 @@ namespace moho
    * What it does:
    * Registers the `PathTables` type-info object and installs process-exit cleanup.
    */
-  int register_PathTablesTypeInfo()
+  void register_PathTablesTypeInfo()
   {
     (void)AcquirePathTablesTypeInfo();
-    return std::atexit(&cleanup_PathTablesTypeInfo);
   }
 } // namespace moho
 
@@ -111,7 +90,6 @@ namespace
 
   [[maybe_unused]] PathTablesTypeInfoRegistration gPathTablesTypeInfoRegistration;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

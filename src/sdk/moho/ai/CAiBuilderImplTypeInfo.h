@@ -71,7 +71,6 @@ namespace moho
    * What it does:
    * Preregisters builder rebuild-map RTTI and installs process-exit cleanup.
    */
-  int register_CAiBuilderRebuildMapTypeInfo();
-
+  void register_CAiBuilderRebuildMapTypeInfo();
 
 } // namespace moho

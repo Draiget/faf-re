@@ -11,34 +11,15 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiReconDBTypeInfo) unsigned char gIAiReconDBTypeInfoStorage[sizeof(IAiReconDBTypeInfo)];
-  bool gIAiReconDBTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF79F0 (FUN_00BF79F0, atexit destructor of the IAiReconDBTypeInfo object)
+   */
   [[nodiscard]] IAiReconDBTypeInfo* AcquireIAiReconDBTypeInfo()
   {
-    if (!gIAiReconDBTypeInfoConstructed) {
-      new (gIAiReconDBTypeInfoStorage) IAiReconDBTypeInfo();
-      gIAiReconDBTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<IAiReconDBTypeInfo*>(gIAiReconDBTypeInfoStorage);
+    static IAiReconDBTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00BF79F0 (FUN_00BF79F0, cleanup_IAiReconDBTypeInfo)
-   *
-   * What it does:
-   * Tears down recovered static `IAiReconDBTypeInfo` storage.
-   */
-  void cleanup_IAiReconDBTypeInfo()
-  {
-    if (!gIAiReconDBTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireIAiReconDBTypeInfo()->~IAiReconDBTypeInfo();
-    gIAiReconDBTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -102,9 +83,7 @@ void IAiReconDBTypeInfo::Init()
 void moho::register_IAiReconDBTypeInfo()
 {
   (void)AcquireIAiReconDBTypeInfo();
-  (void)std::atexit(&cleanup_IAiReconDBTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

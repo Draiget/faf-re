@@ -73,5 +73,5 @@ namespace moho
    * What it does:
    * Registers the `UserUnit` type-info object and installs process-exit cleanup.
    */
-  int register_UserUnitTypeInfo();
+  void register_UserUnitTypeInfo();
 } // namespace moho

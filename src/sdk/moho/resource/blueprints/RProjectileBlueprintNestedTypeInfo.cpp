@@ -14,33 +14,19 @@ namespace
   using EconomyTypeInfo = moho::RProjectileBlueprintEconomyTypeInfo;
   using PhysicsTypeInfo = moho::RProjectileBlueprintPhysicsTypeInfo;
 
-  alignas(DisplayTypeInfo) unsigned char gRProjectileBlueprintDisplayTypeInfoStorage[sizeof(DisplayTypeInfo)];
-  bool gRProjectileBlueprintDisplayTypeInfoConstructed = false;
-
-  alignas(EconomyTypeInfo) unsigned char gRProjectileBlueprintEconomyTypeInfoStorage[sizeof(EconomyTypeInfo)];
-  bool gRProjectileBlueprintEconomyTypeInfoConstructed = false;
-
   alignas(PhysicsTypeInfo) unsigned char gRProjectileBlueprintPhysicsTypeInfoStorage[sizeof(PhysicsTypeInfo)];
   bool gRProjectileBlueprintPhysicsTypeInfoConstructed = false;
 
   [[nodiscard]] DisplayTypeInfo& AcquireRProjectileBlueprintDisplayTypeInfo()
   {
-    if (!gRProjectileBlueprintDisplayTypeInfoConstructed) {
-      new (gRProjectileBlueprintDisplayTypeInfoStorage) DisplayTypeInfo();
-      gRProjectileBlueprintDisplayTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<DisplayTypeInfo*>(gRProjectileBlueprintDisplayTypeInfoStorage);
+    static DisplayTypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] EconomyTypeInfo& AcquireRProjectileBlueprintEconomyTypeInfo()
   {
-    if (!gRProjectileBlueprintEconomyTypeInfoConstructed) {
-      new (gRProjectileBlueprintEconomyTypeInfoStorage) EconomyTypeInfo();
-      gRProjectileBlueprintEconomyTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<EconomyTypeInfo*>(gRProjectileBlueprintEconomyTypeInfoStorage);
+    static EconomyTypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] PhysicsTypeInfo& AcquireRProjectileBlueprintPhysicsTypeInfoStorage()
@@ -51,26 +37,6 @@ namespace
     }
 
     return *reinterpret_cast<PhysicsTypeInfo*>(gRProjectileBlueprintPhysicsTypeInfoStorage);
-  }
-
-  void cleanup_RProjectileBlueprintDisplayTypeInfo()
-  {
-    if (!gRProjectileBlueprintDisplayTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRProjectileBlueprintDisplayTypeInfo().~DisplayTypeInfo();
-    gRProjectileBlueprintDisplayTypeInfoConstructed = false;
-  }
-
-  void cleanup_RProjectileBlueprintEconomyTypeInfo()
-  {
-    if (!gRProjectileBlueprintEconomyTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRProjectileBlueprintEconomyTypeInfo().~EconomyTypeInfo();
-    gRProjectileBlueprintEconomyTypeInfoConstructed = false;
   }
 
   void cleanup_RProjectileBlueprintPhysicsTypeInfo()
@@ -422,19 +388,17 @@ namespace moho
   /**
    * Address: 0x00BC8650 (FUN_00BC8650, register_RProjectileBlueprintDisplayTypeInfo)
    */
-  int register_RProjectileBlueprintDisplayTypeInfo()
+  void register_RProjectileBlueprintDisplayTypeInfo()
   {
     (void)AcquireRProjectileBlueprintDisplayTypeInfo();
-    return std::atexit(&cleanup_RProjectileBlueprintDisplayTypeInfo);
   }
 
   /**
    * Address: 0x00BC8670 (FUN_00BC8670, register_RProjectileBlueprintEconomyTypeInfo)
    */
-  int register_RProjectileBlueprintEconomyTypeInfo()
+  void register_RProjectileBlueprintEconomyTypeInfo()
   {
     (void)AcquireRProjectileBlueprintEconomyTypeInfo();
-    return std::atexit(&cleanup_RProjectileBlueprintEconomyTypeInfo);
   }
 
   /**
@@ -446,7 +410,6 @@ namespace moho
     return std::atexit(&cleanup_RProjectileBlueprintPhysicsTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

@@ -962,35 +962,15 @@ namespace
 
 namespace
 {
-  alignas(moho::CTextureScrollerTypeInfo)
-  unsigned char gCTextureScrollerTypeInfoStorage[sizeof(moho::CTextureScrollerTypeInfo)] = {};
-  bool gCTextureScrollerTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02710 (FUN_00C02710, atexit destructor of the moho::CTextureScrollerTypeInfo object)
+   */
   [[nodiscard]] moho::CTextureScrollerTypeInfo* AcquireCTextureScrollerTypeInfo()
   {
-    if (!gCTextureScrollerTypeInfoConstructed) {
-      new (gCTextureScrollerTypeInfoStorage) moho::CTextureScrollerTypeInfo();
-      gCTextureScrollerTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CTextureScrollerTypeInfo*>(gCTextureScrollerTypeInfoStorage);
+    static moho::CTextureScrollerTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00C02710 (FUN_00C02710, cleanup_CTextureScrollerTypeInfo)
-   *
-   * What it does:
-   * Tears down static `CTextureScrollerTypeInfo` storage at process exit.
-   */
-  void cleanup_CTextureScrollerTypeInfo()
-  {
-    if (!gCTextureScrollerTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCTextureScrollerTypeInfo()->~CTextureScrollerTypeInfo();
-    gCTextureScrollerTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -1007,7 +987,6 @@ namespace moho
   void register_CTextureScrollerTypeInfo()
   {
     (void)AcquireCTextureScrollerTypeInfo();
-    (void)std::atexit(&cleanup_CTextureScrollerTypeInfo);
   }
 } // namespace moho
 

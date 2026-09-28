@@ -11,17 +11,13 @@ namespace
 {
   using TypeInfo = moho::SAudioRequestTypeInfo;
 
-  alignas(TypeInfo) unsigned char gSAudioRequestTypeInfoStorage[sizeof(TypeInfo)];
-  bool gSAudioRequestTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF1020 (FUN_00BF1020, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& GetSAudioRequestTypeInfo() noexcept
   {
-    if (!gSAudioRequestTypeInfoConstructed) {
-      new (gSAudioRequestTypeInfoStorage) TypeInfo();
-      gSAudioRequestTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gSAudioRequestTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -60,25 +56,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF1020 (FUN_00BF1020, cleanup_SAudioRequestTypeInfo)
-   */
-  void cleanup_SAudioRequestTypeInfo()
-  {
-    if (!gSAudioRequestTypeInfoConstructed) {
-      return;
-    }
-
-    GetSAudioRequestTypeInfo().~SAudioRequestTypeInfo();
-    gSAudioRequestTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC6A30 (FUN_00BC6A30, register_SAudioRequestTypeInfo)
    */
-  int register_SAudioRequestTypeInfo()
+  void register_SAudioRequestTypeInfo()
   {
     (void)GetSAudioRequestTypeInfo();
-    return std::atexit(&cleanup_SAudioRequestTypeInfo);
   }
 } // namespace moho
 
@@ -94,8 +76,6 @@ namespace
 
   [[maybe_unused]] SAudioRequestTypeInfoBootstrap gSAudioRequestTypeInfoBootstrap;
 } // namespace
-
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

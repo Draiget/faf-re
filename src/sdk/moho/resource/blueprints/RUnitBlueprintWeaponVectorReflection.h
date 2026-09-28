@@ -81,6 +81,6 @@ namespace moho
    * Startup lane that preregisters `vector<RUnitBlueprintWeapon>` reflection
    * metadata and installs teardown callback.
    */
-  int register_VectorRUnitBlueprintWeaponTypeAtexit();
+  void register_VectorRUnitBlueprintWeaponTypeAtexit();
 } // namespace moho
 

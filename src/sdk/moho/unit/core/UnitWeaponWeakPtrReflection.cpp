@@ -16,19 +16,16 @@ namespace
 {
   using WeakPtrUnitWeaponType = moho::RWeakPtrType<moho::UnitWeapon>;
 
-  alignas(WeakPtrUnitWeaponType) unsigned char gWeakPtrUnitWeaponTypeStorage[sizeof(WeakPtrUnitWeaponType)];
-  bool gWeakPtrUnitWeaponTypeConstructed = false;
-
   msvc8::string gWeakPtrUnitWeaponTypeName;
   bool gWeakPtrUnitWeaponTypeNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BFC490 (FUN_00BFC490, atexit destructor of the WeakPtrUnitWeaponType object)
+   */
   [[nodiscard]] WeakPtrUnitWeaponType* AcquireWeakPtrUnitWeaponType()
   {
-    if (!gWeakPtrUnitWeaponTypeConstructed) {
-      new (gWeakPtrUnitWeaponTypeStorage) WeakPtrUnitWeaponType();
-      gWeakPtrUnitWeaponTypeConstructed = true;
-    }
-    return reinterpret_cast<WeakPtrUnitWeaponType*>(gWeakPtrUnitWeaponTypeStorage);
+    static WeakPtrUnitWeaponType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedUnitWeaponType()
@@ -239,25 +236,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFC490 (FUN_00BFC490, cleanup_WeakPtr_UnitWeapon_Type)
-   */
-  void cleanup_WeakPtr_UnitWeapon_Type()
-  {
-    if (!gWeakPtrUnitWeaponTypeConstructed) {
-      return;
-    }
-
-    AcquireWeakPtrUnitWeaponType()->~WeakPtrUnitWeaponType();
-    gWeakPtrUnitWeaponTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4DF0 (FUN_00BD4DF0, register_WeakPtr_UnitWeapon_Type_AtExit)
    */
-  int register_WeakPtr_UnitWeapon_Type_AtExit()
+  void register_WeakPtr_UnitWeapon_Type_AtExit()
   {
     (void)register_WeakPtr_UnitWeapon_Type_00();
-    return std::atexit(&cleanup_WeakPtr_UnitWeapon_Type);
   }
 } // namespace moho
 

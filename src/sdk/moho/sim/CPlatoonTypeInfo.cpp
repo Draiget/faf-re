@@ -13,35 +13,15 @@
 // objects query CPlatoon RTTI during static initialization.
 namespace
 {
-  alignas(moho::CPlatoonTypeInfo) unsigned char gCPlatoonTypeInfoStorage[sizeof(moho::CPlatoonTypeInfo)];
-  bool gCPlatoonTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C00530 (FUN_00C00530, atexit destructor of the moho::CPlatoonTypeInfo object)
+   */
   [[nodiscard]] moho::CPlatoonTypeInfo* AcquireCPlatoonTypeInfo()
   {
-    if (!gCPlatoonTypeInfoConstructed) {
-      new (gCPlatoonTypeInfoStorage) moho::CPlatoonTypeInfo();
-      gCPlatoonTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CPlatoonTypeInfo*>(gCPlatoonTypeInfoStorage);
+    static moho::CPlatoonTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00C00530 (FUN_00C00530)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `CPlatoon` descriptor,
-   * releasing its reflected field/base lanes.
-   */
-  void cleanup_CPlatoonTypeInfo()
-  {
-    if (!gCPlatoonTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCPlatoonTypeInfo()->~CPlatoonTypeInfo();
-    gCPlatoonTypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -115,10 +95,9 @@ namespace moho
    * What it does:
    * Registers the `CPlatoon` type-info object and installs process-exit cleanup.
    */
-  int register_CPlatoonTypeInfo()
+  void register_CPlatoonTypeInfo()
   {
     (void)AcquireCPlatoonTypeInfo();
-    return std::atexit(&cleanup_CPlatoonTypeInfo);
   }
 } // namespace moho
 
@@ -134,7 +113,6 @@ namespace
 
   [[maybe_unused]] CPlatoonTypeInfoRegistration gCPlatoonTypeInfoRegistration;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

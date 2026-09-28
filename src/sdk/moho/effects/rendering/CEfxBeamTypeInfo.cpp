@@ -5,23 +5,21 @@
 #include <typeinfo>
 
 #include "moho/effects/rendering/CEfxBeam.h"
-#include "moho/effects/rendering/CEffectImpl.h"
+#include "moho/effects/rendering/CEffectImpl.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(moho::CEfxBeamTypeInfo) unsigned char gCEfxBeamTypeInfoStorage[sizeof(moho::CEfxBeamTypeInfo)] = {};
-  bool gCEfxBeamTypeInfoConstructed = false;
   bool gCEfxBeamTypeInfoRegistered = false;
 
+  /**
+   * Address: 0x00BFB8B0 (FUN_00BFB8B0, atexit destructor of the moho::CEfxBeamTypeInfo object)
+   */
   [[nodiscard]] moho::CEfxBeamTypeInfo* AcquireCEfxBeamTypeInfo()
   {
-    if (!gCEfxBeamTypeInfoConstructed) {
-      new (gCEfxBeamTypeInfoStorage) moho::CEfxBeamTypeInfo();
-      gCEfxBeamTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CEfxBeamTypeInfo*>(gCEfxBeamTypeInfoStorage);
+    static moho::CEfxBeamTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RRef MakeCEfxBeamRef(moho::CEfxBeam* const object)
@@ -144,36 +142,19 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFB8B0 (FUN_00BFB8B0, cleanup_CEfxBeamTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `CEfxBeamTypeInfo` reflection storage.
-   */
-  void cleanup_CEfxBeamTypeInfo()
-  {
-    if (!gCEfxBeamTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCEfxBeamTypeInfo()->~CEfxBeamTypeInfo();
-    gCEfxBeamTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD3F30 (FUN_00BD3F30, register_CEfxBeamTypeInfo_AtExit)
    *
    * What it does:
    * Registers `CEfxBeam` RTTI bootstrap and installs process-exit cleanup.
    */
-  int register_CEfxBeamTypeInfo_AtExit()
+  void register_CEfxBeamTypeInfo_AtExit()
   {
     if (gCEfxBeamTypeInfoRegistered) {
-      return 0;
+      return;
     }
 
     (void)register_CEfxBeamTypeInfo_00();
     gCEfxBeamTypeInfoRegistered = true;
-    return std::atexit(&cleanup_CEfxBeamTypeInfo);
   }
 } // namespace moho
 

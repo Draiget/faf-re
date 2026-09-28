@@ -42,7 +42,7 @@ namespace moho
    * What it does:
    * Registers `IAiAttacker` type-info and installs process-exit cleanup.
    */
-  int register_IAiAttackerTypeInfo();
+  void register_IAiAttackerTypeInfo();
 
   static_assert(sizeof(IAiAttackerTypeInfo) == 0x64, "IAiAttackerTypeInfo size must be 0x64");
 } // namespace moho

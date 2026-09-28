@@ -11,27 +11,10 @@ namespace
 {
   using TypeInfo = moho::RUnitBlueprintDefenseShieldTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRUnitBlueprintDefenseShieldTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRUnitBlueprintDefenseShieldTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRUnitBlueprintDefenseShieldTypeInfo()
   {
-    if (!gRUnitBlueprintDefenseShieldTypeInfoConstructed) {
-      new (gRUnitBlueprintDefenseShieldTypeInfoStorage) TypeInfo();
-      gRUnitBlueprintDefenseShieldTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRUnitBlueprintDefenseShieldTypeInfoStorage);
-  }
-
-  void cleanup_RUnitBlueprintDefenseShieldTypeInfo()
-  {
-    if (!gRUnitBlueprintDefenseShieldTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRUnitBlueprintDefenseShieldTypeInfo().~TypeInfo();
-    gRUnitBlueprintDefenseShieldTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* CachedFloatType()
@@ -111,11 +94,8 @@ namespace moho
   void register_RUnitBlueprintDefenseShieldTypeInfo()
   {
     (void)AcquireRUnitBlueprintDefenseShieldTypeInfo();
-    (void)std::atexit(&cleanup_RUnitBlueprintDefenseShieldTypeInfo);
   }
 } // namespace moho
-
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

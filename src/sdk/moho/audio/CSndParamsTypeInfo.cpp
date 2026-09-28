@@ -11,17 +11,13 @@ namespace
 {
   using TypeInfo = moho::CSndParamsTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCSndParamsTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCSndParamsTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF0F60 (FUN_00BF0F60, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& GetCSndParamsTypeInfo() noexcept
   {
-    if (!gCSndParamsTypeInfoConstructed) {
-      new (gCSndParamsTypeInfoStorage) TypeInfo();
-      gCSndParamsTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCSndParamsTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -60,25 +56,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF0F60 (FUN_00BF0F60, cleanup_CSndParamsTypeInfo)
-   */
-  void cleanup_CSndParamsTypeInfo()
-  {
-    if (!gCSndParamsTypeInfoConstructed) {
-      return;
-    }
-
-    GetCSndParamsTypeInfo().~CSndParamsTypeInfo();
-    gCSndParamsTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC69A0 (FUN_00BC69A0, register_CSndParamsTypeInfo)
    */
   void register_CSndParamsTypeInfo()
   {
     (void)GetCSndParamsTypeInfo();
-    (void)std::atexit(&cleanup_CSndParamsTypeInfo);
   }
 } // namespace moho
 
@@ -94,7 +76,6 @@ namespace
 
   [[maybe_unused]] CSndParamsTypeInfoBootstrap gCSndParamsTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

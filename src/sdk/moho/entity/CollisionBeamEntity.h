@@ -308,7 +308,7 @@ namespace moho
    * Materializes startup `CollisionBeamEntityTypeInfo` storage and installs
    * process-exit cleanup.
    */
-  int register_CollisionBeamEntityTypeInfo();
+  void register_CollisionBeamEntityTypeInfo();
 
   static_assert(sizeof(CollisionBeamEntityTypeInfo) == 0x64, "CollisionBeamEntityTypeInfo size must be 0x64");
 } // namespace moho

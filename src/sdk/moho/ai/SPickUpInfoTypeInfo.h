@@ -51,5 +51,5 @@ namespace moho
    * What it does:
    * Registers the `SPickUpInfo` type-info object and installs process-exit cleanup.
    */
-  int register_SPickUpInfoTypeInfo();
+  void register_SPickUpInfoTypeInfo();
 } // namespace moho

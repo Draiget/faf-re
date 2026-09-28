@@ -60,5 +60,5 @@ namespace moho
    * What it does:
    * Ensures `CUnitCommandTypeInfo` is constructed and registers teardown.
    */
-  int register_CUnitCommandTypeInfo();
+  void register_CUnitCommandTypeInfo();
 } // namespace moho

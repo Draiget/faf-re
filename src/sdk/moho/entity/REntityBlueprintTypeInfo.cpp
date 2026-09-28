@@ -22,27 +22,10 @@ namespace
 {
   using TypeInfo = moho::REntityBlueprintTypeInfo;
 
-  alignas(TypeInfo) unsigned char gREntityBlueprintTypeInfoStorage[sizeof(TypeInfo)];
-  bool gREntityBlueprintTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireREntityBlueprintTypeInfo()
   {
-    if (!gREntityBlueprintTypeInfoConstructed) {
-      new (gREntityBlueprintTypeInfoStorage) TypeInfo();
-      gREntityBlueprintTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gREntityBlueprintTypeInfoStorage);
-  }
-
-  void cleanup_REntityBlueprintTypeInfo()
-  {
-    if (!gREntityBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireREntityBlueprintTypeInfo().~TypeInfo();
-    gREntityBlueprintTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedRBlueprintType()
@@ -961,7 +944,6 @@ namespace moho
   void register_REntityBlueprintTypeInfo()
   {
     (void)AcquireREntityBlueprintTypeInfo();
-    (void)std::atexit(&cleanup_REntityBlueprintTypeInfo);
   }
 } // namespace moho
 
@@ -998,7 +980,6 @@ gpg::RRef* gpg::PackRRef_REntityBlueprint(gpg::RRef* const outRef, moho::REntity
   outRef->mType = temp.mType;
   return outRef;
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

@@ -7,34 +7,18 @@
 
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/REffectBlueprint.h"
-#include "moho/resource/blueprints/REmitterBlueprint.h"
+#include "moho/resource/blueprints/REmitterBlueprint.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::REmitterBlueprintTypeInfo;
 
-  alignas(TypeInfo) unsigned char gREmitterBlueprintTypeInfoStorage[sizeof(TypeInfo)];
-  bool gREmitterBlueprintTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireREmitterBlueprintTypeInfo()
   {
-    if (!gREmitterBlueprintTypeInfoConstructed) {
-      new (gREmitterBlueprintTypeInfoStorage) TypeInfo();
-      gREmitterBlueprintTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gREmitterBlueprintTypeInfoStorage);
-  }
-
-  void cleanup_REmitterBlueprintTypeInfo()
-  {
-    if (!gREmitterBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireREmitterBlueprintTypeInfo().~TypeInfo();
-    gREmitterBlueprintTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -131,7 +115,6 @@ namespace
     field->mDesc = description;
     return field;
   }
-
 
   [[nodiscard]] gpg::RRef MakeEmitterBlueprintRef(moho::REmitterBlueprint* object)
   {
@@ -359,10 +342,8 @@ void REmitterBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeI
   void register_REmitterBlueprintTypeInfo()
   {
     (void)AcquireREmitterBlueprintTypeInfo();
-    (void)std::atexit(&cleanup_REmitterBlueprintTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

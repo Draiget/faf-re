@@ -4,34 +4,18 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiTransportImpl.h"
+#include "moho/ai/CAiTransportImpl.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
 namespace
 {
-  alignas(CAiTransportImplTypeInfo) unsigned char gCAiTransportImplTypeInfoStorage[sizeof(CAiTransportImplTypeInfo)];
-  bool gCAiTransportImplTypeInfoConstructed = false;
-
   [[nodiscard]] CAiTransportImplTypeInfo* AcquireCAiTransportImplTypeInfo()
   {
-    if (!gCAiTransportImplTypeInfoConstructed) {
-      new (gCAiTransportImplTypeInfoStorage) CAiTransportImplTypeInfo();
-      gCAiTransportImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiTransportImplTypeInfo*>(gCAiTransportImplTypeInfoStorage);
-  }
-
-  void cleanup_CAiTransportImplTypeInfo()
-  {
-    if (!gCAiTransportImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiTransportImplTypeInfo()->~CAiTransportImplTypeInfo();
-    gCAiTransportImplTypeInfoConstructed = false;
+    static CAiTransportImplTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -109,12 +93,10 @@ void CAiTransportImplTypeInfo::Init()
  * Registers `CAiTransportImpl` type-info object and installs process-exit
  * cleanup.
  */
-int moho::register_CAiTransportImplTypeInfo()
+void moho::register_CAiTransportImplTypeInfo()
 {
   (void)AcquireCAiTransportImplTypeInfo();
-  return std::atexit(&cleanup_CAiTransportImplTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

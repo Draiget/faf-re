@@ -52,7 +52,7 @@ namespace moho
    * Registers `CAiTransportImpl` type-info object and installs process-exit
    * cleanup.
    */
-  int register_CAiTransportImplTypeInfo();
+  void register_CAiTransportImplTypeInfo();
 
   static_assert(sizeof(CAiTransportImplTypeInfo) == 0x64, "CAiTransportImplTypeInfo size must be 0x64");
 } // namespace moho

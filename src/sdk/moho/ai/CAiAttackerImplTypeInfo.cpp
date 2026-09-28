@@ -17,17 +17,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiAttackerImplTypeInfo) unsigned char gCAiAttackerImplTypeInfoStorage[sizeof(CAiAttackerImplTypeInfo)];
-  bool gCAiAttackerImplTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF8310 (FUN_00BF8310, atexit destructor of the CAiAttackerImplTypeInfo object)
+   */
   [[nodiscard]] CAiAttackerImplTypeInfo* AcquireCAiAttackerImplTypeInfo()
   {
-    if (!gCAiAttackerImplTypeInfoConstructed) {
-      new (gCAiAttackerImplTypeInfoStorage) CAiAttackerImplTypeInfo();
-      gCAiAttackerImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiAttackerImplTypeInfo*>(gCAiAttackerImplTypeInfoStorage);
+    static CAiAttackerImplTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedIAiAttackerType()
@@ -48,22 +44,6 @@ namespace
       CScriptObject::sType = type;
     }
     return type;
-  }
-
-  /**
-   * Address: 0x00BF8310 (FUN_00BF8310, sub_BF8310)
-   *
-   * What it does:
-   * Tears down recovered static `CAiAttackerImplTypeInfo` storage.
-   */
-  void cleanup_CAiAttackerImplTypeInfo()
-  {
-    if (!gCAiAttackerImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiAttackerImplTypeInfo()->~CAiAttackerImplTypeInfo();
-    gCAiAttackerImplTypeInfoConstructed = false;
   }
 
   struct AiAttackerRecoveryBootstrap
@@ -148,9 +128,7 @@ void CAiAttackerImplTypeInfo::Init()
 void moho::register_CAiAttackerImplTypeInfo()
 {
   (void)AcquireCAiAttackerImplTypeInfo();
-  (void)std::atexit(&cleanup_CAiAttackerImplTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

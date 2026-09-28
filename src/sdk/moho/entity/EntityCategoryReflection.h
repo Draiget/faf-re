@@ -220,7 +220,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `EntityCategoryHelperTypeInfo`.
    */
-  int register_EntityCategoryHelperTypeInfoStartup();
+  void register_EntityCategoryHelperTypeInfoStartup();
 
   /**
    * Address: 0x005575E0 (FUN_005575E0, func_GetCObj_EntityCategory)

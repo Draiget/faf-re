@@ -11,30 +11,13 @@ namespace
 {
   using TypeInfo = moho::RPropBlueprintDefenseTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRPropBlueprintDefenseTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRPropBlueprintDefenseTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF3030 (FUN_00BF3030, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireRPropBlueprintDefenseTypeInfo()
   {
-    if (!gRPropBlueprintDefenseTypeInfoConstructed) {
-      new (gRPropBlueprintDefenseTypeInfoStorage) TypeInfo();
-      gRPropBlueprintDefenseTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRPropBlueprintDefenseTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF3030 (FUN_00BF3030)
-   */
-  void cleanup_RPropBlueprintDefenseTypeInfo()
-  {
-    if (!gRPropBlueprintDefenseTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRPropBlueprintDefenseTypeInfo().~TypeInfo();
-    gRPropBlueprintDefenseTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* CachedFloatType()
@@ -97,13 +80,11 @@ namespace moho
   /**
    * Address: 0x00BC87D0 (FUN_00BC87D0)
    */
-  int register_RPropBlueprintDefenseTypeInfo()
+  void register_RPropBlueprintDefenseTypeInfo()
   {
     (void)AcquireRPropBlueprintDefenseTypeInfo();
-    return std::atexit(&cleanup_RPropBlueprintDefenseTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

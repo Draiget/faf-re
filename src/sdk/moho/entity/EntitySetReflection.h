@@ -418,7 +418,7 @@ namespace moho
    * What it does:
    * Constructs global `EntitySetBaseTypeInfo` and registers process-exit cleanup.
    */
-  int register_EntitySetBaseTypeInfo();
+  void register_EntitySetBaseTypeInfo();
 
   /**
    * Address: 0x00BD5790 (FUN_00BD5790, sub_BD5790)
@@ -434,7 +434,7 @@ namespace moho
    * What it does:
    * Constructs global `EntitySetTypeInfo` and registers process-exit cleanup.
    */
-  int register_EntitySetTypeInfo();
+  void register_EntitySetTypeInfo();
 
   /**
    * Address: 0x00BD57F0 (FUN_00BD57F0, register_EntitySetSerializer)
@@ -450,7 +450,7 @@ namespace moho
    * What it does:
    * Constructs global `WeakEntitySetTypeInfo` and registers process-exit cleanup.
    */
-  int register_WeakEntitySetTypeInfo();
+  void register_WeakEntitySetTypeInfo();
 
   /**
    * Address: 0x00BD5850 (FUN_00BD5850, register_WeakEntitySetSerializer)

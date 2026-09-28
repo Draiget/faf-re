@@ -11,27 +11,10 @@ namespace
 {
   using TypeInfo = moho::RRuleGameRulesTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRRuleGameRulesTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRRuleGameRulesTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRRuleGameRulesTypeInfo()
   {
-    if (!gRRuleGameRulesTypeInfoConstructed) {
-      new (gRRuleGameRulesTypeInfoStorage) TypeInfo();
-      gRRuleGameRulesTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRRuleGameRulesTypeInfoStorage);
-  }
-
-  void cleanup_RRuleGameRulesTypeInfo()
-  {
-    if (!gRRuleGameRulesTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRRuleGameRulesTypeInfo().~TypeInfo();
-    gRRuleGameRulesTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   struct RRuleGameRulesTypeInfoBootstrap
@@ -112,13 +95,11 @@ namespace moho
   /**
    * Address: 0x00BC8ED0 (FUN_00BC8ED0, register_RRuleGameRulesTypeInfoStartup)
    */
-  int register_RRuleGameRulesTypeInfoStartup()
+  void register_RRuleGameRulesTypeInfoStartup()
   {
     (void)AcquireRRuleGameRulesTypeInfo();
-    return std::atexit(&cleanup_RRuleGameRulesTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

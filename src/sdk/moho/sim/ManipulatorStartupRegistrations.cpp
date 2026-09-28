@@ -142,20 +142,17 @@ namespace
     return reinterpret_cast<const TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
   }
 
-  alignas(RVectorTypeBool) unsigned char gRecoveredRVectorTypeBoolStorage[sizeof(RVectorTypeBool)] = {};
-  bool gRecoveredRVectorTypeBoolConstructed = false;
   thread_local msvc8::detail::vector_bool_word_cursor gRecoveredRVectorTypeBoolSubscriptCursorScratch{};
   msvc8::string gRecoveredRVectorTypeBoolName;
   bool gRecoveredRVectorTypeBoolNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BFB080 (FUN_00BFB080, atexit destructor of the RVectorTypeBool object)
+   */
   [[nodiscard]] RVectorTypeBool* AcquireRecoveredRVectorTypeBool()
   {
-    if (!gRecoveredRVectorTypeBoolConstructed) {
-      new (gRecoveredRVectorTypeBoolStorage) RVectorTypeBool();
-      gRecoveredRVectorTypeBoolConstructed = true;
-    }
-
-    return reinterpret_cast<RVectorTypeBool*>(gRecoveredRVectorTypeBoolStorage);
+    static RVectorTypeBool sInstance;
+    return &sInstance;
   }
 
   /**
@@ -201,22 +198,6 @@ namespace
     RVectorTypeBool* const type = AcquireRecoveredRVectorTypeBool();
     gpg::PreRegisterRType(typeid(std::vector<bool>), type);
     return type;
-  }
-
-  /**
-   * Address: 0x00BFB080 (FUN_00BFB080, cleanup_RVectorType_bool)
-   *
-   * What it does:
-   * Tears down startup-owned `std::vector<bool>` reflection metadata.
-   */
-  void cleanup_RVectorType_bool()
-  {
-    if (!gRecoveredRVectorTypeBoolConstructed) {
-      return;
-    }
-
-    AcquireRecoveredRVectorTypeBool()->~RVectorTypeBool();
-    gRecoveredRVectorTypeBoolConstructed = false;
   }
 
   void cleanup_RVectorTypeBoolName()
@@ -927,10 +908,9 @@ namespace moho
    * Registers startup reflection metadata for `std::vector<bool>` and installs
    * process-exit cleanup.
    */
-  int register_RVectorType_bool()
+  void register_RVectorType_bool()
   {
     (void)preregister_RVectorType_bool();
-    return std::atexit(&cleanup_RVectorType_bool);
   }
 
   /**

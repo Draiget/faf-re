@@ -5,24 +5,21 @@
 #include <typeinfo>
 
 #include "moho/ai/LAiAttackerImpl.h"
-#include "moho/task/CTask.h"
+#include "moho/task/CTask.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
 namespace
 {
-  alignas(LAiAttackerImplTypeInfo) unsigned char gLAiAttackerImplTypeInfoStorage[sizeof(LAiAttackerImplTypeInfo)];
-  bool gLAiAttackerImplTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF8370 (FUN_00BF8370, atexit destructor of the LAiAttackerImplTypeInfo object)
+   */
   [[nodiscard]] LAiAttackerImplTypeInfo* AcquireLAiAttackerImplTypeInfo()
   {
-    if (!gLAiAttackerImplTypeInfoConstructed) {
-      new (gLAiAttackerImplTypeInfoStorage) LAiAttackerImplTypeInfo();
-      gLAiAttackerImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<LAiAttackerImplTypeInfo*>(gLAiAttackerImplTypeInfoStorage);
+    static LAiAttackerImplTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCTaskType()
@@ -33,22 +30,6 @@ namespace
       CTask::sType = type;
     }
     return type;
-  }
-
-  /**
-   * Address: 0x00BF8370 (FUN_00BF8370, sub_BF8370)
-   *
-   * What it does:
-   * Tears down recovered static `LAiAttackerImplTypeInfo` storage.
-   */
-  void cleanup_LAiAttackerImplTypeInfo()
-  {
-    if (!gLAiAttackerImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireLAiAttackerImplTypeInfo()->~LAiAttackerImplTypeInfo();
-    gLAiAttackerImplTypeInfoConstructed = false;
   }
 
   /**
@@ -183,9 +164,7 @@ void LAiAttackerImplTypeInfo::Destruct(void* const objectStorage)
 void moho::register_LAiAttackerImplTypeInfo()
 {
   (void)AcquireLAiAttackerImplTypeInfo();
-  (void)std::atexit(&cleanup_LAiAttackerImplTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

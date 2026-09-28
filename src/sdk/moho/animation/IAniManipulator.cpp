@@ -96,7 +96,6 @@ namespace
     moho::TDatListItem<moho::IAniManipulator, void>* const* linkSlot
   ) noexcept;
 
-
   /**
    * Address: 0x0063C0E0 (FUN_0063C0E0)
    * Address: 0x0063C0F0 (FUN_0063C0F0)
@@ -117,7 +116,6 @@ namespace
       reinterpret_cast<std::uintptr_t>(link) - offsetof(moho::IAniManipulator, mActorOrderLink)
     );
   }
-
 
   [[nodiscard]] gpg::RRef BuildFootPlantManipulatorRef(moho::CFootPlantManipulator* const object)
   {
@@ -365,64 +363,22 @@ namespace
     }
   }
 
-  alignas(moho::CBoneEntityManipulatorTypeInfo)
-  unsigned char gCBoneEntityManipulatorTypeInfoStorage[sizeof(moho::CBoneEntityManipulatorTypeInfo)] = {};
-  bool gCBoneEntityManipulatorTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFA9B0 (FUN_00BFA9B0, atexit destructor of the moho::CBoneEntityManipulatorTypeInfo object)
+   */
   [[nodiscard]] moho::CBoneEntityManipulatorTypeInfo* AcquireCBoneEntityManipulatorTypeInfo()
   {
-    if (!gCBoneEntityManipulatorTypeInfoConstructed) {
-      new (gCBoneEntityManipulatorTypeInfoStorage) moho::CBoneEntityManipulatorTypeInfo();
-      gCBoneEntityManipulatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CBoneEntityManipulatorTypeInfo*>(gCBoneEntityManipulatorTypeInfoStorage);
+    static moho::CBoneEntityManipulatorTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
-   * Address: 0x00BFA9B0 (FUN_00BFA9B0, cleanup_CBoneEntityManipulatorTypeInfo)
-   *
-   * What it does:
-   * Tears down static `CBoneEntityManipulatorTypeInfo` storage at process exit.
+   * Address: 0x00BFABC0 (FUN_00BFABC0, atexit destructor of the moho::CFootPlantManipulatorTypeInfo object)
    */
-  void cleanup_CBoneEntityManipulatorTypeInfo()
-  {
-    if (!gCBoneEntityManipulatorTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCBoneEntityManipulatorTypeInfo()->~CBoneEntityManipulatorTypeInfo();
-    gCBoneEntityManipulatorTypeInfoConstructed = false;
-  }
-
-  alignas(moho::CFootPlantManipulatorTypeInfo)
-  unsigned char gCFootPlantManipulatorTypeInfoStorage[sizeof(moho::CFootPlantManipulatorTypeInfo)] = {};
-  bool gCFootPlantManipulatorTypeInfoConstructed = false;
-
   [[nodiscard]] moho::CFootPlantManipulatorTypeInfo* AcquireCFootPlantManipulatorTypeInfo()
   {
-    if (!gCFootPlantManipulatorTypeInfoConstructed) {
-      new (gCFootPlantManipulatorTypeInfoStorage) moho::CFootPlantManipulatorTypeInfo();
-      gCFootPlantManipulatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CFootPlantManipulatorTypeInfo*>(gCFootPlantManipulatorTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BFABC0 (FUN_00BFABC0, cleanup_CFootPlantManipulatorTypeInfo)
-   *
-   * What it does:
-   * Tears down static `CFootPlantManipulatorTypeInfo` storage at process exit.
-   */
-  void cleanup_CFootPlantManipulatorTypeInfo()
-  {
-    if (!gCFootPlantManipulatorTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCFootPlantManipulatorTypeInfo()->~CFootPlantManipulatorTypeInfo();
-    gCFootPlantManipulatorTypeInfoConstructed = false;
+    static moho::CFootPlantManipulatorTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -1477,7 +1433,6 @@ namespace moho
     archive->Write(CachedVector3fType(), const_cast<Wm3::Vector3f*>(&mPivot), owner);
   }
 
-
   /**
    * Address: 0x00639F50 (FUN_00639F50)
    *
@@ -1493,7 +1448,6 @@ namespace moho
     typeInfo->dtrFunc_ = &DestructFootPlantManipulatorCallback;
     return typeInfo;
   }
-
 
   /**
    * Address: 0x0062FC70 (FUN_0062FC70, ??1IAniManipulator@Moho@@UAE@XZ)
@@ -1916,7 +1870,6 @@ namespace moho
   void register_CBoneEntityManipulatorTypeInfo()
   {
     (void)AcquireCBoneEntityManipulatorTypeInfo();
-    (void)std::atexit(&cleanup_CBoneEntityManipulatorTypeInfo);
   }
 
   /**
@@ -1956,7 +1909,6 @@ namespace moho
   void register_CFootPlantManipulatorTypeInfo()
   {
     (void)AcquireCFootPlantManipulatorTypeInfo();
-    (void)std::atexit(&cleanup_CFootPlantManipulatorTypeInfo);
   }
 } // namespace moho
 

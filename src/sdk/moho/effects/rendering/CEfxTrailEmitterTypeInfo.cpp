@@ -10,19 +10,15 @@
 
 namespace
 {
-  alignas(moho::CEfxTrailEmitterTypeInfo)
-  unsigned char gCEfxTrailEmitterTypeInfoStorage[sizeof(moho::CEfxTrailEmitterTypeInfo)] = {};
-  bool gCEfxTrailEmitterTypeInfoConstructed = false;
   bool gCEfxTrailEmitterTypeInfoRegistered = false;
 
+  /**
+   * Address: 0x00BFC1F0 (FUN_00BFC1F0, atexit destructor of the moho::CEfxTrailEmitterTypeInfo object)
+   */
   [[nodiscard]] moho::CEfxTrailEmitterTypeInfo* AcquireCEfxTrailEmitterTypeInfo()
   {
-    if (!gCEfxTrailEmitterTypeInfoConstructed) {
-      new (gCEfxTrailEmitterTypeInfoStorage) moho::CEfxTrailEmitterTypeInfo();
-      gCEfxTrailEmitterTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CEfxTrailEmitterTypeInfo*>(gCEfxTrailEmitterTypeInfoStorage);
+    static moho::CEfxTrailEmitterTypeInfo sInstance;
+    return &sInstance;
   }
 
   struct CEfxTrailEmitterTypeInfoBootstrap
@@ -143,37 +139,20 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFC1F0 (FUN_00BFC1F0, cleanup_CEfxTrailEmitterTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `CEfxTrailEmitterTypeInfo` reflection storage.
-   */
-  void cleanup_CEfxTrailEmitterTypeInfo()
-  {
-    if (!gCEfxTrailEmitterTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCEfxTrailEmitterTypeInfo()->~CEfxTrailEmitterTypeInfo();
-    gCEfxTrailEmitterTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4950 (FUN_00BD4950, register_CEfxTrailEmitterTypeInfo_AtExit)
    *
    * What it does:
    * Registers `CEfxTrailEmitter` RTTI bootstrap and installs process-exit
    * cleanup.
    */
-  int register_CEfxTrailEmitterTypeInfo_AtExit()
+  void register_CEfxTrailEmitterTypeInfo_AtExit()
   {
     if (gCEfxTrailEmitterTypeInfoRegistered) {
-      return 0;
+      return;
     }
 
     (void)register_CEfxTrailEmitterTypeInfo_00();
     gCEfxTrailEmitterTypeInfoRegistered = true;
-    return std::atexit(&cleanup_CEfxTrailEmitterTypeInfo);
   }
 } // namespace moho
 

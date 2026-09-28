@@ -12,18 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiFormationInstanceTypeInfo)
-  unsigned char gCAiFormationInstanceTypeInfoStorage[sizeof(CAiFormationInstanceTypeInfo)] = {};
-  bool gCAiFormationInstanceTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6740 (FUN_00BF6740, atexit destructor of the CAiFormationInstanceTypeInfo object)
+   */
   [[nodiscard]] CAiFormationInstanceTypeInfo* AcquireCAiFormationInstanceTypeInfo()
   {
-    if (!gCAiFormationInstanceTypeInfoConstructed) {
-      new (gCAiFormationInstanceTypeInfoStorage) CAiFormationInstanceTypeInfo();
-      gCAiFormationInstanceTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiFormationInstanceTypeInfo*>(gCAiFormationInstanceTypeInfoStorage);
+    static CAiFormationInstanceTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
@@ -80,22 +75,6 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
-  /**
-   * Address: 0x00BF6740 (FUN_00BF6740, cleanup_CAiFormationInstanceTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `CAiFormationInstanceTypeInfo` storage, releasing
-   * base/field vectors and restoring base RTTI vtable lanes.
-   */
-  void cleanup_CAiFormationInstanceTypeInfo()
-  {
-    if (!gCAiFormationInstanceTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiFormationInstanceTypeInfo()->~CAiFormationInstanceTypeInfo();
-    gCAiFormationInstanceTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -211,7 +190,6 @@ void CAiFormationInstanceTypeInfo::Destruct(void* const objectStorage)
 void moho::register_CAiFormationInstanceTypeInfo()
 {
   (void)AcquireCAiFormationInstanceTypeInfo();
-  (void)std::atexit(&cleanup_CAiFormationInstanceTypeInfo);
 }
 
 namespace
@@ -226,7 +204,6 @@ namespace
 
   [[maybe_unused]] CAiFormationInstanceTypeInfoBootstrap gCAiFormationInstanceTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

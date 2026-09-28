@@ -52,5 +52,5 @@ namespace moho
    * Constructs startup-owned `SContinueInfoTypeInfo` storage and installs
    * process-exit cleanup.
    */
-  int register_SContinueInfoTypeInfo();
+  void register_SContinueInfoTypeInfo();
 } // namespace moho

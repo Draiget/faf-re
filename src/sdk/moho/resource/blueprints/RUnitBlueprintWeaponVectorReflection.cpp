@@ -32,10 +32,6 @@ namespace
     destination.push_back(value);
   }
 
-  alignas(gpg::RVectorType_RUnitBlueprintWeapon) unsigned char
-    gRUnitBlueprintWeaponVectorTypeStorage[sizeof(gpg::RVectorType_RUnitBlueprintWeapon)];
-  bool gRUnitBlueprintWeaponVectorTypeConstructed = false;
-
   [[nodiscard]] gpg::RType* CachedRUnitBlueprintWeaponType()
   {
     static gpg::RType* cached = nullptr;
@@ -47,22 +43,8 @@ namespace
 
   [[nodiscard]] gpg::RVectorType_RUnitBlueprintWeapon& AcquireRUnitBlueprintWeaponVectorType()
   {
-    if (!gRUnitBlueprintWeaponVectorTypeConstructed) {
-      new (gRUnitBlueprintWeaponVectorTypeStorage) gpg::RVectorType_RUnitBlueprintWeapon();
-      gRUnitBlueprintWeaponVectorTypeConstructed = true;
-    }
-
-    return *reinterpret_cast<gpg::RVectorType_RUnitBlueprintWeapon*>(gRUnitBlueprintWeaponVectorTypeStorage);
-  }
-
-  void cleanup_VectorRUnitBlueprintWeaponTypeStorage()
-  {
-    if (!gRUnitBlueprintWeaponVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireRUnitBlueprintWeaponVectorType().~RVectorType_RUnitBlueprintWeapon();
-    gRUnitBlueprintWeaponVectorTypeConstructed = false;
+    static gpg::RVectorType_RUnitBlueprintWeapon sInstance;
+    return sInstance;
   }
 
   struct RUnitBlueprintWeaponVectorReflectionBootstrap
@@ -474,12 +456,10 @@ gpg::RType* moho::preregister_VectorRUnitBlueprintWeaponType()
  * Startup lane that preregisters `vector<RUnitBlueprintWeapon>` reflection
  * metadata and installs teardown callback.
  */
-int moho::register_VectorRUnitBlueprintWeaponTypeAtexit()
+void moho::register_VectorRUnitBlueprintWeaponTypeAtexit()
 {
   (void)preregister_VectorRUnitBlueprintWeaponType();
-  return std::atexit(&cleanup_VectorRUnitBlueprintWeaponTypeStorage);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

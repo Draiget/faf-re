@@ -12,27 +12,10 @@ namespace
 {
   using TypeInfo = moho::RPropBlueprintDisplayTypeInfo;
 
-  alignas(TypeInfo) unsigned char gRPropBlueprintDisplayTypeInfoStorage[sizeof(TypeInfo)];
-  bool gRPropBlueprintDisplayTypeInfoConstructed = false;
-
   [[nodiscard]] TypeInfo& AcquireRPropBlueprintDisplayTypeInfo()
   {
-    if (!gRPropBlueprintDisplayTypeInfoConstructed) {
-      new (gRPropBlueprintDisplayTypeInfoStorage) TypeInfo();
-      gRPropBlueprintDisplayTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRPropBlueprintDisplayTypeInfoStorage);
-  }
-
-  void cleanup_RPropBlueprintDisplayTypeInfo()
-  {
-    if (!gRPropBlueprintDisplayTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRPropBlueprintDisplayTypeInfo().~TypeInfo();
-    gRPropBlueprintDisplayTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* CachedFloatType()
@@ -123,13 +106,11 @@ namespace moho
   /**
    * Address: 0x00BC87B0 (FUN_00BC87B0, register_RPropBlueprintDisplayTypeInfo)
    */
-  int register_RPropBlueprintDisplayTypeInfo()
+  void register_RPropBlueprintDisplayTypeInfo()
   {
     (void)AcquireRPropBlueprintDisplayTypeInfo();
-    return std::atexit(&cleanup_RPropBlueprintDisplayTypeInfo);
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

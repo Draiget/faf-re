@@ -108,12 +108,12 @@ namespace moho
   /**
    * Address: 0x00BC8480 (FUN_00BC8480, register_REmitterBlueprintCurveTypeInfo)
    */
-  int register_REmitterBlueprintCurveTypeInfo();
+  void register_REmitterBlueprintCurveTypeInfo();
 
   /**
    * Address: 0x00BC84A0 (FUN_00BC84A0, register_REmitterCurveKeyTypeInfo)
    */
-  int register_REmitterCurveKeyTypeInfo();
+  void register_REmitterCurveKeyTypeInfo();
 
   /**
    * Address: 0x00517420 (FUN_00517420, preregister_VectorREmitterCurveKeyType)
@@ -130,7 +130,7 @@ namespace moho
    * Registers `vector<REmitterCurveKey>` reflection and installs `atexit`
    * teardown.
    */
-  int register_VectorREmitterCurveKeyTypeAtexit();
+  void register_VectorREmitterCurveKeyTypeAtexit();
 
   static_assert(sizeof(REmitterBlueprintCurveTypeInfo) == 0x64, "REmitterBlueprintCurveTypeInfo size must be 0x64");
   static_assert(sizeof(REmitterCurveKeyTypeInfo) == 0x64, "REmitterCurveKeyTypeInfo size must be 0x64");

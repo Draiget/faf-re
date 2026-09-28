@@ -5,24 +5,21 @@
 #include <typeinfo>
 
 #include "moho/audio/AudioReflectionHelpers.h"
-#include "moho/audio/CSimSoundManager.h"
+#include "moho/audio/CSimSoundManager.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::CSimSoundManagerTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCSimSoundManagerTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCSimSoundManagerTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C01500 (FUN_00C01500, atexit destructor of the TypeInfo object)
+   */
   [[nodiscard]] TypeInfo& GetCSimSoundManagerTypeInfo() noexcept
   {
-    if (!gCSimSoundManagerTypeInfoConstructed) {
-      new (gCSimSoundManagerTypeInfoStorage) TypeInfo();
-      gCSimSoundManagerTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCSimSoundManagerTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -70,32 +67,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00C01500 (FUN_00C01500, cleanup_CSimSoundManagerTypeInfo)
-   *
-   * What it does:
-   * Releases process-exit CSimSoundManagerTypeInfo storage.
-   */
-  void cleanup_CSimSoundManagerTypeInfo()
-  {
-    if (!gCSimSoundManagerTypeInfoConstructed) {
-      return;
-    }
-
-    GetCSimSoundManagerTypeInfo().~CSimSoundManagerTypeInfo();
-    gCSimSoundManagerTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BDC500 (FUN_00BDC500, register_CSimSoundManagerTypeInfo)
    *
    * What it does:
    * Forces CSimSoundManagerTypeInfo startup construction and installs process-exit
    * cleanup.
    */
-  int register_CSimSoundManagerTypeInfo()
+  void register_CSimSoundManagerTypeInfo()
   {
     (void)GetCSimSoundManagerTypeInfo();
-    return std::atexit(&cleanup_CSimSoundManagerTypeInfo);
   }
 } // namespace moho
 
@@ -111,7 +91,6 @@ namespace
 
   [[maybe_unused]] CSimSoundManagerTypeInfoBootstrap gCSimSoundManagerTypeInfoBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

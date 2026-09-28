@@ -43,5 +43,5 @@ namespace moho
    * Constructs startup-owned `IAiFormationDBTypeInfo` storage and installs
    * process-exit cleanup.
    */
-  int register_IAiFormationDBTypeInfo();
+  void register_IAiFormationDBTypeInfo();
 } // namespace moho

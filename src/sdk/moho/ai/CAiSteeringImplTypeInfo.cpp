@@ -6,24 +6,21 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiSteeringImpl.h"
+#include "moho/ai/CAiSteeringImpl.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
 
 namespace
 {
-  alignas(CAiSteeringImplTypeInfo) unsigned char gCAiSteeringImplTypeInfoStorage[sizeof(CAiSteeringImplTypeInfo)];
-  bool gCAiSteeringImplTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF8130 (FUN_00BF8130, atexit destructor of the CAiSteeringImplTypeInfo object)
+   */
   [[nodiscard]] CAiSteeringImplTypeInfo* AcquireCAiSteeringImplTypeInfo()
   {
-    if (!gCAiSteeringImplTypeInfoConstructed) {
-      new (gCAiSteeringImplTypeInfoStorage) CAiSteeringImplTypeInfo();
-      gCAiSteeringImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiSteeringImplTypeInfo*>(gCAiSteeringImplTypeInfoStorage);
+    static CAiSteeringImplTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -132,24 +129,6 @@ namespace
     return typeInfo;
   }
 
-
-
-  /**
-   * Address: 0x00BF8130 (FUN_00BF8130, cleanup_CAiSteeringImplTypeInfo)
-   *
-   * What it does:
-   * Tears down recovered static `CAiSteeringImplTypeInfo` storage.
-   */
-  void cleanup_CAiSteeringImplTypeInfo()
-  {
-    if (!gCAiSteeringImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiSteeringImplTypeInfo()->~CAiSteeringImplTypeInfo();
-    gCAiSteeringImplTypeInfoConstructed = false;
-  }
-
   struct CAiSteeringImplTypeInfoBootstrap
   {
     CAiSteeringImplTypeInfoBootstrap()
@@ -240,13 +219,11 @@ gpg::RRef CAiSteeringImplTypeInfo::CtrRef(void* const objectStorage)
  * Constructs startup-owned `CAiSteeringImplTypeInfo` storage and installs
  * process-exit cleanup.
  */
-int moho::register_CAiSteeringImplTypeInfo()
+void moho::register_CAiSteeringImplTypeInfo()
 {
   CAiSteeringImplTypeInfo* const typeInfo = AcquireCAiSteeringImplTypeInfo();
   CAiSteeringImpl::sType = typeInfo;
-  return std::atexit(&cleanup_CAiSteeringImplTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

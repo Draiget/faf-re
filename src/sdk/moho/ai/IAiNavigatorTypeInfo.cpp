@@ -13,34 +13,15 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiNavigatorTypeInfo) unsigned char gIAiNavigatorTypeInfoStorage[sizeof(IAiNavigatorTypeInfo)] = {};
-  bool gIAiNavigatorTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6D00 (FUN_00BF6D00, atexit destructor of the IAiNavigatorTypeInfo object)
+   */
   [[nodiscard]] IAiNavigatorTypeInfo* AcquireIAiNavigatorTypeInfo()
   {
-    if (!gIAiNavigatorTypeInfoConstructed) {
-      new (gIAiNavigatorTypeInfoStorage) IAiNavigatorTypeInfo();
-      gIAiNavigatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<IAiNavigatorTypeInfo*>(gIAiNavigatorTypeInfoStorage);
+    static IAiNavigatorTypeInfo sInstance;
+    return &sInstance;
   }
 
-  /**
-   * Address: 0x00BF6D00 (FUN_00BF6D00)
-   *
-   * What it does:
-   * Tears down startup-owned `IAiNavigatorTypeInfo` storage.
-   */
-  void cleanup_IAiNavigatorTypeInfo()
-  {
-    if (!gIAiNavigatorTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireIAiNavigatorTypeInfo()->~IAiNavigatorTypeInfo();
-    gIAiNavigatorTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -103,10 +84,9 @@ void IAiNavigatorTypeInfo::Init()
  * Constructs startup-owned `IAiNavigatorTypeInfo` storage and installs
  * process-exit cleanup.
  */
-int moho::register_IAiNavigatorTypeInfo()
+void moho::register_IAiNavigatorTypeInfo()
 {
   (void)AcquireIAiNavigatorTypeInfo();
-  return std::atexit(&cleanup_IAiNavigatorTypeInfo);
 }
 
 namespace
@@ -121,8 +101,6 @@ namespace
 
   [[maybe_unused]] IAiNavigatorTypeInfoBootstrap gIAiNavigatorTypeInfoBootstrap;
 } // namespace
-
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

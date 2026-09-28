@@ -53,5 +53,5 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RPropBlueprintEconomyTypeInfo`.
    */
-  int register_RPropBlueprintEconomyTypeInfo();
+  void register_RPropBlueprintEconomyTypeInfo();
 } // namespace moho

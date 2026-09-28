@@ -51,5 +51,5 @@ namespace moho
    * What it does:
    * Registers the `SOffsetInfo` type-info object and installs process-exit cleanup.
    */
-  int register_SOffsetInfoTypeInfo();
+  void register_SOffsetInfoTypeInfo();
 } // namespace moho

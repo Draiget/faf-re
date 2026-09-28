@@ -80,18 +80,10 @@ namespace moho
   [[nodiscard]] gpg::RType* register_WeakPtr_Unit_Type_00();
 
   /**
-   * Address: 0x00BFDC40 (FUN_00BFDC40, cleanup_WeakPtr_Unit_Type)
-   *
-   * What it does:
-   * Tears down startup-owned `WeakPtr<Unit>` reflection storage.
-   */
-  void cleanup_WeakPtr_Unit_Type();
-
-  /**
    * Address: 0x00BD6BA0 (FUN_00BD6BA0, register_WeakPtr_Unit_Type_AtExit)
    *
    * What it does:
    * Registers `WeakPtr<Unit>` reflection and installs process-exit teardown.
    */
-  int register_WeakPtr_Unit_Type_AtExit();
+  void register_WeakPtr_Unit_Type_AtExit();
 } // namespace moho

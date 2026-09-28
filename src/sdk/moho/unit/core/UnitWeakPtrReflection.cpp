@@ -16,19 +16,16 @@ namespace
 {
   using WeakPtrUnitType = moho::RWeakPtrType<moho::Unit>;
 
-  alignas(WeakPtrUnitType) unsigned char gWeakPtrUnitTypeStorage[sizeof(WeakPtrUnitType)];
-  bool gWeakPtrUnitTypeConstructed = false;
-
   msvc8::string gWeakPtrUnitTypeName;
   bool gWeakPtrUnitTypeNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BFDC40 (FUN_00BFDC40, atexit destructor of the WeakPtrUnitType object)
+   */
   [[nodiscard]] WeakPtrUnitType* AcquireWeakPtrUnitType()
   {
-    if (!gWeakPtrUnitTypeConstructed) {
-      new (gWeakPtrUnitTypeStorage) WeakPtrUnitType();
-      gWeakPtrUnitTypeConstructed = true;
-    }
-    return reinterpret_cast<WeakPtrUnitType*>(gWeakPtrUnitTypeStorage);
+    static WeakPtrUnitType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedUnitType()
@@ -252,31 +249,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFDC40 (FUN_00BFDC40, cleanup_WeakPtr_Unit_Type)
-   *
-   * What it does:
-   * Tears down startup-owned `WeakPtr<Unit>` reflection storage.
-   */
-  void cleanup_WeakPtr_Unit_Type()
-  {
-    if (!gWeakPtrUnitTypeConstructed) {
-      return;
-    }
-
-    AcquireWeakPtrUnitType()->~WeakPtrUnitType();
-    gWeakPtrUnitTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD6BA0 (FUN_00BD6BA0, register_WeakPtr_Unit_Type_AtExit)
    *
    * What it does:
    * Registers `WeakPtr<Unit>` reflection and installs process-exit teardown.
    */
-  int register_WeakPtr_Unit_Type_AtExit()
+  void register_WeakPtr_Unit_Type_AtExit()
   {
     (void)register_WeakPtr_Unit_Type_00();
-    return std::atexit(&cleanup_WeakPtr_Unit_Type);
   }
 } // namespace moho
 
