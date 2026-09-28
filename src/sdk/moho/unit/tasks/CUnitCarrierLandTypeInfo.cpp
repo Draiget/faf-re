@@ -251,7 +251,7 @@ namespace moho
 
     if (!mHasLoadedIntoCarrier) {
       if (CUnitMotion* const motion = unit->UnitMotion) {
-        motion->mHeight = std::numeric_limits<float>::infinity();
+        motion->mHeight = gpg::pInf;
         motion->mLayer = LAYER_Air;
       }
       if (Unit* const targetCarrier = mTargetCarrier.GetObjectPtr()) {

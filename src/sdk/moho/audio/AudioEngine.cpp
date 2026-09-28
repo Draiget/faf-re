@@ -2098,17 +2098,17 @@ namespace moho
     const SoundConfiguration* const configuration = sSoundConfiguration.get();
     if (configuration == nullptr || configuration->mEngines.mStart == nullptr ||
         configuration->mEngines.mStart == configuration->mEngines.mFinish || configuration->mNoSound != 0u) {
-      return std::numeric_limits<float>::quiet_NaN();
+      return gpg::NaN;
     }
 
     AudioEngine* const engine = configuration->mEngines.mStart->mEngine;
     if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mInstance == nullptr) {
-      return std::numeric_limits<float>::quiet_NaN();
+      return gpg::NaN;
     }
 
-    float value = std::numeric_limits<float>::quiet_NaN();
+    float value = gpg::NaN;
     if (engine->mImpl->mInstance->GetGlobalVariable(varIndex, &value) < 0) {
-      return std::numeric_limits<float>::quiet_NaN();
+      return gpg::NaN;
     }
     return value;
   }

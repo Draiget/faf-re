@@ -208,7 +208,7 @@ namespace moho
       // On the deck: release the height hold and hand the unit over. The task
       // ends here, and `mHasLoadedIntoCarrier` tells the destructor the landing
       // succeeded so it must not undo the reservation.
-      motion->mHeight = std::numeric_limits<float>::infinity();
+      motion->mHeight = gpg::pInf;
       if (transport != nullptr) {
         transport->TransportAddToStorage(unit);
       }

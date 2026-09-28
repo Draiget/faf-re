@@ -3,6 +3,8 @@
 #include <cmath>
 #include <limits>
 
+#include "gpg/core/utils/Global.h"
+
 // FAF SDK helper recovered from FA at FUN_00472BB0. Lives outside
 // dependencies/WildMagic3p8/ because it's FAF SDK glue. Used to live at
 // src/sdk/wm3/AABB.cpp.
@@ -17,7 +19,7 @@ namespace moho
     template <>
     const Wm3::AxisAlignedBox3f& Empty<Wm3::AxisAlignedBox3f>()
     {
-        static const float kPositiveInfinity = std::numeric_limits<float>::infinity();
+        static const float kPositiveInfinity = gpg::pInf;
         static const Wm3::AxisAlignedBox3f kEmpty{
             Wm3::Vector3f{kPositiveInfinity, kPositiveInfinity, kPositiveInfinity},
             Wm3::Vector3f{-kPositiveInfinity, -kPositiveInfinity, -kPositiveInfinity},

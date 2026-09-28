@@ -3,6 +3,8 @@
 #include <cmath>
 #include <limits>
 
+#include "gpg/core/utils/Global.h"
+
 namespace moho
 {
   /**
@@ -269,7 +271,7 @@ namespace moho
     static Wm3::Vector3f invalidVector{};
     static bool initialized = false;
     if (!initialized) {
-      const float nanValue = std::numeric_limits<float>::quiet_NaN();
+      const float nanValue = gpg::NaN;
       invalidVector.x = nanValue;
       invalidVector.y = nanValue;
       invalidVector.z = nanValue;

@@ -4095,7 +4095,7 @@ namespace moho
 
     Unit* bestUnit = nullptr;
     int bestRank = kBestRankUnset;
-    float bestDistSq = std::numeric_limits<float>::infinity();
+    float bestDistSq = gpg::pInf;
 
     for (Entity* const* entrySlot = gatheredUnits.mVec.begin(); entrySlot != gatheredUnits.mVec.end(); ++entrySlot) {
       Unit* const unit = (*entrySlot != nullptr) ? static_cast<Unit*>(*entrySlot) : nullptr;

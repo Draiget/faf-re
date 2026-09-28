@@ -402,7 +402,7 @@ namespace moho
       // On the bone: hand the pod to the host and release the height hold.
       host->AiTransport->TransportAttachUnit(unit);
       unit->UnitMotion->SetFacing(Wm3::Vec3f{0.0f, 0.0f, 0.0f});
-      unit->UnitMotion->mHeight = std::numeric_limits<float>::infinity();
+      unit->UnitMotion->mHeight = gpg::pInf;
       mTaskState = NextTaskState(mTaskState);
       return 1;
 
@@ -450,7 +450,7 @@ namespace moho
 
       if (mUnit->UnitMotion != nullptr) {
         mUnit->UnitMotion->Stop(nullptr);
-        mUnit->UnitMotion->mHeight = std::numeric_limits<float>::infinity();
+        mUnit->UnitMotion->mHeight = gpg::pInf;
       }
 
       mTaskState = TASKSTATE_Preparing;
@@ -496,7 +496,7 @@ namespace moho
     GatherNearbyAssistUnits(mUnit, nearbyHits);
 
     Unit* bestTargetUnit = nullptr;
-    float bestDistanceSquared = std::numeric_limits<float>::infinity();
+    float bestDistanceSquared = gpg::pInf;
     for (const CollisionResult* hit = nearbyHits.start_; hit != nearbyHits.end_; ++hit) {
       Unit* const nearbyUnit = (hit->sourceEntity != nullptr) ? hit->sourceEntity->IsUnit() : nullptr;
       if (!IsEligibleNearbyAssistCandidate(mUnit, nearbyUnit)) {

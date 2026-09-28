@@ -2673,8 +2673,8 @@ namespace
     // UNRESOLVED: Render glyphScale + maxAdvance scalars, asm 0x007F46EF/0x007F46F5
     // (NaN sentinels). Using quiet-NaN "natural size / no advance limit" to match
     // the sibling debug-HUD Render call sites.
-    const float kNoGlyphScale = std::numeric_limits<float>::quiet_NaN();
-    const float kNoMaxAdvance = std::numeric_limits<float>::quiet_NaN();
+    const float kNoGlyphScale = gpg::NaN;
+    const float kNoMaxAdvance = gpg::NaN;
 
     // ---- Y-axis scale labels: 5 rows of "%5d", asm 0x007F469A..0x007F4775. --
     {

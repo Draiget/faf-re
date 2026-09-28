@@ -801,7 +801,7 @@ namespace moho
 
     // Peak lifetime envelope: max over lifetime-curve keys of (z*0.5 + y),
     // seeded with -infinity.
-    float lifetimePeak = -std::numeric_limits<float>::infinity();
+    float lifetimePeak = -gpg::pInf;
     {
       const SEfxCurve& lifetimeCurve = curves[EMITTER_LIFETIME_CURVE];
       for (const Wm3::Vector3f* key = lifetimeCurve.mKeys.begin();

@@ -378,7 +378,7 @@ namespace moho
     mSim->mOGrid->CollectEntitiesInBox(collisions, ENTITYTYPE_Prop, queryBox);
 
     Entity* nearest = nullptr;
-    float nearestDistSq = std::numeric_limits<float>::infinity();
+    float nearestDistSq = gpg::pInf;
     const Wm3::Vec3f& builderPos = mUnit->GetPosition();
     for (const CollisionResult& hit : collisions) {
       Entity* const entity = hit.sourceEntity;

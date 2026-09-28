@@ -668,7 +668,7 @@ const RUnitBlueprint* CAiBuilderImpl::BuilderGetNextRebuildStructure(SOCellPos& 
 
   const RUnitBlueprint* bestBlueprint = nullptr;
   SOCellPos bestCell{0, 0};
-  float bestDist = std::numeric_limits<float>::infinity();
+  float bestDist = gpg::pInf;
 
   for (const auto& [encodedCell, blueprint] : mRebuildStructures) {
     if (!blueprint) {

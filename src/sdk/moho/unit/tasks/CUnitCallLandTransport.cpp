@@ -239,7 +239,7 @@ namespace moho
         if (transport->TransportIsReadyForUnit(mUnit)) {
           static constexpr Wm3::Vector3f kZeroFacing{0.0f, 0.0f, 0.0f};
           mUnit->UnitMotion->SetFacing(kZeroFacing);
-          mUnit->UnitMotion->mHeight = std::numeric_limits<float>::infinity();
+          mUnit->UnitMotion->mHeight = gpg::pInf;
 
           mSourceTransform = mUnit->GetTransform();
           mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);

@@ -532,7 +532,7 @@ Wm3::Vector3f CAiNavigatorAir::BuildGoalWorldPos(const SAiNavigatorGoal& goal) c
 
   std::int32_t bestX = minX;
   std::int32_t bestZ = minZ;
-  float bestDistSq = std::numeric_limits<float>::infinity();
+  float bestDistSq = gpg::pInf;
 
   for (std::int32_t x = minX; x < maxX; ++x) {
     for (std::int32_t z = minZ; z < maxZ; ++z) {

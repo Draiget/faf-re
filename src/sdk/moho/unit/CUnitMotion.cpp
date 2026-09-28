@@ -1808,7 +1808,7 @@ namespace moho
 
     if (targetTolerance < planarDistance) {
       if (mVertEvent != UMVE_Hover &&
-          (mVertEvent != UMVE_Bottom || mHeight == std::numeric_limits<float>::infinity())) {
+          (mVertEvent != UMVE_Bottom || mHeight == gpg::pInf)) {
         return false;
       }
     }
@@ -1898,7 +1898,7 @@ namespace moho
       return ownerElevation + mRandomElevation;
     }
 
-    if (mHeight == std::numeric_limits<float>::infinity()) {
+    if (mHeight == gpg::pInf) {
       return ownerElevation * kCarrierRelativeHeightScale;
     }
 
@@ -2156,8 +2156,8 @@ namespace moho
     STIMap* const mapData = unit->SimulationRef->mMapData;
 
     CGeomHitResult hitResult{};
-    hitResult.distance = std::numeric_limits<float>::quiet_NaN();
-    hitResult.v1 = std::numeric_limits<float>::quiet_NaN();
+    hitResult.distance = gpg::NaN;
+    hitResult.v1 = gpg::NaN;
 
     GeomLine3 moveLine{};
     moveLine.pos = Wm3::Vec3f{
@@ -2353,7 +2353,7 @@ namespace moho
     }
 
     const Wm3::Vector3f ownerPosition = mUnit->GetPosition();
-    float nearestDistanceSq = std::numeric_limits<float>::infinity();
+    float nearestDistanceSq = gpg::pInf;
 
     for (moho::SWeakRefSlot* candidate = candidates.start_; candidate != candidates.end_; ++candidate) {
       // The slot holds an Entity. Recover the unit through the virtual
@@ -3930,7 +3930,7 @@ namespace moho
         if (!enteredLandingPhase && mPreparationTick > 0 && autoLandTicks > 0) {
           const std::uint32_t curTick = sim->mCurTick;
           if (curTick > static_cast<std::uint32_t>(autoLandTicks) + static_cast<std::uint32_t>(mPreparationTick)) {
-            if (mHeight == std::numeric_limits<float>::infinity()) {
+            if (mHeight == gpg::pInf) {
               gpg::Rect2f skirt{};
               if (unit->PrepareMove(0, &mTargetPosition, &skirt, useWholeMap)) {
                 if (unit->IsUnitState(UNITSTATE_CannotFindPlaceToLand)) {
@@ -3988,7 +3988,7 @@ namespace moho
           // aircraft -- 0x00598F99 tests state 42 and bails -- so it could
           // never be given a move order and never left the ground.
           unit->UnitStateMask |= (1ull << UNITSTATE_MovingDown);
-          if (mHeight == std::numeric_limits<float>::infinity()) {
+          if (mHeight == gpg::pInf) {
             if (ShouldHoverInsteadOfLand() || mVertEvent == UMVE_Hover) {
               mNewElevation = air.TransportHoverHeight;
             } else if (horizontalDistance < 0.5f || mVertEvent == UMVE_Bottom) {
@@ -4085,7 +4085,7 @@ namespace moho
       // ---- Combat-state layer/vertical-event resolution --------------------
       if (mCombatState == ACS_None) {
         if (enteredLandingPhase
-            && (mNewElevation == 0.0f || mHeight != std::numeric_limits<float>::infinity() || ShouldHoverInsteadOfLand())) {
+            && (mNewElevation == 0.0f || mHeight != gpg::pInf || ShouldHoverInsteadOfLand())) {
           if (horizontalDistance < 0.5f && ((mCurElevation - mNewElevation) < 0.1f || unit->mVarDat.mLayerMask == mLayer)) {
             mReservation = gpg::Rect2i{};
             unit->FreeOgridRect();

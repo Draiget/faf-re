@@ -1078,7 +1078,7 @@ void CAiPathNavigator::OnEvent(const SNavPath& path)
 
     mPathSearchFailCount = 0;
     mPathRetryDelayFrames = 0;
-    mRepathDistanceThreshold = std::numeric_limits<float>::infinity();
+    mRepathDistanceThreshold = gpg::pInf;
     mState = AIPATHNAVSTATE_HasPath;
     if (mPathFinder) {
       mPathFinder->mSearchType = AIPATHSEARCH_None;
@@ -1155,7 +1155,7 @@ void CAiPathNavigator::OnEvent(const SNavPath& path)
 
   mNoForwardDistanceFailCount = 0;
   mPathRetryDelayFrames = 0;
-  mRepathDistanceThreshold = std::numeric_limits<float>::infinity();
+  mRepathDistanceThreshold = gpg::pInf;
   if (mPathFinder) {
     mPathFinder->mSearchType = AIPATHSEARCH_None;
   }

@@ -1103,8 +1103,8 @@ namespace moho
 
     Entity* bestReachableEntity = nullptr;
     Entity* bestFallbackEntity = nullptr;
-    float bestReachableScore = std::numeric_limits<float>::infinity();
-    float bestFallbackScore = std::numeric_limits<float>::infinity();
+    float bestReachableScore = gpg::pInf;
+    float bestFallbackScore = gpg::pInf;
 
     for (Entity* const* it = candidateSet.begin(); it != candidateSet.end(); ++it) {
       Entity* const candidateEntity = *it;

@@ -659,7 +659,7 @@ int moho::cfunc_CreateRotatorL(LuaPlus::LuaState* const state)
     manipulator->mHasGoal = 1u;
     manipulator->mGoalAngle = goalRadians;
     manipulator->EventSetSignaled(goalRadians == manipulator->mCurrentAngle);
-    manipulator->mSpeed = std::numeric_limits<float>::infinity() * kDegreesPerSecondToRadians;
+    manipulator->mSpeed = gpg::pInf * kDegreesPerSecondToRadians;
   }
 
   if (argumentCount >= 5 && lua_type(rawState, 5) != LUA_TNIL) {

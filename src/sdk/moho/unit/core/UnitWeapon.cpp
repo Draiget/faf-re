@@ -3874,7 +3874,7 @@ namespace moho
     }
 
     std::int32_t closestIndex = -1;
-    float closestDistance = std::numeric_limits<float>::infinity();
+    float closestDistance = gpg::pInf;
 
     // The shipped loop re-reads BOTH `start` and `end` from the container on
     // every iteration: its continuation test is `index < (a1->end - a1->start)`

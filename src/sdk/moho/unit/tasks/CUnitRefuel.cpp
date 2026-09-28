@@ -255,7 +255,7 @@ namespace moho
     Unit* const targetUnit = mTargetUnit.GetObjectPtr();
     if (mHasTransportReservation) {
       if (mUnit->UnitMotion != nullptr) {
-        mUnit->UnitMotion->mHeight = std::numeric_limits<float>::infinity();
+        mUnit->UnitMotion->mHeight = gpg::pInf;
       }
 
       if (targetUnit != nullptr && !targetUnit->IsDead() && !mIsCarrier) {
@@ -602,7 +602,7 @@ namespace moho
       if (alignment > kAttachFacingAlignment || unit->mVarDat.mLayerMask == LAYER_Land) {
         if (unit->UnitMotion != nullptr) {
           unit->UnitMotion->SetFacing(Wm3::Vec3f{0.0f, 0.0f, 0.0f});
-          unit->UnitMotion->mHeight = std::numeric_limits<float>::infinity();
+          unit->UnitMotion->mHeight = gpg::pInf;
         }
 
         if (transport->TransportAttachUnit(unit)) {

@@ -2289,8 +2289,8 @@ namespace moho
   Wm3::Vec3f CHeightField::Intersection(const GeomLine3& line, CGeomHitResult* res) const
   {
     CGeomHitResult temp{};
-    temp.distance = std::numeric_limits<float>::quiet_NaN();
-    temp.v1 = std::numeric_limits<float>::quiet_NaN();
+    temp.distance = gpg::NaN;
+    temp.v1 = gpg::NaN;
 
     CGeomHitResult* const hit = res ? res : &temp;
     if (!DoIntersection(line.pos, line.dir, line.closest, line.farthest, hit)) {

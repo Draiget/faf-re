@@ -260,7 +260,7 @@ namespace moho
   {
     Wm3::Vector3f* const keysEnd = curve.mKeys.end();
     Wm3::Vector3f* nearest = keysEnd;
-    float nearestDistance = std::numeric_limits<float>::infinity();
+    float nearestDistance = gpg::pInf;
 
     for (Wm3::Vector3f* key = curve.mKeys.begin(); key != keysEnd; ++key) {
       const float deltaTime = point.x - key->x;
@@ -315,8 +315,8 @@ namespace moho
    */
   void RecomputeEmitterCurveYBounds(SEfxCurve& curve)
   {
-    curve.mBoundsMin.y = std::numeric_limits<float>::infinity();
-    curve.mBoundsMax.y = -std::numeric_limits<float>::infinity();
+    curve.mBoundsMin.y = gpg::pInf;
+    curve.mBoundsMax.y = -gpg::pInf;
 
     for (Wm3::Vector3f* key = curve.mKeys.begin(); key != curve.mKeys.end(); ++key) {
       if (curve.mBoundsMin.y > key->y) {

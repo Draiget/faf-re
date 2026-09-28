@@ -15938,7 +15938,7 @@ bool Unit::PrepareMove(
   }
 
   const Wm3::Vector3f unitPosition = GetPosition();
-  float bestDistanceSq = std::numeric_limits<float>::infinity();
+  float bestDistanceSq = gpg::pInf;
   Wm3::Vector3f bestCandidatePos = *inOutPos;
   for (const Wm3::Vector3f& candidateWorldPos : candidatePositions) {
     const float dx = candidateWorldPos.x - unitPosition.x;
@@ -16026,7 +16026,7 @@ bool Unit::HasMeleeSpaceAroundSmallTarget(Unit* const target, SOCellPos* const i
   const float moverHalfSizeZ = static_cast<float>(moverFootprint.mSizeZ) * 0.5f;
 
   bool found = false;
-  float bestDistanceSq = std::numeric_limits<float>::infinity();
+  float bestDistanceSq = gpg::pInf;
   SOCellPos bestCell = *inOutCell;
 
   for (int z = minZ; z <= maxZ; ++z) {
@@ -16131,7 +16131,7 @@ bool Unit::HasMeleeSpaceAroundLargeTarget(Unit* const target, SOCellPos* const i
   const float moverHalfSizeZ = static_cast<float>(moverFootprint.mSizeZ) * 0.5f;
 
   bool found = false;
-  float bestDistanceSq = std::numeric_limits<float>::infinity();
+  float bestDistanceSq = gpg::pInf;
   SOCellPos bestCell = *inOutCell;
 
   for (int z = minZ; z <= maxZ; ++z) {

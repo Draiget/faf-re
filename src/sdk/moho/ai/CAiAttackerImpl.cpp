@@ -939,7 +939,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
   const float maxRangeSq = range * range;
 
   Entity* bestEntity = nullptr;
-  float bestDistance = std::numeric_limits<float>::infinity();
+  float bestDistance = gpg::pInf;
   WeaponTargetRangeStatus bestSolution = WeaponTargetRangeStatus::OutsideMaxRange;
   std::uint32_t bestCategory = 9999u;
 
@@ -1652,7 +1652,7 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
   }
 
   Entity* bestProjectile = nullptr;
-  float bestDistanceSquared = std::numeric_limits<float>::infinity();
+  float bestDistanceSquared = gpg::pInf;
 
   gpg::core::FastVectorN<CollisionResult, 10> projectilesInRange{};
   EntitiesAroundPoint(projectilesInRange, searchRadius, *sim->mOGrid, ENTITYTYPE_Projectile, unitPosition);

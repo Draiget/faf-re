@@ -6257,7 +6257,7 @@ namespace moho
       return -1;
     }
 
-    float bestScaledDistance = std::numeric_limits<float>::infinity();
+    float bestScaledDistance = gpg::pInf;
     CmdId bestCommandId = -1;
 
     for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
@@ -10836,7 +10836,7 @@ namespace moho
         (void)spatialDb->Collect(candidates, ENTITYTYPE_Unit);
 
         UserEntity* closest = nullptr;
-        float closestDistanceSq = std::numeric_limits<float>::infinity();
+        float closestDistanceSq = gpg::pInf;
         for (UserEntity* const candidate : candidates) {
           if (candidate == nullptr || candidate->IsBeingBuilt()) {
             continue;
@@ -18799,7 +18799,7 @@ namespace moho
         shadowOrigin,
         kLabelShadowColor,
         1.0f,
-        std::numeric_limits<float>::quiet_NaN()
+        gpg::NaN
       );
       font->Render2D(
         customName.c_str(),
@@ -18807,7 +18807,7 @@ namespace moho
         textOrigin,
         ui_CustomNameColor,
         1.0f,
-        std::numeric_limits<float>::quiet_NaN()
+        gpg::NaN
       );
 
       return textOrigin;
@@ -18915,7 +18915,7 @@ namespace moho
         shadowOrigin,
         kLabelShadowColor,
         1.0f,
-        std::numeric_limits<float>::quiet_NaN()
+        gpg::NaN
       );
       font->Render2D(
         joinedNames.c_str(),
@@ -18923,7 +18923,7 @@ namespace moho
         textOrigin,
         ui_SelectionSetNamesColor,
         1.0f,
-        std::numeric_limits<float>::quiet_NaN()
+        gpg::NaN
       );
 
       return textOrigin;

@@ -694,7 +694,7 @@ namespace moho
     , mScale(scale)
     , mLocalTransform(MakeIdentityPoseTransform())
     , mBones()
-    , mMaxOffset(-std::numeric_limits<float>::infinity())
+    , mMaxOffset(gpg::nInf)
   {
     InitializePoseBonesInlineStorage(*this);
 

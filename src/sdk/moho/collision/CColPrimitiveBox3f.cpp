@@ -208,7 +208,7 @@ namespace moho
     static Wm3::Box3f invalid{};
 
     if (!initialized) {
-      const float nanValue = std::numeric_limits<float>::quiet_NaN();
+      const float nanValue = gpg::NaN;
       const Wm3::Vector3<float> invalidVector{nanValue, nanValue, nanValue};
       invalid = Wm3::Box3f(invalidVector, invalidVector, invalidVector, invalidVector, nanValue, nanValue, nanValue);
       initialized = true;

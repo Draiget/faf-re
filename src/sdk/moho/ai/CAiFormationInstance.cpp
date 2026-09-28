@@ -1668,7 +1668,7 @@ namespace moho
     mExtent = SCoordsVec2{2.0f, 2.0f};
     mUseDynamicOffset = false;
     mInFormation = false;
-    mSpeed = std::numeric_limits<float>::infinity();
+    mSpeed = gpg::pInf;
     mAvgDistToTarget = 0.0f;
     mLeader.Set(nullptr);
   }
@@ -2431,7 +2431,7 @@ namespace moho
     , mGamerules(nullptr)
     , mCommandType(EUnitCommandType::UNITCOMMAND_None)
   {
-    const float quietNan = std::numeric_limits<float>::quiet_NaN();
+    const float quietNan = gpg::NaN;
     mCoords.x = quietNan;
     mCoords.z = quietNan;
     mPlanUpdate = 0u;
@@ -2987,10 +2987,10 @@ namespace moho
     }
 
     // Phase 5 (0x005677E4-0x005679D4): slot-table span/mean statistics.
-    float slotMinX = std::numeric_limits<float>::infinity();
-    float slotMaxX = -std::numeric_limits<float>::infinity();
-    float slotMinZ = std::numeric_limits<float>::infinity();
-    float slotMaxZ = -std::numeric_limits<float>::infinity();
+    float slotMinX = gpg::pInf;
+    float slotMaxX = gpg::nInf;
+    float slotMinZ = gpg::pInf;
+    float slotMaxZ = gpg::nInf;
     float slotSumX = 0.0f;
     float slotSumZ = 0.0f;
     for (const SFormationScriptSlot& slot : scriptResult.mObjs) {
@@ -3042,7 +3042,7 @@ namespace moho
     std::int32_t leaderPriority = 0;
     for (const SFormationRunScriptCandidate& candidate : candidates) {
       auto bestIt = unitDescs.end();
-      float bestDistSq = std::numeric_limits<float>::infinity();
+      float bestDistSq = gpg::pInf;
       for (auto it = unitDescs.begin(); it != unitDescs.end(); ++it) {
         if (it->unit == nullptr) {
           continue;
@@ -3080,7 +3080,7 @@ namespace moho
       info.mLeaderPriority = leaderPriority;
       info.mOffset = SCoordsVec2{candidate.position.x, candidate.position.z};
       info.mTargetPos = Wm3::Vec3f::ZERO;
-      info.mHeadingAngle = std::numeric_limits<float>::infinity();
+      info.mHeadingAngle = gpg::pInf;
       info.mDistToTarget = 0.0f;
       info.mDistFromLeader = 0.0f;
       info.mWeight = candidate.weight;
@@ -3781,7 +3781,7 @@ namespace moho
 
         float minDistToTarget = mCommandType == EUnitCommandType::UNITCOMMAND_Guard
           ? 0.0f
-          : std::numeric_limits<float>::infinity();
+          : gpg::pInf;
         float maxDistToTarget = 0.0f;
 
         // The leader's goal (0x0059AEF6-0x0059B033, air tail at 0x0059B5B7).
@@ -3881,7 +3881,7 @@ namespace moho
               Wm3::Vec3f relative{offsetPos.x - groupCenter.x, 0.0f, offsetPos.z - groupCenter.z};
 
               float heading = 0.0f;
-              if (unitInfo.mHeadingAngle != std::numeric_limits<float>::infinity()) {
+              if (unitInfo.mHeadingAngle != gpg::pInf) {
                 const float leaderHeading = HeadingOf(leader->GetTransform().orient_);
                 const float headingError = WrapAngle(leaderHeading - std::atan2(mForwardVector.x, mForwardVector.z));
                 const float blend = (distToLeader / maxLeaderDistance) * 0.050000001f + 0.94f;
@@ -3921,7 +3921,7 @@ namespace moho
               );
               unitInfo.mTargetPos = world;
               target = SCoordsVec2{world.x, world.z};
-              unitInfo.mHeadingAngle = std::numeric_limits<float>::infinity();
+              unitInfo.mHeadingAngle = gpg::pInf;
             }
           }
 

@@ -8139,9 +8139,9 @@ moho::CBuildDragPreview::CBuildDragPreview()
   , mDecal(nullptr)
   , mActiveCommandMode(moho::COMMOD_None)
   , mStart(
-      std::numeric_limits<float>::quiet_NaN(),
-      std::numeric_limits<float>::quiet_NaN(),
-      std::numeric_limits<float>::quiet_NaN()
+      gpg::NaN,
+      gpg::NaN,
+      gpg::NaN
     )
   , mEnd(mStart)
   , mPreviewInvalid(false)
@@ -16786,14 +16786,14 @@ void moho::CMauiText::DoRender(
   if (mDropShadow) {
     const std::uint32_t shadowColor = this->AdjustARGBAlpha(mColor & 0xFF000000u);
     const float shadowMaxAdvance = mClipToWidth ? CScriptLazyVar_float::GetValue(&mWidthLV)
-                                                          : std::numeric_limits<float>::quiet_NaN();
+                                                          : gpg::NaN;
     const Wm3::Vector3f shadowOrigin{originX + 1.0f, baselineY + 1.0f, 0.0f};
     (void)font->Render(text, primBatcher, shadowOrigin, xAxis, yAxis, shadowColor, 1.0f, shadowMaxAdvance);
   }
 
   // Main text run.
   const float maxAdvance = mClipToWidth ? CScriptLazyVar_float::GetValue(&mWidthLV)
-                                                  : std::numeric_limits<float>::quiet_NaN();
+                                                  : gpg::NaN;
 
   // Alpha byte derived from mAlpha exactly as the binary does: negate-scale,
   // truncate toward zero, then subtract the shifted magnitude.
@@ -22981,7 +22981,7 @@ moho::CMauiControl* moho::CMauiControl::GetTopmostControl(
 )
 {
   CMauiControl* topmostControl = nullptr;
-  float topmostDepth = -std::numeric_limits<float>::infinity();
+  float topmostDepth = gpg::nInf;
   for (CMauiControl* controlCursor = root; controlCursor != nullptr;
        controlCursor = controlCursor->DepthFirstSuccessor(root)) {
     if (controlCursor->IsHidden() || controlCursor->IsHitTestDisabled() || !controlCursor->HitTest(x, y)) {
@@ -25094,7 +25094,7 @@ void moho::CMauiFrame::PurgeDeleted()
  */
 float moho::CMauiFrame::GetTopmostDepth()
 {
-  float topmostDepth = -std::numeric_limits<float>::infinity();
+  float topmostDepth = gpg::nInf;
   for (CMauiControl* controlCursor = DepthFirstSuccessor(this); controlCursor != nullptr;
        controlCursor = controlCursor->DepthFirstSuccessor(this)) {
     const float controlDepth =

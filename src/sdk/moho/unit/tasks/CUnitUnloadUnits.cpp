@@ -347,7 +347,7 @@ namespace moho
 
           if (mIsStagingPlatform) {
             if (detachedUnit->mIsAir && detachedUnit->UnitMotion != nullptr) {
-              detachedUnit->UnitMotion->mHeight = std::numeric_limits<float>::infinity();
+              detachedUnit->UnitMotion->mHeight = gpg::pInf;
             }
             continue;
           }

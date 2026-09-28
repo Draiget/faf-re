@@ -2254,8 +2254,8 @@ void moho::CameraImpl::ClampFocusPos()
   moho::GeomLine3 line{};
   line.pos = mOffset;
   const float cosPitch = std::cos(mFarPitch);
-  line.closest = -std::numeric_limits<float>::infinity();
-  line.farthest = std::numeric_limits<float>::infinity();
+  line.closest = gpg::nInf;
+  line.farthest = gpg::pInf;
   line.dir.x = std::sin(mHeading) * cosPitch;
   line.dir.y = -std::sin(mFarPitch);
   line.dir.z = cosPitch * std::cos(mHeading);
@@ -2390,7 +2390,7 @@ void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float f
   if ((shiftAnchorType == kCameraTargetTypeLocation || shiftAnchorType == kCameraTargetTypeHermite) &&
       startTargetZoom > mTargetZoom) {
     moho::GeomLine3 pivotRay = mCam.Unproject(mPivot);
-    pivotRay.closest = -std::numeric_limits<float>::infinity();
+    pivotRay.closest = gpg::nInf;
 
     moho::CColHitResult hit{};
     if (STIMap* const stiMap = mTerrainMap; stiMap != nullptr) {
@@ -2866,7 +2866,7 @@ void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const fl
   const float cosPitch = std::cos(mFarPitch);
   line.pos = mOffset;
   line.closest = 0.0f;
-  line.farthest = std::numeric_limits<float>::infinity();
+  line.farthest = gpg::pInf;
   line.dir.x = std::sin(mHeading) * cosPitch;
   line.dir.y = -std::sin(mFarPitch);
   line.dir.z = cosPitch * std::cos(mHeading);

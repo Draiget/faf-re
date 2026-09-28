@@ -2978,7 +2978,7 @@ namespace
 
     const RUnitBlueprint* const targetBlueprint = targetUnit->GetBlueprint();
     Unit* bestTransport = nullptr;
-    float bestScore = std::numeric_limits<float>::infinity();
+    float bestScore = gpg::pInf;
 
     for (Entity* const* it = originalSelection.mVec.begin(); it != originalSelection.mVec.end(); ++it) {
       Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(*it);
@@ -6776,7 +6776,7 @@ void CDebugCanvas::Render(
     primBatcher->DrawLine(start, end);
   }
 
-  constexpr float kNoMaxAdvance = std::numeric_limits<float>::quiet_NaN();
+  constexpr float kNoMaxAdvance = gpg::NaN;
   for (const SDebugScreenText& text : screenText) {
     boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(text.pointSize, "Ariel");
     CD3DFont* const font = rawFont.px;
@@ -26458,7 +26458,7 @@ namespace moho
     // concrete, valid point that violates the focus army's no-rush constraints.
     bool shouldIssue = true;
     if (data.mTarget.mType != EAiTargetType::AITARGET_None) {
-      constexpr float kInvalidLane = std::numeric_limits<float>::quiet_NaN();
+      constexpr float kInvalidLane = gpg::NaN;
       Wm3::Vec3f targetPoint{kInvalidLane, kInvalidLane, kInvalidLane};
 
       if (data.mTarget.mType == EAiTargetType::AITARGET_Entity) {

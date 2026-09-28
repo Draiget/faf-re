@@ -2072,7 +2072,7 @@ void CSimDriver::DrawNetworkStats(
   // Render's maxAdvance sentinel is the "NaN_206" global (asm 0x0073EDEC /
   // 0x0073EF9F) -- a quiet NaN meaning "no advance limit", matching sibling
   // debug-HUD Render call sites.
-  const float kNoMaxAdvance = std::numeric_limits<float>::quiet_NaN();
+  const float kNoMaxAdvance = gpg::NaN;
 
   // Shared pen Y: the summary block renders first (top), then the per-client
   // table continues BELOW it from the same running Y (retail preserves the pen

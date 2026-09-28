@@ -1314,7 +1314,7 @@ namespace moho
         bone->mLocalTransform.pos_ = Wm3::Vec3f(0.0f, -10000.0f, 0.0f);
         bone->mPose->MarkBoneDirty(bone->mIdx);
       }
-      pose->mMaxOffset = -std::numeric_limits<float>::infinity();
+      pose->mMaxOffset = gpg::nInf;
     }
 
     return true;

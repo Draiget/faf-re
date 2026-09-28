@@ -424,8 +424,8 @@ namespace moho
         Wm3::Vector3f dir{pointB.x - pointA.x, pointB.y - pointA.y, pointB.z - pointA.z};
         Wm3::Vector3f::Normalize(dir);
         edge.dir = dir;
-        edge.closest = -std::numeric_limits<float>::infinity();
-        edge.farthest = std::numeric_limits<float>::infinity();
+        edge.closest = gpg::nInf;
+        edge.farthest = gpg::pInf;
         return moho::PlaneIntersection(edge, plane, nullptr);
       };
 

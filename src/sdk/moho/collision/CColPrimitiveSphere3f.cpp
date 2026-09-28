@@ -127,7 +127,7 @@ namespace moho
     static Wm3::Sphere3f invalid{};
 
     if (!initialized) {
-      const float nanValue = std::numeric_limits<float>::quiet_NaN();
+      const float nanValue = gpg::NaN;
       invalid.Center = Wm3::Vector3<float>{nanValue, nanValue, nanValue};
       invalid.Radius = nanValue;
       initialized = true;

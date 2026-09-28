@@ -352,7 +352,7 @@ namespace moho
       // dispatch). The `IsDead()` guard avoids dispatching through a stale
       // vtable when the platform was destroyed mid-flight.
       if (CUnitMotion* const unitMotion = mUnit->UnitMotion; unitMotion != nullptr) {
-        unitMotion->mHeight = std::numeric_limits<float>::infinity();
+        unitMotion->mHeight = gpg::pInf;
       }
 
       if (Unit* const platformUnit = mPlatform.GetObjectPtr();

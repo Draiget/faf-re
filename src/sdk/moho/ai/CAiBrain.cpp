@@ -1963,7 +1963,7 @@ namespace moho
               CollectAttackCandidateEntities(this, COMPARE_Closest, alliance, category, squadCenter);
             score = (bestEntity != nullptr)
                       ? DistanceSquared(candidatePoint, bestEntity->GetPositionWm3())
-                      : std::numeric_limits<float>::infinity();
+                      : gpg::pInf;
           }
           if (bestScore > score || bestScore < 0.0f) {
             // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
@@ -1981,7 +1981,7 @@ namespace moho
               CollectAttackCandidateEntities(this, COMPARE_Furthest, alliance, category, squadCenter);
             score = (bestEntity != nullptr)
                       ? DistanceSquared(candidatePoint, bestEntity->GetPositionWm3())
-                      : std::numeric_limits<float>::infinity();
+                      : gpg::pInf;
           }
           if (score > bestScore || bestScore < 0.0f) {
             // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
@@ -4520,7 +4520,7 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
   }
 
   LuaPlus::LuaObject closestPlacement;
-  float closestDist = std::numeric_limits<float>::infinity();
+  float closestDist = gpg::pInf;
 
   for (int groupIndex = 1; groupIndex <= buildingTypes.GetCount(); ++groupIndex) {
     LuaPlus::LuaObject buildingGroup = buildingTypes[groupIndex];
@@ -4629,7 +4629,7 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
     }
   }
 
-  if (closestDist >= std::numeric_limits<float>::infinity()) {
+  if (closestDist >= gpg::pInf) {
     lua_pushnil(state->m_state);
     (void)lua_gettop(state->m_state);
     return 1;
@@ -7813,7 +7813,7 @@ int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* const state)
   brain->CenterOfArmy(&searchPosition);
 
   CArmyImpl* closestArmy = nullptr;
-  float closestDistance = std::numeric_limits<float>::infinity();
+  float closestDistance = gpg::pInf;
 
   CAiReconDBImpl* const reconDB = brain->mArmy->GetReconDB();
   if (reconDB == nullptr) {
@@ -8145,7 +8145,7 @@ int moho::cfunc_CAiBrainCheckBlockingTerrainL(LuaPlus::LuaState* const state)
   startPosition.y += kAiBrainCheckBlockingTerrainStartYLift;
   endPosition.y += kAiBrainCheckBlockingTerrainEndYLift;
 
-  const float nanSentinel = std::numeric_limits<float>::quiet_NaN();
+  const float nanSentinel = gpg::NaN;
   CHeightField* const heightField = brain->mSim->mMapData->mHeightField.get();
 
   // Shared helper: cast one sub-segment and report whether a valid terrain hit

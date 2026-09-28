@@ -133,7 +133,7 @@ namespace
       return nullptr;
     }
 
-    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const float nan = gpg::NaN;
     outCoords->x = nan;
     outCoords->z = nan;
     reader.Read(reinterpret_cast<char*>(outCoords), sizeof(moho::SCoordsVec2));

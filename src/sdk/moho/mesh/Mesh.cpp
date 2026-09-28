@@ -4879,7 +4879,7 @@ namespace moho
     // curPose->mMaxOffset starts at -infinity (CAniPose's ctor default) and is
     // only ever raised by InterpolatePose, so this really tests "has a pose
     // blend ever actually run for this instance".
-    const bool maxOffsetUnset = maxOffset <= -std::numeric_limits<float>::infinity();
+    const bool maxOffsetUnset = maxOffset <= gpg::nInf;
 
     sphere.Center = interpolatedPosition;
     if (!maxOffsetUnset) {

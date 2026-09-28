@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "gpg/core/utils/Logging.h"
+#include "gpg/core/utils/Global.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/textures/DXTCodec.h"
 
@@ -1053,7 +1054,7 @@ namespace moho
       yAxis,
       color,
       glyphScale,
-      std::numeric_limits<float>::quiet_NaN()
+      gpg::NaN
     );
   }
 

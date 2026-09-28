@@ -288,7 +288,7 @@ namespace
       case 1u:
         return 500.0f;
       default:
-        return std::numeric_limits<float>::infinity();
+        return gpg::pInf;
     }
   }
 

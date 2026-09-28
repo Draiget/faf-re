@@ -17,7 +17,7 @@ namespace moho
     , mMaxRadius(-1.0f)
     , mMinRadiusSq(-1.0f)
     , mMaxRadiusSq(-1.0f)
-    , mMaxHeightDiff(std::numeric_limits<float>::infinity())
+    , mMaxHeightDiff(gpg::pInf)
     , mType()
     , mDamageRadius(-1.0f)
     , mDamage(-1.0f)

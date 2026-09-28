@@ -613,7 +613,7 @@ namespace moho
     );
 
     Entity* bestCandidate = nullptr;
-    float bestWeightedDistanceSq = std::numeric_limits<float>::infinity();
+    float bestWeightedDistanceSq = gpg::pInf;
 
     const std::ptrdiff_t count = collisions.end() - collisions.begin();
     for (std::ptrdiff_t i = 0; i < count; ++i) {

@@ -898,7 +898,7 @@ namespace moho
 
       const Wm3::Vector3f ownerPosition = mUnit->GetPosition();
       Wm3::Vector3f nearestGuardTarget = zero;
-      float nearestDistance = std::numeric_limits<float>::infinity();
+      float nearestDistance = gpg::pInf;
 
       if (CUnitCommandQueue* const commandQueue = mUnit->CommandQueue; commandQueue != nullptr) {
         const std::size_t commandCount = commandQueue->mCommandVec.size();
@@ -1493,7 +1493,7 @@ namespace moho
     );
 
     Unit* bestCandidate = nullptr;
-    float bestDistanceSquared = std::numeric_limits<float>::infinity();
+    float bestDistanceSquared = gpg::pInf;
     const Wm3::Vector3f ownerPosition = mUnit->GetPosition();
     for (Entity* const nearbyEntity : nearbyEntities) {
       Unit* const candidate = (nearbyEntity != nullptr) ? nearbyEntity->IsUnit() : nullptr;

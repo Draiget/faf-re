@@ -580,7 +580,7 @@ namespace
     const moho::UserArmy* const focusArmy = session->GetFocusArmy();
 
     moho::UserEntity* nearestEntity = nullptr;
-    float nearestDistance = std::numeric_limits<float>::infinity();
+    float nearestDistance = gpg::pInf;
 
     for (moho::UserEntity* const candidate : gathered) {
       moho::UserUnit* const unit = candidate->IsUserUnit();
@@ -3788,8 +3788,8 @@ namespace moho
       return 0;
     }
 
-    constexpr float kPositiveInfinity = std::numeric_limits<float>::infinity();
-    constexpr float kNegativeInfinity = -std::numeric_limits<float>::infinity();
+    constexpr float kPositiveInfinity = gpg::pInf;
+    constexpr float kNegativeInfinity = gpg::nInf;
     constexpr float kBoxMargin = 20.0f;
 
     float minX = kPositiveInfinity;
@@ -6120,9 +6120,9 @@ namespace moho
     // NaN sentinel: a real closest unit's squared distance always beats an
     // invalid sentinel via IsValidVector3f. Matches the binary's invalid_vec.
     static const Wm3::Vector3f kInvalidVec(
-      std::numeric_limits<float>::quiet_NaN(),
-      std::numeric_limits<float>::quiet_NaN(),
-      std::numeric_limits<float>::quiet_NaN()
+      gpg::NaN,
+      gpg::NaN,
+      gpg::NaN
     );
 
     Unit* closestUnit = nullptr;
