@@ -49,10 +49,10 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_CAniDefaultSkelTypeInfo();
 
   /**
-   * Address: 0x00BC98B0 (FUN_00BC98B0, register_CAniDefaultSkelTypeInfoAtexit)
+   * Address: 0x00BC98B0 (FUN_00BC98B0, register_CAniDefaultSkelTypeInfo)
    *
    * What it does:
    * Preregisters `CAniDefaultSkel` RTTI.
    */
-  void register_CAniDefaultSkelTypeInfoAtexit();
+  void register_CAniDefaultSkelTypeInfo();
 } // namespace moho

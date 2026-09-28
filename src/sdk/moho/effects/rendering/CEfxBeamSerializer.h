@@ -18,7 +18,7 @@ namespace moho
      * binds the load/save callback fields. Confirmed from raw disassembly:
      * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
      * `??_7CEfxBeamSerializer@Moho@@6B@` -- no eager `Init()` call and no
-     * call to `register_CEfxBeamTypeInfo_AtExit()` exist here (both were
+     * call to `register_CEfxBeamTypeInfo()` exist here (both were
      * fabricated in the prior recovery). The `push offset ~CEfxBeamSerializer;
      * call _atexit` sequence visible in the real ctor's tail is the
      * compiler's own implicit static-destructor registration for a global

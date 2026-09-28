@@ -94,7 +94,7 @@ namespace
   {
     ResourceDepositVectorReflectionBootstrap()
     {
-      (void)moho::register_VectorResourceDepositTypeAtexit();
+      (void)moho::register_VectorResourceDepositType();
     }
   };
 
@@ -289,7 +289,7 @@ gpg::RType* moho::preregister_VectorResourceDepositType()
   return typeInfo;
 }
 
-void moho::register_VectorResourceDepositTypeAtexit()
+void moho::register_VectorResourceDepositType()
 {
   (void)preregister_VectorResourceDepositType();
 }
@@ -297,4 +297,4 @@ void moho::register_VectorResourceDepositTypeAtexit()
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_VectorResourceDepositType_c50930, moho::preregister_VectorResourceDepositType)
-GPG_PREREGISTER_INIT(register_VectorResourceDepositTypeAtexit_c50930, moho::register_VectorResourceDepositTypeAtexit)
+GPG_PREREGISTER_INIT(register_VectorResourceDepositType_c50930, moho::register_VectorResourceDepositType)

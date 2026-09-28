@@ -80,10 +80,10 @@ namespace moho
   [[nodiscard]] gpg::RType* register_WeakPtr_Unit_Type_00();
 
   /**
-   * Address: 0x00BD6BA0 (FUN_00BD6BA0, register_WeakPtr_Unit_Type_AtExit)
+   * Address: 0x00BD6BA0 (FUN_00BD6BA0, register_WeakPtr_Unit_Type)
    *
    * What it does:
    * Registers `WeakPtr<Unit>` reflection.
    */
-  void register_WeakPtr_Unit_Type_AtExit();
+  void register_WeakPtr_Unit_Type();
 } // namespace moho

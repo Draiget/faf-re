@@ -89,7 +89,7 @@ namespace
   {
     EntitySetTemplateUnitVectorTypeBootstrap()
     {
-      (void)moho::register_EntitySetTemplateUnitVectorType_AtExit();
+      (void)moho::register_EntitySetTemplateUnitVectorTypeStartup();
     }
   };
 
@@ -242,7 +242,7 @@ gpg::RType* moho::register_EntitySetTemplateUnitVectorType()
  * What it does:
  * Registers `vector<EntitySetTemplate<Unit>>` reflection.
  */
-void moho::register_EntitySetTemplateUnitVectorType_AtExit()
+void moho::register_EntitySetTemplateUnitVectorTypeStartup()
 {
   (void)register_EntitySetTemplateUnitVectorType();
 }

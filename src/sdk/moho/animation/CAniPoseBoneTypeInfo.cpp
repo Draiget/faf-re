@@ -129,8 +129,8 @@ namespace
   {
     CAniPoseBoneReflectionBootstrap()
     {
-      moho::register_CAniPoseBoneTypeInfoAtexit();
-      moho::register_FastVectorCAniPoseBoneTypeAtexit();
+      moho::register_CAniPoseBoneTypeInfo();
+      moho::register_FastVectorCAniPoseBoneType();
     }
   };
 
@@ -190,9 +190,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC99A0 (FUN_00BC99A0, register_CAniPoseBoneTypeInfoAtexit)
+   * Address: 0x00BC99A0 (FUN_00BC99A0, register_CAniPoseBoneTypeInfo)
    */
-  void register_CAniPoseBoneTypeInfoAtexit()
+  void register_CAniPoseBoneTypeInfo()
   {
     (void)preregister_CAniPoseBoneTypeInfo();
   }
@@ -208,9 +208,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC9A00 (FUN_00BC9A00, register_FastVectorCAniPoseBoneTypeAtexit)
+   * Address: 0x00BC9A00 (FUN_00BC9A00, register_FastVectorCAniPoseBoneType)
    */
-  void register_FastVectorCAniPoseBoneTypeAtexit()
+  void register_FastVectorCAniPoseBoneType()
   {
     (void)preregister_FastVectorCAniPoseBoneType();
   }
@@ -321,4 +321,4 @@ namespace gpg
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_CAniPoseBoneTypeInfo_af44d4, moho::preregister_CAniPoseBoneTypeInfo)
 GPG_PREREGISTER_INIT(preregister_FastVectorCAniPoseBoneType_af44d4, moho::preregister_FastVectorCAniPoseBoneType)
-GPG_PREREGISTER_INIT(register_FastVectorCAniPoseBoneTypeAtexit_af44d4, moho::register_FastVectorCAniPoseBoneTypeAtexit)
+GPG_PREREGISTER_INIT(register_FastVectorCAniPoseBoneType_af44d4, moho::register_FastVectorCAniPoseBoneType)

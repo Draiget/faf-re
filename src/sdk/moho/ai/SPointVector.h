@@ -180,12 +180,12 @@ namespace moho
   [[nodiscard]] gpg::RType* register_SPointVectorVectorType();
 
   /**
-   * Address: 0x00BCB470 (FUN_00BCB470, register_SPointVectorVectorType_AtExit)
+   * Address: 0x00BCB470 (FUN_00BCB470, register_SPointVectorVectorTypeStartup)
    *
    * What it does:
    * Registers `vector<SPointVector>` reflection.
    */
-  void register_SPointVectorVectorType_AtExit();
+  void register_SPointVectorVectorTypeStartup();
 } // namespace moho
 
 namespace gpg

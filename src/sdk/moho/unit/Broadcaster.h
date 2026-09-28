@@ -161,7 +161,7 @@ namespace moho
    * What it does:
    * Runs broadcaster status-type registration.
    */
-  void register_Broadcaster_EUnitCommandQueueStatus_RType_AtExit();
+  void register_Broadcaster_EUnitCommandQueueStatus_RTypeStartup();
 
   /**
    * Address: 0x006EBDF0 (FUN_006EBDF0, sub_6EBDF0)
@@ -187,7 +187,7 @@ namespace moho
    * What it does:
    * Runs broadcaster command-event type registration.
    */
-  void register_Broadcaster_ECommandEvent_RType_AtExit();
+  void register_Broadcaster_ECommandEvent_RTypeStartup();
 
   /**
    * Address: 0x00BD95F0 (FUN_00BD95F0, sub_BD95F0)
@@ -195,5 +195,5 @@ namespace moho
    * What it does:
    * Runs listener status-type registration.
    */
-  void register_Listener_EUnitCommandQueueStatus_RType_AtExit();
+  void register_Listener_EUnitCommandQueueStatus_RTypeStartup();
 } // namespace moho

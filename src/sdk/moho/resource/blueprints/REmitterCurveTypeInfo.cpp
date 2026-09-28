@@ -732,7 +732,7 @@ namespace
     {
       (void)moho::register_REmitterBlueprintCurveTypeInfo();
       (void)moho::register_REmitterCurveKeyTypeInfo();
-      (void)moho::register_VectorREmitterCurveKeyTypeAtexit();
+      (void)moho::register_VectorREmitterCurveKeyType();
     }
   };
 
@@ -917,13 +917,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC84E0 (FUN_00BC84E0, register_VectorREmitterCurveKeyTypeAtexit)
+   * Address: 0x00BC84E0 (FUN_00BC84E0, register_VectorREmitterCurveKeyType)
    *
    * What it does:
    * Registers `vector<REmitterCurveKey>` reflection and installs `atexit`
    * teardown.
    */
-  void register_VectorREmitterCurveKeyTypeAtexit()
+  void register_VectorREmitterCurveKeyType()
   {
     (void)preregister_VectorREmitterCurveKeyType();
   }
@@ -935,4 +935,4 @@ GPG_PREREGISTER_INIT(register_REmitterBlueprintCurveTypeInfo_399a30, moho::regis
 GPG_PREREGISTER_INIT(register_REmitterCurveKeyTypeInfo_399a30, moho::register_REmitterCurveKeyTypeInfo)
 
 GPG_PREREGISTER_INIT(preregister_VectorREmitterCurveKeyType_399a30, moho::preregister_VectorREmitterCurveKeyType)
-GPG_PREREGISTER_INIT(register_VectorREmitterCurveKeyTypeAtexit_399a30, moho::register_VectorREmitterCurveKeyTypeAtexit)
+GPG_PREREGISTER_INIT(register_VectorREmitterCurveKeyType_399a30, moho::register_VectorREmitterCurveKeyType)

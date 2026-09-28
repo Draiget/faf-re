@@ -2085,12 +2085,12 @@ void moho::register_CPathPointTypeInfo()
 }
 
 /**
- * Address: 0x00BCD390 (FUN_00BCD390, register_FastVectorCPathPointTypeAtexit)
+ * Address: 0x00BCD390 (FUN_00BCD390, register_FastVectorCPathPointType)
  *
  * What it does:
  * Constructs/preregisters startup RTTI metadata for `gpg::fastvector<CPathPoint>`.
  */
-void moho::register_FastVectorCPathPointTypeAtexit()
+void moho::register_FastVectorCPathPointType()
 {
   (void)preregister_FastVectorCPathPointType();
 }
@@ -2108,7 +2108,7 @@ namespace
     {
       moho::register_SCollisionInfoTypeInfo();
       moho::register_ECollisionTypeTypeInfo();
-      moho::register_FastVectorCPathPointTypeAtexit();
+      moho::register_FastVectorCPathPointType();
       moho::register_EPathPointStateTypeInfo();
       moho::register_CPathPointTypeInfo();
     }
@@ -2125,7 +2125,7 @@ GPG_PREREGISTER_INIT(register_ECollisionTypeTypeInfo_9ee641, moho::register_ECol
 GPG_PREREGISTER_INIT(register_EPathPointStateTypeInfo_9ee641, moho::register_EPathPointStateTypeInfo)
 GPG_PREREGISTER_INIT(register_CPathPointTypeInfo_9ee641, moho::register_CPathPointTypeInfo)
 
-GPG_PREREGISTER_INIT(register_FastVectorCPathPointTypeAtexit_9ee641, moho::register_FastVectorCPathPointTypeAtexit)
+GPG_PREREGISTER_INIT(register_FastVectorCPathPointType_9ee641, moho::register_FastVectorCPathPointType)
 
 GPG_PREREGISTER_INIT(preregister_FastVectorCPathPointType_9ee641, preregister_FastVectorCPathPointType)
 GPG_PREREGISTER_INIT(construct_EPathPointStateTypeInfo_9ee641, construct_EPathPointStateTypeInfo)

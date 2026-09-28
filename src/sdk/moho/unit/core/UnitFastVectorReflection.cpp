@@ -334,8 +334,8 @@ namespace
   {
     UnitFastVectorReflectionBootstrap()
     {
-      (void)moho::register_FastVectorWeakPtrEntityType_AtExit();
-      (void)moho::register_FastVectorReconBlipPtrType_AtExit();
+      (void)moho::register_FastVectorWeakPtrEntityType();
+      (void)moho::register_FastVectorReconBlipPtrType();
     }
   };
 
@@ -536,12 +536,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD6BE0 (FUN_00BD6BE0, register_FastVectorWeakPtrEntityType_AtExit)
+   * Address: 0x00BD6BE0 (FUN_00BD6BE0, register_FastVectorWeakPtrEntityType)
    *
    * What it does:
    * Registers `fastvector<WeakPtr<Entity>>` reflection.
    */
-  void register_FastVectorWeakPtrEntityType_AtExit()
+  void register_FastVectorWeakPtrEntityType()
   {
     (void)register_FastVectorWeakPtrEntityType_00();
   }
@@ -560,12 +560,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD6C00 (FUN_00BD6C00, register_FastVectorReconBlipPtrType_AtExit)
+   * Address: 0x00BD6C00 (FUN_00BD6C00, register_FastVectorReconBlipPtrType)
    *
    * What it does:
    * Registers `fastvector<ReconBlip*>` reflection.
    */
-  void register_FastVectorReconBlipPtrType_AtExit()
+  void register_FastVectorReconBlipPtrType()
   {
     (void)register_FastVectorReconBlipPtrType_00();
   }

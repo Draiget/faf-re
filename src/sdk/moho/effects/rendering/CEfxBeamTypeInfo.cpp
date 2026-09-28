@@ -34,7 +34,7 @@ namespace
   {
     CEfxBeamTypeInfoBootstrap()
     {
-      (void)moho::register_CEfxBeamTypeInfo_AtExit();
+      (void)moho::register_CEfxBeamTypeInfo();
     }
   };
 
@@ -142,12 +142,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD3F30 (FUN_00BD3F30, register_CEfxBeamTypeInfo_AtExit)
+   * Address: 0x00BD3F30 (FUN_00BD3F30, register_CEfxBeamTypeInfo)
    *
    * What it does:
    * Registers `CEfxBeam` RTTI bootstrap and installs process-exit cleanup.
    */
-  void register_CEfxBeamTypeInfo_AtExit()
+  void register_CEfxBeamTypeInfo()
   {
     if (gCEfxBeamTypeInfoRegistered) {
       return;

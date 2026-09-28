@@ -40,10 +40,10 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_CAniSkelTypeInfo();
 
   /**
-   * Address: 0x00BC9890 (FUN_00BC9890, register_CAniSkelTypeInfoAtexit)
+   * Address: 0x00BC9890 (FUN_00BC9890, register_CAniSkelTypeInfo)
    *
    * What it does:
    * Preregisters `CAniSkel` RTTI.
    */
-  void register_CAniSkelTypeInfoAtexit();
+  void register_CAniSkelTypeInfo();
 } // namespace moho

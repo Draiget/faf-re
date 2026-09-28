@@ -91,7 +91,7 @@ namespace
   {
     IEffectWeakPtrReflectionBootstrap()
     {
-      (void)moho::register_WeakPtr_IEffect_Type_AtExit();
+      (void)moho::register_WeakPtr_IEffect_Type();
     }
   };
 
@@ -236,9 +236,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4DD0 (FUN_00BD4DD0, register_WeakPtr_IEffect_Type_AtExit)
+   * Address: 0x00BD4DD0 (FUN_00BD4DD0, register_WeakPtr_IEffect_Type)
    */
-  void register_WeakPtr_IEffect_Type_AtExit()
+  void register_WeakPtr_IEffect_Type()
   {
     (void)register_WeakPtr_IEffect_Type_00();
   }

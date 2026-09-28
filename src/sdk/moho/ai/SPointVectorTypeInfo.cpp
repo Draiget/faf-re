@@ -571,12 +571,12 @@ gpg::RType* moho::register_SPointVectorVectorType()
 }
 
 /**
- * Address: 0x00BCB470 (FUN_00BCB470, register_SPointVectorVectorType_AtExit)
+ * Address: 0x00BCB470 (FUN_00BCB470, register_SPointVectorVectorTypeStartup)
  *
  * What it does:
  * Registers `vector<SPointVector>` reflection.
  */
-void moho::register_SPointVectorVectorType_AtExit()
+void moho::register_SPointVectorVectorTypeStartup()
 {
   (void)register_SPointVectorVectorType();
 }
@@ -598,7 +598,7 @@ namespace
   {
     SPointVectorVectorTypeBootstrap()
     {
-      moho::register_SPointVectorVectorType_AtExit();
+      moho::register_SPointVectorVectorTypeStartup();
     }
   };
 

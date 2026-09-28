@@ -137,7 +137,7 @@ namespace
   {
     SBlackListInfoVectorReflectionBootstrap()
     {
-      moho::register_SBlackListInfoVectorType_AtExit();
+      moho::register_SBlackListInfoVectorType();
     }
   };
 
@@ -297,7 +297,7 @@ gpg::RType* moho::register_SBlackListInfoVectorType_00()
  * What it does:
  * Registers `vector<SBlackListInfo>` reflection.
  */
-void moho::register_SBlackListInfoVectorType_AtExit()
+void moho::register_SBlackListInfoVectorType()
 {
   (void)register_SBlackListInfoVectorType_00();
 }

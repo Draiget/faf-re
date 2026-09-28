@@ -51,7 +51,7 @@ namespace
   {
     RUnitBlueprintWeaponVectorReflectionBootstrap()
     {
-      (void)moho::register_VectorRUnitBlueprintWeaponTypeAtexit();
+      (void)moho::register_VectorRUnitBlueprintWeaponType();
     }
   };
 
@@ -450,13 +450,13 @@ gpg::RType* moho::preregister_VectorRUnitBlueprintWeaponType()
 }
 
 /**
- * Address: 0x00BC8D30 (FUN_00BC8D30, register_VectorRUnitBlueprintWeaponTypeAtexit)
+ * Address: 0x00BC8D30 (FUN_00BC8D30, register_VectorRUnitBlueprintWeaponType)
  *
  * What it does:
  * Startup lane that preregisters `vector<RUnitBlueprintWeapon>` reflection
  * metadata and installs teardown callback.
  */
-void moho::register_VectorRUnitBlueprintWeaponTypeAtexit()
+void moho::register_VectorRUnitBlueprintWeaponType()
 {
   (void)preregister_VectorRUnitBlueprintWeaponType();
 }
@@ -464,4 +464,4 @@ void moho::register_VectorRUnitBlueprintWeaponTypeAtexit()
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_VectorRUnitBlueprintWeaponType_8f3a7d, moho::preregister_VectorRUnitBlueprintWeaponType)
-GPG_PREREGISTER_INIT(register_VectorRUnitBlueprintWeaponTypeAtexit_8f3a7d, moho::register_VectorRUnitBlueprintWeaponTypeAtexit)
+GPG_PREREGISTER_INIT(register_VectorRUnitBlueprintWeaponType_8f3a7d, moho::register_VectorRUnitBlueprintWeaponType)

@@ -71,10 +71,10 @@ namespace moho
   gpg::RType* register_EmitterTypeTypeInfo_00();
 
   /**
-   * Address: 0x00BD4290 (FUN_00BD4290, register_EmitterTypeTypeInfo_AtExit)
+   * Address: 0x00BD4290 (FUN_00BD4290, register_EmitterTypeTypeInfo)
    *
    * What it does:
    * Registers `EmitterType` RTTI bootstrap and installs process-exit cleanup.
    */
-  void register_EmitterTypeTypeInfo_AtExit();
+  void register_EmitterTypeTypeInfo();
 } // namespace moho

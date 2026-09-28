@@ -146,7 +146,7 @@ namespace
   {
     EntityCategorySetVectorReflectionBootstrap()
     {
-      (void)moho::register_EntityCategorySetVectorType_AtExit();
+      (void)moho::register_EntityCategorySetVectorTypeStartup();
     }
   };
 
@@ -265,7 +265,7 @@ gpg::RType* moho::register_EntityCategorySetVectorType()
  * What it does:
  * Registers `vector<EntityCategorySet>` reflection.
  */
-void moho::register_EntityCategorySetVectorType_AtExit()
+void moho::register_EntityCategorySetVectorTypeStartup()
 {
   (void)register_EntityCategorySetVectorType();
 }

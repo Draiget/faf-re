@@ -224,7 +224,7 @@ namespace
     {
       (void)moho::preregister_SDelayedSubVizInfoTypeInfo();
       moho::register_SDelayedSubVizInfoSerializer();
-      (void)moho::register_SDelayedSubVizInfoVectorType_AtExit();
+      (void)moho::register_SDelayedSubVizInfoVectorTypeStartup();
     }
   };
 
@@ -336,9 +336,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC79F0 (FUN_00BC79F0, register_SDelayedSubVizInfoVectorType_AtExit)
+   * Address: 0x00BC79F0 (FUN_00BC79F0, register_SDelayedSubVizInfoVectorTypeStartup)
    */
-  void register_SDelayedSubVizInfoVectorType_AtExit()
+  void register_SDelayedSubVizInfoVectorTypeStartup()
   {
     (void)register_SDelayedSubVizInfoVectorType();
   }

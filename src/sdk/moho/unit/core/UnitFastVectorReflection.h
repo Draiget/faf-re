@@ -124,12 +124,12 @@ namespace moho
   [[nodiscard]] gpg::RType* register_FastVectorWeakPtrEntityType_00();
 
   /**
-   * Address: 0x00BD6BE0 (FUN_00BD6BE0, register_FastVectorWeakPtrEntityType_AtExit)
+   * Address: 0x00BD6BE0 (FUN_00BD6BE0, register_FastVectorWeakPtrEntityType)
    *
    * What it does:
    * Registers `fastvector<WeakPtr<Entity>>` reflection.
    */
-  void register_FastVectorWeakPtrEntityType_AtExit();
+  void register_FastVectorWeakPtrEntityType();
 
   /**
    * Address: 0x006B1780 (FUN_006B1780, register_FastVectorReconBlipPtrType_00)
@@ -140,10 +140,10 @@ namespace moho
   [[nodiscard]] gpg::RType* register_FastVectorReconBlipPtrType_00();
 
   /**
-   * Address: 0x00BD6C00 (FUN_00BD6C00, register_FastVectorReconBlipPtrType_AtExit)
+   * Address: 0x00BD6C00 (FUN_00BD6C00, register_FastVectorReconBlipPtrType)
    *
    * What it does:
    * Registers `fastvector<ReconBlip*>` reflection.
    */
-  void register_FastVectorReconBlipPtrType_AtExit();
+  void register_FastVectorReconBlipPtrType();
 } // namespace moho

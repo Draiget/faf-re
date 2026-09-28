@@ -75,12 +75,12 @@ namespace moho
   gpg::RType* preregister_SAniManipBindingTypeInfo();
 
   /**
-   * Address: 0x00BD2BA0 (FUN_00BD2BA0, register_SAniManipBindingTypeInfoAtexit)
+   * Address: 0x00BD2BA0 (FUN_00BD2BA0, register_SAniManipBindingTypeInfo)
    *
    * What it does:
    * Preregisters `SAniManipBinding` RTTI.
    */
-  void register_SAniManipBindingTypeInfoAtexit();
+  void register_SAniManipBindingTypeInfo();
 
   /**
    * Address: 0x0063D0E0 (FUN_0063D0E0, preregister_FastVectorSAniManipBindingType)
@@ -91,12 +91,12 @@ namespace moho
   gpg::RType* preregister_FastVectorSAniManipBindingType();
 
   /**
-   * Address: 0x00BD2CC0 (FUN_00BD2CC0, register_FastVectorSAniManipBindingTypeAtexit)
+   * Address: 0x00BD2CC0 (FUN_00BD2CC0, register_FastVectorSAniManipBindingType)
    *
    * What it does:
    * Preregisters `fastvector<SAniManipBinding>` RTTI.
    */
-  void register_FastVectorSAniManipBindingTypeAtexit();
+  void register_FastVectorSAniManipBindingType();
 } // namespace moho
 
 namespace gpg
@@ -393,9 +393,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD2BA0 (FUN_00BD2BA0, register_SAniManipBindingTypeInfoAtexit)
+   * Address: 0x00BD2BA0 (FUN_00BD2BA0, register_SAniManipBindingTypeInfo)
    */
-  void register_SAniManipBindingTypeInfoAtexit()
+  void register_SAniManipBindingTypeInfo()
   {
     (void)preregister_SAniManipBindingTypeInfo();
   }
@@ -517,9 +517,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD2CC0 (FUN_00BD2CC0, register_FastVectorSAniManipBindingTypeAtexit)
+   * Address: 0x00BD2CC0 (FUN_00BD2CC0, register_FastVectorSAniManipBindingType)
    */
-  void register_FastVectorSAniManipBindingTypeAtexit()
+  void register_FastVectorSAniManipBindingType()
   {
     (void)preregister_FastVectorSAniManipBindingType();
   }
@@ -531,8 +531,8 @@ namespace
   {
     SAniManipBindingReflectionBootstrap()
     {
-      moho::register_SAniManipBindingTypeInfoAtexit();
-      moho::register_FastVectorSAniManipBindingTypeAtexit();
+      moho::register_SAniManipBindingTypeInfo();
+      moho::register_FastVectorSAniManipBindingType();
     }
   };
 
@@ -543,4 +543,4 @@ namespace
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_SAniManipBindingTypeInfo_c664d9, moho::preregister_SAniManipBindingTypeInfo)
 GPG_PREREGISTER_INIT(preregister_FastVectorSAniManipBindingType_c664d9, moho::preregister_FastVectorSAniManipBindingType)
-GPG_PREREGISTER_INIT(register_FastVectorSAniManipBindingTypeAtexit_c664d9, moho::register_FastVectorSAniManipBindingTypeAtexit)
+GPG_PREREGISTER_INIT(register_FastVectorSAniManipBindingType_c664d9, moho::register_FastVectorSAniManipBindingType)

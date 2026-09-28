@@ -41,10 +41,10 @@ namespace moho
   gpg::RType* register_CEffectImplTypeInfo_00();
 
   /**
-   * Address: 0x00BD40C0 (FUN_00BD40C0, register_CEffectImplTypeInfo_AtExit)
+   * Address: 0x00BD40C0 (FUN_00BD40C0, register_CEffectImplTypeInfo)
    *
    * What it does:
    * Registers `CEffectImpl` RTTI bootstrap and installs process-exit cleanup.
    */
-  void register_CEffectImplTypeInfo_AtExit();
+  void register_CEffectImplTypeInfo();
 } // namespace moho

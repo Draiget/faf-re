@@ -85,12 +85,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4290 (FUN_00BD4290, register_EmitterTypeTypeInfo_AtExit)
+   * Address: 0x00BD4290 (FUN_00BD4290, register_EmitterTypeTypeInfo)
    *
    * What it does:
    * Registers `EmitterType` RTTI bootstrap and installs process-exit cleanup.
    */
-  void register_EmitterTypeTypeInfo_AtExit()
+  void register_EmitterTypeTypeInfo()
   {
     (void)register_EmitterTypeTypeInfo_00();
   }
@@ -102,7 +102,7 @@ namespace
   {
     EmitterTypeTypeInfoBootstrap()
     {
-      (void)moho::register_EmitterTypeTypeInfo_AtExit();
+      (void)moho::register_EmitterTypeTypeInfo();
     }
   };
 

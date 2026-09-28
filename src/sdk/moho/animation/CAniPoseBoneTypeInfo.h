@@ -39,12 +39,12 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_CAniPoseBoneTypeInfo();
 
   /**
-   * Address: 0x00BC99A0 (FUN_00BC99A0, register_CAniPoseBoneTypeInfoAtexit)
+   * Address: 0x00BC99A0 (FUN_00BC99A0, register_CAniPoseBoneTypeInfo)
    *
    * What it does:
    * Preregisters `CAniPoseBone` RTTI.
    */
-  void register_CAniPoseBoneTypeInfoAtexit();
+  void register_CAniPoseBoneTypeInfo();
 
   /**
    * Address: 0x0054E370 (FUN_0054E370, preregister_FastVectorCAniPoseBoneType)
@@ -56,12 +56,12 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_FastVectorCAniPoseBoneType();
 
   /**
-   * Address: 0x00BC9A00 (FUN_00BC9A00, register_FastVectorCAniPoseBoneTypeAtexit)
+   * Address: 0x00BC9A00 (FUN_00BC9A00, register_FastVectorCAniPoseBoneType)
    *
    * What it does:
    * Preregisters `fastvector<CAniPoseBone>` RTTI.
    */
-  void register_FastVectorCAniPoseBoneTypeAtexit();
+  void register_FastVectorCAniPoseBoneType();
 } // namespace moho
 
 namespace gpg

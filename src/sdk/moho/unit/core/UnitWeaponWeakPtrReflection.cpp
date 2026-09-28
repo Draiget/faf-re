@@ -90,7 +90,7 @@ namespace
   {
     UnitWeaponWeakPtrReflectionBootstrap()
     {
-      (void)moho::register_WeakPtr_UnitWeapon_Type_AtExit();
+      (void)moho::register_WeakPtr_UnitWeapon_Type();
     }
   };
 
@@ -215,9 +215,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4DF0 (FUN_00BD4DF0, register_WeakPtr_UnitWeapon_Type_AtExit)
+   * Address: 0x00BD4DF0 (FUN_00BD4DF0, register_WeakPtr_UnitWeapon_Type)
    */
-  void register_WeakPtr_UnitWeapon_Type_AtExit()
+  void register_WeakPtr_UnitWeapon_Type()
   {
     (void)register_WeakPtr_UnitWeapon_Type_00();
   }

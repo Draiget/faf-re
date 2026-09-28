@@ -371,9 +371,9 @@ namespace
   {
     EntityFastVectorReflectionBootstrap()
     {
-      (void)moho::register_WeakPtr_Entity_Type_AtExit();
-      (void)moho::register_VectorEntityPtr_Type_AtExit();
-      (void)moho::register_FastVectorEntityPtrType_AtExit();
+      (void)moho::register_WeakPtr_Entity_Type();
+      (void)moho::register_VectorEntityPtr_Type();
+      (void)moho::register_FastVectorEntityPtrType();
     }
   };
 
@@ -491,12 +491,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5090 (FUN_00BD5090, register_WeakPtr_Entity_Type_AtExit)
+   * Address: 0x00BD5090 (FUN_00BD5090, register_WeakPtr_Entity_Type)
    *
    * What it does:
    * Registers `WeakPtr<Entity>` reflection.
    */
-  void register_WeakPtr_Entity_Type_AtExit()
+  void register_WeakPtr_Entity_Type()
   {
     (void)register_WeakPtr_Entity_Type_00();
   }
@@ -709,12 +709,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD50B0 (FUN_00BD50B0, register_VectorEntityPtr_Type_AtExit)
+   * Address: 0x00BD50B0 (FUN_00BD50B0, register_VectorEntityPtr_Type)
    *
    * What it does:
    * Registers `vector<Entity*>` reflection.
    */
-  void register_VectorEntityPtr_Type_AtExit()
+  void register_VectorEntityPtr_Type()
   {
     (void)register_VectorEntityPtr_Type_00();
   }
@@ -733,12 +733,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5890 (FUN_00BD5890, register_FastVectorEntityPtrType_AtExit)
+   * Address: 0x00BD5890 (FUN_00BD5890, register_FastVectorEntityPtrType)
    *
    * What it does:
    * Registers `fastvector<Entity*>` reflection.
    */
-  void register_FastVectorEntityPtrType_AtExit()
+  void register_FastVectorEntityPtrType()
   {
     (void)register_FastVectorEntityPtrType_00();
   }

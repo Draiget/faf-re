@@ -23,7 +23,7 @@ namespace
   {
     CAniDefaultSkelTypeInfoBootstrap()
     {
-      moho::register_CAniDefaultSkelTypeInfoAtexit();
+      moho::register_CAniDefaultSkelTypeInfo();
     }
   };
 
@@ -90,9 +90,9 @@ void CAniDefaultSkelTypeInfo::AddBase_CAniSkel(gpg::RType* const typeInfo)
   }
 
   /**
-   * Address: 0x00BC98B0 (FUN_00BC98B0, register_CAniDefaultSkelTypeInfoAtexit)
+   * Address: 0x00BC98B0 (FUN_00BC98B0, register_CAniDefaultSkelTypeInfo)
    */
-  void register_CAniDefaultSkelTypeInfoAtexit()
+  void register_CAniDefaultSkelTypeInfo()
   {
     (void)preregister_CAniDefaultSkelTypeInfo();
   }

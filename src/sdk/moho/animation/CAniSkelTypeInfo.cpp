@@ -22,7 +22,7 @@ namespace
   {
     CAniSkelTypeInfoBootstrap()
     {
-      moho::register_CAniSkelTypeInfoAtexit();
+      moho::register_CAniSkelTypeInfo();
     }
   };
 
@@ -68,9 +68,9 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC9890 (FUN_00BC9890, register_CAniSkelTypeInfoAtexit)
+   * Address: 0x00BC9890 (FUN_00BC9890, register_CAniSkelTypeInfo)
    */
-  void register_CAniSkelTypeInfoAtexit()
+  void register_CAniSkelTypeInfo()
   {
     (void)preregister_CAniSkelTypeInfo();
   }

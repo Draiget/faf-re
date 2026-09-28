@@ -85,5 +85,5 @@ namespace moho
    * What it does:
    * Registers `vector<HPathCell>` reflection.
    */
-  void register_HPathCellVectorType_AtExit();
+  void register_HPathCellVectorType();
 } // namespace moho

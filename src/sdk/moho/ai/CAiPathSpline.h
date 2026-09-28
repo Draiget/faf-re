@@ -656,13 +656,13 @@ namespace moho
   void register_CPathPointTypeInfo();
 
   /**
-   * Address: 0x00BCD390 (FUN_00BCD390, register_FastVectorCPathPointTypeAtexit)
+   * Address: 0x00BCD390 (FUN_00BCD390, register_FastVectorCPathPointType)
    *
    * What it does:
    * Constructs/preregisters startup RTTI metadata for
    * `gpg::fastvector<CPathPoint>`.
    */
-  void register_FastVectorCPathPointTypeAtexit();
+  void register_FastVectorCPathPointType();
 
   static_assert(sizeof(SCollisionInfoTypeInfo) == 0x64, "SCollisionInfoTypeInfo size must be 0x64");
   static_assert(sizeof(ECollisionTypeTypeInfo) == 0x78, "ECollisionTypeTypeInfo size must be 0x78");

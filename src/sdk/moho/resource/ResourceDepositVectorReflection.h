@@ -80,6 +80,6 @@ namespace moho
    * `msvc8::vector<moho::ResourceDeposit>`.
    */
   [[nodiscard]] gpg::RType* preregister_VectorResourceDepositType();
-  void register_VectorResourceDepositTypeAtexit();
+  void register_VectorResourceDepositType();
 } // namespace moho
 

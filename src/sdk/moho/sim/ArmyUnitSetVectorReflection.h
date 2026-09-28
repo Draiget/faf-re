@@ -106,5 +106,5 @@ namespace moho
    * What it does:
    * Registers `vector<EntitySetTemplate<Unit>>` reflection.
    */
-  void register_EntitySetTemplateUnitVectorType_AtExit();
+  void register_EntitySetTemplateUnitVectorTypeStartup();
 } // namespace moho

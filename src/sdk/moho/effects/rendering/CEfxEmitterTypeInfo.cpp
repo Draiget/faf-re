@@ -23,7 +23,7 @@ namespace
   {
     CEfxEmitterTypeInfoBootstrap()
     {
-      (void)moho::register_CEfxEmitterTypeInfo_AtExit();
+      (void)moho::register_CEfxEmitterTypeInfoStartup();
     }
   };
 
@@ -192,7 +192,7 @@ namespace moho
    * What it does:
    * Registers `CEfxEmitter` RTTI bootstrap and installs process-exit cleanup.
    */
-  void register_CEfxEmitterTypeInfo_AtExit()
+  void register_CEfxEmitterTypeInfoStartup()
   {
     (void)register_CEfxEmitterTypeInfo_00();
   }

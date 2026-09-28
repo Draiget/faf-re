@@ -133,7 +133,7 @@ namespace
   {
     HPathCellVectorReflectionBootstrap()
     {
-      moho::register_HPathCellVectorType_AtExit();
+      moho::register_HPathCellVectorType();
     }
   };
 
@@ -278,7 +278,7 @@ gpg::RType* moho::register_HPathCellVectorType_00()
  * static-init aggregator that calls the registrar; modeled at source level by
  * the `HPathCellVectorReflectionBootstrap` static-init instance.
  */
-void moho::register_HPathCellVectorType_AtExit()
+void moho::register_HPathCellVectorType()
 {
   (void)register_HPathCellVectorType_00();
 }

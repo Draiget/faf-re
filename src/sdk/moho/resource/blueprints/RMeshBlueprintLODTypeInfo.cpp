@@ -329,7 +329,7 @@ namespace
     RMeshBlueprintLODTypeInfoBootstrap()
     {
       (void)moho::register_RMeshBlueprintLODTypeInfo();
-      (void)moho::register_VectorRMeshBlueprintLODTypeAtexit();
+      (void)moho::register_VectorRMeshBlueprintLODType();
     }
   };
 
@@ -450,7 +450,7 @@ namespace moho
    * Registers `vector<RMeshBlueprintLOD>` reflection and installs process-exit
    * teardown.
    */
-  void register_VectorRMeshBlueprintLODTypeAtexit()
+  void register_VectorRMeshBlueprintLODType()
   {
     (void)preregister_VectorRMeshBlueprintLODType();
   }
@@ -461,4 +461,4 @@ namespace moho
 GPG_PREREGISTER_INIT(register_RMeshBlueprintLODTypeInfo_8ee506, moho::register_RMeshBlueprintLODTypeInfo)
 
 GPG_PREREGISTER_INIT(preregister_VectorRMeshBlueprintLODType_8ee506, moho::preregister_VectorRMeshBlueprintLODType)
-GPG_PREREGISTER_INIT(register_VectorRMeshBlueprintLODTypeAtexit_8ee506, moho::register_VectorRMeshBlueprintLODTypeAtexit)
+GPG_PREREGISTER_INIT(register_VectorRMeshBlueprintLODType_8ee506, moho::register_VectorRMeshBlueprintLODType)

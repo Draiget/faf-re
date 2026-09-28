@@ -313,7 +313,7 @@ namespace moho
   /**
    * Address: 0x00BD8FF0 (FUN_00BD8FF0, sub_BD8FF0)
    */
-  void register_WeakPtr_CUnitCommand_Type_AtExit()
+  void register_WeakPtr_CUnitCommand_Type()
   {
     (void)register_WeakPtr_CUnitCommand_Type_00();
   }
@@ -331,7 +331,7 @@ namespace moho
   /**
    * Address: 0x00BD9010 (FUN_00BD9010, sub_BD9010)
    */
-  void register_WeakPtr_CUnitCommand_VectorType_AtExit()
+  void register_WeakPtr_CUnitCommand_VectorType()
   {
     (void)register_WeakPtr_CUnitCommand_VectorType_00();
   }
@@ -430,9 +430,9 @@ namespace
   {
     CUnitCommandWeakPtrReflectionBootstrap()
     {
-      (void)moho::register_Broadcaster_ECommandEvent_RType_AtExit();
-      (void)moho::register_WeakPtr_CUnitCommand_Type_AtExit();
-      (void)moho::register_WeakPtr_CUnitCommand_VectorType_AtExit();
+      (void)moho::register_Broadcaster_ECommandEvent_RTypeStartup();
+      (void)moho::register_WeakPtr_CUnitCommand_Type();
+      (void)moho::register_WeakPtr_CUnitCommand_VectorType();
     }
   };
 

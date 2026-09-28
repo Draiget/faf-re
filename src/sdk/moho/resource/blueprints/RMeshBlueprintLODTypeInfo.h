@@ -79,7 +79,7 @@ namespace moho
    * Registers `vector<RMeshBlueprintLOD>` reflection and installs process-exit
    * teardown.
    */
-  void register_VectorRMeshBlueprintLODTypeAtexit();
+  void register_VectorRMeshBlueprintLODType();
 
   static_assert(sizeof(RMeshBlueprintLODTypeInfo) == 0x64, "RMeshBlueprintLODTypeInfo size must be 0x64");
 } // namespace moho

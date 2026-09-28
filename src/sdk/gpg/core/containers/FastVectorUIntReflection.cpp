@@ -1219,13 +1219,13 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00BD4120 (FUN_00BD4120, register_FastVectorFloatTypeAtexit)
+   * Address: 0x00BD4120 (FUN_00BD4120, register_FastVectorFloatType)
    *
    * What it does:
    * Startup wrapper that preregisters `gpg::fastvector<float>` and installs
    * process-exit teardown through `atexit`.
    */
-  void register_FastVectorFloatTypeAtexit()
+  void register_FastVectorFloatType()
   {
     (void)preregister_FastVectorFloatType();
   }
@@ -1382,12 +1382,12 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00BCA140 (FUN_00BCA140, register_FastVectorSSTIEntityAttachInfoTypeAtexit)
+   * Address: 0x00BCA140 (FUN_00BCA140, register_FastVectorSSTIEntityAttachInfoType)
    *
    * What it does:
    * Startup wrapper that preregisters `gpg::fastvector<Moho::SSTIEntityAttachInfo>`.
    */
-  void register_FastVectorSSTIEntityAttachInfoTypeAtexit()
+  void register_FastVectorSSTIEntityAttachInfoType()
   {
     (void)preregister_FastVectorSSTIEntityAttachInfoType();
   }
@@ -1519,12 +1519,12 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00BCA6E0 (FUN_00BCA6E0, register_FastVectorUnitWeaponInfoTypeAtexit)
+   * Address: 0x00BCA6E0 (FUN_00BCA6E0, register_FastVectorUnitWeaponInfoType)
    *
    * What it does:
    * Startup wrapper that preregisters `gpg::fastvector<Moho::UnitWeaponInfo>`.
    */
-  void register_FastVectorUnitWeaponInfoTypeAtexit()
+  void register_FastVectorUnitWeaponInfoType()
   {
     (void)preregister_FastVectorUnitWeaponInfoType();
   }
@@ -1652,12 +1652,12 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00BCAD00 (FUN_00BCAD00, register_FastVectorSOffsetInfoTypeAtexit)
+   * Address: 0x00BCAD00 (FUN_00BCAD00, register_FastVectorSOffsetInfoType)
    *
    * What it does:
    * Startup wrapper that preregisters `gpg::fastvector<Moho::SOffsetInfo>`.
    */
-  void register_FastVectorSOffsetInfoTypeAtexit()
+  void register_FastVectorSOffsetInfoType()
   {
     (void)preregister_FastVectorSOffsetInfoType();
   }
@@ -1783,12 +1783,12 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00BCAD20 (FUN_00BCAD20, register_FastVectorSAssignedLocInfoTypeAtexit)
+   * Address: 0x00BCAD20 (FUN_00BCAD20, register_FastVectorSAssignedLocInfoType)
    *
    * What it does:
    * Startup wrapper that preregisters `gpg::fastvector<Moho::SAssignedLocInfo>`.
    */
-  void register_FastVectorSAssignedLocInfoTypeAtexit()
+  void register_FastVectorSAssignedLocInfoType()
   {
     (void)preregister_FastVectorSAssignedLocInfoType();
   }
@@ -1894,13 +1894,13 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00BD4180 (FUN_00BD4180, register_FastVectorStringTypeAtexit)
+   * Address: 0x00BD4180 (FUN_00BD4180, register_FastVectorStringType)
    *
    * What it does:
    * Startup wrapper that preregisters `gpg::fastvector<msvc8::string>` and installs
    * process-exit teardown through `atexit`.
    */
-  void register_FastVectorStringTypeAtexit()
+  void register_FastVectorStringType()
   {
     (void)preregister_FastVectorStringType();
   }
@@ -2049,13 +2049,13 @@ gpg::RType* preregister_FastVectorVector3fType()
 }
 
 /**
- * Address: 0x00BC84C0 (FUN_00BC84C0, register_FastVectorVector3fTypeAtexit)
+ * Address: 0x00BC84C0 (FUN_00BC84C0, register_FastVectorVector3fType)
  *
  * What it does:
  * Startup wrapper that preregisters `gpg::fastvector<Wm3::Vector3<float>>`
  * and installs process-exit teardown through `atexit`.
  */
-void register_FastVectorVector3fTypeAtexit()
+void register_FastVectorVector3fType()
 {
   (void)preregister_FastVectorVector3fType();
 }
@@ -2191,7 +2191,7 @@ namespace
   {
     FastVectorFloatReflectionBootstrap()
     {
-      (void)gpg::register_FastVectorFloatTypeAtexit();
+      (void)gpg::register_FastVectorFloatType();
     }
   };
 
@@ -2201,7 +2201,7 @@ namespace
   {
     FastVectorStringReflectionBootstrap()
     {
-      (void)gpg::register_FastVectorStringTypeAtexit();
+      (void)gpg::register_FastVectorStringType();
     }
   };
 
@@ -2211,7 +2211,7 @@ namespace
   {
     FastVectorVector3fReflectionBootstrap()
     {
-      (void)gpg::register_FastVectorVector3fTypeAtexit();
+      (void)gpg::register_FastVectorVector3fType();
     }
   };
 
@@ -2221,7 +2221,7 @@ namespace
   {
     FastVectorSSTIEntityAttachInfoReflectionBootstrap()
     {
-      (void)gpg::register_FastVectorSSTIEntityAttachInfoTypeAtexit();
+      (void)gpg::register_FastVectorSSTIEntityAttachInfoType();
     }
   };
 
@@ -2231,7 +2231,7 @@ namespace
   {
     FastVectorUnitWeaponInfoReflectionBootstrap()
     {
-      (void)gpg::register_FastVectorUnitWeaponInfoTypeAtexit();
+      (void)gpg::register_FastVectorUnitWeaponInfoType();
     }
   };
 
@@ -2241,7 +2241,7 @@ namespace
   {
     FastVectorSOffsetInfoReflectionBootstrap()
     {
-      (void)gpg::register_FastVectorSOffsetInfoTypeAtexit();
+      (void)gpg::register_FastVectorSOffsetInfoType();
     }
   };
 
@@ -2251,7 +2251,7 @@ namespace
   {
     FastVectorSAssignedLocInfoReflectionBootstrap()
     {
-      (void)gpg::register_FastVectorSAssignedLocInfoTypeAtexit();
+      (void)gpg::register_FastVectorSAssignedLocInfoType();
     }
   };
 
@@ -2261,34 +2261,34 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_FastVectorFloatType_86ef6d, gpg::preregister_FastVectorFloatType)
-GPG_PREREGISTER_INIT(register_FastVectorFloatTypeAtexit_86ef6d, gpg::register_FastVectorFloatTypeAtexit)
+GPG_PREREGISTER_INIT(register_FastVectorFloatType_86ef6d, gpg::register_FastVectorFloatType)
 GPG_PREREGISTER_INIT(preregister_FastVectorStringType_86ef6d, gpg::preregister_FastVectorStringType)
-GPG_PREREGISTER_INIT(register_FastVectorStringTypeAtexit_86ef6d, gpg::register_FastVectorStringTypeAtexit)
+GPG_PREREGISTER_INIT(register_FastVectorStringType_86ef6d, gpg::register_FastVectorStringType)
 GPG_PREREGISTER_INIT(preregister_FastVectorVector3fType_86ef6d, gpg::preregister_FastVectorVector3fType)
-GPG_PREREGISTER_INIT(register_FastVectorVector3fTypeAtexit_86ef6d, gpg::register_FastVectorVector3fTypeAtexit)
+GPG_PREREGISTER_INIT(register_FastVectorVector3fType_86ef6d, gpg::register_FastVectorVector3fType)
 GPG_PREREGISTER_INIT(
   preregister_FastVectorSSTIEntityAttachInfoType_86ef6d,
   gpg::preregister_FastVectorSSTIEntityAttachInfoType
 )
 GPG_PREREGISTER_INIT(
-  register_FastVectorSSTIEntityAttachInfoTypeAtexit_86ef6d,
-  gpg::register_FastVectorSSTIEntityAttachInfoTypeAtexit
+  register_FastVectorSSTIEntityAttachInfoType_86ef6d,
+  gpg::register_FastVectorSSTIEntityAttachInfoType
 )
 GPG_PREREGISTER_INIT(preregister_FastVectorUnitWeaponInfoType_86ef6d, gpg::preregister_FastVectorUnitWeaponInfoType)
 GPG_PREREGISTER_INIT(
-  register_FastVectorUnitWeaponInfoTypeAtexit_86ef6d,
-  gpg::register_FastVectorUnitWeaponInfoTypeAtexit
+  register_FastVectorUnitWeaponInfoType_86ef6d,
+  gpg::register_FastVectorUnitWeaponInfoType
 )
 GPG_PREREGISTER_INIT(preregister_FastVectorSOffsetInfoType_86ef6d, gpg::preregister_FastVectorSOffsetInfoType)
 GPG_PREREGISTER_INIT(
-  register_FastVectorSOffsetInfoTypeAtexit_86ef6d,
-  gpg::register_FastVectorSOffsetInfoTypeAtexit
+  register_FastVectorSOffsetInfoType_86ef6d,
+  gpg::register_FastVectorSOffsetInfoType
 )
 GPG_PREREGISTER_INIT(
   preregister_FastVectorSAssignedLocInfoType_86ef6d,
   gpg::preregister_FastVectorSAssignedLocInfoType
 )
 GPG_PREREGISTER_INIT(
-  register_FastVectorSAssignedLocInfoTypeAtexit_86ef6d,
-  gpg::register_FastVectorSAssignedLocInfoTypeAtexit
+  register_FastVectorSAssignedLocInfoType_86ef6d,
+  gpg::register_FastVectorSAssignedLocInfoType
 )

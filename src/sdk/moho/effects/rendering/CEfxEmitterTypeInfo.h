@@ -86,5 +86,5 @@ namespace moho
    * What it does:
    * Registers `CEfxEmitter` RTTI bootstrap and installs process-exit cleanup.
    */
-  void register_CEfxEmitterTypeInfo_AtExit();
+  void register_CEfxEmitterTypeInfoStartup();
 } // namespace moho

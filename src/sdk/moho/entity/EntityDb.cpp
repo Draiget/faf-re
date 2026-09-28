@@ -2305,12 +2305,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5180 (FUN_00BD5180, register_EntityDbTypeInfoAtexit)
+   * Address: 0x00BD5180 (FUN_00BD5180, register_EntityDbTypeInfo)
    *
    * What it does:
    * Preregisters `EntityDB` RTTI and installs process-exit cleanup.
    */
-  void register_EntityDbTypeInfoAtexit()
+  void register_EntityDbTypeInfo()
   {
     (void)preregister_EntityDbTypeInfo();
   }
@@ -2329,13 +2329,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5250 (FUN_00BD5250, register_EntityDbIdPoolMapTypeInfoAtexit)
+   * Address: 0x00BD5250 (FUN_00BD5250, register_EntityDbIdPoolMapTypeInfo)
    *
    * What it does:
    * Preregisters `std::map<unsigned int,Moho::IdPool>` RTTI and installs
    * process-exit cleanup.
    */
-  void register_EntityDbIdPoolMapTypeInfoAtexit()
+  void register_EntityDbIdPoolMapTypeInfo()
   {
     (void)preregister_EntityDbIdPoolMapTypeInfo();
   }
@@ -2354,13 +2354,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5270 (FUN_00BD5270, register_EntityDbEntityListTypeInfoAtexit)
+   * Address: 0x00BD5270 (FUN_00BD5270, register_EntityDbEntityListTypeInfo)
    *
    * What it does:
    * Preregisters `std::list<Moho::Entity *>` RTTI and installs process-exit
    * cleanup.
    */
-  void register_EntityDbEntityListTypeInfoAtexit()
+  void register_EntityDbEntityListTypeInfo()
   {
     (void)preregister_EntityDbEntityListTypeInfo();
   }
@@ -2372,9 +2372,9 @@ namespace
   {
     EntityDbReflectionBootstrap()
     {
-      (void)moho::register_EntityDbTypeInfoAtexit();
-      (void)moho::register_EntityDbIdPoolMapTypeInfoAtexit();
-      (void)moho::register_EntityDbEntityListTypeInfoAtexit();
+      (void)moho::register_EntityDbTypeInfo();
+      (void)moho::register_EntityDbIdPoolMapTypeInfo();
+      (void)moho::register_EntityDbEntityListTypeInfo();
       (void)moho::register_EntityDBSerializer();
     }
   };

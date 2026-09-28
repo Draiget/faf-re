@@ -25,7 +25,7 @@ namespace
   {
     MapStringFloatTypeInfoBootstrap()
     {
-      (void)gpg::register_MapStringFloat_Type_AtExit();
+      (void)gpg::register_MapStringFloat_Type();
     }
   };
 
@@ -146,9 +146,9 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00BD6BC0 (FUN_00BD6BC0, register_MapStringFloat_Type_AtExit)
+   * Address: 0x00BD6BC0 (FUN_00BD6BC0, register_MapStringFloat_Type)
    */
-  void register_MapStringFloat_Type_AtExit()
+  void register_MapStringFloat_Type()
   {
     (void)register_MapStringFloat_Type_00();
   }

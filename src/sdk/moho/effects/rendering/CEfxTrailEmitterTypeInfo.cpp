@@ -25,7 +25,7 @@ namespace
   {
     CEfxTrailEmitterTypeInfoBootstrap()
     {
-      (void)moho::register_CEfxTrailEmitterTypeInfo_AtExit();
+      (void)moho::register_CEfxTrailEmitterTypeInfo();
     }
   };
 
@@ -139,13 +139,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4950 (FUN_00BD4950, register_CEfxTrailEmitterTypeInfo_AtExit)
+   * Address: 0x00BD4950 (FUN_00BD4950, register_CEfxTrailEmitterTypeInfo)
    *
    * What it does:
    * Registers `CEfxTrailEmitter` RTTI bootstrap and installs process-exit
    * cleanup.
    */
-  void register_CEfxTrailEmitterTypeInfo_AtExit()
+  void register_CEfxTrailEmitterTypeInfo()
   {
     if (gCEfxTrailEmitterTypeInfoRegistered) {
       return;

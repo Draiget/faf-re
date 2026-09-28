@@ -124,13 +124,13 @@ namespace moho
   gpg::RType* preregister_VectorREmitterCurveKeyType();
 
   /**
-   * Address: 0x00BC84E0 (FUN_00BC84E0, register_VectorREmitterCurveKeyTypeAtexit)
+   * Address: 0x00BC84E0 (FUN_00BC84E0, register_VectorREmitterCurveKeyType)
    *
    * What it does:
    * Registers `vector<REmitterCurveKey>` reflection and installs `atexit`
    * teardown.
    */
-  void register_VectorREmitterCurveKeyTypeAtexit();
+  void register_VectorREmitterCurveKeyType();
 
   static_assert(sizeof(REmitterBlueprintCurveTypeInfo) == 0x64, "REmitterBlueprintCurveTypeInfo size must be 0x64");
   static_assert(sizeof(REmitterCurveKeyTypeInfo) == 0x64, "REmitterCurveKeyTypeInfo size must be 0x64");

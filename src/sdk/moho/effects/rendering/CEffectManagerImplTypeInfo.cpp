@@ -87,12 +87,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4570 (FUN_00BD4570, register_CEffectManagerImplTypeInfo_AtExit)
+   * Address: 0x00BD4570 (FUN_00BD4570, register_CEffectManagerImplTypeInfo)
    *
    * What it does:
    * Registers `CEffectManagerImpl` RTTI bootstrap and installs process-exit cleanup.
    */
-  void register_CEffectManagerImplTypeInfo_AtExit()
+  void register_CEffectManagerImplTypeInfo()
   {
     (void)register_CEffectManagerImplTypeInfo_00();
   }
@@ -104,7 +104,7 @@ namespace
   {
     CEffectManagerImplTypeInfoBootstrap()
     {
-      (void)moho::register_CEffectManagerImplTypeInfo_AtExit();
+      (void)moho::register_CEffectManagerImplTypeInfo();
     }
   };
 

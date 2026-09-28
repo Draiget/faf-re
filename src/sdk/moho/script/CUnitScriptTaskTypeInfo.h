@@ -76,5 +76,5 @@ namespace moho
    * What it does:
    * Registers CUnitScriptTask typeinfo at startup.
    */
-  void register_CUnitScriptTaskTypeInfo_AtExit();
+  void register_CUnitScriptTaskTypeInfoStartup();
 } // namespace moho

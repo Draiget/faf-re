@@ -99,5 +99,5 @@ namespace moho
    * What it does:
    * Registers `vector<SBlackListInfo>` reflection.
    */
-  void register_SBlackListInfoVectorType_AtExit();
+  void register_SBlackListInfoVectorType();
 } // namespace moho

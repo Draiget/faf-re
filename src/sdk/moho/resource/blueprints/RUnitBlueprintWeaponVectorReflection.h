@@ -75,12 +75,12 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_VectorRUnitBlueprintWeaponType();
 
   /**
-   * Address: 0x00BC8D30 (FUN_00BC8D30, register_VectorRUnitBlueprintWeaponTypeAtexit)
+   * Address: 0x00BC8D30 (FUN_00BC8D30, register_VectorRUnitBlueprintWeaponType)
    *
    * What it does:
    * Startup lane that preregisters `vector<RUnitBlueprintWeapon>` reflection
    * metadata and installs teardown callback.
    */
-  void register_VectorRUnitBlueprintWeaponTypeAtexit();
+  void register_VectorRUnitBlueprintWeaponType();
 } // namespace moho
 

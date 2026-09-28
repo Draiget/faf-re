@@ -58,7 +58,7 @@ namespace moho
    * What it does:
    * Registers `WeakPtr<CUnitCommand>` reflection.
    */
-  void register_WeakPtr_CUnitCommand_Type_AtExit();
+  void register_WeakPtr_CUnitCommand_Type();
 } // namespace moho
 
 namespace gpg
@@ -133,5 +133,5 @@ namespace moho
    * What it does:
    * Registers `vector<WeakPtr<CUnitCommand>>` reflection.
    */
-  void register_WeakPtr_CUnitCommand_VectorType_AtExit();
+  void register_WeakPtr_CUnitCommand_VectorType();
 } // namespace moho

@@ -963,12 +963,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD2700 (FUN_00BD2700, register_CCollisionManipulatorTypeInfoAtexit)
+   * Address: 0x00BD2700 (FUN_00BD2700, register_CCollisionManipulatorTypeInfo)
    *
    * What it does:
    * Preregisters `CCollisionManipulator` RTTI and installs process-exit cleanup.
    */
-  void register_CCollisionManipulatorTypeInfoAtexit()
+  void register_CCollisionManipulatorTypeInfo()
   {
     (void)preregister_CCollisionManipulatorTypeInfo();
   }
@@ -1023,7 +1023,7 @@ namespace
   {
     CCollisionManipulatorTypeInfoBootstrap()
     {
-      (void)moho::register_CCollisionManipulatorTypeInfoAtexit();
+      (void)moho::register_CCollisionManipulatorTypeInfo();
       moho::register_CCollisionManipulatorSerializer();
     }
   };

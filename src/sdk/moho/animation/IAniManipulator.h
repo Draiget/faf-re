@@ -766,7 +766,7 @@ namespace moho
    * What it does:
    * Registers IAniManipulator RTTI startup ownership.
    */
-  void register_IAniManipulatorTypeInfo_AtExit();
+  void register_IAniManipulatorTypeInfo();
 
   /**
    * Address: 0x00BD2C40 (FUN_00BD2C40, register_IAniManipulatorSerializer)

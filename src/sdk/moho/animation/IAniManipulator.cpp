@@ -1745,7 +1745,7 @@ namespace moho
    * What it does:
    * Registers IAniManipulator RTTI startup ownership.
    */
-  void register_IAniManipulatorTypeInfo_AtExit()
+  void register_IAniManipulatorTypeInfo()
   {
     (void)register_IAniManipulatorTypeInfo_00();
   }
@@ -1868,7 +1868,7 @@ namespace
   {
     IAniManipulatorStartupBootstrap()
     {
-      moho::register_IAniManipulatorTypeInfo_AtExit();
+      moho::register_IAniManipulatorTypeInfo();
       moho::register_IAniManipulatorSerializer();
       moho::register_CFootPlantManipulatorSerializer();
       moho::register_CBoneEntityManipulatorTypeInfo();

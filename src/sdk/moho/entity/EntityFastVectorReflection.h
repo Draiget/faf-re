@@ -196,12 +196,12 @@ namespace moho
   [[nodiscard]] gpg::RType* register_WeakPtr_Entity_Type_00();
 
   /**
-   * Address: 0x00BD5090 (FUN_00BD5090, register_WeakPtr_Entity_Type_AtExit)
+   * Address: 0x00BD5090 (FUN_00BD5090, register_WeakPtr_Entity_Type)
    *
    * What it does:
    * Registers `WeakPtr<Entity>` reflection.
    */
-  void register_WeakPtr_Entity_Type_AtExit();
+  void register_WeakPtr_Entity_Type();
 
   /**
    * Address: 0x0067FF70 (FUN_0067FF70, register_VectorEntityPtr_Type_00)
@@ -212,12 +212,12 @@ namespace moho
   [[nodiscard]] gpg::RType* register_VectorEntityPtr_Type_00();
 
   /**
-   * Address: 0x00BD50B0 (FUN_00BD50B0, register_VectorEntityPtr_Type_AtExit)
+   * Address: 0x00BD50B0 (FUN_00BD50B0, register_VectorEntityPtr_Type)
    *
    * What it does:
    * Registers `vector<Entity*>` reflection.
    */
-  void register_VectorEntityPtr_Type_AtExit();
+  void register_VectorEntityPtr_Type();
 
   /**
     * Alias of FUN_00694380 (non-canonical helper lane).
@@ -228,10 +228,10 @@ namespace moho
   [[nodiscard]] gpg::RType* register_FastVectorEntityPtrType_00();
 
   /**
-   * Address: 0x00BD5890 (FUN_00BD5890, register_FastVectorEntityPtrType_AtExit)
+   * Address: 0x00BD5890 (FUN_00BD5890, register_FastVectorEntityPtrType)
    *
    * What it does:
    * Registers `fastvector<Entity*>` reflection.
    */
-  void register_FastVectorEntityPtrType_AtExit();
+  void register_FastVectorEntityPtrType();
 } // namespace moho

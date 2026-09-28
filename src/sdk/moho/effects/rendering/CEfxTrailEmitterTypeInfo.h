@@ -67,5 +67,5 @@ namespace moho
    * Registers `CEfxTrailEmitter` RTTI bootstrap and installs process-exit
    * cleanup.
    */
-  void register_CEfxTrailEmitterTypeInfo_AtExit();
+  void register_CEfxTrailEmitterTypeInfo();
 } // namespace moho

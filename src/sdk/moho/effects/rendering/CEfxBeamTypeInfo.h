@@ -66,5 +66,5 @@ namespace moho
    * What it does:
    * Registers `CEfxBeam` RTTI bootstrap and installs process-exit cleanup.
    */
-  void register_CEfxBeamTypeInfo_AtExit();
+  void register_CEfxBeamTypeInfo();
 } // namespace moho

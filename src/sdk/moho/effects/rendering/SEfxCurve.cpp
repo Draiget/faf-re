@@ -560,12 +560,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4430 (FUN_00BD4430, register_FastVectorSEfxCurveTypeAtexit)
+   * Address: 0x00BD4430 (FUN_00BD4430, register_FastVectorSEfxCurveType)
    *
    * What it does:
    * Registers `fastvector<SEfxCurve>` reflection and installs process-exit teardown.
    */
-  void register_FastVectorSEfxCurveTypeAtexit()
+  void register_FastVectorSEfxCurveType()
   {
     (void)preregister_FastVectorSEfxCurveType();
   }
@@ -577,7 +577,7 @@ namespace
   {
     SEfxCurveFastVectorReflectionBootstrap()
     {
-      (void)moho::register_FastVectorSEfxCurveTypeAtexit();
+      (void)moho::register_FastVectorSEfxCurveType();
     }
   };
 
@@ -587,4 +587,4 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_FastVectorSEfxCurveType_a4fe50, moho::preregister_FastVectorSEfxCurveType)
-GPG_PREREGISTER_INIT(register_FastVectorSEfxCurveTypeAtexit_a4fe50, moho::register_FastVectorSEfxCurveTypeAtexit)
+GPG_PREREGISTER_INIT(register_FastVectorSEfxCurveType_a4fe50, moho::register_FastVectorSEfxCurveType)

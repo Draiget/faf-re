@@ -87,7 +87,7 @@ namespace
   {
     SPickUpInfoVectorReflectionBootstrap()
     {
-      (void)moho::register_VectorSPickUpInfoTypeAtexit();
+      (void)moho::register_VectorSPickUpInfoType();
     }
   };
 
@@ -316,7 +316,7 @@ gpg::RType* moho::preregister_VectorSPickUpInfoType()
  * via the CRT static-init array (the db-note edge into CUnitLoadUnits ctor is
  * a phantom edge — the real runtime consumers look the type up by typeid).
  */
-void moho::register_VectorSPickUpInfoTypeAtexit()
+void moho::register_VectorSPickUpInfoType()
 {
   (void)preregister_VectorSPickUpInfoType();
 }
@@ -324,4 +324,4 @@ void moho::register_VectorSPickUpInfoTypeAtexit()
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_VectorSPickUpInfoType_37b846, moho::preregister_VectorSPickUpInfoType)
-GPG_PREREGISTER_INIT(register_VectorSPickUpInfoTypeAtexit_37b846, moho::register_VectorSPickUpInfoTypeAtexit)
+GPG_PREREGISTER_INIT(register_VectorSPickUpInfoType_37b846, moho::register_VectorSPickUpInfoType)

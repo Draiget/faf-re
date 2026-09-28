@@ -89,10 +89,10 @@ namespace gpg
   [[nodiscard]] gpg::RType* register_MapStringFloat_Type_00();
 
   /**
-   * Address: 0x00BD6BC0 (FUN_00BD6BC0, register_MapStringFloat_Type_AtExit)
+   * Address: 0x00BD6BC0 (FUN_00BD6BC0, register_MapStringFloat_Type)
    *
    * What it does:
    * Registers `std::map<std::string,float>` RTTI.
    */
-  void register_MapStringFloat_Type_AtExit();
+  void register_MapStringFloat_Type();
 } // namespace gpg

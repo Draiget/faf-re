@@ -467,12 +467,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4140 (FUN_00BD4140, register_CountedPtrCParticleTextureTypeAtexit)
+   * Address: 0x00BD4140 (FUN_00BD4140, register_CountedPtrCParticleTextureType)
    *
    * What it does:
    * Registers `CountedPtr<CParticleTexture>` reflection.
    */
-  void register_CountedPtrCParticleTextureTypeAtexit()
+  void register_CountedPtrCParticleTextureType()
   {
     (void)preregister_CountedPtrCParticleTextureType();
   }
@@ -491,12 +491,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4160 (FUN_00BD4160, register_FastVectorCountedPtrCParticleTextureTypeAtexit)
+   * Address: 0x00BD4160 (FUN_00BD4160, register_FastVectorCountedPtrCParticleTextureType)
    *
    * What it does:
    * Registers `fastvector<CountedPtr<CParticleTexture>>` reflection.
    */
-  void register_FastVectorCountedPtrCParticleTextureTypeAtexit()
+  void register_FastVectorCountedPtrCParticleTextureType()
   {
     (void)preregister_FastVectorCountedPtrCParticleTextureType();
   }
@@ -640,8 +640,8 @@ namespace
   {
     CParticleTextureCountedPtrReflectionBootstrap()
     {
-      (void)moho::register_CountedPtrCParticleTextureTypeAtexit();
-      (void)moho::register_FastVectorCountedPtrCParticleTextureTypeAtexit();
+      (void)moho::register_CountedPtrCParticleTextureType();
+      (void)moho::register_FastVectorCountedPtrCParticleTextureType();
     }
   };
 
@@ -651,6 +651,6 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_CountedPtrCParticleTextureType_d01659, moho::preregister_CountedPtrCParticleTextureType)
-GPG_PREREGISTER_INIT(register_CountedPtrCParticleTextureTypeAtexit_d01659, moho::register_CountedPtrCParticleTextureTypeAtexit)
+GPG_PREREGISTER_INIT(register_CountedPtrCParticleTextureType_d01659, moho::register_CountedPtrCParticleTextureType)
 GPG_PREREGISTER_INIT(preregister_FastVectorCountedPtrCParticleTextureType_d01659, moho::preregister_FastVectorCountedPtrCParticleTextureType)
-GPG_PREREGISTER_INIT(register_FastVectorCountedPtrCParticleTextureTypeAtexit_d01659, moho::register_FastVectorCountedPtrCParticleTextureTypeAtexit)
+GPG_PREREGISTER_INIT(register_FastVectorCountedPtrCParticleTextureType_d01659, moho::register_FastVectorCountedPtrCParticleTextureType)

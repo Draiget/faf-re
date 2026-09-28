@@ -90,7 +90,7 @@ namespace moho
    * What it does:
    * Registers `vector<EntityCategorySet>` reflection.
    */
-  void register_EntityCategorySetVectorType_AtExit();
+  void register_EntityCategorySetVectorTypeStartup();
 
   /**
    * Address: 0x006DB010 (FUN_006DB010, msvc8::vector<EntityCategorySet>::push_back)

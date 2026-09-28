@@ -195,7 +195,7 @@ void CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const t
 /**
  * Address: 0x00BD1960 (FUN_00BD1960)
  */
-void register_CUnitScriptTaskTypeInfo_AtExit()
+void register_CUnitScriptTaskTypeInfoStartup()
 {
   (void)register_CUnitScriptTaskTypeInfo();
 }
@@ -207,7 +207,7 @@ namespace
   {
     CUnitScriptTaskTypeInfoBootstrap()
     {
-      moho::register_CUnitScriptTaskTypeInfo_AtExit();
+      moho::register_CUnitScriptTaskTypeInfoStartup();
     }
   };
 
