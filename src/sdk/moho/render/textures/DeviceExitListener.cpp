@@ -1,7 +1,5 @@
 #include "moho/render/textures/DeviceExitListener.h"
 
-#include <cstdlib>
-
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 
@@ -27,25 +25,20 @@ namespace moho
       }
       return link;
     }
-
-    void DestroyDeviceExitListenerAtProcessExit()
-    {
-      DeviceExitListener* const previousListener = moho::sDeviceExitListener;
-      moho::sDeviceExitListener = nullptr;
-      delete previousListener;
-    }
-
   } // namespace
 
-  DeviceExitListener* sDeviceExitListener = nullptr;
-
   /**
-   * Address: 0x00BC43F0 (FUN_00BC43F0, register_sDeviceExitListener)
+   * Address: 0x00BC43F0 (FUN_00BC43F0, dynamic initializer for
+   * `sDeviceExitListener`)
+   * Address: 0x00BEF460 (FUN_00BEF460, dynamic atexit destructor for
+   * `sDeviceExitListener`)
+   *
+   * What it does:
+   * The initializer only registers the destructor with `atexit` (the null
+   * pointer is already in .bss); the destructor deletes a listener still
+   * alive at exit without clearing the slot, which is `~scoped_ptr`.
    */
-  void register_sDeviceExitListener()
-  {
-    (void)std::atexit(&DestroyDeviceExitListenerAtProcessExit);
-  }
+  boost::scoped_ptr<DeviceExitListener> sDeviceExitListener;
 
   /**
    * Address: 0x004472B0 (FUN_004472B0, Moho::DeviceExitListener::DeviceExitListener)
@@ -59,7 +52,6 @@ namespace moho
     , mTrackedTextures()
   {
     (void)InitializeDeviceListenerLink(&mDeviceLink);
-    mTrackedTextures.ListResetLinks();
 
     if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
       mDeviceLink.ListLinkBefore(reinterpret_cast<DeviceListenerLink*>(static_cast<Broadcaster*>(device)));
@@ -92,35 +84,10 @@ namespace moho
       return;
     }
 
-    BatchTextureLink* cursor = mTrackedTextures.mNext;
-    while (cursor != &mTrackedTextures) {
-      BatchTextureLink* const next = cursor->mNext;
-      if (CD3DBatchTexture* const texture =
-            TDatList<CD3DBatchTexture, void>::template owner_from_member<
-              CD3DBatchTexture,
-              CD3DBatchTexture::BatchTextureLink,
-              &CD3DBatchTexture::mListLink>(cursor);
-          texture != nullptr) {
-        texture->ResetTextureSheet();
-      }
-      cursor = next;
+    for (CD3DBatchTexture* const texture : mTrackedTextures.owners()) {
+      texture->ResetTextureSheet();
     }
 
-    DeviceExitListener* const previousListener = sDeviceExitListener;
-    sDeviceExitListener = nullptr;
-    delete previousListener;
+    sDeviceExitListener.reset();
   }
 } // namespace moho
-
-namespace
-{
-  struct DeviceExitListenerBootstrap
-  {
-    DeviceExitListenerBootstrap()
-    {
-      moho::register_sDeviceExitListener();
-    }
-  };
-
-  DeviceExitListenerBootstrap gDeviceExitListenerBootstrap;
-} // namespace

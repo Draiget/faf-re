@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/scoped_ptr.h"
+#include "gpg/core/containers/DList.h"
 #include "moho/containers/TDatList.h"
 
 namespace moho
@@ -26,7 +28,6 @@ namespace moho
   {
   public:
     using DeviceListenerLink = TDatListItem<DeviceExitListener, void>;
-    using BatchTextureLink = TDatListItem<CD3DBatchTexture, void>;
 
     /**
      * Address: 0x004472B0 (FUN_004472B0, Moho::DeviceExitListener::DeviceExitListener)
@@ -58,8 +59,8 @@ namespace moho
     virtual void Receive(const SD3DDeviceEvent& event);
 
   public:
-    DeviceListenerLink mDeviceLink;    // +0x04
-    BatchTextureLink mTrackedTextures; // +0x0C
+    DeviceListenerLink mDeviceLink;                  // +0x04
+    gpg::DList<CD3DBatchTexture> mTrackedTextures; // +0x0C
   };
 
   static_assert(offsetof(DeviceExitListener, mDeviceLink) == 0x04, "DeviceExitListener::mDeviceLink offset must be 0x04");
@@ -70,13 +71,10 @@ namespace moho
   static_assert(sizeof(DeviceExitListener) == 0x14, "DeviceExitListener size must be 0x14");
 
   /**
-   * Address: 0x00BC43F0 (FUN_00BC43F0, register_sDeviceExitListener)
-   *
-   * What it does:
-   * Registers one process-exit cleanup lane that releases the global
-   * `sDeviceExitListener` instance when still present.
+   * The process-wide listener (0x010A7AC0), created by the first batch
+   * texture that gets a device sheet and dropped when the device exits.
+   * Every write is `scoped_ptr::reset`: the new pointer is stored before the
+   * old listener is deleted (0x00447404, 0x00447399).
    */
-  void register_sDeviceExitListener();
-
-  extern DeviceExitListener* sDeviceExitListener;
+  extern boost::scoped_ptr<DeviceExitListener> sDeviceExitListener;
 } // namespace moho

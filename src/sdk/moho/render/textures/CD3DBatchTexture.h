@@ -5,8 +5,8 @@
 
 #include "boost/mutex.h"
 #include "boost/shared_ptr.h"
+#include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/String.h"
-#include "moho/containers/TDatList.h"
 #include "Wm3Vector2.h"
 
 namespace moho
@@ -19,14 +19,16 @@ namespace moho
   /**
    * VFTABLE: 0x00E02A84
    * COL: 0x00E5FBF0
+   *
+   * RTTI: `gpg::DListItem<CD3DBatchTexture>` base at mdisp 4, the node that
+   * links a texture holding a device sheet onto `DeviceExitListener`'s list.
    */
-  class CD3DBatchTexture
+  class CD3DBatchTexture : public gpg::DListItem<CD3DBatchTexture>
   {
     friend class DeviceExitListener;
     friend class CD3DTextureBatcher;
 
   public:
-    using BatchTextureLink = TDatListItem<CD3DBatchTexture, void>;
     using TextureSheetHandle = boost::shared_ptr<ID3DTextureSheet>;
     using DynamicTextureSheetHandle = boost::shared_ptr<CD3DDynamicTextureSheet>;
 
@@ -35,8 +37,8 @@ namespace moho
      * Address: 0x00447490 (FUN_00447490, non-deleting body)
      *
      * What it does:
-     * Releases retained dynamic-texture ownership and unlinks this texture from
-     * the listener-tracked intrusive list.
+     * Releases the retained texture sheet (the `mTextureSheet` member) and
+     * unlinks this texture from the device-exit list (the `DListItem` base).
      */
     virtual ~CD3DBatchTexture();
 
@@ -141,7 +143,6 @@ namespace moho
     void AddExitListener();
 
   public:
-    BatchTextureLink mListLink;              // +0x04
     std::uint32_t mWidth;                    // +0x0C
     std::uint32_t mHeight;                   // +0x10
     std::uint32_t mBorder;                   // +0x14
@@ -159,7 +160,6 @@ namespace moho
 
   extern boost::mutex sResourceLock;
 
-  static_assert(offsetof(CD3DBatchTexture, mListLink) == 0x04, "CD3DBatchTexture::mListLink offset must be 0x04");
   static_assert(offsetof(CD3DBatchTexture, mWidth) == 0x0C, "CD3DBatchTexture::mWidth offset must be 0x0C");
   static_assert(offsetof(CD3DBatchTexture, mHeight) == 0x10, "CD3DBatchTexture::mHeight offset must be 0x10");
   static_assert(offsetof(CD3DBatchTexture, mBorder) == 0x14, "CD3DBatchTexture::mBorder offset must be 0x14");

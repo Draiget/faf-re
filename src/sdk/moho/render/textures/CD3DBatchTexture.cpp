@@ -39,23 +39,23 @@ namespace moho
    * Address: 0x004470F0 (FUN_004470F0)
    */
   CD3DBatchTexture::CD3DBatchTexture(const std::uint32_t width, const std::uint32_t height, const std::uint32_t border)
-    : mListLink()
-    , mWidth(width)
+    : mWidth(width)
     , mHeight(height)
     , mBorder(border)
     , mTextureSheet()
-  {
-    mListLink.ListResetLinks();
-  }
+  {}
 
   /**
    * Address: 0x00447170 (FUN_00447170, deleting-thunk lane)
    * Address: 0x00447490 (FUN_00447490, non-deleting body)
+   *
+   * What it does:
+   * The body is empty: 0x00447490 releases `mTextureSheet`'s count without
+   * clearing the handle (the member's destructor, not `ResetTextureSheet`,
+   * which zeroes both words first as `DeviceExitListener::Receive` does at
+   * 0x0044735B), then unlinks the node at +0x04 (the base's destructor).
    */
-  CD3DBatchTexture::~CD3DBatchTexture()
-  {
-    ResetTextureSheet();
-  }
+  CD3DBatchTexture::~CD3DBatchTexture() = default;
 
   /**
    * Address: 0x00447120 (FUN_00447120)
@@ -124,18 +124,11 @@ namespace moho
    */
   void CD3DBatchTexture::AddExitListener()
   {
-    if (sDeviceExitListener == nullptr) {
-      void* const listenerStorage = ::operator new(sizeof(DeviceExitListener), std::nothrow);
-      DeviceExitListener* const created = listenerStorage != nullptr ? new (listenerStorage) DeviceExitListener() : nullptr;
-
-      DeviceExitListener* const previous = sDeviceExitListener;
-      sDeviceExitListener = created;
-      delete previous;
+    if (!sDeviceExitListener) {
+      sDeviceExitListener.reset(new DeviceExitListener());
     }
 
-    if (sDeviceExitListener != nullptr) {
-      mListLink.ListLinkBefore(&sDeviceExitListener->mTrackedTextures);
-    }
+    sDeviceExitListener->mTrackedTextures.push_back(this);
   }
 
   /**
