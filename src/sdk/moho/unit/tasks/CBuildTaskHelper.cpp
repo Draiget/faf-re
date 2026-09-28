@@ -522,9 +522,28 @@ namespace
   struct CBuildTaskHelperSerializerHelperNode : public gpg::SerHelperBase
   {
     /**
-     * Address: 0x00BCF830 vtable slot 0 dispatch target (dispatched by
-     * `gpg::SerHelperBase::InitNewHelpers` once this helper is drained from
-     * the pending list).
+     * Address: 0x00BCF830 (FUN_00BCF830, dynamic initializer for `gCBuildTaskHelperSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E1F9D8); the compiler
+     * registers the destructor with `atexit`.
+     */
+    CBuildTaskHelperSerializerHelperNode();
+
+    /**
+     * Address: 0x00BF92A0 (FUN_00BF92A0, dynamic atexit destructor for `gCBuildTaskHelperSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_005F59C0` and `FUN_005F59F0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CBuildTaskHelperSerializerHelperNode() = default;
+
+    /**
+     * Address: 0x005FBAE0 (FUN_005FBAE0, slot 0 of vtable 0x00E1F9D8)
      *
      * What it does:
      * Binds this helper's already-cited load/save callbacks
@@ -558,16 +577,7 @@ namespace
     "CBuildTaskHelperSerializerHelperNode size must be 0x14"
   );
 
-  CBuildTaskHelperSerializerHelperNode gCBuildTaskHelperSerializer{};
-
-  /**
-   * Unlinks `CBuildTaskHelperSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  void UnlinkCBuildTaskHelperSerializerNodePrimary()
-  {
-    gCBuildTaskHelperSerializer.ResetLinks();
-  }
+  CBuildTaskHelperSerializerHelperNode gCBuildTaskHelperSerializer;
 
   /**
    * Address: 0x005F5960 (FUN_005F5960, Moho::CBuildTaskHelperSerializer::Deserialize)
@@ -616,43 +626,14 @@ namespace
   }
 
   /**
-   * Address: 0x00BF92A0 (FUN_00BF92A0, Moho::CBuildTaskHelperSerializer::~CBuildTaskHelperSerializer)
+   * Address: 0x00BCF830 (FUN_00BCF830, dynamic initializer for `gCBuildTaskHelperSerializer`)
    *
    * What it does:
-   * Process-exit teardown: unlinks the `CBuildTaskHelperSerializer` helper
-   * node, matching the sibling unlink lanes used across other serializer
-   * registrars.
+   * Binds this helper's load/save callbacks.
    */
-  void cleanup_CBuildTaskHelperSerializer_atexit()
-  {
-    UnlinkCBuildTaskHelperSerializerNodePrimary();
-  }
+  CBuildTaskHelperSerializerHelperNode::CBuildTaskHelperSerializerHelperNode()
+    : mSerLoadFunc(&DeserializeCBuildTaskHelperSerializerCallback)
+    , mSerSaveFunc(&SerializeCBuildTaskHelperSerializerCallback)
+  {}
 
-  /**
-   * Address: 0x00BCF830 (FUN_00BCF830, register_CBuildTaskHelperSerializer)
-   *
-   * What it does:
-   * Binds the global `CBuildTaskHelper` serializer helper's load/save
-   * callback lanes and installs process-exit cleanup via `atexit`. The
-   * helper node self-links and splices into `gpg::SerHelperBase::sNewHelpers`
-   * automatically as part of its own construction, which runs before this
-   * function does, so this no longer needs to unlink/self-link the node
-   * itself first.
-   */
-  void register_CBuildTaskHelperSerializer()
-  {
-    gCBuildTaskHelperSerializer.mSerLoadFunc = &DeserializeCBuildTaskHelperSerializerCallback;
-    gCBuildTaskHelperSerializer.mSerSaveFunc = &SerializeCBuildTaskHelperSerializerCallback;
-    (void)std::atexit(&cleanup_CBuildTaskHelperSerializer_atexit);
-  }
-
-  struct CBuildTaskHelperSerializerStartupBootstrap
-  {
-    CBuildTaskHelperSerializerStartupBootstrap()
-    {
-      register_CBuildTaskHelperSerializer();
-    }
-  };
-
-  [[maybe_unused]] CBuildTaskHelperSerializerStartupBootstrap gCBuildTaskHelperSerializerStartupBootstrap;
 } // namespace

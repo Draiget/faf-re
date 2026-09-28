@@ -59,7 +59,7 @@ namespace
     }
   };
 
-  moho::SSTIEntityVariableDataSerializer gSSTIEntityVariableDataSerializer{};
+  moho::SSTIEntityVariableDataSerializer gSSTIEntityVariableDataSerializer;
 
   constexpr const char* kSerializationHeaderPath =
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
@@ -300,30 +300,6 @@ namespace
    */
   EntityAttributesSerializerHelper::~EntityAttributesSerializerHelper() = default;
 
-  /**
-   * Address: 0x00558900 (FUN_00558900, SerSaveLoadHelper<SSTIEntityVariableData>::unlink lane A)
-   *
-   * What it does:
-   * Unlinks `SSTIEntityVariableData` serializer helper links and restores
-   * self-links for intrusive-list sentinel state.
-   */
-  void UnlinkSSTIEntityVariableDataSerializerLaneA() noexcept
-  {
-    gSSTIEntityVariableDataSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00558930 (FUN_00558930, SerSaveLoadHelper<SSTIEntityVariableData>::unlink lane B)
-   *
-   * What it does:
-   * Mirrors lane A unlink/self-link reset for the
-   * `SSTIEntityVariableData` serializer helper node.
-   */
-  [[maybe_unused]] void UnlinkSSTIEntityVariableDataSerializerLaneB() noexcept
-  {
-    gSSTIEntityVariableDataSerializer.ResetLinks();
-  }
-
   void DeserializeSSTIEntityVariableDataSerializerCallback(
     gpg::ReadArchive* const archive,
     const int objectPtr,
@@ -354,42 +330,6 @@ namespace
     object->MemberSerialize(archive, 2);
   }
 
-  /**
-   * Address: 0x005588D0 (FUN_005588D0)
-   *
-   * What it does:
-   * Binds callback lanes for global `SSTIEntityVariableDataSerializer`
-   * helper storage and returns that helper object. The helper node
-   * self-links and splices into `gpg::SerHelperBase::sNewHelpers`
-   * automatically as part of its own construction, which runs before this
-   * function does, so this no longer needs to unlink/self-link the node
-   * itself first.
-   */
-  [[nodiscard]] moho::SSTIEntityVariableDataSerializer*
-  InitializeSSTIEntityVariableDataSerializerStartupThunk()
-  {
-    gSSTIEntityVariableDataSerializer.mSerLoadFunc = &DeserializeSSTIEntityVariableDataSerializerCallback;
-    gSSTIEntityVariableDataSerializer.mSerSaveFunc = &SerializeSSTIEntityVariableDataSerializerCallback;
-    return &gSSTIEntityVariableDataSerializer;
-  }
-
-  void cleanup_SSTIEntityVariableDataSerializer_atexit()
-  {
-    UnlinkSSTIEntityVariableDataSerializerLaneA();
-  }
-
-  /**
-   * Address: 0x00BCA100 (FUN_00BCA100, register_SSTIEntityVariableDataSerializer)
-   *
-   * What it does:
-   * Initializes the global SSTIEntityVariableData serializer helper
-   * callbacks and installs process-exit cleanup.
-   */
-  void register_SSTIEntityVariableDataSerializer()
-  {
-    (void)InitializeSSTIEntityVariableDataSerializerStartupThunk();
-    (void)std::atexit(&cleanup_SSTIEntityVariableDataSerializer_atexit);
-  }
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
   {
@@ -959,6 +899,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BCA100 (FUN_00BCA100, dynamic initializer for `gSSTIEntityVariableDataSerializer`)
+   * Address: 0x005588D0 (FUN_005588D0, out-of-line copy of this constructor, unreferenced)
+   *
+   * What it does:
+   * Binds this helper's load/save callbacks.
+   */
+  SSTIEntityVariableDataSerializer::SSTIEntityVariableDataSerializer()
+    : mSerLoadFunc(&DeserializeSSTIEntityVariableDataSerializerCallback)
+    , mSerSaveFunc(&SerializeSSTIEntityVariableDataSerializerCallback)
+  {}
+
+  /**
+   * Address: 0x00BF4FF0 (FUN_00BF4FF0, dynamic atexit destructor for `gSSTIEntityVariableDataSerializer`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). `FUN_00558900` and `FUN_00558930` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  SSTIEntityVariableDataSerializer::~SSTIEntityVariableDataSerializer() = default;
+
+  /**
    * Address: 0x00558E40 (FUN_00558E40, sub_558E40)
    *
    * What it does:
@@ -1049,19 +1011,6 @@ namespace moho
   // Cached reflected `SSTIEntityAttachInfo` lane.
   gpg::RType* SSTIEntityAttachInfo::sType = nullptr;
 } // namespace moho
-
-namespace
-{
-  struct SSTIEntityVariableDataSerializerStartupBootstrap
-  {
-    SSTIEntityVariableDataSerializerStartupBootstrap()
-    {
-      register_SSTIEntityVariableDataSerializer();
-    }
-  };
-
-  [[maybe_unused]] SSTIEntityVariableDataSerializerStartupBootstrap gSSTIEntityVariableDataSerializerStartupBootstrap;
-} // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

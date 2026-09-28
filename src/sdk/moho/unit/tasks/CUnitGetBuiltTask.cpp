@@ -99,6 +99,27 @@ namespace
   struct CUnitGetBuiltTaskSerializer : public gpg::SerHelperBase
   {
     /**
+     * Address: 0x00BD05F0 (FUN_00BD05F0, dynamic initializer for `gCUnitGetBuiltTaskSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E202FC); the compiler
+     * registers the destructor with `atexit`.
+     */
+    CUnitGetBuiltTaskSerializer();
+
+    /**
+     * Address: 0x00BF9BD0 (FUN_00BF9BD0, dynamic atexit destructor for `gCUnitGetBuiltTaskSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_0060A7B0` and `FUN_0060A7E0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitGetBuiltTaskSerializer() = default;
+
+    /**
      * Address: 0x0060BAE0 (FUN_0060BAE0, Moho::CUnitGetBuiltTaskSerializer::Init,
      * vtable slot 0)
      *
@@ -108,8 +129,8 @@ namespace
      */
     void Init() override;
 
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(
     offsetof(CUnitGetBuiltTaskSerializer, mSerLoadFunc) == 0x0C,
@@ -133,33 +154,7 @@ namespace
     type->serSaveFunc_ = mSerSaveFunc;
   }
 
-  CUnitGetBuiltTaskSerializer gCUnitGetBuiltTaskSerializer{};
-
-  /**
-   * Address: 0x0060A7B0 (FUN_0060A7B0)
-   *
-   * What it does:
-   * Unlinks `CUnitGetBuiltTaskSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  void UnlinkCUnitGetBuiltTaskSerializerNodePrimary()
-  {
-    gCUnitGetBuiltTaskSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x0060A7E0 (FUN_0060A7E0)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitGetBuiltTaskSerializer` helper storage. No in-binary caller was
-   * recovered for this address (distinct from the primary lane above); kept
-   * as a thin address-anchored wrapper rather than dropped.
-   */
-  [[maybe_unused]] void UnlinkCUnitGetBuiltTaskSerializerNodeSecondary()
-  {
-    gCUnitGetBuiltTaskSerializer.ResetLinks();
-  }
+  CUnitGetBuiltTaskSerializer gCUnitGetBuiltTaskSerializer;
 
   // CUnitGetBuiltTask adds no fields beyond CCommandTask (see the trivial
   // forwarding constructors above), so the binary serializes it purely as
@@ -231,43 +226,14 @@ namespace
   }
 
   /**
-   * Address: 0x00BF9BD0 (FUN_00BF9BD0, Moho::CUnitGetBuiltTaskSerializer::~CUnitGetBuiltTaskSerializer)
+   * Address: 0x00BD05F0 (FUN_00BD05F0, dynamic initializer for `gCUnitGetBuiltTaskSerializer`)
    *
    * What it does:
-   * Process-exit teardown: unlinks the `CUnitGetBuiltTaskSerializer` helper
-   * node, matching the sibling unlink lanes used across other serializer
-   * registrars.
+   * Binds this helper's load/save callbacks.
    */
-  void cleanup_CUnitGetBuiltTaskSerializer_atexit()
-  {
-    UnlinkCUnitGetBuiltTaskSerializerNodePrimary();
-  }
+  CUnitGetBuiltTaskSerializer::CUnitGetBuiltTaskSerializer()
+    : mSerLoadFunc(&DeserializeCUnitGetBuiltTaskSerializerCallback)
+    , mSerSaveFunc(&SerializeCUnitGetBuiltTaskSerializerCallback)
+  {}
 
-  /**
-   * Address: 0x00BD05F0 (FUN_00BD05F0, register_CUnitGetBuiltTaskSerializer,
-   * dynamic initializer for the global `CUnitGetBuiltTaskSerializer`
-   * singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-   * splices it into the process-global `sNewHelpers` pending list; this was
-   * previously modeled as a manual self-link here), binds the load/save
-   * callback lanes, and installs process-exit cleanup via `atexit`.
-   */
-  void register_CUnitGetBuiltTaskSerializer()
-  {
-    gCUnitGetBuiltTaskSerializer.mSerLoadFunc = &DeserializeCUnitGetBuiltTaskSerializerCallback;
-    gCUnitGetBuiltTaskSerializer.mSerSaveFunc = &SerializeCUnitGetBuiltTaskSerializerCallback;
-    (void)std::atexit(&cleanup_CUnitGetBuiltTaskSerializer_atexit);
-  }
-
-  struct CUnitGetBuiltTaskSerializerStartupBootstrap
-  {
-    CUnitGetBuiltTaskSerializerStartupBootstrap()
-    {
-      register_CUnitGetBuiltTaskSerializer();
-    }
-  };
-
-  [[maybe_unused]] CUnitGetBuiltTaskSerializerStartupBootstrap gCUnitGetBuiltTaskSerializerStartupBootstrap;
 } // namespace

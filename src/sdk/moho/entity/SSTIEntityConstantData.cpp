@@ -56,9 +56,28 @@ namespace
   struct SSTIEntityConstantDataSerializerHelperNode : public gpg::SerHelperBase
   {
     /**
-     * Address: 0x00BC9FE0 vtable slot 0 dispatch target (dispatched by
-     * `gpg::SerHelperBase::InitNewHelpers` once this helper is drained from
-     * the pending list).
+     * Address: 0x00BC9FE0 (FUN_00BC9FE0, dynamic initializer for `gSSTIEntityConstantDataSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E17E9C); the compiler
+     * registers the destructor with `atexit`.
+     */
+    SSTIEntityConstantDataSerializerHelperNode();
+
+    /**
+     * Address: 0x00BF4E40 (FUN_00BF4E40, dynamic atexit destructor for `gSSTIEntityConstantDataSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_00558170` and `FUN_005581A0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~SSTIEntityConstantDataSerializerHelperNode() = default;
+
+    /**
+     * Address: 0x00558A80 (FUN_00558A80, slot 0 of vtable 0x00E17E9C)
      *
      * What it does:
      * Binds this helper's already-cited load/save callbacks
@@ -92,26 +111,7 @@ namespace
     "SSTIEntityConstantDataSerializerHelperNode size must be 0x14"
   );
 
-  SSTIEntityConstantDataSerializerHelperNode gSSTIEntityConstantDataSerializer{};
-
-  /**
-   * Address: 0x00558170 (FUN_00558170, SerSaveLoadHelper<SSTIEntityConstantData>::unlink lane A)
-   *
-   * What it does:
-   * Unlinks `SSTIEntityConstantData` serializer helper links and restores
-   * self-links for intrusive-list sentinel state.
-   */
-  void UnlinkSSTIEntityConstantDataSerializerLaneA() noexcept
-  {
-    gSSTIEntityConstantDataSerializer.ResetLinks();
-  }
-
-  // Address 0x005581A0 (unlink "lane B", a duplicate of lane A above)
-  // formerly modeled here is dead: zero data_refs/call_edges and no
-  // source-level caller anywhere in src/sdk/**.
-  // UnlinkSSTIEntityConstantDataSerializerLaneA above is the real body --
-  // cleanup_SSTIEntityConstantDataSerializer_atexit below calls it directly,
-  // and that cleanup function is atexit-registered from the ctor.
+  SSTIEntityConstantDataSerializerHelperNode gSSTIEntityConstantDataSerializer;
 
   /**
    * Address: 0x00558110 (FUN_00558110, Moho::SSTIEntityConstantDataSerializer::Deserialize)
@@ -162,45 +162,16 @@ namespace
   }
 
   /**
-   * Address: 0x00BF4E40 (FUN_00BF4E40, Moho::SSTIEntityConstantDataSerializer::~SSTIEntityConstantDataSerializer)
+   * Address: 0x00BC9FE0 (FUN_00BC9FE0, dynamic initializer for `gSSTIEntityConstantDataSerializer`)
    *
    * What it does:
-   * Process-exit teardown: unlinks the `SSTIEntityConstantDataSerializer`
-   * helper node, matching the sibling unlink lanes used across other
-   * serializer registrars.
+   * Binds this helper's load/save callbacks.
    */
-  void cleanup_SSTIEntityConstantDataSerializer_atexit()
-  {
-    UnlinkSSTIEntityConstantDataSerializerLaneA();
-  }
+  SSTIEntityConstantDataSerializerHelperNode::SSTIEntityConstantDataSerializerHelperNode()
+    : mSerLoadFunc(&DeserializeSSTIEntityConstantDataSerializerCallback)
+    , mSerSaveFunc(&SerializeSSTIEntityConstantDataSerializerCallback)
+  {}
 
-  /**
-   * Address: 0x00BC9FE0 (FUN_00BC9FE0, register_SSTIEntityConstantDataSerializer)
-   *
-   * What it does:
-   * Binds the global `SSTIEntityConstantData` serializer helper's load/save
-   * callback lanes and installs process-exit cleanup via `atexit`. The
-   * helper node self-links and splices into `gpg::SerHelperBase::sNewHelpers`
-   * automatically as part of its own construction (base-class construction
-   * order guarantees this runs before this function does), so this no longer
-   * needs to unlink/self-link the node itself before setting the callbacks.
-   */
-  void register_SSTIEntityConstantDataSerializer()
-  {
-    gSSTIEntityConstantDataSerializer.mSerLoadFunc = &DeserializeSSTIEntityConstantDataSerializerCallback;
-    gSSTIEntityConstantDataSerializer.mSerSaveFunc = &SerializeSSTIEntityConstantDataSerializerCallback;
-    (void)std::atexit(&cleanup_SSTIEntityConstantDataSerializer_atexit);
-  }
-
-  struct SSTIEntityConstantDataSerializerStartupBootstrap
-  {
-    SSTIEntityConstantDataSerializerStartupBootstrap()
-    {
-      register_SSTIEntityConstantDataSerializer();
-    }
-  };
-
-  [[maybe_unused]] SSTIEntityConstantDataSerializerStartupBootstrap gSSTIEntityConstantDataSerializerStartupBootstrap;
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
   {

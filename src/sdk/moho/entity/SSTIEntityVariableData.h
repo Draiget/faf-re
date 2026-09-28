@@ -236,6 +236,28 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00BCA100 (FUN_00BCA100, dynamic initializer for `gSSTIEntityVariableDataSerializer`)
+     * Address: 0x005588D0 (FUN_005588D0, out-of-line copy of this constructor, unreferenced)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E17FA0); the compiler
+     * registers the destructor with `atexit`.
+     */
+    SSTIEntityVariableDataSerializer();
+
+    /**
+     * Address: 0x00BF4FF0 (FUN_00BF4FF0, dynamic atexit destructor for `gSSTIEntityVariableDataSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_00558900` and `FUN_00558930` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~SSTIEntityVariableDataSerializer();
+
+    /**
      * Address: 0x00558E40 (FUN_00558E40, sub_558E40)
      * Slot: 0
      *

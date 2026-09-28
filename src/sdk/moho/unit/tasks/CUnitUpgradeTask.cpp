@@ -61,6 +61,27 @@ namespace
   struct CUnitUpgradeTaskSerializer : public gpg::SerHelperBase
   {
     /**
+     * Address: 0x00BCF8F0 (FUN_00BCF8F0, dynamic initializer for `gCUnitUpgradeTaskSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E1FA78); the compiler
+     * registers the destructor with `atexit`.
+     */
+    CUnitUpgradeTaskSerializer();
+
+    /**
+     * Address: 0x00BF93C0 (FUN_00BF93C0, dynamic atexit destructor for `gCUnitUpgradeTaskSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_005F8830` and `FUN_005F8860` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitUpgradeTaskSerializer() = default;
+
+    /**
      * Address: 0x005FBC90 (FUN_005FBC90, Moho::CUnitUpgradeTaskSerializer::Init,
      * vtable slot 0)
      *
@@ -70,8 +91,8 @@ namespace
      */
     void Init() override;
 
-    gpg::RType::load_func_t mLoad = nullptr;
-    gpg::RType::save_func_t mSave = nullptr;
+    gpg::RType::load_func_t mLoad;
+    gpg::RType::save_func_t mSave;
   };
   static_assert(sizeof(CUnitUpgradeTaskSerializer) == 0x14, "CUnitUpgradeTaskSerializer size must be 0x14");
 
@@ -84,7 +105,7 @@ namespace
     type->serSaveFunc_ = mSave;
   }
 
-  CUnitUpgradeTaskSerializer gCUnitUpgradeTaskSerializer{};
+  CUnitUpgradeTaskSerializer gCUnitUpgradeTaskSerializer;
 
   void DeserializeCUnitUpgradeTaskSerializerCallback(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
   {
@@ -99,50 +120,16 @@ namespace
   }
 
   /**
-   * Address: 0x00BF93C0 (FUN_00BF93C0, Moho::CUnitUpgradeTaskSerializer::~CUnitUpgradeTaskSerializer)
+   * Address: 0x00BCF8F0 (FUN_00BCF8F0, dynamic initializer for `gCUnitUpgradeTaskSerializer`)
    *
    * What it does:
-   * Process-exit teardown: unlinks the `CUnitUpgradeTaskSerializer` helper
-   * node, matching the sibling unlink lanes used across other serializer
-   * registrars.
+   * Binds this helper's load/save callbacks.
    */
-  void cleanup_CUnitUpgradeTaskSerializer_atexit()
-  {
-    gCUnitUpgradeTaskSerializer.ResetLinks();
-  }
+  CUnitUpgradeTaskSerializer::CUnitUpgradeTaskSerializer()
+    : mLoad(&DeserializeCUnitUpgradeTaskSerializerCallback)
+    , mSave(&SerializeCUnitUpgradeTaskSerializerCallback)
+  {}
 
-  /**
-   * Address: 0x00BCF8F0 (FUN_00BCF8F0, register_CUnitUpgradeTaskSerializer,
-   * dynamic initializer for the global `CUnitUpgradeTaskSerializer`
-   * singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-   * splices it into the process-global `sNewHelpers` pending list; this was
-   * previously modeled as a manual self-link here), binds the load/save
-   * callback lanes, and installs process-exit cleanup via `atexit`.
-   * Supersedes the previous orphaned startup thunk (cited at FUN_005F8800, a
-   * distinct real binary function that performs the same self-link/field-
-   * store sequence but is never called from any recovered path and installs
-   * no `atexit` cleanup -- left unrecovered pending its own callsite
-   * evidence).
-   */
-  void register_CUnitUpgradeTaskSerializer()
-  {
-    gCUnitUpgradeTaskSerializer.mLoad = &DeserializeCUnitUpgradeTaskSerializerCallback;
-    gCUnitUpgradeTaskSerializer.mSave = &SerializeCUnitUpgradeTaskSerializerCallback;
-    (void)std::atexit(&cleanup_CUnitUpgradeTaskSerializer_atexit);
-  }
-
-  struct CUnitUpgradeTaskSerializerStartupBootstrap
-  {
-    CUnitUpgradeTaskSerializerStartupBootstrap()
-    {
-      register_CUnitUpgradeTaskSerializer();
-    }
-  };
-
-  [[maybe_unused]] CUnitUpgradeTaskSerializerStartupBootstrap gCUnitUpgradeTaskSerializerStartupBootstrap;
 } // namespace
 
 namespace moho

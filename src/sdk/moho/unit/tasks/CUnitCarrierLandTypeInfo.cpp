@@ -326,6 +326,27 @@ namespace
   struct CUnitCarrierLandSerializer : public gpg::SerHelperBase
   {
     /**
+     * Address: 0x00BD0280 (FUN_00BD0280, dynamic initializer for `gCUnitCarrierLandSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E200CC); the compiler
+     * registers the destructor with `atexit`.
+     */
+    CUnitCarrierLandSerializer();
+
+    /**
+     * Address: 0x00BF99C0 (FUN_00BF99C0, dynamic atexit destructor for `gCUnitCarrierLandSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_00606D20` and `FUN_00606D50` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitCarrierLandSerializer() = default;
+
+    /**
      * Address: 0x006077F0 (FUN_006077F0, Moho::CUnitCarrierLandSerializer::Init,
      * vtable slot 0)
      *
@@ -335,8 +356,8 @@ namespace
      */
     void Init() override;
 
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(
     offsetof(CUnitCarrierLandSerializer, mSerLoadFunc) == 0x0C,
@@ -357,33 +378,7 @@ namespace
     type->serSaveFunc_ = mSerSaveFunc;
   }
 
-  CUnitCarrierLandSerializer gCUnitCarrierLandSerializer{};
-
-  /**
-   * Address: 0x00606D20 (FUN_00606D20)
-   *
-   * What it does:
-   * Unlinks `CUnitCarrierLandSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  void UnlinkCUnitCarrierLandSerializerNodePrimary()
-  {
-    gCUnitCarrierLandSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00606D50 (FUN_00606D50)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitCarrierLandSerializer` helper storage. No in-binary caller was
-   * recovered for this address (distinct from the primary lane above); kept
-   * as a thin address-anchored wrapper rather than dropped.
-   */
-  [[maybe_unused]] void UnlinkCUnitCarrierLandSerializerNodeSecondary()
-  {
-    gCUnitCarrierLandSerializer.ResetLinks();
-  }
+  CUnitCarrierLandSerializer gCUnitCarrierLandSerializer;
 
   /**
    * Address: 0x00606CD0 (FUN_00606CD0, Moho::CUnitCarrierLandSerializer::Deserialize)
@@ -432,44 +427,16 @@ namespace
   }
 
   /**
-   * Address: 0x00BF99C0 (FUN_00BF99C0, Moho::CUnitCarrierLandSerializer::~CUnitCarrierLandSerializer)
+   * Address: 0x00BD0280 (FUN_00BD0280, dynamic initializer for `gCUnitCarrierLandSerializer`)
    *
    * What it does:
-   * Process-exit teardown: unlinks the `CUnitCarrierLandSerializer` helper
-   * node, matching the sibling unlink lanes used across other serializer
-   * registrars.
+   * Binds this helper's load/save callbacks.
    */
-  void cleanup_CUnitCarrierLandSerializer_atexit()
-  {
-    UnlinkCUnitCarrierLandSerializerNodePrimary();
-  }
+  CUnitCarrierLandSerializer::CUnitCarrierLandSerializer()
+    : mSerLoadFunc(&DeserializeCUnitCarrierLandSerializerCallback)
+    , mSerSaveFunc(&SerializeCUnitCarrierLandSerializerCallback)
+  {}
 
-  /**
-   * Address: 0x00BD0280 (FUN_00BD0280, register_CUnitCarrierLandSerializer,
-   * dynamic initializer for the global `CUnitCarrierLandSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-   * splices it into the process-global `sNewHelpers` pending list; this was
-   * previously modeled as a manual self-link call here), binds the load/save
-   * callback lanes, and installs process-exit cleanup via `atexit`.
-   */
-  void register_CUnitCarrierLandSerializer()
-  {
-    gCUnitCarrierLandSerializer.mSerLoadFunc = &DeserializeCUnitCarrierLandSerializerCallback;
-    gCUnitCarrierLandSerializer.mSerSaveFunc = &SerializeCUnitCarrierLandSerializerCallback;
-    (void)std::atexit(&cleanup_CUnitCarrierLandSerializer_atexit);
-  }
-
-  struct CUnitCarrierLandSerializerStartupBootstrap
-  {
-    CUnitCarrierLandSerializerStartupBootstrap()
-    {
-      register_CUnitCarrierLandSerializer();
-    }
-  };
-
-  [[maybe_unused]] CUnitCarrierLandSerializerStartupBootstrap gCUnitCarrierLandSerializerStartupBootstrap;
 } // namespace
 
 

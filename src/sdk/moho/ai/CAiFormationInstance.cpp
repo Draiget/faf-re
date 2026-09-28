@@ -240,9 +240,28 @@ namespace
   struct SUnitOffsetInfoSerializerHelperNode : public gpg::SerHelperBase
   {
     /**
-     * Address: 0x00BCAAC0 vtable slot 0 dispatch target (dispatched by
-     * `gpg::SerHelperBase::InitNewHelpers` once this helper is drained from
-     * the pending list).
+     * Address: 0x00BCAAC0 (FUN_00BCAAC0, dynamic initializer for `gSUnitOffsetInfoSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E18ED8); the compiler
+     * registers the destructor with `atexit`.
+     */
+    SUnitOffsetInfoSerializerHelperNode();
+
+    /**
+     * Address: 0x00BF5860 (FUN_00BF5860, dynamic atexit destructor for `gSUnitOffsetInfoSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_00566360` and `FUN_00566390` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~SUnitOffsetInfoSerializerHelperNode() = default;
+
+    /**
+     * Address: 0x0056B8C0 (FUN_0056B8C0, gpg::SerSaveLoadHelper<Moho::SUnitOffsetInfo>::Init)
      *
      * What it does:
      * Binds this helper's already-cited load/save callbacks
@@ -260,8 +279,8 @@ namespace
       type->serSaveFunc_ = mSerSaveFunc;
     }
 
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(
     offsetof(SUnitOffsetInfoSerializerHelperNode, mSerLoadFunc) == 0x0C,
@@ -279,7 +298,28 @@ namespace
   struct SOffsetInfoSerializerHelperNode : public gpg::SerHelperBase
   {
     /**
-     * Address: 0x00BCAB20 vtable slot 0 dispatch target.
+     * Address: 0x00BCAB20 (FUN_00BCAB20, dynamic initializer for `gSOffsetInfoSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E18F48); the compiler
+     * registers the destructor with `atexit`.
+     */
+    SOffsetInfoSerializerHelperNode();
+
+    /**
+     * Address: 0x00BF58F0 (FUN_00BF58F0, dynamic atexit destructor for `gSOffsetInfoSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_00566550` and `FUN_00566580` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~SOffsetInfoSerializerHelperNode() = default;
+
+    /**
+     * Address: 0x0056BAD0 (FUN_0056BAD0, gpg::SerSaveLoadHelper<Moho::SOffsetInfo>::Init)
      *
      * What it does:
      * Binds this helper's already-cited load/save callbacks (bound directly
@@ -296,8 +336,8 @@ namespace
       type->serSaveFunc_ = mSerSaveFunc;
     }
 
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(
     offsetof(SOffsetInfoSerializerHelperNode, mSerLoadFunc) == 0x0C,
@@ -315,7 +355,28 @@ namespace
   struct IFormationInstanceSerializerHelperNode : public gpg::SerHelperBase
   {
     /**
-     * Address: 0x00BCAB80 vtable slot 0 dispatch target.
+     * Address: 0x00BCAB80 (FUN_00BCAB80, dynamic initializer for `gIFormationInstanceSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E18FB8); the compiler
+     * registers the destructor with `atexit`.
+     */
+    IFormationInstanceSerializerHelperNode();
+
+    /**
+     * Address: 0x00BF5980 (FUN_00BF5980, dynamic atexit destructor for `gIFormationInstanceSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_00566740` and `FUN_00566770` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~IFormationInstanceSerializerHelperNode() = default;
+
+    /**
+     * Address: 0x0056BCE0 (FUN_0056BCE0, gpg::SerSaveLoadHelper<Moho::IFormationInstance>::Init)
      *
      * What it does:
      * Binds this helper's already-cited load/save callbacks
@@ -333,8 +394,8 @@ namespace
       type->serSaveFunc_ = mSerSaveFunc;
     }
 
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(
     offsetof(IFormationInstanceSerializerHelperNode, mSerLoadFunc) == 0x0C,
@@ -353,7 +414,28 @@ namespace
   struct SAssignedLocInfoSerializerHelperNode : public gpg::SerHelperBase
   {
     /**
-     * Address: 0x00BCABE0 vtable slot 0 dispatch target.
+     * Address: 0x00BCABE0 (FUN_00BCABE0, dynamic initializer for `gSAssignedLocInfoSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E18FF8); the compiler
+     * registers the destructor with `atexit`.
+     */
+    SAssignedLocInfoSerializerHelperNode();
+
+    /**
+     * Address: 0x00BF5A10 (FUN_00BF5A10, dynamic atexit destructor for `gSAssignedLocInfoSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_00566940` and `FUN_00566970` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~SAssignedLocInfoSerializerHelperNode() = default;
+
+    /**
+     * Address: 0x0056BD80 (FUN_0056BD80, gpg::SerSaveLoadHelper<Moho::SAssignedLocInfo>::Init)
      *
      * What it does:
      * Binds this helper's already-cited load/save callbacks
@@ -371,8 +453,8 @@ namespace
       type->serSaveFunc_ = mSerSaveFunc;
     }
 
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(
     offsetof(SAssignedLocInfoSerializerHelperNode, mSerLoadFunc) == 0x0C,
@@ -387,71 +469,10 @@ namespace
     "SAssignedLocInfoSerializerHelperNode size must be 0x14"
   );
 
-  SUnitOffsetInfoSerializerHelperNode gSUnitOffsetInfoSerializer{};
-  SOffsetInfoSerializerHelperNode gSOffsetInfoSerializer{};
-  IFormationInstanceSerializerHelperNode gIFormationInstanceSerializer{};
-  SAssignedLocInfoSerializerHelperNode gSAssignedLocInfoSerializer{};
-
-  /**
-   * Address: 0x00566360 (FUN_00566360, SerSaveLoadHelper<SUnitOffsetInfo>::unlink)
-   *
-   * What it does:
-   * Unlinks the `SUnitOffsetInfo` serializer helper node and restores its
-   * self-links for intrusive-list sentinel state.
-   */
-  void UnlinkSUnitOffsetInfoSerializer() noexcept
-  {
-    gSUnitOffsetInfoSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00566550 (FUN_00566550, SerSaveLoadHelper<SOffsetInfo>::unlink)
-   *
-   * What it does:
-   * Unlinks the `SOffsetInfo` serializer helper node and restores its
-   * self-links for intrusive-list sentinel state.
-   */
-  void UnlinkSOffsetInfoSerializer() noexcept
-  {
-    gSOffsetInfoSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00566740 (FUN_00566740, SerSaveLoadHelper<IFormationInstance>::unlink)
-   *
-   * The duplicate emissions of this file's serializer glue -- second entry
-   * points for the same work, each a single call and referenced by nothing.
-   * A thunk has no source line behind it; the source called the target.
-   *
-   * Address: 0x00566770  duplicate of this unlink
-   * Address: 0x00566970  duplicate of the SAssignedLocInfo unlink
-   * Address: 0x00566580  duplicate of the SOffsetInfo unlink
-   * Address: 0x00566390  duplicate of the SUnitOffsetInfo unlink
-   * Address: 0x0059DB60 / 0x0059E000  bridges into
-   *   CAiFormationInstance::MemberDeserialize
-   * Address: 0x0059DB70 / 0x0059E010  bridges into
-   *   CAiFormationInstance::MemberSerialize
-   *
-   * What it does:
-   * Unlinks the `IFormationInstance` serializer helper node and restores
-   * its self-links for intrusive-list sentinel state.
-   */
-  void UnlinkIFormationInstanceSerializer() noexcept
-  {
-    gIFormationInstanceSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00566940 (FUN_00566940, SerSaveLoadHelper<SAssignedLocInfo>::unlink)
-   *
-   * What it does:
-   * Unlinks the `SAssignedLocInfo` serializer helper node and restores its
-   * self-links for intrusive-list sentinel state.
-   */
-  void UnlinkSAssignedLocInfoSerializer() noexcept
-  {
-    gSAssignedLocInfoSerializer.ResetLinks();
-  }
+  SUnitOffsetInfoSerializerHelperNode gSUnitOffsetInfoSerializer;
+  SOffsetInfoSerializerHelperNode gSOffsetInfoSerializer;
+  IFormationInstanceSerializerHelperNode gIFormationInstanceSerializer;
+  SAssignedLocInfoSerializerHelperNode gSAssignedLocInfoSerializer;
 
   /**
    * Address: 0x00566300 (FUN_00566300, Moho::SUnitOffsetInfoSerializer::Deserialize)
@@ -500,64 +521,26 @@ namespace
   }
 
   /**
-   * Address: 0x00BF5860 (FUN_00BF5860, Moho::SUnitOffsetInfoSerializer::~SUnitOffsetInfoSerializer)
+   * Address: 0x00BCAAC0 (FUN_00BCAAC0, dynamic initializer for `gSUnitOffsetInfoSerializer`)
    *
    * What it does:
-   * Process-exit teardown: unlinks the SUnitOffsetInfoSerializer helper
-   * node, matching the sibling unlinks used across other serializer
-   * registrars.
+   * Binds this helper's load/save callbacks.
    */
-  void cleanup_SUnitOffsetInfoSerializer_atexit()
-  {
-    UnlinkSUnitOffsetInfoSerializer();
-  }
+  SUnitOffsetInfoSerializerHelperNode::SUnitOffsetInfoSerializerHelperNode()
+    : mSerLoadFunc(&DeserializeSUnitOffsetInfoSerializerCallback)
+    , mSerSaveFunc(&SerializeSUnitOffsetInfoSerializerCallback)
+  {}
 
   /**
-   * Address: 0x00BCAAC0 (FUN_00BCAAC0, register_SUnitOffsetInfoSerializer)
+   * Address: 0x00BCAB20 (FUN_00BCAB20, dynamic initializer for `gSOffsetInfoSerializer`)
    *
    * What it does:
-   * Binds the global SUnitOffsetInfo serializer helper load/save callbacks
-   * and installs process-exit cleanup via atexit. The helper node
-   * self-links and splices into `gpg::SerHelperBase::sNewHelpers`
-   * automatically as part of its own construction, which runs before this
-   * function does, so this no longer needs to unlink/self-link the node
-   * itself first.
+   * Binds this helper's load/save callbacks.
    */
-  void register_SUnitOffsetInfoSerializer()
-  {
-    gSUnitOffsetInfoSerializer.mSerLoadFunc = &DeserializeSUnitOffsetInfoSerializerCallback;
-    gSUnitOffsetInfoSerializer.mSerSaveFunc = &SerializeSUnitOffsetInfoSerializerCallback;
-    (void)std::atexit(&cleanup_SUnitOffsetInfoSerializer_atexit);
-  }
-
-  /**
-   * Address: 0x00BF58F0 (FUN_00BF58F0, Moho::SOffsetInfoSerializer::~SOffsetInfoSerializer)
-   *
-   * What it does:
-   * Process-exit teardown: unlinks the SOffsetInfoSerializer helper node,
-   * matching the sibling unlinks used across other serializer registrars.
-   */
-  void cleanup_SOffsetInfoSerializer_atexit()
-  {
-    UnlinkSOffsetInfoSerializer();
-  }
-
-  /**
-   * Address: 0x00BCAB20 (FUN_00BCAB20, register_SOffsetInfoSerializer)
-   *
-   * What it does:
-   * Binds the global SOffsetInfo serializer helper load/save callbacks and
-   * installs process-exit cleanup via atexit. The helper node self-links and
-   * splices into `gpg::SerHelperBase::sNewHelpers` automatically as part of
-   * its own construction, which runs before this function does, so this no
-   * longer needs to unlink/self-link the node itself first.
-   */
-  void register_SOffsetInfoSerializer()
-  {
-    gSOffsetInfoSerializer.mSerLoadFunc = &moho::SOffsetInfoSerializer::Deserialize;
-    gSOffsetInfoSerializer.mSerSaveFunc = &moho::SOffsetInfoSerializer::Serialize;
-    (void)std::atexit(&cleanup_SOffsetInfoSerializer_atexit);
-  }
+  SOffsetInfoSerializerHelperNode::SOffsetInfoSerializerHelperNode()
+    : mSerLoadFunc(&moho::SOffsetInfoSerializer::Deserialize)
+    , mSerSaveFunc(&moho::SOffsetInfoSerializer::Serialize)
+  {}
 
   /**
    * Address: 0x005666F0 (FUN_005666F0, Moho::IFormationInstanceSerializer::Deserialize)
@@ -606,35 +589,15 @@ namespace
   }
 
   /**
-   * Address: 0x00BF5980 (FUN_00BF5980, Moho::IFormationInstanceSerializer::~IFormationInstanceSerializer)
+   * Address: 0x00BCAB80 (FUN_00BCAB80, dynamic initializer for `gIFormationInstanceSerializer`)
    *
    * What it does:
-   * Process-exit teardown: unlinks the IFormationInstanceSerializer
-   * helper node, matching the sibling unlinks used across other
-   * serializer registrars.
+   * Binds this helper's load/save callbacks.
    */
-  void cleanup_IFormationInstanceSerializer_atexit()
-  {
-    UnlinkIFormationInstanceSerializer();
-  }
-
-  /**
-   * Address: 0x00BCAB80 (FUN_00BCAB80, register_IFormationInstanceSerializer)
-   *
-   * What it does:
-   * Binds the global IFormationInstance serializer helper load/save
-   * callbacks and installs process-exit cleanup via atexit. The helper node
-   * self-links and splices into `gpg::SerHelperBase::sNewHelpers`
-   * automatically as part of its own construction, which runs before this
-   * function does, so this no longer needs to unlink/self-link the node
-   * itself first.
-   */
-  void register_IFormationInstanceSerializer()
-  {
-    gIFormationInstanceSerializer.mSerLoadFunc = &DeserializeIFormationInstanceSerializerCallback;
-    gIFormationInstanceSerializer.mSerSaveFunc = &SerializeIFormationInstanceSerializerCallback;
-    (void)std::atexit(&cleanup_IFormationInstanceSerializer_atexit);
-  }
+  IFormationInstanceSerializerHelperNode::IFormationInstanceSerializerHelperNode()
+    : mSerLoadFunc(&DeserializeIFormationInstanceSerializerCallback)
+    , mSerSaveFunc(&SerializeIFormationInstanceSerializerCallback)
+  {}
 
   /**
    * Address: 0x005668E0 (FUN_005668E0, Moho::SAssignedLocInfoSerializer::Deserialize)
@@ -683,47 +646,15 @@ namespace
   }
 
   /**
-   * Address: 0x00BF5A10 (FUN_00BF5A10, Moho::SAssignedLocInfoSerializer::~SAssignedLocInfoSerializer)
+   * Address: 0x00BCABE0 (FUN_00BCABE0, dynamic initializer for `gSAssignedLocInfoSerializer`)
    *
    * What it does:
-   * Process-exit teardown: unlinks the SAssignedLocInfoSerializer helper
-   * node, matching the sibling unlinks used across other serializer
-   * registrars.
+   * Binds this helper's load/save callbacks.
    */
-  void cleanup_SAssignedLocInfoSerializer_atexit()
-  {
-    UnlinkSAssignedLocInfoSerializer();
-  }
-
-  /**
-   * Address: 0x00BCABE0 (FUN_00BCABE0, register_SAssignedLocInfoSerializer)
-   *
-   * What it does:
-   * Binds the global SAssignedLocInfo serializer helper load/save callbacks
-   * and installs process-exit cleanup via atexit. The helper node self-links
-   * and splices into `gpg::SerHelperBase::sNewHelpers` automatically as part
-   * of its own construction, which runs before this function does, so this
-   * no longer needs to unlink/self-link the node itself first.
-   */
-  void register_SAssignedLocInfoSerializer()
-  {
-    gSAssignedLocInfoSerializer.mSerLoadFunc = &DeserializeSAssignedLocInfoSerializerCallback;
-    gSAssignedLocInfoSerializer.mSerSaveFunc = &SerializeSAssignedLocInfoSerializerCallback;
-    (void)std::atexit(&cleanup_SAssignedLocInfoSerializer_atexit);
-  }
-
-  struct FormationSerializerStartupBootstrap
-  {
-    FormationSerializerStartupBootstrap()
-    {
-      register_SUnitOffsetInfoSerializer();
-      register_SOffsetInfoSerializer();
-      register_IFormationInstanceSerializer();
-      register_SAssignedLocInfoSerializer();
-    }
-  };
-
-  [[maybe_unused]] FormationSerializerStartupBootstrap gFormationSerializerStartupBootstrap;
+  SAssignedLocInfoSerializerHelperNode::SAssignedLocInfoSerializerHelperNode()
+    : mSerLoadFunc(&DeserializeSAssignedLocInfoSerializerCallback)
+    , mSerSaveFunc(&SerializeSAssignedLocInfoSerializerCallback)
+  {}
 
   msvc8::string gRMapTypeEntIdSUnitOffsetInfoName;
   bool gRMapTypeEntIdSUnitOffsetInfoNameCleanupRegistered = false;
@@ -2674,6 +2605,8 @@ namespace moho
 
   /**
    * Address: 0x0059E950 (FUN_0059E950, Moho::CAiFormationInstance::MemberDeserialize)
+   * Address: 0x0059DB60 / 0x0059E000  single-jump bridges into this body,
+   *   referenced by nothing
    *
    * What it does:
    * Reads the serialized base-formation payload, then restores `mSim` as an
@@ -2697,6 +2630,8 @@ namespace moho
 
   /**
    * Address: 0x0059E9B0 (FUN_0059E9B0, Moho::CAiFormationInstance::MemberSerialize)
+   * Address: 0x0059DB70 / 0x0059E010  single-jump bridges into this body,
+   *   referenced by nothing
    *
    * What it does:
    * Writes the serialized base-formation payload, then saves `mSim` as an

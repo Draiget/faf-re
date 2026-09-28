@@ -390,6 +390,27 @@ namespace
   struct CUnitWaitForFerryTaskSerializer : public gpg::SerHelperBase
   {
     /**
+     * Address: 0x00BD0960 (FUN_00BD0960, dynamic initializer for `gCUnitWaitForFerryTaskSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable (0x00E20468); the compiler
+     * registers the destructor with `atexit`.
+     */
+    CUnitWaitForFerryTaskSerializer();
+
+    /**
+     * Address: 0x00BF9E30 (FUN_00BF9E30, dynamic atexit destructor for `gCUnitWaitForFerryTaskSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_0060F9E0` and `FUN_0060FA10` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitWaitForFerryTaskSerializer() = default;
+
+    /**
      * Address: 0x006100C0 (FUN_006100C0, Moho::CUnitWaitForFerryTaskSerializer::Init,
      * vtable slot 0)
      *
@@ -399,8 +420,8 @@ namespace
      */
     void Init() override;
 
-    gpg::RType::load_func_t mSerLoadFunc = nullptr;
-    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(
     offsetof(CUnitWaitForFerryTaskSerializer, mSerLoadFunc) == 0x0C,
@@ -424,33 +445,7 @@ namespace
     type->serSaveFunc_ = mSerSaveFunc;
   }
 
-  CUnitWaitForFerryTaskSerializer gCUnitWaitForFerryTaskSerializer{};
-
-  /**
-   * Address: 0x0060F9E0 (FUN_0060F9E0)
-   *
-   * What it does:
-   * Unlinks `CUnitWaitForFerryTaskSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  void UnlinkCUnitWaitForFerryTaskSerializerNodePrimary()
-  {
-    gCUnitWaitForFerryTaskSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x0060FA10 (FUN_0060FA10)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitWaitForFerryTaskSerializer` helper storage. No in-binary caller
-   * was recovered for this address (distinct from the primary lane above);
-   * kept as a thin address-anchored wrapper rather than dropped.
-   */
-  [[maybe_unused]] void UnlinkCUnitWaitForFerryTaskSerializerNodeSecondary()
-  {
-    gCUnitWaitForFerryTaskSerializer.ResetLinks();
-  }
+  CUnitWaitForFerryTaskSerializer gCUnitWaitForFerryTaskSerializer;
 
   /**
    * Address: 0x0060F990 (FUN_0060F990, Moho::CUnitWaitForFerryTaskSerializer::Deserialize)
@@ -505,45 +500,16 @@ namespace
   }
 
   /**
-   * Address: 0x00BF9E30 (FUN_00BF9E30, Moho::CUnitWaitForFerryTaskSerializer::~CUnitWaitForFerryTaskSerializer)
+   * Address: 0x00BD0960 (FUN_00BD0960, dynamic initializer for `gCUnitWaitForFerryTaskSerializer`)
    *
    * What it does:
-   * Process-exit teardown: unlinks the `CUnitWaitForFerryTaskSerializer`
-   * helper node, matching the sibling unlink lanes used across other
-   * serializer registrars.
+   * Binds this helper's load/save callbacks.
    */
-  void cleanup_CUnitWaitForFerryTaskSerializer_atexit()
-  {
-    UnlinkCUnitWaitForFerryTaskSerializerNodePrimary();
-  }
+  CUnitWaitForFerryTaskSerializer::CUnitWaitForFerryTaskSerializer()
+    : mSerLoadFunc(&DeserializeCUnitWaitForFerryTaskSerializerCallback)
+    , mSerSaveFunc(&SerializeCUnitWaitForFerryTaskSerializerCallback)
+  {}
 
-  /**
-   * Address: 0x00BD0960 (FUN_00BD0960, register_CUnitWaitForFerryTaskSerializer,
-   * dynamic initializer for the global `CUnitWaitForFerryTaskSerializer`
-   * singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-   * splices it into the process-global `sNewHelpers` pending list; this was
-   * previously modeled as a manual self-link here), binds the load/save
-   * callback lanes, and installs process-exit cleanup via `atexit`.
-   */
-  void register_CUnitWaitForFerryTaskSerializer()
-  {
-    gCUnitWaitForFerryTaskSerializer.mSerLoadFunc = &DeserializeCUnitWaitForFerryTaskSerializerCallback;
-    gCUnitWaitForFerryTaskSerializer.mSerSaveFunc = &SerializeCUnitWaitForFerryTaskSerializerCallback;
-    (void)std::atexit(&cleanup_CUnitWaitForFerryTaskSerializer_atexit);
-  }
-
-  struct CUnitWaitForFerryTaskSerializerStartupBootstrap
-  {
-    CUnitWaitForFerryTaskSerializerStartupBootstrap()
-    {
-      register_CUnitWaitForFerryTaskSerializer();
-    }
-  };
-
-  [[maybe_unused]] CUnitWaitForFerryTaskSerializerStartupBootstrap gCUnitWaitForFerryTaskSerializerStartupBootstrap;
 } // namespace
 
 namespace gpg
