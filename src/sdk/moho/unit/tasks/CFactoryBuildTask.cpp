@@ -25,6 +25,7 @@
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitCommandWeakPtrReflection.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 
 namespace
 {
@@ -419,8 +420,7 @@ namespace moho
         }
 
         const std::int32_t layerArg = mBlueprint->Air.CanFly;
-        static TSimConVar<bool> sAiInstaBuild(false, "ai_InstaBuild", false);
-        CSimConVarInstanceBase* const instaBuildVar = mSim->GetSimVar(&sAiInstaBuild);
+        CSimConVarInstanceBase* const instaBuildVar = mSim->GetSimVar(&moho::gSimConVar_ai_InstaBuild);
         void* const instaBuildStorage = instaBuildVar != nullptr ? instaBuildVar->GetValueStorage() : nullptr;
         const bool instaBuild =
           instaBuildStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(instaBuildStorage) != 0u);

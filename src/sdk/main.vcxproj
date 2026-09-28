@@ -2300,7 +2300,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\CSquad.h" />
     <ClInclude Include="moho\sim\CCommandLuaFunctionRegistrations.h" />
     <ClInclude Include="moho\sim\ManipulatorLuaFunctionThunks.h" />
-    <ClInclude Include="moho\sim\SimGravityCommandRegistrations.h" />
     <ClInclude Include="moho\sim\SimDebugCommandRegistrations.h" />
     <ClInclude Include="moho\sim\SimFloatInitializers.h" />
     <ClInclude Include="moho\sim\ManipulatorStartupRegistrations.h" />

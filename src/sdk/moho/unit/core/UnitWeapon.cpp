@@ -56,6 +56,7 @@
 #include "moho/unit/tasks/CFireWeaponTask.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "moho/misc/DiagnosticBudget.h"
+#include "moho/sim/SimStartupRegistrations.h"
 
 namespace
 {
@@ -396,9 +397,7 @@ namespace
 
   [[nodiscard]] bool ShouldRenderBombDropZone(moho::Sim* const sim)
   {
-    static moho::TSimConVar<bool> sAiRenderBombDropZone(false, "AI_RenderBombDropZone", false);
-
-    moho::CSimConVarInstanceBase* const instance = sim ? sim->GetSimVar(&sAiRenderBombDropZone) : nullptr;
+    moho::CSimConVarInstanceBase* const instance = sim ? sim->GetSimVar(&moho::gSimConVar_AI_RenderBombDropZone) : nullptr;
     const void* const valueStorage = instance ? instance->GetValueStorage() : nullptr;
     return valueStorage != nullptr && *static_cast<const bool*>(valueStorage);
   }

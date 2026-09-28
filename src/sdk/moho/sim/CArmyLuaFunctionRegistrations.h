@@ -227,13 +227,6 @@ namespace moho
   CScrLuaInitForm* func_SetArmyOutOfGame_LuaFuncDef();
 
 
-  /**
-   * Address: 0x00BD9ED0 (FUN_00BD9ED0, register_SetArmyColor_SimConFuncDef)
-   *
-   * What it does:
-   * Registers the `SetArmyColor` sim-console command callback.
-   */
-  void register_SetArmyColor_SimConFuncDef();
 
   /**
    * Address: 0x00BD9D00 (FUN_00BD9D00, j_func_ListArmies_LuaFuncDef)

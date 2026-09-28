@@ -15,6 +15,7 @@
 #include "moho/sim/CSimConFunc.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 
 namespace
 {
@@ -34,126 +35,6 @@ namespace
   int gRecoveredCScrLuaMetatableFactoryReconBlipIndex = 0;
   int gRecoveredCScrLuaMetatableFactoryEntityIndex = 0;
 
-  [[nodiscard]] moho::TSimConVar<int>& SimConVar_path_ArmyBudget()
-  {
-    static moho::TSimConVar<int> sVar(false, "path_ArmyBudget", 2500);
-    return sVar;
-  }
-
-  [[nodiscard]] moho::TSimConVar<bool>& SimConVar_AI_RenderBombDropZone()
-  {
-    static moho::TSimConVar<bool> sVar(false, "AI_RenderBombDropZone", false);
-    return sVar;
-  }
-
-  /**
-   * Address: 0x007353C0 (FUN_007353C0)
-   *
-   * What it does:
-   * Constructs one startup `TSimConVar<uint8_t>` lane for
-   * `"sim_TestVarUByte"` with default value `0`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::TSimConVar<std::uint8_t>& SimConVar_sim_TestVarUByte()
-  {
-    static moho::TSimConVar<std::uint8_t> sVar(false, "sim_TestVarUByte", static_cast<std::uint8_t>(0));
-    return sVar;
-  }
-
-  /**
-   * Address: 0x00735430 (FUN_00735430, Moho::sim_TestVarStr::sim_TestVarStr)
-   * Address: 0x00BDB360 (FUN_00BDB360, register_sim_TestVarStr_SimConVarDef)
-   *
-   * IDA signature:
-   * void __fastcall Moho::sim_TestVarStr::sim_TestVarStr(bool a1, std::string a2);
-   *
-   * What it does:
-   * Constructs one startup `TSimConVar<msvc8::string>` lane for
-   * `"sim_TestVarStr"` with default value `"yea!"` -- the default is a
-   * caller-supplied argument, not baked into the ctor itself, and
-   * 0x00BDB360's own asm builds `std::string("yea!", 4)` immediately before
-   * calling this ctor (byte-verified; not `"string"`, an earlier
-   * transcription slip). The `static moho::TSimConVar<msvc8::string>`
-   * declaration below is the source-level site that emits the FUN_00735430
-   * ctor template instantiation: it chains to `CSimConCommand::CSimConCommand`,
-   * pulls a unique index from `Moho::SimConVarIndexCounter`, sets the
-   * `TSimConVar<std::string>` vptr, then in-place initializes the
-   * SBO-default `value` string and assigns the `"yea!"` literal.
-   *
-   * Source-level callers: `GetSimTestVarStrStorage` invokes this
-   * accessor; first invocation triggers the static-init that emits the
-   * binary ctor at this address.
-   */
-  [[nodiscard]] moho::TSimConVar<msvc8::string>& SimConVar_sim_TestVarStr()
-  {
-    static moho::TSimConVar<msvc8::string> sVar(false, "sim_TestVarStr", msvc8::string("yea!"));
-    return sVar;
-  }
-
-  /**
-   * Address: 0x00BDB160 (FUN_00BDB160, register_sim_TestVarBool_SimConVarDef)
-   *
-   * What it does:
-   * Constructs one startup `TSimConVar<bool>` lane for `"sim_TestVarBool"`
-   * with default value `false`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::TSimConVar<bool>& SimConVar_sim_TestVarBool()
-  {
-    static moho::TSimConVar<bool> sVar(false, "sim_TestVarBool", false);
-    return sVar;
-  }
-
-  /**
-   * Address: 0x00BDB1E0 (FUN_00BDB1E0, register_sim_TestVar_SimConVarDef)
-   *
-   * What it does:
-   * Constructs one startup `TSimConVar<int>` lane for `"sim_TestVar"` with
-   * default value `0`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::TSimConVar<int>& SimConVar_sim_TestVar()
-  {
-    static moho::TSimConVar<int> sVar(false, "sim_TestVar", 0);
-    return sVar;
-  }
-
-  /**
-   * Address: 0x00BDB2E0 (FUN_00BDB2E0, register_sim_TestVarFloat_SimConVarDef)
-   *
-   * What it does:
-   * Constructs one startup `TSimConVar<float>` lane for `"sim_TestVarFloat"`
-   * with default value `0.0f`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::TSimConVar<float>& SimConVar_sim_TestVarFloat()
-  {
-    static moho::TSimConVar<float> sVar(false, "sim_TestVarFloat", 0.0f);
-    return sVar;
-  }
-
-  /**
-   * Address: 0x00BDB3D0 (FUN_00BDB3D0, register_sim_TestFunc_SimConFuncDef)
-   *
-   * What it does:
-   * Constructs one startup `CSimConFunc` lane for `"sim_TestFunc"`, bound to
-   * `Sim::sim_TestFunc`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CSimConFunc& SimConFunc_sim_TestFunc()
-  {
-    static moho::CSimConFunc sFunc(false, "sim_TestFunc", &moho::Sim::sim_TestFunc);
-    return sFunc;
-  }
-
-  /**
-   * Address: 0x00BDBD80 (FUN_00BDBD80, register_sim_DebugCrash_SimConFuncDef)
-   *
-   * What it does:
-   * Constructs one startup `CSimConFunc` lane for `"sim_DebugCrash"`, bound
-   * to `Sim::sim_DebugCrash`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CSimConFunc& SimConFunc_sim_DebugCrash()
-  {
-    static moho::CSimConFunc sFunc(false, "sim_DebugCrash", &moho::Sim::sim_DebugCrash);
-    return sFunc;
-  }
-
   /**
    * Address: 0x00736830 (FUN_00736830)
    *
@@ -167,7 +48,7 @@ namespace
       return nullptr;
     }
 
-    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVarUByte());
+    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&moho::gSimConVar_sim_TestVarUByte);
     return instance != nullptr ? instance->GetValueStorage() : nullptr;
   }
 
@@ -184,143 +65,8 @@ namespace
       return nullptr;
     }
 
-    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVarStr());
+    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&moho::gSimConVar_sim_TestVarStr);
     return instance != nullptr ? instance->GetValueStorage() : nullptr;
-  }
-
-  /**
-   * What it does:
-   * Returns one raw storage pointer for the per-sim `sim_TestVarBool`
-   * runtime convar instance.
-   */
-  [[maybe_unused]] [[nodiscard]] void* GetSimTestVarBoolStorage(moho::Sim* const sim)
-  {
-    if (sim == nullptr) {
-      return nullptr;
-    }
-
-    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVarBool());
-    return instance != nullptr ? instance->GetValueStorage() : nullptr;
-  }
-
-  /**
-   * What it does:
-   * Returns one raw storage pointer for the per-sim `sim_TestVar` runtime
-   * convar instance.
-   */
-  [[maybe_unused]] [[nodiscard]] void* GetSimTestVarStorage(moho::Sim* const sim)
-  {
-    if (sim == nullptr) {
-      return nullptr;
-    }
-
-    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVar());
-    return instance != nullptr ? instance->GetValueStorage() : nullptr;
-  }
-
-  /**
-   * What it does:
-   * Returns one raw storage pointer for the per-sim `sim_TestVarFloat`
-   * runtime convar instance.
-   */
-  [[maybe_unused]] [[nodiscard]] void* GetSimTestVarFloatStorage(moho::Sim* const sim)
-  {
-    if (sim == nullptr) {
-      return nullptr;
-    }
-
-    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&SimConVar_sim_TestVarFloat());
-    return instance != nullptr ? instance->GetValueStorage() : nullptr;
-  }
-
-  alignas(moho::CConAlias) unsigned char gReconFlushConAliasStorage[sizeof(moho::CConAlias)] = {};
-
-  alignas(moho::CSimConFunc) unsigned char gReconFlushSimConFuncStorage[sizeof(moho::CSimConFunc)] = {};
-  bool gReconFlushSimConFuncConstructed = false;
-
-  alignas(moho::CConAlias) unsigned char gScenarioMethodConAliasStorage[sizeof(moho::CConAlias)] = {};
-
-  alignas(moho::CSimConFunc) unsigned char gScenarioMethodSimConFuncStorage[sizeof(moho::CSimConFunc)] = {};
-  bool gScenarioMethodSimConFuncConstructed = false;
-
-  template <typename T>
-  struct SimConVarStartupStorage
-  {
-    alignas(moho::TSimConVar<T>) unsigned char storage[sizeof(moho::TSimConVar<T>)]{};
-    bool constructed = false;
-  };
-
-  SimConVarStartupStorage<float> gTreeAccelFactorSimConVarSlot{}; // Original startup slot offset: 0x10B5220
-  SimConVarStartupStorage<float> gTreeSpringFactorSimConVarSlot{}; // Original startup slot offset: 0x10B5104
-  SimConVarStartupStorage<float> gTreeDampFactorSimConVarSlot{}; // Original startup slot offset: 0x10B5238
-  SimConVarStartupStorage<float> gTreeUprootFactorSimConVarSlot{}; // Original startup slot offset: 0x10B5094
-  SimConVarStartupStorage<float> gRandomElevationOffsetSimConVarSlot{}; // Original startup slot offset: 0x10B60AC
-  SimConVarStartupStorage<float> gAirLookAheadMultSimConVarSlot{}; // Original startup slot offset: 0x10B61C4
-  SimConVarStartupStorage<bool> gShowRaisedPlatformsSimConVarSlot{}; // Original startup slot offset: 0x10B5B20
-  SimConVarStartupStorage<int> gPathMaxInstantWorkUnitsSimConVarSlot{}; // Original startup slot offset: 0x10AEDB4
-  SimConVarStartupStorage<int> gPathUnreachableTimeoutSearchStepsSimConVarSlot{}; // Original startup slot offset: 0x10AEDCC
-
-  [[nodiscard]] moho::CSimConFunc& ReconFlushSimConFunc()
-  {
-    return *std::launder(reinterpret_cast<moho::CSimConFunc*>(gReconFlushSimConFuncStorage));
-  }
-
-  [[nodiscard]] moho::CSimConFunc& ConstructReconFlushSimConFunc()
-  {
-    if (!gReconFlushSimConFuncConstructed) {
-      new (gReconFlushSimConFuncStorage) moho::CSimConFunc(false, "ReconFlush", &moho::Sim::ReconFlush);
-      gReconFlushSimConFuncConstructed = true;
-    }
-
-    return ReconFlushSimConFunc();
-  }
-
-  [[nodiscard]] moho::CSimConFunc& ScenarioMethodSimConFunc()
-  {
-    return *std::launder(reinterpret_cast<moho::CSimConFunc*>(gScenarioMethodSimConFuncStorage));
-  }
-
-  [[nodiscard]] moho::CSimConFunc& ConstructScenarioMethodSimConFunc()
-  {
-    if (!gScenarioMethodSimConFuncConstructed) {
-      new (gScenarioMethodSimConFuncStorage) moho::CSimConFunc(true, "ScenarioMethod", &moho::Sim::ScenarioMethod);
-      gScenarioMethodSimConFuncConstructed = true;
-    }
-
-    return ScenarioMethodSimConFunc();
-  }
-
-  template <typename T>
-  [[nodiscard]] moho::TSimConVar<T>& ConstructRecoveredSimConVar(
-    SimConVarStartupStorage<T>& slot,
-    const char* const name,
-    const T defaultValue
-  ) noexcept
-  {
-    if (!slot.constructed) {
-      new (slot.storage) moho::TSimConVar<T>(false, name, defaultValue);
-      slot.constructed = true;
-    }
-
-    return *std::launder(reinterpret_cast<moho::TSimConVar<T>*>(slot.storage));
-  }
-
-  template <typename T>
-  void DestroyRecoveredSimConVarBase(SimConVarStartupStorage<T>& slot) noexcept
-  {
-    if (!slot.constructed) {
-      return;
-    }
-
-    auto& simConVar = *std::launder(reinterpret_cast<moho::TSimConVar<T>*>(slot.storage));
-    static_cast<moho::CSimConCommand&>(simConVar).~CSimConCommand();
-    slot.constructed = false;
-  }
-
-  template <void (*Cleanup)()>
-  void RegisterAtexitCleanup() noexcept
-  {
-    (void)std::atexit(Cleanup);
   }
 
   template <int* TargetIndex>
@@ -341,15 +87,6 @@ namespace
   {
     SimStartupRegistrationsBootstrapA()
     {
-      moho::register_tree_AccelFactor_SimConVarDef();
-      moho::register_tree_SpringFactor_SimConVarDef();
-      moho::register_tree_DampFactor_SimConVarDef();
-      moho::register_tree_UprootFactor_SimConVarDef();
-      moho::register_ShowRaisedPlatforms_SimConVar();
-      moho::register_RandomElevationOffset_SimConVarDef();
-      moho::register_AirLookAheadMult_SimConVarDef();
-      moho::register_path_MaxInstantWorkUnits_SimConVarDef();
-      moho::register_path_UnreachableTimeoutSearchSteps_SimConVarDef();
       (void)moho::register_sim_SimInits_mForms_reconBlipAnchorA();
       (void)moho::register_ReconBlipLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_ReconBlip_Index();
@@ -363,8 +100,6 @@ namespace
       (void)moho::register_ReconBlipIsOnSonar_LuaFuncDef();
       (void)moho::register_ReconBlipIsOnRadar_LuaFuncDef();
       (void)moho::register_ReconBlipIsKnownFake_LuaFuncDef();
-      moho::register_ReconFlush_SimConFuncDef();
-      moho::register_ScenarioMethod_SimConFuncDef();
     }
   };
 
@@ -380,28 +115,10 @@ namespace moho
   moho::CConAlias gConAlias_tree_AccelFactor("tree_AccelFactor", "How quickly falling trees accelerate", "DoSimCommand tree_AccelFactor");
 
   /**
-   * Address: 0x00BFD000 (FUN_00BFD000, cleanup_tree_AccelFactor_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `tree_AccelFactor` sim-convar startup storage.
+   * Address: 0x00BD5A10 (FUN_00BD5A10, dynamic initializer for `gSimConVar_tree_AccelFactor`)
+   * Address: 0x00BFD000 (FUN_00BFD000, dynamic atexit destructor for `gSimConVar_tree_AccelFactor`)
    */
-  void cleanup_tree_AccelFactor_SimConVarDef()
-  {
-    DestroyRecoveredSimConVarBase(gTreeAccelFactorSimConVarSlot);
-  }
-
-  /**
-   * Address: 0x00BD5A10 (FUN_00BD5A10, register_tree_AccelFactor_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_AccelFactor` float sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_tree_AccelFactor_SimConVarDef()
-  {
-    (void)ConstructRecoveredSimConVar(gTreeAccelFactorSimConVarSlot, "tree_AccelFactor", 0.1f);
-    RegisterAtexitCleanup<&cleanup_tree_AccelFactor_SimConVarDef>();
-  }
+  TSimConVar<float> gSimConVar_tree_AccelFactor(false, "tree_AccelFactor", 0.1f);
 
   /**
    * Address: 0x00BD5A60 (FUN_00BD5A60, dynamic initializer for `gConAlias_tree_SpringFactor`)
@@ -410,28 +127,10 @@ namespace moho
   moho::CConAlias gConAlias_tree_SpringFactor("tree_SpringFactor", "How quickly swaying trees spring back", "DoSimCommand tree_SpringFactor");
 
   /**
-   * Address: 0x00BFD060 (FUN_00BFD060, cleanup_tree_SpringFactor_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `tree_SpringFactor` sim-convar startup storage.
+   * Address: 0x00BD5A90 (FUN_00BD5A90, dynamic initializer for `gSimConVar_tree_SpringFactor`)
+   * Address: 0x00BFD060 (FUN_00BFD060, dynamic atexit destructor for `gSimConVar_tree_SpringFactor`)
    */
-  void cleanup_tree_SpringFactor_SimConVarDef()
-  {
-    DestroyRecoveredSimConVarBase(gTreeSpringFactorSimConVarSlot);
-  }
-
-  /**
-   * Address: 0x00BD5A90 (FUN_00BD5A90, register_tree_SpringFactor_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_SpringFactor` float sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_tree_SpringFactor_SimConVarDef()
-  {
-    (void)ConstructRecoveredSimConVar(gTreeSpringFactorSimConVarSlot, "tree_SpringFactor", 0.5f);
-    RegisterAtexitCleanup<&cleanup_tree_SpringFactor_SimConVarDef>();
-  }
+  TSimConVar<float> gSimConVar_tree_SpringFactor(false, "tree_SpringFactor", 0.5f);
 
   /**
    * Address: 0x00BD5AE0 (FUN_00BD5AE0, dynamic initializer for `gConAlias_tree_DampFactor`)
@@ -440,28 +139,10 @@ namespace moho
   moho::CConAlias gConAlias_tree_DampFactor("tree_DampFactor", "Damping on swaying trees (0 to 1)", "DoSimCommand tree_DampFactor");
 
   /**
-   * Address: 0x00BFD0C0 (FUN_00BFD0C0, cleanup_tree_DampFactor_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `tree_DampFactor` sim-convar startup storage.
+   * Address: 0x00BD5B10 (FUN_00BD5B10, dynamic initializer for `gSimConVar_tree_DampFactor`)
+   * Address: 0x00BFD0C0 (FUN_00BFD0C0, dynamic atexit destructor for `gSimConVar_tree_DampFactor`)
    */
-  void cleanup_tree_DampFactor_SimConVarDef()
-  {
-    DestroyRecoveredSimConVarBase(gTreeDampFactorSimConVarSlot);
-  }
-
-  /**
-   * Address: 0x00BD5B10 (FUN_00BD5B10, register_tree_DampFactor_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_DampFactor` float sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_tree_DampFactor_SimConVarDef()
-  {
-    (void)ConstructRecoveredSimConVar(gTreeDampFactorSimConVarSlot, "tree_DampFactor", 0.5f);
-    RegisterAtexitCleanup<&cleanup_tree_DampFactor_SimConVarDef>();
-  }
+  TSimConVar<float> gSimConVar_tree_DampFactor(false, "tree_DampFactor", 0.5f);
 
   /**
    * Address: 0x00BD5B60 (FUN_00BD5B60, dynamic initializer for `gConAlias_tree_UprootFactor`)
@@ -470,48 +151,10 @@ namespace moho
   moho::CConAlias gConAlias_tree_UprootFactor("tree_UprootFactor", "How far to raise falling trees up out of the ground", "DoSimCommand tree_UprootFactor");
 
   /**
-   * Address: 0x00BFD120 (FUN_00BFD120, cleanup_tree_UprootFactor_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `tree_UprootFactor` sim-convar startup storage.
+   * Address: 0x00BD5B90 (FUN_00BD5B90, dynamic initializer for `gSimConVar_tree_UprootFactor`)
+   * Address: 0x00BFD120 (FUN_00BFD120, dynamic atexit destructor for `gSimConVar_tree_UprootFactor`)
    */
-  void cleanup_tree_UprootFactor_SimConVarDef()
-  {
-    DestroyRecoveredSimConVarBase(gTreeUprootFactorSimConVarSlot);
-  }
-
-  /**
-   * Address: 0x00BD5B90 (FUN_00BD5B90, register_tree_UprootFactor_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_UprootFactor` float sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_tree_UprootFactor_SimConVarDef()
-  {
-    (void)ConstructRecoveredSimConVar(gTreeUprootFactorSimConVarSlot, "tree_UprootFactor", 0.1f);
-    RegisterAtexitCleanup<&cleanup_tree_UprootFactor_SimConVarDef>();
-  }
-
-  CSimConVarBase* GetTreeAccelFactorSimConVarDef()
-  {
-    return &ConstructRecoveredSimConVar(gTreeAccelFactorSimConVarSlot, "tree_AccelFactor", 0.1f);
-  }
-
-  CSimConVarBase* GetTreeSpringFactorSimConVarDef()
-  {
-    return &ConstructRecoveredSimConVar(gTreeSpringFactorSimConVarSlot, "tree_SpringFactor", 0.5f);
-  }
-
-  CSimConVarBase* GetTreeDampFactorSimConVarDef()
-  {
-    return &ConstructRecoveredSimConVar(gTreeDampFactorSimConVarSlot, "tree_DampFactor", 0.5f);
-  }
-
-  CSimConVarBase* GetTreeUprootFactorSimConVarDef()
-  {
-    return &ConstructRecoveredSimConVar(gTreeUprootFactorSimConVarSlot, "tree_UprootFactor", 0.1f);
-  }
+  TSimConVar<float> gSimConVar_tree_UprootFactor(false, "tree_UprootFactor", 0.1f);
 
   /**
    * Address: 0x00BD69F0 (FUN_00BD69F0, dynamic initializer for `gConAlias_ShowRaisedPlatforms`)
@@ -520,32 +163,10 @@ namespace moho
   moho::CConAlias gConAlias_ShowRaisedPlatforms("ShowRaisedPlatforms", "Turns on or off rendering of raised platform for tweaking and setting up purposes", "DoSimCommand ShowRaisedPlatforms");
 
   /**
-   * Address: 0x00BFD8D0 (FUN_00BFD8D0, cleanup_ShowRaisedPlatforms_SimConVar)
-   *
-   * What it does:
-   * Tears down recovered `ShowRaisedPlatforms` sim-convar startup storage.
+   * Address: 0x00BD6A20 (FUN_00BD6A20, dynamic initializer for `gSimConVar_ShowRaisedPlatforms`)
+   * Address: 0x00BFD8D0 (FUN_00BFD8D0, dynamic atexit destructor for `gSimConVar_ShowRaisedPlatforms`)
    */
-  void cleanup_ShowRaisedPlatforms_SimConVar()
-  {
-    DestroyRecoveredSimConVarBase(gShowRaisedPlatformsSimConVarSlot);
-  }
-
-  /**
-   * Address: 0x00BD6A20 (FUN_00BD6A20, register_ShowRaisedPlatforms_SimConVar)
-   *
-   * What it does:
-   * Registers/initializes the `ShowRaisedPlatforms` bool sim-convar.
-   */
-  void register_ShowRaisedPlatforms_SimConVar()
-  {
-    (void)ConstructRecoveredSimConVar(gShowRaisedPlatformsSimConVarSlot, "ShowRaisedPlatforms", false);
-    RegisterAtexitCleanup<&cleanup_ShowRaisedPlatforms_SimConVar>();
-  }
-
-  CSimConVarBase* GetShowRaisedPlatformsSimConVarDef()
-  {
-    return &ConstructRecoveredSimConVar(gShowRaisedPlatformsSimConVarSlot, "ShowRaisedPlatforms", false);
-  }
+  TSimConVar<bool> gSimConVar_ShowRaisedPlatforms(true, "ShowRaisedPlatforms", false);
 
   /**
    * Address: 0x00BD6F60 (FUN_00BD6F60, dynamic initializer for `gConAlias_RandomElevationOffset`)
@@ -554,28 +175,10 @@ namespace moho
   moho::CConAlias gConAlias_RandomElevationOffset("RandomElevationOffset", "Alter random non-combat elevation offset so plane don't all stick on the same plane", "DoSimCommand RandomElevationOffset");
 
   /**
-   * Address: 0x00BFDE80 (FUN_00BFDE80, cleanup_RandomElevationOffset_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `RandomElevationOffset` sim-convar startup storage.
+   * Address: 0x00BD6F90 (FUN_00BD6F90, dynamic initializer for `gSimConVar_RandomElevationOffset`)
+   * Address: 0x00BFDE80 (FUN_00BFDE80, dynamic atexit destructor for `gSimConVar_RandomElevationOffset`)
    */
-  void cleanup_RandomElevationOffset_SimConVarDef()
-  {
-    DestroyRecoveredSimConVarBase(gRandomElevationOffsetSimConVarSlot);
-  }
-
-  /**
-   * Address: 0x00BD6F90 (FUN_00BD6F90, register_RandomElevationOffset_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `RandomElevationOffset` sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_RandomElevationOffset_SimConVarDef()
-  {
-    (void)ConstructRecoveredSimConVar(gRandomElevationOffsetSimConVarSlot, "RandomElevationOffset", 1.0f);
-    RegisterAtexitCleanup<&cleanup_RandomElevationOffset_SimConVarDef>();
-  }
+  TSimConVar<float> gSimConVar_RandomElevationOffset(false, "RandomElevationOffset", 1.0f);
 
   /**
    * Address: 0x00BD74B0 (FUN_00BD74B0, dynamic initializer for `gConAlias_AirLookAheadMult`)
@@ -584,28 +187,10 @@ namespace moho
   moho::CConAlias gConAlias_AirLookAheadMult("AirLookAheadMult", "Alter the air units look ahead distance", "DoSimCommand AirLookAheadMult");
 
   /**
-   * Address: 0x00BFE140 (FUN_00BFE140, cleanup_AirLookAheadMult_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `AirLookAheadMult` sim-convar startup storage.
+   * Address: 0x00BD74E0 (FUN_00BD74E0, dynamic initializer for `gSimConVar_AirLookAheadMult`)
+   * Address: 0x00BFE140 (FUN_00BFE140, dynamic atexit destructor for `gSimConVar_AirLookAheadMult`)
    */
-  void cleanup_AirLookAheadMult_SimConVarDef()
-  {
-    DestroyRecoveredSimConVarBase(gAirLookAheadMultSimConVarSlot);
-  }
-
-  /**
-   * Address: 0x00BD74E0 (FUN_00BD74E0, register_AirLookAheadMult_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `AirLookAheadMult` sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_AirLookAheadMult_SimConVarDef()
-  {
-    (void)ConstructRecoveredSimConVar(gAirLookAheadMultSimConVarSlot, "AirLookAheadMult", 1.0f);
-    RegisterAtexitCleanup<&cleanup_AirLookAheadMult_SimConVarDef>();
-  }
+  TSimConVar<float> gSimConVar_AirLookAheadMult(false, "AirLookAheadMult", 1.0f);
 
   /**
    * Address: 0x00BD4BE0 (FUN_00BD4BE0, register_sim_SimInits_mForms_prependStartupLane21)
@@ -1262,15 +847,10 @@ namespace moho
   moho::CConAlias gConAlias_path_ArmyBudget("path_ArmyBudget", "Budget for each army to do pathfinding each tick", "DoSimCommand path_ArmyBudget");
 
   /**
-   * Address: 0x00BD9B50 (FUN_00BD9B50, register_path_ArmyBudget_SimConVarDef)
-   *
-   * What it does:
-   * Initializes the `path_ArmyBudget` sim convar with default value 2500.
+   * Address: 0x00BD9B50 (FUN_00BD9B50, dynamic initializer for `gSimConVar_path_ArmyBudget`)
+   * Address: 0x00BFF310 (FUN_00BFF310, dynamic atexit destructor for `gSimConVar_path_ArmyBudget`)
    */
-  void register_path_ArmyBudget_SimConVarDef()
-  {
-    (void)SimConVar_path_ArmyBudget();
-  }
+  TSimConVar<int> gSimConVar_path_ArmyBudget(false, "path_ArmyBudget", 2500);
 
   /**
    * Address: 0x00BCCBF0 (FUN_00BCCBF0, dynamic initializer for `gConAlias_path_MaxInstantWorkUnits`)
@@ -1279,28 +859,10 @@ namespace moho
   moho::CConAlias gConAlias_path_MaxInstantWorkUnits("path_MaxInstantWorkUnits", "Budget for instant pathfinds by the AI", "DoSimCommand path_MaxInstantWorkUnits");
 
   /**
-   * Address: 0x00BF7130 (FUN_00BF7130, sub_BF7130)
-   *
-   * What it does:
-   * Tears down startup-owned sim-convar payload for `path_MaxInstantWorkUnits`.
+   * Address: 0x00BCCC20 (FUN_00BCCC20, dynamic initializer for `gSimConVar_path_MaxInstantWorkUnits`)
+   * Address: 0x00BF7130 (FUN_00BF7130, dynamic atexit destructor for `gSimConVar_path_MaxInstantWorkUnits`)
    */
-  void cleanup_path_MaxInstantWorkUnits_SimConVarDef()
-  {
-    DestroyRecoveredSimConVarBase(gPathMaxInstantWorkUnitsSimConVarSlot);
-  }
-
-  /**
-   * Address: 0x00BCCC20 (FUN_00BCCC20, register_path_MaxInstantWorkUnits_SimConVarDef)
-   *
-   * What it does:
-   * Registers/initializes the `path_MaxInstantWorkUnits` sim convar (default
-   * `500`).
-   */
-  void register_path_MaxInstantWorkUnits_SimConVarDef()
-  {
-    (void)ConstructRecoveredSimConVar(gPathMaxInstantWorkUnitsSimConVarSlot, "path_MaxInstantWorkUnits", 500);
-    RegisterAtexitCleanup<&cleanup_path_MaxInstantWorkUnits_SimConVarDef>();
-  }
+  TSimConVar<int> gSimConVar_path_MaxInstantWorkUnits(false, "path_MaxInstantWorkUnits", 500);
 
   /**
    * Address: 0x00BCCC70 (FUN_00BCCC70, dynamic initializer for `gConAlias_path_UnreachableTimeoutSearchSteps`)
@@ -1309,29 +871,10 @@ namespace moho
   moho::CConAlias gConAlias_path_UnreachableTimeoutSearchSteps("path_UnreachableTimeoutSearchSteps", "Maximum number of ticks to allow a single pathfind to take for an unreachable path", "DoSimCommand path_UnreachableTimeoutSearchSteps");
 
   /**
-   * Address: 0x00BF7190 (FUN_00BF7190, sub_BF7190)
-   *
-   * What it does:
-   * Tears down startup-owned sim-convar payload for
-   * `path_UnreachableTimeoutSearchSteps`.
+   * Address: 0x00BCCCA0 (FUN_00BCCCA0, dynamic initializer for `gSimConVar_path_UnreachableTimeoutSearchSteps`)
+   * Address: 0x00BF7190 (FUN_00BF7190, dynamic atexit destructor for `gSimConVar_path_UnreachableTimeoutSearchSteps`)
    */
-  void cleanup_path_UnreachableTimeoutSearchSteps_SimConVarDef()
-  {
-    DestroyRecoveredSimConVarBase(gPathUnreachableTimeoutSearchStepsSimConVarSlot);
-  }
-
-  /**
-   * Address: 0x00BCCCA0 (FUN_00BCCCA0, register_path_UnreachableTimeoutSearchSteps_SimConVarDef)
-   *
-   * What it does:
-   * Registers/initializes the `path_UnreachableTimeoutSearchSteps` sim convar
-   * (default `1000`).
-   */
-  void register_path_UnreachableTimeoutSearchSteps_SimConVarDef()
-  {
-    (void)ConstructRecoveredSimConVar(gPathUnreachableTimeoutSearchStepsSimConVarSlot, "path_UnreachableTimeoutSearchSteps", 1000);
-    RegisterAtexitCleanup<&cleanup_path_UnreachableTimeoutSearchSteps_SimConVarDef>();
-  }
+  TSimConVar<int> gSimConVar_path_UnreachableTimeoutSearchSteps(false, "path_UnreachableTimeoutSearchSteps", 1000);
 
   /**
    * Address: 0x00BD8710 (FUN_00BD8710, dynamic initializer for `gConAlias_AI_RenderBombDropZone`)
@@ -1340,16 +883,10 @@ namespace moho
   moho::CConAlias gConAlias_AI_RenderBombDropZone("AI_RenderBombDropZone", "Toggle on/off rendering of bomb drop zone", "DoSimCommand AI_RenderBombDropZone");
 
   /**
-   * Address: 0x00BD8740 (FUN_00BD8740, register_AI_RenderBombDropZone_SimConVarDef)
-   *
-   * What it does:
-   * Initializes the `AI_RenderBombDropZone` sim convar with default value
-   * `false`.
+   * Address: 0x00BD8740 (FUN_00BD8740, dynamic initializer for `gSimConVar_AI_RenderBombDropZone`)
+   * Address: 0x00BFE580 (FUN_00BFE580, dynamic atexit destructor for `gSimConVar_AI_RenderBombDropZone`)
    */
-  void register_AI_RenderBombDropZone_SimConVarDef()
-  {
-    (void)SimConVar_AI_RenderBombDropZone();
-  }
+  TSimConVar<bool> gSimConVar_AI_RenderBombDropZone(false, "AI_RenderBombDropZone", false);
 
   /**
    * Address: 0x00BD8790 (FUN_00BD8790, register_moho_weapon_methods) -- record at 0x00F59FF8
@@ -1523,62 +1060,16 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF7B30 (FUN_00BF7B30, cleanup_ReconFlush_SimConFuncDef)
-   *
-   * What it does:
-   * Destroys startup-owned `ReconFlush` sim-command callback object.
-   */
-  void cleanup_ReconFlush_SimConFuncDef()
-  {
-    if (!gReconFlushSimConFuncConstructed) {
-      return;
-    }
-
-    auto& command = ReconFlushSimConFunc();
-    static_cast<CSimConCommand&>(command).~CSimConCommand();
-    gReconFlushSimConFuncConstructed = false;
-  }
-
-  /**
    * Address: 0x00BCDE90 (FUN_00BCDE90, dynamic initializer for `gConAlias_ReconFlush`)
    * Address: 0x00BF7AE0 (FUN_00BF7AE0, dynamic atexit destructor for `gConAlias_ReconFlush`)
    */
   moho::CConAlias gConAlias_ReconFlush("ReconFlush", "Flush all recon databases (destroys all blips)", "DoSimCommand ReconFlush");
 
   /**
-   * Address: 0x00BCDEC0 (FUN_00BCDEC0, register_ReconFlush_SimConFuncDef)
-   *
-   * What it does:
-   * Registers startup-owned `ReconFlush` sim-command callback.
+   * Address: 0x00BCDEC0 (FUN_00BCDEC0, dynamic initializer for `gSimConFunc_ReconFlush`)
+   * Address: 0x00BF7B30 (FUN_00BF7B30, dynamic atexit destructor for `gSimConFunc_ReconFlush`)
    */
-  void register_ReconFlush_SimConFuncDef()
-  {
-    static bool sRegistered = false;
-    if (sRegistered) {
-      return;
-    }
-
-    sRegistered = true;
-    (void)ConstructReconFlushSimConFunc();
-    RegisterAtexitCleanup<&cleanup_ReconFlush_SimConFuncDef>();
-  }
-
-  /**
-   * Address: 0x00C00F40 (FUN_00C00F40, cleanup_ScenarioMethod_SimConFuncDef)
-   *
-   * What it does:
-   * Destroys startup-owned `ScenarioMethod` sim-command callback object.
-   */
-  void cleanup_ScenarioMethod_SimConFuncDef()
-  {
-    if (!gScenarioMethodSimConFuncConstructed) {
-      return;
-    }
-
-    auto& command = ScenarioMethodSimConFunc();
-    static_cast<CSimConCommand&>(command).~CSimConCommand();
-    gScenarioMethodSimConFuncConstructed = false;
-  }
+  CSimConFunc gSimConFunc_ReconFlush(false, "ReconFlush", &Sim::ReconFlush);
 
   /**
    * Address: 0x00BDBCD0 (FUN_00BDBCD0, dynamic initializer for `gConAlias_ScenarioMethod`)
@@ -1587,26 +1078,12 @@ namespace moho
   moho::CConAlias gConAlias_ScenarioMethod("ScenarioMethod", "Run a scenario-specific command", "DoSimCommand ScenarioMethod");
 
   /**
-   * Address: 0x00BDBD00 (FUN_00BDBD00, register_ScenarioMethod_SimConFuncDef)
-   *
-   * What it does:
-   * Registers startup-owned `ScenarioMethod` sim-command callback.
+   * Address: 0x00BDBD00 (FUN_00BDBD00, dynamic initializer for `gSimConFunc_ScenarioMethod`)
+   * Address: 0x00C00F40 (FUN_00C00F40, dynamic atexit destructor for `gSimConFunc_ScenarioMethod`)
    */
-  void register_ScenarioMethod_SimConFuncDef()
-  {
-    static bool sRegistered = false;
-    if (sRegistered) {
-      return;
-    }
-
-    sRegistered = true;
-    (void)ConstructScenarioMethodSimConFunc();
-    RegisterAtexitCleanup<&cleanup_ScenarioMethod_SimConFuncDef>();
-  }
+  CSimConFunc gSimConFunc_ScenarioMethod(true, "ScenarioMethod", &Sim::ScenarioMethod);
 
 } // namespace moho
-
-
 
 namespace
 {

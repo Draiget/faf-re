@@ -1,9 +1,18 @@
 #pragma once
+#include "moho/sim/CSimConVarBase.h"
 
 namespace moho
 {
+  // Sim console variables read outside the console; defined in
+  // SimStartupRegistrations.cpp next to their `DoSimCommand` aliases.
+  extern TSimConVar<float> gSimConVar_tree_AccelFactor;
+  extern TSimConVar<float> gSimConVar_tree_SpringFactor;
+  extern TSimConVar<float> gSimConVar_tree_DampFactor;
+  extern TSimConVar<float> gSimConVar_tree_UprootFactor;
+  extern TSimConVar<bool> gSimConVar_ShowRaisedPlatforms;
+  extern TSimConVar<bool> gSimConVar_AI_RenderBombDropZone;
+
   class CScrLuaInitForm;
-  class CSimConVarBase;
 
   // Underlying Lua function-definition publishers referenced by this thunk pack.
   CScrLuaInitForm* func_EntityCreatePropAtBone_LuaFuncDef();
@@ -66,153 +75,31 @@ namespace moho
 
 
 
-  /**
-   * Address: 0x00BFD000 (FUN_00BFD000, cleanup_tree_AccelFactor_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `tree_AccelFactor` sim-convar startup storage.
-   */
-  void cleanup_tree_AccelFactor_SimConVarDef();
-
-  /**
-   * Address: 0x00BD5A10 (FUN_00BD5A10, register_tree_AccelFactor_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_AccelFactor` float sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_tree_AccelFactor_SimConVarDef();
 
 
 
-  /**
-   * Address: 0x00BFD060 (FUN_00BFD060, cleanup_tree_SpringFactor_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `tree_SpringFactor` sim-convar startup storage.
-   */
-  void cleanup_tree_SpringFactor_SimConVarDef();
-
-  /**
-   * Address: 0x00BD5A90 (FUN_00BD5A90, register_tree_SpringFactor_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_SpringFactor` float sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_tree_SpringFactor_SimConVarDef();
 
 
 
-  /**
-   * Address: 0x00BFD0C0 (FUN_00BFD0C0, cleanup_tree_DampFactor_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `tree_DampFactor` sim-convar startup storage.
-   */
-  void cleanup_tree_DampFactor_SimConVarDef();
-
-  /**
-   * Address: 0x00BD5B10 (FUN_00BD5B10, register_tree_DampFactor_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_DampFactor` float sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_tree_DampFactor_SimConVarDef();
 
 
 
-  /**
-   * Address: 0x00BFD120 (FUN_00BFD120, cleanup_tree_UprootFactor_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `tree_UprootFactor` sim-convar startup storage.
-   */
-  void cleanup_tree_UprootFactor_SimConVarDef();
-
-  /**
-   * Address: 0x00BD5B90 (FUN_00BD5B90, register_tree_UprootFactor_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_UprootFactor` float sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_tree_UprootFactor_SimConVarDef();
-
-  /**
-   * Address owner: tree_* startup convar lanes (0x00BD5A10/0x00BD5A90/0x00BD5B10/0x00BD5B90)
-   *
-   * What it does:
-   * Returns the recovered `tree_AccelFactor` sim-convar definition used by
-   * tree motor update logic.
-   */
-  [[nodiscard]] CSimConVarBase* GetTreeAccelFactorSimConVarDef();
-
-  /**
-   * Address owner: tree_* startup convar lanes (0x00BD5A10/0x00BD5A90/0x00BD5B10/0x00BD5B90)
-   *
-   * What it does:
-   * Returns the recovered `tree_SpringFactor` sim-convar definition used by
-   * tree motor update logic.
-   */
-  [[nodiscard]] CSimConVarBase* GetTreeSpringFactorSimConVarDef();
-
-  /**
-   * Address owner: tree_* startup convar lanes (0x00BD5A10/0x00BD5A90/0x00BD5B10/0x00BD5B90)
-   *
-   * What it does:
-   * Returns the recovered `tree_DampFactor` sim-convar definition used by
-   * tree motor update logic.
-   */
-  [[nodiscard]] CSimConVarBase* GetTreeDampFactorSimConVarDef();
-
-  /**
-   * Address owner: tree_* startup convar lanes (0x00BD5A10/0x00BD5A90/0x00BD5B10/0x00BD5B90)
-   *
-   * What it does:
-   * Returns the recovered `tree_UprootFactor` sim-convar definition used by
-   * tree motor update logic.
-   */
-  [[nodiscard]] CSimConVarBase* GetTreeUprootFactorSimConVarDef();
 
 
 
-  /**
-   * Address: 0x00BFDE80 (FUN_00BFDE80, cleanup_RandomElevationOffset_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `RandomElevationOffset` sim-convar startup storage.
-   */
-  void cleanup_RandomElevationOffset_SimConVarDef();
-
-  /**
-   * Address: 0x00BD6F90 (FUN_00BD6F90, register_RandomElevationOffset_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `RandomElevationOffset` sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_RandomElevationOffset_SimConVarDef();
 
 
 
-  /**
-   * Address: 0x00BFE140 (FUN_00BFE140, cleanup_AirLookAheadMult_SimConVarDef)
-   *
-   * What it does:
-   * Tears down recovered `AirLookAheadMult` sim-convar startup storage.
-   */
-  void cleanup_AirLookAheadMult_SimConVarDef();
 
-  /**
-   * Address: 0x00BD74E0 (FUN_00BD74E0, register_AirLookAheadMult_SimConVarDef)
-   *
-   * What it does:
-   * Initializes recovered `AirLookAheadMult` sim-convar definition and
-   * registers process-exit cleanup.
-   */
-  void register_AirLookAheadMult_SimConVarDef();
+
+
+
+
+
+
+
+
+
 
   /**
    * Address: 0x00BD4BE0 (FUN_00BD4BE0, register_sim_SimInits_mForms_prependStartupLane21)
@@ -641,68 +528,16 @@ namespace moho
 
 
 
-  /**
-   * Address: 0x00BFD8D0 (FUN_00BFD8D0, cleanup_ShowRaisedPlatforms_SimConVar)
-   *
-   * What it does:
-   * Tears down recovered `ShowRaisedPlatforms` sim-convar startup storage.
-   */
-  void cleanup_ShowRaisedPlatforms_SimConVar();
-
-  /**
-   * Address: 0x00BD6A20 (FUN_00BD6A20, register_ShowRaisedPlatforms_SimConVar)
-   *
-   * What it does:
-   * Registers/initializes the `ShowRaisedPlatforms` bool sim-convar.
-   */
-  void register_ShowRaisedPlatforms_SimConVar();
-
-  /**
-   * Address: 0x00BD6A20 (FUN_00BD6A20) startup lane dependency
-   *
-   * What it does:
-   * Returns the recovered `ShowRaisedPlatforms` sim-convar definition used by
-   * `Unit::DebugShowRaisedPlatforms`.
-   */
-  [[nodiscard]] CSimConVarBase* GetShowRaisedPlatformsSimConVarDef();
 
 
-  /**
-   * Address: 0x00BD9B50 (FUN_00BD9B50, register_path_ArmyBudget_SimConVarDef)
-   *
-   * What it does:
-   * Registers/initializes the `path_ArmyBudget` sim convar (default 2500).
-   */
-  void register_path_ArmyBudget_SimConVarDef();
 
 
-  /**
-   * Address: 0x00BCCC20 (FUN_00BCCC20, register_path_MaxInstantWorkUnits_SimConVarDef)
-   *
-   * What it does:
-   * Registers/initializes the `path_MaxInstantWorkUnits` sim convar (default
-   * `500`).
-   */
-  void register_path_MaxInstantWorkUnits_SimConVarDef();
 
 
-  /**
-   * Address: 0x00BCCCA0 (FUN_00BCCCA0, register_path_UnreachableTimeoutSearchSteps_SimConVarDef)
-   *
-   * What it does:
-   * Registers/initializes the `path_UnreachableTimeoutSearchSteps` sim convar
-   * (default `1000`).
-   */
-  void register_path_UnreachableTimeoutSearchSteps_SimConVarDef();
 
 
-  /**
-   * Address: 0x00BD8740 (FUN_00BD8740, register_AI_RenderBombDropZone_SimConVarDef)
-   *
-   * What it does:
-   * Registers/initializes the `AI_RenderBombDropZone` boolean sim convar.
-   */
-  void register_AI_RenderBombDropZone_SimConVarDef();
+
+
 
   /**
    * Address: 0x00BD8790 (FUN_00BD8790, register_moho_weapon_methods)
@@ -820,40 +655,12 @@ namespace moho
   CScrLuaInitForm* register_ReconBlipIsKnownFake_LuaFuncDef();
 
 
-  /**
-   * Address: 0x00BF7B30 (FUN_00BF7B30, cleanup_ReconFlush_SimConFuncDef)
-   *
-   * What it does:
-   * Destroys startup-owned `ReconFlush` sim-command callback object.
-   */
-  void cleanup_ReconFlush_SimConFuncDef();
 
 
-  /**
-   * Address: 0x00BCDEC0 (FUN_00BCDEC0, register_ReconFlush_SimConFuncDef)
-   *
-   * What it does:
-   * Registers startup-owned `ReconFlush` sim-command callback.
-   */
-  void register_ReconFlush_SimConFuncDef();
 
 
-  /**
-   * Address: 0x00C00F40 (FUN_00C00F40, cleanup_ScenarioMethod_SimConFuncDef)
-   *
-   * What it does:
-   * Destroys startup-owned `ScenarioMethod` sim-command callback object.
-   */
-  void cleanup_ScenarioMethod_SimConFuncDef();
 
 
-  /**
-   * Address: 0x00BDBD00 (FUN_00BDBD00, register_ScenarioMethod_SimConFuncDef)
-   *
-   * What it does:
-   * Registers startup-owned `ScenarioMethod` sim-command callback.
-   */
-  void register_ScenarioMethod_SimConFuncDef();
 
 } // namespace moho
 

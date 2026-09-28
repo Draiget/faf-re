@@ -1,48 +1,6 @@
-#include "moho/sim/SimGravityCommandRegistrations.h"
-
-#include <cstdlib>
-#include <new>
-
 #include "moho/console/CConAlias.h"
 #include "moho/sim/CSimConFunc.h"
 #include "moho/sim/Sim.h"
-
-namespace
-{
-  alignas(moho::CSimConFunc) unsigned char gSimConFunc_sim_GravityStorage[sizeof(moho::CSimConFunc)] = {};
-  bool gSimConFunc_sim_GravityConstructed = false;
-
-  [[nodiscard]] moho::CSimConFunc& SimConFunc_sim_Gravity()
-  {
-    return *reinterpret_cast<moho::CSimConFunc*>(gSimConFunc_sim_GravityStorage);
-  }
-
-  [[nodiscard]] moho::CSimConFunc& ConstructSimConFunc_sim_Gravity()
-  {
-    if (!gSimConFunc_sim_GravityConstructed) {
-      new (gSimConFunc_sim_GravityStorage) moho::CSimConFunc(false, "sim_Gravity", &moho::Sim::sim_Gravity);
-      gSimConFunc_sim_GravityConstructed = true;
-    }
-
-    return SimConFunc_sim_Gravity();
-  }
-
-  template <void (*Cleanup)()>
-  void RegisterAtexitCleanup() noexcept
-  {
-    (void)std::atexit(Cleanup);
-  }
-
-  struct SimGravityCommandRegistrationsBootstrap
-  {
-    SimGravityCommandRegistrationsBootstrap()
-    {
-      moho::register_sim_Gravity_SimConFuncDef();
-    }
-  };
-
-  [[maybe_unused]] SimGravityCommandRegistrationsBootstrap gSimGravityCommandRegistrationsBootstrap;
-} // namespace
 
 namespace moho
 {
@@ -53,30 +11,9 @@ namespace moho
   moho::CConAlias gConAlias_sim_Gravity("sim_Gravity", "Show or change the current gravity.  Units are ogrids/(second^2)", "DoSimCommand sim_Gravity");
 
   /**
-   * Address: 0x00BFD4E0 (FUN_00BFD4E0, cleanup_sim_Gravity_SimConFunc)
-   *
-   * What it does:
-   * Destroys startup-owned `sim_Gravity` sim-console callback storage.
+   * Address: 0x00BD60C0 (FUN_00BD60C0, dynamic initializer for `gSimConFunc_sim_Gravity`)
+   * Address: 0x00BFD4E0 (FUN_00BFD4E0, dynamic atexit destructor for `gSimConFunc_sim_Gravity`)
    */
-  void cleanup_sim_Gravity_SimConFunc()
-  {
-    if (!gSimConFunc_sim_GravityConstructed) {
-      return;
-    }
+  CSimConFunc gSimConFunc_sim_Gravity(false, "sim_Gravity", &Sim::sim_Gravity);
 
-    static_cast<CSimConCommand&>(SimConFunc_sim_Gravity()).~CSimConCommand();
-    gSimConFunc_sim_GravityConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BD60C0 (FUN_00BD60C0, register_sim_Gravity_SimConFuncDef)
-   *
-   * What it does:
-   * Registers the `sim_Gravity` sim-console callback and arms its exit cleanup.
-   */
-  void register_sim_Gravity_SimConFuncDef()
-  {
-    (void)ConstructSimConFunc_sim_Gravity();
-    RegisterAtexitCleanup<&cleanup_sim_Gravity_SimConFunc>();
-  }
 } // namespace moho

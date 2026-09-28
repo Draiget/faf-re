@@ -152,13 +152,6 @@ namespace
 
 namespace moho
 {
-  CSimConCommand::CSimConCommand() noexcept
-    : mName(nullptr)
-    , mRequiresCheat(0u)
-    , mPad09{0u, 0u, 0u}
-  {
-  }
-
   /**
    * Address: 0x00734630 (FUN_00734630, ??0CSimConCommand@Moho@@QAE@EPBD@Z)
    *

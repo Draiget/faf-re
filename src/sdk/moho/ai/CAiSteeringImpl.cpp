@@ -28,6 +28,7 @@
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/CUnitMotion.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 
 using namespace moho;
 
@@ -123,7 +124,7 @@ namespace
   [[nodiscard]] float ReadSteeringAirTolerance(Sim* const sim) noexcept
   {
     constexpr float kFallbackTolerance = 1.0f;
-    return ReadSimConVarFloat(sim, moho::console::SimSteeringAirToleranceConVar(), kFallbackTolerance);
+    return ReadSimConVarFloat(sim, &moho::gSimConVar_ai_SteeringAirTolerance, kFallbackTolerance);
   }
 
   void UpdateMotionPathPointers(CAiSteeringImpl& steering)

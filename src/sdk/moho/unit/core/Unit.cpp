@@ -14951,7 +14951,7 @@ Unit* Unit::FindPlatform()
   // Need refuel: threshold ratio exceeds current fuel ratio.
   const float fuelRatio = FuelRatio;
   bool needsService = false;
-  if (CSimConVarBase* const needRefuelDef = GetNeedRefuelThresholdRatioSimConVarDef();
+  if (CSimConVarBase* const needRefuelDef = &moho::gSimConVar_NeedRefuelThresholdRatio;
       needRefuelDef != nullptr) {
     if (CSimConVarInstanceBase* const needRefuel = SimulationRef->GetSimVar(needRefuelDef);
         needRefuel != nullptr) {
@@ -14962,7 +14962,7 @@ Unit* Unit::FindPlatform()
   if (!needsService) {
     const float health = mVarDat.mHealth;
     const float maxHealth = mVarDat.mMaxHealth;
-    if (CSimConVarBase* const needRepairDef = GetNeedRepairThresholdRatioSimConVarDef();
+    if (CSimConVarBase* const needRepairDef = &moho::gSimConVar_NeedRepairThresholdRatio;
         needRepairDef != nullptr) {
       if (CSimConVarInstanceBase* const needRepair = SimulationRef->GetSimVar(needRepairDef);
           needRepair != nullptr) {
@@ -17383,7 +17383,7 @@ void Unit::DebugShowRaisedPlatforms()
     return;
   }
 
-  CSimConVarBase* const showRaisedPlatformsDef = GetShowRaisedPlatformsSimConVarDef();
+  CSimConVarBase* const showRaisedPlatformsDef = &moho::gSimConVar_ShowRaisedPlatforms;
   if (!showRaisedPlatformsDef) {
     return;
   }

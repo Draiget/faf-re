@@ -331,36 +331,6 @@ namespace
     owner->context.Update(wordLane, 4u);
   }
 
-  [[nodiscard]] moho::TSimConVar<bool>& SimConVar_imap_debug()
-  {
-    static moho::TSimConVar<bool> sVar(false, "imap_debug", false);
-    return sVar;
-  }
-
-  [[nodiscard]] moho::TSimConVar<bool>& SimConVar_imap_debug_grid()
-  {
-    static moho::TSimConVar<bool> sVar(false, "imap_debug_grid", false);
-    return sVar;
-  }
-
-  [[nodiscard]] moho::TSimConVar<bool>& SimConVar_imap_debug_path_graph()
-  {
-    static moho::TSimConVar<bool> sVar(false, "imap_debug_path_graph", false);
-    return sVar;
-  }
-
-  [[nodiscard]] moho::TSimConVar<int>& SimConVar_imap_debug_grid_type()
-  {
-    static moho::TSimConVar<int> sVar(false, "imap_debug_grid_type", 0);
-    return sVar;
-  }
-
-  [[nodiscard]] moho::TSimConVar<int>& SimConVar_imap_debug_grid_army()
-  {
-    static moho::TSimConVar<int> sVar(false, "imap_debug_grid_army", -1);
-    return sVar;
-  }
-
   msvc8::string gInfluenceGridVectorTypeName{};
   std::uint32_t gInfluenceGridVectorTypeNameInitGuard = 0u;
   msvc8::string gMapUintIntTypeName{};
@@ -2235,12 +2205,10 @@ namespace moho
   moho::CConAlias gConAlias_imap_debug("imap_debug", "Toggle influence map debug info.", "DoSimCommand imap_debug");
 
   /**
-   * Address: 0x00BDA410 (FUN_00BDA410, register_imap_debug_SimConVarDef)
+   * Address: 0x00BDA410 (FUN_00BDA410, dynamic initializer for `gSimConVar_imap_debug`)
+   * Address: 0x00BFFD20 (FUN_00BFFD20, dynamic atexit destructor for `gSimConVar_imap_debug`)
    */
-  void register_imap_debug_SimConVarDef()
-  {
-    (void)SimConVar_imap_debug();
-  }
+  TSimConVar<bool> gSimConVar_imap_debug(false, "imap_debug", false);
 
   /**
    * Address: 0x00BDA460 (FUN_00BDA460, dynamic initializer for `gConAlias_imap_debug_grid`)
@@ -2249,12 +2217,10 @@ namespace moho
   moho::CConAlias gConAlias_imap_debug_grid("imap_debug_grid", "Toggle influence map debug grid info.", "DoSimCommand imap_debug_grid");
 
   /**
-   * Address: 0x00BDA490 (FUN_00BDA490, func_imap_debug_grid_SimConVarDef)
+   * Address: 0x00BDA490 (FUN_00BDA490, dynamic initializer for `gSimConVar_imap_debug_grid`)
+   * Address: 0x00BFFD80 (FUN_00BFFD80, dynamic atexit destructor for `gSimConVar_imap_debug_grid`)
    */
-  void func_imap_debug_grid_SimConVarDef()
-  {
-    (void)SimConVar_imap_debug_grid();
-  }
+  TSimConVar<bool> gSimConVar_imap_debug_grid(false, "imap_debug_grid", false);
 
   /**
    * Address: 0x00BDA4E0 (FUN_00BDA4E0, dynamic initializer for `gConAlias_imap_debug_path_graph`)
@@ -2263,12 +2229,10 @@ namespace moho
   moho::CConAlias gConAlias_imap_debug_path_graph("imap_debug_path_graph", "Toggle map hints path graph.", "DoSimCommand imap_debug_path_graph");
 
   /**
-   * Address: 0x00BDA510 (FUN_00BDA510, func_imap_debug_path_graph_SimConVarDef)
+   * Address: 0x00BDA510 (FUN_00BDA510, dynamic initializer for `gSimConVar_imap_debug_path_graph`)
+   * Address: 0x00BFFDE0 (FUN_00BFFDE0, dynamic atexit destructor for `gSimConVar_imap_debug_path_graph`)
    */
-  void func_imap_debug_path_graph_SimConVarDef()
-  {
-    (void)SimConVar_imap_debug_path_graph();
-  }
+  TSimConVar<bool> gSimConVar_imap_debug_path_graph(false, "imap_debug_path_graph", false);
 
   /**
    * Address: 0x00BDA560 (FUN_00BDA560, dynamic initializer for `gConAlias_imap_debug_grid_type`)
@@ -2277,12 +2241,10 @@ namespace moho
   moho::CConAlias gConAlias_imap_debug_grid_type("imap_debug_grid_type", "Set influence map debug grid threat type.", "DoSimCommand imap_debug_grid_type");
 
   /**
-   * Address: 0x00BDA590 (FUN_00BDA590, func_imap_debug_grid_type_SimConVarDef)
+   * Address: 0x00BDA590 (FUN_00BDA590, dynamic initializer for `gSimConVar_imap_debug_grid_type`)
+   * Address: 0x00BFFE40 (FUN_00BFFE40, dynamic atexit destructor for `gSimConVar_imap_debug_grid_type`)
    */
-  void func_imap_debug_grid_type_SimConVarDef()
-  {
-    (void)SimConVar_imap_debug_grid_type();
-  }
+  TSimConVar<int> gSimConVar_imap_debug_grid_type(false, "imap_debug_grid_type", 0);
 
   /**
    * Address: 0x00BDA5E0 (FUN_00BDA5E0, dynamic initializer for `gConAlias_imap_debug_grid_army`)
@@ -2291,12 +2253,10 @@ namespace moho
   moho::CConAlias gConAlias_imap_debug_grid_army("imap_debug_grid_army", "Set influence map debug grid for which army threat type.", "DoSimCommand imap_debug_grid_army");
 
   /**
-   * Address: 0x00BDA610 (FUN_00BDA610, func_imap_debug_grid_army_SimConVarDef)
+   * Address: 0x00BDA610 (FUN_00BDA610, dynamic initializer for `gSimConVar_imap_debug_grid_army`)
+   * Address: 0x00BFFEA0 (FUN_00BFFEA0, dynamic atexit destructor for `gSimConVar_imap_debug_grid_army`)
    */
-  void func_imap_debug_grid_army_SimConVarDef()
-  {
-    (void)SimConVar_imap_debug_grid_army();
-  }
+  TSimConVar<int> gSimConVar_imap_debug_grid_army(false, "imap_debug_grid_army", -1);
 
   void SThreat::Clear() noexcept
   {
@@ -3461,23 +3421,6 @@ namespace moho
     return outPosition;
   }
 } // namespace moho
-
-namespace
-{
-  struct CInfluenceMapDebugBootstrap
-  {
-    CInfluenceMapDebugBootstrap()
-    {
-      moho::register_imap_debug_SimConVarDef();
-      moho::func_imap_debug_grid_SimConVarDef();
-      moho::func_imap_debug_path_graph_SimConVarDef();
-      moho::func_imap_debug_grid_type_SimConVarDef();
-      moho::func_imap_debug_grid_army_SimConVarDef();
-    }
-  };
-
-  CInfluenceMapDebugBootstrap gCInfluenceMapDebugBootstrap;
-} // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

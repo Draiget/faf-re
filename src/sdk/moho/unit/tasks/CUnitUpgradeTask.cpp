@@ -18,6 +18,7 @@
 #include "moho/sim/SFootprint.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 
 namespace
 {
@@ -32,9 +33,7 @@ namespace
 
   [[nodiscard]] bool ReadInstaBuildFlag(moho::Sim* const sim)
   {
-    static moho::TSimConVar<bool> sAiInstaBuild(false, "ai_InstaBuild", false);
-
-    moho::CSimConVarInstanceBase* const instance = sim ? sim->GetSimVar(&sAiInstaBuild) : nullptr;
+    moho::CSimConVarInstanceBase* const instance = sim ? sim->GetSimVar(&moho::gSimConVar_ai_InstaBuild) : nullptr;
     void* const valueStorage = instance ? instance->GetValueStorage() : nullptr;
     return valueStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(valueStorage) != 0u);
   }

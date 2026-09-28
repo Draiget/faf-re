@@ -2892,9 +2892,6 @@
     <ClInclude Include="moho\sim\ManipulatorLuaFunctionThunks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\SimGravityCommandRegistrations.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\sim\SimDebugCommandRegistrations.h">
       <Filter>Header Files</Filter>
     </ClInclude>

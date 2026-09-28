@@ -4,15 +4,8 @@
 
 namespace moho
 {
-  class CSimConVarBase;
-
   namespace console
   {
-    [[nodiscard]] CSimConVarBase* SimPathBackgroundUpdateConVar();
-    [[nodiscard]] CSimConVarBase* SimPathBackgroundBudgetConVar();
-    [[nodiscard]] CSimConVarBase* SimPathTimeoutPreviewConVar();
-    [[nodiscard]] CSimConVarBase* SimChecksumPeriodConVar();
-    [[nodiscard]] CSimConVarBase* SimSteeringAirToleranceConVar();
 
     [[nodiscard]] bool SimDebugCheatsEnabled();
     [[nodiscard]] bool SimReportCheatsEnabled();

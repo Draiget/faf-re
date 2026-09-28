@@ -21,8 +21,6 @@ namespace moho
       SEntitySetTemplateUnit* selectedUnits
     );
 
-    CSimConFunc() noexcept;
-
     /**
      * Address: 0x005BE360 (FUN_005BE360)
      *

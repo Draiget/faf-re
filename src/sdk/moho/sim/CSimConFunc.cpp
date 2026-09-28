@@ -2,12 +2,6 @@
 
 namespace moho
 {
-  CSimConFunc::CSimConFunc() noexcept
-    : CSimConCommand()
-    , mHandler(nullptr)
-  {
-  }
-
   /**
    * Address: 0x005BE360 (FUN_005BE360)
    *

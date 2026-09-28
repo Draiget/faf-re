@@ -3626,7 +3626,7 @@ namespace moho
     // The "NoDamage" sim convar blocks all damage (negative deltas); a dead
     // entity cannot be healed (positive delta). Combined skip guard matches the
     // binary at 0x006798A4-0x006798DB.
-    CSimConVarInstanceBase* const noDamageVar = SimulationRef->GetSimVar(GetNoDamageSimConVar());
+    CSimConVarInstanceBase* const noDamageVar = SimulationRef->GetSimVar(&moho::gSimConVar_NoDamage);
     const bool noDamage = *static_cast<const std::uint8_t*>(noDamageVar->GetValueStorage()) != 0;
     if ((noDamage && delta < 0.0f) || (mVarDat.mIsDead && delta > 0.0f)) {
       return;

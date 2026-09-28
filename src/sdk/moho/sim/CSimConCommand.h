@@ -22,8 +22,6 @@ namespace moho
   public:
     using ParsedCommandArgs = std::vector<std::string>;
 
-    CSimConCommand() noexcept;
-
     /**
      * Address: 0x00734630 (FUN_00734630, ??0CSimConCommand@Moho@@QAE@EPBD@Z)
      *
@@ -92,10 +90,9 @@ namespace moho
   static_assert(offsetof(CSimConCommand, mRequiresCheat) == 0x08, "CSimConCommand::mRequiresCheat offset must be 0x08");
 
   /**
-   * Address: 0x00735110 (FUN_00735110)/FUN_00735110-family lookup path.
-   *
    * What it does:
    * Resolves one registered sim command by case-insensitive name.
+   * 0x00735110, cited here before, is `Sim::SimAssert` (a bare `ret`).
    */
   [[nodiscard]] CSimConCommand* FindRegisteredSimConCommand(const std::string& commandName);
 } // namespace moho

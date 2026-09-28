@@ -2813,7 +2813,7 @@ int moho::cfunc_CAiBrainIsOpponentAIRunningL(LuaPlus::LuaState* const state)
 
   bool shouldRunOpponentAi = false;
   if (!CFG_GetArgOption("/noai", 0u, nullptr)) {
-    CSimConVarBase* const runOpponentAiConVar = GetAI_RunOpponentAI_SimConVarDef();
+    CSimConVarBase* const runOpponentAiConVar = &moho::gSimConVar_AI_RunOpponentAI;
     CSimConVarInstanceBase* const runOpponentAiVar = (sim && runOpponentAiConVar) ? sim->GetSimVar(runOpponentAiConVar) : nullptr;
     const void* const runOpponentAiStorage = runOpponentAiVar ? runOpponentAiVar->GetValueStorage() : nullptr;
     shouldRunOpponentAi = runOpponentAiStorage && (*reinterpret_cast<const std::uint8_t*>(runOpponentAiStorage) != 0u);

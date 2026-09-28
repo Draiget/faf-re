@@ -42,12 +42,6 @@ namespace
   constexpr const char* kCivilianArmyColorFieldName = "CivilianArmyColor";
   constexpr const char* kUnidentifiedColorFieldName = "UnidentifiedColor";
 
-  [[nodiscard]] moho::CSimConFunc& SimConFunc_SetArmyColor()
-  {
-    static moho::CSimConFunc sCommand(false, "SetArmyColor", &moho::Sim::SetArmyColor);
-    return sCommand;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
@@ -928,15 +922,10 @@ namespace moho
   moho::CConAlias gConAlias_SetArmyColor("SetArmyColor", "SetArmyColor(army,r,g,b)", "DoSimCommand SetArmyColor");
 
   /**
-   * Address: 0x00BD9ED0 (FUN_00BD9ED0, register_SetArmyColor_SimConFuncDef)
-   *
-   * What it does:
-   * Registers the `SetArmyColor` sim-console command callback.
+   * Address: 0x00BD9ED0 (FUN_00BD9ED0, dynamic initializer for `gSimConFunc_SetArmyColor`)
+   * Address: 0x00BFF540 (FUN_00BFF540, dynamic atexit destructor for `gSimConFunc_SetArmyColor`)
    */
-  void register_SetArmyColor_SimConFuncDef()
-  {
-    (void)SimConFunc_SetArmyColor();
-  }
+  CSimConFunc gSimConFunc_SetArmyColor(false, "SetArmyColor", &Sim::SetArmyColor);
 
   /**
    * Address: 0x00BD9F10 (FUN_00BD9F10, j_func_SetArmyShowScore_LuaFuncDef)

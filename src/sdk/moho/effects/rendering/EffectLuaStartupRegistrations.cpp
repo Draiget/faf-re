@@ -109,14 +109,6 @@ namespace
   constexpr const char* kUnknownBeamKindErrorText = "Unknown beam kind: %s";
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrevious = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor = nullptr;
-  alignas(moho::CSimConFunc) unsigned char gSimConFunc_efx_NewEmitterStorage[sizeof(moho::CSimConFunc)] = {};
-  bool gSimConFunc_efx_NewEmitterConstructed = false;
-  alignas(moho::CSimConFunc) unsigned char gSimConFunc_efx_AttachEmitterStorage[sizeof(moho::CSimConFunc)] = {};
-  bool gSimConFunc_efx_AttachEmitterConstructed = false;
-  alignas(moho::CSimConFunc) unsigned char gSimConFunc_AddLightParticleStorage[sizeof(moho::CSimConFunc)] = {};
-  bool gSimConFunc_AddLightParticleConstructed = false;
-  alignas(moho::CSimConFunc) unsigned char gSimConFunc_AddBeamStorage[sizeof(moho::CSimConFunc)] = {};
-  bool gSimConFunc_AddBeamConstructed = false;
   Wm3::Vector3f gAddBeamStartPoint{};
   bool gAddBeamCaptureStartPending = true;
 
@@ -386,70 +378,6 @@ namespace
   [[nodiscard]] moho::CScrLuaInitForm* ForwardEffectLuaThunk() noexcept
   {
     return Target();
-  }
-
-  template <void (*Cleanup)()>
-  void RegisterAtexitCleanup() noexcept
-  {
-    (void)std::atexit(Cleanup);
-  }
-
-  [[nodiscard]] moho::CSimConFunc& SimConFunc_efx_NewEmitter()
-  {
-    return *reinterpret_cast<moho::CSimConFunc*>(gSimConFunc_efx_NewEmitterStorage);
-  }
-
-  [[nodiscard]] moho::CSimConFunc& ConstructSimConFunc_efx_NewEmitter()
-  {
-    if (!gSimConFunc_efx_NewEmitterConstructed) {
-      new (gSimConFunc_efx_NewEmitterStorage) moho::CSimConFunc(false, "efx_NewEmitter", &moho::Sim::efx_NewEmitter);
-      gSimConFunc_efx_NewEmitterConstructed = true;
-    }
-    return SimConFunc_efx_NewEmitter();
-  }
-
-  [[nodiscard]] moho::CSimConFunc& SimConFunc_efx_AttachEmitter()
-  {
-    return *reinterpret_cast<moho::CSimConFunc*>(gSimConFunc_efx_AttachEmitterStorage);
-  }
-
-  [[nodiscard]] moho::CSimConFunc& ConstructSimConFunc_efx_AttachEmitter()
-  {
-    if (!gSimConFunc_efx_AttachEmitterConstructed) {
-      new (gSimConFunc_efx_AttachEmitterStorage)
-        moho::CSimConFunc(false, "efx_AttachEmitter", &moho::Sim::efx_AttachEmitter);
-      gSimConFunc_efx_AttachEmitterConstructed = true;
-    }
-    return SimConFunc_efx_AttachEmitter();
-  }
-
-  [[nodiscard]] moho::CSimConFunc& SimConFunc_AddLightParticle()
-  {
-    return *reinterpret_cast<moho::CSimConFunc*>(gSimConFunc_AddLightParticleStorage);
-  }
-
-  [[nodiscard]] moho::CSimConFunc& ConstructSimConFunc_AddLightParticle()
-  {
-    if (!gSimConFunc_AddLightParticleConstructed) {
-      new (gSimConFunc_AddLightParticleStorage)
-        moho::CSimConFunc(false, "AddLightParticle", &moho::Sim::AddLightParticle);
-      gSimConFunc_AddLightParticleConstructed = true;
-    }
-    return SimConFunc_AddLightParticle();
-  }
-
-  [[nodiscard]] moho::CSimConFunc& SimConFunc_AddBeam()
-  {
-    return *reinterpret_cast<moho::CSimConFunc*>(gSimConFunc_AddBeamStorage);
-  }
-
-  [[nodiscard]] moho::CSimConFunc& ConstructSimConFunc_AddBeam()
-  {
-    if (!gSimConFunc_AddBeamConstructed) {
-      new (gSimConFunc_AddBeamStorage) moho::CSimConFunc(false, "AddBeam", &moho::ExecuteAddBeamSimCommand);
-      gSimConFunc_AddBeamConstructed = true;
-    }
-    return SimConFunc_AddBeam();
   }
 
   /**
@@ -2762,6 +2690,12 @@ namespace moho
   moho::CConAlias gConAlias_AddBeam("AddBeam", "Add a test beam into the world", "DoSimCommand AddBeam");
 
   /**
+   * Address: 0x00BD4010 (FUN_00BD4010, dynamic initializer for `gSimConFunc_AddBeam`)
+   * Address: 0x00BFB990 (FUN_00BFB990, dynamic atexit destructor for `gSimConFunc_AddBeam`)
+   */
+  CSimConFunc gSimConFunc_AddBeam(false, "AddBeam", &ExecuteAddBeamSimCommand);
+
+  /**
    * Address: 0x00657170 (FUN_00657170, func_AddBeam_SimConFunc)
    *
    * What it does:
@@ -2833,34 +2767,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFB990 (FUN_00BFB990, cleanup_AddBeam_SimConFunc)
-   *
-   * What it does:
-   * Destroys startup-owned `AddBeam` sim-console callback storage.
-   */
-  void cleanup_AddBeam_SimConFunc()
-  {
-    if (!gSimConFunc_AddBeamConstructed) {
-      return;
-    }
-
-    static_cast<CSimConCommand&>(SimConFunc_AddBeam()).~CSimConCommand();
-    gSimConFunc_AddBeamConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BD4010 (FUN_00BD4010, register_AddBeam_SimConFuncDef)
-   *
-   * What it does:
-   * Registers the `AddBeam` sim-console callback and arms startup teardown.
-   */
-  void register_AddBeam_SimConFuncDef()
-  {
-    (void)ConstructSimConFunc_AddBeam();
-    RegisterAtexitCleanup<&cleanup_AddBeam_SimConFunc>();
-  }
-
-  /**
    * Address: 0x00BD3F90 (FUN_00BD3F90, register_CreateBeamEmitter_LuaFuncDef)
    */
   CScrLuaInitForm* register_CreateBeamEmitter_LuaFuncDef()
@@ -2901,38 +2807,16 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFBE30 (FUN_00BFBE30, cleanup_efx_NewEmitter_SimConFunc)
-   *
-   * What it does:
-   * Destroys startup-owned `efx_NewEmitter` sim-console callback storage.
-   */
-  void cleanup_efx_NewEmitter_SimConFunc()
-  {
-    if (!gSimConFunc_efx_NewEmitterConstructed) {
-      return;
-    }
-
-    static_cast<CSimConCommand&>(SimConFunc_efx_NewEmitter()).~CSimConCommand();
-    gSimConFunc_efx_NewEmitterConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4350 (FUN_00BD4350, dynamic initializer for `gConAlias_efx_NewEmitter`)
    * Address: 0x00BFBDE0 (FUN_00BFBDE0, dynamic atexit destructor for `gConAlias_efx_NewEmitter`)
    */
   moho::CConAlias gConAlias_efx_NewEmitter("efx_NewEmitter", "Create an emitter, must specify blueprint", "DoSimCommand efx_NewEmitter");
 
   /**
-   * Address: 0x00BD4380 (FUN_00BD4380, register_efx_NewEmitter_SimConFuncDef)
-   *
-   * What it does:
-   * Registers the `efx_NewEmitter` sim-console callback and arms startup teardown.
+   * Address: 0x00BD4380 (FUN_00BD4380, dynamic initializer for `gSimConFunc_efx_NewEmitter`)
+   * Address: 0x00BFBE30 (FUN_00BFBE30, dynamic atexit destructor for `gSimConFunc_efx_NewEmitter`)
    */
-  void register_efx_NewEmitter_SimConFuncDef()
-  {
-    (void)ConstructSimConFunc_efx_NewEmitter();
-    RegisterAtexitCleanup<&cleanup_efx_NewEmitter_SimConFunc>();
-  }
+  CSimConFunc gSimConFunc_efx_NewEmitter(false, "efx_NewEmitter", &Sim::efx_NewEmitter);
 
   /**
    * Address: 0x00BD43C0 (FUN_00BD43C0, dynamic initializer for `gConAlias_efx_AttachEmitter`)
@@ -2941,49 +2825,10 @@ namespace moho
   moho::CConAlias gConAlias_efx_AttachEmitter("efx_AttachEmitter", "Attach an emitter to selected unit, must specify bone name and blueprint", "DoSimCommand efx_AttachEmitter");
 
   /**
-   * Address: 0x00BFBE90 (FUN_00BFBE90, cleanup_efx_AttachEmitter_SimConFunc)
-   *
-   * What it does:
-   * Destroys startup-owned `efx_AttachEmitter` sim-console callback storage.
+   * Address: 0x00BD43F0 (FUN_00BD43F0, dynamic initializer for `gSimConFunc_efx_AttachEmitter`)
+   * Address: 0x00BFBE90 (FUN_00BFBE90, dynamic atexit destructor for `gSimConFunc_efx_AttachEmitter`)
    */
-  void cleanup_efx_AttachEmitter_SimConFunc()
-  {
-    if (!gSimConFunc_efx_AttachEmitterConstructed) {
-      return;
-    }
-
-    static_cast<CSimConCommand&>(SimConFunc_efx_AttachEmitter()).~CSimConCommand();
-    gSimConFunc_efx_AttachEmitterConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BD43F0 (FUN_00BD43F0, register_efx_AttachEmitter_SimConFuncDef)
-   *
-   * What it does:
-   * Registers the `efx_AttachEmitter` sim-console callback and arms startup
-   * teardown.
-   */
-  void register_efx_AttachEmitter_SimConFuncDef()
-  {
-    (void)ConstructSimConFunc_efx_AttachEmitter();
-    RegisterAtexitCleanup<&cleanup_efx_AttachEmitter_SimConFunc>();
-  }
-
-  /**
-   * Address: 0x00BFC0E0 (FUN_00BFC0E0, cleanup_AddLightParticle_SimConFunc)
-   *
-   * What it does:
-   * Destroys startup-owned `AddLightParticle` sim-console callback storage.
-   */
-  void cleanup_AddLightParticle_SimConFunc()
-  {
-    if (!gSimConFunc_AddLightParticleConstructed) {
-      return;
-    }
-
-    static_cast<CSimConCommand&>(SimConFunc_AddLightParticle()).~CSimConCommand();
-    gSimConFunc_AddLightParticleConstructed = false;
-  }
+  CSimConFunc gSimConFunc_efx_AttachEmitter(false, "efx_AttachEmitter", &Sim::efx_AttachEmitter);
 
   /**
    * Address: 0x00BD4640 (FUN_00BD4640, dynamic initializer for `gConAlias_AddLightParticle`)
@@ -2992,16 +2837,10 @@ namespace moho
   moho::CConAlias gConAlias_AddLightParticle("AddLightParticle", "Add a light to the world under the cursor", "DoSimCommand AddLightParticle");
 
   /**
-   * Address: 0x00BD4670 (FUN_00BD4670, register_AddLightParticle_SimConFuncDef)
-   *
-   * What it does:
-   * Registers the `AddLightParticle` sim-console callback and arms startup teardown.
+   * Address: 0x00BD4670 (FUN_00BD4670, dynamic initializer for `gSimConFunc_AddLightParticle`)
+   * Address: 0x00BFC0E0 (FUN_00BFC0E0, dynamic atexit destructor for `gSimConFunc_AddLightParticle`)
    */
-  void register_AddLightParticle_SimConFuncDef()
-  {
-    (void)ConstructSimConFunc_AddLightParticle();
-    RegisterAtexitCleanup<&cleanup_AddLightParticle_SimConFunc>();
-  }
+  CSimConFunc gSimConFunc_AddLightParticle(false, "AddLightParticle", &Sim::AddLightParticle);
 
   /**
    * Address: 0x00BD4720 (FUN_00BD4720, register_sim_SimInitFormListAnchor)
@@ -3242,10 +3081,6 @@ namespace
       (void)moho::register_CreateBeamEntityToEntity_LuaFuncDef();
       (void)moho::j_func_AttachBeamEntityToEntity_LuaFuncDef();
       (void)moho::register_AttachBeamToEntity_LuaFuncDef();
-      moho::register_AddBeam_SimConFuncDef();
-      moho::register_efx_NewEmitter_SimConFuncDef();
-      moho::register_efx_AttachEmitter_SimConFuncDef();
-      moho::register_AddLightParticle_SimConFuncDef();
       (void)moho::register_sim_SimInitFormListAnchor();
       (void)moho::j_func_IEffectSetBeamParam_LuaFuncDef();
       (void)moho::j_func_IEffectSetEmitterParam_LuaFuncDef();

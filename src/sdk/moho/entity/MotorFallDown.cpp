@@ -446,19 +446,19 @@ namespace moho
 
     Sim* const sim = entity->SimulationRef;
     if (mBreakOnWhack) {
-      const float accelFactor = ReadSimConVarFloat(sim, GetTreeAccelFactorSimConVarDef(), 0.1f);
+      const float accelFactor = ReadSimConVarFloat(sim, &moho::gSimConVar_tree_AccelFactor, 0.1f);
       const float previousAngle = mFallAngleRadians;
       const float nextDepth = (accelFactor * previousAngle) + mFallDepth;
       mFallDepth = nextDepth;
       mFallAngleRadians = nextDepth + previousAngle;
     } else {
-      const float springFactor = ReadSimConVarFloat(sim, GetTreeSpringFactorSimConVarDef(), 0.5f);
+      const float springFactor = ReadSimConVarFloat(sim, &moho::gSimConVar_tree_SpringFactor, 0.5f);
       const float previousAngle = mFallAngleRadians;
       const float nextDepth = mFallDepth - (previousAngle * springFactor);
       mFallDepth = nextDepth;
       mFallAngleRadians = nextDepth + previousAngle;
 
-      const float dampFactor = ReadSimConVarFloat(sim, GetTreeDampFactorSimConVarDef(), 0.5f);
+      const float dampFactor = ReadSimConVarFloat(sim, &moho::gSimConVar_tree_DampFactor, 0.5f);
       mFallDepth = (1.0f - dampFactor) * mFallDepth;
     }
 
@@ -496,7 +496,7 @@ namespace moho
       const CHeightField* const heightField = mapData ? mapData->mHeightField.get() : nullptr;
       if (heightField) {
         const float groundElevation = heightField->GetElevation(pendingTransform.pos_.x, pendingTransform.pos_.z);
-        const float uprootFactor = ReadSimConVarFloat(sim, GetTreeUprootFactorSimConVarDef(), 0.1f);
+        const float uprootFactor = ReadSimConVarFloat(sim, &moho::gSimConVar_tree_UprootFactor, 0.1f);
         const float sizeLane = entity->BluePrint ? entity->BluePrint->mSizeX : 0.0f;
         const float uprootTargetY = groundElevation + (sizeLane * uprootFactor);
         pendingTransform.pos_.y +=

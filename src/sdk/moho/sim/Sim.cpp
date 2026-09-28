@@ -165,6 +165,7 @@
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitMotion.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -3992,26 +3993,6 @@ namespace
     moho::console::PlatformFormatCallstack(outText, frameCount, frames);
   }
 
-  CSimConVarBase* PathBackgroundUpdateConVar()
-  {
-    return moho::console::SimPathBackgroundUpdateConVar();
-  }
-
-  CSimConVarBase* PathBackgroundBudgetConVar()
-  {
-    return moho::console::SimPathBackgroundBudgetConVar();
-  }
-
-  CSimConVarBase* ChecksumPeriodConVar()
-  {
-    return moho::console::SimChecksumPeriodConVar();
-  }
-
-  [[maybe_unused]] CSimConVarBase* PathTimeoutPreviewConVar()
-  {
-    return moho::console::SimPathTimeoutPreviewConVar();
-  }
-
 } // namespace
 
 // `Moho::PathPreviewFinder` is forward-declared at real `moho::` scope in
@@ -4304,7 +4285,7 @@ namespace moho
    */
   std::int32_t PathPreviewFinder::GetPathcap() const
   {
-    CSimConVarInstanceBase* const instance = mSim->GetSimVar(PathTimeoutPreviewConVar());
+    CSimConVarInstanceBase* const instance = mSim->GetSimVar(&gSimConVar_path_TimeoutPreview);
     return *reinterpret_cast<const std::int32_t*>(instance->GetValueStorage());
   }
 
@@ -6027,7 +6008,7 @@ void Sim::FlushLog()
     mDesyncLogLines.push_back(mDesyncLogLine);
   }
 
-  const int checksumPeriod = ReadSimConVarInt(this, ChecksumPeriodConVar(), 0);
+  const int checksumPeriod = ReadSimConVarInt(this, &gSimConVar_sim_ChecksumPeriod, 0);
   const int retainedLogCount = checksumPeriod + 20;
   while (static_cast<int>(mDesyncLogLines.size()) > retainedLogCount) {
     const msvc8::string staleLogPath = mDesyncLogLines.front();
@@ -10754,8 +10735,8 @@ void Sim::AdvanceBeat(const int amt)
     ++mCurTick;
     Logf("  tick number %u\n", mCurTick);
 
-    if (ReadSimConVarBool(this, PathBackgroundUpdateConVar(), false)) {
-      const int pathBudget = ReadSimConVarInt(this, PathBackgroundBudgetConVar(), 0);
+    if (ReadSimConVarBool(this, &gSimConVar_path_BackgroundUpdate, false)) {
+      const int pathBudget = ReadSimConVarInt(this, &gSimConVar_path_BackgroundBudget, 0);
       UpdatePaths(mPathTables, pathBudget);
     }
 
@@ -10901,7 +10882,7 @@ void Sim::AdvanceBeat(const int amt)
   PurgeDestroyedEffects(mEffectManager);
   CleanupDecals(mDecalBuffer);
 
-  const int checksumPeriod = ReadSimConVarInt(this, ChecksumPeriodConVar(), 1);
+  const int checksumPeriod = ReadSimConVarInt(this, &gSimConVar_sim_ChecksumPeriod, 1);
   if (checksumPeriod > 0 && (mCurBeat % static_cast<uint32_t>(checksumPeriod)) == 0u) {
     UpdateChecksum();
   }
@@ -26599,20 +26580,8 @@ namespace moho
     session->DirtyCommandGraph();
   }
 
-  // Owned by SimDebugCommandRegistrations.cpp (same namespace).
-  TSimConVar<bool>& AI_DebugCollisionConVar();
-
 namespace
 {
-  // Process-global `AI_DebugCollision` sim convar singleton (statically
-  // constructed at .data 0x010AD5F8 in the shipped exe; owned here by
-  // SimDebugCommandRegistrations.cpp). When set, `Sim::DoCollisionsFor` skips
-  // physical collision resolution so the collision overlay can be inspected.
-  [[nodiscard]] CSimConVarBase* AIDebugCollisionConVar() noexcept
-  {
-    return &AI_DebugCollisionConVar();
-  }
-
   // The mass proxy and the impulse footprint-gate both used to live here as
   // file-local copies. They are the same two expressions the pathing side now
   // needs to answer "can this unit shove that one aside", so they moved to
@@ -26647,7 +26616,7 @@ void Sim::DoCollisionsFor(
   constexpr float kHalfExtentScale = 0.5f;       // flt_E4F724
 
   // Debug/dead/queued/naval short-circuits (asm 0x597CE4-0x597D26).
-  if (ReadSimConVarBool(sim, AIDebugCollisionConVar(), false) || owner->mIsNaval || owner->IsDead() ||
+  if (ReadSimConVarBool(sim, &gSimConVar_AI_DebugCollision, false) || owner->mIsNaval || owner->IsDead() ||
       owner->DestroyQueued()) {
     return;
   }
