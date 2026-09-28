@@ -31,6 +31,10 @@
  * The macro is purely additive: provider functions guard their singleton, so
  * the existing bootstrap object calling the same provider later is a no-op.
  *
+ * The table entry is a small thunk that calls `FN()`, not `FN` cast to a
+ * `void()` pointer: a provider that takes a parameter is then a compile error
+ * instead of a call that reads its argument off the caller's stack.
+ *
  * Usage - place directly after the provider's definition, at namespace scope:
  *
  *     void register_SFootprintTypeInfo() { ... }
@@ -38,7 +42,11 @@
  */
 
 #define GPG_PREREGISTER_INIT(TAG, FN)                                              \
+  static void __cdecl gGpgPreRegisterThunk_##TAG()                                 \
+  {                                                                                \
+    (void)FN();                                                                    \
+  }                                                                                \
   __pragma(section(".CRT$XCL", read))                                              \
   extern "C" __declspec(allocate(".CRT$XCL")) void(__cdecl* const                  \
                                                    gGpgPreRegisterInit_##TAG)() =  \
-    reinterpret_cast<void(__cdecl*)()>(&FN);
+    &gGpgPreRegisterThunk_##TAG;
