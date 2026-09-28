@@ -119,7 +119,7 @@ namespace
   static_assert(sizeof(RScaResourceConstruct) == 0x14, "RScaResourceConstruct size must be 0x14");
 
   /**
-   * VFTABLE: unknown - not independently observed for this instantiation.
+   * VFTABLE: 0x00E1644C
    *
    * Demangled: gpg::SerSaveConstructHelper<class Moho::RScaResource>
    *
@@ -133,7 +133,26 @@ namespace
   class RScaResourceSaveConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC91F0 (FUN_00BC91F0, dynamic initializer for `gRScaResourceSaveConstructHelper`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the
+     * save-construct-args callback and installs this helper's vtable; the
+     * compiler registers the destructor with `atexit`.
+     */
     RScaResourceSaveConstruct();
+
+    /**
+     * Address: 0x00BF3D40 (FUN_00BF3D40, dynamic atexit destructor for `gRScaResourceSaveConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_0053A710` and `FUN_0053A740` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RScaResourceSaveConstruct() = default;
 
     /**
      * Address: 0x0053ABD0 (FUN_0053ABD0, gpg::SerSaveConstructHelper<Moho::RScaResource>::Init)
@@ -157,6 +176,12 @@ namespace
   );
   static_assert(sizeof(RScaResourceSaveConstruct) == 0x10, "RScaResourceSaveConstruct size must be 0x10");
 
+  /**
+   * Address: 0x00BC91F0 (FUN_00BC91F0, dynamic initializer for `gRScaResourceSaveConstructHelper`)
+   *
+   * What it does:
+   * Binds this helper's save-construct-args callback.
+   */
   RScaResourceSaveConstruct::RScaResourceSaveConstruct()
     : mSaveConstructArgsCallback(
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&moho::SaveConstructArgs_RScaResourceThunk)
@@ -255,20 +280,6 @@ namespace
     return sFactory;
   }
 } // namespace
-
-/**
- * Address: 0x0053A710 (FUN_0053A710)
- *
- * What it does:
- * Unlinks `RScaResource` save-construct helper links and restores the node
- * to self-linked sentinel state. `FUN_0053A740` is a duplicate-emission twin
- * of this exact unlink/reset lane (same `ResetLinks()` shape, folded to a
- * separate address); it has no distinct source-level body of its own.
- */
-[[maybe_unused]] void CleanupRScaResourceSaveConstructHelperPrimary() noexcept
-{
-  gRScaResourceSaveConstructHelper.ResetLinks();
-}
 
 /**
  * Address: 0x0053A2D0 (FUN_0053A2D0, preregister_RScaResourceTypeInfo)

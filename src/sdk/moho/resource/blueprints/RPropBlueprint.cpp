@@ -39,6 +39,10 @@ namespace moho
   );
 
   // Forward declaration: the real definition sits further down in this TU;
+  // RPropBlueprintConstruct's ctor below binds it as the delete callback.
+  void Delete_RPropBlueprint(void* objectPtr);
+
+  // Forward declaration: the real definition sits further down in this TU;
   // RPropBlueprintSaveConstruct's ctor below only needs the signature to
   // bind the callback pointer. Mirrors Construct_RPropBlueprint's forward
   // declaration above (this is the save-side counterpart).
@@ -87,7 +91,26 @@ namespace
   class RPropBlueprintConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC8860 (FUN_00BC8860, dynamic initializer for `gRPropBlueprintConstructHelper`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the
+     * construct/delete callbacks and installs this helper's vtable
+     * (0x00E11088); the compiler registers the destructor with `atexit`.
+     */
     RPropBlueprintConstruct();
+
+    /**
+     * Address: 0x00BF3180 (FUN_00BF3180, dynamic atexit destructor for `gRPropBlueprintConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_0051DC30` and `FUN_0051DC60` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RPropBlueprintConstruct() = default;
 
     /**
      * Address: 0x0051DE50 (FUN_0051DE50, gpg::SerConstructHelper<Moho::RPropBlueprint>::Init)
@@ -116,15 +139,15 @@ namespace
   );
   static_assert(sizeof(RPropBlueprintConstruct) == 0x14, "RPropBlueprintConstruct size must be 0x14");
 
-  // NOTE: no binary evidence in this TU identifies a delete callback for
-  // RPropBlueprint - Construct_RPropBlueprint below resolves an *existing*
-  // blueprint out of RRuleGameRules's blueprint table (SetOwned on a lookup
-  // result, not a fresh heap allocation), so a null delete callback is
-  // plausible (the table, not the reflection system, owns blueprint
-  // lifetime) but is not independently confirmed.
+  /**
+   * Address: 0x00BC8860 (FUN_00BC8860, dynamic initializer for `gRPropBlueprintConstructHelper`)
+   *
+   * What it does:
+   * Binds this helper's construct/delete callbacks (0x0051DC90, 0x0051E080).
+   */
   RPropBlueprintConstruct::RPropBlueprintConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&moho::Construct_RPropBlueprint))
-    , mDeleteCallback(nullptr)
+    , mDeleteCallback(&moho::Delete_RPropBlueprint)
   {}
 
   void RPropBlueprintConstruct::Init()
@@ -188,10 +211,20 @@ namespace
      * What it does:
      * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
      * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the save-construct-args callback field and installs
-     * process-exit cleanup.
+     * then binds the save-construct-args callback field; the compiler
+     * registers the destructor with `atexit`.
      */
     RPropBlueprintSaveConstruct();
+
+    /**
+     * Address: 0x00BF3150 (FUN_00BF3150, dynamic atexit destructor for `gRPropBlueprintSaveConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_0051DB50` and `FUN_0051DB80` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RPropBlueprintSaveConstruct() = default;
 
     /**
      * Address: 0x0051DDD0 (FUN_0051DDD0, gpg::SerSaveConstructHelper<Moho::RPropBlueprint>::Init)
@@ -241,57 +274,6 @@ namespace
 namespace moho
 {
   gpg::RType* RPropBlueprint::sType = nullptr;
-
-  /**
-   * Address: 0x0051DC30 (FUN_0051DC30)
-   *
-   * What it does:
-   * Unlinks `RPropBlueprint` construct-helper links and restores the node to
-   * self-linked sentinel state.
-   */
-  [[maybe_unused]] void CleanupRPropBlueprintConstructHelperPrimary() noexcept
-  {
-    gRPropBlueprintConstructHelper.ResetLinks();
-  }
-
-  /**
-   * Address: 0x0051DC60 (FUN_0051DC60)
-   *
-   * What it does:
-   * Secondary entrypoint for unlink/reset of the same
-   * `RPropBlueprint` construct-helper lane.
-   */
-  [[maybe_unused]] void CleanupRPropBlueprintConstructHelperSecondary() noexcept
-  {
-    gRPropBlueprintConstructHelper.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00BF3150 (FUN_00BF3150, atexit-registered cleanup target)
-   *
-   * What it does:
-   * Unlinks `RPropBlueprint` save-construct-helper links and restores the
-   * node to self-linked sentinel state.
-   */
-  [[maybe_unused]] void CleanupRPropBlueprintSaveConstructHelperPrimary() noexcept
-  {
-    gRPropBlueprintSaveConstructHelper.ResetLinks();
-  }
-
-  /**
-   * Address: 0x0051DB50 (FUN_0051DB50)
-   * ICF twin: 0x0051DB80 (FUN_0051DB80) -- identical unlink/self-link body
-   * hardcoded to the same global; both are dead duplicates of the real
-   * atexit target 0x00BF3150 above.
-   *
-   * What it does:
-   * Secondary entrypoint for unlink/reset of the same
-   * `RPropBlueprint` save-construct-helper lane.
-   */
-  [[maybe_unused]] void CleanupRPropBlueprintSaveConstructHelperSecondary() noexcept
-  {
-    gRPropBlueprintSaveConstructHelper.ResetLinks();
-  }
 
   /**
    * Address: 0x0051DB30 (FUN_0051DB30, register-shape thunk)
@@ -370,6 +352,17 @@ namespace moho
     gpg::RRef blueprintRef{};
     (void)gpg::RRef_RPropBlueprint(&blueprintRef, blueprint);
     result->SetOwned(blueprintRef, 1u);
+  }
+
+  /**
+   * Address: 0x0051E080 (FUN_0051E080)
+   *
+   * What it does:
+   * Deletes one constructed `RPropBlueprint` through its virtual destructor.
+   */
+  void Delete_RPropBlueprint(void* const objectPtr)
+  {
+    delete static_cast<RPropBlueprint*>(objectPtr);
   }
 
   /**

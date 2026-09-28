@@ -192,63 +192,6 @@ namespace
   }
 
   /**
-   * Demangled (by analogy to the established `gpg::Rect2iSerializer` /
-   * `gpg::Rect2fSerializer` sibling shape in Reflection.h):
-   * `gpg::SerSaveLoadHelper<class Moho::CTextureScroller>`.
-   *
-   * NOTE: no citation in this TU identifies a constructor that binds
-   * `mLoadCallback`/`mSaveCallback` for this specific helper, nor an `Init()`
-   * dispatch body -- both load/save fields stay null here, matching this
-   * file's pre-existing (already-uncalled) state. This also appears to
-   * duplicate `moho::CTextureScroller`'s own, fully-evidenced serializer
-   * helper recovered in `CTextureScroller.cpp`
-   * (`register_CTextureScrollerSerializer` /
-   * `InstallTextureScrollerSerializerCallbacks`, FUN_00BDD750/FUN_00777F80) --
-   * flagged here for a follow-up reconciliation pass, not merged.
-   */
-  class CTextureScrollerSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00777D90 (FUN_00777D90, SerSaveLoadHelper<CTextureScroller>::unlink lane A)
-     * Address: 0x00777DC0 (FUN_00777DC0, SerSaveLoadHelper<CTextureScroller>::unlink lane B)
-     *
-     * What it does:
-     * Resolves `CTextureScroller` reflected type metadata and publishes this
-     * helper's (currently null) load/save callback lanes to it.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mLoadCallback = nullptr;
-    gpg::RType::save_func_t mSaveCallback = nullptr;
-  };
-  static_assert(
-    offsetof(CTextureScrollerSerializer, mLoadCallback) == 0x0C,
-    "CTextureScrollerSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CTextureScrollerSerializer, mSaveCallback) == 0x10,
-    "CTextureScrollerSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(CTextureScrollerSerializer) == 0x14, "CTextureScrollerSerializer size must be 0x14");
-
-  void CTextureScrollerSerializer::Init()
-  {
-    gpg::RType* type = moho::CTextureScroller::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CTextureScroller));
-      moho::CTextureScroller::sType = type;
-    }
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  CTextureScrollerSerializer gTextureScrollerSerializer;
-
-  /**
    * VFTABLE: 0x00E37368
    *
    * Demangled: gpg::SerSaveLoadHelper<struct Moho::SDecalInfo>
@@ -282,30 +225,6 @@ namespace
   // `gpg::SerSaveLoadHelper<SDecalInfo>` ctor and registers the real
   // destructor (0x00C02820) via `atexit`.
   SDecalInfoSerializer gSDecalInfoSerializer;
-
-  /**
-   * Address: 0x00777D90 (FUN_00777D90)
-   *
-   * What it does:
-   * Unlinks `CTextureScrollerSerializer` helper node from the intrusive helper
-   * list and restores self-links.
-   */
-  [[maybe_unused]] void UnlinkTextureScrollerSerializerHelperPrimary() noexcept
-  {
-    gTextureScrollerSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00777DC0 (FUN_00777DC0)
-   *
-   * What it does:
-   * Secondary entrypoint for `CTextureScrollerSerializer` helper-node
-   * intrusive unlink + self-link reset.
-   */
-  [[maybe_unused]] void UnlinkTextureScrollerSerializerHelperSecondary() noexcept
-  {
-    gTextureScrollerSerializer.ResetLinks();
-  }
 
   /**
    * Address: 0x0077C9A0 (FUN_0077C9A0)

@@ -351,10 +351,20 @@ namespace moho
      * What it does:
      * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
      * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the load/save callback fields and installs process-exit
-     * cleanup via `atexit`.
+     * then binds the load/save callback fields; the compiler registers the
+     * destructor with `atexit`.
      */
     CUnitMeleeAttackTargetTaskSerializer();
+
+    /**
+     * Address: 0x00BF9F90 (FUN_00BF9F90, dynamic atexit destructor for `gCUnitMeleeAttackTargetTaskSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_00615450` and `FUN_00615480` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitMeleeAttackTargetTaskSerializer();
 
     /**
      * Address: 0x006153F0 (FUN_006153F0, Moho::CUnitMeleeAttackTargetTaskSerializer::Deserialize)

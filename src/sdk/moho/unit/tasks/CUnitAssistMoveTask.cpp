@@ -666,11 +666,6 @@ namespace moho
   }
 } // namespace moho
 
-namespace
-{
-  void cleanup_CUnitAssistMoveTaskSerializer_atexit();
-} // namespace
-
 namespace moho
 {
   /**
@@ -704,13 +699,28 @@ namespace moho
   class CUnitAssistMoveTaskSerializer final : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BCF270 (FUN_00BCF270, dynamic initializer for `gCUnitAssistMoveTaskSerializer`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the load/save
+     * callbacks and installs this helper's vtable; the compiler registers the
+     * destructor with `atexit`.
+     */
     CUnitAssistMoveTaskSerializer()
       : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&CUnitAssistMoveTaskMemberDeserializeThunk))
       , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&CUnitAssistMoveTaskMemberSerializeThunk))
-    {
-      (void)std::atexit(&cleanup_CUnitAssistMoveTaskSerializer_atexit);
-    }
+    {}
 
+    /**
+     * Address: 0x00BF8FF0 (FUN_00BF8FF0, dynamic atexit destructor for `gCUnitAssistMoveTaskSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_005F0B60` and `FUN_005F0B90` are
+     * unreferenced out-of-line copies of the same body.
+     */
     ~CUnitAssistMoveTaskSerializer() = default;
 
     /**
@@ -755,18 +765,6 @@ namespace
   // later dispatches `Init()` on it from within the first
   // `ReadArchive`/`WriteArchive` construction.
   moho::CUnitAssistMoveTaskSerializer gCUnitAssistMoveTaskSerializer;
-
-  /**
-   * Address: 0x00BF8FF0 (FUN_00BF8FF0, atexit unlink target)
-   *
-   * What it does:
-   * Unlinks `CUnitAssistMoveTaskSerializer` from the intrusive
-   * serializer-helper list and restores its self-linked node lane.
-   */
-  void cleanup_CUnitAssistMoveTaskSerializer_atexit()
-  {
-    gCUnitAssistMoveTaskSerializer.ResetLinks();
-  }
 } // namespace
 
 namespace gpg

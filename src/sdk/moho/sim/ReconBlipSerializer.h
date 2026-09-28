@@ -82,11 +82,20 @@ namespace moho
      *
      * What it does:
      * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields, then registers `cleanup_ReconBlipSerializer`
-     * (0x00BF7930, a plain free function -- not a mangled destructor) as
-     * the explicit atexit teardown.
+     * load/save callback fields; the compiler registers the destructor with
+     * `atexit`.
      */
     ReconBlipSerializer();
+
+    /**
+     * Address: 0x00BF7930 (FUN_00BF7930, dynamic atexit destructor for `gReconBlipSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_005BFCE0` and `FUN_005BFD10` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~ReconBlipSerializer();
 
     /**
      * Address: 0x005BFC90 (FUN_005BFC90, Moho::ReconBlipSerializer::Deserialize)

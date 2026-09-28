@@ -1647,51 +1647,28 @@ namespace gpg
 namespace
 {
   moho::CUnitMeleeAttackTargetTaskSerializer gCUnitMeleeAttackTargetTaskSerializer;
-
-  /**
-   * Address: 0x00615450 (FUN_00615450)
-   *
-   * What it does:
-   * Unlinks `CUnitMeleeAttackTargetTaskSerializer` helper node from the
-   * intrusive serializer-helper list and restores self-links.
-   */
-  void UnlinkCUnitMeleeAttackTargetTaskSerializerNodePrimary()
-  {
-    gCUnitMeleeAttackTargetTaskSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00615480 (FUN_00615480)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link lane rewrite for
-   * `CUnitMeleeAttackTargetTaskSerializer` helper storage.
-   */
-  [[maybe_unused]] void UnlinkCUnitMeleeAttackTargetTaskSerializerNodeSecondary()
-  {
-    gCUnitMeleeAttackTargetTaskSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00BF9F90 (FUN_00BF9F90, Moho::CUnitMeleeAttackTargetTaskSerializer::~CUnitMeleeAttackTargetTaskSerializer)
-   *
-   * What it does:
-   * Process-exit teardown: unlinks the `CUnitMeleeAttackTargetTaskSerializer`
-   * helper node, matching the sibling unlink lanes used across other
-   * serializer registrars.
-   */
-  void cleanup_CUnitMeleeAttackTargetTaskSerializer_atexit()
-  {
-    UnlinkCUnitMeleeAttackTargetTaskSerializerNodePrimary();
-  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BD0E00 (FUN_00BD0E00, dynamic initializer for `gCUnitMeleeAttackTargetTaskSerializer`)
+   *
+   * What it does:
+   * Binds this helper's load/save callbacks.
+   */
   CUnitMeleeAttackTargetTaskSerializer::CUnitMeleeAttackTargetTaskSerializer()
     : mDeserialize(&CUnitMeleeAttackTargetTaskSerializer::Deserialize)
     , mSerialize(&CUnitMeleeAttackTargetTaskSerializer::Serialize)
-  {
-    (void)std::atexit(&cleanup_CUnitMeleeAttackTargetTaskSerializer_atexit);
-  }
+  {}
+
+  /**
+   * Address: 0x00BF9F90 (FUN_00BF9F90, dynamic atexit destructor for `gCUnitMeleeAttackTargetTaskSerializer`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). `FUN_00615450` and `FUN_00615480` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  CUnitMeleeAttackTargetTaskSerializer::~CUnitMeleeAttackTargetTaskSerializer() = default;
 } // namespace moho

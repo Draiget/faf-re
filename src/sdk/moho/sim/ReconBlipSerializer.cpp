@@ -136,16 +136,6 @@ namespace
   // for all four, and no source-level caller anywhere in src/sdk/**.
   // `ReconBlipSerializer::Deserialize`/`Serialize` below already call
   // `DeserializeReconBlipMembers`/`SerializeReconBlipMembers` above directly.
-
-  /**
-   * Address: 0x00BF7930 (FUN_00BF7930, cleanup_ReconBlipSerializer)
-   *
-   * What it does:
-   * Process-exit cleanup that unlinks the `ReconBlipSerializer` helper node.
-   * The real ctor pushes this plain free function (not a mangled
-   * destructor) as its atexit target.
-   */
-  void cleanup_ReconBlipSerializer();
 } // namespace
 
 namespace moho
@@ -240,15 +230,23 @@ namespace moho
    *
    * What it does:
    * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields, then registers `cleanup_ReconBlipSerializer`
-   * as the explicit atexit teardown.
+   * load/save callback fields; the compiler registers the destructor with
+   * `atexit`.
    */
   ReconBlipSerializer::ReconBlipSerializer()
     : mLoadCallback(&ReconBlipSerializer::Deserialize)
     , mSaveCallback(&ReconBlipSerializer::Serialize)
-  {
-    (void)std::atexit(&cleanup_ReconBlipSerializer);
-  }
+  {}
+
+  /**
+   * Address: 0x00BF7930 (FUN_00BF7930, dynamic atexit destructor for `gReconBlipSerializer`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). `FUN_005BFCE0` and `FUN_005BFD10` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  ReconBlipSerializer::~ReconBlipSerializer() = default;
 } // namespace moho
 
 namespace
@@ -258,9 +256,4 @@ namespace
 
   // Address: 0x010AF810 -- process-global `ReconBlipSerializer` singleton.
   moho::ReconBlipSerializer gReconBlipSerializer;
-
-  void cleanup_ReconBlipSerializer()
-  {
-    gReconBlipSerializer.ResetLinks();
-  }
 } // namespace

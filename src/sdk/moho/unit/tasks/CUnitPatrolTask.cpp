@@ -1293,6 +1293,16 @@ namespace
     CUnitPatrolTaskConstruct();
 
     /**
+     * Address: 0x00BFA180 (FUN_00BFA180, dynamic atexit destructor for `gCUnitPatrolTaskConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_0061ACA0` and `FUN_0061ACD0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitPatrolTaskConstruct() = default;
+
+    /**
      * Address: 0x0061C660 (FUN_0061C660, gpg::SerConstructHelper<Moho::CUnitPatrolTask>::Init)
      *
      * What it does:
@@ -1367,34 +1377,10 @@ namespace
     delete static_cast<moho::CUnitPatrolTask*>(taskStorage);
   }
 
-  /**
-   * Address: 0x00BFA180 (FUN_00BFA180)
-   *
-   * What it does:
-   * Unlinks `CUnitPatrolTaskConstruct` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   * Registered by this helper's own constructor (0x00BD1300) as this
-   * global's `atexit` teardown. `FUN_0061ACA0` and `FUN_0061ACD0` are
-   * duplicate-emission twins of this exact unlink/reset lane (same
-   * `ResetLinks()` shape, folded to separate addresses); they have no
-   * distinct source-level body of their own.
-   */
-  void UnlinkCUnitPatrolTaskConstructNode()
-  {
-    gCUnitPatrolTaskConstruct.ResetLinks();
-  }
-
-  void cleanup_CUnitPatrolTaskConstruct_atexit()
-  {
-    UnlinkCUnitPatrolTaskConstructNode();
-  }
-
   CUnitPatrolTaskConstruct::CUnitPatrolTaskConstruct()
     : mConstructCallback(&ConstructCUnitPatrolTaskSerializerCallback)
     , mDeleteCallback(&DestructCUnitPatrolTaskSerializerCallback)
-  {
-    (void)std::atexit(&cleanup_CUnitPatrolTaskConstruct_atexit);
-  }
+  {}
 
   void CUnitPatrolTaskConstruct::Init()
   {

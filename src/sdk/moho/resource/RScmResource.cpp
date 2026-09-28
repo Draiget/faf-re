@@ -53,12 +53,6 @@ namespace moho
 
 namespace
 {
-  // Forward declaration: real definition sits in the second anonymous
-  // namespace further down in this TU, after CleanupRScmResourceConstructHelperPrimary
-  // (namespace moho) is visible. Both anonymous-namespace blocks are the same
-  // namespace for the whole translation unit.
-  void CleanupRScmResourceConstructHelperAtExit();
-
   [[nodiscard]] gpg::RType* ResolveRScmResourceTypeCached() noexcept
   {
     gpg::RType* resourceType = moho::RScmResource::sType;
@@ -82,7 +76,26 @@ namespace
   class RScmResourceSaveConstruct : public gpg::SerHelperBase
   {
   public:
+    /**
+     * Address: 0x00BC9110 (FUN_00BC9110, dynamic initializer for `gRScmResourceSaveConstructHelper`)
+     *
+     * What it does:
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the pending `sNewHelpers` list), binds the
+     * save-construct-args callback and installs this helper's vtable
+     * (0x00E16390); the compiler registers the destructor with `atexit`.
+     */
     RScmResourceSaveConstruct();
+
+    /**
+     * Address: 0x00BF3C40 (FUN_00BF3C40, dynamic atexit destructor for `gRScmResourceSaveConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_00538F10` and `FUN_00538F40` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RScmResourceSaveConstruct() = default;
 
     /**
      * Address: 0x00539620 (FUN_00539620, gpg::SerSaveConstructHelper<Moho::RScmResource>::Init)
@@ -106,6 +119,12 @@ namespace
   );
   static_assert(sizeof(RScmResourceSaveConstruct) == 0x10, "RScmResourceSaveConstruct size must be 0x10");
 
+  /**
+   * Address: 0x00BC9110 (FUN_00BC9110, dynamic initializer for `gRScmResourceSaveConstructHelper`)
+   *
+   * What it does:
+   * Binds this helper's save-construct-args callback.
+   */
   RScmResourceSaveConstruct::RScmResourceSaveConstruct()
     : mSaveConstructArgsCallback(
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&moho::SaveConstructArgs_RScmResourceThunk)
@@ -151,12 +170,22 @@ namespace
      * What it does:
      * Binds `Construct_RScmResource` / `DeleteRScmResource` as this helper's
      * construct/delete callbacks (type-erased through
-     * `gpg::RType::construct_func_t` / `delete_func_t`) and registers
-     * process-exit cleanup. The published callbacks are later copied onto
-     * `RScmResource`'s reflected `RType` by `Init()` (0x005396A0) when the
-     * pending helper list is drained.
+     * `gpg::RType::construct_func_t` / `delete_func_t`); the compiler
+     * registers the destructor with `atexit`. The published callbacks are
+     * later copied onto `RScmResource`'s reflected `RType` by `Init()`
+     * (0x005396A0) when the pending helper list is drained.
      */
     RScmResourceConstruct();
+
+    /**
+     * Address: 0x00BF3C70 (FUN_00BF3C70, dynamic atexit destructor for `gRScmResourceConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). `FUN_00539060` and `FUN_00539090` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RScmResourceConstruct() = default;
 
     /**
      * Address: 0x005396A0 (FUN_005396A0, gpg::SerConstructHelper<Moho::RScmResource>::Init)
@@ -188,9 +217,7 @@ namespace
   RScmResourceConstruct::RScmResourceConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&moho::Construct_RScmResource))
     , mDeleteCallback(&moho::DeleteRScmResource)
-  {
-    (void)std::atexit(&CleanupRScmResourceConstructHelperAtExit);
-  }
+  {}
 
   void RScmResourceConstruct::Init()
   {
@@ -233,57 +260,6 @@ namespace
 namespace moho
 {
   gpg::RType* RScmResource::sType = nullptr;
-
-  /**
-   * Address: 0x00538F10 (FUN_00538F10)
-   *
-   * What it does:
-   * Unlinks `RScmResource` save-construct helper links and restores the node
-   * to self-linked sentinel state.
-   */
-  [[maybe_unused]] void CleanupRScmResourceSaveConstructHelperPrimary() noexcept
-  {
-    gRScmResourceSaveConstructHelper.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00538F40 (FUN_00538F40)
-   *
-   * What it does:
-   * Secondary entrypoint for unlink/reset of the same
-   * `RScmResource` save-construct helper lane.
-   */
-  [[maybe_unused]] void CleanupRScmResourceSaveConstructHelperSecondary() noexcept
-  {
-    gRScmResourceSaveConstructHelper.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00539060 (FUN_00539060)
-   *
-   * What it does:
-   * Unlinks `RScmResource` construct-helper links and restores the node to
-   * self-linked sentinel state. Reused as the body of the process-exit
-   * cleanup registered by `RScmResourceConstruct`'s constructor (0x00BC9140,
-   * atexit target 0x00BF3C70): the real 0x00BF3C70 thunk performs the
-   * identical unlink sequence on the same global inline.
-   */
-  void CleanupRScmResourceConstructHelperPrimary() noexcept
-  {
-    gRScmResourceConstructHelper.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00539090 (FUN_00539090)
-   *
-   * What it does:
-   * Secondary entrypoint for unlink/reset of the same
-   * `RScmResource` construct-helper lane.
-   */
-  [[maybe_unused]] void CleanupRScmResourceConstructHelperSecondary() noexcept
-  {
-    gRScmResourceConstructHelper.ResetLinks();
-  }
 
   /**
    * Address: 0x00538BF0 (FUN_00538BF0,
@@ -521,22 +497,3 @@ namespace moho
     RES_RegisterPrefetchType("models", resourceType);
   }
 } // namespace moho
-
-namespace
-{
-  /**
-   * Address: 0x00BF3C70 (FUN_00BF3C70, cleanup_RScmResourceConstructHelper)
-   *
-   * What it does:
-   * Process-exit cleanup registered by `RScmResourceConstruct`'s constructor
-   * via `atexit`. Unlinks the global `RScmResourceConstruct` helper node,
-   * reusing the same unlink logic as `CleanupRScmResourceConstructHelperPrimary`
-   * (0x00539060) -- the real binary duplicates this unlink sequence inline at
-   * 0x00BF3C70 rather than calling 0x00539060 directly, but the effect is
-   * identical.
-   */
-  void CleanupRScmResourceConstructHelperAtExit()
-  {
-    moho::CleanupRScmResourceConstructHelperPrimary();
-  }
-} // namespace

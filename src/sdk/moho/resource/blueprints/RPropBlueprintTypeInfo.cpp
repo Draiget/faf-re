@@ -91,36 +91,6 @@ namespace
     return &typeInfo->fields_.back();
   }
 
-  struct ScalarDeleteSlot2VTable
-  {
-    void* mSlot0;
-    void* mSlot1;
-
-    using deleting_dtor_t = int(__thiscall*)(void* self, int deleteFlag);
-    deleting_dtor_t mDeletingDtor;
-  };
-
-  struct ScalarDeleteSlot2Object
-  {
-    ScalarDeleteSlot2VTable* mVTable;
-  };
-
-  /**
-   * Address: 0x0051E080 (FUN_0051E080)
-   *
-   * What it does:
-   * Invokes the scalar deleting-destructor lane for a prop blueprint object.
-   */
-  [[maybe_unused]] void DeleteRPropBlueprintObject(void* const object)
-  {
-    if (object == nullptr) {
-      return;
-    }
-
-    auto* const scalarDeleteObject = static_cast<ScalarDeleteSlot2Object*>(object);
-    scalarDeleteObject->mVTable->mDeletingDtor(object, 1);
-  }
-
   struct RPropBlueprintTypeInfoBootstrap
   {
     RPropBlueprintTypeInfoBootstrap()
