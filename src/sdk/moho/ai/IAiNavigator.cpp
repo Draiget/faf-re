@@ -90,12 +90,6 @@ namespace
   using BroadcasterNavigatorType = moho::RBroadcasterRType_EAiNavigatorEvent;
   using ListenerNavigatorType = moho::RListenerRType_EAiNavigatorEvent;
 
-  struct CachedTypeName
-  {
-    msvc8::string value;
-    bool initialized = false;
-  };
-
   [[nodiscard]] BroadcasterNavigatorType* AcquireBroadcasterNavigatorType()
   {
     static BroadcasterNavigatorType sInstance;
@@ -118,32 +112,6 @@ namespace
       }
     }
     return cached;
-  }
-
-  [[nodiscard]] CachedTypeName& CachedBroadcasterEAiNavigatorEventTypeName()
-  {
-    static CachedTypeName cache{};
-    return cache;
-  }
-
-  [[nodiscard]] CachedTypeName& CachedListenerEAiNavigatorEventTypeName()
-  {
-    static CachedTypeName cache{};
-    return cache;
-  }
-
-  void cleanup_RBroadcasterRType_EAiNavigatorEvent_GetName()
-  {
-    CachedTypeName& cache = CachedBroadcasterEAiNavigatorEventTypeName();
-    cache.value = msvc8::string{};
-    cache.initialized = false;
-  }
-
-  void cleanup_RListenerRType_EAiNavigatorEvent_GetName()
-  {
-    CachedTypeName& cache = CachedListenerEAiNavigatorEventTypeName();
-    cache.value = msvc8::string{};
-    cache.initialized = false;
   }
 
   [[nodiscard]] gpg::RType* CachedBroadcasterEAiNavigatorEventType()
@@ -371,22 +339,16 @@ namespace
 
 /**
  * Address: 0x005A7000 (FUN_005A7000, Moho::RBroadcasterRType_EAiNavigatorEvent::GetName)
+ * Address: 0x00BF6FD0 (FUN_00BF6FD0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the runtime type name `Broadcaster<EAiNavigatorEvent>`
- * using the currently registered enum reflection type name.
+ * Builds the runtime type name `Broadcaster<EAiNavigatorEvent>` once from the
+ * registered enum reflection type name and returns it.
  */
 const char* moho::RBroadcasterRType_EAiNavigatorEvent::GetName() const
 {
-  CachedTypeName& cache = CachedBroadcasterEAiNavigatorEventTypeName();
-  if (!cache.initialized) {
-    cache.initialized = true;
-    gpg::RType* const eventType = ResolveEAiNavigatorEventType();
-    const char* const eventTypeName = eventType ? eventType->GetName() : "EAiNavigatorEvent";
-    cache.value = gpg::STR_Printf("Broadcaster<%s>", eventTypeName ? eventTypeName : "EAiNavigatorEvent");
-    (void)std::atexit(&cleanup_RBroadcasterRType_EAiNavigatorEvent_GetName);
-  }
-  return cache.value.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", ResolveEAiNavigatorEventType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -451,22 +413,16 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerSave(
 
 /**
  * Address: 0x005A70C0 (FUN_005A70C0, Moho::RListenerRType_EAiNavigatorEvent::GetName)
+ * Address: 0x00BF6FA0 (FUN_00BF6FA0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the runtime type name `Listener<EAiNavigatorEvent>`
- * using the currently registered enum reflection type name.
+ * Builds the runtime type name `Listener<EAiNavigatorEvent>` once from the
+ * registered enum reflection type name and returns it.
  */
 const char* moho::RListenerRType_EAiNavigatorEvent::GetName() const
 {
-  CachedTypeName& cache = CachedListenerEAiNavigatorEventTypeName();
-  if (!cache.initialized) {
-    cache.initialized = true;
-    gpg::RType* const eventType = ResolveEAiNavigatorEventType();
-    const char* const eventTypeName = eventType ? eventType->GetName() : "EAiNavigatorEvent";
-    cache.value = gpg::STR_Printf("Listener<%s>", eventTypeName ? eventTypeName : "EAiNavigatorEvent");
-    (void)std::atexit(&cleanup_RListenerRType_EAiNavigatorEvent_GetName);
-  }
-  return cache.value.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", ResolveEAiNavigatorEventType()->GetName());
+  return sName.c_str();
 }
 
 namespace

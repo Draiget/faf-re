@@ -15,7 +15,14 @@ namespace moho
 
 namespace
 {
-  moho::IdPoolTypeInfo gIdPoolTypeInfo;
+  /**
+   * Address: 0x00BEE000 (FUN_00BEE000, atexit destructor of the IdPoolTypeInfo object)
+   */
+  [[nodiscard]] moho::IdPoolTypeInfo* AcquireIdPoolTypeInfo()
+  {
+    static moho::IdPoolTypeInfo sInstance;
+    return &sInstance;
+  }
 
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeReflectionRef(TObject* const object, gpg::RType* const type)
@@ -43,18 +50,6 @@ namespace
     pool.mReleasedLows.mWords.ResetStorageToInline();
   }
 
-  /**
-   * Address: 0x00BEE000 (FUN_00BEE000, ??1IdPoolTypeInfo@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Process-exit cleanup for global `IdPoolTypeInfo` dynamic field/base lanes.
-   */
-  void cleanup_IdPoolTypeInfo()
-  {
-    gIdPoolTypeInfo.fields_.clear();
-    gIdPoolTypeInfo.bases_.clear();
-  }
-
   struct IdPoolTypeInfoRegistration
   {
     IdPoolTypeInfoRegistration()
@@ -72,13 +67,11 @@ namespace moho
    * Address: 0x00BC2D80 (FUN_00BC2D80, register_IdPoolTypeInfo)
    *
    * What it does:
-   * Materializes startup `IdPoolTypeInfo` storage and registers process-exit
-   * teardown.
+   * Constructs the startup `IdPoolTypeInfo` object, which preregisters it.
    */
   void register_IdPoolTypeInfo()
   {
-    (void)gIdPoolTypeInfo;
-    (void)std::atexit(&cleanup_IdPoolTypeInfo);
+    (void)AcquireIdPoolTypeInfo();
   }
 
   /**

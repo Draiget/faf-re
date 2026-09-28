@@ -10,6 +10,7 @@
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/BoostWrappers.h"
+#include "legacy/containers/AutoPtr.h"
 #include "gpg/gal/EffectVariable.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/console/CConCommand.h"
@@ -24,24 +25,156 @@
 
 namespace moho
 {
-  extern ShaderVar& shaderVarParticleViewMatrix;
-  extern ShaderVar& shaderVarParticleProjection;
-  extern ShaderVar& shaderVarParticleWorldToProjection;
-  extern ShaderVar& shaderVarParticleInverseViewMatrix;
-  extern ShaderVar& shaderVarParticleParticleSystemPosition;
-  extern ShaderVar& shaderVarParticleTime;
-  extern ShaderVar& shaderVarParticleParticleSystemShape;
-  extern ShaderVar& shaderVarParticleParticleSpread;
-  extern ShaderVar& shaderVarParticleParticleSpeed;
-  extern ShaderVar& shaderVarParticleParticleSystemHeight;
-  extern ShaderVar& shaderVarParticleParticleSize;
-  extern ShaderVar& shaderVarParticleDragEnabled;
-  extern ShaderVar& shaderVarParticleDragCoeff;
-  extern ShaderVar& shaderVarParticleInvDragCoeff;
-  extern ShaderVar& shaderVarParticleInvDragCoeffSq;
-  extern ShaderVar& shaderVarParticleBackgroundTexture;
-  extern ShaderVar& shaderVarParticleParticleTexture0;
-  extern ShaderVar& shaderVarParticleParticleTexture1;
+  // The eighteen particle shader-vars below are defined ahead of the
+  // bootstrap object further down in this file: C++ constructs a translation
+  // unit's namespace-scope objects in definition order, so each one is
+  // default-constructed before its registrar runs `RegisterShaderVar` on it.
+  // No other translation unit reads them during static initialization.
+
+  /**
+   * Address: 0x00BF00A0 (FUN_00BF00A0, dynamic atexit destructor for `shaderVarParticleViewMatrix`)
+   *
+   * What it does:
+   * The particle `ViewMatrix` shader-var (binary global 0x010A8440).
+   */
+  ShaderVar shaderVarParticleViewMatrix;
+
+  /**
+   * Address: 0x00BF00C0 (FUN_00BF00C0, dynamic atexit destructor for `shaderVarParticleProjection`)
+   *
+   * What it does:
+   * The particle `Projection` shader-var (binary global 0x010A82D8).
+   */
+  ShaderVar shaderVarParticleProjection;
+
+  /**
+   * Address: 0x00BF0090 (FUN_00BF0090, dynamic atexit destructor for `shaderVarParticleWorldToProjection`)
+   *
+   * What it does:
+   * The particle `WorldToProjection` shader-var (binary global 0x010A83F8).
+   */
+  ShaderVar shaderVarParticleWorldToProjection;
+
+  /**
+   * Address: 0x00BF00B0 (FUN_00BF00B0, dynamic atexit destructor for `shaderVarParticleInverseViewMatrix`)
+   *
+   * What it does:
+   * The particle `InverseViewMatrix` shader-var (binary global 0x010A8638).
+   */
+  ShaderVar shaderVarParticleInverseViewMatrix;
+
+  /**
+   * Address: 0x00BF00D0 (FUN_00BF00D0, dynamic atexit destructor for `shaderVarParticleParticleSystemPosition`)
+   *
+   * What it does:
+   * The particle `ParticleSystemPosition` shader-var (binary global 0x010A8368).
+   */
+  ShaderVar shaderVarParticleParticleSystemPosition;
+
+  /**
+   * Address: 0x00BF00E0 (FUN_00BF00E0, dynamic atexit destructor for `shaderVarParticleTime`)
+   *
+   * What it does:
+   * The particle `time` shader-var (binary global 0x010A8560).
+   */
+  ShaderVar shaderVarParticleTime;
+
+  /**
+   * Address: 0x00BF00F0 (FUN_00BF00F0, dynamic atexit destructor for `shaderVarParticleParticleSystemShape`)
+   *
+   * What it does:
+   * The particle `ParticleSystemShape` shader-var (binary global 0x010A84D0).
+   */
+  ShaderVar shaderVarParticleParticleSystemShape;
+
+  /**
+   * Address: 0x00BF0100 (FUN_00BF0100, dynamic atexit destructor for `shaderVarParticleParticleSpread`)
+   *
+   * What it does:
+   * The particle `ParticleSpread` shader-var (binary global 0x010A8290).
+   */
+  ShaderVar shaderVarParticleParticleSpread;
+
+  /**
+   * Address: 0x00BF0110 (FUN_00BF0110, dynamic atexit destructor for `shaderVarParticleParticleSpeed`)
+   *
+   * What it does:
+   * The particle `ParticleSpeed` shader-var (binary global 0x010A85A8).
+   */
+  ShaderVar shaderVarParticleParticleSpeed;
+
+  /**
+   * Address: 0x00BF0120 (FUN_00BF0120, dynamic atexit destructor for `shaderVarParticleParticleSystemHeight`)
+   *
+   * What it does:
+   * The particle `ParticleSystemHeight` shader-var (binary global 0x010A8518).
+   */
+  ShaderVar shaderVarParticleParticleSystemHeight;
+
+  /**
+   * Address: 0x00BF0130 (FUN_00BF0130, dynamic atexit destructor for `shaderVarParticleParticleSize`)
+   *
+   * What it does:
+   * The particle `ParticleSize` shader-var (binary global 0x010A8488).
+   */
+  ShaderVar shaderVarParticleParticleSize;
+
+  /**
+   * Address: 0x00BF0140 (FUN_00BF0140, dynamic atexit destructor for `shaderVarParticleDragEnabled`)
+   *
+   * What it does:
+   * The particle `DragEnabled` shader-var (binary global 0x010A83B0).
+   */
+  ShaderVar shaderVarParticleDragEnabled;
+
+  /**
+   * Address: 0x00BF0150 (FUN_00BF0150, dynamic atexit destructor for `shaderVarParticleDragCoeff`)
+   *
+   * What it does:
+   * The particle `DragCoeff` shader-var (binary global 0x010A86C8).
+   */
+  ShaderVar shaderVarParticleDragCoeff;
+
+  /**
+   * Address: 0x00BF0160 (FUN_00BF0160, dynamic atexit destructor for `shaderVarParticleInvDragCoeff`)
+   *
+   * What it does:
+   * The particle `invDragCoeff` shader-var (binary global 0x010A8320).
+   */
+  ShaderVar shaderVarParticleInvDragCoeff;
+
+  /**
+   * Address: 0x00BF0170 (FUN_00BF0170, dynamic atexit destructor for `shaderVarParticleInvDragCoeffSq`)
+   *
+   * What it does:
+   * The particle `invDragCoeffSq` shader-var (binary global 0x010A8718).
+   */
+  ShaderVar shaderVarParticleInvDragCoeffSq;
+
+  /**
+   * Address: 0x00BF0180 (FUN_00BF0180, dynamic atexit destructor for `shaderVarParticleBackgroundTexture`)
+   *
+   * What it does:
+   * The particle `BackgroundTexture` shader-var (binary global 0x010A85F0).
+   */
+  ShaderVar shaderVarParticleBackgroundTexture;
+
+  /**
+   * Address: 0x00BF0190 (FUN_00BF0190, dynamic atexit destructor for `shaderVarParticleParticleTexture0`)
+   *
+   * What it does:
+   * The particle `ParticleTexture0` shader-var (binary global 0x010A8680).
+   */
+  ShaderVar shaderVarParticleParticleTexture0;
+
+  /**
+   * Address: 0x00BF01A0 (FUN_00BF01A0, dynamic atexit destructor for `shaderVarParticleParticleTexture1`)
+   *
+   * What it does:
+   * The particle `ParticleTexture1` shader-var (binary global 0x010A8760).
+   */
+  ShaderVar shaderVarParticleParticleTexture1;
+
   extern float efx_ParticleWaterSurface;
 } // namespace moho
 
@@ -67,82 +200,14 @@ namespace
   constexpr int kParticleSelectTechniqueAssertLine = 1359;
   constexpr int kParticleSelectTechniqueWithDragAssertLine = 1026;
 
-  moho::ID3DIndexSheet* sSharedTrailQuadIndexSheet = nullptr;
-
-  template <std::uintptr_t SlotAddress>
-  struct ParticleShaderVarSlot;
-
-#define DEFINE_PARTICLE_SHADER_VAR_SLOT(SLOT_ADDRESS) \
-  template <> \
-  struct ParticleShaderVarSlot<SLOT_ADDRESS> \
-  { \
-    alignas(moho::ShaderVar) static std::byte storage[sizeof(moho::ShaderVar)]; \
-    static bool constructed; \
-  }; \
-  alignas(moho::ShaderVar) std::byte ParticleShaderVarSlot<SLOT_ADDRESS>::storage[sizeof(moho::ShaderVar)]{}; \
-  bool ParticleShaderVarSlot<SLOT_ADDRESS>::constructed = false
-
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8440u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A82D8u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A83F8u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8638u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8368u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8560u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A84D0u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8290u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A85A8u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8518u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8488u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A83B0u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A86C8u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8320u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8718u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A85F0u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8680u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8760u);
-
-#undef DEFINE_PARTICLE_SHADER_VAR_SLOT
-
-  template <std::uintptr_t SlotAddress>
-  [[nodiscard]] moho::ShaderVar& AccessParticleShaderVarSlot() noexcept
-  {
-    auto* const slot = reinterpret_cast<moho::ShaderVar*>(ParticleShaderVarSlot<SlotAddress>::storage);
-    if (!ParticleShaderVarSlot<SlotAddress>::constructed) {
-      ::new (static_cast<void*>(slot)) moho::ShaderVar();
-      ParticleShaderVarSlot<SlotAddress>::constructed = true;
-    }
-    return *slot;
-  }
-
-  template <std::uintptr_t SlotAddress>
-  void DestroyParticleShaderVarSlot() noexcept
-  {
-    if (!ParticleShaderVarSlot<SlotAddress>::constructed) {
-      return;
-    }
-
-    AccessParticleShaderVarSlot<SlotAddress>().~ShaderVar();
-    ParticleShaderVarSlot<SlotAddress>::constructed = false;
-  }
-
-  template <std::uintptr_t SlotAddress>
-  void RegisterParticleShaderVar(const char* const variableName)
-  {
-    moho::RegisterShaderVar(variableName, &AccessParticleShaderVarSlot<SlotAddress>(), "particle");
-  }
-
-  template <std::uintptr_t SlotAddress>
-  void CleanupParticleShaderVarRegistration() noexcept
-  {
-    DestroyParticleShaderVarSlot<SlotAddress>();
-  }
-
-  template <std::uintptr_t SlotAddress>
-  void RegisterParticleShaderVarWithAtexit(const char* const variableName)
-  {
-    RegisterParticleShaderVar<SlotAddress>(variableName);
-    (void)std::atexit(&CleanupParticleShaderVarRegistration<SlotAddress>);
-  }
+  /**
+   * Address: 0x00BC57F0 (FUN_00BC57F0, dynamic initializer for `sSharedTrailQuadIndexSheet`)
+   * Address: 0x00BF01B0 (FUN_00BF01B0, dynamic atexit destructor for `sSharedTrailQuadIndexSheet`)
+   *
+   * What it does:
+   * Owns the shared trail-quad index sheet (binary global 0x010A828C).
+   */
+  msvc8::auto_ptr<moho::ID3DIndexSheet> sSharedTrailQuadIndexSheet;
 
   /**
    * Address: 0x00BC5570 (FUN_00BC5570, dynamic initializer for `gTConVar_efx_ParticleWaterSurface`)
@@ -154,19 +219,12 @@ namespace
     &moho::efx_ParticleWaterSurface
   );
 
-  void CleanupSharedTrailQuadIndexSheetAtProcessExit() noexcept
-  {
-    if (sSharedTrailQuadIndexSheet != nullptr) {
-      delete sSharedTrailQuadIndexSheet;
-    }
-  }
-
   /**
    * Address: 0x00BC55B0 (FUN_00BC55B0, register_ShaderVarParticleWorldToProjection)
    */
   void register_ShaderVarParticleWorldToProjection()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A83F8u>("WorldToProjection");
+    moho::RegisterShaderVar("WorldToProjection", &moho::shaderVarParticleWorldToProjection, "particle");
   }
 
   /**
@@ -174,7 +232,7 @@ namespace
    */
   void register_ShaderVarParticleViewMatrix()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8440u>("ViewMatrix");
+    moho::RegisterShaderVar("ViewMatrix", &moho::shaderVarParticleViewMatrix, "particle");
   }
 
   /**
@@ -182,7 +240,7 @@ namespace
    */
   void register_ShaderVarParticleInverseViewMatrix()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8638u>("InverseViewMatrix");
+    moho::RegisterShaderVar("InverseViewMatrix", &moho::shaderVarParticleInverseViewMatrix, "particle");
   }
 
   /**
@@ -190,7 +248,7 @@ namespace
    */
   void register_ShaderVarParticleProjection()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A82D8u>("Projection");
+    moho::RegisterShaderVar("Projection", &moho::shaderVarParticleProjection, "particle");
   }
 
   /**
@@ -198,7 +256,7 @@ namespace
    */
   void register_ShaderVarParticleParticleSystemPosition()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8368u>("ParticleSystemPosition");
+    moho::RegisterShaderVar("ParticleSystemPosition", &moho::shaderVarParticleParticleSystemPosition, "particle");
   }
 
   /**
@@ -206,7 +264,7 @@ namespace
    */
   void register_ShaderVarParticleTime()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8560u>("time");
+    moho::RegisterShaderVar("time", &moho::shaderVarParticleTime, "particle");
   }
 
   /**
@@ -214,7 +272,7 @@ namespace
    */
   void register_ShaderVarParticleParticleSystemShape()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A84D0u>("ParticleSystemShape");
+    moho::RegisterShaderVar("ParticleSystemShape", &moho::shaderVarParticleParticleSystemShape, "particle");
   }
 
   /**
@@ -222,7 +280,7 @@ namespace
    */
   void register_ShaderVarParticleParticleSpread()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8290u>("ParticleSpread");
+    moho::RegisterShaderVar("ParticleSpread", &moho::shaderVarParticleParticleSpread, "particle");
   }
 
   /**
@@ -230,7 +288,7 @@ namespace
    */
   void register_ShaderVarParticleParticleSpeed()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A85A8u>("ParticleSpeed");
+    moho::RegisterShaderVar("ParticleSpeed", &moho::shaderVarParticleParticleSpeed, "particle");
   }
 
   /**
@@ -238,7 +296,7 @@ namespace
    */
   void register_ShaderVarParticleParticleSystemHeight()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8518u>("ParticleSystemHeight");
+    moho::RegisterShaderVar("ParticleSystemHeight", &moho::shaderVarParticleParticleSystemHeight, "particle");
   }
 
   /**
@@ -246,7 +304,7 @@ namespace
    */
   void register_ShaderVarParticleParticleSize()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8488u>("ParticleSize");
+    moho::RegisterShaderVar("ParticleSize", &moho::shaderVarParticleParticleSize, "particle");
   }
 
   /**
@@ -254,7 +312,7 @@ namespace
    */
   void register_ShaderVarParticleDragEnabled()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A83B0u>("DragEnabled");
+    moho::RegisterShaderVar("DragEnabled", &moho::shaderVarParticleDragEnabled, "particle");
   }
 
   /**
@@ -262,7 +320,7 @@ namespace
    */
   void register_ShaderVarParticleDragCoeff()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A86C8u>("DragCoeff");
+    moho::RegisterShaderVar("DragCoeff", &moho::shaderVarParticleDragCoeff, "particle");
   }
 
   /**
@@ -270,7 +328,7 @@ namespace
    */
   void register_ShaderVarParticleInvDragCoeff()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8320u>("invDragCoeff");
+    moho::RegisterShaderVar("invDragCoeff", &moho::shaderVarParticleInvDragCoeff, "particle");
   }
 
   /**
@@ -278,7 +336,7 @@ namespace
    */
   void register_ShaderVarParticleInvDragCoeffSq()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8718u>("invDragCoeffSq");
+    moho::RegisterShaderVar("invDragCoeffSq", &moho::shaderVarParticleInvDragCoeffSq, "particle");
   }
 
   /**
@@ -286,7 +344,7 @@ namespace
    */
   void register_ShaderVarParticleBackgroundTexture()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A85F0u>("BackgroundTexture");
+    moho::RegisterShaderVar("BackgroundTexture", &moho::shaderVarParticleBackgroundTexture, "particle");
   }
 
   /**
@@ -294,7 +352,7 @@ namespace
    */
   void register_ShaderVarParticleParticleTexture0()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8680u>("ParticleTexture0");
+    moho::RegisterShaderVar("ParticleTexture0", &moho::shaderVarParticleParticleTexture0, "particle");
   }
 
   /**
@@ -302,18 +360,7 @@ namespace
    */
   void register_ShaderVarParticleParticleTexture1()
   {
-    RegisterParticleShaderVarWithAtexit<0x010A8760u>("ParticleTexture1");
-  }
-
-  /**
-   * Address: 0x00BC57F0 (FUN_00BC57F0, sub_BC57F0)
-   *
-   * What it does:
-   * Registers process-exit cleanup for the shared trail index-sheet lane.
-   */
-  int register_SharedTrailQuadIndexSheetCleanupAtExit()
-  {
-    return std::atexit(&CleanupSharedTrailQuadIndexSheetAtProcessExit);
+    moho::RegisterShaderVar("ParticleTexture1", &moho::shaderVarParticleParticleTexture1, "particle");
   }
 
   struct ParticleShaderVarBootstrap
@@ -338,7 +385,6 @@ namespace
       register_ShaderVarParticleBackgroundTexture();
       register_ShaderVarParticleParticleTexture0();
       register_ShaderVarParticleParticleTexture1();
-      (void)register_SharedTrailQuadIndexSheetCleanupAtExit();
     }
   };
 
@@ -783,24 +829,6 @@ namespace
 
 namespace moho
 {
-  ShaderVar& shaderVarParticleViewMatrix = AccessParticleShaderVarSlot<0x010A8440u>();
-  ShaderVar& shaderVarParticleProjection = AccessParticleShaderVarSlot<0x010A82D8u>();
-  ShaderVar& shaderVarParticleWorldToProjection = AccessParticleShaderVarSlot<0x010A83F8u>();
-  ShaderVar& shaderVarParticleInverseViewMatrix = AccessParticleShaderVarSlot<0x010A8638u>();
-  ShaderVar& shaderVarParticleParticleSystemPosition = AccessParticleShaderVarSlot<0x010A8368u>();
-  ShaderVar& shaderVarParticleTime = AccessParticleShaderVarSlot<0x010A8560u>();
-  ShaderVar& shaderVarParticleParticleSystemShape = AccessParticleShaderVarSlot<0x010A84D0u>();
-  ShaderVar& shaderVarParticleParticleSpread = AccessParticleShaderVarSlot<0x010A8290u>();
-  ShaderVar& shaderVarParticleParticleSpeed = AccessParticleShaderVarSlot<0x010A85A8u>();
-  ShaderVar& shaderVarParticleParticleSystemHeight = AccessParticleShaderVarSlot<0x010A8518u>();
-  ShaderVar& shaderVarParticleParticleSize = AccessParticleShaderVarSlot<0x010A8488u>();
-  ShaderVar& shaderVarParticleDragEnabled = AccessParticleShaderVarSlot<0x010A83B0u>();
-  ShaderVar& shaderVarParticleDragCoeff = AccessParticleShaderVarSlot<0x010A86C8u>();
-  ShaderVar& shaderVarParticleInvDragCoeff = AccessParticleShaderVarSlot<0x010A8320u>();
-  ShaderVar& shaderVarParticleInvDragCoeffSq = AccessParticleShaderVarSlot<0x010A8718u>();
-  ShaderVar& shaderVarParticleBackgroundTexture = AccessParticleShaderVarSlot<0x010A85F0u>();
-  ShaderVar& shaderVarParticleParticleTexture0 = AccessParticleShaderVarSlot<0x010A8680u>();
-  ShaderVar& shaderVarParticleParticleTexture1 = AccessParticleShaderVarSlot<0x010A8760u>();
   float efx_ParticleWaterSurface = 0.0F;
 
   CWorldParticles sWorldParticles{};
@@ -819,7 +847,7 @@ namespace moho
 
   ID3DIndexSheet* GetSharedTrailQuadIndexSheet() noexcept
   {
-    return sSharedTrailQuadIndexSheet;
+    return sSharedTrailQuadIndexSheet.get();
   }
 
   /**
@@ -829,12 +857,7 @@ namespace moho
    */
   void DestroySharedTrailQuadIndexSheet() noexcept
   {
-    if (sSharedTrailQuadIndexSheet == nullptr) {
-      return;
-    }
-
-    delete sSharedTrailQuadIndexSheet;
-    sSharedTrailQuadIndexSheet = nullptr;
+    sSharedTrailQuadIndexSheet.reset();
   }
 
   /**
@@ -849,13 +872,10 @@ namespace moho
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
 
-    CD3DIndexSheet* const newSheet = resources->CreateIndexSheet(false, kSharedTrailIndexSheetSize);
-    if (newSheet != sSharedTrailQuadIndexSheet && sSharedTrailQuadIndexSheet != nullptr) {
-      delete sSharedTrailQuadIndexSheet;
-    }
-    sSharedTrailQuadIndexSheet = newSheet;
+    sSharedTrailQuadIndexSheet =
+      msvc8::auto_ptr<ID3DIndexSheet>(resources->CreateIndexSheet(false, kSharedTrailIndexSheetSize));
 
-    if (sSharedTrailQuadIndexSheet == nullptr) {
+    if (sSharedTrailQuadIndexSheet.get() == nullptr) {
       return 0;
     }
 
@@ -1312,7 +1332,7 @@ namespace moho
         trailVertexFormat
       );
 
-      if (sSharedTrailQuadIndexSheet == nullptr) {
+      if (sSharedTrailQuadIndexSheet.get() == nullptr) {
         (void)RebuildSharedTrailQuadIndexSheet();
       }
 

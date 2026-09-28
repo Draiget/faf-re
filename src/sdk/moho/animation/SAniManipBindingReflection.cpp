@@ -75,20 +75,12 @@ namespace moho
   gpg::RType* preregister_SAniManipBindingTypeInfo();
 
   /**
-   * Address: 0x00BFAD30 (FUN_00BFAD30, cleanup_SAniManipBindingTypeInfo)
-   *
-   * What it does:
-   * Releases startup-owned `SAniManipBinding` type-info storage.
-   */
-  void cleanup_SAniManipBindingTypeInfo();
-
-  /**
    * Address: 0x00BD2BA0 (FUN_00BD2BA0, register_SAniManipBindingTypeInfoAtexit)
    *
    * What it does:
-   * Preregisters `SAniManipBinding` RTTI and installs process-exit cleanup.
+   * Preregisters `SAniManipBinding` RTTI.
    */
-  int register_SAniManipBindingTypeInfoAtexit();
+  void register_SAniManipBindingTypeInfoAtexit();
 
   /**
    * Address: 0x0063D0E0 (FUN_0063D0E0, preregister_FastVectorSAniManipBindingType)
@@ -99,17 +91,10 @@ namespace moho
   gpg::RType* preregister_FastVectorSAniManipBindingType();
 
   /**
-   * Address: 0x00BFAE80 (FUN_00BFAE80, cleanup_FastVectorSAniManipBindingType)
-   *
-   * What it does:
-   * Releases startup-owned `fastvector<SAniManipBinding>` reflection storage.
-   */
-
-  /**
    * Address: 0x00BD2CC0 (FUN_00BD2CC0, register_FastVectorSAniManipBindingTypeAtexit)
    *
    * What it does:
-   * Preregisters `fastvector<SAniManipBinding>` RTTI and installs process-exit cleanup.
+   * Preregisters `fastvector<SAniManipBinding>` RTTI.
    */
   void register_FastVectorSAniManipBindingTypeAtexit();
 } // namespace moho
@@ -149,23 +134,16 @@ namespace
   using SAniManipBindingSerializer = moho::SAniManipBindingSerializer;
   using FastVectorSAniManipBindingType = gpg::RFastVectorType<moho::SAniManipBinding>;
 
-  alignas(SAniManipBindingTypeInfo) unsigned char gSAniManipBindingTypeInfoStorage[sizeof(SAniManipBindingTypeInfo)]{};
-  bool gSAniManipBindingTypeInfoConstructed = false;
-
   // Address: 0x010B28C8 -- process-global `SAniManipBindingSerializer` singleton.
   SAniManipBindingSerializer gSAniManipBindingSerializer;
 
-  msvc8::string gFastVectorSAniManipBindingTypeName;
-  bool gFastVectorSAniManipBindingTypeNameCleanupRegistered = false;
-
+  /**
+   * Address: 0x00BFAD30 (FUN_00BFAD30, atexit destructor of the SAniManipBindingTypeInfo object)
+   */
   [[nodiscard]] SAniManipBindingTypeInfo* AcquireSAniManipBindingTypeInfo()
   {
-    if (!gSAniManipBindingTypeInfoConstructed) {
-      new (gSAniManipBindingTypeInfoStorage) SAniManipBindingTypeInfo();
-      gSAniManipBindingTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<SAniManipBindingTypeInfo*>(gSAniManipBindingTypeInfoStorage);
+    static SAniManipBindingTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -215,18 +193,6 @@ namespace
     outView->capacityEnd = inlineStorageBase + 2;
     outView->inlineStorage = inlineStorageBase;
     return outView;
-  }
-
-  /**
-   * Address: 0x00BFAE50 (FUN_00BFAE50, cleanup_FastVectorSAniManipBindingTypeName)
-   *
-   * What it does:
-   * Releases cached lexical type-name storage for `fastvector<SAniManipBinding>`.
-   */
-  void cleanup_FastVectorSAniManipBindingTypeName()
-  {
-    gFastVectorSAniManipBindingTypeName = msvc8::string{};
-    gFastVectorSAniManipBindingTypeNameCleanupRegistered = false;
   }
 
   /**
@@ -427,26 +393,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFAD30 (FUN_00BFAD30, cleanup_SAniManipBindingTypeInfo)
-   */
-  void cleanup_SAniManipBindingTypeInfo()
-  {
-    if (!gSAniManipBindingTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSAniManipBindingTypeInfo()->~SAniManipBindingTypeInfo();
-    SAniManipBinding::sType = nullptr;
-    gSAniManipBindingTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD2BA0 (FUN_00BD2BA0, register_SAniManipBindingTypeInfoAtexit)
    */
-  int register_SAniManipBindingTypeInfoAtexit()
+  void register_SAniManipBindingTypeInfoAtexit()
   {
     (void)preregister_SAniManipBindingTypeInfo();
-    return std::atexit(&cleanup_SAniManipBindingTypeInfo);
   }
 
   /**
@@ -470,21 +421,15 @@ namespace gpg
 
   /**
    * Address: 0x0063C320 (FUN_0063C320, gpg::RFastVectorType_SAniManipBinding::GetName)
+   * Address: 0x00BFAE50 (FUN_00BFAE50, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `fastvector<SAniManipBinding>` once and returns it.
    */
   const char* RFastVectorType<moho::SAniManipBinding>::GetName() const
   {
-    if (gFastVectorSAniManipBindingTypeName.empty()) {
-      const gpg::RType* const elementType = CachedSAniManipBindingType();
-      const char* const elementName = elementType ? elementType->GetName() : "SAniManipBinding";
-      gFastVectorSAniManipBindingTypeName =
-        gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SAniManipBinding");
-      if (!gFastVectorSAniManipBindingTypeNameCleanupRegistered) {
-        gFastVectorSAniManipBindingTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_FastVectorSAniManipBindingTypeName);
-      }
-    }
-
-    return gFastVectorSAniManipBindingTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSAniManipBindingType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -586,8 +531,8 @@ namespace
   {
     SAniManipBindingReflectionBootstrap()
     {
-      (void)moho::register_SAniManipBindingTypeInfoAtexit();
-      (void)moho::register_FastVectorSAniManipBindingTypeAtexit();
+      moho::register_SAniManipBindingTypeInfoAtexit();
+      moho::register_FastVectorSAniManipBindingTypeAtexit();
     }
   };
 

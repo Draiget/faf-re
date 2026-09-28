@@ -211,11 +211,6 @@ namespace moho
   static_assert(sizeof(MotorSinkAwayConstruct) == 0x14, "MotorSinkAwayConstruct size must be 0x14");
 
   /**
-   * Address: 0x00BFD210 (FUN_00BFD210, cleanup_MotorSinkAwayTypeInfo)
-   */
-  void cleanup_MotorSinkAwayTypeInfo();
-
-  /**
    * Address: 0x00BD5D50 (FUN_00BD5D50, register_MotorSinkAwayTypeInfo)
    */
   void register_MotorSinkAwayTypeInfo();

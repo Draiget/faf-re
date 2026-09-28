@@ -4,22 +4,18 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/command/CCommandDb.h"
+#include "moho/command/CCommandDb.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(moho::CCommandDBTypeInfo) unsigned char gCCommandDBTypeInfoStorage[sizeof(moho::CCommandDBTypeInfo)];
-  bool gCCommandDBTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFE940 (FUN_00BFE940, atexit destructor of the CCommandDBTypeInfo object)
+   */
   [[nodiscard]] moho::CCommandDBTypeInfo& GetCCommandDBTypeInfo() noexcept
   {
-    if (!gCCommandDBTypeInfoConstructed) {
-      new (gCCommandDBTypeInfoStorage) moho::CCommandDBTypeInfo();
-      gCCommandDBTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::CCommandDBTypeInfo*>(gCCommandDBTypeInfoStorage);
+    static moho::CCommandDBTypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* gLegacyCCommandDbType = nullptr;
@@ -38,23 +34,6 @@ namespace
       gLegacyCCommandDbType = type;
     }
     return type;
-  }
-
-  /**
-   * Address: 0x00BFE940 (FUN_00BFE940, sub_BFE940)
-   *
-   * What it does:
-   * Releases recovered `CCommandDBTypeInfo` field/base vector lanes at exit.
-   */
-  void cleanup_CCommandDBTypeInfo()
-  {
-    if (!gCCommandDBTypeInfoConstructed) {
-      return;
-    }
-
-    moho::CCommandDBTypeInfo& typeInfo = GetCCommandDBTypeInfo();
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
   }
 } // namespace
 
@@ -115,10 +94,9 @@ namespace moho
   /**
    * Address: 0x00BD8C40 (FUN_00BD8C40, sub_BD8C40)
    */
-  int register_CCommandDBTypeInfo()
+  void register_CCommandDBTypeInfo()
   {
     (void)GetCCommandDBTypeInfo();
-    return std::atexit(&cleanup_CCommandDBTypeInfo);
   }
 } // namespace moho
 
@@ -128,7 +106,7 @@ namespace
   {
     CCommandDBTypeInfoBootstrap()
     {
-      (void)moho::register_CCommandDBTypeInfo();
+      moho::register_CCommandDBTypeInfo();
     }
   };
 

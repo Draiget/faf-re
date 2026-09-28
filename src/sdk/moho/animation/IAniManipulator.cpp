@@ -511,10 +511,6 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
-  alignas(moho::IAniManipulatorTypeInfo)
-  unsigned char gIAniManipulatorTypeInfoStorage[sizeof(moho::IAniManipulatorTypeInfo)] = {};
-  bool gIAniManipulatorTypeInfoConstructed = false;
-
   gpg::RType* gCAniActorType = nullptr;
   gpg::RType* gSimType = nullptr;
   gpg::RType* gFastVectorSAniManipBindingType = nullptr;
@@ -623,15 +619,13 @@ namespace
     return moho::CScriptEvent::sType;
   }
 
+  /**
+   * Address: 0x00BFADC0 (FUN_00BFADC0, atexit destructor of the IAniManipulatorTypeInfo object)
+   */
   [[nodiscard]] moho::IAniManipulatorTypeInfo* AcquireIAniManipulatorTypeInfo()
   {
-    if (!gIAniManipulatorTypeInfoConstructed) {
-      auto* const typeInfo = new (gIAniManipulatorTypeInfoStorage) moho::IAniManipulatorTypeInfo();
-      gpg::PreRegisterRType(typeid(moho::IAniManipulator), typeInfo);
-      gIAniManipulatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::IAniManipulatorTypeInfo*>(gIAniManipulatorTypeInfoStorage);
+    static moho::IAniManipulatorTypeInfo sInstance;
+    return &sInstance;
   }
 
   template <typename TObject>
@@ -656,21 +650,6 @@ namespace
     objectRef.mObj = object;
     objectRef.mType = expectedType;
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
-  }
-
-  void cleanup_IAniManipulatorTypeInfo_00BFADC0_Impl()
-  {
-    if (!gIAniManipulatorTypeInfoConstructed) {
-      return;
-    }
-
-    static_cast<gpg::RType*>(AcquireIAniManipulatorTypeInfo())->~RType();
-    gIAniManipulatorTypeInfoConstructed = false;
-  }
-
-  void CleanupIAniManipulatorTypeInfoAtexit()
-  {
-    cleanup_IAniManipulatorTypeInfo_00BFADC0_Impl();
   }
 
   /**
@@ -795,38 +774,23 @@ namespace moho
   namespace
   {
     /**
-     * Static `RPointerType<IAniManipulator>` descriptor that the binary exposes
-     * as `Moho::IAniManipulator::PointerType`. Default static-init runs the
-     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane.
-     */
-    gpg::RPointerType<moho::IAniManipulator> sIAniManipulatorPointerTypeStorage{};
-
-    /**
      * Address: 0x0063DC30 (FUN_0063DC30)
+     * Address: 0x00BFAEE0 (FUN_00BFAEE0, atexit destructor of the static `RPointerType<IAniManipulator>` descriptor)
      *
      * What it does:
-     * Pre-registers the static `RPointerType<IAniManipulator>` descriptor under
-     * the `IAniManipulator*` type-info key so subsequent `LookupRType` queries
-     * from the lazy `GetPointerType` lane resolve to this descriptor.
+     * Constructs the static `RPointerType<IAniManipulator>` descriptor that
+     * the binary exposes as `Moho::IAniManipulator::PointerType` and
+     * pre-registers it under the `IAniManipulator*` type-info key, so
+     * subsequent `LookupRType` queries from the lazy `GetPointerType` lane
+     * resolve to this descriptor. The binary holds the descriptor as a
+     * function-local static of `GetPointerType`; it lives here because the
+     * preregister phase has to construct it before any consumer looks up
+     * `IAniManipulator*`.
      */
     void PreregisterIAniManipulatorPointerType()
     {
-      gpg::PreRegisterRType(typeid(moho::IAniManipulator*), &sIAniManipulatorPointerTypeStorage);
-    }
-
-    /**
-     * Address: 0x00BFAEE0 (FUN_00BFAEE0)
-     *
-     * What it does:
-     * Tears down the static `RPointerType<IAniManipulator>` descriptor at
-     * process exit: frees heap-backed `bases_`/`fields_` vector storage and
-     * resets the RType vftable lane to the `RObject` base. Registered via
-     * `atexit` from `GetPointerType`'s once-init path.
-     */
-    void CleanupIAniManipulatorPointerType()
-    {
-      sIAniManipulatorPointerTypeStorage.~RPointerType<moho::IAniManipulator>();
+      static gpg::RPointerType<moho::IAniManipulator> sDescriptor;
+      gpg::PreRegisterRType(typeid(moho::IAniManipulator*), &sDescriptor);
     }
   } // namespace
 
@@ -835,17 +799,13 @@ namespace moho
    *
    * What it does:
    * On first call, pre-registers the static `RPointerType<IAniManipulator>`
-   * descriptor and installs the matching atexit teardown. After that, lazily
-   * caches the `LookupRType(typeid(IAniManipulator*))` result in `sPointerType`
-   * and returns it.
+   * descriptor. After that, lazily caches the
+   * `LookupRType(typeid(IAniManipulator*))` result in `sPointerType` and
+   * returns it.
    */
   gpg::RType* IAniManipulator::GetPointerType()
   {
-    static const bool sOnceInit = []() {
-      PreregisterIAniManipulatorPointerType();
-      (void)std::atexit(&CleanupIAniManipulatorPointerType);
-      return true;
-    }();
+    static const bool sOnceInit = (PreregisterIAniManipulatorPointerType(), true);
     (void)sOnceInit;
 
     if (!sPointerType) {
@@ -1774,30 +1734,20 @@ namespace moho
    */
   gpg::RType* register_IAniManipulatorTypeInfo_00()
   {
-    return AcquireIAniManipulatorTypeInfo();
-  }
-
-  /**
-   * Address: 0x00BFADC0 (FUN_00BFADC0, sub_BFADC0)
-   *
-   * What it does:
-   * Releases startup-owned IAniManipulator RTTI storage.
-   */
-  void cleanup_IAniManipulatorTypeInfo()
-  {
-    cleanup_IAniManipulatorTypeInfo_00BFADC0_Impl();
+    IAniManipulatorTypeInfo* const typeInfo = AcquireIAniManipulatorTypeInfo();
+    gpg::PreRegisterRType(typeid(IAniManipulator), typeInfo);
+    return typeInfo;
   }
 
   /**
    * Address: 0x00BD2C20 (FUN_00BD2C20, sub_BD2C20)
    *
    * What it does:
-   * Registers IAniManipulator RTTI startup ownership and installs exit cleanup.
+   * Registers IAniManipulator RTTI startup ownership.
    */
-  int register_IAniManipulatorTypeInfo_AtExit()
+  void register_IAniManipulatorTypeInfo_AtExit()
   {
     (void)register_IAniManipulatorTypeInfo_00();
-    return std::atexit(&CleanupIAniManipulatorTypeInfoAtexit);
   }
 
   /**
@@ -1918,7 +1868,7 @@ namespace
   {
     IAniManipulatorStartupBootstrap()
     {
-      (void)moho::register_IAniManipulatorTypeInfo_AtExit();
+      moho::register_IAniManipulatorTypeInfo_AtExit();
       moho::register_IAniManipulatorSerializer();
       moho::register_CFootPlantManipulatorSerializer();
       moho::register_CBoneEntityManipulatorTypeInfo();
@@ -1931,7 +1881,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(AcquireIAniManipulatorTypeInfo_80a9e7, AcquireIAniManipulatorTypeInfo)
+GPG_PREREGISTER_INIT(register_IAniManipulatorTypeInfo_00_80a9e7, moho::register_IAniManipulatorTypeInfo_00)
 GPG_PREREGISTER_INIT(PreregisterIAniManipulatorPointerType_80a9e7, moho::PreregisterIAniManipulatorPointerType)
 GPG_PREREGISTER_INIT(register_CBoneEntityManipulatorTypeInfo_5c2e91, moho::register_CBoneEntityManipulatorTypeInfo)
 GPG_PREREGISTER_INIT(register_CFootPlantManipulatorTypeInfo_5c2e91, moho::register_CFootPlantManipulatorTypeInfo)

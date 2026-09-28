@@ -81,8 +81,7 @@ namespace gpg
    * Address: 0x00BC2D40 (FUN_00BC2D40, register_RFastVectorType_uint)
    *
    * What it does:
-   * Materializes startup reflection storage for `fastvector<unsigned int>` and
-   * registers process-exit teardown.
+   * Constructs the `fastvector<unsigned int>` reflection descriptor.
    */
   void register_RFastVectorType_uint();
 

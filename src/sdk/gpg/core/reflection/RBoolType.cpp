@@ -1,31 +1,18 @@
 #include "gpg/core/reflection/RBoolType.h"
 
-#include <cstdlib>
 #include <cstring>
-#include <new>
 #include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(boolTypeInfo) unsigned char gStorage[sizeof(boolTypeInfo)];
-  bool gConstructed = false;
-
+  /**
+   * Address: 0x00C09370 (FUN_00C09370, atexit destructor of the boolTypeInfo object)
+   */
   [[nodiscard]] boolTypeInfo& Acquire()
   {
-    if (!gConstructed) {
-      new (gStorage) boolTypeInfo();
-      gConstructed = true;
-    }
-    return *reinterpret_cast<boolTypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) return;
-    auto& ti = *reinterpret_cast<boolTypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static boolTypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { register_boolTypeInfoStartup(); } };
@@ -100,7 +87,6 @@ void boolTypeInfo::Init()
 void register_boolTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

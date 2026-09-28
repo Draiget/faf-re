@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BDED30 (FUN_00BDED30, register_CMauiMovieTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiMovie` type-info object.
+   */
   void register_CMauiMovieTypeInfoStartup();
 } // namespace moho

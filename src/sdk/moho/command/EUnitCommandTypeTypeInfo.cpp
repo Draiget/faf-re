@@ -4,28 +4,9 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::EUnitCommandTypeTypeInfo> gEUnitCommandTypeTypeInfoStorage{};
-
-  /**
-   * Address: 0x00BF4950 (FUN_00BF4950, cleanup_EUnitCommandTypeTypeInfo)
-   *
-   * What it does:
-   * Process-exit teardown for the `EUnitCommandTypeTypeInfo` descriptor.
-   * The real ctor's atexit push at 0x00BC9C20 targets a plain destructor
-   * call, not a mangled symbol.
-   */
-  void cleanup_EUnitCommandTypeTypeInfo()
-  {
-    gEUnitCommandTypeTypeInfoStorage.Destroy();
-  }
-
-  // Address: 0x010AC568 -- process-global `EUnitCommandTypeTypeInfo` singleton
-  // storage (constructed in place by `register_EUnitCommandTypeTypeInfo`).
-
   /**
    * Address: 0x00553540 (FUN_00553540, Deserialize_EUnitCommandType_Primitive)
    * Address: 0x00553560 (FUN_00553560, Serialize_EUnitCommandType_Primitive)
@@ -131,15 +112,15 @@ namespace moho
 
   /**
    * Address: 0x00BC9C20 (FUN_00BC9C20, sub_BC9C20)
+   * Address: 0x00BF4950 (FUN_00BF4950, atexit destructor of the EUnitCommandTypeTypeInfo object)
    *
    * What it does:
-   * Constructs the static `EUnitCommandTypeTypeInfo` descriptor in place and
-   * installs its atexit teardown.
+   * Constructs the static `EUnitCommandTypeTypeInfo` descriptor.
    */
-  int register_EUnitCommandTypeTypeInfo()
+  void register_EUnitCommandTypeTypeInfo()
   {
-    (void)gEUnitCommandTypeTypeInfoStorage.Ensure();
-    return std::atexit(&cleanup_EUnitCommandTypeTypeInfo);
+    // Address: 0x010AC568 -- the process-global `EUnitCommandTypeTypeInfo` object.
+    static EUnitCommandTypeTypeInfo sInstance;
   }
 } // namespace moho
 

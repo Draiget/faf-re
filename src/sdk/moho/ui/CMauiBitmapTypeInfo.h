@@ -33,5 +33,11 @@ namespace moho
 
   static_assert(sizeof(CMauiBitmapTypeInfo) == 0x64, "CMauiBitmapTypeInfo size must be 0x64");
 
+  /**
+   * Address: 0x00BDD9D0 (FUN_00BDD9D0, register_CMauiBitmapTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiBitmap` type-info object.
+   */
   void register_CMauiBitmapTypeInfoStartup();
 } // namespace moho

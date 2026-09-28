@@ -1,7 +1,5 @@
 #include "gpg/core/reflection/RObjectTypeInfo.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -9,21 +7,13 @@ using TypeInfo = gpg::RObjectTypeInfo;
 
 namespace
 {
-  alignas(TypeInfo) unsigned char gStorage[sizeof(TypeInfo)];
-  bool gConstructed = false;
-
+  /**
+   * Address: 0x00C094F0 (FUN_00C094F0, atexit destructor of the gpg::RObjectTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& Acquire()
   {
-    if (!gConstructed) { new (gStorage) TypeInfo(); gConstructed = true; }
-    return *reinterpret_cast<TypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) return;
-    auto& ti = *reinterpret_cast<TypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { gpg::register_RObjectTypeInfoStartup(); } };
@@ -53,7 +43,6 @@ void gpg::RObjectTypeInfo::Init()
 void gpg::register_RObjectTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

@@ -76,10 +76,9 @@ namespace moho
    * Address: 0x00BCCFC0 (FUN_00BCCFC0, register_EAiPathNavigatorStateTypeInfo)
    *
    * What it does:
-   * Constructs and preregisters `EAiPathNavigatorState` type-info and installs
-   * process-exit cleanup.
+   * Constructs and preregisters `EAiPathNavigatorState` type-info.
    */
-  int register_EAiPathNavigatorStateTypeInfo();
+  void register_EAiPathNavigatorStateTypeInfo();
 
   static_assert(sizeof(EAiPathNavigatorStateTypeInfo) == 0x78, "EAiPathNavigatorStateTypeInfo size must be 0x78");
 } // namespace moho

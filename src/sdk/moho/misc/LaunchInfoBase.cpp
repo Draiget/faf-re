@@ -108,20 +108,18 @@ namespace
   // Address: 0x010ABE54 -- process-global `LaunchInfoNewSerializer` singleton.
   moho::LaunchInfoNewSerializer gLaunchInfoNewSerializer;
 
-  alignas(moho::LaunchInfoNewTypeInfo) unsigned char
-    gLaunchInfoNewTypeInfoStorage[sizeof(moho::LaunchInfoNewTypeInfo)]{};
-  bool gLaunchInfoNewTypeInfoConstructed = false;
-
   bool gArmyLaunchInfoTypeRegistered = false;
   bool gArmyLaunchInfoVectorTypeRegistered = false;
-  msvc8::string gArmyLaunchInfoVectorTypeName;
-  bool gArmyLaunchInfoVectorTypeNameCleanupRegistered = false;
   gpg::RType* gArmyLaunchInfoVectorType = nullptr;
   gpg::RType* gStringVectorType = nullptr;
 
-  [[nodiscard]] moho::LaunchInfoNewTypeInfo& LaunchInfoNewTypeInfoStorageRef() noexcept
+  /**
+   * Address: 0x00BF4050 (FUN_00BF4050, atexit destructor of the LaunchInfoNewTypeInfo object)
+   */
+  [[nodiscard]] moho::LaunchInfoNewTypeInfo& AcquireLaunchInfoNewTypeInfo()
   {
-    return *reinterpret_cast<moho::LaunchInfoNewTypeInfo*>(gLaunchInfoNewTypeInfoStorage);
+    static moho::LaunchInfoNewTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -187,10 +185,7 @@ namespace
 
   [[nodiscard]] gpg::RType* ResolveLaunchInfoNewType()
   {
-    if (!gLaunchInfoNewTypeInfoConstructed) {
-      new (gLaunchInfoNewTypeInfoStorage) moho::LaunchInfoNewTypeInfo();
-      gLaunchInfoNewTypeInfoConstructed = true;
-    }
+    (void)AcquireLaunchInfoNewTypeInfo();
     return gpg::LookupRType(typeid(moho::LaunchInfoNew));
   }
 
@@ -518,12 +513,6 @@ namespace
     return archive;
   }
 
-  void CleanupArmyLaunchInfoVectorTypeName()
-  {
-    gArmyLaunchInfoVectorTypeName = msvc8::string{};
-    gArmyLaunchInfoVectorTypeNameCleanupRegistered = false;
-  }
-
   /**
    * Address: 0x005448D0 (FUN_005448D0, scalar deleting destructor thunk)
    */
@@ -531,20 +520,15 @@ namespace
 
   /**
    * Address: 0x00542F60 (FUN_00542F60)
+   * Address: 0x00BF40E0 (FUN_00BF40E0, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `vector<ArmyLaunchInfo>` once and returns it.
    */
   const char* ArmyLaunchInfoVectorTypeInfo::GetName() const
   {
-    if (gArmyLaunchInfoVectorTypeName.empty()) {
-      const gpg::RType* const elementType = ResolveArmyLaunchInfoType();
-      const char* const elementName = elementType ? elementType->GetName() : "ArmyLaunchInfo";
-      gArmyLaunchInfoVectorTypeName = gpg::STR_Printf("vector<%s>", elementName);
-      if (!gArmyLaunchInfoVectorTypeNameCleanupRegistered) {
-        gArmyLaunchInfoVectorTypeNameCleanupRegistered = true;
-        (void)std::atexit(&CleanupArmyLaunchInfoVectorTypeName);
-      }
-    }
-
-    return gArmyLaunchInfoVectorTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveArmyLaunchInfoType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -1055,26 +1039,6 @@ namespace
       ? adapterIndex
       : 0u;
     return kArmyLaunchInfoBackwardCopyAdapters[boundedIndex](destinationEnd, sourceEnd, sourceBegin);
-  }
-
-  void EnsureLaunchInfoNewTypeInfoConstructed()
-  {
-    if (gLaunchInfoNewTypeInfoConstructed) {
-      return;
-    }
-
-    new (gLaunchInfoNewTypeInfoStorage) moho::LaunchInfoNewTypeInfo();
-    gLaunchInfoNewTypeInfoConstructed = true;
-  }
-
-  void CleanupLaunchInfoNewTypeInfoAtexit()
-  {
-    if (!gLaunchInfoNewTypeInfoConstructed) {
-      return;
-    }
-
-    LaunchInfoNewTypeInfoStorageRef().~LaunchInfoNewTypeInfo();
-    gLaunchInfoNewTypeInfoConstructed = false;
   }
 
   /**
@@ -1604,8 +1568,7 @@ namespace moho
    */
   void register_LaunchInfoNewTypeInfo()
   {
-    EnsureLaunchInfoNewTypeInfoConstructed();
-    (void)std::atexit(&CleanupLaunchInfoNewTypeInfoAtexit);
+    (void)AcquireLaunchInfoNewTypeInfo();
   }
 
   /**

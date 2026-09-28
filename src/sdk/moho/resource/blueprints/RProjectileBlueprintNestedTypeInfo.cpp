@@ -1,7 +1,5 @@
 #include "RProjectileBlueprintNestedTypeInfo.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/resource/RResId.h"
@@ -14,39 +12,31 @@ namespace
   using EconomyTypeInfo = moho::RProjectileBlueprintEconomyTypeInfo;
   using PhysicsTypeInfo = moho::RProjectileBlueprintPhysicsTypeInfo;
 
-  alignas(PhysicsTypeInfo) unsigned char gRProjectileBlueprintPhysicsTypeInfoStorage[sizeof(PhysicsTypeInfo)];
-  bool gRProjectileBlueprintPhysicsTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF2DD0 (FUN_00BF2DD0, atexit destructor of the RProjectileBlueprintDisplayTypeInfo object)
+   */
   [[nodiscard]] DisplayTypeInfo& AcquireRProjectileBlueprintDisplayTypeInfo()
   {
     static DisplayTypeInfo sInstance;
     return sInstance;
   }
 
+  /**
+   * Address: 0x00BF2E30 (FUN_00BF2E30, atexit destructor of the RProjectileBlueprintEconomyTypeInfo object)
+   */
   [[nodiscard]] EconomyTypeInfo& AcquireRProjectileBlueprintEconomyTypeInfo()
   {
     static EconomyTypeInfo sInstance;
     return sInstance;
   }
 
-  [[nodiscard]] PhysicsTypeInfo& AcquireRProjectileBlueprintPhysicsTypeInfoStorage()
+  /**
+   * Address: 0x00BF2E90 (FUN_00BF2E90, atexit destructor of the RProjectileBlueprintPhysicsTypeInfo object)
+   */
+  [[nodiscard]] PhysicsTypeInfo& AcquireRProjectileBlueprintPhysicsTypeInfo()
   {
-    if (!gRProjectileBlueprintPhysicsTypeInfoConstructed) {
-      new (gRProjectileBlueprintPhysicsTypeInfoStorage) PhysicsTypeInfo();
-      gRProjectileBlueprintPhysicsTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<PhysicsTypeInfo*>(gRProjectileBlueprintPhysicsTypeInfoStorage);
-  }
-
-  void cleanup_RProjectileBlueprintPhysicsTypeInfo()
-  {
-    if (!gRProjectileBlueprintPhysicsTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRProjectileBlueprintPhysicsTypeInfoStorage().~PhysicsTypeInfo();
-    gRProjectileBlueprintPhysicsTypeInfoConstructed = false;
+    static PhysicsTypeInfo sInstance;
+    return sInstance;
   }
 
   gpg::RType* CachedFloatType()
@@ -100,9 +90,9 @@ namespace
   {
     RProjectileBlueprintNestedTypeInfoBootstrap()
     {
-      (void)moho::register_RProjectileBlueprintDisplayTypeInfo();
-      (void)moho::register_RProjectileBlueprintEconomyTypeInfo();
-      (void)moho::register_RProjectileBlueprintPhysicsTypeInfo();
+      moho::register_RProjectileBlueprintDisplayTypeInfo();
+      moho::register_RProjectileBlueprintEconomyTypeInfo();
+      moho::register_RProjectileBlueprintPhysicsTypeInfo();
     }
   };
 
@@ -228,6 +218,15 @@ namespace moho
     gpg::RType::Init();
     AddFields(this);
     Finish();
+  }
+
+  /**
+   * Address: 0x0051BD30 (FUN_0051BD30, Moho::RProjectileBlueprintPhysicsTypeInfo::RProjectileBlueprintPhysicsTypeInfo)
+   */
+  RProjectileBlueprintPhysicsTypeInfo::RProjectileBlueprintPhysicsTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(RProjectileBlueprintPhysics), this);
   }
 
   /**
@@ -373,19 +372,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0051BD30 (FUN_0051BD30, preregister_RProjectileBlueprintPhysicsTypeInfo)
-   */
-  gpg::RType* preregister_RProjectileBlueprintPhysicsTypeInfo()
-  {
-    if (!gRProjectileBlueprintPhysicsTypeInfoConstructed) {
-      PhysicsTypeInfo& typeInfo = AcquireRProjectileBlueprintPhysicsTypeInfoStorage();
-      gpg::PreRegisterRType(typeid(RProjectileBlueprintPhysics), &typeInfo);
-    }
-
-    return &AcquireRProjectileBlueprintPhysicsTypeInfoStorage();
-  }
-
-  /**
    * Address: 0x00BC8650 (FUN_00BC8650, register_RProjectileBlueprintDisplayTypeInfo)
    */
   void register_RProjectileBlueprintDisplayTypeInfo()
@@ -404,10 +390,9 @@ namespace moho
   /**
    * Address: 0x00BC8690 (FUN_00BC8690, register_RProjectileBlueprintPhysicsTypeInfo)
    */
-  int register_RProjectileBlueprintPhysicsTypeInfo()
+  void register_RProjectileBlueprintPhysicsTypeInfo()
   {
-    (void)preregister_RProjectileBlueprintPhysicsTypeInfo();
-    return std::atexit(&cleanup_RProjectileBlueprintPhysicsTypeInfo);
+    (void)AcquireRProjectileBlueprintPhysicsTypeInfo();
   }
 } // namespace moho
 
@@ -416,5 +401,3 @@ namespace moho
 GPG_PREREGISTER_INIT(register_RProjectileBlueprintDisplayTypeInfo_131585, moho::register_RProjectileBlueprintDisplayTypeInfo)
 GPG_PREREGISTER_INIT(register_RProjectileBlueprintEconomyTypeInfo_131585, moho::register_RProjectileBlueprintEconomyTypeInfo)
 GPG_PREREGISTER_INIT(register_RProjectileBlueprintPhysicsTypeInfo_131585, moho::register_RProjectileBlueprintPhysicsTypeInfo)
-
-GPG_PREREGISTER_INIT(preregister_RProjectileBlueprintPhysicsTypeInfo_131585, moho::preregister_RProjectileBlueprintPhysicsTypeInfo)

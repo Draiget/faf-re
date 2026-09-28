@@ -23,6 +23,7 @@
 #include <string>
 #include <utility>
 
+#include "boost/scoped_ptr.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 
@@ -77,8 +78,8 @@ public:
      * Also emitted at: 0x008E4B10 (FUN_008E4B10, HistoryLogTarget::dtr) --
      *   the scalar deleting destructor MSVC generates for any polymorphic
      *   class with a virtual destructor override, matching this override
-     *   exactly. No source line maps to that emission; DestroyLogHistoryTarget's
-     *   plain `delete gLogHistoryTarget` below already reaches it implicitly.
+     *   exactly. No source line maps to that emission; `gLogHistoryTarget`'s
+     *   `~scoped_ptr` below already reaches it implicitly.
      *   A standalone `func_HistoryLogTargetDeletingDtor` free function
      *   previously modelled it as if it needed its own source-level caller;
      *   nothing ever called it (removed).
@@ -282,14 +283,16 @@ private:
     std::int32_t mReplayDepth = 0;
 };
 
-HistoryLogTarget* gLogHistoryTarget = nullptr;
-std::once_flag gLogHistoryAtexitOnce;
-
-void DestroyLogHistoryTarget()
-{
-  delete gLogHistoryTarget;
-  gLogHistoryTarget = nullptr;
-}
+/**
+ * Address: 0x00BE9A20 (FUN_00BE9A20, dynamic initializer for `gLogHistoryTarget`)
+ * Address: 0x00C095D0 (FUN_00C095D0, dynamic atexit destructor for `gLogHistoryTarget`)
+ *
+ * What it does:
+ * The initializer only registers the destructor with `atexit` (the null
+ * pointer is already in .bss); the destructor deletes a history target still
+ * alive at exit without clearing the slot, which is `~scoped_ptr`.
+ */
+boost::scoped_ptr<HistoryLogTarget> gLogHistoryTarget;
 
 /**
  * Address: 0x00936D20 (FUN_00936D20, ??1sLogContext@gpg@@QAE@@Z)
@@ -1541,15 +1544,12 @@ void gpg::Debugf(const char* fmt, ...)
  */
 void gpg::EnableLogHistory(const int maxEntries)
 {
-    if (gLogHistoryTarget != nullptr) {
+    if (gLogHistoryTarget) {
         gLogHistoryTarget->Enable(maxEntries);
         return;
     }
 
-    gLogHistoryTarget = new HistoryLogTarget(maxEntries);
-    std::call_once(gLogHistoryAtexitOnce, [] {
-        std::atexit(DestroyLogHistoryTarget);
-    });
+    gLogHistoryTarget.reset(new HistoryLogTarget(maxEntries));
 }
 
 /**
@@ -1560,7 +1560,7 @@ void gpg::EnableLogHistory(const int maxEntries)
  */
 bool gpg::ReplayLogHistory(LogTarget* const target)
 {
-    if (target == nullptr || gLogHistoryTarget == nullptr) {
+    if (target == nullptr || !gLogHistoryTarget) {
         return false;
     }
 

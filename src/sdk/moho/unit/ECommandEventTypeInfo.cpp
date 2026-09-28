@@ -1,24 +1,18 @@
 #include "moho/unit/ECommandEventTypeInfo.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::ECommandEventTypeInfo> gECommandEventTypeInfoStorage{};
-
   /**
-   * Address: 0x00BFEB40 (FUN_00BFEB40, sub_BFEB40)
-   *
-   * What it does:
-   * Tears down the recovered `ECommandEvent` enum descriptor at process exit.
+   * Address: 0x00BFEB40 (FUN_00BFEB40, atexit destructor of the ECommandEventTypeInfo object)
    */
-  void cleanup_ECommandEventTypeInfo()
+  [[nodiscard]] moho::ECommandEventTypeInfo& AcquireECommandEventTypeInfo()
   {
-    gECommandEventTypeInfoStorage.Destroy();
+    static moho::ECommandEventTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -68,12 +62,11 @@ namespace moho
    * Address: 0x00BD8ED0 (FUN_00BD8ED0, sub_BD8ED0)
    *
    * What it does:
-   * Ensures `ECommandEvent` type-info is registered and schedules teardown.
+   * Ensures `ECommandEvent` type-info is constructed and registered.
    */
-  int register_ECommandEventTypeInfo()
+  void register_ECommandEventTypeInfo()
   {
-    (void)gECommandEventTypeInfoStorage.Ensure();
-    return std::atexit(&cleanup_ECommandEventTypeInfo);
+    (void)AcquireECommandEventTypeInfo();
   }
 } // namespace moho
 

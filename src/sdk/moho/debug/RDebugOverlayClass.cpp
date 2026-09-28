@@ -1,6 +1,5 @@
 #include "RDebugOverlayClass.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "moho/debug/RDebugGrid.h"
@@ -31,77 +30,76 @@ namespace
     return sType;
   }
 
-  moho::RDebugGridTypeInfo* gRDebugGridTypeInfo = nullptr;
-  moho::RDebugRadarTypeInfo* gRDebugRadarTypeInfo = nullptr;
-  moho::RDebugNavPathTypeInfo* gRDebugNavPathTypeInfo = nullptr;
-  moho::RDebugNavWaypointsTypeInfo* gRDebugNavWaypointsTypeInfo = nullptr;
-  moho::RDebugNavSteeringTypeInfo* gRDebugNavSteeringTypeInfo = nullptr;
-  moho::RDebugOverlayClassTypeInfo* gRDebugOverlayClassTypeInfo = nullptr;
-  moho::RDebugOverlayTypeInfo* gRDebugOverlayTypeInfo = nullptr;
-  moho::RDebugWeaponsTypeInfo* gRDebugWeaponsTypeInfo = nullptr;
-
+  /**
+   * Address: 0x00BFB6A0 (FUN_00BFB6A0, atexit destructor of the RDebugGridTypeInfo object)
+   */
   [[nodiscard]] moho::RDebugGridTypeInfo& GetRDebugGridTypeInfo()
   {
-    if (gRDebugGridTypeInfo == nullptr) {
-      gRDebugGridTypeInfo = new moho::RDebugGridTypeInfo();
-    }
-    return *gRDebugGridTypeInfo;
+    static moho::RDebugGridTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFB6B0 (FUN_00BFB6B0, atexit destructor of the RDebugRadarTypeInfo object)
+   */
   [[nodiscard]] moho::RDebugRadarTypeInfo& GetRDebugRadarTypeInfo()
   {
-    if (gRDebugRadarTypeInfo == nullptr) {
-      gRDebugRadarTypeInfo = new moho::RDebugRadarTypeInfo();
-    }
-    return *gRDebugRadarTypeInfo;
+    static moho::RDebugRadarTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFB6E0 (FUN_00BFB6E0, atexit destructor of the RDebugNavPathTypeInfo object)
+   */
   [[nodiscard]] moho::RDebugNavPathTypeInfo& GetRDebugNavPathTypeInfo()
   {
-    if (gRDebugNavPathTypeInfo == nullptr) {
-      gRDebugNavPathTypeInfo = new moho::RDebugNavPathTypeInfo();
-    }
-    return *gRDebugNavPathTypeInfo;
+    static moho::RDebugNavPathTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFB6F0 (FUN_00BFB6F0, atexit destructor of the RDebugNavWaypointsTypeInfo object)
+   */
   [[nodiscard]] moho::RDebugNavWaypointsTypeInfo& GetRDebugNavWaypointsTypeInfo()
   {
-    if (gRDebugNavWaypointsTypeInfo == nullptr) {
-      gRDebugNavWaypointsTypeInfo = new moho::RDebugNavWaypointsTypeInfo();
-    }
-    return *gRDebugNavWaypointsTypeInfo;
+    static moho::RDebugNavWaypointsTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFB700 (FUN_00BFB700, atexit destructor of the RDebugNavSteeringTypeInfo object)
+   */
   [[nodiscard]] moho::RDebugNavSteeringTypeInfo& GetRDebugNavSteeringTypeInfo()
   {
-    if (gRDebugNavSteeringTypeInfo == nullptr) {
-      gRDebugNavSteeringTypeInfo = new moho::RDebugNavSteeringTypeInfo();
-    }
-    return *gRDebugNavSteeringTypeInfo;
+    static moho::RDebugNavSteeringTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFB760 (FUN_00BFB760, atexit destructor of the RDebugOverlayClassTypeInfo object)
+   */
   [[nodiscard]] moho::RDebugOverlayClassTypeInfo& GetRDebugOverlayClassTypeInfo()
   {
-    if (gRDebugOverlayClassTypeInfo == nullptr) {
-      gRDebugOverlayClassTypeInfo = new moho::RDebugOverlayClassTypeInfo();
-    }
-    return *gRDebugOverlayClassTypeInfo;
+    static moho::RDebugOverlayClassTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFB7C0 (FUN_00BFB7C0, atexit destructor of the RDebugOverlayTypeInfo object)
+   */
   [[nodiscard]] moho::RDebugOverlayTypeInfo& GetRDebugOverlayTypeInfo()
   {
-    if (gRDebugOverlayTypeInfo == nullptr) {
-      gRDebugOverlayTypeInfo = new moho::RDebugOverlayTypeInfo();
-    }
-    return *gRDebugOverlayTypeInfo;
+    static moho::RDebugOverlayTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BFB850 (FUN_00BFB850, atexit destructor of the RDebugWeaponsTypeInfo object)
+   */
   [[nodiscard]] moho::RDebugWeaponsTypeInfo& GetRDebugWeaponsTypeInfo()
   {
-    if (gRDebugWeaponsTypeInfo == nullptr) {
-      gRDebugWeaponsTypeInfo = new moho::RDebugWeaponsTypeInfo();
-    }
-    return *gRDebugWeaponsTypeInfo;
+    static moho::RDebugWeaponsTypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -195,7 +193,7 @@ namespace moho
    * Address: 0x0064D060 (FUN_0064D060, register_RDebugGridTypeInfo)
    *
    * What it does:
-   * Allocates and registers the `RDebugGridTypeInfo` reflection object.
+   * Constructs and registers the `RDebugGridTypeInfo` reflection object.
    */
   gpg::RType* register_RDebugGridTypeInfo()
   {
@@ -208,7 +206,7 @@ namespace moho
    * Address: 0x0064D8C0 (FUN_0064D8C0, register_RDebugRadarTypeInfo)
    *
    * What it does:
-   * Allocates and registers the `RDebugRadarTypeInfo` reflection object.
+   * Constructs and registers the `RDebugRadarTypeInfo` reflection object.
    */
   gpg::RType* register_RDebugRadarTypeInfo()
   {
@@ -221,7 +219,7 @@ namespace moho
    * Address: 0x00650560 (FUN_00650560, register_RDebugNavPathTypeInfo)
    *
    * What it does:
-   * Allocates and registers the `RDebugNavPathTypeInfo` reflection object.
+   * Constructs and registers the `RDebugNavPathTypeInfo` reflection object.
    */
   gpg::RType* register_RDebugNavPathTypeInfo()
   {
@@ -234,7 +232,7 @@ namespace moho
    * Address: 0x00650770 (FUN_00650770, register_RDebugNavWaypointsTypeInfo)
    *
    * What it does:
-   * Allocates and registers the `RDebugNavWaypointsTypeInfo` reflection object.
+   * Constructs and registers the `RDebugNavWaypointsTypeInfo` reflection object.
    */
   gpg::RType* register_RDebugNavWaypointsTypeInfo()
   {
@@ -247,7 +245,7 @@ namespace moho
    * Address: 0x00650970 (FUN_00650970, register_RDebugNavSteeringTypeInfo)
    *
    * What it does:
-   * Allocates and registers the `RDebugNavSteeringTypeInfo` reflection object.
+   * Constructs and registers the `RDebugNavSteeringTypeInfo` reflection object.
    */
   gpg::RType* register_RDebugNavSteeringTypeInfo()
   {
@@ -260,7 +258,7 @@ namespace moho
    * Address: 0x006517D0 (FUN_006517D0, register_RDebugOverlayClassTypeInfo)
    *
    * What it does:
-   * Allocates and registers the `RDebugOverlayClassTypeInfo` reflection object.
+   * Constructs and registers the `RDebugOverlayClassTypeInfo` reflection object.
    */
   gpg::RType* register_RDebugOverlayClassTypeInfo()
   {
@@ -273,7 +271,7 @@ namespace moho
    * Address: 0x006519D0 (FUN_006519D0, register_RDebugOverlayTypeInfo)
    *
    * What it does:
-   * Allocates and registers the `RDebugOverlayTypeInfo` reflection object.
+   * Constructs and registers the `RDebugOverlayTypeInfo` reflection object.
    */
   gpg::RType* register_RDebugOverlayTypeInfo()
   {
@@ -286,7 +284,7 @@ namespace moho
    * Address: 0x00652CD0 (FUN_00652CD0, register_RDebugWeaponsTypeInfo)
    *
    * What it does:
-   * Allocates and registers the `RDebugWeaponsTypeInfo` reflection object.
+   * Constructs and registers the `RDebugWeaponsTypeInfo` reflection object.
    */
   gpg::RType* register_RDebugWeaponsTypeInfo()
   {
@@ -296,195 +294,91 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFB6A0 (FUN_00BFB6A0, cleanup_RDebugGridTypeInfo)
-   *
-   * What it does:
-   * Deletes the cached `RDebugGridTypeInfo` singleton slot.
-   */
-  void cleanup_RDebugGridTypeInfo()
-  {
-    delete gRDebugGridTypeInfo;
-    gRDebugGridTypeInfo = nullptr;
-  }
-
-  /**
-   * Address: 0x00BFB6B0 (FUN_00BFB6B0, cleanup_RDebugRadarTypeInfo)
-   *
-   * What it does:
-   * Deletes the cached `RDebugRadarTypeInfo` singleton slot.
-   */
-  void cleanup_RDebugRadarTypeInfo()
-  {
-    delete gRDebugRadarTypeInfo;
-    gRDebugRadarTypeInfo = nullptr;
-  }
-
-  /**
-   * Address: 0x00BFB6E0 (FUN_00BFB6E0, cleanup_RDebugNavPathTypeInfo)
-   *
-   * What it does:
-   * Deletes the cached `RDebugNavPathTypeInfo` singleton slot.
-   */
-  void cleanup_RDebugNavPathTypeInfo()
-  {
-    delete gRDebugNavPathTypeInfo;
-    gRDebugNavPathTypeInfo = nullptr;
-  }
-
-  /**
-   * Address: 0x00BFB6F0 (FUN_00BFB6F0, cleanup_RDebugNavWaypointsTypeInfo)
-   *
-   * What it does:
-   * Deletes the cached `RDebugNavWaypointsTypeInfo` singleton slot.
-   */
-  void cleanup_RDebugNavWaypointsTypeInfo()
-  {
-    delete gRDebugNavWaypointsTypeInfo;
-    gRDebugNavWaypointsTypeInfo = nullptr;
-  }
-
-  /**
-   * Address: 0x00BFB700 (FUN_00BFB700, cleanup_RDebugNavSteeringTypeInfo)
-   *
-   * What it does:
-   * Deletes the cached `RDebugNavSteeringTypeInfo` singleton slot.
-   */
-  void cleanup_RDebugNavSteeringTypeInfo()
-  {
-    delete gRDebugNavSteeringTypeInfo;
-    gRDebugNavSteeringTypeInfo = nullptr;
-  }
-
-  /**
-   * Address: 0x00BFB760 (FUN_00BFB760, cleanup_RDebugOverlayClassTypeInfo)
-   *
-   * What it does:
-   * Deletes the cached `RDebugOverlayClassTypeInfo` singleton slot.
-   */
-  void cleanup_RDebugOverlayClassTypeInfo()
-  {
-    delete gRDebugOverlayClassTypeInfo;
-    gRDebugOverlayClassTypeInfo = nullptr;
-  }
-
-  /**
-   * Address: 0x00BFB7C0 (FUN_00BFB7C0, cleanup_RDebugOverlayTypeInfo)
-   *
-   * What it does:
-   * Deletes the cached `RDebugOverlayTypeInfo` singleton slot.
-   */
-  void cleanup_RDebugOverlayTypeInfo()
-  {
-    delete gRDebugOverlayTypeInfo;
-    gRDebugOverlayTypeInfo = nullptr;
-  }
-
-  /**
-   * Address: 0x00BFB850 (FUN_00BFB850, cleanup_RDebugWeaponsTypeInfo)
-   *
-   * What it does:
-   * Deletes the cached `RDebugWeaponsTypeInfo` singleton slot.
-   */
-  void cleanup_RDebugWeaponsTypeInfo()
-  {
-    delete gRDebugWeaponsTypeInfo;
-    gRDebugWeaponsTypeInfo = nullptr;
-  }
-
-  /**
    * Address: 0x00BD3BC0 (FUN_00BD3BC0, register_RDebugGridTypeInfoStartup)
    *
    * What it does:
-   * Registers `RDebugGridTypeInfo` and schedules its atexit cleanup.
+   * Registers `RDebugGridTypeInfo`.
    */
-  int register_RDebugGridTypeInfoStartup()
+  void register_RDebugGridTypeInfoStartup()
   {
     (void)register_RDebugGridTypeInfo();
-    return std::atexit(&cleanup_RDebugGridTypeInfo);
   }
 
   /**
    * Address: 0x00BD3BE0 (FUN_00BD3BE0, register_RDebugRadarTypeInfoStartup)
    *
    * What it does:
-   * Registers `RDebugRadarTypeInfo` and schedules its atexit cleanup.
+   * Registers `RDebugRadarTypeInfo`.
    */
-  int register_RDebugRadarTypeInfoStartup()
+  void register_RDebugRadarTypeInfoStartup()
   {
     (void)register_RDebugRadarTypeInfo();
-    return std::atexit(&cleanup_RDebugRadarTypeInfo);
   }
 
   /**
    * Address: 0x00BD3C70 (FUN_00BD3C70, register_RDebugNavPathTypeInfoStartup)
    *
    * What it does:
-   * Registers `RDebugNavPathTypeInfo` and schedules its atexit cleanup.
+   * Registers `RDebugNavPathTypeInfo`.
    */
-  int register_RDebugNavPathTypeInfoStartup()
+  void register_RDebugNavPathTypeInfoStartup()
   {
     (void)register_RDebugNavPathTypeInfo();
-    return std::atexit(&cleanup_RDebugNavPathTypeInfo);
   }
 
   /**
    * Address: 0x00BD3C90 (FUN_00BD3C90, register_RDebugNavWaypointsTypeInfoStartup)
    *
    * What it does:
-   * Registers `RDebugNavWaypointsTypeInfo` and schedules its atexit cleanup.
+   * Registers `RDebugNavWaypointsTypeInfo`.
    */
-  int register_RDebugNavWaypointsTypeInfoStartup()
+  void register_RDebugNavWaypointsTypeInfoStartup()
   {
     (void)register_RDebugNavWaypointsTypeInfo();
-    return std::atexit(&cleanup_RDebugNavWaypointsTypeInfo);
   }
 
   /**
    * Address: 0x00BD3CB0 (FUN_00BD3CB0, register_RDebugNavSteeringTypeInfoStartup)
    *
    * What it does:
-   * Registers `RDebugNavSteeringTypeInfo` and schedules its atexit cleanup.
+   * Registers `RDebugNavSteeringTypeInfo`.
    */
-  int register_RDebugNavSteeringTypeInfoStartup()
+  void register_RDebugNavSteeringTypeInfoStartup()
   {
     (void)register_RDebugNavSteeringTypeInfo();
-    return std::atexit(&cleanup_RDebugNavSteeringTypeInfo);
   }
 
   /**
    * Address: 0x00BD3D40 (FUN_00BD3D40, register_RDebugOverlayClassTypeInfoStartup)
    *
    * What it does:
-   * Registers `RDebugOverlayClassTypeInfo` and schedules its atexit cleanup.
+   * Registers `RDebugOverlayClassTypeInfo`.
    */
-  int register_RDebugOverlayClassTypeInfoStartup()
+  void register_RDebugOverlayClassTypeInfoStartup()
   {
     (void)register_RDebugOverlayClassTypeInfo();
-    return std::atexit(&cleanup_RDebugOverlayClassTypeInfo);
   }
 
   /**
    * Address: 0x00BD3D60 (FUN_00BD3D60, register_RDebugOverlayTypeInfoStartup)
    *
    * What it does:
-   * Registers `RDebugOverlayTypeInfo` and schedules its atexit cleanup.
+   * Registers `RDebugOverlayTypeInfo`.
    */
-  int register_RDebugOverlayTypeInfoStartup()
+  void register_RDebugOverlayTypeInfoStartup()
   {
     (void)register_RDebugOverlayTypeInfo();
-    return std::atexit(&cleanup_RDebugOverlayTypeInfo);
   }
 
   /**
    * Address: 0x00BD3E60 (FUN_00BD3E60, register_RDebugWeaponsTypeInfoStartup)
    *
    * What it does:
-   * Registers `RDebugWeaponsTypeInfo` and schedules its atexit cleanup.
+   * Registers `RDebugWeaponsTypeInfo`.
    */
-  int register_RDebugWeaponsTypeInfoStartup()
+  void register_RDebugWeaponsTypeInfoStartup()
   {
     (void)register_RDebugWeaponsTypeInfo();
-    return std::atexit(&cleanup_RDebugWeaponsTypeInfo);
   }
 } // namespace moho
 

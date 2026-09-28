@@ -1,6 +1,5 @@
 #include "moho/unit/tasks/CUnitCallTeleportTypeInfo.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -13,17 +12,13 @@ namespace
 {
   using TypeInfo = moho::CUnitCallTeleportTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCUnitCallTeleportTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCUnitCallTeleportTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF96E0 (FUN_00BF96E0, atexit destructor of the CUnitCallTeleportTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gCUnitCallTeleportTypeInfoConstructed) {
-      new (gCUnitCallTeleportTypeInfoStorage) TypeInfo();
-      gCUnitCallTeleportTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCUnitCallTeleportTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   void InitializeTeleportRuntimeState(moho::CUnitCallTeleport* const task)
@@ -145,26 +140,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF96E0 (FUN_00BF96E0, cleanup_CUnitCallTeleportTypeInfo)
-   */
-  void cleanup_CUnitCallTeleportTypeInfo()
-  {
-    if (!gCUnitCallTeleportTypeInfoConstructed) {
-      return;
-    }
-
-    auto& typeInfo = *reinterpret_cast<TypeInfo*>(gCUnitCallTeleportTypeInfoStorage);
-    typeInfo.fields_.clear();
-    typeInfo.bases_.clear();
-  }
-
-  /**
    * Address: 0x00BCFD00 (FUN_00BCFD00, register_CUnitCallTeleportTypeInfo)
    */
-  int register_CUnitCallTeleportTypeInfo()
+  void register_CUnitCallTeleportTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup_CUnitCallTeleportTypeInfo);
   }
 } // namespace moho
 

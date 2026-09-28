@@ -12,18 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiPersonalityTypeInfo) unsigned char gCAiPersonalityTypeInfoStorage[sizeof(CAiPersonalityTypeInfo)] = {};
-  bool gCAiPersonalityTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF76B0 (FUN_00BF76B0, atexit destructor of the CAiPersonalityTypeInfo object)
+   */
   [[nodiscard]] CAiPersonalityTypeInfo* AcquireCAiPersonalityTypeInfo()
   {
-    if (!gCAiPersonalityTypeInfoConstructed) {
-      auto* const typeInfo = new (gCAiPersonalityTypeInfoStorage) CAiPersonalityTypeInfo();
-      gpg::PreRegisterRType(typeid(CAiPersonality), typeInfo);
-      gCAiPersonalityTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiPersonalityTypeInfo*>(gCAiPersonalityTypeInfoStorage);
+    static CAiPersonalityTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -34,7 +29,9 @@ namespace
    */
   [[nodiscard]] gpg::RType* preregister_CAiPersonalityTypeInfo()
   {
-    return AcquireCAiPersonalityTypeInfo();
+    CAiPersonalityTypeInfo* const typeInfo = AcquireCAiPersonalityTypeInfo();
+    gpg::PreRegisterRType(typeid(CAiPersonality), typeInfo);
+    return typeInfo;
   }
 
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
@@ -68,22 +65,6 @@ namespace
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }
-
-  /**
-   * Address: 0x00BF76B0 (FUN_00BF76B0, cleanup_CAiPersonalityTypeInfo)
-   *
-   * What it does:
-   * Releases static CAiPersonality RTTI storage.
-   */
-  void cleanup_CAiPersonalityTypeInfo()
-  {
-    if (!gCAiPersonalityTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiPersonalityTypeInfo()->~CAiPersonalityTypeInfo();
-    gCAiPersonalityTypeInfoConstructed = false;
-  }
 } // namespace
 
 /**
@@ -114,13 +95,11 @@ void CAiPersonalityTypeInfo::Init()
  * Address: 0x00BCD600 (FUN_00BCD600, register_CAiPersonalityTypeInfo)
  *
  * What it does:
- * Constructs/preregisters static CAiPersonality RTTI storage and installs
- * process-exit cleanup.
+ * Constructs/preregisters static CAiPersonality RTTI storage.
  */
-int moho::register_CAiPersonalityTypeInfo()
+void moho::register_CAiPersonalityTypeInfo()
 {
   (void)preregister_CAiPersonalityTypeInfo();
-  return std::atexit(&cleanup_CAiPersonalityTypeInfo);
 }
 
 namespace
@@ -129,7 +108,7 @@ namespace
   {
     CAiPersonalityTypeInfoBootstrap()
     {
-      (void)moho::register_CAiPersonalityTypeInfo();
+      moho::register_CAiPersonalityTypeInfo();
     }
   };
 

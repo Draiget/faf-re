@@ -517,24 +517,6 @@ namespace
 
 namespace
 {
-  alignas(moho::SCollisionInfoTypeInfo)
-    unsigned char gSCollisionInfoTypeInfoStorage[sizeof(moho::SCollisionInfoTypeInfo)] = {};
-  bool gSCollisionInfoTypeInfoConstructed = false;
-
-  alignas(moho::ECollisionTypeTypeInfo)
-    unsigned char gECollisionTypeTypeInfoStorage[sizeof(moho::ECollisionTypeTypeInfo)] = {};
-  bool gECollisionTypeTypeInfoConstructed = false;
-
-  alignas(moho::EPathPointStateTypeInfo)
-    unsigned char gEPathPointStateTypeInfoStorage[sizeof(moho::EPathPointStateTypeInfo)] = {};
-  bool gEPathPointStateTypeInfoConstructed = false;
-
-  alignas(moho::CPathPointTypeInfo) unsigned char gCPathPointTypeInfoStorage[sizeof(moho::CPathPointTypeInfo)] = {};
-  bool gCPathPointTypeInfoConstructed = false;
-  alignas(FastVectorCPathPointTypeInfo)
-    unsigned char gFastVectorCPathPointTypeStorage[sizeof(FastVectorCPathPointTypeInfo)] = {};
-  bool gFastVectorCPathPointTypeConstructed = false;
-
   // Address: 0x010AE1EC -- process-global `PrimitiveSerHelper<ECollisionType,int>`
   // singleton (constructed by FUN_00BCBD70, self-registering via `__xc_a`;
   // see the class Doxygen above for the real-ctor/atexit-target/dead-writer
@@ -575,8 +557,6 @@ namespace
   gpg::RType* gVector3fType = nullptr;
   gpg::RType* gCPathPointType = nullptr;
   gpg::RType* gFastVectorCPathPointType = nullptr;
-  msvc8::string gFastVectorCPathPointTypeName{};
-  bool gFastVectorCPathPointTypeNameCleanupRegistered = false;
   gpg::RType* gPathSplineTypeType = nullptr;
   gpg::RType* gPathSplineContinuationType = nullptr;
   template <typename TSerializer>
@@ -666,34 +646,31 @@ namespace
     return gCPathPointType;
   }
 
+  /**
+   * Address: 0x00BF6550 (FUN_00BF6550, atexit destructor of the SCollisionInfoTypeInfo object)
+   */
   [[nodiscard]] moho::SCollisionInfoTypeInfo* AcquireSCollisionInfoTypeInfo()
   {
-    if (!gSCollisionInfoTypeInfoConstructed) {
-      new (gSCollisionInfoTypeInfoStorage) moho::SCollisionInfoTypeInfo();
-      gSCollisionInfoTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::SCollisionInfoTypeInfo*>(gSCollisionInfoTypeInfoStorage);
+    static moho::SCollisionInfoTypeInfo sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BF6510 (FUN_00BF6510, atexit destructor of the ECollisionTypeTypeInfo object)
+   */
   [[nodiscard]] moho::ECollisionTypeTypeInfo* AcquireECollisionTypeTypeInfo()
   {
-    if (!gECollisionTypeTypeInfoConstructed) {
-      new (gECollisionTypeTypeInfoStorage) moho::ECollisionTypeTypeInfo();
-      gECollisionTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::ECollisionTypeTypeInfo*>(gECollisionTypeTypeInfoStorage);
+    static moho::ECollisionTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BF75A0 (FUN_00BF75A0, atexit destructor of the FastVectorCPathPointTypeInfo object)
+   */
   [[nodiscard]] FastVectorCPathPointTypeInfo* AcquireFastVectorCPathPointType()
   {
-    if (!gFastVectorCPathPointTypeConstructed) {
-      new (gFastVectorCPathPointTypeStorage) FastVectorCPathPointTypeInfo();
-      gFastVectorCPathPointTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorCPathPointTypeInfo*>(gFastVectorCPathPointTypeStorage);
+    static FastVectorCPathPointTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* preregister_FastVectorCPathPointType();
@@ -811,12 +788,12 @@ namespace
   {
     FastVectorCPathPointTypeInfo* const type = AcquireFastVectorCPathPointType();
     gpg::PreRegisterRType(typeid(gpg::fastvector<moho::CPathPoint>), type);
-    gFastVectorCPathPointType = type;
     return type;
   }
 
   /**
    * Address: 0x0062F520 (FUN_0062F520, construct_EPathPointStateTypeInfo)
+   * Address: 0x00BFA7E0 (FUN_00BFA7E0, atexit destructor of the EPathPointStateTypeInfo object)
    *
    * What it does:
    * Constructs and preregisters `EPathPointStateTypeInfo` in static startup
@@ -824,130 +801,23 @@ namespace
    */
   [[nodiscard]] gpg::REnumType* construct_EPathPointStateTypeInfo()
   {
-    if (!gEPathPointStateTypeInfoConstructed) {
-      auto* const typeInfo = new (gEPathPointStateTypeInfoStorage) moho::EPathPointStateTypeInfo();
-      gpg::PreRegisterRType(typeid(moho::EPathPointState), typeInfo);
-      gEPathPointStateType = typeInfo;
-      gEPathPointStateTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(gEPathPointStateTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BFA7E0 (FUN_00BFA7E0, cleanup_EPathPointStateTypeInfo)
-   *
-   * What it does:
-   * Tears down the recovered `EPathPointState` enum type descriptor.
-   */
-  void cleanup_EPathPointStateTypeInfo()
-  {
-    if (!gEPathPointStateTypeInfoConstructed) {
-      return;
-    }
-
-    reinterpret_cast<moho::EPathPointStateTypeInfo*>(gEPathPointStateTypeInfoStorage)->~EPathPointStateTypeInfo();
-    gEPathPointStateType = nullptr;
-    gEPathPointStateTypeInfoConstructed = false;
+    static moho::EPathPointStateTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(moho::EPathPointState), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x0062F650 (FUN_0062F650, construct_CPathPointTypeInfo)
+   * Address: 0x00BFA820 (FUN_00BFA820, atexit destructor of the CPathPointTypeInfo object)
    *
    * What it does:
    * Constructs and preregisters `CPathPointTypeInfo` in static startup storage.
    */
   [[nodiscard]] gpg::RType* construct_CPathPointTypeInfo()
   {
-    if (!gCPathPointTypeInfoConstructed) {
-      auto* const typeInfo = new (gCPathPointTypeInfoStorage) moho::CPathPointTypeInfo();
-      gpg::PreRegisterRType(typeid(moho::CPathPoint), typeInfo);
-      gCPathPointType = typeInfo;
-      gCPathPointTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::RType*>(gCPathPointTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BFA820 (FUN_00BFA820, cleanup_CPathPointTypeInfo)
-   *
-   * What it does:
-   * Tears down the recovered `CPathPoint` type descriptor.
-   */
-  void cleanup_CPathPointTypeInfo()
-  {
-    if (!gCPathPointTypeInfoConstructed) {
-      return;
-    }
-
-    reinterpret_cast<moho::CPathPointTypeInfo*>(gCPathPointTypeInfoStorage)->~CPathPointTypeInfo();
-    gCPathPointType = nullptr;
-    gCPathPointTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BF6510 (FUN_00BF6510, Moho::ECollisionTypeTypeInfo::~ECollisionTypeTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `ECollisionTypeTypeInfo` reflection storage.
-   */
-  void cleanup_ECollisionTypeTypeInfo()
-  {
-    if (!gECollisionTypeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireECollisionTypeTypeInfo()->~ECollisionTypeTypeInfo();
-    gECollisionTypeTypeInfoConstructed = false;
-    gECollisionTypeType = nullptr;
-  }
-
-  /**
-   * Address: 0x00BF6550 (FUN_00BF6550, cleanup_SCollisionInfoTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `SCollisionInfoTypeInfo` reflection storage.
-   */
-  void cleanup_SCollisionInfoTypeInfo()
-  {
-    if (!gSCollisionInfoTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSCollisionInfoTypeInfo()->~SCollisionInfoTypeInfo();
-    gSCollisionInfoTypeInfoConstructed = false;
-    gSCollisionInfoType = nullptr;
-  }
-
-  /**
-   * Address: 0x00BF75A0 (FUN_00BF75A0, cleanup_FastVectorCPathPointType)
-   *
-   * What it does:
-   * Tears down startup-owned `fastvector<CPathPoint>` reflection storage.
-   */
-  void cleanup_FastVectorCPathPointType()
-  {
-    if (!gFastVectorCPathPointTypeConstructed) {
-      return;
-    }
-
-    AcquireFastVectorCPathPointType()->~FastVectorCPathPointTypeInfo();
-    gFastVectorCPathPointTypeConstructed = false;
-    gFastVectorCPathPointType = nullptr;
-  }
-
-  /**
-   * Address: 0x00BF7570 (FUN_00BF7570, cleanup_FastVectorCPathPointTypeName)
-   *
-   * What it does:
-   * Clears cached lexical type-name storage for
-   * `gpg::RFastVectorType_CPathPoint::GetName`.
-   */
-  void cleanup_FastVectorCPathPointTypeName()
-  {
-    gFastVectorCPathPointTypeName.clear();
-    gFastVectorCPathPointTypeNameCleanupRegistered = false;
+    static moho::CPathPointTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(moho::CPathPoint), &sInstance);
+    return &sInstance;
   }
 
 } // namespace
@@ -1842,7 +1712,6 @@ void CAiPathSpline::MemberSerialize(gpg::WriteArchive* const archive) const
 SCollisionInfoTypeInfo::SCollisionInfoTypeInfo()
 {
   gpg::PreRegisterRType(typeid(SCollisionInfo), this);
-  gSCollisionInfoType = this;
 }
 
 /**
@@ -1886,11 +1755,10 @@ void SCollisionInfoTypeInfo::Init()
 ECollisionTypeTypeInfo::ECollisionTypeTypeInfo()
 {
   gpg::PreRegisterRType(typeid(ECollisionType), this);
-  gECollisionTypeType = this;
 }
 
 /**
- * Address: 0x00BF6510 (FUN_00BF6510, Moho::ECollisionTypeTypeInfo::~ECollisionTypeTypeInfo)
+ * Address: 0x00596690 (FUN_00596690, scalar deleting destructor, vtable slot 2)
  */
 ECollisionTypeTypeInfo::~ECollisionTypeTypeInfo() = default;
 
@@ -1962,24 +1830,16 @@ void EPathPointStateTypeInfo::Init()
 
 /**
  * Address: 0x005B4950 (FUN_005B4950, gpg::RFastVectorType_CPathPoint::GetName)
+ * Address: 0x00BF7570 (FUN_00BF7570, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the reflected `fastvector<CPathPoint>` type name
- * from the resolved `CPathPoint` element RTTI lane.
+ * Builds the reflected `fastvector<CPathPoint>` type name once from the
+ * resolved `CPathPoint` element RTTI lane and returns it.
  */
 const char* FastVectorCPathPointTypeInfo::GetName() const
 {
-  if (gFastVectorCPathPointTypeName.empty()) {
-    const gpg::RType* const elementType = ResolveCPathPointType();
-    const char* const elementName = elementType ? elementType->GetName() : "CPathPoint";
-    gFastVectorCPathPointTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "CPathPoint");
-    if (!gFastVectorCPathPointTypeNameCleanupRegistered) {
-      gFastVectorCPathPointTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_FastVectorCPathPointTypeName);
-    }
-  }
-
-  return gFastVectorCPathPointTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", ResolveCPathPointType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -2189,10 +2049,9 @@ void CPathPoint::MemberSerialize(gpg::WriteArchive* const archive) const
 /**
  * Address: 0x00BCBDB0 (FUN_00BCBDB0, register_SCollisionInfoTypeInfo)
  */
-int moho::register_SCollisionInfoTypeInfo()
+void moho::register_SCollisionInfoTypeInfo()
 {
   (void)AcquireSCollisionInfoTypeInfo();
-  return std::atexit(&cleanup_SCollisionInfoTypeInfo);
 }
 
 /**
@@ -2201,44 +2060,39 @@ int moho::register_SCollisionInfoTypeInfo()
 void moho::register_ECollisionTypeTypeInfo()
 {
   (void)AcquireECollisionTypeTypeInfo();
-  (void)std::atexit(&cleanup_ECollisionTypeTypeInfo);
 }
 
 /**
  * Address: 0x00BD20C0 (FUN_00BD20C0, register_EPathPointStateTypeInfo)
  *
  * What it does:
- * Constructs/preregisters `EPathPointState` type info and schedules teardown.
+ * Constructs/preregisters `EPathPointState` type info.
  */
-int moho::register_EPathPointStateTypeInfo()
+void moho::register_EPathPointStateTypeInfo()
 {
   (void)construct_EPathPointStateTypeInfo();
-  return std::atexit(&cleanup_EPathPointStateTypeInfo);
 }
 
 /**
  * Address: 0x00BD2120 (FUN_00BD2120, register_CPathPointTypeInfo)
  *
  * What it does:
- * Constructs/preregisters `CPathPoint` type info and schedules teardown.
+ * Constructs/preregisters `CPathPoint` type info.
  */
-int moho::register_CPathPointTypeInfo()
+void moho::register_CPathPointTypeInfo()
 {
   (void)construct_CPathPointTypeInfo();
-  return std::atexit(&cleanup_CPathPointTypeInfo);
 }
 
 /**
  * Address: 0x00BCD390 (FUN_00BCD390, register_FastVectorCPathPointTypeAtexit)
  *
  * What it does:
- * Constructs/preregisters startup RTTI metadata for `gpg::fastvector<CPathPoint>`
- * and installs process-exit teardown.
+ * Constructs/preregisters startup RTTI metadata for `gpg::fastvector<CPathPoint>`.
  */
-int moho::register_FastVectorCPathPointTypeAtexit()
+void moho::register_FastVectorCPathPointTypeAtexit()
 {
   (void)preregister_FastVectorCPathPointType();
-  return std::atexit(&cleanup_FastVectorCPathPointType);
 }
 
 namespace
@@ -2252,11 +2106,11 @@ namespace
   {
     CPathPointReflectionBootstrap()
     {
-      (void)moho::register_SCollisionInfoTypeInfo();
+      moho::register_SCollisionInfoTypeInfo();
       moho::register_ECollisionTypeTypeInfo();
-      (void)moho::register_FastVectorCPathPointTypeAtexit();
-      (void)moho::register_EPathPointStateTypeInfo();
-      (void)moho::register_CPathPointTypeInfo();
+      moho::register_FastVectorCPathPointTypeAtexit();
+      moho::register_EPathPointStateTypeInfo();
+      moho::register_CPathPointTypeInfo();
     }
   };
 

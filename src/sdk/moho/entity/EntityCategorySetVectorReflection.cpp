@@ -1,7 +1,5 @@
 #include "moho/entity/EntityCategorySetVectorReflection.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 #include <utility>
 
@@ -14,24 +12,13 @@ namespace
   using EntityCategorySetVector = msvc8::vector<moho::EntityCategorySet>;
   using EntityCategorySetVectorType = gpg::RVectorType<moho::EntityCategorySet>;
 
-  alignas(EntityCategorySetVectorType) unsigned char gEntityCategorySetVectorTypeStorage[sizeof(EntityCategorySetVectorType)];
-  bool gEntityCategorySetVectorTypeConstructed = false;
-
+  /**
+   * Address: 0x00BFE8C0 (FUN_00BFE8C0, atexit destructor of the vector<EntityCategorySet> type-info object)
+   */
   [[nodiscard]] EntityCategorySetVectorType* AcquireEntityCategorySetVectorType()
   {
-    if (!gEntityCategorySetVectorTypeConstructed) {
-      new (gEntityCategorySetVectorTypeStorage) EntityCategorySetVectorType();
-      gEntityCategorySetVectorTypeConstructed = true;
-    }
-    return reinterpret_cast<EntityCategorySetVectorType*>(gEntityCategorySetVectorTypeStorage);
-  }
-
-  [[nodiscard]] EntityCategorySetVectorType* PeekEntityCategorySetVectorType() noexcept
-  {
-    if (!gEntityCategorySetVectorTypeConstructed) {
-      return nullptr;
-    }
-    return reinterpret_cast<EntityCategorySetVectorType*>(gEntityCategorySetVectorTypeStorage);
+    static EntityCategorySetVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* ResolveEntityCategorySetType()
@@ -155,23 +142,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x00BFE8C0 (FUN_00BFE8C0, sub_BFE8C0)
-   *
-   * What it does:
-   * Tears down `vector<EntityCategorySet>` reflection storage at process exit.
-   */
-  void cleanup_EntityCategorySetVectorType()
-  {
-    EntityCategorySetVectorType* const type = PeekEntityCategorySetVectorType();
-    if (type == nullptr) {
-      return;
-    }
-
-    type->~EntityCategorySetVectorType();
-    gEntityCategorySetVectorTypeConstructed = false;
-  }
-
   struct EntityCategorySetVectorReflectionBootstrap
   {
     EntityCategorySetVectorReflectionBootstrap()
@@ -187,16 +157,14 @@ gpg::RVectorType<moho::EntityCategorySet>::~RVectorType() = default;
 
 /**
  * Address: 0x006DB280 (FUN_006DB280, gpg::RVectorType_BVSet_PRBlueprint::GetName)
+ * Address: 0x00BFE830 (FUN_00BFE830, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `vector<EntityCategorySet>` once and returns it.
  */
 const char* gpg::RVectorType<moho::EntityCategorySet>::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const gpg::RType* const elementType = ResolveEntityCategorySetType();
-    const char* const elementName = elementType ? elementType->GetName() : "EntityCategorySet";
-    sName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "EntityCategorySet");
-  }
-
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveEntityCategorySetType()->GetName());
   return sName.c_str();
 }
 
@@ -295,13 +263,11 @@ gpg::RType* moho::register_EntityCategorySetVectorType()
  * Address: 0x00BD8B90 (FUN_00BD8B90, sub_BD8B90)
  *
  * What it does:
- * Registers `vector<EntityCategorySet>` reflection and installs
- * process-exit teardown via `atexit`.
+ * Registers `vector<EntityCategorySet>` reflection.
  */
-int moho::register_EntityCategorySetVectorType_AtExit()
+void moho::register_EntityCategorySetVectorType_AtExit()
 {
   (void)register_EntityCategorySetVectorType();
-  return std::atexit(&cleanup_EntityCategorySetVectorType);
 }
 
 namespace

@@ -1,7 +1,6 @@
 #include "moho/entity/MotorSinkAway.h"
 
 #include <cstdint>
-#include <cstdlib>
 #include <new>
 #include <string>
 #include <typeinfo>
@@ -25,9 +24,6 @@ namespace gpg
 
 namespace
 {
-  alignas(moho::MotorSinkAwayTypeInfo)
-    unsigned char gMotorSinkAwayTypeInfoStorage[sizeof(moho::MotorSinkAwayTypeInfo)];
-  bool gMotorSinkAwayTypeInfoConstructed = false;
   // Address: 0x00BD5DB0 (dynamic initializer for the global
   // `MotorSinkAwaySerializer` singleton, __xc_a-reachable) -- MSVC's own
   // compiler-generated dynamic initializer for this global runs the real
@@ -44,11 +40,6 @@ namespace
   // Address: 0x010B528C -- process-global `MotorSinkAwayConstruct` singleton.
   moho::MotorSinkAwayConstruct gMotorSinkAwayConstruct;
   std::int32_t gRecoveredCScrLuaMetatableFactoryMotorSinkAwayIndex = 0;
-
-  [[nodiscard]] moho::MotorSinkAwayTypeInfo& MotorSinkAwayTypeInfoStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::MotorSinkAwayTypeInfo*>(gMotorSinkAwayTypeInfoStorage);
-  }
 
   /**
    * Address: 0x00696390 (FUN_00696390)
@@ -489,30 +480,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD210 (FUN_00BFD210, cleanup_MotorSinkAwayTypeInfo)
-   */
-  void cleanup_MotorSinkAwayTypeInfo()
-  {
-    if (!gMotorSinkAwayTypeInfoConstructed) {
-      return;
-    }
-
-    MotorSinkAwayTypeInfoStorageRef().~MotorSinkAwayTypeInfo();
-    gMotorSinkAwayTypeInfoConstructed = false;
-    MotorSinkAway::sType = nullptr;
-  }
-
-  /**
    * Address: 0x00BD5D50 (FUN_00BD5D50, register_MotorSinkAwayTypeInfo)
+   * Address: 0x00BFD210 (FUN_00BFD210, atexit destructor of the MotorSinkAwayTypeInfo object)
    */
   void register_MotorSinkAwayTypeInfo()
   {
-    if (!gMotorSinkAwayTypeInfoConstructed) {
-      new (gMotorSinkAwayTypeInfoStorage) MotorSinkAwayTypeInfo();
-      gMotorSinkAwayTypeInfoConstructed = true;
-    }
-
-    (void)std::atexit(&cleanup_MotorSinkAwayTypeInfo);
+    static MotorSinkAwayTypeInfo sInstance;
+    (void)sInstance;
   }
 
   /**

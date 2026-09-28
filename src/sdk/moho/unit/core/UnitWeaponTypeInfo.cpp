@@ -1,92 +1,36 @@
 #include "moho/unit/core/UnitWeaponTypeInfo.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/unit/core/UnitWeapon.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
   using TypeInfo = moho::UnitWeaponTypeInfo;
 
-  gpg::StaticTypeInfoStorage<TypeInfo> gUnitWeaponTypeInfoStorage{};
-
+  /**
+   * Address: 0x00BFE740 (FUN_00BFE740, atexit destructor of the UnitWeaponTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireUnitWeaponTypeInfo()
   {
-    return gUnitWeaponTypeInfoStorage.Ensure();
-  }
-
-  /**
-   * Returns the descriptor only if the static-init lane already built it.
-   * The atexit cleanup below can run in a process that never touched
-   * reflection, so it must not construct one on the way out.
-   */
-  [[nodiscard]] TypeInfo* PeekUnitWeaponTypeInfo() noexcept
-  {
-    if (!gUnitWeaponTypeInfoStorage.IsConstructed()) {
-      return nullptr;
-    }
-
-    return &gUnitWeaponTypeInfoStorage.Ref();
-  }
-
-  template <class TTypeInfo>
-  void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
-  {
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  /**
-   * Address: 0x00BFE740 (FUN_00BFE740, cleanup lane)
-   *
-   * What it does:
-   * Clears reflected field/base vectors for the `UnitWeaponTypeInfo` singleton.
-   */
-  void cleanup_UnitWeaponTypeInfo_00BFE740_Impl()
-  {
-    TypeInfo* const typeInfo = PeekUnitWeaponTypeInfo();
-    if (!typeInfo) {
-      return;
-    }
-
-    ResetTypeInfoVectors(*typeInfo);
-  }
-
-  void cleanup_UnitWeaponTypeInfo_AtExit()
-  {
-    cleanup_UnitWeaponTypeInfo_00BFE740_Impl();
-  }
-
-  /**
-   * Address: 0x00BD88D0 (FUN_00BD88D0, startup registration + atexit cleanup)
-   *
-   * What it does:
-   * Forces `UnitWeaponTypeInfo` construction and schedules exit cleanup.
-   */
-  int register_UnitWeaponTypeInfo_00BD88D0_Impl()
-  {
-    (void)AcquireUnitWeaponTypeInfo();
-    return std::atexit(&cleanup_UnitWeaponTypeInfo_AtExit);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00BD88D0 (FUN_00BD88D0, startup registration + atexit cleanup)
+   * Address: 0x00BD88D0 (FUN_00BD88D0, startup registration)
    *
    * What it does:
    * Provider entry point for the phase-1 initializer walk: builds the
-   * `UnitWeapon` descriptor and schedules its exit cleanup.
+   * `UnitWeapon` descriptor.
    */
   gpg::RType* preregister_UnitWeaponTypeInfo()
   {
-    (void)register_UnitWeaponTypeInfo_00BD88D0_Impl();
     return &AcquireUnitWeaponTypeInfo();
   }
 } // namespace moho

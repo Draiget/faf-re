@@ -1,6 +1,5 @@
 #include "moho/unit/CUnitCommandWeakPtrReflection.h"
 
-#include <cstdlib>
 #include <new>
 #include <stdexcept>
 #include <typeinfo>
@@ -21,11 +20,6 @@ namespace
   using WeakPtrType = moho::RWeakPtrType<moho::CUnitCommand>;
   using WeakPtrVector = msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>;
   using WeakPtrVectorType = gpg::RVectorType<moho::WeakPtr<moho::CUnitCommand>>;
-
-  msvc8::string gWeakPtrTypeName;
-  msvc8::string gWeakPtrVectorTypeName;
-  bool gWeakPtrTypeNameCleanupRegistered = false;
-  bool gWeakPtrVectorTypeNameCleanupRegistered = false;
 
   /**
    * Address: 0x00BFEDC0 (FUN_00BFEDC0, atexit destructor of the WeakPtrType object)
@@ -144,24 +138,6 @@ namespace
   }
 
   /**
-   * Address: 0x00BFECA0 (FUN_00BFECA0, sub_BFECA0)
-   */
-  void cleanup_WeakPtrCUnitCommandTypeName()
-  {
-    gWeakPtrTypeName = msvc8::string{};
-    gWeakPtrTypeNameCleanupRegistered = false;
-  }
-
-  /**
-   * Address: 0x00BFEC70 (FUN_00BFEC70, sub_BFEC70)
-   */
-  void cleanup_WeakPtrCUnitCommandVectorTypeName()
-  {
-    gWeakPtrVectorTypeName = msvc8::string{};
-    gWeakPtrVectorTypeNameCleanupRegistered = false;
-  }
-
-  /**
    * Address: 0x006EA8F0 (FUN_006EA8F0, sub_6EA8F0)
    */
   void LoadWeakPtrCUnitCommandVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
@@ -221,19 +197,12 @@ namespace moho
 {
   /**
    * Address: 0x006E9890 (FUN_006E9890, Moho::RWeakPtrType_CUnitCommand::GetName)
+   * Address: 0x00BFECA0 (FUN_00BFECA0, atexit destructor of GetName's cached name)
    */
   const char* RWeakPtrType<CUnitCommand>::GetName() const
   {
-    if (gWeakPtrTypeName.empty()) {
-      const char* const pointeeName = CachedCUnitCommandType() ? CachedCUnitCommandType()->GetName() : "CUnitCommand";
-      gWeakPtrTypeName = gpg::STR_Printf("WeakPtr<%s>", pointeeName ? pointeeName : "CUnitCommand");
-      if (!gWeakPtrTypeNameCleanupRegistered) {
-        gWeakPtrTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_WeakPtrCUnitCommandTypeName);
-      }
-    }
-
-    return gWeakPtrTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedCUnitCommandType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -374,20 +343,12 @@ namespace gpg
 
   /**
    * Address: 0x006E9B90 (FUN_006E9B90, gpg::RVectorType_WeakPtr_CUnitCommand::GetName)
+   * Address: 0x00BFEC70 (FUN_00BFEC70, atexit destructor of GetName's cached name)
    */
   const char* RVectorType<moho::WeakPtr<moho::CUnitCommand>>::GetName() const
   {
-    if (gWeakPtrVectorTypeName.empty()) {
-      const gpg::RType* const elementType = CachedWeakPtrCUnitCommandType();
-      const char* const elementName = elementType ? elementType->GetName() : "WeakPtr<CUnitCommand>";
-      gWeakPtrVectorTypeName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "WeakPtr<CUnitCommand>");
-      if (!gWeakPtrVectorTypeNameCleanupRegistered) {
-        gWeakPtrVectorTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_WeakPtrCUnitCommandVectorTypeName);
-      }
-    }
-
-    return gWeakPtrVectorTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedWeakPtrCUnitCommandType()->GetName());
+    return sName.c_str();
   }
 
   /**

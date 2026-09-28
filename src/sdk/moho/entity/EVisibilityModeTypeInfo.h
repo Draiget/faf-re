@@ -20,7 +20,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00BF1F90 (FUN_00BF1F90, Moho::EVisibilityModeTypeInfo::dtr)
+     * Address: 0x0050A190 (FUN_0050A190, Moho::EVisibilityModeTypeInfo::dtr)
      */
     ~EVisibilityModeTypeInfo() override;
 
@@ -77,9 +77,8 @@ namespace moho
    * Address: 0x00BC7AD0 (FUN_00BC7AD0, register_EVisibilityModeTypeInfo)
    *
    * What it does:
-   * Runs `EVisibilityMode` typeinfo preregistration and installs process-exit
-   * cleanup.
+   * Runs `EVisibilityMode` typeinfo preregistration.
    */
-  int register_EVisibilityModeTypeInfo();
+  void register_EVisibilityModeTypeInfo();
 } // namespace moho
 

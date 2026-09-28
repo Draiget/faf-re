@@ -64,7 +64,10 @@ namespace moho
     static void Destruct(void* objectStorage);
   };
 
-  int register_CUnitFireAtTaskTypeInfo();
+  /**
+   * Address: 0x00BD0690 (FUN_00BD0690, register_CUnitFireAtTaskTypeInfo)
+   */
+  void register_CUnitFireAtTaskTypeInfo();
 
   static_assert(sizeof(CUnitFireAtTaskTypeInfo) == 0x64, "CUnitFireAtTaskTypeInfo size must be 0x64");
 } // namespace moho

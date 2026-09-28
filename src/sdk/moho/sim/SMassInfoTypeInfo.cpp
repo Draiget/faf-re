@@ -11,34 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(SMassInfoTypeInfo) unsigned char gSMassInfoTypeInfoStorage[sizeof(SMassInfoTypeInfo)];
-  bool gSMassInfoTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6460 (FUN_00BF6460, atexit destructor of the SMassInfoTypeInfo object)
+   */
   [[nodiscard]] SMassInfoTypeInfo& AcquireSMassInfoTypeInfo()
   {
-    if (!gSMassInfoTypeInfoConstructed) {
-      new (gSMassInfoTypeInfoStorage) SMassInfoTypeInfo();
-      gSMassInfoTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<SMassInfoTypeInfo*>(gSMassInfoTypeInfoStorage);
-  }
-
-  [[nodiscard]] SMassInfoTypeInfo* PeekSMassInfoTypeInfo() noexcept
-  {
-    if (!gSMassInfoTypeInfoConstructed) {
-      return nullptr;
-    }
-    return reinterpret_cast<SMassInfoTypeInfo*>(gSMassInfoTypeInfoStorage);
-  }
-
-  void cleanup_SMassInfoTypeInfoStartup()
-  {
-    SMassInfoTypeInfo* const typeInfo = PeekSMassInfoTypeInfo();
-    if (!typeInfo) {
-      return;
-    }
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
+    static SMassInfoTypeInfo sInstance;
+    return sInstance;
   }
 
   struct SMassInfoTypeInfoStartupBootstrap
@@ -96,7 +75,6 @@ void SMassInfoTypeInfo::Init()
 void moho::register_SMassInfoTypeInfoStartup()
 {
   (void)AcquireSMassInfoTypeInfo();
-  (void)std::atexit(&cleanup_SMassInfoTypeInfoStartup);
 }
 
 

@@ -271,6 +271,14 @@ namespace moho
     CTaskStage();
 
     /**
+     * Address: 0x00409950 (FUN_00409950, ??1CTaskStage@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Tears the stage down; the two thread lists then unlink as members.
+     */
+    ~CTaskStage();
+
+    /**
      * Address: 0x004099C0 (FUN_004099C0)
      */
     void Teardown();
@@ -406,8 +414,7 @@ namespace moho
    * Address: 0x00BC3020 (FUN_00BC3020, register_CTaskThreadTypeInfo)
    *
    * What it does:
-   * Materializes the startup `CTaskThreadTypeInfo` descriptor and registers
-   * process-exit teardown.
+   * Materializes the startup `CTaskThreadTypeInfo` descriptor.
    */
   void register_CTaskThreadTypeInfo();
 
@@ -415,8 +422,7 @@ namespace moho
    * Address: 0x00BC30C0 (FUN_00BC30C0, register_CTaskStageTypeInfo)
    *
    * What it does:
-   * Materializes the startup `CTaskStageTypeInfo` descriptor and registers
-   * process-exit teardown.
+   * Materializes the startup `CTaskStageTypeInfo` descriptor.
    */
   void register_CTaskStageTypeInfo();
 } // namespace moho

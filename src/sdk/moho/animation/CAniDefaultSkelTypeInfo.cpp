@@ -10,26 +10,20 @@
 
 namespace
 {
-  alignas(moho::CAniDefaultSkelTypeInfo)
-    unsigned char gCAniDefaultSkelTypeInfoStorage[sizeof(moho::CAniDefaultSkelTypeInfo)]{};
-  bool gCAniDefaultSkelTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF44E0 (FUN_00BF44E0, atexit destructor of the CAniDefaultSkelTypeInfo object)
+   */
   [[nodiscard]] moho::CAniDefaultSkelTypeInfo* AcquireCAniDefaultSkelTypeInfo()
   {
-    if (!gCAniDefaultSkelTypeInfoConstructed) {
-      new (gCAniDefaultSkelTypeInfoStorage) moho::CAniDefaultSkelTypeInfo();
-      gCAniDefaultSkelTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CAniDefaultSkelTypeInfo*>(gCAniDefaultSkelTypeInfoStorage);
+    static moho::CAniDefaultSkelTypeInfo sInstance;
+    return &sInstance;
   }
-
 
   struct CAniDefaultSkelTypeInfoBootstrap
   {
     CAniDefaultSkelTypeInfoBootstrap()
     {
-      (void)moho::register_CAniDefaultSkelTypeInfoAtexit();
+      moho::register_CAniDefaultSkelTypeInfoAtexit();
     }
   };
 
@@ -96,26 +90,11 @@ void CAniDefaultSkelTypeInfo::AddBase_CAniSkel(gpg::RType* const typeInfo)
   }
 
   /**
-   * Address: 0x00BF44E0 (FUN_00BF44E0, cleanup_CAniDefaultSkelTypeInfo)
-   */
-  void cleanup_CAniDefaultSkelTypeInfo()
-  {
-    if (!gCAniDefaultSkelTypeInfoConstructed) {
-      return;
-    }
-
-    CAniDefaultSkelTypeInfo* const typeInfo = AcquireCAniDefaultSkelTypeInfo();
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  /**
    * Address: 0x00BC98B0 (FUN_00BC98B0, register_CAniDefaultSkelTypeInfoAtexit)
    */
-  int register_CAniDefaultSkelTypeInfoAtexit()
+  void register_CAniDefaultSkelTypeInfoAtexit()
   {
     (void)preregister_CAniDefaultSkelTypeInfo();
-    return std::atexit(&cleanup_CAniDefaultSkelTypeInfo);
   }
 } // namespace moho
 

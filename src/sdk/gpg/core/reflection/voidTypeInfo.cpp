@@ -1,7 +1,5 @@
 #include "gpg/core/reflection/voidTypeInfo.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -9,21 +7,13 @@ using TypeInfo = voidTypeInfo;
 
 namespace
 {
-  alignas(TypeInfo) unsigned char gStorage[sizeof(TypeInfo)];
-  bool gConstructed = false;
-
+  /**
+   * Address: 0x00C08FB0 (FUN_00C08FB0, atexit destructor of the voidTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& Acquire()
   {
-    if (!gConstructed) { new (gStorage) TypeInfo(); gConstructed = true; }
-    return *reinterpret_cast<TypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) return;
-    auto& ti = *reinterpret_cast<TypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { register_voidTypeInfoStartup(); } };
@@ -53,7 +43,6 @@ void voidTypeInfo::Init()
 void register_voidTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

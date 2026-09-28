@@ -12,27 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(EAiTransportEventTypeInfo) unsigned char gEAiTransportEventTypeInfoStorage[sizeof(EAiTransportEventTypeInfo)];
-  bool gEAiTransportEventTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF8960 (FUN_00BF8960, atexit destructor of the EAiTransportEventTypeInfo object)
+   */
   [[nodiscard]] EAiTransportEventTypeInfo* AcquireEAiTransportEventTypeInfo()
   {
-    if (!gEAiTransportEventTypeInfoConstructed) {
-      auto* const typeInfo = new (gEAiTransportEventTypeInfoStorage) EAiTransportEventTypeInfo();
-      gEAiTransportEventTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<EAiTransportEventTypeInfo*>(gEAiTransportEventTypeInfoStorage);
-  }
-
-  void cleanup_EAiTransportEventTypeInfo()
-  {
-    if (!gEAiTransportEventTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEAiTransportEventTypeInfo()->~EAiTransportEventTypeInfo();
-    gEAiTransportEventTypeInfoConstructed = false;
+    static EAiTransportEventTypeInfo sInstance;
+    return &sInstance;
   }
 
   // Address: 0x010B074C -- process-global `PrimitiveSerHelper<EAiTransportEvent,int>`
@@ -110,13 +96,11 @@ void EAiTransportEventTypeInfo::Init()
  * Address: 0x00BCED10 (FUN_00BCED10, register_EAiTransportEventTypeInfo)
  *
  * What it does:
- * Registers `EAiTransportEvent` enum type-info and installs process-exit
- * cleanup.
+ * Registers `EAiTransportEvent` enum type-info.
  */
-int moho::register_EAiTransportEventTypeInfo()
+void moho::register_EAiTransportEventTypeInfo()
 {
   (void)AcquireEAiTransportEventTypeInfo();
-  return std::atexit(&cleanup_EAiTransportEventTypeInfo);
 }
 
 

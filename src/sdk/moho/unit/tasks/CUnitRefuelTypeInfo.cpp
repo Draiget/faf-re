@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -15,19 +14,13 @@ namespace
 {
   using TypeInfo = moho::CUnitRefuelTypeInfo;
 
-  alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
-  bool gTypeInfoConstructed = false;
-
-
-
+  /**
+   * Address: 0x00BFA360 (FUN_00BFA360, atexit destructor of the CUnitRefuelTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gTypeInfoConstructed) {
-      new (gTypeInfoStorage) TypeInfo();
-      gTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
@@ -157,25 +150,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFA360 (FUN_00BFA360)
-   */
-  void cleanup_CUnitRefuelTypeInfo()
-  {
-    if (!gTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CUnitRefuelTypeInfo();
-    gTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD1890 (FUN_00BD1890, sub_BD1890)
    */
-  int register_CUnitRefuelTypeInfo()
+  void register_CUnitRefuelTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup_CUnitRefuelTypeInfo);
   }
 } // namespace moho
 

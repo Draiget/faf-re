@@ -1549,13 +1549,11 @@ namespace moho
           shaderVars.heightScale.SetFloat(mTesselator->GetHeightScale());
         }
 
-        ShaderVar& terrainHeightScale = GetTerrainHeightScaleShaderVar();
-        if (terrainHeightScale.Exists()) {
-          terrainHeightScale.SetFloat(mTesselator->GetHeightScale());
+        if (shaderVarTerrainHeightScale.Exists()) {
+          shaderVarTerrainHeightScale.SetFloat(mTesselator->GetHeightScale());
         }
-        ShaderVar& terrainTime = GetTerrainTimeShaderVar();
-        if (terrainTime.Exists()) {
-          terrainTime.SetFloat(static_cast<float>(gameTick) + deltaSeconds);
+        if (shaderVarTerrainTime.Exists()) {
+          shaderVarTerrainTime.SetFloat(static_cast<float>(gameTick) + deltaSeconds);
         }
 
         mSkirtStartIndex = static_cast<std::uint32_t>(mTesselator->GetSkirtIndexStart());

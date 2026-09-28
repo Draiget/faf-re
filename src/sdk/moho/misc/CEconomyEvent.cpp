@@ -927,38 +927,23 @@ namespace moho
   namespace
   {
     /**
-     * Static `RPointerType<CEconomyEvent>` descriptor that the binary exposes
-     * as `Moho::CEconomyEvent::PointerType`. Default static-init runs the
-     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane.
-     */
-    gpg::RPointerType<moho::CEconomyEvent> sCEconomyEventPointerTypeStorage{};
-
-    /**
      * Address: 0x006B2600 (FUN_006B2600)
+     * Address: 0x00BFDCA0 (FUN_00BFDCA0, atexit destructor of the static `RPointerType<CEconomyEvent>` descriptor)
      *
      * What it does:
-     * Pre-registers the static `RPointerType<CEconomyEvent>` descriptor under
-     * the `CEconomyEvent*` type-info key so subsequent `LookupRType` queries
-     * from the lazy `GetPointerType` lane resolve to this descriptor.
+     * Constructs the static `RPointerType<CEconomyEvent>` descriptor that the
+     * binary exposes as `Moho::CEconomyEvent::PointerType` and pre-registers
+     * it under the `CEconomyEvent*` type-info key, so subsequent `LookupRType`
+     * queries from the lazy `GetPointerType` lane resolve to this descriptor.
+     * The binary holds the descriptor as a function-local static of
+     * `GetPointerType`; it lives here because the preregister phase has to
+     * construct it before any consumer looks up `CEconomyEvent*`.
      */
-    void PreregisterCEconomyEventPointerType()
+    gpg::RType* PreregisterCEconomyEventPointerType()
     {
-      gpg::PreRegisterRType(typeid(moho::CEconomyEvent*), &sCEconomyEventPointerTypeStorage);
-    }
-
-    /**
-     * Address: 0x00BFDCA0 (FUN_00BFDCA0)
-     *
-     * What it does:
-     * Tears down the static `RPointerType<CEconomyEvent>` descriptor at process
-     * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
-     * RType vftable lane to the `RObject` base. Registered via `atexit` from
-     * `GetPointerType`'s once-init path.
-     */
-    void CleanupCEconomyEventPointerType()
-    {
-      sCEconomyEventPointerTypeStorage.~RPointerType<moho::CEconomyEvent>();
+      static gpg::RPointerType<moho::CEconomyEvent> sDescriptor;
+      gpg::PreRegisterRType(typeid(moho::CEconomyEvent*), &sDescriptor);
+      return &sDescriptor;
     }
   } // namespace
 
@@ -967,17 +952,13 @@ namespace moho
    *
    * What it does:
    * On first call, pre-registers the static `RPointerType<CEconomyEvent>`
-   * descriptor and installs the matching atexit teardown. After that, lazily
-   * caches the `LookupRType(typeid(CEconomyEvent*))` result in `sPointerType`
-   * and returns it.
+   * descriptor. After that, lazily caches the
+   * `LookupRType(typeid(CEconomyEvent*))` result in `sPointerType` and
+   * returns it.
    */
   gpg::RType* CEconomyEvent::GetPointerType()
   {
-    static const bool sOnceInit = []() {
-      PreregisterCEconomyEventPointerType();
-      (void)std::atexit(&CleanupCEconomyEventPointerType);
-      return true;
-    }();
+    static const bool sOnceInit = (PreregisterCEconomyEventPointerType(), true);
     (void)sOnceInit;
 
     if (!sPointerType) {

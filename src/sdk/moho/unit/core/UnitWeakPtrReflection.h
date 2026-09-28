@@ -83,7 +83,7 @@ namespace moho
    * Address: 0x00BD6BA0 (FUN_00BD6BA0, register_WeakPtr_Unit_Type_AtExit)
    *
    * What it does:
-   * Registers `WeakPtr<Unit>` reflection and installs process-exit teardown.
+   * Registers `WeakPtr<Unit>` reflection.
    */
   void register_WeakPtr_Unit_Type_AtExit();
 } // namespace moho

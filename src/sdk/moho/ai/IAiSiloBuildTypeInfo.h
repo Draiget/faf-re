@@ -40,10 +40,9 @@ namespace moho
    * Address: 0x00BCE010 (FUN_00BCE010, register_IAiSiloBuildTypeInfo)
    *
    * What it does:
-   * Constructs and preregisters `IAiSiloBuildTypeInfo`, then schedules
-   * process-exit cleanup for its static storage.
+   * Constructs and preregisters `IAiSiloBuildTypeInfo`.
    */
-  int register_IAiSiloBuildTypeInfo();
+  void register_IAiSiloBuildTypeInfo();
 
   static_assert(sizeof(IAiSiloBuildTypeInfo) == 0x64, "IAiSiloBuildTypeInfo size must be 0x64");
 } // namespace moho

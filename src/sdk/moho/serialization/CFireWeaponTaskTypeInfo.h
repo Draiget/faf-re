@@ -10,18 +10,9 @@ namespace moho
    * Address: 0x00BD8870 (FUN_00BD8870, register_CFireWeaponTaskTypeInfo)
    *
    * What it does:
-   * Forces `CFireWeaponTaskTypeInfo` construction and schedules cleanup at
-   * process exit.
+   * Forces `CFireWeaponTaskTypeInfo` construction.
    */
   void register_CFireWeaponTaskTypeInfo();
-
-  /**
-   * Address: 0x00BFE6B0 (FUN_00BFE6B0, cleanup_CFireWeaponTaskTypeInfo)
-   *
-   * What it does:
-   * Releases the reflected base/field buffers during process exit.
-   */
-  void cleanup_CFireWeaponTaskTypeInfo();
 
   class CFireWeaponTaskTypeInfo final : public gpg::RType
   {

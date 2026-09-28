@@ -5,7 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/CBuilderArmManipulator.h"
-#include "moho/animation/IAniManipulator.h"
+#include "moho/animation/IAniManipulator.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
@@ -17,41 +17,19 @@ namespace
 {
   using TypeInfo = moho::CBuilderArmManipulatorTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCBuilderArmManipulatorTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCBuilderArmManipulatorTypeInfoConstructed = false;
-
   /**
    * Address: 0x00635990 (FUN_00635990, bootstrap ctor lane)
+   * Address: 0x00BFAA60 (FUN_00BFAA60, atexit destructor of the CBuilderArmManipulatorTypeInfo object)
    *
    * What it does:
-   * Constructs startup-owned `CBuilderArmManipulatorTypeInfo` storage and
+   * Constructs the startup-owned `CBuilderArmManipulatorTypeInfo` object and
    * preregisters `CBuilderArmManipulator` RTTI binding.
    */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gCBuilderArmManipulatorTypeInfoConstructed) {
-      auto* const typeInfo = new (gCBuilderArmManipulatorTypeInfoStorage) TypeInfo();
-      gpg::PreRegisterRType(typeid(moho::CBuilderArmManipulator), typeInfo);
-      gCBuilderArmManipulatorTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCBuilderArmManipulatorTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BFAA60 (FUN_00BFAA60, cleanup_CBuilderArmManipulatorTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `CBuilderArmManipulatorTypeInfo` storage.
-   */
-  void cleanup_CBuilderArmManipulatorTypeInfo()
-  {
-    if (!gCBuilderArmManipulatorTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~TypeInfo();
-    gCBuilderArmManipulatorTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(moho::CBuilderArmManipulator), &sInstance);
+    return sInstance;
   }
 
   /**
@@ -161,7 +139,7 @@ namespace
   {
     CBuilderArmManipulatorTypeInfoBootstrap()
     {
-      (void)moho::register_CBuilderArmManipulatorTypeInfo();
+      moho::register_CBuilderArmManipulatorTypeInfo();
     }
   };
 
@@ -316,13 +294,11 @@ namespace moho
    * Address: 0x00BD2590 (FUN_00BD2590, register_CBuilderArmManipulatorTypeInfo)
    *
    * What it does:
-   * Constructs startup-owned `CBuilderArmManipulatorTypeInfo` storage and
-   * installs process-exit cleanup.
+   * Constructs the startup-owned `CBuilderArmManipulatorTypeInfo` object.
    */
-  int register_CBuilderArmManipulatorTypeInfo()
+  void register_CBuilderArmManipulatorTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup_CBuilderArmManipulatorTypeInfo);
   }
 } // namespace moho
 

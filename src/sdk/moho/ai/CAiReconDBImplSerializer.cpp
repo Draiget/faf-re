@@ -22,8 +22,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(SReconKeyTypeInfo) unsigned char gSReconKeyTypeInfoStorage[sizeof(SReconKeyTypeInfo)] = {};
-
   // Address: 0x010AF89C -- process-global `SReconKeySerializer` singleton.
   // Constructing it runs SReconKeySerializer::SReconKeySerializer()
   // (0x00BCDD40), which splices this helper into
@@ -59,22 +57,18 @@ namespace
     return slot;
   }
 
-  [[nodiscard]] SReconKeyTypeInfo* SReconKeyTypeInfoStorageRef()
-  {
-    return reinterpret_cast<SReconKeyTypeInfo*>(gSReconKeyTypeInfoStorage);
-  }
-
   /**
    * Address: 0x005BFD90 (FUN_005BFD90, PreregisterSReconKeyTypeInfo)
+   * Address: 0x00BF7960 (FUN_00BF7960, atexit destructor of the SReconKeyTypeInfo object)
    *
    * What it does:
-   * Constructs startup `SReconKeyTypeInfo` storage and preregisters RTTI.
+   * Constructs the startup `SReconKeyTypeInfo` object and preregisters RTTI.
    */
   [[nodiscard]] gpg::RType* PreregisterSReconKeyTypeInfo()
   {
-    auto* const typeInfo = new (gSReconKeyTypeInfoStorage) SReconKeyTypeInfo();
-    gpg::PreRegisterRType(typeid(SReconKey), typeInfo);
-    return typeInfo;
+    static SReconKeyTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(SReconKey), &sInstance);
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* ResolveWeakPtrEntityType()
@@ -98,7 +92,7 @@ namespace
     if (!gReconBlipMapStorageType) {
       gReconBlipMapStorageType = gpg::LookupRType(typeid(moho::ReconBlipMap));
       if (!gReconBlipMapStorageType) {
-        (void)moho::register_RMultiMapType_SReconKey_ReconBlipPtr();
+        moho::register_RMultiMapType_SReconKey_ReconBlipPtr();
         gReconBlipMapStorageType = gpg::LookupRType(typeid(moho::ReconBlipMap));
       }
     }
@@ -110,7 +104,7 @@ namespace
     if (!gReconBlipVectorType) {
       gReconBlipVectorType = gpg::LookupRType(typeid(msvc8::vector<ReconBlip*>));
       if (!gReconBlipVectorType) {
-        (void)moho::register_RVectorType_ReconBlipPtr();
+        moho::register_RVectorType_ReconBlipPtr();
         gReconBlipVectorType = gpg::LookupRType(typeid(msvc8::vector<ReconBlip*>));
       }
     }
@@ -444,17 +438,6 @@ namespace
   // `CAiReconDBImplSerializer::Serialize` below already calls
   // `SerializeCAiReconDBImplMembers` above directly.
 
-  /**
-   * Address: 0x00BF7960 (FUN_00BF7960, cleanup_SReconKeyTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `SReconKeyTypeInfo` reflection storage.
-   */
-  void cleanup_SReconKeyTypeInfo()
-  {
-    static_cast<gpg::RType*>(SReconKeyTypeInfoStorageRef())->~RType();
-  }
-
   // Addresses 0x005BFF20/0x005BFF50 ("StartupThunkA"/"StartupThunkB" for
   // `SReconKeySerializer`) and 0x005C2960/0x005C2990 (same pair for
   // `CAiReconDBImplSerializer`) formerly modeled here are dead: zero
@@ -469,7 +452,7 @@ namespace
   {
     CAiReconDBSerializerBootstrap()
     {
-      (void)moho::register_SReconKeyTypeInfo();
+      moho::register_SReconKeyTypeInfo();
     }
   };
 
@@ -608,10 +591,9 @@ void SReconKeySerializer::Init()
 /**
  * Address: 0x00BCDD20 (FUN_00BCDD20, register_SReconKeyTypeInfo)
  */
-int moho::register_SReconKeyTypeInfo()
+void moho::register_SReconKeyTypeInfo()
 {
   (void)PreregisterSReconKeyTypeInfo();
-  return std::atexit(&cleanup_SReconKeyTypeInfo);
 }
 
 /**

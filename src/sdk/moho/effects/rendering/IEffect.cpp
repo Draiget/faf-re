@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <string>
 #include <typeinfo>
 
@@ -22,38 +21,23 @@ namespace moho
   namespace
   {
     /**
-     * Static `RPointerType<IEffect>` descriptor that the binary exposes as
-     * `Moho::IEffect::PointerType`. Default static-init runs the
-     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane.
-     */
-    gpg::RPointerType<moho::IEffect> sIEffectPointerTypeStorage{};
-
-    /**
      * Address: 0x0066CB30 (FUN_0066CB30)
+     * Address: 0x00BFC0F0 (FUN_00BFC0F0, atexit destructor of the static `RPointerType<IEffect>` descriptor)
      *
      * What it does:
-     * Pre-registers the static `RPointerType<IEffect>` descriptor under the
-     * `IEffect*` type-info key so subsequent `LookupRType` queries from the
-     * lazy `GetPointerType` lane resolve to this descriptor.
+     * Constructs the static `RPointerType<IEffect>` descriptor that the
+     * binary exposes as `Moho::IEffect::PointerType` and pre-registers it
+     * under the `IEffect*` type-info key, so subsequent `LookupRType` queries
+     * from the lazy `GetPointerType` lane resolve to this descriptor. The
+     * binary holds the descriptor as a function-local static of
+     * `GetPointerType`; it lives here because the preregister phase has to
+     * construct it before any consumer looks up `IEffect*`.
      */
-    void PreregisterIEffectPointerType()
+    gpg::RType* PreregisterIEffectPointerType()
     {
-      gpg::PreRegisterRType(typeid(moho::IEffect*), &sIEffectPointerTypeStorage);
-    }
-
-    /**
-     * Address: 0x00BFC0F0 (FUN_00BFC0F0)
-     *
-     * What it does:
-     * Tears down the static `RPointerType<IEffect>` descriptor at process
-     * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
-     * RType vftable lane to the `RObject` base. Registered via `atexit` from
-     * `GetPointerType`'s once-init path.
-     */
-    void CleanupIEffectPointerType()
-    {
-      sIEffectPointerTypeStorage.~RPointerType<moho::IEffect>();
+      static gpg::RPointerType<moho::IEffect> sDescriptor;
+      gpg::PreRegisterRType(typeid(moho::IEffect*), &sDescriptor);
+      return &sDescriptor;
     }
   } // namespace
 
@@ -61,17 +45,13 @@ namespace moho
    * Address: 0x0066C980 (FUN_0066C980, Moho::IEffect::GetPointerType)
    *
    * What it does:
-   * On first call, pre-registers the static `RPointerType<IEffect>` descriptor
-   * and installs the matching atexit teardown. After that, lazily caches the
+   * On first call, pre-registers the static `RPointerType<IEffect>`
+   * descriptor. After that, lazily caches the
    * `LookupRType(typeid(IEffect*))` result in `sPointerType` and returns it.
    */
   gpg::RType* IEffect::GetPointerType()
   {
-    static const bool sOnceInit = []() {
-      PreregisterIEffectPointerType();
-      (void)std::atexit(&CleanupIEffectPointerType);
-      return true;
-    }();
+    static const bool sOnceInit = (PreregisterIEffectPointerType(), true);
     (void)sOnceInit;
 
     if (!sPointerType) {

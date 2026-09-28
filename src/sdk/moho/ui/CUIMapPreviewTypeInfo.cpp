@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CUIMapPreviewTypeInfo) unsigned char gCUIMapPreviewTypeInfoStorage[sizeof(CUIMapPreviewTypeInfo)];
-  bool gCUIMapPreviewTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C068B0 (FUN_00C068B0, atexit destructor of the CUIMapPreviewTypeInfo object)
+   */
   [[nodiscard]] CUIMapPreviewTypeInfo& AcquireCUIMapPreviewTypeInfo()
   {
-    if (!gCUIMapPreviewTypeInfoConstructed) {
-      new (gCUIMapPreviewTypeInfoStorage) CUIMapPreviewTypeInfo();
-      gCUIMapPreviewTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CUIMapPreviewTypeInfo*>(gCUIMapPreviewTypeInfoStorage);
-  }
-
-  void cleanup_CUIMapPreviewTypeInfo()
-  {
-    if (!gCUIMapPreviewTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CUIMapPreviewTypeInfo*>(gCUIMapPreviewTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CUIMapPreviewTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CUIMapPreviewTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CUIMapPreviewTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BE4F40 (FUN_00BE4F40, register_CUIMapPreviewTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CUIMapPreview` type-info object.
+ */
 void moho::register_CUIMapPreviewTypeInfoStartup()
 {
   (void)AcquireCUIMapPreviewTypeInfo();
-  (void)std::atexit(&cleanup_CUIMapPreviewTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

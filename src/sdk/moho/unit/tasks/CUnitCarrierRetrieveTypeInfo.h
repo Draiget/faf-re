@@ -64,7 +64,10 @@ namespace moho
     static void Destruct(void* objectStorage);
   };
 
-  int register_CUnitCarrierRetrieveTypeInfo();
+  /**
+   * Address: 0x00BD0200 (FUN_00BD0200, register_CUnitCarrierRetrieveTypeInfo)
+   */
+  void register_CUnitCarrierRetrieveTypeInfo();
 
   static_assert(sizeof(CUnitCarrierRetrieveTypeInfo) == 0x64, "CUnitCarrierRetrieveTypeInfo size must be 0x64");
 } // namespace moho

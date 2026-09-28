@@ -27,35 +27,22 @@ namespace
   // binary's atexit registration.
   SPointVectorSerializer gSPointVectorSerializer;
 
-  alignas(SPointVectorVectorType) unsigned char gSPointVectorVectorTypeStorage[sizeof(SPointVectorVectorType)] = {};
-  bool gSPointVectorVectorTypeConstructed = false;
-
-  msvc8::string gSPointVectorVectorTypeName;
-  bool gSPointVectorVectorTypeNameCleanupRegistered = false;
-
+  /**
+   * Address: 0x00BF2260 (FUN_00BF2260, atexit destructor of the SPointVectorTypeInfo object)
+   */
   [[nodiscard]] SPointVectorTypeInfo& AcquireSPointVectorTypeInfo()
   {
     static SPointVectorTypeInfo sInstance;
     return sInstance;
   }
 
+  /**
+   * Address: 0x00BF63E0 (FUN_00BF63E0, atexit destructor of the RVectorType<SPointVector> object)
+   */
   [[nodiscard]] SPointVectorVectorType& AcquireSPointVectorVectorType()
   {
-    if (!gSPointVectorVectorTypeConstructed) {
-      new (gSPointVectorVectorTypeStorage) SPointVectorVectorType();
-      gSPointVectorVectorTypeConstructed = true;
-    }
-
-    return *reinterpret_cast<SPointVectorVectorType*>(gSPointVectorVectorTypeStorage);
-  }
-
-  [[nodiscard]] SPointVectorVectorType* PeekSPointVectorVectorType() noexcept
-  {
-    if (!gSPointVectorVectorTypeConstructed) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<SPointVectorVectorType*>(gSPointVectorVectorTypeStorage);
+    static SPointVectorVectorType sInstance;
+    return sInstance;
   }
 
   template <typename TSerializer>
@@ -234,35 +221,6 @@ namespace
     typeInfo->fields_ = msvc8::vector<gpg::RField>{};
     typeInfo->bases_ = msvc8::vector<gpg::RField>{};
   }
-
-  /**
-   * Address: 0x00BF6350 (FUN_00BF6350, cleanup_SPointVectorVectorTypeName)
-   *
-   * What it does:
-   * Releases cached lexical name storage for `vector<SPointVector>`.
-   */
-  void cleanup_SPointVectorVectorTypeName()
-  {
-    gSPointVectorVectorTypeName = msvc8::string{};
-    gSPointVectorVectorTypeNameCleanupRegistered = false;
-  }
-
-  /**
-   * Address: 0x00BF63E0 (FUN_00BF63E0, cleanup_SPointVectorVectorType)
-   *
-   * What it does:
-   * Destroys startup-owned `vector<SPointVector>` reflection storage lanes.
-   */
-  void cleanup_SPointVectorVectorType()
-  {
-    SPointVectorVectorType* const type = PeekSPointVectorVectorType();
-    if (!type) {
-      return;
-    }
-
-    type->~SPointVectorVectorType();
-    gSPointVectorVectorTypeConstructed = false;
-  }
 } // namespace
 
 gpg::RType* moho::SPointVector::sType = nullptr;
@@ -405,24 +363,15 @@ void SPointVectorSerializer::Serialize(gpg::WriteArchive* const archive, SPointV
 
 /**
  * Address: 0x0057DF60 (FUN_0057DF60, gpg::RVectorType_SPointVector::GetName)
+ * Address: 0x00BF6350 (FUN_00BF6350, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the reflected type label `vector<SPointVector>`.
+ * Builds the reflected type label `vector<SPointVector>` once and returns it.
  */
 const char* gpg::RVectorType<moho::SPointVector>::GetName() const
 {
-  if (gSPointVectorVectorTypeName.empty()) {
-    const gpg::RType* const elementType = CachedSPointVectorType();
-    const char* const elementName = elementType ? elementType->GetName() : "SPointVector";
-    gSPointVectorVectorTypeName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SPointVector");
-
-    if (!gSPointVectorVectorTypeNameCleanupRegistered) {
-      gSPointVectorVectorTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_SPointVectorVectorTypeName);
-    }
-  }
-
-  return gSPointVectorVectorTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedSPointVectorType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -601,8 +550,7 @@ void gpg::RVectorType<moho::SPointVector>::SetCount(void* const obj, const int c
  * Address: 0x00BC7DE0 (FUN_00BC7DE0, register_SPointVectorTypeInfo)
  *
  * What it does:
- * Constructs the startup-owned `SPointVectorTypeInfo` descriptor and installs
- * process-exit cleanup.
+ * Constructs the startup-owned `SPointVectorTypeInfo` descriptor.
  */
 void moho::register_SPointVectorTypeInfo()
 {
@@ -626,12 +574,11 @@ gpg::RType* moho::register_SPointVectorVectorType()
  * Address: 0x00BCB470 (FUN_00BCB470, register_SPointVectorVectorType_AtExit)
  *
  * What it does:
- * Registers `vector<SPointVector>` reflection and installs `atexit` cleanup.
+ * Registers `vector<SPointVector>` reflection.
  */
-int moho::register_SPointVectorVectorType_AtExit()
+void moho::register_SPointVectorVectorType_AtExit()
 {
   (void)register_SPointVectorVectorType();
-  return std::atexit(&cleanup_SPointVectorVectorType);
 }
 
 namespace
@@ -651,7 +598,7 @@ namespace
   {
     SPointVectorVectorTypeBootstrap()
     {
-      (void)moho::register_SPointVectorVectorType_AtExit();
+      moho::register_SPointVectorVectorType_AtExit();
     }
   };
 

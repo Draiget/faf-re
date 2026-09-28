@@ -33,5 +33,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BDDFF0 (FUN_00BDDFF0, register_CMauiCursorTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiCursor` type-info object.
+   */
   void register_CMauiCursorTypeInfoStartup();
 } // namespace moho

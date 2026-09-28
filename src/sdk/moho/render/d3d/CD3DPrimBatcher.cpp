@@ -1195,27 +1195,24 @@ namespace moho
       runtime->mRebuildComposite = 0;
     }
 
-    ShaderVar& compositeMatrixShaderVar = GetPrimBatcherCompositeMatrixShaderVar();
     if (runtime->mRebuildComposite == 0u) {
-      if (compositeMatrixShaderVar.Exists()) {
-        compositeMatrixShaderVar.mEffectVariable->SetMatrix4x4(&runtime->mComposite);
+      if (shaderVarPrimBatcherCompositeMatrix.Exists()) {
+        shaderVarPrimBatcherCompositeMatrix.mEffectVariable->SetMatrix4x4(&runtime->mComposite);
       }
       runtime->mRebuildComposite = 1;
     }
 
-    ShaderVar& alphaMultiplierShaderVar = GetPrimBatcherAlphaMultiplierShaderVar();
-    if (alphaMultiplierShaderVar.Exists()) {
-      alphaMultiplierShaderVar.mEffectVariable->SetFloat(runtime->mAlphaMultiplier);
+    if (shaderVarPrimBatcherAlphaMultiplier.Exists()) {
+      shaderVarPrimBatcherAlphaMultiplier.mEffectVariable->SetFloat(runtime->mAlphaMultiplier);
     }
 
-    ShaderVar& textureShaderVar = GetPrimBatcherTexture1ShaderVar();
     if (runtime->mDynamicTexSheet.px != nullptr) {
       const auto& boundDynamicTextureSheet =
         reinterpret_cast<const boost::shared_ptr<CD3DDynamicTextureSheet>&>(runtime->mDynamicTexSheet);
-      textureShaderVar.GetTexture(boundDynamicTextureSheet);
+      shaderVarPrimBatcherTexture1.GetTexture(boundDynamicTextureSheet);
     } else {
       (void)runtime->mTextureBatcher->GetCompositeTexture();
-      textureShaderVar.GetTexture(runtime->mTextureBatcher->mDynTexSheet);
+      shaderVarPrimBatcherTexture1.GetTexture(runtime->mTextureBatcher->mDynTexSheet);
     }
 
     runtime->mCurVertexSheet = (runtime->mCurVertexSheet + 1) % 3;

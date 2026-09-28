@@ -104,8 +104,7 @@ namespace moho
    * Address: 0x00BD9C60 (FUN_00BD9C60, sub_BD9C60)
    *
    * What it does:
-   * Registers `vector<EntitySetTemplate<Unit>>` reflection and installs
-   * process-exit teardown via `atexit`.
+   * Registers `vector<EntitySetTemplate<Unit>>` reflection.
    */
-  int register_EntitySetTemplateUnitVectorType_AtExit();
+  void register_EntitySetTemplateUnitVectorType_AtExit();
 } // namespace moho

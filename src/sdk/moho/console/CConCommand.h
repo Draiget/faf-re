@@ -360,14 +360,6 @@ namespace moho
   CScrLuaInitForm* register_ConExecuteSave_LuaFuncDef();
 
   /**
-   * Address: 0x00BC3890 (FUN_00BC3890, register_console_command_buffer)
-   *
-   * What it does:
-   * Registers process-exit cleanup for the saved console command history buffer.
-   */
-  void register_console_command_buffer();
-
-  /**
    * Address: 0x0041EE10 (FUN_0041EE10, Moho::CON_Echo)
    *
    * What it does:

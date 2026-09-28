@@ -966,8 +966,7 @@ namespace moho
    *
    * What it does:
    * CRT static-init registration thunk for the translation-palette shader-var:
-   * registers `meshShaderVarTransPalette` under the HLSL name `"transPalette"`
-   * and installs its process-exit cleanup via `atexit`.
+   * registers `meshShaderVarTransPalette` under the HLSL name `"transPalette"`.
    */
   void register_MeshShaderVarTransPalette();
 
@@ -976,15 +975,25 @@ namespace moho
    *
    * What it does:
    * CRT static-init registration thunk for the rotation-palette shader-var:
-   * registers `meshShaderVarRotPalette` under the HLSL name `"rotPalette"` and
-   * installs its process-exit cleanup via `atexit`.
+   * registers `meshShaderVarRotPalette` under the HLSL name `"rotPalette"`.
    */
   void register_MeshShaderVarRotPalette();
 
-  /// Translation skinning-palette shader-var (global @0x010BEEF8).
-  [[nodiscard]] MeshShaderPaletteVar& GetMeshShaderVarTransPalette();
-  /// Rotation skinning-palette shader-var (global @0x010BEE50).
-  [[nodiscard]] MeshShaderPaletteVar& GetMeshShaderVarRotPalette();
+  /**
+   * Address: 0x00C03E40 (FUN_00C03E40, dynamic atexit destructor for `meshShaderVarTransPalette`)
+   *
+   * What it does:
+   * Translation skinning-palette shader-var (global @0x010BEEF8).
+   */
+  extern MeshShaderPaletteVar meshShaderVarTransPalette;
+
+  /**
+   * Address: 0x00C03E80 (FUN_00C03E80, dynamic atexit destructor for `meshShaderVarRotPalette`)
+   *
+   * What it does:
+   * Rotation skinning-palette shader-var (global @0x010BEE50).
+   */
+  extern MeshShaderPaletteVar meshShaderVarRotPalette;
 
   static_assert(sizeof(SkinPaletteEntry) == 0x10, "SkinPaletteEntry size must be 0x10");
   static_assert(sizeof(MeshShaderPaletteBuffer) == 0x10, "MeshShaderPaletteBuffer size must be 0x10");

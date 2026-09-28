@@ -30,7 +30,7 @@ namespace moho
     EResourceTypeTypeInfo();
 
     /**
-     * Address: 0x00BF4190 (FUN_00BF4190, Moho::EResourceTypeTypeInfo::~EResourceTypeTypeInfo)
+     * Address: 0x00545AE0 (FUN_00545AE0, Moho::EResourceTypeTypeInfo::dtr)
      */
     ~EResourceTypeTypeInfo() override;
 
@@ -92,8 +92,7 @@ namespace moho
    * Address: 0x00BC95F0 (FUN_00BC95F0, register_EResourceTypeTypeInfo)
    *
    * What it does:
-   * Constructs the global `EResourceTypeTypeInfo` descriptor and schedules
-   * its teardown at process exit.
+   * Constructs the global `EResourceTypeTypeInfo` descriptor.
    */
   void register_EResourceTypeTypeInfo();
 } // namespace moho

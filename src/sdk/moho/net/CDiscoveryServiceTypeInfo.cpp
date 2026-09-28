@@ -12,8 +12,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CDiscoveryServiceTypeInfo) unsigned char gStorage[sizeof(CDiscoveryServiceTypeInfo)];
-  bool gConstructed = false;
   gpg::RType* gCDiscoveryServiceTypeCache = nullptr;
 
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
@@ -77,23 +75,13 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
+  /**
+   * Address: 0x00C03960 (FUN_00C03960, atexit destructor of the CDiscoveryServiceTypeInfo object)
+   */
   [[nodiscard]] CDiscoveryServiceTypeInfo& Acquire()
   {
-    if (!gConstructed) {
-      new (gStorage) CDiscoveryServiceTypeInfo();
-      gConstructed = true;
-    }
-    return *reinterpret_cast<CDiscoveryServiceTypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<CDiscoveryServiceTypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static CDiscoveryServiceTypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { moho::register_CDiscoveryServiceTypeInfoStartup(); } };
@@ -138,7 +126,6 @@ void CDiscoveryServiceTypeInfo::Init()
 void moho::register_CDiscoveryServiceTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

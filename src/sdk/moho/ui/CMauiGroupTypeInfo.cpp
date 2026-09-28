@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiGroupTypeInfo) unsigned char gCMauiGroupTypeInfoStorage[sizeof(CMauiGroupTypeInfo)];
-  bool gCMauiGroupTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02ED0 (FUN_00C02ED0, atexit destructor of the CMauiGroupTypeInfo object)
+   */
   [[nodiscard]] CMauiGroupTypeInfo& AcquireCMauiGroupTypeInfo()
   {
-    if (!gCMauiGroupTypeInfoConstructed) {
-      new (gCMauiGroupTypeInfoStorage) CMauiGroupTypeInfo();
-      gCMauiGroupTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiGroupTypeInfo*>(gCMauiGroupTypeInfoStorage);
-  }
-
-  void cleanup_CMauiGroupTypeInfo()
-  {
-    if (!gCMauiGroupTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiGroupTypeInfo*>(gCMauiGroupTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiGroupTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiGroupTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CMauiGroupTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDE6E0 (FUN_00BDE6E0, register_CMauiGroupTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiGroup` type-info object.
+ */
 void moho::register_CMauiGroupTypeInfoStartup()
 {
   (void)AcquireCMauiGroupTypeInfo();
-  (void)std::atexit(&cleanup_CMauiGroupTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

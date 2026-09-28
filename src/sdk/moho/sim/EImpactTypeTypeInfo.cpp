@@ -11,8 +11,6 @@
 
 namespace
 {
-  alignas(moho::EImpactTypeTypeInfo) unsigned char gEImpactTypeTypeInfoStorage[sizeof(moho::EImpactTypeTypeInfo)]{};
-  bool gEImpactTypeTypeInfoConstructed = false;
   bool gEImpactTypeTypeInfoPreregistered = false;
 
   /**
@@ -30,14 +28,13 @@ namespace
    */
   moho::EImpactTypePrimitiveSerializer gEImpactTypePrimitiveSerializer;
 
+  /**
+   * Address: 0x00BF1F50 (FUN_00BF1F50, atexit destructor of the EImpactTypeTypeInfo object)
+   */
   [[nodiscard]] moho::EImpactTypeTypeInfo* AcquireEImpactTypeTypeInfo()
   {
-    if (!gEImpactTypeTypeInfoConstructed) {
-      new (gEImpactTypeTypeInfoStorage) moho::EImpactTypeTypeInfo();
-      gEImpactTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::EImpactTypeTypeInfo*>(gEImpactTypeTypeInfoStorage);
+    static moho::EImpactTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -52,20 +49,6 @@ namespace
     }
 
     return typeInfo;
-  }
-
-  /**
-   * Address: 0x00BF1F50 (FUN_00BF1F50, cleanup_EImpactTypeTypeInfo)
-   */
-  void cleanup_EImpactTypeTypeInfo()
-  {
-    if (!gEImpactTypeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEImpactTypeTypeInfo()->~EImpactTypeTypeInfo();
-    gEImpactTypeTypeInfoConstructed = false;
-    gEImpactTypeTypeInfoPreregistered = false;
   }
 } // namespace
 
@@ -168,10 +151,11 @@ namespace moho
    * this non-deleting variant is a bare 5-byte `jmp gpg::REnumType::~REnumType`
    * tail-call, not a distinct body. It has zero callsite evidence anywhere
    * in the binary (no code caller, no data/vtable xref, unreachable per the
-   * enriched callgraph index): the one plausible caller,
-   * `cleanup_EImpactTypeTypeInfo` (0x00BF1F50), was independently verified
-   * to itself `jmp` directly into `gpg::REnumType::~REnumType`
-   * (`mov ecx, offset gEImpactTypeTypeInfoStorage; jmp ??1REnumType@gpg@@QAE@@Z`),
+   * enriched callgraph index): the one plausible caller, the atexit
+   * destructor of the `EImpactTypeTypeInfo` object (0x00BF1F50), was
+   * independently verified to itself `jmp` directly into
+   * `gpg::REnumType::~REnumType`
+   * (`mov ecx, offset <object>; jmp ??1REnumType@gpg@@QAE@@Z`),
    * bypassing this address entirely. Compiler-emitted glue for the
    * `= default` destructor below, corresponding to no source line of its
    * own -- RULE ONE.
@@ -223,10 +207,9 @@ namespace moho
   /**
    * Address: 0x00BC7A70 (FUN_00BC7A70, register_EImpactTypeTypeInfo)
    */
-  int register_EImpactTypeTypeInfo()
+  void register_EImpactTypeTypeInfo()
   {
     (void)ConstructEImpactTypeTypeInfoInternal();
-    return std::atexit(&cleanup_EImpactTypeTypeInfo);
   }
 } // namespace moho
 

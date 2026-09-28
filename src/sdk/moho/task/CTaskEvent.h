@@ -457,8 +457,7 @@ namespace moho
    * Address: 0x00BC2ED0 (FUN_00BC2ED0, register_STaskEventLinkageTypeInfo)
    *
    * What it does:
-   * Materializes the startup `STaskEventLinkageTypeInfo` descriptor and
-   * registers process-exit teardown.
+   * Materializes the startup `STaskEventLinkageTypeInfo` descriptor.
    */
   void register_STaskEventLinkageTypeInfo();
 
@@ -466,8 +465,7 @@ namespace moho
    * Address: 0x00BC2F30 (FUN_00BC2F30, register_CTaskEventTypeInfo)
    *
    * What it does:
-   * Materializes the startup `CTaskEventTypeInfo` descriptor and registers
-   * process-exit teardown.
+   * Materializes the startup `CTaskEventTypeInfo` descriptor.
    */
   void register_CTaskEventTypeInfo();
 } // namespace moho

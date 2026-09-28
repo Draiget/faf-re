@@ -221,8 +221,7 @@ namespace moho
    * Address: 0x00BC6280 (FUN_00BC6280, CWaitForTask startup type-info registration)
    *
    * What it does:
-   * Pre-registers `CWaitForTask` reflected type metadata and schedules
-   * type-info cleanup at process exit.
+   * Pre-registers `CWaitForTask` reflected type metadata.
    */
   void register_CWaitForTaskTypeInfo();
 } // namespace moho

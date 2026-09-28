@@ -293,7 +293,7 @@ namespace moho
    * Address: 0x00BD2B00 (FUN_00BD2B00, register_CAniActorTypeInfo)
    *
    * What it does:
-   * Constructs startup-owned `CAniActorTypeInfo` and installs process-exit cleanup.
+   * Constructs the static `CAniActorTypeInfo` object.
    */
   void register_CAniActorTypeInfo();
 

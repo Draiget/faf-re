@@ -69,10 +69,10 @@ namespace moho
     SOCellPosTypeInfo();
 
     /**
-     * Address: 0x00BF2140 (FUN_00BF2140, Moho::SOCellPosTypeInfo::dtr)
-     *
      * What it does:
-     * Releases the reflected field and base vector storage.
+     * Releases the reflected field and base vector storage. The vtable-slot
+     * body (0x0050BE90) is identical to `gpg::RType`'s teardown and is cited
+     * there (Reflection.h).
      */
     ~SOCellPosTypeInfo() override;
 
@@ -171,7 +171,7 @@ namespace moho
    * Address: 0x00BC7D20 (FUN_00BC7D20, register_SOCellPosTypeInfo)
    *
    * What it does:
-   * Installs the static `SOCellPosTypeInfo` instance and its shutdown hook.
+   * Constructs the static `SOCellPosTypeInfo` instance, which preregisters it.
    */
-  int register_SOCellPosTypeInfo();
+  void register_SOCellPosTypeInfo();
 } // namespace moho

@@ -105,6 +105,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0051BD30 (FUN_0051BD30, Moho::RProjectileBlueprintPhysicsTypeInfo::RProjectileBlueprintPhysicsTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflection descriptor for
+     * `RProjectileBlueprintPhysics`.
+     */
+    RProjectileBlueprintPhysicsTypeInfo();
+
+    /**
      * Address: 0x0051BDC0 (FUN_0051BDC0, scalar deleting destructor thunk)
      * Slot: 2
      */
@@ -137,15 +146,6 @@ namespace moho
   };
 
   /**
-   * Address: 0x0051BD30 (FUN_0051BD30, preregister_RProjectileBlueprintPhysicsTypeInfo)
-   *
-   * What it does:
-   * Constructs and preregisters startup-owned type-info storage for
-   * `RProjectileBlueprintPhysics`.
-   */
-  [[nodiscard]] gpg::RType* preregister_RProjectileBlueprintPhysicsTypeInfo();
-
-  /**
    * Address: 0x00BC8650 (FUN_00BC8650, register_RProjectileBlueprintDisplayTypeInfo)
    *
    * What it does:
@@ -167,7 +167,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RProjectileBlueprintPhysicsTypeInfo`.
    */
-  int register_RProjectileBlueprintPhysicsTypeInfo();
+  void register_RProjectileBlueprintPhysicsTypeInfo();
 
   static_assert(
     sizeof(RProjectileBlueprintDisplayTypeInfo) == 0x64, "RProjectileBlueprintDisplayTypeInfo size must be 0x64"

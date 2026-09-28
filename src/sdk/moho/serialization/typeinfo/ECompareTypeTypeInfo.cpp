@@ -8,19 +8,15 @@
 
 namespace
 {
-  alignas(moho::ECompareTypeTypeInfo)
-    unsigned char gECompareTypeTypeInfoStorage[sizeof(moho::ECompareTypeTypeInfo)];
-  bool gECompareTypeTypeInfoConstructed = false;
   bool gECompareTypeTypeInfoPreregistered = false;
 
+  /**
+   * Address: 0x00BF61C0 (FUN_00BF61C0, atexit destructor of the ECompareTypeTypeInfo object)
+   */
   [[nodiscard]] moho::ECompareTypeTypeInfo* AcquireECompareTypeTypeInfo()
   {
-    if (!gECompareTypeTypeInfoConstructed) {
-      new (gECompareTypeTypeInfoStorage) moho::ECompareTypeTypeInfo();
-      gECompareTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::ECompareTypeTypeInfo*>(gECompareTypeTypeInfoStorage);
+    static moho::ECompareTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
   struct ECompareTypeTypeInfoBootstrap
@@ -90,32 +86,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF61C0 (FUN_00BF61C0, cleanup_ECompareTypeTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `ECompareTypeTypeInfo` storage at process exit.
-   */
-  void cleanup_ECompareTypeTypeInfo()
-  {
-    if (!gECompareTypeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireECompareTypeTypeInfo()->gpg::REnumType::~REnumType();
-    gECompareTypeTypeInfoConstructed = false;
-    gECompareTypeTypeInfoPreregistered = false;
-  }
-
-  /**
    * Address: 0x00BCB350 (FUN_00BCB350, register_ECompareTypeTypeInfoStartup)
    *
    * What it does:
-   * Runs preregistration for `ECompareTypeTypeInfo` and installs exit cleanup.
+   * Runs preregistration for `ECompareTypeTypeInfo`.
    */
-  int register_ECompareTypeTypeInfoStartup()
+  void register_ECompareTypeTypeInfoStartup()
   {
     (void)preregister_ECompareTypeTypeInfo();
-    return std::atexit(&cleanup_ECompareTypeTypeInfo);
   }
 } // namespace moho
 

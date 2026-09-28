@@ -17,8 +17,6 @@ namespace moho
 
 namespace
 {
-  moho::BVIntSetTypeInfo gBVIntSetTypeInfo;
-
   // Address: 0x00BC2D00 (FUN_00BC2D00, register_BVIntSetSerializer) -- MSVC's
   // own compiler-generated dynamic initializer for this global runs the real
   // `gpg::SerSaveLoadHelper<BVIntSet>` ctor (self-links into `sNewHelpers`,
@@ -29,18 +27,6 @@ namespace
   // original source -- matches `gpg::PrimitiveSerHelper<T,IntType>`'s
   // already-established modeling.
   moho::BVIntSetSerializer gBVIntSetSerializer;
-
-  /**
-   * Address: 0x00BEDE80 (FUN_00BEDE80, ??1BVIntSetTypeInfo@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Process-exit cleanup for global `BVIntSetTypeInfo` dynamic field/base lanes.
-   */
-  void cleanup_BVIntSetTypeInfo()
-  {
-    gBVIntSetTypeInfo.fields_.clear();
-    gBVIntSetTypeInfo.bases_.clear();
-  }
 
   struct BVIntSetReflectionRegistration
   {
@@ -58,15 +44,14 @@ namespace moho
 {
   /**
    * Address: 0x00BC2CE0 (FUN_00BC2CE0, register_BVIntSetTypeInfo)
+   * Address: 0x00BEDE80 (FUN_00BEDE80, atexit destructor of the BVIntSetTypeInfo object)
    *
    * What it does:
-   * Materializes startup `BVIntSetTypeInfo` storage and registers process-exit
-   * teardown.
+   * Constructs the static `BVIntSetTypeInfo` object.
    */
   void register_BVIntSetTypeInfo()
   {
-    (void)gBVIntSetTypeInfo;
-    (void)std::atexit(&cleanup_BVIntSetTypeInfo);
+    static BVIntSetTypeInfo sInstance;
   }
 
   /**

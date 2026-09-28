@@ -9,32 +9,15 @@
 
 namespace
 {
-  alignas(moho::IArmyTypeInfo) unsigned char gIArmyTypeInfoStorage[sizeof(moho::IArmyTypeInfo)];
-  bool gIArmyTypeInfoConstructed = false;
   bool gIArmyTypeInfoPreregistered = false;
 
+  /**
+   * Address: 0x00BF48A0 (FUN_00BF48A0, atexit destructor of the IArmyTypeInfo object)
+   */
   [[nodiscard]] moho::IArmyTypeInfo* AcquireIArmyTypeInfo()
   {
-    if (!gIArmyTypeInfoConstructed) {
-      new (gIArmyTypeInfoStorage) moho::IArmyTypeInfo();
-      gIArmyTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::IArmyTypeInfo*>(gIArmyTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF48A0 (FUN_00BF48A0, cleanup_IArmyTypeInfo)
-   */
-  void cleanup_IArmyTypeInfo()
-  {
-    if (!gIArmyTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireIArmyTypeInfo()->~IArmyTypeInfo();
-    gIArmyTypeInfoConstructed = false;
-    gIArmyTypeInfoPreregistered = false;
+    static moho::IArmyTypeInfo sInstance;
+    return &sInstance;
   }
 } // namespace
 
@@ -85,12 +68,11 @@ namespace moho
    * Address: 0x00BC9B50 (FUN_00BC9B50, register_IArmyTypeInfo)
    *
    * What it does:
-   * Runs `IArmy` typeinfo preregistration and installs process-exit cleanup.
+   * Runs `IArmy` typeinfo preregistration.
    */
-  int register_IArmyTypeInfo()
+  void register_IArmyTypeInfo()
   {
     (void)preregister_IArmyTypeInfo();
-    return std::atexit(&cleanup_IArmyTypeInfo);
   }
 } // namespace moho
 

@@ -35,10 +35,6 @@ namespace moho
 
 namespace
 {
-  bool gCamManagerInitialized = false;
-  alignas(moho::RCamManager) std::uint8_t gCamManagerStorage[sizeof(moho::RCamManager)]{};
-  moho::RCamManager* gCamManager = nullptr;
-
   using CameraPointer = moho::CameraImpl*;
 
 
@@ -66,17 +62,6 @@ namespace
    * Address: 0x00BEF6D0 (FUN_00BEF6D0, dynamic atexit destructor for `gTConVar_cam_DefaultLOD`)
    */
   moho::TConVar<float> gTConVar_cam_DefaultLOD("cam_DefaultLOD", "default value for camera level-of-detail scaling factor", &moho::cam_DefaultLOD);
-
-  void DestroyCamManager()
-  {
-    if (gCamManager == nullptr) {
-      return;
-    }
-
-    gCamManager->~RCamManager();
-    gCamManager = nullptr;
-    gCamManagerInitialized = false;
-  }
 
   /// 0x00E00779 (the shared empty-string literal also used by
   /// `ResolutionCommands.cpp`'s startup commands), the `.data` initializer
@@ -254,16 +239,15 @@ namespace moho
 
   /**
    * Address: 0x007AAC00 (FUN_007AAC00, ?CAM_GetManager@Moho@@YAPAVRCamManager@1@XZ)
+   * Address: 0x00C035B0 (FUN_00C035B0, atexit destructor of CAM_GetManager's RCamManager object)
+   *
+   * What it does:
+   * Returns the process camera manager, constructing it on first call.
    */
   RCamManager* CAM_GetManager()
   {
-    if (!gCamManagerInitialized) {
-      gCamManagerInitialized = true;
-      gCamManager = new (&gCamManagerStorage[0]) RCamManager();
-      std::atexit(&DestroyCamManager);
-    }
-
-    return gCamManager;
+    static RCamManager sManager;
+    return &sManager;
   }
 
   /**

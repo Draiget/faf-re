@@ -11,24 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(EReconFlagsTypeInfo) unsigned char gStorage[sizeof(EReconFlagsTypeInfo)];
-  bool gConstructed = false;
-
+  /**
+   * Address: 0x00BF5780 (FUN_00BF5780, atexit destructor of the EReconFlagsTypeInfo object)
+   */
   [[nodiscard]] EReconFlagsTypeInfo& Acquire()
   {
-    if (!gConstructed) {
-      new (gStorage) EReconFlagsTypeInfo();
-      gConstructed = true;
-    }
-    return *reinterpret_cast<EReconFlagsTypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) return;
-    auto& ti = *reinterpret_cast<EReconFlagsTypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static EReconFlagsTypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { moho::register_EReconFlagsTypeInfoStartup(); } };
@@ -83,10 +72,12 @@ void EReconFlagsTypeInfo::AddEnums(gpg::REnumType* const enumType)
   enumType->AddEnum(enumType->StripPrefix("RECON_AnySense"), RECON_AnySense);
 }
 
+/**
+ * Address: 0x00BCA910 (FUN_00BCA910, register_EReconFlagsTypeInfo)
+ */
 void moho::register_EReconFlagsTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

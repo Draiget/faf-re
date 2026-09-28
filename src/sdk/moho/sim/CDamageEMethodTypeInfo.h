@@ -61,8 +61,7 @@ namespace moho
    * Address: 0x00BDB710 (FUN_00BDB710, register_CDamageEMethodTypeInfo)
    *
    * What it does:
-   * Runs preregistration and installs process-exit cleanup for
-   * `CDamageEMethodTypeInfo`.
+   * Runs preregistration for `CDamageEMethodTypeInfo`.
    */
-  int register_CDamageEMethodTypeInfo();
+  void register_CDamageEMethodTypeInfo();
 } // namespace moho

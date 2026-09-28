@@ -1,7 +1,5 @@
 #include "moho/audio/SParamKeyTypeInfo.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/audio/SParamKey.h"
@@ -11,12 +9,13 @@ namespace
 {
   using TypeInfo = moho::SParamKeyTypeInfo;
 
-  alignas(TypeInfo) unsigned char gSParamKeyTypeInfoStorage[sizeof(TypeInfo)];
-  bool gSParamKeyTypeInfoConstructed = false;
-
-  [[nodiscard]] TypeInfo& GetSParamKeyTypeInfo() noexcept
+  /**
+   * Address: 0x00BF0DF0 (FUN_00BF0DF0, atexit destructor of the SParamKeyTypeInfo object)
+   */
+  [[nodiscard]] TypeInfo& GetSParamKeyTypeInfo()
   {
-    return *reinterpret_cast<TypeInfo*>(gSParamKeyTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -55,29 +54,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF0DF0 (FUN_00BF0DF0, cleanup_SParamKeyTypeInfo)
-   */
-  void cleanup_SParamKeyTypeInfo()
-  {
-    if (!gSParamKeyTypeInfoConstructed) {
-      return;
-    }
-
-    GetSParamKeyTypeInfo().~SParamKeyTypeInfo();
-    gSParamKeyTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC6840 (FUN_00BC6840, register_SParamKeyTypeInfo)
    */
-  int register_SParamKeyTypeInfo()
+  void register_SParamKeyTypeInfo()
   {
-    if (!gSParamKeyTypeInfoConstructed) {
-      new (gSParamKeyTypeInfoStorage) SParamKeyTypeInfo();
-      gSParamKeyTypeInfoConstructed = true;
-    }
-
-    return std::atexit(&cleanup_SParamKeyTypeInfo);
+    (void)GetSParamKeyTypeInfo();
   }
 } // namespace moho
 
@@ -87,7 +68,7 @@ namespace
   {
     SParamKeyTypeInfoBootstrap()
     {
-      (void)moho::register_SParamKeyTypeInfo();
+      moho::register_SParamKeyTypeInfo();
     }
   };
 

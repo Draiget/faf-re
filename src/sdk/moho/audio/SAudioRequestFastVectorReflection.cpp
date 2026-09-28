@@ -2,8 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -17,30 +15,12 @@
 namespace moho
 {
   /**
-   * Address: 0x007626E0 (FUN_007626E0, preregister_FastVectorSAudioRequestType)
+   * Address: 0x00BDC5F0 (FUN_00BDC5F0, register_FastVectorSAudioRequestType)
    *
    * What it does:
-   * Constructs/preregisters startup RTTI metadata for
-   * `gpg::fastvector<moho::SAudioRequest>`.
+   * Constructs and preregisters `fastvector<SAudioRequest>` RTTI.
    */
-  gpg::RType* preregister_FastVectorSAudioRequestType();
-
-  /**
-   * Address: 0x00C01620 (FUN_00C01620, cleanup_FastVectorSAudioRequestType)
-   *
-   * What it does:
-   * Releases startup-owned `fastvector<SAudioRequest>` reflection storage.
-   */
-  void cleanup_FastVectorSAudioRequestType();
-
-  /**
-   * Address: 0x00BDC5F0 (FUN_00BDC5F0, register_FastVectorSAudioRequestTypeAtexit)
-   *
-   * What it does:
-   * Preregisters `fastvector<SAudioRequest>` RTTI and installs process-exit
-   * cleanup via `atexit`.
-   */
-  int register_FastVectorSAudioRequestTypeAtexit();
+  void register_FastVectorSAudioRequestType();
 } // namespace moho
 
 namespace gpg
@@ -50,7 +30,7 @@ namespace gpg
 
   /**
    * Address family:
-   * - 0x007626E0 (preregister) / 0x00BDC5F0 (register + atexit)
+   * - 0x007626E0 (ctor) / 0x00BDC5F0 (register)
    * - 0x00C01620 (type teardown) / 0x00C015F0 (name teardown)
    * - 0x007619D0 (GetName) / 0x00761A70 (Init) / 0x00761A90 (GetLexical)
    * - 0x00761B20 (IsIndexed) / 0x00761B30 (GetCount) / 0x00761B50 (SetCount)
@@ -68,6 +48,15 @@ namespace gpg
   class RFastVectorType<moho::SAudioRequest> final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x007626E0 (FUN_007626E0, gpg::RFastVectorType_SAudioRequest::RFastVectorType_SAudioRequest)
+     *
+     * What it does:
+     * Constructs/preregisters startup RTTI metadata for
+     * `gpg::fastvector<moho::SAudioRequest>`.
+     */
+    RFastVectorType();
+
     /**
      * Address: 0x007619D0 (FUN_007619D0, gpg::RFastVectorType_SAudioRequest::GetName)
      */
@@ -115,32 +104,13 @@ namespace
 {
   using FastVectorSAudioRequestType = gpg::RFastVectorType<moho::SAudioRequest>;
 
-  // Startup-owned reflection descriptor storage (binary global stru_1106BA8).
-  alignas(FastVectorSAudioRequestType)
-    unsigned char gFastVectorSAudioRequestTypeStorage[sizeof(FastVectorSAudioRequestType)]{};
-  bool gFastVectorSAudioRequestTypeConstructed = false;
-
-  // Cached "fastvector<SAudioRequest>" lexical name (binary global stru_10C7FDC).
-  msvc8::string gFastVectorSAudioRequestTypeName;
-  bool gFastVectorSAudioRequestTypeNameCleanupRegistered = false;
-
+  /**
+   * Address: 0x00C01620 (FUN_00C01620, atexit destructor of the RFastVectorType<SAudioRequest> object)
+   */
   [[nodiscard]] FastVectorSAudioRequestType* AcquireFastVectorSAudioRequestType()
   {
-    if (!gFastVectorSAudioRequestTypeConstructed) {
-      new (gFastVectorSAudioRequestTypeStorage) FastVectorSAudioRequestType();
-      gFastVectorSAudioRequestTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorSAudioRequestType*>(gFastVectorSAudioRequestTypeStorage);
-  }
-
-  [[nodiscard]] FastVectorSAudioRequestType* PeekFastVectorSAudioRequestType() noexcept
-  {
-    if (!gFastVectorSAudioRequestTypeConstructed) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<FastVectorSAudioRequestType*>(gFastVectorSAudioRequestTypeStorage);
+    static FastVectorSAudioRequestType sInstance;
+    return &sInstance;
   }
 
   // Lazily resolves and caches the element RType* (binary Moho::SAudioRequest::sType).
@@ -150,18 +120,6 @@ namespace
       moho::SAudioRequest::sType = gpg::LookupRType(typeid(moho::SAudioRequest));
     }
     return moho::SAudioRequest::sType;
-  }
-
-  /**
-   * Address: 0x00C015F0 (FUN_00C015F0, cleanup_FastVectorSAudioRequestTypeName)
-   *
-   * What it does:
-   * Releases cached lexical type-name storage for `fastvector<SAudioRequest>`.
-   */
-  void cleanup_FastVectorSAudioRequestTypeName()
-  {
-    gFastVectorSAudioRequestTypeName = msvc8::string{};
-    gFastVectorSAudioRequestTypeNameCleanupRegistered = false;
   }
 
   /**
@@ -220,7 +178,7 @@ namespace
   {
     SAudioRequestFastVectorReflectionBootstrap()
     {
-      (void)moho::register_FastVectorSAudioRequestTypeAtexit();
+      moho::register_FastVectorSAudioRequestType();
     }
   };
 
@@ -230,26 +188,28 @@ namespace
 namespace gpg
 {
   /**
-   * Address: 0x007619D0 (FUN_007619D0, gpg::RFastVectorType_SAudioRequest::GetName)
+   * Address: 0x007626E0 (FUN_007626E0, gpg::RFastVectorType_SAudioRequest::RFastVectorType_SAudioRequest)
    *
    * What it does:
-   * Builds and caches `"fastvector<SAudioRequest>"` from the element type name,
-   * arming a one-shot `atexit` teardown for the cached string.
+   * Preregisters this descriptor under `typeid(gpg::fastvector<moho::SAudioRequest>)`.
+   */
+  RFastVectorType<moho::SAudioRequest>::RFastVectorType()
+  {
+    gpg::PreRegisterRType(typeid(gpg::fastvector<moho::SAudioRequest>), this);
+  }
+
+  /**
+   * Address: 0x007619D0 (FUN_007619D0, gpg::RFastVectorType_SAudioRequest::GetName)
+   * Address: 0x00C015F0 (FUN_00C015F0, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `fastvector<SAudioRequest>` once from the element type name and
+   * returns it.
    */
   const char* RFastVectorType<moho::SAudioRequest>::GetName() const
   {
-    if (gFastVectorSAudioRequestTypeName.empty()) {
-      const gpg::RType* const elementType = CachedSAudioRequestType();
-      const char* const elementName = elementType ? elementType->GetName() : "SAudioRequest";
-      gFastVectorSAudioRequestTypeName =
-        gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SAudioRequest");
-      if (!gFastVectorSAudioRequestTypeNameCleanupRegistered) {
-        gFastVectorSAudioRequestTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_FastVectorSAudioRequestTypeName);
-      }
-    }
-
-    return gFastVectorSAudioRequestTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSAudioRequestType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -355,32 +315,12 @@ namespace gpg
 
 namespace moho
 {
-  gpg::RType* preregister_FastVectorSAudioRequestType()
+  void register_FastVectorSAudioRequestType()
   {
-    FastVectorSAudioRequestType* const typeInfo = AcquireFastVectorSAudioRequestType();
-    gpg::PreRegisterRType(typeid(gpg::fastvector<SAudioRequest>), typeInfo);
-    return typeInfo;
-  }
-
-  void cleanup_FastVectorSAudioRequestType()
-  {
-    FastVectorSAudioRequestType* const type = PeekFastVectorSAudioRequestType();
-    if (type == nullptr) {
-      return;
-    }
-
-    type->~FastVectorSAudioRequestType();
-    gFastVectorSAudioRequestTypeConstructed = false;
-  }
-
-  int register_FastVectorSAudioRequestTypeAtexit()
-  {
-    (void)preregister_FastVectorSAudioRequestType();
-    return std::atexit(&cleanup_FastVectorSAudioRequestType);
+    (void)AcquireFastVectorSAudioRequestType();
   }
 } // namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_FastVectorSAudioRequestType_9ff453, moho::preregister_FastVectorSAudioRequestType)
-GPG_PREREGISTER_INIT(register_FastVectorSAudioRequestTypeAtexit_9ff453, moho::register_FastVectorSAudioRequestTypeAtexit)
+GPG_PREREGISTER_INIT(register_FastVectorSAudioRequestType_9ff453, moho::register_FastVectorSAudioRequestType)

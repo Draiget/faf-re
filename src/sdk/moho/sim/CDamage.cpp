@@ -38,35 +38,15 @@
 
 namespace
 {
-  alignas(moho::CDamageTypeInfo) unsigned char gCDamageTypeInfoStorage[sizeof(moho::CDamageTypeInfo)];
-  bool gCDamageTypeInfoConstructed = false;
   bool gCDamageTypeInfoPreregistered = false;
 
+  /**
+   * Address: 0x00C00B10 (FUN_00C00B10, atexit destructor of the CDamageTypeInfo object)
+   */
   [[nodiscard]] moho::CDamageTypeInfo* AcquireCDamageTypeInfo()
   {
-    if (!gCDamageTypeInfoConstructed) {
-      new (gCDamageTypeInfoStorage) moho::CDamageTypeInfo();
-      gCDamageTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CDamageTypeInfo*>(gCDamageTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00C00B10 (FUN_00C00B10, cleanup_CDamageTypeInfo)
-   *
-   * What it does:
-   * Tears down process-global `CDamageTypeInfo` storage.
-   */
-  void cleanup_CDamageTypeInfo()
-  {
-    if (!gCDamageTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCDamageTypeInfo()->~CDamageTypeInfo();
-    gCDamageTypeInfoConstructed = false;
-    gCDamageTypeInfoPreregistered = false;
+    static moho::CDamageTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
@@ -440,10 +420,9 @@ namespace moho
   /**
    * Address: 0x00BDB6F0 (FUN_00BDB6F0, register_CDamageTypeInfo)
    */
-  int register_CDamageTypeInfo()
+  void register_CDamageTypeInfo()
   {
     (void)preregister_CDamageTypeInfo();
-    return std::atexit(&cleanup_CDamageTypeInfo);
   }
 
   /**

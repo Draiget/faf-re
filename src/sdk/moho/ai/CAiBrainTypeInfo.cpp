@@ -12,26 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CAiBrainTypeInfo) unsigned char gCAiBrainTypeInfoStorage[sizeof(CAiBrainTypeInfo)];
-  bool gCAiBrainTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6260 (FUN_00BF6260, atexit destructor of the CAiBrainTypeInfo object)
+   */
   [[nodiscard]] CAiBrainTypeInfo& AcquireCAiBrainTypeInfo()
   {
-    if (!gCAiBrainTypeInfoConstructed) {
-      new (gCAiBrainTypeInfoStorage) CAiBrainTypeInfo();
-      gCAiBrainTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<CAiBrainTypeInfo*>(gCAiBrainTypeInfoStorage);
-  }
-
-  [[nodiscard]] CAiBrainTypeInfo* PeekCAiBrainTypeInfo() noexcept
-  {
-    if (!gCAiBrainTypeInfoConstructed) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<CAiBrainTypeInfo*>(gCAiBrainTypeInfoStorage);
+    static CAiBrainTypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
@@ -85,17 +72,6 @@ namespace
   // has a source-level call to it (RULE ONE / no-orphan-helper rule) --
   // so this address intentionally has no dedicated recovered function here.
 
-  void cleanup_CAiBrainTypeInfoStartup()
-  {
-    CAiBrainTypeInfo* const typeInfo = PeekCAiBrainTypeInfo();
-    if (!typeInfo) {
-      return;
-    }
-
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
-  }
-
   struct CAiBrainTypeInfoStartupBootstrap
   {
     CAiBrainTypeInfoStartupBootstrap()
@@ -147,14 +123,12 @@ void CAiBrainTypeInfo::Init()
  * Address: 0x00BCB3D0 (FUN_00BCB3D0, register_Moho::CAiBrainTypeInfo)
  *
  * What it does:
- * Ensures startup construction of `CAiBrainTypeInfo` and installs process-exit cleanup.
+ * Ensures startup construction of `CAiBrainTypeInfo`.
  */
 void moho::register_CAiBrainTypeInfoStartup()
 {
   (void)AcquireCAiBrainTypeInfo();
-  (void)std::atexit(&cleanup_CAiBrainTypeInfoStartup);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

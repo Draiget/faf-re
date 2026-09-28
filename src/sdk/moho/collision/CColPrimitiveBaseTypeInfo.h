@@ -45,10 +45,9 @@ namespace moho
    * Address: 0x00BC7530 (FUN_00BC7530, register_CColPrimitiveBaseTypeInfo)
    *
    * What it does:
-   * Installs the startup-owned `CColPrimitiveBaseTypeInfo` instance and its
-   * process-exit cleanup hook.
+   * Installs the startup-owned `CColPrimitiveBaseTypeInfo` instance.
    */
-  int register_CColPrimitiveBaseTypeInfo();
+  void register_CColPrimitiveBaseTypeInfo();
 
   static_assert(sizeof(CColPrimitiveBaseTypeInfo) == 0x64, "CColPrimitiveBaseTypeInfo size must be 0x64");
 } // namespace moho

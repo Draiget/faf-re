@@ -67,8 +67,7 @@ namespace moho
    * Address: 0x00BC2D80 (FUN_00BC2D80, register_IdPoolTypeInfo)
    *
    * What it does:
-   * Materializes startup `IdPoolTypeInfo` storage and registers process-exit
-   * teardown.
+   * Constructs the startup `IdPoolTypeInfo` object, which preregisters it.
    */
   void register_IdPoolTypeInfo();
 } // namespace moho

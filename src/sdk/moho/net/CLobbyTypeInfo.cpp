@@ -9,40 +9,13 @@
 
 namespace
 {
-  template <class TTypeInfo>
-  struct TypeInfoStorage
-  {
-    alignas(TTypeInfo) unsigned char bytes[sizeof(TTypeInfo)];
-    bool constructed;
-  };
-
-  template <class TTypeInfo>
-  [[nodiscard]] TTypeInfo& EnsureTypeInfo(TypeInfoStorage<TTypeInfo>& storage) noexcept
-  {
-    if (!storage.constructed) {
-      new (storage.bytes) TTypeInfo();
-      storage.constructed = true;
-    }
-
-    return *reinterpret_cast<TTypeInfo*>(storage.bytes);
-  }
-
-  template <class TTypeInfo>
-  void DestroyTypeInfo(TypeInfoStorage<TTypeInfo>& storage) noexcept
-  {
-    if (!storage.constructed) {
-      return;
-    }
-
-    reinterpret_cast<TTypeInfo*>(storage.bytes)->~TTypeInfo();
-    storage.constructed = false;
-  }
-
-  TypeInfoStorage<moho::CLobbyTypeInfo> gCLobbyTypeInfoStorage{};
-
+  /**
+   * Address: 0x00C039C0 (FUN_00C039C0, atexit destructor of the CLobbyTypeInfo object)
+   */
   [[nodiscard]] moho::CLobbyTypeInfo& GetCLobbyTypeInfo() noexcept
   {
-    return EnsureTypeInfo(gCLobbyTypeInfoStorage);
+    static moho::CLobbyTypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
@@ -77,27 +50,14 @@ namespace
   }
 
   /**
-   * Address: 0x00C039C0 (FUN_00C039C0, Moho::CLobbyTypeInfo::~CLobbyTypeInfo)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global CLobby type descriptor.
-   */
-  void cleanup_CLobbyTypeInfo()
-  {
-    DestroyTypeInfo(gCLobbyTypeInfoStorage);
-  }
-
-  /**
    * Address: 0x00BDFE30 (FUN_00BDFE30, register_CLobbyTypeInfo)
    *
    * What it does:
-   * Constructs the global CLobby type descriptor and wires teardown into CRT
-   * `atexit`.
+   * Constructs the global CLobby type descriptor.
    */
   void register_CLobbyTypeInfo()
   {
     (void)GetCLobbyTypeInfo();
-    (void)std::atexit(&cleanup_CLobbyTypeInfo);
   }
 
   struct CLobbyTypeInfoRegistration

@@ -71,9 +71,6 @@ namespace gpg
 
 namespace
 {
-  msvc8::string gSDecalInfoListTypeName{};
-  std::uint32_t gSDecalInfoListTypeNameInitGuard = 0u;
-
   /**
    * Address: 0x0077B940 (FUN_0077B940)
    *
@@ -183,12 +180,6 @@ namespace
   )
   {
     (void)WriteReflectedSDecalInfoPayload(archive, payload, ownerRef);
-  }
-
-  void cleanup_SDecalInfoListTypeName()
-  {
-    gSDecalInfoListTypeName.clear();
-    gSDecalInfoListTypeNameInitGuard = 0u;
   }
 
   /**
@@ -362,23 +353,15 @@ gpg::RListType_SDecalInfo::~RListType_SDecalInfo() = default;
 
 /**
  * Address: 0x0077A760 (FUN_0077A760, gpg::RListType_SDecalInfo::GetName)
+ * Address: 0x00C02970 (FUN_00C02970, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches reflected lexical type label `list<SDecalInfo>`
- * from runtime RTTI metadata.
+ * Builds `list<SDecalInfo>` once from the element type name and returns it.
  */
 const char* gpg::RListType_SDecalInfo::GetName() const
 {
-  if ((gSDecalInfoListTypeNameInitGuard & 1u) == 0u) {
-    gSDecalInfoListTypeNameInitGuard |= 1u;
-
-    gpg::RType* const valueType = CachedSDecalInfoType();
-    const char* const valueTypeName = valueType ? valueType->GetName() : "SDecalInfo";
-    gSDecalInfoListTypeName = gpg::STR_Printf("list<%s>", valueTypeName ? valueTypeName : "SDecalInfo");
-    (void)std::atexit(&cleanup_SDecalInfoListTypeName);
-  }
-
-  return gSDecalInfoListTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("list<%s>", CachedSDecalInfoType()->GetName());
+  return sName.c_str();
 }
 
 /**

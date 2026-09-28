@@ -633,30 +633,6 @@ namespace
   constexpr moho::EMauiScrollAxis kVerticalScrollAxis = static_cast<moho::EMauiScrollAxis>(0);
 
   LuaPlus::LuaState* gUserLuaState = nullptr;
-  std::uint8_t gUserLuaStateInitGuard = 0;
-  std::aligned_storage_t<sizeof(LuaPlus::LuaState), alignof(LuaPlus::LuaState)> gUserLuaStateStorage{};
-  std::aligned_storage_t<sizeof(moho::CTaskStage), alignof(moho::CTaskStage)> gUserStageStorage{};
-
-  [[nodiscard]] LuaPlus::LuaState* GetUserLuaStateStorageObject() noexcept
-  {
-    return reinterpret_cast<LuaPlus::LuaState*>(&gUserLuaStateStorage);
-  }
-
-  [[nodiscard]] moho::CTaskStage* GetUserStageStorageObject() noexcept
-  {
-    return reinterpret_cast<moho::CTaskStage*>(&gUserStageStorage);
-  }
-
-  void CleanupUserLuaStateStorageAtExit()
-  {
-    std::destroy_at(GetUserLuaStateStorageObject());
-    gUserLuaState = nullptr;
-  }
-
-  void CleanupUserStageStorageAtExit()
-  {
-    moho::sUserStage = nullptr;
-  }
 
   void AttachTaskToStage(
     moho::CTask* const task,
@@ -25989,6 +25965,8 @@ LuaPlus::LuaObject* moho::CreateLuaEventObject(
 
 /**
  * Address: 0x008C65B0 (FUN_008C65B0, Moho::USER_GetLuaState)
+ * Address: 0x00C08810 (FUN_00C08810, atexit destructor of USER_GetLuaState's static LuaState)
+ * Address: 0x00C08800 (FUN_00C08800, atexit destructor of USER_GetLuaState's static CTaskStage)
  *
  * What it does:
  * Lazily initializes process-global user Lua state/runtime stage, installs
@@ -26002,20 +25980,11 @@ LuaPlus::LuaState* moho::USER_GetLuaState()
     return state;
   }
 
-  if ((gUserLuaStateInitGuard & 0x1u) == 0u) {
-    new (GetUserLuaStateStorageObject()) LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
-    gUserLuaStateInitGuard |= 0x1u;
-    (void)std::atexit(&CleanupUserLuaStateStorageAtExit);
-  }
+  static LuaPlus::LuaState sLuaState(LuaPlus::LuaState::LIB_BASE);
+  static CTaskStage sStage;
 
-  if ((gUserLuaStateInitGuard & 0x2u) == 0u) {
-    new (GetUserStageStorageObject()) CTaskStage();
-    gUserLuaStateInitGuard |= 0x2u;
-    (void)std::atexit(&CleanupUserStageStorageAtExit);
-  }
-
-  sUserStage = GetUserStageStorageObject();
-  gUserLuaState = GetUserLuaStateStorageObject();
+  sUserStage = &sStage;
+  gUserLuaState = &sLuaState;
 
   if (SCR_IsDebugWindowActive()) {
     lua_sethook(gUserLuaState->m_state, &DebugLuaHook, 4, 0);

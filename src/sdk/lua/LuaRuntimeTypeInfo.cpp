@@ -1,8 +1,6 @@
 #include "lua/LuaRuntimeTypeInfo.h"
 
-#include <cstdlib>
-#include <new>
-#include <typeinfo>
+#include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 /**
@@ -386,91 +384,6 @@ void UdataTypeInfo::Init()
 
 namespace
 {
-  alignas(TStringTypeInfo) unsigned char gStorage_TStringTypeInfo[sizeof(TStringTypeInfo)];
-  bool gConstructed_TStringTypeInfo = false;
-  alignas(TableTypeInfo) unsigned char gStorage_TableTypeInfo[sizeof(TableTypeInfo)];
-  bool gConstructed_TableTypeInfo = false;
-  alignas(LClosureTypeInfo) unsigned char gStorage_LClosureTypeInfo[sizeof(LClosureTypeInfo)];
-  bool gConstructed_LClosureTypeInfo = false;
-  alignas(UpValTypeInfo) unsigned char gStorage_UpValTypeInfo[sizeof(UpValTypeInfo)];
-  bool gConstructed_UpValTypeInfo = false;
-  alignas(ProtoTypeInfo) unsigned char gStorage_ProtoTypeInfo[sizeof(ProtoTypeInfo)];
-  bool gConstructed_ProtoTypeInfo = false;
-  alignas(lua_StateTypeInfo) unsigned char gStorage_lua_StateTypeInfo[sizeof(lua_StateTypeInfo)];
-  bool gConstructed_lua_StateTypeInfo = false;
-  alignas(UdataTypeInfo) unsigned char gStorage_UdataTypeInfo[sizeof(UdataTypeInfo)];
-  bool gConstructed_UdataTypeInfo = false;
-
-  void cleanup_TStringTypeInfo()
-  {
-    if (!gConstructed_TStringTypeInfo) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<TStringTypeInfo*>(gStorage_TStringTypeInfo);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void cleanup_TableTypeInfo()
-  {
-    if (!gConstructed_TableTypeInfo) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<TableTypeInfo*>(gStorage_TableTypeInfo);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void cleanup_LClosureTypeInfo()
-  {
-    if (!gConstructed_LClosureTypeInfo) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<LClosureTypeInfo*>(gStorage_LClosureTypeInfo);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void cleanup_UpValTypeInfo()
-  {
-    if (!gConstructed_UpValTypeInfo) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<UpValTypeInfo*>(gStorage_UpValTypeInfo);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void cleanup_ProtoTypeInfo()
-  {
-    if (!gConstructed_ProtoTypeInfo) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<ProtoTypeInfo*>(gStorage_ProtoTypeInfo);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void cleanup_lua_StateTypeInfo()
-  {
-    if (!gConstructed_lua_StateTypeInfo) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<lua_StateTypeInfo*>(gStorage_lua_StateTypeInfo);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void cleanup_UdataTypeInfo()
-  {
-    if (!gConstructed_UdataTypeInfo) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<UdataTypeInfo*>(gStorage_UdataTypeInfo);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
   struct LuaRuntimeTypeInfoBootstrap
   {
     LuaRuntimeTypeInfoBootstrap()
@@ -488,74 +401,67 @@ namespace
   LuaRuntimeTypeInfoBootstrap gLuaRuntimeTypeInfoBootstrap;
 }
 
-/** Address: 0x00BEA1A0 (register_TStringTypeInfo) */
+/**
+ * Address: 0x00BEA1A0 (register_TStringTypeInfo)
+ * Address: 0x00C09E80 (FUN_00C09E80, atexit destructor of the TStringTypeInfo object)
+ */
 void register_TStringTypeInfoStartup()
 {
-  if (!gConstructed_TStringTypeInfo) {
-    new (gStorage_TStringTypeInfo) TStringTypeInfo();
-    gConstructed_TStringTypeInfo = true;
-    (void)std::atexit(&cleanup_TStringTypeInfo);
-  }
+  static TStringTypeInfo sInstance;
 }
 
-/** Address: 0x00BEA2B0 (register_TableTypeInfo) */
+/**
+ * Address: 0x00BEA2B0 (register_TableTypeInfo)
+ * Address: 0x00C09EE0 (FUN_00C09EE0, atexit destructor of the TableTypeInfo object)
+ */
 void register_TableTypeInfoStartup()
 {
-  if (!gConstructed_TableTypeInfo) {
-    new (gStorage_TableTypeInfo) TableTypeInfo();
-    gConstructed_TableTypeInfo = true;
-    (void)std::atexit(&cleanup_TableTypeInfo);
-  }
+  static TableTypeInfo sInstance;
 }
 
-/** Address: 0x00BEA3C0 (register_LClosureTypeInfo) */
+/**
+ * Address: 0x00BEA3C0 (register_LClosureTypeInfo)
+ * Address: 0x00C09F40 (FUN_00C09F40, atexit destructor of the LClosureTypeInfo object)
+ */
 void register_LClosureTypeInfoStartup()
 {
-  if (!gConstructed_LClosureTypeInfo) {
-    new (gStorage_LClosureTypeInfo) LClosureTypeInfo();
-    gConstructed_LClosureTypeInfo = true;
-    (void)std::atexit(&cleanup_LClosureTypeInfo);
-  }
+  static LClosureTypeInfo sInstance;
 }
 
-/** Address: 0x00BEA4D0 (register_UpValTypeInfo) */
+/**
+ * Address: 0x00BEA4D0 (register_UpValTypeInfo)
+ * Address: 0x00C09FA0 (FUN_00C09FA0, atexit destructor of the UpValTypeInfo object)
+ */
 void register_UpValTypeInfoStartup()
 {
-  if (!gConstructed_UpValTypeInfo) {
-    new (gStorage_UpValTypeInfo) UpValTypeInfo();
-    gConstructed_UpValTypeInfo = true;
-    (void)std::atexit(&cleanup_UpValTypeInfo);
-  }
+  static UpValTypeInfo sInstance;
 }
 
-/** Address: 0x00BEA5E0 (register_ProtoTypeInfo) */
+/**
+ * Address: 0x00BEA5E0 (register_ProtoTypeInfo)
+ * Address: 0x00C0A000 (FUN_00C0A000, atexit destructor of the ProtoTypeInfo object)
+ */
 void register_ProtoTypeInfoStartup()
 {
-  if (!gConstructed_ProtoTypeInfo) {
-    new (gStorage_ProtoTypeInfo) ProtoTypeInfo();
-    gConstructed_ProtoTypeInfo = true;
-    (void)std::atexit(&cleanup_ProtoTypeInfo);
-  }
+  static ProtoTypeInfo sInstance;
 }
 
-/** Address: 0x00BEA6F0 (register_lua_StateTypeInfo) */
+/**
+ * Address: 0x00BEA6F0 (register_lua_StateTypeInfo)
+ * Address: 0x00C0A060 (FUN_00C0A060, atexit destructor of the lua_StateTypeInfo object)
+ */
 void register_lua_StateTypeInfoStartup()
 {
-  if (!gConstructed_lua_StateTypeInfo) {
-    new (gStorage_lua_StateTypeInfo) lua_StateTypeInfo();
-    gConstructed_lua_StateTypeInfo = true;
-    (void)std::atexit(&cleanup_lua_StateTypeInfo);
-  }
+  static lua_StateTypeInfo sInstance;
 }
 
-/** Address: 0x00BEA800 (register_UdataTypeInfo) */
+/**
+ * Address: 0x00BEA800 (register_UdataTypeInfo)
+ * Address: 0x00C0A0C0 (FUN_00C0A0C0, atexit destructor of the UdataTypeInfo object)
+ */
 void register_UdataTypeInfoStartup()
 {
-  if (!gConstructed_UdataTypeInfo) {
-    new (gStorage_UdataTypeInfo) UdataTypeInfo();
-    gConstructed_UdataTypeInfo = true;
-    (void)std::atexit(&cleanup_UdataTypeInfo);
-  }
+  static UdataTypeInfo sInstance;
 }
 
 

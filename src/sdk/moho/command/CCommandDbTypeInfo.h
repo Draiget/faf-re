@@ -39,7 +39,7 @@ namespace moho
    * Address: 0x00BD8C40 (FUN_00BD8C40, sub_BD8C40)
    *
    * What it does:
-   * Ensures `CCommandDBTypeInfo` is constructed and installs teardown.
+   * Ensures `CCommandDBTypeInfo` is constructed.
    */
-  int register_CCommandDBTypeInfo();
+  void register_CCommandDBTypeInfo();
 } // namespace moho

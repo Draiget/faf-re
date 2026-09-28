@@ -24,7 +24,8 @@ namespace moho
     MotorTypeInfo();
 
     /**
-     * Address: 0x00BFCF00 (FUN_00BFCF00, Moho::MotorTypeInfo::~MotorTypeInfo)
+     * Address: 0x006948F0 (FUN_006948F0, MotorTypeInfo non-deleting destructor
+     * body; zero callers)
      *
      * What it does:
      * Releases reflected base/field vectors for `moho::Motor` type info.

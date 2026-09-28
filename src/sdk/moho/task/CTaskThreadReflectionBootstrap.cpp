@@ -19,22 +19,7 @@ namespace gpg
 
 namespace
 {
-  alignas(moho::CTaskThreadTypeInfo)
-    std::byte gCTaskThreadTypeInfoStorage[sizeof(moho::CTaskThreadTypeInfo)]{};
-  alignas(moho::CTaskStageTypeInfo)
-    std::byte gCTaskStageTypeInfoStorage[sizeof(moho::CTaskStageTypeInfo)]{};
-  bool gCTaskThreadTypeInfoConstructed = false;
-  bool gCTaskStageTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::CTaskThreadTypeInfo& CTaskThreadTypeInfoSlot()
-  {
-    return *reinterpret_cast<moho::CTaskThreadTypeInfo*>(gCTaskThreadTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::CTaskStageTypeInfo& CTaskStageTypeInfoSlot()
-  {
-    return *reinterpret_cast<moho::CTaskStageTypeInfo*>(gCTaskStageTypeInfoStorage);
-  }
+  bool gCTaskThreadTypeInfoPreregistered = false;
 
   [[nodiscard]] gpg::RType* CachedCTaskThreadType()
   {
@@ -83,25 +68,27 @@ namespace
     result->SetUnowned(threadRef, 0u);
   }
 
+  /**
+   * Address: 0x00BEE340 (FUN_00BEE340, atexit destructor of the CTaskThreadTypeInfo object)
+   */
   [[nodiscard]] gpg::RType* InitializeCTaskThreadTypeInfoStorage()
   {
-    if (!gCTaskThreadTypeInfoConstructed) {
-      ::new (static_cast<void*>(&CTaskThreadTypeInfoSlot())) moho::CTaskThreadTypeInfo();
-      gpg::PreRegisterRType(typeid(moho::CTaskThread), &CTaskThreadTypeInfoSlot());
-      gCTaskThreadTypeInfoConstructed = true;
+    static moho::CTaskThreadTypeInfo sInstance;
+    if (!gCTaskThreadTypeInfoPreregistered) {
+      gpg::PreRegisterRType(typeid(moho::CTaskThread), &sInstance);
+      gCTaskThreadTypeInfoPreregistered = true;
     }
 
-    return &CTaskThreadTypeInfoSlot();
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BEE400 (FUN_00BEE400, atexit destructor of the CTaskStageTypeInfo object)
+   */
   [[nodiscard]] gpg::RType* InitializeCTaskStageTypeInfoStorage()
   {
-    if (!gCTaskStageTypeInfoConstructed) {
-      ::new (static_cast<void*>(&CTaskStageTypeInfoSlot())) moho::CTaskStageTypeInfo();
-      gCTaskStageTypeInfoConstructed = true;
-    }
-
-    return &CTaskStageTypeInfoSlot();
+    static moho::CTaskStageTypeInfo sInstance;
+    return &sInstance;
   }
 
   // Address: 0x010A67BC -- process-global `CTaskThreadConstruct` singleton.
@@ -128,61 +115,25 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x00BEE340 (FUN_00BEE340, sub_BEE340)
-   *
-   * What it does:
-   * Executes process-exit teardown for startup `CTaskThreadTypeInfo` storage.
-   */
-  void cleanup_CTaskThreadTypeInfo()
-  {
-    if (!gCTaskThreadTypeInfoConstructed) {
-      return;
-    }
-
-    CTaskThreadTypeInfoSlot().~CTaskThreadTypeInfo();
-    gCTaskThreadTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BEE400 (FUN_00BEE400, ??1CTaskStageTypeInfo@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Executes process-exit teardown for startup `CTaskStageTypeInfo` storage.
-   */
-  void cleanup_CTaskStageTypeInfo()
-  {
-    if (!gCTaskStageTypeInfoConstructed) {
-      return;
-    }
-
-    CTaskStageTypeInfoSlot().~CTaskStageTypeInfo();
-    gCTaskStageTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC3020 (FUN_00BC3020, register_CTaskThreadTypeInfo)
    *
    * What it does:
-   * Materializes startup `CTaskThreadTypeInfo` storage and registers
-   * process-exit teardown.
+   * Materializes the startup `CTaskThreadTypeInfo` object.
    */
   void register_CTaskThreadTypeInfo()
   {
     (void)InitializeCTaskThreadTypeInfoStorage();
-    (void)std::atexit(&cleanup_CTaskThreadTypeInfo);
   }
 
   /**
    * Address: 0x00BC30C0 (FUN_00BC30C0, register_CTaskStageTypeInfo)
    *
    * What it does:
-   * Materializes startup `CTaskStageTypeInfo` storage and registers
-   * process-exit teardown.
+   * Materializes the startup `CTaskStageTypeInfo` object.
    */
   void register_CTaskStageTypeInfo()
   {
     (void)InitializeCTaskStageTypeInfoStorage();
-    (void)std::atexit(&cleanup_CTaskStageTypeInfo);
   }
 
   /**

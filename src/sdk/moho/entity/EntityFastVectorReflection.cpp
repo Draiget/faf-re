@@ -1,8 +1,6 @@
 #include "moho/entity/EntityFastVectorReflection.h"
 
-#include <cstdlib>
 #include <cstdint>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -19,18 +17,6 @@ namespace
   using EntityPtrVectorType = gpg::RVectorType<moho::Entity*>;
   using EntityPtrVector = msvc8::vector<moho::Entity*>;
   using EntityPtrFastVectorType = gpg::RFastVectorType<moho::Entity*>;
-
-  alignas(EntityPtrFastVectorType) unsigned char gEntityPtrFastVectorTypeStorage[sizeof(EntityPtrFastVectorType)];
-  bool gEntityPtrFastVectorTypeConstructed = false;
-
-  msvc8::string gWeakPtrEntityTypeName;
-  bool gWeakPtrEntityTypeNameCleanupRegistered = false;
-
-  msvc8::string gEntityPtrVectorTypeName;
-  bool gEntityPtrVectorTypeNameCleanupRegistered = false;
-
-  msvc8::string gEntityPtrFastVectorTypeName;
-  bool gEntityPtrFastVectorTypeNameCleanupRegistered = false;
 
   /**
    * Address: 0x00BFC9F0 (FUN_00BFC9F0, atexit destructor of the WeakPtrEntityType object)
@@ -50,14 +36,13 @@ namespace
     return &sInstance;
   }
 
+  /**
+   * Address: 0x00BFCEA0 (FUN_00BFCEA0, atexit destructor of the EntityPtrFastVectorType object)
+   */
   [[nodiscard]] EntityPtrFastVectorType* AcquireEntityPtrFastVectorType()
   {
-    if (!gEntityPtrFastVectorTypeConstructed) {
-      new (gEntityPtrFastVectorTypeStorage) EntityPtrFastVectorType();
-      gEntityPtrFastVectorTypeConstructed = true;
-    }
-
-    return reinterpret_cast<EntityPtrFastVectorType*>(gEntityPtrFastVectorTypeStorage);
+    static EntityPtrFastVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedEntityType()
@@ -382,50 +367,6 @@ namespace
     vec.Resize(newSize, fill);
   }
 
-  /**
-   * Address: 0x00BFC8D0 (FUN_00BFC8D0) family (cleanup_WeakPtrEntityTypeName_00BFC8D0)
-   */
-  void cleanup_WeakPtrEntityTypeName()
-  {
-    gWeakPtrEntityTypeName = msvc8::string{};
-    gWeakPtrEntityTypeNameCleanupRegistered = false;
-  }
-
-  /**
-   * Address: 0x00BFC8A0 (FUN_00BFC8A0) family (cleanup_VectorEntityPtrTypeName_00BFC8A0)
-   */
-  void cleanup_EntityPtrVectorTypeName()
-  {
-    gEntityPtrVectorTypeName = msvc8::string{};
-    gEntityPtrVectorTypeNameCleanupRegistered = false;
-  }
-
-  /**
-   * Address: 0x00BFCEA0 (FUN_00BFCEA0) family (cleanup_type_name_00BFCEA0)
-   */
-  void cleanup_EntityPtrFastVectorTypeName()
-  {
-    gEntityPtrFastVectorTypeName = msvc8::string{};
-    gEntityPtrFastVectorTypeNameCleanupRegistered = false;
-  }
-
-  /**
-   * Address: 0x00694340 (FUN_00694340, RFastVectorType_EntityP non-deleting cleanup body)
-   *
-   * What it does:
-   * Clears reflected base/field vector lanes for one `fastvector<Entity*>`
-   * type-info object while preserving outer storage ownership.
-   */
-  void DestroyEntityPtrFastVectorTypeBody(EntityPtrFastVectorType* const typeInfo) noexcept
-  {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
-  }
-
   struct EntityFastVectorReflectionBootstrap
   {
     EntityFastVectorReflectionBootstrap()
@@ -459,19 +400,15 @@ namespace moho
 
   /**
    * Address: 0x0067BDF0 (FUN_0067BDF0, Moho::RWeakPtrType_Entity::GetName)
+   * Address: 0x00BFC8D0 (FUN_00BFC8D0, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `WeakPtr<Entity>` once and returns it.
    */
   const char* RWeakPtrType<Entity>::GetName() const
   {
-    if (gWeakPtrEntityTypeName.empty()) {
-      const char* const pointeeName = CachedEntityType() ? CachedEntityType()->GetName() : "Entity";
-      gWeakPtrEntityTypeName = gpg::STR_Printf("WeakPtr<%s>", pointeeName ? pointeeName : "Entity");
-      if (!gWeakPtrEntityTypeNameCleanupRegistered) {
-        gWeakPtrEntityTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_WeakPtrEntityTypeName);
-      }
-    }
-
-    return gWeakPtrEntityTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedEntityType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -557,7 +494,7 @@ namespace moho
    * Address: 0x00BD5090 (FUN_00BD5090, register_WeakPtr_Entity_Type_AtExit)
    *
    * What it does:
-   * Registers `WeakPtr<Entity>` reflection and installs process-exit cleanup.
+   * Registers `WeakPtr<Entity>` reflection.
    */
   void register_WeakPtr_Entity_Type_AtExit()
   {
@@ -571,20 +508,16 @@ namespace gpg
 
   /**
    * Address: 0x0067C0F0 (FUN_0067C0F0, gpg::RVectorType_Entity_P::GetName)
+   * Address: 0x00BFC8A0 (FUN_00BFC8A0, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `vector<Entity *>` once from the `Entity*` pointer type and
+   * returns it.
    */
   const char* RVectorType<moho::Entity*>::GetName() const
   {
-    if (gEntityPtrVectorTypeName.empty()) {
-      const gpg::RType* const elementType = CachedEntityPointerType();
-      const char* const elementName = elementType ? elementType->GetName() : "Entity*";
-      gEntityPtrVectorTypeName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "Entity*");
-      if (!gEntityPtrVectorTypeNameCleanupRegistered) {
-        gEntityPtrVectorTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_EntityPtrVectorTypeName);
-      }
-    }
-
-    return gEntityPtrVectorTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", moho::Entity::GetPointerType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -659,23 +592,25 @@ namespace gpg
     storage->resize(static_cast<std::size_t>(count), nullptr);
   }
 
+  /**
+   * Address: 0x006943F0 (FUN_006943F0, gpg::RFastVectorType_EntityP::dtr)
+   * Address: 0x00694340 (FUN_00694340, RFastVectorType_EntityP non-deleting
+   * destructor body; zero callers)
+   */
   RFastVectorType<moho::Entity*>::~RFastVectorType() = default;
 
   /**
    * Address: 0x00693C00 (FUN_00693C00, gpg::RFastVectorType_EntityP::GetName)
+   * Address: 0x00BFCE70 (FUN_00BFCE70, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `fastvector<Entity *>` once from the `Entity*` pointer type and
+   * returns it.
    */
   const char* RFastVectorType<moho::Entity*>::GetName() const
   {
-    if (gEntityPtrFastVectorTypeName.empty()) {
-      const char* const elementName = CachedEntityPointerType() ? CachedEntityPointerType()->GetName() : "Entity*";
-      gEntityPtrFastVectorTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "Entity*");
-      if (!gEntityPtrFastVectorTypeNameCleanupRegistered) {
-        gEntityPtrFastVectorTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_EntityPtrFastVectorTypeName);
-      }
-    }
-
-    return gEntityPtrFastVectorTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", moho::Entity::GetPointerType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -777,7 +712,7 @@ namespace moho
    * Address: 0x00BD50B0 (FUN_00BD50B0, register_VectorEntityPtr_Type_AtExit)
    *
    * What it does:
-   * Registers `vector<Entity*>` reflection and installs process-exit cleanup.
+   * Registers `vector<Entity*>` reflection.
    */
   void register_VectorEntityPtr_Type_AtExit()
   {
@@ -798,33 +733,14 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_00BFCEA0 (non-canonical helper lane).
-   *
-   * What it does:
-   * Tears down startup-owned `fastvector<Entity*>` reflection storage.
-   */
-  void cleanup_FastVectorEntityPtrType()
-  {
-    if (!gEntityPtrFastVectorTypeConstructed) {
-      return;
-    }
-
-    EntityPtrFastVectorType* const typeInfo = AcquireEntityPtrFastVectorType();
-    DestroyEntityPtrFastVectorTypeBody(typeInfo);
-    typeInfo->~EntityPtrFastVectorType();
-    gEntityPtrFastVectorTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD5890 (FUN_00BD5890, register_FastVectorEntityPtrType_AtExit)
    *
    * What it does:
-   * Registers `fastvector<Entity*>` reflection and installs process-exit cleanup.
+   * Registers `fastvector<Entity*>` reflection.
    */
-  int register_FastVectorEntityPtrType_AtExit()
+  void register_FastVectorEntityPtrType_AtExit()
   {
     (void)register_FastVectorEntityPtrType_00();
-    return std::atexit(&cleanup_FastVectorEntityPtrType);
   }
 } // namespace moho
 

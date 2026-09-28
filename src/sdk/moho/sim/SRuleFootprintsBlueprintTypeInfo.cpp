@@ -116,19 +116,15 @@ namespace
    */
   SRuleFootprintsBlueprintTypeInfo::~SRuleFootprintsBlueprintTypeInfo() = default;
 
-  alignas(SRuleFootprintsBlueprintTypeInfo)
-    unsigned char gSRuleFootprintsBlueprintTypeInfoStorage[sizeof(SRuleFootprintsBlueprintTypeInfo)]{};
-  bool gSRuleFootprintsBlueprintTypeInfoConstructed = false;
   bool gSRuleFootprintsBlueprintTypeInfoPreregistered = false;
 
+  /**
+   * Address: 0x00BF2880 (FUN_00BF2880, atexit destructor of the SRuleFootprintsBlueprintTypeInfo object)
+   */
   [[nodiscard]] SRuleFootprintsBlueprintTypeInfo* AcquireSRuleFootprintsBlueprintTypeInfo()
   {
-    if (!gSRuleFootprintsBlueprintTypeInfoConstructed) {
-      new (gSRuleFootprintsBlueprintTypeInfoStorage) SRuleFootprintsBlueprintTypeInfo();
-      gSRuleFootprintsBlueprintTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<SRuleFootprintsBlueprintTypeInfo*>(gSRuleFootprintsBlueprintTypeInfoStorage);
+    static SRuleFootprintsBlueprintTypeInfo sInstance;
+    return &sInstance;
   }
 
   struct SRuleFootprintsBlueprintTypeInfoBootstrap
@@ -165,33 +161,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF2880 (FUN_00BF2880, cleanup_SRuleFootprintsBlueprintTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `SRuleFootprintsBlueprintTypeInfo` storage at process exit.
-   */
-  void cleanup_SRuleFootprintsBlueprintTypeInfo()
-  {
-    if (!gSRuleFootprintsBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSRuleFootprintsBlueprintTypeInfo()->~SRuleFootprintsBlueprintTypeInfo();
-    gSRuleFootprintsBlueprintTypeInfoConstructed = false;
-    gSRuleFootprintsBlueprintTypeInfoPreregistered = false;
-    SRuleFootprintsBlueprint::sType = nullptr;
-  }
-
-  /**
    * Address: 0x00BC8380 (FUN_00BC8380, register_SRuleFootprintsBlueprintTypeInfoStartup)
    *
    * What it does:
-   * Preregisters `SRuleFootprintsBlueprint` RTTI and installs process-exit cleanup.
+   * Preregisters `SRuleFootprintsBlueprint` RTTI.
    */
-  int register_SRuleFootprintsBlueprintTypeInfoStartup()
+  void register_SRuleFootprintsBlueprintTypeInfoStartup()
   {
     (void)preregister_SRuleFootprintsBlueprintTypeInfo();
-    return std::atexit(&cleanup_SRuleFootprintsBlueprintTypeInfo);
   }
 } // namespace moho
 

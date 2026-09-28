@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <memory>
 #include <new>
 #include <typeinfo>
@@ -16,29 +15,13 @@ namespace
 {
   using TypeInfo = moho::CUnitWaitForFerryTaskTypeInfo;
 
-  alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
-  bool gTypeInfoConstructed = false;
-
-
-
+  /**
+   * Address: 0x00BF9DD0 (FUN_00BF9DD0, atexit destructor of the CUnitWaitForFerryTaskTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gTypeInfoConstructed) {
-      new (gTypeInfoStorage) TypeInfo();
-      gTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CUnitWaitForFerryTaskTypeInfo();
-    gTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
@@ -170,10 +153,12 @@ namespace moho
     std::destroy_at(object);
   }
 
-  int register_CUnitWaitForFerryTaskTypeInfo()
+  /**
+   * Address: 0x00BD0940 (FUN_00BD0940, register_CUnitWaitForFerryTaskTypeInfo)
+   */
+  void register_CUnitWaitForFerryTaskTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup);
   }
 } // namespace moho
 

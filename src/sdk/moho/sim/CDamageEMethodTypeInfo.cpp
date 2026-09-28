@@ -8,36 +8,15 @@
 
 namespace
 {
-  alignas(moho::CDamageEMethodTypeInfo)
-    unsigned char gCDamageEMethodTypeInfoStorage[sizeof(moho::CDamageEMethodTypeInfo)];
-  bool gCDamageEMethodTypeInfoConstructed = false;
   bool gCDamageEMethodTypeInfoPreregistered = false;
 
+  /**
+   * Address: 0x00C00B70 (FUN_00C00B70, atexit destructor of the CDamageEMethodTypeInfo object)
+   */
   [[nodiscard]] moho::CDamageEMethodTypeInfo* AcquireCDamageEMethodTypeInfo()
   {
-    if (!gCDamageEMethodTypeInfoConstructed) {
-      new (gCDamageEMethodTypeInfoStorage) moho::CDamageEMethodTypeInfo();
-      gCDamageEMethodTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CDamageEMethodTypeInfo*>(gCDamageEMethodTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00C00B70 (FUN_00C00B70, cleanup_CDamageEMethodTypeInfo)
-   *
-   * What it does:
-   * Tears down process-global `CDamageEMethodTypeInfo` storage.
-   */
-  void cleanup_CDamageEMethodTypeInfo()
-  {
-    if (!gCDamageEMethodTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCDamageEMethodTypeInfo()->~CDamageEMethodTypeInfo();
-    gCDamageEMethodTypeInfoConstructed = false;
-    gCDamageEMethodTypeInfoPreregistered = false;
+    static moho::CDamageEMethodTypeInfo sInstance;
+    return &sInstance;
   }
 } // namespace
 
@@ -94,10 +73,9 @@ namespace moho
   /**
    * Address: 0x00BDB710 (FUN_00BDB710, register_CDamageEMethodTypeInfo)
    */
-  int register_CDamageEMethodTypeInfo()
+  void register_CDamageEMethodTypeInfo()
   {
     (void)preregister_CDamageEMethodTypeInfo();
-    return std::atexit(&cleanup_CDamageEMethodTypeInfo);
   }
 } // namespace moho
 

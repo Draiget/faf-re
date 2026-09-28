@@ -52,15 +52,8 @@ namespace
   constexpr const char* kResumeThreadKilledTraceback = "Attempted to resume a thread that was already killed";
   constexpr const char* kResumeThreadTypeError = "thread";
   constexpr const char* kResumeThreadForkOnlyError = "Can't resume a thread that wasn't created with ForkThread.";
-  alignas(moho::CLuaTaskTypeInfo) std::byte gCLuaTaskTypeInfoStorage[sizeof(moho::CLuaTaskTypeInfo)]{};
-  bool gCLuaTaskTypeInfoConstructed = false;
   moho::CLuaTaskConstruct gCLuaTaskConstruct{};
   moho::CLuaTaskSerializer gCLuaTaskSerializer{};
-
-  [[nodiscard]] moho::CLuaTaskTypeInfo& CLuaTaskTypeInfoSlot()
-  {
-    return *reinterpret_cast<moho::CLuaTaskTypeInfo*>(gCLuaTaskTypeInfoStorage);
-  }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
   {
@@ -83,39 +76,17 @@ namespace
 
   /**
    * Address: 0x004C99D0 (FUN_004C99D0, CLuaTask startup type-info pre-registration)
+   * Address: 0x00BF0A60 (FUN_00BF0A60, atexit destructor of the CLuaTaskTypeInfo object)
    *
    * What it does:
-   * Materializes one startup `CLuaTaskTypeInfo` storage lane and pre-registers
-   * the type descriptor for `typeid(CLuaTask)`.
+   * Materializes the startup `CLuaTaskTypeInfo` object and pre-registers the
+   * type descriptor for `typeid(CLuaTask)`.
    */
   [[nodiscard]] gpg::RType* PreRegisterCLuaTaskTypeInfo()
   {
-    if (!gCLuaTaskTypeInfoConstructed) {
-      ::new (static_cast<void*>(&CLuaTaskTypeInfoSlot())) moho::CLuaTaskTypeInfo();
-      gCLuaTaskTypeInfoConstructed = true;
-    }
-
-    gpg::PreRegisterRType(typeid(CLuaTask), &CLuaTaskTypeInfoSlot());
-    return &CLuaTaskTypeInfoSlot();
-  }
-
-  /**
-   * Address: 0x00BF0A60 (FUN_00BF0A60, CLuaTask type-info cleanup at exit)
-   *
-   * What it does:
-   * Releases dynamic field/base arrays from startup CLuaTask type-info storage
-   * and tears down the placement-constructed type descriptor.
-   */
-  void CleanupCLuaTaskTypeInfoAtExit()
-  {
-    if (!gCLuaTaskTypeInfoConstructed) {
-      return;
-    }
-
-    CLuaTaskTypeInfoSlot().fields_ = msvc8::vector<gpg::RField>{};
-    CLuaTaskTypeInfoSlot().bases_ = msvc8::vector<gpg::RField>{};
-    CLuaTaskTypeInfoSlot().~CLuaTaskTypeInfo();
-    gCLuaTaskTypeInfoConstructed = false;
+    static moho::CLuaTaskTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(CLuaTask), &sInstance);
+    return &sInstance;
   }
 
   /**
@@ -1050,17 +1021,11 @@ void CLuaTaskSerializer::Init()
  * Address: 0x00BC6160 (FUN_00BC6160, CLuaTask startup type-info registration)
  *
  * What it does:
- * Pre-registers `CLuaTask` reflected type descriptor and schedules teardown
- * of startup type-info storage at process exit.
+ * Pre-registers `CLuaTask` reflected type descriptor.
  */
 void moho::register_CLuaTaskTypeInfo()
 {
-  static const bool kRegistered = []() {
-    (void)PreRegisterCLuaTaskTypeInfo();
-    (void)std::atexit(&CleanupCLuaTaskTypeInfoAtExit);
-    return true;
-  }();
-  (void)kRegistered;
+  (void)PreRegisterCLuaTaskTypeInfo();
 }
 
 /**

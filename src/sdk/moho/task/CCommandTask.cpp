@@ -22,18 +22,20 @@ namespace
 {
   CCommandTaskSerializer gCCommandTaskSerializer{};
 
-  alignas(CCommandTaskTypeInfo) unsigned char gCCommandTaskTypeInfoStorage[sizeof(CCommandTaskTypeInfo)]{};
-  bool gCCommandTaskTypeInfoConstructed = false;
+  bool gCCommandTaskTypeInfoPreregistered = false;
 
+  /**
+   * Address: 0x00BF9AE0 (FUN_00BF9AE0, atexit destructor of the CCommandTaskTypeInfo object)
+   */
   [[nodiscard]] CCommandTaskTypeInfo* AcquireCCommandTaskTypeInfo()
   {
-    if (!gCCommandTaskTypeInfoConstructed) {
-      auto* const typeInfo = new (gCCommandTaskTypeInfoStorage) CCommandTaskTypeInfo();
-      gpg::PreRegisterRType(typeid(CCommandTask), typeInfo);
-      gCCommandTaskTypeInfoConstructed = true;
+    static CCommandTaskTypeInfo sInstance;
+    if (!gCCommandTaskTypeInfoPreregistered) {
+      gpg::PreRegisterRType(typeid(CCommandTask), &sInstance);
+      gCCommandTaskTypeInfoPreregistered = true;
     }
 
-    return reinterpret_cast<CCommandTaskTypeInfo*>(gCCommandTaskTypeInfoStorage);
+    return &sInstance;
   }
 
   gpg::RType* CachedCCommandTaskType()
@@ -211,22 +213,6 @@ namespace
       actualTypeName ? actualTypeName : "null"
     );
     throw std::runtime_error(msg.c_str());
-  }
-
-  /**
-   * Address: 0x00BF9AE0 (FUN_00BF9AE0, sub_BF9AE0)
-   *
-   * What it does:
-   * Tears down static `CCommandTaskTypeInfo` storage at process exit.
-   */
-  void cleanup_CCommandTaskTypeInfo()
-  {
-    if (!gCCommandTaskTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCCommandTaskTypeInfo()->~CCommandTaskTypeInfo();
-    gCCommandTaskTypeInfoConstructed = false;
   }
 
   /**
@@ -668,13 +654,12 @@ namespace moho
    * Address: 0x00BD0570 (FUN_00BD0570, sub_BD0570)
    *
    * What it does:
-   * Ensures `CCommandTask` RTTI descriptor storage is preregistered and
-   * schedules process-exit teardown.
+   * Ensures the `CCommandTask` RTTI descriptor is constructed and
+   * preregistered.
    */
-  int register_CCommandTaskTypeInfo()
+  void register_CCommandTaskTypeInfo()
   {
     (void)construct_CCommandTaskTypeInfo();
-    return std::atexit(&cleanup_CCommandTaskTypeInfo);
   }
 } // namespace moho
 
@@ -684,7 +669,7 @@ namespace
   {
     CCommandTaskReflectionBootstrap()
     {
-      (void)moho::register_CCommandTaskTypeInfo();
+      moho::register_CCommandTaskTypeInfo();
     }
   };
 

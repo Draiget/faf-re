@@ -1,7 +1,5 @@
 #include "moho/entity/MotorReflection.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -9,11 +7,6 @@
 
 namespace
 {
-  using TypeInfo = moho::MotorTypeInfo;
-
-  alignas(TypeInfo) unsigned char gMotorTypeInfoStorage[sizeof(TypeInfo)];
-  bool gMotorTypeInfoConstructed = false;
-
   // Address: 0x00BD5930 (FUN_00BD5930, register_MotorSerializer) -- MSVC's
   // own compiler-generated dynamic initializer for this global runs the real
   // `gpg::SerSaveLoadHelper<Motor>` ctor (self-links into `sNewHelpers`,
@@ -24,14 +17,13 @@ namespace
   // ctor: 0x006949F0.
   moho::MotorSerializer gMotorSerializer;
 
-  [[nodiscard]] TypeInfo& GetMotorTypeInfo() noexcept
+  /**
+   * Address: 0x00BFCF00 (FUN_00BFCF00, atexit destructor of the MotorTypeInfo object)
+   */
+  [[nodiscard]] moho::MotorTypeInfo& GetMotorTypeInfo()
   {
-    if (!gMotorTypeInfoConstructed) {
-      new (gMotorTypeInfoStorage) TypeInfo();
-      gMotorTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gMotorTypeInfoStorage);
+    static moho::MotorTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -49,17 +41,6 @@ namespace
     }
     return type;
   }
-
-  void cleanup_MotorTypeInfo_Atexit()
-  {
-    if (!gMotorTypeInfoConstructed) {
-      return;
-    }
-
-    GetMotorTypeInfo().~MotorTypeInfo();
-    gMotorTypeInfoConstructed = false;
-    moho::Motor::sType = nullptr;
-  }
 } // namespace
 
 namespace moho
@@ -76,29 +57,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x006948F0 (FUN_006948F0, MotorTypeInfo non-deleting cleanup body)
+   * Address: 0x006948F0 (FUN_006948F0, MotorTypeInfo non-deleting destructor
+   * body; zero callers)
    *
    * What it does:
-   * Clears reflected base/field vector lanes for one `MotorTypeInfo`
-   * instance while preserving outer storage ownership.
+   * Releases reflected base/field vectors through the `gpg::RType` base.
    */
-  void DestroyMotorTypeInfoBody(MotorTypeInfo* const typeInfo) noexcept
-  {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
-  }
-
-  /**
-   * Address: 0x00BFCF00 (FUN_00BFCF00, Moho::MotorTypeInfo::~MotorTypeInfo)
-   */
-  MotorTypeInfo::~MotorTypeInfo()
-  {
-    DestroyMotorTypeInfoBody(this);
-  }
+  MotorTypeInfo::~MotorTypeInfo() = default;
 
   /**
    * Address: 0x00694880 (FUN_00694880, Moho::MotorTypeInfo::GetName)
@@ -124,7 +89,6 @@ namespace moho
   void register_MotorTypeInfo()
   {
     (void)GetMotorTypeInfo();
-    (void)std::atexit(&cleanup_MotorTypeInfo_Atexit);
   }
 
   /**

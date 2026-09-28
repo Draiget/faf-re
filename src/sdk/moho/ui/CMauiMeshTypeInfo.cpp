@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiMeshTypeInfo) unsigned char gCMauiMeshTypeInfoStorage[sizeof(CMauiMeshTypeInfo)];
-  bool gCMauiMeshTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C030B0 (FUN_00C030B0, atexit destructor of the CMauiMeshTypeInfo object)
+   */
   [[nodiscard]] CMauiMeshTypeInfo& AcquireCMauiMeshTypeInfo()
   {
-    if (!gCMauiMeshTypeInfoConstructed) {
-      new (gCMauiMeshTypeInfoStorage) CMauiMeshTypeInfo();
-      gCMauiMeshTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiMeshTypeInfo*>(gCMauiMeshTypeInfoStorage);
-  }
-
-  void cleanup_CMauiMeshTypeInfo()
-  {
-    if (!gCMauiMeshTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiMeshTypeInfo*>(gCMauiMeshTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiMeshTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiMeshTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CMauiMeshTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDEC10 (FUN_00BDEC10, register_CMauiMeshTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiMesh` type-info object.
+ */
 void moho::register_CMauiMeshTypeInfoStartup()
 {
   (void)AcquireCMauiMeshTypeInfo();
-  (void)std::atexit(&cleanup_CMauiMeshTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

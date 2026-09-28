@@ -110,8 +110,7 @@ namespace moho
    * Address: 0x00BD9030 (FUN_00BD9030, register_IFormationInstanceCountedPtrReflection)
    *
    * What it does:
-   * Ensures the counted-pointer descriptor is constructed and schedules cleanup
-   * at process exit.
+   * Ensures the counted-pointer descriptor is constructed.
    */
   void register_IFormationInstanceCountedPtrReflection();
 } // namespace moho

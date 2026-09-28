@@ -498,7 +498,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RUnitBlueprintGeneralTypeInfo`.
    */
-  int register_RUnitBlueprintGeneralTypeInfo();
+  void register_RUnitBlueprintGeneralTypeInfo();
 
   /**
    * Address: 0x00BC8AB0 (FUN_00BC8AB0, register_RUnitBlueprintDisplayTypeInfo)
@@ -506,7 +506,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RUnitBlueprintDisplayTypeInfo`.
    */
-  int register_RUnitBlueprintDisplayTypeInfo();
+  void register_RUnitBlueprintDisplayTypeInfo();
 
   /**
    * Address: 0x00BC8AD0 (FUN_00BC8AD0, register_RUnitBlueprintPhysicsTypeInfo)
@@ -514,7 +514,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RUnitBlueprintPhysicsTypeInfo`.
    */
-  int register_RUnitBlueprintPhysicsTypeInfo();
+  void register_RUnitBlueprintPhysicsTypeInfo();
 
   /**
    * Address: 0x00BC8AF0 (FUN_00BC8AF0, register_RUnitBlueprintAirTypeInfo)
@@ -522,7 +522,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RUnitBlueprintAirTypeInfo`.
    */
-  int register_RUnitBlueprintAirTypeInfo();
+  void register_RUnitBlueprintAirTypeInfo();
 
   /**
    * Address: 0x00BC8B10 (FUN_00BC8B10, register_RUnitBlueprintTransportTypeInfo)
@@ -530,7 +530,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RUnitBlueprintTransportTypeInfo`.
    */
-  int register_RUnitBlueprintTransportTypeInfo();
+  void register_RUnitBlueprintTransportTypeInfo();
 
   /**
    * Address: 0x00BC8B30 (FUN_00BC8B30, register_RUnitBlueprintAITypeInfo)
@@ -538,7 +538,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RUnitBlueprintAITypeInfo`.
    */
-  int register_RUnitBlueprintAITypeInfo();
+  void register_RUnitBlueprintAITypeInfo();
 
   /**
    * Address: 0x00BC8B70 (FUN_00BC8B70, register_RUnitBlueprintDefenseTypeInfo)
@@ -546,7 +546,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RUnitBlueprintDefenseTypeInfo`.
    */
-  int register_RUnitBlueprintDefenseTypeInfo();
+  void register_RUnitBlueprintDefenseTypeInfo();
 
   /**
    * Address: 0x00BC8B90 (FUN_00BC8B90, register_RUnitBlueprintIntelTypeInfo)
@@ -554,7 +554,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RUnitBlueprintIntelTypeInfo`.
    */
-  int register_RUnitBlueprintIntelTypeInfo();
+  void register_RUnitBlueprintIntelTypeInfo();
 
   /**
    * Address: 0x00BC8BB0 (FUN_00BC8BB0, register_RUnitBlueprintEconomyTypeInfo)
@@ -562,7 +562,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RUnitBlueprintEconomyTypeInfo`.
    */
-  int register_RUnitBlueprintEconomyTypeInfo();
+  void register_RUnitBlueprintEconomyTypeInfo();
 
   /**
    * Address: 0x00BC8BF0 (FUN_00BC8BF0, register_RUnitBlueprintWeaponTypeInfo)
@@ -570,7 +570,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `RUnitBlueprintWeaponTypeInfo`.
    */
-  int register_RUnitBlueprintWeaponTypeInfo();
+  void register_RUnitBlueprintWeaponTypeInfo();
 
   static_assert(sizeof(RUnitBlueprintGeneralTypeInfo) == 0x64, "RUnitBlueprintGeneralTypeInfo size must be 0x64");
   static_assert(sizeof(RUnitBlueprintDisplayTypeInfo) == 0x64, "RUnitBlueprintDisplayTypeInfo size must be 0x64");

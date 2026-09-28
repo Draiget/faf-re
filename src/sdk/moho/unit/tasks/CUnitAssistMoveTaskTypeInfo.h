@@ -91,9 +91,9 @@ namespace moho
    * Address: 0x00BCF250 (FUN_00BCF250, register_CUnitAssistMoveTaskTypeInfo)
    *
    * What it does:
-   * Constructs the global type-info owner and schedules process-exit cleanup.
+   * Constructs the global type-info owner.
    */
-  int register_CUnitAssistMoveTaskTypeInfo();
+  void register_CUnitAssistMoveTaskTypeInfo();
 
   static_assert(sizeof(CUnitAssistMoveTaskTypeInfo) == 0x64, "CUnitAssistMoveTaskTypeInfo size must be 0x64");
 } // namespace moho

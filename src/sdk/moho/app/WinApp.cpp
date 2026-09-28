@@ -88,8 +88,6 @@ namespace
   float wakeupTimerDur = kInfiniteWakeupMs;
   std::once_flag sSymHandlerMutexInitOnce;
   boost::mutex* sMutexSymHandler = nullptr;
-  bool sSymHandlerMutexConstructed = false;
-  std::aligned_storage_t<sizeof(boost::mutex), alignof(boost::mutex)> sSymHandlerMutexStorage{};
   bool sMohoEngineMuexInitialized = false;
   bool sSymbolHandlerInitialized = false;
   constexpr DWORD kPlatformSymbolHandlerOptions =
@@ -1977,45 +1975,18 @@ namespace
     return ::CallNextHookEx(sWindowHook, code, wParam, lParam);
   }
 
-  [[nodiscard]]
-  boost::mutex* GetSymHandlerMutexStorage()
-  {
-    return reinterpret_cast<boost::mutex*>(&sSymHandlerMutexStorage);
-  }
-
-  /**
-   * Address: 0x00BF02B0 (FUN_00BF02B0, ??1sMutexSymHandler@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * `atexit` callback for the lazily-constructed symbol-handler mutex storage.
-   */
-  void DestroySymHandlerMutexAtProcessExit()
-  {
-    if (!sSymHandlerMutexConstructed) {
-      return;
-    }
-
-    GetSymHandlerMutexStorage()->~mutex();
-    sSymHandlerMutexConstructed = false;
-    sMutexSymHandler = nullptr;
-  }
-
   /**
    * Address: 0x004A1E20 (FUN_004A1E20, Moho::InitSymHandlerMutex)
+   * Address: 0x00BF02B0 (FUN_00BF02B0, atexit destructor of InitSymHandlerMutex's static mutex)
    *
    * What it does:
-   * Lazily constructs process-global symbol-handler mutex storage and installs
-   * its process-exit destructor callback.
+   * Constructs the process-global symbol-handler mutex once and publishes it
+   * through `sMutexSymHandler`.
    */
   void InitSymHandlerMutex()
   {
-    if (!sSymHandlerMutexConstructed) {
-      new (&sSymHandlerMutexStorage) boost::mutex();
-      sSymHandlerMutexConstructed = true;
-      (void)std::atexit(&DestroySymHandlerMutexAtProcessExit);
-    }
-
-    sMutexSymHandler = GetSymHandlerMutexStorage();
+    static boost::mutex sMutex;
+    sMutexSymHandler = &sMutex;
   }
 
   [[nodiscard]]
@@ -2603,18 +2574,30 @@ void moho::register_wakeupTimer()
   wakeupTimerDur = kInfiniteWakeupMs;
 }
 
-moho::CTaskStage* moho::WIN_GetBeforeEventsStage()
+/**
+ * Address: 0x004F2480 (FUN_004F2480, ?WIN_GetBeforeEventsStage@Moho@@YAAAVCTaskStage@1@XZ)
+ * Address: 0x00BF1860 (FUN_00BF1860, atexit destructor of the stage)
+ *
+ * What it does:
+ * Returns the task stage run before each frame's window events (0x011043CC).
+ */
+moho::CTaskStage& moho::WIN_GetBeforeEventsStage()
 {
-  // 0x011043CC
-  static CTaskStage sBeforeEventsStage{};
-  return &sBeforeEventsStage;
+  static CTaskStage sBeforeEventsStage;
+  return sBeforeEventsStage;
 }
 
-moho::CTaskStage* moho::WIN_GetBeforeWaitStage()
+/**
+ * Address: 0x004F24F0 (FUN_004F24F0, ?WIN_GetBeforeWaitStage@Moho@@YAAAVCTaskStage@1@XZ)
+ * Address: 0x00BF1870 (FUN_00BF1870, atexit destructor of the stage)
+ *
+ * What it does:
+ * Returns the task stage run before each frame's idle wait (0x011043B4).
+ */
+moho::CTaskStage& moho::WIN_GetBeforeWaitStage()
 {
-  // 0x011043B4
-  static CTaskStage sBeforeWaitStage{};
-  return &sBeforeWaitStage;
+  static CTaskStage sBeforeWaitStage;
+  return sBeforeWaitStage;
 }
 
 /**
@@ -2770,7 +2753,7 @@ void moho::WIN_AppExecute(IWinApp* const app)
   for (;;) {
     while (acceptNewEvent) {
       ::SleepEx(0, TRUE);
-      WIN_GetBeforeEventsStage()->UserFrame();
+      WIN_GetBeforeEventsStage().UserFrame();
       acceptNewEvent = false;
     }
 
@@ -2793,7 +2776,7 @@ void moho::WIN_AppExecute(IWinApp* const app)
     success = true;
     acceptNewEvent = true;
 
-    WIN_GetBeforeWaitStage()->UserFrame();
+    WIN_GetBeforeWaitStage().UserFrame();
 
     const DWORD timeoutMs = ComputeWaitTimeoutMs();
     wakeupTimerDur = kInfiniteWakeupMs;

@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiBitmapTypeInfo) unsigned char gCMauiBitmapTypeInfoStorage[sizeof(CMauiBitmapTypeInfo)];
-  bool gCMauiBitmapTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02AB0 (FUN_00C02AB0, atexit destructor of the CMauiBitmapTypeInfo object)
+   */
   [[nodiscard]] CMauiBitmapTypeInfo& AcquireCMauiBitmapTypeInfo()
   {
-    if (!gCMauiBitmapTypeInfoConstructed) {
-      new (gCMauiBitmapTypeInfoStorage) CMauiBitmapTypeInfo();
-      gCMauiBitmapTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiBitmapTypeInfo*>(gCMauiBitmapTypeInfoStorage);
-  }
-
-  void cleanup_CMauiBitmapTypeInfo()
-  {
-    if (!gCMauiBitmapTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiBitmapTypeInfo*>(gCMauiBitmapTypeInfoStorage);
-    typeInfo.~CMauiBitmapTypeInfo();
-    gCMauiBitmapTypeInfoConstructed = false;
+    static CMauiBitmapTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiBitmapTypeInfoBootstrap
@@ -115,14 +102,15 @@ void CMauiBitmapTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDD9D0 (FUN_00BDD9D0, register_CMauiBitmapTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiBitmap` type-info object.
+ */
 void moho::register_CMauiBitmapTypeInfoStartup()
 {
-  if (gCMauiBitmapTypeInfoConstructed) {
-    return;
-  }
-
   (void)AcquireCMauiBitmapTypeInfo();
-  (void)std::atexit(&cleanup_CMauiBitmapTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

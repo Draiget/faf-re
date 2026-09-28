@@ -136,26 +136,13 @@ namespace
     return false;
   }
 
-  alignas(moho::CRotateManipulatorTypeInfo)
-  unsigned char gCRotateManipulatorTypeInfoStorage[sizeof(moho::CRotateManipulatorTypeInfo)] = {};
-  bool gCRotateManipulatorTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFB100 (FUN_00BFB100, atexit destructor of the CRotateManipulatorTypeInfo object)
+   */
   [[nodiscard]] moho::CRotateManipulatorTypeInfo* AcquireCRotateManipulatorTypeInfo()
   {
-    if (!gCRotateManipulatorTypeInfoConstructed) {
-      new (gCRotateManipulatorTypeInfoStorage) moho::CRotateManipulatorTypeInfo();
-      gCRotateManipulatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CRotateManipulatorTypeInfo*>(gCRotateManipulatorTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::CRotateManipulatorTypeInfo* PeekCRotateManipulatorTypeInfo() noexcept
-  {
-    if (!gCRotateManipulatorTypeInfoConstructed) {
-      return nullptr;
-    }
-    return reinterpret_cast<moho::CRotateManipulatorTypeInfo*>(gCRotateManipulatorTypeInfoStorage);
+    static moho::CRotateManipulatorTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -172,28 +159,22 @@ namespace
     return typeInfo;
   }
 
-  void cleanup_CRotateManipulatorTypeInfo()
-  {
-    moho::CRotateManipulatorTypeInfo* const typeInfo = PeekCRotateManipulatorTypeInfo();
-    if (!typeInfo) {
-      return;
-    }
-
-    typeInfo->~CRotateManipulatorTypeInfo();
-    gCRotateManipulatorTypeInfoConstructed = false;
-  }
-
-  int register_CRotateManipulatorTypeInfoStartup()
+  /**
+   * Address: 0x00BD2FF0 (FUN_00BD2FF0, register_CRotateManipulatorTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs and preregisters the `CRotateManipulator` type-info object.
+   */
+  void register_CRotateManipulatorTypeInfoStartup()
   {
     (void)preregister_CRotateManipulatorTypeInfo();
-    return std::atexit(&cleanup_CRotateManipulatorTypeInfo);
   }
 
   struct CRotateManipulatorTypeInfoStartupBootstrap
   {
     CRotateManipulatorTypeInfoStartupBootstrap()
     {
-      (void)register_CRotateManipulatorTypeInfoStartup();
+      register_CRotateManipulatorTypeInfoStartup();
     }
   };
 

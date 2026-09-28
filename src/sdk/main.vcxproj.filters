@@ -1761,9 +1761,6 @@
     <ClCompile Include="lua\LuaStateTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="lua\LuaTypeInfoRegistration.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\client\Localization.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3349,9 +3346,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaParser.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lua\LuaTypeInfoStorage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaUndump.h">

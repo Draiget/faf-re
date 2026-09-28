@@ -83,7 +83,7 @@ namespace moho
    * Address: 0x00BD4DF0 (FUN_00BD4DF0, register_WeakPtr_UnitWeapon_Type_AtExit)
    *
    * What it does:
-   * Registers `WeakPtr<UnitWeapon>` reflection and installs process-exit teardown.
+   * Registers `WeakPtr<UnitWeapon>` reflection.
    */
   void register_WeakPtr_UnitWeapon_Type_AtExit();
 } // namespace moho

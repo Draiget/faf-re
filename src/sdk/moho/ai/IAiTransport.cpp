@@ -311,12 +311,6 @@ namespace
   using ReservedTransportBoneVectorType = gpg::RVectorType_SAiReservedTransportBone;
   using AttachPointVectorType = gpg::RVectorType_SAttachPoint;
 
-  struct CachedTypeName
-  {
-    msvc8::string value;
-    bool initialized = false;
-  };
-
   using IntVector = msvc8::vector<int>;
   using ReservedTransportBoneVector = msvc8::vector<moho::SAiReservedTransportBone>;
   using AttachPointVector = msvc8::vector<moho::SAttachPoint>;
@@ -399,36 +393,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] CachedTypeName& CachedBroadcasterEAiTransportEventTypeName()
-  {
-    static CachedTypeName cache{};
-    return cache;
-  }
-
-  [[nodiscard]] CachedTypeName& CachedListenerEAiTransportEventTypeName()
-  {
-    static CachedTypeName cache{};
-    return cache;
-  }
-
-  [[nodiscard]] CachedTypeName& CachedRVectorTypeIntName()
-  {
-    static CachedTypeName cache{};
-    return cache;
-  }
-
-  [[nodiscard]] CachedTypeName& CachedRVectorTypeSAiReservedTransportBoneName()
-  {
-    static CachedTypeName cache{};
-    return cache;
-  }
-
-  [[nodiscard]] CachedTypeName& CachedRVectorTypeSAttachPointName()
-  {
-    static CachedTypeName cache{};
-    return cache;
-  }
-
   template <class TObject>
   [[nodiscard]] TObject* PointerFromArchiveInt(const int objectPtr)
   {
@@ -448,61 +412,20 @@ namespace
     const int size = vec ? static_cast<int>(vec->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
   }
-
-  void cleanup_RBroadcasterRType_EAiTransportEvent_GetName()
-  {
-    CachedTypeName& cache = CachedBroadcasterEAiTransportEventTypeName();
-    cache.value = msvc8::string{};
-    cache.initialized = false;
-  }
-
-  void cleanup_RListenerRType_EAiTransportEvent_GetName()
-  {
-    CachedTypeName& cache = CachedListenerEAiTransportEventTypeName();
-    cache.value = msvc8::string{};
-    cache.initialized = false;
-  }
-
-  void cleanup_RVectorType_int_GetName()
-  {
-    CachedTypeName& cache = CachedRVectorTypeIntName();
-    cache.value = msvc8::string{};
-    cache.initialized = false;
-  }
-
-  void cleanup_RVectorType_SAiReservedTransportBone_GetName()
-  {
-    CachedTypeName& cache = CachedRVectorTypeSAiReservedTransportBoneName();
-    cache.value = msvc8::string{};
-    cache.initialized = false;
-  }
-
-  void cleanup_RVectorType_SAttachPoint_GetName()
-  {
-    CachedTypeName& cache = CachedRVectorTypeSAttachPointName();
-    cache.value = msvc8::string{};
-    cache.initialized = false;
-  }
 } // namespace
 
 /**
  * Address: 0x005E8C00 (FUN_005E8C00, Moho::RBroadcasterRType_EAiTransportEvent::GetName)
+ * Address: 0x00BF8D60 (FUN_00BF8D60, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the runtime type name
- * `Broadcaster<EAiTransportEvent>` using the registered enum type name.
+ * Builds the runtime type name `Broadcaster<EAiTransportEvent>` once from the
+ * registered enum type name and returns it.
  */
 const char* moho::RBroadcasterRType_EAiTransportEvent::GetName() const
 {
-  CachedTypeName& cache = CachedBroadcasterEAiTransportEventTypeName();
-  if (!cache.initialized) {
-    cache.initialized = true;
-    gpg::RType* const eventType = ResolveEAiTransportEventType();
-    const char* const eventTypeName = eventType ? eventType->GetName() : "EAiTransportEvent";
-    cache.value = gpg::STR_Printf("Broadcaster<%s>", eventTypeName ? eventTypeName : "EAiTransportEvent");
-    (void)std::atexit(&cleanup_RBroadcasterRType_EAiTransportEvent_GetName);
-  }
-  return cache.value.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", ResolveEAiTransportEventType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -569,22 +492,16 @@ void moho::RBroadcasterRType_EAiTransportEvent::SerSave(
 
 /**
  * Address: 0x005E8CC0 (FUN_005E8CC0, Moho::RListenerRType_EAiTransportEvent::GetName)
+ * Address: 0x00BF8D30 (FUN_00BF8D30, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the runtime type name
- * `Listener<EAiTransportEvent>` using the registered enum type name.
+ * Builds the runtime type name `Listener<EAiTransportEvent>` once from the
+ * registered enum type name and returns it.
  */
 const char* moho::RListenerRType_EAiTransportEvent::GetName() const
 {
-  CachedTypeName& cache = CachedListenerEAiTransportEventTypeName();
-  if (!cache.initialized) {
-    cache.initialized = true;
-    gpg::RType* const eventType = ResolveEAiTransportEventType();
-    const char* const eventTypeName = eventType ? eventType->GetName() : "EAiTransportEvent";
-    cache.value = gpg::STR_Printf("Listener<%s>", eventTypeName ? eventTypeName : "EAiTransportEvent");
-    (void)std::atexit(&cleanup_RListenerRType_EAiTransportEvent_GetName);
-  }
-  return cache.value.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", ResolveEAiTransportEventType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -632,22 +549,16 @@ gpg::RVectorType_int::~RVectorType_int() = default;
 
 /**
  * Address: 0x005E8D70 (FUN_005E8D70, gpg::RVectorType_int::GetName)
+ * Address: 0x00BF8D00 (FUN_00BF8D00, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the runtime type name `vector<int>` using the
- * currently registered `int` reflection type.
+ * Builds the runtime type name `vector<int>` once from the registered `int`
+ * reflection type and returns it.
  */
 const char* gpg::RVectorType_int::GetName() const
 {
-  CachedTypeName& cache = CachedRVectorTypeIntName();
-  if (!cache.initialized) {
-    cache.initialized = true;
-    const gpg::RType* const elementType = ResolveIntType();
-    const char* const elementName = elementType ? elementType->GetName() : "int";
-    cache.value = gpg::STR_Printf("vector<%s>", elementName ? elementName : "int");
-    (void)std::atexit(&cleanup_RVectorType_int_GetName);
-  }
-  return cache.value.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveIntType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -784,22 +695,16 @@ gpg::RVectorType_SAiReservedTransportBone::~RVectorType_SAiReservedTransportBone
 
 /**
  * Address: 0x005E8FE0 (FUN_005E8FE0, gpg::RVectorType_SAiReservedTransportBone::GetName)
+ * Address: 0x00BF8CD0 (FUN_00BF8CD0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the runtime type name for
- * `vector<SAiReservedTransportBone>`.
+ * Builds the runtime type name for `vector<SAiReservedTransportBone>` once
+ * and returns it.
  */
 const char* gpg::RVectorType_SAiReservedTransportBone::GetName() const
 {
-  CachedTypeName& cache = CachedRVectorTypeSAiReservedTransportBoneName();
-  if (!cache.initialized) {
-    cache.initialized = true;
-    const gpg::RType* const elementType = ResolveReservedTransportBoneType();
-    const char* const elementName = elementType ? elementType->GetName() : "SAiReservedTransportBone";
-    cache.value = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SAiReservedTransportBone");
-    (void)std::atexit(&cleanup_RVectorType_SAiReservedTransportBone_GetName);
-  }
-  return cache.value.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveReservedTransportBoneType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -965,21 +870,15 @@ gpg::RVectorType_SAttachPoint::~RVectorType_SAttachPoint() = default;
 
 /**
  * Address: 0x005E9250 (FUN_005E9250, gpg::RVectorType_SAttachPoint::GetName)
+ * Address: 0x00BF8CA0 (FUN_00BF8CA0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the runtime type name for `vector<SAttachPoint>`.
+ * Builds the runtime type name for `vector<SAttachPoint>` once and returns it.
  */
 const char* gpg::RVectorType_SAttachPoint::GetName() const
 {
-  CachedTypeName& cache = CachedRVectorTypeSAttachPointName();
-  if (!cache.initialized) {
-    cache.initialized = true;
-    const gpg::RType* const elementType = ResolveAttachPointType();
-    const char* const elementName = elementType ? elementType->GetName() : "SAttachPoint";
-    cache.value = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SAttachPoint");
-    (void)std::atexit(&cleanup_RVectorType_SAttachPoint_GetName);
-  }
-  return cache.value.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveAttachPointType()->GetName());
+  return sName.c_str();
 }
 
 /**

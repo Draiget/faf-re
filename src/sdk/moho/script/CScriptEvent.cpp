@@ -43,52 +43,22 @@ using namespace moho;
 
 namespace
 {
-  alignas(moho::CScriptEventTypeInfo) std::byte gCScriptEventTypeInfoStorage[sizeof(moho::CScriptEventTypeInfo)]{};
-  bool gCScriptEventTypeInfoConstructed = false;
-
   // Address: 0x010A8D04 -- process-global `CScriptEventSerializer` singleton.
   moho::CScriptEventSerializer gCScriptEventSerializer;
 
-  [[nodiscard]] moho::CScriptEventTypeInfo& CScriptEventTypeInfoSlot()
-  {
-    return *reinterpret_cast<moho::CScriptEventTypeInfo*>(gCScriptEventTypeInfoStorage);
-  }
-
   /**
    * Address: 0x004CA110 (FUN_004CA110, CScriptEvent startup type-info pre-registration)
+   * Address: 0x00BF0B20 (FUN_00BF0B20, atexit destructor of the CScriptEventTypeInfo object)
    *
    * What it does:
-   * Materializes one startup `CScriptEventTypeInfo` storage lane and
-   * pre-registers reflected metadata for `typeid(CScriptEvent)`.
+   * Materializes the startup `CScriptEventTypeInfo` object and pre-registers
+   * reflected metadata for `typeid(CScriptEvent)`.
    */
   [[nodiscard]] gpg::RType* PreRegisterCScriptEventTypeInfo()
   {
-    if (!gCScriptEventTypeInfoConstructed) {
-      ::new (static_cast<void*>(&CScriptEventTypeInfoSlot())) moho::CScriptEventTypeInfo();
-      gCScriptEventTypeInfoConstructed = true;
-    }
-
-    gpg::PreRegisterRType(typeid(CScriptEvent), &CScriptEventTypeInfoSlot());
-    return &CScriptEventTypeInfoSlot();
-  }
-
-  /**
-   * Address: 0x00BF0B20 (FUN_00BF0B20, CScriptEvent type-info cleanup at exit)
-   *
-   * What it does:
-   * Releases dynamic field/base arrays from startup CScriptEvent type-info
-   * storage and tears down placement-constructed type metadata.
-   */
-  void CleanupCScriptEventTypeInfoAtExit()
-  {
-    if (!gCScriptEventTypeInfoConstructed) {
-      return;
-    }
-
-    CScriptEventTypeInfoSlot().fields_ = msvc8::vector<gpg::RField>{};
-    CScriptEventTypeInfoSlot().bases_ = msvc8::vector<gpg::RField>{};
-    CScriptEventTypeInfoSlot().~CScriptEventTypeInfo();
-    gCScriptEventTypeInfoConstructed = false;
+    static moho::CScriptEventTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(CScriptEvent), &sInstance);
+    return &sInstance;
   }
 
   gpg::RType* CachedCScriptEventType()
@@ -3022,17 +2992,11 @@ void CScriptEventSerializer::Init()
  * Address: 0x00BC6220 (FUN_00BC6220, CScriptEvent startup type-info registration)
  *
  * What it does:
- * Pre-registers `CScriptEvent` reflected type descriptor and schedules
- * teardown of startup type-info storage at process exit.
+ * Pre-registers `CScriptEvent` reflected type descriptor.
  */
 void moho::register_CScriptEventTypeInfo()
 {
-  static const bool kRegistered = []() {
-    (void)PreRegisterCScriptEventTypeInfo();
-    (void)std::atexit(&CleanupCScriptEventTypeInfoAtExit);
-    return true;
-  }();
-  (void)kRegistered;
+  (void)PreRegisterCScriptEventTypeInfo();
 }
 
 /**

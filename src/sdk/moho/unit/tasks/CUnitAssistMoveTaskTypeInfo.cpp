@@ -2,7 +2,6 @@
 
 #include "moho/unit/tasks/CUnitAssistMoveTask.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -13,30 +12,14 @@ namespace
 {
   using TypeInfo = moho::CUnitAssistMoveTaskTypeInfo;
 
-  alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
-  bool gTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF8F90 (FUN_00BF8F90, atexit destructor of the CUnitAssistMoveTaskTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gTypeInfoConstructed) {
-      new (gTypeInfoStorage) TypeInfo();
-      gTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
-
-  void cleanup()
-  {
-    if (!gTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CUnitAssistMoveTaskTypeInfo();
-    gTypeInfoConstructed = false;
-  }
-
-
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
@@ -189,10 +172,9 @@ namespace moho
   /**
    * Address: 0x00BCF250 (FUN_00BCF250, register_CUnitAssistMoveTaskTypeInfo)
    */
-  int register_CUnitAssistMoveTaskTypeInfo()
+  void register_CUnitAssistMoveTaskTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup);
   }
 } // namespace moho
 

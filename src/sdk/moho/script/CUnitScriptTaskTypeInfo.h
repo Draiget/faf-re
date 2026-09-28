@@ -71,19 +71,10 @@ namespace moho
   [[nodiscard]] gpg::RType* register_CUnitScriptTaskTypeInfo();
 
   /**
-   * Address: 0x00BFA410 (FUN_00BFA410)
-   *
-   * What it does:
-   * Clears preregistered CUnitScriptTask typeinfo base/field vectors for
-   * process teardown.
-   */
-  void cleanup_CUnitScriptTaskTypeInfo();
-
-  /**
    * Address: 0x00BD1960 (FUN_00BD1960)
    *
    * What it does:
-   * Registers CUnitScriptTask typeinfo and schedules process-exit cleanup.
+   * Registers CUnitScriptTask typeinfo at startup.
    */
-  int register_CUnitScriptTaskTypeInfo_AtExit();
+  void register_CUnitScriptTaskTypeInfo_AtExit();
 } // namespace moho

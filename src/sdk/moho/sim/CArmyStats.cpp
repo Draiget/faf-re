@@ -416,38 +416,21 @@ namespace moho
   namespace
   {
     /**
-     * Static `RPointerType<CArmyStatItem>` descriptor that the binary exposes
-     * as `Moho::CArmyStatItem::PointerType`. Default static-init runs the
-     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane.
-     */
-    gpg::RPointerType<moho::CArmyStatItem> sCArmyStatItemPointerTypeStorage{};
-
-    /**
      * Address: 0x007116C0 (FUN_007116C0)
+     * Address: 0x00BFF9A0 (FUN_00BFF9A0, atexit destructor of the RPointerType<CArmyStatItem> object)
      *
      * What it does:
-     * Pre-registers the static `RPointerType<CArmyStatItem>` descriptor under
-     * the `CArmyStatItem*` type-info key so subsequent `LookupRType` queries
-     * from the lazy `GetPointerType` lane resolve to this descriptor.
+     * Constructs the `RPointerType<CArmyStatItem>` descriptor once and
+     * preregisters it under the `CArmyStatItem*` type-info key. The binary
+     * holds the descriptor as a function-local static of `GetPointerType`; it
+     * lives here because the preregister phase has to construct it before any
+     * consumer looks up `CArmyStatItem*`.
      */
-    void PreregisterCArmyStatItemPointerType()
+    gpg::RType* PreregisterCArmyStatItemPointerType()
     {
-      gpg::PreRegisterRType(typeid(moho::CArmyStatItem*), &sCArmyStatItemPointerTypeStorage);
-    }
-
-    /**
-     * Address: 0x00BFF9A0 (FUN_00BFF9A0)
-     *
-     * What it does:
-     * Tears down the static `RPointerType<CArmyStatItem>` descriptor at process
-     * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
-     * RType vftable lane to the `RObject` base. Registered via `atexit` from
-     * `GetPointerType`'s once-init path.
-     */
-    void CleanupCArmyStatItemPointerType()
-    {
-      sCArmyStatItemPointerTypeStorage.~RPointerType<moho::CArmyStatItem>();
+      static gpg::RPointerType<moho::CArmyStatItem> sDescriptor;
+      gpg::PreRegisterRType(typeid(moho::CArmyStatItem*), &sDescriptor);
+      return &sDescriptor;
     }
   } // namespace
 
@@ -455,21 +438,15 @@ namespace moho
    * Address: 0x007107E0 (FUN_007107E0, Moho::CArmyStatItem::GetPointerType)
    *
    * What it does:
-   * On first call, pre-registers the static `RPointerType<CArmyStatItem>`
-   * descriptor and installs the matching atexit teardown. After that, lazily
-   * caches the `LookupRType(typeid(CArmyStatItem*))` result in `sPointerType`
-   * and returns it.
+   * On first call, constructs and pre-registers the static
+   * `RPointerType<CArmyStatItem>` descriptor. After that, lazily caches the
+   * `LookupRType(typeid(CArmyStatItem*))` result in `sPointerType` and
+   * returns it.
    */
   gpg::RType* CArmyStatItem::GetPointerType()
   {
-    static const bool sOnceInit = []() {
-      PreregisterCArmyStatItemPointerType();
-      (void)std::atexit(&CleanupCArmyStatItemPointerType);
-      return true;
-    }();
+    static const bool sOnceInit = (PreregisterCArmyStatItemPointerType(), true);
     (void)sOnceInit;
-
-    (void)StaticGetClass();
 
     gpg::RType* cached = sPointerType;
     if (!cached) {

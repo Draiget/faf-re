@@ -27,26 +27,13 @@ namespace
     return type;
   }
 
-  alignas(moho::CRandomStreamTypeInfo) std::byte gCRandomStreamTypeInfoStorage[sizeof(moho::CRandomStreamTypeInfo)]{};
-  bool gCRandomStreamTypeInfoInitialized = false;
-
-  [[nodiscard]] moho::CRandomStreamTypeInfo& CRandomStreamTypeInfoSlot()
-  {
-    return *reinterpret_cast<moho::CRandomStreamTypeInfo*>(gCRandomStreamTypeInfoStorage);
-  }
-
   /**
-   * Address: 0x00BEE720 (FUN_00BEE720, ??1CRandomStreamTypeInfo@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Executes process-exit teardown for CRandomStream type-info startup storage.
+   * Address: 0x00BEE720 (FUN_00BEE720, atexit destructor of the CRandomStreamTypeInfo object)
    */
-  void cleanup_CRandomStreamTypeInfo()
+  [[nodiscard]] moho::CRandomStreamTypeInfo* AcquireCRandomStreamTypeInfo()
   {
-    if (gCRandomStreamTypeInfoInitialized) {
-      CRandomStreamTypeInfoSlot().~CRandomStreamTypeInfo();
-      gCRandomStreamTypeInfoInitialized = false;
-    }
+    static moho::CRandomStreamTypeInfo sInstance;
+    return &sInstance;
   }
 } // namespace
 
@@ -56,16 +43,11 @@ namespace moho
    * Address: 0x00BC3360 (FUN_00BC3360, register_CRandomStreamTypeInfo)
    *
    * What it does:
-   * Startup thunk that materializes CRandomStream type-info storage and
-   * registers its process-exit destructor.
+   * Startup thunk that constructs the CRandomStream type-info object.
    */
   void register_CRandomStreamTypeInfo()
   {
-    if (!gCRandomStreamTypeInfoInitialized) {
-      new (&CRandomStreamTypeInfoSlot()) CRandomStreamTypeInfo();
-      gCRandomStreamTypeInfoInitialized = true;
-    }
-    (void)std::atexit(&cleanup_CRandomStreamTypeInfo);
+    (void)AcquireCRandomStreamTypeInfo();
   }
 
   /**

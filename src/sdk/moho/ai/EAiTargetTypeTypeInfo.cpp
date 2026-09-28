@@ -12,18 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(EAiTargetTypeTypeInfo) unsigned char gEAiTargetTypeTypeInfoStorage[sizeof(EAiTargetTypeTypeInfo)];
-  bool gEAiTargetTypeTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF8870 (FUN_00BF8870, atexit destructor of the EAiTargetTypeTypeInfo object)
+   */
   [[nodiscard]] EAiTargetTypeTypeInfo* AcquireEAiTargetTypeTypeInfo()
   {
-    if (!gEAiTargetTypeTypeInfoConstructed) {
-      auto* const typeInfo = new (gEAiTargetTypeTypeInfoStorage) EAiTargetTypeTypeInfo();
-      gpg::PreRegisterRType(typeid(EAiTargetType), typeInfo);
-      gEAiTargetTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<EAiTargetTypeTypeInfo*>(gEAiTargetTypeTypeInfoStorage);
+    static EAiTargetTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -34,23 +29,9 @@ namespace
    */
   [[nodiscard]] gpg::REnumType* preregister_EAiTargetTypeTypeInfo()
   {
-    return AcquireEAiTargetTypeTypeInfo();
-  }
-
-  /**
-   * Address: 0x00BF8870 (FUN_00BF8870, sub_BF8870)
-   *
-   * What it does:
-   * Tears down recovered static `EAiTargetTypeTypeInfo` storage.
-   */
-  void cleanup_EAiTargetTypeTypeInfo()
-  {
-    if (!gEAiTargetTypeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEAiTargetTypeTypeInfo()->~EAiTargetTypeTypeInfo();
-    gEAiTargetTypeTypeInfoConstructed = false;
+    EAiTargetTypeTypeInfo* const typeInfo = AcquireEAiTargetTypeTypeInfo();
+    gpg::PreRegisterRType(typeid(EAiTargetType), typeInfo);
+    return typeInfo;
   }
 
   // Address: 0x010B049C -- process-global `PrimitiveSerHelper<EAiTargetType,int>`
@@ -107,12 +88,11 @@ void EAiTargetTypeTypeInfo::Init()
  * Address: 0x00BCEBD0 (FUN_00BCEBD0, register_EAiTargetTypeTypeInfo)
  *
  * What it does:
- * Registers `EAiTargetType` enum type-info and installs process-exit cleanup.
+ * Registers `EAiTargetType` enum type-info.
  */
-int moho::register_EAiTargetTypeTypeInfo()
+void moho::register_EAiTargetTypeTypeInfo()
 {
   (void)preregister_EAiTargetTypeTypeInfo();
-  return std::atexit(&cleanup_EAiTargetTypeTypeInfo);
 }
 
 namespace
@@ -121,7 +101,7 @@ namespace
   {
     EAiTargetTypeTypeInfoBootstrap()
     {
-      (void)moho::register_EAiTargetTypeTypeInfo();
+      moho::register_EAiTargetTypeTypeInfo();
     }
   };
 

@@ -1071,10 +1071,6 @@ namespace
     static_cast<moho::CEntityDb*>(objectStorage)->~CEntityDb();
   }
 
-  extern msvc8::string gEntityDbIdPoolMapTypeName;
-  extern std::uint32_t gEntityDbIdPoolMapTypeNameInitGuard;
-  void cleanup_EntityDbIdPoolMapTypeName();
-
   /**
    * Shared `IdPool` RTTI cache lookup, used by `EntityDbIdPoolMapTypeInfo::
    * GetName`/`SerLoad`/`SerSave` (all three resolve the same element type).
@@ -1089,10 +1085,6 @@ namespace
     return type;
   }
 
-  extern msvc8::string gEntityDbEntityListTypeName;
-  extern std::uint32_t gEntityDbEntityListTypeNameInitGuard;
-  void cleanup_EntityDbEntityListTypeName();
-
   class EntityDbIdPoolMapTypeInfo final : public gpg::RType
   {
   public:
@@ -1103,26 +1095,18 @@ namespace
 
     /**
      * Address: 0x00685C80 (FUN_00685C80, gpg::RMapType_uint_IdPool::GetName)
+     * Address: 0x00BFCB90 (FUN_00BFCB90, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Builds/caches one lexical map type label from runtime key/value RTTI
-     * names and returns `"map<key,value>"`.
+     * Builds `map<unsigned int,IdPool>` once from the key/value RTTI names
+     * and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if ((gEntityDbIdPoolMapTypeNameInitGuard & 1u) == 0u) {
-        gEntityDbIdPoolMapTypeNameInitGuard |= 1u;
-
-        gpg::RType* const valueType = CachedIdPoolElementType();
-        gpg::RType* keyType = gpg::LookupRType(typeid(unsigned int));
-        const char* const keyName = keyType != nullptr ? keyType->GetName() : "unsigned int";
-        const char* const valueName = valueType != nullptr ? valueType->GetName() : "Moho::IdPool";
-
-        gEntityDbIdPoolMapTypeName = gpg::STR_Printf("map<%s,%s>", keyName, valueName);
-        (void)std::atexit(&cleanup_EntityDbIdPoolMapTypeName);
-      }
-
-      return gEntityDbIdPoolMapTypeName.c_str();
+      static const msvc8::string sName = gpg::STR_Printf(
+        "map<%s,%s>", gpg::LookupRType(typeid(unsigned int))->GetName(), CachedIdPoolElementType()->GetName()
+      );
+      return sName.c_str();
     }
 
     /**
@@ -1291,23 +1275,16 @@ namespace
 
     /**
      * Address: 0x00685DF0 (FUN_00685DF0, gpg::RListType_EntityP::GetName)
+     * Address: 0x00BFCB60 (FUN_00BFCB60, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Builds/caches one lexical list type label from runtime `Entity*` RTTI
-     * and returns `"list<value>"`.
+     * Builds `list<Entity *>` once from the `Entity*` pointer RTTI name and
+     * returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if ((gEntityDbEntityListTypeNameInitGuard & 1u) == 0u) {
-        gEntityDbEntityListTypeNameInitGuard |= 1u;
-
-        gpg::RType* const valueType = gpg::LookupRType(typeid(moho::Entity*));
-        const char* const valueName = valueType != nullptr ? valueType->GetName() : "Entity *";
-        gEntityDbEntityListTypeName = gpg::STR_Printf("list<%s>", valueName ? valueName : "Entity *");
-        (void)std::atexit(&cleanup_EntityDbEntityListTypeName);
-      }
-
-      return gEntityDbEntityListTypeName.c_str();
+      static const msvc8::string sName = gpg::STR_Printf("list<%s>", moho::Entity::GetPointerType()->GetName());
+      return sName.c_str();
     }
 
     /**
@@ -1428,35 +1405,6 @@ namespace
       (void)gpg::RRef_Entity(&entityRef, entity);
       gpg::WriteRawPointer(archive, entityRef, gpg::TrackedPointerState::Unowned, owner);
     }
-  }
-
-  msvc8::string gEntityDbIdPoolMapTypeName{};
-  std::uint32_t gEntityDbIdPoolMapTypeNameInitGuard = 0u;
-  msvc8::string gEntityDbEntityListTypeName{};
-  std::uint32_t gEntityDbEntityListTypeNameInitGuard = 0u;
-
-  /**
-   * Address: 0x00BFCB90 (FUN_00BFCB90)
-   *
-   * What it does:
-   * Releases cached lexical storage for `gpg::RMapType_uint_IdPool::GetName`.
-   */
-  void cleanup_EntityDbIdPoolMapTypeName()
-  {
-    gEntityDbIdPoolMapTypeName.clear();
-    gEntityDbIdPoolMapTypeNameInitGuard = 0u;
-  }
-
-  /**
-   * Address: 0x00685DF0 (FUN_00685DF0, gpg::RListType_EntityP::GetName)
-   *
-   * What it does:
-   * Releases cached lexical storage for `gpg::RListType_EntityP::GetName`.
-   */
-  void cleanup_EntityDbEntityListTypeName()
-  {
-    gEntityDbEntityListTypeName.clear();
-    gEntityDbEntityListTypeNameInitGuard = 0u;
   }
 
   /**

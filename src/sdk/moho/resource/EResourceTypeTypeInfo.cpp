@@ -1,19 +1,19 @@
 ﻿#include "moho/resource/EResourceTypeTypeInfo.h"
 
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(moho::EResourceTypeTypeInfo) unsigned char gEResourceTypeTypeInfoStorage[sizeof(moho::EResourceTypeTypeInfo)];
-
-  void CleanupEResourceTypeTypeInfoAtexit()
+  /**
+   * Address: 0x00BF4190 (FUN_00BF4190, atexit destructor of the EResourceTypeTypeInfo object)
+   */
+  [[nodiscard]] moho::EResourceTypeTypeInfo& AcquireEResourceTypeTypeInfo()
   {
-    reinterpret_cast<moho::EResourceTypeTypeInfo*>(gEResourceTypeTypeInfoStorage)->~EResourceTypeTypeInfo();
+    static moho::EResourceTypeTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -50,7 +50,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF4190 (FUN_00BF4190, Moho::EResourceTypeTypeInfo::~EResourceTypeTypeInfo)
    * Address: 0x00545AE0 (FUN_00545AE0, vtable-slot-2 scalar deleting
    * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
    * conditionally frees the object -- ordinary C++ `delete` semantics, not
@@ -100,13 +99,11 @@ namespace moho
    *
    * What it does:
    * Constructs the global `EResourceTypeTypeInfo` descriptor (preregistering
-   * it under `typeid(EResourceType)` as a side effect of its constructor)
-   * and schedules its teardown at process exit.
+   * it under `typeid(EResourceType)` as a side effect of its constructor).
    */
   void register_EResourceTypeTypeInfo()
   {
-    new (gEResourceTypeTypeInfoStorage) EResourceTypeTypeInfo();
-    (void)std::atexit(&CleanupEResourceTypeTypeInfoAtexit);
+    (void)AcquireEResourceTypeTypeInfo();
   }
 } // namespace moho
 

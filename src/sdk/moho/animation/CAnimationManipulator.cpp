@@ -348,9 +348,6 @@ namespace
 
   using TypeInfo = moho::CAnimationManipulatorTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCAnimationManipulatorTypeInfoStorage[sizeof(TypeInfo)] = {};
-  bool gCAnimationManipulatorTypeInfoConstructed = false;
-
   // Address: 0x010B2930 -- process-global `CAnimationManipulatorConstruct` singleton.
   moho::CAnimationManipulatorConstruct gCAnimationManipulatorConstruct;
 
@@ -359,15 +356,13 @@ namespace
   gpg::RType* gWeakPtrUnitType = nullptr;
   gpg::RType* gVectorBoolType = nullptr;
 
+  /**
+   * Address: 0x00BFAF90 (FUN_00BFAF90, atexit destructor of the CAnimationManipulatorTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& GetCAnimationManipulatorTypeInfo() noexcept
   {
-    if (!gCAnimationManipulatorTypeInfoConstructed) {
-      auto* const typeInfo = new (gCAnimationManipulatorTypeInfoStorage) TypeInfo();
-      gpg::PreRegisterRType(typeid(moho::CAnimationManipulator), typeInfo);
-      gCAnimationManipulatorTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCAnimationManipulatorTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedIAniManipulatorTypeForSerializer()
@@ -583,21 +578,6 @@ namespace
   )
   {
     SerializeCAnimationManipulatorState(object, archive);
-  }
-
-  void cleanup_CAnimationManipulatorTypeInfoImpl()
-  {
-    if (!gCAnimationManipulatorTypeInfoConstructed) {
-      return;
-    }
-
-    static_cast<gpg::RType*>(&GetCAnimationManipulatorTypeInfo())->~RType();
-    gCAnimationManipulatorTypeInfoConstructed = false;
-  }
-
-  void CleanupCAnimationManipulatorTypeInfoAtexit()
-  {
-    cleanup_CAnimationManipulatorTypeInfoImpl();
   }
 } // namespace
 
@@ -2033,26 +2013,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFAF90 (FUN_00BFAF90, Moho::CAnimationManipulatorTypeInfo::~CAnimationManipulatorTypeInfo)
-   *
-   * What it does:
-   * Releases startup-owned `CAnimationManipulatorTypeInfo` reflection storage.
-   */
-  void cleanup_CAnimationManipulatorTypeInfo()
-  {
-    cleanup_CAnimationManipulatorTypeInfoImpl();
-  }
-
-  /**
    * Address: 0x00BD2D90 (FUN_00BD2D90, register_CAnimationManipulatorTypeInfo)
    *
    * What it does:
-   * Forces startup construction/preregistration for `CAnimationManipulator` RTTI and installs exit cleanup.
+   * Forces startup construction/preregistration for `CAnimationManipulator` RTTI.
    */
   void register_CAnimationManipulatorTypeInfo()
   {
     (void)GetCAnimationManipulatorTypeInfo();
-    (void)std::atexit(&CleanupCAnimationManipulatorTypeInfoAtexit);
   }
 } // namespace moho
 

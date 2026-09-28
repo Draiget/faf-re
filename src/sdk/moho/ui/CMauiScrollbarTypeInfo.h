@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BDEEA0 (FUN_00BDEEA0, register_CMauiScrollbarTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiScrollbar` type-info object.
+   */
   void register_CMauiScrollbarTypeInfoStartup();
 } // namespace moho

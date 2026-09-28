@@ -47,9 +47,9 @@ namespace moho
   gpg::RType* CProjectileAttributes::sType = nullptr;
   // Both halves' `sType` storage is `inline static` on the templates in
   // moho/misc/ManyToOneBroadcaster.h now, one per instantiation as the binary
-  // has it; this file only registers and clears them
-  // (register_/cleanup_ManyToOne{Broadcaster,Listener}_EProjectileImpactEvent_TypeInfo,
-  // 0x00BD64C0 / 0x00BFD7C0 and 0x00BD64E0 / 0x00BFD760).
+  // has it; this file only registers them
+  // (register_ManyToOne{Broadcaster,Listener}_EProjectileImpactEvent_TypeInfo,
+  // 0x00BD64C0 and 0x00BD64E0).
   CScrLuaMetatableFactory<Projectile> CScrLuaMetatableFactory<Projectile>::sInstance{};
 } // namespace moho
 
@@ -445,6 +445,16 @@ namespace
     return ref;
   }
 
+  gpg::RType* gProjectileImpactEventType = nullptr;
+
+  [[nodiscard]] gpg::RType* LookupProjectileImpactEventType()
+  {
+    if (gProjectileImpactEventType == nullptr) {
+      gProjectileImpactEventType = gpg::LookupRType(typeid(moho::EProjectileImpactEvent));
+    }
+    return gProjectileImpactEventType;
+  }
+
   class RManyToOneBroadcasterProjectileImpactTypeInfo final : public gpg::RType
   {
   public:
@@ -472,18 +482,16 @@ namespace
 
     /**
      * Address: 0x0069E970 (FUN_0069E970, Moho::RManyBroadcasterRType_EProjectileImpactEvent::GetName)
+     * Address: 0x00BFD730 (FUN_00BFD730, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * The binary lazily builds this string once via a function-local static
-     * guard (`gpg::STR_Printf("ManyToOneBroadcaster<%s>", elementTypeName)`
-     * against the reflected `EProjectileImpactEvent` enum's own `RType::GetName()`)
-     * and registers its teardown with `atexit`. Since the formatted result is
-     * always this exact literal for this instantiation, returning the
-     * constant string is behaviorally equivalent for every caller.
+     * Builds `ManyToOneBroadcaster<EProjectileImpactEvent>` once and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      return "ManyToOneBroadcaster<EProjectileImpactEvent>";
+      static const msvc8::string sName =
+        gpg::STR_Printf("ManyToOneBroadcaster<%s>", LookupProjectileImpactEventType()->GetName());
+      return sName.c_str();
     }
 
     /**
@@ -533,20 +541,16 @@ namespace
 
     /**
      * Address: 0x0069EA30 (FUN_0069EA30, Moho::RManyListenerRType_EProjectileImpactEvent::GetName)
+     * Address: 0x00BFD700 (FUN_00BFD700, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * The binary lazily builds this string once via a function-local static
-     * guard (`gpg::STR_Printf("ManyToOneListener<%s>", elementTypeName)`
-     * against the reflected `EProjectileImpactEvent` enum's own
-     * `RType::GetName()`) and registers its teardown with `atexit`, mirroring
-     * the sibling broadcaster's `GetName` above (0x0069E970). Since the
-     * formatted result is always this exact literal for this instantiation,
-     * returning the constant string is behaviorally equivalent for every
-     * caller.
+     * Builds `ManyToOneListener<EProjectileImpactEvent>` once and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      return "ManyToOneListener<EProjectileImpactEvent>";
+      static const msvc8::string sName =
+        gpg::STR_Printf("ManyToOneListener<%s>", LookupProjectileImpactEventType()->GetName());
+      return sName.c_str();
     }
 
     /**
@@ -606,22 +610,6 @@ namespace
    */
   using EProjectileImpactEventPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EProjectileImpactEvent, int>;
 
-  alignas(moho::EProjectileImpactEventTypeInfo)
-    unsigned char gEProjectileImpactEventTypeInfoStorage[sizeof(moho::EProjectileImpactEventTypeInfo)];
-  bool gEProjectileImpactEventTypeInfoConstructed = false;
-
-  alignas(moho::CProjectileAttributesTypeInfo)
-    unsigned char gCProjectileAttributesTypeInfoStorage[sizeof(moho::CProjectileAttributesTypeInfo)];
-  bool gCProjectileAttributesTypeInfoConstructed = false;
-
-  alignas(RManyToOneBroadcasterProjectileImpactTypeInfo)
-    unsigned char gManyToOneBroadcasterProjectileImpactTypeInfoStorage[sizeof(RManyToOneBroadcasterProjectileImpactTypeInfo)];
-  bool gManyToOneBroadcasterProjectileImpactTypeInfoConstructed = false;
-
-  alignas(RManyToOneListenerProjectileImpactTypeInfo)
-    unsigned char gManyToOneListenerProjectileImpactTypeInfoStorage[sizeof(RManyToOneListenerProjectileImpactTypeInfo)];
-  bool gManyToOneListenerProjectileImpactTypeInfoConstructed = false;
-
   // Address: 0x010B55E4 -- process-global `PrimitiveSerHelper<
   // EProjectileImpactEvent,int>` singleton (constructed by FUN_00BD6350,
   // self-registering via `__xc_a`).
@@ -632,71 +620,43 @@ namespace
   // see CProjectileAttributes.h for the real-ctor/atexit-target evidence).
   moho::CProjectileAttributesSerializer gCProjectileAttributesSerializer;
 
-  [[nodiscard]] moho::EProjectileImpactEventTypeInfo& EProjectileImpactEventTypeInfoStorageRef()
-  {
-    return *reinterpret_cast<moho::EProjectileImpactEventTypeInfo*>(gEProjectileImpactEventTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::CProjectileAttributesTypeInfo& CProjectileAttributesTypeInfoStorageRef()
-  {
-    return *reinterpret_cast<moho::CProjectileAttributesTypeInfo*>(gCProjectileAttributesTypeInfoStorage);
-  }
-
-  [[nodiscard]] RManyToOneBroadcasterProjectileImpactTypeInfo& ManyToOneBroadcasterTypeInfoStorageRef()
-  {
-    return *reinterpret_cast<RManyToOneBroadcasterProjectileImpactTypeInfo*>(gManyToOneBroadcasterProjectileImpactTypeInfoStorage);
-  }
-
-  [[nodiscard]] RManyToOneListenerProjectileImpactTypeInfo& ManyToOneListenerTypeInfoStorageRef()
-  {
-    return *reinterpret_cast<RManyToOneListenerProjectileImpactTypeInfo*>(gManyToOneListenerProjectileImpactTypeInfoStorage);
-  }
-
+  /**
+   * Address: 0x00BFD540 (FUN_00BFD540, atexit destructor of the EProjectileImpactEventTypeInfo object)
+   */
   [[nodiscard]] gpg::REnumType* ConstructEProjectileImpactEventTypeInfo()
   {
-    if (!gEProjectileImpactEventTypeInfoConstructed) {
-      new (gEProjectileImpactEventTypeInfoStorage) moho::EProjectileImpactEventTypeInfo();
-      gEProjectileImpactEventTypeInfoConstructed = true;
-    }
-
-    auto& typeInfo = EProjectileImpactEventTypeInfoStorageRef();
-    return &typeInfo;
+    static moho::EProjectileImpactEventTypeInfo sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BFD580 (FUN_00BFD580, atexit destructor of the CProjectileAttributesTypeInfo object)
+   */
   [[nodiscard]] gpg::RType* ConstructCProjectileAttributesTypeInfo()
   {
-    if (!gCProjectileAttributesTypeInfoConstructed) {
-      new (gCProjectileAttributesTypeInfoStorage) moho::CProjectileAttributesTypeInfo();
-      gCProjectileAttributesTypeInfoConstructed = true;
-    }
-
-    auto& typeInfo = CProjectileAttributesTypeInfoStorageRef();
-    moho::CProjectileAttributes::sType = &typeInfo;
-    return &typeInfo;
+    static moho::CProjectileAttributesTypeInfo sInstance;
+    moho::CProjectileAttributes::sType = &sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BFD7C0 (FUN_00BFD7C0, atexit destructor of the ManyToOneBroadcaster<EProjectileImpactEvent> type-info object)
+   */
   [[nodiscard]] gpg::RType* ConstructManyToOneBroadcasterProjectileImpactTypeInfo()
   {
-    if (!gManyToOneBroadcasterProjectileImpactTypeInfoConstructed) {
-      new (gManyToOneBroadcasterProjectileImpactTypeInfoStorage) RManyToOneBroadcasterProjectileImpactTypeInfo();
-      gManyToOneBroadcasterProjectileImpactTypeInfoConstructed = true;
-    }
-
-    auto& typeInfo = ManyToOneBroadcasterTypeInfoStorageRef();
-    moho::ManyToOneBroadcaster_EProjectileImpactEvent::sType = &typeInfo;
-    return &typeInfo;
+    static RManyToOneBroadcasterProjectileImpactTypeInfo sInstance;
+    moho::ManyToOneBroadcaster_EProjectileImpactEvent::sType = &sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BFD760 (FUN_00BFD760, atexit destructor of the ManyToOneListener<EProjectileImpactEvent> type-info object)
+   */
   [[nodiscard]] gpg::RType* ConstructManyToOneListenerProjectileImpactTypeInfo()
   {
-    if (!gManyToOneListenerProjectileImpactTypeInfoConstructed) {
-      new (gManyToOneListenerProjectileImpactTypeInfoStorage) RManyToOneListenerProjectileImpactTypeInfo();
-      gManyToOneListenerProjectileImpactTypeInfoConstructed = true;
-    }
-
-    auto& typeInfo = ManyToOneListenerTypeInfoStorageRef();
-    moho::ManyToOneListener_EProjectileImpactEvent::sType = &typeInfo;
-    return &typeInfo;
+    static RManyToOneListenerProjectileImpactTypeInfo sInstance;
+    moho::ManyToOneListener_EProjectileImpactEvent::sType = &sInstance;
+    return &sInstance;
   }
 
 } // namespace
@@ -3051,94 +3011,35 @@ namespace moho
   CProjectileAttributesSerializer::~CProjectileAttributesSerializer() = default;
 
   /**
-   * Address: 0x00BFD540 (FUN_00BFD540, cleanup_EProjectileImpactEventTypeInfo)
-   */
-  void cleanup_EProjectileImpactEventTypeInfo()
-  {
-    if (!gEProjectileImpactEventTypeInfoConstructed) {
-      return;
-    }
-
-    EProjectileImpactEventTypeInfoStorageRef().~EProjectileImpactEventTypeInfo();
-    gEProjectileImpactEventTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD6330 (FUN_00BD6330, register_EProjectileImpactEventTypeInfo)
    */
-  int register_EProjectileImpactEventTypeInfo()
+  void register_EProjectileImpactEventTypeInfo()
   {
     (void)ConstructEProjectileImpactEventTypeInfo();
-    return std::atexit(&cleanup_EProjectileImpactEventTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BFD580 (FUN_00BFD580, cleanup_CProjectileAttributesTypeInfo)
-   */
-  void cleanup_CProjectileAttributesTypeInfo()
-  {
-    if (!gCProjectileAttributesTypeInfoConstructed) {
-      return;
-    }
-
-    CProjectileAttributesTypeInfoStorageRef().~CProjectileAttributesTypeInfo();
-    gCProjectileAttributesTypeInfoConstructed = false;
-    CProjectileAttributes::sType = nullptr;
   }
 
   /**
    * Address: 0x00BD6390 (FUN_00BD6390, register_CProjectileAttributesTypeInfo)
    */
-  int register_CProjectileAttributesTypeInfo()
+  void register_CProjectileAttributesTypeInfo()
   {
     (void)ConstructCProjectileAttributesTypeInfo();
-    return std::atexit(&cleanup_CProjectileAttributesTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BFD7C0 (FUN_00BFD7C0, cleanup_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo)
-   */
-  void cleanup_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo()
-  {
-    if (!gManyToOneBroadcasterProjectileImpactTypeInfoConstructed) {
-      return;
-    }
-
-    ManyToOneBroadcasterTypeInfoStorageRef().~RManyToOneBroadcasterProjectileImpactTypeInfo();
-    gManyToOneBroadcasterProjectileImpactTypeInfoConstructed = false;
-    ManyToOneBroadcaster_EProjectileImpactEvent::sType = nullptr;
   }
 
   /**
    * Address: 0x00BD64C0 (FUN_00BD64C0, register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo)
    */
-  int register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo()
+  void register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo()
   {
     (void)ConstructManyToOneBroadcasterProjectileImpactTypeInfo();
-    return std::atexit(&cleanup_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo);
-  }
-
-  /**
-   * Address: 0x00BFD760 (FUN_00BFD760, cleanup_ManyToOneListener_EProjectileImpactEvent_TypeInfo)
-   */
-  void cleanup_ManyToOneListener_EProjectileImpactEvent_TypeInfo()
-  {
-    if (!gManyToOneListenerProjectileImpactTypeInfoConstructed) {
-      return;
-    }
-
-    ManyToOneListenerTypeInfoStorageRef().~RManyToOneListenerProjectileImpactTypeInfo();
-    gManyToOneListenerProjectileImpactTypeInfoConstructed = false;
-    ManyToOneListener_EProjectileImpactEvent::sType = nullptr;
   }
 
   /**
    * Address: 0x00BD64E0 (FUN_00BD64E0, register_ManyToOneListener_EProjectileImpactEvent_TypeInfo)
    */
-  int register_ManyToOneListener_EProjectileImpactEvent_TypeInfo()
+  void register_ManyToOneListener_EProjectileImpactEvent_TypeInfo()
   {
     (void)ConstructManyToOneListenerProjectileImpactTypeInfo();
-    return std::atexit(&cleanup_ManyToOneListener_EProjectileImpactEvent_TypeInfo);
   }
 } // namespace moho
 

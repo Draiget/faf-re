@@ -31,20 +31,12 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_SNamedFootprintTypeInfo();
 
   /**
-   * Address: 0x00BF2820 (FUN_00BF2820, cleanup_SNamedFootprintTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `SNamedFootprintTypeInfo` storage at process exit.
-   */
-  void cleanup_SNamedFootprintTypeInfo();
-
-  /**
    * Address: 0x00BC8360 (FUN_00BC8360, register_SNamedFootprintTypeInfoStartup)
    *
    * What it does:
-   * Preregisters `SNamedFootprint` RTTI and installs process-exit cleanup.
+   * Preregisters `SNamedFootprint` RTTI.
    */
-  int register_SNamedFootprintTypeInfoStartup();
+  void register_SNamedFootprintTypeInfoStartup();
 
   /**
    * Address: 0x005149D0 (FUN_005149D0, preregister_SNamedFootprintListTypeInfo)
@@ -55,18 +47,10 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_SNamedFootprintListTypeInfo();
 
   /**
-   * Address: 0x00BF2910 (FUN_00BF2910, cleanup_SNamedFootprintListTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `std::list<SNamedFootprint>` RTTI storage at process exit.
-   */
-  void cleanup_SNamedFootprintListTypeInfo();
-
-  /**
    * Address: 0x00BC83A0 (FUN_00BC83A0, register_SNamedFootprintListTypeInfoStartup)
    *
    * What it does:
-   * Preregisters `std::list<SNamedFootprint>` RTTI and installs process-exit cleanup.
+   * Preregisters `std::list<SNamedFootprint>` RTTI.
    */
-  int register_SNamedFootprintListTypeInfoStartup();
+  void register_SNamedFootprintListTypeInfoStartup();
 } // namespace moho

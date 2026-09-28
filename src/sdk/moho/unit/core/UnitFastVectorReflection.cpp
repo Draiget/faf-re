@@ -1,6 +1,5 @@
 #include "moho/unit/core/UnitFastVectorReflection.h"
 
-#include <cstdlib>
 #include <cstdint>
 #include <new>
 #include <typeinfo>
@@ -20,41 +19,22 @@ namespace
   using WeakPtrEntityFastVectorType = gpg::RFastVectorType<moho::WeakPtr<moho::Entity>>;
   using ReconBlipPtrFastVectorType = gpg::RFastVectorType<moho::ReconBlip*>;
 
-  alignas(WeakPtrEntityFastVectorType) unsigned char gWeakPtrEntityFastVectorTypeStorage[sizeof(WeakPtrEntityFastVectorType)];
-  bool gWeakPtrEntityFastVectorTypeConstructed = false;
-
-  alignas(ReconBlipPtrFastVectorType) unsigned char gReconBlipPtrFastVectorTypeStorage[sizeof(ReconBlipPtrFastVectorType)];
-  bool gReconBlipPtrFastVectorTypeConstructed = false;
-
-  msvc8::string gWeakPtrEntityFastVectorTypeName;
-  msvc8::string gReconBlipPtrFastVectorTypeName;
-  bool gWeakPtrEntityFastVectorTypeNameCleanupRegistered = false;
-  bool gReconBlipPtrFastVectorTypeNameCleanupRegistered = false;
-
-  template <class TType>
-  [[nodiscard]] TType* AcquireReflectionType(unsigned char* const storage, bool& constructedFlag)
-  {
-    if (!constructedFlag) {
-      new (storage) TType();
-      constructedFlag = true;
-    }
-    return reinterpret_cast<TType*>(storage);
-  }
-
+  /**
+   * Address: 0x00BFDB80 (FUN_00BFDB80, atexit destructor of the WeakPtrEntityFastVectorType object)
+   */
   [[nodiscard]] WeakPtrEntityFastVectorType* AcquireWeakPtrEntityFastVectorType()
   {
-    return AcquireReflectionType<WeakPtrEntityFastVectorType>(
-      gWeakPtrEntityFastVectorTypeStorage,
-      gWeakPtrEntityFastVectorTypeConstructed
-    );
+    static WeakPtrEntityFastVectorType sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BFDB20 (FUN_00BFDB20, atexit destructor of the ReconBlipPtrFastVectorType object)
+   */
   [[nodiscard]] ReconBlipPtrFastVectorType* AcquireReconBlipPtrFastVectorType()
   {
-    return AcquireReflectionType<ReconBlipPtrFastVectorType>(
-      gReconBlipPtrFastVectorTypeStorage,
-      gReconBlipPtrFastVectorTypeConstructed
-    );
+    static ReconBlipPtrFastVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
@@ -350,24 +330,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x00BFDA90 (FUN_00BFDA90, sub_BFDA90)
-   */
-  void cleanup_WeakPtrEntityFastVectorTypeName()
-  {
-    gWeakPtrEntityFastVectorTypeName = msvc8::string{};
-    gWeakPtrEntityFastVectorTypeNameCleanupRegistered = false;
-  }
-
-  /**
-   * Address: 0x00BFDA60 (FUN_00BFDA60, sub_BFDA60)
-   */
-  void cleanup_ReconBlipPtrFastVectorTypeName()
-  {
-    gReconBlipPtrFastVectorTypeName = msvc8::string{};
-    gReconBlipPtrFastVectorTypeNameCleanupRegistered = false;
-  }
-
   struct UnitFastVectorReflectionBootstrap
   {
     UnitFastVectorReflectionBootstrap()
@@ -386,19 +348,12 @@ namespace gpg
 
   /**
    * Address: 0x006AE400 (FUN_006AE400, gpg::RFastVectorType_WeakPtr_Entity::GetName)
+   * Address: 0x00BFDA90 (FUN_00BFDA90, atexit destructor of GetName's cached name)
    */
   const char* RFastVectorType<moho::WeakPtr<moho::Entity>>::GetName() const
   {
-    if (gWeakPtrEntityFastVectorTypeName.empty()) {
-      const char* const elementName = CachedWeakPtrEntityType() ? CachedWeakPtrEntityType()->GetName() : "WeakPtr<Entity>";
-      gWeakPtrEntityFastVectorTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "WeakPtr<Entity>");
-      if (!gWeakPtrEntityFastVectorTypeNameCleanupRegistered) {
-        gWeakPtrEntityFastVectorTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_WeakPtrEntityFastVectorTypeName);
-      }
-    }
-
-    return gWeakPtrEntityFastVectorTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedWeakPtrEntityType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -480,21 +435,12 @@ namespace gpg
 
   /**
    * Address: 0x006AE630 (FUN_006AE630, gpg::RFastVectorType_ReconBlip_P::GetName)
+   * Address: 0x00BFDA60 (FUN_00BFDA60, atexit destructor of GetName's cached name)
    */
   const char* RFastVectorType<moho::ReconBlip*>::GetName() const
   {
-    if (gReconBlipPtrFastVectorTypeName.empty()) {
-      const char* const elementName = CachedReconBlipPointerType()
-        ? CachedReconBlipPointerType()->GetName()
-        : "ReconBlip*";
-      gReconBlipPtrFastVectorTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "ReconBlip*");
-      if (!gReconBlipPtrFastVectorTypeNameCleanupRegistered) {
-        gReconBlipPtrFastVectorTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_ReconBlipPtrFastVectorTypeName);
-      }
-    }
-
-    return gReconBlipPtrFastVectorTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", moho::ReconBlip::GetPointerType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -590,31 +536,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFDB80 (FUN_00BFDB80, cleanup_FastVectorWeakPtrEntityType)
-   *
-   * What it does:
-   * Tears down startup-owned `fastvector<WeakPtr<Entity>>` reflection storage.
-   */
-  void cleanup_FastVectorWeakPtrEntityType()
-  {
-    if (!gWeakPtrEntityFastVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireWeakPtrEntityFastVectorType()->~WeakPtrEntityFastVectorType();
-    gWeakPtrEntityFastVectorTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD6BE0 (FUN_00BD6BE0, register_FastVectorWeakPtrEntityType_AtExit)
    *
    * What it does:
-   * Registers `fastvector<WeakPtr<Entity>>` reflection and installs process-exit teardown.
+   * Registers `fastvector<WeakPtr<Entity>>` reflection.
    */
-  int register_FastVectorWeakPtrEntityType_AtExit()
+  void register_FastVectorWeakPtrEntityType_AtExit()
   {
     (void)register_FastVectorWeakPtrEntityType_00();
-    return std::atexit(&cleanup_FastVectorWeakPtrEntityType);
   }
 
   /**
@@ -631,31 +560,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFDB20 (FUN_00BFDB20, cleanup_FastVectorReconBlipPtrType)
-   *
-   * What it does:
-   * Tears down startup-owned `fastvector<ReconBlip*>` reflection storage.
-   */
-  void cleanup_FastVectorReconBlipPtrType()
-  {
-    if (!gReconBlipPtrFastVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireReconBlipPtrFastVectorType()->~ReconBlipPtrFastVectorType();
-    gReconBlipPtrFastVectorTypeConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD6C00 (FUN_00BD6C00, register_FastVectorReconBlipPtrType_AtExit)
    *
    * What it does:
-   * Registers `fastvector<ReconBlip*>` reflection and installs process-exit teardown.
+   * Registers `fastvector<ReconBlip*>` reflection.
    */
-  int register_FastVectorReconBlipPtrType_AtExit()
+  void register_FastVectorReconBlipPtrType_AtExit()
   {
     (void)register_FastVectorReconBlipPtrType_00();
-    return std::atexit(&cleanup_FastVectorReconBlipPtrType);
   }
 } // namespace moho
 

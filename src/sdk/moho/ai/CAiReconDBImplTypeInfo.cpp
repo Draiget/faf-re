@@ -47,6 +47,7 @@ namespace
 
     /**
      * Address: 0x005C40D0 (FUN_005C40D0, gpg::RVectorType_ReconBlipP::GetName)
+     * Address: 0x00BF7B70 (FUN_00BF7B70, atexit destructor of GetName's cached name)
      */
     [[nodiscard]] const char* GetName() const override;
 
@@ -94,6 +95,7 @@ namespace
 
     /**
      * Address: 0x005C4D50 (FUN_005C4D50, gpg::RMultiMapType_SReconKey_ReconBlipP::GetName)
+     * Address: 0x00BF7B40 (FUN_00BF7B40, atexit destructor of GetName's cached name)
      */
     [[nodiscard]] const char* GetName() const override;
 
@@ -109,17 +111,6 @@ namespace
   };
   static_assert(sizeof(ReconBlipMapTypeRuntime) == 0x64, "ReconBlipMapTypeRuntime size must be 0x64");
 
-  alignas(ReconBlipPointerVectorTypeRuntime)
-  unsigned char gReconBlipPtrVectorTypeStorage[sizeof(ReconBlipPointerVectorTypeRuntime)];
-  bool gReconBlipPtrVectorTypeConstructed = false;
-  alignas(ReconBlipMapTypeRuntime) unsigned char gReconBlipMapTypeStorage[sizeof(ReconBlipMapTypeRuntime)];
-  bool gReconBlipMapTypeConstructed = false;
-
-  msvc8::string gReconBlipPtrVectorTypeName;
-  bool gReconBlipPtrVectorTypeNameInit = false;
-  msvc8::string gReconBlipMapTypeName;
-  bool gReconBlipMapTypeNameInit = false;
-
   gpg::RType* gReconBlipType = nullptr;
   gpg::RType* gReconBlipPtrType = nullptr;
   gpg::RType* gSReconKeyType = nullptr;
@@ -133,34 +124,22 @@ namespace
     return &sInstance;
   }
 
+  /**
+   * Address: 0x00BF7CC0 (FUN_00BF7CC0, atexit destructor of the ReconBlipPointerVectorTypeRuntime object)
+   */
   [[nodiscard]] ReconBlipPointerVectorTypeRuntime* AcquireReconBlipPtrVectorType()
   {
-    if (!gReconBlipPtrVectorTypeConstructed) {
-      new (gReconBlipPtrVectorTypeStorage) ReconBlipPointerVectorTypeRuntime();
-      gReconBlipPtrVectorTypeConstructed = true;
-    }
-    return reinterpret_cast<ReconBlipPointerVectorTypeRuntime*>(gReconBlipPtrVectorTypeStorage);
+    static ReconBlipPointerVectorTypeRuntime sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BF7C60 (FUN_00BF7C60, atexit destructor of the ReconBlipMapTypeRuntime object)
+   */
   [[nodiscard]] ReconBlipMapTypeRuntime* AcquireReconBlipMapType()
   {
-    if (!gReconBlipMapTypeConstructed) {
-      new (gReconBlipMapTypeStorage) ReconBlipMapTypeRuntime();
-      gReconBlipMapTypeConstructed = true;
-    }
-    return reinterpret_cast<ReconBlipMapTypeRuntime*>(gReconBlipMapTypeStorage);
-  }
-
-  void cleanup_ReconBlipPtrVectorTypeName()
-  {
-    gReconBlipPtrVectorTypeName.clear();
-    gReconBlipPtrVectorTypeNameInit = false;
-  }
-
-  void cleanup_ReconBlipMapTypeName()
-  {
-    gReconBlipMapTypeName.clear();
-    gReconBlipMapTypeNameInit = false;
+    static ReconBlipMapTypeRuntime sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCAiReconDBImplType()
@@ -395,49 +374,10 @@ namespace
     typeInfo->AddBase(field);
   }
 
-  /**
-    * Alias of FUN_00BF7CC0 (non-canonical helper lane).
-   *
-   * What it does:
-   * Tears down startup-owned `vector<ReconBlip*>` reflection storage.
-   */
-  void cleanup_RVectorType_ReconBlipPtr_Impl()
-  {
-    if (!gReconBlipPtrVectorTypeConstructed) {
-      return;
-    }
-
-    AcquireReconBlipPtrVectorType()->~ReconBlipPointerVectorTypeRuntime();
-    gReconBlipPtrVectorTypeConstructed = false;
-  }
-
-  /**
-    * Alias of FUN_00BF7C60 (non-canonical helper lane).
-   *
-   * What it does:
-   * Tears down startup-owned recon-blip map reflection storage.
-   */
-  void cleanup_RMultiMapType_SReconKey_ReconBlipPtr_Impl()
-  {
-    if (!gReconBlipMapTypeConstructed) {
-      return;
-    }
-
-    AcquireReconBlipMapType()->~ReconBlipMapTypeRuntime();
-    gReconBlipMapTypeConstructed = false;
-  }
-
   const char* ReconBlipPointerVectorTypeRuntime::GetName() const
   {
-    if (!gReconBlipPtrVectorTypeNameInit) {
-      const gpg::RType* const pointerType = CachedReconBlipPointerType();
-      const char* const pointerTypeName = pointerType ? pointerType->GetName() : "ReconBlip *";
-      gReconBlipPtrVectorTypeName = gpg::STR_Printf("vector<%s>", pointerTypeName);
-      gReconBlipPtrVectorTypeNameInit = true;
-      (void)std::atexit(&cleanup_ReconBlipPtrVectorTypeName);
-    }
-
-    return gReconBlipPtrVectorTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ReconBlip::GetPointerType()->GetName());
+    return sName.c_str();
   }
 
   msvc8::string ReconBlipPointerVectorTypeRuntime::GetLexical(const gpg::RRef& ref) const
@@ -489,17 +429,9 @@ namespace
 
   const char* ReconBlipMapTypeRuntime::GetName() const
   {
-    if (!gReconBlipMapTypeNameInit) {
-      const gpg::RType* const keyType = CachedSReconKeyType();
-      const gpg::RType* const valueType = CachedReconBlipPointerType();
-      const char* const keyTypeName = keyType ? keyType->GetName() : "SReconKey";
-      const char* const valueTypeName = valueType ? valueType->GetName() : "ReconBlip *";
-      gReconBlipMapTypeName = gpg::STR_Printf("multimap<%s,%s>", keyTypeName, valueTypeName);
-      gReconBlipMapTypeNameInit = true;
-      (void)std::atexit(&cleanup_ReconBlipMapTypeName);
-    }
-
-    return gReconBlipMapTypeName.c_str();
+    static const msvc8::string sName =
+      gpg::STR_Printf("multimap<%s,%s>", CachedSReconKeyType()->GetName(), ReconBlip::GetPointerType()->GetName());
+    return sName.c_str();
   }
 
   msvc8::string ReconBlipMapTypeRuntime::GetLexical(const gpg::RRef& ref) const
@@ -733,8 +665,7 @@ void CAiReconDBImplTypeInfo::BindFactoryCallbacks() noexcept
  * Address: 0x00BCDDA0 (FUN_00BCDDA0, register_CAiReconDBImplTypeInfo)
  *
  * What it does:
- * Constructs the recovered `CAiReconDBImplTypeInfo` helper and installs
- * process-exit cleanup.
+ * Constructs the recovered `CAiReconDBImplTypeInfo` helper.
  */
 void moho::register_CAiReconDBImplTypeInfo()
 {
@@ -756,27 +687,14 @@ gpg::RType* moho::preregister_RVectorType_ReconBlipPtr()
 }
 
 /**
- * Address: 0x00BF7CC0 (FUN_00BF7CC0, sub_BF7CC0)
- *
- * What it does:
- * Tears down startup-owned `vector<ReconBlip*>` reflection storage.
- */
-void moho::cleanup_RVectorType_ReconBlipPtr()
-{
-  cleanup_RVectorType_ReconBlipPtr_Impl();
-}
-
-/**
  * Address: 0x00BCDF60 (FUN_00BCDF60, sub_BCDF60)
  *
  * What it does:
- * Registers `vector<ReconBlip*>` reflection metadata and installs
- * process-exit cleanup.
+ * Registers `vector<ReconBlip*>` reflection metadata.
  */
-int moho::register_RVectorType_ReconBlipPtr()
+void moho::register_RVectorType_ReconBlipPtr()
 {
   (void)preregister_RVectorType_ReconBlipPtr();
-  return std::atexit(&cleanup_RVectorType_ReconBlipPtr_Impl);
 }
 
 /**
@@ -793,27 +711,14 @@ gpg::RType* moho::preregister_RMultiMapType_SReconKey_ReconBlipPtr()
 }
 
 /**
- * Address: 0x00BF7C60 (FUN_00BF7C60, sub_BF7C60)
- *
- * What it does:
- * Tears down startup-owned recon-blip map reflection storage.
- */
-void moho::cleanup_RMultiMapType_SReconKey_ReconBlipPtr()
-{
-  cleanup_RMultiMapType_SReconKey_ReconBlipPtr_Impl();
-}
-
-/**
  * Address: 0x00BCDF80 (FUN_00BCDF80, sub_BCDF80)
  *
  * What it does:
- * Registers recon-blip map reflection metadata and installs process-exit
- * cleanup.
+ * Registers recon-blip map reflection metadata.
  */
-int moho::register_RMultiMapType_SReconKey_ReconBlipPtr()
+void moho::register_RMultiMapType_SReconKey_ReconBlipPtr()
 {
   (void)preregister_RMultiMapType_SReconKey_ReconBlipPtr();
-  return std::atexit(&cleanup_RMultiMapType_SReconKey_ReconBlipPtr_Impl);
 }
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

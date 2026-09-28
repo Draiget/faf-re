@@ -1,7 +1,6 @@
 #include "moho/render/d3d/D3DSingletonCleanup.h"
 
 #include <cstdint>
-#include <cstdlib>
 
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DVertexStream.h"
@@ -10,112 +9,25 @@
 #include "moho/render/d3d/CD3DVertexFormat.h"
 #include "moho/render/d3d/CD3DVertexStream.h"
 
-namespace
-{
-  template <std::uintptr_t SlotAddress, typename T>
-  struct D3DSingletonSlot;
-
-  template <>
-  struct D3DSingletonSlot<0x10A792Cu, moho::CD3DVertexStream>
-  {
-    static moho::CD3DVertexStream* value;
-  };
-  moho::CD3DVertexStream* D3DSingletonSlot<0x10A792Cu, moho::CD3DVertexStream>::value = nullptr;
-
-  template <>
-  struct D3DSingletonSlot<0x10A7928u, moho::CD3DIndexSheet>
-  {
-    static moho::CD3DIndexSheet* value;
-  };
-  moho::CD3DIndexSheet* D3DSingletonSlot<0x10A7928u, moho::CD3DIndexSheet>::value = nullptr;
-
-  template <std::uintptr_t SlotAddress, typename T>
-  void CleanupD3DSingletonSlot() noexcept
-  {
-    T* const value = D3DSingletonSlot<SlotAddress, T>::value;
-    if (value == nullptr) {
-      return;
-    }
-
-    delete value;
-    D3DSingletonSlot<SlotAddress, T>::value = nullptr;
-  }
-
-  template <void (*Cleanup)()>
-  void RegisterExitCleanup() noexcept
-  {
-    (void)std::atexit(Cleanup);
-  }
-
-  struct D3DSingletonCleanupBootstrap
-  {
-    D3DSingletonCleanupBootstrap()
-    {
-      moho::register_D3DVertexStreamCleanup();
-      moho::register_D3DIndexSheetCleanup();
-    }
-  };
-
-  [[maybe_unused]] D3DSingletonCleanupBootstrap gD3DSingletonCleanupBootstrap;
-} // namespace
-
 namespace moho
 {
-  CD3DVertexStream*& SharedVertexStreamSlot() noexcept
-  {
-    return D3DSingletonSlot<0x10A792Cu, CD3DVertexStream>::value;
-  }
-
-  CD3DIndexSheet*& SharedIndexSheetSlot() noexcept
-  {
-    return D3DSingletonSlot<0x10A7928u, CD3DIndexSheet>::value;
-  }
-
   /**
-   * Address: 0x00BEF190 (FUN_00BEF190, ??1sVertexStream@Moho@@QAE@@Z)
+   * Address: 0x00BC40C0 (FUN_00BC40C0, dynamic initializer for `sVertexStream`)
+   * Address: 0x00BEF190 (FUN_00BEF190, dynamic atexit destructor for `sVertexStream`)
    *
    * What it does:
-   * Deletes the recovered global `CD3DVertexStream` singleton when present.
+   * Owns the shared unit-quad vertex stream (binary global 0x010A792C).
    */
-  void cleanup_D3DVertexStream()
-  {
-    CleanupD3DSingletonSlot<0x10A792Cu, CD3DVertexStream>();
-  }
+  msvc8::auto_ptr<CD3DVertexStream> sVertexStream;
 
   /**
-   * Address: 0x00BC40C0 (FUN_00BC40C0, register_sVertexStream)
+   * Address: 0x00BC40D0 (FUN_00BC40D0, dynamic initializer for `sIndexSheet`)
+   * Address: 0x00BEF1B0 (FUN_00BEF1B0, dynamic atexit destructor for `sIndexSheet`)
    *
    * What it does:
-   * Registers the recovered process-exit cleanup thunk for the global
-   * `CD3DVertexStream` singleton slot.
+   * Owns the shared quad index sheet (binary global 0x010A7928).
    */
-  void register_D3DVertexStreamCleanup()
-  {
-    RegisterExitCleanup<&cleanup_D3DVertexStream>();
-  }
-
-  /**
-   * Address: 0x00BEF1B0 (FUN_00BEF1B0, ??1sIndexSheet@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Deletes the recovered global `CD3DIndexSheet` singleton when present.
-   */
-  void cleanup_D3DIndexSheet()
-  {
-    CleanupD3DSingletonSlot<0x10A7928u, CD3DIndexSheet>();
-  }
-
-  /**
-   * Address: 0x00BC40D0 (FUN_00BC40D0, register_sIndexSheet)
-   *
-   * What it does:
-   * Registers the recovered process-exit cleanup thunk for the global
-   * `CD3DIndexSheet` singleton slot.
-   */
-  void register_D3DIndexSheetCleanup()
-  {
-    RegisterExitCleanup<&cleanup_D3DIndexSheet>();
-  }
+  msvc8::auto_ptr<CD3DIndexSheet> sIndexSheet;
 
   /**
    * Address: 0x0043C690 (FUN_0043C690, sub_43C690)
@@ -135,16 +47,10 @@ namespace moho
   {
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
-    CD3DVertexStream* const newStream = resources->Func5(0u, 1, 0x10000, vertexFormat);
-
-    CD3DVertexStream*& slot = SharedVertexStreamSlot();
-    if (newStream != slot && slot != nullptr) {
-      delete slot;
-    }
-    slot = newStream;
+    sVertexStream.reset(resources->Func5(0u, 1, 0x10000, vertexFormat));
 
     constexpr int kQuadCount = 0x4000;
-    auto* const mappedBase = static_cast<std::uint32_t*>(slot->Lock(0, kQuadCount, false, false));
+    auto* const mappedBase = static_cast<std::uint32_t*>(sVertexStream->Lock(0, kQuadCount, false, false));
     std::uint32_t* cursor = mappedBase + 5;
     for (int i = 0; i < kQuadCount; ++i) {
       cursor[-5] = 0u;
@@ -157,7 +63,7 @@ namespace moho
       cursor[ 2] = 0x3F800000u; // 1.0f
       cursor += 8;
     }
-    slot->Unlock();
+    sVertexStream->Unlock();
   }
 
   /**
@@ -175,22 +81,16 @@ namespace moho
    */
   void func_InitSharedIndexSheet()
   {
-    CD3DIndexSheet*& slot = SharedIndexSheetSlot();
-    if (slot != nullptr) {
+    if (sIndexSheet.get() != nullptr) {
       return;
     }
 
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
-    CD3DIndexSheet* const newSheet = resources->CreateIndexSheet(false, 0x18000);
+    sIndexSheet.reset(resources->CreateIndexSheet(false, 0x18000));
 
-    if (newSheet != slot && slot != nullptr) {
-      delete slot;
-    }
-    slot = newSheet;
-
-    const std::uint32_t indexByteSize = slot->GetSize();
-    std::int16_t* const base = slot->Lock(0u, indexByteSize, false, false);
+    const std::uint32_t indexByteSize = sIndexSheet->GetSize();
+    std::int16_t* const base = sIndexSheet->Lock(0u, indexByteSize, false, false);
 
     constexpr unsigned int kQuadCount = 0x4000u;
     std::int16_t* cursor = base;
@@ -207,7 +107,7 @@ namespace moho
       cursor[5] = v3;
       cursor += 6;
     }
-    slot->Unlock();
+    sIndexSheet->Unlock();
   }
 
   /**
@@ -222,12 +122,12 @@ namespace moho
    */
   CD3DIndexSheet* func_GetSharedIndexSheet()
   {
-    CD3DIndexSheet* const current = SharedIndexSheetSlot();
+    CD3DIndexSheet* const current = sIndexSheet.get();
     if (current != nullptr) {
       return current;
     }
     func_InitSharedIndexSheet();
-    return SharedIndexSheetSlot();
+    return sIndexSheet.get();
   }
 
   /**
@@ -242,11 +142,7 @@ namespace moho
    */
   void func_ClearSharedIndexSheet()
   {
-    CD3DIndexSheet*& slot = SharedIndexSheetSlot();
-    if (slot != nullptr) {
-      delete slot;
-    }
-    slot = nullptr;
+    sIndexSheet.reset();
   }
 
   /**
@@ -262,17 +158,13 @@ namespace moho
    * thunk when it differs from the incoming stream. Returns the
    * address of the updated singleton slot.
    */
-  CD3DVertexStream** func_MoveIntoSharedVertexStream(CD3DVertexStream** const inOutStream)
+  msvc8::auto_ptr<CD3DVertexStream>* func_MoveIntoSharedVertexStream(CD3DVertexStream** const inOutStream)
   {
     CD3DVertexStream* const incoming = *inOutStream;
     *inOutStream = nullptr;
 
-    CD3DVertexStream*& slot = SharedVertexStreamSlot();
-    if (incoming != slot && slot != nullptr) {
-      delete slot;
-    }
-    slot = incoming;
-    return &slot;
+    sVertexStream.reset(incoming);
+    return &sVertexStream;
   }
 
   /**
@@ -288,10 +180,6 @@ namespace moho
    */
   void func_SetSharedVertexStream(CD3DVertexStream* const stream)
   {
-    CD3DVertexStream*& slot = SharedVertexStreamSlot();
-    if (stream != slot && slot != nullptr) {
-      delete slot;
-    }
-    slot = stream;
+    sVertexStream.reset(stream);
   }
 } // namespace moho

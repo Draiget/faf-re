@@ -1,6 +1,5 @@
 #include "moho/unit/CUnitCommandQueueReflection.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "moho/unit/Broadcaster.h"
@@ -24,7 +23,14 @@ namespace gpg
 
 namespace
 {
-  moho::CUnitCommandQueueTypeInfo gCUnitCommandQueueTypeInfo;
+  /**
+   * Address: 0x00BFEEB0 (FUN_00BFEEB0, atexit destructor of the CUnitCommandQueueTypeInfo object)
+   */
+  [[nodiscard]] moho::CUnitCommandQueueTypeInfo* AcquireCUnitCommandQueueTypeInfo()
+  {
+    static moho::CUnitCommandQueueTypeInfo sInstance;
+    return &sInstance;
+  }
 
   // Address: 0x00BD92A0 -- dynamic initializer for the global
   // CUnitCommandQueueSaveConstruct singleton (base-ctor -> field-set ->
@@ -41,25 +47,6 @@ namespace
   // CUnitCommandQueueSerializer singleton, same shape, independent __xc_a
   // static initializer.
   moho::CUnitCommandQueueSerializer gCUnitCommandQueueSerializer;
-
-  template <class TTypeInfo>
-  void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
-  {
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  /**
-   * Address: 0x00BFEEB0 (FUN_00BFEEB0, sub_BFEEB0)
-   *
-   * What it does:
-   * Releases CUnitCommandQueue type-info field/base storage lanes.
-   */
-  void cleanup_CUnitCommandQueueTypeInfo()
-  {
-    ResetTypeInfoVectors(gCUnitCommandQueueTypeInfo);
-  }
-
 } // namespace
 
 namespace moho
@@ -308,8 +295,7 @@ namespace moho
    */
   void register_CUnitCommandQueueTypeInfo()
   {
-    (void)gCUnitCommandQueueTypeInfo;
-    (void)std::atexit(&cleanup_CUnitCommandQueueTypeInfo);
+    (void)AcquireCUnitCommandQueueTypeInfo();
   }
 } // namespace moho
 

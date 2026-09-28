@@ -1,6 +1,5 @@
 #include "moho/effects/rendering/IEffectWeakPtrReflection.h"
 
-#include <cstdlib>
 #include <cstdint>
 #include <new>
 #include <typeinfo>
@@ -15,9 +14,6 @@
 namespace
 {
   using WeakPtrIEffectType = moho::RWeakPtrType<moho::IEffect>;
-
-  msvc8::string gWeakPtrIEffectTypeName;
-  bool gWeakPtrIEffectTypeNameCleanupRegistered = false;
 
   /**
    * Address: 0x00BFC4F0 (FUN_00BFC4F0, atexit destructor of the WeakPtrIEffectType object)
@@ -91,15 +87,6 @@ namespace
     throw gpg::SerializationError(msg.c_str());
   }
 
-  /**
-   * Address: 0x00BFC400 (FUN_00BFC400, cleanup_WeakPtrIEffectTypeName)
-   */
-  void cleanup_WeakPtrIEffectTypeName()
-  {
-    gWeakPtrIEffectTypeName = msvc8::string{};
-    gWeakPtrIEffectTypeNameCleanupRegistered = false;
-  }
-
   struct IEffectWeakPtrReflectionBootstrap
   {
     IEffectWeakPtrReflectionBootstrap()
@@ -161,19 +148,15 @@ namespace moho
 
   /**
    * Address: 0x006748B0 (FUN_006748B0, Moho::RWeakPtrType_IEffect::GetName)
+   * Address: 0x00BFC400 (FUN_00BFC400, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `WeakPtr<IEffect>` once and returns it.
    */
   const char* RWeakPtrType<IEffect>::GetName() const
   {
-    if (gWeakPtrIEffectTypeName.empty()) {
-      const char* const pointeeName = CachedIEffectType() ? CachedIEffectType()->GetName() : "IEffect";
-      gWeakPtrIEffectTypeName = gpg::STR_Printf("WeakPtr<%s>", pointeeName ? pointeeName : "IEffect");
-      if (!gWeakPtrIEffectTypeNameCleanupRegistered) {
-        gWeakPtrIEffectTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_WeakPtrIEffectTypeName);
-      }
-    }
-
-    return gWeakPtrIEffectTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedIEffectType()->GetName());
+    return sName.c_str();
   }
 
   /**

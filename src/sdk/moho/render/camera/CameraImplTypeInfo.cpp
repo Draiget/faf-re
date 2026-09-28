@@ -1,7 +1,5 @@
 #include "moho/render/camera/CameraImplTypeInfo.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/render/camera/CameraImpl.h"
@@ -12,9 +10,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(CameraImplTypeInfo) unsigned char gCameraImplTypeInfoStorage[sizeof(CameraImplTypeInfo)];
-  bool gCameraImplTypeInfoConstructed = false;
-
   [[nodiscard]] gpg::RType* CachedCScriptEventType()
   {
     if (!CScriptEvent::sType) {
@@ -46,23 +41,13 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
+  /**
+   * Address: 0x00C035C0 (FUN_00C035C0, atexit destructor of the CameraImplTypeInfo object)
+   */
   [[nodiscard]] CameraImplTypeInfo& AcquireCameraImplTypeInfo()
   {
-    if (!gCameraImplTypeInfoConstructed) {
-      new (gCameraImplTypeInfoStorage) CameraImplTypeInfo();
-      gCameraImplTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CameraImplTypeInfo*>(gCameraImplTypeInfoStorage);
-  }
-
-  void cleanup_CameraImplTypeInfo()
-  {
-    if (!gCameraImplTypeInfoConstructed) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<CameraImplTypeInfo*>(gCameraImplTypeInfoStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static CameraImplTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CameraImplTypeInfoBootstrap
@@ -111,9 +96,7 @@ void CameraImplTypeInfo::Init()
 void moho::register_CameraImplTypeInfoStartup()
 {
   (void)AcquireCameraImplTypeInfo();
-  (void)std::atexit(&cleanup_CameraImplTypeInfo);
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiMovieTypeInfo) unsigned char gCMauiMovieTypeInfoStorage[sizeof(CMauiMovieTypeInfo)];
-  bool gCMauiMovieTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C03130 (FUN_00C03130, atexit destructor of the CMauiMovieTypeInfo object)
+   */
   [[nodiscard]] CMauiMovieTypeInfo& AcquireCMauiMovieTypeInfo()
   {
-    if (!gCMauiMovieTypeInfoConstructed) {
-      new (gCMauiMovieTypeInfoStorage) CMauiMovieTypeInfo();
-      gCMauiMovieTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiMovieTypeInfo*>(gCMauiMovieTypeInfoStorage);
-  }
-
-  void cleanup_CMauiMovieTypeInfo()
-  {
-    if (!gCMauiMovieTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiMovieTypeInfo*>(gCMauiMovieTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiMovieTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiMovieTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CMauiMovieTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDED30 (FUN_00BDED30, register_CMauiMovieTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiMovie` type-info object.
+ */
 void moho::register_CMauiMovieTypeInfoStartup()
 {
   (void)AcquireCMauiMovieTypeInfo();
-  (void)std::atexit(&cleanup_CMauiMovieTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

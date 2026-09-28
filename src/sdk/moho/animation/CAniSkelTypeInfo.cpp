@@ -9,24 +9,20 @@
 
 namespace
 {
-  alignas(moho::CAniSkelTypeInfo) unsigned char gCAniSkelTypeInfoStorage[sizeof(moho::CAniSkelTypeInfo)]{};
-  bool gCAniSkelTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF4480 (FUN_00BF4480, atexit destructor of the CAniSkelTypeInfo object)
+   */
   [[nodiscard]] moho::CAniSkelTypeInfo* AcquireCAniSkelTypeInfo()
   {
-    if (!gCAniSkelTypeInfoConstructed) {
-      new (gCAniSkelTypeInfoStorage) moho::CAniSkelTypeInfo();
-      gCAniSkelTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CAniSkelTypeInfo*>(gCAniSkelTypeInfoStorage);
+    static moho::CAniSkelTypeInfo sInstance;
+    return &sInstance;
   }
 
   struct CAniSkelTypeInfoBootstrap
   {
     CAniSkelTypeInfoBootstrap()
     {
-      (void)moho::register_CAniSkelTypeInfoAtexit();
+      moho::register_CAniSkelTypeInfoAtexit();
     }
   };
 
@@ -72,26 +68,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF4480 (FUN_00BF4480, cleanup_CAniSkelTypeInfo)
-   */
-  void cleanup_CAniSkelTypeInfo()
-  {
-    if (!gCAniSkelTypeInfoConstructed) {
-      return;
-    }
-
-    CAniSkelTypeInfo* const typeInfo = AcquireCAniSkelTypeInfo();
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  /**
    * Address: 0x00BC9890 (FUN_00BC9890, register_CAniSkelTypeInfoAtexit)
    */
-  int register_CAniSkelTypeInfoAtexit()
+  void register_CAniSkelTypeInfoAtexit()
   {
     (void)preregister_CAniSkelTypeInfo();
-    return std::atexit(&cleanup_CAniSkelTypeInfo);
   }
 } // namespace moho
 

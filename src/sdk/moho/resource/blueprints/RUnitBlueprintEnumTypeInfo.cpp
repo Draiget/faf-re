@@ -2,8 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -12,34 +10,6 @@
 
 namespace
 {
-  alignas(moho::ERuleBPUnitBuildRestrictionTypeInfo)
-    unsigned char gERuleBPUnitBuildRestrictionTypeInfoStorage[sizeof(moho::ERuleBPUnitBuildRestrictionTypeInfo)];
-  bool gERuleBPUnitBuildRestrictionTypeInfoConstructed = false;
-
-  alignas(moho::ERuleBPUnitWeaponBallisticArcTypeInfo) unsigned char
-    gERuleBPUnitWeaponBallisticArcTypeInfoStorage[sizeof(moho::ERuleBPUnitWeaponBallisticArcTypeInfo)];
-  bool gERuleBPUnitWeaponBallisticArcTypeInfoConstructed = false;
-
-  alignas(moho::ERuleBPUnitWeaponTargetTypeTypeInfo)
-    unsigned char gERuleBPUnitWeaponTargetTypeTypeInfoStorage[sizeof(moho::ERuleBPUnitWeaponTargetTypeTypeInfo)];
-  bool gERuleBPUnitWeaponTargetTypeTypeInfoConstructed = false;
-
-  alignas(moho::ERuleBPUnitMovementTypeTypeInfo)
-    unsigned char gERuleBPUnitMovementTypeTypeInfoStorage[sizeof(moho::ERuleBPUnitMovementTypeTypeInfo)];
-  bool gERuleBPUnitMovementTypeTypeInfoConstructed = false;
-
-  alignas(moho::ERuleBPUnitCommandCapsTypeInfo)
-    unsigned char gERuleBPUnitCommandCapsTypeInfoStorage[sizeof(moho::ERuleBPUnitCommandCapsTypeInfo)];
-  bool gERuleBPUnitCommandCapsTypeInfoConstructed = false;
-
-  alignas(moho::ERuleBPUnitToggleCapsTypeInfo)
-    unsigned char gERuleBPUnitToggleCapsTypeInfoStorage[sizeof(moho::ERuleBPUnitToggleCapsTypeInfo)];
-  bool gERuleBPUnitToggleCapsTypeInfoConstructed = false;
-
-  alignas(moho::UnitWeaponRangeCategoryTypeInfo)
-    unsigned char gUnitWeaponRangeCategoryTypeInfoStorage[sizeof(moho::UnitWeaponRangeCategoryTypeInfo)];
-  bool gUnitWeaponRangeCategoryTypeInfoConstructed = false;
-
   /**
    * Demangled: gpg::PrimitiveSerHelper<enum Moho::ERuleBPUnitMovementType,int>
    *
@@ -106,294 +76,87 @@ namespace
   // self-registering via `__xc_a`).
   ERuleBPUnitToggleCapsPrimitiveSerializer gERuleBPUnitToggleCapsPrimitiveSerializer;
 
-  template <typename TTypeInfo, typename TEnum>
-  [[nodiscard]] gpg::REnumType* ConstructEnumTypeInfo(void* const storage)
-  {
-    auto* const typeInfo = new (storage) TTypeInfo();
-    gpg::PreRegisterRType(typeid(TEnum), typeInfo);
-    return typeInfo;
-  }
-
-  template <typename TTypeInfo>
-  void DestroyEnumTypeInfo(void* const storage) noexcept
-  {
-    reinterpret_cast<TTypeInfo*>(storage)->~TTypeInfo();
-  }
-
   void AddEnumEntry(gpg::REnumType* const typeInfo, const char* const token, const int value)
   {
     typeInfo->AddEnum(typeInfo->StripPrefix(token), value);
   }
 
-  // Lazy singleton storage constructor backing
-  // construct_ERuleBPUnitBuildRestrictionTypeInfo.
-  gpg::REnumType* construct_ERuleBPUnitBuildRestrictionTypeInfoImpl()
+  /**
+   * Address: 0x00BF3290 (FUN_00BF3290, atexit destructor of the ERuleBPUnitBuildRestrictionTypeInfo object)
+   */
+  [[nodiscard]] moho::ERuleBPUnitBuildRestrictionTypeInfo& GetERuleBPUnitBuildRestrictionTypeInfo()
   {
-    if (!gERuleBPUnitBuildRestrictionTypeInfoConstructed) {
-      (void)ConstructEnumTypeInfo<moho::ERuleBPUnitBuildRestrictionTypeInfo, moho::ERuleBPUnitBuildRestriction>(
-        gERuleBPUnitBuildRestrictionTypeInfoStorage
-      );
-      gERuleBPUnitBuildRestrictionTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(gERuleBPUnitBuildRestrictionTypeInfoStorage);
-  }
-
-  // Lazy singleton storage constructor backing
-  // construct_ERuleBPUnitWeaponBallisticArcTypeInfo.
-  gpg::REnumType* construct_ERuleBPUnitWeaponBallisticArcTypeInfoImpl()
-  {
-    if (!gERuleBPUnitWeaponBallisticArcTypeInfoConstructed) {
-      (void)
-        ConstructEnumTypeInfo<moho::ERuleBPUnitWeaponBallisticArcTypeInfo, moho::ERuleBPUnitWeaponBallisticArc>(
-          gERuleBPUnitWeaponBallisticArcTypeInfoStorage
-        );
-      gERuleBPUnitWeaponBallisticArcTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(gERuleBPUnitWeaponBallisticArcTypeInfoStorage);
-  }
-
-  // Lazy singleton storage constructor backing
-  // construct_ERuleBPUnitWeaponTargetTypeTypeInfo.
-  gpg::REnumType* construct_ERuleBPUnitWeaponTargetTypeTypeInfoImpl()
-  {
-    if (!gERuleBPUnitWeaponTargetTypeTypeInfoConstructed) {
-      (void)ConstructEnumTypeInfo<moho::ERuleBPUnitWeaponTargetTypeTypeInfo, moho::ERuleBPUnitWeaponTargetType>(
-        gERuleBPUnitWeaponTargetTypeTypeInfoStorage
-      );
-      gERuleBPUnitWeaponTargetTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(gERuleBPUnitWeaponTargetTypeTypeInfoStorage);
-  }
-
-  // Lazy singleton storage constructor backing construct_ERuleBPUnitMovementTypeTypeInfo.
-  gpg::REnumType* construct_ERuleBPUnitMovementTypeTypeInfoImpl()
-  {
-    if (!gERuleBPUnitMovementTypeTypeInfoConstructed) {
-      (void)ConstructEnumTypeInfo<moho::ERuleBPUnitMovementTypeTypeInfo, moho::ERuleBPUnitMovementType>(
-        gERuleBPUnitMovementTypeTypeInfoStorage
-      );
-      gERuleBPUnitMovementTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(gERuleBPUnitMovementTypeTypeInfoStorage);
-  }
-
-  // Lazy singleton storage constructor backing construct_ERuleBPUnitCommandCapsTypeInfo.
-  gpg::REnumType* construct_ERuleBPUnitCommandCapsTypeInfoImpl()
-  {
-    if (!gERuleBPUnitCommandCapsTypeInfoConstructed) {
-      (void)ConstructEnumTypeInfo<moho::ERuleBPUnitCommandCapsTypeInfo, moho::ERuleBPUnitCommandCaps>(
-        gERuleBPUnitCommandCapsTypeInfoStorage
-      );
-      gERuleBPUnitCommandCapsTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(gERuleBPUnitCommandCapsTypeInfoStorage);
-  }
-
-  // Lazy singleton storage constructor backing construct_ERuleBPUnitToggleCapsTypeInfo.
-  gpg::REnumType* construct_ERuleBPUnitToggleCapsTypeInfoImpl()
-  {
-    if (!gERuleBPUnitToggleCapsTypeInfoConstructed) {
-      (void)ConstructEnumTypeInfo<moho::ERuleBPUnitToggleCapsTypeInfo, moho::ERuleBPUnitToggleCaps>(
-        gERuleBPUnitToggleCapsTypeInfoStorage
-      );
-      gERuleBPUnitToggleCapsTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(gERuleBPUnitToggleCapsTypeInfoStorage);
-  }
-
-  // Lazy singleton storage constructor backing construct_UnitWeaponRangeCategoryTypeInfo.
-  gpg::REnumType* construct_UnitWeaponRangeCategoryTypeInfoImpl()
-  {
-    if (!gUnitWeaponRangeCategoryTypeInfoConstructed) {
-      (void)ConstructEnumTypeInfo<moho::UnitWeaponRangeCategoryTypeInfo, moho::UnitWeaponRangeCategory>(
-        gUnitWeaponRangeCategoryTypeInfoStorage
-      );
-      gUnitWeaponRangeCategoryTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(gUnitWeaponRangeCategoryTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::ERuleBPUnitBuildRestrictionTypeInfo& GetERuleBPUnitBuildRestrictionTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::ERuleBPUnitBuildRestrictionTypeInfo*>(
-      construct_ERuleBPUnitBuildRestrictionTypeInfoImpl()
-    );
-  }
-
-  [[nodiscard]] moho::ERuleBPUnitWeaponBallisticArcTypeInfo& GetERuleBPUnitWeaponBallisticArcTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::ERuleBPUnitWeaponBallisticArcTypeInfo*>(
-      construct_ERuleBPUnitWeaponBallisticArcTypeInfoImpl()
-    );
-  }
-
-  [[nodiscard]] moho::ERuleBPUnitWeaponTargetTypeTypeInfo& GetERuleBPUnitWeaponTargetTypeTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::ERuleBPUnitWeaponTargetTypeTypeInfo*>(
-      construct_ERuleBPUnitWeaponTargetTypeTypeInfoImpl()
-    );
-  }
-
-  [[nodiscard]] moho::ERuleBPUnitMovementTypeTypeInfo& GetERuleBPUnitMovementTypeTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::ERuleBPUnitMovementTypeTypeInfo*>(construct_ERuleBPUnitMovementTypeTypeInfoImpl());
-  }
-
-  [[nodiscard]] moho::ERuleBPUnitCommandCapsTypeInfo& GetERuleBPUnitCommandCapsTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::ERuleBPUnitCommandCapsTypeInfo*>(construct_ERuleBPUnitCommandCapsTypeInfoImpl());
-  }
-
-  [[nodiscard]] moho::ERuleBPUnitToggleCapsTypeInfo& GetERuleBPUnitToggleCapsTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::ERuleBPUnitToggleCapsTypeInfo*>(construct_ERuleBPUnitToggleCapsTypeInfoImpl());
-  }
-
-  [[nodiscard]] moho::UnitWeaponRangeCategoryTypeInfo& GetUnitWeaponRangeCategoryTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::UnitWeaponRangeCategoryTypeInfo*>(construct_UnitWeaponRangeCategoryTypeInfoImpl());
+    static moho::ERuleBPUnitBuildRestrictionTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
-   * Address: 0x00BF3290 (FUN_00BF3290)
-   *
-   * What it does:
-   * Tears down the recovered `ERuleBPUnitBuildRestrictionTypeInfo`
-   * descriptor at process exit.
+   * Address: 0x00BF32A0 (FUN_00BF32A0, atexit destructor of the ERuleBPUnitWeaponBallisticArcTypeInfo object)
    */
-  void cleanup_ERuleBPUnitBuildRestrictionTypeInfo()
+  [[nodiscard]] moho::ERuleBPUnitWeaponBallisticArcTypeInfo& GetERuleBPUnitWeaponBallisticArcTypeInfo()
   {
-    if (!gERuleBPUnitBuildRestrictionTypeInfoConstructed) {
-      return;
-    }
-
-    DestroyEnumTypeInfo<moho::ERuleBPUnitBuildRestrictionTypeInfo>(gERuleBPUnitBuildRestrictionTypeInfoStorage);
-    gERuleBPUnitBuildRestrictionTypeInfoConstructed = false;
+    static moho::ERuleBPUnitWeaponBallisticArcTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
-   * Address: 0x00BF32A0 (FUN_00BF32A0)
-   *
-   * What it does:
-   * Tears down the recovered `ERuleBPUnitWeaponBallisticArcTypeInfo`
-   * descriptor at process exit.
+   * Address: 0x00BF32B0 (FUN_00BF32B0, atexit destructor of the ERuleBPUnitWeaponTargetTypeTypeInfo object)
    */
-  void cleanup_ERuleBPUnitWeaponBallisticArcTypeInfo()
+  [[nodiscard]] moho::ERuleBPUnitWeaponTargetTypeTypeInfo& GetERuleBPUnitWeaponTargetTypeTypeInfo()
   {
-    if (!gERuleBPUnitWeaponBallisticArcTypeInfoConstructed) {
-      return;
-    }
-
-    DestroyEnumTypeInfo<moho::ERuleBPUnitWeaponBallisticArcTypeInfo>(gERuleBPUnitWeaponBallisticArcTypeInfoStorage);
-    gERuleBPUnitWeaponBallisticArcTypeInfoConstructed = false;
+    static moho::ERuleBPUnitWeaponTargetTypeTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
-   * Address: 0x00BF32B0 (FUN_00BF32B0)
-   *
-   * What it does:
-   * Tears down the recovered `ERuleBPUnitWeaponTargetTypeTypeInfo`
-   * descriptor at process exit.
+   * Address: 0x00BF31D0 (FUN_00BF31D0, atexit destructor of the ERuleBPUnitMovementTypeTypeInfo object)
    */
-  void cleanup_ERuleBPUnitWeaponTargetTypeTypeInfo()
+  [[nodiscard]] moho::ERuleBPUnitMovementTypeTypeInfo& GetERuleBPUnitMovementTypeTypeInfo()
   {
-    if (!gERuleBPUnitWeaponTargetTypeTypeInfoConstructed) {
-      return;
-    }
-
-    DestroyEnumTypeInfo<moho::ERuleBPUnitWeaponTargetTypeTypeInfo>(gERuleBPUnitWeaponTargetTypeTypeInfoStorage);
-    gERuleBPUnitWeaponTargetTypeTypeInfoConstructed = false;
+    static moho::ERuleBPUnitMovementTypeTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
-   * Address: 0x00BF31D0 (FUN_00BF31D0)
-   *
-   * What it does:
-   * Tears down the recovered `ERuleBPUnitMovementTypeTypeInfo` descriptor at
-   * process exit.
+   * Address: 0x00BF3210 (FUN_00BF3210, atexit destructor of the ERuleBPUnitCommandCapsTypeInfo object)
    */
-  void cleanup_ERuleBPUnitMovementTypeTypeInfo()
+  [[nodiscard]] moho::ERuleBPUnitCommandCapsTypeInfo& GetERuleBPUnitCommandCapsTypeInfo()
   {
-    if (!gERuleBPUnitMovementTypeTypeInfoConstructed) {
-      return;
-    }
-
-    DestroyEnumTypeInfo<moho::ERuleBPUnitMovementTypeTypeInfo>(gERuleBPUnitMovementTypeTypeInfoStorage);
-    gERuleBPUnitMovementTypeTypeInfoConstructed = false;
+    static moho::ERuleBPUnitCommandCapsTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
-   * Address: 0x00BF3210 (FUN_00BF3210)
-   *
-   * What it does:
-   * Tears down the recovered `ERuleBPUnitCommandCapsTypeInfo` descriptor at
-   * process exit.
+   * Address: 0x00BF3250 (FUN_00BF3250, atexit destructor of the ERuleBPUnitToggleCapsTypeInfo object)
    */
-  void cleanup_ERuleBPUnitCommandCapsTypeInfo()
+  [[nodiscard]] moho::ERuleBPUnitToggleCapsTypeInfo& GetERuleBPUnitToggleCapsTypeInfo()
   {
-    if (!gERuleBPUnitCommandCapsTypeInfoConstructed) {
-      return;
-    }
-
-    DestroyEnumTypeInfo<moho::ERuleBPUnitCommandCapsTypeInfo>(gERuleBPUnitCommandCapsTypeInfoStorage);
-    gERuleBPUnitCommandCapsTypeInfoConstructed = false;
+    static moho::ERuleBPUnitToggleCapsTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
-   * Address: 0x00BF3250 (FUN_00BF3250)
-   *
-   * What it does:
-   * Tears down the recovered `ERuleBPUnitToggleCapsTypeInfo` descriptor at
-   * process exit.
+   * Address: 0x00BF3680 (FUN_00BF3680, atexit destructor of the UnitWeaponRangeCategoryTypeInfo object)
    */
-  void cleanup_ERuleBPUnitToggleCapsTypeInfo()
+  [[nodiscard]] moho::UnitWeaponRangeCategoryTypeInfo& GetUnitWeaponRangeCategoryTypeInfo()
   {
-    if (!gERuleBPUnitToggleCapsTypeInfoConstructed) {
-      return;
-    }
-
-    DestroyEnumTypeInfo<moho::ERuleBPUnitToggleCapsTypeInfo>(gERuleBPUnitToggleCapsTypeInfoStorage);
-    gERuleBPUnitToggleCapsTypeInfoConstructed = false;
+    static moho::UnitWeaponRangeCategoryTypeInfo sInstance;
+    return sInstance;
   }
-
-  /**
-   * Address: 0x00BF3680 (FUN_00BF3680)
-   *
-   * What it does:
-   * Tears down the recovered `UnitWeaponRangeCategoryTypeInfo` descriptor at
-   * process exit.
-   */
-  void cleanup_UnitWeaponRangeCategoryTypeInfo()
-  {
-    if (!gUnitWeaponRangeCategoryTypeInfoConstructed) {
-      return;
-    }
-
-    DestroyEnumTypeInfo<moho::UnitWeaponRangeCategoryTypeInfo>(gUnitWeaponRangeCategoryTypeInfoStorage);
-    gUnitWeaponRangeCategoryTypeInfoConstructed = false;
-  }
-
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x005201F0 (FUN_005201F0, construct_ERuleBPUnitBuildRestrictionTypeInfo)
+   * Address: 0x005201F0 (FUN_005201F0, Moho::ERuleBPUnitBuildRestrictionTypeInfo::ERuleBPUnitBuildRestrictionTypeInfo)
    *
    * What it does:
    * Constructs the `ERuleBPUnitBuildRestriction` enum type descriptor and
    * preregisters RTTI.
    */
-  gpg::REnumType* construct_ERuleBPUnitBuildRestrictionTypeInfo()
+  ERuleBPUnitBuildRestrictionTypeInfo::ERuleBPUnitBuildRestrictionTypeInfo()
   {
-    return construct_ERuleBPUnitBuildRestrictionTypeInfoImpl();
+    gpg::PreRegisterRType(typeid(ERuleBPUnitBuildRestriction), this);
   }
 
   /**
@@ -435,15 +198,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00520310 (FUN_00520310, construct_ERuleBPUnitWeaponBallisticArcTypeInfo)
+   * Address: 0x00520310 (FUN_00520310, Moho::ERuleBPUnitWeaponBallisticArcTypeInfo::ERuleBPUnitWeaponBallisticArcTypeInfo)
    *
    * What it does:
    * Constructs the `ERuleBPUnitWeaponBallisticArc` enum type descriptor and
    * preregisters RTTI.
    */
-  gpg::REnumType* construct_ERuleBPUnitWeaponBallisticArcTypeInfo()
+  ERuleBPUnitWeaponBallisticArcTypeInfo::ERuleBPUnitWeaponBallisticArcTypeInfo()
   {
-    return construct_ERuleBPUnitWeaponBallisticArcTypeInfoImpl();
+    gpg::PreRegisterRType(typeid(ERuleBPUnitWeaponBallisticArc), this);
   }
 
   /**
@@ -485,15 +248,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00520420 (FUN_00520420, construct_ERuleBPUnitWeaponTargetTypeTypeInfo)
+   * Address: 0x00520420 (FUN_00520420, Moho::ERuleBPUnitWeaponTargetTypeTypeInfo::ERuleBPUnitWeaponTargetTypeTypeInfo)
    *
    * What it does:
    * Constructs the `ERuleBPUnitWeaponTargetType` enum type descriptor and
    * preregisters RTTI.
    */
-  gpg::REnumType* construct_ERuleBPUnitWeaponTargetTypeTypeInfo()
+  ERuleBPUnitWeaponTargetTypeTypeInfo::ERuleBPUnitWeaponTargetTypeTypeInfo()
   {
-    return construct_ERuleBPUnitWeaponTargetTypeTypeInfoImpl();
+    gpg::PreRegisterRType(typeid(ERuleBPUnitWeaponTargetType), this);
   }
 
   /**
@@ -534,15 +297,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x0051FA80 (FUN_0051FA80, construct_ERuleBPUnitMovementTypeTypeInfo)
+   * Address: 0x0051FA80 (FUN_0051FA80, Moho::ERuleBPUnitMovementTypeTypeInfo::ERuleBPUnitMovementTypeTypeInfo)
    *
    * What it does:
    * Constructs the `ERuleBPUnitMovementType` enum type descriptor and
    * preregisters RTTI.
    */
-  gpg::REnumType* construct_ERuleBPUnitMovementTypeTypeInfo()
+  ERuleBPUnitMovementTypeTypeInfo::ERuleBPUnitMovementTypeTypeInfo()
   {
-    return construct_ERuleBPUnitMovementTypeTypeInfoImpl();
+    gpg::PreRegisterRType(typeid(ERuleBPUnitMovementType), this);
   }
 
   /**
@@ -590,15 +353,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x0051FC80 (FUN_0051FC80, construct_ERuleBPUnitCommandCapsTypeInfo)
+   * Address: 0x0051FC80 (FUN_0051FC80, Moho::ERuleBPUnitCommandCapsTypeInfo::ERuleBPUnitCommandCapsTypeInfo)
    *
    * What it does:
    * Constructs the `ERuleBPUnitCommandCaps` enum type descriptor and
    * preregisters RTTI.
    */
-  gpg::REnumType* construct_ERuleBPUnitCommandCapsTypeInfo()
+  ERuleBPUnitCommandCapsTypeInfo::ERuleBPUnitCommandCapsTypeInfo()
   {
-    return construct_ERuleBPUnitCommandCapsTypeInfoImpl();
+    gpg::PreRegisterRType(typeid(ERuleBPUnitCommandCaps), this);
   }
 
   /**
@@ -661,15 +424,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00520000 (FUN_00520000, construct_ERuleBPUnitToggleCapsTypeInfo)
+   * Address: 0x00520000 (FUN_00520000, Moho::ERuleBPUnitToggleCapsTypeInfo::ERuleBPUnitToggleCapsTypeInfo)
    *
    * What it does:
    * Constructs the `ERuleBPUnitToggleCaps` enum type descriptor and
    * preregisters RTTI.
    */
-  gpg::REnumType* construct_ERuleBPUnitToggleCapsTypeInfo()
+  ERuleBPUnitToggleCapsTypeInfo::ERuleBPUnitToggleCapsTypeInfo()
   {
-    return construct_ERuleBPUnitToggleCapsTypeInfoImpl();
+    gpg::PreRegisterRType(typeid(ERuleBPUnitToggleCaps), this);
   }
 
   /**
@@ -716,15 +479,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x005220C0 (FUN_005220C0, construct_UnitWeaponRangeCategoryTypeInfo)
+   * Address: 0x005220C0 (FUN_005220C0, Moho::UnitWeaponRangeCategoryTypeInfo::UnitWeaponRangeCategoryTypeInfo)
    *
    * What it does:
    * Constructs the `UnitWeaponRangeCategory` enum type descriptor and
    * preregisters RTTI.
    */
-  gpg::REnumType* construct_UnitWeaponRangeCategoryTypeInfo()
+  UnitWeaponRangeCategoryTypeInfo::UnitWeaponRangeCategoryTypeInfo()
   {
-    return construct_UnitWeaponRangeCategoryTypeInfoImpl();
+    gpg::PreRegisterRType(typeid(UnitWeaponRangeCategory), this);
   }
 
   /**
@@ -770,64 +533,57 @@ namespace moho
   /**
    * Address: 0x00BC8A30 (FUN_00BC8A30, register_ERuleBPUnitBuildRestrictionTypeInfo)
    */
-  int register_ERuleBPUnitBuildRestrictionTypeInfo()
+  void register_ERuleBPUnitBuildRestrictionTypeInfo()
   {
     (void)GetERuleBPUnitBuildRestrictionTypeInfo();
-    return std::atexit(&cleanup_ERuleBPUnitBuildRestrictionTypeInfo);
   }
 
   /**
    * Address: 0x00BC8A50 (FUN_00BC8A50, register_ERuleBPUnitWeaponBallisticArcTypeInfo)
    */
-  int register_ERuleBPUnitWeaponBallisticArcTypeInfo()
+  void register_ERuleBPUnitWeaponBallisticArcTypeInfo()
   {
     (void)GetERuleBPUnitWeaponBallisticArcTypeInfo();
-    return std::atexit(&cleanup_ERuleBPUnitWeaponBallisticArcTypeInfo);
   }
 
   /**
    * Address: 0x00BC8A70 (FUN_00BC8A70, register_ERuleBPUnitWeaponTargetTypeTypeInfo)
    */
-  int register_ERuleBPUnitWeaponTargetTypeTypeInfo()
+  void register_ERuleBPUnitWeaponTargetTypeTypeInfo()
   {
     (void)GetERuleBPUnitWeaponTargetTypeTypeInfo();
-    return std::atexit(&cleanup_ERuleBPUnitWeaponTargetTypeTypeInfo);
   }
 
   /**
    * Address: 0x00BC8910 (FUN_00BC8910, register_ERuleBPUnitMovementTypeTypeInfo)
    */
-  int register_ERuleBPUnitMovementTypeTypeInfo()
+  void register_ERuleBPUnitMovementTypeTypeInfo()
   {
     (void)GetERuleBPUnitMovementTypeTypeInfo();
-    return std::atexit(&cleanup_ERuleBPUnitMovementTypeTypeInfo);
   }
 
   /**
    * Address: 0x00BC8970 (FUN_00BC8970, register_ERuleBPUnitCommandCapsTypeInfo)
    */
-  int register_ERuleBPUnitCommandCapsTypeInfo()
+  void register_ERuleBPUnitCommandCapsTypeInfo()
   {
     (void)GetERuleBPUnitCommandCapsTypeInfo();
-    return std::atexit(&cleanup_ERuleBPUnitCommandCapsTypeInfo);
   }
 
   /**
    * Address: 0x00BC89D0 (FUN_00BC89D0, register_ERuleBPUnitToggleCapsTypeInfo)
    */
-  int register_ERuleBPUnitToggleCapsTypeInfo()
+  void register_ERuleBPUnitToggleCapsTypeInfo()
   {
     (void)GetERuleBPUnitToggleCapsTypeInfo();
-    return std::atexit(&cleanup_ERuleBPUnitToggleCapsTypeInfo);
   }
 
   /**
    * Address: 0x00BC8BD0 (FUN_00BC8BD0, register_UnitWeaponRangeCategoryTypeInfo)
    */
-  int register_UnitWeaponRangeCategoryTypeInfo()
+  void register_UnitWeaponRangeCategoryTypeInfo()
   {
     (void)GetUnitWeaponRangeCategoryTypeInfo();
-    return std::atexit(&cleanup_UnitWeaponRangeCategoryTypeInfo);
   }
 } // namespace moho
 
@@ -837,13 +593,13 @@ namespace
   {
     RUnitBlueprintEnumTypeInfoBootstrap()
     {
-      (void)moho::register_ERuleBPUnitBuildRestrictionTypeInfo();
-      (void)moho::register_ERuleBPUnitWeaponBallisticArcTypeInfo();
-      (void)moho::register_ERuleBPUnitWeaponTargetTypeTypeInfo();
-      (void)moho::register_ERuleBPUnitMovementTypeTypeInfo();
-      (void)moho::register_ERuleBPUnitCommandCapsTypeInfo();
-      (void)moho::register_ERuleBPUnitToggleCapsTypeInfo();
-      (void)moho::register_UnitWeaponRangeCategoryTypeInfo();
+      moho::register_ERuleBPUnitBuildRestrictionTypeInfo();
+      moho::register_ERuleBPUnitWeaponBallisticArcTypeInfo();
+      moho::register_ERuleBPUnitWeaponTargetTypeTypeInfo();
+      moho::register_ERuleBPUnitMovementTypeTypeInfo();
+      moho::register_ERuleBPUnitCommandCapsTypeInfo();
+      moho::register_ERuleBPUnitToggleCapsTypeInfo();
+      moho::register_UnitWeaponRangeCategoryTypeInfo();
     }
   };
 

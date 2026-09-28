@@ -12,34 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(EPathTypeTypeInfo) unsigned char gEPathTypeTypeInfoStorage[sizeof(EPathTypeTypeInfo)] = {};
-  bool gEPathTypeTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF7410 (FUN_00BF7410, atexit destructor of the EPathTypeTypeInfo object)
+   */
   [[nodiscard]] EPathTypeTypeInfo* AcquireEPathTypeTypeInfo()
   {
-    if (!gEPathTypeTypeInfoConstructed) {
-      auto* const typeInfo = new (gEPathTypeTypeInfoStorage) EPathTypeTypeInfo();
-      gpg::PreRegisterRType(typeid(EPathType), typeInfo);
-      gEPathTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<EPathTypeTypeInfo*>(gEPathTypeTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF7410 (FUN_00BF7410, cleanup_EPathTypeTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `EPathTypeTypeInfo` reflection storage.
-   */
-  void cleanup_EPathTypeTypeInfo()
-  {
-    if (!gEPathTypeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEPathTypeTypeInfo()->~EPathTypeTypeInfo();
-    gEPathTypeTypeInfoConstructed = false;
+    static EPathTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
   // Address: 0x010AEFEC -- process-global `PrimitiveSerHelper<EPathType,int>`
@@ -99,13 +78,11 @@ void EPathTypeTypeInfo::Init()
  * Address: 0x00BCD270 (FUN_00BCD270, register_EPathTypeTypeInfo)
  *
  * What it does:
- * Constructs/preregisters startup RTTI descriptor for `EPathType` and
- * installs process-exit cleanup.
+ * Constructs/preregisters startup RTTI descriptor for `EPathType`.
  */
-int moho::register_EPathTypeTypeInfo()
+void moho::register_EPathTypeTypeInfo()
 {
   (void)AcquireEPathTypeTypeInfo();
-  return std::atexit(&cleanup_EPathTypeTypeInfo);
 }
 
 namespace
@@ -114,7 +91,7 @@ namespace
   {
     EPathTypeTypeInfoBootstrap()
     {
-      (void)moho::register_EPathTypeTypeInfo();
+      moho::register_EPathTypeTypeInfo();
     }
   };
 

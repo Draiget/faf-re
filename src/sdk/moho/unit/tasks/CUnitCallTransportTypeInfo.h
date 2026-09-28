@@ -65,20 +65,12 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BF95C0 (FUN_00BF95C0, cleanup_CUnitCallTransportTypeInfo)
-   *
-   * What it does:
-   * Releases reflected base/field buffers of the global type-info owner.
-   */
-  void cleanup_CUnitCallTransportTypeInfo();
-
-  /**
    * Address: 0x00BCFC40 (FUN_00BCFC40, register_CUnitCallTransportTypeInfo)
    *
    * What it does:
-   * Constructs the global type-info owner and schedules process-exit cleanup.
+   * Constructs the global type-info owner.
    */
-  int register_CUnitCallTransportTypeInfo();
+  void register_CUnitCallTransportTypeInfo();
 
   static_assert(sizeof(CUnitCallTransportTypeInfo) == 0x64, "CUnitCallTransportTypeInfo size must be 0x64");
 } // namespace moho

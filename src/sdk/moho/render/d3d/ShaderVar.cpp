@@ -2,8 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Effect.hpp"
@@ -15,52 +13,68 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 
+namespace moho
+{
+  // The six globals below are defined ahead of the bootstrap objects further
+  // down in this file: C++ constructs a translation unit's namespace-scope
+  // objects in definition order, so each one is default-constructed before
+  // its registrar runs `RegisterShaderVar` on it. No other translation unit
+  // reads them during static initialization.
+
+  /**
+   * Address: 0x00BEF140 (FUN_00BEF140, dynamic atexit destructor for `shaderVarPrimBatcherCompositeMatrix`)
+   *
+   * What it does:
+   * The prim-batcher `CompositeMatrix` shader-var (binary global 0x010A7840).
+   */
+  ShaderVar shaderVarPrimBatcherCompositeMatrix;
+
+  /**
+   * Address: 0x00BEF150 (FUN_00BEF150, dynamic atexit destructor for `shaderVarPrimBatcherTexture1`)
+   *
+   * What it does:
+   * The prim-batcher `Texture1` shader-var (binary global 0x010A78D0).
+   */
+  ShaderVar shaderVarPrimBatcherTexture1;
+
+  /**
+   * Address: 0x00BEF160 (FUN_00BEF160, dynamic atexit destructor for `shaderVarPrimBatcherAlphaMultiplier`)
+   *
+   * What it does:
+   * The prim-batcher `AlphaMultiplier` shader-var (binary global 0x010A7888).
+   */
+  ShaderVar shaderVarPrimBatcherAlphaMultiplier;
+
+  /**
+   * Address: 0x00C07480 (FUN_00C07480, dynamic atexit destructor for `shaderVarPrimBatcherTime`)
+   *
+   * What it does:
+   * The prim-batcher `time` shader-var (binary global 0x010C4340).
+   */
+  ShaderVar shaderVarPrimBatcherTime;
+
+  /**
+   * Address: 0x00C056A0 (FUN_00C056A0, dynamic atexit destructor for `shaderVarTerrainHeightScale`)
+   *
+   * What it does:
+   * The terrain `HeightScale` shader-var (binary global 0x010C0630), bound by
+   * every TerrainCommon fidelity class's Func3 override (`mov esi, offset
+   * shaderVarTerrainHeightScale` at 0x00800550 in HighFidelityTerrain::Func3).
+   */
+  ShaderVar shaderVarTerrainHeightScale;
+
+  /**
+   * Address: 0x00C056C0 (FUN_00C056C0, dynamic atexit destructor for `shaderVarTerrainTime`)
+   *
+   * What it does:
+   * The terrain `Time` shader-var (binary global 0x010C02D0), bound next to
+   * `shaderVarTerrainHeightScale` (0x0080057D in HighFidelityTerrain::Func3).
+   */
+  ShaderVar shaderVarTerrainTime;
+} // namespace moho
+
 namespace
 {
-  template <std::uintptr_t SlotAddress>
-  struct ShaderVarSlot;
-
-#define DEFINE_SHADER_VAR_SLOT(SLOT_ADDRESS) \
-  template <> \
-  struct ShaderVarSlot<SLOT_ADDRESS> \
-  { \
-    alignas(moho::ShaderVar) static std::byte storage[sizeof(moho::ShaderVar)]; \
-    static bool constructed; \
-  }; \
-  alignas(moho::ShaderVar) std::byte ShaderVarSlot<SLOT_ADDRESS>::storage[sizeof(moho::ShaderVar)]{}; \
-  bool ShaderVarSlot<SLOT_ADDRESS>::constructed = false
-
-  DEFINE_SHADER_VAR_SLOT(0x010A7840u);
-  DEFINE_SHADER_VAR_SLOT(0x010A78D0u);
-  DEFINE_SHADER_VAR_SLOT(0x010A7888u);
-  DEFINE_SHADER_VAR_SLOT(0x010C0630u);
-  DEFINE_SHADER_VAR_SLOT(0x010C02D0u);
-  DEFINE_SHADER_VAR_SLOT(0x010C4340u);
-
-#undef DEFINE_SHADER_VAR_SLOT
-
-  template <std::uintptr_t SlotAddress>
-  [[nodiscard]] moho::ShaderVar& AccessShaderVarSlot() noexcept
-  {
-    auto* const slot = reinterpret_cast<moho::ShaderVar*>(ShaderVarSlot<SlotAddress>::storage);
-    if (!ShaderVarSlot<SlotAddress>::constructed) {
-      ::new (static_cast<void*>(slot)) moho::ShaderVar();
-      ShaderVarSlot<SlotAddress>::constructed = true;
-    }
-    return *slot;
-  }
-
-  template <std::uintptr_t SlotAddress>
-  void DestroyShaderVarSlot() noexcept
-  {
-    if (!ShaderVarSlot<SlotAddress>::constructed) {
-      return;
-    }
-
-    AccessShaderVarSlot<SlotAddress>().~ShaderVar();
-    ShaderVarSlot<SlotAddress>::constructed = false;
-  }
-
   [[nodiscard]] moho::CD3DEffect* ResolveOwnerEffect(const moho::ShaderVar& shaderVar) noexcept
   {
     return reinterpret_cast<moho::CD3DEffect*>(shaderVar.mEffectLink.mLinkLane);
@@ -97,14 +111,6 @@ namespace
     return shaderVar;
   }
 
-  template <std::uintptr_t SlotAddress>
-  void RegisterPrimBatcherShaderVar(const char* const variableName, void (*cleanupFn)())
-  {
-    moho::ShaderVar& slot = AccessShaderVarSlot<SlotAddress>();
-    moho::RegisterShaderVar(variableName, &slot, "primbatcher");
-    (void)std::atexit(cleanupFn);
-  }
-
   struct PrimBatcherShaderVarBootstrap
   {
     PrimBatcherShaderVarBootstrap()
@@ -132,44 +138,6 @@ namespace
 
 namespace moho
 {
-  [[nodiscard]] ShaderVar& GetPrimBatcherCompositeMatrixShaderVar()
-  {
-    return AccessShaderVarSlot<0x010A7840u>();
-  }
-
-  [[nodiscard]] ShaderVar& GetPrimBatcherTexture1ShaderVar()
-  {
-    return AccessShaderVarSlot<0x010A78D0u>();
-  }
-
-  [[nodiscard]] ShaderVar& GetPrimBatcherAlphaMultiplierShaderVar()
-  {
-    return AccessShaderVarSlot<0x010A7888u>();
-  }
-
-  [[nodiscard]] ShaderVar& GetPrimBatcherTimeShaderVar()
-  {
-    return AccessShaderVarSlot<0x010C4340u>();
-  }
-
-  /**
-   * Standalone terrain shader-var globals bound by every TerrainCommon
-   * fidelity class's Func3 override (`shaderVarTerrainHeightScale`/
-   * `shaderVarTerrainTime` in the binary - direct symbol references, not
-   * members of `TerrainShaderVarSet`, confirmed via `mov esi, offset
-   * shaderVarTerrainHeightScale` at 0x00800550/0x0080057D in
-   * HighFidelityTerrain::Func3's disassembly).
-   */
-  [[nodiscard]] ShaderVar& GetTerrainHeightScaleShaderVar()
-  {
-    return AccessShaderVarSlot<0x010C0630u>();
-  }
-
-  [[nodiscard]] ShaderVar& GetTerrainTimeShaderVar()
-  {
-    return AccessShaderVarSlot<0x010C02D0u>();
-  }
-
   /**
    * Address: 0x00438000 (FUN_00438000, func_register_ShaderVar)
    *
@@ -388,85 +356,36 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BEF140 (FUN_00BEF140, sub_BEF140)
-   *
-   * What it does:
-   * Runs the prim-batcher `CompositeMatrix` shader-var destructor at process
-   * exit.
-   */
-  void cleanup_ShaderVarPrimBatcherCompositeMatrix()
-  {
-    DestroyShaderVarSlot<0x010A7840u>();
-  }
-
-  /**
    * Address: 0x00BC3FF0 (FUN_00BC3FF0, register_ShaderVarPrimBatcherCompositeMatrix)
    *
    * What it does:
-   * Registers the prim-batcher `CompositeMatrix` shader-var and its exit cleanup
-   * thunk.
+   * Registers the prim-batcher `CompositeMatrix` shader-var.
    */
   void register_ShaderVarPrimBatcherCompositeMatrix()
   {
-    RegisterPrimBatcherShaderVar<0x010A7840u>("CompositeMatrix", &cleanup_ShaderVarPrimBatcherCompositeMatrix);
-  }
-
-  /**
-   * Address: 0x00BEF150 (FUN_00BEF150, sub_BEF150)
-   *
-   * What it does:
-   * Runs the prim-batcher `Texture1` shader-var destructor at process exit.
-   */
-  void cleanup_ShaderVarPrimBatcherTexture1()
-  {
-    DestroyShaderVarSlot<0x010A78D0u>();
+    RegisterShaderVar("CompositeMatrix", &shaderVarPrimBatcherCompositeMatrix, "primbatcher");
   }
 
   /**
    * Address: 0x00BC4010 (FUN_00BC4010, register_ShaderVarPrimBatcherTexture1)
    *
    * What it does:
-   * Registers the prim-batcher `Texture1` shader-var and its exit cleanup thunk.
+   * Registers the prim-batcher `Texture1` shader-var.
    */
   void register_ShaderVarPrimBatcherTexture1()
   {
-    RegisterPrimBatcherShaderVar<0x010A78D0u>("Texture1", &cleanup_ShaderVarPrimBatcherTexture1);
-  }
-
-  /**
-   * Address: 0x00BEF160 (FUN_00BEF160, sub_BEF160)
-   *
-   * What it does:
-   * Runs the prim-batcher `AlphaMultiplier` shader-var destructor at process
-   * exit.
-   */
-  void cleanup_ShaderVarPrimBatcherAlphaMultiplier()
-  {
-    DestroyShaderVarSlot<0x010A7888u>();
+    RegisterShaderVar("Texture1", &shaderVarPrimBatcherTexture1, "primbatcher");
   }
 
   /**
    * Address: 0x00BC4030 (FUN_00BC4030, register_ShaderVarPrimBatcherAlphaMultiplier)
    *
    * What it does:
-   * Registers the prim-batcher `AlphaMultiplier` shader-var and its exit cleanup
-   * thunk.
+   * Registers the prim-batcher `AlphaMultiplier` shader-var.
    */
   void register_ShaderVarPrimBatcherAlphaMultiplier()
   {
-    RegisterPrimBatcherShaderVar<0x010A7888u>("AlphaMultiplier", &cleanup_ShaderVarPrimBatcherAlphaMultiplier);
-  }
-
-  /**
-   * Address: 0x00C07480 (FUN_00C07480, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Runs the prim-batcher time shader-var destructor at process exit.
-   */
-  void cleanup_ShaderVarPrimBatcherTime()
-  {
-    DestroyShaderVarSlot<0x010C4340u>();
+    RegisterShaderVar("AlphaMultiplier", &shaderVarPrimBatcherAlphaMultiplier, "primbatcher");
   }
 
   /**
@@ -475,23 +394,22 @@ namespace moho
    * What it does:
    * Registers the prim-batcher `time` shader-var (lowercase in the binary's
    * `.rdata` string, unlike its `CompositeMatrix`/`Texture1`/
-   * `AlphaMultiplier` siblings) and its exit cleanup thunk.
+   * `AlphaMultiplier` siblings).
    */
   void register_ShaderVarPrimBatcherTime()
   {
-    RegisterPrimBatcherShaderVar<0x010C4340u>("time", &cleanup_ShaderVarPrimBatcherTime);
+    RegisterShaderVar("time", &shaderVarPrimBatcherTime, "primbatcher");
   }
 
   /**
    * Address: 0x00BE2F70 (FUN_00BE2F70, register_ShaderVarTerrainHeightScale)
-   * Cleanup: 0x00C056A0 (registered via atexit)
    *
    * What it does:
-   * Runs the terrain height-scale shader-var destructor at process exit.
-   * The registrar's own disassembly (0x00BE2F70) confirms the registration
-   * key is the bare effect-parameter name `"HeightScale"`, not
-   * `"TerrainHeightScale"` -- the earlier note conflated IDA's own label for
-   * the global slot (`shaderVarTerrainHeightScale`, referenced by address in
+   * Registers the terrain height-scale shader-var. The registrar's own
+   * disassembly (0x00BE2F70) confirms the registration key is the bare
+   * effect-parameter name `"HeightScale"`, not `"TerrainHeightScale"` -- the
+   * earlier note conflated IDA's own label for the global
+   * (`shaderVarTerrainHeightScale`, referenced by address in
    * HighFidelityTerrain::Func3 at 0x00800550) with the runtime lookup string,
    * which is a different thing entirely. `terrain.fx` (effects.nx2) declares
    * the parameter as `float HeightScale;` with no prefix, confirming this by
@@ -500,38 +418,23 @@ namespace moho
    * `GetParameterByName` finds nothing and calls `ThrowGalError`), crashing
    * the process on the first painted frame.
    */
-  void cleanup_ShaderVarTerrainHeightScale()
-  {
-    DestroyShaderVarSlot<0x010C0630u>();
-  }
-
   void register_ShaderVarTerrainHeightScale()
   {
-    ShaderVar& slot = AccessShaderVarSlot<0x010C0630u>();
-    RegisterShaderVar("HeightScale", &slot, "terrain");
-    (void)std::atexit(&cleanup_ShaderVarTerrainHeightScale);
+    RegisterShaderVar("HeightScale", &shaderVarTerrainHeightScale, "terrain");
   }
 
   /**
    * Address: 0x00BE2FB0 (FUN_00BE2FB0, register_ShaderVarTerrainTime)
-   * Cleanup: 0x00C056C0 (registered via atexit)
    *
    * What it does:
-   * Runs the terrain time shader-var destructor at process exit. Same
-   * mislabeled-evidence bug as `cleanup_ShaderVarTerrainHeightScale`: the
-   * registrar's own disassembly (0x00BE2FB0) shows the registration key is
-   * `"Time"`, matching `terrain.fx`'s `float Time;` -- not `"TerrainTime"`.
+   * Registers the terrain time shader-var. Same mislabeled-evidence bug as
+   * `register_ShaderVarTerrainHeightScale`: the registrar's own disassembly
+   * (0x00BE2FB0) shows the registration key is `"Time"`, matching
+   * `terrain.fx`'s `float Time;` -- not `"TerrainTime"`.
    */
-  void cleanup_ShaderVarTerrainTime()
-  {
-    DestroyShaderVarSlot<0x010C02D0u>();
-  }
-
   void register_ShaderVarTerrainTime()
   {
-    ShaderVar& slot = AccessShaderVarSlot<0x010C02D0u>();
-    RegisterShaderVar("Time", &slot, "terrain");
-    (void)std::atexit(&cleanup_ShaderVarTerrainTime);
+    RegisterShaderVar("Time", &shaderVarTerrainTime, "terrain");
   }
 
   /**

@@ -11,29 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CUIWorldViewTypeInfo) unsigned char gCUIWorldViewTypeInfoStorage[sizeof(CUIWorldViewTypeInfo)];
-  bool gCUIWorldViewTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C07990 (FUN_00C07990, atexit destructor of the CUIWorldViewTypeInfo object)
+   */
   [[nodiscard]] CUIWorldViewTypeInfo& AcquireCUIWorldViewTypeInfo()
   {
-    if (!gCUIWorldViewTypeInfoConstructed) {
-      new (gCUIWorldViewTypeInfoStorage) CUIWorldViewTypeInfo();
-      gCUIWorldViewTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CUIWorldViewTypeInfo*>(gCUIWorldViewTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00C07990 (atexit lane registered by FUN_00BE6920)
-   */
-  void cleanup_CUIWorldViewTypeInfo()
-  {
-    if (!gCUIWorldViewTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CUIWorldViewTypeInfo*>(gCUIWorldViewTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CUIWorldViewTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CUIWorldViewTypeInfoBootstrap
@@ -116,13 +100,11 @@ void CUIWorldViewTypeInfo::Init()
  * Address: 0x00BE6920 (FUN_00BE6920, sub_BE6920)
  *
  * What it does:
- * Constructs the static descriptor and registers its teardown, exactly as the
- * binary's static-initialiser entry does.
+ * Constructs the static `CUIWorldView` type-info object.
  */
 void moho::register_CUIWorldViewTypeInfoStartup()
 {
   (void)AcquireCUIWorldViewTypeInfo();
-  (void)std::atexit(&cleanup_CUIWorldViewTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

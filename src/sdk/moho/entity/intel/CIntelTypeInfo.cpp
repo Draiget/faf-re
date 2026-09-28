@@ -1,6 +1,5 @@
 #include "moho/entity/intel/CIntelTypeInfo.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -10,40 +9,13 @@
 
 namespace
 {
-  template <class TTypeInfo>
-  struct TypeInfoStorage
+  /**
+   * Address: 0x00C01D90 (FUN_00C01D90, atexit destructor of the CIntelTypeInfo object)
+   */
+  [[nodiscard]] moho::CIntelTypeInfo& GetCIntelTypeInfo()
   {
-    alignas(TTypeInfo) unsigned char bytes[sizeof(TTypeInfo)];
-    bool constructed = false;
-  };
-
-  template <class TTypeInfo>
-  [[nodiscard]] TTypeInfo& EnsureTypeInfo(TypeInfoStorage<TTypeInfo>& storage) noexcept
-  {
-    if (!storage.constructed) {
-      new (storage.bytes) TTypeInfo();
-      storage.constructed = true;
-    }
-
-    return *reinterpret_cast<TTypeInfo*>(storage.bytes);
-  }
-
-  template <class TTypeInfo>
-  void DestroyTypeInfo(TypeInfoStorage<TTypeInfo>& storage) noexcept
-  {
-    if (!storage.constructed) {
-      return;
-    }
-
-    reinterpret_cast<TTypeInfo*>(storage.bytes)->~TTypeInfo();
-    storage.constructed = false;
-  }
-
-  TypeInfoStorage<moho::CIntelTypeInfo> gCIntelTypeInfoStorage{};
-
-  [[nodiscard]] moho::CIntelTypeInfo& GetCIntelTypeInfo() noexcept
-  {
-    return EnsureTypeInfo(gCIntelTypeInfoStorage);
+    static moho::CIntelTypeInfo sInstance;
+    return sInstance;
   }
 
   void DestroyHandleSlots(moho::CIntel* const intel)
@@ -154,26 +126,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00C01D90 (FUN_00C01D90, cleanup_CIntelTypeInfo)
-   *
-   * What it does:
-   * Runs process-exit teardown for startup `CIntelTypeInfo` storage.
-   */
-  void cleanup_CIntelTypeInfo()
-  {
-    DestroyTypeInfo(gCIntelTypeInfoStorage);
-  }
-
-  /**
    * Address: 0x00BDCBC0 (FUN_00BDCBC0, register_CIntelTypeInfo)
    *
    * What it does:
-   * Builds startup `CIntelTypeInfo` storage and installs process-exit cleanup.
+   * Builds the startup `CIntelTypeInfo` object.
    */
   void register_CIntelTypeInfo()
   {
     (void)GetCIntelTypeInfo();
-    (void)std::atexit(&cleanup_CIntelTypeInfo);
   }
 } // namespace moho
 

@@ -2,32 +2,15 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/IFormationInstanceCountedPtrReflection.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  msvc8::string gFormationInstancePtrFastVectorTypeName;
-  bool gFormationInstancePtrFastVectorTypeNameCleanupRegistered = false;
-
-  /**
-   * Address: 0x00BF68C0 (FUN_00BF68C0, sub_BF68C0)
-   *
-   * What it does:
-   * Process-exit cleanup for `RFastVectorType<Moho::IFormationInstance*>::GetName`'s
-   * cached display-name string.
-   */
-  void CleanupFormationInstancePtrFastVectorTypeName()
-  {
-    gFormationInstancePtrFastVectorTypeName = msvc8::string{};
-    gFormationInstancePtrFastVectorTypeNameCleanupRegistered = false;
-  }
-
   /**
    * Address: 0x0059CF00 (FUN_0059CF00, gpg::RFastVectorType_IFormationInstance_P::SerLoad)
    *
@@ -90,20 +73,13 @@ namespace
     }
   }
 
-  gpg::RFastVectorType<moho::IFormationInstance*> gFastVectorIFormationInstancePtrType;
-
   /**
-   * Address: 0x00BF6980 (FUN_00BF6980, cleanup_RFastVectorType_IFormationInstance)
-   *
-   * What it does:
-   * Process-exit cleanup for the global `RFastVectorType<Moho::IFormationInstance*>`
-   * descriptor's dynamic field/base storage (the same generic `gpg::RType`
-   * base-class teardown every `RFastVectorType<T>` specialization shares).
+   * Address: 0x00BF6980 (FUN_00BF6980, atexit destructor of the RFastVectorType<Moho::IFormationInstance*> object)
    */
-  void cleanup_RFastVectorType_IFormationInstance()
+  [[nodiscard]] gpg::RFastVectorType<moho::IFormationInstance*>* AcquireFastVectorIFormationInstancePtrType()
   {
-    gFastVectorIFormationInstancePtrType.fields_.clear();
-    gFastVectorIFormationInstancePtrType.bases_.clear();
+    static gpg::RFastVectorType<moho::IFormationInstance*> sInstance;
+    return &sInstance;
   }
 
   struct FastVectorIFormationInstanceReflectionBootstrap
@@ -121,16 +97,15 @@ namespace
  * Address: 0x00BCC210 (FUN_00BCC210, register_RFastVectorType_IFormationInstance)
  *
  * What it does:
- * Materializes startup reflection storage for `fastvector<Moho::IFormationInstance*>`
- * and registers process-exit teardown. Reached from the CRT static-initializer
- * table (`__xc_a`) in the binary; recovered here as the constructor of the
- * file-local `FastVectorIFormationInstanceReflectionBootstrap` global, matching
+ * Constructs the `fastvector<Moho::IFormationInstance*>` reflection
+ * descriptor. Reached from the CRT static-initializer table (`__xc_a`) in the
+ * binary; recovered here as the constructor of the file-local
+ * `FastVectorIFormationInstanceReflectionBootstrap` global, matching
  * `register_RFastVectorType_EntId`'s own bootstrap pattern.
  */
 void gpg::register_RFastVectorType_IFormationInstance()
 {
-  (void)gFastVectorIFormationInstancePtrType;
-  (void)std::atexit(&cleanup_RFastVectorType_IFormationInstance);
+  (void)AcquireFastVectorIFormationInstancePtrType();
 }
 
 /**
@@ -158,30 +133,17 @@ gpg::RFastVectorType<moho::IFormationInstance*>::~RFastVectorType() = default;
 
 /**
  * Address: 0x0059C9A0 (FUN_0059C9A0, gpg::RFastVectorType_IFormationInstance_P::GetName)
+ * Address: 0x00BF68C0 (FUN_00BF68C0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily formats and caches "fastvector<IFormationInstance*>" from the
- * pointer-element type's own reflected name (queried via
- * `Moho::IFormationInstance::GetPointerType()->GetName()`), guarded by a
- * once-init flag and torn down at process exit -- matches the binary's
- * `dword_10C8B50` bit0 guard + `atexit(sub_BF68C0)` shape, and the sibling
- * `RFastVectorType<moho::ReconBlip*>::GetName` recovery in
- * UnitFastVectorReflection.cpp.
+ * Builds `fastvector<IFormationInstance*>` once from the pointer-element
+ * type's own reflected name and returns it.
  */
 const char* gpg::RFastVectorType<moho::IFormationInstance*>::GetName() const
 {
-  if (gFormationInstancePtrFastVectorTypeName.empty()) {
-    gpg::RType* const pointerType = moho::IFormationInstance::GetPointerType();
-    const char* const elementName = pointerType ? pointerType->GetName() : "IFormationInstance*";
-    gFormationInstancePtrFastVectorTypeName =
-      gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "IFormationInstance*");
-    if (!gFormationInstancePtrFastVectorTypeNameCleanupRegistered) {
-      gFormationInstancePtrFastVectorTypeNameCleanupRegistered = true;
-      (void)std::atexit(&CleanupFormationInstancePtrFastVectorTypeName);
-    }
-  }
-
-  return gFormationInstancePtrFastVectorTypeName.c_str();
+  static const msvc8::string sName =
+    gpg::STR_Printf("fastvector<%s>", moho::IFormationInstance::GetPointerType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -251,3 +213,7 @@ void gpg::RFastVectorType<moho::IFormationInstance*>::SetCount(void* obj, const 
   auto& vec = *static_cast<gpg::fastvector<moho::IFormationInstance*>*>(obj);
   vec.Resize(static_cast<std::size_t>(count));
 }
+
+// Phase-1 pre-registration: run this descriptor registration ahead of every
+// consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_RFastVectorType_IFormationInstance_59ded0, gpg::register_RFastVectorType_IFormationInstance)

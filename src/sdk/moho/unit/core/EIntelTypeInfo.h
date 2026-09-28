@@ -79,7 +79,7 @@ namespace moho
    * Address: 0x00BC7B90 (FUN_00BC7B90, register_EIntelTypeInfo)
    *
    * What it does:
-   * Runs `EIntel` typeinfo preregistration and installs process-exit cleanup.
+   * Runs `EIntel` typeinfo preregistration.
    */
-  int register_EIntelTypeInfo();
+  void register_EIntelTypeInfo();
 } // namespace moho

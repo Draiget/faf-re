@@ -59,22 +59,12 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BF9360 (FUN_00BF9360)
-   *
-   * What it does:
-   * Releases reflected base/field buffers for global `CUnitUpgradeTaskTypeInfo`
-   * storage.
-   */
-  void cleanup_CUnitUpgradeTaskTypeInfo();
-
-  /**
    * Address: 0x00BCF8D0 (FUN_00BCF8D0, sub_BCF8D0)
    *
    * What it does:
-   * Constructs the startup-owned `CUnitUpgradeTaskTypeInfo` instance and
-   * schedules process-exit cleanup.
+   * Constructs the startup-owned `CUnitUpgradeTaskTypeInfo` instance.
    */
-  int register_CUnitUpgradeTaskTypeInfo();
+  void register_CUnitUpgradeTaskTypeInfo();
 
   static_assert(sizeof(CUnitUpgradeTaskTypeInfo) == 0x64, "CUnitUpgradeTaskTypeInfo size must be 0x64");
 } // namespace moho

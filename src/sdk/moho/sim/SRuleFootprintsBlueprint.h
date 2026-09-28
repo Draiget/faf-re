@@ -61,18 +61,10 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_SRuleFootprintsBlueprintTypeInfo();
 
   /**
-   * Address: 0x00BF2880 (FUN_00BF2880, cleanup_SRuleFootprintsBlueprintTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `SRuleFootprintsBlueprintTypeInfo` storage at process exit.
-   */
-  void cleanup_SRuleFootprintsBlueprintTypeInfo();
-
-  /**
    * Address: 0x00BC8380 (FUN_00BC8380, register_SRuleFootprintsBlueprintTypeInfoStartup)
    *
    * What it does:
-   * Preregisters `SRuleFootprintsBlueprint` RTTI and installs process-exit cleanup.
+   * Preregisters `SRuleFootprintsBlueprint` RTTI.
    */
-  int register_SRuleFootprintsBlueprintTypeInfoStartup();
+  void register_SRuleFootprintsBlueprintTypeInfoStartup();
 } // namespace moho

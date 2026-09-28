@@ -49,18 +49,10 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_CAniDefaultSkelTypeInfo();
 
   /**
-   * Address: 0x00BF44E0 (FUN_00BF44E0, cleanup_CAniDefaultSkelTypeInfo)
-   *
-   * What it does:
-   * Releases startup-owned `CAniDefaultSkelTypeInfo` field/base metadata storage.
-   */
-  void cleanup_CAniDefaultSkelTypeInfo();
-
-  /**
    * Address: 0x00BC98B0 (FUN_00BC98B0, register_CAniDefaultSkelTypeInfoAtexit)
    *
    * What it does:
-   * Preregisters `CAniDefaultSkel` RTTI and installs process-exit cleanup.
+   * Preregisters `CAniDefaultSkel` RTTI.
    */
-  int register_CAniDefaultSkelTypeInfoAtexit();
+  void register_CAniDefaultSkelTypeInfoAtexit();
 } // namespace moho

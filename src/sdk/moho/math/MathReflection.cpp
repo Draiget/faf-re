@@ -3,11 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
-#include <cstdlib>
 #include <ctime>
 #include <float.h>
 #include <limits>
-#include <new>
 #include <typeinfo>
 
 #include <xmmintrin.h>
@@ -23,11 +21,6 @@
 
 namespace
 {
-  alignas(boost::mutex) std::byte gMathGlobalRandomMutexStorage[sizeof(boost::mutex)]{};
-  alignas(moho::CRandomStream) std::byte gMathGlobalRandomStreamStorage[sizeof(moho::CRandomStream)]{};
-  bool gMathGlobalRandomMutexConstructed = false;
-  bool gMathGlobalRandomStreamConstructed = false;
-
   // Address: 0x010A96D4 -- process-global `AxisAlignedBox3fSerializer` singleton.
   moho::AxisAlignedBox3fSerializer gAxisAlignedBox3fSerializer;
   // Address: 0x010A9634 -- process-global `Vector2iSerializer` singleton.
@@ -48,42 +41,6 @@ namespace
   moho::VAxes3Serializer gVAxes3Serializer;
   // Address: 0x010A9A14 -- process-global `VMatrix4Serializer` singleton.
   moho::VMatrix4Serializer gVMatrix4Serializer;
-
-  template <typename T>
-  struct TypeInfoStartupSlot
-  {
-    alignas(T) static std::byte storage[sizeof(T)];
-    static bool constructed;
-  };
-
-  template <typename T>
-  alignas(T) std::byte TypeInfoStartupSlot<T>::storage[sizeof(T)]{};
-
-  template <typename T>
-  bool TypeInfoStartupSlot<T>::constructed = false;
-
-  template <typename T>
-  [[nodiscard]] T& AccessTypeInfoStartupSlot() noexcept
-  {
-    auto* const slot = reinterpret_cast<T*>(TypeInfoStartupSlot<T>::storage);
-    if (!TypeInfoStartupSlot<T>::constructed) {
-      ::new (static_cast<void*>(slot)) T();
-      TypeInfoStartupSlot<T>::constructed = true;
-    }
-
-    return *slot;
-  }
-
-  template <typename T>
-  void DestroyTypeInfoStartupSlot() noexcept
-  {
-    if (!TypeInfoStartupSlot<T>::constructed) {
-      return;
-    }
-
-    AccessTypeInfoStartupSlot<T>().~T();
-    TypeInfoStartupSlot<T>::constructed = false;
-  }
 
   [[nodiscard]] gpg::RType* ResolveIntType()
   {
@@ -292,12 +249,6 @@ namespace
     return typeInfo->AddFieldFloat("y", 4);
   }
 
-  template <typename TTypeInfo>
-  void CleanupTypeInfoAtExit()
-  {
-    DestroyTypeInfoStartupSlot<TTypeInfo>();
-  }
-
   /**
    * Address: 0x004EE1B0 (FUN_004EE1B0, func_PointsAreSimilar)
    *
@@ -317,12 +268,26 @@ namespace
   }
 } // namespace
 
-boost::mutex& moho::math_GlobalRandomMutex = *reinterpret_cast<boost::mutex*>(gMathGlobalRandomMutexStorage);
-moho::CRandomStream& moho::math_GlobalRandomStream =
-  *reinterpret_cast<moho::CRandomStream*>(gMathGlobalRandomStreamStorage);
-
 namespace moho
 {
+  /**
+   * Address: 0x00BC32A0 (FUN_00BC32A0, dynamic initializer for `math_GlobalRandomStream`)
+   * Address: 0x00BEE670 (FUN_00BEE670, dynamic atexit destructor for `math_GlobalRandomStream`)
+   *
+   * What it does:
+   * Seeds the process-global random stream from `_time64(0) ^ GetTickCount()`
+   * entropy; the seeding constructor also clears the cached gaussian pair.
+   */
+  CRandomStream math_GlobalRandomStream(
+    static_cast<std::uint32_t>(std::time(nullptr)) ^ static_cast<std::uint32_t>(::GetTickCount())
+  );
+
+  /**
+   * Address: 0x00BC32E0 (FUN_00BC32E0, dynamic initializer for `math_GlobalRandomMutex`)
+   * Address: 0x00BEE680 (FUN_00BEE680, dynamic atexit destructor for `math_GlobalRandomMutex`)
+   */
+  boost::mutex math_GlobalRandomMutex;
+
   VMatrix4 VMatrix4::NaN{};
 
   /**
@@ -2101,156 +2066,84 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BEE670 (FUN_00BEE670, ??1math_GlobalRandomStream@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Executes process-exit teardown for the global random stream singleton.
-   */
-  void cleanup_math_GlobalRandomStream()
-  {
-    if (!gMathGlobalRandomStreamConstructed) {
-      return;
-    }
-
-    math_GlobalRandomStream.~CRandomStream();
-    gMathGlobalRandomStreamConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BC32A0 (FUN_00BC32A0, register_math_GlobalRandomStream)
-   *
-   * What it does:
-   * Seeds the process-global random stream with `GetTickCount() ^ _time64(0)`
-   * entropy, clears cached gaussian-pair state, and registers process-exit
-   * teardown.
-   */
-  void register_math_GlobalRandomStream()
-  {
-    if (!gMathGlobalRandomStreamConstructed) {
-      ::new (static_cast<void*>(&math_GlobalRandomStream)) CRandomStream();
-      gMathGlobalRandomStreamConstructed = true;
-    }
-
-    const std::uint32_t timeSeed = static_cast<std::uint32_t>(std::time(nullptr));
-    const std::uint32_t tickSeed = static_cast<std::uint32_t>(::GetTickCount());
-    math_GlobalRandomStream.twister.Seed(tickSeed ^ timeSeed);
-    math_GlobalRandomStream.hasMarsagliaPair = false;
-
-    (void)std::atexit(&cleanup_math_GlobalRandomStream);
-  }
-
-  /**
-   * Address: 0x00BEE680 (FUN_00BEE680, ??1math_GlobalRandomMutex@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Executes process-exit teardown for the global random-math mutex.
-   */
-  void cleanup_math_GlobalRandomMutex()
-  {
-    if (!gMathGlobalRandomMutexConstructed) {
-      return;
-    }
-
-    math_GlobalRandomMutex.~mutex();
-    gMathGlobalRandomMutexConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BC32E0 (FUN_00BC32E0, register_math_GlobalRandomMutex)
-   *
-   * What it does:
-   * Constructs the process-global random-math mutex and registers process-exit
-   * teardown.
-   */
-  void register_math_GlobalRandomMutex()
-  {
-    if (!gMathGlobalRandomMutexConstructed) {
-      ::new (static_cast<void*>(&math_GlobalRandomMutex)) boost::mutex();
-      gMathGlobalRandomMutexConstructed = true;
-    }
-
-    (void)std::atexit(&cleanup_math_GlobalRandomMutex);
-  }
-
-  /**
    * Address: 0x00BC6C40 (FUN_00BC6C40, register_AxisAlignedBox3fTypeInfo)
+   * Address: 0x00BF11D0 (FUN_00BF11D0, atexit destructor of the AxisAlignedBox3fTypeInfo object)
    */
-  int register_AxisAlignedBox3fTypeInfo()
+  void register_AxisAlignedBox3fTypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<AxisAlignedBox3fTypeInfo>();
-    return std::atexit(&CleanupTypeInfoAtExit<AxisAlignedBox3fTypeInfo>);
+    static AxisAlignedBox3fTypeInfo sInstance;
   }
 
   /**
    * Address: 0x00BC6CA0 (FUN_00BC6CA0, register_Vector2iTypeInfo)
+   * Address: 0x00BF1260 (FUN_00BF1260, atexit destructor of the Vector2iTypeInfo object)
    */
-  int register_Vector2iTypeInfo()
+  void register_Vector2iTypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<Vector2iTypeInfo>();
-    return std::atexit(&CleanupTypeInfoAtExit<Vector2iTypeInfo>);
+    static Vector2iTypeInfo sInstance;
   }
 
   /**
    * Address: 0x00BC6D00 (FUN_00BC6D00, register_Vector3iTypeInfo)
+   * Address: 0x00BF12F0 (FUN_00BF12F0, atexit destructor of the Vector3iTypeInfo object)
    */
-  int register_Vector3iTypeInfo()
+  void register_Vector3iTypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<Vector3iTypeInfo>();
-    return std::atexit(&CleanupTypeInfoAtExit<Vector3iTypeInfo>);
+    static Vector3iTypeInfo sInstance;
   }
 
   /**
    * Address: 0x00BC6D60 (FUN_00BC6D60, register_Vector2fTypeInfo)
+   * Address: 0x00BF1380 (FUN_00BF1380, atexit destructor of the Vector2fTypeInfo object)
    */
-  int register_Vector2fTypeInfo()
+  void register_Vector2fTypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<Vector2fTypeInfo>();
-    return std::atexit(&CleanupTypeInfoAtExit<Vector2fTypeInfo>);
+    static Vector2fTypeInfo sInstance;
   }
 
   /**
    * Address: 0x00BC6DC0 (FUN_00BC6DC0, register_Vector3fTypeInfo)
+   * Address: 0x00BF1410 (FUN_00BF1410, atexit destructor of the Vector3fTypeInfo object)
    */
-  int register_Vector3fTypeInfo()
+  void register_Vector3fTypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<Vector3fTypeInfo>();
-    return std::atexit(&CleanupTypeInfoAtExit<Vector3fTypeInfo>);
+    static Vector3fTypeInfo sInstance;
   }
 
   /**
    * Address: 0x00BC6E20 (FUN_00BC6E20, register_Vector4fTypeInfo)
+   * Address: 0x00BF14A0 (FUN_00BF14A0, atexit destructor of the Vector4fTypeInfo object)
    */
-  int register_Vector4fTypeInfo()
+  void register_Vector4fTypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<Vector4fTypeInfo>();
-    return std::atexit(&CleanupTypeInfoAtExit<Vector4fTypeInfo>);
+    static Vector4fTypeInfo sInstance;
   }
 
   /**
    * Address: 0x00BC6E80 (FUN_00BC6E80, register_QuaternionfTypeInfo)
+   * Address: 0x00BF1530 (FUN_00BF1530, atexit destructor of the QuaternionfTypeInfo object)
    */
-  int register_QuaternionfTypeInfo()
+  void register_QuaternionfTypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<QuaternionfTypeInfo>();
-    return std::atexit(&CleanupTypeInfoAtExit<QuaternionfTypeInfo>);
+    static QuaternionfTypeInfo sInstance;
   }
 
   /**
    * Address: 0x00BC6EE0 (FUN_00BC6EE0, register_VEulers3TypeInfo)
+   * Address: 0x00BF15C0 (FUN_00BF15C0, atexit destructor of the VEulers3TypeInfo object)
    */
-  int register_VEulers3TypeInfo()
+  void register_VEulers3TypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<VEulers3TypeInfo>();
-    return std::atexit(&CleanupTypeInfoAtExit<VEulers3TypeInfo>);
+    static VEulers3TypeInfo sInstance;
   }
 
   /**
    * Address: 0x00BC6F40 (FUN_00BC6F40, register_VAxes3TypeInfo)
+   * Address: 0x00BF1650 (FUN_00BF1650, atexit destructor of the VAxes3TypeInfo object)
    */
-  int register_VAxes3TypeInfo()
+  void register_VAxes3TypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<VAxes3TypeInfo>();
-    return std::atexit(&CleanupTypeInfoAtExit<VAxes3TypeInfo>);
+    static VAxes3TypeInfo sInstance;
   }
 
   /**
@@ -2269,11 +2162,11 @@ namespace moho
 
   /**
    * Address: 0x00BC7090 (FUN_00BC7090, register_VMatrix4TypeInfo)
+   * Address: 0x00BF16E0 (FUN_00BF16E0, atexit destructor of the VMatrix4TypeInfo object)
    */
   void register_VMatrix4TypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<VMatrix4TypeInfo>();
-    (void)std::atexit(&CleanupTypeInfoAtExit<VMatrix4TypeInfo>);
+    static VMatrix4TypeInfo sInstance;
   }
 
 } // namespace moho
@@ -2284,8 +2177,6 @@ namespace
   {
     MathReflectionBootstrap()
     {
-      moho::register_math_GlobalRandomStream();
-      moho::register_math_GlobalRandomMutex();
       (void)moho::register_AxisAlignedBox3fTypeInfo();
       (void)moho::register_Vector2iTypeInfo();
       (void)moho::register_Vector3iTypeInfo();

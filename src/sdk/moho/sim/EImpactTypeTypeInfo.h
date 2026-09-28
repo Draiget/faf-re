@@ -117,8 +117,7 @@ namespace moho
    * Address: 0x00BC7A70 (FUN_00BC7A70, register_EImpactTypeTypeInfo)
    *
    * What it does:
-   * Runs `EImpactType` typeinfo preregistration and installs process-exit
-   * cleanup.
+   * Runs `EImpactType` typeinfo preregistration.
    */
-  int register_EImpactTypeTypeInfo();
+  void register_EImpactTypeTypeInfo();
 } // namespace moho

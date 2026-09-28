@@ -761,20 +761,12 @@ namespace moho
   [[nodiscard]] gpg::RType* register_IAniManipulatorTypeInfo_00();
 
   /**
-   * Address: 0x00BFADC0 (FUN_00BFADC0, sub_BFADC0)
-   *
-   * What it does:
-   * Releases startup-owned IAniManipulator RTTI storage.
-   */
-  void cleanup_IAniManipulatorTypeInfo();
-
-  /**
    * Address: 0x00BD2C20 (FUN_00BD2C20, sub_BD2C20)
    *
    * What it does:
-   * Registers IAniManipulator RTTI startup ownership and installs exit cleanup.
+   * Registers IAniManipulator RTTI startup ownership.
    */
-  int register_IAniManipulatorTypeInfo_AtExit();
+  void register_IAniManipulatorTypeInfo_AtExit();
 
   /**
    * Address: 0x00BD2C40 (FUN_00BD2C40, register_IAniManipulatorSerializer)

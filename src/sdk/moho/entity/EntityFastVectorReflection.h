@@ -141,6 +141,8 @@ namespace gpg
   public:
     /**
      * Address: 0x006943F0 (FUN_006943F0, gpg::RFastVectorType_EntityP::dtr)
+     * Address: 0x00694340 (FUN_00694340, RFastVectorType_EntityP non-deleting
+     * destructor body; zero callers)
      */
     ~RFastVectorType() override;
 
@@ -197,7 +199,7 @@ namespace moho
    * Address: 0x00BD5090 (FUN_00BD5090, register_WeakPtr_Entity_Type_AtExit)
    *
    * What it does:
-   * Registers `WeakPtr<Entity>` reflection and installs process-exit cleanup.
+   * Registers `WeakPtr<Entity>` reflection.
    */
   void register_WeakPtr_Entity_Type_AtExit();
 
@@ -213,7 +215,7 @@ namespace moho
    * Address: 0x00BD50B0 (FUN_00BD50B0, register_VectorEntityPtr_Type_AtExit)
    *
    * What it does:
-   * Registers `vector<Entity*>` reflection and installs process-exit cleanup.
+   * Registers `vector<Entity*>` reflection.
    */
   void register_VectorEntityPtr_Type_AtExit();
 
@@ -226,18 +228,10 @@ namespace moho
   [[nodiscard]] gpg::RType* register_FastVectorEntityPtrType_00();
 
   /**
-    * Alias of FUN_00BFCEA0 (non-canonical helper lane).
-   *
-   * What it does:
-   * Tears down startup-owned `fastvector<Entity*>` reflection storage.
-   */
-  void cleanup_FastVectorEntityPtrType();
-
-  /**
    * Address: 0x00BD5890 (FUN_00BD5890, register_FastVectorEntityPtrType_AtExit)
    *
    * What it does:
-   * Registers `fastvector<Entity*>` reflection and installs process-exit cleanup.
+   * Registers `fastvector<Entity*>` reflection.
    */
-  int register_FastVectorEntityPtrType_AtExit();
+  void register_FastVectorEntityPtrType_AtExit();
 } // namespace moho

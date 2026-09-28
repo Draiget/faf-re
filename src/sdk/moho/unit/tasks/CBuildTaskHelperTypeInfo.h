@@ -48,9 +48,9 @@ namespace moho
    * Address: 0x00BCF810 (FUN_00BCF810, register_CBuildTaskHelperTypeInfo)
    *
    * What it does:
-   * Constructs the global type-info owner and schedules process-exit cleanup.
+   * Constructs the global type-info owner.
    */
-  int register_CBuildTaskHelperTypeInfo();
+  void register_CBuildTaskHelperTypeInfo();
 
   static_assert(sizeof(CBuildTaskHelperTypeInfo) == 0x64, "CBuildTaskHelperTypeInfo size must be 0x64");
 } // namespace moho

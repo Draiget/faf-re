@@ -4,7 +4,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <new>
 
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
@@ -168,6 +167,24 @@ void MemBufferCharConstTypeInfo::Init()
 namespace
 {
   /**
+   * Address: 0x00C0A150 (FUN_00C0A150, atexit destructor of the MemBufferCharTypeInfo object)
+   */
+  [[nodiscard]] MemBufferCharTypeInfo& AcquireMemBufferCharTypeInfo()
+  {
+    static MemBufferCharTypeInfo sInstance;
+    return sInstance;
+  }
+
+  /**
+   * Address: 0x00C0A1B0 (FUN_00C0A1B0, atexit destructor of the MemBufferCharConstTypeInfo object)
+   */
+  [[nodiscard]] MemBufferCharConstTypeInfo& AcquireMemBufferCharConstTypeInfo()
+  {
+    static MemBufferCharConstTypeInfo sInstance;
+    return sInstance;
+  }
+
+  /**
    * Address: 0x00BEA9F0 (register_MemBufferCharTypeInfo)
    * Address: 0x00BEAA50 (register_MemBufferCharConstTypeInfo)
    *
@@ -178,42 +195,12 @@ namespace
    * reaches the reflection map. The binary drives both from its CRT
    * initializer table.
    */
-  alignas(MemBufferCharTypeInfo) unsigned char gMemBufferCharStorage[sizeof(MemBufferCharTypeInfo)];
-  alignas(MemBufferCharConstTypeInfo) unsigned char gMemBufferCharConstStorage[sizeof(MemBufferCharConstTypeInfo)];
-  bool gMemBufferCharConstructed = false;
-  bool gMemBufferCharConstConstructed = false;
-
-  void CleanupMemBufferChar()
-  {
-    if (!gMemBufferCharConstructed) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<MemBufferCharTypeInfo*>(gMemBufferCharStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void CleanupMemBufferCharConst()
-  {
-    if (!gMemBufferCharConstConstructed) {
-      return;
-    }
-    auto& ti = *reinterpret_cast<MemBufferCharConstTypeInfo*>(gMemBufferCharConstStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
   struct MemBufferTypeInfoBootstrap
   {
     MemBufferTypeInfoBootstrap()
     {
-      new (gMemBufferCharStorage) MemBufferCharTypeInfo();
-      gMemBufferCharConstructed = true;
-      (void)std::atexit(&CleanupMemBufferChar);
-
-      new (gMemBufferCharConstStorage) MemBufferCharConstTypeInfo();
-      gMemBufferCharConstConstructed = true;
-      (void)std::atexit(&CleanupMemBufferCharConst);
+      (void)AcquireMemBufferCharTypeInfo();
+      (void)AcquireMemBufferCharConstTypeInfo();
     }
   };
 

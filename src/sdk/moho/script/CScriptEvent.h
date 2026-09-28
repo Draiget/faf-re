@@ -943,8 +943,7 @@ namespace moho
    * Address: 0x00BC6220 (FUN_00BC6220, CScriptEvent startup type-info registration)
    *
    * What it does:
-   * Pre-registers `CScriptEvent` reflected type metadata and schedules
-   * type-info cleanup at process exit.
+   * Pre-registers `CScriptEvent` reflected type metadata.
    */
   void register_CScriptEventTypeInfo();
 

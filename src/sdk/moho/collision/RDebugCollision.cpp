@@ -1,7 +1,6 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "RDebugCollision.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -15,11 +14,6 @@
 
 namespace
 {
-  using TypeInfo = moho::RDebugCollisionTypeInfo;
-
-  alignas(TypeInfo) unsigned char gRDebugCollisionTypeInfoStorage[sizeof(TypeInfo)] = {};
-  bool gRDebugCollisionTypeInfoConstructed = false;
-
   [[nodiscard]] gpg::RType* CachedRDebugCollisionType()
   {
     if (!moho::RDebugCollision::sType) {
@@ -96,29 +90,13 @@ namespace
     typeInfo->RegisterOverlayClass("Display collision boxes for all units", "Collision");
   }
 
-  [[nodiscard]] TypeInfo& GetRDebugCollisionTypeInfo() noexcept
+  /**
+   * Address: 0x00BFB670 (FUN_00BFB670, atexit destructor of the RDebugCollisionTypeInfo object)
+   */
+  [[nodiscard]] moho::RDebugCollisionTypeInfo& GetRDebugCollisionTypeInfo()
   {
-    if (!gRDebugCollisionTypeInfoConstructed) {
-      (void)new (gRDebugCollisionTypeInfoStorage) TypeInfo();
-      gRDebugCollisionTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRDebugCollisionTypeInfoStorage);
-  }
-
-  void cleanup_RDebugCollisionTypeInfo_00BFB670_Impl()
-  {
-    if (!gRDebugCollisionTypeInfoConstructed) {
-      return;
-    }
-
-    GetRDebugCollisionTypeInfo().~RDebugCollisionTypeInfo();
-    gRDebugCollisionTypeInfoConstructed = false;
-  }
-
-  void CleanupRDebugCollisionTypeInfoAtexit()
-  {
-    cleanup_RDebugCollisionTypeInfo_00BFB670_Impl();
+    static moho::RDebugCollisionTypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -243,26 +221,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFB670 (FUN_00BFB670, sub_BFB670)
-   *
-   * What it does:
-   * Releases startup-owned `RDebugCollisionTypeInfo` reflection storage.
-   */
-  void cleanup_RDebugCollisionTypeInfo()
-  {
-    cleanup_RDebugCollisionTypeInfo_00BFB670_Impl();
-  }
-
-  /**
    * Address: 0x00BD3B30 (FUN_00BD3B30, register_RDebugCollisionTypeInfo)
    *
    * What it does:
-   * Forces startup construction/preregistration for `RDebugCollision` RTTI and installs exit cleanup.
+   * Forces startup construction/preregistration for `RDebugCollision` RTTI.
    */
   void register_RDebugCollisionTypeInfo()
   {
     (void)GetRDebugCollisionTypeInfo();
-    (void)std::atexit(&CleanupRDebugCollisionTypeInfoAtexit);
   }
 } // namespace moho
 

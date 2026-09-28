@@ -88,10 +88,9 @@ namespace moho
    * Address: 0x00BCED10 (FUN_00BCED10, register_EAiTransportEventTypeInfo)
    *
    * What it does:
-   * Registers `EAiTransportEvent` enum type-info and installs process-exit
-   * cleanup.
+   * Registers `EAiTransportEvent` enum type-info.
    */
-  int register_EAiTransportEventTypeInfo();
+  void register_EAiTransportEventTypeInfo();
 
   static_assert(sizeof(EAiTransportEventTypeInfo) == 0x78, "EAiTransportEventTypeInfo size must be 0x78");
 } // namespace moho

@@ -11,24 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiFrameTypeInfo) unsigned char gCMauiFrameTypeInfoStorage[sizeof(CMauiFrameTypeInfo)];
-  bool gCMauiFrameTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02E50 (FUN_00C02E50, atexit destructor of the CMauiFrameTypeInfo object)
+   */
   [[nodiscard]] CMauiFrameTypeInfo& AcquireCMauiFrameTypeInfo()
   {
-    if (!gCMauiFrameTypeInfoConstructed) {
-      new (gCMauiFrameTypeInfoStorage) CMauiFrameTypeInfo();
-      gCMauiFrameTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiFrameTypeInfo*>(gCMauiFrameTypeInfoStorage);
-  }
-
-  void cleanup_CMauiFrameTypeInfo()
-  {
-    if (!gCMauiFrameTypeInfoConstructed) return;
-    auto& ti = *reinterpret_cast<CMauiFrameTypeInfo*>(gCMauiFrameTypeInfoStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiFrameTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiFrameTypeInfoBootstrap
@@ -105,12 +94,14 @@ void CMauiFrameTypeInfo::Init()
 }
 
 /**
- * Address: 0x00BDE5B0
+ * Address: 0x00BDE5B0 (FUN_00BDE5B0, register_CMauiFrameTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiFrame` type-info object.
  */
 void moho::register_CMauiFrameTypeInfoStartup()
 {
   (void)AcquireCMauiFrameTypeInfo();
-  (void)std::atexit(&cleanup_CMauiFrameTypeInfo);
 }
 
 

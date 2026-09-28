@@ -71,28 +71,13 @@ namespace
     type->serSaveFunc_(archive, PointerToArchiveInt(object), type->version_, ownerRef);
   }
 
-  alignas(moho::SSTIArmyVariableDataTypeInfo)
-    unsigned char gSSTIArmyVariableDataTypeInfoStorage[sizeof(moho::SSTIArmyVariableDataTypeInfo)]{};
-  bool gSSTIArmyVariableDataTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF4810 (FUN_00BF4810, atexit destructor of the SSTIArmyVariableDataTypeInfo object)
+   */
   [[nodiscard]] moho::SSTIArmyVariableDataTypeInfo& AcquireSSTIArmyVariableDataTypeInfo()
   {
-    if (!gSSTIArmyVariableDataTypeInfoConstructed) {
-      new (gSSTIArmyVariableDataTypeInfoStorage) moho::SSTIArmyVariableDataTypeInfo();
-      gSSTIArmyVariableDataTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::SSTIArmyVariableDataTypeInfo*>(gSSTIArmyVariableDataTypeInfoStorage);
-  }
-
-  void CleanupSSTIArmyVariableDataTypeInfoAtexit()
-  {
-    if (!gSSTIArmyVariableDataTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSSTIArmyVariableDataTypeInfo().~SSTIArmyVariableDataTypeInfo();
-    gSSTIArmyVariableDataTypeInfoConstructed = false;
+    static moho::SSTIArmyVariableDataTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -511,13 +496,11 @@ namespace moho
    * Address: 0x00BC9AF0 (FUN_00BC9AF0, register_SSTIArmyVariableDataTypeInfo)
    *
    * What it does:
-   * Constructs startup-owned `SSTIArmyVariableDataTypeInfo` storage and
-   * registers process-exit teardown.
+   * Constructs the startup `SSTIArmyVariableDataTypeInfo` object.
    */
   void register_SSTIArmyVariableDataTypeInfo()
   {
     (void)AcquireSSTIArmyVariableDataTypeInfo();
-    (void)std::atexit(&CleanupSSTIArmyVariableDataTypeInfoAtexit);
   }
 
   /**

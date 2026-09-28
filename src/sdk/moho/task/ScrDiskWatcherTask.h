@@ -24,8 +24,7 @@ namespace moho
    * Address: 0x00BC5F60 (FUN_00BC5F60, ScrDiskWatcherTask startup type-info registration)
    *
    * What it does:
-   * Registers `ScrDiskWatcherTask` reflected type descriptor and schedules
-   * type-info cleanup at process exit.
+   * Registers `ScrDiskWatcherTask` reflected type descriptor.
    */
   void register_ScrDiskWatcherTaskTypeInfo();
 

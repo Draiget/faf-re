@@ -1992,7 +1992,7 @@ namespace moho
    */
   void D3D_Exit()
   {
-    cleanup_D3DIndexSheet();
+    sIndexSheet.reset();
     DestroyWorldParticlesSingleton();
     DestroySharedTrailQuadIndexSheet();
 

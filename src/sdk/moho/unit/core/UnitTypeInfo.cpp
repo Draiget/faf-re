@@ -1,7 +1,5 @@
 #include "moho/unit/core/UnitTypeInfo.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/entity/Entity.h"
@@ -13,8 +11,6 @@ namespace
 {
   using TypeInfo = moho::UnitTypeInfo;
 
-  alignas(TypeInfo) unsigned char gUnitTypeInfoStorage[sizeof(TypeInfo)];
-  bool gUnitTypeInfoConstructed = false;
   gpg::RType* gEntityType = nullptr;
   gpg::RType* gIUnitType = nullptr;
 
@@ -24,14 +20,13 @@ namespace
     typeInfo.bases_ = msvc8::vector<gpg::RField>{};
   }
 
+  /**
+   * Address: 0x00BFD970 (FUN_00BFD970, atexit destructor of the UnitTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireUnitTypeInfo()
   {
-    if (!gUnitTypeInfoConstructed) {
-      new (gUnitTypeInfoStorage) TypeInfo();
-      gUnitTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gUnitTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   struct UnitTypeInfoBootstrap
@@ -146,31 +141,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD970 (FUN_00BFD970, cleanup_UnitTypeInfo)
-   *
-   * What it does:
-   * Releases global `UnitTypeInfo` reflection vectors during process exit.
-   */
-  void cleanup_UnitTypeInfo()
-  {
-    if (!gUnitTypeInfoConstructed) {
-      return;
-    }
-
-    ResetTypeInfoVectors(AcquireUnitTypeInfo());
-    gUnitTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD6AD0 (FUN_00BD6AD0, register_UnitTypeInfo)
    *
    * What it does:
-   * Constructs the global `UnitTypeInfo` storage and registers exit cleanup.
+   * Constructs the global `UnitTypeInfo` object.
    */
   void register_UnitTypeInfo()
   {
     (void)AcquireUnitTypeInfo();
-    (void)std::atexit(&cleanup_UnitTypeInfo);
   }
 } // namespace moho
 

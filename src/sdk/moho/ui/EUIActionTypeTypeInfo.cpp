@@ -9,24 +9,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(EUIActionTypeTypeInfo) unsigned char gStorage[sizeof(EUIActionTypeTypeInfo)];
-  bool gConstructed = false;
-
+  /**
+   * Address: 0x00C05E00 (FUN_00C05E00, atexit destructor of the EUIActionTypeTypeInfo object)
+   */
   [[nodiscard]] EUIActionTypeTypeInfo& Acquire()
   {
-    if (!gConstructed) {
-      new (gStorage) EUIActionTypeTypeInfo();
-      gConstructed = true;
-    }
-    return *reinterpret_cast<EUIActionTypeTypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) return;
-    auto& ti = *reinterpret_cast<EUIActionTypeTypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static EUIActionTypeTypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { moho::register_EUIActionTypeTypeInfoStartup(); } };
@@ -74,10 +63,15 @@ void EUIActionTypeTypeInfo::AddEnums(gpg::REnumType* const enumType)
   enumType->AddEnum(enumType->StripPrefix("EUIAT_Cancel"), 7);
 }
 
+/**
+ * Address: 0x00BE3A50 (FUN_00BE3A50, register_EUIActionTypeTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `EUIActionType` enum type-info object.
+ */
 void moho::register_EUIActionTypeTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

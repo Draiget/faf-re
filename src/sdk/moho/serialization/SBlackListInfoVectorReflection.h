@@ -97,8 +97,7 @@ namespace moho
    * Address: 0x00BD8BB0 (FUN_00BD8BB0, sub_BD8BB0)
    *
    * What it does:
-   * Registers `vector<SBlackListInfo>` reflection and installs process-exit
-   * teardown via `atexit`.
+   * Registers `vector<SBlackListInfo>` reflection.
    */
-  int register_SBlackListInfoVectorType_AtExit();
+  void register_SBlackListInfoVectorType_AtExit();
 } // namespace moho

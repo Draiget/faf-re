@@ -138,11 +138,63 @@ namespace moho
   );
 
   /**
+   * Address: 0x00BEF140 (FUN_00BEF140, dynamic atexit destructor for `shaderVarPrimBatcherCompositeMatrix`)
+   *
+   * What it does:
+   * The prim-batcher `CompositeMatrix` shader-var.
+   */
+  extern ShaderVar shaderVarPrimBatcherCompositeMatrix;
+
+  /**
+   * Address: 0x00BEF150 (FUN_00BEF150, dynamic atexit destructor for `shaderVarPrimBatcherTexture1`)
+   *
+   * What it does:
+   * The prim-batcher `Texture1` shader-var.
+   */
+  extern ShaderVar shaderVarPrimBatcherTexture1;
+
+  /**
+   * Address: 0x00BEF160 (FUN_00BEF160, dynamic atexit destructor for `shaderVarPrimBatcherAlphaMultiplier`)
+   *
+   * What it does:
+   * The prim-batcher `AlphaMultiplier` shader-var.
+   */
+  extern ShaderVar shaderVarPrimBatcherAlphaMultiplier;
+
+  /**
+   * Address: 0x00C07480 (FUN_00C07480, dynamic atexit destructor for `shaderVarPrimBatcherTime`)
+   *
+   * What it does:
+   * The prim-batcher `time` shader-var.
+   */
+  extern ShaderVar shaderVarPrimBatcherTime;
+
+  /**
+   * Address: 0x00C056A0 (FUN_00C056A0, dynamic atexit destructor for `shaderVarTerrainHeightScale`)
+   *
+   * What it does:
+   * The terrain `HeightScale` shader-var bound by every TerrainCommon
+   * fidelity class's per-frame tessellation-rebuild entry point ("Func3"):
+   * a direct standalone symbol reference (`mov esi, offset
+   * shaderVarTerrainHeightScale` at 0x00800550 in HighFidelityTerrain::Func3),
+   * not a `TerrainShaderVarSet` member.
+   */
+  extern ShaderVar shaderVarTerrainHeightScale;
+
+  /**
+   * Address: 0x00C056C0 (FUN_00C056C0, dynamic atexit destructor for `shaderVarTerrainTime`)
+   *
+   * What it does:
+   * The terrain `Time` shader-var, bound next to `shaderVarTerrainHeightScale`
+   * (0x0080057D in HighFidelityTerrain::Func3).
+   */
+  extern ShaderVar shaderVarTerrainTime;
+
+  /**
    * Address: 0x00BC3FF0 (FUN_00BC3FF0, register_ShaderVarPrimBatcherCompositeMatrix)
    *
    * What it does:
-   * Registers the prim-batcher `CompositeMatrix` shader-var and its exit cleanup
-   * thunk.
+   * Registers the prim-batcher `CompositeMatrix` shader-var.
    */
   void register_ShaderVarPrimBatcherCompositeMatrix();
 
@@ -150,7 +202,7 @@ namespace moho
    * Address: 0x00BC4010 (FUN_00BC4010, register_ShaderVarPrimBatcherTexture1)
    *
    * What it does:
-   * Registers the prim-batcher `Texture1` shader-var and its exit cleanup thunk.
+   * Registers the prim-batcher `Texture1` shader-var.
    */
   void register_ShaderVarPrimBatcherTexture1();
 
@@ -158,8 +210,7 @@ namespace moho
    * Address: 0x00BC4030 (FUN_00BC4030, register_ShaderVarPrimBatcherAlphaMultiplier)
    *
    * What it does:
-   * Registers the prim-batcher `AlphaMultiplier` shader-var and its exit cleanup
-   * thunk.
+   * Registers the prim-batcher `AlphaMultiplier` shader-var.
    */
   void register_ShaderVarPrimBatcherAlphaMultiplier();
 
@@ -168,61 +219,25 @@ namespace moho
    *
    * What it does:
    * Registers the prim-batcher `time` shader-var (lowercase in the binary's
-   * `.rdata` string) and its exit cleanup thunk.
+   * `.rdata` string).
    */
   void register_ShaderVarPrimBatcherTime();
 
   /**
+   * Address: 0x00BE2F70 (FUN_00BE2F70, register_ShaderVarTerrainHeightScale)
+   *
    * What it does:
-   * Registers the terrain `TerrainHeightScale`/`TerrainTime` shader-vars.
-   * See `ShaderVar.cpp` for the evidence basis (slot addresses confirmed
-   * directly from HighFidelityTerrain::Func3's disassembly).
+   * Registers `shaderVarTerrainHeightScale` as `"HeightScale"` in `"terrain"`.
    */
   void register_ShaderVarTerrainHeightScale();
+
+  /**
+   * Address: 0x00BE2FB0 (FUN_00BE2FB0, register_ShaderVarTerrainTime)
+   *
+   * What it does:
+   * Registers `shaderVarTerrainTime` as `"Time"` in `"terrain"`.
+   */
   void register_ShaderVarTerrainTime();
-
-  /**
-   * Address: 0x00BEF140 (FUN_00BEF140, sub_BEF140)
-   *
-   * What it does:
-   * Runs the prim-batcher `CompositeMatrix` shader-var destructor at process
-   * exit.
-   */
-  void cleanup_ShaderVarPrimBatcherCompositeMatrix();
-
-  /**
-   * Address: 0x00BEF150 (FUN_00BEF150, sub_BEF150)
-   *
-   * What it does:
-   * Runs the prim-batcher `Texture1` shader-var destructor at process exit.
-   */
-  void cleanup_ShaderVarPrimBatcherTexture1();
-
-  /**
-   * Address: 0x00BEF160 (FUN_00BEF160, sub_BEF160)
-   *
-   * What it does:
-   * Runs the prim-batcher `AlphaMultiplier` shader-var destructor at process
-   * exit.
-   */
-  void cleanup_ShaderVarPrimBatcherAlphaMultiplier();
-
-  /**
-   * Address: 0x00C07480 (FUN_00C07480, the `atexit` target the registrar
-   * above installs)
-   *
-   * What it does:
-   * Runs the prim-batcher `time` shader-var destructor at process exit.
-   */
-  void cleanup_ShaderVarPrimBatcherTime();
-
-  void cleanup_ShaderVarTerrainHeightScale();
-  void cleanup_ShaderVarTerrainTime();
-
-  [[nodiscard]] ShaderVar& GetPrimBatcherCompositeMatrixShaderVar();
-  [[nodiscard]] ShaderVar& GetPrimBatcherTexture1ShaderVar();
-  [[nodiscard]] ShaderVar& GetPrimBatcherAlphaMultiplierShaderVar();
-  [[nodiscard]] ShaderVar& GetPrimBatcherTimeShaderVar();
 
   /**
    * Address: 0x010BF4E0 (?shaderVarFrameGlowCopyAdd@Moho@@3UstructShaderVar@@A)
@@ -242,15 +257,4 @@ namespace moho
    * `"GlowCopyAdd"` in the `"frame"` effect scope.
    */
   void register_ShaderVarFrameGlowCopyAdd();
-
-  /**
-   * Standalone terrain shader-var globals bound by every TerrainCommon
-   * fidelity class's per-frame tessellation-rebuild entry point ("Func3").
-   * Confirmed as direct standalone symbol references (not
-   * `TerrainShaderVarSet` members) via `mov esi, offset
-   * shaderVarTerrainHeightScale`/`shaderVarTerrainTime` in
-   * HighFidelityTerrain::Func3's disassembly (0x00800550, 0x0080057D).
-   */
-  [[nodiscard]] ShaderVar& GetTerrainHeightScaleShaderVar();
-  [[nodiscard]] ShaderVar& GetTerrainTimeShaderVar();
 } // namespace moho

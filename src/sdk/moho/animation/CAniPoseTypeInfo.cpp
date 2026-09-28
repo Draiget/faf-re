@@ -123,34 +123,13 @@ namespace
     pose.mMaxOffset = 0.0f;
   }
 
-  alignas(CAniPoseTypeInfo) unsigned char gCAniPoseTypeInfoStorage[sizeof(CAniPoseTypeInfo)];
-  bool gCAniPoseTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF45B0 (FUN_00BF45B0, atexit destructor of the CAniPoseTypeInfo object)
+   */
   [[nodiscard]] CAniPoseTypeInfo& AcquireCAniPoseTypeInfo()
   {
-    if (!gCAniPoseTypeInfoConstructed) {
-      new (gCAniPoseTypeInfoStorage) CAniPoseTypeInfo();
-      gCAniPoseTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CAniPoseTypeInfo*>(gCAniPoseTypeInfoStorage);
-  }
-
-  [[nodiscard]] CAniPoseTypeInfo* PeekCAniPoseTypeInfo() noexcept
-  {
-    if (!gCAniPoseTypeInfoConstructed) {
-      return nullptr;
-    }
-    return reinterpret_cast<CAniPoseTypeInfo*>(gCAniPoseTypeInfoStorage);
-  }
-
-  void cleanup_CAniPoseTypeInfoStartup()
-  {
-    CAniPoseTypeInfo* const typeInfo = PeekCAniPoseTypeInfo();
-    if (!typeInfo) {
-      return;
-    }
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
+    static CAniPoseTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CAniPoseTypeInfoStartupBootstrap
@@ -305,7 +284,6 @@ void CAniPoseTypeInfo::Destruct(void* const objectStorage)
 void moho::register_CAniPoseTypeInfoStartup()
 {
   (void)AcquireCAniPoseTypeInfo();
-  (void)std::atexit(&cleanup_CAniPoseTypeInfoStartup);
 }
 
 

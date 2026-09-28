@@ -1,41 +1,25 @@
 #include "lua/LuaObjectTypeInfo.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "lua/LuaObject.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 using namespace LuaPlus;
 
-namespace
-{
-	gpg::StaticTypeInfoStorage<LuaPlus::LuaObjectTypeInfo> gLuaObjectTypeInfoStorage{};
-
-	void CleanupLuaObjectTypeInfo()
-	{
-		gLuaObjectTypeInfoStorage.Destroy();
-	}
-}
-
 /**
  * Address: 0x00BE9EF0 (FUN_00BE9EF0, register_LuaObjectTypeInfo)
+ * Address: 0x00C098E0 (FUN_00C098E0, atexit destructor of the LuaObjectTypeInfo object)
  *
  * What it does:
- * Builds the static descriptor - construction is what preregisters
- * `LuaObject` - and schedules the destructor the binary passes to `atexit`.
+ * Builds the static descriptor on the first call - construction is what
+ * preregisters `LuaObject` - and returns it.
  */
 gpg::RType* LuaPlus::register_LuaObjectTypeInfo()
 {
-	const bool firstCall = !gLuaObjectTypeInfoStorage.IsConstructed();
-	auto& typeInfo = gLuaObjectTypeInfoStorage.Ensure();
-	if (firstCall) {
-		(void)std::atexit(&CleanupLuaObjectTypeInfo);
-	}
-
-	return &typeInfo;
+	static LuaObjectTypeInfo sInstance;
+	return &sInstance;
 }
 
 /**

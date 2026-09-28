@@ -436,8 +436,7 @@ namespace moho
    * Address: 0x00BC6160 (FUN_00BC6160, CLuaTask startup type-info registration)
    *
    * What it does:
-   * Pre-registers `CLuaTask` reflected type metadata and schedules type-info
-   * cleanup at process exit.
+   * Pre-registers `CLuaTask` reflected type metadata.
    */
   void register_CLuaTaskTypeInfo();
 } // namespace moho

@@ -63,7 +63,10 @@ namespace moho
     static void Destruct(void* objectStorage);
   };
 
-  int register_CUnitFerryTaskTypeInfo();
+  /**
+   * Address: 0x00BD08E0 (FUN_00BD08E0, register_CUnitFerryTaskTypeInfo)
+   */
+  void register_CUnitFerryTaskTypeInfo();
 
   static_assert(sizeof(CUnitFerryTaskTypeInfo) == 0x64, "CUnitFerryTaskTypeInfo size must be 0x64");
 } // namespace moho

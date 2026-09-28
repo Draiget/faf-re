@@ -23,16 +23,16 @@ namespace
   constexpr int kSerializationLoadLine = 84;
   constexpr int kSerializationSaveLine = 87;
 
-  alignas(moho::VTransformTypeInfo) unsigned char gVTransformTypeInfoStorage[sizeof(moho::VTransformTypeInfo)];
-  bool gVTransformTypeInfoConstructed = false;
-  bool gVTransformTypeInfoPreregistered = false;
-
   gpg::RType* gCachedVector3fType = nullptr;
   gpg::RType* gCachedQuaternionfType = nullptr;
 
-  [[nodiscard]] moho::VTransformTypeInfo& VTransformTypeInfoStorageRef() noexcept
+  /**
+   * Address: 0x00BF1770 (FUN_00BF1770, atexit destructor of the VTransformTypeInfo object)
+   */
+  [[nodiscard]] moho::VTransformTypeInfo& AcquireVTransformTypeInfo()
   {
-    return *reinterpret_cast<moho::VTransformTypeInfo*>(gVTransformTypeInfoStorage);
+    static moho::VTransformTypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* ResolveVector3fType()
@@ -72,19 +72,6 @@ namespace
     field.mName = "r";
     field.mType = quaternionType;
     type.fields_.push_back(field);
-  }
-
-  void CleanupVTransformTypeInfoAtExit()
-  {
-    if (!gVTransformTypeInfoConstructed) {
-      return;
-    }
-
-    VTransformTypeInfoStorageRef().~VTransformTypeInfo();
-    gVTransformTypeInfoConstructed = false;
-    gVTransformTypeInfoPreregistered = false;
-    gCachedVector3fType = nullptr;
-    gCachedQuaternionfType = nullptr;
   }
 
   // Address: 0x010A9B40 -- process-global `VTransformSerializer` singleton
@@ -405,6 +392,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x004F05E0 (FUN_004F05E0, Moho::VTransformTypeInfo::VTransformTypeInfo)
+   *
+   * What it does:
+   * Constructs and preregisters the `VTransform` reflection descriptor.
+   */
+  VTransformTypeInfo::VTransformTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(VTransform), this);
+  }
+
+  /**
    * Address: 0x004F0680 (FUN_004F0680, Moho::VTransformTypeInfo::dtr)
    */
   VTransformTypeInfo::~VTransformTypeInfo() = default;
@@ -503,30 +502,11 @@ namespace moho
   VTransformSerializer::~VTransformSerializer() = default;
 
   /**
-   * Address: 0x004F05E0 (FUN_004F05E0, preregister_VTransformTypeInfo)
-   */
-  gpg::RType* preregister_VTransformTypeInfo()
-  {
-    if (!gVTransformTypeInfoConstructed) {
-      new (gVTransformTypeInfoStorage) VTransformTypeInfo();
-      gVTransformTypeInfoConstructed = true;
-    }
-
-    if (!gVTransformTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(VTransform), &VTransformTypeInfoStorageRef());
-      gVTransformTypeInfoPreregistered = true;
-    }
-
-    return &VTransformTypeInfoStorageRef();
-  }
-
-  /**
    * Address: 0x00BC7150 (FUN_00BC7150, register_VTransformTypeInfo)
    */
-  int register_VTransformTypeInfo()
+  void register_VTransformTypeInfo()
   {
-    (void)preregister_VTransformTypeInfo();
-    return std::atexit(&CleanupVTransformTypeInfoAtExit);
+    (void)AcquireVTransformTypeInfo();
   }
 } // namespace moho
 
@@ -538,7 +518,7 @@ namespace
   {
     VTransformBootstrap()
     {
-      (void)moho::register_VTransformTypeInfo();
+      moho::register_VTransformTypeInfo();
     }
   };
 
@@ -549,5 +529,3 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_VTransformTypeInfo_2fd396, moho::register_VTransformTypeInfo)
-
-GPG_PREREGISTER_INIT(preregister_VTransformTypeInfo_2fd396, moho::preregister_VTransformTypeInfo)

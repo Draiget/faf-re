@@ -57,9 +57,8 @@ namespace moho
    * What it does:
    * Constructs the static `CWeaponAttributesTypeInfo` descriptor in place via
    * the FUN_006D3640 constructor - which preregisters `CWeaponAttributes` with
-   * the reflection registry - schedules the FUN_00BFE590 exit cleanup, and
-   * returns the descriptor.
+   * the reflection registry.
    */
-  [[nodiscard]] gpg::RType* preregister_CWeaponAttributesTypeInfo();
+  void preregister_CWeaponAttributesTypeInfo();
 
 } // namespace moho

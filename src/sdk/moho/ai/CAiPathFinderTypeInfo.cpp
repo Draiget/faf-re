@@ -35,44 +35,22 @@ namespace
 
   static_assert(sizeof(Rect2iListTypeInfo) == 0x64, "Rect2iListTypeInfo size must be 0x64");
 
-  alignas(CAiPathFinderTypeInfo) unsigned char gCAiPathFinderTypeInfoStorage[sizeof(CAiPathFinderTypeInfo)] = {};
-  bool gCAiPathFinderTypeInfoConstructed = false;
-
-  alignas(Rect2iListTypeInfo) unsigned char gRect2iListTypeInfoStorage[sizeof(Rect2iListTypeInfo)] = {};
-  bool gRect2iListTypeInfoConstructed = false;
-  msvc8::string gRect2iListTypeName;
-  bool gRect2iListTypeNameCleanupRegistered = false;
-
-  [[maybe_unused]] [[nodiscard]] gpg::RType** StoreRuntimeTypePointer(
-    gpg::RType** outType,
-    gpg::RType* value
-  ) noexcept;
-  [[maybe_unused]] [[nodiscard]] gpg::RType** StoreRuntimeTypePointerAlias(
-    gpg::RType** outType,
-    gpg::RType* value
-  ) noexcept;
-
+  /**
+   * Address: 0x00BF71E0 (FUN_00BF71E0, atexit destructor of the CAiPathFinderTypeInfo object)
+   */
   [[nodiscard]] CAiPathFinderTypeInfo* AcquireCAiPathFinderTypeInfo()
   {
-    if (!gCAiPathFinderTypeInfoConstructed) {
-      auto* const typeInfo = new (gCAiPathFinderTypeInfoStorage) CAiPathFinderTypeInfo();
-      gpg::PreRegisterRType(typeid(CAiPathFinder), typeInfo);
-      (void)StoreRuntimeTypePointerAlias(&CAiPathFinder::sType, typeInfo);
-      gCAiPathFinderTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiPathFinderTypeInfo*>(gCAiPathFinderTypeInfoStorage);
+    static CAiPathFinderTypeInfo sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BF72A0 (FUN_00BF72A0, atexit destructor of the Rect2iListTypeInfo object)
+   */
   [[nodiscard]] Rect2iListTypeInfo* AcquireRect2iListTypeInfo()
   {
-    if (!gRect2iListTypeInfoConstructed) {
-      auto* const typeInfo = new (gRect2iListTypeInfoStorage) Rect2iListTypeInfo();
-      gpg::PreRegisterRType(typeid(msvc8::list<gpg::Rect2i>), typeInfo);
-      gRect2iListTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<Rect2iListTypeInfo*>(gRect2iListTypeInfoStorage);
+    static Rect2iListTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedRect2iType()
@@ -85,31 +63,17 @@ namespace
     return type;
   }
 
-  void cleanup_Rect2iListTypeName()
-  {
-    gRect2iListTypeName.clear();
-    gRect2iListTypeNameCleanupRegistered = false;
-  }
-
   /**
    * Address: 0x005AAFA0 (FUN_005AAFA0, gpg::RListType_Rect2i::GetName)
+   * Address: 0x00BF7270 (FUN_00BF7270, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily builds and caches the reflected `list<Rect2i>` type name.
+   * Builds the reflected `list<Rect2i>` type name once and returns it.
    */
   const char* Rect2iListTypeInfo::GetName() const
   {
-    if (gRect2iListTypeName.empty()) {
-      const gpg::RType* const elementType = CachedRect2iType();
-      const char* const elementName = elementType ? elementType->GetName() : "Rect2i";
-      gRect2iListTypeName = gpg::STR_Printf("list<%s>", elementName ? elementName : "Rect2i");
-      if (!gRect2iListTypeNameCleanupRegistered) {
-        gRect2iListTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_Rect2iListTypeName);
-      }
-    }
-
-    return gRect2iListTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("list<%s>", CachedRect2iType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -296,7 +260,9 @@ namespace
    */
   [[nodiscard]] gpg::RType* preregister_CAiPathFinderTypeInfo()
   {
-    return AcquireCAiPathFinderTypeInfo();
+    CAiPathFinderTypeInfo* const typeInfo = AcquireCAiPathFinderTypeInfo();
+    gpg::PreRegisterRType(typeid(CAiPathFinder), typeInfo);
+    return typeInfo;
   }
 
   /**
@@ -308,40 +274,9 @@ namespace
    */
   [[nodiscard]] gpg::RType* preregister_Rect2iListTypeInfo()
   {
-    return AcquireRect2iListTypeInfo();
-  }
-
-  /**
-   * Address: 0x00BF71E0 (FUN_00BF71E0, cleanup_CAiPathFinderTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `CAiPathFinderTypeInfo` reflection storage.
-   */
-  void cleanup_CAiPathFinderTypeInfo()
-  {
-    if (!gCAiPathFinderTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiPathFinderTypeInfo()->~CAiPathFinderTypeInfo();
-    gCAiPathFinderTypeInfoConstructed = false;
-    (void)StoreRuntimeTypePointer(&CAiPathFinder::sType, nullptr);
-  }
-
-  /**
-   * Address: 0x00BF72A0 (FUN_00BF72A0, cleanup_Rect2iListTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `std::list<gpg::Rect2<int>>` RTTI storage.
-   */
-  void cleanup_Rect2iListTypeInfo()
-  {
-    if (!gRect2iListTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRect2iListTypeInfo()->~Rect2iListTypeInfo();
-    gRect2iListTypeInfoConstructed = false;
+    Rect2iListTypeInfo* const typeInfo = AcquireRect2iListTypeInfo();
+    gpg::PreRegisterRType(typeid(msvc8::list<gpg::Rect2i>), typeInfo);
+    return typeInfo;
   }
 
 } // namespace
@@ -465,26 +400,22 @@ void CAiPathFinderTypeInfo::Init()
  * Address: 0x00BCCD50 (FUN_00BCCD50, register_CAiPathFinderTypeInfo)
  *
  * What it does:
- * Constructs/preregisters startup RTTI descriptor for `CAiPathFinder` and
- * installs process-exit cleanup.
+ * Constructs/preregisters startup RTTI descriptor for `CAiPathFinder`.
  */
-int moho::register_CAiPathFinderTypeInfo()
+void moho::register_CAiPathFinderTypeInfo()
 {
   (void)preregister_CAiPathFinderTypeInfo();
-  return std::atexit(&cleanup_CAiPathFinderTypeInfo);
 }
 
 /**
  * Address: 0x00BCCDB0 (FUN_00BCCDB0, register_Rect2iListTypeInfo)
  *
  * What it does:
- * Constructs/preregisters reflected `std::list<gpg::Rect2<int>>` type-info
- * and installs process-exit cleanup.
+ * Constructs/preregisters reflected `std::list<gpg::Rect2<int>>` type-info.
  */
-int moho::register_Rect2iListTypeInfo()
+void moho::register_Rect2iListTypeInfo()
 {
   (void)preregister_Rect2iListTypeInfo();
-  return std::atexit(&cleanup_Rect2iListTypeInfo);
 }
 
 namespace
@@ -493,8 +424,8 @@ namespace
   {
     CAiPathFinderTypeInfoBootstrap()
     {
-      (void)moho::register_CAiPathFinderTypeInfo();
-      (void)moho::register_Rect2iListTypeInfo();
+      moho::register_CAiPathFinderTypeInfo();
+      moho::register_Rect2iListTypeInfo();
     }
   };
 

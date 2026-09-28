@@ -3,7 +3,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
-#include <new>
 #include <type_traits>
 #include <typeinfo>
 
@@ -1313,22 +1312,10 @@ template class RIntType<unsigned long>;
 )                                                                                                            \
   namespace                                                                                  \
   {                                                                                          \
-    alignas(NAME) unsigned char gStorage_##NAME[sizeof(NAME)];                               \
-    bool gConstructed_##NAME = false;                                                        \
     [[nodiscard]] NAME& Acquire_##NAME()                                                     \
     {                                                                                        \
-      if (!gConstructed_##NAME) {                                                            \
-        new (gStorage_##NAME) NAME();                                                        \
-        gConstructed_##NAME = true;                                                          \
-      }                                                                                      \
-      return *reinterpret_cast<NAME*>(gStorage_##NAME);                                      \
-    }                                                                                        \
-    void cleanup_##NAME()                                                                    \
-    {                                                                                        \
-      if (!gConstructed_##NAME) return;                                                      \
-      auto& ti = *reinterpret_cast<NAME*>(gStorage_##NAME);                                  \
-      ti.fields_ = msvc8::vector<gpg::RField>{};                                             \
-      ti.bases_ = msvc8::vector<gpg::RField>{};                                              \
+      static NAME sInstance;                                                                 \
+      return sInstance;                                                                      \
     }                                                                                        \
     struct Bootstrap_##NAME { Bootstrap_##NAME() { register_##NAME##Startup(); } };          \
     Bootstrap_##NAME gBootstrap_##NAME;                                                      \
@@ -1353,12 +1340,13 @@ template class RIntType<unsigned long>;
   void register_##NAME##Startup()                                                            \
   {                                                                                          \
     (void)Acquire_##NAME();                                                                  \
-    (void)std::atexit(&cleanup_##NAME);                                                      \
   }
 
 /**
  * Address: 0x008DFAD0 (FUN_008DFAD0, charTypeInfo::charTypeInfo)
  * Address: 0x008E3140 (FUN_008E3140, charTypeInfo::Init)
+ * Address: 0x00BE9800 (FUN_00BE9800, register_charTypeInfoStartup)
+ * Address: 0x00C09010 (FUN_00C09010, atexit destructor of the charTypeInfo object)
  *
  * What it does:
  * Constructs and preregisters reflected integer-type metadata for `char`,
@@ -1371,6 +1359,8 @@ IMPLEMENT_INT_TYPE_INFO(
 /**
  * Address: 0x008DFE50 (FUN_008DFE50, signedcharTypeInfo::signedcharTypeInfo)
  * Address: 0x008E3240 (FUN_008E3240, signedcharTypeInfo::Init)
+ * Address: 0x00BE9880 (FUN_00BE9880, register_signedcharTypeInfoStartup)
+ * Address: 0x00C09190 (FUN_00C09190, atexit destructor of the signedcharTypeInfo object)
  *
  * What it does:
  * Constructs and preregisters reflected integer-type metadata for `signed char`,
@@ -1383,6 +1373,8 @@ IMPLEMENT_INT_TYPE_INFO(
 /**
  * Address: 0x008DFF30 (FUN_008DFF30, unsignedcharTypeInfo::unsignedcharTypeInfo)
  * Address: 0x008E3280 (FUN_008E3280, unsignedcharTypeInfo::Init)
+ * Address: 0x00BE98A0 (FUN_00BE98A0, register_unsignedcharTypeInfoStartup)
+ * Address: 0x00C091F0 (FUN_00C091F0, atexit destructor of the unsignedcharTypeInfo object)
  *
  * What it does:
  * Constructs and preregisters reflected integer-type metadata for `unsigned char`,
@@ -1395,6 +1387,8 @@ IMPLEMENT_INT_TYPE_INFO(
 /**
  * Address: 0x008DFBB0 (FUN_008DFBB0, shortTypeInfo::shortTypeInfo)
  * Address: 0x008E3180 (FUN_008E3180, shortTypeInfo::Init)
+ * Address: 0x00BE9820 (FUN_00BE9820, register_shortTypeInfoStartup)
+ * Address: 0x00C09070 (FUN_00C09070, atexit destructor of the shortTypeInfo object)
  *
  * What it does:
  * Constructs and preregisters reflected integer-type metadata for `short`,
@@ -1407,6 +1401,8 @@ IMPLEMENT_INT_TYPE_INFO(
 /**
  * Address: 0x008E0010 (FUN_008E0010, unsignedshortTypeInfo::unsignedshortTypeInfo)
  * Address: 0x008E32C0 (FUN_008E32C0, unsignedshortTypeInfo::Init)
+ * Address: 0x00BE98C0 (FUN_00BE98C0, register_unsignedshortTypeInfoStartup)
+ * Address: 0x00C09250 (FUN_00C09250, atexit destructor of the unsignedshortTypeInfo object)
  *
  * What it does:
  * Constructs and preregisters reflected integer-type metadata for `unsigned short`,
@@ -1419,6 +1415,8 @@ IMPLEMENT_INT_TYPE_INFO(
 /**
  * Address: 0x008DFC90 (FUN_008DFC90, intTypeInfo::intTypeInfo)
  * Address: 0x008E31C0 (FUN_008E31C0, intTypeInfo::Init)
+ * Address: 0x00BE9840 (FUN_00BE9840, register_intTypeInfoStartup)
+ * Address: 0x00C090D0 (FUN_00C090D0, atexit destructor of the intTypeInfo object)
  *
  * What it does:
  * Constructs and preregisters reflected integer-type metadata for `int`,
@@ -1431,6 +1429,8 @@ IMPLEMENT_INT_TYPE_INFO(
 /**
  * Address: 0x008E00F0 (FUN_008E00F0, unsignedintTypeInfo::unsignedintTypeInfo)
  * Address: 0x008E3300 (FUN_008E3300, unsignedintTypeInfo::Init)
+ * Address: 0x00BE98E0 (FUN_00BE98E0, register_unsignedintTypeInfoStartup)
+ * Address: 0x00C092B0 (FUN_00C092B0, atexit destructor of the unsignedintTypeInfo object)
  *
  * What it does:
  * Constructs and preregisters reflected integer-type metadata for `unsigned int`,
@@ -1443,6 +1443,8 @@ IMPLEMENT_INT_TYPE_INFO(
 /**
  * Address: 0x008DFD70 (FUN_008DFD70, longTypeInfo::longTypeInfo)
  * Address: 0x008E3200 (FUN_008E3200, longTypeInfo::Init)
+ * Address: 0x00BE9860 (FUN_00BE9860, register_longTypeInfoStartup)
+ * Address: 0x00C09130 (FUN_00C09130, atexit destructor of the longTypeInfo object)
  *
  * What it does:
  * Constructs and preregisters reflected integer-type metadata for `long`,
@@ -1455,6 +1457,8 @@ IMPLEMENT_INT_TYPE_INFO(
 /**
  * Address: 0x008E01D0 (FUN_008E01D0, unsignedlongTypeInfo::unsignedlongTypeInfo)
  * Address: 0x008E3340 (FUN_008E3340, unsignedlongTypeInfo::Init)
+ * Address: 0x00BE9900 (FUN_00BE9900, register_unsignedlongTypeInfoStartup)
+ * Address: 0x00C09310 (FUN_00C09310, atexit destructor of the unsignedlongTypeInfo object)
  *
  * What it does:
  * Constructs and preregisters reflected integer-type metadata for `unsigned long`,

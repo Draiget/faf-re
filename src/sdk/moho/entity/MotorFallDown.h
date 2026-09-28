@@ -242,11 +242,6 @@ namespace moho
   static_assert(sizeof(MotorFallDownConstruct) == 0x14, "MotorFallDownConstruct size must be 0x14");
 
   /**
-   * Address: 0x00BFD130 (FUN_00BFD130, cleanup_MotorFallDownTypeInfo)
-   */
-  void cleanup_MotorFallDownTypeInfo();
-
-  /**
    * Address: 0x00BD5BE0 (FUN_00BD5BE0, register_MotorFallDownTypeInfo)
    */
   void register_MotorFallDownTypeInfo();

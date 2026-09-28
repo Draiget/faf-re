@@ -881,8 +881,6 @@ namespace gpg
 
 namespace
 {
-  msvc8::string gEntIdStringMultiMapTypeName;
-  std::uint32_t gEntIdStringMultiMapTypeNameInitGuard = 0;
   gpg::RType* gEntIdStringMultiMapKeyType = nullptr;
   gpg::RType* gEntIdStringMultiMapValueType = nullptr;
   using EntIdStringMultiMap = std::multimap<moho::EntId, msvc8::string>;
@@ -1014,19 +1012,6 @@ namespace
       archive->WriteString(&value);
     }
   }
-
-  /**
-   * Address: 0x00C082E0 (FUN_00C082E0, cleanup_RMultiMapType_EntId_string_Name)
-   *
-   * What it does:
-   * Releases cached lexical storage for
-   * `gpg::RMultiMapType_EntId_string::GetName`.
-   */
-  void cleanup_RMultiMapType_EntId_string_Name()
-  {
-    gEntIdStringMultiMapTypeName.clear();
-    gEntIdStringMultiMapTypeNameInitGuard = 0;
-  }
 } // namespace
 
 /**
@@ -1046,26 +1031,17 @@ void gpg::RMultiMapType_EntId_string::Init()
 
 /**
  * Address: 0x00899060 (FUN_00899060, gpg::RMultiMapType_EntId_string::GetName)
+ * Address: 0x00C082E0 (FUN_00C082E0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches one reflection label for the
- * `multimap<EntId,std::string>` lane.
+ * Builds `multimap<EntId,std::string>` once and returns it.
  */
 const char* gpg::RMultiMapType_EntId_string::GetName() const
 {
-  if ((gEntIdStringMultiMapTypeNameInitGuard & 1u) == 0u) {
-    gEntIdStringMultiMapTypeNameInitGuard |= 1u;
-
-    const gpg::RType* const keyType = ResolveEntIdTypeForMultiMapName();
-    const gpg::RType* const valueType = ResolveStringTypeForMultiMapName();
-    const char* const keyName = keyType != nullptr ? keyType->GetName() : "EntId";
-    const char* const valueName = valueType != nullptr ? valueType->GetName() : "std::string";
-
-    gEntIdStringMultiMapTypeName = gpg::STR_Printf("multimap<%s,%s>", keyName, valueName);
-    (void)std::atexit(&cleanup_RMultiMapType_EntId_string_Name);
-  }
-
-  return gEntIdStringMultiMapTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf(
+    "multimap<%s,%s>", ResolveEntIdTypeForMultiMapName()->GetName(), ResolveStringTypeForMultiMapName()->GetName()
+  );
+  return sName.c_str();
 }
 
 /**
@@ -3266,35 +3242,6 @@ namespace moho
     CWldSession* gActiveWldSession = nullptr;
     SWldSessionInfo* gPendingWldSessionInfo = nullptr;
     EWldFrameAction gWldFrameAction = EWldFrameAction::Inactive;
-    /**
-     * The session-listener registry, held as a **function-local** static.
-     *
-     * The binary's own storage is a zero-initialised static whose only
-     * "construction" is the atexit registration guarded by
-     * `gWldTeardownCallbacksInitMask` (FUN_00869810's magic-static guard) -
-     * an empty VC8 vector is all zero bytes, so it needs no dynamic
-     * initialiser at all.
-     *
-     * Our `msvc8::vector` default constructor is not `constexpr`, so writing
-     * this as a namespace-scope object gave it a dynamic initialiser and put
-     * it into static-initialisation order. Every registrant
-     * (`SelectionListener`, `PauseListener`, `IdleUnitSelector`) registers
-     * from its own translation unit's static initialiser, and those ran
-     * first: their `push_back`s landed in the vector, and this object's
-     * constructor then null'd all three lanes on top of them. The registry
-     * was empty by the time a session was created, so no listener was ever
-     * attached and `OnSelectionChanged` never fired.
-     *
-     * A function-local static is constructed on first use, which is exactly
-     * when the first `push_back` needs it.
-     */
-    [[nodiscard]] WldTeardownCallbackVector& WldTeardownCallbackStorage()
-    {
-      static WldTeardownCallbackVector sCallbacks;
-      return sCallbacks;
-    }
-
-    std::uint32_t gWldTeardownCallbacksInitMask = 0;
 
     /**
      * Address: 0x0088E900 (FUN_0088E900, pending session-info ownership rebind helper)
@@ -3321,12 +3268,6 @@ namespace moho
 
       gPendingWldSessionInfo = nextSessionInfo;
       return &gPendingWldSessionInfo;
-    }
-
-    void CleanupWldTeardownCallbacks()
-    {
-      WldTeardownCallbackStorage().clear();
-      gWldTeardownCallbacksInitMask &= ~1u;
     }
 
     /**
@@ -13634,10 +13575,7 @@ namespace moho
       auto* const sessionStage = new CTaskStage();
       CTaskStage* const previousStage = mCurThread;
       mCurThread = sessionStage;
-      if (previousStage != nullptr) {
-        previousStage->Teardown();
-        delete previousStage;
-      }
+      delete previousStage;
     }
     mState->m_luaTask = reinterpret_cast<CLuaTask*>(mCurThread);
 
@@ -13781,11 +13719,8 @@ namespace moho
     // Tear the session task stage down before the Lua state it is published
     // on: the stage owns the disk-watcher task and every ForkThread coroutine
     // still parked on it, and those hold `mState`.
-    if (mCurThread) {
-      mCurThread->Teardown();
-      delete mCurThread;
-      mCurThread = nullptr;
-    }
+    delete mCurThread;
+    mCurThread = nullptr;
 
     if (mState) {
       delete mState;
@@ -19698,32 +19633,6 @@ namespace moho
     constexpr std::uint32_t kResourceSplatHalfExtentShift = 2u;
 
     /**
-     * Address: 0x010C4340 (`shaderVarPrimBatcherTime`)
-     *
-     * What it does:
-     * Returns the process-global `primbatcher` effect's `"time"` shader
-     * variable. The binary registers it from a CRT static initialiser,
-     * `register_ShaderVarPrimBatcherTime` (0x00BE6050,
-     * `func_register_ShaderVar("time", &shaderVarPrimBatcherTime,
-     * "primbatcher")`), and tears it down through the `atexit` hook at
-     * 0x00C07480.
-     *
-     * The canonical home for this slot is `ShaderVar.cpp` next to
-     * `register_ShaderVarPrimBatcherCompositeMatrix` / `...Texture1` /
-     * `...AlphaMultiplier`; it is defined here as a function-local static
-     * because this translation unit is its only reader so far. The lazy
-     * registration is equivalent to the binary's CRT initialiser: nothing can
-     * observe the slot before the first `RenderResources` call.
-     */
-    [[nodiscard]] ShaderVar& PrimBatcherTimeShaderVar()
-    {
-      static ShaderVar slot;
-      static const bool registered = (RegisterShaderVar("time", &slot, "primbatcher"), true);
-      (void)registered;
-      return slot;
-    }
-
-    /**
      * Address: 0x0086309A..0x0086325A (mass splat run, inlined)
      * Address: 0x00863295..0x00863455 (hydrocarbon splat run, inlined)
      *
@@ -19811,10 +19720,9 @@ namespace moho
     // The resource-icon shader animates off the process wall clock, not off a
     // sim tick - `gpg::time::GetSystemTimer().ElapsedSeconds()` at
     // 0x00862AD3/0x00862ADA.
-    ShaderVar& timeShaderVar = PrimBatcherTimeShaderVar();
     const float shaderTime = gpg::time::GetSystemTimer().ElapsedSeconds();
-    if (timeShaderVar.Exists()) {
-      timeShaderVar.SetFloat(shaderTime);
+    if (shaderVarPrimBatcherTime.Exists()) {
+      shaderVarPrimBatcherTime.SetFloat(shaderTime);
     }
 
     // Raw viewport extents, not the whole-pixel truncation the projection
@@ -20869,16 +20777,24 @@ namespace moho
 
   /**
    * Address: 0x00869810 (FUN_00869810, func_WldSessionLoader_GetOnTeardownCallbacks)
+   * Address: 0x00C07650 (FUN_00C07650, atexit destructor of the session-listener registry)
+   * Address: 0x00869A80 (FUN_00869A80, unreferenced copy of that atexit destructor)
+   *
+   * What it does:
+   * Returns the process-global session-listener registry, a function-local
+   * static constructed on first use.
+   *
+   * Every registrant (`SelectionListener`, `PauseListener`,
+   * `IdleUnitSelector`) registers from its own translation unit's static
+   * initialiser. A namespace-scope vector would be constructed in
+   * static-initialisation order and could null the lanes those `push_back`s
+   * already filled; the function-local static is constructed exactly when the
+   * first registrant needs it, as in the binary.
    */
   WldTeardownCallbackVector* WLD_GetOnTeardownCallbacks()
   {
-    WldTeardownCallbackVector& callbacks = WldTeardownCallbackStorage();
-    if ((gWldTeardownCallbacksInitMask & 1u) == 0u) {
-      gWldTeardownCallbacksInitMask |= 1u;
-      (void)std::atexit(&CleanupWldTeardownCallbacks);
-    }
-
-    return &callbacks;
+    static WldTeardownCallbackVector sCallbacks;
+    return &sCallbacks;
   }
 
   /**
@@ -20905,19 +20821,6 @@ namespace moho
   {
     WldTeardownCallbackVector* const callbacks = WLD_GetOnTeardownCallbacks();
     return DoTeardownCallbacks(callbacks);
-  }
-
-  /**
-   * Address: 0x00869A80 (FUN_00869A80)
-   *
-   * What it does:
-   * Releases global world-session teardown-callback vector storage and rewires
-   * all three storage lanes to null -- VC8's `vector<T>::_Tidy()`, which is
-   * what move-assigning an empty vector compiles to.
-   */
-  void WLD_ResetOnTeardownCallbackStorage()
-  {
-    WldTeardownCallbackStorage() = WldTeardownCallbackVector{};
   }
 
   /**

@@ -15,49 +15,27 @@ using namespace moho;
 
 namespace
 {
-  alignas(IAiCommandDispatchImplTypeInfo)
-  unsigned char gIAiCommandDispatchImplTypeInfoStorage[sizeof(IAiCommandDispatchImplTypeInfo)] = {};
-  bool gIAiCommandDispatchImplTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6660 (FUN_00BF6660, atexit destructor of the IAiCommandDispatchImplTypeInfo object)
+   */
   [[nodiscard]] IAiCommandDispatchImplTypeInfo* AcquireIAiCommandDispatchImplTypeInfo()
   {
-    return reinterpret_cast<IAiCommandDispatchImplTypeInfo*>(gIAiCommandDispatchImplTypeInfoStorage);
+    static IAiCommandDispatchImplTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
    * Address: 0x00599130 (FUN_00599130, constructor lane for IAiCommandDispatchImplTypeInfo)
    *
    * What it does:
-   * Constructs startup-owned `IAiCommandDispatchImplTypeInfo` storage and
+   * Constructs the startup-owned `IAiCommandDispatchImplTypeInfo` object and
    * preregisters RTTI for `IAiCommandDispatchImpl`.
    */
   [[nodiscard]] gpg::RType* construct_IAiCommandDispatchImplTypeInfo()
   {
-    if (!gIAiCommandDispatchImplTypeInfoConstructed) {
-      IAiCommandDispatchImplTypeInfo* const typeInfo =
-        new (gIAiCommandDispatchImplTypeInfoStorage) IAiCommandDispatchImplTypeInfo();
-      gpg::PreRegisterRType(typeid(IAiCommandDispatchImpl), typeInfo);
-      gIAiCommandDispatchImplTypeInfoConstructed = true;
-    }
-
-    return AcquireIAiCommandDispatchImplTypeInfo();
-  }
-
-  /**
-   * Address: 0x00BF6660 (FUN_00BF6660, cleanup_IAiCommandDispatchImplTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned IAiCommandDispatchImpl type-info storage by
-   * running the `gpg::RType` destructor lane.
-   */
-  void cleanup_IAiCommandDispatchImplTypeInfoStorage()
-  {
-    if (!gIAiCommandDispatchImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireIAiCommandDispatchImplTypeInfo()->gpg::RType::~RType();
-    gIAiCommandDispatchImplTypeInfoConstructed = false;
+    IAiCommandDispatchImplTypeInfo* const typeInfo = AcquireIAiCommandDispatchImplTypeInfo();
+    gpg::PreRegisterRType(typeid(IAiCommandDispatchImpl), typeInfo);
+    return typeInfo;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
@@ -166,13 +144,11 @@ void IAiCommandDispatchImplTypeInfo::Init()
  * Address: 0x00BCBEA0 (FUN_00BCBEA0, register_IAiCommandDispatchImplTypeInfo)
  *
  * What it does:
- * Constructs/preregisters startup RTTI storage for
- * `IAiCommandDispatchImpl` and installs process-exit cleanup.
+ * Constructs/preregisters startup RTTI storage for `IAiCommandDispatchImpl`.
  */
-int moho::register_IAiCommandDispatchImplTypeInfo()
+void moho::register_IAiCommandDispatchImplTypeInfo()
 {
   (void)construct_IAiCommandDispatchImplTypeInfo();
-  return std::atexit(&cleanup_IAiCommandDispatchImplTypeInfoStorage);
 }
 
 namespace
@@ -181,7 +157,7 @@ namespace
   {
     IAiCommandDispatchImplTypeInfoBootstrap()
     {
-      (void)moho::register_IAiCommandDispatchImplTypeInfo();
+      moho::register_IAiCommandDispatchImplTypeInfo();
     }
   };
 

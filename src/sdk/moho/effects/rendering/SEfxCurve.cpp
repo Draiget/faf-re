@@ -1,7 +1,6 @@
 #include "moho/effects/rendering/SEfxCurve.h"
 
 #include <cstddef>
-#include <cstdlib>
 #include <limits>
 #include <new>
 #include <typeinfo>
@@ -84,9 +83,6 @@ namespace
 {
   using FastVectorSEfxCurveType = gpg::RFastVectorType<moho::SEfxCurve>;
 
-  msvc8::string gFastVectorSEfxCurveTypeName;
-  bool gFastVectorSEfxCurveTypeNameCleanupRegistered = false;
-
   /**
    * Address: 0x00BFBED0 (FUN_00BFBED0, atexit destructor of the FastVectorSEfxCurveType object)
    */
@@ -99,12 +95,6 @@ namespace
   [[nodiscard]] gpg::RType* CachedSEfxCurveType()
   {
     return moho::SEfxCurve::StaticGetClass();
-  }
-
-  void cleanup_FastVectorSEfxCurveTypeName()
-  {
-    gFastVectorSEfxCurveTypeName = msvc8::string{};
-    gFastVectorSEfxCurveTypeNameCleanupRegistered = false;
   }
 } // namespace
 
@@ -157,24 +147,15 @@ namespace gpg
 
   /**
    * Address: 0x0065EEC0 (FUN_0065EEC0, gpg::RFastVectorType_SEfxCurve::GetName)
+   * Address: 0x00BFBEA0 (FUN_00BFBEA0, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily builds and caches the reflected `fastvector<SEfxCurve>` name and
-   * registers process-exit cleanup for the cached string storage.
+   * Builds `fastvector<SEfxCurve>` once and returns it.
    */
   const char* RFastVectorType<moho::SEfxCurve>::GetName() const
   {
-    if (gFastVectorSEfxCurveTypeName.empty()) {
-      const gpg::RType* const elementType = CachedSEfxCurveType();
-      const char* const elementName = elementType ? elementType->GetName() : "SEfxCurve";
-      gFastVectorSEfxCurveTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SEfxCurve");
-      if (!gFastVectorSEfxCurveTypeNameCleanupRegistered) {
-        gFastVectorSEfxCurveTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_FastVectorSEfxCurveTypeName);
-      }
-    }
-
-    return gFastVectorSEfxCurveTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSEfxCurveType()->GetName());
+    return sName.c_str();
   }
 
   /**

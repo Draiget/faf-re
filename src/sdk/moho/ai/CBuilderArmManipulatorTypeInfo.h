@@ -91,10 +91,9 @@ namespace moho
    * Address: 0x00BD2590 (FUN_00BD2590, register_CBuilderArmManipulatorTypeInfo)
    *
    * What it does:
-   * Constructs startup-owned `CBuilderArmManipulatorTypeInfo` storage and
-   * installs process-exit cleanup.
+   * Constructs the startup-owned `CBuilderArmManipulatorTypeInfo` object.
    */
-  int register_CBuilderArmManipulatorTypeInfo();
+  void register_CBuilderArmManipulatorTypeInfo();
 
   static_assert(sizeof(CBuilderArmManipulatorTypeInfo) == 0x64, "CBuilderArmManipulatorTypeInfo size must be 0x64");
 } // namespace moho

@@ -2,8 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/FastVectorUIntReflection.h"
@@ -113,20 +111,13 @@ namespace
     }
   }
 
-  gpg::RFastVectorType<moho::EntId> gFastVectorEntIdType;
-
   /**
-   * Address: 0x00BF4B70 (FUN_00BF4B70, cleanup_RFastVectorType_EntId)
-   *
-   * What it does:
-   * Process-exit cleanup for the global `RFastVectorType<Moho::EntId>`
-   * descriptor's dynamic field/base storage (the same generic `gpg::RType`
-   * base-class teardown every `RFastVectorType<T>` specialization shares).
+   * Address: 0x00BF4B70 (FUN_00BF4B70, atexit destructor of the RFastVectorType<Moho::EntId> object)
    */
-  void cleanup_RFastVectorType_EntId()
+  [[nodiscard]] gpg::RFastVectorType<moho::EntId>* AcquireFastVectorEntIdType()
   {
-    gFastVectorEntIdType.fields_.clear();
-    gFastVectorEntIdType.bases_.clear();
+    static gpg::RFastVectorType<moho::EntId> sInstance;
+    return &sInstance;
   }
 
   struct FastVectorEntIdReflectionBootstrap
@@ -144,16 +135,15 @@ namespace
  * Address: 0x00BC9D40 (FUN_00BC9D40, register_RFastVectorType_EntId)
  *
  * What it does:
- * Materializes startup reflection storage for `fastvector<Moho::EntId>` and
- * registers process-exit teardown. Reached from the CRT static-initializer
- * table (`__xc_a`) in the binary; recovered here as the constructor of the
- * file-local `FastVectorEntIdReflectionBootstrap` global, matching
+ * Constructs the `fastvector<Moho::EntId>` reflection descriptor. Reached
+ * from the CRT static-initializer table (`__xc_a`) in the binary; recovered
+ * here as the constructor of the file-local
+ * `FastVectorEntIdReflectionBootstrap` global, matching
  * `register_RFastVectorType_uint`'s own bootstrap pattern.
  */
 void gpg::register_RFastVectorType_EntId()
 {
-  (void)gFastVectorEntIdType;
-  (void)std::atexit(&cleanup_RFastVectorType_EntId);
+  (void)AcquireFastVectorEntIdType();
 }
 
 /**
@@ -173,15 +163,14 @@ gpg::RFastVectorType<moho::EntId>::~RFastVectorType() = default;
 
 /**
  * Address: 0x00552E70 (FUN_00552E70, gpg::RFastVectorType_EntId::GetName)
+ * Address: 0x00BF4AE0 (FUN_00BF4AE0, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `fastvector<EntId>` once and returns it.
  */
 const char* gpg::RFastVectorType<moho::EntId>::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    gpg::RType* const elementType = CachedEntIdType();
-    const char* const elementName = elementType ? elementType->GetName() : "EntId";
-    sName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "EntId");
-  }
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedEntIdType()->GetName());
   return sName.c_str();
 }
 

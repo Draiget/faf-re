@@ -47,14 +47,20 @@ namespace moho
   static_assert(sizeof(SPlatSymbolInfo) == 0x48, "SPlatSymbolInfo size must be 0x48");
 
   /**
-   * Address: 0x004F2480
+   * Address: 0x004F2480 (FUN_004F2480, ?WIN_GetBeforeEventsStage@Moho@@YAAAVCTaskStage@1@XZ)
+   *
+   * What it does:
+   * Returns the task stage run before each frame's window events.
    */
-  CTaskStage* WIN_GetBeforeEventsStage();
+  CTaskStage& WIN_GetBeforeEventsStage();
 
   /**
-   * Address: 0x004F24F0
+   * Address: 0x004F24F0 (FUN_004F24F0, ?WIN_GetBeforeWaitStage@Moho@@YAAAVCTaskStage@1@XZ)
+   *
+   * What it does:
+   * Returns the task stage run before each frame's idle wait.
    */
-  CTaskStage* WIN_GetBeforeWaitStage();
+  CTaskStage& WIN_GetBeforeWaitStage();
 
   /**
    * Address: 0x004F2420 (FUN_004F2420, Moho::WIN_GetWaitHandleSet)

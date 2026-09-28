@@ -1922,38 +1922,23 @@ namespace moho
   namespace
   {
     /**
-     * Static `RPointerType<Entity>` descriptor that the binary exposes as
-     * `Moho::Entity::PointerType`. Default static-init runs the
-     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane.
-     */
-    gpg::RPointerType<moho::Entity> sEntityPointerTypeStorage{};
-
-    /**
      * Address: 0x0067E410 (FUN_0067E410)
+     * Address: 0x00BFC900 (FUN_00BFC900, atexit destructor of the static `RPointerType<Entity>` descriptor)
      *
      * What it does:
-     * Pre-registers the static `RPointerType<Entity>` descriptor under the
-     * `Entity*` type-info key so subsequent `LookupRType` queries from the
-     * lazy `GetPointerType` lane resolve to this descriptor.
+     * Constructs the static `RPointerType<Entity>` descriptor that the binary
+     * exposes as `Moho::Entity::PointerType` and pre-registers it under the
+     * `Entity*` type-info key, so subsequent `LookupRType` queries from the
+     * lazy `GetPointerType` lane resolve to this descriptor. The binary holds
+     * the descriptor as a function-local static of `GetPointerType`; it lives
+     * here because the preregister phase has to construct it before any
+     * consumer looks up `Entity*`.
      */
-    void PreregisterEntityPointerType()
+    gpg::RType* PreregisterEntityPointerType()
     {
-      gpg::PreRegisterRType(typeid(moho::Entity*), &sEntityPointerTypeStorage);
-    }
-
-    /**
-     * Address: 0x00BFC900 (FUN_00BFC900)
-     *
-     * What it does:
-     * Tears down the static `RPointerType<Entity>` descriptor at process exit:
-     * frees heap-backed `bases_`/`fields_` vector storage and resets the RType
-     * vftable lane to the `RObject` base. Registered via `atexit` from
-     * `GetPointerType`'s once-init path.
-     */
-    void CleanupEntityPointerType()
-    {
-      sEntityPointerTypeStorage.~RPointerType<moho::Entity>();
+      static gpg::RPointerType<moho::Entity> sDescriptor;
+      gpg::PreRegisterRType(typeid(moho::Entity*), &sDescriptor);
+      return &sDescriptor;
     }
   } // namespace
 
@@ -1961,17 +1946,13 @@ namespace moho
    * Address: 0x0067CFA0 (FUN_0067CFA0, Moho::Entity::GetPointerType)
    *
    * What it does:
-   * On first call, pre-registers the static `RPointerType<Entity>` descriptor
-   * and installs the matching atexit teardown. After that, lazily caches the
+   * On first call, pre-registers the static `RPointerType<Entity>`
+   * descriptor. After that, lazily caches the
    * `LookupRType(typeid(Entity*))` result in `sPointerType` and returns it.
    */
   gpg::RType* Entity::GetPointerType()
   {
-    static const bool sOnceInit = []() {
-      PreregisterEntityPointerType();
-      (void)std::atexit(&CleanupEntityPointerType);
-      return true;
-    }();
+    static const bool sOnceInit = (PreregisterEntityPointerType(), true);
     (void)sOnceInit;
 
     if (!sPointerType) {

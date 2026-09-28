@@ -28,28 +28,13 @@ namespace
     typeInfo->AddBase(gpg::RField{IFormationInstance::sType->GetName(), IFormationInstance::sType, 0});
   }
 
-  alignas(CFormationInstanceTypeInfo)
-  unsigned char gCFormationInstanceTypeInfoStorage[sizeof(CFormationInstanceTypeInfo)] = {};
-
+  /**
+   * Address: 0x00BF5A40 (FUN_00BF5A40, atexit destructor of the CFormationInstanceTypeInfo object)
+   */
   [[nodiscard]] CFormationInstanceTypeInfo& CFormationInstanceTypeInfoSingleton()
   {
-    return *reinterpret_cast<CFormationInstanceTypeInfo*>(gCFormationInstanceTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF5A40 (FUN_00BF5A40, cleanup_CFormationInstanceTypeInfo)
-   *
-   * What it does:
-   * Tears down the startup-owned `CFormationInstanceTypeInfo` singleton,
-   * releasing its base/field vectors and restoring the base RTTI vtable
-   * lane. The binary inlines the non-deleting destructor lane directly
-   * (`deleteFlags=0`), matching a plain in-place `~CFormationInstanceTypeInfo()`
-   * call with no `operator delete` -- the singleton has static storage
-   * duration, not heap duration.
-   */
-  void cleanup_CFormationInstanceTypeInfo()
-  {
-    CFormationInstanceTypeInfoSingleton().~CFormationInstanceTypeInfo();
+    static CFormationInstanceTypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -85,8 +70,7 @@ void CFormationInstanceTypeInfo::Init()
  */
 void moho::register_CFormationInstanceTypeInfo()
 {
-  new (gCFormationInstanceTypeInfoStorage) CFormationInstanceTypeInfo();
-  (void)std::atexit(&cleanup_CFormationInstanceTypeInfo);
+  (void)CFormationInstanceTypeInfoSingleton();
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

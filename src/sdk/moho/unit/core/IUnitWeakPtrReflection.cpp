@@ -1,6 +1,5 @@
 #include "moho/unit/core/IUnitWeakPtrReflection.h"
 
-#include <cstdlib>
 #include <cstddef>
 #include <cstdint>
 #include <new>
@@ -35,31 +34,7 @@ namespace
   using WeakPtrIUnitType = moho::RWeakPtrType<moho::IUnit>;
   using FastVectorWeakPtrIUnitType = gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>;
 
-  alignas(IUnitTypeInfo) unsigned char gIUnitTypeInfoStorage[sizeof(IUnitTypeInfo)]{};
-  bool gIUnitTypeInfoConstructed = false;
-  alignas(WeakPtrIUnitType) unsigned char gWeakPtrIUnitTypeStorage[sizeof(WeakPtrIUnitType)]{};
-  bool gWeakPtrIUnitTypeConstructed = false;
-  alignas(FastVectorWeakPtrIUnitType) unsigned char
-    gFastVectorWeakPtrIUnitTypeStorage[sizeof(FastVectorWeakPtrIUnitType)]{};
-  bool gFastVectorWeakPtrIUnitTypeConstructed = false;
-
   constexpr const char kReflectWeakPtrHeaderPath[] = "c:\\work\\rts\\main\\code\\src\\core/ReflectWeakPtr.h";
-
-  msvc8::string gWeakPtrIUnitTypeName;
-  bool gWeakPtrIUnitTypeNameCleanupRegistered = false;
-
-  msvc8::string gFastVectorWeakPtrIUnitTypeName;
-  bool gFastVectorWeakPtrIUnitTypeNameCleanupRegistered = false;
-
-  void cleanup_WeakPtrIUnitTypeName()
-  {
-    gWeakPtrIUnitTypeName.clear();
-  }
-
-  void cleanup_FastVectorWeakPtrIUnitTypeName()
-  {
-    gFastVectorWeakPtrIUnitTypeName.clear();
-  }
 
   [[nodiscard]] gpg::RType* CachedIUnitType()
   {
@@ -85,14 +60,13 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x00BF5D40 (FUN_00BF5D40, atexit destructor of the FastVectorWeakPtrIUnitType object)
+   */
   [[nodiscard]] FastVectorWeakPtrIUnitType* AcquireFastVectorWeakPtrIUnitType()
   {
-    if (!gFastVectorWeakPtrIUnitTypeConstructed) {
-      ::new (static_cast<void*>(gFastVectorWeakPtrIUnitTypeStorage)) FastVectorWeakPtrIUnitType();
-      gFastVectorWeakPtrIUnitTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorWeakPtrIUnitType*>(gFastVectorWeakPtrIUnitTypeStorage);
+    static FastVectorWeakPtrIUnitType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RRef MakeIUnitRefFromRawObject(void* rawObject)
@@ -373,23 +347,16 @@ namespace
 
 /**
  * Address: 0x00541600 (FUN_00541600, Moho::RWeakPtrType_IUnit::GetName)
+ * Address: 0x00BF3E80 (FUN_00BF3E80, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Builds/caches lexical type name `"WeakPtr<%s>"` from the reflected IUnit
- * pointee type and registers one cleanup callback.
+ * Builds lexical type name `"WeakPtr<%s>"` once from the reflected IUnit
+ * pointee type and returns it.
  */
 const char* moho::RWeakPtrType<moho::IUnit>::GetName() const
 {
-  if (gWeakPtrIUnitTypeName.empty()) {
-    const char* const pointeeName = CachedIUnitType()->GetName();
-    gWeakPtrIUnitTypeName = gpg::STR_Printf("WeakPtr<%s>", pointeeName ? pointeeName : "IUnit");
-
-    if (!gWeakPtrIUnitTypeNameCleanupRegistered) {
-      gWeakPtrIUnitTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_WeakPtrIUnitTypeName);
-    }
-  }
-  return gWeakPtrIUnitTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedIUnitType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -462,23 +429,16 @@ gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::~RFastVectorType() = default;
 
 /**
  * Address: 0x0056BDF0 (FUN_0056BDF0, gpg::RFastVectorType_WeakPtr_IUnit::GetName)
+ * Address: 0x00BF5B60 (FUN_00BF5B60, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Builds/caches lexical type name `"fastvector<%s>"` from reflected
- * `WeakPtr<IUnit>` element type and registers one cleanup callback.
+ * Builds lexical type name `"fastvector<%s>"` once from the reflected
+ * `WeakPtr<IUnit>` element type and returns it.
  */
 const char* gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetName() const
 {
-  if (gFastVectorWeakPtrIUnitTypeName.empty()) {
-    const char* const elementName = CachedWeakPtrIUnitType()->GetName();
-    gFastVectorWeakPtrIUnitTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "WeakPtr<IUnit>");
-
-    if (!gFastVectorWeakPtrIUnitTypeNameCleanupRegistered) {
-      gFastVectorWeakPtrIUnitTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_FastVectorWeakPtrIUnitTypeName);
-    }
-  }
-  return gFastVectorWeakPtrIUnitTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedWeakPtrIUnitType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -554,38 +514,30 @@ void gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::SetCount(void* obj, const
 
 /**
  * Address: 0x00541400 (FUN_00541400, preregister_IUnitTypeInfoStartup)
+ * Address: 0x00BF3E20 (FUN_00BF3E20, atexit destructor of the IUnitTypeInfo object)
  *
  * What it does:
  * Constructs/preregisters RTTI metadata for `IUnit`.
  */
 gpg::RType* moho::preregister_IUnitTypeInfoStartup()
 {
-  if (!gIUnitTypeInfoConstructed) {
-    ::new (static_cast<void*>(gIUnitTypeInfoStorage)) IUnitTypeInfo();
-    gIUnitTypeInfoConstructed = true;
-  }
-
-  auto* const typeInfo = reinterpret_cast<IUnitTypeInfo*>(gIUnitTypeInfoStorage);
-  gpg::PreRegisterRType(typeid(moho::IUnit), typeInfo);
-  return typeInfo;
+  static IUnitTypeInfo sInstance;
+  gpg::PreRegisterRType(typeid(moho::IUnit), &sInstance);
+  return &sInstance;
 }
 
 /**
  * Address: 0x00541B40 (FUN_00541B40, preregister_WeakPtrIUnitTypeStartup)
+ * Address: 0x00BF3EB0 (FUN_00BF3EB0, atexit destructor of the WeakPtrIUnitType object)
  *
  * What it does:
  * Constructs/preregisters RTTI metadata for `WeakPtr<IUnit>`.
  */
 gpg::RType* moho::preregister_WeakPtrIUnitTypeStartup()
 {
-  if (!gWeakPtrIUnitTypeConstructed) {
-    ::new (static_cast<void*>(gWeakPtrIUnitTypeStorage)) WeakPtrIUnitType();
-    gWeakPtrIUnitTypeConstructed = true;
-  }
-
-  auto* const typeInfo = reinterpret_cast<WeakPtrIUnitType*>(gWeakPtrIUnitTypeStorage);
-  gpg::PreRegisterRType(typeid(moho::WeakPtr<moho::IUnit>), typeInfo);
-  return typeInfo;
+  static WeakPtrIUnitType sInstance;
+  gpg::PreRegisterRType(typeid(moho::WeakPtr<moho::IUnit>), &sInstance);
+  return &sInstance;
 }
 
 /**

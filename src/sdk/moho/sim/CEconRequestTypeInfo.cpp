@@ -11,24 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CEconRequestTypeInfo) unsigned char gCEconRequestTypeInfoStorage[sizeof(CEconRequestTypeInfo)];
-  bool gCEconRequestTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02370 (FUN_00C02370, atexit destructor of the CEconRequestTypeInfo object)
+   */
   [[nodiscard]] CEconRequestTypeInfo& AcquireCEconRequestTypeInfo()
   {
-    if (!gCEconRequestTypeInfoConstructed) {
-      new (gCEconRequestTypeInfoStorage) CEconRequestTypeInfo();
-      gCEconRequestTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CEconRequestTypeInfo*>(gCEconRequestTypeInfoStorage);
-  }
-
-  void cleanup_CEconRequestTypeInfo()
-  {
-    if (!gCEconRequestTypeInfoConstructed) return;
-    auto& ti = *reinterpret_cast<CEconRequestTypeInfo*>(gCEconRequestTypeInfoStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static CEconRequestTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CEconRequestTypeInfoBootstrap
@@ -76,7 +65,6 @@ void CEconRequestTypeInfo::Init()
 void moho::register_CEconRequestTypeInfoStartup()
 {
   (void)AcquireCEconRequestTypeInfo();
-  (void)std::atexit(&cleanup_CEconRequestTypeInfo);
 }
 
 

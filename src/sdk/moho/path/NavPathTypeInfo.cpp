@@ -53,21 +53,14 @@ namespace moho
 
 namespace
 {
-  extern moho::NavPathTypeInfo gNavPathTypeInfo;
-
   /**
-   * Address: 0x00C01710 (FUN_00C01710, sub_C01710)
-   *
-   * What it does:
-   * Process-exit cleanup for global `NavPathTypeInfo` dynamic field/base lanes.
+   * Address: 0x00C01710 (FUN_00C01710, atexit destructor of the NavPathTypeInfo object)
    */
-  void cleanup_NavPathTypeInfo()
+  [[nodiscard]] moho::NavPathTypeInfo* AcquireNavPathTypeInfo()
   {
-    gNavPathTypeInfo.fields_.clear();
-    gNavPathTypeInfo.bases_.clear();
+    static moho::NavPathTypeInfo sInstance;
+    return &sInstance;
   }
-
-  moho::NavPathTypeInfo gNavPathTypeInfo;
 
   struct NavPathReflectionRegistration
   {
@@ -86,16 +79,13 @@ namespace moho
    * Address: 0x00BDC670 (FUN_00BDC670, register_NavPathTypeInfo)
    *
    * What it does:
-   * Materializes startup `NavPathTypeInfo` storage and registers process-exit
-   * teardown.
+   * Constructs the startup `NavPathTypeInfo` object, which preregisters it.
    */
   void register_NavPathTypeInfo()
   {
-    (void)gNavPathTypeInfo;
-    (void)std::atexit(&cleanup_NavPathTypeInfo);
+    (void)AcquireNavPathTypeInfo();
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

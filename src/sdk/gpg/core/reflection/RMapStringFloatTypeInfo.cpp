@@ -1,9 +1,6 @@
 #include "gpg/core/reflection/RMapStringFloatTypeInfo.h"
 
-#include <cstdlib>
-#include <cstdint>
 #include <map>
-#include <new>
 #include <string>
 #include <typeinfo>
 
@@ -15,36 +12,13 @@ namespace
 {
   using TypeInfo = gpg::RMapStringFloatTypeInfo;
 
-  alignas(TypeInfo) unsigned char gMapStringFloatTypeInfoStorage[sizeof(TypeInfo)];
-  bool gMapStringFloatTypeInfoConstructed = false;
-  msvc8::string gMapStringFloatTypeName{};
-  std::uint32_t gMapStringFloatTypeNameInitGuard = 0u;
-
+  /**
+   * Address: 0x00BFDBE0 (FUN_00BFDBE0, atexit destructor of the gpg::RMapStringFloatTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireMapStringFloatTypeInfo()
   {
-    if (!gMapStringFloatTypeInfoConstructed) {
-      new (gMapStringFloatTypeInfoStorage) TypeInfo();
-      gMapStringFloatTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gMapStringFloatTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BFDAC0 (FUN_00BFDAC0)
-   *
-   * What it does:
-   * Releases cached lexical storage for `gpg::RMapType_string_float::GetName`.
-   */
-  void cleanup_MapStringFloat_TypeName()
-  {
-    gMapStringFloatTypeName.clear();
-    gMapStringFloatTypeNameInitGuard = 0u;
-  }
-
-  void CleanupMapStringFloatTypeInfoAtExit()
-  {
-    gpg::cleanup_MapStringFloat_Type();
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   struct MapStringFloatTypeInfoBootstrap
@@ -62,32 +36,21 @@ namespace gpg
 {
   /**
    * Address: 0x006AE290 (FUN_006AE290, gpg::RMapType_string_float::GetName)
+   * Address: 0x00BFDAC0 (FUN_00BFDAC0, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Builds/caches the lexical map type label from runtime key/value RTTI
-   * names and returns `"map<key,value>"`.
+   * Builds the lexical map type label `"map<key,value>"` once from the
+   * runtime key/value RTTI names and returns it.
    */
   const char* RMapStringFloatTypeInfo::GetName() const
   {
-    if ((gMapStringFloatTypeNameInitGuard & 1u) == 0u) {
-      gMapStringFloatTypeNameInitGuard |= 1u;
-
-      // The descriptor is registered under the engine ABI string type by
-      // RStringType.cpp. typeid(std::string) is a different type here (the
-      // 2007 build had only one), and LookupRType throws on a miss rather
-      // than returning null, so asking for it first threw and the fallback
-      // below was unreachable.
-      gpg::RType* keyType = gpg::LookupRType(typeid(msvc8::string));
-
-      gpg::RType* valueType = gpg::LookupRType(typeid(float));
-      const char* const keyName = keyType != nullptr ? keyType->GetName() : "std::string";
-      const char* const valueName = valueType != nullptr ? valueType->GetName() : "float";
-
-      gMapStringFloatTypeName = gpg::STR_Printf("map<%s,%s>", keyName, valueName);
-      (void)std::atexit(&cleanup_MapStringFloat_TypeName);
-    }
-
-    return gMapStringFloatTypeName.c_str();
+    // The key descriptor is registered under the engine ABI string type by
+    // RStringType.cpp; typeid(std::string) is a different type here (the
+    // 2007 build had only one).
+    static const msvc8::string sName = gpg::STR_Printf(
+      "map<%s,%s>", gpg::LookupRType(typeid(msvc8::string))->GetName(), gpg::LookupRType(typeid(float))->GetName()
+    );
+    return sName.c_str();
   }
 
   /**
@@ -183,25 +146,11 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00BFDBE0 (FUN_00BFDBE0, cleanup_MapStringFloat_Type)
-   */
-  void cleanup_MapStringFloat_Type()
-  {
-    if (!gMapStringFloatTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireMapStringFloatTypeInfo().~RMapStringFloatTypeInfo();
-    gMapStringFloatTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD6BC0 (FUN_00BD6BC0, register_MapStringFloat_Type_AtExit)
    */
-  int register_MapStringFloat_Type_AtExit()
+  void register_MapStringFloat_Type_AtExit()
   {
     (void)register_MapStringFloat_Type_00();
-    return std::atexit(&CleanupMapStringFloatTypeInfoAtExit);
   }
 } // namespace gpg
 

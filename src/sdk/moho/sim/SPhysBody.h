@@ -389,11 +389,6 @@ namespace moho
   static_assert(sizeof(SPhysBodyConstruct) == 0x14, "SPhysBodyConstruct size must be 0x14");
 
   /**
-   * Address: 0x00BFD2D0 (FUN_00BFD2D0, cleanup_SPhysBodyTypeInfo)
-   */
-  void cleanup_SPhysBodyTypeInfo();
-
-  /**
    * Address: 0x00BD5E80 (FUN_00BD5E80, register_SPhysBodyTypeInfo)
    */
   void register_SPhysBodyTypeInfo();

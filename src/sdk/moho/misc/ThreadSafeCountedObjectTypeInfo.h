@@ -53,8 +53,7 @@ namespace moho
    * Address: 0x00BC2D60 (FUN_00BC2D60, register_ThreadSafeCountedObjectTypeInfo)
    *
    * What it does:
-   * Materializes startup `ThreadSafeCountedObjectTypeInfo` storage and
-   * registers process-exit teardown.
+   * Constructs the startup `ThreadSafeCountedObjectTypeInfo` object.
    */
   void register_ThreadSafeCountedObjectTypeInfo();
 } // namespace moho

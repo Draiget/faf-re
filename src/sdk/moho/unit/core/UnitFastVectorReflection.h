@@ -124,20 +124,12 @@ namespace moho
   [[nodiscard]] gpg::RType* register_FastVectorWeakPtrEntityType_00();
 
   /**
-   * Address: 0x00BFDB80 (FUN_00BFDB80, cleanup_FastVectorWeakPtrEntityType)
-   *
-   * What it does:
-   * Tears down startup-owned `fastvector<WeakPtr<Entity>>` reflection storage.
-   */
-  void cleanup_FastVectorWeakPtrEntityType();
-
-  /**
    * Address: 0x00BD6BE0 (FUN_00BD6BE0, register_FastVectorWeakPtrEntityType_AtExit)
    *
    * What it does:
-   * Registers `fastvector<WeakPtr<Entity>>` reflection and installs process-exit teardown.
+   * Registers `fastvector<WeakPtr<Entity>>` reflection.
    */
-  int register_FastVectorWeakPtrEntityType_AtExit();
+  void register_FastVectorWeakPtrEntityType_AtExit();
 
   /**
    * Address: 0x006B1780 (FUN_006B1780, register_FastVectorReconBlipPtrType_00)
@@ -148,18 +140,10 @@ namespace moho
   [[nodiscard]] gpg::RType* register_FastVectorReconBlipPtrType_00();
 
   /**
-   * Address: 0x00BFDB20 (FUN_00BFDB20, cleanup_FastVectorReconBlipPtrType)
-   *
-   * What it does:
-   * Tears down startup-owned `fastvector<ReconBlip*>` reflection storage.
-   */
-  void cleanup_FastVectorReconBlipPtrType();
-
-  /**
    * Address: 0x00BD6C00 (FUN_00BD6C00, register_FastVectorReconBlipPtrType_AtExit)
    *
    * What it does:
-   * Registers `fastvector<ReconBlip*>` reflection and installs process-exit teardown.
+   * Registers `fastvector<ReconBlip*>` reflection.
    */
-  int register_FastVectorReconBlipPtrType_AtExit();
+  void register_FastVectorReconBlipPtrType_AtExit();
 } // namespace moho

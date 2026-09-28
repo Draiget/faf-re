@@ -36,9 +36,6 @@ namespace
 
   static_assert(sizeof(CAiBuilderRebuildMapTypeInfo) == 0x64, "CAiBuilderRebuildMapTypeInfo size must be 0x64");
 
-  msvc8::string gCAiBuilderRebuildMapTypeName;
-  bool gCAiBuilderRebuildMapTypeNameInitialized = false;
-
   /**
    * Address: 0x00BF6A60 (FUN_00BF6A60, atexit destructor of the CAiBuilderImplTypeInfo object)
    */
@@ -104,33 +101,6 @@ namespace
       type = gpg::LookupRType(typeid(RUnitBlueprint));
     }
     return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedRUnitBlueprintPointerType()
-  {
-    // The descriptor is pre-registered under `typeid(RUnitBlueprint*)` by
-    // PreregisterRUnitBlueprintPointerType. `typeid(const RUnitBlueprint*)` is
-    // a distinct type and is never registered, and LookupRType *throws* on a
-    // miss rather than returning null - so asking for the const form first
-    // threw out of REF_RegisterAllTypes, and the fallback below it was
-    // unreachable.
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(RUnitBlueprint*));
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x00BF6B20 (FUN_00BF6B20)
-   *
-   * What it does:
-   * Releases cached lexical name storage for builder rebuild-map RTTI.
-   */
-  void cleanup_CAiBuilderRebuildMapTypeName()
-  {
-    gCAiBuilderRebuildMapTypeName.clear();
-    gCAiBuilderRebuildMapTypeNameInitialized = false;
   }
 
   [[nodiscard]] gpg::RRef MakeBlueprintObjectRef(const RUnitBlueprint* const blueprint)
@@ -302,20 +272,18 @@ void CAiBuilderImplTypeInfo::Init()
 
 /**
  * Address: 0x005A04C0 (FUN_005A04C0, gpg::RMapType_uint_RUnitBlueprintP::GetName)
+ * Address: 0x00BF6B20 (FUN_00BF6B20, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `map<unsigned int,RUnitBlueprint const *>` once from the key and
+ * value descriptors' own names and returns it. The value descriptor comes
+ * from `RUnitBlueprint::GetPointerType()`, evaluated before the key lookup.
  */
 const char* CAiBuilderRebuildMapTypeInfo::GetName() const
 {
-  if (!gCAiBuilderRebuildMapTypeNameInitialized) {
-    gpg::RType* const keyType = CachedUnsignedIntType();
-    gpg::RType* const valueType = CachedRUnitBlueprintPointerType();
-    const char* const keyName = keyType ? keyType->GetName() : "unsigned int";
-    const char* const valueName = valueType ? valueType->GetName() : "Moho::RUnitBlueprint const *";
-    gCAiBuilderRebuildMapTypeName = gpg::STR_Printf("map<%s,%s>", keyName, valueName);
-    gCAiBuilderRebuildMapTypeNameInitialized = true;
-    (void)std::atexit(&cleanup_CAiBuilderRebuildMapTypeName);
-  }
-
-  return gCAiBuilderRebuildMapTypeName.c_str();
+  static const msvc8::string sName =
+    gpg::STR_Printf("map<%s,%s>", CachedUnsignedIntType()->GetName(), RUnitBlueprint::GetPointerType()->GetName());
+  return sName.c_str();
 }
 
 /**

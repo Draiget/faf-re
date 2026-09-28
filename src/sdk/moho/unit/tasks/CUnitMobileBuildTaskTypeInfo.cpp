@@ -1,6 +1,5 @@
 #include "moho/unit/tasks/CUnitMobileBuildTaskTypeInfo.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -15,17 +14,13 @@ namespace
 {
   using TypeInfo = moho::CUnitMobileBuildTaskTypeInfo;
 
-  alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
-  bool gTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF92D0 (FUN_00BF92D0, atexit destructor of the CUnitMobileBuildTaskTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gTypeInfoConstructed) {
-      new (gTypeInfoStorage) TypeInfo();
-      gTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
@@ -45,16 +40,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
     }
     return cached;
-  }
-
-  void cleanup()
-  {
-    if (!gTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CUnitMobileBuildTaskTypeInfo();
-    gTypeInfoConstructed = false;
   }
 } // namespace
 
@@ -205,10 +190,9 @@ namespace moho
   /**
    * Address: 0x00BCF870 (FUN_00BCF870, register_CUnitMobileBuildTaskTypeInfo)
    */
-  int register_CUnitMobileBuildTaskTypeInfo()
+  void register_CUnitMobileBuildTaskTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup);
   }
 } // namespace moho
 

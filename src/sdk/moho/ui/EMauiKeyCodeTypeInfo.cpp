@@ -59,24 +59,10 @@ namespace moho
 
 namespace
 {
-  alignas(moho::EMauiKeyCodeTypeInfo) unsigned char
-    gEMauiKeyCodeTypeInfoStorage[sizeof(moho::EMauiKeyCodeTypeInfo)]{};
-  bool gEMauiKeyCodeTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::EMauiKeyCodeTypeInfo& GetEMauiKeyCodeTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::EMauiKeyCodeTypeInfo*>(gEMauiKeyCodeTypeInfoStorage);
-  }
-
-  void cleanup_EMauiKeyCodeTypeInfo()
-  {
-    if (gEMauiKeyCodeTypeInfoConstructed) {
-      GetEMauiKeyCodeTypeInfo().~EMauiKeyCodeTypeInfo();
-      gEMauiKeyCodeTypeInfoConstructed = false;
-    }
-  }
-
   /**
+   * Address: 0x00C03080 (FUN_00C03080, atexit destructor of the EMauiKeyCodeTypeInfo object)
+   *
+   * What it does:
    * Constructs the static `EMauiKeyCode` enum descriptor. Same shape as the
    * event-type and scroll-axis descriptors: the constructor pre-registers the
    * RTTI mapping, and the binary static-initialises the object in .data.
@@ -87,23 +73,24 @@ namespace
    */
   gpg::REnumType* construct_EMauiKeyCodeTypeInfo()
   {
-    if (!gEMauiKeyCodeTypeInfoConstructed) {
-      new (gEMauiKeyCodeTypeInfoStorage) moho::EMauiKeyCodeTypeInfo();
-      gEMauiKeyCodeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(&GetEMauiKeyCodeTypeInfo());
+    static moho::EMauiKeyCodeTypeInfo sInstance;
+    return &sInstance;
   }
 
-  int register_EMauiKeyCodeTypeInfo()
+  /**
+   * Address: 0x00BDEB50 (FUN_00BDEB50, register_EMauiKeyCodeTypeInfo)
+   *
+   * What it does:
+   * Constructs the `EMauiKeyCode` enum type-info object.
+   */
+  void register_EMauiKeyCodeTypeInfo()
   {
     (void)construct_EMauiKeyCodeTypeInfo();
-    return std::atexit(&cleanup_EMauiKeyCodeTypeInfo);
   }
 
   struct EMauiKeyCodeTypeInfoBootstrap
   {
-    EMauiKeyCodeTypeInfoBootstrap() { (void)register_EMauiKeyCodeTypeInfo(); }
+    EMauiKeyCodeTypeInfoBootstrap() { register_EMauiKeyCodeTypeInfo(); }
   };
 
   EMauiKeyCodeTypeInfoBootstrap gEMauiKeyCodeTypeInfoBootstrap;

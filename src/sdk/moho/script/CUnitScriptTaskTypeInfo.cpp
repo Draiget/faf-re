@@ -14,17 +14,13 @@ namespace
 {
   using TypeInfo = CUnitScriptTaskTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCUnitScriptTaskTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCUnitScriptTaskTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFA410 (FUN_00BFA410, atexit destructor of the CUnitScriptTaskTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gCUnitScriptTaskTypeInfoConstructed) {
-      new (gCUnitScriptTaskTypeInfoStorage) TypeInfo();
-      gCUnitScriptTaskTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCUnitScriptTaskTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCUnitScriptTaskType()
@@ -197,26 +193,11 @@ void CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const t
 }
 
 /**
- * Address: 0x00BFA410 (FUN_00BFA410)
- */
-void cleanup_CUnitScriptTaskTypeInfo()
-{
-  if (!gCUnitScriptTaskTypeInfoConstructed) {
-    return;
-  }
-
-  auto& typeInfo = *reinterpret_cast<TypeInfo*>(gCUnitScriptTaskTypeInfoStorage);
-  typeInfo.fields_.clear();
-  typeInfo.bases_.clear();
-}
-
-/**
  * Address: 0x00BD1960 (FUN_00BD1960)
  */
-int register_CUnitScriptTaskTypeInfo_AtExit()
+void register_CUnitScriptTaskTypeInfo_AtExit()
 {
   (void)register_CUnitScriptTaskTypeInfo();
-  return std::atexit(&cleanup_CUnitScriptTaskTypeInfo);
 }
 } // namespace moho
 
@@ -226,7 +207,7 @@ namespace
   {
     CUnitScriptTaskTypeInfoBootstrap()
     {
-      (void)moho::register_CUnitScriptTaskTypeInfo_AtExit();
+      moho::register_CUnitScriptTaskTypeInfo_AtExit();
     }
   };
 

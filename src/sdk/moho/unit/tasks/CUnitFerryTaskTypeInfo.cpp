@@ -1,7 +1,6 @@
 #include "moho/unit/tasks/CUnitFerryTaskTypeInfo.h"
 
 #include <cstdint>
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -12,9 +11,6 @@
 namespace
 {
   using TypeInfo = moho::CUnitFerryTaskTypeInfo;
-
-  alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
-  bool gTypeInfoConstructed = false;
 
   class CUnitFerryTaskReflectionView final : public moho::CCommandTask
   {
@@ -94,24 +90,13 @@ namespace
     "CUnitFerryTaskReflectionView::mBeacon offset must be 0x58"
   );
 
+  /**
+   * Address: 0x00BF9D40 (FUN_00BF9D40, atexit destructor of the CUnitFerryTaskTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gTypeInfoConstructed) {
-      new (gTypeInfoStorage) TypeInfo();
-      gTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CUnitFerryTaskTypeInfo();
-    gTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
@@ -249,10 +234,12 @@ namespace moho
     object->~CUnitFerryTaskReflectionView();
   }
 
-  int register_CUnitFerryTaskTypeInfo()
+  /**
+   * Address: 0x00BD08E0 (FUN_00BD08E0, register_CUnitFerryTaskTypeInfo)
+   */
+  void register_CUnitFerryTaskTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup);
   }
 } // namespace moho
 

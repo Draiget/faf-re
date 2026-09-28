@@ -85,7 +85,7 @@ namespace moho
    * Address: 0x006E7D60 (FUN_006E7D60, sub_6E7D60)
    *
    * What it does:
-   * Ensures `ECommandEvent` type-info is registered and schedules teardown.
+   * Ensures `ECommandEvent` type-info is constructed and registered.
    */
-  int register_ECommandEventTypeInfo();
+  void register_ECommandEventTypeInfo();
 } // namespace moho

@@ -13,19 +13,13 @@ namespace moho
 
 namespace
 {
-  moho::ThreadSafeCountedObjectTypeInfo gThreadSafeCountedObjectTypeInfo;
-
   /**
-   * Address: 0x00BEDFA0 (FUN_00BEDFA0, ??1ThreadSafeCountedObjectTypeInfo@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Process-exit cleanup for global `ThreadSafeCountedObjectTypeInfo` dynamic
-   * field/base lanes.
+   * Address: 0x00BEDFA0 (FUN_00BEDFA0, atexit destructor of the ThreadSafeCountedObjectTypeInfo object)
    */
-  void cleanup_ThreadSafeCountedObjectTypeInfo()
+  [[nodiscard]] moho::ThreadSafeCountedObjectTypeInfo* AcquireThreadSafeCountedObjectTypeInfo()
   {
-    gThreadSafeCountedObjectTypeInfo.fields_.clear();
-    gThreadSafeCountedObjectTypeInfo.bases_.clear();
+    static moho::ThreadSafeCountedObjectTypeInfo sInstance;
+    return &sInstance;
   }
 
   struct ThreadSafeCountedObjectTypeInfoRegistration
@@ -45,13 +39,11 @@ namespace moho
    * Address: 0x00BC2D60 (FUN_00BC2D60, register_ThreadSafeCountedObjectTypeInfo)
    *
    * What it does:
-   * Materializes startup `ThreadSafeCountedObjectTypeInfo` storage and
-   * registers process-exit teardown.
+   * Constructs the startup `ThreadSafeCountedObjectTypeInfo` object.
    */
   void register_ThreadSafeCountedObjectTypeInfo()
   {
-    (void)gThreadSafeCountedObjectTypeInfo;
-    (void)std::atexit(&cleanup_ThreadSafeCountedObjectTypeInfo);
+    (void)AcquireThreadSafeCountedObjectTypeInfo();
   }
 
   /**

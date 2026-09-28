@@ -277,10 +277,9 @@ namespace moho
    * Address: 0x00BC7550 (FUN_00BC7550, register_DColPrimSphereTypeInfo)
    *
    * What it does:
-   * Installs the startup-owned `DColPrimSphereTypeInfo` instance and its
-   * process-exit cleanup hook.
+   * Installs the startup-owned `DColPrimSphereTypeInfo` instance.
    */
-  int register_DColPrimSphereTypeInfo();
+  void register_DColPrimSphereTypeInfo();
 
   template <class T>
   [[nodiscard]] const T& Invalid();

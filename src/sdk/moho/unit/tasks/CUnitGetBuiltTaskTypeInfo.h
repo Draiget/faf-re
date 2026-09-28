@@ -89,9 +89,9 @@ namespace moho
    * Address: 0x00BD05D0 (FUN_00BD05D0, register_CUnitGetBuiltTaskTypeInfo)
    *
    * What it does:
-   * Constructs the global type-info owner and schedules process-exit cleanup.
+   * Constructs the global type-info owner.
    */
-  int register_CUnitGetBuiltTaskTypeInfo();
+  void register_CUnitGetBuiltTaskTypeInfo();
 
   static_assert(sizeof(CUnitGetBuiltTaskTypeInfo) == 0x64, "CUnitGetBuiltTaskTypeInfo size must be 0x64");
 } // namespace moho

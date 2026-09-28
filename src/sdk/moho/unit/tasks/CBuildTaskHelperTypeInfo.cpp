@@ -1,6 +1,5 @@
 #include "moho/unit/tasks/CBuildTaskHelperTypeInfo.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "moho/unit/tasks/CBuildTaskHelper.h"
@@ -10,27 +9,13 @@ namespace
 {
   using TypeInfo = moho::CBuildTaskHelperTypeInfo;
 
-  alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
-  bool gTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF9240 (FUN_00BF9240, atexit destructor of the CBuildTaskHelperTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gTypeInfoConstructed) {
-      new (gTypeInfoStorage) TypeInfo();
-      gTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CBuildTaskHelperTypeInfo();
-    gTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -79,10 +64,9 @@ namespace moho
   /**
    * Address: 0x00BCF810 (FUN_00BCF810, register_CBuildTaskHelperTypeInfo)
    */
-  int register_CBuildTaskHelperTypeInfo()
+  void register_CBuildTaskHelperTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup);
   }
 } // namespace moho
 

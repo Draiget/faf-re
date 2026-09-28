@@ -93,9 +93,9 @@ namespace moho
    * Address: 0x00BCF9F0 (FUN_00BCF9F0, register_CUnitSacrificeTaskTypeInfo)
    *
    * What it does:
-   * Constructs the global type-info owner and schedules process-exit cleanup.
+   * Constructs the global type-info owner.
    */
-  int register_CUnitSacrificeTaskTypeInfo();
+  void register_CUnitSacrificeTaskTypeInfo();
 
   static_assert(sizeof(CUnitSacrificeTaskTypeInfo) == 0x64, "CUnitSacrificeTaskTypeInfo size must be 0x64");
 } // namespace moho

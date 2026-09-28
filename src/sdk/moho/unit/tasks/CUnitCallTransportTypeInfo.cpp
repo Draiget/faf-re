@@ -1,6 +1,5 @@
 #include "moho/unit/tasks/CUnitCallTransportTypeInfo.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -13,17 +12,13 @@ namespace
 {
   using TypeInfo = moho::CUnitCallTransportTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCUnitCallTransportTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCUnitCallTransportTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF95C0 (FUN_00BF95C0, atexit destructor of the CUnitCallTransportTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gCUnitCallTransportTypeInfoConstructed) {
-      new (gCUnitCallTransportTypeInfoStorage) TypeInfo();
-      gCUnitCallTransportTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCUnitCallTransportTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -133,26 +128,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF95C0 (FUN_00BF95C0, cleanup_CUnitCallTransportTypeInfo)
-   */
-  void cleanup_CUnitCallTransportTypeInfo()
-  {
-    if (!gCUnitCallTransportTypeInfoConstructed) {
-      return;
-    }
-
-    auto& typeInfo = *reinterpret_cast<TypeInfo*>(gCUnitCallTransportTypeInfoStorage);
-    typeInfo.fields_.clear();
-    typeInfo.bases_.clear();
-  }
-
-  /**
    * Address: 0x00BCFC40 (FUN_00BCFC40, register_CUnitCallTransportTypeInfo)
    */
-  int register_CUnitCallTransportTypeInfo()
+  void register_CUnitCallTransportTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup_CUnitCallTransportTypeInfo);
   }
 } // namespace moho
 

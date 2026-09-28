@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BE63D0 (FUN_00BE63D0, register_CLuaWldUIProviderTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CLuaWldUIProvider` type-info object.
+   */
   void register_CLuaWldUIProviderTypeInfoStartup();
 } // namespace moho

@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BE4F40 (FUN_00BE4F40, register_CUIMapPreviewTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CUIMapPreview` type-info object.
+   */
   void register_CUIMapPreviewTypeInfoStartup();
 } // namespace moho

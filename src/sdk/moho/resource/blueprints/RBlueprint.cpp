@@ -2,9 +2,7 @@
 
 #include <Windows.h>
 
-#include <cstdlib>
 #include <cstring>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
@@ -20,9 +18,6 @@
 namespace
 {
   using TypeInfo = moho::RBlueprintTypeInfo;
-
-  alignas(TypeInfo) unsigned char gRBlueprintTypeInfoStorage[sizeof(TypeInfo)]{};
-  bool gRBlueprintTypeInfoConstructed = false;
 
   [[nodiscard]] gpg::RType* CachedStringType()
   {
@@ -51,24 +46,13 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x00BF23C0 (FUN_00BF23C0, atexit destructor of the RBlueprintTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireRBlueprintTypeInfo()
   {
-    if (!gRBlueprintTypeInfoConstructed) {
-      new (gRBlueprintTypeInfoStorage) TypeInfo();
-      gRBlueprintTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gRBlueprintTypeInfoStorage);
-  }
-
-  void CleanupRBlueprintTypeInfo()
-  {
-    if (!gRBlueprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireRBlueprintTypeInfo().~TypeInfo();
-    gRBlueprintTypeInfoConstructed = false;
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RField* AddTypedField(
@@ -270,10 +254,15 @@ namespace moho
   namespace
   {
     /**
+     * Address: 0x00BF4CA0 (FUN_00BF4CA0, atexit destructor of the RPointerType<RBlueprint> object)
+     *
      * Static `RPointerType<RBlueprint>` descriptor that the binary exposes as
      * `Moho::RBlueprint::PointerType`. Default static-init runs the
      * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane.
+     * derived vftable lane. In the binary this object is a function-local
+     * static of `GetPointerType`, built by 0x00556FF0 (the specialization's
+     * constructor, which also preregisters it); that constructor is not yet
+     * modelled on `gpg::RPointerType<moho::RBlueprint>`.
      */
     gpg::RPointerType<moho::RBlueprint> sRBlueprintPointerTypeStorage{};
 
@@ -289,35 +278,20 @@ namespace moho
     {
       gpg::PreRegisterRType(typeid(moho::RBlueprint*), &sRBlueprintPointerTypeStorage);
     }
-
-    /**
-     * Address: 0x00BF4CA0 (FUN_00BF4CA0)
-     *
-     * What it does:
-     * Tears down the static `RPointerType<RBlueprint>` descriptor at process
-     * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
-     * RType vftable lane to the `RObject` base. Registered via `atexit` from
-     * `GetPointerType`'s once-init path.
-     */
-    void CleanupRBlueprintPointerType()
-    {
-      sRBlueprintPointerTypeStorage.~RPointerType<moho::RBlueprint>();
-    }
   } // namespace
 
   /**
    * Address: 0x00556CE0 (FUN_00556CE0, Moho::RBlueprint::GetPointerType)
    *
    * What it does:
-   * On first call, pre-registers the static `RPointerType<RBlueprint>` descriptor
-   * and installs the matching atexit teardown. After that, lazily caches the
+   * On first call, pre-registers the static `RPointerType<RBlueprint>`
+   * descriptor. After that, lazily caches the
    * `LookupRType(typeid(RBlueprint*))` result in `sPointerType` and returns it.
    */
   gpg::RType* RBlueprint::GetPointerType()
   {
     static const bool sOnceInit = []() {
       PreregisterRBlueprintPointerType();
-      (void)std::atexit(&CleanupRBlueprintPointerType);
       return true;
     }();
     (void)sOnceInit;
@@ -442,13 +416,11 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
    * Address: 0x00BC7FC0 (FUN_00BC7FC0, register_RBlueprintTypeInfo)
    *
    * What it does:
-   * Startup thunk that materializes `RBlueprintTypeInfo` and hooks process-exit
-   * cleanup.
+   * Startup thunk that materializes `RBlueprintTypeInfo`.
    */
   void register_RBlueprintTypeInfo()
   {
     (void)AcquireRBlueprintTypeInfo();
-    (void)std::atexit(&CleanupRBlueprintTypeInfo);
   }
 } // namespace moho
 

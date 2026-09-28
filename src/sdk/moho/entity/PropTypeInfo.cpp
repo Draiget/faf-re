@@ -1,24 +1,10 @@
 #include "moho/entity/PropTypeInfo.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "moho/entity/Entity.h"
 #include "moho/entity/Prop.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
-
-namespace
-{
-  moho::SPropPriorityInfoTypeInfo gSPropPriorityInfoTypeInfo;
-  moho::PropTypeInfo gPropTypeInfo;
-
-  template <typename TTypeInfo>
-  void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
-  {
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
-  }
-} // namespace
 
 namespace moho
 {
@@ -105,37 +91,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFF0E0 (FUN_00BFF0E0, sub_BFF0E0)
-   */
-  void cleanup_SPropPriorityInfoTypeInfo()
-  {
-    ResetTypeInfoVectors(gSPropPriorityInfoTypeInfo);
-  }
-
-  /**
    * Address: 0x00BD9820 (FUN_00BD9820, sub_BD9820)
+   * Address: 0x00BFF0E0 (FUN_00BFF0E0, atexit destructor of the SPropPriorityInfoTypeInfo object)
    */
   void register_SPropPriorityInfoTypeInfo()
   {
-    (void)gSPropPriorityInfoTypeInfo;
-    (void)std::atexit(&cleanup_SPropPriorityInfoTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BFF170 (FUN_00BFF170, sub_BFF170)
-   */
-  void cleanup_PropTypeInfo()
-  {
-    ResetTypeInfoVectors(gPropTypeInfo);
+    static SPropPriorityInfoTypeInfo sInstance;
+    (void)sInstance;
   }
 
   /**
    * Address: 0x00BD9880 (FUN_00BD9880, register_PropTypeInfo)
+   * Address: 0x00BFF170 (FUN_00BFF170, atexit destructor of the PropTypeInfo object)
    */
   void register_PropTypeInfo()
   {
-    (void)gPropTypeInfo;
-    (void)std::atexit(&cleanup_PropTypeInfo);
+    static PropTypeInfo sInstance;
+    (void)sInstance;
   }
 } // namespace moho
 

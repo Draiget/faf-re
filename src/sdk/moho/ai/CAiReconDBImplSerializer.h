@@ -44,9 +44,9 @@ namespace moho
    * Address: 0x00BCDD20 (FUN_00BCDD20, register_SReconKeyTypeInfo)
    *
    * What it does:
-   * Preregisters `SReconKey` RTTI and installs process-exit cleanup.
+   * Preregisters `SReconKey` RTTI.
    */
-  int register_SReconKeyTypeInfo();
+  void register_SReconKeyTypeInfo();
 
   /**
    * VFTABLE: 0x00E1DAA4

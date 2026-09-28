@@ -160,19 +160,10 @@ namespace moho
   static_assert(sizeof(CProjectileAttributesSerializer) == 0x14, "CProjectileAttributesSerializer size must be 0x14");
 
   /**
-   * Address: 0x00BFD580 (FUN_00BFD580, cleanup_CProjectileAttributesTypeInfo)
-   *
-   * What it does:
-   * Tears down startup `CProjectileAttributesTypeInfo` storage.
-   */
-  void cleanup_CProjectileAttributesTypeInfo();
-
-  /**
    * Address: 0x00BD6390 (FUN_00BD6390, register_CProjectileAttributesTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `CProjectileAttributesTypeInfo` and installs
-   * process-exit cleanup.
+   * Constructs/preregisters `CProjectileAttributesTypeInfo`.
    */
-  int register_CProjectileAttributesTypeInfo();
+  void register_CProjectileAttributesTypeInfo();
 } // namespace moho

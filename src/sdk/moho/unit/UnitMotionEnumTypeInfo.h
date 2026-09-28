@@ -185,7 +185,7 @@ namespace moho
   /**
    * Address: 0x00BD6FE0 (FUN_00BD6FE0, register_EUnitMotionStateTypeInfo)
    */
-  int register_EUnitMotionStateTypeInfo();
+  void register_EUnitMotionStateTypeInfo();
 
   /**
    * Address: 0x00BD7000 (FUN_00BD7000, register_EUnitMotionStatePrimitiveSerializer)
@@ -195,7 +195,7 @@ namespace moho
   /**
    * Address: 0x00BD7040 (FUN_00BD7040, register_EUnitMotionCarrierEventTypeInfo)
    */
-  int register_EUnitMotionCarrierEventTypeInfo();
+  void register_EUnitMotionCarrierEventTypeInfo();
 
   /**
    * Address: 0x00BD7060 (FUN_00BD7060, register_EUnitMotionCarrierEventPrimitiveSerializer)
@@ -205,7 +205,7 @@ namespace moho
   /**
    * Address: 0x00BD70A0 (FUN_00BD70A0, register_EUnitMotionHorzEventTypeInfo)
    */
-  int register_EUnitMotionHorzEventTypeInfo();
+  void register_EUnitMotionHorzEventTypeInfo();
 
   /**
    * Address: 0x00BD70C0 (FUN_00BD70C0, register_EUnitMotionHorzEventPrimitiveSerializer)
@@ -215,7 +215,7 @@ namespace moho
   /**
    * Address: 0x00BD7100 (FUN_00BD7100, register_EUnitMotionVertEventTypeInfo)
    */
-  int register_EUnitMotionVertEventTypeInfo();
+  void register_EUnitMotionVertEventTypeInfo();
 
   /**
    * Address: 0x00BD7120 (FUN_00BD7120, register_EUnitMotionVertEventPrimitiveSerializer)
@@ -225,7 +225,7 @@ namespace moho
   /**
    * Address: 0x00BD7160 (FUN_00BD7160, register_EUnitMotionTurnEventTypeInfo)
    */
-  int register_EUnitMotionTurnEventTypeInfo();
+  void register_EUnitMotionTurnEventTypeInfo();
 
   /**
    * Address: 0x00BD7180 (FUN_00BD7180, register_EUnitMotionTurnEventPrimitiveSerializer)

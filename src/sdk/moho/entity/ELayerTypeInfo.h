@@ -12,7 +12,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00BF2070 (FUN_00BF2070, Moho::ELayerTypeInfo::dtr)
+     * Address: 0x0050BA80 (FUN_0050BA80, Moho::ELayerTypeInfo::dtr)
      */
     ~ELayerTypeInfo() override;
 
@@ -67,7 +67,7 @@ namespace moho
    * Address: 0x00BC7C60 (FUN_00BC7C60, register_ELayerTypeInfo)
    *
    * What it does:
-   * Runs `ELayer` typeinfo preregistration and installs process-exit cleanup.
+   * Runs `ELayer` typeinfo preregistration.
    */
-  int register_ELayerTypeInfo();
+  void register_ELayerTypeInfo();
 } // namespace moho

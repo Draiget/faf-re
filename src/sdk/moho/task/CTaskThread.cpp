@@ -303,24 +303,6 @@ namespace
   }
 
   /**
-   * Address: 0x00409950 (FUN_00409950, sub_409950)
-   *
-   * What it does:
-   * Executes stage teardown, then unlinks both stage sentinel heads from any
-   * external list linkage and resets them to singleton state.
-   */
-  void DestroyTaskStageInPlace(CTaskStage* const stage)
-  {
-    if (!stage) {
-      return;
-    }
-
-    stage->Teardown();
-    stage->mStagedThreads.ListUnlink();
-    stage->mThreads.ListUnlink();
-  }
-
-  /**
    * Address: 0x0040B140 (FUN_0040B140, sub_40B140)
    */
   gpg::RRef NewTaskStageRef()
@@ -335,13 +317,7 @@ namespace
    */
   void DeleteTaskStage(void* const object)
   {
-    auto* const stage = static_cast<CTaskStage*>(object);
-    if (!stage) {
-      return;
-    }
-
-    DestroyTaskStageInPlace(stage);
-    ::operator delete(stage);
+    delete static_cast<CTaskStage*>(object);
   }
 
   /**
@@ -359,7 +335,7 @@ namespace
    */
   void DestroyTaskStageOnly(void* const object)
   {
-    DestroyTaskStageInPlace(static_cast<CTaskStage*>(object));
+    static_cast<CTaskStage*>(object)->~CTaskStage();
   }
 
   void PopTaskStack(CTaskThread* const thread)
@@ -699,6 +675,18 @@ CTaskStage::CTaskStage()
   mStagedThreads.mPrev = &mStagedThreads;
   mStagedThreads.mNext = &mStagedThreads;
   mActive = true;
+}
+
+/**
+ * Address: 0x00409950 (FUN_00409950, ??1CTaskStage@Moho@@QAE@XZ)
+ *
+ * What it does:
+ * Tears the stage down; `mStagedThreads` and `mThreads` then unlink as
+ * members.
+ */
+CTaskStage::~CTaskStage()
+{
+  Teardown();
 }
 
 /**

@@ -56,8 +56,7 @@ namespace moho
    * Address: 0x00BD8FF0 (FUN_00BD8FF0, sub_BD8FF0)
    *
    * What it does:
-   * Registers `WeakPtr<CUnitCommand>` reflection and installs process-exit
-   * teardown via `atexit`.
+   * Registers `WeakPtr<CUnitCommand>` reflection.
    */
   void register_WeakPtr_CUnitCommand_Type_AtExit();
 } // namespace moho
@@ -132,8 +131,7 @@ namespace moho
    * Address: 0x00BD9010 (FUN_00BD9010, sub_BD9010)
    *
    * What it does:
-   * Registers `vector<WeakPtr<CUnitCommand>>` reflection and installs process-exit
-   * teardown via `atexit`.
+   * Registers `vector<WeakPtr<CUnitCommand>>` reflection.
    */
   void register_WeakPtr_CUnitCommand_VectorType_AtExit();
 } // namespace moho

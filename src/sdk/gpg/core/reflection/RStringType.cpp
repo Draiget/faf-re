@@ -1,9 +1,7 @@
 #include "gpg/core/reflection/RStringType.h"
 
-#include <cstdlib>
 #include <cstring>
-#include <new>
-#include <typeinfo>
+#include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -14,24 +12,13 @@ namespace gpg
 
 namespace
 {
-  alignas(stringTypeInfo) unsigned char gStorage[sizeof(stringTypeInfo)];
-  bool gConstructed = false;
-
+  /**
+   * Address: 0x00C09430 (FUN_00C09430, atexit destructor of the stringTypeInfo object)
+   */
   [[nodiscard]] stringTypeInfo& Acquire()
   {
-    if (!gConstructed) {
-      new (gStorage) stringTypeInfo();
-      gConstructed = true;
-    }
-    return *reinterpret_cast<stringTypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) return;
-    auto& ti = *reinterpret_cast<stringTypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static stringTypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { register_stringTypeInfoStartup(); } };
@@ -115,7 +102,6 @@ void stringTypeInfo::Init()
 void register_stringTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

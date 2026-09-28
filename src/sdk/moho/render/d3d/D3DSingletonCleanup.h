@@ -1,25 +1,33 @@
 #pragma once
 
+#include "legacy/containers/AutoPtr.h"
+
 namespace moho
 {
   class CD3DVertexStream;
   class CD3DIndexSheet;
 
   /**
-   * Accessor for the `sVertexStream` global slot that holds one shared
-   * vertex-stream wrapper (orig: `dword_10A792C`). Returns a reference
-   * to the pointer slot so callers can both read and replace the
-   * tracked singleton; the allocator/lifetime contract matches the
-   * binary's direct `Moho::sVertexStream` data-section access pattern.
+   * Address: 0x00BC40C0 (FUN_00BC40C0, dynamic initializer for `sVertexStream`)
+   * Address: 0x00BEF190 (FUN_00BEF190, dynamic atexit destructor for `sVertexStream`)
+   *
+   * What it does:
+   * Owns the shared unit-quad vertex stream (`Moho::sVertexStream`, binary
+   * global 0x010A792C). Every replace path in the binary is the
+   * `auto_ptr::reset` shape: delete the old holder when it differs from the
+   * incoming pointer, then store the incoming pointer.
    */
-  CD3DVertexStream*& SharedVertexStreamSlot() noexcept;
+  extern msvc8::auto_ptr<CD3DVertexStream> sVertexStream;
 
   /**
-   * Accessor for the `sIndexSheet` global slot that holds one shared
-   * index-sheet wrapper (orig: `dword_10A7928`). Same read/write
-   * contract as `SharedVertexStreamSlot`.
+   * Address: 0x00BC40D0 (FUN_00BC40D0, dynamic initializer for `sIndexSheet`)
+   * Address: 0x00BEF1B0 (FUN_00BEF1B0, dynamic atexit destructor for `sIndexSheet`)
+   *
+   * What it does:
+   * Owns the shared quad index sheet (`Moho::sIndexSheet`, binary global
+   * 0x010A7928).
    */
-  CD3DIndexSheet*& SharedIndexSheetSlot() noexcept;
+  extern msvc8::auto_ptr<CD3DIndexSheet> sIndexSheet;
 
   class CD3DVertexFormat;
 
@@ -75,7 +83,7 @@ namespace moho
    * (if different from the new one) via its deleting dtor. Returns
    * the address of the updated slot.
    */
-  CD3DVertexStream** func_MoveIntoSharedVertexStream(CD3DVertexStream** inOutStream);
+  msvc8::auto_ptr<CD3DVertexStream>* func_MoveIntoSharedVertexStream(CD3DVertexStream** inOutStream);
 
   /**
    * Address: 0x0043CAF0 (FUN_0043CAF0, sub_43CAF0)
@@ -86,38 +94,4 @@ namespace moho
    * deleting dtor thunk.
    */
   void func_SetSharedVertexStream(CD3DVertexStream* stream);
-
-  /**
-   * Address: 0x00BC40C0 (FUN_00BC40C0, register_sVertexStream)
-   *
-   * What it does:
-   * Registers the recovered process-exit cleanup thunk for the global
-   * `CD3DVertexStream` singleton slot.
-   */
-  void register_D3DVertexStreamCleanup();
-
-  /**
-   * Address: 0x00BEF190 (FUN_00BEF190, ??1sVertexStream@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Deletes the recovered global `CD3DVertexStream` singleton when present.
-   */
-  void cleanup_D3DVertexStream();
-
-  /**
-   * Address: 0x00BC40D0 (FUN_00BC40D0, register_sIndexSheet)
-   *
-   * What it does:
-   * Registers the recovered process-exit cleanup thunk for the global
-   * `CD3DIndexSheet` singleton slot.
-   */
-  void register_D3DIndexSheetCleanup();
-
-  /**
-   * Address: 0x00BEF1B0 (FUN_00BEF1B0, ??1sIndexSheet@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Deletes the recovered global `CD3DIndexSheet` singleton when present.
-   */
-  void cleanup_D3DIndexSheet();
 } // namespace moho

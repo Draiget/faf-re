@@ -1,8 +1,6 @@
 #include "moho/unit/core/UnitWeakPtrReflection.h"
 
-#include <cstdlib>
 #include <cstdint>
-#include <new>
 #include <stdexcept>
 #include <typeinfo>
 
@@ -15,9 +13,6 @@
 namespace
 {
   using WeakPtrUnitType = moho::RWeakPtrType<moho::Unit>;
-
-  msvc8::string gWeakPtrUnitTypeName;
-  bool gWeakPtrUnitTypeNameCleanupRegistered = false;
 
   /**
    * Address: 0x00BFDC40 (FUN_00BFDC40, atexit destructor of the WeakPtrUnitType object)
@@ -103,15 +98,6 @@ namespace
     throw std::runtime_error(message.c_str());
   }
 
-  /**
-   * Address: 0x00BFDAF0 (FUN_00BFDAF0, sub_BFDAF0)
-   */
-  void cleanup_WeakPtrUnitTypeName()
-  {
-    gWeakPtrUnitTypeName = msvc8::string{};
-    gWeakPtrUnitTypeNameCleanupRegistered = false;
-  }
-
   struct UnitWeakPtrReflectionBootstrap
   {
     UnitWeakPtrReflectionBootstrap()
@@ -155,19 +141,12 @@ namespace moho
 
   /**
    * Address: 0x006ADF90 (FUN_006ADF90, Moho::RWeakPtrType_Unit::GetName)
+   * Address: 0x00BFDAF0 (FUN_00BFDAF0, atexit destructor of GetName's cached name)
    */
   const char* RWeakPtrType<Unit>::GetName() const
   {
-    if (gWeakPtrUnitTypeName.empty()) {
-      const char* const pointeeName = CachedUnitType() ? CachedUnitType()->GetName() : "Unit";
-      gWeakPtrUnitTypeName = gpg::STR_Printf("WeakPtr<%s>", pointeeName ? pointeeName : "Unit");
-      if (!gWeakPtrUnitTypeNameCleanupRegistered) {
-        gWeakPtrUnitTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_WeakPtrUnitTypeName);
-      }
-    }
-
-    return gWeakPtrUnitTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedUnitType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -252,7 +231,7 @@ namespace moho
    * Address: 0x00BD6BA0 (FUN_00BD6BA0, register_WeakPtr_Unit_Type_AtExit)
    *
    * What it does:
-   * Registers `WeakPtr<Unit>` reflection and installs process-exit teardown.
+   * Registers `WeakPtr<Unit>` reflection.
    */
   void register_WeakPtr_Unit_Type_AtExit()
   {

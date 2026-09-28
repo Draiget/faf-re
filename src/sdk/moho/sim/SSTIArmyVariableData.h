@@ -312,8 +312,7 @@ namespace moho
    * Address: 0x00BC9AF0 (FUN_00BC9AF0, register_SSTIArmyVariableDataTypeInfo)
    *
    * What it does:
-   * Constructs startup-owned `SSTIArmyVariableDataTypeInfo` storage and
-   * registers process-exit teardown.
+   * Constructs the startup `SSTIArmyVariableDataTypeInfo` object.
    */
   void register_SSTIArmyVariableDataTypeInfo();
 

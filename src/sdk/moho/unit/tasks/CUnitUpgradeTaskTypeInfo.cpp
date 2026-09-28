@@ -1,6 +1,5 @@
 #include "moho/unit/tasks/CUnitUpgradeTaskTypeInfo.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -13,17 +12,13 @@ namespace
 {
   using TypeInfo = moho::CUnitUpgradeTaskTypeInfo;
 
-  alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
-  bool gTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF9360 (FUN_00BF9360, atexit destructor of the CUnitUpgradeTaskTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gTypeInfoConstructed) {
-      new (gTypeInfoStorage) TypeInfo();
-      gTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
@@ -145,25 +140,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF9360 (FUN_00BF9360)
-   */
-  void cleanup_CUnitUpgradeTaskTypeInfo()
-  {
-    if (!gTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CUnitUpgradeTaskTypeInfo();
-    gTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BCF8D0 (FUN_00BCF8D0, sub_BCF8D0)
    */
-  int register_CUnitUpgradeTaskTypeInfo()
+  void register_CUnitUpgradeTaskTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup_CUnitUpgradeTaskTypeInfo);
   }
 } // namespace moho
 

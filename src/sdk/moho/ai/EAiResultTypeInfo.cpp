@@ -11,51 +11,24 @@ using namespace moho;
 
 namespace
 {
-  alignas(moho::EAiResultTypeInfo) unsigned char gEAiResultTypeInfoStorage[sizeof(moho::EAiResultTypeInfo)]{};
-  bool gEAiResultTypeInfoConstructed = false;
-
   // Address: 0x010B12DC -- process-global `PrimitiveSerHelper<EAiResult,int>`
   // singleton (constructed by FUN_00BD0530, self-registering via `__xc_a`;
   // see the per-instantiation address list on gpg::PrimitiveSerHelper in
   // Reflection.h for the real-ctor/atexit-target evidence).
   moho::EAiResultPrimitiveSerializer gEAiResultPrimitiveSerializer;
 
-  [[nodiscard]] moho::EAiResultTypeInfo& GetEAiResultTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::EAiResultTypeInfo*>(gEAiResultTypeInfoStorage);
-  }
-
   /**
    * Address: 0x00608B70 (FUN_00608B70, sub_608B70)
+   * Address: 0x00BF9AA0 (FUN_00BF9AA0, atexit destructor of the EAiResultTypeInfo object)
    *
    * What it does:
-   * Constructs static `EAiResult` enum type-info storage and preregisters RTTI.
+   * Constructs the static `EAiResult` enum type-info object and preregisters RTTI.
    */
   gpg::REnumType* construct_EAiResultTypeInfo()
   {
-    if (!gEAiResultTypeInfoConstructed) {
-      new (gEAiResultTypeInfoStorage) moho::EAiResultTypeInfo();
-      gpg::PreRegisterRType(typeid(moho::EAiResult), &GetEAiResultTypeInfo());
-      gEAiResultTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(&GetEAiResultTypeInfo());
-  }
-
-  /**
-   * Address: 0x00BF9AA0 (FUN_00BF9AA0, sub_BF9AA0)
-   *
-   * What it does:
-   * Tears down static `EAiResult` type-info storage at process exit.
-   */
-  void cleanup_EAiResultTypeInfo()
-  {
-    if (!gEAiResultTypeInfoConstructed) {
-      return;
-    }
-
-    GetEAiResultTypeInfo().~EAiResultTypeInfo();
-    gEAiResultTypeInfoConstructed = false;
+    static moho::EAiResultTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(moho::EAiResult), &sInstance);
+    return &sInstance;
   }
 
 } // namespace
@@ -95,12 +68,11 @@ namespace moho
    * Address: 0x00BD0510 (FUN_00BD0510, sub_BD0510)
    *
    * What it does:
-   * Registers static `EAiResult` type-info storage and schedules teardown.
+   * Registers the static `EAiResult` type-info object.
    */
-  int register_EAiResultTypeInfo()
+  void register_EAiResultTypeInfo()
   {
     (void)construct_EAiResultTypeInfo();
-    return std::atexit(&cleanup_EAiResultTypeInfo);
   }
 
 } // namespace moho
@@ -111,7 +83,7 @@ namespace
   {
     EAiResultTypeInfoBootstrap()
     {
-      (void)moho::register_EAiResultTypeInfo();
+      moho::register_EAiResultTypeInfo();
     }
   };
 

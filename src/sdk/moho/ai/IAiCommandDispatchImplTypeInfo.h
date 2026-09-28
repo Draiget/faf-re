@@ -43,7 +43,7 @@ namespace moho
    *
    * What it does:
    * Constructs/preregisters startup RTTI storage for
-   * `IAiCommandDispatchImpl` and installs process-exit cleanup.
+   * `IAiCommandDispatchImpl`.
    */
-  int register_IAiCommandDispatchImplTypeInfo();
+  void register_IAiCommandDispatchImplTypeInfo();
 } // namespace moho

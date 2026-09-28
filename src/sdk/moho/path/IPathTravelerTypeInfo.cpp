@@ -73,8 +73,6 @@ namespace
 {
   using PathTravelerList = gpg::DList<moho::IPathTraveler>;
 
-  msvc8::string gDListIPathTravelerTypeName;
-  std::uint32_t gDListIPathTravelerTypeNameInitGuard = 0;
   gpg::RType* gDListVoidType = nullptr;
   gpg::RType* gDListIPathTravelerType = nullptr;
 
@@ -87,10 +85,7 @@ namespace
   [[nodiscard]] gpg::RType* ResolveDListVoidType()
   {
     if (gDListVoidType == nullptr) {
-      gDListVoidType = gpg::REF_FindTypeNamed("void");
-      if (gDListVoidType == nullptr) {
-        gDListVoidType = gpg::LookupRType(typeid(void));
-      }
+      gDListVoidType = gpg::LookupRType(typeid(void));
     }
 
     return gDListVoidType;
@@ -99,38 +94,10 @@ namespace
   [[nodiscard]] gpg::RType* ResolveDListIPathTravelerType()
   {
     if (gDListIPathTravelerType == nullptr) {
-      constexpr const char* kTypeNames[] = {
-        "IPathTraveler",
-        "Moho::IPathTraveler",
-        "class Moho::IPathTraveler",
-      };
-
-      for (const char* const name : kTypeNames) {
-        if (gpg::RType* const type = gpg::REF_FindTypeNamed(name); type != nullptr) {
-          gDListIPathTravelerType = type;
-          break;
-        }
-      }
-
-      if (gDListIPathTravelerType == nullptr) {
-        gDListIPathTravelerType = gpg::LookupRType(typeid(moho::IPathTraveler));
-      }
+      gDListIPathTravelerType = gpg::LookupRType(typeid(moho::IPathTraveler));
     }
 
     return gDListIPathTravelerType;
-  }
-
-  /**
-   * Address: 0x00C01B70 (FUN_00C01B70, cleanup_RDListType_IPathTraveler_Name)
-   *
-   * What it does:
-   * Releases cached lexical storage for
-   * `gpg::RDListType_IPathTraveler::GetName`.
-   */
-  void cleanup_RDListType_IPathTraveler_Name()
-  {
-    gDListIPathTravelerTypeName.clear();
-    gDListIPathTravelerTypeNameInitGuard = 0;
   }
 } // namespace
 
@@ -138,26 +105,16 @@ gpg::RDListType_IPathTraveler::~RDListType_IPathTraveler() = default;
 
 /**
  * Address: 0x00766ED0 (FUN_00766ED0, gpg::RDListType_IPathTraveler::GetName)
+ * Address: 0x00C01B70 (FUN_00C01B70, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches one reflection label for the
- * `DList<IPathTraveler,void>` lane.
+ * Builds `DList<IPathTraveler,void>` once and returns it.
  */
 const char* gpg::RDListType_IPathTraveler::GetName() const
 {
-  if ((gDListIPathTravelerTypeNameInitGuard & 1u) == 0u) {
-    gDListIPathTravelerTypeNameInitGuard |= 1u;
-
-    const gpg::RType* const keyType = ResolveDListIPathTravelerType();
-    const gpg::RType* const valueType = ResolveDListVoidType();
-    const char* const keyName = keyType != nullptr ? keyType->GetName() : "IPathTraveler";
-    const char* const valueName = valueType != nullptr ? valueType->GetName() : "void";
-
-    gDListIPathTravelerTypeName = gpg::STR_Printf("DList<%s,%s>", keyName, valueName);
-    (void)std::atexit(&cleanup_RDListType_IPathTraveler_Name);
-  }
-
-  return gDListIPathTravelerTypeName.c_str();
+  static const msvc8::string sName =
+    gpg::STR_Printf("DList<%s,%s>", ResolveDListIPathTravelerType()->GetName(), ResolveDListVoidType()->GetName());
+  return sName.c_str();
 }
 
 /**

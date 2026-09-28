@@ -79,10 +79,9 @@ namespace moho
    * Address: 0x00BCE750 (FUN_00BCE750, sub_BCE750)
    *
    * What it does:
-   * Registers `EAiAttackerEvent` enum type-info and installs process-exit
-   * cleanup.
+   * Registers `EAiAttackerEvent` enum type-info.
    */
-  int register_EAiAttackerEventTypeInfo();
+  void register_EAiAttackerEventTypeInfo();
 
   static_assert(sizeof(EAiAttackerEventTypeInfo) == 0x78, "EAiAttackerEventTypeInfo size must be 0x78");
 } // namespace moho

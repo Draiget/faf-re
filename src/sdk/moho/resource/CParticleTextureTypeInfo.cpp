@@ -1,7 +1,5 @@
 #include "moho/resource/CParticleTextureTypeInfo.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/resource/CParticleTexture.h"
@@ -11,40 +9,20 @@ namespace
 {
   using TypeInfo = moho::CParticleTextureTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCParticleTextureTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCParticleTextureTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BEFD70 (FUN_00BEFD70, atexit destructor of the CParticleTextureTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireCParticleTextureTypeInfo()
   {
-    if (!gCParticleTextureTypeInfoConstructed) {
-      new (gCParticleTextureTypeInfoStorage) TypeInfo();
-      gCParticleTextureTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCParticleTextureTypeInfoStorage);
-  }
-
-  void cleanup_CParticleTextureTypeInfo_00BEFD70_Impl()
-  {
-    if (!gCParticleTextureTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCParticleTextureTypeInfo().~TypeInfo();
-    gCParticleTextureTypeInfoConstructed = false;
-  }
-
-  int register_CParticleTextureTypeInfo_00BC5250_Impl()
-  {
-    (void)AcquireCParticleTextureTypeInfo();
-    return std::atexit(&cleanup_CParticleTextureTypeInfo_00BEFD70_Impl);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   struct CParticleTextureTypeInfoBootstrap
   {
     CParticleTextureTypeInfoBootstrap()
     {
-      (void)moho::register_CParticleTextureTypeInfo();
+      moho::register_CParticleTextureTypeInfo();
     }
   };
 
@@ -88,9 +66,9 @@ namespace moho
   /**
    * Address: 0x00BC5250 (FUN_00BC5250, register_CParticleTextureTypeInfo)
    */
-  int register_CParticleTextureTypeInfo()
+  void register_CParticleTextureTypeInfo()
   {
-    return register_CParticleTextureTypeInfo_00BC5250_Impl();
+    (void)AcquireCParticleTextureTypeInfo();
   }
 } // namespace moho
 

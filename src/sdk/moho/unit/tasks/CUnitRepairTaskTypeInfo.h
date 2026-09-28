@@ -101,9 +101,9 @@ namespace moho
    * Address: 0x00BCF930 (FUN_00BCF930, register_CUnitRepairTaskTypeInfo)
    *
    * What it does:
-   * Constructs the global type-info owner and schedules process-exit cleanup.
+   * Constructs the global type-info owner.
    */
-  int register_CUnitRepairTaskTypeInfo();
+  void register_CUnitRepairTaskTypeInfo();
 
   static_assert(sizeof(CUnitRepairTaskTypeInfo) == 0x64, "CUnitRepairTaskTypeInfo size must be 0x64");
 } // namespace moho

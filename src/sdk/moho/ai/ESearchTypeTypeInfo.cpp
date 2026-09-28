@@ -12,37 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(ESearchTypeTypeInfo) unsigned char gESearchTypeTypeInfoStorage[sizeof(ESearchTypeTypeInfo)] = {};
-  bool gESearchTypeTypeInfoConstructed = false;
-
-  gpg::RType* gESearchTypeRuntimeType = nullptr;
-
+  /**
+   * Address: 0x00BF71A0 (FUN_00BF71A0, atexit destructor of the ESearchTypeTypeInfo object)
+   */
   [[nodiscard]] ESearchTypeTypeInfo* AcquireESearchTypeTypeInfo()
   {
-    if (!gESearchTypeTypeInfoConstructed) {
-      auto* const typeInfo = new (gESearchTypeTypeInfoStorage) ESearchTypeTypeInfo();
-      gESearchTypeRuntimeType = typeInfo;
-      gESearchTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<ESearchTypeTypeInfo*>(gESearchTypeTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF71A0 (FUN_00BF71A0, cleanup_ESearchTypeTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `ESearchTypeTypeInfo` reflection storage.
-   */
-  void cleanup_ESearchTypeTypeInfo()
-  {
-    if (!gESearchTypeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireESearchTypeTypeInfo()->~ESearchTypeTypeInfo();
-    gESearchTypeTypeInfoConstructed = false;
-    gESearchTypeRuntimeType = nullptr;
+    static ESearchTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
   // Address: 0x010AEC54 -- process-global `PrimitiveSerHelper<ESearchType,int>`
@@ -86,13 +62,11 @@ void ESearchTypeTypeInfo::Init()
  * Address: 0x00BCCCF0 (FUN_00BCCCF0, register_ESearchTypeTypeInfo)
  *
  * What it does:
- * Constructs/preregisters startup RTTI descriptor for `ESearchType` and
- * installs process-exit cleanup.
+ * Constructs/preregisters startup RTTI descriptor for `ESearchType`.
  */
-int moho::register_ESearchTypeTypeInfo()
+void moho::register_ESearchTypeTypeInfo()
 {
   (void)AcquireESearchTypeTypeInfo();
-  return std::atexit(&cleanup_ESearchTypeTypeInfo);
 }
 
 namespace
@@ -101,7 +75,7 @@ namespace
   {
     ESearchTypeTypeInfoBootstrap()
     {
-      (void)moho::register_ESearchTypeTypeInfo();
+      moho::register_ESearchTypeTypeInfo();
     }
   };
 

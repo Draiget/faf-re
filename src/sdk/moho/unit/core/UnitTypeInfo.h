@@ -69,16 +69,7 @@ namespace moho
    * Address: 0x00BD6AD0 (FUN_00BD6AD0, register_UnitTypeInfo)
    *
    * What it does:
-   * Constructs the global `UnitTypeInfo` storage and schedules process-exit
-   * cleanup.
+   * Constructs the global `UnitTypeInfo` object.
    */
   void register_UnitTypeInfo();
-
-  /**
-   * Address: 0x00BFD970 (FUN_00BFD970, cleanup_UnitTypeInfo)
-   *
-   * What it does:
-   * Tears down the global `UnitTypeInfo` storage at process exit.
-   */
-  void cleanup_UnitTypeInfo();
 } // namespace moho

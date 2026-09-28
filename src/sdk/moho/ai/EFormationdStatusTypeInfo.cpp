@@ -9,34 +9,13 @@
 
 namespace
 {
-  // Descriptor singleton storage, placement-new'd on first use and destroyed
-  // through atexit - the shape the other recovered enum descriptor lanes use.
-  alignas(moho::EFormationdStatusTypeInfo) unsigned char gEFormationdStatusTypeInfoStorage
-    [sizeof(moho::EFormationdStatusTypeInfo)];
-  bool gEFormationdStatusTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF57F0 (FUN_00BF57F0, atexit destructor of the EFormationdStatusTypeInfo object)
+   */
   [[nodiscard]] moho::EFormationdStatusTypeInfo& AcquireEFormationdStatusTypeInfo()
   {
-    if (!gEFormationdStatusTypeInfoConstructed) {
-      new (gEFormationdStatusTypeInfoStorage) moho::EFormationdStatusTypeInfo();
-      gEFormationdStatusTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::EFormationdStatusTypeInfo*>(gEFormationdStatusTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF57F0 (FUN_00BF57F0, sub_BF57F0, atexit teardown for the descriptor)
-   */
-  void cleanup_EFormationdStatusTypeInfo()
-  {
-    if (!gEFormationdStatusTypeInfoConstructed) {
-      return;
-    }
-
-    reinterpret_cast<moho::EFormationdStatusTypeInfo*>(gEFormationdStatusTypeInfoStorage)
-      ->~EFormationdStatusTypeInfo();
-    gEFormationdStatusTypeInfoConstructed = false;
+    static moho::EFormationdStatusTypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -49,13 +28,12 @@ namespace moho
    * int sub_BCAA80();
    *
    * What it does:
-   * Constructs the process-wide `EFormationdStatusTypeInfo` singleton - whose
-   * constructor pre-registers `typeid(EFormationdStatus)` - and installs the
-   * matching `atexit` teardown. CRT dynamic initializer #1447 in the shipped
-   * binary:
+   * Constructs the process-wide `EFormationdStatusTypeInfo` singleton, whose
+   * constructor pre-registers `typeid(EFormationdStatus)`. CRT dynamic
+   * initializer #1447 in the shipped binary:
    *
    *     sub_566090();                 // the descriptor's constructor
-   *     return atexit(sub_BF57F0);
+   *     return atexit(sub_BF57F0);    // the compiler's destructor registration
    *
    * Nothing constructed the descriptor before this was recovered, so
    * `LookupRType(typeid(EFormationdStatus))` threw during REF_RegisterAllTypes.
@@ -63,7 +41,6 @@ namespace moho
   void register_EFormationdStatusTypeInfo()
   {
     (void)AcquireEFormationdStatusTypeInfo();
-    (void)std::atexit(&cleanup_EFormationdStatusTypeInfo);
   }
 
   /**

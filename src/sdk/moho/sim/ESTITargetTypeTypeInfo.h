@@ -100,7 +100,7 @@ namespace moho
   static_assert(sizeof(ESTITargetTypeTypeInfo) == 0x78, "ESTITargetTypeTypeInfo size must be 0x78");
 
   /**
-   * Address: from register_ESTITargetType in BC* range
+   * Address: 0x00BCA290 (FUN_00BCA290, register_ESTITargetTypeTypeInfo)
    */
   void register_ESTITargetTypeTypeInfoStartup();
 } // namespace moho

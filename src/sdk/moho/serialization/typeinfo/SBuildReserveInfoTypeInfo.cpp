@@ -7,19 +7,15 @@
 
 namespace
 {
-  alignas(moho::SBuildReserveInfoTypeInfo)
-    unsigned char gSBuildReserveInfoTypeInfoStorage[sizeof(moho::SBuildReserveInfoTypeInfo)];
-  bool gSBuildReserveInfoTypeInfoConstructed = false;
   bool gSBuildReserveInfoTypeInfoPreregistered = false;
 
+  /**
+   * Address: 0x00BF61D0 (FUN_00BF61D0, atexit destructor of the SBuildReserveInfoTypeInfo object)
+   */
   [[nodiscard]] moho::SBuildReserveInfoTypeInfo* AcquireSBuildReserveInfoTypeInfo()
   {
-    if (!gSBuildReserveInfoTypeInfoConstructed) {
-      new (gSBuildReserveInfoTypeInfoStorage) moho::SBuildReserveInfoTypeInfo();
-      gSBuildReserveInfoTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::SBuildReserveInfoTypeInfo*>(gSBuildReserveInfoTypeInfoStorage);
+    static moho::SBuildReserveInfoTypeInfo sInstance;
+    return &sInstance;
   }
 
   struct SBuildReserveInfoTypeInfoBootstrap
@@ -77,32 +73,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF61D0 (FUN_00BF61D0, cleanup_SBuildReserveInfoTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `SBuildReserveInfoTypeInfo` storage at process exit.
-   */
-  void cleanup_SBuildReserveInfoTypeInfo()
-  {
-    if (!gSBuildReserveInfoTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSBuildReserveInfoTypeInfo()->~SBuildReserveInfoTypeInfo();
-    gSBuildReserveInfoTypeInfoConstructed = false;
-    gSBuildReserveInfoTypeInfoPreregistered = false;
-  }
-
-  /**
    * Address: 0x00BCB370 (FUN_00BCB370, register_SBuildReserveInfoTypeInfoStartup)
    *
    * What it does:
-   * Runs preregistration for `SBuildReserveInfoTypeInfo` and installs exit cleanup.
+   * Runs preregistration for `SBuildReserveInfoTypeInfo`.
    */
-  int register_SBuildReserveInfoTypeInfoStartup()
+  void register_SBuildReserveInfoTypeInfoStartup()
   {
     (void)preregister_SBuildReserveInfoTypeInfo();
-    return std::atexit(&cleanup_SBuildReserveInfoTypeInfo);
   }
 } // namespace moho
 

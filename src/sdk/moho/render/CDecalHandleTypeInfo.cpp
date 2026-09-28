@@ -1,6 +1,5 @@
 #include "moho/render/CDecalHandleTypeInfo.h"
 
-#include <cstdlib>
 #include <new>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -10,37 +9,13 @@
 
 namespace
 {
-  // Storage for the descriptor singleton. Placement-new'd on first use and
-  // torn down through atexit, matching the other recovered TypeInfo lanes.
-  alignas(moho::CDecalHandleTypeInfo) unsigned char gCDecalHandleTypeInfoStorage
-    [sizeof(moho::CDecalHandleTypeInfo)];
-  bool gCDecalHandleTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C028E0 (FUN_00C028E0, atexit destructor of the CDecalHandleTypeInfo object)
+   */
   [[nodiscard]] moho::CDecalHandleTypeInfo& AcquireCDecalHandleTypeInfo()
   {
-    if (!gCDecalHandleTypeInfoConstructed) {
-      new (gCDecalHandleTypeInfoStorage) moho::CDecalHandleTypeInfo();
-      gCDecalHandleTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<moho::CDecalHandleTypeInfo*>(gCDecalHandleTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00C028E0 (sub_C028E0, atexit thunk for the descriptor)
-   *
-   * What it does:
-   * Releases the descriptor's field/base tables at shutdown.
-   */
-  void cleanup_CDecalHandleTypeInfo()
-  {
-    if (!gCDecalHandleTypeInfoConstructed) {
-      return;
-    }
-
-    auto& typeInfo = *reinterpret_cast<moho::CDecalHandleTypeInfo*>(gCDecalHandleTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static moho::CDecalHandleTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -131,10 +106,9 @@ namespace moho
    * void __cdecl register_CDecalHandleTypeInfo();
    *
    * What it does:
-   * Constructs the process-wide `CDecalHandleTypeInfo` singleton - whose
-   * constructor pre-registers `typeid(CDecalHandle)` - and installs the
-   * matching `atexit` teardown. This is CRT dynamic initializer #3557 in the
-   * shipped binary.
+   * Constructs the process-wide `CDecalHandleTypeInfo` singleton, whose
+   * constructor pre-registers `typeid(CDecalHandle)`. This is CRT dynamic
+   * initializer #3557 in the shipped binary.
    *
    * Without it nothing ever constructs the descriptor, so
    * `RPointerType<CDecalHandle>::GetPointeeType` throws "Attempting to lookup
@@ -143,7 +117,6 @@ namespace moho
   void register_CDecalHandleTypeInfo()
   {
     (void)AcquireCDecalHandleTypeInfo();
-    (void)std::atexit(&cleanup_CDecalHandleTypeInfo);
   }
 
   /**

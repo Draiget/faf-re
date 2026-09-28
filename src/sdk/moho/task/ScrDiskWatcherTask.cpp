@@ -34,8 +34,6 @@ namespace gpg
 
 namespace
 {
-  moho::ScrDiskWatcherTaskTypeInfo gScrDiskWatcherTaskTypeInfo;
-
   gpg::RType* CachedScrDiskWatcherTaskType()
   {
     if (!ScrDiskWatcherTask::sType) {
@@ -109,22 +107,19 @@ namespace
     return outRef;
   }
 
-  void CleanupScrDiskWatcherTaskTypeInfo() noexcept
-  {
-    gScrDiskWatcherTaskTypeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    gScrDiskWatcherTaskTypeInfo.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
   /**
    * Address: 0x004C07D0 (FUN_004C07D0)
+   * Address: 0x00BF0800 (FUN_00BF0800, atexit destructor of the ScrDiskWatcherTaskTypeInfo object)
    *
    * What it does:
-   * Pre-registers the `ScrDiskWatcherTask` runtime type descriptor.
+   * Constructs and pre-registers the `ScrDiskWatcherTask` runtime type
+   * descriptor.
    */
   gpg::RType* RegisterScrDiskWatcherTaskTypeInfo()
   {
-    gpg::PreRegisterRType(typeid(ScrDiskWatcherTask), &gScrDiskWatcherTaskTypeInfo);
-    return &gScrDiskWatcherTaskTypeInfo;
+    static moho::ScrDiskWatcherTaskTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(ScrDiskWatcherTask), &sInstance);
+    return &sInstance;
   }
 
   void ResolvePathForLua(const SDiskWatchEvent& event, msvc8::string& normalizedPath)
@@ -171,17 +166,11 @@ namespace
  * Address: 0x00BC5F60 (FUN_00BC5F60, ScrDiskWatcherTask startup type-info registration)
  *
  * What it does:
- * Registers `ScrDiskWatcherTask` reflected type descriptor and schedules
- * type-info cleanup at process exit.
+ * Registers `ScrDiskWatcherTask` reflected type descriptor.
  */
 void moho::register_ScrDiskWatcherTaskTypeInfo()
 {
-  static const bool kRegistered = []() {
-    (void)RegisterScrDiskWatcherTaskTypeInfo();
-    (void)std::atexit(&CleanupScrDiskWatcherTaskTypeInfo);
-    return true;
-  }();
-  (void)kRegistered;
+  (void)RegisterScrDiskWatcherTaskTypeInfo();
 }
 
 gpg::RType* ScrDiskWatcherTask::sType = nullptr;

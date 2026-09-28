@@ -59,22 +59,12 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BFA200 (FUN_00BFA200)
-   *
-   * What it does:
-   * Releases reflected base/field buffers for global `CUnitPodAssistTypeInfo`
-   * storage.
-   */
-  void cleanup_CUnitPodAssistTypeInfo();
-
-  /**
    * Address: 0x00BD1570 (FUN_00BD1570, sub_BD1570)
    *
    * What it does:
-   * Constructs startup-owned `CUnitPodAssistTypeInfo` and schedules process
-   * exit cleanup.
+   * Constructs startup-owned `CUnitPodAssistTypeInfo`.
    */
-  int register_CUnitPodAssistTypeInfo();
+  void register_CUnitPodAssistTypeInfo();
 
   static_assert(sizeof(CUnitPodAssistTypeInfo) == 0x64, "CUnitPodAssistTypeInfo size must be 0x64");
 } // namespace moho

@@ -86,8 +86,7 @@ namespace gpg
    * Address: 0x00BC9D40 (FUN_00BC9D40, register_RFastVectorType_EntId)
    *
    * What it does:
-   * Materializes startup reflection storage for `fastvector<Moho::EntId>` and
-   * registers process-exit teardown.
+   * Constructs the `fastvector<Moho::EntId>` reflection descriptor.
    */
   void register_RFastVectorType_EntId();
 } // namespace gpg

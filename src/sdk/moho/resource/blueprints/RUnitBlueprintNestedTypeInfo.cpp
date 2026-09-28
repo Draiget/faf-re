@@ -1,6 +1,5 @@
 #include "RUnitBlueprintNestedTypeInfo.h"
 
-#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <new>
@@ -32,28 +31,6 @@ namespace
   using VectorFloatType = msvc8::vector<float>;
   void EnsureVectorFloatLoadCapacity(VectorFloatType& storage, std::size_t requiredCount);
   [[nodiscard]] gpg::RType* CachedFloatType();
-
-  /**
-   * Cached `"vector<float>"` display name plus its one-shot build guard. The
-   * binary keeps these as the `gpg::RVectorType<float>` class statics `sName`
-   * and the init-guard word at `0x010C8E40`; the descriptor class is file-local
-   * here, so they are file-local too.
-   */
-  msvc8::string gVectorFloatTypeName;
-  std::uint32_t gVectorFloatTypeNameInitGuard = 0u;
-  constexpr std::uint32_t kVectorFloatTypeNameInitMask = 0x1u;
-
-  /**
-   * Address: 0x00BF3840 (FUN_00BF3840, gpg::RVectorType_float::sName cleanup)
-   *
-   * What it does:
-   * Releases the cached `vector<float>` display-name string at process exit.
-   */
-  void cleanup_VectorFloatReflectionTypeName()
-  {
-    gVectorFloatTypeName = msvc8::string();
-    gVectorFloatTypeNameInitGuard &= ~kVectorFloatTypeNameInitMask;
-  }
 
   /**
    * Address: 0x00524780 (FUN_00524780)
@@ -105,6 +82,15 @@ namespace
   {
   public:
     /**
+     * Address: 0x00526340 (FUN_00526340, gpg::RVectorType_float::RVectorType_float)
+     *
+     * What it does:
+     * Constructs and preregisters startup reflection RTTI for
+     * `msvc8::vector<float>`.
+     */
+    VectorFloatReflectionType();
+
+    /**
      * Address: 0x005266E0 (FUN_005266E0, gpg::RVectorType_float::dtr)
      */
     ~VectorFloatReflectionType() override;
@@ -117,7 +103,7 @@ namespace
      *
      * What it does:
      * Lazily builds `"vector<float>"` once from the reflected element type's
-     * own name, caches it, and installs the atexit teardown for the cache.
+     * own name and caches it.
      */
     [[nodiscard]] const char* GetName() const override;
 
@@ -265,6 +251,33 @@ namespace
   };
 
   /**
+   * Address: 0x00526340 (FUN_00526340, gpg::RVectorType_float::RVectorType_float)
+   *
+   * What it does:
+   * Preregisters this descriptor under `typeid(msvc8::vector<float>)`.
+   */
+  VectorFloatReflectionType::VectorFloatReflectionType()
+  {
+    gpg::PreRegisterRType(typeid(VectorFloatType), this);
+  }
+
+  VectorFloatReflectionType::~VectorFloatReflectionType() = default;
+
+  /**
+   * Address: 0x005232C0 (FUN_005232C0, gpg::RVectorType_float::GetName)
+   * Address: 0x00BF3840 (FUN_00BF3840, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `vector<float>` once from the reflected `float` descriptor's name
+   * and returns it.
+   */
+  const char* VectorFloatReflectionType::GetName() const
+  {
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedFloatType()->GetName());
+    return sName.c_str();
+  }
+
+  /**
    * Address: 0x00523380 (FUN_00523380, gpg::RVectorType_float::GetLexical)
    *
    * What it does:
@@ -272,32 +285,6 @@ namespace
    * with the reflected vector size as ", size=%d". Out-of-line definition
    * binds the binary symbol to the `??_7?$RVectorType@M@gpg@@6B@ +0x04` slot.
    */
-  /**
-   * Address: 0x005232C0 (FUN_005232C0, gpg::RVectorType_float::GetName)
-   *
-   * What it does:
-   * On the first call, resolves the reflected `float` descriptor, formats
-   * `"vector<%s>"` from its name into the cached `sName` lane, and registers the
-   * cache teardown with `atexit`. Later calls return the cached buffer. The
-   * guard word is set before the string is built, exactly as the binary does, so
-   * a re-entrant call during `LookupRType` cannot rebuild the name.
-   */
-  VectorFloatReflectionType::~VectorFloatReflectionType() = default;
-
-  const char* VectorFloatReflectionType::GetName() const
-  {
-    if ((gVectorFloatTypeNameInitGuard & kVectorFloatTypeNameInitMask) == 0u) {
-      gVectorFloatTypeNameInitGuard |= kVectorFloatTypeNameInitMask;
-
-      const gpg::RType* const elementType = CachedFloatType();
-      const char* const elementName = elementType ? elementType->GetName() : "float";
-      gVectorFloatTypeName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "float");
-      (void)std::atexit(&cleanup_VectorFloatReflectionTypeName);
-    }
-
-    return gVectorFloatTypeName.c_str();
-  }
-
   msvc8::string VectorFloatReflectionType::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
@@ -344,199 +331,115 @@ namespace
 
   static_assert(sizeof(VectorFloatReflectionType) == 0x68, "VectorFloatReflectionType size must be 0x68");
 
-  alignas(GeneralTypeInfo) unsigned char gRUnitBlueprintGeneralTypeInfoStorage[sizeof(GeneralTypeInfo)];
-  bool gRUnitBlueprintGeneralTypeInfoConstructed = false;
-
-  alignas(DisplayTypeInfo) unsigned char gRUnitBlueprintDisplayTypeInfoStorage[sizeof(DisplayTypeInfo)];
-  bool gRUnitBlueprintDisplayTypeInfoConstructed = false;
-
-  alignas(PhysicsTypeInfo) unsigned char gRUnitBlueprintPhysicsTypeInfoStorage[sizeof(PhysicsTypeInfo)];
-  bool gRUnitBlueprintPhysicsTypeInfoConstructed = false;
-
-  alignas(AirTypeInfo) unsigned char gRUnitBlueprintAirTypeInfoStorage[sizeof(AirTypeInfo)];
-  bool gRUnitBlueprintAirTypeInfoConstructed = false;
-
-  alignas(TransportTypeInfo) unsigned char gRUnitBlueprintTransportTypeInfoStorage[sizeof(TransportTypeInfo)];
-  bool gRUnitBlueprintTransportTypeInfoConstructed = false;
-
-  alignas(AITypeInfo) unsigned char gRUnitBlueprintAITypeInfoStorage[sizeof(AITypeInfo)];
-  bool gRUnitBlueprintAITypeInfoConstructed = false;
-
-  alignas(DefenseTypeInfo) unsigned char gRUnitBlueprintDefenseTypeInfoStorage[sizeof(DefenseTypeInfo)];
-  bool gRUnitBlueprintDefenseTypeInfoConstructed = false;
-
-  alignas(IntelTypeInfo) unsigned char gRUnitBlueprintIntelTypeInfoStorage[sizeof(IntelTypeInfo)];
-  bool gRUnitBlueprintIntelTypeInfoConstructed = false;
-
-  alignas(EconomyTypeInfo) unsigned char gRUnitBlueprintEconomyTypeInfoStorage[sizeof(EconomyTypeInfo)];
-  bool gRUnitBlueprintEconomyTypeInfoConstructed = false;
-
-  alignas(WeaponTypeInfo) unsigned char gRUnitBlueprintWeaponTypeInfoStorage[sizeof(WeaponTypeInfo)];
-  bool gRUnitBlueprintWeaponTypeInfoConstructed = false;
-
-  alignas(VectorFloatReflectionType) unsigned char gVectorFloatReflectionTypeStorage[sizeof(VectorFloatReflectionType)];
-  bool gVectorFloatReflectionTypeConstructed = false;
-
-  template <typename T>
-  [[nodiscard]] T& AcquireTypeInfo(unsigned char* const storage, bool& constructed)
-  {
-    if (!constructed) {
-      new (storage) T();
-      constructed = true;
-    }
-
-    return *reinterpret_cast<T*>(storage);
-  }
-
-  template <typename T>
-  void CleanupTypeInfo(unsigned char* const storage, bool& constructed)
-  {
-    if (!constructed) {
-      return;
-    }
-
-    reinterpret_cast<T*>(storage)->~T();
-    constructed = false;
-  }
-
+  /**
+   * Address: 0x00BF32C0 (FUN_00BF32C0, atexit destructor of the RUnitBlueprintGeneralTypeInfo object)
+   */
   [[nodiscard]] GeneralTypeInfo& AcquireRUnitBlueprintGeneralTypeInfo()
   {
-    return AcquireTypeInfo<GeneralTypeInfo>(gRUnitBlueprintGeneralTypeInfoStorage, gRUnitBlueprintGeneralTypeInfoConstructed);
+    static GeneralTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BF3320 (FUN_00BF3320, atexit destructor of the RUnitBlueprintDisplayTypeInfo object)
+   */
   [[nodiscard]] DisplayTypeInfo& AcquireRUnitBlueprintDisplayTypeInfo()
   {
-    return AcquireTypeInfo<DisplayTypeInfo>(gRUnitBlueprintDisplayTypeInfoStorage, gRUnitBlueprintDisplayTypeInfoConstructed);
+    static DisplayTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BF3380 (FUN_00BF3380, atexit destructor of the RUnitBlueprintPhysicsTypeInfo object)
+   */
   [[nodiscard]] PhysicsTypeInfo& AcquireRUnitBlueprintPhysicsTypeInfo()
   {
-    return AcquireTypeInfo<PhysicsTypeInfo>(gRUnitBlueprintPhysicsTypeInfoStorage, gRUnitBlueprintPhysicsTypeInfoConstructed);
+    static PhysicsTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BF33E0 (FUN_00BF33E0, atexit destructor of the RUnitBlueprintAirTypeInfo object)
+   */
   [[nodiscard]] AirTypeInfo& AcquireRUnitBlueprintAirTypeInfo()
   {
-    return AcquireTypeInfo<AirTypeInfo>(gRUnitBlueprintAirTypeInfoStorage, gRUnitBlueprintAirTypeInfoConstructed);
+    static AirTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BF3440 (FUN_00BF3440, atexit destructor of the RUnitBlueprintTransportTypeInfo object)
+   */
   [[nodiscard]] TransportTypeInfo& AcquireRUnitBlueprintTransportTypeInfo()
   {
-    return AcquireTypeInfo<TransportTypeInfo>(
-      gRUnitBlueprintTransportTypeInfoStorage,
-      gRUnitBlueprintTransportTypeInfoConstructed
-    );
+    static TransportTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BF34A0 (FUN_00BF34A0, atexit destructor of the RUnitBlueprintAITypeInfo object)
+   */
   [[nodiscard]] AITypeInfo& AcquireRUnitBlueprintAITypeInfo()
   {
-    return AcquireTypeInfo<AITypeInfo>(gRUnitBlueprintAITypeInfoStorage, gRUnitBlueprintAITypeInfoConstructed);
+    static AITypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BF3560 (FUN_00BF3560, atexit destructor of the RUnitBlueprintDefenseTypeInfo object)
+   */
   [[nodiscard]] DefenseTypeInfo& AcquireRUnitBlueprintDefenseTypeInfo()
   {
-    return AcquireTypeInfo<DefenseTypeInfo>(gRUnitBlueprintDefenseTypeInfoStorage, gRUnitBlueprintDefenseTypeInfoConstructed);
+    static DefenseTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BF35C0 (FUN_00BF35C0, atexit destructor of the RUnitBlueprintIntelTypeInfo object)
+   */
   [[nodiscard]] IntelTypeInfo& AcquireRUnitBlueprintIntelTypeInfo()
   {
-    return AcquireTypeInfo<IntelTypeInfo>(gRUnitBlueprintIntelTypeInfoStorage, gRUnitBlueprintIntelTypeInfoConstructed);
+    static IntelTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BF3620 (FUN_00BF3620, atexit destructor of the RUnitBlueprintEconomyTypeInfo object)
+   */
   [[nodiscard]] EconomyTypeInfo& AcquireRUnitBlueprintEconomyTypeInfo()
   {
-    return AcquireTypeInfo<EconomyTypeInfo>(gRUnitBlueprintEconomyTypeInfoStorage, gRUnitBlueprintEconomyTypeInfoConstructed);
+    static EconomyTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BF3690 (FUN_00BF3690, atexit destructor of the RUnitBlueprintWeaponTypeInfo object)
+   */
   [[nodiscard]] WeaponTypeInfo& AcquireRUnitBlueprintWeaponTypeInfo()
   {
-    return AcquireTypeInfo<WeaponTypeInfo>(gRUnitBlueprintWeaponTypeInfoStorage, gRUnitBlueprintWeaponTypeInfoConstructed);
+    static WeaponTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00BF38D0 (FUN_00BF38D0, atexit destructor of the VectorFloatReflectionType object)
+   */
   [[nodiscard]] VectorFloatReflectionType& AcquireVectorFloatReflectionType()
   {
-    return AcquireTypeInfo<VectorFloatReflectionType>(gVectorFloatReflectionTypeStorage, gVectorFloatReflectionTypeConstructed);
-  }
-
-  void cleanup_RUnitBlueprintGeneralTypeInfo()
-  {
-    CleanupTypeInfo<GeneralTypeInfo>(gRUnitBlueprintGeneralTypeInfoStorage, gRUnitBlueprintGeneralTypeInfoConstructed);
-  }
-
-  void cleanup_RUnitBlueprintDisplayTypeInfo()
-  {
-    CleanupTypeInfo<DisplayTypeInfo>(gRUnitBlueprintDisplayTypeInfoStorage, gRUnitBlueprintDisplayTypeInfoConstructed);
-  }
-
-  void cleanup_RUnitBlueprintPhysicsTypeInfo()
-  {
-    CleanupTypeInfo<PhysicsTypeInfo>(gRUnitBlueprintPhysicsTypeInfoStorage, gRUnitBlueprintPhysicsTypeInfoConstructed);
-  }
-
-  void cleanup_RUnitBlueprintAirTypeInfo()
-  {
-    CleanupTypeInfo<AirTypeInfo>(gRUnitBlueprintAirTypeInfoStorage, gRUnitBlueprintAirTypeInfoConstructed);
-  }
-
-  void cleanup_RUnitBlueprintTransportTypeInfo()
-  {
-    CleanupTypeInfo<TransportTypeInfo>(gRUnitBlueprintTransportTypeInfoStorage, gRUnitBlueprintTransportTypeInfoConstructed);
-  }
-
-  void cleanup_RUnitBlueprintAITypeInfo()
-  {
-    CleanupTypeInfo<AITypeInfo>(gRUnitBlueprintAITypeInfoStorage, gRUnitBlueprintAITypeInfoConstructed);
-  }
-
-  void cleanup_RUnitBlueprintDefenseTypeInfo()
-  {
-    CleanupTypeInfo<DefenseTypeInfo>(gRUnitBlueprintDefenseTypeInfoStorage, gRUnitBlueprintDefenseTypeInfoConstructed);
-  }
-
-  void cleanup_RUnitBlueprintIntelTypeInfo()
-  {
-    CleanupTypeInfo<IntelTypeInfo>(gRUnitBlueprintIntelTypeInfoStorage, gRUnitBlueprintIntelTypeInfoConstructed);
-  }
-
-  void cleanup_RUnitBlueprintEconomyTypeInfo()
-  {
-    CleanupTypeInfo<EconomyTypeInfo>(gRUnitBlueprintEconomyTypeInfoStorage, gRUnitBlueprintEconomyTypeInfoConstructed);
-  }
-
-  void cleanup_RUnitBlueprintWeaponTypeInfo()
-  {
-    CleanupTypeInfo<WeaponTypeInfo>(gRUnitBlueprintWeaponTypeInfoStorage, gRUnitBlueprintWeaponTypeInfoConstructed);
-  }
-
-  void cleanup_VectorFloatReflectionType()
-  {
-    CleanupTypeInfo<VectorFloatReflectionType>(gVectorFloatReflectionTypeStorage, gVectorFloatReflectionTypeConstructed);
+    static VectorFloatReflectionType sInstance;
+    return sInstance;
   }
 
   /**
-   * Address: 0x00526340 (FUN_00526340, preregister_VectorFloatReflectionType)
+   * Address: 0x00BC8D10 (FUN_00BC8D10, register_VectorFloatReflectionType)
    *
    * What it does:
-   * Constructs and preregisters startup reflection RTTI for
-   * `msvc8::vector<float>`.
+   * Startup lane that constructs and preregisters `vector<float>` reflection
+   * type metadata.
    */
-  [[nodiscard]] gpg::RType* preregister_VectorFloatReflectionType()
+  void register_VectorFloatReflectionType()
   {
-    auto* const typeInfo = &AcquireVectorFloatReflectionType();
-    gpg::PreRegisterRType(typeid(VectorFloatType), typeInfo);
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x00BC8D10 (FUN_00BC8D10, register_VectorFloatReflectionTypeAtexitStartup)
-   *
-   * What it does:
-   * Startup lane that preregisters `vector<float>` reflection type metadata and
-   * installs its teardown callback.
-   */
-  int register_VectorFloatReflectionTypeAtexitStartup()
-  {
-    (void)preregister_VectorFloatReflectionType();
-    return std::atexit(&cleanup_VectorFloatReflectionType);
+    (void)AcquireVectorFloatReflectionType();
   }
 
   template <typename T>
@@ -653,17 +556,17 @@ namespace
   {
     RUnitBlueprintNestedTypeInfoBootstrap()
     {
-      (void)register_VectorFloatReflectionTypeAtexitStartup();
-      (void)moho::register_RUnitBlueprintGeneralTypeInfo();
-      (void)moho::register_RUnitBlueprintDisplayTypeInfo();
-      (void)moho::register_RUnitBlueprintPhysicsTypeInfo();
-      (void)moho::register_RUnitBlueprintAirTypeInfo();
-      (void)moho::register_RUnitBlueprintTransportTypeInfo();
-      (void)moho::register_RUnitBlueprintAITypeInfo();
-      (void)moho::register_RUnitBlueprintDefenseTypeInfo();
-      (void)moho::register_RUnitBlueprintIntelTypeInfo();
-      (void)moho::register_RUnitBlueprintEconomyTypeInfo();
-      (void)moho::register_RUnitBlueprintWeaponTypeInfo();
+      register_VectorFloatReflectionType();
+      moho::register_RUnitBlueprintGeneralTypeInfo();
+      moho::register_RUnitBlueprintDisplayTypeInfo();
+      moho::register_RUnitBlueprintPhysicsTypeInfo();
+      moho::register_RUnitBlueprintAirTypeInfo();
+      moho::register_RUnitBlueprintTransportTypeInfo();
+      moho::register_RUnitBlueprintAITypeInfo();
+      moho::register_RUnitBlueprintDefenseTypeInfo();
+      moho::register_RUnitBlueprintIntelTypeInfo();
+      moho::register_RUnitBlueprintEconomyTypeInfo();
+      moho::register_RUnitBlueprintWeaponTypeInfo();
     }
   };
 
@@ -941,9 +844,6 @@ namespace moho
     static gpg::RType* cachedVectorFloatType = nullptr;
     if (!cachedVectorFloatType) {
       cachedVectorFloatType = gpg::LookupRType(typeid(msvc8::vector<float>));
-      if (!cachedVectorFloatType) {
-        cachedVectorFloatType = preregister_VectorFloatReflectionType();
-      }
     }
 
     typeInfo->fields_.push_back(gpg::RField(fieldName, cachedVectorFloatType, offset, 0, nullptr));
@@ -2134,91 +2034,81 @@ namespace moho
   /**
    * Address: 0x00BC8A90 (FUN_00BC8A90, register_RUnitBlueprintGeneralTypeInfo)
    */
-  int register_RUnitBlueprintGeneralTypeInfo()
+  void register_RUnitBlueprintGeneralTypeInfo()
   {
     (void)AcquireRUnitBlueprintGeneralTypeInfo();
-    return std::atexit(&cleanup_RUnitBlueprintGeneralTypeInfo);
   }
 
   /**
    * Address: 0x00BC8AB0 (FUN_00BC8AB0, register_RUnitBlueprintDisplayTypeInfo)
    */
-  int register_RUnitBlueprintDisplayTypeInfo()
+  void register_RUnitBlueprintDisplayTypeInfo()
   {
     (void)AcquireRUnitBlueprintDisplayTypeInfo();
-    return std::atexit(&cleanup_RUnitBlueprintDisplayTypeInfo);
   }
 
   /**
    * Address: 0x00BC8AD0 (FUN_00BC8AD0, register_RUnitBlueprintPhysicsTypeInfo)
    */
-  int register_RUnitBlueprintPhysicsTypeInfo()
+  void register_RUnitBlueprintPhysicsTypeInfo()
   {
     (void)AcquireRUnitBlueprintPhysicsTypeInfo();
-    return std::atexit(&cleanup_RUnitBlueprintPhysicsTypeInfo);
   }
 
   /**
    * Address: 0x00BC8AF0 (FUN_00BC8AF0, register_RUnitBlueprintAirTypeInfo)
    */
-  int register_RUnitBlueprintAirTypeInfo()
+  void register_RUnitBlueprintAirTypeInfo()
   {
     (void)AcquireRUnitBlueprintAirTypeInfo();
-    return std::atexit(&cleanup_RUnitBlueprintAirTypeInfo);
   }
 
   /**
    * Address: 0x00BC8B10 (FUN_00BC8B10, register_RUnitBlueprintTransportTypeInfo)
    */
-  int register_RUnitBlueprintTransportTypeInfo()
+  void register_RUnitBlueprintTransportTypeInfo()
   {
     (void)AcquireRUnitBlueprintTransportTypeInfo();
-    return std::atexit(&cleanup_RUnitBlueprintTransportTypeInfo);
   }
 
   /**
    * Address: 0x00BC8B30 (FUN_00BC8B30, register_RUnitBlueprintAITypeInfo)
    */
-  int register_RUnitBlueprintAITypeInfo()
+  void register_RUnitBlueprintAITypeInfo()
   {
     (void)AcquireRUnitBlueprintAITypeInfo();
-    return std::atexit(&cleanup_RUnitBlueprintAITypeInfo);
   }
 
   /**
    * Address: 0x00BC8B70 (FUN_00BC8B70, register_RUnitBlueprintDefenseTypeInfo)
    */
-  int register_RUnitBlueprintDefenseTypeInfo()
+  void register_RUnitBlueprintDefenseTypeInfo()
   {
     (void)AcquireRUnitBlueprintDefenseTypeInfo();
-    return std::atexit(&cleanup_RUnitBlueprintDefenseTypeInfo);
   }
 
   /**
    * Address: 0x00BC8B90 (FUN_00BC8B90, register_RUnitBlueprintIntelTypeInfo)
    */
-  int register_RUnitBlueprintIntelTypeInfo()
+  void register_RUnitBlueprintIntelTypeInfo()
   {
     (void)AcquireRUnitBlueprintIntelTypeInfo();
-    return std::atexit(&cleanup_RUnitBlueprintIntelTypeInfo);
   }
 
   /**
    * Address: 0x00BC8BB0 (FUN_00BC8BB0, register_RUnitBlueprintEconomyTypeInfo)
    */
-  int register_RUnitBlueprintEconomyTypeInfo()
+  void register_RUnitBlueprintEconomyTypeInfo()
   {
     (void)AcquireRUnitBlueprintEconomyTypeInfo();
-    return std::atexit(&cleanup_RUnitBlueprintEconomyTypeInfo);
   }
 
   /**
    * Address: 0x00BC8BF0 (FUN_00BC8BF0, register_RUnitBlueprintWeaponTypeInfo)
    */
-  int register_RUnitBlueprintWeaponTypeInfo()
+  void register_RUnitBlueprintWeaponTypeInfo()
   {
     (void)AcquireRUnitBlueprintWeaponTypeInfo();
-    return std::atexit(&cleanup_RUnitBlueprintWeaponTypeInfo);
   }
 } // namespace moho
 
@@ -2236,4 +2126,4 @@ GPG_PREREGISTER_INIT(register_RUnitBlueprintIntelTypeInfo_db3407, moho::register
 GPG_PREREGISTER_INIT(register_RUnitBlueprintEconomyTypeInfo_db3407, moho::register_RUnitBlueprintEconomyTypeInfo)
 GPG_PREREGISTER_INIT(register_RUnitBlueprintWeaponTypeInfo_db3407, moho::register_RUnitBlueprintWeaponTypeInfo)
 
-GPG_PREREGISTER_INIT(preregister_VectorFloatReflectionType_db3407, preregister_VectorFloatReflectionType)
+GPG_PREREGISTER_INIT(register_VectorFloatReflectionType_db3407, register_VectorFloatReflectionType)

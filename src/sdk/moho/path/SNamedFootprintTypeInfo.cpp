@@ -204,21 +204,6 @@ namespace
   void LoadSNamedFootprintList(gpg::ReadArchive* archive, int objectPtr, int unused, gpg::RRef* ownerRef);
   void SaveSNamedFootprintList(gpg::WriteArchive* archive, int objectPtr, int unused, gpg::RRef* ownerRef);
 
-  msvc8::string gSNamedFootprintListTypeName;
-  bool gSNamedFootprintListTypeNameCleanupRegistered = false;
-
-  /**
-   * Address: 0x00BF28E0 (FUN_00BF28E0)
-   *
-   * What it does:
-   * Releases the cached `list<SNamedFootprint>` RTTI name string at process exit.
-   */
-  void CleanupSNamedFootprintListTypeName()
-  {
-    gSNamedFootprintListTypeName = msvc8::string{};
-    gSNamedFootprintListTypeNameCleanupRegistered = false;
-  }
-
   class SNamedFootprintTypeInfo final : public gpg::RType
   {
   public:
@@ -300,23 +285,16 @@ namespace
 
     /**
      * Address: 0x00513FB0 (FUN_00513FB0, gpg::RListType_SNamedFootprint::GetName)
+     * Address: 0x00BF28E0 (FUN_00BF28E0, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Lazily builds and caches the `list<SNamedFootprint>` RTTI label.
+     * Builds `list<SNamedFootprint>` once and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if (gSNamedFootprintListTypeName.empty()) {
-        const gpg::RType* const elementType = moho::preregister_SNamedFootprintTypeInfo();
-        const char* const elementName = elementType ? elementType->GetName() : "SNamedFootprint";
-        gSNamedFootprintListTypeName = gpg::STR_Printf("list<%s>", elementName ? elementName : "SNamedFootprint");
-        if (!gSNamedFootprintListTypeNameCleanupRegistered) {
-          gSNamedFootprintListTypeNameCleanupRegistered = true;
-          (void)std::atexit(&CleanupSNamedFootprintListTypeName);
-        }
-      }
-
-      return gSNamedFootprintListTypeName.c_str();
+      static const msvc8::string sName =
+        gpg::STR_Printf("list<%s>", moho::preregister_SNamedFootprintTypeInfo()->GetName());
+      return sName.c_str();
     }
 
     /**
@@ -366,33 +344,25 @@ namespace
     serSaveFunc_ = &SaveSNamedFootprintList;
   }
 
-  alignas(SNamedFootprintTypeInfo) unsigned char gSNamedFootprintTypeInfoStorage[sizeof(SNamedFootprintTypeInfo)]{};
-  bool gSNamedFootprintTypeInfoConstructed = false;
   bool gSNamedFootprintTypeInfoPreregistered = false;
-
-  alignas(SNamedFootprintListTypeInfo)
-    unsigned char gSNamedFootprintListTypeInfoStorage[sizeof(SNamedFootprintListTypeInfo)]{};
-  bool gSNamedFootprintListTypeInfoConstructed = false;
   bool gSNamedFootprintListTypeInfoPreregistered = false;
 
+  /**
+   * Address: 0x00BF2820 (FUN_00BF2820, atexit destructor of the SNamedFootprintTypeInfo object)
+   */
   [[nodiscard]] SNamedFootprintTypeInfo* AcquireSNamedFootprintTypeInfo()
   {
-    if (!gSNamedFootprintTypeInfoConstructed) {
-      new (gSNamedFootprintTypeInfoStorage) SNamedFootprintTypeInfo();
-      gSNamedFootprintTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<SNamedFootprintTypeInfo*>(gSNamedFootprintTypeInfoStorage);
+    static SNamedFootprintTypeInfo sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BF2910 (FUN_00BF2910, atexit destructor of the SNamedFootprintListTypeInfo object)
+   */
   [[nodiscard]] SNamedFootprintListTypeInfo* AcquireSNamedFootprintListTypeInfo()
   {
-    if (!gSNamedFootprintListTypeInfoConstructed) {
-      new (gSNamedFootprintListTypeInfoStorage) SNamedFootprintListTypeInfo();
-      gSNamedFootprintListTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<SNamedFootprintListTypeInfo*>(gSNamedFootprintListTypeInfoStorage);
+    static SNamedFootprintListTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -497,32 +467,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF2820 (FUN_00BF2820, cleanup_SNamedFootprintTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `SNamedFootprintTypeInfo` storage at process exit.
-   */
-  void cleanup_SNamedFootprintTypeInfo()
-  {
-    if (!gSNamedFootprintTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSNamedFootprintTypeInfo()->~SNamedFootprintTypeInfo();
-    gSNamedFootprintTypeInfoConstructed = false;
-    gSNamedFootprintTypeInfoPreregistered = false;
-  }
-
-  /**
    * Address: 0x00BC8360 (FUN_00BC8360, register_SNamedFootprintTypeInfoStartup)
    *
    * What it does:
-   * Preregisters `SNamedFootprint` RTTI and installs process-exit cleanup.
+   * Preregisters `SNamedFootprint` RTTI.
    */
-  int register_SNamedFootprintTypeInfoStartup()
+  void register_SNamedFootprintTypeInfoStartup()
   {
     (void)preregister_SNamedFootprintTypeInfo();
-    return std::atexit(&cleanup_SNamedFootprintTypeInfo);
   }
 
   /**
@@ -543,32 +495,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF2910 (FUN_00BF2910, cleanup_SNamedFootprintListTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `msvc8::list<SNamedFootprint>` RTTI storage at process exit.
-   */
-  void cleanup_SNamedFootprintListTypeInfo()
-  {
-    if (!gSNamedFootprintListTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSNamedFootprintListTypeInfo()->~SNamedFootprintListTypeInfo();
-    gSNamedFootprintListTypeInfoConstructed = false;
-    gSNamedFootprintListTypeInfoPreregistered = false;
-  }
-
-  /**
    * Address: 0x00BC83A0 (FUN_00BC83A0, register_SNamedFootprintListTypeInfoStartup)
    *
    * What it does:
-   * Preregisters `msvc8::list<SNamedFootprint>` RTTI and installs process-exit cleanup.
+   * Preregisters `msvc8::list<SNamedFootprint>` RTTI.
    */
-  int register_SNamedFootprintListTypeInfoStartup()
+  void register_SNamedFootprintListTypeInfoStartup()
   {
     (void)preregister_SNamedFootprintListTypeInfo();
-    return std::atexit(&cleanup_SNamedFootprintListTypeInfo);
   }
 } // namespace moho
 

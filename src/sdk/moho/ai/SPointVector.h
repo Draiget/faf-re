@@ -183,10 +183,9 @@ namespace moho
    * Address: 0x00BCB470 (FUN_00BCB470, register_SPointVectorVectorType_AtExit)
    *
    * What it does:
-   * Registers `vector<SPointVector>` reflection and installs process-exit
-   * cleanup via `atexit`.
+   * Registers `vector<SPointVector>` reflection.
    */
-  int register_SPointVectorVectorType_AtExit();
+  void register_SPointVectorVectorType_AtExit();
 } // namespace moho
 
 namespace gpg

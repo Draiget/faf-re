@@ -297,8 +297,7 @@ namespace moho
    * Address: 0x00BC7620 (FUN_00BC7620, register_DColPrimBoxTypeInfo)
    *
    * What it does:
-   * Installs the startup-owned `DColPrimBoxTypeInfo` instance and its
-   * process-exit cleanup hook.
+   * Installs the startup-owned `DColPrimBoxTypeInfo` instance.
    */
   void register_DColPrimBoxTypeInfo();
 

@@ -10,24 +10,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(ESTITargetTypeTypeInfo) unsigned char gStorage[sizeof(ESTITargetTypeTypeInfo)];
-  bool gConstructed = false;
-
+  /**
+   * Address: 0x00BF50D0 (FUN_00BF50D0, atexit destructor of the ESTITargetTypeTypeInfo object)
+   */
   [[nodiscard]] ESTITargetTypeTypeInfo& Acquire()
   {
-    if (!gConstructed) {
-      new (gStorage) ESTITargetTypeTypeInfo();
-      gConstructed = true;
-    }
-    return *reinterpret_cast<ESTITargetTypeTypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) return;
-    auto& ti = *reinterpret_cast<ESTITargetTypeTypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static ESTITargetTypeTypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { moho::register_ESTITargetTypeTypeInfoStartup(); } };
@@ -96,10 +85,12 @@ void ESTITargetTypeTypeInfo::AddEnums(gpg::REnumType* const enumType)
   enumType->AddEnum(enumType->StripPrefix("STITARGET_Position"), 2);
 }
 
+/**
+ * Address: 0x00BCA290 (FUN_00BCA290, register_ESTITargetTypeTypeInfo)
+ */
 void moho::register_ESTITargetTypeTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

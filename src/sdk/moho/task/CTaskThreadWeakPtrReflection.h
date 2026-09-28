@@ -97,7 +97,7 @@ namespace moho
    *
    * What it does:
    * Materializes the startup weak-pointer reflection descriptor for
-   * `WeakPtr<CTaskThread>` and registers process-exit teardown.
+   * `WeakPtr<CTaskThread>`.
    */
   void register_RWeakPtrType_CTaskThread();
 } // namespace moho

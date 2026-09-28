@@ -1,27 +1,20 @@
 #include "moho/entity/ELayerTypeInfo.h"
 
-#include <cstdlib>
 #include <cstdint>
-#include <new>
 #include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(moho::ELayerTypeInfo) unsigned char gELayerTypeInfoStorage[sizeof(moho::ELayerTypeInfo)]{};
-  bool gELayerTypeInfoConstructed = false;
   bool gELayerTypeInfoPreregistered = false;
 
-  gpg::RType* gELayerCachedType = nullptr;
-
+  /**
+   * Address: 0x00BF2070 (FUN_00BF2070, atexit destructor of the ELayerTypeInfo object)
+   */
   [[nodiscard]] moho::ELayerTypeInfo* AcquireELayerTypeInfo()
   {
-    if (!gELayerTypeInfoConstructed) {
-      new (gELayerTypeInfoStorage) moho::ELayerTypeInfo();
-      gELayerTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::ELayerTypeInfo*>(gELayerTypeInfoStorage);
+    static moho::ELayerTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -38,31 +31,15 @@ namespace
    * never installed under any code path.
    */
   moho::ELayerPrimitiveSerializer gELayerPrimitiveSerializer;
-
-  /**
-   * Address: 0x00BF2070 (FUN_00BF2070, cleanup_ELayerTypeInfo)
-   */
-  void cleanup_ELayerTypeInfo()
-  {
-    if (!gELayerTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireELayerTypeInfo()->~ELayerTypeInfo();
-    gELayerTypeInfoConstructed = false;
-    gELayerTypeInfoPreregistered = false;
-    gELayerCachedType = nullptr;
-  }
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00BF2070 (FUN_00BF2070, Moho::ELayerTypeInfo::dtr)
-   * Address: 0x0050BA80 (FUN_0050BA80, vtable-slot-2 scalar deleting
-   * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
-   * conditionally frees the object -- ordinary C++ `delete` semantics, not
-   * modeled as a separate function here)
+   * Address: 0x0050BA80 (FUN_0050BA80, Moho::ELayerTypeInfo::dtr,
+   * vtable-slot-2 scalar deleting destructor: tail-calls
+   * `gpg::REnumType::~REnumType(this)` then conditionally frees the object --
+   * ordinary C++ `delete` semantics, not modeled as a separate function here)
    */
   ELayerTypeInfo::~ELayerTypeInfo() = default;
 
@@ -112,17 +89,15 @@ namespace moho
       gELayerTypeInfoPreregistered = true;
     }
 
-    gELayerCachedType = typeInfo;
     return typeInfo;
   }
 
   /**
    * Address: 0x00BC7C60 (FUN_00BC7C60, register_ELayerTypeInfo)
    */
-  int register_ELayerTypeInfo()
+  void register_ELayerTypeInfo()
   {
     (void)preregister_ELayerTypeInfo();
-    return std::atexit(&cleanup_ELayerTypeInfo);
   }
 } // namespace moho
 

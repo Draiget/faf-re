@@ -1,26 +1,18 @@
 #include "moho/unit/core/EIntelTypeInfo.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::EIntelTypeInfo> gEIntelTypeInfoStorage{};
-
   /**
-   * Address: 0x00BF2010 (FUN_00BF2010, cleanup_EIntelTypeInfo)
-   *
-   * What it does:
-   * Process-exit teardown for the `EIntelTypeInfo` descriptor. The real
-   * ctor's atexit push at 0x00BC7B90 targets a plain destructor call, not a
-   * mangled symbol.
+   * Address: 0x00BF2010 (FUN_00BF2010, atexit destructor of the EIntelTypeInfo object)
    */
-  void cleanup_EIntelTypeInfo()
+  [[nodiscard]] moho::EIntelTypeInfo& AcquireEIntelTypeInfo()
   {
-    gEIntelTypeInfoStorage.Destroy();
+    static moho::EIntelTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -104,13 +96,11 @@ namespace moho
    * Address: 0x00BC7B90 (FUN_00BC7B90, register_EIntelTypeInfo)
    *
    * What it does:
-   * Constructs the static `EIntelTypeInfo` descriptor in place and installs
-   * its atexit teardown.
+   * Constructs the static `EIntelTypeInfo` descriptor.
    */
-  int register_EIntelTypeInfo()
+  void register_EIntelTypeInfo()
   {
-    (void)gEIntelTypeInfoStorage.Ensure();
-    return std::atexit(&cleanup_EIntelTypeInfo);
+    (void)AcquireEIntelTypeInfo();
   }
 } // namespace moho
 

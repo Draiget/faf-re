@@ -7262,7 +7262,7 @@ void Sim::Setup(LaunchInfoNew* const info)
 
   // Optional sound manager: only when a non-empty engine list is configured and
   // sound is not disabled.
-  if (sSoundConfiguration != nullptr && sSoundConfiguration->mEngines.mStart != nullptr &&
+  if (sSoundConfiguration && sSoundConfiguration->mEngines.mStart != nullptr &&
       sSoundConfiguration->mEngines.mFinish != sSoundConfiguration->mEngines.mStart &&
       sSoundConfiguration->mNoSound == 0) {
     auto* const newSoundManager = new CSimSoundManager(this);

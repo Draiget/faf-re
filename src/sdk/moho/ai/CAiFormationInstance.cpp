@@ -651,39 +651,6 @@ namespace
     , mSerSaveFunc(&SerializeSAssignedLocInfoSerializerCallback)
   {}
 
-  msvc8::string gRMapTypeEntIdSUnitOffsetInfoName;
-  bool gRMapTypeEntIdSUnitOffsetInfoNameCleanupRegistered = false;
-  msvc8::string gRBroadcasterEFormationdStatusTypeName;
-  bool gRBroadcasterEFormationdStatusTypeNameCleanupRegistered = false;
-  msvc8::string gRListenerEFormationdStatusTypeName;
-  bool gRListenerEFormationdStatusTypeNameCleanupRegistered = false;
-  msvc8::string gRMapTypeEntIdSCoordsVec2TypeName;
-  bool gRMapTypeEntIdSCoordsVec2TypeNameCleanupRegistered = false;
-
-  void cleanup_RMapTypeEntIdSUnitOffsetInfoName()
-  {
-    gRMapTypeEntIdSUnitOffsetInfoName = msvc8::string{};
-    gRMapTypeEntIdSUnitOffsetInfoNameCleanupRegistered = false;
-  }
-
-  void cleanup_RBroadcasterEFormationdStatusTypeName()
-  {
-    gRBroadcasterEFormationdStatusTypeName = msvc8::string{};
-    gRBroadcasterEFormationdStatusTypeNameCleanupRegistered = false;
-  }
-
-  void cleanup_RListenerEFormationdStatusTypeName()
-  {
-    gRListenerEFormationdStatusTypeName = msvc8::string{};
-    gRListenerEFormationdStatusTypeNameCleanupRegistered = false;
-  }
-
-  void cleanup_RMapTypeEntIdSCoordsVec2TypeName()
-  {
-    gRMapTypeEntIdSCoordsVec2TypeName = msvc8::string{};
-    gRMapTypeEntIdSCoordsVec2TypeNameCleanupRegistered = false;
-  }
-
   [[nodiscard]] gpg::RType* CachedEFormationdStatusType()
   {
     static gpg::RType* sType = nullptr;
@@ -976,29 +943,17 @@ namespace
 
   /**
    * Address: 0x0056B930 (FUN_0056B930, gpg::RMapType_EntId_SUnitOffsetInfo::GetName)
+   * Address: 0x00BF5BF0 (FUN_00BF5BF0, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily builds one reflected map type label from cached `EntId` and
-   * `SUnitOffsetInfo` RTTI names and returns stable string storage.
+   * Builds one reflected map type label once from the `EntId` and
+   * `SUnitOffsetInfo` RTTI names (value looked up first) and returns it.
    */
   const char* RMapType_EntId_SUnitOffsetInfo::GetName() const
   {
-    if (gRMapTypeEntIdSUnitOffsetInfoName.empty()) {
-      gpg::RType* const valueType = CachedSUnitOffsetInfoType();
-      gpg::RType* const keyType = CachedEntIdType();
-      const char* const keyName = keyType ? keyType->GetName() : "EntId";
-      const char* const valueName = valueType ? valueType->GetName() : "SUnitOffsetInfo";
-      gRMapTypeEntIdSUnitOffsetInfoName = gpg::STR_Printf(
-        "map<%s,%s>",
-        keyName ? keyName : "EntId",
-        valueName ? valueName : "SUnitOffsetInfo"
-      );
-      if (!gRMapTypeEntIdSUnitOffsetInfoNameCleanupRegistered) {
-        gRMapTypeEntIdSUnitOffsetInfoNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_RMapTypeEntIdSUnitOffsetInfoName);
-      }
-    }
-    return gRMapTypeEntIdSUnitOffsetInfoName.c_str();
+    static const msvc8::string sName =
+      gpg::STR_Printf("map<%s,%s>", CachedEntIdType()->GetName(), CachedSUnitOffsetInfoType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -1020,77 +975,45 @@ namespace
 
   /**
    * Address: 0x0056BB40 (FUN_0056BB40, Moho::RBroadcasterRType_EFormationdStatus::GetName)
+   * Address: 0x00BF5BC0 (FUN_00BF5BC0, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily builds one reflected `Broadcaster<...>` type name from cached
-   * `EFormationdStatus` RTTI and returns stable string storage.
+   * Builds one reflected `Broadcaster<...>` type name once from the
+   * `EFormationdStatus` RTTI name and returns it.
    */
   const char* RBroadcasterRType_EFormationdStatus::GetName() const
   {
-    if (gRBroadcasterEFormationdStatusTypeName.empty()) {
-      gpg::RType* const statusType = CachedEFormationdStatusType();
-      const char* const statusName = statusType ? statusType->GetName() : "EFormationdStatus";
-      gRBroadcasterEFormationdStatusTypeName = gpg::STR_Printf(
-        "Broadcaster<%s>",
-        statusName ? statusName : "EFormationdStatus"
-      );
-      if (!gRBroadcasterEFormationdStatusTypeNameCleanupRegistered) {
-        gRBroadcasterEFormationdStatusTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_RBroadcasterEFormationdStatusTypeName);
-      }
-    }
-    return gRBroadcasterEFormationdStatusTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", CachedEFormationdStatusType()->GetName());
+    return sName.c_str();
   }
 
   /**
    * Address: 0x0056BC00 (FUN_0056BC00, Moho::RListenerRType_EFormationdStatus::GetName)
+   * Address: 0x00BF5B90 (FUN_00BF5B90, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily builds one reflected `Listener<...>` type name from cached
-   * `EFormationdStatus` RTTI and returns stable string storage.
+   * Builds one reflected `Listener<...>` type name once from the
+   * `EFormationdStatus` RTTI name and returns it.
    */
   const char* RListenerRType_EFormationdStatus::GetName() const
   {
-    if (gRListenerEFormationdStatusTypeName.empty()) {
-      gpg::RType* const statusType = CachedEFormationdStatusType();
-      const char* const statusName = statusType ? statusType->GetName() : "EFormationdStatus";
-      gRListenerEFormationdStatusTypeName = gpg::STR_Printf(
-        "Listener<%s>",
-        statusName ? statusName : "EFormationdStatus"
-      );
-      if (!gRListenerEFormationdStatusTypeNameCleanupRegistered) {
-        gRListenerEFormationdStatusTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_RListenerEFormationdStatusTypeName);
-      }
-    }
-    return gRListenerEFormationdStatusTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", CachedEFormationdStatusType()->GetName());
+    return sName.c_str();
   }
 
   /**
    * Address: 0x0056C430 (FUN_0056C430, gpg::RMapType_EntId_SCoordsVec2::GetName)
+   * Address: 0x00BF5AD0 (FUN_00BF5AD0, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily builds one reflected map type label from cached `EntId` and
-   * `SCoordsVec2` RTTI names and returns stable string storage.
+   * Builds one reflected map type label once from the `EntId` and
+   * `SCoordsVec2` RTTI names (value looked up first) and returns it.
    */
   const char* RMapType_EntId_SCoordsVec2::GetName() const
   {
-    if (gRMapTypeEntIdSCoordsVec2TypeName.empty()) {
-      gpg::RType* const valueType = CachedSCoordsVec2Type();
-      gpg::RType* const keyType = CachedEntIdType();
-      const char* const keyName = keyType ? keyType->GetName() : "EntId";
-      const char* const valueName = valueType ? valueType->GetName() : "SCoordsVec2";
-      gRMapTypeEntIdSCoordsVec2TypeName = gpg::STR_Printf(
-        "map<%s,%s>",
-        keyName ? keyName : "EntId",
-        valueName ? valueName : "SCoordsVec2"
-      );
-      if (!gRMapTypeEntIdSCoordsVec2TypeNameCleanupRegistered) {
-        gRMapTypeEntIdSCoordsVec2TypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_RMapTypeEntIdSCoordsVec2TypeName);
-      }
-    }
-    return gRMapTypeEntIdSCoordsVec2TypeName.c_str();
+    static const msvc8::string sName =
+      gpg::STR_Printf("map<%s,%s>", CachedEntIdType()->GetName(), CachedSCoordsVec2Type()->GetName());
+    return sName.c_str();
   }
 
   /**

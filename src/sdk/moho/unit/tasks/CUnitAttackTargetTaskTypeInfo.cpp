@@ -2,7 +2,6 @@
 
 #include "moho/unit/tasks/CUnitAttackTargetTask.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -16,17 +15,13 @@ namespace
 {
   using TypeInfo = moho::CUnitAttackTargetTaskTypeInfo;
 
-  alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
-  bool gTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF9040 (FUN_00BF9040, atexit destructor of the CUnitAttackTargetTaskTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gTypeInfoConstructed) {
-      new (gTypeInfoStorage) TypeInfo();
-      gTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
@@ -64,16 +59,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::CUnitAttackTargetTask));
     }
     return cached;
-  }
-
-  void cleanup()
-  {
-    if (!gTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CUnitAttackTargetTaskTypeInfo();
-    gTypeInfoConstructed = false;
   }
 } // namespace
 
@@ -246,10 +231,9 @@ namespace moho
   /**
    * Address: 0x00BCF4A0 (FUN_00BCF4A0, register_CUnitAttackTargetTaskTypeInfo)
    */
-  int register_CUnitAttackTargetTaskTypeInfo()
+  void register_CUnitAttackTargetTaskTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup);
   }
 } // namespace moho
 

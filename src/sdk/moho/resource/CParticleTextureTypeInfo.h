@@ -55,7 +55,7 @@ namespace moho
    * What it does:
    * Materializes and startup-registers `CParticleTextureTypeInfo`.
    */
-  int register_CParticleTextureTypeInfo();
+  void register_CParticleTextureTypeInfo();
 
   static_assert(sizeof(CParticleTextureTypeInfo) == 0x64, "CParticleTextureTypeInfo size must be 0x64");
 } // namespace moho

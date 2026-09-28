@@ -37,20 +37,10 @@ namespace moho
   static_assert(sizeof(ProjectileTypeInfo) == 0x64, "ProjectileTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00BFD610 (FUN_00BFD610, cleanup_ProjectileTypeInfo)
-   *
-   * What it does:
-   * Releases reflected field/base vectors for the global `ProjectileTypeInfo`
-   * instance during process shutdown.
-   */
-  void cleanup_ProjectileTypeInfo();
-
-  /**
    * Address: 0x00BD63F0 (FUN_00BD63F0, register_ProjectileTypeInfo)
    *
    * What it does:
-   * Registers global `ProjectileTypeInfo` startup storage and schedules
-   * process-exit cleanup.
+   * Constructs the startup `ProjectileTypeInfo` object.
    */
   void register_ProjectileTypeInfo();
 } // namespace moho

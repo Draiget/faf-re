@@ -38,9 +38,9 @@ namespace moho
    * Address: 0x00BCEDD0 (FUN_00BCEDD0, register_SAttachPointTypeInfo)
    *
    * What it does:
-   * Registers `SAttachPoint` type-info and installs process-exit cleanup.
+   * Registers `SAttachPoint` type-info.
    */
-  int register_SAttachPointTypeInfo();
+  void register_SAttachPointTypeInfo();
 
   static_assert(sizeof(SAttachPointTypeInfo) == 0x64, "SAttachPointTypeInfo size must be 0x64");
 } // namespace moho

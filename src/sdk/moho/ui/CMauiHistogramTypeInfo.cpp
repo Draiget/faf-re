@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiHistogramTypeInfo) unsigned char gCMauiHistogramTypeInfoStorage[sizeof(CMauiHistogramTypeInfo)];
-  bool gCMauiHistogramTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02F50 (FUN_00C02F50, atexit destructor of the CMauiHistogramTypeInfo object)
+   */
   [[nodiscard]] CMauiHistogramTypeInfo& AcquireCMauiHistogramTypeInfo()
   {
-    if (!gCMauiHistogramTypeInfoConstructed) {
-      new (gCMauiHistogramTypeInfoStorage) CMauiHistogramTypeInfo();
-      gCMauiHistogramTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiHistogramTypeInfo*>(gCMauiHistogramTypeInfoStorage);
-  }
-
-  void cleanup_CMauiHistogramTypeInfo()
-  {
-    if (!gCMauiHistogramTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiHistogramTypeInfo*>(gCMauiHistogramTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiHistogramTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiHistogramTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CMauiHistogramTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDE7E0 (FUN_00BDE7E0, register_CMauiHistogramTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiHistogram` type-info object.
+ */
 void moho::register_CMauiHistogramTypeInfoStartup()
 {
   (void)AcquireCMauiHistogramTypeInfo();
-  (void)std::atexit(&cleanup_CMauiHistogramTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

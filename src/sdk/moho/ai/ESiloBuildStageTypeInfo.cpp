@@ -10,18 +10,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(ESiloBuildStageTypeInfo) unsigned char gESiloBuildStageTypeInfoStorage[sizeof(ESiloBuildStageTypeInfo)];
-  bool gESiloBuildStageTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF7E00 (FUN_00BF7E00, atexit destructor of the ESiloBuildStageTypeInfo object)
+   */
   [[nodiscard]] ESiloBuildStageTypeInfo* AcquireESiloBuildStageTypeInfo()
   {
-    if (!gESiloBuildStageTypeInfoConstructed) {
-      auto* const typeInfo = new (gESiloBuildStageTypeInfoStorage) ESiloBuildStageTypeInfo();
-      gpg::PreRegisterRType(typeid(ESiloBuildStage), typeInfo);
-      gESiloBuildStageTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<ESiloBuildStageTypeInfo*>(gESiloBuildStageTypeInfoStorage);
+    static ESiloBuildStageTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -32,23 +27,9 @@ namespace
    */
   [[nodiscard]] gpg::REnumType* preregister_ESiloBuildStageTypeInfo()
   {
-    return AcquireESiloBuildStageTypeInfo();
-  }
-
-  /**
-   * Address: 0x00BF7E00 (FUN_00BF7E00, sub_BF7E00)
-   *
-   * What it does:
-   * Tears down recovered static `ESiloBuildStageTypeInfo` storage.
-   */
-  void cleanup_ESiloBuildStageTypeInfo()
-  {
-    if (!gESiloBuildStageTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireESiloBuildStageTypeInfo()->~ESiloBuildStageTypeInfo();
-    gESiloBuildStageTypeInfoConstructed = false;
+    ESiloBuildStageTypeInfo* const typeInfo = AcquireESiloBuildStageTypeInfo();
+    gpg::PreRegisterRType(typeid(ESiloBuildStage), typeInfo);
+    return typeInfo;
   }
 
   // Address: 0x010AFBBC -- process-global `PrimitiveSerHelper<ESiloBuildStage,int>`
@@ -84,13 +65,11 @@ void ESiloBuildStageTypeInfo::Init()
  * Address: 0x00BCE030 (FUN_00BCE030, register_ESiloBuildStageTypeInfo)
  *
  * What it does:
- * Registers `ESiloBuildStage` enum type-info and installs process-exit
- * cleanup.
+ * Registers `ESiloBuildStage` enum type-info.
  */
-int moho::register_ESiloBuildStageTypeInfo()
+void moho::register_ESiloBuildStageTypeInfo()
 {
   (void)preregister_ESiloBuildStageTypeInfo();
-  return std::atexit(&cleanup_ESiloBuildStageTypeInfo);
 }
 
 namespace
@@ -99,7 +78,7 @@ namespace
   {
     ESiloBuildStageReflectionBootstrap()
     {
-      (void)moho::register_ESiloBuildStageTypeInfo();
+      moho::register_ESiloBuildStageTypeInfo();
     }
   };
 

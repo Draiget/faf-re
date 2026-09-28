@@ -154,10 +154,6 @@ namespace gpg
 
 namespace
 {
-  alignas(moho::DColPrimSphereTypeInfo) unsigned char
-    gDColPrimSphereTypeInfoStorage[sizeof(moho::DColPrimSphereTypeInfo)];
-  bool gDColPrimSphereTypeInfoConstructed = false;
-
   [[nodiscard]] gpg::RType* CachedDColPrimSpherePrimitiveType()
   {
     static gpg::RType* cached = nullptr;
@@ -204,16 +200,6 @@ namespace
     ref.mObj = object;
     ref.mType = CachedDColPrimSpherePrimitiveType();
     return ref;
-  }
-
-  void CleanupDColPrimSphereTypeInfoAtExit()
-  {
-    if (!gDColPrimSphereTypeInfoConstructed) {
-      return;
-    }
-
-    reinterpret_cast<moho::DColPrimSphereTypeInfo*>(gDColPrimSphereTypeInfoStorage)->~DColPrimSphereTypeInfo();
-    gDColPrimSphereTypeInfoConstructed = false;
   }
 
   /**
@@ -294,11 +280,6 @@ namespace
   void DeleteDColPrimSphere(void* const objectPtr)
   {
     ::operator delete(objectPtr);
-  }
-
-  void cleanup_DColPrimSphereTypeInfo_atexit()
-  {
-    CleanupDColPrimSphereTypeInfoAtExit();
   }
 } // namespace
 
@@ -450,6 +431,7 @@ namespace moho
 
   /**
    * Address: 0x004FE640 (FUN_004FE640, preregister_DColPrimSphereTypeInfo)
+   * Address: 0x00BF1A40 (FUN_00BF1A40, atexit destructor of the DColPrimSphereTypeInfo object)
    *
    * What it does:
    * Constructs/preregisters the startup-owned `DColPrimSphereTypeInfo`
@@ -457,27 +439,20 @@ namespace moho
    */
   [[nodiscard]] gpg::RType* preregister_DColPrimSphereTypeInfo()
   {
-    if (!gDColPrimSphereTypeInfoConstructed) {
-      new (gDColPrimSphereTypeInfoStorage) DColPrimSphereTypeInfo();
-      gDColPrimSphereTypeInfoConstructed = true;
-    }
-
-    auto* const type = reinterpret_cast<gpg::RType*>(gDColPrimSphereTypeInfoStorage);
-    gpg::PreRegisterRType(typeid(CColPrimitive<Wm3::Sphere3f>), type);
-    return type;
+    static DColPrimSphereTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(CColPrimitive<Wm3::Sphere3f>), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x00BC7550 (FUN_00BC7550, register_DColPrimSphereTypeInfo)
    *
    * What it does:
-   * Installs the startup-owned `DColPrimSphereTypeInfo` instance and its
-   * process-exit cleanup hook.
+   * Installs the startup-owned `DColPrimSphereTypeInfo` instance.
    */
-  int register_DColPrimSphereTypeInfo()
+  void register_DColPrimSphereTypeInfo()
   {
     (void)preregister_DColPrimSphereTypeInfo();
-    return std::atexit(&cleanup_DColPrimSphereTypeInfo_atexit);
   }
 } // namespace moho
 

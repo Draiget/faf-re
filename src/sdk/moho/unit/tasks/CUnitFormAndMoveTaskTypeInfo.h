@@ -119,9 +119,9 @@ namespace moho
    * Address: 0x00BD1090 (FUN_00BD1090, register_CUnitFormAndMoveTaskTypeInfo)
    *
    * What it does:
-   * Constructs the global type-info owner and schedules process-exit cleanup.
+   * Constructs the global type-info owner.
    */
-  int register_CUnitFormAndMoveTaskTypeInfo();
+  void register_CUnitFormAndMoveTaskTypeInfo();
 
   static_assert(sizeof(CUnitFormAndMoveTaskTypeInfo) == 0x64, "CUnitFormAndMoveTaskTypeInfo size must be 0x64");
 } // namespace moho

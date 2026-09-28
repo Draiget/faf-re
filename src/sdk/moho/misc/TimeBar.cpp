@@ -119,30 +119,23 @@ namespace moho
       return timer.ElapsedCycles();
     }
 
-    void InitializeTimeBarState()
-    {
-      gTimeBarState = new TimeBarState{};
-    }
-
-    void ShutdownTimeBarStateAtProcessExit()
-    {
-      delete gTimeBarState;
-      gTimeBarState = nullptr;
-    }
-
     /**
      * Address: 0x004E6D00 (FUN_004E6D00)
+     * Address: 0x00BF11A0 (FUN_00BF11A0, atexit destructor of InitializeTimeBarState's static state)
      *
      * What it does:
-     * Performs one-time time-bar runtime initialization and registers process
-     * exit teardown for the time-bar global state.
+     * Constructs the process-wide time-bar state once and publishes it through
+     * `gTimeBarState`.
      */
+    void InitializeTimeBarState()
+    {
+      static TimeBarState sState;
+      gTimeBarState = &sState;
+    }
+
     void EnsureTimeBarRuntimeInitialized()
     {
-      std::call_once(gTimeBarStateInitOnce, []() {
-        InitializeTimeBarState();
-        std::atexit(ShutdownTimeBarStateAtProcessExit);
-      });
+      std::call_once(gTimeBarStateInitOnce, &InitializeTimeBarState);
     }
 
     [[nodiscard]] TimeBarState& GetTimeBarState()

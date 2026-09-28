@@ -11,18 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(SAttachPointTypeInfo) unsigned char gSAttachPointTypeInfoStorage[sizeof(SAttachPointTypeInfo)];
-  bool gSAttachPointTypeInfoConstructed = false;
-  bool gSAttachPointTypeInfoPreregistered = false;
-
+  /**
+   * Address: 0x00BF8A30 (FUN_00BF8A30, atexit destructor of the SAttachPointTypeInfo object)
+   */
   [[nodiscard]] SAttachPointTypeInfo* AcquireSAttachPointTypeInfo()
   {
-    if (!gSAttachPointTypeInfoConstructed) {
-      new (gSAttachPointTypeInfoStorage) SAttachPointTypeInfo();
-      gSAttachPointTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<SAttachPointTypeInfo*>(gSAttachPointTypeInfoStorage);
+    static SAttachPointTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -34,23 +29,9 @@ namespace
    */
   [[nodiscard]] gpg::RType* preregister_SAttachPointTypeInfoStartup()
   {
-    auto* const typeInfo = AcquireSAttachPointTypeInfo();
-    if (!gSAttachPointTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(SAttachPoint), typeInfo);
-      gSAttachPointTypeInfoPreregistered = true;
-    }
+    SAttachPointTypeInfo* const typeInfo = AcquireSAttachPointTypeInfo();
+    gpg::PreRegisterRType(typeid(SAttachPoint), typeInfo);
     return typeInfo;
-  }
-
-  void cleanup_SAttachPointTypeInfo()
-  {
-    if (!gSAttachPointTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSAttachPointTypeInfo()->~SAttachPointTypeInfo();
-    gSAttachPointTypeInfoConstructed = false;
-    gSAttachPointTypeInfoPreregistered = false;
   }
 } // namespace
 
@@ -81,12 +62,11 @@ void SAttachPointTypeInfo::Init()
  * Address: 0x00BCEDD0 (FUN_00BCEDD0, register_SAttachPointTypeInfo)
  *
  * What it does:
- * Registers `SAttachPoint` type-info and installs process-exit cleanup.
+ * Registers `SAttachPoint` type-info.
  */
-int moho::register_SAttachPointTypeInfo()
+void moho::register_SAttachPointTypeInfo()
 {
   (void)preregister_SAttachPointTypeInfoStartup();
-  return std::atexit(&cleanup_SAttachPointTypeInfo);
 }
 
 

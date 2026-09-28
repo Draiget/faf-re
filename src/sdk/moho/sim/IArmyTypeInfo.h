@@ -43,8 +43,8 @@ namespace moho
    * Address: 0x00BC9B50 (FUN_00BC9B50, register_IArmyTypeInfo)
    *
    * What it does:
-   * Runs `IArmy` typeinfo preregistration and installs process-exit cleanup.
+   * Runs `IArmy` typeinfo preregistration.
    */
-  int register_IArmyTypeInfo();
+  void register_IArmyTypeInfo();
 } // namespace moho
 

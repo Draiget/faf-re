@@ -11,68 +11,31 @@ namespace
 {
   using TypeInfo = moho::SBlackListInfoTypeInfo;
 
-  alignas(TypeInfo) unsigned char gSBlackListInfoTypeInfoStorage[sizeof(TypeInfo)];
-  bool gSBlackListInfoTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFE620 (FUN_00BFE620, atexit destructor of the SBlackListInfoTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireSBlackListInfoTypeInfo()
   {
-    if (!gSBlackListInfoTypeInfoConstructed) {
-      new (gSBlackListInfoTypeInfoStorage) TypeInfo();
-      gSBlackListInfoTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gSBlackListInfoTypeInfoStorage);
-  }
-
-  [[nodiscard]] TypeInfo* PeekSBlackListInfoTypeInfo() noexcept
-  {
-    if (!gSBlackListInfoTypeInfoConstructed) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<TypeInfo*>(gSBlackListInfoTypeInfoStorage);
-  }
-
-  template <class TTypeInfo>
-  void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
-  {
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   /**
-   * Address: 0x00BFE620 (FUN_00BFE620, typeinfo cleanup)
+   * Address: 0x00BD8810 (FUN_00BD8810, register_SBlackListInfoTypeInfo)
    *
    * What it does:
-   * Releases cached `SBlackListInfoTypeInfo` field/base vector storage at exit.
+   * Forces `SBlackListInfoTypeInfo` construction.
    */
-  void cleanup_SBlackListInfoTypeInfo_00BFE620_Impl()
-  {
-    TypeInfo* const typeInfo = PeekSBlackListInfoTypeInfo();
-    if (!typeInfo) {
-      return;
-    }
-
-    ResetTypeInfoVectors(*typeInfo);
-  }
-
-  /**
-   * Address: 0x00BD8810 (FUN_00BD8810, startup registration + atexit cleanup)
-   *
-   * What it does:
-   * Forces `SBlackListInfoTypeInfo` construction and schedules exit cleanup.
-   */
-  int register_SBlackListInfoTypeInfo_00BD8810_Impl()
+  void register_SBlackListInfoTypeInfo()
   {
     (void)AcquireSBlackListInfoTypeInfo();
-    return std::atexit(&cleanup_SBlackListInfoTypeInfo_00BFE620_Impl);
   }
 
   struct SBlackListInfoTypeInfoBootstrap
   {
     SBlackListInfoTypeInfoBootstrap()
     {
-      (void)register_SBlackListInfoTypeInfo_00BD8810_Impl();
+      register_SBlackListInfoTypeInfo();
     }
   };
 

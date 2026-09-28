@@ -1,8 +1,5 @@
 #include "moho/render/d3d/RD3DTextureResourceTypeInfo.h"
 
-#include <cstddef>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "moho/render/d3d/RD3DTextureResource.h"
@@ -11,39 +8,13 @@
 
 namespace
 {
-  template <typename T>
-  struct TypeInfoStartupSlot
+  /**
+   * Address: 0x00BEF2B0 (FUN_00BEF2B0, atexit destructor of the RD3DTextureResourceTypeInfo object)
+   */
+  [[nodiscard]] moho::RD3DTextureResourceTypeInfo& AcquireRD3DTextureResourceTypeInfo()
   {
-    alignas(T) static std::byte storage[sizeof(T)];
-    static bool constructed;
-  };
-
-  template <typename T>
-  alignas(T) std::byte TypeInfoStartupSlot<T>::storage[sizeof(T)]{};
-
-  template <typename T>
-  bool TypeInfoStartupSlot<T>::constructed = false;
-
-  template <typename T>
-  [[nodiscard]] T& AccessTypeInfoStartupSlot() noexcept
-  {
-    auto* const slot = reinterpret_cast<T*>(TypeInfoStartupSlot<T>::storage);
-    if (!TypeInfoStartupSlot<T>::constructed) {
-      ::new (static_cast<void*>(slot)) T();
-      TypeInfoStartupSlot<T>::constructed = true;
-    }
-    return *slot;
-  }
-
-  template <typename T>
-  void DestroyTypeInfoStartupSlot() noexcept
-  {
-    if (!TypeInfoStartupSlot<T>::constructed) {
-      return;
-    }
-
-    AccessTypeInfoStartupSlot<T>().~T();
-    TypeInfoStartupSlot<T>::constructed = false;
+    static moho::RD3DTextureResourceTypeInfo sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -91,28 +62,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BEF2B0 (FUN_00BEF2B0, cleanup_RD3DTextureResourceTypeInfo)
-   *
-   * What it does:
-   * Destroys the process-global `RD3DTextureResourceTypeInfo` slot when
-   * startup registration constructed it.
-   */
-  void cleanup_RD3DTextureResourceTypeInfo()
-  {
-    DestroyTypeInfoStartupSlot<RD3DTextureResourceTypeInfo>();
-  }
-
-  /**
    * Address: 0x00BC41F0 (FUN_00BC41F0, register_RD3DTextureResourceTypeInfo)
    *
    * What it does:
-   * Constructs the process-global `RD3DTextureResourceTypeInfo` slot and
-   * registers process-exit teardown for that slot.
+   * Constructs the process-global `RD3DTextureResourceTypeInfo` object.
    */
   void register_RD3DTextureResourceTypeInfo()
   {
-    (void)AccessTypeInfoStartupSlot<RD3DTextureResourceTypeInfo>();
-    (void)std::atexit(&cleanup_RD3DTextureResourceTypeInfo);
+    (void)AcquireRD3DTextureResourceTypeInfo();
   }
 } // namespace moho
 

@@ -168,6 +168,13 @@ namespace
   constexpr const char* kConsoleStartupSCLuaDebuggerDescription = "Open Lua debugger window";
   constexpr const char* kConsoleStartupDoSimCommandDescription = "do a sim command.";
 
+  /**
+   * Address: 0x00BC3890 (FUN_00BC3890, dynamic initializer for `gSavedConsoleCommands`)
+   * Address: 0x00BEEAF0 (FUN_00BEEAF0, dynamic atexit destructor for `gSavedConsoleCommands`)
+   *
+   * What it does:
+   * Saved console-command history, newest first.
+   */
   msvc8::vector<msvc8::string> gSavedConsoleCommands;
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
@@ -3678,33 +3685,6 @@ moho::CScrLuaInitForm* moho::register_ConExecuteSave_LuaFuncDef()
   return func_ConExecuteSave_LuaFuncDef();
 }
 
-namespace
-{
-  /**
-   * Address: 0x00BEEAF0 (FUN_00BEEAF0, sub_BEEAF0)
-   *
-   * What it does:
-   * Destroys and releases saved-console-command string storage and resets
-   * vector pointer lanes to null.
-   */
-  void cleanup_console_command_buffer()
-  {
-    // Per-element ~string(), free, null the three lanes: VC8 _Tidy().
-    gSavedConsoleCommands = msvc8::vector<msvc8::string>{};
-  }
-} // namespace
-
-/**
- * Address: 0x00BC3890 (FUN_00BC3890, register_console_command_buffer)
- *
- * What it does:
- * Registers process-exit cleanup for saved console-command history storage.
- */
-void moho::register_console_command_buffer()
-{
-  (void)std::atexit(&cleanup_console_command_buffer);
-}
-
 /**
  * Address: 0x0041F9C0 (FUN_0041F9C0, sub_41F9C0)
  * Address: 0x1001ED50 (FUN_1001ED50)
@@ -4420,21 +4400,6 @@ namespace
     kConsoleStartupTestVarDescription,
     &moho::con_TestVarUByte
   );
-} // namespace
-
-namespace
-{
-  struct ConsoleStartupRegistrationsRender
-  {
-    ConsoleStartupRegistrationsRender()
-    {
-      moho::register_console_command_buffer();
-      moho::register_sConsoleOutputHandlers();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsRender gConsoleStartupRegistrationsRender;
-
 } // namespace
 
 namespace

@@ -27,5 +27,8 @@ namespace moho
 
   static_assert(sizeof(EReconFlagsTypeInfo) == 0x78, "EReconFlagsTypeInfo size must be 0x78");
 
+  /**
+   * Address: 0x00BCA910 (FUN_00BCA910, register_EReconFlagsTypeInfo)
+   */
   void register_EReconFlagsTypeInfoStartup();
 } // namespace moho

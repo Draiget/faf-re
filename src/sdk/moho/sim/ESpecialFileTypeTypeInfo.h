@@ -61,8 +61,7 @@ namespace moho
    * Address: 0x00BE8C00 (FUN_00BE8C00, register_ESpecialFileTypeTypeInfo)
    *
    * What it does:
-   * Runs preregistration and installs process-exit cleanup for
-   * `ESpecialFileTypeTypeInfo`.
+   * Runs preregistration for `ESpecialFileTypeTypeInfo`.
    */
-  int register_ESpecialFileTypeTypeInfo();
+  void register_ESpecialFileTypeTypeInfo();
 } // namespace moho

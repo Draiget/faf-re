@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CLuaWldUIProviderTypeInfo) unsigned char gCLuaWldUIProviderTypeInfoStorage[sizeof(CLuaWldUIProviderTypeInfo)];
-  bool gCLuaWldUIProviderTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C076B0 (FUN_00C076B0, atexit destructor of the CLuaWldUIProviderTypeInfo object)
+   */
   [[nodiscard]] CLuaWldUIProviderTypeInfo& AcquireCLuaWldUIProviderTypeInfo()
   {
-    if (!gCLuaWldUIProviderTypeInfoConstructed) {
-      new (gCLuaWldUIProviderTypeInfoStorage) CLuaWldUIProviderTypeInfo();
-      gCLuaWldUIProviderTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CLuaWldUIProviderTypeInfo*>(gCLuaWldUIProviderTypeInfoStorage);
-  }
-
-  void cleanup_CLuaWldUIProviderTypeInfo()
-  {
-    if (!gCLuaWldUIProviderTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CLuaWldUIProviderTypeInfo*>(gCLuaWldUIProviderTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CLuaWldUIProviderTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CLuaWldUIProviderTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CLuaWldUIProviderTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BE63D0 (FUN_00BE63D0, register_CLuaWldUIProviderTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CLuaWldUIProvider` type-info object.
+ */
 void moho::register_CLuaWldUIProviderTypeInfoStartup()
 {
   (void)AcquireCLuaWldUIProviderTypeInfo();
-  (void)std::atexit(&cleanup_CLuaWldUIProviderTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

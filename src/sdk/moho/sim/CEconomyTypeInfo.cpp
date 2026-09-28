@@ -11,24 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CEconomyTypeInfo) unsigned char gCEconomyTypeInfoStorage[sizeof(CEconomyTypeInfo)];
-  bool gCEconomyTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C021F0 (FUN_00C021F0, atexit destructor of the CEconomyTypeInfo object)
+   */
   [[nodiscard]] CEconomyTypeInfo& AcquireCEconomyTypeInfo()
   {
-    if (!gCEconomyTypeInfoConstructed) {
-      new (gCEconomyTypeInfoStorage) CEconomyTypeInfo();
-      gCEconomyTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CEconomyTypeInfo*>(gCEconomyTypeInfoStorage);
-  }
-
-  void cleanup_CEconomyTypeInfo()
-  {
-    if (!gCEconomyTypeInfoConstructed) return;
-    auto& ti = *reinterpret_cast<CEconomyTypeInfo*>(gCEconomyTypeInfoStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static CEconomyTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CEconomyTypeInfoBootstrap
@@ -76,7 +65,6 @@ void CEconomyTypeInfo::Init()
 void moho::register_CEconomyTypeInfoStartup()
 {
   (void)AcquireCEconomyTypeInfo();
-  (void)std::atexit(&cleanup_CEconomyTypeInfo);
 }
 
 

@@ -58,7 +58,7 @@ namespace moho
    * Address: 0x00BC7E40 (FUN_00BC7E40, register_SFootprintTypeInfo)
    *
    * What it does:
-   * Installs the static `SFootprintTypeInfo` instance and its shutdown hook.
+   * Constructs the static `SFootprintTypeInfo` instance, which preregisters it.
    */
   void register_SFootprintTypeInfo();
 

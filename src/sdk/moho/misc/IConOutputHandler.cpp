@@ -1,21 +1,16 @@
 #include "moho/misc/IConOutputHandler.h"
 
-#include <cstdlib>
-
 namespace
 {
-  moho::ConOutputHandlerList gConsoleOutputHandlers;
-
   /**
-   * Address: 0x00BEEB40 (FUN_00BEEB40, ??1sConsoleOutputHandlers@@QAE@@Z)
+   * Address: 0x00BC38A0 (FUN_00BC38A0, dynamic initializer for `gConsoleOutputHandlers`)
+   * Address: 0x00BEEB40 (FUN_00BEEB40, dynamic atexit destructor for `gConsoleOutputHandlers`)
    *
    * What it does:
-   * Executes process-exit teardown for the global console-output-handler list.
+   * Process-wide intrusive list head for console output handlers
+   * (`sConsoleOutputHandlers` in the binary).
    */
-  void cleanup_sConsoleOutputHandlers()
-  {
-    gConsoleOutputHandlers.clear();
-  }
+  moho::ConOutputHandlerList gConsoleOutputHandlers;
 }
 
 /**
@@ -35,15 +30,4 @@ moho::IConOutputHandler::IConOutputHandler() noexcept = default;
 moho::ConOutputHandlerList& moho::CON_GetOutputHandlers()
 {
   return gConsoleOutputHandlers;
-}
-
-/**
- * Address: 0x00BC38A0 (FUN_00BC38A0, register_sConsoleOutputHandlers)
- *
- * What it does:
- * Registers process-exit teardown for the global console-output-handler list.
- */
-void moho::register_sConsoleOutputHandlers()
-{
-  (void)std::atexit(&cleanup_sConsoleOutputHandlers);
 }

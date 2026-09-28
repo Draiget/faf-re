@@ -100,13 +100,5 @@ namespace moho
    */
   void register_CAiFormationDBImplTypeInfo();
 
-  /**
-   * Address: 0x00BCC210 (FUN_00BCC210, register_FastVectorIFormationInstanceTypeAtexit)
-   *
-   * What it does:
-   * Preregisters reflected `gpg::fastvector<IFormationInstance*>` type info
-   * and installs process-exit cleanup for that descriptor storage.
-   */
-  void register_FastVectorIFormationInstanceTypeAtexit();
 
 } // namespace moho

@@ -57,21 +57,12 @@ namespace moho
 
 
   /**
-   * Address: 0x00BFD540 (FUN_00BFD540, cleanup_EProjectileImpactEventTypeInfo)
-   *
-   * What it does:
-   * Tears down startup `EProjectileImpactEventTypeInfo` storage.
-   */
-  void cleanup_EProjectileImpactEventTypeInfo();
-
-  /**
    * Address: 0x00BD6330 (FUN_00BD6330, register_EProjectileImpactEventTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `EProjectileImpactEventTypeInfo` and installs
-   * process-exit cleanup.
+   * Constructs/preregisters `EProjectileImpactEventTypeInfo`.
    */
-  int register_EProjectileImpactEventTypeInfo();
+  void register_EProjectileImpactEventTypeInfo();
 
   /**
    * Address: 0x00BFD550 (FUN_00BFD550, cleanup_EProjectileImpactEventPrimitiveSerializer)
@@ -91,40 +82,22 @@ namespace moho
   int register_EProjectileImpactEventPrimitiveSerializer();
 
   /**
-   * Address: 0x00BFD7C0 (FUN_00BFD7C0, cleanup_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo)
-   *
-   * What it does:
-   * Tears down startup type-info storage for
-   * `ManyToOneBroadcaster<EProjectileImpactEvent>`.
-   */
-  void cleanup_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo();
-
-  /**
    * Address: 0x00BD64C0 (FUN_00BD64C0, register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo)
    *
    * What it does:
    * Constructs/preregisters startup type-info for
-   * `ManyToOneBroadcaster<EProjectileImpactEvent>` and installs exit cleanup.
+   * `ManyToOneBroadcaster<EProjectileImpactEvent>`.
    */
-  int register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo();
-
-  /**
-   * Address: 0x00BFD760 (FUN_00BFD760, cleanup_ManyToOneListener_EProjectileImpactEvent_TypeInfo)
-   *
-   * What it does:
-   * Tears down startup type-info storage for
-   * `ManyToOneListener<EProjectileImpactEvent>`.
-   */
-  void cleanup_ManyToOneListener_EProjectileImpactEvent_TypeInfo();
+  void register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo();
 
   /**
    * Address: 0x00BD64E0 (FUN_00BD64E0, register_ManyToOneListener_EProjectileImpactEvent_TypeInfo)
    *
    * What it does:
    * Constructs/preregisters startup type-info for
-   * `ManyToOneListener<EProjectileImpactEvent>` and installs exit cleanup.
+   * `ManyToOneListener<EProjectileImpactEvent>`.
    */
-  int register_ManyToOneListener_EProjectileImpactEvent_TypeInfo();
+  void register_ManyToOneListener_EProjectileImpactEvent_TypeInfo();
 
   /**
    * Address: 0x006A19C0 (FUN_006A19C0, cfunc_ProjectileSetNewTargetGround)

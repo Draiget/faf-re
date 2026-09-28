@@ -88,10 +88,9 @@ namespace moho
    * Address: 0x00BD8B90 (FUN_00BD8B90, sub_BD8B90)
    *
    * What it does:
-   * Registers `vector<EntityCategorySet>` reflection and installs
-   * process-exit teardown via `atexit`.
+   * Registers `vector<EntityCategorySet>` reflection.
    */
-  int register_EntityCategorySetVectorType_AtExit();
+  void register_EntityCategorySetVectorType_AtExit();
 
   /**
    * Address: 0x006DB010 (FUN_006DB010, msvc8::vector<EntityCategorySet>::push_back)

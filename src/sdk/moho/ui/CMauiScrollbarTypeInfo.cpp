@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiScrollbarTypeInfo) unsigned char gCMauiScrollbarTypeInfoStorage[sizeof(CMauiScrollbarTypeInfo)];
-  bool gCMauiScrollbarTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C031B0 (FUN_00C031B0, atexit destructor of the CMauiScrollbarTypeInfo object)
+   */
   [[nodiscard]] CMauiScrollbarTypeInfo& AcquireCMauiScrollbarTypeInfo()
   {
-    if (!gCMauiScrollbarTypeInfoConstructed) {
-      new (gCMauiScrollbarTypeInfoStorage) CMauiScrollbarTypeInfo();
-      gCMauiScrollbarTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiScrollbarTypeInfo*>(gCMauiScrollbarTypeInfoStorage);
-  }
-
-  void cleanup_CMauiScrollbarTypeInfo()
-  {
-    if (!gCMauiScrollbarTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiScrollbarTypeInfo*>(gCMauiScrollbarTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiScrollbarTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiScrollbarTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CMauiScrollbarTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDEEA0 (FUN_00BDEEA0, register_CMauiScrollbarTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiScrollbar` type-info object.
+ */
 void moho::register_CMauiScrollbarTypeInfoStartup()
 {
   (void)AcquireCMauiScrollbarTypeInfo();
-  (void)std::atexit(&cleanup_CMauiScrollbarTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

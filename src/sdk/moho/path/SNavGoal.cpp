@@ -13,12 +13,13 @@
 
 namespace
 {
-  alignas(moho::SNavGoalTypeInfo) unsigned char gSNavGoalTypeInfoStorage[sizeof(moho::SNavGoalTypeInfo)];
-  bool gSNavGoalTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::SNavGoalTypeInfo& SNavGoalTypeInfoStorageRef() noexcept
+  /**
+   * Address: 0x00BF21D0 (FUN_00BF21D0, atexit destructor of the SNavGoalTypeInfo object)
+   */
+  [[nodiscard]] moho::SNavGoalTypeInfo* AcquireSNavGoalTypeInfo()
   {
-    return *reinterpret_cast<moho::SNavGoalTypeInfo*>(gSNavGoalTypeInfoStorage);
+    static moho::SNavGoalTypeInfo sInstance;
+    return &sInstance;
   }
 
   // Address: 0x00BC7DA0 (FUN_00BC7DA0, register_SNavGoalSerializer) -- MSVC's
@@ -67,16 +68,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::ELayer));
     }
     return cached;
-  }
-
-  void CleanupSNavGoalTypeInfoAtExit()
-  {
-    if (!gSNavGoalTypeInfoConstructed) {
-      return;
-    }
-
-    SNavGoalTypeInfoStorageRef().~SNavGoalTypeInfo();
-    gSNavGoalTypeInfoConstructed = false;
   }
 } // namespace
 
@@ -150,7 +141,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF21D0 (FUN_00BF21D0, Moho::SNavGoalTypeInfo::dtr)
+   * Address: 0x0050C0C0 (FUN_0050C0C0, Moho::SNavGoalTypeInfo::dtr)
    *
    * What it does:
    * Releases the reflected field and base vector storage.
@@ -185,16 +176,11 @@ namespace moho
    * Address: 0x00BC7D80 (FUN_00BC7D80, register_SNavGoalTypeInfo)
    *
    * What it does:
-   * Installs the static `SNavGoalTypeInfo` instance and its shutdown hook.
+   * Constructs the static `SNavGoalTypeInfo` instance, which preregisters it.
    */
   void register_SNavGoalTypeInfo()
   {
-    if (!gSNavGoalTypeInfoConstructed) {
-      new (gSNavGoalTypeInfoStorage) SNavGoalTypeInfo();
-      gSNavGoalTypeInfoConstructed = true;
-    }
-
-    (void)std::atexit(&CleanupSNavGoalTypeInfoAtExit);
+    (void)AcquireSNavGoalTypeInfo();
   }
 
   /**

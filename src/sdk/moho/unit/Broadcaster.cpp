@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -24,9 +23,6 @@ namespace gpg
 
 namespace
 {
-  void cleanup_RBroadcasterRType_ECommandEvent_Name();
-  void cleanup_RListenerRType_ECommandEvent_Name();
-
   gpg::RType* gECommandEventTypeCache = nullptr;
 
   /**
@@ -43,81 +39,18 @@ namespace
     return gECommandEventTypeCache;
   }
 
-  [[nodiscard]] gpg::RType* CachedECommandEventType()
-  {
-    gpg::RType* cached = ResolveECommandEventTypeCachePrimary();
-    if (!cached) {
-      cached = gpg::REF_FindTypeNamed("ECommandEvent");
-      gECommandEventTypeCache = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] msvc8::string& RBroadcasterECommandEventTypeName()
-  {
-    static msvc8::string value;
-    return value;
-  }
-
-  [[nodiscard]] bool& RBroadcasterECommandEventTypeNameCleanupRegistered()
-  {
-    static bool value = false;
-    return value;
-  }
-
-  [[nodiscard]] msvc8::string& RListenerECommandEventTypeName()
-  {
-    static msvc8::string value;
-    return value;
-  }
-
-  [[nodiscard]] bool& RListenerECommandEventTypeNameCleanupRegistered()
-  {
-    static bool value = false;
-    return value;
-  }
-
   gpg::RType* gEUnitCommandQueueStatusTypeCache = nullptr;
 
   // Shared reflected-type cache for the bare `EUnitCommandQueueStatus` enum,
   // read/written by both GetName() overrides below (confirmed against
   // FUN_006F8170 and FUN_006F8230's disassembly: both reference the same
-  // binary global slot, unlike the ECommandEvent pair above which resolves
-  // through a two-tier primary/REF_FindTypeNamed fallback -- no such fallback
-  // is present here, so this stays single-tier to match.
+  // binary global slot).
   [[nodiscard]] gpg::RType* CachedEUnitCommandQueueStatusType()
   {
     if (!gEUnitCommandQueueStatusTypeCache) {
       gEUnitCommandQueueStatusTypeCache = gpg::LookupRType(typeid(moho::EUnitCommandQueueStatus));
     }
     return gEUnitCommandQueueStatusTypeCache;
-  }
-
-  msvc8::string gRBroadcasterEUnitCommandQueueStatusName;
-  msvc8::string gRListenerEUnitCommandQueueStatusName;
-
-  /**
-   * Address: 0x00BFEFD0 (FUN_00BFEFD0, RBroadcasterRType_EUnitCommandQueueStatus name-cache cleanup)
-   *
-   * What it does:
-   * Releases the cached lexical name for `Broadcaster<EUnitCommandQueueStatus>`
-   * during process teardown.
-   */
-  void cleanup_RBroadcasterRType_EUnitCommandQueueStatus_Name()
-  {
-    gRBroadcasterEUnitCommandQueueStatusName = msvc8::string{};
-  }
-
-  /**
-   * Address: 0x00BFEFA0 (FUN_00BFEFA0, RListenerRType_EUnitCommandQueueStatus name-cache cleanup)
-   *
-   * What it does:
-   * Releases the cached lexical name for `Listener<EUnitCommandQueueStatus>`
-   * during process teardown.
-   */
-  void cleanup_RListenerRType_EUnitCommandQueueStatus_Name()
-  {
-    gRListenerEUnitCommandQueueStatusName = msvc8::string{};
   }
 
   class RBroadcasterRType_ECommandEvent final : public gpg::RType
@@ -147,26 +80,17 @@ namespace
 
     /**
      * Address: 0x006E97D0 (FUN_006E97D0, Moho::RBroadcasterRType_ECommandEvent::GetName)
+     * Address: 0x00BFECD0 (FUN_00BFECD0, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Lazily resolves the reflected `ECommandEvent` type name, formats the
-     * broadcaster wrapper name, and caches the result for reuse.
+     * Builds `Broadcaster<ECommandEvent>` once from the reflected
+     * `ECommandEvent` descriptor's name and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      auto& cachedName = RBroadcasterECommandEventTypeName();
-      auto& cleanupRegistered = RBroadcasterECommandEventTypeNameCleanupRegistered();
-      if (cachedName.empty()) {
-        gpg::RType* const eventType = CachedECommandEventType();
-        const char* const eventTypeName = eventType ? eventType->GetName() : "ECommandEvent";
-        cachedName = gpg::STR_Printf("Broadcaster<%s>", eventTypeName ? eventTypeName : "ECommandEvent");
-        if (!cleanupRegistered) {
-          cleanupRegistered = true;
-          (void)std::atexit(&cleanup_RBroadcasterRType_ECommandEvent_Name);
-        }
-      }
-
-      return cachedName.c_str();
+      static const msvc8::string sName =
+        gpg::STR_Printf("Broadcaster<%s>", ResolveECommandEventTypeCachePrimary()->GetName());
+      return sName.c_str();
     }
 
     void Init() override
@@ -203,19 +127,17 @@ namespace
 
     /**
      * Address: 0x006F8170 (FUN_006F8170, Moho::RBroadcasterRType_EUnitCommandQueueStatus::GetName)
+     * Address: 0x00BFEFD0 (FUN_00BFEFD0, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Lazily resolves the reflected `EUnitCommandQueueStatus` type name,
-     * formats the broadcaster wrapper name, and caches the result for reuse.
+     * Builds `Broadcaster<EUnitCommandQueueStatus>` once from the reflected
+     * `EUnitCommandQueueStatus` descriptor's name and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if (gRBroadcasterEUnitCommandQueueStatusName.empty()) {
-        gRBroadcasterEUnitCommandQueueStatusName =
-          gpg::STR_Printf("Broadcaster<%s>", CachedEUnitCommandQueueStatusType()->GetName());
-        (void)std::atexit(&cleanup_RBroadcasterRType_EUnitCommandQueueStatus_Name);
-      }
-      return gRBroadcasterEUnitCommandQueueStatusName.c_str();
+      static const msvc8::string sName =
+        gpg::STR_Printf("Broadcaster<%s>", CachedEUnitCommandQueueStatusType()->GetName());
+      return sName.c_str();
     }
 
     /**
@@ -241,10 +163,11 @@ namespace
   public:
     /**
      * Address: 0x005F43B0 (FUN_005F43B0, Moho::RListenerRType_ECommandEvent::GetName)
+     * Address: 0x00BF90D0 (FUN_00BF90D0, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Lazily resolves the reflected `ECommandEvent` type name, formats the
-     * listener wrapper name, and caches the result for reuse.
+     * Builds `Listener<ECommandEvent>` once from the reflected
+     * `ECommandEvent` descriptor's name and returns it.
      */
     [[nodiscard]] const char* GetName() const override;
 
@@ -269,19 +192,17 @@ namespace
 
     /**
      * Address: 0x006F8230 (FUN_006F8230, Moho::RListenerRType_EUnitCommandQueueStatus::GetName)
+     * Address: 0x00BFEFA0 (FUN_00BFEFA0, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Lazily resolves the reflected `EUnitCommandQueueStatus` type name,
-     * formats the listener wrapper name, and caches the result for reuse.
+     * Builds `Listener<EUnitCommandQueueStatus>` once from the reflected
+     * `EUnitCommandQueueStatus` descriptor's name and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if (gRListenerEUnitCommandQueueStatusName.empty()) {
-        gRListenerEUnitCommandQueueStatusName =
-          gpg::STR_Printf("Listener<%s>", CachedEUnitCommandQueueStatusType()->GetName());
-        (void)std::atexit(&cleanup_RListenerRType_EUnitCommandQueueStatus_Name);
-      }
-      return gRListenerEUnitCommandQueueStatusName.c_str();
+      static const msvc8::string sName =
+        gpg::STR_Printf("Listener<%s>", CachedEUnitCommandQueueStatusType()->GetName());
+      return sName.c_str();
     }
 
     void Init() override
@@ -334,24 +255,36 @@ namespace
    */
   RListenerRType_EUnitCommandQueueStatus::~RListenerRType_EUnitCommandQueueStatus() = default;
 
+  /**
+   * Address: 0x00BFF060 (FUN_00BFF060, atexit destructor of the Broadcaster<EUnitCommandQueueStatus> type object)
+   */
   [[nodiscard]] RBroadcasterRType_EUnitCommandQueueStatus& BroadcasterStatusRType()
   {
     static RBroadcasterRType_EUnitCommandQueueStatus sType;
     return sType;
   }
 
+  /**
+   * Address: 0x00BFEE20 (FUN_00BFEE20, atexit destructor of the Broadcaster<ECommandEvent> type object)
+   */
   [[nodiscard]] RBroadcasterRType_ECommandEvent& BroadcasterCommandEventRType()
   {
     static RBroadcasterRType_ECommandEvent sType;
     return sType;
   }
 
+  /**
+   * Address: 0x00BFF000 (FUN_00BFF000, atexit destructor of the Listener<EUnitCommandQueueStatus> type object)
+   */
   [[nodiscard]] RListenerRType_EUnitCommandQueueStatus& ListenerStatusRType()
   {
     static RListenerRType_EUnitCommandQueueStatus sType;
     return sType;
   }
 
+  /**
+   * Address: 0x00BF9100 (FUN_00BF9100, atexit destructor of the Listener<ECommandEvent> type object)
+   */
   [[nodiscard]] RListenerRType_ECommandEvent& ListenerCommandEventRType()
   {
     static RListenerRType_ECommandEvent sType;
@@ -456,97 +389,19 @@ namespace
     }
   }
 
-  template <class TType>
-  void ResetRTypeFieldAndBaseVectors(TType& type) noexcept
-  {
-    type.fields_ = msvc8::vector<gpg::RField>{};
-    type.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  /**
-   * Address: 0x00BFF060 (FUN_00BFF060, sub_BFF060)
-   *
-   * What it does:
-   * Releases broadcaster status-type reflection field/base vector storage and
-   * resets both vectors to empty state for process teardown.
-   */
-  void cleanup_Broadcaster_EUnitCommandQueueStatus_RType()
-  {
-    ResetRTypeFieldAndBaseVectors(BroadcasterStatusRType());
-  }
-
-  /**
-   * Address: 0x00BFEE20 (FUN_00BFEE20, sub_BFEE20)
-   *
-   * What it does:
-   * Releases broadcaster command-event reflection field/base vector storage and
-   * resets both vectors to empty state for process teardown.
-   */
-  void cleanup_Broadcaster_ECommandEvent_RType()
-  {
-    ResetRTypeFieldAndBaseVectors(BroadcasterCommandEventRType());
-  }
-
-  /**
-   * Address: 0x00BFECD0 (FUN_00BFECD0, sub_BFECD0)
-   *
-   * What it does:
-   * Releases the cached lexical name for `Broadcaster<ECommandEvent>` during
-   * process teardown.
-   */
-  void cleanup_RBroadcasterRType_ECommandEvent_Name()
-  {
-    RBroadcasterECommandEventTypeName() = msvc8::string{};
-    RBroadcasterECommandEventTypeNameCleanupRegistered() = false;
-  }
-
-  void cleanup_RListenerRType_ECommandEvent_Name()
-  {
-    RListenerECommandEventTypeName() = msvc8::string{};
-    RListenerECommandEventTypeNameCleanupRegistered() = false;
-  }
-
   /**
    * Address: 0x005F43B0 (FUN_005F43B0, Moho::RListenerRType_ECommandEvent::GetName)
+   * Address: 0x00BF90D0 (FUN_00BF90D0, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily resolves the reflected `ECommandEvent` type name, formats the
-   * listener wrapper name, and caches the result for reuse.
+   * Builds `Listener<ECommandEvent>` once from the reflected
+   * `ECommandEvent` descriptor's name and returns it.
    */
   const char* RListenerRType_ECommandEvent::GetName() const
   {
-    auto& cachedName = RListenerECommandEventTypeName();
-    auto& cleanupRegistered = RListenerECommandEventTypeNameCleanupRegistered();
-    if (cachedName.empty()) {
-      gpg::RType* const eventType = CachedECommandEventType();
-      const char* const eventTypeName = eventType ? eventType->GetName() : "ECommandEvent";
-      cachedName = gpg::STR_Printf("Listener<%s>", eventTypeName ? eventTypeName : "ECommandEvent");
-      if (!cleanupRegistered) {
-        cleanupRegistered = true;
-        (void)std::atexit(&cleanup_RListenerRType_ECommandEvent_Name);
-      }
-    }
-
-    return cachedName.c_str();
-  }
-
-  /**
-   * Address: 0x00BFF000 (FUN_00BFF000, sub_BFF000)
-   *
-   * What it does:
-   * Releases listener status-type reflection field/base vector storage and
-   * resets both vectors to empty state for process teardown.
-   */
-  void cleanup_Listener_EUnitCommandQueueStatus_RType()
-  {
-    ResetRTypeFieldAndBaseVectors(ListenerStatusRType());
-  }
-
-  template <gpg::RType* (*InitFunc)(), void (*CleanupFunc)()>
-  int RegisterRTypeAndInstallAtexit() noexcept
-  {
-    (void)InitFunc();
-    return std::atexit(CleanupFunc);
+    static const msvc8::string sName =
+      gpg::STR_Printf("Listener<%s>", ResolveECommandEventTypeCachePrimary()->GetName());
+    return sName.c_str();
   }
 } // namespace
 
@@ -584,12 +439,11 @@ namespace moho
    * Address: 0x00BD8FD0 (FUN_00BD8FD0, sub_BD8FD0)
    *
    * What it does:
-   * Runs broadcaster command-event type registration and queues its shutdown
-   * cleanup through `atexit`.
+   * Runs broadcaster command-event type registration.
    */
-  int register_Broadcaster_ECommandEvent_RType_AtExit()
+  void register_Broadcaster_ECommandEvent_RType_AtExit()
   {
-    return RegisterRTypeAndInstallAtexit<&register_Broadcaster_ECommandEvent_RType, &cleanup_Broadcaster_ECommandEvent_RType>();
+    (void)register_Broadcaster_ECommandEvent_RType();
   }
 
   /**
@@ -624,28 +478,22 @@ namespace moho
    * Address: 0x00BD95D0 (FUN_00BD95D0, sub_BD95D0)
    *
    * What it does:
-   * Runs broadcaster status-type registration and queues its shutdown cleanup
-   * through `atexit`.
+   * Runs broadcaster status-type registration.
    */
-  int register_Broadcaster_EUnitCommandQueueStatus_RType_AtExit()
+  void register_Broadcaster_EUnitCommandQueueStatus_RType_AtExit()
   {
-    return RegisterRTypeAndInstallAtexit<
-      &register_Broadcaster_EUnitCommandQueueStatus_RType,
-      &cleanup_Broadcaster_EUnitCommandQueueStatus_RType>();
+    (void)register_Broadcaster_EUnitCommandQueueStatus_RType();
   }
 
   /**
    * Address: 0x00BD95F0 (FUN_00BD95F0, sub_BD95F0)
    *
    * What it does:
-   * Runs listener status-type registration and queues its shutdown cleanup
-   * through `atexit`.
+   * Runs listener status-type registration.
    */
-  int register_Listener_EUnitCommandQueueStatus_RType_AtExit()
+  void register_Listener_EUnitCommandQueueStatus_RType_AtExit()
   {
-    return RegisterRTypeAndInstallAtexit<
-      &register_Listener_EUnitCommandQueueStatus_RType,
-      &cleanup_Listener_EUnitCommandQueueStatus_RType>();
+    (void)register_Listener_EUnitCommandQueueStatus_RType();
   }
 } // namespace moho
 

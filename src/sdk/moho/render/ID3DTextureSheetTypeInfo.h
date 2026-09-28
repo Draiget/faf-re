@@ -49,19 +49,9 @@ namespace moho
    * Address: 0x00BC41D0 (FUN_00BC41D0, register_ID3DTextureSheetTypeInfo)
    *
    * What it does:
-   * Constructs the process-global `ID3DTextureSheetTypeInfo` slot and
-   * registers process-exit teardown for that slot.
+   * Constructs the process-global `ID3DTextureSheetTypeInfo` object.
    */
   void register_ID3DTextureSheetTypeInfo();
-
-  /**
-   * Address: 0x00BEF250 (FUN_00BEF250, cleanup_ID3DTextureSheetTypeInfo)
-   *
-   * What it does:
-   * Destroys the process-global `ID3DTextureSheetTypeInfo` slot when
-   * startup registration constructed it.
-   */
-  void cleanup_ID3DTextureSheetTypeInfo();
 
   static_assert(sizeof(ID3DTextureSheetTypeInfo) == 0x64, "ID3DTextureSheetTypeInfo size must be 0x64");
 } // namespace moho

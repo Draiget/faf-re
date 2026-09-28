@@ -12,33 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(EAiAttackerEventTypeInfo) unsigned char gEAiAttackerEventTypeInfoStorage[sizeof(EAiAttackerEventTypeInfo)];
-  bool gEAiAttackerEventTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF8240 (FUN_00BF8240, atexit destructor of the EAiAttackerEventTypeInfo object)
+   */
   [[nodiscard]] EAiAttackerEventTypeInfo* AcquireEAiAttackerEventTypeInfo()
   {
-    if (!gEAiAttackerEventTypeInfoConstructed) {
-      auto* const typeInfo = new (gEAiAttackerEventTypeInfoStorage) EAiAttackerEventTypeInfo();
-      gEAiAttackerEventTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<EAiAttackerEventTypeInfo*>(gEAiAttackerEventTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF8240 (FUN_00BF8240, sub_BF8240)
-   *
-   * What it does:
-   * Tears down recovered static `EAiAttackerEventTypeInfo` storage.
-   */
-  void cleanup_EAiAttackerEventTypeInfo()
-  {
-    if (!gEAiAttackerEventTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEAiAttackerEventTypeInfo()->~EAiAttackerEventTypeInfo();
-    gEAiAttackerEventTypeInfoConstructed = false;
+    static EAiAttackerEventTypeInfo sInstance;
+    return &sInstance;
   }
 
   // Address: 0x010B0304 -- process-global `PrimitiveSerHelper<EAiAttackerEvent,int>`
@@ -106,13 +86,11 @@ void EAiAttackerEventTypeInfo::Init()
  * Address: 0x00BCE750 (FUN_00BCE750, sub_BCE750)
  *
  * What it does:
- * Registers `EAiAttackerEvent` enum type-info and installs process-exit
- * cleanup.
+ * Registers `EAiAttackerEvent` enum type-info.
  */
-int moho::register_EAiAttackerEventTypeInfo()
+void moho::register_EAiAttackerEventTypeInfo()
 {
   (void)AcquireEAiAttackerEventTypeInfo();
-  return std::atexit(&cleanup_EAiAttackerEventTypeInfo);
 }
 
 

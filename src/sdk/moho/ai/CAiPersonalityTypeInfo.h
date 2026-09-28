@@ -42,8 +42,7 @@ namespace moho
    * Address: 0x00BCD600 (FUN_00BCD600, register_CAiPersonalityTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters CAiPersonality RTTI storage and installs
-   * process-exit cleanup.
+   * Constructs/preregisters CAiPersonality RTTI storage.
    */
-  int register_CAiPersonalityTypeInfo();
+  void register_CAiPersonalityTypeInfo();
 } // namespace moho

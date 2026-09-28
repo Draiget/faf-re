@@ -68,27 +68,13 @@ namespace moho
 
 namespace
 {
-  alignas(moho::EMauiEventTypeTypeInfo) unsigned char
-    gEMauiEventTypeTypeInfoStorage[sizeof(moho::EMauiEventTypeTypeInfo)]{};
-  bool gEMauiEventTypeTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::EMauiEventTypeTypeInfo& GetEMauiEventTypeTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::EMauiEventTypeTypeInfo*>(gEMauiEventTypeTypeInfoStorage);
-  }
-
-  void cleanup_EMauiEventTypeTypeInfo()
-  {
-    if (gEMauiEventTypeTypeInfoConstructed) {
-      GetEMauiEventTypeTypeInfo().~EMauiEventTypeTypeInfo();
-      gEMauiEventTypeTypeInfoConstructed = false;
-    }
-  }
-
   /**
+   * Address: 0x00C02E20 (FUN_00C02E20, atexit destructor of the EMauiEventTypeTypeInfo object)
+   *
+   * What it does:
    * Constructs the static `EMauiEventType` enum descriptor. The constructor
-   * pre-registers the RTTI mapping itself, so placement-constructing it here is
-   * the whole registration.
+   * pre-registers the RTTI mapping itself, so constructing it here is the
+   * whole registration.
    *
    * Every MAUI event delivered to a control passes through
    * `CreateLuaEventObject`, which reflects the event type to build the Lua
@@ -98,23 +84,24 @@ namespace
    */
   gpg::REnumType* construct_EMauiEventTypeTypeInfo()
   {
-    if (!gEMauiEventTypeTypeInfoConstructed) {
-      new (gEMauiEventTypeTypeInfoStorage) moho::EMauiEventTypeTypeInfo();
-      gEMauiEventTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(&GetEMauiEventTypeTypeInfo());
+    static moho::EMauiEventTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
-  int register_EMauiEventTypeTypeInfo()
+  /**
+   * Address: 0x00BDE520 (FUN_00BDE520, register_EMauiEventTypeTypeInfo)
+   *
+   * What it does:
+   * Constructs the `EMauiEventType` enum type-info object.
+   */
+  void register_EMauiEventTypeTypeInfo()
   {
     (void)construct_EMauiEventTypeTypeInfo();
-    return std::atexit(&cleanup_EMauiEventTypeTypeInfo);
   }
 
   struct EMauiEventTypeTypeInfoBootstrap
   {
-    EMauiEventTypeTypeInfoBootstrap() { (void)register_EMauiEventTypeTypeInfo(); }
+    EMauiEventTypeTypeInfoBootstrap() { register_EMauiEventTypeTypeInfo(); }
   };
 
   EMauiEventTypeTypeInfoBootstrap gEMauiEventTypeTypeInfoBootstrap;

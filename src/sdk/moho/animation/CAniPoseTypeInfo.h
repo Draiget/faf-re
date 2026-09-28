@@ -99,7 +99,7 @@ namespace moho
    * Address: 0x00BC9940 (FUN_00BC9940, register_CAniPoseTypeInfo)
    *
    * What it does:
-   * Ensures startup construction of `CAniPoseTypeInfo` and installs process-exit cleanup.
+   * Ensures startup construction of `CAniPoseTypeInfo`.
    */
   void register_CAniPoseTypeInfoStartup();
 } // namespace moho

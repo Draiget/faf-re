@@ -66,20 +66,12 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BF9770 (FUN_00BF9770, cleanup_CUnitCallAirStagingPlatformTypeInfo)
-   *
-   * What it does:
-   * Releases reflected base/field buffers of the global type-info owner.
-   */
-  void cleanup_CUnitCallAirStagingPlatformTypeInfo();
-
-  /**
    * Address: 0x00BCFD60 (FUN_00BCFD60, register_CUnitCallAirStagingPlatformTypeInfo)
    *
    * What it does:
-   * Constructs the global type-info owner and schedules process-exit cleanup.
+   * Constructs the global type-info owner.
    */
-  int register_CUnitCallAirStagingPlatformTypeInfo();
+  void register_CUnitCallAirStagingPlatformTypeInfo();
 
   static_assert(
     sizeof(CUnitCallAirStagingPlatformTypeInfo) == 0x64, "CUnitCallAirStagingPlatformTypeInfo size must be 0x64"

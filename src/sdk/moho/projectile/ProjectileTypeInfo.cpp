@@ -1,6 +1,5 @@
 #include "moho/projectile/ProjectileTypeInfo.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "moho/entity/Entity.h"
@@ -9,15 +8,6 @@
 
 namespace
 {
-  moho::ProjectileTypeInfo gProjectileTypeInfo;
-
-  template <typename TTypeInfo>
-  void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
-  {
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
-  }
-
   /**
    * Address: 0x0069E300 (FUN_0069E300)
    *
@@ -116,20 +106,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD610 (FUN_00BFD610, cleanup_ProjectileTypeInfo)
-   */
-  void cleanup_ProjectileTypeInfo()
-  {
-    ResetTypeInfoVectors(gProjectileTypeInfo);
-  }
-
-  /**
    * Address: 0x00BD63F0 (FUN_00BD63F0, register_ProjectileTypeInfo)
+   * Address: 0x00BFD610 (FUN_00BFD610, atexit destructor of the ProjectileTypeInfo object)
    */
   void register_ProjectileTypeInfo()
   {
-    (void)gProjectileTypeInfo;
-    (void)std::atexit(&cleanup_ProjectileTypeInfo);
+    static ProjectileTypeInfo sInstance;
+    (void)sInstance;
   }
 } // namespace moho
 

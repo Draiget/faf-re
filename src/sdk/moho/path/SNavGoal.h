@@ -108,7 +108,7 @@ namespace moho
     SNavGoalTypeInfo();
 
     /**
-     * Address: 0x00BF21D0 (FUN_00BF21D0, Moho::SNavGoalTypeInfo::dtr)
+     * Address: 0x0050C0C0 (FUN_0050C0C0, Moho::SNavGoalTypeInfo::dtr)
      *
      * What it does:
      * Releases the reflected field and base vector storage.
@@ -155,7 +155,7 @@ namespace moho
    * Address: 0x00BC7D80 (FUN_00BC7D80, register_SNavGoalTypeInfo)
    *
    * What it does:
-   * Installs the static `SNavGoalTypeInfo` instance and its shutdown hook.
+   * Constructs the static `SNavGoalTypeInfo` instance, which preregisters it.
    */
   void register_SNavGoalTypeInfo();
 

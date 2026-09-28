@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BDEC10 (FUN_00BDEC10, register_CMauiMeshTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiMesh` type-info object.
+   */
   void register_CMauiMeshTypeInfoStartup();
 } // namespace moho

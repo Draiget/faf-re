@@ -1,6 +1,5 @@
 #include "moho/unit/tasks/CUnitSacrificeTaskTypeInfo.h"
 
-#include <cstdlib>
 #include <cstdint>
 #include <new>
 #include <typeinfo>
@@ -16,17 +15,13 @@ namespace
 {
   using TypeInfo = moho::CUnitSacrificeTaskTypeInfo;
 
-  alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
-  bool gTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF9510 (FUN_00BF9510, atexit destructor of the CUnitSacrificeTaskTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gTypeInfoConstructed) {
-      new (gTypeInfoStorage) TypeInfo();
-      gTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
@@ -46,16 +41,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
     }
     return cached;
-  }
-
-  void cleanup()
-  {
-    if (!gTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CUnitSacrificeTaskTypeInfo();
-    gTypeInfoConstructed = false;
   }
 } // namespace
 
@@ -214,12 +199,11 @@ namespace moho
    * Address: 0x00BCF9F0 (FUN_00BCF9F0, register_CUnitSacrificeTaskTypeInfo)
    *
    * What it does:
-   * Constructs the global type-info owner and schedules process-exit cleanup.
+   * Constructs the global type-info owner.
    */
-  int register_CUnitSacrificeTaskTypeInfo()
+  void register_CUnitSacrificeTaskTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup);
   }
 } // namespace moho
 

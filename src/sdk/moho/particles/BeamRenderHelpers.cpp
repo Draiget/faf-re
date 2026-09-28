@@ -1044,11 +1044,11 @@ namespace moho
     ID3DDeviceResources* const resources = device->GetResources();
     CD3DVertexFormat* const vertexFormat = resources->GetVertexFormat(3);
 
-    if (SharedVertexStreamSlot() == nullptr) {
+    if (sVertexStream.get() == nullptr) {
       func_CreateSharedVertexStream(vertexFormat);
     }
 
-    CD3DVertexStream* streamArray[2]{nullptr, SharedVertexStreamSlot()};
+    CD3DVertexStream* streamArray[2]{nullptr, sVertexStream.get()};
     CD3DDevice* const device2 = D3D_GetDevice();
     ID3DDeviceResources* const resources2 = device2->GetResources();
     CD3DVertexSheet* const newSheet = resources2->Func6(

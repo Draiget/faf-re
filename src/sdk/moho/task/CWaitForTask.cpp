@@ -26,51 +26,22 @@ using namespace moho;
 
 namespace
 {
-  alignas(moho::CWaitForTaskTypeInfo) std::byte gCWaitForTaskTypeInfoStorage[sizeof(moho::CWaitForTaskTypeInfo)]{};
-  bool gCWaitForTaskTypeInfoConstructed = false;
   moho::CWaitForTaskConstruct gCWaitForTaskConstruct{};
   moho::CWaitForTaskSerializer gCWaitForTaskSerializer{};
 
-  [[nodiscard]] moho::CWaitForTaskTypeInfo& CWaitForTaskTypeInfoSlot()
-  {
-    return *reinterpret_cast<moho::CWaitForTaskTypeInfo*>(gCWaitForTaskTypeInfoStorage);
-  }
-
   /**
    * Address: 0x004CA330 (FUN_004CA330, CWaitForTask startup type-info pre-registration)
+   * Address: 0x00BF0BB0 (FUN_00BF0BB0, atexit destructor of the CWaitForTaskTypeInfo object)
    *
    * What it does:
-   * Materializes one startup `CWaitForTaskTypeInfo` storage lane and
-   * pre-registers reflected metadata for `typeid(CWaitForTask)`.
+   * Materializes the startup `CWaitForTaskTypeInfo` object and pre-registers
+   * reflected metadata for `typeid(CWaitForTask)`.
    */
   [[nodiscard]] gpg::RType* PreRegisterCWaitForTaskTypeInfo()
   {
-    if (!gCWaitForTaskTypeInfoConstructed) {
-      ::new (static_cast<void*>(&CWaitForTaskTypeInfoSlot())) moho::CWaitForTaskTypeInfo();
-      gCWaitForTaskTypeInfoConstructed = true;
-    }
-
-    gpg::PreRegisterRType(typeid(CWaitForTask), &CWaitForTaskTypeInfoSlot());
-    return &CWaitForTaskTypeInfoSlot();
-  }
-
-  /**
-   * Address: 0x00BF0BB0 (FUN_00BF0BB0, CWaitForTask type-info cleanup at exit)
-   *
-   * What it does:
-   * Releases dynamic field/base arrays from startup CWaitForTask type-info
-   * storage and tears down placement-constructed type metadata.
-   */
-  void CleanupCWaitForTaskTypeInfoAtExit()
-  {
-    if (!gCWaitForTaskTypeInfoConstructed) {
-      return;
-    }
-
-    CWaitForTaskTypeInfoSlot().fields_ = msvc8::vector<gpg::RField>{};
-    CWaitForTaskTypeInfoSlot().bases_ = msvc8::vector<gpg::RField>{};
-    CWaitForTaskTypeInfoSlot().~CWaitForTaskTypeInfo();
-    gCWaitForTaskTypeInfoConstructed = false;
+    static moho::CWaitForTaskTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(CWaitForTask), &sInstance);
+    return &sInstance;
   }
 
   /**
@@ -374,17 +345,11 @@ void CWaitForTaskSerializer::Init()
  * Address: 0x00BC6280 (FUN_00BC6280, CWaitForTask startup type-info registration)
  *
  * What it does:
- * Pre-registers `CWaitForTask` reflected type descriptor and schedules
- * teardown of startup type-info storage at process exit.
+ * Pre-registers `CWaitForTask` reflected type descriptor.
  */
 void moho::register_CWaitForTaskTypeInfo()
 {
-  static const bool kRegistered = []() {
-    (void)PreRegisterCWaitForTaskTypeInfo();
-    (void)std::atexit(&CleanupCWaitForTaskTypeInfoAtExit);
-    return true;
-  }();
-  (void)kRegistered;
+  (void)PreRegisterCWaitForTaskTypeInfo();
 }
 
 /**

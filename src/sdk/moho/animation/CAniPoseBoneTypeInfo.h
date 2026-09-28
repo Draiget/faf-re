@@ -39,20 +39,12 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_CAniPoseBoneTypeInfo();
 
   /**
-   * Address: 0x00BF4640 (FUN_00BF4640, cleanup_CAniPoseBoneTypeInfo)
-   *
-   * What it does:
-   * Releases startup-owned `CAniPoseBoneTypeInfo` field/base metadata storage.
-   */
-  void cleanup_CAniPoseBoneTypeInfo();
-
-  /**
    * Address: 0x00BC99A0 (FUN_00BC99A0, register_CAniPoseBoneTypeInfoAtexit)
    *
    * What it does:
-   * Preregisters `CAniPoseBone` RTTI and installs process-exit cleanup.
+   * Preregisters `CAniPoseBone` RTTI.
    */
-  int register_CAniPoseBoneTypeInfoAtexit();
+  void register_CAniPoseBoneTypeInfoAtexit();
 
   /**
    * Address: 0x0054E370 (FUN_0054E370, preregister_FastVectorCAniPoseBoneType)
@@ -64,21 +56,12 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_FastVectorCAniPoseBoneType();
 
   /**
-   * Address: 0x00BF4700 (FUN_00BF4700, cleanup_FastVectorCAniPoseBoneType)
-   *
-   * What it does:
-   * Releases startup-owned `fastvector<CAniPoseBone>` reflection metadata.
-   */
-  void cleanup_FastVectorCAniPoseBoneType();
-
-  /**
    * Address: 0x00BC9A00 (FUN_00BC9A00, register_FastVectorCAniPoseBoneTypeAtexit)
    *
    * What it does:
-   * Preregisters `fastvector<CAniPoseBone>` RTTI and installs process-exit
-   * cleanup.
+   * Preregisters `fastvector<CAniPoseBone>` RTTI.
    */
-  int register_FastVectorCAniPoseBoneTypeAtexit();
+  void register_FastVectorCAniPoseBoneTypeAtexit();
 } // namespace moho
 
 namespace gpg

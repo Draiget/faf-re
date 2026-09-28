@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BDE6E0 (FUN_00BDE6E0, register_CMauiGroupTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiGroup` type-info object.
+   */
   void register_CMauiGroupTypeInfoStartup();
 } // namespace moho

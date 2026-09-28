@@ -64,7 +64,10 @@ namespace moho
     static void Destruct(void* objectStorage);
   };
 
-  int register_CUnitTeleportTaskTypeInfo();
+  /**
+   * Address: 0x00BD0630 (FUN_00BD0630, register_CUnitTeleportTaskTypeInfo)
+   */
+  void register_CUnitTeleportTaskTypeInfo();
 
   static_assert(sizeof(CUnitTeleportTaskTypeInfo) == 0x64, "CUnitTeleportTaskTypeInfo size must be 0x64");
 } // namespace moho

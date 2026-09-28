@@ -11,24 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiControlTypeInfo) unsigned char gCMauiControlTypeInfoStorage[sizeof(CMauiControlTypeInfo)];
-  bool gCMauiControlTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02BC0 (FUN_00C02BC0, atexit destructor of the CMauiControlTypeInfo object)
+   */
   [[nodiscard]] CMauiControlTypeInfo& AcquireCMauiControlTypeInfo()
   {
-    if (!gCMauiControlTypeInfoConstructed) {
-      new (gCMauiControlTypeInfoStorage) CMauiControlTypeInfo();
-      gCMauiControlTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiControlTypeInfo*>(gCMauiControlTypeInfoStorage);
-  }
-
-  void cleanup_CMauiControlTypeInfo()
-  {
-    if (!gCMauiControlTypeInfoConstructed) return;
-    auto& ti = *reinterpret_cast<CMauiControlTypeInfo*>(gCMauiControlTypeInfoStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiControlTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiControlTypeInfoBootstrap
@@ -99,12 +88,14 @@ void CMauiControlTypeInfo::Init()
 }
 
 /**
- * Address: 0x00BDDD60
+ * Address: 0x00BDDD60 (FUN_00BDDD60, register_CMauiControlTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiControl` type-info object.
  */
 void moho::register_CMauiControlTypeInfoStartup()
 {
   (void)AcquireCMauiControlTypeInfo();
-  (void)std::atexit(&cleanup_CMauiControlTypeInfo);
 }
 
 

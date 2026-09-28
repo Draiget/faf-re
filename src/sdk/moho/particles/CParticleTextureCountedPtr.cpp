@@ -2,8 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -91,23 +89,13 @@ namespace
   using CountedPtrType = moho::RCountedPtrType<moho::CParticleTexture>;
   using CountedPtrFastVectorType = gpg::RFastVectorType<moho::CountedPtr_CParticleTexture>;
 
-  alignas(CountedPtrType) unsigned char gCountedPtrCParticleTextureTypeStorage[sizeof(CountedPtrType)]{};
-  bool gCountedPtrCParticleTextureTypeConstructed = false;
-
-  msvc8::string gCountedPtrCParticleTextureTypeName;
-  bool gCountedPtrCParticleTextureTypeNameCleanupRegistered = false;
-
-  msvc8::string gCountedPtrFastVectorTypeName;
-  bool gCountedPtrFastVectorTypeNameCleanupRegistered = false;
-
+  /**
+   * Address: 0x00BFBBD0 (FUN_00BFBBD0, atexit destructor of the CountedPtrType object)
+   */
   [[nodiscard]] CountedPtrType* AcquireCountedPtrCParticleTextureType()
   {
-    if (!gCountedPtrCParticleTextureTypeConstructed) {
-      new (gCountedPtrCParticleTextureTypeStorage) CountedPtrType();
-      gCountedPtrCParticleTextureTypeConstructed = true;
-    }
-
-    return reinterpret_cast<CountedPtrType*>(gCountedPtrCParticleTextureTypeStorage);
+    static CountedPtrType sInstance;
+    return &sInstance;
   }
 
   /**
@@ -168,18 +156,6 @@ namespace
       actual
     );
     throw gpg::SerializationError(message.c_str());
-  }
-
-  void cleanup_CountedPtrCParticleTextureTypeName()
-  {
-    gCountedPtrCParticleTextureTypeName = msvc8::string{};
-    gCountedPtrCParticleTextureTypeNameCleanupRegistered = false;
-  }
-
-  void cleanup_CountedPtrFastVectorTypeName()
-  {
-    gCountedPtrFastVectorTypeName = msvc8::string{};
-    gCountedPtrFastVectorTypeNameCleanupRegistered = false;
   }
 
   void LoadCountedPtrCParticleTexture(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
@@ -362,24 +338,16 @@ namespace moho
 
   /**
    * Address: 0x00659BC0 (FUN_00659BC0, Moho::RCountedPtrType_CParticleTexture::GetName)
+   * Address: 0x00BFBAB0 (FUN_00BFBAB0, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily builds and caches `CountedPtr<element>` reflection text using the
-   * resolved particle-texture type name.
+   * Builds `CountedPtr<CParticleTexture>` once from the resolved
+   * particle-texture type name and returns it.
    */
   const char* RCountedPtrType<moho::CParticleTexture>::GetName() const
   {
-    if (gCountedPtrCParticleTextureTypeName.empty()) {
-      gpg::RType* const pointeeType = CachedCParticleTextureType();
-      const char* const pointeeName = pointeeType ? pointeeType->GetName() : "CParticleTexture";
-      gCountedPtrCParticleTextureTypeName = gpg::STR_Printf("CountedPtr<%s>", pointeeName ? pointeeName : "CParticleTexture");
-      if (!gCountedPtrCParticleTextureTypeNameCleanupRegistered) {
-        gCountedPtrCParticleTextureTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_CountedPtrCParticleTextureTypeName);
-      }
-    }
-
-    return gCountedPtrCParticleTextureTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("CountedPtr<%s>", CachedCParticleTextureType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -499,32 +467,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFBBD0 (FUN_00BFBBD0, cleanup_CountedPtrCParticleTextureType)
-   *
-   * What it does:
-   * Tears down startup-owned `CountedPtr<CParticleTexture>` reflection storage.
-   */
-  void cleanup_CountedPtrCParticleTextureType()
-  {
-    if (!gCountedPtrCParticleTextureTypeConstructed) {
-      return;
-    }
-
-    AcquireCountedPtrCParticleTextureType()->~CountedPtrType();
-    gCountedPtrCParticleTextureTypeConstructed = false;
-    moho::CountedPtr_CParticleTexture::sType = nullptr;
-  }
-
-  /**
    * Address: 0x00BD4140 (FUN_00BD4140, register_CountedPtrCParticleTextureTypeAtexit)
    *
    * What it does:
-   * Registers `CountedPtr<CParticleTexture>` reflection and installs process-exit teardown.
+   * Registers `CountedPtr<CParticleTexture>` reflection.
    */
-  int register_CountedPtrCParticleTextureTypeAtexit()
+  void register_CountedPtrCParticleTextureTypeAtexit()
   {
     (void)preregister_CountedPtrCParticleTextureType();
-    return std::atexit(&cleanup_CountedPtrCParticleTextureType);
   }
 
   /**
@@ -544,7 +494,7 @@ namespace moho
    * Address: 0x00BD4160 (FUN_00BD4160, register_FastVectorCountedPtrCParticleTextureTypeAtexit)
    *
    * What it does:
-   * Registers `fastvector<CountedPtr<CParticleTexture>>` reflection and installs process-exit teardown.
+   * Registers `fastvector<CountedPtr<CParticleTexture>>` reflection.
    */
   void register_FastVectorCountedPtrCParticleTextureTypeAtexit()
   {
@@ -565,25 +515,17 @@ namespace gpg
 
   /**
    * Address: 0x00659E60 (FUN_00659E60, gpg::RFastVectorType_CountedPtr_CParticleTexture::GetName)
+   * Address: 0x00BFBA80 (FUN_00BFBA80, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily builds and caches `fastvector<element>` reflection text using the
-   * resolved counted-particle-texture type name.
+   * Builds `fastvector<CountedPtr<CParticleTexture>>` once from the resolved
+   * counted-particle-texture type name and returns it.
    */
   const char* RFastVectorType<moho::CountedPtr_CParticleTexture>::GetName() const
   {
-    if (gCountedPtrFastVectorTypeName.empty()) {
-      gpg::RType* const elementType = CachedCountedPtrCParticleTextureType();
-      const char* const elementName = elementType ? elementType->GetName() : "CountedPtr<CParticleTexture>";
-      gCountedPtrFastVectorTypeName =
-        gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "CountedPtr<CParticleTexture>");
-      if (!gCountedPtrFastVectorTypeNameCleanupRegistered) {
-        gCountedPtrFastVectorTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_CountedPtrFastVectorTypeName);
-      }
-    }
-
-    return gCountedPtrFastVectorTypeName.c_str();
+    static const msvc8::string sName =
+      gpg::STR_Printf("fastvector<%s>", CachedCountedPtrCParticleTextureType()->GetName());
+    return sName.c_str();
   }
 
   /**

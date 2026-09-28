@@ -47,8 +47,7 @@ namespace moho
    * Address: 0x00BC2CE0 (FUN_00BC2CE0, register_BVIntSetTypeInfo)
    *
    * What it does:
-   * Materializes startup `BVIntSetTypeInfo` storage and registers process-exit
-   * teardown.
+   * Constructs the static `BVIntSetTypeInfo` object.
    */
   void register_BVIntSetTypeInfo();
 } // namespace moho

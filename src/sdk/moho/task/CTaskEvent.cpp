@@ -36,40 +36,22 @@ namespace
     return cached;
   }
 
-  alignas(moho::STaskEventLinkageTypeInfo)
-    std::byte gSTaskEventLinkageTypeInfoStorage[sizeof(moho::STaskEventLinkageTypeInfo)]{};
-  alignas(moho::CTaskEventTypeInfo) std::byte gCTaskEventTypeInfoStorage[sizeof(moho::CTaskEventTypeInfo)]{};
-  bool gSTaskEventLinkageTypeInfoConstructed = false;
-  bool gCTaskEventTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::STaskEventLinkageTypeInfo& STaskEventLinkageTypeInfoSlot()
-  {
-    return *reinterpret_cast<moho::STaskEventLinkageTypeInfo*>(gSTaskEventLinkageTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::CTaskEventTypeInfo& CTaskEventTypeInfoSlot()
-  {
-    return *reinterpret_cast<moho::CTaskEventTypeInfo*>(gCTaskEventTypeInfoStorage);
-  }
-
+  /**
+   * Address: 0x00BEE0E0 (FUN_00BEE0E0, atexit destructor of the STaskEventLinkageTypeInfo object)
+   */
   [[nodiscard]] gpg::RType* InitializeSTaskEventLinkageTypeInfoStorage()
   {
-    if (!gSTaskEventLinkageTypeInfoConstructed) {
-      ::new (static_cast<void*>(&STaskEventLinkageTypeInfoSlot())) moho::STaskEventLinkageTypeInfo();
-      gSTaskEventLinkageTypeInfoConstructed = true;
-    }
-
-    return &STaskEventLinkageTypeInfoSlot();
+    static moho::STaskEventLinkageTypeInfo sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BEE170 (FUN_00BEE170, atexit destructor of the CTaskEventTypeInfo object)
+   */
   [[nodiscard]] gpg::RType* InitializeCTaskEventTypeInfoStorage()
   {
-    if (!gCTaskEventTypeInfoConstructed) {
-      ::new (static_cast<void*>(&CTaskEventTypeInfoSlot())) moho::CTaskEventTypeInfo();
-      gCTaskEventTypeInfoConstructed = true;
-    }
-
-    return &CTaskEventTypeInfoSlot();
+    static moho::CTaskEventTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -806,62 +788,25 @@ void CTaskEventTypeInfo::Init()
 namespace moho
 {
   /**
-   * Address: 0x00BEE0E0 (FUN_00BEE0E0, ??1STaskEventLinkageTypeInfo@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Executes process-exit teardown for startup `STaskEventLinkageTypeInfo`
-   * storage.
-   */
-  void cleanup_STaskEventLinkageTypeInfo()
-  {
-    if (!gSTaskEventLinkageTypeInfoConstructed) {
-      return;
-    }
-
-    STaskEventLinkageTypeInfoSlot().~STaskEventLinkageTypeInfo();
-    gSTaskEventLinkageTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BEE170 (FUN_00BEE170, ??1CTaskEventTypeInfo@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Executes process-exit teardown for startup `CTaskEventTypeInfo` storage.
-   */
-  void cleanup_CTaskEventTypeInfo()
-  {
-    if (!gCTaskEventTypeInfoConstructed) {
-      return;
-    }
-
-    CTaskEventTypeInfoSlot().~CTaskEventTypeInfo();
-    gCTaskEventTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC2ED0 (FUN_00BC2ED0, register_STaskEventLinkageTypeInfo)
    *
    * What it does:
-   * Materializes startup `STaskEventLinkageTypeInfo` storage and registers
-   * process-exit teardown.
+   * Materializes the startup `STaskEventLinkageTypeInfo` object.
    */
   void register_STaskEventLinkageTypeInfo()
   {
     (void)InitializeSTaskEventLinkageTypeInfoStorage();
-    (void)std::atexit(&cleanup_STaskEventLinkageTypeInfo);
   }
 
   /**
    * Address: 0x00BC2F30 (FUN_00BC2F30, register_CTaskEventTypeInfo)
    *
    * What it does:
-   * Materializes startup `CTaskEventTypeInfo` storage and registers process-exit
-   * teardown.
+   * Materializes the startup `CTaskEventTypeInfo` object.
    */
   void register_CTaskEventTypeInfo()
   {
     (void)InitializeCTaskEventTypeInfoStorage();
-    (void)std::atexit(&cleanup_CTaskEventTypeInfo);
   }
 } // namespace moho
 

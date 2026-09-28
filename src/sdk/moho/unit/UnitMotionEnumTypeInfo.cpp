@@ -1,10 +1,8 @@
 #include "moho/unit/UnitMotionEnumTypeInfo.h"
 
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 #include "moho/ai/EAirCombatState.h"
 #include "moho/ai/EAirCombatStateTypeInfo.h"
 #include "moho/unit/CUnitMotion.h"
@@ -28,61 +26,6 @@ namespace
   using EUnitMotionHorzEventPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EUnitMotionHorzEvent, int>;
   using EUnitMotionVertEventPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EUnitMotionVertEvent, int>;
   using EUnitMotionTurnEventPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EUnitMotionTurnEvent, int>;
-
-  gpg::StaticTypeInfoStorage<moho::EUnitMotionStateTypeInfo> gEUnitMotionStateTypeInfoStorage{};
-  gpg::StaticTypeInfoStorage<moho::EUnitMotionCarrierEventTypeInfo> gEUnitMotionCarrierEventTypeInfoStorage{};
-  gpg::StaticTypeInfoStorage<moho::EUnitMotionHorzEventTypeInfo> gEUnitMotionHorzEventTypeInfoStorage{};
-  gpg::StaticTypeInfoStorage<moho::EUnitMotionVertEventTypeInfo> gEUnitMotionVertEventTypeInfoStorage{};
-  gpg::StaticTypeInfoStorage<moho::EUnitMotionTurnEventTypeInfo> gEUnitMotionTurnEventTypeInfoStorage{};
-  gpg::StaticTypeInfoStorage<moho::EAirCombatStateTypeInfo> gEAirCombatStateTypeInfoStorage{};
-
-  /**
-   * Address: 0x00BFDE90 (FUN_00BFDE90)
-   */
-  void cleanup_EUnitMotionStateTypeInfo()
-  {
-    gEUnitMotionStateTypeInfoStorage.Destroy();
-  }
-
-  /**
-   * Address: 0x00BFDED0 (FUN_00BFDED0)
-   */
-  void cleanup_EUnitMotionCarrierEventTypeInfo()
-  {
-    gEUnitMotionCarrierEventTypeInfoStorage.Destroy();
-  }
-
-  /**
-   * Address: 0x00BFDF10 (FUN_00BFDF10)
-   */
-  void cleanup_EUnitMotionHorzEventTypeInfo()
-  {
-    gEUnitMotionHorzEventTypeInfoStorage.Destroy();
-  }
-
-  /**
-   * Address: 0x00BFDF50 (FUN_00BFDF50)
-   */
-  void cleanup_EUnitMotionVertEventTypeInfo()
-  {
-    gEUnitMotionVertEventTypeInfoStorage.Destroy();
-  }
-
-  /**
-   * Address: 0x00BFDF90 (FUN_00BFDF90)
-   */
-  void cleanup_EUnitMotionTurnEventTypeInfo()
-  {
-    gEUnitMotionTurnEventTypeInfoStorage.Destroy();
-  }
-
-  /**
-   * Address: 0x00BFDFD0 (FUN_00BFDFD0)
-   */
-  void cleanup_EAirCombatStateTypeInfo()
-  {
-    gEAirCombatStateTypeInfoStorage.Destroy();
-  }
 
   /**
    * Per-instantiation `gpg::PrimitiveSerHelper<T,int>` dynamic-initializer
@@ -231,104 +174,138 @@ namespace moho
 
   /**
    * Address: 0x006B7080 (FUN_006B7080, construct_EUnitMotionStateTypeInfo)
+   * Address: 0x00BFDE90 (FUN_00BFDE90, atexit destructor of the EUnitMotionStateTypeInfo object)
+   *
+   * What it does:
+   * Constructs the `EUnitMotionState` enum descriptor and pre-registers it.
    */
   gpg::REnumType* construct_EUnitMotionStateTypeInfo()
   {
-    return &gEUnitMotionStateTypeInfoStorage.Ensure();
+    static EUnitMotionStateTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(EUnitMotionState), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x006B71B0 (FUN_006B71B0, construct_EUnitMotionCarrierEventTypeInfo)
+   * Address: 0x00BFDED0 (FUN_00BFDED0, atexit destructor of the EUnitMotionCarrierEventTypeInfo object)
+   *
+   * What it does:
+   * Constructs the `EUnitMotionCarrierEvent` enum descriptor and
+   * pre-registers it.
    */
   gpg::REnumType* construct_EUnitMotionCarrierEventTypeInfo()
   {
-    return &gEUnitMotionCarrierEventTypeInfoStorage.Ensure();
+    static EUnitMotionCarrierEventTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(EUnitMotionCarrierEvent), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x006B72E0 (FUN_006B72E0, construct_EUnitMotionHorzEventTypeInfo)
+   * Address: 0x00BFDF10 (FUN_00BFDF10, atexit destructor of the EUnitMotionHorzEventTypeInfo object)
+   *
+   * What it does:
+   * Constructs the `EUnitMotionHorzEvent` enum descriptor and pre-registers
+   * it.
    */
   gpg::REnumType* construct_EUnitMotionHorzEventTypeInfo()
   {
-    return &gEUnitMotionHorzEventTypeInfoStorage.Ensure();
+    static EUnitMotionHorzEventTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(EUnitMotionHorzEvent), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x006B7410 (FUN_006B7410, construct_EUnitMotionVertEventTypeInfo)
+   * Address: 0x00BFDF50 (FUN_00BFDF50, atexit destructor of the EUnitMotionVertEventTypeInfo object)
+   *
+   * What it does:
+   * Constructs the `EUnitMotionVertEvent` enum descriptor and pre-registers
+   * it.
    */
   gpg::REnumType* construct_EUnitMotionVertEventTypeInfo()
   {
-    return &gEUnitMotionVertEventTypeInfoStorage.Ensure();
+    static EUnitMotionVertEventTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(EUnitMotionVertEvent), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x006B7540 (FUN_006B7540, construct_EUnitMotionTurnEventTypeInfo)
+   * Address: 0x00BFDF90 (FUN_00BFDF90, atexit destructor of the EUnitMotionTurnEventTypeInfo object)
+   *
+   * What it does:
+   * Constructs the `EUnitMotionTurnEvent` enum descriptor and pre-registers
+   * it.
    */
   gpg::REnumType* construct_EUnitMotionTurnEventTypeInfo()
   {
-    return &gEUnitMotionTurnEventTypeInfoStorage.Ensure();
+    static EUnitMotionTurnEventTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(EUnitMotionTurnEvent), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x006B7670 (FUN_006B7670, construct_EAirCombatStateTypeInfo)
+   * Address: 0x00BFDFD0 (FUN_00BFDFD0, atexit destructor of the EAirCombatStateTypeInfo object)
+   *
+   * What it does:
+   * Constructs the `EAirCombatState` enum descriptor and pre-registers it.
    */
   gpg::REnumType* construct_EAirCombatStateTypeInfo()
   {
-    return &gEAirCombatStateTypeInfoStorage.Ensure();
+    static EAirCombatStateTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(EAirCombatState), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x00BD6FE0 (FUN_00BD6FE0, register_EUnitMotionStateTypeInfo)
    */
-  int register_EUnitMotionStateTypeInfo()
+  void register_EUnitMotionStateTypeInfo()
   {
     (void)construct_EUnitMotionStateTypeInfo();
-    return std::atexit(&cleanup_EUnitMotionStateTypeInfo);
   }
 
   /**
    * Address: 0x00BD7040 (FUN_00BD7040, register_EUnitMotionCarrierEventTypeInfo)
    */
-  int register_EUnitMotionCarrierEventTypeInfo()
+  void register_EUnitMotionCarrierEventTypeInfo()
   {
     (void)construct_EUnitMotionCarrierEventTypeInfo();
-    return std::atexit(&cleanup_EUnitMotionCarrierEventTypeInfo);
   }
 
   /**
    * Address: 0x00BD70A0 (FUN_00BD70A0, register_EUnitMotionHorzEventTypeInfo)
    */
-  int register_EUnitMotionHorzEventTypeInfo()
+  void register_EUnitMotionHorzEventTypeInfo()
   {
     (void)construct_EUnitMotionHorzEventTypeInfo();
-    return std::atexit(&cleanup_EUnitMotionHorzEventTypeInfo);
   }
 
   /**
    * Address: 0x00BD7100 (FUN_00BD7100, register_EUnitMotionVertEventTypeInfo)
    */
-  int register_EUnitMotionVertEventTypeInfo()
+  void register_EUnitMotionVertEventTypeInfo()
   {
     (void)construct_EUnitMotionVertEventTypeInfo();
-    return std::atexit(&cleanup_EUnitMotionVertEventTypeInfo);
   }
 
   /**
    * Address: 0x00BD7160 (FUN_00BD7160, register_EUnitMotionTurnEventTypeInfo)
    */
-  int register_EUnitMotionTurnEventTypeInfo()
+  void register_EUnitMotionTurnEventTypeInfo()
   {
     (void)construct_EUnitMotionTurnEventTypeInfo();
-    return std::atexit(&cleanup_EUnitMotionTurnEventTypeInfo);
   }
 
   /**
    * Address: 0x00BD71C0 (FUN_00BD71C0, register_EAirCombatStateTypeInfo)
    */
-  int register_EAirCombatStateTypeInfo()
+  void register_EAirCombatStateTypeInfo()
   {
     (void)construct_EAirCombatStateTypeInfo();
-    return std::atexit(&cleanup_EAirCombatStateTypeInfo);
   }
 } // namespace moho
 

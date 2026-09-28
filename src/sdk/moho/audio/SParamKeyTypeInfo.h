@@ -32,14 +32,9 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BF0DF0 (FUN_00BF0DF0, cleanup_SParamKeyTypeInfo)
-   */
-  void cleanup_SParamKeyTypeInfo();
-
-  /**
    * Address: 0x00BC6840 (FUN_00BC6840, register_SParamKeyTypeInfo)
    */
-  int register_SParamKeyTypeInfo();
+  void register_SParamKeyTypeInfo();
 
   static_assert(sizeof(SParamKeyTypeInfo) == 0x64, "SParamKeyTypeInfo size must be 0x64");
 } // namespace moho

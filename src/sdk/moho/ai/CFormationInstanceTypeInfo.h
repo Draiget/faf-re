@@ -75,10 +75,8 @@ namespace moho
    * Address: 0x00BCAC20 (FUN_00BCAC20, register_CFormationInstanceTypeInfo)
    *
    * What it does:
-   * Constructs the startup-owned `CFormationInstanceTypeInfo` singleton and
-   * installs process-exit cleanup. Dispatched from `.CRT$XCL` (`__xc_a`);
-   * the binary has exactly one call site and no reentry guard, so the
-   * recovered singleton storage is constructed unconditionally here.
+   * Constructs the startup-owned `CFormationInstanceTypeInfo` singleton.
+   * Dispatched from `.CRT$XCL` (`__xc_a`).
    */
   void register_CFormationInstanceTypeInfo();
 } // namespace moho

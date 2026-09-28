@@ -6,14 +6,20 @@
 namespace moho
 {
   /**
-   * Address: 0x005201F0 (FUN_005201F0)
-   *
-   * What it does:
    * Owns the reflected enum descriptor for `ERuleBPUnitBuildRestriction`.
    */
   class ERuleBPUnitBuildRestrictionTypeInfo final : public gpg::REnumType
   {
   public:
+    /**
+     * Address: 0x005201F0 (FUN_005201F0, Moho::ERuleBPUnitBuildRestrictionTypeInfo::ERuleBPUnitBuildRestrictionTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflected enum descriptor for
+     * `ERuleBPUnitBuildRestriction`.
+     */
+    ERuleBPUnitBuildRestrictionTypeInfo();
+
     /**
      * Address: 0x00520280 (FUN_00520280, scalar deleting thunk)
      */
@@ -44,14 +50,20 @@ namespace moho
   );
 
   /**
-   * Address: 0x00520310 (FUN_00520310)
-   *
-   * What it does:
    * Owns the reflected enum descriptor for `ERuleBPUnitWeaponBallisticArc`.
    */
   class ERuleBPUnitWeaponBallisticArcTypeInfo final : public gpg::REnumType
   {
   public:
+    /**
+     * Address: 0x00520310 (FUN_00520310, Moho::ERuleBPUnitWeaponBallisticArcTypeInfo::ERuleBPUnitWeaponBallisticArcTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflected enum descriptor for
+     * `ERuleBPUnitWeaponBallisticArc`.
+     */
+    ERuleBPUnitWeaponBallisticArcTypeInfo();
+
     /**
      * Address: 0x005203A0 (FUN_005203A0, scalar deleting thunk)
      */
@@ -83,14 +95,20 @@ namespace moho
   );
 
   /**
-   * Address: 0x00520420 (FUN_00520420)
-   *
-   * What it does:
    * Owns the reflected enum descriptor for `ERuleBPUnitWeaponTargetType`.
    */
   class ERuleBPUnitWeaponTargetTypeTypeInfo final : public gpg::REnumType
   {
   public:
+    /**
+     * Address: 0x00520420 (FUN_00520420, Moho::ERuleBPUnitWeaponTargetTypeTypeInfo::ERuleBPUnitWeaponTargetTypeTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflected enum descriptor for
+     * `ERuleBPUnitWeaponTargetType`.
+     */
+    ERuleBPUnitWeaponTargetTypeTypeInfo();
+
     /**
      * Address: 0x005204B0 (FUN_005204B0, scalar deleting thunk)
      */
@@ -122,14 +140,20 @@ namespace moho
   );
 
   /**
-   * Address: 0x0051FA80 (FUN_0051FA80)
-   *
-   * What it does:
    * Owns the reflected enum descriptor for `ERuleBPUnitMovementType`.
    */
   class ERuleBPUnitMovementTypeTypeInfo final : public gpg::REnumType
   {
   public:
+    /**
+     * Address: 0x0051FA80 (FUN_0051FA80, Moho::ERuleBPUnitMovementTypeTypeInfo::ERuleBPUnitMovementTypeTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflected enum descriptor for
+     * `ERuleBPUnitMovementType`.
+     */
+    ERuleBPUnitMovementTypeTypeInfo();
+
     /**
      * Address: 0x0051FB10 (FUN_0051FB10, scalar deleting thunk)
      */
@@ -158,14 +182,20 @@ namespace moho
   static_assert(sizeof(ERuleBPUnitMovementTypeTypeInfo) == 0x78, "ERuleBPUnitMovementTypeTypeInfo size must be 0x78");
 
   /**
-   * Address: 0x0051FC80 (FUN_0051FC80)
-   *
-   * What it does:
    * Owns the reflected enum descriptor for `ERuleBPUnitCommandCaps`.
    */
   class ERuleBPUnitCommandCapsTypeInfo final : public gpg::REnumType
   {
   public:
+    /**
+     * Address: 0x0051FC80 (FUN_0051FC80, Moho::ERuleBPUnitCommandCapsTypeInfo::ERuleBPUnitCommandCapsTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflected enum descriptor for
+     * `ERuleBPUnitCommandCaps`.
+     */
+    ERuleBPUnitCommandCapsTypeInfo();
+
     /**
      * Address: 0x0051FD10 (FUN_0051FD10, scalar deleting thunk)
      */
@@ -194,14 +224,20 @@ namespace moho
   static_assert(sizeof(ERuleBPUnitCommandCapsTypeInfo) == 0x78, "ERuleBPUnitCommandCapsTypeInfo size must be 0x78");
 
   /**
-   * Address: 0x00520000 (FUN_00520000)
-   *
-   * What it does:
    * Owns the reflected enum descriptor for `ERuleBPUnitToggleCaps`.
    */
   class ERuleBPUnitToggleCapsTypeInfo final : public gpg::REnumType
   {
   public:
+    /**
+     * Address: 0x00520000 (FUN_00520000, Moho::ERuleBPUnitToggleCapsTypeInfo::ERuleBPUnitToggleCapsTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflected enum descriptor for
+     * `ERuleBPUnitToggleCaps`.
+     */
+    ERuleBPUnitToggleCapsTypeInfo();
+
     /**
      * Address: 0x00520090 (FUN_00520090, scalar deleting thunk)
      */
@@ -230,14 +266,20 @@ namespace moho
   static_assert(sizeof(ERuleBPUnitToggleCapsTypeInfo) == 0x78, "ERuleBPUnitToggleCapsTypeInfo size must be 0x78");
 
   /**
-   * Address: 0x005220C0 (FUN_005220C0)
-   *
-   * What it does:
    * Owns the reflected enum descriptor for `UnitWeaponRangeCategory`.
    */
   class UnitWeaponRangeCategoryTypeInfo final : public gpg::REnumType
   {
   public:
+    /**
+     * Address: 0x005220C0 (FUN_005220C0, Moho::UnitWeaponRangeCategoryTypeInfo::UnitWeaponRangeCategoryTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflected enum descriptor for
+     * `UnitWeaponRangeCategory`.
+     */
+    UnitWeaponRangeCategoryTypeInfo();
+
     /**
      * Address: 0x00522150 (FUN_00522150, scalar deleting thunk)
      */
@@ -266,128 +308,58 @@ namespace moho
   static_assert(sizeof(UnitWeaponRangeCategoryTypeInfo) == 0x78, "UnitWeaponRangeCategoryTypeInfo size must be 0x78");
 
   /**
-   * Address: 0x005201F0 (FUN_005201F0, construct_ERuleBPUnitBuildRestrictionTypeInfo)
-   *
-   * What it does:
-   * Constructs and preregisters the reflected enum descriptor for
-   * `ERuleBPUnitBuildRestriction`.
-   */
-  gpg::REnumType* construct_ERuleBPUnitBuildRestrictionTypeInfo();
-
-  /**
-   * Address: 0x00520310 (FUN_00520310, construct_ERuleBPUnitWeaponBallisticArcTypeInfo)
-   *
-   * What it does:
-   * Constructs and preregisters the reflected enum descriptor for
-   * `ERuleBPUnitWeaponBallisticArc`.
-   */
-  gpg::REnumType* construct_ERuleBPUnitWeaponBallisticArcTypeInfo();
-
-  /**
-   * Address: 0x00520420 (FUN_00520420, construct_ERuleBPUnitWeaponTargetTypeTypeInfo)
-   *
-   * What it does:
-   * Constructs and preregisters the reflected enum descriptor for
-   * `ERuleBPUnitWeaponTargetType`.
-   */
-  gpg::REnumType* construct_ERuleBPUnitWeaponTargetTypeTypeInfo();
-
-  /**
-   * Address: 0x0051FA80 (FUN_0051FA80, construct_ERuleBPUnitMovementTypeTypeInfo)
-   *
-   * What it does:
-   * Constructs and preregisters the reflected enum descriptor for
-   * `ERuleBPUnitMovementType`.
-   */
-  gpg::REnumType* construct_ERuleBPUnitMovementTypeTypeInfo();
-
-  /**
-   * Address: 0x0051FC80 (FUN_0051FC80, construct_ERuleBPUnitCommandCapsTypeInfo)
-   *
-   * What it does:
-   * Constructs and preregisters the reflected enum descriptor for
-   * `ERuleBPUnitCommandCaps`.
-   */
-  gpg::REnumType* construct_ERuleBPUnitCommandCapsTypeInfo();
-
-  /**
-   * Address: 0x00520000 (FUN_00520000, construct_ERuleBPUnitToggleCapsTypeInfo)
-   *
-   * What it does:
-   * Constructs and preregisters the reflected enum descriptor for
-   * `ERuleBPUnitToggleCaps`.
-   */
-  gpg::REnumType* construct_ERuleBPUnitToggleCapsTypeInfo();
-
-  /**
-   * Address: 0x005220C0 (FUN_005220C0, construct_UnitWeaponRangeCategoryTypeInfo)
-   *
-   * What it does:
-   * Constructs and preregisters the reflected enum descriptor for
-   * `UnitWeaponRangeCategory`.
-   */
-  gpg::REnumType* construct_UnitWeaponRangeCategoryTypeInfo();
-
-  /**
    * Address: 0x00BC8A30 (FUN_00BC8A30, register_ERuleBPUnitBuildRestrictionTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `ERuleBPUnitBuildRestrictionTypeInfo` and
-   * installs process-exit cleanup.
+   * Constructs/preregisters `ERuleBPUnitBuildRestrictionTypeInfo`.
    */
-  int register_ERuleBPUnitBuildRestrictionTypeInfo();
+  void register_ERuleBPUnitBuildRestrictionTypeInfo();
 
   /**
    * Address: 0x00BC8A50 (FUN_00BC8A50, register_ERuleBPUnitWeaponBallisticArcTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `ERuleBPUnitWeaponBallisticArcTypeInfo` and
-   * installs process-exit cleanup.
+   * Constructs/preregisters `ERuleBPUnitWeaponBallisticArcTypeInfo`.
    */
-  int register_ERuleBPUnitWeaponBallisticArcTypeInfo();
+  void register_ERuleBPUnitWeaponBallisticArcTypeInfo();
 
   /**
    * Address: 0x00BC8A70 (FUN_00BC8A70, register_ERuleBPUnitWeaponTargetTypeTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `ERuleBPUnitWeaponTargetTypeTypeInfo` and
-   * installs process-exit cleanup.
+   * Constructs/preregisters `ERuleBPUnitWeaponTargetTypeTypeInfo`.
    */
-  int register_ERuleBPUnitWeaponTargetTypeTypeInfo();
+  void register_ERuleBPUnitWeaponTargetTypeTypeInfo();
 
   /**
    * Address: 0x00BC8910 (FUN_00BC8910, register_ERuleBPUnitMovementTypeTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `ERuleBPUnitMovementTypeTypeInfo` and installs
-   * process-exit cleanup.
+   * Constructs/preregisters `ERuleBPUnitMovementTypeTypeInfo`.
    */
-  int register_ERuleBPUnitMovementTypeTypeInfo();
+  void register_ERuleBPUnitMovementTypeTypeInfo();
 
   /**
    * Address: 0x00BC8970 (FUN_00BC8970, register_ERuleBPUnitCommandCapsTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `ERuleBPUnitCommandCapsTypeInfo` and installs
-   * process-exit cleanup.
+   * Constructs/preregisters `ERuleBPUnitCommandCapsTypeInfo`.
    */
-  int register_ERuleBPUnitCommandCapsTypeInfo();
+  void register_ERuleBPUnitCommandCapsTypeInfo();
 
   /**
    * Address: 0x00BC89D0 (FUN_00BC89D0, register_ERuleBPUnitToggleCapsTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `ERuleBPUnitToggleCapsTypeInfo` and installs
-   * process-exit cleanup.
+   * Constructs/preregisters `ERuleBPUnitToggleCapsTypeInfo`.
    */
-  int register_ERuleBPUnitToggleCapsTypeInfo();
+  void register_ERuleBPUnitToggleCapsTypeInfo();
 
   /**
    * Address: 0x00BC8BD0 (FUN_00BC8BD0, register_UnitWeaponRangeCategoryTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `UnitWeaponRangeCategoryTypeInfo` and installs
-   * process-exit cleanup.
+   * Constructs/preregisters `UnitWeaponRangeCategoryTypeInfo`.
    */
-  int register_UnitWeaponRangeCategoryTypeInfo();
+  void register_UnitWeaponRangeCategoryTypeInfo();
 } // namespace moho

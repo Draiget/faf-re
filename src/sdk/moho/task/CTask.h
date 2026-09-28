@@ -227,7 +227,7 @@ namespace moho
    * thread top, preserving existing subtask chaining.
    */
   CPushTask<T>::CPushTask()
-    : CTask(new CTaskThread(WIN_GetBeforeWaitStage()), false)
+    : CTask(new CTaskThread(&WIN_GetBeforeWaitStage()), false)
   {}
 
   template <class T>
@@ -257,15 +257,14 @@ namespace moho
    * thread top, preserving existing subtask chaining.
    */
   CPullTask<T>::CPullTask()
-    : CTask(new CTaskThread(WIN_GetBeforeEventsStage()), false)
+    : CTask(new CTaskThread(&WIN_GetBeforeEventsStage()), false)
   {}
 
   /**
    * Address: 0x00BC2FC0 (FUN_00BC2FC0, register_CTaskTypeInfo)
    *
    * What it does:
-   * Materializes the startup `CTaskTypeInfo` descriptor and registers
-   * process-exit teardown.
+   * Materializes the startup `CTaskTypeInfo` descriptor.
    */
   void register_CTaskTypeInfo();
 } // namespace moho

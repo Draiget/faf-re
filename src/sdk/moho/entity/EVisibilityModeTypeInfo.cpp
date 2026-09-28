@@ -1,27 +1,20 @@
 #include "moho/entity/EVisibilityModeTypeInfo.h"
 
-#include <cstdlib>
 #include <cstdint>
-#include <new>
 #include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  alignas(moho::EVisibilityModeTypeInfo) unsigned char gEVisibilityModeTypeInfoStorage[sizeof(moho::EVisibilityModeTypeInfo)]{};
-  bool gEVisibilityModeTypeInfoConstructed = false;
   bool gEVisibilityModeTypeInfoPreregistered = false;
 
-  const gpg::REnumType* gEVisibilityModeCachedType = nullptr;
-
+  /**
+   * Address: 0x00BF1F90 (FUN_00BF1F90, atexit destructor of the EVisibilityModeTypeInfo object)
+   */
   [[nodiscard]] moho::EVisibilityModeTypeInfo* AcquireEVisibilityModeTypeInfo()
   {
-    if (!gEVisibilityModeTypeInfoConstructed) {
-      new (gEVisibilityModeTypeInfoStorage) moho::EVisibilityModeTypeInfo();
-      gEVisibilityModeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::EVisibilityModeTypeInfo*>(gEVisibilityModeTypeInfoStorage);
+    static moho::EVisibilityModeTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -38,31 +31,15 @@ namespace
    * were never installed under any code path.
    */
   moho::EVisibilityModePrimitiveSerializer gEVisibilityModePrimitiveSerializer;
-
-  /**
-   * Address: 0x00BF1F90 (FUN_00BF1F90, cleanup_EVisibilityModeTypeInfo)
-   */
-  void cleanup_EVisibilityModeTypeInfo()
-  {
-    if (!gEVisibilityModeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEVisibilityModeTypeInfo()->~EVisibilityModeTypeInfo();
-    gEVisibilityModeTypeInfoConstructed = false;
-    gEVisibilityModeTypeInfoPreregistered = false;
-    gEVisibilityModeCachedType = nullptr;
-  }
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00BF1F90 (FUN_00BF1F90, Moho::EVisibilityModeTypeInfo::dtr)
-   * Address: 0x0050A190 (FUN_0050A190, vtable-slot-2 scalar deleting
-   * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
-   * conditionally frees the object -- ordinary C++ `delete` semantics, not
-   * modeled as a separate function here)
+   * Address: 0x0050A190 (FUN_0050A190, Moho::EVisibilityModeTypeInfo::dtr,
+   * vtable-slot-2 scalar deleting destructor: tail-calls
+   * `gpg::REnumType::~REnumType(this)` then conditionally frees the object --
+   * ordinary C++ `delete` semantics, not modeled as a separate function here)
    */
   EVisibilityModeTypeInfo::~EVisibilityModeTypeInfo() = default;
 
@@ -107,17 +84,15 @@ namespace moho
       gEVisibilityModeTypeInfoPreregistered = true;
     }
 
-    gEVisibilityModeCachedType = typeInfo;
     return typeInfo;
   }
 
   /**
    * Address: 0x00BC7AD0 (FUN_00BC7AD0, register_EVisibilityModeTypeInfo)
    */
-  int register_EVisibilityModeTypeInfo()
+  void register_EVisibilityModeTypeInfo()
   {
     (void)preregister_EVisibilityModeTypeInfo();
-    return std::atexit(&cleanup_EVisibilityModeTypeInfo);
   }
 } // namespace moho
 

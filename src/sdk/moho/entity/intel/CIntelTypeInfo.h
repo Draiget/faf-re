@@ -89,18 +89,10 @@ namespace moho
   static_assert(sizeof(CIntelTypeInfo) == 0x64, "CIntelTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00C01D90 (FUN_00C01D90, cleanup_CIntelTypeInfo)
-   *
-   * What it does:
-   * Runs process-exit teardown for startup `CIntelTypeInfo` storage.
-   */
-  void cleanup_CIntelTypeInfo();
-
-  /**
    * Address: 0x00BDCBC0 (FUN_00BDCBC0, register_CIntelTypeInfo)
    *
    * What it does:
-   * Builds startup `CIntelTypeInfo` storage and installs process-exit cleanup.
+   * Builds the startup `CIntelTypeInfo` object.
    */
   void register_CIntelTypeInfo();
 } // namespace moho

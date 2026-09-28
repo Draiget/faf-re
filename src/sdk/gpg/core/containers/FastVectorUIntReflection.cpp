@@ -2,8 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
@@ -502,25 +500,16 @@ namespace
     }
   }
 
-  gpg::RFastVectorType<unsigned int> gFastVectorUIntType;
-
   /**
-   * Address: 0x00BEDF40 (FUN_00BEDF40, ??1RFastVectorType_uint@gpg@@QAE@@Z)
-   *
-   * What it does:
-   * Process-exit cleanup for global `RFastVectorType<unsigned int>` dynamic
-   * field/base lanes.
+   * Address: 0x00BEDF40 (FUN_00BEDF40, atexit destructor of the RFastVectorType<unsigned int> object)
    */
-  void cleanup_RFastVectorType_uint()
+  [[nodiscard]] gpg::RFastVectorType<unsigned int>* AcquireFastVectorUIntType()
   {
-    gFastVectorUIntType.fields_.clear();
-    gFastVectorUIntType.bases_.clear();
+    static gpg::RFastVectorType<unsigned int> sInstance;
+    return &sInstance;
   }
 
   using FastVectorFloatType = gpg::RFastVectorType<float>;
-
-  msvc8::string gFastVectorFloatTypeName;
-  bool gFastVectorFloatTypeNameCleanupRegistered = false;
 
   /**
    * Address: 0x0065AA60 family helper
@@ -540,43 +529,29 @@ namespace
 
   /**
    * Address: 0x01104CC8 (`gpg::RFastVectorType<Moho::SSTIEntityAttachInfo>` descriptor storage)
+   * Address: 0x00BF5050 (FUN_00BF5050, atexit destructor of the RFastVectorType<Moho::SSTIEntityAttachInfo> object)
    *
    * The binary places this descriptor in `.data` and builds it in-place from
    * FUN_00559580; the RIndexed sub-object vtable lands at 0x01104D2C, i.e.
    * storage + 0x64.
    */
-  alignas(FastVectorSSTIEntityAttachInfoType)
-    unsigned char gFastVectorSSTIEntityAttachInfoTypeStorage[sizeof(FastVectorSSTIEntityAttachInfoType)]{};
-  bool gFastVectorSSTIEntityAttachInfoTypeConstructed = false;
+  [[nodiscard]] FastVectorSSTIEntityAttachInfoType* AcquireFastVectorSSTIEntityAttachInfoType()
+  {
+    static FastVectorSSTIEntityAttachInfoType sInstance;
+    return &sInstance;
+  }
 
   /**
    * Address: 0x01104D98 (`gpg::RFastVectorType<Moho::UnitWeaponInfo>` descriptor storage)
+   * Address: 0x00BF55A0 (FUN_00BF55A0, atexit destructor of the RFastVectorType<Moho::UnitWeaponInfo> object)
    *
    * Built in-place from FUN_0055E9B0; the RIndexed sub-object vtable lands at
    * 0x01104DFC, i.e. storage + 0x64.
    */
-  alignas(FastVectorUnitWeaponInfoType)
-    unsigned char gFastVectorUnitWeaponInfoTypeStorage[sizeof(FastVectorUnitWeaponInfoType)]{};
-  bool gFastVectorUnitWeaponInfoTypeConstructed = false;
-
-  [[nodiscard]] FastVectorSSTIEntityAttachInfoType* AcquireFastVectorSSTIEntityAttachInfoType()
-  {
-    if (!gFastVectorSSTIEntityAttachInfoTypeConstructed) {
-      new (gFastVectorSSTIEntityAttachInfoTypeStorage) FastVectorSSTIEntityAttachInfoType();
-      gFastVectorSSTIEntityAttachInfoTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorSSTIEntityAttachInfoType*>(gFastVectorSSTIEntityAttachInfoTypeStorage);
-  }
-
   [[nodiscard]] FastVectorUnitWeaponInfoType* AcquireFastVectorUnitWeaponInfoType()
   {
-    if (!gFastVectorUnitWeaponInfoTypeConstructed) {
-      new (gFastVectorUnitWeaponInfoTypeStorage) FastVectorUnitWeaponInfoType();
-      gFastVectorUnitWeaponInfoTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorUnitWeaponInfoType*>(gFastVectorUnitWeaponInfoTypeStorage);
+    static FastVectorUnitWeaponInfoType sInstance;
+    return &sInstance;
   }
 
   using FastVectorSOffsetInfoType = gpg::RFastVectorType<moho::SOffsetInfo>;
@@ -584,42 +559,28 @@ namespace
 
   /**
    * Address: 0x01104FA0 (`gpg::RFastVectorType<Moho::SOffsetInfo>` descriptor storage)
+   * Address: 0x00BF5CE0 (FUN_00BF5CE0, atexit destructor of the RFastVectorType<Moho::SOffsetInfo> object)
    *
    * Built in-place from FUN_00571C00; the RIndexed sub-object vtable lands at
    * 0x01105004, i.e. storage + 0x64.
    */
-  alignas(FastVectorSOffsetInfoType)
-    unsigned char gFastVectorSOffsetInfoTypeStorage[sizeof(FastVectorSOffsetInfoType)]{};
-  bool gFastVectorSOffsetInfoTypeConstructed = false;
+  [[nodiscard]] FastVectorSOffsetInfoType* AcquireFastVectorSOffsetInfoType()
+  {
+    static FastVectorSOffsetInfoType sInstance;
+    return &sInstance;
+  }
 
   /**
    * Address: 0x01104ED0 (`gpg::RFastVectorType<Moho::SAssignedLocInfo>` descriptor storage)
+   * Address: 0x00BF5C80 (FUN_00BF5C80, atexit destructor of the RFastVectorType<Moho::SAssignedLocInfo> object)
    *
    * Built in-place from FUN_00571C70; the RIndexed sub-object vtable lands at
    * 0x01104F34, i.e. storage + 0x64.
    */
-  alignas(FastVectorSAssignedLocInfoType)
-    unsigned char gFastVectorSAssignedLocInfoTypeStorage[sizeof(FastVectorSAssignedLocInfoType)]{};
-  bool gFastVectorSAssignedLocInfoTypeConstructed = false;
-
-  [[nodiscard]] FastVectorSOffsetInfoType* AcquireFastVectorSOffsetInfoType()
-  {
-    if (!gFastVectorSOffsetInfoTypeConstructed) {
-      new (gFastVectorSOffsetInfoTypeStorage) FastVectorSOffsetInfoType();
-      gFastVectorSOffsetInfoTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorSOffsetInfoType*>(gFastVectorSOffsetInfoTypeStorage);
-  }
-
   [[nodiscard]] FastVectorSAssignedLocInfoType* AcquireFastVectorSAssignedLocInfoType()
   {
-    if (!gFastVectorSAssignedLocInfoTypeConstructed) {
-      new (gFastVectorSAssignedLocInfoTypeStorage) FastVectorSAssignedLocInfoType();
-      gFastVectorSAssignedLocInfoTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorSAssignedLocInfoType*>(gFastVectorSAssignedLocInfoTypeStorage);
+    static FastVectorSAssignedLocInfoType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedFloatType()
@@ -629,12 +590,6 @@ namespace
       cached = gpg::LookupRType(typeid(float));
     }
     return cached;
-  }
-
-  void cleanup_FastVectorFloatTypeName()
-  {
-    gFastVectorFloatTypeName = msvc8::string{};
-    gFastVectorFloatTypeNameCleanupRegistered = false;
   }
 
   /**
@@ -703,9 +658,6 @@ namespace
 
   using FastVectorStringType = gpg::RFastVectorType<msvc8::string>;
 
-  msvc8::string gFastVectorStringTypeName;
-  bool gFastVectorStringTypeNameCleanupRegistered = false;
-
   /**
    * Address: 0x00BFBB10 (FUN_00BFBB10, atexit destructor of the FastVectorStringType object)
    */
@@ -722,12 +674,6 @@ namespace
       cached = gpg::LookupRType(typeid(msvc8::string));
     }
     return cached;
-  }
-
-  void cleanup_FastVectorStringTypeName()
-  {
-    gFastVectorStringTypeName = msvc8::string{};
-    gFastVectorStringTypeNameCleanupRegistered = false;
   }
 
   void FastVectorStringResize(const msvc8::string* fillValue, const unsigned int newSize, void* objectStorage)
@@ -790,9 +736,6 @@ namespace
 
   using FastVectorVector3fType = gpg::RFastVectorType<Wm3::Vector3f>;
 
-  msvc8::string gFastVectorVector3fTypeName;
-  bool gFastVectorVector3fTypeNameCleanupRegistered = false;
-
   /**
    * Address: 0x00BF2B80 (FUN_00BF2B80, atexit destructor of the FastVectorVector3fType object)
    */
@@ -840,39 +783,6 @@ namespace
     return type;
   }
 
-  msvc8::string gFastVectorSSTIEntityAttachInfoTypeName;
-  bool gFastVectorSSTIEntityAttachInfoTypeNameCleanupRegistered = false;
-  msvc8::string gFastVectorUnitWeaponInfoTypeName;
-  bool gFastVectorUnitWeaponInfoTypeNameCleanupRegistered = false;
-  msvc8::string gFastVectorSOffsetInfoTypeName;
-  bool gFastVectorSOffsetInfoTypeNameCleanupRegistered = false;
-  msvc8::string gFastVectorSAssignedLocInfoTypeName;
-  bool gFastVectorSAssignedLocInfoTypeNameCleanupRegistered = false;
-
-  void cleanup_FastVectorSSTIEntityAttachInfoTypeName()
-  {
-    gFastVectorSSTIEntityAttachInfoTypeName = msvc8::string{};
-    gFastVectorSSTIEntityAttachInfoTypeNameCleanupRegistered = false;
-  }
-
-  void cleanup_FastVectorUnitWeaponInfoTypeName()
-  {
-    gFastVectorUnitWeaponInfoTypeName = msvc8::string{};
-    gFastVectorUnitWeaponInfoTypeNameCleanupRegistered = false;
-  }
-
-  void cleanup_FastVectorSOffsetInfoTypeName()
-  {
-    gFastVectorSOffsetInfoTypeName = msvc8::string{};
-    gFastVectorSOffsetInfoTypeNameCleanupRegistered = false;
-  }
-
-  void cleanup_FastVectorSAssignedLocInfoTypeName()
-  {
-    gFastVectorSAssignedLocInfoTypeName = msvc8::string{};
-    gFastVectorSAssignedLocInfoTypeNameCleanupRegistered = false;
-  }
-
   [[nodiscard]] gpg::RType* CachedUnitWeaponInfoType()
   {
     static gpg::RType* cached = nullptr;
@@ -914,51 +824,6 @@ namespace
   }
 
   /**
-   * Address: 0x00558C30 (FUN_00558C30, gpg::RFastVectorType_SSTIEntityAttachInfo::GetName)
-   *
-   * What it does:
-   * Lazily builds and caches the reflected
-   * `fastvector<SSTIEntityAttachInfo>` type name.
-   */
-  const char* GetFastVectorSSTIEntityAttachInfoTypeName()
-  {
-    if (gFastVectorSSTIEntityAttachInfoTypeName.empty()) {
-      gpg::RType* const elementType = CachedSSTIEntityAttachInfoType();
-      const char* const elementName = elementType ? elementType->GetName() : "SSTIEntityAttachInfo";
-      gFastVectorSSTIEntityAttachInfoTypeName = gpg::STR_Printf(
-        "fastvector<%s>",
-        elementName ? elementName : "SSTIEntityAttachInfo"
-      );
-      if (!gFastVectorSSTIEntityAttachInfoTypeNameCleanupRegistered) {
-        gFastVectorSSTIEntityAttachInfoTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_FastVectorSSTIEntityAttachInfoTypeName);
-      }
-    }
-    return gFastVectorSSTIEntityAttachInfoTypeName.c_str();
-  }
-
-  /**
-   * Address: 0x0055CBF0 (FUN_0055CBF0, gpg::RFastVectorType_UnitWeaponInfo::GetName)
-   *
-   * What it does:
-   * Lazily builds and caches the reflected `fastvector<UnitWeaponInfo>` type
-   * name.
-   */
-  const char* GetFastVectorUnitWeaponInfoTypeName()
-  {
-    if (gFastVectorUnitWeaponInfoTypeName.empty()) {
-      gpg::RType* const elementType = CachedUnitWeaponInfoType();
-      const char* const elementName = elementType ? elementType->GetName() : "UnitWeaponInfo";
-      gFastVectorUnitWeaponInfoTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "UnitWeaponInfo");
-      if (!gFastVectorUnitWeaponInfoTypeNameCleanupRegistered) {
-        gFastVectorUnitWeaponInfoTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_FastVectorUnitWeaponInfoTypeName);
-      }
-    }
-    return gFastVectorUnitWeaponInfoTypeName.c_str();
-  }
-
-  /**
    * Address: 0x0055CD70 (FUN_0055CD70, gpg::RFastVectorType_UnitWeaponInfo::SetCount)
    *
    * IDA signature:
@@ -982,54 +847,6 @@ namespace
   {
     moho::UnitWeaponInfo fill;
     static_cast<gpg::core::FastVectorInline<moho::UnitWeaponInfo>*>(vector)->resize(static_cast<unsigned int>(count), fill);
-  }
-
-  /**
-   * Address: 0x0056C020 (FUN_0056C020, gpg::RFastVectorType_SOffsetInfo::GetName)
-   *
-   * What it does:
-   * Lazily builds and caches the reflected `fastvector<SOffsetInfo>` type
-   * name.
-   */
-  const char* GetFastVectorSOffsetInfoTypeName()
-  {
-    if (gFastVectorSOffsetInfoTypeName.empty()) {
-      gpg::RType* const elementType = CachedSOffsetInfoTypeCompat();
-      const char* const elementName = elementType ? elementType->GetName() : "SOffsetInfo";
-      gFastVectorSOffsetInfoTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SOffsetInfo");
-      if (!gFastVectorSOffsetInfoTypeNameCleanupRegistered) {
-        gFastVectorSOffsetInfoTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_FastVectorSOffsetInfoTypeName);
-      }
-    }
-    return gFastVectorSOffsetInfoTypeName.c_str();
-  }
-
-  /**
-   * Address: 0x0056C240 (FUN_0056C240, gpg::RFastVectorType_SAssignedLocInfo::GetName)
-   *
-   * What it does:
-   * Lazily builds and caches the reflected `fastvector<SAssignedLocInfo>` type
-   * name.
-   */
-  const char* GetFastVectorSAssignedLocInfoTypeName()
-  {
-    if (gFastVectorSAssignedLocInfoTypeName.empty()) {
-      gpg::RType* const elementType = CachedSAssignedLocInfoTypeCompat();
-      const char* const elementName = elementType ? elementType->GetName() : "SAssignedLocInfo";
-      gFastVectorSAssignedLocInfoTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SAssignedLocInfo");
-      if (!gFastVectorSAssignedLocInfoTypeNameCleanupRegistered) {
-        gFastVectorSAssignedLocInfoTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_FastVectorSAssignedLocInfoTypeName);
-      }
-    }
-    return gFastVectorSAssignedLocInfoTypeName.c_str();
-  }
-
-  void cleanup_FastVectorVector3fTypeName()
-  {
-    gFastVectorVector3fTypeName = msvc8::string{};
-    gFastVectorVector3fTypeNameCleanupRegistered = false;
   }
 
   void FastVectorVector3fResize(const Wm3::Vector3f* fillValue, const unsigned int newSize, void* objectStorage)
@@ -1236,13 +1053,11 @@ gpg::RType* gpg::ResolveFastVectorUIntType()
  * Address: 0x00BC2D40 (FUN_00BC2D40, register_RFastVectorType_uint)
  *
  * What it does:
- * Materializes startup reflection storage for `fastvector<unsigned int>` and
- * registers process-exit teardown.
+ * Constructs the `fastvector<unsigned int>` reflection descriptor.
  */
 void gpg::register_RFastVectorType_uint()
 {
-  (void)gFastVectorUIntType;
-  (void)std::atexit(&cleanup_RFastVectorType_uint);
+  (void)AcquireFastVectorUIntType();
 }
 
 /**
@@ -1289,14 +1104,14 @@ gpg::RFastVectorType<unsigned int>::~RFastVectorType() = default;
 
 /**
  * Address: 0x00402420 (FUN_00402420, gpg::RFastVectorType_uint::GetName)
+ * Address: 0x00BEDF10 (FUN_00BEDF10, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `fastvector<unsigned int>` once and returns it.
  */
 const char* gpg::RFastVectorType<unsigned int>::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const char* const elementName = CachedUIntType()->GetName();
-    sName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "unsigned int");
-  }
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedUIntType()->GetName());
   return sName.c_str();
 }
 
@@ -1420,24 +1235,15 @@ gpg::RFastVectorType<float>::~RFastVectorType() = default;
 
 /**
  * Address: 0x006599E0 (FUN_006599E0, gpg::RFastVectorType_float::GetName)
+ * Address: 0x00BFBAE0 (FUN_00BFBAE0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches `fastvector<element>` reflection text using the
- * resolved `float` type name.
+ * Builds `fastvector<float>` once and returns it.
  */
 const char* gpg::RFastVectorType<float>::GetName() const
 {
-  if (gFastVectorFloatTypeName.empty()) {
-    gpg::RType* const elementType = CachedFloatType();
-    const char* const elementName = elementType ? elementType->GetName() : "float";
-    gFastVectorFloatTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "float");
-    if (!gFastVectorFloatTypeNameCleanupRegistered) {
-      gFastVectorFloatTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_FastVectorFloatTypeName);
-    }
-  }
-
-  return gFastVectorFloatTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedFloatType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -1575,20 +1381,15 @@ namespace gpg
     return type;
   }
 
-  void cleanup_FastVectorSSTIEntityAttachInfoType()
-  {
-    if (!gFastVectorSSTIEntityAttachInfoTypeConstructed) {
-      return;
-    }
-
-    AcquireFastVectorSSTIEntityAttachInfoType()->~FastVectorSSTIEntityAttachInfoType();
-    gFastVectorSSTIEntityAttachInfoTypeConstructed = false;
-  }
-
-  int register_FastVectorSSTIEntityAttachInfoTypeAtexit()
+  /**
+   * Address: 0x00BCA140 (FUN_00BCA140, register_FastVectorSSTIEntityAttachInfoTypeAtexit)
+   *
+   * What it does:
+   * Startup wrapper that preregisters `gpg::fastvector<Moho::SSTIEntityAttachInfo>`.
+   */
+  void register_FastVectorSSTIEntityAttachInfoTypeAtexit()
   {
     (void)preregister_FastVectorSSTIEntityAttachInfoType();
-    return std::atexit(&cleanup_FastVectorSSTIEntityAttachInfoType);
   }
 } // namespace gpg
 
@@ -1599,10 +1400,15 @@ gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::~RFastVectorType() = default;
 
 /**
  * Address: 0x00558C30 (FUN_00558C30, gpg::RFastVectorType_SSTIEntityAttachInfo::GetName)
+ * Address: 0x00BF5020 (FUN_00BF5020, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `fastvector<SSTIEntityAttachInfo>` once and returns it.
  */
 const char* gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::GetName() const
 {
-  return GetFastVectorSSTIEntityAttachInfoTypeName();
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSSTIEntityAttachInfoType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -1712,20 +1518,15 @@ namespace gpg
     return type;
   }
 
-  void cleanup_FastVectorUnitWeaponInfoType()
-  {
-    if (!gFastVectorUnitWeaponInfoTypeConstructed) {
-      return;
-    }
-
-    AcquireFastVectorUnitWeaponInfoType()->~FastVectorUnitWeaponInfoType();
-    gFastVectorUnitWeaponInfoTypeConstructed = false;
-  }
-
-  int register_FastVectorUnitWeaponInfoTypeAtexit()
+  /**
+   * Address: 0x00BCA6E0 (FUN_00BCA6E0, register_FastVectorUnitWeaponInfoTypeAtexit)
+   *
+   * What it does:
+   * Startup wrapper that preregisters `gpg::fastvector<Moho::UnitWeaponInfo>`.
+   */
+  void register_FastVectorUnitWeaponInfoTypeAtexit()
   {
     (void)preregister_FastVectorUnitWeaponInfoType();
-    return std::atexit(&cleanup_FastVectorUnitWeaponInfoType);
   }
 } // namespace gpg
 
@@ -1736,10 +1537,15 @@ gpg::RFastVectorType<moho::UnitWeaponInfo>::~RFastVectorType() = default;
 
 /**
  * Address: 0x0055CBF0 (FUN_0055CBF0, gpg::RFastVectorType_UnitWeaponInfo::GetName)
+ * Address: 0x00BF5510 (FUN_00BF5510, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `fastvector<UnitWeaponInfo>` once and returns it.
  */
 const char* gpg::RFastVectorType<moho::UnitWeaponInfo>::GetName() const
 {
-  return GetFastVectorUnitWeaponInfoTypeName();
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedUnitWeaponInfoType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -1845,20 +1651,15 @@ namespace gpg
     return type;
   }
 
-  void cleanup_FastVectorSOffsetInfoType()
-  {
-    if (!gFastVectorSOffsetInfoTypeConstructed) {
-      return;
-    }
-
-    AcquireFastVectorSOffsetInfoType()->~FastVectorSOffsetInfoType();
-    gFastVectorSOffsetInfoTypeConstructed = false;
-  }
-
-  int register_FastVectorSOffsetInfoTypeAtexit()
+  /**
+   * Address: 0x00BCAD00 (FUN_00BCAD00, register_FastVectorSOffsetInfoTypeAtexit)
+   *
+   * What it does:
+   * Startup wrapper that preregisters `gpg::fastvector<Moho::SOffsetInfo>`.
+   */
+  void register_FastVectorSOffsetInfoTypeAtexit()
   {
     (void)preregister_FastVectorSOffsetInfoType();
-    return std::atexit(&cleanup_FastVectorSOffsetInfoType);
   }
 } // namespace gpg
 
@@ -1869,10 +1670,15 @@ gpg::RFastVectorType<moho::SOffsetInfo>::~RFastVectorType() = default;
 
 /**
  * Address: 0x0056C020 (FUN_0056C020, gpg::RFastVectorType_SOffsetInfo::GetName)
+ * Address: 0x00BF5B30 (FUN_00BF5B30, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `fastvector<SOffsetInfo>` once and returns it.
  */
 const char* gpg::RFastVectorType<moho::SOffsetInfo>::GetName() const
 {
-  return GetFastVectorSOffsetInfoTypeName();
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSOffsetInfoTypeCompat()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -1976,20 +1782,15 @@ namespace gpg
     return type;
   }
 
-  void cleanup_FastVectorSAssignedLocInfoType()
-  {
-    if (!gFastVectorSAssignedLocInfoTypeConstructed) {
-      return;
-    }
-
-    AcquireFastVectorSAssignedLocInfoType()->~FastVectorSAssignedLocInfoType();
-    gFastVectorSAssignedLocInfoTypeConstructed = false;
-  }
-
-  int register_FastVectorSAssignedLocInfoTypeAtexit()
+  /**
+   * Address: 0x00BCAD20 (FUN_00BCAD20, register_FastVectorSAssignedLocInfoTypeAtexit)
+   *
+   * What it does:
+   * Startup wrapper that preregisters `gpg::fastvector<Moho::SAssignedLocInfo>`.
+   */
+  void register_FastVectorSAssignedLocInfoTypeAtexit()
   {
     (void)preregister_FastVectorSAssignedLocInfoType();
-    return std::atexit(&cleanup_FastVectorSAssignedLocInfoType);
   }
 } // namespace gpg
 
@@ -2000,10 +1801,16 @@ gpg::RFastVectorType<moho::SAssignedLocInfo>::~RFastVectorType() = default;
 
 /**
  * Address: 0x0056C240 (FUN_0056C240, gpg::RFastVectorType_SAssignedLocInfo::GetName)
+ * Address: 0x00BF5B00 (FUN_00BF5B00, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `fastvector<SAssignedLocInfo>` once and returns it.
  */
 const char* gpg::RFastVectorType<moho::SAssignedLocInfo>::GetName() const
 {
-  return GetFastVectorSAssignedLocInfoTypeName();
+  static const msvc8::string sName =
+    gpg::STR_Printf("fastvector<%s>", CachedSAssignedLocInfoTypeCompat()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -2103,24 +1910,15 @@ gpg::RFastVectorType<msvc8::string>::~RFastVectorType() = default;
 
 /**
  * Address: 0x0065A060 (FUN_0065A060, gpg::RFastVectorType_String::GetName)
+ * Address: 0x00BFBA50 (FUN_00BFBA50, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the reflected `fastvector<msvc8::string>` name and
- * registers process-exit cleanup for the cached string storage.
+ * Builds `fastvector<std::string>` once and returns it.
  */
 const char* gpg::RFastVectorType<msvc8::string>::GetName() const
 {
-  if (gFastVectorStringTypeName.empty()) {
-    const gpg::RType* const elementType = CachedStringType();
-    const char* const elementName = elementType ? elementType->GetName() : "msvc8::string";
-    gFastVectorStringTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "msvc8::string");
-    if (!gFastVectorStringTypeNameCleanupRegistered) {
-      gFastVectorStringTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_FastVectorStringTypeName);
-    }
-  }
-
-  return gFastVectorStringTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedStringType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -2270,23 +2068,15 @@ gpg::RFastVectorType<Wm3::Vector3f>::~RFastVectorType() = default;
 
 /**
  * Address: 0x00515920 (FUN_00515920, gpg::RFastVectorType_Vector3f::GetName)
+ * Address: 0x00BF2AF0 (FUN_00BF2AF0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Builds and caches lexical reflection name `fastvector<element>` for
- * `gpg::fastvector<Wm3::Vector3f>`.
+ * Builds `fastvector<Vector3f>` once and returns it.
  */
 const char* gpg::RFastVectorType<Wm3::Vector3f>::GetName() const
 {
-  if (gFastVectorVector3fTypeName.empty()) {
-    const char* const elementName = CachedVector3fType() ? CachedVector3fType()->GetName() : "Vector3f";
-    gFastVectorVector3fTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "Vector3f");
-    if (!gFastVectorVector3fTypeNameCleanupRegistered) {
-      gFastVectorVector3fTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_FastVectorVector3fTypeName);
-    }
-  }
-
-  return gFastVectorVector3fTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedVector3fType()->GetName());
+  return sName.c_str();
 }
 
 /**

@@ -52,12 +52,12 @@ namespace moho
   static_assert(sizeof(UnitWeaponTypeInfo) == 0x64, "UnitWeaponTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00BD88D0 (FUN_00BD88D0, startup registration + atexit cleanup)
+   * Address: 0x00BD88D0 (FUN_00BD88D0, startup registration)
    *
    * What it does:
-   * Constructs the static `UnitWeaponTypeInfo` descriptor and schedules its
-   * atexit cleanup. Runs in the phase-1 initializer walk so consumers that
-   * call `gpg::LookupRType(typeid(UnitWeapon))` cannot outrun it.
+   * Constructs the static `UnitWeaponTypeInfo` descriptor. Runs in the
+   * phase-1 initializer walk so consumers that call
+   * `gpg::LookupRType(typeid(UnitWeapon))` cannot outrun it.
    */
   [[nodiscard]] gpg::RType* preregister_UnitWeaponTypeInfo();
 } // namespace moho

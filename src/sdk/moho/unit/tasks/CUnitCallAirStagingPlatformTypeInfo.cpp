@@ -1,6 +1,5 @@
 #include "moho/unit/tasks/CUnitCallAirStagingPlatformTypeInfo.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -13,17 +12,13 @@ namespace
 {
   using TypeInfo = moho::CUnitCallAirStagingPlatformTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCUnitCallAirStagingPlatformTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCUnitCallAirStagingPlatformTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF9770 (FUN_00BF9770, atexit destructor of the CUnitCallAirStagingPlatformTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gCUnitCallAirStagingPlatformTypeInfoConstructed) {
-      new (gCUnitCallAirStagingPlatformTypeInfoStorage) TypeInfo();
-      gCUnitCallAirStagingPlatformTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCUnitCallAirStagingPlatformTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   void InitializeAirStagingRuntimeState(moho::CUnitCallAirStagingPlatform* const task)
@@ -144,26 +139,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF9770 (FUN_00BF9770, cleanup_CUnitCallAirStagingPlatformTypeInfo)
-   */
-  void cleanup_CUnitCallAirStagingPlatformTypeInfo()
-  {
-    if (!gCUnitCallAirStagingPlatformTypeInfoConstructed) {
-      return;
-    }
-
-    auto& typeInfo = *reinterpret_cast<TypeInfo*>(gCUnitCallAirStagingPlatformTypeInfoStorage);
-    typeInfo.fields_.clear();
-    typeInfo.bases_.clear();
-  }
-
-  /**
    * Address: 0x00BCFD60 (FUN_00BCFD60, register_CUnitCallAirStagingPlatformTypeInfo)
    */
-  int register_CUnitCallAirStagingPlatformTypeInfo()
+  void register_CUnitCallAirStagingPlatformTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup_CUnitCallAirStagingPlatformTypeInfo);
   }
 } // namespace moho
 

@@ -94,18 +94,16 @@ namespace moho
    * Address: 0x00BCCD50 (FUN_00BCCD50, register_CAiPathFinderTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters startup RTTI descriptor for `CAiPathFinder` and
-   * installs process-exit cleanup.
+   * Constructs/preregisters startup RTTI descriptor for `CAiPathFinder`.
    */
-  int register_CAiPathFinderTypeInfo();
+  void register_CAiPathFinderTypeInfo();
 
   /**
    * Address: 0x00BCCDB0 (FUN_00BCCDB0, register_Rect2iListTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters reflected `std::list<gpg::Rect2<int>>` type-info
-   * and installs process-exit cleanup.
+   * Constructs/preregisters reflected `std::list<gpg::Rect2<int>>` type-info.
    */
-  int register_Rect2iListTypeInfo();
+  void register_Rect2iListTypeInfo();
 
 } // namespace moho

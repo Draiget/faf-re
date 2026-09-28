@@ -18,8 +18,6 @@
 namespace
 {
   using CountedPtrType = moho::RCountedPtrType<moho::IFormationInstance>;
-  msvc8::string gCountedPtrTypeName;
-  bool gCountedPtrTypeNameCleanupRegistered = false;
   constexpr std::uint32_t kTypeCacheInitMask = 0x1u;
   constexpr std::int32_t kIsDerivedAssertLine = 458;
   constexpr const char* kIsDerivedAssertExpr = "isDer";
@@ -139,53 +137,13 @@ namespace
     throw gpg::SerializationError(message.c_str());
   }
 
-  alignas(CountedPtrType) unsigned char gCountedPtrTypeStorage[sizeof(CountedPtrType)];
-  bool gCountedPtrTypeConstructed = false;
-
+  /**
+   * Address: 0x00BFED00 (FUN_00BFED00, atexit destructor of the RCountedPtrType<IFormationInstance> object)
+   */
   [[nodiscard]] CountedPtrType& GetCountedPtrType() noexcept
   {
-    if (!gCountedPtrTypeConstructed) {
-      new (gCountedPtrTypeStorage) CountedPtrType();
-      gCountedPtrTypeConstructed = true;
-    }
-
-    return *reinterpret_cast<CountedPtrType*>(gCountedPtrTypeStorage);
-  }
-
-  template <class TTypeInfo>
-  void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
-  {
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-  }
-
-  /**
-   * Address: 0x00BFED00 (FUN_00BFED00, Moho::RCountedPtrType<Moho::IFormationInstance>::cleanup)
-   *
-   * What it does:
-   * Releases reflected field/base vector storage and restores the base `RObject`
-   * vtable lane.
-   */
-  void cleanup_RCountedPtrType_IFormationInstance()
-  {
-    if (!gCountedPtrTypeConstructed) {
-      return;
-    }
-
-    ResetTypeInfoVectors(GetCountedPtrType());
-    GetCountedPtrType().~CountedPtrType();
-    gCountedPtrTypeConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BFEC40 (FUN_00BFEC40, Moho::RCountedPtrType<Moho::IFormationInstance>::cleanup name cache)
-   *
-   * What it does:
-   * Releases the cached `CountedPtr<...>` display name string.
-   */
-  void cleanup_RCountedPtrType_IFormationInstance_Name()
-  {
-    gCountedPtrTypeName = msvc8::string();
+    static CountedPtrType sInstance;
+    return sInstance;
   }
 } // namespace
 
@@ -291,38 +249,20 @@ namespace moho
   namespace
   {
     /**
-     * Static `RPointerType<IFormationInstance>` descriptor that the binary
-     * exposes as `Moho::IFormationInstance::PointerType`. Default static-init
-     * runs the RPointerTypeBase → RType → RObject ctor chain and installs the
-     * most-derived vftable lane.
-     */
-    gpg::RPointerType<moho::IFormationInstance> sIFormationInstancePointerTypeStorage{};
-
-    /**
      * Address: 0x0059D5B0 (FUN_0059D5B0)
+     * Address: 0x00BF68F0 (FUN_00BF68F0, atexit destructor of the RPointerType<IFormationInstance> object)
      *
      * What it does:
-     * Pre-registers the static `RPointerType<IFormationInstance>` descriptor
-     * under the `IFormationInstance*` type-info key so subsequent `LookupRType`
-     * queries from the lazy `GetPointerType` lane resolve to this descriptor.
+     * Constructs the static `RPointerType<IFormationInstance>` descriptor (the
+     * binary's `Moho::IFormationInstance::PointerType`) on first use and
+     * pre-registers it under the `IFormationInstance*` type-info key so
+     * subsequent `LookupRType` queries from the lazy `GetPointerType` lane
+     * resolve to this descriptor.
      */
     void PreregisterIFormationInstancePointerType()
     {
-      gpg::PreRegisterRType(typeid(moho::IFormationInstance*), &sIFormationInstancePointerTypeStorage);
-    }
-
-    /**
-     * Address: 0x00BF68F0 (FUN_00BF68F0)
-     *
-     * What it does:
-     * Tears down the static `RPointerType<IFormationInstance>` descriptor at
-     * process exit: frees heap-backed `bases_`/`fields_` vector storage and
-     * resets the RType vftable lane to the `RObject` base. Registered via
-     * `atexit` from `GetPointerType`'s once-init path.
-     */
-    void CleanupIFormationInstancePointerType()
-    {
-      sIFormationInstancePointerTypeStorage.~RPointerType<moho::IFormationInstance>();
+      static gpg::RPointerType<moho::IFormationInstance> sDescriptor;
+      gpg::PreRegisterRType(typeid(moho::IFormationInstance*), &sDescriptor);
     }
   } // namespace
 
@@ -330,23 +270,18 @@ namespace moho
    * Address: 0x0059D010 (FUN_0059D010, Moho::IFormationInstance::GetPointerType)
    *
    * What it does:
-   * On first call, pre-registers the static `RPointerType<IFormationInstance>`
-   * descriptor and installs the matching atexit teardown. After that, lazily
-   * caches the `LookupRType(typeid(IFormationInstance*))` result in
-   * `sPointerType` and returns it.
+   * On first call, constructs and pre-registers the static
+   * `RPointerType<IFormationInstance>` descriptor. After that, lazily caches
+   * the `LookupRType(typeid(IFormationInstance*))` result in `sPointerType`
+   * and returns it.
    */
   gpg::RType* IFormationInstance::GetPointerType()
   {
     static const bool sOnceInit = []() {
       PreregisterIFormationInstancePointerType();
-      (void)std::atexit(&CleanupIFormationInstancePointerType);
       return true;
     }();
     (void)sOnceInit;
-
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::IFormationInstance));
-    }
 
     gpg::RType* cached = sPointerType;
     if (!cached) {
@@ -432,19 +367,16 @@ namespace moho
 
   /**
    * Address: 0x006E9D80 (FUN_006E9D80, Moho::RCountedPtrType<Moho::IFormationInstance>::GetName)
+   * Address: 0x00BFEC40 (FUN_00BFEC40, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `CountedPtr<IFormationInstance>` once from the pointee type's name
+   * and returns it.
    */
   const char* RCountedPtrType<moho::IFormationInstance>::GetName() const
   {
-    if (gCountedPtrTypeName.empty()) {
-      const char* const pointeeName = CachedIFormationInstanceType() ? CachedIFormationInstanceType()->GetName() : "IFormationInstance";
-      gCountedPtrTypeName = gpg::STR_Printf("CountedPtr<%s>", pointeeName ? pointeeName : "IFormationInstance");
-      if (!gCountedPtrTypeNameCleanupRegistered) {
-        gCountedPtrTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_RCountedPtrType_IFormationInstance_Name);
-      }
-    }
-
-    return gCountedPtrTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("CountedPtr<%s>", CachedIFormationInstanceType()->GetName());
+    return sName.c_str();
   }
 
   /**
@@ -573,7 +505,6 @@ namespace moho
   void register_IFormationInstanceCountedPtrReflection()
   {
     (void)GetCountedPtrType();
-    (void)std::atexit(&cleanup_RCountedPtrType_IFormationInstance);
   }
 } // namespace moho
 

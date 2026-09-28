@@ -29,10 +29,10 @@ namespace moho
     SCoordsVec2TypeInfo();
 
     /**
-     * Address: 0x00BF20B0 (FUN_00BF20B0, Moho::SCoordsVec2TypeInfo::dtr)
-     *
      * What it does:
-     * Releases the reflected field and base vector storage.
+     * Releases the reflected field and base vector storage. Its deleting
+     * destructor (vtable slot 2) is one of the `gpg::RType` teardown COMDAT
+     * clones cited on `gpg::RType::~RType`.
      */
     ~SCoordsVec2TypeInfo() override;
 
@@ -134,7 +134,7 @@ namespace moho
    * Address: 0x00BC7CC0 (FUN_00BC7CC0, register_SCoordsVec2TypeInfo)
    *
    * What it does:
-   * Installs the static `SCoordsVec2TypeInfo` instance and its shutdown hook.
+   * Constructs the static `SCoordsVec2TypeInfo` instance.
    */
   void register_SCoordsVec2TypeInfo();
 } // namespace moho

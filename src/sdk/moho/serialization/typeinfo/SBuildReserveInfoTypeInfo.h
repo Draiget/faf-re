@@ -39,19 +39,11 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_SBuildReserveInfoTypeInfo();
 
   /**
-   * Address: 0x00BF61D0 (FUN_00BF61D0, cleanup_SBuildReserveInfoTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `SBuildReserveInfoTypeInfo` storage at process exit.
-   */
-  void cleanup_SBuildReserveInfoTypeInfo();
-
-  /**
    * Address: 0x00BCB370 (FUN_00BCB370, register_SBuildReserveInfoTypeInfoStartup)
    *
    * What it does:
-   * Runs preregistration for `SBuildReserveInfoTypeInfo` and installs exit cleanup.
+   * Runs preregistration for `SBuildReserveInfoTypeInfo`.
    */
-  int register_SBuildReserveInfoTypeInfoStartup();
+  void register_SBuildReserveInfoTypeInfoStartup();
 } // namespace moho
 

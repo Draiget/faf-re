@@ -11,15 +11,6 @@
 
 namespace
 {
-  alignas(moho::SCoordsVec2TypeInfo) unsigned char
-    gSCoordsVec2TypeInfoStorage[sizeof(moho::SCoordsVec2TypeInfo)];
-  bool gSCoordsVec2TypeInfoConstructed = false;
-
-  [[nodiscard]] moho::SCoordsVec2TypeInfo& SCoordsVec2TypeInfoStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::SCoordsVec2TypeInfo*>(gSCoordsVec2TypeInfoStorage);
-  }
-
   /**
    * Address: 0x0050CAB0 (FUN_0050CAB0)
    *
@@ -52,16 +43,6 @@ namespace
     typeInfo->fields_ = msvc8::vector<gpg::RField>{};
     typeInfo->bases_ = msvc8::vector<gpg::RField>{};
   }
-
-  void CleanupSCoordsVec2TypeInfoAtExit()
-  {
-    if (!gSCoordsVec2TypeInfoConstructed) {
-      return;
-    }
-
-    SCoordsVec2TypeInfoStorageRef().~SCoordsVec2TypeInfo();
-    gSCoordsVec2TypeInfoConstructed = false;
-  }
 } // namespace
 
 namespace moho
@@ -81,10 +62,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF20B0 (FUN_00BF20B0, Moho::SCoordsVec2TypeInfo::dtr)
-   *
    * What it does:
-   * Releases the reflected field and base vector storage.
+   * Releases the reflected field and base vector storage. Its deleting
+   * destructor (vtable slot 2) is one of the `gpg::RType` teardown COMDAT
+   * clones cited on `gpg::RType::~RType`.
    */
   SCoordsVec2TypeInfo::~SCoordsVec2TypeInfo() = default;
 
@@ -173,18 +154,14 @@ namespace moho
 
   /**
    * Address: 0x00BC7CC0 (FUN_00BC7CC0, register_SCoordsVec2TypeInfo)
+   * Address: 0x00BF20B0 (FUN_00BF20B0, atexit destructor of the SCoordsVec2TypeInfo object)
    *
    * What it does:
-   * Installs the static `SCoordsVec2TypeInfo` instance and its shutdown hook.
+   * Constructs the static `SCoordsVec2TypeInfo` instance.
    */
   void register_SCoordsVec2TypeInfo()
   {
-    if (!gSCoordsVec2TypeInfoConstructed) {
-      new (gSCoordsVec2TypeInfoStorage) SCoordsVec2TypeInfo();
-      gSCoordsVec2TypeInfoConstructed = true;
-    }
-
-    (void)std::atexit(&CleanupSCoordsVec2TypeInfoAtExit);
+    static SCoordsVec2TypeInfo sInstance;
   }
 } // namespace moho
 

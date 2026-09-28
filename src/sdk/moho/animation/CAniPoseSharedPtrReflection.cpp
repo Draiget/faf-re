@@ -10,22 +10,15 @@
 
 namespace
 {
-  alignas(gpg::RSharedPointerType_CAniPose) unsigned char
-    gSharedPtrCAniPoseTypeStorage[sizeof(gpg::RSharedPointerType_CAniPose)]{};
-  bool gSharedPtrCAniPoseTypeConstructed = false;
-
   gpg::RType* gCAniPoseSharedPtrPointeeType = nullptr;
-  msvc8::string gCAniPoseSharedPtrTypeName;
-  bool gCAniPoseSharedPtrTypeNameCleanupRegistered = false;
 
+  /**
+   * Address: 0x00BF5540 (FUN_00BF5540, atexit destructor of the RSharedPointerType<CAniPose> object)
+   */
   [[nodiscard]] gpg::RSharedPointerType_CAniPose* AcquireSharedPtrCAniPoseType()
   {
-    if (!gSharedPtrCAniPoseTypeConstructed) {
-      ::new (static_cast<void*>(gSharedPtrCAniPoseTypeStorage)) gpg::RSharedPointerType_CAniPose();
-      gSharedPtrCAniPoseTypeConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::RSharedPointerType_CAniPose*>(gSharedPtrCAniPoseTypeStorage);
+    static gpg::RSharedPointerType_CAniPose sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCAniPoseType()
@@ -40,11 +33,6 @@ namespace
   {
     return gpg::RRef{pose, CachedCAniPoseType()};
   }
-
-  void cleanup_CAniPoseSharedPtrTypeName()
-  {
-    gCAniPoseSharedPtrTypeName.clear();
-  }
 } // namespace
 
 namespace gpg
@@ -53,24 +41,15 @@ namespace gpg
 
   /**
    * Address: 0x0055CE20 (FUN_0055CE20, gpg::RSharedPointerType_CAniPose::GetName)
+   * Address: 0x00BF54E0 (FUN_00BF54E0, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Builds/caches lexical type name `"boost::shared_ptr<%s>"` from CAniPose RTTI.
+   * Builds `boost::shared_ptr<CAniPose>` once from CAniPose RTTI and returns it.
    */
   const char* RSharedPointerType<moho::CAniPose>::GetName() const
   {
-    if (gCAniPoseSharedPtrTypeName.empty()) {
-      const gpg::RType* const pointeeType = CachedCAniPoseType();
-      const char* const pointeeName = pointeeType ? pointeeType->GetName() : "CAniPose";
-      gCAniPoseSharedPtrTypeName = gpg::STR_Printf("boost::shared_ptr<%s>", pointeeName ? pointeeName : "CAniPose");
-
-      if (!gCAniPoseSharedPtrTypeNameCleanupRegistered) {
-        gCAniPoseSharedPtrTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_CAniPoseSharedPtrTypeName);
-      }
-    }
-
-    return gCAniPoseSharedPtrTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("boost::shared_ptr<%s>", CachedCAniPoseType()->GetName());
+    return sName.c_str();
   }
 
   /**

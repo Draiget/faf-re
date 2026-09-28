@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiBorderTypeInfo) unsigned char gCMauiBorderTypeInfoStorage[sizeof(CMauiBorderTypeInfo)];
-  bool gCMauiBorderTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02B30 (FUN_00C02B30, atexit destructor of the CMauiBorderTypeInfo object)
+   */
   [[nodiscard]] CMauiBorderTypeInfo& AcquireCMauiBorderTypeInfo()
   {
-    if (!gCMauiBorderTypeInfoConstructed) {
-      new (gCMauiBorderTypeInfoStorage) CMauiBorderTypeInfo();
-      gCMauiBorderTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiBorderTypeInfo*>(gCMauiBorderTypeInfoStorage);
-  }
-
-  void cleanup_CMauiBorderTypeInfo()
-  {
-    if (!gCMauiBorderTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiBorderTypeInfo*>(gCMauiBorderTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiBorderTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiBorderTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CMauiBorderTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDDC20 (FUN_00BDDC20, register_CMauiBorderTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiBorder` type-info object.
+ */
 void moho::register_CMauiBorderTypeInfoStartup()
 {
   (void)AcquireCMauiBorderTypeInfo();
-  (void)std::atexit(&cleanup_CMauiBorderTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

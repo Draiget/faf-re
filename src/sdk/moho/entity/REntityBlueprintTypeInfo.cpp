@@ -228,40 +228,26 @@ namespace
 
   static_assert(sizeof(RStringVectorTypeInfo) == 0x68, "RStringVectorTypeInfo size must be 0x68");
 
-  msvc8::string gRStringVectorTypeName{};
-  std::uint32_t gRStringVectorTypeNameInitGuard = 0u;
   using StringVector = msvc8::vector<msvc8::string>;
   constexpr std::size_t kStringVectorMaxElements = 0x9249249u;
-
-  /**
-   * Address: 0x00BF2760 (FUN_00BF2760, sub_BF2760)
-   *
-   * What it does:
-   * Clears cached lexical-name state used by `RStringVectorTypeInfo::GetName`.
-   */
-  void cleanup_RStringVectorTypeInfo_GetName()
-  {
-    gRStringVectorTypeName.clear();
-    gRStringVectorTypeNameInitGuard = 0u;
-  }
 
   /**
    * Address: 0x00513560 (FUN_00513560, gpg::RVectorType_string::dtr)
    */
   RStringVectorTypeInfo::~RStringVectorTypeInfo() = default;
 
+  /**
+   * Address: 0x00512C30 (FUN_00512C30, gpg::RVectorType_string::GetName)
+   * Address: 0x00BF2760 (FUN_00BF2760, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `vector<std::string>` once from the reflected string element type
+   * name and returns it.
+   */
   const char* RStringVectorTypeInfo::GetName() const
   {
-    if ((gRStringVectorTypeNameInitGuard & 1u) == 0u) {
-      gRStringVectorTypeNameInitGuard |= 1u;
-
-      const gpg::RType* const elementType = CachedStringType();
-      const char* const elementName = elementType != nullptr ? elementType->GetName() : "std::string";
-      gRStringVectorTypeName = gpg::STR_Printf("vector<%s>", elementName);
-      (void)std::atexit(&cleanup_RStringVectorTypeInfo_GetName);
-    }
-
-    return gRStringVectorTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedStringType()->GetName());
+    return sName.c_str();
   }
 
   msvc8::string RStringVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
@@ -505,14 +491,9 @@ namespace
     ResizeStringVector(*storage, static_cast<std::size_t>(count), fill);
   }
 
-  alignas(EFootprintFlagsTypeInfo) unsigned char gEFootprintFlagsTypeInfoStorage[sizeof(EFootprintFlagsTypeInfo)];
-  bool gEFootprintFlagsTypeInfoConstructed = false;
-
-  alignas(RStringVectorTypeInfo) unsigned char gRStringVectorTypeInfoStorage[sizeof(RStringVectorTypeInfo)];
-  bool gRStringVectorTypeInfoConstructed = false;
-
   /**
    * Address: 0x00513BC0 (FUN_00513BC0, sub_513BC0)
+   * Address: 0x00BF2810 (FUN_00BF2810, atexit destructor of the EFootprintFlagsTypeInfo object)
    *
    * What it does:
    * Materializes the `EFootprintFlags` enum type descriptor and preregisters
@@ -520,33 +501,14 @@ namespace
    */
   [[nodiscard]] EFootprintFlagsTypeInfo* AcquireEFootprintFlagsTypeInfo()
   {
-    if (!gEFootprintFlagsTypeInfoConstructed) {
-      new (gEFootprintFlagsTypeInfoStorage) EFootprintFlagsTypeInfo();
-      gpg::PreRegisterRType(typeid(moho::EFootprintFlags), reinterpret_cast<EFootprintFlagsTypeInfo*>(gEFootprintFlagsTypeInfoStorage));
-      gEFootprintFlagsTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<EFootprintFlagsTypeInfo*>(gEFootprintFlagsTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF2810 (FUN_00BF2810, sub_BF2810)
-   *
-   * What it does:
-   * Releases startup-owned `EFootprintFlags` enum type-descriptor state.
-   */
-  void cleanup_EFootprintFlagsTypeInfo()
-  {
-    if (!gEFootprintFlagsTypeInfoConstructed) {
-      return;
-    }
-
-    reinterpret_cast<EFootprintFlagsTypeInfo*>(gEFootprintFlagsTypeInfoStorage)->~EFootprintFlagsTypeInfo();
-    gEFootprintFlagsTypeInfoConstructed = false;
+    static EFootprintFlagsTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(moho::EFootprintFlags), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x005134B0 (FUN_005134B0, sub_5134B0)
+   * Address: 0x00BF2790 (FUN_00BF2790, atexit destructor of the RStringVectorTypeInfo object)
    *
    * What it does:
    * Materializes the reflected `vector<string>` descriptor and preregisters
@@ -554,29 +516,9 @@ namespace
    */
   [[nodiscard]] RStringVectorTypeInfo* AcquireRStringVectorTypeInfo()
   {
-    if (!gRStringVectorTypeInfoConstructed) {
-      new (gRStringVectorTypeInfoStorage) RStringVectorTypeInfo();
-      gpg::PreRegisterRType(typeid(msvc8::vector<msvc8::string>), reinterpret_cast<RStringVectorTypeInfo*>(gRStringVectorTypeInfoStorage));
-      gRStringVectorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<RStringVectorTypeInfo*>(gRStringVectorTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF2790 (FUN_00BF2790, sub_BF2790)
-   *
-   * What it does:
-   * Releases startup-owned `vector<string>` descriptor resources.
-   */
-  void cleanup_RStringVectorTypeInfo()
-  {
-    if (!gRStringVectorTypeInfoConstructed) {
-      return;
-    }
-
-    reinterpret_cast<RStringVectorTypeInfo*>(gRStringVectorTypeInfoStorage)->~RStringVectorTypeInfo();
-    gRStringVectorTypeInfoConstructed = false;
+    static RStringVectorTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(msvc8::vector<msvc8::string>), &sInstance);
+    return &sInstance;
   }
 
   struct TypeInfoRTypePair
@@ -690,26 +632,22 @@ namespace moho
    * Address: 0x00BC8340 (FUN_00BC8340, register_EFootprintFlagsTypeInfo)
    *
    * What it does:
-   * Materializes the reflected `EFootprintFlags` enum descriptor and installs
-   * process-exit cleanup.
+   * Materializes the reflected `EFootprintFlags` enum descriptor.
    */
-  int register_EFootprintFlagsTypeInfo()
+  void register_EFootprintFlagsTypeInfo()
   {
     (void)AcquireEFootprintFlagsTypeInfo();
-    return std::atexit(&cleanup_EFootprintFlagsTypeInfo);
   }
 
   /**
    * Address: 0x00BC82B0 (FUN_00BC82B0, register_RStringVectorTypeInfo)
    *
    * What it does:
-   * Materializes the reflected `vector<string>` descriptor and installs
-   * process-exit cleanup.
+   * Materializes the reflected `vector<string>` descriptor.
    */
-  int register_RStringVectorTypeInfo()
+  void register_RStringVectorTypeInfo()
   {
     (void)AcquireRStringVectorTypeInfo();
-    return std::atexit(&cleanup_RStringVectorTypeInfo);
   }
 
   /**

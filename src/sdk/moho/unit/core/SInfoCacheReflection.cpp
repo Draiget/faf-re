@@ -1,8 +1,6 @@
 #include "moho/unit/core/SInfoCacheReflection.h"
 
-#include <cstdlib>
 #include <cstdint>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -27,9 +25,6 @@ namespace
   using TypeInfo = moho::SInfoCacheTypeInfo;
   using Serializer = moho::SInfoCacheSerializer;
 
-  alignas(TypeInfo) unsigned char gSInfoCacheTypeInfoStorage[sizeof(TypeInfo)];
-  bool gSInfoCacheTypeInfoConstructed = false;
-
   /**
    * Address: 0x00BD6A90 (FUN_00BD6A90, dynamic initializer for the global
    * `SInfoCacheSerializer` singleton)
@@ -43,14 +38,13 @@ namespace
    */
   Serializer gSInfoCacheSerializer{};
 
+  /**
+   * Address: 0x00BFD8E0 (FUN_00BFD8E0, atexit destructor of the SInfoCacheTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireSInfoCacheTypeInfo()
   {
-    if (!gSInfoCacheTypeInfoConstructed) {
-      new (gSInfoCacheTypeInfoStorage) TypeInfo();
-      gSInfoCacheTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gSInfoCacheTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedRType(const std::type_info& typeInfo)
@@ -233,36 +227,14 @@ namespace
   }
 
   /**
-   * Address: 0x00BFD8E0 (FUN_00BFD8E0, sub_BFD8E0)
-   *
-   * What it does:
-   * Releases reflected `SInfoCacheTypeInfo` field/base vectors at exit.
-   */
-  void cleanup_SInfoCacheTypeInfo_00BFD8E0_Impl()
-  {
-    if (!gSInfoCacheTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSInfoCacheTypeInfo().~TypeInfo();
-    gSInfoCacheTypeInfoConstructed = false;
-  }
-
-  void cleanup_SInfoCacheTypeInfo_00BFD8E0_AtExit()
-  {
-    cleanup_SInfoCacheTypeInfo_00BFD8E0_Impl();
-  }
-
-  /**
    * Address: 0x00BD6A70 (FUN_00BD6A70, register_SInfoCacheTypeInfo)
    *
    * What it does:
-   * Forces `SInfoCacheTypeInfo` construction and schedules exit cleanup.
+   * Forces `SInfoCacheTypeInfo` construction.
    */
-  int register_SInfoCacheTypeInfo_Impl()
+  void register_SInfoCacheTypeInfo_Impl()
   {
     (void)AcquireSInfoCacheTypeInfo();
-    return std::atexit(&cleanup_SInfoCacheTypeInfo_00BFD8E0_AtExit);
   }
 
   struct SInfoCacheReflectionBootstrap

@@ -12,7 +12,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00BF1FD0 (FUN_00BF1FD0, Moho::ESiloTypeTypeInfo::dtr)
+     * Address: 0x0050A300 (FUN_0050A300, scalar deleting destructor)
      */
     ~ESiloTypeTypeInfo() override;
 
@@ -74,8 +74,7 @@ namespace moho
    * Address: 0x00BC7B30 (FUN_00BC7B30, register_ESiloTypeTypeInfo)
    *
    * What it does:
-   * Runs `ESiloType` typeinfo preregistration and installs process-exit
-   * cleanup.
+   * Runs `ESiloType` typeinfo preregistration.
    */
-  int register_ESiloTypeTypeInfo();
+  void register_ESiloTypeTypeInfo();
 } // namespace moho

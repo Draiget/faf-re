@@ -42,9 +42,8 @@ namespace moho
    * Address: 0x00BCBE80 (FUN_00BCBE80, register_IAiCommandDispatchTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters startup RTTI storage for `IAiCommandDispatch` and
-   * installs process-exit cleanup.
+   * Constructs/preregisters startup RTTI storage for `IAiCommandDispatch`.
    */
-  int register_IAiCommandDispatchTypeInfo();
+  void register_IAiCommandDispatchTypeInfo();
 
 } // namespace moho

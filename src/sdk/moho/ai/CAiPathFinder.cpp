@@ -333,8 +333,6 @@ namespace
   gpg::RType* gSearchType = nullptr;
   gpg::RType* gRect2iListType = nullptr;
   gpg::RType* gMotionType = nullptr;
-  msvc8::string gBroadcasterNavPathTypeName{};
-  std::uint32_t gBroadcasterNavPathTypeNameInitGuard = 0u;
 
   [[nodiscard]] gpg::RType* CachedNavPathType()
   {
@@ -343,21 +341,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::SNavPath));
     }
     return cached;
-  }
-
-  void cleanup_BroadcasterNavPathTypeName()
-  {
-    gBroadcasterNavPathTypeName.clear();
-    gBroadcasterNavPathTypeNameInitGuard = 0u;
-  }
-
-  msvc8::string gListenerNavPathTypeName{};
-  std::uint32_t gListenerNavPathTypeNameInitGuard = 0u;
-
-  void cleanup_ListenerNavPathTypeName()
-  {
-    gListenerNavPathTypeName.clear();
-    gListenerNavPathTypeNameInitGuard = 0u;
   }
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
@@ -604,24 +587,16 @@ namespace
 
 /**
  * Address: 0x007635C0 (FUN_007635C0, Moho::RBroadcasterRType_NavPath::GetName)
+ * Address: 0x00C017D0 (FUN_00C017D0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the reflected lexical type label
- * `Broadcaster<NavPath>` from runtime RTTI metadata.
+ * Builds the reflected lexical type label `Broadcaster<NavPath>` once from
+ * runtime RTTI metadata and returns it.
  */
 const char* moho::RBroadcasterRType_NavPath::GetName() const
 {
-  if ((gBroadcasterNavPathTypeNameInitGuard & 1u) == 0u) {
-    gBroadcasterNavPathTypeNameInitGuard |= 1u;
-
-    gpg::RType* const valueType = CachedNavPathType();
-    const char* const valueTypeName = valueType ? valueType->GetName() : "NavPath";
-    gBroadcasterNavPathTypeName =
-      gpg::STR_Printf("Broadcaster<%s>", valueTypeName ? valueTypeName : "NavPath");
-    (void)std::atexit(&cleanup_BroadcasterNavPathTypeName);
-  }
-
-  return gBroadcasterNavPathTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", CachedNavPathType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -707,24 +682,17 @@ moho::RBroadcasterRType_NavPath::~RBroadcasterRType_NavPath() = default;
 
 /**
  * Address: 0x00763680 (FUN_00763680, Moho::RListenerRType_NavPath::GetName)
+ * Address: 0x00C017A0 (FUN_00C017A0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the reflected lexical type label `Listener<NavPath>`
- * from runtime RTTI metadata (the wrapped value type's own `GetName()`).
+ * Builds the reflected lexical type label `Listener<NavPath>` once from
+ * runtime RTTI metadata (the wrapped value type's own `GetName()`) and
+ * returns it.
  */
 const char* moho::RListenerRType_NavPath::GetName() const
 {
-  if ((gListenerNavPathTypeNameInitGuard & 1u) == 0u) {
-    gListenerNavPathTypeNameInitGuard |= 1u;
-
-    gpg::RType* const valueType = CachedNavPathType();
-    const char* const valueTypeName = valueType ? valueType->GetName() : "NavPath";
-    gListenerNavPathTypeName =
-      gpg::STR_Printf("Listener<%s>", valueTypeName ? valueTypeName : "NavPath");
-    (void)std::atexit(&cleanup_ListenerNavPathTypeName);
-  }
-
-  return gListenerNavPathTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", CachedNavPathType()->GetName());
+  return sName.c_str();
 }
 
 /**

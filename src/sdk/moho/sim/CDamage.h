@@ -182,10 +182,9 @@ namespace moho
    * Address: 0x00BDB6F0 (FUN_00BDB6F0, register_CDamageTypeInfo)
    *
    * What it does:
-   * Runs preregistration and installs process-exit cleanup for
-   * `CDamageTypeInfo`.
+   * Runs preregistration for `CDamageTypeInfo`.
    */
-  int register_CDamageTypeInfo();
+  void register_CDamageTypeInfo();
 
   /**
    * Address: 0x00737140 (FUN_00737140, Moho::SIM_DoDamagePoint)

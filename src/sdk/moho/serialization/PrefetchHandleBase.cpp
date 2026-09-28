@@ -225,16 +225,17 @@ namespace
 
   PrefetchSetTypeRegistration gPrefetchSetTypeRegistration{};
 
-  moho::PrefetchHandleBaseTypeInfo gPrefetchHandleBaseTypeInfo;
+  /**
+   * Address: 0x00BF05C0 (FUN_00BF05C0, atexit destructor of the PrefetchHandleBaseTypeInfo object)
+   */
+  [[nodiscard]] moho::PrefetchHandleBaseTypeInfo* AcquirePrefetchHandleBaseTypeInfo()
+  {
+    static moho::PrefetchHandleBaseTypeInfo sInstance;
+    return &sInstance;
+  }
 
   // Address: 0x010A8938 -- process-global `PrefetchHandleBaseSerializer` singleton.
   moho::PrefetchHandleBaseSerializer gPrefetchHandleBaseSerializer;
-
-  void CleanupPrefetchHandleBaseTypeInfoAtExit() noexcept
-  {
-    gPrefetchHandleBaseTypeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    gPrefetchHandleBaseTypeInfo.bases_ = msvc8::vector<gpg::RField>{};
-  }
 
   void EnsurePrefetchHandleBaseRegistered()
   {
@@ -258,16 +259,12 @@ namespace moho
    * Address: 0x00BC5BC0 (FUN_00BC5BC0, register_PrefetchHandleBaseTypeInfo)
    *
    * What it does:
-   * Materializes prefetch-handle type-info startup registration.
+   * Materializes prefetch-handle type-info startup registration; the
+   * `PrefetchHandleBaseTypeInfo` constructor performs the preregistration.
    */
   void register_PrefetchHandleBaseTypeInfo()
   {
-    gpg::PreRegisterRType(typeid(PrefetchHandleBase), &gPrefetchHandleBaseTypeInfo);
-    static const bool kAtexitRegistered = []() {
-      (void)std::atexit(&CleanupPrefetchHandleBaseTypeInfoAtExit);
-      return true;
-    }();
-    (void)kAtexitRegistered;
+    (void)AcquirePrefetchHandleBaseTypeInfo();
   }
 
   /**

@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BDE910 (FUN_00BDE910, register_CMauiItemListTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiItemList` type-info object.
+   */
   void register_CMauiItemListTypeInfoStartup();
 } // namespace moho

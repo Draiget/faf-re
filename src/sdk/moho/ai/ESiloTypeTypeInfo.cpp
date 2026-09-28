@@ -8,32 +8,13 @@
 
 namespace
 {
-  alignas(moho::ESiloTypeTypeInfo) unsigned char gESiloTypeTypeInfoStorage[sizeof(moho::ESiloTypeTypeInfo)]{};
-  bool gESiloTypeTypeInfoConstructed = false;
-  bool gESiloTypeTypeInfoPreregistered = false;
-
+  /**
+   * Address: 0x00BF1FD0 (FUN_00BF1FD0, atexit destructor of the ESiloTypeTypeInfo object)
+   */
   [[nodiscard]] moho::ESiloTypeTypeInfo* AcquireESiloTypeTypeInfo()
   {
-    if (!gESiloTypeTypeInfoConstructed) {
-      new (gESiloTypeTypeInfoStorage) moho::ESiloTypeTypeInfo();
-      gESiloTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::ESiloTypeTypeInfo*>(gESiloTypeTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BF1FD0 (FUN_00BF1FD0, cleanup_ESiloTypeTypeInfo)
-   */
-  void cleanup_ESiloTypeTypeInfo()
-  {
-    if (!gESiloTypeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireESiloTypeTypeInfo()->~ESiloTypeTypeInfo();
-    gESiloTypeTypeInfoConstructed = false;
-    gESiloTypeTypeInfoPreregistered = false;
+    static moho::ESiloTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
   // Address: 0x010AA0FC -- process-global `PrimitiveSerHelper<ESiloType,int>`
@@ -46,7 +27,6 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x00BF1FD0 (FUN_00BF1FD0, Moho::ESiloTypeTypeInfo::dtr)
    * Address: 0x0050A300 (FUN_0050A300, vtable-slot-2 scalar deleting
    * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
    * conditionally frees the object -- ordinary C++ `delete` semantics, not
@@ -77,22 +57,17 @@ namespace moho
    */
   gpg::REnumType* preregister_ESiloTypeTypeInfo()
   {
-    auto* const typeInfo = AcquireESiloTypeTypeInfo();
-    if (!gESiloTypeTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(ESiloType), typeInfo);
-      gESiloTypeTypeInfoPreregistered = true;
-    }
-
+    ESiloTypeTypeInfo* const typeInfo = AcquireESiloTypeTypeInfo();
+    gpg::PreRegisterRType(typeid(ESiloType), typeInfo);
     return typeInfo;
   }
 
   /**
    * Address: 0x00BC7B30 (FUN_00BC7B30, register_ESiloTypeTypeInfo)
    */
-  int register_ESiloTypeTypeInfo()
+  void register_ESiloTypeTypeInfo()
   {
     (void)preregister_ESiloTypeTypeInfo();
-    return std::atexit(&cleanup_ESiloTypeTypeInfo);
   }
 } // namespace moho
 
@@ -102,7 +77,7 @@ namespace
   {
     ESiloTypeTypeInfoBootstrap()
     {
-      (void)moho::register_ESiloTypeTypeInfo();
+      moho::register_ESiloTypeTypeInfo();
     }
   };
 

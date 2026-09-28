@@ -82,8 +82,7 @@ namespace gpg
    * Address: 0x00BC9D60 (FUN_00BC9D60, register_RFastVectorType_SOCellPos)
    *
    * What it does:
-   * Materializes startup reflection storage for `fastvector<Moho::SOCellPos>`
-   * and registers process-exit teardown.
+   * Constructs the `fastvector<Moho::SOCellPos>` reflection descriptor.
    */
   void register_RFastVectorType_SOCellPos();
 } // namespace gpg

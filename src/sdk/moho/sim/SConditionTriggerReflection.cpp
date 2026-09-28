@@ -440,9 +440,6 @@ namespace
   static_assert(sizeof(STriggerSerializer) == 0x14, "STriggerSerializer size must be 0x14");
 #endif
 
-  msvc8::string gFastVectorSConditionTypeName;
-  bool gFastVectorSConditionTypeNameCleanupRegistered = false;
-
   [[nodiscard]] gpg::RType* CachedSConditionType()
   {
     static gpg::RType* cached = nullptr;
@@ -450,12 +447,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::SCondition));
     }
     return cached;
-  }
-
-  void cleanup_FastVectorSConditionTypeName()
-  {
-    gFastVectorSConditionTypeName = msvc8::string{};
-    gFastVectorSConditionTypeNameCleanupRegistered = false;
   }
 
   class RFastVectorSConditionTypeInfo final : public gpg::RType, public gpg::RIndexed
@@ -475,24 +466,15 @@ namespace
 
     /**
      * Address: 0x0070E620 (FUN_0070E620, gpg::RFastVectorType_SCondition::GetName)
+     * Address: 0x00BFF970 (FUN_00BFF970, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Lazily builds and caches the reflected `fastvector<SCondition>` name and
-     * registers process-exit cleanup for the cached string storage.
+     * Builds `fastvector<SCondition>` once and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if (gFastVectorSConditionTypeName.empty()) {
-        const gpg::RType* const elementType = CachedSConditionType();
-        const char* const elementName = elementType ? elementType->GetName() : "SCondition";
-        gFastVectorSConditionTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SCondition");
-        if (!gFastVectorSConditionTypeNameCleanupRegistered) {
-          gFastVectorSConditionTypeNameCleanupRegistered = true;
-          (void)std::atexit(&cleanup_FastVectorSConditionTypeName);
-        }
-      }
-
-      return gFastVectorSConditionTypeName.c_str();
+      static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSConditionType()->GetName());
+      return sName.c_str();
     }
 
     /**
@@ -638,13 +620,6 @@ namespace
     }
   };
 
-  extern msvc8::string gSharedPtrSTriggerTypeName;
-  extern std::uint32_t gSharedPtrSTriggerTypeNameInitGuard;
-  extern msvc8::string gListSharedPtrSTriggerTypeName;
-  extern std::uint32_t gListSharedPtrSTriggerTypeNameInitGuard;
-  void cleanup_SharedPtrSTriggerTypeName();
-  void cleanup_ListSharedPtrSTriggerTypeName();
-
   [[nodiscard]] gpg::RType* CachedSharedPtrSTriggerType()
   {
     static gpg::RType* cached = nullptr;
@@ -671,21 +646,16 @@ namespace
 
     /**
      * Address: 0x0070EA60 (FUN_0070EA60, gpg::RSharedPointerType_STrigger::GetName)
+     * Address: 0x00BFF940 (FUN_00BFF940, atexit destructor of GetName's cached name)
+     *
+     * What it does:
+     * Builds `boost::shared_ptr<STrigger>` once and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if ((gSharedPtrSTriggerTypeNameInitGuard & 1u) == 0u) {
-        gSharedPtrSTriggerTypeNameInitGuard |= 1u;
-
-        gpg::RType* triggerType = moho::STrigger::StaticGetClass();
-        if (triggerType == nullptr) {
-          triggerType = gpg::LookupRType(typeid(moho::STrigger));
-        }
-        const char* const triggerName = triggerType != nullptr ? triggerType->GetName() : "STrigger";
-        gSharedPtrSTriggerTypeName = gpg::STR_Printf("boost::shared_ptr<%s>", triggerName);
-        (void)std::atexit(&cleanup_SharedPtrSTriggerTypeName);
-      }
-      return gSharedPtrSTriggerTypeName.c_str();
+      static const msvc8::string sName =
+        gpg::STR_Printf("boost::shared_ptr<%s>", moho::STrigger::StaticGetClass()->GetName());
+      return sName.c_str();
     }
 
     /**
@@ -836,24 +806,15 @@ namespace
 
     /**
      * Address: 0x0070F360 (FUN_0070F360, gpg::RListType_shared_ptr_STrigger::GetName)
+     * Address: 0x00BFF880 (FUN_00BFF880, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Lazily builds and caches the reflected lexical type label
-     * `list<boost::shared_ptr<STrigger>>`.
+     * Builds `list<boost::shared_ptr<STrigger>>` once and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if ((gListSharedPtrSTriggerTypeNameInitGuard & 1u) == 0u) {
-        gListSharedPtrSTriggerTypeNameInitGuard |= 1u;
-
-        gpg::RType* valueType = CachedSharedPtrSTriggerType();
-        const char* const valueTypeName = valueType ? valueType->GetName() : "boost::shared_ptr<STrigger>";
-        gListSharedPtrSTriggerTypeName =
-          gpg::STR_Printf("list<%s>", valueTypeName ? valueTypeName : "boost::shared_ptr<STrigger>");
-        (void)std::atexit(&cleanup_ListSharedPtrSTriggerTypeName);
-      }
-
-      return gListSharedPtrSTriggerTypeName.c_str();
+      static const msvc8::string sName = gpg::STR_Printf("list<%s>", CachedSharedPtrSTriggerType()->GetName());
+      return sName.c_str();
     }
 
     /**
@@ -938,81 +899,6 @@ namespace
 
   using UnitBlueprintWeightMap = std::map<const moho::RUnitBlueprint*, float>;
   using StringToArmyStatItemMap = std::map<std::string, moho::CArmyStatItem*>;
-  msvc8::string gSharedPtrSTriggerTypeName{};
-  std::uint32_t gSharedPtrSTriggerTypeNameInitGuard = 0u;
-  msvc8::string gListSharedPtrSTriggerTypeName{};
-  std::uint32_t gListSharedPtrSTriggerTypeNameInitGuard = 0u;
-  msvc8::string gMapUnitBlueprintFloatTypeName{};
-  std::uint32_t gMapUnitBlueprintFloatTypeNameInitGuard = 0u;
-  msvc8::string gMapStringArmyStatItemPtrTypeName{};
-  std::uint32_t gMapStringArmyStatItemPtrTypeNameInitGuard = 0u;
-  msvc8::string gStatsCArmyStatItemTypeName{};
-  std::uint32_t gStatsCArmyStatItemTypeNameInitGuard = 0u;
-
-  /**
-   * Address: 0x00BFF940 (FUN_00BFF940, sub_BFF940)
-   *
-   * What it does:
-   * Releases cached lexical storage for
-   * `gpg::RSharedPointerType_STrigger::GetName`.
-   */
-  void cleanup_SharedPtrSTriggerTypeName()
-  {
-    gSharedPtrSTriggerTypeName.clear();
-    gSharedPtrSTriggerTypeNameInitGuard = 0u;
-  }
-
-  /**
-   * Address: 0x00BFF880 (FUN_00BFF880, cleanup_ListSharedPtrSTriggerTypeName)
-   *
-   * What it does:
-   * Releases cached lexical storage for
-   * `gpg::RListType_shared_ptr_STrigger::GetName`.
-   */
-  void cleanup_ListSharedPtrSTriggerTypeName()
-  {
-    gListSharedPtrSTriggerTypeName.clear();
-    gListSharedPtrSTriggerTypeNameInitGuard = 0u;
-  }
-
-  /**
-   * Address: 0x00BFF910 (FUN_00BFF910)
-   *
-   * What it does:
-   * Releases cached lexical storage for
-   * `gpg::RMapType_RUnitBlueprintP_float::GetName`.
-   */
-  void cleanup_MapUnitBlueprintFloatTypeName()
-  {
-    gMapUnitBlueprintFloatTypeName.clear();
-    gMapUnitBlueprintFloatTypeNameInitGuard = 0u;
-  }
-
-  /**
-   * Address: 0x00BFF8B0 (FUN_00BFF8B0)
-   *
-   * What it does:
-   * Releases cached lexical storage for
-   * `gpg::RMapType_string_CArmyStateItemP::GetName`.
-   */
-  void cleanup_MapStringArmyStatItemPtrTypeName()
-  {
-    gMapStringArmyStatItemPtrTypeName.clear();
-    gMapStringArmyStatItemPtrTypeNameInitGuard = 0u;
-  }
-
-  /**
-   * Address: 0x00BFF8E0 (FUN_00BFF8E0, cleanup_StatsCArmyStatItemTypeName)
-   *
-   * What it does:
-   * Releases cached lexical storage for
-   * `gpg::StatsRType_CArmyStatItem::GetName`.
-   */
-  void cleanup_StatsCArmyStatItemTypeName()
-  {
-    gStatsCArmyStatItemTypeName.clear();
-    gStatsCArmyStatItemTypeNameInitGuard = 0u;
-  }
 
   /**
    * Address: 0x0070FE00 (FUN_0070FE00, gpg::RMapType_RUnitBlueprintP_float::SerLoad)
@@ -1234,31 +1120,19 @@ namespace
 
     /**
      * Address: 0x0070ED30 (FUN_0070ED30, gpg::RMapType_RUnitBlueprintP_float::GetName)
+     * Address: 0x00BFF910 (FUN_00BFF910, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Builds/caches one lexical map type label from runtime key/value RTTI
-     * names and returns `"map<key,value>"`.
+     * Builds `map<RUnitBlueprint*,float>` once from the key/value RTTI names
+     * and returns it. The key is `RUnitBlueprint::GetPointerType()`, as in
+     * the binary (0x0070ED7F).
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if ((gMapUnitBlueprintFloatTypeNameInitGuard & 1u) == 0u) {
-        gMapUnitBlueprintFloatTypeNameInitGuard |= 1u;
-
-        // PreregisterRUnitBlueprintPointerType registers the descriptor under
-        // typeid(RUnitBlueprint*). The const-qualified pointer is a distinct
-        // type and is never registered, and LookupRType throws on a miss, so
-        // probing for it threw and the fallback below never ran.
-        gpg::RType* keyType = gpg::LookupRType(typeid(moho::RUnitBlueprint*));
-
-        gpg::RType* valueType = gpg::LookupRType(typeid(float));
-        const char* const keyName = keyType != nullptr ? keyType->GetName() : "Moho::RUnitBlueprint const *";
-        const char* const valueName = valueType != nullptr ? valueType->GetName() : "float";
-
-        gMapUnitBlueprintFloatTypeName = gpg::STR_Printf("map<%s,%s>", keyName, valueName);
-        (void)std::atexit(&cleanup_MapUnitBlueprintFloatTypeName);
-      }
-
-      return gMapUnitBlueprintFloatTypeName.c_str();
+      static const msvc8::string sName = gpg::STR_Printf(
+        "map<%s,%s>", moho::RUnitBlueprint::GetPointerType()->GetName(), gpg::LookupRType(typeid(float))->GetName()
+      );
+      return sName.c_str();
     }
 
     /**
@@ -1303,27 +1177,15 @@ namespace
 
     /**
      * Address: 0x0070F130 (FUN_0070F130, Moho::StatsRType_CArmyStatItem::GetName)
+     * Address: 0x00BFF8E0 (FUN_00BFF8E0, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Lazily builds and caches reflected lexical type label
-     * `Stats<CArmyStatItem>` using runtime RTTI element name.
+     * Builds `Stats<CArmyStatItem>` once and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if ((gStatsCArmyStatItemTypeNameInitGuard & 1u) == 0u) {
-        gStatsCArmyStatItemTypeNameInitGuard |= 1u;
-
-        gpg::RType* itemType = moho::CArmyStatItem::sType;
-        if (itemType == nullptr) {
-          itemType = gpg::LookupRType(typeid(moho::CArmyStatItem));
-          moho::CArmyStatItem::sType = itemType;
-        }
-        const char* const itemTypeName = itemType != nullptr ? itemType->GetName() : "CArmyStatItem";
-        gStatsCArmyStatItemTypeName = gpg::STR_Printf("Stats<%s>", itemTypeName ? itemTypeName : "CArmyStatItem");
-        (void)std::atexit(&cleanup_StatsCArmyStatItemTypeName);
-      }
-
-      return gStatsCArmyStatItemTypeName.c_str();
+      static const msvc8::string sName = gpg::STR_Printf("Stats<%s>", moho::CArmyStatItem::StaticGetClass()->GetName());
+      return sName.c_str();
     }
 
     /**
@@ -1361,30 +1223,20 @@ namespace
 
     /**
      * Address: 0x0070F200 (FUN_0070F200, gpg::RMapType_string_CArmyStateItemP::GetName)
+     * Address: 0x00BFF8B0 (FUN_00BFF8B0, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Builds/caches one lexical map type label from runtime key/value RTTI
-     * names and returns `"map<key,value>"`.
+     * Builds `map<std::string,CArmyStatItem*>` once from the key/value RTTI
+     * names and returns it. The key is the engine ABI string type (see
+     * RMapStringFloatTypeInfo.cpp); the value is
+     * `CArmyStatItem::GetPointerType()`, as in the binary (0x0070F232).
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if ((gMapStringArmyStatItemPtrTypeNameInitGuard & 1u) == 0u) {
-        gMapStringArmyStatItemPtrTypeNameInitGuard |= 1u;
-
-        // See RMapStringFloatTypeInfo.cpp: the descriptor is registered under
-        // the engine ABI string type, and LookupRType throws on a miss, so the
-        // std::string probe threw and its fallback never ran.
-        gpg::RType* keyType = gpg::LookupRType(typeid(msvc8::string));
-
-        gpg::RType* valueType = gpg::LookupRType(typeid(moho::CArmyStatItem*));
-        const char* const keyName = keyType != nullptr ? keyType->GetName() : "std::string";
-        const char* const valueName = valueType != nullptr ? valueType->GetName() : "Moho::CArmyStatItem *";
-
-        gMapStringArmyStatItemPtrTypeName = gpg::STR_Printf("map<%s,%s>", keyName, valueName);
-        (void)std::atexit(&cleanup_MapStringArmyStatItemPtrTypeName);
-      }
-
-      return gMapStringArmyStatItemPtrTypeName.c_str();
+      static const msvc8::string sName = gpg::STR_Printf(
+        "map<%s,%s>", gpg::LookupRType(typeid(msvc8::string))->GetName(), moho::CArmyStatItem::GetPointerType()->GetName()
+      );
+      return sName.c_str();
     }
 
     /**

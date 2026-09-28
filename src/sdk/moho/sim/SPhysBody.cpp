@@ -37,8 +37,14 @@ namespace gpg
 
 namespace
 {
-  alignas(moho::SPhysBodyTypeInfo) unsigned char gSPhysBodyTypeInfoStorage[sizeof(moho::SPhysBodyTypeInfo)];
-  bool gSPhysBodyTypeInfoConstructed = false;
+  /**
+   * Address: 0x00BFD2D0 (FUN_00BFD2D0, atexit destructor of the SPhysBodyTypeInfo object)
+   */
+  [[nodiscard]] moho::SPhysBodyTypeInfo* AcquireSPhysBodyTypeInfo()
+  {
+    static moho::SPhysBodyTypeInfo sInstance;
+    return &sInstance;
+  }
 
   // Address: 0x010B5314 -- process-global `SPhysBodyConstruct` singleton.
   moho::SPhysBodyConstruct gSPhysBodyConstruct;
@@ -48,11 +54,6 @@ namespace
 
   // Address: 0x010B53A0 -- process-global `SPhysBodySerializer` singleton.
   moho::SPhysBodySerializer gSPhysBodySerializer;
-
-  [[nodiscard]] moho::SPhysBodyTypeInfo& SPhysBodyTypeInfoStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::SPhysBodyTypeInfo*>(gSPhysBodyTypeInfoStorage);
-  }
 
   [[nodiscard]] gpg::RType* CachedSPhysBodyType()
   {
@@ -986,30 +987,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD2D0 (FUN_00BFD2D0, cleanup_SPhysBodyTypeInfo)
-   */
-  void cleanup_SPhysBodyTypeInfo()
-  {
-    if (!gSPhysBodyTypeInfoConstructed) {
-      return;
-    }
-
-    SPhysBodyTypeInfoStorageRef().~SPhysBodyTypeInfo();
-    gSPhysBodyTypeInfoConstructed = false;
-    SPhysBody::sType = nullptr;
-  }
-
-  /**
    * Address: 0x00BD5E80 (FUN_00BD5E80, register_SPhysBodyTypeInfo)
    */
   void register_SPhysBodyTypeInfo()
   {
-    if (!gSPhysBodyTypeInfoConstructed) {
-      new (gSPhysBodyTypeInfoStorage) SPhysBodyTypeInfo();
-      gSPhysBodyTypeInfoConstructed = true;
-    }
-
-    (void)std::atexit(&cleanup_SPhysBodyTypeInfo);
+    (void)AcquireSPhysBodyTypeInfo();
   }
 } // namespace moho
 

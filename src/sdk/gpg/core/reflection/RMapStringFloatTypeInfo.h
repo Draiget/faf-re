@@ -89,19 +89,10 @@ namespace gpg
   [[nodiscard]] gpg::RType* register_MapStringFloat_Type_00();
 
   /**
-   * Address: 0x00BFDBE0 (FUN_00BFDBE0, cleanup_MapStringFloat_Type)
-   *
-   * What it does:
-   * Tears down startup-owned `std::map<std::string,float>` RTTI storage.
-   */
-  void cleanup_MapStringFloat_Type();
-
-  /**
    * Address: 0x00BD6BC0 (FUN_00BD6BC0, register_MapStringFloat_Type_AtExit)
    *
    * What it does:
-   * Registers `std::map<std::string,float>` RTTI and installs process-exit
-   * cleanup.
+   * Registers `std::map<std::string,float>` RTTI.
    */
-  int register_MapStringFloat_Type_AtExit();
+  void register_MapStringFloat_Type_AtExit();
 } // namespace gpg

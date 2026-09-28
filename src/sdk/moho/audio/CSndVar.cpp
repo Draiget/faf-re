@@ -381,7 +381,7 @@ namespace moho
       return true;
     }
 
-    const SoundConfiguration* const configuration = sSoundConfiguration;
+    const SoundConfiguration* const configuration = sSoundConfiguration.get();
     if (configuration != nullptr && configuration->mEngines.mStart != nullptr &&
         configuration->mEngines.mStart != configuration->mEngines.mFinish && configuration->mNoSound == 0u) {
       gpg::Warnf("SND: Couldn't find variable %s", mName.c_str());

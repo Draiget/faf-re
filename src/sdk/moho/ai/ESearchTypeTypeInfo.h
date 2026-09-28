@@ -72,8 +72,7 @@ namespace moho
    * Address: 0x00BCCCF0 (FUN_00BCCCF0, register_ESearchTypeTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters startup RTTI descriptor for `ESearchType` and
-   * installs process-exit cleanup.
+   * Constructs/preregisters startup RTTI descriptor for `ESearchType`.
    */
-  int register_ESearchTypeTypeInfo();
+  void register_ESearchTypeTypeInfo();
 } // namespace moho

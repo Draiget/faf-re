@@ -22,10 +22,10 @@ namespace moho
   using Vector3i = Wm3::Vector3i;
   using Quaternionf = Wm3::Quaternionf;
 
-  // Address-backed process-wide mutex used by math/random helper lanes.
-  extern boost::mutex& math_GlobalRandomMutex;
-  // Address-backed process-wide random stream used by math helper lanes.
-  extern CRandomStream& math_GlobalRandomStream;
+  // Process-wide mutex used by math/random helper lanes.
+  extern boost::mutex math_GlobalRandomMutex;
+  // Process-wide random stream used by math helper lanes.
+  extern CRandomStream math_GlobalRandomStream;
 
   /**
    * Address: 0x007A6460 (FUN_007A6460, sub_7A6460)
@@ -928,65 +928,47 @@ namespace moho
   /**
    * Address: 0x00BC6C40 (FUN_00BC6C40, register_AxisAlignedBox3fTypeInfo)
    */
-  int register_AxisAlignedBox3fTypeInfo();
-
-  /**
-   * Address: 0x00BC32E0 (FUN_00BC32E0, register_math_GlobalRandomMutex)
-   *
-   * What it does:
-   * Constructs the process-global random-math mutex and registers process-exit
-   * teardown.
-   */
-  void register_math_GlobalRandomMutex();
-
-  /**
-   * Address: 0x00BC32A0 (FUN_00BC32A0, register_math_GlobalRandomStream)
-   *
-   * What it does:
-   * Seeds the process-global random stream from time/tick entropy and
-   * registers process-exit teardown.
-   */
-  void register_math_GlobalRandomStream();
+  void register_AxisAlignedBox3fTypeInfo();
 
   /**
    * Address: 0x00BC6CA0 (FUN_00BC6CA0, register_Vector2iTypeInfo)
    */
-  int register_Vector2iTypeInfo();
+  void register_Vector2iTypeInfo();
 
   /**
    * Address: 0x00BC6D00 (FUN_00BC6D00, register_Vector3iTypeInfo)
    */
-  int register_Vector3iTypeInfo();
+  void register_Vector3iTypeInfo();
 
   /**
    * Address: 0x00BC6D60 (FUN_00BC6D60, register_Vector2fTypeInfo)
    */
-  int register_Vector2fTypeInfo();
+  void register_Vector2fTypeInfo();
 
   /**
    * Address: 0x00BC6DC0 (FUN_00BC6DC0, register_Vector3fTypeInfo)
    */
-  int register_Vector3fTypeInfo();
+  void register_Vector3fTypeInfo();
 
   /**
    * Address: 0x00BC6E20 (FUN_00BC6E20, register_Vector4fTypeInfo)
    */
-  int register_Vector4fTypeInfo();
+  void register_Vector4fTypeInfo();
 
   /**
    * Address: 0x00BC6E80 (FUN_00BC6E80, register_QuaternionfTypeInfo)
    */
-  int register_QuaternionfTypeInfo();
+  void register_QuaternionfTypeInfo();
 
   /**
    * Address: 0x00BC6EE0 (FUN_00BC6EE0, register_VEulers3TypeInfo)
    */
-  int register_VEulers3TypeInfo();
+  void register_VEulers3TypeInfo();
 
   /**
    * Address: 0x00BC6F40 (FUN_00BC6F40, register_VAxes3TypeInfo)
    */
-  int register_VAxes3TypeInfo();
+  void register_VAxes3TypeInfo();
 
   /**
    * Address: 0x00BC7000 (FUN_00BC7000, register_VMatrix4NaN)

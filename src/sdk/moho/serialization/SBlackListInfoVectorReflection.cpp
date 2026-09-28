@@ -13,27 +13,13 @@ namespace
   using SBlackListInfoVector = msvc8::vector<moho::SBlackListInfo>;
   using SBlackListInfoVectorType = gpg::RVectorType<moho::SBlackListInfo>;
 
-  alignas(SBlackListInfoVectorType) unsigned char gSBlackListInfoVectorTypeStorage[sizeof(SBlackListInfoVectorType)];
-  bool gSBlackListInfoVectorTypeConstructed = false;
-
-  msvc8::string gSBlackListInfoVectorTypeName;
-  bool gSBlackListInfoVectorTypeNameCleanupRegistered = false;
-
+  /**
+   * Address: 0x00BFE860 (FUN_00BFE860, atexit destructor of the RVectorType<SBlackListInfo> object)
+   */
   [[nodiscard]] SBlackListInfoVectorType* AcquireSBlackListInfoVectorType()
   {
-    if (!gSBlackListInfoVectorTypeConstructed) {
-      new (gSBlackListInfoVectorTypeStorage) SBlackListInfoVectorType();
-      gSBlackListInfoVectorTypeConstructed = true;
-    }
-    return reinterpret_cast<SBlackListInfoVectorType*>(gSBlackListInfoVectorTypeStorage);
-  }
-
-  [[nodiscard]] SBlackListInfoVectorType* PeekSBlackListInfoVectorType() noexcept
-  {
-    if (!gSBlackListInfoVectorTypeConstructed) {
-      return nullptr;
-    }
-    return reinterpret_cast<SBlackListInfoVectorType*>(gSBlackListInfoVectorTypeStorage);
+    static SBlackListInfoVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* ResolveSBlackListInfoType()
@@ -44,18 +30,6 @@ namespace
       moho::SBlackListInfo::sType = type;
     }
     return type;
-  }
-
-  /**
-   * Address: 0x00BFE800 (FUN_00BFE800, sub_BFE800)
-   *
-   * What it does:
-   * Releases cached lexical-name storage for `RVectorType_SBlackListInfo`.
-   */
-  void cleanup_SBlackListInfoVectorTypeName()
-  {
-    gSBlackListInfoVectorTypeName = msvc8::string{};
-    gSBlackListInfoVectorTypeNameCleanupRegistered = false;
   }
 
   /**
@@ -159,28 +133,11 @@ namespace
     return requestedCount;
   }
 
-  /**
-   * Address: 0x00BFE860 (FUN_00BFE860, sub_BFE860)
-   *
-   * What it does:
-   * Tears down `vector<SBlackListInfo>` reflection storage at process exit.
-   */
-  void cleanup_SBlackListInfoVectorType()
-  {
-    SBlackListInfoVectorType* const type = PeekSBlackListInfoVectorType();
-    if (type == nullptr) {
-      return;
-    }
-
-    type->~SBlackListInfoVectorType();
-    gSBlackListInfoVectorTypeConstructed = false;
-  }
-
   struct SBlackListInfoVectorReflectionBootstrap
   {
     SBlackListInfoVectorReflectionBootstrap()
     {
-      (void)moho::register_SBlackListInfoVectorType_AtExit();
+      moho::register_SBlackListInfoVectorType_AtExit();
     }
   };
 
@@ -234,21 +191,15 @@ gpg::RVectorType<moho::SBlackListInfo>::~RVectorType() = default;
 
 /**
  * Address: 0x006DB5D0 (FUN_006DB5D0, gpg::RVectorType_SBlackListInfo::GetName)
+ * Address: 0x00BFE800 (FUN_00BFE800, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `vector<SBlackListInfo>` once and returns it.
  */
 const char* gpg::RVectorType<moho::SBlackListInfo>::GetName() const
 {
-  if (gSBlackListInfoVectorTypeName.empty()) {
-    const gpg::RType* const elementType = ResolveSBlackListInfoType();
-    const char* const elementName = elementType ? elementType->GetName() : "SBlackListInfo";
-    gSBlackListInfoVectorTypeName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SBlackListInfo");
-
-    if (!gSBlackListInfoVectorTypeNameCleanupRegistered) {
-      gSBlackListInfoVectorTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_SBlackListInfoVectorTypeName);
-    }
-  }
-
-  return gSBlackListInfoVectorTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveSBlackListInfoType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -344,13 +295,11 @@ gpg::RType* moho::register_SBlackListInfoVectorType_00()
  * Address: 0x00BD8BB0 (FUN_00BD8BB0, sub_BD8BB0)
  *
  * What it does:
- * Registers `vector<SBlackListInfo>` reflection and installs process-exit
- * teardown via `atexit`.
+ * Registers `vector<SBlackListInfo>` reflection.
  */
-int moho::register_SBlackListInfoVectorType_AtExit()
+void moho::register_SBlackListInfoVectorType_AtExit()
 {
   (void)register_SBlackListInfoVectorType_00();
-  return std::atexit(&cleanup_SBlackListInfoVectorType);
 }
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

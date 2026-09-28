@@ -12,19 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(EAiPathNavigatorStateTypeInfo)
-    unsigned char gEAiPathNavigatorStateTypeInfoStorage[sizeof(EAiPathNavigatorStateTypeInfo)] = {};
-  bool gEAiPathNavigatorStateTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF7320 (FUN_00BF7320, atexit destructor of the EAiPathNavigatorStateTypeInfo object)
+   */
   [[nodiscard]] EAiPathNavigatorStateTypeInfo* AcquireEAiPathNavigatorStateTypeInfo()
   {
-    if (!gEAiPathNavigatorStateTypeInfoConstructed) {
-      auto* const typeInfo = new (gEAiPathNavigatorStateTypeInfoStorage) EAiPathNavigatorStateTypeInfo();
-      gpg::PreRegisterRType(typeid(EAiPathNavigatorState), typeInfo);
-      gEAiPathNavigatorStateTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<EAiPathNavigatorStateTypeInfo*>(gEAiPathNavigatorStateTypeInfoStorage);
+    static EAiPathNavigatorStateTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -36,23 +30,9 @@ namespace
    */
   [[nodiscard]] gpg::REnumType* preregister_EAiPathNavigatorStateTypeInfo()
   {
-    return AcquireEAiPathNavigatorStateTypeInfo();
-  }
-
-  /**
-   * Address: 0x00BF7320 (FUN_00BF7320, cleanup_EAiPathNavigatorStateTypeInfo)
-   *
-   * What it does:
-   * Tears down recovered static `EAiPathNavigatorStateTypeInfo` storage.
-   */
-  void cleanup_EAiPathNavigatorStateTypeInfo()
-  {
-    if (!gEAiPathNavigatorStateTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireEAiPathNavigatorStateTypeInfo()->~EAiPathNavigatorStateTypeInfo();
-    gEAiPathNavigatorStateTypeInfoConstructed = false;
+    EAiPathNavigatorStateTypeInfo* const typeInfo = AcquireEAiPathNavigatorStateTypeInfo();
+    gpg::PreRegisterRType(typeid(EAiPathNavigatorState), typeInfo);
+    return typeInfo;
   }
 
   // Address: 0x010AEE20 -- process-global `PrimitiveSerHelper<CAiPathNavigator::
@@ -96,13 +76,11 @@ void EAiPathNavigatorStateTypeInfo::Init()
  * Address: 0x00BCCFC0 (FUN_00BCCFC0, register_EAiPathNavigatorStateTypeInfo)
  *
  * What it does:
- * Registers `EAiPathNavigatorState` enum type-info and installs process-exit
- * cleanup.
+ * Registers `EAiPathNavigatorState` enum type-info.
  */
-int moho::register_EAiPathNavigatorStateTypeInfo()
+void moho::register_EAiPathNavigatorStateTypeInfo()
 {
   (void)preregister_EAiPathNavigatorStateTypeInfo();
-  return std::atexit(&cleanup_EAiPathNavigatorStateTypeInfo);
 }
 
 namespace
@@ -111,7 +89,7 @@ namespace
   {
     EAiPathNavigatorStateTypeInfoBootstrap()
     {
-      (void)moho::register_EAiPathNavigatorStateTypeInfo();
+      moho::register_EAiPathNavigatorStateTypeInfo();
     }
   };
 

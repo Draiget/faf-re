@@ -448,19 +448,10 @@ namespace moho
   static_assert(sizeof(CIntelGridTypeInfo) == 0x64, "CIntelGridTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00BF1D90 (FUN_00BF1D90, cleanup_CIntelGridTypeInfo)
-   *
-   * What it does:
-   * Releases startup `CIntelGridTypeInfo` field/base storage lanes.
-   */
-  void cleanup_CIntelGridTypeInfo();
-
-  /**
    * Address: 0x00BC7920 (FUN_00BC7920, register_CIntelGridTypeInfo)
    *
    * What it does:
-   * Forces startup construction for `CIntelGridTypeInfo` and installs `atexit`
-   * cleanup.
+   * Forces startup construction for `CIntelGridTypeInfo`.
    */
   void register_CIntelGridTypeInfo();
 } // namespace moho

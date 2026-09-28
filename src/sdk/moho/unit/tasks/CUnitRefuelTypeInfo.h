@@ -59,22 +59,12 @@ namespace moho
   };
 
   /**
-   * Address: 0x00BFA360 (FUN_00BFA360)
-   *
-   * What it does:
-   * Releases reflected base/field buffers for global `CUnitRefuelTypeInfo`
-   * storage.
-   */
-  void cleanup_CUnitRefuelTypeInfo();
-
-  /**
    * Address: 0x00BD1890 (FUN_00BD1890, sub_BD1890)
    *
    * What it does:
-   * Constructs startup-owned `CUnitRefuelTypeInfo` and schedules process exit
-   * cleanup.
+   * Constructs startup-owned `CUnitRefuelTypeInfo`.
    */
-  int register_CUnitRefuelTypeInfo();
+  void register_CUnitRefuelTypeInfo();
 
   static_assert(sizeof(CUnitRefuelTypeInfo) == 0x64, "CUnitRefuelTypeInfo size must be 0x64");
 } // namespace moho

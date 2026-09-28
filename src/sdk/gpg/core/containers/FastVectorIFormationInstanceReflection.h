@@ -84,8 +84,7 @@ namespace gpg
    * Address: 0x00BCC210 (FUN_00BCC210, register_RFastVectorType_IFormationInstance)
    *
    * What it does:
-   * Materializes startup reflection storage for `fastvector<Moho::IFormationInstance*>`
-   * and registers process-exit teardown.
+   * Constructs the `fastvector<Moho::IFormationInstance*>` reflection descriptor.
    */
   void register_RFastVectorType_IFormationInstance();
 } // namespace gpg

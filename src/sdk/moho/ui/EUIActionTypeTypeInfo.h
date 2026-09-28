@@ -41,5 +41,11 @@ namespace moho
 
   static_assert(sizeof(EUIActionTypeTypeInfo) == 0x78, "EUIActionTypeTypeInfo size must be 0x78");
 
+  /**
+   * Address: 0x00BE3A50 (FUN_00BE3A50, register_EUIActionTypeTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `EUIActionType` enum type-info object.
+   */
   void register_EUIActionTypeTypeInfoStartup();
 } // namespace moho

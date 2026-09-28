@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiEditTypeInfo) unsigned char gCMauiEditTypeInfoStorage[sizeof(CMauiEditTypeInfo)];
-  bool gCMauiEditTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02DA0 (FUN_00C02DA0, atexit destructor of the CMauiEditTypeInfo object)
+   */
   [[nodiscard]] CMauiEditTypeInfo& AcquireCMauiEditTypeInfo()
   {
-    if (!gCMauiEditTypeInfoConstructed) {
-      new (gCMauiEditTypeInfoStorage) CMauiEditTypeInfo();
-      gCMauiEditTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiEditTypeInfo*>(gCMauiEditTypeInfoStorage);
-  }
-
-  void cleanup_CMauiEditTypeInfo()
-  {
-    if (!gCMauiEditTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiEditTypeInfo*>(gCMauiEditTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiEditTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiEditTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CMauiEditTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDE230 (FUN_00BDE230, register_CMauiEditTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiEdit` type-info object.
+ */
 void moho::register_CMauiEditTypeInfoStartup()
 {
   (void)AcquireCMauiEditTypeInfo();
-  (void)std::atexit(&cleanup_CMauiEditTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

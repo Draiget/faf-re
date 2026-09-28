@@ -16,31 +16,17 @@ namespace
   using HPathCellVector = msvc8::vector<moho::HPathCell>;
   using HPathCellVectorType = gpg::RVectorType<moho::HPathCell>;
 
-  // Startup-owned reflection descriptor storage (binary global stru_1106C10 @
-  // 0x01106C10). Constructed lazily by the registrar; the base gpg::RType ctor
-  // plus the specialization vtable install reproduce the binary's inline setup.
-  alignas(HPathCellVectorType) unsigned char gHPathCellVectorTypeStorage[sizeof(HPathCellVectorType)];
-  bool gHPathCellVectorTypeConstructed = false;
-
-  // Cached "vector<HPathCell>" lexical name (binary global stru_10C7FBC).
-  msvc8::string gHPathCellVectorTypeName;
-  bool gHPathCellVectorTypeNameCleanupRegistered = false;
-
+  /**
+   * Address: 0x00C018F0 (FUN_00C018F0, atexit destructor of the RVectorType<HPathCell> object)
+   *
+   * What it does:
+   * Owns the startup reflection descriptor (binary global at 0x01106C10),
+   * constructed on the registrar's first call.
+   */
   [[nodiscard]] HPathCellVectorType* AcquireHPathCellVectorType()
   {
-    if (!gHPathCellVectorTypeConstructed) {
-      new (gHPathCellVectorTypeStorage) HPathCellVectorType();
-      gHPathCellVectorTypeConstructed = true;
-    }
-    return reinterpret_cast<HPathCellVectorType*>(gHPathCellVectorTypeStorage);
-  }
-
-  [[nodiscard]] HPathCellVectorType* PeekHPathCellVectorType() noexcept
-  {
-    if (!gHPathCellVectorTypeConstructed) {
-      return nullptr;
-    }
-    return reinterpret_cast<HPathCellVectorType*>(gHPathCellVectorTypeStorage);
+    static HPathCellVectorType sInstance;
+    return &sInstance;
   }
 
   // Lazily resolves and caches the element RType* (binary Moho::HPathCell::sType).
@@ -52,18 +38,6 @@ namespace
       moho::HPathCell::sType = type;
     }
     return type;
-  }
-
-  /**
-   * Address: 0x00C01800 (FUN_00C01800, sub_C01800)
-   *
-   * What it does:
-   * Releases cached lexical-name storage for `RVectorType_HPathCell`.
-   */
-  void cleanup_HPathCellVectorTypeName()
-  {
-    gHPathCellVectorTypeName = msvc8::string{};
-    gHPathCellVectorTypeNameCleanupRegistered = false;
   }
 
   /**
@@ -155,30 +129,11 @@ namespace
     return requestedCount;
   }
 
-  /**
-   * Address: 0x00C018F0 (FUN_00C018F0, sub_C018F0)
-   *
-   * What it does:
-   * Tears down `vector<HPathCell>` reflection storage at process exit (frees the
-   * RType base's field/base lanes and restores the RObject vftable, exactly as
-   * the specialization's destructor does).
-   */
-  void cleanup_HPathCellVectorType()
-  {
-    HPathCellVectorType* const type = PeekHPathCellVectorType();
-    if (type == nullptr) {
-      return;
-    }
-
-    type->~HPathCellVectorType();
-    gHPathCellVectorTypeConstructed = false;
-  }
-
   struct HPathCellVectorReflectionBootstrap
   {
     HPathCellVectorReflectionBootstrap()
     {
-      (void)moho::register_HPathCellVectorType_AtExit();
+      moho::register_HPathCellVectorType_AtExit();
     }
   };
 
@@ -192,25 +147,15 @@ namespace moho
 
 /**
  * Address: 0x007633E0 (FUN_007633E0, gpg::RVectorType_HPathCell::GetName)
+ * Address: 0x00C01800 (FUN_00C01800, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Builds and caches `"vector<HPathCell>"` from the element type name, arming a
- * one-shot `atexit` teardown for the cached string.
+ * Builds `"vector<HPathCell>"` once from the element type name and returns it.
  */
 const char* gpg::RVectorType<moho::HPathCell>::GetName() const
 {
-  if (gHPathCellVectorTypeName.empty()) {
-    const gpg::RType* const elementType = ResolveHPathCellType();
-    const char* const elementName = elementType ? elementType->GetName() : "HPathCell";
-    gHPathCellVectorTypeName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "HPathCell");
-
-    if (!gHPathCellVectorTypeNameCleanupRegistered) {
-      gHPathCellVectorTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_HPathCellVectorTypeName);
-    }
-  }
-
-  return gHPathCellVectorTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveHPathCellType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -329,15 +274,13 @@ gpg::RType* moho::register_HPathCellVectorType_00()
  * Address: 0x00BDC6D0 (FUN_00BDC6D0, sub_BDC6D0)
  *
  * What it does:
- * Registers `vector<HPathCell>` reflection and installs process-exit teardown
- * via `atexit`. In the binary this is the static-init aggregator that calls the
- * registrar; modeled at source level by the `HPathCellVectorReflectionBootstrap`
- * static-init instance.
+ * Registers `vector<HPathCell>` reflection. In the binary this is the
+ * static-init aggregator that calls the registrar; modeled at source level by
+ * the `HPathCellVectorReflectionBootstrap` static-init instance.
  */
-int moho::register_HPathCellVectorType_AtExit()
+void moho::register_HPathCellVectorType_AtExit()
 {
   (void)register_HPathCellVectorType_00();
-  return std::atexit(&cleanup_HPathCellVectorType);
 }
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

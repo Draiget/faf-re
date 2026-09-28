@@ -1,8 +1,6 @@
 #include "moho/unit/core/UnitWeaponWeakPtrReflection.h"
 
-#include <cstdlib>
 #include <cstdint>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -15,9 +13,6 @@
 namespace
 {
   using WeakPtrUnitWeaponType = moho::RWeakPtrType<moho::UnitWeapon>;
-
-  msvc8::string gWeakPtrUnitWeaponTypeName;
-  bool gWeakPtrUnitWeaponTypeNameCleanupRegistered = false;
 
   /**
    * Address: 0x00BFC490 (FUN_00BFC490, atexit destructor of the WeakPtrUnitWeaponType object)
@@ -91,15 +86,6 @@ namespace
     throw gpg::SerializationError(msg.c_str());
   }
 
-  /**
-   * Address: 0x00BFC3D0 (FUN_00BFC3D0, cleanup_WeakPtrUnitWeaponTypeName)
-   */
-  void cleanup_WeakPtrUnitWeaponTypeName()
-  {
-    gWeakPtrUnitWeaponTypeName = msvc8::string{};
-    gWeakPtrUnitWeaponTypeNameCleanupRegistered = false;
-  }
-
   struct UnitWeaponWeakPtrReflectionBootstrap
   {
     UnitWeaponWeakPtrReflectionBootstrap()
@@ -144,19 +130,12 @@ namespace moho
 
   /**
    * Address: 0x00674BB0 (FUN_00674BB0, Moho::RWeakPtrType_UnitWeapon::GetName)
+   * Address: 0x00BFC3D0 (FUN_00BFC3D0, atexit destructor of GetName's cached name)
    */
   const char* RWeakPtrType<UnitWeapon>::GetName() const
   {
-    if (gWeakPtrUnitWeaponTypeName.empty()) {
-      const char* const pointeeName = CachedUnitWeaponType() ? CachedUnitWeaponType()->GetName() : "UnitWeapon";
-      gWeakPtrUnitWeaponTypeName = gpg::STR_Printf("WeakPtr<%s>", pointeeName ? pointeeName : "UnitWeapon");
-      if (!gWeakPtrUnitWeaponTypeNameCleanupRegistered) {
-        gWeakPtrUnitWeaponTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_WeakPtrUnitWeaponTypeName);
-      }
-    }
-
-    return gWeakPtrUnitWeaponTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedUnitWeaponType()->GetName());
+    return sName.c_str();
   }
 
   /**

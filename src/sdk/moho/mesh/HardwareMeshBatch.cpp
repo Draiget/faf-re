@@ -1032,8 +1032,8 @@ namespace moho
         static int sDrawBudget = 0;
         if (sDrawBudget < 6 && mBoneCount > 4) {
           ++sDrawBudget;
-          const SkinPaletteEntry* const trans = GetMeshShaderVarTransPalette().mPalette.begin();
-          const SkinPaletteEntry* const rot = GetMeshShaderVarRotPalette().mPalette.begin();
+          const SkinPaletteEntry* const trans = meshShaderVarTransPalette.mPalette.begin();
+          const SkinPaletteEntry* const rot = meshShaderVarRotPalette.mPalette.begin();
           const auto* const record = static_cast<const std::uint8_t*>(mScratchVertexData);
           const float* const rows = reinterpret_cast<const float*>(record);
           char probe[512];
@@ -1044,7 +1044,7 @@ namespace moho
             "anim=(%u,%u,%u,%u) row0=(%.2f,%.2f,%.2f) row3=(%.2f,%.2f,%.2f) skip=%d\n",
             static_cast<const void*>(this), packedCount, mVertexCount, mIndexCount, mBoneCount,
             mMaxInstancesPerDraw, mActiveInstanceBudget,
-            static_cast<unsigned>(GetMeshShaderVarTransPalette().mPalette.size()),
+            static_cast<unsigned>(meshShaderVarTransPalette.mPalette.size()),
             trans[0].x, trans[0].y, trans[0].z, trans[0].w, rot[0].x, rot[0].y, rot[0].z, rot[0].w,
             trans[1].x, trans[1].y, trans[1].z, trans[1].w,
             record[0x30], record[0x31], record[0x32], record[0x33],
@@ -1231,8 +1231,8 @@ namespace moho
       return 0;
     }
 
-    MeshShaderPaletteVar& transPaletteVar = GetMeshShaderVarTransPalette();
-    MeshShaderPaletteVar& rotPaletteVar = GetMeshShaderVarRotPalette();
+    MeshShaderPaletteVar& transPaletteVar = meshShaderVarTransPalette;
+    MeshShaderPaletteVar& rotPaletteVar = meshShaderVarRotPalette;
     SkinPaletteEntry* const transPalette = transPaletteVar.mPalette.begin();
     SkinPaletteEntry* const rotPalette = rotPaletteVar.mPalette.begin();
 

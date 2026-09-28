@@ -13,22 +13,13 @@
 
 namespace
 {
-  alignas(moho::SFootprintTypeInfo) unsigned char gSFootprintTypeInfoStorage[sizeof(moho::SFootprintTypeInfo)];
-  bool gSFootprintTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::SFootprintTypeInfo& SFootprintTypeInfoStorageRef() noexcept
+  /**
+   * Address: 0x00BF22F0 (FUN_00BF22F0, atexit destructor of the SFootprintTypeInfo object)
+   */
+  [[nodiscard]] moho::SFootprintTypeInfo* AcquireSFootprintTypeInfo()
   {
-    return *reinterpret_cast<moho::SFootprintTypeInfo*>(gSFootprintTypeInfoStorage);
-  }
-
-  void CleanupSFootprintTypeInfoAtExit()
-  {
-    if (!gSFootprintTypeInfoConstructed) {
-      return;
-    }
-
-    SFootprintTypeInfoStorageRef().~SFootprintTypeInfo();
-    gSFootprintTypeInfoConstructed = false;
+    static moho::SFootprintTypeInfo sInstance;
+    return &sInstance;
   }
 } // namespace
 
@@ -201,16 +192,11 @@ namespace moho
    * Address: 0x00BC7E40 (FUN_00BC7E40, register_SFootprintTypeInfo)
    *
    * What it does:
-   * Installs the static `SFootprintTypeInfo` instance and its shutdown hook.
+   * Constructs the static `SFootprintTypeInfo` instance, which preregisters it.
    */
   void register_SFootprintTypeInfo()
   {
-    if (!gSFootprintTypeInfoConstructed) {
-      new (gSFootprintTypeInfoStorage) SFootprintTypeInfo();
-      gSFootprintTypeInfoConstructed = true;
-    }
-
-    (void)std::atexit(&CleanupSFootprintTypeInfoAtExit);
+    (void)AcquireSFootprintTypeInfo();
   }
 
   /**

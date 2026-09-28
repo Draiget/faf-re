@@ -12,24 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CUIWorldMeshTypeInfo) unsigned char gStorage[sizeof(CUIWorldMeshTypeInfo)];
-  bool gConstructed = false;
-
+  /**
+   * Address: 0x00C07730 (FUN_00C07730, atexit destructor of the CUIWorldMeshTypeInfo object)
+   */
   [[nodiscard]] CUIWorldMeshTypeInfo& Acquire()
   {
-    if (!gConstructed) {
-      new (gStorage) CUIWorldMeshTypeInfo();
-      gConstructed = true;
-    }
-    return *reinterpret_cast<CUIWorldMeshTypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) return;
-    auto& ti = *reinterpret_cast<CUIWorldMeshTypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static CUIWorldMeshTypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { moho::register_CUIWorldMeshTypeInfoStartup(); } };
@@ -56,10 +45,15 @@ void CUIWorldMeshTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BE64C0 (FUN_00BE64C0, register_CUIWorldMeshTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CUIWorldMesh` type-info object.
+ */
 void moho::register_CUIWorldMeshTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

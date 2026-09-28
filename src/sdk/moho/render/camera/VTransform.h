@@ -204,6 +204,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x004F05E0 (FUN_004F05E0, Moho::VTransformTypeInfo::VTransformTypeInfo)
+     *
+     * What it does:
+     * Materializes/preregisters startup RTTI storage for `VTransform`.
+     */
+    VTransformTypeInfo();
+
+    /**
      * Address: 0x004F0680 (FUN_004F0680, Moho::VTransformTypeInfo::dtr)
      */
     ~VTransformTypeInfo() override;
@@ -304,20 +312,12 @@ namespace moho
   static_assert(sizeof(VTransformSerializer) == 0x14, "VTransformSerializer size must be 0x14");
 
   /**
-   * Address: 0x004F05E0 (FUN_004F05E0, preregister_VTransformTypeInfo)
-   *
-   * What it does:
-   * Materializes/preregisters startup RTTI storage for `VTransform`.
-   */
-  [[nodiscard]] gpg::RType* preregister_VTransformTypeInfo();
-
-  /**
    * Address: 0x00BC7150 (FUN_00BC7150, register_VTransformTypeInfo)
    *
    * What it does:
-   * Runs `VTransform` type preregistration and installs process-exit cleanup.
+   * Runs `VTransform` type preregistration.
    */
-  int register_VTransformTypeInfo();
+  void register_VTransformTypeInfo();
 
   /**
    * Applies rigid transform `(R,p)` to plane `N*X = C`:

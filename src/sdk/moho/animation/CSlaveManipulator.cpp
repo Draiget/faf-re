@@ -190,26 +190,13 @@ namespace
     return &bonesBegin[boneIndex];
   }
 
-  alignas(moho::CSlaveManipulatorTypeInfo)
-  unsigned char gCSlaveManipulatorTypeInfoStorage[sizeof(moho::CSlaveManipulatorTypeInfo)] = {};
-  bool gCSlaveManipulatorTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFB1B0 (FUN_00BFB1B0, atexit destructor of the CSlaveManipulatorTypeInfo object)
+   */
   [[nodiscard]] moho::CSlaveManipulatorTypeInfo* AcquireCSlaveManipulatorTypeInfo()
   {
-    if (!gCSlaveManipulatorTypeInfoConstructed) {
-      new (gCSlaveManipulatorTypeInfoStorage) moho::CSlaveManipulatorTypeInfo();
-      gCSlaveManipulatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CSlaveManipulatorTypeInfo*>(gCSlaveManipulatorTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::CSlaveManipulatorTypeInfo* PeekCSlaveManipulatorTypeInfo() noexcept
-  {
-    if (!gCSlaveManipulatorTypeInfoConstructed) {
-      return nullptr;
-    }
-    return reinterpret_cast<moho::CSlaveManipulatorTypeInfo*>(gCSlaveManipulatorTypeInfoStorage);
+    static moho::CSlaveManipulatorTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -227,40 +214,21 @@ namespace
   }
 
   /**
-   * Address: 0x00BFB1B0 (FUN_00BFB1B0)
-   *
-   * What it does:
-   * Tears down startup-owned `CSlaveManipulator` type-info storage.
-   */
-  void cleanup_CSlaveManipulatorTypeInfo()
-  {
-    moho::CSlaveManipulatorTypeInfo* const typeInfo = PeekCSlaveManipulatorTypeInfo();
-    if (!typeInfo) {
-      return;
-    }
-
-    typeInfo->~CSlaveManipulatorTypeInfo();
-    gCSlaveManipulatorTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD31D0 (FUN_00BD31D0)
    *
    * What it does:
-   * Registers startup `CSlaveManipulator` type-info preregistration and
-   * process-exit teardown.
+   * Registers startup `CSlaveManipulator` type-info preregistration.
    */
-  int register_CSlaveManipulatorTypeInfoStartup()
+  void register_CSlaveManipulatorTypeInfoStartup()
   {
     (void)preregister_CSlaveManipulatorTypeInfo();
-    return std::atexit(&cleanup_CSlaveManipulatorTypeInfo);
   }
 
   struct CSlaveManipulatorTypeInfoStartupBootstrap
   {
     CSlaveManipulatorTypeInfoStartupBootstrap()
     {
-      (void)register_CSlaveManipulatorTypeInfoStartup();
+      register_CSlaveManipulatorTypeInfoStartup();
     }
   };
 

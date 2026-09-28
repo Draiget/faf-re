@@ -47,19 +47,11 @@ namespace moho
   [[nodiscard]] gpg::REnumType* preregister_ECompareTypeTypeInfo();
 
   /**
-   * Address: 0x00BF61C0 (FUN_00BF61C0, cleanup_ECompareTypeTypeInfo)
-   *
-   * What it does:
-   * Tears down startup-owned `ECompareTypeTypeInfo` storage at process exit.
-   */
-  void cleanup_ECompareTypeTypeInfo();
-
-  /**
    * Address: 0x00BCB350 (FUN_00BCB350, register_ECompareTypeTypeInfoStartup)
    *
    * What it does:
-   * Runs preregistration for `ECompareTypeTypeInfo` and installs exit cleanup.
+   * Runs preregistration for `ECompareTypeTypeInfo`.
    */
-  int register_ECompareTypeTypeInfoStartup();
+  void register_ECompareTypeTypeInfoStartup();
 } // namespace moho
 

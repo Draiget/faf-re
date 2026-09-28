@@ -50,8 +50,7 @@ namespace moho
    * Address: 0x00BDC670 (FUN_00BDC670, register_NavPathTypeInfo)
    *
    * What it does:
-   * Materializes startup `NavPathTypeInfo` storage and registers process-exit
-   * teardown.
+   * Constructs the startup `NavPathTypeInfo` object, which preregisters it.
    */
   void register_NavPathTypeInfo();
 } // namespace moho

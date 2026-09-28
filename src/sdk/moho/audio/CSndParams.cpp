@@ -1211,10 +1211,15 @@ namespace moho
   namespace
   {
     /**
+     * Address: 0x00BF1110 (FUN_00BF1110, atexit destructor of the RPointerType<CSndParams> object)
+     *
      * Static `RPointerType<CSndParams>` descriptor that the binary exposes as
      * `Moho::CSndParams::PointerType`. Default static-init runs the
      * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane.
+     * derived vftable lane. In the binary this object is a function-local
+     * static of `GetPointerType`, built by 0x004E5CB0 (the specialization's
+     * constructor, which also preregisters it); that constructor is not yet
+     * modelled on `gpg::RPointerType<moho::CSndParams>`.
      */
     gpg::RPointerType<moho::CSndParams> sCSndParamsPointerTypeStorage{};
 
@@ -1230,20 +1235,6 @@ namespace moho
     {
       gpg::PreRegisterRType(typeid(moho::CSndParams*), &sCSndParamsPointerTypeStorage);
     }
-
-    /**
-     * Address: 0x00BF1110 (FUN_00BF1110)
-     *
-     * What it does:
-     * Tears down the static `RPointerType<CSndParams>` descriptor at process
-     * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
-     * RType vftable lane to the `RObject` base. Registered via `atexit` from
-     * `GetPointerType`'s once-init path.
-     */
-    void CleanupCSndParamsPointerType()
-    {
-      sCSndParamsPointerTypeStorage.~RPointerType<moho::CSndParams>();
-    }
   } // namespace
 
   /**
@@ -1251,15 +1242,13 @@ namespace moho
    *
    * What it does:
    * On first call, pre-registers the static `RPointerType<CSndParams>`
-   * descriptor and installs the matching atexit teardown. After that, lazily
-   * caches the `LookupRType(typeid(CSndParams*))` result in `sPointerType` and
-   * returns it.
+   * descriptor. After that, lazily caches the
+   * `LookupRType(typeid(CSndParams*))` result in `sPointerType` and returns it.
    */
   gpg::RType* CSndParams::GetPointerType()
   {
     static const bool sOnceInit = []() {
       PreregisterCSndParamsPointerType();
-      (void)std::atexit(&CleanupCSndParamsPointerType);
       return true;
     }();
     (void)sOnceInit;
@@ -1286,7 +1275,7 @@ namespace moho
       return outEngine;
     }
 
-    const SoundConfiguration* const configuration = sSoundConfiguration;
+    const SoundConfiguration* const configuration = sSoundConfiguration.get();
     if (configuration == nullptr || configuration->mEngines.mStart == nullptr ||
         configuration->mEngines.mFinish == nullptr || configuration->mEngines.mStart == configuration->mEngines.mFinish ||
         configuration->mNoSound != 0u) {

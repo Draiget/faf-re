@@ -83,18 +83,18 @@ namespace moho
    *
    * What it does:
    * Materializes and startup-registers the reflected `EFootprintFlags` enum
-   * descriptor, then installs its exit-time cleanup.
+   * descriptor.
    */
-  int register_EFootprintFlagsTypeInfo();
+  void register_EFootprintFlagsTypeInfo();
 
   /**
    * Address: 0x00BC82B0 (FUN_00BC82B0, register_RStringVectorTypeInfo)
    *
    * What it does:
    * Materializes and startup-registers the reflected `vector<string>`
-   * descriptor, then installs its exit-time cleanup.
+   * descriptor.
    */
-  int register_RStringVectorTypeInfo();
+  void register_RStringVectorTypeInfo();
 
   static_assert(sizeof(REntityBlueprintTypeInfo) == 0x64, "REntityBlueprintTypeInfo size must be 0x64");
 } // namespace moho

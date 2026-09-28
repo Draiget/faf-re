@@ -873,10 +873,15 @@ namespace moho
   namespace
   {
     /**
+     * Address: 0x00BF6B50 (FUN_00BF6B50, atexit destructor of the RPointerType<RUnitBlueprint> object)
+     *
      * Static `RPointerType<RUnitBlueprint>` descriptor that the binary exposes
      * as `Moho::RUnitBlueprint::PointerType`. Default static-init runs the
      * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane.
+     * derived vftable lane. In the binary this object is a function-local
+     * static of `GetPointerType`, built by 0x005A15E0 (the specialization's
+     * constructor, which also preregisters it); that constructor is not yet
+     * modelled on `gpg::RPointerType<moho::RUnitBlueprint>`.
      */
     gpg::RPointerType<moho::RUnitBlueprint> sRUnitBlueprintPointerTypeStorage{};
 
@@ -892,20 +897,6 @@ namespace moho
     {
       gpg::PreRegisterRType(typeid(moho::RUnitBlueprint*), &sRUnitBlueprintPointerTypeStorage);
     }
-
-    /**
-     * Address: 0x00BF6B50 (FUN_00BF6B50)
-     *
-     * What it does:
-     * Tears down the static `RPointerType<RUnitBlueprint>` descriptor at
-     * process exit: frees heap-backed `bases_`/`fields_` vector storage and
-     * resets the RType vftable lane to the `RObject` base. Registered via
-     * `atexit` from `GetPointerType`'s once-init path.
-     */
-    void CleanupRUnitBlueprintPointerType()
-    {
-      sRUnitBlueprintPointerTypeStorage.~RPointerType<moho::RUnitBlueprint>();
-    }
   } // namespace
 
   /**
@@ -913,15 +904,14 @@ namespace moho
    *
    * What it does:
    * On first call, pre-registers the static `RPointerType<RUnitBlueprint>`
-   * descriptor and installs the matching atexit teardown. After that, lazily
-   * caches the `LookupRType(typeid(RUnitBlueprint*))` result in `sPointerType`
-   * and returns it.
+   * descriptor. After that, lazily caches the
+   * `LookupRType(typeid(RUnitBlueprint*))` result in `sPointerType` and
+   * returns it.
    */
   gpg::RType* RUnitBlueprint::GetPointerType()
   {
     static const bool sOnceInit = []() {
       PreregisterRUnitBlueprintPointerType();
-      (void)std::atexit(&CleanupRUnitBlueprintPointerType);
       return true;
     }();
     (void)sOnceInit;

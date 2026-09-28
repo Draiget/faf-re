@@ -33,7 +33,14 @@ namespace gpg
 
 namespace
 {
-  moho::CIntelGridTypeInfo gCIntelGridTypeInfo;
+  /**
+   * Address: 0x00BF1D90 (FUN_00BF1D90, atexit destructor of the CIntelGridTypeInfo object)
+   */
+  [[nodiscard]] moho::CIntelGridTypeInfo* AcquireCIntelGridTypeInfo()
+  {
+    static moho::CIntelGridTypeInfo sInstance;
+    return &sInstance;
+  }
 
   // Address: 0x010A9F44 -- process-global `CIntelGridSaveConstruct` singleton.
   moho::CIntelGridSaveConstruct gCIntelGridSaveConstruct;
@@ -753,20 +760,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF1D90 (FUN_00BF1D90, cleanup_CIntelGridTypeInfo)
-   */
-  void cleanup_CIntelGridTypeInfo()
-  {
-    ResetTypeInfoVectors(gCIntelGridTypeInfo);
-  }
-
-  /**
    * Address: 0x00BC7920 (FUN_00BC7920, register_CIntelGridTypeInfo)
    */
   void register_CIntelGridTypeInfo()
   {
-    (void)gCIntelGridTypeInfo;
-    (void)std::atexit(&cleanup_CIntelGridTypeInfo);
+    (void)AcquireCIntelGridTypeInfo();
   }
 } // namespace moho
 

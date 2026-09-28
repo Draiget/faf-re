@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiItemListTypeInfo) unsigned char gCMauiItemListTypeInfoStorage[sizeof(CMauiItemListTypeInfo)];
-  bool gCMauiItemListTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02FD0 (FUN_00C02FD0, atexit destructor of the CMauiItemListTypeInfo object)
+   */
   [[nodiscard]] CMauiItemListTypeInfo& AcquireCMauiItemListTypeInfo()
   {
-    if (!gCMauiItemListTypeInfoConstructed) {
-      new (gCMauiItemListTypeInfoStorage) CMauiItemListTypeInfo();
-      gCMauiItemListTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiItemListTypeInfo*>(gCMauiItemListTypeInfoStorage);
-  }
-
-  void cleanup_CMauiItemListTypeInfo()
-  {
-    if (!gCMauiItemListTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiItemListTypeInfo*>(gCMauiItemListTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiItemListTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiItemListTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CMauiItemListTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDE910 (FUN_00BDE910, register_CMauiItemListTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiItemList` type-info object.
+ */
 void moho::register_CMauiItemListTypeInfoStartup()
 {
   (void)AcquireCMauiItemListTypeInfo();
-  (void)std::atexit(&cleanup_CMauiItemListTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

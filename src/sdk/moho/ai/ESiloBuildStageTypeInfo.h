@@ -57,10 +57,9 @@ namespace moho
    * Address: 0x00BCE030 (FUN_00BCE030, register_ESiloBuildStageTypeInfo)
    *
    * What it does:
-   * Registers `ESiloBuildStage` enum type-info and installs process-exit
-   * cleanup.
+   * Registers `ESiloBuildStage` enum type-info.
    */
-  int register_ESiloBuildStageTypeInfo();
+  void register_ESiloBuildStageTypeInfo();
 
   static_assert(sizeof(ESiloBuildStageTypeInfo) == 0x78, "ESiloBuildStageTypeInfo size must be 0x78");
 } // namespace moho

@@ -1164,33 +1164,6 @@ namespace
     map.erase(map.begin(), map.end());
   }
 
-  [[nodiscard]] CTaskStage* AllocateTaskStage()
-  {
-    auto* const stage = static_cast<CTaskStage*>(::operator new(sizeof(CTaskStage)));
-    stage->mThreads.mPrev = &stage->mThreads;
-    stage->mThreads.mNext = &stage->mThreads;
-    stage->mStagedThreads.mPrev = &stage->mStagedThreads;
-    stage->mStagedThreads.mNext = &stage->mStagedThreads;
-    stage->mActive = true;
-    stage->mAlignmentPad11[0] = 0;
-    stage->mAlignmentPad11[1] = 0;
-    stage->mAlignmentPad11[2] = 0;
-    return stage;
-  }
-
-  void DestroyTaskStageAndDelete(CTaskStage*& stage)
-  {
-    if (!stage) {
-      return;
-    }
-
-    stage->Teardown();
-    stage->mStagedThreads.ListUnlink();
-    stage->mThreads.ListUnlink();
-    ::operator delete(stage);
-    stage = nullptr;
-  }
-
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
   {
     for (const char* const name : names) {
@@ -1207,29 +1180,6 @@ namespace
   }
 
   using BuildReserveMapStorage = moho::SBuildStructurePositionMap;
-
-  /**
-   * Cached `"map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>"` display name plus
-   * its one-shot build guard. The binary keeps these as the
-   * `gpg::RMapType_IVector2i_SBuildReserveInfo` class static `sName` and the
-   * init-guard word at `0x010C8B70`; the descriptor class is file-local here, so
-   * they are file-local too.
-   */
-  msvc8::string gBuildReserveMapTypeName;
-  std::uint32_t gBuildReserveMapTypeNameInitGuard = 0u;
-  constexpr std::uint32_t kBuildReserveMapTypeNameInitMask = 0x1u;
-
-  /**
-   * Address: 0x00BF6320 (FUN_00BF6320, gpg::RMapType_IVector2i_SBuildReserveInfo::sName cleanup)
-   *
-   * What it does:
-   * Releases the cached reflected map display-name string at process exit.
-   */
-  void cleanup_BuildReserveMapTypeName()
-  {
-    gBuildReserveMapTypeName = msvc8::string();
-    gBuildReserveMapTypeNameInitGuard &= ~kBuildReserveMapTypeNameInitMask;
-  }
 
   [[nodiscard]] gpg::RType* ResolveBuildReserveKeyType()
   {
@@ -1276,41 +1226,30 @@ namespace
      * Vtable-confirmed: `??_7?$RMapType@V?$IVector2@H@Wm3@@USBuildReserveInfo@Moho@@@gpg@@6B@+0x8`
      * writes this address; that vtable is constructed by `FUN_00582610`
      * (`preregister_BuildReserveMapTypeInfo`, recovered, this file), which
-     * placement-news the singleton `BuildReserveMapTypeInfo` and so writes
-     * its vptr on construction.
+     * constructs the singleton `BuildReserveMapTypeInfo` and so writes its
+     * vptr on construction.
      */
     ~BuildReserveMapTypeInfo() override = default;
 
     /**
      * Address: 0x0057E240 (FUN_0057E240, gpg::RMapType_IVector2i_SBuildReserveInfo::GetName)
+     * Address: 0x00BF6320 (FUN_00BF6320, atexit destructor of GetName's cached name)
      *
      * IDA signature:
      * std::string::_Bxty *gpg::RMapType_IVector2i_SBuildReserveInfo::GetName();
      *
      * What it does:
-     * Lazily builds `"map<key,value>"` once from the reflected key and value
-     * descriptors' own names, caches it, and installs the atexit teardown. The
-     * binary resolves the value descriptor first and the key descriptor second,
-     * but formats key-then-value.
+     * Builds `"map<key,value>"` once from the reflected key and value
+     * descriptors' own names and returns it. The binary resolves the value
+     * descriptor first and the key descriptor second (right-to-left argument
+     * evaluation), but formats key-then-value.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if ((gBuildReserveMapTypeNameInitGuard & kBuildReserveMapTypeNameInitMask) == 0u) {
-        gBuildReserveMapTypeNameInitGuard |= kBuildReserveMapTypeNameInitMask;
-
-        const gpg::RType* const valueType = ResolveBuildReserveValueType();
-        const gpg::RType* const keyType = ResolveBuildReserveKeyType();
-        const char* const keyName = keyType ? keyType->GetName() : "Wm3::IVector2<int>";
-        const char* const valueName = valueType ? valueType->GetName() : "Moho::SBuildReserveInfo";
-        gBuildReserveMapTypeName = gpg::STR_Printf(
-          "map<%s,%s>",
-          keyName ? keyName : "Wm3::IVector2<int>",
-          valueName ? valueName : "Moho::SBuildReserveInfo"
-        );
-        (void)std::atexit(&cleanup_BuildReserveMapTypeName);
-      }
-
-      return gBuildReserveMapTypeName.c_str();
+      static const msvc8::string sName = gpg::STR_Printf(
+        "map<%s,%s>", ResolveBuildReserveKeyType()->GetName(), ResolveBuildReserveValueType()->GetName()
+      );
+      return sName.c_str();
     }
 
     /**
@@ -1437,16 +1376,13 @@ namespace
 
   static_assert(sizeof(BuildReserveMapTypeInfo) == 0x64, "BuildReserveMapTypeInfo size must be 0x64");
 
-  alignas(BuildReserveMapTypeInfo) unsigned char gBuildReserveMapTypeInfoStorage[sizeof(BuildReserveMapTypeInfo)]{};
-  bool gBuildReserveMapTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BF6380 (FUN_00BF6380, atexit destructor of the BuildReserveMapTypeInfo object)
+   */
   [[nodiscard]] BuildReserveMapTypeInfo& AcquireBuildReserveMapTypeInfo()
   {
-    if (!gBuildReserveMapTypeInfoConstructed) {
-      new (gBuildReserveMapTypeInfoStorage) BuildReserveMapTypeInfo();
-      gBuildReserveMapTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<BuildReserveMapTypeInfo*>(gBuildReserveMapTypeInfoStorage);
+    static BuildReserveMapTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
@@ -1559,10 +1495,7 @@ namespace
   {
     CTaskStage* const previous = field;
     field = replacement;
-    if (previous != nullptr) {
-      previous->~CTaskStage();
-      ::operator delete(previous);
-    }
+    delete previous;
   }
 
   struct CAiBrainStartupBootstrap
@@ -2166,9 +2099,9 @@ CAiBrain::CAiBrain(CArmyImpl* const army)
 
   mPersonality = new (std::nothrow) CAiPersonality(mSim);
 
-  mAiThreadStage = AllocateTaskStage();
-  mAttackerThreadStage = AllocateTaskStage();
-  mReservedThreadStage = AllocateTaskStage();
+  mAiThreadStage = new CTaskStage();
+  mAttackerThreadStage = new CTaskStage();
+  mReservedThreadStage = new CTaskStage();
 
   if (mPersonality) {
     mPersonality->ReadData();
@@ -2374,9 +2307,9 @@ int moho::register_CScrLuaMetatableFactory_CAiBrain_Index()
  */
 CAiBrain::~CAiBrain()
 {
-  DestroyTaskStageAndDelete(mReservedThreadStage);
-  DestroyTaskStageAndDelete(mAttackerThreadStage);
-  DestroyTaskStageAndDelete(mAiThreadStage);
+  delete mReservedThreadStage;
+  delete mAttackerThreadStage;
+  delete mAiThreadStage;
 
   DestroyBuildStructureMap(mBuildStructureMap);
 

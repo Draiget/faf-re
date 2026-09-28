@@ -1,7 +1,5 @@
 #include "moho/collision/CColPrimitiveBaseTypeInfo.h"
 
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -11,45 +9,7 @@
 
 namespace
 {
-  alignas(moho::CColPrimitiveBaseTypeInfo)
-    unsigned char gCColPrimitiveBaseTypeInfoStorage[sizeof(moho::CColPrimitiveBaseTypeInfo)];
-  bool gCColPrimitiveBaseTypeInfoConstructed = false;
-
-  alignas(moho::ECollisionShapeTypeInfo)
-    unsigned char gECollisionShapeTypeInfoStorage[sizeof(moho::ECollisionShapeTypeInfo)];
-  bool gECollisionShapeTypeInfoConstructed = false;
   bool gECollisionShapeTypeInfoPreregistered = false;
-
-  [[nodiscard]] moho::CColPrimitiveBaseTypeInfo& CColPrimitiveBaseTypeInfoStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::CColPrimitiveBaseTypeInfo*>(gCColPrimitiveBaseTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::ECollisionShapeTypeInfo& ECollisionShapeTypeInfoStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::ECollisionShapeTypeInfo*>(gECollisionShapeTypeInfoStorage);
-  }
-
-  void CleanupCColPrimitiveBaseTypeInfoAtExit()
-  {
-    if (!gCColPrimitiveBaseTypeInfoConstructed) {
-      return;
-    }
-
-    CColPrimitiveBaseTypeInfoStorageRef().~CColPrimitiveBaseTypeInfo();
-    gCColPrimitiveBaseTypeInfoConstructed = false;
-  }
-
-  void CleanupECollisionShapeTypeInfoAtExit()
-  {
-    if (!gECollisionShapeTypeInfoConstructed) {
-      return;
-    }
-
-    ECollisionShapeTypeInfoStorageRef().~ECollisionShapeTypeInfo();
-    gECollisionShapeTypeInfoConstructed = false;
-    gECollisionShapeTypeInfoPreregistered = false;
-  }
 } // namespace
 
 namespace moho
@@ -82,6 +42,7 @@ namespace moho
 
   /**
    * Address: 0x004FE500 (FUN_004FE500, preregister_CColPrimitiveBaseTypeInfo)
+   * Address: 0x00BF19E0 (FUN_00BF19E0, atexit destructor of the CColPrimitiveBaseTypeInfo object)
    *
    * What it does:
    * Constructs/preregisters the startup-owned `CColPrimitiveBaseTypeInfo`
@@ -89,26 +50,20 @@ namespace moho
    */
   [[nodiscard]] gpg::RType* preregister_CColPrimitiveBaseTypeInfo()
   {
-    if (!gCColPrimitiveBaseTypeInfoConstructed) {
-      new (gCColPrimitiveBaseTypeInfoStorage) CColPrimitiveBaseTypeInfo();
-      gCColPrimitiveBaseTypeInfoConstructed = true;
-    }
-
-    gpg::PreRegisterRType(typeid(CColPrimitiveBase), &CColPrimitiveBaseTypeInfoStorageRef());
-    return &CColPrimitiveBaseTypeInfoStorageRef();
+    static CColPrimitiveBaseTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(CColPrimitiveBase), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x00BC7530 (FUN_00BC7530, register_CColPrimitiveBaseTypeInfo)
    *
    * What it does:
-   * Installs the startup-owned `CColPrimitiveBaseTypeInfo` instance and its
-   * process-exit cleanup hook.
+   * Installs the startup-owned `CColPrimitiveBaseTypeInfo` instance.
    */
-  int register_CColPrimitiveBaseTypeInfo()
+  void register_CColPrimitiveBaseTypeInfo()
   {
     (void)preregister_CColPrimitiveBaseTypeInfo();
-    return std::atexit(&CleanupCColPrimitiveBaseTypeInfoAtExit);
   }
 
   /**
@@ -148,29 +103,25 @@ namespace moho
 
   /**
    * Address: 0x004FE3F0 (FUN_004FE3F0, preregister_ECollisionShapeTypeInfo)
+   * Address: 0x00BF19D0 (FUN_00BF19D0, atexit destructor of the ECollisionShapeTypeInfo object)
    */
   gpg::REnumType* preregister_ECollisionShapeTypeInfo()
   {
-    if (!gECollisionShapeTypeInfoConstructed) {
-      new (gECollisionShapeTypeInfoStorage) ECollisionShapeTypeInfo();
-      gECollisionShapeTypeInfoConstructed = true;
-    }
-
+    static ECollisionShapeTypeInfo sInstance;
     if (!gECollisionShapeTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(ECollisionShape), &ECollisionShapeTypeInfoStorageRef());
+      gpg::PreRegisterRType(typeid(ECollisionShape), &sInstance);
       gECollisionShapeTypeInfoPreregistered = true;
     }
 
-    return &ECollisionShapeTypeInfoStorageRef();
+    return &sInstance;
   }
 
   /**
    * Address: 0x00BC7510 (FUN_00BC7510, register_ECollisionShapeTypeInfo)
    */
-  int register_ECollisionShapeTypeInfo()
+  void register_ECollisionShapeTypeInfo()
   {
     (void)preregister_ECollisionShapeTypeInfo();
-    return std::atexit(&CleanupECollisionShapeTypeInfoAtExit);
   }
 } // namespace moho
 

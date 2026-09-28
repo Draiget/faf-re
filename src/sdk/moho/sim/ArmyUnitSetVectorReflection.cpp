@@ -16,24 +16,13 @@ namespace
   using EntitySetVector = msvc8::vector<moho::SEntitySetTemplateUnit>;
   using EntitySetVectorType = gpg::RVectorType<moho::SEntitySetTemplateUnit>;
 
-  alignas(EntitySetVectorType) unsigned char gEntitySetVectorTypeStorage[sizeof(EntitySetVectorType)];
-  bool gEntitySetVectorTypeConstructed = false;
-
+  /**
+   * Address: 0x00BFF470 (FUN_00BFF470, atexit destructor of the RVectorType<SEntitySetTemplateUnit> object)
+   */
   [[nodiscard]] EntitySetVectorType* AcquireEntitySetVectorType()
   {
-    if (!gEntitySetVectorTypeConstructed) {
-      new (gEntitySetVectorTypeStorage) EntitySetVectorType();
-      gEntitySetVectorTypeConstructed = true;
-    }
-    return reinterpret_cast<EntitySetVectorType*>(gEntitySetVectorTypeStorage);
-  }
-
-  [[nodiscard]] EntitySetVectorType* PeekEntitySetVectorType() noexcept
-  {
-    if (!gEntitySetVectorTypeConstructed) {
-      return nullptr;
-    }
-    return reinterpret_cast<EntitySetVectorType*>(gEntitySetVectorTypeStorage);
+    static EntitySetVectorType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* ResolveEntitySetTemplateUnitType()
@@ -94,38 +83,6 @@ namespace
     out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
     out.mType = dynamicType;
     return out;
-  }
-
-  /**
-   * Address: 0x00BFF470 (FUN_00BFF470, sub_BFF470)
-   *
-   * What it does:
-   * Tears down `vector<EntitySetTemplate<Unit>>` reflection storage lanes
-   * at process exit.
-   */
-  void cleanup_EntitySetTemplateUnitVectorType()
-  {
-    EntitySetVectorType* const type = PeekEntitySetVectorType();
-    if (type == nullptr) {
-      return;
-    }
-
-    type->~EntitySetVectorType();
-    gEntitySetVectorTypeConstructed = false;
-  }
-
-  msvc8::string gEntitySetTemplateUnitVectorTypeName;
-
-  /**
-   * Address: 0x00BFF440 (FUN_00BFF440, vector<EntitySetTemplate<Unit>> name-cache cleanup)
-   *
-   * What it does:
-   * Releases the cached lexical name for `vector<EntitySetTemplate<Unit>>`
-   * during process teardown.
-   */
-  void cleanup_EntitySetTemplateUnitVectorTypeName()
-  {
-    gEntitySetTemplateUnitVectorTypeName = msvc8::string{};
   }
 
   struct EntitySetTemplateUnitVectorTypeBootstrap
@@ -195,22 +152,16 @@ gpg::RVectorType<moho::SEntitySetTemplateUnit>::~RVectorType() = default;
 
 /**
  * Address: 0x00701680 (FUN_00701680, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::GetName)
+ * Address: 0x00BFF440 (FUN_00BFF440, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily resolves the reflected `EntitySetTemplate<Unit>` element type name
- * through the shared `EntitySetTemplate<Unit>::sType` cache, formats
- * "vector<%s>", caches the result, and registers its teardown with
- * `atexit` -- all under one once-guard, matching the binary's static-init
- * guard byte.
+ * Builds `vector<EntitySetTemplate<Unit>>` once, through the shared
+ * `EntitySetTemplate<Unit>::sType` cache, and returns it.
  */
 const char* gpg::RVectorType<moho::SEntitySetTemplateUnit>::GetName() const
 {
-  if (gEntitySetTemplateUnitVectorTypeName.empty()) {
-    gEntitySetTemplateUnitVectorTypeName =
-      gpg::STR_Printf("vector<%s>", CachedEntitySetTemplateUnitReflType()->GetName());
-    (void)std::atexit(&cleanup_EntitySetTemplateUnitVectorTypeName);
-  }
-  return gEntitySetTemplateUnitVectorTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedEntitySetTemplateUnitReflType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -289,13 +240,11 @@ gpg::RType* moho::register_EntitySetTemplateUnitVectorType()
  * Address: 0x00BD9C60 (FUN_00BD9C60, sub_BD9C60)
  *
  * What it does:
- * Registers `vector<EntitySetTemplate<Unit>>` reflection and installs
- * process-exit teardown via `atexit`.
+ * Registers `vector<EntitySetTemplate<Unit>>` reflection.
  */
-int moho::register_EntitySetTemplateUnitVectorType_AtExit()
+void moho::register_EntitySetTemplateUnitVectorType_AtExit()
 {
   (void)register_EntitySetTemplateUnitVectorType();
-  return std::atexit(&cleanup_EntitySetTemplateUnitVectorType);
 }
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

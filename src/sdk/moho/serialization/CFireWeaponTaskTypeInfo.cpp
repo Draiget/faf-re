@@ -13,30 +13,14 @@ namespace
 {
   using TypeInfo = moho::CFireWeaponTaskTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCFireWeaponTaskTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCFireWeaponTaskTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFE6B0 (FUN_00BFE6B0, atexit destructor of the CFireWeaponTaskTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gCFireWeaponTaskTypeInfoConstructed) {
-      new (gCFireWeaponTaskTypeInfoStorage) TypeInfo();
-      gCFireWeaponTaskTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCFireWeaponTaskTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
-
-  void cleanup_CFireWeaponTaskTypeInfo_00BFE6B0_Impl()
-  {
-    if (!gCFireWeaponTaskTypeInfoConstructed) {
-      return;
-    }
-
-    auto& typeInfo = *reinterpret_cast<TypeInfo*>(gCFireWeaponTaskTypeInfoStorage);
-    typeInfo.fields_.clear();
-    typeInfo.bases_.clear();
-  }
-
 } // namespace
 
 namespace moho
@@ -145,20 +129,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE6B0 (FUN_00BFE6B0, cleanup)
-   */
-  void cleanup_CFireWeaponTaskTypeInfo()
-  {
-    cleanup_CFireWeaponTaskTypeInfo_00BFE6B0_Impl();
-  }
-
-  /**
    * Address: 0x00BD8870 (FUN_00BD8870, register_CFireWeaponTaskTypeInfo)
    */
   void register_CFireWeaponTaskTypeInfo()
   {
     (void)AcquireTypeInfo();
-    (void)std::atexit(&cleanup_CFireWeaponTaskTypeInfo);
   }
 } // namespace moho
 

@@ -10,13 +10,13 @@
 
 namespace
 {
-  alignas(moho::SOCellPosTypeInfo) unsigned char
-    gSOCellPosTypeInfoStorage[sizeof(moho::SOCellPosTypeInfo)];
-  bool gSOCellPosTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::SOCellPosTypeInfo& SOCellPosTypeInfoStorageRef() noexcept
+  /**
+   * Address: 0x00BF2140 (FUN_00BF2140, atexit destructor of the SOCellPosTypeInfo object)
+   */
+  [[nodiscard]] moho::SOCellPosTypeInfo* AcquireSOCellPosTypeInfo()
   {
-    return *reinterpret_cast<moho::SOCellPosTypeInfo*>(gSOCellPosTypeInfoStorage);
+    static moho::SOCellPosTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -50,16 +50,6 @@ namespace
 
     typeInfo->fields_ = msvc8::vector<gpg::RField>{};
     typeInfo->bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  void CleanupSOCellPosTypeInfoAtExit()
-  {
-    if (!gSOCellPosTypeInfoConstructed) {
-      return;
-    }
-
-    SOCellPosTypeInfoStorageRef().~SOCellPosTypeInfo();
-    gSOCellPosTypeInfoConstructed = false;
   }
 
   // Address: 0x010A3334 -- process-global `SOCellPosSerializer` singleton.
@@ -146,10 +136,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF2140 (FUN_00BF2140, Moho::SOCellPosTypeInfo::dtr)
-   *
    * What it does:
-   * Releases the reflected field and base vector storage.
+   * Releases the reflected field and base vector storage. The vtable-slot
+   * body (0x0050BE90) is identical to `gpg::RType`'s teardown and is cited
+   * there (Reflection.h).
    */
   SOCellPosTypeInfo::~SOCellPosTypeInfo() = default;
 
@@ -225,16 +215,11 @@ namespace moho
    * Address: 0x00BC7D20 (FUN_00BC7D20, register_SOCellPosTypeInfo)
    *
    * What it does:
-   * Installs the static `SOCellPosTypeInfo` instance and its shutdown hook.
+   * Constructs the static `SOCellPosTypeInfo` instance, which preregisters it.
    */
-  int register_SOCellPosTypeInfo()
+  void register_SOCellPosTypeInfo()
   {
-    if (!gSOCellPosTypeInfoConstructed) {
-      new (gSOCellPosTypeInfoStorage) SOCellPosTypeInfo();
-      gSOCellPosTypeInfoConstructed = true;
-    }
-
-    return std::atexit(&CleanupSOCellPosTypeInfoAtExit);
+    (void)AcquireSOCellPosTypeInfo();
   }
 
   /**

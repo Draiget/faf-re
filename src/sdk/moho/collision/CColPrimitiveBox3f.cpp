@@ -235,9 +235,6 @@ namespace gpg
 
 namespace
 {
-  alignas(moho::DColPrimBoxTypeInfo) unsigned char gDColPrimBoxTypeInfoStorage[sizeof(moho::DColPrimBoxTypeInfo)];
-  bool gDColPrimBoxTypeInfoConstructed = false;
-
   [[nodiscard]] gpg::RType* CachedDColPrimBoxPrimitiveType()
   {
     static gpg::RType* cached = nullptr;
@@ -284,17 +281,6 @@ namespace
     ref.mObj = object;
     ref.mType = CachedDColPrimBoxPrimitiveType();
     return ref;
-  }
-
-
-  void CleanupDColPrimBoxTypeInfoAtExit()
-  {
-    if (!gDColPrimBoxTypeInfoConstructed) {
-      return;
-    }
-
-    reinterpret_cast<moho::DColPrimBoxTypeInfo*>(gDColPrimBoxTypeInfoStorage)->~DColPrimBoxTypeInfo();
-    gDColPrimBoxTypeInfoConstructed = false;
   }
 
   /**
@@ -373,13 +359,7 @@ namespace
   void DeleteDColPrimBox(void* const objectPtr)
   {
     ::operator delete(objectPtr);
-  }
-
-  void cleanup_DColPrimBoxTypeInfo_atexit()
-  {
-    CleanupDColPrimBoxTypeInfoAtExit();
-  }
-} // namespace
+  }} // namespace
 
 namespace moho
 {
@@ -535,19 +515,15 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
 
   /**
    * Address: 0x00BC7620 (FUN_00BC7620, register_DColPrimBoxTypeInfo)
+   * Address: 0x00BF1B30 (FUN_00BF1B30, atexit destructor of the DColPrimBoxTypeInfo object)
    *
    * What it does:
-   * Installs the startup-owned `DColPrimBoxTypeInfo` instance and its process-
-   * exit cleanup hook.
+   * Installs the startup-owned `DColPrimBoxTypeInfo` instance.
    */
   void register_DColPrimBoxTypeInfo()
   {
-    if (!gDColPrimBoxTypeInfoConstructed) {
-      new (gDColPrimBoxTypeInfoStorage) DColPrimBoxTypeInfo();
-      gDColPrimBoxTypeInfoConstructed = true;
-    }
-
-    (void)std::atexit(&cleanup_DColPrimBoxTypeInfo_atexit);
+    static DColPrimBoxTypeInfo sInstance;
+    (void)sInstance;
   }
 } // namespace moho
 

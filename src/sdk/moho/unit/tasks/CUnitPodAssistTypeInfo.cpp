@@ -1,7 +1,6 @@
 #include "moho/unit/tasks/CUnitPodAssistTypeInfo.h"
 
 #include <cstddef>
-#include <cstdlib>
 #include <memory>
 #include <new>
 #include <typeinfo>
@@ -15,19 +14,13 @@ namespace
 {
   using TypeInfo = moho::CUnitPodAssistTypeInfo;
 
-  alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
-  bool gTypeInfoConstructed = false;
-
-
-
+  /**
+   * Address: 0x00BFA200 (FUN_00BFA200, atexit destructor of the CUnitPodAssistTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
-    if (!gTypeInfoConstructed) {
-      new (gTypeInfoStorage) TypeInfo();
-      gTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
@@ -157,25 +150,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFA200 (FUN_00BFA200)
-   */
-  void cleanup_CUnitPodAssistTypeInfo()
-  {
-    if (!gTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireTypeInfo().~CUnitPodAssistTypeInfo();
-    gTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD1570 (FUN_00BD1570, sub_BD1570)
    */
-  int register_CUnitPodAssistTypeInfo()
+  void register_CUnitPodAssistTypeInfo()
   {
     (void)AcquireTypeInfo();
-    return std::atexit(&cleanup_CUnitPodAssistTypeInfo);
   }
 } // namespace moho
 

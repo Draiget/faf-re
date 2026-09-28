@@ -12,26 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiCursorTypeInfo) unsigned char gCMauiCursorTypeInfoStorage[sizeof(CMauiCursorTypeInfo)];
-  bool gCMauiCursorTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02C70 (FUN_00C02C70, atexit destructor of the CMauiCursorTypeInfo object)
+   */
   [[nodiscard]] CMauiCursorTypeInfo& AcquireCMauiCursorTypeInfo()
   {
-    if (!gCMauiCursorTypeInfoConstructed) {
-      new (gCMauiCursorTypeInfoStorage) CMauiCursorTypeInfo();
-      gCMauiCursorTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiCursorTypeInfo*>(gCMauiCursorTypeInfoStorage);
-  }
-
-  void cleanup_CMauiCursorTypeInfo()
-  {
-    if (!gCMauiCursorTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiCursorTypeInfo*>(gCMauiCursorTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiCursorTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiCursorTypeInfoBootstrap
@@ -113,10 +100,15 @@ void CMauiCursorTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDDFF0 (FUN_00BDDFF0, register_CMauiCursorTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiCursor` type-info object.
+ */
 void moho::register_CMauiCursorTypeInfoStartup()
 {
   (void)AcquireCMauiCursorTypeInfo();
-  (void)std::atexit(&cleanup_CMauiCursorTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

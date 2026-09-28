@@ -5,7 +5,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
-#include "gpg/core/containers/String.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -13,34 +13,22 @@ namespace
   using CAniPoseBoneTypeInfo = moho::CAniPoseBoneTypeInfo;
   using FastVectorCAniPoseBoneType = gpg::RFastVectorType<moho::CAniPoseBone>;
 
-  alignas(CAniPoseBoneTypeInfo) unsigned char gCAniPoseBoneTypeInfoStorage[sizeof(CAniPoseBoneTypeInfo)]{};
-  bool gCAniPoseBoneTypeInfoConstructed = false;
-
-  alignas(FastVectorCAniPoseBoneType)
-    unsigned char gFastVectorCAniPoseBoneTypeStorage[sizeof(FastVectorCAniPoseBoneType)]{};
-  bool gFastVectorCAniPoseBoneTypeConstructed = false;
-
-  msvc8::string gFastVectorCAniPoseBoneTypeName;
-  bool gFastVectorCAniPoseBoneTypeNameCleanupRegistered = false;
-
+  /**
+   * Address: 0x00BF4640 (FUN_00BF4640, atexit destructor of the CAniPoseBoneTypeInfo object)
+   */
   [[nodiscard]] CAniPoseBoneTypeInfo* AcquireCAniPoseBoneTypeInfo()
   {
-    if (!gCAniPoseBoneTypeInfoConstructed) {
-      new (gCAniPoseBoneTypeInfoStorage) CAniPoseBoneTypeInfo();
-      gCAniPoseBoneTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAniPoseBoneTypeInfo*>(gCAniPoseBoneTypeInfoStorage);
+    static CAniPoseBoneTypeInfo sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BF4700 (FUN_00BF4700, atexit destructor of the RFastVectorType<CAniPoseBone> object)
+   */
   [[nodiscard]] FastVectorCAniPoseBoneType* AcquireFastVectorCAniPoseBoneType()
   {
-    if (!gFastVectorCAniPoseBoneTypeConstructed) {
-      new (gFastVectorCAniPoseBoneTypeStorage) FastVectorCAniPoseBoneType();
-      gFastVectorCAniPoseBoneTypeConstructed = true;
-    }
-
-    return reinterpret_cast<FastVectorCAniPoseBoneType*>(gFastVectorCAniPoseBoneTypeStorage);
+    static FastVectorCAniPoseBoneType sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedCAniPoseBoneType()
@@ -78,18 +66,6 @@ namespace
     fill.mVisible = 0u;
     fill.mSkipNextInterp = 0u;
     return fill;
-  }
-
-  /**
-   * Address: 0x00BF46D0 (FUN_00BF46D0, cleanup_FastVectorCAniPoseBoneTypeName)
-   *
-   * What it does:
-   * Releases cached lexical type-name storage for `fastvector<CAniPoseBone>`.
-   */
-  void cleanup_FastVectorCAniPoseBoneTypeName()
-  {
-    gFastVectorCAniPoseBoneTypeName = msvc8::string{};
-    gFastVectorCAniPoseBoneTypeNameCleanupRegistered = false;
   }
 
   /**
@@ -153,8 +129,8 @@ namespace
   {
     CAniPoseBoneReflectionBootstrap()
     {
-      (void)moho::register_CAniPoseBoneTypeInfoAtexit();
-      (void)moho::register_FastVectorCAniPoseBoneTypeAtexit();
+      moho::register_CAniPoseBoneTypeInfoAtexit();
+      moho::register_FastVectorCAniPoseBoneTypeAtexit();
     }
   };
 
@@ -197,20 +173,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF4640 (FUN_00BF4640, cleanup_CAniPoseBoneTypeInfo)
-   */
-  void cleanup_CAniPoseBoneTypeInfo()
-  {
-    if (!gCAniPoseBoneTypeInfoConstructed) {
-      return;
-    }
-
-    CAniPoseBoneTypeInfo* const typeInfo = AcquireCAniPoseBoneTypeInfo();
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  /**
    * Address: 0x0054E310 (FUN_0054E310)
    *
    * What it does:
@@ -230,10 +192,9 @@ namespace moho
   /**
    * Address: 0x00BC99A0 (FUN_00BC99A0, register_CAniPoseBoneTypeInfoAtexit)
    */
-  int register_CAniPoseBoneTypeInfoAtexit()
+  void register_CAniPoseBoneTypeInfoAtexit()
   {
     (void)preregister_CAniPoseBoneTypeInfo();
-    return std::atexit(&cleanup_CAniPoseBoneTypeInfo);
   }
 
   /**
@@ -247,26 +208,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF4700 (FUN_00BF4700, cleanup_FastVectorCAniPoseBoneType)
-   */
-  void cleanup_FastVectorCAniPoseBoneType()
-  {
-    if (!gFastVectorCAniPoseBoneTypeConstructed) {
-      return;
-    }
-
-    FastVectorCAniPoseBoneType* const typeInfo = AcquireFastVectorCAniPoseBoneType();
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
-  }
-
-  /**
    * Address: 0x00BC9A00 (FUN_00BC9A00, register_FastVectorCAniPoseBoneTypeAtexit)
    */
-  int register_FastVectorCAniPoseBoneTypeAtexit()
+  void register_FastVectorCAniPoseBoneTypeAtexit()
   {
     (void)preregister_FastVectorCAniPoseBoneType();
-    return std::atexit(&cleanup_FastVectorCAniPoseBoneType);
   }
 } // namespace moho
 
@@ -279,19 +225,15 @@ namespace gpg
 
   /**
    * Address: 0x0054C680 (FUN_0054C680, gpg::RFastVectorType_CAniPoseBone::GetName)
+   * Address: 0x00BF46D0 (FUN_00BF46D0, atexit destructor of GetName's cached name)
+   *
+   * What it does:
+   * Builds `fastvector<CAniPoseBone>` once and returns it.
    */
   const char* RFastVectorType<moho::CAniPoseBone>::GetName() const
   {
-    if (gFastVectorCAniPoseBoneTypeName.empty()) {
-      const gpg::RType* const elementType = CachedCAniPoseBoneType();
-      const char* const elementName = elementType ? elementType->GetName() : "CAniPoseBone";
-      gFastVectorCAniPoseBoneTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "CAniPoseBone");
-      if (!gFastVectorCAniPoseBoneTypeNameCleanupRegistered) {
-        gFastVectorCAniPoseBoneTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_FastVectorCAniPoseBoneTypeName);
-      }
-    }
-    return gFastVectorCAniPoseBoneTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedCAniPoseBoneType()->GetName());
+    return sName.c_str();
   }
 
   /**

@@ -12,29 +12,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiLuaDraggerTypeInfo) unsigned char gCMauiLuaDraggerTypeInfoStorage[sizeof(CMauiLuaDraggerTypeInfo)];
-  bool gCMauiLuaDraggerTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C02CF0 (FUN_00C02CF0, atexit destructor of the CMauiLuaDraggerTypeInfo object)
+   */
   [[nodiscard]] CMauiLuaDraggerTypeInfo& AcquireCMauiLuaDraggerTypeInfo()
   {
-    if (!gCMauiLuaDraggerTypeInfoConstructed) {
-      new (gCMauiLuaDraggerTypeInfoStorage) CMauiLuaDraggerTypeInfo();
-      gCMauiLuaDraggerTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiLuaDraggerTypeInfo*>(gCMauiLuaDraggerTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00C02CF0 (atexit lane registered by FUN_00BDE120)
-   */
-  void cleanup_CMauiLuaDraggerTypeInfo()
-  {
-    if (!gCMauiLuaDraggerTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiLuaDraggerTypeInfo*>(gCMauiLuaDraggerTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiLuaDraggerTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiLuaDraggerTypeInfoBootstrap
@@ -125,13 +109,11 @@ void CMauiLuaDraggerTypeInfo::Init()
  * Address: 0x00BDE120 (FUN_00BDE120, sub_BDE120)
  *
  * What it does:
- * Constructs the static descriptor and registers its teardown, exactly as the
- * binary's static-initialiser entry does.
+ * Constructs the static `CMauiLuaDragger` type-info object.
  */
 void moho::register_CMauiLuaDraggerTypeInfoStartup()
 {
   (void)AcquireCMauiLuaDraggerTypeInfo();
-  (void)std::atexit(&cleanup_CMauiLuaDraggerTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

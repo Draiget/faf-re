@@ -182,26 +182,13 @@ namespace
     return brakingDistance > remainingDistance;
   }
 
-  alignas(moho::CSlideManipulatorTypeInfo)
-  unsigned char gCSlideManipulatorTypeInfoStorage[sizeof(moho::CSlideManipulatorTypeInfo)] = {};
-  bool gCSlideManipulatorTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFB260 (FUN_00BFB260, atexit destructor of the CSlideManipulatorTypeInfo object)
+   */
   [[nodiscard]] moho::CSlideManipulatorTypeInfo* AcquireCSlideManipulatorTypeInfo()
   {
-    if (!gCSlideManipulatorTypeInfoConstructed) {
-      new (gCSlideManipulatorTypeInfoStorage) moho::CSlideManipulatorTypeInfo();
-      gCSlideManipulatorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CSlideManipulatorTypeInfo*>(gCSlideManipulatorTypeInfoStorage);
-  }
-
-  [[nodiscard]] moho::CSlideManipulatorTypeInfo* PeekCSlideManipulatorTypeInfo() noexcept
-  {
-    if (!gCSlideManipulatorTypeInfoConstructed) {
-      return nullptr;
-    }
-    return reinterpret_cast<moho::CSlideManipulatorTypeInfo*>(gCSlideManipulatorTypeInfoStorage);
+    static moho::CSlideManipulatorTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -219,40 +206,21 @@ namespace
   }
 
   /**
-   * Address: 0x00BFB260 (FUN_00BFB260)
-   *
-   * What it does:
-   * Tears down startup-owned `CSlideManipulator` type-info storage.
-   */
-  void cleanup_CSlideManipulatorTypeInfo()
-  {
-    moho::CSlideManipulatorTypeInfo* const typeInfo = PeekCSlideManipulatorTypeInfo();
-    if (!typeInfo) {
-      return;
-    }
-
-    typeInfo->~CSlideManipulatorTypeInfo();
-    gCSlideManipulatorTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD34A0 (FUN_00BD34A0)
    *
    * What it does:
-   * Registers startup `CSlideManipulator` type-info preregistration and
-   * process-exit teardown.
+   * Registers startup `CSlideManipulator` type-info preregistration.
    */
-  int register_CSlideManipulatorTypeInfoStartup()
+  void register_CSlideManipulatorTypeInfoStartup()
   {
     (void)preregister_CSlideManipulatorTypeInfo();
-    return std::atexit(&cleanup_CSlideManipulatorTypeInfo);
   }
 
   struct CSlideManipulatorTypeInfoStartupBootstrap
   {
     CSlideManipulatorTypeInfoStartupBootstrap()
     {
-      (void)register_CSlideManipulatorTypeInfoStartup();
+      register_CSlideManipulatorTypeInfoStartup();
     }
   };
 

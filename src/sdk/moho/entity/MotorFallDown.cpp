@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
 #include <new>
 #include <string>
 #include <typeinfo>
@@ -43,17 +42,9 @@ namespace
   constexpr float kTwoPi = 6.2831855f;
   constexpr float kQuatUpdateThreshold = 0.0001f;
 
-  alignas(moho::MotorFallDownTypeInfo)
-    unsigned char gMotorFallDownTypeInfoStorage[sizeof(moho::MotorFallDownTypeInfo)];
-  bool gMotorFallDownTypeInfoConstructed = false;
   moho::MotorFallDownSerializer gMotorFallDownSerializer{};
   moho::MotorFallDownConstruct gMotorFallDownConstruct{};
   std::int32_t gRecoveredCScrLuaMetatableFactoryMotorFallDownIndex = 0;
-
-  [[nodiscard]] moho::MotorFallDownTypeInfo& MotorFallDownTypeInfoStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::MotorFallDownTypeInfo*>(gMotorFallDownTypeInfoStorage);
-  }
 
   /**
    * Address: 0x00694B70 (FUN_00694B70)
@@ -661,30 +652,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD130 (FUN_00BFD130, cleanup_MotorFallDownTypeInfo)
-   */
-  void cleanup_MotorFallDownTypeInfo()
-  {
-    if (!gMotorFallDownTypeInfoConstructed) {
-      return;
-    }
-
-    MotorFallDownTypeInfoStorageRef().~MotorFallDownTypeInfo();
-    gMotorFallDownTypeInfoConstructed = false;
-    MotorFallDown::sType = nullptr;
-  }
-
-  /**
    * Address: 0x00BD5BE0 (FUN_00BD5BE0, register_MotorFallDownTypeInfo)
+   * Address: 0x00BFD130 (FUN_00BFD130, atexit destructor of the MotorFallDownTypeInfo object)
    */
   void register_MotorFallDownTypeInfo()
   {
-    if (!gMotorFallDownTypeInfoConstructed) {
-      new (gMotorFallDownTypeInfoStorage) MotorFallDownTypeInfo();
-      gMotorFallDownTypeInfoConstructed = true;
-    }
-
-    (void)std::atexit(&cleanup_MotorFallDownTypeInfo);
+    static MotorFallDownTypeInfo sInstance;
+    (void)sInstance;
   }
 
   /**

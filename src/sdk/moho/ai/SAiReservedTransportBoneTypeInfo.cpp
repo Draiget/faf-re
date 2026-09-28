@@ -13,19 +13,13 @@ gpg::RType* SAiReservedTransportBone::sType = nullptr;
 
 namespace
 {
-  alignas(SAiReservedTransportBoneTypeInfo)
-    unsigned char gSAiReservedTransportBoneTypeInfoStorage[sizeof(SAiReservedTransportBoneTypeInfo)];
-  bool gSAiReservedTransportBoneTypeInfoConstructed = false;
-  bool gSAiReservedTransportBoneTypeInfoPreregistered = false;
-
+  /**
+   * Address: 0x00BF89A0 (FUN_00BF89A0, atexit destructor of the SAiReservedTransportBoneTypeInfo object)
+   */
   [[nodiscard]] SAiReservedTransportBoneTypeInfo* AcquireSAiReservedTransportBoneTypeInfo()
   {
-    if (!gSAiReservedTransportBoneTypeInfoConstructed) {
-      new (gSAiReservedTransportBoneTypeInfoStorage) SAiReservedTransportBoneTypeInfo();
-      gSAiReservedTransportBoneTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<SAiReservedTransportBoneTypeInfo*>(gSAiReservedTransportBoneTypeInfoStorage);
+    static SAiReservedTransportBoneTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -37,26 +31,9 @@ namespace
    */
   [[nodiscard]] gpg::RType* preregister_SAiReservedTransportBoneTypeInfoStartup()
   {
-    auto* const typeInfo = AcquireSAiReservedTransportBoneTypeInfo();
-    if (!gSAiReservedTransportBoneTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(SAiReservedTransportBone), typeInfo);
-      gSAiReservedTransportBoneTypeInfoPreregistered = true;
-    }
-
-    SAiReservedTransportBone::sType = typeInfo;
+    SAiReservedTransportBoneTypeInfo* const typeInfo = AcquireSAiReservedTransportBoneTypeInfo();
+    gpg::PreRegisterRType(typeid(SAiReservedTransportBone), typeInfo);
     return typeInfo;
-  }
-
-  void cleanup_SAiReservedTransportBoneTypeInfo()
-  {
-    if (!gSAiReservedTransportBoneTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSAiReservedTransportBoneTypeInfo()->~SAiReservedTransportBoneTypeInfo();
-    SAiReservedTransportBone::sType = nullptr;
-    gSAiReservedTransportBoneTypeInfoConstructed = false;
-    gSAiReservedTransportBoneTypeInfoPreregistered = false;
   }
 } // namespace
 
@@ -87,13 +64,11 @@ void SAiReservedTransportBoneTypeInfo::Init()
  * Address: 0x00BCED70 (FUN_00BCED70, register_SAiReservedTransportBoneTypeInfo)
  *
  * What it does:
- * Registers `SAiReservedTransportBone` type-info and installs process-exit
- * cleanup.
+ * Registers `SAiReservedTransportBone` type-info.
  */
-int moho::register_SAiReservedTransportBoneTypeInfo()
+void moho::register_SAiReservedTransportBoneTypeInfo()
 {
   (void)preregister_SAiReservedTransportBoneTypeInfoStartup();
-  return std::atexit(&cleanup_SAiReservedTransportBoneTypeInfo);
 }
 
 

@@ -11,9 +11,6 @@ using namespace moho;
 
 namespace
 {
-  alignas(SSessionSaveDataTypeInfo) unsigned char gSSessionSaveDataTypeInfoStorage[sizeof(SSessionSaveDataTypeInfo)];
-  bool gSSessionSaveDataTypeInfoConstructed = false;
-
   [[nodiscard]] gpg::RRef MakeSSessionSaveDataRef(SSessionSaveData* const object)
   {
     gpg::RRef out{};
@@ -38,21 +35,13 @@ namespace
     return typeInfo;
   }
 
+  /**
+   * Address: 0x00C081C0 (FUN_00C081C0, atexit destructor of the SSessionSaveDataTypeInfo object)
+   */
   [[nodiscard]] SSessionSaveDataTypeInfo& AcquireSSessionSaveDataTypeInfo()
   {
-    if (!gSSessionSaveDataTypeInfoConstructed) {
-      new (gSSessionSaveDataTypeInfoStorage) SSessionSaveDataTypeInfo();
-      gSSessionSaveDataTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<SSessionSaveDataTypeInfo*>(gSSessionSaveDataTypeInfoStorage);
-  }
-
-  void cleanup_SSessionSaveDataTypeInfo()
-  {
-    if (!gSSessionSaveDataTypeInfoConstructed) return;
-    auto& ti = *reinterpret_cast<SSessionSaveDataTypeInfo*>(gSSessionSaveDataTypeInfoStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static SSessionSaveDataTypeInfo sInstance;
+    return sInstance;
   }
 
   struct SSessionSaveDataTypeInfoBootstrap
@@ -150,7 +139,6 @@ void SSessionSaveDataTypeInfo::Destruct(void* const objectStorage)
 void moho::register_SSessionSaveDataTypeInfoStartup()
 {
   (void)AcquireSSessionSaveDataTypeInfo();
-  (void)std::atexit(&cleanup_SSessionSaveDataTypeInfo);
 }
 
 

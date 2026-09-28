@@ -83,8 +83,7 @@ namespace moho
    * Address: 0x00BDC6D0 (FUN_00BDC6D0, sub_BDC6D0)
    *
    * What it does:
-   * Registers `vector<HPathCell>` reflection and installs process-exit teardown
-   * via `atexit`.
+   * Registers `vector<HPathCell>` reflection.
    */
-  int register_HPathCellVectorType_AtExit();
+  void register_HPathCellVectorType_AtExit();
 } // namespace moho

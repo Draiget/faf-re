@@ -3410,37 +3410,6 @@ RRef MoveUnitWeaponPointerSlotRef(void* const slotObject, RRef* const sourceRef)
     typeInfo->fields_.push_back(RField(fieldName, CachedFloatType(), offset));
   }
 
-  template <class TTypeInfo>
-  struct TypeInfoStorage
-  {
-    alignas(TTypeInfo) unsigned char bytes[sizeof(TTypeInfo)];
-    bool constructed;
-  };
-
-  template <class TTypeInfo>
-  [[nodiscard]] TTypeInfo& EnsureTypeInfo(TypeInfoStorage<TTypeInfo>& storage) noexcept
-  {
-    if (!storage.constructed) {
-      new (storage.bytes) TTypeInfo();
-      storage.constructed = true;
-    }
-
-    return *reinterpret_cast<TTypeInfo*>(storage.bytes);
-  }
-
-  template <class TTypeInfo>
-  void DestroyTypeInfo(TypeInfoStorage<TTypeInfo>& storage) noexcept
-  {
-    if (!storage.constructed) {
-      return;
-    }
-
-    reinterpret_cast<TTypeInfo*>(storage.bytes)->~TTypeInfo();
-    storage.constructed = false;
-  }
-
-  TypeInfoStorage<gpg::Rect2iTypeInfo> gRect2iTypeInfoStorage{};
-  TypeInfoStorage<gpg::Rect2fTypeInfo> gRect2fTypeInfoStorage{};
   gpg::Rect2iSerializer gRect2iSerializer;
   gpg::Rect2fSerializer gRect2fSerializer;
   gpg::RPointerType<moho::CTaskThread> gCTaskThreadPointerType;
@@ -3488,64 +3457,46 @@ RRef MoveUnitWeaponPointerSlotRef(void* const slotObject, RRef* const sourceRef)
    */
   gpg::RVectorType<moho::SimArmy*> gSimArmyVectorType;
 
+  /**
+   * Address: 0x00C09760 (FUN_00C09760, atexit destructor of the gpg::Rect2iTypeInfo object)
+   */
   [[nodiscard]] gpg::Rect2iTypeInfo& GetRect2iTypeInfo() noexcept
   {
-    return EnsureTypeInfo(gRect2iTypeInfoStorage);
+    static gpg::Rect2iTypeInfo sInstance;
+    return sInstance;
   }
 
+  /**
+   * Address: 0x00C097C0 (FUN_00C097C0, atexit destructor of the gpg::Rect2fTypeInfo object)
+   */
   [[nodiscard]] gpg::Rect2fTypeInfo& GetRect2fTypeInfo() noexcept
   {
-    return EnsureTypeInfo(gRect2fTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00C09760 (FUN_00C09760, gpg::Rect2iTypeInfo::~Rect2iTypeInfo)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `Rect2<int>` descriptor.
-   */
-  void cleanup_Rect2iTypeInfo()
-  {
-    DestroyTypeInfo(gRect2iTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00C097C0 (FUN_00C097C0, gpg::Rect2fTypeInfo::~Rect2fTypeInfo)
-   *
-   * What it does:
-   * Runs startup-registered teardown for the global `Rect2<float>` descriptor.
-   */
-  void cleanup_Rect2fTypeInfo()
-  {
-    DestroyTypeInfo(gRect2fTypeInfoStorage);
+    static gpg::Rect2fTypeInfo sInstance;
+    return sInstance;
   }
 
   /**
    * Address: 0x00BE9DB0 (FUN_00BE9DB0, register_Rect2iTypeInfo)
    *
    * What it does:
-   * Constructs and preregisters the `Rect2<int>` reflection type descriptor and
-   * wires its teardown callback into CRT `atexit`.
+   * Constructs the `Rect2<int>` reflection type descriptor, whose constructor
+   * preregisters it under `typeid(Rect2i)`.
    */
   void register_Rect2iTypeInfo()
   {
-    gpg::Rect2iTypeInfo& typeInfo = GetRect2iTypeInfo();
-    gpg::PreRegisterRType(typeid(gpg::Rect2i), &typeInfo);
-    (void)std::atexit(&cleanup_Rect2iTypeInfo);
+    (void)GetRect2iTypeInfo();
   }
 
   /**
    * Address: 0x00BE9E50 (FUN_00BE9E50, register_Rect2fTypeInfo)
    *
    * What it does:
-   * Constructs and preregisters the `Rect2<float>` reflection type descriptor
-   * and wires its teardown callback into CRT `atexit`.
+   * Constructs the `Rect2<float>` reflection type descriptor, whose
+   * constructor preregisters it under `typeid(Rect2f)`.
    */
   void register_Rect2fTypeInfo()
   {
-    gpg::Rect2fTypeInfo& typeInfo = GetRect2fTypeInfo();
-    gpg::PreRegisterRType(typeid(gpg::Rect2f), &typeInfo);
-    (void)std::atexit(&cleanup_Rect2fTypeInfo);
+    (void)GetRect2fTypeInfo();
   }
 
   struct Rect2ReflectionRegistration

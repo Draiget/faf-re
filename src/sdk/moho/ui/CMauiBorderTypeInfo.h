@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BDDC20 (FUN_00BDDC20, register_CMauiBorderTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiBorder` type-info object.
+   */
   void register_CMauiBorderTypeInfoStartup();
 } // namespace moho

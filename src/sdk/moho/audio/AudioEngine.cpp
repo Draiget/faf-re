@@ -33,7 +33,12 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/camera/VTransform.h"
 
-moho::SoundConfiguration* moho::sSoundConfiguration = nullptr;
+/**
+ * Address: 0x00BC67C0 (FUN_00BC67C0, dynamic initializer for `sSoundConfiguration`)
+ * Address: 0x00BF0DB0 (FUN_00BF0DB0, dynamic atexit destructor for `sSoundConfiguration`)
+ * Address: 0x004DC230 (FUN_004DC230, boost::scoped_ptr<SoundConfiguration>::swap, emitted for its reset)
+ */
+boost::scoped_ptr<moho::SoundConfiguration> moho::sSoundConfiguration;
 
 extern "C" __declspec(dllimport) void __cdecl X3DAudioCalculate(
   const void* instance,
@@ -51,37 +56,6 @@ extern "C" __declspec(dllimport) void __cdecl X3DAudioInitialize(
 namespace moho
 {
   const char* func_SoundErrorCodeToMsg(int errorCode);
-  int register_SoundConfigurationCleanupAtExit();
-}
-
-namespace
-{
-  /**
-   * Address: 0x00BF0DB0 (FUN_00BF0DB0, sub_BF0DB0)
-   *
-   * What it does:
-   * Deletes the process-global sound-configuration singleton when present.
-   */
-  void cleanup_SoundConfigurationSingleton()
-  {
-    if (moho::sSoundConfiguration == nullptr) {
-      return;
-    }
-
-    delete moho::sSoundConfiguration;
-    moho::sSoundConfiguration = nullptr;
-  }
-}
-
-/**
- * Address: 0x00BC67C0 (FUN_00BC67C0, sub_BC67C0)
- *
- * What it does:
- * Registers process-exit cleanup for the global sound configuration singleton.
- */
-int moho::register_SoundConfigurationCleanupAtExit()
-{
-  return std::atexit(&cleanup_SoundConfigurationSingleton);
 }
 
 /**
@@ -209,18 +183,6 @@ boost::SharedCountPair* moho::AssignWeakAudioEnginePairFromShared(
   return boost::AssignWeakPairFromShared(outWeakPair, sourceSharedPair);
 }
 
-namespace
-{
-  struct AudioStartupCleanupRegistrations
-  {
-    AudioStartupCleanupRegistrations()
-    {
-      (void)moho::register_SoundConfigurationCleanupAtExit();
-    }
-  };
-
-  [[maybe_unused]] AudioStartupCleanupRegistrations gAudioStartupCleanupRegistrations;
-}
 
 namespace
 {
@@ -700,20 +662,6 @@ namespace
   }
 
   /**
-   * Address: 0x004DC230 (FUN_004DC230)
-   *
-   * What it does:
-   * Atomically swaps the process-global `sSoundConfiguration` lane with the
-   * caller-provided pointer slot.
-   */
-  void SwapSoundConfigurationSingletonPointer(moho::SoundConfiguration*& replacementOrOutPrevious) noexcept
-  {
-    moho::SoundConfiguration* const previous = moho::sSoundConfiguration;
-    moho::sSoundConfiguration = replacementOrOutPrevious;
-    replacementOrOutPrevious = previous;
-  }
-
-  /**
    * Address: 0x004DDFE0 (FUN_004DDFE0)
    *
    * What it does:
@@ -1014,7 +962,7 @@ namespace
    */
   [[nodiscard]] moho::SoundConfiguration* GetSoundConfigurationSingletonA() noexcept
   {
-    return moho::sSoundConfiguration;
+    return moho::sSoundConfiguration.get();
   }
 
   /**
@@ -1025,7 +973,7 @@ namespace
    */
   [[nodiscard]] moho::SoundConfiguration* GetSoundConfigurationSingletonB() noexcept
   {
-    return moho::sSoundConfiguration;
+    return moho::sSoundConfiguration.get();
   }
 
   /**
@@ -1462,7 +1410,7 @@ namespace moho
     std::uint32_t mode = 0u;
     if (CFG_GetArgOption("/xactdebug", 0, nullptr)) {
       mode = 2u;
-    } else if (sSoundConfiguration != nullptr && sSoundConfiguration->mAudition != 0u) {
+    } else if (sSoundConfiguration && sSoundConfiguration->mAudition != 0u) {
       mode = 1u;
     }
 
@@ -1937,18 +1885,7 @@ namespace moho
    */
   void func_InitSound()
   {
-    auto* const freshConfiguration = new (std::nothrow) SoundConfiguration();
-
-    SoundConfiguration* previousConfiguration = freshConfiguration;
-    SwapSoundConfigurationSingletonPointer(previousConfiguration);
-    if (previousConfiguration != nullptr) {
-      previousConfiguration->~SoundConfiguration();
-      ::operator delete(previousConfiguration);
-    }
-
-    if (sSoundConfiguration == nullptr) {
-      return;
-    }
+    sSoundConfiguration.reset(new SoundConfiguration());
 
     sSoundConfiguration->mAudition = static_cast<std::uint8_t>(
       moho::CFG_GetArgOption("/audition", 0u, nullptr) ? 1u : 0u
@@ -2020,14 +1957,7 @@ namespace moho
    */
   void SND_Shutdown()
   {
-    SoundConfiguration* configuration = nullptr;
-    SwapSoundConfigurationSingletonPointer(configuration);
-    if (configuration == nullptr) {
-      return;
-    }
-
-    configuration->~SoundConfiguration();
-    ::operator delete(configuration);
+    sSoundConfiguration.reset();
   }
 
   /**
@@ -2139,7 +2069,7 @@ namespace moho
       return false;
     }
 
-    const SoundConfiguration* const configuration = sSoundConfiguration;
+    const SoundConfiguration* const configuration = sSoundConfiguration.get();
     if (configuration == nullptr || configuration->mEngines.mStart == nullptr ||
         configuration->mEngines.mStart == configuration->mEngines.mFinish || configuration->mNoSound != 0u) {
       return false;
@@ -2165,7 +2095,7 @@ namespace moho
    */
   float SND_GetGlobalFloat(const std::uint16_t varIndex)
   {
-    const SoundConfiguration* const configuration = sSoundConfiguration;
+    const SoundConfiguration* const configuration = sSoundConfiguration.get();
     if (configuration == nullptr || configuration->mEngines.mStart == nullptr ||
         configuration->mEngines.mStart == configuration->mEngines.mFinish || configuration->mNoSound != 0u) {
       return std::numeric_limits<float>::quiet_NaN();
@@ -2193,7 +2123,7 @@ namespace moho
    */
   void SND_SetGlobalFloat(const std::uint16_t varIndex, const float value)
   {
-    const SoundConfiguration* const configuration = sSoundConfiguration;
+    const SoundConfiguration* const configuration = sSoundConfiguration.get();
     if (configuration == nullptr || configuration->mEngines.mStart == nullptr ||
         configuration->mEngines.mStart == configuration->mEngines.mFinish || configuration->mNoSound != 0u) {
       return;
@@ -2220,7 +2150,7 @@ namespace moho
    */
   boost::shared_ptr<AudioEngine> SND_FindEngine(const gpg::StrArg bankName)
   {
-    SoundConfiguration* const configuration = sSoundConfiguration;
+    SoundConfiguration* const configuration = sSoundConfiguration.get();
     if (configuration == nullptr || bankName == nullptr || configuration->mEngines.mStart == nullptr ||
         configuration->mEngines.mFinish == nullptr) {
       return {};
@@ -2260,7 +2190,7 @@ namespace moho
   AudioEngine::AudioEngine(const gpg::StrArg voicePath)
     : mImpl(nullptr)
   {
-    SoundConfiguration* const configuration = sSoundConfiguration;
+    SoundConfiguration* const configuration = sSoundConfiguration.get();
     ReplaceAudioEngineImplPointer(mImpl, new AudioEngineImpl(this, configuration));
 
     if (configuration == nullptr || configuration->mNoSound != 0u || mImpl == nullptr) {
@@ -2350,14 +2280,14 @@ namespace moho
     // mHandleSoundEvent = nullptr, so the engine came up permanently muted with
     // no notification sink - zero "Wavebank prepared" lines, against 270 from
     // the shipped binary on the same startup.
-    if (sSoundConfiguration == nullptr) {
+    if (!sSoundConfiguration) {
       func_InitSound();
     }
 
     AudioEngine* const createdEngine = new AudioEngine(voicePath);
 
     boost::shared_ptr<AudioEngine> result(createdEngine);
-    if (sSoundConfiguration != nullptr && createdEngine != nullptr) {
+    if (sSoundConfiguration && createdEngine != nullptr) {
       RegisterEngineRef(*sSoundConfiguration, result);
     }
 

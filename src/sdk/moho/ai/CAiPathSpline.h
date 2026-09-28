@@ -455,7 +455,7 @@ namespace moho
     ECollisionTypeTypeInfo();
 
     /**
-     * Address: 0x00BF6510 (FUN_00BF6510, dtr)
+     * Address: 0x00596690 (FUN_00596690, scalar deleting destructor, vtable slot 2)
      */
     ~ECollisionTypeTypeInfo() override;
 
@@ -627,24 +627,23 @@ namespace moho
    * Address: 0x00BD20C0 (FUN_00BD20C0, register_EPathPointStateTypeInfo)
    *
    * What it does:
-   * Constructs and preregisters `EPathPointState` type-info, then schedules
-   * teardown.
+   * Constructs and preregisters `EPathPointState` type-info.
    */
-  int register_EPathPointStateTypeInfo();
+  void register_EPathPointStateTypeInfo();
 
   /**
    * Address: 0x00BCBDB0 (FUN_00BCBDB0, register_SCollisionInfoTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `SCollisionInfo` type-info and installs teardown.
+   * Constructs/preregisters `SCollisionInfo` type-info.
    */
-  int register_SCollisionInfoTypeInfo();
+  void register_SCollisionInfoTypeInfo();
 
   /**
    * Address: 0x00BCBD50 (FUN_00BCBD50, register_ECollisionTypeTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `ECollisionType` enum type-info and installs teardown.
+   * Constructs/preregisters `ECollisionType` enum type-info.
    */
   void register_ECollisionTypeTypeInfo();
 
@@ -652,18 +651,18 @@ namespace moho
    * Address: 0x00BD2120 (FUN_00BD2120, register_CPathPointTypeInfo)
    *
    * What it does:
-   * Constructs and preregisters `CPathPoint` type-info, then schedules teardown.
+   * Constructs and preregisters `CPathPoint` type-info.
    */
-  int register_CPathPointTypeInfo();
+  void register_CPathPointTypeInfo();
 
   /**
    * Address: 0x00BCD390 (FUN_00BCD390, register_FastVectorCPathPointTypeAtexit)
    *
    * What it does:
    * Constructs/preregisters startup RTTI metadata for
-   * `gpg::fastvector<CPathPoint>` and installs process-exit teardown.
+   * `gpg::fastvector<CPathPoint>`.
    */
-  int register_FastVectorCPathPointTypeAtexit();
+  void register_FastVectorCPathPointTypeAtexit();
 
   static_assert(sizeof(SCollisionInfoTypeInfo) == 0x64, "SCollisionInfoTypeInfo size must be 0x64");
   static_assert(sizeof(ECollisionTypeTypeInfo) == 0x78, "ECollisionTypeTypeInfo size must be 0x78");

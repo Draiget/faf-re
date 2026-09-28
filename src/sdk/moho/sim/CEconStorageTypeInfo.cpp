@@ -11,24 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CEconStorageTypeInfo) unsigned char gStorage[sizeof(CEconStorageTypeInfo)];
-  bool gConstructed = false;
-
+  /**
+   * Address: 0x00C022B0 (FUN_00C022B0, atexit destructor of the CEconStorageTypeInfo object)
+   */
   [[nodiscard]] CEconStorageTypeInfo& Acquire()
   {
-    if (!gConstructed) {
-      new (gStorage) CEconStorageTypeInfo();
-      gConstructed = true;
-    }
-    return *reinterpret_cast<CEconStorageTypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) return;
-    auto& ti = *reinterpret_cast<CEconStorageTypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static CEconStorageTypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { moho::register_CEconStorageTypeInfoStartup(); } };
@@ -54,10 +43,12 @@ void CEconStorageTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDD150 (FUN_00BDD150, register_CEconStorageTypeInfo)
+ */
 void moho::register_CEconStorageTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

@@ -56,27 +56,13 @@ namespace moho
 
 namespace
 {
-  alignas(moho::EMauiScrollAxisTypeInfo) unsigned char
-    gEMauiScrollAxisTypeInfoStorage[sizeof(moho::EMauiScrollAxisTypeInfo)]{};
-  bool gEMauiScrollAxisTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::EMauiScrollAxisTypeInfo& GetEMauiScrollAxisTypeInfo() noexcept
-  {
-    return *reinterpret_cast<moho::EMauiScrollAxisTypeInfo*>(gEMauiScrollAxisTypeInfoStorage);
-  }
-
-  void cleanup_EMauiScrollAxisTypeInfo()
-  {
-    if (gEMauiScrollAxisTypeInfoConstructed) {
-      GetEMauiScrollAxisTypeInfo().~EMauiScrollAxisTypeInfo();
-      gEMauiScrollAxisTypeInfoConstructed = false;
-    }
-  }
-
   /**
+   * Address: 0x00C02BB0 (FUN_00C02BB0, atexit destructor of the EMauiScrollAxisTypeInfo object)
+   *
+   * What it does:
    * Constructs the static `EMauiScrollAxis` enum descriptor. The constructor
-   * pre-registers the RTTI mapping itself, so placement-constructing it here is
-   * the whole registration. The binary static-initialises this descriptor in
+   * pre-registers the RTTI mapping itself, so constructing it here is the
+   * whole registration. The binary static-initialises this descriptor in
    * .data (FUN_00786530 operates on a fixed global).
    *
    * `CMauiControl::GetScrollValues` reflects the axis to build its Lua call, and
@@ -90,23 +76,24 @@ namespace
    */
   gpg::REnumType* construct_EMauiScrollAxisTypeInfo()
   {
-    if (!gEMauiScrollAxisTypeInfoConstructed) {
-      new (gEMauiScrollAxisTypeInfoStorage) moho::EMauiScrollAxisTypeInfo();
-      gEMauiScrollAxisTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<gpg::REnumType*>(&GetEMauiScrollAxisTypeInfo());
+    static moho::EMauiScrollAxisTypeInfo sInstance;
+    return &sInstance;
   }
 
-  int register_EMauiScrollAxisTypeInfo()
+  /**
+   * Address: 0x00BDDD40 (FUN_00BDDD40, register_EMauiScrollAxisTypeInfo)
+   *
+   * What it does:
+   * Constructs the `EMauiScrollAxis` enum type-info object.
+   */
+  void register_EMauiScrollAxisTypeInfo()
   {
     (void)construct_EMauiScrollAxisTypeInfo();
-    return std::atexit(&cleanup_EMauiScrollAxisTypeInfo);
   }
 
   struct EMauiScrollAxisTypeInfoBootstrap
   {
-    EMauiScrollAxisTypeInfoBootstrap() { (void)register_EMauiScrollAxisTypeInfo(); }
+    EMauiScrollAxisTypeInfoBootstrap() { register_EMauiScrollAxisTypeInfo(); }
   };
 
   EMauiScrollAxisTypeInfoBootstrap gEMauiScrollAxisTypeInfoBootstrap;

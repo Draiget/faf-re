@@ -1,7 +1,6 @@
 #include "gpg/core/containers/FastVectorSOCellPosReflection.h"
 
 #include <cstddef>
-#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/containers/FastVectorUIntReflection.h"
@@ -91,20 +90,13 @@ namespace
     }
   }
 
-  gpg::RFastVectorType<moho::SOCellPos> gFastVectorSOCellPosType;
-
   /**
-   * Address: 0x00BF4B10 (FUN_00BF4B10, cleanup_RFastVectorType_SOCellPos)
-   *
-   * What it does:
-   * Process-exit cleanup for the global `RFastVectorType<Moho::SOCellPos>`
-   * descriptor's dynamic field/base storage (the same generic `gpg::RType`
-   * base-class teardown every `RFastVectorType<T>` specialization shares).
+   * Address: 0x00BF4B10 (FUN_00BF4B10, atexit destructor of the RFastVectorType<Moho::SOCellPos> object)
    */
-  void cleanup_RFastVectorType_SOCellPos()
+  [[nodiscard]] gpg::RFastVectorType<moho::SOCellPos>* AcquireFastVectorSOCellPosType()
   {
-    gFastVectorSOCellPosType.fields_.clear();
-    gFastVectorSOCellPosType.bases_.clear();
+    static gpg::RFastVectorType<moho::SOCellPos> sInstance;
+    return &sInstance;
   }
 
   struct FastVectorSOCellPosReflectionBootstrap
@@ -122,17 +114,16 @@ namespace
  * Address: 0x00BC9D60 (FUN_00BC9D60, register_RFastVectorType_SOCellPos)
  *
  * What it does:
- * Materializes startup reflection storage for `fastvector<Moho::SOCellPos>`
- * and registers process-exit teardown. Reached from the CRT static-initializer
- * table (`__xc_a`) in the binary; recovered here as the constructor of the
- * file-local `FastVectorSOCellPosReflectionBootstrap` global, matching
+ * Constructs the `fastvector<Moho::SOCellPos>` reflection descriptor.
+ * Reached from the CRT static-initializer table (`__xc_a`) in the binary;
+ * recovered here as the constructor of the file-local
+ * `FastVectorSOCellPosReflectionBootstrap` global, matching
  * `register_RFastVectorType_uint`/`register_RFastVectorType_EntId`'s own
  * bootstrap pattern.
  */
 void gpg::register_RFastVectorType_SOCellPos()
 {
-  (void)gFastVectorSOCellPosType;
-  (void)std::atexit(&cleanup_RFastVectorType_SOCellPos);
+  (void)AcquireFastVectorSOCellPosType();
 }
 
 /**
@@ -152,15 +143,14 @@ gpg::RFastVectorType<moho::SOCellPos>::~RFastVectorType() = default;
 
 /**
  * Address: 0x00553050 (FUN_00553050, gpg::RFastVectorType_SOCellPos::GetName)
+ * Address: 0x00BF4AB0 (FUN_00BF4AB0, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `fastvector<SOCellPos>` once and returns it.
  */
 const char* gpg::RFastVectorType<moho::SOCellPos>::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    gpg::RType* const elementType = CachedSOCellPosType();
-    const char* const elementName = elementType ? elementType->GetName() : "SOCellPos";
-    sName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SOCellPos");
-  }
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSOCellPosType()->GetName());
   return sName.c_str();
 }
 

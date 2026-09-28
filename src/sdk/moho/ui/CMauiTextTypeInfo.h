@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BDEFE0 (FUN_00BDEFE0, register_CMauiTextTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiText` type-info object.
+   */
   void register_CMauiTextTypeInfoStartup();
 } // namespace moho

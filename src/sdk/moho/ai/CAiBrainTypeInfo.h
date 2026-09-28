@@ -50,7 +50,7 @@ namespace moho
    * Address: 0x00BCB3D0 (FUN_00BCB3D0, register_Moho::CAiBrainTypeInfo)
    *
    * What it does:
-   * Ensures startup construction of `CAiBrainTypeInfo` and installs process-exit cleanup.
+   * Ensures startup construction of `CAiBrainTypeInfo`.
    */
   void register_CAiBrainTypeInfoStartup();
 } // namespace moho

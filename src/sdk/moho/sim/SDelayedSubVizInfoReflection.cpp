@@ -19,18 +19,20 @@ namespace
   using DelayedSubVizVector = msvc8::vector<moho::SDelayedSubVizInfo>;
   using DelayedSubVizVectorType = gpg::RVectorType<moho::SDelayedSubVizInfo>;
 
-  alignas(DelayedSubVizVectorType) unsigned char gDelayedSubVizVectorTypeStorage[sizeof(DelayedSubVizVectorType)];
-  bool gDelayedSubVizVectorTypeConstructed = false;
-
-  msvc8::string gDelayedSubVizVectorTypeName;
-  bool gDelayedSubVizVectorTypeNameCleanupRegistered = false;
-
   // Address: 0x00BC78E0 (FUN_00BC78E0, register_SDelayedSubVizInfoSerializer)
   // -- MSVC's own compiler-generated dynamic initializer for this global; see
   // gpg::SerSaveLoadHelper<T>'s class-level comment in Reflection.h (same
   // shape already established for gpg::PrimitiveSerHelper<T,IntType>).
   moho::SDelayedSubVizInfoSerializer gSDelayedSubVizInfoSerializer;
-  [[nodiscard]] DelayedSubVizVectorType* AcquireDelayedSubVizVectorType();
+
+  /**
+   * Address: 0x00BF1EB0 (FUN_00BF1EB0, atexit destructor of the RVectorType<SDelayedSubVizInfo> object)
+   */
+  [[nodiscard]] DelayedSubVizVectorType* AcquireDelayedSubVizVectorType()
+  {
+    static DelayedSubVizVectorType sInstance;
+    return &sInstance;
+  }
 
   [[nodiscard]] gpg::RType* ResolveVector3fType()
   {
@@ -148,35 +150,6 @@ namespace
     return gpg::RRef_SDelayedSubVizInfo(outRef, value);
   }
 
-  [[nodiscard]] DelayedSubVizVectorType* AcquireDelayedSubVizVectorType()
-  {
-    if (!gDelayedSubVizVectorTypeConstructed) {
-      new (gDelayedSubVizVectorTypeStorage) DelayedSubVizVectorType();
-      gDelayedSubVizVectorTypeConstructed = true;
-    }
-    return reinterpret_cast<DelayedSubVizVectorType*>(gDelayedSubVizVectorTypeStorage);
-  }
-
-  [[nodiscard]] DelayedSubVizVectorType* PeekDelayedSubVizVectorType() noexcept
-  {
-    if (!gDelayedSubVizVectorTypeConstructed) {
-      return nullptr;
-    }
-    return reinterpret_cast<DelayedSubVizVectorType*>(gDelayedSubVizVectorTypeStorage);
-  }
-
-  /**
-   * Address: 0x00BF1E80 (FUN_00BF1E80, delayed-sub-viz vector name cleanup)
-   *
-   * What it does:
-   * Releases cached `vector<SDelayedSubVizInfo>` type-name storage.
-   */
-  void cleanup_SDelayedSubVizInfoVectorTypeName()
-  {
-    gDelayedSubVizVectorTypeName = msvc8::string{};
-    gDelayedSubVizVectorTypeNameCleanupRegistered = false;
-  }
-
   /**
    * Address: 0x005080C0 (FUN_005080C0, gpg::RVectorType_SDelayedSubVizInfo::SerLoad)
    *
@@ -243,21 +216,6 @@ namespace
         element.MemberSerialize(archive);
       }
     }
-  }
-
-  /**
-   * What it does:
-   * Destroys delayed-sub-viz vector type storage lanes at process exit.
-   */
-  void cleanup_SDelayedSubVizInfoVectorType()
-  {
-    DelayedSubVizVectorType* const type = PeekDelayedSubVizVectorType();
-    if (!type) {
-      return;
-    }
-
-    type->~DelayedSubVizVectorType();
-    gDelayedSubVizVectorTypeConstructed = false;
   }
 
   struct SDelayedSubVizInfoReflectionBootstrap
@@ -380,10 +338,9 @@ namespace moho
   /**
    * Address: 0x00BC79F0 (FUN_00BC79F0, register_SDelayedSubVizInfoVectorType_AtExit)
    */
-  int register_SDelayedSubVizInfoVectorType_AtExit()
+  void register_SDelayedSubVizInfoVectorType_AtExit()
   {
     (void)register_SDelayedSubVizInfoVectorType();
-    return std::atexit(&cleanup_SDelayedSubVizInfoVectorType);
   }
 } // namespace moho
 
@@ -403,21 +360,16 @@ gpg::RRef* gpg::RRef_SDelayedSubVizInfo(gpg::RRef* const outRef, moho::SDelayedS
 
 /**
  * Address: 0x00507AA0 (FUN_00507AA0, gpg::RVectorType_SDelayedSubVizInfo::GetName)
+ * Address: 0x00BF1E80 (FUN_00BF1E80, atexit destructor of GetName's cached name)
+ *
+ * What it does:
+ * Builds `vector<SDelayedSubVizInfo>` once and returns it.
  */
 const char* gpg::RVectorType<moho::SDelayedSubVizInfo>::GetName() const
 {
-  if (gDelayedSubVizVectorTypeName.empty()) {
-    const gpg::RType* const elementType = moho::SDelayedSubVizInfo::StaticGetClass();
-    const char* const elementName = elementType ? elementType->GetName() : "SDelayedSubVizInfo";
-    gDelayedSubVizVectorTypeName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SDelayedSubVizInfo");
-
-    if (!gDelayedSubVizVectorTypeNameCleanupRegistered) {
-      gDelayedSubVizVectorTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_SDelayedSubVizInfoVectorTypeName);
-    }
-  }
-
-  return gDelayedSubVizVectorTypeName.c_str();
+  static const msvc8::string sName =
+    gpg::STR_Printf("vector<%s>", moho::SDelayedSubVizInfo::StaticGetClass()->GetName());
+  return sName.c_str();
 }
 
 /**

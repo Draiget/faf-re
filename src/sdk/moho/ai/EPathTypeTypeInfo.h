@@ -86,8 +86,7 @@ namespace moho
    * Address: 0x00BCD270 (FUN_00BCD270, register_EPathTypeTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters startup RTTI descriptor for `EPathType` and
-   * installs process-exit cleanup.
+   * Constructs/preregisters startup RTTI descriptor for `EPathType`.
    */
-  int register_EPathTypeTypeInfo();
+  void register_EPathTypeTypeInfo();
 } // namespace moho

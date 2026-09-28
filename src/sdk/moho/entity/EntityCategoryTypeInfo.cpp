@@ -1,6 +1,5 @@
 #include "moho/entity/EntityCategoryTypeInfo.h"
 
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -116,24 +115,13 @@ namespace
     return typeInfo;
   }
 
-  alignas(EntityCategoryTypeInfo) unsigned char gStorage[sizeof(EntityCategoryTypeInfo)];
-  bool gConstructed = false;
-
+  /**
+   * Address: 0x00BF4C10 (FUN_00BF4C10, atexit destructor of the EntityCategoryTypeInfo object)
+   */
   [[nodiscard]] EntityCategoryTypeInfo& Acquire()
   {
-    if (!gConstructed) {
-      new (gStorage) EntityCategoryTypeInfo();
-      gConstructed = true;
-    }
-    return *reinterpret_cast<EntityCategoryTypeInfo*>(gStorage);
-  }
-
-  void cleanup()
-  {
-    if (!gConstructed) return;
-    auto& ti = *reinterpret_cast<EntityCategoryTypeInfo*>(gStorage);
-    ti.fields_ = msvc8::vector<gpg::RField>{};
-    ti.bases_ = msvc8::vector<gpg::RField>{};
+    static EntityCategoryTypeInfo sInstance;
+    return sInstance;
   }
 
   struct Bootstrap { Bootstrap() { moho::register_EntityCategoryTypeInfoStartup(); } };
@@ -271,7 +259,6 @@ void EntityCategoryTypeInfo::Destruct(void* const objectStorage)
 void moho::register_EntityCategoryTypeInfoStartup()
 {
   (void)Acquire();
-  (void)std::atexit(&cleanup);
 }
 
 

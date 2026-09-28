@@ -56,8 +56,7 @@ namespace moho
    * Address: 0x00BC7510 (FUN_00BC7510, register_ECollisionShapeTypeInfo)
    *
    * What it does:
-   * Runs `ECollisionShape` type preregistration and installs process-exit
-   * cleanup.
+   * Runs `ECollisionShape` type preregistration.
    */
-  int register_ECollisionShapeTypeInfo();
+  void register_ECollisionShapeTypeInfo();
 }

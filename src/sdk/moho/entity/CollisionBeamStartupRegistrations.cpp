@@ -2,8 +2,6 @@
 
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
-#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
@@ -53,52 +51,21 @@ namespace
     return gCollisionBeamEventType;
   }
 
-  [[nodiscard]] const char* GetCollisionBeamEventTypeName()
-  {
-    const gpg::RType* const type = LookupCollisionBeamEventType();
-    return type ? type->GetName() : "ECollisionBeamEvent";
-  }
-
-  msvc8::string gManyToOneBroadcasterCollisionBeamEventTypeName;
-  bool gManyToOneBroadcasterCollisionBeamEventTypeNameCleanupRegistered = false;
-
-  msvc8::string gManyToOneListenerCollisionBeamEventTypeName;
-  bool gManyToOneListenerCollisionBeamEventTypeNameCleanupRegistered = false;
-
-  void cleanup_ManyToOneBroadcasterCollisionBeamEventTypeName()
-  {
-    gManyToOneBroadcasterCollisionBeamEventTypeName = msvc8::string{};
-    gManyToOneBroadcasterCollisionBeamEventTypeNameCleanupRegistered = false;
-  }
-
-  void cleanup_ManyToOneListenerCollisionBeamEventTypeName()
-  {
-    gManyToOneListenerCollisionBeamEventTypeName = msvc8::string{};
-    gManyToOneListenerCollisionBeamEventTypeNameCleanupRegistered = false;
-  }
-
   class RManyToOneBroadcasterCollisionBeamEventTypeInfo final : public gpg::RType
   {
   public:
     /**
      * Address: 0x00674740 (FUN_00674740, Moho::RManyBroadcasterRType_ECollisionBeamEvent::GetName)
+     * Address: 0x00BFC460 (FUN_00BFC460, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Lazily caches the lexical reflection name for the collision-beam
-     * many-to-one broadcaster type descriptor.
+     * Builds `ManyToOneBroadcaster<ECollisionBeamEvent>` once and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if (gManyToOneBroadcasterCollisionBeamEventTypeName.empty()) {
-        gManyToOneBroadcasterCollisionBeamEventTypeName =
-          gpg::STR_Printf("ManyToOneBroadcaster<%s>", GetCollisionBeamEventTypeName());
-        if (!gManyToOneBroadcasterCollisionBeamEventTypeNameCleanupRegistered) {
-          gManyToOneBroadcasterCollisionBeamEventTypeNameCleanupRegistered = true;
-          (void)std::atexit(&cleanup_ManyToOneBroadcasterCollisionBeamEventTypeName);
-        }
-      }
-
-      return gManyToOneBroadcasterCollisionBeamEventTypeName.c_str();
+      static const msvc8::string sName =
+        gpg::STR_Printf("ManyToOneBroadcaster<%s>", LookupCollisionBeamEventType()->GetName());
+      return sName.c_str();
     }
 
     /**
@@ -133,23 +100,16 @@ namespace
   public:
     /**
      * Address: 0x00674800 (FUN_00674800, Moho::RManyListenerRType_ECollisionBeamEvent::GetName)
+     * Address: 0x00BFC430 (FUN_00BFC430, atexit destructor of GetName's cached name)
      *
      * What it does:
-     * Lazily caches the lexical reflection name for the collision-beam many-
-     * to-one listener type descriptor.
+     * Builds `ManyToOneListener<ECollisionBeamEvent>` once and returns it.
      */
     [[nodiscard]] const char* GetName() const override
     {
-      if (gManyToOneListenerCollisionBeamEventTypeName.empty()) {
-        gManyToOneListenerCollisionBeamEventTypeName =
-          gpg::STR_Printf("ManyToOneListener<%s>", GetCollisionBeamEventTypeName());
-        if (!gManyToOneListenerCollisionBeamEventTypeNameCleanupRegistered) {
-          gManyToOneListenerCollisionBeamEventTypeNameCleanupRegistered = true;
-          (void)std::atexit(&cleanup_ManyToOneListenerCollisionBeamEventTypeName);
-        }
-      }
-
-      return gManyToOneListenerCollisionBeamEventTypeName.c_str();
+      static const msvc8::string sName =
+        gpg::STR_Printf("ManyToOneListener<%s>", LookupCollisionBeamEventType()->GetName());
+      return sName.c_str();
     }
 
     void Init() override
@@ -160,47 +120,19 @@ namespace
     }
   };
 
-  alignas(moho::ECollisionBeamEventTypeInfo)
-    unsigned char gECollisionBeamEventTypeInfoStorage[sizeof(moho::ECollisionBeamEventTypeInfo)];
-  bool gECollisionBeamEventTypeInfoConstructed = false;
-
-  alignas(RManyToOneBroadcasterCollisionBeamEventTypeInfo)
-    unsigned char gManyToOneBroadcasterCollisionBeamEventTypeInfoStorage[sizeof(RManyToOneBroadcasterCollisionBeamEventTypeInfo)];
-  bool gManyToOneBroadcasterCollisionBeamEventTypeInfoConstructed = false;
-
-  alignas(RManyToOneListenerCollisionBeamEventTypeInfo)
-    unsigned char gManyToOneListenerCollisionBeamEventTypeInfoStorage[sizeof(RManyToOneListenerCollisionBeamEventTypeInfo)];
-  bool gManyToOneListenerCollisionBeamEventTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::ECollisionBeamEventTypeInfo& ECollisionBeamEventTypeInfoStorageRef()
-  {
-    return *reinterpret_cast<moho::ECollisionBeamEventTypeInfo*>(gECollisionBeamEventTypeInfoStorage);
-  }
-
-  [[nodiscard]] RManyToOneBroadcasterCollisionBeamEventTypeInfo& ManyToOneBroadcasterTypeInfoStorageRef()
-  {
-    return *reinterpret_cast<RManyToOneBroadcasterCollisionBeamEventTypeInfo*>(gManyToOneBroadcasterCollisionBeamEventTypeInfoStorage);
-  }
-
-  [[nodiscard]] RManyToOneListenerCollisionBeamEventTypeInfo& ManyToOneListenerTypeInfoStorageRef()
-  {
-    return *reinterpret_cast<RManyToOneListenerCollisionBeamEventTypeInfo*>(gManyToOneListenerCollisionBeamEventTypeInfoStorage);
-  }
-
+  /**
+   * Address: 0x00BFC2D0 (FUN_00BFC2D0, atexit destructor of the ECollisionBeamEventTypeInfo object)
+   */
   [[nodiscard]] gpg::REnumType* ConstructECollisionBeamEventTypeInfo()
   {
-    if (!gECollisionBeamEventTypeInfoConstructed) {
-      new (gECollisionBeamEventTypeInfoStorage) moho::ECollisionBeamEventTypeInfo();
-      gECollisionBeamEventTypeInfoConstructed = true;
-    }
-
-    auto& typeInfo = ECollisionBeamEventTypeInfoStorageRef();
-    gpg::PreRegisterRType(typeid(moho::ECollisionBeamEvent), &typeInfo);
-    return &typeInfo;
+    static moho::ECollisionBeamEventTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(moho::ECollisionBeamEvent), &sInstance);
+    return &sInstance;
   }
 
   /**
    * Address: 0x00675990 (FUN_00675990, sub_675990)
+   * Address: 0x00BFC5B0 (FUN_00BFC5B0, atexit destructor of the ManyToOneBroadcaster<ECollisionBeamEvent> type-info object)
    *
    * What it does:
    * Constructs/preregisters startup RTTI for
@@ -208,19 +140,15 @@ namespace
    */
   [[nodiscard]] gpg::RType* ConstructManyToOneBroadcasterCollisionBeamEventTypeInfo()
   {
-    if (!gManyToOneBroadcasterCollisionBeamEventTypeInfoConstructed) {
-      new (gManyToOneBroadcasterCollisionBeamEventTypeInfoStorage) RManyToOneBroadcasterCollisionBeamEventTypeInfo();
-      gManyToOneBroadcasterCollisionBeamEventTypeInfoConstructed = true;
-    }
-
-    auto& typeInfo = ManyToOneBroadcasterTypeInfoStorageRef();
-    gpg::PreRegisterRType(typeid(moho::ManyToOneBroadcaster_ECollisionBeamEvent), &typeInfo);
-    moho::ManyToOneBroadcaster_ECollisionBeamEvent::sType = &typeInfo;
-    return &typeInfo;
+    static RManyToOneBroadcasterCollisionBeamEventTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(moho::ManyToOneBroadcaster_ECollisionBeamEvent), &sInstance);
+    moho::ManyToOneBroadcaster_ECollisionBeamEvent::sType = &sInstance;
+    return &sInstance;
   }
 
   /**
    * Address: 0x006759F0 (FUN_006759F0, sub_6759F0)
+   * Address: 0x00BFC550 (FUN_00BFC550, atexit destructor of the ManyToOneListener<ECollisionBeamEvent> type-info object)
    *
    * What it does:
    * Constructs/preregisters startup RTTI for
@@ -228,15 +156,10 @@ namespace
    */
   [[nodiscard]] gpg::RType* ConstructManyToOneListenerCollisionBeamEventTypeInfo()
   {
-    if (!gManyToOneListenerCollisionBeamEventTypeInfoConstructed) {
-      new (gManyToOneListenerCollisionBeamEventTypeInfoStorage) RManyToOneListenerCollisionBeamEventTypeInfo();
-      gManyToOneListenerCollisionBeamEventTypeInfoConstructed = true;
-    }
-
-    auto& typeInfo = ManyToOneListenerTypeInfoStorageRef();
-    gpg::PreRegisterRType(typeid(moho::ManyToOneListener_ECollisionBeamEvent), &typeInfo);
-    moho::ManyToOneListener_ECollisionBeamEvent::sType = &typeInfo;
-    return &typeInfo;
+    static RManyToOneListenerCollisionBeamEventTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(moho::ManyToOneListener_ECollisionBeamEvent), &sInstance);
+    moho::ManyToOneListener_ECollisionBeamEvent::sType = &sInstance;
+    return &sInstance;
   }
 
   /**
@@ -278,11 +201,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFC2D0 (FUN_00BFC2D0, Moho::ECollisionBeamEventTypeInfo::dtr)
-   * Address: 0x00672D50 (FUN_00672D50, vtable-slot-2 scalar deleting
-   * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
-   * conditionally frees the object -- ordinary C++ `delete` semantics, not
-   * modeled as a separate function here)
+   * Address: 0x00672D50 (FUN_00672D50, Moho::ECollisionBeamEventTypeInfo::dtr,
+   * vtable-slot-2 scalar deleting destructor: tail-calls
+   * `gpg::REnumType::~REnumType(this)` then conditionally frees the object --
+   * ordinary C++ `delete` semantics, not modeled as a separate function here)
    */
   ECollisionBeamEventTypeInfo::~ECollisionBeamEventTypeInfo() = default;
 
@@ -321,71 +243,27 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFC2D0 (FUN_00BFC2D0, cleanup_ECollisionBeamEventTypeInfo)
-   */
-  void cleanup_ECollisionBeamEventTypeInfo()
-  {
-    if (!gECollisionBeamEventTypeInfoConstructed) {
-      return;
-    }
-
-    ECollisionBeamEventTypeInfoStorageRef().~ECollisionBeamEventTypeInfo();
-    gECollisionBeamEventTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BD4C20 (FUN_00BD4C20, register_ECollisionBeamEventTypeInfo)
    */
   void register_ECollisionBeamEventTypeInfo()
   {
     (void)ConstructECollisionBeamEventTypeInfo();
-    (void)std::atexit(&cleanup_ECollisionBeamEventTypeInfo);
-  }
-
-  /**
-   * Address: 0x00BFC5B0 (FUN_00BFC5B0, cleanup_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo)
-   */
-  void cleanup_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo()
-  {
-    if (!gManyToOneBroadcasterCollisionBeamEventTypeInfoConstructed) {
-      return;
-    }
-
-    ManyToOneBroadcasterTypeInfoStorageRef().~RManyToOneBroadcasterCollisionBeamEventTypeInfo();
-    gManyToOneBroadcasterCollisionBeamEventTypeInfoConstructed = false;
-    ManyToOneBroadcaster_ECollisionBeamEvent::sType = nullptr;
   }
 
   /**
    * Address: 0x00BD4D90 (FUN_00BD4D90, register_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo)
    */
-  int register_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo()
+  void register_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo()
   {
     (void)ConstructManyToOneBroadcasterCollisionBeamEventTypeInfo();
-    return std::atexit(&cleanup_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo);
-  }
-
-  /**
-   * Address: 0x00BFC550 (FUN_00BFC550, cleanup_ManyToOneListener_ECollisionBeamEvent_TypeInfo)
-   */
-  void cleanup_ManyToOneListener_ECollisionBeamEvent_TypeInfo()
-  {
-    if (!gManyToOneListenerCollisionBeamEventTypeInfoConstructed) {
-      return;
-    }
-
-    ManyToOneListenerTypeInfoStorageRef().~RManyToOneListenerCollisionBeamEventTypeInfo();
-    gManyToOneListenerCollisionBeamEventTypeInfoConstructed = false;
-    ManyToOneListener_ECollisionBeamEvent::sType = nullptr;
   }
 
   /**
    * Address: 0x00BD4DB0 (FUN_00BD4DB0, register_ManyToOneListener_ECollisionBeamEvent_TypeInfo)
    */
-  int register_ManyToOneListener_ECollisionBeamEvent_TypeInfo()
+  void register_ManyToOneListener_ECollisionBeamEvent_TypeInfo()
   {
     (void)ConstructManyToOneListenerCollisionBeamEventTypeInfo();
-    return std::atexit(&cleanup_ManyToOneListener_ECollisionBeamEvent_TypeInfo);
   }
 } // namespace moho
 

@@ -128,9 +128,6 @@ namespace
 
   using moho::ReconBlipTypeInfo;
 
-  msvc8::string gSPerArmyReconInfoVectorTypeName;
-  bool gSPerArmyReconInfoVectorTypeNameCleanupRegistered = false;
-
   /**
    * Address: 0x00BF7870 (FUN_00BF7870, atexit destructor of the moho::ReconBlipTypeInfo object)
    */
@@ -158,32 +155,17 @@ namespace
     return &sInstance;
   }
 
-  void cleanup_SPerArmyReconInfoVectorTypeName()
-  {
-    gSPerArmyReconInfoVectorTypeName = msvc8::string{};
-    gSPerArmyReconInfoVectorTypeNameCleanupRegistered = false;
-  }
-
   /**
    * Address: 0x005C3E50 (FUN_005C3E50, gpg::RVectorType_SPerArmyReconInfo::GetName)
+   * Address: 0x00BF7BA0 (FUN_00BF7BA0, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily formats and caches the reflected type label for
-   * `vector<SPerArmyReconInfo>` using the registered element RTTI name.
+   * Builds `vector<SPerArmyReconInfo>` once and returns it.
    */
   const char* SPerArmyReconInfoVectorTypeRuntime::GetName() const
   {
-    if (gSPerArmyReconInfoVectorTypeName.empty()) {
-      gpg::RType* const valueType = ResolveSPerArmyReconInfoType();
-      const char* const valueTypeName = valueType ? valueType->GetName() : "SPerArmyReconInfo";
-      gSPerArmyReconInfoVectorTypeName = gpg::STR_Printf("vector<%s>", valueTypeName ? valueTypeName : "SPerArmyReconInfo");
-      if (!gSPerArmyReconInfoVectorTypeNameCleanupRegistered) {
-        gSPerArmyReconInfoVectorTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_SPerArmyReconInfoVectorTypeName);
-      }
-    }
-
-    return gSPerArmyReconInfoVectorTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveSPerArmyReconInfoType()->GetName());
+    return sName.c_str();
   }
 
   struct ReconBlipTypeInfoBootstrap

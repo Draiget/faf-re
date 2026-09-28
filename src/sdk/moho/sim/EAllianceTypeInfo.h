@@ -90,8 +90,7 @@ namespace moho
    * Address: 0x00BC7A10 (FUN_00BC7A10, register_EAllianceTypeInfo)
    *
    * What it does:
-   * Runs `EAlliance` typeinfo preregistration and installs process-exit
-   * cleanup.
+   * Runs `EAlliance` typeinfo preregistration.
    */
-  int register_EAllianceTypeInfo();
+  void register_EAllianceTypeInfo();
 } // namespace moho

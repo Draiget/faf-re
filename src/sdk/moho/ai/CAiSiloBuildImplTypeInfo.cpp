@@ -45,49 +45,31 @@ namespace
   static_assert(sizeof(SSiloBuildInfoTypeInfo) == 0x64, "SSiloBuildInfoTypeInfo size must be 0x64");
   static_assert(sizeof(ESiloTypeListTypeInfo) == 0x64, "ESiloTypeListTypeInfo size must be 0x64");
 
-  alignas(SSiloBuildInfoTypeInfo) unsigned char gSSiloBuildInfoTypeInfoStorage[sizeof(SSiloBuildInfoTypeInfo)];
-  bool gSSiloBuildInfoTypeInfoConstructed = false;
-
-  alignas(CAiSiloBuildImplTypeInfo) unsigned char gCAiSiloBuildImplTypeInfoStorage[sizeof(CAiSiloBuildImplTypeInfo)];
-  bool gCAiSiloBuildImplTypeInfoConstructed = false;
-
-  alignas(ESiloTypeListTypeInfo) unsigned char gESiloTypeListTypeInfoStorage[sizeof(ESiloTypeListTypeInfo)];
-  bool gESiloTypeListTypeInfoConstructed = false;
-  msvc8::string gESiloTypeListTypeName;
-  bool gESiloTypeListTypeNameCleanupRegistered = false;
-
+  /**
+   * Address: 0x00BF7E40 (FUN_00BF7E40, atexit destructor of the SSiloBuildInfoTypeInfo object)
+   */
   [[nodiscard]] SSiloBuildInfoTypeInfo* AcquireSSiloBuildInfoTypeInfo()
   {
-    if (!gSSiloBuildInfoTypeInfoConstructed) {
-      auto* const typeInfo = new (gSSiloBuildInfoTypeInfoStorage) SSiloBuildInfoTypeInfo();
-      gpg::PreRegisterRType(typeid(SSiloBuildInfo), typeInfo);
-      SSiloBuildInfo::sType = typeInfo;
-      gSSiloBuildInfoTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<SSiloBuildInfoTypeInfo*>(gSSiloBuildInfoTypeInfoStorage);
+    static SSiloBuildInfoTypeInfo sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BF7ED0 (FUN_00BF7ED0, atexit destructor of the CAiSiloBuildImplTypeInfo object)
+   */
   [[nodiscard]] CAiSiloBuildImplTypeInfo* AcquireCAiSiloBuildImplTypeInfo()
   {
-    if (!gCAiSiloBuildImplTypeInfoConstructed) {
-      auto* const typeInfo = new (gCAiSiloBuildImplTypeInfoStorage) CAiSiloBuildImplTypeInfo();
-      gpg::PreRegisterRType(typeid(CAiSiloBuildImpl), typeInfo);
-      gCAiSiloBuildImplTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<CAiSiloBuildImplTypeInfo*>(gCAiSiloBuildImplTypeInfoStorage);
+    static CAiSiloBuildImplTypeInfo sInstance;
+    return &sInstance;
   }
 
+  /**
+   * Address: 0x00BF7FC0 (FUN_00BF7FC0, atexit destructor of the ESiloTypeListTypeInfo object)
+   */
   [[nodiscard]] ESiloTypeListTypeInfo* AcquireESiloTypeListTypeInfo()
   {
-    if (!gESiloTypeListTypeInfoConstructed) {
-      auto* const typeInfo = new (gESiloTypeListTypeInfoStorage) ESiloTypeListTypeInfo();
-      gpg::PreRegisterRType(typeid(msvc8::list<ESiloType>), typeInfo);
-      gESiloTypeListTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<ESiloTypeListTypeInfo*>(gESiloTypeListTypeInfoStorage);
+    static ESiloTypeListTypeInfo sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedESiloTypeType()
@@ -113,7 +95,9 @@ namespace
    */
   [[nodiscard]] gpg::RType* preregister_SSiloBuildInfoTypeInfo()
   {
-    return AcquireSSiloBuildInfoTypeInfo();
+    SSiloBuildInfoTypeInfo* const typeInfo = AcquireSSiloBuildInfoTypeInfo();
+    gpg::PreRegisterRType(typeid(SSiloBuildInfo), typeInfo);
+    return typeInfo;
   }
 
   /**
@@ -124,7 +108,9 @@ namespace
    */
   [[nodiscard]] gpg::RType* preregister_CAiSiloBuildImplTypeInfo()
   {
-    return AcquireCAiSiloBuildImplTypeInfo();
+    CAiSiloBuildImplTypeInfo* const typeInfo = AcquireCAiSiloBuildImplTypeInfo();
+    gpg::PreRegisterRType(typeid(CAiSiloBuildImpl), typeInfo);
+    return typeInfo;
   }
 
   /**
@@ -135,7 +121,9 @@ namespace
    */
   [[nodiscard]] gpg::RType* preregister_ESiloTypeListTypeInfo()
   {
-    return AcquireESiloTypeListTypeInfo();
+    ESiloTypeListTypeInfo* const typeInfo = AcquireESiloTypeListTypeInfo();
+    gpg::PreRegisterRType(typeid(msvc8::list<ESiloType>), typeInfo);
+    return typeInfo;
   }
 
   [[nodiscard]] gpg::RType* CachedIAiSiloBuildType()
@@ -144,61 +132,6 @@ namespace
       IAiSiloBuild::sType = gpg::LookupRType(typeid(IAiSiloBuild));
     }
     return IAiSiloBuild::sType;
-  }
-
-  void cleanup_ESiloTypeListTypeName()
-  {
-    gESiloTypeListTypeName = msvc8::string{};
-    gESiloTypeListTypeNameCleanupRegistered = false;
-  }
-
-  /**
-   * Address: 0x00BF7ED0 (FUN_00BF7ED0, cleanup_CAiSiloBuildImplTypeInfo)
-   *
-   * What it does:
-   * Tears down static `CAiSiloBuildImplTypeInfo` storage at process exit.
-   */
-  void cleanup_CAiSiloBuildImplTypeInfo()
-  {
-    if (!gCAiSiloBuildImplTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCAiSiloBuildImplTypeInfo()->~CAiSiloBuildImplTypeInfo();
-    gCAiSiloBuildImplTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BF7E40 (FUN_00BF7E40, cleanup_SSiloBuildInfoTypeInfo)
-   *
-   * What it does:
-   * Tears down static `SSiloBuildInfoTypeInfo` storage at process exit.
-   */
-  void cleanup_SSiloBuildInfoTypeInfo()
-  {
-    if (!gSSiloBuildInfoTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireSSiloBuildInfoTypeInfo()->~SSiloBuildInfoTypeInfo();
-    SSiloBuildInfo::sType = nullptr;
-    gSSiloBuildInfoTypeInfoConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BF7FC0 (FUN_00BF7FC0, cleanup_ESiloTypeListTypeInfo)
-   *
-   * What it does:
-   * Tears down static reflected `msvc8::list<ESiloType>` type-info storage.
-   */
-  void cleanup_ESiloTypeListTypeInfo()
-  {
-    if (!gESiloTypeListTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireESiloTypeListTypeInfo()->~ESiloTypeListTypeInfo();
-    gESiloTypeListTypeInfoConstructed = false;
   }
 } // namespace
 
@@ -274,24 +207,16 @@ void CAiSiloBuildImplTypeInfo::Init()
 
 /**
  * Address: 0x005CFBD0 (FUN_005CFBD0, gpg::RListType_ESiloType::GetName)
+ * Address: 0x00BF7F90 (FUN_00BF7F90, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily formats and caches the reflected type label for `list<ESiloType>`
- * using the registered enum RTTI name.
+ * Formats the reflected type label for `list<ESiloType>` once from the
+ * registered enum RTTI name and returns it.
  */
 const char* ESiloTypeListTypeInfo::GetName() const
 {
-  if (gESiloTypeListTypeName.empty()) {
-    gpg::RType* const valueType = CachedESiloTypeType();
-    const char* const valueTypeName = valueType ? valueType->GetName() : "ESiloType";
-    gESiloTypeListTypeName = gpg::STR_Printf("list<%s>", valueTypeName ? valueTypeName : "ESiloType");
-    if (!gESiloTypeListTypeNameCleanupRegistered) {
-      gESiloTypeListTypeNameCleanupRegistered = true;
-      (void)std::atexit(&cleanup_ESiloTypeListTypeName);
-    }
-  }
-
-  return gESiloTypeListTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("list<%s>", CachedESiloTypeType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -405,39 +330,33 @@ void ESiloTypeListTypeInfo::SerSave(
  * Address: 0x00BCE090 (FUN_00BCE090, register_SSiloBuildInfoTypeInfo)
  *
  * What it does:
- * Registers `SSiloBuildInfo` RTTI type-info and installs process-exit
- * cleanup for its static storage.
+ * Registers `SSiloBuildInfo` RTTI type-info.
  */
-int moho::register_SSiloBuildInfoTypeInfo()
+void moho::register_SSiloBuildInfoTypeInfo()
 {
   (void)preregister_SSiloBuildInfoTypeInfo();
-  return std::atexit(&cleanup_SSiloBuildInfoTypeInfo);
 }
 
 /**
  * Address: 0x00BCE0F0 (FUN_00BCE0F0, register_CAiSiloBuildImplTypeInfo)
  *
  * What it does:
- * Registers `CAiSiloBuildImpl` RTTI type-info and installs process-exit
- * cleanup for its static storage.
+ * Registers `CAiSiloBuildImpl` RTTI type-info.
  */
-int moho::register_CAiSiloBuildImplTypeInfo()
+void moho::register_CAiSiloBuildImplTypeInfo()
 {
   (void)preregister_CAiSiloBuildImplTypeInfo();
-  return std::atexit(&cleanup_CAiSiloBuildImplTypeInfo);
 }
 
 /**
  * Address: 0x00BCE190 (FUN_00BCE190, register_ESiloTypeListTypeInfo)
  *
  * What it does:
- * Registers reflected `msvc8::list<ESiloType>` type-info and installs
- * process-exit cleanup for its static storage.
+ * Registers reflected `msvc8::list<ESiloType>` type-info.
  */
-int moho::register_ESiloTypeListTypeInfo()
+void moho::register_ESiloTypeListTypeInfo()
 {
   (void)preregister_ESiloTypeListTypeInfo();
-  return std::atexit(&cleanup_ESiloTypeListTypeInfo);
 }
 
 namespace
@@ -446,12 +365,12 @@ namespace
   {
     CAiSiloBuildTypeInfoBootstrap()
     {
-      (void)moho::register_SSiloBuildInfoTypeInfo();
+      moho::register_SSiloBuildInfoTypeInfo();
       (void)moho::register_SSiloBuildInfoSerializer();
-      (void)moho::register_CAiSiloBuildImplTypeInfo();
+      moho::register_CAiSiloBuildImplTypeInfo();
       (void)moho::register_CAiSiloBuildImplConstruct();
       (void)moho::register_CAiSiloBuildImplSerializer();
-      (void)moho::register_ESiloTypeListTypeInfo();
+      moho::register_ESiloTypeListTypeInfo();
     }
   };
 

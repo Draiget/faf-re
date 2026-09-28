@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -71,10 +70,6 @@ namespace
 {
   using ShieldPtrList = msvc8::list<moho::Shield*>;
 
-  // Cached "list<Shield*>" lexical name (binary global stru_10C80D8).
-  msvc8::string gShieldPtrListTypeName{};
-  bool gShieldPtrListTypeNameCleanupRegistered = false;
-
   // std::list control block: {proxy, sentinel, count} — count at +0x08.
   struct ShieldPtrListRuntimeView
   {
@@ -95,18 +90,6 @@ namespace
     return static_cast<int>(static_cast<const ShieldPtrListRuntimeView*>(object)->mCount);
   }
 
-  /**
-   * Address: 0x00C00FB0 (FUN_00C00FB0, cleanup_ShieldPtrListTypeName)
-   *
-   * What it does:
-   * Releases cached lexical type-name storage for `list<Shield*>`.
-   */
-  void cleanup_ShieldPtrListTypeName()
-  {
-    gShieldPtrListTypeName = msvc8::string{};
-    gShieldPtrListTypeNameCleanupRegistered = false;
-  }
-
   struct ShieldPtrListReflectionBootstrap
   {
     ShieldPtrListReflectionBootstrap()
@@ -122,25 +105,16 @@ namespace gpg
 {
   /**
    * Address: 0x0074CD20 (FUN_0074CD20, gpg::RListType_ShieldPtr::GetName)
+   * Address: 0x00C00FB0 (FUN_00C00FB0, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily builds and caches `"list<Shield*>"` from the element pointer-type
-   * name (`moho::Shield::GetPointerType()->GetName()`), arming a one-shot
-   * `atexit` teardown for the cached string.
+   * Builds `list<Shield *>` once from the element pointer-type name
+   * (`moho::Shield::GetPointerType()->GetName()`) and returns it.
    */
   const char* RListType_ShieldPtr::GetName() const
   {
-    if (gShieldPtrListTypeName.empty()) {
-      gpg::RType* const pointerType = moho::Shield::GetPointerType();
-      const char* const elementName = pointerType ? pointerType->GetName() : "Shield*";
-      gShieldPtrListTypeName = gpg::STR_Printf("list<%s>", elementName ? elementName : "Shield*");
-      if (!gShieldPtrListTypeNameCleanupRegistered) {
-        gShieldPtrListTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_ShieldPtrListTypeName);
-      }
-    }
-
-    return gShieldPtrListTypeName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("list<%s>", moho::Shield::GetPointerType()->GetName());
+    return sName.c_str();
   }
 
   /**

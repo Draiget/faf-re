@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BDE7E0 (FUN_00BDE7E0, register_CMauiHistogramTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiHistogram` type-info object.
+   */
   void register_CMauiHistogramTypeInfoStartup();
 } // namespace moho

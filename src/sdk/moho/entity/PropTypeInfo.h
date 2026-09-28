@@ -89,34 +89,18 @@ namespace moho
   static_assert(sizeof(PropTypeInfo) == 0x64, "PropTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00BFF0E0 (FUN_00BFF0E0, sub_BFF0E0)
-   *
-   * What it does:
-   * Releases `SPropPriorityInfoTypeInfo` field/base vectors and resets RObject vftable.
-   */
-  void cleanup_SPropPriorityInfoTypeInfo();
-
-  /**
    * Address: 0x00BD9820 (FUN_00BD9820, sub_BD9820)
    *
    * What it does:
-   * Registers `SPropPriorityInfoTypeInfo` static instance and schedules cleanup at process exit.
+   * Constructs the `SPropPriorityInfoTypeInfo` static instance.
    */
   void register_SPropPriorityInfoTypeInfo();
-
-  /**
-   * Address: 0x00BFF170 (FUN_00BFF170, sub_BFF170)
-   *
-   * What it does:
-   * Releases `PropTypeInfo` field/base vectors and resets RObject vftable.
-   */
-  void cleanup_PropTypeInfo();
 
   /**
    * Address: 0x00BD9880 (FUN_00BD9880, register_PropTypeInfo)
    *
    * What it does:
-   * Registers `PropTypeInfo` static instance and schedules cleanup at process exit.
+   * Constructs the `PropTypeInfo` static instance.
    */
   void register_PropTypeInfo();
 } // namespace moho

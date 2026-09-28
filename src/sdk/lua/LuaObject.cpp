@@ -25,7 +25,6 @@
 #include "LuaError.h"
 #include "LuaParser.h"
 #include "LuaTableIterator.h"
-#include "LuaTypeInfoStorage.h"
 #include "LuaUndump.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
@@ -6664,6 +6663,24 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00C099A0 (FUN_00C099A0, atexit destructor of the WrapFileTypeInfo object)
+	 */
+	[[nodiscard]] WrapFileTypeInfo& AcquireWrapFileTypeInfo()
+	{
+		static WrapFileTypeInfo sInstance;
+		return sInstance;
+	}
+
+	/**
+	 * Address: 0x00C09E20 (FUN_00C09E20, atexit destructor of the TObjectTypeInfo object)
+	 */
+	[[nodiscard]] TObjectTypeInfo& AcquireTObjectTypeInfo()
+	{
+		static TObjectTypeInfo sInstance;
+		return sInstance;
+	}
+
+	/**
 	 * Address: 0x00BEA0A0 (register_WrapFileTypeInfo)
 	 * Address: 0x00BEA100 (register_TObjectTypeInfo)
 	 *
@@ -6673,32 +6690,12 @@ namespace
 	 * so without an instance neither typeid ever reaches the reflection map.
 	 * The binary drives both from its CRT initializer table.
 	 */
-	// Both descriptors keep the shape lua::TypeInfoStorage<T> models: aligned
-	// bytes plus a construct-once flag. They stay registered for the life of
-	// the process, so teardown releases their field tables rather than running
-	// ~T() and leaving the reflection map pointing at freed memory.
-	lua::TypeInfoStorage<WrapFileTypeInfo> gWrapFileTypeInfoStorage{};
-	lua::TypeInfoStorage<TObjectTypeInfo> gTObjectTypeInfoStorage{};
-
-	void CleanupWrapFileTypeInfo()
-	{
-		lua::ReleaseTypeInfoFieldStorage(gWrapFileTypeInfoStorage);
-	}
-
-	void CleanupTObjectTypeInfo()
-	{
-		lua::ReleaseTypeInfoFieldStorage(gTObjectTypeInfoStorage);
-	}
-
 	struct LuaObjectTypeInfoBootstrap
 	{
 		LuaObjectTypeInfoBootstrap()
 		{
-			(void)lua::EnsureTypeInfo(gWrapFileTypeInfoStorage);
-			(void)std::atexit(&CleanupWrapFileTypeInfo);
-
-			(void)lua::EnsureTypeInfo(gTObjectTypeInfoStorage);
-			(void)std::atexit(&CleanupTObjectTypeInfo);
+			(void)AcquireWrapFileTypeInfo();
+			(void)AcquireTObjectTypeInfo();
 		}
 	};
 

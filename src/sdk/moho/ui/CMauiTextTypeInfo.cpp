@@ -11,26 +11,13 @@ using namespace moho;
 
 namespace
 {
-  alignas(CMauiTextTypeInfo) unsigned char gCMauiTextTypeInfoStorage[sizeof(CMauiTextTypeInfo)];
-  bool gCMauiTextTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00C03230 (FUN_00C03230, atexit destructor of the CMauiTextTypeInfo object)
+   */
   [[nodiscard]] CMauiTextTypeInfo& AcquireCMauiTextTypeInfo()
   {
-    if (!gCMauiTextTypeInfoConstructed) {
-      new (gCMauiTextTypeInfoStorage) CMauiTextTypeInfo();
-      gCMauiTextTypeInfoConstructed = true;
-    }
-    return *reinterpret_cast<CMauiTextTypeInfo*>(gCMauiTextTypeInfoStorage);
-  }
-
-  void cleanup_CMauiTextTypeInfo()
-  {
-    if (!gCMauiTextTypeInfoConstructed) {
-      return;
-    }
-    auto& typeInfo = *reinterpret_cast<CMauiTextTypeInfo*>(gCMauiTextTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    static CMauiTextTypeInfo sInstance;
+    return sInstance;
   }
 
   struct CMauiTextTypeInfoBootstrap
@@ -115,10 +102,15 @@ void CMauiTextTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BDEFE0 (FUN_00BDEFE0, register_CMauiTextTypeInfoStartup)
+ *
+ * What it does:
+ * Constructs the `CMauiText` type-info object.
+ */
 void moho::register_CMauiTextTypeInfoStartup()
 {
   (void)AcquireCMauiTextTypeInfo();
-  (void)std::atexit(&cleanup_CMauiTextTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

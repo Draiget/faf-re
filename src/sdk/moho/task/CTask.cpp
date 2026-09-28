@@ -18,32 +18,26 @@ using namespace moho;
 
 namespace
 {
-  alignas(moho::CTaskTypeInfo) std::byte gCTaskTypeInfoStorage[sizeof(moho::CTaskTypeInfo)]{};
-  bool gCTaskTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::CTaskTypeInfo& CTaskTypeInfoSlot()
-  {
-    return *reinterpret_cast<moho::CTaskTypeInfo*>(gCTaskTypeInfoStorage);
-  }
+  bool gCTaskTypeInfoPreregistered = false;
 
   /**
    * Address: 0x00408B00 (FUN_00408B00, sub_408B00)
+   * Address: 0x00BEE2B0 (FUN_00BEE2B0, atexit destructor of the CTaskTypeInfo object)
    *
    * What it does:
-   * Constructs the process-wide CTaskTypeInfo in its static storage and
-   * pre-registers it as the reflected type for CTask. The binary spells the
-   * construction as an RType base ctor plus an explicit vftable store; the
-   * placement-new here is the same thing expressed in C++.
+   * Constructs the process-wide CTaskTypeInfo and pre-registers it as the
+   * reflected type for CTask. The binary spells the construction as an RType
+   * base ctor plus an explicit vftable store.
    */
   [[nodiscard]] gpg::RType* InitializeCTaskTypeInfoStorage()
   {
-    if (!gCTaskTypeInfoConstructed) {
-      ::new (static_cast<void*>(&CTaskTypeInfoSlot())) moho::CTaskTypeInfo();
-      gpg::PreRegisterRType(typeid(moho::CTask), &CTaskTypeInfoSlot());
-      gCTaskTypeInfoConstructed = true;
+    static moho::CTaskTypeInfo sInstance;
+    if (!gCTaskTypeInfoPreregistered) {
+      gpg::PreRegisterRType(typeid(moho::CTask), &sInstance);
+      gCTaskTypeInfoPreregistered = true;
     }
 
-    return &CTaskTypeInfoSlot();
+    return &sInstance;
   }
 
   gpg::RType* CachedCTaskType()
@@ -205,32 +199,14 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x00BEE2B0 (FUN_00BEE2B0, sub_BEE2B0)
-   *
-   * What it does:
-   * Executes process-exit teardown for startup `CTaskTypeInfo` storage.
-   */
-  void cleanup_CTaskTypeInfo()
-  {
-    if (!gCTaskTypeInfoConstructed) {
-      return;
-    }
-
-    CTaskTypeInfoSlot().~CTaskTypeInfo();
-    gCTaskTypeInfoConstructed = false;
-  }
-
-  /**
    * Address: 0x00BC2FC0 (FUN_00BC2FC0, register_CTaskTypeInfo)
    *
    * What it does:
-   * Materializes startup `CTaskTypeInfo` storage and registers process-exit
-   * teardown.
+   * Materializes the startup `CTaskTypeInfo` descriptor.
    */
   void register_CTaskTypeInfo()
   {
     (void)InitializeCTaskTypeInfoStorage();
-    (void)std::atexit(&cleanup_CTaskTypeInfo);
   }
 } // namespace moho
 

@@ -143,8 +143,6 @@ namespace
   }
 
   thread_local msvc8::detail::vector_bool_word_cursor gRecoveredRVectorTypeBoolSubscriptCursorScratch{};
-  msvc8::string gRecoveredRVectorTypeBoolName;
-  bool gRecoveredRVectorTypeBoolNameCleanupRegistered = false;
 
   /**
    * Address: 0x00BFB080 (FUN_00BFB080, atexit destructor of the RVectorTypeBool object)
@@ -200,33 +198,19 @@ namespace
     return type;
   }
 
-  void cleanup_RVectorTypeBoolName()
-  {
-    gRecoveredRVectorTypeBoolName.clear();
-    gRecoveredRVectorTypeBoolNameCleanupRegistered = false;
-  }
-
   RVectorTypeBool::~RVectorTypeBool() = default;
 
   /**
    * Address: 0x00641C20 (FUN_00641C20, gpg::RVectorType_bool::GetName)
+   * Address: 0x00BFB050 (FUN_00BFB050, atexit destructor of GetName's cached name)
    *
    * What it does:
-   * Lazily builds and caches the reflected `vector<bool>` type name.
+   * Builds `vector<bool>` once and returns it.
    */
   const char* RVectorTypeBool::GetName() const
   {
-    if (gRecoveredRVectorTypeBoolName.empty()) {
-      const gpg::RType* const elementType = CachedVectorBoolElementType();
-      const char* const elementName = elementType ? elementType->GetName() : "bool";
-      gRecoveredRVectorTypeBoolName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "bool");
-      if (!gRecoveredRVectorTypeBoolNameCleanupRegistered) {
-        gRecoveredRVectorTypeBoolNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_RVectorTypeBoolName);
-      }
-    }
-
-    return gRecoveredRVectorTypeBoolName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedVectorBoolElementType()->GetName());
+    return sName.c_str();
   }
 
   /**

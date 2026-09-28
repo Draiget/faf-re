@@ -4279,38 +4279,20 @@ namespace moho
   namespace
   {
     /**
-     * Static `RPointerType<UnitWeapon>` descriptor that the binary exposes as
-     * `Moho::UnitWeapon::PointerType`. Default static-init runs the
-     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane.
-     */
-    gpg::RPointerType<moho::UnitWeapon> sUnitWeaponPointerTypeStorage{};
-
-    /**
      * Address: 0x005DDC00 (FUN_005DDC00)
+     * Address: 0x00BF8610 (FUN_00BF8610, atexit destructor of the RPointerType<UnitWeapon> object)
      *
      * What it does:
-     * Pre-registers the static `RPointerType<UnitWeapon>` descriptor under the
-     * `UnitWeapon*` type-info key so subsequent `LookupRType` queries from the
-     * lazy `GetPointerType` lane resolve to this descriptor.
+     * Constructs the static `RPointerType<UnitWeapon>` descriptor (the
+     * binary's `Moho::UnitWeapon::PointerType`) on first use and
+     * pre-registers it under the `UnitWeapon*` type-info key so subsequent
+     * `LookupRType` queries from the lazy `GetPointerType` lane resolve to
+     * this descriptor.
      */
     void PreregisterUnitWeaponPointerType()
     {
-      gpg::PreRegisterRType(typeid(moho::UnitWeapon*), &sUnitWeaponPointerTypeStorage);
-    }
-
-    /**
-     * Address: 0x00BF8610 (FUN_00BF8610)
-     *
-     * What it does:
-     * Tears down the static `RPointerType<UnitWeapon>` descriptor at process
-     * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
-     * RType vftable lane to the `RObject` base. Registered via `atexit` from
-     * `GetPointerType`'s once-init path.
-     */
-    void CleanupUnitWeaponPointerType()
-    {
-      sUnitWeaponPointerTypeStorage.~RPointerType<moho::UnitWeapon>();
+      static gpg::RPointerType<moho::UnitWeapon> sDescriptor;
+      gpg::PreRegisterRType(typeid(moho::UnitWeapon*), &sDescriptor);
     }
   } // namespace
 
@@ -4318,21 +4300,18 @@ namespace moho
    * Address: 0x005DCD70 (FUN_005DCD70, Moho::UnitWeapon::GetPointerType)
    *
    * What it does:
-   * On first call, pre-registers the static `RPointerType<UnitWeapon>`
-   * descriptor and installs the matching atexit teardown. After that, lazily
-   * caches the `LookupRType(typeid(UnitWeapon*))` result in `sPointerType` and
-   * returns it.
+   * On first call, constructs and pre-registers the static
+   * `RPointerType<UnitWeapon>` descriptor. After that, lazily caches the
+   * `LookupRType(typeid(UnitWeapon*))` result in `sPointerType` and returns
+   * it.
    */
   gpg::RType* UnitWeapon::GetPointerType()
   {
     static const bool sOnceInit = []() {
       PreregisterUnitWeaponPointerType();
-      (void)std::atexit(&CleanupUnitWeaponPointerType);
       return true;
     }();
     (void)sOnceInit;
-
-    (void)StaticGetClass();
 
     gpg::RType* cached = sPointerType;
     if (!cached) {

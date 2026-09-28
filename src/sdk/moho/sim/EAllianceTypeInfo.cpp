@@ -8,9 +8,16 @@
 
 namespace
 {
-  alignas(moho::EAllianceTypeInfo) unsigned char gEAllianceTypeInfoStorage[sizeof(moho::EAllianceTypeInfo)]{};
-  bool gEAllianceTypeInfoConstructed = false;
   bool gEAllianceTypeInfoPreregistered = false;
+
+  /**
+   * Address: 0x00BF1F10 (FUN_00BF1F10, atexit destructor of the EAllianceTypeInfo object)
+   */
+  [[nodiscard]] moho::EAllianceTypeInfo* AcquireEAllianceTypeInfo()
+  {
+    static moho::EAllianceTypeInfo sInstance;
+    return &sInstance;
+  }
 
   /**
    * Address: 0x00BC7A30 (FUN_00BC7A30, dynamic initializer for the global
@@ -36,33 +43,13 @@ namespace
    */
   [[maybe_unused]] gpg::REnumType* ConstructEAllianceTypeInfoInternal()
   {
-    if (!gEAllianceTypeInfoConstructed) {
-      new (gEAllianceTypeInfoStorage) moho::EAllianceTypeInfo();
-      gEAllianceTypeInfoConstructed = true;
-    }
-
-    auto* const typeInfo = reinterpret_cast<moho::EAllianceTypeInfo*>(gEAllianceTypeInfoStorage);
+    auto* const typeInfo = AcquireEAllianceTypeInfo();
     if (!gEAllianceTypeInfoPreregistered) {
       gpg::PreRegisterRType(typeid(moho::EAlliance), typeInfo);
       gEAllianceTypeInfoPreregistered = true;
     }
     return typeInfo;
   }
-
-  /**
-   * Address: 0x00BF1F10 (FUN_00BF1F10, cleanup_EAllianceTypeInfo)
-   */
-  void cleanup_EAllianceTypeInfo()
-  {
-    if (!gEAllianceTypeInfoConstructed) {
-      return;
-    }
-
-    reinterpret_cast<moho::EAllianceTypeInfo*>(gEAllianceTypeInfoStorage)->~EAllianceTypeInfo();
-    gEAllianceTypeInfoConstructed = false;
-    gEAllianceTypeInfoPreregistered = false;
-  }
-
 } // namespace
 
 namespace moho
@@ -76,10 +63,11 @@ namespace moho
    * this non-deleting variant is a bare 5-byte `jmp gpg::REnumType::~REnumType`
    * tail-call, not a distinct body. It has zero callsite evidence anywhere
    * in the binary (no code caller, no data/vtable xref, unreachable per the
-   * enriched callgraph index): the one plausible caller,
-   * `cleanup_EAllianceTypeInfo` (0x00BF1F10), was independently verified to
-   * itself `jmp` directly into `gpg::REnumType::~REnumType`
-   * (`mov ecx, offset gEAllianceTypeInfoStorage; jmp ??1REnumType@gpg@@QAE@@Z`),
+   * enriched callgraph index): the one plausible caller, the atexit
+   * destructor of the `EAllianceTypeInfo` object (0x00BF1F10), was
+   * independently verified to itself `jmp` directly into
+   * `gpg::REnumType::~REnumType`
+   * (`mov ecx, offset <object>; jmp ??1REnumType@gpg@@QAE@@Z`),
    * bypassing this address entirely. Compiler-emitted glue for the
    * `= default` destructor below, corresponding to no source line of its
    * own -- RULE ONE.
@@ -119,10 +107,9 @@ namespace moho
   /**
    * Address: 0x00BC7A10 (FUN_00BC7A10, register_EAllianceTypeInfo)
    */
-  int register_EAllianceTypeInfo()
+  void register_EAllianceTypeInfo()
   {
     (void)ConstructEAllianceTypeInfoInternal();
-    return std::atexit(&cleanup_EAllianceTypeInfo);
   }
 } // namespace moho
 

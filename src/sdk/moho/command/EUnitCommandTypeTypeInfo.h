@@ -70,14 +70,14 @@ namespace moho
    * Address: 0x00BC9C20 (FUN_00BC9C20, sub_BC9C20)
    *
    * What it does:
-   * Constructs the static `EUnitCommandTypeTypeInfo` descriptor in place --
+   * Constructs the static `EUnitCommandTypeTypeInfo` descriptor --
    * construction preregisters `EUnitCommandType` with the reflection
-   * registry -- and installs its atexit teardown. This is an independent
-   * `__xc_a` static-initializer entry, separate from (and not coupled to)
+   * registry. This is an independent `__xc_a` static-initializer entry,
+   * separate from (and not coupled to)
    * `EUnitCommandTypePrimitiveSerializer`'s own independent initializer
    * (`FUN_00BC9C40`); the two must not be constructed from one shared
    * bootstrap.
    */
-  int register_EUnitCommandTypeTypeInfo();
+  void register_EUnitCommandTypeTypeInfo();
 } // namespace moho
 

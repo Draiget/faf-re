@@ -8,36 +8,15 @@
 
 namespace
 {
-  alignas(moho::ESpecialFileTypeTypeInfo)
-    unsigned char gESpecialFileTypeTypeInfoStorage[sizeof(moho::ESpecialFileTypeTypeInfo)];
-  bool gESpecialFileTypeTypeInfoConstructed = false;
   bool gESpecialFileTypeTypeInfoPreregistered = false;
 
+  /**
+   * Address: 0x00C08940 (FUN_00C08940, atexit destructor of the ESpecialFileTypeTypeInfo object)
+   */
   [[nodiscard]] moho::ESpecialFileTypeTypeInfo* AcquireESpecialFileTypeTypeInfo()
   {
-    if (!gESpecialFileTypeTypeInfoConstructed) {
-      new (gESpecialFileTypeTypeInfoStorage) moho::ESpecialFileTypeTypeInfo();
-      gESpecialFileTypeTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::ESpecialFileTypeTypeInfo*>(gESpecialFileTypeTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00C08940 (FUN_00C08940, cleanup_ESpecialFileTypeTypeInfo)
-   *
-   * What it does:
-   * Tears down process-global `ESpecialFileTypeTypeInfo` storage.
-   */
-  void cleanup_ESpecialFileTypeTypeInfo()
-  {
-    if (!gESpecialFileTypeTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireESpecialFileTypeTypeInfo()->~ESpecialFileTypeTypeInfo();
-    gESpecialFileTypeTypeInfoConstructed = false;
-    gESpecialFileTypeTypeInfoPreregistered = false;
+    static moho::ESpecialFileTypeTypeInfo sInstance;
+    return &sInstance;
   }
 } // namespace
 
@@ -94,10 +73,9 @@ namespace moho
   /**
    * Address: 0x00BE8C00 (FUN_00BE8C00, register_ESpecialFileTypeTypeInfo)
    */
-  int register_ESpecialFileTypeTypeInfo()
+  void register_ESpecialFileTypeTypeInfo()
   {
     (void)preregister_ESpecialFileTypeTypeInfo();
-    return std::atexit(&cleanup_ESpecialFileTypeTypeInfo);
   }
 } // namespace moho
 

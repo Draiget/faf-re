@@ -393,38 +393,21 @@ gpg::RType* ReconBlip::sPointerType = nullptr;
 namespace
 {
   /**
-   * Storage for the static `RPointerType<ReconBlip>` descriptor that the binary
-   * exposes as `Moho::ReconBlip::PRType`. Default static-init runs the
-   * RPointerTypeBase → RType → RObject ctor chain and installs the most-derived
-   * vftable lane.
-   */
-  gpg::RPointerType<moho::ReconBlip> sReconBlipPointerTypeStorage{};
-
-  /**
    * Address: 0x005C8170 (FUN_005C8170)
+   * Address: 0x00BF7BD0 (FUN_00BF7BD0, atexit destructor of the RPointerType<ReconBlip> object)
    *
    * What it does:
-   * Pre-registers the static `RPointerType<ReconBlip>` descriptor under the
-   * `ReconBlip*` type-info key so that subsequent `LookupRType` queries from
-   * the lazy `GetPointerType` lane resolve to this descriptor.
+   * Constructs the `RPointerType<ReconBlip>` descriptor (the binary's
+   * `ReconBlip::PRType`) once and preregisters it under the `ReconBlip*`
+   * type-info key. The binary holds the descriptor as a function-local static
+   * of `GetPointerType`; it lives here because the preregister phase has to
+   * construct it before any consumer looks up `ReconBlip*`.
    */
-  void PreregisterReconBlipPointerType()
+  gpg::RType* PreregisterReconBlipPointerType()
   {
-    gpg::PreRegisterRType(typeid(moho::ReconBlip*), &sReconBlipPointerTypeStorage);
-  }
-
-  /**
-   * Address: 0x00BF7BD0 (FUN_00BF7BD0)
-   *
-   * What it does:
-   * Tears down the static `RPointerType<ReconBlip>` descriptor at process
-   * exit: frees heap-backed `bases_`/`fields_` vector storage and resets the
-   * RType vftable lane to the `RObject` base. Registered via `atexit` from
-   * `GetPointerType`'s once-init path.
-   */
-  void CleanupReconBlipPointerType()
-  {
-    sReconBlipPointerTypeStorage.~RPointerType<moho::ReconBlip>();
+    static gpg::RPointerType<moho::ReconBlip> sDescriptor;
+    gpg::PreRegisterRType(typeid(moho::ReconBlip*), &sDescriptor);
+    return &sDescriptor;
   }
 } // namespace
 
@@ -440,17 +423,13 @@ gpg::RType* ReconBlip::StaticGetClass()
  * Address: 0x005C6470 (FUN_005C6470, Moho::ReconBlip::GetPointerType)
  *
  * What it does:
- * On first call, pre-registers the static `RPointerType<ReconBlip>` descriptor
- * and installs the matching atexit teardown. After that, lazily caches the
- * `LookupRType(typeid(ReconBlip*))` result in `sPointerType` and returns it.
+ * On first call, pre-registers the static `RPointerType<ReconBlip>`
+ * descriptor. After that, lazily caches the `LookupRType(typeid(ReconBlip*))`
+ * result in `sPointerType` and returns it.
  */
 gpg::RType* ReconBlip::GetPointerType()
 {
-  static const bool sOnceInit = []() {
-    PreregisterReconBlipPointerType();
-    (void)std::atexit(&CleanupReconBlipPointerType);
-    return true;
-  }();
+  static const bool sOnceInit = (PreregisterReconBlipPointerType(), true);
   (void)sOnceInit;
 
   if (!sPointerType) {

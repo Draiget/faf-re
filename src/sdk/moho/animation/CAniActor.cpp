@@ -29,9 +29,6 @@ namespace
 {
   constexpr std::uint32_t kWatchBoneEnabledFlag = 0x8000u;
 
-  alignas(moho::CAniActorTypeInfo) unsigned char gCAniActorTypeInfoStorage[sizeof(moho::CAniActorTypeInfo)] = {};
-  bool gCAniActorTypeInfoConstructed = false;
-
   // Address: 0x010B284C -- process-global `CAniActorConstruct` singleton.
   moho::CAniActorConstruct gCAniActorConstruct;
 
@@ -419,35 +416,13 @@ namespace
     head->ListUnlink();
   }
 
+  /**
+   * Address: 0x00BFAC70 (FUN_00BFAC70, atexit destructor of the CAniActorTypeInfo object)
+   */
   [[nodiscard]] moho::CAniActorTypeInfo* AcquireCAniActorTypeInfo()
   {
-    if (!gCAniActorTypeInfoConstructed) {
-      new (gCAniActorTypeInfoStorage) moho::CAniActorTypeInfo();
-      gCAniActorTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CAniActorTypeInfo*>(gCAniActorTypeInfoStorage);
-  }
-
-  /**
-   * Address: 0x00BFAC70 (FUN_00BFAC70, sub_BFAC70)
-   *
-   * What it does:
-   * Releases startup-owned `CAniActorTypeInfo` storage.
-   */
-  void cleanup_CAniActorTypeInfo_Impl()
-  {
-    if (!gCAniActorTypeInfoConstructed) {
-      return;
-    }
-
-    static_cast<gpg::RType*>(AcquireCAniActorTypeInfo())->~RType();
-    gCAniActorTypeInfoConstructed = false;
-  }
-
-  void CleanupCAniActorTypeInfoAtexit()
-  {
-    cleanup_CAniActorTypeInfo_Impl();
+    static moho::CAniActorTypeInfo sInstance;
+    return &sInstance;
   }
 } // namespace
 
@@ -944,26 +919,14 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_00BFAC70 (non-canonical helper lane).
-   *
-   * What it does:
-   * Releases startup-owned `CAniActorTypeInfo` storage.
-   */
-  void cleanup_CAniActorTypeInfo()
-  {
-    cleanup_CAniActorTypeInfo_Impl();
-  }
-
-  /**
    * Address: 0x00BD2B00 (FUN_00BD2B00, register_CAniActorTypeInfo)
    *
    * What it does:
-   * Constructs startup-owned `CAniActorTypeInfo` and installs process-exit cleanup.
+   * Constructs the static `CAniActorTypeInfo` object.
    */
   void register_CAniActorTypeInfo()
   {
     (void)AcquireCAniActorTypeInfo();
-    (void)std::atexit(&CleanupCAniActorTypeInfoAtexit);
   }
 
   /**

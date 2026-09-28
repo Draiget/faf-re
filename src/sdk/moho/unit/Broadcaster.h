@@ -159,10 +159,9 @@ namespace moho
    * Address: 0x00BD95D0 (FUN_00BD95D0, sub_BD95D0)
    *
    * What it does:
-   * Runs broadcaster status-type registration and queues its shutdown cleanup
-   * through `atexit`.
+   * Runs broadcaster status-type registration.
    */
-  int register_Broadcaster_EUnitCommandQueueStatus_RType_AtExit();
+  void register_Broadcaster_EUnitCommandQueueStatus_RType_AtExit();
 
   /**
    * Address: 0x006EBDF0 (FUN_006EBDF0, sub_6EBDF0)
@@ -186,17 +185,15 @@ namespace moho
    * Address: 0x00BD8FD0 (FUN_00BD8FD0, sub_BD8FD0)
    *
    * What it does:
-   * Runs broadcaster command-event type registration and queues shutdown
-   * cleanup via `atexit`.
+   * Runs broadcaster command-event type registration.
    */
-  int register_Broadcaster_ECommandEvent_RType_AtExit();
+  void register_Broadcaster_ECommandEvent_RType_AtExit();
 
   /**
    * Address: 0x00BD95F0 (FUN_00BD95F0, sub_BD95F0)
    *
    * What it does:
-   * Runs listener status-type registration and queues its shutdown cleanup
-   * through `atexit`.
+   * Runs listener status-type registration.
    */
-  int register_Listener_EUnitCommandQueueStatus_RType_AtExit();
+  void register_Listener_EUnitCommandQueueStatus_RType_AtExit();
 } // namespace moho

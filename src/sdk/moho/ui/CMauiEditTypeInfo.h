@@ -31,5 +31,11 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BDE230 (FUN_00BDE230, register_CMauiEditTypeInfoStartup)
+   *
+   * What it does:
+   * Constructs the `CMauiEdit` type-info object.
+   */
   void register_CMauiEditTypeInfoStartup();
 } // namespace moho

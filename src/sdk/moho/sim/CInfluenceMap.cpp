@@ -331,15 +331,6 @@ namespace
     owner->context.Update(wordLane, 4u);
   }
 
-  msvc8::string gInfluenceGridVectorTypeName{};
-  std::uint32_t gInfluenceGridVectorTypeNameInitGuard = 0u;
-  msvc8::string gMapUintIntTypeName{};
-  std::uint32_t gMapUintIntTypeNameInitGuard = 0u;
-  msvc8::string gMapUintInfluenceMapEntryTypeName{};
-  std::uint32_t gMapUintInfluenceMapEntryTypeNameInitGuard = 0u;
-  msvc8::string gSThreatVectorTypeName{};
-  std::uint32_t gSThreatVectorTypeNameInitGuard = 0u;
-
   /**
    * Address: 0x0071A8E0 (FUN_0071A8E0)
    *
@@ -644,30 +635,6 @@ namespace
       type = gpg::LookupRType(typeid(InfluenceGridVector));
     }
     return type;
-  }
-
-  void cleanup_InfluenceGridVectorTypeName()
-  {
-    gInfluenceGridVectorTypeName.clear();
-    gInfluenceGridVectorTypeNameInitGuard = 0u;
-  }
-
-  void cleanup_SThreatVectorTypeName()
-  {
-    gSThreatVectorTypeName.clear();
-    gSThreatVectorTypeNameInitGuard = 0u;
-  }
-
-  void cleanup_MapUintIntTypeName()
-  {
-    gMapUintIntTypeName.clear();
-    gMapUintIntTypeNameInitGuard = 0u;
-  }
-
-  void cleanup_MapUintInfluenceMapEntryTypeName()
-  {
-    gMapUintInfluenceMapEntryTypeName.clear();
-    gMapUintInfluenceMapEntryTypeNameInitGuard = 0u;
   }
 
   /**
@@ -1737,24 +1704,16 @@ namespace
 
 /**
  * Address: 0x00718C70 (FUN_00718C70, gpg::RMapType_uint_int::GetName)
+ * Address: 0x00C001B0 (FUN_00C001B0, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the reflected type label `map<unsigned int,int>`.
+ * Builds `map<unsigned int,int>` once and returns it.
  */
 const char* gpg::RMapType_uint_int::GetName() const
 {
-  if ((gMapUintIntTypeNameInitGuard & 1u) == 0u) {
-    gMapUintIntTypeNameInitGuard |= 1u;
-
-    const gpg::RType* const keyType = CachedUIntType();
-    const gpg::RType* const valueType = CachedIntType();
-    const char* const valueTypeName = valueType ? valueType->GetName() : "int";
-    const char* const keyTypeName = keyType ? keyType->GetName() : "unsigned int";
-    gMapUintIntTypeName = gpg::STR_Printf("map<%s,%s>", keyTypeName, valueTypeName);
-    (void)std::atexit(&cleanup_MapUintIntTypeName);
-  }
-
-  return gMapUintIntTypeName.c_str();
+  static const msvc8::string sName =
+    gpg::STR_Printf("map<%s,%s>", CachedUIntType()->GetName(), CachedIntType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -1785,25 +1744,16 @@ void gpg::RMapType_uint_int::Init()
 
 /**
  * Address: 0x00718FE0 (FUN_00718FE0, gpg::RMapType_uint_InfluenceMapEntry::GetName)
+ * Address: 0x00C00150 (FUN_00C00150, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the reflected type label
- * `map<unsigned int,InfluenceMapEntry>`.
+ * Builds `map<unsigned int,InfluenceMapEntry>` once and returns it.
  */
 const char* gpg::RMapType_uint_InfluenceMapEntry::GetName() const
 {
-  if ((gMapUintInfluenceMapEntryTypeNameInitGuard & 1u) == 0u) {
-    gMapUintInfluenceMapEntryTypeNameInitGuard |= 1u;
-
-    const gpg::RType* const keyType = CachedUIntType();
-    const gpg::RType* const valueType = CachedInfluenceMapEntryType();
-    const char* const valueTypeName = valueType ? valueType->GetName() : "InfluenceMapEntry";
-    const char* const keyTypeName = keyType ? keyType->GetName() : "unsigned int";
-    gMapUintInfluenceMapEntryTypeName = gpg::STR_Printf("map<%s,%s>", keyTypeName, valueTypeName);
-    (void)std::atexit(&cleanup_MapUintInfluenceMapEntryTypeName);
-  }
-
-  return gMapUintInfluenceMapEntryTypeName.c_str();
+  static const msvc8::string sName =
+    gpg::STR_Printf("map<%s,%s>", CachedUIntType()->GetName(), CachedInfluenceMapEntryType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -1898,23 +1848,15 @@ void gpg::RMapType_uint_InfluenceMapEntry::Init()
 
 /**
  * Address: 0x00718DE0 (FUN_00718DE0, gpg::RVectorType_InfluenceGrid::GetName)
+ * Address: 0x00C00180 (FUN_00C00180, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the reflected lexical type label
- * `vector<InfluenceGrid>` from runtime RTTI metadata.
+ * Builds `vector<InfluenceGrid>` once and returns it.
  */
 const char* gpg::RVectorType_InfluenceGrid::GetName() const
 {
-  if ((gInfluenceGridVectorTypeNameInitGuard & 1u) == 0u) {
-    gInfluenceGridVectorTypeNameInitGuard |= 1u;
-
-    gpg::RType* const valueType = CachedInfluenceGridType();
-    const char* const valueTypeName = valueType ? valueType->GetName() : "InfluenceGrid";
-    gInfluenceGridVectorTypeName = gpg::STR_Printf("vector<%s>", valueTypeName ? valueTypeName : "InfluenceGrid");
-    (void)std::atexit(&cleanup_InfluenceGridVectorTypeName);
-  }
-
-  return gInfluenceGridVectorTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedInfluenceGridType()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -2032,23 +1974,15 @@ void gpg::RVectorType_InfluenceGrid::SetCount(void* const obj, const int count) 
 
 /**
  * Address: 0x00719150 (FUN_00719150, gpg::RVectorType_SThreat::GetName)
+ * Address: 0x00C00120 (FUN_00C00120, atexit destructor of GetName's cached name)
  *
  * What it does:
- * Lazily builds and caches the reflected lexical type label
- * `vector<SThreat>` from runtime RTTI metadata.
+ * Builds `vector<SThreat>` once and returns it.
  */
 const char* gpg::RVectorType_SThreat::GetName() const
 {
-  if ((gSThreatVectorTypeNameInitGuard & 1u) == 0u) {
-    gSThreatVectorTypeNameInitGuard |= 1u;
-
-    gpg::RType* const valueType = CachedSThreatType();
-    const char* const valueTypeName = valueType ? valueType->GetName() : "SThreat";
-    gSThreatVectorTypeName = gpg::STR_Printf("vector<%s>", valueTypeName ? valueTypeName : "SThreat");
-    (void)std::atexit(&cleanup_SThreatVectorTypeName);
-  }
-
-  return gSThreatVectorTypeName.c_str();
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedSThreatType()->GetName());
+  return sName.c_str();
 }
 
 /**

@@ -7,43 +7,18 @@
 #include "moho/unit/core/CWeaponAttributes.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
   using TypeInfo = moho::CWeaponAttributesTypeInfo;
 
-  gpg::StaticTypeInfoStorage<TypeInfo> gCWeaponAttributesTypeInfoStorage{};
-
+  /**
+   * Address: 0x00BFE590 (FUN_00BFE590, atexit destructor of the CWeaponAttributesTypeInfo object)
+   */
   [[nodiscard]] TypeInfo& AcquireCWeaponAttributesTypeInfo()
   {
-    return gCWeaponAttributesTypeInfoStorage.Ensure();
-  }
-
-  /**
-   * Address: 0x00BFE590 (FUN_00BFE590, typeinfo cleanup)
-   *
-   * What it does:
-   * Destroys the static descriptor, releasing its reflected field/base vector
-   * storage. FUN_00BD87B0 hands this to `atexit` as the descriptor's own
-   * destructor. A process that never reached the static-init lane has nothing
-   * to tear down, so this must not construct one on the way out.
-   */
-  void cleanup_CWeaponAttributesTypeInfo_00BFE590_Impl()
-  {
-    gCWeaponAttributesTypeInfoStorage.Destroy();
-  }
-
-  /**
-   * Address: 0x00BD87B0 (FUN_00BD87B0, startup registration + atexit cleanup)
-   *
-   * What it does:
-   * Forces `CWeaponAttributesTypeInfo` construction and schedules exit cleanup.
-   */
-  int register_CWeaponAttributesTypeInfo_00BD87B0_Impl()
-  {
-    (void)AcquireCWeaponAttributesTypeInfo();
-    return std::atexit(&cleanup_CWeaponAttributesTypeInfo_00BFE590_Impl);
+    static TypeInfo sInstance;
+    return sInstance;
   }
 
   // The `CWeaponAttributesSerializer` consumer (a `gpg::LookupRType` caller,
@@ -56,18 +31,16 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x00BD87B0 (FUN_00BD87B0, startup registration + atexit cleanup)
+   * Address: 0x00BD87B0 (FUN_00BD87B0, register_CWeaponAttributesTypeInfo)
    *
    * What it does:
    * Provider entry point for the phase-1 initializer walk: builds the
    * `CWeaponAttributes` descriptor through the FUN_006D3640 constructor -
-   * which is what performs the `PreRegisterRType` - and schedules its exit
-   * cleanup.
+   * which is what performs the `PreRegisterRType`.
    */
-  gpg::RType* preregister_CWeaponAttributesTypeInfo()
+  void preregister_CWeaponAttributesTypeInfo()
   {
-    (void)register_CWeaponAttributesTypeInfo_00BD87B0_Impl();
-    return &AcquireCWeaponAttributesTypeInfo();
+    (void)AcquireCWeaponAttributesTypeInfo();
   }
 
   /**

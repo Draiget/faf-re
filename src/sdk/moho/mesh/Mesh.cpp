@@ -5508,66 +5508,30 @@ namespace moho
     return paletteVar;
   }
 
+  // The two palette globals are defined ahead of the bootstrap object below:
+  // C++ constructs a translation unit's namespace-scope objects in definition
+  // order, so each one is default-constructed before its registrar runs
+  // `register_MeshShaderVar` on it. No other translation unit reads them
+  // during static initialization.
+
+  /**
+   * Address: 0x00C03E40 (FUN_00C03E40, dynamic atexit destructor for `meshShaderVarTransPalette`)
+   *
+   * What it does:
+   * Translation skinning-palette shader-var (binary global 0x010BEEF8).
+   */
+  MeshShaderPaletteVar meshShaderVarTransPalette;
+
+  /**
+   * Address: 0x00C03E80 (FUN_00C03E80, dynamic atexit destructor for `meshShaderVarRotPalette`)
+   *
+   * What it does:
+   * Rotation skinning-palette shader-var (binary global 0x010BEE50).
+   */
+  MeshShaderPaletteVar meshShaderVarRotPalette;
+
   namespace
   {
-    /**
-     * Storage + lazy construction for one mesh skinning-palette shader-var global.
-     * The binary keeps each palette var as a zero-initialized static object
-     * (`.data` BSS tail) that the CRT static-init thunk registers in place; the
-     * recovered model uses aligned storage constructed on first access so the
-     * embedded `ShaderVar` non-trivial members initialize correctly.
-     */
-    template <std::uintptr_t GlobalAddress>
-    struct MeshPaletteVarSlot
-    {
-      alignas(moho::MeshShaderPaletteVar) static std::byte storage[sizeof(moho::MeshShaderPaletteVar)];
-      static bool constructed;
-    };
-
-    template <std::uintptr_t GlobalAddress>
-    alignas(moho::MeshShaderPaletteVar) std::byte
-      MeshPaletteVarSlot<GlobalAddress>::storage[sizeof(moho::MeshShaderPaletteVar)]{};
-    template <std::uintptr_t GlobalAddress>
-    bool MeshPaletteVarSlot<GlobalAddress>::constructed = false;
-
-    template <std::uintptr_t GlobalAddress>
-    [[nodiscard]] moho::MeshShaderPaletteVar& AccessMeshPaletteVarSlot() noexcept
-    {
-      auto* const slot = reinterpret_cast<moho::MeshShaderPaletteVar*>(MeshPaletteVarSlot<GlobalAddress>::storage);
-      if (!MeshPaletteVarSlot<GlobalAddress>::constructed) {
-        ::new (static_cast<void*>(slot)) moho::MeshShaderPaletteVar();
-        MeshPaletteVarSlot<GlobalAddress>::constructed = true;
-      }
-      return *slot;
-    }
-
-    /**
-     * Address: 0x00C03E40 (FUN_00C03E40, sub_C03E40) — trans-palette cleanup.
-     * Address: 0x00C03E80 (FUN_00C03E80, sub_C03E80) — rot-palette cleanup.
-     *
-     * What it does:
-     * Process-exit cleanup for one palette shader-var: frees the palette buffer,
-     * clears the triplet, and runs the base `ShaderVar` destructor (which detaches
-     * the effect link and releases the effect-variable handle).
-     */
-    template <std::uintptr_t GlobalAddress>
-    void DestroyMeshPaletteVarSlot() noexcept
-    {
-      if (!MeshPaletteVarSlot<GlobalAddress>::constructed) {
-        return;
-      }
-
-      moho::MeshShaderPaletteVar& paletteVar = AccessMeshPaletteVarSlot<GlobalAddress>();
-      // The destructor below already tears mPalette down (real
-      // msvc8::vector<SkinPaletteEntry> destructor: destroy_all() +
-      // deallocate_all()), so no separate manual free/reset is needed here.
-      paletteVar.~MeshShaderPaletteVar();
-      MeshPaletteVarSlot<GlobalAddress>::constructed = false;
-    }
-
-    void CleanupMeshShaderVarTransPalette() { DestroyMeshPaletteVarSlot<0x010BEEF8u>(); }
-    void CleanupMeshShaderVarRotPalette() { DestroyMeshPaletteVarSlot<0x010BEE50u>(); }
-
     /**
      * CRT static-init bootstrap mirroring the two `__xc_a` entries at
      * 0x00BE0900 / 0x00BE0920: registering both palette shader-vars at process
@@ -5586,28 +5550,16 @@ namespace moho
     [[maybe_unused]] MeshPaletteShaderVarBootstrap gMeshPaletteShaderVarBootstrap;
   } // namespace
 
-  MeshShaderPaletteVar& GetMeshShaderVarTransPalette()
-  {
-    return AccessMeshPaletteVarSlot<0x010BEEF8u>();
-  }
-
-  MeshShaderPaletteVar& GetMeshShaderVarRotPalette()
-  {
-    return AccessMeshPaletteVarSlot<0x010BEE50u>();
-  }
-
   /**
    * Address: 0x00BE0900 (FUN_00BE0900, register_MeshShaderVarTransPalette)
    *
    * What it does:
    * CRT static-init registration thunk: registers `meshShaderVarTransPalette`
-   * under the byte-verified HLSL name `"transPalette"` and installs its
-   * process-exit cleanup via `atexit`.
+   * under the byte-verified HLSL name `"transPalette"`.
    */
   void register_MeshShaderVarTransPalette()
   {
-    register_MeshShaderVar("transPalette", &GetMeshShaderVarTransPalette());
-    (void)std::atexit(&CleanupMeshShaderVarTransPalette);
+    register_MeshShaderVar("transPalette", &meshShaderVarTransPalette);
   }
 
   /**
@@ -5615,13 +5567,11 @@ namespace moho
    *
    * What it does:
    * CRT static-init registration thunk: registers `meshShaderVarRotPalette`
-   * under the byte-verified HLSL name `"rotPalette"` and installs its
-   * process-exit cleanup via `atexit`.
+   * under the byte-verified HLSL name `"rotPalette"`.
    */
   void register_MeshShaderVarRotPalette()
   {
-    register_MeshShaderVar("rotPalette", &GetMeshShaderVarRotPalette());
-    (void)std::atexit(&CleanupMeshShaderVarRotPalette);
+    register_MeshShaderVar("rotPalette", &meshShaderVarRotPalette);
   }
 
   /**

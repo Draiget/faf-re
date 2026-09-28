@@ -23,7 +23,7 @@ namespace moho
     ECollisionBeamEventTypeInfo();
 
     /**
-     * Address: 0x00BFC2D0 (FUN_00BFC2D0, Moho::ECollisionBeamEventTypeInfo::dtr)
+     * Address: 0x00672D50 (FUN_00672D50, Moho::ECollisionBeamEventTypeInfo::dtr)
      */
     ~ECollisionBeamEventTypeInfo() override;
 
@@ -61,51 +61,25 @@ namespace moho
    * Address: 0x00BD4C20 (FUN_00BD4C20, register_ECollisionBeamEventTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters `ECollisionBeamEventTypeInfo` and installs exit cleanup.
+   * Constructs/preregisters `ECollisionBeamEventTypeInfo`.
    */
   void register_ECollisionBeamEventTypeInfo();
-
-  /**
-   * Address: 0x00BFC2D0 (FUN_00BFC2D0, cleanup_ECollisionBeamEventTypeInfo)
-   *
-   * What it does:
-   * Tears down startup `ECollisionBeamEventTypeInfo` storage.
-   */
-  void cleanup_ECollisionBeamEventTypeInfo();
 
   /**
    * Address: 0x00BD4D90 (FUN_00BD4D90, register_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo)
    *
    * What it does:
    * Constructs/preregisters startup type-info for
-   * `ManyToOneBroadcaster<ECollisionBeamEvent>` and installs exit cleanup.
-   */
-  int register_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo();
-
-  /**
-   * Address: 0x00BFC5B0 (FUN_00BFC5B0, cleanup_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo)
-   *
-   * What it does:
-   * Tears down startup type-info storage for
    * `ManyToOneBroadcaster<ECollisionBeamEvent>`.
    */
-  void cleanup_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo();
+  void register_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo();
 
   /**
    * Address: 0x00BD4DB0 (FUN_00BD4DB0, register_ManyToOneListener_ECollisionBeamEvent_TypeInfo)
    *
    * What it does:
    * Constructs/preregisters startup type-info for
-   * `ManyToOneListener<ECollisionBeamEvent>` and installs exit cleanup.
-   */
-  int register_ManyToOneListener_ECollisionBeamEvent_TypeInfo();
-
-  /**
-   * Address: 0x00BFC550 (FUN_00BFC550, cleanup_ManyToOneListener_ECollisionBeamEvent_TypeInfo)
-   *
-   * What it does:
-   * Tears down startup type-info storage for
    * `ManyToOneListener<ECollisionBeamEvent>`.
    */
-  void cleanup_ManyToOneListener_ECollisionBeamEvent_TypeInfo();
+  void register_ManyToOneListener_ECollisionBeamEvent_TypeInfo();
 } // namespace moho

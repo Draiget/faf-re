@@ -71,10 +71,9 @@ namespace moho
    * Address: 0x00BCEBD0 (FUN_00BCEBD0, register_EAiTargetTypeTypeInfo)
    *
    * What it does:
-   * Registers `EAiTargetType` enum type-info and installs process-exit
-   * cleanup.
+   * Registers `EAiTargetType` enum type-info.
    */
-  int register_EAiTargetTypeTypeInfo();
+  void register_EAiTargetTypeTypeInfo();
 
   static_assert(sizeof(EAiTargetTypeTypeInfo) == 0x78, "EAiTargetTypeTypeInfo size must be 0x78");
 } // namespace moho

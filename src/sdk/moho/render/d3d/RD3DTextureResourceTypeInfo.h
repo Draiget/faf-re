@@ -58,19 +58,9 @@ namespace moho
    * Address: 0x00BC41F0 (FUN_00BC41F0, register_RD3DTextureResourceTypeInfo)
    *
    * What it does:
-   * Constructs the process-global `RD3DTextureResourceTypeInfo` slot and
-   * registers process-exit teardown for that slot.
+   * Constructs the process-global `RD3DTextureResourceTypeInfo` object.
    */
   void register_RD3DTextureResourceTypeInfo();
-
-  /**
-   * Address: 0x00BEF2B0 (FUN_00BEF2B0, cleanup_RD3DTextureResourceTypeInfo)
-   *
-   * What it does:
-   * Destroys the process-global `RD3DTextureResourceTypeInfo` slot when
-   * startup registration constructed it.
-   */
-  void cleanup_RD3DTextureResourceTypeInfo();
 
   static_assert(sizeof(RD3DTextureResourceTypeInfo) == 0x64, "RD3DTextureResourceTypeInfo size must be 0x64");
 } // namespace moho
