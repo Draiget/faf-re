@@ -96,6 +96,7 @@ namespace
 
 /**
  * Address: 0x00626BA0 (FUN_00626BA0, gpg::RVectorType_SPickUpInfo::GetName)
+ * Address: 0x00BFA670 (FUN_00BFA670, atexit destructor of GetName's cached name)
  *
  * What it does:
  * Builds and caches lexical reflection name `vector<element>` for
@@ -103,13 +104,8 @@ namespace
  */
 const char* gpg::RVectorType_SPickUpInfo::GetName() const
 {
-  static msvc8::string sName{};
-  if (sName.empty()) {
-    const gpg::RType* const elementType = CachedSPickUpInfoType();
-    const char* const elementName = elementType ? elementType->GetName() : "SPickUpInfo";
-    sName = gpg::STR_Printf("vector<%s>", elementName);
-  }
-  return sName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedSPickUpInfoType()->GetName());
+    return sName.c_str();
 }
 
 /**

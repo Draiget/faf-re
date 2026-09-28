@@ -194,15 +194,12 @@ gpg::RVectorType_SSavedGameArmyInfo::~RVectorType_SSavedGameArmyInfo() = default
 
 /**
  * Address: 0x00882100 (FUN_00882100)
+ * Address: 0x00C07D80 (FUN_00C07D80, atexit destructor of GetName's cached name)
  */
 const char* gpg::RVectorType_SSavedGameArmyInfo::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const char* const elementName = moho::SSavedGameArmyInfo::StaticGetClass()->GetName();
-    sName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SSavedGameArmyInfo");
-  }
-  return sName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", moho::SSavedGameArmyInfo::StaticGetClass()->GetName());
+    return sName.c_str();
 }
 
 /**

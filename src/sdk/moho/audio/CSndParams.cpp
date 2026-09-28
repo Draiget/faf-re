@@ -1211,29 +1211,21 @@ namespace moho
   namespace
   {
     /**
+     * Address: 0x004E5CB0 (FUN_004E5CB0)
      * Address: 0x00BF1110 (FUN_00BF1110, atexit destructor of the RPointerType<CSndParams> object)
      *
-     * Static `RPointerType<CSndParams>` descriptor that the binary exposes as
-     * `Moho::CSndParams::PointerType`. Default static-init runs the
-     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane. In the binary this object is a function-local
-     * static of `GetPointerType`, built by 0x004E5CB0 (the specialization's
-     * constructor, which also preregisters it); that constructor is not yet
-     * modelled on `gpg::RPointerType<moho::CSndParams>`.
-     */
-    gpg::RPointerType<moho::CSndParams> sCSndParamsPointerTypeStorage{};
-
-    /**
-     * Address: 0x004E5CB0 (FUN_004E5CB0)
-     *
      * What it does:
-     * Pre-registers the static `RPointerType<CSndParams>` descriptor under the
-     * `CSndParams*` type-info key so subsequent `LookupRType` queries from the
-     * lazy `GetPointerType` lane resolve to this descriptor.
+     * Constructs the `RPointerType<CSndParams>` descriptor (the binary's
+     * `Moho::CSndParams::PointerType`) once and preregisters it under the `CSndParams*`
+     * type-info key. The binary holds the descriptor as a function-local static
+     * of `GetPointerType`; it lives here because the preregister phase has to
+     * construct it before any consumer looks up `CSndParams*`.
      */
-    void PreregisterCSndParamsPointerType()
+    gpg::RType* PreregisterCSndParamsPointerType()
     {
-      gpg::PreRegisterRType(typeid(moho::CSndParams*), &sCSndParamsPointerTypeStorage);
+      static gpg::RPointerType<moho::CSndParams> sDescriptor;
+      gpg::PreRegisterRType(typeid(moho::CSndParams*), &sDescriptor);
+      return &sDescriptor;
     }
   } // namespace
 
@@ -1247,10 +1239,7 @@ namespace moho
    */
   gpg::RType* CSndParams::GetPointerType()
   {
-    static const bool sOnceInit = []() {
-      PreregisterCSndParamsPointerType();
-      return true;
-    }();
+    static const bool sOnceInit = (PreregisterCSndParamsPointerType(), true);
     (void)sOnceInit;
 
     gpg::RType* cached = sPointerType;

@@ -254,29 +254,21 @@ namespace moho
   namespace
   {
     /**
+     * Address: 0x00556FF0 (FUN_00556FF0)
      * Address: 0x00BF4CA0 (FUN_00BF4CA0, atexit destructor of the RPointerType<RBlueprint> object)
      *
-     * Static `RPointerType<RBlueprint>` descriptor that the binary exposes as
-     * `Moho::RBlueprint::PointerType`. Default static-init runs the
-     * RPointerTypeBase → RType → RObject ctor chain and installs the most-
-     * derived vftable lane. In the binary this object is a function-local
-     * static of `GetPointerType`, built by 0x00556FF0 (the specialization's
-     * constructor, which also preregisters it); that constructor is not yet
-     * modelled on `gpg::RPointerType<moho::RBlueprint>`.
-     */
-    gpg::RPointerType<moho::RBlueprint> sRBlueprintPointerTypeStorage{};
-
-    /**
-     * Address: 0x00556FF0 (FUN_00556FF0)
-     *
      * What it does:
-     * Pre-registers the static `RPointerType<RBlueprint>` descriptor under the
-     * `RBlueprint*` type-info key so subsequent `LookupRType` queries from the
-     * lazy `GetPointerType` lane resolve to this descriptor.
+     * Constructs the `RPointerType<RBlueprint>` descriptor (the binary's
+     * `Moho::RBlueprint::PointerType`) once and preregisters it under the `RBlueprint*`
+     * type-info key. The binary holds the descriptor as a function-local static
+     * of `GetPointerType`; it lives here because the preregister phase has to
+     * construct it before any consumer looks up `RBlueprint*`.
      */
-    void PreregisterRBlueprintPointerType()
+    gpg::RType* PreregisterRBlueprintPointerType()
     {
-      gpg::PreRegisterRType(typeid(moho::RBlueprint*), &sRBlueprintPointerTypeStorage);
+      static gpg::RPointerType<moho::RBlueprint> sDescriptor;
+      gpg::PreRegisterRType(typeid(moho::RBlueprint*), &sDescriptor);
+      return &sDescriptor;
     }
   } // namespace
 
@@ -290,10 +282,7 @@ namespace moho
    */
   gpg::RType* RBlueprint::GetPointerType()
   {
-    static const bool sOnceInit = []() {
-      PreregisterRBlueprintPointerType();
-      return true;
-    }();
+    static const bool sOnceInit = (PreregisterRBlueprintPointerType(), true);
     (void)sOnceInit;
 
     gpg::RType* cached = sPointerType;

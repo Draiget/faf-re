@@ -129,15 +129,12 @@ moho::RWeakPtrType<moho::CTaskThread>::~RWeakPtrType() = default;
 
 /**
  * Address: 0x0040A300 (FUN_0040A300, Moho::RWeakPtrType_CTaskThread::GetName)
+ * Address: 0x00BEE490 (FUN_00BEE490, atexit destructor of GetName's cached name)
  */
 const char* moho::RWeakPtrType<moho::CTaskThread>::GetName() const
 {
-  static msvc8::string cachedName;
-  if (cachedName.empty()) {
-    const char* const taskThreadTypeName = CachedCTaskThreadType()->GetName();
-    cachedName = gpg::STR_Printf("WeakPtr<%s>", taskThreadTypeName ? taskThreadTypeName : "CTaskThread");
-  }
-  return cachedName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedCTaskThreadType()->GetName());
+    return sName.c_str();
 }
 
 /**

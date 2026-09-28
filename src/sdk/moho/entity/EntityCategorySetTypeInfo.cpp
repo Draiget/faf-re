@@ -29,9 +29,6 @@ namespace
 
 namespace moho
 {
-  msvc8::string BVSetRType<const RBlueprint*, EntityCategoryHelper>::sName{};
-  std::uint32_t BVSetRType<const RBlueprint*, EntityCategoryHelper>::sNameInitGuard = 0u;
-
   /**
    * Address: 0x00556510 (FUN_00556510, deleting dtor thunk)
    */
@@ -39,23 +36,13 @@ namespace moho
 
   /**
    * Address: 0x005563A0 (FUN_005563A0, Moho::BVSetRType_RBlueprintP_EntityCategoryHelper::GetName)
+   * Address: 0x00BF4C70 (FUN_00BF4C70, atexit destructor of GetName's cached name)
    */
   const char* BVSetRType<const RBlueprint*, EntityCategoryHelper>::GetName() const
   {
-    if ((sNameInitGuard & 1u) == 0u) {
-      sNameInitGuard |= 1u;
-
-      const char* const helperTypeName = EntityCategoryHelper::StaticGetClass()->GetName();
-      gpg::RType* const pointerType = CachedRBlueprintPointerType();
-      const char* const pointerTypeName = pointerType ? pointerType->GetName() : "RBlueprint *";
-
-      sName = gpg::STR_Printf(
-        "BVSet<%s,%s>",
-        pointerTypeName ? pointerTypeName : "RBlueprint*",
-        helperTypeName ? helperTypeName : "EntityCategoryHelper"
-      );
-    }
-
+    static const msvc8::string sName = gpg::STR_Printf(
+      "BVSet<%s,%s>", CachedRBlueprintPointerType()->GetName(), EntityCategoryHelper::StaticGetClass()->GetName()
+    );
     return sName.c_str();
   }
 

@@ -440,15 +440,12 @@ RWeakPtrType<STaskEventLinkage>::~RWeakPtrType() = default;
 
 /**
  * Address: 0x004072B0 (FUN_004072B0, Moho::RWeakPtrType_STaskEventLinkage::GetName)
+ * Address: 0x00BEE200 (FUN_00BEE200, atexit destructor of GetName's cached name)
  */
 const char* RWeakPtrType<STaskEventLinkage>::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const char* const linkageTypeName = CachedSTaskEventLinkageType()->GetName();
-    sName = gpg::STR_Printf("WeakPtr<%s>", linkageTypeName ? linkageTypeName : "STaskEventLinkage");
-  }
-  return sName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedSTaskEventLinkageType()->GetName());
+    return sName.c_str();
 }
 
 /**

@@ -105,6 +105,7 @@ gpg::RVectorType_ResourceDeposit::~RVectorType_ResourceDeposit() = default;
 
 /**
  * Address: 0x005474C0 (FUN_005474C0, gpg::RVectorType_ResourceDeposit::GetName)
+ * Address: 0x00BF43D0 (FUN_00BF43D0, atexit destructor of GetName's cached name)
  *
  * What it does:
  * Builds and caches lexical reflection name `vector<element>` for
@@ -112,13 +113,8 @@ gpg::RVectorType_ResourceDeposit::~RVectorType_ResourceDeposit() = default;
  */
 const char* gpg::RVectorType_ResourceDeposit::GetName() const
 {
-  static msvc8::string sName{};
-  if (sName.empty()) {
-    const gpg::RType* const elementType = CachedResourceDepositType();
-    const char* const elementName = elementType ? elementType->GetName() : "ResourceDeposit";
-    sName = gpg::STR_Printf("vector<%s>", elementName);
-  }
-  return sName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedResourceDepositType()->GetName());
+    return sName.c_str();
 }
 
 /**

@@ -117,15 +117,12 @@ gpg::RVectorType<moho::PrefetchHandleBase>::~RVectorType() = default;
 
 /**
  * Address: 0x004A5D10 (FUN_004A5D10, gpg::RVectorType_PrefetchHandleBase::GetName)
+ * Address: 0x00BF03D0 (FUN_00BF03D0, atexit destructor of GetName's cached name)
  */
 const char* gpg::RVectorType<moho::PrefetchHandleBase>::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const char* const elementName = moho::PrefetchHandleBase::StaticGetClass()->GetName();
-    sName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "PrefetchHandleBase");
-  }
-  return sName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", moho::PrefetchHandleBase::StaticGetClass()->GetName());
+    return sName.c_str();
 }
 
 /**

@@ -268,6 +268,7 @@ gpg::RVectorType_RUnitBlueprintWeapon::~RVectorType_RUnitBlueprintWeapon() = def
 
 /**
  * Address: 0x00523490 (FUN_00523490, gpg::RVectorType_RUnitBlueprintWeapon::GetName)
+ * Address: 0x00BF3810 (FUN_00BF3810, atexit destructor of GetName's cached name)
  *
  * What it does:
  * Builds and caches lexical reflection name `vector<element>` for
@@ -275,13 +276,8 @@ gpg::RVectorType_RUnitBlueprintWeapon::~RVectorType_RUnitBlueprintWeapon() = def
  */
 const char* gpg::RVectorType_RUnitBlueprintWeapon::GetName() const
 {
-  static msvc8::string sName{};
-  if (sName.empty()) {
-    const gpg::RType* const elementType = CachedRUnitBlueprintWeaponType();
-    const char* const elementName = elementType ? elementType->GetName() : "RUnitBlueprintWeapon";
-    sName = gpg::STR_Printf("vector<%s>", elementName);
-  }
-  return sName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedRUnitBlueprintWeaponType()->GetName());
+    return sName.c_str();
 }
 
 /**

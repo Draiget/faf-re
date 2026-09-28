@@ -2457,14 +2457,12 @@ namespace moho
 
   /**
    * Address: 0x00419550 (FUN_00419550, Moho::StatsRType_StatItem::GetName)
+   * Address: 0x00BEEA00 (FUN_00BEEA00, atexit destructor of GetName's cached name)
    */
   const char* StatsRType<StatItem>::GetName() const
   {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-      cachedName = gpg::STR_Printf("Stats<%s>", CachedStatItemType()->GetName());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("Stats<%s>", CachedStatItemType()->GetName());
+    return sName.c_str();
   }
 
   /**

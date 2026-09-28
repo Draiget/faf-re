@@ -6059,10 +6059,6 @@ namespace gpg
   protected:
     [[nodiscard]]
     RType* GetPointeeType() const override;
-
-  private:
-    static msvc8::string sName;
-    static std::uint32_t sNameInitGuard;
   };
   static_assert(sizeof(RPointerType<moho::CUnitCommand>) == 0x68, "RPointerType<CUnitCommand> size must be 0x68");
 
@@ -6698,10 +6694,6 @@ namespace gpg
   protected:
     [[nodiscard]]
     RType* GetPointeeType() const override;
-
-  private:
-    static msvc8::string sName;
-    static std::uint32_t sNameInitGuard;
   };
   static_assert(
     sizeof(RPointerType<moho::CArmyStatItem>) == 0x68, "RPointerType<CArmyStatItem> size must be 0x68"

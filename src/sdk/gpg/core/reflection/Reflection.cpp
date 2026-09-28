@@ -3417,13 +3417,6 @@ RRef MoveUnitWeaponPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RPointerType<moho::SimArmy> gSimArmyPointerType;
   gpg::RPointerType<moho::Shield> gShieldPointerType;
   gpg::RPointerType<moho::CDecalHandle> gCDecalHandlePointerType;
-  gpg::RPointerType<moho::RBlueprint> gRBlueprintPointerType;
-  gpg::RPointerType<moho::UnitWeapon> gUnitWeaponPointerType;
-  gpg::RPointerType<moho::IAniManipulator> gIAniManipulatorPointerType;
-  gpg::RPointerType<moho::IEffect> gIEffectPointerType;
-  gpg::RPointerType<moho::CUnitCommand> gCUnitCommandPointerType;
-  gpg::RPointerType<moho::Entity> gEntityPointerType;
-  gpg::RPointerType<moho::CEconomyEvent> gCEconomyEventPointerType;
   gpg::RPointerType<moho::CLuaConOutputHandler> gCLuaConOutputHandlerPointerType;
   /**
    * Address: 0x004C86E0 (FUN_004C86E0, ??0?$RPointerType@VCScriptObject@moho@@@gpg@@QAE@XZ)
@@ -3440,11 +3433,6 @@ RRef MoveUnitWeaponPointerSlotRef(void* const slotObject, RRef* const sourceRef)
    * side effect (registration is live before first reflection query).
    */
   gpg::RPointerType<moho::CScriptObject> gCScriptObjectPointerType;
-  gpg::RPointerType<moho::CSndParams> gCSndParamsPointerType;
-  gpg::RPointerType<moho::IFormationInstance> gIFormationInstancePointerType;
-  gpg::RPointerType<moho::RUnitBlueprint> gRUnitBlueprintPointerType;
-  gpg::RPointerType<moho::ReconBlip> gReconBlipPointerType;
-  gpg::RPointerType<moho::CArmyStatItem> gCArmyStatItemPointerType;
 
   /**
    * Address: 0x01106AD8 (global storage for gpg::RVectorType<moho::SimArmy*>)
@@ -3525,16 +3513,8 @@ struct PointerTypeRegistration
         (void)gpg::preregister_ShieldPointerTypeStartup();
         (void)gpg::preregister_CDecalHandlePointerTypeStartup();
         (void)gpg::preregister_SimArmyVectorTypeStartup();
-        gpg::PreRegisterRType(typeid(moho::RBlueprint*), &gRBlueprintPointerType);
-        gpg::PreRegisterRType(typeid(moho::UnitWeapon*), &gUnitWeaponPointerType);
-        gpg::PreRegisterRType(typeid(moho::IAniManipulator*), &gIAniManipulatorPointerType);
-        gpg::PreRegisterRType(typeid(moho::IEffect*), &gIEffectPointerType);
-        gpg::PreRegisterRType(typeid(moho::CUnitCommand*), &gCUnitCommandPointerType);
-        gpg::PreRegisterRType(typeid(moho::Entity*), &gEntityPointerType);
-        gpg::PreRegisterRType(typeid(moho::CEconomyEvent*), &gCEconomyEventPointerType);
         gpg::PreRegisterRType(typeid(moho::CLuaConOutputHandler*), &gCLuaConOutputHandlerPointerType);
         gpg::PreRegisterRType(typeid(moho::CScriptObject*), &gCScriptObjectPointerType);
-        gpg::PreRegisterRType(typeid(moho::CSndParams*), &gCSndParamsPointerType);
     }
 };
 
@@ -11379,15 +11359,13 @@ gpg::RPointerType<moho::CTaskThread>::~RPointerType() = default;
 
 /**
  * Address: 0x0040C7C0 (FUN_0040C7C0)
+ * Address: 0x00BEE580 (FUN_00BEE580, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_CTaskThread::GetName
  */
 const char* gpg::RPointerType<moho::CTaskThread>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -11443,15 +11421,13 @@ gpg::RPointerType<moho::CAcquireTargetTask>::~RPointerType() = default;
 
 /**
  * Address: 0x005DDF20 (FUN_005DDF20)
+ * Address: 0x00BF8670 (FUN_00BF8670, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_CAcquireTargetTask::GetName
  */
 const char* gpg::RPointerType<moho::CAcquireTargetTask>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -11522,6 +11498,7 @@ gpg::RPointerType<moho::SimArmy>::~RPointerType() = default;
 
 /**
  * Address: 0x0074FD80 (FUN_0074FD80)
+ * Address: 0x00C01100 (FUN_00C01100, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_SimArmy::GetName
  *
  * What it does:
@@ -11530,11 +11507,8 @@ gpg::RPointerType<moho::SimArmy>::~RPointerType() = default;
  */
 const char* gpg::RPointerType<moho::SimArmy>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -11655,6 +11629,7 @@ gpg::RVectorType<moho::SimArmy*>::~RVectorType() = default;
 
 /**
  * Address: 0x0074CB70 (FUN_0074CB70, gpg::RVectorType_SimArmy_P::GetName)
+ * Address: 0x00C00FE0 (FUN_00C00FE0, atexit destructor of GetName's cached name)
  *
  * What it does:
  * Builds and caches `"vector<SimArmy*>"` from the element pointer-type name
@@ -11662,13 +11637,8 @@ gpg::RVectorType<moho::SimArmy*>::~RVectorType() = default;
  */
 const char* gpg::RVectorType<moho::SimArmy*>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        RType* const elementType = GetPointeeType();
-        const char* const elementName = elementType ? elementType->GetName() : "null";
-        cachedName = STR_Printf("vector<%s>", elementName ? elementName : "null");
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = STR_Printf("vector<%s>", GetPointeeType()->GetName());
+    return sName.c_str();
 }
 
 /**
@@ -11821,6 +11791,7 @@ gpg::RPointerType<moho::Shield>::~RPointerType() = default;
 
 /**
  * Address: 0x00750190 (FUN_00750190)
+ * Address: 0x00C010D0 (FUN_00C010D0, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_Shield::GetName
  *
  * What it does:
@@ -11829,11 +11800,8 @@ gpg::RPointerType<moho::Shield>::~RPointerType() = default;
  */
 const char* gpg::RPointerType<moho::Shield>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -11945,6 +11913,7 @@ gpg::RPointerType<moho::CDecalHandle>::~RPointerType() = default;
 
 /**
  * Address: 0x0077EAB0 (FUN_0077EAB0)
+ * Address: 0x00C02A60 (FUN_00C02A60, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_CDecalHandle::GetName
  *
  * What it does:
@@ -11953,11 +11922,8 @@ gpg::RPointerType<moho::CDecalHandle>::~RPointerType() = default;
  */
 const char* gpg::RPointerType<moho::CDecalHandle>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -12070,15 +12036,13 @@ gpg::RPointerType<moho::RBlueprint>::~RPointerType() = default;
 
 /**
  * Address: 0x00556F00 (FUN_00556F00)
+ * Address: 0x00BF4D00 (FUN_00BF4D00, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_RBlueprint::GetName
  */
 const char* gpg::RPointerType<moho::RBlueprint>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -12180,15 +12144,13 @@ gpg::RPointerType<moho::UnitWeapon>::~RPointerType() = default;
 
 /**
  * Address: 0x005DDB10 (FUN_005DDB10)
+ * Address: 0x00BF86A0 (FUN_00BF86A0, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_UnitWeapon::GetName
  */
 const char* gpg::RPointerType<moho::UnitWeapon>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -12289,15 +12251,13 @@ gpg::RPointerType<moho::IAniManipulator>::~RPointerType() = default;
 
 /**
  * Address: 0x0063DB40 (FUN_0063DB40)
+ * Address: 0x00BFAF40 (FUN_00BFAF40, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_IAniManipulator::GetName
  */
 const char* gpg::RPointerType<moho::IAniManipulator>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -12368,15 +12328,13 @@ gpg::RPointerType<moho::IEffect>::~RPointerType() = default;
 
 /**
  * Address: 0x0066CA40 (FUN_0066CA40)
+ * Address: 0x00BFC150 (FUN_00BFC150, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_IEffect::GetName
  */
 const char* gpg::RPointerType<moho::IEffect>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -12439,8 +12397,6 @@ RType* gpg::RPointerType<moho::IEffect>::GetPointeeType() const
     return CachedIEffectType();
 }
 
-msvc8::string gpg::RPointerType<moho::CUnitCommand>::sName{};
-std::uint32_t gpg::RPointerType<moho::CUnitCommand>::sNameInitGuard = 0u;
 
 /**
  * Address: 0x006E3670 (FUN_006E3670, RPointerType_CUnitCommand non-deleting cleanup body)
@@ -12467,23 +12423,12 @@ gpg::RPointerType<moho::CUnitCommand>::~RPointerType() = default;
 
 /**
  * Address: 0x006E36B0 (FUN_006E36B0)
+ * Address: 0x00BFEA90 (FUN_00BFEA90, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_CUnitCommand::GetName
  */
 const char* gpg::RPointerType<moho::CUnitCommand>::GetName() const
 {
-    if ((sNameInitGuard & 1u) == 0u) {
-        sNameInitGuard |= 1u;
-
-        RType* pointeeType = moho::CUnitCommand::sType;
-        if (!pointeeType) {
-            pointeeType = gpg::LookupRType(typeid(moho::CUnitCommand));
-            moho::CUnitCommand::sType = pointeeType;
-        }
-
-        const char* pointeeName = pointeeType ? pointeeType->GetName() : nullptr;
-        sName = msvc8::string((pointeeName != nullptr) ? pointeeName : "");
-        sName += "*";
-    }
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -12556,15 +12501,13 @@ gpg::RPointerType<moho::Entity>::~RPointerType() = default;
 
 /**
  * Address: 0x0067E320 (FUN_0067E320)
+ * Address: 0x00BFC960 (FUN_00BFC960, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_Entity::GetName
  */
 const char* gpg::RPointerType<moho::Entity>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -12636,15 +12579,13 @@ gpg::RPointerType<moho::CEconomyEvent>::~RPointerType() = default;
 
 /**
  * Address: 0x006B2510 (FUN_006B2510)
+ * Address: 0x00BFDD00 (FUN_00BFDD00, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_CEconomyEvent::GetName
  */
 const char* gpg::RPointerType<moho::CEconomyEvent>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -12725,15 +12666,13 @@ gpg::RPointerType<moho::CLuaConOutputHandler>::~RPointerType() = default;
 
 /**
  * Address: 0x004211B0 (FUN_004211B0)
+ * Address: 0x00BEEE20 (FUN_00BEEE20, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_CLuaConOutputHandler::GetName
  */
 const char* gpg::RPointerType<moho::CLuaConOutputHandler>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -12788,15 +12727,13 @@ gpg::RPointerType<moho::CScriptObject>::~RPointerType() = default;
 
 /**
  * Address: 0x004C85F0 (FUN_004C85F0)
+ * Address: 0x00BF0A10 (FUN_00BF0A10, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_CScriptObject::GetName
  */
 const char* gpg::RPointerType<moho::CScriptObject>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -12881,15 +12818,13 @@ gpg::RPointerType<moho::CSndParams>::~RPointerType() = default;
 
 /**
  * Address: 0x004E5BC0 (FUN_004E5BC0)
+ * Address: 0x00BF1170 (FUN_00BF1170, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_CSndParams::GetName
  */
 const char* gpg::RPointerType<moho::CSndParams>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -12994,15 +12929,13 @@ gpg::RPointerType<moho::IFormationInstance>::~RPointerType() = default;
 
 /**
  * Address: 0x0059D4C0 (FUN_0059D4C0)
+ * Address: 0x00BF6950 (FUN_00BF6950, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_IFormationInstance::GetName
  */
 const char* gpg::RPointerType<moho::IFormationInstance>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -13073,15 +13006,13 @@ gpg::RPointerType<moho::RUnitBlueprint>::~RPointerType() = default;
 
 /**
  * Address: 0x005A14F0 (FUN_005A14F0)
+ * Address: 0x00BF6BB0 (FUN_00BF6BB0, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_RUnitBlueprint::GetName
  */
 const char* gpg::RPointerType<moho::RUnitBlueprint>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -13211,15 +13142,13 @@ gpg::RPointerType<moho::ReconBlip>::~RPointerType() = default;
 
 /**
  * Address: 0x005C8080 (FUN_005C8080)
+ * Address: 0x00BF7C30 (FUN_00BF7C30, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_ReconBlip::GetName
  */
 const char* gpg::RPointerType<moho::ReconBlip>::GetName() const
 {
-    static msvc8::string cachedName;
-    if (cachedName.empty()) {
-        cachedName = BuildPointerName(GetPointeeType());
-    }
-    return cachedName.c_str();
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    return sName.c_str();
 }
 
 /**
@@ -13282,8 +13211,6 @@ RType* gpg::RPointerType<moho::ReconBlip>::GetPointeeType() const
     return CachedReconBlipType();
 }
 
-msvc8::string gpg::RPointerType<moho::CArmyStatItem>::sName{};
-std::uint32_t gpg::RPointerType<moho::CArmyStatItem>::sNameInitGuard = 0u;
 
 /**
  * Address: 0x00711A30 (FUN_00711A30)
@@ -13293,23 +13220,12 @@ gpg::RPointerType<moho::CArmyStatItem>::~RPointerType() = default;
 
 /**
  * Address: 0x007115D0 (FUN_007115D0)
+ * Address: 0x00BFFA00 (FUN_00BFFA00, atexit destructor of GetName's cached name)
  * Demangled: gpg::RPointerType_CArmyStatItem::GetName
  */
 const char* gpg::RPointerType<moho::CArmyStatItem>::GetName() const
 {
-    if ((sNameInitGuard & 1u) == 0u) {
-        sNameInitGuard |= 1u;
-
-        RType* pointeeType = moho::CArmyStatItem::sType;
-        if (!pointeeType) {
-            pointeeType = gpg::LookupRType(typeid(moho::CArmyStatItem));
-            moho::CArmyStatItem::sType = pointeeType;
-        }
-
-        const char* pointeeName = pointeeType ? pointeeType->GetName() : nullptr;
-        sName = msvc8::string((pointeeName != nullptr) ? pointeeName : "");
-        sName += "*";
-    }
+    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 

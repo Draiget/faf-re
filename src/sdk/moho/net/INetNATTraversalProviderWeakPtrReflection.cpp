@@ -199,15 +199,12 @@ gpg::RWeakPointerType<moho::INetNATTraversalProvider>::~RWeakPointerType() = def
 
 /**
  * Address: 0x00481A00 (FUN_00481A00, gpg::RWeakPointerType_INetNATTraversalProvider::GetName)
+ * Address: 0x00BEFA60 (FUN_00BEFA60, atexit destructor of GetName's cached name)
  */
 const char* gpg::RWeakPointerType<moho::INetNATTraversalProvider>::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const char* const providerTypeName = CachedProviderType()->GetName();
-    sName = gpg::STR_Printf("boost::weak_ptr<%s>", providerTypeName ? providerTypeName : "INetNATTraversalProvider");
-  }
-  return sName.c_str();
+    static const msvc8::string sName = gpg::STR_Printf("boost::weak_ptr<%s>", CachedProviderType()->GetName());
+    return sName.c_str();
 }
 
 /**

@@ -44,10 +44,6 @@ namespace moho
      * Slot: 9
      */
     void Init() override;
-
-  private:
-    static msvc8::string sName;
-    static std::uint32_t sNameInitGuard;
   };
 
   static_assert(
