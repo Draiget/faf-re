@@ -115,11 +115,6 @@ namespace moho
     ~ResourceManager();
 
     /**
-     * Address: 0x00461DC0 (FUN_00461DC0, ?OnEvent@CDiskWatchListener@Moho@@EAEXABUSDiskWatchEvent@2@@Z)
-     */
-    void OnEvent(const SDiskWatchEvent& event) override;
-
-    /**
      * Address: 0x004A9B90 (FUN_004A9B90)
      *
      * What it does:

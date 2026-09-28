@@ -16,6 +16,7 @@ namespace moho
   enum ECommandEvent : int;
   enum EFormationdStatus : std::int32_t;
   enum EUnitCommandQueueStatus : int;
+  struct SDiskWatchEvent;
   struct SNavPath;
 
   class Broadcaster : public TDatList<Broadcaster, void>
@@ -139,6 +140,18 @@ namespace moho
      * the concrete listener dispatch resolves to CAiPathNavigator::OnEvent.
      */
     void BroadcastEvent(const SNavPath& event);
+
+    /**
+     * Address: 0x004637D0 (FUN_004637D0,
+     * `Broadcaster<SDiskWatchEvent const&>::BroadcastEvent` -- unnamed in the
+     * lost database; the same body as the overloads above, called with
+     * `esi = &watch->mListeners` from `CDiskDirWatch::Update` (0x0046264B))
+     *
+     * What it does:
+     * Delivers one disk-watch event to every `CDiskWatchListener` on the
+     * watch. The definition lives in CDiskWatch.cpp.
+     */
+    void BroadcastEvent(const SDiskWatchEvent& event);
   };
 
   static_assert(offsetof(Broadcaster, mPrev) == 0x00, "Broadcaster::mPrev offset must be 0x00");

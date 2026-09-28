@@ -2804,14 +2804,6 @@ void DestroyResourceManagerRuntimeAdapter(moho::ResourceManager* const manager) 
 }
 
 /**
-  * Alias of FUN_00461DC0 (non-canonical helper lane).
- */
-void moho::ResourceManager::OnEvent(const SDiskWatchEvent& event)
-{
-  CDiskWatchListener::OnEvent(event);
-}
-
-/**
  * Address: 0x004A9B90 (FUN_004A9B90)
  *
  * What it does:

@@ -8,7 +8,7 @@
 #include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/containers/TDatList.h"
+#include "moho/misc/Listener.h"
 
 namespace moho
 {
@@ -86,8 +86,18 @@ namespace moho
    */
   bool FILE_Wild(gpg::StrArg path, gpg::StrArg pattern, bool caseSensitive = false, char pathSeparator = '\\');
 
-  class CDiskWatchListener
+  /**
+   * VFTABLE: 0x00E03474
+   *
+   * RTTI: `Listener<SDiskWatchEvent const&>` is a private base (attr 0x4d),
+   * which is also why `OnEvent` below mangles as private (`EAE`). Its node at
+   * +0x04 is what `CDiskWatch::mListeners` rings; its own vtable (0x00E03484,
+   * one pure slot) is what `~CDiskWatchListener` restores before unlinking.
+   */
+  class CDiskWatchListener : private Listener<const SDiskWatchEvent&>
   {
+    friend class CDiskWatch;
+
   public:
     /**
      * Address: 0x00461B10 (FUN_00461B10, ??0CDiskWatchListener@Moho@@QAE@VStrArg@gpg@@@Z)
@@ -114,10 +124,16 @@ namespace moho
      */
     ~CDiskWatchListener();
 
+  private:
     /**
      * Address: 0x00461DC0 (FUN_00461DC0, ?OnEvent@CDiskWatchListener@Moho@@EAEXABUSDiskWatchEvent@2@@Z)
+     *
+     * What it does:
+     * `Listener` slot 0: filters one broadcast event and queues or handles it.
      */
-    virtual void OnEvent(const SDiskWatchEvent& event);
+    void OnEvent(const SDiskWatchEvent& event) override;
+
+  public:
 
     /**
      * Address: 0x00461D00 (FUN_00461D00, ?FilterEvent@CDiskWatchListener@Moho@@UAE_NABUSDiskWatchEvent@2@@Z)
@@ -142,7 +158,6 @@ namespace moho
     void CopyAndClearPendingChanges(msvc8::vector<SDiskWatchEvent>& outEvents);
 
   public:
-    TDatListItem<CDiskWatchListener, void> mLink; // +0x04
     CDiskWatch* mWatch;                           // +0x0C
     msvc8::vector<SDiskWatchEvent> mEvents;       // +0x10
     msvc8::vector<msvc8::string> mPatterns;       // +0x20
@@ -235,7 +250,7 @@ namespace moho
     void WatchQuery();
 
   public:
-    TDatListItem<CDiskWatchListener, void> mListeners; // +0x00
+    Broadcaster mListeners;                            // +0x00
     void* mUnknown08;                                  // +0x08
     gpg::core::SharedLock mLock;                       // +0x0C
     std::uint8_t mOpaque10[0x08];                      // +0x10
@@ -286,7 +301,6 @@ namespace moho
   static_assert(offsetof(CDiskDirWatch, mReadBuffer) == 0x34, "CDiskDirWatch::mReadBuffer offset must be 0x34");
   static_assert(offsetof(CDiskDirWatch, mReadOverlapped) == 0x44, "CDiskDirWatch::mReadOverlapped offset must be 0x44");
   static_assert(sizeof(CDiskWatchListener) == 0x30, "CDiskWatchListener size must be 0x30");
-  static_assert(offsetof(CDiskWatchListener, mLink) == 0x04, "CDiskWatchListener::mLink offset must be 0x04");
   static_assert(offsetof(CDiskWatchListener, mWatch) == 0x0C, "CDiskWatchListener::mWatch offset must be 0x0C");
   static_assert(offsetof(CDiskWatchListener, mEvents) == 0x10, "CDiskWatchListener::mEvents offset must be 0x10");
   static_assert(offsetof(CDiskWatchListener, mPatterns) == 0x20, "CDiskWatchListener::mPatterns offset must be 0x20");

@@ -44,8 +44,6 @@ namespace
   constexpr const char* kReadDirectoryChangesFailedWarning = "CDiskWatch::Read() failed: %s";
   constexpr const char* kGetOverlappedResultFailedWarning = "CDiskWatch::Check(): GetOverlappedResult() failed: %s";
 
-  CDiskWatchListener* LinkOwnerFromNode(TDatListItem<CDiskWatchListener, void>* node);
-
   [[nodiscard]]
   [[nodiscard]]
   [[nodiscard]]
@@ -189,47 +187,6 @@ namespace
     return false;
   }
 
-  /**
-   * Address: 0x004637D0 (FUN_004637D0, sub_4637D0)
-   *
-   * IDA signature:
-   * int __usercall sub_4637D0@<eax>(const SDiskWatchEvent* event@<edi>, TDatListItem* listeners@<esi>);
-   *
-   * What it does:
-   * Delivers one watch event to every listener. The whole list is spliced onto
-   * a local head first and each node is relinked into the real list just
-   * before its callback runs, so a listener may unlink itself or register
-   * another during dispatch without the walk losing its place.
-   */
-  void DispatchEventToListeners(CDiskWatch& owner, const SDiskWatchEvent& event)
-  {
-    using ListenerNode = TDatListItem<CDiskWatchListener, void>;
-
-    ListenerNode* const listenersHead = &owner.mListeners;
-    if (listenersHead->mNext == listenersHead) {
-      return;
-    }
-
-    ListenerNode pendingHead{};
-    pendingHead.mPrev = listenersHead->mPrev;
-    pendingHead.mNext = listenersHead->mNext;
-    pendingHead.mPrev->mNext = &pendingHead;
-    pendingHead.mNext->mPrev = &pendingHead;
-
-    listenersHead->mPrev = listenersHead;
-    listenersHead->mNext = listenersHead;
-
-    while (pendingHead.mNext != &pendingHead) {
-      ListenerNode* const node = pendingHead.mNext;
-      node->ListLinkBefore(listenersHead);
-
-      CDiskWatchListener* const listener = LinkOwnerFromNode(node);
-      if (listener != nullptr) {
-        listener->OnEvent(event);
-      }
-    }
-  }
-
   [[nodiscard]]
   bool IsFileStillWriterLocked(const SDiskWatchEvent& event)
   {
@@ -282,12 +239,6 @@ namespace
 
     gDiskWatch = new CDiskWatch();
     std::atexit(&DISK_ResetWatch);
-  }
-
-  CDiskWatchListener* LinkOwnerFromNode(TDatListItem<CDiskWatchListener, void>* const node)
-  {
-    using DiskWatchList = TDatList<CDiskWatchListener, void>;
-    return DiskWatchList::template owner_from_member_node<CDiskWatchListener, &CDiskWatchListener::mLink>(node);
   }
 } // namespace
 
@@ -486,9 +437,7 @@ void CDiskDirWatch::Update()
     if (!IsFileStillWriterLocked(*eventIt)) {
       DISK_InvalidateFileInfoCache(eventIt->mPath.c_str());
 
-      if (mOwner != nullptr) {
-        DispatchEventToListeners(*mOwner, *eventIt);
-      }
+      mOwner->mListeners.BroadcastEvent(*eventIt);
     }
 
     eventIt = mPendingEvents.erase(eventIt);
@@ -501,11 +450,22 @@ bool CDiskDirWatch::HasValidHandle() const
 }
 
 /**
+ * Address: 0x004637D0 (FUN_004637D0, `Broadcaster<SDiskWatchEvent const&>::BroadcastEvent`)
+ *
+ * What it does:
+ * Delivers one watch event to every listener through the shared ring walk,
+ * so a listener may unlink itself or register another during its callback.
+ */
+void Broadcaster::BroadcastEvent(const SDiskWatchEvent& event)
+{
+  DispatchToListeners<Listener<const SDiskWatchEvent&>>(event);
+}
+
+/**
  * Address: 0x00461B10 (FUN_00461B10, ??0CDiskWatchListener@Moho@@QAE@VStrArg@gpg@@@Z)
  */
 CDiskWatchListener::CDiskWatchListener(const gpg::StrArg patterns)
-  : mLink()
-  , mWatch(nullptr)
+  : mWatch(nullptr)
   , mEvents()
   , mPatterns()
 {
@@ -630,12 +590,8 @@ CDiskWatch::~CDiskWatch()
  */
 void CDiskWatch::AddListener(CDiskWatchListener* const listener)
 {
-  if (listener == nullptr) {
-    return;
-  }
-
   gpg::core::func_LockShared(&mLock);
-  listener->mLink.ListLinkBefore(&mListeners);
+  mListeners.push_back(&listener->mListenerLink);
   listener->mWatch = this;
   gpg::core::func_UnlockShared(&mLock);
 }
@@ -645,12 +601,8 @@ void CDiskWatch::AddListener(CDiskWatchListener* const listener)
  */
 void CDiskWatch::RemoveListener(CDiskWatchListener* const listener)
 {
-  if (listener == nullptr) {
-    return;
-  }
-
   gpg::core::func_LockShared(&mLock);
-  listener->mLink.ListUnlink();
+  listener->mListenerLink.ListUnlink();
   listener->mWatch = nullptr;
   gpg::core::func_UnlockShared(&mLock);
 }
