@@ -525,9 +525,6 @@
     <ClCompile Include="moho\sim\SimDebugCommandRegistrations.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\sim\SimFloatInitializers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\sim\SimRecoveryRuntime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2890,9 +2887,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\SimDebugCommandRegistrations.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\sim\SimFloatInitializers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\ManipulatorStartupRegistrations.h">

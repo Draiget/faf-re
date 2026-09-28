@@ -371,7 +371,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
     </ClCompile>
-    <ClCompile Include="moho\sim\SimFloatInitializers.cpp" />
     <ClCompile Include="moho\sim\SimRecoveryRuntime.cpp" />
     <ClCompile Include="moho\containers\BVIntSetSerializer.cpp" />
     <ClCompile Include="moho\containers\BVIntSetTypeInfo.cpp" />
@@ -2299,7 +2298,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\CCommandLuaFunctionRegistrations.h" />
     <ClInclude Include="moho\sim\ManipulatorLuaFunctionThunks.h" />
     <ClInclude Include="moho\sim\SimDebugCommandRegistrations.h" />
-    <ClInclude Include="moho\sim\SimFloatInitializers.h" />
     <ClInclude Include="moho\sim\ManipulatorStartupRegistrations.h" />
     <ClInclude Include="moho\sim\SimStartupRegistrations.h" />
     <ClInclude Include="moho\sim\SPhysConstantsTypeInfo.h" />
