@@ -248,12 +248,9 @@ namespace moho
    *
    * What it does:
    * Unlinks the loop ring so no `HSound` is left naming the sentinel this
-   * object is about to take with it. Destroying `mRequests` and the
-   * `ISoundManager` base is the compiler's half of 0x00761520 and says nothing
-   * here -- see the note on the declaration.
+   * object is about to take with it. That unlink is `mActiveLoops`' own
+   * destructor, and destroying `mRequests` and the `ISoundManager` base is the
+   * rest of 0x00761520 -- see the note on the declaration.
    */
-  CSimSoundManager::~CSimSoundManager()
-  {
-    mActiveLoops.ListUnlink();
-  }
+  CSimSoundManager::~CSimSoundManager() = default;
 } // namespace moho

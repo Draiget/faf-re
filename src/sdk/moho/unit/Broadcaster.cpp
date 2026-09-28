@@ -359,26 +359,6 @@ namespace
   }
 
   /**
-   * Address: 0x006E8190 (FUN_006E8190)
-   *
-   * What it does:
-   * Unlinks one broadcaster intrusive-list node and resets it to self-linked
-   * sentinel state.
-   */
-  [[maybe_unused]] moho::Broadcaster* UnlinkBroadcasterNodeAndResetSentinel(moho::Broadcaster* const node) noexcept
-  {
-    if (node == nullptr || node->mPrev == nullptr || node->mNext == nullptr) {
-      return node;
-    }
-
-    node->mNext->mPrev = node->mPrev;
-    node->mPrev->mNext = node->mNext;
-    node->mPrev = node;
-    node->mNext = node;
-    return node;
-  }
-
-  /**
    * Address: 0x005F4567 (FUN_005F4567)
    *
    * What it does:

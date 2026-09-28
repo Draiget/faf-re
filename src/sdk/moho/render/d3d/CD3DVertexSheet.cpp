@@ -105,7 +105,6 @@ namespace moho
 
     mOwnedStreamMask.Reset();
     mStreams = msvc8::vector<CD3DVertexStream*>{};
-    mLink.ListUnlink();
   }
 
   /**

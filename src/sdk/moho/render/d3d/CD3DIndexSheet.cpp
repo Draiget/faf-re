@@ -56,7 +56,6 @@ namespace moho
   CD3DIndexSheet::~CD3DIndexSheet()
   {
     mBuffer.reset();
-    mLink.ListUnlink();
   }
 
   /**

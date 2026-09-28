@@ -780,7 +780,6 @@ namespace moho
     if (!mListenerLink.ListIsSingleton()) {
       mListenerLink.ListUnlink();
     }
-    mListenerLink.ListResetLinks();
   }
 
   /**

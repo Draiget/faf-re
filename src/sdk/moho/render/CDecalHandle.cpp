@@ -287,10 +287,7 @@ namespace moho
    * Address: 0x00778B40 (FUN_00778B40, Moho::CDecalHandle::dtr)
    * Address: 0x00778C10 (FUN_00778C10, Moho::CDecalHandle::~CDecalHandle body)
    */
-  CDecalHandle::~CDecalHandle()
-  {
-    mListNode.ListUnlink();
-  }
+  CDecalHandle::~CDecalHandle() = default;
 
   CDecalHandle* CDecalHandle::FromListNode(CDecalHandleListNode* const node) noexcept
   {

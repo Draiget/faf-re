@@ -48,7 +48,6 @@ namespace moho
   CD3DRenderTarget::~CD3DRenderTarget()
   {
     ReleaseSurfaceHandle();
-    mLink.ListUnlink();
   }
 
   /**

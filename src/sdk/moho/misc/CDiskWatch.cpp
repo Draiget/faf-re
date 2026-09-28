@@ -525,7 +525,6 @@ CDiskWatchListener::~CDiskWatchListener()
   }
   mPatterns.clear();
   mEvents.clear();
-  mLink.ListUnlink();
 }
 
 /**

@@ -268,7 +268,6 @@ namespace moho
 
     // Final explicit Listener sub-object detach (trivially-destructible in our
     // model, so the compiler does not emit it): unlink and reset to singleton.
-    mListenerLink.ListUnlinkSelf();
   }
 
   /**

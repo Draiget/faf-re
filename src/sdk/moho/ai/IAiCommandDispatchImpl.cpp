@@ -876,8 +876,6 @@ IAiCommandDispatchImpl::~IAiCommandDispatchImpl()
   if (taskThread != nullptr) {
     (void)taskThread->Destroy();
   }
-
-  mListenerLink.ListUnlink();
 }
 
 /**

@@ -175,35 +175,6 @@ namespace moho
       effect.SetNParam(0, &stackLane.pos_.x, 3);
       effect.Interpolate();
     }
-
-    /**
-     * Address: 0x0066B430 (FUN_0066B430)
-     *
-     * What it does:
-     * Unlinks one manager-list node from its current intrusive list and resets
-     * that node back to self-linked sentinel form.
-     */
-    IEffect::ManagerListNode* UnlinkManagerListNodeAndSelfReference(
-      IEffect::ManagerListNode* const node
-    ) noexcept
-    {
-      if (node == nullptr) {
-        return nullptr;
-      }
-
-      IEffect::ManagerListNode* const previous = node->mPrev;
-      IEffect::ManagerListNode* const next = node->mNext;
-      if (previous != nullptr) {
-        previous->mNext = next;
-      }
-      if (next != nullptr) {
-        next->mPrev = previous;
-      }
-
-      node->mPrev = node;
-      node->mNext = node;
-      return node;
-    }
   } // namespace
 
   /**
@@ -452,7 +423,6 @@ namespace moho
       return;
     }
 
-    (void)UnlinkManagerListNodeAndSelfReference(&effect->mManagerListNode);
     effect->mManagerListNode.ListLinkBefore(&mDestroyedEffects);
   }
 

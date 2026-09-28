@@ -154,7 +154,6 @@ CUnitCommandQueue::~CUnitCommandQueue()
 {
   ClearCommandQueue();
   ReleaseCommandVectorStorage(mCommandVec);
-  ListUnlink();
 }
 
 /**

@@ -53,7 +53,6 @@ namespace moho
   IdleUnitSelector::~IdleUnitSelector()
   {
     DestroyWeakEntitySet(mIdleSet);
-    mListenerLink.ListUnlink();
   }
 
   /**

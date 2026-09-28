@@ -88,17 +88,10 @@ CNetUDPConnection& CNetUDPConnector::RelinkConnectionToFront(CNetUDPConnection& 
  */
 CNetUDPConnector::~CNetUDPConnector()
 {
-  // Drain packet free-list.
+  // Drain the packet free-list: 0x00489C00 deletes the front packet until the
+  // list is empty, each packet's destructor unlinking it.
   while (mPacketList.mNext != &mPacketList) {
-    if (auto* n = mPacketList.mNext) {
-      // Unlink from intrusive list and free. ListUnlink() (not used here)
-      // returns the OLD mNext -- the node after n, which stays fully linked
-      // into the ring. Deleting that would free a still-linked live node and
-      // leak n itself (orphaned via ListResetLinks(), never freed). The
-      // binary (FUN_00489BC0) frees the captured front node itself;
-      // ListUnlinkSelf() is the variant that returns `this`.
-      delete n->ListUnlinkSelf();
-    }
+    delete static_cast<SNetPacket*>(mPacketList.mNext);
   }
 
 #if defined(_WIN32)
@@ -117,9 +110,8 @@ CNetUDPConnector::~CNetUDPConnector()
   mInboundTraversalPackets.clear();
   mOutboundPackets.clear();
 
-  // Normalize intrusive lists (both to self-sentinel)
-  mPacketList.ListUnlink();
-  mConnections.ListUnlink();
+  // `mPacketList` and `mConnections` unlink in their own destructors
+  // (0x00489C71, 0x00489C89).
 
   // Release weak_ptr to NAT traversal provider
   mNatTraversalProvider.reset();

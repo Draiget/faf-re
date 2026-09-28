@@ -785,7 +785,6 @@ namespace moho
     // Embedded Listener<ECommandEvent> sub-object teardown: detach the
     // listener-link from whatever ring it sits in (typically already
     // self-linked after the conditional unlink above) and reset to singleton.
-    Listener<ECommandEvent>::mListenerLink.ListUnlink();
   }
 
   /**

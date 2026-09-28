@@ -833,9 +833,9 @@ CAiPathFinder::~CAiPathFinder()
     mRecentSearchRects.mHead = nullptr;
   }
 
-  mPathQueueNode.mPrev = &mPathQueueNode;
-  mPathQueueNode.mNext = &mPathQueueNode;
-  static_cast<Broadcaster*>(this)->ListResetLinks();
+  // `mPathQueueNode` and the `Broadcaster` base unlink in their own
+  // destructors (0x005AA033, 0x005AA04E). Only self-linking them here, as this
+  // body used to, left a deleted path finder threaded on the path queue.
 }
 
 /**

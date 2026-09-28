@@ -13738,7 +13738,6 @@ Unit::~Unit()
 
   mReconBlips.ResetStorageToInline();
   ClearUnitWeakReferences(*this);
-  mEconomyEventListHead.ListUnlinkSelf();
   DestroyUnitEconomyRequest(mConsumptionData);
   DestroyUnitExtraStorage(mExtraStorage);
 

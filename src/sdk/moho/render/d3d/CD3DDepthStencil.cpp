@@ -45,7 +45,6 @@ namespace moho
   CD3DDepthStencil::~CD3DDepthStencil()
   {
     ReleaseSurfaceHandle();
-    mLink.ListUnlink();
   }
 
   /**

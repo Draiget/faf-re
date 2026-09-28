@@ -1095,7 +1095,6 @@ CAiPathNavigator::CAiPathNavigator(Unit* const unit)
  */
 CAiPathNavigator::~CAiPathNavigator()
 {
-  DetachListenerNode(*this);
   DetachWeakUnit(mLeaderLink);
   mPath.FreeStorage();
 
@@ -1104,7 +1103,8 @@ CAiPathNavigator::~CAiPathNavigator()
     mPathFinder = nullptr;
   }
 
-  mListenerLink.ListResetLinks();
+  // `mListenerLink` leaves the path finder's ring in its own destructor, the
+  // one unlink 0x005A44C0 has (0x005A4522, after the path finder is gone).
 }
 
 /**

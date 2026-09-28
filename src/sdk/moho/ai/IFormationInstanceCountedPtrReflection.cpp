@@ -283,16 +283,10 @@ namespace moho
    * The two vftable stores that bracket it are the compiler's, and the trailing
    * one is `~CountedObject` inlined -- the same eight-instruction tail
    * `~CFormationInstance` (0x00569880) ends with, which is what proves the
-   * unlink belongs here and not to its owner.
-   *
-   * `TDatList` carries no destructor in this tree, so the unlink is spelled
-   * out; giving one to `Broadcaster` instead would emit it into every
-   * broadcaster owner in the engine, which the binary does not do.
+   * unlink belongs here and not to its owner. The unlink itself is the
+   * `Broadcaster` base's `~TDatListItem`; the body is empty.
    */
-  IFormationInstance::~IFormationInstance()
-  {
-    FormationStatusBroadcaster::ListUnlink();
-  }
+  IFormationInstance::~IFormationInstance() = default;
 
   namespace
   {

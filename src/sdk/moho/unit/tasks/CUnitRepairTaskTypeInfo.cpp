@@ -88,7 +88,6 @@ namespace
     {
       mTargetUnit.UnlinkFromOwnerChain();
       mBuildTargetUnit.UnlinkFromOwnerChain();
-      mListenerLink.ListResetLinks();
     }
 
     int Execute() override

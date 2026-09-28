@@ -211,7 +211,6 @@ namespace moho
     }
 
     mTargetUnit.UnlinkFromOwnerChain();
-    mListenerLink.ListUnlink();
   }
 
   /**

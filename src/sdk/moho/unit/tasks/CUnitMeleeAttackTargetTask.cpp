@@ -549,13 +549,12 @@ namespace moho
 
     mTarget.targetEntity.UnlinkFromOwnerChain();
     mTarget.targetEntity.ClearLinkState();
-    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
-    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
 
     // The base slice is a real `CCommandTask` base now, not raw storage, so the
     // compiler chains its destructor. Calling it here as well would run it
     // twice -- and `~CCommandTask` is virtual, so the call would dispatch back
-    // into this destructor and recurse.
+    // into this destructor and recurse. The two listener bases unlink in their
+    // own `~TDatListItem` the same way (0x006176F9, 0x00617719).
   }
 
   /**

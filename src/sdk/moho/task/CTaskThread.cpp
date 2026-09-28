@@ -634,7 +634,6 @@ CTaskThread::~CTaskThread()
 {
   PopTaskStack(this);
   ClearTaskEventLinks(this);
-  ListUnlink();
 }
 
 /**

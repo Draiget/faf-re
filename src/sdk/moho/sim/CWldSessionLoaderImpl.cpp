@@ -184,23 +184,6 @@ namespace moho
       }
     }
 
-    /**
-     * Address: 0x00885640 (FUN_00885640, sub_885640)
-     *
-     * What it does:
-     * Unlinks one intrusive list-item lane from its current neighbors and
-     * re-initializes it as a self-linked sentinel node.
-     */
-    [[nodiscard]] TDatListItem<SWldScenarioInfo, void>* ResetScenarioListHead(
-      TDatListItem<SWldScenarioInfo, void>& listItem
-    ) noexcept
-    {
-      listItem.mNext->mPrev = listItem.mPrev;
-      listItem.mPrev->mNext = listItem.mNext;
-      listItem.mPrev = &listItem;
-      listItem.mNext = &listItem;
-      return &listItem;
-    }
   } // namespace
 
   /**
@@ -222,7 +205,6 @@ namespace moho
   CWldSessionLoaderImpl::~CWldSessionLoaderImpl()
   {
     Finalize();
-    (void)ResetScenarioListHead(mScenarioHead);
   }
 
   /**

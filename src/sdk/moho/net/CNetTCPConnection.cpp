@@ -324,8 +324,6 @@ CNetTCPConnection::~CNetTCPConnection()
     ::closesocket(mSocket);
     mSocket = INVALID_SOCKET;
   }
-
-  TDatListItem<CNetTCPConnection, void>::ListUnlink();
 }
 
 /**

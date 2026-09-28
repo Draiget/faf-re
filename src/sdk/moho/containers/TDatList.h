@@ -164,6 +164,40 @@ namespace moho
      *   what places it on this base. Formerly `UnlinkPeerListHead` in
      *   moho/net/CLobby.cpp, written into the ctor and dtor bodies (RULE ONE),
      *   removed 2026-09-28.)
+     * Address: 0x00447470 (FUN_00447470 -- `DeviceExitListener::mDeviceLink`'s
+     *   emission; formerly `UnlinkAndResetDeviceListenerLink`, called from a
+     *   `~DeviceExitListener` that also freed itself.)
+     * Address: 0x00484B00 (FUN_00484B00 -- `CNetTCPConnector::mPartials`';
+     *   formerly `ResetPartialListHead`, called from the destructor body.)
+     * Address: 0x00484B20 (FUN_00484B20 -- `CNetTCPConnector::mConnections`';
+     *   formerly `ResetConnectionListHead`, likewise.)
+     * Address: 0x00486110 (FUN_00486110 -- `CNetUDPConnection`'s connector-list
+     *   base; formerly `CNetUDPConnection::UnlinkFromConnectorList`.)
+     * Address: 0x004A9B30 (FUN_004A9B30 -- `PrefetchRequestRuntime::
+     *   mWaiterListHead`'s; formerly `UnlinkIntrusiveListNode`.)
+     * Address: 0x004ACF00 (FUN_004ACF00 -- a second ResourceManager emission;
+     *   zero callers; formerly `UnlinkIntrusivePairLinkNode`.)
+     * Address: 0x004E1F70 (FUN_004E1F70 -- a CSndParams emission; zero
+     *   callers; formerly `ResetIntrusiveNodeLinks` over a null-guarded overlay.)
+     * Address: 0x00657BF0 (FUN_00657BF0 -- `IEffect::mManagerListNode`'s; zero
+     *   callers; formerly `UnlinkIEffectManagerNodeAndSelfLink`.)
+     * Address: 0x0066B430 (FUN_0066B430 -- the same node's in the effect
+     *   manager's TU; formerly `UnlinkManagerListNodeAndSelfReference`, called
+     *   by `DestroyEffect` just before a `ListLinkBefore` that unlinks anyway.)
+     * Address: 0x006E8190 (FUN_006E8190 -- a `Broadcaster` emission; formerly
+     *   `UnlinkBroadcasterNodeAndResetSentinel`.)
+     * Address: 0x00771860 (FUN_00771860 -- zero callers; formerly a free unlink
+     *   helper over the sim-recovery TU's two-pointer node overlay.)
+     * Address: 0x007DF2B0 (FUN_007DF2B0 -- `MeshRenderer::instanceListHead`'s;
+     *   formerly `UnlinkMeshInstanceListLink`, called from both the ctor and
+     *   the dtor.)
+     * Address: 0x00885640 (FUN_00885640 -- `CWldSessionLoaderImpl::
+     *   mScenarioHead`'s; formerly `ResetScenarioListHead`, called from the
+     *   dtor.)
+     *   All of the above were removed 2026-09-28 (RULE ONE). Two more copies
+     *   are still transcribed over overlay nodes that do not yet use this type:
+     *   0x00684340 (`CEntityDbListHead`, EntityDb.cpp) and 0x0052CF50
+     *   (`LuaTaskListNode`, RRuleGameRules.cpp).
      *
      * What it does:
      * Unlinks this node from its ring and leaves it self-linked.

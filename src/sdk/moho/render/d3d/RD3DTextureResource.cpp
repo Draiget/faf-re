@@ -65,7 +65,6 @@ namespace moho
   RD3DTextureResource::~RD3DTextureResource()
   {
     mBaseTex.reset();
-    mResources.ListUnlink();
   }
 
   /**

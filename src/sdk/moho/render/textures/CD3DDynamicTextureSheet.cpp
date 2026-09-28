@@ -63,7 +63,6 @@ namespace moho
   CD3DDynamicTextureSheet::~CD3DDynamicTextureSheet()
   {
     mTexture.reset();
-    mLink.ListUnlink();
   }
 
   /**

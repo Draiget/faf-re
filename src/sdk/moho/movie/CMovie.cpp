@@ -268,13 +268,9 @@ namespace moho
     // null after Dispose(), so this matches the skipped binary block.
     mTextureSheet.release();
 
-    // [0x00873EDF-0x00873EF9] ~Listener<SD3DDeviceEvent const&> base subobject:
-    // unlink this listener node from its ring (no-op when the conditional
-    // unlink above already ran; the real unlink when no device was present).
-    // This must happen before the base subobject goes away: a node left in the
-    // device ring outlives the movie and the next device event dispatches
-    // through freed memory.
-    mListenerLink.ListUnlink();
+    // [0x00873EDF-0x00873EF9] is the `Listener<SD3DDeviceEvent const&>` base's
+    // `~TDatListItem`, after this body: a no-op when the conditional unlink
+    // above already ran, the real unlink when no device was present.
   }
 
   /**

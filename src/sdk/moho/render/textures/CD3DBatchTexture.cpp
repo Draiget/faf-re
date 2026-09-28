@@ -55,7 +55,6 @@ namespace moho
   CD3DBatchTexture::~CD3DBatchTexture()
   {
     ResetTextureSheet();
-    mListLink.ListUnlink();
   }
 
   /**
@@ -131,9 +130,7 @@ namespace moho
 
       DeviceExitListener* const previous = sDeviceExitListener;
       sDeviceExitListener = created;
-      if (previous != nullptr) {
-        previous->~DeviceExitListener();
-      }
+      delete previous;
     }
 
     if (sDeviceExitListener != nullptr) {

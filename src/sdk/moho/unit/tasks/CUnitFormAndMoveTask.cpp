@@ -266,10 +266,6 @@ namespace moho
         navigator->AbortMove();
       }
     }
-
-    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
-    Listener<EFormationdStatus>::mListenerLink.ListResetLinks();
-    Listener<EAiNavigatorEvent>::mListenerLink.ListResetLinks();
   }
 
   /**

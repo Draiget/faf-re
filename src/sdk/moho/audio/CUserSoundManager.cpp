@@ -1103,7 +1103,6 @@ namespace moho
    */
   CUserSoundManager::~CUserSoundManager()
   {
-    mActiveLoops.ListUnlink();
     UnlinkArmyHook(mListenerArmyHook);
 
     mPendingDestroyCues.clear();

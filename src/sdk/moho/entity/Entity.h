@@ -272,7 +272,6 @@ namespace moho
     ~EntitySetTemplate()
     {
       Clear();
-      this->ListUnlink();
     }
 
     [[nodiscard]] bool Empty() const noexcept

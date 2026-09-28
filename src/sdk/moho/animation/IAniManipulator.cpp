@@ -1501,7 +1501,6 @@ namespace moho
   IAniManipulator::~IAniManipulator()
   {
     ResetWatchBoneStorage();
-    mActorOrderLink.ListUnlink();
   }
 
   /**

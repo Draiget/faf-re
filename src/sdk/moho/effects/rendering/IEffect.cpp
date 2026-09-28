@@ -136,24 +136,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00657BF0 (FUN_00657BF0)
-   *
-   * What it does:
-   * Unlinks one effect-manager intrusive node from its current ring and
-   * restores singleton self-links.
-   */
-  [[maybe_unused]] IEffect::ManagerListNode* UnlinkIEffectManagerNodeAndSelfLink(
-    IEffect::ManagerListNode* const node
-  ) noexcept
-  {
-    node->mPrev->mNext = node->mNext;
-    node->mNext->mPrev = node->mPrev;
-    node->mNext = node;
-    node->mPrev = node;
-    return node;
-  }
-
-  /**
    * Address: 0x00654260 (FUN_00654260)
    *
    * What it does:
@@ -234,10 +216,7 @@ namespace moho
    * Address: 0x006543D0 (FUN_006543D0, Moho::IEffect::dtr)
    * Address: 0x00654180 (FUN_00654180, Moho::IEffect::~IEffect body)
    */
-  IEffect::~IEffect()
-  {
-    mManagerListNode.ListUnlink();
-  }
+  IEffect::~IEffect() = default;
 
   /**
    * Address: 0x00654270 (FUN_00654270, Moho::IEffect::OnInit)

@@ -640,7 +640,6 @@ namespace moho
 
     DestroyEconomyRequestPointer(mConsumptionData);
     mTargetEntity.UnlinkFromOwnerChain();
-    mListenerLink.ListUnlink();
   }
 
   /**

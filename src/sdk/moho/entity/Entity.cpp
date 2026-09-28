@@ -2082,7 +2082,6 @@ namespace moho
     mLuaPositionCache = LuaPlus::LuaObject{};
 
     mShooters.Clear();
-    mShooters.ListUnlink();
     mUniqueName = msvc8::string{};
 
     delete mPhysBody;
@@ -2122,13 +2121,11 @@ namespace moho
     // `Entity::SyncInterface` has grown it past the inline capacity.
     mVarDat.mAuxValueVector.ReleaseDynamicStorage();
 
-    // Leave Sim::mCoordEntities (binary FUN_006785D0 lines 75-78: the splice
-    // and self-reset at +0x60/+0x64). The binary runs it as the dirty-list
-    // base's teardown, after InstanceCounter<Entity>'s -1 and ~CTask; our
-    // TDatListItem has no destructor, so the unlink is written here, a little
-    // earlier than the binary does it. Nothing between the two points reads
-    // the list. Without it a freed entity stays threaded on the Sim's ring.
-    ListUnlink();
+    // Leaving Sim::mCoordEntities (binary FUN_006785D0 lines 75-78: the splice
+    // and self-reset at +0x60/+0x64) is the dirty-list base's own
+    // `~TDatListItem`, after InstanceCounter<Entity>'s -1 and ~CTask, where
+    // the binary runs it. `mShooters` leaves the entity DB's set ring the same
+    // way, as a member (0x0067866A: its inline vector reset, then its unlink).
 
     // The collision shape leaves the grid in ~CollisionShapeBase, which runs
     // after this body and ~CTask -- binary FUN_006785D0 line 79 calls

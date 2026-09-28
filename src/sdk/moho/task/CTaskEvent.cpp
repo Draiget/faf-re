@@ -575,8 +575,6 @@ STaskEventLinkage::~STaskEventLinkage()
     node = next;
   }
   mOwnerWeakRefHead = nullptr;
-
-  ListUnlink();
 }
 
 /**
@@ -657,8 +655,6 @@ CTaskEvent::~CTaskEvent()
       waitingThread->Destroy();
     }
   }
-
-  mWaitLinks.ListUnlink();
 }
 
 /**

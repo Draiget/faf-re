@@ -28,30 +28,11 @@ namespace moho
       return link;
     }
 
-    /**
-     * Address: 0x00447470 (FUN_00447470)
-     *
-     * What it does:
-     * Unlinks one recovered listener node from its current ring and resets it
-     * to singleton state.
-     */
-    [[nodiscard]] DeviceExitListener::DeviceListenerLink* UnlinkAndResetDeviceListenerLink(
-      DeviceExitListener::DeviceListenerLink* const link
-    )
-    {
-      if (link != nullptr) {
-        link->ListUnlink();
-      }
-      return link;
-    }
-
     void DestroyDeviceExitListenerAtProcessExit()
     {
       DeviceExitListener* const previousListener = moho::sDeviceExitListener;
       moho::sDeviceExitListener = nullptr;
-      if (previousListener != nullptr) {
-        previousListener->~DeviceExitListener();
-      }
+      delete previousListener;
     }
 
   } // namespace
@@ -89,15 +70,12 @@ namespace moho
    * Address: 0x0044E6E0 (FUN_0044E6E0, ??1DeviceExitListener@Moho@@QAE@@Z)
    *
    * What it does:
-   * Unlinks tracked texture/device-list nodes and releases the listener heap
-   * allocation through explicit destructor-call ownership paths.
+   * `delete listener` in full: `mTrackedTextures` unlinks (0x0044E6E0), the
+   * vptr drops to the `Listener` base's, `mDeviceLink` unlinks (0x0044E6FF),
+   * then `operator delete`. Every step is compiler-emitted, so the body is
+   * empty and the callers `delete`.
    */
-  DeviceExitListener::~DeviceExitListener()
-  {
-    mTrackedTextures.ListUnlink();
-    (void)UnlinkAndResetDeviceListenerLink(&mDeviceLink);
-    ::operator delete(static_cast<void*>(this));
-  }
+  DeviceExitListener::~DeviceExitListener() = default;
 
   /**
    * Address: 0x00447330 (FUN_00447330, Moho::DeviceExitListener::Receive)
@@ -130,9 +108,7 @@ namespace moho
 
     DeviceExitListener* const previousListener = sDeviceExitListener;
     sDeviceExitListener = nullptr;
-    if (previousListener != nullptr) {
-      previousListener->~DeviceExitListener();
-    }
+    delete previousListener;
   }
 } // namespace moho
 

@@ -22319,12 +22319,10 @@ moho::CMauiControl::~CMauiControl()
   // so their Lua objects are released by hand, last-declared first, as the
   // binary does.
 
-  childSentinel->ListUnlink();
-
-  ListUnlink();
-
-  // ~CScriptObject() runs automatically after this body: CMauiControl derives
-  // from it for real, so the compiler chains the base destructor.
+  // `mChildrenList` (0x00786E44) and this control's own parent-list link
+  // (0x00786E5C) unlink in their own destructors, then ~CScriptObject() runs:
+  // CMauiControl derives from it for real, so the compiler chains the base
+  // destructor.
 }
 
 /**
@@ -25080,7 +25078,6 @@ moho::CMauiFrame::~CMauiFrame()
     mEventHandler = nullptr;
   }
 
-  static_cast<CMauiControlListNode*>(&mDeletedControlList)->ListUnlink();
   mSelfWeak = boost::weak_ptr<CMauiFrame>{};
 }
 

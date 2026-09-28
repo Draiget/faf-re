@@ -72,18 +72,6 @@ namespace
   static_assert(sizeof(DualSharedPairCleanupView) == 0x18, "DualSharedPairCleanupView size must be 0x18");
 
   /**
-   * Address: 0x004A9B30 (FUN_004A9B30)
-   *
-   * What it does:
-   * Unlinks one intrusive list node and rewires it to self-linked state.
-   */
-  IntrusiveListLink* UnlinkIntrusiveListNode(IntrusiveListLink* const node) noexcept
-  {
-    node->ListUnlink();
-    return node;
-  }
-
-  /**
    * Address: 0x004A99C0 (FUN_004A99C0)
    *
    * What it does:
@@ -183,12 +171,13 @@ namespace
    * Address: 0x004AA560 (FUN_004AA560)
    *
    * What it does:
-   * Tears down one prefetch request runtime entry: unlinks waiter head,
-   * weak-releases both control lanes, then tidies the path string.
+   * Tears down one prefetch request runtime entry: weak-releases both control
+   * lanes, then tidies the path string. The waiter-head unlink 0x004AA560
+   * opens with is `mWaiterListHead`'s own destructor (last member, so first),
+   * which runs when the request is destroyed.
    */
   PrefetchRequestRuntime* DestroyPrefetchRequestRuntime(PrefetchRequestRuntime* const request) noexcept
   {
-    (void)UnlinkIntrusiveListNode(&request->mWaiterListHead);
     (void)ReleaseWeakControlFromPair(&request->mPrefetch);
     (void)ReleaseWeakControlFromPair(&request->mResolved);
     request->mResourceId.name.tidy(true, 0U);
@@ -1123,22 +1112,6 @@ namespace
    * No-op helper thunk retained for callsite parity.
    */
   void NoOpHelperThunkVariant1() noexcept {}
-
-  using IntrusivePairLink_004ACF00 = moho::TDatListItem<void, void>;
-
-  /**
-   * Address: 0x004ACF00 (FUN_004ACF00)
-   *
-   * What it does:
-   * Unlinks one intrusive pair-link node and rewires it to self-linked state.
-   */
-  IntrusivePairLink_004ACF00* UnlinkIntrusivePairLinkNode(
-    IntrusivePairLink_004ACF00* const node
-  ) noexcept
-  {
-    node->ListUnlink();
-    return node;
-  }
 
   /**
    * Address: 0x004ACF80 (FUN_004ACF80)

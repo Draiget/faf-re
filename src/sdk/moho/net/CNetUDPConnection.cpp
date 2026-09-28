@@ -386,8 +386,9 @@ CNetUDPConnection::~CNetUDPConnection()
     mOutputFilterStream = nullptr;
   }
 
-  // This node is linked into CNetUDPConnector::mConnections in ctor.
-  UnlinkFromConnectorList();
+  // The ctor links this node into CNetUDPConnector::mConnections; the
+  // `TDatListItem` base's destructor takes it out (0x00486110 is that
+  // destructor's unwind copy).
 }
 
 /**
@@ -1722,16 +1723,6 @@ bool CNetUDPConnection::ReceiverNonceDiffers32(const char (&expected)[32], const
   return ByteArrayDiffers(expected, received);
 }
 
-/**
- * Address: 0x00486110 (FUN_00486110)
- *
- * What it does:
- * Unlinks this connection node from the connector intrusive list.
- */
-void CNetUDPConnection::UnlinkFromConnectorList() noexcept
-{
-  this->TDatListItem<CNetUDPConnection, void>::ListUnlink();
-}
 
 /**
   * Alias of FUN_00488D80 (non-canonical helper lane).

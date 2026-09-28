@@ -612,31 +612,6 @@ namespace
   }
 
   /**
-   * Address: 0x004E1F70 (FUN_004E1F70)
-   *
-   * What it does:
-   * Unlinks one intrusive node from its current list and resets it to a
-   * self-linked singleton node.
-   */
-  [[nodiscard]] IntrusiveLinkNode* ResetIntrusiveNodeLinks(IntrusiveLinkNode* const node) noexcept
-  {
-    if (node == nullptr) {
-      return node;
-    }
-
-    if (node->mNext != nullptr) {
-      node->mNext->mPrev = node->mPrev;
-    }
-    if (node->mPrev != nullptr) {
-      node->mPrev->mNext = node->mNext;
-    }
-
-    node->mPrev = node;
-    node->mNext = node;
-    return node;
-  }
-
-  /**
    * Address: 0x004DF790 (FUN_004DF790, func_GetCSndParams)
    *
    * What it does:

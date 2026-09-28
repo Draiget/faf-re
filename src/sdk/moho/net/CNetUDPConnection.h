@@ -313,14 +313,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x00486110 (FUN_00486110)
-     *
-     * What it does:
-     * Unlinks this connection node from connector intrusive list.
-     */
-    void UnlinkFromConnectorList() noexcept;
-
-    /**
      * Address: 0x004874C0
      */
     void UpdatePingInfoFromPacket(const SNetPacket& packet);

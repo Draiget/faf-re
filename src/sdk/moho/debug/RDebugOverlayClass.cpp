@@ -195,8 +195,6 @@ namespace moho
   {
     mOverlayDescription.assign_owned("");
     mOverlayToken.assign_owned("");
-    mOverlayClassLink.ListUnlink();
-    mOverlayClassLink.ListResetLinks();
     fields_ = {};
     bases_ = {};
   }

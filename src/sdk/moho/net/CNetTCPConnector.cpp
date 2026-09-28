@@ -56,7 +56,6 @@ namespace moho
         ::closesocket(mSocket);
         mSocket = INVALID_SOCKET;
       }
-      ListUnlink();
     }
 
     /**
@@ -225,29 +224,6 @@ namespace moho
     STcpConnWorkFrame mFrame{};
   };
 
-  /**
-   * Address: 0x00484B00 (FUN_00484B00)
-   *
-   * What it does:
-   * Unlinks the partial-list head from any current neighbors and resets it
-   * to a self-linked empty intrusive list sentinel.
-   */
-  void ResetPartialListHead(TDatListItem<STcpPartialConnection, void>* const head)
-  {
-    head->ListUnlink();
-  }
-
-  /**
-   * Address: 0x00484B20 (FUN_00484B20)
-   *
-   * What it does:
-   * Unlinks the connection-list head from any current neighbors and resets it
-   * to a self-linked empty intrusive list sentinel.
-   */
-  void ResetConnectionListHead(TDatListItem<CNetTCPConnection, void>* const head)
-  {
-    head->ListUnlink();
-  }
 } // namespace moho
 
 /**
@@ -591,10 +567,9 @@ void CNetTCPConnector::CleanupConnectionsAndPartials()
     mSocket = INVALID_SOCKET;
   }
 
-  auto* const partialHead = static_cast<TDatListItem<STcpPartialConnection, void>*>(&mPartials);
-  auto* const connectionHead = static_cast<TDatListItem<CNetTCPConnection, void>*>(&mConnections);
-  ResetPartialListHead(partialHead);
-  ResetConnectionListHead(connectionHead);
+  // `mPartials` and `mConnections` unlink in their own destructors
+  // (0x00484BBC, 0x00484BD0); 0x00484B00/0x00484B20 are those destructors'
+  // unwind copies.
 
   auto* work = reinterpret_cast<STcpConnWorkFrame*>(mWorkingList.next);
   while (work != nullptr) {

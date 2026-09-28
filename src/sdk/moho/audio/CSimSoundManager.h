@@ -123,8 +123,9 @@ namespace moho
      * Moho::SAudioRequest *__usercall sub_761520@<eax>(Moho::CSimSoundManager *this@<esi>);
      *
      * What it does:
-     * Unlinks the active-loop ring. The rest of 0x00761520 is compiler glue:
-     * the leading `mov [esi], 0xE35A50` vptr latch, the inlined
+     * Unlinks the active-loop ring. All of 0x00761520 is compiler glue: the
+     * leading `mov [esi], 0xE35A50` vptr latch, `mActiveLoops`' own
+     * `~TDatListItem` (0x00761542, last-declared so first), the inlined
      * `~fastvector_n` teardown of `mRequests` (the same body the linker kept
      * standalone at 0x00401DE0), and the closing `mov [esi], 0xE359B0` that is
      * `~ISoundManager` -- members in reverse declaration order, then the base.

@@ -2193,28 +2193,6 @@ namespace
   static_assert(sizeof(CopyEndCursor8ByteRuntime) == 0x08, "CopyEndCursor8ByteRuntime size must be 0x08");
 }
 
-/**
- * Address: 0x00771860 (FUN_00771860)
- *
- * What it does:
- * Unlinks one intrusive list node from its ring and resets it to a
- * self-linked sentinel lane.
- */
-IntrusiveListNodeRuntime* UnlinkIntrusiveNodeAndResetSelfLinksRuntime(
-  IntrusiveListNodeRuntime* const node
-) noexcept
-{
-  if (node == nullptr || node->next == nullptr || node->prev == nullptr) {
-    return node;
-  }
-
-  node->next->prev = node->prev;
-  node->prev->next = node->next;
-  node->prev = node;
-  node->next = node;
-  return node;
-}
-
 namespace
 {
   struct Element20Runtime

@@ -383,9 +383,6 @@ namespace moho
     // binary also rewrites each sub-object's vtable pointer to the base
     // `Listener<E>` vftable; those are dead stores on the dying object and are
     // handled implicitly by the C++ destructor.
-    Listener<ECommandEvent>::mListenerLink.ListUnlink();
-    Listener<EFormationdStatus>::mListenerLink.ListUnlink();
-    Listener<EAiNavigatorEvent>::mListenerLink.ListUnlink();
   }
 
   /**

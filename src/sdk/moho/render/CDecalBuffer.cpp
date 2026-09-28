@@ -140,7 +140,6 @@ CDecalBuffer::~CDecalBuffer()
   // open-codes that teardown, including freeing the sentinel head, which is
   // the container's destructor here.
   mStartTickBuckets.clear();
-  mHandleListHead.ListResetLinks();
 }
 
 /**

@@ -1422,10 +1422,7 @@ void moho::AI_ClearPathData()
 /**
  * Address: 0x005A2D30 (FUN_005A2D30, scalar deleting thunk)
  */
-IAiNavigator::~IAiNavigator()
-{
-  mListenerNode.ListUnlink();
-}
+IAiNavigator::~IAiNavigator() = default;
 
 /**
  * Address: 0x005A7B60 (FUN_005A7B60, Moho::IAiNavigator::MemberDeserialize)

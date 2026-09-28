@@ -844,11 +844,7 @@ IAiAttacker::IAiAttacker()
 /**
  * Address: 0x005D5780 (FUN_005D5780)
  */
-IAiAttacker::~IAiAttacker()
-{
-  Broadcaster* const link = static_cast<Broadcaster*>(&mListeners);
-  link->ListUnlink();
-}
+IAiAttacker::~IAiAttacker() = default;
 
 /**
  * Address: 0x005DF860 (FUN_005DF860, preregister_RBroadcasterRType_EAiAttackerEvent)

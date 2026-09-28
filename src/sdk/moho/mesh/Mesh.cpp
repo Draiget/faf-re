@@ -2443,24 +2443,6 @@ namespace
     );
   }
 
-  /**
-   * Address: 0x007DF2B0 (FUN_007DF2B0)
-   *
-   * What it does:
-   * Unlinks one mesh-instance intrusive link node from its current ring and
-   * restores self-linked singleton lanes.
-   */
-  [[maybe_unused]] moho::MeshInstance::ListLink* UnlinkMeshInstanceListLink(
-    moho::MeshInstance::ListLink* const link
-  ) noexcept
-  {
-    link->mPrev->mNext = link->mNext;
-    link->mNext->mPrev = link->mPrev;
-    link->mPrev = link;
-    link->mNext = link;
-    return link;
-  }
-
   void RemoveLinkFromList(moho::MeshInstance::ListLink* const link) noexcept
   {
     if (!link || !link->mPrev || !link->mNext) {
@@ -5086,7 +5068,6 @@ namespace moho
     // `meshCacheTree` and `meshes` both stand their own header sentinel up in
     // the map constructor (0x007E4770+0x007E2B50 / 0x007E2C30 `_Tree::_Tree`
     // emissions the binary's ctor inlines here).
-    (void)UnlinkMeshInstanceListLink(&instanceListHead);
 
     // The binary's constructor ends by constructing this member:
     //   0x007DF23A  push offset Moho__sMeshRenderer.bd   ; +0xAC
@@ -5128,8 +5109,9 @@ namespace moho
     // ..., insectlookupTex, anisotropiclookupTex, meshEnvironmentTex,
     // dissolveTex, meshCacheTree, meshEnvironment - no explicit call needed
     // for either, and none for meshCacheTree specifically fixes the
-    // ordering bug.
-    (void)UnlinkMeshInstanceListLink(&instanceListHead);
+    // ordering bug. `instanceListHead` unlinks the same way, in its own
+    // destructor between `meshes` and the textures (0x007DF2B0 is that
+    // destructor's unwind copy).
     if (gMeshRendererInstance == this) {
       gMeshRendererInstance = nullptr;
     }

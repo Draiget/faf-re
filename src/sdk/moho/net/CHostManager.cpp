@@ -90,7 +90,6 @@ CHostManager::~CHostManager()
     Host::DestroyHeapNode(front);
   }
 
-  mHostList.ListResetLinks();
   mHosts.clear();
 }
 

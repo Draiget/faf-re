@@ -1249,12 +1249,10 @@ IAiTransport::IAiTransport()
  * Address: 0x005E3C70 (FUN_005E3C70, scalar deleting thunk target)
  *
  * What it does:
- * Unlinks IAiTransport from broadcaster chain and restores self-linked node.
+ * Unlinks IAiTransport from broadcaster chain and restores self-linked node,
+ * through the `TDatListItem` base's destructor.
  */
-IAiTransport::~IAiTransport()
-{
-  ListUnlink();
-}
+IAiTransport::~IAiTransport() = default;
 
 /**
  * What it does:
