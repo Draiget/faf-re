@@ -47,11 +47,4 @@ namespace moho
    */
   int register_IAiCommandDispatchTypeInfo();
 
-  /**
-   * Address: 0x00BCBE10 (FUN_00BCBE10, register_IAiCommandDispatchTypeInfoStartupStatsCleanup)
-   *
-   * What it does:
-   * Registers process-exit cleanup for one startup-owned engine-stats slot.
-   */
-  int register_IAiCommandDispatchTypeInfoStartupStatsCleanup();
 } // namespace moho

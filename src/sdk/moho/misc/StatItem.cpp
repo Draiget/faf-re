@@ -887,7 +887,6 @@ namespace moho
 {
   gpg::RType* StatItem::sType = nullptr;
   gpg::RType* Stats<StatItem>::sType = nullptr;
-  EngineStats* sEngineStats = nullptr;
   static StatItem* sPrintStatsBoogers = nullptr;
   static StatItem* sPrintStatsBoogersFarts = nullptr;
   static StatItem* sPrintStatsInsert = nullptr;
@@ -1002,20 +1001,6 @@ namespace moho
     const double thisFineSeconds =
       static_cast<double>(ftime) + (static_cast<double>(millis) * kMillisToSeconds);
     return otherFineSeconds - thisFineSeconds;
-  }
-
-  /**
-   * Address: 0x0040AB20 (FUN_0040AB20, sub_40AB20)
-   *
-   * What it does:
-   * Swaps the global engine-stats singleton pointer with the caller slot.
-   */
-  static EngineStats** SwapEngineStatsSingleton(EngineStats** slot)
-  {
-    EngineStats* const previous = sEngineStats;
-    sEngineStats = *slot;
-    *slot = previous;
-    return slot;
   }
 
   void StatSampleBuffer::Reset() noexcept
@@ -1254,17 +1239,10 @@ namespace moho
    */
   EngineStats* GetEngineStats()
   {
-    EngineStats* result = sEngineStats;
-    if (result != nullptr) {
-      return result;
+    if (!sEngineStats) {
+      sEngineStats.reset(new EngineStats());
     }
-
-    EngineStats* candidate = new (std::nothrow) EngineStats();
-    (void)SwapEngineStatsSingleton(&candidate);
-    if (candidate != nullptr) {
-      delete candidate;
-    }
-    return sEngineStats;
+    return sEngineStats.get();
   }
 
   /**

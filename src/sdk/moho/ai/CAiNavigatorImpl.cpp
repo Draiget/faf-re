@@ -108,15 +108,6 @@ namespace
   constexpr const char* kNavigatorCanPathToGoalMethodName = "CanPathToGoal";
   constexpr const char* kNavigatorEmptyHelpText = "";
 
-  template <std::uintptr_t SlotAddress>
-  struct StartupEngineStatsSlot
-  {
-    static EngineStats* value;
-  };
-
-  template <>
-  EngineStats* StartupEngineStatsSlot<0x10AEDB0u>::value = nullptr;
-
   [[nodiscard]] gpg::RType* CachedIAiNavigatorType()
   {
     if (!IAiNavigator::sType) {
@@ -271,22 +262,6 @@ namespace
     return Target();
   }
 
-  /**
-   * Address: 0x00BF70C0 (FUN_00BF70C0, sub_BF70C0)
-   *
-   * What it does:
-   * Tears down one startup-owned navigator stats slot.
-   */
-  void cleanup_CAiNavigatorImplStartupStatsSlot()
-  {
-    EngineStats*& slot = StartupEngineStatsSlot<0x10AEDB0u>::value;
-    if (!slot) {
-      return;
-    }
-
-    delete slot;
-    slot = nullptr;
-  }
 } // namespace
 
 gpg::RType* CAiNavigatorImpl::sType = nullptr;
@@ -1238,17 +1213,6 @@ int moho::register_CScrLuaMetatableFactory_CAiNavigatorImpl_Index()
   return index;
 }
 
-/**
- * Address: 0x00BCCA60 (FUN_00BCCA60)
- *
- * What it does:
- * Installs process-exit cleanup for one startup-owned navigator stats slot.
- */
-int moho::register_CAiNavigatorImplStartupCleanup()
-{
-  return std::atexit(&cleanup_CAiNavigatorImplStartupStatsSlot);
-}
-
 namespace
 {
   struct CAiNavigatorImplStartupBootstrap
@@ -1271,7 +1235,6 @@ namespace
       (void)moho::register_CAiNavigatorImplAtGoal_LuaFuncDef();
       (void)moho::register_CAiNavigatorImplCanPathToGoal_LuaFuncDef();
       (void)moho::register_CScrLuaMetatableFactory_CAiNavigatorImpl_Index();
-      (void)moho::register_CAiNavigatorImplStartupCleanup();
     }
   };
 

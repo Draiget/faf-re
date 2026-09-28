@@ -109,12 +109,4 @@ namespace moho
    */
   int register_FastVectorIFormationInstanceTypeAtexit();
 
-  /**
-   * Address: 0x00BCC230 (FUN_00BCC230, register_CAiFormationDBImplStartupStatsCleanup)
-   *
-   * What it does:
-   * Installs process-exit cleanup for one startup-owned engine-stats slot used
-   * by this lane.
-   */
-  int register_CAiFormationDBImplStartupStatsCleanup();
 } // namespace moho

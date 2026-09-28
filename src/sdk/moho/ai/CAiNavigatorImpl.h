@@ -413,11 +413,4 @@ namespace moho
    */
   int register_CScrLuaMetatableFactory_CAiNavigatorImpl_Index();
 
-  /**
-   * Address: 0x00BCCA60 (FUN_00BCCA60)
-   *
-   * What it does:
-   * Installs process-exit cleanup for one startup-owned navigator stats slot.
-   */
-  int register_CAiNavigatorImplStartupCleanup();
 } // namespace moho

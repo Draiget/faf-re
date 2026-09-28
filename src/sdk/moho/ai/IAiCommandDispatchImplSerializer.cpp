@@ -11,15 +11,6 @@ using namespace moho;
 
 namespace
 {
-  template <std::uintptr_t SlotAddress>
-  struct StartupEngineStatsSlot
-  {
-    static EngineStats* value;
-  };
-
-  template <>
-  EngineStats* StartupEngineStatsSlot<0x10AE4DCu>::value = nullptr;
-
   // Address: 0x010AE324 -- process-global `IAiCommandDispatchImplSerializer`
   // singleton. Constructing it runs IAiCommandDispatchImplSerializer::
   // IAiCommandDispatchImplSerializer() (0x00BCBF00), which splices this
@@ -75,22 +66,6 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00BF6720 (FUN_00BF6720, cleanup_IAiCommandDispatchImplStartupStatsSlot)
-   *
-   * What it does:
-   * Tears down one startup-owned engine-stats slot.
-   */
-  void cleanup_IAiCommandDispatchImplStartupStatsSlot()
-  {
-    EngineStats*& slot = StartupEngineStatsSlot<0x10AE4DCu>::value;
-    if (!slot) {
-      return;
-    }
-
-    delete slot;
-    slot = nullptr;
-  }
 } // namespace
 
 /**
@@ -165,33 +140,3 @@ void IAiCommandDispatchImplSerializer::Init()
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSaveCallback;
 }
-
-/**
- * Address: 0x00BCBF40 (FUN_00BCBF40, register_IAiCommandDispatchImplStartupStatsCleanup)
- *
- * What it does:
- * Registers an atexit cleanup thunk for one startup-owned engine-stats slot.
- */
-int moho::register_IAiCommandDispatchImplStartupStatsCleanup()
-{
-  return std::atexit(&cleanup_IAiCommandDispatchImplStartupStatsSlot);
-}
-
-namespace
-{
-  // The binary runs `register_IAiCommandDispatchImplStartupStatsCleanup`
-  // from the CRT static-initializer array as its own independent entry
-  // (FUN_00BCBF40 takes no `this` and never touches
-  // `IAiCommandDispatchImplSerializer`); a file-scope bootstrap object
-  // reproduces that entry now that the serializer above no longer needs one
-  // of its own.
-  struct IAiCommandDispatchImplStartupStatsCleanupBootstrap
-  {
-    IAiCommandDispatchImplStartupStatsCleanupBootstrap()
-    {
-      (void)moho::register_IAiCommandDispatchImplStartupStatsCleanup();
-    }
-  };
-
-  [[maybe_unused]] IAiCommandDispatchImplStartupStatsCleanupBootstrap gIAiCommandDispatchImplStartupStatsCleanupBootstrap;
-} // namespace

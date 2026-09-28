@@ -665,15 +665,6 @@ namespace moho
    */
   int register_FastVectorCPathPointTypeAtexit();
 
-  /**
-   * Address: 0x00BCD3B0 (FUN_00BCD3B0, register_CAiPathSplineStartupStatsCleanup)
-   *
-   * What it does:
-   * Installs process-exit cleanup for one startup-owned AI path-spline stats
-   * slot.
-   */
-  int register_CAiPathSplineStartupStatsCleanup();
-
   static_assert(sizeof(SCollisionInfoTypeInfo) == 0x64, "SCollisionInfoTypeInfo size must be 0x64");
   static_assert(sizeof(ECollisionTypeTypeInfo) == 0x78, "ECollisionTypeTypeInfo size must be 0x78");
   static_assert(sizeof(CPathPointTypeInfo) == 0x64, "CPathPointTypeInfo size must be 0x64");

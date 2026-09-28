@@ -41,15 +41,6 @@ namespace
     "IFormationInstanceFastVectorTypeInfo size must be 0x68"
   );
 
-  template <std::uintptr_t SlotAddress>
-  struct StartupEngineStatsSlot
-  {
-    static EngineStats* value;
-  };
-
-  template <>
-  EngineStats* StartupEngineStatsSlot<0x10AE658u>::value = nullptr;
-
   alignas(CAiFormationDBImplTypeInfo)
   unsigned char gCAiFormationDBImplTypeInfoStorage[sizeof(CAiFormationDBImplTypeInfo)] = {};
   bool gCAiFormationDBImplTypeInfoConstructed = false;
@@ -256,23 +247,6 @@ namespace
 
     AcquireFastVectorIFormationInstanceType()->~IFormationInstanceFastVectorTypeInfo();
     gFastVectorIFormationInstanceTypeConstructed = false;
-  }
-
-  /**
-   * Address: 0x00BF69E0 (FUN_00BF69E0, cleanup_CAiFormationDBImplStartupStatsSlot)
-   *
-   * What it does:
-   * Tears down one startup-owned engine-stats slot for this lane.
-   */
-  void cleanup_CAiFormationDBImplStartupStatsSlot()
-  {
-    EngineStats*& slot = StartupEngineStatsSlot<0x10AE658u>::value;
-    if (!slot) {
-      return;
-    }
-
-    delete slot;
-    slot = nullptr;
   }
 
   void cleanup_FastVectorIFormationInstanceTypeName()
@@ -540,18 +514,6 @@ int moho::register_FastVectorIFormationInstanceTypeAtexit()
   return std::atexit(&cleanup_FastVectorIFormationInstanceType);
 }
 
-/**
- * Address: 0x00BCC230 (FUN_00BCC230, register_CAiFormationDBImplStartupStatsCleanup)
- *
- * What it does:
- * Installs process-exit cleanup for one startup-owned engine-stats slot used
- * by this lane.
- */
-int moho::register_CAiFormationDBImplStartupStatsCleanup()
-{
-  return std::atexit(&cleanup_CAiFormationDBImplStartupStatsSlot);
-}
-
 namespace
 {
   struct CAiFormationDBImplTypeInfoBootstrap
@@ -560,7 +522,6 @@ namespace
     {
       moho::register_CAiFormationDBImplTypeInfo();
       (void)moho::register_FastVectorIFormationInstanceTypeAtexit();
-      (void)moho::register_CAiFormationDBImplStartupStatsCleanup();
     }
   };
 

@@ -52,15 +52,6 @@ namespace
     gpg::RType* value
   ) noexcept;
 
-  template <std::uintptr_t SlotAddress>
-  struct StartupEngineStatsSlot
-  {
-    static EngineStats* value;
-  };
-
-  template <>
-  EngineStats* StartupEngineStatsSlot<0x10AEE34u>::value = nullptr;
-
   [[nodiscard]] CAiPathFinderTypeInfo* AcquireCAiPathFinderTypeInfo()
   {
     if (!gCAiPathFinderTypeInfoConstructed) {
@@ -353,22 +344,6 @@ namespace
     gRect2iListTypeInfoConstructed = false;
   }
 
-  /**
-   * Address: 0x00BF7300 (FUN_00BF7300, cleanup_CAiPathFinderStartupStatsSlot)
-   *
-   * What it does:
-   * Tears down one startup-owned AI path-finder stats slot.
-   */
-  void cleanup_CAiPathFinderStartupStatsSlot()
-  {
-    EngineStats*& slot = StartupEngineStatsSlot<0x10AEE34u>::value;
-    if (!slot) {
-      return;
-    }
-
-    delete slot;
-    slot = nullptr;
-  }
 } // namespace
 
 /**
@@ -512,18 +487,6 @@ int moho::register_Rect2iListTypeInfo()
   return std::atexit(&cleanup_Rect2iListTypeInfo);
 }
 
-/**
- * Address: 0x00BCCDD0 (FUN_00BCCDD0, register_CAiPathFinderStartupStatsCleanup)
- *
- * What it does:
- * Installs process-exit cleanup for one startup-owned AI path-finder stats
- * slot.
- */
-int moho::register_CAiPathFinderStartupStatsCleanup()
-{
-  return std::atexit(&cleanup_CAiPathFinderStartupStatsSlot);
-}
-
 namespace
 {
   struct CAiPathFinderTypeInfoBootstrap
@@ -532,7 +495,6 @@ namespace
     {
       (void)moho::register_CAiPathFinderTypeInfo();
       (void)moho::register_Rect2iListTypeInfo();
-      (void)moho::register_CAiPathFinderStartupStatsCleanup();
     }
   };
 

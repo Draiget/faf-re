@@ -77,11 +77,4 @@ namespace moho
   );
   static_assert(sizeof(IAiCommandDispatchImplSerializer) == 0x14, "IAiCommandDispatchImplSerializer size must be 0x14");
 
-  /**
-   * Address: 0x00BCBF40 (FUN_00BCBF40, register_IAiCommandDispatchImplStartupStatsCleanup)
-   *
-   * What it does:
-   * Registers an atexit cleanup thunk for one startup-owned engine-stats slot.
-   */
-  int register_IAiCommandDispatchImplStartupStatsCleanup();
 } // namespace moho

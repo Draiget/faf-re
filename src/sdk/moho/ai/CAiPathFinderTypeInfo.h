@@ -108,12 +108,4 @@ namespace moho
    */
   int register_Rect2iListTypeInfo();
 
-  /**
-   * Address: 0x00BCCDD0 (FUN_00BCCDD0, register_CAiPathFinderStartupStatsCleanup)
-   *
-   * What it does:
-   * Installs process-exit cleanup for one startup-owned AI path-finder stats
-   * slot.
-   */
-  int register_CAiPathFinderStartupStatsCleanup();
 } // namespace moho

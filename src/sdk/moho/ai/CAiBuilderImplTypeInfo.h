@@ -73,20 +73,5 @@ namespace moho
    */
   int register_CAiBuilderRebuildMapTypeInfo();
 
-  /**
-   * Address: 0x00BCC380 (FUN_00BCC380)
-   *
-   * What it does:
-   * Installs process-exit cleanup for one startup-owned AI-builder stats slot.
-   */
-  int register_CAiBuilderStartupStatsCleanupPrimary();
 
-  /**
-   * Address: 0x00BCC3F0 (FUN_00BCC3F0)
-   *
-   * What it does:
-   * Installs process-exit cleanup for a second startup-owned AI-builder stats
-   * slot.
-   */
-  int register_CAiBuilderStartupStatsCleanupSecondary();
 } // namespace moho

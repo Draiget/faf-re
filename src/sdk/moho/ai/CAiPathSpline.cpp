@@ -579,8 +579,6 @@ namespace
   bool gFastVectorCPathPointTypeNameCleanupRegistered = false;
   gpg::RType* gPathSplineTypeType = nullptr;
   gpg::RType* gPathSplineContinuationType = nullptr;
-  EngineStats* gRecoveredAiPathSplineStartupStatsSlot = nullptr;
-
   template <typename TSerializer>
   [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
   {
@@ -950,22 +948,6 @@ namespace
   {
     gFastVectorCPathPointTypeName.clear();
     gFastVectorCPathPointTypeNameCleanupRegistered = false;
-  }
-
-  /**
-   * Address: 0x00BF7600 (FUN_00BF7600, cleanup_CAiPathSplineStartupStats)
-   *
-   * What it does:
-   * Tears down one startup-owned AI path-spline stats slot.
-   */
-  void cleanup_CAiPathSplineStartupStats()
-  {
-    if (!gRecoveredAiPathSplineStartupStatsSlot) {
-      return;
-    }
-
-    delete gRecoveredAiPathSplineStartupStatsSlot;
-    gRecoveredAiPathSplineStartupStatsSlot = nullptr;
   }
 
 } // namespace
@@ -2259,17 +2241,6 @@ int moho::register_FastVectorCPathPointTypeAtexit()
   return std::atexit(&cleanup_FastVectorCPathPointType);
 }
 
-/**
- * Address: 0x00BCD3B0 (FUN_00BCD3B0, register_CAiPathSplineStartupStatsCleanup)
- *
- * What it does:
- * Installs process-exit cleanup for one startup-owned AI path-spline stats slot.
- */
-int moho::register_CAiPathSplineStartupStatsCleanup()
-{
-  return std::atexit(&cleanup_CAiPathSplineStartupStats);
-}
-
 namespace
 {
   // `ECollisionTypePrimitiveSerializer`, `SCollisionInfoSerializer`,
@@ -2284,7 +2255,6 @@ namespace
       (void)moho::register_SCollisionInfoTypeInfo();
       moho::register_ECollisionTypeTypeInfo();
       (void)moho::register_FastVectorCPathPointTypeAtexit();
-      (void)moho::register_CAiPathSplineStartupStatsCleanup();
       (void)moho::register_EPathPointStateTypeInfo();
       (void)moho::register_CPathPointTypeInfo();
     }

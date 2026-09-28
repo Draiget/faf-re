@@ -48,18 +48,6 @@ namespace
   msvc8::string gCAiBuilderRebuildMapTypeName;
   bool gCAiBuilderRebuildMapTypeNameInitialized = false;
 
-  template <std::uintptr_t SlotAddress>
-  struct StartupEngineStatsSlot
-  {
-    static EngineStats* value;
-  };
-
-  template <>
-  EngineStats* StartupEngineStatsSlot<0x10AE6CCu>::value = nullptr;
-
-  template <>
-  EngineStats* StartupEngineStatsSlot<0x10AEABCu>::value = nullptr;
-
   [[nodiscard]] CAiBuilderImplTypeInfo* AcquireCAiBuilderImplTypeInfo()
   {
     if (!gCAiBuilderImplTypeInfoConstructed) {
@@ -318,31 +306,6 @@ namespace
     gCAiBuilderRebuildMapTypeInfoConstructed = false;
   }
 
-  /**
-   * Address: 0x00BF6C40 (FUN_00BF6C40)
-   *
-   * What it does:
-   * Destroys one startup-owned AI-builder engine-stats slot.
-   */
-  void cleanup_CAiBuilderStartupStatsPrimary()
-  {
-    if (EngineStats* const slot = StartupEngineStatsSlot<0x10AE6CCu>::value; slot) {
-      delete slot;
-    }
-  }
-
-  /**
-   * Address: 0x00BF6C60 (FUN_00BF6C60)
-   *
-   * What it does:
-   * Destroys one secondary startup-owned AI-builder engine-stats slot.
-   */
-  void cleanup_CAiBuilderStartupStatsSecondary()
-  {
-    if (EngineStats* const slot = StartupEngineStatsSlot<0x10AEABCu>::value; slot) {
-      delete slot;
-    }
-  }
 } // namespace
 
 /**
@@ -459,29 +422,6 @@ int moho::register_CAiBuilderRebuildMapTypeInfo()
   return std::atexit(&cleanup_CAiBuilderRebuildMapTypeInfo);
 }
 
-/**
- * Address: 0x00BCC380 (FUN_00BCC380)
- *
- * What it does:
- * Installs process-exit cleanup for one startup-owned AI-builder stats slot.
- */
-int moho::register_CAiBuilderStartupStatsCleanupPrimary()
-{
-  return std::atexit(&cleanup_CAiBuilderStartupStatsPrimary);
-}
-
-/**
- * Address: 0x00BCC3F0 (FUN_00BCC3F0)
- *
- * What it does:
- * Installs process-exit cleanup for a second startup-owned AI-builder stats
- * slot.
- */
-int moho::register_CAiBuilderStartupStatsCleanupSecondary()
-{
-  return std::atexit(&cleanup_CAiBuilderStartupStatsSecondary);
-}
-
 namespace
 {
   struct CAiBuilderImplTypeInfoBootstrap
@@ -490,8 +430,6 @@ namespace
     {
       moho::register_CAiBuilderImplTypeInfo();
       (void)moho::register_CAiBuilderRebuildMapTypeInfo();
-      (void)moho::register_CAiBuilderStartupStatsCleanupPrimary();
-      (void)moho::register_CAiBuilderStartupStatsCleanupSecondary();
     }
   };
 

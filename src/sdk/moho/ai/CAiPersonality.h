@@ -206,14 +206,6 @@ namespace moho
   int register_CScrLuaMetatableFactory_CAiPersonality_Index();
 
   /**
-   * Address: 0x00BCD6C0 (FUN_00BCD6C0)
-   *
-   * What it does:
-   * Installs process-exit cleanup for one startup-owned AI reflection slot.
-   */
-  int register_CAiPersonalityStartupCleanup();
-
-  /**
    * VFTABLE: 0x00E1D2D0
    * COL:  0x00E737CC
    */

@@ -78,22 +78,12 @@ namespace moho
   CScrLuaInitForm* func_CAiBrainGetNoRushTicks_LuaFuncDef();
 
   CScrLuaInitForm* register_sim_SimInits_mForms_resourceDepositFactoryAnchor();
-  int register_AiBrainPrimaryEngineStatsCleanupAtExit();
-  int register_AiBrainEngineStatsCleanupAtExit();
 } // namespace moho
 
 namespace
 {
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_ResourceDepositStartup = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_ResourceDepositStartup = nullptr;
-
-  // Maps the cleanup slot used by FUN_00BF6440 (`dword_10AE09C`).
-  moho::EngineStats* gAiBrainPrimaryEngineStatsCleanupSlot = nullptr;
-
-  // Maps the cleanup slot used by FUN_00BF64F0 (`dword_10AE298`).
-  // Ownership is not fully recovered yet, so keep it isolated from the
-  // primary `moho::sEngineStats` singleton lane.
-  moho::EngineStats* gAiBrainStartupEngineStatsCleanupSlot = nullptr;
 
   [[nodiscard]] moho::CScrLuaInitFormSet* FindLuaInitFormSetByName(const char* const setName) noexcept
   {
@@ -112,27 +102,6 @@ namespace
     return Target();
   }
 
-  void CleanupEngineStatsSingletonAtProcessExit()
-  {
-    moho::EngineStats* const engineStats = gAiBrainStartupEngineStatsCleanupSlot;
-    if (!engineStats) {
-      return;
-    }
-
-    engineStats->~EngineStats();
-    ::operator delete(engineStats);
-  }
-
-  void CleanupPrimaryEngineStatsSingletonAtProcessExit()
-  {
-    moho::EngineStats* const engineStats = gAiBrainPrimaryEngineStatsCleanupSlot;
-    if (!engineStats) {
-      return;
-    }
-
-    engineStats->~EngineStats();
-    ::operator delete(engineStats);
-  }
 } // namespace
 
 namespace moho
@@ -888,27 +857,6 @@ namespace moho
     return &binder;
   }
 
-  /**
-   * Address: 0x00BCB4D0 (FUN_00BCB4D0, sub_BCB4D0)
-   *
-   * What it does:
-   * Registers process-exit cleanup for the primary AI-brain startup stats slot.
-   */
-  int register_AiBrainPrimaryEngineStatsCleanupAtExit()
-  {
-    return std::atexit(&CleanupPrimaryEngineStatsSingletonAtProcessExit);
-  }
-
-  /**
-   * Address: 0x00BCBB60 (FUN_00BCBB60, sub_BCBB60)
-   *
-   * What it does:
-   * Registers the recovered engine-stats cleanup callback for process exit.
-   */
-  int register_AiBrainEngineStatsCleanupAtExit()
-  {
-    return std::atexit(&CleanupEngineStatsSingletonAtProcessExit);
-  }
 } // namespace moho
 
 namespace
@@ -984,8 +932,6 @@ namespace
       (void)moho::register_CAiBrainGetThreatsAroundPosition_LuaFuncDef();
       (void)moho::j_func_CAiBrainCheckBlockingTerrain_LuaFuncDef();
       (void)moho::register_CAiBrainGetNoRushTicks_LuaFuncDef();
-      (void)moho::register_AiBrainPrimaryEngineStatsCleanupAtExit();
-      (void)moho::register_AiBrainEngineStatsCleanupAtExit();
     }
   };
 

@@ -13,15 +13,6 @@ using namespace moho;
 
 namespace
 {
-  template <std::uintptr_t SlotAddress>
-  struct StartupEngineStatsSlot
-  {
-    static EngineStats* value;
-  };
-
-  template <>
-  EngineStats* StartupEngineStatsSlot<0x10AE39Cu>::value = nullptr;
-
   alignas(IAiCommandDispatchTypeInfo)
   unsigned char gIAiCommandDispatchTypeInfoStorage[sizeof(IAiCommandDispatchTypeInfo)] = {};
   bool gIAiCommandDispatchTypeInfoConstructed = false;
@@ -67,21 +58,6 @@ namespace
     gIAiCommandDispatchTypeInfoConstructed = false;
   }
 
-  /**
-   * Address: 0x00BF65E0 (FUN_00BF65E0, cleanup_IAiCommandDispatchTypeInfoStartupStatsSlot)
-   *
-   * What it does:
-   * Destroys one startup-owned IAiCommandDispatch stats slot.
-   */
-  void cleanup_IAiCommandDispatchTypeInfoStartupStatsSlot()
-  {
-    EngineStats* const slot = StartupEngineStatsSlot<0x10AE39Cu>::value;
-    if (!slot) {
-      return;
-    }
-
-    delete slot;
-  }
 } // namespace
 
 /**
@@ -120,24 +96,12 @@ int moho::register_IAiCommandDispatchTypeInfo()
   return std::atexit(&cleanup_IAiCommandDispatchTypeInfoStorage);
 }
 
-/**
- * Address: 0x00BCBE10 (FUN_00BCBE10, register_IAiCommandDispatchTypeInfoStartupStatsCleanup)
- *
- * What it does:
- * Registers process-exit cleanup for one startup-owned engine-stats slot.
- */
-int moho::register_IAiCommandDispatchTypeInfoStartupStatsCleanup()
-{
-  return std::atexit(&cleanup_IAiCommandDispatchTypeInfoStartupStatsSlot);
-}
-
 namespace
 {
   struct IAiCommandDispatchTypeInfoBootstrap
   {
     IAiCommandDispatchTypeInfoBootstrap()
     {
-      (void)moho::register_IAiCommandDispatchTypeInfoStartupStatsCleanup();
       (void)moho::register_IAiCommandDispatchTypeInfo();
     }
   };

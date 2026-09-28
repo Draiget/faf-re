@@ -144,8 +144,6 @@ namespace
   gpg::RType* gSimType = nullptr;
   gpg::RType* gAiPersonalityRangeType = nullptr;
   gpg::RType* gStringVectorType = nullptr;
-  EngineStats* gRecoveredAiPersonalityStartupStatsSlot = nullptr;
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
@@ -329,21 +327,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x00BF7770 (FUN_00BF7770, cleanup_CAiPersonalityStartup)
-   *
-   * What it does:
-   * Tears down one startup-owned AI personality stats slot.
-   */
-  void cleanup_CAiPersonalityStartup()
-  {
-    if (!gRecoveredAiPersonalityStartupStatsSlot) {
-      return;
-    }
-
-    delete gRecoveredAiPersonalityStartupStatsSlot;
-    gRecoveredAiPersonalityStartupStatsSlot = nullptr;
-  }
 } // namespace
 
 gpg::RType* CAiPersonality::sType = nullptr;
@@ -1819,17 +1802,6 @@ int moho::register_CScrLuaMetatableFactory_CAiPersonality_Index()
   return index;
 }
 
-/**
- * Address: 0x00BCD6C0 (FUN_00BCD6C0)
- *
- * What it does:
- * Installs process-exit cleanup for one startup-owned AI reflection slot.
- */
-int moho::register_CAiPersonalityStartupCleanup()
-{
-  return std::atexit(&cleanup_CAiPersonalityStartup);
-}
-
 CScrLuaMetatableFactory<CAiPersonality>& CScrLuaMetatableFactory<CAiPersonality>::Instance()
 {
   return sInstance;
@@ -1842,7 +1814,6 @@ namespace
     CAiPersonalityStartupBootstrap()
     {
       (void)moho::register_CScrLuaMetatableFactory_CAiPersonality_Index();
-      (void)moho::register_CAiPersonalityStartupCleanup();
     }
   };
 
