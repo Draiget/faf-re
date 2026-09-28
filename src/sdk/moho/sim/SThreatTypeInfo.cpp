@@ -3,17 +3,16 @@
 #include "moho/sim/CInfluenceMap.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::SThreatTypeInfo> gSThreatTypeInfoStorage{};
 } // namespace
 
 namespace moho
 {
   /**
    * Address: 0x007179B0 (FUN_007179B0, static-init lane)
+   * Address: 0x00C00000 (FUN_00C00000, atexit destructor of the SThreatTypeInfo object; registered by 0x00BDA760)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -22,7 +21,8 @@ namespace moho
    */
   gpg::RType* preregister_SThreatTypeInfo()
   {
-    return &gSThreatTypeInfoStorage.Ensure();
+    static moho::SThreatTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**

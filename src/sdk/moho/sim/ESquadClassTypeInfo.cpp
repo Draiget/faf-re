@@ -10,11 +10,9 @@
 
 namespace
 {
-  alignas(moho::ESquadClassTypeInfo) unsigned char gESquadClassTypeInfoStorage[sizeof(moho::ESquadClassTypeInfo)]{};
-  bool gESquadClassTypeInfoConstructed = false;
-
   /**
    * Address: 0x00723B10 (FUN_00723B10, ESquadClassTypeInfo construct/register lane)
+   * Address: 0x00C00430 (FUN_00C00430, atexit destructor of the ESquadClassTypeInfo object; registered by 0x00BDAB60)
    *
    * What it does:
    * Constructs one static `ESquadClassTypeInfo` object and pre-registers RTTI
@@ -22,14 +20,9 @@ namespace
    */
   [[maybe_unused]] gpg::REnumType* ConstructESquadClassTypeInfo()
   {
-    if (!gESquadClassTypeInfoConstructed) {
-      new (gESquadClassTypeInfoStorage) moho::ESquadClassTypeInfo();
-      gESquadClassTypeInfoConstructed = true;
-    }
-
-    auto* const typeInfo = reinterpret_cast<moho::ESquadClassTypeInfo*>(gESquadClassTypeInfoStorage);
-    gpg::PreRegisterRType(typeid(moho::ESquadClass), typeInfo);
-    return typeInfo;
+    static moho::ESquadClassTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(moho::ESquadClass), &sInstance);
+    return &sInstance;
   }
 
   // Address: 0x010B9804 -- process-global `PrimitiveSerHelper<ESquadClass,int>`
@@ -49,11 +42,8 @@ namespace moho
    * this non-deleting variant is a bare 5-byte `jmp gpg::REnumType::~REnumType`
    * tail-call, not a distinct body. It has zero callsite evidence anywhere in
    * the binary (no code caller, no data/vtable xref, unreachable per the
-   * enriched callgraph index) -- unlike its `EAllianceTypeInfo`/
-   * `EImpactTypeTypeInfo` siblings, `ESquadClassTypeInfo` has no
-   * `cleanup_*`/`atexit` teardown registered at all (see
-   * `ConstructESquadClassTypeInfo` above), so there is no plausible explicit
-   * `->~ESquadClassTypeInfo()` call site in this binary in the first place.
+   * enriched callgraph index); the static object's own atexit destructor
+   * (0x00C00430) destroys it.
    * Compiler-emitted glue for the `= default` destructor below, corresponding
    * to no source line of its own -- RULE ONE.
    */

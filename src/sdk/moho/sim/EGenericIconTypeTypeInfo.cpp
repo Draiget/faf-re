@@ -3,17 +3,16 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::EGenericIconTypeTypeInfo> gEGenericIconTypeTypeInfoStorage{};
 } // namespace
 
 namespace moho
 {
   /**
    * Address: 0x0085B120 (FUN_0085B120, static-init lane)
+   * Address: 0x00C07110 (FUN_00C07110, atexit destructor of the EGenericIconTypeTypeInfo object; registered by 0x00BE5B40)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -22,7 +21,8 @@ namespace moho
    */
   gpg::REnumType* preregister_EGenericIconTypeTypeInfo()
   {
-    return &gEGenericIconTypeTypeInfoStorage.Ensure();
+    static moho::EGenericIconTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**

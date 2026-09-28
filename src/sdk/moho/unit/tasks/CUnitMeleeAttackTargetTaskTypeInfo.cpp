@@ -10,13 +10,9 @@
 #include "moho/unit/tasks/CUnitMeleeAttackTargetTask.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::CUnitMeleeAttackTargetTaskTypeInfo>
-    gCUnitMeleeAttackTargetTaskTypeInfoStorage{};
-
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
     gpg::RType* type = moho::CCommandTask::sType;
@@ -72,6 +68,7 @@ namespace moho
 
   /**
    * Address: 0x00615270 (FUN_00615270, sub_615270)
+   * Address: 0x00BF9F30 (FUN_00BF9F30, atexit destructor of the CUnitMeleeAttackTargetTaskTypeInfo object; registered by 0x00BD0DE0)
    *
    * What it does:
    * Constructs the static descriptor in place on first call and returns it,
@@ -79,7 +76,8 @@ namespace moho
    */
   gpg::RType* preregister_CUnitMeleeAttackTargetTaskTypeInfo()
   {
-    return &gCUnitMeleeAttackTargetTaskTypeInfoStorage.Ensure();
+    static moho::CUnitMeleeAttackTargetTaskTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**

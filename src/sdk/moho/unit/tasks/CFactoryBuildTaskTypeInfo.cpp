@@ -9,15 +9,6 @@
 
 namespace
 {
-  alignas(moho::CFactoryBuildTaskTypeInfo)
-    unsigned char gCFactoryBuildTaskTypeInfoStorage[sizeof(moho::CFactoryBuildTaskTypeInfo)];
-  bool gCFactoryBuildTaskTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::CFactoryBuildTaskTypeInfo& CFactoryBuildTaskTypeInfoStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::CFactoryBuildTaskTypeInfo*>(gCFactoryBuildTaskTypeInfoStorage);
-  }
-
   /**
    * Address: 0x005FC500 (FUN_005FC500, Moho::CFactoryBuildTaskTypeInfo::Delete)
    *
@@ -48,6 +39,7 @@ namespace moho
 {
   /**
    * Address: 0x005FA130 (FUN_005FA130, preregister_CFactoryBuildTaskTypeInfo)
+   * Address: 0x00BF9480 (FUN_00BF9480, atexit destructor of the CFactoryBuildTaskTypeInfo object)
    *
    * What it does:
    * Constructs/preregisters the startup `CFactoryBuildTaskTypeInfo`
@@ -55,13 +47,9 @@ namespace moho
    */
   gpg::RType* preregister_CFactoryBuildTaskTypeInfo()
   {
-    if (!gCFactoryBuildTaskTypeInfoConstructed) {
-      new (gCFactoryBuildTaskTypeInfoStorage) CFactoryBuildTaskTypeInfo();
-      gCFactoryBuildTaskTypeInfoConstructed = true;
-    }
-
-    gpg::PreRegisterRType(typeid(CFactoryBuildTask), &CFactoryBuildTaskTypeInfoStorageRef());
-    return &CFactoryBuildTaskTypeInfoStorageRef();
+    static CFactoryBuildTaskTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(CFactoryBuildTask), &sInstance);
+    return &sInstance;
   }
 
   const char* CFactoryBuildTaskTypeInfo::GetName() const

@@ -10,15 +10,6 @@
 
 namespace
 {
-  alignas(moho::CUnitUnloadUnitsTypeInfo)
-    unsigned char gCUnitUnloadUnitsTypeInfoStorage[sizeof(moho::CUnitUnloadUnitsTypeInfo)];
-  bool gCUnitUnloadUnitsTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::CUnitUnloadUnitsTypeInfo& CUnitUnloadUnitsTypeInfoStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::CUnitUnloadUnitsTypeInfo*>(gCUnitUnloadUnitsTypeInfoStorage);
-  }
-
   [[nodiscard]] gpg::RType* CachedCUnitUnloadUnitsType()
   {
     static gpg::RType* cached = nullptr;
@@ -73,6 +64,7 @@ namespace moho
 
 /**
    * Address: 0x00626120 (FUN_00626120, preregister_CUnitUnloadUnitsTypeInfo)
+ * Address: 0x00BFA5E0 (FUN_00BFA5E0, atexit destructor of the CUnitUnloadUnitsTypeInfo object)
    *
    * What it does:
    * Constructs/preregisters the startup `CUnitUnloadUnitsTypeInfo`
@@ -80,13 +72,9 @@ namespace moho
    */
   gpg::RType* preregister_CUnitUnloadUnitsTypeInfo()
   {
-    if (!gCUnitUnloadUnitsTypeInfoConstructed) {
-      new (gCUnitUnloadUnitsTypeInfoStorage) CUnitUnloadUnitsTypeInfo();
-      gCUnitUnloadUnitsTypeInfoConstructed = true;
-    }
-
-    gpg::PreRegisterRType(typeid(CUnitUnloadUnits), &CUnitUnloadUnitsTypeInfoStorageRef());
-    return &CUnitUnloadUnitsTypeInfoStorageRef();
+    static CUnitUnloadUnitsTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(CUnitUnloadUnits), &sInstance);
+    return &sInstance;
   }
 
   const char* CUnitUnloadUnitsTypeInfo::GetName() const

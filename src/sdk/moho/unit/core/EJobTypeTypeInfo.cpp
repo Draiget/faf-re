@@ -4,12 +4,9 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::EJobTypeTypeInfo> gEJobTypeTypeInfoStorage{};
-
   /**
    * Address: 0x00BCA460 (FUN_00BCA460, dynamic initializer for the global
    * `PrimitiveSerHelper<EJobType,int>` singleton)
@@ -28,6 +25,7 @@ namespace moho
 {
   /**
    * Address: 0x0055B810 (FUN_0055B810, static-init lane)
+   * Address: 0x00BF51E0 (FUN_00BF51E0, atexit destructor of the EJobTypeTypeInfo object; registered by 0x00BCA440)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -36,7 +34,8 @@ namespace moho
    */
   gpg::REnumType* preregister_EJobTypeTypeInfo()
   {
-    return &gEJobTypeTypeInfoStorage.Ensure();
+    static moho::EJobTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**

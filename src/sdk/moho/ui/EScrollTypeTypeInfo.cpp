@@ -5,17 +5,16 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::EScrollTypeTypeInfo> gEScrollTypeTypeInfoStorage{};
 } // namespace
 
 namespace moho
 {
   /**
    * Address: 0x007771B0 (FUN_007771B0, static-init lane)
+   * Address: 0x00C02640 (FUN_00C02640, atexit destructor of the EScrollTypeTypeInfo object; registered by 0x00BDD670)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -24,7 +23,8 @@ namespace moho
    */
   gpg::REnumType* preregister_EScrollTypeTypeInfo()
   {
-    return &gEScrollTypeTypeInfoStorage.Ensure();
+    static moho::EScrollTypeTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**

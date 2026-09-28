@@ -11,20 +11,13 @@
 
 namespace
 {
-  alignas(moho::CUnitPatrolTaskTypeInfo)
-    unsigned char gCUnitPatrolTaskTypeInfoStorage[sizeof(moho::CUnitPatrolTaskTypeInfo)];
-  bool gCUnitPatrolTaskTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::CUnitPatrolTaskTypeInfo& CUnitPatrolTaskTypeInfoStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::CUnitPatrolTaskTypeInfo*>(gCUnitPatrolTaskTypeInfoStorage);
-  }
 } // namespace
 
 namespace moho
 {
   /**
    * Address: 0x0061AB10 (FUN_0061AB10, preregister_CUnitPatrolTaskTypeInfo)
+   * Address: 0x00BFA120 (FUN_00BFA120, atexit destructor of the CUnitPatrolTaskTypeInfo object)
    *
    * What it does:
    * Constructs/preregisters the startup `CUnitPatrolTaskTypeInfo`
@@ -32,13 +25,9 @@ namespace moho
    */
   gpg::RType* preregister_CUnitPatrolTaskTypeInfo()
   {
-    if (!gCUnitPatrolTaskTypeInfoConstructed) {
-      new (gCUnitPatrolTaskTypeInfoStorage) CUnitPatrolTaskTypeInfo();
-      gCUnitPatrolTaskTypeInfoConstructed = true;
-    }
-
-    gpg::PreRegisterRType(typeid(CUnitPatrolTask), &CUnitPatrolTaskTypeInfoStorageRef());
-    return &CUnitPatrolTaskTypeInfoStorageRef();
+    static CUnitPatrolTaskTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(CUnitPatrolTask), &sInstance);
+    return &sInstance;
   }
 
   const char* CUnitPatrolTaskTypeInfo::GetName() const

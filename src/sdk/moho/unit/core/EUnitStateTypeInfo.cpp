@@ -4,12 +4,9 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::EUnitStateTypeInfo> gEUnitStateTypeInfoStorage{};
-
   /**
    * Address: 0x00BCA520 (FUN_00BCA520, dynamic initializer for the global
    * `PrimitiveSerHelper<EUnitState,int>` singleton)
@@ -28,6 +25,7 @@ namespace moho
 {
   /**
    * Address: 0x0055BB10 (FUN_0055BB10, static-init lane)
+   * Address: 0x00BF5260 (FUN_00BF5260, atexit destructor of the EUnitStateTypeInfo object; registered by 0x00BCA500)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -36,7 +34,8 @@ namespace moho
    */
   gpg::REnumType* preregister_EUnitStateTypeInfo()
   {
-    return &gEUnitStateTypeInfoStorage.Ensure();
+    static moho::EUnitStateTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**

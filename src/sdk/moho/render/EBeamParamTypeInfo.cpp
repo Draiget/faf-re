@@ -6,19 +6,18 @@
 #include "moho/render/EBeamParam.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 using namespace moho;
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::EBeamParamTypeInfo> gEBeamParamTypeInfoStorage{};
 } // namespace
 
 namespace moho
 {
   /**
    * Address: 0x00770AC0 (FUN_00770AC0, static-init lane)
+   * Address: 0x00C02000 (FUN_00C02000, atexit destructor of the EBeamParamTypeInfo object; registered by 0x00BDCE80)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -27,7 +26,8 @@ namespace moho
    */
   gpg::REnumType* preregister_EBeamParamTypeInfo()
   {
-    return &gEBeamParamTypeInfoStorage.Ensure();
+    static moho::EBeamParamTypeInfo sInstance;
+    return &sInstance;
   }
 } // namespace moho
 

@@ -3618,9 +3618,6 @@
     <ClInclude Include="gpg\core\reflection\Reflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gpg\core\reflection\StaticTypeInfoStorage.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="gpg\core\reflection\BadRefCast.h">
       <Filter>Header Files</Filter>
     </ClInclude>

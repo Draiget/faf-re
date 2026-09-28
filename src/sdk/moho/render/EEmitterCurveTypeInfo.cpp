@@ -6,19 +6,18 @@
 #include "moho/render/EEmitterCurve.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 using namespace moho;
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::EEmitterCurveTypeInfo> gEEmitterCurveTypeInfoStorage{};
 } // namespace
 
 namespace moho
 {
   /**
    * Address: 0x007704E0 (FUN_007704E0, static-init lane)
+   * Address: 0x00C01FE0 (FUN_00C01FE0, atexit destructor of the EEmitterCurveTypeInfo object; registered by 0x00BDCE40)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -27,7 +26,8 @@ namespace moho
    */
   gpg::REnumType* preregister_EEmitterCurveTypeInfo()
   {
-    return &gEEmitterCurveTypeInfoStorage.Ensure();
+    static moho::EEmitterCurveTypeInfo sInstance;
+    return &sInstance;
   }
 } // namespace moho
 

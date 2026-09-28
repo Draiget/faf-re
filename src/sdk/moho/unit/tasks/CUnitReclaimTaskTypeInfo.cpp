@@ -9,19 +9,14 @@
 
 namespace
 {
-  alignas(moho::CUnitReclaimTaskTypeInfo)
-  unsigned char gCUnitReclaimTaskTypeInfoStorage[sizeof(moho::CUnitReclaimTaskTypeInfo)]{};
-  bool gCUnitReclaimTaskTypeInfoConstructed = false;
-
+  /**
+   * Address: 0x00BFA2B0 (FUN_00BFA2B0, atexit destructor of the CUnitReclaimTaskTypeInfo object; registered by 0x00BD17C0)
+   */
   [[nodiscard]] moho::CUnitReclaimTaskTypeInfo* AcquireCUnitReclaimTaskTypeInfo()
   {
-    if (!gCUnitReclaimTaskTypeInfoConstructed) {
-      auto* const typeInfo = new (gCUnitReclaimTaskTypeInfoStorage) moho::CUnitReclaimTaskTypeInfo();
-      gpg::PreRegisterRType(typeid(moho::CUnitReclaimTask), typeInfo);
-      gCUnitReclaimTaskTypeInfoConstructed = true;
-    }
-
-    return reinterpret_cast<moho::CUnitReclaimTaskTypeInfo*>(gCUnitReclaimTaskTypeInfoStorage);
+    static moho::CUnitReclaimTaskTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(moho::CUnitReclaimTask), &sInstance);
+    return &sInstance;
   }
 
   /**

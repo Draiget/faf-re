@@ -10,15 +10,6 @@
 
 namespace
 {
-  alignas(moho::CUnitCarrierLaunchTypeInfo)
-    unsigned char gCUnitCarrierLaunchTypeInfoStorage[sizeof(moho::CUnitCarrierLaunchTypeInfo)];
-  bool gCUnitCarrierLaunchTypeInfoConstructed = false;
-
-  [[nodiscard]] moho::CUnitCarrierLaunchTypeInfo& CUnitCarrierLaunchTypeInfoStorageRef() noexcept
-  {
-    return *reinterpret_cast<moho::CUnitCarrierLaunchTypeInfo*>(gCUnitCarrierLaunchTypeInfoStorage);
-  }
-
   /**
    * Address: 0x00607D80 (FUN_00607D80, Moho::CUnitCarrierLaunchTypeInfo::Delete)
    *
@@ -64,6 +55,7 @@ namespace moho
 
 /**
    * Address: 0x00607470 (FUN_00607470, preregister_CUnitCarrierLaunchTypeInfo)
+ * Address: 0x00BF99F0 (FUN_00BF99F0, atexit destructor of the CUnitCarrierLaunchTypeInfo object)
    *
    * What it does:
    * Constructs/preregisters the startup `CUnitCarrierLaunchTypeInfo`
@@ -71,13 +63,9 @@ namespace moho
    */
   gpg::RType* preregister_CUnitCarrierLaunchTypeInfo()
   {
-    if (!gCUnitCarrierLaunchTypeInfoConstructed) {
-      new (gCUnitCarrierLaunchTypeInfoStorage) CUnitCarrierLaunchTypeInfo();
-      gCUnitCarrierLaunchTypeInfoConstructed = true;
-    }
-
-    gpg::PreRegisterRType(typeid(CUnitCarrierLaunch), &CUnitCarrierLaunchTypeInfoStorageRef());
-    return &CUnitCarrierLaunchTypeInfoStorageRef();
+    static CUnitCarrierLaunchTypeInfo sInstance;
+    gpg::PreRegisterRType(typeid(CUnitCarrierLaunch), &sInstance);
+    return &sInstance;
   }
 
   const char* CUnitCarrierLaunchTypeInfo::GetName() const

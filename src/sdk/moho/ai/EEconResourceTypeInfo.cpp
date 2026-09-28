@@ -4,12 +4,9 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::EEconResourceTypeInfo> gEEconResourceTypeInfoStorage{};
-
   /**
    * Address: 0x00BCA810 (FUN_00BCA810, dynamic initializer for the global
    * `PrimitiveSerHelper<EEconResource,int>` singleton)
@@ -28,6 +25,7 @@ namespace moho
 {
   /**
    * Address: 0x00563980 (FUN_00563980, static-init lane)
+   * Address: 0x00BF5620 (FUN_00BF5620, atexit destructor of the EEconResourceTypeInfo object; registered by 0x00BCA7F0)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -36,7 +34,8 @@ namespace moho
    */
   gpg::REnumType* preregister_EEconResourceTypeInfo()
   {
-    return &gEEconResourceTypeInfoStorage.Ensure();
+    static moho::EEconResourceTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**

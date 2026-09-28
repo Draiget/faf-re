@@ -3,17 +3,16 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::CWldTerrainDecalTYPETypeInfo> gCWldTerrainDecalTYPETypeInfoStorage{};
 } // namespace
 
 namespace moho
 {
   /**
    * Address: 0x0089C8A0 (FUN_0089C8A0, static-init lane)
+   * Address: 0x00C08470 (FUN_00C08470, atexit destructor of the CWldTerrainDecalTYPETypeInfo object; registered by 0x00BE7CC0)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -22,7 +21,8 @@ namespace moho
    */
   gpg::REnumType* preregister_CWldTerrainDecalTYPETypeInfo()
   {
-    return &gCWldTerrainDecalTYPETypeInfoStorage.Ensure();
+    static moho::CWldTerrainDecalTYPETypeInfo sInstance;
+    return &sInstance;
   }
 
   /**

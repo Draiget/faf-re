@@ -4,12 +4,9 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::EFireStateTypeInfo> gEFireStateTypeInfoStorage{};
-
   /**
    * Address: 0x00BCA4C0 (FUN_00BCA4C0, dynamic initializer for the global
    * `PrimitiveSerHelper<EFireState,int>` singleton)
@@ -28,6 +25,7 @@ namespace moho
 {
   /**
    * Address: 0x0055B990 (FUN_0055B990, static-init lane)
+   * Address: 0x00BF5220 (FUN_00BF5220, atexit destructor of the EFireStateTypeInfo object; registered by 0x00BCA4A0)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -36,7 +34,8 @@ namespace moho
    */
   gpg::REnumType* preregister_EFireStateTypeInfo()
   {
-    return &gEFireStateTypeInfoStorage.Ensure();
+    static moho::EFireStateTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**

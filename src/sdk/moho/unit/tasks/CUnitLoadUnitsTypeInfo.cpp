@@ -11,12 +11,9 @@
 #include "moho/unit/tasks/CUnitLoadUnits.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::CUnitLoadUnitsTypeInfo> gCUnitLoadUnitsTypeInfoStorage{};
-
   [[nodiscard]] gpg::RType* CachedCUnitLoadUnitsType()
   {
     static gpg::RType* cached = nullptr;
@@ -89,6 +86,7 @@ namespace moho
 
   /**
    * Address: 0x00624E90 (FUN_00624E90, sub_624E90)
+   * Address: 0x00BFA550 (FUN_00BFA550, atexit destructor of the CUnitLoadUnitsTypeInfo object; registered by 0x00BD1C90)
    *
    * What it does:
    * Constructs the static descriptor in place on first call and returns it,
@@ -96,7 +94,8 @@ namespace moho
    */
   gpg::RType* preregister_CUnitLoadUnitsTypeInfo()
   {
-    return &gCUnitLoadUnitsTypeInfoStorage.Ensure();
+    static moho::CUnitLoadUnitsTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**

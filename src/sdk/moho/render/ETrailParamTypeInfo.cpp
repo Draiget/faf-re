@@ -6,19 +6,18 @@
 #include "moho/render/ETrailParam.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/reflection/StaticTypeInfoStorage.h"
 
 using namespace moho;
 
 namespace
 {
-  gpg::StaticTypeInfoStorage<moho::ETrailParamTypeInfo> gETrailParamTypeInfoStorage{};
 } // namespace
 
 namespace moho
 {
   /**
    * Address: 0x00770DD0 (FUN_00770DD0, static-init lane)
+   * Address: 0x00C02010 (FUN_00C02010, atexit destructor of the ETrailParamTypeInfo object; registered by 0x00BDCEA0)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -27,7 +26,8 @@ namespace moho
    */
   gpg::REnumType* preregister_ETrailParamTypeInfo()
   {
-    return &gETrailParamTypeInfoStorage.Ensure();
+    static moho::ETrailParamTypeInfo sInstance;
+    return &sInstance;
   }
 } // namespace moho
 
