@@ -70,7 +70,14 @@ namespace moho
     void RegisterOverlayClassToken(const char* overlayToken);
 
   public:
-    std::uint32_t mOverlayClassPad0064;                       // +0x64 (observed gap before intrusive link base)
+    // RTTI has `gpg::DListItem<RDebugOverlayClass>` as a base at +0x68, and
+    // RType is 0x64 in the binary as well (its ctor 0x008DD950 stops at the
+    // +0x60 byte; REnumType::StripPrefix 0x008D86F3 reads `mPrefix` at +0x64).
+    // RType holds no noncopyable, so the rule that moves CNetTCPConnection's
+    // and CEconomyEvent's nodes does not apply; MSVC8 left these four bytes
+    // anyway. VS2022 puts such a base at +0x64, so the node stays a member
+    // behind this word until the compiler's rule is pinned down.
+    std::uint32_t mOverlayClassPad0064;                       // +0x64
     TDatListItem<RDebugOverlayClass, void> mOverlayClassLink; // +0x68
     msvc8::string mOverlayToken;                              // +0x70
     msvc8::string mOverlayDescription;                        // +0x8C
