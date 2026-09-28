@@ -8,6 +8,7 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
+#include "moho/containers/TDatList.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/misc/CDiskWatch.h"
 #include "moho/misc/InstanceCounter.h"
@@ -46,6 +47,7 @@ namespace moho
   // constructor takes a `const RRuleGameRulesImpl*` parameter -- a pointer
   // to an incomplete type is a legal declaration.
   class RRuleGameRulesImpl;
+  struct LuaReloadRequestNode;
 
   /**
    * The category-lookup map's node does not follow the usual "value starts at
@@ -803,8 +805,9 @@ namespace moho
      * not the identifier.
      */
     EntityCategoryLookupTable* mEntityCategoryLookup; // +0xC4
-    void* mPendingBlueprintReloadNext;                // +0xC8
-    void* mPendingBlueprintReloadPrev;                // +0xCC
+    /// Blueprint files that changed on disk, each reloaded once its deadline
+    /// passes (`UpdateLuaState`, 0x0052A520 enqueue / 0x0052A64B drain).
+    TDatList<LuaReloadRequestNode, void> mPendingBlueprintReloads; // +0xC8
   };
 
   static_assert(offsetof(RRuleGameRulesImpl, mLuaState) == 0x40, "RRuleGameRulesImpl::mLuaState offset must be 0x40");
@@ -853,8 +856,8 @@ namespace moho
     "RRuleGameRulesImpl::mEntityCategoryLookup offset must be 0xC4"
   );
   static_assert(
-    offsetof(RRuleGameRulesImpl, mPendingBlueprintReloadNext) == 0xC8,
-    "RRuleGameRulesImpl::mPendingBlueprintReloadNext offset must be 0xC8"
+    offsetof(RRuleGameRulesImpl, mPendingBlueprintReloads) == 0xC8,
+    "RRuleGameRulesImpl::mPendingBlueprintReloads offset must be 0xC8"
   );
   static_assert(sizeof(RRuleGameRulesImpl) == 0xD0, "RRuleGameRulesImpl size must be 0xD0");
 

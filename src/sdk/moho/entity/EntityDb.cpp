@@ -362,7 +362,7 @@ namespace
     return static_cast<moho::Entity*>(upcast.mObj ? upcast.mObj : tracked.object);
   }
 
-  [[nodiscard]] moho::CEntityDbListHead* ReadEntitySetPointer(gpg::ReadArchive* const archive)
+  [[nodiscard]] moho::EntitySetBase* ReadEntitySetPointer(gpg::ReadArchive* const archive)
   {
     if (!archive) {
       return nullptr;
@@ -375,58 +375,12 @@ namespace
 
     gpg::RType* const expectedType = ResolveEntitySetBaseType();
     if (!expectedType || !tracked.type) {
-      return static_cast<moho::CEntityDbListHead*>(tracked.object);
+      return static_cast<moho::EntitySetBase*>(tracked.object);
     }
 
     const gpg::RRef source = MakeObjectRef(tracked.object, tracked.type);
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    return static_cast<moho::CEntityDbListHead*>(upcast.mObj ? upcast.mObj : tracked.object);
-  }
-
-  void EnsureSetListHeadInitialized(moho::CEntityDbListHead& head) noexcept
-  {
-    if (!head.next || !head.prev) {
-      head.next = &head;
-      head.prev = &head;
-    }
-  }
-
-  /**
-   * Address: 0x00684340 (FUN_00684340)
-   *
-   * What it does:
-   * Resets one intrusive list-head lane to the empty self-linked sentinel
-   * shape (`next=this`, `prev=this`) and returns the same head pointer.
-   */
-  moho::CEntityDbListHead* ResetEntityDbListHeadToSelf(moho::CEntityDbListHead* const head) noexcept
-  {
-    if (head != nullptr) {
-      head->next = head;
-      head->prev = head;
-    }
-    return head;
-  }
-
-  void LinkSetNodeToFront(moho::CEntityDbListHead& head, moho::CEntityDbListHead* const node) noexcept
-  {
-    if (!node) {
-      return;
-    }
-
-    EnsureSetListHeadInitialized(head);
-
-    if (node->next && node->prev) {
-      node->next->prev = node->prev;
-      node->prev->next = node->next;
-    }
-
-    node->next = node;
-    node->prev = node;
-
-    node->next = head.next;
-    node->prev = &head;
-    head.next->prev = node;
-    head.next = node;
+    return static_cast<moho::EntitySetBase*>(upcast.mObj ? upcast.mObj : tracked.object);
   }
 
   [[nodiscard]] moho::CEntityDbAllUnitsNode*
@@ -941,19 +895,11 @@ namespace
     return outIterator;
   }
 
-  using RegisteredEntitySetList = moho::TDatList<moho::EntitySetBase, void>;
-
-  [[nodiscard]] RegisteredEntitySetList& AccessRegisteredEntitySetList(moho::CEntityDb& entityDb) noexcept
-  {
-    return *reinterpret_cast<RegisteredEntitySetList*>(&entityDb.mRegisteredEntitySets);
-  }
-
   void PurgeRegisteredEntitySets(moho::CEntityDb& entityDb)
   {
-    RegisteredEntitySetList& registry = AccessRegisteredEntitySetList(entityDb);
+    auto& registry = entityDb.mRegisteredEntitySets;
     for (auto* node = registry.mNext; node != &registry; node = node->mNext) {
-      auto* const entitySet = static_cast<moho::EntitySetBase*>(static_cast<void*>(node));
-      auto& entities = entitySet->mVec;
+      auto& entities = static_cast<moho::EntitySetBase*>(node)->mVec;
       for (auto it = entities.begin(); it != entities.end();) {
         moho::Entity* const entity = *it;
         if (entity != nullptr && entity->mOnDestroyDispatched == 0u) {
@@ -1564,9 +1510,6 @@ namespace moho
    */
   CEntityDb::CEntityDb()
   {
-
-    (void)ResetEntityDbListHeadToSelf(&mRegisteredEntitySets);
-
     // mBoundedProps (Address: 0x00685980, FUN_00685980) starts empty via its
     // own default member initialization -- see the constructor citation on
     // `CEntityDbBoundedPropQueueRuntime` in EntityDb.h.
@@ -1608,11 +1551,8 @@ namespace moho
   {
     mBoundedProps.Reset();
 
-    if (mRegisteredEntitySets.next && mRegisteredEntitySets.prev) {
-      mRegisteredEntitySets.prev->next = mRegisteredEntitySets.next;
-      mRegisteredEntitySets.next->prev = mRegisteredEntitySets.prev;
-    }
-    (void)ResetEntityDbListHeadToSelf(&mRegisteredEntitySets);
+    // `mRegisteredEntitySets` unlinks itself as a member (0x006843F0); the
+    // sets still on it are left linked to each other.
   }
 
   /**
@@ -2155,12 +2095,12 @@ namespace moho
 
   void CEntityDb::RegisterEntitySet(SEntitySetTemplateUnit& set) noexcept
   {
-    LinkSetNodeToFront(mRegisteredEntitySets, reinterpret_cast<CEntityDbListHead*>(&set));
+    set.ListLinkBefore(&mRegisteredEntitySets);
   }
 
   void CEntityDb::RegisterEntitySet(EntitySetBase& set) noexcept
   {
-    LinkSetNodeToFront(mRegisteredEntitySets, reinterpret_cast<CEntityDbListHead*>(&set));
+    set.ListLinkBefore(&mRegisteredEntitySets);
   }
 
   /**
@@ -2231,14 +2171,13 @@ namespace moho
       return;
     }
 
-    EnsureSetListHeadInitialized(mRegisteredEntitySets);
     for (;;) {
-      CEntityDbListHead* const setNode = ReadEntitySetPointer(archive);
-      if (!setNode) {
+      EntitySetBase* const set = ReadEntitySetPointer(archive);
+      if (!set) {
         break;
       }
 
-      LinkSetNodeToFront(mRegisteredEntitySets, setNode);
+      set->ListLinkBefore(&mRegisteredEntitySets);
     }
   }
 
@@ -2251,14 +2190,12 @@ namespace moho
       return;
     }
 
-    EnsureSetListHeadInitialized(mRegisteredEntitySets);
     gpg::RType* const setType = ResolveEntitySetBaseType();
 
-    for (CEntityDbListHead* node = mRegisteredEntitySets.next; node && node != &mRegisteredEntitySets;
-         node = node->next) {
+    for (auto* node = mRegisteredEntitySets.mNext; node != &mRegisteredEntitySets; node = node->mNext) {
       gpg::WriteRawPointer(
         archive,
-        MakeObjectRef(node, setType),
+        MakeObjectRef(static_cast<EntitySetBase*>(node), setType),
         gpg::TrackedPointerState::Unowned,
         NullOwnerRef()
       );

@@ -194,10 +194,14 @@ namespace moho
      * Address: 0x00885640 (FUN_00885640 -- `CWldSessionLoaderImpl::
      *   mScenarioHead`'s; formerly `ResetScenarioListHead`, called from the
      *   dtor.)
-     *   All of the above were removed 2026-09-28 (RULE ONE). Two more copies
-     *   are still transcribed over overlay nodes that do not yet use this type:
-     *   0x00684340 (`CEntityDbListHead`, EntityDb.cpp) and 0x0052CF50
-     *   (`LuaTaskListNode`, RRuleGameRules.cpp).
+     *   All of the above were removed 2026-09-28 (RULE ONE).
+     * Address: 0x00684340 (FUN_00684340 -- `EntityDB::mRegisteredEntitySets`';
+     *   reached from the `EntityDB` constructor's unwind state. Formerly
+     *   `ResetEntityDbListHeadToSelf` over a `CEntityDbListHead {next, prev}`
+     *   overlay, which the registry now is a real `TDatList` instead of.)
+     * Address: 0x0052CF50 (FUN_0052CF50 -- zero callers; formerly
+     *   `DetachLuaTaskListNodeToSelfLinkedLane` over a `LuaTaskListNode`
+     *   overlay that was really the export-binding set's tree node.)
      *
      * What it does:
      * Unlinks this node from its ring and leaves it self-linked.
@@ -334,6 +338,11 @@ namespace moho
      *   caller-held anchor slot rather than an anchor pointer; zero callers,
      *   unreachable; formerly `RelinkManipulatorOrderBeforeSlot` in the same
      *   file, removed 2026-09-22.)
+     * Address: 0x0052CF70 (FUN_0052CF70 -- zero callers; formerly
+     *   `DetachAndInsertLuaTaskListNodeAfterLane` in
+     *   moho/sim/RRuleGameRules.cpp, removed 2026-09-28. Its stores are
+     *   `+0 = anchor->+0`, `+4 = anchor`, `anchor->+0 = this`, then the old
+     *   `+0`'s `+4 = this`: a splice ahead of the anchor.)
      */
     item_t* ListLinkBefore(item_t* that) noexcept
     {

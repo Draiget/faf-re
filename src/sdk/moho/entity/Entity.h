@@ -220,9 +220,18 @@ namespace moho
   [[nodiscard]] Wm3::Vector3f
   COORDS_GridSnap(const STIMap* map, const SCoordsVec2& worldPos, const SFootprint& footprint, ELayer layer) noexcept;
 
+  class EntitySetBase;
+
+  /**
+   * Every entity set, whatever `T`, is a node of one ring: `EntityDB`'s
+   * registered sets (+0x18), which `EntityDB::Purge` (0x00684560) walks as
+   * `EntitySetBase`s. The binary's reflection agrees that the set types share
+   * that base: `EntitySet` registers `EntitySetBase` at offset 0 (0x00694180)
+   * and both are 0x28 bytes (0x006935D0, 0x006937C0).
+   */
   template <class T>
   class EntitySetTemplate
-    : public TDatList<EntitySetTemplate<T>, void>
+    : public TDatList<EntitySetBase, void>
   {
   public:
     inline static gpg::RType* sType = nullptr;
@@ -242,7 +251,7 @@ namespace moho
     EntitySetTemplate& operator=(const EntitySetTemplate&) = delete;
 
     EntitySetTemplate(EntitySetTemplate&& other) noexcept
-      : TDatList<EntitySetTemplate<T>, void>{}
+      : TDatList<EntitySetBase, void>{}
       , mVec()
     {
       mVec.ResetFrom(other.mVec);

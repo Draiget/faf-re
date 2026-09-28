@@ -2416,7 +2416,7 @@ namespace
 
   static_assert(sizeof(SEntitySetTemplateUnit) == 0x28, "SEntitySetTemplateUnit size must be 0x28");
   static_assert(
-    sizeof(TDatList<SEntitySetTemplateUnit, void>) == 0x08, "SEntitySetTemplateUnit link-node size must be 0x08"
+    sizeof(TDatList<EntitySetBase, void>) == 0x08, "SEntitySetTemplateUnit link-node size must be 0x08"
   );
 
   void InitSimDebugEntitySet(SEntitySetTemplateUnit& outSet)

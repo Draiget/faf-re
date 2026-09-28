@@ -48,32 +48,13 @@
 
 namespace moho
 {
-  namespace
+  /**
+   * One blueprint file waiting to be reloaded, linked into
+   * `RRuleGameRulesImpl::mPendingBlueprintReloads`. Retiring one is a plain
+   * `delete` (0x0052A742..0x0052A77A: the path's destructor, then the unlink).
+   */
+  struct LuaReloadRequestNode : TDatListItem<LuaReloadRequestNode, void>
   {
-    struct LuaTaskListNode
-    {
-      LuaTaskListNode* next;    // +0x00
-      LuaTaskListNode* prev;    // +0x04
-      void* taskThread;         // +0x08
-      std::uint32_t reserved0C; // +0x0C
-      std::uint8_t isOwning;    // +0x10
-      std::uint8_t isSentinel;  // +0x11
-      std::uint8_t pad12[2];    // +0x12
-    };
-
-    static_assert(sizeof(LuaTaskListNode) == 0x14, "LuaTaskListNode size must be 0x14");
-
-    struct LuaReloadRequestNode
-    {
-      LuaReloadRequestNode* next; // +0x00
-      LuaReloadRequestNode* prev; // +0x04
-      float reloadAtSeconds;      // +0x08
-      msvc8::string sourcePath;   // +0x0C
-      std::uint32_t reserved28;   // +0x28
-    };
-
-    static_assert(sizeof(LuaReloadRequestNode) == 0x2C, "LuaReloadRequestNode size must be 0x2C");
-
     /**
      * Address: 0x00528260 (FUN_00528260, Moho::LuaReloadRequestNode::LuaReloadRequestNode)
      *
@@ -81,37 +62,27 @@ namespace moho
      * int __userpurge sub_528260@<eax>(float a1@<xmm0>, int a2, std::string *str1);
      *
      * What it does:
-     * In-place constructs one `LuaReloadRequestNode` at `node`: self-links the
-     * intrusive `next`/`prev` lanes to form a detached singleton, stores the
-     * caller-supplied scheduled reload deadline (`reloadAtSeconds`), then
-     * default-constructs the inline `msvc8::string` lane and immediately
-     * `assign`s it from `sourcePath`. The trailing reserved dword at +0x28 is
-     * zeroed. Returns `node` for chaining at the call site (binary leaves the
-     * fresh node pointer in `eax`).
-     *
-     * Per-T named free helper that the compiler binds to the engine's typed
-     * out-of-line ctor body. Callers invoke this helper by explicit name on
-     * a freshly `operator new`'d node — never by relying on
-     * `LuaReloadRequestNode{deadline, std::move(path)}` aggregate
-     * initialization, which the compiler can inline away.
+     * Self-links the node, stores the reload deadline, copies the path and
+     * zeroes +0x28. `UpdateLuaState` calls it on a fresh 0x2C allocation
+     * (0x0052A5A1).
      */
-    [[nodiscard]] LuaReloadRequestNode* ConstructLuaReloadRequestNode(
-      LuaReloadRequestNode* const node,
-      const float reloadAtSeconds,
-      const msvc8::string& sourcePath)
-    {
-      if (!node) {
-        return nullptr;
-      }
+    LuaReloadRequestNode(float reloadAt, const msvc8::string& path);
 
-      node->next = node;
-      node->prev = node;
-      node->reloadAtSeconds = reloadAtSeconds;
-      ::new (static_cast<void*>(&node->sourcePath)) msvc8::string{};
-      node->sourcePath.assign(sourcePath, 0u, msvc8::string::npos);
-      node->reserved28 = 0u;
-      return node;
-    }
+    float reloadAtSeconds;    // +0x08
+    msvc8::string sourcePath; // +0x0C
+    std::uint32_t reserved28; // +0x28
+  };
+
+  static_assert(sizeof(LuaReloadRequestNode) == 0x2C, "LuaReloadRequestNode size must be 0x2C");
+
+  LuaReloadRequestNode::LuaReloadRequestNode(const float reloadAt, const msvc8::string& path)
+    : reloadAtSeconds(reloadAt)
+    , sourcePath(path)
+    , reserved28(0u)
+  {}
+
+  namespace
+  {
 
     using BlueprintMapHeadAllocator = RRuleGameRulesBlueprintNode* (*)();
 
@@ -232,44 +203,6 @@ namespace moho
     [[nodiscard]] void** StoreOpaquePointerLaneC(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
-    }
-
-    /**
-     * Address: 0x0052CF50 (FUN_0052CF50)
-     *
-     * What it does:
-     * Unlinks one Lua-task intrusive node from its current list and rewires it
-     * to a self-linked singleton.
-     */
-    [[nodiscard]] LuaTaskListNode* DetachLuaTaskListNodeToSelfLinkedLane(
-      LuaTaskListNode* const node
-    ) noexcept
-    {
-      node->next->prev = node->prev;
-      node->prev->next = node->next;
-      node->prev = node;
-      node->next = node;
-      return node;
-    }
-
-    /**
-     * Address: 0x0052CF70 (FUN_0052CF70)
-     *
-     * What it does:
-     * Unlinks one Lua-task intrusive node, self-links it, then inserts it
-     * directly after one anchor node.
-     */
-    [[nodiscard]] LuaTaskListNode* DetachAndInsertLuaTaskListNodeAfterLane(
-      LuaTaskListNode* const node,
-      LuaTaskListNode* const anchor
-    ) noexcept
-    {
-      DetachLuaTaskListNodeToSelfLinkedLane(node);
-      node->next = anchor->next;
-      node->prev = anchor;
-      anchor->next = node;
-      node->next->prev = node;
-      return node;
     }
 
     /**
@@ -472,97 +405,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x0052F370 (FUN_0052F370)
-     *
-     * What it does:
-     * Allocates one non-sentinel Lua task-list node with null links/thread
-     * lanes and default ownership flags.
-     */
-    [[nodiscard]] LuaTaskListNode* CreateLuaTaskListNode()
-    {
-      auto* const node = new LuaTaskListNode{};
-      node->next = nullptr;
-      node->prev = nullptr;
-      node->taskThread = nullptr;
-      node->reserved0C = 0u;
-      node->isOwning = 1u;
-      node->isSentinel = 0u;
-      return node;
-    }
-
-    struct LuaTaskList
-    {
-      void* allocProxy;         // +0x00
-      LuaTaskListNode* head;    // +0x04
-      std::uint32_t size;       // +0x08
-    };
-    static_assert(sizeof(LuaTaskList) == 0x0C, "LuaTaskList size must be 0x0C");
-
-    [[nodiscard]] LuaTaskList* InitializeLuaTaskListContainer(
-      LuaTaskList* const container,
-      void* const allocProxy
-    )
-    {
-      container->allocProxy = allocProxy;
-      container->head = CreateLuaTaskListNode();
-      container->head->isSentinel = 1u;
-      container->head->prev = container->head;
-      container->head->next = container->head;
-      container->head->taskThread = container->head;
-      container->size = 0u;
-      return container;
-    }
-
-    /**
-     * Address: 0x00528200 (FUN_00528200)
-     *
-     * What it does:
-     * Initializes one list-container runtime lane from an explicit allocator
-     * proxy and self-links the sentinel task node.
-     */
-    LuaTaskList* InitializeLuaTaskListContainerWithProxy(
-      void* const allocProxy,
-      LuaTaskList* const container
-    )
-    {
-      return InitializeLuaTaskListContainer(container, allocProxy);
-    }
-
-    /**
-     * Address: 0x0052CCC0 (FUN_0052CCC0)
-     *
-     * What it does:
-     * Initializes one list-container runtime lane and self-links its sentinel
-     * task node.
-     */
-    LuaTaskList* InitializeLuaTaskListContainerDefault(
-      LuaTaskList* const container
-    )
-    {
-      return InitializeLuaTaskListContainer(container, container->allocProxy);
-    }
-
-    /**
-     * Address: 0x0052DA80 (FUN_0052DA80)
-     *
-     * What it does:
-     * Initializes one Lua-task list container head lane as a self-linked
-     * sentinel node and returns that sentinel pointer.
-     */
-    [[nodiscard]] LuaTaskListNode* InitializeLuaTaskListContainerHeadLane(
-      LuaTaskList* const container
-    )
-    {
-      container->head = CreateLuaTaskListNode();
-      container->head->isSentinel = 1u;
-      container->head->prev = container->head;
-      container->head->next = container->head;
-      container->head->taskThread = container->head;
-      container->size = 0u;
-      return container->head;
-    }
-
-    /**
      * Address: 0x0052DBA0 (FUN_0052DBA0)
      *
      * What it does:
@@ -695,41 +537,14 @@ namespace moho
       rules.mMaps.erase(binding);
     }
 
-    [[nodiscard]] LuaReloadRequestNode* ReloadQueueSentinel(RRuleGameRulesImpl& rules) noexcept
-    {
-      return reinterpret_cast<LuaReloadRequestNode*>(&rules.mPendingBlueprintReloadNext);
-    }
-
-    void EnsureReloadQueueSentinelInitialized(RRuleGameRulesImpl& rules) noexcept
-    {
-      if (!rules.mPendingBlueprintReloadNext || !rules.mPendingBlueprintReloadPrev) {
-        LuaReloadRequestNode* const sentinel = ReloadQueueSentinel(rules);
-        sentinel->next = sentinel;
-        sentinel->prev = sentinel;
-      }
-    }
-
-    void UnlinkReloadRequest(LuaReloadRequestNode* const node) noexcept
-    {
-      if (!node || !node->next || !node->prev) {
-        return;
-      }
-
-      node->prev->next = node->next;
-      node->next->prev = node->prev;
-      node->next = node;
-      node->prev = node;
-    }
-
     void ProcessPendingReloadRequests(RRuleGameRulesImpl& rules)
     {
-      EnsureReloadQueueSentinelInitialized(rules);
-      LuaReloadRequestNode* const sentinel = ReloadQueueSentinel(rules);
+      auto& pending = rules.mPendingBlueprintReloads;
       const float nowSeconds = gpg::time::CyclesToSeconds(gpg::time::GetSystemTimer().ElapsedCycles());
 
-      LuaReloadRequestNode* node = sentinel->next;
-      while (node && node != sentinel) {
-        LuaReloadRequestNode* const next = node->next;
+      for (auto* link = pending.mNext; link != &pending;) {
+        auto* const node = static_cast<LuaReloadRequestNode*>(link);
+        link = link->mNext;
         if (node->reloadAtSeconds <= nowSeconds && rules.mLuaState) {
           gpg::Logf("Refreshing %s", node->sourcePath.c_str());
           LuaPlus::LuaObject reloadBlueprint = rules.mLuaState->GetGlobal("ReloadBlueprint");
@@ -738,70 +553,37 @@ namespace moho
             reloadFunction(node->sourcePath.c_str());
           }
 
-          UnlinkReloadRequest(node);
           delete node;
         }
-        node = next;
       }
     }
 
     /**
-     * Enqueues one fresh blueprint reload request at the tail of the
-     * `RRuleGameRulesImpl` pending-reload list. Allocates the node, initializes
-     * it via `ConstructLuaReloadRequestNode` (FUN_00528260) — the canonical
-     * per-T constructor body the engine binary emits — and inserts the new
-     * node just before the sentinel.
-     *
-     * The deadline is `now + rule_BlueprintReloadDelay`, matching the binary's
-     * `UpdateLuaState` (FUN_0052A3D0) enqueue lane at 0x52A57D-0x52A5A1 where
-     * the file-watcher notification → reload-request transition lives.
+     * Schedules `sourcePath` for reload `reloadDelaySeconds` from now, as
+     * `UpdateLuaState` (FUN_0052A3D0) does for each changed file: a request
+     * already pending for the same path only has its deadline pushed back
+     * (0x0052A5A8, which also zeroes +0x28); otherwise a new one goes on the
+     * back of the ring (0x0052A561..0x0052A5E7).
      */
-    [[nodiscard]] LuaReloadRequestNode* EnqueueLuaReloadRequest(
+    void EnqueueLuaReloadRequest(
       RRuleGameRulesImpl& rules,
       const msvc8::string& sourcePath,
       const float reloadDelaySeconds)
     {
-      EnsureReloadQueueSentinelInitialized(rules);
-      LuaReloadRequestNode* const sentinel = ReloadQueueSentinel(rules);
+      auto& pending = rules.mPendingBlueprintReloads;
+      const float deadline =
+        gpg::time::CyclesToSeconds(gpg::time::GetSystemTimer().ElapsedCycles()) + reloadDelaySeconds;
 
-      auto* const node = static_cast<LuaReloadRequestNode*>(
-        ::operator new(sizeof(LuaReloadRequestNode)));
-      if (!node) {
-        return nullptr;
-      }
-
-      const float nowSeconds =
-        gpg::time::CyclesToSeconds(gpg::time::GetSystemTimer().ElapsedCycles());
-      const float deadline = nowSeconds + reloadDelaySeconds;
-      (void)ConstructLuaReloadRequestNode(node, deadline, sourcePath);
-
-      // Link the freshly self-linked node just before the sentinel.
-      LuaReloadRequestNode* const tail = sentinel->prev;
-      node->prev = tail;
-      node->next = sentinel;
-      tail->next = node;
-      sentinel->prev = node;
-      return node;
-    }
-
-    /**
-     * Looks up `candidatePath` against the existing pending-reload queue.
-     * Returns true if a node with the same source path is already enqueued.
-     */
-    [[nodiscard]] bool ReloadQueueContainsPath(
-      RRuleGameRulesImpl& rules,
-      const msvc8::string& candidatePath)
-    {
-      EnsureReloadQueueSentinelInitialized(rules);
-      LuaReloadRequestNode* const sentinel = ReloadQueueSentinel(rules);
-      for (LuaReloadRequestNode* node = sentinel->next;
-           node && node != sentinel;
-           node = node->next) {
-        if (node->sourcePath == candidatePath) {
-          return true;
+      for (auto* link = pending.mNext; link != &pending; link = link->mNext) {
+        auto* const node = static_cast<LuaReloadRequestNode*>(link);
+        if (node->sourcePath == sourcePath) {
+          node->reserved28 = 0u;
+          node->reloadAtSeconds = deadline;
+          return;
         }
       }
-      return false;
+
+      (new LuaReloadRequestNode(deadline, sourcePath))->ListLinkBefore(&pending);
     }
 
     /**
@@ -824,13 +606,9 @@ namespace moho
     }
 
     /**
-     * Drains file-watcher notifications and enqueues a fresh
-     * `LuaReloadRequestNode` for each changed path that isn't already
-     * scheduled for reload. The actual `sPFWaitHandleSet` walk lives in the
-     * binary's `UpdateLuaState` (FUN_0052A3D0 between 0x52A474 and 0x52A56F);
-     * we surface the enqueue lane explicitly so the per-T constructor
-     * `ConstructLuaReloadRequestNode` (FUN_00528260) stays bound to a real
-     * source-level call site.
+     * Drains file-watcher notifications into the pending-reload ring. The
+     * actual `sPFWaitHandleSet` walk lives in the binary's `UpdateLuaState`
+     * (FUN_0052A3D0 between 0x52A474 and 0x52A56F) and is not recovered yet.
      *
      * The drain checks the TU-local `gPendingBlueprintReloadPath` slot — when
      * the file-watcher integration stages a path here, that path is dequeued
@@ -838,16 +616,12 @@ namespace moho
      */
     void DrainFileWatcherIntoReloadQueue(RRuleGameRulesImpl& rules)
     {
-      EnsureReloadQueueSentinelInitialized(rules);
-
       msvc8::string& pendingPath = gPendingBlueprintReloadPath;
       if (pendingPath.empty()) {
         return;
       }
 
-      if (!ReloadQueueContainsPath(rules, pendingPath)) {
-        (void)EnqueueLuaReloadRequest(rules, pendingPath, rule_BlueprintReloadDelay);
-      }
+      EnqueueLuaReloadRequest(rules, pendingPath, rule_BlueprintReloadDelay);
       pendingPath.clear();
     }
 
@@ -1083,8 +857,6 @@ namespace moho
     , mTrailBlueprints{}
     , mBlueprintsByOrdinal()
     , mEntityCategoryLookup(nullptr)
-    , mPendingBlueprintReloadNext(nullptr)
-    , mPendingBlueprintReloadPrev(nullptr)
   {
     // 0x00553... constructs the blueprint watcher in place; it has no default
     // state, which is why it is built here rather than in the member list.
@@ -1117,8 +889,6 @@ namespace moho
     EntityCategoryLookupTable* const oldCategoryLookup = mEntityCategoryLookup;
     mEntityCategoryLookup = newCategoryLookup;
     delete oldCategoryLookup;
-    mPendingBlueprintReloadNext = &mPendingBlueprintReloadNext;
-    mPendingBlueprintReloadPrev = &mPendingBlueprintReloadNext;
 
     if (mLuaState == nullptr) {
       return;
@@ -1257,16 +1027,9 @@ namespace moho
     // `msvc8::vector<T>::~vector()` (`destroy_range` + `operator delete`,
     // `legacy/containers/Vector.h`) already does. Same pattern already used
     // just below for the seven blueprint maps.
-    EnsureReloadQueueSentinelInitialized(*this);
-    LuaReloadRequestNode* const sentinel = ReloadQueueSentinel(*this);
-    LuaReloadRequestNode* node = sentinel->next;
-    while (node && node != sentinel) {
-      LuaReloadRequestNode* const next = node->next;
-      delete node;
-      node = next;
-    }
-    sentinel->next = sentinel;
-    sentinel->prev = sentinel;
+    // `mPendingBlueprintReloads` is not drained: the binary only unlinks its
+    // head (0x0052989C, the member destructor), and any request still
+    // waiting stays allocated.
 
     // Address: 0x00529700 (FUN_00529700) calls FUN_00533E20
     // (EntityCategoryLookupTable's real destructor, see above)
@@ -1347,9 +1110,8 @@ namespace moho
    *
    * Drains the file-watcher set (`sPFWaitHandleSet`) of changed-file
    * notifications, looks up each path against the existing pending-reload
-   * queue, and enqueues a fresh `LuaReloadRequestNode` (via
-   * `EnqueueLuaReloadRequest`, which routes through
-   * `ConstructLuaReloadRequestNode` = FUN_00528260) when no duplicate exists.
+   * queue, and either pushes back that request's deadline or enqueues a new
+   * `LuaReloadRequestNode` (FUN_00528260), through `EnqueueLuaReloadRequest`.
    * Then drains the matured reload-request queue and synchronizes the
    * blueprint table to the target root Lua state. The file-watcher drain step
    * is invoked here for fidelity with the binary's emission shape — the

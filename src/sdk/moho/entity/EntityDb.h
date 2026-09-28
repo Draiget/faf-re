@@ -6,6 +6,7 @@
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
+#include "moho/containers/TDatList.h"
 #include "moho/sim/IdPool.h"
 
 namespace gpg
@@ -25,13 +26,6 @@ namespace moho
   class Sim;
   class Unit;
   struct CEntityDbBoundedPropQueueNode;
-
-  struct CEntityDbListHead
-  {
-    CEntityDbListHead* next; // +0x00
-    CEntityDbListHead* prev; // +0x04
-  };
-  static_assert(sizeof(CEntityDbListHead) == 0x08, "CEntityDbListHead size must be 0x08");
 
   struct CEntityDbAllUnitsNode : msvc8::Tree<CEntityDbAllUnitsNode>
   {
@@ -441,7 +435,9 @@ namespace moho
     // rotate_right) -- all cited on `legacy/containers/RbTree.h`'s shared
     // members, not reimplemented here (RULE ONE).
     msvc8::map<std::uint32_t, IdPool> mIdPoolTree;  // +0x0C
-    CEntityDbListHead mRegisteredEntitySets;        // +0x18
+    // Every live entity set (`EntitySetBase` and each `EntitySetTemplate<T>`),
+    // for `Purge` to drop destroyed entities from and `SerSets` to save.
+    TDatList<EntitySetBase, void> mRegisteredEntitySets; // +0x18
     // `std::list<Moho::Entity*>` (`Moho::EntityDB::mEntList`): the entities
     // waiting for `Purge` to destroy them. `Entity::OnDestroy` (0x00679B80)
     // appends with `push_back`, `Purge` (0x00684560) drains it, and

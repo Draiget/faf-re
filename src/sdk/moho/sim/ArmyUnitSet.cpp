@@ -84,7 +84,7 @@ namespace moho
    * Address: 0x00706230 (FUN_00706230 -- a third emission of it; zero callers, unreachable; formerly `CopyConstructEntitySetTemplateUnitIfPresentSecondary`, removed 2026-09-11.)
    */
   SEntitySetTemplateUnit::SEntitySetTemplateUnit(const SEntitySetTemplateUnit& other)
-    : TDatList<SEntitySetTemplateUnit, void>()
+    : TDatList<EntitySetBase, void>()
     , mVec(other.mVec)
   {
     // 0x00579500 self-links the two list words and then hands `this + 8` to

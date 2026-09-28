@@ -89,12 +89,9 @@ namespace moho
       mName.assign(name, std::strlen(name));
     }
 
-    // Insert this squad's unit-set node at the back of the sim's registered
-    // entity-set ring. The binary's `entityDB += 3` walks 3 list-pair words
-    // (24 bytes) into CEntityDb to reach `mRegisteredEntitySets`.
-    auto* const sentinel =
-      reinterpret_cast<TDatListItem<SEntitySetTemplateUnit, void>*>(&sim->mEntityDB->mRegisteredEntitySets);
-    mUnits.ListLinkBefore(reinterpret_cast<SEntitySetTemplateUnit*>(sentinel));
+    // Insert this squad's unit set at the back of the sim's registered
+    // entity-set ring (`mEntityDB + 0x18`).
+    mUnits.ListLinkBefore(&sim->mEntityDB->mRegisteredEntitySets);
   }
 
   /**

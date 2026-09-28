@@ -8,6 +8,7 @@
 namespace moho
 {
   class Entity;
+  class EntitySetBase;
   class Unit;
   template <class T>
   class EntitySetTemplate;
@@ -36,7 +37,7 @@ namespace moho
    * What it does:
    * Per-category unit/entity set with intrusive links (TDatList base) and sorted inline-vector storage.
    */
-  struct SEntitySetTemplateUnit : TDatList<SEntitySetTemplateUnit, void>
+  struct SEntitySetTemplateUnit : TDatList<EntitySetBase, void>
   {
     SEntitySetTemplateUnit() = default;
 
