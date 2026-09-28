@@ -136,10 +136,7 @@ namespace moho
    * Address: 0x00BFFF40 (FUN_00BFFF40, atexit target registered by the real
    * ctor above)
    */
-  CInfluenceMapSerializer::~CInfluenceMapSerializer()
-  {
-    ResetLinks();
-  }
+  CInfluenceMapSerializer::~CInfluenceMapSerializer() = default;
 
   /**
    * Address: 0x00718B60 (FUN_00718B60, gpg::SerSaveLoadHelper_CInfluenceMap::Init)

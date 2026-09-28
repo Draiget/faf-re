@@ -215,10 +215,7 @@ namespace moho
   /**
    * Address: 0x00C07D50 (FUN_00C07D50, ??1SSavedGameHeaderSerializer@Moho@@QAE@@Z)
    */
-  SSavedGameHeaderSerializer::~SSavedGameHeaderSerializer()
-  {
-    ResetLinks();
-  }
+  SSavedGameHeaderSerializer::~SSavedGameHeaderSerializer() = default;
 
   /**
    * Address: 0x00882330 (FUN_00882330, Moho::SSavedGameHeaderSerializer::Init)

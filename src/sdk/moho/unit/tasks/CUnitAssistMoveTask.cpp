@@ -711,10 +711,7 @@ namespace moho
       (void)std::atexit(&cleanup_CUnitAssistMoveTaskSerializer_atexit);
     }
 
-    ~CUnitAssistMoveTaskSerializer()
-    {
-      ResetLinks();
-    }
+    ~CUnitAssistMoveTaskSerializer() = default;
 
     /**
      * Address: 0x005F1A70 (FUN_005F1A70, vtable slot 0 dispatch target)

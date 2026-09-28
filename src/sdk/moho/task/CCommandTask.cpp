@@ -580,10 +580,7 @@ CCommandTaskSerializer::CCommandTaskSerializer()
 /**
  * Address: 0x00BF9B40 (FUN_00BF9B40, Moho::CCommandTaskSerializer::~CCommandTaskSerializer)
  */
-CCommandTaskSerializer::~CCommandTaskSerializer()
-{
-  ResetLinks();
-}
+CCommandTaskSerializer::~CCommandTaskSerializer() = default;
 
 /**
  * Address: 0x0060BA20 (FUN_0060BA20, sub_60BA20)

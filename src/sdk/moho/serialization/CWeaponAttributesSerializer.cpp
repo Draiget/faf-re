@@ -466,10 +466,7 @@ namespace moho
   /**
    * Address: 0x00BFE5F0 (FUN_00BFE5F0, Moho::CWeaponAttributesSerializer::~CWeaponAttributesSerializer)
    */
-  CWeaponAttributesSerializer::~CWeaponAttributesSerializer()
-  {
-    ResetLinks();
-  }
+  CWeaponAttributesSerializer::~CWeaponAttributesSerializer() = default;
 
   /**
     * Alias of FUN_006D3780 (non-canonical helper lane).

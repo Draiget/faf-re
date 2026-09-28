@@ -67,10 +67,7 @@ CAiPathNavigatorSerializer::CAiPathNavigatorSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits
  * in and restores a self-linked sentinel state.
  */
-CAiPathNavigatorSerializer::~CAiPathNavigatorSerializer()
-{
-  ResetLinks();
-}
+CAiPathNavigatorSerializer::~CAiPathNavigatorSerializer() = default;
 
 /**
  * Address: 0x005B0130 (FUN_005B0130)

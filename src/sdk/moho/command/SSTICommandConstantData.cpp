@@ -113,10 +113,7 @@ namespace moho
   /**
    * Address: 0x00BF49F0 (FUN_00BF49F0, Moho::SSTICommandConstantDataSerializer::~SSTICommandConstantDataSerializer)
    */
-  SSTICommandConstantDataSerializer::~SSTICommandConstantDataSerializer()
-  {
-    ResetLinks();
-  }
+  SSTICommandConstantDataSerializer::~SSTICommandConstantDataSerializer() = default;
 
   /**
    * Address: 0x00552810 (FUN_00552810, Moho::SSTICommandConstantDataSerializer::Deserialize)

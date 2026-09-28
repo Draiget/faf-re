@@ -2129,10 +2129,7 @@ SCollisionInfoSerializer::SCollisionInfoSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits in
  * and restores a self-linked sentinel state.
  */
-SCollisionInfoSerializer::~SCollisionInfoSerializer()
-{
-  ResetLinks();
-}
+SCollisionInfoSerializer::~SCollisionInfoSerializer() = default;
 
 /**
  * Address: 0x00598390 (FUN_00598390, gpg::SerSaveLoadHelper<Moho::SCollisionInfo>::Init)

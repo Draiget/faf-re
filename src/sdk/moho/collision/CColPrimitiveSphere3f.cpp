@@ -115,10 +115,7 @@ namespace moho
   /**
    * Address: 0x00BEF780 (FUN_00BEF780, Moho::Sphere3fSerializer::~Sphere3fSerializer)
    */
-  Sphere3fSerializer::~Sphere3fSerializer()
-  {
-    ResetLinks();
-  }
+  Sphere3fSerializer::~Sphere3fSerializer() = default;
 
   /**
    * Address: 0x00473050 (FUN_00473050, Moho::Invalid<Wm3::Sphere3<float>>)
@@ -393,10 +390,7 @@ namespace moho
     , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&DColPrimSphereSerializer::Serialize))
   {}
 
-  DColPrimSphereSerializer::~DColPrimSphereSerializer()
-  {
-    ResetLinks();
-  }
+  DColPrimSphereSerializer::~DColPrimSphereSerializer() = default;
 
   /**
    * Address: 0x004FFAC0 (FUN_004FFAC0, Moho::DColPrimSphereConstruct::Init)
@@ -424,10 +418,7 @@ namespace moho
     , mDeleteCallback(&DeleteDColPrimSphere)
   {}
 
-  DColPrimSphereConstruct::~DColPrimSphereConstruct()
-  {
-    ResetLinks();
-  }
+  DColPrimSphereConstruct::~DColPrimSphereConstruct() = default;
 
   /**
    * Address: 0x004FFA40 (FUN_004FFA40, Moho::DColPrimSphereSaveConstruct::Init)
@@ -455,10 +446,7 @@ namespace moho
       )
   {}
 
-  DColPrimSphereSaveConstruct::~DColPrimSphereSaveConstruct()
-  {
-    ResetLinks();
-  }
+  DColPrimSphereSaveConstruct::~DColPrimSphereSaveConstruct() = default;
 
   /**
    * Address: 0x004FE640 (FUN_004FE640, preregister_DColPrimSphereTypeInfo)

@@ -93,10 +93,7 @@ namespace moho
    * Address: 0x00BFF820 (FUN_00BFF820, atexit target registered by the real
    * ctor above)
    */
-  CArmyStatsConstruct::~CArmyStatsConstruct()
-  {
-    ResetLinks();
-  }
+  CArmyStatsConstruct::~CArmyStatsConstruct() = default;
 
   /**
    * Address: 0x0070F560 (FUN_0070F560, gpg::SerConstructHelper_CArmyStats::Init)

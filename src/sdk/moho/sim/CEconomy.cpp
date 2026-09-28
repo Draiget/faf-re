@@ -223,10 +223,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  SEconValueSerializer::~SEconValueSerializer()
-  {
-    ResetLinks();
-  }
+  SEconValueSerializer::~SEconValueSerializer() = default;
 
   /**
    * Address: 0x00563C50 (FUN_00563C50, Moho::SEconValueSerializer::Deserialize)
@@ -314,10 +311,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  SEconTotalsSerializer::~SEconTotalsSerializer()
-  {
-    ResetLinks();
-  }
+  SEconTotalsSerializer::~SEconTotalsSerializer() = default;
 
   /**
    * Address: 0x00563E80 (FUN_00563E80, Moho::SEconTotalsSerializer::Deserialize)
@@ -1098,10 +1092,7 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
    * Address: 0x00C02250 (FUN_00C02250, atexit target registered by the real
    * ctor above)
    */
-  CEconomyConstruct::~CEconomyConstruct()
-  {
-    ResetLinks();
-  }
+  CEconomyConstruct::~CEconomyConstruct() = default;
 
   /**
    * Address: 0x00773C80 (FUN_00773C80, Moho::CEconomyConstruct::Init)

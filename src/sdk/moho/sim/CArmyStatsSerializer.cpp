@@ -65,10 +65,7 @@ namespace moho
   /**
    * Address: 0x00BFF850 (FUN_00BFF850, Moho::CArmyStatsSerializer::~CArmyStatsSerializer)
    */
-  CArmyStatsSerializer::~CArmyStatsSerializer()
-  {
-    ResetLinks();
-  }
+  CArmyStatsSerializer::~CArmyStatsSerializer() = default;
 
   /**
    * Address: 0x0070F5E0 (FUN_0070F5E0, gpg::SerSaveLoadHelper_CArmyStats::Init)

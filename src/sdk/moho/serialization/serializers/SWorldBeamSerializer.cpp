@@ -65,10 +65,7 @@ namespace moho
    * What it does:
    * Unlinks the `SWorldBeamSerializer` helper node and rewires self-links.
    */
-  SWorldBeamSerializer::~SWorldBeamSerializer()
-  {
-    ResetLinks();
-  }
+  SWorldBeamSerializer::~SWorldBeamSerializer() = default;
 
   /**
    * Address: 0x0048F480 (Moho::SWorldBeamSerializer::Deserialize)

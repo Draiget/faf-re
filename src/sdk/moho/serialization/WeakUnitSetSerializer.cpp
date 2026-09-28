@@ -55,10 +55,7 @@ namespace moho
     , mSerialize(&WeakUnitSetSerializer::Serialize)
   {}
 
-  WeakUnitSetSerializer::~WeakUnitSetSerializer()
-  {
-    ResetLinks();
-  }
+  WeakUnitSetSerializer::~WeakUnitSetSerializer() = default;
 
   /**
    * Address: 0x006D2C50 (FUN_006D2C50, sub_6D2C50)

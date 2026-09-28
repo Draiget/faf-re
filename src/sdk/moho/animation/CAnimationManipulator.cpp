@@ -1939,10 +1939,7 @@ namespace moho
   /**
    * Address: 0x00BFAFF0 (FUN_00BFAFF0, Moho::CAnimationManipulatorConstruct::~CAnimationManipulatorConstruct)
    */
-  CAnimationManipulatorConstruct::~CAnimationManipulatorConstruct()
-  {
-    ResetLinks();
-  }
+  CAnimationManipulatorConstruct::~CAnimationManipulatorConstruct() = default;
 
   /**
    * Address: 0x00641E70 (FUN_00641E70, Moho::CAnimationManipulatorConstruct::Init)
@@ -1988,10 +1985,7 @@ namespace moho
   /**
    * Address: 0x00BFB020 (FUN_00BFB020, Moho::CAnimationManipulatorSerializer::~CAnimationManipulatorSerializer)
    */
-  CAnimationManipulatorSerializer::~CAnimationManipulatorSerializer()
-  {
-    ResetLinks();
-  }
+  CAnimationManipulatorSerializer::~CAnimationManipulatorSerializer() = default;
 
   /**
    * Address: 0x00641EF0 (FUN_00641EF0, Moho::CAnimationManipulatorSerializer::Init)

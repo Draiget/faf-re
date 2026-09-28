@@ -102,10 +102,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  IEffectSerializer::~IEffectSerializer()
-  {
-    ResetLinks();
-  }
+  IEffectSerializer::~IEffectSerializer() = default;
 
   /**
    * Address: 0x007711E0 (FUN_007711E0, Moho::IEffectSerializer::Deserialize)

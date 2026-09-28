@@ -26413,10 +26413,7 @@ SimSerializer::SimSerializer()
 /**
  * Address: 0x00C00EC0 (FUN_00C00EC0, Moho::SimSerializer::~SimSerializer)
  */
-SimSerializer::~SimSerializer()
-{
-  ResetLinks();
-}
+SimSerializer::~SimSerializer() = default;
 
 /**
  * Address: 0x0074CFB0 (FUN_0074CFB0, Moho::SimSerializer::Init)

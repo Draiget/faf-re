@@ -75,8 +75,5 @@ namespace moho
     , mSerialize(&CSimResourcesSerializer::Serialize)
   {}
 
-  CSimResourcesSerializer::~CSimResourcesSerializer()
-  {
-    ResetLinks();
-  }
+  CSimResourcesSerializer::~CSimResourcesSerializer() = default;
 } // namespace moho

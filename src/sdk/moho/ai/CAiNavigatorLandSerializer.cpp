@@ -118,10 +118,7 @@ CAiNavigatorLandSerializer::CAiNavigatorLandSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits
  * in and restores a self-linked sentinel state.
  */
-CAiNavigatorLandSerializer::~CAiNavigatorLandSerializer()
-{
-  ResetLinks();
-}
+CAiNavigatorLandSerializer::~CAiNavigatorLandSerializer() = default;
 
 /**
  * Address: 0x005A7430 (FUN_005A7430)

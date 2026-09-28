@@ -92,10 +92,7 @@ namespace moho
   /**
    * Address: 0x00BFE680 (FUN_00BFE680, implicit static-destructor registration target)
    */
-  SBlackListInfoSerializer::~SBlackListInfoSerializer()
-  {
-    ResetLinks();
-  }
+  SBlackListInfoSerializer::~SBlackListInfoSerializer() = default;
 
   /**
    * Address: 0x006D3980 (FUN_006D3980, Moho::SBlackListInfoSerializer::Deserialize)

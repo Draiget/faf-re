@@ -260,10 +260,7 @@ namespace moho
   /**
    * Address: 0x00BF5420 (FUN_00BF5420, Moho::SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer)
    */
-  SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer()
-  {
-    ResetLinks();
-  }
+  SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer() = default;
 
   /**
    * Address: 0x0055CB80 (FUN_0055CB80, gpg::SerSaveLoadHelper<Moho::SSTIUnitConstantData>::Init lane)

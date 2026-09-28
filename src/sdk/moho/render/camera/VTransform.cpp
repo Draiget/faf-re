@@ -500,10 +500,7 @@ namespace moho
     , mSerialize(&VTransformSerializer::Serialize)
   {}
 
-  VTransformSerializer::~VTransformSerializer()
-  {
-    ResetLinks();
-  }
+  VTransformSerializer::~VTransformSerializer() = default;
 
   /**
    * Address: 0x004F05E0 (FUN_004F05E0, preregister_VTransformTypeInfo)

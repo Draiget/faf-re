@@ -74,10 +74,7 @@ namespace moho
     , mDeleteCallback(&CollisionBeamEntityConstruct::Deconstruct)
   {}
 
-  CollisionBeamEntityConstruct::~CollisionBeamEntityConstruct()
-  {
-    ResetLinks();
-  }
+  CollisionBeamEntityConstruct::~CollisionBeamEntityConstruct() = default;
 
   /**
    * Address: 0x00674F60 (FUN_00674F60, gpg::SerConstructHelper_CollisionBeamEntity::Init)

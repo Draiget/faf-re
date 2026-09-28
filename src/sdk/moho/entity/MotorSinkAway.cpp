@@ -472,10 +472,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  MotorSinkAwayConstruct::~MotorSinkAwayConstruct()
-  {
-    ResetLinks();
-  }
+  MotorSinkAwayConstruct::~MotorSinkAwayConstruct() = default;
 
   /**
    * Address: 0x00696C60 (FUN_00696C60, Moho::MotorSinkAwayConstruct::Init)

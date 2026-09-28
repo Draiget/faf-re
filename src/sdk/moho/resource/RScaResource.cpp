@@ -210,10 +210,7 @@ namespace
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  RScaResourceConstruct::~RScaResourceConstruct()
-  {
-    ResetLinks();
-  }
+  RScaResourceConstruct::~RScaResourceConstruct() = default;
 
   /**
    * Address: 0x0053AC50 (FUN_0053AC50, Moho::RScaResourceConstruct::Init)

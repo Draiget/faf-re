@@ -136,10 +136,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  CUnitCommandQueueSaveConstruct::~CUnitCommandQueueSaveConstruct()
-  {
-    ResetLinks();
-  }
+  CUnitCommandQueueSaveConstruct::~CUnitCommandQueueSaveConstruct() = default;
 
   /**
    * Address: 0x006EE9C0 (FUN_006EE9C0, save-construct callback thunk)
@@ -190,10 +187,7 @@ namespace moho
   /**
    * Address: 0x00BFEF40 (FUN_00BFEF40, Moho::CUnitCommandQueueConstruct::~CUnitCommandQueueConstruct)
    */
-  CUnitCommandQueueConstruct::~CUnitCommandQueueConstruct()
-  {
-    ResetLinks();
-  }
+  CUnitCommandQueueConstruct::~CUnitCommandQueueConstruct() = default;
 
   /**
    * Address: 0x006EEAA0 (FUN_006EEAA0, Moho::CUnitCommandQueueConstruct::Construct)
@@ -255,10 +249,7 @@ namespace moho
   /**
    * Address: 0x00BFEF70 (FUN_00BFEF70, sub_BFEF70)
    */
-  CUnitCommandQueueSerializer::~CUnitCommandQueueSerializer()
-  {
-    ResetLinks();
-  }
+  CUnitCommandQueueSerializer::~CUnitCommandQueueSerializer() = default;
 
   /**
    * Address: 0x006EEB70 (FUN_006EEB70, Moho::CUnitCommandQueueSerializer::Deserialize)

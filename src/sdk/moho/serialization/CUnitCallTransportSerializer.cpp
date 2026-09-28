@@ -103,10 +103,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently
    * sits in and restores a self-linked sentinel state.
    */
-  CUnitCallTransportSerializer::~CUnitCallTransportSerializer()
-  {
-    ResetLinks();
-  }
+  CUnitCallTransportSerializer::~CUnitCallTransportSerializer() = default;
 } // namespace moho
 
 namespace

@@ -976,10 +976,7 @@ namespace moho
     , mSerialize(&SEntAttachInfoSerializer::Serialize)
   {}
 
-  SEntAttachInfoSerializer::~SEntAttachInfoSerializer()
-  {
-    ResetLinks();
-  }
+  SEntAttachInfoSerializer::~SEntAttachInfoSerializer() = default;
 
   /**
    * Address: 0x00676F40 (FUN_00676F40, Moho::PositionHistoryTypeInfo::PositionHistoryTypeInfo)
@@ -1081,10 +1078,7 @@ namespace moho
     , mSerialize(&PositionHistorySerializer::Serialize)
   {}
 
-  PositionHistorySerializer::~PositionHistorySerializer()
-  {
-    ResetLinks();
-  }
+  PositionHistorySerializer::~PositionHistorySerializer() = default;
 
   /**
    * Address: 0x006771F0 (FUN_006771F0, Moho::EntityTypeInfo::EntityTypeInfo)
@@ -1196,10 +1190,7 @@ namespace moho
     : mConstructCallback(reinterpret_cast<gpg::RType::save_construct_args_func_t>(&EntitySaveConstruct::Construct))
   {}
 
-  EntitySaveConstruct::~EntitySaveConstruct()
-  {
-    ResetLinks();
-  }
+  EntitySaveConstruct::~EntitySaveConstruct() = default;
 
   /**
    * Address: 0x0067B550 (FUN_0067B550, Moho::EntityConstruct::Construct)
@@ -1255,10 +1246,7 @@ namespace moho
     , mDeconstructCallback(&EntityConstruct::Deconstruct)
   {}
 
-  EntityConstruct::~EntityConstruct()
-  {
-    ResetLinks();
-  }
+  EntityConstruct::~EntityConstruct() = default;
 
   /**
    * Address: 0x00BFC690 (FUN_00BFC690, cleanup_SEntAttachInfoTypeInfo)

@@ -39,10 +39,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  CEfxEmitterSerializer::~CEfxEmitterSerializer()
-  {
-    ResetLinks();
-  }
+  CEfxEmitterSerializer::~CEfxEmitterSerializer() = default;
 
   /**
    * Address: 0x0065E140 (FUN_0065E140, Moho::CEfxEmitterSerializer::Deserialize)

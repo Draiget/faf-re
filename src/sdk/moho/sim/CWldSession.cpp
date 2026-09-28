@@ -632,10 +632,7 @@ namespace
   /**
    * Address: 0x00C08220 (FUN_00C08220, Moho::SSessionSaveDataSerializer::~SSessionSaveDataSerializer)
    */
-  SSessionSaveDataSerializer::~SSessionSaveDataSerializer()
-  {
-    ResetLinks();
-  }
+  SSessionSaveDataSerializer::~SSessionSaveDataSerializer() = default;
 
   /**
    * Address: 0x00899220 (FUN_00899220, Moho::SSessionSaveDataSerializer::Init)

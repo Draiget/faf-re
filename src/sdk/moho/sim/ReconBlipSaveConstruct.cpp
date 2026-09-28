@@ -79,10 +79,7 @@ namespace moho
       )
   {}
 
-  ReconBlipSaveConstruct::~ReconBlipSaveConstruct()
-  {
-    ResetLinks();
-  }
+  ReconBlipSaveConstruct::~ReconBlipSaveConstruct() = default;
 
   /**
    * Address: 0x005C42B0 (FUN_005C42B0, gpg::SerSaveConstructHelper_ReconBlip::Init)

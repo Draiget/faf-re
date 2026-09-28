@@ -71,10 +71,7 @@ namespace moho
   /**
    * Address: 0x00BF9880 (FUN_00BF9880, Moho::CUnitCaptureTaskSerializer::~CUnitCaptureTaskSerializer)
    */
-  CUnitCaptureTaskSerializer::~CUnitCaptureTaskSerializer()
-  {
-    ResetLinks();
-  }
+  CUnitCaptureTaskSerializer::~CUnitCaptureTaskSerializer() = default;
 
   /**
    * Address: 0x00605320 (FUN_00605320, Moho::CUnitCaptureTaskSerializer::RegisterSerializeFunctions)

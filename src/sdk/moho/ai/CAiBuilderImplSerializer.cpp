@@ -125,10 +125,7 @@ CAiBuilderImplSerializer::CAiBuilderImplSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits
  * in and restores a self-linked sentinel state.
  */
-CAiBuilderImplSerializer::~CAiBuilderImplSerializer()
-{
-  ResetLinks();
-}
+CAiBuilderImplSerializer::~CAiBuilderImplSerializer() = default;
 
 /**
  * Address: 0x005A06D0 (FUN_005A06D0)

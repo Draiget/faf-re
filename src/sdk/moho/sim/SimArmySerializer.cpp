@@ -17,10 +17,7 @@ namespace moho
     , mSaveCallback(&SimArmySerializer::Serialize)
   {}
 
-  SimArmySerializer::~SimArmySerializer()
-  {
-    ResetLinks();
-  }
+  SimArmySerializer::~SimArmySerializer() = default;
 
   /**
    * Address: 0x006FDB60 (FUN_006FDB60, Moho::SimArmySerializer::Deserialize)

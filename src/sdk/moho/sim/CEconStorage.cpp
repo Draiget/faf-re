@@ -201,10 +201,7 @@ namespace
     , mDeleteCallback(reinterpret_cast<gpg::RType::delete_func_t>(&DeconstructCEconStorageSerializerCallback))
   {}
 
-  CEconStorageConstruct::~CEconStorageConstruct()
-  {
-    ResetLinks();
-  }
+  CEconStorageConstruct::~CEconStorageConstruct() = default;
 
   void CEconStorageConstruct::Init()
   {
@@ -286,10 +283,7 @@ namespace
     , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SerializeCEconStorageSerializerCallback))
   {}
 
-  CEconStorageSerializer::~CEconStorageSerializer()
-  {
-    ResetLinks();
-  }
+  CEconStorageSerializer::~CEconStorageSerializer() = default;
 
   void CEconStorageSerializer::Init()
   {

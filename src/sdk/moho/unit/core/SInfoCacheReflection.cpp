@@ -355,10 +355,7 @@ namespace moho
   /**
    * Address: 0x00BFD940 (FUN_00BFD940, sub_BFD940)
    */
-  SInfoCacheSerializer::~SInfoCacheSerializer()
-  {
-    ResetLinks();
-  }
+  SInfoCacheSerializer::~SInfoCacheSerializer() = default;
 
   /**
    * Address: 0x006AE810 (FUN_006AE810, gpg::SerSaveLoadHelper<Moho::SInfoCache>::Init)

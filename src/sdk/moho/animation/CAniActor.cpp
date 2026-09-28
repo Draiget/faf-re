@@ -910,10 +910,7 @@ namespace moho
   /**
    * Address: 0x00BFACD0 (FUN_00BFACD0, Moho::CAniActorConstruct::~CAniActorConstruct)
    */
-  CAniActorConstruct::~CAniActorConstruct()
-  {
-    ResetLinks();
-  }
+  CAniActorConstruct::~CAniActorConstruct() = default;
 
   /**
    * Address: 0x0063A770 (FUN_0063A770, ??0CAniActorTypeInfo@Moho@@QAE@@Z)

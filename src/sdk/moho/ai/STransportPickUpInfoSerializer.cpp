@@ -160,10 +160,7 @@ STransportPickUpInfoSerializer::STransportPickUpInfoSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits in
  * and restores a self-linked sentinel state.
  */
-STransportPickUpInfoSerializer::~STransportPickUpInfoSerializer()
-{
-  ResetLinks();
-}
+STransportPickUpInfoSerializer::~STransportPickUpInfoSerializer() = default;
 
 void STransportPickUpInfoSerializer::Init()
 {

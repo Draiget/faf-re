@@ -83,10 +83,7 @@ CFormationInstanceSerializer::CFormationInstanceSerializer()
  * Unlinks the helper node from the intrusive serializer chain and re-points
  * both links at itself, leaving a valid one-element ring.
  */
-CFormationInstanceSerializer::~CFormationInstanceSerializer()
-{
-  ResetLinks();
-}
+CFormationInstanceSerializer::~CFormationInstanceSerializer() = default;
 
 /**
  * What it does:

@@ -656,10 +656,7 @@ namespace moho
   /**
    * Address: 0x00BF1DF0 (FUN_00BF1DF0, Moho::CIntelGridSaveConstruct::~CIntelGridSaveConstruct)
    */
-  CIntelGridSaveConstruct::~CIntelGridSaveConstruct()
-  {
-    ResetLinks();
-  }
+  CIntelGridSaveConstruct::~CIntelGridSaveConstruct() = default;
 
   /**
    * Address: 0x00507D60 (FUN_00507D60, Moho::CIntelGridSaveConstruct::Init)
@@ -683,10 +680,7 @@ namespace moho
   /**
    * Address: 0x00BF1E20 (FUN_00BF1E20, Moho::CIntelGridConstruct::~CIntelGridConstruct)
    */
-  CIntelGridConstruct::~CIntelGridConstruct()
-  {
-    ResetLinks();
-  }
+  CIntelGridConstruct::~CIntelGridConstruct() = default;
 
   /**
    * Address: 0x00507DE0 (FUN_00507DE0, Moho::CIntelGridConstruct::Init)
@@ -712,10 +706,7 @@ namespace moho
   /**
    * Address: 0x00BF1E50 (FUN_00BF1E50, Moho::CIntelGridSerializer::~CIntelGridSerializer)
    */
-  CIntelGridSerializer::~CIntelGridSerializer()
-  {
-    ResetLinks();
-  }
+  CIntelGridSerializer::~CIntelGridSerializer() = default;
 
   /**
    * Address: 0x00507E60 (FUN_00507E60, Moho::CIntelGridSerializer::Init)

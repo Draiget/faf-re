@@ -73,10 +73,7 @@ CAiSiloBuildImplConstruct::CAiSiloBuildImplConstruct()
  * Unlinks this helper node from whatever intrusive list it currently sits
  * in and restores a self-linked sentinel state.
  */
-CAiSiloBuildImplConstruct::~CAiSiloBuildImplConstruct()
-{
-  ResetLinks();
-}
+CAiSiloBuildImplConstruct::~CAiSiloBuildImplConstruct() = default;
 
 /**
  * Address: 0x005CFEB0 (FUN_005CFEB0, gpg::SerConstructHelper_CAiSiloBuildImpl::Init)

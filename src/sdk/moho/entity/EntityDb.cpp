@@ -2342,10 +2342,7 @@ namespace moho
     , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&EntityDBSerializer::Serialize))
   {}
 
-  EntityDBSerializer::~EntityDBSerializer()
-  {
-    ResetLinks();
-  }
+  EntityDBSerializer::~EntityDBSerializer() = default;
 
   /**
    * Address: 0x00BD51A0 (FUN_00BD51A0, register_EntityDBSerializer)

@@ -202,10 +202,7 @@ SAiReservedTransportBoneSerializer::SAiReservedTransportBoneSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits in
  * and restores a self-linked sentinel state.
  */
-SAiReservedTransportBoneSerializer::~SAiReservedTransportBoneSerializer()
-{
-  ResetLinks();
-}
+SAiReservedTransportBoneSerializer::~SAiReservedTransportBoneSerializer() = default;
 
 /**
  * Address: 0x005E8F70 (FUN_005E8F70)

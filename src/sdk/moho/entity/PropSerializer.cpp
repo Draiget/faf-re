@@ -57,10 +57,7 @@ namespace moho
     , mSerialize(&SPropPriorityInfoSerializer::Serialize)
   {}
 
-  SPropPriorityInfoSerializer::~SPropPriorityInfoSerializer()
-  {
-    ResetLinks();
-  }
+  SPropPriorityInfoSerializer::~SPropPriorityInfoSerializer() = default;
 
   /**
    * Address: 0x006FA8C0 (FUN_006FA8C0, gpg::SerSaveLoadHelper_SPropPriorityInfo::Init)
@@ -112,10 +109,7 @@ namespace moho
   /**
    * Address: 0x00BFF230 (FUN_00BFF230, Moho::PropSerializer::~PropSerializer)
    */
-  PropSerializer::~PropSerializer()
-  {
-    ResetLinks();
-  }
+  PropSerializer::~PropSerializer() = default;
 
   /**
    * Address: 0x006FAA60 (FUN_006FAA60, gpg::SerSaveLoadHelper_Prop::Init)

@@ -681,10 +681,7 @@ namespace moho
   /**
    * Address: 0x00BF1230 (FUN_00BF1230, Moho::AxisAlignedBox3fSerializer::~AxisAlignedBox3fSerializer)
    */
-  AxisAlignedBox3fSerializer::~AxisAlignedBox3fSerializer()
-  {
-    ResetLinks();
-  }
+  AxisAlignedBox3fSerializer::~AxisAlignedBox3fSerializer() = default;
 
   /**
    * Address: 0x004ED140 (FUN_004ED140, Moho::AxisAlignedBox3fSerializer::Init)
@@ -782,10 +779,7 @@ namespace moho
   /**
    * Address: 0x00BF12C0 (FUN_00BF12C0, Moho::Vector2iSerializer::~Vector2iSerializer)
    */
-  Vector2iSerializer::~Vector2iSerializer()
-  {
-    ResetLinks();
-  }
+  Vector2iSerializer::~Vector2iSerializer() = default;
 
   /**
    * Address: 0x004ED1E0 (FUN_004ED1E0, Moho::Vector2iSerializer::Init)
@@ -886,10 +880,7 @@ namespace moho
   /**
    * Address: 0x00BF1350 (FUN_00BF1350, Moho::Vector3iSerializer::~Vector3iSerializer)
    */
-  Vector3iSerializer::~Vector3iSerializer()
-  {
-    ResetLinks();
-  }
+  Vector3iSerializer::~Vector3iSerializer() = default;
 
   /**
    * Address: 0x004ED280 (FUN_004ED280, Moho::Vector3iSerializer::Init)
@@ -986,10 +977,7 @@ namespace moho
   /**
    * Address: 0x00BF13E0 (FUN_00BF13E0, Moho::Vector2fSerializer::~Vector2fSerializer)
    */
-  Vector2fSerializer::~Vector2fSerializer()
-  {
-    ResetLinks();
-  }
+  Vector2fSerializer::~Vector2fSerializer() = default;
 
   /**
    * Address: 0x004ED320 (FUN_004ED320, Moho::Vector2fSerializer::Init)
@@ -1088,10 +1076,7 @@ namespace moho
   /**
    * Address: 0x00BF1470 (FUN_00BF1470, Moho::Vector3fSerializer::~Vector3fSerializer)
    */
-  Vector3fSerializer::~Vector3fSerializer()
-  {
-    ResetLinks();
-  }
+  Vector3fSerializer::~Vector3fSerializer() = default;
 
   /**
    * Address: 0x004ED3C0 (FUN_004ED3C0, Moho::Vector3fSerializer::Init)
@@ -1195,10 +1180,7 @@ namespace moho
   /**
    * Address: 0x00BF1500 (FUN_00BF1500, Moho::Vector4fSerializer::~Vector4fSerializer)
    */
-  Vector4fSerializer::~Vector4fSerializer()
-  {
-    ResetLinks();
-  }
+  Vector4fSerializer::~Vector4fSerializer() = default;
 
   /**
    * Address: 0x004ED460 (FUN_004ED460, Moho::Vector4fSerializer::Init)
@@ -1302,10 +1284,7 @@ namespace moho
   /**
    * Address: 0x00BF1590 (FUN_00BF1590, Moho::QuaternionfSerializer::~QuaternionfSerializer)
    */
-  QuaternionfSerializer::~QuaternionfSerializer()
-  {
-    ResetLinks();
-  }
+  QuaternionfSerializer::~QuaternionfSerializer() = default;
 
   /**
    * Address: 0x004ED500 (FUN_004ED500, Moho::QuaternionfSerializer::Init)
@@ -1418,10 +1397,7 @@ namespace moho
   /**
    * Address: 0x00BF1620 (FUN_00BF1620, Moho::VEulers3Serializer::~VEulers3Serializer)
    */
-  VEulers3Serializer::~VEulers3Serializer()
-  {
-    ResetLinks();
-  }
+  VEulers3Serializer::~VEulers3Serializer() = default;
 
   /**
    * Address: 0x004ED5A0 (FUN_004ED5A0, Moho::VEulers3Serializer::Init)
@@ -1524,10 +1500,7 @@ namespace moho
   /**
    * Address: 0x00BF16B0 (FUN_00BF16B0, Moho::VAxes3Serializer::~VAxes3Serializer)
    */
-  VAxes3Serializer::~VAxes3Serializer()
-  {
-    ResetLinks();
-  }
+  VAxes3Serializer::~VAxes3Serializer() = default;
 
   /**
    * Address: 0x004ED640 (FUN_004ED640, Moho::VAxes3Serializer::Init)
@@ -1752,10 +1725,7 @@ namespace moho
   /**
    * Address: 0x00BF1740 (FUN_00BF1740, Moho::VMatrix4Serializer::~VMatrix4Serializer)
    */
-  VMatrix4Serializer::~VMatrix4Serializer()
-  {
-    ResetLinks();
-  }
+  VMatrix4Serializer::~VMatrix4Serializer() = default;
 
   /**
    * Address: 0x004F0300 (FUN_004F0300, Moho::VMatrix4Serializer::Init)

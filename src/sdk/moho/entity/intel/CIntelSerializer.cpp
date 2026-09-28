@@ -42,10 +42,7 @@ namespace moho
    * Address: 0x00C01DF0 (FUN_00C01DF0, atexit target registered by the real
    * ctor above)
    */
-  CIntelSerializer::~CIntelSerializer()
-  {
-    ResetLinks();
-  }
+  CIntelSerializer::~CIntelSerializer() = default;
 
   /**
    * Address: 0x0076E810 (FUN_0076E810, gpg::SerSaveLoadHelper_CIntel::Init)

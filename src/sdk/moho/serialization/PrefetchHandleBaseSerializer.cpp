@@ -24,10 +24,7 @@ namespace moho
   /**
    * Address: 0x00BF0620 (FUN_00BF0620, Moho::PrefetchHandleBaseSerializer::~PrefetchHandleBaseSerializer)
    */
-  PrefetchHandleBaseSerializer::~PrefetchHandleBaseSerializer()
-  {
-    ResetLinks();
-  }
+  PrefetchHandleBaseSerializer::~PrefetchHandleBaseSerializer() = default;
 
   /**
    * Address: 0x004ABD30 (FUN_004ABD30, Moho::PrefetchHandleBaseSerializer::Deserialize)

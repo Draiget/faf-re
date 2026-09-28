@@ -87,10 +87,7 @@ namespace moho
    * class destructor proper. The two extras are recorded as ICF twins of this
    * one.
    */
-  CAimManipulatorSerializer::~CAimManipulatorSerializer()
-  {
-    ResetLinks();
-  }
+  CAimManipulatorSerializer::~CAimManipulatorSerializer() = default;
 
   /**
    * Address: 0x00632D80 (FUN_00632D80)

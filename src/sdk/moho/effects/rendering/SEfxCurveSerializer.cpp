@@ -34,10 +34,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  SEfxCurveSerializer::~SEfxCurveSerializer()
-  {
-    ResetLinks();
-  }
+  SEfxCurveSerializer::~SEfxCurveSerializer() = default;
 
   /**
    * Address: 0x00515B30 (FUN_00515B30, gpg::SerSaveLoadHelper_SEfxCurve::Init)

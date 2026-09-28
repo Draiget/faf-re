@@ -131,10 +131,7 @@ namespace moho
   /**
    * Address: 0x00BFDA00 (FUN_00BFDA00, Moho::UnitConstruct::~UnitConstruct)
    */
-  UnitConstruct::~UnitConstruct()
-  {
-    ResetLinks();
-  }
+  UnitConstruct::~UnitConstruct() = default;
 
   /**
    * Address: 0x006AE9A0 (FUN_006AE9A0, Moho::UnitConstruct::RegisterConstructFunction)
@@ -170,10 +167,7 @@ namespace moho
   /**
    * Address: 0x00BFDA30 (FUN_00BFDA30, Moho::UnitSerializer::~UnitSerializer)
    */
-  UnitSerializer::~UnitSerializer()
-  {
-    ResetLinks();
-  }
+  UnitSerializer::~UnitSerializer() = default;
 
   /**
    * Address: 0x006AEA20 (FUN_006AEA20, gpg::SerSaveLoadHelper<Moho::Unit>::Init lane)

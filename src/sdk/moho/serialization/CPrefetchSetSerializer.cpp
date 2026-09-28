@@ -22,10 +22,7 @@ namespace moho
   /**
    * Address: 0x00BF03A0 (FUN_00BF03A0, Moho::CPrefetchSetSerializer::~CPrefetchSetSerializer)
    */
-  CPrefetchSetSerializer::~CPrefetchSetSerializer()
-  {
-    ResetLinks();
-  }
+  CPrefetchSetSerializer::~CPrefetchSetSerializer() = default;
 
   /**
    * Address: 0x004A55F0 (FUN_004A55F0, Moho::CPrefetchSetSerializer::Deserialize)

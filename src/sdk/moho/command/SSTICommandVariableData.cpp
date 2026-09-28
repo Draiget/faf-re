@@ -672,10 +672,7 @@ namespace moho
   /**
    * Address: 0x00BF4A80 (FUN_00BF4A80)
    */
-  SSTICommandVariableDataSerializer::~SSTICommandVariableDataSerializer()
-  {
-    ResetLinks();
-  }
+  SSTICommandVariableDataSerializer::~SSTICommandVariableDataSerializer() = default;
 
   /**
    * Address: 0x00552B20 (FUN_00552B20, Moho::SSTICommandVariableDataSerializer::Serialize)

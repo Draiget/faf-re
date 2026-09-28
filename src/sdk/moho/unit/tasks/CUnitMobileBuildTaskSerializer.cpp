@@ -100,10 +100,7 @@ namespace moho
   /**
    * Address: 0x00BF9330 (FUN_00BF9330, Moho::CUnitMobileBuildTaskSerializer::~CUnitMobileBuildTaskSerializer)
    */
-  CUnitMobileBuildTaskSerializer::~CUnitMobileBuildTaskSerializer()
-  {
-    ResetLinks();
-  }
+  CUnitMobileBuildTaskSerializer::~CUnitMobileBuildTaskSerializer() = default;
 
   /**
    * Address: 0x005FBBA0 (FUN_005FBBA0, gpg::SerSaveLoadHelper<Moho::CUnitMobileBuildTask>::Init)

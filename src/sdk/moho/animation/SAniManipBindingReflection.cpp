@@ -458,10 +458,7 @@ namespace moho
   /**
    * Address: 0x00BFAD90 (FUN_00BFAD90, Moho::SAniManipBindingSerializer::~SAniManipBindingSerializer)
    */
-  SAniManipBindingSerializer::~SAniManipBindingSerializer()
-  {
-    ResetLinks();
-  }
+  SAniManipBindingSerializer::~SAniManipBindingSerializer() = default;
 
   /**
    * Address: 0x00BD2BC0 (FUN_00BD2BC0, dynamic initializer for the global

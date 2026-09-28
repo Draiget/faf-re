@@ -46,10 +46,7 @@ namespace moho
   /**
    * Address: 0x00C01ED0 (FUN_00C01ED0, Moho::CIntelPosHandleSerializer::~CIntelPosHandleSerializer)
    */
-  CIntelPosHandleSerializer::~CIntelPosHandleSerializer()
-  {
-    ResetLinks();
-  }
+  CIntelPosHandleSerializer::~CIntelPosHandleSerializer() = default;
 
   /**
    * Address: 0x0076FB00 (FUN_0076FB00, gpg::SerSaveLoadHelper_CIntelPosHandle::Init)

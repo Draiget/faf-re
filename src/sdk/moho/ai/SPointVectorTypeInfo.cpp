@@ -386,10 +386,7 @@ SPointVectorSerializer::SPointVectorSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits in
  * and restores a self-linked sentinel state.
  */
-SPointVectorSerializer::~SPointVectorSerializer()
-{
-  ResetLinks();
-}
+SPointVectorSerializer::~SPointVectorSerializer() = default;
 
 void SPointVectorSerializer::Init()
 {

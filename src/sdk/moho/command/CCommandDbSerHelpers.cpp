@@ -100,10 +100,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  CCommandDBSaveConstruct::~CCommandDBSaveConstruct()
-  {
-    ResetLinks();
-  }
+  CCommandDBSaveConstruct::~CCommandDBSaveConstruct() = default;
 
   /**
    * Address: 0x006E1040 (FUN_006E1040, sub_6E1040)
@@ -164,10 +161,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  CCommandDBConstruct::~CCommandDBConstruct()
-  {
-    ResetLinks();
-  }
+  CCommandDBConstruct::~CCommandDBConstruct() = default;
 
   /**
    * Address: 0x006E1220 (FUN_006E1220, sub_6E1220)
@@ -221,10 +215,7 @@ namespace moho
   /**
    * Address: 0x00BFEA00 (FUN_00BFEA00, Moho::CCommandDBSerializer::~CCommandDBSerializer)
    */
-  CCommandDBSerializer::~CCommandDBSerializer()
-  {
-    ResetLinks();
-  }
+  CCommandDBSerializer::~CCommandDBSerializer() = default;
 
   /**
    * Address: 0x006E12E0 (FUN_006E12E0, Moho::CCommandDBSerializer::Deserialize)

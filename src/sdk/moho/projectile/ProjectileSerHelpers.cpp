@@ -215,10 +215,7 @@ namespace moho
       )
   {}
 
-  ProjectileSaveConstruct::~ProjectileSaveConstruct()
-  {
-    ResetLinks();
-  }
+  ProjectileSaveConstruct::~ProjectileSaveConstruct() = default;
 
   /**
    * Address: 0x00BD6440 (FUN_00BD6440, dynamic initializer for the global
@@ -229,10 +226,7 @@ namespace moho
     , mDeconstructCallback(&ProjectileConstruct::Deconstruct)
   {}
 
-  ProjectileConstruct::~ProjectileConstruct()
-  {
-    ResetLinks();
-  }
+  ProjectileConstruct::~ProjectileConstruct() = default;
 
   /**
    * Address: 0x00BD6480 (FUN_00BD6480, dynamic initializer for the global
@@ -243,8 +237,5 @@ namespace moho
     , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&ProjectileSerializer::Serialize))
   {}
 
-  ProjectileSerializer::~ProjectileSerializer()
-  {
-    ResetLinks();
-  }
+  ProjectileSerializer::~ProjectileSerializer() = default;
 } // namespace moho

@@ -51,10 +51,7 @@ CAiTargetSerializer::CAiTargetSerializer()
   , mSaveCallback(&CAiTarget::SerializeToArchive)
 {}
 
-CAiTargetSerializer::~CAiTargetSerializer()
-{
-  ResetLinks();
-}
+CAiTargetSerializer::~CAiTargetSerializer() = default;
 
 /**
  * Address: 0x005E3540 (FUN_005E3540, gpg::SerSaveLoadHelper_CAiTarget::Init)

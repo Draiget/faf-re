@@ -101,10 +101,7 @@ namespace moho
     , mSaveCallback(&SaveCMersenneTwister)
   {}
 
-  CMersenneTwisterSerializer::~CMersenneTwisterSerializer()
-  {
-    ResetLinks();
-  }
+  CMersenneTwisterSerializer::~CMersenneTwisterSerializer() = default;
 
   /**
    * Address: 0x0040F2C0 (FUN_0040F2C0, gpg::SerSaveLoadHelper<class Moho::CMersenneTwister>::Init)

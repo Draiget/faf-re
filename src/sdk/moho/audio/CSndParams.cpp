@@ -1154,10 +1154,7 @@ namespace moho
     , mDeleteCallback(&CSndParamsConstruct::Deconstruct)
   {}
 
-  CSndParamsConstruct::~CSndParamsConstruct()
-  {
-    ResetLinks();
-  }
+  CSndParamsConstruct::~CSndParamsConstruct() = default;
 
   /**
    * Address: 0x004E1E30 (FUN_004E1E30, gpg::SerConstructHelper<Moho::CSndParams>::Init)
@@ -1197,10 +1194,7 @@ namespace moho
       )
   {}
 
-  CSndParamsSaveConstruct::~CSndParamsSaveConstruct()
-  {
-    ResetLinks();
-  }
+  CSndParamsSaveConstruct::~CSndParamsSaveConstruct() = default;
 
   /**
    * Address: 0x004E1DB0 (FUN_004E1DB0, gpg::SerSaveConstructHelper<Moho::CSndParams>::Init)

@@ -157,10 +157,7 @@ CAiPathSplineSerializer::CAiPathSplineSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits
  * in and restores a self-linked sentinel state.
  */
-CAiPathSplineSerializer::~CAiPathSplineSerializer()
-{
-  ResetLinks();
-}
+CAiPathSplineSerializer::~CAiPathSplineSerializer() = default;
 
 /**
  * Address: 0x005B48E0 (FUN_005B48E0)

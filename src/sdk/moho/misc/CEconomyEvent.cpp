@@ -1304,10 +1304,7 @@ moho::CEconomyEventConstruct::CEconomyEventConstruct()
  * Address: 0x00C024B0 (FUN_00C024B0, atexit target registered by the real
  * ctor above)
  */
-moho::CEconomyEventConstruct::~CEconomyEventConstruct()
-{
-  ResetLinks();
-}
+moho::CEconomyEventConstruct::~CEconomyEventConstruct() = default;
 
 /**
  * Address: 0x00775C40 (FUN_00775C40, sub_775C40)

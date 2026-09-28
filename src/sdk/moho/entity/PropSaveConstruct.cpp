@@ -72,10 +72,7 @@ namespace moho
    * Address: 0x00BFF1D0 (FUN_00BFF1D0, atexit target registered by the real
    * ctor above)
    */
-  PropSaveConstruct::~PropSaveConstruct()
-  {
-    ResetLinks();
-  }
+  PropSaveConstruct::~PropSaveConstruct() = default;
 
   /**
    * Address: 0x006FA960 (FUN_006FA960, gpg::SerSaveConstructHelper_Prop::Init)

@@ -148,10 +148,7 @@ IAiCommandDispatchImplSerializer::IAiCommandDispatchImplSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits in
  * and restores a self-linked sentinel state.
  */
-IAiCommandDispatchImplSerializer::~IAiCommandDispatchImplSerializer()
-{
-  ResetLinks();
-}
+IAiCommandDispatchImplSerializer::~IAiCommandDispatchImplSerializer() = default;
 
 /**
  * Address: 0x005996D0 (FUN_005996D0)

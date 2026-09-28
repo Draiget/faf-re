@@ -78,10 +78,7 @@ namespace moho
    * Unlinks the `SWorldParticleSerializer` helper node and rewires
    * self-links.
    */
-  SWorldParticleSerializer::~SWorldParticleSerializer()
-  {
-    ResetLinks();
-  }
+  SWorldParticleSerializer::~SWorldParticleSerializer() = default;
 
   /**
    * Address: 0x0048F8D0 (Moho::SWorldParticleSerializer::Deserialize)

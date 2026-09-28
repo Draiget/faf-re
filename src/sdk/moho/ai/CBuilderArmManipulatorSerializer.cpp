@@ -72,10 +72,7 @@ namespace moho
     , mSerialize(&CBuilderArmManipulatorSerializer::Serialize)
   {}
 
-  CBuilderArmManipulatorSerializer::~CBuilderArmManipulatorSerializer()
-  {
-    ResetLinks();
-  }
+  CBuilderArmManipulatorSerializer::~CBuilderArmManipulatorSerializer() = default;
 
   /**
    * Address: 0x00636F80 (FUN_00636F80)

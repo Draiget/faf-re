@@ -43,10 +43,7 @@ namespace moho
    * Unlinks the serializer helper node from the intrusive helper list and
    * restores self-links.
    */
-  SBuildReserveInfoSerializer::~SBuildReserveInfoSerializer()
-  {
-    ResetLinks();
-  }
+  SBuildReserveInfoSerializer::~SBuildReserveInfoSerializer() = default;
 
   /**
    * Address: 0x00579A70 (FUN_00579A70, Moho::SBuildReserveInfoSerializer::Deserialize)

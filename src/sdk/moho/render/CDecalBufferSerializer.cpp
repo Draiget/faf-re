@@ -191,8 +191,5 @@ namespace moho
     , mSaveCallback(&CDecalBufferSerializeLane)
   {}
 
-  CDecalBufferSerializer::~CDecalBufferSerializer()
-  {
-    ResetLinks();
-  }
+  CDecalBufferSerializer::~CDecalBufferSerializer() = default;
 } // namespace moho

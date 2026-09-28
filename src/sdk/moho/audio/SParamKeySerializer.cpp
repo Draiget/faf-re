@@ -41,10 +41,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  SParamKeySerializer::~SParamKeySerializer() noexcept
-  {
-    ResetLinks();
-  }
+  SParamKeySerializer::~SParamKeySerializer() noexcept = default;
 
   /**
    * Address: 0x004DEFD0 (FUN_004DEFD0, Moho::SParamKeySerializer::Deserialize)

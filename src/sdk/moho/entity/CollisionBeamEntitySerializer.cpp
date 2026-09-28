@@ -55,10 +55,7 @@ namespace moho
   /**
    * Address: 0x00BFC3A0 (FUN_00BFC3A0, Moho::CollisionBeamEntitySerializer::~CollisionBeamEntitySerializer)
    */
-  CollisionBeamEntitySerializer::~CollisionBeamEntitySerializer()
-  {
-    ResetLinks();
-  }
+  CollisionBeamEntitySerializer::~CollisionBeamEntitySerializer() = default;
 
   /**
    * Address: 0x00674FE0 (FUN_00674FE0, gpg::SerSaveLoadHelper_CollisionBeamEntity::Init)

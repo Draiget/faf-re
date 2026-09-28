@@ -267,10 +267,7 @@ namespace
     , mSaveCallback(&ResourceDepositSerializer::Serialize)
   {}
 
-  ResourceDepositSerializer::~ResourceDepositSerializer()
-  {
-    ResetLinks();
-  }
+  ResourceDepositSerializer::~ResourceDepositSerializer() = default;
 
   struct ResourceDepositTypeInfoStartup
   {

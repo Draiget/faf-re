@@ -69,10 +69,7 @@ namespace moho
     , mSerialize(&UnitAttributesSerializer::Serialize)
   {}
 
-  UnitAttributesSerializer::~UnitAttributesSerializer()
-  {
-    ResetLinks();
-  }
+  UnitAttributesSerializer::~UnitAttributesSerializer() = default;
 } // namespace moho
 
 namespace

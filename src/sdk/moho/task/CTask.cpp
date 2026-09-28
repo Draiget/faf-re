@@ -415,10 +415,7 @@ CTaskSerializer::CTaskSerializer()
 /**
  * Address: 0x00BEE310 (FUN_00BEE310, Moho::CTaskSerializer::~CTaskSerializer)
  */
-CTaskSerializer::~CTaskSerializer()
-{
-  ResetLinks();
-}
+CTaskSerializer::~CTaskSerializer() = default;
 
 /**
  * Address: 0x00408E00 (FUN_00408E00, Moho::CTaskSerializer::Deserialize)

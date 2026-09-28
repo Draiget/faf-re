@@ -187,10 +187,7 @@ namespace moho
   /**
    * Address: 0x00BF7840 (FUN_00BF7840, Moho::SPerArmyReconInfoSerializer::~SPerArmyReconInfoSerializer)
    */
-  SPerArmyReconInfoSerializer::~SPerArmyReconInfoSerializer()
-  {
-    ResetLinks();
-  }
+  SPerArmyReconInfoSerializer::~SPerArmyReconInfoSerializer() = default;
 
   /**
    * Address: 0x005C3DE0 (FUN_005C3DE0, Moho::SPerArmyReconInfoSerializer::RegisterSerializeFunctions)

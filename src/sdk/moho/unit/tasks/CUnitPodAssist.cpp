@@ -665,10 +665,7 @@ namespace moho
      * What it does:
      * Unlinks the serializer helper from the intrusive helper list.
      */
-    ~CUnitPodAssistSerializer()
-    {
-      ResetLinks();
-    }
+    ~CUnitPodAssistSerializer() = default;
 
     /**
      * What it does:

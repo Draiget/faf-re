@@ -238,10 +238,7 @@ namespace moho
     , mSaveCallback(&IArmySerializer::Serialize)
   {}
 
-  IArmySerializer::~IArmySerializer()
-  {
-    ResetLinks();
-  }
+  IArmySerializer::~IArmySerializer() = default;
 
   /**
    * Address: 0x00550C00 (FUN_00550C00, Moho::IArmySerializer::Deserialize)

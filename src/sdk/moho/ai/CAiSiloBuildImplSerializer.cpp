@@ -101,10 +101,7 @@ SSiloBuildInfoSerializer::SSiloBuildInfoSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits in
  * and restores a self-linked sentinel state.
  */
-SSiloBuildInfoSerializer::~SSiloBuildInfoSerializer()
-{
-  ResetLinks();
-}
+SSiloBuildInfoSerializer::~SSiloBuildInfoSerializer() = default;
 
 /**
  * Address: 0x005CFB60 (FUN_005CFB60)

@@ -111,10 +111,7 @@ namespace moho
    * Address: 0x00BFFFD0 (FUN_00BFFFD0, atexit target registered by the real
    * ctor above)
    */
-  InfluenceMapEntrySerializer::~InfluenceMapEntrySerializer()
-  {
-    ResetLinks();
-  }
+  InfluenceMapEntrySerializer::~InfluenceMapEntrySerializer() = default;
 
   /**
    * Address: 0x00718C00 (FUN_00718C00, gpg::SerSaveLoadHelper_InfluenceMapEntry::Init)

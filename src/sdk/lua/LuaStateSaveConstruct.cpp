@@ -177,10 +177,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09820 (FUN_00C09820, LuaPlus::LuaStateSaveConstruct::~LuaStateSaveConstruct)
    */
-  LuaStateSaveConstruct::~LuaStateSaveConstruct()
-  {
-    ResetLinks();
-  }
+  LuaStateSaveConstruct::~LuaStateSaveConstruct() = default;
 
   /**
    * Address: 0x0091E510 (FUN_0091E510, UpValSaveConstruct::Construct)
@@ -210,10 +207,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09BB0 (FUN_00C09BB0, UpValSaveConstruct::~UpValSaveConstruct)
    */
-  UpValSaveConstruct::~UpValSaveConstruct()
-  {
-    ResetLinks();
-  }
+  UpValSaveConstruct::~UpValSaveConstruct() = default;
 
   /**
    * Address: 0x0091E520 (FUN_0091E520, ProtoSaveConstruct::Construct)
@@ -243,10 +237,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09C40 (FUN_00C09C40, ProtoSaveConstruct::~ProtoSaveConstruct)
    */
-  ProtoSaveConstruct::~ProtoSaveConstruct()
-  {
-    ResetLinks();
-  }
+  ProtoSaveConstruct::~ProtoSaveConstruct() = default;
 
   /**
    * Address: 0x0091E530 (FUN_0091E530, UdataSaveConstruct::Construct)
@@ -279,10 +270,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09D60 (FUN_00C09D60, UdataSaveConstruct::~UdataSaveConstruct)
    */
-  UdataSaveConstruct::~UdataSaveConstruct()
-  {
-    ResetLinks();
-  }
+  UdataSaveConstruct::~UdataSaveConstruct() = default;
 
   /**
    * Address: 0x0091F490 (FUN_0091F490, LClosureSaveConstruct::Construct)
@@ -314,10 +302,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09B20 (FUN_00C09B20, LClosureSaveConstruct::~LClosureSaveConstruct)
    */
-  LClosureSaveConstruct::~LClosureSaveConstruct()
-  {
-    ResetLinks();
-  }
+  LClosureSaveConstruct::~LClosureSaveConstruct() = default;
 
   /**
    * Address: 0x009220A0 (FUN_009220A0, TStringSaveConstruct::Construct)
@@ -347,10 +332,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09A00 (FUN_00C09A00, TStringSaveConstruct::~TStringSaveConstruct)
    */
-  TStringSaveConstruct::~TStringSaveConstruct()
-  {
-    ResetLinks();
-  }
+  TStringSaveConstruct::~TStringSaveConstruct() = default;
 
   /**
    * Address: 0x00922180 (FUN_00922180, TableSaveConstruct::Construct)
@@ -380,10 +362,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09A90 (FUN_00C09A90, TableSaveConstruct::~TableSaveConstruct)
    */
-  TableSaveConstruct::~TableSaveConstruct()
-  {
-    ResetLinks();
-  }
+  TableSaveConstruct::~TableSaveConstruct() = default;
 
   /**
    * Address: 0x00922610 (FUN_00922610, lua_StateSaveConstruct::Construct)
@@ -413,10 +392,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09CD0 (FUN_00C09CD0, lua_StateSaveConstruct::~lua_StateSaveConstruct)
    */
-  lua_StateSaveConstruct::~lua_StateSaveConstruct()
-  {
-    ResetLinks();
-  }
+  lua_StateSaveConstruct::~lua_StateSaveConstruct() = default;
 
   /**
    * Address: 0x0090B5F0 (FUN_0090B5F0, LuaPlus::LuaStateSaveConstruct::Init)

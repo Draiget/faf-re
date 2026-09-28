@@ -35,10 +35,7 @@ namespace moho
     , mSaveCallback(&COGridSerializer::Serialize)
   {}
 
-  COGridSerializer::~COGridSerializer()
-  {
-    ResetLinks();
-  }
+  COGridSerializer::~COGridSerializer() = default;
 
   /**
    * Address: 0x00722CC0 (FUN_00722CC0, Moho::COGridSerializer::Deserialize)

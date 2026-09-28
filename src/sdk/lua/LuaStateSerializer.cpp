@@ -78,10 +78,7 @@ LuaStateSerializer::LuaStateSerializer()
 /**
  * Address: 0x00C09880 (FUN_00C09880, ??1LuaStateSerializer@LuaPlus@@QAE@@Z)
  */
-LuaStateSerializer::~LuaStateSerializer()
-{
-	ResetLinks();
-}
+LuaStateSerializer::~LuaStateSerializer() = default;
 
 /**
  * Address: 0x0090B6F0 (FUN_0090B6F0, LuaPlus::LuaStateSerializer::Init)

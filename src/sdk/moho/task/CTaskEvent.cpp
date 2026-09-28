@@ -329,10 +329,7 @@ STaskEventLinkageSerializer::STaskEventLinkageSerializer()
 /**
  * Address: 0x00BEE140 (FUN_00BEE140, Moho::STaskEventLinkageSerializer::~STaskEventLinkageSerializer)
  */
-STaskEventLinkageSerializer::~STaskEventLinkageSerializer()
-{
-  ResetLinks();
-}
+STaskEventLinkageSerializer::~STaskEventLinkageSerializer() = default;
 
 /**
  * Address: 0x00407240 (FUN_00407240, Moho::STaskEventLinkageSerializer::Init)
@@ -752,10 +749,7 @@ CTaskEventSerializer::CTaskEventSerializer()
 /**
  * Address: 0x00BEE1D0 (FUN_00BEE1D0, Moho::CTaskEventSerializer::~CTaskEventSerializer)
  */
-CTaskEventSerializer::~CTaskEventSerializer()
-{
-  ResetLinks();
-}
+CTaskEventSerializer::~CTaskEventSerializer() = default;
 
 /**
  * Address: 0x00407620 (FUN_00407620, ?Init@CTaskEventSerializer@Moho@@UAEXXZ)

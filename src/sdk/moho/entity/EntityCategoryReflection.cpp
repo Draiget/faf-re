@@ -858,10 +858,7 @@ namespace
   /**
    * Address: 0x00BF3AD0 (FUN_00BF3AD0, Moho::EntityCategoryHelperSerializer::~EntityCategoryHelperSerializer)
    */
-  EntityCategoryHelperSerializer::~EntityCategoryHelperSerializer()
-  {
-    ResetLinks();
-  }
+  EntityCategoryHelperSerializer::~EntityCategoryHelperSerializer() = default;
 
   /**
    * Address: 0x0052C8E0 (FUN_0052C8E0, Moho::EntityCategoryHelperSerializer::Init)

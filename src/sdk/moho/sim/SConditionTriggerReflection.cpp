@@ -309,10 +309,7 @@ namespace
      * Unlinks this helper node from whatever intrusive list it currently
      * sits in and restores a self-linked sentinel state.
      */
-    ~SConditionSerializer()
-    {
-      ResetLinks();
-    }
+    ~SConditionSerializer() = default;
 
     /**
      * Address: 0x0070B120 (FUN_0070B120, Moho::SConditionSerializer::Deserialize)
@@ -389,10 +386,7 @@ namespace
      * Unlinks this helper node from whatever intrusive list it currently
      * sits in and restores a self-linked sentinel state.
      */
-    ~STriggerSerializer()
-    {
-      ResetLinks();
-    }
+    ~STriggerSerializer() = default;
 
     /**
      * Address: 0x0070B380 (FUN_0070B380, Moho::STriggerSerializer::Deserialize)

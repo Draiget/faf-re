@@ -74,9 +74,6 @@ namespace moho
     , mSerialize(&RResIdSerializer::Serialize)
   {}
 
-  RResIdSerializer::~RResIdSerializer()
-  {
-    ResetLinks();
-  }
+  RResIdSerializer::~RResIdSerializer() = default;
 } // namespace moho
 

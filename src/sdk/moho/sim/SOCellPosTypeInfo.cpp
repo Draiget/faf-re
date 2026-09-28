@@ -260,10 +260,7 @@ namespace moho
     , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&SOCellPosSerializer::Serialize))
   {}
 
-  SOCellPosSerializer::~SOCellPosSerializer()
-  {
-    ResetLinks();
-  }
+  SOCellPosSerializer::~SOCellPosSerializer() = default;
 
   void SOCellPosSerializer::Init()
   {

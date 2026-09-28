@@ -71,10 +71,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  CEfxBeamSerializer::~CEfxBeamSerializer()
-  {
-    ResetLinks();
-  }
+  CEfxBeamSerializer::~CEfxBeamSerializer() = default;
 
   /**
    * Address: 0x00657B80 (FUN_00657B80, gpg::SerSaveLoadHelper_CEfxBeam::Init)

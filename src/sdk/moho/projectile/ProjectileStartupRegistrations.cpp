@@ -3050,10 +3050,7 @@ namespace moho
     , mSerialize(&CProjectileAttributesSerializer::Serialize)
   {}
 
-  CProjectileAttributesSerializer::~CProjectileAttributesSerializer()
-  {
-    ResetLinks();
-  }
+  CProjectileAttributesSerializer::~CProjectileAttributesSerializer() = default;
 
   /**
    * Address: 0x00BFD510 (FUN_00BFD510, cleanup_TConVar_dbg_Projectile)

@@ -152,10 +152,7 @@ namespace moho
   /**
    * Address: 0x00BF2110 (FUN_00BF2110, Moho::SCoordsVec2Serializer::~SCoordsVec2Serializer)
    */
-  SCoordsVec2Serializer::~SCoordsVec2Serializer()
-  {
-    ResetLinks();
-  }
+  SCoordsVec2Serializer::~SCoordsVec2Serializer() = default;
 
   /**
    * Address: 0x0050C730 (FUN_0050C730)

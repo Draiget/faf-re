@@ -95,10 +95,7 @@ namespace moho
   /**
    * Address: 0x00BFE710 (FUN_00BFE710, Moho::CFireWeaponTaskSerializer::~CFireWeaponTaskSerializer)
    */
-  CFireWeaponTaskSerializer::~CFireWeaponTaskSerializer()
-  {
-    ResetLinks();
-  }
+  CFireWeaponTaskSerializer::~CFireWeaponTaskSerializer() = default;
 
   /**
    * Address: 0x006D3EF0 (FUN_006D3EF0, Moho::CFireWeaponTaskSerializer::Deserialize)

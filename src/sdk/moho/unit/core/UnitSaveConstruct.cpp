@@ -89,10 +89,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  UnitSaveConstruct::~UnitSaveConstruct()
-  {
-    ResetLinks();
-  }
+  UnitSaveConstruct::~UnitSaveConstruct() = default;
 
   /**
    * Address: 0x006AE920 (FUN_006AE920, Moho::UnitSaveConstruct::RegisterSaveConstructArgsFunction)

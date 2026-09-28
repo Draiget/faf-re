@@ -40,10 +40,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  CUnitMotionConstruct::~CUnitMotionConstruct()
-  {
-    ResetLinks();
-  }
+  CUnitMotionConstruct::~CUnitMotionConstruct() = default;
 
   /**
    * Address: 0x006BA7F0 (FUN_006BA7F0, gpg::SerConstructHelper_CUnitMotion::Init)

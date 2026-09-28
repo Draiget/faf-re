@@ -16,10 +16,7 @@ namespace moho
   /**
    * Address: 0x00BF0980 (FUN_00BF0980, Moho::CScriptObjectSerializer::~CScriptObjectSerializer)
    */
-  CScriptObjectSerializer::~CScriptObjectSerializer()
-  {
-    ResetLinks();
-  }
+  CScriptObjectSerializer::~CScriptObjectSerializer() = default;
 
   /**
    * Address: 0x004C79E0 (FUN_004C79E0, Moho::CScriptObjectSerializer::Deserialize)

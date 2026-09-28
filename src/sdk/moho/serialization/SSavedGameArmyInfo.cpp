@@ -90,10 +90,7 @@ namespace moho
   /**
    * Address: 0x00C07CC0 (FUN_00C07CC0)
    */
-  SSavedGameArmyInfoSerializer::~SSavedGameArmyInfoSerializer()
-  {
-    ResetLinks();
-  }
+  SSavedGameArmyInfoSerializer::~SSavedGameArmyInfoSerializer() = default;
 
   /**
    * Address: 0x00882090 (FUN_00882090, Moho::SSavedGameArmyInfoSerializer::Init)

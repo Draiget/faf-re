@@ -324,10 +324,7 @@ ScrDiskWatcherTaskSaveConstruct::ScrDiskWatcherTaskSaveConstruct()
     )
 {}
 
-ScrDiskWatcherTaskSaveConstruct::~ScrDiskWatcherTaskSaveConstruct()
-{
-  ResetLinks();
-}
+ScrDiskWatcherTaskSaveConstruct::~ScrDiskWatcherTaskSaveConstruct() = default;
 
 /**
  * Address: 0x004C0F90 (FUN_004C0F90, sub_4C0F90)
@@ -348,10 +345,7 @@ ScrDiskWatcherTaskConstruct::ScrDiskWatcherTaskConstruct()
   , mDeleteFunc(&ScrDiskWatcherTask::Delete)
 {}
 
-ScrDiskWatcherTaskConstruct::~ScrDiskWatcherTaskConstruct()
-{
-  ResetLinks();
-}
+ScrDiskWatcherTaskConstruct::~ScrDiskWatcherTaskConstruct() = default;
 
 /**
  * Address: 0x004C1010 (FUN_004C1010, sub_4C1010)

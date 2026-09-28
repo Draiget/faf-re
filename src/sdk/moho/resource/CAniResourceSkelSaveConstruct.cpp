@@ -97,8 +97,5 @@ namespace moho
       )
   {}
 
-  CAniResourceSkelSaveConstruct::~CAniResourceSkelSaveConstruct()
-  {
-    ResetLinks();
-  }
+  CAniResourceSkelSaveConstruct::~CAniResourceSkelSaveConstruct() = default;
 } // namespace moho

@@ -457,10 +457,7 @@ namespace moho
     , mSerSaveFunc(&SSTIArmyVariableDataSerializer::Serialize)
   {}
 
-  SSTIArmyVariableDataSerializer::~SSTIArmyVariableDataSerializer()
-  {
-    ResetLinks();
-  }
+  SSTIArmyVariableDataSerializer::~SSTIArmyVariableDataSerializer() = default;
 
   /**
    * Address: 0x00550D90 (FUN_00550D90, shared Init() body)

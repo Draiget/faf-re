@@ -81,10 +81,7 @@ namespace moho
     , mSaveCallback(&CRandomStreamSerializer::Serialize)
   {}
 
-  CRandomStreamSerializer::~CRandomStreamSerializer()
-  {
-    ResetLinks();
-  }
+  CRandomStreamSerializer::~CRandomStreamSerializer() = default;
 
   /**
    * Address: 0x0040F1D0 (FUN_0040F1D0, Moho::CRandomStreamSerializer::Deserialize)

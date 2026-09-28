@@ -19,10 +19,7 @@ namespace moho
     , mDeleteCallback(&ReconBlipConstruct::DeleteConstructedObject)
   {}
 
-  ReconBlipConstruct::~ReconBlipConstruct()
-  {
-    ResetLinks();
-  }
+  ReconBlipConstruct::~ReconBlipConstruct() = default;
 
   /**
    * Address: 0x005BFBC0 (FUN_005BFBC0, Moho::ReconBlipConstruct::Construct)

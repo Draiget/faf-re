@@ -93,8 +93,5 @@ namespace moho
     , mDeleteCallback(&CParticleTextureConstruct::Deconstruct)
   {}
 
-  CParticleTextureConstruct::~CParticleTextureConstruct()
-  {
-    ResetLinks();
-  }
+  CParticleTextureConstruct::~CParticleTextureConstruct() = default;
 } // namespace moho

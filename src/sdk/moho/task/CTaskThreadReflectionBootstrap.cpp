@@ -197,10 +197,7 @@ namespace moho
   /**
    * Address: 0x00BEE3A0 (FUN_00BEE3A0, Moho::CTaskThreadConstruct::~CTaskThreadConstruct)
    */
-  CTaskThreadConstruct::~CTaskThreadConstruct()
-  {
-    ResetLinks();
-  }
+  CTaskThreadConstruct::~CTaskThreadConstruct() = default;
 
   /**
    * Address: 0x00BC3080 (FUN_00BC3080, dynamic initializer for the global
@@ -214,10 +211,7 @@ namespace moho
   /**
    * Address: 0x00BEE3D0 (FUN_00BEE3D0, Moho::CTaskThreadSerializer::~CTaskThreadSerializer)
    */
-  CTaskThreadSerializer::~CTaskThreadSerializer()
-  {
-    ResetLinks();
-  }
+  CTaskThreadSerializer::~CTaskThreadSerializer() = default;
 
   /**
    * Address: 0x00BC30E0 (FUN_00BC30E0, dynamic initializer for the global
@@ -231,10 +225,7 @@ namespace moho
   /**
    * Address: 0x00BEE460 (FUN_00BEE460, Moho::CTaskStageSerializer::~CTaskStageSerializer)
    */
-  CTaskStageSerializer::~CTaskStageSerializer()
-  {
-    ResetLinks();
-  }
+  CTaskStageSerializer::~CTaskStageSerializer() = default;
 } // namespace moho
 
 /**

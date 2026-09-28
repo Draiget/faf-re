@@ -81,10 +81,7 @@ namespace moho
   /**
    * Address: 0x00BFEBE0 (FUN_00BFEBE0, Moho::CUnitCommandConstruct::~CUnitCommandConstruct)
    */
-  CUnitCommandConstruct::~CUnitCommandConstruct()
-  {
-    ResetLinks();
-  }
+  CUnitCommandConstruct::~CUnitCommandConstruct() = default;
 
   /**
    * Address: 0x006E9250 (FUN_006E9250, Moho::CUnitCommandSerializer::Deserialize)
@@ -159,10 +156,7 @@ namespace moho
   /**
    * Address: 0x00BFEC10 (FUN_00BFEC10, Moho::CUnitCommandSerializer::~CUnitCommandSerializer)
    */
-  CUnitCommandSerializer::~CUnitCommandSerializer()
-  {
-    ResetLinks();
-  }
+  CUnitCommandSerializer::~CUnitCommandSerializer() = default;
 } // namespace moho
 
 namespace

@@ -762,10 +762,7 @@ namespace moho
     , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&EntitySetBaseSerializer::Serialize))
   {}
 
-  EntitySetBaseSerializer::~EntitySetBaseSerializer()
-  {
-    ResetLinks();
-  }
+  EntitySetBaseSerializer::~EntitySetBaseSerializer() = default;
 
   /**
    * Address: 0x00BD5790 (FUN_00BD5790, register_EntitySetBaseSerializer)
@@ -820,10 +817,7 @@ namespace moho
     , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&EntitySetSerializer::Serialize))
   {}
 
-  EntitySetSerializer::~EntitySetSerializer()
-  {
-    ResetLinks();
-  }
+  EntitySetSerializer::~EntitySetSerializer() = default;
 
   /**
    * Address: 0x00BD57F0 (FUN_00BD57F0, register_EntitySetSerializer)
@@ -878,10 +872,7 @@ namespace moho
     , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&WeakEntitySetSerializer::Serialize))
   {}
 
-  WeakEntitySetSerializer::~WeakEntitySetSerializer()
-  {
-    ResetLinks();
-  }
+  WeakEntitySetSerializer::~WeakEntitySetSerializer() = default;
 
   /**
    * Address: 0x00BD5850 (FUN_00BD5850, register_WeakEntitySetSerializer)

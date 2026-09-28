@@ -32,10 +32,7 @@ namespace moho
     , mSaveCallback(&SMassInfoSerializer::Serialize)
   {}
 
-  SMassInfoSerializer::~SMassInfoSerializer()
-  {
-    ResetLinks();
-  }
+  SMassInfoSerializer::~SMassInfoSerializer() = default;
 
   /**
    * Address: 0x00585E10 (FUN_00585E10, Moho::SMassInfoSerializer::Deserialize)

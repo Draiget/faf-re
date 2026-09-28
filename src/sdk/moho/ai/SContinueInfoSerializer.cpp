@@ -76,10 +76,7 @@ SContinueInfoSerializer::SContinueInfoSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits in
  * and restores a self-linked sentinel state.
  */
-SContinueInfoSerializer::~SContinueInfoSerializer()
-{
-  ResetLinks();
-}
+SContinueInfoSerializer::~SContinueInfoSerializer() = default;
 
 /**
  * Address: 0x005B4820 (FUN_005B4820)

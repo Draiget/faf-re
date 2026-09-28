@@ -381,10 +381,7 @@ CAiPersonalitySerializer::CAiPersonalitySerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits
  * in and restores a self-linked sentinel state.
  */
-CAiPersonalitySerializer::~CAiPersonalitySerializer()
-{
-  ResetLinks();
-}
+CAiPersonalitySerializer::~CAiPersonalitySerializer() = default;
 
 /**
  * Address: 0x005B9350 (FUN_005B9350)

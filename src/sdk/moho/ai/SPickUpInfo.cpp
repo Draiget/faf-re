@@ -207,10 +207,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  SPickUpInfoSerializer::~SPickUpInfoSerializer()
-  {
-    ResetLinks();
-  }
+  SPickUpInfoSerializer::~SPickUpInfoSerializer() = default;
 
   /**
    * What it does:

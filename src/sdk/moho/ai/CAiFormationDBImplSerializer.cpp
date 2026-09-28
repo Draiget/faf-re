@@ -76,10 +76,7 @@ CAiFormationDBImplSerializer::CAiFormationDBImplSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits
  * in and restores a self-linked sentinel state.
  */
-CAiFormationDBImplSerializer::~CAiFormationDBImplSerializer()
-{
-  ResetLinks();
-}
+CAiFormationDBImplSerializer::~CAiFormationDBImplSerializer() = default;
 
 /**
  * Address: 0x0059CBA0 (FUN_0059CBA0)

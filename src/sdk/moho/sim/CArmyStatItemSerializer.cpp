@@ -78,10 +78,7 @@ namespace moho
    * Address: 0x00BFF730 (FUN_00BFF730, atexit target registered by the real
    * ctor above)
    */
-  CArmyStatItemSerializer::~CArmyStatItemSerializer()
-  {
-    ResetLinks();
-  }
+  CArmyStatItemSerializer::~CArmyStatItemSerializer() = default;
 
   /**
    * Address: 0x0070B770 (FUN_0070B770, sub_70B770)

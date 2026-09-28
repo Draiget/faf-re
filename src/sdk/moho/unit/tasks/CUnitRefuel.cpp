@@ -349,10 +349,7 @@ namespace moho
      * What it does:
      * Unlinks the serializer helper from the intrusive helper list.
      */
-    ~CUnitRefuelSerializer()
-    {
-      ResetLinks();
-    }
+    ~CUnitRefuelSerializer() = default;
 
     /**
      * What it does:

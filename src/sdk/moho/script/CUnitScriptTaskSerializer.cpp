@@ -33,10 +33,7 @@ namespace moho
   /**
    * Address: 0x00BFA470 (FUN_00BFA470, Moho::CUnitScriptTaskSerializer::~CUnitScriptTaskSerializer)
    */
-  CUnitScriptTaskSerializer::~CUnitScriptTaskSerializer()
-  {
-    ResetLinks();
-  }
+  CUnitScriptTaskSerializer::~CUnitScriptTaskSerializer() = default;
 
   /**
    * Address: 0x00622EA0 (FUN_00622EA0, Moho::CUnitScriptTaskSerializer::Deserialize)

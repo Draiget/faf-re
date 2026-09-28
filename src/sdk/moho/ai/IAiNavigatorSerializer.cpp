@@ -79,10 +79,7 @@ IAiNavigatorSerializer::IAiNavigatorSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits in
  * and restores a self-linked sentinel state.
  */
-IAiNavigatorSerializer::~IAiNavigatorSerializer()
-{
-  ResetLinks();
-}
+IAiNavigatorSerializer::~IAiNavigatorSerializer() = default;
 
 /**
  * Address: 0x005A71A0 (FUN_005A71A0)

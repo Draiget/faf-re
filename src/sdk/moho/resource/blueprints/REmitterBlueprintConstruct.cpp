@@ -113,10 +113,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  REmitterBlueprintConstruct::~REmitterBlueprintConstruct()
-  {
-    ResetLinks();
-  }
+  REmitterBlueprintConstruct::~REmitterBlueprintConstruct() = default;
 
   /**
    * Address: 0x00510600 (FUN_00510600, gpg::SerConstructHelper<Moho::REmitterBlueprint>::Init)

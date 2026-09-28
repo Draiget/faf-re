@@ -1561,10 +1561,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  CSquadConstruct::~CSquadConstruct()
-  {
-    ResetLinks();
-  }
+  CSquadConstruct::~CSquadConstruct() = default;
 
   /**
    * Address: 0x0072A570 (FUN_0072A570, Moho::CSquadConstruct::Init)
@@ -1619,10 +1616,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  CPlatoonConstruct::~CPlatoonConstruct()
-  {
-    ResetLinks();
-  }
+  CPlatoonConstruct::~CPlatoonConstruct() = default;
 
   /**
    * Address: 0x0072A690 (FUN_0072A690, Moho::CPlatoonConstruct::Init)
@@ -1690,10 +1684,7 @@ namespace moho
    * Address: 0x00C00500 (`??1CSquadSerializer@Moho@@QAE@@Z`,
    * Moho::CSquadSerializer::~CSquadSerializer)
    */
-  CSquadSerializer::~CSquadSerializer()
-  {
-    ResetLinks();
-  }
+  CSquadSerializer::~CSquadSerializer() = default;
 
   /**
    * Address: 0x0072A5F0 (FUN_0072A5F0, Moho::CSquadSerializer::Init)
@@ -1739,10 +1730,7 @@ namespace moho
   /**
    * Address: 0x00C005C0 (FUN_00C005C0, Moho::CPlatoonSerializer::~CPlatoonSerializer)
    */
-  CPlatoonSerializer::~CPlatoonSerializer()
-  {
-    ResetLinks();
-  }
+  CPlatoonSerializer::~CPlatoonSerializer() = default;
 
   /**
    * Address: 0x0072A710 (FUN_0072A710, Moho::CPlatoonSerializer::Init)

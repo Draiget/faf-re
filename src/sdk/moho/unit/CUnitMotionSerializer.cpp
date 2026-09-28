@@ -19,10 +19,7 @@ namespace moho
   /**
    * Address: 0x00BFE0A0 (FUN_00BFE0A0, Moho::CUnitMotionSerializer::~CUnitMotionSerializer)
    */
-  CUnitMotionSerializer::~CUnitMotionSerializer()
-  {
-    ResetLinks();
-  }
+  CUnitMotionSerializer::~CUnitMotionSerializer() = default;
 
   /**
    * Address: 0x006BA2E0 (FUN_006BA2E0, Moho::CUnitMotionSerializer::Deserialize)

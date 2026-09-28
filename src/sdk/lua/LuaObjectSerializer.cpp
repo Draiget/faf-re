@@ -53,10 +53,7 @@ LuaObjectSerializer::LuaObjectSerializer()
 /**
  * Address: 0x00C098B0 (FUN_00C098B0, ??1LuaObjectSerializer@LuaPlus@@QAE@@Z)
  */
-LuaObjectSerializer::~LuaObjectSerializer()
-{
-	ResetLinks();
-}
+LuaObjectSerializer::~LuaObjectSerializer() = default;
 
 /**
  * Address: 0x0090B560 (FUN_0090B560, LuaPlus::LuaObjectSerializer::Init)

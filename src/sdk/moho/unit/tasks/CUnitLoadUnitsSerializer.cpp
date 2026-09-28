@@ -79,10 +79,7 @@ namespace moho
   /**
    * Address: 0x00BFA5B0 (FUN_00BFA5B0, cleanup_CUnitLoadUnitsSerializer)
    */
-  CUnitLoadUnitsSerializer::~CUnitLoadUnitsSerializer()
-  {
-    ResetLinks();
-  }
+  CUnitLoadUnitsSerializer::~CUnitLoadUnitsSerializer() = default;
 
   /**
    * Address: 0x00626F90 (FUN_00626F90, gpg::SerSaveLoadHelper<Moho::CUnitLoadUnits>::Init)

@@ -97,10 +97,7 @@ namespace moho
   /**
    * Address: 0x00BFE7A0 (FUN_00BFE7A0, sub_BFE7A0)
    */
-  UnitWeaponConstruct::~UnitWeaponConstruct()
-  {
-    ResetLinks();
-  }
+  UnitWeaponConstruct::~UnitWeaponConstruct() = default;
 
   /**
    * Address: 0x006DB960 (FUN_006DB960, sub_6DB960)
@@ -160,10 +157,7 @@ namespace moho
   /**
    * Address: 0x00BFE7D0 (FUN_00BFE7D0, Moho::UnitWeaponSerializer::~UnitWeaponSerializer)
    */
-  UnitWeaponSerializer::~UnitWeaponSerializer()
-  {
-    ResetLinks();
-  }
+  UnitWeaponSerializer::~UnitWeaponSerializer() = default;
 
   /**
    * Address: 0x00BD8930 (FUN_00BD8930, register_UnitWeaponSerializer)

@@ -586,10 +586,7 @@ SReconKeySerializer::SReconKeySerializer()
   , mSerSaveFunc(&SReconKeySerializer::Serialize)
 {}
 
-SReconKeySerializer::~SReconKeySerializer()
-{
-  ResetLinks();
-}
+SReconKeySerializer::~SReconKeySerializer() = default;
 
 /**
  * Address: 0x005C4450 (FUN_005C4450, Moho::SReconKeySerializer::Init)
@@ -648,10 +645,7 @@ CAiReconDBImplSerializer::CAiReconDBImplSerializer()
   , mSerSaveFunc(&CAiReconDBImplSerializer::Serialize)
 {}
 
-CAiReconDBImplSerializer::~CAiReconDBImplSerializer()
-{
-  ResetLinks();
-}
+CAiReconDBImplSerializer::~CAiReconDBImplSerializer() = default;
 
 /**
  * Address: 0x005C4EE0 (FUN_005C4EE0, Moho::CAiReconDBImplSerializer::Init)

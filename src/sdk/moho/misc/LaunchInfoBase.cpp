@@ -1175,10 +1175,7 @@ namespace moho
   /**
    * Address: 0x00BF3F90 (FUN_00BF3F90, Moho::ArmyLaunchInfoSerializer::~ArmyLaunchInfoSerializer)
    */
-  ArmyLaunchInfoSerializer::~ArmyLaunchInfoSerializer()
-  {
-    ResetLinks();
-  }
+  ArmyLaunchInfoSerializer::~ArmyLaunchInfoSerializer() = default;
 
   /**
    * Address: 0x005421C0 (FUN_005421C0, Moho::ArmyLaunchInfoSerializer::Deserialize)
@@ -1600,10 +1597,7 @@ namespace moho
   /**
    * Address: 0x00BF4020 (FUN_00BF4020, Moho::LaunchInfoBaseSerializer::~LaunchInfoBaseSerializer)
    */
-  LaunchInfoBaseSerializer::~LaunchInfoBaseSerializer()
-  {
-    ResetLinks();
-  }
+  LaunchInfoBaseSerializer::~LaunchInfoBaseSerializer() = default;
 
   /**
    * Address: 0x00BC9500 (FUN_00BC9500, register_LaunchInfoNewTypeInfo)

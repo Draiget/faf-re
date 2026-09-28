@@ -100,10 +100,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently
    * sits in and restores a self-linked sentinel state.
    */
-  CUnitCallAirStagingPlatformSerializer::~CUnitCallAirStagingPlatformSerializer()
-  {
-    ResetLinks();
-  }
+  CUnitCallAirStagingPlatformSerializer::~CUnitCallAirStagingPlatformSerializer() = default;
 } // namespace moho
 
 namespace

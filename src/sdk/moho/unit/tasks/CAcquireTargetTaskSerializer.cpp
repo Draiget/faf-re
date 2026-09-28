@@ -47,10 +47,7 @@ namespace moho
   /**
    * Address: 0x00BF84C0 (FUN_00BF84C0, Moho::CAcquireTargetTaskSerializer::~CAcquireTargetTaskSerializer)
    */
-  CAcquireTargetTaskSerializer::~CAcquireTargetTaskSerializer()
-  {
-    ResetLinks();
-  }
+  CAcquireTargetTaskSerializer::~CAcquireTargetTaskSerializer() = default;
 
   /**
    * Address: 0x005DC190 (FUN_005DC190)

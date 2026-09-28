@@ -135,10 +135,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09A30 (FUN_00C09A30, TStringConstruct::~TStringConstruct)
    */
-  TStringConstruct::~TStringConstruct()
-  {
-    ResetLinks();
-  }
+  TStringConstruct::~TStringConstruct() = default;
 
   /**
    * Address: 0x00922190 (FUN_00922190, TableConstruct::Construct)
@@ -229,10 +226,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09AC0 (FUN_00C09AC0, TableConstruct::~TableConstruct)
    */
-  TableConstruct::~TableConstruct()
-  {
-    ResetLinks();
-  }
+  TableConstruct::~TableConstruct() = default;
 
   /**
    * Address: 0x00920A80 (FUN_00920A80, LClosureConstruct::Construct)
@@ -283,10 +277,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09B50 (FUN_00C09B50, LClosureConstruct::~LClosureConstruct)
    */
-  LClosureConstruct::~LClosureConstruct()
-  {
-    ResetLinks();
-  }
+  LClosureConstruct::~LClosureConstruct() = default;
 
   /**
    * Address: 0x00920B10 (FUN_00920B10, UpValConstruct::Construct)
@@ -333,10 +324,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09BE0 (FUN_00C09BE0, UpValConstruct::~UpValConstruct)
    */
-  UpValConstruct::~UpValConstruct()
-  {
-    ResetLinks();
-  }
+  UpValConstruct::~UpValConstruct() = default;
 
   /**
    * Address: 0x0091F050 (recovered, mirrors lfunc.c::luaF_newupval pattern)
@@ -430,10 +418,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09C10 (FUN_00C09C10, UpValSerializer::~UpValSerializer)
    */
-  UpValSerializer::~UpValSerializer()
-  {
-    ResetLinks();
-  }
+  UpValSerializer::~UpValSerializer() = default;
 
   /**
    * Address: 0x00920C20 (FUN_00920C20, ProtoConstruct::Construct)
@@ -480,10 +465,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09C70 (FUN_00C09C70, ProtoConstruct::~ProtoConstruct)
    */
-  ProtoConstruct::~ProtoConstruct()
-  {
-    ResetLinks();
-  }
+  ProtoConstruct::~ProtoConstruct() = default;
 
   /**
    * Address: 0x0090B860 (FUN_0090B860, LuaPlus::LuaStateConstruct::Construct)
@@ -534,10 +516,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09850 (FUN_00C09850, LuaPlus::LuaStateConstruct::~LuaStateConstruct)
    */
-  LuaStateConstruct::~LuaStateConstruct()
-  {
-    ResetLinks();
-  }
+  LuaStateConstruct::~LuaStateConstruct() = default;
 
   /**
    * Address: 0x00920C70 (FUN_00920C70, lua_StateConstruct::Construct)
@@ -595,10 +574,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09D00 (FUN_00C09D00, lua_StateConstruct::~lua_StateConstruct)
    */
-  lua_StateConstruct::~lua_StateConstruct()
-  {
-    ResetLinks();
-  }
+  lua_StateConstruct::~lua_StateConstruct() = default;
 
   /**
    * Address: 0x00920D30 (FUN_00920D30, UdataConstruct::Construct)
@@ -646,10 +622,7 @@ namespace LuaPlus
   /**
    * Address: 0x00C09D90 (FUN_00C09D90, UdataConstruct::~UdataConstruct)
    */
-  UdataConstruct::~UdataConstruct()
-  {
-    ResetLinks();
-  }
+  UdataConstruct::~UdataConstruct() = default;
 
   /**
    * Address: 0x0090B670 (FUN_0090B670, LuaPlus::LuaStateConstruct::Init)

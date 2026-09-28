@@ -75,10 +75,7 @@ IAiCommandDispatchImplConstruct::IAiCommandDispatchImplConstruct()
  * Unlinks this helper node from whatever intrusive list it currently sits in
  * and restores a self-linked sentinel state.
  */
-IAiCommandDispatchImplConstruct::~IAiCommandDispatchImplConstruct()
-{
-  ResetLinks();
-}
+IAiCommandDispatchImplConstruct::~IAiCommandDispatchImplConstruct() = default;
 
 /**
  * Address: 0x00599650 (FUN_00599650, gpg::SerConstructHelper_IAiCommandDispatchImpl::Init)

@@ -449,10 +449,7 @@ namespace
     , mSaveCallback(&NavPathSerializer::Serialize)
   {}
 
-  NavPathSerializer::~NavPathSerializer()
-  {
-    ResetLinks();
-  }
+  NavPathSerializer::~NavPathSerializer() = default;
 
   void NavPathSerializer::Deserialize(
     gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const

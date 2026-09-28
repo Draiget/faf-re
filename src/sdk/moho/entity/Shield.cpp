@@ -407,10 +407,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  ShieldSaveConstruct::~ShieldSaveConstruct()
-  {
-    ResetLinks();
-  }
+  ShieldSaveConstruct::~ShieldSaveConstruct() = default;
 
   /**
    * Address: 0x007766B0 (FUN_007766B0, Moho::ShieldSaveConstruct::SaveConstructArgs)
@@ -474,10 +471,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  ShieldConstruct::~ShieldConstruct()
-  {
-    ResetLinks();
-  }
+  ShieldConstruct::~ShieldConstruct() = default;
 
   /**
    * Address: 0x00776DA0 (FUN_00776DA0, Moho::ShieldConstruct::Init)
@@ -505,10 +499,7 @@ namespace moho
   /**
    * Address: 0x00C025F0 (FUN_00C025F0, dynamic-initializer atexit target)
    */
-  ShieldSerializer::~ShieldSerializer()
-  {
-    ResetLinks();
-  }
+  ShieldSerializer::~ShieldSerializer() = default;
 
   /**
    * Address: 0x00776910 (FUN_00776910, Moho::ShieldSerializer::Deserialize)

@@ -34,10 +34,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  ISoundManagerSerializer::~ISoundManagerSerializer()
-  {
-    ResetLinks();
-  }
+  ISoundManagerSerializer::~ISoundManagerSerializer() = default;
 
   /**
    * Address: 0x00760BD0 (FUN_00760BD0, Moho::ISoundManagerSerializer::Deserialize)

@@ -79,10 +79,7 @@ CAiTransportImplConstruct::CAiTransportImplConstruct()
  * Unlinks this helper node from whatever intrusive list it currently sits in
  * and restores a self-linked sentinel state.
  */
-CAiTransportImplConstruct::~CAiTransportImplConstruct()
-{
-  ResetLinks();
-}
+CAiTransportImplConstruct::~CAiTransportImplConstruct() = default;
 
 /**
  * Address: 0x005E9BB0 (FUN_005E9BB0, gpg::SerConstructHelper_CAiTransportImpl::Init)

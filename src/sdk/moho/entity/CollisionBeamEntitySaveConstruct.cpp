@@ -77,10 +77,7 @@ namespace moho
    * Address: 0x00BFC340 (FUN_00BFC340, atexit target registered by the real
    * ctor above)
    */
-  CollisionBeamEntitySaveConstruct::~CollisionBeamEntitySaveConstruct()
-  {
-    ResetLinks();
-  }
+  CollisionBeamEntitySaveConstruct::~CollisionBeamEntitySaveConstruct() = default;
 
   /**
    * Address: 0x00674EE0 (FUN_00674EE0, gpg::SerSaveConstructHelper_CollisionBeamEntity::Init)

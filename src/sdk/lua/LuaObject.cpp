@@ -195,10 +195,7 @@ TableSerializer::TableSerializer()
 /**
  * Address: 0x00C09AF0 (FUN_00C09AF0, TableSerializer::~TableSerializer)
  */
-TableSerializer::~TableSerializer()
-{
-	ResetLinks();
-}
+TableSerializer::~TableSerializer() = default;
 
 /**
  * Address: 0x0091FBC0 (FUN_0091FBC0, TableSerializer::Init)
@@ -521,10 +518,7 @@ LClosureSerializer::LClosureSerializer()
 /**
  * Address: 0x00C09B80 (FUN_00C09B80, LClosureSerializer::~LClosureSerializer)
  */
-LClosureSerializer::~LClosureSerializer()
-{
-	ResetLinks();
-}
+LClosureSerializer::~LClosureSerializer() = default;
 
 /**
  * Address: 0x0091FD50 (FUN_0091FD50, LClosureSerializer::Init)
@@ -589,10 +583,7 @@ ProtoSerializer::ProtoSerializer()
 /**
  * Address: 0x00C09CA0 (FUN_00C09CA0, ProtoSerializer::~ProtoSerializer)
  */
-ProtoSerializer::~ProtoSerializer()
-{
-	ResetLinks();
-}
+ProtoSerializer::~ProtoSerializer() = default;
 
 /**
  * Address: 0x00920070 (FUN_00920070, ProtoSerializer::Init)
@@ -683,10 +674,7 @@ lua_StateSerializer::lua_StateSerializer()
 /**
  * Address: 0x00C09D30 (FUN_00C09D30, lua_StateSerializer::~lua_StateSerializer)
  */
-lua_StateSerializer::~lua_StateSerializer()
-{
-	ResetLinks();
-}
+lua_StateSerializer::~lua_StateSerializer() = default;
 
 /**
  * Address: 0x00920200 (FUN_00920200, lua_StateSerializer::Init)
@@ -756,10 +744,7 @@ TObjectSerializer::TObjectSerializer()
 /**
  * Address: 0x00C09DF0 (FUN_00C09DF0, TObjectSerializer::~TObjectSerializer)
  */
-TObjectSerializer::~TObjectSerializer()
-{
-	ResetLinks();
-}
+TObjectSerializer::~TObjectSerializer() = default;
 
 /**
  * Address: 0x0091F8A0 (FUN_0091F8A0, TObjectSerializer::Init)
@@ -830,10 +815,7 @@ UdataSerializer::UdataSerializer()
 /**
  * Address: 0x00C09DC0 (FUN_00C09DC0, UdataSerializer::~UdataSerializer)
  */
-UdataSerializer::~UdataSerializer()
-{
-	ResetLinks();
-}
+UdataSerializer::~UdataSerializer() = default;
 
 /**
  * Address: 0x00920390 (FUN_00920390, UdataSerializer::Init)

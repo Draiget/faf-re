@@ -46,10 +46,7 @@ namespace moho
   /**
    * Address: 0x00C01F90 (FUN_00C01F90, Moho::CIntelCounterHandleSerializer::~CIntelCounterHandleSerializer)
    */
-  CIntelCounterHandleSerializer::~CIntelCounterHandleSerializer()
-  {
-    ResetLinks();
-  }
+  CIntelCounterHandleSerializer::~CIntelCounterHandleSerializer() = default;
 
   /**
    * Address: 0x0076FC20 (FUN_0076FC20, gpg::SerSaveLoadHelper_CIntelCounterHandle::Init)

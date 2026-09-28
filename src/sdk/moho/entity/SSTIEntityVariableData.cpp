@@ -264,10 +264,7 @@ namespace
   /**
    * Address: 0x00BF4ED0 (FUN_00BF4ED0, Moho::SSTIEntityAttachInfoSerializer::~SSTIEntityAttachInfoSerializer)
    */
-  SSTIEntityAttachInfoSerializerHelper::~SSTIEntityAttachInfoSerializerHelper()
-  {
-    ResetLinks();
-  }
+  SSTIEntityAttachInfoSerializerHelper::~SSTIEntityAttachInfoSerializerHelper() = default;
 
   void DeserializeEntityAttributesSerializerCallback(
     gpg::ReadArchive* const archive,
@@ -301,10 +298,7 @@ namespace
   /**
    * Address: 0x00BF4F60 (FUN_00BF4F60, Moho::EntityAttributesSerializer::~EntityAttributesSerializer)
    */
-  EntityAttributesSerializerHelper::~EntityAttributesSerializerHelper()
-  {
-    ResetLinks();
-  }
+  EntityAttributesSerializerHelper::~EntityAttributesSerializerHelper() = default;
 
   /**
    * Address: 0x00558900 (FUN_00558900, SerSaveLoadHelper<SSTIEntityVariableData>::unlink lane A)

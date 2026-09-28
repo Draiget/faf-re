@@ -96,10 +96,7 @@ namespace moho
    * Address: 0x00C000F0 (FUN_00C000F0, atexit target registered by the real
    * ctor above)
    */
-  InfluenceGridSerializer::~InfluenceGridSerializer()
-  {
-    ResetLinks();
-  }
+  InfluenceGridSerializer::~InfluenceGridSerializer() = default;
 
   /**
    * Address: 0x00719410 (FUN_00719410, gpg::SerSaveLoadHelper_InfluenceGrid::Init)

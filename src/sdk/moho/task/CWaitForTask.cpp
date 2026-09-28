@@ -264,10 +264,7 @@ CWaitForTaskConstruct::CWaitForTaskConstruct()
  * of this same unlink shape also exist (0x004CA6E0, 0x004CA710); neither is
  * reachable from anywhere in the binary.
  */
-CWaitForTaskConstruct::~CWaitForTaskConstruct()
-{
-  ResetLinks();
-}
+CWaitForTaskConstruct::~CWaitForTaskConstruct() = default;
 
 /**
  * Address: 0x004CA740 (FUN_004CA740, Moho::CWaitForTaskConstruct::Construct)
@@ -333,10 +330,7 @@ CWaitForTaskSerializer::CWaitForTaskSerializer()
  * unlink shape also exist (0x004CA830, 0x004CA860); neither is reachable
  * from anywhere in the binary.
  */
-CWaitForTaskSerializer::~CWaitForTaskSerializer()
-{
-  ResetLinks();
-}
+CWaitForTaskSerializer::~CWaitForTaskSerializer() = default;
 
 /**
  * Address: 0x004CA7E0 (FUN_004CA7E0, CWaitForTaskSerializer::Deserialize callback)

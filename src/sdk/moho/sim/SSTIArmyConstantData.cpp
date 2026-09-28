@@ -220,10 +220,7 @@ namespace moho
     , mSaveCallback(&SSTIArmyConstantDataSerializer::Serialize)
   {}
 
-  SSTIArmyConstantDataSerializer::~SSTIArmyConstantDataSerializer()
-  {
-    ResetLinks();
-  }
+  SSTIArmyConstantDataSerializer::~SSTIArmyConstantDataSerializer() = default;
 
   /**
    * Address: 0x005507F0 (FUN_005507F0, Moho::SSTIArmyConstantDataSerializer::Deserialize)
@@ -296,10 +293,7 @@ namespace moho
     , mSaveCallback(&EntIdSerializer::Serialize)
   {}
 
-  EntIdSerializer::~EntIdSerializer()
-  {
-    ResetLinks();
-  }
+  EntIdSerializer::~EntIdSerializer() = default;
 
   /**
    * Address: 0x00557EF0 (FUN_00557EF0, Moho::EntIdSerializer::Deserialize)

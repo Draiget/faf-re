@@ -35,10 +35,7 @@ namespace moho
     , mSaveCallback(&IdPoolSerializer::Serialize)
   {}
 
-  IdPoolSerializer::~IdPoolSerializer()
-  {
-    ResetLinks();
-  }
+  IdPoolSerializer::~IdPoolSerializer() = default;
 
   /**
    * Address: 0x00403B90 (FUN_00403B90, Moho::IdPoolSerializer::Deserialize)

@@ -226,10 +226,7 @@ namespace moho
     , mSerialize(&SFootprintSerializer::Serialize)
   {}
 
-  SFootprintSerializer::~SFootprintSerializer() noexcept
-  {
-    ResetLinks();
-  }
+  SFootprintSerializer::~SFootprintSerializer() noexcept = default;
 } // namespace moho
 
 namespace

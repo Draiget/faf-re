@@ -878,10 +878,7 @@ namespace moho
      * What it does:
      * Unlinks the serializer helper from the intrusive helper list.
      */
-    ~CUnitReclaimTaskSerializer()
-    {
-      ResetLinks();
-    }
+    ~CUnitReclaimTaskSerializer() = default;
 
     /**
      * What it does:

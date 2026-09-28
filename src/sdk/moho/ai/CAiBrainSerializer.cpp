@@ -77,10 +77,7 @@ CAiBrainSerializer::CAiBrainSerializer()
  * Unlinks this helper node from whatever intrusive list it currently sits
  * in and restores a self-linked sentinel state.
  */
-CAiBrainSerializer::~CAiBrainSerializer()
-{
-  ResetLinks();
-}
+CAiBrainSerializer::~CAiBrainSerializer() = default;
 
 /**
  * Address: 0x0057E460 (FUN_0057E460)

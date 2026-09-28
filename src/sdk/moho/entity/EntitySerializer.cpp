@@ -86,7 +86,4 @@ EntitySerializer::EntitySerializer()
 /**
  * Address: 0x00BFC870 (FUN_00BFC870, Moho::EntitySerializer::~EntitySerializer)
  */
-EntitySerializer::~EntitySerializer()
-{
-  ResetLinks();
-}
+EntitySerializer::~EntitySerializer() = default;

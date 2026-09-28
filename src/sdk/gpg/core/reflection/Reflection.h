@@ -4727,10 +4727,7 @@ namespace gpg
       , mSaveCallback(&SerSaveLoadHelper::Serialize)
     {}
 
-    ~SerSaveLoadHelper()
-    {
-      ResetLinks();
-    }
+    ~SerSaveLoadHelper() = default;
 
     /**
      * What it does:
@@ -5064,10 +5061,7 @@ namespace gpg
       , mSaveCallback(&PrimitiveSerHelper::Serialize)
     {}
 
-    ~PrimitiveSerHelper()
-    {
-      ResetLinks();
-    }
+    ~PrimitiveSerHelper() = default;
 
     /**
      * Per-instantiation addresses (one compiler-emitted body per `T`):

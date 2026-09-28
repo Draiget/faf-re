@@ -3001,10 +3001,7 @@ CScriptEventSerializer::CScriptEventSerializer()
 /**
  * Address: 0x00BF0B80 (FUN_00BF0B80, ??1CScriptEventSerializer@Moho@@QAE@@Z)
  */
-CScriptEventSerializer::~CScriptEventSerializer()
-{
-  ResetLinks();
-}
+CScriptEventSerializer::~CScriptEventSerializer() = default;
 
 /**
  * Address: 0x004CB0A0 (FUN_004CB0A0, Moho::CScriptEventSerializer::Init)

@@ -80,10 +80,7 @@ namespace moho
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
    */
-  CAniResourceSkelConstruct::~CAniResourceSkelConstruct()
-  {
-    ResetLinks();
-  }
+  CAniResourceSkelConstruct::~CAniResourceSkelConstruct() = default;
 
   /**
    * Address: 0x005388C0 (FUN_005388C0, Moho::CAniResourceSkelConstruct::Construct)

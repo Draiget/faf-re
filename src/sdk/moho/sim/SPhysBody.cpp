@@ -894,10 +894,7 @@ namespace moho
   /**
    * Address: 0x00BFD390 (FUN_00BFD390, Moho::SPhysBodySerializer::~SPhysBodySerializer)
    */
-  SPhysBodySerializer::~SPhysBodySerializer()
-  {
-    ResetLinks();
-  }
+  SPhysBodySerializer::~SPhysBodySerializer() = default;
 
   /**
    * Address: 0x00698760 (FUN_00698760, Moho::SPhysBodySerializer::Init)
@@ -935,10 +932,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  SPhysBodySaveConstruct::~SPhysBodySaveConstruct()
-  {
-    ResetLinks();
-  }
+  SPhysBodySaveConstruct::~SPhysBodySaveConstruct() = default;
 
   /**
    * Address: 0x00698660 (FUN_00698660, Moho::SPhysBodySaveConstruct::Init)
@@ -974,10 +968,7 @@ namespace moho
    * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
-  SPhysBodyConstruct::~SPhysBodyConstruct()
-  {
-    ResetLinks();
-  }
+  SPhysBodyConstruct::~SPhysBodyConstruct() = default;
 
   /**
    * Address: 0x006986E0 (FUN_006986E0, Moho::SPhysBodyConstruct::Init)

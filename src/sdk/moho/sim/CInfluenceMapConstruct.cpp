@@ -79,10 +79,7 @@ namespace moho
    * Address: 0x00BFFF10 (FUN_00BFFF10, atexit target registered by the real
    * ctor above)
    */
-  CInfluenceMapConstruct::~CInfluenceMapConstruct()
-  {
-    ResetLinks();
-  }
+  CInfluenceMapConstruct::~CInfluenceMapConstruct() = default;
 
   /**
    * Address: 0x00718AE0 (FUN_00718AE0, gpg::SerConstructHelper_CInfluenceMap::Init)

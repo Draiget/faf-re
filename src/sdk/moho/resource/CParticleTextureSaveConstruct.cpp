@@ -68,8 +68,5 @@ namespace moho
     : mSerSaveConstructArgsFunc(reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CParticleTextureSaveConstruct::Construct))
   {}
 
-  CParticleTextureSaveConstruct::~CParticleTextureSaveConstruct()
-  {
-    ResetLinks();
-  }
+  CParticleTextureSaveConstruct::~CParticleTextureSaveConstruct() = default;
 } // namespace moho

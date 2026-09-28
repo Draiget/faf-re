@@ -942,10 +942,7 @@ CLuaTaskConstruct::CLuaTaskConstruct()
  * of this same unlink shape also exist (0x004C9B40, 0x004C9B70); neither is
  * reachable from anywhere in the binary.
  */
-CLuaTaskConstruct::~CLuaTaskConstruct()
-{
-  ResetLinks();
-}
+CLuaTaskConstruct::~CLuaTaskConstruct() = default;
 
 /**
  * Address: 0x004C9BA0 (FUN_004C9BA0, Moho::CLuaTaskConstruct::Construct)
@@ -1011,10 +1008,7 @@ CLuaTaskSerializer::CLuaTaskSerializer()
  * unlink shape also exist (0x004C9CA0, 0x004C9CD0); neither is reachable
  * from anywhere in the binary.
  */
-CLuaTaskSerializer::~CLuaTaskSerializer()
-{
-  ResetLinks();
-}
+CLuaTaskSerializer::~CLuaTaskSerializer() = default;
 
 /**
  * Address: 0x004C9C40 (FUN_004C9C40, CLuaTaskSerializer::Deserialize callback)

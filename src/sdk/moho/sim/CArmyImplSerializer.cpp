@@ -17,10 +17,7 @@ namespace moho
     , mSaveCallback(&CArmyImplSerializer::Serialize)
   {}
 
-  CArmyImplSerializer::~CArmyImplSerializer()
-  {
-    ResetLinks();
-  }
+  CArmyImplSerializer::~CArmyImplSerializer() = default;
 
   /**
    * Address: 0x00701000 (FUN_00701000, Moho::CArmyImplSerializer::Deserialize)

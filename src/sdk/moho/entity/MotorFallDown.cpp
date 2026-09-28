@@ -619,10 +619,7 @@ namespace moho
     , mSerialize(&MotorFallDownSerializer::Serialize)
   {}
 
-  MotorFallDownSerializer::~MotorFallDownSerializer()
-  {
-    ResetLinks();
-  }
+  MotorFallDownSerializer::~MotorFallDownSerializer() = default;
 
   /**
    * Address: 0x00695AC0 (FUN_00695AC0, MotorFallDownSerializer::Init)
@@ -649,10 +646,7 @@ namespace moho
    * Address: 0x00BFD190 (FUN_00BFD190, atexit target registered by the real
    * ctor above)
    */
-  MotorFallDownConstruct::~MotorFallDownConstruct()
-  {
-    ResetLinks();
-  }
+  MotorFallDownConstruct::~MotorFallDownConstruct() = default;
 
   /**
    * Address: 0x00695A40 (FUN_00695A40, MotorFallDownConstruct::Init)

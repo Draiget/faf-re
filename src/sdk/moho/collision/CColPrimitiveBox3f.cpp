@@ -184,10 +184,7 @@ namespace moho
     , mSaveCallback(&Box3fSerializer::Serialize)
   {}
 
-  Box3fSerializer::~Box3fSerializer()
-  {
-    ResetLinks();
-  }
+  Box3fSerializer::~Box3fSerializer() = default;
 
   /**
    * Address: 0x00BC4A20 (FUN_00BC4A20, register_Box3fTypeInfo)
@@ -480,10 +477,7 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
     , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&DColPrimBoxSerializer::Serialize))
   {}
 
-  DColPrimBoxSerializer::~DColPrimBoxSerializer()
-  {
-    ResetLinks();
-  }
+  DColPrimBoxSerializer::~DColPrimBoxSerializer() = default;
 
   /**
    * Address: 0x004FFCF0 (FUN_004FFCF0, Moho::DColPrimBoxConstruct::RegisterConstructFunction)
@@ -510,10 +504,7 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
     , mDeleteCallback(&DeleteDColPrimBox)
   {}
 
-  DColPrimBoxConstruct::~DColPrimBoxConstruct()
-  {
-    ResetLinks();
-  }
+  DColPrimBoxConstruct::~DColPrimBoxConstruct() = default;
 
   /**
    * Address: 0x004FFC70 (FUN_004FFC70, Moho::DColPrimBoxSaveConstruct::RegisterSaveConstructArgsFunction)
@@ -540,10 +531,7 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
       )
   {}
 
-  DColPrimBoxSaveConstruct::~DColPrimBoxSaveConstruct()
-  {
-    ResetLinks();
-  }
+  DColPrimBoxSaveConstruct::~DColPrimBoxSaveConstruct() = default;
 
   /**
    * Address: 0x00BC7620 (FUN_00BC7620, register_DColPrimBoxTypeInfo)
