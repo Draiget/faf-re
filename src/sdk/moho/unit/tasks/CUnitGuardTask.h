@@ -34,7 +34,7 @@ namespace moho
    * Recovered command-task owner for unit guard behavior state.
    */
   class CUnitGuardTask
-    : public CCommandTaskWithListenerSlot
+    : public CCommandTask
     , public Listener<ECommandEvent>
   {
   public:
@@ -347,14 +347,6 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitGuardTask) == 0xC0, "CUnitGuardTask size must be 0xC0");
-  // The base-class chain (CCommandTaskWithListenerSlot + Listener<ECommandEvent>)
-  // must land mCommandTask, the first genuinely non-standard-layout member,
-  // at exactly +0x40 - offsetof on a member from a non-first base is not
-  // portable, so this checks the running byte total the same way instead.
-  static_assert(
-    sizeof(CCommandTaskWithListenerSlot) + sizeof(Listener<ECommandEvent>) == 0x40,
-    "CUnitGuardTask base-class chain must total 0x40 bytes"
-  );
   static_assert(offsetof(CUnitGuardTask, mCommandTask) == 0x40, "CUnitGuardTask::mCommandTask offset must be 0x40");
   static_assert(
     offsetof(CUnitGuardTask, mPrimaryCommandRef) == 0x44,

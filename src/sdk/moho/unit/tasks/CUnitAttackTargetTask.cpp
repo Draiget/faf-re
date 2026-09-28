@@ -183,48 +183,6 @@ namespace
     return static_cast<int>(std::lrintf(value));
   }
 
-  struct CUnitCommandCommandEventLinkView
-  {
-    std::uint8_t pad_0000_0034[0x34];
-    moho::Broadcaster mCommandEventListenerHead;
-  };
-
-  static_assert(
-    offsetof(CUnitCommandCommandEventLinkView, mCommandEventListenerHead) == 0x34,
-    "CUnitCommandCommandEventLinkView::mCommandEventListenerHead offset must be 0x34"
-  );
-
-  [[nodiscard]] moho::Broadcaster* CommandEventListenerHead(moho::CUnitCommand* const command) noexcept
-  {
-    if (command == nullptr) {
-      return nullptr;
-    }
-
-    auto* const commandView = reinterpret_cast<CUnitCommandCommandEventLinkView*>(command);
-    return &commandView->mCommandEventListenerHead;
-  }
-
-  struct CAiAttackerEventLinkView
-  {
-    std::uint8_t pad_0000_0004[0x04];
-    moho::Broadcaster mAiAttackerEventHead;
-  };
-
-  static_assert(
-    offsetof(CAiAttackerEventLinkView, mAiAttackerEventHead) == 0x04,
-    "CAiAttackerEventLinkView::mAiAttackerEventHead offset must be 0x04"
-  );
-
-  [[nodiscard]] moho::Broadcaster* AiAttackerListenerHead(moho::CAiAttackerImpl* const attacker) noexcept
-  {
-    if (attacker == nullptr) {
-      return nullptr;
-    }
-
-    auto* const attackerView = reinterpret_cast<CAiAttackerEventLinkView*>(attacker);
-    return &attackerView->mAiAttackerEventHead;
-  }
-
   class UnitAttackTaskStateGate
   {
   public:
@@ -353,10 +311,6 @@ namespace moho
     : CAttackTargetTask()
   {
 
-    CCommandTaskWithListenerSlot::mListenerPad = 0;
-    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
-    AiAttackerListenerWithSlot::mListenerPad = 0;
-    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
 
     mDispatchTask = nullptr;
     mCommand = nullptr;
@@ -393,10 +347,6 @@ namespace moho
     : CAttackTargetTask(dispatchTask)
   {
 
-    CCommandTaskWithListenerSlot::mListenerPad = 0;
-    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
-    AiAttackerListenerWithSlot::mListenerPad = 0;
-    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
 
     mDispatchTask = dispatchTask;
     mCommand = nullptr;
@@ -461,10 +411,7 @@ namespace moho
       // ranged attack task started on was left mislabelled as factory-issued
       // for any move task constructed under it afterwards.
       mCommand->mUnknownFlag154 = true;
-      if (Broadcaster* const commandListenerHead = CommandEventListenerHead(mCommand); commandListenerHead != nullptr)
-      {
-        Listener<ECommandEvent>::mListenerLink.ListLinkBefore(commandListenerHead);
-      }
+      mCommand->AddListener(this);
     }
 
     if (!unit->IsMobile()) {
@@ -477,7 +424,7 @@ namespace moho
 
     CAiAttackerImpl* const attacker = unit->AiAttacker;
     if (attacker != nullptr) {
-      Listener<EAiAttackerEvent>::mListenerLink.ListUnlink();
+      Listener<EAiAttackerEvent>::ListUnlink();
 
       if (enableOverchargeWeapon) {
         const int weaponCount = attacker->GetWeaponCount();
@@ -530,7 +477,7 @@ namespace moho
       unit->UnitStateMask &= ~(1ull << UNITSTATE_Attacking);
     }
 
-    Listener<ECommandEvent>::mListenerLink.ListUnlink();
+    Listener<ECommandEvent>::ListUnlink();
 
     if (unit != nullptr) {
       if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
@@ -544,7 +491,7 @@ namespace moho
 
     if (unit != nullptr) {
       if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
-        Listener<EAiAttackerEvent>::mListenerLink.ListUnlink();
+        Listener<EAiAttackerEvent>::ListUnlink();
         attacker->Stop();
       }
 
@@ -1081,9 +1028,7 @@ namespace moho
     }
 
     attacker->SetDesiredTarget(desiredTarget);
-    if (Broadcaster* const listenerHead = AiAttackerListenerHead(attacker); listenerHead != nullptr) {
-      Listener<EAiAttackerEvent>::mListenerLink.ListLinkBefore(listenerHead);
-    }
+    attacker->AddListener(this);
     return true;
   }
 

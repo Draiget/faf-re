@@ -252,23 +252,6 @@ namespace
 namespace moho
 {
   /**
-   * `msvc8::vector<WeakPtr<CUnitCommand>>::push_back` (0x006E9680, cited on
-   * Vector.h: in-place `_Ufill` when capacity remains, else `_Insert_n`
-   * 0x006EA440). This name survives only for CUnitCommand.cpp's call site;
-   * new code calls `push_back` directly.
-   */
-  void PushBackWeakPtrCUnitCommand(
-    msvc8::vector<WeakPtr<CUnitCommand>>& storage,
-    const WeakPtr<CUnitCommand>& value
-  )
-  {
-    storage.push_back(value);
-  }
-} // namespace moho
-
-namespace moho
-{
-  /**
    * Address: 0x006E9890 (FUN_006E9890, Moho::RWeakPtrType_CUnitCommand::GetName)
    */
   const char* RWeakPtrType<CUnitCommand>::GetName() const

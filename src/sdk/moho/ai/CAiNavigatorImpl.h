@@ -19,12 +19,10 @@ namespace moho
    * COL:  0x00E71BD0
    *
    * The +0x0C..+0x0F slot between the `IAiNavigator` and `CTask` subobjects
-   * lives on `IAiNavigator` itself (`mPad0C`) rather than in a separate
-   * 4-byte base declared here. A modern MSVC sorts non-polymorphic bases
-   * behind every polymorphic one, so such a base is relocated to the tail and
-   * drags `CTask` to +0x0C and `CScriptObject` to +0x24 -- four bytes off the
-   * offsets the shipped `AddBase` calls register (0x005A7CBB stores 0x10,
-   * 0x005A7D1B stores 0x28). See the comment on `IAiNavigator::mPad0C`.
+   * lives on `IAiNavigator` itself (`mPad0C`): MSVC8 padded there, VS2022
+   * does not, and a separate 4-byte base declared here would be sorted
+   * behind the polymorphic ones. `CTask` must sit at +0x10 (0x005A7CBB
+   * stores 0x10, 0x005A7D1B puts `CScriptObject` at 0x28).
    */
   class CAiNavigatorImpl : public IAiNavigator,
                            public CTask,
@@ -153,15 +151,6 @@ namespace moho
      */
     [[nodiscard]]
     LuaPlus::LuaObject GetMetatable(LuaPlus::LuaState* luaState);
-
-  protected:
-    /**
-     * Address: 0x005A6C50 (FUN_005A6C50 helper call chain)
-     *
-     * What it does:
-     * Dispatches one event code to all registered navigator listeners.
-     */
-    void DispatchNavigatorEvent(std::int32_t eventCode);
 
   public:
     static gpg::RType* sType;

@@ -29,7 +29,7 @@ namespace moho
    * Builds the repair-task command/listener subobjects, initializes the shared
    * build helper, binds the target weak lane, and primes the repair mode flags.
    */
-  class CUnitRepairTask : public CCommandTaskWithListenerSlot, public Listener<ECommandEvent>
+  class CUnitRepairTask : public CCommandTask, public Listener<ECommandEvent>
   {
   public:
     static gpg::RType* sType;

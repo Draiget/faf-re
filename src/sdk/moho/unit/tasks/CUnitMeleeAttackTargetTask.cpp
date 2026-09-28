@@ -288,48 +288,6 @@ namespace
     );
   }
 
-  struct CUnitCommandCommandEventLinkView
-  {
-    std::uint8_t pad_0000_0034[0x34];
-    moho::Broadcaster mCommandEventListenerHead;
-  };
-
-  static_assert(
-    offsetof(CUnitCommandCommandEventLinkView, mCommandEventListenerHead) == 0x34,
-    "CUnitCommandCommandEventLinkView::mCommandEventListenerHead offset must be 0x34"
-  );
-
-  [[nodiscard]] moho::Broadcaster* CommandEventListenerHead(moho::CUnitCommand* const command) noexcept
-  {
-    if (command == nullptr) {
-      return nullptr;
-    }
-
-    auto* const commandView = reinterpret_cast<CUnitCommandCommandEventLinkView*>(command);
-    return &commandView->mCommandEventListenerHead;
-  }
-
-  struct CAiAttackerEventLinkView
-  {
-    std::uint8_t pad_0000_0004[0x04];
-    moho::Broadcaster mAiAttackerEventHead;
-  };
-
-  static_assert(
-    offsetof(CAiAttackerEventLinkView, mAiAttackerEventHead) == 0x04,
-    "CAiAttackerEventLinkView::mAiAttackerEventHead offset must be 0x04"
-  );
-
-  [[nodiscard]] moho::Broadcaster* AiAttackerListenerHead(moho::CAiAttackerImpl* const attacker) noexcept
-  {
-    if (attacker == nullptr) {
-      return nullptr;
-    }
-
-    auto* const attackerView = reinterpret_cast<CAiAttackerEventLinkView*>(attacker);
-    return &attackerView->mAiAttackerEventHead;
-  }
-
   [[nodiscard]] moho::CUnitCommand* GetCurrentCommand(moho::Unit* const unit) noexcept
   {
     if (unit == nullptr || unit->CommandQueue == nullptr) {
@@ -375,10 +333,6 @@ namespace moho
     : CAttackTargetTask()
   {
 
-    CCommandTaskWithListenerSlot::mListenerPad = 0;
-    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
-    AiAttackerListenerWithSlot::mListenerPad = 0;
-    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
 
     mDispatchTask = nullptr;
     mCommand = nullptr;
@@ -415,10 +369,6 @@ namespace moho
     : CAttackTargetTask(dispatchTask)
   {
 
-    CCommandTaskWithListenerSlot::mListenerPad = 0;
-    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
-    AiAttackerListenerWithSlot::mListenerPad = 0;
-    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
 
     mDispatchTask = dispatchTask;
     mCommand = nullptr;
@@ -459,9 +409,7 @@ namespace moho
       mCommand = GetCurrentCommand(unit);
       if (CUnitCommand* const command = mCommand; command != nullptr) {
         command->mUnknownFlag154 = true;
-        if (Broadcaster* const commandListenerHead = CommandEventListenerHead(command); commandListenerHead != nullptr) {
-          Listener<ECommandEvent>::mListenerLink.ListLinkBefore(commandListenerHead);
-        }
+        command->AddListener(this);
       }
 
       if (!unit->IsMobile()) {
@@ -470,7 +418,7 @@ namespace moho
 
       CAiAttackerImpl* const attacker = unit->AiAttacker;
       if (attacker != nullptr) {
-        Listener<EAiAttackerEvent>::mListenerLink.ListUnlink();
+        Listener<EAiAttackerEvent>::ListUnlink();
       }
 
       mHasMobileTarget =
@@ -525,7 +473,7 @@ namespace moho
       unit->NeedSyncGameData = true;
     }
 
-    Listener<ECommandEvent>::mListenerLink.ListUnlink();
+    Listener<ECommandEvent>::ListUnlink();
 
     if (unit != nullptr) {
       if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
@@ -533,7 +481,7 @@ namespace moho
       }
 
       if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
-        Listener<EAiAttackerEvent>::mListenerLink.ListUnlink();
+        Listener<EAiAttackerEvent>::ListUnlink();
         attacker->Stop();
       }
 
@@ -910,38 +858,6 @@ namespace moho
 
     attacker->ResetReportingState();
     return false;
-  }
-
-  /**
-   * Address: 0x005F42C0 (FUN_005F42C0, CUnitMeleeAttackTargetTask::RelinkAiAttackerListener)
-   * Address: 0x00651EF0 (FUN_00651EF0, ICF twin -- identical function_sha256.
-   *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
-   *          as `RelinkOwnerNodeOffset04BeforeAnchor`; that duplicate has
-   *          been deleted.)
-   * Address: 0x005E9D50 (FUN_005E9D50, ICF twin -- identical function_sha256.
-   *          Formerly duplicated in the same file as `RelinkOwnerNodeBeforeAnchor`;
-   *          that duplicate has been deleted too.)
-   * Address: 0x005F4310 (FUN_005F4310, ICF twin -- identical function_sha256,
-   *          zero callers/xrefs of its own. Formerly mis-cited in
-   *          Broadcaster.cpp's fabricated `BroadcasterOwnerNodeOffset4RuntimeView`
-   *          cluster alongside the wrong claim on 0x005F42C0 itself; that
-   *          whole cluster has been deleted, see Broadcaster.cpp's removal note.)
-   *
-   * What it does:
-   * Unlinks this task's attacker-listener node from its current intrusive
-   * list and relinks it before `attackerListenerHead`.
-   *
-   * Fidelity fix: the real body is a single unlink-and-relink pass (22
-   * instructions: 4 stores unlinking+self-linking the node, 4 stores
-   * splicing it before the anchor -- see FUN_005F42C0.asm). The previous
-   * recovery called `ListUnlink()` explicitly before `ListLinkBefore()`,
-   * which itself already calls `ListUnlink()` internally (TDatList.h) --
-   * a redundant no-op unlink-of-an-already-self-linked-node that does not
-   * match the single-pass binary body. Removed the explicit call.
-   */
-  void CUnitMeleeAttackTargetTask::RelinkAiAttackerListener(Broadcaster* const attackerListenerHead)
-  {
-    Listener<EAiAttackerEvent>::mListenerLink.ListLinkBefore(attackerListenerHead);
   }
 
   /**
@@ -1346,7 +1262,7 @@ namespace moho
 
       case TASKSTATE_Starting:
         if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
-          RelinkAiAttackerListener(AiAttackerListenerHead(attacker));
+          attacker->AddListener(this);
         }
         RefreshMeleeNavigationGoal();
         commandTask->mTaskState = TASKSTATE_Processing;

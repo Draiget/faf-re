@@ -563,7 +563,7 @@ int CAiNavigatorLand::Execute()
 
     const EAiNavigatorEvent eventCode =
       (mPathNavigator->mState == AIPATHNAVSTATE_Idle) ? AINAVEVENT_Succeeded : AINAVEVENT_Failed;
-    DispatchNavigatorEvent(eventCode);
+    BroadcastEvent(eventCode);
   }
 
   return 1;

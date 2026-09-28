@@ -20,7 +20,7 @@ namespace moho
   /**
    * Runtime owner for unit-capture command task state.
    */
-  class CUnitCaptureTask : public CCommandTaskWithListenerSlot, public Listener<ECommandEvent>
+  class CUnitCaptureTask : public CCommandTask, public Listener<ECommandEvent>
   {
   public:
     /**

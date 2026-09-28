@@ -3,21 +3,25 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "moho/unit/Broadcaster.h"
+#include "gpg/core/containers/DList.h"
 
 namespace moho
 {
   enum EFormationdStatus : std::int32_t;
 
   /**
-   * Legacy intrusive listener base used by broadcaster-style event lists.
+   * One subscriber to a `Broadcaster<TEvent>`.
    *
-   * Layout evidence:
-   * - `Listener<enum Moho::EUnitCommandQueueStatus>` RTTI/vtable at 0x00E1B374.
-   * - IAiCommandDispatchImpl secondary-base registration at +0x34 in FUN_00599970.
+   * RTTI (every instantiation, e.g. `Listener<ECommandEvent>` COL at
+   * vtable 0x00E1F624): a one-slot vtable at +0x00 and a
+   * `gpg::DListItem<Listener<TEvent>>` base at +0x04, which carries the
+   * `boost::noncopyable` at the same offset. The node is what links the
+   * listener onto its broadcaster's ring, so a listener is found from a ring
+   * node with `DListItem::Get()` -- the `node - 4` every broadcast loop
+   * spells as `lea ecx, [eax-4]` behind a null test.
    */
   template <class TEvent>
-  class Listener
+  class Listener : public gpg::DListItem<Listener<TEvent>>
   {
   public:
     /**
@@ -25,67 +29,50 @@ namespace moho
      * Address: 0x005F2970 (FUN_005F2970, Listener<ECommandEvent> ctor lane)
      * Address: 0x00618E40 (FUN_00618E40, Listener<EAiNavigatorEvent> ctor lane)
      * Address: 0x00618E50 (FUN_00618E50, Listener<EFormationdStatus> ctor lane)
-     * Address: 0x00869A40 (FUN_00869A40, Listener<SPauseEvent> ctor lane)
      * Address: 0x00599120 (FUN_00599120, Listener<EUnitCommandQueueStatus> ctor
      *   lane, `this` in EAX -- the whole body is this constructor:
-     *   `lea ecx, [eax+4]` takes `&mListenerLink`, the two stores self-link it,
-     *   and `mov [eax], 0xE1B374` installs the instantiation's vtable. It has
+     *   `lea ecx, [eax+4]` takes the node, the two stores self-link it, and
+     *   `mov [eax], 0xE1B374` installs the instantiation's vtable. It has
      *   zero callers because every derived constructor inlines it;
      *   `IAiCommandDispatchImpl` is the one that instantiates this
      *   specialisation, naming it in its own initializer list.)
+     * Address: 0x005AD5A0 (FUN_005AD5A0, Listener<NavPath const&> ctor lane,
+     *   `this` in EAX, vtable 0x00E1BE1C; zero callers; formerly
+     *   `InitializePathNavigatorListenerLane` in CAiPathNavigator.cpp.)
+     * Address: 0x00865710 (FUN_00865710, Listener<SSelectionEvent> ctor lane,
+     *   vtable 0x00E47A10; formerly `InitializeSelectionEventListenerLane`
+     *   over a `SelectionEventListenerRuntimeLane` in CWldSession.cpp.)
+     * Address: 0x00869800 (FUN_00869800, Listener<SPauseEvent> ctor lane,
+     *   vtable 0x00E47B30; formerly `InitializePauseEventListenerLane`.)
+     * Address: 0x00447460 (FUN_00447460, Listener<SD3DDeviceEvent const&>
+     *   ctor lane, `this` in EAX, vtable 0x00E02A94; inlined into
+     *   `DeviceExitListener`'s constructor, zero callers; formerly
+     *   `InitializeDeviceListenerLink` in DeviceExitListener.cpp.)
      *
      * What it does:
-     * Initializes one listener lane with a self-linked broadcaster node.
+     * Self-links the listener's node (the `DListItem` base) and installs the
+     * instantiation's vtable.
      */
-    Listener()
-      : mListenerLink()
-    {}
+    Listener() = default;
+
+    /**
+     * Address: 0x00869A40 (FUN_00869A40, Listener<SPauseEvent>: the vtable
+     *   0x00E47B30 goes back in, then the node unlinks; formerly listed as a
+     *   constructor)
+     * Address: 0x005F42F0 (FUN_005F42F0, the node's unlink alone, listener
+     *   in EAX; zero callers)
+     * Address: 0x005F4340 (FUN_005F4340, a second copy of that body)
+     *
+     * What it does:
+     * Nothing of its own; the `DListItem` base's destructor unlinks the
+     * listener from whatever broadcaster it is on. Not virtual: the vtable
+     * has one slot.
+     */
+    ~Listener() = default;
 
     virtual void OnEvent(TEvent event) = 0;
-
-    /**
-     * The intrusive link -> owner downcast for this ring: a node in a
-     * broadcaster's list is some listener's `mListenerLink`, so the listener is
-     * `node - 0x04`. Every walk of such a ring in the binary spells it as a bare
-     * `sub reg, 4` on the node it just stepped to -- `BroadcastAiAttackerEvent`
-     * (0x005DB480) and `RBroadcasterRType_EFormationdStatus::SerLoad`
-     * (0x0056DCA0) among them -- and both used to carry their own copy of this
-     * three-line helper, one per event type, differing only in the `offsetof`
-     * they named.
-     *
-     * The mirror of `ManyToOneBroadcaster<TEvent>::GetListener()`
-     * (moho/misc/ManyToOneBroadcaster.h), which does the same decode for the
-     * one-listener case over a weak-link slot instead of a ring node.
-     */
-    [[nodiscard]] static Listener<TEvent>* FromListenerLink(Broadcaster* const node) noexcept
-    {
-      if (node == nullptr) {
-        return nullptr;
-      }
-
-      auto* const bytes = reinterpret_cast<std::uint8_t*>(node);
-      return reinterpret_cast<Listener<TEvent>*>(bytes - offsetof(Listener<TEvent>, mListenerLink));
-    }
-
-  public:
-    /**
-     * The listener's own intrusive node, and the one every
-     * `Listener<T>`-shaped owner links through. The compiler emits its
-     * unlink/relink pair per instantiation:
-     *
-     * Address: 0x005F42F0, 0x005F4340 (unlink and self-link the node)
-     * Address: 0x005F42C0, 0x005F4310 (unlink, then relink before an anchor)
-     * Address: 0x005F4560 (the same relink reached through the owner pointer)
-     *
-     * All five were hand-written in moho/unit/Broadcaster.cpp over a
-     * `BroadcasterOwnerNodeOffset4RuntimeView` stand-in - which is this class,
-     * a vtable and a node at +0x04 - with no callers (RULE ONE), removed
-     * 2026-09-18.
-     */
-    Broadcaster mListenerLink; // +0x04
   };
 
-  static_assert(offsetof(Listener<std::int32_t>, mListenerLink) == 0x04, "Listener<T>::mListenerLink offset must be 0x04");
   static_assert(sizeof(Listener<std::int32_t>) == 0x0C, "Listener<T> size must be 0x0C");
 
   using Listener_EFormationdStatus = Listener<EFormationdStatus>;

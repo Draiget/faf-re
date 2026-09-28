@@ -5,7 +5,7 @@
 
 #include "boost/scoped_ptr.h"
 #include "gpg/core/containers/DList.h"
-#include "moho/containers/TDatList.h"
+#include "moho/misc/Listener.h"
 
 namespace moho
 {
@@ -23,18 +23,18 @@ namespace moho
   /**
    * VFTABLE: 0x00E02ABC
    * COL: 0x00E5FA0C
+   *
+   * RTTI: `Listener<SD3DDeviceEvent const&>` at +0x00 (its node at +0x04).
    */
-  class DeviceExitListener
+  class DeviceExitListener : public Listener<const SD3DDeviceEvent&>
   {
   public:
-    using DeviceListenerLink = TDatListItem<DeviceExitListener, void>;
-
     /**
      * Address: 0x004472B0 (FUN_004472B0, Moho::DeviceExitListener::DeviceExitListener)
      *
      * What it does:
-     * Initializes device-list and tracked-texture intrusive heads, then links this
-     * listener into the D3D-device event listener ring.
+     * Starts with an empty texture list and subscribes to the D3D device's
+     * events. The device is not null-checked (0x004472EF).
      */
     DeviceExitListener();
 
@@ -42,32 +42,26 @@ namespace moho
      * Address: 0x0044E6E0 (FUN_0044E6E0, ??1DeviceExitListener@Moho@@QAE@@Z)
      *
      * What it does:
-     * Unlinks tracked texture/device-list nodes and releases the listener heap
-     * allocation through explicit destructor-call ownership paths.
+     * `delete listener` in full: `mTrackedTextures` unlinks (0x0044E6E0), the
+     * vptr drops to the `Listener` base's, the listener node unlinks
+     * (0x0044E6FF), then `operator delete`. Every step is compiler-emitted.
      */
     ~DeviceExitListener();
 
     /**
      * Address: 0x00447330 (FUN_00447330, Moho::DeviceExitListener::Receive)
-     *
-     * SD3DDeviceEvent const &
+     * Slot: 0
      *
      * What it does:
-     * On device-exit events, drops cached texture-sheet handles for all tracked
-     * batch textures and destroys the global listener instance.
+     * On a device exit that releases textures, drops every tracked batch
+     * texture's sheet and destroys the process-wide listener (itself).
      */
-    virtual void Receive(const SD3DDeviceEvent& event);
+    void OnEvent(const SD3DDeviceEvent& event) override;
 
   public:
-    DeviceListenerLink mDeviceLink;                  // +0x04
     gpg::DList<CD3DBatchTexture> mTrackedTextures; // +0x0C
   };
 
-  static_assert(offsetof(DeviceExitListener, mDeviceLink) == 0x04, "DeviceExitListener::mDeviceLink offset must be 0x04");
-  static_assert(
-    offsetof(DeviceExitListener, mTrackedTextures) == 0x0C,
-    "DeviceExitListener::mTrackedTextures offset must be 0x0C"
-  );
   static_assert(sizeof(DeviceExitListener) == 0x14, "DeviceExitListener size must be 0x14");
 
   /**

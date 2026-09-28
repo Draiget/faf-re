@@ -28,6 +28,7 @@ namespace gpg
 
 namespace moho
 {
+  struct SCameraTracking;
   class CScrLuaInitForm;
   class STIMap;
   class UserEntity;
@@ -350,8 +351,8 @@ namespace moho
    *
    * What it does:
    * The polymorphic camera-manager base `CameraImpl` derives from. Adds
-   * nothing but a vtable (destructor slot 0) over the plain, non-virtual
-   * `Broadcaster` self-linked ring node it wraps; the reflected base-lane
+   * nothing but a vtable (destructor slot 0) over its
+   * `Broadcaster<SCameraTracking>` base at +0x04 (RTTI); the reflected base-lane
    * registration in `CameraImplTypeInfo.cpp` (`AddCScriptEventBaseToCameraImplType`,
    * offset `+0x0C`) is what places `CScriptEvent` immediately after this
    * 0x0C-byte base in every `CameraImpl` instance. The real name is proven by
@@ -361,12 +362,12 @@ namespace moho
    * a real, distinct class.
    *
    * The destructor's own body (removing this camera from `RCamManager`
-   * ownership and restoring the broadcaster ring node to its self-linked
-   * idle state) lives in `CameraImpl.cpp` and runs automatically, chained
+   * ownership; the base's destructor then unlinks the ring) lives in
+   * `CameraImpl.cpp` and runs automatically, chained
    * after `CameraImpl::~CameraImpl`'s body, via ordinary C++ base-destructor
    * chaining -- it is never called explicitly.
    */
-  class RCamCamera : public Broadcaster
+  class RCamCamera : public Broadcaster<SCameraTracking>
   {
   public:
     virtual ~RCamCamera();
@@ -506,6 +507,15 @@ namespace moho
     [[nodiscard]] virtual Wm3::Vector3f GetTargetPosition() const = 0;
 
   protected:
+    /**
+     * Address: 0x007A7DE0 (FUN_007A7DE0, `this` in EAX; zero callers, inlined
+     *   into `CameraImpl`'s constructor)
+     *
+     * What it does:
+     * Self-links the tracking ring (the base) and installs the vtable
+     * 0x00E3C544. `CameraImpl`'s constructor used to call this a second
+     * time as `InitializeCameraBroadcasterLane`.
+     */
     RCamCamera() = default;
   };
 
@@ -1411,13 +1421,6 @@ namespace moho
   static_assert(offsetof(CameraImpl, mMaxZoomMult) == 0x850, "CameraImpl::mMaxZoomMult offset must be 0x850");
   static_assert(sizeof(CameraImpl) == 0x858, "CameraImpl size must be 0x858");
 
-  /**
-   * The camera's own broadcaster ring node, at `camera+0x04` - the lane every
-   * `CameraImpl` tracking broadcast walks and the one `func_SetWorldCamera`
-   * splices the global tracking listener into.
-   */
-  [[nodiscard]] Broadcaster* CameraBroadcasterLink(CameraImpl* camera) noexcept;
-
   template <>
   class CScrLuaMetatableFactory<CameraImpl> final : public CScrLuaObjectFactory
   {
@@ -2104,7 +2107,7 @@ namespace moho
    */
   int cfunc_CameraImplDisableEaseInOutL(LuaPlus::LuaState* state);
 
-  static_assert(sizeof(RCamCamera) == 0x0Cu, "RCamCamera size must be 0x0C (vtable + Broadcaster prev/next)");
+  static_assert(sizeof(RCamCamera) == 0x0Cu, "RCamCamera size must be 0x0C (vtable + Broadcaster ring)");
   static_assert(
     offsetof(CameraImpl, mName) == 0x0Cu + sizeof(CScriptEvent),
     "CameraImpl's two real bases, RCamCamera then CScriptEvent, must sit back to back with no padding"

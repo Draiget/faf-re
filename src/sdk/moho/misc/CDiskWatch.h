@@ -9,6 +9,7 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/misc/Listener.h"
+#include "moho/unit/Broadcaster.h"
 
 namespace moho
 {
@@ -90,8 +91,8 @@ namespace moho
    * VFTABLE: 0x00E03474
    *
    * RTTI: `Listener<SDiskWatchEvent const&>` is a private base (attr 0x4d),
-   * which is also why `OnEvent` below mangles as private (`EAE`). Its node at
-   * +0x04 is what `CDiskWatch::mListeners` rings; its own vtable (0x00E03484,
+   * which is also why `OnEvent` below mangles as private (`EAE`). Its
+   * `DListItem` node at +0x04 is what `CDiskWatch::mListeners` rings; its own vtable (0x00E03484,
    * one pure slot) is what `~CDiskWatchListener` restores before unlinking.
    */
   class CDiskWatchListener : private Listener<const SDiskWatchEvent&>
@@ -250,7 +251,7 @@ namespace moho
     void WatchQuery();
 
   public:
-    Broadcaster mListeners;                            // +0x00
+    Broadcaster<const SDiskWatchEvent&> mListeners;    // +0x00
     void* mUnknown08;                                  // +0x08
     gpg::core::SharedLock mLock;                       // +0x0C
     std::uint8_t mOpaque10[0x08];                      // +0x10

@@ -270,84 +270,6 @@ namespace
     );
   }
 
-  struct CUnitScriptTaskListenerLaneRuntime
-  {
-    moho::TDatListItem<moho::Broadcaster, void>* mPrev = nullptr;   // +0x00
-    moho::TDatListItem<moho::Broadcaster, void>* mNext = nullptr;   // +0x04
-    std::uint8_t reserved08_0B[0x04]{};
-    moho::TDatListItem<moho::Broadcaster, void>* mAnchor = nullptr; // +0x0C
-    std::uint8_t reserved10_13[0x04]{};
-    std::uint32_t dispatchState = 0;            // +0x14
-    std::uint8_t linkState = 0;                 // +0x18
-  };
-  static_assert(
-    offsetof(CUnitScriptTaskListenerLaneRuntime, mAnchor) == 0x0C,
-    "CUnitScriptTaskListenerLaneRuntime::mAnchor offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CUnitScriptTaskListenerLaneRuntime, dispatchState) == 0x14,
-    "CUnitScriptTaskListenerLaneRuntime::dispatchState offset must be 0x14"
-  );
-  static_assert(
-    offsetof(CUnitScriptTaskListenerLaneRuntime, linkState) == 0x18,
-    "CUnitScriptTaskListenerLaneRuntime::linkState offset must be 0x18"
-  );
-
-  struct CUnitScriptTaskListenerBridgeRuntime
-  {
-    std::uint8_t reserved00_0B[0x0C]{};
-    CUnitScriptTaskListenerLaneRuntime* listenerLane = nullptr; // +0x0C
-    std::uint8_t reserved10_23[0x14]{};
-    std::uint32_t pendingEventState = 0;                        // +0x24
-  };
-  static_assert(
-    offsetof(CUnitScriptTaskListenerBridgeRuntime, listenerLane) == 0x0C,
-    "CUnitScriptTaskListenerBridgeRuntime::listenerLane offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CUnitScriptTaskListenerBridgeRuntime, pendingEventState) == 0x24,
-    "CUnitScriptTaskListenerBridgeRuntime::pendingEventState offset must be 0x24"
-  );
-
-  /**
-   * Address: 0x006230F0 (FUN_006230F0)
-   *
-   * What it does:
-   * Clears one pending listener-event state lane and, when linked, unlinks and
-   * reinserts the listener node before its anchor broadcaster.
-   */
-  [[maybe_unused]] int CUnitScriptTaskRepairListenerLinkRuntime(
-    void* const listenerRuntime,
-    int
-  ) noexcept
-  {
-    auto* const listenerBase = static_cast<std::uint8_t*>(listenerRuntime);
-    auto* const taskRuntime = reinterpret_cast<CUnitScriptTaskListenerBridgeRuntime*>(listenerBase - 0x64);
-    taskRuntime->pendingEventState = 0;
-
-    CUnitScriptTaskListenerLaneRuntime* const lane = taskRuntime->listenerLane;
-    if (lane == nullptr) {
-      return 0;
-    }
-
-    const bool alreadyUnlinked = (lane->linkState == 0);
-    lane->dispatchState = 0;
-    if (!alreadyUnlinked) {
-      auto* const anchor = lane->mAnchor;
-      auto* const laneLink = reinterpret_cast<moho::TDatListItem<moho::Broadcaster, void>*>(lane);
-      lane->mPrev->mNext = lane->mNext;
-      lane->mNext->mPrev = lane->mPrev;
-      lane->mPrev = laneLink;
-      lane->mNext = laneLink;
-      lane->mPrev = anchor->mPrev;
-      lane->mNext = anchor;
-      anchor->mPrev = laneLink;
-      lane->mPrev->mNext = laneLink;
-      lane->linkState = 0;
-    }
-
-    return static_cast<int>(reinterpret_cast<std::intptr_t>(lane));
-  }
 } // namespace
 
 gpg::RType* CUnitScriptTask::sType = nullptr;
@@ -425,7 +347,7 @@ CUnitScriptTask::CUnitScriptTask(IAiCommandDispatchImpl* const dispatchTask, con
   }
 
   if (mSourceCommand != nullptr) {
-    mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(mSourceCommand));
+    mSourceCommand->AddListener(this);
   }
 
   mTaskClassLua = ResolveTaskClassFromSourceArgs(this, mSourceLuaObj);
@@ -463,7 +385,7 @@ CUnitScriptTask* CUnitScriptTask::Create(IAiCommandDispatchImpl* const dispatchT
 CUnitScriptTask::~CUnitScriptTask()
 {
   CallbackStr("OnDestroy");
-  mListenerLink.ListUnlink();
+  ListUnlink();
 }
 
 /**
@@ -984,9 +906,25 @@ int CUnitScriptTask::Execute()
   return -1;
 }
 
+/**
+ * Address: 0x006230F0 (FUN_006230F0, slot 0 of the `Listener<ECommandEvent>`
+ *   vtable, `this` = the listener at +0x64)
+ *
+ * What it does:
+ * Any change to the command sends the task back to its first state and wakes
+ * its thread for an immediate tick: `mTaskState` (+0x24) is cleared, then the
+ * owner thread's pending frames and staged flag. The tree used to run
+ * `Execute()` (the Lua `TaskTick`) here, inside the command's broadcast.
+ */
 void CUnitScriptTask::OnEvent(const ECommandEvent)
 {
-  (void)Execute();
+  mTaskState = TASKSTATE_Preparing;
+  if (CTaskThread* const thread = mOwnerThread; thread != nullptr) {
+    thread->mPendingFrames = 0;
+    if (thread->mStaged) {
+      thread->Unstage();
+    }
+  }
 }
 
 namespace gpg

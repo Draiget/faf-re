@@ -23,10 +23,10 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedAttackerBroadcasterType()
   {
-    gpg::RType* type = Broadcaster_EAiAttackerEvent::sType;
+    gpg::RType* type = Broadcaster<EAiAttackerEvent>::sType;
     if (!type) {
-      type = gpg::LookupRType(typeid(Broadcaster_EAiAttackerEvent));
-      Broadcaster_EAiAttackerEvent::sType = type;
+      type = gpg::LookupRType(typeid(Broadcaster<EAiAttackerEvent>));
+      Broadcaster<EAiAttackerEvent>::sType = type;
     }
     return type;
   }
@@ -85,7 +85,7 @@ void IAiAttackerSerializer::Deserialize(gpg::ReadArchive* const archive, const i
   }
 
   IAiAttacker* const attacker = reinterpret_cast<IAiAttacker*>(static_cast<std::uintptr_t>(objectPtr));
-  void* const broadcasterLane = (attacker != nullptr) ? static_cast<void*>(&attacker->mListeners) : nullptr;
+  void* const broadcasterLane = (attacker != nullptr) ? static_cast<void*>(static_cast<Broadcaster<EAiAttackerEvent>*>(attacker)) : nullptr;
   gpg::RType* const broadcasterType = CachedAttackerBroadcasterType();
   GPG_ASSERT(broadcasterType != nullptr);
   const gpg::RRef ownerRef{};
@@ -102,7 +102,7 @@ void IAiAttackerSerializer::Serialize(gpg::WriteArchive* const archive, const in
   }
 
   const IAiAttacker* const attacker = reinterpret_cast<const IAiAttacker*>(static_cast<std::uintptr_t>(objectPtr));
-  const void* const broadcasterLane = (attacker != nullptr) ? static_cast<const void*>(&attacker->mListeners) : nullptr;
+  const void* const broadcasterLane = (attacker != nullptr) ? static_cast<const void*>(static_cast<const Broadcaster<EAiAttackerEvent>*>(attacker)) : nullptr;
   gpg::RType* const broadcasterType = CachedAttackerBroadcasterType();
   GPG_ASSERT(broadcasterType != nullptr);
   const gpg::RRef ownerRef{};

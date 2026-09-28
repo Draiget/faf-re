@@ -860,7 +860,7 @@ IAiCommandDispatchImpl::IAiCommandDispatchImpl(Unit* const unit)
   }
 
   if (mCommandQueue != nullptr) {
-    mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(mCommandQueue));
+    mCommandQueue->AddListener(this);
   }
 }
 
@@ -870,7 +870,9 @@ IAiCommandDispatchImpl::IAiCommandDispatchImpl(Unit* const unit)
  */
 IAiCommandDispatchImpl::~IAiCommandDispatchImpl()
 {
-  mListenerLink.ListUnlink();
+  // 0x00598E0A; the `Listener` base unlinks the node a second time
+  // (0x00598E35).
+  Listener<EUnitCommandQueueStatus>::ListUnlink();
 
   CTaskThread* const taskThread = mOwnerThread;
   if (taskThread != nullptr) {

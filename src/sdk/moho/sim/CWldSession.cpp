@@ -86,7 +86,9 @@
 #include "moho/misc/SessionStartup.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SFootprint.h"
+#include "moho/sim/PauseListener.h"
 #include "moho/sim/SOCellPos.h"
+#include "moho/sim/SSelectionEvent.h"
 #include "moho/ui/EMauiKeyCodeTypeInfo.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/STIMap.h"
@@ -242,43 +244,6 @@ namespace
     pivot->mParent = promoted;
     return promoted;
   }
-
-  struct ListenerLinkRuntimeView final
-  {
-    ListenerLinkRuntimeView* mPrev; // +0x00
-    ListenerLinkRuntimeView* mNext; // +0x04
-  };
-  static_assert(sizeof(ListenerLinkRuntimeView) == 0x08, "ListenerLinkRuntimeView size must be 0x08");
-
-  class SelectionEventListenerRuntimeLane final
-  {
-  public:
-    SelectionEventListenerRuntimeLane() noexcept
-      : mLink{&mLink, &mLink}
-    {}
-
-    virtual ~SelectionEventListenerRuntimeLane() = default;
-    virtual void OnEvent() noexcept {}
-
-  public:
-    ListenerLinkRuntimeView mLink; // +0x04
-  };
-  static_assert(sizeof(SelectionEventListenerRuntimeLane) == 0x0C, "SelectionEventListenerRuntimeLane size must be 0x0C");
-
-  class PauseEventListenerRuntimeLane final
-  {
-  public:
-    PauseEventListenerRuntimeLane() noexcept
-      : mLink{&mLink, &mLink}
-    {}
-
-    virtual ~PauseEventListenerRuntimeLane() = default;
-    virtual void OnEvent() noexcept {}
-
-  public:
-    ListenerLinkRuntimeView mLink; // +0x04
-  };
-  static_assert(sizeof(PauseEventListenerRuntimeLane) == 0x0C, "PauseEventListenerRuntimeLane size must be 0x0C");
 
   /**
    * Address: 0x0085A070 (FUN_0085A070)
@@ -478,34 +443,6 @@ namespace
   [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryD(const int /*unused*/) noexcept
   {
     return &gStrategicIconScratchOwnerLane;
-  }
-
-  /**
-   * Address: 0x00865710 (FUN_00865710)
-   *
-   * What it does:
-   * Initializes one selection-event listener lane by self-linking its
-   * intrusive broadcaster node.
-   */
-  [[nodiscard]] SelectionEventListenerRuntimeLane* InitializeSelectionEventListenerLane(
-    SelectionEventListenerRuntimeLane* const listener
-  ) noexcept
-  {
-    return ::new (listener) SelectionEventListenerRuntimeLane();
-  }
-
-  /**
-   * Address: 0x00869800 (FUN_00869800)
-   *
-   * What it does:
-   * Initializes one pause-event listener lane by self-linking its intrusive
-   * broadcaster node.
-   */
-  [[nodiscard]] PauseEventListenerRuntimeLane* InitializePauseEventListenerLane(
-    PauseEventListenerRuntimeLane* const listener
-  ) noexcept
-  {
-    return ::new (listener) PauseEventListenerRuntimeLane();
   }
 
   /**
@@ -3496,208 +3433,6 @@ namespace moho
       return reinterpret_cast<const VizUpdateTree*>(&session->mVizUpdateRoot);
     }
 
-    struct SessionPauseCallbackLink
-    {
-      SessionPauseCallbackLink* prev;
-      SessionPauseCallbackLink* next;
-    };
-
-    class ISessionPauseCallback
-    {
-    public:
-      virtual void OnSessionPauseStateChanged(bool isPaused) = 0;
-    };
-
-    struct SessionPauseCallbackOwnerLayout
-    {
-      void* vftable;
-      SessionPauseCallbackLink link;
-    };
-
-    static_assert(sizeof(SessionPauseCallbackLink) == 0x8, "SessionPauseCallbackLink size must be 0x8");
-    static_assert(
-      offsetof(SessionPauseCallbackOwnerLayout, link) == sizeof(void*),
-      "SessionPauseCallbackOwnerLayout::link offset must follow vftable lane"
-    );
-
-    [[nodiscard]] SessionPauseCallbackLink* AsSessionPauseCallbackLink(gpg::core::IntrusiveLink<CWldSession*>* link) noexcept
-    {
-      return reinterpret_cast<SessionPauseCallbackLink*>(link);
-    }
-
-    [[nodiscard]] ISessionPauseCallback* AsSessionPauseCallbackOwner(SessionPauseCallbackLink* const link) noexcept
-    {
-      constexpr std::size_t kCallbackLinkOffset = offsetof(SessionPauseCallbackOwnerLayout, link);
-      auto* const raw = reinterpret_cast<std::uint8_t*>(link) - kCallbackLinkOffset;
-      return reinterpret_cast<ISessionPauseCallback*>(raw);
-    }
-
-    void InitSessionPauseCallbackHead(gpg::core::IntrusiveLink<CWldSession*>& head) noexcept
-    {
-      auto* const link = AsSessionPauseCallbackLink(&head);
-      link->prev = link;
-      link->next = link;
-    }
-
-    [[nodiscard]] bool IsSessionPauseCallbackHeadEmpty(const gpg::core::IntrusiveLink<CWldSession*>& head) noexcept
-    {
-      const SessionPauseCallbackLink* const link =
-        reinterpret_cast<const SessionPauseCallbackLink*>(&head);
-      return link->next == link;
-    }
-
-    void UnlinkSessionPauseCallbackNode(SessionPauseCallbackLink* const link) noexcept
-    {
-      link->prev->next = link->next;
-      link->next->prev = link->prev;
-      link->prev = link;
-      link->next = link;
-    }
-
-    void LinkSessionPauseCallbackNodeBefore(
-      SessionPauseCallbackLink* const anchor,
-      SessionPauseCallbackLink* const link
-    ) noexcept
-    {
-      link->prev = anchor->prev;
-      link->next = anchor;
-      anchor->prev->next = link;
-      anchor->prev = link;
-    }
-
-    struct SelectionEventBroadcasterOwnerLayout
-    {
-      void** vftable;
-      ListenerLinkRuntimeView link;
-    };
-
-    using SelectionEventDispatchFn = void(__thiscall*)(
-      SelectionEventBroadcasterOwnerLayout* owner,
-      std::uint32_t lane0,
-      std::uint32_t lane1,
-      std::uint32_t lane2,
-      std::uint32_t lane3
-    );
-
-    [[nodiscard]] SelectionEventBroadcasterOwnerLayout* AsSelectionEventBroadcasterOwner(
-      ListenerLinkRuntimeView* const link
-    ) noexcept
-    {
-      constexpr std::size_t kLinkOffset = offsetof(SelectionEventBroadcasterOwnerLayout, link);
-      auto* const raw = reinterpret_cast<std::uint8_t*>(link) - kLinkOffset;
-      return reinterpret_cast<SelectionEventBroadcasterOwnerLayout*>(raw);
-    }
-
-    /**
-     * Address: 0x008986F0 (FUN_008986F0, ?BroadcastEvent@?$Broadcaster@USSelectionEvent@Moho@@@Moho@@IAEXUSSelectionEvent@2@@Z)
-     *
-     * What it does:
-     * Stages one selection-event listener list into a temporary sentinel lane,
-     * reinserts each listener back into the owner list, and dispatches one
-     * 4-lane selection-event payload through the listener vtable.
-     */
-    void BroadcastSelectionEventListeners(
-      ListenerLinkRuntimeView& head,
-      const std::uint32_t lane0,
-      const std::uint32_t lane1,
-      const std::uint32_t lane2,
-      const std::uint32_t lane3
-    )
-    {
-      if (head.mNext == &head) {
-        return;
-      }
-
-      ListenerLinkRuntimeView staging{};
-      staging.mPrev = &staging;
-      staging.mNext = &staging;
-
-      staging.mPrev = head.mPrev;
-      staging.mNext = head.mNext;
-      staging.mPrev->mNext = &staging;
-      staging.mNext->mPrev = &staging;
-      head.mPrev = &head;
-      head.mNext = &head;
-
-      while (staging.mNext != &staging) {
-        ListenerLinkRuntimeView* const listenerLink = staging.mNext;
-        listenerLink->mPrev->mNext = listenerLink->mNext;
-        listenerLink->mNext->mPrev = listenerLink->mPrev;
-        listenerLink->mPrev = listenerLink;
-        listenerLink->mNext = listenerLink;
-
-        listenerLink->mPrev = head.mPrev;
-        listenerLink->mNext = &head;
-        head.mPrev->mNext = listenerLink;
-        head.mPrev = listenerLink;
-
-        SelectionEventBroadcasterOwnerLayout* const owner = AsSelectionEventBroadcasterOwner(listenerLink);
-        if (owner->vftable != nullptr && owner->vftable[0] != nullptr) {
-          auto* const dispatch = reinterpret_cast<SelectionEventDispatchFn>(owner->vftable[0]);
-          dispatch(owner, lane0, lane1, lane2, lane3);
-        }
-      }
-    }
-
-    /**
-     * `Broadcaster<SSelectionEvent>` is a base subobject of `CWldSession`, so
-     * its listener-list head is the session's own first intrusive link at
-     * +0x00 - `SetSelection` (0x00896140) loads `arg_0`, the session pointer,
-     * straight into `esi` as `BroadcastEvent`'s `this`.
-     */
-    [[nodiscard]] ListenerLinkRuntimeView& SelectionEventHead(CWldSession& session) noexcept
-    {
-      return *reinterpret_cast<ListenerLinkRuntimeView*>(&session.head0);
-    }
-
-    [[nodiscard]] std::uint32_t SelectionEventLaneFromPointer(const void* const pointer) noexcept
-    {
-      return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer));
-    }
-
-    /**
-     * Address: 0x00898820 (FUN_00898820)
-     *
-     * What it does:
-     * Stages the pause-callback intrusive list into a temporary sentinel lane,
-     * reinserts each callback back into the owner list, and dispatches pause
-     * state notifications in original iteration order.
-     *
-     * The lane it takes is the session's *second* intrusive head, `head1` at
-     * +0x08 -- both call sites reach it through `add esi, 8` (0x008942E5 and
-     * 0x0089431C in RequestPause, 0x00894364 and 0x0089439D in Resume). `head0`
-     * at +0x00 is a different lane entirely: it is the
-     * `Broadcaster<SSelectionEvent>` listener list, whose nodes sit at +0x08 of
-     * a listener whose *secondary* vtable is at +0x04. Handing that lane to
-     * this function makes the `[eax-4]` owner adjustment land on the secondary
-     * vtable and the slot-0 call dispatch `SelectionListener::OnEvent`, which
-     * then reads `SSelectionEvent`'s set pointers out of the `bool`.
-     */
-    void DispatchSessionPauseCallbacks(gpg::core::IntrusiveLink<CWldSession*>& head, const bool isPaused)
-    {
-      if (IsSessionPauseCallbackHeadEmpty(head)) {
-        return;
-      }
-
-      SessionPauseCallbackLink staging{};
-      staging.prev = &staging;
-      staging.next = &staging;
-
-      SessionPauseCallbackLink* const headLink = AsSessionPauseCallbackLink(&head);
-      staging.prev = headLink->prev;
-      staging.next = headLink->next;
-      staging.prev->next = &staging;
-      staging.next->prev = &staging;
-      headLink->prev = headLink;
-      headLink->next = headLink;
-
-      while (staging.next != &staging) {
-        SessionPauseCallbackLink* const callbackLink = staging.next;
-        UnlinkSessionPauseCallbackNode(callbackLink);
-        LinkSessionPauseCallbackNodeBefore(headLink, callbackLink);
-        AsSessionPauseCallbackOwner(callbackLink)->OnSessionPauseStateChanged(isPaused);
-      }
-    }
 
     // `DestroyBuildTemplateInfo` (0x00823E10, per-element blueprint-id string
     // release) and `DestroyBuildTemplateRange` (0x00823DD0, the loop over it)
@@ -13707,9 +13442,6 @@ namespace moho
     // Partial lift of 0x00893160: ownership transfers + proven field initialization.
     // Remaining helper-heavy initialization chain (vision/task/lua options/spatial builders)
     // is tracked for subsequent recovery pass.
-    InitSessionPauseCallbackHead(head0);
-    InitSessionPauseCallbackHead(head1);
-
     mState = state.release();
     mCurThread = nullptr;
     mRules = static_cast<RRuleGameRulesImpl*>(rulesOwner.release());
@@ -14072,9 +13804,6 @@ namespace moho
     GetEntitySpatialDbStorage()->~SpatialDB();
     // The entity map's storage goes with the member (~map); 0x00893A60 frees it
     // here, after the spatial DB, because that is reverse declaration order.
-
-    InitSessionPauseCallbackHead(head0);
-    InitSessionPauseCallbackHead(head1);
 
     if (gActiveWldSession == this) {
       gActiveWldSession = nullptr;
@@ -14962,7 +14691,7 @@ namespace moho
       mPauseRequester = commandCookie;
     }
 
-    DispatchSessionPauseCallbacks(head1, true);
+    mPauseBroadcaster.BroadcastEvent(SPauseEvent{true});
   }
 
   /**
@@ -14984,7 +14713,7 @@ namespace moho
       mPauseRequester = commandCookie;
     }
 
-    DispatchSessionPauseCallbacks(head1, false);
+    mPauseBroadcaster.BroadcastEvent(SPauseEvent{false});
   }
 
   /**
@@ -17882,12 +17611,8 @@ namespace moho
       }
     }
 
-    BroadcastSelectionEventListeners(
-      SelectionEventHead(*this),
-      SelectionEventLaneFromPointer(&mSelection),
-      SelectionEventLaneFromPointer(incomingSelection),
-      SelectionEventLaneFromPointer(&addedEntities),
-      SelectionEventLaneFromPointer(&removedEntities)
+    mSelectionBroadcaster.BroadcastEvent(
+      SSelectionEvent{&mSelection, incomingSelection, &addedEntities, &removedEntities}
     );
 
     if (&mSelection != incomingSelection && mSelection.mHead != nullptr && incomingSelection != nullptr &&

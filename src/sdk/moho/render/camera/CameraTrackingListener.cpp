@@ -82,11 +82,10 @@ namespace moho
      * Layout evidence:
      * - Static-init thunk FUN_008715C0 writes the primary vtable
      *   `??_7CameraTrackingListener@Moho@@6B@` (`.rdata:0x00E49158`) to
-     *   `*off_F5B668` and self-links the inherited `Broadcaster
-     *   mListenerLink` at `off_F5B66C`/`off_F5B670` (`mPrev`/`mNext`).
-     * - The instance is the broadcaster sink registered with the world camera
-     *   when `func_SetWorldCamera` (FUN_00871640) attaches the camera's
-     *   broadcaster lane to the singleton's sentinel.
+     *   `*off_F5B668` and self-links the inherited node at
+     *   `off_F5B66C`/`off_F5B670`.
+     * - The instance is the listener `func_SetWorldCamera` (FUN_00871640)
+     *   subscribes to the world camera's tracking ring.
      * - Atexit reset thunks (FUN_008715E0 / FUN_00871620) restore the base
      *   `Listener<SCameraTracking>` vtable and re-initialize the lane on
      *   teardown.
@@ -131,17 +130,12 @@ namespace moho
    * around their own ring, so the tracking events reach
    * `/lua/ui/game/tracking.lua:OnTrackUnit` for exactly one camera.
    *
-   * 0x00871640 open-codes `TDatList::ListLinkBefore` on the singleton's link:
-   * the unlink pair, the self-link reset, then the four-store insert ahead of
-   * the node at `camera+0x04`.
+   * 0x00871640 is `AddListener` inlined on the singleton: the unlink pair,
+   * the self-link reset, then the four-store insert ahead of the camera's
+   * ring at `camera+0x04`. The camera is not null-checked.
    */
   void func_SetWorldCamera(CameraImpl* const camera)
   {
-    if (camera == nullptr) {
-      return;
-    }
-
-    Broadcaster& listenerLink = GlobalCameraTrackingListener().mListenerLink;
-    (void)listenerLink.ListLinkBefore(CameraBroadcasterLink(camera));
+    camera->AddListener(&GlobalCameraTrackingListener());
   }
 } // namespace moho

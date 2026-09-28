@@ -31,6 +31,7 @@ namespace moho
 {
   class CD3DDepthStencil;
   class CD3DRenderTarget;
+  struct SD3DDeviceEvent;
   struct SD3DIndexRange;
   struct SD3DVertexRange;
   class CD3DDynamicTextureSheet;
@@ -98,7 +99,7 @@ namespace moho
    * does not exist in this tree. Only 3 of the interface's 53 pure slots are
    * modelled; the rest are simply not recovered yet.
    */
-  class CD3DDevice : public Broadcaster
+  class CD3DDevice : public Broadcaster<const SD3DDeviceEvent&>
   {
   public:
     /**

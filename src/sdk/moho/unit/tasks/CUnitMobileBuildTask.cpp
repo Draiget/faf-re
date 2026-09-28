@@ -140,17 +140,6 @@ namespace
     return type;
   }
 
-  [[nodiscard]] moho::Broadcaster* ResolveCommandEventBroadcaster(moho::CUnitCommand* const command)
-  {
-    if (command == nullptr) {
-      return nullptr;
-    }
-
-    // `CUnitCommand : CScriptObject, Broadcaster` - the event ring at +0x34 is
-    // the `Broadcaster` base subobject, not a lane to be found by offset.
-    return static_cast<moho::Broadcaster*>(command);
-  }
-
   [[nodiscard]] moho::CUnitCommand* ResolveQueueHeadCommand(moho::Unit* const unit)
   {
     if (unit == nullptr || unit->CommandQueue == nullptr || unit->CommandQueue->mCommandVec.empty()) {
@@ -234,7 +223,7 @@ namespace moho
    * placement/runtime weak-link state.
    */
   CUnitMobileBuildTask::CUnitMobileBuildTask()
-    : CCommandTaskWithListenerSlot()
+    : CCommandTask()
     , Listener<ECommandEvent>()
     , mBuildHelper()
     , mCommand(nullptr)
@@ -248,8 +237,6 @@ namespace moho
     , mBuildRect{}
     , mBuildSkirt{}
   {
-    mListenerPad = 0;
-    mListenerLink.ListResetLinks();
     mBuildUnit.ClearLinkState();
     mPendingBuildEntity.ClearLinkState();
   }
@@ -269,7 +256,7 @@ namespace moho
     const Wm3::Quatf& buildOrientation,
     const Wm3::Vector3f& buildDirection
   )
-    : CCommandTaskWithListenerSlot(dispatchTask)
+    : CCommandTask(dispatchTask)
     , Listener<ECommandEvent>()
     , mBuildHelper("MobileBuild", dispatchTask != nullptr ? dispatchTask->mUnit : nullptr)
     , mCommand(nullptr)
@@ -283,16 +270,12 @@ namespace moho
     , mBuildRect{}
     , mBuildSkirt{}
   {
-    mListenerPad = 0;
-    mListenerLink.ListResetLinks();
     mBuildUnit.ClearLinkState();
     mPendingBuildEntity.ClearLinkState();
 
     mCommand = ResolveQueueHeadCommand(mUnit);
     if (mCommand != nullptr) {
-      if (Broadcaster* const eventBroadcaster = ResolveCommandEventBroadcaster(mCommand); eventBroadcaster != nullptr) {
-        mListenerLink.ListLinkBefore(eventBroadcaster);
-      }
+      mCommand->AddListener(this);
     }
 
     mBuildPosition = ResolveBuildPlacementPosition(mSim, mBlueprint, mBuildPosition);
@@ -777,8 +760,8 @@ namespace moho
     mBuildUnit.UnlinkFromOwnerChain();
     mBuildUnit.ClearLinkState();
 
-    if (!mListenerLink.ListIsSingleton()) {
-      mListenerLink.ListUnlink();
+    if (!ListIsUnlinked()) {
+      ListUnlink();
     }
   }
 

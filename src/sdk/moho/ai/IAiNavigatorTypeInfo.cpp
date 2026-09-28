@@ -76,26 +76,20 @@ const char* IAiNavigatorTypeInfo::GetName() const
  *
  * What it does:
  * Registers the navigator-event broadcaster as a reflected base at offset 4.
- *
- * Our `IAiNavigator` models that sub-object as the `mListenerNode` member
- * rather than as a base class, but the layout is the one the binary has -
- * vptr at 0, the 8-byte broadcaster at 4, sizeof 0xC - so the reflected base
- * lands on the right bytes either way.
  */
 void IAiNavigatorTypeInfo::AddBase_Broadcaster_EAiNavigatorEvent(gpg::RType* const typeInfo)
 {
   static gpg::RType* sBroadcasterType = nullptr;
   if (!sBroadcasterType) {
-    sBroadcasterType = gpg::LookupRType(typeid(BroadcasterEventTag<EAiNavigatorEvent>));
+    sBroadcasterType = gpg::LookupRType(typeid(Broadcaster<EAiNavigatorEvent>));
   }
   gpg::AddBaseIfPresent(typeInfo, sBroadcasterType, 4);
 }
 
 void IAiNavigatorTypeInfo::Init()
 {
-  // 0x005A31F3 stores the literal 0x0C, which is `sizeof(IAiNavigator)` minus
-  // the trailing `mPad0C` slot the C++ model has to carry so that
-  // `CAiNavigatorImpl`'s CTask base lands at +0x10 (see IAiNavigator.h).
+  // 0x005A31F3 stores the literal 0x0C: `sizeof(IAiNavigator)` without the
+  // `mPad0C` slot (see IAiNavigator.h).
   size_ = 0x0C;
   gpg::RType::Init();
   AddBase_Broadcaster_EAiNavigatorEvent(this);

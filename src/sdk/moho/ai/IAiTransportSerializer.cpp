@@ -33,7 +33,7 @@ namespace
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::BroadcasterEventTag<moho::EAiTransportEvent>));
+      cached = gpg::LookupRType(typeid(moho::Broadcaster<moho::EAiTransportEvent>));
     }
     return cached;
   }
@@ -88,7 +88,7 @@ void IAiTransportSerializer::Deserialize(gpg::ReadArchive* const archive, const 
   }
 
   auto* const transport = reinterpret_cast<IAiTransport*>(static_cast<std::uintptr_t>(objectPtr));
-  auto* const broadcasterLane = static_cast<void*>(static_cast<Broadcaster*>(transport));
+  auto* const broadcasterLane = static_cast<void*>(static_cast<Broadcaster<EAiTransportEvent>*>(transport));
   ReadEAiTransportBroadcasterLane(broadcasterLane, archive);
 }
 
@@ -102,7 +102,7 @@ void IAiTransportSerializer::Serialize(gpg::WriteArchive* const archive, const i
   }
 
   auto* const transport = reinterpret_cast<const IAiTransport*>(static_cast<std::uintptr_t>(objectPtr));
-  auto* const broadcasterLane = static_cast<const void*>(static_cast<const Broadcaster*>(transport));
+  auto* const broadcasterLane = static_cast<const void*>(static_cast<const Broadcaster<EAiTransportEvent>*>(transport));
   WriteEAiTransportBroadcasterLane(broadcasterLane, archive);
 }
 

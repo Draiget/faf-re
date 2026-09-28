@@ -265,37 +265,6 @@ namespace
     return goal;
   }
 
-  void DispatchNavigatorEventList(TDatListItem<void, void>& listenerHead, const std::int32_t eventCode)
-  {
-    TDatList<void, void> pending{};
-    if (listenerHead.mNext == &listenerHead) {
-      return;
-    }
-
-    // Move current listeners to a temporary list first. This matches FUN_005A6C50
-    // behavior and keeps iteration stable even when callbacks relink listeners.
-    pending.mNext = listenerHead.mNext;
-    pending.mPrev = listenerHead.mPrev;
-    pending.mNext->mPrev = &pending;
-    pending.mPrev->mNext = &pending;
-    listenerHead.mNext = &listenerHead;
-    listenerHead.mPrev = &listenerHead;
-
-    while (pending.mNext != &pending) {
-      auto* const listenerNode = pending.pop_front();
-      if (!listenerNode) {
-        break;
-      }
-
-      listenerNode->ListLinkAfter(&listenerHead);
-
-      auto* const listener = TDatList<void, void>::owner_from_member_node<
-        IAiNavigatorEventListener,
-        &IAiNavigatorEventListener::mLink>(listenerNode);
-      listener->OnNavigatorEvent(eventCode);
-    }
-  }
-
   template <CScrLuaInitForm* (*Target)()>
   [[nodiscard]] CScrLuaInitForm* ForwardNavigatorLuaThunk() noexcept
   {
@@ -1529,7 +1498,7 @@ void CAiNavigatorImpl::AbortMove()
 {
   SetSpeedThroughGoal(false);
   if (NavigatorMakeIdle()) {
-    DispatchNavigatorEvent(AINAVEVENT_Aborted);
+    BroadcastEvent(AINAVEVENT_Aborted);
   }
 }
 
@@ -1538,7 +1507,7 @@ void CAiNavigatorImpl::AbortMove()
  */
 void CAiNavigatorImpl::BroadcastResumeTaskEvent()
 {
-  DispatchNavigatorEvent(AINAVEVENT_ResumeTask);
+  BroadcastEvent(AINAVEVENT_ResumeTask);
 }
 
 /**
@@ -1584,13 +1553,6 @@ bool CAiNavigatorImpl::NavigatorMakeIdle()
   return true;
 }
 
-/**
- * Address: 0x005A6C50 (FUN_005A6C50 helper call chain)
- */
-void CAiNavigatorImpl::DispatchNavigatorEvent(const std::int32_t eventCode)
-{
-  DispatchNavigatorEventList(mListenerNode, eventCode);
-}
 
 namespace
 {

@@ -6,6 +6,7 @@
 #include "moho/containers/TDatList.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/sim/SOCellPos.h"
+#include "moho/unit/Broadcaster.h"
 #include "Wm3Vector3.h"
 
 namespace gpg
@@ -40,32 +41,6 @@ namespace moho
     AINAVEVENT_Succeeded = 2,
     AINAVEVENT_ResumeTask = 3,
   };
-
-  /**
-   * Intrusive listener payload linked from IAiNavigator::mListenerNode.
-   *
-   * Evidence:
-   * - FUN_005A6C50 re-links each listener node, resolves owner at `node - 0x04`,
-   *   then invokes vtable slot 0 with one event code integer.
-   */
-  class IAiNavigatorEventListener
-  {
-  public:
-    /**
-     * Address: 0x005A6C50 (FUN_005A6C50 callback callsite)
-     *
-     * What it does:
-     * Receives one navigator event code from IAiNavigator listener dispatch.
-     */
-    virtual void OnNavigatorEvent(std::int32_t eventCode) = 0;
-
-    TDatListItem<void, void> mLink; // +0x04
-  };
-
-  static_assert(sizeof(IAiNavigatorEventListener) == 0x0C, "IAiNavigatorEventListener size must be 0x0C");
-  static_assert(
-    offsetof(IAiNavigatorEventListener, mLink) == 0x04, "IAiNavigatorEventListener::mLink offset must be 0x04"
-  );
 
   /**
    * Packed grid-cell path payload used by land navigation callbacks.
@@ -124,19 +99,24 @@ namespace moho
    * VFTABLE: 0x00E1BD9C
    * COL:  0x00E71FA8
    */
-  class IAiNavigator
+  class IAiNavigator : public Broadcaster<EAiNavigatorEvent>
   {
   public:
     /**
-     * Address: 0x005A2CF0 (FUN_005A2CF0, ??0IAiNavigator@Moho@@QAE@XZ)
+     * Address: 0x005A37D0 (FUN_005A37D0, `this` in EAX; zero callers, inlined
+     *   into every navigator constructor)
      *
      * What it does:
-     * Initializes IAiNavigator base state and resets `mListenerNode` to a
-     * self-linked singleton intrusive node.
+     * Self-links the listener ring (the `Broadcaster` base) and installs the
+     * interface vtable 0x00E1BD9C.
      */
-    IAiNavigator();
+    IAiNavigator() = default;
 
     /**
+     * Address: 0x005A2CF0 (FUN_005A2CF0, the body: IDA's label
+     *   `??0IAiNavigator` is wrong -- it installs the interface vtable and
+     *   then *unlinks* the ring's live links, which is the `Broadcaster`
+     *   base's destructor)
      * Address: 0x005A2D30 (FUN_005A2D30, scalar deleting thunk)
      *
      * VFTable SLOT: 0
@@ -331,34 +311,19 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    TDatListItem<void, void> mListenerNode; // +0x04
-
     /**
-     * Trailing slot at +0x0C that no `IAiNavigator` code ever touches: neither
-     * the interface ctor (0x005A2CF0, which writes only the vftable at +0x00
-     * and self-links `mListenerNode` at +0x04/+0x08) nor
-     * `CAiNavigatorImpl`'s ctor (0x005A33E0, same three stores inlined) ever
-     * initializes it. It exists because the shipped `CAiNavigatorImpl` puts
-     * its `CTask` base at **+0x10**, not +0x0C -- `lea esi, [ebp+10h]` at
-     * 0x005A3415, immediately before `mov [esi], offset ??_7CTask@Moho@@6B@`
-     * -- while `IAiNavigatorTypeInfo::Init` registers this interface's size as
-     * 0x0C (`mov dword ptr [esi+8], 0Ch` at 0x005A31F3), which is why
-     * `size_` below stays 0x0C rather than `sizeof(IAiNavigator)`.
-     *
-     * The slot used to be modelled as a separate 4-byte base
-     * (`CAiNavigatorImplLegacyPadBase`) declared between `IAiNavigator` and
-     * `CTask`. That does not survive a modern MSVC: it sorts non-polymorphic
-     * bases *after* every polymorphic one, so the pad landed at +0x58 and
-     * every base behind it slid down four bytes -- `CTask` to +0x0C and
-     * `CScriptObject` to +0x24, against the 0x10/0x28 the shipped
-     * `AddBase` calls register (0x005A7CBB, 0x005A7D1B). The reflection then
-     * subtracted 0x28 from a `CScriptObject*` that sat at +0x24, so every
-     * `SCR_FromLua_CAiNavigatorImpl` handed Lua a navigator pointer four
-     * bytes low and `navigator:AbortMove()` dispatched through a float.
-     * Carrying the slot here instead pins `CTask` at +0x10 with no base
-     * reordering to fight.
+     * +0x0C, never read or written by any `IAiNavigator` code: the interface
+     * constructor (0x005A37D0) stores only the vtable and self-links the ring,
+     * and `IAiNavigatorTypeInfo::Init` registers the size as 0x0C
+     * (0x005A31F3). The shipped `CAiNavigatorImpl` still puts its `CTask`
+     * base at +0x10 (`lea esi, [ebp+10h]` at 0x005A3415; `AddBase` stores
+     * 0x10 at 0x005A7CBB and 0x28 for `CScriptObject` at 0x005A7D1B):
+     * MSVC8 padded between the ring's trailing `boost::noncopyable` and
+     * `CTask`'s leading one. VS2022 does not pad there, so the slot is
+     * carried here, as `CTask` and `CScriptObject` carry their own
+     * `eboPadding` words.
      */
-    std::uint32_t mPad0C{0}; // +0x0C
+    std::uint32_t mPad0C;
   };
 
   /**
@@ -407,7 +372,7 @@ namespace moho
 
   // 0x10, not the 0x0C `IAiNavigatorTypeInfo::Init` registers: see `mPad0C`.
   static_assert(sizeof(IAiNavigator) == 0x10, "IAiNavigator size must be 0x10");
-  static_assert(offsetof(IAiNavigator, mListenerNode) == 0x04, "IAiNavigator::mListenerNode offset must be 0x04");
+  static_assert(offsetof(IAiNavigator, mListeners) == 0x04, "IAiNavigator::mListeners offset must be 0x04");
   static_assert(offsetof(IAiNavigator, mPad0C) == 0x0C, "IAiNavigator::mPad0C offset must be 0x0C");
 } // namespace moho
 

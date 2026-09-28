@@ -24,7 +24,7 @@ namespace moho
   class Entity;
   class Unit;
 
-  class CUnitCommandQueue : public Broadcaster
+  class CUnitCommandQueue : public Broadcaster<EUnitCommandQueueStatus>
   {
   public:
     /**

@@ -46,7 +46,7 @@ namespace
   }
 
   class CUnitRepairTaskReflectionView final
-    : public moho::CCommandTaskWithListenerSlot
+    : public moho::CCommandTask
     , public moho::Listener<moho::ECommandEvent>
   {
   public:
@@ -67,7 +67,7 @@ namespace
      * listener self-links, build-helper defaults, and weak-target slots.
      */
     CUnitRepairTaskReflectionView()
-      : CCommandTaskWithListenerSlot()
+      : CCommandTask()
       , Listener<moho::ECommandEvent>()
       , mBuildHelper()
       , mCommand(nullptr)
@@ -78,8 +78,6 @@ namespace
       , mGuardAssistMode(false)
       , mInheritingWork(false)
     {
-      mListenerPad = 0;
-      mListenerLink.ListResetLinks();
       mTargetUnit.ClearLinkState();
       mBuildTargetUnit.ClearLinkState();
     }

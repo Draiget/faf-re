@@ -97,10 +97,10 @@ void IAiAttackerTypeInfo::Init()
  */
 void IAiAttackerTypeInfo::AddBase_Broadcaster_EAiAttackerEvent(gpg::RType* const typeInfo)
 {
-  gpg::RType* baseType = Broadcaster_EAiAttackerEvent::sType;
+  gpg::RType* baseType = Broadcaster<EAiAttackerEvent>::sType;
   if (!baseType) {
-    baseType = gpg::LookupRType(typeid(Broadcaster_EAiAttackerEvent));
-    Broadcaster_EAiAttackerEvent::sType = baseType;
+    baseType = gpg::LookupRType(typeid(Broadcaster<EAiAttackerEvent>));
+    Broadcaster<EAiAttackerEvent>::sType = baseType;
   }
 
   if (typeInfo == nullptr || baseType == nullptr) {

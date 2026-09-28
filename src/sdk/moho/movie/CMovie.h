@@ -95,7 +95,7 @@ namespace moho
    *
    * Layout: `IMovie` is the primary base and contributes only its vptr at
    * +0x00, so the `Listener` subobject lands at +0x04 with its own vptr there
-   * and `mListenerLink` at +0x08 - the offsets the binary uses.
+   * and its `DListItem` node at +0x08 - the offsets the binary uses.
    */
   class CMovie : public IMovie, public Listener<const SD3DDeviceEvent&>
   {
@@ -327,7 +327,7 @@ namespace moho
     ) override;
 
   public:
-    // +0x04 vptr and +0x08 mListenerLink come from the Listener base above.
+    // +0x04 vptr and the +0x08 node come from the Listener base above.
     std::uint8_t mPlaybackEnabled = 0;   // +0x10
     std::uint8_t mReserved11_13[0x3]{};  // +0x11
     TextureSheetHandle mTextureSheet{};  // +0x14
@@ -344,7 +344,7 @@ namespace moho
     MwsfdPlaybackStateSubobj* mPly = nullptr; // +0x80
   };
 
-  static_assert(offsetof(CMovie, mListenerLink) == 0x08, "CMovie::mListenerLink offset must be 0x08");
+  static_assert(offsetof(CMovie, mPlaybackEnabled) == 0x10, "CMovie::mPlaybackEnabled offset must be 0x10");
   static_assert(offsetof(CMovie, mTextureSheet) == 0x14, "CMovie::mTextureSheet offset must be 0x14");
   static_assert(offsetof(CMovie, mSubtitleBuffer) == 0x1C, "CMovie::mSubtitleBuffer offset must be 0x1C");
   static_assert(offsetof(CMovie, mWorkbuffer) == 0x2C, "CMovie::mWorkbuffer offset must be 0x2C");

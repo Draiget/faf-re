@@ -158,26 +158,6 @@ namespace
   constexpr float kPatrolLegMinLength = 0.001f;
 
   /**
-   * Returns the formation-status broadcaster ring head embedded in an
-   * `IFormationInstance`. Mirrors `NavigatorListenerHead` in CUnitMoveTask: the
-   * instance stores its self-linked `Broadcaster` node immediately after the
-   * interface vtable pointer (binary `formationInstance + 0x04`; the interface's
-   * own ctor FUN_00569450 self-links it). The recovered header models
-   * `IFormationInstance` as vtable-only, so the typed ring head is recovered
-   * through this narrow accessor rather than an inline offset in the ctor body.
-   */
-  [[nodiscard]] moho::Broadcaster* FormationStatusBroadcasterHead(
-    moho::IFormationInstance* const formationInstance
-  ) noexcept
-  {
-    if (formationInstance == nullptr) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::Broadcaster*>(reinterpret_cast<char*>(formationInstance) + sizeof(void*));
-  }
-
-  /**
    * Resolves the queue-head (`front == true`) or queue-tail command from the
    * owner unit's command queue, returning null when the queue is empty or the
    * weak slot is expired. Mirrors the binary's `_Myfirst`/`_Mylast` guard plus
@@ -222,9 +202,7 @@ namespace moho
    */
   CUnitPatrolTask::CUnitPatrolTask() noexcept
     : CCommandTask()
-    , CUnitPatrolTaskCommandSlot()
     , Listener<ECommandEvent>()
-    , CUnitPatrolTaskReservedSlot()
     , Listener<EFormationdStatus>()
     , mDispatch(nullptr)
     , mBoundCommand(nullptr)
@@ -269,9 +247,7 @@ namespace moho
     const bool inFormation
   )
     : CCommandTask(dispatchTask)
-    , CUnitPatrolTaskCommandSlot()
     , Listener<ECommandEvent>()
-    , CUnitPatrolTaskReservedSlot()
     , Listener<EFormationdStatus>()
     , mDispatch(static_cast<IAiCommandDispatchImpl*>(dispatchTask))
     , mBoundCommand(nullptr)
@@ -302,20 +278,14 @@ namespace moho
 
     // Resolve the queue-head command and store it as the bound patrol command
     // (binary `this + 0x54`, the command the search-box builder later reads as
-    // the leg-start). The binary leaves `mFirstCommand` (+0x30) untouched here;
-    // we initialized it to null above.
+    // the leg-start).
     CUnitCommandQueue* const commandQueue = unit->CommandQueue;
     CUnitCommand* const frontCommand = ResolvePatrolQueueCommand(commandQueue, /*front=*/true);
     mBoundCommand = frontCommand;
 
-    // Splice the command-event listener node into the front command's
-    // broadcaster ring (the command derives Broadcaster at offset 0). When the
-    // queue is empty the binary splices before a null head; here the ring head
-    // falls back to the node's own self-linked broadcaster to stay well-defined.
-    Broadcaster* const commandBroadcasterHead = (frontCommand != nullptr)
-      ? static_cast<Broadcaster*>(frontCommand)
-      : &this->Listener<ECommandEvent>::mListenerLink;
-    Listener<ECommandEvent>::mListenerLink.ListLinkBefore(commandBroadcasterHead);
+    // Subscribe to the front command's events. The command is not
+    // null-checked: 0x0061AF57 adds 0x34 to whatever the queue returned.
+    frontCommand->AddListener(this);
 
     // Link the per-army membership node into the sim entity DB's registered-set
     // list (binary `mUnit->mSim->mEntityDB + 0x18`).
@@ -324,11 +294,11 @@ namespace moho
 
     // When a formation instance is bound, splice the formation-status listener
     // into that instance's broadcaster ring.
+    // The ring is `IFormationInstance`'s `Broadcaster` base at +0x08
+    // (0x0061AFC4); the tree used to link at +0x04, over the instance's
+    // `CountedObject` reference count.
     if (mFormationInstance != nullptr) {
-      if (Broadcaster* const formationHead = FormationStatusBroadcasterHead(mFormationInstance);
-          formationHead != nullptr) {
-        Listener<EFormationdStatus>::mListenerLink.ListLinkBefore(formationHead);
-      }
+      mFormationInstance->AddListener(this);
     }
 
     // Refresh navigator speed-through state when the unit still has a navigator.
@@ -385,7 +355,7 @@ namespace moho
   {
     // (1) Unconditionally unlink the command-event listener lane
     // (0x0061B17A: splice prev/next, then self-relink the node).
-    Listener<ECommandEvent>::mListenerLink.ListUnlink();
+    Listener<ECommandEvent>::ListUnlink();
 
     // (2) Navigator branch: stop honoring the formation, and abort the active
     // move when the unit's current and previous positions differ
@@ -401,7 +371,7 @@ namespace moho
     // (3) Formation-status listener lane: unlink only when a formation instance
     // is bound (0x0061B1CF: `cmp [esi+58h], 0`).
     if (mFormationInstance != nullptr) {
-      Listener<EFormationdStatus>::mListenerLink.ListUnlink();
+      Listener<EFormationdStatus>::ListUnlink();
     }
 
     // (4) Clear the two patrol move-state bits on the owner unit

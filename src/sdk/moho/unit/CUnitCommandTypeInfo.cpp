@@ -250,7 +250,7 @@ namespace moho
   {
     gpg::RType* baseType = register_Broadcaster_ECommandEvent_RType();
     if (!baseType) {
-      baseType = gpg::LookupRType(typeid(BroadcasterEventTag<ECommandEvent>));
+      baseType = gpg::LookupRType(typeid(Broadcaster<ECommandEvent>));
     }
 
     if (!baseType) {

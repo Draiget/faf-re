@@ -36,6 +36,7 @@ namespace moho
   class Listener;
   template <class TEvent>
   class ManyToOneListener;
+  template <class TEvent>
   class Broadcaster;
 
   enum EFormationdStatus : std::int32_t;
@@ -1560,7 +1561,7 @@ namespace gpg
    */
   moho::Listener<const moho::SNavPath&>* ReadAndLinkNavPathListeners(
     ReadArchive* archive,
-    moho::Broadcaster* listHead,
+    moho::Broadcaster<const moho::SNavPath&>* listHead,
     int version,
     const gpg::RRef* ownerRef
   );

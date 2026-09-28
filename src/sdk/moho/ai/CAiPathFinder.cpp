@@ -391,7 +391,7 @@ namespace
         {"Broadcaster<Moho::NavPath const &>", "Moho::Broadcaster<Moho::NavPath const &>", "Broadcaster"}
       );
       if (!gBroadcasterNavPathType) {
-        gBroadcasterNavPathType = gpg::LookupRType(typeid(Broadcaster));
+        gBroadcasterNavPathType = gpg::LookupRType(typeid(Broadcaster<const SNavPath&>));
       }
     }
     return gBroadcasterNavPathType;
@@ -569,30 +569,18 @@ namespace
 namespace
 {
   /**
-   * container_of: recover the owning `Listener<const SNavPath&>` from its
-   * intrusive `mListenerLink` node (`mListenerLink` sits at +0x04 in Listener),
-   * mirroring the `node - 4` recovery in FUN_00763940.
-   */
-  [[nodiscard]] moho::Listener<const moho::SNavPath&>* NavPathListenerFromLink(moho::Broadcaster* const link) noexcept
-  {
-    return reinterpret_cast<moho::Listener<const moho::SNavPath&>*>(
-      reinterpret_cast<char*>(link) - offsetof(moho::Listener<const moho::SNavPath&>, mListenerLink)
-    );
-  }
-
-  /**
    * Address: 0x00763940 (FUN_00763940)
    *
    * What it does:
    * Serializes the broadcaster's `Listener<const SNavPath&>` ring as a
    * null-terminated sequence of unowned tracked pointers: walk from
-   * `listHead->mNext` back to the `Broadcaster` sentinel, writing each listener
+   * the front of the ring back to the head, writing each listener
    * (via `RRef_Listener_NavPath` + `WriteRawPointer`), then write one
    * null-listener terminator. Bound as `serSaveFunc_`; `version` is unused.
    */
   void WriteNavPathListeners(
     gpg::WriteArchive* const archive,
-    moho::Broadcaster* const listHead,
+    moho::Broadcaster<const moho::SNavPath&>* const listHead,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -602,9 +590,7 @@ namespace
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (auto* node = listHead->mNext; node != listHead; node = node->mNext) {
-      moho::Listener<const moho::SNavPath&>* const listener =
-        node ? NavPathListenerFromLink(static_cast<moho::Broadcaster*>(node)) : nullptr;
+    for (moho::Listener<const moho::SNavPath&>* const listener : listHead->mListeners.owners()) {
       gpg::RRef ref{};
       gpg::RRef_Listener_NavPath(&ref, listener);
       gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Unowned, owner);
@@ -710,12 +696,12 @@ moho::RBroadcasterRType_NavPath::~RBroadcasterRType_NavPath() = default;
  * Address: 0x00763F50 (FUN_00763F50, preregister_RBroadcasterRType_NavPath)
  *
  * What it does:
- * Constructs/preregisters RTTI metadata for `moho::Broadcaster`.
+ * Constructs/preregisters RTTI metadata for `Broadcaster<NavPath const&>`.
  */
 [[nodiscard]] gpg::RType* preregister_RBroadcasterRType_NavPath()
 {
   static RBroadcasterRType_NavPath typeInfo;
-  gpg::PreRegisterRType(typeid(Broadcaster), &typeInfo);
+  gpg::PreRegisterRType(typeid(Broadcaster<const SNavPath&>), &typeInfo);
   return &typeInfo;
 }
 
@@ -785,7 +771,6 @@ gpg::RType* CAiPathFinder::sType = nullptr;
  */
 CAiPathFinder::CAiPathFinder()
   : IPathTraveler()
-  , Broadcaster()
   , mIsGoalBoundaryBlocked(0)
   , mIsQueuedOnPathQueue(0)
   , mUseGoalBoundaryProbe(0)
@@ -814,7 +799,6 @@ CAiPathFinder::CAiPathFinder()
 {
   mPathQueueNode.mPrev = &mPathQueueNode;
   mPathQueueNode.mNext = &mPathQueueNode;
-  static_cast<Broadcaster*>(this)->ListResetLinks();
 
   mRecentSearchRects.mAllocatorOrProxy = nullptr;
   mRecentSearchRects.mHead = AllocateRectSentinel();
@@ -1161,7 +1145,7 @@ void CAiPathFinder::OnPathAccepted(const SNavPath& path)
   mHasPathResult = 1;
   mIsQueuedOnPathQueue = 0;
   mResultCell = LastPathCell(path);
-  static_cast<Broadcaster*>(this)->BroadcastEvent(path);
+  BroadcastEvent(path);
 }
 
 /**
@@ -1233,7 +1217,7 @@ void CAiPathFinder::OnPathRejected(const SNavPath& path)
   mHasPathResult = 0;
   mIsQueuedOnPathQueue = 0;
   mResultCell = LastPathCell(path);
-  static_cast<Broadcaster*>(this)->BroadcastEvent(path);
+  BroadcastEvent(path);
 }
 
 /**
@@ -1282,7 +1266,7 @@ void CAiPathFinder::MemberDeserialize(gpg::ReadArchive* const archive, const int
   const gpg::RRef owner{};
 
   if (gpg::RType* const broadcasterType = CachedBroadcasterNavPathType()) {
-    archive->Read(broadcasterType, static_cast<Broadcaster*>(this), owner);
+    archive->Read(broadcasterType, static_cast<Broadcaster<const SNavPath&>*>(this), owner);
   }
 
   bool boolValue = false;
@@ -1358,7 +1342,7 @@ void CAiPathFinder::MemberSerialize(gpg::WriteArchive* const archive, const int)
   const gpg::RRef owner{};
 
   if (gpg::RType* const broadcasterType = CachedBroadcasterNavPathType()) {
-    archive->Write(broadcasterType, static_cast<const Broadcaster*>(this), owner);
+    archive->Write(broadcasterType, static_cast<const Broadcaster<const SNavPath&>*>(this), owner);
   }
 
   archive->WriteBool(mIsGoalBoundaryBlocked != 0u);
@@ -1450,27 +1434,6 @@ void CAiPathFinder::PushRectHistory(const gpg::Rect2i& rect)
   head->next->prev = node;
   head->next = node;
   ++mRecentSearchRects.mSize;
-}
-
-/**
- * Address: 0x005AAD80 (FUN_005AAD80,
- * ?BroadcastEvent@?$Broadcaster@ABUSNavPath@Moho@@@Moho@@IAEXABUSNavPath@2@@Z)
- *
- * IDA signature:
- * int callcnv_F3 sub_5AAD80@<eax>(SNavPath* event@<edi>, Broadcaster* this@<esi>);
- *
- * What it does:
- * Broadcasts one navigation-path payload to every linked path listener. The
- * whole listener ring is detached into a local sentinel first; each detached
- * node is then relinked directly after the live head and its owning
- * CAiPathNavigator receives OnEvent(event). Detaching before dispatch keeps
- * iteration safe when a listener unlinks/relinks itself inside the callback.
- * Same intrusive-broadcast shape as Broadcaster::BroadcastEvent(ECommandEvent)
- * (FUN_006E94A0), distinct per-T body (not ICF-folded).
- */
-void moho::Broadcaster::BroadcastEvent(const SNavPath& event)
-{
-  DispatchToListeners<CAiPathNavigator>(event);
 }
 
 void CAiPathFinder::UpdatePlayableRectGate()

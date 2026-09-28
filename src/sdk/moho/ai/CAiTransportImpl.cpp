@@ -466,32 +466,6 @@ namespace
   }
 
   /**
-   * Address: 0x005E8A30 (FUN_005E8A30, sub_5E8A30)
-   *
-   * What it does:
-   * Broadcasts one transport event to intrusive listeners while preserving
-   * safe iteration semantics when listeners mutate registration.
-   */
-  void BroadcastTransportEvent(IAiTransport& transport, const EAiTransportEvent event)
-  {
-    Broadcaster* const head = static_cast<Broadcaster*>(&transport);
-    if (!head || head->ListIsSingleton()) {
-      return;
-    }
-
-    Broadcaster pending{};
-    head->move_nodes_to(pending);
-
-    while (auto* pendingNode = pending.pop_front()) {
-      auto* const node = static_cast<Broadcaster*>(pendingNode);
-      head->push_back(node);
-      if (auto* const listener = IAiTransportEventListener::FromListenerLink(node)) {
-        listener->OnTransportEvent(event);
-      }
-    }
-  }
-
-  /**
    * Address: 0x005E3ED0 (FUN_005E3ED0, sub_5E3ED0)
    *
    * What it does:
@@ -1561,7 +1535,7 @@ void CAiTransportImpl::AttachUnitToBone(
   if (transportBone) {
     mUnit->RunScriptStringUnit("OnTransportAttach", transportBone->mBoneName, unit);
   }
-  BroadcastTransportEvent(*this, AITRANSPORTEVENT_Load);
+  BroadcastEvent(AITRANSPORTEVENT_Load);
 }
 
 /**
@@ -1645,7 +1619,7 @@ bool CAiTransportImpl::TransportDetachUnit(Unit* const unit)
   if (detachedBone) {
     mUnit->RunScriptStringUnit("OnTransportDetach", detachedBone->mBoneName, unit);
   }
-  BroadcastTransportEvent(*this, AITRANSPORTEVENT_Unload);
+  BroadcastEvent(AITRANSPORTEVENT_Unload);
 
   if (unit->AiNavigator) {
     unit->AiNavigator->AbortMove();

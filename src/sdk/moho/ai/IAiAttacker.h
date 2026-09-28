@@ -35,27 +35,18 @@ namespace moho
   struct SWeakRefSlot;
 
   /**
-   * Broadcaster subobject used by `IAiAttacker` event-dispatch lists.
-   *
-   * Evidence:
-   * - `FUN_005DE870` (`IAiAttackerTypeInfo::AddBase_Broadcaster_EAiAttackerEvent`)
+   * RTTI: `Broadcaster<EAiAttackerEvent>` at +0x04, the ring the attack and
+   * melee tasks subscribe to.
    */
-  class Broadcaster_EAiAttackerEvent : public Broadcaster
-  {
-  public:
-    static gpg::RType* sType;
-  };
-
-  static_assert(sizeof(Broadcaster_EAiAttackerEvent) == 0x08, "Broadcaster_EAiAttackerEvent size must be 0x08");
-
-  class IAiAttacker
+  class IAiAttacker : public Broadcaster<EAiAttackerEvent>
   {
   public:
     /**
      * Address: 0x005D6A80 (FUN_005D6A80)
      *
      * What it does:
-     * Installs the interface vtable and self-links the listener ring.
+     * Installs the interface vtable; the `Broadcaster` base self-links the
+     * listener ring.
      */
     IAiAttacker();
 
@@ -64,7 +55,7 @@ namespace moho
      * Address: 0x005D56D0 (FUN_005D56D0)
      *
      * What it does:
-     * Unlinks the listener ring (the member's destructor) and, in the deleting
+     * Unlinks the listener ring (the base's destructor) and, in the deleting
      * form, frees the object.
      */
     virtual ~IAiAttacker();
@@ -105,9 +96,6 @@ namespace moho
     virtual void TransmitBeamImpactEvent(UnitWeapon* weapon, CollisionBeamEntity* beam) = 0;    // slot 26
     virtual void ForceEngage(Entity* target) = 0;                                     // slot 27
     virtual void PushStack(LuaPlus::LuaState* luaState) = 0;                          // slot 28
-
-  public:
-    Broadcaster_EAiAttackerEvent mListeners; // +0x04
 
   public:
     static gpg::RType* sType;

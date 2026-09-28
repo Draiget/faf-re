@@ -98,27 +98,6 @@ namespace
     return type;
   }
 
-  struct CUnitCommandCommandEventLinkView
-  {
-    std::uint8_t pad_0000_0034[0x34];
-    moho::Broadcaster mCommandEventListenerHead;
-  };
-
-  static_assert(
-    offsetof(CUnitCommandCommandEventLinkView, mCommandEventListenerHead) == 0x34,
-    "CUnitCommandCommandEventLinkView::mCommandEventListenerHead offset must be 0x34"
-  );
-
-  [[nodiscard]] moho::Broadcaster* CommandEventListenerHead(moho::CUnitCommand* const command) noexcept
-  {
-    if (!command) {
-      return nullptr;
-    }
-
-    auto* const view = reinterpret_cast<CUnitCommandCommandEventLinkView*>(command);
-    return &view->mCommandEventListenerHead;
-  }
-
   void WakeTaskThreadForImmediateTick(moho::CTaskThread* const ownerThread)
   {
     if (ownerThread == nullptr) {
@@ -142,13 +121,11 @@ namespace moho
    * null current-command pointer, and cleared weak target lane.
    */
   CUnitSacrificeTask::CUnitSacrificeTask()
-    : CCommandTaskWithListenerSlot()
+    : CCommandTask()
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetUnit{}
   {
-    mListenerPad = 0;
-    mListenerLink.ListResetLinks();
     mTargetUnit.ownerLinkSlot = nullptr;
     mTargetUnit.nextInOwner = nullptr;
   }
@@ -161,19 +138,17 @@ namespace moho
    * payload ownership context.
    */
   CUnitSacrificeTask::CUnitSacrificeTask(CCommandTask* const parentTask, Unit* const targetUnit)
-    : CCommandTaskWithListenerSlot(parentTask)
+    : CCommandTask(parentTask)
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetUnit{}
   {
-    mListenerPad = 0;
-    mListenerLink.ListResetLinks();
     mTargetUnit.ResetFromObject(targetUnit);
 
     if (mUnit != nullptr && mUnit->CommandQueue != nullptr) {
       mCommand = mUnit->CommandQueue->GetCurrentCommand();
-      if (Broadcaster* const commandListenerHead = CommandEventListenerHead(mCommand); commandListenerHead != nullptr) {
-        mListenerLink.ListLinkBefore(commandListenerHead);
+      if (mCommand != nullptr) {
+        mCommand->AddListener(this);
       }
     }
   }
@@ -191,7 +166,7 @@ namespace moho
    */
   CUnitSacrificeTask::~CUnitSacrificeTask()
   {
-    mListenerLink.ListUnlink();
+    ListUnlink();
 
     if (mUnit != nullptr) {
       mUnit->UnitStateMask &= ~(1ull << UNITSTATE_Repairing);

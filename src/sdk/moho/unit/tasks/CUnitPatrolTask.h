@@ -26,30 +26,6 @@ namespace moho
   class IFormationInstance;
 
   /**
-   * Layout-only carrier for the `CUnitCommand*` slot that sits between
-   * `CCommandTask` and the first `Listener<T>` base (complete-object +0x30).
-   * Multiple inheritance lays out non-virtual bases back-to-back in
-   * declaration order, so this 4-byte base positions
-   * `Listener<ECommandEvent>` at exactly +0x34.
-   */
-  struct CUnitPatrolTaskCommandSlot
-  {
-    CUnitCommand* mFirstCommand = nullptr; // +0x00 (complete-object +0x30)
-  };
-  static_assert(sizeof(CUnitPatrolTaskCommandSlot) == 0x04, "CUnitPatrolTaskCommandSlot size must be 0x04");
-
-  /**
-   * Layout-only carrier for the reserved dword between the two `Listener<T>`
-   * bases (complete-object +0x40), positioning `Listener<EFormationdStatus>`
-   * at exactly +0x44.
-   */
-  struct CUnitPatrolTaskReservedSlot
-  {
-    std::uint32_t mReserved40 = 0u; // +0x00 (complete-object +0x40)
-  };
-  static_assert(sizeof(CUnitPatrolTaskReservedSlot) == 0x04, "CUnitPatrolTaskReservedSlot size must be 0x04");
-
-  /**
    * Runtime owner for the patrol/target command task.
    *
    * Layout recovered from the two constructors (default `FUN_0061B0B0`,
@@ -65,9 +41,7 @@ namespace moho
    */
   class CUnitPatrolTask
     : public CCommandTask
-    , public CUnitPatrolTaskCommandSlot
     , public Listener<ECommandEvent>
-    , public CUnitPatrolTaskReservedSlot
     , public Listener<EFormationdStatus>
   {
   public:
@@ -277,12 +251,10 @@ namespace moho
     void RecomputePatrolSearchBox();
 
   public:
-    // --- Derived fields (replace the former opaque mPadding[0xF0]) ---
-    //
-    // 0x30 (mFirstCommand), 0x34 (Listener<ECommandEvent>), 0x40 (reserved),
-    // and 0x44 (Listener<EFormationdStatus>) now come from the base-class
-    // chain declared above - see CUnitPatrolTaskCommandSlot,
-    // CUnitPatrolTaskReservedSlot, and the two Listener<T> bases.
+    // `Listener<ECommandEvent>` is at 0x34 and `Listener<EFormationdStatus>`
+    // at 0x44; the four bytes before each are the compiler's (a base that
+    // starts with an empty `boost::noncopyable` is padded away from a
+    // preceding base that ends with one).
 
     // 0x50: dispatch owner used to issue refuel/reclaim/attack/repair sub-tasks.
     IAiCommandDispatchImpl* mDispatch;
@@ -322,17 +294,6 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitPatrolTask) == 0xF0, "CUnitPatrolTask size must be 0xF0");
-  // The four-base chain (CCommandTask + CommandSlot + Listener<ECommandEvent>
-  // + ReservedSlot + Listener<EFormationdStatus>) must land mDispatch, the
-  // first genuinely non-standard-layout member, at exactly +0x50 - offsetof
-  // on a member from a non-first base is not portable, so this checks the
-  // running byte total the same way instead.
-  static_assert(
-    sizeof(CCommandTask) + sizeof(CUnitPatrolTaskCommandSlot) + sizeof(Listener<ECommandEvent>)
-        + sizeof(CUnitPatrolTaskReservedSlot) + sizeof(Listener<EFormationdStatus>)
-      == 0x50,
-    "CUnitPatrolTask base-class chain must total 0x50 bytes"
-  );
   static_assert(offsetof(CUnitPatrolTask, mDispatch) == 0x50, "CUnitPatrolTask::mDispatch offset must be 0x50");
   static_assert(
     offsetof(CUnitPatrolTask, mBoundCommand) == 0x54, "CUnitPatrolTask::mBoundCommand offset must be 0x54"

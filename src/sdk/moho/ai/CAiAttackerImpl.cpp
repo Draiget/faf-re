@@ -506,32 +506,6 @@ namespace
 } // namespace
 
 /**
- * Address: 0x005DB480 (FUN_005DB480,
- * `Broadcaster<EAiAttackerEvent>::BroadcastEvent`)
- *
- * IDA signature:
- * void __usercall sub_5DB480(Broadcaster *this@<esi>, EAiAttackerEvent event@<edi>);
- *
- * What it does:
- * Broadcasts one attacker event to all linked listeners. Defined here because
- * this is where the `Listener<EAiAttackerEvent>` overrides its slot-0 dispatch
- * resolves to live; the ring mechanic itself is `DispatchToListeners`
- * (moho/unit/Broadcaster.h), shared with the four sibling event types.
- *
- * This was a free `BroadcastAiAttackerEvent(CAiAttackerImpl*, EAiAttackerEvent)`
- * in this file's anonymous namespace, taking the attacker rather than the ring
- * and carrying its own copy of the detach/dispatch/relink loop. The lost
- * database left 0x005DB480 unnamed, but it is byte-shaped identically to the
- * four named `?BroadcastEvent@?$Broadcaster@...` emissions and is reached the
- * same way -- as `mListeners` on the attacker -- from `SetState` (0x005D7320),
- * `SetDesiredTarget` (0x005D75B0) and `ForceEngage` (0x005D8650).
- */
-void moho::Broadcaster::BroadcastEvent(const EAiAttackerEvent event)
-{
-  DispatchToListeners<Listener<EAiAttackerEvent>>(event);
-}
-
-/**
  * Address: 0x005D6BC0 (FUN_005D6BC0, Moho::CAiAttackerImpl::~CAiAttackerImpl
  *   real dtor body; the scalar deleting dtor at 0x005D6A60 forwards into it,
  *   and 0x005E2330 adjusts from the `CScriptObject` subobject into 0x005D6A60).
@@ -790,7 +764,7 @@ void CAiAttackerImpl::SetDesiredTarget(CAiTarget* const target)
 
   if (view->mReportingState != static_cast<EAiAttackerEvent>(0)) {
     view->mReportingState = kAiAttackerEventCannotTarget;
-    mListeners.BroadcastEvent(kAiAttackerEventCannotTarget);
+    BroadcastEvent(kAiAttackerEventCannotTarget);
   }
 }
 
@@ -1542,7 +1516,7 @@ void CAiAttackerImpl::ForceEngage(Entity* const target)
   }
 
   view->mUnit->NeedSyncGameData = true;
-  mListeners.BroadcastEvent(kAiAttackerEventCanTarget);
+  BroadcastEvent(kAiAttackerEventCanTarget);
 }
 
 gpg::RType* CAiAttackerImpl::sType = nullptr;
@@ -1624,7 +1598,7 @@ void CAiAttackerImpl::SetState(const State state)
   const auto stateValue = static_cast<std::int32_t>(state);
   if (stateValue != static_cast<std::int32_t>(view->mReportingState)) {
     view->mReportingState = static_cast<EAiAttackerEvent>(stateValue);
-    mListeners.BroadcastEvent(static_cast<EAiAttackerEvent>(stateValue));
+    BroadcastEvent(static_cast<EAiAttackerEvent>(stateValue));
   }
 }
 

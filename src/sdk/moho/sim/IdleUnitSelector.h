@@ -22,22 +22,17 @@ namespace moho
    *   VTABLE_CONFIRMED: the static-init constructor FUN_00865490 writes
    *   both vtable pointers into the same process-global instance
    *   (`off_10C4408` = primary at complete-object +0x00, `off_10C440C` =
-   *   secondary at +0x04), and independently self-links
-   *   `Listener<SSelectionEvent>::mListenerLink` at +0x08/+0x0C - both
-   *   confirming the secondary subobject starts at complete-object +0x04,
-   *   exactly matching `Listener<T>`'s own 0x0C-byte shape (vtable at
-   *   subobject-relative +0x00, `mListenerLink` at subobject-relative
-   *   +0x04). `FUN_008656A0`/`FUN_008656E0` (dispatched through the
-   *   *primary*, unadjusted vtable) independently confirm the same
-   *   `mListenerLink` storage by reading/writing complete-object +0x08/+0x0C
-   *   directly from the unadjusted `this`.
-   * - `boost::noncopyable_::noncopyable` mixin: constructed once as a
-   *   process-global instance (matches the sibling listener singletons).
+   *   secondary at +0x04), and independently self-links the listener's
+   *   node at +0x08/+0x0C - the secondary subobject starts at +0x04, with
+   *   `Listener<T>`'s own shape (vtable, then its `DListItem` node).
+   *   `FUN_008656A0`/`FUN_008656E0` (dispatched through the *primary*,
+   *   unadjusted vtable) read and write that node at complete-object
+   *   +0x08/+0x0C directly.
    *
    * Object layout:
    *   +0x00 ISessionListener vftable
    *   +0x04 Listener<SSelectionEvent> vftable
-   *   +0x08 Broadcaster mListenerLink (Listener<SSelectionEvent> subobject)
+   *   +0x08 the listener node (Listener<SSelectionEvent>'s DListItem)
    *   +0x10 mIdleSet (SSelectionSetUserEntity, own field)
    * Complete-object size 0x20.
    *
@@ -58,7 +53,6 @@ namespace moho
   class IdleUnitSelector
     : public ISessionListener
     , public Listener<SSelectionEvent>
-    , boost::noncopyable_::noncopyable
   {
     // Primary vftable (ISessionListener, 2 entries)
   public:
@@ -83,8 +77,8 @@ namespace moho
      * Tears the idle-set tree down completely (full-range erase plus
      * `operator delete` on the head sentinel, matching
      * `DestroyWeakEntitySet`) and unlinks this node from whatever
-     * session-listener lane it is still attached to, leaving
-     * `mListenerLink` self-linked.
+     * session-listener lane it is still attached to, leaving the node
+     * self-linked.
      *
      * The binary calls this through a compiler-generated, argument-less
      * "destroy this one static object" thunk (`FUN_00C07510`) registered
@@ -104,7 +98,7 @@ namespace moho
      * What it does:
      * Re-links this listener node into the provided session-listener lane.
      */
-    void AttachToSessionListenerLane(void* laneContext) override;
+    void AttachToSessionListenerLane(CWldSession* session) override;
 
     /**
      * Address: 0x008656E0 (FUN_008656E0)
@@ -113,7 +107,7 @@ namespace moho
      * What it does:
      * Unlinks this listener node from its current session-listener lane.
      */
-    void DetachFromSessionListenerLane(void* laneContext) override;
+    void DetachFromSessionListenerLane(CWldSession* session) override;
 
     // Secondary vftable (Listener<SSelectionEvent>, 1 entry)
   public:

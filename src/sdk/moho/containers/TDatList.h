@@ -164,9 +164,6 @@ namespace moho
      *   what places it on this base. Formerly `UnlinkPeerListHead` in
      *   moho/net/CLobby.cpp, written into the ctor and dtor bodies (RULE ONE),
      *   removed 2026-09-28.)
-     * Address: 0x00447470 (FUN_00447470 -- `DeviceExitListener::mDeviceLink`'s
-     *   emission; formerly `UnlinkAndResetDeviceListenerLink`, called from a
-     *   `~DeviceExitListener` that also freed itself.)
      * Address: 0x00484B00 (FUN_00484B00 -- `CNetTCPConnector::mPartials`';
      *   formerly `ResetPartialListHead`, called from the destructor body.)
      * Address: 0x004A9B30 (FUN_004A9B30 -- `PrefetchRequestRuntime::

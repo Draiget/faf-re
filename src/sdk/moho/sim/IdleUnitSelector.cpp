@@ -32,12 +32,10 @@ namespace moho
    *
    * What it does:
    * Tears `mIdleSet` down completely - full-range erase followed by
-   * `operator delete` on the head sentinel - then unlinks
-   * `mListenerLink` from its current session-listener lane, leaving it
-   * self-linked. Both the tree teardown and the link-unlink are hand-written
-   * (`WeakEntitySetUserEntity`/`Broadcaster`/`TDatList` have no destructors
-   * of their own that would do this implicitly), so this is a real,
-   * explicit `~IdleUnitSelector()` body, not compiler-generated glue.
+   * `operator delete` on the head sentinel - then unlinks the listener node
+   * from its current session-listener lane, leaving it self-linked. The
+   * tree teardown is this body; the unlink is the `Listener` base's
+   * destructor.
    *
    * The binary reaches this destructor through a compiler-generated,
    * argument-less thunk (`FUN_00C07510`, `void sub_C07510() { sub_865780();
@@ -59,16 +57,12 @@ namespace moho
    * Address: 0x008656A0 (FUN_008656A0)
    *
    * What it does:
-   * Detaches this idle-selector listener node from its current lane and
-   * reinserts it immediately before the provided lane anchor. Operates on
-   * `Listener<SSelectionEvent>::mListenerLink`, inherited at complete-object
-   * +0x08 - confirmed by reading/writing that exact offset from the
-   * unadjusted (primary-vtable) `this` in the binary.
+   * Subscribes this listener to the session's selection broadcaster
+   * (`session + 0x00`); the node is at complete-object +0x08.
    */
-  void IdleUnitSelector::AttachToSessionListenerLane(void* const laneContext)
+  void IdleUnitSelector::AttachToSessionListenerLane(CWldSession* const session)
   {
-    auto* const laneAnchor = static_cast<Broadcaster*>(laneContext);
-    this->mListenerLink.ListLinkBefore(laneAnchor);
+    session->mSelectionBroadcaster.AddListener(this);
   }
 
   /**
@@ -78,10 +72,9 @@ namespace moho
    * Detaches this idle-selector listener node from its current lane and
    * leaves it self-linked.
    */
-  void IdleUnitSelector::DetachFromSessionListenerLane(void* const laneContext)
+  void IdleUnitSelector::DetachFromSessionListenerLane(CWldSession* const)
   {
-    (void)laneContext;
-    this->mListenerLink.ListUnlink();
+    ListUnlink();
   }
 
   /**

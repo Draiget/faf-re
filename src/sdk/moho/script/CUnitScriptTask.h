@@ -111,8 +111,11 @@ namespace moho
     int Execute() override;
 
     /**
-     * Listener slot body is still under active recovery; current wiring keeps
-     * script-task updates routed through `Execute()`.
+     * Address: 0x006230F0 (FUN_006230F0)
+     *
+     * What it does:
+     * Resets the task state and wakes the owner thread when the command
+     * changes.
      */
     void OnEvent(ECommandEvent event) override;
 

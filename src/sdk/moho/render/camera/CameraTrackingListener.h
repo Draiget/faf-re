@@ -9,45 +9,6 @@
 namespace moho
 {
   /**
-   * ABI-compatible view of a single intrusive broadcaster link node used by
-   * the camera-tracking broadcaster.
-   *
-   * Layout note: this is layout-equivalent to `moho::Broadcaster` (the
-   * `Listener<T>::mListenerLink` field type), but with field names that
-   * match the existing `CameraImpl.cpp` dispatcher idiom. Both names refer
-   * to the same two-pointer node; field offsets (`+0x00`, `+0x04`) carry
-   * the prev/next pair in TDatList semantics. Used by
-   * `BroadcastCameraTrackingEvent` to walk the broadcaster ring without
-   * depending on the typed `Listener<T>::mListenerLink` accessor.
-   */
-  /**
-   * Intrusive link for the camera tracking broadcaster list.
-   *
-   * The field order here is the binary's: slot `+0x00` is **next** and `+0x04`
-   * is **prev**, confirmed by `FUN_007AE2B0`
-   * (`Broadcaster<SCameraTracking>::BroadcastEvent`), which splices with
-   * `X->[+0]->[+4] = S` / `X->[+4]->[+0] = S` and tests emptiness on `[+4]`.
-   *
-   * Note that `moho::TDatListItem` names the same two slots the opposite way
-   * round. See the warning on that template before mixing the two, and never
-   * reinterpret one as the other and then use the field names.
-   */
-  struct CameraTrackingBroadcasterLink
-  {
-    CameraTrackingBroadcasterLink* mListNext = nullptr; // +0x00
-    CameraTrackingBroadcasterLink* mListPrev = nullptr; // +0x04
-  };
-  static_assert(
-    offsetof(CameraTrackingBroadcasterLink, mListNext) == 0x00,
-    "CameraTrackingBroadcasterLink::mListNext offset must be 0x00"
-  );
-  static_assert(
-    offsetof(CameraTrackingBroadcasterLink, mListPrev) == 0x04,
-    "CameraTrackingBroadcasterLink::mListPrev offset must be 0x04"
-  );
-  static_assert(sizeof(CameraTrackingBroadcasterLink) == 0x08, "CameraTrackingBroadcasterLink size must be 0x08");
-
-  /**
    * Camera-tracking event payload.
    *
    * Layout evidence:
@@ -90,14 +51,12 @@ namespace moho
    *   pointing to `Moho::CameraTrackingListener::Receive` (FUN_008714B0).
    * - Singleton instance at `.data:0x00F5B668`, constructed by static-init
    *   thunk FUN_008715C0 which writes the vtable to `off_F5B668` and
-   *   self-links the broadcaster sentinel at `off_F5B66C`/`off_F5B670`
-   *   (`mPrev`/`mNext` of the `Broadcaster mListenerLink` inherited from
-   *   `Listener<SCameraTracking>`).
+   *   self-links the listener node at `off_F5B66C`/`off_F5B670` (the
+   *   `DListItem` base of `Listener<SCameraTracking>`).
    * - Atexit reset thunk FUN_008715E0 writes
    *   `Moho::Listener<Moho::SCameraTracking>::vftable` back into
    *   `off_F5B668`, confirming the base class is `Listener<SCameraTracking>`.
-   * - Size 12 (0x0C): vtable pointer (4) + inherited `Broadcaster
-   *   mListenerLink` (8).
+   * - Size 12 (0x0C): vtable pointer (4) + the inherited node (8).
    *
    * Calling convention for the binary `Receive` symbol: the IDA demangler
    * names the override `?Receive@...` though it overrides
@@ -110,8 +69,8 @@ namespace moho
    * Dispatch chain: CRT `__xc_a` static-init invokes FUN_008715C0 once at
    * process startup; thereafter, every camera target-mode transition in
    * `moho::CameraImpl` (TargetEntity / TargetNothing / Reset / SnapTo /
-   * TimedMove etc.) calls `BroadcastCameraTrackingEvent`, which walks the
-   * broadcaster ring at `camera+0x04` and dispatches via this vtable slot.
+   * TimedMove etc.) calls `BroadcastEvent` on the camera's
+   * `Broadcaster<SCameraTracking>` base, which dispatches via this slot.
    * The runtime payload is forwarded to the Lua side at
    * `/lua/ui/game/tracking.lua:OnTrackUnit(cameraName, transitionFlag)`.
    */

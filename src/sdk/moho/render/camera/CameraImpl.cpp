@@ -371,112 +371,6 @@ namespace
   }
 
   /**
-   * Address: 0x007A7DE0 (FUN_007A7DE0)
-   *
-   * What it does:
-   * Restores one camera's broadcaster node to the self-linked sentinel state
-   * after construction. The node is `RCamCamera`'s own `Broadcaster` base at
-   * +0x04 - `CameraImpl` reaches it as an ordinary base subobject, so nothing
-   * here needs a layout overlay.
-   */
-  void InitializeCameraBroadcasterLane(moho::Broadcaster& broadcaster) noexcept
-  {
-    broadcaster.ListResetLinks();
-  }
-
-  [[nodiscard]] moho::CameraTrackingBroadcasterLink* AsCameraTrackingBroadcaster(moho::CameraImpl* const camera) noexcept
-  {
-    return reinterpret_cast<moho::CameraTrackingBroadcasterLink*>(
-      reinterpret_cast<std::uint8_t*>(camera) + 0x04
-    );
-  }
-
-  void CameraTrackingSelfLink(moho::CameraTrackingBroadcasterLink* const node) noexcept
-  {
-    node->mListPrev = node;
-    node->mListNext = node;
-  }
-
-  void CameraTrackingDetach(moho::CameraTrackingBroadcasterLink* const node) noexcept
-  {
-    node->mListNext->mListPrev = node->mListPrev;
-    node->mListPrev->mListNext = node->mListNext;
-    CameraTrackingSelfLink(node);
-  }
-
-  void CameraTrackingAttachAfter(
-    moho::CameraTrackingBroadcasterLink* const node, moho::CameraTrackingBroadcasterLink* const anchor
-  ) noexcept
-  {
-    CameraTrackingDetach(node);
-    node->mListNext = anchor->mListNext;
-    node->mListPrev = anchor;
-    anchor->mListNext = node;
-    node->mListNext->mListPrev = node;
-  }
-
-  /**
-   * Recover the owning `CameraTrackingListener` instance from one of its
-   * intrusive broadcaster link nodes. The link sits inside the inherited
-   * `Listener<SCameraTracking>::mListenerLink` subobject at offset +0x04
-   * within `CameraTrackingListener`; the binary uses the same fixed offset
-   * for the singleton at `.data:0x00F5B668`.
-   */
-  [[nodiscard]] moho::CameraTrackingListener* CameraTrackingListenerFromLink(
-    moho::CameraTrackingBroadcasterLink* const listenerLink
-  ) noexcept
-  {
-    constexpr std::ptrdiff_t kListenerLinkOffset = 0x04;
-    return reinterpret_cast<moho::CameraTrackingListener*>(
-      reinterpret_cast<std::uint8_t*>(listenerLink) - kListenerLinkOffset
-    );
-  }
-
-  /**
-   * Address: 0x007AE2B0 (FUN_007AE2B0, Moho::Broadcaster<Moho::SCameraTracking>::BroadcastEvent)
-   *
-   * What it does:
-   * Moves listeners into a snapshot ring, iterates safely while relinking each
-   * listener back to broadcaster head, and dispatches one camera-tracking
-   * event payload (`mCameraName`, `mTransitionFlag`) per listener via the
-   * `Listener<SCameraTracking>::OnEvent` vtable slot.
-   */
-  void BroadcastCameraTrackingEvent(
-    moho::CameraTrackingBroadcasterLink* const broadcaster,
-    const msvc8::string& cameraName,
-    const std::uint8_t transitionFlag
-  )
-  {
-    moho::CameraTrackingBroadcasterLink snapshot{};
-    CameraTrackingSelfLink(&snapshot);
-
-    if (broadcaster->mListPrev != broadcaster) {
-      snapshot.mListPrev = broadcaster->mListPrev;
-      snapshot.mListNext = broadcaster->mListNext;
-      snapshot.mListNext->mListPrev = &snapshot;
-      snapshot.mListPrev->mListNext = &snapshot;
-      CameraTrackingSelfLink(broadcaster);
-
-      while (snapshot.mListPrev != &snapshot) {
-        moho::CameraTrackingBroadcasterLink* const listenerLink = snapshot.mListPrev;
-        CameraTrackingDetach(listenerLink);
-        CameraTrackingAttachAfter(listenerLink, broadcaster);
-
-        moho::SCameraTracking event{};
-        event.mCameraName = cameraName;
-        event.mTransitionFlag = transitionFlag;
-
-        moho::CameraTrackingListener* const listener = CameraTrackingListenerFromLink(listenerLink);
-        listener->OnEvent(event);
-      }
-    }
-
-    snapshot.mListNext->mListPrev = snapshot.mListPrev;
-    snapshot.mListPrev->mListNext = snapshot.mListNext;
-    CameraTrackingSelfLink(&snapshot);
-  }
-
-  /**
    * Address: 0x007A6BF0 (FUN_007A6BF0, Moho::CameraImpl::TargetNothing)
    *
    * What it does:
@@ -486,7 +380,7 @@ namespace
   void TargetNothingRuntime(moho::CameraImpl* const camera)
   {
     if (camera->mTargetType == kCameraTargetTypeEntity) {
-      BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(camera), camera->mName, 0u);
+      camera->BroadcastEvent(moho::SCameraTracking{camera->mName, 0});
     }
 
     camera->mTargetType = kCameraTargetTypeLocation;
@@ -963,18 +857,13 @@ namespace moho
   }
 } // namespace moho
 
-[[nodiscard]] moho::Broadcaster* moho::CameraBroadcasterLink(moho::CameraImpl* const camera) noexcept
-{
-  return static_cast<moho::Broadcaster*>(camera);
-}
-
 /**
  * Address: 0x007AAC60 (FUN_007AAC60, ??1RCamCamera@Moho@@UAE@XZ,
  * Moho::RCamCamera::~RCamCamera)
  *
  * What it does:
- * Removes this camera from `RCamManager` ownership and restores the
- * self-linked broadcaster ring node to its idle state. Every live
+ * Removes this camera from `RCamManager` ownership; the `Broadcaster` base's
+ * destructor then unlinks the tracking ring (0x007AAC9D). Every live
  * `RCamCamera` subobject is the first base of a `CameraImpl` complete
  * object (see the class doc comment in CameraImpl.h), so `this` safely
  * converts back to the owning camera with zero pointer adjustment. Runs
@@ -988,12 +877,6 @@ moho::RCamCamera::~RCamCamera()
   if (RCamManager* const manager = CAM_GetManager(); manager != nullptr) {
     manager->ForgetCamera(camera);
   }
-
-  moho::Broadcaster& broadcaster = *CameraBroadcasterLink(camera);
-  broadcaster.mNext->mPrev = broadcaster.mPrev;
-  broadcaster.mPrev->mNext = broadcaster.mNext;
-  broadcaster.mPrev = &broadcaster;
-  broadcaster.mNext = &broadcaster;
 }
 
 /**
@@ -1054,12 +937,9 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
   , mName(name, std::strlen(name))
   , mCam()
 {
-  // `RCamCamera` (vtable + broadcaster node, +0x00..+0x0C) and `CScriptEvent`
-  // (+0x0C..+0x50) are both real C++ bases and already fully constructed by
-  // the initializer list above. Only the intrusive broadcaster sentinel still
-  // needs explicit seeding -- `Broadcaster`'s own default state does not
-  // self-link.
-  InitializeCameraBroadcasterLane(*this);
+  // `RCamCamera` (vtable + broadcaster ring, +0x00..+0x0C) and
+  // `CScriptEvent` (+0x0C..+0x50) are both real C++ bases and already fully
+  // constructed by the initializer list above.
 
   // Bind terrain-map context.
   mTerrainMap = const_cast<moho::STIMap*>(&map);
@@ -2665,7 +2545,7 @@ void moho::CameraImpl::UpdateTargets(const float interpolationAlpha, const float
       mTargetTime = 1u;
       const bool wasEntityMode = (mTargetType == kCameraTargetTypeEntity);
       if (wasEntityMode && mTargetEntities.mSize <= 1) {
-        BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), mName, 0u);
+        BroadcastEvent(SCameraTracking{mName, 0});
       }
       const bool wasRotated = (mIsRotated != 0u);
       mTargetType = kCameraTargetTypeLocation;
@@ -3336,7 +3216,7 @@ void moho::CameraImpl::TargetLocation(const Wm3::Vec3f& position, const float se
     }
   }
   if (mTargetType == kCameraTargetTypeEntity) {
-    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), mName, 0u);
+    BroadcastEvent(SCameraTracking{mName, 0});
   }
 
   TimedMoveInit(seconds, 0.0f);
@@ -3381,7 +3261,7 @@ void moho::CameraImpl::TargetBox(const Wm3::AxisAlignedBox3f& targetBox, const f
     }
   }
   if (mTargetType == kCameraTargetTypeEntity) {
-    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), mName, 0u);
+    BroadcastEvent(SCameraTracking{mName, 0});
   }
 
   TimedMoveInit(seconds, 0.0f);
@@ -3497,10 +3377,10 @@ void moho::CameraImpl::TargetEntities(
 
   if (trackEntities) {
     mTargetType = kCameraTargetTypeEntity;
-    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), mName, 1u);
+    BroadcastEvent(SCameraTracking{mName, 1});
   } else {
     if (mTargetType == kCameraTargetTypeEntity) {
-      BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), mName, 0u);
+      BroadcastEvent(SCameraTracking{mName, 0});
     }
     mTargetType = kCameraTargetTypeLocation;
   }
@@ -3544,11 +3424,11 @@ void moho::CameraImpl::TargetNextEntity()
       mTargetType = kCameraTargetTypeEntity;
       mTargetTimeLeft = 0.0f;
       mTargetTime = 0u;
-      BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), mName, 1u);
+      BroadcastEvent(SCameraTracking{mName, 1});
       return;
     }
 
-    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), mName, 0u);
+    BroadcastEvent(SCameraTracking{mName, 0});
 
     CameraTargetEntityNode* const next = (active != nullptr) ? active->mNext : nullptr;
     if (active != nullptr && active != mTargetEntities.mHead) {
@@ -3580,7 +3460,7 @@ void moho::CameraImpl::TargetNoseCam(
 )
 {
   if (mTargetType == kCameraTargetTypeEntity) {
-    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), mName, 0u);
+    BroadcastEvent(SCameraTracking{mName, 0});
   }
 
   mTargetTimeLeft = 0.0f;
@@ -3638,7 +3518,7 @@ void moho::CameraImpl::TargetManual(
     }
   }
   if (mTargetType == kCameraTargetTypeEntity) {
-    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), mName, 0u);
+    BroadcastEvent(SCameraTracking{mName, 0});
   }
 
   TimedMoveInit(seconds, 0.0f);

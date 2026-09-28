@@ -287,36 +287,6 @@ namespace
     return lhs[0] != rhs[0] || lhs[1] != rhs[1];
   }
 
-  [[nodiscard]] Broadcaster* NavigatorListenerNode(CAiPathNavigator& navigator) noexcept
-  {
-    return &navigator.mListenerLink;
-  }
-
-  [[nodiscard]] Broadcaster* PathFinderListenerHead(CAiPathFinder* pathFinder) noexcept
-  {
-    if (!pathFinder) {
-      return nullptr;
-    }
-    return static_cast<Broadcaster*>(pathFinder);
-  }
-
-  void DetachListenerNode(CAiPathNavigator& navigator) noexcept
-  {
-    NavigatorListenerNode(navigator)->ListUnlink();
-  }
-
-  void AttachListenerNodeToPathFinder(CAiPathNavigator& navigator) noexcept
-  {
-    Broadcaster* const node = NavigatorListenerNode(navigator);
-    node->ListUnlink();
-
-    Broadcaster* const head = PathFinderListenerHead(navigator.mPathFinder);
-    if (!head) {
-      return;
-    }
-    head->push_front(node);
-  }
-
   void DetachWeakUnit(WeakPtr<Unit>& link) noexcept
   {
     link.ResetFromObject(nullptr);
@@ -965,35 +935,6 @@ namespace
 
 gpg::RType* CAiPathNavigator::sType = nullptr;
 
-CAiPathNavigator* CAiPathNavigator::FromListenerLink(Broadcaster* const link) noexcept
-{
-  return Broadcaster::owner_from_member<CAiPathNavigator, Broadcaster, &CAiPathNavigator::mListenerLink>(link);
-}
-
-const CAiPathNavigator* CAiPathNavigator::FromListenerLink(const Broadcaster* const link) noexcept
-{
-  return Broadcaster::owner_from_member<CAiPathNavigator, Broadcaster, &CAiPathNavigator::mListenerLink>(link);
-}
-
-/**
- * Address: 0x005AD5A0 (FUN_005AD5A0)
- *
- * What it does:
- * Initializes one detached listener-link lane on `CAiPathNavigator`
- * construction storage.
- */
-[[maybe_unused]] CAiPathNavigator* InitializePathNavigatorListenerLane(
-  CAiPathNavigator* const navigatorStorage
-) noexcept
-{
-  if (navigatorStorage == nullptr) {
-    return nullptr;
-  }
-
-  navigatorStorage->mListenerLink.ListResetLinks();
-  return navigatorStorage;
-}
-
 /**
  * Address: 0x005AD5C0 (FUN_005AD5C0, default ctor used by RTTI NewRef/CtrRef)
  *
@@ -1001,8 +942,7 @@ const CAiPathNavigator* CAiPathNavigator::FromListenerLink(const Broadcaster* co
  * Initializes one detached navigator object for reflection construction paths.
  */
 CAiPathNavigator::CAiPathNavigator()
-  : mListenerLink{}
-  , mState(AIPATHNAVSTATE_Idle)
+  : mState(AIPATHNAVSTATE_Idle)
   , mPathFinder(nullptr)
   , mPath{}
   , mCurrentPos{0, 0}
@@ -1034,7 +974,6 @@ CAiPathNavigator::CAiPathNavigator()
   , mTickBucket7(0)
   , mTickBucket13(0)
 {
-  mListenerLink.ListResetLinks();
   mPath.reserved0 = 0;
   mPath.start = nullptr;
   mPath.finish = nullptr;
@@ -1045,8 +984,7 @@ CAiPathNavigator::CAiPathNavigator()
  * Address: 0x005AD3E0 (FUN_005AD3E0, unit ctor)
  */
 CAiPathNavigator::CAiPathNavigator(Unit* const unit)
-  : mListenerLink{}
-  , mState(AIPATHNAVSTATE_Idle)
+  : mState(AIPATHNAVSTATE_Idle)
   , mPathFinder(nullptr)
   , mPath{}
   , mCurrentPos{0, 0}
@@ -1078,8 +1016,6 @@ CAiPathNavigator::CAiPathNavigator(Unit* const unit)
   , mTickBucket7(unit ? (unit->GetEntityId() % 7) : 0)
   , mTickBucket13(unit ? (unit->GetEntityId() % 13) : 0)
 {
-  mListenerLink.ListResetLinks();
-
   mPath.reserved0 = 0;
   mPath.start = nullptr;
   mPath.finish = nullptr;
@@ -1103,16 +1039,17 @@ CAiPathNavigator::~CAiPathNavigator()
     mPathFinder = nullptr;
   }
 
-  // `mListenerLink` leaves the path finder's ring in its own destructor, the
-  // one unlink 0x005A44C0 has (0x005A4522, after the path finder is gone).
+  // The `Listener` base's node leaves the path finder's ring in its own
+  // destructor, the one unlink 0x005A44C0 has (0x005A4522, after the path
+  // finder is gone).
 }
 
 /**
  * Address: 0x005AEEB0 (FUN_005AEEB0)
  */
-bool CAiPathNavigator::OnEvent(const SNavPath& path)
+void CAiPathNavigator::OnEvent(const SNavPath& path)
 {
-  DetachListenerNode(*this);
+  ListUnlink();
 
   Unit* const unit = GetOwningUnit(*this);
   const std::int32_t incomingCount = path.CountInt();
@@ -1127,7 +1064,7 @@ bool CAiPathNavigator::OnEvent(const SNavPath& path)
       if (unit && unit->IsUnitState(UNITSTATE_Patrolling)) {
         SetUnitPathBits(unit, kUnitPatrolStallFlag);
       }
-      return false;
+      return;
     }
 
     const SOCellPos tailCell = mPath.finish[-1];
@@ -1146,12 +1083,12 @@ bool CAiPathNavigator::OnEvent(const SNavPath& path)
     if (mPathFinder) {
       mPathFinder->mSearchType = AIPATHSEARCH_None;
     }
-    return true;
+    return;
   }
 
   if (mState != AIPATHNAVSTATE_PathEvent4) {
     GPG_ASSERT(false);
-    return false;
+    return;
   }
 
   if (incomingCount == 0) {
@@ -1164,12 +1101,12 @@ bool CAiPathNavigator::OnEvent(const SNavPath& path)
         mPathSearchFailCount = 0;
         RequestPath(1);
       }
-      return mState != AIPATHNAVSTATE_Failed;
+      return;
     }
 
     ++mPathSearchFailCount;
     mPathRetryDelayFrames = 10;
-    return true;
+    return;
   }
 
   bool mergedWithFront = false;
@@ -1197,19 +1134,19 @@ bool CAiPathNavigator::OnEvent(const SNavPath& path)
           mState = AIPATHNAVSTATE_Failed;
           mPathRetryDelayFrames = 0;
           mPathSearchFailCount = 0;
-          return false;
+          return;
         }
         mLastBlockedCell = packedFirstCell;
       } else {
         if (mPathSearchFailCount < 3) {
           ++mPathSearchFailCount;
           mPathRetryDelayFrames = 10;
-          return true;
+          return;
         }
         mState = AIPATHNAVSTATE_Failed;
         mPathRetryDelayFrames = 0;
         mPathSearchFailCount = 0;
-        return false;
+        return;
       }
     }
 
@@ -1231,7 +1168,6 @@ bool CAiPathNavigator::OnEvent(const SNavPath& path)
   }
 
   mState = AIPATHNAVSTATE_HasPath;
-  return true;
 }
 
 /**
@@ -1269,7 +1205,7 @@ void CAiPathNavigator::ResetPathState()
   mTargetPos = mCurrentPos;
   ResetPathContent(mPath);
 
-  DetachListenerNode(*this);
+  ListUnlink();
 
   if (mPathFinder) {
     mPathFinder->OnPathSearchCancelled();
@@ -1347,7 +1283,7 @@ void CAiPathNavigator::RequestPath(const std::int32_t requestMode)
     SetUnitPathBits(unit, kUnitPathingBusyFlag);
     mPathFinder->QueueSearch();
     mState = AIPATHNAVSTATE_PathEvent3;
-    AttachListenerNodeToPathFinder(*this);
+    mPathFinder->AddListener(this);
   } else {
     AppendPathCellFast(mPath, GoalAnchorCell(mGoal));
     mState = AIPATHNAVSTATE_FollowingLeader;
@@ -1411,7 +1347,7 @@ void CAiPathNavigator::RequestContinuationPath(std::int32_t requestMode)
   mPathFinder->QueueSearch();
 
   mState = AIPATHNAVSTATE_PathEvent4;
-  AttachListenerNodeToPathFinder(*this);
+  mPathFinder->AddListener(this);
   mPathRetryDelayFrames = 0;
 }
 

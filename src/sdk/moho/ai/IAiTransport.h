@@ -33,23 +33,6 @@ namespace moho
     AITRANSPORTEVENT_Unload = 1,
   };
 
-  class IAiTransportEventListener
-  {
-  public:
-    virtual void OnTransportEvent(EAiTransportEvent event) = 0;
-
-    [[nodiscard]] static IAiTransportEventListener* FromListenerLink(Broadcaster* link) noexcept;
-    [[nodiscard]] static const IAiTransportEventListener* FromListenerLink(const Broadcaster* link) noexcept;
-
-    Broadcaster mListenerLink; // +0x04
-  };
-
-  static_assert(sizeof(IAiTransportEventListener) == 0x0C, "IAiTransportEventListener size must be 0x0C");
-  static_assert(
-    offsetof(IAiTransportEventListener, mListenerLink) == 0x04,
-    "IAiTransportEventListener::mListenerLink offset must be 0x04"
-  );
-
   /**
    * VFTABLE: 0x00E1F0AC
    * COL:  0x00E76D64
@@ -58,7 +41,7 @@ namespace moho
    * - IAiTransport contains a broadcaster subobject at +0x04
    *   (`Broadcaster<EAiTransportEvent>` in emitted RTTI).
    */
-  class IAiTransport : public Broadcaster
+  class IAiTransport : public Broadcaster<EAiTransportEvent>
   {
   public:
     /**

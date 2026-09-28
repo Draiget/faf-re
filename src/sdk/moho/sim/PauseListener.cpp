@@ -16,14 +16,11 @@ namespace moho
    * Address: 0x00869700 (FUN_00869700)
    *
    * What it does:
-   * Detaches this pause-listener node from its current lane and reinserts it
-   * into the pause lane embedded at `laneContext + 0x08`.
+   * Subscribes this listener to the session's pause broadcaster (+0x08).
    */
-  void PauseListener::AttachToSessionListenerLane(void* const laneContext)
+  void PauseListener::AttachToSessionListenerLane(CWldSession* const session)
   {
-    auto* const laneOwnerBytes = static_cast<std::uint8_t*>(laneContext);
-    auto* const laneAnchor = reinterpret_cast<Broadcaster*>(laneOwnerBytes + 0x08);
-    this->mListenerLink.ListLinkBefore(laneAnchor);
+    session->mPauseBroadcaster.AddListener(this);
   }
 
   /**
@@ -33,10 +30,9 @@ namespace moho
    * Detaches this pause-listener node from its current lane and leaves it
    * self-linked.
    */
-  void PauseListener::DetachFromSessionListenerLane(void* const laneContext)
+  void PauseListener::DetachFromSessionListenerLane(CWldSession* const)
   {
-    (void)laneContext;
-    this->mListenerLink.ListUnlink();
+    ListUnlink();
   }
 
   /**

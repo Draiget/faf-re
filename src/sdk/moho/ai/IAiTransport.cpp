@@ -72,7 +72,7 @@ namespace moho
      *
      * What it does:
      * Constructs and preregisters the broadcaster RTTI lane for
-     * `BroadcasterEventTag<EAiTransportEvent>`.
+     * `Broadcaster<EAiTransportEvent>`.
      */
     RBroadcasterRType_EAiTransportEvent();
 
@@ -88,7 +88,7 @@ namespace moho
      */
     void Init() override
     {
-      size_ = sizeof(Broadcaster);
+      size_ = sizeof(Broadcaster<EAiTransportEvent>);
       version_ = 1;
       serLoadFunc_ = &RBroadcasterRType_EAiTransportEvent::SerLoad;
       serSaveFunc_ = &RBroadcasterRType_EAiTransportEvent::SerSave;
@@ -605,7 +605,7 @@ void moho::RBroadcasterRType_EAiTransportEvent::SerLoad(
   gpg::RRef* const ownerRef
 )
 {
-  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster>(objectPtr);
+  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster<moho::EAiTransportEvent>>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
   if (!archive || !broadcaster) {
@@ -615,7 +615,7 @@ void moho::RBroadcasterRType_EAiTransportEvent::SerLoad(
   moho::Listener<moho::EAiTransportEvent>* listener = nullptr;
   archive->ReadPointer_Listener_EAiTransportEvent(&listener, ownerRef);
   while (listener != nullptr) {
-    listener->mListenerLink.ListLinkBefore(broadcaster);
+    broadcaster->AddListener(listener);
     archive->ReadPointer_Listener_EAiTransportEvent(&listener, ownerRef);
   }
 }
@@ -634,7 +634,7 @@ void moho::RBroadcasterRType_EAiTransportEvent::SerSave(
   gpg::RRef* const
 )
 {
-  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster>(objectPtr);
+  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster<moho::EAiTransportEvent>>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
   if (!archive || !broadcaster) {
@@ -644,17 +644,7 @@ void moho::RBroadcasterRType_EAiTransportEvent::SerSave(
   const gpg::RRef nullOwner{};
   gpg::RRef pointerRef{};
 
-  for (
-    moho::Broadcaster* node = static_cast<moho::Broadcaster*>(broadcaster->mNext);
-    node != broadcaster;
-    node = static_cast<moho::Broadcaster*>(node->mNext)
-  ) {
-    moho::Listener<moho::EAiTransportEvent>* listener = nullptr;
-    if (node != nullptr) {
-      moho::IAiTransportEventListener* const eventListener = moho::IAiTransportEventListener::FromListenerLink(node);
-      listener = reinterpret_cast<moho::Listener<moho::EAiTransportEvent>*>(eventListener);
-    }
-
+  for (moho::Listener<moho::EAiTransportEvent>* const listener : broadcaster->mListeners.owners()) {
     (void)gpg::RRef_Listener_EAiTransportEvent(&pointerRef, listener);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
   }
@@ -688,12 +678,12 @@ const char* moho::RListenerRType_EAiTransportEvent::GetName() const
  *
  * What it does:
  * Constructs and preregisters the broadcaster RTTI lane for
- * `BroadcasterEventTag<EAiTransportEvent>`.
+ * `Broadcaster<EAiTransportEvent>`.
  */
 moho::RBroadcasterRType_EAiTransportEvent::RBroadcasterRType_EAiTransportEvent()
   : gpg::RType()
 {
-  gpg::PreRegisterRType(typeid(moho::BroadcasterEventTag<moho::EAiTransportEvent>), this);
+  gpg::PreRegisterRType(typeid(moho::Broadcaster<moho::EAiTransportEvent>), this);
 }
 
 /**
@@ -1215,42 +1205,22 @@ void gpg::RVectorType_SAttachPoint::SetCount(void* const obj, const int count) c
 
 gpg::RType* IAiTransport::sType = nullptr;
 
-IAiTransportEventListener* IAiTransportEventListener::FromListenerLink(Broadcaster* const link) noexcept
-{
-  return Broadcaster::owner_from_member<IAiTransportEventListener, Broadcaster, &IAiTransportEventListener::mListenerLink>(
-    link
-  );
-}
-
-const IAiTransportEventListener* IAiTransportEventListener::FromListenerLink(const Broadcaster* const link) noexcept
-{
-  return Broadcaster::owner_from_member<IAiTransportEventListener, Broadcaster, &IAiTransportEventListener::mListenerLink>(
-    link
-  );
-}
-
 /**
  * Address: 0x005E3C50 (FUN_005E3C50)
  * Address: 0x005E82A0 (FUN_005E82A0)
  *
  * What it does:
- * Initializes IAiTransport base lanes and re-seeds broadcaster links to a
- * self-linked sentinel chain; the second constructor lane is an equivalent
- * alias.
+ * Installs the interface vtable; the `Broadcaster` base self-links the
+ * listener ring. The second address is an equivalent copy.
  */
-IAiTransport::IAiTransport()
-  : Broadcaster()
-{
-  mNext = this;
-  mPrev = this;
-}
+IAiTransport::IAiTransport() = default;
 
 /**
  * Address: 0x005E3C70 (FUN_005E3C70, scalar deleting thunk target)
  *
  * What it does:
- * Unlinks IAiTransport from broadcaster chain and restores self-linked node,
- * through the `TDatListItem` base's destructor.
+ * Nothing of its own: the `Broadcaster` base's destructor unlinks the
+ * listener ring.
  */
 IAiTransport::~IAiTransport() = default;
 

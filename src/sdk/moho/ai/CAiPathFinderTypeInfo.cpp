@@ -467,7 +467,7 @@ void CAiPathFinderTypeInfo::AddBase_IPathTraveler(gpg::RType* const typeInfo)
  */
 void CAiPathFinderTypeInfo::Addbase_Broadcaster_NavPath(gpg::RType* const typeInfo)
 {
-  AddBaseByTypeInfo(typeInfo, typeid(Broadcaster), 0x0C);
+  AddBaseByTypeInfo(typeInfo, typeid(Broadcaster<const SNavPath&>), 0x0C);
 }
 
 /**

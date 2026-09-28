@@ -63,10 +63,10 @@ namespace
    */
   [[nodiscard]] gpg::RType* CachedBroadcasterEFormationdStatusType()
   {
-    gpg::RType* type = moho::BroadcasterEventTag<moho::EFormationdStatus>::sType;
+    gpg::RType* type = moho::Broadcaster<moho::EFormationdStatus>::sType;
     if (!type) {
-      type = gpg::LookupRType(typeid(moho::BroadcasterEventTag<moho::EFormationdStatus>));
-      moho::BroadcasterEventTag<moho::EFormationdStatus>::sType = type;
+      type = gpg::LookupRType(typeid(moho::Broadcaster<moho::EFormationdStatus>));
+      moho::Broadcaster<moho::EFormationdStatus>::sType = type;
     }
     return type;
   }
@@ -86,7 +86,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    auto* const broadcaster = reinterpret_cast<moho::Broadcaster*>(
+    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EFormationdStatus>*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
     );
     GPG_ASSERT(archive != nullptr);
@@ -98,8 +98,7 @@ namespace
     moho::Listener<moho::EFormationdStatus>* listener = nullptr;
     archive->ReadPointer_Listener_EFormationdStatus(&listener, ownerRef);
     while (listener != nullptr) {
-      listener->mListenerLink.ListUnlink();
-      listener->mListenerLink.ListLinkBefore(broadcaster);
+      broadcaster->AddListener(listener);
       archive->ReadPointer_Listener_EFormationdStatus(&listener, ownerRef);
     }
   }
@@ -122,7 +121,7 @@ namespace
     gpg::RRef* const
   )
   {
-    auto* const broadcaster = reinterpret_cast<moho::Broadcaster*>(
+    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EFormationdStatus>*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
     );
     GPG_ASSERT(archive != nullptr);
@@ -134,12 +133,8 @@ namespace
     const gpg::RRef nullOwner{};
     gpg::RRef pointerRef{};
 
-    for (
-      moho::Broadcaster* node = static_cast<moho::Broadcaster*>(broadcaster->mNext);
-      node != broadcaster;
-      node = static_cast<moho::Broadcaster*>(node->mNext)
-    ) {
-      (void)gpg::RRef_Listener_EFormationdStatus(&pointerRef, moho::Listener<moho::EFormationdStatus>::FromListenerLink(node));
+    for (moho::Listener<moho::EFormationdStatus>* const listener : broadcaster->mListeners.owners()) {
+      (void)gpg::RRef_Listener_EFormationdStatus(&pointerRef, listener);
       gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
     }
 
@@ -837,7 +832,7 @@ namespace
 
     void Init() override
     {
-      size_ = sizeof(moho::BroadcasterEventTag<moho::EFormationdStatus>);
+      size_ = sizeof(moho::Broadcaster<moho::EFormationdStatus>);
       version_ = 1;
       serLoadFunc_ = &LoadBroadcasterEFormationdStatusListeners;
       serSaveFunc_ = &SaveBroadcasterEFormationdStatusListeners;
@@ -1732,22 +1727,6 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x0056B070 (FUN_0056B070,
-   * ?BroadcastEvent@?$Broadcaster@W4EFormationdStatus@Moho@@@Moho@@IAEXW4EFormationdStatus@2@@Z)
-   *
-   * What it does:
-   * Broadcasts one formation-status event to every linked listener while
-   * preserving iteration safety if listeners relink/unlink themselves during
-   * the callback: the ring is detached onto a stack node, each listener is
-   * moved back before `this` and then told the event, and whatever is left
-   * on the stack node is spliced back at the end.
-   */
-  void Broadcaster::BroadcastEvent(const EFormationdStatus event)
-  {
-    DispatchToListeners<Listener<EFormationdStatus>>(event);
-  }
-
-  /**
    * Address: 0x00565AB0 (FUN_00565AB0, Moho::SOffsetInfo::SOffsetInfo)
    *
    * What it does:
@@ -2419,7 +2398,7 @@ namespace moho
   gpg::RType* preregister_RBroadcasterRType_EFormationdStatus()
   {
     static RBroadcasterRType_EFormationdStatus typeInfo;
-    gpg::PreRegisterRType(typeid(BroadcasterEventTag<EFormationdStatus>), &typeInfo);
+    gpg::PreRegisterRType(typeid(Broadcaster<EFormationdStatus>), &typeInfo);
     return &typeInfo;
   }
 

@@ -450,18 +450,6 @@ bool CDiskDirWatch::HasValidHandle() const
 }
 
 /**
- * Address: 0x004637D0 (FUN_004637D0, `Broadcaster<SDiskWatchEvent const&>::BroadcastEvent`)
- *
- * What it does:
- * Delivers one watch event to every listener through the shared ring walk,
- * so a listener may unlink itself or register another during its callback.
- */
-void Broadcaster::BroadcastEvent(const SDiskWatchEvent& event)
-{
-  DispatchToListeners<Listener<const SDiskWatchEvent&>>(event);
-}
-
-/**
  * Address: 0x00461B10 (FUN_00461B10, ??0CDiskWatchListener@Moho@@QAE@VStrArg@gpg@@@Z)
  */
 CDiskWatchListener::CDiskWatchListener(const gpg::StrArg patterns)
@@ -591,7 +579,7 @@ CDiskWatch::~CDiskWatch()
 void CDiskWatch::AddListener(CDiskWatchListener* const listener)
 {
   gpg::core::func_LockShared(&mLock);
-  mListeners.push_back(&listener->mListenerLink);
+  mListeners.AddListener(listener);
   listener->mWatch = this;
   gpg::core::func_UnlockShared(&mLock);
 }
@@ -602,7 +590,7 @@ void CDiskWatch::AddListener(CDiskWatchListener* const listener)
 void CDiskWatch::RemoveListener(CDiskWatchListener* const listener)
 {
   gpg::core::func_LockShared(&mLock);
-  listener->mListenerLink.ListUnlink();
+  listener->ListUnlink();
   listener->mWatch = nullptr;
   gpg::core::func_UnlockShared(&mLock);
 }

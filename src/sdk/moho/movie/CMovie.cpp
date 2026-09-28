@@ -209,13 +209,8 @@ namespace moho
    */
   CMovie::CMovie()
   {
-    mListenerLink.ListResetLinks();
-
-    // The device's listener ring is its own Broadcaster base, which is the
-    // +0x04 the binary indexes. Reaching it as a base rather than by offset
-    // arithmetic is the same address and keeps the types honest.
     if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
-      mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(device));
+      device->AddListener(this);
     }
   }
 
@@ -243,7 +238,7 @@ namespace moho
     // self-contained and does not need the ring head).
     if (D3D_GetDevice() != nullptr) {
       (void)D3D_GetDevice();
-      mListenerLink.ListUnlink();
+      ListUnlink();
     }
 
     // [0x00873DDA] Tear down active Sofdec playback + texture-sheet owner lane.
@@ -269,7 +264,7 @@ namespace moho
     mTextureSheet.release();
 
     // [0x00873EDF-0x00873EF9] is the `Listener<SD3DDeviceEvent const&>` base's
-    // `~TDatListItem`, after this body: a no-op when the conditional unlink
+    // `~DListItem`, after this body: a no-op when the conditional unlink
     // above already ran, the real unlink when no device was present.
   }
 

@@ -62,7 +62,7 @@ namespace moho
    *
    * Recovered complete-object layout size: 0x7C.
    */
-  class CAiPathFinder : public IPathTraveler, public Broadcaster
+  class CAiPathFinder : public IPathTraveler, public Broadcaster<const SNavPath&>
   {
   public:
     /**

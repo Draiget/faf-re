@@ -58,7 +58,7 @@ namespace moho
    * `mSharedCount` member and left the broadcaster on `CFormationInstance` as
    * `mStatusListeners`.
    */
-  class IFormationInstance : public CountedObject, public BroadcasterEventTag<EFormationdStatus>
+  class IFormationInstance : public CountedObject, public Broadcaster<EFormationdStatus>
   {
   public:
     inline static gpg::RType* sType = nullptr;

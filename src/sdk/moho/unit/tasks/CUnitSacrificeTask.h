@@ -23,7 +23,7 @@ namespace moho
   /**
    * Runtime owner for unit-sacrifice command task state.
    */
-  class CUnitSacrificeTask : public CCommandTaskWithListenerSlot, public Listener<ECommandEvent>
+  class CUnitSacrificeTask : public CCommandTask, public Listener<ECommandEvent>
   {
   public:
     /**

@@ -54,7 +54,7 @@ namespace
     return CachedRType<moho::IFormationInstance>();
   }
 
-  using FormationStatusBroadcaster = moho::BroadcasterEventTag<moho::EFormationdStatus>;
+  using FormationStatusBroadcaster = moho::Broadcaster<moho::EFormationdStatus>;
 
   /**
    * The binary keeps one global for this descriptor -- `0x010C6F84`, which

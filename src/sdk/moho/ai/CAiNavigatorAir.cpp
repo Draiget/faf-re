@@ -468,7 +468,7 @@ int CAiNavigatorAir::Execute()
       static_cast<std::uint16_t>(currentTargetCellZ) == static_cast<std::uint16_t>(goalCellZ)) {
     if (!mDestinationEntity.HasValue()) {
       mStatus = AINAVSTATUS_Idle;
-      DispatchNavigatorEvent(AINAVEVENT_Succeeded);
+      BroadcastEvent(AINAVEVENT_Succeeded);
       return 1;
     }
 
@@ -498,7 +498,7 @@ int CAiNavigatorAir::Execute()
         (focusUnit->IsDead() || focusUnit->DestroyQueued() || !IsUnitIdleState(*focusUnit) ||
          focusUnit->IsUnitState(UNITSTATE_MovingUp) || focusUnit->IsUnitState(UNITSTATE_MovingDown))) {
       mStatus = AINAVSTATUS_Idle;
-      DispatchNavigatorEvent(AINAVEVENT_Failed);
+      BroadcastEvent(AINAVEVENT_Failed);
     }
   } else {
     UpdateCurrentTargetFromFormation();

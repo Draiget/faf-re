@@ -19,57 +19,6 @@
 
 namespace
 {
-  struct CUnitCommandCommandEventLinkView
-  {
-    std::uint8_t pad_0000_0034[0x34];
-    moho::Broadcaster mCommandEventListenerHead;
-  };
-
-  static_assert(
-    offsetof(CUnitCommandCommandEventLinkView, mCommandEventListenerHead) == 0x34,
-    "CUnitCommandCommandEventLinkView::mCommandEventListenerHead offset must be 0x34"
-  );
-
-  struct CAiFormationInstanceStatusListenerHeadView
-  {
-    std::uint8_t pad_0000_0008[0x08];
-    moho::Broadcaster mFormationStatusListenerHead;
-  };
-
-  static_assert(
-    offsetof(CAiFormationInstanceStatusListenerHeadView, mFormationStatusListenerHead) == 0x08,
-    "CAiFormationInstanceStatusListenerHeadView::mFormationStatusListenerHead offset must be 0x08"
-  );
-
-  [[nodiscard]] moho::Broadcaster* CommandEventListenerHead(moho::CUnitCommand* const command) noexcept
-  {
-    if (!command) {
-      return nullptr;
-    }
-
-    auto* const view = reinterpret_cast<CUnitCommandCommandEventLinkView*>(command);
-    return &view->mCommandEventListenerHead;
-  }
-
-  [[nodiscard]] moho::Broadcaster* FormationStatusListenerHead(moho::CAiFormationInstance* const formation) noexcept
-  {
-    if (!formation) {
-      return nullptr;
-    }
-
-    auto* const view = reinterpret_cast<CAiFormationInstanceStatusListenerHeadView*>(formation);
-    return &view->mFormationStatusListenerHead;
-  }
-
-  [[nodiscard]] moho::Broadcaster* NavigatorListenerHead(moho::IAiNavigator* const navigator) noexcept
-  {
-    if (!navigator) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::Broadcaster*>(&navigator->mListenerNode);
-  }
-
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
     gpg::RType* type = moho::CCommandTask::sType;
@@ -134,11 +83,8 @@ namespace moho
    */
   CUnitFormAndMoveTask::CUnitFormAndMoveTask()
     : CCommandTask()
-    , CUnitFormAndMoveTaskReservedSlot30()
     , Listener<EAiNavigatorEvent>()
-    , CUnitFormAndMoveTaskReservedSlot40()
     , Listener<EFormationdStatus>()
-    , CUnitFormAndMoveTaskReservedSlot50()
     , Listener<ECommandEvent>()
     , mFormation(nullptr)
     , mFormationArrivalSatisfied(0)
@@ -181,11 +127,8 @@ namespace moho
     CAiFormationInstance* const formation
   )
     : CCommandTask(dispatchTask)
-    , CUnitFormAndMoveTaskReservedSlot30()
     , Listener<EAiNavigatorEvent>()
-    , CUnitFormAndMoveTaskReservedSlot40()
     , Listener<EFormationdStatus>()
-    , CUnitFormAndMoveTaskReservedSlot50()
     , Listener<ECommandEvent>()
     , mFormation(formation)
     , mFormationArrivalSatisfied(0)
@@ -199,14 +142,12 @@ namespace moho
 
     if (CUnitCommandQueue* const queue = mUnit->CommandQueue; queue != nullptr) {
       if (CUnitCommand* const currentCommand = queue->GetCurrentCommand(); currentCommand != nullptr) {
-        if (Broadcaster* const commandListenerHead = CommandEventListenerHead(currentCommand); commandListenerHead != nullptr) {
-          Listener<ECommandEvent>::mListenerLink.ListLinkBefore(commandListenerHead);
-        }
+        currentCommand->AddListener(this);
       }
     }
 
-    if (Broadcaster* const formationListenerHead = FormationStatusListenerHead(mFormation); formationListenerHead != nullptr) {
-      Listener<EFormationdStatus>::mListenerLink.ListLinkBefore(formationListenerHead);
+    if (mFormation != nullptr) {
+      mFormation->AddListener(this);
     }
 
     ApplyFormationGoalFromCurrentUnit();
@@ -225,9 +166,7 @@ namespace moho
     mUnit->UpdateSpeedThroughStatus();
 
     if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
-      if (Broadcaster* const navigatorListenerHead = NavigatorListenerHead(navigator); navigatorListenerHead != nullptr) {
-        Listener<EAiNavigatorEvent>::mListenerLink.ListLinkBefore(navigatorListenerHead);
-      }
+      navigator->AddListener(this);
     }
 
     if (mOwnerThread != nullptr && !mOwnerThread->mStaged) {
@@ -253,16 +192,16 @@ namespace moho
     }
 
     if (mUnit != nullptr && mUnit->CommandQueue != nullptr && mUnit->CommandQueue->GetCurrentCommand() != nullptr) {
-      Listener<ECommandEvent>::mListenerLink.ListUnlink();
+      Listener<ECommandEvent>::ListUnlink();
     }
 
     if (mFormation != nullptr) {
-      Listener<EFormationdStatus>::mListenerLink.ListUnlink();
+      Listener<EFormationdStatus>::ListUnlink();
     }
 
     if (mUnit != nullptr) {
       if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
-        Listener<EAiNavigatorEvent>::mListenerLink.ListUnlink();
+        Listener<EAiNavigatorEvent>::ListUnlink();
         navigator->AbortMove();
       }
     }

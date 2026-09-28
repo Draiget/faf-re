@@ -19,6 +19,7 @@
 #include "legacy/containers/Map.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/ISessionListener.h"
+#include "moho/unit/Broadcaster.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/VisibilityRect.h"
 #include "moho/command/CommandManager.h"
@@ -40,6 +41,8 @@ namespace moho
   class UserArmy;
   class UserUnit;
   class CWldSession;
+  struct SPauseEvent;
+  struct SSelectionEvent;
   struct SSyncData;
   struct SExtraUnitData;
   struct UserCommandIssueHelper;
@@ -1457,8 +1460,11 @@ namespace moho
     [[nodiscard]] const SSelectionSetUserEntity& ExtraSelectionView() const;
 
   public:
-    gpg::core::IntrusiveLink<CWldSession*> head0;
-    gpg::core::IntrusiveLink<CWldSession*> head1;
+    // `SetSelection` (0x00896140) broadcasts with `esi = session`, and the
+    // pause/resume paths with `add esi, 8`; the destructor ends by unlinking
+    // +0x08 then +0x00 (0x008940AF, 0x008940C8).
+    Broadcaster<SSelectionEvent> mSelectionBroadcaster; // 0x0000
+    Broadcaster<SPauseEvent> mPauseBroadcaster;         // 0x0008
 
     LuaPlus::LuaState* mState;                              // 0x0010
     CTaskStage* mCurThread;                                 // 0x0014
@@ -1604,14 +1610,10 @@ namespace moho
   static_assert(
     sizeof(CWldSession) >= 0x500 && sizeof(CWldSession) <= 0x540, "CWldSession size must remain in expected x86 range"
   );
-  // Two intrusive list heads back to back, and they are not interchangeable:
-  // head0 is the Broadcaster<SSelectionEvent> listener list that
-  // SelectionListener::AttachToSessionListenerLane (0x00869540) links into at
-  // +0x00, head1 is the pause-callback list PauseListener's attach
-  // (0x00869700) links into at +0x08 and that RequestPause / Resume dispatch
-  // through `add esi, 8`.
-  static_assert(offsetof(CWldSession, head0) == 0x00, "CWldSession::head0 offset must be 0x00");
-  static_assert(offsetof(CWldSession, head1) == 0x08, "CWldSession::head1 offset must be 0x08");
+  static_assert(
+    offsetof(CWldSession, mSelectionBroadcaster) == 0x00, "CWldSession::mSelectionBroadcaster offset must be 0x00"
+  );
+  static_assert(offsetof(CWldSession, mPauseBroadcaster) == 0x08, "CWldSession::mPauseBroadcaster offset must be 0x08");
   static_assert(offsetof(CWldSession, mWldMap) == 0x1C, "CWldSession::mWldMap offset must be 0x1C");
   static_assert(offsetof(CWldSession, mLaunchInfo) == 0x20, "CWldSession::mLaunchInfo offset must be 0x20");
   static_assert(offsetof(CWldSession, mEntities) == 0x44, "CWldSession::mEntities offset must be 0x44");

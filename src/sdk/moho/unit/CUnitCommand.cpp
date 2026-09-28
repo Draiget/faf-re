@@ -67,7 +67,6 @@ namespace gpg
 namespace
 {
   using CommandOwnerSlotNode = WeakPtr<CUnitCommand>;
-  using BroadcasterOwnerSlotNode = WeakPtr<Broadcaster>;
   using EntityOwnerSlotNode = WeakPtr<Entity>;
 
   // RUnitBlueprintEconomyCategoryCache is a flat-field spelling of the same
@@ -231,7 +230,6 @@ namespace
   }
 
   static_assert(sizeof(CommandOwnerSlotNode) == sizeof(std::uintptr_t) * 2u, "CommandOwnerSlotNode size");
-  static_assert(sizeof(BroadcasterOwnerSlotNode) == sizeof(std::uintptr_t) * 2u, "BroadcasterOwnerSlotNode size");
   static_assert(sizeof(EntityOwnerSlotNode) == sizeof(std::uintptr_t) * 2u, "EntityOwnerSlotNode size");
 
   constexpr std::uint32_t kNoTargetEntityId = 0xF0000000u;
@@ -258,7 +256,7 @@ namespace
     if (!sType) {
       sType = register_Broadcaster_ECommandEvent_RType();
       if (!sType) {
-        sType = gpg::LookupRType(typeid(BroadcasterEventTag<ECommandEvent>));
+        sType = gpg::LookupRType(typeid(Broadcaster<ECommandEvent>));
       }
     }
     return sType;
@@ -274,7 +272,7 @@ namespace
   {
     static gpg::RType* type = nullptr;
     if (!type) {
-      type = gpg::LookupRType(typeid(BroadcasterEventTag<ECommandEvent>));
+      type = gpg::LookupRType(typeid(Broadcaster<ECommandEvent>));
     }
     return type;
   }
@@ -567,17 +565,17 @@ namespace
 
   // The serializer works on the `Broadcaster` secondary base. That slice sits at
   // +0x34 in the binary layout, which is exactly where the compiler puts it:
-  // `CUnitCommand : public CScriptObject, public Broadcaster` and
+  // `CUnitCommand : public CScriptObject, public Broadcaster<ECommandEvent>` and
   // `sizeof(CScriptObject) == 0x34`. So this is a base cast, not pointer
   // arithmetic -- let the compiler compute the adjustment.
   [[nodiscard]] void* BroadcasterSubobjectPtr(CUnitCommand* const command) noexcept
   {
-    return static_cast<Broadcaster*>(command);
+    return static_cast<Broadcaster<ECommandEvent>*>(command);
   }
 
   [[nodiscard]] const void* BroadcasterSubobjectPtr(const CUnitCommand* const command) noexcept
   {
-    return static_cast<const Broadcaster*>(command);
+    return static_cast<const Broadcaster<ECommandEvent>*>(command);
   }
 
   void CopyUnitSetFromEntitySet(const EntitySetTemplate<Unit>& source, SCommandUnitSet& destination)
@@ -1183,7 +1181,6 @@ bool SCommandUnitSet::RemoveUnitSorted(Unit* const unit)
  */
 CUnitCommand::CUnitCommand()
   : CScriptObject()
-  , unk0(nullptr)
   , mSim(nullptr)
   , mConstDat{}
   , mVarDat{}
@@ -1202,9 +1199,6 @@ CUnitCommand::CUnitCommand()
   , mArgs()
   , mUnknownTailInt(0)
 {
-  mPrev = this;
-  mNext = this;
-
   mConstDat.cmd = -1;
   mConstDat.mFormationScriptIndex = -1;
   mConstDat.origin = Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f};
@@ -1255,7 +1249,6 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
       LuaPlus::LuaObject{},
       LuaPlus::LuaObject{}
     )
-  , unk0(nullptr)
   , mSim(sim)
   , mConstDat{}
   , mVarDat{}
@@ -1274,9 +1267,6 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
   , mArgs(issueData.mObject)
   , mUnknownTailInt(0)
 {
-  mPrev = this;
-  mNext = this;
-
   (void)InitializePublishedCommandDescriptorFromIssueData(&mConstDat, &issueData);
   mConstDat.cmd = resolvedCommandId;
 
@@ -2149,27 +2139,14 @@ Unit* CUnitCommand::CreateFerryBeacon(
 
 void CUnitCommand::CoordinateWith(CUnitCommand* const other)
 {
-  if (!other) {
-    return;
-  }
-
   if (other->mVarDat.mCmdType != mVarDat.mCmdType) {
     return;
   }
 
-  auto*& ownerSlotHead = reinterpret_cast<CommandOwnerSlotNode*&>(this->Broadcaster::mNext);
-  CommandOwnerSlotNode temp{};
-  temp.ownerLinkSlot = &ownerSlotHead;
-  temp.nextInOwner = ownerSlotHead;
-  ownerSlotHead = &temp;
-
-  // Binary pushes the staged weak node through the typed VC8
-  // `vector<WeakPtr<CUnitCommand>>::push_back` lane (FUN_006E9680), not the
-  // generic vector template; invoke the recovered helper by name so the same
-  // symbol is exercised here.
-  auto& coordinatingOrders = other->mCoordinatingOrders;
-  PushBackWeakPtrCUnitCommand(coordinatingOrders, temp);
-  temp.UnlinkFromOwnerChain();
+  // 0x006E9027: the temporary is a weak pointer on `this` (its chain head is
+  // the `WeakObject` at +0x04), handed to `push_back` (0x006E9680) and
+  // unlinked by its destructor.
+  other->mCoordinatingOrders.push_back(WeakPtr<CUnitCommand>(this));
 }
 
 /**

@@ -38,8 +38,11 @@ namespace moho
   /**
    * VFTABLE: 0x00E1C66C
    * COL:  0x00E725D8
+   *
+   * RTTI: `Listener<NavPath const&>` at +0x00, its node at +0x04 on the path
+   * finder's ring; the one vtable slot is `OnEvent`.
    */
-  class CAiPathNavigator
+  class CAiPathNavigator : public Listener<const SNavPath&>
   {
   public:
     /**
@@ -67,8 +70,10 @@ namespace moho
      *
      * What it does:
      * Consumes one pathfinding callback payload and updates path-state machine.
+     * Several exits leave EAX unset (0x005AF004, 0x005AF16F), so the override
+     * returns nothing.
      */
-    virtual bool OnEvent(const SNavPath& path);
+    void OnEvent(const SNavPath& path) override;
 
     /**
      * Address: 0x005AD6E0 (FUN_005AD6E0)
@@ -164,9 +169,6 @@ namespace moho
       return &mPath;
     }
 
-    [[nodiscard]] static CAiPathNavigator* FromListenerLink(Broadcaster* link) noexcept;
-    [[nodiscard]] static const CAiPathNavigator* FromListenerLink(const Broadcaster* link) noexcept;
-
   private:
     /**
      * Address: 0x005AEC70 (FUN_005AEC70)
@@ -196,7 +198,6 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    Broadcaster mListenerLink;           // +0x04
     EAiPathNavigatorState mState;        // +0x0C
     CAiPathFinder* mPathFinder;          // +0x10
     SNavPath mPath;                      // +0x14
@@ -231,7 +232,6 @@ namespace moho
   };
 
   static_assert(sizeof(CAiPathNavigator) == 0xA8, "CAiPathNavigator size must be 0xA8");
-  static_assert(offsetof(CAiPathNavigator, mListenerLink) == 0x04, "CAiPathNavigator::mListenerLink offset must be 0x04");
   static_assert(offsetof(CAiPathNavigator, mState) == 0x0C, "CAiPathNavigator::mState offset must be 0x0C");
   static_assert(offsetof(CAiPathNavigator, mPathFinder) == 0x10, "CAiPathNavigator::mPathFinder offset must be 0x10");
   static_assert(offsetof(CAiPathNavigator, mPath) == 0x14, "CAiPathNavigator::mPath offset must be 0x14");

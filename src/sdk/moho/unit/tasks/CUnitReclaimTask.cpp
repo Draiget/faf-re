@@ -283,7 +283,7 @@ namespace moho
    * runtime lanes used by reflection allocation paths.
    */
   CUnitReclaimTask::CUnitReclaimTask()
-    : CCommandTaskWithListenerSlot()
+    : CCommandTask()
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetEntity{}
@@ -296,8 +296,6 @@ namespace moho
     , mReclaimRate(0.0f)
     , mReclaimPerSecond{}
   {
-    mListenerPad = 0;
-    mListenerLink.ListResetLinks();
     mTargetEntity.ClearLinkState();
     mTargetPosition.x = 0.0f;
     mTargetPosition.y = 0.0f;
@@ -319,7 +317,7 @@ namespace moho
     Entity* const targetEntity,
     const Wm3::Vector3f& targetPos
   )
-    : CCommandTaskWithListenerSlot(parentTask)
+    : CCommandTask(parentTask)
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetEntity{}
@@ -332,8 +330,6 @@ namespace moho
     , mReclaimRate(0.0f)
     , mReclaimPerSecond{}
   {
-    mListenerPad = 0;
-    mListenerLink.ListResetLinks();
 
     mTargetEntity.ResetFromObject(targetEntity);
 
@@ -359,7 +355,7 @@ namespace moho
       mCommand = mUnit->CommandQueue->GetCurrentCommand();
     }
     if (mCommand != nullptr) {
-      mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(mCommand));
+      mCommand->AddListener(this);
     }
 
     if (mUnit != nullptr && mUnit->AiNavigator != nullptr) {
@@ -382,7 +378,7 @@ namespace moho
    */
   CUnitReclaimTask::~CUnitReclaimTask()
   {
-    mListenerLink.ListUnlink();
+    ListUnlink();
 
     if (Entity* const targetEntity = mTargetEntity.GetObjectPtr(); targetEntity != nullptr) {
       if (Unit* const targetUnit = targetEntity->IsUnit(); targetUnit != nullptr) {

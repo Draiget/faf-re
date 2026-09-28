@@ -21,7 +21,7 @@ namespace moho
   /**
    * Recovered runtime layout used by reclaim-task reflection constructors.
    */
-  class CUnitReclaimTask : public CCommandTaskWithListenerSlot, public Listener<ECommandEvent>
+  class CUnitReclaimTask : public CCommandTask, public Listener<ECommandEvent>
   {
   public:
     static gpg::RType* sType;

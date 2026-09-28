@@ -45,15 +45,6 @@ namespace moho
   static_assert(sizeof(RWeakPtrType<CUnitCommand>) == 0x68, "RWeakPtrType<CUnitCommand> size must be 0x68");
 
   /**
-   * `msvc8::vector<WeakPtr<CUnitCommand>>::push_back` (0x006E9680, cited on
-   * Vector.h); kept only for CUnitCommand.cpp's call site.
-   */
-  void PushBackWeakPtrCUnitCommand(
-    msvc8::vector<WeakPtr<CUnitCommand>>& storage,
-    const WeakPtr<CUnitCommand>& value
-  );
-
-  /**
    * Address: 0x006EBE50 (FUN_006EBE50, sub_6EBE50)
    *
    * What it does:

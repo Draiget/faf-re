@@ -73,7 +73,7 @@ namespace moho
 
   static_assert(sizeof(SCommandUnitSet) == 0x28, "moho::SCommandUnitSet size must be 0x28");
 
-  class CUnitCommand : public CScriptObject, public Broadcaster, public InstanceCounter<CUnitCommand>
+  class CUnitCommand : public CScriptObject, public Broadcaster<ECommandEvent>, public InstanceCounter<CUnitCommand>
   {
   public:
     static gpg::RType* sType;
@@ -292,8 +292,11 @@ namespace moho
      * Address: 0x006E9000 (FUN_006E9000, ?CoordinateWith@CUnitCommand@Moho@@QAEXPAV12@@Z)
      *
      * What it does:
-     * Adds a one-way coordinating-order link from this command to `other`
-     * when command types are compatible.
+     * When both commands have the same type, appends a weak pointer to this
+     * command to `other`'s coordinating orders. The tree used to stage that
+     * weak pointer on the `Broadcaster` ring's link at +0x38 instead of the
+     * `WeakObject` head at +0x04, splicing a vector element into the
+     * command-event listener ring and giving it the wrong owner.
      */
     void CoordinateWith(CUnitCommand* other);
 
@@ -362,8 +365,9 @@ namespace moho
     void RefreshPublishedCommandEvent(bool forceRefresh, SSyncData* syncData);
 
   public:
-    // Placeholder for unresolved leading subobject/layout slice.
-    void* unk0;
+    // +0x3C..+0x3F is the compiler's: `InstanceCounter<CUnitCommand>` sits at
+    // +0x3D (RTTI), padded away from the `Broadcaster` ring that ends with an
+    // empty `boost::noncopyable`, so the first member lands at +0x40.
     Sim* mSim;
     SSTICommandConstantData mConstDat;
     SSTICommandVariableData mVarDat;

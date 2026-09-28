@@ -143,7 +143,7 @@ namespace moho
    * build helper, binds the target weak lane, and primes the repair mode flags.
    */
   CUnitRepairTask::CUnitRepairTask(IAiCommandDispatchImpl* const dispatchTask, Unit* const targetUnit, const bool isSiloBuild)
-    : CCommandTaskWithListenerSlot(static_cast<CCommandTask*>(dispatchTask))
+    : CCommandTask(static_cast<CCommandTask*>(dispatchTask))
     , Listener<ECommandEvent>()
     , mBuildHelper("Repair", mUnit)
     , mCommand(nullptr)
@@ -154,12 +154,11 @@ namespace moho
     , mGuardAssistMode(false)
     , mInheritingWork(false)
   {
-    mListenerLink.ListResetLinks();
 
     if (dispatchTask != nullptr && dispatchTask->mUnit != nullptr && dispatchTask->mUnit->CommandQueue != nullptr) {
       mCommand = dispatchTask->mUnit->CommandQueue->GetCurrentCommand();
       if (mCommand != nullptr) {
-        mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(mCommand));
+        mCommand->AddListener(this);
       }
     }
 
@@ -231,7 +230,7 @@ namespace moho
 
     // Detach the embedded command-event listener from whatever broadcaster
     // ring it currently sits in and reset it to a self-linked singleton.
-    mListenerLink.ListUnlinkSelf();
+    ListUnlink();
 
     // Drop the repairing state bit this task owns on the owner unit.
     mUnit->UnitStateMask &= ~(1ull << UNITSTATE_Repairing);

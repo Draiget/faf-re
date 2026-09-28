@@ -3,7 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "moho/containers/TDatList.h"
+#include "gpg/core/containers/DList.h"
+#include "moho/misc/Listener.h"
 
 namespace gpg
 {
@@ -19,160 +20,122 @@ namespace moho
   struct SDiskWatchEvent;
   struct SNavPath;
 
-  class Broadcaster : public TDatList<Broadcaster, void>
+  /**
+   * The publishing side of `Listener<TEvent>`: a ring of subscribed
+   * listeners, notified in ring order by `BroadcastEvent`.
+   *
+   * RTTI names every instantiation (`Broadcaster<ECommandEvent>` at
+   * `CUnitCommand`+0x34, `Broadcaster<SD3DDeviceEvent const&>` at
+   * `ID3DDevice`+0x04, ...) but lists no base beneath any of them, so the
+   * ring head is a member, not a `gpg::DList` base: a base would appear in
+   * the owner's base-class array with its `boost::noncopyable`, as
+   * `Listener<TEvent>`'s `DListItem` does.
+   */
+  template <class TEvent>
+  class Broadcaster
   {
   public:
+    using listener_type = Listener<TEvent>;
+
     /**
-     * The ring mechanic every `BroadcastEvent` below is built on, written once.
+     * Address: 0x005F42C0 (FUN_005F42C0, `this` = head in ECX, listener in
+     *   EAX: a null-checked cast to the node, unlink, then link before the
+     *   head. Called out of line from the melee attack task's `Starting`
+     *   state; formerly `CUnitMeleeAttackTargetTask::RelinkAiAttackerListener`)
+     * Address: 0x005F4310 (FUN_005F4310, byte-identical copy)
+     * Address: 0x00651EF0 (FUN_00651EF0, byte-identical copy; formerly
+     *   `RelinkOwnerNodeOffset04BeforeAnchor`)
+     * Address: 0x005E9D50 (FUN_005E9D50, byte-identical copy; formerly
+     *   `RelinkOwnerNodeBeforeAnchor`)
+     * Address: 0x005F4560 (FUN_005F4560, a third copy; IDA split it at
+     *   0x005F4567 after the cast, formerly
+     *   `RelinkBroadcasterNodeBeforeAnchor` in Broadcaster.cpp)
      *
-     * A listener is free to unlink or relink itself from inside its own
-     * callback, so the ring cannot be walked in place. Instead the whole ring is
-     * moved onto a local sentinel, and each listener is moved back onto the live
-     * head *before* it is told the event — so a callback that unlinks sees a
-     * consistent ring, and one that relinks lands on the head rather than on the
-     * sentinel that is about to die.
-     *
-     * Every emission is the same instruction sequence, and reads slot `+0x04`
-     * throughout: `empty()` tests it (`mov eax,[esi+4]; cmp eax,esi`),
-     * `pop_front()` takes it, and `push_back()` writes `mov [node+4], head` /
-     * `mov [head], node`. Note that slot `+0x04` is `mNext` *by name* in this
-     * tree and the *prev* link in the binary — see the warning on
-     * `TDatListItem`; the two views agree by slot, which is what matters here.
-     *
-     * `pop_front()` then `push_back()` unlinks the node twice, the second time
-     * on an already-self-linked node. That is not an oversight: the binary emits
-     * both unlink sequences (0x006E9500-0x006E9518 and 0x006E9523-0x006E9534 in
-     * the `ECommandEvent` emission), which is what pins the source to this pair
-     * of calls rather than a single splice.
-     *
-     * Four of the five hand-written copies this replaces walked the ring the
-     * other way — slot `+0x00` and `ListLinkAfter` instead of `+0x04` and
-     * `ListLinkBefore`. Those two mistakes are mirror images, so the ring was
-     * left in the right order and nothing crashed; what they got wrong is the
-     * order listeners are *notified* in, which came out reversed. Only
-     * `Broadcaster::BroadcastEvent(EFormationdStatus)` had it right.
-     *
-     * The binary also inlines `pending`'s destructor (`~TDatListItem`) on both
-     * the early-return and the loop-exit path. Both copies act on an
-     * already-empty node, so no behaviour rides on them.
+     * What it does:
+     * Moves `listener` to the back of this broadcaster's ring, unlinking it
+     * from any ring it is on first.
      */
-    template <class TListener, class TEvent>
-    void DispatchToListeners(const TEvent& event)
+    void AddListener(listener_type* const listener) noexcept
     {
-      Broadcaster pending{};
-
-      if (empty()) {
-        return;
-      }
-
-      move_nodes_to(pending);
-
-      while (!pending.empty()) {
-        auto* const link = static_cast<Broadcaster*>(pending.pop_front());
-        push_back(link);
-
-        if (TListener* const listener = TListener::FromListenerLink(link); listener != nullptr) {
-          (void)listener->OnEvent(event);
-        }
-      }
+      mListeners.push_back(listener);
     }
 
     /**
-     * Address: 0x005DB480 (FUN_005DB480,
-     * `Broadcaster<EAiAttackerEvent>::BroadcastEvent` — unnamed in the lost
-     * database, but instruction-for-instruction the same body as the four
-     * overloads below, reached as `attacker->mListeners` from
-     * `CAiAttackerImpl::SetState` (0x005D7320), `SetDesiredTarget` (0x005D75B0)
-     * and `ForceEngage` (0x005D8650))
-     *
-     * What it does:
-     * Broadcasts one attacker event to all linked listeners. The definition
-     * lives in CAiAttackerImpl.cpp beside the `Listener<EAiAttackerEvent>`
-     * overrides its dispatch resolves to.
-     */
-    void BroadcastEvent(EAiAttackerEvent event);
-
-    /**
+     * Address: 0x005DB480 (FUN_005DB480, `Broadcaster<EAiAttackerEvent>`;
+     *   reached as `attacker->BroadcastEvent` from `CAiAttackerImpl::SetState`
+     *   (0x005D7320), `SetDesiredTarget` (0x005D75B0) and `ForceEngage`
+     *   (0x005D8650))
      * Address: 0x0056B070 (FUN_0056B070,
-     * ?BroadcastEvent@?$Broadcaster@W4EFormationdStatus@Moho@@@Moho@@IAEXW4EFormationdStatus@2@@Z)
-     *
-     * What it does:
-     * Broadcasts one formation-status event to all linked listeners while
-     * preserving iteration safety when listeners relink/unlink during
-     * callback. Same intrusive-broadcast shape as the overloads below
-     * (distinct per-T body, not ICF-folded); the definition lives in
-     * CAiFormationInstance.cpp beside its only broadcaster, which is the
-     * `BroadcasterEventTag<EFormationdStatus>` base `IFormationInstance`
-     * carries at mdisp 8.
-     */
-    void BroadcastEvent(EFormationdStatus event);
-
-    /**
+     *   ?BroadcastEvent@?$Broadcaster@W4EFormationdStatus@Moho@@@Moho@@IAEXW4EFormationdStatus@2@@Z)
      * Address: 0x006E94A0 (FUN_006E94A0,
-     * ?BroadcastEvent@?$Broadcaster@W4ECommandEvent@Moho@@@Moho@@IAEXW4ECommandEvent@2@@Z)
-     *
-     * What it does:
-     * Broadcasts one command event to all linked listeners while preserving
-     * iteration safety when listeners relink/unlink during callback.
-     */
-    void BroadcastEvent(ECommandEvent event);
-
-    /**
+     *   ?BroadcastEvent@?$Broadcaster@W4ECommandEvent@Moho@@@Moho@@IAEXW4ECommandEvent@2@@Z)
+     * Address: 0x006E9110 (FUN_006E9110, the ECommandEvent broadcast reached
+     *   through a `CUnitCommand*`: a base adjustment to +0x34 and this call;
+     *   zero callers)
      * Address: 0x006F8070 (FUN_006F8070,
-     * ?BroadcastEvent@?$Broadcaster@W4EUnitCommandQueueStatus@Moho@@@Moho@@IAEXW4EUnitCommandQueueStatus@2@@Z)
-     *
-     * What it does:
-     * Broadcasts one queue-status event to all linked listeners while
-     * preserving iteration safety when listeners relink/unlink during callback.
-     */
-    void BroadcastEvent(EUnitCommandQueueStatus event);
-
-    /**
+     *   ?BroadcastEvent@?$Broadcaster@W4EUnitCommandQueueStatus@Moho@@@Moho@@IAEXW4EUnitCommandQueueStatus@2@@Z)
      * Address: 0x005AAD80 (FUN_005AAD80,
-     * ?BroadcastEvent@?$Broadcaster@ABUSNavPath@Moho@@@Moho@@IAEXABUSNavPath@2@@Z)
+     *   ?BroadcastEvent@?$Broadcaster@ABUNavPath@Moho@@@Moho@@IAEXABUNavPath@2@@Z)
+     * Address: 0x004637D0 (FUN_004637D0, `Broadcaster<SDiskWatchEvent const&>`;
+     *   called with `esi = &watch->mListeners` from `CDiskDirWatch::Update`
+     *   (0x0046264B))
+     * Address: 0x00431D80 (FUN_00431D80, `Broadcaster<SD3DDeviceEvent const&>`,
+     *   `this` in ESI; formerly `DispatchDeviceEventToListeners`)
+     * Address: 0x005A6C50 (FUN_005A6C50, `Broadcaster<EAiNavigatorEvent>`;
+     *   reached from `CAiNavigatorImpl::AbortMove` (0x005A3750), the
+     *   resume-task broadcast (0x005A3730) and the land/air navigators' tick;
+     *   formerly `CAiNavigatorImpl::DispatchNavigatorEvent`)
+     * Address: 0x005E8A30 (FUN_005E8A30, `Broadcaster<EAiTransportEvent>`;
+     *   formerly `BroadcastTransportEvent` in CAiTransportImpl.cpp)
+     * Address: 0x008986F0 (FUN_008986F0,
+     *   ?BroadcastEvent@?$Broadcaster@USSelectionEvent@Moho@@@Moho@@IAEXUSSelectionEvent@2@@Z;
+     *   `CWldSession::SetSelection`'s publish, formerly
+     *   `BroadcastSelectionEventListeners` calling slot 0 through a raw
+     *   vtable cast)
+     * Address: 0x00898820 (FUN_00898820, `Broadcaster<SPauseEvent>`, reached
+     *   from `CWldSession::RequestPause`/`Resume` with `add esi, 8`;
+     *   formerly `DispatchSessionPauseCallbacks`)
+     * Address: 0x007AE2B0 (FUN_007AE2B0,
+     *   ?BroadcastEvent@?$Broadcaster@USCameraTracking@Moho@@@Moho@@IAEXUSCameraTracking@2@@Z;
+     *   longer only because the by-value event (a string and a flag) is
+     *   copied for each listener's call; formerly
+     *   `BroadcastCameraTrackingEvent` in CameraImpl.cpp)
      *
      * What it does:
-     * Broadcasts one navigation-path payload to all linked path listeners
-     * (CAiPathNavigator) while preserving iteration safety when listeners
-     * relink/unlink themselves during callback. Same intrusive-broadcast shape
-     * as the ECommandEvent / EUnitCommandQueueStatus overloads (distinct per-T
-     * body, not ICF-folded); the definition lives in CAiPathFinder.cpp because
-     * the concrete listener dispatch resolves to CAiPathNavigator::OnEvent.
-     */
-    void BroadcastEvent(const SNavPath& event);
-
-    /**
-     * Address: 0x004637D0 (FUN_004637D0,
-     * `Broadcaster<SDiskWatchEvent const&>::BroadcastEvent` -- unnamed in the
-     * lost database; the same body as the overloads above, called with
-     * `esi = &watch->mListeners` from `CDiskDirWatch::Update` (0x0046264B))
+     * A listener may unlink or relink itself from inside its callback, so the
+     * ring is not walked in place: the whole ring moves onto a local head,
+     * and each listener goes back onto this ring *before* it is told the
+     * event. A callback that unlinks sees a consistent ring; one that relinks
+     * lands here rather than on the local head that is about to die.
      *
-     * What it does:
-     * Delivers one disk-watch event to every `CDiskWatchListener` on the
-     * watch. The definition lives in CDiskWatch.cpp.
+     * Every emission is the same instruction sequence (0x006E94A0 and
+     * 0x00431D80 differ only in the argument push): the empty test reads
+     * slot `+0x04`, `pop_front` takes the node at `+0x04` and casts it to the
+     * listener behind a null test (`lea ecx, [eax-4]`), and `push_back`
+     * casts it back behind a second null test and links it before the head.
+     * `pop_front` then `push_back` unlinks the node twice, the second time on
+     * a self-linked node; the binary emits both sequences, which is what pins
+     * the source to this pair of calls rather than one splice.
      */
-    void BroadcastEvent(const SDiskWatchEvent& event);
-  };
+    void BroadcastEvent(TEvent event)
+    {
+      gpg::DList<listener_type> pending;
+      mListeners.move_nodes_to(pending);
 
-  static_assert(offsetof(Broadcaster, mPrev) == 0x00, "Broadcaster::mPrev offset must be 0x00");
-  static_assert(offsetof(Broadcaster, mNext) == 0x04, "Broadcaster::mNext offset must be 0x04");
-  static_assert(sizeof(Broadcaster) == 0x08, "Broadcaster size must be 0x08");
+      while (!pending.empty()) {
+        listener_type* const listener = pending.pop_front();
+        mListeners.push_back(listener);
+        listener->OnEvent(event);
+      }
+    }
 
-  template <class TEvent>
-  class BroadcasterEventTag : public Broadcaster
-  {
-  public:
-    /// Cached reflection descriptor for this instantiation. The binary keeps
-    /// one static per `Broadcaster<TEvent>`, populated by the base-registration
-    /// helpers on first lookup, so later reflection paths find it resolved
-    /// rather than re-resolving or reading null.
+    /// Cached reflection descriptor for this instantiation.
     inline static gpg::RType* sType = nullptr;
+
+    gpg::DList<listener_type> mListeners; // +0x00
   };
 
-  static_assert(
-    sizeof(BroadcasterEventTag<ECommandEvent>) == sizeof(Broadcaster),
-    "BroadcasterEventTag<ECommandEvent> size must match Broadcaster"
-  );
+  static_assert(sizeof(Broadcaster<std::int32_t>) == 0x08, "Broadcaster<T> size must be 0x08");
 
   /**
    * Address: 0x006F9210 (FUN_006F9210, sub_6F9210)

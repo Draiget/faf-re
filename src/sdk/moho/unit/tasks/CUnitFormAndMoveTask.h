@@ -17,57 +17,12 @@ namespace moho
   class IAiCommandDispatchImpl;
 
   /**
-   * Layout-only carrier for the reserved dword between `CCommandTask` and the
-   * first `Listener<T>` base (complete-object +0x30). Multiple inheritance
-   * lays out non-virtual bases back-to-back in declaration order, so this
-   * 4-byte base positions `Listener<EAiNavigatorEvent>` at exactly +0x34.
-   */
-  struct CUnitFormAndMoveTaskReservedSlot30
-  {
-    std::uint32_t mUnknown0030 = 0u; // +0x00 (complete-object +0x30)
-  };
-  static_assert(
-    sizeof(CUnitFormAndMoveTaskReservedSlot30) == 0x04, "CUnitFormAndMoveTaskReservedSlot30 size must be 0x04"
-  );
-
-  /**
-   * Layout-only carrier for the reserved dword between
-   * `Listener<EAiNavigatorEvent>` and `Listener<EFormationdStatus>`
-   * (complete-object +0x40), positioning `Listener<EFormationdStatus>` at
-   * exactly +0x44.
-   */
-  struct CUnitFormAndMoveTaskReservedSlot40
-  {
-    std::uint32_t mUnknown0040 = 0u; // +0x00 (complete-object +0x40)
-  };
-  static_assert(
-    sizeof(CUnitFormAndMoveTaskReservedSlot40) == 0x04, "CUnitFormAndMoveTaskReservedSlot40 size must be 0x04"
-  );
-
-  /**
-   * Layout-only carrier for the reserved dword between
-   * `Listener<EFormationdStatus>` and `Listener<ECommandEvent>`
-   * (complete-object +0x50), positioning `Listener<ECommandEvent>` at
-   * exactly +0x54.
-   */
-  struct CUnitFormAndMoveTaskReservedSlot50
-  {
-    std::uint32_t mUnknown0050 = 0u; // +0x00 (complete-object +0x50)
-  };
-  static_assert(
-    sizeof(CUnitFormAndMoveTaskReservedSlot50) == 0x04, "CUnitFormAndMoveTaskReservedSlot50 size must be 0x04"
-  );
-
-  /**
    * Recovered form-and-move command task.
    */
   class CUnitFormAndMoveTask
     : public CCommandTask
-    , public CUnitFormAndMoveTaskReservedSlot30
     , public Listener<EAiNavigatorEvent>
-    , public CUnitFormAndMoveTaskReservedSlot40
     , public Listener<EFormationdStatus>
-    , public CUnitFormAndMoveTaskReservedSlot50
     , public Listener<ECommandEvent>
   {
   public:
@@ -182,18 +137,6 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitFormAndMoveTask) == 0x68, "CUnitFormAndMoveTask size must be 0x68");
-  // The seven-base chain (CCommandTask + ReservedSlot30 + Listener<EAiNavigatorEvent>
-  // + ReservedSlot40 + Listener<EFormationdStatus> + ReservedSlot50 +
-  // Listener<ECommandEvent>) must land mFormation, the first genuinely
-  // non-standard-layout member, at exactly +0x60 - offsetof on a member from a
-  // non-first base is not portable, so this checks the running byte total instead.
-  static_assert(
-    sizeof(CCommandTask) + sizeof(CUnitFormAndMoveTaskReservedSlot30) + sizeof(Listener<EAiNavigatorEvent>)
-        + sizeof(CUnitFormAndMoveTaskReservedSlot40) + sizeof(Listener<EFormationdStatus>)
-        + sizeof(CUnitFormAndMoveTaskReservedSlot50) + sizeof(Listener<ECommandEvent>)
-      == 0x60,
-    "CUnitFormAndMoveTask base-class chain must total 0x60 bytes"
-  );
   static_assert(offsetof(CUnitFormAndMoveTask, mFormation) == 0x60, "CUnitFormAndMoveTask::mFormation offset must be 0x60");
   static_assert(
     offsetof(CUnitFormAndMoveTask, mFormationArrivalSatisfied) == 0x64,

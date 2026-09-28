@@ -104,7 +104,7 @@ namespace moho
   {
     gpg::RType* baseType = register_Broadcaster_EUnitCommandQueueStatus_RType();
     if (baseType == nullptr) {
-      baseType = gpg::LookupRType(typeid(Broadcaster));
+      baseType = gpg::LookupRType(typeid(Broadcaster<EUnitCommandQueueStatus>));
     }
 
     gpg::RField baseField{};

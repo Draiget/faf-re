@@ -153,15 +153,6 @@ namespace
     return !unit.IsUnitState(moho::UNITSTATE_TransportLoading) && !unit.IsUnitState(moho::UNITSTATE_Refueling);
   }
 
-  [[nodiscard]] moho::Broadcaster* NavigatorListenerHead(moho::IAiNavigator* const navigator) noexcept
-  {
-    if (!navigator) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::Broadcaster*>(&navigator->mListenerNode);
-  }
-
   /**
    * Address: 0x00618700 (FUN_00618700, inline switch/short-circuit lane)
    *
@@ -260,11 +251,8 @@ namespace moho
    */
   CUnitMoveTask::CUnitMoveTask()
     : CCommandTask()
-    , CUnitMoveTaskReservedSlot30()
     , Listener<EAiNavigatorEvent>()
-    , CUnitMoveTaskReservedSlot40()
     , Listener<EFormationdStatus>()
-    , CUnitMoveTaskReservedSlot50()
     , Listener<ECommandEvent>()
     , mDispatchTask(nullptr)
     , mMoveGoal()
@@ -314,7 +302,7 @@ namespace moho
     // (2 in binary head order) Command-event listener lane: unlink only while
     // the command weak reference still resolves to a live command object.
     if (mCommandRef.GetObjectPtr() != nullptr) {
-      Listener<ECommandEvent>::mListenerLink.ListUnlink();
+      Listener<ECommandEvent>::ListUnlink();
     }
 
     // (3) Ferry-transport weak link: when this task required a transport
@@ -352,7 +340,7 @@ namespace moho
     // next command was classified instant.
     if (mUnit != nullptr) {
       if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
-        Listener<EAiNavigatorEvent>::mListenerLink.ListUnlink();
+        Listener<EAiNavigatorEvent>::ListUnlink();
         if (mNextCmdIsInstant != 0u) {
           navigator->AbortMove();
         }
@@ -370,7 +358,7 @@ namespace moho
       CAiFormationInstance* const formation = command->mFormationInstance;
       if (formation != nullptr && mUnit != nullptr && formation->Contains(mUnit, true) &&
           command->mFormationInstance != nullptr) {
-        Listener<EFormationdStatus>::mListenerLink.ListUnlink();
+        Listener<EFormationdStatus>::ListUnlink();
       }
     }
 
@@ -613,11 +601,8 @@ namespace moho
     const std::uint8_t moveVariant
   )
     : CCommandTask(dispatchTask)
-    , CUnitMoveTaskReservedSlot30()
     , Listener<EAiNavigatorEvent>()
-    , CUnitMoveTaskReservedSlot40()
     , Listener<EFormationdStatus>()
-    , CUnitMoveTaskReservedSlot50()
     , Listener<ECommandEvent>()
     , mDispatchTask(dispatchTask)
     , mMoveGoal(moveGoal)
@@ -643,9 +628,7 @@ namespace moho
     mUnit->UnitStateMask |= 0x0000000000000004ull;
 
     if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
-      if (Broadcaster* const listenerHead = NavigatorListenerHead(navigator); listenerHead != nullptr) {
-        Listener<EAiNavigatorEvent>::mListenerLink.ListLinkBefore(listenerHead);
-      }
+      navigator->AddListener(this);
     }
 
     CUnitCommand* command = mCommandRef.GetObjectPtr();
@@ -660,9 +643,10 @@ namespace moho
       // 0x0061827C `lea ecx, [eax + 0x34]` (eax = the bound command) /
       // 0x0061827F `lea eax, [ebp + 0x54]` -> `add eax, 4`: splice this task's
       // `Listener<ECommandEvent>` node (+0x54, link at +0x58) into the bound
-      // command's broadcaster ring. `CUnitCommand` derives `Broadcaster`
-      // after `CScriptObject`, and `sizeof(CScriptObject) == 0x34`, so the
-      // ring head the binary computes is exactly that base subobject.
+      // command's broadcaster ring. `CUnitCommand` derives
+      // `Broadcaster<ECommandEvent>` after `CScriptObject`, and
+      // `sizeof(CScriptObject) == 0x34`, so the ring head the binary
+      // computes is exactly that base subobject.
       //
       // Without this link `CUnitMoveTask::OnEvent(ECommandEvent)` is dead
       // code and the move never learns that the command it is serving was
@@ -670,7 +654,7 @@ namespace moho
       // (`CUnitPatrolTask`, `CUnitGuardTask`, `CUnitFormAndMoveTask`) makes
       // the same link; `~CUnitMoveTask` already unlinks both nodes below,
       // which is what makes the omission visible.
-      Listener<ECommandEvent>::mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(command));
+      command->AddListener(this);
 
       // 0x006182BC `mov ecx, [esi + 0x118]` = `command->mFormationInstance`
       // (`mUnitSet` ends at +0x118), guarded by the virtual at
@@ -683,7 +667,7 @@ namespace moho
       // `+ 8` is the base upcast, exactly like the `+ 0x34` above.
       if (CAiFormationInstance* const formation = command->mFormationInstance;
           formation != nullptr && formation->Contains(mUnit, true)) {
-        Listener<EFormationdStatus>::mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(formation));
+        formation->AddListener(this);
       }
 
       // 0x00618318 seeds one candidate destination with the zero vector and
@@ -785,7 +769,7 @@ namespace moho
     }
 
     if (mUnit->AiNavigator != nullptr) {
-      Listener<EAiNavigatorEvent>::mListenerLink.ListUnlink();
+      Listener<EAiNavigatorEvent>::ListUnlink();
     }
 
     Unit* const transportUnit = ResolveAssignedTransportUnit(mUnit);

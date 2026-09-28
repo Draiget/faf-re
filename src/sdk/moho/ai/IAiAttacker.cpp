@@ -23,7 +23,6 @@
 
 using namespace moho;
 
-gpg::RType* Broadcaster_EAiAttackerEvent::sType = nullptr;
 gpg::RType* IAiAttacker::sType = nullptr;
 
 namespace moho
@@ -62,7 +61,7 @@ namespace moho
      */
     void Init() override
     {
-      size_ = sizeof(Broadcaster);
+      size_ = sizeof(Broadcaster<EAiAttackerEvent>);
       version_ = 1;
       serLoadFunc_ = &RBroadcasterRType_EAiAttackerEvent::SerLoad;
       serSaveFunc_ = &RBroadcasterRType_EAiAttackerEvent::SerSave;
@@ -468,7 +467,7 @@ void moho::RBroadcasterRType_EAiAttackerEvent::SerLoad(
   gpg::RRef* const ownerRef
 )
 {
-  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster>(objectPtr);
+  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster<moho::EAiAttackerEvent>>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
   if (!archive || !broadcaster) {
@@ -478,7 +477,7 @@ void moho::RBroadcasterRType_EAiAttackerEvent::SerLoad(
   moho::Listener<moho::EAiAttackerEvent>* listener = nullptr;
   archive->ReadPointer_Listener_EAiAttackerEvent(&listener, ownerRef);
   while (listener != nullptr) {
-    listener->mListenerLink.ListLinkBefore(broadcaster);
+    broadcaster->AddListener(listener);
     archive->ReadPointer_Listener_EAiAttackerEvent(&listener, ownerRef);
   }
 }
@@ -498,7 +497,7 @@ void moho::RBroadcasterRType_EAiAttackerEvent::SerSave(
   gpg::RRef* const
 )
 {
-  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster_EAiAttackerEvent>(objectPtr);
+  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster<moho::EAiAttackerEvent>>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
   if (!archive || !broadcaster) {
@@ -508,19 +507,7 @@ void moho::RBroadcasterRType_EAiAttackerEvent::SerSave(
   const gpg::RRef nullOwner{};
   gpg::RRef pointerRef{};
 
-  for (
-    moho::Broadcaster* node = static_cast<moho::Broadcaster*>(broadcaster->mNext);
-    node != broadcaster;
-    node = static_cast<moho::Broadcaster*>(node->mNext)
-  ) {
-    moho::Listener<moho::EAiAttackerEvent>* listener = nullptr;
-    if (node != nullptr) {
-      auto* const bytePtr = reinterpret_cast<std::uint8_t*>(node);
-      listener = reinterpret_cast<moho::Listener<moho::EAiAttackerEvent>*>(
-        bytePtr - offsetof(moho::Listener<moho::EAiAttackerEvent>, mListenerLink)
-      );
-    }
-
+  for (moho::Listener<moho::EAiAttackerEvent>* const listener : broadcaster->mListeners.owners()) {
     (void)gpg::RRef_Listener_EAiAttackerEvent(&pointerRef, listener);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
   }
@@ -829,7 +816,7 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SetCount(void* const obj, const int
  * Address: 0x005D6A80 (FUN_005D6A80)
  *
  * What it does:
- * Installs the interface vtable; `mListeners`' constructor self-links the
+ * Installs the interface vtable; the `Broadcaster` base self-links the
  * listener ring.
  */
 IAiAttacker::IAiAttacker() = default;
@@ -840,7 +827,7 @@ IAiAttacker::IAiAttacker() = default;
  *   states of both `CAiAttackerImpl` constructors and its destructor)
  *
  * What it does:
- * Nothing of its own: `mListeners`' destructor unlinks the listener ring.
+ * Nothing of its own: the `Broadcaster` base's destructor unlinks the listener ring.
  */
 IAiAttacker::~IAiAttacker() = default;
 
@@ -853,7 +840,7 @@ IAiAttacker::~IAiAttacker() = default;
 gpg::RType* moho::preregister_RBroadcasterRType_EAiAttackerEvent()
 {
   auto* const type = AcquireBroadcasterAttackerType();
-  gpg::PreRegisterRType(typeid(moho::Broadcaster_EAiAttackerEvent), type);
+  gpg::PreRegisterRType(typeid(moho::Broadcaster<moho::EAiAttackerEvent>), type);
   return type;
 }
 

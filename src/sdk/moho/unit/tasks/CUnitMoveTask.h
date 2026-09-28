@@ -26,49 +26,10 @@ namespace moho
   enum EFormationdStatus : std::int32_t;
   struct SOCellPos;
 
-  /**
-   * Layout-only carrier for the reserved dword between `CCommandTask` and the
-   * first `Listener<T>` base (complete-object +0x30). Multiple inheritance
-   * lays out non-virtual bases back-to-back in declaration order, so this
-   * 4-byte base positions `Listener<EAiNavigatorEvent>` at exactly +0x34.
-   */
-  struct CUnitMoveTaskReservedSlot30
-  {
-    std::uint32_t mUnknown0030 = 0u; // +0x00 (complete-object +0x30)
-  };
-  static_assert(sizeof(CUnitMoveTaskReservedSlot30) == 0x04, "CUnitMoveTaskReservedSlot30 size must be 0x04");
-
-  /**
-   * Layout-only carrier for the reserved dword between
-   * `Listener<EAiNavigatorEvent>` and `Listener<EFormationdStatus>`
-   * (complete-object +0x40), positioning `Listener<EFormationdStatus>` at
-   * exactly +0x44.
-   */
-  struct CUnitMoveTaskReservedSlot40
-  {
-    std::uint32_t mUnknown0040 = 0u; // +0x00 (complete-object +0x40)
-  };
-  static_assert(sizeof(CUnitMoveTaskReservedSlot40) == 0x04, "CUnitMoveTaskReservedSlot40 size must be 0x04");
-
-  /**
-   * Layout-only carrier for the reserved dword between
-   * `Listener<EFormationdStatus>` and `Listener<ECommandEvent>`
-   * (complete-object +0x50), positioning `Listener<ECommandEvent>` at
-   * exactly +0x54.
-   */
-  struct CUnitMoveTaskReservedSlot50
-  {
-    std::uint32_t mUnknown0050 = 0u; // +0x00 (complete-object +0x50)
-  };
-  static_assert(sizeof(CUnitMoveTaskReservedSlot50) == 0x04, "CUnitMoveTaskReservedSlot50 size must be 0x04");
-
   class CUnitMoveTask
     : public CCommandTask
-    , public CUnitMoveTaskReservedSlot30
     , public Listener<EAiNavigatorEvent>
-    , public CUnitMoveTaskReservedSlot40
     , public Listener<EFormationdStatus>
-    , public CUnitMoveTaskReservedSlot50
     , public Listener<ECommandEvent>
   {
   public:
@@ -209,18 +170,6 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitMoveTask) == 0x98, "CUnitMoveTask size must be 0x98");
-  // The seven-base chain (CCommandTask + ReservedSlot30 + Listener<EAiNavigatorEvent>
-  // + ReservedSlot40 + Listener<EFormationdStatus> + ReservedSlot50 +
-  // Listener<ECommandEvent>) must land mDispatchTask, the first genuinely
-  // non-standard-layout member, at exactly +0x60 - offsetof on a member from a
-  // non-first base is not portable, so this checks the running byte total instead.
-  static_assert(
-    sizeof(CCommandTask) + sizeof(CUnitMoveTaskReservedSlot30) + sizeof(Listener<EAiNavigatorEvent>)
-        + sizeof(CUnitMoveTaskReservedSlot40) + sizeof(Listener<EFormationdStatus>)
-        + sizeof(CUnitMoveTaskReservedSlot50) + sizeof(Listener<ECommandEvent>)
-      == 0x60,
-    "CUnitMoveTask base-class chain must total 0x60 bytes"
-  );
   static_assert(offsetof(CUnitMoveTask, mDispatchTask) == 0x60, "CUnitMoveTask::mDispatchTask offset must be 0x60");
   static_assert(offsetof(CUnitMoveTask, mMoveGoal) == 0x64, "CUnitMoveTask::mMoveGoal offset must be 0x64");
   static_assert(offsetof(CUnitMoveTask, mCommandRef) == 0x88, "CUnitMoveTask::mCommandRef offset must be 0x88");

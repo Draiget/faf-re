@@ -35,28 +35,22 @@ namespace moho
    *   AttachToSessionListenerLane / DetachFromSessionListenerLane).
    * - Secondary base `Listener<SPauseEvent>` mdisp=4 -> vftable@0xE47B58
    *   (1 slot: OnEvent, overridden here by `Receive`, FUN_00869630).
-   * - `DListItem<Listener<SPauseEvent>>` mdisp=8 is the `Broadcaster
-   *   mListenerLink` member owned by the `Listener<SPauseEvent>` subobject
-   *   (object +0x08 = mPrev / +0x0C = mNext).
-   * - `boost::noncopyable_::noncopyable` mixin: constructed once per session,
-   *   never copied.
+   * - `DListItem<Listener<SPauseEvent>>` mdisp=8, the listener's node, with
+   *   the `boost::noncopyable` RTTI lists at the same offset.
    *
    * Object layout:
    *   +0x00 ISessionListener vftable
    *   +0x04 Listener<SPauseEvent> vftable
-   *   +0x08 Broadcaster mPrev  (Listener<SPauseEvent>::mListenerLink)
-   *   +0x0C Broadcaster mNext
+   *   +0x08 the node's two links
    * Complete-object size 0x10.
    *
-   * The session attach/detach hooks reinsert this listener's intrusive node
-   * into the pause lane embedded at `laneContext + 0x08` (see FUN_00869700 /
-   * FUN_00869750), distinct from the SelectionListener lane which anchors at
-   * `laneContext + 0x00`.
+   * The session attach hook subscribes this listener to the session's pause
+   * broadcaster at `session + 0x08` (FUN_00869700); the selection listeners
+   * use the one at `session + 0x00`.
    */
   class PauseListener
     : public ISessionListener
     , public Listener<SPauseEvent>
-    , boost::noncopyable_::noncopyable
   {
   public:
     /**
@@ -64,10 +58,9 @@ namespace moho
      * Slot: 0 (ISessionListener primary vtable)
      *
      * What it does:
-     * Re-links this listener node into the pause lane embedded in `laneContext`
-     * (anchor at `laneContext + 0x08`).
+     * Subscribes this listener to `session->mPauseBroadcaster` (+0x08).
      */
-    void AttachToSessionListenerLane(void* laneContext) override;
+    void AttachToSessionListenerLane(CWldSession* session) override;
 
     /**
      * Address: 0x00869750 (FUN_00869750)
@@ -76,7 +69,7 @@ namespace moho
      * What it does:
      * Unlinks this listener node from its current session-listener lane.
      */
-    void DetachFromSessionListenerLane(void* laneContext) override;
+    void DetachFromSessionListenerLane(CWldSession* session) override;
 
     /**
      * Address: 0x00869630 (FUN_00869630, Moho::PauseListener::Receive)

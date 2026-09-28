@@ -101,10 +101,9 @@ namespace moho
    * Re-links this listener node into the provided session-listener lane
    * (the lane anchor is the session selection broadcaster sentinel).
    */
-  void SelectionListener::AttachToSessionListenerLane(void* const laneContext)
+  void SelectionListener::AttachToSessionListenerLane(CWldSession* const session)
   {
-    auto* const laneAnchor = static_cast<Broadcaster*>(laneContext);
-    this->mListenerLink.ListLinkBefore(laneAnchor);
+    session->mSelectionBroadcaster.AddListener(this);
   }
 
   /**
@@ -114,10 +113,9 @@ namespace moho
    * Detaches this selection-listener node from its current lane and leaves it
    * self-linked.
    */
-  void SelectionListener::DetachFromSessionListenerLane(void* const laneContext)
+  void SelectionListener::DetachFromSessionListenerLane(CWldSession* const)
   {
-    (void)laneContext;
-    this->mListenerLink.ListUnlink();
+    ListUnlink();
   }
 
   /**

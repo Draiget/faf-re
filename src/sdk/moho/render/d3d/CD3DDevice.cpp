@@ -132,90 +132,6 @@ namespace
     return out;
   }
 
-  struct CD3DDeviceEventListenerRuntime
-  {
-    virtual void Receive(const moho::SD3DDeviceEvent& event) = 0;
-
-    moho::Broadcaster mListenerLink{}; // +0x04
-  };
-
-  static_assert(
-    offsetof(CD3DDeviceEventListenerRuntime, mListenerLink) == 0x04,
-    "CD3DDeviceEventListenerRuntime::mListenerLink offset must be 0x04"
-  );
-
-  /**
-   * Address: 0x00431D80 (FUN_00431D80)
-   *
-   * struct_DeviceExitEvent *,Moho::Broadcaster *
-   *
-   * What it does:
-   * Moves one device-listener ring into a temporary pending head, re-links each
-   * listener back to the owner ring, and dispatches one device event.
-   */
-  [[nodiscard]] moho::Broadcaster* DispatchDeviceEventToListeners(
-    const moho::SD3DDeviceEvent& event,
-    moho::Broadcaster* const listenerHead
-  )
-  {
-    moho::Broadcaster pending{};
-    if (listenerHead == nullptr || listenerHead->ListIsSingleton()) {
-      return static_cast<moho::Broadcaster*>(pending.mNext);
-    }
-
-    listenerHead->move_nodes_to(pending);
-
-    for (auto* pendingNode = pending.pop_back(); pendingNode != nullptr; pendingNode = pending.pop_back()) {
-      auto* const node = static_cast<moho::Broadcaster*>(pendingNode);
-      listenerHead->push_front(node);
-
-      auto* const listener = moho::Broadcaster::owner_from_member<
-        CD3DDeviceEventListenerRuntime,
-        moho::Broadcaster,
-        &CD3DDeviceEventListenerRuntime::mListenerLink>(node);
-      if (listener != nullptr) {
-        listener->Receive(event);
-      }
-    }
-
-    return static_cast<moho::Broadcaster*>(pending.mNext);
-  }
-
-  /**
-   * Address: 0x00430D50 (FUN_00430D50, sub_430D50)
-   *
-   * What it does:
-   * Resets one device broadcaster node to singleton self-links during
-   * constructor-lane initialization (vftable reset is compiler-managed).
-   */
-  [[nodiscard]] moho::Broadcaster* ResetDeviceBroadcasterSelfLinks(moho::Broadcaster* const broadcaster)
-  {
-    if (broadcaster == nullptr) {
-      return nullptr;
-    }
-
-    broadcaster->mPrev = broadcaster;
-    broadcaster->mNext = broadcaster;
-    return broadcaster;
-  }
-
-  /**
-   * Address: 0x00430D70 (FUN_00430D70, sub_430D70)
-   *
-   * What it does:
-   * Detaches one device broadcaster node from its current ring and restores
-   * singleton self-links.
-   */
-  [[nodiscard]] moho::Broadcaster* UnlinkAndResetDeviceBroadcaster(moho::Broadcaster* const broadcaster)
-  {
-    if (broadcaster == nullptr) {
-      return nullptr;
-    }
-
-    broadcaster->ListUnlink();
-    return broadcaster;
-  }
-
   /**
    * Address: 0x004408F0 (FUN_004408F0, sub_4408F0)
    *
@@ -450,6 +366,10 @@ namespace
   public:
     /**
      * Address: 0x00430C20 (FUN_00430C20, ??0CD3DDevice@Moho@@QAE@XZ)
+     * Address: 0x00430D50 (FUN_00430D50, the interface-level constructor on
+     *   the global device at 0x010C7C18: `ID3DDevice`'s vtable 0x00E01F04
+     *   and its `Broadcaster` ring at +0x04 self-linked; zero callers, the
+     *   base-constructor step of this one)
      *
      * What it does:
      * Initializes singleton device runtime lanes, broadcaster links, and
@@ -457,8 +377,6 @@ namespace
      */
     CD3DDeviceSingleton()
     {
-      (void)ResetDeviceBroadcasterSelfLinks(static_cast<moho::Broadcaster*>(this));
-
       CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
       runtime->mShowingCursor = 1;
       runtime->mDrawViewportBackground = 1;
@@ -474,6 +392,10 @@ namespace
 
     /**
      * Address: 0x00430DF0 (FUN_00430DF0, ??1CD3DDevice@Moho@@UAE@XZ)
+     * Address: 0x00430D70 (FUN_00430D70, the global device's `Broadcaster`
+     *   ring at 0x010C7C1C unlinked and self-linked -- the base's destructor,
+     *   called from here and from the constructor's unwind path; formerly
+     *   `UnlinkAndResetDeviceBroadcaster`)
      *
      * What it does:
      * Tears down singleton-owned runtime lanes and unlinks device broadcaster
@@ -497,7 +419,6 @@ namespace
       runtime->mSoftwareVP = 0;
       runtime->mDirectDebug = 0;
       runtime->mCurEffect = nullptr;
-      (void)UnlinkAndResetDeviceBroadcaster(static_cast<moho::Broadcaster*>(this));
     }
 
     [[nodiscard]] moho::ID3DDeviceResources* GetResources() override
@@ -544,7 +465,7 @@ namespace
         }
 
         const moho::SD3DDeviceEvent deviceExitEvent{1u, false, {0u, 0u, 0u}};
-        (void)DispatchDeviceEventToListeners(deviceExitEvent, static_cast<moho::Broadcaster*>(this));
+        BroadcastEvent(deviceExitEvent);
         ResetResourcesForContextTransition(mResources, false);
         ResetWorldParticleBuffers();
 
@@ -576,7 +497,7 @@ namespace
         }
 
         const moho::SD3DDeviceEvent deviceInitEvent{0u, false, {0u, 0u, 0u}};
-        (void)DispatchDeviceEventToListeners(deviceInitEvent, static_cast<moho::Broadcaster*>(this));
+        BroadcastEvent(deviceInitEvent);
 
         for (int headIndex = 1; headIndex < headCount; ++headIndex) {
           const gpg::gal::Head& head = context->GetHead(static_cast<unsigned int>(headIndex));
@@ -618,7 +539,7 @@ namespace
         }
 
         const moho::SD3DDeviceEvent deviceExitEvent{1u, true, {0u, 0u, 0u}};
-        (void)DispatchDeviceEventToListeners(deviceExitEvent, static_cast<moho::Broadcaster*>(this));
+        BroadcastEvent(deviceExitEvent);
         ResetResourcesForContextTransition(mResources, true);
         mResources.ClearCachedVertexFormats();
 
@@ -841,7 +762,7 @@ namespace moho
 
     runtime->mDrawViewportBackground = 0u;
     const moho::SD3DDeviceEvent deviceInitEvent{0u, true, {0u, 0u, 0u}};
-    (void)DispatchDeviceEventToListeners(deviceInitEvent, static_cast<moho::Broadcaster*>(this));
+    BroadcastEvent(deviceInitEvent);
 
     if (runtime->mViewport != nullptr) {
       runtime->mViewport->D3DWindowOnDeviceInit(true);

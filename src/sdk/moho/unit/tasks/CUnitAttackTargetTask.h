@@ -42,28 +42,13 @@ namespace moho
    * whose recovered stand-in calls `std::terminate()`. Issuing any attack order
    * aborted the process from the sim thread.
    */
-  /**
-   * `Listener<EAiAttackerEvent>` (0x0C) plus the four-byte slot that separates
-   * it from the `Listener<ECommandEvent>` base at +0x44. Both attack tasks lay
-   * their attacker listener at +0x34 and their command listener at +0x44, which
-   * leaves exactly one dword between the two 0x0C-byte bases.
-   */
-  class AiAttackerListenerWithSlot : public Listener<EAiAttackerEvent>
-  {
-  public:
-    /// +0x40. Never read; present only to place the next base at +0x44.
-    std::uint32_t mListenerPad{0};
-  };
-
-  static_assert(sizeof(AiAttackerListenerWithSlot) == 0x10, "AiAttackerListenerWithSlot size must be 0x10");
-
   class CAttackTargetTask
-    : public CCommandTaskWithListenerSlot
-    , public AiAttackerListenerWithSlot
+    : public CCommandTask
+    , public Listener<EAiAttackerEvent>
     , public Listener<ECommandEvent>
   {
   public:
-    using CCommandTaskWithListenerSlot::CCommandTaskWithListenerSlot;
+    using CCommandTask::CCommandTask;
 
     /**
      * Address: 0x005F27D0 (FUN_005F27D0, Moho::CAttackTargetTask::operator new)
@@ -305,7 +290,7 @@ namespace moho
      */
     [[nodiscard]] bool UpdateAttacker(CAiTarget* desiredTarget);
   public:
-    // +0x00..+0x4F are the bases: `CCommandTaskWithListenerSlot`, the
+    // +0x00..+0x4F are the bases: `CCommandTask`, the
     // attacker-event listener and the command-event listener.
     CCommandTask* mDispatchTask;      // +0x50
     CUnitCommand* mCommand;           // +0x54

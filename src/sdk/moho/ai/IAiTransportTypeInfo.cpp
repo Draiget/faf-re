@@ -5,7 +5,7 @@
 #include <typeinfo>
 
 #include "moho/ai/IAiTransport.h"
-#include "moho/unit/Broadcaster.h"
+#include "moho/unit/Broadcaster.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -51,9 +51,9 @@ namespace
    */
   void AddBaseBroadcasterToIAiTransportTypeInfo(gpg::RType* const typeInfo)
   {
-    using BroadcasterEvent = BroadcasterEventTag<EAiTransportEvent>;
+    using BroadcasterEvent = Broadcaster<EAiTransportEvent>;
     if (BroadcasterEvent::sType == nullptr) {
-      BroadcasterEvent::sType = gpg::LookupRType(typeid(Broadcaster));
+      BroadcasterEvent::sType = gpg::LookupRType(typeid(BroadcasterEvent));
     }
 
     gpg::RType* const baseType = BroadcasterEvent::sType;

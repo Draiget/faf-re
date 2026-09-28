@@ -54,6 +54,9 @@ namespace gpg
      *   formerly `ResetConnectionListHead`.)
      * Address: 0x00486110 (FUN_00486110 -- `CNetUDPConnection`'s connector-list
      *   base; formerly `CNetUDPConnection::UnlinkFromConnectorList`.)
+     * Address: 0x00447470 (FUN_00447470 -- `DeviceExitListener`'s listener
+     *   node, from its constructor's unwind path; formerly
+     *   `UnlinkAndResetDeviceListenerLink`.)
      */
     ~DListItem()
     {
@@ -350,6 +353,25 @@ namespace gpg
       item_t* n = this->mPrev;
       n->ListUnlink();
       return n->Get();
+    }
+
+    /**
+     * Move every node onto `pending`, an empty head, and leave this head
+     * empty. Store order as `Broadcaster::BroadcastEvent` inlines it
+     * (0x006E94DA): the two head links, the old front's and back's links
+     * back to the new head, then this head self-links.
+     */
+    void move_nodes_to(DList& pending) noexcept
+    {
+      if (empty()) {
+        return;
+      }
+      pending.mNext = this->mNext;
+      pending.mPrev = this->mPrev;
+      pending.mPrev->mNext = &pending;
+      pending.mNext->mPrev = &pending;
+      this->mNext = this;
+      this->mPrev = this;
     }
 
     /**

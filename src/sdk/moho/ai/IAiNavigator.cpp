@@ -56,7 +56,7 @@ namespace moho
      */
     void Init() override
     {
-      size_ = sizeof(Broadcaster);
+      size_ = sizeof(Broadcaster<EAiNavigatorEvent>);
       version_ = 1;
       serLoadFunc_ = &RBroadcasterRType_EAiNavigatorEvent::SerLoad;
       serSaveFunc_ = &RBroadcasterRType_EAiNavigatorEvent::SerSave;
@@ -184,34 +184,9 @@ namespace
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(BroadcasterEventTag<EAiNavigatorEvent>));
+      cached = gpg::LookupRType(typeid(Broadcaster<EAiNavigatorEvent>));
     }
     return cached;
-  }
-
-  using GenericListNode = moho::TDatListItem<void, void>;
-
-  [[nodiscard]] GenericListNode* GenericNodeFromListener(
-    moho::Listener<moho::EAiNavigatorEvent>* const listener
-  ) noexcept
-  {
-    if (!listener) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<GenericListNode*>(&listener->mListenerLink);
-  }
-
-  [[nodiscard]] moho::Listener<moho::EAiNavigatorEvent>* ListenerFromGenericNode(GenericListNode* const node) noexcept
-  {
-    if (!node) {
-      return nullptr;
-    }
-
-    auto* const bytes = reinterpret_cast<std::uint8_t*>(node);
-    return reinterpret_cast<moho::Listener<moho::EAiNavigatorEvent>*>(
-      bytes - offsetof(moho::Listener<moho::EAiNavigatorEvent>, mListenerLink)
-    );
   }
 
   struct NavigatorGlueTailWordView
@@ -324,7 +299,7 @@ namespace
   [[nodiscard]] gpg::RType* RegisterBroadcasterEAiNavigatorEventType()
   {
     gpg::RType* const type = AcquireBroadcasterNavigatorType();
-    gpg::PreRegisterRType(typeid(moho::BroadcasterEventTag<moho::EAiNavigatorEvent>), type);
+    gpg::PreRegisterRType(typeid(moho::Broadcaster<moho::EAiNavigatorEvent>), type);
     return type;
   }
 
@@ -462,21 +437,19 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerLoad(
   gpg::RRef* const ownerRef
 )
 {
-  auto* const targetRing = reinterpret_cast<GenericListNode*>(
+  auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(
     static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
   );
   GPG_ASSERT(archive != nullptr);
-  GPG_ASSERT(targetRing != nullptr);
-  if (!archive || !targetRing) {
+  GPG_ASSERT(broadcaster != nullptr);
+  if (!archive || !broadcaster) {
     return;
   }
 
   moho::Listener<moho::EAiNavigatorEvent>* listener = nullptr;
   archive->ReadPointer_Listener_EAiNavigatorEvent(&listener, ownerRef);
   while (listener != nullptr) {
-    if (GenericListNode* const listenerNode = GenericNodeFromListener(listener); listenerNode != nullptr) {
-      listenerNode->ListLinkBefore(targetRing);
-    }
+    broadcaster->AddListener(listener);
     archive->ReadPointer_Listener_EAiNavigatorEvent(&listener, ownerRef);
   }
 }
@@ -495,17 +468,17 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerSave(
   gpg::RRef* const ownerRef
 )
 {
-  auto* const sourceRing = reinterpret_cast<GenericListNode*>(
+  auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(
     static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
   );
   GPG_ASSERT(archive != nullptr);
-  GPG_ASSERT(sourceRing != nullptr);
-  if (!archive || !sourceRing) {
+  GPG_ASSERT(broadcaster != nullptr);
+  if (!archive || !broadcaster) {
     return;
   }
 
-  for (GenericListNode* node = sourceRing->mNext; node != sourceRing; node = node->mNext) {
-    (void)WriteUnownedListenerEAiNavigatorEvent(ListenerFromGenericNode(node), archive, ownerRef);
+  for (moho::Listener<moho::EAiNavigatorEvent>* const listener : broadcaster->mListeners.owners()) {
+    (void)WriteUnownedListenerEAiNavigatorEvent(listener, archive, ownerRef);
   }
   (void)WriteUnownedListenerEAiNavigatorEvent(nullptr, archive, ownerRef);
 }
@@ -1353,37 +1326,6 @@ void SNavPath::EraseFrontCells(std::int32_t count) noexcept
 gpg::RType* IAiNavigator::sType = nullptr;
 
 /**
- * Address: 0x005A2CF0 (FUN_005A2CF0, ??0IAiNavigator@Moho@@QAE@XZ)
- *
- * What it does:
- * Initializes IAiNavigator base state and resets `mListenerNode` to a
- * self-linked singleton intrusive node.
- */
-IAiNavigator::IAiNavigator()
-{
-  mListenerNode.ListUnlinkSelf();
-}
-
-/**
- * Address: 0x005A37D0 (FUN_005A37D0)
- *
- * What it does:
- * Alternate base-initialization lane that restores detached listener-node
- * state for one IAiNavigator interface subobject.
- */
-[[maybe_unused]] IAiNavigator* InitializeIAiNavigatorInterfaceLane(
-  IAiNavigator* const navigatorStorage
-) noexcept
-{
-  if (navigatorStorage == nullptr) {
-    return nullptr;
-  }
-
-  navigatorStorage->mListenerNode.ListUnlinkSelf();
-  return navigatorStorage;
-}
-
-/**
  * Address: 0x005A5790 (FUN_005A5790, ?AI_CreatePathingNavigator@Moho@@YAPAVIAiNavigator@1@PAVUnit@1@@Z)
  *
  * What it does:
@@ -1420,6 +1362,8 @@ void moho::AI_ClearPathData()
 }
 
 /**
+ * Address: 0x005A2CF0 (FUN_005A2CF0, the body; the `Broadcaster` base's
+ *   destructor unlinks the listener ring)
  * Address: 0x005A2D30 (FUN_005A2D30, scalar deleting thunk)
  */
 IAiNavigator::~IAiNavigator() = default;
@@ -1440,7 +1384,7 @@ void IAiNavigator::MemberDeserialize(IAiNavigator* const object, gpg::ReadArchiv
   const gpg::RRef ownerRef{};
   archive->Read(
     CachedBroadcasterEAiNavigatorEventType(),
-    object ? static_cast<void*>(&object->mListenerNode) : nullptr,
+    object ? static_cast<void*>(static_cast<Broadcaster<EAiNavigatorEvent>*>(object)) : nullptr,
     ownerRef
   );
 }
@@ -1461,7 +1405,7 @@ void IAiNavigator::MemberSerialize(const IAiNavigator* const object, gpg::WriteA
   const gpg::RRef ownerRef{};
   archive->Write(
     CachedBroadcasterEAiNavigatorEventType(),
-    object ? static_cast<const void*>(&object->mListenerNode) : nullptr,
+    object ? static_cast<const void*>(static_cast<const Broadcaster<EAiNavigatorEvent>*>(object)) : nullptr,
     ownerRef
   );
 }

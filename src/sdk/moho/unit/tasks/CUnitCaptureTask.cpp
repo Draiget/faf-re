@@ -51,27 +51,6 @@ namespace
   constexpr const char* kGetCaptureCostsScript = "GetCaptureCosts";
   constexpr const char* kCaptureCostsError = "Failed to get valid capture costs from the target";
 
-  struct CUnitCommandCommandEventLinkView
-  {
-    std::uint8_t pad_0000_0034[0x34];
-    moho::Broadcaster mCommandEventListenerHead;
-  };
-
-  static_assert(
-    offsetof(CUnitCommandCommandEventLinkView, mCommandEventListenerHead) == 0x34,
-    "CUnitCommandCommandEventLinkView::mCommandEventListenerHead offset must be 0x34"
-  );
-
-  [[nodiscard]] moho::Broadcaster* CommandEventListenerHead(moho::CUnitCommand* const command) noexcept
-  {
-    if (!command) {
-      return nullptr;
-    }
-
-    auto* const view = reinterpret_cast<CUnitCommandCommandEventLinkView*>(command);
-    return &view->mCommandEventListenerHead;
-  }
-
   [[nodiscard]] moho::Entity* ResolveCaptureTargetEntity(const moho::CAiTarget* const commandTarget) noexcept
   {
     if (commandTarget == nullptr) {
@@ -214,7 +193,7 @@ namespace moho
    * bookkeeping/economy lanes.
    */
   CUnitCaptureTask::CUnitCaptureTask()
-    : CCommandTaskWithListenerSlot()
+    : CCommandTask()
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetEntity{}
@@ -225,8 +204,6 @@ namespace moho
     , mConsumptionData(nullptr)
     , mCaptureRate{0.0f, 0.0f}
   {
-    mListenerPad = 0;
-    mListenerLink.ListResetLinks();
     mTargetEntity.ClearLinkState();
   }
 
@@ -238,7 +215,7 @@ namespace moho
    * target/listener ownership links, and seeds owner focus/target blip state.
    */
   CUnitCaptureTask::CUnitCaptureTask(CCommandTask* const parentTask, Entity* const targetEntity)
-    : CCommandTaskWithListenerSlot(parentTask)
+    : CCommandTask(parentTask)
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetEntity{}
@@ -249,8 +226,6 @@ namespace moho
     , mConsumptionData(nullptr)
     , mCaptureRate{0.0f, 0.0f}
   {
-    mListenerPad = 0;
-    mListenerLink.ListResetLinks();
     mTargetEntity.ResetFromObject(targetEntity);
 
     if (mUnit != nullptr) {
@@ -269,8 +244,8 @@ namespace moho
 
     if (mUnit != nullptr && mUnit->CommandQueue != nullptr) {
       mCommand = mUnit->CommandQueue->GetCurrentCommand();
-      if (Broadcaster* const commandListenerHead = CommandEventListenerHead(mCommand); commandListenerHead != nullptr) {
-        mListenerLink.ListLinkBefore(commandListenerHead);
+      if (mCommand != nullptr) {
+        mCommand->AddListener(this);
       }
     }
   }
@@ -612,7 +587,7 @@ namespace moho
    */
   CUnitCaptureTask::~CUnitCaptureTask()
   {
-    mListenerLink.ListUnlink();
+    ListUnlink();
 
     if (mUnit != nullptr) {
       mUnit->FocusEntityRef.ResetObjectPtr<Entity>(nullptr);

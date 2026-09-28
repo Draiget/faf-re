@@ -456,7 +456,7 @@ namespace moho
    * resets target payload, and zeros guard-goal rectangle state.
    */
   CUnitGuardTask::CUnitGuardTask()
-    : CCommandTaskWithListenerSlot()
+    : CCommandTask()
     , Listener<ECommandEvent>()
     , mCommandTask(nullptr)
     , mPrimaryCommandRef{}
@@ -492,35 +492,6 @@ namespace moho
     mGuardGoal.mLayer = static_cast<ELayer>(0);
   }
 
-  namespace
-  {
-    struct CUnitCommandCommandEventLinkView
-    {
-      std::uint8_t pad_0000_0034[0x34];
-      moho::Broadcaster mCommandEventListenerHead;
-    };
-
-    static_assert(
-      offsetof(CUnitCommandCommandEventLinkView, mCommandEventListenerHead) == 0x34,
-      "CUnitCommandCommandEventLinkView::mCommandEventListenerHead offset must be 0x34"
-    );
-
-    /**
-     * Resolves the command-event broadcaster list head embedded at offset 0x34
-     * of a `CUnitCommand`, used to register a guard task's command-event
-     * listener on the command it is linked to.
-     */
-    [[nodiscard]] moho::Broadcaster* CommandEventListenerHead(moho::CUnitCommand* const command) noexcept
-    {
-      if (command == nullptr) {
-        return nullptr;
-      }
-
-      auto* const view = reinterpret_cast<CUnitCommandCommandEventLinkView*>(command);
-      return &view->mCommandEventListenerHead;
-    }
-  } // namespace
-
   /**
    * Address: 0x006111E0 (FUN_006111E0, Moho::CUnitGuardTask::CUnitGuardTask)
    *
@@ -539,7 +510,7 @@ namespace moho
    * and initial task state.
    */
   CUnitGuardTask::CUnitGuardTask(IAiCommandDispatchImpl* const dispatch, CAiTarget* const target)
-    : CCommandTaskWithListenerSlot(dispatch)
+    : CCommandTask(dispatch)
     , Listener<ECommandEvent>()
     , mCommandTask(dispatch)
     , mPrimaryCommandRef{}
@@ -558,7 +529,6 @@ namespace moho
     , mGuardMoveAnchorPosition(Wm3::Vector3f::Zero())
     , mGuardGoal{}
   {
-    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
 
     // Copy the guard target payload, link-inserting the target entity into its
     // owner chain (matches the binary's field-by-field target copy).
@@ -591,10 +561,7 @@ namespace moho
     }
     mCommandRef.ResetFromObject(headCommand);
     if (CUnitCommand* const linkedCommand = mCommandRef.GetObjectPtr(); linkedCommand != nullptr) {
-      if (Broadcaster* const commandListenerHead = CommandEventListenerHead(linkedCommand);
-          commandListenerHead != nullptr) {
-        Listener<ECommandEvent>::mListenerLink.ListLinkBefore(commandListenerHead);
-      }
+      linkedCommand->AddListener(this);
     }
 
     RefreshGuardedUnitFromTarget();
@@ -719,7 +686,7 @@ namespace moho
     // listener from that command's broadcaster chain. The compiler inlines
     // both the unlink-from-ring and the self-link-reset.
     if (mCommandRef.GetObjectPtr() != nullptr) {
-      Listener<ECommandEvent>::mListenerLink.ListUnlink();
+      Listener<ECommandEvent>::ListUnlink();
     }
 
     if (Unit* const unit = mUnit; unit != nullptr) {

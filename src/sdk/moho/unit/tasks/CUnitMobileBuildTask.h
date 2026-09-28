@@ -24,10 +24,10 @@ namespace moho
    * Runtime owner for mobile-build task command/listener lanes.
    *
    * The listener base sits at +0x34 (0x005F6A0B stores that offset), four
-   * bytes past the end of `CCommandTask`; `CCommandTaskWithListenerSlot`
+   * bytes past the end of `CCommandTask`; `CCommandTask`
    * carries the gap.
    */
-  class CUnitMobileBuildTask : public CCommandTaskWithListenerSlot, public Listener<ECommandEvent>
+  class CUnitMobileBuildTask : public CCommandTask, public Listener<ECommandEvent>
   {
   public:
     /**
