@@ -1,5 +1,9 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/ai/CAiAttackerImpl.h"
+
+#include <typeinfo>
+
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/EAiAttackerEvent.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiTarget.h"
@@ -159,21 +163,6 @@ namespace
   std::int32_t gRecoveredCScrLuaMetatableFactoryCAiAttackerImplIndex = 0;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A00 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F599F0 = nullptr;
-
-  [[nodiscard]] IAiAttacker* AsAiAttackerBase(CAiAttackerImpl* const object) noexcept
-  {
-    return reinterpret_cast<IAiAttacker*>(object);
-  }
-
-  [[nodiscard]] const IAiAttacker* AsAiAttackerBase(const CAiAttackerImpl* const object) noexcept
-  {
-    return reinterpret_cast<const IAiAttacker*>(object);
-  }
-
-  [[nodiscard]] CScriptObject* AsScriptObjectBase(CAiAttackerImpl* const object) noexcept
-  {
-    return reinterpret_cast<CScriptObject*>(reinterpret_cast<std::uint8_t*>(object) + 0x0C);
-  }
 
   enum class WeaponTargetRangeStatus : std::int32_t
   {
@@ -544,24 +533,17 @@ void moho::Broadcaster::BroadcastEvent(const EAiAttackerEvent event)
 
 /**
  * Address: 0x005D6BC0 (FUN_005D6BC0, Moho::CAiAttackerImpl::~CAiAttackerImpl
- *   real dtor body — the vtable slot wrapper is 0x005D6A60 / the scalar
- *   deleting dtor at 0x005D6A60 forwards into this body).
+ *   real dtor body; the scalar deleting dtor at 0x005D6A60 forwards into it,
+ *   and 0x005E2330 adjusts from the `CScriptObject` subobject into 0x005D6A60).
  *
  * What it does:
- * Tears down the recovered embedded objects (mTasks vector of owned
- * CAcquireTargetTask*, WeakPtr<CTaskThread> mThread, mWeapons vector
- * of owned UnitWeapon*, CAiTarget mDesiredTarget, CTaskStage mStage,
- * and CScriptObject base subobject) in the same order the binary
- * does, and unlinks the IAiAttacker subobject's intrusive-listener
- * list head at +0x04/+0x08 back to a self-link sentinel. The binary
- * also re-writes the IAiAttacker/CScriptObject vtable slots before
- * each base dtor call so virtual dispatch reaches base methods —
- * the recovered class declaration doesn't yet model the multi-base
- * vtable thunk slot for CAiAttackerImpl::vftable{for CScriptObject},
- * so we directly invoke `CScriptObject::~CScriptObject()` on the
- * embedded subobject and skip the vtable rewrites; observable
- * behavior matches because the binary's rewrite-then-dispatch ends
- * at the same destructor body.
+ * Deletes the owned acquire-target tasks, destroys the owned task thread and
+ * deletes the owned weapons. Everything after
+ * that is compiler-emitted, in reverse declaration order: `mDesiredTarget`'s
+ * weak link, `mTasks`' storage, `mThread`'s weak link (0x005D6CA7),
+ * `mWeapons`' storage, `mStage` (0x005D6CE2), then the
+ * `CScriptObject` base (0x005D6CF0) and the `IAiAttacker` base, whose
+ * listener ring unlinks at 0x005D6CFB.
  *
  * Caller chain: CAiAttackerImplConstruct::Deconstruct
  *   (CAiAttackerImplConstruct.cpp:156) calls
@@ -583,13 +565,12 @@ CAiAttackerImpl::~CAiAttackerImpl()
     }
   }
 
-  // Destroy the owned task thread if it is still alive (binary 0x005D6BE9:
+  // Destroy the owned task thread if it is still alive (binary 0x005D6C1F:
   // `if (mThread.object valid) CTaskThread::Destroy(object)`), right after the
-  // task loop and before the weapon loop. mThread is a WeakPtr whose destructor
-  // is trivial (= default), so the thread is NOT torn down automatically -- it
-  // must be destroyed explicitly here, otherwise the CTaskThread the attacker
-  // created leaks. The returned detached CTaskStage* is discarded, as in the
-  // binary.
+  // task loop and before the weapon loop. mThread is only a weak reference, so
+  // its destructor drops the link but leaves the thread alive; the attacker
+  // created it and has to destroy it. The returned detached CTaskStage* is
+  // discarded, as in the binary.
   if (CTaskThread* const ownedThread = view->mThread.GetObjectPtr()) {
     ownedThread->Destroy();
   }
@@ -600,52 +581,6 @@ CAiAttackerImpl::~CAiAttackerImpl()
       delete weapon;
     }
   }
-
-  // Unlink the mThread WeakPtr from the CTaskThread's weak-ref chain (binary
-  // 0x005D6C6A, between the mTasks and mWeapons storage frees). `WeakPtr`'s
-  // destructor is `= default`, so this one really is a source line and has to
-  // stay. Self-guards, and is a no-op if `Destroy()` above already nulled the
-  // weak lane.
-  view->mThread.UnlinkFromOwnerChain();
-
-  // `mDesiredTarget`'s weak-link unlink, the two vectors' storage release and
-  // `mStage`'s intrusive-list teardown are *not* written here. They are members
-  // now, so MSVC emits each one after this body, in reverse declaration order -
-  // mDesiredTarget, mTasks, mWeapons, mStage - which is the order the binary
-  // tears them down in. Writing them out by hand as well would destroy each
-  // twice; that is exactly the double teardown that made `~CWldMap` fault in
-  // `rb_tree::leftmost` on a null header.
-
-  // The CScriptObject subobject at +0x0C is deliberately NOT destroyed here.
-  //
-  // This used to call `reinterpret_cast<CScriptObject*>(bytes + 0x0C)->
-  // ~CScriptObject()`, which crashed every time a unit was destroyed:
-  // `~CScriptObject` is virtual (CScriptObject.h:85), so the call dispatches
-  // through the vtable pointer at +0x0C -- and the constructor in this same
-  // file states plainly that it leaves that pointer null, because
-  // CScriptObject is abstract and the recovered CAiAttackerImpl deliberately
-  // does not inherit it. Loading a null vptr and reading a slot from it is the
-  // access violation at address 0x00000008 seen in
-  // Unit::~Unit -> ClearUnitOwnedSidecars -> DeleteAndNull<CAiAttackerImpl>.
-  //
-  // The constructor's premise -- "nothing dispatches a virtual through it" --
-  // was simply false, contradicted by this line 55 lines below it.
-  //
-  // Destroying it is also wrong on its own terms: nothing ever constructs it,
-  // so there is no paired construction to undo. The binary's construct and
-  // destruct are both part of the multi-base layout this class does not model,
-  // and modelling only the destroy half is what produced the crash. The
-  // subobject's lanes are zeroed by `mBaseSubobjects`' default member
-  // initialiser and inert, so there is nothing to release.
-
-  // Unlink the IAiAttacker subobject's own listener-ring head at +0x04: the
-  // binary unconditionally lets the head's two neighbours adopt each other and
-  // then self-links it back to the empty sentinel, which is
-  // `TDatListItem::ListUnlinkSelf()`. It used to be open-coded here over
-  // `void**` cursors at `this+0x04`/`this+0x08` and a `successor[1]` /
-  // `predecessor[0]` index pair -- and with `mPrev` at +0x00 and `mNext` at
-  // +0x04, those two locals had their names the wrong way round.
-  (void)AsAiAttackerBase(this)->mListeners.ListUnlinkSelf();
 }
 
 /**
@@ -653,52 +588,16 @@ CAiAttackerImpl::~CAiAttackerImpl()
  *   default ctor)
  *
  * What it does:
- * Initializes the IAiAttacker and CAiAttackerImpl vftable pointers,
- * self-links the IAiAttacker subobject's intrusive-listener list at
- * `+0x04/+0x08`, constructs the embedded CScriptObject base at `+0x0C`,
- * zero-clears the `mUnit` pointer at `+0x40`, in-place constructs the
- * embedded `CTaskStage mStage` at `+0x44`, leaves the `mWeapons`
- * (`+0x58`), `mThread` (`+0x68`), and `mTasks` (`+0x70`) lanes
- * zero-initialized so that their proxy pointers and begin/end/cap
- * triplets read as null, in-place constructs `CAiTarget mDesiredTarget`
- * at `+0x80` and writes the binary's `targetPoint = -1` sentinel,
- * and zero-initializes `mReportingState` at `+0xA0`. Called from
- * `ConstructCAiAttackerImplForResult` (in `CAiAttackerImplConstruct.cpp`)
- * via the `SerConstruct` callback registered at process init by
- * `register_CAiAttackerImplConstruct` (in the
- * `AiAttackerRecoveryBootstrap` static-init lane).
+ * Runs both base constructors (the `IAiAttacker` listener ring self-linked,
+ * then `CScriptObject` at +0x0C), then the members: `mUnit` null, `mStage`
+ * constructed, both vectors, `mThread` and `mDesiredTarget` empty, and
+ * `mReportingState` zero. The body adds the binary's `targetPoint = -1`.
+ * Called from `ConstructCAiAttackerImplForResult` (in
+ * `CAiAttackerImplConstruct.cpp`) via the `SerConstruct` callback registered
+ * at process init by `register_CAiAttackerImplConstruct`.
  */
 CAiAttackerImpl::CAiAttackerImpl() noexcept
 {
-  // Compiler-emitted vtable init has already written
-  // `&CAiAttackerImpl::vftable` at offset +0x00 before this body runs, and the
-  // members from +0x40 on have already been default-constructed - `mStage`
-  // self-linked, both vectors and the WeakPtr zeroed, `mDesiredTarget` and
-  // `mReportingState` value-initialised. Only the opaque base-subobject bytes
-  // at +0x04..+0x40 are this body's to set up; `mBaseSubobjects`' default
-  // member initialiser has already zeroed them.
-  //
-  // This body used to `memset` everything past the vptr and then placement-new
-  // each field back over the top. With the fields typed that would wipe
-  // already-live members and start a second lifetime on each one.
-
-  // IAiAttacker subobject's listener-ring head at +0x04. The binary self-links
-  // it so the ring reads as empty (`mPrev = mNext = &head`), which is
-  // `TDatListItem::ListResetLinks()`; it was open-coded here over two `void**`
-  // cursors into `this+0x04` and `this+0x08`.
-  AsAiAttackerBase(this)->mListeners.ListResetLinks();
-
-  // CScriptObject base subobject at +0x0C. The binary constructs it here and
-  // overrides the slot with the `??_7CAiAttackerImpl@@6BCScriptObject@@@`
-  // thunk-vftable for multi-base virtual dispatch. CScriptObject is an abstract
-  // class (pure `GetClass`/`GetDerivedObjectRef`, protected ctor), so it cannot
-  // be constructed in isolation, and the recovered CAiAttackerImpl deliberately
-  // does not inherit CScriptObject. The memset above already zero-initialises
-  // the subobject's field lanes; the embedded subobject's vtable pointer is left
-  // null because nothing in the recovered CAiAttackerImpl dispatches a virtual
-  // through it (the runtime CScriptObject vtable/thunk setup belongs to the
-  // not-yet-modeled multi-base inheritance and is out of scope here).
-
   // CAiTarget mDesiredTarget at +0x80. Its default constructor leaves every
   // field zero; the binary additionally writes `targetPoint = -1` at +0x18
   // (overall +0x98) as the "no target selected" sentinel, which is a real
@@ -891,7 +790,7 @@ void CAiAttackerImpl::SetDesiredTarget(CAiTarget* const target)
 
   if (view->mReportingState != static_cast<EAiAttackerEvent>(0)) {
     view->mReportingState = kAiAttackerEventCannotTarget;
-    AsAiAttackerBase(this)->mListeners.BroadcastEvent(kAiAttackerEventCannotTarget);
+    mListeners.BroadcastEvent(kAiAttackerEventCannotTarget);
   }
 }
 
@@ -1643,7 +1542,40 @@ void CAiAttackerImpl::ForceEngage(Entity* const target)
   }
 
   view->mUnit->NeedSyncGameData = true;
-  AsAiAttackerBase(this)->mListeners.BroadcastEvent(kAiAttackerEventCanTarget);
+  mListeners.BroadcastEvent(kAiAttackerEventCanTarget);
+}
+
+gpg::RType* CAiAttackerImpl::sType = nullptr;
+
+/**
+ * Address: 0x005D5D20 (FUN_005D5D20, ?GetClass@CAiAttackerImpl@Moho@@UBEPAVRType@gpg@@XZ)
+ *
+ * What it does:
+ * Resolves and caches the reflection descriptor for `CAiAttackerImpl`.
+ */
+gpg::RType* CAiAttackerImpl::GetClass() const
+{
+  gpg::RType* type = CAiAttackerImpl::sType;
+  if (!type) {
+    type = gpg::LookupRType(typeid(CAiAttackerImpl));
+    CAiAttackerImpl::sType = type;
+  }
+  return type;
+}
+
+/**
+ * Address: 0x005D5D40 (FUN_005D5D40, ?GetDerivedObjectRef@CAiAttackerImpl@Moho@@UAE?AVRRef@gpg@@XZ)
+ *
+ * What it does:
+ * Returns a reflection reference to the whole attacker (the `CScriptObject`
+ * subobject adjusted back by 0x0C) typed by `GetClass()`.
+ */
+gpg::RRef CAiAttackerImpl::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
 }
 
 /**
@@ -1654,11 +1586,7 @@ void CAiAttackerImpl::ForceEngage(Entity* const target)
  */
 void CAiAttackerImpl::PushStack(LuaPlus::LuaState* const luaState)
 {
-  if (luaState == nullptr) {
-    return;
-  }
-
-  AsScriptObjectBase(this)->mLuaObj.PushStack(luaState);
+  mLuaObj.PushStack(luaState);
 }
 
 /**
@@ -1696,7 +1624,7 @@ void CAiAttackerImpl::SetState(const State state)
   const auto stateValue = static_cast<std::int32_t>(state);
   if (stateValue != static_cast<std::int32_t>(view->mReportingState)) {
     view->mReportingState = static_cast<EAiAttackerEvent>(stateValue);
-    AsAiAttackerBase(this)->mListeners.BroadcastEvent(static_cast<EAiAttackerEvent>(stateValue));
+    mListeners.BroadcastEvent(static_cast<EAiAttackerEvent>(stateValue));
   }
 }
 

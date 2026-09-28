@@ -826,23 +826,21 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SetCount(void* const obj, const int
 }
 
 /**
- * Address: 0x005D56D0 (FUN_005D56D0)
  * Address: 0x005D6A80 (FUN_005D6A80)
  *
  * What it does:
- * Initializes IAiAttacker base lanes and re-seeds the embedded broadcaster
- * list to self-linked sentinel links; the second constructor lane is an
- * equivalent alias.
+ * Installs the interface vtable; `mListeners`' constructor self-links the
+ * listener ring.
  */
-IAiAttacker::IAiAttacker()
-  : mListeners()
-{
-  mListeners.mNext = &mListeners;
-  mListeners.mPrev = &mListeners;
-}
+IAiAttacker::IAiAttacker() = default;
 
 /**
- * Address: 0x005D5780 (FUN_005D5780)
+ * Address: 0x005D5780 (FUN_005D5780, scalar deleting destructor)
+ * Address: 0x005D56D0 (FUN_005D56D0, the body alone, reached from the unwind
+ *   states of both `CAiAttackerImpl` constructors and its destructor)
+ *
+ * What it does:
+ * Nothing of its own: `mListeners`' destructor unlinks the listener ring.
  */
 IAiAttacker::~IAiAttacker() = default;
 

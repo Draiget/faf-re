@@ -17717,7 +17717,7 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
   // Owned AI implementation lanes.
   {
     gpg::RRef ref{};
-    gpg::RRef_IAiAttacker(&ref, reinterpret_cast<IAiAttacker*>(unit->AiAttacker));
+    gpg::RRef_IAiAttacker(&ref, unit->AiAttacker);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
   {
@@ -17913,7 +17913,7 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
     IAiAttacker* attacker = nullptr;
     archive->ReadPointerOwned_IAiAttacker(&attacker, &ownerRef);
     CAiAttackerImpl* const prior = unit->AiAttacker;
-    unit->AiAttacker = reinterpret_cast<CAiAttackerImpl*>(attacker);
+    unit->AiAttacker = static_cast<CAiAttackerImpl*>(attacker);
     delete prior;
   }
   {

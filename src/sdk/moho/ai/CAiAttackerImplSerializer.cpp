@@ -28,45 +28,6 @@ namespace
   using WeaponPointerVector = msvc8::vector<moho::UnitWeapon*>;
   using AcquireTargetTaskPointerVector = msvc8::vector<moho::CAcquireTargetTask*>;
 
-  struct CAiAttackerImplSerializationView
-  {
-    std::uint8_t pad_00[0x40];
-    moho::Unit* mUnit;                           // +0x40
-    moho::CTaskStage mStage;                     // +0x44
-    WeaponPointerVector mWeapons;                // +0x58
-    moho::WeakPtr<moho::CTaskThread> mThread;    // +0x68
-    AcquireTargetTaskPointerVector mTasks;       // +0x70
-    moho::CAiTarget mDesiredTarget;              // +0x80
-    moho::EAiAttackerEvent mReportingState;      // +0xA0
-  };
-
-  static_assert(offsetof(CAiAttackerImplSerializationView, mUnit) == 0x40, "CAiAttackerImpl::mUnit offset must be 0x40");
-  static_assert(offsetof(CAiAttackerImplSerializationView, mStage) == 0x44, "CAiAttackerImpl::mStage offset must be 0x44");
-  static_assert(
-    offsetof(CAiAttackerImplSerializationView, mWeapons) == 0x58, "CAiAttackerImpl::mWeapons offset must be 0x58"
-  );
-  static_assert(offsetof(CAiAttackerImplSerializationView, mThread) == 0x68, "CAiAttackerImpl::mThread offset must be 0x68");
-  static_assert(offsetof(CAiAttackerImplSerializationView, mTasks) == 0x70, "CAiAttackerImpl::mTasks offset must be 0x70");
-  static_assert(
-    offsetof(CAiAttackerImplSerializationView, mDesiredTarget) == 0x80,
-    "CAiAttackerImpl::mDesiredTarget offset must be 0x80"
-  );
-  static_assert(
-    offsetof(CAiAttackerImplSerializationView, mReportingState) == 0xA0,
-    "CAiAttackerImpl::mReportingState offset must be 0xA0"
-  );
-  static_assert(sizeof(CAiAttackerImplSerializationView) == 0xA4, "CAiAttackerImpl serialized view size must be 0xA4");
-
-  [[nodiscard]] CAiAttackerImplSerializationView* AsSerializationView(moho::CAiAttackerImpl* const object)
-  {
-    return reinterpret_cast<CAiAttackerImplSerializationView*>(object);
-  }
-
-  [[nodiscard]] const CAiAttackerImplSerializationView* AsSerializationView(const moho::CAiAttackerImpl* const object)
-  {
-    return reinterpret_cast<const CAiAttackerImplSerializationView*>(object);
-  }
-
   template <typename T>
   void ResizePointerVector(msvc8::vector<T*>& storage, const unsigned int count)
   {
@@ -79,9 +40,10 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedCAiAttackerImplType()
   {
-    static gpg::RType* cached = nullptr;
+    gpg::RType* cached = CAiAttackerImpl::sType;
     if (!cached) {
       cached = gpg::LookupRType(typeid(CAiAttackerImpl));
+      CAiAttackerImpl::sType = cached;
     }
     return cached;
   }
@@ -162,24 +124,23 @@ void CAiAttackerImpl::DeserializePointerVectors(gpg::ReadArchive* const archive,
     return;
   }
 
-  CAiAttackerImplSerializationView* const view = AsSerializationView(object);
 
   unsigned int weaponCount = 0;
   archive->ReadUInt(&weaponCount);
-  ResizePointerVector(view->mWeapons, weaponCount);
+  ResizePointerVector(object->mWeapons, weaponCount);
 
   for (unsigned int i = 0; i < weaponCount; ++i) {
     gpg::RRef ownerRef{};
-    archive->ReadPointerOwned_UnitWeapon(&view->mWeapons[static_cast<std::size_t>(i)], &ownerRef);
+    archive->ReadPointerOwned_UnitWeapon(&object->mWeapons[static_cast<std::size_t>(i)], &ownerRef);
   }
 
   unsigned int taskCount = 0;
   archive->ReadUInt(&taskCount);
-  ResizePointerVector(view->mTasks, taskCount);
+  ResizePointerVector(object->mTasks, taskCount);
 
   for (unsigned int i = 0; i < taskCount; ++i) {
     gpg::RRef ownerRef{};
-    archive->ReadPointerOwned_CAcquireTargetTask(&view->mTasks[static_cast<std::size_t>(i)], &ownerRef);
+    archive->ReadPointerOwned_CAcquireTargetTask(&object->mTasks[static_cast<std::size_t>(i)], &ownerRef);
   }
 }
 
@@ -196,22 +157,21 @@ void CAiAttackerImpl::SerializePointerVectors(gpg::WriteArchive* const archive, 
     return;
   }
 
-  const CAiAttackerImplSerializationView* const view = AsSerializationView(object);
   const gpg::RRef ownerRef{};
 
-  const unsigned int weaponCount = static_cast<unsigned int>(view->mWeapons.size());
+  const unsigned int weaponCount = static_cast<unsigned int>(object->mWeapons.size());
   archive->WriteUInt(weaponCount);
   for (unsigned int i = 0; i < weaponCount; ++i) {
     gpg::RRef pointerRef{};
-    gpg::RRef_UnitWeapon(&pointerRef, view->mWeapons[static_cast<std::size_t>(i)]);
+    gpg::RRef_UnitWeapon(&pointerRef, object->mWeapons[static_cast<std::size_t>(i)]);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Owned, ownerRef);
   }
 
-  const unsigned int taskCount = static_cast<unsigned int>(view->mTasks.size());
+  const unsigned int taskCount = static_cast<unsigned int>(object->mTasks.size());
   archive->WriteUInt(taskCount);
   for (unsigned int i = 0; i < taskCount; ++i) {
     gpg::RRef pointerRef{};
-    gpg::RRef_CAcquireTargetTask(&pointerRef, view->mTasks[static_cast<std::size_t>(i)]);
+    gpg::RRef_CAcquireTargetTask(&pointerRef, object->mTasks[static_cast<std::size_t>(i)]);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Owned, ownerRef);
   }
 }
@@ -229,7 +189,6 @@ void CAiAttackerImpl::MemberDeserialize(CAiAttackerImpl* const object, gpg::Read
     return;
   }
 
-  CAiAttackerImplSerializationView* const view = AsSerializationView(object);
   gpg::RType* const attackerType = CachedIAiAttackerType();
   gpg::RType* const stageType = CachedCTaskStageType();
   gpg::RType* const threadType = CachedWeakPtrCTaskThreadType();
@@ -245,28 +204,28 @@ void CAiAttackerImpl::MemberDeserialize(CAiAttackerImpl* const object, gpg::Read
     return;
   }
 
-  const gpg::RRef trackedStageRef(&view->mStage, stageType);
+  const gpg::RRef trackedStageRef(&object->mStage, stageType);
   (void)archive->TrackPointer(trackedStageRef);
 
   gpg::RRef ownerRef{};
-  archive->Read(attackerType, object, ownerRef);
+  archive->Read(attackerType, static_cast<IAiAttacker*>(object), ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->ReadPointer_Unit(&view->mUnit, &ownerRef);
+  archive->ReadPointer_Unit(&object->mUnit, &ownerRef);
 
   DeserializePointerVectors(archive, object);
 
   ownerRef = gpg::RRef{};
-  archive->Read(stageType, &view->mStage, ownerRef);
+  archive->Read(stageType, &object->mStage, ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->Read(threadType, &view->mThread, ownerRef);
+  archive->Read(threadType, &object->mThread, ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->Read(targetType, &view->mDesiredTarget, ownerRef);
+  archive->Read(targetType, &object->mDesiredTarget, ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->Read(reportingType, &view->mReportingState, ownerRef);
+  archive->Read(reportingType, &object->mReportingState, ownerRef);
 }
 
 /**
@@ -282,8 +241,7 @@ void CAiAttackerImpl::MemberSerialize(const CAiAttackerImpl* const object, gpg::
     return;
   }
 
-  const CAiAttackerImplSerializationView* const view = AsSerializationView(object);
-  auto* const mutableView = const_cast<CAiAttackerImplSerializationView*>(view);
+  auto* const mutableObject = const_cast<CAiAttackerImpl*>(object);
   gpg::RType* const attackerType = CachedIAiAttackerType();
   gpg::RType* const stageType = CachedCTaskStageType();
   gpg::RType* const threadType = CachedWeakPtrCTaskThreadType();
@@ -299,29 +257,29 @@ void CAiAttackerImpl::MemberSerialize(const CAiAttackerImpl* const object, gpg::
     return;
   }
 
-  const gpg::RRef trackedStageRef(&mutableView->mStage, stageType);
+  const gpg::RRef trackedStageRef(&mutableObject->mStage, stageType);
   (void)archive->PreCreatedPtr(trackedStageRef);
 
   gpg::RRef ownerRef{};
-  archive->Write(attackerType, object, ownerRef);
+  archive->Write(attackerType, static_cast<const IAiAttacker*>(object), ownerRef);
 
   gpg::RRef unitRef{};
-  gpg::RRef_Unit(&unitRef, view->mUnit);
+  gpg::RRef_Unit(&unitRef, object->mUnit);
   gpg::WriteRawPointer(archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
   SerializePointerVectors(archive, object);
 
   ownerRef = gpg::RRef{};
-  archive->Write(stageType, &view->mStage, ownerRef);
+  archive->Write(stageType, &object->mStage, ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->Write(threadType, &view->mThread, ownerRef);
+  archive->Write(threadType, &object->mThread, ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->Write(targetType, &view->mDesiredTarget, ownerRef);
+  archive->Write(targetType, &object->mDesiredTarget, ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->Write(reportingType, &view->mReportingState, ownerRef);
+  archive->Write(reportingType, &object->mReportingState, ownerRef);
 }
 
 // Addresses 0x005DEBB0/0x005E04B0 (deserialize "ThunkA"/"ThunkB" pair) and

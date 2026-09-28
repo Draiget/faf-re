@@ -5,8 +5,10 @@
 #include "legacy/containers/Vector.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/EAiAttackerEvent.h"
+#include "moho/ai/IAiAttacker.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/script/CScriptObject.h"
 #include "moho/task/CTaskThread.h"
 #include "Wm3Vector3.h"
 
@@ -45,15 +47,16 @@ namespace moho
 
   /**
    * VFTABLE: 0x00E1E9CC
+   * VFTABLE: 0x00E1EA44 (the `CScriptObject` subobject at +0x0C)
    * COL:  0x00E75AF8
    *
-   * Layout: 0xA4 = 164 bytes total. Everything from +0x40 on is a real
-   * typed member below, each pinned by an `offsetof` assertion; only
-   * +0x04..+0x40 stays opaque, because it covers the `IAiAttacker`
-   * intrusive-listener list head and the `CScriptObject` subobject, two
-   * bases this class does not model as bases.
+   * RTTI: `IAiAttacker` at 0 (its `Broadcaster<EAiAttackerEvent>` at +0x04),
+   * `CScriptObject` at +0x0C. Both constructors run the two base constructors
+   * (0x005D69C4 installs the interface vtable after self-linking +0x04; the
+   * `CScriptObject` ctor is called at 0x005D69D4), and the destructor ends in
+   * both base destructors (0x005D6CF0, 0x005D6CF5).
    */
-  class CAiAttackerImpl
+  class CAiAttackerImpl : public IAiAttacker, public CScriptObject
   {
   public:
     /**
@@ -119,209 +122,222 @@ namespace moho
      * Slot: 0
      * Demangled: public: __thiscall Moho::CAiAttackerImpl::~CAiAttackerImpl()
      */
-    virtual ~CAiAttackerImpl();
+    ~CAiAttackerImpl() override;
 
     /**
      * Address: 0x005D6D30 (FUN_005D6D30)
      * Slot: 1
      * Demangled: Moho::CAiAttackerImpl::WeaponsOnDestroy
      */
-    virtual void WeaponsOnDestroy();
+    void WeaponsOnDestroy() override;
 
     /**
      * Address: 0x005D5D60 (FUN_005D5D60)
      * Slot: 2
      * Demangled: Moho::CAiAttackerImpl::GetUnit
      */
-    virtual Unit* GetUnit();
+    Unit* GetUnit() override;
 
     /**
      * Address: 0x005D6D80 (FUN_005D6D80)
      * Slot: 3
      * Demangled: Moho::CAiAttackerImpl::WeaponsBusy
      */
-    virtual bool WeaponsBusy();
+    bool WeaponsBusy() override;
 
     /**
      * Address: 0x005D5D80 (FUN_005D5D80)
      * Slot: 4
      * Demangled: Moho::CAiAttackerImpl::GetTaskStage
      */
-    virtual CTaskStage* GetTaskStage();
+    CTaskStage* GetTaskStage() override;
 
     /**
      * Address: 0x005D76E0 (FUN_005D76E0)
      * Slot: 5
      * Demangled: Moho::CAiAttackerImpl::CreateWeapon
      */
-    virtual UnitWeapon* CreateWeapon(RUnitBlueprintWeapon* weaponBlueprint);
+    UnitWeapon* CreateWeapon(RUnitBlueprintWeapon* weaponBlueprint) override;
 
     /**
      * Address: 0x005D5D90 (FUN_005D5D90)
      * Slot: 6
      * Demangled: Moho::CAiAttackerImpl::GetWeaponCount
      */
-    virtual int GetWeaponCount();
+    int GetWeaponCount() override;
 
     /**
      * Address: 0x005D77D0 (FUN_005D77D0)
      * Slot: 7
      * Demangled: Moho::CAiAttackerImpl::GetWeapon
      */
-    virtual UnitWeapon* GetWeapon(int index);
+    UnitWeapon* GetWeapon(int index) override;
 
     /**
      * Address: 0x005D75B0 (FUN_005D75B0)
      * Slot: 8
      * Demangled: Moho::CAiAttackerImpl::SetDesiredTarget
      */
-    virtual void SetDesiredTarget(CAiTarget* target);
+    void SetDesiredTarget(CAiTarget* target) override;
 
     /**
      * Address: 0x005D5D70 (FUN_005D5D70)
      * Slot: 9
      * Demangled: Moho::CAiAttackerImpl::GetDesiredTarget
      */
-    virtual CAiTarget* GetDesiredTarget();
+    CAiTarget* GetDesiredTarget() override;
 
     /**
      * Address: 0x005D7570 (FUN_005D7570)
      * Slot: 10
      * Demangled: Moho::CAiAttackerImpl::OnWeaponHaltFire
      */
-    virtual void OnWeaponHaltFire();
+    void OnWeaponHaltFire() override;
 
     /**
      * Address: 0x005D6FA0 (FUN_005D6FA0)
      * Slot: 11
      * Demangled: Moho::CAiAttackerImpl::CanAttackTarget
      */
-    virtual bool CanAttackTarget(CAiTarget* target);
+    bool CanAttackTarget(CAiTarget* target) override;
 
     /**
      * Address: 0x005D6F40 (FUN_005D6F40)
      * Slot: 12
      * Demangled: Moho::CAiAttackerImpl::PickTarget
      */
-    virtual bool PickTarget(Entity* targetEntity);
+    bool PickTarget(Entity* targetEntity) override;
 
     /**
      * Address: 0x005D7A10 (FUN_005D7A10)
      * Slot: 13
      * Demangled: Moho::CAiAttackerImpl::FindBestEnemy
      */
-    virtual Entity*
-    FindBestEnemy(
+    Entity* FindBestEnemy(
       UnitWeapon* weapon,
       gpg::core::FastVectorN<SWeakRefSlot, 20>* blipsInRange,
       float maxRange,
       bool use3DDistance
-    );
+    ) override;
 
     /**
      * Address: 0x005D6DC0 (FUN_005D6DC0)
      * Slot: 14
      * Demangled: Moho::CAiAttackerImpl::GetTargetWeapon
      */
-    virtual UnitWeapon* GetTargetWeapon(CAiTarget* target);
+    UnitWeapon* GetTargetWeapon(CAiTarget* target) override;
 
     /**
      * Address: 0x005D6E30 (FUN_005D6E30)
      * Slot: 15
      * Demangled: Moho::CAiAttackerImpl::GetPrimaryWeapon
      */
-    virtual UnitWeapon* GetPrimaryWeapon();
+    UnitWeapon* GetPrimaryWeapon() override;
 
     /**
      * Address: 0x005D6E80 (FUN_005D6E80)
      * Slot: 16
      * Demangled: Moho::CAiAttackerImpl::GetMaxWeaponRange
      */
-    virtual float GetMaxWeaponRange();
+    float GetMaxWeaponRange() override;
 
     /**
      * Address: 0x005D7190 (FUN_005D7190)
      * Slot: 17
      * Demangled: Moho::CAiAttackerImpl::VectorIsWithinWeaponAttackRange
      */
-    virtual bool VectorIsWithinWeaponAttackRange(UnitWeapon* weapon, const Wm3::Vector3f* targetPos);
+    bool VectorIsWithinWeaponAttackRange(UnitWeapon* weapon, const Wm3::Vector3f* targetPos) override;
 
     /**
      * Address: 0x005D70E0 (FUN_005D70E0)
      * Slot: 18
      * Demangled: Moho::CAiAttackerImpl::VectorIsWithinAttackRange
      */
-    virtual bool VectorIsWithinAttackRange(const Wm3::Vector3f* targetPos);
+    bool VectorIsWithinAttackRange(const Wm3::Vector3f* targetPos) override;
 
     /**
      * Address: 0x005D7090 (FUN_005D7090)
      * Slot: 19
      * Demangled: Moho::CAiAttackerImpl::TargetIsWithinWeaponAttackRange
      */
-    virtual bool TargetIsWithinWeaponAttackRange(UnitWeapon* weapon, CAiTarget* target);
+    bool TargetIsWithinWeaponAttackRange(UnitWeapon* weapon, CAiTarget* target) override;
 
     /**
      * Address: 0x005D7000 (FUN_005D7000)
      * Slot: 20
      * Demangled: Moho::CAiAttackerImpl::TargetIsWithinAttackRange
      */
-    virtual bool TargetIsWithinAttackRange(CAiTarget* target);
+    bool TargetIsWithinAttackRange(CAiTarget* target) override;
 
     /**
      * Address: 0x005D7210 (FUN_005D7210)
      * Slot: 21
      * Demangled: Moho::CAiAttackerImpl::IsTooClose
      */
-    virtual bool IsTooClose(CAiTarget* target);
+    bool IsTooClose(CAiTarget* target) override;
 
     /**
      * Address: 0x005D7340 (FUN_005D7340)
      * Slot: 22
      * Demangled: Moho::CAiAttackerImpl::IsTargetExempt
      */
-    virtual bool IsTargetExempt(Entity* target);
+    bool IsTargetExempt(Entity* target) override;
 
     /**
      * Address: 0x005D72B0 (FUN_005D72B0)
      * Slot: 23
      * Demangled: Moho::CAiAttackerImpl::HasSlavedTarget
      */
-    virtual CAiTarget* HasSlavedTarget(UnitWeapon** outWeapon);
+    CAiTarget* HasSlavedTarget(UnitWeapon** outWeapon) override;
 
     /**
      * Address: 0x005D5DB0 (FUN_005D5DB0)
      * Slot: 24
      * Demangled: Moho::CAiAttackerImpl::ResetReportingState
      */
-    virtual void ResetReportingState();
+    void ResetReportingState() override;
 
     /**
      * Address: 0x005D7800 (FUN_005D7800)
      * Slot: 25
      * Demangled: Moho::CAiAttackerImpl::TransmitProjectileImpactEvent
      */
-    virtual void TransmitProjectileImpactEvent(UnitWeapon* weapon, Projectile* projectile);
+    void TransmitProjectileImpactEvent(UnitWeapon* weapon, Projectile* projectile) override;
 
     /**
      * Address: 0x005D7870 (FUN_005D7870)
      * Slot: 26
      * Demangled: Moho::CAiAttackerImpl::TransmitBeamImpactEvent
      */
-    virtual void TransmitBeamImpactEvent(UnitWeapon* weapon, CollisionBeamEntity* beam);
+    void TransmitBeamImpactEvent(UnitWeapon* weapon, CollisionBeamEntity* beam) override;
 
     /**
      * Address: 0x005D8650 (FUN_005D8650)
      * Slot: 27
      * Demangled: Moho::CAiAttackerImpl::ForceEngage
      */
-    virtual void ForceEngage(Entity* target);
+    void ForceEngage(Entity* target) override;
 
     /**
      * Address: 0x005D5DC0 (FUN_005D5DC0)
      * Slot: 28
      * Demangled: Moho::CAiAttackerImpl::PushStack
      */
-    virtual void PushStack(LuaPlus::LuaState* luaState);
+    void PushStack(LuaPlus::LuaState* luaState) override;
+
+    /**
+     * Address: 0x005D5D20 (FUN_005D5D20, ?GetClass@CAiAttackerImpl@Moho@@UBEPAVRType@gpg@@XZ)
+     *
+     * VFTable SLOT (`CScriptObject`): 0
+     */
+    gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x005D5D40 (FUN_005D5D40, ?GetDerivedObjectRef@CAiAttackerImpl@Moho@@UAE?AVRRef@gpg@@XZ)
+     *
+     * VFTable SLOT (`CScriptObject`): 1
+     */
+    gpg::RRef GetDerivedObjectRef() override;
 
   public:
     /**
@@ -398,15 +414,9 @@ namespace moho
     // caller, now reads those two typed fields directly.
 
   public:
-    /**
-     * +0x04..+0x40. The vftable pointer the implicit vptr-init writes sits at
-     * +0x00, ahead of this; what follows it is the IAiAttacker subobject's
-     * intrusive-listener list head (+0x04..+0x0C) and the CScriptObject
-     * subobject (+0x0C..+0x40). Neither is modelled as a base here - see the
-     * constructor for why the CScriptObject slot is left inert - so the bytes
-     * stay opaque and the constructor self-links the listener head by hand.
-     */
-    std::uint8_t mBaseSubobjects[0x40 - sizeof(void*)] = {};
+    /// Address: 0x010C7260 (the reflection descriptor `GetClass` and the
+    /// serializer/construct helpers resolve lazily).
+    static gpg::RType* sType;
 
     Unit* mUnit = nullptr;                             // +0x40
     CTaskStage mStage;                                 // +0x44

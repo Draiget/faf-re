@@ -22,9 +22,10 @@ namespace
 {
   [[nodiscard]] gpg::RType* CachedCAiAttackerImplType()
   {
-    static gpg::RType* cached = nullptr;
+    gpg::RType* cached = CAiAttackerImpl::sType;
     if (!cached) {
       cached = gpg::LookupRType(typeid(CAiAttackerImpl));
+      CAiAttackerImpl::sType = cached;
     }
     return cached;
   }

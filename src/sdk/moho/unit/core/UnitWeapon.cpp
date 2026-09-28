@@ -2923,7 +2923,7 @@ namespace moho
     , mSim(attackerImpl->GetUnit()->SimulationRef)
     , mWeaponBlueprint(weaponBlueprint)
     , mProjectileBlueprint(nullptr)
-    , mAttacker(reinterpret_cast<IAiAttacker*>(attackerImpl))
+    , mAttacker(attackerImpl)
     , mAttributes(weaponBlueprint)
     , mUnit(attackerImpl->GetUnit())
     , mWeaponIndex(weaponIndex)
@@ -4093,8 +4093,7 @@ namespace moho
 
     if (mWeaponBlueprint != nullptr && mWeaponBlueprint->ReTargetOnMiss != 0u && mAttacker != nullptr
         && mTarget.targetEntity.GetObjectPtr() != nullptr) {
-      CAiAttackerImpl* const attackerImpl = reinterpret_cast<CAiAttackerImpl*>(mAttacker);
-      attackerImpl->TransmitProjectileImpactEvent(this, projectile);
+      mAttacker->TransmitProjectileImpactEvent(this, projectile);
     }
 
     return projectile;

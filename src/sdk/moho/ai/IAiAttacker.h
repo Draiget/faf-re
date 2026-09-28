@@ -3,16 +3,36 @@
 #include <cstddef>
 
 #include "moho/unit/Broadcaster.h"
+#include "Wm3Vector3.h"
+
+namespace LuaPlus
+{
+  class LuaState;
+} // namespace LuaPlus
 
 namespace gpg
 {
   class RType;
 } // namespace gpg
 
+namespace gpg::core
+{
+  template <class T, std::size_t N>
+  class FastVectorN;
+} // namespace gpg::core
+
 namespace moho
 {
   class CAcquireTargetTask;
+  class CAiTarget;
+  class CollisionBeamEntity;
+  class CTaskStage;
+  class Entity;
+  class Projectile;
+  class Unit;
   class UnitWeapon;
+  struct RUnitBlueprintWeapon;
+  struct SWeakRefSlot;
 
   /**
    * Broadcaster subobject used by `IAiAttacker` event-dispatch lists.
@@ -32,53 +52,59 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005D56D0 (FUN_005D56D0)
      * Address: 0x005D6A80 (FUN_005D6A80)
      *
      * What it does:
-     * Initializes the attacker interface vtable lane and resets the embedded
-     * broadcaster links to a self-linked sentinel state; the second
-     * constructor lane is an equivalent alias.
+     * Installs the interface vtable and self-links the listener ring.
      */
     IAiAttacker();
 
     /**
      * Address: 0x005D5780 (FUN_005D5780)
+     * Address: 0x005D56D0 (FUN_005D56D0)
      *
      * What it does:
-     * Unlinks this attacker from the attacker-event broadcaster list and
-     * conditionally deletes storage in deleting-dtor mode.
+     * Unlinks the listener ring (the member's destructor) and, in the deleting
+     * form, frees the object.
      */
     virtual ~IAiAttacker();
 
-    virtual void purecall1() = 0;
-    virtual void purecall2() = 0;
-    virtual void purecall3() = 0;
-    virtual void purecall4() = 0;
-    virtual void purecall5() = 0;
-    virtual void purecall6() = 0;
-    virtual void purecall7() = 0;
-    virtual void purecall8() = 0;
-    virtual void purecall9() = 0;
-    virtual void purecall10() = 0;
-    virtual void purecall11() = 0;
-    virtual void purecall12() = 0;
-    virtual void purecall13() = 0;
-    virtual void purecall14() = 0;
-    virtual void purecall15() = 0;
-    virtual void purecall16() = 0;
-    virtual void purecall17() = 0;
-    virtual void purecall18() = 0;
-    virtual void purecall19() = 0;
-    virtual void purecall20() = 0;
-    virtual void purecall21() = 0;
-    virtual void purecall22() = 0;
-    virtual void purecall23() = 0;
-    virtual void purecall24() = 0;
-    virtual void purecall25() = 0;
-    virtual void purecall26() = 0;
-    virtual void purecall27() = 0;
-    virtual void purecall28() = 0;
+    // Slots 1..28 are `_purecall` in the interface vtable (0x00E1E7C4) and
+    // resolve to `CAiAttackerImpl`'s overrides (0x00E1E9CC), the only
+    // implementation; names and signatures are that class's.
+    virtual void WeaponsOnDestroy() = 0;                                              // slot 1
+    virtual Unit* GetUnit() = 0;                                                      // slot 2
+    virtual bool WeaponsBusy() = 0;                                                   // slot 3
+    virtual CTaskStage* GetTaskStage() = 0;                                           // slot 4
+    virtual UnitWeapon* CreateWeapon(RUnitBlueprintWeapon* weaponBlueprint) = 0;      // slot 5
+    virtual int GetWeaponCount() = 0;                                                 // slot 6
+    virtual UnitWeapon* GetWeapon(int index) = 0;                                     // slot 7
+    virtual void SetDesiredTarget(CAiTarget* target) = 0;                             // slot 8
+    virtual CAiTarget* GetDesiredTarget() = 0;                                        // slot 9
+    virtual void OnWeaponHaltFire() = 0;                                              // slot 10
+    virtual bool CanAttackTarget(CAiTarget* target) = 0;                              // slot 11
+    virtual bool PickTarget(Entity* targetEntity) = 0;                                // slot 12
+    virtual Entity* FindBestEnemy(
+      UnitWeapon* weapon,
+      gpg::core::FastVectorN<SWeakRefSlot, 20>* blipsInRange,
+      float maxRange,
+      bool use3DDistance
+    ) = 0;                                                                            // slot 13
+    virtual UnitWeapon* GetTargetWeapon(CAiTarget* target) = 0;                       // slot 14
+    virtual UnitWeapon* GetPrimaryWeapon() = 0;                                       // slot 15
+    virtual float GetMaxWeaponRange() = 0;                                            // slot 16
+    virtual bool VectorIsWithinWeaponAttackRange(UnitWeapon* weapon, const Wm3::Vector3f* targetPos) = 0; // slot 17
+    virtual bool VectorIsWithinAttackRange(const Wm3::Vector3f* targetPos) = 0;       // slot 18
+    virtual bool TargetIsWithinWeaponAttackRange(UnitWeapon* weapon, CAiTarget* target) = 0; // slot 19
+    virtual bool TargetIsWithinAttackRange(CAiTarget* target) = 0;                    // slot 20
+    virtual bool IsTooClose(CAiTarget* target) = 0;                                   // slot 21
+    virtual bool IsTargetExempt(Entity* target) = 0;                                  // slot 22
+    virtual CAiTarget* HasSlavedTarget(UnitWeapon** outWeapon) = 0;                   // slot 23
+    virtual void ResetReportingState() = 0;                                           // slot 24
+    virtual void TransmitProjectileImpactEvent(UnitWeapon* weapon, Projectile* projectile) = 0; // slot 25
+    virtual void TransmitBeamImpactEvent(UnitWeapon* weapon, CollisionBeamEntity* beam) = 0;    // slot 26
+    virtual void ForceEngage(Entity* target) = 0;                                     // slot 27
+    virtual void PushStack(LuaPlus::LuaState* luaState) = 0;                          // slot 28
 
   public:
     Broadcaster_EAiAttackerEvent mListeners; // +0x04
