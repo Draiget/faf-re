@@ -5,6 +5,7 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
+#include "gpg/core/containers/DList.h"
 #include "moho/containers/TDatList.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -108,8 +109,13 @@ namespace moho
   /**
    * VFTABLE: 0x00E36F88
    * COL:  0x00E90BB8
+   *
+   * RTTI: `gpg::DListItem<CEconomyEvent>` at +0x48 (mdisp 72), the node on
+   * the owning unit's `mEconomyEventListHead`. It sits four bytes past
+   * `CScriptEvent`'s 0x44 because its `noncopyable` base may not share an
+   * address with the one inside `CScriptObject`.
    */
-  class CEconomyEvent : public CScriptEvent
+  class CEconomyEvent : public CScriptEvent, public gpg::DListItem<CEconomyEvent>
   {
   public:
     /**
@@ -183,7 +189,6 @@ namespace moho
      */
     [[nodiscard]] static gpg::RType* GetPointerType();
 
-    TDatListItem<void, void> mUnitEventNode; // +0x48
     Unit* mUnit;                             // +0x50
     SEconValue mRequestedPerTick;            // +0x54
     CEconRequest* mRequest;                  // +0x5C
@@ -445,7 +450,6 @@ namespace moho
   );
 
 #if defined(MOHO_STRICT_LAYOUT_ASSERTS)
-  static_assert(offsetof(CEconomyEvent, mUnitEventNode) == 0x48, "CEconomyEvent::mUnitEventNode offset must be 0x48");
   static_assert(offsetof(CEconomyEvent, mUnit) == 0x50, "CEconomyEvent::mUnit offset must be 0x50");
   static_assert(
     offsetof(CEconomyEvent, mRequestedPerTick) == 0x54, "CEconomyEvent::mRequestedPerTick offset must be 0x54"

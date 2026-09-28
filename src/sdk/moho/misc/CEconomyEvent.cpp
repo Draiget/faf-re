@@ -1122,7 +1122,6 @@ moho::CEconomyEvent::CEconomyEvent(
   const LuaPlus::LuaObject& progressCallback
 )
   : CScriptEvent()
-  , mUnitEventNode()
   , mUnit(unit)
   , mRequestedPerTick{}
   , mRequest(nullptr)
@@ -1162,7 +1161,6 @@ moho::CEconomyEvent::CEconomyEvent(
  */
 moho::CEconomyEvent::CEconomyEvent()
   : CScriptEvent()
-  , mUnitEventNode()
   , mUnit(nullptr)
   , mRequestedPerTick{}
   , mRequest(nullptr)
@@ -1212,7 +1210,6 @@ moho::CEconomyEvent::~CEconomyEvent()
   ClearUnitRequestedRates(mUnit);
   mProgressCallback = LuaPlus::LuaObject{};
   DestroyEconomyRequestPointer(mRequest);
-  IntrusiveUnlink(mUnitEventNode);
 }
 
 /**
@@ -1413,7 +1410,7 @@ int moho::cfunc_CreateEconomyEventL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject callbackObject(LuaPlus::LuaStackObject(state, 5));
   auto* const event = new CEconomyEvent(unit, energy, mass, duration, callbackObject);
-  IntrusiveLinkBefore(event->mUnitEventNode, unit->mEconomyEventListHead);
+  unit->mEconomyEventListHead.push_back(event);
 
   event->mLuaObj.PushStack(state);
   return 1;

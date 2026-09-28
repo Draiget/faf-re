@@ -1467,16 +1467,6 @@ namespace
     return bone;
   }
 
-  [[nodiscard]] CEconomyEvent* EconomyEventFromNode(TDatListItem<void, void>* const node) noexcept
-  {
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    auto* const rawNode = reinterpret_cast<std::uint8_t*>(node);
-    return reinterpret_cast<CEconomyEvent*>(rawNode - offsetof(CEconomyEvent, mUnitEventNode));
-  }
-
   // `IsSpeedThroughBusyCommandType` (0x00552C10, func_UnitStateIsBusy) lives
   // in moho/command/SSTICommandVariableData.cpp next to the command type it
   // classifies; the formation code calls it too.
@@ -12754,12 +12744,9 @@ namespace
 
   void DestroyUnitEconomyEvents(Unit& unit) noexcept
   {
-    TDatListItem<void, void>* const head = &unit.mEconomyEventListHead;
-    while (head->mNext != head) {
-      CEconomyEvent* const event = EconomyEventFromNode(head->mNext);
-      delete event;
+    while (!unit.mEconomyEventListHead.empty()) {
+      delete unit.mEconomyEventListHead.front();
     }
-    head->ListResetLinks();
   }
 
   void ClearUnitWeakReferences(Unit& unit) noexcept
@@ -13089,9 +13076,8 @@ int Unit::MotionTick()
   const int motionResult =
     (UnitMotion != nullptr) ? static_cast<int>(UnitMotion->MotionTick()) : static_cast<int>(TASKSTATUS_Wait);
 
-  const TDatListItem<void, void>* const econEventsHead = &mEconomyEventListHead;
-  for (TDatListItem<void, void>* node = mEconomyEventListHead.mNext; node != econEventsHead; node = node->mNext) {
-    EconomyEventFromNode(node)->ProcessTick();
+  for (CEconomyEvent* const economyEvent : mEconomyEventListHead) {
+    economyEvent->ProcessTick();
   }
 
   AniActor->UpdateManipulators(mPendingTransform);
@@ -15504,7 +15490,7 @@ void Unit::SerEconomyEvents(gpg::ReadArchive& archive, const int)
   archive.ReadPointerOwned_CEconomyEvent(&economyEvent, &ownerRef);
 
   while (economyEvent != nullptr) {
-    economyEvent->mUnitEventNode.ListLinkBefore(&mEconomyEventListHead);
+    mEconomyEventListHead.push_back(economyEvent);
     economyEvent = nullptr;
     ownerRef = gpg::RRef{};
     archive.ReadPointerOwned_CEconomyEvent(&economyEvent, &ownerRef);
@@ -15520,11 +15506,10 @@ void Unit::SerEconomyEvents(gpg::ReadArchive& archive, const int)
  */
 void Unit::SerEconomyEvents(gpg::WriteArchive& archive, const int) const
 {
-  const TDatListItem<void, void>* const listHead = &mEconomyEventListHead;
-  for (TDatListItem<void, void>* node = mEconomyEventListHead.mNext; node != listHead; node = node->mNext) {
+  for (auto* node = mEconomyEventListHead.mNext; node != &mEconomyEventListHead; node = node->mNext) {
     gpg::RRef eventOwnerRef{};
     gpg::RRef eventRef{};
-    gpg::RRef_CEconomyEvent(&eventRef, EconomyEventFromNode(node));
+    gpg::RRef_CEconomyEvent(&eventRef, node->Get());
     gpg::WriteRawPointer(&archive, eventRef, gpg::TrackedPointerState::Owned, eventOwnerRef);
   }
 

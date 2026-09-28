@@ -11,6 +11,7 @@
 #include <string_view>
 
 #include "boost/shared_ptr.h"
+#include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/String.h"
@@ -2198,7 +2199,7 @@ namespace moho
      *   derivation (confirmed independently via `Moho::CCommandDb::commands`).
      */
     msvc8::map<msvc8::string, float> ArmorMultipliers; // 0x0568
-    TDatListItem<void, void> mEconomyEventListHead;  // 0x0574
+    gpg::DList<CEconomyEvent> mEconomyEventListHead; // 0x0574
     std::uint8_t CurrentTerrainType;                 // 0x057C
     bool mDebugAIStates;                             // 0x057D
     char pad_057E[2];                                // 0x057E
