@@ -16852,7 +16852,7 @@ void Unit::KillCleanup()
   delete commandDispatch;
 
   if (CommandQueue) {
-    CommandQueue->MarkForUnitKillCleanup();
+    CommandQueue->ClearCommandQueue();
   }
 
   auto* attacker = AiAttacker;
@@ -16881,10 +16881,7 @@ void Unit::KillCleanup()
 
   CUnitCommandQueue* queue = CommandQueue;
   CommandQueue = nullptr;
-  if (queue) {
-    queue->DestroyForUnitKillCleanup();
-    ::operator delete(queue);
-  }
+  delete queue;
 }
 
 /**

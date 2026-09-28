@@ -219,20 +219,6 @@ namespace moho
     void ClearCommandQueue();
 
     /**
-      * Alias of FUN_006EE2D0 (non-canonical helper lane).
-     *
-     * Applies pre-destroy queue cleanup and marks owning unit dirty when needed.
-     */
-    void MarkForUnitKillCleanup();
-
-    /**
-      * Alias of FUN_006A4D40 (non-canonical helper lane).
-     *
-     * Runs full queue teardown logic (list unlink + internal buffers cleanup).
-     */
-    void DestroyForUnitKillCleanup();
-
-    /**
      * Address: 0x006EE360 (FUN_006EE360, ?AbortActiveTask@CUnitCommandQueue@Moho@@QAEXXZ)
      *
      * What it does:

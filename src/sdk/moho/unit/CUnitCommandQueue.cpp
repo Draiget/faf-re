@@ -116,14 +116,6 @@ namespace
     unit->MarkNeedsSyncGameData();
   }
 
-  void ReleaseCommandVectorStorage(msvc8::vector<WeakPtr<CUnitCommand>>& commandVec)
-  {
-    while (!commandVec.empty()) {
-      commandVec.back().ResetFromObject(nullptr);
-      commandVec.pop_back();
-    }
-    commandVec = msvc8::vector<WeakPtr<CUnitCommand>>{};
-  }
 } // namespace
 
 gpg::RType* CUnitCommandQueue::sType = nullptr;
@@ -147,13 +139,13 @@ CUnitCommandQueue::CUnitCommandQueue(Unit* const unit)
  * Address: 0x006A4D40 (FUN_006A4D40, ??1CUnitCommandQueue@Moho@@QAE@XZ)
  *
  * What it does:
- * Clears queued commands, releases weak-command storage, and unlinks the
- * queue from broadcaster intrusive lanes.
+ * Clears the queued commands. `mCommandVec`'s destructor then drops each weak
+ * link and frees the storage (0x006A4D77), and the `Broadcaster` base unlinks
+ * the queue's listener ring (0x006A4DA0).
  */
 CUnitCommandQueue::~CUnitCommandQueue()
 {
   ClearCommandQueue();
-  ReleaseCommandVectorStorage(mCommandVec);
 }
 
 /**
@@ -667,30 +659,6 @@ void CUnitCommandQueue::ClearCommandQueue()
 
   mCommandType = EUnitCommandType::UNITCOMMAND_None;
   mNeedsRefresh = true;
-}
-
-/**
-  * Alias of FUN_006EE2D0 (non-canonical helper lane).
- *
- * What it does:
- * Runs pre-destroy queue cleanup only.
- */
-void CUnitCommandQueue::MarkForUnitKillCleanup()
-{
-  ClearCommandQueue();
-}
-
-/**
-  * Alias of FUN_006A4D40 (non-canonical helper lane).
- *
- * What it does:
- * Runs full queue teardown (clear + vector storage release + broadcaster unlink reset).
- */
-void CUnitCommandQueue::DestroyForUnitKillCleanup()
-{
-  ClearCommandQueue();
-  ReleaseCommandVectorStorage(mCommandVec);
-  ListUnlink();
 }
 
 /**
