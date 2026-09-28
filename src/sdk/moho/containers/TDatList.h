@@ -264,11 +264,15 @@ namespace moho
      * Address: 0x005A7AB0 (FUN_005A7AB0 -- a third emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias2` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x005A7AC0 (FUN_005A7AC0 -- `operator++` -- step the cursor to `mNext` for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `AdvanceNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x005A7AF0 (FUN_005A7AF0 -- a fourth emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias3` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x004027D0 (FUN_004027D0), 0x009063A0 (FUN_009063A0),
-     *   0x00906410 (FUN_00906410), 0x009359B0 (FUN_009359B0),
-     *   0x00935E10 (FUN_00935E10), 0x00936220 (FUN_00936220),
-     *   0x009064E0 (FUN_009064E0) -- further byte-identical copies of this
-     *   body (capture the successor, unlink, self-link, return it); formerly
+     * Address: 0x004027D0 (FUN_004027D0)
+     * Address: 0x009063A0 (FUN_009063A0)
+     * Address: 0x00906410 (FUN_00906410)
+     * Address: 0x009359B0 (FUN_009359B0)
+     * Address: 0x00935E10 (FUN_00935E10)
+     * Address: 0x00936220 (FUN_00936220)
+     * Address: 0x009064E0 (FUN_009064E0)
+     *   -- these seven are further byte-identical copies of this body
+     *   (capture the successor, unlink, self-link, return it); formerly
      *   cited on `gpg::SerHelperBase::ResetLinks`, a wrapper whose only
      *   callers were two helper destructors that unlinked twice.
      */
