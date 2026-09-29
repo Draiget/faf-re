@@ -1,5 +1,6 @@
 #include "moho/misc/StartupHelpers.h"
 
+#include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/Set.h"
 
 #include <algorithm>
@@ -73,7 +74,13 @@ namespace
   moho::SAppIdentity gAppIdentity{};
   std::uint8_t gAqtimeInstrumentationMode = 1;
   std::once_flag gAppIdentityInitOnce;
-  moho::CMovieManager* gMovieManager = nullptr;
+  /**
+   * The one `CMovieManager` (0x010C4AF0). `SetupBasicMovieManager` is its
+   * `reset(new CMovieManager)` and `DestroyMovieManagerSingleton` its
+   * `reset()`; the CRT destroys it at exit through the `atexit` destructor
+   * 0x00BE6C80 registers.
+   */
+  msvc8::auto_ptr<moho::CMovieManager> sMovieManager;
   moho::IUserPrefs* gPreferences = nullptr;
 
   constexpr const char* kOptionPrefixes[] = {"/", "-", "+", "\\"};
@@ -150,76 +157,12 @@ namespace
   constexpr char kUnreachableAssertText[] = "Reached the supposably unreachable.";
   constexpr char kScrUnsafeSourcePath[] = "c:\\work\\rts\\main\\code\\src\\core\\ScrUnsafe.cpp";
   constexpr int kScrUnsafeUnknownPathLine = 95;
-  constexpr float kLuaMovieVolumeHardClamp = 2.0f;
-  constexpr float kLuaMovieVolumeMax = 1.0f;
-  constexpr float kLuaMovieVolumeDbFloor = -10000.0f;
+  /** The top of `SetMovieVolume`'s "0.0 - 2.0" range (0x00DFEB0C). */
+  constexpr float kMovieVolumeScriptMax = 2.0f;
   constexpr float kMovieSofdecVideoRefreshHz = 59.939999f;
   constexpr float kWordFloatScale = 65536.0f;
   constexpr std::int32_t kSofdecHeaderTypeMovie = 1;
   constexpr std::int32_t kSofdecHeaderTypeMovieAlt = 3;
-  struct MovieManagerRuntimeView
-  {
-    IDirectSound* mDirectSound = nullptr;               // +0x00
-    IDirectSoundBuffer* mPrimarySoundBuffer = nullptr;  // +0x04
-    float mVolume = 0.0f;                               // +0x08
-  };
-  static_assert(sizeof(MovieManagerRuntimeView) == 0x0C, "MovieManagerRuntimeView size must be 0x0C");
-  static_assert(offsetof(MovieManagerRuntimeView, mVolume) == 0x08, "MovieManagerRuntimeView::mVolume offset must be 0x08");
-
-  /**
-   * Address: 0x00874BD0 (FUN_00874BD0)
-   *
-   * What it does:
-   * Clamps one normalized movie volume lane to `<= 1.0`, converts it into the
-   * legacy DirectSound dB floor range (`[-10000,0]`), stores the converted
-   * value in the manager runtime, and returns the integer dB lane.
-   */
-  [[maybe_unused]] std::int32_t ApplyMovieVolumeLinearDbScale(
-    moho::CMovieManager* const manager,
-    float normalizedVolume
-  ) noexcept
-  {
-    if (normalizedVolume >= 1.0f) {
-      normalizedVolume = 1.0f;
-    }
-
-    const std::int32_t storedDbVolume =
-      static_cast<std::int32_t>(kLuaMovieVolumeDbFloor - (normalizedVolume * kLuaMovieVolumeDbFloor));
-    auto* const runtime = reinterpret_cast<MovieManagerRuntimeView*>(manager);
-    runtime->mVolume = static_cast<float>(storedDbVolume);
-    return storedDbVolume;
-  }
-
-  /**
-   * Address: 0x00874F80 (FUN_00874F80)
-   *
-   * What it does:
-   * Returns the global movie-manager stored volume lane, or `1.0f` when the
-   * singleton has not been created.
-   */
-  [[maybe_unused]] [[nodiscard]] float ResolveMovieVolumeForLuaOrUnityFallback() noexcept
-  {
-    if (gMovieManager != nullptr) {
-      const auto* const runtime = reinterpret_cast<const MovieManagerRuntimeView*>(gMovieManager);
-      return runtime->mVolume;
-    }
-
-    return 1.0f;
-  }
-
-  /**
-   * Address: 0x00875210 (FUN_00875210)
-   *
-   * What it does:
-   * Clears the global movie-manager singleton storage lane and returns the
-   * address of that storage slot.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CMovieManager** ResetMovieManagerSingletonStorageLane() noexcept
-  {
-    gMovieManager = nullptr;
-    return &gMovieManager;
-  }
-
 
   /**
    * Address: 0x008C8700 (FUN_008C8700, func_CpyFile)
@@ -850,7 +793,7 @@ namespace
    */
   int __cdecl GpgSofDecError(std::uint32_t /*ignored*/, const char* const message)
   {
-    gpg::Warnf("SofDec error: %s", message != nullptr ? message : "");
+    gpg::Warnf("SofDec error: %s", message);
     return 0;
   }
 
@@ -3249,8 +3192,8 @@ moho::CScrLuaInitForm* moho::func_SetMovieVolume_LuaFuncDef()
  * Address: 0x00875020 (FUN_00875020, cfunc_SetMovieVolumeL)
  *
  * What it does:
- * Reads one volume argument, validates numeric type, and applies movie-volume
- * transform through process-global movie manager lane when present.
+ * Reads one volume argument, validates numeric type, and hands it to
+ * `MOV_SetVolume`, which the binary carries inline.
  */
 int moho::cfunc_SetMovieVolumeL(LuaPlus::LuaState* const state)
 {
@@ -3265,10 +3208,7 @@ int moho::cfunc_SetMovieVolumeL(LuaPlus::LuaState* const state)
     volumeArg.TypeError("number");
   }
 
-  const float requestedVolume = static_cast<float>(lua_tonumber(rawState, 1));
-  if (gMovieManager != nullptr) {
-    gMovieManager->SetVolumeFromLua(requestedVolume);
-  }
+  MOV_SetVolume(static_cast<float>(lua_tonumber(rawState, 1)));
   return 0;
 }
 
@@ -3307,8 +3247,8 @@ moho::CScrLuaInitForm* moho::func_GetMovieVolume_LuaFuncDef()
  * Address: 0x00875180 (FUN_00875180, cfunc_GetMovieVolumeL)
  *
  * What it does:
- * Validates zero-argument call shape and returns current movie-volume lane
- * (fallback `1.0` when no movie manager exists).
+ * Validates zero-argument call shape and pushes `MOV_GetVolume()`, which the
+ * binary carries inline.
  */
 int moho::cfunc_GetMovieVolumeL(LuaPlus::LuaState* const state)
 {
@@ -3318,7 +3258,7 @@ int moho::cfunc_GetMovieVolumeL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetMovieVolumeHelpText, 0, argumentCount);
   }
 
-  lua_pushnumber(rawState, ResolveMovieVolumeForLuaOrUnityFallback());
+  lua_pushnumber(rawState, MOV_GetVolume());
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -6105,9 +6045,14 @@ std::filesystem::path moho::DISK_GetDataPathScriptFile()
  * Address: 0x00874AF0 (FUN_00874AF0, `Moho::CMovieManager::CMovieManager`)
  *
  * What it does:
- * Initializes movie-audio runtime ownership lanes and Sofdec middleware setup.
+ * Opens DirectSound, hands it to the ADX middleware along with the default
+ * file system and thread setup, routes middleware errors to the log, and
+ * initialises Sofdec for a 59.94 Hz display. The volume starts at 0: full
+ * volume, in DirectSound's attenuation units.
  */
 moho::CMovieManager::CMovieManager()
+  : mDirectSound(nullptr)
+  , mPrimaryBuffer(nullptr)
 {
   CreateDirectSound();
 
@@ -6115,11 +6060,11 @@ moho::CMovieManager::CMovieManager()
   ::ADXPC_SetupFileSystem(nullptr);
   ::ADXM_SetupThrd(nullptr);
 
-  moho::MwsfdInitPrm initParams{};
+  MwsfdInitPrm initParams{};
   initParams.vhz = kMovieSofdecVideoRefreshHz;
   initParams.disp_cycle = 1;
   initParams.disp_latency = 1;
-  initParams.dec_svr = moho::MWSFD_DEC_SVR_MAIN;
+  initParams.dec_svr = MWSFD_DEC_SVR_MAIN;
 
   ::ADXM_SetCbErr(&GpgSofDecError, 0);
   ::mwPlyInitSfdFx(&initParams);
@@ -6130,8 +6075,10 @@ moho::CMovieManager::CMovieManager()
  * Address: 0x00874990 (FUN_00874990, `func_CreateDirectSound`)
  *
  * What it does:
- * Creates DirectSound runtime state and primary sound buffer unless
- * `/nosound` startup flag is present.
+ * Unless `/nosound` is given, creates the DirectSound device at priority
+ * level on the main window and a 48 kHz 16-bit stereo buffer with volume
+ * control. Either later failure releases the device again, so the middleware
+ * runs without sound.
  */
 void moho::CMovieManager::CreateDirectSound()
 {
@@ -6144,11 +6091,11 @@ void moho::CMovieManager::CreateDirectSound()
     return;
   }
 
-  const HWND mainWindowHandle =
-    sMainWindow != nullptr ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle())) : nullptr;
-  if (mainWindowHandle == nullptr || FAILED(mDirectSound->SetCooperativeLevel(mainWindowHandle, DSSCL_PRIORITY))) {
+  const HWND mainWindow = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle()));
+  if (FAILED(mDirectSound->SetCooperativeLevel(mainWindow, DSSCL_PRIORITY))) {
     gpg::Warnf("Failed to set cooperative level.");
-    ReleaseDirectSoundObjects();
+    mDirectSound->Release();
+    mDirectSound = nullptr;
     return;
   }
 
@@ -6165,79 +6112,51 @@ void moho::CMovieManager::CreateDirectSound()
   bufferDesc.dwFlags = DSBCAPS_CTRLVOLUME;
   bufferDesc.dwBufferBytes = 576000;
   bufferDesc.lpwfxFormat = &waveFormat;
-  if (FAILED(mDirectSound->CreateSoundBuffer(&bufferDesc, &mPrimarySoundBuffer, nullptr))) {
+  if (FAILED(mDirectSound->CreateSoundBuffer(&bufferDesc, &mPrimaryBuffer, nullptr))) {
     gpg::Warnf("Failed to create primary sound buffer.");
-    ReleaseDirectSoundObjects();
-  }
-}
-
-void moho::CMovieManager::ReleaseDirectSoundObjects()
-{
-  if (mPrimarySoundBuffer != nullptr) {
-    mPrimarySoundBuffer->Release();
-    mPrimarySoundBuffer = nullptr;
-  }
-  if (mDirectSound != nullptr) {
     mDirectSound->Release();
     mDirectSound = nullptr;
   }
 }
 
 /**
- * Address: 0x00874B90 (FUN_00874B90)
+ * Address: 0x00874B90 (FUN_00874B90, ??1CMovieManager@Moho@@QAE@XZ)
+ * Address: 0x00875290 (FUN_00875290, the scalar deleting destructor: this
+ * body inlined, then `operator delete`)
  *
  * What it does:
- * Shuts down Sofdec runtime lanes and releases owned DirectSound resources
- * without deleting this movie-manager instance.
+ * Shuts Sofdec and the ADX manager down, releases the sound buffer and the
+ * DirectSound device, and runs the ADX PC shutdown hook last.
  */
-void moho::CMovieManager::ShutdownMovieRuntimeNoDelete()
+moho::CMovieManager::~CMovieManager()
 {
   ::mwPlyFinishSfdFx();
   ::ADXM_Finish();
-  ReleaseDirectSoundObjects();
+
+  if (mPrimaryBuffer != nullptr) {
+    mPrimaryBuffer->Release();
+    mPrimaryBuffer = nullptr;
+  }
+  if (mDirectSound != nullptr) {
+    mDirectSound->Release();
+    mDirectSound = nullptr;
+  }
+
+  ::ADXPC_NoOpShutdownCallback();
 }
 
 /**
- * Address: 0x00874F20 (FUN_00874F20, sub_874F20)
- * Address context:
- * - `0x00875020` (`cfunc_SetMovieVolumeL`) applies this transform when
- *   script code sets movie volume.
- */
-void moho::CMovieManager::SetVolumeFromLua(const float requestedVolume)
-{
-  float clampedVolume = requestedVolume;
-  if (clampedVolume >= kLuaMovieVolumeHardClamp) {
-    clampedVolume = kLuaMovieVolumeHardClamp;
-  }
-  if (clampedVolume < 0.0f) {
-    clampedVolume = 0.0f;
-  }
-  if (clampedVolume >= kLuaMovieVolumeMax) {
-    clampedVolume = kLuaMovieVolumeMax;
-  }
-
-  (void)ApplyMovieVolumeLinearDbScale(this, clampedVolume);
-}
-
-/**
- * Address context:
- * - `0x00875180` (`cfunc_GetMovieVolumeL`) reads this stored lane.
- */
-float moho::CMovieManager::GetVolumeForLua() const
-{
-  return mVolume;
-}
-
-/**
- * Address: 0x00875290 (FUN_00875290, `Moho::CMovieManager::Destroy`)
+ * Address: 0x00874BD0 (FUN_00874BD0)
  *
  * What it does:
- * Shuts down movie Sofdec middleware, releases COM interfaces, and destroys this instance.
+ * Stores a linear volume, capped at 1, as DirectSound attenuation in
+ * hundredths of a decibel: `DSBVOLUME_MIN` (-100 dB) for 0 up to 0 for full
+ * volume, truncated to a whole unit.
  */
-void moho::CMovieManager::Destroy()
+void moho::CMovieManager::SetVolume(float volume)
 {
-  ShutdownMovieRuntimeNoDelete();
-  delete this;
+  volume = std::min(1.0f, volume);
+  mVolume = static_cast<float>(static_cast<std::int32_t>(DSBVOLUME_MIN - volume * DSBVOLUME_MIN));
 }
 
 /**
@@ -6909,88 +6828,26 @@ namespace moho
 }
 
 /**
- * Address: 0x00874C20 (FUN_00874C20)
+ * Address: 0x00874C20 (FUN_00874C20, func_SetupBasicMovieManager)
  *
  * What it does:
- * Recreates process-global movie-manager ownership lane.
+ * Creates the movie manager, destroying any previous one first.
  */
 void moho::SetupBasicMovieManager()
 {
-  (void)ReplaceMovieManagerSingleton(new CMovieManager{});
+  sMovieManager.reset(new CMovieManager());
 }
 
 /**
- * Address: 0x00874CA0 (FUN_00874CA0, sub_874CA0)
+ * Address: 0x00874CA0 (FUN_00874CA0)
  *
  * What it does:
- * Destroys the current movie-manager singleton when present and clears the
- * global owner lane.
+ * Destroys the movie manager. `CScApp::Destroy` carries this inline
+ * (0x008D0F9C).
  */
-moho::CMovieManager* moho::DestroyMovieManagerSingleton()
+void moho::DestroyMovieManagerSingleton()
 {
-  CMovieManager* const current = gMovieManager;
-  if (current != nullptr) {
-    current->Destroy();
-  }
-
-  (void)ResetMovieManagerSingletonStorageLane();
-  return current;
-}
-
-/**
- * Address: 0x00875250 (FUN_00875250, sub_875250)
- *
- * What it does:
- * Replaces the global movie-manager singleton, destroying any existing
- * different instance before rebinding.
- */
-moho::CMovieManager* moho::ReplaceMovieManagerSingleton(CMovieManager* const manager)
-{
-  if (manager != gMovieManager && gMovieManager != nullptr) {
-    gMovieManager->Destroy();
-  }
-
-  gMovieManager = manager;
-  return gMovieManager;
-}
-
-/**
- * Address: 0x00875230 (FUN_00875230, movie-manager singleton getter lane)
- *
- * What it does:
- * Returns the process-global movie-manager singleton pointer without creating
- * or replacing it.
- */
-namespace
-{
-  [[maybe_unused]] [[nodiscard]] moho::CMovieManager* MOV_GetMovieManagerSingletonRaw() noexcept
-  {
-    return gMovieManager;
-  }
-
-  /**
-   * Address: 0x00875240 (FUN_00875240, movie-manager singleton getter lane)
-   *
-   * What it does:
-   * Alias entry that returns the same process-global movie-manager singleton
-   * pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CMovieManager* MOV_GetMovieManagerSingletonRawAliasA() noexcept
-  {
-    return MOV_GetMovieManagerSingletonRaw();
-  }
-
-  /**
-   * Address: 0x008752E0 (FUN_008752E0, movie-manager singleton getter lane)
-   *
-   * What it does:
-   * Alias entry that returns the same process-global movie-manager singleton
-   * pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CMovieManager* MOV_GetMovieManagerSingletonRawAliasB() noexcept
-  {
-    return MOV_GetMovieManagerSingletonRaw();
-  }
+  sMovieManager.reset();
 }
 
 /**
@@ -7002,7 +6859,7 @@ namespace
  */
 float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
 {
-  if (gMovieManager == nullptr) {
+  if (sMovieManager.get() == nullptr) {
     gpg::Warnf("Movie component not initialized.");
     return 0.0f;
   }
@@ -7036,5 +6893,37 @@ float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
 
   gpg::Warnf("%s is not a valid SFD file.", requestedPath);
   return 0.0f;
+}
+
+/**
+ * Address: 0x00874F20 (FUN_00874F20)
+ *
+ * What it does:
+ * Clamps a script volume to [0, 2] and hands it to the movie manager, if
+ * there is one. `cfunc_SetMovieVolumeL` (0x00875020) carries this inline.
+ */
+void moho::MOV_SetVolume(float volume)
+{
+  volume = std::max(std::min(kMovieVolumeScriptMax, volume), 0.0f);
+  if (CMovieManager* const manager = sMovieManager.get(); manager != nullptr) {
+    manager->SetVolume(volume);
+  }
+}
+
+/**
+ * Address: 0x00874F80 (FUN_00874F80)
+ *
+ * What it does:
+ * Returns the movie manager's stored volume, or 1 without a manager.
+ * `cfunc_GetMovieVolumeL` (0x00875180) carries this inline.
+ *
+ * The stored value is DirectSound attenuation (-10000..0), not the 0..2 that
+ * `MOV_SetVolume` took, so `GetMovieVolume()` does not return what
+ * `SetMovieVolume()` was given. That is the binary's behaviour.
+ */
+float moho::MOV_GetVolume()
+{
+  const CMovieManager* const manager = sMovieManager.get();
+  return manager != nullptr ? manager->GetVolume() : 1.0f;
 }
 

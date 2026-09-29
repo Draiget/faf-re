@@ -21,6 +21,12 @@ namespace msvc8
         typedef T element_type;
 
         // constructors
+        /**
+         * Address: 0x00875210 (FUN_00875210) - `auto_ptr<Moho::CMovieManager>`,
+         * the movie manager's static (moho/misc/StartupHelpers.cpp) with
+         * `this` folded to 0x010C4AF0: stores the null default and returns
+         * `this`. A linker-retained copy; the static itself is zero-initialised.
+         */
         explicit auto_ptr(T* p = 0) : px_(p) {}
 
         auto_ptr(auto_ptr& r) : px_(r.release()) {}
@@ -34,6 +40,12 @@ namespace msvc8
         auto_ptr(auto_ptr_ref<U> r) : px_(static_cast<T*>(r.ptr)) {}
 
         // destructor
+        /**
+         * Address: 0x00C07B40 (FUN_00C07B40) - `auto_ptr<Moho::CMovieManager>`,
+         * the movie manager static's `atexit` destructor (0x00BE6C80 registers
+         * it): `if (p) delete p;` through the manager's scalar deleting
+         * destructor 0x00875290.
+         */
         ~auto_ptr() { delete px_; }
 
         auto_ptr& operator=(T* p)
@@ -73,6 +85,17 @@ namespace msvc8
         // observers
         T& operator*() const { return *px_; }
         T* operator->() const { return px_; }
+
+        /**
+         * Address: 0x00875230 (FUN_00875230)
+         * Address: 0x00875240 (FUN_00875240)
+         * Address: 0x008752E0 (FUN_008752E0)
+         *
+         * `auto_ptr<Moho::CMovieManager>`'s `get`, `operator->` and
+         * `operator*` for the movie manager static, `this` folded: each is
+         * `mov eax, [0x010C4AF0]; ret`, so which address is which of the three
+         * cannot be told apart. Linker-retained copies; every caller inlines.
+         */
         T* get() const { return px_; }
 
         // modifiers
@@ -83,12 +106,20 @@ namespace msvc8
             return p;
         }
 
+        /**
+         * Address: 0x00875250 (FUN_00875250) - `auto_ptr<Moho::CMovieManager>`
+         * for the movie manager static: `if (p != px && px) delete px;` then
+         * the store. `SetupBasicMovieManager` (0x00874C20) and
+         * `DestroyMovieManagerSingleton` (0x00874CA0) carry it inline.
+         *
+         * VC8's shape: the old object is destroyed before the new pointer is
+         * stored, and the store is unconditional.
+         */
         void reset(T* p = 0)
         {
-            if (px_ != p) {
+            if (p != px_)
                 delete px_;
-                px_ = p;
-            }
+            px_ = p;
         }
 
         void swap(auto_ptr& other)

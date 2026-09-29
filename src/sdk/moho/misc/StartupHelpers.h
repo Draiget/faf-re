@@ -409,30 +409,85 @@ namespace moho
   void SetupAntiAliasingSettings();
 
   /**
-   * Address: 0x00874C20 (FUN_00874C20)
+   * The movie subsystem's process-wide state: the DirectSound device the
+   * Sofdec middleware plays movie audio through, and the movie volume.
+   *
+   * No vtable: `SetupBasicMovieManager` allocates it with `operator new(0xC)`
+   * (0x00874C3A) and the constructor's first two stores are the COM pointers
+   * at +0x00/+0x04. Its one owner is a static `msvc8::auto_ptr` in
+   * StartupHelpers.cpp.
+   */
+  class CMovieManager
+  {
+  public:
+    /**
+     * Address: 0x00874AF0 (FUN_00874AF0, `Moho::CMovieManager::CMovieManager`)
+     *
+     * What it does:
+     * Opens DirectSound, sets up the ADX middleware on it and initialises
+     * Sofdec.
+     */
+    CMovieManager();
+
+    /**
+     * Address: 0x00874B90 (FUN_00874B90, ??1CMovieManager@Moho@@QAE@XZ)
+     * Address: 0x00875290 (FUN_00875290, the scalar deleting destructor: this
+     * body inlined, then `operator delete`; 0x00875220 is a one-instruction
+     * `jmp` to it)
+     *
+     * What it does:
+     * Shuts Sofdec and the ADX manager down and releases DirectSound.
+     */
+    ~CMovieManager();
+
+    CMovieManager(const CMovieManager&) = delete;
+    CMovieManager& operator=(const CMovieManager&) = delete;
+
+    /**
+     * Address: 0x00874BD0 (FUN_00874BD0)
+     *
+     * What it does:
+     * Stores a linear volume as DirectSound attenuation.
+     */
+    void SetVolume(float volume);
+
+    /** The stored volume, in DirectSound attenuation units. */
+    [[nodiscard]] float GetVolume() const noexcept
+    {
+      return mVolume;
+    }
+
+  private:
+    /**
+     * Address: 0x00874990 (FUN_00874990, `func_CreateDirectSound`)
+     *
+     * What it does:
+     * Creates the DirectSound device and its buffer unless `/nosound` is given.
+     */
+    void CreateDirectSound();
+
+    IDirectSound* mDirectSound;         // +0x00
+    IDirectSoundBuffer* mPrimaryBuffer; // +0x04
+    float mVolume;                      // +0x08 hundredths of a dB, DSBVOLUME_MIN..0
+  };
+
+  static_assert(sizeof(CMovieManager) == 0xC, "CMovieManager size must be 0xC");
+
+  /**
+   * Address: 0x00874C20 (FUN_00874C20, func_SetupBasicMovieManager)
    *
    * What it does:
-   * Recreates the process-global movie manager singleton lane.
+   * Creates the movie manager, destroying any previous one.
    */
   void SetupBasicMovieManager();
 
   /**
-   * Address: 0x00874CA0 (FUN_00874CA0, sub_874CA0)
+   * Address: 0x00874CA0 (FUN_00874CA0)
    *
    * What it does:
-   * Destroys the current movie-manager singleton when present and clears the
-   * global owner lane.
+   * Destroys the movie manager.
    */
-  CMovieManager* DestroyMovieManagerSingleton();
-
-  /**
-   * Address: 0x00875250 (FUN_00875250, sub_875250)
-   *
-   * What it does:
-   * Replaces the global movie-manager singleton, destroying any existing
-   * different instance before rebinding.
-   */
-  CMovieManager* ReplaceMovieManagerSingleton(CMovieManager* manager);
+  void DestroyMovieManagerSingleton();
 
   /**
    * Address: 0x00874D30 (FUN_00874D30, `Moho::MOV_GetDuration`)
@@ -444,74 +499,20 @@ namespace moho
   [[nodiscard]] float MOV_GetDuration(gpg::StrArg sourcePath);
 
   /**
-   * Address context:
-   * - `FUN_00874C20` allocates this runtime owner with `operator new(0x0C)`.
+   * Address: 0x00874F20 (FUN_00874F20)
+   *
+   * What it does:
+   * Clamps a script volume to [0, 2] and hands it to the movie manager.
    */
-  class CMovieManager
-  {
-  public:
-    /**
-     * Address: 0x00874AF0 (FUN_00874AF0, `Moho::CMovieManager::CMovieManager`)
-     *
-     * What it does:
-     * Initializes movie-audio runtime ownership lanes and Sofdec middleware setup.
-     */
-    CMovieManager();
+  void MOV_SetVolume(float volume);
 
-    /**
-     * Address: 0x00875290 (FUN_00875290, `Moho::CMovieManager::Destroy`)
-     *
-     * What it does:
-     * Shuts down movie Sofdec middleware, releases COM interfaces, and destroys this instance.
-     */
-    void Destroy();
-
-    /**
-     * Address: 0x00874F20 (FUN_00874F20, sub_874F20)
-     * Address context:
-     * - `cfunc_SetMovieVolumeL` (`0x00875020`) writes this transformed value.
-     *
-     * What it does:
-     * Applies recovered Lua movie-volume clamp/conversion into `mVolume`.
-     */
-    void SetVolumeFromLua(float requestedVolume);
-
-    /**
-     * Address context:
-     * - `cfunc_GetMovieVolumeL` (`0x00875180`) reads this lane.
-     *
-     * What it does:
-     * Returns the stored movie-volume lane for Lua callback paths.
-     */
-    [[nodiscard]] float GetVolumeForLua() const;
-
-  private:
-    /**
-     * Address: 0x00874B90 (FUN_00874B90)
-     *
-     * What it does:
-     * Shuts down Sofdec runtime lanes and releases owned DirectSound resources
-     * without deleting the owning `CMovieManager` object.
-     */
-    void ShutdownMovieRuntimeNoDelete();
-
-    /**
-     * Address: 0x00874990 (FUN_00874990, `func_CreateDirectSound`)
-     *
-     * What it does:
-     * Creates DirectSound runtime state and primary sound buffer unless
-     * `/nosound` startup flag is present.
-     */
-    void CreateDirectSound();
-
-    void ReleaseDirectSoundObjects();
-
-    IDirectSound* mDirectSound = nullptr;
-    IDirectSoundBuffer* mPrimarySoundBuffer = nullptr;
-    float mVolume = 0.0f;
-  };
-
-  static_assert(sizeof(CMovieManager) == 0xC, "CMovieManager size must be 0xC");
+  /**
+   * Address: 0x00874F80 (FUN_00874F80)
+   *
+   * What it does:
+   * Returns the movie manager's stored volume, or 1 without a manager.
+   */
+  [[nodiscard]] float MOV_GetVolume();
 
   // Address-backed startup window defaults from FA globals.
   extern std::int32_t wnd_MinCmdLineWidth;
