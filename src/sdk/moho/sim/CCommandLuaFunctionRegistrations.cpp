@@ -3185,7 +3185,11 @@ namespace moho
 
         if (voiceOver != nullptr) {
           if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
-            driver->ProcessInfoPair(representativeUnit->mParams.mEntityId, "play", voiceOver);
+            // The voice-over name is the key and "play" the value
+            // (0x008413C0..0x008413EE push "play" first, as the last
+            // argument). `Sim::ProcessInfoPair` matches on the key, so the
+            // other way round the voice-over never plays.
+            driver->ProcessInfoPair(representativeUnit->mParams.mEntityId, voiceOver, "play");
           }
         }
       }

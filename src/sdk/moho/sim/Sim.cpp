@@ -3616,25 +3616,6 @@ namespace
 
 
 
-  /**
-   * Address: 0x00748C00 (FUN_00748C00)
-   *
-   * What it does:
-   * Builds an identity transform at world position and executes PROP_Create chain.
-   */
-  void SpawnPropByBlueprint(Sim* sim, RRuleGameRules* rules, const char* blueprintId, const Wm3::Vec3f& worldPos)
-  {
-    if (!sim || !blueprintId || !*blueprintId) {
-      return;
-    }
-
-    // 0x00748C15..0x00748C5D: identity orientation stores, then the position.
-    VTransform spawnXform;
-    spawnXform.pos_ = worldPos;
-
-    (void)PROP_Create(sim, spawnXform, blueprintId);
-  }
-
   // 0x00748D50 queues silo builds through CAiSiloBuildImpl (0=tactical, 1=nuke).
   bool QueueSiloBuildRequest(Unit* unit, const int modeIndex)
   {
@@ -8193,7 +8174,7 @@ Unit* Sim::CreateUnit(const SUnitConstructionParams& params, const bool doCallba
     if (params.mArmy->GetArmyUnitCostTotal() + params.mBlueprint->General.CapCost > unitCap) {
       if (doCallback) {
         if (CAiBrain* const brain = params.mArmy->GetArmyBrain()) {
-          reinterpret_cast<CScriptObject*>(brain)->CallbackStr("OnUnitCapLimitReached");
+          brain->CallbackStr("OnUnitCapLimitReached");
         }
       }
       return nullptr;
@@ -8326,7 +8307,7 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
     // --- Phase H: creation failed (unit cap) — notify the army's brain script ---
     if (!newArmy->IgnoreUnitCap()) {
       if (CAiBrain* const brain = newArmy->GetArmyBrain()) {
-        reinterpret_cast<CScriptObject*>(brain)->RunScript("OnFailedUnitTransfer");
+        brain->RunScript("OnFailedUnitTransfer");
       }
     }
     return nullptr;
@@ -8454,18 +8435,23 @@ void Sim::CreateUnit(const uint32_t armyIndex, const RResId& blueprintId, const 
 }
 
 /**
-  * Alias of FUN_00748C00 (non-canonical helper lane).
+ * Address: 0x00748C00 (FUN_00748C00)
  *
  * What it does:
- * Cheat-gated prop creation entry point for sim commands.
+ * `ICommandSink` slot 7, a cheat command: creates prop `blueprint` at `loc`,
+ * unrotated. Formerly split into a free `SpawnPropByBlueprint`, which added a
+ * null/empty-blueprint early-out the binary does not have.
  */
-void Sim::CreateProp(const char* blueprint, const Wm3::Vec3f& loc)
+void Sim::CreateProp(const char* const blueprint, const Wm3::Vec3f& loc)
 {
   if (!CheatsEnabled()) {
     return;
   }
 
-  SpawnPropByBlueprint(this, mRules, blueprint, loc);
+  // 0x00748C15..0x00748C5D: identity orientation, then the position.
+  VTransform transform;
+  transform.pos_ = loc;
+  (void)PROP_Create(this, transform, blueprint);
 }
 
 /**
@@ -8614,7 +8600,7 @@ void Sim::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, const gpg
       return;
     }
 
-    (void)reinterpret_cast<CScriptObject*>(unit->ArmyRef->GetArmyBrain())->RunScript("OnPlayNoStagingPlatformsVO");
+    (void)unit->ArmyRef->GetArmyBrain()->RunScript("OnPlayNoStagingPlatformsVO");
     return;
   }
 
@@ -8624,7 +8610,7 @@ void Sim::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, const gpg
       return;
     }
 
-    (void)reinterpret_cast<CScriptObject*>(unit->ArmyRef->GetArmyBrain())->RunScript("OnPlayBusyStagingPlatformsVO");
+    (void)unit->ArmyRef->GetArmyBrain()->RunScript("OnPlayBusyStagingPlatformsVO");
     return;
   }
 }
@@ -24169,8 +24155,7 @@ int moho::cfunc_GetArmyBrainL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
   CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
-  CScriptObject* const brainScriptObject = reinterpret_cast<CScriptObject*>(army->GetArmyBrain());
-  brainScriptObject->mLuaObj.PushStack(state);
+  army->GetArmyBrain()->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -24334,8 +24319,7 @@ int moho::cfunc_ArmyInitializePrebuiltUnitsL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
   CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
-  CAiBrain* const brain = army->GetArmyBrain();
-  reinterpret_cast<CScriptObject*>(brain)->OnSpawnPreBuiltUnits();
+  army->GetArmyBrain()->OnSpawnPreBuiltUnits();
   return 0;
 }
 

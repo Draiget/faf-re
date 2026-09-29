@@ -292,16 +292,14 @@ namespace moho
     void CreateUnit(uint32_t, const RResId& blueprintId, const SCoordsVec2&, float) override;
 
     /**
-      * Alias of FUN_00748C00 (non-canonical helper lane).
-     *
-     * gpg::StrArg, Wm3::Vector3<float> const &
+     * Address: 0x00748C00 (FUN_00748C00)
      *
      * IDA signature:
      * void __thiscall Moho::Sim::CreateProp(Moho::Sim *this, const char *blueprint, Wm3::Vector3f *pos);
      *
      * What it does:
-     * Cheat-gated prop creation entry point. Builds identity transform at
-     * the requested world position and forwards into PROP_Create chain.
+     * `ICommandSink` slot 7 (vftable 0x00E34714 +0x1C), a cheat command:
+     * creates prop `blueprint` at the position, unrotated, via `PROP_Create`.
      */
     void CreateProp(const char*, const Wm3::Vec3f&) override;
 
