@@ -171,7 +171,8 @@ namespace moho
 
     /**
      * Data payload:
-     * - string - lua string to execute in sim
+     * - string - name of the global Lua function to call in the sim
+     * - LuaObject - its argument (`LuaObject::ToByteStream`)
      */
     CMDST_ExecuteLuaInSim = 21,
 
@@ -179,6 +180,7 @@ namespace moho
      * Data payload:
      * - string - callback function name
      * - LuaObject - callback args
+     * - uint32_t + int32_t[] - selected unit ids
      */
     CMDST_LuaSimCallback = 22,
 
