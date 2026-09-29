@@ -185,6 +185,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x007FEE70 (FUN_007FEE70)
+   *
+   * What it does:
+   * Selects `mBlurTargetB` (+0x2F0) when `mShadowBlurEnabled` (+0x0C) is set,
+   * otherwise `mShadowMap` (+0x2E0), and returns a retained copy.
+   */
+  boost::shared_ptr<CD3DRenderTarget> Shadow::GetShadowTexture() const
+  {
+    return mShadowBlurEnabled ? mBlurTargetB : mShadowMap;
+  }
+
+  /**
    * Address: 0x007DB350 (FUN_007DB350)
    *
    * What it does:

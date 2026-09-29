@@ -12,7 +12,7 @@ namespace moho
   class IWldTerrainRes;
   struct GeomCamera3;
   class ID3DRenderTarget;
-  struct TerrainShadowContext;
+  class Shadow;
   class CD3DPrimBatcher;
   class CD3DDynamicTextureSheet;
   // Slot 7's argument block. Its single owning definition lives in
@@ -233,7 +233,7 @@ namespace moho
       std::int32_t gameTick,
       float deltaSeconds,
       const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
-      TerrainShadowContext* shadowContext) = 0;
+      Shadow* shadowContext) = 0;
 
     /**
      * Primary vtable slot 9.

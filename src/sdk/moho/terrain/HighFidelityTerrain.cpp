@@ -47,6 +47,7 @@ namespace gpg::gal { long DebugSaveSurfaceToFileA(const char*, unsigned int, voi
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 #include "moho/terrain/water/WaterSurface.h"
+#include "moho/render/Shadow.h"
 
 namespace
 {
@@ -586,7 +587,7 @@ namespace moho
    * LoadTerrainLighting (0x00805600); the two differ only in which
    * per-fidelity noise / bi-cubic sheet globals they bind.
    */
-  void HighFidelityTerrain::LoadTerrainLighting(TerrainShadowContext* const shadowContext)
+  void HighFidelityTerrain::LoadTerrainLighting(Shadow* const shadowContext)
   {
     auto& shaderVars = GetTerrainShaderVars();
 
@@ -715,14 +716,14 @@ namespace moho
     if (shadowContext != nullptr) {
       // The binary zero-extends the raw shadow-enabled byte into a 4-byte blob.
       const std::uint32_t shadowsEnabledBlob =
-        static_cast<std::uint32_t>(static_cast<std::uint8_t>(shadowContext->shadowsEnabled));
+        static_cast<std::uint32_t>(static_cast<std::uint8_t>(shadowContext->mShadowCameraValid));
       SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsEnabledBlob, 4U);
 
       if (shaderVars.shadowMatrix.Exists()) {
-        shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->shadowMatrix);
+        shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->mCamera.viewProjection);
       }
 
-      const boost::shared_ptr<CD3DRenderTarget> shadowTexture = GetActiveShadowTexture(*shadowContext);
+      const boost::shared_ptr<CD3DRenderTarget> shadowTexture = shadowContext->GetShadowTexture();
       shaderVars.shadowTexture.SetRenderTargetTexture(shadowTexture);
 
       // TEMPORARY PROBE (do not commit). Terrain rasterizes but comes out
@@ -739,9 +740,9 @@ namespace moho
           gpg::Warnf("[SHADOWDIAG] shadowsEnabled=%u shadowTexture=%08X useSecondary=%d primary=%p secondary=%p n=%d",
                      shadowsEnabledBlob,
                      static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(shadowTexture.get())),
-                     shadowContext->useSecondaryShadowTexture ? 1 : 0,
-                     static_cast<const void*>(shadowContext->primaryShadowTexture.get()),
-                     static_cast<const void*>(shadowContext->secondaryShadowTexture.get()), sShadowBudget);
+                     shadowContext->mShadowBlurEnabled ? 1 : 0,
+                     static_cast<const void*>(shadowContext->mShadowMap.get()),
+                     static_cast<const void*>(shadowContext->mBlurTargetB.get()), sShadowBudget);
         }
       }
     } else {
@@ -1656,7 +1657,7 @@ namespace moho
     const std::int32_t gameTick,
     const float deltaSeconds,
     const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
-    TerrainShadowContext* const shadowContext)
+    Shadow* const shadowContext)
   {
     if (!ren_Terrain) {
       return false;

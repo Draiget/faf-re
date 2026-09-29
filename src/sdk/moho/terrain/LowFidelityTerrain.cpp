@@ -34,6 +34,7 @@
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
+#include "moho/render/Shadow.h"
 
 namespace
 {
@@ -701,7 +702,7 @@ namespace moho
    * direction/ambience/color and shadow-fill color from the terrain resource, and
    * enables + binds the cast-shadow lane when a shadow context is present.
    */
-  void LowFidelityTerrain::LoadTerrainLighting(TerrainShadowContext* const shadowContext)
+  void LowFidelityTerrain::LoadTerrainLighting(Shadow* const shadowContext)
   {
     auto& shaderVars = GetTerrainShaderVars();
 
@@ -730,12 +731,11 @@ namespace moho
       SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsEnabledBlob, 4U);
 
       if (shaderVars.shadowMatrix.Exists()) {
-        shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->shadowMatrix);
+        shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->mCamera.viewProjection);
       }
 
       const boost::shared_ptr<CD3DRenderTarget> shadowTexture =
-        shadowContext->useSecondaryShadowTexture ? shadowContext->secondaryShadowTexture
-                                                  : shadowContext->primaryShadowTexture;
+        shadowContext->GetShadowTexture();
       shaderVars.shadowTexture.SetRenderTargetTexture(shadowTexture);
     } else {
       const std::uint32_t shadowsDisabledBlob = 0U;
@@ -882,7 +882,7 @@ namespace moho
     const std::int32_t gameTick,
     const float deltaSeconds,
     const boost::shared_ptr<ID3DRenderTarget>& /*terrainNormalTexture*/,
-    TerrainShadowContext* const shadowContext)
+    Shadow* const shadowContext)
   {
     if (!ren_Terrain) {
       return false;

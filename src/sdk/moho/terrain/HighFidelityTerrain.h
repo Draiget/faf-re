@@ -27,7 +27,7 @@ namespace moho
   class CTesselator;
   struct GeomCamera3;
   class IWldTerrainRes;
-  struct TerrainShadowContext;
+  class Shadow;
 
   /**
    * High-fidelity terrain renderer and shoreline-sheet owner runtime.
@@ -128,7 +128,7 @@ namespace moho
      * optional shadow context, and the noise / decal-mask / bi-cubic
      * lookup sheets.
      */
-    void LoadTerrainLighting(TerrainShadowContext* shadowContext);
+    void LoadTerrainLighting(Shadow* shadowContext);
 
     /**
      * Address: 0x008003E0 (FUN_008003E0, Moho::HighFidelityTerrain::Func3)
@@ -239,7 +239,7 @@ namespace moho
       std::int32_t gameTick,
       float deltaSeconds,
       const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
-      TerrainShadowContext* shadowContext) override;
+      Shadow* shadowContext) override;
 
     /**
      * Address: 0x00802F20 (FUN_00802F20, Moho::HighFidelityTerrain::DrawTerrainNormal)

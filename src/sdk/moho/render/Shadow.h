@@ -143,6 +143,18 @@ namespace moho
       boost::shared_ptr<CD3DRenderTarget>& outShadowMap
     ) const;
 
+    /**
+     * Address: 0x007FEE70 (FUN_007FEE70)
+     *
+     * IDA signature:
+     * _DWORD *__usercall sub_7FEE70@<eax>(_DWORD *result@<eax>, int a2@<ecx>);
+     *
+     * What it does:
+     * The texture the terrain lighting passes sample: the second blur target
+     * when blur is on, otherwise the raw shadow map, as a retained copy.
+     */
+    [[nodiscard]] boost::shared_ptr<CD3DRenderTarget> GetShadowTexture() const;
+
   public:
     // Alignment padding after the vfptr (see the class comment): never written
     // by the constructor, and nothing reads it. Explicit because the alignment

@@ -36,6 +36,7 @@
 #include "moho/terrain/water/WaterShaderVars.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/render/Shadow.h"
 
 namespace
 {
@@ -199,25 +200,6 @@ namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x007FEE70 (FUN_007FEE70, sub_7FEE70)
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_7FEE70@<eax>(_DWORD *result@<eax>, int a2@<ecx>);
-   *
-   * What it does:
-   * Returns the active retained shadow texture for a cast-shadow terrain pass.
-   * Selects the secondary texture at +0x2F0 when the byte flag at +0x0C is set,
-   * otherwise the primary texture at +0x2E0, and returns a retained (strong-ref)
-   * copy of that `boost::shared_ptr<gpg::gal::TextureD3D9>`.
-   */
-  [[nodiscard]] boost::shared_ptr<CD3DRenderTarget> GetActiveShadowTexture(
-    const TerrainShadowContext& shadowContext
-  )
-  {
-    return shadowContext.useSecondaryShadowTexture ? shadowContext.secondaryShadowTexture
-                                                   : shadowContext.primaryShadowTexture;
-  }
   // Defined in moho/app/WxRuntimeTypes.cpp (0x007FA170); folds in both the map
   // and terrain null checks. FUN_00805F10 inlines it twice (0x00805F88 and
   // 0x00806055) rather than caching the result.
@@ -526,7 +508,7 @@ namespace moho
    * lane is written disabled. Finally the noise / decal-mask / bi-cubic-lookup
    * textures are bound.
    */
-  void MediumFidelityTerrain::LoadTerrainLighting(TerrainShadowContext* const shadowContext)
+  void MediumFidelityTerrain::LoadTerrainLighting(Shadow* const shadowContext)
   {
     auto& shaderVars = GetTerrainShaderVars();
 
@@ -606,14 +588,14 @@ namespace moho
     if (shadowContext != nullptr) {
       // The binary zero-extends the raw shadow-enabled byte into a 4-byte blob.
       const std::uint32_t shadowsEnabledBlob =
-        static_cast<std::uint32_t>(static_cast<std::uint8_t>(shadowContext->shadowsEnabled));
+        static_cast<std::uint32_t>(static_cast<std::uint8_t>(shadowContext->mShadowCameraValid));
       SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsEnabledBlob, 4U);
 
       if (shaderVars.shadowMatrix.Exists()) {
-        shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->shadowMatrix);
+        shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->mCamera.viewProjection);
       }
 
-      const boost::shared_ptr<CD3DRenderTarget> shadowTexture = GetActiveShadowTexture(*shadowContext);
+      const boost::shared_ptr<CD3DRenderTarget> shadowTexture = shadowContext->GetShadowTexture();
       shaderVars.shadowTexture.SetRenderTargetTexture(shadowTexture);
     } else {
       const std::uint32_t shadowsDisabledBlob = 0U;
@@ -1429,7 +1411,7 @@ namespace moho
     const std::int32_t gameTick,
     const float deltaSeconds,
     const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
-    TerrainShadowContext* const shadowContext
+    Shadow* const shadowContext
   )
   {
     if (!ren_Terrain) {

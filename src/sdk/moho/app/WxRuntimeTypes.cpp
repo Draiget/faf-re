@@ -4367,9 +4367,9 @@ void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
   // The shadow renderer is passed only when a fidelity is selected
   // (0x007F8221: cmp [esi+4F8h], 0), and the normal target is
   // mPrimaryTargetLocks[mHead], retained across the call.
-  moho::TerrainShadowContext* const shadowContext =
+  moho::Shadow* const shadowContext =
     mShadowRenderer.mShadowFidelity != 0 && !ShadowsDisabledByEnv()
-      ? reinterpret_cast<moho::TerrainShadowContext*>(&mShadowRenderer)
+      ? &mShadowRenderer
       : nullptr;
 
   const auto drewNormals = terrain->DrawNormals(

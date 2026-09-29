@@ -6,6 +6,7 @@
 #include "boost/shared_ptr.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
+#include "moho/mesh/SpatialDb.h"
 #include "moho/render/CWldTerrainDecal.h"
 
 namespace gpg
@@ -652,7 +653,7 @@ namespace moho
     msvc8::vector<CDecalGroup*> mDecalGroups; // +0x28
     msvc8::map<std::uint32_t, CDecalGroup*> mDecalGroupLookupBySplatIndex; // +0x38
     msvc8::vector<CWldSplat*> mSplats; // +0x44
-    std::uint8_t mSpatialDbOwnerStorage[0x90]; // +0x54
+    SpatialDB<CWldTerrainDecal> mSpatialDb; // +0x54 (built by 0x00501D80, the database ctor)
     IWldTerrainRes* mWldTerrain; // +0xE4
     float mLodThresholds[10]; // +0xE8 (decal-area decile LOD histogram)
     std::uint8_t mDidSomething; // +0x110
@@ -685,8 +686,8 @@ namespace moho
   );
   static_assert(offsetof(CDecalManager, mSplats) == 0x44, "CDecalManager::mSplats offset must be 0x44");
   static_assert(
-    offsetof(CDecalManager, mSpatialDbOwnerStorage) == 0x54,
-    "CDecalManager::mSpatialDbOwnerStorage offset must be 0x54"
+    offsetof(CDecalManager, mSpatialDb) == 0x54,
+    "CDecalManager::mSpatialDb offset must be 0x54"
   );
   static_assert(offsetof(CDecalManager, mWldTerrain) == 0xE4, "CDecalManager::mWldTerrain offset must be 0xE4");
   static_assert(

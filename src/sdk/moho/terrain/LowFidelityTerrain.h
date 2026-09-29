@@ -34,7 +34,7 @@ namespace moho
   struct GeomCamera3;
   struct SNormalMapInfo;
   struct STerrainTechniqueDrawParams;
-  struct TerrainShadowContext;
+  class Shadow;
 
   /**
    * Low-fidelity terrain renderer and sheet-owner runtime.
@@ -229,7 +229,7 @@ namespace moho
       std::int32_t gameTick,
       float deltaSeconds,
       const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
-      TerrainShadowContext* shadowContext
+      Shadow* shadowContext
     ) override;
 
     /**
@@ -251,7 +251,7 @@ namespace moho
      * resource. Enables + binds the cast-shadow lane when a shadow context is
      * supplied; otherwise writes the shadows-disabled flag.
      */
-    void LoadTerrainLighting(TerrainShadowContext* shadowContext);
+    void LoadTerrainLighting(Shadow* shadowContext);
 
     /**
      * Address: 0x00808640 (FUN_00808640, Moho::LowFidelityTerrain::Func3)

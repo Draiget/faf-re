@@ -74,77 +74,6 @@ namespace moho
   );
 
   /**
-   * Runtime shadow-render context passed into the terrain-lighting binder when
-   * the terrain effect is rendered with a cast-shadow source. The layout is
-   * recovered from sub_805600's shadow branch (0x00805975-0x00805A1A) and the
-   * shadow-texture accessor sub_7FEE70 (0x007FEE70). Only the fields the terrain
-   * lighting path touches are modeled; the object is owned by the shadow render
-   * subsystem and is never constructed here.
-   */
-  struct TerrainShadowContext
-  {
-    std::uint8_t reserved00[0x0C]; // +0x00
-
-    /// Selects between the primary/secondary retained shadow textures.
-    /// Read as a byte at +0x0C by sub_7FEE70.
-    bool useSecondaryShadowTexture; // +0x0C
-
-    std::uint8_t reserved0D[0x07]; // +0x0D
-
-    /// Terrain shadow-enabled flag, written to the effect as a 4-byte blob.
-    /// Read as a byte at +0x14 by sub_805600.
-    bool shadowsEnabled; // +0x14
-
-    std::uint8_t reserved15[0x9F]; // +0x15
-
-    /// World-to-shadow-map matrix bound into the `ShadowMatrix` shader var.
-    gpg::gal::Matrix shadowMatrix; // +0xB4
-
-    std::uint8_t reservedF4[0x1EC]; // +0xF4
-
-    /// Retained shadow texture used when `useSecondaryShadowTexture == false`.
-    boost::shared_ptr<CD3DRenderTarget> primaryShadowTexture; // +0x2E0
-
-    std::uint8_t reserved2E8[0x08]; // +0x2E8
-
-    /// Retained shadow texture used when `useSecondaryShadowTexture == true`.
-    boost::shared_ptr<CD3DRenderTarget> secondaryShadowTexture; // +0x2F0
-  };
-
-  static_assert(
-    offsetof(TerrainShadowContext, useSecondaryShadowTexture) == 0x0C,
-    "TerrainShadowContext::useSecondaryShadowTexture offset must be 0x0C"
-  );
-
-  /**
-   * Address: 0x007FEE70 (FUN_007FEE70, sub_7FEE70)
-   *
-   * What it does:
-   * Returns the active retained shadow texture for a cast-shadow terrain
-   * pass. Shared by every fidelity class's LoadTerrainLighting, so it lives
-   * beside TerrainShadowContext rather than being copied per TU.
-   */
-  [[nodiscard]] boost::shared_ptr<CD3DRenderTarget> GetActiveShadowTexture(
-    const TerrainShadowContext& shadowContext
-  );
-  static_assert(
-    offsetof(TerrainShadowContext, shadowsEnabled) == 0x14,
-    "TerrainShadowContext::shadowsEnabled offset must be 0x14"
-  );
-  static_assert(
-    offsetof(TerrainShadowContext, shadowMatrix) == 0xB4,
-    "TerrainShadowContext::shadowMatrix offset must be 0xB4"
-  );
-  static_assert(
-    offsetof(TerrainShadowContext, primaryShadowTexture) == 0x2E0,
-    "TerrainShadowContext::primaryShadowTexture offset must be 0x2E0"
-  );
-  static_assert(
-    offsetof(TerrainShadowContext, secondaryShadowTexture) == 0x2F0,
-    "TerrainShadowContext::secondaryShadowTexture offset must be 0x2F0"
-  );
-
-  /**
    * Medium-fidelity terrain renderer runtime.
    */
   class MediumFidelityTerrain : public TerrainCommon
@@ -238,7 +167,7 @@ namespace moho
      * optional cast-shadow context (shadows-enabled/shadow matrix/shadow
      * texture), and the noise / decal-mask / bi-cubic-lookup textures.
      */
-    void LoadTerrainLighting(TerrainShadowContext* shadowContext);
+    void LoadTerrainLighting(Shadow* shadowContext);
 
     /**
      * Address: 0x00804440 (FUN_00804440, Moho::MediumFidelityTerrain::Func3)
@@ -335,7 +264,7 @@ namespace moho
       std::int32_t gameTick,
       float deltaSeconds,
       const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
-      TerrainShadowContext* shadowContext
+      Shadow* shadowContext
     ) override;
 
     /**

@@ -80,12 +80,6 @@ namespace
     decal.mOrientation = record.mRot;
   }
 
-  [[nodiscard]] moho::SpatialDB<moho::CWldTerrainDecal>*
-  AsDecalManagerSpatialDbRuntime(moho::CDecalManager* const manager) noexcept
-  {
-    return reinterpret_cast<moho::SpatialDB<moho::CWldTerrainDecal>*>(manager->mSpatialDbOwnerStorage);
-  }
-
   /**
    * Address: 0x0087CF80 (FUN_0087CF80, sub_87CF80)
    *
@@ -239,7 +233,7 @@ namespace moho
     , mDecalGroups()
     , mDecalGroupLookupBySplatIndex()
     , mSplats()
-    , mSpatialDbOwnerStorage{}
+    , mSpatialDb()
     , mWldTerrain(terrainRes)
     , mLodThresholds{}
     , mDidSomething(0u)
@@ -252,11 +246,6 @@ namespace moho
     // separate call. A prior pass called this out explicitly as
     // `InitializeLookupTree(...)`; that helper duplicated
     // `msvc8::map<K,V>`'s own default constructor and is deleted.
-    SpatialDB<CWldTerrainDecal>* const spatialDb = AsDecalManagerSpatialDbRuntime(this);
-    // 0x00501D80 is SpatialDB<T>::SpatialDB; the manager keeps the lane raw,
-    // so the database is built into it in place.
-    new (spatialDb) SpatialDB<CWldTerrainDecal>();
-
     if (mWldTerrain == nullptr) {
       return;
     }
@@ -267,7 +256,7 @@ namespace moho
     }
 
     const CHeightField* const heightField = map->mHeightField.get();
-    spatialDb->ResizeForMap(heightField->width - 1, heightField->height - 1);
+    mSpatialDb.ResizeForMap(heightField->width - 1, heightField->height - 1);
   }
 
   /**
@@ -286,7 +275,7 @@ namespace moho
    */
   CDecalManager* CDecalManager::Create(IWldTerrainRes* const terrainRes)
   {
-    void* const storage = ::operator new(0x114u);
+    void* const storage = ::operator new(sizeof(CDecalManager)); // 0x114 on x86
     if (storage == nullptr) {
       return nullptr;
     }
@@ -336,7 +325,8 @@ namespace moho
       delete splat;
     }
 
-    AsDecalManagerSpatialDbRuntime(this)->~SpatialDB();
+    // mSpatialDb is torn down as a member, after this body and before the
+    // containers, as 0x00877B70 does.
   }
 
   /**
@@ -608,7 +598,7 @@ namespace moho
    */
   CWldTerrainDecal* CDecalManager::NewDecal(const std::int32_t decalIndex)
   {
-    CWldTerrainDecal* const decal = new CWldTerrainDecal(AsDecalManagerSpatialDbRuntime(this), mWldTerrain);
+    CWldTerrainDecal* const decal = new CWldTerrainDecal(&mSpatialDb, mWldTerrain);
     decal->mIndex = decalIndex;
     mDidSomething = 1u;
     return LoadDecal(decal);
@@ -719,7 +709,7 @@ namespace moho
   {
     CWldTerrainDecal* loaded = decal;
     if (loaded == nullptr) {
-      loaded = new CWldTerrainDecal(AsDecalManagerSpatialDbRuntime(this), mWldTerrain);
+      loaded = new CWldTerrainDecal(&mSpatialDb, mWldTerrain);
       loaded->mIndex = static_cast<std::int32_t>(mDecalCount);
       ++mDecalCount;
     }
@@ -830,7 +820,7 @@ namespace moho
     const bool ignoreDecalLod
   )
   {
-    auto* const spatialDb = AsDecalManagerSpatialDbRuntime(this);
+    auto* const spatialDb = &mSpatialDb;
     if (ignoreDecalLod) {
       spatialDb->CollectInVolume(entities, static_cast<EEntityType>(0x0800u), &camera->solid2);
     } else {
@@ -853,7 +843,7 @@ namespace moho
     const bool ignoreDecalLod
   )
   {
-    auto* const spatialDb = AsDecalManagerSpatialDbRuntime(this);
+    auto* const spatialDb = &mSpatialDb;
     if (ignoreDecalLod) {
       spatialDb->CollectInVolume(props, static_cast<EEntityType>(0x0200u), &camera->solid2);
     } else {
@@ -1077,7 +1067,7 @@ namespace moho
    */
   CWldSplat* CDecalManager::NewSplat()
   {
-    auto* const spatialDbOwner = AsDecalManagerSpatialDbRuntime(this);
+    auto* const spatialDbOwner = &mSpatialDb;
     CWldSplat* const splat = new CWldSplat(spatialDbOwner, mWldTerrain);
     AppendSplat(mSplats, splat);
     return splat;
@@ -1292,7 +1282,7 @@ namespace moho
     std::uint32_t decalCount = 0;
     reader.Read(reinterpret_cast<char*>(&decalCount), sizeof(decalCount));
     for (; decalCount != 0u; --decalCount) {
-      auto* const decal = new CWldTerrainDecal(AsDecalManagerSpatialDbRuntime(this), mWldTerrain);
+      auto* const decal = new CWldTerrainDecal(&mSpatialDb, mWldTerrain);
       decal->DecalLoad(reader);
       (void)LoadDecal(decal);
     }
