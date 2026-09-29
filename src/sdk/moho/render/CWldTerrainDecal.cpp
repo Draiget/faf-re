@@ -301,7 +301,9 @@ namespace moho
       ReleaseTrackedCountedObjectPtr(mResourceRefs[index - 1]);
     }
 
-    mEntry.ClearRegistration();
+    // `mEntry` unregisters itself as a member: 0x0089CC52 is its inlined
+    // destructor, the `mDb != nullptr` guard and the call into `Unregister`
+    // 0x00501BC0. No source line writes that call.
 
     // 0x0089CC5C..0x0089CC7B: the same head-reloading drain
     // `~CScriptObject` (0x004C7340) carries, over the `WeakObject` base at

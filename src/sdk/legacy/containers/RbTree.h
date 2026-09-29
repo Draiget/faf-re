@@ -370,6 +370,7 @@ namespace msvc8
          * Address: 0x00736470 (FUN_00736470, sub_736470 -- the `_Min` emission for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList`; node 0x30, isNil@+0x2D; walks `_Left` at +0x00); called from that instantiation's `erase_node` (FUN_00735D40 at 0x00735E1E). Formerly `FindPlatoonTreeLeftmostNode` over a padded `PlatoonTreeNodeFlag45Runtime` node overlay in moho/sim/CPlatoon.cpp (RULE ONE/THREE), removed 2026-09-29.)
          * Address: 0x00719700 (FUN_00719700 -- the `_Min` emission for `InfluenceGrid::entries` (reflected as `std::map<unsigned int, Moho::InfluenceMapEntry>`; node 0x40, isNil@+0x3D); callers 0x00717EF0. Formerly `FindInfluenceTreeLeftmostNodeFlag61` over a padded `InfluenceNodeFlag61Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
          * Address: 0x00719CC0 (FUN_00719CC0 -- the `_Min` emission for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, isNil@+0x15); callers 0x00718410. Formerly `FindInfluenceTreeLeftmostNodeFlag21` over a padded `InfluenceNodeFlag21Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x00504C80 (FUN_00504C80 -- `_Min` for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35), walking `_Left` while `!_Isnil`; callers 0x005043B0 (that tree's `erase`).)
          */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
@@ -590,6 +591,7 @@ namespace msvc8
          * Address: 0x00736450 (FUN_00736450, sub_736450 -- the `_Max` emission for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList`; node 0x30, isNil@+0x2D; walks `_Right` at +0x08); called from that instantiation's `erase_node` (FUN_00735D40 at 0x00735E40). Formerly `FindPlatoonTreeRightmostNode` over a padded `PlatoonTreeNodeFlag45Runtime` node overlay in moho/sim/CPlatoon.cpp (RULE ONE/THREE), removed 2026-09-29.)
          * Address: 0x007196E0 (FUN_007196E0 -- the `_Max` emission for `InfluenceGrid::entries` (node 0x40, isNil@+0x3D); callers 0x00717EF0. Formerly `FindInfluenceTreeRightmostNodeFlag61` over a padded `InfluenceNodeFlag61Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
          * Address: 0x00719CA0 (FUN_00719CA0 -- the `_Max` emission for `CInfluenceMap::mBlipCells` (node 0x18, isNil@+0x15); callers 0x00718410. Formerly `FindInfluenceTreeRightmostNodeFlag21` over a padded `InfluenceNodeFlag21Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x00504C60 (FUN_00504C60 -- `_Max` for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35), walking `_Right` while `!_Isnil`; callers 0x005043B0 (that tree's `erase`).)
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -974,6 +976,7 @@ namespace msvc8
          * Address: 0x0046EE50 (FUN_0046EE50 -- `_Inc` -- the in-order successor for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046E890, 0x0046EC14, 0x0046EE22; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00465390 (FUN_00465390 -- `_Inc` -- the in-order successor for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004628C0, 0x004629B0, 0x00463A70; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x004E9650 (FUN_004E9650 -- `_Inc` -- the successor capture that erase performs before unlinking for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E8FF2, 0x004E9352, 0x004E96A0; formerly `EraseSingleTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00505B40 (FUN_00505B40 -- `_Inc` through the iterator's own slot for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35): every range walk in the spatial database (`SpatialShardData<T>::RecalculateBounds` 0x005023B0, the collect bodies 0x00502780/0x00502950/0x00502C60/0x005030C0/0x00503490/0x00503730) and the hinted insert 0x00504A10. It was booked `external_dependency`; it is engine code, the tree's own iterator step.)
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
@@ -1295,6 +1298,7 @@ namespace msvc8
          * Address: 0x0046EC30 (FUN_0046EC30 -- `_Dec` -- the in-order predecessor for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046D840, 0x0046E122, 0x0046E7C2; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00465570 (FUN_00465570 -- `_Dec` -- the in-order predecessor for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00463960, 0x00464A42, 0x00465382; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x004E9A20 (FUN_004E9A20 -- `_Dec` -- the in-order predecessor the lower-bound path steps through for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E8EB0, 0x004E9342, 0x004E9642; formerly `FindTimeBarTrackLowerBound` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00505F40 (FUN_00505F40 -- `_Dec` for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35), `end()` stepping to `_Rmost()`; callers 0x00504A10 (the hinted insert's "before `where`" test); formerly `SpatialMapPrevNode` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -2724,6 +2728,8 @@ namespace msvc8
              * Address: 0x00734720 (FUN_00734720 -- `~rb_tree()` -- drain the whole range, then free the header for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `DestroySimConRegistryStorageLaneA` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x00735240 (FUN_00735240 -- a second emission of that teardown for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `DestroySimConRegistryStorageLaneB` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x007358C0 (FUN_007358C0 -- a third emission of that teardown for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `DestroySimConRegistryStorageLaneC` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00501760 (FUN_00501760 -- `~_Tree` -- `erase(begin(), end())` through 0x00505200, free the head, zero head and size, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x00500F60 (the shard-data constructor's unwind), 0x005017E0, 0x00501E50; formerly `DestroySpatialMapTree` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x00504350 (FUN_00504350 -- a second emission of that same `~_Tree` for `moho::SpatialMap<T>`; zero callers, no references, a linker-retained copy nothing runs.)
              */
             ~rb_tree()
             {
@@ -3967,6 +3973,7 @@ namespace msvc8
              * Address: 0x005C44F0 (FUN_005C44F0 -- the out-parameter shape of that same `insert_equal` for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); zero callers, unreachable; formerly `InsertMapNodeBySourceEntityIdNodeOutAdapter` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x004E1FD0 (FUN_004E1FD0 -- `insert(value)` -- descends `key < node->key ? left : right` with no equivalence probe, which is what makes this a multimap for `msvc8::multimap<std::uint32_t, moho::CSndParams*>` (`gSndParamsHashCache` in moho/audio/CSndParams.cpp, the shipped `Moho::sSndParamsCache`; pair 0x08, node 0x18, key at node+0x0C, descriptor pointer at node+0x10, colour/nil at +0x14/+0x15); callers 0x004DF790, 0x004E16B0; formerly `InsertSndParamsCacheEntryLocked`'s body in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x004E2110 (FUN_004E2110 -- `insert(value)` -- the `if (_Multi)` branch of `_Tree::insert`: descend without probing for an equivalent key, link, and hand back `{node, true}` for `msvc8::multimap<std::uint32_t, moho::CSndVar*>` (`gSndVarNameCache` in moho/audio/CSndVar.cpp; pair 0x08, node 0x18, key at node+0x0C, variable pointer at node+0x10, colour/nil at +0x14/+0x15); callers 0x004DF390, 0x004E1770; formerly `LocateSndVarCacheLowerBound` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00504990 (FUN_00504990 -- `_Tree::insert(value)`, the `_Multi` descent that hands back `{node, true}` through its out-pair, for `moho::SpatialMap<T>` = `msvc8::multiset<moho::SpatialEntry<T>, moho::SpatialEntryLess<T>>` (moho/mesh/SpatialDb.h; node 0x38, the 0x28 entry at node+0x0C, the fade key at node+0x2C, colour/nil at +0x34/+0x35); callers 0x00502200, 0x00504310, 0x00504A10; formerly `InsertSpatialPayloadByFade` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
              */
             node_type* insert_equal(const value_type& v)
             {
@@ -4427,6 +4434,56 @@ namespace msvc8
                 }
 
                 return insert_unique(v).first;
+            }
+
+            /**
+             * VC8's hinted insert for the multi containers -- the `if (this->_Multi)`
+             * branch of `_Tree::insert(iterator _Where, const value_type& _Val)`.
+             *
+             * It differs from `insert_hint` above in exactly the ways equivalent keys
+             * require: every hint test is the non-strict `!comp(a, b)` form, so a
+             * value equal to its neighbours still lands at the hint, and a missed
+             * hint falls back to `insert_equal`, never to `insert_unique` (which would
+             * refuse the duplicate). The four cases are VC8's, in VC8's order: an
+             * empty tree; `where == begin()`; `where == end()`, linked after
+             * `_Rmost()`; and an interior hint, tried first as "before `where`"
+             * against its predecessor and then as "after `where`" against its
+             * successor, each linking under whichever neighbour has the free child.
+             *
+             * Address: 0x00504A10 (FUN_00504A10 -- `insert(where, value)` for `moho::SpatialMap<T>` = `msvc8::multiset<moho::SpatialEntry<T>, moho::SpatialEntryLess<T>>` (moho/mesh/SpatialDb.h; node 0x38, the 0x28 entry at node+0x0C, the fade key at node+0x2C, colour/nil at +0x34/+0x35). Every branch above is in the body: the `size() == 0` link at the head, the `begin()` and `end()` edge tests, `_Dec` 0x00505F40 and `_Inc` 0x00505B40 for the interior neighbours, `_Insert` 0x005052F0 for the link and `insert(value)` 0x00504990 as the fallback; callers 0x00501A80, 0x00501B00, 0x00504330; formerly `InsertSpatialPayloadWithHint` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             */
+            node_type* insert_hint_equal(const_iterator hint, const value_type& v)
+            {
+                if (size_ == 0) {
+                    return insert_at(true, head_, v);
+                }
+
+                node_type* const at = hint.node();
+                if (at == leftmost()) {
+                    if (!this->comp()(Traits::key_of(at->value), Traits::key_of(v))) {
+                        return insert_at(true, at, v);
+                    }
+                } else if (rb_is_nil(at)) {
+                    if (!this->comp()(Traits::key_of(v), Traits::key_of(rightmost()->value))) {
+                        return insert_at(false, rightmost(), v);
+                    }
+                } else {
+                    if (!this->comp()(Traits::key_of(at->value), Traits::key_of(v))) {
+                        node_type* const before = rb_decrement(at);
+                        if (!this->comp()(Traits::key_of(v), Traits::key_of(before->value))) {
+                            return rb_is_nil(before->right) ? insert_at(false, before, v) : insert_at(true, at, v);
+                        }
+                    }
+
+                    if (!this->comp()(Traits::key_of(v), Traits::key_of(at->value))) {
+                        node_type* const after = rb_increment(at);
+                        if (rb_is_nil(after) || !this->comp()(Traits::key_of(after->value), Traits::key_of(v))) {
+                            return rb_is_nil(at->right) ? insert_at(false, at, v) : insert_at(true, after, v);
+                        }
+                    }
+                }
+
+                return insert_equal(v);
             }
 
             /**
@@ -5149,6 +5206,7 @@ namespace msvc8
              * Address: 0x00463A70 (FUN_00463A70 -- `erase(const_iterator)` -- the `invalid map/set<T> iterator` guard, then unlink, rebalance and destroy for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00462DD0, 0x00464F20; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x004E96A0 (FUN_004E96A0 -- `erase(const_iterator)` -- capture the successor, unlink, rebalance, destroy for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E93C0; formerly `EraseSingleTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x00735D40 (FUN_00735D40 -- `erase(const_iterator)` -- the `invalid map/set<T> iterator` guard, then unlink, rebalance and destroy for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007357C0; formerly cited on `GetSimConCommandRegistry`'s doc block in moho/sim/CSimConCommand.cpp instead of on the member (RULE ONE), moved 2026-09-11.)
+             * Address: 0x005043B0 (FUN_005043B0 -- `erase(const_iterator)` -- the `invalid map/set<T> iterator` guard, `_Inc` for the result, unlink with `_Min`/`_Max` 0x00504C80/0x00504C60 for the header extremes, `_Lrotate`/`_Rrotate` 0x00504C10/0x00504CC0 for the fixup, then free, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x00501B00, 0x00501BC0, 0x00501C10, 0x00502340, 0x00505200. It was booked `external_dependency`; it is engine code. Formerly `SpatialMapEraseNode`/`SpatialMapEraseFixup` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29 -- the copy whose sentinel test once turned every erase into a no-op (564d7e57d).)
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -5878,6 +5936,7 @@ namespace msvc8
              * Address: 0x004E9AB0 (FUN_004E9AB0 -- a second emission of that range erase for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E93C0, 0x004E995C; formerly `EraseRangeTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x00432910 (FUN_00432910 -- `erase(first, last)` -- what `~rb_tree()` drains through for `msvc8::map<msvc8::string, msvc8::string>` (`ShaderDictionary::mRemaps` at +0x10; pair 0x38, node 0x48, key at node+0x0C, mapped name at node+0x28, colour/nil at +0x44/+0x45); callers 0x0042BCB0, 0x0042C180, 0x0042C1D0; formerly unrecovered.)
              * Address: 0x007357C0 (FUN_007357C0 -- `erase(first, last)` -- whole-tree fast path through `destroy_subtree`, else erase one at a time for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00734720, 0x00735240, 0x00735290; formerly cited on `GetSimConCommandRegistry`'s doc block in moho/sim/CSimConCommand.cpp instead of on the member (RULE ONE), moved 2026-09-11.)
+             * Address: 0x00505200 (FUN_00505200 -- `erase(first, last)` -- the whole-tree fast path through `_Erase` 0x00505EC0 and the header self-link, else `erase(first++)` one at a time, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x00501760, 0x005017E0, 0x00501E50, 0x00504350; formerly `EraseSpatialMapRange` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -6855,6 +6914,8 @@ namespace msvc8
              * Address: 0x0046EBA0 (FUN_0046EBA0 -- `_Buynode()` -- one node, links nulled, colour black, not nil for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046BEF0, 0x0046D7D0, 0x0046DE80; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x00465480 (FUN_00465480 -- `_Buynode()` -- one node, links nulled, colour black, not nil for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004627C0, 0x00464430, 0x00464FE0; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x005A1410 (FUN_005A1410 -- `_Buynode()` -- one node, links nulled, colour black, not nil for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); callers 0x0059F920, 0x0059FAB0, 0x005A0010; formerly `CreateRebuildMapNode` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00505D20 (FUN_00505D20 -- `_Buynode()` -- one 0x38 node through `_Allocate` 0x00506330, links nulled, colour black, not nil, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); callers 0x00500F60 (four times, one per shard-data map), 0x00501D80 (the database's overflow map); formerly `AllocateSpatialMapNodeHeader` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x00505F20 (FUN_00505F20 -- `_Allocate(1)` for that 0x38 node -- `mov ecx, 1` then a tail jump into 0x00506330; zero callers, no references, a linker-retained copy nothing runs.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -7385,6 +7446,7 @@ namespace msvc8
              * Address: 0x0046E6D0 (FUN_0046E6D0 -- `_Buynode(left, parent, right, value)` -- the key assigned in place, then the index for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046DEE0; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x00465060 (FUN_00465060 -- `_Buynode(left, parent, right, value)` -- the key assigned in place, then the watcher pointer for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00464470; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x005A0C50 (FUN_005A0C50 -- the fresh node's `pair<const std::uint32_t, RUnitBlueprint*>` build for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `BuildRebuildMapKeyValueLane` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00505D60 (FUN_00505D60 -- `_Buynode(left, parent, right, value)` -- the 0x38 node through `_Allocate` 0x00506330, the three links, the 0x28 entry copied in, colour red, not nil, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); callers 0x005052F0; formerly `AllocateSpatialMapValueNode` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -8418,6 +8480,7 @@ namespace msvc8
              * Address: 0x0045DE20 (FUN_0045DE20 -- `_Lrotate` for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045CB80, 0x0045CED0; formerly `FileInfoMapRotateLeft` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x0046E620 (FUN_0046E620 -- `_Lrotate` for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046DEE0, 0x0046E890; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x00464630 (FUN_00464630 -- `_Lrotate` for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00463A70, 0x00464470; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00504C10 (FUN_00504C10 -- `_Lrotate` for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x005043B0, 0x005052F0; formerly `SpatialMapRotateLeft` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
              */
             void rotate_left(node_type* const n) noexcept
             {
@@ -8711,6 +8774,7 @@ namespace msvc8
              * Address: 0x0045DEC0 (FUN_0045DEC0 -- `_Rrotate` for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x0045CB80, 0x0045CED0; formerly `FileInfoMapRotateRight` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x0046E680 (FUN_0046E680 -- `_Rrotate` for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046DEE0, 0x0046E890; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x004646E0 (FUN_004646E0 -- `_Rrotate` for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00463A70, 0x00464470; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00504CC0 (FUN_00504CC0 -- `_Rrotate` for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x005043B0, 0x005052F0; formerly `SpatialMapRotateRight` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -9177,6 +9241,7 @@ namespace msvc8
              * Address: 0x005C7430 (FUN_005C7430 -- `_Insert(addLeft, where, value)` -- link at the chosen leaf, then the recolour/rotate fixup for `msvc8::multimap<moho::SReconKey, moho::ReconBlip*, moho::SReconKeyLess>` (`CAiReconDBImpl::mBlipMap` at +0x04; node 0x20, the 0x0C key at node+0x0C, the blip at node+0x18, colour/nil at +0x1C/+0x1D, `max_size` 0x0FFFFFFE = 0xFFFFFFFF/0x10 - 1); callers 0x005C5AF0; formerly `InsertMapNodeWithHint` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x004E2980 (FUN_004E2980 -- `insert_at` -- buy the node, link it under the chosen edge, fix the header extremes and rebalance for `msvc8::multimap<std::uint32_t, moho::CSndParams*>` (`gSndParamsHashCache` in moho/audio/CSndParams.cpp, the shipped `Moho::sSndParamsCache`; pair 0x08, node 0x18, key at node+0x0C, descriptor pointer at node+0x10, colour/nil at +0x14/+0x15); callers 0x004E1FD0; the link half of that same insert; formerly unrecovered.)
              * Address: 0x004E2D70 (FUN_004E2D70 -- `_Insert` -- the `0x1FFFFFFE` = `0xFFFFFFFF/0x08 - 1` length guard, then buy the node, link it under the chosen edge and rebalance for `msvc8::multimap<std::uint32_t, moho::CSndVar*>` (`gSndVarNameCache` in moho/audio/CSndVar.cpp; pair 0x08, node 0x18, key at node+0x0C, variable pointer at node+0x10, colour/nil at +0x14/+0x15); callers 0x004E2110; the link half of that same insert; formerly unrecovered.)
+             * Address: 0x005052F0 (FUN_005052F0 -- `_Insert(addLeft, where, value)` -- the `0x06666665` = `0xFFFFFFFF/0x28 - 1` length guard, `_Buynode` 0x00505D60, the link, the header extremes and the recolour/rotate fixup through 0x00504C10/0x00504CC0, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, the 0x28 entry, colour/nil at +0x34/+0x35); callers 0x00504990, 0x00504A10; formerly `InsertSpatialPayloadAtLink`/`SpatialMapInsertFixup` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {

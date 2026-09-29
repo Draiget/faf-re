@@ -706,7 +706,16 @@ namespace msvc8
 
         /** Always inserts; equal keys keep insertion order. See `rb_tree::insert_equal`. */
         iterator insert(const value_type& v) { return iterator(tree_.insert_equal(v)); }
-        iterator insert(const_iterator hint, const value_type& v) { return iterator(tree_.insert_hint(hint, v)); }
+        /**
+         * The `_Multi` hinted insert (`rb_tree::insert_hint_equal`). This used to
+         * route through the unique hint insert, which tests the hint strictly and
+         * falls back to `insert_unique` -- so a hinted insert of a key already in
+         * the multimap was silently refused.
+         */
+        iterator insert(const_iterator hint, const value_type& v)
+        {
+            return iterator(tree_.insert_hint_equal(hint, v));
+        }
 
         iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
         iterator erase(const_iterator first, const_iterator last)

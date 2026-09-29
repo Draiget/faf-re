@@ -189,8 +189,111 @@ namespace msvc8
         tree_type tree_;
     };
 
+    /**
+     * \brief Owning MSVC8-layout `std::multiset`.
+     *
+     * The same `_Tree` as `set`, instantiated with `_Multi = true`: equivalent
+     * keys are allowed and land in insertion order, and the hinted insert takes
+     * the non-strict `_Multi` branch that falls back to `insert_equal`. Same
+     * 12-byte `{proxy, _Myhead, _Mysize}` head, same node.
+     *
+     * Unlike `set`, `iterator` hands out `value_type&`, because VC8's did:
+     * Dinkumware's `_Tree::iterator` stayed mutable for the set containers until
+     * VC10 made it the const iterator, and engine code wrote the non-key half
+     * of an element through it. The spatial database does exactly that -- it
+     * stores the moved entry's box and owning leaf lane through the entry's
+     * iterator (0x00501C10, 0x00502200). Changing the key that way is as
+     * undefined here as it was then.
+     *
+     * `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h) is the instantiation this
+     * models; its emissions are cited on these members and on `rb_tree`.
+     */
+    template<class Key, class Less = std::less<Key>>
+    class multiset
+    {
+        using traits = detail::rb_set_traits<Key, Less>;
+        using tree_type = detail::rb_tree<traits>;
+
+    public:
+        using key_type = Key;
+        using value_type = Key;
+        using size_type = std::uint32_t;
+        using difference_type = std::ptrdiff_t;
+        using key_compare = Less;
+        using value_compare = Less;
+        using reference = value_type&;
+        using const_reference = const value_type&;
+
+        using iterator = detail::rb_iterator<traits, false>;
+        using const_iterator = detail::rb_iterator<traits, true>;
+
+        multiset() {}
+        explicit multiset(const key_compare& comp) : tree_(comp) {}
+        multiset(const multiset& o) : tree_(o.tree_) {}
+        multiset& operator=(const multiset& o)
+        {
+            tree_ = o.tree_;
+            return *this;
+        }
+        multiset(multiset&& o) MSVC8_SET_NOEXCEPT : tree_(std::move(o.tree_)) {}
+        multiset& operator=(multiset&& o) MSVC8_SET_NOEXCEPT
+        {
+            tree_ = std::move(o.tree_);
+            return *this;
+        }
+
+        /**
+         * Address: 0x00504380 (FUN_00504380 -- `begin()` through the hidden iterator slot, `_Myhead->_Left`, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot04LaneA`'s "dereferencing shape" over `PointerToPointerSlot04RuntimeView` in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
+         */
+        [[nodiscard]] iterator begin() noexcept { return iterator(tree_.leftmost()); }
+        [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(tree_.leftmost()); }
+
+        /**
+         * Address: 0x00504390 (FUN_00504390 -- `end()` through the hidden iterator slot, `_Myhead` itself, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot04LaneA` over `PointerSlot04RuntimeView` in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
+         */
+        [[nodiscard]] iterator end() noexcept { return iterator(tree_.header()); }
+        [[nodiscard]] const_iterator end() const noexcept { return const_iterator(tree_.header()); }
+
+        [[nodiscard]] bool empty() const MSVC8_SET_NOEXCEPT { return tree_.empty(); }
+        [[nodiscard]] size_type size() const MSVC8_SET_NOEXCEPT { return tree_.size(); }
+        [[nodiscard]] key_compare key_comp() const { return tree_.key_comp(); }
+
+        /**
+         * Always inserts; equivalent keys keep insertion order. See
+         * `rb_tree::insert_equal`, which carries the `_Tree::insert` body
+         * (0x00504990) this returns `.first` of.
+         *
+         * Address: 0x00504310 (FUN_00504310 -- `multiset::insert(value)` -- `_Tree::insert` 0x00504990, then `.first` stored through the hidden iterator slot, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); callers 0x00502200 (the entity lane of `SpatialShardData<T>::Insert`, the one of its four inserts MSVC left out of line); formerly `InsertSpatialEntityPayload` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+         */
+        iterator insert(const value_type& v) { return iterator(tree_.insert_equal(v)); }
+
+        /**
+         * The `_Multi` hinted insert. See `rb_tree::insert_hint_equal`, which
+         * carries the body (0x00504A10).
+         *
+         * Address: 0x00504330 (FUN_00504330 -- the calling-convention bridge that moves the hidden result slot into `ebx` and tail-calls `insert(where, value)` 0x00504A10, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs.)
+         */
+        iterator insert(const_iterator hint, const value_type& v)
+        {
+            return iterator(tree_.insert_hint_equal(hint, v));
+        }
+
+        iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
+        iterator erase(const_iterator first, const_iterator last)
+        {
+            return iterator(tree_.erase_range(first.node(), last.node()));
+        }
+
+        void clear() MSVC8_SET_NOEXCEPT { tree_.clear(); }
+        void swap(multiset& other) MSVC8_SET_NOEXCEPT { tree_.swap(other.tree_); }
+
+    private:
+        tree_type tree_;
+    };
+
     // Size check (x86)
     static_assert(sizeof(set<int>) == 12, "msvc8::set must be 12 bytes on x86");
+    static_assert(sizeof(multiset<int>) == 12, "msvc8::multiset must be 12 bytes on x86");
 
 } // namespace msvc8
 

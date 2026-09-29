@@ -67,26 +67,6 @@ namespace
     return cached;
   }
 
-  /**
-   * Address: 0x0089E520 (FUN_0089E520)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one spatial-db registration into
-   * `SpatialDB_MeshInstance::Register` and returns the destination entry.
-   * The five instructions at 0x0089E520 only shuffle the register-passed
-   * `this`/storage pair onto the stack shape 0x00501A80 expects.
-   */
-  [[maybe_unused]] moho::SpatialDBEntry<moho::UserEntity>* RegisterSpatialDbEntryAdapter(
-    moho::SpatialDBEntry<moho::UserEntity>* const destinationEntry,
-    moho::SpatialDB<moho::UserEntity>* const sessionSpatialDbStorage,
-    moho::UserEntity* const owner,
-    const std::int32_t spatialDbMask
-  )
-  {
-    destinationEntry->Register(sessionSpatialDbStorage, owner, spatialDbMask);
-    return destinationEntry;
-  }
-
   // 0x00416F60
   [[nodiscard]] bool ContainsCell(const moho::VisibilityRect& rect, const std::int32_t x, const std::int32_t z)
   {

@@ -5,6 +5,8 @@
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
+#include "legacy/containers/Set.h"
+#include "legacy/containers/Vector.h"
 #include "Wm3AxisAlignedBox3.h"
 
 namespace moho
@@ -19,30 +21,89 @@ namespace moho
 
   template <class T> struct SpatialShardData;
 
+  /**
+   * One object's record in a spatial map -- the value a map node carries at
+   * +0x0C. The node is 0x38: three links, this 0x28 entry, then the colour and
+   * nil bytes at +0x34/+0x35 (every tree body in 0x005043B0..0x00505F40 reads
+   * `_Isnil` at +0x35).
+   *
+   *   - `mBox` is the world box the owner last published (`UpdateBounds`,
+   *     0x00501C10, copies six dwords into node+0x0C).
+   *   - `mEntityType` is the routing mask `Register` was given; it picks the
+   *     leaf map (0x100 unit, 0x400 projectile, 0x200 prop, anything else the
+   *     generic lane) in `Insert` 0x00502200 and `RemoveNode` 0x00502340.
+   *   - `mShardData` is the leaf lane holding the entry, null while it sits in
+   *     the database's overflow map. `Insert` stores it through the fresh
+   *     iterator; `Unregister` 0x00501BC0 branches on it.
+   *   - `mFadeOut` is the dissolve cutoff and the map's sort key (see
+   *     `SpatialEntryLess`); `UpdateDissolveCutoff` 0x00501B00 re-inserts the
+   *     entry with a new one.
+   *   - `mOwner` is the object that registered; every collect pushes it.
+   */
   template <class T>
-  struct SpatialShardArray
+  struct SpatialEntry
   {
-    void* mDebugProxy; // +0x00
-    T** mBegin;        // +0x04
-    T** mEnd;          // +0x08
-    T** mCapacity;     // +0x0C
+    Wm3::AxisAlignedBox3f mBox;      // +0x00
+    std::uint32_t mEntityType;       // +0x18
+    SpatialShardData<T>* mShardData; // +0x1C
+    float mFadeOut;                  // +0x20
+    T* mOwner;                       // +0x24
   };
 
-  static_assert(sizeof(SpatialShardArray<void>) == 0x10, "SpatialShardArray size must be 0x10");
+  static_assert(sizeof(SpatialEntry<UserEntity>) == 0x28, "SpatialEntry<T> size must be 0x28");
+  static_assert(offsetof(SpatialEntry<UserEntity>, mEntityType) == 0x18, "SpatialEntry<T>::mEntityType offset must be 0x18");
+  static_assert(offsetof(SpatialEntry<UserEntity>, mShardData) == 0x1C, "SpatialEntry<T>::mShardData offset must be 0x1C");
+  static_assert(offsetof(SpatialEntry<UserEntity>, mFadeOut) == 0x20, "SpatialEntry<T>::mFadeOut offset must be 0x20");
+  static_assert(offsetof(SpatialEntry<UserEntity>, mOwner) == 0x24, "SpatialEntry<T>::mOwner offset must be 0x24");
+
+  /**
+   * The spatial map's ordering: entries that never fade (`mFadeOut <= 0`)
+   * first, in ascending order, then the fading ones by descending cutoff.
+   *
+   * That order is what lets the view collect stop early.
+   * `SpatialShardData<T>::FindInVolumeFromData` (0x00503730) walks a map
+   * front to back and breaks at the first fading entry whose cutoff the view
+   * already reaches -- every entry after it fades out sooner.
+   *
+   * Decoded from the compare MSVC inlined into the tree's insert (0x00504990)
+   * and hinted insert (0x00504A10): `0 < lhs` selects the first arm, and in it
+   * `rhs <= 0` answers false; otherwise `0 < rhs` answers true.
+   */
+  template <class T>
+  struct SpatialEntryLess
+  {
+    [[nodiscard]] bool operator()(const SpatialEntry<T>& lhs, const SpatialEntry<T>& rhs) const noexcept
+    {
+      if (lhs.mFadeOut > 0.0f) {
+        return rhs.mFadeOut > 0.0f && lhs.mFadeOut > rhs.mFadeOut;
+      }
+      return rhs.mFadeOut > 0.0f || lhs.mFadeOut < rhs.mFadeOut;
+    }
+  };
+
+  /**
+   * The spatial database's map type: a VC8 multiset of entries in fade order.
+   * Its insert/erase/destroy bodies are the tree's own and are cited on
+   * `msvc8::multiset` and `msvc8::detail::rb_tree`.
+   */
+  template <class T>
+  using SpatialMap = msvc8::multiset<SpatialEntry<T>, SpatialEntryLess<T>>;
+
+  static_assert(sizeof(SpatialMap<UserEntity>) == 0x0C, "SpatialMap<T> size must be 0x0C");
 
   template <class T>
   struct SpatialShard
   {
-    SpatialShard<T>* mParent;                     // +0x00
-    gpg::Rect2i mAreaRect;                     // +0x04
-    std::int32_t mLevel;                       // +0x14
-    std::int32_t mUnitCount;                   // +0x18
-    std::int32_t mProjectileCount;             // +0x1C
-    std::int32_t mPropCount;                   // +0x20
-    std::int32_t mEntityCount;                 // +0x24
-    Wm3::AxisAlignedBox3f mBounds;             // +0x28
-    SpatialShardArray<SpatialShard<T>> mShards;   // +0x40
-    SpatialShardArray<SpatialShardData<T>> mData; // +0x50
+    SpatialShard<T>* mParent;                   // +0x00
+    gpg::Rect2i mAreaRect;                      // +0x04
+    std::int32_t mLevel;                        // +0x14
+    std::int32_t mUnitCount;                    // +0x18
+    std::int32_t mProjectileCount;              // +0x1C
+    std::int32_t mPropCount;                    // +0x20
+    std::int32_t mEntityCount;                  // +0x24
+    Wm3::AxisAlignedBox3f mBounds;              // +0x28
+    msvc8::vector<SpatialShard<T>*> mShards;    // +0x40, the 4x4 children while mLevel > 0
+    msvc8::vector<SpatialShardData<T>*> mData;  // +0x50, the 4x4 leaf lanes once mLevel <= 0
 
     /**
      * Address: 0x005011A0 (FUN_005011A0, Moho::SpatialShard<T>::SpatialShard)
@@ -57,10 +118,13 @@ namespace moho
      * Address: 0x00501370 (FUN_00501370, Moho::SpatialShard<T>::~SpatialShard)
      *
      * What it does:
-     * Releases recursively-owned child shards or leaf-data lanes and clears
-     * shard pointer arrays.
+     * Deletes the owned child shards or leaf-data lanes and clears whichever
+     * vector held them; both vectors then release their storage as members.
      */
     ~SpatialShard();
+
+    SpatialShard(const SpatialShard&) = delete;
+    SpatialShard& operator=(const SpatialShard&) = delete;
 
     /**
      * Address: 0x00501490 (FUN_00501490, Moho::SpatialShard<T>::CountType)
@@ -96,49 +160,17 @@ namespace moho
   static_assert(offsetof(SpatialShard<UserEntity>, mData) == 0x50, "SpatialShard<T>::mData offset must be 0x50");
 
   template <class T>
-  struct SpatialMapNode
-  {
-    SpatialMapNode<T>* mLeft;      // +0x00
-    SpatialMapNode<T>* mParent;    // +0x04
-    SpatialMapNode<T>* mRight;     // +0x08
-    Wm3::AxisAlignedBox3f mBox; // +0x0C
-    std::uint32_t mEntityType;     // +0x24
-    SpatialShardData<T>* mShardData;  // +0x28
-    float mFadeOut;                // +0x2C
-    T* mOwner;                     // +0x30
-    std::uint8_t mColor;           // +0x34
-    std::uint8_t mIsNil;           // +0x35
-    std::uint8_t mPad_36_37[0x02];
-  };
-
-  static_assert(sizeof(SpatialMapNode<UserEntity>) == 0x38, "SpatialMapNode<T> size must be 0x38");
-  static_assert(offsetof(SpatialMapNode<UserEntity>, mBox) == 0x0C, "SpatialMapNode<T>::mBox offset must be 0x0C");
-  static_assert(offsetof(SpatialMapNode<UserEntity>, mEntityType) == 0x24, "SpatialMapNode<T>::mEntityType offset must be 0x24");
-  static_assert(offsetof(SpatialMapNode<UserEntity>, mShardData) == 0x28, "SpatialMapNode<T>::mShardData offset must be 0x28");
-  static_assert(offsetof(SpatialMapNode<UserEntity>, mFadeOut) == 0x2C, "SpatialMapNode<T>::mFadeOut offset must be 0x2C");
-  static_assert(offsetof(SpatialMapNode<UserEntity>, mOwner) == 0x30, "SpatialMapNode<T>::mOwner offset must be 0x30");
-  static_assert(offsetof(SpatialMapNode<UserEntity>, mIsNil) == 0x35, "SpatialMapNode<T>::mIsNil offset must be 0x35");
-
-  template <class T>
-  struct SpatialMapTree
-  {
-    void* mAllocatorCookie; // +0x00
-    SpatialMapNode<T>* mHead;  // +0x04
-    std::int32_t mSize;     // +0x08
-  };
-
-  static_assert(sizeof(SpatialMapTree<UserEntity>) == 0x0C, "SpatialMapTree<T> size must be 0x0C");
-
-  template <class T>
   struct SpatialShardData
   {
+    using iterator = typename SpatialMap<T>::iterator;
+
     SpatialShard<T>* mShard;       // +0x00
 
     /**
      * +0x04..+0x13. Four dwords the constructor at 0x00500F60 stores zero into
      * individually, so a member was declared here -- this is not compiler
      * padding. Nothing else in the subsystem touches it: not the destructor at
-     * 0x005017E0, not HasType (which answers per-type queries from the tree
+     * 0x005017E0, not HasType (which answers per-type queries from the map
      * sizes at +0x38/+0x44/+0x50/+0x5C), not RecalculateBounds, and not any of
      * the collect or find bodies. Both constructors that build one of these
      * leave it at zero -- the database at 0x00501D80 for its inline lane, and
@@ -152,36 +184,41 @@ namespace moho
     std::uint8_t mUnknown_04_13[0x10];
     std::int32_t mTimeSinceRecalc; // +0x14
     Wm3::AxisAlignedBox3f mBounds; // +0x18
-    SpatialMapTree<T> mMapUnits;      // +0x30
-    SpatialMapTree<T> mMapProjectiles; // +0x3C
-    SpatialMapTree<T> mMapProps;      // +0x48
-    SpatialMapTree<T> mMapEntities;   // +0x54
+    SpatialMap<T> mMapUnits;       // +0x30
+    SpatialMap<T> mMapProjectiles; // +0x3C
+    SpatialMap<T> mMapProps;       // +0x48
+    SpatialMap<T> mMapEntities;    // +0x54
 
     /**
      * Address: 0x00500F60 (FUN_00500F60, Moho::SpatialShardData<T>::SpatialShardData)
      *
      * What it does:
-     * Initializes one leaf-data lane container and allocates sentinel map
-     * heads for unit/projectile/prop/entity trees.
+     * Names the owning shard, zeroes the header and staleness counter and
+     * seeds the bounds inverted; the four maps construct their own heads.
      */
     explicit SpatialShardData(SpatialShard<T>* ownerShard);
-
-    /**
-     * The database embeds one of these as its inline root lane and fills it in
-     * its own constructor body (0x00501D80), rather than through a member
-     * initializer -- there is no owning shard to name at that point. This
-     * leaves the members untouched, exactly as the binary does.
-     */
-    SpatialShardData() = default;
 
     /**
      * Address: 0x005017E0 (FUN_005017E0, Moho::SpatialShardData<T>::~SpatialShardData)
      *
      * What it does:
-     * Destroys all map nodes in unit/projectile/prop/entity trees and releases
-     * their sentinel heads.
+     * Member destruction only: the four maps' `~_Tree`, entities first,
+     * inlined into this body.
      */
     ~SpatialShardData();
+
+    SpatialShardData(const SpatialShardData&) = delete;
+    SpatialShardData& operator=(const SpatialShardData&) = delete;
+
+    /**
+     * Address: 0x00502200 (FUN_00502200)
+     *
+     * What it does:
+     * Inserts one entry into the map its routing mask selects, widens this
+     * lane's bounds, stores this lane into the entry through the new iterator,
+     * and propagates the bounds and the type count up the shard chain.
+     */
+    iterator Insert(const SpatialEntry<T>& entry);
 
     /**
      * Address: 0x00502780 (FUN_00502780, Moho::SpatialShardData<T>::CollectFromData)
@@ -287,8 +324,8 @@ namespace moho
      * the requested type or when the sphere does not touch the lane's AABB.
      * Refreshes the cached bounds if their staleness counter is over the
      * limit, then for each enabled entity-type bucket walks the associated
-     * tree appending owners whose node-box either intersects the sphere or
-     * is fully contained by it.
+     * map appending owners whose box either intersects the sphere or is
+     * fully contained by it.
      */
     [[nodiscard]] bool CollectInSphereFromData(
       EEntityType type,
@@ -300,10 +337,10 @@ namespace moho
      * Address: 0x00502340 (FUN_00502340, Moho::SpatialShardData<T>::RemoveNode)
      *
      * What it does:
-     * Removes one map node from the matching type lane and decrements shard
-     * counters up the parent chain.
+     * Erases one entry from the map its routing mask selects and decrements
+     * shard counters up the parent chain.
      */
-    void RemoveNode(SpatialMapNode<T>* node);
+    void RemoveNode(iterator node);
 
     /**
      * Address: 0x00503730 (FUN_00503730, Moho::SpatialShardData<T>::FindInVolumeFromData)
@@ -362,41 +399,38 @@ namespace moho
    * names only one of them, and why this was previously recovered as a single
    * flat `SpatialDB_MeshInstance` that had to serve as both the database and
    * the per-object handle.
-   *
-   * `SpatialDB()` is 0x00501D80 and `~SpatialDB()` is 0x00501E50; the progress
-   * db records the former under the class's own constructor name. They were
-   * previously spelled as explicit `InitializeStorage()` / `DestroyStorage()`
-   * calls at every owner, which is hand-written member construction.
    */
   template <class T>
   struct SpatialDB
   {
-    SpatialShardArray<SpatialShard<T>> mShards;  // +0x00
-    SpatialShardData<T> mShardData;             // +0x10
-    std::int32_t mMapWidth;                  // +0x70
-    std::int32_t mMapHeight;                 // +0x74
-    std::int32_t mShardWidth;                // +0x78
-    std::int32_t mShardHeight;               // +0x7C
-    std::int32_t mShardLevel;                // +0x80
-    SpatialMapTree<T> mMapTree;                 // +0x84
+    msvc8::vector<SpatialShard<T>*> mShards;  // +0x00, the 4x4 top-level shards
+    SpatialShardData<T> mShardData;           // +0x10, entries outside the shard grid
+    std::int32_t mMapWidth;                   // +0x70
+    std::int32_t mMapHeight;                  // +0x74
+    std::int32_t mShardWidth;                 // +0x78
+    std::int32_t mShardHeight;                // +0x7C
+    std::int32_t mShardLevel;                 // +0x80
+    SpatialMap<T> mMapTree;                   // +0x84, registered entries not yet bounded
 
-    /** Address: 0x00501D80 -- builds the root shard lanes and the map tree. */
+    /**
+     * Address: 0x00501D80 (FUN_00501D80) -- member construction (the root lane
+     * with no owning shard, the overflow map's head) and a `clear()` of the
+     * shard vector.
+     */
     SpatialDB();
 
-    /** Address: 0x00501E50 -- releases every shard lane and map node. */
+    /**
+     * Address: 0x00501E50 (FUN_00501E50) -- deletes the top-level shards; the
+     * members release the rest.
+     */
     ~SpatialDB();
 
     SpatialDB(const SpatialDB&) = delete;
     SpatialDB& operator=(const SpatialDB&) = delete;
 
-    /** Alias of 0x00501F50 -- rebuilds the top-level shards for a map size. */
+    /** Address: 0x00501F50 -- rebuilds the top-level shards for a map size. */
     void ResizeForMap(std::int32_t width, std::int32_t height);
 
-    // The collect destination is still typed `UserEntity*` even for
-    // `SpatialDB<MeshInstance>`, where the slots are really `MeshInstance*`.
-    // Typing it `T*` cascades into eight `SpatialShardData<T>` helpers, so it is
-    // a separate step; the payload stays erased at the node (`mOwner`) until
-    // then.
     /** Address: 0x00503F80 */
     std::int32_t Collect(gpg::fastvector<T*>& dest, EEntityType type);
     /** Address: 0x00504040 */
@@ -421,41 +455,68 @@ namespace moho
    * value in every participant (`MeshInstance` +0x0C, `UserEntity` +0x10,
    * `ShoreCell` +0x38, `CWldTerrainDecal` +0x0C, `WaveGenerator` +0x08).
    *
-   * Field evidence from `Register` (0x00501A80) and its teardown (0x00501BC0):
-   *
    *   - `mDb` (+0x00) is the database registered into. `Register` publishes it
-   *     with `mov [edi], esi`, `esi` being the storage root the caller passed
-   *     -- `CWldSession + 0x50` for entities.
-   *   - `mNode` (+0x04) is the node the insert produced, not an index.
-   *     `Register` stores it with `mov [edi+4], edx`, and the teardown
-   *     dereferences it immediately: `mov eax, [edi+4]; mov esi, [eax+0x28]`,
-   *     +0x28 being `SpatialMapNode<T>::mShardData`. Typing it `std::int32_t` is
-   *     why consumers had to launder it through casts.
+   *     with `mov [edi], esi` before inserting.
+   *   - `mNode` (+0x04) is the entry's iterator into whichever map holds it:
+   *     the database's overflow map until the first `UpdateBounds`, a leaf
+   *     lane's map after. Every member dereferences it immediately
+   *     (`mov eax, [edi+4]; mov esi, [eax+0x28]` reads the entry's
+   *     `mShardData`), because nothing calls one on an unregistered entry.
    *
-   * Both entry points guard on `mDb != nullptr` and the teardown zeroes it, so
-   * unregistering twice is a no-op by construction.
+   * Only the destructor and `Register` test `mDb`; `Unregister` zeroes it and
+   * leaves `mNode` as it was.
    */
   template <class T>
   struct SpatialDBEntry
   {
-    SpatialDB<T>* mDb;     // +0x00
-    SpatialMapNode<T>* mNode; // +0x04
+    using iterator = typename SpatialMap<T>::iterator;
+
+    SpatialDB<T>* mDb; // +0x00
+    iterator mNode;    // +0x04
+
+    /**
+     * Address: 0x00501A70 (FUN_00501A70 -- the out-of-line copy: two zero
+     * stores through `eax`; zero callers, no references, a linker-retained
+     * copy nothing runs. Every owner's constructor inlines it. Formerly
+     * `InitializeSpatialDbEntryPairZero` over `SpatialDbEntryPairRuntimeView`
+     * in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
+     */
+    SpatialDBEntry() noexcept
+      : mDb(nullptr)
+      , mNode()
+    {}
+
+    /**
+     * Inlined at every owner's destructor as `cmp dword ptr [entry], 0` then
+     * a call into `Unregister` 0x00501BC0 (0x007DE663 in `~MeshInstance`,
+     * 0x008B888D in `~UserEntity`).
+     *
+     * Address: 0x00812760 (FUN_00812760 -- the out-of-line copy for
+     * `SpatialDBEntry<ShoreCell>`; zero callers, no references, a
+     * linker-retained copy nothing runs. Formerly
+     * `DestroySpatialDbEntryIfBoundAdapter` in
+     * moho/terrain/water/Shoreline.cpp, removed 2026-09-29.)
+     */
+    ~SpatialDBEntry()
+    {
+      if (mDb != nullptr) {
+        Unregister();
+      }
+    }
 
     /** Address: 0x00501A80 -- rebinds this entry, unregistering any previous. */
     void Register(SpatialDB<T>* db, T* owner, std::int32_t routingMask);
 
-    /** Address: 0x00501B00 -- updates the dissolve cutoff on this entry's node. */
+    /** Address: 0x00501BC0 -- erases the entry from its map and clears `mDb`. */
+    void Unregister();
+
+    /** Address: 0x00501B00 -- re-inserts the entry under a new dissolve cutoff. */
     void UpdateDissolveCutoff(float cutoff);
 
-    /** Address: 0x00501C10 -- republishes bounds, re-seating the node if needed. */
+    /** Address: 0x00501C10 -- republishes bounds, re-seating the entry if needed. */
     void UpdateBounds(const Wm3::AxisAlignedBox3f& bounds);
-
-    /** Drops local state without touching a database already torn down. */
-    void ClearRegistration() noexcept;
-
-    /** Address: 0x00501BC0 -- removes the node and clears `mDb`. */
-    ~SpatialDBEntry();
   };
 
   static_assert(sizeof(SpatialDBEntry<UserEntity>) == 0x08, "SpatialDBEntry size must be 0x08");
+  static_assert(offsetof(SpatialDBEntry<UserEntity>, mNode) == 0x04, "SpatialDBEntry::mNode offset must be 0x04");
 } // namespace moho

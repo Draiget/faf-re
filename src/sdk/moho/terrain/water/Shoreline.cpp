@@ -129,37 +129,6 @@ namespace
     } while (::InterlockedCompareExchange(counter, static_cast<long>(value), observed) != observed);
   }
 
-  void InitializeShorelineSpatialDbGrid(moho::Shoreline& shoreline, const std::int32_t width, const std::int32_t height)
-  {
-    moho::SpatialDB<moho::ShoreCell>& runtime = shoreline.mSpatialDb;
-    if (runtime.mMapWidth == width && runtime.mMapHeight == height) {
-      return;
-    }
-
-    runtime.mMapWidth = width;
-    runtime.mMapHeight = height;
-    runtime.mShardWidth = (width <= 0) ? 0 : ((width + 0x0F) >> 4);
-    runtime.mShardHeight = (height <= 0) ? 0 : ((height + 0x0F) >> 4);
-
-    const std::int32_t maxExtent = std::max(width, height);
-    if (maxExtent <= 0) {
-      runtime.mShardLevel = 0;
-    } else if (maxExtent <= 0x100) {
-      runtime.mShardLevel = 1;
-    } else if (maxExtent <= 0x400) {
-      runtime.mShardLevel = 2;
-    } else {
-      runtime.mShardLevel = 3;
-    }
-
-    if (runtime.mShards.mBegin != nullptr) {
-      for (std::int32_t index = 0; index < 16; ++index) {
-        runtime.mShards.mBegin[index] = nullptr;
-      }
-      runtime.mShards.mEnd = runtime.mShards.mBegin;
-    }
-  }
-
   [[nodiscard]] float ReadHeightSampleMeters(
     const moho::CHeightField* const heightField,
     const std::int32_t sampleX,
@@ -215,8 +184,6 @@ namespace
       point.z = 0.0f;
     }
 
-    cell.mSpatialDbEntry.mDb = nullptr;
-    cell.mSpatialDbEntry.mNode = nullptr;
     cell.mBounds.Min.x = 0.0f;
     cell.mBounds.Min.y = 0.0f;
     cell.mBounds.Min.z = 0.0f;
@@ -761,39 +728,18 @@ namespace moho
    * Address: 0x008126E0 (FUN_008126E0, ??0ShoreCell@Moho@@QAE@XZ)
    *
    * What it does:
-   * Initializes one shoreline-cell object by setting `mType` to zero,
-   * clearing the embedded spatial-db entry lanes, and zeroing all five
-   * shoreline point pairs.
+   * Initializes one shoreline-cell object by setting `mType` to zero and
+   * zeroing all five shoreline point pairs; the embedded spatial-db entry
+   * zeroes itself as a member (`SpatialDBEntry()`).
    */
   ShoreCell::ShoreCell()
   {
     mType = 0;
 
-    mSpatialDbEntry.mDb = nullptr;
-    mSpatialDbEntry.mNode = nullptr;
-
     for (ShoreCellPoint2& point : mPoints) {
       point.x = 0.0f;
       point.z = 0.0f;
     }
-  }
-
-  /**
-   * Address: 0x00812760 (FUN_00812760)
-   *
-   * What it does:
-   * Runs one null-guard adapter lane that only destroys one
-   * `SpatialDB_MeshInstance` when its `db` lane is non-null.
-   */
-  [[maybe_unused]] SpatialDBEntry<ShoreCell>* DestroySpatialDbEntryIfBoundAdapter(
-    SpatialDBEntry<ShoreCell>* const entry
-  )
-  {
-    if (entry->mDb != nullptr) {
-      entry->~SpatialDBEntry();
-    }
-
-    return entry;
   }
 
   /**
@@ -869,7 +815,7 @@ namespace moho
     if (heightField != nullptr) {
       const std::int32_t width = heightField->width - 1;
       const std::int32_t height = heightField->height - 1;
-      InitializeShorelineSpatialDbGrid(*this, width, height);
+      mSpatialDb.ResizeForMap(width, height);
 
       for (std::int32_t x = 0; x < width; x += 2) {
         for (std::int32_t z = 0; z < height; z += 2) {

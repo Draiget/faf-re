@@ -116,19 +116,6 @@ namespace moho
    */
   VMatrix4* CopyTransform4x4(VMatrix4* destination, const VMatrix4& source);
 
-  /**
-   * Address: 0x0082BA50 (FUN_0082BA50)
-   *
-   * What it does:
-   * Register-order bridge that forwards one mesh-instance spatial collect lane
-   * into `SpatialDB<MeshInstance>::Collect`.
-   */
-  std::int32_t CollectMeshInstanceRegisterAdapter(
-    SpatialDB<MeshInstance>* instance,
-    EEntityType type,
-    gpg::fastvector<UserEntity*>& destination
-  );
-
 
   class MeshMaterial
   {

@@ -237,6 +237,10 @@ namespace msvc8
          * What it does:
          * Moves one half-open source word range `[sourceBegin, sourceEnd)` into
          * `destination` and returns one-past the last written destination word.
+         * Address: 0x00506160 (FUN_00506160 -- the tail move inside `_Insert_n` 0x00505530 for `msvc8::vector<moho::SpatialShard<T>*>` (`SpatialShard<T>::mShards`, `SpatialDB<T>::mShards`; moho/mesh/SpatialDb.h): `(end - src) >> 2` words through `memmove_s`, returning `dest + n`; caller 0x00505530.)
+         * Address: 0x00506230 (FUN_00506230 -- the same move for `msvc8::vector<moho::SpatialShardData<T>*>` (`SpatialShard<T>::mData`); caller 0x00505850.)
+         * Address: 0x00506080 (FUN_00506080 -- another emission of that word move for the spatial database's pointer vectors; zero callers, no references, a linker-retained copy nothing runs. Formerly `CopyDwordLaneRangeAndReturnEnd` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+         * Address: 0x005060B0 (FUN_005060B0 -- a second copy of 0x00506080; zero callers, no references.)
          */
         template <class WordT>
         [[nodiscard]] inline WordT* MoveWordRange(
@@ -2505,6 +2509,8 @@ namespace msvc8
          * Address: 0x0047DD30 (FUN_0047DD30 -- `end()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `BandwidthSampleEndAlias2` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047DFF0 (FUN_0047DFF0 -- `_Vector_iterator` base + index arithmetic for the `moho::SSendStamp` send-stamp vector (this tree's iterators are raw pointers); zero callers, unreachable; formerly `StampPointerFromVectorBase` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047E020 (FUN_0047E020 -- `_Vector_iterator` base + index arithmetic for the 8-byte `moho::SBandwidthUsageSample` series vector (this tree's iterators are raw pointers); zero callers, unreachable; formerly `BandwidthPointerFromVectorBase` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005046C0 (FUN_005046C0 -- `begin()` through the hidden iterator slot (`first_` at +0x04) for the spatial database's `msvc8::vector<moho::SpatialShard<T>*>` / `msvc8::vector<moho::SpatialShardData<T>*>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot04LaneA` over `PointerSlot04RuntimeView` in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
+         * Address: 0x005046D0 (FUN_005046D0 -- the other of that pair of `begin()` copies; zero callers.)
          */
         T* begin() const noexcept { return first_; }
 
@@ -2553,6 +2559,8 @@ namespace msvc8
          * Address: 0x00497200 (FUN_00497200 -- `end()` for `msvc8::vector<SWorldParticle>`; zero callers.)
          * Address: 0x004973A0 (FUN_004973A0 -- `end()` for `msvc8::vector<SWorldTrail>`; zero callers.)
          * Address: 0x00495940 (FUN_00495940 -- `end()` for `msvc8::vector<SWorldBeam>`; zero callers.)
+         * Address: 0x005046E0 (FUN_005046E0 -- `end()` through the hidden iterator slot (`last_` at +0x08) for the spatial database's `msvc8::vector<moho::SpatialShard<T>*>` / `msvc8::vector<moho::SpatialShardData<T>*>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot08LaneA` over `PointerSlot08RuntimeView` in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
+         * Address: 0x005046F0 (FUN_005046F0 -- the other of that pair of `end()` copies; zero callers.)
          */
         T* end() const noexcept { return last_; }
         /**
@@ -3067,6 +3075,8 @@ namespace msvc8
          * Address: 0x0054C080 (FUN_0054C080 -- the register-shape adapter over that same `resize(n)` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `ResizeAniSkelBoneVectorRegisterAdapter` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004A2FE0 (FUN_004A2FE0 -- `resize(n)` -- the zero-filled form for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); zero callers, unreachable; formerly `ResizeLegacyByteVectorStorageWithZeroFill` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00515DE0 (FUN_00515DE0 -- `resize(n)` -- build the default `REmitterCurveKey` temporary and hand it to `resize(n, value)` 0x00516410. Reached from `RVectorType_REmitterCurveKey::SetCount` 0x00515D20 for `msvc8::vector<moho::REmitterCurveKey>` (`REmitterBlueprintCurve::Keys`; the element is a polymorphic 0x10 `{vptr, X, Y, Z}`, so every element step routes through its virtual destructor or its copy constructor); zero callers, unreachable; formerly `ResizeEmitterCurveKeyVectorWithDefaultFillAdapter` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00504D70 (FUN_00504D70 -- `resize(16)` with the value-initialised null temporary, growing through `_Insert_n` 0x00505530 at `end()` and shrinking through `erase(begin() + 16, end())` 0x00504DE0, for `msvc8::vector<moho::SpatialShard<T>*>` (moho/mesh/SpatialDb.h); callers 0x005011A0 (`SpatialShard<T>::SpatialShard`'s `mShards.resize(16)`), 0x00501F50 (`SpatialDB<T>::ResizeForMap`); formerly `EnsureSpatialShardSlots16` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+         * Address: 0x00504EE0 (FUN_00504EE0 -- the same `resize(16)` for `msvc8::vector<moho::SpatialShardData<T>*>`, through `_Insert_n` 0x00505850 and `erase` 0x00504F50; caller 0x005011A0 (`mData.resize(16)`); formerly `EnsureSpatialShardDataSlots16` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
          */
         void resize(std::size_t newSize) {
             // VC8 defines this as `resize(_Newsize, _Ty())` -- the temporary is
@@ -6673,6 +6683,8 @@ namespace msvc8
          * Address: 0x007A5A70 (FUN_007A5A70 -- `_Insert_n` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp): the local
          *   value copy, the in-place tail shift, and the 1.5x relocation. Formerly
          *   `GrowAndInsertInputCaptureWeakRef`.)
+         * Address: 0x00505530 (FUN_00505530 -- `_Insert_n(pos, count, value)` for `msvc8::vector<moho::SpatialShard<T>*>` (moho/mesh/SpatialDb.h): the `0x3FFFFFFF` length guard into `_Xlen` 0x00505750, the in-place tail shift through 0x00506160 and fill, or the 1.5x relocation through `_Allocate` 0x005061D0; caller 0x00504D70; formerly `InsertNullSpatialShardSlots` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+         * Address: 0x00505850 (FUN_00505850 -- the same `_Insert_n` for `msvc8::vector<moho::SpatialShardData<T>*>`, through `_Xlen` 0x00505A70, 0x00506230 and `_Allocate` 0x005062A0; caller 0x00504EE0; formerly `InsertNullSpatialShardDataSlots` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -11327,6 +11339,8 @@ namespace msvc8
          * Address: 0x004241C0 (FUN_004241C0 -- `throw_too_long` -- the length_error the growth cap raises for `msvc8::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px, pi}` element retains and releases its control block on every copy); callers 0x00423948, 0x00423EB0; formerly `ThrowAnimTextureFrameVectorTooLong` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x004331F0 (FUN_004331F0 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x00432266, 0x0093FF3B. It was marked `skip` as a non-engine runtime helper; it is this engine instantiation.)
          * Address: 0x008EAA50 (FUN_008EAA50 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF776 (`_Buy` 0x008EF750), 0x008EFBB3 (the copy constructor), 0x00940DBC (`_Insert_n` 0x00940D40). It had no anchor.)
+         * Address: 0x00505750 (FUN_00505750 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<moho::SpatialShard<T>*>` (moho/mesh/SpatialDb.h); callers 0x00505530.)
+         * Address: 0x00505A70 (FUN_00505A70 -- the same `_Xlen` for `msvc8::vector<moho::SpatialShardData<T>*>`; callers 0x00505850.)
          */
         [[noreturn]] static void throw_too_long()
         {
