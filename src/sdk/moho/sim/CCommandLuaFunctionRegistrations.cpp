@@ -6035,18 +6035,26 @@ namespace moho
    * int __cdecl cfunc_IssueBuildMobileL(LuaPlus::LuaState *state);
    *
    * What it does:
-   * Lua `IssueBuildMobile(unitList, target, blueprintId, cellList)`. Resolves the
-   * build target world position and the blueprint to build, parses the cell list,
-   * then picks the single buildable unit from `unitList` whose position is closest
-   * to the target, and issues one `UNITCOMMAND_BuildMobile` at the target ground
-   * position carrying the blueprint and the cell list.
+   * Lua `IssueBuildMobile(unitList, target, blueprintId, cellList, all)`. Resolves
+   * the build target world position and the blueprint to build, parses the cell
+   * list, then picks the single buildable unit from `unitList` whose position is
+   * closest to the target, and issues one `UNITCOMMAND_BuildMobile` at the target
+   * ground position carrying the blueprint and the cell list.
+   *
+   * The shipped build carries FAF's patch (FA-Binary-Patches #29): the call takes
+   * five arguments (`cmp eax, 5` at 0x006F5B98), and just before the issue the
+   * body jumps to the `.exxt` stub at 0x0128F6C1, which tests `lua_toboolean(5)`.
+   * When it is true the command goes to every unit in `unitList` (the same set
+   * func_GetUnitList filled) instead of the closest builder alone. FAF's
+   * SimHooks.lua wraps this as `IssueBuildMobile` (false) and
+   * `IssueBuildAllMobile` (true).
    */
   int cfunc_IssueBuildMobileL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueBuildMobileName, 4, argumentCount);
+    if (argumentCount != 5) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueBuildMobileName, 5, argumentCount);
     }
 
     // arg1: candidate builders.
@@ -6114,7 +6122,13 @@ namespace moho
         commandIssueData.mCells.push_back(cell);
       }
 
-      (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+      if (lua_toboolean(rawState, 5) != 0) {
+        SEntitySetTemplateUnit allUnits{};
+        allUnits.AddUnits(candidateUnits);
+        (void)IssueCommandToSelectedUnits(sim, allUnits, commandIssueData, false);
+      } else {
+        (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
+      }
     }
 
     return 0;
