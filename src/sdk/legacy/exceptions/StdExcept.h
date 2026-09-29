@@ -1,36 +1,43 @@
 #pragma once
 
 #include <cstddef>
+#include <exception>
 
 #include "legacy/containers/String.h" // msvc8::string
 
 namespace msvc8
 {
   /**
-   * MSVC8's `std::exception`, which is not the modern one.
+   * MSVC8's `std::exception`, the root of every exception the binary throws.
    *
    * `std::exception::exception()` (0x00A821B0) is the whole layout in five
    * instructions:
    *
    *     mov  eax, ecx
-   *     and  dword ptr [eax+4], 0     ; mWhat  = nullptr
-   *     and  dword ptr [eax+8], 0     ; mDoFree = 0
+   *     and  dword ptr [eax+4], 0     ; what  = nullptr
+   *     and  dword ptr [eax+8], 0     ; doFree = 0
    *     mov  dword ptr [eax], 0xD72A44 ; vptr
    *     ret
    *
-   * so vptr at +0x00 and the two members at +0x04/+0x08, 0x0C in total. The
-   * `mDoFree` flag is what tells the CRT whether `mWhat` is a borrowed
-   * literal or a buffer this object owns.
+   * so vptr at +0x00 and two members at +0x04/+0x08, 0x0C in total, the
+   * destructor in slot 0 and `what()` in slot 1. The modern `std::exception`
+   * is that same object on x86 (vptr, then `__std_exception_data` holding the
+   * message pointer and the free flag), and its `what()` falls back to the
+   * same "Unknown exception". So this derives from it and adds nothing.
+   *
+   * It has to derive rather than stand alone: in the binary every handler is
+   * a `catch (std::exception&)`, and that is what catches a `lua::lua_Error`
+   * thrown out of a script. A separate root let those errors past every
+   * recovered `catch (const std::exception&)` into `catch (...)`, where the
+   * message is lost.
    *
    * Only the default constructor is declared here. The CRT's other two - the
-   * one that copies the message and sets `mDoFree`, and the borrowing
+   * one that copies the message and sets the free flag, and the borrowing
    * `(const char*&, int)` overload - have no caller in the recovered tree:
-   * `runtime_error` keeps its text in its own string and leaves `mWhat`
-   * null, which is the only form anything here constructs. Declaring them
-   * would mean inventing bodies, so they are left out rather than guessed.
-   * That also makes the copy trivially safe, since `mDoFree` is never set.
+   * `runtime_error` keeps its text in its own string and leaves the base's
+   * pointer null, which is the only form anything here constructs.
    */
-  class exception
+  class exception : public std::exception
   {
   public:
     /// Address: 0x00A821B0 (FUN_00A821B0, std::exception::exception)
@@ -38,13 +45,7 @@ namespace msvc8
 
     exception(const exception& other) noexcept = default;
     exception& operator=(const exception& other) noexcept = default;
-    virtual ~exception();
-
-    [[nodiscard]] virtual const char* what() const noexcept;
-
-  private:
-    const char* mWhat = nullptr; // +0x04 message, borrowed or owned
-    int mDoFree = 0;             // +0x08 non-zero when mWhat must be freed
+    ~exception() override;
   };
 
   static_assert(sizeof(exception) == 0x0C, "msvc8::exception size must be 0x0C");

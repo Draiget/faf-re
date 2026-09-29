@@ -9710,7 +9710,7 @@ namespace
 	{
 		int status = ::luaL_loadfile(state, filename);
 		if (status == 0) {
-			status = lua_call(state, 0, LUA_MULTRET);
+			status = LuaCallProtected(state, 0, LUA_MULTRET);
 		}
 
 		LuaCallAlert(state, status);
@@ -9733,7 +9733,7 @@ namespace
 	{
 		int status = ::luaL_loadbuffer(state, buffer, static_cast<size_t>(size), name);
 		if (status == 0) {
-			status = lua_call(state, 0, LUA_MULTRET);
+			status = LuaCallProtected(state, 0, LUA_MULTRET);
 		}
 
 		LuaCallAlert(state, status);
@@ -12124,7 +12124,7 @@ namespace
 	int luaB_pcall(lua_State* const state)
 	{
 		luaL_checkany(state, 1);
-		const int status = lua_call(state, lua_gettop(state) - 1, LUA_MULTRET);
+		const int status = LuaCallProtected(state, lua_gettop(state) - 1, LUA_MULTRET);
 		lua_pushboolean(state, status == 0 ? 1 : 0);
 		lua_insert(state, 1);
 		return lua_gettop(state);

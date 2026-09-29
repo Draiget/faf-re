@@ -8862,37 +8862,26 @@ void Sim::RemoveCommandFromUnitQueue(const CmdId cmdId, const EntId unitId)
  *   LuaPlus::LuaObject const &args);
  *
  * What it does:
- * Cheat-gated Lua bridge that resolves a global function by name, pushes one
- * argument table/object payload, executes it with protected call, and restores
- * the Lua stack top.
+ * Cheat-gated: calls the global Lua function `functionName` with `args` and
+ * restores the stack top. A script error, including a name that is not a
+ * function (the LuaFunction constructor raises that), is logged instead of
+ * reaching the command decoder.
  */
-void Sim::ExecuteLuaInSim(const char* functionName, const LuaPlus::LuaObject& args)
+void Sim::ExecuteLuaInSim(const char* const functionName, const LuaPlus::LuaObject& args)
 {
-  if (!CheatsEnabled() || !functionName || !mLuaState || !mLuaState->m_state) {
-    return;
-  }
-
-  lua_State* state = mLuaState->m_state;
-  const int oldTop = lua_gettop(state);
-
-  lua_getglobal(state, functionName);
-  if (!lua_isfunction(state, -1)) {
-    lua_settop(state, oldTop);
+  if (!CheatsEnabled()) {
     return;
   }
 
   try {
-    LuaPlus::LuaPush(state, args);
-  } catch (const std::exception&) {
-    lua_pushnil(state);
+    lua_State* const state = mLuaState->m_state;
+    const int savedTop = lua_gettop(state);
+    const LuaPlus::LuaFunction<> function{mLuaState->GetGlobal(functionName)};
+    function.Call_Object(args);
+    lua_settop(state, savedTop);
+  } catch (const std::exception& error) {
+    gpg::Warnf("Error running global lua function '%s':\n%s", functionName, error.what());
   }
-
-  if (lua_call(state, 1, 0) != 0) {
-    const char* err = lua_tostring(state, -1);
-    gpg::Warnf("Sim::ExecuteLuaInSim('%s') failed: %s", functionName, err ? err : "<unknown>");
-  }
-
-  lua_settop(state, oldTop);
 }
 
 namespace
@@ -10967,23 +10956,11 @@ void Sim::Shutdown()
  */
 void Sim::SaveState(gpg::WriteArchive* const archive)
 {
-  bool isNisMode = false;
-  if (mLuaState) {
-    LuaPlus::LuaObject cinematicsModule = SCR_ImportLuaModule(mLuaState, "/lua/cinematics.lua");
-    LuaPlus::LuaObject isOpEndedFn = SCR_GetLuaTableField(mLuaState, cinematicsModule, "IsOpEnded");
-
-    lua_State* const state = mLuaState->GetCState();
-    if (state && !isOpEndedFn.IsNil()) {
-      const int savedTop = lua_gettop(state);
-      isOpEndedFn.PushStack(state);
-      if (lua_isfunction(state, -1) && lua_call(state, 0, 1) == 0) {
-        isNisMode = lua_toboolean(state, -1) != 0;
-      }
-      lua_settop(state, savedTop);
-    }
-  }
-
-  if (isNisMode) {
+  // No handler here: a script error, or a module without IsOpEnded (the
+  // LuaFunction constructor raises that), reaches the caller like the throw.
+  const LuaPlus::LuaObject cinematics = SCR_Import(mLuaState, "/lua/cinematics.lua");
+  const LuaPlus::LuaFunction<bool> isOpEnded{cinematics["IsOpEnded"]};
+  if (isOpEnded.Call_x_Bool()) {
     throw std::runtime_error("Attemped Save in NIS mode");
   }
 

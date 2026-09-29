@@ -383,7 +383,7 @@ int moho::FORMATION_PickTravelFormation(
   pickTravelFn.PushStack(rawState);
   formationTypeArg.PushStack(rawState);
   distArg.PushStack(rawState);
-  if (lua_call(rawState, 2, 1) != 0) {
+  if (LuaCallProtected(rawState, 2, 1) != 0) {
     lua_settop(rawState, savedTop);
     return 0;
   }
@@ -431,7 +431,7 @@ int moho::FORMATION_PickBestFormation(
   pickBestFn.PushStack(rawState);
   formationTypeArg.PushStack(rawState);
   radiusArg.PushStack(rawState);
-  if (lua_call(rawState, 2, 1) != 0) {
+  if (LuaCallProtected(rawState, 2, 1) != 0) {
     lua_settop(rawState, savedTop);
     return 0;
   }
@@ -534,7 +534,7 @@ moho::SFormationScriptResult moho::FORMATION_RunScript(
 
   scriptFunc.PushStack(state);
   unitTable.PushStack(state);
-  if (lua_call(rawState, 1, 1) != 0) {
+  if (LuaCallProtected(rawState, 1, 1) != 0) {
     const LuaPlus::LuaStackObject errorSlot(state, -1);
     gpg::Warnf("Formation script %s threw an error:\n%s", scriptName, errorSlot.GetString());
     lua_settop(rawState, savedTop);

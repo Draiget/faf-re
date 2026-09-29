@@ -5345,44 +5345,13 @@ namespace moho
    */
   void UICommandGraph::OnCommandGraphShow(LuaPlus::LuaState* const state, const bool visible)
   {
-    if (!state) {
-      return;
+    try {
+      const LuaPlus::LuaObject commandGraph = SCR_Import(state, "/lua/ui/game/commandgraph.lua");
+      const LuaPlus::LuaFunction<> onShow{commandGraph["OnCommandGraphShow"]};
+      onShow.Call_Bool(visible);
+    } catch (const std::exception& error) {
+      gpg::Warnf("Error running '/lua/ui/game/commandgraph.lua:OnCommandGraphShow': %s", error.what());
     }
-
-    lua_State* const cstate = state->GetCState();
-    if (!cstate) {
-      return;
-    }
-
-    const int savedTop = lua_gettop(cstate);
-    lua_getglobal(cstate, "import");
-    if (!lua_isfunction(cstate, -1)) {
-      lua_settop(cstate, savedTop);
-      return;
-    }
-
-    lua_pushstring(cstate, "/lua/ui/game/commandgraph.lua");
-    if (lua_call(cstate, 1, 1) != 0) {
-      lua_settop(cstate, savedTop);
-      return;
-    }
-
-    if (!lua_istable(cstate, -1)) {
-      lua_settop(cstate, savedTop);
-      return;
-    }
-
-    // Lua 5.0-era ABI: use push+gettable instead of lua_getfield.
-    lua_pushstring(cstate, "OnCommandGraphShow");
-    lua_gettable(cstate, -2);
-    if (!lua_isfunction(cstate, -1)) {
-      lua_settop(cstate, savedTop);
-      return;
-    }
-
-    lua_pushboolean(cstate, visible ? 1 : 0);
-    lua_call(cstate, 1, 0);
-    lua_settop(cstate, savedTop);
   }
 
   /**

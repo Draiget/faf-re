@@ -191,15 +191,17 @@ inline moho::Sim* lua_getglobaluserdata_typed(lua_State* state)
  * Address: 0x0090D430 (FUN_0090D430, lua_call)
  *
  * This fork contains no lua_pcall, no luaD_pcall and no
- * luaD_rawrunprotected - the setjmp machinery was removed and lua_call took
- * over the job. It wraps luaD_call in a C++ try with two handlers: the one at
- * 0x0090D48D returns the caught lua::lua_Error's `code` (read at +0x28, which
- * the constructor at 0x0090DA40 pins with `mov [esi+28h], edx`), and the one
- * at 0x0090D4B0 returns 1 for anything else. So lua_call *is* the protected
- * call here, and it returns a status where vanilla LuaPlus 1081 declares void.
+ * luaD_rawrunprotected - the setjmp machinery was removed and this overload
+ * took over the job. It wraps luaD_call in a C++ try with two handlers: the one
+ * at 0x0090D48D returns the caught lua::lua_Error's `code` (read at +0x28,
+ * which the constructor at 0x0090DA40 pins with `mov [esi+28h], edx`), and the
+ * one at 0x0090D4B0 returns 1 for anything else.
  *
- * The macro is how every call site gets to see the real signature without
- * editing the vendored lua.h, the same shape lua_getglobaluserdata uses above.
+ * The binary calls it from exactly 16 places, all of which read the status:
+ * lua_dofile, lua_dobuffer and their shared tail, luaB_pcall, SCR_LuaDoString,
+ * SCR_LuaDoFile, CScriptObject::CreateLuaObject and RunScriptMultiRet, the
+ * three FORMATION_* script calls, CScriptLazyVar_float's constructor,
+ * GetValue and SetValue, and CMauiFrame::Create. Those name it directly.
  */
 /**
  * Address: 0x0090D400 (FUN_0090D400, lua_call)
@@ -211,9 +213,12 @@ inline moho::Sim* lua_getglobaluserdata_typed(lua_State* state)
  * What it does:
  * The other half of the pair, and the one the LuaPlus surface exports: a bare
  * luaD_call with no handler at all, so an error keeps unwinding to whatever
- * protected boundary the caller sits inside. Engine code that wants a script
- * error to reach the caller - `doscript` above all - calls this one; only the
- * sites that genuinely want to inspect a status code call the protected form.
+ * protected boundary the caller sits inside. The binary calls it from 114
+ * places, including every LuaFunction call operator, so it is what `lua_call`
+ * means. Routing those through the protected form instead swallowed script
+ * errors and left the message where the result belongs: CScriptObject::TaskTick
+ * read that string as TASKSTATUS 0 ("run again now") and spun the sim forever
+ * on the first error in a script task's TaskTick.
  */
 #ifdef __cplusplus
 extern "C"
@@ -224,7 +229,7 @@ void LuaCallUnprotected(lua_State* L, int nargs, int nresults);
 #ifdef __cplusplus
 }
 #endif
-#define lua_call LuaCallProtected
+#define lua_call LuaCallUnprotected
 
 namespace LuaPlus
 {
