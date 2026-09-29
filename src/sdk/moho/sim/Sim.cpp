@@ -97,6 +97,7 @@
 #include "moho/render/d3d/CD3DFont.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "lua/LuaError.h"
 #include "lua/LuaRuntimeTypes.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -9013,17 +9014,20 @@ void Sim::LuaSimCallback(
     });
   }
 
-  lua_State* const state = mLuaState->m_state;
-  const int oldTop = lua_gettop(state);
-  LuaPlus::LuaObject simCallbacksModule = SCR_Import(mLuaState, "/lua/SimCallbacks.lua");
-  LuaPlus::LuaObject doCallbackObject = simCallbacksModule["DoCallback"];
-  if (!doCallbackObject.IsFunction()) {
-    doCallbackObject.TypeError("call");
+  // A script error is logged, not propagated: the binary's only handler here is
+  // `catch (lua_RuntimeError&)` (FuncInfo 0x00EE1C84, funclet 0x00749D74).
+  // Without it one bad UI callback (e.g. a wrong-arity Issue* call inside
+  // SimCallbacks.lua) unwinds out of the sim thread and terminates the game.
+  try {
+    lua_State* const state = mLuaState->m_state;
+    const int oldTop = lua_gettop(state);
+    const LuaPlus::LuaObject simCallbacksModule = SCR_Import(mLuaState, "/lua/SimCallbacks.lua");
+    const LuaPlus::LuaFunction<> doCallback(simCallbacksModule["DoCallback"]);
+    doCallback(callbackName, args, selectedUnits);
+    lua_settop(state, oldTop);
+  } catch (const lua_RuntimeError& error) {
+    gpg::Warnf("Error running sim lua callback function '%s':\n%s", callbackName, error.what());
   }
-
-  const LuaPlus::LuaFunction<> doCallback(doCallbackObject);
-  doCallback(callbackName, args, selectedUnits);
-  lua_settop(state, oldTop);
 }
 
 /**
