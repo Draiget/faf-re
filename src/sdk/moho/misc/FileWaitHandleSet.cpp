@@ -743,15 +743,23 @@ msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileRead(
  * gpg::StrArg
  *
  * What it does:
- * Opens one source path for write using the legacy buffered FileStream lane.
+ * Opens one source path for write through a buffered `gpg::FileStream`. A
+ * failed open (the 0x00459C04 catch funclet) records the exception text as the
+ * disk error, read back by `DISK_GetLastError`, and returns null; callers such
+ * as `VCR_CreateReplay` then log and carry on without the file.
  */
 msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileWrite(
   const gpg::StrArg sourcePath
 )
 {
-  return msvc8::auto_ptr<gpg::Stream>(
-    new gpg::FileStream(sourcePath != nullptr ? sourcePath : "", gpg::Stream::ModeSend, 0u, 4096)
-  );
+  try {
+    return msvc8::auto_ptr<gpg::Stream>(
+      new gpg::FileStream(sourcePath != nullptr ? sourcePath : "", gpg::Stream::ModeSend, 0u, 4096)
+    );
+  } catch (const std::exception& error) {
+    FWaitHandleSet::GetErrorString()->assign_owned(error.what());
+    return msvc8::auto_ptr<gpg::Stream>(nullptr);
+  }
 }
 
 /**

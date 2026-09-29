@@ -212,10 +212,26 @@ namespace moho
      */
     CPushTask();
 
+    /**
+     * Address: 0x007C8BF0 (FUN_007C8BF0, CPushTask<CLobby>::Execute, vtable 0x00E3ED70 slot 1)
+     *
+     * What it does:
+     * The before-wait stage's task body: the owner's push phase, then stay
+     * scheduled. A class with both a push and a pull task gets one `Execute`
+     * per task, so a push phase that destroys its owner (a lobby launching)
+     * never runs the pull phase on the freed object.
+     */
+    int Execute() override
+    {
+      static_cast<T*>(this)->PushTask();
+      return 1;
+    }
+
   private:
     int32_t padding0_;
   };
-  static_assert(sizeof(CPushTask<void>) == 0x1C, "size of CPushTask must be 0x1C");
+  // Sizes are asserted next to each owner (CLobby.h, CGpgNetInterface.h):
+  // `Execute` calls into the owner, so `CPushTask<void>` no longer compiles.
 
   template <class T>
   /**
@@ -243,8 +259,21 @@ namespace moho
      * Recovered constructor path shared by `CPullTask<T>` instantiations.
      */
     CPullTask();
+
+    /**
+     * Address: 0x007C8CB0 (FUN_007C8CB0, CPullTask<CLobby>::Execute)
+     * Address: 0x007BB250 (FUN_007BB250, CPullTask<CGpgNetInterface>::Execute)
+     *
+     * What it does:
+     * The before-events stage's task body: the owner's pull phase, then stay
+     * scheduled.
+     */
+    int Execute() override
+    {
+      static_cast<T*>(this)->PullTask();
+      return 1;
+    }
   };
-  static_assert(sizeof(CPullTask<void>) == 0x18, "size of CPullTask must be 0x18");
 
   template <class T>
   /**

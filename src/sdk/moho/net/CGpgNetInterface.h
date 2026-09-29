@@ -224,15 +224,6 @@ namespace moho
     void ReceivePacket(u_long address, u_short port, const char* dat, size_t size) override;
 
     /**
-     * Address: 0x007BB250 (FUN_007BB250)
-     * Slot: 3
-     *
-     * What it does:
-     * Runs one queued-command drain pass and returns task-continue flag (`1`).
-     */
-    int Execute() override;
-
-    /**
      * Address: 0x007B65C0 (FUN_007B65C0)
      *
      * What it does:
@@ -374,9 +365,13 @@ namespace moho
     void EnsureConnectedAndCloseSocket();
 
     /**
-     * Address: 0x007B7710
+     * Address: 0x007B7710 (FUN_007B7710, func_GPGNETProcess)
+     *
+     * What it does:
+     * The pull phase `CPullTask<CGpgNetInterface>::Execute` (0x007BB250) runs:
+     * drains the queued GPGNet commands and dispatches each.
      */
-    void Process();
+    void PullTask();
 
     /**
      * Address: 0x007B7A30
@@ -511,6 +506,9 @@ namespace moho
     boost::weak_ptr<INetNATTraversalHandler> mNATHandler;
   };
   static_assert(sizeof(CGpgNetInterface) == 0x70, "CGpgNetInterface size must be 0x70");
+  static_assert(
+    sizeof(CPullTask<CGpgNetInterface>) == 0x18, "CPullTask<CGpgNetInterface> size must be 0x18"
+  );
 
   // FUN_007BB4E0 (boost::weak_ptr<INetNATTraversalHandler>(const shared_ptr&))
   // and FUN_007BC5C0 (the CGpgNetInterface->INetNATTraversalProvider aliasing

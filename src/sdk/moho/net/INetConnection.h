@@ -8,7 +8,7 @@
 
 namespace moho
 {
-  class CMessageStream;
+  struct CMessage;
 
   struct NetDataSpan
   {
@@ -27,9 +27,9 @@ namespace moho
      * Address: <synthetic host-build helper>
      *
      * What it does:
-     * Creates a span over CMessageStream write window [mWriteStart, mWriteHead).
+     * Creates a span over a message's whole wire buffer (header + payload).
      */
-    explicit NetDataSpan(const CMessageStream& stream) noexcept;
+    explicit NetDataSpan(const CMessage& message) noexcept;
 
     /**
      * Address: <synthetic host-build helper>
@@ -109,9 +109,9 @@ namespace moho
      * Address: <synthetic host-build helper>
      *
      * What it does:
-     * Forwards CMessageStream write window [mWriteStart, mWriteHead) to virtual Write(NetDataSpan*).
+     * Queues one whole message (3-byte header + payload) through Write(NetDataSpan*).
      */
-    void Write(const CMessageStream& stream);
+    void Write(const CMessage& message);
   };
   // The vtable and `CMessageDispatcher` (+0x04, 0x408). A derived connection's
   // own `gpg::DListItem` then starts at +0x410, not +0x40C: its empty

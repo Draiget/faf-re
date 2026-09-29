@@ -411,6 +411,9 @@ namespace moho
     std::unique_ptr<gpg::Stream> replayStream = OpenGPGNetURI(replayPath.c_str(), EGpgNetOpenMode::Write);
     gpg::Stream* const stream = replayStream.get();
     if (stream == nullptr) {
+      // Two clients sharing one profile both target LastGame; the second open
+      // fails and that client simply does not record.
+      gpg::Logf("Can't create replay file \"%s\"", replayPath.c_str());
       return msvc8::auto_ptr<gpg::Stream>(nullptr);
     }
 

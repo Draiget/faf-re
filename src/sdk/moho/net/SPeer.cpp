@@ -122,7 +122,7 @@ namespace moho
     stream.Write(address);
     stream.Write(port);
     stream.Write(uid);
-    connection->Write(stream);
+    connection->Write(msg);
   }
 
   /**

@@ -416,8 +416,9 @@ void CNetUDPConnection::CreateFilterStream()
 
   gpg::Logf("NET: using deflate compression for receives from %s", ToString().c_str());
 
+  // 0x00486A6A pushes 0 (inflate); the send-side filter in the ctor pushes 1.
   const auto* const old = mFilterStream;
-  mFilterStream = new gpg::ZLibOutputFilterStream(&mInputBuffer, gpg::FLOP_Deflate);
+  mFilterStream = new gpg::ZLibOutputFilterStream(&mInputBuffer, gpg::FLOP_Inflate);
   delete old;
 }
 

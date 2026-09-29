@@ -59,7 +59,7 @@ namespace
   }
 
   [[nodiscard]] moho::CDiscoveryService* OwnerFromPullTaskSubobject(
-    moho::CPullTask<moho::CDiscoveryService>* const pullTask
+    moho::CTask* const pullTask
   ) noexcept
   {
     if (pullTask == nullptr) {
@@ -71,7 +71,7 @@ namespace
   }
 
   [[nodiscard]] moho::CDiscoveryService* OwnerFromPushTaskSubobject(
-    moho::CPushTask<moho::CDiscoveryService>* const pushTask
+    moho::CTask* const pushTask
   ) noexcept
   {
     if (pushTask == nullptr) {
@@ -188,7 +188,7 @@ namespace
     return reinterpret_cast<moho::CTask*>(discoveryService->mPushTaskStorage);
   }
 
-  class CDiscoveryServicePullTask final : public moho::CPullTask<moho::CDiscoveryService>
+  class CDiscoveryServicePullTask final : public moho::CPullTask<CDiscoveryServicePullTask>
   {
   public:
     /**
@@ -198,14 +198,13 @@ namespace
      * Executes discovery pull-task maintenance by expiring stale discovery
      * reply lanes in the owning `CDiscoveryService`.
      */
-    int Execute() override
+    void PullTask()
     {
       ExpireStaleDiscoveryReplies(OwnerFromPullTaskSubobject(this));
-      return 1;
     }
   };
 
-  class CDiscoveryServicePushTask final : public moho::CPushTask<moho::CDiscoveryService>
+  class CDiscoveryServicePushTask final : public moho::CPushTask<CDiscoveryServicePushTask>
   {
   public:
     /**
@@ -215,15 +214,20 @@ namespace
      * Executes discovery push-task maintenance by issuing periodic discovery
      * broadcast requests for the owning `CDiscoveryService`.
      */
-    int Execute() override
+    void PushTask()
     {
       BroadcastDiscoveryRequestTick(OwnerFromPushTaskSubobject(this));
-      return 1;
     }
   };
 
   static_assert(sizeof(CDiscoveryServicePullTask) == 0x18, "CDiscoveryServicePullTask size must be 0x18");
   static_assert(sizeof(CDiscoveryServicePushTask) == 0x1C, "CDiscoveryServicePushTask size must be 0x1C");
+  // Array-size checks, not static_assert: the x64 build compiles the x86 layout
+  // asserts out, and these two must hold there too.
+  using PullTaskFitsStorage =
+    char[sizeof(moho::CDiscoveryService::mPullTaskStorage) >= sizeof(CDiscoveryServicePullTask) ? 1 : -1];
+  using PushTaskFitsStorage =
+    char[sizeof(moho::CDiscoveryService::mPushTaskStorage) >= sizeof(CDiscoveryServicePushTask) ? 1 : -1];
 } // namespace
 
 /**

@@ -77,11 +77,6 @@ namespace moho
     ~CLobby() override;
 
     /**
-     * Task-execution bridge for legacy `CTask` ABI.
-     */
-    int Execute() override;
-
-    /**
      * Address: 0x004C70A0
      */
     msvc8::string GetErrorDescription() override;
@@ -170,7 +165,7 @@ namespace moho
     /**
      * Address: 0x007C8040
      */
-    void BroadcastStream(const CMessageStream& s);
+    void BroadcastMessage(const CMessage& msg);
 
     /**
      * Address: 0x007C1720
@@ -252,38 +247,24 @@ namespace moho
     void KickPeer(SPeer* peer, const char* reason);
 
     /**
-     * Address: 0x007C5490 (FUN_007C5490, Moho::CLobby::PushTask)
+     * Address: 0x007C5490 (FUN_007C5490)
      *
      * What it does:
-     * Runs lobby push-phase network processing for pending connector/socket events.
-     */
-    void PushTask();
-
-    /**
-     * Address: 0x007C8CB0 (FUN_007C8CB0, `CPushTask_CLobby::PushTask` wrapper)
-     *
-     * What it does:
-     * Wrapper that forwards into `PushTask()`.
-     */
-    void Push();
-
-    /**
-     * Address: 0x007C56B0 (FUN_007C56B0, Moho::CLobby::PullTask)
-     *
-     * What it does:
-     * When peer replication is dirty, builds one `LOBMSG_EstablishedPeers`
-     * payload, appends all established peer UIDs plus `-1` terminator, and
-     * broadcasts the packet to established peers.
+     * Pull phase (run by `CPullTask<CLobby>::Execute`, 0x007C8CB0): services the
+     * discovery socket and pending LAN connections, then pulls incoming traffic.
      */
     void PullTask();
 
     /**
-     * Address: 0x007C8BF0 (FUN_007C8BF0, `CPullTask_CLobby::PullTask` wrapper)
+     * Address: 0x007C56B0 (FUN_007C56B0)
      *
      * What it does:
-     * Wrapper that forwards into `PullTask()`.
+     * Push phase (run by `CPushTask<CLobby>::Execute`, 0x007C8BF0): when peer
+     * replication is dirty, builds one `LOBMSG_EstablishedPeers`
+     * payload, appends all established peer UIDs plus `-1` terminator, and
+     * broadcasts the packet to established peers.
      */
-    void Pull();
+    void PushTask();
 
     /**
      * Address: 0x007C1B20 (FUN_007C1B20)
@@ -372,6 +353,8 @@ namespace moho
     int32_t hostedTime{0};                       // 0xC4
   };
   static_assert(sizeof(CLobby) == 0xC8, "CLobby size must be 0xC8");
+  static_assert(sizeof(CPushTask<CLobby>) == 0x1C, "CPushTask<CLobby> size must be 0x1C");
+  static_assert(sizeof(CPullTask<CLobby>) == 0x18, "CPullTask<CLobby> size must be 0x18");
   static_assert(offsetof(CLobby, connector) == 0x78, "connector offset");
   static_assert(offsetof(CLobby, maxConnections) == 0x7C, "maxConnections offset");
   static_assert(offsetof(CLobby, event) == 0x80, "event offset");

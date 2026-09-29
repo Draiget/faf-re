@@ -9,6 +9,7 @@
 #include "moho/net/INetDatagramHandler.h"
 #include "moho/net/NetTransportEnums.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/task/CTask.h"
 
 struct lua_State;
 namespace LuaPlus
@@ -122,9 +123,13 @@ namespace moho
     void AddDiscoveredGame(const DiscoveredGameRecord& newRecord);
 
   public:
-    alignas(void*) std::uint8_t mPullTaskStorage[0x18]{}; // +0x38
+    // The two task subobjects, placement-built by the constructor. Sized from
+    // CTask (0x18 / 0x1C on x86) so the x64 build, where CTask is larger, does
+    // not overrun the members that follow.
+    alignas(CTask) std::uint8_t mPullTaskStorage[sizeof(CTask)]{}; // +0x38
     std::uint8_t mUnknown50_53[0x04]{};              // +0x50
-    alignas(void*) std::uint8_t mPushTaskStorage[0x1C]{}; // +0x54
+    alignas(CTask) std::uint8_t
+      mPushTaskStorage[(sizeof(CTask) + sizeof(std::int32_t) + alignof(CTask) - 1) / alignof(CTask) * alignof(CTask)]{}; // +0x54
 
     /**
      * Discovered-game storage. Bare 3-pointer, 12-byte instantiation

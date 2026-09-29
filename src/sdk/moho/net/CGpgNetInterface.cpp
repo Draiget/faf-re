@@ -909,18 +909,6 @@ void CGpgNetInterface::ReceivePacket(
 }
 
 /**
- * Address: 0x007BB250 (FUN_007BB250)
- *
- * What it does:
- * Executes one command-queue processing pass and returns task continuation (`1`).
- */
-int CGpgNetInterface::Execute()
-{
-  Process();
-  return 1;
-}
-
-/**
  * Address: 0x007B65C0 (FUN_007B65C0)
  *
  * What it does:
@@ -1439,7 +1427,7 @@ void CGpgNetInterface::EnsureConnectedAndCloseSocket()
  * Drains queued inbound commands, updates state from each command envelope,
  * and dispatches to command-specific handlers.
  */
-void CGpgNetInterface::Process()
+void CGpgNetInterface::PullTask()
 {
   msvc8::deque<SNetCommand> pending;
 
@@ -1600,7 +1588,11 @@ void CGpgNetInterface::CreateLobby(
     throw std::runtime_error("Wrong number of arguments to CreateLobby command, expected 5");
   }
 
-  if (!mLobbyObject.IsNil()) {
+  // 0x007B7E72: `cmp [this+0x5C], 0`, the lobby object's state word. A lobby
+  // exists once the object is bound to a Lua state; the never-assigned member
+  // has none. (IsNil() is false for an unbound object, so testing it here
+  // refused every CreateLobby.)
+  if (mLobbyObject.m_state != nullptr) {
     throw std::runtime_error("Lobby already exists.");
   }
 
@@ -1673,7 +1665,9 @@ void CGpgNetInterface::HostGame(
     scenarioPath = gpg::STR_Printf("/maps/%s/%s_scenario.lua", mapName.c_str(), mapName.c_str());
   }
 
-  hostGame(scenarioPath.c_str());
+  // 0x007BC856: the call passes a fixed game name first, then the scenario;
+  // the Lua side is `HostGame(gameName, scenarioFileName, singlePlayer)`.
+  hostGame("GPGNetGame", scenarioPath.c_str());
 }
 
 /**

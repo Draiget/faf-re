@@ -791,10 +791,10 @@ void CLobby::OnJoin(
 
   if (!canAccept) {
     CMessage lobbyFull(ELobbyMsg::LOBMSG_Rejected);
-    CMessageStream lobbyFullStream{&lobbyFull};
+    CMessageStream lobbyFullStream(lobbyFull, CMessageStream::Access::kReadWrite);
     lobbyFullStream.Write("LobbyFull");
 
-    connection->Write(lobbyFullStream);
+    connection->Write(lobbyFull);
     connection->ScheduleDestroy();
     return;
   }
@@ -808,7 +808,7 @@ void CLobby::OnJoin(
   }
 
   CMessage accept(ELobbyMsg::LOBMSG_Welcome);
-  CMessageStream acceptStream{&accept};
+  CMessageStream acceptStream(accept, CMessageStream::Access::kReadWrite);
   if (peerConnection == nullptr) {
     const auto normalized = MakeValidPlayerName(joiningName, player->uid);
     player->playerName.assign(normalized, 0, msvc8::string::npos);
@@ -820,7 +820,7 @@ void CLobby::OnJoin(
     acceptStream.Write(player->playerName);
     acceptStream.Write(hostedTime);
   }
-  connection->Write(acceptStream);
+  connection->Write(accept);
 
   LuaPlus::LuaState* l = mLuaObj.GetActiveState();
   const msvc8::string locMsg = Loc(l, "<LOC Engine0004>Connection to %s established.");
@@ -905,8 +905,8 @@ void CLobby::OnWelcome(
       gpg::Logf("LOBBY: host thinks our uid is %u, but we think it is %u", assignedUid, localUid);
     }
 
-    // If host wants to rename us, apply
-    if (!renameSelfTo.empty()) {
+    // 0x007C6D5B compares the two names (FUN_00469010); only a different name is a rename.
+    if (playerName != renameSelfTo) {
       gpg::Logf("LOBBY: host renamed us to %s", renameSelfTo.c_str());
       playerName = renameSelfTo;
     }
@@ -1128,7 +1128,7 @@ void CLobby::OnConnectionMade(
     s.Write(playerName);
     s.Write(localUid);
 
-    connection->Write(s);
+    connection->Write(msg);
   } else {
     if (peer->state != ENetworkPlayerState::kPending) {
       GPG_UNREACHABLE("unreachable")
@@ -1265,7 +1265,7 @@ void CLobby::PeerDisconnected(
 
     s.Write(localUid);
 
-    BroadcastStream(s);
+    BroadcastMessage(msg);
   }
 
   delete peer;
@@ -1274,13 +1274,13 @@ void CLobby::PeerDisconnected(
 /**
  * Address: 0x007C8040 (FUN_007C8040)
  */
-void CLobby::BroadcastStream(
-  const CMessageStream& s
+void CLobby::BroadcastMessage(
+  const CMessage& msg
 )
 {
   for (SPeer* it : peers.owners()) {
     if (it->state == ENetworkPlayerState::kEstablished) {
-      it->peerConnection->Write(s);
+      it->peerConnection->Write(msg);
     }
   }
 }
@@ -2980,19 +2980,21 @@ void CLobby::KickPeer(
     CMessageStream s(msg, CMessageStream::Access::kReadWrite);
 
     s.Write(reason);
-    peer->peerConnection->Write(s);
+    peer->peerConnection->Write(msg);
   }
 
   PeerDisconnected(peer);
 }
 
 /**
- * Address: 0x007C5490 (FUN_007C5490, Moho::CLobby::PushTask)
+ * Address: 0x007C5490 (FUN_007C5490)
  *
  * What it does:
- * Runs lobby push-phase polling for pending connector/socket events.
+ * The pull phase `CPullTask<CLobby>::Execute` (0x007C8CB0) runs on the
+ * before-events stage: services the discovery socket and pending LAN
+ * connections, then pulls the connector's incoming traffic.
  */
-void CLobby::PushTask()
+void CLobby::PullTask()
 {
   if (mSocket != nullptr) {
     mSocket->Pull();
@@ -3022,32 +3024,15 @@ void CLobby::PushTask()
   connector->Pull();
 }
 
-int CLobby::Execute()
-{
-  PushTask();
-  PullTask();
-  return 1;
-}
-
 /**
- * Address: 0x007C8CB0 (FUN_007C8CB0, `CPushTask_CLobby::PushTask` wrapper)
+ * Address: 0x007C56B0 (FUN_007C56B0)
  *
  * What it does:
- * Thin wrapper that forwards task-stage execution into `PushTask()`.
+ * The push phase `CPushTask<CLobby>::Execute` (0x007C8BF0) runs on the
+ * before-wait stage: when peer replication is dirty, serializes established
+ * peer UIDs into one `LOBMSG_EstablishedPeers` packet and broadcasts it.
  */
-void CLobby::Push()
-{
-  PushTask();
-}
-
-/**
- * Address: 0x007C56B0 (FUN_007C56B0, Moho::CLobby::PullTask)
- *
- * What it does:
- * When peer replication is dirty, serializes established peer UIDs into one
- * `LOBMSG_EstablishedPeers` packet and broadcasts it to established peers.
- */
-void CLobby::PullTask()
+void CLobby::PushTask()
 {
   if (!peersDirty) {
     return;
@@ -3061,18 +3046,7 @@ void CLobby::PullTask()
   }
 
   s.Write<int32_t>(-1);
-  BroadcastStream(s);
-}
-
-/**
- * Address: 0x007C8BF0 (FUN_007C8BF0, `CPullTask_CLobby::PullTask` wrapper)
- *
- * What it does:
- * Wrapper that forwards into `PullTask()`.
- */
-void CLobby::Pull()
-{
-  PullTask();
+  BroadcastMessage(msg);
 }
 
 /**
@@ -3159,7 +3133,7 @@ void CLobby::BroadcastScriptData(
   if (!dat.ToByteStream(s)) {
     throw std::runtime_error("CLobby::BroadcastScriptData(): failed to encode message.");
   }
-  BroadcastStream(s);
+  BroadcastMessage(msg);
 }
 
 /**
@@ -3182,7 +3156,7 @@ void CLobby::SendScriptData(
 
   SPeer* peer = FindPeerByUid(id);
   if (peer != nullptr) {
-    peer->peerConnection->Write(s);
+    peer->peerConnection->Write(msg);
     return;
   }
 
