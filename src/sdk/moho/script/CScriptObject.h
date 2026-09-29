@@ -9,6 +9,7 @@
 #include "platform/Platform.h"
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <string>
 
 namespace moho
@@ -231,6 +232,14 @@ namespace moho
      * Omitting `self` here is not a harmless simplification: every Lua-side
      * handler is declared `function(self, ...)`, so the arguments shift by one
      * and `Control:OnInit` ends up calling `ResetLayout` on nothing.
+     *
+     * A script error does not escape: the binary's catch funclet reports it
+     * through `LogScriptWarning` (call at 0x00581BE3) and returns, like every
+     * other RunScript_* variant. Without that catch the error unwound through
+     * the caller unlogged - CMauiMovie::Frame's "OnFinished" among them, which
+     * is how the campaign timeline's DoExit failure left a silent black screen.
+     * The warning names the object only while the guard still holds its link
+     * slot; a callback that destroyed the object clears it.
      */
     template <class... Ts>
     LuaPlus::LuaObject RunScript(const char* name, Ts... args)
@@ -243,9 +252,16 @@ namespace moho
         return {};
       }
 
-      const LuaPlus::LuaObject self(mLuaObj);
-      LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{script};
-      return fn(self, args...);
+      try {
+        const LuaPlus::LuaObject self(mLuaObj);
+        LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{script};
+        return fn(self, args...);
+      } catch (const std::exception& ex) {
+        LogScriptWarning(weakGuard.OwnerLinkSlotAddress() ? this : nullptr, name ? name : "<unknown>", ex.what());
+      } catch (...) {
+        LogScriptWarning(weakGuard.OwnerLinkSlotAddress() ? this : nullptr, name ? name : "<unknown>", "unknown exception");
+      }
+      return {};
     }
 
     /**
