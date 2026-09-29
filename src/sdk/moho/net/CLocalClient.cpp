@@ -79,7 +79,7 @@ float CLocalClient::GetStatusMetricB()
  *
  * What it does:
  * Takes manager lock, runs shared base incoming-message processing, and
- * signals current manager event when marshaller has no bound manager.
+ * signals the manager's current event unless the manager is inside `DoBeat`.
  */
 void CLocalClient::Process(
   CMessage& msg
@@ -87,7 +87,7 @@ void CLocalClient::Process(
 {
   std::scoped_lock lock(mManager->mLock);
   CClientBase::Process(msg);
-  if (mManager->mCurrentEvent != nullptr && mManager->mMarshaller.mClientManager == nullptr) {
+  if (mManager->mCurrentEvent != nullptr && !mManager->mInDoBeat) {
     SetEvent(mManager->mCurrentEvent);
   }
 }

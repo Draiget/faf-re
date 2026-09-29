@@ -19,17 +19,18 @@ namespace moho
   class CMessageStream;
   class CClientManagerImpl;
 
+  /**
+   * VFTABLE: 0x00E2E7FC
+   * RTTI:    .?AVCMarshaller@Moho@@
+   *
+   * The sending half of the command stream: every `ICommandSink` call becomes
+   * one `CMDST_*` message handed to the client manager
+   * (`ProcessClients`). `CDecoder` is the receiving half. Owned by
+   * `CSimDriver::mMarshaller`, which is the only place one is built.
+   */
   class CMarshaller final : public ICommandSink
   {
   public:
-    /**
-     * Address: <synthetic host-build helper>
-     *
-     * What it does:
-     * Default-constructs marshaller with null manager pointer.
-     */
-    CMarshaller();
-
     /**
      * Address: 0x006E5A60 (FUN_006E5A60)
      *
@@ -549,7 +550,17 @@ namespace moho
     gpg::time::Timer mTimer3;
     SSendStampBuffer mStampBuffer;
     gpg::PipeStream mStream;
-    CMarshaller mMarshaller;
+    // The command source `CClientBase::UpdateState` last announced in
+    // `mStream`. It is shared by every client and kept across beats, so a
+    // `CMDST_SetCommandSource` is written only when the sender changes
+    // (0x01290038: `UpdateState(client, beat, &this->mLastEmittedCommandSource,
+    // &this->mStream)`). 0xFF means none yet.
+    CommandSourceId mLastEmittedCommandSource{0xFF};
+    // True while `DoBeat` runs (set at 0x0053EA84, cleared at 0x0053ED20).
+    // Clients that receive data while it is set skip `SetEvent`, because
+    // `DoBeat` is already draining. Read by `CLocalClient::Process`,
+    // `CReplayClient::Process` and the replay thread.
+    bool mInDoBeat{false};
     gpg::time::Timer mDispatchedTimer;
     gpg::time::Timer mTimer2;
   };
@@ -565,8 +576,10 @@ namespace moho
     offsetof(CClientManagerImpl, mStream) == 0x18470, "CClientManagerImpl::mStream offset must be 0x18470"
   );
   static_assert(
-    offsetof(CClientManagerImpl, mMarshaller) == 0x184B8, "CClientManagerImpl::mMarshaller offset must be 0x184B8"
+    offsetof(CClientManagerImpl, mLastEmittedCommandSource) == 0x184B8,
+    "CClientManagerImpl::mLastEmittedCommandSource offset must be 0x184B8"
   );
+  static_assert(offsetof(CClientManagerImpl, mInDoBeat) == 0x184BC, "CClientManagerImpl::mInDoBeat offset must be 0x184BC");
   static_assert(
     offsetof(CClientManagerImpl, mDispatchedTimer) == 0x184C0,
     "CClientManagerImpl::mDispatchedTimer offset must be 0x184C0"

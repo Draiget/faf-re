@@ -25,22 +25,24 @@ namespace
    * Address: 0x0053C4B0 (FUN_0053C4B0, func_WriteSetCommandSource)
    *
    * What it does:
-   * Emits one `CMDST_SetCommandSource` message only when source ownership
-   * changed from the last emitted source lane.
+   * Writes one `CMDST_SetCommandSource` into the merged stream unless
+   * `sourceId` is already the last one announced there. The comparison and
+   * the store are full dwords (`cmp ebx, [ebp]`); the slot is the manager's
+   * `mLastEmittedCommandSource`.
    */
   void WriteSetCommandSourceMessage(
-    const std::uint8_t sourceId,
+    const CommandSourceId sourceId,
     gpg::PipeStream* const outPipe,
-    std::uint8_t* const lastEmittedSource
+    CommandSourceId* const lastEmittedSource
   )
   {
-    if (outPipe == nullptr || lastEmittedSource == nullptr || sourceId == *lastEmittedSource) {
+    if (sourceId == *lastEmittedSource) {
       return;
     }
 
     CMessage message{ECmdStreamOp::CMDST_SetCommandSource};
     CMessageStream stream(message);
-    stream.Write(sourceId);
+    stream.Write(static_cast<std::uint8_t>(sourceId)); // one byte on the wire (0x0053C4F0)
     outPipe->Write(message.mBuff.start_, message.mBuff.Size());
     *lastEmittedSource = sourceId;
   }
@@ -476,42 +478,34 @@ void CClientBase::ApplyIncomingGameSpeedRequest(const int32_t speedClock, const 
  * void __stdcall sub_53C550(Moho::CClientBase *a1, int arg4,
  *                           Moho::CMarshaller *arg8, gpg::PipeStream *a4);
  *
+ * IDA's `CMarshaller *arg8` is wrong. The third parameter goes straight to
+ * `WriteSetCommandSourceMessage` (0x0053C4B0), which reads and writes it as a
+ * dword. `CClientManagerImpl::UpdateStates` (patched to 0x0128FFE0) passes
+ * `&this->mLastEmittedCommandSource` (+0x184B8) at 0x0129003F for every
+ * client. The dedup therefore spans all clients and every beat: a
+ * `CMDST_SetCommandSource` reaches the merged stream only when the sender
+ * really changes.
+ *
  * What it does:
  * Pumps queued per-client command-stream data up to `beat`, enforces
  * command-source ownership, and forwards authorized packets to output pipe.
  *
  * Deviations from the binary, each tagged [NOT-IN-BINARY] at its site:
  *
- *  1. `lastEmittedSource` is ours. The binary has no such local -- it forwards
- *     its own third parameter (`arg8`) straight to `sub_53C4B0`, whose
- *     verified decompile is
- *       void __usercall sub_53C4B0(int a1@<ebx>, _DWORD *a2@<edi>, _DWORD *arg0)
- *     reading `*arg0` and writing `*arg0 = a1`. The third parameter is
- *     therefore a caller-owned `uint32_t*` last-emitted-source slot, NOT a
- *     `CMarshaller*` -- IDA mistyped it in the outer signature. Because the
- *     caller owns it, the binary's dedup spans every client in one
- *     `UpdateStates` pass while ours restarts per client per call, so we emit
- *     redundant `CMDST_SetCommandSource` ops the binary suppresses. The sim
- *     treats them identically, but a replay we record is not byte-equal to
- *     one the original engine records. Not corrected: `CClientManagerImpl::
- *     UpdateStates` (0x0053F010) tail-jumps to 0x0128FFE0, outside the export,
- *     so where the binary keeps that slot is unverified and guessing would be
- *     more invention.
- *
- *  2. The `ReadMessage` result is tested here; the binary discards it
+ *  1. The `ReadMessage` result is tested here; the binary discards it
  *     (decompile line 131, bare `Moho::CMessage::ReadMessage(&a2,
  *     &a1->mPipe);`, no test at 0x0053C658). Unreachable in practice -- a beat
  *     is only counted once a full `CMDST_Advance` has been queued, so the pipe
  *     always holds a whole beat -- so behaviour is identical and the guard is
  *     kept as a safety net.
  *
- *  3. `mValidCommandSources = BVIntSet{}` replaces the binary's open-coded
+ *  2. `mValidCommandSources = BVIntSet{}` replaces the binary's open-coded
  *     reset (decompile lines 115-123: `v0 = 0`, free the heap buffer when it
  *     is not the inline one, repoint start/end_of_storage at the inline
  *     buffer, `finish = start`). Same resulting set; ours additionally zeroes
  *     `mReservedMetaWord`, which the binary leaves untouched.
  *
- *  4. The eject-request minimum uses `a < b`; the binary uses the wrap-safe
+ *  3. The eject-request minimum uses `a < b`; the binary uses the wrap-safe
  *     `(int)(a - b) < 0` (decompile line 71). Differs only on signed overflow
  *     of the beat counter.
  *
@@ -529,25 +523,21 @@ void CClientBase::ApplyIncomingGameSpeedRequest(const int32_t speedClock, const 
  * ahead of the payload append, which the binary does not have (0x0053C756
  * falls straight through to the write).
  */
-void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::PipeStream* const outPipe)
+void CClientBase::UpdateState(
+  const int beat, CommandSourceId* const lastEmittedSource, gpg::PipeStream* const outPipe
+)
 {
   static constexpr uint32_t kInvalidCommandSource = 0xFFu;
-  // [NOT-IN-BINARY] deviation 1: `update` is really the caller's
-  // `uint32_t* lastEmittedSource`, which the binary hands to every
-  // `sub_53C4B0` call. We ignore it and use the local below instead.
-  (void)update;
 
   if (mEjected) {
     return;
   }
 
-  // [NOT-IN-BINARY] deviation 1: the binary has no local for this.
-  std::uint8_t lastEmittedSource = static_cast<std::uint8_t>(kInvalidCommandSource);
   // Decompile line 48: `v30 = mCommandSource != 255;`. Set here and nowhere
   // else -- see the authorized branch below.
   bool hasCommandSource = mCommandSourceId != kInvalidCommandSource;
   if (hasCommandSource) {
-    WriteSetCommandSourceMessage(static_cast<std::uint8_t>(mCommandSourceId), outPipe, &lastEmittedSource);
+    WriteSetCommandSourceMessage(mCommandSourceId, outPipe, lastEmittedSource);
   }
 
   CMessage message{};
@@ -557,7 +547,7 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
     if (mEjectPending) {
       int earliestEjectBeat = static_cast<int>(mQueuedBeat);
       for (const SEjectRequest& request : mEjectRequests) {
-        // [NOT-IN-BINARY] deviation 4: decompile line 71 is the wrap-safe
+        // [NOT-IN-BINARY] deviation 3: decompile line 71 is the wrap-safe
         // `if (*p_mAfterBeat - mQueuedBeat < 0)`. Differs only on overflow.
         if (request.mAfterBeat < earliestEjectBeat) {
           earliestEjectBeat = request.mAfterBeat;
@@ -569,11 +559,11 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
         for (unsigned int source = mValidCommandSources.GetNext(std::numeric_limits<unsigned int>::max());
              source < mValidCommandSources.Max();
              source = mValidCommandSources.GetNext(source)) {
-          WriteSetCommandSourceMessage(static_cast<std::uint8_t>(source), outPipe, &lastEmittedSource);
+          WriteSetCommandSourceMessage(source, outPipe, lastEmittedSource);
           outPipe->Write(terminateSourceMessage.mBuff.start_, terminateSourceMessage.mBuff.Size());
         }
 
-        // [NOT-IN-BINARY] deviation 3: the binary open-codes this reset at
+        // [NOT-IN-BINARY] deviation 2: the binary open-codes this reset at
         // decompile lines 115-123 instead of assigning a fresh set.
         mValidCommandSources = BVIntSet{};
         mEjected = true;
@@ -582,7 +572,7 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
     }
 
     while (true) {
-      // [NOT-IN-BINARY] deviation 2: the binary ignores the result (decompile
+      // [NOT-IN-BINARY] deviation 1: the binary ignores the result (decompile
       // line 131; no test after the call at 0x0053C658). Kept as a safety net
       // -- unreachable, since a beat is only counted once a whole
       // `CMDST_Advance` has been queued.
@@ -663,7 +653,7 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
           // the long-standing "replay desyncs one tick after someone leaves".
           //
           mCommandSourceId = claimedSource;
-          WriteSetCommandSourceMessage(claimedSource, outPipe, &lastEmittedSource);
+          WriteSetCommandSourceMessage(claimedSource, outPipe, lastEmittedSource);
 
           // [DELIBERATE-FIX] The line below is NOT in the binary. Everything
           // above in this branch matches 0x0053C705..0x0053C72E exactly, and

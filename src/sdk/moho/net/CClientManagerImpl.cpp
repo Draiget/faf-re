@@ -65,11 +65,6 @@ namespace
 } // namespace
 
 /**
- * Address: <synthetic host-build helper>
- */
-CMarshaller::CMarshaller() = default;
-
-/**
  * Address: 0x006E5A60 (FUN_006E5A60)
  *
  * What it does:
@@ -120,7 +115,8 @@ CClientManagerImpl::CClientManagerImpl(
   , mTimer3()
   , mStampBuffer()
   , mStream()
-  , mMarshaller()
+  , mLastEmittedCommandSource(0xFF)
+  , mInDoBeat(false)
   , mDispatchedTimer()
   , mTimer2()
 {
@@ -563,8 +559,6 @@ void CMarshaller::WriteCells(CMessageStream& stream, const gpg::core::FastVector
  */
 CClientManagerImpl::~CClientManagerImpl()
 {
-  mMarshaller.mClientManager = nullptr;
-
   for (CClientBase*& client : mClients) {
     delete client;
     client = nullptr;
@@ -876,8 +870,7 @@ void CClientManagerImpl::DoBeat()
 {
   std::scoped_lock lock(mLock);
 
-  // Binary toggles this slot during DoBeat as a re-entrancy/event guard.
-  mMarshaller.mClientManager = this;
+  mInDoBeat = true;
 
   if (mConnector != nullptr) {
     mConnector->Pull();
@@ -952,7 +945,7 @@ void CClientManagerImpl::DoBeat()
     }
   }
 
-  mMarshaller.mClientManager = nullptr;
+  mInDoBeat = false;
 }
 
 /**
@@ -995,7 +988,7 @@ void CClientManagerImpl::UpdateStates(const int beat)
 
     for (CClientBase* const client : mClients) {
       if (client != nullptr) {
-        client->UpdateState(beat, &mMarshaller, &mStream);
+        client->UpdateState(beat, &mLastEmittedCommandSource, &mStream);
       }
     }
 

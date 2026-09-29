@@ -39,7 +39,7 @@ namespace
       return;
     }
 
-    if (manager->mCurrentEvent != nullptr && manager->mMarshaller.mClientManager == nullptr) {
+    if (manager->mCurrentEvent != nullptr && !manager->mInDoBeat) {
       SetEvent(manager->mCurrentEvent);
     }
   }

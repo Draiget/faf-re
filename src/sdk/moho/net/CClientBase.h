@@ -3,6 +3,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/PipeStream.h"
 #include "IClient.h"
+#include "moho/command/CmdDefs.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/sim/SSyncFilter.h"
 #include "platform/Platform.h"
@@ -23,7 +24,6 @@ namespace moho
 {
   class CClientBase;
   class CClientManagerImpl;
-  class CMarshaller;
 
   struct SEjectRequest
   {
@@ -280,8 +280,10 @@ namespace moho
      * What it does:
      * Pumps queued per-client command-stream data up to `beat`, enforces
      * command-source ownership, and forwards authorized packets to output pipe.
+     * `lastEmittedSource` is the manager's shared dedup slot
+     * (`CClientManagerImpl::mLastEmittedCommandSource`).
      */
-    void UpdateState(int beat, CMarshaller* update, gpg::PipeStream* outPipe);
+    void UpdateState(int beat, CommandSourceId* lastEmittedSource, gpg::PipeStream* outPipe);
 
     /**
      * Address: 0x0053F2C0 (FUN_0053F2C0)
