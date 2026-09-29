@@ -545,13 +545,6 @@ namespace moho
   /**
    * 8-byte lock cell used by CSimDriver (matches +0x30..+0x37 layout).
    */
-  struct SDriverMutex
-  {
-    boost::mutex* lock = nullptr; // runtime-owned lock pointer
-    uint8_t pad[3]{};
-  };
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SDriverMutex) == 0x8, "SDriverMutex size must be 0x8");
-
   /**
    * Paged deque of pending sync-data payload pointers, matching a
    * `boost::ptr_deque<SSyncData>` binding over `std::deque<SSyncData*>`.
@@ -951,7 +944,9 @@ namespace moho
     int32_t mNextIssueBeat = 1;                    // +0x24
     boost::scoped_ptr<CMarshaller> mMarshaller;    // +0x28
     boost::scoped_ptr<CDecoder> mDecoder;          // +0x2C
-    SDriverMutex mLock;                            // +0x30
+    // Constructed and destroyed in place: `boost::mutex::mutex` at 0x0073B5F0,
+    // `~mutex` at 0x0073BB1A, both on `this+0x30`.
+    boost::mutex mLock;                            // +0x30
     boost::thread* mSimThread = nullptr;           // +0x38
     int32_t mOutstandingRequests = 1;              // +0x3C
     gpg::time::Timer mTimer;                       // +0x40
