@@ -10053,6 +10053,7 @@ namespace msvc8
          * recovery.
          * Address: 0x00940C60 (FUN_00940C60 -- `_Umove`, the member bridge into the copy 0x008EA210 (VC8 moves an element with no move semantics by copying it), for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940F23, 0x00940FA5 (`_Insert_n` 0x00940D40); formerly a second address on `CopyAdapterModeRange` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00940BD0 (FUN_00940BD0 -- `_Uninit_move`'s fallback to the copy, a tag-rewriting `jmp` into 0x008EA210, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); zero callers, unreachable; formerly `CopyAdapterModeRangeDispatchB` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008D6EA0 (FUN_008D6EA0 -- the `_Uninit_copy` adapter for the bucket array of `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp): `(first, last, dest)` reformed onto the 4-byte null-checked copy 0x008D80A0 (an ICF twin of 0x005B1630); callers 0x008D5F2D, 0x008D5FA4 (`_Insert_n` 0x008D5D70).)
          */
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -11351,6 +11352,7 @@ namespace msvc8
          * Address: 0x008EAA50 (FUN_008EAA50 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF776 (`_Buy` 0x008EF750), 0x008EFBB3 (the copy constructor), 0x00940DBC (`_Insert_n` 0x00940D40). It had no anchor.)
          * Address: 0x00505750 (FUN_00505750 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<moho::SpatialShard<T>*>` (moho/mesh/SpatialDb.h); callers 0x00505530.)
          * Address: 0x00505A70 (FUN_00505A70 -- the same `_Xlen` for `msvc8::vector<moho::SpatialShardData<T>*>`; callers 0x00505850.)
+         * Address: 0x008D6570 (FUN_008D6570 -- `_Xlen` for the bucket array of `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp); caller 0x008D5DD4 (`_Insert_n` 0x008D5D70).)
          */
         [[noreturn]] static void throw_too_long()
         {

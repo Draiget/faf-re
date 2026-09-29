@@ -1670,16 +1670,40 @@ namespace moho
       return outValues;
     }
 
+    /**
+     * Address: 0x008C7D70 (FUN_008C7D70, Moho::CUserPrefs::SetBoolean)
+     *
+     * VFTable SLOT: 9 (+0x24)
+     *
+     * What it does:
+     * Forwards to `SetPreferenceBooleanRecursive` (0x008CBFB0) over `mState`/`mRoot`.
+     */
     void SetBoolean(const msvc8::string& key, const bool value) override
     {
       SetPreferenceBooleanRecursive(&mState, &mRoot, key, value);
     }
 
+    /**
+     * Address: 0x008C7D90 (FUN_008C7D90, Moho::CUserPrefs::SetInteger)
+     *
+     * VFTable SLOT: 10 (+0x28)
+     *
+     * What it does:
+     * Forwards to `SetPreferenceIntegerRecursive` (0x008CC210) over `mState`/`mRoot`.
+     */
     void SetInteger(const msvc8::string& key, const std::int32_t value) override
     {
       SetPreferenceIntegerRecursive(&mState, &mRoot, key, value);
     }
 
+    /**
+     * Address: 0x008C7DB0 (FUN_008C7DB0, Moho::CUserPrefs::SetNumber)
+     *
+     * VFTable SLOT: 11 (+0x2C)
+     *
+     * What it does:
+     * Forwards to `SetPreferenceNumberRecursive` (0x008CC470) over `mState`/`mRoot`.
+     */
     void SetNumber(const msvc8::string& key, const float value) override
     {
       SetPreferenceNumberRecursive(&mState, &mRoot, key, value);
@@ -1698,11 +1722,27 @@ namespace moho
       SetPreferenceStringRecursive(&mState, &mRoot, key, valueText);
     }
 
+    /**
+     * Address: 0x008C7E40 (FUN_008C7E40, Moho::CUserPrefs::SetString)
+     *
+     * VFTable SLOT: 13 (+0x34)
+     *
+     * What it does:
+     * Forwards to `SetPreferenceStringRecursive` (0x008CC6D0) over `mState`/`mRoot`.
+     */
     void SetString(const msvc8::string& key, const msvc8::string& value) override
     {
       SetPreferenceStringRecursive(&mState, &mRoot, key, value);
     }
 
+    /**
+     * Address: 0x008C7E60 (FUN_008C7E60, Moho::CUserPrefs::SetStringArr)
+     *
+     * VFTable SLOT: 14 (+0x38)
+     *
+     * What it does:
+     * Forwards to `SetPreferenceStringArrayRecursive` (0x008CC930) over `mState`/`mRoot`.
+     */
     void SetStringArr(const msvc8::string& key, const msvc8::list<msvc8::string>& values) override
     {
       SetPreferenceStringArrayRecursive(&mState, &mRoot, key, values);
@@ -1772,6 +1812,14 @@ namespace moho
       return mRoot;
     }
 
+    /**
+     * Address: 0x008C7E80 (FUN_008C7E80, Moho::CUserPrefs::SetObject)
+     *
+     * VFTable SLOT: 18 (+0x48)
+     *
+     * What it does:
+     * Forwards to `SetPreferenceObjectRecursive` (0x008CCBA0) over `mState`/`mRoot`.
+     */
     void SetObject(const msvc8::string& key, void* const valueObject) override
     {
       SetPreferenceObjectRecursive(&mState, &mRoot, key, *static_cast<LuaPlus::LuaObject*>(valueObject));
@@ -5871,7 +5919,20 @@ moho::CMovieManager::~CMovieManager()
 {
   ::mwPlyFinishSfdFx();
   ::ADXM_Finish();
+  ReleaseDirectSound();
+  ::ADXPC_NoOpShutdownCallback();
+}
 
+/**
+ * Address: 0x00874AC0 (FUN_00874AC0)
+ *
+ * What it does:
+ * Releases the sound buffer, then the DirectSound device, nulling each. The
+ * destructor (0x00874B9A) and its deleting copy carry it inline; this is the
+ * linker-retained out-of-line copy.
+ */
+void moho::CMovieManager::ReleaseDirectSound()
+{
   if (mPrimaryBuffer != nullptr) {
     mPrimaryBuffer->Release();
     mPrimaryBuffer = nullptr;
@@ -5880,8 +5941,6 @@ moho::CMovieManager::~CMovieManager()
     mDirectSound->Release();
     mDirectSound = nullptr;
   }
-
-  ::ADXPC_NoOpShutdownCallback();
 }
 
 /**

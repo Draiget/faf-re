@@ -467,6 +467,14 @@ namespace moho
      */
     void CreateDirectSound();
 
+    /**
+     * Address: 0x00874AC0 (FUN_00874AC0)
+     *
+     * What it does:
+     * Releases the sound buffer, then the DirectSound device, nulling each.
+     */
+    void ReleaseDirectSound();
+
     IDirectSound* mDirectSound;         // +0x00
     IDirectSoundBuffer* mPrimaryBuffer; // +0x04
     float mVolume;                      // +0x08 hundredths of a dB, DSBVOLUME_MIN..0

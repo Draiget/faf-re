@@ -32,6 +32,12 @@ namespace msvc8
          */
         explicit auto_ptr(T* p = 0) : px_(p) {}
 
+        /**
+         * Address: 0x00875270 (FUN_00875270) - an `auto_ptr` of the movie
+         * translation unit (StartupHelpers.cpp), `this` in EAX and `r` on the
+         * stack: `px = r.px; r.px = 0`. The body is the same for every `T`, so
+         * which instantiation it is cannot be read off it.
+         */
         auto_ptr(auto_ptr& r) : px_(r.release()) {}
 
         template<class U>
