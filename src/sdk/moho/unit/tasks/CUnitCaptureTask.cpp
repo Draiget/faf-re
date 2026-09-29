@@ -363,7 +363,7 @@ namespace moho
           mUnit->AiBuilder->BuilderSetAimTarget(targetTransform.pos_);
         }
 
-        mUnit->UnitStateMask |= (1ull << UNITSTATE_Capturing);
+        mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_Capturing);
         mTaskState = NextTaskState(mTaskState);
         return 0;
       }
@@ -460,8 +460,8 @@ namespace moho
       case TASKSTATE_Processing: {
         if (mConsumptionData->mGranted.energy >= mCaptureRate.energy && mConsumptionData->mGranted.mass >= mCaptureRate.mass) {
           const SEconValue granted = TakeGrantedResourcesAndReset(mConsumptionData);
-          mUnit->mBeatResourceAccumulators.resourcesSpentEnergy += granted.energy;
-          mUnit->mBeatResourceAccumulators.resourcesSpentMass += granted.mass;
+          mUnit->mUnitVarDat.mResourcesSpent.ENERGY += granted.energy;
+          mUnit->mUnitVarDat.mResourcesSpent.MASS += granted.mass;
 
           targetEntity = mTargetEntity.GetObjectPtr();
           targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
@@ -471,7 +471,7 @@ namespace moho
               captureProgress = mCaptureTime;
             }
             mCaptureProgress = captureProgress;
-            mUnit->WorkProgress = static_cast<float>(mCaptureProgress) / static_cast<float>(mCaptureTime);
+            mUnit->mUnitVarDat.mWorkProgress = static_cast<float>(mCaptureProgress) / static_cast<float>(mCaptureTime);
           }
         }
 
@@ -599,8 +599,8 @@ namespace moho
       mUnit->TargetBlipEntityRef.ResetObjectPtr<Entity>(nullptr);
       mUnit->NeedSyncGameData = true;
 
-      mUnit->UnitStateMask &= ~(1ull << UNITSTATE_Capturing);
-      mUnit->WorkProgress = 0.0f;
+      mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Capturing);
+      mUnit->mUnitVarDat.mWorkProgress = 0.0f;
     }
 
     DoCallback(false);
@@ -639,7 +639,7 @@ namespace moho
         return;
       }
 
-      targetUnit->UnitStateMask |= (1ull << UNITSTATE_BeingCaptured);
+      targetUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_BeingCaptured);
       ++targetUnit->CaptorCount;
 
       targetUnit->RunScriptUnit(kOnStartBeingCapturedScript, mUnit);
@@ -657,7 +657,7 @@ namespace moho
 
     targetUnit->DecrementCapturers();
     if (targetUnit->IsUnitState(UNITSTATE_BeingCaptured) && targetUnit->CaptorCount == 0) {
-      targetUnit->UnitStateMask &= ~(1ull << UNITSTATE_BeingCaptured);
+      targetUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_BeingCaptured);
     }
 
     targetUnit->RunScriptUnit(kOnFailedBeingCapturedScript, mUnit);
@@ -688,7 +688,7 @@ namespace moho
 
     mUnit->TargetBlipEntityRef.ResetObjectPtr<Entity>(commandTargetBlip);
     mUnit->NeedSyncGameData = true;
-    mUnit->WorkProgress = 0.0f;
+    mUnit->mUnitVarDat.mWorkProgress = 0.0f;
 
     DestroyEconomyRequestPointer(mConsumptionData);
     mCaptureProgress = 0;

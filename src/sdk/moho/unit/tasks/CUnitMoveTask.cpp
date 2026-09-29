@@ -317,7 +317,7 @@ namespace moho
 
     // (4) Clear the unit's move-in-progress state bit (bit 2 of UnitStateMask).
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask &= ~static_cast<std::uint64_t>(0x4u);
+      mUnit->mUnitVarDat.mUnitStates &= ~static_cast<std::uint64_t>(0x4u);
     }
 
     // (5) Trace teardown for the owning unit.
@@ -625,7 +625,7 @@ namespace moho
     // navigator). An early return here is worse than a crash: it silently
     // skips the tail `Stage()` below, which is the one thing that suspends
     // the owning task thread while the move runs.
-    mUnit->UnitStateMask |= 0x0000000000000004ull;
+    mUnit->mUnitVarDat.mUnitStates |= 0x0000000000000004ull;
 
     if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
       navigator->AddListener(this);

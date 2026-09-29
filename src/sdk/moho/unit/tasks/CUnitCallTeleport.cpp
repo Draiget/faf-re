@@ -402,7 +402,7 @@ namespace moho
           return 1;
         }
 
-        mUnit->UnitStateMask |= kUnitStateMaskWaitingForTransport;
+        mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskWaitingForTransport;
         const SOCellPos attachCell = transport->TransportGetAttachPosition(mUnit);
         if (!IsValidCellPos(attachCell)) {
           return -1;
@@ -453,7 +453,7 @@ namespace moho
     mIsOccupying = false;
 
     if (mUnit) {
-      mUnit->UnitStateMask |= kUnitStateMaskTeleportPending;
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTeleportPending;
     }
   }
 
@@ -471,8 +471,8 @@ namespace moho
    */
   CUnitCallTeleport::~CUnitCallTeleport()
   {
-    mUnit->UnitStateMask &= ~kUnitStateMaskTeleportPending;
-    mUnit->UnitStateMask &= ~kUnitStateMaskWaitingForTransport;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTeleportPending;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskWaitingForTransport;
 
     if (mIsOccupying) {
       mUnit->FreeOgridRect();
@@ -574,7 +574,7 @@ namespace moho
    */
   CUnitTeleportTask::~CUnitTeleportTask()
   {
-    mUnit->UnitStateMask &= ~kUnitStateMaskTeleporting;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTeleporting;
 
     if (mTaskState == TASKSTATE_Starting) {
       *mDispatchResult = static_cast<EAiResult>(1);
@@ -636,7 +636,7 @@ namespace moho
       return -1;
     }
 
-    mUnit->UnitStateMask |= kUnitStateMaskTeleporting;
+    mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTeleporting;
 
     Unit* const beaconUnit = mTeleportBeaconUnit.GetObjectPtr();
     if (beaconUnit == nullptr || beaconUnit->IsDead()) {

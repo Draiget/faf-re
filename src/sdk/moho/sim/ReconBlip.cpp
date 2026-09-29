@@ -1549,7 +1549,7 @@ void ReconBlip::SyncInterface(SSyncData* const syncData)
 
   const bool creatorAlive = creator != nullptr;
   const std::int32_t creatorStunTicks =
-    creatorAlive ? static_cast<std::int32_t>(creator->StunnedState != 0) : 0;
+    creatorAlive ? static_cast<std::int32_t>(creator->mUnitVarDat.mStunTicks != 0) : 0;
   PatchUnitUpdateReconPose(
     entry,
     reconInfo.mPriorPose.px,

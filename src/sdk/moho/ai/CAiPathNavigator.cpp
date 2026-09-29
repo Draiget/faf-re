@@ -336,7 +336,7 @@ namespace
     if (!unit) {
       return;
     }
-    unit->UnitStateMask &= ~(kUnitPathFlag | kUnitPathingBusyFlag | kUnitPatrolStallFlag);
+    unit->mUnitVarDat.mUnitStates &= ~(kUnitPathFlag | kUnitPathingBusyFlag | kUnitPatrolStallFlag);
   }
 
   void ClearUnitPathingBusyBit(Unit* const unit)
@@ -344,7 +344,7 @@ namespace
     if (!unit) {
       return;
     }
-    unit->UnitStateMask &= ~kUnitPathingBusyFlag;
+    unit->mUnitVarDat.mUnitStates &= ~kUnitPathingBusyFlag;
   }
 
   void SetUnitPathBits(Unit* const unit, const std::uint64_t bits)
@@ -352,7 +352,7 @@ namespace
     if (!unit) {
       return;
     }
-    unit->UnitStateMask |= bits;
+    unit->mUnitVarDat.mUnitStates |= bits;
   }
 
   /**
@@ -1183,7 +1183,7 @@ void CAiPathNavigator::ConfigureGoal(const SAiNavigatorGoal& goal, const bool ig
 
   Unit* const unit = GetOwningUnit(*this);
   if (unit) {
-    unit->UnitStateMask &= ~kUnitPathFlag;
+    unit->mUnitVarDat.mUnitStates &= ~kUnitPathFlag;
   }
 
   mIsInFormation = 0;

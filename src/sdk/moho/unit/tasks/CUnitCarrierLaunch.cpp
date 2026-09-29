@@ -126,7 +126,7 @@ namespace moho
 
     if (mUnit && mUnit->SimulationRef && mUnit->SimulationRef->mEntityDB) {
       mUnit->SimulationRef->mEntityDB->RegisterEntitySet(mCarriedUnits);
-      mUnit->UnitStateMask |= kUnitStateMaskCarrierLaunch;
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskCarrierLaunch;
     }
   }
 
@@ -143,7 +143,7 @@ namespace moho
   CUnitCarrierLaunch::~CUnitCarrierLaunch()
   {
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask &= ~kUnitStateMaskCarrierLaunch;
+      mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskCarrierLaunch;
     }
   }
 

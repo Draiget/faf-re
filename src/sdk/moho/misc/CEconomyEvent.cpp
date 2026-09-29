@@ -685,8 +685,8 @@ namespace
 
   void ClearUnitRequestedRates(moho::Unit* unit)
   {
-    unit->SharedEconomyRateEnergy = 0.0f;
-    unit->SharedEconomyRateMass = 0.0f;
+    unit->mUnitVarDat.mMaintainenceCost.ENERGY = 0.0f;
+    unit->mUnitVarDat.mMaintainenceCost.MASS = 0.0f;
   }
 
   /**
@@ -1215,14 +1215,14 @@ gpg::RRef moho::CEconomyEvent::GetDerivedObjectRef()
 void moho::CEconomyEvent::ProcessTick()
 {
   if (mRemainingTicks != 0 && mRequest != nullptr && mUnit != nullptr) {
-    mUnit->SharedEconomyRateEnergy = mRequestedPerTick.energy;
-    mUnit->SharedEconomyRateMass = mRequestedPerTick.mass;
+    mUnit->mUnitVarDat.mMaintainenceCost.ENERGY = mRequestedPerTick.energy;
+    mUnit->mUnitVarDat.mMaintainenceCost.MASS = mRequestedPerTick.mass;
 
     if (mRequest->mGranted.energy >= mRequestedPerTick.energy && mRequest->mGranted.mass >= mRequestedPerTick.mass) {
       LuaPlus::LuaObject* callbackUnitLuaCleanupLane = nullptr;
       const SEconValue granted = TakeGrantedResourcesAndReset(mRequest);
-      mUnit->mBeatResourceAccumulators.resourcesSpentEnergy += granted.energy;
-      mUnit->mBeatResourceAccumulators.resourcesSpentMass += granted.mass;
+      mUnit->mUnitVarDat.mResourcesSpent.ENERGY += granted.energy;
+      mUnit->mUnitVarDat.mResourcesSpent.MASS += granted.mass;
 
       --mRemainingTicks;
 

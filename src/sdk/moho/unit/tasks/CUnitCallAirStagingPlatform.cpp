@@ -212,7 +212,7 @@ namespace moho
       }
 
       if (transport->TransportIsUnitAssignedForPickup(unit)) {
-        unit->UnitStateMask &= ~kUnitStateMaskForceSpeedThrough;
+        unit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskForceSpeedThrough;
         if (transport->TransportIsReadyForUnit(unit)) {
           mTaskState = NextTaskState(mTaskState);
         }
@@ -223,7 +223,7 @@ namespace moho
         return -1;
       }
 
-      unit->UnitStateMask |= kUnitStateMaskForceSpeedThrough;
+      unit->mUnitVarDat.mUnitStates |= kUnitStateMaskForceSpeedThrough;
       const SOCellPos goalCell = ToCellPos(platformUnit->GetPosition(), unit->GetFootprint());
       const SNavGoal goal = BuildSingleCellGoal(goalCell, LAYER_Air);
       QueueMoveGoal(this, goal);
@@ -264,7 +264,7 @@ namespace moho
         mDone = true;
       }
       mTaskState = NextTaskState(mTaskState);
-      unit->UnitStateMask &= ~kUnitStateMaskAirStagingPending;
+      unit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskAirStagingPending;
       return 1;
     }
 
@@ -282,7 +282,7 @@ namespace moho
       const SOCellPos goalCell = ToCellPos(platformUnit->GetPosition(), unit->GetFootprint());
       const SNavGoal goal = BuildSingleCellGoal(goalCell, LAYER_None);
 
-      unit->UnitStateMask |= kUnitStateMaskForceSpeedThrough;
+      unit->mUnitVarDat.mUnitStates |= kUnitStateMaskForceSpeedThrough;
       if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
         navigator->SetSpeedThroughGoal(true);
         navigator->SetGoal(goal);
@@ -306,8 +306,8 @@ namespace moho
     mDone = false;
 
     if (mUnit) {
-      mUnit->UnitStateMask |= kUnitStateMaskTaskPending;
-      mUnit->UnitStateMask |= kUnitStateMaskAirStagingPending;
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTaskPending;
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskAirStagingPending;
     }
   }
 
@@ -339,10 +339,10 @@ namespace moho
     // owning unit (the binary clears these unconditionally before any further
     // checks; `mUnit` is non-null on a constructed task — the ctor stores
     // through it -- so the explicit guard is omitted).
-    mUnit->UnitStateMask &= ~kUnitStateMaskForceSpeedThrough;
-    mUnit->UnitStateMask &= ~kUnitStateMaskLandingOnPlatform;
-    mUnit->UnitStateMask &= ~kUnitStateMaskTransportLoading;
-    mUnit->UnitStateMask &= ~kUnitStateMaskWaitingForTransport;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskForceSpeedThrough;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskLandingOnPlatform;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTransportLoading;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskWaitingForTransport;
 
     if (!mDone) {
       // Cancellation path: the platform never finished the load handshake.

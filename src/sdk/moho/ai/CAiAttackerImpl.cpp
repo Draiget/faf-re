@@ -1626,7 +1626,7 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
   if (!weapon->CheckSilo()) {
     return nullptr;
   }
-  if (unit->StunnedState != 0 || unit->IsUnitState(UNITSTATE_Busy)) {
+  if (unit->mUnitVarDat.mStunTicks != 0 || unit->IsUnitState(UNITSTATE_Busy)) {
     return nullptr;
   }
 

@@ -375,7 +375,7 @@ namespace moho
       return;
     }
 
-    unit->UnitStateMask |= (1ull << UNITSTATE_Attacking);
+    unit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_Attacking);
 
     if (mIgnoreFormationUpdates == 0u) {
       if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
@@ -474,7 +474,7 @@ namespace moho
     Unit* const unit = commandTask->mUnit;
 
     if (unit != nullptr) {
-      unit->UnitStateMask &= ~(1ull << UNITSTATE_Attacking);
+      unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Attacking);
     }
 
     Listener<ECommandEvent>::ListUnlink();

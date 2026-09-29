@@ -218,7 +218,7 @@ int CFireWeaponTask::Execute()
     return 1;
   }
 
-  if (mFireClock == 0 && unit->FireState != kHoldFireState && WeaponHasTarget(weapon)) {
+  if (mFireClock == 0 && unit->mUnitVarDat.mFireState != kHoldFireState && WeaponHasTarget(weapon)) {
     // 0x006D3DC0 nests the gate as CanAttackTarget, then
     // `CanFire && CheckSilo && !TargetIsTooClose`. The `CanFire` term was
     // missing here, and for every non-winged unit that call reduces to

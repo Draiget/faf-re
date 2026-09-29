@@ -1,4 +1,5 @@
 #include "moho/unit/tasks/CUnitCallLandTransport.h"
+#include "legacy/math/X87Math.h"
 
 #include <cmath>
 #include <cstdint>
@@ -130,13 +131,13 @@ namespace moho
       mIsOccupying = false;
     }
 
-    mUnit->UnitStateMask &= ~kUnitStateMaskCallLandTransportPending;
-    mUnit->UnitStateMask &= ~kUnitStateMaskWaitingForTransport;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskCallLandTransportPending;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskWaitingForTransport;
 
     if (!mHasBeamupDestination) {
       if (mUnit->IsUnitState(UNITSTATE_Teleporting)) {
         (void)mUnit->RunScript("OnStopTransportBeamUp");
-        mUnit->UnitStateMask &= ~kUnitStateMaskTeleporting;
+        mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTeleporting;
       }
 
       if (CUnitMotion* const unitMotion = mUnit->UnitMotion; unitMotion != nullptr && mBeamupTime < 10.0f) {
@@ -198,7 +199,7 @@ namespace moho
           return -1;
         }
 
-        mUnit->UnitStateMask |= kUnitStateMaskWaitingForTransport;
+        mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskWaitingForTransport;
         if (transport->TransportIsReadyForUnit(mUnit)) {
           SOCellPos pickupCell = transportUnit->GetFootprint().ToCellPos(transportUnit->GetPosition());
 
@@ -244,7 +245,7 @@ namespace moho
           mSourceTransform = mUnit->GetTransform();
           mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
           mUnit->StartTransportBeamUp(mTargetTransportUnit, transport->TransportGetAttachBone(mUnit));
-          mUnit->UnitStateMask |= kUnitStateMaskTeleporting;
+          mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTeleporting;
           mTaskState = NextTaskState(mTaskState);
         }
         return 1;
@@ -274,7 +275,7 @@ namespace moho
         }
 
         (void)mUnit->RunScript("OnStopTransportBeamUp");
-        mUnit->UnitStateMask &= ~kUnitStateMaskTeleporting;
+        mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTeleporting;
         if (transport->TransportAttachUnit(mUnit)) {
           mHasBeamupDestination = true;
         }
@@ -331,7 +332,7 @@ namespace moho
     mHasBeamupDestination = false;
     mIsOccupying = false;
 
-    mUnit->UnitStateMask |= kUnitStateMaskCallLandTransportPending;
+    mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskCallLandTransportPending;
     if (mUnit->IsUnitState(UNITSTATE_WaitForFerry)) {
       mTaskState = TASKSTATE_Waiting;
     }

@@ -174,7 +174,7 @@ namespace moho
   {
     OnStopBuild(false);
     if (mUnit != nullptr) {
-      mUnit->WorkProgress = 0.0f;
+      mUnit->mUnitVarDat.mWorkProgress = 0.0f;
     }
     mFocus.UnlinkFromOwnerChain();
     mFocus.ClearLinkState();
@@ -264,15 +264,15 @@ namespace moho
       return false;
     }
 
-    if (ownerUnit->IsPaused) {
+    if (ownerUnit->mUnitVarDat.mIsPaused) {
       if (focusUnit == nullptr) {
         mFractionComplete = 0.0f;
-        ownerUnit->WorkProgress = 0.0f;
+        ownerUnit->mUnitVarDat.mWorkProgress = 0.0f;
         return false;
       }
 
       mFractionComplete = focusUnit->mVarDat.mFractionComplete;
-      ownerUnit->WorkProgress = focusUnit->mVarDat.mFractionComplete;
+      ownerUnit->mUnitVarDat.mWorkProgress = focusUnit->mVarDat.mFractionComplete;
 
       if (!ownerUnit->IsUnitState(UNITSTATE_Repairing) && focusUnit->mVarDat.mFractionComplete >= 1.0f) {
         return true;
@@ -308,7 +308,7 @@ namespace moho
       perSecond.mass *= resourceConsumed;
 
       focusUnit->AiSiloBuild->SiloAssistWithResource(perSecond);
-      ownerUnit->WorkProgress = focusUnit->WorkProgress;
+      ownerUnit->mUnitVarDat.mWorkProgress = focusUnit->mUnitVarDat.mWorkProgress;
       return false;
     }
 
@@ -329,7 +329,7 @@ namespace moho
           }
         }
 
-        ownerUnit->WorkProgress = workProgress;
+        ownerUnit->mUnitVarDat.mWorkProgress = workProgress;
         return false;
       }
 
@@ -366,13 +366,13 @@ namespace moho
       }
     }
 
-    if (focusBlueprint->Physics.FuelUseTime > 0.0f && focusUnit->FuelRatio < 1.0f) {
+    if (focusBlueprint->Physics.FuelUseTime > 0.0f && focusUnit->mUnitVarDat.mFuelRatio < 1.0f) {
       float fuelTickDelta = (focusBlueprint->Physics.FuelRechargeRate / focusBlueprint->Physics.FuelUseTime) * kTickBuildScale;
       if (focusUnitIsDamaged) {
         fuelTickDelta *= 0.5f;
         buildProgressDelta *= 0.5f;
       }
-      focusUnit->FuelRatio = std::min(1.0f, focusUnit->FuelRatio + fuelTickDelta);
+      focusUnit->mUnitVarDat.mFuelRatio = std::min(1.0f, focusUnit->mUnitVarDat.mFuelRatio + fuelTickDelta);
     }
 
     focusUnit->Materialize((resourceConsumed != 0.0f) ? buildProgressDelta : 0.0f);
@@ -380,17 +380,17 @@ namespace moho
     const bool isRepairAction = mActionName.equals_no_case("Repair");
     if (isRepairAction && !focusUnit->IsBeingBuilt()) {
       if (focusUnit->mVarDat.mMaxHealth > 0.0f) {
-        ownerUnit->WorkProgress = focusUnit->mVarDat.mHealth / focusUnit->mVarDat.mMaxHealth;
+        ownerUnit->mUnitVarDat.mWorkProgress = focusUnit->mVarDat.mHealth / focusUnit->mVarDat.mMaxHealth;
       } else {
-        ownerUnit->WorkProgress = 1.0f;
+        ownerUnit->mUnitVarDat.mWorkProgress = 1.0f;
       }
 
-      if (ownerUnit->WorkProgress != 1.0f) {
+      if (ownerUnit->mUnitVarDat.mWorkProgress != 1.0f) {
         return false;
       }
 
       if (focusBlueprint->Physics.FuelUseTime > 0.0f) {
-        return focusUnit->FuelRatio == 1.0f;
+        return focusUnit->mUnitVarDat.mFuelRatio == 1.0f;
       }
 
       if (!focusUnit->IsInCategory("SHIELD")) {
@@ -412,7 +412,7 @@ namespace moho
     }
 
     mFractionComplete = currentFraction;
-    ownerUnit->WorkProgress = currentFraction;
+    ownerUnit->mUnitVarDat.mWorkProgress = currentFraction;
     return currentFraction == 1.0f;
   }
 

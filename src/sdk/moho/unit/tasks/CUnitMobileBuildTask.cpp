@@ -546,7 +546,7 @@ namespace moho
           builder->BuilderSetAimTarget(Wm3::Vector3f{mBuildPosition.x, aimY, mBuildPosition.z});
         }
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
-        mUnit->UnitStateMask |= kUnitStateBuildingMask;
+        mUnit->mUnitVarDat.mUnitStates |= kUnitStateBuildingMask;
         return 0;
       }
 
@@ -622,7 +622,7 @@ namespace moho
         if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && !builder->BuilderGetOnTarget()) {
           return 1;
         }
-        if (mUnit->IsPaused) {
+        if (mUnit->mUnitVarDat.mIsPaused) {
           return 10;
         }
 
@@ -652,7 +652,7 @@ namespace moho
         if (spawned == nullptr) {
           return 10;
         }
-        spawned->UnitStateMask |= kUnitStateNoReclaimMask;
+        spawned->mUnitVarDat.mUnitStates |= kUnitStateNoReclaimMask;
 
         if (Entity* const pending = mPendingBuildEntity.GetObjectPtr(); pending != nullptr) {
           pending->Destroy();
@@ -671,7 +671,7 @@ namespace moho
         if (!mBuildHelper.IsGood()) {
           return -1;
         }
-        if (mUnit->IsPaused) {
+        if (mUnit->mUnitVarDat.mIsPaused) {
           return 10;
         }
         if (!mBuildHelper.UpdateWorkProgress()) {
@@ -700,7 +700,7 @@ namespace moho
           (void)IssueCommandToSelectedUnits(mSim, dispatchSet, moveData, true);
         }
         if (builtUnit != nullptr) {
-          builtUnit->UnitStateMask &= ~kUnitStateNoReclaimMask;
+          builtUnit->mUnitVarDat.mUnitStates &= ~kUnitStateNoReclaimMask;
         }
         mBuildUnit.UnlinkFromOwnerChain();
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
@@ -728,14 +728,14 @@ namespace moho
   CUnitMobileBuildTask::~CUnitMobileBuildTask()
   {
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask &= ~kUnitStateBuildingMask;
+      mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateBuildingMask;
       if (mUnit->AiBuilder != nullptr) {
         mUnit->AiBuilder->BuilderSetAimTarget(Wm3::Vector3f::Zero());
       }
     }
 
     if (Unit* const buildUnit = mBuildUnit.GetObjectPtr(); buildUnit != nullptr) {
-      buildUnit->UnitStateMask &= ~kUnitStateNoReclaimMask;
+      buildUnit->mUnitVarDat.mUnitStates &= ~kUnitStateNoReclaimMask;
     }
 
     mBuildHelper.OnStopBuild(true);
@@ -793,11 +793,11 @@ namespace moho
       // mask and stores it back untouched because only the high half carries
       // the bit - `and [unit+4A4h], 0FFFFFEFFh` clears bit 8 of the high
       // dword, i.e. bit 40, `UNITSTATE_NoReclaim`.
-      mBuildUnit.GetObjectPtr()->UnitStateMask &= ~kUnitStateNoReclaimMask;
+      mBuildUnit.GetObjectPtr()->mUnitVarDat.mUnitStates &= ~kUnitStateNoReclaimMask;
 
       // 0x005F811E: no null check on `mUnit` here, unlike the destructor -
       // a listener event can only arrive on a task that still has its builder.
-      mUnit->WorkProgress = 0.0f;
+      mUnit->mUnitVarDat.mWorkProgress = 0.0f;
       mBuildHelper.OnStopBuild(true);
 
       mBuildUnit.UnlinkFromOwnerChain();

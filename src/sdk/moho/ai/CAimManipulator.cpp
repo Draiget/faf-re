@@ -893,7 +893,7 @@ bool moho::CAimManipulator::ManipulatorUpdate()
   }
 
   UnitWeapon* const weapon = this->mWeapon.GetObjectPtr();
-  if (weapon == nullptr || unit->IsDead() || unit->StunnedState != 0) {
+  if (weapon == nullptr || unit->IsDead() || unit->mUnitVarDat.mStunTicks != 0) {
     this->mOnTarget = false;
     if (CAniPoseBone* const watchBone0 = ResolveWatchBone(this, 0u); watchBone0 != nullptr) {
       watchBone0->Rotate(this->mHeadingRot);

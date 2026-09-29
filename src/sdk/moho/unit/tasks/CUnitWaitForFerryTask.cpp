@@ -144,7 +144,7 @@ namespace moho
 
     Unit* const ownerUnit = mUnit;
     if (ownerUnit != nullptr) {
-      ownerUnit->UnitStateMask |= kUnitStateMaskWaitForFerry;
+      ownerUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskWaitForFerry;
       ownerUnit->SetFocusEntity(ferryUnit);
     }
   }
@@ -168,7 +168,7 @@ namespace moho
       ownerUnit->AssignedTransportRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
       ownerUnit->SetFocusEntity(nullptr);
       ownerUnit->FreeOgridRect();
-      ownerUnit->UnitStateMask &= ~kUnitStateMaskWaitForFerry;
+      ownerUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskWaitForFerry;
     }
 
     mFerryUnit.UnlinkFromOwnerChain();

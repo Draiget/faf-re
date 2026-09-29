@@ -733,7 +733,7 @@ namespace
       }
 
       case EUnitCommandType::UNITCOMMAND_Pause: {
-        unit->SetPaused(!unit->IsPaused);
+        unit->SetPaused(!unit->mUnitVarDat.mIsPaused);
         return;
       }
 
@@ -1047,7 +1047,7 @@ ETaskStatus IAiCommandDispatchImpl::TaskTick()
     return tryDispatchHead();
   }
 
-  if (mUnit != nullptr && mUnit->RepeatQueueEnabled != 0 &&
+  if (mUnit != nullptr && mUnit->mUnitVarDat.mRepeatQueue != 0 &&
       currentCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
     currentCommand->mVarDat.mCount = currentCommand->mVarDat.mMaxCount;
     currentCommand->mNeedsUpdate = true;

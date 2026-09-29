@@ -116,7 +116,7 @@ namespace
       return;
     }
 
-    ownerUnit->UnitStateMask |= kUnitStateMaskFerryTaskAssigned;
+    ownerUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskFerryTaskAssigned;
   }
 
   void RunOwnerFerryPointSetScript(moho::Unit* const ownerUnit)
@@ -332,7 +332,7 @@ namespace moho
         navigator->AbortMove();
       }
 
-      ownerUnit->UnitStateMask &= ~kUnitStateMaskFerryTaskFlags;
+      ownerUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskFerryTaskFlags;
     }
 
     mBeacon.UnlinkFromOwnerChain();
@@ -1020,7 +1020,7 @@ namespace moho
 
     switch (mTaskState) {
       case TASKSTATE_Preparing: {
-        mUnit->UnitStateMask &= ~(1ull << UNITSTATE_ForceSpeedThrough);
+        mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
 
         if (HasNextUnitToLoad()) {
           return 1;
@@ -1036,25 +1036,25 @@ namespace moho
       }
 
       case TASKSTATE_Waiting: {
-        mUnit->UnitStateMask |= (1ull << UNITSTATE_ForceSpeedThrough);
+        mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_ForceSpeedThrough);
         MoveToNextRoutePoint();
         return 1;
       }
 
       case TASKSTATE_Starting: {
-        mUnit->UnitStateMask &= ~(1ull << UNITSTATE_ForceSpeedThrough);
+        mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
         IssueUnloadAtRoutePoint();
         return 1;
       }
 
       case TASKSTATE_Processing: {
-        mUnit->UnitStateMask |= (1ull << UNITSTATE_ForceSpeedThrough);
+        mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_ForceSpeedThrough);
         MoveToPreviousRoutePoint();
         return 1;
       }
 
       case TASKSTATE_Complete: {
-        mUnit->UnitStateMask &= ~(1ull << UNITSTATE_ForceSpeedThrough);
+        mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
         ResumeFerryRoute();
         return 1;
       }

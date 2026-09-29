@@ -98,7 +98,7 @@ namespace moho
   {
     mTargetCarrier.ResetFromObject(carrier);
 
-    mUnit->UnitStateMask |= (1ull << UNITSTATE_TransportLoading);
+    mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_TransportLoading);
     mUnit->SetFocusEntity(mTargetCarrier.GetObjectPtr());
   }
 

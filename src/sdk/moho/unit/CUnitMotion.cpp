@@ -1,4 +1,5 @@
 #include "moho/unit/CUnitMotion.h"
+#include "legacy/math/X87Math.h"
 
 #include <algorithm>
 #include <cmath>
@@ -743,8 +744,8 @@ namespace moho
 
     void ClearMaintenanceCost(Unit* const unit) noexcept
     {
-      unit->SharedEconomyRateEnergy = 0.0f;
-      unit->SharedEconomyRateMass = 0.0f;
+      unit->mUnitVarDat.mMaintainenceCost.ENERGY = 0.0f;
+      unit->mUnitVarDat.mMaintainenceCost.MASS = 0.0f;
     }
   } // namespace
 
@@ -1286,7 +1287,7 @@ namespace moho
 
     const RUnitBlueprint* const blueprint = unit->GetBlueprint();
     if (blueprint && blueprint->Air.CanFly != 0u) {
-      unit->UnitStateMask &= ~kVerticalMotionStateMask;
+      unit->mUnitVarDat.mUnitStates &= ~kVerticalMotionStateMask;
     }
 
     Wm3::Vector3f normalizedSteeringVector = steeringVector;
@@ -1342,7 +1343,7 @@ namespace moho
 
     if (oldLayer == LAYER_Sub) {
       if (newLayer == LAYER_Water) {
-        unit->UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
+        unit->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
 
         const EUnitMotionVertEvent previousEvent = mVertEvent;
         if (previousEvent != UMVE_Up) {
@@ -1355,7 +1356,7 @@ namespace moho
         }
       }
     } else if (oldLayer == LAYER_Water && newLayer == LAYER_Sub) {
-      unit->UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown));
+      unit->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown));
       SetMotionVertEvent(UMVE_Down);
     }
 
@@ -2624,7 +2625,7 @@ namespace moho
       mSubElevation = newSubElevation;
       if (newSubElevation == 0.0f) {
         mUnit->SetCurrentLayer(mLayer);
-        mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
+        mUnit->mUnitVarDat.mUnitStates &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
         SetMotionVertEvent(UMVE_Top);
       }
       return true;
@@ -2637,7 +2638,7 @@ namespace moho
       } else {
         mSubElevation = diveDepthLimit;
         mUnit->SetCurrentLayer(mLayer);
-        mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown));
+        mUnit->mUnitVarDat.mUnitStates &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown));
         SetMotionVertEvent(UMVE_Bottom);
       }
       return true;
@@ -3752,7 +3753,7 @@ namespace moho
     switch (mCombatState) {
       case ACS_Combat:
       case ACS_NormalTurn: {
-        unit->UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_MakingAttackRun));
+        unit->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_MakingAttackRun));
 
         Entity* const rawTargetEntity = target.targetEntity.GetObjectPtr();
         bool wroteBombDropVelocity = false;
@@ -3811,7 +3812,7 @@ namespace moho
       }
 
       case ACS_BreakOff: {
-        unit->UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_MakingAttackRun));
+        unit->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_MakingAttackRun));
         mSustainedTurnTicks = 0;
         outDesiredVelocity.x = currentHeading.x * maxAirSpeed;
         outDesiredVelocity.y = currentHeading.y * maxAirSpeed;
@@ -3925,7 +3926,7 @@ namespace moho
               gpg::Rect2f skirt{};
               if (unit->PrepareMove(0, &mTargetPosition, &skirt, useWholeMap)) {
                 if (unit->IsUnitState(UNITSTATE_CannotFindPlaceToLand)) {
-                  unit->UnitStateMask &= ~(1ull << UNITSTATE_CannotFindPlaceToLand);
+                  unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_CannotFindPlaceToLand);
                   unit->UpdateSpeedThroughStatus();
                 }
 
@@ -3939,12 +3940,12 @@ namespace moho
                 mLayer = (landElevation <= waterElevation) ? LAYER_Water : LAYER_Land;
               } else {
                 mPreparationTick = static_cast<std::int32_t>(curTick);
-                unit->UnitStateMask |= (1ull << UNITSTATE_CannotFindPlaceToLand);
+                unit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_CannotFindPlaceToLand);
                 unit->UpdateSpeedThroughStatus();
               }
             } else {
               if (unit->IsUnitState(UNITSTATE_CannotFindPlaceToLand)) {
-                unit->UnitStateMask &= ~(1ull << UNITSTATE_CannotFindPlaceToLand);
+                unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_CannotFindPlaceToLand);
                 unit->UpdateSpeedThroughStatus();
               }
               enteredLandingPhase = true;
@@ -3978,7 +3979,7 @@ namespace moho
           // IAiCommandDispatchImpl::TaskTick from dispatching anything to the
           // aircraft -- 0x00598F99 tests state 42 and bails -- so it could
           // never be given a move order and never left the ground.
-          unit->UnitStateMask |= (1ull << UNITSTATE_MovingDown);
+          unit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_MovingDown);
           if (mHeight == gpg::pInf) {
             if (ShouldHoverInsteadOfLand() || mVertEvent == UMVE_Hover) {
               mNewElevation = air.TransportHoverHeight;
@@ -3994,7 +3995,7 @@ namespace moho
           mNewElevation = GetElevation();
           // 0x006BF7E3: `and [eax+4A0h], 0FFFFF7FFh` clears low bit 11,
           // UNITSTATE_MovingUp.
-          unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingUp);
+          unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_MovingUp);
         }
       } else {
         // 0x006BF3E9..0x006BF409: too far to be landing, so the fallback is a
@@ -4006,10 +4007,10 @@ namespace moho
         // 0x006BF422 / 0x006BF43B clear low bits 11 and 10 -- MovingUp then
         // MovingDown. Something far from its target is neither climbing to
         // reach it nor descending onto it.
-        unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingUp);
-        unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingDown);
+        unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_MovingUp);
+        unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_MovingDown);
         if (unit->IsUnitState(UNITSTATE_CannotFindPlaceToLand)) {
-          unit->UnitStateMask &= ~(1ull << UNITSTATE_CannotFindPlaceToLand);
+          unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_CannotFindPlaceToLand);
           unit->UpdateSpeedThroughStatus();
         }
       }
@@ -4083,8 +4084,8 @@ namespace moho
             unit->SetCurrentLayer(mLayer);
             // 0x006BFB5C / 0x006BFB75: low bits 11 and 10 again -- it has
             // arrived, so it is neither climbing nor descending.
-            unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingUp);
-            unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingDown);
+            unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_MovingUp);
+            unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_MovingDown);
 
             if (!ShouldHoverInsteadOfLand()) {
               SetMotionVertEvent(UMVE_Bottom);
@@ -4101,7 +4102,7 @@ namespace moho
             // 0x006BFC53: `or [eax+4A0h], 800h` -- low bit 11,
             // UNITSTATE_MovingUp. Coming off a deck or out of a hover is a
             // climb.
-            unit->UnitStateMask |= (1ull << UNITSTATE_MovingUp);
+            unit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_MovingUp);
           }
 
           if (mNewElevation > 0.0f && mCurElevation < mNewElevation * 0.5f) {
@@ -4114,7 +4115,7 @@ namespace moho
           }
         }
       }
-      unit->UnitStateMask &= ~(1ull << UNITSTATE_MakingAttackRun);
+      unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_MakingAttackRun);
 
       // ---- Steering / combat-target / motion-event dispatch ----------------
       CAiTarget combatTarget{};
@@ -4444,7 +4445,7 @@ namespace moho
         const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
 
         if (blueprint->Air.CanFly) {
-          if (mUnit->IsUnitState(UNITSTATE_Immobile) || mUnit->StunnedState) {
+          if (mUnit->IsUnitState(UNITSTATE_Immobile) || mUnit->mUnitVarDat.mStunTicks) {
             SetMotionHorzEvent(kUnitMotionHorzEventStopped);
             return TASKSTATUS_Wait;
           }
@@ -4454,7 +4455,7 @@ namespace moho
           return TASKSTATUS_Wait;
         }
 
-        if (mUnit->IsUnitState(UNITSTATE_Immobile) || mUnit->StunnedState) {
+        if (mUnit->IsUnitState(UNITSTATE_Immobile) || mUnit->mUnitVarDat.mStunTicks) {
           mFollowingWaypoint = nullptr;
           mNextWaypoint = nullptr;
 
@@ -4749,7 +4750,7 @@ namespace moho
       return;
     }
 
-    const float previousFuelRatio = unit->FuelRatio;
+    const float previousFuelRatio = unit->mUnitVarDat.mFuelRatio;
     float nextFuelRatio = previousFuelRatio;
 
     if (IsRefuelVertEvent(mVertEvent)) {
@@ -4772,8 +4773,8 @@ namespace moho
             if (mEconomyRequest->mGranted.energy >= mRepairConsumption.energy &&
                 mEconomyRequest->mGranted.mass >= mRepairConsumption.mass) {
               const SEconValue granted = TakeGrantedResourcesAndReset(mEconomyRequest);
-              unit->mBeatResourceAccumulators.resourcesSpentEnergy += granted.energy;
-              unit->mBeatResourceAccumulators.resourcesSpentMass += granted.mass;
+              unit->mUnitVarDat.mResourcesSpent.ENERGY += granted.energy;
+              unit->mUnitVarDat.mResourcesSpent.MASS += granted.mass;
               static_cast<Entity*>(unit)->AdjustHealth(
                 static_cast<Entity*>(stagingPlatform), stagingBlueprint->AI.RefuelingRepairAmount * kFuelTickScale
               );
@@ -4786,8 +4787,8 @@ namespace moho
             CSimArmyEconomyInfo* const economy = unit->ArmyRef ? unit->ArmyRef->GetEconomy() : nullptr;
             ReplaceEconomyRequestPointer(mEconomyRequest, CreateEconomyRequest(mRepairConsumption, economy));
 
-            unit->SharedEconomyRateEnergy = mRepairConsumption.energy;
-            unit->SharedEconomyRateMass = mRepairConsumption.mass;
+            unit->mUnitVarDat.mMaintainenceCost.ENERGY = mRepairConsumption.energy;
+            unit->mUnitVarDat.mMaintainenceCost.MASS = mRepairConsumption.mass;
           }
         }
       } else {
@@ -4818,6 +4819,6 @@ namespace moho
       }
     }
 
-    unit->FuelRatio = nextFuelRatio;
+    unit->mUnitVarDat.mFuelRatio = nextFuelRatio;
   }
 } // namespace moho

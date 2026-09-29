@@ -219,8 +219,8 @@ namespace moho
     , mUpgradedUnit{}
   {
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask |= kUpgradeOwnerLowMask;
-      mUnit->WorkProgress = 0.0f;
+      mUnit->mUnitVarDat.mUnitStates |= kUpgradeOwnerLowMask;
+      mUnit->mUnitVarDat.mWorkProgress = 0.0f;
     }
   }
 
@@ -242,9 +242,9 @@ namespace moho
       }
       mUnit->NeedSyncGameData = true;
 
-      mUnit->UnitStateMask &= ~kUpgradeOwnerLowMask;
-      mUnit->UnitStateMask &= ~kUpgradeOwnerHighMask;
-      mUnit->WorkProgress = 0.0f;
+      mUnit->mUnitVarDat.mUnitStates &= ~kUpgradeOwnerLowMask;
+      mUnit->mUnitVarDat.mUnitStates &= ~kUpgradeOwnerHighMask;
+      mUnit->mUnitVarDat.mWorkProgress = 0.0f;
     }
 
     Unit* const upgradedUnit = mUpgradedUnit.GetObjectPtr();
@@ -253,7 +253,7 @@ namespace moho
         mUnit->FootprintDown = false;
       }
       if (upgradedUnit != nullptr) {
-        upgradedUnit->UnitStateMask &= ~kUpgradeTargetHighMask;
+        upgradedUnit->mUnitVarDat.mUnitStates &= ~kUpgradeTargetHighMask;
       }
       mBuildHelper.OnStopBuild(true);
       if (mDispatchResult != nullptr) {
@@ -269,7 +269,7 @@ namespace moho
 
       if (mUnit != nullptr) {
         mUnit->ExecuteOccupyGround();
-        mUnit->UpgradedToEntityId = static_cast<EntId>(ToRaw(EEntityIdSentinel::Invalid));
+        mUnit->mUnitVarDat.mSelectionInheritorId = static_cast<EntId>(ToRaw(EEntityIdSentinel::Invalid));
       }
 
       mBuildHelper.OnStopBuild(false);
@@ -337,7 +337,7 @@ int CUnitUpgradeTask::TaskTick()
         return finishOrContinueBuild();
     }
 
-    if (mUnit == nullptr || mUnit->IsPaused) {
+    if (mUnit == nullptr || mUnit->mUnitVarDat.mIsPaused) {
       return 10;
     }
 
@@ -359,7 +359,7 @@ int CUnitUpgradeTask::TaskTick()
     // every upgrade half its own footprint toward -X/-Z - up and to the left
     // on screen - so the upgrade's placement mesh sat beside the structure it
     // was replacing and read as a second, duplicated building.
-    mUnit->UnitStateMask |= kUpgradeOwnerHighMask;
+    mUnit->mUnitVarDat.mUnitStates |= kUpgradeOwnerHighMask;
 
     SUnitConstructionParams params(
       static_cast<std::int32_t>(mUnit->mVarDat.mLayerMask),
@@ -386,19 +386,19 @@ int CUnitUpgradeTask::TaskTick()
       return -1;
     }
 
-    mUnit->UpgradedToEntityId = upgradedUnit->id_;
+    mUnit->mUnitVarDat.mSelectionInheritorId = upgradedUnit->id_;
     mUnit->FocusEntityRef.ResetObjectPtr<Entity>(upgradedUnit);
     if (mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
       mUnit->RunScript("OnAssignedFocusEntity");
     }
     mUnit->NeedSyncGameData = true;
 
-    if (upgradedUnit->FireState != mUnit->FireState) {
-      upgradedUnit->FireState = mUnit->FireState;
+    if (upgradedUnit->mUnitVarDat.mFireState != mUnit->mUnitVarDat.mFireState) {
+      upgradedUnit->mUnitVarDat.mFireState = mUnit->mUnitVarDat.mFireState;
       upgradedUnit->NeedSyncGameData = true;
     }
 
-    upgradedUnit->UnitStateMask |= kUpgradeTargetHighMask;
+    upgradedUnit->mUnitVarDat.mUnitStates |= kUpgradeTargetHighMask;
     mBuildHelper.SetFocus(upgradedUnit);
     mTaskState = AdvanceTaskState(mTaskState);
 

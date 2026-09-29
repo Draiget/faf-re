@@ -507,7 +507,7 @@ namespace moho
     }
 
     // Hold-fire clears the weapon target and waits.
-    if (mUnit->FireState == FIRESTATE_HoldFire) {
+    if (mUnit->mUnitVarDat.mFireState == FIRESTATE_HoldFire) {
       if (mWeapon != nullptr) {
         CAiTarget clearedTarget{};
         clearedTarget.targetPoint = -1;

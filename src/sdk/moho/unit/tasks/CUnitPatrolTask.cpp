@@ -274,7 +274,7 @@ namespace moho
 
     // Owner unit gains the patrol move-state bit (0x1000). The binary loads and
     // writes back the high dword unchanged, so the 64-bit mask stays intact.
-    unit->UnitStateMask |= static_cast<std::uint64_t>(0x1000u);
+    unit->mUnitVarDat.mUnitStates |= static_cast<std::uint64_t>(0x1000u);
 
     // Resolve the queue-head command and store it as the bound patrol command
     // (binary `this + 0x54`, the command the search-box builder later reads as
@@ -377,8 +377,8 @@ namespace moho
     // (4) Clear the two patrol move-state bits on the owner unit
     // (0x0061B1ED / 0x0061B206: `&= ~0x2000000` then `&= ~0x1000`; the binary's
     // read-back of the high dword is a no-op, so the 64-bit masks stay intact).
-    mUnit->UnitStateMask &= ~static_cast<std::uint64_t>(0x2000000u);
-    mUnit->UnitStateMask &= ~static_cast<std::uint64_t>(0x1000u);
+    mUnit->mUnitVarDat.mUnitStates &= ~static_cast<std::uint64_t>(0x2000000u);
+    mUnit->mUnitVarDat.mUnitStates &= ~static_cast<std::uint64_t>(0x1000u);
 
     // (5) Reset the owner unit's guarded position to the zero vector
     // (0x0061B21F..0x0061B250: three `movss` stores from the shared `vec0`

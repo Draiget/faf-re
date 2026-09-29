@@ -1496,13 +1496,13 @@ bool CAiSteeringImpl::ProcessSplineMovement()
   }
 
   if (mPausedForStateTransition == 0) {
-    if (IsUnitState(mOwnerUnit, UNITSTATE_Immobile) || mOwnerUnit->StunnedState != 0) {
+    if (IsUnitState(mOwnerUnit, UNITSTATE_Immobile) || mOwnerUnit->mUnitVarDat.mStunTicks != 0) {
       mPausedForStateTransition = 1;
       gpg::Warnf("[STEERDIAG] Stop() from %s", "site1506-immobile"); // TEMPORARY PROBE
       Stop();
       return false;
     }
-  } else if (!IsUnitState(mOwnerUnit, UNITSTATE_Immobile) && mOwnerUnit->StunnedState == 0) {
+  } else if (!IsUnitState(mOwnerUnit, UNITSTATE_Immobile) && mOwnerUnit->mUnitVarDat.mStunTicks == 0) {
     if (IsUnitState(mOwnerUnit, UNITSTATE_Moving) || IsUnitState(mOwnerUnit, UNITSTATE_Patrolling) ||
         IsUnitState(mOwnerUnit, UNITSTATE_Attacking)) {
       UpdatePath(GetVal(), mDestination, true);
@@ -1554,7 +1554,7 @@ bool CAiSteeringImpl::ProcessSplineMovement()
                    sim ? static_cast<int>(sim->mCurTick) : -1, static_cast<int>(mPausedForStateTransition), doPathRefresh ? 1 : 0,
                    mPath ? static_cast<int>(mPath->mCurrentNodeIndex) : -1, mPath ? static_cast<int>(mPath->mNodeCount) : -1,
                    motion ? static_cast<int>(motion->mIsBeingPushed) : -1,
-                   IsUnitState(mOwnerUnit, UNITSTATE_Immobile) ? 1 : 0, static_cast<int>(mOwnerUnit->StunnedState), seen + 1);
+                   IsUnitState(mOwnerUnit, UNITSTATE_Immobile) ? 1 : 0, static_cast<int>(mOwnerUnit->mUnitVarDat.mStunTicks), seen + 1);
       }
     }
     UpdateMotionPathPointers(*this);

@@ -383,7 +383,7 @@ namespace moho
       mIsTeleporter = transport->TransportIsTeleporter();
     }
 
-    mUnit->UnitStateMask |= kUnitStateMaskTransportLoading;
+    mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTransportLoading;
     RunUnitScript(mUnit, "OnStartTransportLoading");
   }
 
@@ -404,7 +404,7 @@ namespace moho
     if (mUnit != nullptr) {
       RunUnitScript(mUnit, "OnStopTransportLoading");
       mUnit->FreeOgridRect();
-      mUnit->UnitStateMask &= ~kUnitStateMaskTransportLoading;
+      mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTransportLoading;
 
       if (IAiTransport* const transport = mUnit->AiTransport; transport != nullptr) {
         transport->TransportClearWaitingFormation();
@@ -646,7 +646,7 @@ namespace moho
     switch (mTaskState) {
       case TASKSTATE_Preparing: {
         if (!mUnit->IsUnitState(UNITSTATE_AssistMoving) && !mUnit->IsUnitState(UNITSTATE_Ferrying)) {
-          mUnit->UnitStateMask |= kUnitStateMaskHoldingPattern;
+          mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskHoldingPattern;
 
           CUnitCommand* const ownerHeadCommand = mUnit->CommandQueue != nullptr ? mUnit->CommandQueue->GetCurrentCommand() : nullptr;
           for (Entity* const unitSlot : mRequestedUnits.mVec) {
@@ -680,7 +680,7 @@ namespace moho
             }
           }
 
-          mUnit->UnitStateMask &= ~kUnitStateMaskHoldingPattern;
+          mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskHoldingPattern;
         }
 
         DoTask();

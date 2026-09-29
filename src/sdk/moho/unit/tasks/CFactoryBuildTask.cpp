@@ -178,8 +178,8 @@ namespace moho
    */
   CFactoryBuildTask::~CFactoryBuildTask()
   {
-    mUnit->UnitStateMask &= ~(kUnitStateBuildingMask | kUnitStateBusyMask);
-    mUnit->WorkProgress = 0.0f;
+    mUnit->mUnitVarDat.mUnitStates &= ~(kUnitStateBuildingMask | kUnitStateBusyMask);
+    mUnit->mUnitVarDat.mWorkProgress = 0.0f;
 
     if (mTaskState == TASKSTATE_Complete) {
       mBuildHelper.OnStopBuild(true);
@@ -406,7 +406,7 @@ namespace moho
         if (!mUnit->CanStartBuilding(mBlueprint->Economy.BuildCostEnergy, mBlueprint->Economy.BuildCostMass)) {
           return 1;
         }
-        if (mUnit->IsPaused) {
+        if (mUnit->mUnitVarDat.mIsPaused) {
           return 10;
         }
 
@@ -433,9 +433,9 @@ namespace moho
           return 10;
         }
 
-        newUnit->SetFireState(mUnit->FireState);
+        newUnit->SetFireState(mUnit->mUnitVarDat.mFireState);
         mBuildHelper.SetFocus(newUnit);
-        mUnit->UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_Building));
+        mUnit->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_Building));
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
       }
         [[fallthrough]];
@@ -452,7 +452,7 @@ namespace moho
 
         Unit* const newUnit = mBuildHelper.mFocus.GetObjectPtr();
         mBuildHelper.OnStopBuild(true);
-        mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_Building));
+        mUnit->mUnitVarDat.mUnitStates &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_Building));
         // Waiting -> Starting, the step the finished unit earns. Without it the
         // next tick re-enters Waiting with a build helper whose focus has just
         // been released, `IsGood()` answers false, and the case below resets to
@@ -520,7 +520,7 @@ namespace moho
           mTaskState = TASKSTATE_Preparing;
           return 0;
         }
-        mUnit->WorkProgress = 0.0f;
+        mUnit->mUnitVarDat.mWorkProgress = 0.0f;
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
         return 1;
 

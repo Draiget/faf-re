@@ -382,7 +382,7 @@ namespace moho
 
     if (Entity* const targetEntity = mTargetEntity.GetObjectPtr(); targetEntity != nullptr) {
       if (Unit* const targetUnit = targetEntity->IsUnit(); targetUnit != nullptr) {
-        targetUnit->UnitStateMask &= ~kUnitStateNoReclaimMask;
+        targetUnit->mUnitVarDat.mUnitStates &= ~kUnitStateNoReclaimMask;
       }
     }
 
@@ -398,8 +398,8 @@ namespace moho
         (void)mUnit->RunScript(kOnAssignedFocusEntityScript);
       }
       mUnit->NeedSyncGameData = true;
-      mUnit->UnitStateMask &= ~kUnitStateReclaimingMask;
-      mUnit->WorkProgress = 0.0f;
+      mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateReclaimingMask;
+      mUnit->mUnitVarDat.mWorkProgress = 0.0f;
     }
 
     DestroyEconomyRequestPointer(mConsumptionData);
@@ -432,7 +432,7 @@ namespace moho
         (void)mUnit->RunScript(kOnAssignedFocusEntityScript);
       }
       mUnit->NeedSyncGameData = true;
-      mUnit->WorkProgress = 0.0f;
+      mUnit->mUnitVarDat.mWorkProgress = 0.0f;
     }
 
     mTargetHasNoMotor = (commandTargetEntity == nullptr);
@@ -608,7 +608,7 @@ namespace moho
           return -1;
         }
 
-        mUnit->UnitStateMask |= kUnitStateReclaimingMask;
+        mUnit->mUnitVarDat.mUnitStates |= kUnitStateReclaimingMask;
         mUnit->SetFocusEntity(targetEntity);
 
         float reclaimHealthDelta = targetEntity->mVarDat.mMaxHealth / reclaimCosts.reclaimTime;
@@ -634,7 +634,7 @@ namespace moho
         } else {
           targetEntity->AdjustHealth(nullptr, -reclaimHealthDelta);
           if (targetUnit != nullptr) {
-            targetUnit->UnitStateMask |= kUnitStateNoReclaimMask;
+            targetUnit->mUnitVarDat.mUnitStates |= kUnitStateNoReclaimMask;
           }
         }
 
@@ -667,7 +667,7 @@ namespace moho
           mReclaimPerSecond.mass = std::max(reclaimCosts.reclaimMass, 0.0f) * reclaimRate;
 
           mTaskState = NextTaskState(mTaskState);
-          mUnit->UnitStateMask |= kUnitStateReclaimingMask;
+          mUnit->mUnitVarDat.mUnitStates |= kUnitStateReclaimingMask;
 
           const float previousFraction = targetEntity->mVarDat.mFractionComplete;
           const float completionFromHealth = targetEntity->mVarDat.mHealth / targetEntity->mVarDat.mMaxHealth;
@@ -696,7 +696,7 @@ namespace moho
 
         const float limitingRate = mConsumptionData->LimitingRate();
         float appliedFractionDelta = 0.0f;
-        float reclaimWorkProgress = mUnit->WorkProgress;
+        float reclaimWorkProgress = mUnit->mUnitVarDat.mWorkProgress;
         PausedPropReclaimOverride pausedOverride{};
         if (targetUnit != nullptr) {
           appliedFractionDelta = targetEntity->Materialize(mReclaimRate * limitingRate);
@@ -711,7 +711,7 @@ namespace moho
           reclaimWorkProgress = 1.0f - targetEntity->mVarDat.mFractionComplete;
         } else if (targetEntity != nullptr) {
           if (Prop* const propTarget = targetEntity->IsProp(); propTarget != nullptr) {
-            if (mUnit->IsPaused) {
+            if (mUnit->mUnitVarDat.mIsPaused) {
               pausedOverride.active = true;
               pausedOverride.savedReclaimRate = mReclaimRate;
               pausedOverride.savedReclaimPerSecond = mReclaimPerSecond;
@@ -725,7 +725,7 @@ namespace moho
           }
         }
 
-        mUnit->WorkProgress = reclaimWorkProgress;
+        mUnit->mUnitVarDat.mWorkProgress = reclaimWorkProgress;
         AwardReclaimedResources(mUnit, appliedFractionDelta, mReclaimRate, mReclaimPerSecond);
 
         if (pausedOverride.active) {

@@ -103,7 +103,7 @@ namespace moho
 
     if (mUnit->SimulationRef != nullptr && mUnit->SimulationRef->mEntityDB != nullptr) {
       mUnit->SimulationRef->mEntityDB->RegisterEntitySet(mTrackedUnits);
-      mUnit->UnitStateMask |= kUnitStateMaskCarrierRetrieve;
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskCarrierRetrieve;
     }
   }
 
@@ -139,7 +139,7 @@ namespace moho
     if (mUnit != nullptr) {
       (void)mUnit->RunScript("OnStopTransportLoading");
       mUnit->AiTransport->TransportResetReservation();
-      mUnit->UnitStateMask &= ~kUnitStateMaskCarrierRetrieve;
+      mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskCarrierRetrieve;
     }
 
     if (mRetrievalComplete) {

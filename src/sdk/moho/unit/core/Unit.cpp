@@ -1,5 +1,6 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/unit/core/Unit.h"
+#include "legacy/math/X87Math.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiNavigatorImpl.h"
 
@@ -1219,7 +1220,8 @@ namespace
   constexpr const char* kUnitOnProductionInactiveScript = "OnProductionInActive";
   constexpr const char* kUnitLuaClassName = "Unit";
   constexpr const char* kGlobalLuaClassName = "<global>";
-  constexpr std::uintptr_t kInvalidWeakCommandSentinel = 4u;
+  // A weak command link that decodes to its own owner-link offset has no owner (4 on x86).
+  constexpr std::uintptr_t kInvalidWeakCommandSentinel = WeakPtr<CUnitCommand>::kOwnerLinkOffset;
 
   [[nodiscard]] bool BlueprintHasOccupancyCaps(const REntityBlueprint* const blueprint, const std::uint8_t caps) noexcept
   {
@@ -2485,7 +2487,7 @@ msvc8::list<msvc8::string> moho::ARMOR_GetArmorDefinations(
  */
 void Unit::SetStunnedStateRaw(const std::int32_t stunnedState) noexcept
 {
-  StunnedState = stunnedState;
+  mUnitVarDat.mStunTicks = stunnedState;
 }
 
 /**
@@ -2496,7 +2498,7 @@ void Unit::SetStunnedStateRaw(const std::int32_t stunnedState) noexcept
  */
 void Unit::SetOverchargePausedFlag(const bool paused) noexcept
 {
-  OverchargePaused = paused;
+  mUnitVarDat.mOverchargePaused = paused;
 }
 
 /**
@@ -2507,7 +2509,7 @@ void Unit::SetOverchargePausedFlag(const bool paused) noexcept
  */
 bool Unit::IsOverchargePausedFlag() const noexcept
 {
-  return OverchargePaused;
+  return mUnitVarDat.mOverchargePaused;
 }
 
 /**
@@ -2529,7 +2531,7 @@ bool Unit::IsConsumptionActiveFlag() const noexcept
  */
 bool Unit::IsValidTargetFlag() const noexcept
 {
-  return IsValidTarget;
+  return mUnitVarDat.mIsValidTarget;
 }
 
 /**
@@ -2540,7 +2542,7 @@ bool Unit::IsValidTargetFlag() const noexcept
  */
 void Unit::SetIsValidTargetFlag(const bool validTarget) noexcept
 {
-  IsValidTarget = validTarget;
+  mUnitVarDat.mIsValidTarget = validTarget;
 }
 
 /**
@@ -2551,7 +2553,7 @@ void Unit::SetIsValidTargetFlag(const bool validTarget) noexcept
  */
 float Unit::GetShieldRatioRaw() const noexcept
 {
-  return ShieldRatio;
+  return mUnitVarDat.mShieldRatio;
 }
 
 /**
@@ -2562,7 +2564,7 @@ float Unit::GetShieldRatioRaw() const noexcept
  */
 void Unit::SetShieldRatioRaw(const float shieldRatio) noexcept
 {
-  ShieldRatio = shieldRatio;
+  mUnitVarDat.mShieldRatio = shieldRatio;
 }
 
 /**
@@ -5386,7 +5388,7 @@ int moho::cfunc_GetScriptBitL(LuaPlus::LuaState* const state)
       }
 
       const std::uint32_t bitShift = static_cast<std::uint32_t>(bitIndex);
-      const std::int64_t scriptBits = static_cast<std::int64_t>(static_cast<std::int32_t>(unit->ScriptBitMask));
+      const std::int64_t scriptBits = static_cast<std::int64_t>(static_cast<std::int32_t>(unit->mUnitVarDat.mScriptbits));
       const std::int64_t scriptBitMask = bitShift < 64u ? static_cast<std::int64_t>(1ull << bitShift) : 0;
       if ((scriptBits & scriptBitMask) != 0) {
         hasBitSet = true;
@@ -5532,7 +5534,7 @@ int moho::cfunc_UnitIsStunnedL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   const Unit* const unit = GetUnitOptional(unitObject);
-  const bool isStunned = (unit == nullptr) || (unit->StunnedState != 0);
+  const bool isStunned = (unit == nullptr) || (unit->mUnitVarDat.mStunTicks != 0);
   lua_pushboolean(rawState, isStunned ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
@@ -5635,7 +5637,7 @@ int moho::cfunc_UnitIsPausedL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   const Unit* const unit = GetUnitOptional(unitObject);
-  lua_pushboolean(rawState, (unit != nullptr && unit->IsPaused) ? 1 : 0);
+  lua_pushboolean(rawState, (unit != nullptr && unit->mUnitVarDat.mIsPaused) ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -7088,7 +7090,7 @@ int moho::cfunc_UnitSetWorkProgressL(LuaPlus::LuaState* const state)
     progressArg.TypeError("number");
   }
 
-  unit->WorkProgress = static_cast<float>(lua_tonumber(rawState, 2));
+  unit->mUnitVarDat.mWorkProgress = static_cast<float>(lua_tonumber(rawState, 2));
   return 0;
 }
 
@@ -7138,7 +7140,7 @@ int moho::cfunc_UnitGetWorkProgressL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
-  lua_pushnumber(rawState, unit->WorkProgress);
+  lua_pushnumber(rawState, unit->mUnitVarDat.mWorkProgress);
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -7220,9 +7222,9 @@ int moho::cfunc_UnitSetBusyL(LuaPlus::LuaState* const state)
 
   constexpr std::uint64_t kBusyStateMask = 0x0000000000002000ull;
   if (shouldBeBusy) {
-    unit->UnitStateMask |= kBusyStateMask;
+    unit->mUnitVarDat.mUnitStates |= kBusyStateMask;
   } else {
-    unit->UnitStateMask &= ~kBusyStateMask;
+    unit->mUnitVarDat.mUnitStates &= ~kBusyStateMask;
   }
 
   return 0;
@@ -7280,9 +7282,9 @@ int moho::cfunc_UnitSetBlockCommandQueueL(LuaPlus::LuaState* const state)
 
   constexpr std::uint64_t kBlockCommandQueueMask = 0x0000040000000000ull;
   if (shouldBlock) {
-    unit->UnitStateMask |= kBlockCommandQueueMask;
+    unit->mUnitVarDat.mUnitStates |= kBlockCommandQueueMask;
   } else {
-    unit->UnitStateMask &= ~kBlockCommandQueueMask;
+    unit->mUnitVarDat.mUnitStates &= ~kBlockCommandQueueMask;
   }
 
 
@@ -7342,9 +7344,9 @@ int moho::cfunc_UnitSetImmobileL(LuaPlus::LuaState* const state)
 
   constexpr std::uint64_t kImmobileMask = 0x0000000000000002ull;
   if (shouldSetImmobile) {
-    unit->UnitStateMask |= kImmobileMask;
+    unit->mUnitVarDat.mUnitStates |= kImmobileMask;
   } else {
-    unit->UnitStateMask &= ~kImmobileMask;
+    unit->mUnitVarDat.mUnitStates &= ~kImmobileMask;
   }
 
   return 0;
@@ -7404,9 +7406,9 @@ int moho::cfunc_UnitSetUnSelectableL(LuaPlus::LuaState* const state)
   // TEMPORARY PROBE -- warp-in triage, delete when resolved.
   gpg::Warnf("[WARPDIAG] SetUnSelectable unit=%p flag=%d", static_cast<void*>(unit), shouldSetUnSelectable ? 1 : 0);
   if (shouldSetUnSelectable) {
-    unit->UnitStateMask |= kUnSelectableMask;
+    unit->mUnitVarDat.mUnitStates |= kUnSelectableMask;
   } else {
-    unit->UnitStateMask &= ~kUnSelectableMask;
+    unit->mUnitVarDat.mUnitStates &= ~kUnSelectableMask;
   }
 
   return 0;
@@ -7465,9 +7467,9 @@ int moho::cfunc_UnitSetDoNotTargetL(LuaPlus::LuaState* const state)
 
   constexpr std::uint64_t kDoNotTargetMask = 0x0000000400000000ull;
   if (shouldSetDoNotTarget) {
-    unit->UnitStateMask |= kDoNotTargetMask;
+    unit->mUnitVarDat.mUnitStates |= kDoNotTargetMask;
   } else {
-    unit->UnitStateMask &= ~kDoNotTargetMask;
+    unit->mUnitVarDat.mUnitStates &= ~kDoNotTargetMask;
   }
 
   return 0;
@@ -7577,7 +7579,7 @@ int moho::cfunc_UnitSetIsValidTargetL(LuaPlus::LuaState* const state)
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
   const LuaPlus::LuaStackObject validTargetArg(state, 2);
-  unit->IsValidTarget = validTargetArg.GetBoolean();
+  unit->mUnitVarDat.mIsValidTarget = validTargetArg.GetBoolean();
   return 0;
 }
 
@@ -7629,7 +7631,7 @@ int moho::cfunc_UnitIsValidTargetL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  lua_pushboolean(rawState, unit->IsValidTarget ? 1 : 0);
+  lua_pushboolean(rawState, unit->mUnitVarDat.mIsValidTarget ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -7851,7 +7853,7 @@ int moho::cfunc_UnitSetStunnedL(LuaPlus::LuaState* const state)
     timeArg.TypeError("number");
   }
 
-  unit->StunnedState = static_cast<std::int32_t>(lua_tonumber(rawState, 2) * 10.0);
+  unit->mUnitVarDat.mStunTicks = static_cast<std::int32_t>(lua_tonumber(rawState, 2) * 10.0);
   return 0;
 }
 
@@ -7918,9 +7920,9 @@ int moho::cfunc_UnitSetUnitStateL(LuaPlus::LuaState* const state)
     if (bit >= 0 && bit < 64) {
       const std::uint64_t mask = 1ull << static_cast<std::uint32_t>(bit);
       if (enabled) {
-        unit->UnitStateMask |= mask;
+        unit->mUnitVarDat.mUnitStates |= mask;
       } else {
-        unit->UnitStateMask &= ~mask;
+        unit->mUnitVarDat.mUnitStates &= ~mask;
       }
     }
   }
@@ -7992,7 +7994,7 @@ int moho::cfunc_UnitGetScriptBitL(LuaPlus::LuaState* const state)
 
   const int bitIndex = ScriptBitIndexFromToggleCapValue(toggleCapValue);
   const std::uint32_t mask = 1u << static_cast<std::uint32_t>(bitIndex);
-  lua_pushboolean(rawState, (unit->ScriptBitMask & mask) != 0u ? 1 : 0);
+  lua_pushboolean(rawState, (unit->mUnitVarDat.mScriptbits & mask) != 0u ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -8061,7 +8063,7 @@ int moho::cfunc_UnitSetScriptBitL(LuaPlus::LuaState* const state)
   if (toggleCapValue >= 1 && toggleCapValue <= 0x100) {
     const int bitIndex = ScriptBitIndexFromToggleCapValue(toggleCapValue);
     const std::uint32_t mask = 1u << static_cast<std::uint32_t>(bitIndex);
-    const bool currentlySet = (unit->ScriptBitMask & mask) != 0u;
+    const bool currentlySet = (unit->mUnitVarDat.mScriptbits & mask) != 0u;
     if (currentlySet != enabled) {
       unit->ToggleScriptBit(bitIndex);
     }
@@ -8184,7 +8186,7 @@ int moho::cfunc_UnitToggleFireStateL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  const std::int32_t nextFireState = (unit->FireState + 1) % 3;
+  const std::int32_t nextFireState = (unit->mUnitVarDat.mFireState + 1) % 3;
   unit->SetFireState(nextFireState);
   return 0;
 }
@@ -8243,8 +8245,8 @@ int moho::cfunc_UnitSetFireStateL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  std::int32_t parsedFireState = unit->FireState;
-  if (ParseFireStateLexical(fireStateLexical, parsedFireState) && unit->FireState != parsedFireState) {
+  std::int32_t parsedFireState = unit->mUnitVarDat.mFireState;
+  if (ParseFireStateLexical(fireStateLexical, parsedFireState) && unit->mUnitVarDat.mFireState != parsedFireState) {
     unit->SetFireState(parsedFireState);
   }
 
@@ -8297,7 +8299,7 @@ int moho::cfunc_UnitGetFireStateL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
-  lua_pushnumber(rawState, static_cast<float>(unit->FireState));
+  lua_pushnumber(rawState, static_cast<float>(unit->mUnitVarDat.mFireState));
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -8435,7 +8437,7 @@ int moho::cfunc_UnitAddBuildRestrictionL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
   const EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
 
-  EntityCategorySet& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
+  EntityCategorySet& restrictionWords = unit->GetAttributes().restrictionCategory;
   (void)EntityCategory::Add(&restrictionWords, categorySet);
   unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
@@ -8493,7 +8495,7 @@ int moho::cfunc_UnitRemoveBuildRestrictionL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
   const EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
 
-  EntityCategorySet& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
+  EntityCategorySet& restrictionWords = unit->GetAttributes().restrictionCategory;
   AsCategoryWordBitset(restrictionWords).RemoveAllFrom(&categorySet->Bits());
   unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
@@ -8547,7 +8549,7 @@ int moho::cfunc_UnitRestoreBuildRestrictionsL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  EntityCategorySet& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
+  EntityCategorySet& restrictionWords = unit->GetAttributes().restrictionCategory;
   ResetCategoryWordRange(restrictionWords);
   unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
@@ -9247,7 +9249,7 @@ int moho::cfunc_UnitSetOverchargePausedL(LuaPlus::LuaState* const state)
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
   const LuaPlus::LuaStackObject pausedArg(state, 2);
-  unit->OverchargePaused = pausedArg.GetBoolean();
+  unit->mUnitVarDat.mOverchargePaused = pausedArg.GetBoolean();
   return 0;
 }
 
@@ -9299,7 +9301,7 @@ int moho::cfunc_UnitIsOverchargePausedL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  lua_pushboolean(rawState, unit->OverchargePaused ? 1 : 0);
+  lua_pushboolean(rawState, unit->mUnitVarDat.mOverchargePaused ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -9595,7 +9597,7 @@ int moho::cfunc_UnitGetFuelRatioL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, "Unit has not motion object");
   }
 
-  lua_pushnumber(rawState, unit->FuelRatio);
+  lua_pushnumber(rawState, unit->mUnitVarDat.mFuelRatio);
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -9716,7 +9718,7 @@ int moho::cfunc_UnitSetFuelRatioL(LuaPlus::LuaState* const state)
     fuelRatioArg.TypeError("number");
   }
 
-  unit->FuelRatio = static_cast<float>(lua_tonumber(rawState, 2));
+  unit->mUnitVarDat.mFuelRatio = static_cast<float>(lua_tonumber(rawState, 2));
   return 0;
 }
 
@@ -9767,7 +9769,7 @@ int moho::cfunc_UnitGetShieldRatioL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  lua_pushnumber(rawState, unit->ShieldRatio);
+  lua_pushnumber(rawState, unit->mUnitVarDat.mShieldRatio);
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -10916,16 +10918,8 @@ int moho::cfunc_UnitSetShieldRatioL(LuaPlus::LuaState* const state)
     ratioArg.TypeError("number");
   }
 
-  unit->ShieldRatio = static_cast<float>(lua_tonumber(rawState, 2));
+  unit->mUnitVarDat.mShieldRatio = static_cast<float>(lua_tonumber(rawState, 2));
   return 0;
-}
-
-void SBeatResourceAccumulators::Clear() noexcept
-{
-  maintenanceEnergy = 0.0f;
-  maintenanceMass = 0.0f;
-  resourcesSpentEnergy = 0.0f;
-  resourcesSpentMass = 0.0f;
 }
 
 bool Unit::NeedsKillCleanup() const noexcept
@@ -10935,7 +10929,8 @@ bool Unit::NeedsKillCleanup() const noexcept
 
 void Unit::ClearBeatResourceAccumulators() noexcept
 {
-  mBeatResourceAccumulators.Clear();
+  mUnitVarDat.mProduced = {};
+  mUnitVarDat.mResourcesSpent = {};
 }
 
 CIntel* Unit::GetIntelManager() noexcept
@@ -11568,15 +11563,15 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   }
 
   // 4) Repeat-queue state transfer + OnStart/OnStopRepeatQueue script dispatch.
-  const bool sourceRepeat = source->RepeatQueueEnabled;
+  const bool sourceRepeat = source->mUnitVarDat.mRepeatQueue;
   if (sourceRepeat) {
-    if (!dest->RepeatQueueEnabled) {
+    if (!dest->mUnitVarDat.mRepeatQueue) {
       dest->RunScript("OnStartRepeatQueue");
     }
-  } else if (dest->RepeatQueueEnabled) {
+  } else if (dest->mUnitVarDat.mRepeatQueue) {
     dest->RunScript("OnStopRepeatQueue");
   }
-  dest->RepeatQueueEnabled = sourceRepeat;
+  dest->mUnitVarDat.mRepeatQueue = sourceRepeat;
   dest->mVarDat.mRequestRefreshUI = 1;
 
   // 5) Health ratio transfer.
@@ -12610,12 +12605,12 @@ SSTIUnitVariableData& SSTIUnitVariableData::AssignFrom(const SSTIUnitVariableDat
 
 SSTIUnitVariableData& Unit::VarDat() noexcept
 {
-  return *reinterpret_cast<SSTIUnitVariableData*>(mVarDatHead);
+  return mUnitVarDat;
 }
 
 SSTIUnitVariableData const& Unit::VarDat() const noexcept
 {
-  return *reinterpret_cast<SSTIUnitVariableData const*>(mVarDatHead);
+  return mUnitVarDat;
 }
 
 /**
@@ -12865,8 +12860,8 @@ void Unit::HandleResourceManagement()
     SEconValue withdrawn{};
     WithdrawFromGrantedEconValue(withdrawn, *mConsumptionData, desiredConsumption);
 
-    mBeatResourceAccumulators.resourcesSpentEnergy += withdrawn.energy;
-    mBeatResourceAccumulators.resourcesSpentMass += withdrawn.mass;
+    mUnitVarDat.mResourcesSpent.ENERGY += withdrawn.energy;
+    mUnitVarDat.mResourcesSpent.MASS += withdrawn.mass;
   }
 
   if (mVarDat.mIsBeingBuilt || IsDead() || !ProductionActive) {
@@ -12890,7 +12885,7 @@ void Unit::HandleResourceManagement()
   }
 
   SEconValue producedThisTick{
-    Attributes.productionPerSecondEnergy * productionRate, Attributes.productionPerSecondMass * productionRate
+    mUnitVarDat.mAttributes.productionPerSecondEnergy * productionRate, mUnitVarDat.mAttributes.productionPerSecondMass * productionRate
   };
   producedThisTick.energy *= 0.1f;
   producedThisTick.mass *= 0.1f;
@@ -12900,8 +12895,8 @@ void Unit::HandleResourceManagement()
   economyInfo->mResources.MASS += producedThisTick.mass;
   economyInfo->mPendingResources.ENERGY += producedThisTick.energy;
   economyInfo->mPendingResources.MASS += producedThisTick.mass;
-  mBeatResourceAccumulators.maintenanceEnergy += producedThisTick.energy;
-  mBeatResourceAccumulators.maintenanceMass += producedThisTick.mass;
+  mUnitVarDat.mProduced.ENERGY += producedThisTick.energy;
+  mUnitVarDat.mProduced.MASS += producedThisTick.mass;
 }
 
 /**
@@ -13017,8 +13012,8 @@ int Unit::MotionTick()
   UpdateGuardFormation();
   UpdateInfoCache();
 
-  if (StunnedState > 0) {
-    --StunnedState;
+  if (mUnitVarDat.mStunTicks > 0) {
+    --mUnitVarDat.mStunTicks;
   }
 
   const int motionResult =
@@ -13030,7 +13025,7 @@ int Unit::MotionTick()
 
   AniActor->UpdateManipulators(mPendingTransform);
 
-  mIsBusy = mAttachInfo.HasAttachTarget();
+  mUnitVarDat.mIsBusy = mAttachInfo.HasAttachTarget();
 
   if (!mVarDat.mIsBeingBuilt) {
     if (mVarDat.mMaxHealth > mVarDat.mHealth && GetAttributes().regenRate > 0.0f) {
@@ -13082,11 +13077,6 @@ int Unit::MotionTick()
  */
 Unit::Unit(Sim* sim) : IUnit(), Entity(sim, ENTITYTYPE_Unit)
 {
-  // mConstDat is a real member and default-constructs automatically. The
-  // variable stat-data subobject at +0x288 is flattened into Unit's field list
-  // (see VarDat()), so construct it in place through the typed accessor.
-  new (&VarDat()) SSTIUnitVariableData();
-
   UnitMotion = nullptr;
   CommandQueue = nullptr;
   CreatorRef = {};
@@ -13221,8 +13211,6 @@ Unit::Unit(const SUnitConstructionParams& params)
       ENTITYTYPE_Unit
     )
 {
-  new (&VarDat()) SSTIUnitVariableData();
-
   Sim* const sim = SimulationRef;
   const RUnitBlueprint& blueprint = *params.mBlueprint;
 
@@ -13322,9 +13310,8 @@ Unit::Unit(const SUnitConstructionParams& params)
   mVarDat.mIntelAttributes.Initialize(&blueprint);
 
   VarDat().mCreator = params.mLinkSourceUnit != nullptr ? params.mLinkSourceUnit->id_ : kNoCreatorEntityId;
-  // Constructed in place over the unit's own attribute lane (unit+0x428),
-  // which is VarDat().mAttributes.
-  new (&Attributes) UnitAttributes(&blueprint, static_cast<const RRuleGameRulesImpl*>(sim->mRules));
+  // Constructed in place over the unit's own attribute lane (unit+0x428).
+  new (&mUnitVarDat.mAttributes) UnitAttributes(&blueprint, static_cast<const RRuleGameRulesImpl*>(sim->mRules));
   VarDat().mCreationTick = sim->mCurTick;
 
   SetAutoMode(blueprint.AI.InitialAutoMode != 0);
@@ -13478,7 +13465,7 @@ Unit::Unit(const SUnitConstructionParams& params)
     params.mLinkSourceUnit != nullptr ? params.mLinkSourceUnit->GetLuaObject() : GetLuaObject();
 
   if (params.mComplete == 0) {
-    UnitStateMask |= kUnitStateBeingBuilt;
+    mUnitVarDat.mUnitStates |= kUnitStateBeingBuilt;
     mVarDat.mIsBeingBuilt = 1;
     if (armyStats != nullptr) {
       IncrementArmyBlueprintFloatStat(armyStats, "Units_BeingBuilt", &blueprint, 1.0f);
@@ -14139,7 +14126,7 @@ bool Unit::IsMeleeUnit() const noexcept
  */
 std::int32_t Unit::GetFireStateValue() const noexcept
 {
-  return FireState;
+  return mUnitVarDat.mFireState;
 }
 
 /**
@@ -14150,7 +14137,7 @@ std::int32_t Unit::GetFireStateValue() const noexcept
  */
 EntId Unit::SetUpgradedToEntityId(const EntId upgradedToEntityId) noexcept
 {
-  UpgradedToEntityId = upgradedToEntityId;
+  mUnitVarDat.mSelectionInheritorId = upgradedToEntityId;
   return upgradedToEntityId;
 }
 
@@ -14483,7 +14470,7 @@ bool Unit::AttachTo(const SEntAttachInfo& attachInfo)
 
   if (IsMobile()) {
     UnitMotion->NotifyAttached(attachInfo);
-    UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_Attached));
+    mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_Attached));
   }
 
   TransportLoadFactor = -1.0f;
@@ -14506,7 +14493,7 @@ bool Unit::DetachFrom(Entity* const parent, const bool skipBallistic)
 
   if (IsMobile()) {
     UnitMotion->NotifyDetached(parent, skipBallistic);
-    UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_Attached));
+    mUnitVarDat.mUnitStates &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_Attached));
   }
 
   TransportLoadFactor = -1.0f;
@@ -14872,7 +14859,7 @@ Unit* Unit::FindPlatform()
   if (!GetBlueprint()->Air.CanFly) {
     return nullptr;
   }
-  if (UnitMotion != nullptr && FuelRatio < 0.0f) {
+  if (UnitMotion != nullptr && mUnitVarDat.mFuelRatio < 0.0f) {
     return nullptr;
   }
   if ((GetAttributes().commandCapsMask & 0x400000u) == 0u) {
@@ -14886,7 +14873,7 @@ Unit* Unit::FindPlatform()
   }
 
   // Need refuel: threshold ratio exceeds current fuel ratio.
-  const float fuelRatio = FuelRatio;
+  const float fuelRatio = mUnitVarDat.mFuelRatio;
   bool needsService = false;
   if (CSimConVarBase* const needRefuelDef = &moho::gSimConVar_NeedRefuelThresholdRatio;
       needRefuelDef != nullptr) {
@@ -15036,7 +15023,7 @@ void Unit::Warp(const VTransform& transform)
 
   const Sim* const sim = SimulationRef;
   const STIMap* const mapData = sim ? sim->mMapData : nullptr;
-  warpedTransform.pos_.y = IUnit::CalcSpawnElevation(mapData, startingLayer, warpedTransform, Attributes);
+  warpedTransform.pos_.y = IUnit::CalcSpawnElevation(mapData, startingLayer, warpedTransform, mUnitVarDat.mAttributes);
 
   if (UnitMotion != nullptr) {
     UnitMotion->Warp(warpedTransform);
@@ -15063,7 +15050,7 @@ bool Unit::IsUnitState(const EUnitState state) const
   if (bit >= 64u) {
     return false;
   }
-  return (UnitStateMask & (1ull << bit)) != 0ull;
+  return (mUnitVarDat.mUnitStates & (1ull << bit)) != 0ull;
 }
 
 /**
@@ -16257,13 +16244,13 @@ bool Unit::CanReserveOgridRect(const gpg::Rect2i& ogridRect)
 // 0x006A4990
 UnitAttributes& Unit::GetAttributes()
 {
-  return Attributes;
+  return mUnitVarDat.mAttributes;
 }
 
 // 0x006A4980
 UnitAttributes const& Unit::GetAttributes() const
 {
-  return Attributes;
+  return mUnitVarDat.mAttributes;
 }
 
 // 0x006A4B90
@@ -16298,7 +16285,7 @@ StatItem* Unit::GetStat(gpg::StrArg name)
  */
 void Unit::SetAutoMode(const bool enabled)
 {
-  AutoMode = enabled;
+  mUnitVarDat.mAutoMode = enabled;
   CallbackStr(enabled ? "OnAutoModeOn" : "OnAutoModeOff");
 }
 
@@ -16310,7 +16297,7 @@ void Unit::SetAutoMode(const bool enabled)
  */
 void Unit::SetAutoSurfaceMode(const bool enabled)
 {
-  AutoSurfaceMode = enabled;
+  mUnitVarDat.mAutoSurfaceMode = enabled;
 }
 
 /**
@@ -16321,7 +16308,7 @@ void Unit::SetAutoSurfaceMode(const bool enabled)
  */
 bool Unit::IsAutoMode() const
 {
-  return AutoMode;
+  return mUnitVarDat.mAutoMode;
 }
 
 /**
@@ -16332,7 +16319,7 @@ bool Unit::IsAutoMode() const
  */
 bool Unit::IsAutoSurfaceMode() const
 {
-  return AutoSurfaceMode;
+  return mUnitVarDat.mAutoSurfaceMode;
 }
 
 /**
@@ -16343,7 +16330,7 @@ bool Unit::IsAutoSurfaceMode() const
  */
 void Unit::SetCustomName(const std::string name)
 {
-  CustomName = name.c_str();
+  mUnitVarDat.mCustomName = name.c_str();
 }
 
 /**
@@ -16354,7 +16341,7 @@ void Unit::SetCustomName(const std::string name)
  */
 std::string Unit::GetCustomName() const
 {
-  return std::string(CustomName.c_str(), CustomName.size());
+  return std::string(mUnitVarDat.mCustomName.c_str(), mUnitVarDat.mCustomName.size());
 }
 
 /**
@@ -16517,7 +16504,7 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
   // unit-cap walk skips on, so a unit stops counting against the cap the moment
   // it starts dying. Read as a low-dword write it came out as state 9,
   // UNITSTATE_TransportUnloading, which every corpse then carried.
-  UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_NoCost));
+  mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_NoCost));
 
   SEntitySetTemplateUnit overlappingStructures{};
   if (!IsMobile()) {
@@ -16533,7 +16520,7 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
     excessDamageRatio = 10.0f;
   }
 
-  if (IsBeingBuilt() && WorkProgress < 0.5f) {
+  if (IsBeingBuilt() && mUnitVarDat.mWorkProgress < 0.5f) {
     excessDamageRatio = 10.0f;
   }
 
@@ -16568,8 +16555,8 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
   float massValue = (blueprint != nullptr) ? blueprint->Economy.BuildCostMass : 0.0f;
   float energyValue = (blueprint != nullptr) ? blueprint->Economy.BuildCostEnergy : 0.0f;
   if (IsBeingBuilt()) {
-    massValue *= WorkProgress;
-    energyValue *= WorkProgress;
+    massValue *= mUnitVarDat.mWorkProgress;
+    energyValue *= mUnitVarDat.mWorkProgress;
   }
 
   if (ArmyRef != nullptr) {
@@ -16599,7 +16586,7 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
   if (Unit* const instigatorUnit = instigator->IsUnit(); instigatorUnit != nullptr && instigatorUnit->ArmyRef != nullptr) {
     ESquadClass instigatorSquadClass = ESquadClass::Unassigned;
     if (CPlatoon* const instigatorPlatoon = instigatorUnit->ArmyRef->GetPlatoonFor(
-          static_cast<int>(reinterpret_cast<std::uintptr_t>(instigatorUnit)),
+          instigatorUnit,
           &instigatorSquadClass
         );
         instigatorPlatoon != nullptr) {
@@ -16801,14 +16788,14 @@ void Unit::SetPaused(const bool paused)
   }
 
   if (paused) {
-    if (!IsPaused) {
+    if (!mUnitVarDat.mIsPaused) {
       CallbackStr("OnPaused");
     }
-  } else if (IsPaused) {
+  } else if (mUnitVarDat.mIsPaused) {
     CallbackStr("OnUnpaused");
   }
 
-  IsPaused = paused;
+  mUnitVarDat.mIsPaused = paused;
   MarkNeedsSyncGameData();
 }
 
@@ -16822,14 +16809,14 @@ void Unit::SetPaused(const bool paused)
 void Unit::SetRepeatQueue(const bool enabled)
 {
   if (enabled) {
-    if (!RepeatQueueEnabled) {
+    if (!mUnitVarDat.mRepeatQueue) {
       CallbackStr("OnStartRepeatQueue");
     }
-  } else if (RepeatQueueEnabled) {
+  } else if (mUnitVarDat.mRepeatQueue) {
     CallbackStr("OnStopRepeatQueue");
   }
 
-  RepeatQueueEnabled = enabled;
+  mUnitVarDat.mRepeatQueue = enabled;
   MarkNeedsSyncGameData();
 }
 
@@ -16855,8 +16842,8 @@ SEconValue Unit::GetConsumptionRequest() const
  */
 void Unit::UpdateResourceProduction(const SEconValue& resourceProduction)
 {
-  SharedEconomyRateEnergy = resourceProduction.energy;
-  SharedEconomyRateMass = resourceProduction.mass;
+  mUnitVarDat.mMaintainenceCost.ENERGY = resourceProduction.energy;
+  mUnitVarDat.mMaintainenceCost.MASS = resourceProduction.mass;
 }
 
 /**
@@ -16888,8 +16875,8 @@ void Unit::SetConsumptionActive(const bool isActive)
   ConsumptionActive = isActive;
 
   SEconValue newConsumption{};
-  newConsumption.energy = Attributes.consumptionPerSecondEnergy * 0.1f;
-  newConsumption.mass = Attributes.consumptionPerSecondMass * 0.1f;
+  newConsumption.energy = mUnitVarDat.mAttributes.consumptionPerSecondEnergy * 0.1f;
+  newConsumption.mass = mUnitVarDat.mAttributes.consumptionPerSecondMass * 0.1f;
 
   if (mConsumptionData == nullptr) {
     auto* const request = new CEconRequest{};
@@ -16926,8 +16913,8 @@ void Unit::SetConsumptionActive(const bool isActive)
     mConsumptionData->mRequested = newConsumption;
   }
 
-  SharedEconomyRateEnergy = newConsumption.energy;
-  SharedEconomyRateMass = newConsumption.mass;
+  mUnitVarDat.mMaintainenceCost.ENERGY = newConsumption.energy;
+  mUnitVarDat.mMaintainenceCost.MASS = newConsumption.mass;
 
   if (ConsumptionActive != oldConsumptionIsActive) {
     if (ConsumptionActive) {
@@ -17386,11 +17373,11 @@ void Unit::ToggleScriptBit(const int bitIndex)
     return;
   }
 
-  if ((ScriptBitMask & mask) != 0u) {
-    ScriptBitMask &= ~mask;
+  if ((mUnitVarDat.mScriptbits & mask) != 0u) {
+    mUnitVarDat.mScriptbits &= ~mask;
     CallbackInt("OnScriptBitClear", bitIndex);
   } else {
-    ScriptBitMask |= mask;
+    mUnitVarDat.mScriptbits |= mask;
     CallbackInt("OnScriptBitSet", bitIndex);
   }
 
@@ -17405,11 +17392,11 @@ void Unit::ToggleScriptBit(const int bitIndex)
  */
 void Unit::SetFireState(const std::int32_t fireState)
 {
-  if (FireState == fireState) {
+  if (mUnitVarDat.mFireState == fireState) {
     return;
   }
 
-  FireState = fireState;
+  mUnitVarDat.mFireState = fireState;
   MarkNeedsSyncGameData();
 }
 

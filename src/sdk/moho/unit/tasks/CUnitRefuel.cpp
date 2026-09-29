@@ -112,7 +112,7 @@ namespace
     const moho::SNavGoal goal = SingleCellGoalAt(platform.GetPosition(), unit.GetFootprint());
 
     if (speedThrough) {
-      unit.UnitStateMask |= (1ull << moho::UNITSTATE_ForceSpeedThrough);
+      unit.mUnitVarDat.mUnitStates |= (1ull << moho::UNITSTATE_ForceSpeedThrough);
     }
 
     moho::IAiNavigator* const navigator = unit.AiNavigator;
@@ -220,7 +220,7 @@ namespace moho
     mTargetUnit.ResetFromObject(targetUnit);
 
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask |= (1ull << UNITSTATE_Refueling);
+      mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_Refueling);
       mUnit->UpdateSpeedThroughStatus();
     }
 
@@ -244,8 +244,8 @@ namespace moho
    */
   CUnitRefuel::~CUnitRefuel()
   {
-    mUnit->UnitStateMask &= ~(1ull << UNITSTATE_ForceSpeedThrough);
-    mUnit->UnitStateMask &= ~(1ull << UNITSTATE_Refueling);
+    mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
+    mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Refueling);
     mUnit->UpdateSpeedThroughStatus();
 
     if (mUnit->AiNavigator != nullptr) {
@@ -466,7 +466,7 @@ namespace moho
         // approach; otherwise keep steering at the carrier (unless the unit is
         // patrolling or guarding, where the refuel attempt is simply dropped).
         if (transport != nullptr && transport->TransportHasAvailableStorage()) {
-          unit->UnitStateMask &= ~(1ull << UNITSTATE_ForceSpeedThrough);
+          unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
           IAiCommandDispatchImpl::IssueCarrierLandTask(platform, this);
           mTaskState = NextTaskState(mTaskState);
           mHasTransportReservation = true;
@@ -489,7 +489,7 @@ namespace moho
           return -1;
         }
 
-        if (unit->FuelRatio <= kRefuelCompleteFuelRatio || unit->mVarDat.mHealth != unit->mVarDat.mMaxHealth) {
+        if (unit->mUnitVarDat.mFuelRatio <= kRefuelCompleteFuelRatio || unit->mVarDat.mHealth != unit->mVarDat.mMaxHealth) {
           return 10;
         }
 
@@ -522,7 +522,7 @@ namespace moho
         // Launched. Drop the refuel flag and, if the shared command still has
         // another aircraft waiting on this carrier, clear the deck by moving
         // off; otherwise just park where we are and end the task.
-        unit->UnitStateMask &= ~(1ull << UNITSTATE_Refueling);
+        unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Refueling);
 
         if (unit->IsUnitState(UNITSTATE_Patrolling) || unit->IsUnitState(UNITSTATE_Guarding)) {
           return -1;
@@ -546,7 +546,7 @@ namespace moho
     case TASKSTATE_Preparing:
       // Ask the pad for a landing slot. `-1` lets the platform pick the hook.
       if (transport != nullptr && transport->TransportAssignSlot(unit, -1)) {
-        unit->UnitStateMask &= ~(1ull << UNITSTATE_ForceSpeedThrough);
+        unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
         transport->TransportAtPickupPosition();
         mTaskState = NextTaskState(mTaskState);
         mHasTransportReservation = true;
@@ -617,7 +617,7 @@ namespace moho
       // Docked and refuelling. This is the only place the engine undocks a
       // repaired, refuelled aircraft: once both conditions hold the pad
       // detaches it and a move task lifts it back into the air layer.
-      if (unit->FuelRatio > kRefuelCompleteFuelRatio && unit->mVarDat.mHealth == unit->mVarDat.mMaxHealth) {
+      if (unit->mUnitVarDat.mFuelRatio > kRefuelCompleteFuelRatio && unit->mVarDat.mHealth == unit->mVarDat.mMaxHealth) {
         if (transport != nullptr) {
           transport->TransportDetachUnit(unit);
         }
@@ -632,7 +632,7 @@ namespace moho
     case TASKSTATE_Complete:
       // Airborne again. Drop the refuel flag, and if the shared dock command
       // still lists another refuelling aircraft, vacate the pad for it.
-      unit->UnitStateMask &= ~(1ull << UNITSTATE_Refueling);
+      unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Refueling);
 
       if (unit->IsUnitState(UNITSTATE_Patrolling) || unit->IsUnitState(UNITSTATE_Guarding)) {
         return -1;

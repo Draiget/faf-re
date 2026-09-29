@@ -138,7 +138,7 @@ namespace moho
       return;
     }
 
-    mUnit->UnitStateMask |= 0x0000000000000004ull;
+    mUnit->mUnitVarDat.mUnitStates |= 0x0000000000000004ull;
 
     if (CUnitCommandQueue* const queue = mUnit->CommandQueue; queue != nullptr) {
       if (CUnitCommand* const currentCommand = queue->GetCurrentCommand(); currentCommand != nullptr) {
@@ -188,7 +188,7 @@ namespace moho
   CUnitFormAndMoveTask::~CUnitFormAndMoveTask()
   {
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask &= ~0x0000000000000004ull;
+      mUnit->mUnitVarDat.mUnitStates &= ~0x0000000000000004ull;
     }
 
     if (mUnit != nullptr && mUnit->CommandQueue != nullptr && mUnit->CommandQueue->GetCurrentCommand() != nullptr) {

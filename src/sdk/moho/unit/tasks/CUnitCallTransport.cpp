@@ -1,4 +1,5 @@
 #include "moho/unit/tasks/CUnitCallTransport.h"
+#include "legacy/math/X87Math.h"
 
 #include <algorithm>
 #include <cmath>
@@ -181,13 +182,13 @@ namespace moho
    */
   CUnitCallTransport::~CUnitCallTransport()
   {
-    mUnit->UnitStateMask &= ~kUnitStateMaskCallTransportPending;
-    mUnit->UnitStateMask &= ~kUnitStateMaskWaitingForTransport;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskCallTransportPending;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskWaitingForTransport;
 
     if (!mHasBeamupDestination) {
       if (mUnit->IsUnitState(UNITSTATE_Teleporting)) {
         (void)mUnit->RunScript("OnStopTransportBeamUp");
-        mUnit->UnitStateMask &= ~kUnitStateMaskTeleporting;
+        mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTeleporting;
       }
 
       if (CUnitMotion* const unitMotion = mUnit->UnitMotion; unitMotion != nullptr && mBeamupTime < 10.0f) {
@@ -268,7 +269,7 @@ namespace moho
           return -1;
         }
 
-        mUnit->UnitStateMask |= kUnitStateMaskWaitingForTransport;
+        mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskWaitingForTransport;
         const SOCellPos targetCell =
           transport->TransportIsReadyForUnit(mUnit) ? transport->TransportGetAttachPosition(mUnit)
                                                     : transport->TransportGetPickupUnitPos(mUnit);
@@ -300,7 +301,7 @@ namespace moho
           mSourceTransform = mUnit->GetTransform();
           mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
           mUnit->StartTransportBeamUp(mTargetTransportUnit, transport->TransportGetAttachBone(mUnit));
-          mUnit->UnitStateMask |= kUnitStateMaskTeleporting;
+          mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTeleporting;
           mTaskState = NextTaskState(mTaskState);
           return 1;
         }
@@ -316,14 +317,14 @@ namespace moho
       case TASKSTATE_Processing: {
         if (mBeamupTime <= 1.0f) {
           (void)mUnit->RunScript("OnStopTransportBeamUp");
-          mUnit->UnitStateMask &= ~kUnitStateMaskTeleporting;
+          mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTeleporting;
           if (transport->TransportAttachUnit(mUnit)) {
             mHasBeamupDestination = true;
           }
           return -1;
         }
 
-        const float blend = (std::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
+        const float blend = (msvc8::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
         mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
 
         if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint(); blueprint != nullptr) {
@@ -402,7 +403,7 @@ namespace moho
     mArrivalTickOrSequence = 0;
 
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask |= kUnitStateMaskCallTransportPending;
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskCallTransportPending;
       if (mUnit->IsUnitState(UNITSTATE_WaitForFerry)) {
         mTaskState = TASKSTATE_Waiting;
       }

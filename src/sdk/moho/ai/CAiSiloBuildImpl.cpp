@@ -314,7 +314,7 @@ CAiSiloBuildImpl::CAiSiloBuildImpl(Unit* const unit)
   mUnit = unit;
 
   if (mUnit) {
-    mUnit->WorkProgress = 0.0f;
+    mUnit->mUnitVarDat.mWorkProgress = 0.0f;
   }
 
   SiloUpdateProjectileBlueprint();
@@ -570,9 +570,9 @@ void CAiSiloBuildImpl::SiloAssistWithResource(const SEconValue& value)
     mSegmentSpent.mass = std::max(0.0f, mSegmentSpent.mass - mSegmentCost.mass);
 
     if (mUnit) {
-      mUnit->mBeatResourceAccumulators.resourcesSpentEnergy += mSegmentCost.energy;
-      mUnit->mBeatResourceAccumulators.resourcesSpentMass += mSegmentCost.mass;
-      mUnit->WorkProgress = static_cast<float>(mCurSegments++) / mSegments;
+      mUnit->mUnitVarDat.mResourcesSpent.ENERGY += mSegmentCost.energy;
+      mUnit->mUnitVarDat.mResourcesSpent.MASS += mSegmentCost.mass;
+      mUnit->mUnitVarDat.mWorkProgress = static_cast<float>(mCurSegments++) / mSegments;
     } else {
       ++mCurSegments;
     }
@@ -594,18 +594,18 @@ void CAiSiloBuildImpl::SiloStopBuild()
 
   if (mUnit->IsAutoMode()) {
     mUnit->SetAutoMode(false);
-    mUnit->RepeatQueueEnabled = true;
+    mUnit->mUnitVarDat.mRepeatQueue = true;
   }
 
   mUnit->NeedSyncGameData = true;
 
   if (mState == SBS_Prepare || mState == SBS_Active) {
-    mUnit->SharedEconomyRateEnergy = 0.0f;
-    mUnit->SharedEconomyRateMass = 0.0f;
+    mUnit->mUnitVarDat.mMaintainenceCost.ENERGY = 0.0f;
+    mUnit->mUnitVarDat.mMaintainenceCost.MASS = 0.0f;
   }
 
-  mUnit->UnitStateMask &= ~kSiloBuildingStateMask;
-  mUnit->WorkProgress = 0.0f;
+  mUnit->mUnitVarDat.mUnitStates &= ~kSiloBuildingStateMask;
+  mUnit->mUnitVarDat.mWorkProgress = 0.0f;
   mState = SBS_Idle;
   mSiloTypes.clear();
   mCurSegments = 0;
@@ -624,7 +624,7 @@ void CAiSiloBuildImpl::SiloTick()
     return;
   }
 
-  if (mUnit->IsPaused) {
+  if (mUnit->mUnitVarDat.mIsPaused) {
     return;
   }
 
@@ -677,9 +677,9 @@ void CAiSiloBuildImpl::SiloTick()
     ReplaceEconomyRequestPointer(mRequest, CreateEconomyRequest(mSegmentCost, economy));
 
     mState = SBS_Active;
-    mUnit->SharedEconomyRateEnergy = mSegmentCost.energy;
-    mUnit->SharedEconomyRateMass = mSegmentCost.mass;
-    mUnit->UnitStateMask |= kSiloBuildingStateMask;
+    mUnit->mUnitVarDat.mMaintainenceCost.ENERGY = mSegmentCost.energy;
+    mUnit->mUnitVarDat.mMaintainenceCost.MASS = mSegmentCost.mass;
+    mUnit->mUnitVarDat.mUnitStates |= kSiloBuildingStateMask;
     DispatchWeaponCallback(mUnit, "OnSiloBuildStart", queuedWeapon);
     return;
   }
@@ -687,11 +687,11 @@ void CAiSiloBuildImpl::SiloTick()
   case SBS_Active:
     if (mRequest && mRequest->mGranted.energy >= mSegmentCost.energy && mRequest->mGranted.mass >= mSegmentCost.mass) {
       const SEconValue granted = TakeGrantedResourcesAndReset(mRequest);
-      mUnit->SharedEconomyRateEnergy = mSegmentCost.energy;
-      mUnit->SharedEconomyRateMass = mSegmentCost.mass;
-      mUnit->mBeatResourceAccumulators.resourcesSpentEnergy += granted.energy;
-      mUnit->mBeatResourceAccumulators.resourcesSpentMass += granted.mass;
-      mUnit->WorkProgress = static_cast<float>(mCurSegments++) / mSegments;
+      mUnit->mUnitVarDat.mMaintainenceCost.ENERGY = mSegmentCost.energy;
+      mUnit->mUnitVarDat.mMaintainenceCost.MASS = mSegmentCost.mass;
+      mUnit->mUnitVarDat.mResourcesSpent.ENERGY += granted.energy;
+      mUnit->mUnitVarDat.mResourcesSpent.MASS += granted.mass;
+      mUnit->mUnitVarDat.mWorkProgress = static_cast<float>(mCurSegments++) / mSegments;
     }
 
     if (static_cast<float>(mCurSegments) >= mSegments) {
@@ -701,10 +701,10 @@ void CAiSiloBuildImpl::SiloTick()
 
   case SBS_Finish:
   {
-    mUnit->SharedEconomyRateEnergy = 0.0f;
-    mUnit->SharedEconomyRateMass = 0.0f;
-    mUnit->UnitStateMask &= ~kSiloBuildingStateMask;
-    mUnit->WorkProgress = 0.0f;
+    mUnit->mUnitVarDat.mMaintainenceCost.ENERGY = 0.0f;
+    mUnit->mUnitVarDat.mMaintainenceCost.MASS = 0.0f;
+    mUnit->mUnitVarDat.mUnitStates &= ~kSiloBuildingStateMask;
+    mUnit->mUnitVarDat.mWorkProgress = 0.0f;
 
     if (!mSiloTypes.empty()) {
       const ESiloType builtType = mSiloTypes.front();

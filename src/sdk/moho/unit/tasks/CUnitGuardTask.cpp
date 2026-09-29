@@ -269,11 +269,11 @@ namespace
       return true;
     }
 
-    if (!unit->IsPaused && unit->IsUnitState(moho::UNITSTATE_Enhancing)) {
+    if (!unit->mUnitVarDat.mIsPaused && unit->IsUnitState(moho::UNITSTATE_Enhancing)) {
       return true;
     }
 
-    return !unit->IsPaused && unit->AiSiloBuild != nullptr && unit->IsUnitState(moho::UNITSTATE_SiloBuildingAmmo);
+    return !unit->mUnitVarDat.mIsPaused && unit->AiSiloBuild != nullptr && unit->IsUnitState(moho::UNITSTATE_SiloBuildingAmmo);
   }
 
   [[nodiscard]] moho::Unit* ResolveGuardFocusAssistTarget(moho::Unit* const unit, const moho::Unit* const ownerUnit)
@@ -549,7 +549,7 @@ namespace moho
     mGuardGoal.mLayer = static_cast<ELayer>(0);
 
     Unit* const unit = mUnit;
-    unit->UnitStateMask |= (1ull << UNITSTATE_Guarding);
+    unit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_Guarding);
 
     // Bind the linked-command weak reference to the owner's current queue-head
     // command, then register this task's embedded command-event listener on that
@@ -674,8 +674,8 @@ namespace moho
   {
     if (Unit* const unit = mUnit; unit != nullptr) {
       // Drop the two guard-state bits this task owns on the owner unit.
-      unit->UnitStateMask &= ~(1ull << UNITSTATE_GuardBusy);
-      unit->UnitStateMask &= ~(1ull << UNITSTATE_Guarding);
+      unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_GuardBusy);
+      unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Guarding);
 
       // Release the guarded-unit association and zero the cached guard pos.
       unit->SetGuardedUnit(nullptr);
@@ -827,7 +827,7 @@ namespace moho
       const bool useCandidate =
         (candidate == mUnit && commandCount > 0u)
         || (commandCount > 1u)
-        || (commandCount > 0u && candidate->RepeatQueueEnabled);
+        || (commandCount > 0u && candidate->mUnitVarDat.mRepeatQueue);
       if (useCandidate) {
         return candidate;
       }
@@ -1264,7 +1264,7 @@ namespace moho
 
       const bool canDispatchSlot =
         index > 0u || command->mVarDat.mCount > 1
-        || (guardedCommandCount <= 1u && mUnit->RepeatQueueEnabled);
+        || (guardedCommandCount <= 1u && mUnit->mUnitVarDat.mRepeatQueue);
       if (!canDispatchSlot) {
         continue;
       }
@@ -1276,7 +1276,7 @@ namespace moho
 
       if (command->mVarDat.mCount > 1) {
         command->DecreaseCount(1);
-      } else if (mUnit->RepeatQueueEnabled) {
+      } else if (mUnit->mUnitVarDat.mRepeatQueue) {
         command->mVarDat.mCount = command->mVarDat.mMaxCount;
         command->mNeedsUpdate = true;
         (void)guardedQueue->MoveCommandToBackOfQueue(command);
@@ -1436,7 +1436,7 @@ namespace moho
         }
 
         const RUnitBlueprint* const guardedBlueprint = guardedUnit->GetBlueprint();
-        if (guardedBlueprint != nullptr && guardedBlueprint->Physics.FuelUseTime > 1.0f && guardedUnit->FuelRatio < 1.0f) {
+        if (guardedBlueprint != nullptr && guardedBlueprint->Physics.FuelUseTime > 1.0f && guardedUnit->mUnitVarDat.mFuelRatio < 1.0f) {
           return guardedUnit;
         }
 
@@ -1444,7 +1444,7 @@ namespace moho
           return guardedUnit;
         }
 
-        if (!guardedUnit->IsPaused && guardedUnit->IsUnitState(UNITSTATE_Enhancing)) {
+        if (!guardedUnit->mUnitVarDat.mIsPaused && guardedUnit->IsUnitState(UNITSTATE_Enhancing)) {
           return guardedUnit;
         }
 
@@ -1452,7 +1452,7 @@ namespace moho
           return focusAssistTarget;
         }
 
-        if (!guardedUnit->IsPaused && guardedUnit->AiSiloBuild != nullptr
+        if (!guardedUnit->mUnitVarDat.mIsPaused && guardedUnit->AiSiloBuild != nullptr
             && guardedUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
           return guardedUnit;
         }
@@ -1705,7 +1705,7 @@ namespace moho
       return;
     }
 
-    mUnit->UnitStateMask |= kUnitStateMoveAbortMask;
+    mUnit->mUnitVarDat.mUnitStates |= kUnitStateMoveAbortMask;
 
     if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
       navigator->AbortMove();
@@ -1731,7 +1731,7 @@ namespace moho
     if (CUnitCommand* const primaryCommand = mPrimaryCommandRef.GetObjectPtr(); primaryCommand != nullptr) {
       if (mLinkResult == static_cast<EAiResult>(1)) {
         if (primaryCommand->mVarDat.mCount <= 1) {
-          if (mUnit->RepeatQueueEnabled && primaryCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
+          if (mUnit->mUnitVarDat.mRepeatQueue && primaryCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
             primaryCommand->mVarDat.mCount = primaryCommand->mVarDat.mMaxCount;
             primaryCommand->mNeedsUpdate = true;
             if (mUnit->CommandQueue != nullptr) {
@@ -1762,7 +1762,7 @@ namespace moho
       }
     }
 
-    mUnit->UnitStateMask &= ~kUnitStateMoveAbortMask;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMoveAbortMask;
 
     Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr();
     if (mTrackGuardedUnit) {

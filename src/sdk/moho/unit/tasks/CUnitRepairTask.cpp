@@ -233,10 +233,10 @@ namespace moho
     ListUnlink();
 
     // Drop the repairing state bit this task owns on the owner unit.
-    mUnit->UnitStateMask &= ~(1ull << UNITSTATE_Repairing);
+    mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Repairing);
 
     // Clear the owner unit's cached work-progress and builder aim target.
-    mUnit->WorkProgress = 0.0f;
+    mUnit->mUnitVarDat.mWorkProgress = 0.0f;
     if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr) {
       builder->BuilderSetAimTarget(Wm3::Vector3f::Zero());
     }
@@ -249,7 +249,7 @@ namespace moho
 
     // Clear the no-reclaim protection bit on the unit we were building/assisting.
     if (Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr(); buildTarget != nullptr) {
-      buildTarget->UnitStateMask &= ~(1ull << UNITSTATE_NoReclaim);
+      buildTarget->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_NoReclaim);
     }
 
     // Stop the shared build helper (failed == true), matching the binary.
@@ -349,7 +349,7 @@ namespace moho
       return true;
     }
 
-    if (target->GetBlueprint()->Physics.FuelUseTime > 0.0f && target->FuelRatio < 1.0f) {
+    if (target->GetBlueprint()->Physics.FuelUseTime > 0.0f && target->mUnitVarDat.mFuelRatio < 1.0f) {
       return false;
     }
 
@@ -543,19 +543,19 @@ namespace moho
         if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && !builder->BuilderGetOnTarget()) {
           return 1;
         }
-        if (mUnit->IsPaused) {
+        if (mUnit->mUnitVarDat.mIsPaused) {
           return 10;
         }
 
         if (Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr(); buildTarget != nullptr) {
-          buildTarget->UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_NoReclaim));
+          buildTarget->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_NoReclaim));
           mBuildHelper.SetFocus(buildTarget);
         } else {
           mBuildHelper.SetFocus(nullptr);
         }
         mBuildHelper.mIsSilo = mIsSilo;
 
-        mUnit->UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_Repairing));
+        mUnit->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_Repairing));
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
         return 0;
       }
@@ -607,8 +607,8 @@ namespace moho
   void CUnitRepairTask::OnEvent(ECommandEvent /*event*/)
   {
     if (Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr(); buildTarget != nullptr) {
-      buildTarget->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_NoReclaim));
-      mUnit->WorkProgress = 0.0f;
+      buildTarget->mUnitVarDat.mUnitStates &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_NoReclaim));
+      mUnit->mUnitVarDat.mWorkProgress = 0.0f;
       mBuildHelper.OnStopBuild(true);
       mBuildTargetUnit.UnlinkFromOwnerChain();
     }

@@ -224,7 +224,7 @@ namespace moho
       static_cast<int>(footprint.mSizeZ)
     );
 
-    mUnit->UnitStateMask |= kUnitStateMaskAssistMoving;
+    mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskAssistMoving;
     mTaskState = (mUnit->AiTransport != nullptr) ? TASKSTATE_Preparing : TASKSTATE_Complete;
   }
 
@@ -245,7 +245,7 @@ namespace moho
       return;
     }
 
-    mUnit->UnitStateMask &= ~kUnitStateMaskAssistMoving;
+    mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskAssistMoving;
 
     IAiTransport* const transport = mUnit->AiTransport;
     if (transport == nullptr) {

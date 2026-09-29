@@ -258,7 +258,7 @@ namespace moho
     , mAssistTarget{}
   {
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask |= (1ull << UNITSTATE_AssistingCommander);
+      mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_AssistingCommander);
     }
 
     Unit* const creatorUnit = (mUnit != nullptr) ? mUnit->CreatorRef.ResolveObjectPtr<Unit>() : nullptr;
@@ -297,7 +297,7 @@ namespace moho
   CUnitPodAssist::~CUnitPodAssist()
   {
     Kill();
-    mUnit->UnitStateMask &= ~(1ull << UNITSTATE_AssistingCommander);
+    mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_AssistingCommander);
     mAssistTarget.UnlinkFromOwnerChain();
   }
 
@@ -488,7 +488,7 @@ namespace moho
       return false;
     }
 
-    if (mUnit->IsInCategory("STATIONASSISTPOD") && ((mUnit->ScriptBitMask & 0x10u) != 0u)) {
+    if (mUnit->IsInCategory("STATIONASSISTPOD") && ((mUnit->mUnitVarDat.mScriptbits & 0x10u) != 0u)) {
       return false;
     }
 

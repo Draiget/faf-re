@@ -142,7 +142,7 @@ namespace moho
   CUnitUnloadUnits::~CUnitUnloadUnits()
   {
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask &= ~kUnitStateMaskTransportUnloading;
+      mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTransportUnloading;
       mUnit->NeedSyncGameData = true;
     }
 
@@ -237,7 +237,7 @@ namespace moho
       }
     }
 
-    mUnit->UnitStateMask |= kUnitStateMaskTransportUnloading;
+    mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTransportUnloading;
     mIsStagingPlatform = mUnit->AiTransport->TransportIsAirStagingPlatform();
 
     if (mUnit->IsMobile()) {

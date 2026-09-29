@@ -170,16 +170,6 @@ namespace moho
    */
   LuaPlus::LuaObject* func_GetUnitFactory(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
 
-  struct SBeatResourceAccumulators
-  {
-    float maintenanceEnergy;
-    float maintenanceMass;
-    float resourcesSpentEnergy;
-    float resourcesSpentMass;
-
-    void Clear() noexcept;
-  };
-
   struct SWeakRefSlot
   {
     void* valueWithTag;
@@ -2097,49 +2087,21 @@ namespace moho
 
   public:
     SSTIUnitConstantData mConstDat; // 0x0278
-    // Leading bytes of SSTIUnitVariableData (starts at 0x0288).
-    std::uint8_t mVarDatHead[8]; // 0x0288
-    bool AutoMode;               // 0x0290
-    bool AutoSurfaceMode;        // 0x0291
-    // Whether this unit is currently attached to something (e.g. docked on a
-    // transport/pad). Confirmed by Unit::MotionTick (0x006A9010, 0x006A90DA-
-    // 0x006A90FD): `mIsBusy = mAttachInfo.HasAttachTarget()`, written every
-    // tick. SSTIUnitVariableData's own declaration already names the mirrored
-    // relative field `mIsBusy` (+0x00A) - this byte was previously mismodeled
-    // as padding in this flattened view. Named with the `m` prefix (unlike
-    // sibling flattened fields) because the unprefixed `IsBusy` name is
-    // already taken by the unrelated computed accessor `Unit::IsBusy() const`
-    // (0x006A7D10, "movement navigation active or builder busy").
-    bool mIsBusy;                 // 0x0292
-    char pad_0293[1];            // 0x0293
-    float FuelRatio;             // 0x0294
-    float ShieldRatio;           // 0x0298
-    std::int32_t StunnedState;   // 0x029C
-    bool IsPaused;               // 0x02A0
-    bool IsValidTarget;          // 0x02A1
-    bool RepeatQueueEnabled;     // 0x02A2
-    char pad_02A3[5];            // 0x02A3
-    std::int32_t FireState;      // 0x02A8
-    float WorkProgress;          // 0x02AC
-    char pad_02B0[24];           // 0x02B0
-    EntId UpgradedToEntityId;    // 0x02C8
-    msvc8::string CustomName;    // 0x02CC
-    // 0x02E8..0x02F4 reset in Sim::AdvanceBeat for living units.
-    SBeatResourceAccumulators mBeatResourceAccumulators; // 0x02E8
-    // Shared runtime slot used by multiple economy lanes (event requests and
-    // maintenance consumption) at different points in the beat/update flow.
-    float SharedEconomyRateEnergy; // 0x02F8
-    float SharedEconomyRateMass;   // 0x02FC
-    char pad_0300[16];                                   // 0x0300
-    class CAniPose* AnimationPose;                       // 0x0310
-    char pad_0314[0x114];                                // 0x0314
-    UnitAttributes Attributes;                           // 0x0428
-    std::uint32_t ScriptBitMask;                         // 0x0498: toggled by ToggleScriptBit
-    std::uint32_t pad_049C;                              // 0x049C
-    std::uint64_t UnitStateMask;                         // 0x04A0
-    std::uint8_t mUnknown04A8;                           // 0x04A8
-    bool OverchargePaused;                               // 0x04A9
-    std::uint8_t mUnknown04AA[6];                        // 0x04AA
+    /**
+     * The replicated variable-data block, copied whole into every
+     * `SSyncData::mUnitUpdates` record by `SyncInterface`. It used to be spelled
+     * out here field by field with x86-sized padding, and `VarDat()` recast the
+     * first bytes as the struct -- which only lines up on x86. Its members keep
+     * the struct's names; the ones the sim writes directly:
+     *  - `mIsBusy`: attached to something, rewritten every tick by `MotionTick`
+     *    (0x006A90DA..0x006A90FD, `mAttachInfo.HasAttachTarget()`);
+     *  - `mProduced` / `mResourcesSpent`: the per-beat economy accumulators
+     *    `Sim::AdvanceBeat` clears for living units;
+     *  - `mMaintainenceCost`: the per-tick rate the economy events, silo build
+     *    and repair lanes publish;
+     *  - `mSelectionInheritorId`: the unit an upgrade hands its selection to.
+     */
+    SSTIUnitVariableData mUnitVarDat; // 0x0288
     CUnitMotion* UnitMotion;                             // 0x04B0
     CUnitCommandQueue* CommandQueue;                     // 0x04B4
     SWeakRefSlot CreatorRef;                             // 0x04B8
@@ -2233,16 +2195,12 @@ namespace moho
     char pad_0694[0x14];                               // 0x0694
   };
 
-  static_assert(offsetof(Unit, mIsBusy) == 0x0292, "Unit::mIsBusy offset must be 0x0292");
+  static_assert(offsetof(Unit, mUnitVarDat) == 0x0288, "Unit::mUnitVarDat offset must be 0x0288");
   static_assert(offsetof(Unit, GuardedByList) == 0x04F8, "Unit::GuardedByList offset must be 0x04F8");
   static_assert(offsetof(Unit, mCreationTick) == 0x0528, "Unit::mCreationTick offset must be 0x0528");
   static_assert(offsetof(Unit, mExtraStorage) == 0x052C, "Unit::mExtraStorage offset must be 0x052C");
   static_assert(offsetof(Unit, PriorityBoost) == 0x0530, "Unit::PriorityBoost offset must be 0x0530");
   static_assert(offsetof(Unit, mConsumptionData) == 0x0534, "Unit::mConsumptionData offset must be 0x0534");
-  static_assert(
-    offsetof(Unit, SharedEconomyRateEnergy) == 0x02F8, "Unit::SharedEconomyRateEnergy offset must be 0x02F8"
-  );
-  static_assert(offsetof(Unit, SharedEconomyRateMass) == 0x02FC, "Unit::SharedEconomyRateMass offset must be 0x02FC");
   static_assert(offsetof(Unit, mDebugAIStates) == 0x057D, "Unit::mDebugAIStates offset must be 0x057D");
   static_assert(
     offsetof(Unit, ReservedOgridRectMinX) == 0x05A8, "Unit::ReservedOgridRectMinX offset must be 0x05A8"
@@ -2266,7 +2224,7 @@ namespace moho
   static_assert(offsetof(Unit, mEconomyEventListHead) == 0x0574, "Unit::mEconomyEventListHead offset must be 0x0574");
   static_assert(offsetof(Unit, mReconBlips) == 0x0670, "Unit::mReconBlips offset must be 0x0670");
   static_assert(offsetof(Unit, GuardFormation) == 0x0520, "Unit::GuardFormation offset must be 0x0520");
-  static_assert(offsetof(Unit, OverchargePaused) == 0x04A9, "Unit::OverchargePaused offset must be 0x04A9");
+  static_assert(offsetof(Unit, UnitMotion) == 0x04B0, "Unit::UnitMotion offset must be 0x04B0");
   static_assert(offsetof(Unit, NeedSyncGameData) == 0x068E, "Unit::NeedSyncGameData offset must be 0x068E");
   static_assert(offsetof(Unit, CaptorCount) == 0x0690, "Unit::CaptorCount offset must be 0x0690");
   static_assert(sizeof(Unit) == 0x6A8, "Unit size must be 0x6A8");

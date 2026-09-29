@@ -398,7 +398,7 @@ namespace moho
     CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
     if (unit != nullptr) {
-      unit->UnitStateMask |= (1ull << UNITSTATE_Attacking);
+      unit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_Attacking);
 
       if (!mIgnoreFormationUpdates) {
         if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
@@ -464,7 +464,7 @@ namespace moho
     }
 
     if (unit != nullptr) {
-      unit->UnitStateMask &= ~(1ull << UNITSTATE_Attacking);
+      unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Attacking);
 
       unit->FocusEntityRef.ResetObjectPtr<Entity>(nullptr);
       if (unit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {

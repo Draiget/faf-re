@@ -168,7 +168,7 @@ namespace moho
   CUnitFireAtTask::~CUnitFireAtTask()
   {
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_Busy));
+      mUnit->mUnitVarDat.mUnitStates &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_Busy));
     }
 
     mTarget.targetEntity.UnlinkFromOwnerChain();

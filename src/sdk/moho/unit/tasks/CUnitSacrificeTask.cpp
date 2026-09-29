@@ -169,7 +169,7 @@ namespace moho
     ListUnlink();
 
     if (mUnit != nullptr) {
-      mUnit->UnitStateMask &= ~(1ull << UNITSTATE_Repairing);
+      mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Repairing);
 
       if (mTaskState == TASKSTATE_Waiting) {
         mUnit->FreeOgridRect();
@@ -379,7 +379,7 @@ namespace moho
       // A recipient mid-enhancement only has somewhere to put the donation
       // while the enhancement is actually running and drawing resources.
       if (target->IsUnitState(UNITSTATE_Enhancing)) {
-        if (target->IsPaused) {
+        if (target->mUnitVarDat.mIsPaused) {
           return -1;
         }
 

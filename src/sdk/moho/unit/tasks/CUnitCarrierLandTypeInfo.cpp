@@ -243,7 +243,7 @@ namespace moho
     if (CUnitMotion* const motion = unit->UnitMotion) {
       motion->mCarrierEvent = static_cast<EUnitMotionCarrierEvent>(0);
     }
-    unit->UnitStateMask &= ~static_cast<std::uint64_t>(0x100u);
+    unit->mUnitVarDat.mUnitStates &= ~static_cast<std::uint64_t>(0x100u);
 
     // Release the focus-entity weak link this carrier-land task established.
     unit->FocusEntityRef.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
