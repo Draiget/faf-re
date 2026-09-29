@@ -1,11 +1,15 @@
 #pragma once
 #include <cstdint>
 
+#include "boost/scoped_ptr.h"
 #include "gpg/core/containers/Rect2.h"
 
 namespace gpg
 {
+  class RRef;
   class RType;
+  class ReadArchive;
+  class WriteArchive;
 } // namespace gpg
 
 namespace gpg::HaStar
@@ -19,27 +23,36 @@ namespace moho
   class IPathTraveler;
   class PathTables;
   struct SRuleFootprintsBlueprint;
-  struct PathTablesImpl;
 
   /**
-   * Runtime queue owner used by per-army pathfinder lanes.
+   * `Moho::PathQueue` - one army's path-search queue.
    *
-   * Layout evidence currently confirms the outer pointer-sized owner and
-   * constructor behavior. Deeper `Impl` payload fields are reconstructed in
-   * `PathTables.cpp` from the `FUN_00765B20/FUN_00765B90/FUN_00766CE0`
-   * constructor chain.
+   * Travelers queue up on `Impl::mPendingTravelers`; `Work` serves them one at
+   * a time through the A* state in `Impl::mBase`, a slice of CPU budget per
+   * sim tick. The queue itself is only the owning pointer: `Impl` is private
+   * to PathTables.cpp.
    */
   class PathQueue
   {
   public:
     static gpg::RType* sType;
 
+    struct Impl;
+    struct ImplBase;
+
+    /**
+     * What it does:
+     * An empty queue with no `Impl`: the form reflection builds before a load
+     * installs one. Inlined into `PathQueueTypeInfo::NewRef` (0x007678C0) and
+     * `::CtrRef` (0x00767950).
+     */
+    PathQueue() = default;
+
     /**
      * Address: 0x00765D30 (FUN_00765D30, ??0PathQueue@Moho@@QA@Z)
      *
      * What it does:
-     * Allocates one `PathQueue::Impl` payload and stores the caller-supplied
-     * queue-size lane in the impl header.
+     * Allocates the `Impl` and records the `PathTables` it searches.
      */
     explicit PathQueue(PathTables* owner);
 
@@ -55,6 +68,26 @@ namespace moho
 
     PathQueue(const PathQueue&) = delete;
     PathQueue& operator=(const PathQueue&) = delete;
+
+    /**
+     * Address: 0x0076AD40 (FUN_0076AD40)
+     *
+     * IDA signature:
+     * void __usercall sub_76AD40(int* slot@<eax>, gpg::ReadArchive* archive@<ebx>);
+     *
+     * What it does:
+     * Reads the owned `Impl` and installs it, deleting the one it replaces
+     * (`scoped_ptr::reset`: the new pointer is stored before the old one is
+     * deleted).
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * What it does:
+     * Writes the `Impl` as an owned tracked pointer. Inlined into
+     * `PathQueueSerializer::Serialize` (0x00766980).
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x00765ED0 (FUN_00765ED0, Moho::PathQueue::Work)
@@ -81,13 +114,6 @@ namespace moho
     void WorkImmediate(int& budget, IPathTraveler& traveller);
 
     /**
-     * Address: 0x00701AD0 (FUN_00701AD0, Moho::PathQueue::Move)
-     *
-     * What it does:
-     * Replaces one owner slot with a new queue pointer, then tears down and
-     * frees the previous queue payload when present.
-     */
-    /**
      * Address: 0x005AA318..0x005AA345 (inlined into Moho::CAiPathFinder::QueueSearch, FUN_005AA310)
      *
      * What it does:
@@ -98,18 +124,42 @@ namespace moho
      */
     void QueueTraveler(IPathTraveler& traveller);
 
+    /**
+     * Address: 0x00701AD0 (FUN_00701AD0, Moho::PathQueue::Move)
+     *
+     * What it does:
+     * Stores `replacement` in the owner's slot, then deletes the queue it
+     * replaced.
+     */
     static void Move(PathQueue** slot, PathQueue* replacement) noexcept;
 
-    struct Impl;
-
   private:
-    Impl* mImpl{};
+    boost::scoped_ptr<Impl> mImpl;
   };
   static_assert(sizeof(PathQueue) == 0x04, "PathQueue size must be 0x04");
+} // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x0076A5F0 (FUN_0076A5F0, gpg::RRef_PathQueue_Impl)
+   *
+   * What it does:
+   * Wraps a `PathQueue::Impl*` as a reflected reference. Declared here rather
+   * than beside `RRef_PathQueue` in Reflection.h because only this header can
+   * name the nested type; defined in gpg/core/containers/ArchiveSerialization.cpp.
+   */
+  RRef* RRef_PathQueue_Impl(RRef* outRef, moho::PathQueue::Impl* value);
+} // namespace gpg
+
+namespace moho
+{
 
   class PathTables
   {
   public:
+    struct Impl;
+
     /**
      * Address: 0x0076B8C0 (FUN_0076B8C0, ??0PathTables@Moho@@QAE@@Z)
      *
@@ -164,8 +214,7 @@ namespace moho
     [[nodiscard]] gpg::HaStar::ClusterMap* ClusterMapForFootprint(std::int32_t footprintIndex) const;
 
   private:
-    // Runtime path-table implementation payload (PathTables::Impl).
-    PathTablesImpl* mImpl;
+    Impl* mImpl;
   };
 
   static_assert(sizeof(PathTables) == 0x4, "PathTables size must be 0x4");

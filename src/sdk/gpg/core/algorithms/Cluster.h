@@ -387,7 +387,7 @@ namespace gpg::HaStar
      * `outCache` must be freshly default-constructed (null `mCacheTree`/
      * `mCacheRefs`); this function does not release any prior value.
      *
-     * Reached from `PathTablesImpl::PathTablesImpl()`
+     * Reached from `PathTables::Impl::Impl()`
      * (`moho/path/PathTables.cpp`, `FUN_0076BA40` calls `FUN_009356E0`
      * directly).
      */

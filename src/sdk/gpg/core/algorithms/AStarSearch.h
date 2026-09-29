@@ -29,7 +29,9 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 
+#include "gpg/core/containers/FastVector.h"
 #include "legacy/containers/HashMap.h"
 #include "legacy/containers/Vector.h"
 
@@ -318,6 +320,14 @@ namespace gpg
         }
     };
 
+    /** One edge offered by the owner's expansion: where to, and at what cost. */
+    template <class TCell>
+    struct AStarNeighbour
+    {
+        TCell mCell;  // +0x00
+        float mCost;  // +0x04
+    };
+
     /**
      * The A* search state shared by every instantiation.
      *
@@ -327,6 +337,7 @@ namespace gpg
      *
      *   float GetHeuristicCost(const TCell&) const;
      *   void  NoteCandidateCell(const TCell&, float estimate);
+     *   Step  ExpandNode(const TCell&, neighbour_list&);  // Step{} = keep going
      *
      * Layout:
      *   +0x00 : mNodes  (msvc8::hash_map, 0x28)
@@ -340,6 +351,12 @@ namespace gpg
         using node_type = AStarNode<TCell>;
         using table_type = msvc8::hash_map<TCell, node_type, TCellTraits>;
         using heap_type = AStarOpenHeap<TCell>;
+        using neighbour_type = AStarNeighbour<TCell>;
+
+        // The expansion buffer lives on the search's stack frame: 200 inline
+        // entries before it spills to the heap (the 0x10 head at [esp+650h],
+        // entries at [esp+660h]..[esp+CA0h] in 0x007685A0).
+        using neighbour_list = core::FastVectorN<neighbour_type, 200>;
 
     protected:
         table_type mNodes;  // +0x00
@@ -474,6 +491,83 @@ namespace gpg
                 outCells[--writeIndex] = step->mCell;
             }
             return true;
+        }
+
+        /**
+         * Address: 0x007685A0 (FUN_007685A0, the `Moho::PathQueue::ImplBase`
+         * instantiation; callers 0x00765DD0, 0x00765ED0, 0x007660C0)
+         *
+         * IDA signature:
+         * int __stdcall sub_7685A0(Moho::PathQueue::ImplBase *a3, Moho::PathQueue::ImplBase *a2);
+         *
+         * What it does:
+         * The A* main loop. Each pass takes the cheapest open node and asks the
+         * owner to expand it; a non-default step from the owner ends the pass
+         * and is returned (goal reached, budget spent, ...). Otherwise the node
+         * closes and every offered edge relaxes its target: an unvisited target
+         * opens with its heuristic, an open one re-parents when this route is
+         * cheaper. Returns the default step only once the open set is empty,
+         * i.e. nothing further is reachable.
+         */
+        auto WorkOnce(TTraits& traits)
+        {
+            using step_type = decltype(traits.ExpandNode(std::declval<const TCell&>(), std::declval<neighbour_list&>()));
+
+            neighbour_list neighbours;
+
+            while (!mOpen.empty()) {
+                node_type* const current = mOpen.top();
+
+                neighbours.clear();
+                const step_type step = traits.ExpandNode(current->mCell, neighbours);
+                if (step != step_type{}) {
+                    return step;
+                }
+
+                current->mState = AStarNodeState::Closed;
+                (void)mOpen.Pop();
+
+                for (const neighbour_type& neighbour : neighbours) {
+                    node_type& node = FindOrCreateNode(neighbour.mCell);
+                    const float reachedCost = current->mCost + neighbour.mCost;
+
+                    switch (node.mState) {
+                        case AStarNodeState::Unvisited: {
+                            node.mState = AStarNodeState::Open;
+
+                            const float estimate = traits.GetHeuristicCost(neighbour.mCell);
+                            traits.NoteCandidateCell(neighbour.mCell, estimate);
+
+                            node.mEstimate = estimate;
+                            node.mParent = current;
+                            node.mCell = neighbour.mCell;
+                            node.mCost = reachedCost;
+                            node.mHandle = mOpen.Push(reachedCost + estimate, &node);
+                            break;
+                        }
+
+                        case AStarNodeState::Open: {
+                            // Only a genuinely cheaper route re-parents; the
+                            // estimate is unchanged, so this is a decrease-key.
+                            if (node.mCost > reachedCost) {
+                                node.mParent = current;
+                                node.mCell = neighbour.mCell;
+                                node.mCost = reachedCost;
+                                mOpen.UpdatePriority(node.mHandle, node.mEstimate + reachedCost);
+                            }
+                            break;
+                        }
+
+                        case AStarNodeState::Closed:
+                        default:
+                            // "neib->mState == CLOSED", AStarSearch.h:253
+                            assert(node.mState == AStarNodeState::Closed);
+                            break;
+                    }
+                }
+            }
+
+            return step_type{};
         }
     };
 } // namespace gpg

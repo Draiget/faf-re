@@ -2673,6 +2673,7 @@ namespace msvc8
          * Address: 0x004F7140 (FUN_004F7140 -- the same `size()` for `moho::managedFrames` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`) (0x010A9BD8); caller 0x004F9113 (`insert`, 0x004F9050). Formerly anchored in moho/app/WxRuntimeTypes.cpp.)
          * Address: 0x007A56A0 (FUN_007A56A0 -- `size()` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp) (`sar 3`).
          *   Formerly `InputCaptureCount`.)
+         * Address: 0x0076C400 (FUN_0076C400 -- `size()` for `msvc8::vector<moho::OccupySourceBinding>` (`PathTables::Impl::mSources`): `(last - first) / 12` through the 0x2AAAAAAB reciprocal, 0 when unallocated; caller 0x0076C490 (`_Insert_n`).)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -3079,6 +3080,8 @@ namespace msvc8
          * Address: 0x00515DE0 (FUN_00515DE0 -- `resize(n)` -- build the default `REmitterCurveKey` temporary and hand it to `resize(n, value)` 0x00516410. Reached from `RVectorType_REmitterCurveKey::SetCount` 0x00515D20 for `msvc8::vector<moho::REmitterCurveKey>` (`REmitterBlueprintCurve::Keys`; the element is a polymorphic 0x10 `{vptr, X, Y, Z}`, so every element step routes through its virtual destructor or its copy constructor); zero callers, unreachable; formerly `ResizeEmitterCurveKeyVectorWithDefaultFillAdapter` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00504D70 (FUN_00504D70 -- `resize(16)` with the value-initialised null temporary, growing through `_Insert_n` 0x00505530 at `end()` and shrinking through `erase(begin() + 16, end())` 0x00504DE0, for `msvc8::vector<moho::SpatialShard<T>*>` (moho/mesh/SpatialDb.h); callers 0x005011A0 (`SpatialShard<T>::SpatialShard`'s `mShards.resize(16)`), 0x00501F50 (`SpatialDB<T>::ResizeForMap`); formerly `EnsureSpatialShardSlots16` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
          * Address: 0x00504EE0 (FUN_00504EE0 -- the same `resize(16)` for `msvc8::vector<moho::SpatialShardData<T>*>`, through `_Insert_n` 0x00505850 and `erase` 0x00504F50; caller 0x005011A0 (`mData.resize(16)`); formerly `EnsureSpatialShardDataSlots16` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+         * Address: 0x0076BFA0 (FUN_0076BFA0 -- `resize(n)` for `msvc8::vector<moho::OccupySourceBinding>` (`PathTables::Impl::mSources`, a 12-byte polymorphic element): builds the value-initialised binding on the stack -- the `IOccupationSource` vftable 0x00E360D0, then `OccupySourceBinding`'s 0x00E360D8 -- and tail-calls `resize(n, value)` 0x0076C130. Zero callers: `PathTables::PathTables` 0x0076B8C0 inlines it. Formerly `ResizeOccupySourceStorageWithDefaultBinding` in moho/path/PathTables.cpp (RULE ONE), removed 2026-09-29.)
+         * Address: 0x0076C270 (FUN_0076C270 -- `resize(n)` for `msvc8::vector<gpg::HaStar::ClusterMap*>` (`PathTables::Impl::mMaps`), the fused 4-byte form: shrink through `erase` 0x0076C7F0, grow through `_Insert_n` 0x0076C850 with a stack-local null; caller 0x0076B8C0 (`PathTables::PathTables`). Formerly `ResizeLegacyPointerStorage` in moho/path/PathTables.cpp, an `operator new` + `memset` stand-in (RULE ONE), removed 2026-09-29.)
          */
         void resize(std::size_t newSize) {
             // VC8 defines this as `resize(_Newsize, _Ty())` -- the temporary is
@@ -3314,6 +3317,7 @@ namespace msvc8
          * Address: 0x005EA890 (FUN_005EA890 -- the one-argument `resize(n)` that builds the default attach point and hands it to 0x005EB260 for `msvc8::vector<moho::SAttachPoint>` (the reflected attach-point vector; `max_size` 0x0CCCCCCC, so the element is 0x14); zero callers, unreachable; formerly `ResizeAttachPointVectorWithDefaultLane` in moho/ai/IAiTransport.cpp (RULE ONE), removed 2026-09-11.)
  * Address: 0x008D5580 (FUN_008D5580 -- `resize(n, end())` of the bucket array of
  *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp): the grow in its `insert` (0x008D4C72) doubles the array through it.)
+ * Address: 0x0076C130 (FUN_0076C130 -- `resize(n, value)` for `msvc8::vector<moho::OccupySourceBinding>` (`PathTables::Impl::mSources`): grow through `_Insert_n` 0x0076C490 at `end()`, shrink through `erase(begin() + n, end())` 0x0076C430; callers 0x0076B8C0 (`PathTables::PathTables`), 0x0076BFA0. Formerly `ResizeOccupySourceBindingVectorWithFill` in moho/path/PathTables.cpp, which shrank by rebasing the end instead of erasing (RULE ONE), removed 2026-09-29.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -4462,6 +4466,7 @@ namespace msvc8
          * Address: 0x007A5E30 (FUN_007A5E30 -- see 0x007A5F60 above.)
  * Address: 0x008D5D00 (FUN_008D5D00 -- `erase(first, last)` of the bucket array of
  *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp): `resize`'s shrink branch, the tail copied down over the gap.)
+ * Address: 0x0076C430 (FUN_0076C430 -- `erase(first, last)` for `msvc8::vector<moho::OccupySourceBinding>`: the tail is assigned down through the implicit `operator=`, which copies `mGrid`/`mFootprint` and leaves every vptr alone; caller 0x0076C130. Formerly `CopyOccupySourceBindingTailRangeAndCommitRuntime` in moho/path/PathTables.cpp (RULE ONE), removed 2026-09-29.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -6693,6 +6698,9 @@ namespace msvc8
          * Address: 0x00505850 (FUN_00505850 -- the same `_Insert_n` for `msvc8::vector<moho::SpatialShardData<T>*>`, through `_Xlen` 0x00505A70, 0x00506230 and `_Allocate` 0x005062A0; caller 0x00504EE0; formerly `InsertNullSpatialShardDataSlots` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
  * Address: 0x008D5D70 (FUN_008D5D70 -- `insert(pos, count, value)` (`_Insert_n`) of the bucket
  *   array of `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp), `resize`'s grow branch.)
+ * Address: 0x0076C490 (FUN_0076C490 -- `_Insert_n` for `msvc8::vector<moho::OccupySourceBinding>` (12-byte element, `max_size` 0x15555555): `size` 0x0076C400, `_Xlen` 0x0076C730, `_Uninit_fill_n` 0x0076CBA0 / `_Ufill` 0x0076D150, `_Umove` 0x0076CD00 over `_Ucopy` 0x0076D300, the gap `fill` 0x0076CD30, `copy_backward` 0x0076CD60, `_Allocate` 0x0076CD90; caller 0x0076C130. Formerly `InsertOccupySourceBindingRange` in moho/path/PathTables.cpp (RULE ONE), removed 2026-09-29.)
+ * Address: 0x0076CD30 (FUN_0076CD30 -- the gap `fill` of that `_Insert_n`: the binding's implicit `operator=` over `[first, last)`, `mGrid`/`mFootprint` only; caller 0x0076C490. Formerly `FillOccupySourceBindingPayloadRangeRuntime` in moho/path/PathTables.cpp (RULE ONE), removed 2026-09-29.)
+ * Address: 0x0076C850 (FUN_0076C850 -- `_Insert_n` for `msvc8::vector<gpg::HaStar::ClusterMap*>` (`PathTables::Impl::mMaps`, 4-byte element): `_Xlen` 0x0076CA70, `_Copy_opt` 0x0076CE20, `_Copy_backward_opt` 0x0076CE60, `_Allocate` 0x0076CE90; caller 0x0076C270.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -9503,6 +9511,7 @@ namespace msvc8
          * Address: 0x008EA2F0 (FUN_008EA2F0 -- a tag-pushing bridge into 0x008EA0D0 for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); zero callers, unreachable; formerly `FillDwordRangeWithSourceLaneDispatchAAdapter` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
  * Address: 0x008D72F0 (FUN_008D72F0 -- the 4-byte fill for the bucket array of
  *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp): count in EAX, destination in ECX, `&value` in EDX, one null-checked store per slot.)
+ * Address: 0x0076CBA0 (FUN_0076CBA0 -- `_Uninit_fill_n` for `msvc8::vector<moho::OccupySourceBinding>`, forwarding to `_Ufill` 0x0076D150; caller 0x0076C490. Formerly `FillOccupySourceBindingRangeFromPrototype` in moho/path/PathTables.cpp, which assigned into raw slots instead of constructing them (RULE ONE), removed 2026-09-29.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -10548,6 +10557,7 @@ namespace msvc8
          * Address: 0x008EA030 (FUN_008EA030 -- `copy_backward` for `Head::validFormats1` (+0x70; the 4-byte non-builtin element described on `insert` at 0x008EF500); callers 0x008EF718 (`_Insert_n` 0x008EF500); formerly `CopyDwordRangeBackwardD3D9B` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x008EA000 (FUN_008EA000 -- `copy_backward` for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); callers 0x008EF4C8 (`_Insert_n` 0x008EF2B0); formerly `CopyDwordRangeBackwardD3D9A` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x008F6580 (FUN_008F6580 -- `copy_backward` for `msvc8::vector<DXGI_MODE_DESC>` (the D3D10 adapter-mode list, the 0x1C POD element, one `rep movsd` per slot); callers 0x008F6CEE (`_Insert_n` 0x008F6A50); formerly `CopyDwordHeptRangeBackwardD3D9` over a `DwordHeptRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x0076CD60 (FUN_0076CD60 -- `copy_backward` for `msvc8::vector<moho::OccupySourceBinding>`, by assignment (vptrs untouched); caller 0x0076C490. Formerly `CopyOccupySourceBindingPayloadRangeBackwardRuntime` in moho/path/PathTables.cpp (RULE ONE), removed 2026-09-29.)
          */
     public:
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
@@ -11353,6 +11363,8 @@ namespace msvc8
          * Address: 0x00505750 (FUN_00505750 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<moho::SpatialShard<T>*>` (moho/mesh/SpatialDb.h); callers 0x00505530.)
          * Address: 0x00505A70 (FUN_00505A70 -- the same `_Xlen` for `msvc8::vector<moho::SpatialShardData<T>*>`; callers 0x00505850.)
          * Address: 0x008D6570 (FUN_008D6570 -- `_Xlen` for the bucket array of `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp); caller 0x008D5DD4 (`_Insert_n` 0x008D5D70).)
+         * Address: 0x0076C730 (FUN_0076C730 -- `_Xlen` for `msvc8::vector<moho::OccupySourceBinding>` (`PathTables::Impl::mSources`); callers 0x0076C1D9, 0x0076C490 (`_Insert_n`). Its old anchor sat on a stale block in the excluded moho/misc/CrtRuntimeHelpers.cpp.)
+         * Address: 0x0076CA70 (FUN_0076CA70 -- `_Xlen` for `msvc8::vector<gpg::HaStar::ClusterMap*>` (`PathTables::Impl::mMaps`); callers 0x0076C309, 0x0076C850 (`_Insert_n`).)
          */
         [[noreturn]] static void throw_too_long()
         {
@@ -12186,6 +12198,8 @@ namespace msvc8
          * first element is inserted unprotected (nothing to roll back if
          * its own construction is what throws), matching the binary's own
          * zero-iterations-rolled-back behaviour on a first-element failure.
+         * Address: 0x0076B030 (FUN_0076B030 -- `_Insert(where, first, last)` for the element list of `PathQueue::ImplBase`'s A* node table (`msvc8::hash_map<moho::SOCellPos, gpg::AStarNode<moho::SOCellPos>>`, 0x24-byte value): `_Buynode` 0x0076A2E0 and `_Incsize(1)` 0x00769ED0 per element, `erase` 0x0076A2B0 in the rethrowing catch; caller 0x0076AA30.)
+         * Address: 0x0076AA30 (FUN_0076AA30 -- the `insert(where, first, last)` forwarder into 0x0076B030 for that list; nothing in the PE references it, so it is unreachable.)
          */
         template <class InputIt>
         iterator insert(const_iterator pos, InputIt first, InputIt last)
@@ -12254,6 +12268,7 @@ namespace msvc8
          * Address: 0x00685950 (FUN_00685950 -- `erase(pos)` over the back-reference list, patching the back pointer and exporting the successor for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `EraseBackRefListNodeAndStoreNext` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00776C30 (FUN_00776C30 -- `remove(value)` -- `erase(pos)` run over every node whose value matches, rewiring the neighbours and dropping the size for `msvc8::list<moho::Shield*>` (`Sim::mShields`; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007762BD, 0x00776600; formerly `UnlinkShieldListNodesByValue` in moho/entity/Shield.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x0070E460 (FUN_0070E460 -- `erase(pos)` -- unlink, free, decrement, hand back the successor. Reached from `CArmyStats::RemoveArmyStatsTrigger` for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); callers 0x0070BE50, 0x0070BEA0; formerly `EraseTriggerListNodeAndAdvance` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x0076A2B0 (FUN_0076A2B0 -- `erase(pos)` for the element list of `PathQueue::ImplBase`'s A* node table (`msvc8::hash_map<moho::SOCellPos, gpg::AStarNode<moho::SOCellPos>>`), the list in ESI and the successor out through EDI; the rollback step of the range insert 0x0076B030. Formerly `UnlinkAndDeleteIntrusiveNode` over `IntrusiveListNodeRuntime`/`IntrusiveListOwnerRuntime` in moho/path/PathTables.cpp (RULE ONE/THREE), removed 2026-09-29.)
          */
         iterator erase(const_iterator pos)
         {
