@@ -19,6 +19,7 @@
 #include "gpg/core/streams/FileStream.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/exceptions/StdExcept.h"
 #include "gpg/gal/MeshFormatter.h"
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
@@ -1228,7 +1229,13 @@ void moho::ExecuteConsoleCommandText(const char* commandText)
     if (!parsedTokens.empty()) {
       CConCommand* const command = CON_FindCommand(parsedTokens[0].c_str());
       if (command != nullptr) {
-        command->Handle(parsedTokens);
+        // A failing command is logged and the chain carries on (runtime_error,
+        // try state 3 around the Handle call at 0x0041CE08, handler 0x0041CE16).
+        try {
+          command->Handle(parsedTokens);
+        } catch (const msvc8::runtime_error& error) {
+          gpg::Warnf("Error running console command %s: %s", commandText, error.what());
+        }
       } else {
         msvc8::string easterEgg("ipdlfz");
         DecStringChars(easterEgg);

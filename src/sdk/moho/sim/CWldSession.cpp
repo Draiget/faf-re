@@ -10761,85 +10761,6 @@ namespace moho
       return (dragMask != 0xFF000000u) ? COMMOD_Reclaim : COMMOD_Move;
     }
 
-    [[nodiscard]] LuaPlus::LuaObject
-    GetLuaIndex(LuaPlus::LuaState* state, const LuaPlus::LuaObject& tableObj, const std::int32_t index)
-    {
-      if (!state || !tableObj || !tableObj.IsTable()) {
-        return {};
-      }
-
-      lua_State* const lstate = state->GetCState();
-      if (!lstate) {
-        return {};
-      }
-
-      const int savedTop = lua_gettop(lstate);
-      const_cast<LuaPlus::LuaObject&>(tableObj).PushStack(lstate);
-      // Lua 5.0-era ABI: integer index is pushed as number.
-      lua_pushnumber(lstate, static_cast<lua_Number>(index));
-      lua_gettable(lstate, -2);
-      LuaPlus::LuaObject result{LuaPlus::LuaStackObject(state, -1)};
-      lua_settop(lstate, savedTop);
-      return result;
-    }
-
-    [[nodiscard]] bool IsLuaFunction(LuaPlus::LuaState* state, const LuaPlus::LuaObject& obj)
-    {
-      if (!state || !obj) {
-        return false;
-      }
-
-      lua_State* const lstate = state->GetCState();
-      if (!lstate) {
-        return false;
-      }
-
-      const int savedTop = lua_gettop(lstate);
-      const_cast<LuaPlus::LuaObject&>(obj).PushStack(lstate);
-      const bool isFn = lua_isfunction(lstate, -1) != 0;
-      lua_settop(lstate, savedTop);
-      return isFn;
-    }
-
-    /**
-     * Address: 0x0083DDA0 (FUN_0083DDA0, Moho::UI_GetCommandMode)
-     *
-     * What it does:
-     * Imports `/lua/ui/game/commandmode.lua`, calls `GetCommandMode()`, and
-     * extracts `(modeString, payloadTable)` when present.
-     */
-    [[nodiscard]] bool TryGetUICommandMode(LuaPlus::LuaState* state, UICommandModeData& out)
-    {
-      LuaPlus::LuaObject module = moho::SCR_ImportLuaModule(state, "/lua/ui/game/commandmode.lua");
-      if (!module || !module.IsTable()) {
-        return false;
-      }
-
-      LuaPlus::LuaObject getCommandMode = moho::SCR_GetLuaTableField(state, module, "GetCommandMode");
-      if (!IsLuaFunction(state, getCommandMode)) {
-        return false;
-      }
-
-      LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{getCommandMode};
-      LuaPlus::LuaObject result = fn();
-      if (!result || !result.IsTable()) {
-        return false;
-      }
-
-      LuaPlus::LuaObject modeField = GetLuaIndex(state, result, 1);
-      if (modeField && modeField.IsString()) {
-        const char* const modeName = modeField.GetString();
-        out.mMode = modeName ? modeName : "";
-      }
-
-      LuaPlus::LuaObject payloadField = GetLuaIndex(state, result, 2);
-      if (payloadField && payloadField.IsTable()) {
-        out.mPayload = payloadField;
-      }
-
-      return true;
-    }
-
     // ===================================================================
     // Right-mouse-button command resolution helpers (FUN_0081EC00 family)
     // ===================================================================
@@ -16816,7 +16737,8 @@ namespace moho
           const std::size_t focusIndex = static_cast<std::size_t>(FocusArmy);
           if (focusIndex < userArmies.size() && userArmies[focusIndex] != nullptr) {
             UICommandModeData uiMode{};
-            if (TryGetUICommandMode(mState, uiMode)) {
+            UI_GetCommandMode(uiMode);
+            {
               if (uiMode.mMode.empty()) {
                 resolvedByUi = false;
               } else if (uiMode.mMode == "order") {
@@ -20098,7 +20020,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
   // entirely - which is why right-clicking never discarded a building you were
   // about to place.
   UICommandModeData commandMode{};
-  TryGetUICommandMode(wldSession->mState, commandMode);
+  UI_GetCommandMode(commandMode);
   if (!commandMode.mMode.empty()) {
     commandModeData.mMode = COMMOD_CancelCommandMode;
     *out = commandModeData;

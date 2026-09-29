@@ -8,6 +8,7 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/core/utils/Global.h"
+#include "legacy/exceptions/StdExcept.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_Color.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -432,11 +433,18 @@ bool moho::ShowEscapeDialog(const bool showDialog)
     return true;
   }
 
-  const LuaPlus::LuaObject uiMainModule = SCR_Import(state, "/lua/ui/uimain.lua");
-  const LuaPlus::LuaObject showEscapeDialogObj = uiMainModule["ShowEscapeDialog"];
-  LuaPlus::LuaFunction<bool> showEscapeDialogFn(showEscapeDialogObj);
-  (void)showEscapeDialogFn(showDialog);
-  return true;
+  // A script error is logged and answers false (runtime_error, handler
+  // 0x0083D3EA, continuation 0x0083D408 `xor al, al`).
+  try {
+    const LuaPlus::LuaObject uiMainModule = SCR_Import(state, "/lua/ui/uimain.lua");
+    const LuaPlus::LuaObject showEscapeDialogObj = uiMainModule["ShowEscapeDialog"];
+    LuaPlus::LuaFunction<bool> showEscapeDialogFn(showEscapeDialogObj);
+    (void)showEscapeDialogFn(showDialog);
+    return true;
+  } catch (const msvc8::runtime_error& error) {
+    gpg::Warnf("Error running '/lua/ui/uimain.lua:ShowEscapeDialog': %s", error.what());
+  }
+  return false;
 }
 
 /**
@@ -454,11 +462,18 @@ bool moho::UI_UpdateDisconnectDialogCallback()
     return true;
   }
 
-  const LuaPlus::LuaObject uiMainModule = SCR_Import(state, "/lua/ui/uimain.lua");
-  const LuaPlus::LuaObject updateDisconnectDialogObj = uiMainModule["UpdateDisconnectDialog"];
-  LuaPlus::LuaFunction<void> updateDisconnectDialogFn(updateDisconnectDialogObj);
-  updateDisconnectDialogFn();
-  return true;
+  // A script error is logged and answers false (runtime_error, handler
+  // 0x0083D4C6).
+  try {
+    const LuaPlus::LuaObject uiMainModule = SCR_Import(state, "/lua/ui/uimain.lua");
+    const LuaPlus::LuaObject updateDisconnectDialogObj = uiMainModule["UpdateDisconnectDialog"];
+    LuaPlus::LuaFunction<void> updateDisconnectDialogFn(updateDisconnectDialogObj);
+    updateDisconnectDialogFn();
+    return true;
+  } catch (const msvc8::runtime_error& error) {
+    gpg::Warnf("Error running '/lua/ui/uimain.lua:UpdateDisconnectDialog': %s", error.what());
+  }
+  return false;
 }
 
 /**
@@ -486,24 +501,30 @@ void moho::UI_GetCommandMode(UICommandModeData& outCommandModeData)
     return;
   }
 
-  const LuaPlus::LuaObject commandModeModule = SCR_Import(state, "/lua/ui/game/commandmode.lua");
-  const LuaPlus::LuaObject getCommandModeObj = commandModeModule["GetCommandMode"];
-  LuaPlus::LuaFunction<LuaPlus::LuaObject> getCommandModeFn(getCommandModeObj);
+  // A script error is logged and leaves the default mode (runtime_error,
+  // handler 0x0083DF3A, continuation 0x0083DF26 returns the out-parameter).
+  try {
+    const LuaPlus::LuaObject commandModeModule = SCR_Import(state, "/lua/ui/game/commandmode.lua");
+    const LuaPlus::LuaObject getCommandModeObj = commandModeModule["GetCommandMode"];
+    LuaPlus::LuaFunction<LuaPlus::LuaObject> getCommandModeFn(getCommandModeObj);
 
-  const LuaPlus::LuaObject result = getCommandModeFn();
-  if (!result.IsTable()) {
-    return;
-  }
+    const LuaPlus::LuaObject result = getCommandModeFn();
+    if (!result.IsTable()) {
+      return;
+    }
 
-  const LuaPlus::LuaObject modeField = result[1];
-  if (modeField.IsString()) {
-    const char* const modeText = modeField.GetString();
-    outCommandModeData.mMode = modeText != nullptr ? modeText : "";
-  }
+    const LuaPlus::LuaObject modeField = result[1];
+    if (modeField.IsString()) {
+      const char* const modeText = modeField.GetString();
+      outCommandModeData.mMode = modeText != nullptr ? modeText : "";
+    }
 
-  const LuaPlus::LuaObject payloadField = result[2];
-  if (payloadField.IsTable()) {
-    outCommandModeData.mPayload = payloadField;
+    const LuaPlus::LuaObject payloadField = result[2];
+    if (payloadField.IsTable()) {
+      outCommandModeData.mPayload = payloadField;
+    }
+  } catch (const msvc8::runtime_error& error) {
+    gpg::Warnf("Error running '/lua/ui/game/commandmode.lua:GetCommandMode': %s", error.what());
   }
 }
 

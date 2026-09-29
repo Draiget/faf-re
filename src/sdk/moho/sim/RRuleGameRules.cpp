@@ -23,6 +23,7 @@
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Tree.h"
+#include "lua/LuaError.h"
 #include "lua/LuaObject.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/lua/CScrLuaInitForm.h"
@@ -929,22 +930,23 @@ namespace moho
 
   /**
    * Address: 0x0052B960 (FUN_0052B960)
+   *
+   * What it does:
+   * Returns `/lua/ui/lobby/lobbyComm.lua:GetDefaultPlayerOptions()`. A script
+   * error (lua_RuntimeError, handler 0x0052BA2F) is logged and the result
+   * stays nil.
    */
   LuaPlus::LuaObject RULE_GetDefaultPlayerOptions(LuaPlus::LuaState* const state)
   {
-    if (state == nullptr) {
-      return {};
+    LuaPlus::LuaObject defaultOptions{};
+    try {
+      const LuaPlus::LuaObject lobbyComm = SCR_Import(state, "/lua/ui/lobby/lobbyComm.lua");
+      const LuaPlus::LuaFunction<LuaPlus::LuaObject> getDefaultPlayerOptions(lobbyComm["GetDefaultPlayerOptions"]);
+      defaultOptions = getDefaultPlayerOptions();
+    } catch (const lua_RuntimeError& error) {
+      gpg::Warnf("Error running GetDefaultPlayerOptions in LobbyComm.lua: %s", error.what());
     }
-
-    LuaPlus::LuaObject lobbyModule = SCR_ImportLuaModule(state, "/lua/ui/lobby/lobbyComm.lua");
-    LuaPlus::LuaObject getDefaultPlayerOptions = SCR_GetLuaTableField(state, lobbyModule, "GetDefaultPlayerOptions");
-    if (getDefaultPlayerOptions.m_state == nullptr || getDefaultPlayerOptions.m_object.tt != LUA_TFUNCTION) {
-      gpg::Warnf("RULE_GetDefaultPlayerOptions: missing lobbyComm.GetDefaultPlayerOptions().");
-      return {};
-    }
-
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> getDefaultsFn{getDefaultPlayerOptions};
-    return getDefaultsFn();
+    return defaultOptions;
   }
 
   /**

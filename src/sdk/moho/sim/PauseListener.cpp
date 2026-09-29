@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/utils/Logging.h"
+#include "legacy/exceptions/StdExcept.h"
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/CWldSession.h"
@@ -51,12 +53,18 @@ namespace moho
    */
   void PauseListener::OnEvent(const SPauseEvent event)
   {
-    LuaPlus::LuaState* const luaState = WLD_GetSession()->mState;
+    // The whole body is guarded (runtime_error, try states 0..5, handler
+    // 0x008696DA).
+    try {
+      LuaPlus::LuaState* const luaState = WLD_GetSession()->mState;
 
-    LuaPlus::LuaFunction onUserPauseFn(
-      SCR_Import(luaState, "/lua/ui/game/gamemain.lua")["OnUserPause"]
-    );
-    onUserPauseFn.Call_Bool(event.mPaused);
+      LuaPlus::LuaFunction onUserPauseFn(
+        SCR_Import(luaState, "/lua/ui/game/gamemain.lua")["OnUserPause"]
+      );
+      onUserPauseFn.Call_Bool(event.mPaused);
+    } catch (const msvc8::runtime_error& error) {
+      gpg::Warnf("Error running '/lua/ui/game/gamemain.lua:OnUserPause': %s", error.what());
+    }
   }
 
   namespace

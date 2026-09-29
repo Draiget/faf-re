@@ -2822,6 +2822,12 @@ void CLobby::Msgf(
 
 /**
  * Address: 0x007CBAD0 (FUN_007CBAD0)
+ *
+ * What it does:
+ * A `RunScript` instantiation: calls `self:ConnectionToHostEstablished(
+ * localPeerUid, newLocalName, hostPeerUid)` under the weak guard; a script
+ * error is reported through LogScriptWarning (runtime_error, handler
+ * 0x007CBC07).
  */
 void CLobby::ProcessConnectionToHostEstablished(
   const char** localPeerUidBuf,
@@ -2829,32 +2835,23 @@ void CLobby::ProcessConnectionToHostEstablished(
   const char** hostPeerUidBuf
 )
 {
-  LuaPlus::LuaObject dest;
-  FindScript(&dest, "ConnectionToHostEstablished");
-
-  if (dest) {
-    const char* localPeerUid = (localPeerUidBuf && *localPeerUidBuf) ? *localPeerUidBuf : "";
-    const char* newLocalName = (newLocalNameBuf && *newLocalNameBuf) ? *newLocalNameBuf : "";
-    const char* postPeerUid = (hostPeerUidBuf && *hostPeerUidBuf) ? *hostPeerUidBuf : "";
-
-    const LuaPlus::LuaObject self(mLuaObj);
-    const LuaPlus::LuaFunction<void> fn(dest);
-    fn(self, localPeerUid, newLocalName, postPeerUid);
-  }
+  const char* const localPeerUid = (localPeerUidBuf && *localPeerUidBuf) ? *localPeerUidBuf : "";
+  const char* const newLocalName = (newLocalNameBuf && *newLocalNameBuf) ? *newLocalNameBuf : "";
+  const char* const hostPeerUid = (hostPeerUidBuf && *hostPeerUidBuf) ? *hostPeerUidBuf : "";
+  (void)RunScript("ConnectionToHostEstablished", localPeerUid, newLocalName, hostPeerUid);
 }
 
 /**
  * Address: 0x007CBD20 (FUN_007CBD20)
+ *
+ * What it does:
+ * A `RunScript` instantiation: calls `self:Ejected("KickedByHost")`; a script
+ * error is reported through LogScriptWarning (runtime_error, handler
+ * 0x007CBE42).
  */
 void CLobby::ProcessEjected()
 {
-  LuaPlus::LuaObject dest;
-  FindScript(&dest, "Ejected");
-  if (dest) {
-    LuaPlus::LuaObject self(mLuaObj);
-    LuaPlus::LuaFunction<void> fn(dest);
-    fn.Call(self, "KickedByHost");
-  }
+  (void)RunScript("Ejected", "KickedByHost");
 }
 
 /**

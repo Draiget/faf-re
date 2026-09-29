@@ -24803,25 +24803,16 @@ void moho::CMauiEdit::DragRelease(
  * Address: 0x00794F20 (FUN_00794F20, Moho::CMauiEdit::TextChanged)
  *
  * What it does:
- * Invokes script callback `OnTextChanged(self, newText, oldText)` when present
- * while holding weak-object callback guard state.
+ * A `RunScript` instantiation: invokes `OnTextChanged(self, newText, oldText)`
+ * under the weak guard; a script error is reported through LogScriptWarning
+ * (runtime_error, handler 0x0079505C).
  */
 void moho::CMauiEdit::TextChanged(
   const msvc8::string& newText,
   const msvc8::string& oldText
 )
 {
-  CScriptObject* const scriptObject = this;
-  WeakObject::ScopedWeakLinkGuard weakGuard(static_cast<WeakObject*>(scriptObject));
-
-  LuaPlus::LuaObject callbackObject{};
-  scriptObject->FindScript(&callbackObject, "OnTextChanged");
-  if (!callbackObject) {
-    return;
-  }
-
-  LuaPlus::LuaFunction<void> callback(callbackObject);
-  callback(mLuaObj, newText.c_str(), oldText.c_str());
+  (void)RunScript("OnTextChanged", newText.c_str(), oldText.c_str());
 }
 
 /**
