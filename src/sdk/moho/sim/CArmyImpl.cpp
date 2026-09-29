@@ -1637,7 +1637,7 @@ namespace moho
       if (unit == nullptr) {
         break;
       }
-      unit->ListLinkAfter(&Simulation->mCoordEntities);
+      unit->ListLinkBefore(&Simulation->mCoordEntities);
       node = CEntityDb::NextAllUnitsNode(node);
     }
   }

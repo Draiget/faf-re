@@ -77,7 +77,7 @@ namespace
     prop.SimulationRef->mEntityDB->mEntList.push_back(&prop);
 
     if (prop.SimulationRef) {
-      prop.ListLinkAfter(&prop.SimulationRef->mCoordEntities);
+      prop.ListLinkBefore(&prop.SimulationRef->mCoordEntities);
     }
   }
 
@@ -824,7 +824,7 @@ namespace moho
     }
 
     if (SimulationRef && ListIsSingleton()) {
-      ListLinkAfter(&SimulationRef->mCoordEntities);
+      ListLinkBefore(&SimulationRef->mCoordEntities);
     }
 
     const float previous = mVarDat.mFractionComplete;

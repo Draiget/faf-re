@@ -42,6 +42,19 @@ namespace moho
   class CSimConVarBase;
   class Unit;
   class CAniPose;
+
+  /**
+   * Address: 0x004A4920 (FUN_004A4920)
+   * Mangled: ?REF_UpdateMD5@Moho@@YAXAAVMD5Context@gpg@@ABVRRef@3@PAU_iobuf@@H@Z
+   *
+   * What it does:
+   * Folds one reflected value into `md5`: primitives and enums by their bytes,
+   * strings with their terminator, objects field by field, pointers and indexed
+   * containers by element count then elements. With `traceFile` set it also
+   * writes each field name and lexical value, indented two spaces per level
+   * (the `/synclog` beat log).
+   */
+  void REF_UpdateMD5(gpg::MD5Context& md5, const gpg::RRef& ref, std::FILE* traceFile, int indentDepth);
 } // namespace moho
 
 namespace moho

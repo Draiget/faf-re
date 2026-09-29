@@ -622,7 +622,7 @@ namespace moho
     // Splice the coord node into Sim::mCoordEntities at the FRONT: the binary
     // self-inits the node to a singleton then inserts it immediately after the
     // list sentinel (ListLinkAfter unlinks-first, matching that exactly).
-    ListLinkAfter(&sim->mCoordEntities);
+    ListLinkBefore(&sim->mCoordEntities);
 
     // Scale velocity = Display.MeshScaleVelocity + rand(±Display.MeshScaleVelocityRange).
     {
@@ -872,7 +872,7 @@ namespace moho
     // Relink the coord node at the FRONT of the Sim coord list: the binary
     // unlinks then inserts immediately after the sentinel (node.prev=sentinel,
     // node.next=sentinel.next, sentinel.next=node), asm 0x0069BF3B-0069BF5D.
-    ListLinkAfter(&SimulationRef->mCoordEntities);
+    ListLinkBefore(&SimulationRef->mCoordEntities);
 
     if (!mTrackTarget) {
       // --- Ballistic integration ---
@@ -969,22 +969,16 @@ namespace moho
       Wm3::Quaternionf spin;
       moho::QuatFromAxisAngleVector(&spin, spinAxisAngle);
 
-      // Compose the new orientation as spin * oldOrientation using the engine's
-      // exact lane pattern (decompile lines: tran.orient.x/y/z/w assignments,
-      // asm 0x0069C3AC-0x0069C4A1). spin=(sx,sy,sz,sw), old=(ox,oy,oz,ow).
-      const float ox = tran.orient_.x;
-      const float oy = tran.orient_.y;
-      const float oz = tran.orient_.z;
-      const float ow = tran.orient_.w;
-      const float sx = spin.x;
-      const float sy = spin.y;
-      const float sz = spin.z;
-      const float sw = spin.w;
-      const float newX = ((sx * ox) - (sy * oy) - (sz * oz)) - (sw * ow);
-      const float newY = ((sy * ox) + (sw * oz) + (oy * sx)) - (sz * ow);
-      const float newZ = ((sz * ox) + (sy * ow) + (oz * sx)) - (sw * oy);
-      const float newW = ((sw * ox) + (sz * oy) + (ow * sx)) - (sy * oz);
-      tran.orient_ = Wm3::Quatf{newW, newX, newY, newZ};
+      // The new orientation is orientation * spin, the spin applied in the
+      // projectile's own frame (asm 0x0069C3AC-0x0069C4A1). Lane 0 is the
+      // scalar; each lane keeps the binary's operation order so the result is
+      // bit-identical, which a sim checksum needs.
+      const Wm3::Quaternionf& o = tran.orient_;
+      const float w = ((spin.w * o.w) - (spin.x * o.x) - (spin.y * o.y)) - (spin.z * o.z);
+      const float x = ((spin.x * o.w) + (spin.z * o.y) + (o.x * spin.w)) - (spin.y * o.z);
+      const float y = ((spin.y * o.w) + (spin.x * o.z) + (o.y * spin.w)) - (spin.z * o.x);
+      const float z = ((spin.z * o.w) + (spin.y * o.x) + (o.z * spin.w)) - (spin.x * o.y);
+      tran.orient_ = Wm3::Quatf{w, x, y, z};
     }
 
     // Underwater clamp: keep the projectile just below the surface.

@@ -310,25 +310,22 @@ namespace
     return owner->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(source->mConstDat.mArmyIndex));
   }
 
-  struct InfluenceMapMd5UpdateOwnerRuntime
-  {
-    std::uint8_t pad_00_4F[0x50];
-    gpg::MD5Context context;
-  };
-
   /**
    * Address: 0x0071CA70 (FUN_0071CA70)
    *
+   * IDA signature:
+   * void __usercall sub_71CA70(const void *word@<eax>, Moho::Sim *sim@<ecx>);
+   *
    * What it does:
-   * Updates the embedded MD5 context at owner offset `+0x50` with one 32-bit
-   * word lane from caller-provided storage.
+   * Folds one 32-bit word into the sim's desync checksum: `add ecx, 0x50`
+   * lands on `Sim::mContext` (the MD5 context right after `mIsDesyncFree` at
+   * +0x4C), then `MD5Context::Update(word, 4)` -- the same
+   * `sim->mContext.Update(&value, sizeof(float))` step `CInfluenceMap::Update`
+   * performs per entry.
    */
-  void UpdateMd5ContextWordAtOffset50(
-    const void* const wordLane,
-    InfluenceMapMd5UpdateOwnerRuntime* const owner
-  )
+  void UpdateSimChecksumWord(const void* const word, moho::Sim* const sim)
   {
-    owner->context.Update(wordLane, 4u);
+    sim->mContext.Update(word, 4u);
   }
 
   /**

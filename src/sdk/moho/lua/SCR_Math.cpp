@@ -1355,8 +1355,11 @@ int moho::cfunc_MATH_IRoundL(LuaPlus::LuaState* const state)
     LuaPlus::LuaStackObject::TypeError(&numberArg, "number");
   }
 
+  // 0x004D2005 converts with `fistp`: round to nearest (even) under the default
+  // rounding mode, not the truncation a cast gives. Blueprint Lua sizes engineer
+  // build overlays from this (MATH_IRound(0.9) must be 1).
   const float value = static_cast<float>(lua_tonumber(state->m_state, 1));
-  lua_pushnumber(state->m_state, static_cast<float>(static_cast<int>(value)));
+  lua_pushnumber(state->m_state, static_cast<float>(std::lrintf(value)));
   (void)lua_gettop(state->m_state);
   return 1;
 }

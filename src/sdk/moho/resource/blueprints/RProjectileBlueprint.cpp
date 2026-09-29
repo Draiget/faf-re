@@ -206,9 +206,9 @@ namespace moho
     randomAxis.z = randomStream->FRandGaussian();
     Wm3::Vector3f::Normalize(&randomAxis);
 
+    // 0x0051C8EC..0x0051C946 is CRandomStream::FRand(-range, range) inlined.
     const float randomRange = Physics.RotationalVelocityRange;
-    const float randomUnit = CMersenneTwister::ToUnitFloat(randomStream->twister.NextUInt32());
-    const float randomOffset = (-randomRange) + ((randomRange - (-randomRange)) * randomUnit);
+    const float randomOffset = randomStream->FRand(-randomRange, randomRange);
 
     constexpr float kDegreesToRadians = 0.017453292f;
     const float angularSpeed = (Physics.RotationalVelocity + randomOffset) * kDegreesToRadians;

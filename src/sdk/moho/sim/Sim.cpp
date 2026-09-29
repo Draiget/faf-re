@@ -1,4 +1,5 @@
 #include "Sim.h"
+#include "legacy/math/X87Math.h"
 #include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "SimDriver.h"
@@ -187,15 +188,6 @@ namespace moho
    * code has both dropped at the one call site.
    */
   void REF_CreateEditDialog(wxWindow* parent, const gpg::RRef& ref, const char* name, bool);
-
-  /**
-   * Address: 0x004A4920 (FUN_004A4920, REF_UpdateMD5)
-   *
-   * What it does:
-   * Walks a reflected value tree, emits optional textual trace output, and
-   * folds deterministic value bytes/shape into the provided MD5 context.
-   */
-  void REF_UpdateMD5(gpg::MD5Context* md5, gpg::RRef* ref, FILE* traceFile, std::size_t indentDepth);
 
   /**
    * VFTABLE: 0x00E06F18 (??_7CRefTreeItemData@Moho@@6B@)
@@ -711,64 +703,56 @@ namespace
 } // namespace
 
 /**
- * Address: 0x004A4920 (FUN_004A4920, REF_UpdateMD5)
+ * Address: 0x004A4920 (FUN_004A4920)
+ * Mangled: ?REF_UpdateMD5@Moho@@YAXAAVMD5Context@gpg@@ABVRRef@3@PAU_iobuf@@H@Z
  *
  * What it does:
  * Walks a reflected value tree, emits optional textual trace output, and
  * folds deterministic value bytes/shape into the provided MD5 context.
+ * Called per blueprint by `RRuleGameRulesImpl::UpdateChecksum`, which seeds
+ * every session's checksum.
  */
 void moho::REF_UpdateMD5(
-  gpg::MD5Context* const md5,
-  gpg::RRef* const ref,
-  FILE* const traceFile,
-  const std::size_t indentDepth
+  gpg::MD5Context& md5,
+  const gpg::RRef& ref,
+  std::FILE* const traceFile,
+  const int indentDepth
 )
 {
-  if (md5 == nullptr || ref == nullptr || ref->mType == nullptr) {
-    return;
-  }
-
-  gpg::RType* const refType = ref->mType;
+  gpg::RType* const refType = ref.mType;
+  const std::size_t depth = static_cast<std::size_t>(indentDepth);
   const bool isPrimitiveLike =
     refType == GetCharRType() || refType == GetShortRType() || refType == GetIntRType() || refType == GetLongRType()
     || refType == GetSignedCharRType() || refType == GetUnsignedCharRType() || refType == GetFloatRType()
     || refType == GetBoolRType() || refType->IsEnumType() != nullptr;
 
   if (isPrimitiveLike) {
-    PrintMd5TraceLexical(traceFile, indentDepth, ref->GetLexical());
-    md5->Update(ref->mObj, static_cast<std::size_t>(refType->size_));
+    PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    md5.Update(ref.mObj, static_cast<std::size_t>(refType->size_));
     return;
   }
 
   if (refType == GetStringRType()) {
-    const auto* const stringValue = static_cast<const msvc8::string*>(ref->mObj);
-    if (stringValue != nullptr) {
-      PrintMd5TraceLexical(traceFile, indentDepth, ref->GetLexical());
-      md5->Update(stringValue->c_str(), stringValue->size() + 1u);
-    } else {
-      static const char kEmpty = '\0';
-      md5->Update(&kEmpty, 1u);
-    }
+    PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    const auto& stringValue = *static_cast<const msvc8::string*>(ref.mObj);
+    md5.Update(stringValue.c_str(), stringValue.size() + 1u);
     return;
   }
 
   const std::size_t fieldCount = refType->fields_.size();
   for (std::size_t fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex) {
-    PrintMd5TraceFieldPrefix(traceFile, indentDepth, refType->fields_[fieldIndex].mName);
-
-    gpg::RRef fieldRef = ref->GetField(static_cast<int>(fieldIndex));
-    REF_UpdateMD5(md5, &fieldRef, traceFile, indentDepth + 1u);
+    PrintMd5TraceFieldPrefix(traceFile, depth, refType->fields_[fieldIndex].mName);
+    REF_UpdateMD5(md5, ref.GetField(static_cast<int>(fieldIndex)), traceFile, indentDepth + 1);
   }
 
   if (const gpg::RIndexed* const pointerType = refType->IsPointer(); pointerType != nullptr) {
-    const std::uint32_t pointerCount = static_cast<std::uint32_t>(pointerType->GetCount(ref->mObj));
-    md5->Update(&pointerCount, sizeof(pointerCount));
+    const std::uint32_t pointerCount = static_cast<std::uint32_t>(pointerType->GetCount(ref.mObj));
+    md5.Update(&pointerCount, sizeof(pointerCount));
 
     if (pointerCount != 0u) {
-      gpg::RRef pointedRef = pointerType->SubscriptIndex(ref->mObj, 0);
-      REF_UpdateMD5(md5, &pointedRef, traceFile, indentDepth);
+      REF_UpdateMD5(md5, pointerType->SubscriptIndex(ref.mObj, 0), traceFile, indentDepth);
     } else if (traceFile != nullptr) {
-      const msvc8::string indent = BuildMd5TraceIndent(indentDepth);
+      const msvc8::string indent = BuildMd5TraceIndent(depth);
       std::fprintf(traceFile, "%s<NULL>\n", indent.c_str());
     }
     return;
@@ -779,13 +763,12 @@ void moho::REF_UpdateMD5(
     return;
   }
 
-  const std::uint32_t indexedCount = static_cast<std::uint32_t>(indexedType->GetCount(ref->mObj));
-  md5->Update(&indexedCount, sizeof(indexedCount));
+  const std::uint32_t indexedCount = static_cast<std::uint32_t>(indexedType->GetCount(ref.mObj));
+  md5.Update(&indexedCount, sizeof(indexedCount));
 
   for (std::uint32_t index = 0; index < indexedCount; ++index) {
-    PrintMd5TraceIndexPrefix(traceFile, indentDepth, index);
-    gpg::RRef indexedRef = indexedType->SubscriptIndex(ref->mObj, static_cast<int>(index));
-    REF_UpdateMD5(md5, &indexedRef, traceFile, indentDepth + 1u);
+    PrintMd5TraceIndexPrefix(traceFile, depth, index);
+    REF_UpdateMD5(md5, indexedType->SubscriptIndex(ref.mObj, static_cast<int>(index)), traceFile, indentDepth + 1);
   }
 }
 
@@ -1259,7 +1242,7 @@ namespace
 
   void RequeueEntityCoordUpdate(moho::Entity& entity) noexcept
   {
-    entity.ListLinkAfter(&entity.SimulationRef->mCoordEntities);
+    entity.ListLinkBefore(&entity.SimulationRef->mCoordEntities);
   }
 
   [[nodiscard]] bool IsIntelEnabledForType(const moho::CIntel& intelManager, const moho::EIntel intelType) noexcept
@@ -5150,7 +5133,7 @@ void Sim::SerDirtyEnts(gpg::ReadArchive* const archive)
   Entity* entity = nullptr;
   (void)archive->ReadPointer_Entity(&entity, &ownerRef);
   while (entity != nullptr) {
-    entity->ListLinkAfter(&mCoordEntities);
+    entity->ListLinkBefore(&mCoordEntities);
     ownerRef = gpg::RRef{};
     (void)archive->ReadPointer_Entity(&entity, &ownerRef);
   }
@@ -5964,6 +5947,22 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // outgoing one. `reset_from` is that mechanic on the wrapper itself.
   outSyncData->mSimResources.reset_from(mSimResources);
 
+  // 0x0074820E..0x00748310: close this beat's checksum. On a checksum beat
+  // (the same `sim_ChecksumPeriod` test `AdvanceBeat` used to feed `mContext`)
+  // the digest goes into the 128-beat ring and the context restarts; any other
+  // beat stores a zero digest, which `SimDriver` treats as "nothing to send".
+  // `VerifyChecksum` compares every peer's report against this ring.
+  const std::uint32_t beat = mCurBeat;
+  gpg::MD5Digest& beatHash = mSimHashes[beat & 0x7Fu];
+  const int checksumPeriod = ReadSimConVarInt(this, &gSimConVar_sim_ChecksumPeriod, 1);
+  if ((beat % static_cast<std::uint32_t>(checksumPeriod)) == 0u) {
+    beatHash = mContext.Digest();
+    mContext.Reset();
+  } else {
+    beatHash = gpg::MD5Digest{};
+  }
+  Logf("beat %d final checksum: %s\n", static_cast<int>(beat), beatHash.ToString().c_str());
+
   // 0x00748311..0x00748336: the beat is published, so retire it. The
   // advanced-this-tick latch is consumed with it, and the game-over flag the
   // rules layer raised becomes the one the client is told about.
@@ -6074,7 +6073,7 @@ void Sim::UpdateChecksum()
   Logf("Armies\n");
   for (auto it = mArmiesList.begin(); it != mArmiesList.end(); ++it) {
     CArmyImpl* const army = *it;
-    Logf("  \"%s\" [%s]\n", army->mConstDat.mArmyName.raw_data_unsafe(), army->mVarDat.mArmyType.raw_data_unsafe());
+    Logf("  \"%s\" [%s]\n", army->mConstDat.mPlayerName.raw_data_unsafe(), army->mConstDat.mArmyName.raw_data_unsafe());
 
     const SEconTotals& economy = army->GetEconomy()->economy;
     mContext.Update(&economy, sizeof(economy));
@@ -6084,18 +6083,17 @@ void Sim::UpdateChecksum()
       Logf("    mReclaimed=%.1f,%.1f\n", economy.mReclaimed.ENERGY, economy.mReclaimed.MASS);
       Logf("    mLastUseRequested=%.1f,%.1f\n", economy.mLastUseRequested.ENERGY, economy.mLastUseRequested.MASS);
       Logf("    mLastUseActual=%.1f,%.1f\n", economy.mLastUseActual.ENERGY, economy.mLastUseActual.MASS);
-      const std::uint64_t energyStorageBits = economy.mMaxStorage.ENERGY;
-      Logf(
-        "    mMaxStorage.ENERGY=%I64\n",
-        static_cast<std::uint32_t>(energyStorageBits & 0xFFFFFFFFu),
-        static_cast<std::uint32_t>(energyStorageBits >> 32)
-      );
-      const std::uint64_t massStorageBits = economy.mMaxStorage.MASS;
-      Logf(
-        "    mMaxStorage.MASS=%I64\n",
-        static_cast<std::uint32_t>(massStorageBits & 0xFFFFFFFFu),
-        static_cast<std::uint32_t>(massStorageBits >> 32)
-      );
+      // 0x0074A780: one line per resource, index first; "%I64" has no
+      // conversion letter, so the shipped trace prints nothing after '='.
+      const std::uint64_t maxStorage[] = {economy.mMaxStorage.ENERGY, economy.mMaxStorage.MASS};
+      for (int resource = 0; resource < 2; ++resource) {
+        Logf(
+          "    mMaxStorage[%d]=%I64\n",
+          resource,
+          static_cast<std::uint32_t>(maxStorage[resource] & 0xFFFFFFFFu),
+          static_cast<std::uint32_t>(maxStorage[resource] >> 32)
+        );
+      }
       logChecksumDigest();
     }
 

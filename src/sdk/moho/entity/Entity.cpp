@@ -1,6 +1,7 @@
 ﻿#include "Entity.h"
 
 #include <utility>
+#include "legacy/math/X87Math.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -2167,7 +2168,7 @@ namespace moho
     mMotor = nullptr;
 
     if (sim != nullptr) {
-      ListLinkAfter(&sim->mCoordEntities);
+      ListLinkBefore(&sim->mCoordEntities);
     }
   }
 
@@ -2415,7 +2416,7 @@ namespace moho
     RevertCollisionShape();
 
     if (SimulationRef) {
-      ListLinkAfter(&SimulationRef->mCoordEntities);
+      ListLinkBefore(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -3216,7 +3217,7 @@ namespace moho
     mPendingVelocityScale = pendingVelocityScale;
 
     if (SimulationRef && ListIsSingleton()) {
-      ListLinkAfter(&SimulationRef->mCoordEntities);
+      ListLinkBefore(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -3578,7 +3579,7 @@ namespace moho
     // Unlink from the current list and re-insert immediately after the Sim
     // coord-dirty list sentinel (front). The binary does this unconditionally,
     // regardless of whether the node was already linked.
-    ListLinkAfter(&SimulationRef->mCoordEntities);
+    ListLinkBefore(&SimulationRef->mCoordEntities);
   }
 
   /**
@@ -3717,7 +3718,7 @@ namespace moho
     SimulationRef->mDeletionQueue.push_back(this);
     SimulationRef->Logf("Entity 0x%08x queued for delete.\n", static_cast<unsigned int>(id_));
 
-    ListLinkAfter(&SimulationRef->mCoordEntities);
+    ListLinkBefore(&SimulationRef->mCoordEntities);
   }
 
   /**
@@ -4112,7 +4113,7 @@ namespace moho
 
     mVarDat.mUnderlayTexture = CD3DBatchTexture::FromFile(underlayPath.c_str(), 0u);
 
-    ListLinkAfter(&SimulationRef->mCoordEntities);
+    ListLinkBefore(&SimulationRef->mCoordEntities);
   }
 
   /**
@@ -4261,7 +4262,7 @@ namespace moho
     }
 
     if (SimulationRef && ListIsSingleton()) {
-      ListLinkAfter(&SimulationRef->mCoordEntities);
+      ListLinkBefore(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -4350,7 +4351,7 @@ namespace moho
     mVizToFocusPlayer = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && ListIsSingleton()) {
-      ListLinkAfter(&SimulationRef->mCoordEntities);
+      ListLinkBefore(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -4366,7 +4367,7 @@ namespace moho
     mVizToEnemies = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && ListIsSingleton()) {
-      ListLinkAfter(&SimulationRef->mCoordEntities);
+      ListLinkBefore(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -4382,7 +4383,7 @@ namespace moho
     mVizToAllies = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && ListIsSingleton()) {
-      ListLinkAfter(&SimulationRef->mCoordEntities);
+      ListLinkBefore(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -4398,7 +4399,7 @@ namespace moho
     mVizToNeutrals = static_cast<std::int32_t>(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && ListIsSingleton()) {
-      ListLinkAfter(&SimulationRef->mCoordEntities);
+      ListLinkBefore(&SimulationRef->mCoordEntities);
     }
   }
 

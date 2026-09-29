@@ -15,6 +15,7 @@
 #include "moho/animation/CAniActor.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/collision/CColPrimitiveBase.h"
+#include "moho/console/CConCommand.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/particles/SWorldBeam.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -824,6 +825,23 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
   sEverCreated = static_cast<unsigned>(mBlipMap.size()) > sEverCreated
     ? static_cast<unsigned>(mBlipMap.size()) : sEverCreated;
   RebuildBlipListFromMapAndOrphans(this);
+
+  // 0x005C137F: the per-army readout the `recon_debug` convar selects.
+  if (recon_debug == mArmy->mConstDat.mArmyIndex) {
+    gpg::Logf(
+      "BlipMap: %i, Orphans: %i, BlipList: %i",
+      static_cast<int>(mBlipMap.size()),
+      static_cast<int>(mTempBlips.size()),
+      static_cast<int>(mBblips.size())
+    );
+  }
+
+  // 0x005C13C6..0x005C1419: every recon tick feeds tag 3 into the sim checksum
+  // and traces the running digest, before the intel grids advance.
+  const std::uint32_t reconTickChecksumTag = 3u;
+  mSim->mContext.Update(&reconTickChecksumTag, sizeof(reconTickChecksumTag));
+  mSim->Logf("      %s\n", mSim->mContext.Digest().ToString().c_str());
+
   TickAllReconGrids(this, dTicks);
 
   // TEMPORARY PROBE -- delete once resolved. Per-gate survivor counts for the

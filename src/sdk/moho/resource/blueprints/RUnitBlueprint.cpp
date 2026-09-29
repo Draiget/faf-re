@@ -255,7 +255,9 @@ namespace moho
 
     constexpr std::uint8_t kGroundOccupancyMask = 0x0F;
     constexpr float kBlueprintExtentMultiplier = 3.0f;
-    constexpr std::int8_t kDefaultFootprintFlags = -1;
+    // The per-motion-type flag table (0x010A63C4) sits in .bss and nothing
+    // writes it, so every motion type derives FPFLAG_None.
+    constexpr std::int8_t kDefaultFootprintFlags = 0;
 
     constexpr EOccupancyCaps OccupancyMask(const std::uint8_t value) noexcept
     {
@@ -1024,8 +1026,8 @@ namespace moho
     TargetCheckInterval(3.0f),
     AlwaysRecheckTarget(1),
     pad_0055_0058{},
-    MinRadius(1.0f),
-    MaxRadius(3.0f),
+    MinRadius(0.0f),
+    MaxRadius(0.0f),
     MaximumBeamLength(0.0f),
     EffectiveRadius(-1.0f),
     MaxHeightDiff(std::numeric_limits<float>::infinity()),
@@ -1060,8 +1062,9 @@ namespace moho
     MaxProjectileStorage(0),
     IgnoresAlly(1),
     pad_012D_0130{},
-    TargetType(static_cast<ERuleBPUnitWeaponTargetType>(3)),
-    AttackGroundTries(0),
+    // 0x0051F672 / 0x0051F6C7: TargetType +0x130 = 0 (RULEWTT_Unit), AttackGroundTries +0x134 = 3.
+    TargetType(RULEWTT_Unit),
+    AttackGroundTries(3),
     AimsStraightOnDisable(0),
     Turreted(0),
     YawOnlyOnTarget(0),

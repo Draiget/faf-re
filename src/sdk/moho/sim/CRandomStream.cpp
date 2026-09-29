@@ -1,4 +1,5 @@
 #include "CRandomStream.h"
+#include "legacy/math/X87Math.h"
 
 #include <cmath>
 #include <typeinfo>
@@ -26,10 +27,16 @@ namespace moho
     constexpr double kInvTwoTo31 = 4.656612873077392578125e-10;  // 1 / 2^31
     constexpr double kInvTwoTo32 = 2.3283064365386962890625e-10; // 1 / 2^32
 
+    // 0x0040EF3A: the shipped code runs on x87 with 24-bit precision control,
+    // so the scaled draw is rounded to single before the 1.0 is subtracted and
+    // again after. One rounding in double lands on a different float often
+    // enough to move a gaussian sample, and with it the sim checksum.
     [[nodiscard]] float NextSignedUnit(CRandomStream& stream) noexcept
     {
+      constexpr float kInvTwoTo31f = 4.656612873077392578125e-10f;
       const std::uint32_t value = stream.twister.NextUInt32();
-      return static_cast<float>(static_cast<double>(value) * kInvTwoTo31 - 1.0);
+      const float scaled = static_cast<float>(value) * kInvTwoTo31f;
+      return scaled - 1.0f;
     }
 
     [[nodiscard]] const gpg::RRef& NullOwnerRef()
@@ -212,9 +219,12 @@ namespace moho
    */
   float CRandomStream::FRand(const float lower, const float upper) noexcept
   {
-    const double unit = static_cast<double>(twister.NextUInt32()) * kInvTwoTo32;
-    const double range = static_cast<double>(upper) - static_cast<double>(lower);
-    return static_cast<float>(static_cast<double>(lower) + range * unit);
+    // x87 under 24-bit precision: range rounded, range * word rounded once,
+    // the 2^-32 scale exact, the sum rounded.
+    constexpr float kInvTwoTo32f = 2.3283064365386962890625e-10f;
+    const std::uint32_t word = twister.NextUInt32();
+    const float range = upper - lower;
+    return lower + msvc8::MulTwisterWord(range, word) * kInvTwoTo32f;
   }
 
   /**

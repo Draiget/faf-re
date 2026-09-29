@@ -1200,14 +1200,9 @@ void ReconBlip::Refresh()
   pending.pos_.x += mJamOffset.x;
   pending.pos_.y += mJamOffset.y;
   pending.pos_.z += mJamOffset.z;
-  mPendingTransform = pending;
-  mPendingVelocityScale = sourceUnit->mPendingVelocityScale;
-
-  // This block inlines Entity::SetPendingTransform's coord-list requeue, which
-  // front-inserts (ListLinkAfter, after the sentinel) when the node is singleton.
-  if (SimulationRef && ListIsSingleton()) {
-    ListLinkAfter(&SimulationRef->mCoordEntities);
-  }
+  // 0x005BF8D6 calls Entity::SetPendingTransform (0x00678E90), which also
+  // requeues the blip at the tail of the sim's dirty-entity list.
+  SetPendingTransform(pending, sourceUnit->mPendingVelocityScale);
 
   const VTransform& sourceTransform = sourceUnit->GetTransform();
   mVarDat.mCurTransform.orient_ = sourceTransform.orient_;

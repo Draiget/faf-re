@@ -102,7 +102,7 @@ float moho::con_TestVarFloat = 0.0f;
  */
 msvc8::string moho::con_TestVarStr("string");
 bool moho::snd_ExtraDoWorkCalls = false;
-int moho::recon_debug = 0;
+int moho::recon_debug = -1; // 0x00F58AC8 is initialised .data: -1, no army selected
 bool moho::sPathDebuggerEnabled = false;
 int moho::rule_Paranoid = 0;
 float moho::rule_BlueprintReloadDelay = 0.0f;

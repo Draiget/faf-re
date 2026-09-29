@@ -40,6 +40,7 @@
 #include "moho/resource/blueprints/REmitterBlueprint.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
+#include "moho/sim/Sim.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/resource/blueprints/RTrailBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -1436,52 +1437,56 @@ namespace moho
    * Address: 0x0052B2B0 (FUN_0052B2B0)
    *
    * What it does:
-   * Extends the simulation checksum with deterministic blueprint/rule tables.
+   * Seeds the session checksum with the rules: the named-footprint table, then
+   * every blueprint in ordinal order (its id, then its whole reflected value
+   * through `REF_UpdateMD5`), then the unit/projectile/prop/mesh table sizes.
+   * With `fileHandle` set (the `/synclog` beat log) each value is also traced.
+   *
+   * Everything hashed is a value, never an address, so x86 and x64 builds and
+   * the shipped engine agree on it.
    */
   void RRuleGameRulesImpl::UpdateChecksum(void* md5Context, void* fileHandle)
   {
-    auto* const context = static_cast<gpg::MD5Context*>(md5Context);
+    auto& context = *static_cast<gpg::MD5Context*>(md5Context);
     auto* const file = static_cast<std::FILE*>(fileHandle);
-    if (!context) {
-      return;
-    }
 
     if (file) {
       std::fprintf(file, "Named Footprints:\n");
     }
 
-    // Preserve footprint-table contribution (binary hashes SRuleFootprintsBlueprint here).
-    context->Update(&mFootprints, sizeof(mFootprints));
+    gpg::RRef footprintsRef{};
+    gpg::RRef_SRuleFootprintsBlueprint(&footprintsRef, &mFootprints);
+    REF_UpdateMD5(context, footprintsRef, file, 1);
 
-    auto blueprintCount = static_cast<std::uint32_t>(mBlueprintsByOrdinal.size());
-    context->Update(&blueprintCount, sizeof(blueprintCount));
+    const auto blueprintCount = static_cast<std::uint32_t>(mBlueprintsByOrdinal.size());
+    context.Update(&blueprintCount, sizeof(blueprintCount));
 
-    for (std::uint32_t ordinal = 0; ordinal < blueprintCount; ++ordinal) {
-      RBlueprint* const blueprint = mBlueprintsByOrdinal[ordinal];
-      const char* id = nullptr;
-      if (blueprint) {
-        id = blueprint->mBlueprintId.c_str();
-      }
-
+    for (RBlueprint* const blueprint : mBlueprintsByOrdinal) {
+      const char* const id = blueprint->mBlueprintId.c_str();
       if (file) {
-        std::fprintf(file, "%s:\n", id ? id : "<NULL>");
+        std::fprintf(file, "%s:\n", id);
       }
 
-      const char* const hashText = id ? id : "<NULL>";
-      context->Update(hashText, std::strlen(hashText) + 1u);
+      // 0x0052B3D1: the fallback feeds the six characters without a terminator.
+      if (id != nullptr) {
+        context.Update(id, std::strlen(id) + 1u);
+      } else {
+        context.Update("<NULL>", 6u);
+      }
 
-      const std::int32_t ordinalValue = blueprint ? blueprint->mBlueprintOrdinal : -1;
-      context->Update(&ordinalValue, sizeof(ordinalValue));
+      gpg::RRef blueprintRef{};
+      gpg::RRef_RBlueprint(&blueprintRef, blueprint);
+      REF_UpdateMD5(context, blueprintRef, file, 1);
     }
 
     const std::uint32_t unitCount = mUnitBlueprints.size();
     const std::uint32_t projectileCount = mProjectileBlueprints.size();
     const std::uint32_t propCount = mPropBlueprints.size();
     const std::uint32_t meshCount = mMeshBlueprints.size();
-    context->Update(&unitCount, sizeof(unitCount));
-    context->Update(&projectileCount, sizeof(projectileCount));
-    context->Update(&propCount, sizeof(propCount));
-    context->Update(&meshCount, sizeof(meshCount));
+    context.Update(&unitCount, sizeof(unitCount));
+    context.Update(&projectileCount, sizeof(projectileCount));
+    context.Update(&propCount, sizeof(propCount));
+    context.Update(&meshCount, sizeof(meshCount));
   }
 
   /**
