@@ -194,10 +194,15 @@ namespace moho
     boost::shared_ptr<ID3DTextureSheet> mSecondarySheet;   // +0x40
     boost::shared_ptr<ID3DTextureSheet> mEnvironmentSheet; // +0x48
     std::int32_t mShaderIndex;                            // +0x50
-    msvc8::string mAuxTag0;                               // +0x54
-    msvc8::string mAuxTag1;                               // +0x70
-    std::uint8_t mRuntimeFlag0;                           // +0x8C
-    std::uint8_t mRuntimeFlag1;                           // +0x8D
+    // The two technique names the cartographic and depth passes resolve from
+    // `mShaderAnnotation` the first time they reach this material
+    // (`"cartographicTechnique"` in RenderCartographic 0x007DFF30,
+    // `"depthTechnique"` in RenderDepth 0x007E03B0), each with the byte that
+    // records it was looked up -- an empty name is a valid, cached answer.
+    msvc8::string mCartographicTechnique;                 // +0x54
+    msvc8::string mDepthTechnique;                        // +0x70
+    bool mCartographicTechniqueResolved;                  // +0x8C
+    bool mDepthTechniqueResolved;                         // +0x8D
     std::uint8_t mPad8E_8F[0x02]{};
   };
 
@@ -1314,10 +1319,10 @@ namespace moho
     offsetof(MeshMaterial, mEnvironmentSheet) == 0x48, "MeshMaterial::mEnvironmentSheet offset must be 0x48"
   );
   static_assert(offsetof(MeshMaterial, mShaderIndex) == 0x50, "MeshMaterial::mShaderIndex offset must be 0x50");
-  static_assert(offsetof(MeshMaterial, mAuxTag0) == 0x54, "MeshMaterial::mAuxTag0 offset must be 0x54");
-  static_assert(offsetof(MeshMaterial, mAuxTag1) == 0x70, "MeshMaterial::mAuxTag1 offset must be 0x70");
-  static_assert(offsetof(MeshMaterial, mRuntimeFlag0) == 0x8C, "MeshMaterial::mRuntimeFlag0 offset must be 0x8C");
-  static_assert(offsetof(MeshMaterial, mRuntimeFlag1) == 0x8D, "MeshMaterial::mRuntimeFlag1 offset must be 0x8D");
+  static_assert(offsetof(MeshMaterial, mCartographicTechnique) == 0x54, "MeshMaterial::mCartographicTechnique offset must be 0x54");
+  static_assert(offsetof(MeshMaterial, mDepthTechnique) == 0x70, "MeshMaterial::mDepthTechnique offset must be 0x70");
+  static_assert(offsetof(MeshMaterial, mCartographicTechniqueResolved) == 0x8C, "MeshMaterial::mCartographicTechniqueResolved offset must be 0x8C");
+  static_assert(offsetof(MeshMaterial, mDepthTechniqueResolved) == 0x8D, "MeshMaterial::mDepthTechniqueResolved offset must be 0x8D");
   static_assert(sizeof(MeshMaterial) == 0x90, "MeshMaterial size must be 0x90");
 
   static_assert(offsetof(MeshLOD, useDissolve) == 0x04, "MeshLOD::useDissolve offset must be 0x04");

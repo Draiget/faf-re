@@ -2106,10 +2106,10 @@ namespace moho
     , mSecondarySheet()
     , mEnvironmentSheet()
     , mShaderIndex(-1)
-    , mAuxTag0()
-    , mAuxTag1()
-    , mRuntimeFlag0(0)
-    , mRuntimeFlag1(0)
+    , mCartographicTechnique()
+    , mDepthTechnique()
+    , mCartographicTechniqueResolved(false)
+    , mDepthTechniqueResolved(false)
     , mPad8E_8F{}
   {}
 
@@ -2119,8 +2119,8 @@ namespace moho
    */
   MeshMaterial::~MeshMaterial()
   {
-    mAuxTag1.tidy(true, 0U);
-    mAuxTag0.tidy(true, 0U);
+    mDepthTechnique.tidy(true, 0U);
+    mCartographicTechnique.tidy(true, 0U);
     mEnvironmentSheet.reset();
     mSecondarySheet.reset();
     mLookupSheet.reset();
@@ -2150,10 +2150,10 @@ namespace moho
     mSecondarySheet = rhs.mSecondarySheet;
     mEnvironmentSheet = rhs.mEnvironmentSheet;
     mShaderIndex = rhs.mShaderIndex;
-    mAuxTag0.assign_owned(rhs.mAuxTag0.view());
-    mAuxTag1.assign_owned(rhs.mAuxTag1.view());
-    mRuntimeFlag0 = rhs.mRuntimeFlag0;
-    mRuntimeFlag1 = rhs.mRuntimeFlag1;
+    mCartographicTechnique.assign_owned(rhs.mCartographicTechnique.view());
+    mDepthTechnique.assign_owned(rhs.mDepthTechnique.view());
+    mCartographicTechniqueResolved = rhs.mCartographicTechniqueResolved;
+    mDepthTechniqueResolved = rhs.mDepthTechniqueResolved;
     return *this;
   }
 
@@ -4302,7 +4302,7 @@ namespace moho
    * current effect, so it reads `device->GetCurEffect()` to resolve the per-
    * material cartographic technique. There is no renderStage gate: each material
    * lazily resolves + caches its "cartographicTechnique" string annotation
-   * (`MeshMaterial::mAuxTag0`, guarded by `mRuntimeFlag0`) and is drawn only when
+   * (`MeshMaterial::mCartographicTechnique`, guarded by `mCartographicTechniqueResolved`) and is drawn only when
    * that technique is non-empty. Per material it binds the albedo/specular/
    * normals samplers (this bind order), then draws the bucket's instances through
    * the LOD's lazily-built skinned/static hardware batch, always un-mirrored
@@ -4398,17 +4398,17 @@ namespace moho
       // mMat.byte8C = 1; mMat.mStr2 = GetStringAnnotation(mAnnot,
       // "cartographicTechnique", ""); }`). Unlike Render/RenderDepth there is no
       // renderStage gate — the only per-material gate is a non-empty technique.
-      if (!material.mRuntimeFlag0) {
-        material.mRuntimeFlag0 = 1;
+      if (!material.mCartographicTechniqueResolved) {
+        material.mCartographicTechniqueResolved = true;
         const msvc8::string cartographicTechnique =
           effect->GetStringAnnotation(material.mShaderAnnotation, msvc8::string("cartographicTechnique"), msvc8::string(""));
-        material.mAuxTag0.assign_owned(cartographicTechnique.view());
+        material.mCartographicTechnique.assign_owned(cartographicTechnique.view());
       }
 
       // Only draw when a cartographic technique is defined for the material
       // (binary: `if (mMat.mStr2._Mysize)`).
-      if (material.mAuxTag0.size() != 0) {
-        device->SelectTechnique(material.mAuxTag0.c_str());
+      if (material.mCartographicTechnique.size() != 0) {
+        device->SelectTechnique(material.mCartographicTechnique.c_str());
 
         // Cartographic pass binds three samplers, in binary bind order:
         // albedo, specular, normals (0x007E01FD / 0x007E020B / 0x007E0219).
@@ -4520,12 +4520,12 @@ namespace moho
    * `depthTechnique` string annotation; only the albedo sampler is bound; and
    * the batch is always drawn un-mirrored.
    *
-   * The depth-technique string is `MeshMaterial::mAuxTag1` (a msvc8::string at
+   * The depth-technique string is `MeshMaterial::mDepthTechnique` (a msvc8::string at
    * mMat+0x70). The binary's reads at mMat+0x74 / +0x84 / +0x88 (`_Bx`,
    * `_Mysize`, `_Myres`) are that same string's internal members at
    * string+0x04 / +0x14 / +0x18 — normal msvc8::string access, not a separate
    * field. Cross-checked from FUN_007E03B0.asm via mAlbedoSheet at esi+0x2C =
-   * mMat+0x20, mShaderIndex at esi+0x5C = mMat+0x50, mRuntimeFlag1 at esi+0x99
+   * mMat+0x20, mShaderIndex at esi+0x5C = mMat+0x50, mDepthTechniqueResolved at esi+0x99
    * = mMat+0x8D.
    */
   void MeshRenderer::RenderDepth(const GeomCamera3& camera, MeshBatchBucketTree& meshMap)
@@ -4600,17 +4600,17 @@ namespace moho
       // Lazily resolve + cache this material's depth technique the first time
       // the depth pass reaches it (binary: `if (!mMat.byte8D) { mMat.byte8D=1;
       // mMat.mStr3 = GetStringAnnotation(mAnnot,"depthTechnique",""); }`).
-      if (!material.mRuntimeFlag1) {
-        material.mRuntimeFlag1 = 1;
+      if (!material.mDepthTechniqueResolved) {
+        material.mDepthTechniqueResolved = true;
         const msvc8::string depthTechnique =
           meshEffect->GetStringAnnotation(material.mShaderAnnotation, msvc8::string("depthTechnique"), msvc8::string(""));
-        material.mAuxTag1.assign_owned(depthTechnique.view());
+        material.mDepthTechnique.assign_owned(depthTechnique.view());
       }
 
       // Only draw when a depth technique is defined for the material
       // (binary: `if (mMat.mStr3._Mysize)`).
-      if (material.mAuxTag1.size() != 0) {
-        device->SelectTechnique(material.mAuxTag1.c_str());
+      if (material.mDepthTechnique.size() != 0) {
+        device->SelectTechnique(material.mDepthTechnique.c_str());
 
         // Depth pass binds only the albedo sampler.
         tv.albedoTexture.GetTexture(material.mAlbedoSheet);
