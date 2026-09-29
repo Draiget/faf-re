@@ -105,7 +105,6 @@ namespace
   // All-squad-classes sentinel used by the patrol/attack/move Lua bindings: applies
   // to every assigned squad class. Not one of the ESquadClass enum's named members.
   constexpr std::int32_t kAllSquadClassesSentinel = 6;
-  constexpr std::uintptr_t kSquadUnitOwnerBias = 0x8;
   constexpr int kLuaNumberTypeTag = 3;
 
   constexpr const char* kCanConsiderFormingPlatoonHelpText = "CPlatoon:CanConsiderFormingPlatoon()";
@@ -381,13 +380,13 @@ namespace
     return nullptr;
   }
 
-  [[nodiscard]] bool SquadContainsUnit(const CSquadRuntimeView* const squad, const Unit* const targetUnit) noexcept
+  [[nodiscard]] bool SquadContainsUnit(const moho::CSquad* const squad, const Unit* const targetUnit) noexcept
   {
     if (!squad || !targetUnit) {
       return false;
     }
 
-    for (void** unitSlot = squad->mUnitSlotBegin; unitSlot != squad->mUnitSlotEnd; ++unitSlot) {
+    for (auto unitSlot = squad->mUnits.mVec.begin(); unitSlot != squad->mUnits.mVec.end(); ++unitSlot) {
       if (DecodeSquadUnit(*unitSlot) == targetUnit) {
         return true;
       }
@@ -396,19 +395,19 @@ namespace
     return false;
   }
 
-  void BuildPlatoonUnitSet(const CPlatoonRuntimeView& platoonRuntime, SEntitySetTemplateUnit& outSet);
+  void BuildPlatoonUnitSet(const moho::CPlatoon& platoonRuntime, SEntitySetTemplateUnit& outSet);
 
-  [[nodiscard]] bool ComputeSquadCenter(const CSquadRuntimeView* const squad, Wm3::Vector3f& outCenter) noexcept
+  [[nodiscard]] bool ComputeSquadCenter(const moho::CSquad* const squad, Wm3::Vector3f& outCenter) noexcept
   {
     if (!squad) {
       return false;
     }
 
-    reinterpret_cast<const moho::CSquad*>(squad)->GetCenter(&outCenter);
+    squad->GetCenter(&outCenter);
     return true;
   }
 
-  [[nodiscard]] bool ComputePlatoonCenter(const CPlatoonRuntimeView& platoonRuntime, Wm3::Vector3f& outCenter) noexcept
+  [[nodiscard]] bool ComputePlatoonCenter(const moho::CPlatoon& platoonRuntime, Wm3::Vector3f& outCenter) noexcept
   {
     SEntitySetTemplateUnit platoonUnits{};
     BuildPlatoonUnitSet(platoonRuntime, platoonUnits);
@@ -449,18 +448,18 @@ namespace
    * Rebuilds one sorted unique unit-entity set by merging all squad unit lanes
    * currently referenced by the platoon.
    */
-  void BuildPlatoonUnitSet(const CPlatoonRuntimeView& platoonRuntime, SEntitySetTemplateUnit& outSet)
+  void BuildPlatoonUnitSet(const moho::CPlatoon& platoonRuntime, SEntitySetTemplateUnit& outSet)
   {
     outSet.Clear();
     outSet.ListResetLinks();
 
-    for (CSquadRuntimeView* const* squadLane = platoonRuntime.mSquadStart; squadLane != platoonRuntime.mSquadEnd; ++squadLane) {
-      const CSquadRuntimeView* const squad = *squadLane;
-      if (!squad || squad->mUnitSlotBegin == squad->mUnitSlotEnd) {
+    for (moho::CSquad* const* squadLane = platoonRuntime.mSquadList.begin(); squadLane != platoonRuntime.mSquadList.end(); ++squadLane) {
+      const moho::CSquad* const squad = *squadLane;
+      if (!squad || squad->mUnits.mVec.begin() == squad->mUnits.mVec.end()) {
         continue;
       }
 
-      for (void* const* unitSlot = squad->mUnitSlotBegin; unitSlot != squad->mUnitSlotEnd; ++unitSlot) {
+      for (auto unitSlot = squad->mUnits.mVec.begin(); unitSlot != squad->mUnits.mVec.end(); ++unitSlot) {
         (void)outSet.AddUnit(DecodeSquadUnit(*unitSlot));
       }
     }
@@ -671,13 +670,13 @@ namespace
    * Iterates one squad's unit slot vector and stops each live unit by clearing
    * its command queue and stopping its attacker controller when present.
    */
-  void StopSquad(CSquadRuntimeView* const squad)
+  void StopSquad(moho::CSquad* const squad)
   {
     if (!squad) {
       return;
     }
 
-    for (void** unitSlot = squad->mUnitSlotBegin; unitSlot != squad->mUnitSlotEnd; ++unitSlot) {
+    for (auto unitSlot = squad->mUnits.mVec.begin(); unitSlot != squad->mUnits.mVec.end(); ++unitSlot) {
       moho::Unit* const unit = DecodeSquadUnit(*unitSlot);
       if (!unit || unit->IsDead()) {
         continue;
@@ -701,37 +700,21 @@ namespace
    * matched slot by compacting trailing entries, and preserves first-match
    * behavior.
    */
-  void RemoveUnitFromSquad(CSquadRuntimeView* const squad, const moho::Entity* const entity)
+  void RemoveUnitFromSquad(moho::CSquad* const squad, const moho::Entity* const entity)
   {
     if (!squad || !entity) {
       return;
     }
 
-    void** const begin = squad->mUnitSlotBegin;
-    void** const end = squad->mUnitSlotEnd;
-    if (begin == end) {
-      return;
-    }
-
-    void** match = begin;
-    for (; match != end; ++match) {
+    auto& units = squad->mUnits.mVec;
+    for (auto match = units.begin(); match != units.end(); ++match) {
       const moho::Unit* const unit = DecodeSquadUnit(*match);
       if (unit != nullptr && static_cast<const moho::Entity*>(unit) == entity) {
-        break;
+        // First match only: compact the tail down one slot.
+        (void)units.erase(match);
+        return;
       }
     }
-
-    if (match == end) {
-      return;
-    }
-
-    const std::ptrdiff_t tailCount = end - (match + 1);
-    if (tailCount > 0) {
-      const std::size_t byteCount = static_cast<std::size_t>(tailCount) * sizeof(void*);
-      memmove_s(match, byteCount, match + 1, byteCount);
-    }
-
-    squad->mUnitSlotEnd = end - 1;
   }
 
   /**
@@ -742,7 +725,7 @@ namespace
    * `RemoveUnitFromSquad` one-by-one.
    */
   [[maybe_unused]] void RemoveUnitSetMembersFromSquad(
-    CSquadRuntimeView& squad,
+    moho::CSquad& squad,
     const SEntitySetTemplateUnit& units
   )
   {
@@ -762,7 +745,7 @@ namespace
   [[maybe_unused]] void AppendUnitSetRangeAndInvalidateLuaCache(
     const SEntitySetTemplateUnit& sourceUnits,
     SEntitySetTemplateUnit& destinationUnits,
-    CPlatoonRuntimeView& platoonRuntime
+    moho::CPlatoon& platoonRuntime
   )
   {
     destinationUnits.AddRange(sourceUnits.mVec.begin(), sourceUnits.mVec.end());
@@ -802,23 +785,23 @@ namespace
    *   std::vector_EntityCategory *a3);        // source category vector
    *
    * What it does:
-   * Walks the platoon's squad-pointer vector (`mSquadStart..mSquadEnd`) until
+   * Walks the platoon's squad-pointer vector (`mSquadStart..mSquadList.end()`) until
    * one squad reports the requested `squadClass`, then forwards
    * `categorySource` into that squad's `SetPrioritizedTargetList`. Missing or
    * mismatched squads short-circuit to no-op.
    */
   void ApplyPlatoonSquadPrioritizedTargetList(
-    CPlatoonRuntimeView& platoonRuntime,
+    moho::CPlatoon& platoonRuntime,
     const ESquadClass squadClass,
     const msvc8::vector<EntityCategorySet>& categorySource
   )
   {
-    for (CSquadRuntimeView** squadLane = platoonRuntime.mSquadStart; squadLane != platoonRuntime.mSquadEnd; ++squadLane) {
-      CSquadRuntimeView* const squadRuntime = *squadLane;
+    for (moho::CSquad** squadLane = platoonRuntime.mSquadList.begin(); squadLane != platoonRuntime.mSquadList.end(); ++squadLane) {
+      moho::CSquad* const squadRuntime = *squadLane;
       if (squadRuntime == nullptr || squadRuntime->mSquadClass != squadClass) {
         continue;
       }
-      auto& squad = *reinterpret_cast<CSquad*>(squadRuntime);
+      auto& squad = *squadRuntime;
       ApplySquadPrioritizedTargetList(squad, categorySource);
       return;
     }
@@ -1387,7 +1370,7 @@ namespace moho
 
     ownerRef = {};
     gpg::RRef armyRef{};
-    gpg::RRef_SimArmy(&armyRef, reinterpret_cast<SimArmy*>(mArmy));
+    gpg::RRef_SimArmy(&armyRef, mArmy);
     gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     WritePlatoonSquadPointersToArchive(archive, const_cast<CPlatoon*>(this));
@@ -1675,9 +1658,9 @@ namespace moho
    */
   CSquad* CPlatoon::GetSquad(const ESquadClass squadClass)
   {
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
-    CSquadRuntimeView* const squadView = FindSquadByClass(runtimeView, squadClass);
-    return reinterpret_cast<CSquad*>(squadView);
+    auto& runtimeView = *this;
+    moho::CSquad* const squadView = FindSquadByClass(runtimeView, squadClass);
+    return squadView;
   }
 
   /**
@@ -1689,13 +1672,13 @@ namespace moho
    */
   int CPlatoon::CountUnassignedUnitsWithBP(const char* const blueprintId)
   {
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
-    CSquadRuntimeView* const squadView = FindSquadByClass(runtimeView, ESquadClass::Unassigned);
+    auto& runtimeView = *this;
+    moho::CSquad* const squadView = FindSquadByClass(runtimeView, ESquadClass::Unassigned);
     if (squadView == nullptr) {
       return 0;
     }
 
-    return reinterpret_cast<CSquad*>(squadView)->CountUnitsWithBP(blueprintId);
+    return squadView->CountUnitsWithBP(blueprintId);
   }
 
   /**
@@ -1707,13 +1690,13 @@ namespace moho
    */
   int CPlatoon::CountUnassignedUnitsInCategory(const EntityCategorySet* const categorySet)
   {
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
-    CSquadRuntimeView* const squadView = FindSquadByClass(runtimeView, ESquadClass::Unassigned);
+    auto& runtimeView = *this;
+    moho::CSquad* const squadView = FindSquadByClass(runtimeView, ESquadClass::Unassigned);
     if (squadView == nullptr) {
       return 0;
     }
 
-    return reinterpret_cast<CSquad*>(squadView)->CountUnitsInCategory(categorySet);
+    return squadView->CountUnitsInCategory(categorySet);
   }
 
   /**
@@ -1727,14 +1710,14 @@ namespace moho
     const EntityCategorySet* const categorySet, const int maxCount, SEntitySetTemplateUnit& outUnits
   )
   {
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
-    for (CSquadRuntimeView** squadLane = runtimeView.mSquadStart; squadLane != runtimeView.mSquadEnd; ++squadLane) {
-      CSquadRuntimeView* const squadView = *squadLane;
+    auto& runtimeView = *this;
+    for (moho::CSquad** squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
+      moho::CSquad* const squadView = *squadLane;
       if (squadView == nullptr || squadView->mSquadClass != ESquadClass::Unassigned) {
         continue;
       }
 
-      reinterpret_cast<CSquad*>(squadView)->AppendUnitsInCategory(categorySet, maxCount, outUnits);
+      squadView->AppendUnitsInCategory(categorySet, maxCount, outUnits);
       return;
     }
   }
@@ -1764,11 +1747,11 @@ namespace moho
    */
   int CPlatoon::CountAllSquadUnitSlots() const
   {
-    const auto& runtimeView = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtimeView = *this;
     int unitSlotCount = 0;
-    for (CSquadRuntimeView* const* squadLane = runtimeView.mSquadStart; squadLane != runtimeView.mSquadEnd; ++squadLane) {
-      const CSquadRuntimeView* const squad = *squadLane;
-      unitSlotCount += static_cast<int>(squad->mUnitSlotEnd - squad->mUnitSlotBegin);
+    for (moho::CSquad* const* squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
+      const moho::CSquad* const squad = *squadLane;
+      unitSlotCount += static_cast<int>(squad->mUnits.mVec.end() - squad->mUnits.mVec.begin());
     }
     return unitSlotCount;
   }
@@ -1782,16 +1765,16 @@ namespace moho
    */
   void CPlatoon::RemoveUnit(Entity* const unit)
   {
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
+    auto& runtimeView = *this;
     runtimeView.mHasLuaList = 0u;
 
-    for (CSquadRuntimeView** squadLane = runtimeView.mSquadStart; squadLane != runtimeView.mSquadEnd; ++squadLane) {
-      CSquadRuntimeView* const squadView = *squadLane;
+    for (moho::CSquad** squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
+      moho::CSquad* const squadView = *squadLane;
       if (!squadView) {
         continue;
       }
 
-      for (void** unitSlot = squadView->mUnitSlotBegin; unitSlot != squadView->mUnitSlotEnd; ++unitSlot) {
+      for (auto unitSlot = squadView->mUnits.mVec.begin(); unitSlot != squadView->mUnits.mVec.end(); ++unitSlot) {
         const moho::Unit* const squadUnit = DecodeSquadUnit(*unitSlot);
         if (squadUnit != nullptr && static_cast<const moho::Entity*>(squadUnit) == unit) {
           RemoveUnitFromSquad(squadView, unit);
@@ -1814,8 +1797,8 @@ namespace moho
       return false;
     }
 
-    const auto& runtimeView = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
-    for (CSquadRuntimeView* const* squadLane = runtimeView.mSquadStart; squadLane != runtimeView.mSquadEnd; ++squadLane) {
+    const auto& runtimeView = *this;
+    for (moho::CSquad* const* squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
       if (SquadContainsUnit(*squadLane, unit)) {
         return true;
       }
@@ -1837,9 +1820,9 @@ namespace moho
       return kUnassignedSquadClass;
     }
 
-    const auto& runtimeView = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
-    for (CSquadRuntimeView* const* squadLane = runtimeView.mSquadStart; squadLane != runtimeView.mSquadEnd; ++squadLane) {
-      const CSquadRuntimeView* const squadView = *squadLane;
+    const auto& runtimeView = *this;
+    for (moho::CSquad* const* squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
+      const moho::CSquad* const squadView = *squadLane;
       if (SquadContainsUnit(squadView, unit)) {
         return squadView->mSquadClass;
       }
@@ -1858,14 +1841,14 @@ namespace moho
    */
   void CPlatoon::AppendUnitsToSquad(const ESquadClass squadClass, const SEntitySetTemplateUnit& units)
   {
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
-    for (CSquadRuntimeView** squadLane = runtimeView.mSquadStart; squadLane != runtimeView.mSquadEnd; ++squadLane) {
-      CSquadRuntimeView* const squadView = *squadLane;
+    auto& runtimeView = *this;
+    for (moho::CSquad** squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
+      moho::CSquad* const squadView = *squadLane;
       if (squadView == nullptr || squadView->mSquadClass != squadClass) {
         continue;
       }
 
-      reinterpret_cast<CSquad*>(squadView)->mUnits.AddRange(units.mVec.begin(), units.mVec.end());
+      squadView->mUnits.AddRange(units.mVec.begin(), units.mVec.end());
       break;
     }
 
@@ -1925,10 +1908,10 @@ namespace moho
    */
   void CPlatoon::Stop(const ESquadClass squadClass)
   {
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
+    auto& runtimeView = *this;
     if (squadClass == kAllSquadsClass) {
-      for (CSquadRuntimeView** squad = runtimeView.mSquadStart; squad != runtimeView.mSquadEnd; ++squad) {
-        CSquadRuntimeView* const squadView = *squad;
+      for (moho::CSquad** squad = runtimeView.mSquadList.begin(); squad != runtimeView.mSquadList.end(); ++squad) {
+        moho::CSquad* const squadView = *squad;
         if (squadView && squadView->mSquadClass != kUnassignedSquadClass) {
           StopSquad(squadView);
         }
@@ -1936,8 +1919,8 @@ namespace moho
       return;
     }
 
-    for (CSquadRuntimeView** squad = runtimeView.mSquadStart; squad != runtimeView.mSquadEnd; ++squad) {
-      CSquadRuntimeView* const squadView = *squad;
+    for (moho::CSquad** squad = runtimeView.mSquadList.begin(); squad != runtimeView.mSquadList.end(); ++squad) {
+      moho::CSquad* const squadView = *squad;
       if (!squadView || squadView->mSquadClass != squadClass) {
         continue;
       }
@@ -2060,13 +2043,13 @@ namespace moho
    * Returns true when the squad has no live unit with an active command at
    * queue-head; returns false as soon as one active queued command is found.
    */
-  [[nodiscard]] bool SquadHasNoActiveOrders(const CSquadRuntimeView* const squad) noexcept
+  [[nodiscard]] bool SquadHasNoActiveOrders(const moho::CSquad* const squad) noexcept
   {
     if (!squad) {
       return true;
     }
 
-    for (void** unitSlot = squad->mUnitSlotBegin; unitSlot != squad->mUnitSlotEnd; ++unitSlot) {
+    for (auto unitSlot = squad->mUnits.mVec.begin(); unitSlot != squad->mUnits.mVec.end(); ++unitSlot) {
       Unit* const unit = DecodeSquadUnit(*unitSlot);
       if (!unit || unit->IsDead()) {
         continue;
@@ -2095,12 +2078,12 @@ namespace moho
    */
   bool CPlatoon::AssignedSquadsAreIdle() const
   {
-    const auto& runtimeView = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtimeView = *this;
 
     for (std::int32_t squadClass = 1; squadClass < static_cast<std::int32_t>(kAllSquadsClass); ++squadClass) {
-      CSquadRuntimeView* matchingSquad = nullptr;
-      for (CSquadRuntimeView** squad = runtimeView.mSquadStart; squad != runtimeView.mSquadEnd; ++squad) {
-        CSquadRuntimeView* const squadView = *squad;
+      moho::CSquad* matchingSquad = nullptr;
+      for (moho::CSquad* const* squad = runtimeView.mSquadList.begin(); squad != runtimeView.mSquadList.end(); ++squad) {
+        moho::CSquad* const squadView = *squad;
         if (!squadView || static_cast<std::int32_t>(squadView->mSquadClass) != squadClass) {
           continue;
         }
@@ -2127,12 +2110,12 @@ namespace moho
   void CPlatoon::SwitchAIPlan(const char* const planName)
   {
     const char* const normalizedPlan = (planName != nullptr) ? planName : "";
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
+    auto& runtimeView = *this;
     if (runtimeView.mPlan == normalizedPlan) {
       return;
     }
 
-    auto* const scriptObject = reinterpret_cast<CScriptObject*>(this);
+    CScriptObject* const scriptObject = this;
     scriptObject->RunScript("OnDestroy");
 
     runtimeView.mPlan.assign(normalizedPlan);
@@ -2247,14 +2230,14 @@ namespace moho
   {
     constexpr const char* kArmyPoolName = "ArmyPool";
 
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
+    auto& runtimeView = *this;
     runtimeView.mHasLuaList = 0u;
 
     if (armyPool == nullptr || runtimeView.mArmy == nullptr) {
       return;
     }
 
-    auto& armyPoolRuntimeView = *reinterpret_cast<CPlatoonRuntimeView*>(armyPool);
+    auto& armyPoolRuntimeView = *armyPool;
     if (FindSquadByClass(armyPoolRuntimeView, kUnassignedSquadClass) == nullptr) {
       return;
     }
@@ -2339,7 +2322,7 @@ namespace moho
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
     CAiPersonality* const personality = runtimeView.mArmy->GetArmyBrain()->mPersonality;
 
     if (personality != nullptr) {
@@ -2397,7 +2380,7 @@ namespace moho
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
     runtimeView.mArmy->GetArmyBrain()->mLuaObj.PushStack(state);
     return 1;
   }
@@ -2448,7 +2431,7 @@ namespace moho
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
     const CAiBrain* const brain = runtimeView.mArmy->GetArmyBrain();
 
     lua_pushnumber(state->m_state, static_cast<float>(brain->mArmy->mVarDat.mFaction + 1));
@@ -2525,7 +2508,7 @@ namespace moho
 
     const LuaPlus::LuaObject uniqueNameObject(LuaPlus::LuaStackObject(state, 2));
     if (platoon != nullptr && uniqueNameObject.IsString()) {
-      auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+      auto& runtimeView = *platoon;
       runtimeView.mUniqueName.assign(uniqueNameObject.GetString());
     }
 
@@ -2584,7 +2567,7 @@ namespace moho
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    const auto& runtimeView = *reinterpret_cast<const CPlatoonRuntimeView*>(platoon);
+    const auto& runtimeView = *platoon;
 
     lua_pushstring(state->m_state, runtimeView.mUniqueName.c_str());
     (void)lua_gettop(state->m_state);
@@ -2636,7 +2619,7 @@ namespace moho
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    const auto& runtimeView = *reinterpret_cast<const CPlatoonRuntimeView*>(platoon);
+    const auto& runtimeView = *platoon;
     const CAiBrain* const armyBrain = runtimeView.mArmy->GetArmyBrain();
 
     lua_pushstring(state->m_state, armyBrain->mCurrentPlan.c_str());
@@ -2728,7 +2711,7 @@ namespace moho
 
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    const auto& runtimeView = *reinterpret_cast<const CPlatoonRuntimeView*>(platoon);
+    const auto& runtimeView = *platoon;
 
     Wm3::Vector3f platoonCenter{};
     if (!ComputePlatoonCenter(runtimeView, platoonCenter)) {
@@ -2789,7 +2772,7 @@ namespace moho
 
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
@@ -2802,7 +2785,7 @@ namespace moho
     }
     SCR_GetEnum(state, squadClassName, enumRef);
 
-    CSquadRuntimeView* const squad = FindSquadByClass(runtimeView, squadClass);
+    moho::CSquad* const squad = FindSquadByClass(runtimeView, squadClass);
     if (!squad) {
       lua_pushnil(state->m_state);
       (void)lua_gettop(state->m_state);
@@ -2871,7 +2854,7 @@ namespace moho
 
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
@@ -2884,19 +2867,19 @@ namespace moho
     }
     SCR_GetEnum(state, squadClassName, enumRef);
 
-    CSquadRuntimeView* const squad = FindSquadByClass(runtimeView, squadClass);
+    moho::CSquad* const squad = FindSquadByClass(runtimeView, squadClass);
     if (!squad) {
       lua_pushnil(state->m_state);
       (void)lua_gettop(state->m_state);
       return 1;
     }
 
-    // CSquadRuntimeView is a flat-field spelling of CSquad: its
+    // moho::CSquad is a flat-field spelling of CSquad: its
     // mUnitSlotBegin/mUnitSlotEnd at +0x10/+0x14 are mUnits.mVec's begin/end,
     // and mSquadClass lands at +0x30 right past mUnits. The binary calls
     // CSquad::GetUnits out of line here rather than open-coding the fill.
     LuaPlus::LuaObject unitTable{};
-    (void)reinterpret_cast<const CSquad*>(squad)->GetUnits(&unitTable, state);
+    (void)squad->GetUnits(&unitTable, state);
 
     unitTable.PushStack(state);
     return 1;
@@ -2942,7 +2925,7 @@ namespace moho
 
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
 
     SimArmy* const army = runtimeView.mArmy;
     Sim* const sim = army ? army->GetSim() : nullptr;
@@ -3441,7 +3424,7 @@ namespace moho
       return 1;
     }
 
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
     if (runtimeView.mHasLuaList == 0u) {
       SEntitySetTemplateUnit platoonUnits{};
       BuildPlatoonUnitSet(runtimeView, platoonUnits);
@@ -3876,7 +3859,7 @@ namespace moho
         }
       }
 
-      auto& runtime = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+      auto& runtime = *platoon;
       ApplyPlatoonSquadPrioritizedTargetList(runtime, squadClass, prioritizedCategories);
     }
 
@@ -4653,15 +4636,15 @@ namespace moho
     }
     SCR_GetEnum(state, squadClassName, enumRef);
 
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
-    CSquadRuntimeView* const squadView = FindSquadByClass(runtimeView, squadClass);
+    auto& runtimeView = *platoon;
+    moho::CSquad* const squadView = FindSquadByClass(runtimeView, squadClass);
     if (squadView == nullptr) {
       return 0;
     }
 
     const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 3));
     Unit* const targetUnit = SCR_FromLua_Unit(targetObject);
-    const bool canAttack = reinterpret_cast<CSquad*>(squadView)->CanAttackTarget(targetUnit);
+    const bool canAttack = squadView->CanAttackTarget(targetUnit);
 
     lua_pushboolean(state->m_state, canAttack ? 1 : 0);
     (void)lua_gettop(state->m_state);
@@ -4834,15 +4817,15 @@ namespace moho
 
     if (mFormation.empty()) {
       // Per-squad attack: only the Attack (1) and Artillery (2) squad classes.
-      const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+      const auto& runtime = *this;
       for (std::int32_t squadClassIndex = 1; squadClassIndex <= 2; ++squadClassIndex) {
         if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
             static_cast<std::int32_t>(squadClass) != squadClassIndex) {
           continue;
         }
 
-        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+          CSquad* const squad = *squadLane;
           if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
             continue;
           }
@@ -4857,7 +4840,7 @@ namespace moho
     } else {
       // Platoon-wide formation attack.
       SEntitySetTemplateUnit platoonUnits{};
-      BuildPlatoonUnitSet(*reinterpret_cast<const CPlatoonRuntimeView*>(this), platoonUnits);
+      BuildPlatoonUnitSet(*this, platoonUnits);
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonAttackCommand(mSim, platoonUnits, target, formationScriptIndex, issuedCommands);
     }
@@ -5037,15 +5020,15 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
-    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtime = *this;
 
     if (useTransports) {
       SEntitySetTemplateUnit transports{};
       SEntitySetTemplateUnit moveSet{};
 
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+          CSquad* const squad = *squadLane;
           if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
             continue;
           }
@@ -5095,8 +5078,8 @@ namespace moho
           continue;
         }
 
-        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+          CSquad* const squad = *squadLane;
           if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
             continue;
           }
@@ -5275,15 +5258,15 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
-    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtime = *this;
 
     if (useTransports) {
       SEntitySetTemplateUnit transports{};
       SEntitySetTemplateUnit moveSet{};
 
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+          CSquad* const squad = *squadLane;
           if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
             continue;
           }
@@ -5331,8 +5314,8 @@ namespace moho
           continue;
         }
 
-        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+          CSquad* const squad = *squadLane;
           if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
             continue;
           }
@@ -5508,7 +5491,7 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
-    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtime = *this;
 
     if (mFormation.empty()) {
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
@@ -5517,8 +5500,8 @@ namespace moho
           continue;
         }
 
-        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+          CSquad* const squad = *squadLane;
           if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
             continue;
           }
@@ -5649,10 +5632,10 @@ namespace moho
     targetPos.y = surfaceElevation;
 
     SEntitySetTemplateUnit transports{};
-    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+        CSquad* const squad = *squadLane;
         if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
           continue;
         }
@@ -5867,10 +5850,10 @@ namespace moho
     pos.y = surfaceElevation;
 
     SEntitySetTemplateUnit unitsToUnload{};
-    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+        CSquad* const squad = *squadLane;
         if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
           continue;
         }
@@ -6012,10 +5995,10 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     SEntitySetTemplateUnit carriers{};
-    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+        CSquad* const squad = *squadLane;
         if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
           continue;
         }
@@ -6191,22 +6174,22 @@ namespace moho
     // Platoon-wide formation patrol.
     if (!mFormation.empty()) {
       SEntitySetTemplateUnit platoonUnits{};
-      BuildPlatoonUnitSet(*reinterpret_cast<const CPlatoonRuntimeView*>(this), platoonUnits);
+      BuildPlatoonUnitSet(*this, platoonUnits);
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonPatrolCommand(mSim, platoonUnits, target, formationScriptIndex);
       return;
     }
 
     // Per-squad-class patrol: each requested class patrols on its own.
-    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
       if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
           static_cast<std::int32_t>(squadClass) != squadClassIndex) {
         continue;
       }
 
-      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+        CSquad* const squad = *squadLane;
         if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
           continue;
         }
@@ -6327,14 +6310,14 @@ namespace moho
     };
 
     if (platoon->mFormation.empty()) {
-      const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(platoon);
+      const auto& runtime = *platoon;
       for (std::int32_t squadClassIndex = 1; squadClassIndex <= 2; ++squadClassIndex) {
         if (squadClass != kAllSquadsClass && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
           continue;
         }
 
-        for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-          CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+          CSquad* const squad = *squadLane;
           if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
             continue;
           }
@@ -6347,7 +6330,7 @@ namespace moho
       }
     } else {
       SEntitySetTemplateUnit formationUnits{};
-      BuildPlatoonUnitSet(*reinterpret_cast<const CPlatoonRuntimeView*>(platoon), formationUnits);
+      BuildPlatoonUnitSet(*platoon, formationUnits);
       issueGuardOnUnits(formationUnits);
     }
 
@@ -6457,7 +6440,7 @@ namespace moho
    */
   static void DestroyPlatoonSquads(CPlatoon* const platoon, const ESquadClass squadClass)
   {
-    auto& runtime = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtime = *platoon;
     runtime.mHasLuaList = 0u;
 
     SEntitySetTemplateUnit doomedUnits{};
@@ -6466,14 +6449,14 @@ namespace moho
         continue;
       }
 
-      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-        CSquadRuntimeView* const squadView = *squadLane;
+      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+        moho::CSquad* const squadView = *squadLane;
         if (squadView == nullptr || static_cast<std::int32_t>(squadView->mSquadClass) != squadClassIndex) {
           continue;
         }
 
         SEntitySetTemplateUnit squadUnits{};
-        CopyCSquadUnitsIntoEntitySet(&squadUnits, reinterpret_cast<const CSquad*>(squadView));
+        CopyCSquadUnitsIntoEntitySet(&squadUnits, squadView);
 
         // Live members get the destroy order; every member is detached from the squad.
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
@@ -6578,7 +6561,7 @@ namespace moho
    */
   void CPlatoon::GetFerryBeacons(SEntitySetTemplateUnit& outBeacons)
   {
-    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtime = *this;
     SEntitySetTemplateUnit platoonUnits{};
     BuildPlatoonUnitSet(runtime, platoonUnits);
 
@@ -6680,10 +6663,10 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     SEntitySetTemplateUnit loadableUnits{};
-    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+        CSquad* const squad = *squadLane;
         if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
           continue;
         }
@@ -6813,14 +6796,14 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     SEntitySetTemplateUnit selectedUnits{};
-    const auto& runtime = *reinterpret_cast<const CPlatoonRuntimeView*>(this);
+    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
       if (squadClass != kAllSquadsClass && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
         continue;
       }
 
-      for (CSquadRuntimeView* const* squadLane = runtime.mSquadStart; squadLane != runtime.mSquadEnd; ++squadLane) {
-        CSquad* const squad = reinterpret_cast<CSquad*>(*squadLane);
+      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
+        CSquad* const squad = *squadLane;
         if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
           continue;
         }
@@ -7120,7 +7103,7 @@ namespace moho
     const EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
     const PlatoonThreatType threatType = ParsePlatoonThreatType(threatTypeName);
 
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
     SEntitySetTemplateUnit platoonUnits{};
     BuildPlatoonUnitSet(runtimeView, platoonUnits);
 
@@ -7215,7 +7198,7 @@ namespace moho
     const float radiusSq = ReadSquaredRadiusArg(state, 5);
     const PlatoonThreatType threatType = ParsePlatoonThreatType(threatTypeName);
 
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
     SEntitySetTemplateUnit platoonUnits{};
     BuildPlatoonUnitSet(runtimeView, platoonUnits);
 
@@ -7309,7 +7292,7 @@ namespace moho
     const Wm3::Vector3f position = SCR_FromLuaCopy<Wm3::Vector3<float>>(positionObject);
     const float radiusSq = ReadSquaredRadiusArg(state, 4);
 
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
     SEntitySetTemplateUnit platoonUnits{};
     BuildPlatoonUnitSet(runtimeView, platoonUnits);
 
@@ -7391,7 +7374,7 @@ namespace moho
     LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
     const EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
-    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    auto& runtimeView = *platoon;
     SEntitySetTemplateUnit platoonUnits{};
     BuildPlatoonUnitSet(runtimeView, platoonUnits);
 

@@ -665,22 +665,6 @@ namespace
     return invalid;
   }
 
-  struct UnitWeaponProjectileVelocityRuntimeView
-  {
-    std::uint8_t mUnknown0000[0x280];
-    Wm3::Vector3f mVelocity; // +0x280
-  };
-
-  static_assert(
-    offsetof(UnitWeaponProjectileVelocityRuntimeView, mVelocity) == 0x280,
-    "UnitWeaponProjectileVelocityRuntimeView::mVelocity offset must be 0x280"
-  );
-
-  [[nodiscard]] Wm3::Vector3f& AccessProjectileVelocity(moho::Projectile& projectile) noexcept
-  {
-    return reinterpret_cast<UnitWeaponProjectileVelocityRuntimeView*>(&projectile)->mVelocity;
-  }
-
 } // namespace
 
 namespace moho

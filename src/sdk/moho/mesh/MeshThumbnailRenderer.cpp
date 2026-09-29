@@ -6,32 +6,10 @@
 #include <stdexcept>
 
 #include "moho/mesh/Mesh.h"
-
-namespace moho
-{
-  class WRenViewport;
-  extern WRenViewport* ren_Viewport;
-}
+#include "moho/render/WRenViewport.h"
 
 namespace
 {
-  struct WRenViewportThumbnailRendererRuntime
-  {
-    std::uint8_t mUnknown000_33F[0x340];
-    moho::MeshThumbnailRenderer mThumbnailRenderer;
-  };
-
-  static_assert(
-    offsetof(WRenViewportThumbnailRendererRuntime, mThumbnailRenderer) == 0x340,
-    "WRenViewportThumbnailRendererRuntime::mThumbnailRenderer offset must be 0x340"
-  );
-
-  [[nodiscard]] moho::MeshThumbnailRenderer& GetViewportThumbnailRenderer(moho::WRenViewport* const viewport) noexcept
-  {
-    auto* const viewportRuntime = reinterpret_cast<WRenViewportThumbnailRendererRuntime*>(viewport);
-    return viewportRuntime->mThumbnailRenderer;
-  }
-
   [[nodiscard]] float VectorLengthSq(const Wm3::Vec3f& v) noexcept
   {
     return v.x * v.x + v.y * v.y + v.z * v.z;
@@ -271,7 +249,7 @@ namespace moho
   )
   {
     boost::shared_ptr<ID3DTextureSheet> retainedOutputSheet(outputSheet);
-    return GetViewportThumbnailRenderer(ren_Viewport)
+    return ren_Viewport->mThumbnailRenderer
       .PushRequest(blueprint, orientation, color, viewOffsetHint, retainedOutputSheet, outputRect);
   }
 

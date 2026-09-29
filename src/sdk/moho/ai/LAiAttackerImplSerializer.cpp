@@ -14,15 +14,6 @@ using namespace moho;
 
 namespace
 {
-  struct LAiAttackerImplSerializationView
-  {
-    std::uint8_t pad_00[0x1C];
-    CAiAttackerImpl* cImpl; // +0x1C
-  };
-
-  static_assert(offsetof(LAiAttackerImplSerializationView, cImpl) == 0x1C, "LAiAttackerImpl::cImpl offset must be 0x1C");
-  static_assert(sizeof(LAiAttackerImplSerializationView) == 0x20, "LAiAttackerImplSerializationView size must be 0x20");
-
   template <typename T>
   [[nodiscard]] gpg::RRef MakeDerivedRef(T* object, gpg::RType* staticType)
   {
@@ -83,11 +74,6 @@ namespace
   {
     return reinterpret_cast<LAiAttackerImpl*>(static_cast<std::uintptr_t>(objectPtr));
   }
-
-  [[nodiscard]] LAiAttackerImplSerializationView* AsView(LAiAttackerImpl* const task)
-  {
-    return reinterpret_cast<LAiAttackerImplSerializationView*>(task);
-  }
 } // namespace
 
 /**
@@ -107,11 +93,10 @@ void LAiAttackerImplSerializer::Deserialize(gpg::ReadArchive* const archive, con
     return;
   }
 
-  LAiAttackerImplSerializationView* const view = AsView(task);
   gpg::RRef owner{};
   gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, owner);
   if (!tracked.object) {
-    view->cImpl = nullptr;
+    task->cImpl = nullptr;
     return;
   }
 
@@ -121,11 +106,11 @@ void LAiAttackerImplSerializer::Deserialize(gpg::ReadArchive* const archive, con
 
   const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiAttackerImplType());
   if (upcast.mObj) {
-    view->cImpl = static_cast<CAiAttackerImpl*>(upcast.mObj);
+    task->cImpl = static_cast<CAiAttackerImpl*>(upcast.mObj);
     return;
   }
 
-  view->cImpl = static_cast<CAiAttackerImpl*>(tracked.object);
+  task->cImpl = static_cast<CAiAttackerImpl*>(tracked.object);
 }
 
 /**
@@ -141,8 +126,7 @@ void LAiAttackerImplSerializer::Serialize(gpg::WriteArchive* const archive, cons
   }
 
   const LAiAttackerImpl* const task = AsLAiAttackerImpl(objectPtr);
-  const LAiAttackerImplSerializationView* const view = reinterpret_cast<const LAiAttackerImplSerializationView*>(task);
-  const gpg::RRef objectRef = MakeDerivedRef(view ? view->cImpl : nullptr, CachedCAiAttackerImplType());
+  const gpg::RRef objectRef = MakeDerivedRef(task ? task->cImpl : nullptr, CachedCAiAttackerImplType());
   gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 }
 

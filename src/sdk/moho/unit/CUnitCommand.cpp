@@ -66,26 +66,6 @@ namespace gpg
 
 namespace
 {
-  using CommandOwnerSlotNode = WeakPtr<CUnitCommand>;
-  using EntityOwnerSlotNode = WeakPtr<Entity>;
-
-  // RUnitBlueprintEconomyCategoryCache is a flat-field spelling of the same
-  // 0x28-byte object EntityCategorySet models; Unit.cpp carries the same
-  // observation for its own word-range view. Reunifying the two declarations
-  // is a separate pass, so this file goes through one named view instead of
-  // casting at each use.
-  static_assert(
-    sizeof(RUnitBlueprintEconomyCategoryCache) == sizeof(EntityCategorySet),
-    "RUnitBlueprintEconomyCategoryCache must match EntityCategorySet size"
-  );
-
-  [[nodiscard]] const EntityCategorySet& AsEntityCategorySet(
-    const RUnitBlueprintEconomyCategoryCache& categoryCache
-  ) noexcept
-  {
-    return reinterpret_cast<const EntityCategorySet&>(categoryCache);
-  }
-
   gpg::RType* gUnitBlueprintType = nullptr;
 
   [[nodiscard]] gpg::RType* CachedRUnitBlueprintType()
@@ -138,7 +118,7 @@ namespace
   )
   {
     EntityCategorySet narrowed{};
-    (void)EntityCategory::Mul(&narrowed, &armyBuildable, &AsEntityCategorySet(blueprint.Economy.CategoryCache));
+    (void)EntityCategory::Mul(&narrowed, &armyBuildable, &blueprint.Economy.CategoryCache);
 
     EntityCategorySet reachable{};
     (void)EntityCategory::Sub(&reachable, &narrowed, &restrictions);
@@ -174,7 +154,7 @@ namespace
 
     msvc8::vector<CUnitCommand*> unreachableCommands{};
 
-    for (const CommandOwnerSlotNode& slot : queue.mCommandVec) {
+    for (const WeakPtr<CUnitCommand>& slot : queue.mCommandVec) {
       CUnitCommand* const command = slot.GetObjectPtr();
       const EUnitCommandType commandType = command->mVarDat.mCmdType;
 
@@ -228,9 +208,6 @@ namespace
   {
     return SCommandUnitSet::IsUsableEntry(entry);
   }
-
-  static_assert(sizeof(CommandOwnerSlotNode) == sizeof(std::uintptr_t) * 2u, "CommandOwnerSlotNode size");
-  static_assert(sizeof(EntityOwnerSlotNode) == sizeof(std::uintptr_t) * 2u, "EntityOwnerSlotNode size");
 
   constexpr std::uint32_t kNoTargetEntityId = 0xF0000000u;
   constexpr const char* kCommandTypeKey = "CommandType";
@@ -986,28 +963,6 @@ namespace
     const char* const blueprintId = blueprint->mBlueprintId.c_str();
     return (blueprintId && blueprintId[0] != '\0') ? blueprintId : nullptr;
   }
-
-  struct CUnitCommandDestroyRuntimeView
-  {
-    std::uint8_t pad_0000_0118[0x118];
-    CountedObject* formationObject;
-    std::uint8_t pad_011C_0120[0x04];
-    CommandOwnerSlotNode coordinatingOrdersOwnerChainNode;
-    std::uint8_t pad_0128_0158[0x30];
-    EntityOwnerSlotNode sidecarOwnerChainNode;
-  };
-  static_assert(
-    offsetof(CUnitCommandDestroyRuntimeView, formationObject) == 0x118,
-    "CUnitCommandDestroyRuntimeView::formationObject"
-  );
-  static_assert(
-    offsetof(CUnitCommandDestroyRuntimeView, coordinatingOrdersOwnerChainNode) == 0x120,
-    "CUnitCommandDestroyRuntimeView::coordinatingOrdersOwnerChainNode"
-  );
-  static_assert(
-    offsetof(CUnitCommandDestroyRuntimeView, sidecarOwnerChainNode) == 0x158,
-    "CUnitCommandDestroyRuntimeView::sidecarOwnerChainNode"
-  );
 
   void ReleaseIntrusiveRefcountedObject(CountedObject*& object)
   {
@@ -1973,15 +1928,16 @@ CUnitCommand::~CUnitCommand()
  */
 void CUnitCommand::DestroyInternal()
 {
-  auto& runtime = *reinterpret_cast<CUnitCommandDestroyRuntimeView*>(this);
-
-  // +0x158/+0x15C: intrusive weak-owner link pair used by command sidecar ownership.
-  auto& sidecarLink = runtime.sidecarOwnerChainNode;
-  Entity* const sidecarEntity = sidecarLink.GetObjectPtr();
-  if (sidecarEntity) {
-    sidecarEntity->Destroy();
-    sidecarLink.UnlinkFromOwnerChain();
-    sidecarLink.ClearLinkState();
+  // +0x158: the ferry beacon this command spawned. 0x006E8533..0x006E8571
+  // decodes it with the `WeakPtr<Unit>` `-4`, steps to its `Entity` base
+  // (`add eax, 8`) for `Entity::Destroy` (0x00679AF0), then unlinks the node
+  // and nulls both words. The overlay this replaced read the lane as a
+  // `WeakPtr<Entity>`, which handed `Destroy` the `Unit` address itself, eight
+  // bytes short of the `Entity` subobject.
+  if (Unit* const beacon = mUnit.GetObjectPtr(); beacon != nullptr) {
+    beacon->Destroy();
+    mUnit.UnlinkFromOwnerChain();
+    mUnit.ClearLinkState();
   }
 
   // 0x006E8574..0x006E85B4. The retire call is the one that matters outside
@@ -2005,11 +1961,17 @@ void CUnitCommand::DestroyInternal()
   // +0x148..+0x154: coordinating-order vector storage (8-byte owner-link elements).
   mCoordinatingOrders = msvc8::vector<WeakPtr<CUnitCommand>>{};
 
-  // +0x120 list node mirrors binary helper 0x0057D490 unlink shape.
-  runtime.coordinatingOrdersOwnerChainNode.UnlinkFromOwnerChain();
+  // +0x120 is `mTarget`'s entity weak link (`mTarget` at +0x11C, its
+  // `targetEntity` at +0x04), unlinked with the 0x0057D490 shape. It was
+  // overlaid as a "coordinating-orders" `WeakPtr<CUnitCommand>`.
+  mTarget.targetEntity.UnlinkFromOwnerChain();
 
   // +0x118 intrusive-refcounted formation object.
-  ReleaseIntrusiveRefcountedObject(runtime.formationObject);
+  if (mFormationInstance != nullptr) {
+    CountedObject* formationObject = mFormationInstance;
+    ReleaseIntrusiveRefcountedObject(formationObject);
+    mFormationInstance = nullptr;
+  }
 
   // +0x0F8 command unit-set vector payload.
   mUnitSet.mVec = gpg::core::FastVectorN<CScriptObject*, 4>{};

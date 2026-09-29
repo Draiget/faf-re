@@ -2324,23 +2324,6 @@ namespace
     return leaf != nullptr ? leaf : &storage.mShardData;
   }
 
-  struct SpatialDbStorageRootView
-  {
-    std::uint8_t pad_00_83[0x84];
-    void* orderedEntryRoot;     // +0x84
-    void* orderedEntrySentinel; // +0x88
-  };
-
-  static_assert(
-    offsetof(SpatialDbStorageRootView, orderedEntryRoot) == 0x84,
-    "SpatialDbStorageRootView::orderedEntryRoot offset must be 0x84"
-  );
-  static_assert(
-    offsetof(SpatialDbStorageRootView, orderedEntrySentinel) == 0x88,
-    "SpatialDbStorageRootView::orderedEntrySentinel offset must be 0x88"
-  );
-  static_assert(sizeof(SpatialDbStorageRootView) == 0x8C, "SpatialDbStorageRootView size must be 0x8C");
-
   [[nodiscard]] moho::VTransform IdentityTransform() noexcept
   {
     moho::VTransform transform{};

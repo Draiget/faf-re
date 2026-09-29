@@ -8,6 +8,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "moho/resource/CSimResources.h"
 #include "moho/resource/ResourceDeposit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -24,17 +25,6 @@ namespace
     return cached;
   }
 
-  struct ResourceDepositVectorFieldView
-  {
-    std::uint8_t reserved00[0x0C];
-    ResourceDepositVector mDeposits;
-  };
-
-  static_assert(
-    offsetof(ResourceDepositVectorFieldView, mDeposits) == 0x0C,
-    "ResourceDepositVectorFieldView::mDeposits offset must be 0x0C"
-  );
-
   [[nodiscard]] gpg::RType* CachedResourceDepositVectorFieldType()
   {
     static gpg::RType* cached = nullptr;
@@ -49,7 +39,9 @@ namespace
    *
    * What it does:
    * Lazily resolves `vector<ResourceDeposit>` reflection type and dispatches
-   * one archive read for the vector field stored at offset `+0x0C`.
+   * one archive read for `CSimResources::deposits_` (x86 `+0x0C`, the only
+   * `msvc8::vector<ResourceDeposit>` member at that offset; same body as the
+   * CSimResources serializer's load half).
    */
   void ReadResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::ReadArchive* const archive)
   {
@@ -59,9 +51,9 @@ namespace
       return;
     }
 
-    auto* const view = static_cast<ResourceDepositVectorFieldView*>(object);
+    auto* const resources = static_cast<moho::CSimResources*>(object);
     gpg::RRef owner{};
-    archive->Read(CachedResourceDepositVectorFieldType(), &view->mDeposits, owner);
+    archive->Read(CachedResourceDepositVectorFieldType(), &resources->deposits_, owner);
   }
 
   /**
@@ -69,7 +61,7 @@ namespace
    *
    * What it does:
    * Lazily resolves `vector<ResourceDeposit>` reflection type and dispatches
-   * one archive write for the vector field stored at offset `+0x0C`.
+   * one archive write for `CSimResources::deposits_` (x86 `+0x0C`).
    */
   void WriteResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::WriteArchive* const archive)
   {
@@ -79,9 +71,9 @@ namespace
       return;
     }
 
-    auto* const view = static_cast<ResourceDepositVectorFieldView*>(object);
+    auto* const resources = static_cast<moho::CSimResources*>(object);
     gpg::RRef owner{};
-    archive->Write(CachedResourceDepositVectorFieldType(), &view->mDeposits, owner);
+    archive->Write(CachedResourceDepositVectorFieldType(), &resources->deposits_, owner);
   }
 
   [[nodiscard]] gpg::RVectorType_ResourceDeposit& AcquireResourceDepositVectorType()

@@ -2955,7 +2955,7 @@ LRESULT CALLBACK DispatchWindowMessageHookRuntime(
   LPARAM lParam
 )
 {
-  auto* const runtime = reinterpret_cast<DispatchWindowRuntime*>(::GetWindowLongW(window, GWL_USERDATA));
+  auto* const runtime = reinterpret_cast<DispatchWindowRuntime*>(::GetWindowLongPtrW(window, GWLP_USERDATA));
   if (runtime == nullptr) {
     return 0;
   }
@@ -2976,7 +2976,7 @@ LRESULT CALLBACK DispatchWindowMessageHookRuntime(
     const auto dispatch = reinterpret_cast<MsgDispatchFn>(vtable[124]);
     if (dispatch != nullptr) {
       dispatch(runtime, message, wParam, lParam);
-      if (!::IsWindow(window) || reinterpret_cast<DispatchWindowRuntime*>(::GetWindowLongW(window, GWL_USERDATA)) != runtime) {
+      if (!::IsWindow(window) || reinterpret_cast<DispatchWindowRuntime*>(::GetWindowLongPtrW(window, GWLP_USERDATA)) != runtime) {
         return 0;
       }
     }

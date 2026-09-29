@@ -49,37 +49,6 @@ namespace
     moho::resource_reflection::AddBase(typeInfo, moho::resource_reflection::ResolveISimResourcesType());
   }
 
-  struct CSimResourcesTypeInfoCallbackLaneView
-  {
-    unsigned char reserved00_47[0x48];
-    gpg::RType::new_ref_func_t newRefFunc;   // +0x48
-    gpg::RType::cpy_ref_func_t cpyRefFunc;   // +0x4C
-    gpg::RType::delete_func_t deleteFunc;    // +0x50
-    gpg::RType::ctor_ref_func_t ctorRefFunc; // +0x54
-    gpg::RType::mov_ref_func_t movRefFunc;   // +0x58
-    gpg::RType::dtr_func_t dtrFunc;          // +0x5C
-    bool v24;                                // +0x60
-    unsigned char reserved61_63[0x03];
-  };
-
-  static_assert(
-    offsetof(CSimResourcesTypeInfoCallbackLaneView, newRefFunc) == 0x48,
-    "CSimResourcesTypeInfoCallbackLaneView::newRefFunc offset must be 0x48"
-  );
-  static_assert(
-    offsetof(CSimResourcesTypeInfoCallbackLaneView, deleteFunc) == 0x50,
-    "CSimResourcesTypeInfoCallbackLaneView::deleteFunc offset must be 0x50"
-  );
-  static_assert(
-    offsetof(CSimResourcesTypeInfoCallbackLaneView, ctorRefFunc) == 0x54,
-    "CSimResourcesTypeInfoCallbackLaneView::ctorRefFunc offset must be 0x54"
-  );
-  static_assert(
-    offsetof(CSimResourcesTypeInfoCallbackLaneView, dtrFunc) == 0x5C,
-    "CSimResourcesTypeInfoCallbackLaneView::dtrFunc offset must be 0x5C"
-  );
-  static_assert(sizeof(CSimResourcesTypeInfoCallbackLaneView) == 0x64, "Callback lane view size must be 0x64");
-
   /**
    * Address: 0x00547820 (FUN_00547820)
    *
@@ -99,11 +68,7 @@ namespace
       return nullptr;
     }
 
-    auto* const lanes = reinterpret_cast<CSimResourcesTypeInfoCallbackLaneView*>(typeInfo);
-    lanes->newRefFunc = newRefFunc;
-    lanes->ctorRefFunc = ctorRefFunc;
-    lanes->deleteFunc = deleteFunc;
-    lanes->dtrFunc = dtrFunc;
+    (void)gpg::BindRTypeLifecycleCallbacks(typeInfo, newRefFunc, ctorRefFunc, deleteFunc, dtrFunc);
     return typeInfo;
   }
 

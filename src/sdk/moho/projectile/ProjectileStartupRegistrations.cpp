@@ -130,101 +130,6 @@ namespace
     return outName;
   }
 
-  struct ProjectileVelocityRuntimeView
-  {
-    std::uint8_t mUnknown0000[0x280];
-    Wm3::Vector3f mVelocity;
-  };
-  static_assert(
-    offsetof(ProjectileVelocityRuntimeView, mVelocity) == 0x280,
-    "ProjectileVelocityRuntimeView::mVelocity offset must be 0x280"
-  );
-  static_assert(sizeof(ProjectileVelocityRuntimeView) == 0x28C, "ProjectileVelocityRuntimeView size must be 0x28C");
-
-  struct ProjectileTargetingRuntimeView
-  {
-    std::uint8_t mUnknown0000[0x278];
-    moho::WeakPtr<moho::Entity> mLauncherWeak; // +0x278
-    std::uint8_t mUnknown0280[0x28];
-    bool mCollideSurface; // +0x2A8
-    bool mDoCollision;    // +0x2A9
-    bool mTrackTarget;    // +0x2AA
-    bool mVelocityAlign;  // +0x2AB
-    bool mStayUpright;    // +0x2AC
-    bool mLeadTarget;     // +0x2AD
-    bool mStayUnderwater; // +0x2AE
-  };
-  static_assert(
-    offsetof(ProjectileTargetingRuntimeView, mLauncherWeak) == 0x278,
-    "ProjectileTargetingRuntimeView::mLauncherWeak offset must be 0x278"
-  );
-  static_assert(
-    offsetof(ProjectileTargetingRuntimeView, mTrackTarget) == 0x2AA,
-    "ProjectileTargetingRuntimeView::mTrackTarget offset must be 0x2AA"
-  );
-  static_assert(
-    offsetof(ProjectileTargetingRuntimeView, mStayUnderwater) == 0x2AE,
-    "ProjectileTargetingRuntimeView::mStayUnderwater offset must be 0x2AE"
-  );
-  static_assert(sizeof(ProjectileTargetingRuntimeView) == 0x2B0, "ProjectileTargetingRuntimeView size must be 0x2B0");
-
-  struct ProjectileMotionControlRuntimeView
-  {
-    std::uint8_t mUnknown0000[0x2B0];
-    float mTurnRateDegrees; // +0x2B0
-    float mMaxSpeed;        // +0x2B4
-    float mAcceleration;    // +0x2B8
-    Wm3::Vector3f mBallisticAcceleration; // +0x2BC
-  };
-  static_assert(
-    offsetof(ProjectileMotionControlRuntimeView, mTurnRateDegrees) == 0x2B0,
-    "ProjectileMotionControlRuntimeView::mTurnRateDegrees offset must be 0x2B0"
-  );
-  static_assert(
-    offsetof(ProjectileMotionControlRuntimeView, mMaxSpeed) == 0x2B4,
-    "ProjectileMotionControlRuntimeView::mMaxSpeed offset must be 0x2B4"
-  );
-  static_assert(
-    offsetof(ProjectileMotionControlRuntimeView, mAcceleration) == 0x2B8,
-    "ProjectileMotionControlRuntimeView::mAcceleration offset must be 0x2B8"
-  );
-  static_assert(
-    offsetof(ProjectileMotionControlRuntimeView, mBallisticAcceleration) == 0x2BC,
-    "ProjectileMotionControlRuntimeView::mBallisticAcceleration offset must be 0x2BC"
-  );
-  static_assert(
-    sizeof(ProjectileMotionControlRuntimeView) == 0x2C8,
-    "ProjectileMotionControlRuntimeView size must be 0x2C8"
-  );
-
-  struct ProjectileWaterBehaviorRuntimeView
-  {
-    std::uint8_t mUnknown0000[0x2AF];
-    bool mDestroyOnWater; // +0x2AF
-  };
-  static_assert(
-    offsetof(ProjectileWaterBehaviorRuntimeView, mDestroyOnWater) == 0x2AF,
-    "ProjectileWaterBehaviorRuntimeView::mDestroyOnWater offset must be 0x2AF"
-  );
-  static_assert(
-    sizeof(ProjectileWaterBehaviorRuntimeView) == 0x2B0,
-    "ProjectileWaterBehaviorRuntimeView size must be 0x2B0"
-  );
-
-  struct ProjectileAttributesRuntimeView
-  {
-    std::uint8_t mUnknown0000[0x368];
-    moho::CProjectileAttributes mAttributes; // +0x368
-  };
-  static_assert(
-    offsetof(ProjectileAttributesRuntimeView, mAttributes) == 0x368,
-    "ProjectileAttributesRuntimeView::mAttributes offset must be 0x368"
-  );
-  static_assert(
-    sizeof(ProjectileAttributesRuntimeView) == 0x37C,
-    "ProjectileAttributesRuntimeView size must be 0x37C"
-  );
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     // Every file that wants this set must resolve the one that already
@@ -244,34 +149,6 @@ namespace
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  [[nodiscard]] ProjectileVelocityRuntimeView& AccessProjectileVelocityView(moho::Projectile& projectile) noexcept
-  {
-    return *reinterpret_cast<ProjectileVelocityRuntimeView*>(&projectile);
-  }
-
-  [[nodiscard]] ProjectileTargetingRuntimeView& AccessProjectileTargetingView(moho::Projectile& projectile) noexcept
-  {
-    return *reinterpret_cast<ProjectileTargetingRuntimeView*>(&projectile);
-  }
-
-  [[nodiscard]] ProjectileMotionControlRuntimeView&
-  AccessProjectileMotionControlView(moho::Projectile& projectile) noexcept
-  {
-    return *reinterpret_cast<ProjectileMotionControlRuntimeView*>(&projectile);
-  }
-
-  [[nodiscard]] ProjectileWaterBehaviorRuntimeView&
-  AccessProjectileWaterBehaviorView(moho::Projectile& projectile) noexcept
-  {
-    return *reinterpret_cast<ProjectileWaterBehaviorRuntimeView*>(&projectile);
-  }
-
-  [[nodiscard]] moho::CProjectileAttributes&
-  AccessProjectileAttributesView(moho::Projectile& projectile) noexcept
-  {
-    return reinterpret_cast<ProjectileAttributesRuntimeView*>(&projectile)->mAttributes;
-  }
-
   /**
    * Address: 0x006A11C0 (FUN_006A11C0)
    *
@@ -283,7 +160,7 @@ namespace
     const bool enabled
   ) noexcept
   {
-    AccessProjectileTargetingView(*projectile).mDoCollision = enabled;
+    projectile->mDoCollision = enabled;
     return projectile;
   }
 
@@ -298,7 +175,7 @@ namespace
     const bool enabled
   ) noexcept
   {
-    AccessProjectileTargetingView(*projectile).mCollideSurface = enabled;
+    projectile->mCollideSurface = enabled;
     return projectile;
   }
 
@@ -313,7 +190,7 @@ namespace
     const bool enabled
   ) noexcept
   {
-    AccessProjectileTargetingView(*projectile).mTrackTarget = enabled;
+    projectile->mTrackTarget = enabled;
     return projectile;
   }
 
@@ -328,7 +205,7 @@ namespace
     const bool enabled
   ) noexcept
   {
-    AccessProjectileTargetingView(*projectile).mStayUnderwater = enabled;
+    projectile->mStayUnderwater = enabled;
     return projectile;
   }
 
@@ -343,7 +220,7 @@ namespace
     const bool enabled
   ) noexcept
   {
-    AccessProjectileTargetingView(*projectile).mStayUpright = enabled;
+    projectile->mStayUpright = enabled;
     return projectile;
   }
 
@@ -358,7 +235,7 @@ namespace
     const bool enabled
   ) noexcept
   {
-    AccessProjectileTargetingView(*projectile).mVelocityAlign = enabled;
+    projectile->mVelocityAlign = enabled;
     return projectile;
   }
 
@@ -373,7 +250,7 @@ namespace
     const bool enabled
   ) noexcept
   {
-    AccessProjectileWaterBehaviorView(*projectile).mDestroyOnWater = enabled;
+    projectile->mDestroyOnWater = enabled;
     return projectile;
   }
 
@@ -913,8 +790,7 @@ namespace moho
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
 
     Entity* trackingTarget = nullptr;
-    ProjectileTargetingRuntimeView& targetingView = AccessProjectileTargetingView(*projectile);
-    if (targetingView.mTrackTarget && projectile->mTargetPosData.HasTarget()) {
+    if (projectile->mTrackTarget && projectile->mTargetPosData.HasTarget()) {
       trackingTarget = projectile->mTargetPosData.GetEntity();
     }
 
@@ -1313,7 +1189,7 @@ namespace moho
       LuaPlus::LuaStackObject::TypeError(&speedArg, "number");
     }
 
-    AccessProjectileMotionControlView(*projectile).mMaxSpeed = static_cast<float>(lua_tonumber(rawState, 2));
+    projectile->mMaxSpeed = static_cast<float>(lua_tonumber(rawState, 2));
     projectile->mLuaObj.PushStack(state);
     return 1;
   }
@@ -1376,7 +1252,7 @@ namespace moho
       LuaPlus::LuaStackObject::TypeError(&accelerationArg, "number");
     }
 
-    AccessProjectileMotionControlView(*projectile).mAcceleration = static_cast<float>(lua_tonumber(rawState, 2));
+    projectile->mAcceleration = static_cast<float>(lua_tonumber(rawState, 2));
     projectile->mLuaObj.PushStack(state);
     return 1;
   }
@@ -1439,20 +1315,20 @@ namespace moho
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
-    ProjectileMotionControlRuntimeView& motion = AccessProjectileMotionControlView(*projectile);
+    Wm3::Vector3f& ballisticAcceleration = projectile->mBallisticAcceleration;
 
     switch (argumentCount) {
       case 1: {
         Sim* const sim = lua_getglobaluserdata(rawState);
-        motion.mBallisticAcceleration = sim->mPhysConstants->mGravity;
+        ballisticAcceleration = sim->mPhysConstants->mGravity;
         break;
       }
 
       case 2: {
         LuaPlus::LuaStackObject yArg(state, 2);
-        motion.mBallisticAcceleration.x = 0.0f;
-        motion.mBallisticAcceleration.y = static_cast<float>(yArg.GetNumber());
-        motion.mBallisticAcceleration.z = 0.0f;
+        ballisticAcceleration.x = 0.0f;
+        ballisticAcceleration.y = static_cast<float>(yArg.GetNumber());
+        ballisticAcceleration.z = 0.0f;
         break;
       }
 
@@ -1460,9 +1336,9 @@ namespace moho
         LuaPlus::LuaStackObject xArg(state, 2);
         LuaPlus::LuaStackObject yArg(state, 3);
         LuaPlus::LuaStackObject zArg(state, 4);
-        motion.mBallisticAcceleration.x = static_cast<float>(xArg.GetNumber());
-        motion.mBallisticAcceleration.y = static_cast<float>(yArg.GetNumber());
-        motion.mBallisticAcceleration.z = static_cast<float>(zArg.GetNumber());
+        ballisticAcceleration.x = static_cast<float>(xArg.GetNumber());
+        ballisticAcceleration.y = static_cast<float>(yArg.GetNumber());
+        ballisticAcceleration.z = static_cast<float>(zArg.GetNumber());
         break;
       }
 
@@ -1592,7 +1468,7 @@ namespace moho
       LuaPlus::LuaStackObject::TypeError(&turnRateArg, "number");
     }
 
-    AccessProjectileMotionControlView(*projectile).mTurnRateDegrees = static_cast<float>(lua_tonumber(rawState, 2));
+    projectile->mTurnRateDegrees = static_cast<float>(lua_tonumber(rawState, 2));
     projectile->mLuaObj.PushStack(state);
     return 1;
   }
@@ -1776,7 +1652,7 @@ namespace moho
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
-    Wm3::Vector3f& velocity = AccessProjectileVelocityView(*projectile).mVelocity;
+    Wm3::Vector3f& velocity = projectile->mVelocity;
 
     LuaPlus::LuaStackObject speedOrXArg(state, 2);
     if (argumentCount == 2) {
@@ -2555,7 +2431,7 @@ namespace moho
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
 
     SetVectorLengthIfNonZero(randomDirection, ReadProjectileRandomUpSpeed(*projectile));
-    AccessProjectileVelocityView(*projectile).mVelocity = randomDirection;
+    projectile->mVelocity = randomDirection;
     return 0;
   }
 
@@ -2605,7 +2481,7 @@ namespace moho
     if (lua_type(rawState, 2) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&maxZigZagArg, "number");
     }
-    AccessProjectileAttributesView(*projectile).mMaxZigZag = static_cast<float>(lua_tonumber(rawState, 2));
+    projectile->mAttributes.mMaxZigZag = static_cast<float>(lua_tonumber(rawState, 2));
     return 0;
   }
 
@@ -2667,7 +2543,7 @@ namespace moho
     if (lua_type(rawState, 2) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&zigZagFrequencyArg, "number");
     }
-    AccessProjectileAttributesView(*projectile).mZigZagFrequency = static_cast<float>(lua_tonumber(rawState, 2));
+    projectile->mAttributes.mZigZagFrequency = static_cast<float>(lua_tonumber(rawState, 2));
     return 0;
   }
 
@@ -2729,7 +2605,7 @@ namespace moho
     if (lua_type(rawState, 2) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&detonateAboveHeightArg, "number");
     }
-    AccessProjectileAttributesView(*projectile).mDetonateAboveHeight = static_cast<float>(lua_tonumber(rawState, 2));
+    projectile->mAttributes.mDetonateAboveHeight = static_cast<float>(lua_tonumber(rawState, 2));
     return 0;
   }
 
@@ -2791,7 +2667,7 @@ namespace moho
     if (lua_type(rawState, 2) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&detonateBelowHeightArg, "number");
     }
-    AccessProjectileAttributesView(*projectile).mDetonateBelowHeight = static_cast<float>(lua_tonumber(rawState, 2));
+    projectile->mAttributes.mDetonateBelowHeight = static_cast<float>(lua_tonumber(rawState, 2));
     return 0;
   }
 

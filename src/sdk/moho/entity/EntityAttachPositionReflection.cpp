@@ -521,57 +521,46 @@ namespace
     return (packedWord->packedWord >> kPackedHistoryIndexShift) & kPackedHistoryIndexMask;
   }
 
-  struct PackedHistoryLookupOwnerView
-  {
-    std::uint8_t pad_0000_0910[0x910];
-    const std::uint32_t* tableBegin; // +0x910
-    const std::uint32_t* tableEnd;   // +0x914
-  };
-
-  static_assert(
-    offsetof(PackedHistoryLookupOwnerView, tableBegin) == 0x910,
-    "PackedHistoryLookupOwnerView::tableBegin offset must be 0x910"
-  );
-  static_assert(
-    offsetof(PackedHistoryLookupOwnerView, tableEnd) == 0x914,
-    "PackedHistoryLookupOwnerView::tableEnd offset must be 0x914"
-  );
-
   /**
    * Address: 0x00676AE0 (FUN_00676AE0)
    *
    * What it does:
-   * Decodes one packed index (`[27:20]`) and returns the matching dword table
-   * element from lanes `+0x910/+0x914`, with null/range/sentinel guards.
+   * Decodes the army index (`[27:20]`) of one entity id and returns that army
+   * from `Sim::mArmiesList`, or null for the 0xFF "no army" sentinel, an empty
+   * list, or an index past its end.
+   *
+   * The owner (`esi`) is the Sim: the body reads a 4-byte-element vector whose
+   * `_Myfirst`/`_Mylast` sit at +0x910/+0x914, i.e. `msvc8::vector<CArmyImpl*>
+   * mArmiesList` at +0x90C behind its proxy word, and it decodes the index the
+   * same way as `CInfluenceMap::ResolveSourceArmy`
+   * (`sim->mArmiesList[(id >> 20) & 0xFF]`).
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t LookupPackedHistoryTableValue(
-    const PackedHistoryLookupOwnerView* const ownerView,
-    const std::uint32_t packedValue
+  [[maybe_unused]] [[nodiscard]] moho::CArmyImpl* LookupArmyForEntityId(
+    const moho::Sim* const sim,
+    const std::uint32_t entityId
   ) noexcept
   {
-    GPG_ASSERT(ownerView != nullptr);
-    if (!ownerView) {
-      return 0u;
+    GPG_ASSERT(sim != nullptr);
+    if (!sim) {
+      return nullptr;
     }
 
-    const PackedHistoryIndexWordView packedWord{packedValue};
-    const std::uint32_t decodedIndex = DecodePackedHistoryIndexByte(&packedWord);
-    if (decodedIndex == kPackedHistoryIndexInvalid) {
-      return 0u;
+    const PackedHistoryIndexWordView packedWord{entityId};
+    const std::uint32_t armyIndex = DecodePackedHistoryIndexByte(&packedWord);
+    if (armyIndex == kPackedHistoryIndexInvalid) {
+      return nullptr;
     }
 
-    const std::uint32_t* const begin = ownerView->tableBegin;
-    const std::uint32_t* const end = ownerView->tableEnd;
-    if (begin == nullptr || end <= begin) {
-      return 0u;
+    const msvc8::vector<moho::CArmyImpl*>& armies = sim->mArmiesList;
+    if (armies.begin() == nullptr) {
+      return nullptr;
     }
 
-    const std::size_t entryCount = static_cast<std::size_t>(end - begin);
-    if (decodedIndex >= entryCount) {
-      return 0u;
+    if (armyIndex >= armies.size()) {
+      return nullptr;
     }
 
-    return begin[decodedIndex];
+    return armies[armyIndex];
   }
 
   /**

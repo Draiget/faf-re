@@ -14,22 +14,9 @@ namespace moho
 {
   class CArmyStatItem;
   class CAiBrain;
+  struct RBlueprint;
   struct STrigger;
   enum ETriggerOperator : std::int32_t;
-
-  struct ArmyBlueprintNameView
-  {
-    std::uint8_t pad_0000[0x08];
-    msvc8::string mName;
-    std::uint8_t pad_0024[0x38];
-    std::int32_t mBlueprintOrdinal;
-  };
-  static_assert(offsetof(ArmyBlueprintNameView, mName) == 0x08, "ArmyBlueprintNameView::mName offset must be 0x08");
-  static_assert(
-    offsetof(ArmyBlueprintNameView, mBlueprintOrdinal) == 0x5C,
-    "ArmyBlueprintNameView::mBlueprintOrdinal offset must be 0x5C"
-  );
-  static_assert(sizeof(ArmyBlueprintNameView) == 0x60, "ArmyBlueprintNameView size must be 0x60");
 
   /**
    * The per-blueprint stat table is a plain `std::map<const RBlueprint*, float>`
@@ -38,11 +25,13 @@ namespace moho
    * is exactly what `msvc8::map` lays out for an 8-byte `value_type`. The key
    * comparison in the binary is a raw pointer compare, so the default
    * `std::less` is the right predicate rather than a name-ordering one.
+   * The consumers read the key's `mBlueprintId` (+0x08), `mDescription`
+   * (+0x24) and `mBlueprintOrdinal` (+0x5C); callers pass unit blueprints.
    */
-  using ArmyBlueprintStatTree = msvc8::map<const ArmyBlueprintNameView*, float>;
+  using ArmyBlueprintStatTree = msvc8::map<const RBlueprint*, float>;
   // The 0x18 node is not nameable from here -- `msvc8::map` keeps `node_type`
   // private -- but it is pinned by construction: links at 0/4/8, an 8-byte
-  // `pair<const ArmyBlueprintNameView*, float>` at +0x0C, colour at +0x14 and
+  // `pair<const RBlueprint*, float>` at +0x0C, colour at +0x14 and
   // nil at +0x15, which the RbTree node template lays out exactly.
   static_assert(sizeof(ArmyBlueprintStatTree) == 0x0C, "ArmyBlueprintStatTree size must be 0x0C");
 
@@ -137,7 +126,7 @@ namespace moho
      * zero-initialized node when the key is missing, and returns a writable
      * pointer to that lane.
      */
-    [[nodiscard]] float* FindOrCreateBlueprintStatValue(const ArmyBlueprintNameView* blueprintName);
+    [[nodiscard]] float* FindOrCreateBlueprintStatValue(const RBlueprint* blueprint);
 
     /**
      * Address: 0x0070ADD0 (FUN_0070ADD0, sub_70ADD0)
@@ -263,7 +252,7 @@ namespace moho
      */
     [[nodiscard]] float* AddBlueprintStatDelta(
       const char* statPath,
-      const ArmyBlueprintNameView* blueprintName,
+      const RBlueprint* blueprint,
       float delta
     );
 

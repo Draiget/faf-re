@@ -18,6 +18,7 @@
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/ISimResources.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/CWldMap.h"
 #include "moho/sim/GridTraversalLine.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/containers/SCoordsVec2.h"
@@ -2926,35 +2927,22 @@ namespace moho
            z < mPlayableRect.z1;
   }
 
-  struct HeightFieldOwnerRuntimeView
-  {
-    std::uint8_t reserved00_03[0x04];
-    CHeightField** heightField; // +0x04
-  };
-
-  static_assert(
-    offsetof(HeightFieldOwnerRuntimeView, heightField) == 0x04,
-    "HeightFieldOwnerRuntimeView::heightField offset must be 0x04"
-  );
-
   /**
    * Address: 0x0086DA90 (FUN_0086DA90)
    *
+   * IDA signature:
+   * double __usercall sub_86DA90@<st0>(Moho::IWldTerrainRes *terrainRes@<eax>, float x, float z);
+   *
    * What it does:
-   * Reads one `CHeightField*` lane from owner runtime state and returns
-   * sampled terrain elevation at world `(x,z)`.
+   * Samples the terrain elevation at world `(x,z)` through the terrain
+   * resource's map: `[terrainRes+0x04]` is `IWldTerrainRes::mMap`, whose
+   * first word is `STIMap::mHeightField`'s pointer, handed straight to
+   * `CHeightField::GetElevation` (0x0044FB90). The binary performs no null
+   * checks on either hop.
    */
-  double QueryOwnerHeightFieldElevation(
-    const HeightFieldOwnerRuntimeView* const owner,
-    const float x,
-    const float z
-  ) noexcept
+  double QueryTerrainResElevation(const IWldTerrainRes* const terrainRes, const float x, const float z) noexcept
   {
-    if (owner == nullptr || owner->heightField == nullptr || *owner->heightField == nullptr) {
-      return 0.0;
-    }
-
-    return static_cast<double>((*owner->heightField)->GetElevation(x, z));
+    return static_cast<double>(terrainRes->mMap->mHeightField->GetElevation(x, z));
   }
 
   /**

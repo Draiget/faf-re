@@ -810,22 +810,6 @@ namespace
     return childOrParent;
   }
 
-  [[nodiscard]] moho::Unit* DecodeAllUnitsIteratorPayload(
-    const moho::CEntityDbAllUnitsNode* const node
-  ) noexcept
-  {
-    if (node == nullptr || node->unitListNode == nullptr) {
-      return nullptr;
-    }
-
-    const auto encodedNode = reinterpret_cast<std::uintptr_t>(node->unitListNode);
-    if (encodedNode < 0x8u) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::Unit*>(encodedNode - 0x8u);
-  }
-
   moho::CEntityDbAllUnitsNode* EraseAllUnitsTreeRange(
     moho::CEntityDb* const entityDb,
     moho::CEntityDbAllUnitsNode** const outPosition,
@@ -1561,7 +1545,7 @@ namespace moho
     mItr = entityDb->AllUnitsEnd(sourceIndex);
     mEnd = entityDb->AllUnitsEnd(sourceIndex + 1u);
     if (mItr != mEnd) {
-      mCur = DecodeAllUnitsIteratorPayload(mItr);
+      mCur = CEntityDb::UnitFromAllUnitsNode(mItr);
     }
   }
 
@@ -1595,7 +1579,7 @@ namespace moho
     mItr = leftMost;
     mEnd = entityDb->AllUnitsEnd();
     if (mItr != mEnd) {
-      mCur = DecodeAllUnitsIteratorPayload(mItr);
+      mCur = CEntityDb::UnitFromAllUnitsNode(mItr);
     }
   }
 

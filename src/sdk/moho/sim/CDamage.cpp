@@ -561,13 +561,13 @@ namespace moho
             const RUnitBlueprint* const blueprint = instigatorUnit->GetBlueprint();
             (void)armyStats->AddBlueprintStatDelta(
               "Units_TotalDamageDealt",
-              reinterpret_cast<const ArmyBlueprintNameView*>(blueprint),
+              reinterpret_cast<const RBlueprint*>(blueprint),
               postArmorAmount
             );
 
             ESquadClass squadClass{};
             CPlatoon* const platoon = instigatorArmy->GetPlatoonFor(
-              static_cast<int>(reinterpret_cast<std::uintptr_t>(instigatorUnit)),
+              instigatorUnit,
               &squadClass
             );
             if (platoon != nullptr) {
@@ -600,13 +600,13 @@ namespace moho
             const RUnitBlueprint* const targetBlueprint = targetUnitForStats->GetBlueprint();
             (void)armyStats->AddBlueprintStatDelta(
               "Units_TotalDamageReceive",
-              reinterpret_cast<const ArmyBlueprintNameView*>(targetBlueprint),
+              reinterpret_cast<const RBlueprint*>(targetBlueprint),
               postArmorAmount
             );
 
             ESquadClass squadClass{};
             CPlatoon* const platoon = targetArmy->GetPlatoonFor(
-              static_cast<int>(reinterpret_cast<std::uintptr_t>(targetUnitForStats)),
+              targetUnitForStats,
               &squadClass
             );
             if (platoon != nullptr) {

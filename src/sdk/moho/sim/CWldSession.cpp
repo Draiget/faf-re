@@ -1053,16 +1053,12 @@ const char* gpg::RMultiMapType_EntId_string::GetName() const
  */
 msvc8::string gpg::RMultiMapType_EntId_string::GetLexical(const gpg::RRef& ref) const
 {
-  struct MultiMapRuntimeView
-  {
-    void* allocProxy;
-    void* head;
-    std::uint32_t size;
-  };
-
   const msvc8::string base = gpg::RType::GetLexical(ref);
-  const auto* const map = static_cast<const MultiMapRuntimeView*>(ref.mObj);
-  const int size = map ? static_cast<int>(map->size) : 0;
+  // The reflected object is the `EntIdStringMultiMap` this type describes; a
+  // private `{proxy, head, size}` view of it read the third word, which is not
+  // where that container keeps its count.
+  const auto* const map = static_cast<const EntIdStringMultiMap*>(ref.mObj);
+  const int size = map ? static_cast<int>(map->size()) : 0;
   return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
 }
 
@@ -1490,6 +1486,18 @@ namespace moho
       gpg::fastvector_n<CommandGraphEdge*, 2> mLaneB; // +0x60
 
       /**
+       * Address: 0x00824600 (FUN_00824600, sub_824600)
+       *
+       * What it does:
+       * A fresh node: no command (`-1`), not linked to any helper, zero
+       * position sum/weight/orientation/centroid/scale/ETA, no mesh, visible,
+       * both edge lanes empty on their inline storage. Callers:
+       * `FindOrInsertCommandGraphDrawNode` (0x0082B300) and
+       * `AddCommandQueueToCommandGraph` (0x00826140).
+       */
+      UICommandGraphDrawNode();
+
+      /**
        * Address: 0x00826550 (FUN_00826550, sub_826550)
        *
        * What it does:
@@ -1543,16 +1551,47 @@ namespace moho
     static_assert(offsetof(HashTable<void>, mBucketMask) == 0x20, "HashTable<TNode>::mBucketMask offset must be 0x20");
     static_assert(offsetof(HashTable<void>, mBucketCount) == 0x24, "HashTable<TNode>::mBucketCount offset must be 0x24");
 
+    /**
+     * `mGraphRuntimeTree`'s value: a texture-keyed bucket of orderline edges.
+     * The tree is a real msvc8-shaped red-black tree (`mColorOrAllocated` /
+     * `mIsSentinel` at the offsets a real `_Tree` node uses) whose nodes carry
+     * this pair by value at +0x0C.
+     */
+    struct CommandGraphTreeBucket
+    {
+      /// An `ID3DTextureSheet`, not a `CD3DBatchTexture`. `orderline_texture`
+      /// is loaded through `ID3DDeviceResources::GetTexture`, which hands back
+      /// an `RD3DTextureResource` -- and that derives from `ID3DTextureSheet`.
+      /// The binary agrees from the consuming side: the two orderline passes
+      /// call `SetTexture(boost::shared_ptr<ID3DTextureSheet>)` at 0x00829226
+      /// and 0x00829396, and only the flat-white node pass at 0x0082952C takes
+      /// the `CD3DBatchTexture` overload.
+      boost::SharedPtrRaw<ID3DTextureSheet> mTexture;   // +0x00
+      msvc8::vector<CommandGraphEdge*> mEdges;          // +0x08
+    };
+    static_assert(sizeof(CommandGraphTreeBucket) == 0x18, "CommandGraphTreeBucket size must be 0x18");
+
+    /**
+     * One `mGraphRuntimeTree` node. The bucket used to sit in a 0x18-byte raw
+     * payload array and was reinterpreted in place, which only fits on x86.
+     * Nodes are still bought raw (`operator new` + `InitCommandGraphTreeBucketValue`
+     * for the bucket) and released raw, as the binary does.
+     */
     struct CommandGraphTreeNode
     {
       CommandGraphTreeNode* mLeft;    // +0x00
       CommandGraphTreeNode* mParent;  // +0x04
       CommandGraphTreeNode* mRight;   // +0x08
-      std::uint8_t mPayload[0x18];    // +0x0C
+      CommandGraphTreeBucket mBucket; // +0x0C
       std::uint8_t mColorOrAllocated; // +0x24
       std::uint8_t mIsSentinel;       // +0x25
       std::uint8_t pad_26[2];
     };
+    static_assert(offsetof(CommandGraphTreeNode, mBucket) == 0x0C, "CommandGraphTreeNode::mBucket offset must be 0x0C");
+    static_assert(
+      offsetof(CommandGraphTreeNode, mColorOrAllocated) == 0x24,
+      "CommandGraphTreeNode::mColorOrAllocated offset must be 0x24"
+    );
 
     struct CommandGraphTree
     {
@@ -1564,7 +1603,7 @@ namespace moho
     /**
      * One drawn segment of a queued-order "orderline" - the ribbon connecting
      * two command-graph draw nodes. `mGraphRuntimeTree` buckets these by
-     * texture: each tree node's `mPayload` holds a
+     * texture: each tree node's `mBucket` holds a
      * `{boost::SharedPtrRaw<ID3DTextureSheet>, msvc8::vector<CommandGraphEdge*>}`
      * pair, and the render pass walks the bucket's vector once per texture.
      *
@@ -1634,32 +1673,6 @@ namespace moho
     static_assert(sizeof(HashListNode2C) == 0x2C, "UICommandGraph::HashListNode2C size must be 0x2C");
     static_assert(offsetof(HashListNode2C, mKeyHigh) == 0x0C, "UICommandGraph::HashListNode2C::mKeyHigh offset must be 0x0C");
     static_assert(offsetof(HashListNode2C, mEdge) == 0x10, "UICommandGraph::HashListNode2C::mEdge offset must be 0x10");
-
-    /**
-     * Typed view over `CommandGraphTreeNode::mPayload` - a texture-keyed
-     * bucket of orderline edges. `mGraphRuntimeTree` is a real msvc8-shaped
-     * red-black tree (matching `mColorOrAllocated`/`mIsSentinel` at the same
-     * offsets a real `_Tree` node uses), so this reinterprets the 24-byte
-     * payload rather than modeling the tree as a distinct container type.
-     */
-    struct CommandGraphTreeBucket
-    {
-      /// An `ID3DTextureSheet`, not a `CD3DBatchTexture`. `orderline_texture`
-      /// is loaded through `ID3DDeviceResources::GetTexture`, which hands back
-      /// an `RD3DTextureResource` -- and that derives from `ID3DTextureSheet`.
-      /// The binary agrees from the consuming side: the two orderline passes
-      /// call `SetTexture(boost::shared_ptr<ID3DTextureSheet>)` at 0x00829226
-      /// and 0x00829396, and only the flat-white node pass at 0x0082952C takes
-      /// the `CD3DBatchTexture` overload.
-      boost::SharedPtrRaw<ID3DTextureSheet> mTexture;   // +0x00
-      msvc8::vector<CommandGraphEdge*> mEdges;          // +0x08
-    };
-    static_assert(sizeof(CommandGraphTreeBucket) == 0x18, "CommandGraphTreeBucket size must be 0x18");
-
-    [[nodiscard]] static CommandGraphTreeBucket& BucketOf(CommandGraphTreeNode& node) noexcept
-    {
-      return *reinterpret_cast<CommandGraphTreeBucket*>(node.mPayload);
-    }
 
     /**
      * `EstimateDrawNodeWorkTicks` (0x00826F10) reaches the game rules through
@@ -2901,84 +2914,11 @@ namespace moho
       "CommandGraphLane458RuntimeView::mValue offset must be 0x458"
     );
 
-    struct WeakOwnerLinkHeadRuntimeView
-    {
-      std::uint8_t mPad00_07[0x8];
-      void* mHead; // +0x08
-    };
-
-    static_assert(
-      offsetof(WeakOwnerLinkHeadRuntimeView, mHead) == 0x08,
-      "WeakOwnerLinkHeadRuntimeView::mHead offset must be 0x08"
-    );
-
-    struct WeakOwnerLinkNodeRuntimeView
-    {
-      std::int32_t mState;      // +0x00
-      void** mOwnerLinkSlot;    // +0x04
-      void* mNextInOwner;       // +0x08
-    };
-
-    static_assert(sizeof(WeakOwnerLinkNodeRuntimeView) == 0x0C, "WeakOwnerLinkNodeRuntimeView size must be 0x0C");
-    static_assert(
-      offsetof(WeakOwnerLinkNodeRuntimeView, mOwnerLinkSlot) == 0x04,
-      "WeakOwnerLinkNodeRuntimeView::mOwnerLinkSlot offset must be 0x04"
-    );
-
     struct DwordPairRuntimeView
     {
       std::uint32_t mFirst;   // +0x00
       std::uint32_t mSecond;  // +0x04
     };
-
-    struct PointerTripletLaneRuntimeView
-    {
-      void* mBegin;       // +0x00
-      void* mEnd;         // +0x04
-      void* mCapacityEnd; // +0x08
-      void* mMeta;        // +0x0C
-    };
-
-    static_assert(sizeof(PointerTripletLaneRuntimeView) == 0x10, "PointerTripletLaneRuntimeView size must be 0x10");
-
-    struct CommandGraphIssueRuntimeView
-    {
-      std::int32_t mCommandId;                   // +0x00
-      void* mOwnerLinkSlot;                      // +0x04
-      void* mOwnerNextLink;                      // +0x08
-      Wm3::Vector3f mAnchorPosition;             // +0x0C
-      float mLaneWidth;                          // +0x18
-      std::uint8_t mFlag1;                       // +0x1C
-      std::uint8_t mFlag2;                       // +0x1D
-      std::uint8_t mIsEnabled;                   // +0x1E
-      std::uint8_t pad_1F;                       // +0x1F
-      std::uint32_t mUnknown20;                  // +0x20
-      std::uint32_t mUnknown24;                  // +0x24
-      float mUnknown28;                          // +0x28
-      float mUnknown2C;                          // +0x2C
-      float mUnknown30;                          // +0x30
-      float mUnknown34;                          // +0x34
-      float mUnknown38;                          // +0x38
-      float mUnknown3C;                          // +0x3C
-      float mUnknown40;                          // +0x40
-      std::uint32_t mUnknown44;                  // +0x44
-      PointerTripletLaneRuntimeView mPrimaryRefLane;   // +0x48
-      std::uint32_t mPrimaryInline0;             // +0x58
-      std::uint32_t mPrimaryInline1;             // +0x5C
-      PointerTripletLaneRuntimeView mSecondaryRefLane; // +0x60
-      std::uint32_t mSecondaryInline0;           // +0x70
-      std::uint32_t mSecondaryInline1;           // +0x74
-    };
-
-    static_assert(sizeof(CommandGraphIssueRuntimeView) == 0x78, "CommandGraphIssueRuntimeView size must be 0x78");
-    static_assert(
-      offsetof(CommandGraphIssueRuntimeView, mPrimaryRefLane) == 0x48,
-      "CommandGraphIssueRuntimeView::mPrimaryRefLane offset must be 0x48"
-    );
-    static_assert(
-      offsetof(CommandGraphIssueRuntimeView, mSecondaryRefLane) == 0x60,
-      "CommandGraphIssueRuntimeView::mSecondaryRefLane offset must be 0x60"
-    );
 
     /**
      * Address: 0x00824330 (FUN_00824330, sub_824330)
@@ -3025,33 +2965,29 @@ namespace moho
     /**
      * Address: 0x00824480 (FUN_00824480, sub_824480)
      *
+     * IDA signature:
+     * Moho::UserTarget *__usercall sub_824480@<eax>(
+     *     Moho::UserTarget *this@<eax>, Moho::UserEntity *entity@<ecx>);
+     *
      * What it does:
-     * Initializes one weak-owner link node and inserts its owner-slot lane into
-     * one owner link-head lane at `+0x08`.
+     * `UserTarget`'s entity constructor: stores `UserTargetType::Entity` and
+     * links `targetEntity` at the head of `entity`'s weak-owner chain (the
+     * `WeakObject` head at `entity+8` on x86), or leaves it empty for a null
+     * entity. The position is not written. Its one caller is
+     * `ProcessCommandDrag`'s cached-target arm (0x00829EAB), which builds the
+     * re-acquired target this way right before `ISSUE_SetCommandTarget`.
+     * The link used to be spelled out by hand through a padded overlay of the
+     * owner's `+0x08` head and a three-word view of the target.
      */
-    [[nodiscard]] WeakOwnerLinkNodeRuntimeView* InitWeakOwnerLinkNodeFromHead(
-      WeakOwnerLinkNodeRuntimeView* const node,
-      void* const owner
-    ) noexcept
+    [[nodiscard]] UserTarget* ConstructEntityUserTarget(UserTarget* const target, UserEntity* const entity) noexcept
     {
-      if (node == nullptr) {
+      if (target == nullptr) {
         return nullptr;
       }
 
-      node->mState = 1;
-      auto* const ownerSlot = (owner != nullptr)
-        ? reinterpret_cast<void**>(&static_cast<WeakOwnerLinkHeadRuntimeView*>(owner)->mHead)
-        : nullptr;
-      node->mOwnerLinkSlot = ownerSlot;
-
-      if (ownerSlot != nullptr) {
-        node->mNextInOwner = *ownerSlot;
-        *ownerSlot = &node->mOwnerLinkSlot;
-      } else {
-        node->mNextInOwner = nullptr;
-      }
-
-      return node;
+      target->targetType = UserTargetType::Entity;
+      ::new (static_cast<void*>(&target->targetEntity)) WeakPtr<UserEntity>(entity);
+      return target;
     }
 
     /**
@@ -3108,56 +3044,6 @@ namespace moho
       destination->mFirst = first;
       destination->mSecond = second;
       return destination;
-    }
-
-    /**
-     * Address: 0x00824600 (FUN_00824600, sub_824600)
-     *
-     * What it does:
-     * Initializes one command-graph issue runtime lane with cleared scalar state
-     * and two inline-backed pointer-triplet reference lanes.
-     */
-    [[nodiscard]] CommandGraphIssueRuntimeView*
-    InitCommandGraphIssueRuntimeLane(CommandGraphIssueRuntimeView* const lane) noexcept
-    {
-      if (lane == nullptr) {
-        return nullptr;
-      }
-
-      lane->mCommandId = -1;
-      lane->mOwnerLinkSlot = nullptr;
-      lane->mOwnerNextLink = nullptr;
-      lane->mAnchorPosition = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
-      lane->mLaneWidth = 0.0f;
-      lane->mFlag1 = 0u;
-      lane->mFlag2 = 0u;
-      lane->mIsEnabled = 1u;
-      lane->pad_1F = 0u;
-      lane->mUnknown20 = 0u;
-      lane->mUnknown24 = 0u;
-      lane->mUnknown28 = 0.0f;
-      lane->mUnknown2C = 0.0f;
-      lane->mUnknown30 = 0.0f;
-      lane->mUnknown34 = 0.0f;
-      lane->mUnknown38 = 0.0f;
-      lane->mUnknown3C = 0.0f;
-      lane->mUnknown40 = 0.0f;
-      lane->mUnknown44 = 0u;
-
-      lane->mPrimaryInline0 = 0u;
-      lane->mPrimaryInline1 = 0u;
-      lane->mPrimaryRefLane.mBegin = &lane->mPrimaryInline0;
-      lane->mPrimaryRefLane.mEnd = &lane->mPrimaryInline0;
-      lane->mPrimaryRefLane.mCapacityEnd = &lane->mPrimaryInline1;
-      lane->mPrimaryRefLane.mMeta = &lane->mPrimaryInline0;
-
-      lane->mSecondaryInline0 = 0u;
-      lane->mSecondaryInline1 = 0u;
-      lane->mSecondaryRefLane.mBegin = &lane->mSecondaryInline0;
-      lane->mSecondaryRefLane.mEnd = &lane->mSecondaryInline0;
-      lane->mSecondaryRefLane.mCapacityEnd = &lane->mSecondaryInline1;
-      lane->mSecondaryRefLane.mMeta = &lane->mSecondaryInline0;
-      return lane;
     }
 
     /**
@@ -3339,40 +3225,6 @@ namespace moho
       }
 
       return result;
-    }
-
-    struct VizUpdateNode
-    {
-      VizUpdateNode* left;          // +0x00
-      VizUpdateNode* parent;        // +0x04
-      VizUpdateNode* right;         // +0x08
-      std::uintptr_t key;           // +0x0C
-      std::uintptr_t ownerLinkHead; // +0x10
-      std::uintptr_t ownerNextLink; // +0x14
-      std::uint8_t color;           // +0x18 (0=red, 1=black)
-      std::uint8_t isSentinel;      // +0x19
-      std::uint8_t pad_1A[2];
-    };
-
-    static_assert(sizeof(VizUpdateNode) == 0x1C, "VizUpdateNode size must be 0x1C");
-
-    struct VizUpdateTree
-    {
-      void* debugProxy;    // +0x00
-      VizUpdateNode* head; // +0x04
-      std::uint32_t size;  // +0x08
-    };
-
-    static_assert(sizeof(VizUpdateTree) == 0x0C, "VizUpdateTree size must be 0x0C");
-
-    [[nodiscard]] VizUpdateTree* GetVizUpdateTree(CWldSession* session)
-    {
-      return reinterpret_cast<VizUpdateTree*>(&session->mVizUpdateRoot);
-    }
-
-    [[nodiscard]] const VizUpdateTree* GetVizUpdateTree(const CWldSession* session)
-    {
-      return reinterpret_cast<const VizUpdateTree*>(&session->mVizUpdateRoot);
     }
 
 
@@ -4043,6 +3895,42 @@ namespace moho
    * The binary releases lane B before lane A; the order is preserved because
    * `operator delete[]` is observable.
    */
+  /**
+   * Address: 0x00824600 (FUN_00824600, sub_824600)
+   *
+   * What it does:
+   * Seeds a fresh draw node in the binary's store order: `mCommandId = -1`,
+   * the helper link nulled, the +0x0C..+0x18 float run zeroed, the two
+   * flag bytes cleared and `mIsVisible = 1` (+0x1E; the pad byte at +0x1F is
+   * not written), no mesh, the +0x28..+0x44 run zeroed, then both lanes armed
+   * on their inline windows. It was a free function over a padded 0x78-byte
+   * view that `FindOrInsertCommandGraphDrawNode` then reinterpreted as this
+   * type.
+   *
+   * The binary arms each lane with a one-slot capacity (`lea edx,[ecx+4]` at
+   * 0x00824667/0x00824670, and the same in the lane copy constructor
+   * 0x0082E5E0); the lanes here are modelled as two-slot `fastvector_n`s, so
+   * their own constructor arms two. Every default node is only ever copied
+   * (`RelocateDrawNode`) and destroyed, neither of which reads the capacity
+   * of an empty inline lane.
+   */
+  UICommandGraph::UICommandGraphDrawNode::UICommandGraphDrawNode()
+    : mCommandId(-1)
+    , mHelperLink{nullptr, nullptr}
+    , mPositionSum(0.0f, 0.0f, 0.0f)
+    , mWeight(0.0f)
+    , mHasResolvedPosition(0u)
+    , mIsChainBoundary(0u)
+    , mIsVisible(1u)
+    , mMeshInstance{}
+    , mOrientationHint(0.0f, 0.0f, 0.0f)
+    , mPreviousCentroid(0.0f, 0.0f, 0.0f)
+    , mUnitCountScale(0.0f)
+    , mCompletionTick(0u)
+    , mLaneA()
+    , mLaneB()
+  {}
+
   UICommandGraph::UICommandGraphDrawNode::~UICommandGraphDrawNode()
   {
     mLaneB.ResetStorageToInline();
@@ -5100,17 +4988,15 @@ namespace moho
       return &found->mDraw;
     }
 
-    // Miss: build a default-valued draw node payload (0x00824600 -
-    // InitCommandGraphIssueRuntimeLane, shared with the command-issue
-    // helper's own runtime lane below: identical 0x78-byte shape, see
-    // CommandGraphIssueRuntimeView), relocate-copy it into a second
-    // temporary, and insert a real node built from `{key, temporary}`.
-    CommandGraphIssueRuntimeView tempDefault{};
-    (void)InitCommandGraphIssueRuntimeLane(&tempDefault);
-    auto* const tempDefaultAsDrawNode = reinterpret_cast<UICommandGraphDrawNode*>(&tempDefault);
-
-    UICommandGraphDrawNode tempRelocated{};
-    RelocateDrawNode(&tempRelocated, *tempDefaultAsDrawNode);
+    // Miss: build a default draw node (its constructor, 0x00824600),
+    // relocate-copy it into a second temporary, and insert a real node built
+    // from `{key, temporary}`. The temporaries die as locals on the way out;
+    // the explicit destructor calls this used to make ran `tempRelocated`'s
+    // destructor twice, and the default node used to be a padded 0x78-byte
+    // view reinterpreted as this type.
+    UICommandGraphDrawNode tempDefault;
+    UICommandGraphDrawNode tempRelocated;
+    RelocateDrawNode(&tempRelocated, tempDefault);
 
     HashListNode88Value insertValue{};
     insertValue.mKey = key;
@@ -5118,10 +5004,6 @@ namespace moho
 
     bool inserted = false;
     HashListNode88* const resultNode = InsertOrFindHashListNode88(table, insertValue, inserted);
-
-    tempRelocated.~UICommandGraphDrawNode();
-    tempDefaultAsDrawNode->~UICommandGraphDrawNode();
-
     return &resultNode->mDraw;
   }
 
@@ -5171,7 +5053,7 @@ namespace moho
 
     DestroyCommandGraphTreeSubtree(sentinelHead, node->mRight);
     CommandGraphTreeNode* const left = node->mLeft;
-    ReleaseCommandGraphTreeBucket(BucketOf(*node));
+    ReleaseCommandGraphTreeBucket(node->mBucket);
     ::operator delete(node);
     DestroyCommandGraphTreeSubtree(sentinelHead, left);
   }
@@ -5297,7 +5179,7 @@ namespace moho
     fresh->mColorOrAllocated = 0u; // kRbRed
     fresh->mIsSentinel = 0u;
     try {
-      InitCommandGraphTreeBucketValue(&BucketOf(*fresh), texture);
+      InitCommandGraphTreeBucketValue(&fresh->mBucket, texture);
     } catch (...) {
       ::operator delete(fresh);
       throw;
@@ -5376,7 +5258,7 @@ namespace moho
     bool addLeft = true;
     for (CommandGraphTreeNode* node = tree.mHead->mParent; node->mIsSentinel == 0u;) {
       where = node;
-      addLeft = texture.pi < BucketOf(*node).mTexture.pi;
+      addLeft = texture.pi < node->mBucket.mTexture.pi;
       node = addLeft ? node->mLeft : node->mRight;
     }
 
@@ -5388,7 +5270,7 @@ namespace moho
       probe = PrevTreeNode(where);
     }
 
-    if (BucketOf(*probe).mTexture.pi < texture.pi) {
+    if (probe->mBucket.mTexture.pi < texture.pi) {
       return AttachGraphRuntimeTreeNodeAt(tree, addLeft, where, texture);
     }
     return probe;
@@ -5407,23 +5289,23 @@ namespace moho
     }
 
     if (hint == tree.mHead->mLeft) {
-      if (texture.pi < BucketOf(*hint).mTexture.pi) {
+      if (texture.pi < hint->mBucket.mTexture.pi) {
         return AttachGraphRuntimeTreeNodeAt(tree, true, hint, texture);
       }
     } else if (hint->mIsSentinel != 0u) {
       CommandGraphTreeNode* const rightmost = tree.mHead->mRight;
-      if (BucketOf(*rightmost).mTexture.pi < texture.pi) {
+      if (rightmost->mBucket.mTexture.pi < texture.pi) {
         return AttachGraphRuntimeTreeNodeAt(tree, false, rightmost, texture);
       }
-    } else if (texture.pi < BucketOf(*hint).mTexture.pi) {
+    } else if (texture.pi < hint->mBucket.mTexture.pi) {
       CommandGraphTreeNode* const before = PrevTreeNode(hint);
-      if (BucketOf(*before).mTexture.pi < texture.pi) {
+      if (before->mBucket.mTexture.pi < texture.pi) {
         return (before->mRight->mIsSentinel != 0u) ? AttachGraphRuntimeTreeNodeAt(tree, false, before, texture)
                                                      : AttachGraphRuntimeTreeNodeAt(tree, true, hint, texture);
       }
-    } else if (BucketOf(*hint).mTexture.pi < texture.pi) {
+    } else if (hint->mBucket.mTexture.pi < texture.pi) {
       CommandGraphTreeNode* const after = NextTreeNode(hint);
-      if (after->mIsSentinel != 0u || texture.pi < BucketOf(*after).mTexture.pi) {
+      if (after->mIsSentinel != 0u || texture.pi < after->mBucket.mTexture.pi) {
         return (hint->mRight->mIsSentinel != 0u) ? AttachGraphRuntimeTreeNodeAt(tree, false, hint, texture)
                                                   : AttachGraphRuntimeTreeNodeAt(tree, true, after, texture);
       }
@@ -5442,7 +5324,7 @@ namespace moho
   {
     CommandGraphTreeNode* candidate = tree.mHead;
     for (CommandGraphTreeNode* node = tree.mHead->mParent; node->mIsSentinel == 0u;) {
-      if (texture.pi <= BucketOf(*node).mTexture.pi) {
+      if (texture.pi <= node->mBucket.mTexture.pi) {
         candidate = node;
         node = node->mLeft;
       } else {
@@ -5450,12 +5332,12 @@ namespace moho
       }
     }
 
-    if (candidate != tree.mHead && !(texture.pi < BucketOf(*candidate).mTexture.pi)) {
-      return BucketOf(*candidate).mEdges;
+    if (candidate != tree.mHead && !(texture.pi < candidate->mBucket.mTexture.pi)) {
+      return candidate->mBucket.mEdges;
     }
 
     CommandGraphTreeNode* const inserted = AttachGraphRuntimeTreeNodeAtHint(tree, candidate, texture);
-    return BucketOf(*inserted).mEdges;
+    return inserted->mBucket.mEdges;
   }
 
   /**
@@ -5768,7 +5650,7 @@ namespace moho
   /**
    * `LinkCommandGraphEdge` (0x00826960) and `AddCommandQueueToCommandGraph`
    * (0x00826140) are both defined later in this file, after
-   * `LowerBoundWeakEntitySetNode`/`ResolveCommandGraphAnchorSampleFromHistory`/
+   * `LowerBoundWeakEntitySetNode`/`ResolveCommandIssueTarget`/
    * `ResolveCommandGraphAnchorWorldPosition` and the rest of the
    * command-issue-history helper cluster they call - see the doc comment on
    * `AddCommandQueueToCommandGraph`'s real definition for the full address
@@ -6687,7 +6569,7 @@ namespace moho
     batcher.SetViewProjMatrix(camera);
     for (CommandGraphTreeNode* node = mGraphRuntimeTree.mHead->mLeft;
          node != nullptr && node != mGraphRuntimeTree.mHead; node = NextTreeNode(node)) {
-      CommandGraphTreeBucket& bucket = BucketOf(*node);
+      CommandGraphTreeBucket& bucket = node->mBucket;
       batcher.SetTexture(boost::SharedPtrFromRawRetained(bucket.mTexture));
       for (CommandGraphEdge* const edge : bucket.mEdges) {
         DrawCommandOrderline(camera, batcher, tick, tickFraction, *edge, /*isGlow=*/false);
@@ -6700,7 +6582,7 @@ namespace moho
     batcher.SetViewProjMatrix(camera);
     for (CommandGraphTreeNode* node = mGraphRuntimeTree.mHead->mLeft;
          node != nullptr && node != mGraphRuntimeTree.mHead; node = NextTreeNode(node)) {
-      CommandGraphTreeBucket& bucket = BucketOf(*node);
+      CommandGraphTreeBucket& bucket = node->mBucket;
       batcher.SetTexture(boost::SharedPtrFromRawRetained(bucket.mTexture));
       for (CommandGraphEdge* const edge : bucket.mEdges) {
         DrawCommandOrderline(camera, batcher, tick, tickFraction, *edge, /*isGlow=*/true);
@@ -6867,12 +6749,12 @@ namespace moho
       }
 
       IUnit* const subjectBridge = GetIUnitBridge(subject);
-      // The blueprint byte this reads (its own footprint-size lane, same
-      // family as the sizeX byte the ui_PathPreview branch above reads from
-      // the descriptor) was not independently re-derived against
-      // RUnitBlueprint's layout - kept as a raw byte read rather than
-      // guessing a named field.
-      capWidthSeed = static_cast<float>(reinterpret_cast<const std::uint8_t*>(subjectBridge->GetBlueprint())[216]);
+      // 0x0082A60D..0x0082A62A: `GetBlueprint()` (IUnit slot 7), `add eax,
+      // 0D8h` / `movzx eax, byte ptr [eax]` -- the first byte of the
+      // blueprint's inline `REntityBlueprint::mFootprint` (+0xD8), i.e. the
+      // same footprint `mSizeX` the ui_PathPreview branch above reads from
+      // its descriptor. It was a raw `[216]` byte index into the blueprint.
+      capWidthSeed = static_cast<float>(subjectBridge->GetBlueprint()->mFootprint.mSizeX);
 
       Wm3::Vector3f endPos = subjectBridge->GetPosition();
       if (MAUI_KeyIsDown(MKEY_SHIFT)) {
@@ -7082,88 +6964,11 @@ namespace moho
 
   namespace
   {
-    struct CWldSessionOrphanRuntimeView
-    {
-      std::uint8_t pad_0000_042B[0x42C];
-      SSelectionSetUserEntity mPendingOrphanSet;  // +0x42C
-    };
-
-    static_assert(
-      offsetof(CWldSessionOrphanRuntimeView, mPendingOrphanSet) == 0x42C,
-      "CWldSessionOrphanRuntimeView::mPendingOrphanSet offset must be 0x42C"
-    );
-    /// The visibility lane is the same weak-entity set shape as the orphan
-    /// lane, but it starts 12 bytes later - only the shared base is really
-    /// there - so it needs its own overlay rather than a second member.
-    struct CWldSessionVizUpdateRuntimeView
-    {
-      std::uint8_t pad_0000_0437[0x438];
-      SSelectionSetUserEntity mVizUpdateSet;      // +0x438
-    };
-
-    static_assert(
-      offsetof(CWldSessionVizUpdateRuntimeView, mVizUpdateSet) == 0x438,
-      "CWldSessionVizUpdateRuntimeView::mVizUpdateSet offset must be 0x438"
-    );
-
-    struct UserEntityWeakLinkSlotRuntimeView
-    {
-      void* mOwnerLinkSlot; // +0x00
-    };
-
-    static_assert(
-      sizeof(UserEntityWeakLinkSlotRuntimeView) == sizeof(void*),
-      "UserEntityWeakLinkSlotRuntimeView size must be pointer-sized"
-    );
-
-    struct CursorInfoRuntimeView
-    {
-      std::uint8_t mHitValid; // +0x00
-      std::uint8_t pad_01[3];
-      Wm3::Vector3f mMouseWorldPos;            // +0x04
-      UserEntityWeakLinkSlotRuntimeView mUnitHover; // +0x10
-      UserEntityWeakLinkSlotRuntimeView mPrevious;  // +0x14
-      std::int32_t mIsDragger;                 // +0x18
-      Wm3::Vector2f mMouseScreenPos;           // +0x1C
-    };
-
-    static_assert(sizeof(CursorInfoRuntimeView) == 0x24, "CursorInfoRuntimeView size must be 0x24");
-    static_assert(offsetof(CursorInfoRuntimeView, mUnitHover) == 0x10, "CursorInfoRuntimeView::mUnitHover offset must be 0x10");
-    static_assert(offsetof(CursorInfoRuntimeView, mPrevious) == 0x14, "CursorInfoRuntimeView::mPrevious offset must be 0x14");
-    static_assert(
-      offsetof(CursorInfoRuntimeView, mIsDragger) == 0x18, "CursorInfoRuntimeView::mIsDragger offset must be 0x18"
-    );
-
-    struct CWldSessionCursorRuntimeView
-    {
-      std::uint8_t pad_0000_04AF[0x4B0];
-      CursorInfoRuntimeView mCursorInfo; // +0x4B0
-    };
-
-    static_assert(
-      offsetof(CWldSessionCursorRuntimeView, mCursorInfo) == 0x4B0,
-      "CWldSessionCursorRuntimeView::mCursorInfo offset must be 0x4B0"
-    );
-
-    [[nodiscard]] CursorInfoRuntimeView& AccessCursorInfoRuntime(CWldSession& session) noexcept
-    {
-      return reinterpret_cast<CWldSessionCursorRuntimeView*>(&session)->mCursorInfo;
-    }
-
-    [[nodiscard]] const CursorInfoRuntimeView& AccessCursorInfoRuntime(const CWldSession& session) noexcept
-    {
-      return reinterpret_cast<const CWldSessionCursorRuntimeView*>(&session)->mCursorInfo;
-    }
-
-    [[nodiscard]] MouseInfo& AccessCursorInfo(CWldSession& session) noexcept
-    {
-      return *reinterpret_cast<MouseInfo*>(&AccessCursorInfoRuntime(session));
-    }
-
-    [[nodiscard]] const MouseInfo& AccessCursorInfo(const CWldSession& session) noexcept
-    {
-      return *reinterpret_cast<const MouseInfo*>(&AccessCursorInfoRuntime(session));
-    }
+    // The orphan and visibility sets are `CWldSession::mOrphans` (+0x42C) and
+    // `CWldSession::mVizUpdates` (+0x438), two bare 12-byte `WeakSet<UserEntity>`
+    // headers; they were reached through two padded overlays here that laid a
+    // 16-byte `SSelectionSetUserEntity` over each. The cursor snapshot at
+    // +0x4B0 is `CWldSession::CursorInfo()`, not a third padded overlay.
 
     template <typename TNode>
     [[nodiscard]] bool IsSentinelNode(const TNode* const node)
@@ -8487,10 +8292,14 @@ namespace moho
      * What it does:
      * Resolves one weak-set tree node for `entity` using the transient
      * owner-link guard lane, then writes one `{set,node}` cursor pair.
+     *
+     * Takes the bare 12-byte `WeakSet<UserEntity>` header: the body reads only
+     * `mHead`, and `CWldSession::RemoveFromVizUpdate` (0x00894243) hands it
+     * the bare visibility set at `session+0x438`.
      */
-    [[nodiscard]] SSelectionSetUserEntity::FindResult* FindSelectionNodeByEntityGuarded(
-      SSelectionSetUserEntity::FindResult* const outResult,
-      SSelectionSetUserEntity* const set,
+    [[nodiscard]] WeakEntitySetUserEntity::FindResult* FindSelectionNodeByEntityGuarded(
+      WeakEntitySetUserEntity::FindResult* const outResult,
+      WeakEntitySetUserEntity* const set,
       UserEntity* const entity
     )
     {
@@ -9742,7 +9551,8 @@ namespace moho
         return nullptr;
       }
 
-      auto* const inlineBase = reinterpret_cast<std::uint8_t*>(view) + 0x10;
+      // The inline slot sits right behind the four-pointer header (+0x10 on x86).
+      auto* const inlineBase = reinterpret_cast<std::uint8_t*>(view + 1);
       view->mBegin = inlineBase;
       view->mEnd = inlineBase;
       view->mCapacityEnd = inlineBase + 0x4;
@@ -10166,346 +9976,89 @@ namespace moho
       return ownerLinkSlot;
     }
 
-    struct SelectionWeakOwnerLinkNodeLane
-    {
-      std::uint32_t mLeadingDword;          // +0x00
-      SSelectionWeakRefUserEntity mWeakRef; // +0x04
-    };
-    static_assert(sizeof(SelectionWeakOwnerLinkNodeLane) == 0x0C, "SelectionWeakOwnerLinkNodeLane size must be 0x0C");
-    static_assert(
-      offsetof(SelectionWeakOwnerLinkNodeLane, mWeakRef) == 0x04,
-      "SelectionWeakOwnerLinkNodeLane::mWeakRef offset must be 0x04"
-    );
-
-    /**
-     * Address: 0x0081D010 (FUN_0081D010)
-     *
-     * What it does:
-     * Unlinks one owner-link node whose weak-ref lane begins at +0x04 and
-     * returns the final owner-link cursor slot without resetting link fields.
-     */
-    [[nodiscard]] SSelectionWeakRefUserEntity**
-    UnlinkSelectionWeakOwnerRefAfterLeadingDword(SelectionWeakOwnerLinkNodeLane& node) noexcept
-    {
-      SSelectionWeakRefUserEntity* const weakRef = &node.mWeakRef;
-      auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef->mOwnerLinkSlot);
-      if (ownerLinkSlot != nullptr) {
-        while (*ownerLinkSlot != nullptr && *ownerLinkSlot != weakRef) {
-          ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
-        }
-
-        if (*ownerLinkSlot == weakRef) {
-          *ownerLinkSlot = weakRef->mNextOwner;
-        }
-      }
-
-      return ownerLinkSlot;
-    }
-
-    struct CommandGraphAnchorSampleRuntimeView
-    {
-      std::int32_t mSampleKind = 0;            // +0x00
-      SSelectionWeakRefUserEntity mWeakRef{};  // +0x04
-      Wm3::Vector3f mWorldPosition{};          // +0x0C
-    };
-    static_assert(
-      sizeof(CommandGraphAnchorSampleRuntimeView) == 0x18, "CommandGraphAnchorSampleRuntimeView size must be 0x18"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorSampleRuntimeView, mWeakRef) == 0x04,
-      "CommandGraphAnchorSampleRuntimeView::mWeakRef offset must be 0x04"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorSampleRuntimeView, mWorldPosition) == 0x0C,
-      "CommandGraphAnchorSampleRuntimeView::mWorldPosition offset must be 0x0C"
-    );
-
-    struct CommandGraphAnchorHistoryEntryRuntimeView
-    {
-      std::uint8_t mUnknown00_03[0x04]{};
-      std::int32_t mEntryType = 0; // +0x04
-      // Per-entry relation tree `sub_8B4300` looks `mRelationLookupKey` up in
-      // (0x008B435F/0x008B4389: `eax = tree + 8`, `sub_82CEA0` reads
-      // `*(eax+4)` as the tree's own head pointer - a `WeakEntitySetUserEntity`
-      // proxy/head/size triple). See `CommandGraphAnchorHistoryRuntimeView::
-      // mRelationLookupKey`'s doc comment for the same "shape confirmed,
-      // semantic id not confirmed" caveat.
-      WeakEntitySetUserEntity mRelationTree{}; // +0x08
-      std::uint8_t mUnknown14_17[0x04]{};
-      // +0x18, not +0x24: `sub_8B4080` takes the sample's address as
-      // `lea esi, [entry]` + `add esi, 18h` at 0x008B40CB, and this is the same
-      // 0x50-byte local command-issue event `CommandIssueUpdateEventRuntimeView`
-      // (Sim.cpp) describes, whose `CAiTarget target` sits at +0x18 behind
-      // `count` at +0x14. The two views agree field for field once this one
-      // stops padding twelve bytes too far: sample kind is the target type,
-      // `mWeakRef` is `CAiTarget::targetEntity`, `mWorldPosition` its position.
-      CommandGraphAnchorSampleRuntimeView mAnchorSample{}; // +0x18
-    };
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryEntryRuntimeView, mEntryType) == 0x04,
-      "CommandGraphAnchorHistoryEntryRuntimeView::mEntryType offset must be 0x04"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryEntryRuntimeView, mRelationTree) == 0x08,
-      "CommandGraphAnchorHistoryEntryRuntimeView::mRelationTree offset must be 0x08"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryEntryRuntimeView, mAnchorSample) == 0x18,
-      "CommandGraphAnchorHistoryEntryRuntimeView::mAnchorSample offset must be 0x18"
-    );
-
-    struct CommandGraphAnchorHistoryRuntimeView
-    {
-      std::uint8_t mUnknown00_3F[0x40]{};
-      // `sub_8B4300`'s fallback path (ring holds neither a type-0 nor a
-      // type-3 entry) scans this `[begin, end)` run of entity ids
-      // (0x008B4300-0x008B430A read `this+0x40`/`this+0x44` directly, before
-      // the ring-scan setup at `this+0xB8` even runs) for the candidate's own
-      // `UserEntity::mParams.mEntityId`.
-      const std::int32_t* mFallbackIdRunBegin = nullptr; // +0x40
-      const std::int32_t* mFallbackIdRunEnd = nullptr;   // +0x44
-      std::uint8_t mUnknown48_5B[0x14]{};
-      /// This is the helper's own `SSTICommandVariableData::mTarget1` -- an
-      /// `SSTITarget`, whose position sits at `+0x08` behind a single 4-byte
-      /// entity id, NOT the 0x18-byte anchor sample with its 8-byte weak-ref.
-      /// `sub_8BEC40` reads the source at `+0x08/+0x0C/+0x10` while writing the
-      /// destination at `+0x0C/+0x10/+0x14`, which is only consistent with the
-      /// two being different shapes.
-      SSTITarget mFallbackSample{}; // +0x5C
-      std::uint8_t mUnknown70_B8[0x48]{};
-      // Search key `sub_8B4300` (`IsCandidateExcludedByCachedRelation` below)
-      // looks up in each history entry's own per-entry relation tree
-      // (0x008B430A/0x008B4310: `ebx = this + 0xB8`, then `*ebx` is forwarded
-      // unchanged through `sub_82B450`/`sub_82C2E0` as the lower-bound search
-      // key). The tree-walk shape is confirmed against `SSelectionNodeUserEntity`
-      // node-for-node; what this specific id counts (army? viewing-player?) is
-      // not independently confirmed.
-      std::uint32_t mRelationLookupKey = 0; // +0xB8
-      CommandGraphAnchorHistoryEntryRuntimeView** mEntries = nullptr; // +0xBC
-      std::uint32_t mEntryBase = 0; // +0xC0
-      std::uint32_t mEntryStart = 0; // +0xC4
-      std::uint32_t mEntryCount = 0; // +0xC8
-    };
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryRuntimeView, mFallbackIdRunBegin) == 0x40,
-      "CommandGraphAnchorHistoryRuntimeView::mFallbackIdRunBegin offset must be 0x40"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryRuntimeView, mFallbackSample) == 0x5C,
-      "CommandGraphAnchorHistoryRuntimeView::mFallbackSample offset must be 0x5C"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryRuntimeView, mFallbackIdRunEnd) == 0x44,
-      "CommandGraphAnchorHistoryRuntimeView::mFallbackIdRunEnd offset must be 0x44"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryRuntimeView, mFallbackSample) == 0x5C,
-      "CommandGraphAnchorHistoryRuntimeView::mFallbackSample offset must be 0x5C"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryRuntimeView, mRelationLookupKey) == 0xB8,
-      "CommandGraphAnchorHistoryRuntimeView::mRelationLookupKey offset must be 0xB8"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryRuntimeView, mEntries) == 0xBC,
-      "CommandGraphAnchorHistoryRuntimeView::mEntries offset must be 0xBC"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryRuntimeView, mEntryBase) == 0xC0,
-      "CommandGraphAnchorHistoryRuntimeView::mEntryBase offset must be 0xC0"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryRuntimeView, mEntryStart) == 0xC4,
-      "CommandGraphAnchorHistoryRuntimeView::mEntryStart offset must be 0xC4"
-    );
-    static_assert(
-      offsetof(CommandGraphAnchorHistoryRuntimeView, mEntryCount) == 0xC8,
-      "CommandGraphAnchorHistoryRuntimeView::mEntryCount offset must be 0xC8"
-    );
-
-    [[nodiscard]] Wm3::Vector3f InvalidCommandGraphAnchorPosition() noexcept
-    {
-      const float qnan = std::numeric_limits<float>::quiet_NaN();
-      return Wm3::Vector3f{qnan, qnan, qnan};
-    }
-
-    /**
-     * Address: 0x008B40F0 (FUN_008B40F0)
-     *
-     * What it does:
-     * Copies one command-graph anchor sample and rebinds its weak-owner lane
-     * into the destination slot.
-     */
-    [[nodiscard]] CommandGraphAnchorSampleRuntimeView* CopyCommandGraphAnchorSampleWithRelink(
-      CommandGraphAnchorSampleRuntimeView* const destination,
-      const CommandGraphAnchorSampleRuntimeView* const source
-    ) noexcept
-    {
-      if (destination == nullptr || source == nullptr) {
-        return destination;
-      }
-
-      destination->mSampleKind = source->mSampleKind;
-      destination->mWeakRef.mOwnerLinkSlot = source->mWeakRef.mOwnerLinkSlot;
-
-      if (destination->mWeakRef.mOwnerLinkSlot != nullptr) {
-        auto** const ownerLinkSlot =
-          reinterpret_cast<SSelectionWeakRefUserEntity**>(destination->mWeakRef.mOwnerLinkSlot);
-        destination->mWeakRef.mNextOwner = *ownerLinkSlot;
-        *ownerLinkSlot = &destination->mWeakRef;
-      } else {
-        destination->mWeakRef.mNextOwner = nullptr;
-      }
-
-      destination->mWorldPosition = source->mWorldPosition;
-      return destination;
-    }
+    // `UserTarget` (UserTarget.h) is what the three padded "anchor" views that
+    // used to live here described: `{kind, weak entity link, position}` at
+    // +0x00/+0x04/+0x0C is `UserTarget` member for member, the "history" was
+    // the whole `UserCommandIssueHelper` (its local event queue at +0xB8, the
+    // replicated entity ids at +0x40 and target at +0x5C), and a "history
+    // entry" was one `UserCommandIssueLocalEvent`.
 
     /**
      * Address: 0x008BEC40 (FUN_008BEC40)
      *
      * What it does:
-     * Builds one fallback anchor sample: for entity samples, resolves and links
-     * the entity weak-owner lane; for literal samples, copies inline position.
+     * Converts one replicated command target (`SSTITarget`: kind, entity id,
+     * ground position) into the UI-side `UserTarget`. An entity target is
+     * resolved through the active session's entity map (the id is the one
+     * dword at +0x04, 0x008BEC5F) and linked weakly; a ground target copies
+     * its position, which sits at +0x08 in the source and +0x0C in the
+     * destination (0x008BEC94..0x008BECAA). Any other kind sets only the kind.
      */
-    [[nodiscard]] CommandGraphAnchorSampleRuntimeView* ResolveFallbackCommandGraphAnchorSample(
-      CommandGraphAnchorSampleRuntimeView* const outSample,
-      const SSTITarget* const fallbackSample
-    ) noexcept
+    [[nodiscard]] UserTarget MakeUserTargetFromSSTITarget(const SSTITarget& source)
     {
-      if (outSample == nullptr || fallbackSample == nullptr) {
-        return outSample;
-      }
+      UserTarget target{};
+      target.targetType = static_cast<UserTargetType>(source.mType);
 
-      outSample->mSampleKind = static_cast<std::int32_t>(fallbackSample->mType);
-      outSample->mWeakRef.mOwnerLinkSlot = nullptr;
-      outSample->mWeakRef.mNextOwner = nullptr;
-
-      if (outSample->mSampleKind == 1) {
-        // 0x008BEC5F: `a3 = *(a1 + 4)` -- the source's entity id, one dword.
-        const std::uint32_t entityIdRaw = fallbackSample->mEnt;
-
+      if (target.targetType == UserTargetType::Entity) {
         UserEntity* entity = nullptr;
-        moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
-        if (activeSession != nullptr) {
-          entity = activeSession->LookupEntityId(static_cast<moho::EntId>(entityIdRaw));
+        if (CWldSession* const activeSession = moho::WLD_GetActiveSession(); activeSession != nullptr) {
+          entity = activeSession->LookupEntityId(static_cast<moho::EntId>(source.mEnt));
         }
-
-        if (entity != nullptr) {
-          auto** const ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
-          outSample->mWeakRef.mOwnerLinkSlot = ownerLinkSlot;
-          outSample->mWeakRef.mNextOwner = *ownerLinkSlot;
-          *ownerLinkSlot = &outSample->mWeakRef;
-        }
-        return outSample;
+        target.targetEntity.ResetFromObject(entity);
+      } else if (target.targetType == UserTargetType::Position) {
+        target.position = source.mPos;
       }
 
-      if (outSample->mSampleKind == 2) {
-        // 0x008BEC94..0x008BECAA: destination `+0x0C/+0x10/+0x14` from source
-        // `+0x08/+0x0C/+0x10`. The two shapes differ by one dword, so copying
-        // the source's `+0x0C` run instead handed the graph `(y, z, junk)` and
-        // every order node landed at an impossible place.
-        outSample->mWorldPosition.x = fallbackSample->mPos.x;
-        outSample->mWorldPosition.y = fallbackSample->mPos.y;
-        outSample->mWorldPosition.z = fallbackSample->mPos.z;
-      }
-
-      return outSample;
+      return target;
     }
 
     /**
      * Address: 0x008B4080 (FUN_008B4080)
+     * Address: 0x008B40F0 (FUN_008B40F0 -- `UserTarget`'s implicit copy
+     * constructor: the kind, the `targetEntity` weak link re-linked at its
+     * owner's chain head, the position. Returned out of here for the event's
+     * target, and run per event by `UserCommandIssueLocalEvent`'s own copy
+     * constructor 0x008B56F0.)
+     * Address: 0x0081D010 (FUN_0081D010 -- `UserTarget`'s implicit destructor:
+     * `targetEntity`'s unlink from its owner chain, without clearing the two
+     * link words. Every transient `UserTarget` below dies through it.)
      *
      * What it does:
-     * Scans command-graph history backward for the latest entry tagged as
-     * build-position sample (`type==4`), otherwise falls back to the cached
-     * default sample lane.
+     * The helper's current target: the newest unconfirmed `SetTarget` edit in
+     * `mLocalQueue`, walked from the back (block size 1, so the map slot is
+     * `off + i`, less `_Mapsize` once it wraps), else the replicated
+     * `mVariableData.mTarget1`. An empty queue goes straight to the fallback,
+     * which is how a command with no local edits gets its sim-side target.
      */
-    [[nodiscard]] CommandGraphAnchorSampleRuntimeView* ResolveCommandGraphAnchorSampleFromHistory(
-      CommandGraphAnchorSampleRuntimeView* const outSample,
-      CommandGraphAnchorHistoryRuntimeView* const history
-    ) noexcept
+    [[nodiscard]] UserTarget ResolveCommandIssueTarget(const UserCommandIssueHelper& helper)
     {
-      if (outSample == nullptr || history == nullptr) {
-        return outSample;
-      }
-
-      // No `mEntries == nullptr` guard: 0x008B4080 walks straight into the
-      // do-while, and an empty ring makes the very first `cursor ==
-      // mEntryStart` test fire, which is what routes a command with no history
-      // entry to its fallback target. Bailing out here instead left the sample
-      // kind at 0, so `ResolveCommandGraphAnchorSamplePositionAlias` answered
-      // the invalid-position sentinel and every order node was placed at NaN.
-      std::uint32_t cursor = history->mEntryStart + history->mEntryCount;
-      while (true) {
-        if (cursor == history->mEntryStart) {
-          return ResolveFallbackCommandGraphAnchorSample(outSample, &history->mFallbackSample);
-        }
-
-        const std::uint32_t previousCursor = cursor - 1u;
-        std::uint32_t ringIndex = previousCursor;
-        if (history->mEntryBase <= previousCursor) {
-          ringIndex = previousCursor - history->mEntryBase;
-        }
-
-        const CommandGraphAnchorHistoryEntryRuntimeView* const entry = history->mEntries[ringIndex];
-        if (entry != nullptr && entry->mEntryType == 4) {
-          return CopyCommandGraphAnchorSampleWithRelink(outSample, &entry->mAnchorSample);
-        }
-
-        cursor = previousCursor;
-      }
-    }
-
-    /**
-     * Unlinks one weak entity reference from its owner's chain, matching
-     * `UnlinkWeakEntityOwner` (UserUnit.cpp) field-for-field. Used by
-     * `ResolveCommandTargetEntityFromAnchorHistory`'s transient-sample teardown.
-     */
-    void UnlinkEntityWeakRef(SSelectionWeakRefUserEntity& weakRef) noexcept
-    {
-      auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
-      if (ownerLinkSlot != nullptr) {
-        while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
-          ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
-        }
-        if (*ownerLinkSlot == &weakRef) {
-          *ownerLinkSlot = weakRef.mNextOwner;
+      for (std::size_t index = helper.mLocalQueue.size(); index != 0u; --index) {
+        const UserCommandIssueLocalEvent& event = helper.mLocalQueue[index - 1u];
+        if (event.mType == ECommandIssueEvent::SetTarget) {
+          return event.mTarget;
         }
       }
-      weakRef.mOwnerLinkSlot = nullptr;
-      weakRef.mNextOwner = nullptr;
+
+      return MakeUserTargetFromSSTITarget(helper.mVariableData.mTarget1);
     }
 
     /**
      * Address: 0x00824550 (FUN_00824550, sub_824550)
      *
      * Misclassified `external_dependency` by an earlier automated pass (its
-     * sole callee `sub_8B4080` walks the helper's own event-ring fields, not
-     * external runtime state - same misclassification family as the
-     * `mMapAB0` hash-subsystem thunks landed earlier this session).
+     * sole callee `sub_8B4080` walks the helper's own event queue, not
+     * external runtime state).
      *
      * What it does:
-     * Resolves one command's live target entity from its command-graph
-     * anchor history (falling back to its cached default anchor sample when
-     * the history holds no build-position entry via
-     * `ResolveCommandGraphAnchorSampleFromHistory`), then unlinks the
-     * transient local sample from whatever weak-entity chain the lookup
-     * joined it to before returning the resolved entity. Sole caller is
-     * `func_ProcessCommandDrag` (0x00829B40).
+     * The live entity the helper's current target names, or null for a
+     * ground target or an entity that has gone away. The transient target is
+     * released before returning. Callers: `func_ProcessCommandDrag`
+     * (0x00829B40) and `EstimateDrawNodeWorkTicks` (0x00826F10).
      */
-    [[nodiscard]] UserEntity* ResolveCommandTargetEntityFromAnchorHistory(
-      CommandGraphAnchorHistoryRuntimeView* const history
-    ) noexcept
+    [[nodiscard]] UserEntity* ResolveCommandTargetEntity(const UserCommandIssueHelper& helper)
     {
-      CommandGraphAnchorSampleRuntimeView sample{};
-      (void)ResolveCommandGraphAnchorSampleFromHistory(&sample, history);
-
-      UserEntity* const entity = (sample.mSampleKind == 1) ? DecodeSelectedUserEntity(sample.mWeakRef) : nullptr;
-
-      UnlinkEntityWeakRef(sample.mWeakRef);
-
-      return entity;
+      const UserTarget target = ResolveCommandIssueTarget(helper);
+      return target.targetType == UserTargetType::Entity ? target.targetEntity.GetObjectPtr() : nullptr;
     }
 
     /**
@@ -10540,76 +10093,50 @@ namespace moho
     }
 
     /**
-     * Address: 0x008B4300 (FUN_008B4300, sub_8B4300) plus the scoped map
-     * lookup it calls per matching ring entry, `sub_82CEA0` (0x0082CEA0),
-     * which itself wraps the lower-bound walk above (`sub_82E560`).
-     * Misclassified `external_dependency`/`owner_layout` by earlier automated
-     * passes for the same reason as `ResolveCommandTargetEntityFromAnchorHistory`.
-     *
-     * `sub_82CEA0`'s own body additionally threads a transient weak node
-     * through `candidateUnit`'s own link chain around the lookup
-     * (0x0082CEB2-0x0082CF11: insert before, splice out after). Nothing else
-     * runs between the insert and the splice-out in this single-threaded
-     * call, so the chain membership is never observable from outside
-     * `sub_82CEA0` itself; this recovery omits it as behaviorally inert.
+     * Address: 0x008B4300 (FUN_008B4300, sub_8B4300)
      *
      * What it does:
-     * Scans `history`'s cached command-issue event ring from newest to
-     * oldest (same ring `ResolveCommandTargetEntityFromAnchorHistory` walks)
-     * for the first entry tagged type `0` or type `3`; for that entry, looks
-     * `history.mRelationLookupKey` up in the entry's own per-entry relation
-     * tree (`LowerBoundWeakEntitySetNode`) and returns whether the lookup
-     * came up empty (`true` = exclude the candidate). See
-     * `CommandGraphAnchorHistoryRuntimeView::mRelationLookupKey`'s doc
-     * comment: the lookup shape is confirmed, the exact game-rule the key
-     * encodes is not. When the ring holds neither event type, falls back to
-     * a direct membership scan of `history.mFallbackIdRunBegin/End` against
-     * `candidateUnit->mParams.mEntityId`.
+     * Whether `candidateUnit` belongs to the helper's command, reading the
+     * unconfirmed local edits first: walking `mLocalQueue` from the back, the
+     * newest `SelectUnit` edit that lists the unit answers `true` and the
+     * newest `DeselectUnit` edit that lists it answers `false`
+     * (0x008B4346..0x008B439D). With no such edit it answers whether the unit's
+     * entity id is in the replicated `mVariableData.mEntIds` (0x008B43B7..).
+     *
+     * The per-event lookup is `WeakSet<UserUnit>::find(candidateUnit)` over the
+     * event's `mUnits` (`sub_82CEA0`, which takes the unit in `eax` from the
+     * second stack argument at 0x008B4363/0x008B438D and keys the tree walk
+     * `sub_82E560` with it). It used to be keyed with the dword at
+     * `helper+0xB8` instead -- the local queue's own first word, read through
+     * a padded view -- so no local select/deselect edit ever matched and every
+     * answer came from the replicated id list.
+     *
+     * `sub_82CEA0` also brackets the lookup with a transient weak guard on the
+     * unit; nothing runs between its link and its unlink, so it is omitted.
      */
     [[nodiscard]] bool IsCandidateExcludedByCachedRelation(
-      CommandGraphAnchorHistoryRuntimeView& history, UserUnit* const candidateUnit
+      const UserCommandIssueHelper& helper, UserUnit* const candidateUnit
     ) noexcept
     {
-      std::uint32_t cursor = history.mEntryStart + history.mEntryCount;
-      while (cursor != history.mEntryStart) {
-        const std::uint32_t previousCursor = cursor - 1u;
-        std::uint32_t ringIndex = previousCursor;
-        if (history.mEntryBase <= previousCursor) {
-          ringIndex = previousCursor - history.mEntryBase;
-        }
-        cursor = previousCursor;
-
-        CommandGraphAnchorHistoryEntryRuntimeView* const entry = history.mEntries[ringIndex];
-        const std::int32_t entryType = entry->mEntryType;
-        if (entryType != 0 && entryType != 3) {
+      const std::uint32_t candidateKey = SelectionKeyFromEntity(candidateUnit);
+      for (std::size_t index = helper.mLocalQueue.size(); index != 0u; --index) {
+        const UserCommandIssueLocalEvent& event = helper.mLocalQueue[index - 1u];
+        if (event.mType != ECommandIssueEvent::SelectUnit && event.mType != ECommandIssueEvent::DeselectUnit) {
           continue;
         }
 
-        // 0x008B4370/0x008B439A: the binary runs this exact lookup (same tree,
-        // same key) twice per entry - once as an immediate-exclude gate only
-        // reachable for type 0 (0x008B434A: type 3 jumps straight past it via
-        // loc_8B4375), once as the shared found/not-found gate both types share.
-        // Nothing observable happens between the two calls (see this function's
-        // own doc comment on sub_82CEA0's inert scope-guard dance), so both reads
-        // are provably identical; computed once here instead of twice.
-        const bool foundInRelationTree =
-          LowerBoundWeakEntitySetNode(entry->mRelationTree, history.mRelationLookupKey) !=
-          entry->mRelationTree.mHead;
-
-        if (entryType == 0 && foundInRelationTree) {
-          return true; // immediate exclude (0x008B43AB)
+        // 0x008B4370/0x008B439A: the binary runs this lookup twice for a
+        // `SelectUnit` edit (an early "listed" exit, then the shared gate);
+        // nothing observable happens in between, so it is computed once.
+        const bool listed = LowerBoundWeakEntitySetNode(event.mUnits, candidateKey) != event.mUnits.mHead;
+        if (!listed) {
+          continue;
         }
-        if (foundInRelationTree) {
-          return false; // found on the shared gate: stop scanning, don't exclude (0x008B439F)
-        }
-        // not found: keep scanning older ring entries (0x008B439D -> loc_8B4320)
+        return event.mType == ECommandIssueEvent::SelectUnit;
       }
 
-      // Matches "return i != v15": excludes the candidate when its entity id
-      // *is* present in the fallback id run (not when it's absent).
-      for (const std::int32_t* idCursor = history.mFallbackIdRunBegin; idCursor != history.mFallbackIdRunEnd;
-           ++idCursor) {
-        if (*idCursor == candidateUnit->mParams.mEntityId) {
+      for (const EntId entityId : helper.mVariableData.mEntIds) {
+        if (entityId == candidateUnit->mParams.mEntityId) {
           return true;
         }
       }
@@ -10735,7 +10262,7 @@ namespace moho
      * override). On release, unless the drag just ended over an invalid
      * build placement, dispatches the new target: when the command already
      * follows a live cached target entity
-     * (`ResolveCommandTargetEntityFromAnchorHistory`), searches nearby
+     * (`ResolveCommandTargetEntity`), searches nearby
      * collected entities for the closest live unit sharing the cached
      * target's army and not excluded by `IsCandidateExcludedByCachedRelation`,
      * and issues that entity as the new target; otherwise, for a live
@@ -10826,9 +10353,7 @@ namespace moho
         clampedPos.z, static_cast<float>(map->mPlayableRect.z0 + 1), static_cast<float>(map->mPlayableRect.z1 - 1)
       );
 
-      if (UserEntity* const cachedTargetEntity = ResolveCommandTargetEntityFromAnchorHistory(
-            reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(helper)
-          );
+      if (UserEntity* const cachedTargetEntity = ResolveCommandTargetEntity(*helper);
           cachedTargetEntity != nullptr) {
         // Cached-target reacquire: search nearby collected entities for the
         // closest live unit sharing the cached target's army.
@@ -10844,8 +10369,7 @@ namespace moho
           }
 
           if (UserUnit* const candidateUnit = candidate->IsUserUnit(); candidateUnit != nullptr) {
-            auto& anchorHistory = reinterpret_cast<CommandGraphAnchorHistoryRuntimeView&>(*helper);
-            if (IsCandidateExcludedByCachedRelation(anchorHistory, candidateUnit)) {
+            if (IsCandidateExcludedByCachedRelation(*helper, candidateUnit)) {
               continue;
             }
           }
@@ -10923,71 +10447,23 @@ namespace moho
   namespace
   {
     /**
-     * Alias of FUN_008BED50.
-     *
-     * What it does:
-     * Resolves one anchor sample to world position: owner-linked entity
-     * position for kind `1`, inline position for kind `2`, otherwise invalid.
-     */
-    [[nodiscard]] Wm3::Vector3f* ResolveCommandGraphAnchorSamplePositionAlias(
-      const CommandGraphAnchorSampleRuntimeView* const sample,
-      Wm3::Vector3f* const outPosition
-    ) noexcept
-    {
-      if (outPosition == nullptr) {
-        return nullptr;
-      }
-      if (sample == nullptr) {
-        *outPosition = InvalidCommandGraphAnchorPosition();
-        return outPosition;
-      }
-
-      if (sample->mSampleKind == 1) {
-        UserEntity* const entity = DecodeSelectedUserEntity(sample->mWeakRef);
-        if (entity == nullptr) {
-          *outPosition = InvalidCommandGraphAnchorPosition();
-        } else {
-          const Wm3::Vec3f& entityPos = entity->mVariableData.mCurTransform.pos_;
-          outPosition->x = entityPos.x;
-          outPosition->y = entityPos.y;
-          outPosition->z = entityPos.z;
-        }
-        return outPosition;
-      }
-
-      if (sample->mSampleKind == 2) {
-        *outPosition = sample->mWorldPosition;
-        return outPosition;
-      }
-
-      *outPosition = InvalidCommandGraphAnchorPosition();
-      return outPosition;
-    }
-
-    /**
      * Address: 0x0081CFD0 (FUN_0081CFD0)
      *
      * What it does:
-     * Resolves one command-graph anchor sample from history into world space
-     * and then unlinks temporary weak-owner lanes from the owner chain.
+     * The world position of the helper's current target
+     * (`ResolveCommandIssueTarget`, then `ResolvePositionFromTarget`,
+     * 0x008BED50): the named entity's position, the ground position, or the
+     * invalid vector. The transient target is released on the way out.
      */
-    [[nodiscard]] Wm3::Vector3f* ResolveCommandGraphAnchorHistoryWorldPosition(
-      Wm3::Vector3f* const outPosition,
-      CommandGraphAnchorHistoryRuntimeView* const history
-    ) noexcept
+    [[nodiscard]] Wm3::Vector3f* ResolveCommandIssueTargetPosition(
+      Wm3::Vector3f* const outPosition, const UserCommandIssueHelper& helper
+    )
     {
       if (outPosition == nullptr) {
         return nullptr;
       }
 
-      CommandGraphAnchorSampleRuntimeView sample{};
-      (void)ResolveCommandGraphAnchorSampleFromHistory(&sample, history);
-      (void)ResolveCommandGraphAnchorSamplePositionAlias(&sample, outPosition);
-
-      if (sample.mWeakRef.mOwnerLinkSlot != nullptr) {
-        (void)UnlinkSelectionWeakOwnerRefNoReset(sample.mWeakRef);
-      }
-
+      *outPosition = ResolvePositionFromTarget(ResolveCommandIssueTarget(helper));
       return outPosition;
     }
 
@@ -11399,407 +10875,6 @@ namespace moho
       return true;
     }
 
-    [[nodiscard]] VizUpdateNode* TreeMin(VizUpdateNode* node, VizUpdateNode* head)
-    {
-      while (node != nullptr && node != head && node->left != head) {
-        node = node->left;
-      }
-      return node ? node : head;
-    }
-
-    [[nodiscard]] VizUpdateNode* TreeMax(VizUpdateNode* node, VizUpdateNode* head)
-    {
-      while (node != nullptr && node != head && node->right != head) {
-        node = node->right;
-      }
-      return node ? node : head;
-    }
-
-    [[nodiscard]] VizUpdateNode* FindVizUpdateNode(VizUpdateTree* tree, const std::uintptr_t key)
-    {
-      if (!tree || !tree->head) {
-        return nullptr;
-      }
-
-      VizUpdateNode* candidate = tree->head;
-      VizUpdateNode* current = tree->head->parent;
-      while (current && current->isSentinel == 0) {
-        if (current->key >= key) {
-          candidate = current;
-          current = current->left;
-        } else {
-          current = current->right;
-        }
-      }
-
-      if (!candidate || candidate == tree->head || key < candidate->key) {
-        return tree->head;
-      }
-      return candidate;
-    }
-
-    [[nodiscard]] bool IsVizNodeNil(const VizUpdateNode* const node) noexcept
-    {
-      return node == nullptr || node->isSentinel != 0u;
-    }
-
-    void RecomputeVizUpdateExtrema(VizUpdateTree* tree)
-    {
-      if (!tree || !tree->head) {
-        return;
-      }
-
-      VizUpdateNode* const head = tree->head;
-      VizUpdateNode* const root = head->parent;
-      if (IsVizNodeNil(root)) {
-        head->parent = head;
-        head->left = head;
-        head->right = head;
-        return;
-      }
-
-      head->left = TreeMin(root, head);
-      head->right = TreeMax(root, head);
-    }
-
-    void LinkVizUpdateOwner(UserEntity* const entity, VizUpdateNode* const node)
-    {
-      node->ownerLinkHead = 0u;
-      node->ownerNextLink = 0u;
-      if (entity == nullptr) {
-        return;
-      }
-
-      auto* const ownerLinkSlot = reinterpret_cast<std::uintptr_t*>(&entity->mIUnitChainHead);
-      node->ownerLinkHead = reinterpret_cast<std::uintptr_t>(ownerLinkSlot);
-      node->ownerNextLink = *ownerLinkSlot;
-      *ownerLinkSlot = reinterpret_cast<std::uintptr_t>(&node->ownerLinkHead);
-    }
-
-    void RotateLeft(VizUpdateTree* tree, VizUpdateNode* node);
-    void RotateRight(VizUpdateTree* tree, VizUpdateNode* node);
-
-    void FixupAfterVizInsert(VizUpdateTree* tree, VizUpdateNode* node)
-    {
-      VizUpdateNode* const head = tree->head;
-      while (node != head->parent && node->parent->color == 0u) {
-        VizUpdateNode* const parent = node->parent;
-        VizUpdateNode* const grand = parent->parent;
-        if (parent == grand->left) {
-          VizUpdateNode* const uncle = grand->right;
-          if (uncle->color == 0u) {
-            parent->color = 1u;
-            uncle->color = 1u;
-            grand->color = 0u;
-            node = grand;
-          } else {
-            if (node == parent->right) {
-              node = parent;
-              RotateLeft(tree, node);
-            }
-            node->parent->color = 1u;
-            grand->color = 0u;
-            RotateRight(tree, grand);
-          }
-        } else {
-          VizUpdateNode* const uncle = grand->left;
-          if (uncle->color == 0u) {
-            parent->color = 1u;
-            uncle->color = 1u;
-            grand->color = 0u;
-            node = grand;
-          } else {
-            if (node == parent->left) {
-              node = parent;
-              RotateRight(tree, node);
-            }
-            node->parent->color = 1u;
-            grand->color = 0u;
-            RotateLeft(tree, grand);
-          }
-        }
-      }
-
-      head->parent->color = 1u;
-    }
-
-    [[nodiscard]] bool InsertVizUpdateNode(VizUpdateTree* tree, UserEntity* const entity)
-    {
-      if (!tree || !tree->head || entity == nullptr) {
-        return false;
-      }
-
-      const std::uintptr_t key = reinterpret_cast<std::uintptr_t>(entity);
-      VizUpdateNode* const head = tree->head;
-      VizUpdateNode* parent = head;
-      VizUpdateNode* probe = head->parent;
-      while (!IsVizNodeNil(probe)) {
-        parent = probe;
-        if (key < probe->key) {
-          probe = probe->left;
-        } else if (probe->key < key) {
-          probe = probe->right;
-        } else {
-          return false;
-        }
-      }
-
-      auto* const inserted = static_cast<VizUpdateNode*>(::operator new(sizeof(VizUpdateNode)));
-      inserted->left = head;
-      inserted->parent = parent;
-      inserted->right = head;
-      inserted->key = key;
-      inserted->color = 0u;
-      inserted->isSentinel = 0u;
-      inserted->pad_1A[0] = 0u;
-      inserted->pad_1A[1] = 0u;
-      LinkVizUpdateOwner(entity, inserted);
-
-      if (parent == head) {
-        head->parent = inserted;
-      } else if (key < parent->key) {
-        parent->left = inserted;
-      } else {
-        parent->right = inserted;
-      }
-
-      ++tree->size;
-      FixupAfterVizInsert(tree, inserted);
-      RecomputeVizUpdateExtrema(tree);
-      return true;
-    }
-
-    void RotateLeft(VizUpdateTree* tree, VizUpdateNode* node)
-    {
-      VizUpdateNode* const pivot = node->right;
-      node->right = pivot->left;
-      if (pivot->left && pivot->left->isSentinel == 0) {
-        pivot->left->parent = node;
-      }
-
-      pivot->parent = node->parent;
-      if (node == tree->head->parent) {
-        tree->head->parent = pivot;
-      } else if (node == node->parent->left) {
-        node->parent->left = pivot;
-      } else {
-        node->parent->right = pivot;
-      }
-
-      pivot->left = node;
-      node->parent = pivot;
-    }
-
-    void RotateRight(VizUpdateTree* tree, VizUpdateNode* node)
-    {
-      VizUpdateNode* const pivot = node->left;
-      node->left = pivot->right;
-      if (pivot->right && pivot->right->isSentinel == 0) {
-        pivot->right->parent = node;
-      }
-
-      pivot->parent = node->parent;
-      if (node == tree->head->parent) {
-        tree->head->parent = pivot;
-      } else if (node == node->parent->right) {
-        node->parent->right = pivot;
-      } else {
-        node->parent->left = pivot;
-      }
-
-      pivot->right = node;
-      node->parent = pivot;
-    }
-
-    void Transplant(VizUpdateTree* tree, VizUpdateNode* from, VizUpdateNode* to)
-    {
-      if (from->parent == tree->head) {
-        tree->head->parent = to;
-      } else if (from == from->parent->left) {
-        from->parent->left = to;
-      } else {
-        from->parent->right = to;
-      }
-
-      if (to != tree->head) {
-        to->parent = from->parent;
-      }
-    }
-
-    void UnlinkOwnerChain(VizUpdateNode* node)
-    {
-      if (!node || node->ownerLinkHead == 0u) {
-        return;
-      }
-
-      auto* slot = reinterpret_cast<std::uintptr_t*>(node->ownerLinkHead);
-      const std::uintptr_t target = reinterpret_cast<std::uintptr_t>(&node->ownerLinkHead);
-
-      std::size_t guard = 0;
-      while (slot && *slot != target && guard < 65536u) {
-        slot = reinterpret_cast<std::uintptr_t*>(*slot + sizeof(std::uintptr_t));
-        ++guard;
-      }
-
-      if (slot && *slot == target) {
-        *slot = node->ownerNextLink;
-      }
-
-      node->ownerLinkHead = 0u;
-      node->ownerNextLink = 0u;
-    }
-
-    void DeleteFixup(VizUpdateTree* tree, VizUpdateNode* node, VizUpdateNode* parentHint)
-    {
-      VizUpdateNode* head = tree->head;
-      VizUpdateNode* parent = (node != head) ? node->parent : parentHint;
-
-      while (node != head->parent && (node == head || node->color == 1u)) {
-        if (!parent) {
-          break;
-        }
-
-        if (node == parent->left) {
-          VizUpdateNode* sibling = parent->right;
-          if (sibling == head) {
-            break;
-          }
-
-          if (sibling->color == 0u) {
-            sibling->color = 1u;
-            parent->color = 0u;
-            RotateLeft(tree, parent);
-            sibling = parent->right;
-          }
-
-          const bool siblingLeftBlack = (sibling->left == head) || (sibling->left->color == 1u);
-          const bool siblingRightBlack = (sibling->right == head) || (sibling->right->color == 1u);
-          if (siblingLeftBlack && siblingRightBlack) {
-            sibling->color = 0u;
-            node = parent;
-            parent = node->parent;
-          } else {
-            if ((sibling->right == head) || (sibling->right->color == 1u)) {
-              if (sibling->left != head) {
-                sibling->left->color = 1u;
-              }
-              sibling->color = 0u;
-              RotateRight(tree, sibling);
-              sibling = parent->right;
-            }
-
-            sibling->color = parent->color;
-            parent->color = 1u;
-            if (sibling->right != head) {
-              sibling->right->color = 1u;
-            }
-            RotateLeft(tree, parent);
-            node = head->parent;
-            break;
-          }
-        } else {
-          VizUpdateNode* sibling = parent->left;
-          if (sibling == head) {
-            break;
-          }
-
-          if (sibling->color == 0u) {
-            sibling->color = 1u;
-            parent->color = 0u;
-            RotateRight(tree, parent);
-            sibling = parent->left;
-          }
-
-          const bool siblingRightBlack = (sibling->right == head) || (sibling->right->color == 1u);
-          const bool siblingLeftBlack = (sibling->left == head) || (sibling->left->color == 1u);
-          if (siblingRightBlack && siblingLeftBlack) {
-            sibling->color = 0u;
-            node = parent;
-            parent = node->parent;
-          } else {
-            if ((sibling->left == head) || (sibling->left->color == 1u)) {
-              if (sibling->right != head) {
-                sibling->right->color = 1u;
-              }
-              sibling->color = 0u;
-              RotateLeft(tree, sibling);
-              sibling = parent->left;
-            }
-
-            sibling->color = parent->color;
-            parent->color = 1u;
-            if (sibling->left != head) {
-              sibling->left->color = 1u;
-            }
-            RotateRight(tree, parent);
-            node = head->parent;
-            break;
-          }
-        }
-      }
-
-      if (node != head) {
-        node->color = 1u;
-      }
-    }
-
-    void EraseVizUpdateNode(VizUpdateTree* tree, VizUpdateNode* node)
-    {
-      VizUpdateNode* const head = tree->head;
-      VizUpdateNode* y = node;
-      std::uint8_t yOriginalColor = y->color;
-      VizUpdateNode* x = head;
-      VizUpdateNode* xParent = nullptr;
-
-      if (node->left == head) {
-        x = node->right;
-        xParent = node->parent;
-        Transplant(tree, node, node->right);
-      } else if (node->right == head) {
-        x = node->left;
-        xParent = node->parent;
-        Transplant(tree, node, node->left);
-      } else {
-        y = TreeMin(node->right, head);
-        yOriginalColor = y->color;
-        x = y->right;
-        if (y->parent == node) {
-          xParent = y;
-          if (x != head) {
-            x->parent = y;
-          }
-        } else {
-          Transplant(tree, y, y->right);
-          y->right = node->right;
-          y->right->parent = y;
-          xParent = y->parent;
-        }
-        Transplant(tree, node, y);
-        y->left = node->left;
-        y->left->parent = y;
-        y->color = node->color;
-      }
-
-      if (head->left == node) {
-        head->left =
-          (node->left != head) ? TreeMax(node->left, head) : ((node->parent != nullptr) ? node->parent : head);
-      }
-      if (head->right == node) {
-        head->right =
-          (node->right != head) ? TreeMin(node->right, head) : ((node->parent != nullptr) ? node->parent : head);
-      }
-
-      UnlinkOwnerChain(node);
-      ::operator delete(node);
-      if (tree->size > 0u) {
-        --tree->size;
-      }
-
-      if (yOriginalColor == 1u) {
-        DeleteFixup(tree, x, xParent);
-      }
-    }
-
     // ===================================================================
     // Right-mouse-button command resolution helpers (FUN_0081EC00 family)
     // ===================================================================
@@ -11810,94 +10885,11 @@ namespace moho
     // in this anonymous namespace next to the selection-iteration helpers they
     // reuse (DecodeSelectedUserEntity / ResolveIUnitBridge / IsSentinelNode).
 
-    // Session command-manager runtime views. The session's command manager
-    // lives behind `CWldSession::mCommandManager`; its command-issue map (keyed by
-    // CmdId) starts at manager offset +0xCB4 with the RB-tree head at +0xCB8.
-    // Same per-TU view shape used by Sim.cpp / UserUnit.cpp.
-    struct RightClickCommandIssueMapNodeView
-    {
-      RightClickCommandIssueMapNodeView* left;   // +0x00
-      RightClickCommandIssueMapNodeView* parent; // +0x04
-      RightClickCommandIssueMapNodeView* right;  // +0x08
-      std::uint32_t key;                         // +0x0C (CmdId)
-      void* value;                               // +0x10 (helper*)
-      std::uint8_t color;                        // +0x14
-      std::uint8_t isNil;                        // +0x15
-      std::uint8_t pad_16[2];
-    };
-    static_assert(offsetof(RightClickCommandIssueMapNodeView, key) == 0x0C, "cmd-issue node key offset must be 0x0C");
-    static_assert(offsetof(RightClickCommandIssueMapNodeView, value) == 0x10, "cmd-issue node value offset must be 0x10");
-    static_assert(offsetof(RightClickCommandIssueMapNodeView, isNil) == 0x15, "cmd-issue node isNil offset must be 0x15");
-
-    struct RightClickCommandIssueMapView
-    {
-      void* allocatorProxy;                    // +0x00
-      RightClickCommandIssueMapNodeView* head; // +0x04
-      std::uint32_t size;                      // +0x08
-    };
-    static_assert(offsetof(RightClickCommandIssueMapView, head) == 0x04, "cmd-issue map head offset must be 0x04");
-
-    struct RightClickCommandManagerView
-    {
-      std::uint8_t pad_0000_0CB4[0xCB4];
-      RightClickCommandIssueMapView commandIssueMap; // +0xCB4
-    };
-    static_assert(
-      offsetof(RightClickCommandManagerView, commandIssueMap) == 0xCB4, "command manager issue-map offset must be 0xCB4"
-    );
-
-    // The command-issue helper stores its baseline unit-command type at +0x58.
-    // The dispatcher only needs that field to detect Attack / FormAttack; the
-    // IDA helper `sub_8B4140` resolves the most-recent override event, which for
-    // this Attack/FormAttack test degrades to the same baseline command-type
-    // read (ResolveHelperCommandType in UserUnit.cpp, FUN_008B4140).
-    struct RightClickCommandIssueHelperView
-    {
-      std::uint8_t pad_0000_0058[0x58];
-      EUnitCommandType commandType; // +0x58
-    };
-    static_assert(
-      offsetof(RightClickCommandIssueHelperView, commandType) == 0x58,
-      "command-issue helper command-type offset must be 0x58"
-    );
-
-    /**
-     * Ordered lookup of one command-issue helper by CmdId in the session
-     * command manager's RB-tree, mirroring the `std::map<CmdId,...>::find` in
-     * FUN_0081EC00. Returns nullptr when the manager is absent or the key is
-     * not present.
-     */
-    [[nodiscard]] RightClickCommandIssueHelperView*
-      FindRightClickCommandIssueHelper(CWldSession* const session, const std::uint32_t commandId) noexcept
-    {
-      if (session == nullptr || session->mCommandManager == nullptr) {
-        return nullptr;
-      }
-
-      auto* const manager = reinterpret_cast<RightClickCommandManagerView*>(session->mCommandManager);
-      RightClickCommandIssueMapView& issueMap = manager->commandIssueMap;
-      RightClickCommandIssueMapNodeView* const head = issueMap.head;
-      if (head == nullptr) {
-        return nullptr;
-      }
-
-      RightClickCommandIssueMapNodeView* result = head;
-      RightClickCommandIssueMapNodeView* node = head->parent;
-      while (node != nullptr && node != head && node->isNil == 0u) {
-        if (node->key >= commandId) {
-          result = node;
-          node = node->left;
-        } else {
-          node = node->right;
-        }
-      }
-
-      if (result == head || commandId < result->key) {
-        return nullptr;
-      }
-
-      return reinterpret_cast<RightClickCommandIssueHelperView*>(result->value);
-    }
+    // The pending command the cursor drags is looked up through the session
+    // command manager's own `mCommands` map (`CommandManager::mCommands`,
+    // +0xCB4) with `FindCommandIssueHelper` below, and its type is read
+    // through `ResolveCommandIssueHelperCommandType` -- see the no-hover arm
+    // of `func_GetRightMouseButtonAction`.
 
     /**
      * Address: 0x0081D080 (FUN_0081D080, sub_81D080)
@@ -12188,7 +11180,7 @@ namespace moho
    * What it does: see the declaration above `RebuildCommandQueueNodes`.
    *
    * It sits here rather than beside `EstimateEdgeTravelTicks` because it needs
-   * `ResolveEntityFromCommandIssueOwner` from the anonymous namespace above.
+   * `ResolveUnitFocusEntity` from the anonymous namespace above.
    *
    * Two shapes worth keeping honest, both read off the disassembly rather than
    * the decompiler, which renders them misleadingly:
@@ -12219,9 +11211,8 @@ namespace moho
     // The resolver is not pure - it unlinks the transient anchor sample from
     // whatever weak-entity chain the lookup joined it to - so collapsing the
     // pair would drop a side effect the original source performs twice.
-    auto* const anchorHistory = reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(helper);
-    if (ResolveCommandTargetEntityFromAnchorHistory(anchorHistory) != nullptr) {
-      (void)ResolveCommandTargetEntityFromAnchorHistory(anchorHistory)->IsUserUnit();
+    if (ResolveCommandTargetEntity(*helper) != nullptr) {
+      (void)ResolveCommandTargetEntity(*helper)->IsUserUnit();
     }
 
     REntityBlueprint* const orderedBlueprint = helper->mConstantData.blueprint;
@@ -12263,7 +11254,7 @@ namespace moho
         // How much of the job is left is read off whatever this unit is
         // currently working on, and only while it is working on *this* order -
         // an engineer queued to help later must not shorten the estimate.
-        if (UserEntity* const workTarget = ResolveEntityFromCommandIssueOwner(unit);
+        if (UserEntity* const workTarget = ResolveUnitFocusEntity(unit);
             workTarget != nullptr) {
           if (ResolveUserUnitFrontCommandIssueHelper(unit->GetCommandQueue()) == helper) {
             const float maxHealth = workTarget->mVariableData.mMaxHealth;
@@ -12398,39 +11389,34 @@ namespace moho
 
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker: resolves the world
-   * position seeded from one unit's last-queued command-graph anchor history.
-   * Reinterprets the opaque `QueuedUserCommandRecord` handle (produced by
-   * `GetLastQueuedUserCommandAnchor`) as the command-graph anchor history and
-   * forwards to the file-local `ResolveCommandGraphAnchorHistoryWorldPosition`
-   * (FUN_0081CFD0), which resolves the sample position and unlinks the transient
-   * weak-owner lane.
+   * position of one unit's last-queued command. `QueuedUserCommandRecord` is
+   * the opaque cross-TU name `GetLastQueuedUserCommandAnchor` (UserUnit.cpp)
+   * hands out for that command's `UserCommandIssueHelper`; the handle points at
+   * the helper itself, so this is a pointer conversion, not an offset. Forwards
+   * to `ResolveCommandIssueTargetPosition` (FUN_0081CFD0).
    */
   Wm3::Vector3f ResolveLastQueuedCommandAnchorPosition(const QueuedUserCommandRecord* const record)
   {
     Wm3::Vector3f out{};
-    auto* const history = reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(
-      const_cast<QueuedUserCommandRecord*>(record)
-    );
-    (void)ResolveCommandGraphAnchorHistoryWorldPosition(&out, history);
+    (void)ResolveCommandIssueTargetPosition(&out, *reinterpret_cast<const UserCommandIssueHelper*>(record));
     return out;
   }
 
-  /**
-   * Bridge for `Moho::DrawAllUnitSkirts` (FUN_0085AD80): resolves the world
-   * position a pending command-issue helper is anchored at.
-   *
-   * A `UserCommandIssueHelper` *is* the command-graph anchor history - its
-   * local issue-event ring at +0xB8 is the entry ring
-   * `CommandGraphAnchorHistoryRuntimeView` models at +0xBC..+0xC8 - so the
-   * binary reaches the same code path by inlining FUN_0081CFD0's
-   * resolve-sample / sample-to-position / unlink-weak-lane trio straight into
-   * the skirt loop (asm 0x0085AE88..0x0085AEB7).
-   */
   MouseInfo& CWldSession::CursorInfo() noexcept
   {
     static_assert(
       offsetof(CWldSession, CursorWorldPos) - offsetof(CWldSession, mCursorWorldState)
         == offsetof(MouseInfo, mMouseWorldPos),
+      "CWldSession's flattened cursor snapshot must line up with MouseInfo"
+    );
+    static_assert(
+      offsetof(CWldSession, mCursorUnitHover) - offsetof(CWldSession, mCursorWorldState)
+        == offsetof(MouseInfo, mUnitHover),
+      "CWldSession's flattened cursor snapshot must line up with MouseInfo"
+    );
+    static_assert(
+      offsetof(CWldSession, HighlightCommandId) - offsetof(CWldSession, mCursorWorldState)
+        == offsetof(MouseInfo, mIsDragger),
       "CWldSession's flattened cursor snapshot must line up with MouseInfo"
     );
     static_assert(
@@ -12441,13 +11427,21 @@ namespace moho
     return *reinterpret_cast<MouseInfo*>(&mCursorWorldState[0]);
   }
 
+  const MouseInfo& CWldSession::CursorInfo() const noexcept
+  {
+    return *reinterpret_cast<const MouseInfo*>(&mCursorWorldState[0]);
+  }
+
+  /**
+   * Bridge for `Moho::DrawAllUnitSkirts` (FUN_0085AD80): resolves the world
+   * position a pending command-issue helper is anchored at. The binary inlines
+   * FUN_0081CFD0's resolve-target / target-to-position / release trio straight
+   * into the skirt loop (asm 0x0085AE88..0x0085AEB7).
+   */
   Wm3::Vector3f ResolveCommandIssueHelperAnchorPosition(UserCommandIssueHelper& helper)
   {
     Wm3::Vector3f out{};
-    (void)ResolveCommandGraphAnchorHistoryWorldPosition(
-      &out,
-      reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(&helper)
-    );
+    (void)ResolveCommandIssueTargetPosition(&out, helper);
     return out;
   }
 
@@ -13392,16 +12386,13 @@ namespace moho
 
     mMapName = sessionInfo.mMapName;
 
-    std::memset(mEntitySpatialDbStorage, 0, sizeof(mEntitySpatialDbStorage));
     // 0x00893160 line 84: `SpatialDB_MeshInstance::SpatialDB_MeshInstance(&mSpatialDB)`
     // (0x00501D80) runs right after the entity map's head sentinel is built.
     // It allocates the map-tree head sentinel and the root shard-data lane;
     // without it every `Register` from a UserEntity ctor finds a null tree
     // head and silently drops the entry, so unit picking, band-box
-    // selection and every area query see an empty database.
-    // The storage lane is raw bytes, so the database is built into it in
-    // place: 0x00501D80 is SpatialDB<T>::SpatialDB, not a separate init step.
-    new (GetEntitySpatialDbStorage()) SpatialDB<UserEntity>();
+    // selection and every area query see an empty database. That is
+    // `mEntitySpatialDb`'s own constructor, run as a member in that order.
     // 0x00893214-0x0089323D, immediately after that ctor: the extra-selection
     // weak set at +0xE0 gets its head sentinel built inline, exactly like every
     // other `WeakSet<UserEntity>` in this class --
@@ -13414,7 +12405,7 @@ namespace moho
     //   0x0089323A: mov  [eax+8], eax          ; mParent = head
     //   0x0089323D: mov  [ebp+0E8h], ebx       ; set.mSize = 0
     //
-    // The memset above leaves that lane all-zero, so `mHead` stayed null and
+    // Without it `mHead` stayed null and
     // the set read as permanently empty: `IsEmptyFromHeadFind` short-circuits
     // on a null head and `GetExtraSelectList` returns a blank clone. Every
     // cargo unit the player picked out of a transport's panel was therefore
@@ -13449,12 +12440,8 @@ namespace moho
     // binary does at 0x00893358 / 0x0089338C. Leaving them null is not a
     // harmless deferral: every insert path checks the head first and silently
     // does nothing without it, which is why visibility updates never ran.
-    mAuxUpdateRoot = nullptr;
-    mAuxUpdateHead = AllocateWeakEntitySetHead();
-    mAuxUpdateSize = 0;
-    mVizUpdateRoot = nullptr;
-    mVizUpdateHead = AllocateWeakEntitySetHead();
-    mVizUpdateSize = 0;
+    InitWeakEntitySetHead(mOrphans);
+    InitWeakEntitySetHead(mVizUpdates);
 
     mGameTick = 0;
     mLastBeatWasTick = 0;
@@ -13515,7 +12502,7 @@ namespace moho
 
     // 0x0089349D..0x008934D9 is `MouseInfo`'s default constructor, inlined
     // over the cursor lane this class still spells out field by field
-    // (`mCursorWorldState` / `CursorWorldPos` / `pad_04C0` /
+    // (`mCursorWorldState` / `CursorWorldPos` / `mCursorUnitHover` /
     // `HighlightCommandId` / `CursorScreenPos` - see `CursorInfo()`):
     //
     //   0x0089349D  mov  [ebp+4B0h], bl    ; mHitValid   = 0
@@ -13533,9 +12520,9 @@ namespace moho
     // run where those bytes were not already zero, the very first frame
     // walked a garbage owner chain and faulted in
     // `WeakPtr<UserEntity>::ResetFromOwnerLinkSlot`. Whether a given build
-    // survived startup came down to heap layout.
+    // survived startup came down to heap layout. The two stores are now
+    // `mCursorUnitHover`'s own default constructor, run as a member.
     mCursorWorldState[0] = 0u;
-    ::new (static_cast<void*>(&pad_04C0[0])) WeakPtr<UserEntity>{};
 
     // 0x00893160 line ~288-293: seeds the initial cursor world position from
     // the map's own bounds midpoint, not the origin - matters because
@@ -13735,11 +12722,8 @@ namespace moho
     mLaunchInfo.reset();
     // 0x00893A60 line 297: `~SpatialDB_MeshInstance(&mSpatialDB)` (0x00501E50)
     // runs after the extra-selection set is torn down and before the entity
-    // map's storage is released.
-    // 0x00501E50 is SpatialDB<T>::~SpatialDB; the lane itself is not freed.
-    GetEntitySpatialDbStorage()->~SpatialDB();
-    // The entity map's storage goes with the member (~map); 0x00893A60 frees it
-    // here, after the spatial DB, because that is reverse declaration order.
+    // map's storage is released -- member destruction in reverse declaration
+    // order: `mExtraSelection`, then `mEntitySpatialDb`, then `mEntities`.
 
     if (gActiveWldSession == this) {
       gActiveWldSession = nullptr;
@@ -13799,7 +12783,7 @@ namespace moho
    */
   void CWldSession::SetCursorInfo(const MouseInfo& cursorInfo)
   {
-    AccessCursorInfo(*this) = cursorInfo;
+    CursorInfo() = cursorInfo;
   }
 
   /**
@@ -13843,7 +12827,7 @@ namespace moho
    */
   const MouseInfo& CWldSession::GetCursorInfo() const
   {
-    return AccessCursorInfo(*this);
+    return CursorInfo();
   }
 
   /**
@@ -13853,11 +12837,8 @@ namespace moho
    * so callers outside this TU (`sub_8281E0`'s recovered form in the
    * command-graph render pass) don't need their own copy.
    *
-   * `MouseInfo::mUnitHover` (the public struct) is declared as a raw
-   * `UserEntity*`, but the binary stores an intrusive weak-link slot there,
-   * not a live pointer - `CursorInfoRuntimeView::mUnitHover` already models
-   * it correctly as `UserEntityWeakLinkSlotRuntimeView`. Decode through that
-   * view rather than reading `MouseInfo::mUnitHover` directly.
+   * `MouseInfo::mUnitHover` is the intrusive `WeakPtr<UserEntity>` the binary
+   * stores there, so the decode is `MouseInfo::HoveredEntity()`.
    */
   UserEntity* CWldSession::GetHoveredUserEntity() const noexcept
   {
@@ -13866,19 +12847,14 @@ namespace moho
 
   /**
    * Not a distinct binary function - promotes the file-private
-   * `ResolveCommandGraphAnchorHistoryWorldPosition` (= FUN_0081CFD0) so
+   * `ResolveCommandIssueTargetPosition` (= FUN_0081CFD0) so
    * `UICommandGraph::DrawPositionNodeMesh` (a different TU) can resolve a
-   * command's fallback world-space anchor without its own copy of the
-   * `CommandGraphAnchorHistoryRuntimeView` reinterpret, which - like the
-   * event-slot view it shares every offset with - reads the whole
-   * `UserCommandIssueHelper` from its own base, not a sub-object.
+   * command's world-space anchor.
    */
   Wm3::Vector3f ResolveCommandGraphAnchorWorldPosition(UserCommandIssueHelper& helper) noexcept
   {
     Wm3::Vector3f position{};
-    (void)ResolveCommandGraphAnchorHistoryWorldPosition(
-      &position, reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(&helper)
-    );
+    (void)ResolveCommandIssueTargetPosition(&position, helper);
     return position;
   }
 
@@ -14044,15 +13020,9 @@ namespace moho
    * below as such (no fresh node has ever been linked to a *different*
    * helper for `UnlinkFromChain` to have real work to do).
    *
-   * The Attack/FormAttack anchor test reads its target-kind sample through
-   * `ResolveCommandGraphAnchorSampleFromHistory` (0x008B4080, already
-   * recovered) via the same whole-helper reinterpret
-   * `ResolveCommandGraphAnchorWorldPosition` above uses, and releases the
-   * sample's embedded weak ref through `UnlinkSelectionWeakOwnerRefAfterLeadingDword`
-   * (0x0081D010) - `CommandGraphAnchorSampleRuntimeView`'s
-   * `{mSampleKind, mWeakRef}` header is byte-identical to
-   * `SelectionWeakOwnerLinkNodeLane`'s `{mLeadingDword, mWeakRef}`, so the
-   * same cleanup lane applies.
+   * The Attack/FormAttack anchor test reads the kind of the helper's current
+   * `UserTarget` (`ResolveCommandIssueTarget`, 0x008B4080) and releases that
+   * transient target (`~UserTarget`, 0x0081D010) before testing it.
    */
   void AddCommandQueueToCommandGraph(UserEntity& entity, UICommandGraph& graph, UserCommandQueue* const queue)
   {
@@ -14177,12 +13147,10 @@ namespace moho
         switch (commandType) {
         case EUnitCommandType::UNITCOMMAND_Attack:
         case EUnitCommandType::UNITCOMMAND_FormAttack: {
-          CommandGraphAnchorSampleRuntimeView sample{};
-          (void)ResolveCommandGraphAnchorSampleFromHistory(
-            &sample, reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(helper)
-          );
-          (void)UnlinkSelectionWeakOwnerRefAfterLeadingDword(reinterpret_cast<SelectionWeakOwnerLinkNodeLane&>(sample));
-          if (sample.mSampleKind == 2) {
+          // The transient target is released at the end of this full
+          // expression, before the kind test, as the binary orders it.
+          const bool targetsGround = ResolveCommandIssueTarget(*helper).targetType == UserTargetType::Position;
+          if (targetsGround) {
             anchorNode = currentNode;
           }
           break;
@@ -14345,9 +13313,7 @@ namespace moho
    */
   SpatialDB<UserEntity>* CWldSession::GetEntitySpatialDbStorage()
   {
-    // The storage is still a sized byte lane because CWldSession sequences its
-    // set-up explicitly; this accessor is the one place it becomes typed.
-    return reinterpret_cast<SpatialDB<UserEntity>*>(mEntitySpatialDbStorage);
+    return &mEntitySpatialDb;
   }
 
   /**
@@ -14355,9 +13321,7 @@ namespace moho
    */
   const SpatialDB<UserEntity>* CWldSession::GetEntitySpatialDbStorage() const
   {
-    // The storage is still a sized byte lane because CWldSession sequences its
-    // set-up explicitly; this accessor is the one place it becomes typed.
-    return reinterpret_cast<const SpatialDB<UserEntity>*>(mEntitySpatialDbStorage);
+    return &mEntitySpatialDb;
   }
 
   /**
@@ -14365,12 +13329,7 @@ namespace moho
    */
   SSelectionSetUserEntity& CWldSession::ExtraSelectionView()
   {
-    constexpr std::size_t kExtraSelectionOffsetInStorage = 0x90;
-    static_assert(
-      offsetof(CWldSession, mEntitySpatialDbStorage) + kExtraSelectionOffsetInStorage == 0xE0,
-      "CWldSession::ExtraSelectionView offset must be 0xE0"
-    );
-    return *reinterpret_cast<SSelectionSetUserEntity*>(mEntitySpatialDbStorage + kExtraSelectionOffsetInStorage);
+    return mExtraSelection;
   }
 
   /**
@@ -14378,7 +13337,7 @@ namespace moho
    */
   const SSelectionSetUserEntity& CWldSession::ExtraSelectionView() const
   {
-    return const_cast<CWldSession*>(this)->ExtraSelectionView();
+    return mExtraSelection;
   }
 
   /**
@@ -14557,7 +13516,6 @@ namespace moho
       return;
     }
 
-    auto* const runtimeView = reinterpret_cast<CWldSessionOrphanRuntimeView*>(this);
     (void)mEntities.erase(static_cast<std::uint32_t>(entity->mParams.mEntityId));
 
     // The flag is what keeps the render side from treating the entity as live
@@ -14565,12 +13523,17 @@ namespace moho
     // the weak-set insert.
     entity->mMarkedForDeletion = 1;
 
-    SSelectionSetUserEntity::AddResult addResult{};
-    (void)SSelectionSetUserEntity::Add(&addResult, &runtimeView->mPendingOrphanSet, entity);
+    WeakEntitySetUserEntity::AddResult addResult{};
+    (void)WeakEntitySetUserEntity::Add(&addResult, &mOrphans, entity);
   }
 
   /**
    * Address: 0x00894210 (FUN_00894210, ?AddToVizUpdate@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+   *
+   * What it does:
+   * `WeakSet<UserEntity>::Add` (0x007AE1B0) of `entity` into the visibility
+   * set at `this+0x438` -- the same insert `OrphanEntity` runs on the orphan
+   * set.
    */
   void CWldSession::AddToVizUpdate(UserEntity* const entity)
   {
@@ -14578,16 +13541,17 @@ namespace moho
       return;
     }
 
-    VizUpdateTree* const tree = GetVizUpdateTree(this);
-    if (!tree || !tree->head) {
-      return;
-    }
-
-    (void)InsertVizUpdateNode(tree, entity);
+    WeakEntitySetUserEntity::AddResult added{};
+    (void)WeakEntitySetUserEntity::Add(&added, &mVizUpdates, entity);
   }
 
   /**
    * Address: 0x00894230 (FUN_00894230, ?RemoveFromVizUpdate@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+   *
+   * What it does:
+   * Finds `entity` in the visibility set under the owner-link guard
+   * (0x00867780) and, when present, erases that node (0x0066A550) and prunes
+   * forward from the successor (0x0066A330) -- `set.erase(set.find(entity))`.
    */
   void CWldSession::RemoveFromVizUpdate(UserEntity* const entity)
   {
@@ -14595,17 +13559,14 @@ namespace moho
       return;
     }
 
-    VizUpdateTree* const tree = GetVizUpdateTree(this);
-    if (!tree || !tree->head) {
+    WeakEntitySetUserEntity::FindResult found{};
+    (void)FindSelectionNodeByEntityGuarded(&found, &mVizUpdates, entity);
+    if (found.mRes == mVizUpdates.mHead) {
       return;
     }
 
-    VizUpdateNode* const node = FindVizUpdateNode(tree, reinterpret_cast<std::uintptr_t>(entity));
-    if (!node || node == tree->head) {
-      return;
-    }
-
-    EraseVizUpdateNode(tree, node);
+    SSelectionNodeUserEntity* next = EraseSelectionNodeAndAdvance(mVizUpdates, found.mRes);
+    (void)SSelectionSetUserEntity::find(&mVizUpdates, next, &next);
   }
 
   /**
@@ -15062,14 +14023,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x008955F2..0x00895617 / 0x0089564A..0x00895667 (inside FUN_00894530)
-     *
-     * What it does:
-     * Opens a pruning cursor on one weak-entity set. `find` drops entries whose
-     * owner died since the last beat instead of handing them out, so the first
-     * position has to come through it rather than straight off `mHead->mLeft`.
-     */
-    /**
      * Address: 0x00895097..0x0089511F and three siblings (inside FUN_00894530)
      *
      * What it does:
@@ -15077,13 +14030,11 @@ namespace moho
      * raw pointer is copied unconditionally; the control block is only swapped
      * when it actually changes, taking the new reference before dropping the
      * old one so a self-assignment cannot free what it is about to keep.
+     *
+     * (Stranded note: the helper this documented is no longer in this file.
+     * The pruning cursor that sat under it, 0x008955F2..0x00895667, is now
+     * `WeakEntitySetUserEntity::begin()` over `mOrphans`/`mVizUpdates`.)
      */
-    [[nodiscard]] SSelectionSetUserEntity::Index OpenLiveWeakSetCursor(SSelectionSetUserEntity& set)
-    {
-      SSelectionNodeUserEntity* firstLive = nullptr;
-      (void)SSelectionSetUserEntity::find(&set, set.mHead->mLeft, &firstLive);
-      return SSelectionSetUserEntity::Index{&set, firstLive};
-    }
   } // namespace
 
   /**
@@ -15449,25 +14400,22 @@ namespace moho
     // before it calls out, because `OrphanUpdate` can unlink the entity it was
     // just handed; the visibility walk steps after, because `UpdateVisibility`
     // leaves the set alone.
-    {
-      auto* const runtimeView = reinterpret_cast<CWldSessionOrphanRuntimeView*>(this);
-
-      SSelectionSetUserEntity& orphanSet = runtimeView->mPendingOrphanSet;
-      for (auto cursor = OpenLiveWeakSetCursor(orphanSet); cursor.mNode != orphanSet.mHead;) {
-        UserEntity* const entity = DecodeSelectionIndexOwner(&cursor);
-        (void)cursor.Next();
-        if (entity != nullptr) {
-          entity->OrphanUpdate();
-        }
+    //
+    // 0x008955F2..0x00895641: `find` from `mOrphans.mHead->mLeft`, then per
+    // entry decode (0x0066A300), advance (0x007AE7E0) and `OrphanUpdate`.
+    // 0x0089564A..0x008956D8: the same walk over `mVizUpdates`, with the
+    // successor step inlined after the `UpdateVisibility` call.
+    for (auto orphan = mOrphans.begin(); orphan != mOrphans.end();) {
+      UserEntity* const entity = *orphan;
+      ++orphan;
+      if (entity != nullptr) {
+        entity->OrphanUpdate();
       }
+    }
 
-      SSelectionSetUserEntity& vizSet =
-        reinterpret_cast<CWldSessionVizUpdateRuntimeView*>(this)->mVizUpdateSet;
-      for (auto cursor = OpenLiveWeakSetCursor(vizSet); cursor.mNode != vizSet.mHead;) {
-        if (UserEntity* const entity = DecodeSelectionIndexOwner(&cursor); entity != nullptr) {
-          entity->UpdateVisibility();
-        }
-        (void)cursor.Next();
+    for (UserEntity* const entity : mVizUpdates) {
+      if (entity != nullptr) {
+        entity->UpdateVisibility();
       }
     }
 
@@ -15510,7 +14458,7 @@ namespace moho
       mTimeSinceLastTick += WLD_GetSimRate() * deltaSeconds * 10.0f;
     }
 
-    CFormation::UpdateOrientation(AccessCursorInfo(*this).mMouseWorldPos, mCurFormation);
+    CFormation::UpdateOrientation(CursorInfo().mMouseWorldPos, mCurFormation);
 
     const std::int32_t tickAtFrameStart = mGameTick;
     const std::int32_t targetTick = mGameTick + static_cast<std::int32_t>(std::floor(mTimeSinceLastTick));
@@ -16081,8 +15029,7 @@ namespace moho
    * What it does:
    * Header-visible bridge over `IsCandidateExcludedByCachedRelation` (the
    * anonymous-namespace body earlier in this file), so callers outside this
-   * translation unit can run the command-graph relation gate without the
-   * anonymous runtime-view type leaking into a header.
+   * translation unit can run the command-graph participant gate.
    *
    * Invocation: `Moho::CUIWorldView::HandleEvent` (0x008704B0) calls it at
    * 0x008706C6 while scanning the selection for a participant of the hovered
@@ -16093,8 +15040,7 @@ namespace moho
     UserUnit* const candidateUnit
   ) noexcept
   {
-    auto& anchorHistory = reinterpret_cast<CommandGraphAnchorHistoryRuntimeView&>(command);
-    return IsCandidateExcludedByCachedRelation(anchorHistory, candidateUnit);
+    return IsCandidateExcludedByCachedRelation(command, candidateUnit);
   }
 
   /**
@@ -21232,14 +20178,20 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
   UserEntity* const hoverEntity = mouseInfo->HoveredEntity();
 
   if (hoverEntity == nullptr) {
-    // No hover: consult the pending right-click command-manager helper. An
-    // attack/form-attack pending command with an attack-capable selection
-    // resolves to an Order+Attack; otherwise fall through to the move tail.
-    RightClickCommandIssueHelperView* const helper =
-      FindRightClickCommandIssueHelper(wldSession, static_cast<std::uint32_t>(mouseInfo->mIsDragger));
+    // No hover: consult the command the cursor is dragging. An attack/form-
+    // attack command with an attack-capable selection resolves to an
+    // Order+Attack; otherwise fall through to the move tail.
+    //
+    // 0x0081F513..0x0081F565: `mCommandManager->mCommands.find(mIsDragger)`
+    // (0x008B6160), then the command type through `sub_8B4140` -- called
+    // twice, once per comparison -- so a pending local SetCommandType edit
+    // counts, not just the replicated `mVariableData.mCmdType`.
+    CommandManager* const commandManager = wldSession->mCommandManager;
+    UserCommandIssueHelper* const helper =
+      commandManager != nullptr ? FindCommandIssueHelper(*commandManager, mouseInfo->mIsDragger) : nullptr;
     if (helper != nullptr
-        && (helper->commandType == EUnitCommandType::UNITCOMMAND_Attack
-            || helper->commandType == EUnitCommandType::UNITCOMMAND_FormAttack)
+        && (ResolveCommandIssueHelperCommandType(*helper) == EUnitCommandType::UNITCOMMAND_Attack
+            || ResolveCommandIssueHelperCommandType(*helper) == EUnitCommandType::UNITCOMMAND_FormAttack)
         && (selectionCommandCaps & RULEUCC_Attack) != 0) {
       commandModeData.mMode = COMMOD_Order;
       commandModeData.mCommandCaps = RULEUCC_Attack;

@@ -205,70 +205,49 @@ namespace
     }
   }
 
-  struct RangeDynamicVertexAllocatorVTable
-  {
-    std::uint8_t reserved_00[0x08];
-    int(__thiscall* lockRange)(void* self, int offsetBytes, unsigned int sizeBytes, int lockMode); // +0x08
-  };
-
-  struct RangeDynamicVertexAllocatorRuntime
-  {
-    RangeDynamicVertexAllocatorVTable* vtable; // +0x00
-  };
-
-  struct RangeDynamicVertexReservationStateRuntime
-  {
-    std::uint8_t reserved_00[0x40];
-    std::uint32_t activeVertexCount;                 // +0x40
-    RangeDynamicVertexAllocatorRuntime* allocator;   // +0x44
-  };
-
-  static_assert(
-    offsetof(RangeDynamicVertexReservationStateRuntime, activeVertexCount) == 0x40,
-    "RangeDynamicVertexReservationStateRuntime::activeVertexCount offset must be 0x40"
-  );
-  static_assert(
-    offsetof(RangeDynamicVertexReservationStateRuntime, allocator) == 0x44,
-    "RangeDynamicVertexReservationStateRuntime::allocator offset must be 0x44"
-  );
-
   /**
    * Address: 0x007EEDC0 (FUN_007EEDC0)
    *
+   * IDA signature:
+   * bool __usercall sub_7EEDC0@<al>(unsigned int requestedVertexCount@<eax>,
+   *     void **outVertexWriteBase@<ebx>, Moho::RangeRenderer *renderer@<edi>,
+   *     unsigned int *outPreviousVertexCount);
+   *
    * What it does:
    * Reserves one contiguous dynamic ring-vertex slice (16-byte stride) inside
-   * a 1000-vertex arena, either by appending after current occupancy or by
-   * resetting/relocking the arena when append would overflow.
+   * the renderer's 1000-vertex dynamic vertex buffer, either by appending
+   * after `mDynamicRingVertexCount` (`Lock` with NoOverwrite) or by restarting
+   * the arena (`Lock` with Discard) when the append would overflow. The binary
+   * reads `[renderer+0x40]` (`mDynamicRingVertexCount`) and dispatches slot 2
+   * (`Lock`) through `[renderer+0x44]` (`mDynamicVertexBuffer`).
    */
-  bool ReserveDynamicRingVertexSliceRuntime(
+  bool ReserveDynamicRingVertexSlice(
     const std::uint32_t requestedVertexCount,
-    int* const outVertexWriteBase,
-    RangeDynamicVertexReservationStateRuntime* const state,
+    void** const outVertexWriteBase,
+    moho::RangeRenderer& rangeRenderer,
     std::uint32_t* const outPreviousVertexCount
   ) noexcept
   {
-    if (outVertexWriteBase == nullptr || state == nullptr || state->allocator == nullptr || state->allocator->vtable == nullptr ||
-        state->allocator->vtable->lockRange == nullptr) {
+    gpg::gal::VertexBuffer* const vertexBuffer = rangeRenderer.mDynamicVertexBuffer.get();
+    if (outVertexWriteBase == nullptr || vertexBuffer == nullptr) {
       return false;
     }
 
     constexpr std::uint32_t kDynamicVertexLimit = 1000u;
     constexpr std::uint32_t kDynamicVertexStrideBytes = 16u;
-    constexpr int kLockModeDiscard = 1;
-    constexpr int kLockModeNoOverwrite = 4;
 
-    const std::uint32_t used = state->activeVertexCount;
+    const std::uint32_t used = rangeRenderer.mDynamicRingVertexCount;
     if (used + requestedVertexCount < kDynamicVertexLimit) {
-      const int writeBase = state->allocator->vtable->lockRange(
-        state->allocator, static_cast<int>(used * kDynamicVertexStrideBytes), requestedVertexCount * kDynamicVertexStrideBytes,
-        kLockModeNoOverwrite
+      void* const writeBase = vertexBuffer->Lock(
+        used * kDynamicVertexStrideBytes, requestedVertexCount * kDynamicVertexStrideBytes,
+        gpg::gal::MohoD3DLockFlags::NoOverwrite
       );
       *outVertexWriteBase = writeBase;
-      if (writeBase != 0) {
+      if (writeBase != nullptr) {
         if (outPreviousVertexCount != nullptr) {
-          *outPreviousVertexCount = used;
+          *outPreviousVertexCount = rangeRenderer.mDynamicRingVertexCount;
         }
-        state->activeVertexCount = used + requestedVertexCount;
+        rangeRenderer.mDynamicRingVertexCount += requestedVertexCount;
         return true;
       }
       return false;
@@ -278,16 +257,15 @@ namespace
       return false;
     }
 
-    state->activeVertexCount = requestedVertexCount;
+    rangeRenderer.mDynamicRingVertexCount = requestedVertexCount;
     if (outPreviousVertexCount != nullptr) {
       *outPreviousVertexCount = 0u;
     }
 
-    const int writeBase = state->allocator->vtable->lockRange(
-      state->allocator, 0, requestedVertexCount * kDynamicVertexStrideBytes, kLockModeDiscard
-    );
+    void* const writeBase =
+      vertexBuffer->Lock(0u, requestedVertexCount * kDynamicVertexStrideBytes, gpg::gal::MohoD3DLockFlags::Discard);
     *outVertexWriteBase = writeBase;
-    return writeBase != 0;
+    return writeBase != nullptr;
   }
 
   constexpr std::uint32_t kDynamicVertexBatchLimit = 1000u;
@@ -336,7 +314,7 @@ namespace
    * variable is fetched but never rewritten here - the device already carries
    * it), binds the renderer's static ring-template vertex/index buffers on
    * stream 0 and its dynamic per-batch vertex buffer on stream 1 (offset by
-   * `dynamicStreamStartVertex`, the vertex index `ReserveDynamicRingVertexSliceRuntime`
+   * `dynamicStreamStartVertex`, the vertex index `ReserveDynamicRingVertexSlice`
    * returned for this batch), and issues one indexed draw per technique pass.
    */
   void DrawRangeRingBatch(
@@ -421,7 +399,7 @@ namespace
    * - expands every source entry into 1 fill payload + 2 edge payloads
    *   (`BuildRingPayloadBuffers`)
    * - draws the fill payloads in batches of up to 1000 dynamic vertices, each
-   *   batch locked via `ReserveDynamicRingVertexSliceRuntime` and drawn via
+   *   batch locked via `ReserveDynamicRingVertexSlice` and drawn via
    *   `DrawRangeRingBatch`, then runs the renderer's "RangeMask" frame pass
    * - draws the edge payloads (2x the fill count, inner+outer edge per source
    *   entry) the same way, then runs "RangeFill" (gated on `range_Fill`) and
@@ -478,14 +456,6 @@ namespace
     RangeRingGeometryBuildState buildState{innerThicknessOffset, outerThicknessOffset, &fillPayloads, &edgePayloads};
     BuildRingPayloadBuffers(buildState, ringEntries.begin(), ringEntries.end());
 
-    // `ReserveDynamicRingVertexSliceRuntime`'s state parameter is the same
-    // `{activeVertexCount@+0x40, allocator@+0x44}` lane the binary reads
-    // straight out of the `RangeRenderer` object at those exact offsets
-    // (`RangeRenderer::mDynamicRingVertexCount`/`mDynamicVertexBuffer` per the
-    // header's own static_asserts) - this is that function's own documented
-    // aliasing contract, not new offset magic introduced here.
-    auto* const dynamicState = reinterpret_cast<RangeDynamicVertexReservationStateRuntime*>(&rangeRenderer);
-
     const auto drawBatched = [&](const RangeExtractionPayloadVector& payloads) {
       const std::uint32_t totalCount = static_cast<std::uint32_t>(payloads.size());
       std::uint32_t drawn = 0u;
@@ -493,13 +463,10 @@ namespace
         const std::uint32_t remaining = totalCount - drawn;
         const std::uint32_t batchCount = remaining < kDynamicVertexBatchLimit ? remaining : kDynamicVertexBatchLimit;
 
-        int lockedWritePtr = 0;
+        void* lockedWritePtr = nullptr;
         std::uint32_t previousVertexCount = 0u;
-        if (ReserveDynamicRingVertexSliceRuntime(batchCount, &lockedWritePtr, dynamicState, &previousVertexCount)) {
-          std::memcpy(
-            reinterpret_cast<void*>(lockedWritePtr), payloads.begin() + drawn,
-            sizeof(moho::SRangeExtractionPayload) * batchCount
-          );
+        if (ReserveDynamicRingVertexSlice(batchCount, &lockedWritePtr, rangeRenderer, &previousVertexCount)) {
+          std::memcpy(lockedWritePtr, payloads.begin() + drawn, sizeof(moho::SRangeExtractionPayload) * batchCount);
           rangeRenderer.mDynamicVertexBuffer->Unlock();
           DrawRangeRingBatch(cameraView, rangeRenderer, batchCount, static_cast<int>(previousVertexCount));
         }

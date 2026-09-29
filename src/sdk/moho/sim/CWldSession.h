@@ -7,6 +7,7 @@
 #include "CArmyImpl.h"
 #include "gpg/core/containers/IntrusiveLink.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/mesh/SpatialDb.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/List.h"
@@ -913,6 +914,7 @@ namespace moho
      * `GetLeftMouseButtonAction`.
      */
     [[nodiscard]] MouseInfo& CursorInfo() noexcept;
+    [[nodiscard]] const MouseInfo& CursorInfo() const noexcept;
 
     /**
      * Address: 0x00894140 (FUN_00894140, ?AddEntity@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
@@ -1453,8 +1455,7 @@ namespace moho
      * Address context: 0x00896870 (`ClearExtraSelectList`) field lane.
      *
      * What it does:
-     * Returns typed view for the extra-selection weak-set embedded inside the
-     * spatial-db storage block.
+     * Returns the extra-selection weak-set, `mExtraSelection` (+0xE0).
      */
     [[nodiscard]] SSelectionSetUserEntity& ExtraSelectionView();
     [[nodiscard]] const SSelectionSetUserEntity& ExtraSelectionView() const;
@@ -1491,7 +1492,19 @@ namespace moho
      * head to null instead of buying one.
      */
     msvc8::map<std::uint32_t, UserEntity*> mEntities;       // 0x0044
-    std::uint8_t mEntitySpatialDbStorage[0xA0];             // 0x0050
+    /// The session's entity spatial database. The constructor builds it right
+    /// after the entity map (0x00501D80 on `this+0x50`) and the destructor
+    /// tears it down after the extra-selection set and before the map
+    /// (0x00501E50) -- member order. Every `UserEntity` registers against it
+    /// (`SpatialDBEntry::Register`, 0x00501A80, with `CWldSession + 0x50`).
+    /// It was 0xA0 raw bytes holding this and the extra-selection set, with
+    /// the database placement-constructed in and the set reached at a
+    /// hard-coded +0x90 -- both x86 sizes.
+    SpatialDB<UserEntity> mEntitySpatialDb;                 // 0x0050
+    /// The extra-selection set (`GetExtraSelectList` / `ClearExtraSelectList`,
+    /// the units picked out of a transport's cargo panel). Its head sentinel is
+    /// built inline at 0x00893214..0x0089323D, right after the spatial db.
+    SSelectionSetUserEntity mExtraSelection;                // 0x00E0
     /**
      * The active build templates, a `gpg::fastvector_n<SBuildTemplateInfo, 16>`
      * -- confirmed by the mangled names of `GetActiveBuildTemplate` and
@@ -1531,12 +1544,19 @@ namespace moho
     /// The beat-scoped debug canvas; `DoBeat` re-seats it from the packet.
     boost::SharedPtrRaw<CDebugCanvas> mBeatDebugCanvas;     // 0x041C
     boost::SharedPtrRaw<CSimResources> mSimResources;       // 0x0424
-    void* mAuxUpdateRoot;                                   // 0x042C
-    void* mAuxUpdateHead;                                   // 0x0430
-    std::uint32_t mAuxUpdateSize;                           // 0x0434
-    void* mVizUpdateRoot;                                   // 0x0438
-    void* mVizUpdateHead;                                   // 0x043C
-    std::uint32_t mVizUpdateSize;                           // 0x0440
+    /// Entities the sim has destroyed that are still playing out their death
+    /// on the user side. `OrphanEntity` (0x008941FA) and `DoBeat`'s entity
+    /// removal (0x00894C70) both `WeakSet<UserEntity>::Add` (0x007AE1B0) into
+    /// `this+0x42C`; `DoBeat` drains it through `OrphanUpdate` (0x008955F2..).
+    /// A bare 12-byte `WeakSet<UserEntity>`: the visibility set starts right
+    /// after it, and the destructor tears the two down as members, 0x438 first
+    /// (0x00893D64) then 0x42C.
+    WeakEntitySetUserEntity mOrphans;                       // 0x042C
+    /// Entities whose visibility must be re-evaluated on the next beat:
+    /// `AddToVizUpdate` adds (0x00894215, the same `Add` as above),
+    /// `RemoveFromVizUpdate` finds and erases (0x00894238), `DoBeat` calls
+    /// `UpdateVisibility` on every live entry (0x0089564A..).
+    WeakEntitySetUserEntity mVizUpdates;                    // 0x0438
     LuaPlus::LuaObject mScenarioInfo;                       // 0x0444
     std::int32_t mGameTick;                                 // 0x0458
     std::int32_t mLastBeatWasTick;                          // 0x045C
@@ -1590,9 +1610,16 @@ namespace moho
     /// 0x4B0 + sizeof(MouseInfo) == 0x4D4. Use `CursorInfo()` below rather
     /// than these lanes; folding them into a real member is a separate pass
     /// because 31 call sites still name them individually.
-    std::uint8_t mCursorWorldState[4];                      // 0x04B0
+    ///
+    /// Until then the lanes spell `MouseInfo`'s members one for one, with the
+    /// same types in the same order and `MouseInfo`'s alignment on the first,
+    /// so `CursorInfo()`'s view is the same object on every ABI, not just on
+    /// x86 (a `char[8]` stood in for the weak link and was half its x64 size).
+    /// The destructor unlinks the hovered-unit weak link as a member, as
+    /// 0x00893C7D does (`lea ecx, [ebp+4C0h]`).
+    alignas(MouseInfo) std::uint8_t mCursorWorldState[4];   // 0x04B0
     Wm3::Vector3f CursorWorldPos;                           // 0x04B4
-    char pad_04C0[8];                                       // 0x04C0
+    WeakPtr<UserEntity> mCursorUnitHover;                   // 0x04C0
     int32_t HighlightCommandId;                             // 0x04C8
     Wm3::Vector2f CursorScreenPos;                          // 0x04CC
     bool IsCheatsEnabled;                                   // 0x04D4
@@ -1618,19 +1645,16 @@ namespace moho
   static_assert(offsetof(CWldSession, mLaunchInfo) == 0x20, "CWldSession::mLaunchInfo offset must be 0x20");
   static_assert(offsetof(CWldSession, mEntities) == 0x44, "CWldSession::mEntities offset must be 0x44");
   static_assert(sizeof(msvc8::map<std::uint32_t, UserEntity*>) == 0x0C, "entity map size must be 0x0C");
-  static_assert(
-    offsetof(CWldSession, mEntitySpatialDbStorage) == 0x50, "CWldSession::mEntitySpatialDbStorage offset must be 0x50"
-  );
-  static_assert(
-    (offsetof(CWldSession, mEntitySpatialDbStorage) + 0x90) == 0xE0,
-    "CWldSession extra-selection view base must remain at 0xE0"
-  );
+  static_assert(offsetof(CWldSession, mEntitySpatialDb) == 0x50, "CWldSession::mEntitySpatialDb offset must be 0x50");
+  static_assert(sizeof(SpatialDB<UserEntity>) == 0x90, "SpatialDB<UserEntity> size must be 0x90");
+  static_assert(offsetof(CWldSession, mExtraSelection) == 0xE0, "CWldSession::mExtraSelection offset must be 0xE0");
   static_assert(offsetof(CWldSession, mBuildTemplates) == 0xF0, "CWldSession::mBuildTemplates offset must be 0xF0");
   static_assert(sizeof(CWldSession::mBuildTemplates) == 0x2D0, "CWldSession::mBuildTemplates size must be 0x2D0");
   static_assert(
     offsetof(CWldSession, mBuildTemplateArg1) == 0x3C0, "CWldSession::mBuildTemplateArg1 offset must be 0x3C0"
   );
-  static_assert(offsetof(CWldSession, mVizUpdateRoot) == 0x438, "CWldSession::mVizUpdateRoot offset must be 0x438");
+  static_assert(offsetof(CWldSession, mOrphans) == 0x42C, "CWldSession::mOrphans offset must be 0x42C");
+  static_assert(offsetof(CWldSession, mVizUpdates) == 0x438, "CWldSession::mVizUpdates offset must be 0x438");
   static_assert(offsetof(CWldSession, mScenarioInfo) == 0x444, "CWldSession::mScenarioInfo offset must be 0x444");
   static_assert(offsetof(CWldSession, mGameTick) == 0x458, "CWldSession::mGameTick offset must be 0x458");
   static_assert(
@@ -1654,6 +1678,12 @@ namespace moho
     offsetof(CWldSession, mCursorWorldState) == 0x4B0, "CWldSession::mCursorWorldState offset must be 0x4B0"
   );
   static_assert(offsetof(CWldSession, CursorWorldPos) == 0x4B4, "CWldSession::CursorWorldPos offset must be 0x4B4");
+  static_assert(
+    offsetof(CWldSession, mCursorUnitHover) == 0x4C0, "CWldSession::mCursorUnitHover offset must be 0x4C0"
+  );
+  static_assert(
+    offsetof(CWldSession, HighlightCommandId) == 0x4C8, "CWldSession::HighlightCommandId offset must be 0x4C8"
+  );
   static_assert(offsetof(CWldSession, CursorScreenPos) == 0x4CC, "CWldSession::CursorScreenPos offset must be 0x4CC");
   static_assert(
     offsetof(CWldSession, mShowInvalidBuildPlacementPreview) == 0x4D5,
@@ -1874,16 +1904,12 @@ namespace moho
    * char __cdecl sub_8B4300(int commandIssueHelper, Moho::UserUnit *candidateUnit);
    *
    * What it does:
-   * Public entry point for the command-graph relation gate implemented as
-   * `IsCandidateExcludedByCachedRelation` in CWldSession.cpp: reports whether
-   * `candidateUnit` is excluded by the newest type-0/type-3 entry in
-   * `command`'s cached command-issue event ring. Returning `true` means "this
-   * unit is not a participant of that command".
-   *
-   * The implementation takes an anonymous-namespace runtime view of the
-   * helper; this bridge is the header-visible form over the public
-   * `UserCommandIssueHelper` type, following the same pattern
-   * `ResolveCommandIssueHelperCommandType` (UserUnit.h) uses.
+   * Public entry point for the command-graph participant gate implemented as
+   * `IsCandidateExcludedByCachedRelation` in CWldSession.cpp: the newest
+   * unconfirmed `SelectUnit`/`DeselectUnit` edit in `command.mLocalQueue`
+   * that lists `candidateUnit` decides (`true` / `false`); with none, whether
+   * the unit's entity id is in `command.mVariableData.mEntIds`. `true` means
+   * the unit belongs to that command.
    *
    * `Moho::CUIWorldView::HandleEvent` calls it at 0x008706C6 to decide which of
    * the two command-graph hover banners to raise.
@@ -2013,7 +2039,7 @@ namespace moho
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker: resolves the world
    * position seeded from one unit's last-queued command-graph anchor history.
-   * Wraps the CWldSession.cpp-local `ResolveCommandGraphAnchorHistoryWorldPosition`
+   * Wraps the CWldSession.cpp-local `ResolveCommandIssueTargetPosition`
    * (FUN_0081CFD0).
    */
   [[nodiscard]] Wm3::Vector3f ResolveLastQueuedCommandAnchorPosition(const QueuedUserCommandRecord* record);
@@ -2431,11 +2457,10 @@ namespace moho
 
   /**
    * Not a distinct binary function - promotes the file-private
-   * `ResolveCommandGraphAnchorHistoryWorldPosition` (= FUN_0081CFD0) for
-   * cross-TU callers (the command-graph render pass in
-   * `CUIWorldView.cpp`). Resolves one command's fallback world-space
-   * anchor: the latest build-position sample in its command-graph history,
-   * or the history's cached default sample when none exists.
+   * `ResolveCommandIssueTargetPosition` (= FUN_0081CFD0) for cross-TU
+   * callers (the command-graph render pass in `CUIWorldView.cpp`). Resolves
+   * the world position of one command's current target: its newest
+   * unconfirmed `SetTarget` edit, else its replicated `mTarget1`.
    */
   [[nodiscard]] Wm3::Vector3f ResolveCommandGraphAnchorWorldPosition(UserCommandIssueHelper& helper) noexcept;
 

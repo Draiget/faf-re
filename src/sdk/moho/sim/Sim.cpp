@@ -2914,8 +2914,8 @@ namespace
       return false;
     }
 
-    const auto& lhsCategories = reinterpret_cast<const EntityCategorySet&>(lhsBlueprint->Economy.CategoryCache);
-    const auto& rhsCategories = reinterpret_cast<const EntityCategorySet&>(rhsBlueprint->Economy.CategoryCache);
+    const EntityCategorySet& lhsCategories = lhsBlueprint->Economy.CategoryCache;
+    const EntityCategorySet& rhsCategories = rhsBlueprint->Economy.CategoryCache;
     const BVIntSet& lhsBits = CategoryWordRangeAsBVIntSet(lhsCategories);
     const BVIntSet& rhsBits = CategoryWordRangeAsBVIntSet(rhsCategories);
 

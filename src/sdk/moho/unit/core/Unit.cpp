@@ -1773,11 +1773,6 @@ namespace
     return statItem->AddFloat(deltaValue);
   }
 
-  [[nodiscard]] const ArmyBlueprintNameView* ToArmyBlueprintNameView(const RUnitBlueprint* const blueprint) noexcept
-  {
-    return reinterpret_cast<const ArmyBlueprintNameView*>(blueprint);
-  }
-
   void IncrementArmyBlueprintFloatStat(
     CArmyStats* const armyStats,
     const char* const statPath,
@@ -1789,7 +1784,7 @@ namespace
       return;
     }
 
-    (void)armyStats->AddBlueprintStatDelta(statPath, ToArmyBlueprintNameView(blueprint), delta);
+    (void)armyStats->AddBlueprintStatDelta(statPath, reinterpret_cast<const RBlueprint*>(blueprint), delta);
   }
 
   void IncrementArmyIntStatByName(CArmyStats* const armyStats, const char* const statPath)
@@ -1988,56 +1983,9 @@ namespace
    * instantiation already documented there.
    */
 
-  struct UnitAttributesBuildRestrictionRuntimeView
-  {
-    std::uint8_t mUnresolved00[0x08];
-    EntityCategorySet mBuildRestrictionCategorySet; // +0x08
-  };
-  static_assert(
-    offsetof(UnitAttributesBuildRestrictionRuntimeView, mBuildRestrictionCategorySet) == 0x08,
-    "UnitAttributesBuildRestrictionRuntimeView::mBuildRestrictionCategorySet offset must be 0x08"
-  );
-  static_assert(sizeof(UnitAttributesBuildRestrictionRuntimeView) == 0x30, "UnitAttributes view size must be 0x30");
-
-  struct CArmyBuildCategoryFilterRuntimeView
-  {
-    std::uint8_t mUnresolved00[0x198];
-    EntityCategorySet mBuildCategoryFilterSet; // +0x198
-  };
-  static_assert(
-    offsetof(CArmyBuildCategoryFilterRuntimeView, mBuildCategoryFilterSet) == 0x198,
-    "CArmyBuildCategoryFilterRuntimeView::mBuildCategoryFilterSet offset must be 0x198"
-  );
-
-  // RUnitBlueprintEconomyCategoryCache is a flat-field view of the same 0x28
-  // BVSet payload that backs EntityCategorySet. Cross-check the binary
-  // offsets via the canonical BVSet field path so the duplicate flat-view
-  // type stays in lockstep with the canonical BVSet layout.
-  static_assert(
-    sizeof(RUnitBlueprintEconomyCategoryCache) == sizeof(EntityCategorySet),
-    "RUnitBlueprintEconomyCategoryCache layout must match EntityCategorySet size"
-  );
-  static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, RuntimeWord08)
-      == offsetof(EntityCategorySet, mBits) + offsetof(BVIntSet, mFirstWordIndex),
-    "RUnitBlueprintEconomyCategoryCache::RuntimeWord08 offset must match BVSet::mBits.mFirstWordIndex"
-  );
-
-  [[nodiscard]] const EntityCategorySet&
-  AsCategoryWordRange(const RUnitBlueprintEconomyCategoryCache& categoryCache) noexcept
-  {
-    return reinterpret_cast<const EntityCategorySet&>(categoryCache);
-  }
-
   [[nodiscard]] BVIntSet& AsCategoryWordBitset(EntityCategorySet& range) noexcept
   {
     return range.mBits;
-  }
-
-  [[nodiscard]] EntityCategorySet& UnitBuildRestrictionCategoryWords(Unit& unit) noexcept
-  {
-    auto& runtimeView = reinterpret_cast<UnitAttributesBuildRestrictionRuntimeView&>(unit.GetAttributes());
-    return runtimeView.mBuildRestrictionCategorySet;
   }
 
   void ResetCategoryWordRange(EntityCategorySet& range) noexcept
@@ -11608,11 +11556,11 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   // 3) Platoon membership transfer.
   if (CArmyImpl* const army = source->ArmyRef) {
     ESquadClass squadClass{};
-    CPlatoon* const destPlatoon = army->GetPlatoonFor(reinterpret_cast<int>(dest), &squadClass);
+    CPlatoon* const destPlatoon = army->GetPlatoonFor(dest, &squadClass);
     if (destPlatoon != nullptr) {
       destPlatoon->RemoveUnit(dest);
     }
-    CPlatoon* const sourcePlatoon = army->GetPlatoonFor(reinterpret_cast<int>(source), &squadClass);
+    CPlatoon* const sourcePlatoon = army->GetPlatoonFor(source, &squadClass);
     if (sourcePlatoon != nullptr) {
       sourcePlatoon->RemoveUnit(source);
       sourcePlatoon->AppendUnitToSquad(squadClass, dest);
@@ -14098,11 +14046,11 @@ void Unit::SetPoses(
  */
 bool Unit::CanBuild(const RUnitBlueprint* const blueprint) const
 {
-  const auto& armyBuildCategories =
-    reinterpret_cast<const CArmyBuildCategoryFilterRuntimeView&>(*ArmyRef).mBuildCategoryFilterSet;
-  const EntityCategorySet& unitBlueprintBuildCategories = AsCategoryWordRange(GetBlueprint()->Economy.CategoryCache);
-  const auto& unitBuildRestrictions = reinterpret_cast<const UnitAttributesBuildRestrictionRuntimeView&>(GetAttributes())
-                                        .mBuildRestrictionCategorySet;
+  // CArmyImpl +0x198 on x86: the IArmy payload at +0x08, `mVarDat` at +0x80,
+  // `mCategoryFilterSet` at +0x110.
+  const EntityCategorySet& armyBuildCategories = ArmyRef->mVarDat.mCategoryFilterSet;
+  const EntityCategorySet& unitBlueprintBuildCategories = GetBlueprint()->Economy.CategoryCache;
+  const EntityCategorySet& unitBuildRestrictions = GetAttributes().restrictionCategory;
 
   const std::uint32_t categoryBitIndex = blueprint->mCategoryBitIndex;
   return armyBuildCategories.ContainsBit(categoryBitIndex) &&
@@ -14593,18 +14541,7 @@ Wm3::Vec3f* Unit::PredictAheadBomb(Wm3::Vec3f* const out, const float precision)
     return out;
   }
 
-  struct EntityPhysBodyRuntimeView
-  {
-    std::uint8_t pad_0000_01F4[0x1F4];
-    SPhysBody* mPhysBody; // +0x1F4
-  };
-  static_assert(
-    offsetof(EntityPhysBodyRuntimeView, mPhysBody) == 0x1F4,
-    "EntityPhysBodyRuntimeView::mPhysBody offset must be 0x1F4"
-  );
-
-  const auto& entityView = static_cast<const Entity&>(*this);
-  SPhysBody* const physBody = reinterpret_cast<const EntityPhysBodyRuntimeView&>(entityView).mPhysBody;
+  SPhysBody* const physBody = Entity::mPhysBody;
   if (physBody == nullptr) {
     *out = predicted;
     return out;
@@ -16647,7 +16584,7 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
 
     ESquadClass squadClass = ESquadClass::Unassigned;
     if (CPlatoon* const platoon =
-          ArmyRef->GetPlatoonFor(static_cast<int>(reinterpret_cast<std::uintptr_t>(this)), &squadClass);
+          ArmyRef->GetPlatoonFor(this, &squadClass);
         platoon != nullptr) {
       ++platoon->mLifetimeStat2;
     }

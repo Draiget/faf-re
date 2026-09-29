@@ -193,7 +193,7 @@ namespace moho
     /** Address: 0x00700470 (FUN_00700470, Moho::CArmyImpl::GetPlatoonByName) */
     CPlatoon* GetPlatoonByName(const char* platoonName) override;
     /** Address: 0x007004E0 (FUN_007004E0, Moho::CArmyImpl::GetPlatoonFor) */
-    CPlatoon* GetPlatoonFor(int queryArg, ESquadClass* outSquadClass) override;
+    CPlatoon* GetPlatoonFor(Unit* unit, ESquadClass* outSquadClass) override;
     /**
      * Address: 0x007005F0 (FUN_007005F0, Moho::CArmyImpl::DisbandPlatoonUniquelyNamed)
      *

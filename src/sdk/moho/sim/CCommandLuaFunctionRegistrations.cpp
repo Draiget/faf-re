@@ -2755,12 +2755,14 @@ namespace moho
     std::uint32_t accToggleCaps = 0u;
     bool haveAcc = false;
 
+    // The category universe word is the owning rules object, stored as the
+    // binary stores it (see `RUnitBlueprint`'s CategoryCache).
     EntityCategorySet accCategory{};
-    accCategory.ResetToEmpty(reinterpret_cast<std::uint32_t>(session->mRules));
+    accCategory.ResetToEmpty(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(session->mRules)));
 
     for (int i = 1; i <= unitCount; ++i) {
       EntityCategorySet perUnit{};
-      perUnit.ResetToEmpty(reinterpret_cast<std::uint32_t>(session->mRules));
+      perUnit.ResetToEmpty(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(session->mRules)));
 
       const LuaPlus::LuaObject unitObject = unitTable[i];
       UserUnit* const unit = GetUserUnitOptional(unitObject, state);
@@ -2770,10 +2772,9 @@ namespace moho
         if (attrs.blueprint != nullptr) {
           const RUnitBlueprint* const bp = iunit->GetBlueprint();
 
-          const auto* const economyCat = reinterpret_cast<const EntityCategorySet*>(&bp->Economy.CategoryCache);
-          const UserArmy* const army = reinterpret_cast<const UserEntity*>(unit)->mArmy;
-          const auto* const armyCat =
-            reinterpret_cast<const EntityCategorySet*>(&army->mVarDat.mCategoryFilterSet);
+          const EntityCategorySet* const economyCat = &bp->Economy.CategoryCache;
+          const UserArmy* const army = unit->mArmy;
+          const EntityCategorySet* const armyCat = &army->mVarDat.mCategoryFilterSet;
           const EntityCategorySet* const restrictionCat = &attrs.restrictionCategory;
 
           accCommandCaps |= attrs.commandCapsMask;
@@ -2791,8 +2792,7 @@ namespace moho
           msvc8::list<const RUnitBlueprint*> upgradeTargets;
           CollectUpgradeCommandTargetBlueprints(unit, upgradeTargets);
           for (const RUnitBlueprint* const targetBp : upgradeTargets) {
-            const auto* const targetEconomyCat =
-              reinterpret_cast<const EntityCategorySet*>(&targetBp->Economy.CategoryCache);
+            const EntityCategorySet* const targetEconomyCat = &targetBp->Economy.CategoryCache;
 
             EntityCategorySet targetIntersect{};
             (void)EntityCategory::Mul(&targetIntersect, targetEconomyCat, armyCat);
@@ -3015,7 +3015,7 @@ namespace moho
         if (platform == nullptr) {
           continue;
         }
-        if (reinterpret_cast<UserEntity*>(platform)->mArmy != focusArmy) {
+        if (platform->mArmy != focusArmy) {
           continue;
         }
         if (platform->IsBeingBuilt()) {
@@ -3034,7 +3034,7 @@ namespace moho
 
         foundStagingPlatform = true;
 
-        const std::uint32_t layerMask = reinterpret_cast<UserEntity*>(platform)->mVariableData.mLayerMask;
+        const std::uint32_t layerMask = platform->mVariableData.mLayerMask;
         if (layerMask == kDockRejectLayerSub || layerMask == kDockRejectLayerSeabed) {
           continue;
         }
@@ -3046,7 +3046,7 @@ namespace moho
         std::int32_t freeCapacity = blueprint->Transport.DockingSlots;
         if (storageSlots != 0) {
           const std::int32_t dockedCount =
-            static_cast<std::int32_t>(reinterpret_cast<UserEntity*>(platform)->mVariableData.mAuxValueVector.Size());
+            static_cast<std::int32_t>(platform->mVariableData.mAuxValueVector.Size());
           freeCapacity = storageSlots - dockedCount;
         }
         if (freeCapacity <= 0) {
@@ -3079,7 +3079,7 @@ namespace moho
       if (dockCapableSize <= candidates.front().freeCapacity) {
         // The nearest platform can hold the entire dock-capable set: one command.
         SSTICommandIssueData command(EUnitCommandType::UNITCOMMAND_Dock);
-        command.mTarget.mEnt = reinterpret_cast<UserEntity*>(candidates.front().platform)->mParams.mEntityId;
+        command.mTarget.mEnt = candidates.front().platform->mParams.mEntityId;
         command.mTarget.mType = EAiTargetType::AITARGET_Entity;
         command.mTarget.mPos = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
         ISSUE_Command(dockTargets.get(), command, clear);
@@ -3160,7 +3160,7 @@ namespace moho
           }
 
           SSTICommandIssueData command(EUnitCommandType::UNITCOMMAND_Dock);
-          command.mTarget.mEnt = reinterpret_cast<UserEntity*>(platformSlot.platform)->mParams.mEntityId;
+          command.mTarget.mEnt = platformSlot.platform->mParams.mEntityId;
           command.mTarget.mType = EAiTargetType::AITARGET_Entity;
           command.mTarget.mPos = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
           ISSUE_Command(quotaUnits.get(), command, clear);
@@ -3190,7 +3190,7 @@ namespace moho
         if (voiceOver != nullptr) {
           if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
             const auto entityIdAsPtr = reinterpret_cast<void*>(
-              static_cast<std::uintptr_t>(reinterpret_cast<UserEntity*>(representativeUnit)->mParams.mEntityId)
+              static_cast<std::uintptr_t>(representativeUnit->mParams.mEntityId)
             );
             driver->ProcessInfoPair(entityIdAsPtr, "play", voiceOver);
           }
@@ -3249,73 +3249,19 @@ namespace moho
 
   namespace
   {
-    // Typed field view over a UI-side UserUnit for the GetRolloverInfo builders.
-    // Every offset is asm-confirmed from FUN_008421F0 and matches the committed
-    // UserUnitLuaRuntimeView (UserUnit.cpp). Read-only: instances are obtained by
-    // reinterpret_cast over a live UserUnit, so no ctor/dtor runs on the members.
-    struct RolloverUnitView
-    {
-      std::uint8_t pad_0000_0044[0x44];
-      std::uint32_t entityId;                    // +0x44  UserEntity::mParams.mEntityId
-      std::uint8_t pad_0048_0068[0x68 - 0x48];
-      float health;                              // +0x68  mVariableData.mHealth
-      float maxHealth;                           // +0x6C  mVariableData.mMaxHealth
-      std::uint8_t pad_0070_0120[0x120 - 0x70];
-      UserArmy* army;                            // +0x120
-      std::uint8_t pad_0124_01A4[0x1A4 - 0x124];
-      float fuelRatio;                           // +0x1A4
-      float shieldRatio;                         // +0x1A8
-      std::uint8_t pad_01AC_01BC[0x1BC - 0x1AC];
-      float workProgress;                        // +0x1BC
-      std::int32_t tacticalSiloBuildCount;       // +0x1C0
-      std::int32_t nukeSiloBuildCount;           // +0x1C4
-      std::int32_t tacticalSiloStorageCount;     // +0x1C8
-      std::int32_t nukeSiloStorageCount;         // +0x1CC
-      std::int32_t tacticalSiloMaxStorageCount;  // +0x1D0
-      std::int32_t nukeSiloMaxStorageCount;      // +0x1D4
-      std::uint8_t pad_01D8_01DC[0x1DC - 0x1D8];
-      msvc8::string customName;                  // +0x1DC
-      float producedEnergy;                      // +0x1F8  mUnitVarDat.mProduced.ENERGY
-      float producedMass;                        // +0x1FC  mUnitVarDat.mProduced.MASS
-      float spentEnergy;                         // +0x200  mResourcesSpent.ENERGY (consumed)
-      float spentMass;                           // +0x204  mResourcesSpent.MASS
-      float maintEnergy;                         // +0x208  mMaintainenceCost.ENERGY (requested)
-      float maintMass;                           // +0x20C  mMaintainenceCost.MASS
-      EntId focusUnitId;                         // +0x210  (mFocusUnit)
-      EntId guardedUnitId;                       // +0x214  (mGuardedUnit)
-      EntId targetBlipId;                        // +0x218  (mTargetBlip)
-      std::uint8_t pad_021C_03E0[0x3E0 - 0x21C];
-      std::uint32_t dataFlags;                   // +0x3E0  (mIntelStateFlags; 0x10=has-data, 0x08=health-valid)
-    };
-    static_assert(offsetof(RolloverUnitView, entityId) == 0x44, "rollover entityId @0x44");
-    static_assert(offsetof(RolloverUnitView, health) == 0x68, "rollover health @0x68");
-    static_assert(offsetof(RolloverUnitView, maxHealth) == 0x6C, "rollover maxHealth @0x6C");
-    static_assert(offsetof(RolloverUnitView, army) == 0x120, "rollover army @0x120");
-    static_assert(offsetof(RolloverUnitView, fuelRatio) == 0x1A4, "rollover fuelRatio @0x1A4");
-    static_assert(offsetof(RolloverUnitView, shieldRatio) == 0x1A8, "rollover shieldRatio @0x1A8");
-    static_assert(offsetof(RolloverUnitView, workProgress) == 0x1BC, "rollover workProgress @0x1BC");
-    static_assert(offsetof(RolloverUnitView, tacticalSiloBuildCount) == 0x1C0, "rollover tacSiloBuild @0x1C0");
-    static_assert(offsetof(RolloverUnitView, nukeSiloBuildCount) == 0x1C4, "rollover nukeSiloBuild @0x1C4");
-    static_assert(offsetof(RolloverUnitView, tacticalSiloStorageCount) == 0x1C8, "rollover tacSiloStore @0x1C8");
-    static_assert(offsetof(RolloverUnitView, nukeSiloStorageCount) == 0x1CC, "rollover nukeSiloStore @0x1CC");
-    static_assert(offsetof(RolloverUnitView, tacticalSiloMaxStorageCount) == 0x1D0, "rollover tacSiloMax @0x1D0");
-    static_assert(offsetof(RolloverUnitView, nukeSiloMaxStorageCount) == 0x1D4, "rollover nukeSiloMax @0x1D4");
-    static_assert(offsetof(RolloverUnitView, customName) == 0x1DC, "rollover customName @0x1DC");
-    static_assert(offsetof(RolloverUnitView, producedEnergy) == 0x1F8, "rollover producedEnergy @0x1F8");
-    static_assert(offsetof(RolloverUnitView, spentEnergy) == 0x200, "rollover spentEnergy @0x200");
-    static_assert(offsetof(RolloverUnitView, maintEnergy) == 0x208, "rollover maintEnergy @0x208");
-    static_assert(offsetof(RolloverUnitView, focusUnitId) == 0x210, "rollover focusUnitId @0x210");
-    static_assert(offsetof(RolloverUnitView, guardedUnitId) == 0x214, "rollover guardedUnitId @0x214");
-    static_assert(offsetof(RolloverUnitView, targetBlipId) == 0x218, "rollover targetBlipId @0x218");
-    static_assert(offsetof(RolloverUnitView, dataFlags) == 0x3E0, "rollover dataFlags @0x3E0");
+    // The rollover builders read the UI unit's own members (x86 offsets as
+    // FUN_008421F0 reads them): `mParams.mEntityId` (+0x44),
+    // `mVariableData.mHealth/mMaxHealth` (+0x68/+0x6C), `mArmy` (+0x120), the
+    // replicated `mUnitVarDat` block at +0x198 (fuel +0x1A4, shield +0x1A8, work
+    // +0x1BC, silo counters +0x1C0..+0x1D4, custom name +0x1DC, produced /
+    // spent / maintenance pairs +0x1F8..+0x20C, focus / guarded / target-blip
+    // ids +0x210..+0x218), and `mIntelStateFlags` (+0x3E0; 0x10 = has unit
+    // data, 0x08 = health valid).
+    constexpr std::uint32_t kRolloverHasUnitDataFlag = 0x10u;
+    constexpr std::uint32_t kRolloverHealthValidFlag = 0x08u;
 
     // Per-tick economy value → per-second UI rate (ds:dword_DFF31C == 10.0f).
     constexpr float kRolloverEconomyPerSecondToUiRate = 10.0f;
-
-    [[nodiscard]] const RolloverUnitView& AsRolloverUnitView(const UserUnit* const unit) noexcept
-    {
-      return *reinterpret_cast<const RolloverUnitView*>(unit);
-    }
 
     /**
      * Address: 0x008421F0 (FUN_008421F0, sub_8421F0)
@@ -3370,41 +3316,51 @@ namespace moho
           StatItem* const killsStat = bridge->GetStat("KILLS", killsDefault);
           out.SetNumber("kills", static_cast<float>(killsStat->GetInt(false)));
 
-          out.SetInteger("energyConsumed", static_cast<int>(view.spentEnergy * kRolloverEconomyPerSecondToUiRate));
-          out.SetInteger("massConsumed", static_cast<int>(view.spentMass * kRolloverEconomyPerSecondToUiRate));
-          out.SetInteger("energyRequested", static_cast<int>(view.maintEnergy * kRolloverEconomyPerSecondToUiRate));
-          out.SetInteger("massRequested", static_cast<int>(view.maintMass * kRolloverEconomyPerSecondToUiRate));
-          out.SetInteger("energyProduced", static_cast<int>(view.producedEnergy * kRolloverEconomyPerSecondToUiRate));
-          out.SetInteger("massProduced", static_cast<int>(view.producedMass * kRolloverEconomyPerSecondToUiRate));
-          out.SetInteger("tacticalSiloBuildCount", view.tacticalSiloBuildCount);
-          out.SetInteger("tacticalSiloStorageCount", view.tacticalSiloStorageCount);
-          out.SetInteger("tacticalSiloMaxStorageCount", view.tacticalSiloMaxStorageCount);
-          out.SetInteger("nukeSiloBuildCount", view.nukeSiloBuildCount);
-          out.SetInteger("nukeSiloStorageCount", view.nukeSiloStorageCount);
-          out.SetInteger("nukeSiloMaxStorageCount", view.nukeSiloMaxStorageCount);
-          out.SetNumber("fuelRatio", view.fuelRatio);
-          out.SetNumber("shieldRatio", view.shieldRatio);
-          out.SetNumber("workProgress", view.workProgress);
+          out.SetInteger(
+            "energyConsumed", static_cast<int>(unitData.mResourcesSpent.ENERGY * kRolloverEconomyPerSecondToUiRate)
+          );
+          out.SetInteger(
+            "massConsumed", static_cast<int>(unitData.mResourcesSpent.MASS * kRolloverEconomyPerSecondToUiRate)
+          );
+          out.SetInteger(
+            "energyRequested", static_cast<int>(unitData.mMaintainenceCost.ENERGY * kRolloverEconomyPerSecondToUiRate)
+          );
+          out.SetInteger(
+            "massRequested", static_cast<int>(unitData.mMaintainenceCost.MASS * kRolloverEconomyPerSecondToUiRate)
+          );
+          out.SetInteger(
+            "energyProduced", static_cast<int>(unitData.mProduced.ENERGY * kRolloverEconomyPerSecondToUiRate)
+          );
+          out.SetInteger("massProduced", static_cast<int>(unitData.mProduced.MASS * kRolloverEconomyPerSecondToUiRate));
+          out.SetInteger("tacticalSiloBuildCount", unitData.mTacticalSiloBuildCount);
+          out.SetInteger("tacticalSiloStorageCount", unitData.mTacticalSiloStorageCount);
+          out.SetInteger("tacticalSiloMaxStorageCount", unitData.mTacticalSiloMaxStorageCount);
+          out.SetInteger("nukeSiloBuildCount", unitData.mNukeSiloBuildCount);
+          out.SetInteger("nukeSiloStorageCount", unitData.mNukeSiloStorageCount);
+          out.SetInteger("nukeSiloMaxStorageCount", unitData.mNukeSiloMaxStorageCount);
+          out.SetNumber("fuelRatio", unitData.mFuelRatio);
+          out.SetNumber("shieldRatio", unitData.mShieldRatio);
+          out.SetNumber("workProgress", unitData.mWorkProgress);
 
           const LuaPlus::LuaObject unitObject = bridge->GetLuaObject();
           out.SetObject("userUnit", unitObject);
 
-          const msvc8::string entityIdText = gpg::STR_Printf("%d", view.entityId);
+          const msvc8::string entityIdText = gpg::STR_Printf("%d", unit->mParams.mEntityId);
           out.SetString("entityId", entityIdText.c_str());
         }
 
-        out.SetInteger("armyIndex", static_cast<int>(view.army->mArmyIndex));
-        const LuaPlus::LuaObject teamColor = SCR_EncodeColor(state, view.army->mVarDat.mPlayerColorBgra);
+        out.SetInteger("armyIndex", static_cast<int>(unit->mArmy->mArmyIndex));
+        const LuaPlus::LuaObject teamColor = SCR_EncodeColor(state, unit->mArmy->mVarDat.mPlayerColorBgra);
         out.SetObject("teamColor", teamColor);
 
-        if (!view.customName.empty()) {
-          out.SetString("customName", view.customName.c_str());
+        if (!unitData.mCustomName.empty()) {
+          out.SetString("customName", unitData.mCustomName.c_str());
         }
       } else {
         out.SetString("blueprintId", "unknown");
-        const LuaPlus::LuaObject teamColor = SCR_EncodeColor(state, view.army->mVarDat.mPlayerColorBgra);
+        const LuaPlus::LuaObject teamColor = SCR_EncodeColor(state, unit->mArmy->mVarDat.mPlayerColorBgra);
         out.SetObject("teamColor", teamColor);
-        out.SetInteger("armyIndex", static_cast<int>(view.army->mArmyIndex));
+        out.SetInteger("armyIndex", static_cast<int>(unit->mArmy->mArmyIndex));
       }
     }
 
@@ -3428,12 +3384,12 @@ namespace moho
 
       IUnit* const bridge = GetIUnitBridge(unit);
       const RUnitBlueprint* const blueprint = bridge->GetBlueprint();
-      const RolloverUnitView& view = AsRolloverUnitView(unit);
 
       bool hasBlueprintId = false;
       if (blueprint != nullptr) {
-        const std::uint32_t requiredFlag = blueprint->IsMobile() ? 0x08u : 0x10u;
-        hasBlueprintId = (view.dataFlags & requiredFlag) != 0u;
+        const std::uint32_t requiredFlag =
+          blueprint->IsMobile() ? kRolloverHealthValidFlag : kRolloverHasUnitDataFlag;
+        hasBlueprintId = (unit->mIntelStateFlags & requiredFlag) != 0u;
       }
 
       if (!hasBlueprintId) {
@@ -3442,8 +3398,8 @@ namespace moho
       }
 
       out.SetString("blueprintId", blueprint->mBlueprintId.c_str());
-      out.SetNumber("health", view.health);
-      out.SetNumber("maxHealth", view.maxHealth);
+      out.SetNumber("health", unit->mVariableData.mHealth);
+      out.SetNumber("maxHealth", unit->mVariableData.mMaxHealth);
     }
 
     /**
@@ -3543,12 +3499,13 @@ namespace moho
           } else {
             result.SetObject("focus", focusTable);
           }
-        } else if ((view.focusUnitId & 0xF0000000u) == 0x20000000u) {
+        } else if ((hoveredData.mFocusUnit & 0xF0000000u) == 0x20000000u) {
           LuaPlus::LuaObject propTable;
           BuildFocusPropRolloverInfo(propTable, focusEntity, state);
           result.SetObject("focusProp", propTable);
         }
-      } else if (UserEntity* const guardedEntity = session->LookupEntityId(view.guardedUnitId); guardedEntity != nullptr) {
+      } else if (UserEntity* const guardedEntity = session->LookupEntityId(hoveredData.mGuardedUnit);
+                 guardedEntity != nullptr) {
         if (UserUnit* const guardedUnit = guardedEntity->IsUserUnit(); guardedUnit != nullptr) {
           LuaPlus::LuaObject guardedTable;
           BuildUserUnitRolloverInfo(guardedTable, guardedUnit, state);
@@ -3706,7 +3663,7 @@ namespace moho
     (void)SSelectionSetUserEntity::Add(
       &addResult,
       &selection,
-      reinterpret_cast<UserEntity*>(unit)
+      static_cast<UserEntity*>(unit)
     );
 
     session->SetSelection(selection);
@@ -3717,7 +3674,7 @@ namespace moho
       seconds = static_cast<float>(secondsArg.GetNumber());
     }
 
-    camera->TargetEntityBox(reinterpret_cast<UserEntity*>(unit), seconds);
+    camera->TargetEntityBox(static_cast<UserEntity*>(unit), seconds);
     return 0;
   }
 

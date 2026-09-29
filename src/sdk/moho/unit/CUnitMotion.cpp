@@ -154,16 +154,6 @@ namespace moho
       (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown)) |
       (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
 
-    struct UnitRecoilOrientationRuntimeView
-    {
-      std::uint8_t mUnknown00_00A4[0xA4];
-      Wm3::Quatf mCurrentOrientation; // +0xA4 (mVarDat.mCurTransform.orient)
-    };
-    static_assert(
-      offsetof(UnitRecoilOrientationRuntimeView, mCurrentOrientation) == 0xA4,
-      "UnitRecoilOrientationRuntimeView::mCurrentOrientation offset must be 0xA4"
-    );
-
     // The candidate slots hold weak references to the *entities* the collision
     // grid returned, not to units: `ProcessSurfaceCollisionFromLastMove` builds
     // each node straight from `CollisionResult::sourceEntity`
@@ -1475,8 +1465,9 @@ namespace moho
       return;
     }
 
-    const auto& unitRuntime = reinterpret_cast<const UnitRecoilOrientationRuntimeView&>(*mUnit);
-    const Wm3::Quatf& orientation = unitRuntime.mCurrentOrientation;
+    // Unit +0xA4 on x86: the Entity base (+0x08), then `mVarDat` (+0x78) and
+    // its `mCurTransform` (+0x24), whose orientation leads the transform.
+    const Wm3::Quatf& orientation = mUnit->mVarDat.mCurTransform.orient_;
 
     Wm3::Vector3f forward{};
     forward.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
@@ -4584,15 +4575,13 @@ namespace moho
     float rollTargetZ = 0.0f;
 
     if (mUnit->IsUnitState(UNITSTATE_MovingDown)) {
-      const auto& unitRuntime = reinterpret_cast<const UnitRecoilOrientationRuntimeView&>(*mUnit);
-      const VAxes3 axes(unitRuntime.mCurrentOrientation);
+      const VAxes3 axes(mUnit->mVarDat.mCurTransform.orient_);
       const float rollScale = mDivingSpeed * kRollHackAxisScale;
       rollTargetX = -axes.vZ.x * rollScale;
       rollTargetY = 0.0f;
       rollTargetZ = -axes.vZ.z * rollScale;
     } else if (mUnit->IsUnitState(UNITSTATE_MovingUp)) {
-      const auto& unitRuntime = reinterpret_cast<const UnitRecoilOrientationRuntimeView&>(*mUnit);
-      const VAxes3 axes(unitRuntime.mCurrentOrientation);
+      const VAxes3 axes(mUnit->mVarDat.mCurTransform.orient_);
       const float rollScale = mDivingSpeed * kRollHackAxisScale;
       rollTargetX = axes.vZ.x * rollScale;
       rollTargetY = 0.0f;

@@ -28,17 +28,6 @@ namespace
   constexpr const char* kMapBorderClearHelpText = "MapBorderClear()";
   constexpr const char* kGlobalLuaClassName = "<global>";
 
-  struct WRenViewportMapImagerView
-  {
-    std::uint8_t pad[0x32C];
-    moho::MapImager mMapImager;
-  };
-
-  static_assert(
-    offsetof(WRenViewportMapImagerView, mMapImager) == 0x32C,
-    "WRenViewportMapImagerView::mMapImager offset must be 0x32C"
-  );
-
 
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
@@ -57,8 +46,7 @@ namespace
       return nullptr;
     }
 
-    auto* const viewportView = reinterpret_cast<WRenViewportMapImagerView*>(moho::ren_Viewport);
-    return &viewportView->mMapImager;
+    return &moho::ren_Viewport->mMapImager;
   }
 
   void ClearActiveViewportMapBorder() noexcept

@@ -500,50 +500,13 @@ namespace Wm3
     return RebindIntersectorDouble2RuntimeBaseVtable(intersectorRuntime);
   }
 
-  namespace
-  {
-    struct IntrBox2Circle2dCtorRuntimeView
-    {
-      void* vtable = nullptr;                     // +0x00
-      std::uint8_t lane04_17[0x14]{};            // +0x04
-      const Box2<double>* box = nullptr;         // +0x18
-      const void* circle = nullptr;              // +0x1C
-    };
-    static_assert(
-      offsetof(IntrBox2Circle2dCtorRuntimeView, box) == 0x18,
-      "IntrBox2Circle2dCtorRuntimeView::box offset must be 0x18"
-    );
-    static_assert(
-      offsetof(IntrBox2Circle2dCtorRuntimeView, circle) == 0x1C,
-      "IntrBox2Circle2dCtorRuntimeView::circle offset must be 0x1C"
-    );
-  }
-
-  /**
-   * Address: 0x00A4EE20 (FUN_00A4EE20)
-   *
-   * What it does:
-   * Constructs one `IntrBox2Circle2<double>` runtime payload by initializing
-   * the double-precision intersector base lane and binding box/circle owners.
-   */
-  IntrBox2Circle2dCtorRuntimeView* ConstructIntrBox2Circle2dRuntime(
-    IntrBox2Circle2dCtorRuntimeView* const runtime,
-    const Box2<double>* const box,
-    const void* const circle
-  ) noexcept
-  {
-    static std::uint8_t sIntrBox2Circle2dRuntimeVtableTag = 0;
-
-    if (runtime == nullptr) {
-      return nullptr;
-    }
-
-    (void)ConstructIntersectorDouble2RuntimeBase(runtime);
-    runtime->box = box;
-    runtime->vtable = &sIntrBox2Circle2dRuntimeVtableTag;
-    runtime->circle = circle;
-    return runtime;
-  }
+  // 0x00A4EE20 is `Wm3::IntrBox2Circle2<double>::IntrBox2Circle2(const Box2<double>&,
+  // const Circle2<double>&)` itself: the `Intersector<double, Vector2<double>>`
+  // base ctor, then `m_rkBox`/`m_rkCircle` at +0x18/+0x1C and the
+  // `??_7?$IntrBox2Circle2@N@Wm3@@6B@` vftable. That body is WildMagic's
+  // (dependencies/WildMagic3p8 Wm3IntrBox2Circle2.cpp, explicitly instantiated
+  // for `double` in Foundation.lib), so no transcription of it belongs here; the
+  // padded view it used to be written over is gone with it.
 
   /**
    * Address: 0x00A53080 (FUN_00A53080)
@@ -1791,53 +1754,16 @@ namespace Wm3
   };
   static_assert(sizeof(IntrSegment3Capsule3f) == 0x14, "IntrSegment3Capsule3f size must be 0x14");
 
-  struct IntrSegment3Capsule3fRootsRuntimeView
-  {
-    std::uint8_t reserved00_2F[0x30]{};
-    float roots[2]{}; // +0x30
-  };
-  static_assert(
-    offsetof(IntrSegment3Capsule3fRootsRuntimeView, roots) == 0x30,
-    "IntrSegment3Capsule3fRootsRuntimeView::roots offset must be 0x30"
-  );
-
-  struct IntrSegment3Capsule3dRootsRuntimeView
-  {
-    std::uint8_t reserved00_57[0x58]{};
-    double roots[2]{}; // +0x58
-  };
-  static_assert(
-    offsetof(IntrSegment3Capsule3dRootsRuntimeView, roots) == 0x58,
-    "IntrSegment3Capsule3dRootsRuntimeView::roots offset must be 0x58"
-  );
-
-  /**
-   * Address: 0x00A6BE00 (FUN_00A6BE00)
-   *
-   * What it does:
-   * Returns one cached float root lane from `IntrSegment3Capsule3f` by index.
-   */
-  float IntrSegment3Capsule3fGetRootByIndex(
-    const IntrSegment3Capsule3fRootsRuntimeView* const runtime,
-    const std::int32_t index
-  ) noexcept
-  {
-    return runtime->roots[index];
-  }
-
-  /**
-   * Address: 0x00A6BE50 (FUN_00A6BE50)
-   *
-   * What it does:
-   * Returns one cached double root lane from `IntrSegment3Capsule3d` by index.
-   */
-  double IntrSegment3Capsule3dGetRootByIndex(
-    const IntrSegment3Capsule3dRootsRuntimeView* const runtime,
-    const std::int32_t index
-  ) noexcept
-  {
-    return runtime->roots[index];
-  }
+  // 0x00A6BE00 (`fld [ecx+eax*4+30h]`) and 0x00A6BE50 (`fld [ecx+eax*8+58h]`)
+  // are `Wm3::IntrSegment3Capsule3<float>::GetParameter(int)` and
+  // `<double>::GetParameter(int)`: `m_afParameter[i]` after `m_akPoint[2]` in
+  // WildMagic's own layout (float: quantity +0x14, points +0x18, parameters
+  // +0x30; double: quantity +0x20, points +0x28, parameters +0x58). Their
+  // neighbours 0x00A6BDC0..0x00A6BE40 are the same class's GetSegment,
+  // GetCapsule, GetQuantity and GetPoint. The bodies are WildMagic's
+  // (Wm3IntrSegment3Capsule3.cpp, explicitly instantiated for both `Real`s in
+  // Foundation.lib), reached through `IntrSegment3Capsule3<Real>::GetParameter`,
+  // so the padded "roots" views that re-described those members are gone.
 
   namespace
   {
@@ -4639,13 +4565,6 @@ namespace Wm3
   };
   static_assert(offsetof(Intersector2fRuntimeView, contactTime) == 0x04, "Intersector2fRuntimeView::contactTime offset must be 0x04");
 
-  struct IntrBox3Sphere3fRuntimeView
-  {
-    std::uint8_t reserved00_1F[0x20];    // +0x00
-    Vector3<float> contactPoint;         // +0x20
-  };
-  static_assert(offsetof(IntrBox3Sphere3fRuntimeView, contactPoint) == 0x20, "IntrBox3Sphere3fRuntimeView::contactPoint offset must be 0x20");
-
   /**
    * Address: 0x00A39250 (FUN_00A39250)
    *
@@ -5066,19 +4985,15 @@ namespace Wm3
     return outCursor;
   }
 
-  /**
-   * Address: 0x00A414F0 (FUN_00A414F0)
-   *
-   * What it does:
-   * Returns one mutable pointer to the cached contact point lane in one
-   * `IntrBox3Sphere3f` runtime object.
-   */
-  Vector3<float>* GetIntrBox3Sphere3fContactPointLaneB(
-    IntrBox3Sphere3fRuntimeView* const runtime
-  ) noexcept
-  {
-    return &runtime->contactPoint;
-  }
+  // 0x00A414F0 (`lea eax, [ecx+20h]; ret`) is
+  // `Wm3::IntrBox3Sphere3<double>::GetContactPoint()`, not a float accessor: it
+  // is the last of the six-accessor run 0x00A414A0..0x00A414F0 (float
+  // GetBox/GetSphere/GetContactPoint at +0x0C/+0x10/+0x14, then the double
+  // ones at +0x18/+0x1C/+0x20 behind the 8-aligned `Intersector<double, ...>`
+  // base), and 0x00A414C0 is the float GetContactPoint. The padded
+  // "IntrBox3Sphere3f" view laid a `Vector3<float>` over that `Vector3<double>`
+  // `m_kContactPoint`. The body is WildMagic's (Wm3IntrBox3Sphere3.cpp,
+  // explicitly instantiated for `double` in Foundation.lib).
 
   /**
    * Address: 0x00A454C0 (FUN_00A454C0)

@@ -87,6 +87,11 @@ namespace
     return fallbackSet;
   }
 
+  // The SCA file header record, read in place from the loaded file bytes
+  // (pointer-free on-disk data, so the same layout on every architecture).
+  // `moho::SScaHeader` (RScaResource.h) describes the same record, but its
+  // +0x08/+0x10 names (boneCount/keysPerBone) are really the frame count and
+  // the bone-track count, as the frame stride at 0x0063FDD0 shows.
   struct AnimationClipHeaderView
   {
     std::uint8_t mReserved00[0x08];
@@ -96,31 +101,27 @@ namespace
     std::uint32_t mBoneNameTableOffset; // +0x14 (from the header start; NUL-separated names)
   };
 
-  // One bone key inside an SCA frame: position then rotation, 28 bytes.
-  struct AnimationBoneKeyView
+  // The loaded SCA image: `RScaResource::mStart` (+0x2C) is the file header,
+  // `RScaResource::mEnd` (+0x30) the animation section (a 28-byte root
+  // transform, then the frames). Both point into the resource's own file
+  // buffer, so the header record is read straight out of those bytes.
+  [[nodiscard]] const AnimationClipHeaderView* ScaClipHeader(const moho::RScaResource& resource) noexcept
   {
-    float mPosition[3]; // +0x00
-    float mRotation[4]; // +0x0C (VTransform::orient_ memory order: w,x,y,z)
-  };
-  static_assert(sizeof(AnimationBoneKeyView) == 0x1C, "AnimationBoneKeyView size must be 0x1C");
-
-  struct AnimationResourceView
-  {
-    std::uint8_t mReserved00[0x2C];
-    AnimationClipHeaderView* mClipHeader; // +0x2C (RScaResource::mStart: the SCA header)
-    char* mAnimData;                      // +0x30 (RScaResource::mEnd: 28-byte root transform, then frames)
-  };
+    return reinterpret_cast<const AnimationClipHeaderView*>(resource.mStart);
+  }
 
   // Frame `index` of a clip: the animation section starts with a 28-byte root
   // transform, each frame is an 8-byte prefix (time, flags) plus one 28-byte
-  // key per bone track (0x0063FDD0: stride = 28 * tracks + 8, base + 28).
-  [[nodiscard]] const AnimationBoneKeyView* AnimationFrameKeys(
-    const AnimationResourceView& resource, const std::uint32_t boneTrackCount, const std::int32_t index
+  // `SScaAnimKey` (position, then rotation in VTransform::orient_ memory order
+  // w,x,y,z) per bone track (0x0063FDD0: stride = 28 * tracks + 8, base + 28).
+  [[nodiscard]] const moho::SScaAnimKey* AnimationFrameKeys(
+    const moho::RScaResource& resource, const std::uint32_t boneTrackCount, const std::int32_t index
   )
   {
-    const std::size_t frameStride = 28u * static_cast<std::size_t>(boneTrackCount) + 8u;
-    const char* const frame = resource.mAnimData + 28 + static_cast<std::size_t>(index) * frameStride;
-    return reinterpret_cast<const AnimationBoneKeyView*>(frame + 8);
+    const std::size_t frameStride = sizeof(moho::SScaAnimKey) * static_cast<std::size_t>(boneTrackCount) + 8u;
+    const char* const frame =
+      resource.mEnd + sizeof(moho::SScaAnimDataHeader) + static_cast<std::size_t>(index) * frameStride;
+    return reinterpret_cast<const moho::SScaAnimKey*>(frame + 8);
   }
 
   /**
@@ -143,8 +144,7 @@ namespace
       return nullptr;
     }
 
-    auto* const resource = static_cast<const AnimationResourceView*>(ref.px);
-    return resource->mClipHeader;
+    return ScaClipHeader(*static_cast<const moho::RScaResource*>(ref.px));
   }
 
   /**
@@ -154,10 +154,10 @@ namespace
    * Returns animation clip bone-track count from one resource payload lane.
    */
   [[maybe_unused]] [[nodiscard]] std::uint32_t ReadAnimationClipBoneTrackCount(
-    const AnimationResourceView* const resource
+    const moho::RScaResource* const resource
   ) noexcept
   {
-    return resource->mClipHeader->mBoneTrackCount;
+    return ScaClipHeader(*resource)->mBoneTrackCount;
   }
 
   /**
@@ -167,10 +167,10 @@ namespace
    * Returns animation clip frame count from one resource payload lane.
    */
   [[maybe_unused]] [[nodiscard]] std::uint32_t ReadAnimationClipFrameCount(
-    const AnimationResourceView* const resource
+    const moho::RScaResource* const resource
   ) noexcept
   {
-    return resource->mClipHeader->mFrameCount;
+    return ScaClipHeader(*resource)->mFrameCount;
   }
 
   [[nodiscard]] float WrapToRange(const float value, const float range)
@@ -1514,11 +1514,11 @@ namespace moho
    */
   bool CAnimationManipulator::ManipulatorUpdate()
   {
-    const auto* const resource = static_cast<const AnimationResourceView*>(mAnimationRef.px);
+    const auto* const resource = static_cast<const RScaResource*>(mAnimationRef.px);
     if (resource == nullptr) {
       return false;
     }
-    const AnimationClipHeaderView* const clip = resource->mClipHeader;
+    const AnimationClipHeaderView* const clip = ScaClipHeader(*resource);
     if (clip->mFrameCount == 0u) {
       return false;
     }
@@ -1593,8 +1593,8 @@ namespace moho
       nextFrameIndex = static_cast<std::int32_t>(frameCount) - 1;
     }
     const std::uint32_t boneTrackCount = clip->mBoneTrackCount;
-    const AnimationBoneKeyView* const keys0 = AnimationFrameKeys(*resource, boneTrackCount, frameIndex);
-    const AnimationBoneKeyView* const keys1 = AnimationFrameKeys(*resource, boneTrackCount, nextFrameIndex);
+    const SScaAnimKey* const keys0 = AnimationFrameKeys(*resource, boneTrackCount, frameIndex);
+    const SScaAnimKey* const keys1 = AnimationFrameKeys(*resource, boneTrackCount, nextFrameIndex);
 
     CAniPose* const pose = mOwnerActor->mPose.px;
     const float poseScale = pose->mScale;
@@ -1611,29 +1611,29 @@ namespace moho
       if (!mBoneMask.TestBit(boneIndex)) {
         continue;
       }
-      const AnimationBoneKeyView& key0 = keys0[track];
-      const AnimationBoneKeyView& key1 = keys1[track];
+      const SScaAnimKey& key0 = keys0[track];
+      const SScaAnimKey& key1 = keys1[track];
       VTransform keyTransform{};
       if (frac >= 0.001f) {
         if (invFrac >= 0.001f) {
-          keyTransform.pos_.x = key0.mPosition[0] + (key1.mPosition[0] - key0.mPosition[0]) * frac;
-          keyTransform.pos_.y = key0.mPosition[1] + (key1.mPosition[1] - key0.mPosition[1]) * frac;
-          keyTransform.pos_.z = key0.mPosition[2] + (key1.mPosition[2] - key0.mPosition[2]) * frac;
+          keyTransform.pos_.x = key0.position[0] + (key1.position[0] - key0.position[0]) * frac;
+          keyTransform.pos_.y = key0.position[1] + (key1.position[1] - key0.position[1]) * frac;
+          keyTransform.pos_.z = key0.position[2] + (key1.position[2] - key0.position[2]) * frac;
           Wm3::Quatf blended{};
           (void)QuatLERP(
-            reinterpret_cast<const Wm3::Quatf*>(key1.mRotation),
-            reinterpret_cast<const Wm3::Quatf*>(key0.mRotation),
+            reinterpret_cast<const Wm3::Quatf*>(key1.rotation),
+            reinterpret_cast<const Wm3::Quatf*>(key0.rotation),
             &blended,
             frac
           );
           keyTransform.orient_ = blended;
         } else {
-          std::memcpy(&keyTransform.pos_, key1.mPosition, sizeof(keyTransform.pos_));
-          std::memcpy(&keyTransform.orient_, key1.mRotation, sizeof(keyTransform.orient_));
+          std::memcpy(&keyTransform.pos_, key1.position, sizeof(keyTransform.pos_));
+          std::memcpy(&keyTransform.orient_, key1.rotation, sizeof(keyTransform.orient_));
         }
       } else {
-        std::memcpy(&keyTransform.pos_, key0.mPosition, sizeof(keyTransform.pos_));
-        std::memcpy(&keyTransform.orient_, key0.mRotation, sizeof(keyTransform.orient_));
+        std::memcpy(&keyTransform.pos_, key0.position, sizeof(keyTransform.pos_));
+        std::memcpy(&keyTransform.orient_, key0.rotation, sizeof(keyTransform.orient_));
       }
 
       CAniPoseBone& bone = poseBones[boneIndex];
@@ -1735,8 +1735,7 @@ namespace moho
       // 0x0063FBC1..0x0063FC5A: rebuild the watch-bone bindings from the clip's
       // bone-name table, resolving each name against the owner's skeleton.
       const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
-      const auto* const resourceView = static_cast<const AnimationResourceView*>(resource.px);
-      const AnimationClipHeaderView* const clip = resourceView->mClipHeader;
+      const AnimationClipHeaderView* const clip = ScaClipHeader(*static_cast<const RScaResource*>(resource.px));
       const std::uint32_t boneTrackCount = clip->mBoneTrackCount;
       const char* boneName = reinterpret_cast<const char*>(clip) + clip->mBoneNameTableOffset;
       ResetWatchBoneStorage();

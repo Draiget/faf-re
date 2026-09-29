@@ -53,6 +53,7 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/RangeRenderer.h"
 #include "moho/render/VisionRenderer.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
@@ -801,22 +802,6 @@ namespace
     RegisterProcessControlLuaFunction<lua_SetProcessAffinity>(state->m_state, "SetProcessAffinityMask");
     RegisterProcessControlLuaFunction<lua_SetProcessPriority>(state->m_state, "SetProcessPriority");
   }
-
-  // Typed view over the range/vision renderer sub-objects embedded in a
-  // WRenViewport (mRangeRenderer @ +0x37C, mVisionRenderer @ +0x410). The
-  // full WRenViewport is not modelled with named members; the offsets match
-  // the WxRuntimeTypes viewport layout.
-  struct WRenViewportRenderersView
-  {
-    std::uint8_t reserved0000_037B[0x37C];
-    moho::RangeRenderer mRangeRenderer;   // +0x037C (0x94 bytes, ends exactly at 0x410)
-    moho::VisionRenderer mVisionRenderer; // +0x0410
-  };
-  static_assert(offsetof(WRenViewportRenderersView, mRangeRenderer) == 0x37C,
-    "WRenViewport::mRangeRenderer offset must be 0x37C");
-  static_assert(offsetof(WRenViewportRenderersView, mVisionRenderer) == 0x410,
-    "WRenViewport::mVisionRenderer offset must be 0x410");
-
 
   [[nodiscard]] const msvc8::string& SaveGameDirName()
   {
@@ -2222,9 +2207,8 @@ moho::Sim* moho::Sim_Create_exxt(const boost::SharedPtrRaw<moho::LaunchInfoBase>
   // Initialize the active viewport's range/vision renderers.
   if (moho::CD3DDevice* const device = moho::D3D_GetDevice(); device != nullptr) {
     if (moho::WRenViewport* const viewport = device->GetViewport(); viewport != nullptr) {
-      auto* const renderers = reinterpret_cast<WRenViewportRenderersView*>(viewport);
-      renderers->mRangeRenderer.Init();
-      renderers->mVisionRenderer.Init();
+      viewport->mRangeRenderer.Init();
+      viewport->mVisionRenderer.Init();
     }
   }
 

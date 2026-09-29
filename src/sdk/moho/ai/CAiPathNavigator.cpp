@@ -165,14 +165,6 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, state, owner);
   }
 
-  struct UnitLayerTokenView
-  {
-    std::uint8_t pad[0x120];
-    std::uint32_t layerToken;
-  };
-
-  static_assert(offsetof(UnitLayerTokenView, layerToken) == 0x120, "UnitLayerTokenView::layerToken offset must be 0x120");
-
   /**
    * Address: 0x005AD0D0 (FUN_005AD0D0)
    *
@@ -325,13 +317,18 @@ namespace
     return pathFinder->GetFootprint();
   }
 
+  /**
+   * The unit's current layer: `Entity::mVarDat.mLayerMask` (x86 unit +0x120,
+   * the Entity base at +0x08 plus 0x118). The ctor at 0x005AD3E0 reads it as
+   * `mov eax,[edi+120h]`, and the navigator serializes the cached copy as an
+   * `ELayer`.
+   */
   [[nodiscard]] std::uint32_t ReadUnitLayerToken(const Unit* const unit) noexcept
   {
     if (!unit) {
       return 0;
     }
-    const auto* const view = reinterpret_cast<const UnitLayerTokenView*>(unit);
-    return view->layerToken;
+    return static_cast<std::uint32_t>(unit->mVarDat.mLayerMask);
   }
 
   void ClearUnitPathBits(Unit* const unit)

@@ -5,6 +5,7 @@
 
 #include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/Vector.h"
+#include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/resource/RResId.h"
@@ -666,30 +667,6 @@ namespace moho
   };
 
   /**
-   * Runtime category-resolution state nested in `RUnitBlueprintEconomy`.
-   *
-   * Evidence:
-   * - 0x1010E390 (`RUnitBlueprintEconomy` ctor) initializes:
-   *   - `RuleGameRules` at +0x00
-   *   - inline category word buffer pointers at +0x10..+0x1C
-   *   - inline storage window at +0x20..+0x27
-   * - 0x1010CD70 (`RUnitBlueprintEconomy` dtor) and 0x1010CF40 helper
-   *   manage the +0x10..+0x1C pointer window.
-   */
-  struct RUnitBlueprintEconomyCategoryCache
-  {
-    RRuleGameRules* RuleGameRules;   // +0x00
-    std::uint32_t UnresolvedWord04;  // +0x04
-    std::uint32_t RuntimeWord08;     // +0x08
-    void* RuntimeVectorProxy;        // +0x0C
-    std::uint32_t* First;            // +0x10
-    std::uint32_t* Last;             // +0x14
-    std::uint32_t* End;              // +0x18
-    std::uint32_t* InlineStoragePtr; // +0x1C
-    std::uint32_t InlineStorage[2];  // +0x20
-  };
-
-  /**
    * Address: 0x00521E70 (FUN_00521E70)
    *
    * What it does:
@@ -733,7 +710,7 @@ namespace moho
     msvc8::vector<msvc8::string> BuildableCategories; // +0x1C
     msvc8::vector<msvc8::string> RebuildBonusIds;     // +0x2C
     std::uint32_t UnresolvedWord3C;                   // +0x3C
-    RUnitBlueprintEconomyCategoryCache CategoryCache; // +0x40
+    EntityCategorySet CategoryCache; // +0x40 (resolved BuildableCategories)
     float InitialRallyX;                              // +0x68
     float InitialRallyZ;                              // +0x6C
     std::uint8_t NeedToFaceTargetToBuild;             // +0x70
@@ -1428,25 +1405,6 @@ namespace moho
   );
   static_assert(sizeof(RUnitBlueprintWeapons) == 0x14, "RUnitBlueprintWeapons size must be 0x14");
 
-  static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, RuleGameRules) == 0x00,
-    "RUnitBlueprintEconomyCategoryCache::RuleGameRules offset must be 0x00"
-  );
-  static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, First) == 0x10,
-    "RUnitBlueprintEconomyCategoryCache::First offset must be 0x10"
-  );
-  static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, InlineStoragePtr) == 0x1C,
-    "RUnitBlueprintEconomyCategoryCache::InlineStoragePtr offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, InlineStorage) == 0x20,
-    "RUnitBlueprintEconomyCategoryCache::InlineStorage offset must be 0x20"
-  );
-  static_assert(
-    sizeof(RUnitBlueprintEconomyCategoryCache) == 0x28, "RUnitBlueprintEconomyCategoryCache size must be 0x28"
-  );
 
   static_assert(
     offsetof(RUnitBlueprintEconomy, BuildCostEnergy) == 0x00,

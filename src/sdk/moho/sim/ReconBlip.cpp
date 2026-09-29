@@ -107,19 +107,6 @@ namespace
   gpg::RType* gRScmResourceType = nullptr;
   gpg::RType* gCAniPoseType = nullptr;
 
-  struct SimArmyRuntimeView
-  {
-    std::uint8_t mPad00_07[0x08];
-    SSTIArmyConstantData mConstDat;
-  };
-
-  static_assert(offsetof(SimArmyRuntimeView, mConstDat) == 0x08, "SimArmyRuntimeView::mConstDat offset must be 0x08");
-
-  [[nodiscard]] std::int32_t ResolveReconArmyIndex(const SimArmy* const army) noexcept
-  {
-    return reinterpret_cast<const SimArmyRuntimeView*>(army)->mConstDat.mArmyIndex;
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
   {
@@ -1338,7 +1325,7 @@ SPerArmyReconInfo* ReconBlip::GetReconInfo(const std::int32_t armyIndex)
  */
 SPerArmyReconInfo* ReconBlip::GetReconInfo(SimArmy* const army)
 {
-  return mReconDat.begin() + static_cast<std::ptrdiff_t>(ResolveReconArmyIndex(army));
+  return mReconDat.begin() + static_cast<std::ptrdiff_t>(army->mConstDat.mArmyIndex);
 }
 
 /**
@@ -1360,7 +1347,7 @@ const SPerArmyReconInfo* ReconBlip::GetReconInfo(const std::int32_t armyIndex) c
  */
 const SPerArmyReconInfo* ReconBlip::GetReconInfo(SimArmy* const army) const
 {
-  return mReconDat.begin() + static_cast<std::ptrdiff_t>(ResolveReconArmyIndex(army));
+  return mReconDat.begin() + static_cast<std::ptrdiff_t>(army->mConstDat.mArmyIndex);
 }
 
 /**

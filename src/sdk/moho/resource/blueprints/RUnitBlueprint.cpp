@@ -557,14 +557,10 @@ namespace moho
     , SacrificeEnergyMult(0.0f)
     , MaxBuildDistance(5.0f)
   {
-    CategoryCache.RuleGameRules = rules;
-    CategoryCache.UnresolvedWord04 = 0;
-    CategoryCache.RuntimeWord08 = 0;
-    CategoryCache.RuntimeVectorProxy = nullptr;
-    CategoryCache.First = CategoryCache.InlineStorage;
-    CategoryCache.Last = CategoryCache.InlineStorage;
-    CategoryCache.End = reinterpret_cast<std::uint32_t*>(&InitialRallyX);
-    CategoryCache.InlineStoragePtr = CategoryCache.InlineStorage;
+    // The set's own construction leaves its word vector on the inline buffer;
+    // the universe word is the owning rules object, as the binary stores it.
+    CategoryCache.mUniverse.mWordUniverseHandle =
+      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(rules));
   }
 
   /**
@@ -575,17 +571,7 @@ namespace moho
    * Frees dynamic category-cache storage when detached from inline lanes and
    * restores inline start/end pointers before member vector destruction.
    */
-  RUnitBlueprintEconomy::~RUnitBlueprintEconomy()
-  {
-    if (CategoryCache.First != CategoryCache.InlineStoragePtr) {
-      ::operator delete[](CategoryCache.First);
-      CategoryCache.First = CategoryCache.InlineStoragePtr;
-      CategoryCache.End =
-        reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(*CategoryCache.InlineStoragePtr));
-    }
-
-    CategoryCache.Last = CategoryCache.First;
-  }
+  RUnitBlueprintEconomy::~RUnitBlueprintEconomy() = default; // CategoryCache releases its own words
 
   /**
    * Address: 0x0051E480 (FUN_0051E480, Moho::RUnitBlueprint::RUnitBlueprint)
@@ -811,7 +797,7 @@ namespace moho
    */
   void RUnitBlueprint::AddEconomyRestrictions(RRuleGameRulesImpl* const rules)
   {
-    auto* const economyCategoryCache = reinterpret_cast<EntityCategorySet*>(&Economy.CategoryCache);
+    EntityCategorySet* const economyCategoryCache = &Economy.CategoryCache;
 
     for (msvc8::string* it = Economy.BuildableCategories.begin();
          it != Economy.BuildableCategories.end();

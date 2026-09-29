@@ -406,6 +406,12 @@ namespace moho
   static_assert(sizeof(CUnitCommand) == 0x178, "CUnitCommand size must be 0x178");
   // mUnit is the ferry-beacon weak lane read by Unit::GetTransportFerryBeacon (+0x158).
   static_assert(offsetof(CUnitCommand, mUnit) == 0x158, "CUnitCommand::mUnit offset must be 0x158");
+  // DestroyInternal (0x006E8500) releases [+0x118] and unlinks the weak node at
+  // [+0x120], which is mTarget's targetEntity (CAiTarget +0x04).
+  static_assert(
+    offsetof(CUnitCommand, mFormationInstance) == 0x118, "CUnitCommand::mFormationInstance offset must be 0x118"
+  );
+  static_assert(offsetof(CUnitCommand, mTarget) == 0x11C, "CUnitCommand::mTarget offset must be 0x11C");
 
   /**
    * Address: 0x0128E638 (FUN_0128E638, SimGetCommandQueueInsert)

@@ -157,14 +157,15 @@ namespace
     out.append(text.c_str(), text.size());
   }
 
-  [[nodiscard]] const moho::RBlueprint* AsBlueprint(const moho::ArmyBlueprintNameView* const view) noexcept
+  /**
+   * The stat keys are unit blueprints. `RUnitBlueprint` derives from
+   * `RBlueprint` in the binary (RTTI), but `REntityBlueprint` still repeats
+   * the `RBlueprint` fields inline here rather than deriving from it, so the
+   * downcast cannot be spelled `static_cast` yet.
+   */
+  [[nodiscard]] const moho::RUnitBlueprint* AsUnitBlueprint(const moho::RBlueprint* const blueprint) noexcept
   {
-    return reinterpret_cast<const moho::RBlueprint*>(view);
-  }
-
-  [[nodiscard]] const moho::RUnitBlueprint* AsUnitBlueprint(const moho::ArmyBlueprintNameView* const view) noexcept
-  {
-    return reinterpret_cast<const moho::RUnitBlueprint*>(view);
+    return reinterpret_cast<const moho::RUnitBlueprint*>(blueprint);
   }
 
   [[nodiscard]] const moho::EntityCategorySet*
@@ -190,7 +191,7 @@ namespace
   }
 
   void CollectBlueprintStatKeys(
-    msvc8::set<const moho::ArmyBlueprintNameView*>& outKeys,
+    msvc8::set<const moho::RBlueprint*>& outKeys,
     const moho::CArmyStatItem* const item
   )
   {
@@ -294,7 +295,7 @@ namespace
   )
   {
     for (const auto& entry : tree) {
-      const moho::RBlueprint* const blueprint = AsBlueprint(entry.first);
+      const moho::RBlueprint* const blueprint = entry.first;
       const int value = static_cast<int>(entry.second);
       gpg::Logf(logFormat, blueprint->mBlueprintId.c_str(), blueprint->mDescription.c_str(), value);
       writer.Printf("%s(%s), %d\n", blueprint->mBlueprintId.c_str(), blueprint->mDescription.c_str(), value);
@@ -499,10 +500,10 @@ namespace moho
     blueprints.AssignNewTable(state, 0, 0);
 
     for (const auto& entry : mBlueprintStats) {
-      const ArmyBlueprintNameView* const nameView = entry.first;
-      if (nameView != nullptr) {
+      const RBlueprint* const blueprint = entry.first;
+      if (blueprint != nullptr) {
         const msvc8::string value = gpg::STR_Printf("%.2f", entry.second);
-        blueprints.SetString(nameView->mName.c_str(), value.c_str());
+        blueprints.SetString(blueprint->mBlueprintId.c_str(), value.c_str());
       }
     }
 
@@ -520,12 +521,12 @@ namespace moho
 
     float total = 0.0f;
     for (const auto& entry : mBlueprintStats) {
-      const ArmyBlueprintNameView* const blueprintView = entry.first;
-      if (blueprintView == nullptr) {
+      const RBlueprint* const blueprint = entry.first;
+      if (blueprint == nullptr) {
         continue;
       }
 
-      if (categorySet->mBits.Contains(static_cast<unsigned int>(blueprintView->mBlueprintOrdinal))) {
+      if (categorySet->mBits.Contains(static_cast<unsigned int>(blueprint->mBlueprintOrdinal))) {
         total += entry.second;
       }
     }
@@ -541,13 +542,13 @@ namespace moho
    * zero-initialized node when missing, and returns a writable pointer to that
    * lane.
    */
-  float* CArmyStatItem::FindOrCreateBlueprintStatValue(const ArmyBlueprintNameView* const blueprintName)
+  float* CArmyStatItem::FindOrCreateBlueprintStatValue(const RBlueprint* const blueprint)
   {
     // The binary is VC8's `map::operator[]`: lower_bound, then a *hinted*
     // insert of a zero-initialised mapped value when the key is absent, and
     // a reference to the mapped lane either way. That hinted insert is the
     // emission at 0x0070F6C0.
-    return &mBlueprintStats[blueprintName];
+    return &mBlueprintStats[blueprint];
   }
 
   /**
@@ -860,14 +861,13 @@ namespace moho
     CArmyStatItem* const damageDealt = GetItem("Units_TotalDamageDealt");
     CArmyStatItem* const damageReceived = GetItem("Units_TotalDamageReceive");
 
-    msvc8::set<const ArmyBlueprintNameView*> blueprintKeys;
+    msvc8::set<const RBlueprint*> blueprintKeys;
     CollectBlueprintStatKeys(blueprintKeys, unitsActive);
     CollectBlueprintStatKeys(blueprintKeys, enemiesKilled);
 
     AppendMsvcString(xml, gpg::STR_Printf("%s    <UnitStats>\n", indentText));
-    for (const ArmyBlueprintNameView* const key : blueprintKeys) {
-      const RBlueprint* const blueprint = AsBlueprint(key);
-      const RUnitBlueprint* const unitBlueprint = AsUnitBlueprint(key);
+    for (const RBlueprint* const blueprint : blueprintKeys) {
+      const RUnitBlueprint* const unitBlueprint = AsUnitBlueprint(blueprint);
       const EntityCategorySet* const unitCategory = ResolveStatsCategory(rules, blueprint->mBlueprintId.c_str());
 
       AppendMsvcString(
@@ -1116,10 +1116,10 @@ namespace moho
    * in that item, applies `delta`, and returns the updated lane pointer.
    */
   float*
-  CArmyStats::AddBlueprintStatDelta(const char* const statPath, const ArmyBlueprintNameView* const blueprintName, const float delta)
+  CArmyStats::AddBlueprintStatDelta(const char* const statPath, const RBlueprint* const blueprint, const float delta)
   {
     CArmyStatItem* const statItem = ResolveArmyStatItemCachedCreate(this, statPath);
-    float* const lane = statItem->FindOrCreateBlueprintStatValue(blueprintName);
+    float* const lane = statItem->FindOrCreateBlueprintStatValue(blueprint);
     *lane += delta;
     return lane;
   }

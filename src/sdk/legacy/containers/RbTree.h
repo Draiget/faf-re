@@ -367,6 +367,9 @@ namespace msvc8
          * `LeftmostCategoryDescendant` (`AudioEngine.cpp`, deleted by this
          * migration).
          * Address: 0x0056CF50 (FUN_0056CF50, sub_56CF50 -- the `_Min` emission for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41); reached from that instantiation's `erase_node`/`rb_increment` (CAiFormationInstance.cpp).)
+         * Address: 0x00736470 (FUN_00736470, sub_736470 -- the `_Min` emission for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList`; node 0x30, isNil@+0x2D; walks `_Left` at +0x00); called from that instantiation's `erase_node` (FUN_00735D40 at 0x00735E1E). Formerly `FindPlatoonTreeLeftmostNode` over a padded `PlatoonTreeNodeFlag45Runtime` node overlay in moho/sim/CPlatoon.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x00719700 (FUN_00719700 -- the `_Min` emission for `InfluenceGrid::entries` (reflected as `std::map<unsigned int, Moho::InfluenceMapEntry>`; node 0x40, isNil@+0x3D); callers 0x00717EF0. Formerly `FindInfluenceTreeLeftmostNodeFlag61` over a padded `InfluenceNodeFlag61Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x00719CC0 (FUN_00719CC0 -- the `_Min` emission for `msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>` (`CInfluenceMap::mBlipCells` at +0x14; node 0x18, isNil@+0x15); callers 0x00718410. Formerly `FindInfluenceTreeLeftmostNodeFlag21` over a padded `InfluenceNodeFlag21Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
          */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
@@ -584,6 +587,9 @@ namespace msvc8
          * `RightmostCategoryDescendant` (`AudioEngine.cpp`, deleted by this
          * migration).
          * Address: 0x0056CF30 (FUN_0056CF30, sub_56CF30 -- the `_Max` emission for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41); reached from that instantiation's `erase_node`.)
+         * Address: 0x00736450 (FUN_00736450, sub_736450 -- the `_Max` emission for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList`; node 0x30, isNil@+0x2D; walks `_Right` at +0x08); called from that instantiation's `erase_node` (FUN_00735D40 at 0x00735E40). Formerly `FindPlatoonTreeRightmostNode` over a padded `PlatoonTreeNodeFlag45Runtime` node overlay in moho/sim/CPlatoon.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x007196E0 (FUN_007196E0 -- the `_Max` emission for `InfluenceGrid::entries` (node 0x40, isNil@+0x3D); callers 0x00717EF0. Formerly `FindInfluenceTreeRightmostNodeFlag61` over a padded `InfluenceNodeFlag61Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+         * Address: 0x00719CA0 (FUN_00719CA0 -- the `_Max` emission for `CInfluenceMap::mBlipCells` (node 0x18, isNil@+0x15); callers 0x00718410. Formerly `FindInfluenceTreeRightmostNodeFlag21` over a padded `InfluenceNodeFlag21Runtime` node overlay in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
          */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -1576,6 +1582,7 @@ namespace msvc8
              * Address: 0x004E48D0 (FUN_004E48D0 -- a third emission of that increment, with the tree passed but unused for the sound-variable hash tree -- `msvc8::map<std::uint32_t, moho::CSndVar*>`-shaped: node 0x18, the hash key at node+0x0C, the value at node+0x10, colour/nil at +0x14/+0x15; callers 0x004E4060, 0x004E4434, 0x004E4762; formerly `AdvanceSndVarTreeSuccessorCursorAlt` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0094FB40 (FUN_0094FB40 -- `rb_iterator::operator++` -- the in-order successor step for `msvc8::map<const void*, gpg::WriteArchive::TrackedPointerRecord>` (`WriteArchive::mObjRefs` at +0x10; node 0x28, colour/nil at +0x24/+0x25, `value_type` 0x18 from the insert guard at 0x009512CC); callers 0x00950423, 0x00950AE3, 0x00950B89; formerly `AdvanceTrackedPointerMapIterator` in gpg/core/containers/WriteArchive.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x00424910 (FUN_00424910 -- `rb_iterator::operator++` -- the in-order successor walk for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004234E0, 0x00423AD0, 0x00423E12; formerly `AdvanceAnimTextureCacheIterator` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x0071BDB0 (FUN_0071BDB0 -- `rb_iterator::operator++()` returning the iterator slot, advancing through the `_Inc` 0x0071C590 (cited above) for `CInfluenceMap::mBlipCells` (node 0x18, isNil@+0x15); zero callers, unreachable; formerly `AdvanceRbIteratorNil21InPlaceLaneA` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-29.)
              */
             rb_iterator& operator++() noexcept
             {
@@ -1630,6 +1637,9 @@ namespace msvc8
              *
              * `d3d9::RenderState`'s sibling emission, `FUN_00947080`, is
              * not independently exported in this pass.
+             * Address: 0x0071C560 (FUN_0071C560 -- `rb_iterator::operator++(int)`: copies the source slot into the hidden result slot, then advances the source through the `_Inc` 0x0071C590, for `CInfluenceMap::mBlipCells` (isNil@+0x15); zero callers, unreachable; formerly `PostAdvanceRbIteratorNil21CopyLaneA` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x0071C5E0 (FUN_0071C5E0 -- the same `operator++(int)` for `InfluenceGrid::entries` (isNil@+0x3D), advancing through the `_Inc` 0x0071BE10; zero callers, unreachable; formerly `PostAdvanceRbIteratorNil61CopyLaneA` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-29.)
+             * Address: 0x0077C710 (FUN_0077C710 -- the same `operator++(int)` for the decal bucket set, advancing through its successor walk 0x0077C740 (cited on `rb_increment`); zero callers, unreachable; formerly mis-filed as a second address of `PostAdvanceRbIteratorNil21CopyLaneA` in moho/sim/CInfluenceMap.cpp, removed 2026-09-29.)
              */
             rb_iterator operator++(int) noexcept
             {
@@ -1715,6 +1725,10 @@ namespace msvc8
              * Address: 0x0049C550 (FUN_0049C550 -- `rb_iterator::operator--` for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00495AE0, 0x00497AC2, 0x0049A142; formerly `GetPreviousBeamBucketTreeNode` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x004AEC00 (FUN_004AEC00 -- `rb_iterator::operator--` for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); callers 0x004AC460, 0x004ADBC2, 0x004AE6B2; formerly `RetreatTreeIterator_004AEC00` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x004AECE0 (FUN_004AECE0 -- `rb_iterator::operator--` for the prefetch-request tree (`sPrefetchRequestEntries`; value 0x40 -- one `PrefetchRequestRuntime` -- node 0x50, colour@+0x4C, isNil@+0x4D); callers 0x004AC890, 0x004ADC52, 0x004AE702; formerly `RetreatWideTreeIterator_004AECE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0071C7D0 (FUN_0071C7D0 -- the in-place `_Dec` (iterator slot in edx) for `CInfluenceMap::mBlipCells` (`msvc8::set<moho::InfluenceMapCellIndex, moho::InfluenceMapCellIndexLess>`; node 0x18, isNil@+0x15); callers 0x00719AB0, 0x0071B360, 0x0071BD70, 0x0071C580; formerly the `InfluenceNodeFlag21Runtime` instantiation of `RetreatRuntimeRbIteratorSlot` in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+             * Address: 0x0071C830 (FUN_0071C830 -- the same `_Dec` for `InfluenceGrid::entries` (node 0x40, isNil@+0x3D); callers 0x00719520, 0x0071A9A0, 0x0071BDD0, 0x0071C600; formerly the `InfluenceNodeFlag61Runtime` instantiation of `RetreatRuntimeRbIteratorSlot` in moho/sim/CInfluenceMap.cpp (RULE ONE/THREE), removed 2026-09-29.)
+             * Address: 0x0071BD70 (FUN_0071BD70) Address: 0x0071C580 (FUN_0071C580) -- `operator--()` returning the iterator slot, through the `_Dec` 0x0071C7D0, for `CInfluenceMap::mBlipCells`; zero callers, unreachable; formerly `StepRbIteratorNil21BackwardLaneA`/`LaneB` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-29.
+             * Address: 0x0071BDD0 (FUN_0071BDD0) Address: 0x0071C600 (FUN_0071C600) -- the same `operator--()` for `InfluenceGrid::entries`, through the `_Dec` 0x0071C830; zero callers, unreachable; formerly `StepRbIteratorNil61BackwardLaneA`/`LaneB` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-29.
              */
             rb_iterator& operator--() noexcept
             {
@@ -4726,7 +4740,7 @@ namespace msvc8
              * Address: 0x00711BE0 (FUN_00711BE0, sub_711BE0) -- the local
              * `blueprintKeys` variable's `erase_node` in `Moho::
              * CArmyStats::ArmyXmlStatsNode` (`msvc8::set<const
-             * ArmyBlueprintNameView*>`, isNil@+0x11 -- the same
+             * RBlueprint*>`, isNil@+0x11 -- the same
              * instantiation cited on `erase_range`/`destroy_subtree` above
              * as `FUN_00711350`/`FUN_00712090`). Same `out_of_range`
              * checked-iterator guard shape as every other `erase_node`
@@ -5513,7 +5527,7 @@ namespace msvc8
              * Address: 0x00711350 (FUN_00711350, sub_711350) -- the local
              * `blueprintKeys` variable's `erase_range` in `Moho::
              * CArmyStats::ArmyXmlStatsNode` (`msvc8::set<const
-             * ArmyBlueprintNameView*>`, isNil@+0x11, 4-byte pointer
+             * RBlueprint*>`, isNil@+0x11, 4-byte pointer
              * value_type, CArmyStats.cpp:965). Whole-range fast path calls
              * `sub_712090` (`destroy_subtree`, this same instantiation,
              * cited below); walk path erases node-by-node via `sub_711BE0`
@@ -7701,7 +7715,7 @@ namespace msvc8
              * Address: 0x00712090 (FUN_00712090, sub_712090) -- the local
              * `blueprintKeys` variable's `destroy_subtree` in `Moho::
              * CArmyStats::ArmyXmlStatsNode` (`msvc8::set<const
-             * ArmyBlueprintNameView*>`, isNil@+0x11 -- the same
+             * RBlueprint*>`, isNil@+0x11 -- the same
              * instantiation cited on `erase_range` above as
              * `FUN_00711350`). Plain `operator delete` per node, no
              * vtable write (the pointer value_type needs none). Reached

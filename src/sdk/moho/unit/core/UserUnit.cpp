@@ -218,21 +218,6 @@ namespace
   constexpr std::uint8_t kToggleCapStealth = 0x20u;
   constexpr std::int32_t kRangeCategoryAll = 6;
 
-  struct UserEntityUiFlagView
-  {
-    std::uint8_t pad_0000_0070[0x70];
-    std::uint8_t isBeingBuilt; // +0x70
-    std::uint8_t pad_0071;
-    std::uint8_t requestRefreshUi; // +0x72
-  };
-  static_assert(
-    offsetof(UserEntityUiFlagView, isBeingBuilt) == 0x70, "UserEntityUiFlagView::isBeingBuilt offset must be 0x70"
-  );
-  static_assert(
-    offsetof(UserEntityUiFlagView, requestRefreshUi) == 0x72,
-    "UserEntityUiFlagView::requestRefreshUi offset must be 0x72"
-  );
-
   // The weapon snapshot the client reads here is the very `UnitWeaponInfo` the
   // sim publishes into `SSTIUnitVariableData::mWeaponInfo` (Unit.h), so it is
   // named directly rather than re-declared. A second byte-identical layout used
@@ -325,16 +310,6 @@ namespace moho
 
 namespace
 {
-
-  struct UserUnitIUnitStateBridgeView
-  {
-    std::uint8_t pad_0000_0268[0x268];
-    std::uint64_t unitStates; // +0x268
-  };
-  static_assert(
-    offsetof(UserUnitIUnitStateBridgeView, unitStates) == 0x268,
-    "UserUnitIUnitStateBridgeView::unitStates offset must be 0x268"
-  );
 
   /**
    * Address: 0x008BEF80 (FUN_008BEF80, Moho::IUnit_UserUnit::CalcTransportLoadFactor)
@@ -1105,7 +1080,7 @@ namespace
       return false;
     }
 
-    return InsertWeakEntitySet(army->mEngineers, reinterpret_cast<UserEntity*>(unit));
+    return InsertWeakEntitySet(army->mEngineers, static_cast<UserEntity*>(unit));
   }
 
   /**
@@ -1120,76 +1095,32 @@ namespace
       return false;
     }
 
-    return InsertWeakEntitySet(army->mFactories, reinterpret_cast<UserEntity*>(unit));
-  }
-
-  /**
-   * Address: 0x008B3870 (FUN_008B3870, detach_user_unit_priority_record_tail)
-   *
-   * IDA signature:
-   * int __usercall sub_8B3870@<eax>(int result@<eax>, _DWORD **a2@<edx>,
-   *                                  _DWORD **a3@<esi>);
-   *
-   * What it does:
-   * Drains the half-open priority-registry record run starting at `result`
-   * against the update stream `[a2, a3)`. For each record that still points
-   * at its source hook, the helper unchains the record through its intrusive
-   * next-link slot (`*hook -> ... -> record`) and reseats the new target so
-   * the registry stays linked to live hooks while one element is being
-   * retired. The helper is shared with other `UserArmy` unit-registry lanes
-   * (`sub_8B2820`, `sub_8B2A70`, `sub_8B35F0`), and the pair advances
-   * 8 bytes at a time in lock-step with `a2`.
-   */
-  void PatchUserArmyPriorityRegistryRecordTail(
-    std::uint32_t* record,
-    std::uint32_t* const replacementBegin,
-    std::uint32_t* const replacementEnd
-  )
-  {
-    std::uint32_t* cursor = replacementBegin;
-    while (cursor != replacementEnd) {
-      std::uint32_t* const currentHook = reinterpret_cast<std::uint32_t*>(record[0]);
-      if (reinterpret_cast<std::uint32_t*>(cursor[0]) != currentHook) {
-        if (currentHook != nullptr) {
-          std::uint32_t* chainSlot = currentHook;
-          while (*chainSlot != reinterpret_cast<std::uintptr_t>(record)) {
-            chainSlot = reinterpret_cast<std::uint32_t*>(*chainSlot);
-            chainSlot += 1;
-          }
-          *chainSlot = record[1];
-        }
-
-        std::uint32_t* const replacementHook = reinterpret_cast<std::uint32_t*>(cursor[0]);
-        record[0] = reinterpret_cast<std::uintptr_t>(replacementHook);
-        if (replacementHook == nullptr) {
-          record[1] = 0u;
-        } else {
-          record[1] = *replacementHook;
-          *replacementHook = reinterpret_cast<std::uintptr_t>(record);
-        }
-      }
-
-      cursor += 2;
-      record += 2;
-    }
+    return InsertWeakEntitySet(army->mFactories, static_cast<UserEntity*>(unit));
   }
 
   /**
    * Address: 0x008B2470 (FUN_008B2470, UserArmy::UnregisterPrioritySelectionSlot)
+   * Address: 0x008B3870 (FUN_008B3870, `std::copy` over `WeakPtr<UserUnit>` --
+   *   the tail shift of `msvc8::vector<WeakPtr<UserUnit>>::erase` below,
+   *   formerly transcribed here as `PatchUserArmyPriorityRegistryRecordTail`)
    *
    * IDA signature:
    * _DWORD *__usercall sub_8B2470@<eax>(Moho::UserUnit *unit@<eax>,
    *                                      Moho::UserArmy *army@<edi>);
    *
    * What it does:
-   * Removes `unit` from the `UserArmy` high-priority selection registry run
-   * that lives at UserArmy `[+0x1EC, +0x1F0)`. The loop scans the run for
-   * the record whose first dword dereferences back to `unit` (via the
-   * `*(hook) - 8` decoding shared with other unit registry lanes), then (1)
-   * calls the shared tail-patching helper to re-chain every record past the
-   * removed slot via `PatchUserArmyPriorityRegistryRecordTail`, (2) drains
-   * each pair's intrusive back-link slot, and (3) compacts the run end by
-   * one 8-byte record.
+   * Erases `unit`'s record from the army's quick-select avatar run
+   * (`UserArmy::mAvatars`, `[+0x1EC, +0x1F0)` on x86): finds the first
+   * `WeakPtr<UserUnit>` naming it (0x008B2484..0x008B249A decodes each slot
+   * with the `WeakPtr<UserUnit>` `-8`), then `erase`s it -- the survivors are
+   * copy-assigned one record down through FUN_008B3870, the single vacated
+   * tail record `[end-8, end)` is unlinked from its owner chain
+   * (0x008B24C1..0x008B24F3), and `_Mylast` steps back one record.
+   *
+   * The previous transcription walked those records as raw dwords and
+   * unlinked every shifted record from `cursor+1` to the old end rather than
+   * only the vacated tail, leaving the surviving avatars out of their owners'
+   * weak chains (and, when the erased record was the last, leaving it linked).
    *
    * Called from `UserUnit::DestroyUserUnit` (FUN_008BF9B0) when the unit's
    * blueprint `QuickSelectPriority` is positive, and from `UserUnit::Tick`
@@ -1201,55 +1132,13 @@ namespace
       return;
     }
 
-    // The registry run is the army's avatar vector: one 8-byte
-    // `WeakPtr<UserUnit>` record per quick-select unit.
     msvc8::vector<WeakPtr<UserUnit>>& avatars = army->mAvatars;
-    auto* const runBegin = reinterpret_cast<std::uint32_t*>(avatars.data());
-    std::uint32_t* const runEnd = runBegin + (avatars.size() * 2u);
-    std::uint32_t* cursor = runBegin;
-    if (cursor == runEnd) {
-      return;
-    }
-
-    while (cursor != runEnd) {
-      const std::uintptr_t hook = cursor[0];
-      UserUnit* const recordOwner = (hook != 0u)
-        ? reinterpret_cast<UserUnit*>(hook - 8u)
-        : nullptr;
-      if (recordOwner == unit) {
-        break;
+    for (auto it = avatars.begin(); it != avatars.end(); ++it) {
+      if (it->GetObjectPtr() == unit) {
+        (void)avatars.erase(it);
+        return;
       }
-      cursor += 2;
     }
-
-    if (cursor == runEnd) {
-      return;
-    }
-
-    // Apply the shared tail-patch walk over everything strictly after the
-    // matched record so each remaining priority record's intrusive chain is
-    // re-seated in lock-step.
-    std::uint32_t* const tailBegin = cursor + 2;
-    PatchUserArmyPriorityRegistryRecordTail(cursor, tailBegin, runEnd);
-
-    // Walk the [cursor+2, runEnd) records one more time to retire their
-    // per-record intrusive back-link entries -- this matches the second loop
-    // in FUN_008B2470 which drains the old chain slot for each sliding pair.
-    std::uint32_t* drainCursor = cursor + 2;
-    while (drainCursor != runEnd) {
-      std::uint32_t* const hook = reinterpret_cast<std::uint32_t*>(drainCursor[0]);
-      if (hook != nullptr) {
-        std::uint32_t* chainSlot = hook;
-        while (*chainSlot != reinterpret_cast<std::uintptr_t>(drainCursor)) {
-          chainSlot = reinterpret_cast<std::uint32_t*>(*chainSlot);
-          chainSlot += 1;
-        }
-        *chainSlot = drainCursor[1];
-      }
-      drainCursor += 2;
-    }
-
-    avatars.pop_back_no_destroy();
   }
 
   /**
@@ -2528,11 +2417,6 @@ namespace
     return static_cast<float>(GetIntelRangeMagnitude(self, intel));
   }
 
-  [[nodiscard]] const UserEntityUiFlagView& GetUiFlagView(const UserUnit* const self) noexcept
-  {
-    return *reinterpret_cast<const UserEntityUiFlagView*>(self);
-  }
-
   [[nodiscard]] const UnitWeaponInfo* GetWeaponInfoBegin(const UserUnit* const self) noexcept
   {
     return self->mUnitVarDat.mWeaponInfo.data();
@@ -2571,7 +2455,7 @@ namespace
   {
     msvc8::string category{};
     category.assign_owned(categoryName != nullptr ? categoryName : "");
-    const UserEntity* const entityView = (unit != nullptr) ? reinterpret_cast<const UserEntity*>(unit) : nullptr;
+    const UserEntity* const entityView = unit;
     return entityView != nullptr && entityView->IsInCategory(category);
   }
 
@@ -2688,7 +2572,7 @@ namespace
 
   [[nodiscard]] UserEntity* ResolveUserEntityView(UserUnit* const userUnit) noexcept
   {
-    return reinterpret_cast<UserEntity*>(userUnit);
+    return userUnit;
   }
 
   [[nodiscard]] UserEntity* FindSessionEntityById(CWldSession* const session, const std::int32_t entityId) noexcept
@@ -3587,7 +3471,7 @@ UserUnit::~UserUnit()
  */
 gpg::Rect2f* UserUnit::GetSkirt(gpg::Rect2f* const outSkirtRect) const
 {
-  const UserEntity* const entityView = reinterpret_cast<const UserEntity*>(this);
+  const UserEntity* const entityView = this;
   const SCoordsVec2 currentPosition{
     entityView->mVariableData.mCurTransform.pos_.x,
     entityView->mVariableData.mCurTransform.pos_.z
@@ -3606,7 +3490,7 @@ gpg::Rect2f* UserUnit::GetSkirt(gpg::Rect2f* const outSkirtRect) const
  */
 void UserUnit::UpdateVisibility()
 {
-  UserEntity* const entityView = reinterpret_cast<UserEntity*>(this);
+  UserEntity* const entityView = this;
   MeshInstance* const meshInstance = entityView->mMeshInstance;
   if (meshInstance == nullptr) {
     return;
@@ -3958,7 +3842,7 @@ void UserUnit::Tick(const std::int32_t seqNo)
     return;
   }
 
-  UserEntity* const entityView = reinterpret_cast<UserEntity*>(this);
+  UserEntity* const entityView = this;
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   UserArmy* const army = this->mArmy;
   if (iunitBridge->IsDead()) {
@@ -4051,7 +3935,7 @@ void UserUnit::Tick(const std::int32_t seqNo)
  */
 void UserUnit::UpdateEntityData(const SSTIEntityVariableData& variableData)
 {
-  reinterpret_cast<UserEntity*>(this)->UserEntity::UpdateEntityData(variableData);
+  UserEntity::UpdateEntityData(variableData);
 }
 
 /**
@@ -4142,7 +4026,7 @@ UserCommandQueue* UserUnit::GetFactoryCommandQueue()
  */
 bool UserUnit::RequiresUIRefresh() const
 {
-  return GetUiFlagView(this).requestRefreshUi != 0;
+  return mVariableData.mRequestRefreshUI != 0;
 }
 
 /**
@@ -4153,7 +4037,7 @@ bool UserUnit::RequiresUIRefresh() const
  */
 bool UserUnit::IsBeingBuilt() const
 {
-  return GetUiFlagView(this).isBeingBuilt != 0;
+  return mVariableData.mIsBeingBuilt != 0;
 }
 
 /**
@@ -4376,7 +4260,7 @@ void UserUnit::CreateMeshInstance(const bool forUnitPose)
  */
 void UserUnit::DestroyMeshInstance()
 {
-  auto* const entityView = reinterpret_cast<UserEntity*>(this);
+  UserEntity* const entityView = this;
   entityView->UserEntity::DestroyMeshInstance();
 }
 
@@ -4686,7 +4570,7 @@ bool UserUnit::IsRepeatQueueEnabled() const
 bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) const
 {
   const IUnit* const iunitBridge = GetIUnitBridge(this);
-  const UserEntity* const selfEntity = reinterpret_cast<const UserEntity*>(this);
+  const UserEntity* const selfEntity = this;
   const REntityBlueprint* const targetBlueprint = (targetEntity != nullptr) ? targetEntity->mParams.mBlueprint : nullptr;
 
   if (targetBlueprint != nullptr) {
@@ -4964,7 +4848,7 @@ bool moho::USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint,
   spatialStorage->Collect(nearbyUnits, kSpatialTypeUnit);
 
   for (UserEntity* const nearbyEntity : nearbyUnits) {
-    auto* const nearbyUserUnit = reinterpret_cast<UserUnit*>(nearbyEntity);
+    auto* const nearbyUserUnit = static_cast<UserUnit*>(nearbyEntity);
     const IUnit* const iunitBridge = GetIUnitBridge(nearbyUserUnit);
     const RUnitBlueprint* const unitBlueprint = iunitBridge->GetBlueprint();
     if (unitBlueprint->IsMobile() || (nearbyUserUnit->mIntelStateFlags & kIntelVisibleMask) == 0u) {

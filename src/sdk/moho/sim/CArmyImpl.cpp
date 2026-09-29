@@ -120,23 +120,6 @@ namespace
     moho::PathQueue::Move(reinterpret_cast<moho::PathQueue**>(&field), value);
   }
 
-  struct CEconStorageView
-  {
-    std::uint8_t* economyRuntime; // +0x00
-    float amounts[4];             // +0x04
-  };
-
-  static_assert(
-    offsetof(CEconStorageView, economyRuntime) == 0x00, "CEconStorageView::economyRuntime offset must be 0x00"
-  );
-  static_assert(offsetof(CEconStorageView, amounts) == 0x04, "CEconStorageView::amounts offset must be 0x04");
-
-  void ApplyEconStorageDelta(const std::int32_t direction, CEconStorageView& storage)
-  {
-    auto* const econStorage = reinterpret_cast<moho::CEconStorage*>(&storage);
-    (void)econStorage->Chng(direction);
-  }
-
   void DestroyArmyEconomyInfo(moho::CSimArmyEconomyInfo*& economyInfo)
   {
     if (economyInfo == nullptr) {
@@ -144,12 +127,12 @@ namespace
     }
 
     // Address: 0x006FF9A0 (FUN_006FF9A0), +0x1F4 teardown branch.
-    UnlinkIntrusiveNode(reinterpret_cast<IntrusiveListNode&>(economyInfo->registrationNode));
+    UnlinkIntrusiveNode(economyInfo->registrationNode);
 
-    auto* const storage = reinterpret_cast<CEconStorageView*>(economyInfo->storageDelta);
+    moho::CEconStorage* const storage = economyInfo->storageDelta;
     if (storage != nullptr) {
-      if (storage->economyRuntime != nullptr) {
-        ApplyEconStorageDelta(-1, *storage);
+      if (storage->mEconomy != nullptr) {
+        (void)storage->Chng(-1);
       }
       operator delete(storage);
       economyInfo->storageDelta = nullptr;
@@ -186,28 +169,6 @@ namespace
       it->mNext = it;
       it->mPrev = it;
     }
-  }
-
-  [[nodiscard]] moho::SSTIArmyConstantData* GetArmyConstantData(moho::CArmyImpl* army)
-  {
-    // Evidence: FUN_00700080 passes (this + 0x08) into the constant-data copier.
-    return reinterpret_cast<moho::SSTIArmyConstantData*>(&army->mConstDat.mArmyIndex);
-  }
-
-  [[nodiscard]] const moho::SSTIArmyConstantData* GetArmyConstantData(const moho::CArmyImpl* army)
-  {
-    return reinterpret_cast<const moho::SSTIArmyConstantData*>(&army->mConstDat.mArmyIndex);
-  }
-
-  [[nodiscard]] moho::SSTIArmyVariableData* GetArmyVariableData(moho::CArmyImpl* army)
-  {
-    // Evidence: FUN_00700240 copies/exports variable data from (this + 0x88).
-    return reinterpret_cast<moho::SSTIArmyVariableData*>(&army->mVarDat.mEconomyTotals.mStored.ENERGY);
-  }
-
-  [[nodiscard]] const moho::SSTIArmyVariableData* GetArmyVariableData(const moho::CArmyImpl* army)
-  {
-    return reinterpret_cast<const moho::SSTIArmyVariableData*>(&army->mVarDat.mEconomyTotals.mStored.ENERGY);
   }
 
   [[nodiscard]] moho::SArmyVectorWithMeta* GetRuntimeWordVectorWithMeta(moho::CArmyImpl* army)
@@ -619,27 +580,6 @@ namespace
     dstPlatoons.SetSizeUnchecked(srcSize);
   }
 
-  struct RPlatoonDebugStringsView
-  {
-    std::uint8_t pad_0000[0x90];
-    msvc8::string mAiPlan;
-    msvc8::string mPlatoonName;
-  };
-
-  static_assert(
-    offsetof(RPlatoonDebugStringsView, mAiPlan) == 0x90, "RPlatoonDebugStringsView::mAiPlan offset must be 0x90"
-  );
-  static_assert(
-    offsetof(RPlatoonDebugStringsView, mPlatoonName) == 0xAC,
-    "RPlatoonDebugStringsView::mPlatoonName offset must be 0xAC"
-  );
-  static_assert(sizeof(RPlatoonDebugStringsView) == 0xC8, "RPlatoonDebugStringsView size must be 0xC8");
-
-  [[nodiscard]] msvc8::string CopyLegacyString(const msvc8::string& source)
-  {
-    return msvc8::string(source.data(), source.size());
-  }
-
   [[nodiscard]] msvc8::string GetUnitUniqueName(const moho::Unit* unit)
   {
     if (unit == nullptr) {
@@ -651,26 +591,6 @@ namespace
     // - FUN_00689F20 reads the backing string from Entity + 0x1FC.
     const moho::Entity* const entity = static_cast<const moho::Entity*>(unit);
     return entity->GetUniqueName();
-  }
-
-  [[nodiscard]] msvc8::string GetPlatoonName(const moho::CPlatoon* platoon)
-  {
-    if (platoon == nullptr) {
-      return msvc8::string();
-    }
-
-    const auto* const view = reinterpret_cast<const RPlatoonDebugStringsView*>(platoon);
-    return CopyLegacyString(view->mPlatoonName);
-  }
-
-  [[nodiscard]] msvc8::string GetPlatoonAiPlan(const moho::CPlatoon* platoon)
-  {
-    if (platoon == nullptr) {
-      return msvc8::string();
-    }
-
-    const auto* const view = reinterpret_cast<const RPlatoonDebugStringsView*>(platoon);
-    return CopyLegacyString(view->mAiPlan);
   }
 
   [[nodiscard]] msvc8::string GetSquadClassLexical(const moho::ESquadClass squadClass)
@@ -1097,130 +1017,9 @@ namespace
     return (sim != nullptr) ? sim->mPathTables : nullptr;
   }
 
-  struct CSquadRuntimeUnitsView
-  {
-    std::uint8_t pad_0000_0010[0x10];
-    moho::Entity** unitSlotsBegin; // +0x10
-    moho::Entity** unitSlotsEnd;   // +0x14
-  };
-
-  static_assert(
-    offsetof(CSquadRuntimeUnitsView, unitSlotsBegin) == 0x10, "CSquadRuntimeUnitsView::unitSlotsBegin offset must be 0x10"
-  );
-  static_assert(
-    offsetof(CSquadRuntimeUnitsView, unitSlotsEnd) == 0x14, "CSquadRuntimeUnitsView::unitSlotsEnd offset must be 0x14"
-  );
-
-  struct CPlatoonCleanupView
-  {
-    std::uint8_t pad_0000_0040[0x40];
-    CSquadRuntimeUnitsView** squadBegin; // +0x40
-    CSquadRuntimeUnitsView** squadEnd;   // +0x44
-    std::uint8_t pad_0048_00A8[0x60];
-    msvc8::string uniqueName;            // +0xA8
-    std::uint8_t pad_00C4_00E0[0x1C];
-    std::uint8_t disbandOnIdle;          // +0xE0
-  };
-
-  static_assert(offsetof(CPlatoonCleanupView, squadBegin) == 0x40, "CPlatoonCleanupView::squadBegin offset must be 0x40");
-  static_assert(offsetof(CPlatoonCleanupView, squadEnd) == 0x44, "CPlatoonCleanupView::squadEnd offset must be 0x44");
-  static_assert(offsetof(CPlatoonCleanupView, uniqueName) == 0xA8, "CPlatoonCleanupView::uniqueName offset must be 0xA8");
-  static_assert(
-    offsetof(CPlatoonCleanupView, disbandOnIdle) == 0xE0, "CPlatoonCleanupView::disbandOnIdle offset must be 0xE0"
-  );
-
-  constexpr std::uintptr_t kEntitySetUnitOwnerBias = 0x8u;
-
-  struct CSquadAssignmentRuntimeView
-  {
-    std::uint8_t pad_0000_0008[0x08];
-    moho::SEntitySetTemplateUnit mUnits; // +0x08
-    moho::ESquadClass mSquadClass; // +0x30
-  };
-  static_assert(
-    offsetof(CSquadAssignmentRuntimeView, mUnits) == 0x08, "CSquadAssignmentRuntimeView::mUnits offset must be 0x08"
-  );
-  static_assert(
-    offsetof(CSquadAssignmentRuntimeView, mSquadClass) == 0x30,
-    "CSquadAssignmentRuntimeView::mSquadClass offset must be 0x30"
-  );
-
-  struct CPlatoonAssignmentRuntimeView
-  {
-    std::uint8_t pad_0000_0040[0x40];
-    CSquadAssignmentRuntimeView** mSquadBegin; // +0x40
-    CSquadAssignmentRuntimeView** mSquadEnd;   // +0x44
-    std::uint8_t pad_0048_0108[0xC0];
-    std::uint8_t mHasLuaList; // +0x108
-  };
-  static_assert(
-    offsetof(CPlatoonAssignmentRuntimeView, mSquadBegin) == 0x40,
-    "CPlatoonAssignmentRuntimeView::mSquadBegin offset must be 0x40"
-  );
-  static_assert(
-    offsetof(CPlatoonAssignmentRuntimeView, mSquadEnd) == 0x44,
-    "CPlatoonAssignmentRuntimeView::mSquadEnd offset must be 0x44"
-  );
-  static_assert(
-    offsetof(CPlatoonAssignmentRuntimeView, mHasLuaList) == 0x108,
-    "CPlatoonAssignmentRuntimeView::mHasLuaList offset must be 0x108"
-  );
-
-  struct CPlatoonTemplatePlanQueryView
-  {
-    std::uint8_t pad_0000_0070[0x70];
-    msvc8::string mTemplateName; // +0x70
-    msvc8::string mPlanName;     // +0x8C
-  };
-  static_assert(
-    offsetof(CPlatoonTemplatePlanQueryView, mTemplateName) == 0x70,
-    "CPlatoonTemplatePlanQueryView::mTemplateName offset must be 0x70"
-  );
-  static_assert(
-    offsetof(CPlatoonTemplatePlanQueryView, mPlanName) == 0x8C,
-    "CPlatoonTemplatePlanQueryView::mPlanName offset must be 0x8C"
-  );
-
-  [[nodiscard]] moho::Unit* DecodeUnitFromEntitySetEntry(const moho::Entity* const entry) noexcept
-  {
-    const auto rawEntry = reinterpret_cast<std::uintptr_t>(entry);
-    if (rawEntry <= kEntitySetUnitOwnerBias) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::Unit*>(rawEntry - kEntitySetUnitOwnerBias);
-  }
-
-  void AppendUnitsToUnassignedSquad(moho::CPlatoon* const platoon, const moho::SEntitySetTemplateUnit& units)
-  {
-    if (platoon == nullptr) {
-      return;
-    }
-
-    auto& platoonView = *reinterpret_cast<CPlatoonAssignmentRuntimeView*>(platoon);
-    constexpr moho::ESquadClass kUnassignedSquadClass = static_cast<moho::ESquadClass>(0);
-    for (CSquadAssignmentRuntimeView** squadLane = platoonView.mSquadBegin; squadLane != platoonView.mSquadEnd;
-         ++squadLane) {
-      CSquadAssignmentRuntimeView* const squad = *squadLane;
-      if (squad == nullptr || squad->mSquadClass != kUnassignedSquadClass) {
-        continue;
-      }
-
-      squad->mUnits.AddRange(units.mVec.begin(), units.mVec.end());
-      break;
-    }
-
-    platoonView.mHasLuaList = 0u;
-  }
-
-  [[nodiscard]] const CPlatoonCleanupView& AsCleanupView(const moho::CPlatoon* const platoon)
-  {
-    return *reinterpret_cast<const CPlatoonCleanupView*>(platoon);
-  }
-
   [[nodiscard]] bool PlatoonDisbandsOnIdle(const moho::CPlatoon* const platoon)
   {
-    return platoon != nullptr && AsCleanupView(platoon).disbandOnIdle != 0u;
+    return platoon != nullptr && platoon->mDisbandOnIdle != 0u;
   }
 
   [[nodiscard]] bool IsPlatoonUniqueNameEmpty(const moho::CPlatoon* const platoon)
@@ -1229,26 +1028,27 @@ namespace
       return true;
     }
 
-    return ::_stricmp(AsCleanupView(platoon).uniqueName.data(), "") == 0;
+    return ::_stricmp(platoon->mUniqueName.c_str(), "") == 0;
   }
 
+  /**
+   * The unit count `CleanUpPlatoons` inlines at 0x007008F6..0x0070091F: the
+   * `mUnits` element count (`mVec` end - begin) of every squad in
+   * `mSquadList`.
+   */
   [[nodiscard]] std::size_t CountPlatoonUnits(const moho::CPlatoon* const platoon)
   {
     if (platoon == nullptr) {
       return 0u;
     }
 
-    const CPlatoonCleanupView& view = AsCleanupView(platoon);
     std::size_t unitCount = 0u;
-    for (CSquadRuntimeUnitsView* const* squadLane = view.squadBegin; squadLane != view.squadEnd; ++squadLane) {
-      const CSquadRuntimeUnitsView* const squad = *squadLane;
-      if (squad == nullptr || squad->unitSlotsBegin == nullptr || squad->unitSlotsEnd == nullptr) {
+    for (const moho::CSquad* const squad : platoon->mSquadList) {
+      if (squad == nullptr) {
         continue;
       }
 
-      if (squad->unitSlotsEnd > squad->unitSlotsBegin) {
-        unitCount += static_cast<std::size_t>(squad->unitSlotsEnd - squad->unitSlotsBegin);
-      }
+      unitCount += squad->mUnits.mVec.size();
     }
 
     return unitCount;
@@ -1260,7 +1060,7 @@ namespace
       return;
     }
 
-    reinterpret_cast<moho::CScriptObject*>(platoon)->RunScript(kOnDestroyScriptName);
+    platoon->RunScript(kOnDestroyScriptName);
     delete platoon;
   }
 
@@ -2084,7 +1884,7 @@ namespace moho
     auto& platoons = PlatoonPool.platoons;
     for (CPlatoon** platoonIt = platoons.begin(); platoonIt != platoons.end(); ++platoonIt) {
       CPlatoon* const platoon = *platoonIt;
-      if (::_stricmp(AsCleanupView(platoon).uniqueName.data(), platoonName) != 0) {
+      if (::_stricmp(platoon->mUniqueName.c_str(), platoonName) != 0) {
         continue;
       }
 
@@ -2113,7 +1913,8 @@ namespace moho
       return;
     }
 
-    AppendUnitsToUnassignedSquad(platoon, *units);
+    // 0x007006EB: `call 0x00725280` with `ecx` = 0 (unassigned) and `edx` = units.
+    platoon->AppendUnitsToSquad(ESquadClass::Unassigned, *units);
   }
 
   /**
@@ -2126,7 +1927,7 @@ namespace moho
   void CArmyImpl::RemoveFromPlatoon(Unit* const unit)
   {
     ESquadClass squadClass = static_cast<ESquadClass>(0);
-    CPlatoon* const platoon = GetPlatoonFor(static_cast<int>(reinterpret_cast<std::uintptr_t>(unit)), &squadClass);
+    CPlatoon* const platoon = GetPlatoonFor(unit, &squadClass);
     if (platoon != nullptr) {
       platoon->RemoveUnit(unit);
     }
@@ -2141,8 +1942,10 @@ namespace moho
    */
   void CArmyImpl::RemoveUnitsFromPlatoons(const SEntitySetTemplateUnit* const units)
   {
-    for (Entity* const* unitEntry = units->mVec.begin(); unitEntry != units->mVec.end(); ++unitEntry) {
-      RemoveFromPlatoon(DecodeUnitFromEntitySetEntry(*unitEntry));
+    // Each entry is the unit's `Entity` subobject; 0x00700743..0x0070074C is the
+    // null-preserving derived cast back to `Unit*`.
+    for (Entity* const entity : units->mVec) {
+      RemoveFromPlatoon(static_cast<Unit*>(entity));
     }
   }
 
@@ -2155,11 +1958,10 @@ namespace moho
    */
   int CArmyImpl::GetNumPlatoonsTemplateNamed(const char* const templateName)
   {
+    // 0x00700787: the template name is the platoon's `mName` (+0x70).
     int count = 0;
-    for (CPlatoon* const* platoonIt = PlatoonPool.platoons.begin(); platoonIt != PlatoonPool.platoons.end();
-         ++platoonIt) {
-      const auto& platoonView = *reinterpret_cast<const CPlatoonTemplatePlanQueryView*>(*platoonIt);
-      if (::_stricmp(platoonView.mTemplateName.data(), templateName) == 0) {
+    for (const CPlatoon* const platoon : PlatoonPool.platoons) {
+      if (::_stricmp(platoon->mName.c_str(), templateName) == 0) {
         ++count;
       }
     }
@@ -2176,11 +1978,10 @@ namespace moho
    */
   int CArmyImpl::GetNumPlatoonWithPlan(const char* const planName)
   {
+    // 0x007007D7: the plan is the platoon's `mPlan` (+0x8C).
     int count = 0;
-    for (CPlatoon* const* platoonIt = PlatoonPool.platoons.begin(); platoonIt != PlatoonPool.platoons.end();
-         ++platoonIt) {
-      const auto& platoonView = *reinterpret_cast<const CPlatoonTemplatePlanQueryView*>(*platoonIt);
-      if (::_stricmp(platoonView.mPlanName.data(), planName) == 0) {
+    for (const CPlatoon* const platoon : PlatoonPool.platoons) {
+      if (::_stricmp(platoon->mPlan.c_str(), planName) == 0) {
         ++count;
       }
     }
@@ -2195,7 +1996,7 @@ namespace moho
   {
     mVarDat.mValidCommandSources.Remove(sourceId);
     if (mVarDat.mValidCommandSources.WordCount() == 0u && AiBrain != nullptr) {
-      reinterpret_cast<CScriptObject*>(AiBrain)->CallbackStr("AbandonedByPlayer");
+      AiBrain->CallbackStr("AbandonedByPlayer");
     }
   }
 
@@ -2212,7 +2013,7 @@ namespace moho
     // assignment (FUN_007000A0). The destination is the sync packet's
     // per-army `mNewGrids` slot; `UserArmy` reaches the same lane through its
     // `SSTIArmyConstantData` base when the client rebuilds an army from it.
-    (void)AssignArmyConstantData(*GetArmyConstantData(this), outBuffer);
+    (void)AssignArmyConstantData(mConstDat, outBuffer);
     return outBuffer;
   }
 
@@ -2231,7 +2032,7 @@ namespace moho
 
     // The binary tail-calls the shared variable-data assignment
     // (FUN_00700280) with the army's own payload.
-    return AssignArmyVariableData(*GetArmyVariableData(this), outBuffer);
+    return AssignArmyVariableData(mVarDat, outBuffer);
   }
 
   /**
@@ -2363,7 +2164,7 @@ namespace moho
         continue;
       }
 
-      if (::_stricmp(AsCleanupView(platoon).uniqueName.data(), platoonName) == 0) {
+      if (::_stricmp(platoon->mUniqueName.c_str(), platoonName) == 0) {
         return platoon;
       }
     }
@@ -2374,10 +2175,8 @@ namespace moho
   /**
    * Address: 0x007004E0 (FUN_007004E0, Moho::CArmyImpl::GetPlatoonFor)
    */
-  CPlatoon* CArmyImpl::GetPlatoonFor(const int queryArg, ESquadClass* const outSquadClass)
+  CPlatoon* CArmyImpl::GetPlatoonFor(Unit* const queryUnit, ESquadClass* const outSquadClass)
   {
-    Unit* const queryUnit = reinterpret_cast<Unit*>(static_cast<std::uintptr_t>(queryArg));
-
     for (CPlatoon* const platoon : PlatoonPool.platoons) {
       if (platoon == nullptr || !platoon->IsInPlatoon(queryUnit)) {
         continue;
@@ -2434,7 +2233,7 @@ namespace moho
     const msvc8::string debugPrefix = msvc8::string("AIDebug_") + GetUnitUniqueName(unit);
 
     ESquadClass squadClass = ESquadClass::Unassigned;
-    CPlatoon* const platoon = GetPlatoonFor(static_cast<int>(reinterpret_cast<std::uintptr_t>(unit)), &squadClass);
+    CPlatoon* const platoon = GetPlatoonFor(unit, &squadClass);
     if (platoon == nullptr) {
       return;
     }
@@ -2443,9 +2242,12 @@ namespace moho
     const msvc8::string squadClassKey = debugPrefix + "_SquadClass";
     const msvc8::string aiPlanKey = debugPrefix + "_AIPlan";
 
-    Stats->SetStringValueByPath(platoonNameKey.data(), GetPlatoonName(platoon));
+    // 0x00700B3D / 0x00700D30: the platoon-name stat is `mUniqueName` (+0xA8,
+    // capacity word at +0xC0) and the AI-plan stat is `mPlan` (+0x8C, capacity
+    // word at +0xA4), each copied through its `c_str()`.
+    Stats->SetStringValueByPath(platoonNameKey.data(), msvc8::string(platoon->mUniqueName.c_str()));
     Stats->SetStringValueByPath(squadClassKey.data(), GetSquadClassLexical(squadClass));
-    Stats->SetStringValueByPath(aiPlanKey.data(), GetPlatoonAiPlan(platoon));
+    Stats->SetStringValueByPath(aiPlanKey.data(), msvc8::string(platoon->mPlan.c_str()));
   }
 
   /**

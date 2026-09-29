@@ -110,7 +110,7 @@ namespace moho
     // Address: 0x00700470 (FUN_00700470)
     virtual CPlatoon* GetPlatoonByName(const char* platoonName) = 0;
     // Address: 0x007004E0 (FUN_007004E0)
-    virtual CPlatoon* GetPlatoonFor(int queryArg, ESquadClass* outSquadClass) = 0;
+    virtual CPlatoon* GetPlatoonFor(Unit* unit, ESquadClass* outSquadClass) = 0;
     // Address: 0x007005F0 (FUN_007005F0)
     virtual void DisbandPlatoonUniquelyNamed(const char* platoonName) = 0;
     // Address: 0x00700540 (FUN_00700540)
