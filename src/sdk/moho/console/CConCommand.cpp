@@ -237,11 +237,6 @@ namespace
     return userUnit ? static_cast<IUnit*>(userUnit) : nullptr;
   }
 
-  [[nodiscard]] UserEntity* ResolveUserEntityView(UserUnit* const userUnit) noexcept
-  {
-    return userUnit;  // UserEntity is a base of UserUnit; let the compiler adjust
-  }
-
   /**
    * The session's terrain map header. Every console command that needs it walks
    * the same two hops the binary does (`mWldMap` -> `mTerrainRes` -> the
@@ -2677,7 +2672,7 @@ void moho::CON_ProcessInfoPair(const msvc8::vector<msvc8::string>& args)
   const char* const infoValue = TokenDataOrEmpty(ConCommandArg(args, 2u));
 
   for (UserUnit* const selectedUnit : selectedUnits) {
-    UserEntity* const entityView = ResolveUserEntityView(selectedUnit);
+    UserEntity* const entityView = selectedUnit;
     if (entityView == nullptr || entityView->mArmy != focusArmy) {
       continue;
     }
@@ -2796,7 +2791,7 @@ void moho::RenameUnit(const msvc8::vector<msvc8::string>& args)
   const msvc8::string joinedName = JoinConCommandTokens(args, 1u);
   const msvc8::string customName = gpg::STR_TrimWhitespace(joinedName.c_str());
 
-  UserEntity* const entityView = ResolveUserEntityView(selectedUnit);
+  UserEntity* const entityView = selectedUnit;
   SIM_GetActiveDriver()->ProcessInfoPair(
     entityView->mParams.mEntityId,
     kRenameUnitInfoKey,
@@ -2984,7 +2979,7 @@ void moho::CON_TeleportSelectedUnits(const msvc8::vector<msvc8::string>& args)
   session->GetSelectionUnits(selectedUnits);
 
   for (UserUnit* const userUnit : selectedUnits) {
-    UserEntity* const entityView = ResolveUserEntityView(userUnit);
+    UserEntity* const entityView = userUnit;
     if (entityView->mArmy != focusArmy) {
       continue;
     }
@@ -3316,7 +3311,7 @@ void moho::DoSimCommand(const msvc8::vector<msvc8::string>& args)
     msvc8::vector<UserUnit*> selectedUnits;
     session->GetSelectionUnits(selectedUnits);
     for (UserUnit* const userUnit : selectedUnits) {
-      UserEntity* const entityView = ResolveUserEntityView(userUnit);
+      UserEntity* const entityView = userUnit;
       (void)entities.Bits().Add(entityView->mParams.mEntityId);
     }
 

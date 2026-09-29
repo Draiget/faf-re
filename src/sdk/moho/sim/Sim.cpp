@@ -8963,12 +8963,9 @@ namespace moho
       return;
     }
 
-    // The engine reads the packed entity id straight from the UserEntity
-    // sub-object at [unit+0x44] (mParams.mEntityId). UserUnit and its
-    // UserEntity view share the same address (see UserUnit.cpp's file-static
-    // ResolveUserEntityView), so a direct reinterpret_cast reproduces the load.
+    // The packed entity id is `UserEntity::mParams.mEntityId` ([unit+0x44]).
     const auto entityIdOf = [](const moho::UserUnit* const unit) noexcept -> std::uint32_t {
-      return reinterpret_cast<const moho::UserEntity*>(unit)->mParams.mEntityId;
+      return static_cast<std::uint32_t>(unit->mParams.mEntityId);
     };
 
     // The shared id type is taken from the first unit and compared against

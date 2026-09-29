@@ -2572,11 +2572,6 @@ namespace
     return CopyVector3RangeNullable(destination, sourceBegin, sourceEnd);
   }
 
-  [[nodiscard]] UserEntity* ResolveUserEntityView(UserUnit* const userUnit) noexcept
-  {
-    return userUnit;
-  }
-
   [[nodiscard]] UserEntity* FindSessionEntityById(CWldSession* const session, const std::int32_t entityId) noexcept
   {
     if (session == nullptr) {
@@ -2592,7 +2587,7 @@ namespace
       return nullptr;
     }
 
-    UserEntity* const entityView = ResolveUserEntityView(userUnit);
+    UserEntity* const entityView = userUnit;
     const std::int32_t attachmentParentId = static_cast<std::int32_t>(entityView->mVariableData.mAttachmentParentRef);
     if (attachmentParentId == 0) {
       return nullptr;
@@ -4181,7 +4176,7 @@ bool UserUnit::DoOnDetectAdjacencyBonusFor(const RUnitBlueprint* const blueprint
  */
 void UserUnit::CreateMeshInstance(const bool forUnitPose)
 {
-  UserEntity* const entityView = ResolveUserEntityView(this);
+  UserEntity* const entityView = this;
   if (entityView == nullptr || entityView->mSession == nullptr) {
     return;
   }
@@ -5387,7 +5382,7 @@ int moho::cfunc_UserUnitGetEntityIdL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
-  const UserEntity* const entityView = ResolveUserEntityView(userUnit);
+  const UserEntity* const entityView = userUnit;
   const std::int32_t entityId = entityView != nullptr ? static_cast<std::int32_t>(entityView->mParams.mEntityId) : 0;
   const msvc8::string entityIdText = gpg::STR_Printf("%d", entityId);
 
@@ -5502,7 +5497,7 @@ int moho::cfunc_UserUnitProcessInfoL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
-  UserEntity* const entityView = ResolveUserEntityView(userUnit);
+  UserEntity* const entityView = userUnit;
 
   const LuaPlus::LuaStackObject keyArg(state, 2);
   const char* infoKey = lua_tostring(rawState, 2);
@@ -5588,7 +5583,7 @@ int moho::cfunc_UserUnitSetCustomNameL(LuaPlus::LuaState* const state)
     customName = "";
   }
 
-  UserEntity* const entityView = ResolveUserEntityView(userUnit);
+  UserEntity* const entityView = userUnit;
   if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
     activeDriver->ProcessInfoPair(
       entityView->mParams.mEntityId,
@@ -5849,7 +5844,7 @@ int moho::cfunc_UserUnitIsInCategoryL(LuaPlus::LuaState* const state)
   }
 
   const msvc8::string category(categoryText);
-  const UserEntity* const entityView = ResolveUserEntityView(userUnit);
+  const UserEntity* const entityView = userUnit;
   const bool inCategory = entityView != nullptr && entityView->IsInCategory(category);
   lua_pushboolean(rawState, inCategory ? 1 : 0);
   (void)lua_gettop(rawState);
@@ -5902,7 +5897,7 @@ int moho::cfunc_UserUnitGetHealthL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
-  const UserEntity* const entityView = ResolveUserEntityView(userUnit);
+  const UserEntity* const entityView = userUnit;
   lua_pushnumber(rawState, entityView->mVariableData.mHealth);
   (void)lua_gettop(rawState);
   return 1;
@@ -5954,7 +5949,7 @@ int moho::cfunc_UserUnitGetMaxHealthL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
-  const UserEntity* const entityView = ResolveUserEntityView(userUnit);
+  const UserEntity* const entityView = userUnit;
   lua_pushnumber(rawState, entityView->mVariableData.mMaxHealth);
   (void)lua_gettop(rawState);
   return 1;
@@ -6653,7 +6648,7 @@ int moho::cfunc_UserUnitGetFocusL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
-  UserEntity* const userEntity = ResolveUserEntityView(userUnit);
+  UserEntity* const userEntity = userUnit;
   UserEntity* const focusEntity =
     FindSessionEntityById(userEntity ? userEntity->mSession : nullptr, static_cast<std::int32_t>(userUnit->mUnitVarDat.mFocusUnit));
 
@@ -6720,7 +6715,7 @@ int moho::cfunc_UserUnitGetGuardedEntityL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
-  UserEntity* const userEntity = ResolveUserEntityView(userUnit);
+  UserEntity* const userEntity = userUnit;
   UserEntity* const guardedEntity = FindSessionEntityById(
     userEntity ? userEntity->mSession : nullptr, static_cast<std::int32_t>(userUnit->mUnitVarDat.mGuardedUnit)
   );
@@ -7040,7 +7035,7 @@ int moho::cfunc_UserUnitGetCommandQueueL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject queueTable;
   queueTable.AssignNewTable(state, 0, 0);
 
-  UserEntity* const userEntity = ResolveUserEntityView(userUnit);
+  UserEntity* const userEntity = userUnit;
   CWldSession* const session = userEntity ? userEntity->mSession : nullptr;
 
   int tableIndex = 1;
