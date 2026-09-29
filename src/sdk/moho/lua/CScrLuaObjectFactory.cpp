@@ -10,6 +10,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/exceptions/StdExcept.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/misc/FileWaitHandleSet.h"
 
@@ -501,22 +502,25 @@ namespace moho
    * Address: 0x004D3250 (FUN_004D3250, ?SCR_Import@Moho@@YA?AVLuaObject@LuaPlus@@PAVLuaState@3@VStrArg@gpg@@@Z)
    *
    * What it does:
-   * Calls global `import(modulePath)`, captures the returned value as
-   * `LuaObject`, then restores the previous Lua stack top.
+   * Calls global `import(modulePath)` and returns its result, restoring the
+   * Lua stack top on the way out (LuaAutoBlock, unwind action 0x00B81F10).
+   * A script error while importing is caught (runtime_error, FuncInfo
+   * 0x00ED0CA4), logged as "Error importing %s:\n%s", and answers nil.
    */
   LuaPlus::LuaObject SCR_Import(LuaPlus::LuaState* const state, const gpg::StrArg modulePath)
   {
-    lua_State* const lstate = state->m_state;
-    const int savedTop = lua_gettop(lstate);
-
-    lua_pushstring(lstate, "import");
-    lua_gettable(lstate, LUA_GLOBALSINDEX);
-    lua_pushstring(lstate, modulePath);
-    lua_call(lstate, 1, 1);
-
-    LuaPlus::LuaObject result(state, -1);
-    lua_settop(lstate, savedTop);
-    return result;
+    const LuaPlus::LuaAutoBlock autoBlock(state);
+    try {
+      lua_State* const lstate = state->m_state;
+      lua_pushstring(lstate, "import");
+      lua_gettable(lstate, LUA_GLOBALSINDEX);
+      lua_pushstring(lstate, modulePath);
+      lua_call(lstate, 1, 1);
+      return LuaPlus::LuaObject(state, -1);
+    } catch (const msvc8::runtime_error& error) {
+      gpg::Warnf("Error importing %s:\n%s", modulePath, error.what());
+      return LuaPlus::LuaObject(state);
+    }
   }
 
   LuaPlus::LuaObject SCR_ImportLuaModule(LuaPlus::LuaState* const state, const char* const modulePath)

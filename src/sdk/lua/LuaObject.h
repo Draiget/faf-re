@@ -1388,6 +1388,33 @@ namespace LuaPlus
 		obj->mLuaObj.PushStack(L);
 	}
 
+	/**
+	 * LuaPlus's LuaAutoBlock: records a state's stack top and restores it when
+	 * the block leaves scope, by any path.
+	 *
+	 * Destructor: 0x0041BE20 (`lua_settop(m_state, m_stackTop)`), the out-of-line
+	 * copy the EH unwind actions jump to - 113 of them, e.g. SCR_Import's
+	 * state-1 action at 0x00B81F10. Normal exits inline the same call.
+	 */
+	class LuaAutoBlock
+	{
+	public:
+		explicit LuaAutoBlock(LuaState* const state)
+			: m_state(state->m_state)
+			, m_stackTop(lua_gettop(m_state))
+		{}
+
+		~LuaAutoBlock() { lua_settop(m_state, m_stackTop); }
+
+		LuaAutoBlock(const LuaAutoBlock&) = delete;
+		LuaAutoBlock& operator=(const LuaAutoBlock&) = delete;
+
+	private:
+		lua_State* m_state; // +0x00
+		int m_stackTop;     // +0x04
+	};
+	static_assert(sizeof(LuaAutoBlock) == 0x08, "LuaAutoBlock size must be 0x08");
+
 	template<class Ret = void>
 	class LuaFunction : public LuaObject
 	{
