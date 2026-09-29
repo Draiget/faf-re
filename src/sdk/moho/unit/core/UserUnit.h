@@ -936,11 +936,12 @@ namespace moho
    * Address: 0x008B6DE0 (FUN_008B6DE0, struct_UserUnitManager::add)
    *
    * What it does:
-   * Appends one pending command-issue helper to a user-unit command queue and
-   * enqueues the matching select-unit update event. Exposed so the client-side
-   * `ISSUE_Command` keystone (Sim.cpp) can enqueue an issued command per unit.
+   * Appends one pending Add edit for `helper` to a user-unit command queue and
+   * enqueues the matching select-unit update event. `index` is the issue
+   * data's `mIndex`; -1 appends. Exposed so the client-side `ISSUE_Command`
+   * keystone (Sim.cpp) can enqueue an issued command per unit.
    */
-  void UserUnitManagerAdd(UserCommandQueue* manager, UserCommandIssueHelper* helper, CmdId cmdId, bool clearFlag);
+  void UserUnitManagerAdd(UserCommandQueue* manager, UserCommandIssueHelper* helper, CmdId cmdId, CmdId index);
 
   /**
    * Address: 0x0081D030 (FUN_0081D030, struct_UserUnitManager queue-length accessor)
@@ -1057,15 +1058,14 @@ namespace moho
    *
    * What it does:
    * Records that `helper` has been locally removed from `manager`'s
-   * tracked queue: pushes one `UserManagerHelperEntry{commandType=tag,
-   * isResetCommand=2, subject=helper, sequenceOrCount=-1}` onto the
-   * manager's pending issue queue (`isResetCommand=2` is a third pending-
-   * issue marker kind, distinct from `UserUnitManagerAdd`'s 0 and
-   * `ResetUserUnitManagerState`'s 1), records a "deselect unit" local ring
+   * tracked queue: pushes one `UserManagerHelperEntry{mCommandId=tag,
+   * Remove, helper, -1}` onto the manager's pending issue queue (the third
+   * `EUserQueueEdit` kind, beside `UserUnitManagerAdd`'s Add and
+   * `ResetUserUnitManagerState`'s Reset), records a "deselect unit" local ring
    * event against `manager->ownerUnit` via `QueueCommandIssueDeselectUnitEvent`,
    * marks the resolved-link range dirty, and resets it to inline storage.
    *
-   * `tag` is not a `CmdId` despite landing in the entry's `commandType`
+   * `tag` is not a `CmdId` despite landing in the entry's `mCommandId`
    * slot and being forwarded as `QueueCommandIssueDeselectUnitEvent`'s own
    * `cmdId` parameter: both call sites in `Moho::ISSUE_RemoveLastCommand`
    * (FUN_008B1270) pass the *original unit-batch element count* (a

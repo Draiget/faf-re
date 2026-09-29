@@ -26524,7 +26524,10 @@ namespace moho
       if (clearQueue) {
         ResetUserUnitManagerState(unitManager, commandId);
       }
-      UserUnitManagerAdd(unitManager, commandHelper, commandId, clearQueue);
+      // The add's last argument is `data.mIndex` (`[esp+0x148]`, i.e. data+0x08
+      // once LTCG's `units, clearQueue, data` stack order is accounted for),
+      // not the clear flag; -1 appends.
+      UserUnitManagerAdd(unitManager, commandHelper, commandId, data.mIndex);
     }
 
     UI_OnCommandIssued(units, data, clearQueue);

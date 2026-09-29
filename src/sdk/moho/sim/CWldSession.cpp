@@ -14708,14 +14708,9 @@ namespace moho
    * which shares the same no-rush gate, id-allocation, and per-unit queue
    * bookkeeping shape almost verbatim - factory commands go through
    * `GetFactoryCommandQueue()`/`IssueFactoryCommand` instead of the plain
-   * command queue/`IssueCommand`. One low-confidence spot: the binary's own
-   * `struct_UserUnitManager::add` call appears to pass `arg8.mIndex` as its
-   * 4th argument rather than `clearQueue` - given the "variable allocation
-   * failed" warning and that `UserUnitManagerAdd`'s public contract
-   * (UserUnit.h) is `(manager, helper, cmdId, clearFlag)`, this recovery
-   * trusts the established public signature (`clearQueue`) over the
-   * uncertain decompiler artifact; flagged here for a follow-up asm-level
-   * re-check before this lands.
+   * command queue/`IssueCommand`. The `struct_UserUnitManager::add` call
+   * passes the issue data's `mIndex` as its 4th argument, exactly as
+   * `ISSUE_Command`'s does (0x008B0566 pushes `data+0x08`); -1 appends.
    *
    * What it does:
    * Client/UI-side factory-command issue keystone over an explicit
@@ -14800,10 +14795,10 @@ namespace moho
         if (clearQueue) {
           ResetUserUnitManagerState(factoryQueue, commandId);
         }
-        UserUnitManagerAdd(factoryQueue, commandHelper, commandId, clearQueue);
+        UserUnitManagerAdd(factoryQueue, commandHelper, commandId, commandIssueData.mIndex);
       } else if (clearQueue) {
         ResetUserUnitManagerState(factoryQueue, commandId);
-        UserUnitManagerAdd(factoryQueue, commandHelper, commandId, clearQueue);
+        UserUnitManagerAdd(factoryQueue, commandHelper, commandId, commandIssueData.mIndex);
       }
     }
 

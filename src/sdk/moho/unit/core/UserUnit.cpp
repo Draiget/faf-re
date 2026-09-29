@@ -249,41 +249,39 @@ namespace
   // `ebx` at 0x00835DF0 and in `esi` at 0x00836080 - so this translation unit
   // keeps no build-queue global of its own.
 
-  /**
-   * The head of one pending issue-queue block. `AdvanceUserCommandManagerBySeq`
-   * reads the first `int32` of the block and compares it against the sim
-   * sequence (0x008B7372 `mov ecx,[eax]` then `sub ecx,esi`), which is why it
-   * is named for that here.
-   *
-   * It is deliberately NOT merged into `UserManagerHelperEntry`: that type is
-   * 0x10 bytes with `commandType` at +0x00, and `PushUserManagerIssue` writes a
-   * command tag into that same first word. Both readings cannot be right, and
-   * settling which needs `PushUserManagerIssue`'s own disassembly rather than a
-   * layout match, so the two stay separate until someone does that work.
-   */
-  struct UserCommandManagerPendingSlotView
-  {
-    std::int32_t dueSeqNo; // +0x00
-    std::uint8_t pad_0004_0008[0x04];
-  };
-  static_assert(
-    offsetof(UserCommandManagerPendingSlotView, dueSeqNo) == 0x00,
-    "UserCommandManagerPendingSlotView::dueSeqNo offset must be 0x00"
-  );
-
-
 } // namespace
 
 namespace moho
 {
+  /**
+   * What one pending queue edit does when `struct_UserUnitManager::Get`
+   * (0x008B6F60) replays it over the acknowledged links: the switch on the
+   * entry's +0x04 at 0x008B7092.
+   */
+  enum class EUserQueueEdit : std::int32_t
+  {
+    Add = 0,    // struct_UserUnitManager::add (0x008B6DE0)
+    Reset = 1,  // struct_UserUnitManager::reset (0x008B6E60)
+    Remove = 2, // RecordUnitManagerCommandHelperRemoval (0x008B6EE0)
+  };
+
+  /**
+   * One edit the UI made to a unit's command queue ahead of the sim. Until the
+   * sim's sequence reaches `mCommandId` (`AdvanceUserCommandManagerBySeq`,
+   * 0x008B7350: `mov ecx,[eax]` then `sub ecx,esi`) the edit is replayed over
+   * the acknowledged links, which is what puts a command in the queue the
+   * moment it is issued.
+   */
   struct UserManagerHelperEntry
   {
-    std::int32_t commandType;     // +0x00
-    std::int32_t isResetCommand;  // +0x04
-    void* subject;                // +0x08
-    std::int32_t sequenceOrCount; // +0x0C
+    CmdId mCommandId;                // +0x00 the command this edit belongs to
+    EUserQueueEdit mEdit;            // +0x04
+    UserCommandIssueHelper* mHelper; // +0x08 the command added or removed; null for Reset
+    CmdId mIndex;                    // +0x0C Add: the issue data's `mIndex`; a 0xFF source byte appends mHelper
   };
   static_assert(sizeof(UserManagerHelperEntry) == 0x10, "UserManagerHelperEntry size must be 0x10");
+  static_assert(offsetof(UserManagerHelperEntry, mEdit) == 0x04, "UserManagerHelperEntry::mEdit offset must be 0x04");
+  static_assert(offsetof(UserManagerHelperEntry, mIndex) == 0x0C, "UserManagerHelperEntry::mIndex offset must be 0x0C");
 } // namespace moho
 
 namespace
@@ -1718,14 +1716,19 @@ namespace
         continue;
       }
 
-      if (pending->commandType == 1) {
+      // The kind is +0x04 (0x008B7092). This used to switch on +0x00, which
+      // is the command id, so an Add was skipped (and a Reset ignored) unless
+      // the id happened to match: a new command stayed out of
+      // `GetCommandQueue()`, and a cleared one stayed in it, until the sim
+      // acknowledged the edit. The UI's enhancement queue dropped the upgrade
+      // it had just queued because it saw no Script command to pair it with.
+      if (pending->mEdit == EUserQueueEdit::Reset) {
         (void)ResetQueueLinkVectorToInlineStorage(&manager.resolvedLinks);
         continue;
       }
 
-      if (pending->commandType == 2) {
-        UserCommandIssueHelper* const helperToRemove =
-          static_cast<UserCommandIssueHelper*>(pending->subject);
+      if (pending->mEdit == EUserQueueEdit::Remove) {
+        UserCommandIssueHelper* const helperToRemove = pending->mHelper;
         if (helperToRemove == nullptr) {
           continue;
         }
@@ -1740,15 +1743,15 @@ namespace
         continue;
       }
 
-      if (pending->commandType != 0 || pending->subject == nullptr) {
+      if (pending->mEdit != EUserQueueEdit::Add || pending->mHelper == nullptr) {
         continue;
       }
 
-      const std::uint32_t encodedCommandId = static_cast<std::uint32_t>(pending->sequenceOrCount);
+      const std::uint32_t encodedCommandId = static_cast<std::uint32_t>(pending->mIndex);
       if ((encodedCommandId & 0xFF000000u) != 0xFF000000u) {
         CWldSession* const activeSession = WLD_GetActiveSession();
         UserCommandIssueHelper* const helperToInsert =
-          FindSessionCommandIssueHelperById(activeSession, static_cast<CmdId>(pending->sequenceOrCount));
+          FindSessionCommandIssueHelperById(activeSession, pending->mIndex);
         if (helperToInsert == nullptr) {
           continue;
         }
@@ -1777,8 +1780,7 @@ namespace
         continue;
       }
 
-      UserCommandIssueHelper* const helperToAppend =
-        static_cast<UserCommandIssueHelper*>(pending->subject);
+      UserCommandIssueHelper* const helperToAppend = pending->mHelper;
       if (helperToAppend == nullptr) {
         continue;
       }
@@ -2076,9 +2078,8 @@ namespace
         queueIndex -= managerPtr->issueQueue.blockCount;
       }
 
-      const auto* const slot =
-        reinterpret_cast<const UserCommandManagerPendingSlotView*>(managerPtr->issueQueue.blocks[queueIndex]);
-      if (slot == nullptr || (slot->dueSeqNo - seqNo) > 0) {
+      const UserManagerHelperEntry* const pending = managerPtr->issueQueue.blocks[queueIndex];
+      if (pending == nullptr || (pending->mCommandId - seqNo) > 0) {
         break;
       }
 
@@ -2794,41 +2795,38 @@ namespace moho
    *     struct_UserUnitManager *a1@<edi>, _DWORD *eax0@<eax>, int a3, int a4);
    *
    * What it does:
-   * Records one pending command-issue for `manager`: appends a
-   * `UserManagerHelperEntry` {commandType=cmdId, isResetCommand=0,
-   * subject=helper, sequenceOrCount=clearFlag} onto the manager's issue queue,
-   * enqueues the helper's select-unit update event against the manager owner
-   * unit, marks the resolved-link range dirty, and restores that range to
-   * inline storage.
+   * Records one pending Add edit for `manager` ({cmdId, Add, helper, index},
+   * built at 0x008B6DFB-0x008B6E07), enqueues the helper's select-unit update
+   * event against the manager's owner unit, and marks the resolved links
+   * dirty. `index` is the issue data's `mIndex` (`ISSUE_Command` pushes
+   * `[esp+0x148]`, i.e. `data+0x08`, at 0x008B0566); -1 appends.
    */
   void UserUnitManagerAdd(
     UserCommandQueue* const manager,
     UserCommandIssueHelper* const helper,
     const CmdId cmdId,
-    const bool clearFlag)
+    const CmdId index)
   {
-    auto& view = *reinterpret_cast<UserCommandQueue*>(manager);
-
     UserManagerHelperEntry entry{};
-    entry.commandType = static_cast<std::int32_t>(cmdId);
-    entry.isResetCommand = 0;
-    entry.subject = helper;
-    entry.sequenceOrCount = static_cast<std::int32_t>(clearFlag);
-    PushUserManagerIssue(view.issueQueue, entry);
+    entry.mCommandId = cmdId;
+    entry.mEdit = EUserQueueEdit::Add;
+    entry.mHelper = helper;
+    entry.mIndex = index;
+    PushUserManagerIssue(manager->issueQueue, entry);
 
-    QueueCommandIssueSelectUnitEvent(helper, cmdId, view.ownerUnit);
+    QueueCommandIssueSelectUnitEvent(helper, cmdId, manager->ownerUnit);
 
-    view.resolvedLinksDirty = 1u;
-    (void)ResetQueueLinkVectorToInlineStorage(&view.resolvedLinks);
+    manager->resolvedLinksDirty = 1u;
+    (void)ResetQueueLinkVectorToInlineStorage(&manager->resolvedLinks);
   }
 
   /**
    * Address: 0x008B6E60 (FUN_008B6E60, struct_UserUnitManager::reset)
    *
    * What it does:
-   * Clears one user-unit command-issue queue and pushes a reset marker entry
-   * {commandType, isResetCommand=1, subject=null, sequenceOrCount=-1}, marks the
-   * resolved-link range dirty, and restores it to inline storage.
+   * Clears one user-unit command-issue queue and pushes a Reset edit
+   * {commandType, Reset, null, -1}, marks the resolved-link range dirty, and
+   * restores it to inline storage.
    */
   void ResetUserUnitManagerState(UserCommandQueue* const managerPtr, const std::int32_t commandType)
   {
@@ -2840,10 +2838,10 @@ namespace moho
     ClearUserManagerIssueQueue(manager.issueQueue);
 
     UserManagerHelperEntry resetHelper{};
-    resetHelper.commandType = commandType;
-    resetHelper.isResetCommand = 1;
-    resetHelper.subject = nullptr;
-    resetHelper.sequenceOrCount = -1;
+    resetHelper.mCommandId = commandType;
+    resetHelper.mEdit = EUserQueueEdit::Reset;
+    resetHelper.mHelper = nullptr;
+    resetHelper.mIndex = -1;
     PushUserManagerIssue(manager.issueQueue, resetHelper);
 
     manager.resolvedLinksDirty = 1u;
@@ -2861,10 +2859,10 @@ namespace moho
   ) noexcept
   {
     UserManagerHelperEntry entry{};
-    entry.commandType = tag;
-    entry.isResetCommand = 2;
-    entry.subject = helper;
-    entry.sequenceOrCount = -1;
+    entry.mCommandId = tag;
+    entry.mEdit = EUserQueueEdit::Remove;
+    entry.mHelper = helper;
+    entry.mIndex = -1;
     PushUserManagerIssue(manager->issueQueue, entry);
 
     QueueCommandIssueDeselectUnitEvent(helper, static_cast<CmdId>(tag), manager->ownerUnit);
