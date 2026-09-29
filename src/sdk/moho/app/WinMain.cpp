@@ -33,6 +33,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Error.hpp"
+#include "legacy/containers/HashMap.h"
 #include "WinApp.h"
 #include "moho/console/CConCommand.h"
 #include "moho/console/CConFunc.h"
@@ -68,351 +69,16 @@ extern "C" __declspec(allocate(".CRT$XIB")) int(__cdecl* const gQueryStartupInfo
 
 namespace
 {
-  class AllocationLogSymbolAddressCache
-  {
-  private:
-    struct SymbolAddressNode
-    {
-      SymbolAddressNode* next = nullptr;
-      SymbolAddressNode* prev = nullptr;
-      std::uint32_t address = 0;
-    };
-    static_assert(offsetof(SymbolAddressNode, next) == 0x00, "SymbolAddressNode::next offset must be 0x00");
-    static_assert(offsetof(SymbolAddressNode, prev) == 0x04, "SymbolAddressNode::prev offset must be 0x04");
-    static_assert(offsetof(SymbolAddressNode, address) == 0x08, "SymbolAddressNode::address offset must be 0x08");
-    static_assert(sizeof(SymbolAddressNode) == 0x0C, "SymbolAddressNode size must be 0x0C");
+  // The allocation log (`/alloclog`, `SC_StartMemoryLog`): the open file
+  // (0x010A648C), the lock every hook call takes (0x010A6344), the re-entry
+  // guard that keeps the log's own allocations out of it (0x010A6490), and the
+  // return addresses whose symbol line is already in the file - `MemHookAddr`
+  // (0x010C6264), built by its dynamic initializer 0x00BE8FA0.
+  std::FILE* sAllocLogFile = nullptr;
+  CRITICAL_SECTION sAllocLogLock{};
+  bool sInMemHook = false;
+  msvc8::hash_set<std::uint32_t> sMemHookAddr;
 
-    static constexpr std::uint32_t kInitialSymbolAddressMask = 0x3;
-    static constexpr std::uint32_t kHashXorMask = 0xDEADBEEFu;
-    static constexpr long kHashDivisor = 127773L;
-    static constexpr long kHashMul = 16807L;
-    static constexpr long kHashSub = 2836L;
-    static constexpr long kHashModulus = 0x7FFFFFFFL;
-
-    /**
-     * Address: 0x008D5D00 (FUN_008D5D00, sub_8D5D00)
-     *
-     * What it does:
-     * Compacts one pointer-vector tail by shifting `[eraseEnd, finish)` onto
-     * `eraseBegin` and updating vector logical end to the new tail.
-     */
-    [[nodiscard]] static SymbolAddressNode** CompactBucketVectorTail(
-      std::vector<SymbolAddressNode*>& bucketHeads,
-      SymbolAddressNode** const eraseBegin,
-      SymbolAddressNode** const eraseEnd
-    )
-    {
-      if (eraseBegin != eraseEnd) {
-        SymbolAddressNode** writeCursor = eraseBegin;
-        SymbolAddressNode** readCursor = eraseEnd;
-        SymbolAddressNode** const finish =
-          bucketHeads.data() + static_cast<std::ptrdiff_t>(bucketHeads.size());
-        while (readCursor != finish) {
-          *writeCursor = *readCursor;
-          ++writeCursor;
-          ++readCursor;
-        }
-        bucketHeads.resize(static_cast<std::size_t>(writeCursor - bucketHeads.data()));
-      }
-      return eraseBegin;
-    }
-
-    /**
-     * Address: 0x008D5580 (FUN_008D5580, sub_8D5580)
-     *
-     * What it does:
-     * Normalizes the bucket-head vector size used by the symbol-address cache.
-     *
-     * Address: 0x008D5D70 (FUN_008D5D70, sub_8D5D70) -- the compiler's
-     * out-of-line `std::vector<SymbolAddressNode*>::_Insert_n` emission
-     * triggered by this function's `bucketHeads.insert(bucketHeads.end(),
-     * size - bucketHeads.size(), fillValue)` call below (grow branch):
-     * `__thiscall(this, outIter, count, &value)`, handles the capacity-full
-     * reallocate-and-copy path and the capacity-available shift-and-fill
-     * path for a 4-byte pointer element. Genuine `std::` (not `msvc8::`)
-     * STL internals for this file's own `std::vector` usage -- not
-     * hand-modeled here since the recovered source already invokes the
-     * real `std::vector::insert` API that the compiler lowers to this body.
-     * Address: 0x008D72F0 (FUN_008D72F0, sub_8D72F0) -- this instantiation's
-     * fill-n sub-step, called from `FUN_008D5D70`'s capacity-available
-     * path: `for (; count; ++dst) { if (dst) *dst = value; --count; }
-     * return count;`, a trivial per-element pointer broadcast matching
-     * `_Uninit_fill_n`/`fill_n` for a 4-byte trivially-copyable element.
-     */
-    static void NormalizeBucketVectorSize(
-      std::vector<SymbolAddressNode*>& bucketHeads, const std::size_t size, SymbolAddressNode* const fillValue
-    )
-    {
-      if (bucketHeads.size() < size) {
-        bucketHeads.insert(bucketHeads.end(), size - bucketHeads.size(), fillValue);
-      } else if (bucketHeads.size() > size) {
-        SymbolAddressNode** const eraseBegin =
-          bucketHeads.data() + static_cast<std::ptrdiff_t>(size);
-        SymbolAddressNode** const eraseEnd =
-          bucketHeads.data() + static_cast<std::ptrdiff_t>(bucketHeads.size());
-        (void)CompactBucketVectorTail(bucketHeads, eraseBegin, eraseEnd);
-      }
-    }
-
-    /**
-     * Address: 0x008D6410 (FUN_008D6410, func_NewSymbolAddrNode)
-     *
-     * What it does:
-     * Allocates and initializes one symbol-address cache node.
-     */
-    SymbolAddressNode* CreateSymbolAddressNode(
-      SymbolAddressNode* const next, SymbolAddressNode* const prev, const std::uint32_t address
-    )
-    {
-      auto node = std::make_unique<SymbolAddressNode>();
-      node->next = next;
-      node->prev = prev;
-      node->address = address;
-      SymbolAddressNode* const rawNode = node.get();
-      nodes_.push_back(std::move(node));
-      return rawNode;
-    }
-
-    [[nodiscard]]
-    static std::uint32_t ComputeAddressHash(const std::uint32_t address)
-    {
-      const long mixed = static_cast<long>(address ^ kHashXorMask);
-      const ldiv_t hashedParts = std::ldiv(mixed, kHashDivisor);
-      long hashedValue = kHashMul * hashedParts.rem - kHashSub * hashedParts.quot;
-      if (hashedValue < 0) {
-        hashedValue += kHashModulus;
-      }
-      return static_cast<std::uint32_t>(hashedValue);
-    }
-
-    [[nodiscard]]
-    std::uint32_t ResolveBucketIndex(const std::uint32_t address) const
-    {
-      return ComputeAddressHash(address) & symbolAddrMask_;
-    }
-
-    void EnsureInitialized()
-    {
-      if (!bucketHeads_.empty()) {
-        return;
-      }
-      symbolAddrMask_ = kInitialSymbolAddressMask;
-      NormalizeBucketVectorSize(bucketHeads_, static_cast<std::size_t>(symbolAddrMask_) + 1U, nullptr);
-    }
-
-    void Rehash(const std::uint32_t nextMask)
-    {
-      std::vector<SymbolAddressNode*> nextBucketHeads;
-      NormalizeBucketVectorSize(nextBucketHeads, static_cast<std::size_t>(nextMask) + 1U, nullptr);
-
-      for (const std::unique_ptr<SymbolAddressNode>& ownedNode : nodes_) {
-        SymbolAddressNode* const node = ownedNode.get();
-        node->next = nullptr;
-        node->prev = nullptr;
-
-        SymbolAddressNode*& bucketHead = nextBucketHeads[ComputeAddressHash(node->address) & nextMask];
-        SymbolAddressNode* previous = nullptr;
-        SymbolAddressNode* cursor = bucketHead;
-        while (cursor != nullptr && cursor->address < node->address) {
-          previous = cursor;
-          cursor = cursor->next;
-        }
-
-        node->next = cursor;
-        node->prev = previous;
-        if (previous != nullptr) {
-          previous->next = node;
-        } else {
-          bucketHead = node;
-        }
-        if (cursor != nullptr) {
-          cursor->prev = node;
-        }
-      }
-
-      bucketHeads_.swap(nextBucketHeads);
-      symbolAddrMask_ = nextMask;
-    }
-
-    void EnsureCapacityForInsert()
-    {
-      const std::uint32_t bucketCount = static_cast<std::uint32_t>(bucketHeads_.size());
-      if (bucketCount == 0) {
-        return;
-      }
-
-      // Keep the same high-level growth policy as the recovered helper path:
-      // grow when the cache exceeds 4 addresses per bucket on average.
-      if (symbolAddrNodeCount_ > (bucketCount * 4U)) {
-        const std::uint32_t nextMask = (symbolAddrMask_ * 2U) + 1U;
-        Rehash(nextMask);
-      }
-    }
-
-  public:
-    void Clear()
-    {
-      bucketHeads_.clear();
-      nodes_.clear();
-      symbolAddrMask_ = 0;
-      symbolAddrNodeCount_ = 0;
-    }
-
-    /**
-     * Address: 0x008D4C10 (FUN_008D4C10, sub_8D4C10)
-     *
-     * What it does:
-     * Looks up one frame address in the symbol cache and inserts it when absent.
-     */
-    [[nodiscard]]
-    bool InsertIfMissing(const std::uint32_t address)
-    {
-      EnsureInitialized();
-      EnsureCapacityForInsert();
-
-      SymbolAddressNode*& bucketHead = bucketHeads_[ResolveBucketIndex(address)];
-      SymbolAddressNode* previous = nullptr;
-      SymbolAddressNode* cursor = bucketHead;
-      while (cursor != nullptr && cursor->address < address) {
-        previous = cursor;
-        cursor = cursor->next;
-      }
-
-      if (cursor != nullptr && cursor->address == address) {
-        return false;
-      }
-
-      SymbolAddressNode* const insertedNode = CreateSymbolAddressNode(cursor, previous, address);
-      if (previous != nullptr) {
-        previous->next = insertedNode;
-      } else {
-        bucketHead = insertedNode;
-      }
-      if (cursor != nullptr) {
-        cursor->prev = insertedNode;
-      }
-
-      ++symbolAddrNodeCount_;
-      return true;
-    }
-
-  private:
-    std::uint32_t symbolAddrMask_ = 0;
-    std::uint32_t symbolAddrNodeCount_ = 0;
-    std::vector<SymbolAddressNode*> bucketHeads_{};
-    std::vector<std::unique_ptr<SymbolAddressNode>> nodes_{};
-  };
-
-  class AllocationLogRuntime
-  {
-  public:
-    [[nodiscard]]
-    bool Open(const char* const path)
-    {
-      if (path == nullptr || path[0] == '\0' || file_ != nullptr) {
-        return false;
-      }
-
-      std::FILE* file = nullptr;
-      if (::fopen_s(&file, path, "wb") != 0 || file == nullptr) {
-        return false;
-      }
-
-      LARGE_INTEGER frequency{};
-      ::QueryPerformanceFrequency(&frequency);
-      (void)::fwrite(&frequency, sizeof(frequency), 1, file);
-
-      ::InitializeCriticalSection(&criticalSection_);
-      criticalSectionInitialized_ = true;
-      file_ = file;
-      return true;
-    }
-
-    void Close()
-    {
-      if (file_ != nullptr) {
-        (void)::fclose(file_);
-        file_ = nullptr;
-      }
-
-      if (criticalSectionInitialized_) {
-        ::DeleteCriticalSection(&criticalSection_);
-        criticalSectionInitialized_ = false;
-      }
-
-      isFlushing_ = false;
-      symbolAddressCache_.Clear();
-    }
-
-    void WriteEntry(const int isFreeing, const int size, const void* const pointerValue)
-    {
-      if (file_ == nullptr || !criticalSectionInitialized_) {
-        return;
-      }
-
-      ::EnterCriticalSection(&criticalSection_);
-      if (isFlushing_) {
-        ::LeaveCriticalSection(&criticalSection_);
-        return;
-      }
-
-      isFlushing_ = true;
-      try {
-        const std::uint32_t threadId = static_cast<std::uint32_t>(::GetCurrentThreadId());
-        (void)::fwrite(&threadId, sizeof(threadId), 1, file_);
-
-        LARGE_INTEGER performanceCounter{};
-        ::QueryPerformanceCounter(&performanceCounter);
-        (void)::fwrite(&performanceCounter, sizeof(performanceCounter), 1, file_);
-
-        (void)::fwrite(&isFreeing, sizeof(isFreeing), 1, file_);
-        (void)::fwrite(&size, sizeof(size), 1, file_);
-
-        const std::uint32_t pointerWord = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointerValue));
-        (void)::fwrite(&pointerWord, sizeof(pointerWord), 1, file_);
-
-        std::uint32_t frames[64]{};
-        const std::uint32_t frameCount = moho::PLAT_GetCallStack(nullptr, 64, frames);
-        for (std::uint32_t frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
-          const std::uint32_t frameAddress = frames[frameIndex];
-          (void)::fwrite(&frameAddress, sizeof(frameAddress), 1, file_);
-          WriteSymbolLineIfFirstSeen(frameAddress);
-        }
-
-        constexpr std::uint32_t kTerminator = 0;
-        (void)::fwrite(&kTerminator, sizeof(kTerminator), 1, file_);
-      } catch (...) {
-        // Preserve binary intent: swallow logging-side failures.
-      }
-
-      isFlushing_ = false;
-      ::LeaveCriticalSection(&criticalSection_);
-    }
-
-  private:
-    void WriteSymbolLineIfFirstSeen(const std::uint32_t frameAddress)
-    {
-      if (!symbolAddressCache_.InsertIfMissing(frameAddress)) {
-        return;
-      }
-
-      moho::SPlatSymbolInfo symbolInfo{};
-      if (!moho::PLAT_GetSymbolInfo(frameAddress, &symbolInfo)) {
-        return;
-      }
-
-      const msvc8::string symbolLine = symbolInfo.FormatResolvedLine();
-      (void)::fwrite(symbolLine.c_str(), 1, symbolLine.size() + 1U, file_);
-    }
-
-    std::FILE* file_ = nullptr;
-    CRITICAL_SECTION criticalSection_{};
-    bool criticalSectionInitialized_ = false;
-    bool isFlushing_ = false;
-    AllocationLogSymbolAddressCache symbolAddressCache_{};
-  };
-
-  AllocationLogRuntime sAllocationLogRuntime{};
   STICKYKEYS sSavedStickyKeys{};
   TOGGLEKEYS sSavedToggleKeys{};
   FILTERKEYS sSavedFilterKeys{};
@@ -421,12 +87,14 @@ namespace
    * Address: 0x008D2140 (FUN_008D2140, func_CleanupAllocLoc)
    *
    * What it does:
-   * Removes the allocation hook callback and closes alloc-log runtime state.
+   * Removes the allocation hook, closes the log file and deletes its lock.
    */
   void func_CleanupAllocLoc()
   {
     gpg::SetMemHook(nullptr);
-    sAllocationLogRuntime.Close();
+    std::fclose(sAllocLogFile);
+    sAllocLogFile = nullptr;
+    ::DeleteCriticalSection(&sAllocLogLock);
   }
 
   /**
@@ -435,33 +103,72 @@ namespace
    * int isFreeing, int size, ...
    *
    * What it does:
-   * Alloc-log sink callback: records thread/time/op/size/pointer, writes callstack
-   * frame addresses, and appends symbol text once per unique frame address.
+   * Appends one record under the lock, unless the hook is already running on
+   * this thread's record: thread id, performance counter, the operation, size
+   * and pointer, then up to 64 return addresses and a 0 terminator. An address
+   * seen for the first time also gets its resolved symbol line, NUL included.
    */
   void func_MemHook(const int isFreeing, const int size, ...)
   {
-    va_list ptrs;
-    va_start(ptrs, size);
-    const void* const pointerValue = va_arg(ptrs, const void*);
-    va_end(ptrs);
+    va_list args;
+    va_start(args, size);
+    const void* const pointer = va_arg(args, const void*);
+    va_end(args);
 
-    sAllocationLogRuntime.WriteEntry(isFreeing, size, pointerValue);
+    ::EnterCriticalSection(&sAllocLogLock);
+    if (!sInMemHook) {
+      sInMemHook = true;
+
+      const DWORD threadId = ::GetCurrentThreadId();
+      std::fwrite(&threadId, sizeof(threadId), 1, sAllocLogFile);
+      LARGE_INTEGER counter;
+      ::QueryPerformanceCounter(&counter);
+      std::fwrite(&counter, sizeof(counter), 1, sAllocLogFile);
+      std::fwrite(&isFreeing, sizeof(isFreeing), 1, sAllocLogFile);
+      std::fwrite(&size, sizeof(size), 1, sAllocLogFile);
+      std::fwrite(&pointer, sizeof(pointer), 1, sAllocLogFile);
+
+      std::uint32_t frames[64];
+      const std::uint32_t frameCount = moho::PLAT_GetCallStack(nullptr, 64, frames);
+      for (std::uint32_t index = 0; index < frameCount; ++index) {
+        std::fwrite(&frames[index], sizeof(frames[index]), 1, sAllocLogFile);
+        if (sMemHookAddr.insert(frames[index]).second) {
+          moho::SPlatSymbolInfo symbolInfo{};
+          if (moho::PLAT_GetSymbolInfo(frames[index], &symbolInfo)) {
+            const msvc8::string symbolLine = symbolInfo.FormatResolvedLine();
+            std::fwrite(symbolLine.c_str(), 1, symbolLine.size() + 1U, sAllocLogFile);
+          }
+        }
+      }
+
+      const std::uint32_t terminator = 0;
+      std::fwrite(&terminator, sizeof(terminator), 1, sAllocLogFile);
+      sInMemHook = false;
+    }
+    ::LeaveCriticalSection(&sAllocLogLock);
   }
 
   /**
    * Address: 0x008D2170 (FUN_008D2170)
    *
    * What it does:
-   * Opens the `/alloclog` target file, writes the QPC frequency header,
-   * sets the memory hook callback, and keeps the sink active for process life.
+   * Opens the log file for binary write; if that works, writes the
+   * performance-counter frequency as its header, sets up the lock, registers
+   * the cleanup for exit and installs the hook.
    */
   void InitializeAllocationLog(const char* const path)
   {
-    if (!sAllocationLogRuntime.Open(path)) {
+    std::FILE* const file = std::fopen(path, "wb");
+    if (file == nullptr) {
       return;
     }
 
-    (void)::atexit(&func_CleanupAllocLoc);
+    LARGE_INTEGER frequency;
+    ::QueryPerformanceFrequency(&frequency);
+    std::fwrite(&frequency, sizeof(frequency), 1, file);
+    ::InitializeCriticalSection(&sAllocLogLock);
+    sAllocLogFile = file;
+    (void)std::atexit(&func_CleanupAllocLoc);
     gpg::SetMemHook(&func_MemHook);
   }
 

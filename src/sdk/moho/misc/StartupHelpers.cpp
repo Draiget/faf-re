@@ -622,11 +622,11 @@ namespace
     throw moho::XFileError(errorText.to_std(), callstack, frameCount);
   }
 
-  [[noreturn]] void ThrowFileDirRuntimeError(const char* const runtimeApiName)
+  [[noreturn]] void ThrowFileDirCrtError(const char* const crtFunctionName)
   {
     const msvc8::string errnoDescription = moho::FILE_GetErrorFromErrno(errno);
     const msvc8::string detail =
-      gpg::STR_Printf("%s error: %s", runtimeApiName != nullptr ? runtimeApiName : "_getcwd", errnoDescription.c_str());
+      gpg::STR_Printf("%s error: %s", crtFunctionName != nullptr ? crtFunctionName : "_getcwd", errnoDescription.c_str());
     ThrowStartupFileError("Moho::FILE_Dir", detail.c_str());
   }
 
@@ -851,31 +851,6 @@ namespace
     }
 
     return false;
-  }
-
-  struct SelfLinkedDwordNodeRuntimeView
-  {
-    SelfLinkedDwordNodeRuntimeView* mNext; // +0x00
-    SelfLinkedDwordNodeRuntimeView* mPrev; // +0x04
-    std::uint32_t mLane08;                 // +0x08
-  };
-  static_assert(sizeof(SelfLinkedDwordNodeRuntimeView) == 0x0C, "SelfLinkedDwordNodeRuntimeView size must be 0x0C");
-
-  /**
-   * Address: 0x008D63F0 (FUN_008D63F0, sub_8D63F0)
-   *
-   * What it does:
-   * Allocates one 12-byte intrusive-list sentinel lane and self-links the
-   * first two pointer lanes.
-   */
-  [[maybe_unused]] [[nodiscard]] SelfLinkedDwordNodeRuntimeView* CreateSelfLinkedDwordNodeRuntime()
-  {
-    auto* const node = static_cast<SelfLinkedDwordNodeRuntimeView*>(::operator new(sizeof(SelfLinkedDwordNodeRuntimeView)));
-    if (node != nullptr) {
-      node->mNext = node;
-      node->mPrev = node;
-    }
-    return node;
   }
 
   /**
@@ -4907,14 +4882,14 @@ msvc8::string moho::FILE_Dir(const gpg::StrArg filename)
     const char* resolvedPath = nullptr;
     if (normalized.size() <= 2u) {
       if (_getdcwd(GetDrive(filename), cwdBuffer, kPathBufferLen) == nullptr) {
-        ThrowFileDirRuntimeError("_getdcwd");
+        ThrowFileDirCrtError("_getdcwd");
       }
       resolvedPath = cwdBuffer;
     } else if (normalized[2] == '/' || hasUnc) {
       resolvedPath = filename;
     } else {
       if (_getdcwd(GetDrive(filename), cwdBuffer, kPathBufferLen) == nullptr) {
-        ThrowFileDirRuntimeError("_getdcwd");
+        ThrowFileDirCrtError("_getdcwd");
       }
       const std::string suffix = normalized.substr(2u);
       std::snprintf(resolvedBuffer, sizeof(resolvedBuffer), "%s/%s", cwdBuffer, suffix.c_str());
@@ -4925,7 +4900,7 @@ msvc8::string moho::FILE_Dir(const gpg::StrArg filename)
 
   if (!fileStr.empty() && fileStr.c_str()[0] != '/') {
     if (_getcwd(cwdBuffer, kPathBufferLen) == nullptr) {
-      ThrowFileDirRuntimeError("_getcwd");
+      ThrowFileDirCrtError("_getcwd");
     }
     std::snprintf(resolvedBuffer, sizeof(resolvedBuffer), "%s/%s", cwdBuffer, fileStr.c_str());
     return FILE_DirPrefix(resolvedBuffer);

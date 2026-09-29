@@ -1,13 +1,17 @@
 #pragma once
 
 /**
- * MSVC8-era `stdext::hash_map` (from `<hash_map>`), recovered 1:1 from the
- * Forged Alliance binary.
+ * MSVC8-era `stdext::hash_map` / `stdext::hash_set` (from `<hash_map>` /
+ * `<hash_set>`), recovered 1:1 from the Forged Alliance binary. Both are one
+ * `_Hash` table (`detail::hash_table` here) that differs only in how a key is
+ * read out of an element.
  *
- * The engine instantiates this container for the A* search node table owned by
- * `Moho::PathQueue::ImplBase` (see `gpg/core/algorithms/AStarSearch.h`). Every
- * structural detail below is pinned by binary evidence rather than by the
- * modern `std::unordered_map` design:
+ * The engine instantiates the map for the A* search node table owned by
+ * `Moho::PathQueue::ImplBase` (see `gpg/core/algorithms/AStarSearch.h`) and the
+ * path cluster caches, and the set for the allocation log's symbol-address
+ * cache (`MemHookAddr`, moho/app/WinMain.cpp). Every structural detail below is
+ * pinned by binary evidence rather than by the modern `std::unordered_map`
+ * design:
  *
  *   - Elements live in a single sorted `msvc8::list`, not in per-bucket chains.
  *     A bucket is a *window* `[mVec[b], mVec[b + 1])` into that one list, so
@@ -16,9 +20,11 @@
  *   - The table uses **linear hashing**: `mMaxidx` buckets are live out of a
  *     `mMask + 1` address space, and `_Grow` splits exactly one bucket per call
  *     instead of rehashing the whole table.
- *   - `hash_value` is the Park-Miller minstd step MSVC8 shipped for integral
- *     keys, reproduced exactly (including the `ldiv` decomposition) because the
- *     bucket assignment - and therefore iteration order - is observable.
+ *   - `hash_compare` pseudorandomizes every key hash with the Park-Miller
+ *     minstd step MSVC8 shipped, reproduced exactly (including the `ldiv`
+ *     decomposition) because the bucket assignment - and therefore iteration
+ *     order - is observable. An integral key's hash is `key ^ 0xDEADBEEF`
+ *     (VC8's `_HASH_SEED`) first; other key types supply their own.
  *
  * Layout (verified against `Moho::PathQueue::ImplBase` +0x00..+0x28):
  *
@@ -39,6 +45,7 @@
 #include <cstdlib>
 #include <functional>
 #include <iterator>
+#include <type_traits>
 #include <utility>
 
 #include "legacy/containers/Vector.h"
@@ -55,9 +62,11 @@ namespace msvc8
      * if (v4 < 0) v4 += 0x7FFFFFFF;
      *
      * What it does:
-     * MSVC8's `stdext::hash_value` for integral keys - one step of the
+     * `stdext::hash_compare`'s pseudorandomizing transform - one step of the
      * Park-Miller "minimal standard" generator using Schrage decomposition so
-     * the 32-bit intermediate never overflows.
+     * the 32-bit intermediate never overflows. Key types that supply their own
+     * `hash_value` end in this step over their hash; integral keys reach it
+     * through `hash_compare` after the `_HASH_SEED` XOR.
      */
     [[nodiscard]] inline std::size_t hash_value(long key) noexcept
     {
@@ -68,6 +77,9 @@ namespace msvc8
         }
         return static_cast<std::size_t>(scrambled);
     }
+
+    /** VC8's `_HASH_SEED`. */
+    inline constexpr std::size_t hash_seed = 0xDEADBEEFu;
 
     /**
      * MSVC8 `stdext::hash_compare`: bundles the hash function and the strict
@@ -93,10 +105,19 @@ namespace msvc8
         {
         }
 
-        /** Hashes one key. Found via ADL so user key types can supply their own. */
+        /**
+         * Hashes one key. An integral key is VC8's `hash_value(key) = key ^
+         * _HASH_SEED` then the Park-Miller step (`xor edx, 0DEADBEEFh` ahead of
+         * the `ldiv(.., 127773)` in `MemHookAddr`'s insert, 0x008D4CC3); any
+         * other key type supplies its own `hash_value`, found via ADL.
+         */
         [[nodiscard]] std::size_t operator()(const Key& key) const
         {
-            return hash_value(key);
+            if constexpr (std::is_integral_v<Key>) {
+                return hash_value(static_cast<long>(static_cast<std::size_t>(key) ^ hash_seed));
+            } else {
+                return hash_value(key);
+            }
         }
 
         /** Orders two keys inside a bucket window. */
@@ -106,13 +127,38 @@ namespace msvc8
         }
     };
 
-    template <class Key, class T, class Traits = hash_compare<Key>>
-    class hash_map
+    namespace detail
+    {
+        /** `hash_map`'s key is the element's `first`. */
+        struct hash_map_key
+        {
+            template <class Pair>
+            [[nodiscard]] const auto& operator()(const Pair& value) const noexcept
+            {
+                return value.first;
+            }
+        };
+
+        /** `hash_set`'s key is the element itself. */
+        struct hash_set_key
+        {
+            template <class Key>
+            [[nodiscard]] const Key& operator()(const Key& value) const noexcept
+            {
+                return value;
+            }
+        };
+
+    /**
+     * VC8's `_Hash`: the table `hash_map` and `hash_set` both are. `KeyOf`
+     * reads the key out of an element.
+     */
+    template <class Key, class Value, class Traits, class KeyOf>
+    class hash_table
     {
     public:
         using key_type = Key;
-        using mapped_type = T;
-        using value_type = std::pair<const Key, T>;
+        using value_type = Value;
         using list_type = list<value_type>;
         using iterator = typename list_type::iterator;
         using const_iterator = typename list_type::const_iterator;
@@ -126,11 +172,25 @@ namespace msvc8
         size_type mMaxidx;         // +0x24
 
     public:
-        hash_map()
-            : mMask(1)
+        /**
+         * Address: 0x008D5350 (FUN_008D5350) - `hash_set<unsigned int>`, the
+         *          allocation log's `MemHookAddr` (0x010C6264): stores the
+         *          comparator byte, buys the list head (0x008D63F0), constructs
+         *          the bucket vector with `min_buckets + 1` copies of `end()`
+         *          (0x008D6480), then `mMask = mMaxidx = 1`. Its dynamic
+         *          initializer is 0x00BE8FA0.
+         *
+         * VC8's `_Hash` constructor: the bucket array is built by the
+         * count-value `vector` constructor, not by `_Init()`'s `assign`,
+         * which only `clear()` reaches.
+         */
+        hash_table()
+            : mTraits()
+            , mList()
+            , mVec(Traits::min_buckets + 1, mList.end())
+            , mMask(1)
             , mMaxidx(1)
         {
-            _Init();
         }
 
         [[nodiscard]] iterator begin() { return mList.begin(); }
@@ -189,9 +249,9 @@ namespace msvc8
             const iterator windowEnd = mVec[bucket + 1];
 
             while (scan != windowEnd) {
-                if (!mTraits(scan->first, key)) {
+                if (!mTraits(_Kfn(*scan), key)) {
                     // Ordering stops here; only an exact match is a hit.
-                    return mTraits(key, scan->first) ? mList.end() : scan;
+                    return mTraits(key, _Kfn(*scan)) ? mList.end() : scan;
                 }
                 ++scan;
             }
@@ -209,6 +269,11 @@ namespace msvc8
          * insertion point by scanning the bucket window *backwards* from its end
          * boundary, and links the new node there. Returns `{position, false}`
          * without inserting when an equivalent key is already present.
+         *
+         * Address: 0x008D4C10 (FUN_008D4C10) - `hash_set<unsigned int>`,
+         *          `MemHookAddr`'s `insert` with `_Grow` inlined at its head
+         *          (the `size / 4` test against `mMaxidx`, 0x008D4C1F); the
+         *          allocation log's `func_MemHook` (0x008D1F5F) tests `.second`.
          */
         std::pair<iterator, bool> insert(const value_type& value)
         {
@@ -216,16 +281,16 @@ namespace msvc8
                 _Grow();
             }
 
-            const size_type bucket = _Buckno(value.first);
+            const size_type bucket = _Buckno(_Kfn(value));
             const iterator windowBegin = mVec[bucket];
             iterator where = mVec[bucket + 1];
 
             if (windowBegin != where) {
                 for (;;) {
                     --where;
-                    if (!mTraits(value.first, where->first)) {
-                        // where->first <= value.first
-                        if (!mTraits(where->first, value.first)) {
+                    if (!mTraits(_Kfn(value), _Kfn(*where))) {
+                        // key(*where) <= key(value)
+                        if (!mTraits(_Kfn(*where), _Kfn(value))) {
                             return std::pair<iterator, bool>(where, false);
                         }
                         ++where;
@@ -241,26 +306,6 @@ namespace msvc8
             const iterator inserted = mList.insert(where, value);
             _RetargetBucketStarts(bucket, displaced, inserted);
             return std::pair<iterator, bool>(inserted, true);
-        }
-
-        /**
-         * Address: 0x00768F40 (FUN_00768F40)
-         *
-         * IDA signature:
-         * int __usercall sub_768F40@<eax>(int *key@<eax>, _DWORD *self@<ecx>);
-         *
-         * What it does:
-         * Returns the mapped value for `key`, default-constructing and inserting
-         * the element first when the key is absent. The binary's `+ 12` on the
-         * return value is the `pair::second` offset inside the list node.
-         */
-        [[nodiscard]] mapped_type& operator[](const key_type& key)
-        {
-            const iterator found = find(key);
-            if (found != mList.end()) {
-                return found->second;
-            }
-            return insert(value_type(key, mapped_type())).first->second;
         }
 
         /**
@@ -306,12 +351,12 @@ namespace msvc8
             const iterator windowEnd = mVec[bucket + 1];
 
             for (iterator lower = mVec[bucket]; lower != windowEnd; ++lower) {
-                if (mTraits(lower->first, key)) {
+                if (mTraits(_Kfn(*lower), key)) {
                     continue;
                 }
 
                 iterator upper = lower;
-                while (upper != windowEnd && !mTraits(key, upper->first)) {
+                while (upper != windowEnd && !mTraits(key, _Kfn(*upper))) {
                     ++upper;
                 }
 
@@ -373,7 +418,7 @@ namespace msvc8
             iterator next = where;
             ++next;
 
-            _RetargetBucketStarts(_Buckno(where->first), where, next);
+            _RetargetBucketStarts(_Buckno(_Kfn(*where)), where, next);
             return mList.erase(where);
         }
 
@@ -450,9 +495,14 @@ namespace msvc8
         }
 
     private:
+        [[nodiscard]] static const key_type& _Kfn(const value_type& value) noexcept
+        {
+            return KeyOf{}(value);
+        }
+
         /**
-         * Address: 0x009303F0 (FUN_009303F0), reached from the constructor
-         * (`FUN_00930810`) and `clear()` (`FUN_00930B40`) for the
+         * Address: 0x009303F0 (FUN_009303F0), reached from `clear()`
+         * (`FUN_00930B40`; 0x00930810 is a one-`jmp` thunk into it) for the
          * `OccupationCacheMap` instantiation
          * (`gpg::HaStar::ClusterInternalCache<gpg::HaStar::OccupationData>`,
          * `gpg/core/algorithms/Cluster.cpp`) -- see
@@ -466,9 +516,8 @@ namespace msvc8
          * instantiation fuse both into one unconditional
          * `insert(first_, count, value)` (`vector<T>::assign`'s own shape),
          * which only holds when the vector starts empty on every call --
-         * true here since `_Init()` only ever runs from a fresh constructor
-         * or right after `clear()` has already emptied `mList`/reset
-         * `mMask`/`mMaxidx`. `assign` reproduces that fused shape exactly;
+         * true here since `_Init()` only ever runs right after `clear()` has
+         * already emptied `mList`/reset `mMask`/`mMaxidx`. `assign` reproduces that fused shape exactly;
          * the previous `clear(); resize(...);` pair was behaviourally
          * equivalent but did not match the binary's one-call emission.
          */
@@ -562,7 +611,7 @@ namespace msvc8
             iterator scan = mVec[splitBucket];
 
             while (mVec[splitBucket + 1] != scan) {
-                if ((mTraits(scan->first) & mMask) == splitBucket) {
+                if ((mTraits(_Kfn(*scan)) & mMask) == splitBucket) {
                     ++scan;
                     continue;
                 }
@@ -596,4 +645,48 @@ namespace msvc8
             ++mMaxidx;
         }
     };
+    } // namespace detail
+
+    template <class Key, class T, class Traits = hash_compare<Key>>
+    class hash_map : public detail::hash_table<Key, std::pair<const Key, T>, Traits, detail::hash_map_key>
+    {
+        using base_type = detail::hash_table<Key, std::pair<const Key, T>, Traits, detail::hash_map_key>;
+
+    public:
+        using key_type = Key;
+        using mapped_type = T;
+        using value_type = typename base_type::value_type;
+        using iterator = typename base_type::iterator;
+
+        /**
+         * Address: 0x00768F40 (FUN_00768F40)
+         *
+         * IDA signature:
+         * int __usercall sub_768F40@<eax>(int *key@<eax>, _DWORD *self@<ecx>);
+         *
+         * What it does:
+         * Returns the mapped value for `key`, default-constructing and inserting
+         * the element first when the key is absent. The binary's `+ 12` on the
+         * return value is the `pair::second` offset inside the list node.
+         */
+        [[nodiscard]] mapped_type& operator[](const key_type& key)
+        {
+            const iterator found = this->find(key);
+            if (found != this->end()) {
+                return found->second;
+            }
+            return this->insert(value_type(key, mapped_type())).first->second;
+        }
+    };
+
+    /**
+     * `stdext::hash_set`: the same table keyed by the element itself. Its
+     * iterator is the list's, mutable, as VC8's was.
+     */
+    template <class Key, class Traits = hash_compare<Key>>
+    class hash_set : public detail::hash_table<Key, Key, Traits, detail::hash_set_key>
+    {
+    };
+
+    static_assert(sizeof(hash_set<unsigned int>) == 0x28, "msvc8::hash_set size must be 0x28");
 } // namespace msvc8

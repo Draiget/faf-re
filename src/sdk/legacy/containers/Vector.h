@@ -1807,6 +1807,8 @@ namespace msvc8
          * Address: 0x005400A0 (FUN_005400A0 -- `vector<uint32>(count, value)`: `CClientManagerImpl::CClientManagerImpl` (0x0053DF20).)
          * Address: 0x00A74370 (FUN_00A74370 -- `vector(count, value)` for an 8-byte element (buy at 0x00A72080, fill at 0x00A72C30).)
          * Address: 0x00A74430 (FUN_00A74430 -- `vector(count, value)` for a 16-byte element (buy at 0x00A720E0, fill at 0x00A72C70).)
+ * Address: 0x008D6480 (FUN_008D6480 -- `vector<list<unsigned>::iterator>(9, end())`, the bucket array
+ *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp)'s constructor 0x008D5350 builds: `_Allocate(9)` (0x008D6F60), then the fill 0x008D72F0.)
          */
         vector(std::size_t count, const T& value) : vector() {
             // VC8: `if (_Buy(count)) { try { _Mylast = _Ufill(_Myfirst, count,
@@ -3310,6 +3312,8 @@ namespace msvc8
          * Address: 0x005DC9B0 (FUN_005DC9B0 -- `resize(n, value)` for the task pointers -- same shape, growing through `_Insert_n` 0x005DD570. Reached from `RVectorType_CAcquireTargetTask_P::SetCount` for `msvc8::vector<moho::CAcquireTargetTask*>` (the reflected acquire-target-task vector); callers 0x005D85B0, 0x005DBC10, 0x005DBE41; formerly `ResizeCAcquireTargetTaskPointerVector` in moho/ai/IAiAttacker.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x005EB260 (FUN_005EB260 -- `resize(n, value)` -- erase the tail when shrinking, fill from a default-constructed attach point when growing. Reached from that instantiation's `SetCount` for `msvc8::vector<moho::SAttachPoint>` (the reflected attach-point vector; `max_size` 0x0CCCCCCC, so the element is 0x14); callers 0x005E93E0, 0x005EA890; formerly `ResizeAttachPointVectorToCount` in moho/ai/IAiTransport.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x005EA890 (FUN_005EA890 -- the one-argument `resize(n)` that builds the default attach point and hands it to 0x005EB260 for `msvc8::vector<moho::SAttachPoint>` (the reflected attach-point vector; `max_size` 0x0CCCCCCC, so the element is 0x14); zero callers, unreachable; formerly `ResizeAttachPointVectorWithDefaultLane` in moho/ai/IAiTransport.cpp (RULE ONE), removed 2026-09-11.)
+ * Address: 0x008D5580 (FUN_008D5580 -- `resize(n, end())` of the bucket array of
+ *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp): the grow in its `insert` (0x008D4C72) doubles the array through it.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -4456,6 +4460,8 @@ namespace msvc8
          *   same vector, through `WeakPtr`'s relinking assignment; 0x007A5E30 is its
          *   register-order adapter. Formerly `CopyInputCaptureWeakRangeAssign`.)
          * Address: 0x007A5E30 (FUN_007A5E30 -- see 0x007A5F60 above.)
+ * Address: 0x008D5D00 (FUN_008D5D00 -- `erase(first, last)` of the bucket array of
+ *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp): `resize`'s shrink branch, the tail copied down over the gap.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -6685,6 +6691,8 @@ namespace msvc8
          *   `GrowAndInsertInputCaptureWeakRef`.)
          * Address: 0x00505530 (FUN_00505530 -- `_Insert_n(pos, count, value)` for `msvc8::vector<moho::SpatialShard<T>*>` (moho/mesh/SpatialDb.h): the `0x3FFFFFFF` length guard into `_Xlen` 0x00505750, the in-place tail shift through 0x00506160 and fill, or the 1.5x relocation through `_Allocate` 0x005061D0; caller 0x00504D70; formerly `InsertNullSpatialShardSlots` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
          * Address: 0x00505850 (FUN_00505850 -- the same `_Insert_n` for `msvc8::vector<moho::SpatialShardData<T>*>`, through `_Xlen` 0x00505A70, 0x00506230 and `_Allocate` 0x005062A0; caller 0x00504EE0; formerly `InsertNullSpatialShardDataSlots` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
+ * Address: 0x008D5D70 (FUN_008D5D70 -- `insert(pos, count, value)` (`_Insert_n`) of the bucket
+ *   array of `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp), `resize`'s grow branch.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -9493,6 +9501,8 @@ namespace msvc8
          * Address: 0x008EA0D0 (FUN_008EA0D0 -- the same `_Uninit_fill_n` for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); callers 0x008F2396, 0x008FF8F9 (the same two inlined `push_back`s), 0x008EA540, 0x008EA2F0, and 0x008EFEA3 in the unboxed `push_back` 0x008EFE60; formerly `FillDwordRangeWithSourceLaneDispatchA` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x008EA540 (FUN_008EA540 -- `_Ufill` over it for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); callers 0x008EF3AE, 0x008EF473 (`_Insert_n` 0x008EF2B0); formerly `FillDwordRangeWithSourceLaneDispatchAAndReturnEnd` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x008EA2F0 (FUN_008EA2F0 -- a tag-pushing bridge into 0x008EA0D0 for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); zero callers, unreachable; formerly `FillDwordRangeWithSourceLaneDispatchAAdapter` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+ * Address: 0x008D72F0 (FUN_008D72F0 -- the 4-byte fill for the bucket array of
+ *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp): count in EAX, destination in ECX, `&value` in EDX, one null-checked store per slot.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -12355,6 +12365,9 @@ namespace msvc8
          *   `AllocateCommandFeedbackBlipNodeLane`.)
          * Address: 0x00858730 (FUN_00858730 -- the checked one-node `operator new` this
          *   `_Buynode` inlines for the same list (`0xFFFFFFFF / 0x14` guard, dead at one node).)
+ * Address: 0x008D6410 (FUN_008D6410 -- `_Buynode(next, prev, value)` for the element list of
+ *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp): `_Allocate(1)` (0x008D7020), then the three null-checked stores; formerly
+ *   `CreateSymbolAddressNode` in moho/app/WinMain.cpp, removed 2026-09-29.)
          */
         _Nodeptr _Buynode(_Nodeptr next, _Nodeptr prev, const value_type& v)
         {
@@ -12445,6 +12458,10 @@ namespace msvc8
          * Address: 0x00702090 (FUN_00702090 -- `_Buy_head` -- allocate the 0x10 header sentinel and self-link its links for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); callers 0x006FD7C0, 0x007015A0, 0x0070BEA0; formerly `AllocateSelfLinkedArmyTriggerSentinel` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x005D01E0 (FUN_005D01E0 -- `_Buy_head` -- allocate the 0x0C header sentinel and self-link its links for `msvc8::list<moho::ESiloType>` (`CAiSiloBuildImpl::mSiloTypes` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x005CED30, 0x005CF5B0, 0x005CFD20; formerly `AllocateSelfLinkedSiloTypeSentinel` in moho/ai/CAiSiloBuildImpl.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x0081A440 (FUN_0081A440 -- `_Buy_head` -- allocate the 0x30 header sentinel and self-link its links for `msvc8::list<moho::SkyDomeDecalVertices>` (`SkyDome::mDecalUploads` at +0xB4; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x28 vertex block}` 0x30); callers 0x008149E0, 0x0081A1F0; formerly `AllocateSkyDomeDecalUploadListSentinel` in moho/render/SkyDome.cpp (RULE ONE), removed 2026-09-11.)
+ * Address: 0x008D63F0 (FUN_008D63F0 -- `_Buy_head()` for the element list of
+ *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp): `_Allocate(1)` (0x008D7020), then `_Next = _Prev = node`, each store null-checked;
+ *   caller the set's constructor 0x008D5350. Formerly `CreateSelfLinkedDwordNodeRuntime` over
+ *   `SelfLinkedDwordNodeRuntimeView` in moho/misc/StartupHelpers.cpp, removed 2026-09-29.)
          */
         void _Buy_head()
         {
