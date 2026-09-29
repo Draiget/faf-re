@@ -673,9 +673,9 @@ namespace
    * What it does:
    * Startup thunk that forwards to `func_SecondsPerTick_LuaFuncDef`.
    */
-  void register_SecondsPerTick_LuaFuncDef()
+  CScrLuaInitForm* register_SecondsPerTick_LuaFuncDef()
   {
-    (void)func_SecondsPerTick_LuaFuncDef();
+    return func_SecondsPerTick_LuaFuncDef();
   }
 
   /**
@@ -901,6 +901,7 @@ namespace
       (void)::moho::register_EntityCategory__sub_LuaFuncDef();
       (void)::moho::register_EntityCategory__mul_LuaFuncDef();
       (void)::moho::register_EntityCategoryEmpty_LuaFuncDef();
+      (void)::moho::register_SecondsPerTick_LuaFuncDef();
       (void)::moho::register_EntityCategoryGetUnitList_LuaFuncDef();
     }
   };

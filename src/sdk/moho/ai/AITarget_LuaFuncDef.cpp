@@ -123,3 +123,21 @@ namespace moho
     (void)binder;
   }
 } // namespace moho
+
+namespace
+{
+  /**
+   * Runs this file's Lua binder registration, which the binary's static-init
+   * array does through 0x00BCEC90 before `main`. Without it `AITarget` never
+   * joins the Core init set and is missing from every Lua state.
+   */
+  struct AITargetLuaBinderBootstrap
+  {
+    AITargetLuaBinderBootstrap()
+    {
+      moho::register_AITarget_LuaFuncDef();
+    }
+  };
+
+  const AITargetLuaBinderBootstrap gAITargetLuaBinderBootstrap{};
+} // namespace

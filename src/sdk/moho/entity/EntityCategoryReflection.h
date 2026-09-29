@@ -451,7 +451,7 @@ namespace moho
    * What it does:
    * Startup thunk that forwards to `func_SecondsPerTick_LuaFuncDef`.
    */
-  void register_SecondsPerTick_LuaFuncDef();
+  CScrLuaInitForm* register_SecondsPerTick_LuaFuncDef();
 
   /**
    * Address: 0x00555B60 (FUN_00555B60, cfunc_EntityCategoryGetUnitList)
