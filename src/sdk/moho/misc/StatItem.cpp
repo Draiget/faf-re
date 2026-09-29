@@ -677,7 +677,7 @@ namespace
       }
     }
 
-    for (StatIntrusiveNode* node = AsChildHead(item)->next; node != nullptr; node = node->next) {
+    for (StatIntrusiveNode* node = AsChildHead(item)->next; node != nullptr && node != AsChildHead(item); node = node->next) {
       moho::StatItem* const child = node->owner;
       if (!child) {
         break;
@@ -700,7 +700,7 @@ namespace
     }
 
     item->mSampleHistory.Clear();
-    for (StatIntrusiveNode* node = AsChildHead(item)->next; node != nullptr; node = node->next) {
+    for (StatIntrusiveNode* node = AsChildHead(item)->next; node != nullptr && node != AsChildHead(item); node = node->next) {
       moho::StatItem* const child = node->owner;
       if (!child) {
         break;
@@ -804,7 +804,7 @@ namespace
     }
 
     bool childWroteLine = false;
-    for (StatIntrusiveNode* node = AsChildHead(item)->next; node != nullptr; node = node->next) {
+    for (StatIntrusiveNode* node = AsChildHead(item)->next; node != nullptr && node != AsChildHead(item); node = node->next) {
       moho::StatItem* const child = node->owner;
       if (!child) {
         break;
@@ -1075,7 +1075,7 @@ namespace moho
 
   StatItem* StatItem::FindDirectChildByName(const msvc8::string& token)
   {
-    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr; node = node->next) {
+    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr && node != AsChildHead(this); node = node->next) {
       StatItem* const child = node->owner;
       if (child == nullptr) {
         break;
@@ -1378,7 +1378,7 @@ namespace moho
     children.AssignNewTable(state, 0, 0);
 
     std::int32_t childIndex = 1;
-    for (StatIntrusiveNode* node = childHead->next; node != nullptr;) {
+    for (StatIntrusiveNode* node = childHead->next; node != nullptr && node != childHead;) {
       StatIntrusiveNode* const next = node->next;
       StatItem* const child = node->owner;
       if (child == nullptr) {
@@ -1446,7 +1446,7 @@ namespace moho
       return;
     }
 
-    for (StatIntrusiveNode* node = AsChildHead(root)->next; node != nullptr; node = node->next) {
+    for (StatIntrusiveNode* node = AsChildHead(root)->next; node != nullptr && node != AsChildHead(root); node = node->next) {
       StatItem* const child = node->owner;
       if (!child) {
         break;
@@ -1904,7 +1904,7 @@ namespace moho
    */
   StatItem::~StatItem()
   {
-    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr;) {
+    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr && node != AsChildHead(this);) {
       StatItem* const child = node->owner;
       if (child == nullptr) {
         break;
@@ -1971,7 +1971,7 @@ namespace moho
       return;
     }
 
-    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr; node = node->next) {
+    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr && node != AsChildHead(this); node = node->next) {
       StatItem* const child = node->owner;
       if (!child) {
         break;
@@ -1992,7 +1992,7 @@ namespace moho
       Clear(false);
     }
 
-    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr; node = node->next) {
+    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr && node != AsChildHead(this); node = node->next) {
       StatItem* const child = node->owner;
       if (!child) {
         break;
@@ -2012,7 +2012,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    for (StatIntrusiveNode* node = AsChildHead(const_cast<StatItem*>(this))->next; node != nullptr; node = node->next) {
+    for (StatIntrusiveNode* node = AsChildHead(const_cast<StatItem*>(this))->next; node != nullptr && node != AsChildHead(const_cast<StatItem*>(this)); node = node->next) {
       StatItem* const child = node->owner;
       if (!child) {
         break;

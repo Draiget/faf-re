@@ -16,6 +16,7 @@
 #include "moho/ai/IFormationInstance.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/Vector3f.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UserUnit.h"
 #include "gpg/core/time/Timer.h"
@@ -36,22 +37,6 @@ namespace
     }
 
     return reinterpret_cast<moho::UserEntity*>(rawOwnerSlot - kWeakOwnerOffset);
-  }
-
-  [[nodiscard]] moho::Unit* ResolveSelectionUnit(moho::UserEntity* const entity) noexcept
-  {
-    if (entity == nullptr) {
-      return nullptr;
-    }
-
-    moho::UserUnit* const userUnitView = entity->IsUserUnit();
-    if (userUnitView == nullptr) {
-      return nullptr;
-    }
-
-    constexpr std::size_t kUserUnitSubobjectOffsetInUnit = 0x148;
-    auto* const rawUserUnitView = reinterpret_cast<std::uint8_t*>(userUnitView);
-    return reinterpret_cast<moho::Unit*>(rawUserUnitView - kUserUnitSubobjectOffsetInUnit);
   }
 
   /**
@@ -83,9 +68,11 @@ namespace
     bool hasSurfaceUnits = false;
 
     while (node != selection.mHead) {
-      moho::UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
-      moho::Unit* const unit = ResolveSelectionUnit(entity);
-      if (unit != nullptr && unit->mVarDat.mLayerMask == moho::LAYER_Air) {
+      // Every selection entry is a unit: the binary casts without a check and
+      // dispatches `GetBlueprint` (IUnit slot 7, through the sub-object at
+      // UserUnit+0x148), then tests `Physics.MotionType` (+0x290).
+      auto* const unit = static_cast<moho::UserUnit*>(DecodeSelectionEntity(node->mEnt));
+      if (unit->GetBlueprint()->Physics.MotionType == moho::RULEUMT_Air) {
         hasAirUnits = true;
       } else {
         hasSurfaceUnits = true;
