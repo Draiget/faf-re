@@ -1,58 +1,30 @@
 #include "moho/effects/rendering/IEffect.h"
 
-#include <cstddef>
 #include <cstdint>
-#include <string>
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/utils/Global.h"
 #include "moho/effects/rendering/CEffectManagerImpl.h"
-#include "moho/misc/StatItem.h"
-#include "moho/misc/Stats.h"
 #include "moho/sim/Sim.h"
-#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
   gpg::RType* IEffect::sType = nullptr;
   gpg::RType* IEffect::sPointerType = nullptr;
 
-  namespace
-  {
-    /**
-     * Address: 0x0066CB30 (FUN_0066CB30)
-     * Address: 0x00BFC0F0 (FUN_00BFC0F0, atexit destructor of the static `RPointerType<IEffect>` descriptor)
-     *
-     * What it does:
-     * Constructs the static `RPointerType<IEffect>` descriptor that the
-     * binary exposes as `Moho::IEffect::PointerType` and pre-registers it
-     * under the `IEffect*` type-info key, so subsequent `LookupRType` queries
-     * from the lazy `GetPointerType` lane resolve to this descriptor. The
-     * binary holds the descriptor as a function-local static of
-     * `GetPointerType`; it lives here because the preregister phase has to
-     * construct it before any consumer looks up `IEffect*`.
-     */
-    gpg::RType* PreregisterIEffectPointerType()
-    {
-      static gpg::RPointerType<moho::IEffect> sDescriptor;
-      gpg::PreRegisterRType(typeid(moho::IEffect*), &sDescriptor);
-      return &sDescriptor;
-    }
-  } // namespace
-
   /**
    * Address: 0x0066C980 (FUN_0066C980, Moho::IEffect::GetPointerType)
+   * Address: 0x00BFC0F0 (FUN_00BFC0F0, `atexit` destructor of `sDescriptor`)
    *
    * What it does:
-   * On first call, pre-registers the static `RPointerType<IEffect>`
-   * descriptor. After that, lazily caches the
-   * `LookupRType(typeid(IEffect*))` result in `sPointerType` and returns it.
+   * Constructs `sDescriptor` on the first call -- guard bit 0 of 0x010C8670,
+   * constructor 0x0066CB30, `atexit(0x00BFC0F0)` -- and resolves
+   * `typeid(IEffect*)` into `sPointerType`. The descriptor is never read by
+   * name: its constructor pre-registers it, and that is what the lookup finds.
    */
   gpg::RType* IEffect::GetPointerType()
   {
-    static const bool sOnceInit = (PreregisterIEffectPointerType(), true);
-    (void)sOnceInit;
+    static gpg::RPointerType<IEffect> sDescriptor;
 
     if (!sPointerType) {
       sPointerType = gpg::LookupRType(typeid(IEffect*));
@@ -60,110 +32,52 @@ namespace moho
     return sPointerType;
   }
 
-  namespace
-  {
-    [[nodiscard]] LuaPlus::LuaObject BuildEffectLuaFactoryObject(CEffectManagerImpl* const manager)
-    {
-      LuaPlus::LuaObject factory{};
-      if (manager == nullptr) {
-        return factory;
-      }
-
-      Sim* const sim = manager->GetSim();
-      LuaPlus::LuaState* const luaState = sim != nullptr ? sim->GetLuaState() : nullptr;
-      (void)func_CreateLuaIEffect(&factory, luaState);
-      return factory;
-    }
-  } // namespace
-
   /**
    * Address: 0x00658F00 (FUN_00658F00, Moho::IEffect::IEffect)
    */
   IEffect::IEffect()
     : CScriptObject()
+    , mManager(nullptr)
+    , mScriptObjectToken(-1)
+  {}
+
+  namespace
   {
-    mManager = nullptr;
-    mScriptObjectToken = -1;
-  }
+    /**
+     * The `IEffect` metatable object for `state`, as the first argument of
+     * `CScriptObject`'s binding constructor. `func_CreateLuaIEffect` fills a
+     * caller-provided slot; returning it by value keeps that slot the
+     * constructor's argument temporary, which is what 0x00658FE1 passes.
+     */
+    [[nodiscard]] LuaPlus::LuaObject IEffectMetatable(LuaPlus::LuaState* const state)
+    {
+      LuaPlus::LuaObject metatable;
+      (void)func_CreateLuaIEffect(&metatable, state);
+      return metatable;
+    }
+  } // namespace
 
   /**
    * Address: 0x00658F70 (FUN_00658F70, Moho::IEffect::IEffect)
    *
    * What it does:
-   * Builds manager-bound script metadata from the owning sim Lua state and
-   * initializes one effect runtime lane with manager and script token fields.
+   * Evaluates the three empty `LuaObject` arguments first (right to left),
+   * then `manager->GetSim()` through the manager's vtable and the metatable
+   * for that sim's Lua state, and chains into `CScriptObject`. The binary
+   * checks neither the manager nor the sim for null.
    */
   IEffect::IEffect(CEffectManagerImpl* const manager, const int scriptObjectToken)
-    : CScriptObject(BuildEffectLuaFactoryObject(manager), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
-  {
-    mManager = manager;
-    mScriptObjectToken = scriptObjectToken;
-  }
+    : CScriptObject(
+        IEffectMetatable(manager->GetSim()->mLuaState), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{}
+      )
+    , mManager(manager)
+    , mScriptObjectToken(scriptObjectToken)
+  {}
 
   /**
-   * Address: 0x00659950 (FUN_00659950)
-   *
    * What it does:
-   * Initializes one effect-manager intrusive node to singleton self-links.
-   */
-  [[maybe_unused]] IEffect::ManagerListNode* InitializeIEffectManagerNodeSelfLinks(
-    IEffect::ManagerListNode* const node
-  ) noexcept
-  {
-    node->mNext = node;
-    node->mPrev = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x00654260 (FUN_00654260)
-   *
-   * What it does:
-   * Returns the effect manager that owns this effect's intrusive-list lane.
-   */
-  [[maybe_unused]] IEffectManager* ReadIEffectManagerOwner(const IEffect* const effect) noexcept
-  {
-    return effect->mManager;
-  }
-
-  struct RefCountedRuntimeView
-  {
-    void** vtable = nullptr; // +0x00
-    volatile long refCount = 0; // +0x04
-  };
-  static_assert(sizeof(RefCountedRuntimeView) == 0x08, "RefCountedRuntimeView size must be 0x08");
-  static_assert(offsetof(RefCountedRuntimeView, refCount) == 0x04, "RefCountedRuntimeView::refCount offset must be 0x04");
-
-  /**
-   * Address: 0x00658440 (FUN_00658440)
-   *
-   * What it does:
-   * Releases one ref-counted object pointer lane and nulls the caller slot.
-   */
-  [[maybe_unused]] RefCountedRuntimeView** ReleaseRefCountedPointerAndClearSlot(
-    RefCountedRuntimeView** const objectSlot
-  ) noexcept
-  {
-    RefCountedRuntimeView* const object = *objectSlot;
-    if (object != nullptr) {
-#if defined(_WIN32)
-      if (::InterlockedExchangeAdd(&object->refCount, -1L) == 1L)
-#else
-      if (--object->refCount == 0L)
-#endif
-      {
-        using DeleteWithFlagFn = void(__thiscall*)(RefCountedRuntimeView*, int);
-        const auto destroy = reinterpret_cast<DeleteWithFlagFn>(object->vtable[0]);
-        destroy(object, 1);
-      }
-    }
-
-    *objectSlot = nullptr;
-    return objectSlot;
-  }
-
-  /**
-   * Address: 0x00654220 (FUN_00654220, Moho::IEffect::GetClass)
+   * Returns the reflection descriptor for `IEffect`, resolving it into
+   * `sType` on first use.
    */
   gpg::RType* IEffect::StaticGetClass()
   {
@@ -174,7 +88,7 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_00654220 (non-canonical helper lane).
+   * Address: 0x00654220 (FUN_00654220, Moho::IEffect::GetClass)
    */
   gpg::RType* IEffect::GetClass() const
   {
@@ -190,6 +104,14 @@ namespace moho
     out.mObj = this;
     out.mType = GetClass();
     return out;
+  }
+
+  /**
+   * Address: 0x00654260 (FUN_00654260)
+   */
+  IEffectManager* IEffect::GetManager() const noexcept
+  {
+    return mManager;
   }
 
   /**
@@ -295,12 +217,12 @@ namespace moho
   {}
 
   /**
-    * Alias of FUN_006543C0 (non-canonical helper lane).
+   * Address: 0x006543C0 (FUN_006543C0, Moho::IEffect::OnTick)
+   *
+   * What it does:
+   * Nothing. `CEffectImpl` inherits this slot unchanged: its vtable holds the
+   * same 0x006543C0.
    */
   void IEffect::OnTick()
   {}
 } // namespace moho
-
-// Phase-1 pre-registration: run these descriptor registrations ahead of
-// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(PreregisterIEffectPointerType_32e2fd, moho::PreregisterIEffectPointerType)

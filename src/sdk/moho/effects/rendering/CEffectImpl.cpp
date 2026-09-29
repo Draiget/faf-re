@@ -275,12 +275,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006543C0 (FUN_006543C0, Moho::IEffect::OnTick lane)
-   */
-  void CEffectImpl::OnTick()
-  {}
-
-  /**
    * Address: 0x00654430 (FUN_00654430, Moho::CEffectImpl::Invalidate)
    */
   void CEffectImpl::Invalidate(const std::int32_t, const std::int32_t)

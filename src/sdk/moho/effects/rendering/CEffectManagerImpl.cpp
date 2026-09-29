@@ -104,7 +104,7 @@ namespace moho
         return nullptr;
       }
 
-      effect->mManagerListNode.ListLinkBefore(&activeEffects);
+      effect->ListLinkBefore(&activeEffects);
       return effect;
     }
 
@@ -423,7 +423,7 @@ namespace moho
       return;
     }
 
-    effect->mManagerListNode.ListLinkBefore(&mDestroyedEffects);
+    effect->ListLinkBefore(&mDestroyedEffects);
   }
 
   /**
@@ -442,14 +442,10 @@ namespace moho
     constexpr std::int32_t kNoEmitters = 0;
     (void)sEngineStatRenderActiveEmitters->SetInt(&kNoEmitters);
 
-    // Keep iteration semantics from the binary: capture next before invoking
-    // effect code so list mutation during callback remains safe.
-    TDatListItem<IEffect, void>* node = mActiveEffects.mNext;
-    while (node != &mActiveEffects) {
-      TDatListItem<IEffect, void>* const current = node;
-      node = node->mNext;
-      IEffect::ManagerList::owner_from_member<IEffect, IEffect::ManagerListNode, &IEffect::mManagerListNode>(current)
-        ->OnTick();
+    // The successor is read before each OnTick, as the binary does: an effect
+    // that destroys itself relinks into mDestroyedEffects mid-walk.
+    for (IEffect* const effect : mActiveEffects.owners_safe()) {
+      effect->OnTick();
     }
   }
 
@@ -459,11 +455,7 @@ namespace moho
   void CEffectManagerImpl::PurgeDestroyedEffects()
   {
     while (!mDestroyedEffects.empty()) {
-      IEffect* const effect = IEffect::ManagerList::owner_from_member<
-        IEffect,
-        IEffect::ManagerListNode,
-        &IEffect::mManagerListNode>(mDestroyedEffects.mNext);
-      delete effect;
+      delete mDestroyedEffects.ListGetNext();
     }
   }
 

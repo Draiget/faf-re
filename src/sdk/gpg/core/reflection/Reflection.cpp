@@ -719,16 +719,6 @@ RType* CachedIAniManipulatorType()
     return cached;
 }
 
-RType* CachedIEffectType()
-{
-    RType* cached = moho::IEffect::sType;
-    if (!cached) {
-        cached = gpg::LookupRType(typeid(moho::IEffect));
-        moho::IEffect::sType = cached;
-    }
-    return cached;
-}
-
 RType* CachedCUnitCommandType()
 {
     RType* cached = moho::CUnitCommand::sType;
@@ -1362,29 +1352,24 @@ RType* CachedRTypeDescriptor()
     return cached;
 }
 
-template <class T>
-RType* CachedPointerType()
-{
-    static RType* cached = nullptr;
-    if (!cached) {
-        cached = gpg::LookupRType(typeid(T*));
-    }
-    return cached;
-}
+// The `T*` descriptor always comes from `T::GetPointerType()`: every
+// `RRef_T_P` and `RRef::TryUpcast_T_P` body in the binary calls it (e.g.
+// 0x0066C800 and 0x0066D110 both call 0x0066C980 for IEffect), and for most
+// `T` that call is also what constructs and pre-registers the descriptor.
 
 template <class T>
 RRef MakePointerSlotRef(T** const slot)
 {
     RRef out{};
     out.mObj = slot;
-    out.mType = CachedPointerType<T>();
+    out.mType = T::GetPointerType();
     return out;
 }
 
 template <class T>
 T* const* TryUpcastPointerSlotOrThrow(const RRef& source)
 {
-    const RRef upcast = gpg::REF_UpcastPtr(source, CachedPointerType<T>());
+    const RRef upcast = gpg::REF_UpcastPtr(source, T::GetPointerType());
     if (!upcast.mObj) {
         throw gpg::BadRefCast("type error");
     }
@@ -1413,16 +1398,21 @@ TValue* TryUpcastValueOrThrow(const RRef& source, const std::type_info& targetTy
     return static_cast<TValue*>(upcast.mObj);
 }
 
+/**
+ * What it does:
+ * Upcasts `source` to a `T*` slot, or throws `BadRefCast` naming both types.
+ * As 0x0066D110 does, the failure path asks `T::GetPointerType()` again for
+ * the target name rather than reusing the first result.
+ */
 template <class T>
 T** TryUpcastPointerSlotWithTypeNameOrThrow(const RRef& source)
 {
-  RType* const targetType = CachedPointerType<T>();
-  const RRef upcast = gpg::REF_UpcastPtr(source, targetType);
+  const RRef upcast = gpg::REF_UpcastPtr(source, T::GetPointerType());
   auto* const slot = static_cast<T**>(upcast.mObj);
   if (!slot) {
+    RType* const targetType = T::GetPointerType();
     const char* const sourceName = source.mType ? source.mType->GetName() : "null";
-    const char* const targetName = targetType ? targetType->GetName() : "null";
-    throw gpg::BadRefCast(nullptr, sourceName, targetName);
+    throw gpg::BadRefCast(nullptr, sourceName, targetType->GetName());
   }
 
   return slot;
@@ -2787,7 +2777,7 @@ RRef MakeCLuaConOutputHandlerPointerSlotRef(moho::CLuaConOutputHandler** const s
  */
 moho::CLuaConOutputHandler** TryUpcastCLuaConOutputHandlerPointerSlotOrThrow(const RRef& source)
 {
-    const RRef upcast = gpg::REF_UpcastPtr(source, CachedPointerType<moho::CLuaConOutputHandler>());
+    const RRef upcast = gpg::REF_UpcastPtr(source, moho::CLuaConOutputHandler::GetPointerType());
     auto* const slot = static_cast<moho::CLuaConOutputHandler**>(upcast.mObj);
     if (!slot) {
         throw gpg::BadRefCast("type error");
@@ -3063,7 +3053,7 @@ RRef CopyCSndParamsPointerSlotRef(RRef* const sourceRef)
 {
     auto* const slot = static_cast<moho::CSndParams**>(::operator new(sizeof(moho::CSndParams*)));
     if (slot) {
-        const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedPointerType<moho::CSndParams>());
+        const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::CSndParams::GetPointerType());
         auto* const sourceSlot = static_cast<moho::CSndParams**>(upcast.mObj);
         if (!sourceSlot) {
             throw gpg::BadRefCast("type error");
@@ -3099,7 +3089,7 @@ RRef MoveCSndParamsPointerSlotRef(void* const slotObject, RRef* const sourceRef)
 {
     auto* slot = static_cast<moho::CSndParams**>(slotObject);
     if (slot) {
-        const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedPointerType<moho::CSndParams>());
+        const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, moho::CSndParams::GetPointerType());
         auto* const sourceSlot = static_cast<moho::CSndParams**>(upcast.mObj);
         if (!sourceSlot) {
             throw gpg::BadRefCast("type error");
@@ -5265,7 +5255,7 @@ gpg::RRef* RRef_IAniManipulator_P(RRef* const out, moho::IAniManipulator** const
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::IAniManipulator>();
+  out->mType = moho::IAniManipulator::GetPointerType();
   return out;
 }
 
@@ -5663,7 +5653,7 @@ gpg::RRef* RRef_CAcquireTargetTask_P(RRef* const out, moho::CAcquireTargetTask**
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::CAcquireTargetTask>();
+  out->mType = moho::CAcquireTargetTask::GetPointerType();
   return out;
 }
 
@@ -5703,7 +5693,7 @@ gpg::RRef* RRef_IFormationInstance_P(RRef* const out, moho::IFormationInstance**
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::IFormationInstance>();
+  out->mType = moho::IFormationInstance::GetPointerType();
   return out;
 }
 
@@ -5961,7 +5951,7 @@ gpg::RRef* RRef_IEffect_P(RRef* const out, moho::IEffect** const value)
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::IEffect>();
+  out->mType = moho::IEffect::GetPointerType();
   return out;
 }
 
@@ -6081,7 +6071,7 @@ gpg::RRef* RRef_CScriptObject_P(RRef* const out, moho::CScriptObject** const val
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::CScriptObject>();
+  out->mType = moho::CScriptObject::GetPointerType();
   return out;
 }
 
@@ -6170,7 +6160,7 @@ gpg::RRef* RRef_CSndParams_P(RRef* const out, moho::CSndParams** const value)
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::CSndParams>();
+  out->mType = moho::CSndParams::GetPointerType();
   return out;
 }
 
@@ -6396,7 +6386,7 @@ gpg::RRef* RRef_Entity_P(RRef* const out, moho::Entity** const value)
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::Entity>();
+  out->mType = moho::Entity::GetPointerType();
   return out;
 }
 
@@ -6825,7 +6815,7 @@ gpg::RRef* RRef_RBlueprint_P(RRef* const out, moho::RBlueprint** const value)
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::RBlueprint>();
+  out->mType = moho::RBlueprint::GetPointerType();
   return out;
 }
 
@@ -6862,7 +6852,7 @@ gpg::RRef* RRef_RUnitBlueprint_P(RRef* const out, moho::RUnitBlueprint** const v
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::RUnitBlueprint>();
+  out->mType = moho::RUnitBlueprint::GetPointerType();
   return out;
 }
 
@@ -7509,7 +7499,7 @@ gpg::RRef* RRef_SimArmy_P(RRef* const out, moho::SimArmy** const value)
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::SimArmy>();
+  out->mType = moho::SimArmy::GetPointerType();
   return out;
 }
 
@@ -7967,7 +7957,7 @@ gpg::RRef* RRef_CUnitCommand_P(RRef* const out, moho::CUnitCommand** const value
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::CUnitCommand>();
+  out->mType = moho::CUnitCommand::GetPointerType();
   return out;
 }
 
@@ -8152,7 +8142,7 @@ gpg::RRef* RRef_UnitWeapon_P(RRef* const out, moho::UnitWeapon** const value)
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::UnitWeapon>();
+  out->mType = moho::UnitWeapon::GetPointerType();
   return out;
 }
 
@@ -8429,7 +8419,7 @@ gpg::RRef* RRef_CArmyStatItem_P(RRef* const out, moho::CArmyStatItem** const val
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::CArmyStatItem>();
+  out->mType = moho::CArmyStatItem::GetPointerType();
   return out;
 }
 
@@ -8491,7 +8481,7 @@ gpg::RRef* RRef_ReconBlip_P(RRef* const out, moho::ReconBlip** const value)
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::ReconBlip>();
+  out->mType = moho::ReconBlip::GetPointerType();
   return out;
 }
 
@@ -8508,7 +8498,7 @@ gpg::RRef* RRef_CEconomyEvent_P(RRef* const out, moho::CEconomyEvent** const val
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::CEconomyEvent>();
+  out->mType = moho::CEconomyEvent::GetPointerType();
   return out;
 }
 
@@ -8612,7 +8602,7 @@ gpg::RRef* RRef_CDecalHandle_P(RRef* const out, moho::CDecalHandle** const value
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::CDecalHandle>();
+  out->mType = moho::CDecalHandle::GetPointerType();
   return out;
 }
 
@@ -9392,7 +9382,7 @@ gpg::RRef* RRef_Shield_P(RRef* const out, moho::Shield** const value)
   }
 
   out->mObj = value;
-  out->mType = CachedPointerType<moho::Shield>();
+  out->mType = moho::Shield::GetPointerType();
   return out;
 }
 
@@ -12321,6 +12311,15 @@ RType* gpg::RPointerType<moho::IAniManipulator>::GetPointeeType() const
 }
 
 /**
+ * Address: 0x0066CB30 (FUN_0066CB30)
+ */
+gpg::RPointerType<moho::IEffect>::RPointerType()
+  : RPointerTypeBase()
+{
+    gpg::PreRegisterRType(typeid(moho::IEffect*), this);
+}
+
+/**
  * Address: 0x0066CE50 (FUN_0066CE50)
  * Demangled: gpg::RPointerType_IEffect::dtr
  */
@@ -12394,7 +12393,7 @@ void gpg::RPointerType<moho::IEffect>::Init()
 
 RType* gpg::RPointerType<moho::IEffect>::GetPointeeType() const
 {
-    return CachedIEffectType();
+    return moho::IEffect::StaticGetClass();
 }
 
 

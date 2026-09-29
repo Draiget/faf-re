@@ -66,7 +66,7 @@ namespace
     const gpg::RRef nullOwner{};
     archive->Write(CachedCScriptObjectType(), static_cast<const moho::CScriptObject*>(effect), nullOwner);
 
-    moho::IEffectManager* manager = effect->mManager;
+    moho::IEffectManager* manager = effect->GetManager();
     (void)SerializeIEffectManagerPointer(&manager, archive);
 
     archive->WriteInt(effect->mScriptObjectToken);

@@ -212,14 +212,6 @@ namespace
     return IAniManipulator::sType;
   }
 
-  gpg::RType* CachedIEffectType()
-  {
-    if (!IEffect::sType) {
-      IEffect::sType = gpg::LookupRType(typeid(IEffect));
-    }
-    return IEffect::sType;
-  }
-
   gpg::RType* CachedCDecalHandleType()
   {
     if (!CDecalHandle::sType) {
@@ -1267,7 +1259,7 @@ IEffect* moho::SCR_FromLua_IEffect(const LuaPlus::LuaObject& object, LuaPlus::Lu
   }
 
   const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedIEffectType());
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, moho::IEffect::StaticGetClass());
   if (!upcast.mObj) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
     return nullptr;
@@ -1298,7 +1290,7 @@ IEffect* moho::SCR_FromLua_IEffectOpt(const LuaPlus::LuaObject& object, LuaPlus:
   }
 
   const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedIEffectType());
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, moho::IEffect::StaticGetClass());
   if (!upcast.mObj) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
     return nullptr;

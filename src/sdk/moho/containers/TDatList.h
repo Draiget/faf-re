@@ -172,7 +172,7 @@ namespace moho
      *   zero callers; formerly `UnlinkIntrusivePairLinkNode`.)
      * Address: 0x004E1F70 (FUN_004E1F70 -- a CSndParams emission; zero
      *   callers; formerly `ResetIntrusiveNodeLinks` over a null-guarded overlay.)
-     * Address: 0x00657BF0 (FUN_00657BF0 -- `IEffect::mManagerListNode`'s; zero
+     * Address: 0x00657BF0 (FUN_00657BF0 -- IEffect's `TDatListItem<IEffect, void>` base's; zero
      *   callers; formerly `UnlinkIEffectManagerNodeAndSelfLink`.)
      * Address: 0x0066B430 (FUN_0066B430 -- the same node's in the effect
      *   manager's TU; formerly `UnlinkManagerListNodeAndSelfReference`, called
@@ -223,6 +223,10 @@ namespace moho
      *   what identifies it. Zero callers, unreachable; formerly
      *   `InitializeNodeSelfLinks` over an `IntrusiveNodeRuntimeView` in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
+     * Address: 0x00659950 (FUN_00659950 -- the `moho::TDatListItem<IEffect, void>`
+     *   emission, `this` in EAX; ICF twin of 0x00442DA0 above. Zero references in
+     *   the PE; formerly `InitializeIEffectManagerNodeSelfLinks` in
+     *   moho/effects/rendering/IEffect.cpp (RULE ONE), removed 2026-09-29.)
      *
      * What it does:
      * Resets one intrusive node to a self-linked singleton state.

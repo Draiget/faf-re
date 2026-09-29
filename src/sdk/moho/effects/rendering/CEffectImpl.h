@@ -107,11 +107,6 @@ namespace moho
     void SetBone(Entity* entity, std::int32_t boneIndex) override;
 
     /**
-     * Address: 0x006543C0 (FUN_006543C0, Moho::IEffect::OnTick lane)
-     */
-    void OnTick() override;
-
-    /**
      * Address: 0x00654430 (FUN_00654430, Moho::CEffectImpl::Invalidate)
      */
     virtual void Invalidate(std::int32_t paramIndex, std::int32_t valueCount);

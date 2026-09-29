@@ -68,6 +68,21 @@ namespace moho
 
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
+
+    /**
+     * Address: 0x004210F0 (FUN_004210F0)
+     *
+     * What it does:
+     * Returns the reflection descriptor for `CLuaConOutputHandler*`,
+     * resolving it into `sPointerType` on first use. The binary also holds
+     * the `RPointerType<CLuaConOutputHandler>` descriptor as this function's
+     * local static (guard 0x01103AB8, ctor 0x004212A0, `atexit` 0x00BEEDC0);
+     * here it is still the startup global in Reflection.cpp.
+     */
+    [[nodiscard]]
+    static gpg::RType* GetPointerType();
+
     LuaPlus::LuaFunction<void> mCallback; // +0x10
   };
 

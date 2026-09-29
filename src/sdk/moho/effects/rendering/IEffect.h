@@ -17,32 +17,48 @@ namespace moho
   class Entity;
   struct SEfxCurve;
 
-  class IEffect : public CScriptObject, public InstanceCounter<IEffect>
+  /**
+   * Base of every sim effect (emitters, beams, trails).
+   *
+   * `CEffectImpl`'s RTTI base-class array places the bases at `CScriptObject`
+   * +0x00, `TDatListItem<IEffect, void>` +0x34 and the empty
+   * `InstanceCounter<IEffect>` +0x3C. The list item is this effect's link in
+   * its manager's `mActiveEffects` / `mDestroyedEffects` ring. Declaration
+   * order is what the binary's ctor and dtor follow: 0x00658F00 self-links
+   * +0x34 and then bumps the instance count, 0x00654180 drops the count and
+   * then unlinks +0x34.
+   */
+  class IEffect : public CScriptObject, public TDatListItem<IEffect, void>, public InstanceCounter<IEffect>
   {
   public:
     static gpg::RType* sType;
     static gpg::RType* sPointerType;
 
     /**
-      * Alias of FUN_00654220 (non-canonical helper lane).
-     *
      * What it does:
-     * Returns cached reflection descriptor for `IEffect`.
+     * Returns the reflection descriptor for `IEffect`, resolving it into
+     * `sType` on first use. Inlined into every body that names the type
+     * (0x006585F0, 0x0066CA40, 0x0066CDC0, ...); its one out-of-line copy is
+     * `GetClass`.
      */
     [[nodiscard]]
     static gpg::RType* StaticGetClass();
 
     /**
      * Address: 0x0066C980 (FUN_0066C980, Moho::IEffect::GetPointerType)
+     * Address: 0x00BFC0F0 (FUN_00BFC0F0, `atexit` destructor of its local descriptor)
      *
      * What it does:
-     * Lazily resolves and caches the reflection descriptor for `IEffect*`.
+     * Returns the reflection descriptor for `IEffect*`. The first call
+     * constructs the function-local `gpg::RPointerType<IEffect>`, whose
+     * constructor pre-registers it under `typeid(IEffect*)`, so the lookup
+     * that follows always resolves.
      */
     [[nodiscard]]
     static gpg::RType* GetPointerType();
 
     /**
-      * Alias of FUN_00654220 (non-canonical helper lane).
+     * Address: 0x00654220 (FUN_00654220, Moho::IEffect::GetClass)
      * Slot: 0
      */
     [[nodiscard]]
@@ -52,9 +68,9 @@ namespace moho
      * Address: 0x00658F00 (FUN_00658F00, Moho::IEffect::IEffect)
      *
      * What it does:
-     * Initializes one effect runtime lane from `CScriptObject`, self-links the
-     * manager-node list entry, increments effect instance stats, and clears the
-     * manager/Lua sentinel lanes.
+     * Default-constructs the script object with no Lua binding, leaving the
+     * effect unowned (`mManager` null, `mScriptObjectToken` -1). This is the
+     * serializer's construction path.
      */
     IEffect();
 
@@ -62,9 +78,8 @@ namespace moho
      * Address: 0x00658F70 (FUN_00658F70, Moho::IEffect::IEffect)
      *
      * What it does:
-     * Initializes one effect runtime lane using manager-owned Lua state
-     * metadata, self-links the manager list node, increments instance stats,
-     * and stores manager/script token ownership fields.
+     * Binds the script object to the `IEffect` metatable in the manager's sim
+     * Lua state, then records the owning manager and the script token.
      */
     IEffect(CEffectManagerImpl* manager, int scriptObjectToken);
 
@@ -75,11 +90,26 @@ namespace moho
     gpg::RRef GetDerivedObjectRef() override;
 
     /**
+     * Address: 0x00654260 (FUN_00654260)
+     *
+     * What it does:
+     * Returns the manager that owns this effect.
+     *
+     * The out-of-line copy sits among IEffect's own members (between
+     * `GetDerivedObjectRef` at 0x00654240 and `OnInit` at 0x00654270) and
+     * nothing references it; every use is inlined.
+     */
+    [[nodiscard]]
+    IEffectManager* GetManager() const noexcept;
+
+    /**
      * Address: 0x006543D0 (FUN_006543D0, Moho::IEffect::dtr)
      * Address: 0x00654180 (FUN_00654180, Moho::IEffect::~IEffect body)
      *
      * What it does:
-     * Unlinks this effect from the manager intrusive list before base script-object teardown.
+     * Nothing of its own: the body is the base destructors, in reverse
+     * declaration order -- the instance count drops, the manager-list link
+     * unlinks, then `CScriptObject` tears down.
      */
     ~IEffect() override;
 
@@ -113,15 +143,11 @@ namespace moho
     virtual void OnTick();
 
   public:
-    using ManagerList = TDatList<IEffect, void>;
-    using ManagerListNode = TDatListItem<IEffect, void>;
-
-    TDatListItem<IEffect, void> mManagerListNode; // +0x34
-    IEffectManager* mManager;                     // +0x3C
-    std::int32_t mScriptObjectToken;              // +0x40
+    IEffectManager* mManager;        // +0x3C
+    std::int32_t mScriptObjectToken; // +0x40
   };
 
-  static_assert(offsetof(IEffect, mManagerListNode) == 0x34, "IEffect::mManagerListNode offset must be 0x34");
+  static_assert(sizeof(CScriptObject) == 0x34, "CScriptObject size must be 0x34 (IEffect's list link sits at +0x34)");
   static_assert(offsetof(IEffect, mManager) == 0x3C, "IEffect::mManager offset must be 0x3C");
   static_assert(offsetof(IEffect, mScriptObjectToken) == 0x40, "IEffect::mScriptObjectToken offset must be 0x40");
   static_assert(sizeof(IEffect) == 0x44, "IEffect size must be 0x44");

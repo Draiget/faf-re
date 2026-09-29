@@ -56,21 +56,6 @@ namespace
   }
 
   /**
-   * Address: 0x004210F0 (FUN_004210F0, Moho::CLuaConOututHandlerPtr::GetClass)
-   *
-   * What it does:
-   * Returns/caches reflection type descriptor for `CLuaConOutputHandler*`.
-   */
-  gpg::RType* CachedCLuaConOutputHandlerPointerType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CLuaConOutputHandler*));
-    }
-    return cached;
-  }
-
-  /**
    * Address: 0x00420FF0 (FUN_00420FF0, sub_420FF0)
    * Address: 0x00421BA0 (FUN_00421BA0, sub_421BA0)
    *
@@ -96,7 +81,7 @@ namespace
   {
     gpg::RRef ref{};
     ref.mObj = &handlerSlot;
-    ref.mType = CachedCLuaConOutputHandlerPointerType();
+    ref.mType = moho::CLuaConOutputHandler::GetPointerType();
     return ref;
   }
 
@@ -174,7 +159,19 @@ namespace
 namespace moho
 {
   gpg::RType* CLuaConOutputHandler::sType = nullptr;
+  gpg::RType* CLuaConOutputHandler::sPointerType = nullptr;
   CLuaConOutputHandlerTypeInfo gCLuaConOutputHandlerTypeInfo{};
+
+  /**
+   * Address: 0x004210F0 (FUN_004210F0)
+   */
+  gpg::RType* CLuaConOutputHandler::GetPointerType()
+  {
+    if (!sPointerType) {
+      sPointerType = gpg::LookupRType(typeid(CLuaConOutputHandler*));
+    }
+    return sPointerType;
+  }
   CScrLuaMetatableFactory<CLuaConOutputHandler*> CScrLuaMetatableFactory<CLuaConOutputHandler*>::sInstance{};
 
   /**
@@ -421,7 +418,7 @@ moho::CLuaConOutputHandler** moho::SCR_GetLuaConOutputHandlerSlot(const LuaPlus:
   }
 
   const gpg::RRef userDataRef = ExtractUserDataSlotRef(payload);
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CachedCLuaConOutputHandlerPointerType());
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, moho::CLuaConOutputHandler::GetPointerType());
   return static_cast<CLuaConOutputHandler**>(upcast.mObj);
 }
 

@@ -1151,16 +1151,6 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedIEffectType()
-  {
-    gpg::RType* type = moho::IEffect::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::IEffect));
-      moho::IEffect::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* CachedIAiAttackerType()
   {
     gpg::RType* type = moho::IAiAttacker::sType;
@@ -1625,7 +1615,7 @@ namespace
    */
   [[nodiscard]] moho::IEffect* UpcastToIEffect(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIEffectType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, moho::IEffect::StaticGetClass());
     return static_cast<moho::IEffect*>(upcast.mObj);
   }
 
@@ -5852,13 +5842,13 @@ ReadArchive* ReadArchive::ReadPointer_IEffect(moho::IEffect** const outValue, co
     return this;
   }
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIEffectType());
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, moho::IEffect::StaticGetClass());
   *outValue = static_cast<moho::IEffect*>(upcast.mObj);
   if (*outValue) {
     return this;
   }
 
-  const char* const expectedName = SafeTypeName(CachedIEffectType());
+  const char* const expectedName = SafeTypeName(moho::IEffect::StaticGetClass());
   const char* const actualName = source.GetTypeName();
   ThrowSerializationError(STR_Printf(
     "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
@@ -6952,7 +6942,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IEffect(moho::IEffect** const outValu
 
   *outValue = UpcastToIEffect(source);
   if (!*outValue) {
-    const char* const expectedName = SafeTypeName(CachedIEffectType());
+    const char* const expectedName = SafeTypeName(moho::IEffect::StaticGetClass());
     const char* const actualName = source.GetTypeName();
     ThrowSerializationError(STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "

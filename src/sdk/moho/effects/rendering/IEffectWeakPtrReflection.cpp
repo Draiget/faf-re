@@ -24,40 +24,30 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedIEffectType()
-  {
-    gpg::RType* cached = moho::IEffect::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::IEffect));
-      moho::IEffect::sType = cached;
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeIEffectRef(moho::IEffect* effect)
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedIEffectType();
+    out.mType = moho::IEffect::StaticGetClass();
     if (!effect) {
       return out;
     }
 
-    gpg::RType* dynamicType = CachedIEffectType();
+    gpg::RType* dynamicType = moho::IEffect::StaticGetClass();
     try {
       dynamicType = gpg::LookupRType(typeid(*effect));
     } catch (...) {
-      dynamicType = CachedIEffectType();
+      dynamicType = moho::IEffect::StaticGetClass();
     }
 
     std::int32_t baseOffset = 0;
     const bool isDerived =
-      dynamicType != nullptr && CachedIEffectType() != nullptr && dynamicType->IsDerivedFrom(CachedIEffectType(), &baseOffset);
+      dynamicType != nullptr && moho::IEffect::StaticGetClass() != nullptr && dynamicType->IsDerivedFrom(moho::IEffect::StaticGetClass(), &baseOffset);
 
     out.mObj = isDerived
       ? reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(effect) - static_cast<std::uintptr_t>(baseOffset))
       : static_cast<void*>(effect);
-    out.mType = dynamicType ? dynamicType : CachedIEffectType();
+    out.mType = dynamicType ? dynamicType : moho::IEffect::StaticGetClass();
     return out;
   }
 
@@ -72,12 +62,12 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIEffectType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, moho::IEffect::StaticGetClass());
     if (upcast.mObj) {
       return static_cast<moho::IEffect*>(upcast.mObj);
     }
 
-    const char* const expected = CachedIEffectType() ? CachedIEffectType()->GetName() : "IEffect";
+    const char* const expected = moho::IEffect::StaticGetClass() ? moho::IEffect::StaticGetClass()->GetName() : "IEffect";
     const char* const actual = source.GetTypeName();
     const msvc8::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
@@ -155,7 +145,7 @@ namespace moho
    */
   const char* RWeakPtrType<IEffect>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedIEffectType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", moho::IEffect::StaticGetClass()->GetName());
     return sName.c_str();
   }
 

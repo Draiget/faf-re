@@ -5943,6 +5943,17 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x0066CB30 (FUN_0066CB30)
+     *
+     * What it does:
+     * Builds the descriptor and pre-registers it under `typeid(IEffect*)`.
+     * The one instance is `IEffect::GetPointerType`'s function-local static,
+     * and LTCG folded its address into the body: `this` is the constant
+     * 0x010C8608 rather than ECX.
+     */
+    RPointerType();
+
+    /**
      * Address: 0x0066CE50 (FUN_0066CE50)
      * Demangled: gpg::RPointerType_IEffect::dtr
      */

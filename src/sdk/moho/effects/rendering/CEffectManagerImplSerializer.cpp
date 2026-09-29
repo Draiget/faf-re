@@ -71,7 +71,7 @@ namespace
       if (effect == nullptr) {
         break;
       }
-      effect->mManagerListNode.ListLinkBefore(&object->mActiveEffects);
+      effect->ListLinkBefore(&object->mActiveEffects);
     }
   }
 
@@ -90,11 +90,7 @@ namespace
       return;
     }
 
-    for (auto* node = object->mActiveEffects.mNext; node != &object->mActiveEffects; node = node->mNext) {
-      auto* const effect = moho::IEffect::ManagerList::owner_from_member<
-        moho::IEffect,
-        moho::IEffect::ManagerListNode,
-        &moho::IEffect::mManagerListNode>(node);
+    for (moho::IEffect* const effect : object->mActiveEffects.owners()) {
       WriteOwnedIEffectPointer(archive, effect, gpg::RRef{});
     }
 

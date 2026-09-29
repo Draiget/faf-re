@@ -88,6 +88,13 @@ namespace moho
      * flag 1, then `tex = 0`. Called from `CAnimTexture::FromFile` (0x00422E50)
      * and `CWldTerrainDecal::SetName` (0x0089D1F0), and pushed as the element
      * destructor for `CWldTerrainDecal::mResourceRefs[2]` (0x0089CAFD).)
+     * Address: 0x00658440 (FUN_00658440 -- the same destructor with the atomic
+     * release: `lock xadd [tex+4], -1`, on zero a delete through vtable slot 0
+     * with flag 1, then `tex = 0`, `this` arriving in ESI. No reference to it
+     * anywhere in the PE; a dead copy among the CEfxBeam bodies. Formerly
+     * `ReleaseRefCountedPointerAndClearSlot` over a private two-word
+     * `{vtable, refCount}` overlay of `CountedObject` in
+     * moho/effects/rendering/IEffect.cpp (RULE THREE), removed 2026-09-29.)
      */
     ~CountedPtr()
     {
