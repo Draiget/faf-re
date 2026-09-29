@@ -369,10 +369,10 @@ void CClientBase::Process(CMessage& msg)
     return;
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_Eject): {
-    const auto requesterClientIndex = reader.ReadExact<uint8_t>();
+    const auto targetClientIndex = reader.ReadExact<uint8_t>();
     int32_t afterBeat = 0;
     reader.ReadExact(afterBeat);
-    HandleIncomingEjectRequest(requesterClientIndex, afterBeat);
+    HandleIncomingEjectRequest(targetClientIndex, afterBeat);
     return;
   }
 
@@ -416,17 +416,26 @@ void CClientBase::Process(CMessage& msg)
  * Address: 0x1012C6E0 (sub_1012C6E0)
  *
  * What it does:
- * Resolves requester index to a client pointer, records the eject request,
- * and notifies UI for non-local targets.
+ * `this` sent the request; the payload index names the client it wants
+ * ejected. The request is filed on that target with `this` as requester, so
+ * the target's `mEjectRequests` holds one "last beat I have from you" report
+ * per survivor -- the list `UpdateState` and `IsReadyForBeat` take the minimum
+ * of. Only requests from remote senders reach the UI hook.
+ *
+ * Binary: called from `Process` at 0x0053C21E with eax = `this`, edx = the
+ * payload index, afterBeat on the stack; 0x0053F497 loads
+ * `mClients[index]` into edi, and `AddOrUpdateEjectRequest` (0x0053CBB0) runs
+ * on edi with ebx (`this`) as the requester. 0x0053F4B3/0x0053F4B4 push
+ * `this` then the target, so the hook receives (target, requester).
  */
-void CClientBase::HandleIncomingEjectRequest(const uint8_t requesterClientIndex, const int32_t afterBeat)
+void CClientBase::HandleIncomingEjectRequest(const uint8_t targetClientIndex, const int32_t afterBeat)
 {
-  if (requesterClientIndex < mManager->mClients.size()) {
-    const auto* requester = mManager->mClients[requesterClientIndex];
-    AddOrUpdateEjectRequest(requester, afterBeat);
+  if (targetClientIndex < mManager->mClients.size()) {
+    CClientBase* const target = mManager->mClients[targetClientIndex];
+    target->AddOrUpdateEjectRequest(this, afterBeat);
 
     if (this != mManager->mLocalClient) {
-      mManager->mInterface->NoteEjectRequest(requester, this);
+      mManager->mInterface->NoteEjectRequest(target, this);
     }
     return;
   }
@@ -434,7 +443,7 @@ void CClientBase::HandleIncomingEjectRequest(const uint8_t requesterClientIndex,
   gpg::Logf(
     "Ignoring eject request from %s for invalid client index %u",
     mNickname.c_str(),
-    static_cast<unsigned int>(requesterClientIndex)
+    static_cast<unsigned int>(targetClientIndex)
   );
 }
 
@@ -900,13 +909,20 @@ bool CClientBase::IsReadyForBeat(const int beat) const
 
 /**
  * Address: 0x0053F2C0 (FUN_0053F2C0)
+ *
+ * What it does:
+ * Runs on the client being ejected. Broadcasts `CLIMSG_Eject` naming this
+ * client and the last beat of its data we hold; every receiver files it on
+ * this client with the sender as requester (`HandleIncomingEjectRequest`),
+ * the local client included. Then drops the requests this client authored
+ * against others, since it will never report again.
  */
 void CClientBase::ProcessEject(CClientManagerImpl* manager, const uint32_t beat) const
 {
   CMessage msg(EClientMsg::CLIMSG_Eject);
   CMessageStream s(msg, CMessageStream::Access::kReadWrite);
-  const auto requesterIndex = static_cast<uint8_t>(mIndex);
-  s.Write(requesterIndex);
+  const auto targetIndex = static_cast<uint8_t>(mIndex);
+  s.Write(targetIndex);
   s.Write(beat);
   manager->ProcessClients(msg);
 

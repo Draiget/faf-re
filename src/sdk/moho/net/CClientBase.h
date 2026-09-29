@@ -285,6 +285,10 @@ namespace moho
 
     /**
      * Address: 0x0053F2C0 (FUN_0053F2C0)
+     *
+     * What it does:
+     * Called on the client being ejected: broadcasts its eject with `beat` as
+     * the last beat of its data held locally.
      */
     void ProcessEject(CClientManagerImpl* manager, uint32_t beat) const;
 
@@ -294,10 +298,11 @@ namespace moho
      * Address: 0x1012C6E0 (sub_1012C6E0)
      *
      * What it does:
-     * Resolves requester index to a client pointer, records the eject request,
-     * and notifies UI for non-local targets.
+     * Files an eject request sent by `this` on the client at
+     * `targetClientIndex`, with `this` as requester, and notifies the UI when
+     * the sender is remote.
      */
-    void HandleIncomingEjectRequest(uint8_t requesterClientIndex, int32_t afterBeat);
+    void HandleIncomingEjectRequest(uint8_t targetClientIndex, int32_t afterBeat);
 
     /**
      * Address: 0x0053E810 (FUN_0053E810)

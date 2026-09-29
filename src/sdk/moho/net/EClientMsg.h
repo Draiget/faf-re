@@ -25,7 +25,7 @@ namespace moho
     /** Ready notification. */
     CLIMSG_Ready = 53,
 
-    /** Eject request (`requesterIndex`, `afterBeat`). */
+    /** Eject request (`targetIndex`, `afterBeat`); the sender is the requester. */
     CLIMSG_Eject = 54,
 
     /** Chat relay payload bytes. */

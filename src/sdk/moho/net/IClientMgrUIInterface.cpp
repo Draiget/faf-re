@@ -76,10 +76,10 @@ namespace moho
    * What it does:
    * Default UI callback lane for eject-request notifications (no-op in base interface).
    */
-  void IClientMgrUIInterface::NoteEjectRequest(const CClientBase* const requester, const CClientBase* const target)
+  void IClientMgrUIInterface::NoteEjectRequest(const CClientBase* const target, const CClientBase* const requester)
   {
-    (void)requester;
     (void)target;
+    (void)requester;
   }
 
   /**
@@ -212,10 +212,10 @@ namespace moho
    * What it does:
    * Nothing: the game UI ignores eject requests (`ret 8`).
    */
-  void CWldUiInterface::NoteEjectRequest(const CClientBase* const requester, const CClientBase* const target)
+  void CWldUiInterface::NoteEjectRequest(const CClientBase* const target, const CClientBase* const requester)
   {
-    (void)requester;
     (void)target;
+    (void)requester;
   }
 
   /**

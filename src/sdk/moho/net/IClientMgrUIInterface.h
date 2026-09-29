@@ -46,9 +46,11 @@ namespace moho
      * Slot: 1
      *
      * What it does:
-     * Notifies UI about an eject request from `requester` against `target`.
+     * Notifies UI that `requester` asked to eject `target`. Argument order is
+     * the binary's: `CClientBase::HandleIncomingEjectRequest` pushes the
+     * requester then the target (0x0053F4B3/0x0053F4B4), so `target` is first.
      */
-    virtual void NoteEjectRequest(const CClientBase* requester, const CClientBase* target);
+    virtual void NoteEjectRequest(const CClientBase* target, const CClientBase* requester);
 
     /**
      * Address: 0x0088B6F0 (Moho::IClientMgrUIInterface::ReceiveChat)
@@ -111,7 +113,7 @@ namespace moho
      * What it does:
      * Nothing: the override is a bare `ret 8`, separate from the base's.
      */
-    void NoteEjectRequest(const CClientBase* requester, const CClientBase* target) override;
+    void NoteEjectRequest(const CClientBase* target, const CClientBase* requester) override;
 
     /**
      * Address: 0x0088B880 (FUN_0088B880, Moho::CWldUiInterface::ReceiveChat)
