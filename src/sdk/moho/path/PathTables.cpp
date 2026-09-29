@@ -2405,9 +2405,24 @@ namespace moho
       // was smashed or a single entry, and what the garbage actually is (a
       // freed block, an image/.rdata address like the documented small-block
       // allocator defect, or an unmapped page).
-      if (!ClusterMapPointerLooksLive(cluster)) {
-        ReportCorruptClusterMapLane(mImpl, it, cluster);
-        continue;
+      //
+      // Each slot is queried once per pointer value: the array is filled in the
+      // PathTables constructor and never reassigned, so the corruption this
+      // hunts shows up as a slot whose value changed. A VirtualQuery on every
+      // call cost one syscall per cluster per dirtied rect, and every prop
+      // creation dirties one - that stalled the sim for ~40s while the
+      // commander's warp-in knocked trees down, and slowed it after.
+      static const ClusterMap* sVerifiedLanes[32]{};
+      const std::ptrdiff_t lane = it - mImpl->mMaps.mFirst;
+      const bool cached = lane < std::ssize(sVerifiedLanes) && sVerifiedLanes[lane] == cluster;
+      if (!cached) {
+        if (!ClusterMapPointerLooksLive(cluster)) {
+          ReportCorruptClusterMapLane(mImpl, it, cluster);
+          continue;
+        }
+        if (lane < std::ssize(sVerifiedLanes)) {
+          sVerifiedLanes[lane] = cluster;
+        }
       }
 
       cluster->DirtyRect(dirtyRect);

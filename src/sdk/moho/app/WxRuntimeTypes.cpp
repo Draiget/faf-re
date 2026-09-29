@@ -3718,9 +3718,14 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
 
   gpg::gal::Device* const galDevice = device->GetGalDevice();
 
+  // `ren_RegenShore` is a one-shot request (0x007F910C-0x007F9120): latched
+  // and cleared here, then handed to the terrain's render-context update as
+  // its regenerate flag. The shoreline is otherwise built once, when the
+  // terrain is created.
+  const bool regenerateShoreline = moho::ren_RegenShore;
+  moho::ren_RegenShore = false;
+
   // Clamp the requested fidelity into the range this adapter actually supports.
-  // The binary also latches and clears `ren_RegenShore` here; that flag is not
-  // modelled in this tree yet, so it is not touched.
   if (moho::graphics_Fidelity >= moho::graphics_FidelitySupported) {
     moho::graphics_Fidelity = moho::graphics_FidelitySupported;
   }
@@ -3940,17 +3945,17 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
       // Per-frame render-context update (TerrainCommon slot 5), dispatched
       // immediately before RenderTerrainNormals in the binary
       // (0x007F93A6-0x007F93C7). The viewport block is the 3 contiguous
-      // Vector2i fields at +0x308 (mScreenPos/mScreenSize/mFullScreen). minimapPass is always false from this call site; the
-      // binary's forceRegenerate push is worldView->mView.get(), guaranteed
-      // non-null by the loop's own continue-guard above, used purely as a
-      // truthy flag - this call always forces a shoreline check.
+      // Vector2i fields at +0x308 (mScreenPos/mScreenSize/mFullScreen). minimapPass is always false from this call site;
+      // forceRegenerate is the `ren_RegenShore` latch taken on entry (the
+      // push at 0x007F939A reads that stack byte). Passing 1 here rebuilt the
+      // whole shoreline every frame.
       terrain->UpdateRenderContext(
         moho::REN_GetGameTick(),
         moho::REN_GetSimDeltaSeconds(),
         mCam,
         reinterpret_cast<const std::int32_t*>(&mScreenPos),
         false,
-        1
+        regenerateShoreline ? 1 : 0
       );
 
       RenderTerrainNormals(terrain);
