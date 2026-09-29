@@ -6,6 +6,7 @@
 
 struct IDirectSound;
 struct IDirectSoundBuffer;
+struct SofdecTransferStrategy;
 
 #ifndef FAF_ENFORCE_STRICT_LAYOUT_ASSERTS
 #define FAF_ENFORCE_STRICT_LAYOUT_ASSERTS 0
@@ -134,6 +135,69 @@ namespace moho
     kMwsfcreStreamVideoOnly = 3,
     kMwsfcreStreamMpeg2Ts = 5,
   };
+
+  /**
+   * What `SFD_AnalyCreInf` (0x00AD9FC0) learns from the first bytes of a
+   * stream: the transfer strategies it needs, the picture format and the ADX
+   * audio format. `mwPlyGetHdrInf` turns it into an `MwsfdHdrInf`.
+   *
+   * `sfcre_SetDflCreInf` (0x00ADA080) clears it with a 0x40-byte `memset` and
+   * then field by field: byte stores at +0x00, +0x01 and +0x28, dwords
+   * elsewhere. The three transfers point at `SofdecTransferStrategy` blocks
+   * (`sfcre_AnalyAdxAlign4` stores 0x00D7F57C, SFADXT's, into +0x0C).
+   */
+  struct SfdCreInf
+  {
+    std::uint8_t formatRecognized;                  // +0x00 a transfer was bound, or the pack size varies
+    std::uint8_t streamRecognized;                  // +0x01 a video or audio transfer was bound
+    std::uint8_t reserved02[0x02];
+    const ::SofdecTransferStrategy* systemTransfer; // +0x04 SFD_tr_sd_mps / SFD_tr_sd_m2ts
+    const ::SofdecTransferStrategy* videoTransfer;  // +0x08 SFD_tr_vd_mpv
+    const ::SofdecTransferStrategy* audioTransfer;  // +0x0C SFADXT
+    std::int32_t packSize;                          // +0x10 MPS pack size, -1 when not constant
+    std::int32_t width;                             // +0x14
+    std::int32_t height;                            // +0x18
+    std::int32_t byteRate;                          // +0x1C
+    std::int32_t fps;                               // +0x20 frames per second x 1000
+    std::int32_t videoBitRate;                      // +0x24
+    std::int8_t audioChannelCount;                  // +0x28 ADX header byte 7
+    std::uint8_t reserved29[0x03];
+    std::int32_t audioSampleRate;                   // +0x2C ADX header bytes 8..11, big-endian
+    std::uint8_t reserved30[0x10];
+  };
+
+  static_assert(offsetof(SfdCreInf, systemTransfer) == 0x04, "SfdCreInf::systemTransfer offset must be 0x04");
+  static_assert(offsetof(SfdCreInf, packSize) == 0x10, "SfdCreInf::packSize offset must be 0x10");
+  static_assert(offsetof(SfdCreInf, fps) == 0x20, "SfdCreInf::fps offset must be 0x20");
+  static_assert(offsetof(SfdCreInf, audioChannelCount) == 0x28, "SfdCreInf::audioChannelCount offset must be 0x28");
+  static_assert(offsetof(SfdCreInf, audioSampleRate) == 0x2C, "SfdCreInf::audioSampleRate offset must be 0x2C");
+  static_assert(sizeof(SfdCreInf) == 0x40, "SfdCreInf size must be 0x40");
+
+  /**
+   * What `mwPlyGetHdrInf` (0x00AC8DF0) reports about a movie before it is
+   * opened. `MOV_GetDuration` divides `frameCount` by `fps`, and
+   * `CMovie::OpenMovie` sizes and configures the player from it.
+   */
+  struct MwsfdHdrInf
+  {
+    std::int32_t playable = 0;          // +0x00 1 when `ftype` was recognised
+    std::int32_t ftype = 0;             // +0x04 MwsfcreStreamType; 0 = not a Sofdec stream
+    std::int32_t width = 0;             // +0x08
+    std::int32_t height = 0;            // +0x0C
+    std::int32_t fps = 0;               // +0x10 frames per second x 1000
+    std::int32_t frameCount = 0;        // +0x14 -1 when the header gives none
+    std::int32_t compoMode = 0;         // +0x18 composition mode (the create's buffer format)
+    std::int32_t videoStreamCount = 0;  // +0x1C
+    std::int32_t audioStreamCount = 0;  // +0x20
+    std::int32_t audioSampleRate = 0;   // +0x24
+    std::int32_t audioChannelCount = 0; // +0x28
+  };
+
+  static_assert(offsetof(MwsfdHdrInf, fps) == 0x10, "MwsfdHdrInf::fps offset must be 0x10");
+  static_assert(offsetof(MwsfdHdrInf, frameCount) == 0x14, "MwsfdHdrInf::frameCount offset must be 0x14");
+  static_assert(offsetof(MwsfdHdrInf, compoMode) == 0x18, "MwsfdHdrInf::compoMode offset must be 0x18");
+  static_assert(offsetof(MwsfdHdrInf, audioChannelCount) == 0x28, "MwsfdHdrInf::audioChannelCount offset must be 0x28");
+  static_assert(sizeof(MwsfdHdrInf) == 0x2C, "MwsfdHdrInf size must be 0x2C");
 
   /**
    * Runtime SFD init parameter lane used by `mwPlySfdInit`.
@@ -2520,6 +2584,22 @@ void mwPlyInitSfdFx(moho::MwsfdInitPrm* initParams);
  * Shuts down movie Sofdec playback runtime when init reference count reaches 0.
  */
 void mwPlyFinishSfdFx();
+
+/**
+ * Address: 0x00AC8DF0 (_mwPlyGetHdrInf)
+ *
+ * What it does:
+ * Fills a header-info record from the first bytes of a movie.
+ */
+void mwPlyGetHdrInf(const char* buffer, std::int32_t bufferSize, moho::MwsfdHdrInf* hdrinf);
+
+/**
+ * Address: 0x00AD9FC0 (_SFD_AnalyCreInf)
+ *
+ * What it does:
+ * Classifies a stream from its first bytes into a create-info record.
+ */
+void SFD_AnalyCreInf(const char* buffer, std::int32_t bufferSize, moho::SfdCreInf* creinf);
 
 /**
  * Address: 0x00AC9120 (_MWSFLIB_GetLibWorkPtr)

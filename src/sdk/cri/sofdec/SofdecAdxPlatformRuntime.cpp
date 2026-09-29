@@ -1715,6 +1715,89 @@
     mwply_Destroy(ply);
   }
 
+  extern "C" void MWSFFRM_AnalyzeSofdecHeader(const char* buffer, std::int32_t bufferSize, moho::MwsfdHdrInf* hdrinf);
+
+  /**
+   * Address: 0x00AC8F00 (FUN_00AC8F00, _mwsfcre_DecideFtypeByHdrInf)
+   *
+   * What it does:
+   * Classifies an analysed stream by the transfers the analyser bound. A
+   * system-stream transfer means a Sofdec program stream - video only when no
+   * audio transfer came with it. Without one, a lone video transfer is an
+   * elementary MPEG video stream. Anything else is not a Sofdec stream (0),
+   * which is what makes `mwPlyGetHdrInf` report the movie unplayable.
+   */
+  extern "C" std::int32_t mwsfcre_DecideFtypeByHdrInf(const moho::SfdCreInf* const creinf)
+  {
+    if (creinf->systemTransfer != nullptr) {
+      return (creinf->audioTransfer == nullptr) ? moho::kMwsfcreStreamVideoOnly : moho::kMwsfcreStreamMps;
+    }
+
+    if (creinf->videoTransfer != nullptr && creinf->audioTransfer == nullptr) {
+      return moho::kMwsfcreStreamMpvOnly;
+    }
+
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AC8F30 (FUN_00AC8F30, _mwsfdcre_IsPlayableByHdrInf)
+   *
+   * What it does:
+   * A header is playable exactly when its stream type was recognised.
+   */
+  extern "C" std::int32_t mwsfdcre_IsPlayableByHdrInf(const moho::MwsfdHdrInf* const hdrinf)
+  {
+    return (hdrinf->ftype != 0) ? 1 : 0;
+  }
+
+  /**
+   * Address: 0x00AC8DF0 (FUN_00AC8DF0, _mwPlyGetHdrInf)
+   *
+   * What it does:
+   * Fills `hdrinf` from the first bytes of a movie. `SFD_AnalyCreInf`
+   * classifies the stream and supplies the picture size, frame rate and ADX
+   * audio format; `MWSFFRM_AnalyzeSofdecHeader` adds the frame count,
+   * composition mode and stream counts from the Sofdec header pack; the
+   * result is playable when the stream type was recognised.
+   *
+   * The caller's record is cleared before the argument checks, as the binary
+   * does (0x00AC8E0E). When the analyser recognised no format and no stream
+   * (both flags must be exactly 1), the caller gets the cleared record.
+   */
+  extern "C" void mwPlyGetHdrInf(const char* const buffer, const std::int32_t bufferSize, moho::MwsfdHdrInf* const hdrinf)
+  {
+    moho::MwsfdHdrInf info{};
+    *hdrinf = moho::MwsfdHdrInf{};
+    if (buffer == nullptr || hdrinf == nullptr) {
+      (void)MWSFSVM_Error("E204161: mwPlyGetHdrInf(): NULL pointer");
+      return;
+    }
+
+    if (bufferSize <= 0) {
+      (void)MWSFSVM_Error("E204162: mwPlyGetHdrInf(): bufsize error");
+      return;
+    }
+
+    moho::SfdCreInf creinf;
+    SFD_AnalyCreInf(buffer, bufferSize, &creinf);
+    if (creinf.formatRecognized != 1 || creinf.streamRecognized != 1) {
+      *hdrinf = info;
+      hdrinf->playable = 0;
+      return;
+    }
+
+    info.ftype = mwsfcre_DecideFtypeByHdrInf(&creinf);
+    info.width = creinf.width;
+    info.height = creinf.height;
+    info.fps = creinf.fps;
+    info.audioSampleRate = creinf.audioSampleRate;
+    info.audioChannelCount = creinf.audioChannelCount;
+    MWSFFRM_AnalyzeSofdecHeader(buffer, bufferSize, &info);
+    info.playable = mwsfdcre_IsPlayableByHdrInf(&info);
+    *hdrinf = info;
+  }
+
   // The SFX composition layer is defined later in this aggregate translation
   // unit (cri/sofdec/SofdecSfxRuntime.cpp).
   std::int32_t MWSFSFX_Init();
@@ -2065,35 +2148,35 @@
   // this aggregate compiles after this one, so its handle type and the six
   // entry points mwsffrm_CallbackAnalyzeSofdecHeader reaches through are
   // announced here.
-  struct SofdecHeaderAnalyzerRuntimeView;
-  extern "C" SofdecHeaderAnalyzerRuntimeView* SFH_Create(std::int32_t bufferAddress, std::int32_t remainingBytes);
-  extern "C" std::int32_t SFH_Destroy(SofdecHeaderAnalyzerRuntimeView* handle);
-  extern "C" std::int32_t SFH_IsSfdHeader(SofdecHeaderAnalyzerRuntimeView* handle, std::uint32_t* outIsSfdHeader);
+  struct SofdecHeaderAnalyzer;
+  extern "C" SofdecHeaderAnalyzer* SFH_Create(std::int32_t bufferAddress, std::int32_t remainingBytes);
+  extern "C" std::int32_t SFH_Destroy(SofdecHeaderAnalyzer* handle);
+  extern "C" std::int32_t SFH_IsSfdHeader(SofdecHeaderAnalyzer* handle, std::uint32_t* outIsSfdHeader);
   extern "C" std::int32_t SFH_IsExistStmId(
-    const SofdecHeaderAnalyzerRuntimeView* handle,
+    const SofdecHeaderAnalyzer* handle,
     std::uint32_t streamId,
     std::int32_t* outExists
   );
   extern "C" std::int32_t SFH_AnlyFtrColType(
-    const SofdecHeaderAnalyzerRuntimeView* handle,
+    const SofdecHeaderAnalyzer* handle,
     std::uint32_t streamId,
     std::int32_t* outColourType
   );
   extern "C" std::int32_t SFH_AnlyFtrFxType(
-    const SofdecHeaderAnalyzerRuntimeView* handle,
+    const SofdecHeaderAnalyzer* handle,
     std::uint32_t streamId,
     std::uint32_t* outEffectType
   );
   extern "C" std::int32_t SFH_AnlyMaxFrmNum(
-    const SofdecHeaderAnalyzerRuntimeView* handle,
+    const SofdecHeaderAnalyzer* handle,
     std::int32_t* outFrameNumber
   );
   extern "C" std::int32_t SFH_AnlyNumElemAud(
-    const SofdecHeaderAnalyzerRuntimeView* handle,
+    const SofdecHeaderAnalyzer* handle,
     std::int32_t* outCount
   );
   extern "C" std::int32_t SFH_AnlyNumElemVid(
-    const SofdecHeaderAnalyzerRuntimeView* handle,
+    const SofdecHeaderAnalyzer* handle,
     std::int32_t* outCount
   );
 
@@ -2584,7 +2667,7 @@
    * Answers how many audio elements the analysed Sofdec header declares,
    * or -1 when the analyser does not report success.
    */
-  int mwsffrm_GetNumAudioCh(SofdecHeaderAnalyzerRuntimeView* const handle)
+  int mwsffrm_GetNumAudioCh(SofdecHeaderAnalyzer* const handle)
   {
     std::int32_t elementCount = 0;
     if (SFH_AnlyNumElemAud(handle, &elementCount) != 1) {
@@ -2600,7 +2683,7 @@
    * The video counterpart of mwsffrm_GetNumAudioCh, byte-for-byte the same
    * shape against SFH_AnlyNumElemVid.
    */
-  int mwsffrm_GetNumVideoCh(SofdecHeaderAnalyzerRuntimeView* const handle)
+  int mwsffrm_GetNumVideoCh(SofdecHeaderAnalyzer* const handle)
   {
     std::int32_t elementCount = 0;
     if (SFH_AnlyNumElemVid(handle, &elementCount) != 1) {
@@ -2655,7 +2738,7 @@
    * to exist and its feature record has to report colour type 3; anything
    * else, including a header too old to have the field, answers false.
    */
-  [[nodiscard]] std::int32_t mwsffrm_AnalyColHsyuv(SofdecHeaderAnalyzerRuntimeView* const header)
+  [[nodiscard]] std::int32_t mwsffrm_AnalyColHsyuv(SofdecHeaderAnalyzer* const header)
   {
     std::int32_t streamExists = 0;
     if (SFH_IsExistStmId(header, kSofdecVideoStreamId, &streamExists) != 1 || streamExists != 1) {
@@ -2676,7 +2759,7 @@
    * What it does:
    * The movie's frame count, or -1 when the header does not state one.
    */
-  [[nodiscard]] std::int32_t mwsffrm_AnalyTotalFrm(SofdecHeaderAnalyzerRuntimeView* const header)
+  [[nodiscard]] std::int32_t mwsffrm_AnalyTotalFrm(SofdecHeaderAnalyzer* const header)
   {
     std::int32_t frameCount = 0;
     return (SFH_AnlyMaxFrmNum(header, &frameCount) != 0) ? frameCount : -1;
@@ -2691,7 +2774,7 @@
    * else, and a header with no readable effect type at all, falls back to
    * the same `kSofdecSfhInfoSlotUnused` the table is initialised with.
    */
-  [[nodiscard]] std::int32_t mwsffrm_AnalyFxType(SofdecHeaderAnalyzerRuntimeView* const header)
+  [[nodiscard]] std::int32_t mwsffrm_AnalyFxType(SofdecHeaderAnalyzer* const header)
   {
     std::uint32_t effectType = 0;
     if (SFH_AnlyFtrFxType(header, kSofdecVideoStreamId, &effectType) != 1) {
@@ -2707,6 +2790,54 @@
         return kSofdecSfhInfoSlotFxType6;
       default:
         return moho::kSofdecSfhInfoSlotUnused;
+    }
+  }
+
+  /**
+   * Address: 0x00ACA8E0 (FUN_00ACA8E0, _MWSFFRM_AnalyzeSofdecHeader)
+   *
+   * What it does:
+   * Looks for the Sofdec header in the second and third 2 KiB packs of the
+   * buffer. The first pack the SFH analyser accepts supplies the frame count,
+   * composition mode and video/audio stream counts; a pack it creates a
+   * handle for but rejects resets the frame count and composition mode to -1
+   * before the next one is tried. The frame count starts at -1, and a buffer
+   * shorter than one pack is otherwise left alone.
+   */
+  extern "C" void MWSFFRM_AnalyzeSofdecHeader(
+    const char* const buffer,
+    const std::int32_t bufferSize,
+    moho::MwsfdHdrInf* const hdrinf
+  )
+  {
+    hdrinf->frameCount = -1;
+    if (bufferSize < kSofdecHeaderMinimumBytes || buffer == nullptr) {
+      return;
+    }
+
+    const char* pack = buffer + kSofdecHeaderMinimumBytes;
+    std::int32_t remaining = bufferSize - kSofdecHeaderMinimumBytes;
+    for (std::int32_t packIndex = 2; packIndex <= 3;
+         ++packIndex, pack += kSofdecHeaderMinimumBytes, remaining -= kSofdecHeaderMinimumBytes) {
+      SofdecHeaderAnalyzer* const header =
+        SFH_Create(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(pack)), remaining);
+      if (header == nullptr) {
+        continue;
+      }
+
+      std::uint32_t isSfdHeader = 0;
+      if (SFH_IsSfdHeader(header, &isSfdHeader) == 1 && isSfdHeader == 1) {
+        hdrinf->frameCount = mwsffrm_AnalyTotalFrm(header);
+        hdrinf->compoMode = mwsffrm_AnalyFxType(header);
+        hdrinf->videoStreamCount = mwsffrm_GetNumVideoCh(header);
+        hdrinf->audioStreamCount = mwsffrm_GetNumAudioCh(header);
+        (void)SFH_Destroy(header);
+        return;
+      }
+
+      hdrinf->frameCount = -1;
+      hdrinf->compoMode = -1;
+      (void)SFH_Destroy(header);
     }
   }
 
@@ -2740,7 +2871,7 @@
       return;
     }
 
-    SofdecHeaderAnalyzerRuntimeView* const header = SFH_Create(bufferAddress, bufferSize);
+    SofdecHeaderAnalyzer* const header = SFH_Create(bufferAddress, bufferSize);
     if (header == nullptr) {
       return;
     }

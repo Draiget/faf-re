@@ -161,8 +161,6 @@ namespace
   constexpr float kMovieVolumeScriptMax = 2.0f;
   constexpr float kMovieSofdecVideoRefreshHz = 59.939999f;
   constexpr float kWordFloatScale = 65536.0f;
-  constexpr std::int32_t kSofdecHeaderTypeMovie = 1;
-  constexpr std::int32_t kSofdecHeaderTypeMovieAlt = 3;
 
   /**
    * Address: 0x008C8700 (FUN_008C8700, func_CpyFile)
@@ -304,232 +302,6 @@ namespace
       output << '\n';
       iter.Next();
     }
-  }
-
-  struct SofdecHeaderInfoRuntimeView
-  {
-    std::int32_t headerValid = 0;            // +0x00
-    std::int32_t streamType = 0;             // +0x04
-    std::int32_t videoWidth = 0;             // +0x08
-    std::int32_t videoHeight = 0;            // +0x0C
-    std::int32_t frameRateTimes1000 = 0;     // +0x10
-    std::int32_t frameCount = 0;             // +0x14
-    std::int32_t compositionMode = 0;        // +0x18
-    std::int32_t videoChannelCount = 0;      // +0x1C
-    std::int32_t audioChannelCount = 0;      // +0x20
-    std::int32_t streamTimingMetric = 0;     // +0x24
-    std::int32_t frameCountLowByte = 0;      // +0x28
-  };
-
-  static_assert(offsetof(SofdecHeaderInfoRuntimeView, headerValid) == 0x00, "headerValid offset must be 0x00");
-  static_assert(offsetof(SofdecHeaderInfoRuntimeView, streamType) == 0x04, "streamType offset must be 0x04");
-  static_assert(offsetof(SofdecHeaderInfoRuntimeView, videoWidth) == 0x08, "videoWidth offset must be 0x08");
-  static_assert(offsetof(SofdecHeaderInfoRuntimeView, videoHeight) == 0x0C, "videoHeight offset must be 0x0C");
-  static_assert(
-    offsetof(SofdecHeaderInfoRuntimeView, frameRateTimes1000) == 0x10,
-    "frameRateTimes1000 offset must be 0x10"
-  );
-  static_assert(offsetof(SofdecHeaderInfoRuntimeView, frameCount) == 0x14, "frameCount offset must be 0x14");
-  static_assert(
-    offsetof(SofdecHeaderInfoRuntimeView, compositionMode) == 0x18,
-    "compositionMode offset must be 0x18"
-  );
-  static_assert(sizeof(SofdecHeaderInfoRuntimeView) == 0x2C, "SofdecHeaderInfoRuntimeView size must be 0x2C");
-
-  struct SofdecCreateInfoRuntimeView
-  {
-    std::uint8_t headerWord0 = 0; // +0x00
-    std::uint8_t headerWord1 = 0; // +0x01
-    std::uint8_t reserved02_03[0x02]{}; // +0x02
-    const void* streamDescriptor = nullptr; // +0x04
-    const void* videoDescriptor = nullptr; // +0x08
-    const void* audioDescriptor = nullptr; // +0x0C
-    std::int32_t packetSizeBytes = 0; // +0x10
-    std::int32_t videoWidthPixels = 0; // +0x14
-    std::int32_t videoHeightPixels = 0; // +0x18
-    std::int32_t streamTimingMetric = 0; // +0x1C
-    std::int32_t videoFrameMetric = 0; // +0x20
-    std::int32_t videoBitRate = 0; // +0x24
-    std::int32_t frameCountMetric = 0; // +0x28
-    std::int32_t extraMetric = 0; // +0x2C
-    std::uint8_t reserved30_3F[0x10]{}; // +0x30
-  };
-  static_assert(sizeof(SofdecCreateInfoRuntimeView) == 0x40, "SofdecCreateInfoRuntimeView size must be 0x40");
-
-  extern "C" void SFD_AnalyCreInf(const char* buffer, std::int32_t size, SofdecCreateInfoRuntimeView* outInfo);
-
-  // Sofdec stream-type codes. mwPlyGetHdrInf's callers treat 1 and 3 as the
-  // playable SFD shapes; 2 is the video-only elementary stream.
-  constexpr std::int32_t kSofdecFtypeNone = 0;
-  constexpr std::int32_t kSofdecFtypeSfdWithAudio = 1;
-  constexpr std::int32_t kSofdecFtypeVideoOnlyStream = 2;
-  constexpr std::int32_t kSofdecFtypeSfdVideoOnly = 3;
-
-  /**
-   * Address: 0x00AC8F00 (FUN_00AC8F00, _mwsfcre_DecideFtypeByHdrInf)
-   *
-   * IDA signature:
-   * int __cdecl sub_AC8F00(struct_sofdec_unk1 *a1);
-   *
-   * What it does:
-   * Classifies an analysed Sofdec header into a stream-type code from which
-   * of the three descriptor lanes the analyser filled in. A system-stream
-   * descriptor means a real SFD container - 3 when it carries video only, 1
-   * when an audio descriptor is present too. With no system stream, a bare
-   * video descriptor is the elementary-stream case (2). Anything else is not
-   * a Sofdec stream at all (0), which is what makes mwPlyGetHdrInf report
-   * "not a valid SFD file".
-   */
-  extern "C" std::int32_t mwsfcre_DecideFtypeByHdrInf(const SofdecCreateInfoRuntimeView* const headerInfo)
-  {
-    if (headerInfo->streamDescriptor != nullptr) {
-      return (headerInfo->audioDescriptor == nullptr) ? kSofdecFtypeSfdVideoOnly : kSofdecFtypeSfdWithAudio;
-    }
-
-    if (headerInfo->videoDescriptor != nullptr && headerInfo->audioDescriptor == nullptr) {
-      return kSofdecFtypeVideoOnlyStream;
-    }
-
-    return kSofdecFtypeNone;
-  }
-
-  /**
-   * Address: 0x00AC8F30 (FUN_00AC8F30, _mwsfdcre_IsPlayableByHdrInf)
-   *
-   * IDA signature:
-   * BOOL __cdecl sub_AC8F30(struct_SFD *a1);
-   *
-   * What it does:
-   * Reports whether a parsed header describes something the player can open,
-   * which reduces to "the stream type was classified at all".
-   */
-  extern "C" std::int32_t mwsfdcre_IsPlayableByHdrInf(const SofdecHeaderInfoRuntimeView* const headerInfo)
-  {
-    return (headerInfo->streamType != kSofdecFtypeNone) ? 1 : 0;
-  }
-  /**
-   * Address: 0x00ACA8E0 (FUN_00ACA8E0, _MWSFFRM_AnalyzeSofdecHeader)
-   *
-   * What it does:
-   * Scans Sofdec header chunks starting at the second 2 KiB block and fills the runtime header lanes when a valid
-   * Sofdec stream marker is found.
-   */
-  extern "C" void
-    MWSFFRM_AnalyzeSofdecHeader(const char* buffer, std::int32_t size, SofdecHeaderInfoRuntimeView* headerInfo);
-  extern "C" void MWSFSVM_Error(const char* message);
-
-  struct SofdecHeaderAnalyzerRuntimeView;
-
-  extern "C" SofdecHeaderAnalyzerRuntimeView* SFH_Create(int bufferAddress, int remainingBytes);
-  extern "C" int SFH_Destroy(SofdecHeaderAnalyzerRuntimeView* handle);
-  extern "C" int SFH_IsSfdHeader(SofdecHeaderAnalyzerRuntimeView* handle, unsigned int* success);
-  extern "C" int mwsffrm_AnalyTotalFrm(SofdecHeaderAnalyzerRuntimeView* handle);
-  extern "C" int mwsffrm_AnalyFxType(SofdecHeaderAnalyzerRuntimeView* handle);
-  extern "C" int mwsffrm_GetNumVideoCh(SofdecHeaderAnalyzerRuntimeView* handle);
-  extern "C" int mwsffrm_GetNumAudioCh(SofdecHeaderAnalyzerRuntimeView* handle);
-
-  /**
-   * Address: 0x00ACA8E0 (FUN_00ACA8E0, _MWSFFRM_AnalyzeSofdecHeader)
-   *
-   * What it does:
-   * Scans Sofdec header chunks starting at the second 2 KiB block, validates the header marker, and populates the
-   * runtime Sofdec header lanes with frame count, composition mode, and audio/video channel counts.
-   */
-  extern "C" void MWSFFRM_AnalyzeSofdecHeader(
-    const char* const buffer,
-    const std::int32_t size,
-    SofdecHeaderInfoRuntimeView* const headerInfo
-  )
-  {
-    headerInfo->frameCount = -1;
-
-    if (size < 2048 || buffer == nullptr) {
-      return;
-    }
-
-    std::int32_t chunkIndex = 2;
-    const char* chunkCursor = buffer + 2048;
-    std::int32_t remainingSize = size - 2048;
-
-    do {
-      SofdecHeaderAnalyzerRuntimeView* const handle = SFH_Create(
-        static_cast<int>(reinterpret_cast<std::uintptr_t>(chunkCursor)),
-        remainingSize
-      );
-      if (handle != nullptr) {
-        unsigned int headerKind = 0;
-        if (SFH_IsSfdHeader(handle, &headerKind) == 1 && headerKind == 1) {
-          headerInfo->frameCount = mwsffrm_AnalyTotalFrm(handle);
-          headerInfo->compositionMode = mwsffrm_AnalyFxType(handle);
-          headerInfo->videoChannelCount = mwsffrm_GetNumVideoCh(handle);
-          headerInfo->audioChannelCount = mwsffrm_GetNumAudioCh(handle);
-          SFH_Destroy(handle);
-          return;
-        }
-
-        headerInfo->frameCount = -1;
-        headerInfo->compositionMode = -1;
-        SFH_Destroy(handle);
-      }
-
-      ++chunkIndex;
-      remainingSize -= 2048;
-      chunkCursor += 2048;
-    } while (chunkIndex <= 3);
-  }
-
-  /**
-   * Address: 0x00AC8DF0 (FUN_00AC8DF0, mwPlyGetHdrInf)
-   *
-   * What it does:
-   * Parses Sofdec header lanes from a mapped movie buffer, fills the runtime
-   * header-info struct used by `MOV_GetDuration`, and reports invalid input
-   * through Sofdec error sink lanes.
-   */
-  extern "C" std::int32_t mwPlyGetHdrInf(const char* const buffer, const std::int32_t size, void* const outHeaderInfo)
-  {
-    SofdecHeaderInfoRuntimeView parsedHeader{};
-    std::memset(&parsedHeader, 0, sizeof(parsedHeader));
-    if (outHeaderInfo != nullptr) {
-      std::memset(outHeaderInfo, 0, sizeof(SofdecHeaderInfoRuntimeView));
-    }
-
-    if (buffer == nullptr || outHeaderInfo == nullptr) {
-      MWSFSVM_Error("E204161 mwPlyGetHdrInf");
-      return 0;
-    }
-
-    if (size <= 0) {
-      MWSFSVM_Error("E204162 mwPlyGetHdrInf");
-      return 0;
-    }
-
-    SofdecCreateInfoRuntimeView createInfo{};
-    std::memset(&createInfo, 0, sizeof(createInfo));
-    SFD_AnalyCreInf(buffer, size, &createInfo);
-    if (createInfo.headerWord0 == 0 || createInfo.headerWord1 == 0) {
-      parsedHeader.headerValid = 0;
-      std::memcpy(outHeaderInfo, &parsedHeader, sizeof(parsedHeader));
-      return 0;
-    }
-
-    // Field-for-field as 0x00AC8E6C..0x00AC8E9C writes them: the analysed
-    // create-info's width lands at +0x08 and its height at +0x0C - which is
-    // where `CMovie::OpenMovie` reads the frame size it hands to
-    // `mwPlyCreateSofdec` as maxWidth/maxHeight. The remaining lanes at
-    // +0x14..+0x20 are filled by `MWSFFRM_AnalyzeSofdecHeader` below, so
-    // nothing is written to them here.
-    parsedHeader.streamType = mwsfcre_DecideFtypeByHdrInf(&createInfo);
-    parsedHeader.videoWidth = createInfo.videoWidthPixels;
-    parsedHeader.videoHeight = createInfo.videoHeightPixels;
-    parsedHeader.frameRateTimes1000 = createInfo.videoFrameMetric;
-    parsedHeader.streamTimingMetric = createInfo.extraMetric;
-    parsedHeader.frameCountLowByte =
-      static_cast<std::int32_t>(static_cast<std::int8_t>(createInfo.frameCountMetric & 0xFF));
-    MWSFFRM_AnalyzeSofdecHeader(buffer, size, &parsedHeader);
-    parsedHeader.headerValid = mwsfdcre_IsPlayableByHdrInf(&parsedHeader);
-    std::memcpy(outHeaderInfo, &parsedHeader, sizeof(parsedHeader));
-    return parsedHeader.headerValid;
   }
 
   struct UnsafePathEntry
@@ -6864,14 +6636,13 @@ float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
     return 0.0f;
   }
 
-  const char* const requestedPath = sourcePath != nullptr ? sourcePath : "";
   FILE_EnsureWaitHandleSet();
   FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
 
   msvc8::string resolvedPath{};
-  (void)waitHandleSet->mHandle->FindFile(&resolvedPath, requestedPath, nullptr);
+  (void)waitHandleSet->mHandle->FindFile(&resolvedPath, sourcePath, nullptr);
   if (resolvedPath.empty()) {
-    gpg::Warnf("Movie file \"%s\" doesn't exist.", requestedPath);
+    gpg::Warnf("Movie file \"%s\" doesn't exist.", sourcePath);
     return 0.0f;
   }
 
@@ -6880,18 +6651,15 @@ float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
     return 0.0f;
   }
 
-  SofdecHeaderInfoRuntimeView headerInfo{};
-  std::memset(&headerInfo, 0, sizeof(headerInfo));
-  const std::int32_t mappedByteCount = static_cast<std::int32_t>(mappedMovieData.mEnd - mappedMovieData.mBegin);
-  (void)mwPlyGetHdrInf(mappedMovieData.mBegin, mappedByteCount, &headerInfo);
-
-  const bool validType =
-    (headerInfo.streamType == kSofdecHeaderTypeMovie || headerInfo.streamType == kSofdecHeaderTypeMovieAlt);
-  if (validType && headerInfo.headerValid != 0 && headerInfo.frameRateTimes1000 != 0) {
-    return static_cast<float>(headerInfo.frameCount) / (static_cast<float>(headerInfo.frameRateTimes1000) * 0.001f);
+  MwsfdHdrInf header{};
+  ::mwPlyGetHdrInf(
+    mappedMovieData.mBegin, static_cast<std::int32_t>(mappedMovieData.mEnd - mappedMovieData.mBegin), &header
+  );
+  if ((header.ftype == kMwsfcreStreamVideoOnly || header.ftype == kMwsfcreStreamMps) && header.playable != 0) {
+    return static_cast<float>(header.frameCount) / (static_cast<float>(header.fps) * 0.001f);
   }
 
-  gpg::Warnf("%s is not a valid SFD file.", requestedPath);
+  gpg::Warnf("%s is not a valid SFD file.", sourcePath);
   return 0.0f;
 }
 

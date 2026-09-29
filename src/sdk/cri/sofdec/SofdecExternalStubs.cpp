@@ -326,15 +326,15 @@ extern "C" {
   // reads, which stayed null for every frame while this stub stood. Recovered
   // in cri/sofdec/SofdecAdxPlatformRuntime.cpp with its four mwsffrm_* helpers.
   // mwsfcre_AllFree: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
-  // mwsfcre_DecideFtypeByHdrInf: real body in moho/misc/StartupHelpers.cpp,
-  // next to its only caller mwPlyGetHdrInf (adjacent addresses 0x00AC8F00 /
-  // 0x00AC8DF0 - same original translation unit).
+  // mwsfcre_DecideFtypeByHdrInf: real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp, next to its only caller
+  // mwPlyGetHdrInf (adjacent addresses 0x00AC8F00 / 0x00AC8DF0).
   // mwsfcre_GetMallocCnt: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
   // mwsfcre_IncMallocCnt: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
   // mwsfcre_OrgMalloc: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
   // mwsfcre_UsrMalloc: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
-  // mwsfdcre_IsPlayableByHdrInf: real body in moho/misc/StartupHelpers.cpp
-  // (0x00AC8F30, same original translation unit as mwPlyGetHdrInf).
+  // mwsfdcre_IsPlayableByHdrInf: real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp (0x00AC8F30, beside mwPlyGetHdrInf).
   // mwsffrm_AnalyFxType / mwsffrm_AnalyTotalFrm / mwsffrm_AnalyColHsyuv:
   // real bodies in cri/sofdec/SofdecAdxPlatformRuntime.cpp, beside the
   // MWSFFRM_InitSfhInfTable that owns the ring they write into.

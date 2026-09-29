@@ -63,8 +63,7 @@ extern "C" std::int32_t ADXM_WaitVsync();
  * Converts one decoded MWSFD frame descriptor into ARGB8888 pixels in the
  * caller-provided output buffer.
  */
-// extern "C" to match the definition's linkage, the same way mwPlyGetHdrInf
-// below does. The Sofdec side declares this inside an extern "C" block, so it
+// extern "C" to match the definition's linkage. The Sofdec side declares this inside an extern "C" block, so it
 // exports _mwPlyFxCnvFrmARGB8888; without this the call would ask for
 // ?mwPlyFxCnvFrmARGB8888@@YAX... and go unresolved.
 extern "C" void mwPlyFxCnvFrmARGB8888(
@@ -72,18 +71,6 @@ extern "C" void mwPlyFxCnvFrmARGB8888(
   const moho::MwsfdFrameInfo* frameInfo,
   void* outputBits
 );
-
-/**
- * Address: 0x00AC8DF0 (FUN_00AC8DF0, _mwPlyGetHdrInf)
- *
- * What it does:
- * Parses one Sofdec .sfd header block into the caller header-info view.
- */
-// extern "C" to match the definition's linkage. Without it this asks the
-// linker for ?mwPlyGetHdrInf@@YAHPBDHPAX@Z while StartupHelpers.cpp exports
-// the C name, so the call went unresolved and /FORCE bound it to the image
-// base - a jump to address 0 the moment a movie is opened.
-extern "C" std::int32_t mwPlyGetHdrInf(const char* buffer, std::int32_t size, void* outHeaderInfo);
 
 // mwPlyCalcWorkCprmSfd / mwPlyCreateSofdec are declared with their real
 // parameter type in moho/audio/SofdecRuntime.h. They used to be declared here
@@ -117,23 +104,6 @@ namespace moho
     };
 
     static_assert(sizeof(MoviePlaybackInfoDebugView) == 0x14, "MoviePlaybackInfoDebugView size must be 0x14");
-
-    // CRI Sofdec SDK external struct views (not engine objects). Field offsets
-    // are taken from FUN_00874060.asm and mirror moho::SofdecHeaderInfoRuntimeView
-    // in StartupHelpers.cpp, with the video width/height/composition lanes named.
-    struct SofdecSfdHeaderInfo
-    {
-      std::int32_t headerValid = 0;        // +0x00
-      std::int32_t streamType = 0;         // +0x04 (1 or 3 == valid SFD)
-      std::int32_t videoWidth = 0;         // +0x08
-      std::int32_t videoHeight = 0;        // +0x0C
-      std::int32_t frameRateTimes1000 = 0; // +0x10
-      std::int32_t frameCount = 0;         // +0x14
-      std::int32_t compositionMode = 0;    // +0x18
-      std::uint8_t reserved1C[0x10]{};     // +0x1C
-    };
-
-    static_assert(sizeof(SofdecSfdHeaderInfo) == 0x2C, "SofdecSfdHeaderInfo size must be 0x2C");
 
     // _mwsfcre_MallocTab create-params; the binary memsets 0x30 bytes then fills.
     // The create-parameter layout is shared with the recovered mwsfcre create
@@ -365,27 +335,26 @@ namespace moho
       stream->mReadHead += kSofdecHeaderProbeBytes;
     }
 
-    SofdecSfdHeaderInfo header{};
-    std::memset(&header, 0, sizeof(header));
-    (void)::mwPlyGetHdrInf(headerBuffer, kSofdecHeaderProbeBytes, &header);
+    MwsfdHdrInf header{};
+    ::mwPlyGetHdrInf(headerBuffer, kSofdecHeaderProbeBytes, &header);
 
-    if ((header.streamType != 3 && header.streamType != 1) || header.headerValid == 0) {
+    if ((header.ftype != kMwsfcreStreamVideoOnly && header.ftype != kMwsfcreStreamMps) || header.playable == 0) {
       gpg::Warnf("%s is not a valid SFD file.", path);
       Dispose();
       return false;
     }
     movieStream.reset(nullptr);
 
-    mFrameRate = static_cast<float>(header.frameRateTimes1000) * 0.001f;
+    mFrameRate = static_cast<float>(header.fps) * 0.001f;
     mFrameCount = header.frameCount;
 
     SofdecCreateParams createParams{};
     std::memset(&createParams, 0, sizeof(createParams));
-    createParams.ftype = header.streamType;
-    createParams.bufferFormat = header.compositionMode;
+    createParams.ftype = header.ftype;
+    createParams.bufferFormat = header.compoMode;
     createParams.maxBitsPerSecond = kMovieMaxBitsPerSecond;
-    createParams.maxWidth = header.videoWidth;
-    createParams.maxHeight = header.videoHeight;
+    createParams.maxWidth = header.width;
+    createParams.maxHeight = header.height;
     createParams.framePoolWork = 2;
     createParams.maxStreams = 1;
     createParams.outerFramePoolNum = 0;

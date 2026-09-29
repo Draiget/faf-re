@@ -1,24 +1,24 @@
-  struct SofdecHeaderAnalyzerRuntimeView
+  struct SofdecHeaderAnalyzer
   {
     std::int32_t state = 0;          // +0x00
     std::int32_t bufferAddress = 0;  // +0x04
     std::int32_t remainingBytes = 0; // +0x08
     std::int32_t version = 0;        // +0x0C
   };
-  static_assert(offsetof(SofdecHeaderAnalyzerRuntimeView, state) == 0x00, "SofdecHeaderAnalyzerRuntimeView::state offset must be 0x00");
-  static_assert(offsetof(SofdecHeaderAnalyzerRuntimeView, bufferAddress) == 0x04, "SofdecHeaderAnalyzerRuntimeView::bufferAddress offset must be 0x04");
+  static_assert(offsetof(SofdecHeaderAnalyzer, state) == 0x00, "SofdecHeaderAnalyzer::state offset must be 0x00");
+  static_assert(offsetof(SofdecHeaderAnalyzer, bufferAddress) == 0x04, "SofdecHeaderAnalyzer::bufferAddress offset must be 0x04");
   static_assert(
-    offsetof(SofdecHeaderAnalyzerRuntimeView, remainingBytes) == 0x08,
-    "SofdecHeaderAnalyzerRuntimeView::remainingBytes offset must be 0x08"
+    offsetof(SofdecHeaderAnalyzer, remainingBytes) == 0x08,
+    "SofdecHeaderAnalyzer::remainingBytes offset must be 0x08"
   );
-  static_assert(offsetof(SofdecHeaderAnalyzerRuntimeView, version) == 0x0C, "SofdecHeaderAnalyzerRuntimeView::version offset must be 0x0C");
-  static_assert(sizeof(SofdecHeaderAnalyzerRuntimeView) == 0x10, "SofdecHeaderAnalyzerRuntimeView size must be 0x10");
+  static_assert(offsetof(SofdecHeaderAnalyzer, version) == 0x0C, "SofdecHeaderAnalyzer::version offset must be 0x0C");
+  static_assert(sizeof(SofdecHeaderAnalyzer) == 0x10, "SofdecHeaderAnalyzer size must be 0x10");
 
   struct SofdecHeaderAnalyzerPoolState
   {
     std::int32_t size = 0;                                  // +0x00
     std::int32_t cur = 0;                                   // +0x04
-    SofdecHeaderAnalyzerRuntimeView* ptr = nullptr;         // +0x08
+    SofdecHeaderAnalyzer* ptr = nullptr;         // +0x08
   };
   static_assert(offsetof(SofdecHeaderAnalyzerPoolState, size) == 0x00, "SofdecHeaderAnalyzerPoolState::size offset must be 0x00");
   static_assert(offsetof(SofdecHeaderAnalyzerPoolState, cur) == 0x04, "SofdecHeaderAnalyzerPoolState::cur offset must be 0x04");
@@ -83,7 +83,7 @@
   extern "C" SofdecHeaderAnalyzerPoolState* func_SofDec_InitSfhWork(
     SofdecHeaderAnalyzerPoolState* const poolState,
     const std::int32_t slotCount,
-    SofdecHeaderAnalyzerRuntimeView* const slotArray
+    SofdecHeaderAnalyzer* const slotArray
   )
   {
     poolState->size = slotCount;
@@ -99,8 +99,8 @@
    * Marks one SFH analyzer slot as active and binds `(bufferAddress,
    * remainingBytes)` to that slot.
    */
-  extern "C" SofdecHeaderAnalyzerRuntimeView* func_SofDec_InitSfhObj(
-    SofdecHeaderAnalyzerRuntimeView* const handle,
+  extern "C" SofdecHeaderAnalyzer* func_SofDec_InitSfhObj(
+    SofdecHeaderAnalyzer* const handle,
     const std::int32_t bufferAddress,
     const std::int32_t remainingBytes
   )
@@ -117,7 +117,7 @@
    * What it does:
    * Reports whether one SFH analyzer slot is still idle.
    */
-  extern "C" std::int32_t func_SofDec_Unk5Unused(SofdecHeaderAnalyzerRuntimeView* handle);
+  extern "C" std::int32_t func_SofDec_Unk5Unused(SofdecHeaderAnalyzer* handle);
 
   /**
    * Address: 0x00ADC760 (FUN_00ADC760, _SFH_Create)
@@ -127,17 +127,17 @@
    * for `(bufferAddress, remainingBytes)`, and increments the active slot
    * counter.
    */
-  extern "C" SofdecHeaderAnalyzerRuntimeView*
+  extern "C" SofdecHeaderAnalyzer*
   SFH_Create(const std::int32_t bufferAddress, const std::int32_t remainingBytes)
   {
-    SofdecHeaderAnalyzerRuntimeView* selectedSlot = nullptr;
+    SofdecHeaderAnalyzer* selectedSlot = nullptr;
     const std::int32_t poolSize = sfh_workinfo.size;
     if (sfh_workinfo.cur >= poolSize) {
       return nullptr;
     }
 
     if (poolSize > 0) {
-      SofdecHeaderAnalyzerRuntimeView* slot = sfh_workinfo.ptr;
+      SofdecHeaderAnalyzer* slot = sfh_workinfo.ptr;
       std::int32_t index = 0;
       do {
         selectedSlot = slot;
@@ -169,16 +169,16 @@
   // Exactly the 24 bytes the binary compares: "SofdecStream" padded to width.
   constexpr char kSofdecStreamSignature[kSofdecStreamSignatureBytes + 1] = "SofdecStream            ";
 
-  extern "C" std::int32_t isEffectiveObj(const SofdecHeaderAnalyzerRuntimeView* handle);
+  extern "C" std::int32_t isEffectiveObj(const SofdecHeaderAnalyzer* handle);
   extern "C" std::int32_t
-  SFH_AnlyHdrToolInf(const SofdecHeaderAnalyzerRuntimeView* handle, char* outToolBanner);
+  SFH_AnlyHdrToolInf(const SofdecHeaderAnalyzer* handle, char* outToolBanner);
   extern "C" std::int32_t SFH_AnlyHdrToolVer(
-    const SofdecHeaderAnalyzerRuntimeView* handle,
+    const SofdecHeaderAnalyzer* handle,
     std::uint32_t* outMajor,
     std::uint32_t* outMinor
   );
   extern "C" std::int32_t getToolVer(char* text, std::uint32_t* major, std::uint32_t* minor);
-  extern "C" void func_SofDef_InitAllUnk5(std::int32_t slotCount, SofdecHeaderAnalyzerRuntimeView* slotArray);
+  extern "C" void func_SofDef_InitAllUnk5(std::int32_t slotCount, SofdecHeaderAnalyzer* slotArray);
 
   /**
    * Address: 0x00ADC820 (FUN_00ADC820, _initSfhObj)
@@ -186,7 +186,7 @@
    * What it does:
    * Resets one SFH analyzer slot to the idle zeroed state.
    */
-  extern "C" void initSfhObj(SofdecHeaderAnalyzerRuntimeView* const handle)
+  extern "C" void initSfhObj(SofdecHeaderAnalyzer* const handle)
   {
     handle->state = 0;
     handle->bufferAddress = 0;
@@ -200,7 +200,7 @@
    * What it does:
    * Reports whether one SFH analyzer slot is still idle.
    */
-  extern "C" std::int32_t func_SofDec_Unk5Unused(SofdecHeaderAnalyzerRuntimeView* const handle)
+  extern "C" std::int32_t func_SofDec_Unk5Unused(SofdecHeaderAnalyzer* const handle)
   {
     return handle->state == 0 ? 1 : 0;
   }
@@ -217,7 +217,7 @@
   // (`push 20h` at 0x00AE7155) out of this static array; sfh_workinfo just
   // points at it.
   constexpr std::int32_t kSfhAnalyzerSlotCount = 32;
-  extern "C" SofdecHeaderAnalyzerRuntimeView sfh_work[kSfhAnalyzerSlotCount]{};
+  extern "C" SofdecHeaderAnalyzer sfh_work[kSfhAnalyzerSlotCount]{};
   extern "C" std::int32_t sfh_init_cont = 0;
   extern "C" const char* cri_verstr_ptr_sfh = nullptr;
 
@@ -244,7 +244,7 @@
    * every slot, and publishes the slot array through `sfh_workinfo`. The
    * `sfh_init_cont` guard makes repeat calls no-ops.
    */
-  extern "C" void SFH_Init(const std::int32_t slotCount, SofdecHeaderAnalyzerRuntimeView* const slotArray)
+  extern "C" void SFH_Init(const std::int32_t slotCount, SofdecHeaderAnalyzer* const slotArray)
   {
     if (sfh_init_cont > 0) {
       return;
@@ -283,7 +283,7 @@
    * Reports whether one analyzer slot holds a parsed header, which is any
    * state outside the idle/bound/failed band.
    */
-  extern "C" std::int32_t isEffectiveObj(const SofdecHeaderAnalyzerRuntimeView* const handle)
+  extern "C" std::int32_t isEffectiveObj(const SofdecHeaderAnalyzer* const handle)
   {
     return (handle->state < kSfhStateFailed || handle->state > kSfhStateBound) ? 1 : 0;
   }
@@ -294,7 +294,7 @@
    * What it does:
    * Returns one analyzer slot to the pool and drops the active-slot count.
    */
-  extern "C" std::int32_t SFH_Destroy(SofdecHeaderAnalyzerRuntimeView* const handle)
+  extern "C" std::int32_t SFH_Destroy(SofdecHeaderAnalyzer* const handle)
   {
     initSfhObj(handle);
     return --sfh_workinfo.cur;
@@ -311,7 +311,7 @@
    * `+0x60` of the analysed pack) into a NUL-terminated caller buffer.
    */
   extern "C" std::int32_t
-  SFH_AnlyHdrToolInf(const SofdecHeaderAnalyzerRuntimeView* const handle, char* const outToolBanner)
+  SFH_AnlyHdrToolInf(const SofdecHeaderAnalyzer* const handle, char* const outToolBanner)
   {
     outToolBanner[0] = '\0';
     const char* const bannerSource =
@@ -341,7 +341,7 @@
    * `minor + 100 * major`.
    */
   extern "C" std::int32_t SFH_AnlyHdrToolVer(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     std::uint32_t* const outMajor,
     std::uint32_t* const outMinor
   )
@@ -393,7 +393,7 @@
    * authoring-tool version; anything else parks the slot as failed.
    */
   extern "C" std::int32_t
-  SFH_IsSfdHeader(SofdecHeaderAnalyzerRuntimeView* const handle, std::uint32_t* const outIsSfdHeader)
+  SFH_IsSfdHeader(SofdecHeaderAnalyzer* const handle, std::uint32_t* const outIsSfdHeader)
   {
     *outIsSfdHeader = 0;
 
@@ -442,7 +442,7 @@
    */
   extern "C" std::int32_t SFHDS_IsSfdHeader(const std::int32_t bufferAddress, const std::int32_t sizeBytes)
   {
-    SofdecHeaderAnalyzerRuntimeView* const handle = SFH_Create(bufferAddress, sizeBytes);
+    SofdecHeaderAnalyzer* const handle = SFH_Create(bufferAddress, sizeBytes);
     if (handle == nullptr) {
       return 0;
     }
@@ -464,7 +464,7 @@
    */
   extern "C" void func_SofDef_InitAllUnk5(
     std::int32_t slotCount,
-    SofdecHeaderAnalyzerRuntimeView* slotArray
+    SofdecHeaderAnalyzer* slotArray
   )
   {
     while (slotCount > 0) {
@@ -630,7 +630,7 @@
   // Defined below, at 0x00ADD7A0: maps an MPEG frame-rate code to a rate.
   extern "C" std::int32_t getPicRate(std::int32_t pictureRateCode);
 
-  [[nodiscard]] const std::uint8_t* SfhPackBytes(const SofdecHeaderAnalyzerRuntimeView* const handle) noexcept
+  [[nodiscard]] const std::uint8_t* SfhPackBytes(const SofdecHeaderAnalyzer* const handle) noexcept
   {
     return reinterpret_cast<const std::uint8_t*>(static_cast<std::uintptr_t>(handle->bufferAddress));
   }
@@ -642,7 +642,7 @@
    * Accepts a slot whose state says it holds a parsed header and whose parser
    * version is one this analysis understands - 1.07, or 1.10 and later.
    */
-  extern "C" std::int32_t isEffectiveVer(const SofdecHeaderAnalyzerRuntimeView* const handle)
+  extern "C" std::int32_t isEffectiveVer(const SofdecHeaderAnalyzer* const handle)
   {
     if (isEffectiveObj(handle) == 0) {
       return 0;
@@ -677,7 +677,7 @@
    * The element record for one stream id, or none when the slot is not usable.
    */
   extern "C" const std::uint8_t*
-  getElemInfPtr(const SofdecHeaderAnalyzerRuntimeView* const handle, const std::uint32_t streamId)
+  getElemInfPtr(const SofdecHeaderAnalyzer* const handle, const std::uint32_t streamId)
   {
     if (isEffectiveVer(handle) == 0) {
       return nullptr;
@@ -692,7 +692,7 @@
    * Whether the header lists an element for this stream id.
    */
   extern "C" std::int32_t SFH_IsExistStmId(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outExists
   )
@@ -715,7 +715,7 @@
    * predicates, and any other stream class has none.
    */
   extern "C" std::int32_t SFH_IsEffFtrInf(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outHasFeatureInfo
   )
@@ -744,7 +744,7 @@
 
   /** Address: 0x00ADCC80 (FUN_00ADCC80, _SFH_AnlyHdrSiz) - header size in bytes. */
   extern "C" std::int32_t
-  SFH_AnlyHdrSiz(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outHeaderSize)
+  SFH_AnlyHdrSiz(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outHeaderSize)
   {
     *outHeaderSize = 0;
     const std::uint8_t* const pack = SfhPackBytes(handle) + kSofdecPackDescriptorOffset;
@@ -760,7 +760,7 @@
 
   /** Address: 0x00ADCCC0 (FUN_00ADCCC0, _SFH_AnlyPackType) - pack layout code. */
   extern "C" std::int32_t
-  SFH_AnlyPackType(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outPackType)
+  SFH_AnlyPackType(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outPackType)
   {
     *outPackType = -1;
     const std::uint8_t* const pack = SfhPackBytes(handle) + kSofdecPackDescriptorOffset;
@@ -774,7 +774,7 @@
 
   /** Address: 0x00ADCD00 (FUN_00ADCD00, _SFH_AnlyPketSizLen) - packet length-field width. */
   extern "C" std::int32_t
-  SFH_AnlyPketSizLen(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outLengthFieldWidth)
+  SFH_AnlyPketSizLen(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outLengthFieldWidth)
   {
     *outLengthFieldWidth = 0;
     const std::uint8_t* const pack = SfhPackBytes(handle) + kSofdecPackDescriptorOffset;
@@ -790,7 +790,7 @@
 
   /** Address: 0x00ADCD40 (FUN_00ADCD40, _SFH_AnlyPackSiz) - pack size in bytes. */
   extern "C" std::int32_t
-  SFH_AnlyPackSiz(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outPackSize)
+  SFH_AnlyPackSiz(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outPackSize)
   {
     *outPackSize = 0;
     const std::uint8_t* const pack = SfhPackBytes(handle) + kSofdecPackDescriptorOffset;
@@ -812,7 +812,7 @@
    *   0x00ADCE00 total, 0x00ADCE40 audio, 0x00ADCE80 video, 0x00ADCEC0 private
    */
   [[nodiscard]] std::int32_t SfhReadElementCount(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::int32_t byteIndex,
     std::int32_t* const outCount
   )
@@ -829,28 +829,28 @@
 
   /** Address: 0x00ADCE00 (FUN_00ADCE00, _SFH_AnlyNumElemTot) */
   extern "C" std::int32_t
-  SFH_AnlyNumElemTot(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outCount)
+  SFH_AnlyNumElemTot(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outCount)
   {
     return SfhReadElementCount(handle, 0, outCount);
   }
 
   /** Address: 0x00ADCE40 (FUN_00ADCE40, _SFH_AnlyNumElemAud) */
   extern "C" std::int32_t
-  SFH_AnlyNumElemAud(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outCount)
+  SFH_AnlyNumElemAud(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outCount)
   {
     return SfhReadElementCount(handle, 1, outCount);
   }
 
   /** Address: 0x00ADCE80 (FUN_00ADCE80, _SFH_AnlyNumElemVid) */
   extern "C" std::int32_t
-  SFH_AnlyNumElemVid(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outCount)
+  SFH_AnlyNumElemVid(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outCount)
   {
     return SfhReadElementCount(handle, 2, outCount);
   }
 
   /** Address: 0x00ADCEC0 (FUN_00ADCEC0, _SFH_AnlyNumElemPrv) */
   extern "C" std::int32_t
-  SFH_AnlyNumElemPrv(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outCount)
+  SFH_AnlyNumElemPrv(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outCount)
   {
     return SfhReadElementCount(handle, 3, outCount);
   }
@@ -861,7 +861,7 @@
    *   0x00ADCFD0 max frame number
    */
   [[nodiscard]] std::int32_t SfhReadSystemInfoWord(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::int32_t wordIndex,
     std::int32_t* const outValue
   )
@@ -888,7 +888,7 @@
    * anything older.
    */
   extern "C" std::int32_t
-  SFH_AnlyByteRate(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outByteRate)
+  SFH_AnlyByteRate(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outByteRate)
   {
     *outByteRate = 0;
     const std::uint8_t* const systemInfo = SfhPackBytes(handle) + kSofdecSystemInfoOffset;
@@ -908,21 +908,21 @@
 
   /** Address: 0x00ADCF50 (FUN_00ADCF50, _SFH_AnlyMaxPlyLenAud) */
   extern "C" std::int32_t
-  SFH_AnlyMaxPlyLenAud(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outLength)
+  SFH_AnlyMaxPlyLenAud(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outLength)
   {
     return SfhReadSystemInfoWord(handle, 2, outLength);
   }
 
   /** Address: 0x00ADCF90 (FUN_00ADCF90, _SFH_AnlyMaxPlyLenVid) */
   extern "C" std::int32_t
-  SFH_AnlyMaxPlyLenVid(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outLength)
+  SFH_AnlyMaxPlyLenVid(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outLength)
   {
     return SfhReadSystemInfoWord(handle, 3, outLength);
   }
 
   /** Address: 0x00ADCFD0 (FUN_00ADCFD0, _SFH_AnlyMaxFrmNum) */
   extern "C" std::int32_t
-  SFH_AnlyMaxFrmNum(const SofdecHeaderAnalyzerRuntimeView* const handle, std::int32_t* const outFrameNumber)
+  SFH_AnlyMaxFrmNum(const SofdecHeaderAnalyzer* const handle, std::int32_t* const outFrameNumber)
   {
     return SfhReadSystemInfoWord(handle, 4, outFrameNumber);
   }
@@ -934,7 +934,7 @@
    * confirm the stream belongs to the expected class, and read one field.
    */
   [[nodiscard]] const std::uint8_t* SfhElementOfClass(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     const std::int32_t expectedClass
   )
@@ -948,7 +948,7 @@
 
   /** Address: 0x00ADD140 (FUN_00ADD140, _SFH_AnlyElemCodecAud) */
   extern "C" std::int32_t SFH_AnlyElemCodecAud(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outCodec
   )
@@ -970,7 +970,7 @@
    * The MPEG audio layer, which only exists for codec 1 (MPEG audio).
    */
   extern "C" std::int32_t SFH_AnlyElemLayer(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outLayer
   )
@@ -991,7 +991,7 @@
 
   /** Address: 0x00ADD210 (FUN_00ADD210, _SFH_AnlyElemChNum) */
   extern "C" std::int32_t SFH_AnlyElemChNum(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outChannelCount
   )
@@ -1008,7 +1008,7 @@
 
   /** Address: 0x00ADD270 (FUN_00ADD270, _SFH_AnlyElemSmpHz) */
   extern "C" std::int32_t SFH_AnlyElemSmpHz(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outSampleRateHz
   )
@@ -1027,7 +1027,7 @@
 
   /** Address: 0x00ADD2D0 (FUN_00ADD2D0, _SFH_AnlyElemCodecVid) */
   extern "C" std::int32_t SFH_AnlyElemCodecVid(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outCodec
   )
@@ -1049,7 +1049,7 @@
    * The video bit rate, with the all-ones encoding meaning "not stated".
    */
   extern "C" std::int32_t SFH_AnlyElemBitRate(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outBitRate
   )
@@ -1074,7 +1074,7 @@
    * exactly as MPEG video sequence headers carry them.
    */
   extern "C" std::int32_t SFH_AnlyElemPicSz(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outWidth,
     std::int32_t* const outHeight
@@ -1094,7 +1094,7 @@
 
   /** Address: 0x00ADD430 (FUN_00ADD430, _SFH_AnlyElemPicRate) - frame rate code to rate. */
   extern "C" std::int32_t SFH_AnlyElemPicRate(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outPictureRate
   )
@@ -1116,7 +1116,7 @@
    * enable predicate before reading its field.
    */
   [[nodiscard]] const std::uint8_t* SfhEnabledFeatureElement(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId
   )
   {
@@ -1131,7 +1131,7 @@
 
   /** Address: 0x00ADD490 (FUN_00ADD490, _SFH_AnlyFtrColType) */
   extern "C" std::int32_t SFH_AnlyFtrColType(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outColourType
   )
@@ -1148,7 +1148,7 @@
 
   /** Address: 0x00ADD4F0 (FUN_00ADD4F0, _SFH_AnlyFtrPicType) */
   extern "C" std::int32_t SFH_AnlyFtrPicType(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outPictureType
   )
@@ -1165,7 +1165,7 @@
 
   /** Address: 0x00ADD550 (FUN_00ADD550, _SFH_AnlyFtrFixFlg) - bit 0 of the flag byte. */
   extern "C" std::int32_t SFH_AnlyFtrFixFlg(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outFixedFlag
   )
@@ -1189,7 +1189,7 @@
    * the earlier header layout.
    */
   extern "C" std::int32_t SFH_AnlyFtrFxType(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::uint32_t* const outEffectType
   )
@@ -1210,7 +1210,7 @@
 
   /** Address: 0x00ADD5B0 (FUN_00ADD5B0, _SFH_AnlyFtrShcFixFlg) - bit 4 of the same byte. */
   extern "C" std::int32_t SFH_AnlyFtrShcFixFlg(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outShcFixedFlag
   )
@@ -1227,7 +1227,7 @@
 
   /** Address: 0x00ADD610 (FUN_00ADD610, _SFH_AnlyFtrExpand) */
   extern "C" std::int32_t SFH_AnlyFtrExpand(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outExpand
   )
@@ -1244,7 +1244,7 @@
 
   /** Address: 0x00ADD670 (FUN_00ADD670, _SFH_AnlyFtrGopN) - out-of-range means absent. */
   extern "C" std::int32_t SFH_AnlyFtrGopN(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outGopN
   )
@@ -1262,7 +1262,7 @@
 
   /** Address: 0x00ADD6D0 (FUN_00ADD6D0, _SFH_AnlyFtrGopM) */
   extern "C" std::int32_t SFH_AnlyFtrGopM(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     std::int32_t* const outGopM
   )
@@ -3560,62 +3560,6 @@
     return 1;
   }
 
-  struct SofdecCreateStreamDescriptor;
-
-  struct SofdecCreateInfoRuntimeView
-  {
-    std::uint8_t headerWord0 = 0; // +0x00
-    std::uint8_t headerWord1 = 0; // +0x01
-    std::uint8_t reserved02_03[0x02]{}; // +0x02
-    const SofdecCreateStreamDescriptor* streamDescriptor = nullptr; // +0x04
-    const SofdecCreateStreamDescriptor* videoDescriptor = nullptr; // +0x08
-    const void* audioDescriptor = nullptr; // +0x0C
-    std::int32_t packetSizeBytes = 0; // +0x10
-    std::int32_t videoWidthPixels = 0; // +0x14
-    std::int32_t videoHeightPixels = 0; // +0x18
-    std::int32_t streamTimingMetric = 0; // +0x1C
-    std::int32_t videoFrameMetric = 0; // +0x20
-    std::int32_t videoBitRate = 0; // +0x24
-    std::int32_t frameCountMetric = 0; // +0x28
-    std::int32_t extraMetric = 0; // +0x2C
-    std::uint8_t reserved30_3F[0x10]{}; // +0x30
-  };
-  static_assert(offsetof(SofdecCreateInfoRuntimeView, headerWord0) == 0x00, "SofdecCreateInfoRuntimeView::headerWord0 offset must be 0x00");
-  static_assert(offsetof(SofdecCreateInfoRuntimeView, headerWord1) == 0x01, "SofdecCreateInfoRuntimeView::headerWord1 offset must be 0x01");
-  static_assert(
-    offsetof(SofdecCreateInfoRuntimeView, streamDescriptor) == 0x04,
-    "SofdecCreateInfoRuntimeView::streamDescriptor offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SofdecCreateInfoRuntimeView, videoDescriptor) == 0x08,
-    "SofdecCreateInfoRuntimeView::videoDescriptor offset must be 0x08"
-  );
-  static_assert(offsetof(SofdecCreateInfoRuntimeView, audioDescriptor) == 0x0C, "SofdecCreateInfoRuntimeView::audioDescriptor offset must be 0x0C");
-  static_assert(offsetof(SofdecCreateInfoRuntimeView, packetSizeBytes) == 0x10, "SofdecCreateInfoRuntimeView::packetSizeBytes offset must be 0x10");
-  static_assert(
-    offsetof(SofdecCreateInfoRuntimeView, videoWidthPixels) == 0x14,
-    "SofdecCreateInfoRuntimeView::videoWidthPixels offset must be 0x14"
-  );
-  static_assert(
-    offsetof(SofdecCreateInfoRuntimeView, videoHeightPixels) == 0x18,
-    "SofdecCreateInfoRuntimeView::videoHeightPixels offset must be 0x18"
-  );
-  static_assert(
-    offsetof(SofdecCreateInfoRuntimeView, streamTimingMetric) == 0x1C,
-    "SofdecCreateInfoRuntimeView::streamTimingMetric offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(SofdecCreateInfoRuntimeView, videoFrameMetric) == 0x20,
-    "SofdecCreateInfoRuntimeView::videoFrameMetric offset must be 0x20"
-  );
-  static_assert(offsetof(SofdecCreateInfoRuntimeView, videoBitRate) == 0x24, "SofdecCreateInfoRuntimeView::videoBitRate offset must be 0x24");
-  static_assert(
-    offsetof(SofdecCreateInfoRuntimeView, frameCountMetric) == 0x28,
-    "SofdecCreateInfoRuntimeView::frameCountMetric offset must be 0x28"
-  );
-  static_assert(offsetof(SofdecCreateInfoRuntimeView, extraMetric) == 0x2C, "SofdecCreateInfoRuntimeView::extraMetric offset must be 0x2C");
-  static_assert(sizeof(SofdecCreateInfoRuntimeView) == 0x40, "SofdecCreateInfoRuntimeView size must be 0x40");
-
   /**
    * The parsed SFD file header. `sfhds_DoProcessHdr` (0x00AE7440) writes every
    * one of these lanes in order, which is what fixes both the field names and
@@ -3758,8 +3702,8 @@
   // and every movie was rejected with "is not a valid SFD file".
   // ---------------------------------------------------------------------------
 
-  using SfhAnalyzeWholeFn = std::int32_t (*)(const SofdecHeaderAnalyzerRuntimeView*, std::int32_t*);
-  using SfhAnalyzeStreamFn = std::int32_t (*)(const SofdecHeaderAnalyzerRuntimeView*, std::uint32_t, std::int32_t*);
+  using SfhAnalyzeWholeFn = std::int32_t (*)(const SofdecHeaderAnalyzer*, std::int32_t*);
+  using SfhAnalyzeStreamFn = std::int32_t (*)(const SofdecHeaderAnalyzer*, std::uint32_t, std::int32_t*);
 
   /**
    * Address: 0x00AE77E0 (FUN_00AE77E0, _sfhds_CallN)
@@ -3767,7 +3711,7 @@
    * What it does:
    * Runs one whole-header accessor and folds "not available" into -1.
    */
-  std::int32_t sfhds_CallN(const SofdecHeaderAnalyzerRuntimeView* const handle, const SfhAnalyzeWholeFn accessor)
+  std::int32_t sfhds_CallN(const SofdecHeaderAnalyzer* const handle, const SfhAnalyzeWholeFn accessor)
   {
     std::int32_t value = 0;
     return (accessor(handle, &value) != 0) ? value : -1;
@@ -3780,7 +3724,7 @@
    * The same for a per-stream accessor.
    */
   std::int32_t sfhds_CallS(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::uint32_t streamId,
     const SfhAnalyzeStreamFn accessor
   )
@@ -3796,7 +3740,7 @@
    * Fills the pack-descriptor lanes. A packet length-field width that comes
    * back unavailable is forced to 2, which is the MPEG default.
    */
-  void sfhds_AnlyHead(const SofdecHeaderAnalyzerRuntimeView* const handle, SfcreHeaderRuntimeView* const header)
+  void sfhds_AnlyHead(const SofdecHeaderAnalyzer* const handle, SfcreHeaderRuntimeView* const header)
   {
     header->headerSizeBytes = sfhds_CallN(handle, &SFH_AnlyHdrSiz);
     header->packType = sfhds_CallN(handle, &SFH_AnlyPackType);
@@ -3813,7 +3757,7 @@
    * What it does:
    * Fills the system-info lanes: element counts and playback maxima.
    */
-  void sfhds_AnlySys(const SofdecHeaderAnalyzerRuntimeView* const handle, SfcreHeaderRuntimeView* const header)
+  void sfhds_AnlySys(const SofdecHeaderAnalyzer* const handle, SfcreHeaderRuntimeView* const header)
   {
     header->elementCountTotal = sfhds_CallN(handle, &SFH_AnlyNumElemTot);
     header->elementCountAudio = sfhds_CallN(handle, &SFH_AnlyNumElemAud);
@@ -3832,7 +3776,7 @@
    * or 0 when the range carries nothing.
    */
   std::int32_t sfhds_AnlyUsedStmid(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::int32_t firstStreamId,
     const std::int32_t lastStreamId
   )
@@ -3853,7 +3797,7 @@
    * Fills the audio lanes, but only when an audio stream was actually found.
    */
   void sfhds_AnlyAudio(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::int32_t audioStreamId,
     SfcreHeaderRuntimeView* const header
   )
@@ -3877,11 +3821,11 @@
    * block only gets read when the header says it is there.
    *
    * The width/height this writes is what finally reaches
-   * `SofdecCreateInfo::videoWidthPixels`, which is why a movie whose header
+   * `SfdCreInf::width`, which is why a movie whose header
    * analysis fails has no dimensions and cannot be opened.
    */
   void sfhds_AnlyVideo(
-    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const SofdecHeaderAnalyzer* const handle,
     const std::int32_t videoStreamId,
     SfcreHeaderRuntimeView* const header
   )
@@ -3929,7 +3873,7 @@
    * how the format marks a rate that was inferred rather than stated.
    */
   std::int32_t sfhds_DoProcessHdr(
-    SofdecHeaderAnalyzerRuntimeView* const handle,
+    SofdecHeaderAnalyzer* const handle,
     SfcreHeaderRuntimeView* const header
   )
   {
@@ -4006,7 +3950,7 @@
    */
   extern "C" std::int32_t SFHDS_ProcessHdr(SfcreHeaderRuntimeView* const header)
   {
-    SofdecHeaderAnalyzerRuntimeView* const handle = SFH_Create(
+    SofdecHeaderAnalyzer* const handle = SFH_Create(
       static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(header->headerBuffer)),
       header->copiedHeaderBytes
     );
@@ -4314,13 +4258,13 @@
     std::int32_t decodeSizeBytes,
     std::int32_t* outMuxRateUnits50BytesPerSecond
   );
-  extern "C" std::int32_t sfcre_SetDflCreInf(SofdecCreateInfoRuntimeView* createInfo);
-  extern "C" std::int32_t sfcre_AnalyM2ts(char* buffer, std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* createInfo);
-  extern "C" std::int32_t sfcre_AnalyMps(char* buffer, std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* createInfo);
-  extern "C" void sfcre_AnalyCreInf(char* buffer, std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* createInfo);
-  extern "C" void sfcre_AnalySfh(char* buffer, std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* createInfo);
-  extern "C" std::int32_t sfcre_AnalyAudio(char* buffer, std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* createInfo);
-  extern "C" std::int32_t sfcre_AnalyMpv(char* buffer, std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* createInfo);
+  extern "C" std::int32_t sfcre_SetDflCreInf(moho::SfdCreInf* createInfo);
+  extern "C" std::int32_t sfcre_AnalyM2ts(char* buffer, std::int32_t sizeBytes, moho::SfdCreInf* createInfo);
+  extern "C" std::int32_t sfcre_AnalyMps(char* buffer, std::int32_t sizeBytes, moho::SfdCreInf* createInfo);
+  extern "C" void sfcre_AnalyCreInf(char* buffer, std::int32_t sizeBytes, moho::SfdCreInf* createInfo);
+  extern "C" void sfcre_AnalySfh(char* buffer, std::int32_t sizeBytes, moho::SfdCreInf* createInfo);
+  extern "C" std::int32_t sfcre_AnalyAudio(char* buffer, std::int32_t sizeBytes, moho::SfdCreInf* createInfo);
+  extern "C" std::int32_t sfcre_AnalyMpv(char* buffer, std::int32_t sizeBytes, moho::SfdCreInf* createInfo);
   extern "C" std::int32_t SFADXT_IsHeader(char* buffer, std::int32_t sizeBytes, std::int32_t* outHeaderSizeBytes);
   extern "C" std::int32_t SFHDS_IsSfdHeader(std::int32_t bufferAddress, std::int32_t sizeBytes);
   extern "C" void sfcre_ProcessHdr(std::int32_t bufferAddress, std::int32_t sizeBytes, std::int32_t headerAddress);
@@ -4328,13 +4272,13 @@
   extern "C" std::int32_t SFHDS_ProcessHdr(SfcreHeaderRuntimeView* header);
   extern "C" char* MPS_SearchDelim(char* buffer, std::int32_t sizeBytes, std::int32_t delimiterMask);
   extern "C" char* sfcre_GetPketData(std::int32_t packetAddress, std::int32_t packetWindowBytes);
-  extern "C" std::int32_t sfcre_AnalyAdx(char* buffer, std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* createInfo);
+  extern "C" std::int32_t sfcre_AnalyAdx(char* buffer, std::int32_t sizeBytes, moho::SfdCreInf* createInfo);
   extern "C" std::int32_t sfcre_AnalyAdxAlign4(
     char* buffer,
     std::int32_t sizeBytes,
-    SofdecCreateInfoRuntimeView* createInfo
+    moho::SfdCreInf* createInfo
   );
-  extern "C" std::int32_t sfcre_AnalyMpa(char* buffer, std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* createInfo);
+  extern "C" std::int32_t sfcre_AnalyMpa(char* buffer, std::int32_t sizeBytes, moho::SfdCreInf* createInfo);
   std::int32_t MPS_Create();
   std::int32_t MPS_DecHd(
     std::int32_t mpsHandleAddress,
@@ -4674,22 +4618,22 @@
    * What it does:
    * Clears one create-info lane to defaults before stream probing.
    */
-  extern "C" std::int32_t sfcre_SetDflCreInf(SofdecCreateInfoRuntimeView* const createInfo)
+  extern "C" std::int32_t sfcre_SetDflCreInf(moho::SfdCreInf* const createInfo)
   {
-    std::memset(createInfo, 0, sizeof(SofdecCreateInfoRuntimeView));
-    createInfo->headerWord0 = 0;
-    createInfo->headerWord1 = 0;
-    createInfo->streamDescriptor = nullptr;
-    createInfo->videoDescriptor = nullptr;
-    createInfo->audioDescriptor = nullptr;
-    createInfo->packetSizeBytes = 0;
-    createInfo->videoWidthPixels = 0;
-    createInfo->videoHeightPixels = 0;
-    createInfo->streamTimingMetric = 0;
-    createInfo->videoFrameMetric = 0;
+    std::memset(createInfo, 0, sizeof(moho::SfdCreInf));
+    createInfo->formatRecognized = 0;
+    createInfo->streamRecognized = 0;
+    createInfo->systemTransfer = nullptr;
+    createInfo->videoTransfer = nullptr;
+    createInfo->audioTransfer = nullptr;
+    createInfo->packSize = 0;
+    createInfo->width = 0;
+    createInfo->height = 0;
+    createInfo->byteRate = 0;
+    createInfo->fps = 0;
     createInfo->videoBitRate = 0;
-    createInfo->frameCountMetric = 0;
-    createInfo->extraMetric = 0;
+    createInfo->audioChannelCount = 0;
+    createInfo->audioSampleRate = 0;
     return 0;
   }
 
@@ -4896,17 +4840,17 @@
    * MPV lane probing for video/audio descriptor lanes.
    */
   extern "C" std::int32_t
-  sfcre_AnalyM2ts(char* const buffer, const std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* const createInfo)
+  sfcre_AnalyM2ts(char* const buffer, const std::int32_t sizeBytes, moho::SfdCreInf* const createInfo)
   {
     const std::int32_t isConformable = M2T_IsConformable(buffer, sizeBytes);
     if (isConformable == 0) {
       return 0;
     }
 
-    createInfo->streamDescriptor = reinterpret_cast<const SofdecCreateStreamDescriptor*>(&SFD_tr_sd_m2ts);
+    createInfo->systemTransfer = &SFD_tr_sd_m2ts;
     (void)sfcre_AnalyMpv(buffer, sizeBytes, createInfo);
-    if (createInfo->videoDescriptor != nullptr) {
-      createInfo->audioDescriptor = reinterpret_cast<const void*>(&SFD_tr_ad_adxt);
+    if (createInfo->videoTransfer != nullptr) {
+      createInfo->audioTransfer = reinterpret_cast<const SofdecTransferStrategy*>(&SFD_tr_ad_adxt);
     }
     return 1;
   }
@@ -4920,7 +4864,7 @@
    * payload is found.
    */
   extern "C" std::int32_t
-  sfcre_AnalyMpv(char* buffer, const std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* const createInfo)
+  sfcre_AnalyMpv(char* buffer, const std::int32_t sizeBytes, moho::SfdCreInf* const createInfo)
   {
     std::int32_t remainingBytes = sizeBytes;
     if (remainingBytes > 0) {
@@ -4948,19 +4892,19 @@
         const bool hasSupportedRateIndex = (pictureRateIndex >= 1u) && (pictureRateIndex <= 8u);
         const bool hasSequenceExtension = (byte0A & 0x20u) != 0;
         if (hasNonZeroSequenceHeader && hasSupportedRateIndex && hasSequenceExtension) {
-          createInfo->videoWidthPixels = (static_cast<std::int32_t>(byte04) << 4) | static_cast<std::int32_t>(byte05 >> 4);
-          createInfo->videoHeightPixels =
+          createInfo->width = (static_cast<std::int32_t>(byte04) << 4) | static_cast<std::int32_t>(byte05 >> 4);
+          createInfo->height =
             static_cast<std::int32_t>(byte06) | (static_cast<std::int32_t>(byte05 & 0x0Fu) << 8);
 
-          if (createInfo->streamTimingMetric == 0) {
+          if (createInfo->byteRate == 0) {
             const std::uint16_t sequenceWord = static_cast<std::uint16_t>((static_cast<std::uint16_t>(byte08) << 8) | byte09);
             const std::int32_t timingMetric =
               static_cast<std::int32_t>(byte0A >> 6) | (4 * static_cast<std::int32_t>(sequenceWord));
-            createInfo->streamTimingMetric = timingMetric * 50;
+            createInfo->byteRate = timingMetric * 50;
           }
 
-          createInfo->videoDescriptor = reinterpret_cast<const SofdecCreateStreamDescriptor*>(&SFD_tr_vd_mpv);
-          createInfo->videoFrameMetric = sfcre_mpv_picrate[static_cast<std::size_t>(pictureRateIndex)];
+          createInfo->videoTransfer = &SFD_tr_vd_mpv;
+          createInfo->fps = sfcre_mpv_picrate[static_cast<std::size_t>(pictureRateIndex)];
           createInfo->videoBitRate =
             static_cast<std::int32_t>((static_cast<std::int32_t>(byte0B >> 3) | (32 * static_cast<std::int32_t>(byte0A & 0x1Fu)))
                                       << 11);
@@ -4984,7 +4928,7 @@
    * M2TS -> MPS -> MPV -> ADX -> MPA.
    */
   extern "C" void
-  sfcre_AnalyCreInf(char* const buffer, const std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* const createInfo)
+  sfcre_AnalyCreInf(char* const buffer, const std::int32_t sizeBytes, moho::SfdCreInf* const createInfo)
   {
     sfcre_SetDflCreInf(createInfo);
     if (sfcre_AnalyM2ts(buffer, sizeBytes, createInfo) == 0 && sfcre_AnalyMps(buffer, sizeBytes, createInfo) == 0 &&
@@ -5001,18 +4945,18 @@
    * flags when descriptor and packet-size lanes indicate playable content.
    */
   extern "C" void
-  SFD_AnalyCreInf(const char* const buffer, const std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* const createInfo)
+  SFD_AnalyCreInf(const char* const buffer, const std::int32_t sizeBytes, moho::SfdCreInf* const createInfo)
   {
     SFLIB_LockCs();
     sfcre_AnalyCreInf(const_cast<char*>(buffer), sizeBytes, createInfo);
 
-    const bool hasVideoDescriptor = createInfo->videoDescriptor != nullptr;
-    const bool hasAudioDescriptor = createInfo->audioDescriptor != nullptr;
-    if (hasVideoDescriptor || hasAudioDescriptor || createInfo->packetSizeBytes == -1) {
-      createInfo->headerWord0 = 1;
+    const bool hasVideoDescriptor = createInfo->videoTransfer != nullptr;
+    const bool hasAudioDescriptor = createInfo->audioTransfer != nullptr;
+    if (hasVideoDescriptor || hasAudioDescriptor || createInfo->packSize == -1) {
+      createInfo->formatRecognized = 1;
     }
     if (hasVideoDescriptor || hasAudioDescriptor) {
-      createInfo->headerWord1 = 1;
+      createInfo->streamRecognized = 1;
     }
 
     SFLIB_UnlockCs();
@@ -5026,7 +4970,7 @@
    * descriptor lanes before delegating to stream/header/audio analyzers.
    */
   extern "C"
-  std::int32_t sfcre_AnalyMps(char* const buffer, const std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* const createInfo)
+  std::int32_t sfcre_AnalyMps(char* const buffer, const std::int32_t sizeBytes, moho::SfdCreInf* const createInfo)
   {
     std::int32_t packetSizeCandidate = sizeBytes;
     const std::int32_t packetSize = sfcre_AnalyPackSiz(
@@ -5038,13 +4982,13 @@
       return 0;
     }
 
-    createInfo->packetSizeBytes = packetSize;
+    createInfo->packSize = packetSize;
     if (packetSize != -1) {
       if (packetSizeCandidate > 0) {
-        createInfo->streamTimingMetric = packetSizeCandidate * 50;
+        createInfo->byteRate = packetSizeCandidate * 50;
       }
 
-      createInfo->streamDescriptor = reinterpret_cast<const SofdecCreateStreamDescriptor*>(&SFD_tr_sd_mps);
+      createInfo->systemTransfer = &SFD_tr_sd_mps;
       sfcre_AnalySfh(buffer, sizeBytes, createInfo);
       sfcre_AnalyAudio(buffer, sizeBytes, createInfo);
       sfcre_AnalyMpv(buffer, sizeBytes, createInfo);
@@ -5546,10 +5490,10 @@
    * processing into `sfcre_fhd`, and propagates validated width/height/timing
    * fields into create-info lanes.
    */
-  extern "C" void sfcre_AnalySfh(char* buffer, std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* const createInfo)
+  extern "C" void sfcre_AnalySfh(char* buffer, std::int32_t sizeBytes, moho::SfdCreInf* const createInfo)
   {
     std::int32_t remainingBytes = sizeBytes;
-    const std::int32_t packetStrideBytes = createInfo->packetSizeBytes;
+    const std::int32_t packetStrideBytes = createInfo->packSize;
     char* cursor = buffer;
     std::int32_t probeCount = 0;
 
@@ -5579,17 +5523,17 @@
     }
 
     if (sfcre_fhd.byteRate > 0) {
-      createInfo->streamTimingMetric = sfcre_fhd.byteRate;
+      createInfo->byteRate = sfcre_fhd.byteRate;
     }
     if (sfcre_fhd.widthPixels > 0) {
-      createInfo->videoWidthPixels = sfcre_fhd.widthPixels;
+      createInfo->width = sfcre_fhd.widthPixels;
     }
     if (sfcre_fhd.heightPixels > 0) {
-      createInfo->videoHeightPixels = sfcre_fhd.heightPixels;
+      createInfo->height = sfcre_fhd.heightPixels;
     }
     if (sfcre_fhd.videoFrameMetric > 0) {
-      createInfo->videoFrameMetric = sfcre_fhd.videoFrameMetric;
-      createInfo->videoDescriptor = reinterpret_cast<const SofdecCreateStreamDescriptor*>(&SFD_tr_vd_mpv);
+      createInfo->fps = sfcre_fhd.videoFrameMetric;
+      createInfo->videoTransfer = &SFD_tr_vd_mpv;
     }
   }
 
@@ -5634,13 +5578,13 @@
    * packet-size cap lane.
    */
   extern "C"
-  std::int32_t sfcre_AnalyAudio(char* buffer, const std::int32_t sizeBytes, SofdecCreateInfoRuntimeView* const createInfo)
+  std::int32_t sfcre_AnalyAudio(char* buffer, const std::int32_t sizeBytes, moho::SfdCreInf* const createInfo)
   {
     std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(createInfo));
     std::int32_t remainingBytes = sizeBytes;
     char* cursor = buffer;
     char* const bufferEnd = buffer + sizeBytes;
-    const std::int32_t packetSizeCap = createInfo->packetSizeBytes;
+    const std::int32_t packetSizeCap = createInfo->packSize;
 
     while (remainingBytes > 0) {
       char* const delimiter = MPS_SearchDelim(cursor, remainingBytes, 0x40000);
@@ -5717,7 +5661,7 @@
   extern "C" std::int32_t sfcre_AnalyAdxAlign4(
     char* const buffer,
     std::int32_t sizeBytes,
-    SofdecCreateInfoRuntimeView* const createInfo
+    moho::SfdCreInf* const createInfo
   )
   {
     std::int32_t copyBytes = sizeBytes;
@@ -5741,9 +5685,11 @@
       }
     }
 
-    createInfo->audioDescriptor = reinterpret_cast<const void*>(&SFD_tr_ad_adxt);
-    createInfo->frameCountMetric = static_cast<std::int32_t>(static_cast<std::uint8_t>(headerScanCursor[7]));
-    createInfo->extraMetric =
+    // SFADXT's strategy block (0x00D7F57C) is not recovered; the stub
+    // function stands in, and only its non-null address is ever looked at.
+    createInfo->audioTransfer = reinterpret_cast<const SofdecTransferStrategy*>(&SFD_tr_ad_adxt);
+    createInfo->audioChannelCount = static_cast<std::int8_t>(headerScanCursor[7]);
+    createInfo->audioSampleRate =
       static_cast<std::int32_t>(static_cast<std::uint8_t>(headerScanCursor[11]))
       | (static_cast<std::int32_t>(static_cast<std::uint8_t>(headerScanCursor[10])) << 8)
       | (static_cast<std::int32_t>(static_cast<std::uint8_t>(headerScanCursor[9])) << 16)
@@ -5761,7 +5707,7 @@
   extern "C" std::int32_t sfcre_AnalyAdx(
     char* const buffer,
     const std::int32_t sizeBytes,
-    SofdecCreateInfoRuntimeView* const createInfo
+    moho::SfdCreInf* const createInfo
   )
   {
     if (sfcre_AnalyAdxAlign4(buffer, sizeBytes, createInfo) != 0) {
@@ -19994,7 +19940,7 @@
   struct SfdPlaybackTimestampSourceRuntimeView
   {
     std::uint8_t reserved00_03[0x04]{};
-    const SofdecCreateStreamDescriptor* streamDescriptor = nullptr; // +0x04
+    const SofdecTransferStrategy* streamDescriptor = nullptr; // +0x04
     std::uint8_t reserved08_1F7B[0x1F74]{};
     SfmpsStreamPrepRuntimeView* streamPrepRuntime = nullptr; // +0x1F7C
   };
@@ -20052,7 +19998,7 @@
 
     if (workctrlSubobj != nullptr) {
       const auto* const runtimeView = reinterpret_cast<const SfdPlaybackTimestampSourceRuntimeView*>(workctrlSubobj);
-      if (runtimeView->streamDescriptor == reinterpret_cast<const SofdecCreateStreamDescriptor*>(&SFD_tr_sd_m2ts)) {
+      if (runtimeView->streamDescriptor == &SFD_tr_sd_m2ts) {
         const auto* const m2tsdRuntime = reinterpret_cast<const M2TsdRuntimeView*>(
           SjAddressToPointer(runtimeView->streamPrepRuntime->m2tsdRuntimeAddress)
         );
