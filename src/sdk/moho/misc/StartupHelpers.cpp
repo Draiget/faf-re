@@ -81,7 +81,13 @@ namespace
    * 0x00BE6C80 registers.
    */
   msvc8::auto_ptr<moho::CMovieManager> sMovieManager;
-  moho::IUserPrefs* gPreferences = nullptr;
+  /**
+   * The loaded preferences (0x010C6258). `USER_LoadPreferences` assigns its
+   * local `auto_ptr` into it and `USER_GetPreferences` `reset`s it with
+   * defaults; the CRT destroys it at exit through the `atexit` destructor
+   * 0x00BE8B40 registers.
+   */
+  msvc8::auto_ptr<moho::IUserPrefs> sPreferences;
 
   constexpr const char* kOptionPrefixes[] = {"/", "-", "+", "\\"};
   constexpr const char* kAdapterAliases[] = {"adapter"};
@@ -1512,19 +1518,28 @@ namespace
     }
   }
 
-  class CUserPrefsRuntime final : public moho::IUserPrefs
+} // namespace
+
+namespace moho
+{
+  /**
+   * RTTI `.?AVCUserPrefs@Moho@@`, vftable 0x00E4E344 (20 slots), 0x84 bytes:
+   * `USER_GetPreferences` allocates it with `operator new(0x84)` (0x008C913A).
+   * The preferences live in a private Lua state as one root table, loaded from
+   * and saved back to `mFilePath`.
+   */
+  class CUserPrefs final : public IUserPrefs
   {
   public:
     /**
-     * Address: 0x008C7410 (FUN_008C7410, Moho::IUserPrefs::IUserPrefs)
+     * Address: 0x008C7410 (FUN_008C7410, ??0CUserPrefs@Moho@@QAE@XZ)
      *
      * What it does:
-     * Initializes preferences state storage (strings + Lua state/object) and
-     * creates an empty root preference table.
+     * Opens a base-library Lua state and gives it an empty root table.
      */
-    CUserPrefsRuntime()
-      : mPreferencesPrimaryString()
-      , mPreferencesPathString()
+    CUserPrefs()
+      : mFileName()
+      , mFilePath()
       , mState(LuaPlus::LuaState::LIB_BASE)
       , mRoot()
     {
@@ -1532,20 +1547,20 @@ namespace
     }
 
     /**
-     * Address context:
-     * - Derived runtime teardown lane for `CUserPrefsRuntime`.
+     * Address: 0x008C74A0 (FUN_008C74A0, ??1CUserPrefs@Moho@@UAE@XZ)
+     * Address: 0x008C8620 (FUN_008C8620, the scalar deleting destructor -
+     * vftable 0x00E4E344 slot 0)
      *
      * What it does:
-     * Tears down user-preferences runtime storage (Lua root/state and profile
-     * string lanes) before restoring base interface vftable ownership.
+     * Member destruction: the root table, the Lua state, then both strings.
      */
-    ~CUserPrefsRuntime();
+    ~CUserPrefs() override;
 
     /**
      * Address: 0x008C7540 (FUN_008C7540, Moho::CUserPrefs::GetStr1)
      *
      * What it does:
-     * Returns mutable access to one primary preferences string lane.
+     * Returns the preferences file name.
      */
     msvc8::string* GetStr1() override;
 
@@ -1553,7 +1568,7 @@ namespace
      * Address: 0x008C7550 (FUN_008C7550, Moho::CUserPrefs::GetStr2)
      *
      * What it does:
-     * Returns mutable access to the resolved preferences-path string lane.
+     * Returns the resolved preferences path.
      */
     msvc8::string* GetStr2() override;
 
@@ -1811,57 +1826,42 @@ namespace
     }
 
   private:
-    msvc8::string mPreferencesPrimaryString;
-    msvc8::string mPreferencesPathString;
-    LuaPlus::LuaState mState;
-    LuaPlus::LuaObject mRoot;
+    msvc8::string mFileName;  // +0x04 `USER_LoadPreferences`' file name
+    msvc8::string mFilePath;  // +0x20 the full UTF-8 path it resolved to
+    LuaPlus::LuaState mState; // +0x3C
+    LuaPlus::LuaObject mRoot; // +0x70
   };
 
   /**
-   * Address context:
-   * - Derived runtime teardown lane for `CUserPrefsRuntime`.
+   * Address: 0x008C74A0 (FUN_008C74A0, ??1CUserPrefs@Moho@@UAE@XZ)
+   * Address: 0x008C8620 (FUN_008C8620, the scalar deleting destructor)
    *
    * What it does:
-   * Tears down user-preferences runtime storage (Lua root/state and profile
-   * string lanes) before restoring base interface vftable ownership.
+   * Stores the CUserPrefs vptr, destroys `mRoot` (+0x70), `mState` (+0x3C),
+   * `mFilePath` and `mFileName`, then restores the IUserPrefs vptr.
    */
-  CUserPrefsRuntime::~CUserPrefsRuntime() = default;
-
-  /**
-   * Address: 0x008C8620 (FUN_008C8620)
-   *
-   * What it does:
-   * Runs one deleting-destructor thunk for `IUserPrefs` runtime storage,
-   * forwarding through `CUserPrefsRuntime` teardown and optional storage release.
-   */
-  void DestroyUserPrefsRuntimeDeleting(CUserPrefsRuntime* const prefs, const unsigned int deleteFlag)
-  {
-    prefs->~CUserPrefsRuntime();
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(prefs));
-    }
-  }
+  CUserPrefs::~CUserPrefs() = default;
 
   /**
    * Address: 0x008C7540 (FUN_008C7540, Moho::CUserPrefs::GetStr1)
    *
    * What it does:
-   * Returns mutable access to one primary preferences string lane.
+   * Returns the preferences file name.
    */
-  msvc8::string* CUserPrefsRuntime::GetStr1()
+  msvc8::string* CUserPrefs::GetStr1()
   {
-    return &mPreferencesPrimaryString;
+    return &mFileName;
   }
 
   /**
    * Address: 0x008C7550 (FUN_008C7550, Moho::CUserPrefs::GetStr2)
    *
    * What it does:
-   * Returns mutable access to the resolved preferences-path string lane.
+   * Returns the resolved preferences path.
    */
-  msvc8::string* CUserPrefsRuntime::GetStr2()
+  msvc8::string* CUserPrefs::GetStr2()
   {
-    return &mPreferencesPathString;
+    return &mFilePath;
   }
 
   /**
@@ -1870,13 +1870,13 @@ namespace
    * What it does:
    * Returns the underlying Lua state object pointer used by preferences.
    */
-  void* CUserPrefsRuntime::GetState()
+  void* CUserPrefs::GetState()
   {
     return &mState;
   }
 
-  static_assert(sizeof(CUserPrefsRuntime) == 0x84, "CUserPrefsRuntime size must be 0x84");
-} // namespace
+  static_assert(sizeof(CUserPrefs) == 0x84, "CUserPrefs size must be 0x84");
+} // namespace moho
 
 /**
  * Address: 0x0128E4AC (FUN_0128E4AC, Moho::Sim::Create_exxt)
@@ -1938,14 +1938,6 @@ moho::Sim* moho::Sim_Create_exxt(const boost::SharedPtrRaw<moho::LaunchInfoBase>
  * Initializes one user-preferences base interface object.
  */
 moho::IUserPrefs::IUserPrefs() = default;
-
-/**
- * Address: 0x008C74A0 (FUN_008C74A0, ??1IUserPrefs@Moho@@UAE@XZ)
- *
- * What it does:
- * Tears down one user-preferences base interface object.
- */
-moho::IUserPrefs::~IUserPrefs() = default;
 
 std::int32_t moho::wnd_MinCmdLineWidth = 1024;
 std::int32_t moho::wnd_MinCmdLineHeight = 720;
@@ -5943,7 +5935,7 @@ void moho::CMovieManager::SetVolume(float volume)
  */
 void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
 {
-  auto* const loadedPreferences = new CUserPrefsRuntime{};
+  msvc8::auto_ptr<CUserPrefs> preferences(new CUserPrefs());
   bool loadedPrimaryPreferences = false;
 
   wchar_t appDataPath[MAX_PATH]{};
@@ -5976,25 +5968,25 @@ void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
     preferencePathWide.push_back(L'\\');
     preferencePathWide.append(gpg::STR_Utf8ToWide(preferenceFileName.c_str()));
 
-    loadedPreferences->GetStr1()->assign(preferenceFileName, 0, msvc8::string::npos);
+    preferences->GetStr1()->assign(preferenceFileName, 0, msvc8::string::npos);
 
     const msvc8::string preferencePathUtf8 = gpg::STR_WideToUtf8(preferencePathWide.c_str());
-    loadedPreferences->GetStr2()->assign(preferencePathUtf8, 0, msvc8::string::npos);
+    preferences->GetStr2()->assign(preferencePathUtf8, 0, msvc8::string::npos);
 
     PLAT_RegisterFileForErrorReport(preferencePathWide.c_str());
 
     if (::PathFileExistsW(preferencePathWide.c_str()) != FALSE) {
-      LuaPlus::LuaObject* const preferenceRoot = loadedPreferences->GetPreferenceTableMutable();
+      LuaPlus::LuaObject* const preferenceRoot = preferences->GetPreferenceTableMutable();
       const bool loadedFromFile =
-        SCR_LuaDoFile(loadedPreferences->GetStateMutable(), loadedPreferences->GetStr2()->c_str(), preferenceRoot);
+        SCR_LuaDoFile(preferences->GetStateMutable(), preferences->GetStr2()->c_str(), preferenceRoot);
 
       if (loadedFromFile) {
         const msvc8::string versionKey("version.major");
-        loadedPrimaryPreferences = (loadedPreferences->GetInteger(versionKey, 0) == 1);
+        loadedPrimaryPreferences = (preferences->GetInteger(versionKey, 0) == 1);
       }
 
       if (!loadedPrimaryPreferences) {
-        loadedPreferences->ResetPreferenceTable();
+        preferences->ResetPreferenceTable();
 
         const std::wstring badPreferencePath = preferencePathWide + L".bad";
         gpg::Warnf(
@@ -6010,20 +6002,17 @@ void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
     const std::filesystem::path installedPrefsPath = (DISK_GetLaunchDir() / ".." / "Installed.Prefs").lexically_normal();
     const std::string installedPrefsText = installedPrefsPath.string();
 
-    LuaPlus::LuaObject* const preferenceRoot = loadedPreferences->GetPreferenceTableMutable();
-    if (!SCR_LuaDoFile(loadedPreferences->GetStateMutable(), installedPrefsText.c_str(), preferenceRoot)) {
+    LuaPlus::LuaObject* const preferenceRoot = preferences->GetPreferenceTableMutable();
+    if (!SCR_LuaDoFile(preferences->GetStateMutable(), installedPrefsText.c_str(), preferenceRoot)) {
       gpg::Warnf("unable to load Installed.Prefs; using empty initial prefs");
-      loadedPreferences->ResetPreferenceTable();
+      preferences->ResetPreferenceTable();
     }
   }
 
   const msvc8::string versionKey("version.major");
-  loadedPreferences->SetInteger(versionKey, 1);
+  preferences->SetInteger(versionKey, 1);
 
-  if (loadedPreferences != gPreferences && gPreferences != nullptr) {
-    delete gPreferences;
-  }
-  gPreferences = loadedPreferences;
+  sPreferences = preferences;
 }
 
 /**
@@ -6036,28 +6025,11 @@ void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
  */
 moho::IUserPrefs* moho::USER_GetPreferences()
 {
-  if (gPreferences != nullptr) {
-    return gPreferences;
+  if (sPreferences.get() == nullptr) {
+    gpg::Warnf("preferences not loaded prior to first use, creating defaults");
+    sPreferences.reset(new CUserPrefs());
   }
-
-  gpg::Warnf("preferences not loaded prior to first use, creating defaults");
-  gPreferences = new CUserPrefsRuntime{};
-  return gPreferences;
-}
-
-/**
- * Address: 0x008CB470 (FUN_008CB470, user-preferences singleton getter lane)
- *
- * What it does:
- * Returns the process-global user-preferences singleton pointer without
- * forcing lazy creation.
- */
-namespace
-{
-  [[maybe_unused]] [[nodiscard]] moho::IUserPrefs* USER_GetPreferencesSingletonRaw() noexcept
-  {
-    return gPreferences;
-  }
+  return sPreferences.get();
 }
 
 /**
@@ -6069,7 +6041,7 @@ namespace
  */
 void moho::USER_SavePreferences()
 {
-  IUserPrefs* const preferences = gPreferences;
+  IUserPrefs* const preferences = sPreferences.get();
   if (preferences == nullptr) {
     gpg::Warnf("preferences not loaded prior to first save, nothing persisted");
     return;

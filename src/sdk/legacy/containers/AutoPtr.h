@@ -26,6 +26,9 @@ namespace msvc8
          * the movie manager's static (moho/misc/StartupHelpers.cpp) with
          * `this` folded to 0x010C4AF0: stores the null default and returns
          * `this`. A linker-retained copy; the static itself is zero-initialised.
+         * Address: 0x008CB410 (FUN_008CB410) - `auto_ptr<Moho::CUserPrefs>`
+         * (StartupHelpers.cpp), `this` in EAX and `p` in ECX: `mov [eax], ecx`.
+         * A linker-retained copy; `USER_LoadPreferences` inlines it.
          */
         explicit auto_ptr(T* p = 0) : px_(p) {}
 
@@ -45,6 +48,12 @@ namespace msvc8
          * the movie manager static's `atexit` destructor (0x00BE6C80 registers
          * it): `if (p) delete p;` through the manager's scalar deleting
          * destructor 0x00875290.
+         * Address: 0x00C08890 (FUN_00C08890) - `auto_ptr<Moho::IUserPrefs>`,
+         * the preferences static's `atexit` destructor (0x00BE8B40 registers
+         * it): `if (p) delete p;` through vtable slot 0 with flag 1.
+         * Address: 0x008CB450 (FUN_008CB450) - `auto_ptr<Moho::CUserPrefs>`,
+         * `this` in EAX: `USER_LoadPreferences`' local, reached from its EH
+         * unwind funclet (`jmp` at 0x00BBE524).
          */
         ~auto_ptr() { delete px_; }
 
@@ -62,6 +71,12 @@ namespace msvc8
             return *this;
         }
 
+        /**
+         * Address: 0x008CB420 (FUN_008CB420) - `auto_ptr<Moho::IUserPrefs>` =
+         * `auto_ptr<Moho::CUserPrefs>&` for the preferences static, `this`
+         * folded, `r` in EAX: `r.px` taken and cleared, then `reset`.
+         * `USER_LoadPreferences` (0x008C90D1) carries it inline.
+         */
         template<class U>
         auto_ptr& operator=(auto_ptr<U>& r)
         {
@@ -95,6 +110,10 @@ namespace msvc8
          * `operator*` for the movie manager static, `this` folded: each is
          * `mov eax, [0x010C4AF0]; ret`, so which address is which of the three
          * cannot be told apart. Linker-retained copies; every caller inlines.
+         * Address: 0x008CB470 (FUN_008CB470) - the same for the preferences
+         * static `auto_ptr<Moho::IUserPrefs>` (`mov eax, [0x010C6258]; ret`).
+         * Address: 0x008CB460 (FUN_008CB460) - `auto_ptr<Moho::CUserPrefs>`,
+         * `this` in EAX: `mov eax, [eax]; ret`.
          */
         T* get() const { return px_; }
 
@@ -114,6 +133,9 @@ namespace msvc8
          *
          * VC8's shape: the old object is destroyed before the new pointer is
          * stored, and the store is unconditional.
+         * Address: 0x008CB480 (FUN_008CB480) - `auto_ptr<Moho::IUserPrefs>` for
+         * the preferences static, `p` in ESI; `USER_GetPreferences` (0x008C916B)
+         * carries it inline.
          */
         void reset(T* p = 0)
         {

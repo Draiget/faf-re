@@ -213,12 +213,11 @@ namespace moho
     IUserPrefs();
 
     /**
-     * Address: 0x008C74A0 (FUN_008C74A0, ??1IUserPrefs@Moho@@UAE@XZ)
-     *
-     * What it does:
-     * Tears down one user-preferences base interface object.
+     * Pure: slot 0 of IUserPrefs' own vftable (0x00E4E2EC) is `_purecall`,
+     * like every other slot. The body is the vptr restore `~CUserPrefs`
+     * (0x008C74A0) ends with, at 0x008C7525.
      */
-    virtual ~IUserPrefs();
+    virtual ~IUserPrefs() = 0;
 
     virtual msvc8::string* GetStr1() = 0;
     virtual msvc8::string* GetStr2() = 0;
@@ -271,6 +270,8 @@ namespace moho
     virtual void SetObject(const msvc8::string& key, void* valueObject) = 0;
     virtual void* GetState() = 0;
   };
+
+  inline IUserPrefs::~IUserPrefs() = default;
 
   static_assert(sizeof(IUserPrefs) == 0x4, "IUserPrefs size must be 0x4");
 
