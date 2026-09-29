@@ -921,7 +921,7 @@ namespace moho
 
     const std::uint32_t categoryBitIndex = mParams.mBlueprint->mCategoryBitIndex;
     const auto wordIt = range->FindWord(categoryBitIndex >> 5u);
-    if (wordIt == range->cend()) {
+    if (wordIt == range->WordEnd()) {
       return false;
     }
 

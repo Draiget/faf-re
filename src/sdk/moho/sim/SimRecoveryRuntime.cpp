@@ -2226,27 +2226,6 @@ void ReleaseLegacyBufferTripleRuntime(
 }
 
 /**
- * Address: 0x006E79D0 (FUN_006E79D0)
- *
- * What it does:
- * Builds one begin-iterator lane for an `EntIdSet` payload by caching the
- * backing `BVIntSet` pointer and first live id.
- */
-std::uint32_t* BuildEntIdSetBeginIteratorRuntime(
-  moho::BVIntSet* const set,
-  std::uint32_t* const outIteratorLanes
-)
-{
-  if (outIteratorLanes == nullptr) {
-    return nullptr;
-  }
-
-  outIteratorLanes[1] = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(set));
-  outIteratorLanes[2] = (set != nullptr) ? set->GetNext(static_cast<unsigned int>(-1)) : 0u;
-  return outIteratorLanes;
-}
-
-/**
  * Address: 0x00687AF0 (FUN_00687AF0)
  *
  * What it does:

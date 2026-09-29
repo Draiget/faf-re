@@ -1237,7 +1237,7 @@ bool CAiTransportImpl::TransportValidateType(const RUnitBlueprint* const unitBlu
 
   const std::uint32_t ordinal = static_cast<std::uint32_t>(unitBlueprint->mCategoryBitIndex);
   const auto it = category->FindWord(ordinal >> 5u);
-  if (it == category->cend()) {
+  if (it == category->WordEnd()) {
     return false;
   }
 

@@ -43,7 +43,17 @@ namespace gpg
 namespace moho
 {
   typedef int32_t EntId;
-  typedef int32_t EntIdUniverse;
+
+  /**
+   * The universe of an entity-id `BVSet` (mangled `UEntIdUniverse@Moho@@`, a
+   * struct): an id is its own index, so it carries no state. Copying it emits
+   * no code, which is why `BVSet<EntId, EntIdUniverse>::begin`/`end`
+   * (0x006E79D0 / 0x006E7A00) never store their iterator's first lane.
+   */
+  struct EntIdUniverse
+  {
+    [[nodiscard]] EntId FromIndex(const unsigned int index) const noexcept { return static_cast<EntId>(index); }
+  };
   class Entity;
   class CollisionBeamEntity;
   class Projectile;

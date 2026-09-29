@@ -50,10 +50,57 @@ namespace moho
   template <class T, class U>
   struct alignas(8) BVSet
   {
-    static_assert(sizeof(U) == 4u, "BVSet<T,U>::U must be exactly 4 bytes to preserve binary layout.");
+    // `EntIdUniverse` is empty (sizeof 1); `mReserved04` keeps `mBits` at
+    // +0x08 either way.
+    static_assert(sizeof(U) <= 4u, "BVSet<T,U>::U must fit the 4-byte universe lane.");
 
-    using iterator = std::uint32_t*;
-    using const_iterator = const std::uint32_t*;
+    /**
+     * The value iterator (0x0C): a copy of the set's universe, then the
+     * `BVIntSetIndex` walk over `mBits`. The universe turns an index back into
+     * a `T`; for `EntIdUniverse` it is empty, so copying it emits nothing -
+     * which is why `begin`/`end` (0x006E79D0 / 0x006E7A00) store only
+     * +0x04/+0x08 and `Add`'s +0x00 store copies an undefined lane.
+     */
+    class const_iterator
+    {
+    public:
+      const_iterator(const U& universe, const BVIntSetIndex& index) noexcept
+        : mUniverse(universe)
+        , mIndex(index)
+      {}
+
+      /**
+       * Address: 0x00534960 (FUN_00534960 -- `U::FromIndex` through the
+       *   universe lane: `mov ecx,[eax] / mov eax,[ecx] / push [eax+8] / call
+       *   [eax+0x14]`, the category universe's vtable slot 5. Zero callers;
+       *   every use inlined it.)
+       */
+      [[nodiscard]] T operator*() const { return mUniverse.FromIndex(mIndex.mValue); }
+
+      /**
+       * Address: 0x00534940 (FUN_00534940 -- `mValue = mOwnerSet->GetNext(mValue)`,
+       *   returning the iterator. Zero callers.)
+       * Address: 0x006E7A40 (FUN_006E7A40 -- the same body in the ent-id
+       *   translation unit; not an ICF twin only because the `call`
+       *   displacement differs. Zero callers.)
+       */
+      const_iterator& operator++()
+      {
+        mIndex.mValue = mIndex.mOwnerSet->GetNext(mIndex.mValue);
+        return *this;
+      }
+
+      /**
+       * Address: 0x00534970 (FUN_00534970 -- `cmp ecx,[edx+8] / setne al`,
+       *   the value lanes only. Zero callers; ICF twin FUN_006E7A70 is `skip`.)
+       */
+      [[nodiscard]] bool operator!=(const const_iterator& rhs) const noexcept { return mIndex.mValue != rhs.mIndex.mValue; }
+      [[nodiscard]] bool operator==(const const_iterator& rhs) const noexcept { return mIndex.mValue == rhs.mIndex.mValue; }
+
+    private:
+      U mUniverse;          // +0x00
+      BVIntSetIndex mIndex; // +0x04
+    };
 
     static gpg::RType* sType;
 
@@ -196,33 +243,54 @@ namespace moho
 
     [[nodiscard]] const std::uint32_t* WordData() const noexcept { return mBits.mWords.start_; }
     [[nodiscard]] std::uint32_t* WordData() noexcept { return mBits.mWords.start_; }
+    [[nodiscard]] const std::uint32_t* WordEnd() const noexcept { return mBits.mWords.end_; }
 
-    [[nodiscard]] iterator begin() noexcept { return mBits.mWords.start_; }
-    [[nodiscard]] iterator end() noexcept { return mBits.mWords.end_; }
-    [[nodiscard]] const_iterator begin() const noexcept { return mBits.mWords.start_; }
-    [[nodiscard]] const_iterator end() const noexcept { return mBits.mWords.end_; }
-    [[nodiscard]] const_iterator cbegin() const noexcept { return mBits.mWords.start_; }
-    [[nodiscard]] const_iterator cend() const noexcept { return mBits.mWords.end_; }
+    /**
+     * Address: 0x006E79D0 (FUN_006E79D0, BVSet<EntId,EntIdUniverse>::begin --
+     *   `{universe, {&mBits, mBits.GetNext(-1)}}`, BVIntSet::BeginIndex inlined;
+     *   out-of-line for Sim::LuaSimCallback. Formerly
+     *   `BuildEntIdSetBeginIteratorRuntime` in SimRecoveryRuntime.cpp.)
+     */
+    [[nodiscard]] const_iterator begin() const
+    {
+      return const_iterator(mUniverse, const_cast<BVIntSet&>(mBits).BeginIndex());
+    }
 
-    [[nodiscard]] const_iterator FindWord(const std::uint32_t absoluteWordIndex) const noexcept
+    /**
+     * Address: 0x006E7A00 (FUN_006E7A00, BVSet<EntId,EntIdUniverse>::end --
+     *   `{universe, {&mBits, (mFirstWordIndex + wordCount) << 5}}`,
+     *   BVIntSet::EndIndex inlined; re-evaluated on every pass of
+     *   Sim::LuaSimCallback's loop. Formerly `BuildEntIdSetEndCursorLane` in
+     *   Sim.cpp.)
+     */
+    [[nodiscard]] const_iterator end() const
+    {
+      return const_iterator(mUniverse, const_cast<BVIntSet&>(mBits).EndIndex());
+    }
+
+    /**
+     * The storage word holding absolute word index `absoluteWordIndex`, or
+     * `WordEnd()` when the set does not cover it.
+     */
+    [[nodiscard]] const std::uint32_t* FindWord(const std::uint32_t absoluteWordIndex) const noexcept
     {
       if (absoluteWordIndex < mBits.mFirstWordIndex) {
-        return cend();
+        return WordEnd();
       }
 
       const std::size_t localWordIndex =
         static_cast<std::size_t>(absoluteWordIndex - mBits.mFirstWordIndex);
       if (localWordIndex >= WordCount()) {
-        return cend();
+        return WordEnd();
       }
 
-      return cbegin() + localWordIndex;
+      return WordData() + localWordIndex;
     }
 
     [[nodiscard]] bool ContainsBit(const std::uint32_t categoryBitIndex) const noexcept
     {
-      const const_iterator wordIt = FindWord(categoryBitIndex >> 5u);
-      if (wordIt == cend()) {
+      const std::uint32_t* const wordIt = FindWord(categoryBitIndex >> 5u);
+      if (wordIt == WordEnd()) {
         return false;
       }
       return (((*wordIt) >> (categoryBitIndex & 0x1Fu)) & 1u) != 0u;
@@ -238,4 +306,5 @@ namespace moho
   static_assert(offsetof(BVSetWord32, mBits) == 0x08, "BVSet::mBits offset must be 0x08");
   static_assert(sizeof(BVSetWord32) == 0x28, "BVSet size must be 0x28");
   static_assert(alignof(BVSetWord32) == 8, "BVSet must be 8-aligned");
+  static_assert(sizeof(BVSetWord32::const_iterator) == 0x0C, "BVSet::const_iterator size must be 0x0C");
 } // namespace moho

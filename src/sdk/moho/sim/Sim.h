@@ -62,7 +62,7 @@ namespace moho
   // Keep local id aliases visible even when transitive Entity typedef visibility
   // is disrupted during partial IntelliSense parses.
   typedef std::int32_t EntId;
-  typedef std::int32_t EntIdUniverse;
+  struct EntIdUniverse;
 
   class PathTables;
   class COGrid;

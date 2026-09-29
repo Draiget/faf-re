@@ -8900,43 +8900,6 @@ void Sim::ExecuteLuaInSim(const char* const functionName, const LuaPlus::LuaObje
   }
 }
 
-namespace
-{
-  struct EntIdSetCursorLane
-  {
-    std::uint32_t reservedZero; // +0x00
-    moho::BVIntSet* set;        // +0x04
-    std::int32_t value;         // +0x08
-  };
-  static_assert(sizeof(EntIdSetCursorLane) == 0x0C, "EntIdSetCursorLane size must be 0x0C");
-  static_assert(offsetof(EntIdSetCursorLane, set) == 0x04, "EntIdSetCursorLane::set offset must be 0x04");
-  static_assert(offsetof(EntIdSetCursorLane, value) == 0x08, "EntIdSetCursorLane::value offset must be 0x08");
-
-  /**
-   * Address: 0x006E7A00 (FUN_006E7A00, ent-id set end-cursor lane helper)
-   *
-   * What it does:
-   * Writes one `{set, endValue}` iterator lane for an ent-id set, where
-   * `endValue` is `(firstWordIndex + wordCount) * 32`.
-   */
-  [[maybe_unused]] [[nodiscard]] EntIdSetCursorLane* BuildEntIdSetEndCursorLane(
-    EntIdSetCursorLane* const out,
-    const moho::BVSet<moho::EntId, moho::EntIdUniverse>* const entitySet
-  ) noexcept
-  {
-    moho::BVIntSet* const bits = const_cast<moho::BVIntSet*>(&entitySet->mBits);
-    const std::uintptr_t beginAddress = reinterpret_cast<std::uintptr_t>(bits->mWords.start_);
-    const std::uintptr_t endAddress = reinterpret_cast<std::uintptr_t>(bits->mWords.end_);
-    const std::uint32_t wordCount = static_cast<std::uint32_t>((endAddress - beginAddress) >> 2u);
-    const std::uint32_t endValue = (bits->mFirstWordIndex + wordCount) << 5u;
-
-    out->set = bits;
-    out->value = static_cast<std::int32_t>(endValue);
-    return out;
-  }
-
-} // namespace
-
 // Given moho:: linkage rather than internal: the shipped binary had this
 // file-static beside its only caller, but our tree recovers that caller
 // (ISSUE_FactoryCommand) into CWldSession.cpp, so an internal-linkage body
@@ -9005,28 +8968,26 @@ void Sim::LuaSimCallback(
 )
 {
   LuaPlus::LuaObject selectedUnits(mLuaState);
-  if (entities.Bits().Count() != 0u) {
+  if (!entities.Empty()) {
     selectedUnits.AssignNewTable(mLuaState, 0, 0);
 
+    // `end()` is re-evaluated every pass, as the binary's loop calls
+    // 0x006E7A00 each time round.
     int luaIndex = 1;
-    auto appendUnitLuaObject = [this, &selectedUnits, &luaIndex](const EntId entId) {
-      Entity* const entity = FindEntityById(mEntityDB, entId);
+    for (BVSet<EntId, EntIdUniverse>::const_iterator it = entities.begin(); it != entities.end(); ++it) {
+      Entity* const entity = FindEntityById(mEntityDB, *it);
       if (!entity) {
-        return;
+        continue;
       }
 
       Unit* const unit = entity->IsUnit();
       if (!unit) {
-        return;
+        continue;
       }
 
       selectedUnits.SetObject(luaIndex, unit->GetLuaObject());
       ++luaIndex;
-    };
-
-    entities.ForEachValue([&appendUnitLuaObject](const unsigned int value) {
-      appendUnitLuaObject(static_cast<EntId>(value));
-    });
+    }
   }
 
   // A script error is logged, not propagated: the binary's only handler here is

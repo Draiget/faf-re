@@ -62,37 +62,10 @@ namespace moho
    * match, which is what makes `it != end` terminate a walk whose `end` was
    * built by `EndIndex()` on the same set.
    *
-   * Emissions of the same index walk carried by a **0x0C** record rather than
-   * by `BVIntSetIndex` alone -- the pair sits at `+0x04`, so the set pointer
-   * lands at `+0x04` and the value at `+0x08`, with one further lane ahead of
-   * it at `+0x00`:
-   *
-   * Address: 0x00534940 (FUN_00534940 -- `operator++`:
-   *   `mov eax,[esi+8] / mov edi,[esi+4] / call BVIntSet::GetNext /
-   *   mov [esi+8],eax / mov eax,esi`, i.e. `mValue = mOwnerSet->GetNext(mValue)`
-   *   returning the cursor. Formerly `AdvanceBVIntSetCursorRuntimeView`.)
-   * Address: 0x006E7A40 (FUN_006E7A40 -- the same body emitted in a second
-   *   translation unit; not an ICF twin of the above only because the `call`
-   *   displacement differs. Formerly `AdvanceBVIntSetCursorRuntimeViewSecondary`,
-   *   which had been written as a forwarder to the first.)
-   * Address: 0x00534970 (FUN_00534970 -- `operator!=` on that record's value
-   *   lane, `cmp ecx,[edx+8] / setne al`. Its ICF twin FUN_006E7A70 was
-   *   disposed `skip` on 2026-09-10 for the same reason these carry here.
-   *   Formerly `BVIntSetCursorValueNotEqualDispatch`.)
-   * Address: 0x00534960 (FUN_00534960 -- resolves the value through the lane
-   *   at `+0x00`, which is a pointer to a polymorphic object:
-   *   `mov ecx,[eax] / mov eax,[ecx] / push [eax+8] / call [eax+0x14]`, a
-   *   `__thiscall` through vtable slot 5 taking the value. Formerly
-   *   `AdvanceCursorValueViaDispatch`, over a fabricated five-slot interface
-   *   invented to give that call a shape.)
-   *
-   * All four are zero-caller and unreachable from every seeded root; each use
-   * site inlined the operator and the linker kept the out-of-line COMDAT. They
-   * are recorded here rather than modelled because the owning record is not
-   * pinned: the `+0x00` lane's class could not be identified from the binary in
-   * this pass, and inventing a type for it is what the removed code did.
-   * Whatever it is, the walk itself is this file's `{BVIntSet*, value}` pair,
-   * and `BeginIndex`/`EndIndex`/`GetNext` below are the operations it performs.
+   * The same walk carried by a 0x0C record, with this pair at `+0x04` behind a
+   * universe lane at `+0x00`, is `BVSet<T,U>::const_iterator` (BVSet.h); its
+   * out-of-line `++`, `!=` and `*` (0x00534940, 0x006E7A40, 0x00534970,
+   * 0x00534960) are cited there.
    */
   [[nodiscard]] bool BVIntSetIndexValueNotEqual(const BVIntSetIndex& lhs, const BVIntSetIndex& rhs) noexcept;
 

@@ -4079,7 +4079,7 @@ namespace moho
 
     const std::uint32_t bitIndex = ReadBlueprintCategoryBitIndex(BluePrint);
     const auto wordIt = range->FindWord(bitIndex >> 5u);
-    if (wordIt == range->cend()) {
+    if (wordIt == range->WordEnd()) {
       return false;
     }
 
