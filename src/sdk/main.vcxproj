@@ -740,7 +740,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\SSyncFilter.cpp" />
     <ClCompile Include="moho\sim\SSTIArmyConstantData.cpp" />
     <ClCompile Include="moho\command\EUnitCommandTypeTypeInfo.cpp" />
-    <ClCompile Include="moho\command\ICommandSink.cpp" />
     <ClCompile Include="moho\command\SSTICommandConstantData.cpp" />
     <ClCompile Include="moho\command\SSTICommandVariableData.cpp" />
     <ClCompile Include="moho\entity\EntityCategoryTypeInfo.cpp" />

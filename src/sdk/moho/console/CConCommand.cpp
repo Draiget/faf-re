@@ -2683,7 +2683,7 @@ void moho::CON_ProcessInfoPair(const msvc8::vector<msvc8::string>& args)
     }
 
     SIM_GetActiveDriver()->ProcessInfoPair(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(entityView->mParams.mEntityId)),
+      entityView->mParams.mEntityId,
       infoKey,
       infoValue
     );
@@ -2798,7 +2798,7 @@ void moho::RenameUnit(const msvc8::vector<msvc8::string>& args)
 
   UserEntity* const entityView = ResolveUserEntityView(selectedUnit);
   SIM_GetActiveDriver()->ProcessInfoPair(
-    reinterpret_cast<void*>(static_cast<std::uintptr_t>(entityView->mParams.mEntityId)),
+    entityView->mParams.mEntityId,
     kRenameUnitInfoKey,
     customName.c_str()
   );

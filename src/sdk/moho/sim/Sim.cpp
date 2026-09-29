@@ -8508,9 +8508,8 @@ void Sim::WarpEntity(const EntId entityId, const VTransform& transform)
  * What it does:
  * Applies one UI/info key-value command lane to a controllable live unit.
  */
-void Sim::ProcessInfoPair(void* id, const char* key, const char* val)
+void Sim::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, const gpg::StrArg val)
 {
-  const EntId entityId = static_cast<EntId>(reinterpret_cast<std::uintptr_t>(id));
   Entity* const entity = FindEntityById(mEntityDB, entityId);
   if (!entity || !OkayToMessWith(entity) || entity->mVarDat.mIsDead != 0u) {
     return;
@@ -15370,9 +15369,8 @@ int moho::cfunc_SetAutoModeL(LuaPlus::LuaState* const state)
     }
 
     if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
-      const auto entityIdWord = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(iunitBridge->GetEntityId()));
       activeDriver->ProcessInfoPair(
-        reinterpret_cast<void*>(entityIdWord),
+        iunitBridge->GetEntityId(),
         "SetAutoMode",
         enabled ? "true" : "false"
       );
@@ -15449,9 +15447,8 @@ int moho::cfunc_SetAutoSurfaceModeL(LuaPlus::LuaState* const state)
     }
 
     if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
-      const auto entityIdWord = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(iunitBridge->GetEntityId()));
       activeDriver->ProcessInfoPair(
-        reinterpret_cast<void*>(entityIdWord),
+        iunitBridge->GetEntityId(),
         "SetAutoSurfaceMode",
         enabled ? "true" : "false"
       );
@@ -15544,8 +15541,7 @@ int moho::cfunc_ToggleScriptBitL(LuaPlus::LuaState* const state)
       }
 
       if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
-        const auto entityIdWord = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(iunitBridge->GetEntityId()));
-        activeDriver->ProcessInfoPair(reinterpret_cast<void*>(entityIdWord), "ToggleScriptBit", bitText);
+        activeDriver->ProcessInfoPair(iunitBridge->GetEntityId(), "ToggleScriptBit", bitText);
       }
     }
   }
@@ -15617,9 +15613,8 @@ int moho::cfunc_SetPausedL(LuaPlus::LuaState* const state)
       }
 
       if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
-        const auto entityIdWord = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(iunitBridge->GetEntityId()));
         activeDriver->ProcessInfoPair(
-          reinterpret_cast<void*>(entityIdWord),
+          iunitBridge->GetEntityId(),
           "SetPaused",
           paused ? "true" : "false"
         );

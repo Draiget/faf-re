@@ -4008,7 +4008,7 @@ int moho::cfunc_SetFireStateL(LuaPlus::LuaState* const state)
 
     if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
       activeDriver->ProcessInfoPair(
-        reinterpret_cast<void*>(static_cast<std::uintptr_t>(unit->GetEntityId())),
+        unit->GetEntityId(),
         kSetFireStateName,
         fireStateValue
       );
@@ -4200,8 +4200,7 @@ int moho::cfunc_ToggleFireStateL(LuaPlus::LuaState* const state)
       }
 
       if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
-        const std::uintptr_t entityIdWord = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(unit->GetEntityId()));
-        activeDriver->ProcessInfoPair(reinterpret_cast<void*>(entityIdWord), kSetFireStateName, nextFireStateLexical.c_str());
+        activeDriver->ProcessInfoPair(unit->GetEntityId(), kSetFireStateName, nextFireStateLexical.c_str());
       }
     }
   }

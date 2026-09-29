@@ -5520,7 +5520,7 @@ int moho::cfunc_UserUnitProcessInfoL(LuaPlus::LuaState* const state)
 
   if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
     activeDriver->ProcessInfoPair(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(entityView->mParams.mEntityId)),
+      entityView->mParams.mEntityId,
       infoKey,
       infoValue
     );
@@ -5591,7 +5591,7 @@ int moho::cfunc_UserUnitSetCustomNameL(LuaPlus::LuaState* const state)
   UserEntity* const entityView = ResolveUserEntityView(userUnit);
   if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
     activeDriver->ProcessInfoPair(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(entityView->mParams.mEntityId)),
+      entityView->mParams.mEntityId,
       kUserUnitSetCustomNameInfoKey,
       customName
     );

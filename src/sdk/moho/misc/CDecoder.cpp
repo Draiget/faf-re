@@ -485,7 +485,7 @@ namespace moho
     reader.ReadString(&key);
     reader.ReadString(&value);
 
-    mSink->ProcessInfoPair(reinterpret_cast<void*>(static_cast<std::uintptr_t>(entityId)), key.c_str(), value.c_str());
+    mSink->ProcessInfoPair(entityId, key.c_str(), value.c_str());
   }
 
   /**

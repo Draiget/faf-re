@@ -2,6 +2,7 @@
 #include <cstdint>
 
 #include "CmdDefs.h"
+#include "gpg/core/containers/String.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/containers/BVSet.h"
 #include "moho/containers/SCoordsVec2.h"
@@ -24,222 +25,130 @@ namespace moho
   struct CommandSpec; // command descriptor (a3)
 
   /**
-   * Abstract class, pure virtual functions (all are __purecall <-> sub_A82547)
+   * VFTABLE: 0x00E2E794 (24 slots, every one `_purecall` at 0x00A82547)
+   * RTTI:    .?AVICommandSink@Moho@@
+   *
+   * The command-stream vocabulary: one virtual per `ECmdStreamOp`. The
+   * interface itself has no bodies. Its two implementors each own their
+   * slot addresses:
+   *   - `Sim`         (vftable 0x00E34714) applies the command to the world;
+   *   - `CMarshaller` (vftable 0x00E2E7FC) serialises it onto the wire.
+   * `CDecoder` is the reverse of `CMarshaller`: it reads the wire and calls
+   * back into an `ICommandSink` (the `Sim`).
+   *
+   * There is no virtual destructor slot. Nothing deletes through an
+   * `ICommandSink*`; each owner holds its concrete type.
    */
   class ICommandSink
   {
-    // Primary vftable (24 entries)
   public:
     /**
-     * Address: 0x006E59F0 (FUN_006E59F0, ??0ICommandSink@Moho@@QAE@XZ)
+     * Address: 0x006E59F0 (FUN_006E59F0)
+     * Address: 0x006E5A70 (FUN_006E5A70)
+     * Address: 0x006E5A80 (FUN_006E5A80)
      *
      * What it does:
-     * Initializes one command-sink base interface object.
-     */
-    ICommandSink();
-
-    /**
-     * Address: 0x00748650 (FUN_00748650)
+     * Re-installs the interface vftable (`mov [this], 0x00E2E794; ret`) as the
+     * last step of destroying an implementor.
      *
-     * VFTable SLOT: 0
+     * 0x006E59F0 is reached only from EH unwind funclets: 0x00BB94F3 and
+     * 0x00BC1A13 destroy `Sim`'s `ICommandSink` base when `Sim::Sim` /
+     * `Sim::~Sim` unwind. It was formerly cited as `ICommandSink()`, but no
+     * constructor path ever calls it. The destructor is user-declared
+     * because a trivial one would never be called from a funclet.
+     *
+     * 0x006E5A70 and 0x006E5A80 are byte-identical copies emitted in
+     * `CMarshaller`'s translation unit, beside `CMarshaller::CMarshaller`
+     * (0x006E5A60). Nothing in the binary references them. The implicit
+     * `ICommandSink()` and `CMarshaller`'s implicit destructor both reduce
+     * to this same single store, so they are the compiler's out-of-line
+     * copies of this family, not source of their own. They were formerly
+     * `ResetICommandSinkBaseVtableLaneA/B` over an `ICommandSinkRuntimeView`,
+     * which stored the address of a one-byte static where the vftable
+     * belongs.
      */
+    ~ICommandSink() {}
+
+    // Slot 0
     virtual void SetCommandSource(CommandSourceId sourceId) = 0;
 
-    /**
-     * Address:0x007486B0 (FUN_007486B0)
-     *
-     * VFTable SLOT: 1
-     */
+    // Slot 1
     virtual void OnCommandSourceTerminated() = 0;
 
-    /**
-     * Address: 0x007487C0 (FUN_007487C0)
-     *
-     * VFTable SLOT: 2
-     */
+    // Slot 2
     virtual void VerifyChecksum(gpg::MD5Digest const&, CSeqNo) = 0;
 
-    /**
-     * Address: 0x00748960 (FUN_00748960)
-     *
-     * VFTable SLOT: 3
-     */
+    // Slot 3
     virtual void RequestPause() = 0;
 
-    /**
-     * Address: 0x007489A0 (FUN_007489A0)
-     *
-     * VFTable SLOT: 4
-     */
+    // Slot 4
     virtual void Resume() = 0;
 
-    /**
-     * Address: 0x007489C0 (FUN_007489C0)
-     *
-     * VFTable SLOT: 5
-     */
+    // Slot 5
     virtual void SingleStep() = 0;
 
-    /**
-     * Address: 0x00748AA0 (FUN_00748AA0)
-     *
-     * VFTable SLOT: 6
-     */
+    // Slot 6
     virtual void CreateUnit(uint32_t, RResId const&, SCoordsVec2 const&, float) = 0;
 
-    /**
-      * Alias of FUN_00748C00 (non-canonical helper lane).
-     *
-     * VFTable SLOT: 7
-     */
+    // Slot 7
     virtual void CreateProp(const char*, Wm3::Vec3f const&) = 0;
 
-    /**
-     * Address: 0x00748C80 (FUN_00748C80)
-     *
-     * VFTable SLOT: 8
-     */
+    // Slot 8
     virtual void DestroyEntity(EntId) = 0;
 
-    /**
-     * Address: 0x00748CD0 (FUN_00748CD0)
-     *
-     * VFTable SLOT: 9
-     */
+    // Slot 9
     virtual void WarpEntity(EntId, VTransform const&) = 0;
 
     /**
-     * Address: 0x00748D50 (FUN_00748D50)
-     * #STRs:
-     *  "SetFireState", "SetAutoMode", "CustomName",
-     *  "SetAutoSurfaceMode", "SetRepeatQueue", "SetPaused",
-     *  "SiloBuildTactical", "SiloBuildNuke", "ToggleScriptBit",
-     *  "false"
+     * Slot 10
      *
-     * VFTable SLOT: 10
+     * `Sim`'s override is mangled
+     * `?ProcessInfoPair@Sim@Moho@@UAEXVEntId@2@VStrArg@gpg@@1@Z`, i.e.
+     * `(EntId, gpg::StrArg, gpg::StrArg)`. The id is an entity id, not a
+     * pointer.
      */
-    virtual void ProcessInfoPair(void* id, const char* key, const char* val) = 0;
+    virtual void ProcessInfoPair(EntId entityId, gpg::StrArg key, gpg::StrArg value) = 0;
 
-    /**
-     * Address: 0x00749290 (FUN_00749290)
-     *
-     * Moho::BVSet<Moho::EntId,Moho::EntIdUniverse> const &,Moho::SSTICommandIssueData const &,bool
-     *
-     * IDA signature:
-     * char __userpurge Moho__Sim__IssueCommand@<al>(Moho::Sim *this@<ecx>, int esi0@<esi>, int *a3,
-     * Moho::SSTICommandIssueData *commandIssueData, BOOL flag);
-     *
-     * VFTable SLOT: 11
-     */
+    // Slot 11
     virtual void
     IssueCommand(BVSet<EntId, EntIdUniverse> const&, SSTICommandIssueData const& commandIssueData, bool flag) = 0;
 
-    /**
-     * Address: 0x007494B0 (FUN_007494B0)
-     *
-     * VFTable SLOT: 12
-     */
+    // Slot 12
     virtual void
     IssueFactoryCommand(BVSet<EntId, EntIdUniverse> const&, SSTICommandIssueData const& commandIssueData, bool) = 0;
 
-    /**
-     * Address: 0x00749680 (FUN_00749680)
-     *
-     * VFTable SLOT: 13
-     */
+    // Slot 13
     virtual void IncreaseCommandCount(CmdId, int) = 0;
 
-    /**
-     * Address: 0x007496E0 (FUN_007496E0)
-     *
-     * VFTable SLOT: 14
-     */
+    // Slot 14
     virtual void DecreaseCommandCount(CmdId, int) = 0;
 
-    /**
-     * Address: 0x00749740 (FUN_00749740)
-     *
-     * VFTable SLOT: 15
-     */
+    // Slot 15
     virtual void SetCommandTarget(CmdId, SSTITarget const&) = 0;
 
-    /**
-     * Address: 0x00749800 (FUN_00749800)
-     *
-     * VFTable SLOT: 16
-     */
+    // Slot 16
     virtual void SetCommandType(CmdId, EUnitCommandType) = 0;
 
-    /**
-     * Address: 0x00749860 (FUN_00749860)
-     *
-     * VFTable SLOT: 17
-     */
+    // Slot 17
     virtual void SetCommandCells(CmdId, gpg::core::FastVector<SOCellPos> const&, Wm3::Vector3<float> const&) = 0;
 
-    /**
-     * Address: 0x00749970 (FUN_00749970)
-     *
-     * VFTable SLOT: 18
-     */
+    // Slot 18
     virtual void RemoveCommandFromUnitQueue(CmdId, EntId) = 0;
 
-    /**
-     * Address: 0x00749A70 (FUN_00749A70)
-     *
-     * VFTable SLOT: 19
-     */
+    // Slot 19
     virtual void ExecuteLuaInSim(const char*, LuaPlus::LuaObject const&) = 0;
 
-    /**
-     * Address: 0x00749B60 (FUN_00749B60)
-     *
-     * VFTable SLOT: 20
-     */
+    // Slot 20
     virtual void LuaSimCallback(const char*, LuaPlus::LuaObject const&, BVSet<EntId, EntIdUniverse> const&) = 0;
 
-    /**
-     * Address: 0x00749DA0 (FUN_00749DA0)
-     *
-     * VFTable SLOT: 21
-     */
+    // Slot 21
     virtual void
     ExecuteDebugCommand(const char*, Wm3::Vector3<float> const&, uint32_t, BVSet<EntId, EntIdUniverse> const&) = 0;
 
-    /**
-     * VFTable SLOT: 22
-     *
-     * Pure like every other slot here. 0x00749F40 used to be cited on this
-     * declaration, but that address is `Sim`'s override -- it is slot 22 of
-     * `Moho::Sim`'s vftable (0x00E34714), not of this interface's
-     * (0x00E2E794), whose slot 22 is `_purecall`. `Sim::AdvanceBeat` already
-     * carries it.
-     */
+    // Slot 22
     virtual void AdvanceBeat(int) = 0;
 
-    /**
-     * VFTable SLOT: 23
-     *
-     * Same as above: 0x0074B100 is slot 23 of `Moho::Sim`'s vftable and is
-     * already cited on `Sim::EndGame`.
-     */
+    // Slot 23
     virtual void EndGame() = 0;
   };
-
-  /**
-   * Address: 0x0073F8A0 (FUN_0073F8A0)
-   *
-   * What it does:
-   * Replaces one owned command-sink storage pointer and releases the previous
-   * storage lane with raw `operator delete` when present.
-   */
-  void ReplaceOwnedCommandSinkStorage(ICommandSink*& slot, ICommandSink* replacement) noexcept;
-
-  /**
-   * Address: 0x007418D0 (FUN_007418D0)
-   *
-   * What it does:
-   * Releases one owned command-sink storage lane with raw `operator delete`.
-   */
-  void DeleteOwnedCommandSinkStorage(ICommandSink* sink) noexcept;
 } // namespace moho

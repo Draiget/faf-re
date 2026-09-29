@@ -2445,9 +2445,7 @@ namespace moho
         if (UserEntity* const selectedEntity = decodeSelectionSlot(node->mEnt); selectedEntity != nullptr) {
           // sSimDriver global read fresh each iteration (asm reloads it in-loop).
           if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
-            const auto entityIdAsPtr =
-              reinterpret_cast<void*>(static_cast<std::uintptr_t>(selectedEntity->mParams.mEntityId));
-            driver->ProcessInfoPair(entityIdAsPtr, commandKey, "add");
+            driver->ProcessInfoPair(selectedEntity->mParams.mEntityId, commandKey, "add");
           }
         }
 
@@ -2558,9 +2556,7 @@ namespace moho
       while (node != selection.mHead) {
         if (UserEntity* const selectedEntity = DecodeSelectionEntity(node->mEnt); selectedEntity != nullptr) {
           if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
-            const auto entityIdAsPtr =
-              reinterpret_cast<void*>(static_cast<std::uintptr_t>(selectedEntity->mParams.mEntityId));
-            driver->ProcessInfoPair(entityIdAsPtr, commandKey, "add");
+            driver->ProcessInfoPair(selectedEntity->mParams.mEntityId, commandKey, "add");
           }
         }
         SSelectionSetUserEntity::Iterator_inc(&node);
@@ -3189,10 +3185,7 @@ namespace moho
 
         if (voiceOver != nullptr) {
           if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
-            const auto entityIdAsPtr = reinterpret_cast<void*>(
-              static_cast<std::uintptr_t>(representativeUnit->mParams.mEntityId)
-            );
-            driver->ProcessInfoPair(entityIdAsPtr, "play", voiceOver);
+            driver->ProcessInfoPair(representativeUnit->mParams.mEntityId, "play", voiceOver);
           }
         }
       }

@@ -135,7 +135,7 @@ namespace moho
      * What it does:
      * Marshals `CMDST_ProcessInfoPair` (`EntId` + key/value strings).
      */
-    void ProcessInfoPair(void* id, const char* key, const char* val) override;
+    void ProcessInfoPair(EntId entityId, gpg::StrArg key, gpg::StrArg value) override;
 
     /**
      * Address: 0x006E6690 (FUN_006E6690)

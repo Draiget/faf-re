@@ -325,7 +325,7 @@ namespace moho
      * What it does:
      * Applies one UI/info key-value command to a controllable live unit.
      */
-    void ProcessInfoPair(void* id, const char* key, const char* val) override;
+    void ProcessInfoPair(EntId entityId, gpg::StrArg key, gpg::StrArg val) override;
 
     /**
      * Address: 0x00749290 (FUN_00749290)

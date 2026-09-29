@@ -132,7 +132,7 @@ namespace moho
 
     // Slot 24. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CAD0 (FUN_0073CAD0),
     // ECmdStreamOp::CMDST_ProcessInfoPair (11)
-    virtual CmdId ProcessInfoPair(void* id, const char* key, const char* val) = 0;
+    virtual CmdId ProcessInfoPair(EntId entityId, gpg::StrArg key, gpg::StrArg val) = 0;
 
     // Slot 25. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CB70 (FUN_0073CB70),
     // ECmdStreamOp::CMDST_IssueCommand (12)

@@ -269,14 +269,13 @@ void CMarshaller::WarpEntity(const EntId entityId, const VTransform& transform)
  * Address: 0x006E6560 (FUN_006E6560)
  * Address: 0x102C1990
  */
-void CMarshaller::ProcessInfoPair(void* id, const char* key, const char* val)
+void CMarshaller::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, const gpg::StrArg value)
 {
   CMessage message{ECmdStreamOp::CMDST_ProcessInfoPair};
   CMessageStream stream{message};
-  const auto entityId = static_cast<EntId>(reinterpret_cast<std::uintptr_t>(id));
   stream.Write(entityId);
   stream.Write(key);
-  stream.Write(val);
+  stream.Write(value);
   mClientManager->ProcessClients(message);
 }
 

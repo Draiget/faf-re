@@ -18,9 +18,6 @@
     <ClCompile Include="moho\sim\Sim.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\command\ICommandSink.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\command\CCommandDbTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

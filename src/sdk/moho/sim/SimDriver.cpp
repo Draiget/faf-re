@@ -682,8 +682,33 @@ SSyncData* moho::PopFrontSSyncDataPtrDeque(SSyncDataQueue& queue)
  * Address: 0x0073B570 (FUN_0073B570)
  * Mangled: ??0CSimDriver@Moho@@QAE@@Z
  *
+ * `boost::scoped_ptr<CMarshaller>` as this constructor instantiates it.
+ * `mMarshaller.reset(...)` is inlined at 0x0073B820. These out-of-line
+ * copies sit beside it in this translation unit:
+ * Address: 0x0073F880 (FUN_0073F880, ~scoped_ptr - reached from the unwind
+ *   funclets 0x00BBB93A (this constructor) and 0x00BC284A (the destructor))
+ * Address: 0x0073F8A0 (FUN_0073F8A0, scoped_ptr::reset(CMarshaller*) -
+ *   `old = px; px = p; delete old`, no self-test, the swap-based boost
+ *   reset; no reference in the PE; formerly `ReplaceOwnedCommandSinkStorage`
+ *   in ICommandSink.cpp, typed as a free function over `ICommandSink*&`)
+ *
+ * `boost::scoped_ptr<CDecoder>` and `boost::scoped_ptr<Sim>`, the same shape:
+ * Address: 0x0073F8E0 (FUN_0073F8E0, ~scoped_ptr<CDecoder> - funclets
+ *   0x00BBB945 and 0x00BC2855)
+ * Address: 0x0073F900 (FUN_0073F900, scoped_ptr<CDecoder>::reset)
+ * Address: 0x0073F7C0 (FUN_0073F7C0, ~scoped_ptr<Sim> - funclet 0x00BBB90E)
+ * Address: 0x0073F7E0 (FUN_0073F7E0, scoped_ptr<Sim>::reset)
+ *
+ * `msvc8::auto_ptr` for the two owners handed in by the caller:
+ * Address: 0x0073F830 (FUN_0073F830, auto_ptr(auto_ptr&) - `mClientManager(clientManager)`,
+ *   inlined at 0x0073B5A7)
+ * Address: 0x0073F840 (FUN_0073F840, ~auto_ptr<CClientManagerImpl> - funclet 0x00BBB919)
+ *
  * What it does:
- * Initializes driver state, events, marshaller, and the create-sim bootstrap thread.
+ * Takes ownership of the command stream and the client manager, creates the
+ * connection and sync events, builds the marshaller that turns this driver's
+ * `ISTIDriver` calls into command-stream messages, and starts the
+ * create-sim bootstrap thread.
  */
 CSimDriver::CSimDriver(
   msvc8::auto_ptr<gpg::Stream> stream,
@@ -691,16 +716,16 @@ CSimDriver::CSimDriver(
   const boost::shared_ptr<LaunchInfoBase>& launchInfo,
   const uint32_t commandSourceId
 )
-  : mSim(nullptr)
-  , mClientManager(clientManager.release())
-  , mStream(stream.release())
+  : mSim()
+  , mClientManager(clientManager)
+  , mStream(stream)
   , mLaunchInfo(launchInfo)
   , mCommandSourceId(commandSourceId)
   , mLastDequeuedBeat(-1)
   , mDispatchBeat(1)
   , mNextIssueBeat(1)
-  , mMarshaller(nullptr)
-  , mDecoder(nullptr)
+  , mMarshaller()
+  , mDecoder()
   , mSimThread(nullptr)
   , mOutstandingRequests(1)
   , mConnectionEvent(nullptr)
@@ -734,8 +759,8 @@ CSimDriver::CSimDriver(
 
   mClientManager->SelectEvent(mConnectionEvent);
 
-  mMarshaller = new CMarshaller(mClientManager);
-  mMarshaller->SetCommandSource(commandSourceId);
+  mMarshaller.reset(new CMarshaller(mClientManager.get()));
+  mMarshaller->SetCommandSource(mCommandSourceId);
 
   const auto createSimBootstrapProc = [](CSimDriver* const driver) { driver->ThreadCreateSim(); };
   mCreateSimThread = new boost::thread(BuildDeferredDriverCallback(createSimBootstrapProc, this));
@@ -746,8 +771,19 @@ CSimDriver::CSimDriver(
  * Mangled: ??1CSimDriver@Moho@@QAE@@Z
  * Slot: 0 (ISTIDriver override)
  *
+ * `boost::checked_delete<T>`, which `~scoped_ptr<T>` runs on the members
+ * below. Inlined here as `~T(); operator delete` (0x0073BB24 for the decoder,
+ * 0x0073BB3A for the marshaller); the out-of-line copies are not referenced:
+ * Address: 0x007418D0 (FUN_007418D0, checked_delete<CMarshaller> - the pointer
+ *   in `eax`, `~CMarshaller` reduced to `mov [p], ICommandSink::vftable`;
+ *   formerly `DeleteOwnedCommandSinkStorage(ICommandSink*)` in ICommandSink.cpp)
+ * Address: 0x007418F0 (FUN_007418F0, checked_delete<CDecoder> - `~CDecoder`
+ *   at 0x006E40A0, then `operator delete`)
+ *
  * What it does:
- * Performs full shutdown and releases owned driver resources.
+ * Shuts the driver down and closes its two events. The owned members are
+ * released afterwards, in reverse declaration order, by their own
+ * destructors: decoder, marshaller, launch info, stream, client manager, sim.
  */
 CSimDriver::~CSimDriver()
 {
@@ -770,24 +806,6 @@ CSimDriver::~CSimDriver()
   }
 
   mSyncDataQueue.ClearAndDelete();
-
-  if (mDecoder) {
-    mDecoder->~CDecoder();
-    ::operator delete(static_cast<void*>(mDecoder));
-    mDecoder = nullptr;
-  }
-
-  delete mMarshaller;
-  mMarshaller = nullptr;
-
-  delete mStream;
-  mStream = nullptr;
-
-  delete mClientManager;
-  mClientManager = nullptr;
-
-  delete mSim;
-  mSim = nullptr;
 }
 
 /**
@@ -992,7 +1010,7 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
  */
 CClientManagerImpl* CSimDriver::GetClientManager()
 {
-  return mClientManager;
+  return mClientManager.get();
 }
 
 /**
@@ -1129,8 +1147,8 @@ void CSimDriver::ShutDown()
     // instead of returning to the front end.
     mSim->Shutdown();
     FinalizeSyncDispatchLocked(lock);
-    delete mSim;
-    mSim = nullptr;
+    // 0x0073BD8D: the member is cleared before `~Sim` runs.
+    mSim.reset();
   }
 }
 
@@ -1158,34 +1176,22 @@ void CSimDriver::ThreadCreateSim()
   gpg::SetThreadName(kCurrentThreadId, "Sim");
   TIME_SetTimeBarColor(kSimThreadTimeBarColor);
 
-  {
-    Sim* const previousSim = mSim;
-    mSim = Sim_Create_exxt(boost::SharedPtrRawFromSharedBorrow(mLaunchInfo));
-    if (previousSim != nullptr && previousSim != mSim) {
-      delete previousSim;
-    }
-  }
+  mSim.reset(Sim_Create_exxt(boost::SharedPtrRawFromSharedBorrow(mLaunchInfo)));
 
   // The launch info was only needed to build the sim; the sim owns whatever it
   // kept from it.
   mLaunchInfo = boost::shared_ptr<LaunchInfoBase>{};
 
-  if (mSim == nullptr) {
+  if (!mSim) {
     boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
     SetStateAndNotify(EDriverState::Failed);
     return;
   }
 
-  // The decoder takes the command stream and replays it into the sim.
-  {
-    msvc8::auto_ptr<gpg::Stream> commandStream(mStream);
-    mStream = nullptr;
-
-    CDecoder* const previousDecoder = mDecoder;
-    mDecoder = new CDecoder(commandStream, mSim, mSim->mRules, mSim->mLuaState);
-    delete previousDecoder;
-  }
-  mClientManager->PushReceiver(0u, kSimCommandMessageUpperBound, mDecoder);
+  // The decoder takes the command stream (0x0073D5A4 moves it out of
+  // `mStream`) and replays it into the sim.
+  mDecoder.reset(new CDecoder(mStream, mSim.get(), mSim->mRules, mSim->mLuaState));
+  mClientManager->PushReceiver(0u, kSimCommandMessageUpperBound, mDecoder.get());
 
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
 
@@ -1657,10 +1663,10 @@ CmdId CSimDriver::WarpEntity(const EntId entityId, const VTransform& transform)
  * Address: 0x0073CAD0 (FUN_0073CAD0), ISTIDriver slot 24
  * Marshals CMDST_ProcessInfoPair and reports command-cookie result.
  */
-CmdId CSimDriver::ProcessInfoPair(void* id, const char* key, const char* val)
+CmdId CSimDriver::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, const gpg::StrArg val)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
-  mMarshaller->ProcessInfoPair(id, key, val);
+  mMarshaller->ProcessInfoPair(entityId, key, val);
   MarkFirstConnectionActivityLocked();
   return mNextIssueBeat;
 }
@@ -1826,7 +1832,7 @@ Sim* CSimDriver::ProcessEvents()
     lock.lock();
   }
 
-  return mSim;
+  return mSim.get();
 }
 
 /**

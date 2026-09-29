@@ -6,6 +6,7 @@
 
 #include "boost/condition.h"
 #include "boost/mutex.h"
+#include "boost/scoped_ptr.h"
 #include "boost/shared_ptr.h"
 #include "boost/thread.h"
 #include "gpg/core/containers/FastVector.h"
@@ -773,7 +774,7 @@ namespace moho
     /**
      * Address: 0x0073CAD0 (FUN_0073CAD0)
      */
-    CmdId ProcessInfoPair(void* id, const char* key, const char* val) override;
+    CmdId ProcessInfoPair(EntId entityId, gpg::StrArg key, gpg::StrArg val) override;
     /**
      * Address: 0x0073CB70 (FUN_0073CB70)
      */
@@ -930,10 +931,17 @@ namespace moho
     static void JoinAndDeleteThread(boost::thread*& thread);
 
   private:
-    Sim* mSim = nullptr;                           // +0x04
-    CClientManagerImpl* mClientManager = nullptr;  // +0x08
-    gpg::Stream* mStream = nullptr;                // +0x0C
-    boost::shared_ptr<LaunchInfoBase> mLaunchInfo; // +0x10
+    // The five owners below are smart pointers, not raw ones. `~CSimDriver`'s
+    // body ends after the two `CloseHandle`s. The binary then destroys the
+    // members in reverse declaration order, each under its own EH state
+    // (0x0073BB24..0x0073BBC6): decoder, marshaller, launch info, stream,
+    // client manager, sim. The constructor's unwind funclets (0x00BBB908..
+    // 0x00BBB945) destroy the same members through their smart-pointer
+    // destructors when a later initialiser throws.
+    boost::scoped_ptr<Sim> mSim;                          // +0x04
+    msvc8::auto_ptr<CClientManagerImpl> mClientManager;   // +0x08
+    msvc8::auto_ptr<gpg::Stream> mStream;                 // +0x0C
+    boost::shared_ptr<LaunchInfoBase> mLaunchInfo;        // +0x10
     uint32_t mCommandSourceId = 0;                 // +0x18
     int32_t mLastDequeuedBeat = -1;                // +0x1C
     int32_t mDispatchBeat = 1;                     // +0x20
@@ -941,8 +949,8 @@ namespace moho
     // methods hand this same number back to their caller as the "cookie" for
     // the command they just issued - it is the beat that command lands on.
     int32_t mNextIssueBeat = 1;                    // +0x24
-    CMarshaller* mMarshaller = nullptr;            // +0x28
-    CDecoder* mDecoder = nullptr;                  // +0x2C
+    boost::scoped_ptr<CMarshaller> mMarshaller;    // +0x28
+    boost::scoped_ptr<CDecoder> mDecoder;          // +0x2C
     SDriverMutex mLock;                            // +0x30
     boost::thread* mSimThread = nullptr;           // +0x38
     int32_t mOutstandingRequests = 1;              // +0x3C
