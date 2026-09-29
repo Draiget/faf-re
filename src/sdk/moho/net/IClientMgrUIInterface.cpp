@@ -410,7 +410,7 @@ namespace moho
     const std::int32_t gameSpeed
   )
   {
-    if (SIM_GetActiveDriver() != nullptr) {
+    if (WLD_GetDriver() != nullptr) {
       UI_NoteGameSpeedChanged(slotZeroBased, gameSpeed);
     }
   }

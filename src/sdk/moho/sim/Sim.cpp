@@ -2291,7 +2291,7 @@ namespace moho
     // its own `resultCookie`. Passing the command id instead put a command id
     // where the drain expects a beat.
     CmdId resultCookie = helper->mConstantData.cmd;
-    if (ISTIDriver* const simDriver = SIM_GetActiveDriver()) {
+    if (ISTIDriver* const simDriver = WLD_GetDriver()) {
       resultCookie = simDriver->SetCommandTarget(helper->mConstantData.cmd, ConvertUserCommandTargetToSSTITarget(target));
     }
     QueueCommandIssueSetTargetEvent(*helper, resultCookie, target);
@@ -13974,7 +13974,7 @@ int moho::cfunc_EjectSessionClientL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEjectSessionClientHelpText, 1, argumentCount);
   }
 
-  auto* const simDriver = dynamic_cast<CSimDriver*>(SIM_GetActiveDriver());
+  auto* const simDriver = dynamic_cast<CSimDriver*>(WLD_GetDriver());
   if (simDriver == nullptr) {
     LuaPlus::LuaState::Error(state, kNoActiveSessionPeriodText);
   }
@@ -14153,7 +14153,7 @@ int moho::cfunc_GetGameSpeedL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetGameSpeedHelpText, 0, argumentCount);
   }
 
-  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  ISTIDriver* const activeDriver = WLD_GetDriver();
   if (activeDriver == nullptr) {
     LuaPlus::LuaState::Error(state, kNoActiveSessionPeriodText);
   }
@@ -14207,7 +14207,7 @@ int moho::cfunc_SetGameSpeedL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetGameSpeedHelpText, 1, argumentCount);
   }
 
-  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  ISTIDriver* const activeDriver = WLD_GetDriver();
   if (activeDriver == nullptr) {
     LuaPlus::LuaState::Error(state, kNoActiveSessionPeriodText);
   }
@@ -15206,7 +15206,7 @@ int moho::cfunc_ExecLuaInSimL(LuaPlus::LuaState* const state)
   }
 
   const std::string functionName(functionNameText);
-  if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+  if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
     LuaPlus::LuaObject callbackArgs(LuaPlus::LuaStackObject(state, 2));
     activeDriver->ExecuteLuaInSim(functionName.c_str(), callbackArgs);
   }
@@ -15275,7 +15275,7 @@ int moho::cfunc_SimCallbackL(LuaPlus::LuaState* const state)
     }
   }
 
-  if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+  if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
     activeDriver->LuaSimCallback(callbackName.c_str(), callbackArgs, selectedEntities);
   }
   return 0;
@@ -15347,7 +15347,7 @@ int moho::cfunc_SetAutoModeL(LuaPlus::LuaState* const state)
       continue;
     }
 
-    if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+    if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
       activeDriver->ProcessInfoPair(
         iunitBridge->GetEntityId(),
         "SetAutoMode",
@@ -15425,7 +15425,7 @@ int moho::cfunc_SetAutoSurfaceModeL(LuaPlus::LuaState* const state)
       continue;
     }
 
-    if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+    if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
       activeDriver->ProcessInfoPair(
         iunitBridge->GetEntityId(),
         "SetAutoSurfaceMode",
@@ -15519,7 +15519,7 @@ int moho::cfunc_ToggleScriptBitL(LuaPlus::LuaState* const state)
         continue;
       }
 
-      if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+      if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
         activeDriver->ProcessInfoPair(iunitBridge->GetEntityId(), "ToggleScriptBit", bitText);
       }
     }
@@ -15591,7 +15591,7 @@ int moho::cfunc_SetPausedL(LuaPlus::LuaState* const state)
         continue;
       }
 
-      if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+      if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
         activeDriver->ProcessInfoPair(
           iunitBridge->GetEntityId(),
           "SetPaused",
@@ -17961,7 +17961,7 @@ int moho::cfunc_SessionEndGameL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionEndGameHelpText, 0, argumentCount);
   }
 
-  ISTIDriver* const driver = SIM_GetActiveDriver();
+  ISTIDriver* const driver = WLD_GetDriver();
   if (driver == nullptr) {
     LuaPlus::LuaState::Error(state, kSessionGetScenarioInfoNoActiveSessionText);
     return 0;
@@ -18699,7 +18699,7 @@ int moho::cfunc_GetSimRateL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kNoSessionStartedText);
   }
 
-  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  ISTIDriver* const activeDriver = WLD_GetDriver();
   CClientManagerImpl* const clientManager = activeDriver->GetClientManager();
   lua_pushnumber(rawState, static_cast<float>(clientManager->GetSimRate()));
   return 1;
@@ -18966,7 +18966,7 @@ int moho::cfunc_DeleteCommandL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+  if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
     // The driver marshals the decrement and returns the resulting command
     // cookie; the event is queued with that cookie (FUN_00843FA0 passes the
     // DecreaseCommandCount result, not the input command id).
@@ -19043,7 +19043,7 @@ int moho::cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
 
     // The driver marshals the decrement and returns the resulting command cookie;
     // the local event is queued with that cookie (not the input command id).
-    ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+    ISTIDriver* const activeDriver = WLD_GetDriver();
     const CmdId resultCookie = activeDriver->DecreaseCommandCount(helper->mConstantData.cmd, take);
     QueueCommandIssueDecreaseCountEvent(*helper, resultCookie, take);
 
@@ -23428,7 +23428,7 @@ int moho::cfunc_CreateUnitAtMouseL(LuaPlus::LuaState* const state)
     }
   }
 
-  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  ISTIDriver* const activeDriver = WLD_GetDriver();
   if (activeDriver != nullptr) {
     RResId createId{};
     gpg::STR_CopyFilename(&createId.name, &blueprint->mBlueprintId);
@@ -23767,7 +23767,7 @@ int moho::cfunc_SetFocusArmySim(lua_State* const luaContext)
 
   const int focusArmy = static_cast<int>(lua_tonumber(luaContext, 1));
 
-  if (ISTIDriver* const activeDriver = SIM_GetActiveDriver()) {
+  if (ISTIDriver* const activeDriver = WLD_GetDriver()) {
     if (auto* const simDriver = dynamic_cast<CSimDriver*>(activeDriver)) {
       simDriver->SetPendingFocusArmyRaw(focusArmy);
     } else {
@@ -26383,7 +26383,7 @@ namespace moho
    */
   void ISSUE_DecreaseCommandCount(UserCommandIssueHelper* const helper, const int count)
   {
-    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    ISTIDriver* const simDriver = WLD_GetDriver();
     const CmdId resultCookie = simDriver->DecreaseCommandCount(helper->mConstantData.cmd, count);
     QueueCommandIssueDecreaseCountEvent(*helper, resultCookie, count);
   }
@@ -26474,7 +26474,7 @@ namespace moho
                static_cast<int>(data.mCommandType), static_cast<int>(data.mTarget.mType),
                data.mTarget.mPos.x, data.mTarget.mPos.y, data.mTarget.mPos.z,
                static_cast<unsigned>(units.size()), clearQueue ? 1 : 0,
-               static_cast<unsigned>(data.nextCommandId), static_cast<void*>(SIM_GetActiveDriver()));
+               static_cast<unsigned>(data.nextCommandId), static_cast<void*>(WLD_GetDriver()));
     issuedEntitySet.ForEachValue([](const unsigned int value) {
       DiagLine("[ORDERDIAG]   sent id=0x%08X", value);
     });
@@ -26483,7 +26483,7 @@ namespace moho
                  reinterpret_cast<const moho::UserEntity*>(unit)->mParams.mEntityId);
     }
 
-    if (ISTIDriver* const simDriver = SIM_GetActiveDriver()) {
+    if (ISTIDriver* const simDriver = WLD_GetDriver()) {
       simDriver->IssueCommand(issuedEntitySet, data, clearQueue);
     }
 

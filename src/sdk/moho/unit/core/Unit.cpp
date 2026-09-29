@@ -67,6 +67,7 @@
 #include "moho/path/PathTables.h"
 #include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/CWldSession.h"
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/CPlatoon.h"
 #include "moho/sim/CEconStorage.h"
@@ -4006,7 +4007,7 @@ int moho::cfunc_SetFireStateL(LuaPlus::LuaState* const state)
       fireStateValue = "";
     }
 
-    if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+    if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
       activeDriver->ProcessInfoPair(
         unit->GetEntityId(),
         kSetFireStateName,
@@ -4199,7 +4200,7 @@ int moho::cfunc_ToggleFireStateL(LuaPlus::LuaState* const state)
         continue;
       }
 
-      if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+      if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
         activeDriver->ProcessInfoPair(unit->GetEntityId(), kSetFireStateName, nextFireStateLexical.c_str());
       }
     }

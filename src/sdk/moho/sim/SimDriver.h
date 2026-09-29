@@ -1022,22 +1022,4 @@ namespace moho
     uint32_t commandSourceId
   );
 
-  /**
-   * Address context: process-global `sSimDriver` ownership lane used by world/app frame code.
-   *
-   * What it does:
-   * Returns the currently active simulation driver instance, or nullptr.
-   */
-  [[nodiscard]] ISTIDriver* SIM_GetActiveDriver();
-
-  /**
-   * Address context:
-   * - world teardown path (`WLD_Teardown`) clears process-global driver ownership
-   *   before destroying the detached instance.
-   *
-   * What it does:
-   * Detaches and returns the active simulation driver pointer, then clears the
-   * global active-driver lane.
-   */
-  [[nodiscard]] ISTIDriver* SIM_DetachActiveDriver();
 } // namespace moho

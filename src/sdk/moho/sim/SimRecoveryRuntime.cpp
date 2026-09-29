@@ -8,6 +8,7 @@
 #include "moho/entity/EntityDb.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/sim/ArmyUnitSet.h"
+#include "moho/sim/CWldSession.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/SimDriver.h"
@@ -4617,7 +4618,7 @@ void ResetWaveParametersStringsRuntime(
  */
 void SimDriverDebugClientManagerRuntime()
 {
-  moho::ISTIDriver* const driver = moho::SIM_GetActiveDriver();
+  moho::ISTIDriver* const driver = moho::WLD_GetDriver();
   if (driver == nullptr) {
     return;
   }

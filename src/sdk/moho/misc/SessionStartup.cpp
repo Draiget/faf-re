@@ -811,7 +811,7 @@ namespace moho
       );
     }
 
-    ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+    ISTIDriver* const activeDriver = WLD_GetDriver();
     if (activeDriver == nullptr) {
       LuaPlus::LuaState::Error(state, kNoActiveGameMessage);
       return 0;
@@ -1131,7 +1131,7 @@ namespace moho
 
     LuaPlus::LuaObject clientsTable{};
 
-    ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+    ISTIDriver* const activeDriver = WLD_GetDriver();
     if (activeDriver == nullptr) {
       clientsTable.AssignNil(state);
       clientsTable.PushStack(state);
@@ -1248,7 +1248,7 @@ namespace moho
     const msvc8::string saveTargetDirectory = FILE_Dir(savePath);
     EnsureDirectoryExistsOrThrow(saveTargetDirectory);
 
-    ISTIDriver* const driver = SIM_GetActiveDriver();
+    ISTIDriver* const driver = WLD_GetDriver();
     if (driver == nullptr) {
       LuaPlus::LuaState::Error(state, "No session to save!");
     }

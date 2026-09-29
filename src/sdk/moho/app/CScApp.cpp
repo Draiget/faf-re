@@ -1011,7 +1011,7 @@ void CScApp::Main()
   UpdateAddressSpaceMonitor();
   moho::WIN_SetMainWindow(supcomFrame);
 
-  moho::ISTIDriver* const simDriver = moho::SIM_GetActiveDriver();
+  moho::ISTIDriver* const simDriver = moho::WLD_GetDriver();
   if (simDriver != nullptr) {
     if (moho::CWaitHandleSet* const waitHandleSet = moho::WIN_GetWaitHandleSet()) {
       waitHandleSet->RemoveHandle(simDriver->GetSyncDataAvailableEvent());

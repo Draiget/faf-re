@@ -43,7 +43,6 @@ using namespace moho;
 namespace
 {
   bool gSimInterlocked = false;
-  ISTIDriver* gActiveSimDriver = nullptr;
 
   // Issue-thread pacing, from CSimDriver::ThreadRun (0x0073BDF0).
   constexpr unsigned int kCurrentThreadId = 0xFFFFFFFFu;
@@ -149,23 +148,6 @@ namespace
     }
   }
   StatItem* gEngineStatSimSync = nullptr;
-
-  /**
-   * Address: 0x0088E9F0 (FUN_0088E9F0)
-   *
-   * What it does:
-   * Swaps the process-global active sim-driver singleton lane with the value
-   * stored at `inOutDriver`.
-   */
-  [[maybe_unused]] CSimDriver** SwapActiveSimDriverStorageLane(CSimDriver** const inOutDriver) noexcept
-  {
-    CSimDriver* const previous = static_cast<CSimDriver*>(gActiveSimDriver);
-    if (inOutDriver != nullptr) {
-      gActiveSimDriver = static_cast<ISTIDriver*>(*inOutDriver);
-      *inOutDriver = previous;
-    }
-    return inOutDriver;
-  }
 
   /**
    * Address: 0x0073AEF0 (FUN_0073AEF0, sub_73AEF0)
@@ -777,10 +759,6 @@ CSimDriver::CSimDriver(
  */
 CSimDriver::~CSimDriver()
 {
-  if (gActiveSimDriver == this) {
-    gActiveSimDriver = nullptr;
-  }
-
   ShutDown();
 
   if (mConnectionEvent) {
@@ -2217,49 +2195,5 @@ ISTIDriver* moho::SIM_CreateDriver(
 {
   msvc8::auto_ptr<CClientManagerImpl> clientOwner(clientManager);
   msvc8::auto_ptr<gpg::Stream> streamOwner(stream);
-  CSimDriver* const created = new CSimDriver(streamOwner, clientOwner, launchInfo, commandSourceId);
-  gActiveSimDriver = created;
-  return created;
-}
-
-/**
- * Address context: process-global `sSimDriver` ownership lane used by world/app frame code.
- */
-ISTIDriver* moho::SIM_GetActiveDriver()
-{
-  return gActiveSimDriver;
-}
-
-/**
- * Address: 0x0088E8D0 (FUN_0088E8D0, sim-driver singleton getter lane)
- *
- * What it does:
- * Returns the process-global concrete `CSimDriver` singleton pointer without
- * changing ownership.
- */
-namespace
-{
-  [[maybe_unused]] [[nodiscard]] moho::CSimDriver* SIM_GetActiveDriverRaw() noexcept
-  {
-    return static_cast<moho::CSimDriver*>(gActiveSimDriver);
-  }
-
-  /**
-   * Address: 0x0088E8E0 (FUN_0088E8E0, sim-driver singleton getter lane)
-   *
-   * What it does:
-   * Alias entry that returns the same process-global concrete `CSimDriver`
-   * singleton pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CSimDriver* SIM_GetActiveDriverRawAlias() noexcept
-  {
-    return SIM_GetActiveDriverRaw();
-  }
-}
-
-ISTIDriver* moho::SIM_DetachActiveDriver()
-{
-  ISTIDriver* const detached = gActiveSimDriver;
-  gActiveSimDriver = nullptr;
-  return detached;
+  return new CSimDriver(streamOwner, clientOwner, launchInfo, commandSourceId);
 }

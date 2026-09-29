@@ -2194,7 +2194,7 @@ void moho::CON_CreateProp(const msvc8::vector<msvc8::string>& args)
     character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
   }
 
-  SIM_GetActiveDriver()->CreateProp(normalizedBlueprintPath.c_str(), session->CursorWorldPos);
+  WLD_GetDriver()->CreateProp(normalizedBlueprintPath.c_str(), session->CursorWorldPos);
 }
 
 /**
@@ -2290,7 +2290,7 @@ void moho::CON_CreateUnit(const msvc8::vector<msvc8::string>& args)
   RResId spawnBlueprintId{};
   (void)gpg::STR_CopyFilename(&spawnBlueprintId.name, &blueprint->mBlueprintId);
 
-  SIM_GetActiveDriver()
+  WLD_GetDriver()
     ->CreateUnit(static_cast<std::uint32_t>(spawnArmy->mArmyIndex), spawnBlueprintId, gridSnappedPos, 0.0f);
 
   spawnBlueprintId.name.clear();
@@ -2353,7 +2353,7 @@ void moho::CON_LotsOfProps(const msvc8::vector<msvc8::string>& args)
       worldY = terrainMap->mWaterElevation;
     }
 
-    SIM_GetActiveDriver()->CreateProp(propBlueprintPath.c_str(), Wm3::Vec3f{worldX, worldY, worldZ});
+    WLD_GetDriver()->CreateProp(propBlueprintPath.c_str(), Wm3::Vec3f{worldX, worldY, worldZ});
   }
 }
 
@@ -2684,7 +2684,7 @@ void moho::CON_ProcessInfoPair(const msvc8::vector<msvc8::string>& args)
       continue;
     }
 
-    SIM_GetActiveDriver()->ProcessInfoPair(
+    WLD_GetDriver()->ProcessInfoPair(
       entityView->mParams.mEntityId,
       infoKey,
       infoValue
@@ -2799,7 +2799,7 @@ void moho::RenameUnit(const msvc8::vector<msvc8::string>& args)
   const msvc8::string customName = gpg::STR_TrimWhitespace(joinedName.c_str());
 
   UserEntity* const entityView = selectedUnit;
-  SIM_GetActiveDriver()->ProcessInfoPair(
+  WLD_GetDriver()->ProcessInfoPair(
     entityView->mParams.mEntityId,
     kRenameUnitInfoKey,
     customName.c_str()
@@ -2980,7 +2980,7 @@ void moho::CON_TeleportSelectedUnits(const msvc8::vector<msvc8::string>& args)
   }
 
   const STIMap* const terrainMap = ResolveSessionTerrainMap(session);
-  ISTIDriver* const simDriver = SIM_GetActiveDriver();
+  ISTIDriver* const simDriver = WLD_GetDriver();
 
   msvc8::vector<UserUnit*> selectedUnits;
   session->GetSelectionUnits(selectedUnits);
@@ -3106,7 +3106,7 @@ void moho::WLD_SingleStep(const msvc8::vector<msvc8::string>& args)
 {
   (void)args;
 
-  ISTIDriver* const simDriver = SIM_GetActiveDriver();
+  ISTIDriver* const simDriver = WLD_GetDriver();
   if (simDriver == nullptr) {
     PrintLocalizedConsoleLine(kNoSessionLocToken);
     return;
@@ -3137,7 +3137,7 @@ void moho::WLD_GameSpeed(const msvc8::vector<msvc8::string>& args)
     return;
   }
 
-  ISTIDriver* const simDriver = SIM_GetActiveDriver();
+  ISTIDriver* const simDriver = WLD_GetDriver();
   if (simDriver == nullptr) {
     return;
   }
@@ -3301,7 +3301,7 @@ void moho::DoSimCommand(const msvc8::vector<msvc8::string>& args)
     return;
   }
 
-  ISTIDriver* const simDriver = SIM_GetActiveDriver();
+  ISTIDriver* const simDriver = WLD_GetDriver();
   if (simDriver == nullptr) {
     PrintLocalizedConsoleLine(kNoSessionLocToken);
     return;

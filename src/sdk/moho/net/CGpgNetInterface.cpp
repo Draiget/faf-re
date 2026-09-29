@@ -406,7 +406,7 @@ void moho::GPGNET_ReportBottleneck(
 )
 {
   const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
-  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  ISTIDriver* const activeDriver = WLD_GetDriver();
   if (!active || activeDriver == nullptr) {
     return;
   }
@@ -1844,7 +1844,7 @@ void CGpgNetInterface::EjectPlayer(
     throw std::runtime_error("Wrong number of arguments to EjectPlayer, expected 1");
   }
 
-  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  ISTIDriver* const activeDriver = WLD_GetDriver();
   if (activeDriver == nullptr) {
     throw std::runtime_error("No active session.");
   }

@@ -3221,7 +3221,7 @@ namespace moho
 
       auto& queuedHelper = *entryHelper;
       CmdId newCmdId = queuedHelper.mConstantData.cmd;
-      if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
+      if (ISTIDriver* const simDriver = WLD_GetDriver(); simDriver != nullptr) {
         newCmdId = simDriver->SetCommandType(newCmdId, restartCommandType);
       }
       ReissueCommandIssueEntryAsType(queuedHelper, newCmdId, restartCommandType);
@@ -5511,7 +5511,7 @@ int moho::cfunc_UserUnitProcessInfoL(LuaPlus::LuaState* const state)
     infoValue = "";
   }
 
-  if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+  if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
     activeDriver->ProcessInfoPair(
       entityView->mParams.mEntityId,
       infoKey,
@@ -5582,7 +5582,7 @@ int moho::cfunc_UserUnitSetCustomNameL(LuaPlus::LuaState* const state)
   }
 
   UserEntity* const entityView = userUnit;
-  if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+  if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
     activeDriver->ProcessInfoPair(
       entityView->mParams.mEntityId,
       kUserUnitSetCustomNameInfoKey,

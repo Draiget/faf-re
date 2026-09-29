@@ -26,6 +26,7 @@
 #include "moho/render/EEmitterParam.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/REffectBlueprint.h"
+#include "moho/sim/CWldSession.h"
 #include "moho/sim/ISTIDriver.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
@@ -782,7 +783,7 @@ moho::WEmitterWx::WEmitterWx(UserEntity* const attachEntity, const Wm3::Vector3f
 {
   // Slot 36 hands back the sim with the driver's interlock held; the
   // destructor's ReleaseInterlockRef (slot 37) gives it back.
-  mSim = SIM_GetActiveDriver()->ProcessEvents();
+  mSim = WLD_GetDriver()->ProcessEvents();
 
   if (attachEntity != nullptr) {
     Entity* const entity = mSim->mEntityDB->FindEntityById(attachEntity->mParams.mEntityId);
@@ -985,7 +986,7 @@ moho::WEmitterWx::~WEmitterWx()
   if (mPreviewEffect.GetObjectPtr() != nullptr) {
     mSim->mEffectManager->DestroyEffect(mPreviewEffect.GetObjectPtr());
   }
-  SIM_GetActiveDriver()->ReleaseInterlockRef();
+  WLD_GetDriver()->ReleaseInterlockRef();
 }
 
 /**

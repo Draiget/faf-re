@@ -2444,7 +2444,7 @@ namespace moho
       while (node != selection.mHead) {
         if (UserEntity* const selectedEntity = decodeSelectionSlot(node->mEnt); selectedEntity != nullptr) {
           // sSimDriver global read fresh each iteration (asm reloads it in-loop).
-          if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
+          if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
             driver->ProcessInfoPair(selectedEntity->mParams.mEntityId, commandKey, "add");
           }
         }
@@ -2555,7 +2555,7 @@ namespace moho
       node = SSelectionSetUserEntity::find(&selection, selection.mHead->mLeft, &node);
       while (node != selection.mHead) {
         if (UserEntity* const selectedEntity = DecodeSelectionEntity(node->mEnt); selectedEntity != nullptr) {
-          if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
+          if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
             driver->ProcessInfoPair(selectedEntity->mParams.mEntityId, commandKey, "add");
           }
         }
@@ -3184,7 +3184,7 @@ namespace moho
         }
 
         if (voiceOver != nullptr) {
-          if (ISTIDriver* const driver = SIM_GetActiveDriver(); driver != nullptr) {
+          if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
             // The voice-over name is the key and "play" the value
             // (0x008413C0..0x008413EE push "play" first, as the last
             // argument). `Sim::ProcessInfoPair` matches on the key, so the

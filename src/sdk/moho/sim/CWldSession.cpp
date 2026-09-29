@@ -3127,35 +3127,30 @@ namespace moho
     }
 
     CWldSession* gActiveWldSession = nullptr;
-    SWldSessionInfo* gPendingWldSessionInfo = nullptr;
-    EWldFrameAction gWldFrameAction = EWldFrameAction::Inactive;
 
     /**
-     * Address: 0x0088E900 (FUN_0088E900, pending session-info ownership rebind helper)
-     *
-     * What it does:
-     * Moves one released `SWldSessionInfo*` payload into the process-global
-     * pending-session slot, deleting the previous payload when ownership
-     * changes, and returns the global slot address.
+     * The world session's simulation driver (`sSimDriver`, 0x010C4F50), a
+     * `boost::scoped_ptr`. Its out-of-line members are LTCG copies specialised
+     * on this global, none of them referenced:
+     * Address: 0x0088E8B0 (FUN_0088E8B0, `reset`: new value stored first, old
+     *   one deleted through vtable slot 0, no self-test)
+     * Address: 0x0088E8F0 (FUN_0088E8F0, `operator unspecified_bool_type`: 0 when
+     *   set, -1 - the null data-member pointer - when empty)
+     * Address: 0x0088E9F0 (FUN_0088E9F0, `swap`: three plain stores)
+     * Address: 0x00C07EB0 (FUN_00C07EB0, atexit destructor: delete through slot 0)
+     * `get` is WLD_GetDriver (0x0088D330); 0x0088E8D0 and 0x0088E8E0 are its ICF
+     * twins.
      */
-    [[nodiscard]] SWldSessionInfo** RebindPendingWldSessionInfoFromReleasedSlot(
-      SWldSessionInfo** const releasedSlot
-    ) noexcept
-    {
-      SWldSessionInfo* const nextSessionInfo = *releasedSlot;
-      *releasedSlot = nullptr;
+    boost::scoped_ptr<ISTIDriver> sSimDriver;
 
-      if (nextSessionInfo != gPendingWldSessionInfo) {
-        SWldSessionInfo* const previousSessionInfo = gPendingWldSessionInfo;
-        if (previousSessionInfo != nullptr) {
-          previousSessionInfo->~SWldSessionInfo();
-          ::operator delete(previousSessionInfo);
-        }
-      }
-
-      gPendingWldSessionInfo = nextSessionInfo;
-      return &gPendingWldSessionInfo;
-    }
+    /**
+     * The next session's launch description (0x010C4F58), a `std::auto_ptr`.
+     * Address: 0x0088E900 (FUN_0088E900, its `operator=(auto_ptr&)` specialised
+     *   on this global: release the source, delete the old value when it
+     *   differs, return the global) - WLD_BeginSession's assignment.
+     */
+    msvc8::auto_ptr<SWldSessionInfo> gPendingWldSessionInfo;
+    EWldFrameAction gWldFrameAction = EWldFrameAction::Inactive;
 
     /**
      * Address: 0x00869870 (FUN_00869870, session-listener attach dispatch)
@@ -13078,7 +13073,7 @@ namespace moho
       return;
     }
 
-    if (ISTIDriver* const activeDriver = SIM_GetActiveDriver()) {
+    if (ISTIDriver* const activeDriver = sSimDriver.get()) {
       activeDriver->SetArmyIndex(-1);
     }
   }
@@ -13122,7 +13117,7 @@ namespace moho
       return;
     }
 
-    if (ISTIDriver* const activeDriver = SIM_GetActiveDriver()) {
+    if (ISTIDriver* const activeDriver = sSimDriver.get()) {
       activeDriver->SetArmyIndex(index);
     }
   }
@@ -13461,7 +13456,7 @@ namespace moho
   void CWldSession::RequestPause()
   {
     std::int32_t commandCookie = 0;
-    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    ISTIDriver* const simDriver = sSimDriver.get();
     if (IsReplay) {
       if (mReplayIsPaused == 0u) {
         mReplayIsPaused = 1;
@@ -13483,7 +13478,7 @@ namespace moho
   void CWldSession::Resume()
   {
     std::int32_t commandCookie = 0;
-    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    ISTIDriver* const simDriver = sSimDriver.get();
     if (IsReplay) {
       if (mReplayIsPaused != 0u) {
         mReplayIsPaused = 0;
@@ -14333,7 +14328,7 @@ namespace moho
   {
     static_cast<RRuleGameRules*>(mRules)->UpdateLuaState(mState);
 
-    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    ISTIDriver* const simDriver = sSimDriver.get();
 
     // Interpolation between ticks. Running with the wind means "do not
     // interpolate, just consume beats", so the fraction is pinned at a whole
@@ -14693,7 +14688,7 @@ namespace moho
 
     BVSet<EntId, EntIdUniverse> issuedEntitySet{};
     func_DecodeEntIdSet(issuedEntitySet, units);
-    if (ISTIDriver* const simDriver = SIM_GetActiveDriver()) {
+    if (ISTIDriver* const simDriver = sSimDriver.get()) {
       simDriver->IssueFactoryCommand(issuedEntitySet, commandIssueData, clearQueue);
     }
 
@@ -14807,7 +14802,7 @@ namespace moho
       }
 
       const EntId entityId = unit->mParams.mEntityId;
-      if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
+      if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr) {
         (void)simDriver->RemoveCommandFromUnitQueue(lastHelper->mConstantData.cmd, entityId);
       }
 
@@ -14898,7 +14893,7 @@ namespace moho
     }
 
     const CmdId removedCommandId =
-      SIM_GetActiveDriver()->RemoveCommandFromUnitQueue(command->mConstantData.cmd, unit->mParams.mEntityId);
+      sSimDriver.get()->RemoveCommandFromUnitQueue(command->mConstantData.cmd, unit->mParams.mEntityId);
 
     UserCommandQueue* const manager = unit->GetCommandQueue();
     RecordUnitManagerCommandHelperRemoval(command, manager, removedCommandId);
@@ -16388,7 +16383,7 @@ namespace moho
     mSelection.mSizeMirrorOrUnused = static_cast<std::uint32_t>(mSelection.size());
 
     if (selectionChanged) {
-      if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+      if (ISTIDriver* const activeDriver = sSimDriver.get(); activeDriver != nullptr) {
         SSyncFilterMaskBlock selectionMask{};
         BuildSelectionSyncMask(mSelection, selectionMask);
         activeDriver->SetSyncFilterMaskB(selectionMask);
@@ -16951,7 +16946,7 @@ namespace moho
       }
     }
 
-    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    ISTIDriver* const simDriver = sSimDriver.get();
     if (simDriver == nullptr) {
       return;
     }
@@ -19017,7 +19012,7 @@ namespace moho
       }
 
       CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
-      SWldSessionInfo* const pendingSession = gPendingWldSessionInfo;
+      SWldSessionInfo* const pendingSession = gPendingWldSessionInfo.get();
       if (loader != nullptr && pendingSession != nullptr) {
         LaunchInfoBase* const launchInfo = pendingSession->mLaunchInfo.get();
         if (launchInfo != nullptr) {
@@ -19082,7 +19077,7 @@ namespace moho
         (void)marker;
       }
 
-      SWldSessionInfo* const sessionInfo = gPendingWldSessionInfo;
+      SWldSessionInfo* const sessionInfo = gPendingWldSessionInfo.get();
       if (sessionInfo != nullptr && sessionInfo->mClientManager != nullptr) {
         sessionInfo->mClientManager->DoBeat();
       }
@@ -19180,18 +19175,14 @@ namespace moho
       // driver; the session info gives its client manager up here.
       IClientManager* const clientManager = sessionInfo->mClientManager;
       sessionInfo->mClientManager = nullptr;
-      ISTIDriver* const previousDriver = SIM_GetActiveDriver();
-      // `SIM_CreateDriver` publishes the new driver into the same global lane
-      // the binary assigns here, so the previous one is released afterwards.
-      (void)SIM_CreateDriver(
+      // 0x0088C364..0x0088C37C: the inlined `scoped_ptr::reset` - the new
+      // driver is stored first, then the previous one is deleted.
+      sSimDriver.reset(SIM_CreateDriver(
         static_cast<CClientManagerImpl*>(clientManager),
         replayStream.release(),
         sessionInfo->mLaunchInfo,
         sessionInfo->mSourceId
-      );
-      if (previousDriver != nullptr) {
-        delete previousDriver;
-      }
+      ));
 
       gWldFrameAction = EWldFrameAction::Initialize;
       if (outContinue != nullptr) {
@@ -19218,7 +19209,7 @@ namespace moho
      */
     void WLD_DoInitializing(bool* const outContinue)
     {
-      ISTIDriver* const simDriver = SIM_GetActiveDriver();
+      ISTIDriver* const simDriver = sSimDriver.get();
       if (simDriver == nullptr) {
         if (outContinue != nullptr) {
           *outContinue = false;
@@ -19275,11 +19266,7 @@ namespace moho
 
       // The session info existed only to carry launch parameters into the
       // session; the session owns everything it needed by now.
-      if (SWldSessionInfo* const consumedSessionInfo = gPendingWldSessionInfo; consumedSessionInfo != nullptr) {
-        consumedSessionInfo->~SWldSessionInfo();
-        ::operator delete(consumedSessionInfo);
-      }
-      gPendingWldSessionInfo = nullptr;
+      gPendingWldSessionInfo.reset();
 
       (void)WLD_DispatchOnTeardownCallbacksCoreFromGlobalList();
 
@@ -19311,7 +19298,7 @@ namespace moho
     int WLD_EnterPlayingAndNotifyUIProvider()
     {
       int dispatchResult = 0;
-      if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
+      if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr) {
         simDriver->DecrementOutstandingRequestsAndSignal();
       }
 
@@ -19337,7 +19324,7 @@ namespace moho
         *outContinue = false;
       }
 
-      ISTIDriver* const simDriver = SIM_GetActiveDriver();
+      ISTIDriver* const simDriver = sSimDriver.get();
       if (simDriver == nullptr) {
         gWldFrameAction = EWldFrameAction::Exit;
         return;
@@ -19375,7 +19362,7 @@ namespace moho
         *outContinue = false;
       }
 
-      ISTIDriver* const simDriver = SIM_GetActiveDriver();
+      ISTIDriver* const simDriver = sSimDriver.get();
       if (simDriver == nullptr) {
         gWldFrameAction = EWldFrameAction::Exit;
         return;
@@ -19413,7 +19400,7 @@ namespace moho
      */
     void WLD_DoPlayingAction(const float deltaSeconds)
     {
-      if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
+      if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr) {
         simDriver->Dispatch();
 
         // Snapshot every active GeomCamera and forward to the sim driver so
@@ -19426,7 +19413,7 @@ namespace moho
         activeSession->SessionFrame(deltaSeconds);
       }
 
-      if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
+      if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr) {
         // Trailing sim-driver post-frame slot (Func1 in IDA): currently
         // a NoOp until full ISTIDriver vtable slot ownership is recovered.
         simDriver->NoOp();
@@ -19672,26 +19659,45 @@ namespace moho
 
   /**
    * Address: 0x0088C860 (FUN_0088C860, ?WLD_Teardown@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Shuts the driver down and hands the session every sync packet it still
+   * holds, then silences sound, runs the teardown callbacks, destroys the game
+   * interface and its provider, clears the particle buckets, drops the UI Lua
+   * state, deletes the session and finally releases the driver.
+   *
+   * The drain matters: packets the sim produced after the session's last beat
+   * carry entity deletions and command releases the session would otherwise
+   * never apply before it is destroyed.
    */
   void WLD_Teardown()
   {
-    if (ISTIDriver* const simDriver = SIM_DetachActiveDriver(); simDriver != nullptr) {
-      simDriver->ShutDown();
-      delete simDriver;
+    if (sSimDriver) {
+      sSimDriver->ShutDown();
+      CWldSession* const session = gActiveWldSession;
+      while (sSimDriver->HasSyncData()) {
+        SSyncData* syncData = nullptr;
+        sSimDriver->GetSyncData(syncData);
+        session->DoBeat(msvc8::auto_ptr<SSyncData>(syncData));
+      }
     }
 
-    if (IUIManager* const uiManager = UI_GetManager(); uiManager != nullptr) {
-      (void)uiManager->SetNewLuaState(nullptr);
-    }
-
-    if (IUserSoundManager* const userSound = USER_GetSound(); userSound != nullptr) {
-      userSound->StopAllSounds();
-    }
-
+    USER_GetSound()->StopAllSounds();
     (void)DoTeardownCallbacks(WLD_GetOnTeardownCallbacks());
-    WLD_DestroySession();
 
+    if (sWldUIProvider != nullptr) {
+      sWldUIProvider->DestroyGameInterface();
+      delete sWldUIProvider;
+      sWldUIProvider = nullptr;
+    }
+
+    sWorldParticles.ClearRenderBuckets();
+    (void)g_UIManager->SetNewLuaState(nullptr);
+
+    delete gActiveWldSession;
+    gActiveWldSession = nullptr;
     gWldFrameAction = EWldFrameAction::Inactive;
+    sSimDriver.reset();
   }
 
   /**
@@ -19804,8 +19810,7 @@ namespace moho
    */
   void WLD_BeginSession(msvc8::auto_ptr<SWldSessionInfo> sessionInfo)
   {
-    SWldSessionInfo* nextSessionInfo = sessionInfo.release();
-    (void)RebindPendingWldSessionInfoFromReleasedSlot(&nextSessionInfo);
+    gPendingWldSessionInfo = sessionInfo;
     gWldFrameAction = EWldFrameAction::Preload;
   }
 
@@ -19817,7 +19822,7 @@ namespace moho
     extern float wld_SkewRateAdjustBase;
     extern float wld_SkewRateAdjustMax;
 
-    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    ISTIDriver* const simDriver = sSimDriver.get();
     if (simDriver == nullptr) {
       return 1.0f;
     }
@@ -19872,7 +19877,7 @@ namespace moho
    */
   void WLD_IncreaseSimRate()
   {
-    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    ISTIDriver* const simDriver = sSimDriver.get();
     if (simDriver == nullptr || !WLD_CanAdjustSimRate()) {
       return;
     }
@@ -19893,7 +19898,7 @@ namespace moho
    */
   void WLD_ResetSimRate()
   {
-    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    ISTIDriver* const simDriver = sSimDriver.get();
     if (simDriver == nullptr || !WLD_CanAdjustSimRate()) {
       return;
     }
@@ -19913,7 +19918,7 @@ namespace moho
    */
   void WLD_DecreaseSimRate()
   {
-    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    ISTIDriver* const simDriver = sSimDriver.get();
     if (simDriver == nullptr || !WLD_CanAdjustSimRate()) {
       return;
     }
@@ -19934,7 +19939,7 @@ namespace moho
    */
   void WLD_SetGameSpeed(int gameSpeed)
   {
-    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    ISTIDriver* const simDriver = sSimDriver.get();
     if (simDriver == nullptr) {
       return;
     }
@@ -19956,11 +19961,11 @@ namespace moho
    * Address: 0x0088D330 (FUN_0088D330, ?WLD_GetDriver@Moho@@YAPAVISTIDriver@1@XZ)
    *
    * What it does:
-   * Returns the process-global active sim-driver pointer.
+   * Returns the world session's simulation driver (`sSimDriver.get()`).
    */
   ISTIDriver* WLD_GetDriver()
   {
-    return SIM_GetActiveDriver();
+    return sSimDriver.get();
   }
 
   /**
