@@ -745,7 +745,7 @@ namespace moho
   template <>
   struct WeakPtrOwnerLinkOffset<WWinManagedDialog>
   {
-    static constexpr std::uintptr_t value = 0x170;
+    static constexpr std::uintptr_t value = sizeof(wxDialog); // 0x170 on x86
   };
 
   /**
@@ -963,7 +963,7 @@ namespace moho
   template <>
   struct WeakPtrOwnerLinkOffset<WWinManagedFrame>
   {
-    static constexpr std::uintptr_t value = 0x178;
+    static constexpr std::uintptr_t value = sizeof(wxFrame); // 0x178 on x86
   };
 
   // Every managed dialog / frame still open (elements at 0x010A9B94 /

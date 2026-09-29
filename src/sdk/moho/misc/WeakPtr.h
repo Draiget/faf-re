@@ -37,7 +37,10 @@ namespace moho
   template <>
   struct WeakPtrOwnerLinkOffset<UnitWeapon>
   {
-    static constexpr std::uintptr_t value = 0x14;
+    // CTaskEvent {vptr, bool (one pointer slot), TDatList {prev, next}}, then
+    // the CScriptObject base's vptr: the link head is the fifth pointer slot
+    // (0x14 on x86).
+    static constexpr std::uintptr_t value = 5 * sizeof(void*);
   };
 #endif
 
@@ -54,13 +57,15 @@ namespace moho
   template <>
   struct WeakPtrOwnerLinkOffset<UserEntity>
   {
-    static constexpr std::uintptr_t value = 0x08;
+    // UserEntity::mIUnitChainHead, after the WeakObject base's two words (0x08 on x86).
+    static constexpr std::uintptr_t value = 2 * sizeof(void*);
   };
 
   template <>
   struct WeakPtrOwnerLinkOffset<UserUnit>
   {
-    static constexpr std::uintptr_t value = 0x08;
+    // Same slot as UserEntity's (0x08 on x86).
+    static constexpr std::uintptr_t value = 2 * sizeof(void*);
   };
 
   /**

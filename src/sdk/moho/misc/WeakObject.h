@@ -128,8 +128,10 @@ namespace moho
     }
 
     // Head link slot for intrusive weak-guard / weak-pointer chains.
-    // WeakPtr<T>::ownerLinkSlot points to this slot in owner objects.
-    uint32_t weakLinkHead_;
+    // WeakPtr<T>::ownerLinkSlot points to this slot in owner objects, and every
+    // link stores a node pointer through it, so it is pointer-sized: a 32-bit
+    // field here lets each x64 store spill into the owner's next member.
+    void* weakLinkHead_;
   };
 
   static_assert(sizeof(WeakObject) == 4, "WeakObject must be 4 bytes");

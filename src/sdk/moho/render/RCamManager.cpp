@@ -133,7 +133,7 @@ namespace moho
     // bearing, back when the class was a thin shell whose state lived behind
     // runtime views and sizing the block by it would have handed the
     // constructor four bytes to write 0x854 past.
-    CameraImpl* const storage = static_cast<CameraImpl*>(::operator new(kCameraImplRuntimeSize, std::nothrow));
+    CameraImpl* const storage = static_cast<CameraImpl*>(::operator new(sizeof(CameraImpl), std::nothrow)); // 0x858 on x86
     if (storage != nullptr) {
       try {
         camera = new (storage) CameraImpl(name, map, luaState);

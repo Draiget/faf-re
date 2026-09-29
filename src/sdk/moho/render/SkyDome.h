@@ -354,7 +354,7 @@ namespace moho
     void* mWatchedEnd = nullptr;                                  // +0x0C
     void* mWatchedStorageEnd = nullptr;                           // +0x10
     void* mWatchedStorageOrigin = nullptr;                        // +0x14
-    std::uint8_t mWatchedInline[0x08]{};                          // +0x18
+    void* mWatchedInline[2]{};                                    // +0x18
     Wm3::Vector3f mDomeOrigin{0.0f, 0.0f, 0.0f};                 // +0x20
     Wm3::Vector3f mDomeShapeParams{0.0f, 512.0f, 1.2566371f};    // +0x2C (height/radius/start-angle)
     std::int32_t mWidth = 16;                                     // +0x38

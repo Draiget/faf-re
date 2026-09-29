@@ -152,7 +152,7 @@ namespace moho
     : mWatcherFlags(0)
     , mWatchedBegin(mWatchedInline)
     , mWatchedEnd(mWatchedInline)
-    , mWatchedStorageEnd(mWatchedInline + sizeof(mWatchedInline))
+    , mWatchedStorageEnd(std::end(mWatchedInline))
     , mWatchedStorageOrigin(mWatchedInline)
     , mWatchedInline{}
     , mHorizonLookupPath("/textures/environment/horizonLookup.dds")
@@ -160,8 +160,7 @@ namespace moho
   {
     // Legacy small-vector reset path reads `*(origin)` as fallback storage
     // end - see CResourceWatcher::CResourceWatcher for the same idiom.
-    auto** const inlineSlots = reinterpret_cast<void**>(mWatchedInline);
-    inlineSlots[0] = mWatchedStorageEnd;
+    mWatchedInline[0] = mWatchedStorageEnd;
   }
 
   /**

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/thread.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
@@ -733,7 +734,8 @@ namespace moho
     {
       return *reinterpret_cast<CDiskWatchListener*>(mDiskWatchListenerStorage);
     }
-    std::uint8_t mLockStorage[0x08];                  // +0x38
+    // boost::mutex placed by hand; 8 bytes on x86, larger on x64.
+    alignas(boost::mutex) std::uint8_t mLockStorage[sizeof(boost::mutex)]; // +0x38
     LuaPlus::LuaState* mLuaState;                     // +0x40
     /**
      * Vector of per-target-LuaState export bindings. Real field name per

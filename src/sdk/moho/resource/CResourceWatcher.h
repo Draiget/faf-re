@@ -53,7 +53,7 @@ namespace moho
     void* mWatchedEnd;                // +0x0C
     void* mWatchedStorageEnd;         // +0x10
     void* mWatchedStorageOrigin;      // +0x14
-    std::uint8_t mWatchedInline[0x08]; // +0x18
+    void* mWatchedInline[2];           // +0x18 two inline watch-node slots
   };
 
   static_assert(offsetof(CResourceWatcher, mWatcherFlags) == 0x04, "CResourceWatcher::mWatcherFlags offset must be 0x04");

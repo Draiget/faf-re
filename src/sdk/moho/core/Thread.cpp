@@ -1,6 +1,8 @@
 #include "Thread.h"
 
 #include "platform/Platform.h"
+
+#include <algorithm>
 using namespace moho;
 
 namespace
@@ -58,13 +60,13 @@ void moho::THREAD_InvokeAsync(boost::function<void(), std::allocator<void>> fn, 
   }
 
   // Allocate pair (8 bytes) and box (32 bytes)
-  auto pair = static_cast<void**>(::operator new(8, std::nothrow));
+  auto pair = static_cast<void**>(::operator new(2 * sizeof(void*), std::nothrow));
   if (!pair) {
     ::CloseHandle(hThread);
     return;
   }
 
-  void* raw = ::operator new(32, std::nothrow);
+  void* raw = ::operator new((std::max)(std::size_t{32}, sizeof(InvokePayload)), std::nothrow);
   if (!raw) {
     ::operator delete(pair);
     ::CloseHandle(hThread);
@@ -100,14 +102,14 @@ void moho::THREAD_InvokeWait(boost::function<void(), std::allocator<void>> fn, c
   WaitCtx ctx;
   ctx.begin(2);
 
-  auto pair = static_cast<void**>(::operator new(8, std::nothrow));
+  auto pair = static_cast<void**>(::operator new(2 * sizeof(void*), std::nothrow));
   if (!pair) {
     ::CloseHandle(hThread);
     ctx.end();
     return;
   }
 
-  void* raw = ::operator new(32, std::nothrow);
+  void* raw = ::operator new((std::max)(std::size_t{32}, sizeof(InvokePayload)), std::nothrow);
   if (!raw) {
     ::operator delete(pair);
     ::CloseHandle(hThread);

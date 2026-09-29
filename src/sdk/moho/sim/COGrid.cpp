@@ -525,7 +525,8 @@ namespace moho
   void EntityOccupationManager::EnsureSize(const int requiredFreeNodes)
   {
     while (mFreeNodeCount < requiredFreeNodes) {
-      auto* chunk = static_cast<EntityCollisionCellNode*>(::operator new(0x10000u));
+      // 0x2000 nodes: 0x10000 bytes on x86.
+      auto* chunk = static_cast<EntityCollisionCellNode*>(::operator new(0x2000u * sizeof(EntityCollisionCellNode)));
       for (int i = 0; i < 0x1FFF; ++i) {
         chunk[i].next = &chunk[i + 1];
       }

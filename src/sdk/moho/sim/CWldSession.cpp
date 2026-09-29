@@ -6792,8 +6792,8 @@ namespace moho
    * this function's declaration in CWldSession.h.
    *
    * The runtime cell-position buffer's trailing "meta" dword
-   * (`SArmyVectorWithMeta::mMetaWord`, modeled as a plain `uint32_t` because
-   * different consumers reuse the same four bytes differently) is read here
+   * (`SArmyVectorWithMeta::mMetaWord`, modeled as a plain pointer-sized word
+   * because different consumers reuse the same bytes differently) is read here
    * as a pointer to a 3-byte `{sizeX, sizeZ, layer}` footprint descriptor -
    * confirmed against the raw disassembly, not just the decompile, so the
    * reinterpret is applied at this call site rather than changing the
@@ -6820,7 +6820,7 @@ namespace moho
     // The meta dword is only ever a real descriptor pointer once the army's
     // scratch buffer has been populated for STI/path-preview display; a
     // fresh/never-populated army leaves it null.
-    const std::uint8_t* const footprintDescriptor = *reinterpret_cast<const std::uint8_t* const*>(&scratch.mMetaWord);
+    const auto* const footprintDescriptor = reinterpret_cast<const std::uint8_t*>(scratch.mMetaWord);
 
     msvc8::list<Wm3::Vector3f> simplifiedPath{};
     float capWidthSeed = 0.0f;

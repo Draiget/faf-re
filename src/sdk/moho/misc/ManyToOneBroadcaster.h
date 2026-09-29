@@ -56,7 +56,7 @@ namespace moho
     ManyToOneListener() noexcept
       : WeakObject()
     {
-      weakLinkHead_ = 0u;
+      weakLinkHead_ = nullptr;
     }
 
     virtual int OnEvent(TEvent event) = 0;

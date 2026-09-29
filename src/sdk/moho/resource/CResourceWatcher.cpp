@@ -1,5 +1,7 @@
 #include "moho/resource/CResourceWatcher.h"
 
+#include <iterator>
+
 #include "moho/resource/ResourceManager.h"
 
 namespace moho
@@ -15,13 +17,12 @@ namespace moho
     : mWatcherFlags(0)
     , mWatchedBegin(mWatchedInline)
     , mWatchedEnd(mWatchedInline)
-    , mWatchedStorageEnd(mWatchedInline + sizeof(mWatchedInline))
+    , mWatchedStorageEnd(std::end(mWatchedInline))
     , mWatchedStorageOrigin(mWatchedInline)
     , mWatchedInline{}
   {
     // Legacy small-vector reset path reads `*(origin)` as fallback storage end.
-    auto** const inlineSlots = reinterpret_cast<void**>(mWatchedInline);
-    inlineSlots[0] = mWatchedStorageEnd;
+    mWatchedInline[0] = mWatchedStorageEnd;
   }
 
   /**

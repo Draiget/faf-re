@@ -189,7 +189,10 @@ namespace
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
   constexpr float kEconomyPerSecondToUiRate = 10.0f;
-  constexpr std::uintptr_t kUserEntityWeakOwnerOffset = 0x08u;
+  // A selection weak-ref's owner-link slot is `&entity->mIUnitChainHead`
+  // (`LinkWeakEntityOwner` below), so the entity is the slot minus that
+  // member's offset (0x08 on x86).
+  constexpr std::uintptr_t kUserEntityWeakOwnerOffset = offsetof(UserEntity, mIUnitChainHead);
 
   enum class UserUnitIntelLane : std::int32_t
   {

@@ -25,7 +25,9 @@ namespace moho
   struct SArmyVectorWithMeta
   {
     msvc8::vector<std::uint32_t> mWords; // +0x00
-    std::uint32_t mMetaWord;             // +0x10
+    // A dword in the binary; the path preview stores a footprint pointer in
+    // it, so it is pointer-sized (the same unsigned int on x86).
+    std::uintptr_t mMetaWord;            // +0x10
 
     SArmyVectorWithMeta() = default;
 

@@ -591,7 +591,7 @@ namespace
 
   [[nodiscard]] moho::UserEntity* DecodeUserEntityWeakRef(const moho::SSelectionWeakRefUserEntity& weakRef) noexcept
   {
-    constexpr std::uintptr_t kOwnerOffset = 0x08;
+    constexpr std::uintptr_t kOwnerOffset = offsetof(moho::UserEntity, mIUnitChainHead);
 
     const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
     if (raw == 0u || raw == kOwnerOffset || raw < kOwnerOffset) {
@@ -740,10 +740,9 @@ namespace
   }
 
   // The camera frustum lanes track entities by their `IUnit` intrusive
-  // weak-link chain head, which sits at +0x08 in each collected entity (the
-  // `mIUnitChainHead` slot). A lane node's `mOwnerLinkSlot` points at that
-  // chain-head slot; `mNextOwnerRef` is the next node in the owner's chain.
-  constexpr std::uintptr_t kEntityIUnitChainHeadOffset = 0x08;
+  // weak-link chain head, the `mIUnitChainHead` slot (+0x08 on x86). A lane
+  // node's `mOwnerLinkSlot` points at that chain-head slot; `mNextOwnerRef` is
+  // the next node in the owner's chain.
 
   // Detaches one temporary lane node from the owner chain it was spliced into,
   // restoring the saved previous head. Mirrors the binary's per-push unsplice
@@ -787,8 +786,7 @@ namespace
     moho::CameraFrustumUserEntityList& lane, moho::UserEntity* const entity
   )
   {
-    void* const ownerChainHead =
-      reinterpret_cast<std::uint8_t*>(entity) + kEntityIUnitChainHeadOffset;
+    void* const ownerChainHead = &entity->mIUnitChainHead;
 
     if (lane.mFinish == lane.mCapacity) {
       moho::CameraUserEntityWeakRef newValue{ownerChainHead, nullptr};
@@ -1717,10 +1715,7 @@ moho::CameraFrustumUserEntityList* moho::CameraImpl::GetArmyUnitsInFrustum()
  */
 moho::UserEntity* moho::DecodeCameraFrustumWeakRef(const moho::CameraUserEntityWeakRef& weakRef) noexcept
 {
-  constexpr std::uintptr_t kUserEntityWeakOwnerOffset = 0x08;
-#if defined(MOHO_ABI_MSVC8_COMPAT)
-  static_assert(kUserEntityWeakOwnerOffset == offsetof(UserEntity, mIUnitChainHead));
-#endif
+  constexpr std::uintptr_t kUserEntityWeakOwnerOffset = offsetof(UserEntity, mIUnitChainHead);
 
   const auto raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
   if (raw <= kUserEntityWeakOwnerOffset) {

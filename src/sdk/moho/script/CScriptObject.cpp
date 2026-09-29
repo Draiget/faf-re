@@ -606,7 +606,7 @@ namespace
  */
 CScriptObject::CScriptObject()
 {
-  weakLinkHead_ = 0u;
+  weakLinkHead_ = nullptr;
 }
 
 /**

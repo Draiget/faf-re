@@ -173,8 +173,8 @@ namespace moho
   /**
    * Decodes one `CameraFrustumUserEntityList` lane back to the `UserEntity`
    * it tracks. `mOwnerLinkSlot` points at the entity's `mIUnitChainHead`
-   * slot (`offsetof(UserEntity, mIUnitChainHead) == 0x08`), so the entity
-   * itself sits `0x08` bytes before it; an unlinked or self-pointing lane
+   * slot (`offsetof(UserEntity, mIUnitChainHead)`, 0x08 on x86), so the
+   * entity itself sits that many bytes before it; an unlinked or self-pointing lane
    * (`raw <= kUserEntityWeakOwnerOffset`) decodes to null.
    *
    * Named distinctly from `CameraImpl.cpp`'s file-private

@@ -665,16 +665,18 @@ namespace
    * Address: 0x004DDFE0 (FUN_004DDFE0)
    *
    * What it does:
-   * Allocates one contiguous array of 8-byte elements and raises
-   * `std::bad_alloc` when element-count multiplication overflows.
+   * Allocates one contiguous array of `AudioEngineRef` elements (8 bytes
+   * each on x86) and raises `std::bad_alloc` when element-count
+   * multiplication overflows.
    */
-  [[nodiscard]] void* AllocateEightByteElementArrayChecked(const std::uint32_t elementCount)
+  [[nodiscard]] void* AllocateAudioEngineRefArrayChecked(const std::uint32_t elementCount)
   {
-    if (elementCount != 0u && (std::numeric_limits<std::uint32_t>::max() / elementCount) < 8u) {
+    constexpr std::size_t kElementBytes = sizeof(moho::AudioEngineRef);
+    if (elementCount != 0u && (std::numeric_limits<std::uint32_t>::max() / elementCount) < kElementBytes) {
       throw std::bad_alloc{};
     }
 
-    return operator new(static_cast<std::size_t>(elementCount) * 8u);
+    return operator new(static_cast<std::size_t>(elementCount) * kElementBytes);
   }
 
   /**
@@ -710,7 +712,7 @@ namespace
     }
 
     auto* const newStorage = static_cast<moho::AudioEngineRef*>(
-      AllocateEightByteElementArrayChecked(static_cast<std::uint32_t>(targetCapacity))
+      AllocateAudioEngineRefArrayChecked(static_cast<std::uint32_t>(targetCapacity))
     );
     if (currentCount != 0u) {
       std::memcpy(newStorage, engines.mStart, currentCount * sizeof(moho::AudioEngineRef));
@@ -848,7 +850,7 @@ namespace
     }
 
     auto* const newStorage = static_cast<moho::AudioEngineRef*>(
-      AllocateEightByteElementArrayChecked(static_cast<std::uint32_t>(newCapacity))
+      AllocateAudioEngineRefArrayChecked(static_cast<std::uint32_t>(newCapacity))
     );
 
     moho::AudioEngineRef* write = newStorage;

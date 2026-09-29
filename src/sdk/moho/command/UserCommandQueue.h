@@ -31,6 +31,10 @@ namespace moho
   /// capacity the constructor seeds at 0x008BF620 and 0x008BF635.
   inline constexpr std::size_t kUserCommandQueueInlineEntries = 2;
 
+  /// A link entry is two pointer words, `{helper, link}`; the inline stores are
+  /// sized in those words so they hold two entries on either pointer width.
+  inline constexpr std::size_t kUserCommandQueueInlineWords = kUserCommandQueueInlineEntries * 2;
+
   /** The manager's pending-issue ring: block table, block count, start, size. */
   struct UserManagerIssueQueue
   {
@@ -75,11 +79,11 @@ namespace moho
     /// Two-entry small-buffer store `primaryLinks` starts out pointing at.
     /// While the run lives here the first word doubles as the saved inline
     /// capacity end (FUN_008B7CC0 stashes it there on the way to the heap).
-    std::uint8_t primaryInlineStorage[0x10];  // +0x18
+    void* primaryInlineStorage[kUserCommandQueueInlineWords];  // +0x18
     UserManagerIssueQueue issueQueue;         // +0x28
     UserCommandQueueLinkVector resolvedLinks; // +0x40
     /// The matching two-entry small-buffer store for `resolvedLinks`.
-    std::uint8_t resolvedInlineStorage[0x10]; // +0x50
+    void* resolvedInlineStorage[kUserCommandQueueInlineWords]; // +0x50
     std::uint8_t resolvedLinksDirty;          // +0x60
     std::uint8_t pad_0061_0068[0x07];
   };

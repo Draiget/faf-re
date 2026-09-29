@@ -1,4 +1,5 @@
 #include "Cluster.h"
+#include "legacy/math/X87Math.h"
 
 #include <algorithm>
 #include <array>
@@ -1576,16 +1577,13 @@ namespace
       "ClusterSearchFrontierStateRuntime::mNodeZ offset must be 0x05"
     );
 
-    struct ClusterPayloadEdgeTableRuntime
+    using ClusterData = gpg::HaStar::Cluster::Data;
+
+    /// The edge-cost triangle stored right after the node array in one `Data` block.
+    [[nodiscard]] const gpg::HaStar::Cluster::Edge* ClusterEdgeCosts(const ClusterData& data) noexcept
     {
-      std::int32_t mRefs;       // +0x00
-      void* mReleaseObject;     // +0x04
-      std::uint32_t mReleaseArg;// +0x08
-      std::uint8_t mEdgeCount;  // +0x0C
-      std::uint8_t mEdgeData[1];// +0x0D
-    };
-    static_assert(offsetof(ClusterPayloadEdgeTableRuntime, mEdgeCount) == 0x0C, "ClusterPayloadEdgeTableRuntime::mEdgeCount offset must be 0x0C");
-    static_assert(offsetof(ClusterPayloadEdgeTableRuntime, mEdgeData) == 0x0D, "ClusterPayloadEdgeTableRuntime::mEdgeData offset must be 0x0D");
+      return reinterpret_cast<const gpg::HaStar::Cluster::Edge*>(data.mNodes + data.mNodeCount);
+    }
 
     [[nodiscard]] std::uint32_t TriangularEdgePairIndex(const std::uint32_t lhs, const std::uint32_t rhs) noexcept
     {
@@ -1595,30 +1593,23 @@ namespace
       return lhs + ((rhs * (rhs - 1u)) >> 1u);
     }
 
-    [[nodiscard]] const std::uint8_t* EdgeCoordBase(const ClusterPayloadEdgeTableRuntime& table) noexcept
+    [[nodiscard]] std::uint8_t EdgeCoordX(const ClusterData& table, const std::uint32_t edgeIndex) noexcept
     {
-      return table.mEdgeData;
+      return table.mNodes[edgeIndex].x;
     }
 
-    [[nodiscard]] std::uint8_t EdgeCoordX(const ClusterPayloadEdgeTableRuntime& table, const std::uint32_t edgeIndex) noexcept
+    [[nodiscard]] std::uint8_t EdgeCoordZ(const ClusterData& table, const std::uint32_t edgeIndex) noexcept
     {
-      return EdgeCoordBase(table)[edgeIndex * 2u];
-    }
-
-    [[nodiscard]] std::uint8_t EdgeCoordZ(const ClusterPayloadEdgeTableRuntime& table, const std::uint32_t edgeIndex) noexcept
-    {
-      return EdgeCoordBase(table)[edgeIndex * 2u + 1u];
+      return table.mNodes[edgeIndex].z;
     }
 
     [[nodiscard]] std::int8_t EdgeTraversalBucketCost(
-      const ClusterPayloadEdgeTableRuntime& table,
+      const ClusterData& table,
       const std::uint32_t fromEdgeIndex,
       const std::uint32_t toEdgeIndex
     ) noexcept
     {
-      const std::uint32_t pairIndex = TriangularEdgePairIndex(fromEdgeIndex, toEdgeIndex);
-      const std::uint32_t byteOffset = static_cast<std::uint32_t>(table.mEdgeCount) * 2u + pairIndex;
-      return static_cast<std::int8_t>(EdgeCoordBase(table)[byteOffset]);
+      return ClusterEdgeCosts(table)[TriangularEdgePairIndex(fromEdgeIndex, toEdgeIndex)].cost;
     }
 
     [[nodiscard]] float ComputeEdgeTraversalDistance(
@@ -1690,8 +1681,8 @@ namespace
         const std::uint8_t tileBaseZ = static_cast<std::uint8_t>(tileZ << levelShift);
         for (int tileX = localRect.x0; tileX != localRect.x1; ++tileX) {
           const std::uint32_t cellIndex = static_cast<std::uint32_t>(tileX + tileZ * 4);
-          const auto* const table = reinterpret_cast<const ClusterPayloadEdgeTableRuntime*>(subcluster.mClusters[cellIndex].mData);
-          if (table == nullptr || table->mEdgeCount == 0u) {
+          const ClusterData* const table = subcluster.mClusters[cellIndex].mData;
+          if (table == nullptr || table->mNodeCount == 0u) {
             continue;
           }
 
@@ -1704,7 +1695,7 @@ namespace
             continue;
           }
 
-          const std::uint32_t edgeCount = static_cast<std::uint32_t>(table->mEdgeCount);
+          const std::uint32_t edgeCount = static_cast<std::uint32_t>(table->mNodeCount);
           for (std::uint32_t edgeIndex = 0u; edgeIndex < edgeCount; ++edgeIndex) {
             if (edgeIndex == sourceEdgeIndex) {
               continue;
@@ -1993,17 +1984,6 @@ namespace
 
     static_assert(sizeof(PackedNodeVector) == 0x10, "PackedNodeVector size must be 0x10");
 
-    struct ClusterDataNodeListRuntime
-    {
-      std::int32_t mRefs;       // +0x00
-      void* mReleaseObject;     // +0x04
-      std::uint32_t mReleaseArg;// +0x08
-      std::uint8_t mNodeCount;  // +0x0C
-      std::uint8_t mNodes[1];   // +0x0D [x,z] pairs
-    };
-    static_assert(offsetof(ClusterDataNodeListRuntime, mNodeCount) == 0x0C, "ClusterDataNodeListRuntime::mNodeCount offset must be 0x0C");
-    static_assert(offsetof(ClusterDataNodeListRuntime, mNodes) == 0x0D, "ClusterDataNodeListRuntime::mNodes offset must be 0x0D");
-
     /**
      * Address: 0x0092FE30 (FUN_0092FE30)
      *
@@ -2027,14 +2007,14 @@ namespace
         const std::uint32_t tileBaseZ = tileZ << levelShift;
         for (std::uint32_t tileX = 0u; tileX < 4u; ++tileX, ++clusterIndex) {
           const std::uint32_t tileBaseX = tileX << levelShift;
-          const auto* const data = reinterpret_cast<const ClusterDataNodeListRuntime*>(subcluster.mClusters[clusterIndex].mData);
+          const gpg::HaStar::Cluster::Data* const data = subcluster.mClusters[clusterIndex].mData;
           if (data == nullptr || data->mNodeCount == 0u) {
             continue;
           }
 
           for (std::uint32_t nodeIndex = 0u; nodeIndex < data->mNodeCount; ++nodeIndex) {
-            const std::uint8_t nodeXLocal = data->mNodes[nodeIndex * 2u];
-            const std::uint8_t nodeZLocal = data->mNodes[nodeIndex * 2u + 1u];
+            const std::uint8_t nodeXLocal = data->mNodes[nodeIndex].x;
+            const std::uint8_t nodeZLocal = data->mNodes[nodeIndex].z;
             const std::uint32_t nodeX = tileBaseX + nodeXLocal;
             const std::uint32_t nodeZ = tileBaseZ + nodeZLocal;
             if ((nodeX & clusterMask) == 0u || (nodeZ & clusterMask) == 0u) {
@@ -3113,7 +3093,7 @@ void Cluster::SetData(
         );
     }
 
-    constexpr std::size_t kHeaderBytes = 0x0Du; // offsetof(Data, mNodes)
+    constexpr std::size_t kHeaderBytes = offsetof(Data, mNodes); // 0x0D on x86
     const std::size_t nodeBytes = static_cast<std::size_t>(nodeCount) * sizeof(Node);
     const std::size_t edgeBytes = static_cast<std::size_t>(nodeCount) * (nodeCount - 1u) / 2u;
 
@@ -3149,7 +3129,7 @@ void Cluster::SetData(
         payload = replacement;
     }
 
-    // Node array begins at `mNodes` (offset 0x0D); edges follow it.
+    // Node array begins at `mNodes` (0x0D on x86); edges follow it.
     auto* const nodeBase = reinterpret_cast<std::byte*>(&payload->mNodes[0]);
     if (nodes != nullptr && nodeBytes != 0u) {
         std::memcpy(nodeBase, nodes, nodeBytes);

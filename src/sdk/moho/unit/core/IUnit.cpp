@@ -38,7 +38,7 @@ namespace
  */
 IUnit::IUnit() noexcept
 {
-  weakLinkHead_ = 0;
+  weakLinkHead_ = nullptr;
 }
 
 /**

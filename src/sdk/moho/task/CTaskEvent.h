@@ -18,14 +18,15 @@ namespace moho
   template <>
   struct WeakPtrOwnerLinkOffset<CTaskThread>
   {
-    static constexpr std::uintptr_t value = 0x08;
+    static constexpr std::uintptr_t value = 2 * sizeof(void*); // after the TDatListItem links (0x08 on x86)
   };
 #endif
 
   template <>
   struct WeakPtrOwnerLinkOffset<STaskEventLinkage>
   {
-    static constexpr std::uintptr_t value = 0x08;
+    // mOwnerWeakRefHead, after the TDatListItem links (0x08 on x86).
+    static constexpr std::uintptr_t value = 2 * sizeof(void*);
   };
 
   struct STaskEventLinkage : TDatListItem<STaskEventLinkage, void>

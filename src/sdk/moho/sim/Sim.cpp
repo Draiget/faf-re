@@ -4244,7 +4244,7 @@ namespace moho
     for (std::size_t i = 0; i < cellCount; ++i) {
       payload.mWords[i] = std::bit_cast<std::uint32_t>(path.start[i]);
     }
-    payload.mMetaWord = std::bit_cast<std::uint32_t>(mFootprint);
+    payload.mMetaWord = reinterpret_cast<std::uintptr_t>(mFootprint);
     mFootprint = nullptr;
 
     mOwnerContext->SetUnknownVectorWithMeta(&payload);
