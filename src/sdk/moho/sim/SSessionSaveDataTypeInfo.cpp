@@ -78,7 +78,8 @@ const char* SSessionSaveDataTypeInfo::GetName() const
  */
 void SSessionSaveDataTypeInfo::Init()
 {
-  size_ = 0x0C;
+  static_assert(sizeof(moho::SSessionSaveData) == 0x0C, "moho::SSessionSaveData is 0x0C bytes on x86");
+  size_ = sizeof(moho::SSessionSaveData);
   gpg::RType::Init();
   (void)gpg::BindRTypeLifecycleCallbacks(
     this,

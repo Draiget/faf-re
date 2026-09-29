@@ -86,7 +86,8 @@ namespace moho
    */
   void ISimResourcesTypeInfo::Init()
   {
-    size_ = 0x04;
+    static_assert(sizeof(moho::ISimResources) == 0x04, "moho::ISimResources is 0x04 bytes on x86");
+    size_ = sizeof(moho::ISimResources);
     gpg::RType::Init();
     AddBase_IResources(this);
     Finish();

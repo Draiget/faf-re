@@ -41,7 +41,8 @@ namespace moho
    */
   void IArmyTypeInfo::Init()
   {
-    size_ = 0x1E0;
+    static_assert(sizeof(moho::IArmy) == 0x1E0, "moho::IArmy is 0x1E0 bytes on x86");
+    size_ = sizeof(moho::IArmy);
     gpg::RType::Init();
     Finish();
   }

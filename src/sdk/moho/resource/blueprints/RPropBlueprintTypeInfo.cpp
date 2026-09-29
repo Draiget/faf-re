@@ -185,7 +185,7 @@ namespace moho
    */
   gpg::RField* RPropBlueprintTypeInfo::AddFieldDisplay(gpg::RType* const typeInfo)
   {
-    return AppendField(typeInfo, "Display", CachedPropDisplayType(), 0x17C);
+    return AppendField(typeInfo, "Display", CachedPropDisplayType(), offsetof(RPropBlueprint, Display));
   }
 
   /**
@@ -193,7 +193,7 @@ namespace moho
    */
   gpg::RField* RPropBlueprintTypeInfo::AddFieldDefense(gpg::RType* const typeInfo)
   {
-    return AppendField(typeInfo, "Defense", CachedPropDefenseType(), 0x19C);
+    return AppendField(typeInfo, "Defense", CachedPropDefenseType(), offsetof(RPropBlueprint, Defense));
   }
 
   /**
@@ -201,7 +201,7 @@ namespace moho
    */
   gpg::RField* RPropBlueprintTypeInfo::AddFieldEconomy(gpg::RType* const typeInfo)
   {
-    return AppendField(typeInfo, "Economy", CachedPropEconomyType(), 0x1A4);
+    return AppendField(typeInfo, "Economy", CachedPropEconomyType(), offsetof(RPropBlueprint, Economy));
   }
 
   /**

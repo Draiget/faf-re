@@ -94,7 +94,8 @@ const char* stringTypeInfo::GetName() const { return "std::string"; }
  */
 void stringTypeInfo::Init()
 {
-  size_ = 28;
+  static_assert(sizeof(msvc8::string) == 28, "msvc8::string is 28 bytes on x86");
+  size_ = sizeof(msvc8::string);
   Finish();
 }
 

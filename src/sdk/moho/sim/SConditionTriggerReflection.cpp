@@ -554,7 +554,8 @@ namespace
 
     void Init() override
     {
-      size_ = 0x10;
+      static_assert(sizeof(gpg::core::FastVectorInline<moho::SCondition>) == 0x10, "gpg::core::FastVectorInline<moho::SCondition> is 0x10 bytes on x86");
+      size_ = sizeof(gpg::core::FastVectorInline<moho::SCondition>);
       version_ = 1;
       serLoadFunc_ = &RFastVectorSConditionTypeInfo::Deserialize;
       serSaveFunc_ = &RFastVectorSConditionTypeInfo::Serialize;
@@ -889,7 +890,8 @@ namespace
      */
     void Init() override
     {
-      size_ = 0x0C;
+      static_assert(sizeof(msvc8::list<boost::shared_ptr<moho::STrigger>>) == 0x0C, "msvc8::list<boost::shared_ptr<moho::STrigger>> is 0x0C bytes on x86");
+      size_ = sizeof(msvc8::list<boost::shared_ptr<moho::STrigger>>);
       version_ = 1;
       serLoadFunc_ = &RListSharedPtrSTriggerTypeInfo::SerLoad;
       serSaveFunc_ = &RListSharedPtrSTriggerTypeInfo::SerSave;

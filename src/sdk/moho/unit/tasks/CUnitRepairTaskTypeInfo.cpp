@@ -165,7 +165,8 @@ namespace moho
    */
   void CUnitRepairTaskTypeInfo::Init()
   {
-    size_ = 0x9C;
+    static_assert(sizeof(moho::CUnitRepairTask) == 0x9C, "moho::CUnitRepairTask is 0x9C bytes on x86");
+    size_ = sizeof(moho::CUnitRepairTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitRepairTaskTypeInfo::NewRef,
@@ -212,7 +213,7 @@ namespace moho
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 0x34;
+    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitRepairTask, Listener<ECommandEvent>>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

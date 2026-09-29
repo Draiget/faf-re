@@ -63,7 +63,8 @@ namespace moho
    */
   void CUnitCaptureTaskTypeInfo::Init()
   {
-    size_ = 0x64;
+    static_assert(sizeof(moho::CUnitCaptureTask) == 0x64, "moho::CUnitCaptureTask is 0x64 bytes on x86");
+    size_ = sizeof(moho::CUnitCaptureTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitCaptureTaskTypeInfo::NewRef,
@@ -110,7 +111,7 @@ namespace moho
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 0x34;
+    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitCaptureTask, Listener<ECommandEvent>>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

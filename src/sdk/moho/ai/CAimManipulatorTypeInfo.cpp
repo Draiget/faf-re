@@ -91,7 +91,8 @@ namespace moho
    */
   void CAimManipulatorTypeInfo::Init()
   {
-    size_ = 0x110;
+    static_assert(sizeof(moho::CAimManipulator) == 0x110, "moho::CAimManipulator is 0x110 bytes on x86");
+    size_ = sizeof(moho::CAimManipulator);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CAimManipulatorTypeInfo::NewRef,

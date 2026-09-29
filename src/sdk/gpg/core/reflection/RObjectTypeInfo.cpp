@@ -34,7 +34,8 @@ const char* gpg::RObjectTypeInfo::GetName() const { return "RObject"; }
 /** Address: 0x008E06E0 */
 void gpg::RObjectTypeInfo::Init()
 {
-  size_ = 4;
+  static_assert(sizeof(gpg::RObject) == 4, "gpg::RObject is 4 bytes on x86");
+  size_ = sizeof(gpg::RObject);
   gpg::RType::Init();
   Finish();
 }

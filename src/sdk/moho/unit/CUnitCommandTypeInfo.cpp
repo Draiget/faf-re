@@ -217,7 +217,7 @@ namespace moho
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 0x34;
+    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitCommand, Broadcaster<ECommandEvent>>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

@@ -96,7 +96,8 @@ const char* CMauiScrollbarTypeInfo::GetName() const
  */
 void CMauiScrollbarTypeInfo::Init()
 {
-  size_ = 0x158;
+  static_assert(sizeof(moho::CMauiScrollbar) == 0x158, "moho::CMauiScrollbar is 0x158 bytes on x86");
+  size_ = sizeof(moho::CMauiScrollbar);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

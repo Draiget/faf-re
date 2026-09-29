@@ -128,7 +128,8 @@ const char* MemBufferCharTypeInfo::GetName() const
  */
 void MemBufferCharTypeInfo::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::MemBuffer<char>) == 0x10, "gpg::MemBuffer<char> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::MemBuffer<char>);
   gpg::RType::Init();
   Finish();
 }
@@ -159,7 +160,8 @@ const char* MemBufferCharConstTypeInfo::GetName() const
  */
 void MemBufferCharConstTypeInfo::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::MemBuffer<const char>) == 0x10, "gpg::MemBuffer<const char> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::MemBuffer<const char>);
   gpg::RType::Init();
   Finish();
 }

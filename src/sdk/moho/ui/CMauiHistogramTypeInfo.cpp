@@ -96,7 +96,8 @@ const char* CMauiHistogramTypeInfo::GetName() const
  */
 void CMauiHistogramTypeInfo::Init()
 {
-  size_ = 0x134;
+  static_assert(sizeof(moho::CMauiHistogram) == 0x134, "moho::CMauiHistogram is 0x134 bytes on x86");
+  size_ = sizeof(moho::CMauiHistogram);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

@@ -143,10 +143,10 @@ void REffectBlueprintTypeInfo::AddBase_RObject(gpg::RType* typeInfo)
    */
   void REffectBlueprintTypeInfo::AddFields()
   {
-    AddFieldWithDescription(this, "BlueprintId", CachedRResIdType(), 0x08, "Blueprint ID");
-    AddFieldWithDescription(this, "HighFidelity", CachedBoolType(), 0x24, "Allowed in high fidelity");
-    AddFieldWithDescription(this, "MedFidelity", CachedBoolType(), 0x25, "Allowed in medium fidelity");
-    AddFieldWithDescription(this, "LowFidelity", CachedBoolType(), 0x26, "Allowed in low fidelity");
+    AddFieldWithDescription(this, "BlueprintId", CachedRResIdType(), offsetof(REffectBlueprint, BlueprintId), "Blueprint ID");
+    AddFieldWithDescription(this, "HighFidelity", CachedBoolType(), offsetof(REffectBlueprint, HighFidelity), "Allowed in high fidelity");
+    AddFieldWithDescription(this, "MedFidelity", CachedBoolType(), offsetof(REffectBlueprint, MedFidelity), "Allowed in medium fidelity");
+    AddFieldWithDescription(this, "LowFidelity", CachedBoolType(), offsetof(REffectBlueprint, LowFidelity), "Allowed in low fidelity");
   }
 
   /**

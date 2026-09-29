@@ -63,7 +63,8 @@ namespace moho
    */
   void CUnitGuardTaskTypeInfo::Init()
   {
-    size_ = 0xC0;
+    static_assert(sizeof(moho::CUnitGuardTask) == 0xC0, "moho::CUnitGuardTask is 0xC0 bytes on x86");
+    size_ = sizeof(moho::CUnitGuardTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitGuardTaskTypeInfo::NewRef,
@@ -110,7 +111,7 @@ namespace moho
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 0x34;
+    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitGuardTask, Listener<ECommandEvent>>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

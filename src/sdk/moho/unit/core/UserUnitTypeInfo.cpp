@@ -14,13 +14,6 @@
 // objects query UserUnit RTTI during static initialization.
 namespace
 {
-  // Reflected base sub-object offsets inside the retail `UserUnit` complete
-  // object. `UserUnit` is modeled flat in this tree, so the multiple-inheritance
-  // sub-object displacements the descriptor publishes are carried here as the
-  // binary's own layout constants (FUN_008C6030 / FUN_008C6090).
-  constexpr int kUserUnitCScriptObjectBaseOffset = 0x150;
-  constexpr int kUserUnitIUnitBaseOffset = 0x148;
-
   /**
    * Address: 0x00C08780 (FUN_00C08780, atexit destructor of the moho::UserUnitTypeInfo object)
    */
@@ -76,7 +69,7 @@ namespace moho
     }
 
     gpg::RType* const baseType = CScriptObject::sType;
-    const gpg::RField base(baseType->GetName(), baseType, kUserUnitCScriptObjectBaseOffset, 0, nullptr);
+    const gpg::RField base(baseType->GetName(), baseType, gpg::BaseSubobjectOffset<UserUnit, CScriptObject>(), 0, nullptr);
     AddBase(base);
   }
 
@@ -94,7 +87,7 @@ namespace moho
     }
 
     gpg::RType* const baseType = IUnit::sType;
-    const gpg::RField base(baseType->GetName(), baseType, kUserUnitIUnitBaseOffset, 0, nullptr);
+    const gpg::RField base(baseType->GetName(), baseType, gpg::BaseSubobjectOffset<UserUnit, IUnit>(), 0, nullptr);
     AddBase(base);
   }
 

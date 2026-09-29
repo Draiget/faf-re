@@ -96,7 +96,8 @@ const char* CUIMapPreviewTypeInfo::GetName() const
  */
 void CUIMapPreviewTypeInfo::Init()
 {
-  size_ = 0x124;
+  static_assert(sizeof(moho::CUIMapPreview) == 0x124, "moho::CUIMapPreview is 0x124 bytes on x86");
+  size_ = sizeof(moho::CUIMapPreview);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

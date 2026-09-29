@@ -94,7 +94,8 @@ const char* CMauiCursorTypeInfo::GetName() const
  */
 void CMauiCursorTypeInfo::Init()
 {
-  size_ = 0x58;
+  static_assert(sizeof(moho::CMauiCursor) == 0x58, "moho::CMauiCursor is 0x58 bytes on x86");
+  size_ = sizeof(moho::CMauiCursor);
   AddCScriptObjectBase(*this);
   gpg::RType::Init();
   Finish();

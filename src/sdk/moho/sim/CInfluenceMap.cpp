@@ -1736,7 +1736,8 @@ msvc8::string gpg::RMapType_uint_int::GetLexical(const gpg::RRef& ref) const
  */
 void gpg::RMapType_uint_int::Init()
 {
-  size_ = 0x0C;
+  static_assert(sizeof(msvc8::map<unsigned int, int>) == 0x0C, "msvc8::map<unsigned int, int> is 0x0C bytes on x86");
+  size_ = sizeof(msvc8::map<unsigned int, int>);
   version_ = 1;
   serLoadFunc_ = &LoadUIntIntMap;
   serSaveFunc_ = &SaveUIntIntMap;
@@ -1776,7 +1777,8 @@ msvc8::string gpg::RMapType_uint_InfluenceMapEntry::GetLexical(const gpg::RRef& 
  */
 void gpg::RMapType_uint_InfluenceMapEntry::Init()
 {
-  size_ = 0x0C;
+  static_assert(sizeof(msvc8::map<unsigned int, moho::InfluenceMapEntry>) == 0x0C, "msvc8::map<unsigned int, moho::InfluenceMapEntry> is 0x0C bytes on x86");
+  size_ = sizeof(msvc8::map<unsigned int, moho::InfluenceMapEntry>);
   version_ = 1;
   serLoadFunc_ = &LoadUIntInfluenceMapEntryMap;
   serSaveFunc_ = &SaveUIntInfluenceMapEntryMap;
@@ -1875,9 +1877,17 @@ msvc8::string gpg::RVectorType_InfluenceGrid::GetLexical(const gpg::RRef& ref) c
   );
 }
 
+/**
+ * Address: 0x00718E80 (FUN_00718E80, gpg::RVectorType_InfluenceGrid::Init)
+ *
+ * What it does:
+ * Registers `sizeof(vector<InfluenceGrid>)` (`mov [ecx+8], 10h`), version 1,
+ * and the archive load/save callbacks.
+ */
 void gpg::RVectorType_InfluenceGrid::Init()
 {
-  size_ = 0x0C;
+  static_assert(sizeof(msvc8::vector<moho::InfluenceGrid>) == 0x10, "msvc8::vector<moho::InfluenceGrid> is 0x10 bytes on x86");
+  size_ = sizeof(msvc8::vector<moho::InfluenceGrid>);
   version_ = 1;
   serLoadFunc_ = &LoadInfluenceGridVectorArchive;
   serSaveFunc_ = &SaveInfluenceGridVectorArchive;

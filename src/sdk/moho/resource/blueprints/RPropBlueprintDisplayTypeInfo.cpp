@@ -96,10 +96,10 @@ namespace moho
       this,
       "MeshBlueprint",
       CachedRResIdType(),
-      0x00,
+      offsetof(RPropBlueprintDisplay, MeshBlueprint),
       "Name of mesh blueprint to use. Leave blank to use default mesh."
     );
-    AddFieldWithDescription(this, "UniformScale", CachedFloatType(), 0x1C, "Uniform scale to apply to mesh");
+    AddFieldWithDescription(this, "UniformScale", CachedFloatType(), offsetof(RPropBlueprintDisplay, UniformScale), "Uniform scale to apply to mesh");
     Finish();
   }
 

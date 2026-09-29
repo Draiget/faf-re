@@ -97,12 +97,12 @@ namespace moho
   {
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->AddFieldUChar("SizeX", 0x00);
-    typeInfo->AddFieldUChar("SizeZ", 0x01);
-    typeInfo->AddFieldFloat("MaxSlope", 0x04);
-    typeInfo->AddFieldFloat("MinWaterDepth", 0x08);
-    typeInfo->AddFieldUChar("OccupancyCaps", 0x02);
-    typeInfo->AddFieldUChar("Flags", 0x03);
+    typeInfo->AddFieldUChar("SizeX", offsetof(SFootprint, mSizeX));
+    typeInfo->AddFieldUChar("SizeZ", offsetof(SFootprint, mSizeZ));
+    typeInfo->AddFieldFloat("MaxSlope", offsetof(SFootprint, mMaxSlope));
+    typeInfo->AddFieldFloat("MinWaterDepth", offsetof(SFootprint, mMinWaterDepth));
+    typeInfo->AddFieldUChar("OccupancyCaps", offsetof(SFootprint, mOccupancyCaps));
+    typeInfo->AddFieldUChar("Flags", offsetof(SFootprint, mFlags));
   }
 
   /**

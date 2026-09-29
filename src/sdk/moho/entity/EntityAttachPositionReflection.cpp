@@ -13,6 +13,7 @@
 #include "moho/entity/PositionHistory.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/sim/Sim.h"
 #include "moho/task/CTask.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -606,7 +607,7 @@ namespace
     gpg::RField field{};
     field.mName = "PendingCoords";
     field.mType = ResolveVTransformType();
-    field.mOffset = 0x150;
+    field.mOffset = offsetof(moho::Entity, mPendingTransform);
     owner->fields_.push_back(field);
     return &owner->fields_.back();
   }
@@ -1123,7 +1124,7 @@ namespace moho
       return;
     }
 
-    typeInfo->AddBase(gpg::RField{baseType->GetName(), baseType, 0x34});
+    typeInfo->AddBase(gpg::RField{baseType->GetName(), baseType, gpg::BaseSubobjectOffset<Entity, CTask>()});
   }
 
   /**
@@ -1201,14 +1202,9 @@ namespace moho
    */
   void EntityConstruct::Deconstruct(void* const objectPtr)
   {
-    if (!objectPtr) {
-      return;
-    }
-
-    using deleting_dtor_t = void(__thiscall*)(void*, int);
-    void** const vftable = *reinterpret_cast<void***>(objectPtr);
-    auto* const deletingDtor = reinterpret_cast<deleting_dtor_t>(vftable[2]);
-    deletingDtor(objectPtr, 1);
+    // `if (p) p->[slot 2](1)`: the virtual scalar deleting destructor of
+    // `Entity` (~Entity is VFTable slot 2), i.e. a plain `delete`.
+    delete static_cast<Entity*>(objectPtr);
   }
 
   /**

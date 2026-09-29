@@ -96,7 +96,8 @@ const char* CMauiGroupTypeInfo::GetName() const
  */
 void CMauiGroupTypeInfo::Init()
 {
-  size_ = 0x11C;
+  static_assert(sizeof(moho::CMauiGroup) == 0x11C, "moho::CMauiGroup is 0x11C bytes on x86");
+  size_ = sizeof(moho::CMauiGroup);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

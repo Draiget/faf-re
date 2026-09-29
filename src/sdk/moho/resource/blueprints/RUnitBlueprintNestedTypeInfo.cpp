@@ -610,7 +610,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("CommandCaps", CachedCommandCapsType(), 0x00, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("CommandCaps", CachedCommandCapsType(), offsetof(RUnitBlueprintGeneral, CommandCaps), offsetof(RUnitBlueprintGeneral, CommandCaps), nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -627,7 +627,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("ToggleCaps", CachedToggleCapsType(), 0x04, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("ToggleCaps", CachedToggleCapsType(), offsetof(RUnitBlueprintGeneral, ToggleCaps), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -647,29 +647,29 @@ namespace moho
     toggleCapsField->v4 = 3;
     toggleCapsField->mDesc = "Command capability flags for this unit";
 
-    AddFieldWithDescription(typeInfo, "UpgradesTo", CachedRResIdType(), 8, "What unit, if any, does this unit upgrade to.");
-    AddFieldWithDescription(typeInfo, "UpgradesFrom", CachedRResIdType(), 36, "What unit, if any, was this unit upgrade from.");
+    AddFieldWithDescription(typeInfo, "UpgradesTo", CachedRResIdType(), offsetof(RUnitBlueprintGeneral, UpgradesTo), "What unit, if any, does this unit upgrade to.");
+    AddFieldWithDescription(typeInfo, "UpgradesFrom", CachedRResIdType(), offsetof(RUnitBlueprintGeneral, UpgradesFrom), "What unit, if any, was this unit upgrade from.");
     AddFieldWithDescription(
       typeInfo,
       "UpgradesFromBase",
       CachedRResIdType(),
-      64,
+      offsetof(RUnitBlueprintGeneral, UpgradesFromBase),
       "What unit, if any, was this unit upgrade from base."
     );
-    AddFieldWithDescription(typeInfo, "SeedUnit", CachedRResIdType(), 92, "What unit, if any, was this unit seeded from.");
+    AddFieldWithDescription(typeInfo, "SeedUnit", CachedRResIdType(), offsetof(RUnitBlueprintGeneral, SeedUnit), "What unit, if any, was this unit seeded from.");
     AddFieldWithDescription(
       typeInfo,
       "QuickSelectPriority",
       CachedInt32Type(),
-      120,
+      offsetof(RUnitBlueprintGeneral, QuickSelectPriority),
       "Indicates unit has it's own avatar button in the quick select interface, and it's sorting priority"
     );
-    AddFieldWithDescription(typeInfo, "CapCost", CachedFloatType(), 124, "Cost of unit towards unit cap");
+    AddFieldWithDescription(typeInfo, "CapCost", CachedFloatType(), offsetof(RUnitBlueprintGeneral, CapCost), "Cost of unit towards unit cap");
     AddFieldWithDescription(
       typeInfo,
       "SelectionPriority",
       CachedInt32Type(),
-      0x80,
+      offsetof(RUnitBlueprintGeneral, SelectionPriority),
       "Determines if a unit will be selected in a drag selection, only the highest priority units will get selected (1 is highest)"
     );
   }
@@ -718,19 +718,19 @@ namespace moho
    */
   void RUnitBlueprintDisplayTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "DisplayName", CachedStringType(), 0, "Displayed name of unit");
-    AddFieldWithDescription(typeInfo, "MeshBlueprint", CachedRResIdType(), 28, "Mesh blueprint we use for display");
+    AddFieldWithDescription(typeInfo, "DisplayName", CachedStringType(), offsetof(RUnitBlueprintDisplay, DisplayName), "Displayed name of unit");
+    AddFieldWithDescription(typeInfo, "MeshBlueprint", CachedRResIdType(), offsetof(RUnitBlueprintDisplay, MeshBlueprint), "Mesh blueprint we use for display");
     AddFieldWithDescription(
       typeInfo,
       "PlaceholderMeshName",
       CachedStringType(),
-      56,
+      offsetof(RUnitBlueprintDisplay, PlaceholderMeshName),
       "Name of placeholder mesh to use for the unit when normal mesh isn't available"
     );
-    AddFieldWithDescription(typeInfo, "IconName", CachedRResIdType(), 84, "Name of icon to use for the unit");
-    AddFieldWithDescription(typeInfo, "UniformScale", CachedFloatType(), 112, "Uniform scale to be applied to mesh");
-    AddFieldWithDescription(typeInfo, "SpawnRandomRotation", CachedBoolType(), 116, "Spawn with a small random rotation");
-    AddFieldWithDescription(typeInfo, "HideLifebars", CachedBoolType(), 0x75, "Hide lifebars if true");
+    AddFieldWithDescription(typeInfo, "IconName", CachedRResIdType(), offsetof(RUnitBlueprintDisplay, IconName), "Name of icon to use for the unit");
+    AddFieldWithDescription(typeInfo, "UniformScale", CachedFloatType(), offsetof(RUnitBlueprintDisplay, UniformScale), "Uniform scale to be applied to mesh");
+    AddFieldWithDescription(typeInfo, "SpawnRandomRotation", CachedBoolType(), offsetof(RUnitBlueprintDisplay, SpawnRandomRotation), "Spawn with a small random rotation");
+    AddFieldWithDescription(typeInfo, "HideLifebars", CachedBoolType(), offsetof(RUnitBlueprintDisplay, HideLifebars), "Hide lifebars if true");
   }
 
   /**
@@ -803,7 +803,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("BuildOnLayerCaps", CachedLayerType(), 0x7C, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("BuildOnLayerCaps", CachedLayerType(), offsetof(RUnitBlueprintPhysics, BuildOnLayerCapsMask), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -820,7 +820,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("BuildRestriction", CachedBuildRestrictionType(), 0x80, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("BuildRestriction", CachedBuildRestrictionType(), offsetof(RUnitBlueprintPhysics, BuildRestriction), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -862,117 +862,117 @@ namespace moho
       typeInfo,
       "FlattenSkirt",
       CachedBoolType(),
-      0,
+      offsetof(RUnitBlueprintPhysics, FlattenSkirt),
       "If true, terrain under building's skirt will be flattened."
     );
     AddFieldWithDescription(
       typeInfo,
       "SkirtOffsetX",
       CachedFloatType(),
-      4,
+      offsetof(RUnitBlueprintPhysics, SkirtOffsetX),
       "Offset of left edge of skirt from left edge of footprint. Should be <= 0."
     );
     AddFieldWithDescription(
       typeInfo,
       "SkirtOffsetZ",
       CachedFloatType(),
-      0x08,
+      offsetof(RUnitBlueprintPhysics, SkirtOffsetZ),
       "Offset of top edge of skirt from top edge of footprint. Should be <= 0."
     );
-    AddFieldWithDescription(typeInfo, "SkirtSizeX", CachedFloatType(), 0x0C, "Unit construction pad Size X for building");
-    AddFieldWithDescription(typeInfo, "SkirtSizeZ", CachedFloatType(), 0x10, "Unit construction pad Size Z for building");
+    AddFieldWithDescription(typeInfo, "SkirtSizeX", CachedFloatType(), offsetof(RUnitBlueprintPhysics, SkirtSizeX), "Unit construction pad Size X for building");
+    AddFieldWithDescription(typeInfo, "SkirtSizeZ", CachedFloatType(), offsetof(RUnitBlueprintPhysics, SkirtSizeZ), "Unit construction pad Size Z for building");
     AddFieldWithDescription(
       typeInfo,
       "MaxGroundVariation",
       CachedFloatType(),
-      0x14,
+      offsetof(RUnitBlueprintPhysics, MaxGroundVariation),
       "Maximum elevation difference across skirt for build site"
     );
-    gpg::RField* const motionTypeField = AddFieldMovementType(typeInfo, "MotionType", 0x18);
+    gpg::RField* const motionTypeField = AddFieldMovementType(typeInfo, "MotionType", offsetof(RUnitBlueprintPhysics, MotionType));
     motionTypeField->v4 = 3;
     motionTypeField->mDesc = "Method of locomotion";
-    gpg::RField* const altMotionTypeField = AddFieldMovementType(typeInfo, "AltMotionType", 0x1C);
+    gpg::RField* const altMotionTypeField = AddFieldMovementType(typeInfo, "AltMotionType", offsetof(RUnitBlueprintPhysics, AltMotionType));
     altMotionTypeField->v4 = 3;
     altMotionTypeField->mDesc = "Alternate method of locomotion";
-    AddFieldWithDescription(typeInfo, "StandUpright", CachedBoolType(), 0x20, "Stands upright regardless of terrain");
-    AddFieldWithDescription(typeInfo, "SinkLower", CachedBoolType(), 0x21, "Stands upright regardless of terrain");
+    AddFieldWithDescription(typeInfo, "StandUpright", CachedBoolType(), offsetof(RUnitBlueprintPhysics, StandUpright), "Stands upright regardless of terrain");
+    AddFieldWithDescription(typeInfo, "SinkLower", CachedBoolType(), offsetof(RUnitBlueprintPhysics, SinkLower), "Stands upright regardless of terrain");
     AddFieldWithDescription(
       typeInfo,
       "RotateBodyWhileMoving",
       CachedBoolType(),
-      0x22,
+      offsetof(RUnitBlueprintPhysics, RotateBodyWhileMoving),
       "Ability to rotate body to aim weapon slaved to body while in still in motion"
     );
-    AddFieldWithDescription(typeInfo, "DiveSurfaceSpeed", CachedFloatType(), 0x24, "Dive/surface speed for the sub units");
-    AddFieldWithDescription(typeInfo, "MaxSpeed", CachedFloatType(), 0x28, "Maximum speed for the unit");
-    AddFieldWithDescription(typeInfo, "MaxSpeedReverse", CachedFloatType(), 0x2C, "Maximum speed for the unit in reverse");
-    AddFieldWithDescription(typeInfo, "MaxAcceleration", CachedFloatType(), 0x30, "Maximum acceleration for the unit");
-    AddFieldWithDescription(typeInfo, "MaxBrake", CachedFloatType(), 0x34, "Maximum braking acceleration for the unit");
+    AddFieldWithDescription(typeInfo, "DiveSurfaceSpeed", CachedFloatType(), offsetof(RUnitBlueprintPhysics, DiveSurfaceSpeed), "Dive/surface speed for the sub units");
+    AddFieldWithDescription(typeInfo, "MaxSpeed", CachedFloatType(), offsetof(RUnitBlueprintPhysics, MaxSpeed), "Maximum speed for the unit");
+    AddFieldWithDescription(typeInfo, "MaxSpeedReverse", CachedFloatType(), offsetof(RUnitBlueprintPhysics, MaxSpeedReverse), "Maximum speed for the unit in reverse");
+    AddFieldWithDescription(typeInfo, "MaxAcceleration", CachedFloatType(), offsetof(RUnitBlueprintPhysics, MaxAcceleration), "Maximum acceleration for the unit");
+    AddFieldWithDescription(typeInfo, "MaxBrake", CachedFloatType(), offsetof(RUnitBlueprintPhysics, MaxBrake), "Maximum braking acceleration for the unit");
     AddFieldWithDescription(
       typeInfo,
       "MaxSteerForce",
       CachedFloatType(),
-      0x38,
+      offsetof(RUnitBlueprintPhysics, MaxSteerForce),
       "Maximum steer force magnitude that can be applied to acceleration"
     );
     AddFieldWithDescription(
       typeInfo,
       "BankingSlope",
       CachedFloatType(),
-      0x3C,
+      offsetof(RUnitBlueprintPhysics, BankingSlope),
       "How much the unit banks in corners (negative to lean outwards)"
     );
     AddFieldWithDescription(
       typeInfo,
       "RollStability",
       CachedFloatType(),
-      0x40,
+      offsetof(RUnitBlueprintPhysics, RollStability),
       "How stable the unit is against rolling (0 to 1)"
     );
     AddFieldWithDescription(
       typeInfo,
       "RollDamping",
       CachedFloatType(),
-      0x44,
+      offsetof(RUnitBlueprintPhysics, RollDamping),
       "How much damping there is against rolling motion (1 = no motion at all)"
     );
-    AddFieldWithDescription(typeInfo, "WobbleFactor", CachedFloatType(), 0x48, "How much wobbling for the unit while hovering");
+    AddFieldWithDescription(typeInfo, "WobbleFactor", CachedFloatType(), offsetof(RUnitBlueprintPhysics, WobbleFactor), "How much wobbling for the unit while hovering");
     AddFieldWithDescription(
       typeInfo,
       "WobbleSpeed",
       CachedFloatType(),
-      0x4C,
+      offsetof(RUnitBlueprintPhysics, WobbleSpeed),
       "How fast is the wobble. The faster the less stable looking"
     );
-    AddFieldWithDescription(typeInfo, "TurnRadius", CachedFloatType(), 0x50, "Turn radius for the unit, in world units");
-    AddFieldWithDescription(typeInfo, "TurnRate", CachedFloatType(), 0x54, "Turn rate for the unit, in degrees per second");
+    AddFieldWithDescription(typeInfo, "TurnRadius", CachedFloatType(), offsetof(RUnitBlueprintPhysics, TurnRadius), "Turn radius for the unit, in world units");
+    AddFieldWithDescription(typeInfo, "TurnRate", CachedFloatType(), offsetof(RUnitBlueprintPhysics, TurnRate), "Turn rate for the unit, in degrees per second");
     AddFieldWithDescription(
       typeInfo,
       "TurnFacingRate",
       CachedFloatType(),
-      0x58,
+      offsetof(RUnitBlueprintPhysics, TurnFacingRate),
       "Turn facing damping for the unit, usually used for hover units only"
     );
-    AddFieldWithDescription(typeInfo, "RotateOnSpot", CachedBoolType(), 0x5C, "This unit can tries to rotate on the spot.");
+    AddFieldWithDescription(typeInfo, "RotateOnSpot", CachedBoolType(), offsetof(RUnitBlueprintPhysics, RotateOnSpot), "This unit can tries to rotate on the spot.");
     AddFieldWithDescription(
       typeInfo,
       "RotateOnSpotThreshold",
       CachedFloatType(),
-      0x60,
+      offsetof(RUnitBlueprintPhysics, RotateOnSpotThreshold),
       "Threshold for rotate on spot to take effect when moving."
     );
     AddFieldWithDescription(
       typeInfo,
       "Elevation",
       CachedFloatType(),
-      0x64,
+      offsetof(RUnitBlueprintPhysics, Elevation),
       "Preferred height above (-below) land or water surface"
     );
     AddFieldWithDescription(
       typeInfo,
       "AttackElevation",
       CachedFloatType(),
-      0x68,
+      offsetof(RUnitBlueprintPhysics, AttackElevation),
       "Preferred attack height when attacking ground targets... used by dive bombers"
     );
     gpg::RField* const buildOnLayerCapsField = AddFieldBuildOnLayerCaps(typeInfo);
@@ -985,40 +985,40 @@ namespace moho
       typeInfo,
       "CatchUpAcc",
       CachedFloatType(),
-      0x6C,
+      offsetof(RUnitBlueprintPhysics, CatchUpAcc),
       "Acceleration to allow unit to catch up to the target when it starts to drift"
     );
     AddFieldWithDescription(
       typeInfo,
       "BackUpDistance",
       CachedFloatType(),
-      0x70,
+      offsetof(RUnitBlueprintPhysics, BackUpDistance),
       "Distance that the unit will just back up if it's easier to do so"
     );
     AddFieldWithDescription(
       typeInfo,
       "LayerChangeOffsetHeight",
       CachedFloatType(),
-      0x74,
+      offsetof(RUnitBlueprintPhysics, LayerChangeOffsetHeight),
       "An offset to the layer change height used during the transition between seabed/water and land"
     );
     AddFieldWithDescription(
       typeInfo,
       "LayerTransitionDuration",
       CachedFloatType(),
-      0x78,
+      offsetof(RUnitBlueprintPhysics, LayerTransitionDuration),
       "Transition time in seconds when going from water/land and land/water"
     );
-    AddFieldWithDescription(typeInfo, "FuelUseTime", CachedFloatType(), 0x8C, "Unit has fuel for this number of seconds");
-    AddFieldWithDescription(typeInfo, "FuelRechargeRate", CachedFloatType(), 0x90, "Unit fuels up at this rate per second");
-    AddFieldWithDescription(typeInfo, "GroundCollisionOffset", CachedFloatType(), 0x94, "Collision with ground offset");
+    AddFieldWithDescription(typeInfo, "FuelUseTime", CachedFloatType(), offsetof(RUnitBlueprintPhysics, FuelUseTime), "Unit has fuel for this number of seconds");
+    AddFieldWithDescription(typeInfo, "FuelRechargeRate", CachedFloatType(), offsetof(RUnitBlueprintPhysics, FuelRechargeRate), "Unit fuels up at this rate per second");
+    AddFieldWithDescription(typeInfo, "GroundCollisionOffset", CachedFloatType(), offsetof(RUnitBlueprintPhysics, GroundCollisionOffset), "Collision with ground offset");
 
-    gpg::RField* const raisedPlatformsField = AddFieldVectorFloat(typeInfo, "RaisedPlatforms", 0xA8);
+    gpg::RField* const raisedPlatformsField = AddFieldVectorFloat(typeInfo, "RaisedPlatforms", offsetof(RUnitBlueprintPhysics, RaisedPlatforms));
     raisedPlatformsField->mName = "RaisedPlatforms";
     raisedPlatformsField->v4 = 3;
     raisedPlatformsField->mDesc = "Raised platoform definition for ground units to move on";
 
-    gpg::RField* const occupyRectsField = AddFieldVectorFloat(typeInfo, "OccupyRects", 0x98);
+    gpg::RField* const occupyRectsField = AddFieldVectorFloat(typeInfo, "OccupyRects", offsetof(RUnitBlueprintPhysics, OccupyRects));
     occupyRectsField->mName = "OccupyRects";
     occupyRectsField->v4 = 3;
     occupyRectsField->mDesc = "Set up the occupy rectangles of the unit that will override the footprint.";
@@ -1067,171 +1067,171 @@ namespace moho
    */
   void RUnitBlueprintAirTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "CanFly", CachedBoolType(), 0, "Is the unit capable of flight?");
-    AddFieldWithDescription(typeInfo, "Winged", CachedBoolType(), 1, "Does the unit use wings for forward flight?");
-    AddFieldWithDescription(typeInfo, "FlyInWater", CachedBoolType(), 2, "Can this unit fly under water?");
-    AddFieldWithDescription(typeInfo, "AutoLandTime", CachedFloatType(), 4, "Timer to automatically initate landing on ground if idle");
-    AddFieldWithDescription(typeInfo, "MaxAirspeed", CachedFloatType(), 8, "Maximum airspeed");
-    AddFieldWithDescription(typeInfo, "MinAirspeed", CachedFloatType(), 12, "Minimum combat airspeed");
-    AddFieldWithDescription(typeInfo, "TurnSpeed", CachedFloatType(), 16, "Regular turn speed of the unit");
+    AddFieldWithDescription(typeInfo, "CanFly", CachedBoolType(), offsetof(RUnitBlueprintAir, CanFly), "Is the unit capable of flight?");
+    AddFieldWithDescription(typeInfo, "Winged", CachedBoolType(), offsetof(RUnitBlueprintAir, Winged), "Does the unit use wings for forward flight?");
+    AddFieldWithDescription(typeInfo, "FlyInWater", CachedBoolType(), offsetof(RUnitBlueprintAir, FlyInWater), "Can this unit fly under water?");
+    AddFieldWithDescription(typeInfo, "AutoLandTime", CachedFloatType(), offsetof(RUnitBlueprintAir, AutoLandTime), "Timer to automatically initate landing on ground if idle");
+    AddFieldWithDescription(typeInfo, "MaxAirspeed", CachedFloatType(), offsetof(RUnitBlueprintAir, MaxAirspeed), "Maximum airspeed");
+    AddFieldWithDescription(typeInfo, "MinAirspeed", CachedFloatType(), offsetof(RUnitBlueprintAir, MinAirspeed), "Minimum combat airspeed");
+    AddFieldWithDescription(typeInfo, "TurnSpeed", CachedFloatType(), offsetof(RUnitBlueprintAir, TurnSpeed), "Regular turn speed of the unit");
     AddFieldWithDescription(
       typeInfo,
       "CombatTurnSpeed",
       CachedFloatType(),
-      20,
+      offsetof(RUnitBlueprintAir, CombatTurnSpeed),
       "Maximum combat turn speed of the unit for special manuvers"
     );
     AddFieldWithDescription(
       typeInfo,
       "StartTurnDistance",
       CachedFloatType(),
-      24,
+      offsetof(RUnitBlueprintAir, StartTurnDistance),
       "Distance from target at which to start turning to align with it"
     );
     AddFieldWithDescription(
       typeInfo,
       "TightTurnMultiplier",
       CachedFloatType(),
-      0x1C,
+      offsetof(RUnitBlueprintAir, TightTurnMultiplier),
       "Additional turning multiplier ability during a tight turn manuver"
     );
     AddFieldWithDescription(
       typeInfo,
       "SustainedTurnThreshold",
       CachedFloatType(),
-      32,
+      offsetof(RUnitBlueprintAir, SustainedTurnThreshold),
       "Length of time allowed for sustained turn before we re-try a different approach"
     );
-    AddFieldWithDescription(typeInfo, "LiftFactor", CachedFloatType(), 36, "How much altitude the unit can gain/loose per second");
-    AddFieldWithDescription(typeInfo, "BankFactor", CachedFloatType(), 40, "How much aircraft banks in turns; negative to lean out");
+    AddFieldWithDescription(typeInfo, "LiftFactor", CachedFloatType(), offsetof(RUnitBlueprintAir, LiftFactor), "How much altitude the unit can gain/loose per second");
+    AddFieldWithDescription(typeInfo, "BankFactor", CachedFloatType(), offsetof(RUnitBlueprintAir, BankFactor), "How much aircraft banks in turns; negative to lean out");
     AddFieldWithDescription(
       typeInfo,
       "BankForward",
       CachedBoolType(),
-      44,
+      offsetof(RUnitBlueprintAir, BankForward),
       "True if aircraft banks forward/back as well as sideways"
     );
     AddFieldWithDescription(
       typeInfo,
       "EngageDistance",
       CachedFloatType(),
-      0x30,
+      offsetof(RUnitBlueprintAir, EngageDistance),
       "Distance to being engaging enemy target in attack task"
     );
     AddFieldWithDescription(
       typeInfo,
       "BreakOffTrigger",
       CachedFloatType(),
-      52,
+      offsetof(RUnitBlueprintAir, BreakOffTrigger),
       "Distance to target to trigger the breaking off attack"
     );
     AddFieldWithDescription(
       typeInfo,
       "BreakOffDistance",
       CachedFloatType(),
-      56,
+      offsetof(RUnitBlueprintAir, BreakOffDistance),
       "Distnace to break off before turning around for another attack run"
     );
     AddFieldWithDescription(
       typeInfo,
       "BreakOffIfNearNewTarget",
       CachedBoolType(),
-      60,
+      offsetof(RUnitBlueprintAir, BreakOffIfNearNewTarget),
       "If our new target is close by then perform break off first to increase distance between the 2"
     );
     AddFieldWithDescription(
       typeInfo,
       "KMove",
       CachedFloatType(),
-      64,
+      offsetof(RUnitBlueprintAir, KMove),
       "Controller proportional parameter for horizontal motion"
     );
-    AddFieldWithDescription(typeInfo, "KMoveDamping", CachedFloatType(), 68, "Controller damping parameter for horizontal motion");
-    AddFieldWithDescription(typeInfo, "KLift", CachedFloatType(), 0x48, "Controller proportional parameter for vertical motion");
-    AddFieldWithDescription(typeInfo, "KLiftDamping", CachedFloatType(), 76, "Controller damping parameter for vertical motion");
-    AddFieldWithDescription(typeInfo, "KTurn", CachedFloatType(), 80, "Controller proportional parameter for heading changes");
-    AddFieldWithDescription(typeInfo, "KTurnDamping", CachedFloatType(), 84, "Controller damping parameter for heading changes");
-    AddFieldWithDescription(typeInfo, "KRoll", CachedFloatType(), 88, "Controller proportional parameter for roll changes");
-    AddFieldWithDescription(typeInfo, "KRollDamping", CachedFloatType(), 92, "Controller damping parameter for roll changes");
-    AddFieldWithDescription(typeInfo, "CirclingTurnMult", CachedFloatType(), 96, "Adjust turning ability when in circling mode");
+    AddFieldWithDescription(typeInfo, "KMoveDamping", CachedFloatType(), offsetof(RUnitBlueprintAir, KMoveDamping), "Controller damping parameter for horizontal motion");
+    AddFieldWithDescription(typeInfo, "KLift", CachedFloatType(), offsetof(RUnitBlueprintAir, KLift), "Controller proportional parameter for vertical motion");
+    AddFieldWithDescription(typeInfo, "KLiftDamping", CachedFloatType(), offsetof(RUnitBlueprintAir, KLiftDamping), "Controller damping parameter for vertical motion");
+    AddFieldWithDescription(typeInfo, "KTurn", CachedFloatType(), offsetof(RUnitBlueprintAir, KTurn), "Controller proportional parameter for heading changes");
+    AddFieldWithDescription(typeInfo, "KTurnDamping", CachedFloatType(), offsetof(RUnitBlueprintAir, KTurnDamping), "Controller damping parameter for heading changes");
+    AddFieldWithDescription(typeInfo, "KRoll", CachedFloatType(), offsetof(RUnitBlueprintAir, KRoll), "Controller proportional parameter for roll changes");
+    AddFieldWithDescription(typeInfo, "KRollDamping", CachedFloatType(), offsetof(RUnitBlueprintAir, KRollDamping), "Controller damping parameter for roll changes");
+    AddFieldWithDescription(typeInfo, "CirclingTurnMult", CachedFloatType(), offsetof(RUnitBlueprintAir, CirclingTurnMult), "Adjust turning ability when in circling mode");
     AddFieldWithDescription(
       typeInfo,
       "CirclingRadiusChangeMinRatio",
       CachedFloatType(),
-      100,
+      offsetof(RUnitBlueprintAir, CirclingRadiusChangeMinRatio),
       "Min circling radius ratio for unit"
     );
     AddFieldWithDescription(
       typeInfo,
       "CirclingRadiusChangeMaxRatio",
       CachedFloatType(),
-      104,
+      offsetof(RUnitBlueprintAir, CirclingRadiusChangeMaxRatio),
       "Max circling radius ratio for unit"
     );
     AddFieldWithDescription(
       typeInfo,
       "CirclingRadiusVsAirMult",
       CachedFloatType(),
-      0x6C,
+      offsetof(RUnitBlueprintAir, CirclingRadiusVsAirMult),
       "Multiplier to the circling radius when targetting another air unit"
     );
     AddFieldWithDescription(
       typeInfo,
       "CirclingElevationChangeRatio",
       CachedFloatType(),
-      112,
+      offsetof(RUnitBlueprintAir, CirclingElevationChangeRatio),
       "Elevation change ratio of unit when circling"
     );
     AddFieldWithDescription(
       typeInfo,
       "CirclingFlightChangeFrequency",
       CachedFloatType(),
-      116,
+      offsetof(RUnitBlueprintAir, CirclingFlightChangeFrequency),
       "Frequency of flight pattern change for unit"
     );
     AddFieldWithDescription(
       typeInfo,
       "CirclingDirChange",
       CachedBoolType(),
-      120,
+      offsetof(RUnitBlueprintAir, CirclingDirChange),
       "Whether unit should ever change flight direction while circling"
     );
     AddFieldWithDescription(
       typeInfo,
       "HoverOverAttack",
       CachedBoolType(),
-      121,
+      offsetof(RUnitBlueprintAir, HoverOverAttack),
       "Whether unit should hover over the target directly to attack... used for cases like the C.Z.A.R"
     );
     AddFieldWithDescription(
       typeInfo,
       "RandomBreakOffDistanceMult",
       CachedFloatType(),
-      124,
+      offsetof(RUnitBlueprintAir, RandomBreakOffDistanceMult),
       "Random multiplier applied to the break off distance for winged aircrafts"
     );
     AddFieldWithDescription(
       typeInfo,
       "RandomMinChangeCombatStateTime",
       CachedFloatType(),
-      128,
+      offsetof(RUnitBlueprintAir, RandomMinChangeCombatStateTime),
       "Random min time to switch combat state in seconds for winged aircrafts"
     );
     AddFieldWithDescription(
       typeInfo,
       "RandomMaxChangeCombatStateTime",
       CachedFloatType(),
-      132,
+      offsetof(RUnitBlueprintAir, RandomMaxChangeCombatStateTime),
       "Random max time to switch combat state in seconds for winged aircrafts"
     );
     AddFieldWithDescription(
       typeInfo,
       "TransportHoverHeight",
       CachedFloatType(),
-      136,
+      offsetof(RUnitBlueprintAir, TransportHoverHeight),
       "This transport will stay at this height when picking up and dropping off units"
     );
-    AddFieldWithDescription(typeInfo, "PredictAheadForBombDrop", CachedFloatType(), 0x8C, "Time to predict ahead for moving targets?");
+    AddFieldWithDescription(typeInfo, "PredictAheadForBombDrop", CachedFloatType(), offsetof(RUnitBlueprintAir, PredictAheadForBombDrop), "Time to predict ahead for moving targets?");
   }
 
   /**
@@ -1278,38 +1278,38 @@ namespace moho
    */
   void RUnitBlueprintTransportTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "TransportClass", CachedInt32Type(), 0, "Type of attach points required on transports");
-    AddFieldWithDescription(typeInfo, "ClassGenericUpTo", CachedInt32Type(), 4, "Generic slots up to the specified class");
-    AddFieldWithDescription(typeInfo, "Class2AttachSize", CachedInt32Type(), 8, "Number of class 1 attach points this affects");
-    AddFieldWithDescription(typeInfo, "Class3AttachSize", CachedInt32Type(), 12, "Number of class 1 attach points this affects");
-    AddFieldWithDescription(typeInfo, "Class4AttachSize", CachedInt32Type(), 16, "Number of class 1 attach points this affects");
-    AddFieldWithDescription(typeInfo, "ClassSAttachSize", CachedInt32Type(), 20, "Number of class 1 attach points this affects");
+    AddFieldWithDescription(typeInfo, "TransportClass", CachedInt32Type(), offsetof(RUnitBlueprintTransport, TransportClass), "Type of attach points required on transports");
+    AddFieldWithDescription(typeInfo, "ClassGenericUpTo", CachedInt32Type(), offsetof(RUnitBlueprintTransport, ClassGenericUpTo), "Generic slots up to the specified class");
+    AddFieldWithDescription(typeInfo, "Class2AttachSize", CachedInt32Type(), offsetof(RUnitBlueprintTransport, Class2AttachSize), "Number of class 1 attach points this affects");
+    AddFieldWithDescription(typeInfo, "Class3AttachSize", CachedInt32Type(), offsetof(RUnitBlueprintTransport, Class3AttachSize), "Number of class 1 attach points this affects");
+    AddFieldWithDescription(typeInfo, "Class4AttachSize", CachedInt32Type(), offsetof(RUnitBlueprintTransport, Class4AttachSize), "Number of class 1 attach points this affects");
+    AddFieldWithDescription(typeInfo, "ClassSAttachSize", CachedInt32Type(), offsetof(RUnitBlueprintTransport, ClassSAttachSize), "Number of class 1 attach points this affects");
     AddFieldWithDescription(
       typeInfo,
       "AirClass",
       CachedBoolType(),
-      24,
+      offsetof(RUnitBlueprintTransport, AirClass),
       "These define that the unit can only land on air staging platforms"
     );
     AddFieldWithDescription(
       typeInfo,
       "StorageSlots",
       CachedInt32Type(),
-      28,
+      offsetof(RUnitBlueprintTransport, StorageSlots),
       "How many internal storage slots available for the transport on top of the attach points"
     );
     AddFieldWithDescription(
       typeInfo,
       "DockingSlots",
       CachedInt32Type(),
-      32,
+      offsetof(RUnitBlueprintTransport, DockingSlots),
       "How many external docking slots available for air staging platforms"
     );
     AddFieldWithDescription(
       typeInfo,
       "RepairRate",
       CachedFloatType(),
-      0x24,
+      offsetof(RUnitBlueprintTransport, RepairRate),
       "Repairs units attached to me at this % of max health per second"
     );
   }
@@ -1358,87 +1358,87 @@ namespace moho
    */
   void RUnitBlueprintAITypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "GuardScanRadius", CachedFloatType(), 0, "Guard range for the unit");
+    AddFieldWithDescription(typeInfo, "GuardScanRadius", CachedFloatType(), offsetof(RUnitBlueprintAI, GuardScanRadius), "Guard range for the unit");
     AddFieldWithDescription(
       typeInfo,
       "GuardReturnRadius",
       CachedFloatType(),
-      4,
+      offsetof(RUnitBlueprintAI, GuardReturnRadius),
       "Maximum range from the guarded unit before initiating return"
     );
     AddFieldWithDescription(
       typeInfo,
       "StagingPlatformScanRadius",
       CachedFloatType(),
-      8,
+      offsetof(RUnitBlueprintAI, StagingPlatformScanRadius),
       "Range for staging platforms to look for planes to repair and refuel when they are on patrol"
     );
     AddFieldWithDescription(
       typeInfo,
       "ShowAssistRangeOnSelect",
       CachedBoolType(),
-      12,
+      offsetof(RUnitBlueprintAI, ShowAssistRangeOnSelect),
       "Show assist range for the unit if selected"
     );
     AddFieldWithDescription(
       typeInfo,
       "GuardFormationName",
       CachedStringType(),
-      16,
+      offsetof(RUnitBlueprintAI, GuardFormationName),
       "The formation name used for guarding this unit"
     );
-    AddFieldWithDescription(typeInfo, "NeedUnpack", CachedBoolType(), 44, "Unit should unpack before firing weapon");
-    AddFieldWithDescription(typeInfo, "InitialAutoMode", CachedBoolType(), 45, "Initial auto mode behavior for the unit");
+    AddFieldWithDescription(typeInfo, "NeedUnpack", CachedBoolType(), offsetof(RUnitBlueprintAI, NeedUnpack), "Unit should unpack before firing weapon");
+    AddFieldWithDescription(typeInfo, "InitialAutoMode", CachedBoolType(), offsetof(RUnitBlueprintAI, InitialAutoMode), "Initial auto mode behavior for the unit");
     AddFieldWithDescription(
       typeInfo,
       "BeaconName",
       CachedStringType(),
-      48,
+      offsetof(RUnitBlueprintAI, BeaconName),
       "Thie is the beacon that this unit will create under some circumstances"
     );
-    gpg::RField* const targetBonesField = typeInfo->AddFieldVectorString("TargetBones", 76);
+    gpg::RField* const targetBonesField = typeInfo->AddFieldVectorString("TargetBones", offsetof(RUnitBlueprintAI, TargetBones));
     targetBonesField->v4 = 3;
     targetBonesField->mDesc = "Some target bones setup for other units to aim at instead of the default center pos";
     AddFieldWithDescription(
       typeInfo,
       "RefuelingMultiplier",
       CachedFloatType(),
-      92,
+      offsetof(RUnitBlueprintAI, RefuelingMultiplier),
       "This multiplier is applied when a staging platform is refueling an air unit"
     );
     AddFieldWithDescription(
       typeInfo,
       "RefuelingRepairAmount",
       CachedFloatType(),
-      0x60,
+      offsetof(RUnitBlueprintAI, RefuelingRepairAmount),
       "This amount of repair per second offered to refueling air units"
     );
     AddFieldWithDescription(
       typeInfo,
       "RepairConsumeEnergy",
       CachedFloatType(),
-      100,
+      offsetof(RUnitBlueprintAI, RepairConsumeEnergy),
       "This amount of energy per second required to repair air unit"
     );
     AddFieldWithDescription(
       typeInfo,
       "RepairConsumeMass",
       CachedFloatType(),
-      104,
+      offsetof(RUnitBlueprintAI, RepairConsumeMass),
       "This amount of mass per second require to repair air unit"
     );
     AddFieldWithDescription(
       typeInfo,
       "AutoSurfaceToAttack",
       CachedBoolType(),
-      108,
+      offsetof(RUnitBlueprintAI, AutoSurfaceToAttack),
       "Automatically surface to attack ground targets"
     );
     AddFieldWithDescription(
       typeInfo,
       "AttackAngle",
       CachedFloatType(),
-      0x70,
+      offsetof(RUnitBlueprintAI, AttackAngle),
       "Desired angle to face target to maximize the number of guns able to hit the targets"
     );
   }
@@ -1492,7 +1492,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Shield", CachedDefenseShieldType(), 0x38, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Shield", CachedDefenseShieldType(), offsetof(RUnitBlueprintDefense, Shield), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -1504,38 +1504,38 @@ namespace moho
    */
   void RUnitBlueprintDefenseTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "MaxHealth", CachedFloatType(), 0, "Max health value for the unit");
-    AddFieldWithDescription(typeInfo, "Health", CachedFloatType(), 4, "Starting health value for the unit");
-    AddFieldWithDescription(typeInfo, "RegenRate", CachedFloatType(), 8, "Amount of health to regenerate per second");
+    AddFieldWithDescription(typeInfo, "MaxHealth", CachedFloatType(), offsetof(RUnitBlueprintDefense, MaxHealth), "Max health value for the unit");
+    AddFieldWithDescription(typeInfo, "Health", CachedFloatType(), offsetof(RUnitBlueprintDefense, Health), "Starting health value for the unit");
+    AddFieldWithDescription(typeInfo, "RegenRate", CachedFloatType(), offsetof(RUnitBlueprintDefense, RegenRate), "Amount of health to regenerate per second");
     AddFieldWithDescription(
       typeInfo,
       "AirThreatLevel",
       CachedFloatType(),
-      12,
+      offsetof(RUnitBlueprintDefense, AirThreatLevel),
       "Amount of threat this poses to the enemy air units"
     );
     AddFieldWithDescription(
       typeInfo,
       "SurfaceThreatLevel",
       CachedFloatType(),
-      16,
+      offsetof(RUnitBlueprintDefense, SurfaceThreatLevel),
       "Amount of threat this poses to the enemy air units"
     );
     AddFieldWithDescription(
       typeInfo,
       "SubThreatLevel",
       CachedFloatType(),
-      20,
+      offsetof(RUnitBlueprintDefense, SubThreatLevel),
       "Amount of threat this poses to the enemy air units"
     );
     AddFieldWithDescription(
       typeInfo,
       "EconomyThreatLevel",
       CachedFloatType(),
-      24,
+      offsetof(RUnitBlueprintDefense, EconomyThreatLevel),
       "Amount of threat this poses to the enemy air units"
     );
-    AddFieldWithDescription(typeInfo, "ArmorType", CachedStringType(), 28, "The Armor type name");
+    AddFieldWithDescription(typeInfo, "ArmorType", CachedStringType(), offsetof(RUnitBlueprintDefense, ArmorType), "The Armor type name");
     gpg::RField* const shieldField = AddFieldShield(typeInfo);
     shieldField->v4 = 3;
     shieldField->mDesc = "Shield information";
@@ -1605,37 +1605,37 @@ namespace moho
    */
   void RUnitBlueprintIntelTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "VisionRadius", CachedUInt32Type(), 0, "How far we can see above water");
-    AddFieldWithDescription(typeInfo, "WaterVisionRadius", CachedUInt32Type(), 4, "How far we can see underwater");
-    AddFieldWithDescription(typeInfo, "RadarRadius", CachedUInt32Type(), 8, "How far our radar coverage goes");
-    AddFieldWithDescription(typeInfo, "SonarRadius", CachedUInt32Type(), 12, "How far our radar coverage goes");
-    AddFieldWithDescription(typeInfo, "OmniRadius", CachedUInt32Type(), 16, "How far our radar coverage goes");
-    AddFieldWithDescription(typeInfo, "RadarStealth", CachedBoolType(), 20, "Single unit radar stealth");
-    AddFieldWithDescription(typeInfo, "SonarStealth", CachedBoolType(), 21, "Single unit sonar stealth");
-    AddFieldWithDescription(typeInfo, "Cloak", CachedBoolType(), 22, "Single unit cloaking");
-    AddFieldWithDescription(typeInfo, "ShowIntelOnSelect", CachedBoolType(), 23, "Show intel radius of unit if selected");
+    AddFieldWithDescription(typeInfo, "VisionRadius", CachedUInt32Type(), offsetof(RUnitBlueprintIntel, VisionRadius), "How far we can see above water");
+    AddFieldWithDescription(typeInfo, "WaterVisionRadius", CachedUInt32Type(), offsetof(RUnitBlueprintIntel, WaterVisionRadius), "How far we can see underwater");
+    AddFieldWithDescription(typeInfo, "RadarRadius", CachedUInt32Type(), offsetof(RUnitBlueprintIntel, RadarRadius), "How far our radar coverage goes");
+    AddFieldWithDescription(typeInfo, "SonarRadius", CachedUInt32Type(), offsetof(RUnitBlueprintIntel, SonarRadius), "How far our radar coverage goes");
+    AddFieldWithDescription(typeInfo, "OmniRadius", CachedUInt32Type(), offsetof(RUnitBlueprintIntel, OmniRadius), "How far our radar coverage goes");
+    AddFieldWithDescription(typeInfo, "RadarStealth", CachedBoolType(), offsetof(RUnitBlueprintIntel, RadarStealth), "Single unit radar stealth");
+    AddFieldWithDescription(typeInfo, "SonarStealth", CachedBoolType(), offsetof(RUnitBlueprintIntel, SonarStealth), "Single unit sonar stealth");
+    AddFieldWithDescription(typeInfo, "Cloak", CachedBoolType(), offsetof(RUnitBlueprintIntel, Cloak), "Single unit cloaking");
+    AddFieldWithDescription(typeInfo, "ShowIntelOnSelect", CachedBoolType(), offsetof(RUnitBlueprintIntel, ShowIntelOnSelect), "Show intel radius of unit if selected");
     AddFieldWithDescription(
       typeInfo,
       "RadarStealthFieldRadius",
       CachedUInt32Type(),
-      0x18,
+      offsetof(RUnitBlueprintIntel, RadarStealthFieldRadius),
       "How far our radar stealth goes"
     );
     AddFieldWithDescription(
       typeInfo,
       "SonarStealthFieldRadius",
       CachedUInt32Type(),
-      28,
+      offsetof(RUnitBlueprintIntel, SonarStealthFieldRadius),
       "How far our sonar stealth goes"
     );
-    AddFieldWithDescription(typeInfo, "CloakFieldRadius", CachedUInt32Type(), 0x20, "How far our cloaking goes");
-    gpg::RField* const jamRadiusField = AddFieldSMinMaxUInt(typeInfo, "JamRadius", 0x24);
+    AddFieldWithDescription(typeInfo, "CloakFieldRadius", CachedUInt32Type(), offsetof(RUnitBlueprintIntel, CloakFieldRadius), "How far our cloaking goes");
+    gpg::RField* const jamRadiusField = AddFieldSMinMaxUInt(typeInfo, "JamRadius", offsetof(RUnitBlueprintIntel, JamRadius));
     jamRadiusField->v4 = 3;
     jamRadiusField->mDesc = "How far we create fake blips";
-    gpg::RField* const spoofRadiusField = AddFieldSMinMaxUInt(typeInfo, "SpoofRadius", 0x30);
+    gpg::RField* const spoofRadiusField = AddFieldSMinMaxUInt(typeInfo, "SpoofRadius", offsetof(RUnitBlueprintIntel, SpoofRadius));
     spoofRadiusField->v4 = 3;
     spoofRadiusField->mDesc = "How far off to displace blip";
-    gpg::RField* const jammerBlipsField = typeInfo->AddFieldUChar("JammerBlips", 0x2C);
+    gpg::RField* const jammerBlipsField = typeInfo->AddFieldUChar("JammerBlips", offsetof(RUnitBlueprintIntel, JammerBlips));
     jammerBlipsField->v4 = 3;
     jammerBlipsField->mDesc = "How many blips does a jammer produce?";
   }
@@ -1684,63 +1684,63 @@ namespace moho
    */
   void RUnitBlueprintEconomyTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "BuildCostEnergy", CachedFloatType(), 0, "Energy cost to build this unit");
-    AddFieldWithDescription(typeInfo, "BuildCostMass", CachedFloatType(), 4, "Mass cost to build this unit");
-    AddFieldWithDescription(typeInfo, "BuildRate", CachedFloatType(), 8, "How efficient a unit is at building");
-    AddFieldWithDescription(typeInfo, "BuildTime", CachedFloatType(), 0x0C, "How long it takes to build this unit (in seconds)");
+    AddFieldWithDescription(typeInfo, "BuildCostEnergy", CachedFloatType(), offsetof(RUnitBlueprintEconomy, BuildCostEnergy), "Energy cost to build this unit");
+    AddFieldWithDescription(typeInfo, "BuildCostMass", CachedFloatType(), offsetof(RUnitBlueprintEconomy, BuildCostMass), "Mass cost to build this unit");
+    AddFieldWithDescription(typeInfo, "BuildRate", CachedFloatType(), offsetof(RUnitBlueprintEconomy, BuildRate), "How efficient a unit is at building");
+    AddFieldWithDescription(typeInfo, "BuildTime", CachedFloatType(), offsetof(RUnitBlueprintEconomy, BuildTime), "How long it takes to build this unit (in seconds)");
     AddFieldWithDescription(
       typeInfo,
       "StorageEnergy",
       CachedFloatType(),
-      0x10,
+      offsetof(RUnitBlueprintEconomy, StorageEnergy),
       "Energy storage capacity provided by this unit"
     );
-    AddFieldWithDescription(typeInfo, "StorageMass", CachedFloatType(), 0x14, "Mass storage capacity provided by this unit");
+    AddFieldWithDescription(typeInfo, "StorageMass", CachedFloatType(), offsetof(RUnitBlueprintEconomy, StorageMass), "Mass storage capacity provided by this unit");
     AddFieldWithDescription(
       typeInfo,
       "NaturalProducer",
       CachedBoolType(),
-      0x18,
+      offsetof(RUnitBlueprintEconomy, NaturalProducer),
       "Produces resouce naturally and does not consume anything"
     );
 
-    gpg::RField* const buildableCategoriesField = typeInfo->AddFieldVectorString("BuildableCategories", 0x1C);
+    gpg::RField* const buildableCategoriesField = typeInfo->AddFieldVectorString("BuildableCategories", offsetof(RUnitBlueprintEconomy, BuildableCategories));
     buildableCategoriesField->v4 = 3;
     buildableCategoriesField->mDesc = "One of the unit categories that can be built by this unit";
     SetLastFieldName(typeInfo, "BuildableCategory");
 
-    gpg::RField* const rebuildBonusIdsField = typeInfo->AddFieldVectorString("RebuildBonusIds", 0x2C);
+    gpg::RField* const rebuildBonusIdsField = typeInfo->AddFieldVectorString("RebuildBonusIds", offsetof(RUnitBlueprintEconomy, RebuildBonusIds));
     rebuildBonusIdsField->v4 = 3;
     rebuildBonusIdsField->mDesc = "You will get bonus if you rebuild this unit over the wreckage of these wreckages";
 
-    AddFieldWithDescription(typeInfo, "InitialRallyX", CachedFloatType(), 0x68, "default rally point Xfor the factory");
-    AddFieldWithDescription(typeInfo, "InitialRallyZ", CachedFloatType(), 0x6C, "default rally point Z for the factory");
+    AddFieldWithDescription(typeInfo, "InitialRallyX", CachedFloatType(), offsetof(RUnitBlueprintEconomy, InitialRallyX), "default rally point Xfor the factory");
+    AddFieldWithDescription(typeInfo, "InitialRallyZ", CachedFloatType(), offsetof(RUnitBlueprintEconomy, InitialRallyZ), "default rally point Z for the factory");
     AddFieldWithDescription(
       typeInfo,
       "NeedToFaceTargetToBuild",
       CachedBoolType(),
-      0x70,
+      offsetof(RUnitBlueprintEconomy, NeedToFaceTargetToBuild),
       "builder needs to face target before it can build/repair"
     );
     AddFieldWithDescription(
       typeInfo,
       "SacrificeMassMult",
       CachedFloatType(),
-      0x74,
+      offsetof(RUnitBlueprintEconomy, SacrificeMassMult),
       "builder will kill self but provide this amount of mass based on builder's mass cost to the unit it is helping"
     );
     AddFieldWithDescription(
       typeInfo,
       "SacrificeEnergyMult",
       CachedFloatType(),
-      0x78,
+      offsetof(RUnitBlueprintEconomy, SacrificeEnergyMult),
       "builder will kill self but provide this amount of energy based on the builder's energy cost to the unit it is helping"
     );
     AddFieldWithDescription(
       typeInfo,
       "MaxBuildDistance",
       CachedFloatType(),
-      0x7C,
+      offsetof(RUnitBlueprintEconomy, MaxBuildDistance),
       "Maximum build range of the unit. The target must be within this range before the builder can perform operation"
     );
   }
@@ -1793,7 +1793,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("RangeCategory", CachedWeaponRangeCategoryType(), 0x40, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("RangeCategory", CachedWeaponRangeCategoryType(), offsetof(RUnitBlueprintWeapon, RangeCategory), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -1810,7 +1810,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("BallisticArc", CachedWeaponBallisticArcType(), 0xE4, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("BallisticArc", CachedWeaponBallisticArcType(), offsetof(RUnitBlueprintWeapon, BallisticArc), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -1827,7 +1827,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("TargetType", CachedWeaponTargetType(), 0x130, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("TargetType", CachedWeaponTargetType(), offsetof(RUnitBlueprintWeapon, TargetType), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -1839,8 +1839,8 @@ namespace moho
    */
   void RUnitBlueprintWeaponTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "Label", CachedStringType(), 8, "The label to pass to scripts to id this weapon.");
-    AddFieldWithDescription(typeInfo, "DisplayName", CachedStringType(), 0x24, "The display name of this weapon.");
+    AddFieldWithDescription(typeInfo, "Label", CachedStringType(), offsetof(RUnitBlueprintWeapon, Label), "The label to pass to scripts to id this weapon.");
+    AddFieldWithDescription(typeInfo, "DisplayName", CachedStringType(), offsetof(RUnitBlueprintWeapon, DisplayName), "The display name of this weapon.");
     gpg::RField* const rangeCategoryField = AddFieldRangeCategory(typeInfo);
     rangeCategoryField->v4 = 3;
     rangeCategoryField->mDesc = "The range category this weapon satisfies.";
@@ -1848,106 +1848,106 @@ namespace moho
       typeInfo,
       "DummyWeapon",
       CachedBoolType(),
-      0x44,
+      offsetof(RUnitBlueprintWeapon, DummyWeapon),
       "True if the engine should not create an actual weapon for this blueprint. This is used for special damage like the Spiderbot's feet, where no real weapon exists, but we still want a consistent way to spec damage types etc."
     );
-    AddFieldWithDescription(typeInfo, "TargetCheckInterval", CachedFloatType(), 0x50, "Interval between checks for a new weapon target. Default is three seconds.");
+    AddFieldWithDescription(typeInfo, "TargetCheckInterval", CachedFloatType(), offsetof(RUnitBlueprintWeapon, TargetCheckInterval), "Interval between checks for a new weapon target. Default is three seconds.");
     AddFieldWithDescription(
       typeInfo,
       "AlwaysRecheckTarget",
       CachedBoolType(),
-      0x54,
+      offsetof(RUnitBlueprintWeapon, AlwaysRecheckTarget),
       "Always recheck for better target regardless of whether you already have one or not."
     );
     AddFieldWithDescription(
       typeInfo,
       "PrefersPrimaryWeaponTarget",
       CachedBoolType(),
-      0x45,
+      offsetof(RUnitBlueprintWeapon, PrefersPrimaryWeaponTarget),
       "Flag to specify if the weapon prefers to target what the primary weapon is currently targetting."
     );
     AddFieldWithDescription(
       typeInfo,
       "StopOnPrimaryWeaponBusy",
       CachedBoolType(),
-      0x46,
+      offsetof(RUnitBlueprintWeapon, StopOnPrimaryWeaponBusy),
       "Flag to specify to not make weapon active if the primary weapon has a current target."
     );
     AddFieldWithDescription(
       typeInfo,
       "SlavedToBody",
       CachedBoolType(),
-      0x47,
+      offsetof(RUnitBlueprintWeapon, SlavedToBody),
       "Flag to specify if the weapon is slaved to the unit body, thus requiring unit to face target to fire."
     );
-    AddFieldWithDescription(typeInfo, "SlavedToBodyArcRange", CachedFloatType(), 0x48, "Range of arc to be considered slaved to a target.");
+    AddFieldWithDescription(typeInfo, "SlavedToBodyArcRange", CachedFloatType(), offsetof(RUnitBlueprintWeapon, SlavedToBodyArcRange), "Range of arc to be considered slaved to a target.");
     AddFieldWithDescription(
       typeInfo,
       "AutoInitiateAttackCommand",
       CachedBoolType(),
-      0x4C,
+      offsetof(RUnitBlueprintWeapon, AutoInitiateAttackCommand),
       "Flag to specify if the unit will initate an attack command when idle if an enemy target comes within firing/tracking range."
     );
-    AddFieldWithDescription(typeInfo, "MinRadius", CachedFloatType(), 0x58, "The minimum range we must be to fire at our target.");
-    AddFieldWithDescription(typeInfo, "MaxRadius", CachedFloatType(), 0x5C, "The maximum range we can be to fire at our target.");
-    AddFieldWithDescription(typeInfo, "EffectiveRadius", CachedFloatType(), 0x64, "The effective range that this weapon really is.");
+    AddFieldWithDescription(typeInfo, "MinRadius", CachedFloatType(), offsetof(RUnitBlueprintWeapon, MinRadius), "The minimum range we must be to fire at our target.");
+    AddFieldWithDescription(typeInfo, "MaxRadius", CachedFloatType(), offsetof(RUnitBlueprintWeapon, MaxRadius), "The maximum range we can be to fire at our target.");
+    AddFieldWithDescription(typeInfo, "EffectiveRadius", CachedFloatType(), offsetof(RUnitBlueprintWeapon, EffectiveRadius), "The effective range that this weapon really is.");
     AddFieldWithDescription(
       typeInfo,
       "MaxHeightDiff",
       CachedFloatType(),
-      0x68,
+      offsetof(RUnitBlueprintWeapon, MaxHeightDiff),
       "The maximum height diff range for the weapon. Keep in mind weapons are now cylinder in nature."
     );
     AddFieldWithDescription(
       typeInfo,
       "TrackingRadius",
       CachedFloatType(),
-      0x6C,
+      offsetof(RUnitBlueprintWeapon, TrackingRadius),
       "The range where we begin tracking a unit but will not fire yet; multiplier of the weapon's MaxRadius"
     );
-    AddFieldWithDescription(typeInfo, "HeadingArcCenter", CachedFloatType(), 0x70, "Center of firing arc for this weapon, in degrees. Default is 0");
+    AddFieldWithDescription(typeInfo, "HeadingArcCenter", CachedFloatType(), offsetof(RUnitBlueprintWeapon, HeadingArcCenter), "Center of firing arc for this weapon, in degrees. Default is 0");
     AddFieldWithDescription(
       typeInfo,
       "HeadingArcRange",
       CachedFloatType(),
-      0x74,
+      offsetof(RUnitBlueprintWeapon, HeadingArcRange),
       "Maximum angle from HeadingArcCenter, in degrees. Default is 180, meaning weapon can aim anywhere."
     );
-    AddFieldWithDescription(typeInfo, "FiringTolerance", CachedFloatType(), 0x78, "How accurate do we have to be aimed before we take a shot.  In degrees.");
-    AddFieldWithDescription(typeInfo, "FiringRandomness", CachedFloatType(), 0x7C, "How many degrees of arc can we randomly be off by (gaussian)");
-    AddFieldWithDescription(typeInfo, "IgnoreIfDisabled", CachedBoolType(), 0x149, "Does not consider weapon when attacking targets if it is disabled");
-    AddFieldWithDescription(typeInfo, "CannotAttackGround", CachedBoolType(), 0x14A, "Weapon cannot attack ground positions");
-    AddFieldWithDescription(typeInfo, "RequiresEnergy", CachedFloatType(), 0x80, "Weapon requires this much available energy to fire");
-    AddFieldWithDescription(typeInfo, "RequiresMass", CachedFloatType(), 0x84, "Weapon requires this much available mass to fire");
-    AddFieldWithDescription(typeInfo, "MuzzleVelocity", CachedFloatType(), 0x88, "Weapon's muzzle velocity");
-    AddFieldWithDescription(typeInfo, "MuzzleVelocityRandom", CachedFloatType(), 0x8C, "Random variation for muzzle velocity (gaussian)");
+    AddFieldWithDescription(typeInfo, "FiringTolerance", CachedFloatType(), offsetof(RUnitBlueprintWeapon, FiringTolerance), "How accurate do we have to be aimed before we take a shot.  In degrees.");
+    AddFieldWithDescription(typeInfo, "FiringRandomness", CachedFloatType(), offsetof(RUnitBlueprintWeapon, FiringRandomness), "How many degrees of arc can we randomly be off by (gaussian)");
+    AddFieldWithDescription(typeInfo, "IgnoreIfDisabled", CachedBoolType(), offsetof(RUnitBlueprintWeapon, IgnoreIfDisabled), "Does not consider weapon when attacking targets if it is disabled");
+    AddFieldWithDescription(typeInfo, "CannotAttackGround", CachedBoolType(), offsetof(RUnitBlueprintWeapon, CannotAttackGround), "Weapon cannot attack ground positions");
+    AddFieldWithDescription(typeInfo, "RequiresEnergy", CachedFloatType(), offsetof(RUnitBlueprintWeapon, RequiresEnergy), "Weapon requires this much available energy to fire");
+    AddFieldWithDescription(typeInfo, "RequiresMass", CachedFloatType(), offsetof(RUnitBlueprintWeapon, RequiresMass), "Weapon requires this much available mass to fire");
+    AddFieldWithDescription(typeInfo, "MuzzleVelocity", CachedFloatType(), offsetof(RUnitBlueprintWeapon, MuzzleVelocity), "Weapon's muzzle velocity");
+    AddFieldWithDescription(typeInfo, "MuzzleVelocityRandom", CachedFloatType(), offsetof(RUnitBlueprintWeapon, MuzzleVelocityRandom), "Random variation for muzzle velocity (gaussian)");
     AddFieldWithDescription(
       typeInfo,
       "MuzzleVelocityReduceDistance",
       CachedFloatType(),
-      0x90,
+      offsetof(RUnitBlueprintWeapon, MuzzleVelocityReduceDistance),
       "Target distance at which weapon will start reducing muzzle velocity to maintain a higher firing arc."
     );
-    AddFieldWithDescription(typeInfo, "LeadTarget", CachedBoolType(), 0x94, "True if weapon should lead its target when aiming.");
+    AddFieldWithDescription(typeInfo, "LeadTarget", CachedBoolType(), offsetof(RUnitBlueprintWeapon, LeadTarget), "True if weapon should lead its target when aiming.");
     AddFieldWithDescription(
       typeInfo,
       "ProjectileLifetime",
       CachedFloatType(),
-      0x98,
+      offsetof(RUnitBlueprintWeapon, ProjectileLifetime),
       "Lifetime for projectile in seconds. If 0, the projectile will use the lifetime from its own blueprint."
     );
     AddFieldWithDescription(
       typeInfo,
       "ProjectileLifetimeUsesMultiplier",
       CachedFloatType(),
-      0x9C,
+      offsetof(RUnitBlueprintWeapon, ProjectileLifetimeUsesMultiplier),
       "Lifetime for projectile based on lifetime equation of Multiplier * (MaxRadius/MuzzleVelocity)"
     );
-    AddFieldWithDescription(typeInfo, "Damage", CachedFloatType(), 0xA0, "How much damage to cause.");
-    AddFieldWithDescription(typeInfo, "DamageRadius", CachedFloatType(), 0xA4, "Radius to inflict damage in.");
-    AddFieldWithDescription(typeInfo, "DamageType", CachedStringType(), 0xA8, "Type of damage this weapon deals");
-    AddFieldWithDescription(typeInfo, "RateOfFire", CachedFloatType(), 0xC4, "How many shots/second we can fire.");
-    AddFieldWithDescription(typeInfo, "ProjectileId", CachedRResIdType(), 0xC8, "Blueprint Id for projectile, if any.");
+    AddFieldWithDescription(typeInfo, "Damage", CachedFloatType(), offsetof(RUnitBlueprintWeapon, Damage), "How much damage to cause.");
+    AddFieldWithDescription(typeInfo, "DamageRadius", CachedFloatType(), offsetof(RUnitBlueprintWeapon, DamageRadius), "Radius to inflict damage in.");
+    AddFieldWithDescription(typeInfo, "DamageType", CachedStringType(), offsetof(RUnitBlueprintWeapon, DamageType), "Type of damage this weapon deals");
+    AddFieldWithDescription(typeInfo, "RateOfFire", CachedFloatType(), offsetof(RUnitBlueprintWeapon, RateOfFire), "How many shots/second we can fire.");
+    AddFieldWithDescription(typeInfo, "ProjectileId", CachedRResIdType(), offsetof(RUnitBlueprintWeapon, ProjectileId), "Blueprint Id for projectile, if any.");
     gpg::RField* const ballisticArcField = AddFieldBallisticArc(typeInfo);
     ballisticArcField->v4 = 3;
     ballisticArcField->mDesc = "High or low arc for projectiles";
@@ -1955,64 +1955,64 @@ namespace moho
       typeInfo,
       "TargetRestrictOnlyAllow",
       CachedStringType(),
-      0xE8,
+      offsetof(RUnitBlueprintWeapon, TargetRestrictOnlyAllow),
       "Comma separated list of Entity Category that are the only valid targets."
     );
     AddFieldWithDescription(
       typeInfo,
       "TargetRestrictDisallow",
       CachedStringType(),
-      0x104,
+      offsetof(RUnitBlueprintWeapon, TargetRestrictDisallow),
       "Comma separated list of Entity Category that are always invalid targets."
     );
     gpg::RField* const targetTypeField = AddFieldTargetType(typeInfo);
     targetTypeField->v4 = 3;
     targetTypeField->mDesc = "The type of entity this unit can target.";
-    AddFieldWithDescription(typeInfo, "ManualFire", CachedBoolType(), 0x120, "Never fires automaticly.");
-    AddFieldWithDescription(typeInfo, "NukeWeapon", CachedBoolType(), 0x121, "Nuke weapon flag.");
-    AddFieldWithDescription(typeInfo, "OverChargeWeapon", CachedBoolType(), 0x122, "Overcharge weapon flag.");
-    AddFieldWithDescription(typeInfo, "NeedPrep", CachedBoolType(), 0x123, "Weapon needs prep time (applies to most Aeon units).");
-    AddFieldWithDescription(typeInfo, "CountedProjectile", CachedBoolType(), 0x124, "This projectile needs to be built and stored before the weapon can fire");
-    AddFieldWithDescription(typeInfo, "MaxProjectileStorage", CachedInt32Type(), 0x128, "This weapon can only hold this many counted projectiles");
-    AddFieldWithDescription(typeInfo, "IgnoreIfDisabled", CachedBoolType(), 0x149, "Ignore trying to use the weapon if it's disabled.");
-    AddFieldWithDescription(typeInfo, "IgnoresAlly", CachedBoolType(), 0x12C, "This determines whether the weapon affect ally units or not");
-    AddFieldWithDescription(typeInfo, "AttackGroundTries", CachedInt32Type(), 0x134, "This determines the number of shots at a ground target before moving on to the enxt target");
-    AddFieldWithDescription(typeInfo, "AimsStraightOnDisable", CachedBoolType(), 0x138, "This weapon will aim straight ahead when disabled");
-    AddFieldWithDescription(typeInfo, "Turreted", CachedBoolType(), 0x139, "This weapon is on a turret");
-    AddFieldWithDescription(typeInfo, "YawOnlyOnTarget", CachedBoolType(), 0x13A, "This weapon is considered on target if the yaw is facing the target");
-    AddFieldWithDescription(typeInfo, "AboveWaterFireOnly", CachedBoolType(), 0x13B, "This weapon will only fire if it is above water");
-    AddFieldWithDescription(typeInfo, "BelowWaterFireOnly", CachedBoolType(), 0x13C, "This weapon will only fire if it is below water");
-    AddFieldWithDescription(typeInfo, "AboveWaterTargetsOnly", CachedBoolType(), 0x13D, "This weapon will only at targets above water");
-    AddFieldWithDescription(typeInfo, "BelowWaterTargetsOnly", CachedBoolType(), 0x13E, "This weapon will only at targets below water");
-    AddFieldWithDescription(typeInfo, "NeedToComputeBombDrop", CachedBoolType(), 0x140, "This to compute when to drop bomb?");
-    AddFieldWithDescription(typeInfo, "BombDropThreshold", CachedFloatType(), 0x144, "Threshold to release point before releasing ordinance?");
-    AddFieldWithDescription(typeInfo, "ReTargetOnMiss", CachedBoolType(), 0x13F, "This weapon will find new target on miss events");
+    AddFieldWithDescription(typeInfo, "ManualFire", CachedBoolType(), offsetof(RUnitBlueprintWeapon, ManualFire), "Never fires automaticly.");
+    AddFieldWithDescription(typeInfo, "NukeWeapon", CachedBoolType(), offsetof(RUnitBlueprintWeapon, NukeWeapon), "Nuke weapon flag.");
+    AddFieldWithDescription(typeInfo, "OverChargeWeapon", CachedBoolType(), offsetof(RUnitBlueprintWeapon, OverChargeWeapon), "Overcharge weapon flag.");
+    AddFieldWithDescription(typeInfo, "NeedPrep", CachedBoolType(), offsetof(RUnitBlueprintWeapon, NeedPrep), "Weapon needs prep time (applies to most Aeon units).");
+    AddFieldWithDescription(typeInfo, "CountedProjectile", CachedBoolType(), offsetof(RUnitBlueprintWeapon, CountedProjectile), "This projectile needs to be built and stored before the weapon can fire");
+    AddFieldWithDescription(typeInfo, "MaxProjectileStorage", CachedInt32Type(), offsetof(RUnitBlueprintWeapon, MaxProjectileStorage), "This weapon can only hold this many counted projectiles");
+    AddFieldWithDescription(typeInfo, "IgnoreIfDisabled", CachedBoolType(), offsetof(RUnitBlueprintWeapon, IgnoreIfDisabled), "Ignore trying to use the weapon if it's disabled.");
+    AddFieldWithDescription(typeInfo, "IgnoresAlly", CachedBoolType(), offsetof(RUnitBlueprintWeapon, IgnoresAlly), "This determines whether the weapon affect ally units or not");
+    AddFieldWithDescription(typeInfo, "AttackGroundTries", CachedInt32Type(), offsetof(RUnitBlueprintWeapon, AttackGroundTries), "This determines the number of shots at a ground target before moving on to the enxt target");
+    AddFieldWithDescription(typeInfo, "AimsStraightOnDisable", CachedBoolType(), offsetof(RUnitBlueprintWeapon, AimsStraightOnDisable), "This weapon will aim straight ahead when disabled");
+    AddFieldWithDescription(typeInfo, "Turreted", CachedBoolType(), offsetof(RUnitBlueprintWeapon, Turreted), "This weapon is on a turret");
+    AddFieldWithDescription(typeInfo, "YawOnlyOnTarget", CachedBoolType(), offsetof(RUnitBlueprintWeapon, YawOnlyOnTarget), "This weapon is considered on target if the yaw is facing the target");
+    AddFieldWithDescription(typeInfo, "AboveWaterFireOnly", CachedBoolType(), offsetof(RUnitBlueprintWeapon, AboveWaterFireOnly), "This weapon will only fire if it is above water");
+    AddFieldWithDescription(typeInfo, "BelowWaterFireOnly", CachedBoolType(), offsetof(RUnitBlueprintWeapon, BelowWaterFireOnly), "This weapon will only fire if it is below water");
+    AddFieldWithDescription(typeInfo, "AboveWaterTargetsOnly", CachedBoolType(), offsetof(RUnitBlueprintWeapon, AboveWaterTargetsOnly), "This weapon will only at targets above water");
+    AddFieldWithDescription(typeInfo, "BelowWaterTargetsOnly", CachedBoolType(), offsetof(RUnitBlueprintWeapon, BelowWaterTargetsOnly), "This weapon will only at targets below water");
+    AddFieldWithDescription(typeInfo, "NeedToComputeBombDrop", CachedBoolType(), offsetof(RUnitBlueprintWeapon, NeedToComputeBombDrop), "This to compute when to drop bomb?");
+    AddFieldWithDescription(typeInfo, "BombDropThreshold", CachedFloatType(), offsetof(RUnitBlueprintWeapon, BombDropThreshold), "Threshold to release point before releasing ordinance?");
+    AddFieldWithDescription(typeInfo, "ReTargetOnMiss", CachedBoolType(), offsetof(RUnitBlueprintWeapon, ReTargetOnMiss), "This weapon will find new target on miss events");
     AddFieldWithDescription(
       typeInfo,
       "UseFiringSolutionInsteadOfAimBone",
       CachedBoolType(),
-      0x148,
+      offsetof(RUnitBlueprintWeapon, UseFiringSolutionInsteadOfAimBone),
       "This weapon uses the recent firing solution to create projectile istead of the aim bone transform"
     );
     AddFieldWithDescription(
       typeInfo,
       "UIMinRangeVisualId",
       CachedStringType(),
-      0x14C,
+      offsetof(RUnitBlueprintWeapon, UIMinRangeVisualId),
       "Allows the UI to know what kind of minimum range indicator to draw for this weapon."
     );
     AddFieldWithDescription(
       typeInfo,
       "UIMaxRangeVisualId",
       CachedStringType(),
-      0x168,
+      offsetof(RUnitBlueprintWeapon, UIMaxRangeVisualId),
       "Allows the UI to know what kind of maximum range indicator to draw for this weapon."
     );
     AddFieldWithDescription(
       typeInfo,
       "MaximumBeamLength",
       CachedFloatType(),
-      0x60,
+      offsetof(RUnitBlueprintWeapon, MaximumBeamLength),
       "Allows the setting of the Maximum Beam length so beams and radius can be different. Default to MaxRadius."
     );
   }

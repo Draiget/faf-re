@@ -131,27 +131,27 @@ namespace moho
    */
   void RProjectileBlueprintDisplayTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "MeshBlueprint", CachedRResIdType(), 0x00, "Mesh to use as the display of this projectile");
-    AddFieldWithDescription(typeInfo, "UniformScale", CachedFloatType(), 0x1C, "Uniform scale to apply to mesh");
-    AddFieldWithDescription(typeInfo, "MeshScaleRange", CachedFloatType(), 0x20, "range uniform scale of this projectile");
-    AddFieldWithDescription(typeInfo, "MeshScaleVelocity", CachedFloatType(), 0x24, "rate at which scale changes");
-    AddFieldWithDescription(typeInfo, "MeshScaleVelocityRange", CachedFloatType(), 0x28, "range rate at which scale changes");
+    AddFieldWithDescription(typeInfo, "MeshBlueprint", CachedRResIdType(), offsetof(RProjectileBlueprintDisplay, MeshBlueprint), "Mesh to use as the display of this projectile");
+    AddFieldWithDescription(typeInfo, "UniformScale", CachedFloatType(), offsetof(RProjectileBlueprintDisplay, UniformScale), "Uniform scale to apply to mesh");
+    AddFieldWithDescription(typeInfo, "MeshScaleRange", CachedFloatType(), offsetof(RProjectileBlueprintDisplay, MeshScaleRange), "range uniform scale of this projectile");
+    AddFieldWithDescription(typeInfo, "MeshScaleVelocity", CachedFloatType(), offsetof(RProjectileBlueprintDisplay, MeshScaleVelocity), "rate at which scale changes");
+    AddFieldWithDescription(typeInfo, "MeshScaleVelocityRange", CachedFloatType(), offsetof(RProjectileBlueprintDisplay, MeshScaleVelocityRange), "range rate at which scale changes");
     AddFieldWithDescription(
       typeInfo,
       "CameraFollowsProjectile",
       CachedBoolType(),
-      0x2C,
+      offsetof(RProjectileBlueprintDisplay, CameraFollowsProjectile),
       "Set if tracking camera should follow this projectile when it's created."
     );
     AddFieldWithDescription(
       typeInfo,
       "CameraFollowTimeout",
       CachedFloatType(),
-      0x30,
+      offsetof(RProjectileBlueprintDisplay, CameraFollowTimeout),
       "After I die, how long until we snap the camera back to the launcher?"
     );
     AddFieldWithDescription(
-      typeInfo, "StrategicIconSize", CachedFloatType(), 0x34, "How large is the strategic icon square for the projectile"
+      typeInfo, "StrategicIconSize", CachedFloatType(), offsetof(RProjectileBlueprintDisplay, StrategicIconSize), "How large is the strategic icon square for the projectile"
     );
   }
 
@@ -200,9 +200,9 @@ namespace moho
    */
   void RProjectileBlueprintEconomyTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "BuildCostEnergy", CachedFloatType(), 0x00, "Energy cost to build this projectile");
-    AddFieldWithDescription(typeInfo, "BuildCostMass", CachedFloatType(), 0x04, "Mass cost to build this projectile");
-    AddFieldWithDescription(typeInfo, "BuildTime", CachedFloatType(), 0x08, "Time in seconds to build this projectile");
+    AddFieldWithDescription(typeInfo, "BuildCostEnergy", CachedFloatType(), offsetof(RProjectileBlueprintEconomy, BuildCostEnergy), "Energy cost to build this projectile");
+    AddFieldWithDescription(typeInfo, "BuildCostMass", CachedFloatType(), offsetof(RProjectileBlueprintEconomy, BuildCostMass), "Mass cost to build this projectile");
+    AddFieldWithDescription(typeInfo, "BuildTime", CachedFloatType(), offsetof(RProjectileBlueprintEconomy, BuildTime), "Time in seconds to build this projectile");
   }
 
   /**
@@ -254,106 +254,106 @@ namespace moho
       typeInfo,
       "CollideSurface",
       CachedBoolType(),
-      0x00,
+      offsetof(RProjectileBlueprintPhysics, CollideSurface),
       "Whether to check the projectile for collisions against terrain/water"
     );
     AddFieldWithDescription(
       typeInfo,
       "CollideEntity",
       CachedBoolType(),
-      0x01,
+      offsetof(RProjectileBlueprintPhysics, CollideEntity),
       "Whether to check the projectile for collisions against other entities"
     );
     AddFieldWithDescription(
-      typeInfo, "TrackTarget", CachedBoolType(), 0x02, "True if projectile should turn to track its target"
+      typeInfo, "TrackTarget", CachedBoolType(), offsetof(RProjectileBlueprintPhysics, TrackTarget), "True if projectile should turn to track its target"
     );
     AddFieldWithDescription(
-      typeInfo, "VelocityAlign", CachedBoolType(), 0x03, "True if projectile should always face the direction its moving"
+      typeInfo, "VelocityAlign", CachedBoolType(), offsetof(RProjectileBlueprintPhysics, VelocityAlign), "True if projectile should always face the direction its moving"
     );
-    AddFieldWithDescription(typeInfo, "StayUpright", CachedBoolType(), 0x04, "True if projectile should always remain upright");
+    AddFieldWithDescription(typeInfo, "StayUpright", CachedBoolType(), offsetof(RProjectileBlueprintPhysics, StayUpright), "True if projectile should always remain upright");
     AddFieldWithDescription(
       typeInfo,
       "LeadTarget",
       CachedBoolType(),
-      0x05,
+      offsetof(RProjectileBlueprintPhysics, LeadTarget),
       "Whether projectiles should lead their target. Applies only to tracking projectiles."
     );
     AddFieldWithDescription(
       typeInfo,
       "StayUnderwater",
       CachedBoolType(),
-      0x06,
+      offsetof(RProjectileBlueprintPhysics, StayUnderwater),
       "Whether projectiles should try to stay underwater. Applies only to tracking projectiles."
     );
     AddFieldWithDescription(
-      typeInfo, "UseGravity", CachedBoolType(), 0x07, "True if the projectile is initially affected by gravity."
+      typeInfo, "UseGravity", CachedBoolType(), offsetof(RProjectileBlueprintPhysics, UseGravity), "True if the projectile is initially affected by gravity."
     );
     AddFieldWithDescription(
       typeInfo,
       "DetonateAboveHeight",
       CachedFloatType(),
-      0x08,
+      offsetof(RProjectileBlueprintPhysics, DetonateAboveHeight),
       "Projectile will detonate when going above this height above ground."
     );
     AddFieldWithDescription(
       typeInfo,
       "DetonateBelowHeight",
       CachedFloatType(),
-      0x0C,
+      offsetof(RProjectileBlueprintPhysics, DetonateBelowHeight),
       "Projectile will detonate when dipping under this height above ground."
     );
     AddFieldWithDescription(
       typeInfo,
       "TurnRate",
       CachedFloatType(),
-      0x10,
+      offsetof(RProjectileBlueprintPhysics, TurnRate),
       "Max turn rate for the projectile, in degrees per second. Applies only to tracking and velocity-aligned projectiles."
     );
-    AddFieldWithDescription(typeInfo, "TurnRateRange", CachedFloatType(), 0x14, "Random variation around TurnRate");
-    AddFieldWithDescription(typeInfo, "Lifetime", CachedFloatType(), 0x18, "Numbers of seconds I'm alive");
-    AddFieldWithDescription(typeInfo, "LifetimeRange", CachedFloatType(), 0x1C, "Random variation around Lifetime");
-    AddFieldWithDescription(typeInfo, "InitialSpeed", CachedFloatType(), 0x20, "Initial speed for the projectile.");
-    AddFieldWithDescription(typeInfo, "InitialSpeedRange", CachedFloatType(), 0x24, "Random variation around InitialSpeed");
-    AddFieldWithDescription(typeInfo, "MaxSpeed", CachedFloatType(), 0x28, "Maximum speed for the Projectile");
-    AddFieldWithDescription(typeInfo, "MaxSpeedRange", CachedFloatType(), 0x2C, "Random variation around MaxSpeed");
-    AddFieldWithDescription(typeInfo, "Acceleration", CachedFloatType(), 0x30, "Forward acceleration of the Projectile");
-    AddFieldWithDescription(typeInfo, "AccelerationRange", CachedFloatType(), 0x34, "Random variation around Acceleration");
-    AddFieldWithDescription(typeInfo, "PositionX", CachedFloatType(), 0x38, "Initial Position offset X component");
-    AddFieldWithDescription(typeInfo, "PositionXRange", CachedFloatType(), 0x44, "Random variation around PositionX");
-    AddFieldWithDescription(typeInfo, "PositionY", CachedFloatType(), 0x3C, "Initial Position offset Y component");
-    AddFieldWithDescription(typeInfo, "PositionYRange", CachedFloatType(), 0x48, "Random variation around PositionY");
-    AddFieldWithDescription(typeInfo, "PositionZ", CachedFloatType(), 0x40, "Initial Position offset Z component");
-    AddFieldWithDescription(typeInfo, "PositionZRange", CachedFloatType(), 0x4C, "Random variation around PositionZ");
-    AddFieldWithDescription(typeInfo, "DirectionX", CachedFloatType(), 0x50, "Initial Direction X component");
-    AddFieldWithDescription(typeInfo, "DirectionXRange", CachedFloatType(), 0x5C, "Random variation around DirectionX");
-    AddFieldWithDescription(typeInfo, "DirectionY", CachedFloatType(), 0x54, "Initial Direction Y component");
-    AddFieldWithDescription(typeInfo, "DirectionYRange", CachedFloatType(), 0x60, "Random variation around DirectionY");
-    AddFieldWithDescription(typeInfo, "DirectionZ", CachedFloatType(), 0x58, "Initial Direction Z component");
-    AddFieldWithDescription(typeInfo, "DirectionZRange", CachedFloatType(), 0x64, "Random variation around DirectionZ");
-    AddFieldWithDescription(typeInfo, "RotationalVelocity", CachedFloatType(), 0x68, "rotation rate in random direction");
+    AddFieldWithDescription(typeInfo, "TurnRateRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, TurnRateRange), "Random variation around TurnRate");
+    AddFieldWithDescription(typeInfo, "Lifetime", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, Lifetime), "Numbers of seconds I'm alive");
+    AddFieldWithDescription(typeInfo, "LifetimeRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, LifetimeRange), "Random variation around Lifetime");
+    AddFieldWithDescription(typeInfo, "InitialSpeed", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, InitialSpeed), "Initial speed for the projectile.");
+    AddFieldWithDescription(typeInfo, "InitialSpeedRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, InitialSpeedRange), "Random variation around InitialSpeed");
+    AddFieldWithDescription(typeInfo, "MaxSpeed", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, MaxSpeed), "Maximum speed for the Projectile");
+    AddFieldWithDescription(typeInfo, "MaxSpeedRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, MaxSpeedRange), "Random variation around MaxSpeed");
+    AddFieldWithDescription(typeInfo, "Acceleration", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, Acceleration), "Forward acceleration of the Projectile");
+    AddFieldWithDescription(typeInfo, "AccelerationRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, AccelerationRange), "Random variation around Acceleration");
+    AddFieldWithDescription(typeInfo, "PositionX", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, PositionX), "Initial Position offset X component");
+    AddFieldWithDescription(typeInfo, "PositionXRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, PositionXRange), "Random variation around PositionX");
+    AddFieldWithDescription(typeInfo, "PositionY", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, PositionY), "Initial Position offset Y component");
+    AddFieldWithDescription(typeInfo, "PositionYRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, PositionYRange), "Random variation around PositionY");
+    AddFieldWithDescription(typeInfo, "PositionZ", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, PositionZ), "Initial Position offset Z component");
+    AddFieldWithDescription(typeInfo, "PositionZRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, PositionZRange), "Random variation around PositionZ");
+    AddFieldWithDescription(typeInfo, "DirectionX", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, DirectionX), "Initial Direction X component");
+    AddFieldWithDescription(typeInfo, "DirectionXRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, DirectionXRange), "Random variation around DirectionX");
+    AddFieldWithDescription(typeInfo, "DirectionY", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, DirectionY), "Initial Direction Y component");
+    AddFieldWithDescription(typeInfo, "DirectionYRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, DirectionYRange), "Random variation around DirectionY");
+    AddFieldWithDescription(typeInfo, "DirectionZ", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, DirectionZ), "Initial Direction Z component");
+    AddFieldWithDescription(typeInfo, "DirectionZRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, DirectionZRange), "Random variation around DirectionZ");
+    AddFieldWithDescription(typeInfo, "RotationalVelocity", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, RotationalVelocity), "rotation rate in random direction");
     AddFieldWithDescription(
-      typeInfo, "RotationalVelocityRange", CachedFloatType(), 0x6C, "range rotation rate in random direction"
+      typeInfo, "RotationalVelocityRange", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, RotationalVelocityRange), "range rotation rate in random direction"
     );
     AddFieldWithDescription(
-      typeInfo, "MinBounceCount", CachedIntType(), 0x7C, "Minimum times to bounce on terrain before impact"
+      typeInfo, "MinBounceCount", CachedIntType(), offsetof(RProjectileBlueprintPhysics, MinBounceCount), "Minimum times to bounce on terrain before impact"
     );
     AddFieldWithDescription(
-      typeInfo, "MaxBounceCount", CachedIntType(), 0x80, "Maximum times to bounce on terrain before impact"
+      typeInfo, "MaxBounceCount", CachedIntType(), offsetof(RProjectileBlueprintPhysics, MaxBounceCount), "Maximum times to bounce on terrain before impact"
     );
     AddFieldWithDescription(
-      typeInfo, "BounceVelDamp", CachedFloatType(), 0x84, "Bounce velocity dampening. .75 loses 75% velocity, def: 0.5f"
+      typeInfo, "BounceVelDamp", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, BounceVelDamp), "Bounce velocity dampening. .75 loses 75% velocity, def: 0.5f"
     );
-    AddFieldWithDescription(typeInfo, "DestroyOnWater", CachedBoolType(), 0x78, "Destroy this entity if it touches water");
-    AddFieldWithDescription(typeInfo, "MaxZigZag", CachedFloatType(), 0x70, "Max amount of zig-zag deflection");
+    AddFieldWithDescription(typeInfo, "DestroyOnWater", CachedBoolType(), offsetof(RProjectileBlueprintPhysics, DestroyOnWater), "Destroy this entity if it touches water");
+    AddFieldWithDescription(typeInfo, "MaxZigZag", CachedFloatType(), offsetof(RProjectileBlueprintPhysics, MaxZigZag), "Max amount of zig-zag deflection");
     AddFieldWithDescription(
       typeInfo,
       "ZigZagFrequency",
       CachedFloatType(),
-      0x74,
+      offsetof(RProjectileBlueprintPhysics, ZigZagFrequency),
       "Frequency of zig-zag directional changes in seconds"
     );
-    AddFieldWithDescription(typeInfo, "RealisticOrdinance", CachedBoolType(), 0x88, "Realistic free fall ordinance type weapon");
-    AddFieldWithDescription(typeInfo, "StraightDownOrdinance", CachedBoolType(), 0x89, "bombs that always drop stright down");
+    AddFieldWithDescription(typeInfo, "RealisticOrdinance", CachedBoolType(), offsetof(RProjectileBlueprintPhysics, RealisticOrdinance), "Realistic free fall ordinance type weapon");
+    AddFieldWithDescription(typeInfo, "StraightDownOrdinance", CachedBoolType(), offsetof(RProjectileBlueprintPhysics, StraightDownOrdinance), "bombs that always drop stright down");
   }
 
   /**

@@ -54,7 +54,8 @@ const char* CEconomyTypeInfo::GetName() const
  */
 void CEconomyTypeInfo::Init()
 {
-  size_ = 0x60;
+  static_assert(sizeof(moho::CEconomy) == 0x60, "moho::CEconomy is 0x60 bytes on x86");
+  size_ = sizeof(moho::CEconomy);
   gpg::RType::Init();
   Finish();
 }

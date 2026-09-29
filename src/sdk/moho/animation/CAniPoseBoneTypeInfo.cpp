@@ -258,7 +258,8 @@ namespace gpg
    */
   void RFastVectorType<moho::CAniPoseBone>::Init()
   {
-    size_ = 0x10;
+    static_assert(sizeof(gpg::core::FastVectorInline<moho::CAniPoseBone>) == 0x10, "gpg::core::FastVectorInline<moho::CAniPoseBone> is 0x10 bytes on x86");
+    size_ = sizeof(gpg::core::FastVectorInline<moho::CAniPoseBone>);
     version_ = 1;
     serLoadFunc_ = &LoadFastVectorCAniPoseBone;
     serSaveFunc_ = &SaveFastVectorCAniPoseBone;

@@ -17,11 +17,11 @@ namespace
    */
   gpg::RField* AddProjectileDamageFloatFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* const damageField = typeInfo->AddFieldFloat("Damage", 0x2C8);
+    gpg::RField* const damageField = typeInfo->AddFieldFloat("Damage", offsetof(moho::Projectile, mDamage));
     damageField->v4 = 1;
     damageField->mDesc = "Damage per hit (configured by weapon)";
 
-    gpg::RField* const damageRadiusField = typeInfo->AddFieldFloat("DamageRadius", 0x2CC);
+    gpg::RField* const damageRadiusField = typeInfo->AddFieldFloat("DamageRadius", offsetof(moho::Projectile, mDamageRadius));
     damageRadiusField->v4 = 1;
     damageRadiusField->mDesc = "Radius to inflict damage within (configured by weapon)";
     return damageRadiusField;

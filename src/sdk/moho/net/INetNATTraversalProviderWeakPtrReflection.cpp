@@ -236,7 +236,8 @@ msvc8::string gpg::RWeakPointerType<moho::INetNATTraversalProvider>::GetLexical(
  */
 void gpg::RWeakPointerType<moho::INetNATTraversalProvider>::Init()
 {
-  size_ = 0x08;
+  static_assert(sizeof(boost::weak_ptr<moho::INetNATTraversalProvider>) == 0x08, "boost::weak_ptr<moho::INetNATTraversalProvider> is 0x08 bytes on x86");
+  size_ = sizeof(boost::weak_ptr<moho::INetNATTraversalProvider>);
   newRefFunc_ = &NewWeakProviderRef;
   cpyRefFunc_ = &CopyWeakProviderRef;
   deleteFunc_ = &DeleteWeakProvider;

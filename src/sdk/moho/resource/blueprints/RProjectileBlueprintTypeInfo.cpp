@@ -141,7 +141,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Display", CachedProjectileDisplayType(), 0x198, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Display", CachedProjectileDisplayType(), offsetof(RProjectileBlueprint, Display), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -158,7 +158,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Economy", CachedProjectileEconomyType(), 0x1D0, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Economy", CachedProjectileEconomyType(), offsetof(RProjectileBlueprint, Economy), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -175,7 +175,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Physics", CachedProjectilePhysicsType(), 0x1DC, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Physics", CachedProjectilePhysicsType(), offsetof(RProjectileBlueprint, Physics), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -187,7 +187,7 @@ namespace moho
    */
   void RProjectileBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "DevStatus", CachedStringType(), 0x17C, "Development Status");
+    AddFieldWithDescription(typeInfo, "DevStatus", CachedStringType(), offsetof(RProjectileBlueprint, DevStatus), "Development Status");
     gpg::RField* const displayField = AddFieldDisplay(typeInfo);
     displayField->v4 = 3;
     displayField->mDesc = "Display information for the Projectile";

@@ -142,7 +142,8 @@ const char* moho::RWeakPtrType<moho::CTaskThread>::GetName() const
  */
 void moho::RWeakPtrType<moho::CTaskThread>::Init()
 {
-  size_ = 0x08;
+  static_assert(sizeof(moho::WeakPtr<moho::CTaskThread>) == 0x08, "moho::WeakPtr<moho::CTaskThread> is 0x08 bytes on x86");
+  size_ = sizeof(moho::WeakPtr<moho::CTaskThread>);
   version_ = 1;
   serLoadFunc_ = &moho::WeakPtr_CTaskThread::Deserialize;
   serSaveFunc_ = &moho::WeakPtr_CTaskThread::Serialize;

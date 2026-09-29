@@ -783,8 +783,8 @@ namespace moho
    */
   void REmitterBlueprintCurveTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "XRange", CachedFloatType(), 0x04, "Range of X for this curve.");
-    AddFieldWithDescription(typeInfo, "Keys", CachedEmitterCurveKeyVectorType(), 0x08, "Keys for this curve.");
+    AddFieldWithDescription(typeInfo, "XRange", CachedFloatType(), offsetof(REmitterBlueprintCurve, XRange), "Range of X for this curve.");
+    AddFieldWithDescription(typeInfo, "Keys", CachedEmitterCurveKeyVectorType(), offsetof(REmitterBlueprintCurve, Keys), "Keys for this curve.");
   }
 
   /**
@@ -865,9 +865,9 @@ namespace moho
    */
   void REmitterCurveKeyTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "x", CachedFloatType(), 0x04, "X pos of this curve.");
-    AddFieldWithDescription(typeInfo, "y", CachedFloatType(), 0x08, "Y pos of this curve.");
-    AddFieldWithDescription(typeInfo, "z", CachedFloatType(), 0x0C, "Z size of this curve.");
+    AddFieldWithDescription(typeInfo, "x", CachedFloatType(), offsetof(REmitterCurveKey, X), "X pos of this curve.");
+    AddFieldWithDescription(typeInfo, "y", CachedFloatType(), offsetof(REmitterCurveKey, Y), "Y pos of this curve.");
+    AddFieldWithDescription(typeInfo, "z", CachedFloatType(), offsetof(REmitterCurveKey, Z), "Z size of this curve.");
   }
 
   /**

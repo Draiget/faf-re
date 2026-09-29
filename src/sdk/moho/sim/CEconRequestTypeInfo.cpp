@@ -54,7 +54,8 @@ const char* CEconRequestTypeInfo::GetName() const
  */
 void CEconRequestTypeInfo::Init()
 {
-  size_ = 0x18;
+  static_assert(sizeof(moho::CEconRequest) == 0x18, "moho::CEconRequest is 0x18 bytes on x86");
+  size_ = sizeof(moho::CEconRequest);
   gpg::RType::Init();
   Finish();
 }

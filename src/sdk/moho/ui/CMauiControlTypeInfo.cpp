@@ -81,7 +81,8 @@ const char* CMauiControlTypeInfo::GetName() const
  */
 void CMauiControlTypeInfo::Init()
 {
-  size_ = 0x11C;
+  static_assert(sizeof(moho::CMauiControl) == 0x11C, "moho::CMauiControl is 0x11C bytes on x86");
+  size_ = sizeof(moho::CMauiControl);
   AddCScriptObjectBase(*this);
   gpg::RType::Init();
   Finish();

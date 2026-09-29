@@ -386,19 +386,19 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
    */
   gpg::RField* RBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* field = AddTypedField(typeInfo, "BlueprintId", CachedStringType(), 0x08);
+    gpg::RField* field = AddTypedField(typeInfo, "BlueprintId", CachedStringType(), offsetof(RBlueprint, mBlueprintId));
     field->v4 = 1;
     field->mDesc = "Blueprint Id";
 
-    field = AddTypedField(typeInfo, "Description", CachedStringType(), 0x24);
+    field = AddTypedField(typeInfo, "Description", CachedStringType(), offsetof(RBlueprint, mDescription));
     field->v4 = 3;
     field->mDesc = "Generic type of unit (non-display name)";
 
-    field = AddTypedField(typeInfo, "Source", CachedStringType(), 0x40);
+    field = AddTypedField(typeInfo, "Source", CachedStringType(), offsetof(RBlueprint, mSource));
     field->v4 = 1;
     field->mDesc = "File this blueprint was defined in";
 
-    return AddTypedField(typeInfo, "BlueprintOrdinal", CachedIntType(), 0x5C);
+    return AddTypedField(typeInfo, "BlueprintOrdinal", CachedIntType(), offsetof(RBlueprint, mBlueprintOrdinal));
   }
 
   /**

@@ -61,7 +61,8 @@ namespace moho
    */
   void RScmResourceTypeInfo::Init()
   {
-    size_ = 0x4C;
+    static_assert(sizeof(moho::RScmResource) == 0x4C, "moho::RScmResource is 0x4C bytes on x86");
+    size_ = sizeof(moho::RScmResource);
     gpg::RType::Init();
     Finish();
   }

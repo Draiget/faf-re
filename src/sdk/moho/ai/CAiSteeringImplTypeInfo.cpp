@@ -180,7 +180,7 @@ void CAiSteeringImplTypeInfo::AddBase_IAiSteering(gpg::RType* const typeInfo)
  */
 void CAiSteeringImplTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
 {
-  gpg::AddBaseIfPresent(typeInfo, CachedCTaskType(), 4);
+  gpg::AddBaseIfPresent(typeInfo, CachedCTaskType(), gpg::BaseSubobjectOffset<CAiSteeringImpl, CTask>());
 }
 
 /**

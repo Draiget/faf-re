@@ -90,7 +90,8 @@ namespace
    */
   void SRuleFootprintsBlueprintTypeInfo::Init()
   {
-    size_ = 0x0C;
+    static_assert(sizeof(moho::SRuleFootprintsBlueprint) == 0x0C, "moho::SRuleFootprintsBlueprint is 0x0C bytes on x86");
+    size_ = sizeof(moho::SRuleFootprintsBlueprint);
     gpg::RType::Init();
     (void)AddFields(this);
     Finish();

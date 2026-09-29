@@ -201,7 +201,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("General", CachedGeneralType(), 0x17C, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("General", CachedGeneralType(), offsetof(RUnitBlueprint, General), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -218,7 +218,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Display", CachedDisplayType(), 0x200, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Display", CachedDisplayType(), offsetof(RUnitBlueprint, Display), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -235,7 +235,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Physics", CachedPhysicsType(), 0x278, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Physics", CachedPhysicsType(), offsetof(RUnitBlueprint, Physics), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -252,7 +252,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Air", CachedAirType(), 0x368, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Air", CachedAirType(), offsetof(RUnitBlueprint, Air), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -269,7 +269,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Transport", CachedTransportType(), 0x3F8, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Transport", CachedTransportType(), offsetof(RUnitBlueprint, Transport), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -286,7 +286,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Defense", CachedDefenseType(), 0x420, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Defense", CachedDefenseType(), offsetof(RUnitBlueprint, Defense), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -303,7 +303,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("AI", CachedAiType(), 0x460, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("AI", CachedAiType(), offsetof(RUnitBlueprint, AI), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -320,7 +320,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Intel", CachedIntelType(), 0x330, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Intel", CachedIntelType(), offsetof(RUnitBlueprint, Intel), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -337,7 +337,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Weapons", CachedWeaponVectorType(), 0x4D4, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Weapons", CachedWeaponVectorType(), offsetof(RUnitBlueprint, Weapons), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -354,7 +354,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Economy", CachedEconomyType(), 0x4E8, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Economy", CachedEconomyType(), offsetof(RUnitBlueprint, Economy), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 

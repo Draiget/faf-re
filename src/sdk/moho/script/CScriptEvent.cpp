@@ -702,9 +702,8 @@ namespace
   gpg::RRef CreateScriptEventRefOwned()
   {
     gpg::RRef out{};
-    // Binary: `operator new(0x44)` - the event's real object size, not the
-    // thin behaviour class `sizeof` reports.
-    auto* const event = static_cast<CScriptEvent*>(::operator new(0x44u));
+    // Binary: `operator new(0x44)`, which is sizeof(CScriptEvent) on x86.
+    auto* const event = static_cast<CScriptEvent*>(::operator new(sizeof(CScriptEvent)));
     new (event) CScriptEvent();
     (void)gpg::RRef_CScriptEvent(&out, event);
     return out;
@@ -3008,7 +3007,7 @@ void CScriptEventTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
   gpg::RField baseField{};
   baseField.mName = scriptObjectType->GetName();
   baseField.mType = scriptObjectType;
-  baseField.mOffset = 0x10;
+  baseField.mOffset = gpg::BaseSubobjectOffset<CScriptEvent, CScriptObject>();
   baseField.v4 = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);

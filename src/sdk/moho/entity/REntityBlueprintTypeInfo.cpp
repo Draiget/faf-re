@@ -703,7 +703,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("CollisionShape", CachedCollisionShapeType(), 0xA8, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("CollisionShape", CachedCollisionShapeType(), offsetof(REntityBlueprint, mCollisionShape), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -716,146 +716,146 @@ namespace moho
    */
   void REntityBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* const categoriesField = typeInfo->AddFieldVectorString("Categories", 0x60);
+    gpg::RField* const categoriesField = typeInfo->AddFieldVectorString("Categories", offsetof(REntityBlueprint, mCategories));
     categoriesField->v4 = 3;
     categoriesField->mDesc = "Named categories that this entity belongs to";
-    AddFieldWithDescription(typeInfo, "ScriptModule", CachedStringType(), 0x70, "Module defining entity's class.");
-    AddFieldWithDescription(typeInfo, "ScriptClass", CachedStringType(), 0x8C, "Name of entity's class.");
+    AddFieldWithDescription(typeInfo, "ScriptModule", CachedStringType(), offsetof(REntityBlueprint, mScriptModule), "Module defining entity's class.");
+    AddFieldWithDescription(typeInfo, "ScriptClass", CachedStringType(), offsetof(REntityBlueprint, mScriptClass), "Name of entity's class.");
     gpg::RField* const collisionShapeField = AddFieldCollisionShape(typeInfo);
     collisionShapeField->v4 = 3;
     collisionShapeField->mDesc = "Shape to use for collision db, 'None' for no collision.";
-    AddFieldWithDescription(typeInfo, "SizeX", CachedFloatType(), 0xAC, "Unit size X");
-    AddFieldWithDescription(typeInfo, "SizeY", CachedFloatType(), 0xB0, "Unit size Y");
-    AddFieldWithDescription(typeInfo, "SizeZ", CachedFloatType(), 0xB4, "Unit size Z");
+    AddFieldWithDescription(typeInfo, "SizeX", CachedFloatType(), offsetof(REntityBlueprint, mSizeX), "Unit size X");
+    AddFieldWithDescription(typeInfo, "SizeY", CachedFloatType(), offsetof(REntityBlueprint, mSizeY), "Unit size Y");
+    AddFieldWithDescription(typeInfo, "SizeZ", CachedFloatType(), offsetof(REntityBlueprint, mSizeZ), "Unit size Z");
     AddFieldWithDescription(
       typeInfo,
       "AverageDensity",
       CachedFloatType(),
-      0xB8,
+      offsetof(REntityBlueprint, mAverageDensity),
       "Unit average density in tons / m^3. (Default is 0.49)"
     );
-    AddFieldWithDescription(typeInfo, "InertiaTensorX", CachedFloatType(), 0xBC, "Component X,X of inertia tensor");
-    AddFieldWithDescription(typeInfo, "InertiaTensorY", CachedFloatType(), 0xC0, "Component Y,Y of inertia tensor");
-    AddFieldWithDescription(typeInfo, "InertiaTensorZ", CachedFloatType(), 0xC4, "Component Z,Z of inertia tensor");
+    AddFieldWithDescription(typeInfo, "InertiaTensorX", CachedFloatType(), offsetof(REntityBlueprint, mInertiaTensorX), "Component X,X of inertia tensor");
+    AddFieldWithDescription(typeInfo, "InertiaTensorY", CachedFloatType(), offsetof(REntityBlueprint, mInertiaTensorY), "Component Y,Y of inertia tensor");
+    AddFieldWithDescription(typeInfo, "InertiaTensorZ", CachedFloatType(), offsetof(REntityBlueprint, mInertiaTensorZ), "Component Z,Z of inertia tensor");
     AddFieldWithDescription(
       typeInfo,
       "CollisionOffsetX",
       CachedFloatType(),
-      0xC8,
+      offsetof(REntityBlueprint, mCollisionOffsetX),
       "Offset collision by this much on the X Axis"
     );
     AddFieldWithDescription(
       typeInfo,
       "CollisionOffsetY",
       CachedFloatType(),
-      0xCC,
+      offsetof(REntityBlueprint, mCollisionOffsetY),
       "Offset collision by this much on the Y Axis"
     );
     AddFieldWithDescription(
       typeInfo,
       "CollisionOffsetZ",
       CachedFloatType(),
-      0xD0,
+      offsetof(REntityBlueprint, mCollisionOffsetZ),
       "Offset collision by this much on the Z Axis"
     );
-    gpg::RField* const footprintField = typeInfo->AddFieldSFootprint("Footprint", 0xD8);
+    gpg::RField* const footprintField = typeInfo->AddFieldSFootprint("Footprint", offsetof(REntityBlueprint, mFootprint));
     footprintField->v4 = 3;
     footprintField->mDesc = "Unit footprint";
-    gpg::RField* const altFootprintField = typeInfo->AddFieldSFootprint("AltFootprint", 0xE8);
+    gpg::RField* const altFootprintField = typeInfo->AddFieldSFootprint("AltFootprint", offsetof(REntityBlueprint, mAltFootprint));
     altFootprintField->v4 = 3;
     altFootprintField->mDesc = "Alternate Unit footprint";
     AddFieldWithDescription(
       typeInfo,
       "DesiredShooterCap",
       CachedIntType(),
-      0xD4,
+      offsetof(REntityBlueprint, mDesiredShooterCap),
       "Set the desired maximum number of shooters taking shots at me"
     );
     AddFieldWithDescription(
       typeInfo,
       "StrategicIconName",
       CachedRResIdType(),
-      0x13C,
+      offsetof(REntityBlueprint, mStrategicIconName),
       "Name of strategic icon to use for this unit"
     );
-    AddFieldWithDescription(typeInfo, "LifeBarRender", CachedBoolType(), 0xF8, "Should render life bar or not.");
-    AddFieldWithDescription(typeInfo, "LifeBarOffset", CachedFloatType(), 0xFC, "Vertical offset from unit for lifebar.");
-    AddFieldWithDescription(typeInfo, "LifeBarSize", CachedFloatType(), 0x100, "size of lifebar in OGrids.");
-    AddFieldWithDescription(typeInfo, "LifeBarHeight", CachedFloatType(), 0x104, "height of lifebar in OGrids.");
-    AddFieldWithDescription(typeInfo, "SelectionSizeX", CachedFloatType(), 0x108, "X Size of selection box");
-    AddFieldWithDescription(typeInfo, "SelectionSizeY", CachedFloatType(), 0x10C, "Y Size of selection box");
-    AddFieldWithDescription(typeInfo, "SelectionSizeZ", CachedFloatType(), 0x110, "Z Size of selection box");
+    AddFieldWithDescription(typeInfo, "LifeBarRender", CachedBoolType(), offsetof(REntityBlueprint, mLifeBarRender), "Should render life bar or not.");
+    AddFieldWithDescription(typeInfo, "LifeBarOffset", CachedFloatType(), offsetof(REntityBlueprint, mLifeBarOffset), "Vertical offset from unit for lifebar.");
+    AddFieldWithDescription(typeInfo, "LifeBarSize", CachedFloatType(), offsetof(REntityBlueprint, mLifeBarSize), "size of lifebar in OGrids.");
+    AddFieldWithDescription(typeInfo, "LifeBarHeight", CachedFloatType(), offsetof(REntityBlueprint, mLifeBarHeight), "height of lifebar in OGrids.");
+    AddFieldWithDescription(typeInfo, "SelectionSizeX", CachedFloatType(), offsetof(REntityBlueprint, mSelectionSizeX), "X Size of selection box");
+    AddFieldWithDescription(typeInfo, "SelectionSizeY", CachedFloatType(), offsetof(REntityBlueprint, mSelectionSizeY), "Y Size of selection box");
+    AddFieldWithDescription(typeInfo, "SelectionSizeZ", CachedFloatType(), offsetof(REntityBlueprint, mSelectionSizeZ), "Z Size of selection box");
     AddFieldWithDescription(
       typeInfo,
       "SelectionCenterOffsetX",
       CachedFloatType(),
-      0x114,
+      offsetof(REntityBlueprint, mSelectionCenterOffsetX),
       "X center offset of selection box"
     );
     AddFieldWithDescription(
       typeInfo,
       "SelectionCenterOffsetY",
       CachedFloatType(),
-      0x118,
+      offsetof(REntityBlueprint, mSelectionCenterOffsetY),
       "Y center offset of selection box"
     );
     AddFieldWithDescription(
       typeInfo,
       "SelectionCenterOffsetZ",
       CachedFloatType(),
-      0x11C,
+      offsetof(REntityBlueprint, mSelectionCenterOffsetZ),
       "Z center offset of selection box"
     );
     AddFieldWithDescription(
       typeInfo,
       "SelectionYOffset",
       CachedFloatType(),
-      0x120,
+      offsetof(REntityBlueprint, mSelectionYOffset),
       "How far to reduce top of collision box for selection (default 0.5 (half))"
     );
     AddFieldWithDescription(
       typeInfo,
       "SelectionMeshScaleX",
       CachedFloatType(),
-      0x124,
+      offsetof(REntityBlueprint, mSelectionMeshScaleX),
       "Scale the mesh on the X axis by this much when we perform our mouse over entity test"
     );
     AddFieldWithDescription(
       typeInfo,
       "SelectionMeshScaleY",
       CachedFloatType(),
-      0x128,
+      offsetof(REntityBlueprint, mSelectionMeshScaleY),
       "Scale the mesh on the Y axis by this much when we perform our mouse over entity test"
     );
     AddFieldWithDescription(
       typeInfo,
       "SelectionMeshScaleZ",
       CachedFloatType(),
-      0x12C,
+      offsetof(REntityBlueprint, mSelectionMeshScaleZ),
       "Scale the mesh on the Z axis by this much when we perform our mouse over entity test"
     );
     AddFieldWithDescription(
       typeInfo,
       "SelectionMeshUseTopAmount",
       CachedFloatType(),
-      0x130,
+      offsetof(REntityBlueprint, mSelectionMeshUseTopAmount),
       "Use this much of the top portion of our mesh for intersection test. Useful for naval stuctures that go deep into water"
     );
     AddFieldWithDescription(
       typeInfo,
       "SelectionThickness",
       CachedFloatType(),
-      0x134,
+      offsetof(REntityBlueprint, mSelectionThickness),
       "Use this to modify the thickness of the rendered selection indicator for the unit"
     );
     AddFieldWithDescription(
       typeInfo,
       "UseOOBTestZoom",
       CachedFloatType(),
-      0x138,
+      offsetof(REntityBlueprint, mUseOOBTestZoom),
       "Use OOB hit test for this unit when camera is below this zoom level"
     );
-    gpg::RField* const strategicIconSortPriorityField = typeInfo->AddFieldUChar("StrategicIconSortPriority", 0x158);
+    gpg::RField* const strategicIconSortPriorityField = typeInfo->AddFieldUChar("StrategicIconSortPriority", offsetof(REntityBlueprint, mStrategicIconSortPriority));
     strategicIconSortPriorityField->v4 = 3;
     strategicIconSortPriorityField->mDesc = "0 renders on top, 255 on bottom";
   }

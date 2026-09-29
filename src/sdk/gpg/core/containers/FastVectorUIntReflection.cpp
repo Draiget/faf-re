@@ -1137,7 +1137,8 @@ const gpg::RIndexed* gpg::RFastVectorType<unsigned int>::IsIndexed() const
  */
 void gpg::RFastVectorType<unsigned int>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<unsigned int>) == 0x10, "gpg::core::FastVectorInline<unsigned int> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<unsigned int>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorUInt;
   serSaveFunc_ = &SaveFastVectorUInt;
@@ -1279,7 +1280,8 @@ const gpg::RIndexed* gpg::RFastVectorType<float>::IsIndexed() const
  */
 void gpg::RFastVectorType<float>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<float>) == 0x10, "gpg::core::FastVectorInline<float> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<float>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorFloat;
   serSaveFunc_ = &SaveFastVectorFloat;
@@ -1439,7 +1441,8 @@ const gpg::RIndexed* gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::IsIndexed
  */
 void gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>) == 0x10, "gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorSSTIEntityAttachInfo;
   serSaveFunc_ = &SaveFastVectorSSTIEntityAttachInfo;
@@ -1576,7 +1579,8 @@ const gpg::RIndexed* gpg::RFastVectorType<moho::UnitWeaponInfo>::IsIndexed() con
  */
 void gpg::RFastVectorType<moho::UnitWeaponInfo>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<moho::UnitWeaponInfo>) == 0x10, "gpg::core::FastVectorInline<moho::UnitWeaponInfo> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<moho::UnitWeaponInfo>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorUnitWeaponInfo;
   serSaveFunc_ = &gpg::SaveFastVectorUnitWeaponInfo;
@@ -1708,7 +1712,8 @@ const gpg::RIndexed* gpg::RFastVectorType<moho::SOffsetInfo>::IsIndexed() const
  */
 void gpg::RFastVectorType<moho::SOffsetInfo>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<moho::SOffsetInfo>) == 0x10, "gpg::core::FastVectorInline<moho::SOffsetInfo> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<moho::SOffsetInfo>);
   version_ = 1;
   serLoadFunc_ = &moho::LoadFastVectorSOffsetInfo;
   serSaveFunc_ = &moho::SaveFastVectorSOffsetInfo;
@@ -1835,7 +1840,8 @@ const gpg::RIndexed* gpg::RFastVectorType<moho::SAssignedLocInfo>::IsIndexed() c
  */
 void gpg::RFastVectorType<moho::SAssignedLocInfo>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<moho::SAssignedLocInfo>) == 0x10, "gpg::core::FastVectorInline<moho::SAssignedLocInfo> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<moho::SAssignedLocInfo>);
   version_ = 1;
   serLoadFunc_ = &moho::LoadFastVectorSAssignedLocInfo;
   serSaveFunc_ = &moho::SaveFastVectorSAssignedLocInfo;
@@ -1955,7 +1961,8 @@ const gpg::RIndexed* gpg::RFastVectorType<msvc8::string>::IsIndexed() const
  */
 void gpg::RFastVectorType<msvc8::string>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<msvc8::string>) == 0x10, "gpg::core::FastVectorInline<msvc8::string> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<msvc8::string>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorString;
   serSaveFunc_ = &SaveFastVectorString;
@@ -2105,7 +2112,8 @@ const gpg::RIndexed* gpg::RFastVectorType<Wm3::Vector3f>::IsIndexed() const
  */
 void gpg::RFastVectorType<Wm3::Vector3f>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<Wm3::Vector3f>) == 0x10, "gpg::core::FastVectorInline<Wm3::Vector3f> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<Wm3::Vector3f>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorVector3f;
   serSaveFunc_ = &SaveFastVectorVector3f;

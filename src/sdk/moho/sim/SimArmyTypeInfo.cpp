@@ -2,7 +2,7 @@
 
 #include <typeinfo>
 
-#include "moho/sim/SimArmy.h"
+#include "moho/sim/SimArmy.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -60,7 +60,7 @@ namespace moho
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 0x08;
+    baseField.mOffset = gpg::BaseSubobjectOffset<SimArmy, IArmy>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

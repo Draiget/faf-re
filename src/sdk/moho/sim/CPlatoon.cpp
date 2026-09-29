@@ -348,122 +348,29 @@ namespace
     return destinationEnd;
   }
 
-  struct PlatoonTreeNodeFlag45Runtime
-  {
-    PlatoonTreeNodeFlag45Runtime* left; // +0x00
-    PlatoonTreeNodeFlag45Runtime* parent; // +0x04
-    PlatoonTreeNodeFlag45Runtime* right; // +0x08
-    std::uint8_t reserved0C_0F[0x04]; // +0x0C
-    std::uint8_t payload_10_2B[0x1C]; // +0x10
-    std::uint8_t sentinel44; // +0x2C
-    std::uint8_t isNil45; // +0x2D
-  };
-  static_assert(offsetof(PlatoonTreeNodeFlag45Runtime, isNil45) == 0x2D, "PlatoonTreeNodeFlag45Runtime::isNil45 offset");
+  // 0x00736450 / 0x00736470 are `rb_max`/`rb_min` of `sSimConList`'s
+  // `msvc8::map` (node 0x30, isNil@+0x2D), cited on those members in
+  // legacy/containers/RbTree.h.
 
-  /**
-   * Address: 0x00736450 (FUN_00736450)
-   *
-   * What it does:
-   * Returns the rightmost node reachable from a flag-45 RB-tree head.
-   */
-  [[maybe_unused]] PlatoonTreeNodeFlag45Runtime* FindPlatoonTreeRightmostNode(
-    PlatoonTreeNodeFlag45Runtime* head
-  ) noexcept
+  [[nodiscard]] moho::Unit* DecodeSquadUnit(moho::Entity* const entry) noexcept
   {
-    PlatoonTreeNodeFlag45Runtime* cursor = head->right;
-    while (cursor->isNil45 == 0u) {
-      head = cursor;
-      cursor = head->right;
-    }
-    return head;
-  }
-
-  /**
-   * Address: 0x00736470 (FUN_00736470)
-   *
-   * What it does:
-   * Returns the leftmost node reachable from a flag-45 RB-tree head.
-   */
-  [[maybe_unused]] PlatoonTreeNodeFlag45Runtime* FindPlatoonTreeLeftmostNode(
-    PlatoonTreeNodeFlag45Runtime* head
-  ) noexcept
-  {
-    PlatoonTreeNodeFlag45Runtime* cursor = head->left;
-    if (cursor->isNil45 != 0u) {
-      return head;
-    }
-
-    do {
-      head = cursor;
-      cursor = head->left;
-    } while (cursor->isNil45 == 0u);
-    return head;
-  }
-
-  struct CSquadRuntimeView
-  {
-    std::uint8_t pad_0000_0010[0x10];
-    void** mUnitSlotBegin;
-    void** mUnitSlotEnd;
-    std::uint8_t pad_0018_0030[0x18];
-    ESquadClass mSquadClass;
-  };
-  static_assert(offsetof(CSquadRuntimeView, mUnitSlotBegin) == 0x10, "CSquadRuntimeView::mUnitSlotBegin offset");
-  static_assert(offsetof(CSquadRuntimeView, mUnitSlotEnd) == 0x14, "CSquadRuntimeView::mUnitSlotEnd offset");
-  static_assert(offsetof(CSquadRuntimeView, mSquadClass) == 0x30, "CSquadRuntimeView::mSquadClass offset");
-
-  struct CPlatoonRuntimeView
-  {
-    std::uint8_t pad_0000_0038[0x38];
-    moho::SimArmy* mArmy;
-    std::uint8_t pad_003C_0040[0x04];
-    CSquadRuntimeView** mSquadStart;
-    CSquadRuntimeView** mSquadEnd;
-    std::uint8_t pad_0048_008C[0x44];
-    msvc8::string mPlan;
-    msvc8::string mUniqueName;
-    std::uint8_t pad_00C4_00E0[0x1C];
-    std::uint8_t mDisbandOnIdle;
-    std::uint8_t pad_00E1_00E4[0x03];
-    std::int32_t mLifetimeStat1;
-    std::int32_t mLifetimeStat2;
-    float mLifetimeStat3;
-    float mLifetimeStat4;
-    LuaPlus::LuaObject mLuaUnitList;
-    std::uint8_t mHasLuaList;
-  };
-  static_assert(offsetof(CPlatoonRuntimeView, mArmy) == 0x38, "CPlatoonRuntimeView::mArmy offset");
-  static_assert(offsetof(CPlatoonRuntimeView, mSquadStart) == 0x40, "CPlatoonRuntimeView::mSquadStart offset");
-  static_assert(offsetof(CPlatoonRuntimeView, mSquadEnd) == 0x44, "CPlatoonRuntimeView::mSquadEnd offset");
-  static_assert(offsetof(CPlatoonRuntimeView, mPlan) == 0x8C, "CPlatoonRuntimeView::mPlan offset");
-  static_assert(offsetof(CPlatoonRuntimeView, mUniqueName) == 0xA8, "CPlatoonRuntimeView::mUniqueName offset");
-  static_assert(
-    offsetof(CPlatoonRuntimeView, mDisbandOnIdle) == 0xE0, "CPlatoonRuntimeView::mDisbandOnIdle offset"
-  );
-  static_assert(offsetof(CPlatoonRuntimeView, mLifetimeStat1) == 0xE4, "CPlatoonRuntimeView::mLifetimeStat1 offset");
-  static_assert(offsetof(CPlatoonRuntimeView, mLifetimeStat2) == 0xE8, "CPlatoonRuntimeView::mLifetimeStat2 offset");
-  static_assert(offsetof(CPlatoonRuntimeView, mLifetimeStat3) == 0xEC, "CPlatoonRuntimeView::mLifetimeStat3 offset");
-  static_assert(offsetof(CPlatoonRuntimeView, mLifetimeStat4) == 0xF0, "CPlatoonRuntimeView::mLifetimeStat4 offset");
-  static_assert(offsetof(CPlatoonRuntimeView, mLuaUnitList) == 0xF4, "CPlatoonRuntimeView::mLuaUnitList offset");
-  static_assert(offsetof(CPlatoonRuntimeView, mHasLuaList) == 0x108, "CPlatoonRuntimeView::mHasLuaList offset");
-
-  [[nodiscard]] moho::Unit* DecodeSquadUnit(void* const slotValue) noexcept
-  {
-    const auto raw = reinterpret_cast<std::uintptr_t>(slotValue);
-    if (raw <= kSquadUnitOwnerBias) {
+    // Null, or a null unit's Entity subobject (`raw <= 8` on x86).
+    const auto raw = reinterpret_cast<std::uintptr_t>(entry);
+    if (raw <= static_cast<std::uintptr_t>(gpg::BaseSubobjectOffset<moho::Unit, moho::Entity>())) {
       return nullptr;
     }
 
-    return reinterpret_cast<moho::Unit*>(raw - kSquadUnitOwnerBias);
+    return static_cast<moho::Unit*>(entry);
   }
 
-  [[nodiscard]] CSquadRuntimeView* FindSquadByClass(
-    CPlatoonRuntimeView& platoonRuntime,
+
+  [[nodiscard]] moho::CSquad* FindSquadByClass(
+    moho::CPlatoon& platoonRuntime,
     const ESquadClass squadClass
   ) noexcept
   {
-    for (CSquadRuntimeView** squadLane = platoonRuntime.mSquadStart; squadLane != platoonRuntime.mSquadEnd; ++squadLane) {
-      CSquadRuntimeView* const squadView = *squadLane;
+    for (moho::CSquad** squadLane = platoonRuntime.mSquadList.begin(); squadLane != platoonRuntime.mSquadList.end(); ++squadLane) {
+      moho::CSquad* const squadView = *squadLane;
       if (!squadView || squadView->mSquadClass != squadClass) {
         continue;
       }

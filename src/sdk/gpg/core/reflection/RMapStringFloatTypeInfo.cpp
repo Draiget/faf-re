@@ -129,7 +129,8 @@ namespace gpg
    */
   void RMapStringFloatTypeInfo::Init()
   {
-    size_ = 0x0C;
+    static_assert(sizeof(msvc8::map<msvc8::string, float>) == 0x0C, "msvc8::map<msvc8::string, float> is 0x0C bytes on x86");
+    size_ = sizeof(msvc8::map<msvc8::string, float>);
     version_ = 1;
     serLoadFunc_ = &RMapStringFloatTypeInfo::SerLoad;
     serSaveFunc_ = &RMapStringFloatTypeInfo::SerSave;

@@ -87,7 +87,8 @@ const char* CMauiFrameTypeInfo::GetName() const
  */
 void CMauiFrameTypeInfo::Init()
 {
-  size_ = 0x134;
+  static_assert(sizeof(moho::CMauiFrame) == 0x134, "moho::CMauiFrame is 0x134 bytes on x86");
+  size_ = sizeof(moho::CMauiFrame);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

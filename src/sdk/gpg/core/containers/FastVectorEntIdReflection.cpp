@@ -196,7 +196,8 @@ const gpg::RIndexed* gpg::RFastVectorType<moho::EntId>::IsIndexed() const
  */
 void gpg::RFastVectorType<moho::EntId>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<moho::EntId>) == 0x10, "gpg::core::FastVectorInline<moho::EntId> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<moho::EntId>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorEntId;
   serSaveFunc_ = &SaveFastVectorEntId;

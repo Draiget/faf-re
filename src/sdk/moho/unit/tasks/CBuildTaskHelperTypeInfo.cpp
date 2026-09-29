@@ -56,7 +56,8 @@ namespace moho
    */
   void CBuildTaskHelperTypeInfo::Init()
   {
-    size_ = 0x44;
+    static_assert(sizeof(moho::CBuildTaskHelper) == 0x44, "moho::CBuildTaskHelper is 0x44 bytes on x86");
+    size_ = sizeof(moho::CBuildTaskHelper);
     gpg::RType::Init();
     Finish();
   }

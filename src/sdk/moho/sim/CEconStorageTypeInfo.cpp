@@ -38,7 +38,8 @@ const char* CEconStorageTypeInfo::GetName() const { return "CEconStorage"; }
 
 void CEconStorageTypeInfo::Init()
 {
-  size_ = 0x0C;
+  static_assert(sizeof(moho::CEconStorage) == 0x0C, "moho::CEconStorage is 0x0C bytes on x86");
+  size_ = sizeof(moho::CEconStorage);
   gpg::RType::Init();
   Finish();
 }

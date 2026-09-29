@@ -114,7 +114,8 @@ const char* CDiscoveryServiceTypeInfo::GetName() const
  */
 void CDiscoveryServiceTypeInfo::Init()
 {
-  size_ = 0x90;
+  static_assert(sizeof(moho::CDiscoveryService) == 0x90, "moho::CDiscoveryService is 0x90 bytes on x86");
+  size_ = sizeof(moho::CDiscoveryService);
   AddCScriptObjectBaseToCDiscoveryServiceType(this);
   gpg::RType::Init();
   Finish();

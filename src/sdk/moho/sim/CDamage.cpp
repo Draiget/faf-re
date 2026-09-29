@@ -354,7 +354,7 @@ namespace moho
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(!typeInfo->initFinished_);
 
-    typeInfo->fields_.push_back(gpg::RField("Method", CachedDamageMethodType(), 0x34, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("Method", CachedDamageMethodType(), offsetof(CDamage, mMethod), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -369,7 +369,7 @@ namespace moho
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(!typeInfo->initFinished_);
 
-    typeInfo->fields_.push_back(gpg::RField("MinMaxRadius", CachedSMinMaxFloatType(), 0x48, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("MinMaxRadius", CachedSMinMaxFloatType(), offsetof(CDamage, mRadius), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -383,13 +383,13 @@ namespace moho
   {
     (void)AddFieldMethod(typeInfo);
     (void)AddFieldMinMaxRadius(typeInfo);
-    typeInfo->AddFieldVector3f("Origin", 0x50);
-    typeInfo->AddFieldFloat("Amount", 0x5C);
-    typeInfo->AddFieldString("Type", 0x60);
-    typeInfo->AddFieldBool("DamageFriendly", 0x7C);
-    typeInfo->AddFieldBool("DamageNeutral", 0x7D);
-    typeInfo->AddFieldBool("DamageSelf", 0x7E);
-    typeInfo->AddFieldVector3f("Vector", 0x80);
+    typeInfo->AddFieldVector3f("Origin", offsetof(CDamage, mOrigin));
+    typeInfo->AddFieldFloat("Amount", offsetof(CDamage, mAmount));
+    typeInfo->AddFieldString("Type", offsetof(CDamage, mType));
+    typeInfo->AddFieldBool("DamageFriendly", offsetof(CDamage, mDamageFriendly));
+    typeInfo->AddFieldBool("DamageNeutral", offsetof(CDamage, mDamageNeutral));
+    typeInfo->AddFieldBool("DamageSelf", offsetof(CDamage, mDamageSelf));
+    typeInfo->AddFieldVector3f("Vector", offsetof(CDamage, mVector));
   }
 
   /**

@@ -1874,7 +1874,8 @@ const gpg::RIndexed* FastVectorCPathPointTypeInfo::IsIndexed() const
  */
 void FastVectorCPathPointTypeInfo::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<moho::CPathPoint>) == 0x10, "gpg::core::FastVectorInline<moho::CPathPoint> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<moho::CPathPoint>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorCPathPoint;
   serSaveFunc_ = &SaveFastVectorCPathPoint;

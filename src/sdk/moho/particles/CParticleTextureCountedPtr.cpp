@@ -562,7 +562,8 @@ namespace gpg
    */
   void RFastVectorType<moho::CountedPtr_CParticleTexture>::Init()
   {
-    size_ = 0x10;
+    static_assert(sizeof(gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>) == 0x10, "gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture> is 0x10 bytes on x86");
+    size_ = sizeof(gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>);
     version_ = 1;
     serLoadFunc_ = &LoadFastVectorCountedPtrCParticleTexture;
     serSaveFunc_ = &SaveFastVectorCountedPtrCParticleTexture;

@@ -503,7 +503,8 @@ namespace
      */
     void Init() override
     {
-      size_ = 0x08;
+      static_assert(sizeof(moho::ManyToOneBroadcaster_EProjectileImpactEvent) == 0x08, "moho::ManyToOneBroadcaster_EProjectileImpactEvent is 0x08 bytes on x86");
+      size_ = sizeof(moho::ManyToOneBroadcaster_EProjectileImpactEvent);
       version_ = 1;
       serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(
         &gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent
@@ -562,7 +563,8 @@ namespace
      */
     void Init() override
     {
-      size_ = 0x08;
+      static_assert(sizeof(moho::ManyToOneListener_EProjectileImpactEvent) == 0x08, "moho::ManyToOneListener_EProjectileImpactEvent is 0x08 bytes on x86");
+      size_ = sizeof(moho::ManyToOneListener_EProjectileImpactEvent);
     }
   };
 

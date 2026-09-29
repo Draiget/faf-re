@@ -1023,7 +1023,8 @@ namespace
  */
 void gpg::RMultiMapType_EntId_string::Init()
 {
-  size_ = 0x0C;
+  static_assert(sizeof(msvc8::multimap<moho::EntId, msvc8::string>) == 0x0C, "msvc8::multimap<moho::EntId, msvc8::string> is 0x0C bytes on x86");
+  size_ = sizeof(msvc8::multimap<moho::EntId, msvc8::string>);
   version_ = 1;
   serSaveFunc_ = &SerializeEntIdStringMultiMap;
   serLoadFunc_ = &DeserializeEntIdStringMultiMap;

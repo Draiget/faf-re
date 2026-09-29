@@ -1368,7 +1368,8 @@ namespace
      */
     void Init() override
     {
-      size_ = 0x0C;
+      static_assert(sizeof(moho::SBuildStructurePositionMap) == 0x0C, "moho::SBuildStructurePositionMap is 0x0C bytes on x86");
+      size_ = sizeof(moho::SBuildStructurePositionMap);
       version_ = 1;
       serLoadFunc_ = &BuildReserveMapTypeInfo::SerLoad;
       serSaveFunc_ = &BuildReserveMapTypeInfo::SerSave;

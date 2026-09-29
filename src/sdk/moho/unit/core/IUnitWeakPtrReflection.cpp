@@ -394,7 +394,8 @@ const gpg::RIndexed* moho::RWeakPtrType<moho::IUnit>::IsPointer() const
 
 void moho::RWeakPtrType<moho::IUnit>::Init()
 {
-  size_ = 0x08;
+  static_assert(sizeof(moho::WeakPtr<moho::IUnit>) == 0x08, "moho::WeakPtr<moho::IUnit> is 0x08 bytes on x86");
+  size_ = sizeof(moho::WeakPtr<moho::IUnit>);
   version_ = 1;
   serLoadFunc_ = &LoadWeakPtrIUnit;
   serSaveFunc_ = &SaveWeakPtrIUnit;
@@ -461,7 +462,8 @@ const gpg::RIndexed* gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::IsIndexed
 
 void gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>) == 0x10, "gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorWeakPtrIUnit;
   serSaveFunc_ = &SaveFastVectorWeakPtrIUnit;

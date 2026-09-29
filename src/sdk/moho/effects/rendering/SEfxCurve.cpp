@@ -189,7 +189,8 @@ namespace gpg
    */
   void RFastVectorType<moho::SEfxCurve>::Init()
   {
-    size_ = 0x10;
+    static_assert(sizeof(gpg::core::FastVectorInline<moho::SEfxCurve>) == 0x10, "gpg::core::FastVectorInline<moho::SEfxCurve> is 0x10 bytes on x86");
+    size_ = sizeof(gpg::core::FastVectorInline<moho::SEfxCurve>);
     version_ = 1;
     serLoadFunc_ = &RFastVectorType<moho::SEfxCurve>::SerLoad;
     serSaveFunc_ = &RFastVectorType<moho::SEfxCurve>::SerSave;

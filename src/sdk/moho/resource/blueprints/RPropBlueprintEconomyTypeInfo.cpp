@@ -72,8 +72,8 @@ namespace moho
   {
     size_ = sizeof(RPropBlueprintEconomy);
     gpg::RType::Init();
-    AddFieldWithDescription(this, "ReclaimMassMax", CachedFloatType(), 0x00, "Max Reclaimable mass resource.");
-    AddFieldWithDescription(this, "ReclaimEnergyMax", CachedFloatType(), 0x04, "Max Reclaimable Energy resource.");
+    AddFieldWithDescription(this, "ReclaimMassMax", CachedFloatType(), offsetof(RPropBlueprintEconomy, ReclaimMassMax), "Max Reclaimable mass resource.");
+    AddFieldWithDescription(this, "ReclaimEnergyMax", CachedFloatType(), offsetof(RPropBlueprintEconomy, ReclaimEnergyMax), "Max Reclaimable Energy resource.");
     Finish();
   }
 

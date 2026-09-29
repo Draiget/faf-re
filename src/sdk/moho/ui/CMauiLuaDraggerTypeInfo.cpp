@@ -99,7 +99,8 @@ const char* CMauiLuaDraggerTypeInfo::GetName() const
  */
 void CMauiLuaDraggerTypeInfo::Init()
 {
-  size_ = 0x3C;
+  static_assert(sizeof(moho::CMauiLuaDragger) == 0x3C, "moho::CMauiLuaDragger is 0x3C bytes on x86");
+  size_ = sizeof(moho::CMauiLuaDragger);
   AddCScriptObjectBase(*this);
   gpg::RType::Init();
   Finish();

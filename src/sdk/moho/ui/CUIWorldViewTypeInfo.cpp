@@ -90,7 +90,8 @@ const char* CUIWorldViewTypeInfo::GetName() const
  */
 void CUIWorldViewTypeInfo::Init()
 {
-  size_ = 0x2A8;
+  static_assert(sizeof(moho::CUIWorldView) == 0x2A8, "moho::CUIWorldView is 0x2A8 bytes on x86");
+  size_ = sizeof(moho::CUIWorldView);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

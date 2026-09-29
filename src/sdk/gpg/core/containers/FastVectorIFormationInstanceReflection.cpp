@@ -168,7 +168,8 @@ const gpg::RIndexed* gpg::RFastVectorType<moho::IFormationInstance*>::IsIndexed(
  */
 void gpg::RFastVectorType<moho::IFormationInstance*>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(gpg::core::FastVectorInline<moho::IFormationInstance*>) == 0x10, "gpg::core::FastVectorInline<moho::IFormationInstance*> is 0x10 bytes on x86");
+  size_ = sizeof(gpg::core::FastVectorInline<moho::IFormationInstance*>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorIFormationInstance;
   serSaveFunc_ = &SaveFastVectorIFormationInstance;

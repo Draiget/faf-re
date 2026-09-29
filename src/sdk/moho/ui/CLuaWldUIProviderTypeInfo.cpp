@@ -96,7 +96,8 @@ const char* CLuaWldUIProviderTypeInfo::GetName() const
  */
 void CLuaWldUIProviderTypeInfo::Init()
 {
-  size_ = 0x48;
+  static_assert(sizeof(moho::CLuaWldUIProvider) == 0x48, "moho::CLuaWldUIProvider is 0x48 bytes on x86");
+  size_ = sizeof(moho::CLuaWldUIProvider);
   AddCScriptObjectBase(*this);
   gpg::RType::Init();
   Finish();

@@ -269,8 +269,8 @@ namespace
     gpg::RType::Init();
 
     AddSFootprintBaseDescriptor(this);
-    AddFieldDescriptor(this, "Name", ResolveType<msvc8::string>(), 0x10);
-    AddFieldDescriptor(this, "Index", ResolveType<int>(), 0x2C);
+    AddFieldDescriptor(this, "Name", ResolveType<msvc8::string>(), offsetof(moho::SNamedFootprint, mName));
+    AddFieldDescriptor(this, "Index", ResolveType<int>(), offsetof(moho::SNamedFootprint, mIndex));
 
     Finish();
   }

@@ -79,7 +79,8 @@ namespace moho
    */
   void CUnitSacrificeTaskTypeInfo::Init()
   {
-    size_ = 0x4C;
+    static_assert(sizeof(moho::CUnitSacrificeTask) == 0x4C, "moho::CUnitSacrificeTask is 0x4C bytes on x86");
+    size_ = sizeof(moho::CUnitSacrificeTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitSacrificeTaskTypeInfo::NewRef,
@@ -127,7 +128,7 @@ namespace moho
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 0x34;
+    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitSacrificeTask, Listener<ECommandEvent>>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

@@ -488,7 +488,8 @@ const gpg::RIndexed* RWeakPtrType<STaskEventLinkage>::IsPointer() const
  */
 void RWeakPtrType<STaskEventLinkage>::Init()
 {
-  size_ = 0x08;
+  static_assert(sizeof(moho::WeakPtr<moho::STaskEventLinkage>) == 0x08, "moho::WeakPtr<moho::STaskEventLinkage> is 0x08 bytes on x86");
+  size_ = sizeof(moho::WeakPtr<moho::STaskEventLinkage>);
   version_ = 1;
   serLoadFunc_ = &LoadWeakPtrSTaskEventLinkage;
   serSaveFunc_ = &SaveWeakPtrSTaskEventLinkage;

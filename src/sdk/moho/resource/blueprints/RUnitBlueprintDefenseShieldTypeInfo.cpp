@@ -83,8 +83,8 @@ namespace moho
   {
     size_ = sizeof(RUnitBlueprintDefenseShield);
     gpg::RType::Init();
-    AddFieldWithDescription(this, "ShieldSize", CachedFloatType(), 0x00, "Shield diameter");
-    AddFieldWithDescription(this, "RegenAssistMult", CachedFloatType(), 0x04, "Regen assist multiplier");
+    AddFieldWithDescription(this, "ShieldSize", CachedFloatType(), offsetof(RUnitBlueprintDefenseShield, ShieldSize), "Shield diameter");
+    AddFieldWithDescription(this, "RegenAssistMult", CachedFloatType(), offsetof(RUnitBlueprintDefenseShield, RegenAssistMult), "Regen assist multiplier");
     Finish();
   }
 

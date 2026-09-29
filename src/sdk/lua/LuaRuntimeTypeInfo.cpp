@@ -177,7 +177,10 @@ const char* TStringTypeInfo::GetName() const
  */
 void TStringTypeInfo::Init()
 {
-  size_ = 0x14;
+  // The registered size is the string header -- the character payload `str`
+  // begins at +0x14 (see LuaRuntimeTypes.h), not at sizeof(TString).
+  static_assert(offsetof(TString, str) == 0x14, "TString header is 0x14 bytes on x86");
+  size_ = offsetof(TString, str);
   gpg::RType::Init();
   Finish();
 }
@@ -199,7 +202,8 @@ const char* TableTypeInfo::GetName() const
  */
 void TableTypeInfo::Init()
 {
-  size_ = 0x24;
+  static_assert(sizeof(Table) == 0x24, "Table is 0x24 bytes on x86");
+  size_ = sizeof(Table);
   gpg::RType::Init();
   Finish();
 }
@@ -233,7 +237,8 @@ const char* LClosureTypeInfo::GetName() const
  */
 void LClosureTypeInfo::Init()
 {
-  size_ = 0x20;
+  static_assert(sizeof(LClosure) == 0x20, "LClosure is 0x20 bytes on x86");
+  size_ = sizeof(LClosure);
   gpg::RType::Init();
   Finish();
 }
@@ -267,7 +272,8 @@ const char* UpValTypeInfo::GetName() const
  */
 void UpValTypeInfo::Init()
 {
-  size_ = 0x14;
+  static_assert(sizeof(UpVal) == 0x14, "UpVal is 0x14 bytes on x86");
+  size_ = sizeof(UpVal);
   gpg::RType::Init();
   Finish();
 }
@@ -301,7 +307,8 @@ const char* ProtoTypeInfo::GetName() const
  */
 void ProtoTypeInfo::Init()
 {
-  size_ = 0x70;
+  static_assert(sizeof(Proto) == 0x70, "Proto is 0x70 bytes on x86");
+  size_ = sizeof(Proto);
   gpg::RType::Init();
   Finish();
 }
@@ -335,7 +342,8 @@ const char* lua_StateTypeInfo::GetName() const
  */
 void lua_StateTypeInfo::Init()
 {
-  size_ = 0x48;
+  static_assert(sizeof(lua_State) == 0x48, "lua_State is 0x48 bytes on x86");
+  size_ = sizeof(lua_State);
   gpg::RType::Init();
   Finish();
 }
@@ -369,7 +377,8 @@ const char* UdataTypeInfo::GetName() const
  */
 void UdataTypeInfo::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(Udata) == 0x10, "Udata is 0x10 bytes on x86");
+  size_ = sizeof(Udata);
   gpg::RType::Init();
   Finish();
 }

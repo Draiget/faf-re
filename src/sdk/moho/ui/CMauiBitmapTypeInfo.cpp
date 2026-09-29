@@ -96,7 +96,8 @@ const char* CMauiBitmapTypeInfo::GetName() const
  */
 void CMauiBitmapTypeInfo::Init()
 {
-  size_ = 0x18C;
+  static_assert(sizeof(moho::CMauiBitmap) == 0x18C, "moho::CMauiBitmap is 0x18C bytes on x86");
+  size_ = sizeof(moho::CMauiBitmap);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

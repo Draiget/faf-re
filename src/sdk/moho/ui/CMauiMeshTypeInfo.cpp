@@ -96,7 +96,8 @@ const char* CMauiMeshTypeInfo::GetName() const
  */
 void CMauiMeshTypeInfo::Init()
 {
-  size_ = 0x140;
+  static_assert(sizeof(moho::CMauiMesh) == 0x140, "moho::CMauiMesh is 0x140 bytes on x86");
+  size_ = sizeof(moho::CMauiMesh);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

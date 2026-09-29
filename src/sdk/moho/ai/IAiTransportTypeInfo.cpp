@@ -47,7 +47,7 @@ namespace
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 4;
+    baseField.mOffset = gpg::BaseSubobjectOffset<IAiTransport, BroadcasterEvent>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

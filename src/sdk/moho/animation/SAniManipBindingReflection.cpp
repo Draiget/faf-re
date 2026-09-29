@@ -454,7 +454,8 @@ namespace gpg
    */
   void RFastVectorType<moho::SAniManipBinding>::Init()
   {
-    size_ = 0x10;
+    static_assert(sizeof(gpg::core::FastVectorInline<moho::SAniManipBinding>) == 0x10, "gpg::core::FastVectorInline<moho::SAniManipBinding> is 0x10 bytes on x86");
+    size_ = sizeof(gpg::core::FastVectorInline<moho::SAniManipBinding>);
     version_ = 1;
     serLoadFunc_ = &LoadFastVectorSAniManipBinding;
     serSaveFunc_ = &SaveFastVectorSAniManipBinding;

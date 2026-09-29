@@ -81,7 +81,8 @@ namespace moho
    */
   void CUnitAssistMoveTaskTypeInfo::Init()
   {
-    size_ = 0x68;
+    static_assert(sizeof(moho::CUnitAssistMoveTask) == 0x68, "moho::CUnitAssistMoveTask is 0x68 bytes on x86");
+    size_ = sizeof(moho::CUnitAssistMoveTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitAssistMoveTaskTypeInfo::NewRef,

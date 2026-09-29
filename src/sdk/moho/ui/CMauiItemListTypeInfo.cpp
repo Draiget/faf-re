@@ -96,7 +96,8 @@ const char* CMauiItemListTypeInfo::GetName() const
  */
 void CMauiItemListTypeInfo::Init()
 {
-  size_ = 0x158;
+  static_assert(sizeof(moho::CMauiItemList) == 0x158, "moho::CMauiItemList is 0x158 bytes on x86");
+  size_ = sizeof(moho::CMauiItemList);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

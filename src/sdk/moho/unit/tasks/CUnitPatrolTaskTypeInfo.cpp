@@ -56,7 +56,7 @@ namespace moho
     if (!sType) {
       sType = gpg::LookupRType(typeid(Listener<ECommandEvent>));
     }
-    gpg::AddBaseIfPresent(typeInfo, sType, 0x34);
+    gpg::AddBaseIfPresent(typeInfo, sType, gpg::BaseSubobjectOffset<CUnitPatrolTask, Listener<ECommandEvent>>());
   }
 
   /**
@@ -70,7 +70,7 @@ namespace moho
     if (!sType) {
       sType = gpg::LookupRType(typeid(Listener<EFormationdStatus>));
     }
-    gpg::AddBaseIfPresent(typeInfo, sType, 0x44);
+    gpg::AddBaseIfPresent(typeInfo, sType, gpg::BaseSubobjectOffset<CUnitPatrolTask, Listener<EFormationdStatus>>());
   }
 
   void CUnitPatrolTaskTypeInfo::Init()

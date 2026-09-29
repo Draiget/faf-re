@@ -97,7 +97,8 @@ namespace moho
    */
   void CUnitAttackTargetTaskTypeInfo::Init()
   {
-    size_ = 0x90;
+    static_assert(sizeof(moho::CUnitAttackTargetTask) == 0x90, "moho::CUnitAttackTargetTask is 0x90 bytes on x86");
+    size_ = sizeof(moho::CUnitAttackTargetTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitAttackTargetTaskTypeInfo::NewRef,
@@ -145,7 +146,7 @@ namespace moho
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 0x34;
+    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitAttackTargetTask, Listener<EAiAttackerEvent>>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
@@ -165,7 +166,7 @@ namespace moho
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 0x44;
+    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitAttackTargetTask, Listener<ECommandEvent>>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

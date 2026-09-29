@@ -96,7 +96,8 @@ const char* CMauiTextTypeInfo::GetName() const
  */
 void CMauiTextTypeInfo::Init()
 {
-  size_ = 0x194;
+  static_assert(sizeof(moho::CMauiText) == 0x194, "moho::CMauiText is 0x194 bytes on x86");
+  size_ = sizeof(moho::CMauiText);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

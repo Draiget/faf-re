@@ -178,7 +178,7 @@ void CUnitScriptTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
  */
 void CUnitScriptTaskTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
 {
-  AddBaseIfPresent(typeInfo, CachedCScriptObjectType(), 0x30);
+  AddBaseIfPresent(typeInfo, CachedCScriptObjectType(), gpg::BaseSubobjectOffset<CUnitScriptTask, CScriptObject>());
 }
 
 /**
@@ -189,7 +189,7 @@ void CUnitScriptTaskTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
  */
 void CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
 {
-  AddBaseIfPresent(typeInfo, CachedCommandEventListenerType(), 0x64);
+  AddBaseIfPresent(typeInfo, CachedCommandEventListenerType(), gpg::BaseSubobjectOffset<CUnitScriptTask, Listener<ECommandEvent>>());
 }
 
 /**

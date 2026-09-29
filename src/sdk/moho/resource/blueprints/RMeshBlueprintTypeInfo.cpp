@@ -132,7 +132,7 @@ namespace moho
     }
 
     GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("LODs", CachedMeshLodVectorType(), 0x60, 0, nullptr));
+    typeInfo->fields_.push_back(gpg::RField("LODs", CachedMeshLodVectorType(), offsetof(RMeshBlueprint, mLods), 0, nullptr));
     return &typeInfo->fields_.back();
   }
 
@@ -151,12 +151,12 @@ namespace moho
       typeInfo,
       "IconFadeInZoom",
       CachedFloatType(),
-      0x70,
+      offsetof(RMeshBlueprint, mIconFadeInZoom),
       "Zoom level at which to start fading in the strategic icon"
     );
-    AddFieldWithDescription(typeInfo, "SortOrder", CachedFloatType(), 0x74, "Sort order of mesh we render smallest to largest");
-    AddFieldWithDescription(typeInfo, "UniformScale", CachedFloatType(), 0x78, "Uniform scale factor");
-    AddFieldWithDescription(typeInfo, "StraddleWater", CachedBoolType(), 0x7C, "Render both above and below the water.");
+    AddFieldWithDescription(typeInfo, "SortOrder", CachedFloatType(), offsetof(RMeshBlueprint, mSortOrder), "Sort order of mesh we render smallest to largest");
+    AddFieldWithDescription(typeInfo, "UniformScale", CachedFloatType(), offsetof(RMeshBlueprint, mUniformScale), "Uniform scale factor");
+    AddFieldWithDescription(typeInfo, "StraddleWater", CachedBoolType(), offsetof(RMeshBlueprint, mStraddleWater), "Render both above and below the water.");
   }
 
   /**

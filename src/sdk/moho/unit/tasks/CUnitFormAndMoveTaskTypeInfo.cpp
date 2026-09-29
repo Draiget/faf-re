@@ -197,7 +197,7 @@ namespace moho
    */
   void CUnitFormAndMoveTaskTypeInfo::AddBase_Listener_EAiNavigatorEvent(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedListenerEAiNavigatorEventType(), 0x34);
+    AddBaseField(typeInfo, CachedListenerEAiNavigatorEventType(), gpg::BaseSubobjectOffset<CUnitFormAndMoveTask, Listener<EAiNavigatorEvent>>());
   }
 
   /**
@@ -209,7 +209,7 @@ namespace moho
    */
   void CUnitFormAndMoveTaskTypeInfo::AddBase_Listener_EFormationdStatus(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedListenerEFormationdStatusType(), 0x44);
+    AddBaseField(typeInfo, CachedListenerEFormationdStatusType(), gpg::BaseSubobjectOffset<CUnitFormAndMoveTask, Listener<EFormationdStatus>>());
   }
 
   /**
@@ -221,7 +221,7 @@ namespace moho
    */
   void CUnitFormAndMoveTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedListenerECommandEventType(), 0x54);
+    AddBaseField(typeInfo, CachedListenerECommandEventType(), gpg::BaseSubobjectOffset<CUnitFormAndMoveTask, Listener<ECommandEvent>>());
   }
 
   /**

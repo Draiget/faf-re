@@ -107,7 +107,7 @@ namespace
    */
   void AddBase_IAiCommandDispatch(gpg::RType* const typeInfo)
   {
-    AddBaseIfPresent(typeInfo, CachedIAiCommandDispatchType(), 0x30);
+    AddBaseIfPresent(typeInfo, CachedIAiCommandDispatchType(), gpg::BaseSubobjectOffset<IAiCommandDispatchImpl, IAiCommandDispatch>());
   }
 
   /**
@@ -120,7 +120,7 @@ namespace
    */
   void AddBase_Listener_EUnitCommandQueueStatus(gpg::RType* const typeInfo)
   {
-    AddBaseIfPresent(typeInfo, CachedQueueStatusListenerType(), 0x34);
+    AddBaseIfPresent(typeInfo, CachedQueueStatusListenerType(), gpg::BaseSubobjectOffset<IAiCommandDispatchImpl, Listener<EUnitCommandQueueStatus>>());
   }
 
 } // namespace

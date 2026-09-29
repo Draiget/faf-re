@@ -394,7 +394,8 @@ const gpg::RIndexed* gpg::RVectorType<moho::SDelayedSubVizInfo>::IsIndexed() con
  */
 void gpg::RVectorType<moho::SDelayedSubVizInfo>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(msvc8::vector<moho::SDelayedSubVizInfo>) == 0x10, "msvc8::vector<moho::SDelayedSubVizInfo> is 0x10 bytes on x86");
+  size_ = sizeof(msvc8::vector<moho::SDelayedSubVizInfo>);
   version_ = 1;
   serLoadFunc_ = &LoadSDelayedSubVizInfoVector;
   serSaveFunc_ = &SaveSDelayedSubVizInfoVector;

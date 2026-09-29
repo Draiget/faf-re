@@ -191,7 +191,8 @@ const gpg::RIndexed* gpg::RVectorType<moho::HPathCell>::IsIndexed() const
  */
 void gpg::RVectorType<moho::HPathCell>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(msvc8::vector<moho::HPathCell>) == 0x10, "msvc8::vector<moho::HPathCell> is 0x10 bytes on x86");
+  size_ = sizeof(msvc8::vector<moho::HPathCell>);
   version_ = 1;
   serLoadFunc_ = &LoadHPathCellVector;
   serSaveFunc_ = &SaveHPathCellVector;

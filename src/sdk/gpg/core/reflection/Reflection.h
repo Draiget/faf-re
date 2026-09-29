@@ -6912,4 +6912,19 @@ namespace gpg
     RType::delete_func_t deleteFunc,
     RType::dtr_func_t dtrFunc
   ) noexcept;
+
+  /**
+   * Byte offset of the `Base` subobject inside `Derived`, for base-class
+   * registrations (`RType::AddBase`). The binary registers these as
+   * constants (0x34 for a unit task's command-event listener base, ...),
+   * which describe the x86 layout; this is the same number on x86 and the
+   * right one on x64, where every base after a pointer-bearing one moves.
+   */
+  template <class Derived, class Base>
+  [[nodiscard]] inline int BaseSubobjectOffset() noexcept
+  {
+    constexpr std::uintptr_t kProbeAddress = 0x1000u;
+    auto* const derived = reinterpret_cast<Derived*>(kProbeAddress);
+    return static_cast<int>(reinterpret_cast<std::uintptr_t>(static_cast<Base*>(derived)) - kProbeAddress);
+  }
 } // namespace gpg

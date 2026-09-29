@@ -64,14 +64,15 @@ void IAiNavigatorTypeInfo::AddBase_Broadcaster_EAiNavigatorEvent(gpg::RType* con
   if (!sBroadcasterType) {
     sBroadcasterType = gpg::LookupRType(typeid(Broadcaster<EAiNavigatorEvent>));
   }
-  gpg::AddBaseIfPresent(typeInfo, sBroadcasterType, 4);
+  gpg::AddBaseIfPresent(typeInfo, sBroadcasterType, gpg::BaseSubobjectOffset<IAiNavigator, Broadcaster<EAiNavigatorEvent>>());
 }
 
 void IAiNavigatorTypeInfo::Init()
 {
   // 0x005A31F3 stores the literal 0x0C: `sizeof(IAiNavigator)` without the
   // `mPad0C` slot (see IAiNavigator.h).
-  size_ = 0x0C;
+  static_assert(offsetof(moho::IAiNavigator, mPad0C) == 0x0C, "IAiNavigator registers 0x0C bytes on x86");
+  size_ = offsetof(moho::IAiNavigator, mPad0C);
   gpg::RType::Init();
   AddBase_Broadcaster_EAiNavigatorEvent(this);
   Finish();

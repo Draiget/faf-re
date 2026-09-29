@@ -72,8 +72,8 @@ namespace moho
   {
     size_ = sizeof(RPropBlueprintDefense);
     gpg::RType::Init();
-    AddFieldWithDescription(this, "MaxHealth", CachedFloatType(), 0x00, "Max health value for the prop");
-    AddFieldWithDescription(this, "Health", CachedFloatType(), 0x04, "Starting health value for the prop");
+    AddFieldWithDescription(this, "MaxHealth", CachedFloatType(), offsetof(RPropBlueprintDefense, MaxHealth), "Max health value for the prop");
+    AddFieldWithDescription(this, "Health", CachedFloatType(), offsetof(RPropBlueprintDefense, Health), "Starting health value for the prop");
     Finish();
   }
 

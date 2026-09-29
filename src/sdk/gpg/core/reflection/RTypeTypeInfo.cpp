@@ -50,7 +50,8 @@ void gpg::RTypeTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
 
 void gpg::RTypeTypeInfo::Init()
 {
-  size_ = 0x64;
+  static_assert(sizeof(gpg::RType) == 0x64, "gpg::RType is 0x64 bytes on x86");
+  size_ = sizeof(gpg::RType);
   gpg::RType::Init();
   AddBase_RObject(this);
   Finish();

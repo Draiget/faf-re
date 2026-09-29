@@ -78,7 +78,8 @@ namespace moho
    */
   void CUnitMobileBuildTaskTypeInfo::Init()
   {
-    size_ = 0xE8;
+    static_assert(sizeof(moho::CUnitMobileBuildTask) == 0xE8, "moho::CUnitMobileBuildTask is 0xE8 bytes on x86");
+    size_ = sizeof(moho::CUnitMobileBuildTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitMobileBuildTaskTypeInfo::NewRef,
@@ -125,7 +126,7 @@ namespace moho
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 0x34;
+    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitMobileBuildTask, Listener<ECommandEvent>>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

@@ -101,7 +101,7 @@ void CAiAttackerImplTypeInfo::AddBase_IAiAttacker(gpg::RType* const typeInfo)
  */
 void CAiAttackerImplTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
 {
-  gpg::AddBaseIfPresent(typeInfo, CachedCScriptObjectType(), 0x0C);
+  gpg::AddBaseIfPresent(typeInfo, CachedCScriptObjectType(), gpg::BaseSubobjectOffset<CAiAttackerImpl, CScriptObject>());
 }
 
 /**
@@ -109,7 +109,8 @@ void CAiAttackerImplTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
  */
 void CAiAttackerImplTypeInfo::Init()
 {
-  size_ = 0xA4;
+  static_assert(sizeof(moho::CAiAttackerImpl) == 0xA4, "moho::CAiAttackerImpl is 0xA4 bytes on x86");
+  size_ = sizeof(moho::CAiAttackerImpl);
   gpg::RType::Init();
 
   AddBase_IAiAttacker(this);

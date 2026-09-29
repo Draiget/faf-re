@@ -96,7 +96,8 @@ const char* CMauiBorderTypeInfo::GetName() const
  */
 void CMauiBorderTypeInfo::Init()
 {
-  size_ = 0x174;
+  static_assert(sizeof(moho::CMauiBorder) == 0x174, "moho::CMauiBorder is 0x174 bytes on x86");
+  size_ = sizeof(moho::CMauiBorder);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

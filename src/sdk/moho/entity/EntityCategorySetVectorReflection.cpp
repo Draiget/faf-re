@@ -190,7 +190,8 @@ const gpg::RIndexed* gpg::RVectorType<moho::EntityCategorySet>::IsIndexed() cons
  */
 void gpg::RVectorType<moho::EntityCategorySet>::Init()
 {
-  size_ = 0x10;
+  static_assert(sizeof(msvc8::vector<moho::EntityCategorySet>) == 0x10, "msvc8::vector<moho::EntityCategorySet> is 0x10 bytes on x86");
+  size_ = sizeof(msvc8::vector<moho::EntityCategorySet>);
   version_ = 1;
   serLoadFunc_ = &LoadEntityCategorySetVector;
   serSaveFunc_ = &SaveEntityCategorySetVector;

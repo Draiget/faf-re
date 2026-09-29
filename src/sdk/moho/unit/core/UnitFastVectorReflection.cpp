@@ -378,7 +378,8 @@ namespace gpg
    */
   void RFastVectorType<moho::WeakPtr<moho::Entity>>::Init()
   {
-    size_ = 0x10;
+    static_assert(sizeof(gpg::core::FastVectorInline<moho::WeakPtr<moho::Entity>>) == 0x10, "gpg::core::FastVectorInline<moho::WeakPtr<moho::Entity>> is 0x10 bytes on x86");
+    size_ = sizeof(gpg::core::FastVectorInline<moho::WeakPtr<moho::Entity>>);
     version_ = 1;
     serLoadFunc_ = &LoadFastVectorWeakPtrEntity;
     serSaveFunc_ = &SaveFastVectorWeakPtrEntity;
@@ -465,7 +466,8 @@ namespace gpg
    */
   void RFastVectorType<moho::ReconBlip*>::Init()
   {
-    size_ = 0x10;
+    static_assert(sizeof(gpg::core::FastVectorInline<moho::ReconBlip*>) == 0x10, "gpg::core::FastVectorInline<moho::ReconBlip*> is 0x10 bytes on x86");
+    size_ = sizeof(gpg::core::FastVectorInline<moho::ReconBlip*>);
     version_ = 1;
     serLoadFunc_ = &LoadFastVectorReconBlipPointer;
     serSaveFunc_ = &SaveFastVectorReconBlipPointer;

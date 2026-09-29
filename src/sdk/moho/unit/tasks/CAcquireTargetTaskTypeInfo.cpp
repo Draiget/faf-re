@@ -125,7 +125,7 @@ namespace moho
     gpg::RField field{};
     field.mName = baseType->GetName();
     field.mType = baseType;
-    field.mOffset = 0x18;
+    field.mOffset = gpg::BaseSubobjectOffset<CAcquireTargetTask, ManyToOneListener_EProjectileImpactEvent>();
     field.v4 = 0;
     field.mDesc = nullptr;
     typeInfo->AddBase(field);
@@ -145,7 +145,7 @@ namespace moho
     gpg::RField field{};
     field.mName = baseType->GetName();
     field.mType = baseType;
-    field.mOffset = 0x20;
+    field.mOffset = gpg::BaseSubobjectOffset<CAcquireTargetTask, ManyToOneListener_ECollisionBeamEvent>();
     field.v4 = 0;
     field.mDesc = nullptr;
     typeInfo->AddBase(field);

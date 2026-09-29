@@ -96,7 +96,8 @@ const char* CMauiMovieTypeInfo::GetName() const
  */
 void CMauiMovieTypeInfo::Init()
 {
-  size_ = 0x168;
+  static_assert(sizeof(moho::CMauiMovie) == 0x168, "moho::CMauiMovie is 0x168 bytes on x86");
+  size_ = sizeof(moho::CMauiMovie);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();

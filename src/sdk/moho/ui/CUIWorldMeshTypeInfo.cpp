@@ -39,7 +39,8 @@ const char* CUIWorldMeshTypeInfo::GetName() const { return "CUIWorldMesh"; }
 
 void CUIWorldMeshTypeInfo::Init()
 {
-  size_ = 0x38;
+  static_assert(sizeof(moho::CUIWorldMesh) == 0x38, "moho::CUIWorldMesh is 0x38 bytes on x86");
+  size_ = sizeof(moho::CUIWorldMesh);
   debug_reflection::AddBaseCScriptObject(this);
   gpg::RType::Init();
   Finish();

@@ -612,7 +612,8 @@ const char* moho::RBroadcasterRType_NavPath::GetName() const
  */
 void moho::RBroadcasterRType_NavPath::Init()
 {
-  size_ = 8;
+  static_assert(sizeof(moho::Broadcaster<const moho::SNavPath&>) == 8, "moho::Broadcaster<const moho::SNavPath&> is 8 bytes on x86");
+  size_ = sizeof(moho::Broadcaster<const moho::SNavPath&>);
   version_ = 1;
   serLoadFunc_ = reinterpret_cast<load_func_t>(&gpg::ReadAndLinkNavPathListeners);
   serSaveFunc_ = reinterpret_cast<save_func_t>(&WriteNavPathListeners);
@@ -704,7 +705,8 @@ const char* moho::RListenerRType_NavPath::GetName() const
  */
 void moho::RListenerRType_NavPath::Init()
 {
-  size_ = 12;
+  static_assert(sizeof(moho::Listener<const moho::SNavPath&>) == 12, "moho::Listener<const moho::SNavPath&> is 12 bytes on x86");
+  size_ = sizeof(moho::Listener<const moho::SNavPath&>);
 }
 
 /**

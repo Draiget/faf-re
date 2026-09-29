@@ -227,22 +227,22 @@ void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
    */
   void RTrailBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "BlueprintId", CachedRResIdType(), 0x08, "Blueprint ID");
-    AddFieldWithDescription(typeInfo, "Lifetime", CachedFloatType(), 0x28, "Lifetime of emitter");
-    AddFieldWithDescription(typeInfo, "TrailLength", CachedFloatType(), 0x2C, "Trail Length");
-    AddFieldWithDescription(typeInfo, "Size", CachedFloatType(), 0x30, "Startsize");
-    AddFieldWithDescription(typeInfo, "SortOrder", CachedFloatType(), 0x34, "Sort Order");
-    AddFieldWithDescription(typeInfo, "BlendMode", CachedInt32Type(), 0x38, "BlendMode");
-    AddFieldWithDescription(typeInfo, "TextureRepeatRate", CachedFloatType(), 0x44, "Texture repeat rate in units");
-    AddFieldWithDescription(typeInfo, "LODCutoff", CachedFloatType(), 0x3C, "cutoff distance");
+    AddFieldWithDescription(typeInfo, "BlueprintId", CachedRResIdType(), offsetof(RTrailBlueprint, BlueprintId), "Blueprint ID");
+    AddFieldWithDescription(typeInfo, "Lifetime", CachedFloatType(), offsetof(RTrailBlueprint, Lifetime), "Lifetime of emitter");
+    AddFieldWithDescription(typeInfo, "TrailLength", CachedFloatType(), offsetof(RTrailBlueprint, TrailLength), "Trail Length");
+    AddFieldWithDescription(typeInfo, "Size", CachedFloatType(), offsetof(RTrailBlueprint, StartSize), "Startsize");
+    AddFieldWithDescription(typeInfo, "SortOrder", CachedFloatType(), offsetof(RTrailBlueprint, SortOrder), "Sort Order");
+    AddFieldWithDescription(typeInfo, "BlendMode", CachedInt32Type(), offsetof(RTrailBlueprint, BlendMode), "BlendMode");
+    AddFieldWithDescription(typeInfo, "TextureRepeatRate", CachedFloatType(), offsetof(RTrailBlueprint, TextureRepeatRate), "Texture repeat rate in units");
+    AddFieldWithDescription(typeInfo, "LODCutoff", CachedFloatType(), offsetof(RTrailBlueprint, LODCutoff), "cutoff distance");
     AddFieldWithDescription(
-      typeInfo, "EmitIfVisible", CachedBoolType(), 0x40, "Emit particles ONLY if this is emitter is visible"
+      typeInfo, "EmitIfVisible", CachedBoolType(), offsetof(RTrailBlueprint, EmitIfVisible), "Emit particles ONLY if this is emitter is visible"
     );
     AddFieldWithDescription(
-      typeInfo, "CatchupEmit", CachedBoolType(), 0x41, "catchup particles for the ticks that we weren't visible"
+      typeInfo, "CatchupEmit", CachedBoolType(), offsetof(RTrailBlueprint, CatchupEmit), "catchup particles for the ticks that we weren't visible"
     );
-    AddFieldWithDescription(typeInfo, "RepeatTexture", CachedStringType(), 0x48, "name of texture that repeats");
-    AddFieldWithDescription(typeInfo, "RampTexture", CachedStringType(), 0x64, "RampTextureName");
+    AddFieldWithDescription(typeInfo, "RepeatTexture", CachedStringType(), offsetof(RTrailBlueprint, RepeatTexture), "name of texture that repeats");
+    AddFieldWithDescription(typeInfo, "RampTexture", CachedStringType(), offsetof(RTrailBlueprint, RampTexture), "RampTextureName");
   }
 
   /**

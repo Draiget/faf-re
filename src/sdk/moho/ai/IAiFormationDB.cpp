@@ -14,11 +14,12 @@ namespace
   /// rebases each word by `-8 + 4` and treats both 0 and 8 (a null unit's
   /// `Entity` subobject) as empty.
   constexpr std::uint32_t kEmptyFormationWeakRefWord = 0u;
-  constexpr std::uint32_t kEntityBaseOffsetWord = 0x8u;
-  constexpr std::uint32_t kEmptyFormationWeakRefEntityWord = kEmptyFormationWeakRefWord + kEntityBaseOffsetWord;
-  constexpr std::uint32_t kUnitOwnerLinkOffsetWord = static_cast<std::uint32_t>(moho::WeakPtr<moho::IUnit>::kOwnerLinkOffset);
 
-  static_assert(kUnitOwnerLinkOffsetWord == 0x04, "Formation weak-ref slot decoding expects the IUnit owner-link offset 0x04");
+  // `Unit`'s `Entity` base offset (0x08 on x86): the word a null unit encodes to.
+  [[nodiscard]] std::uint32_t NullUnitEntityWord() noexcept
+  {
+    return static_cast<std::uint32_t>(gpg::BaseSubobjectOffset<moho::Unit, moho::Entity>());
+  }
 }
 
 using namespace moho;
@@ -39,14 +40,16 @@ SFormationUnitWeakRef SFormationUnitWeakRef::FromUnit(Unit* const unit) noexcept
 
 std::uint32_t* SFormationUnitWeakRef::DecodeOwnerChainHead() const noexcept
 {
-  // FUN_0059C120 treats {0, 8} as empty words.
-  if (ownerLinkSlotWord == kEmptyFormationWeakRefWord || ownerLinkSlotWord == kEmptyFormationWeakRefEntityWord) {
+  // FUN_0059C120 treats {0, 8} as empty words: null, and a null unit's Entity.
+  if (ownerLinkSlotWord == kEmptyFormationWeakRefWord || ownerLinkSlotWord == NullUnitEntityWord()) {
     return nullptr;
   }
 
-  return reinterpret_cast<std::uint32_t*>(
-    static_cast<std::uintptr_t>(ownerLinkSlotWord - kEntityBaseOffsetWord + kUnitOwnerLinkOffsetWord)
-  );
+  // Rebase the Entity word to its Unit (`-8` on x86), then to the IUnit
+  // weak-link head (`+4`).
+  auto* const entity = reinterpret_cast<Entity*>(static_cast<std::uintptr_t>(ownerLinkSlotWord));
+  IUnit* const unit = static_cast<Unit*>(entity);
+  return reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uintptr_t>(unit) + WeakPtr<IUnit>::kOwnerLinkOffset);
 }
 
 /**

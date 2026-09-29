@@ -139,7 +139,8 @@ namespace gpg
    */
   void RListType_ShieldPtr::Init()
   {
-    size_ = 0x0C;
+    static_assert(sizeof(msvc8::list<moho::Shield*>) == 0x0C, "msvc8::list<moho::Shield*> is 0x0C bytes on x86");
+    size_ = sizeof(msvc8::list<moho::Shield*>);
     version_ = 1;
     serLoadFunc_ = &gpg::RListType_ShieldPtr::SerLoad;
     serSaveFunc_ = &gpg::RListType_ShieldPtr::SerSave;

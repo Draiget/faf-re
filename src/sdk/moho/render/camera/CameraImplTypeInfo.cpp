@@ -35,7 +35,7 @@ namespace
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 12;
+    baseField.mOffset = gpg::BaseSubobjectOffset<CameraImpl, CScriptEvent>();
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
@@ -84,7 +84,8 @@ const char* CameraImplTypeInfo::GetName() const
  */
 void CameraImplTypeInfo::Init()
 {
-  size_ = 0x858;
+  static_assert(sizeof(moho::CameraImpl) == 0x858, "moho::CameraImpl is 0x858 bytes on x86");
+  size_ = sizeof(moho::CameraImpl);
   AddCScriptEventBaseToCameraImplType(this);
   gpg::RType::Init();
   Finish();

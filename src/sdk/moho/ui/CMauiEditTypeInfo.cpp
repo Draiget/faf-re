@@ -96,7 +96,8 @@ const char* CMauiEditTypeInfo::GetName() const
  */
 void CMauiEditTypeInfo::Init()
 {
-  size_ = 0x198;
+  static_assert(sizeof(moho::CMauiEdit) == 0x198, "moho::CMauiEdit is 0x198 bytes on x86");
+  size_ = sizeof(moho::CMauiEdit);
   AddCMauiControlBase(*this);
   gpg::RType::Init();
   Finish();
