@@ -106,6 +106,8 @@ Shipped scenarios (`scenarios/`):
 | `2p-direct-smoke.yaml` | Baseline: two shipped-game instances launch and play 2 minutes, no desync, no crash |
 | `2p-ice-turn.yaml` | The production path: faf-pioneer adapters, TURN relay forced (`relayOnly`, `minTurnAllocations`) |
 | `3p-relay-lag-and-drop.yaml` | 150 ms ± 30 ms and 3 % loss on one link, a 20 s partition, then a crash; survivors stay in sync |
+| `3p-kill-uneven-leaver-data.yaml` | A killed player nobody is told about, after one survivor lost 1.5 s of its data; both survivors eject it through their Connectivity dialogs and must end its command source on the same tick |
+| `3p-kill-eject-race.yaml` | The same with ~1 beat of difference and one survivor ejecting at once: reproduces the retail eject race (game 27869686). Fails whenever the difference is exactly one beat |
 | `2p-recovered-vs-original.yaml` | Recovered `main.exe` against `ForgedAlliance.exe` in one match; divergence shows up as a `Desync` report |
 | `2p-debug-main.yaml` | Player 2 is started by you under the debugger; mpemu prints its command line and waits |
 
@@ -141,6 +143,7 @@ game:
   nosound: true
   tile: true
   spawn: true              # false: print the command line and wait (debugger)
+  saveReplays: true        # each instance records <run>\replay-<uid>.scfareplay
 ice: { forceRelay: false, noTurn: false, logLevel: 0 }
 link: { latency: 0ms }     # default impairment for new relay links
 players:
@@ -168,6 +171,8 @@ expect:
   minTurnAllocations: 2
   relayOnly: true
   peerStats: { minAnswered: 20, maxAvgRtt: 50ms, maxLoss: 0.02 }   # fakegame only
+  logsAgree:               # these players' game logs match the same lines (groups compared)
+    - { uids: [1, 2], pattern: '(Army \d+ \S+) has been abandoned by all players' }
 ```
 
 ## Debugging

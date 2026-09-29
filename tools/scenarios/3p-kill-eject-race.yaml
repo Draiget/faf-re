@@ -1,0 +1,56 @@
+﻿name: 3p-kill-eject-race
+description: >
+  Reproduces the eject race behind game 27869686's desync, which is in the
+  retail engine too. CClientBase::IsReadyForBeat stops requiring acks for a
+  leaver's data once the beat reaches the locally known minimum eject beat
+  (0x0053C44A: skip while beat - mostExpired >= 0), yet UpdateState still
+  dispatches the leaver's data for that beat. A survivor holding exactly one
+  more beat than another, and ejecting before the other's report arrives,
+  therefore ends the leaver's source a tick later. A difference of two or
+  more beats is caught (the ack requirement holds below the minimum), so is
+  none. Charlie's packets to Bravo are cut ~120 ms before the kill to aim at
+  one beat; Alpha ejects at once through GPGNet EjectPlayer, Bravo only
+  through its Connectivity dialog ~85 s later. Expected to FAIL with a Desync
+  whenever the difference lands on exactly one beat, until the engine
+  requires acks up to and including that beat; the saved replays show the
+  two survivors' CommandSourceTerminated a beat apart.
+timeout: 15m
+
+mode: relay
+lobby: auto
+leave: never
+map: SCMP_009
+gameOptions:
+  DisconnectionDelay02: '30'
+
+game:
+  exe: '%ProgramData%\FAForever\bin\main.exe'
+  nosound: true
+  tile: true
+  saveReplays: true  # replay-<uid>: diff where each survivor ended Charlie's source
+
+players:
+  - { uid: 1, name: Alpha }
+  - { uid: 2, name: Bravo }
+  - { uid: 3, name: Charlie }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 5m }
+  - wait: 60s
+  - note: cutting Charlie -> Bravo, then killing Charlie
+  - link: { from: 3, to: 2, oneWay: true, blocked: true }
+  - wait: 120ms
+  - kill: 3
+  - wait: 500ms       # let Charlie's last packets reach Alpha
+  - send: { uid: 1, cmd: EjectPlayer, args: [3] }
+  - wait: 150s
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsAgree:
+    - { uids: [1, 2], pattern: '(Army \d+ \S+) has been abandoned by all players' }

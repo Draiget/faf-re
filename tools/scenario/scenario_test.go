@@ -1,7 +1,10 @@
 package scenario
 
 import (
+	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"testing"
 	"time"
 )
@@ -52,5 +55,28 @@ func TestDurationsAndSelectors(t *testing.T) {
 	}
 	if got := (UIDs{Others: true}).Resolve([]int{1, 2, 3}, 1); len(got) != 2 || got[0] != 2 {
 		t.Fatalf("others = %v", got)
+	}
+}
+
+// logMatches keeps capture groups only, so per-client text around them does
+// not break agreement; a pattern without groups compares the whole match.
+func TestLogMatches(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game-1.log")
+	log := "info: Command source Charlie terminated tick 1234\r\n" +
+		"warning: unrelated\n" +
+		"info: Command source Delta terminated tick 1300\n"
+	if err := os.WriteFile(path, []byte(log), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := logMatches(path, regexp.MustCompile(`Command source (\S+) terminated tick (\d+)`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"Charlie 1234", "Delta 1300"}; !slices.Equal(got, want) {
+		t.Fatalf("groups: got %q, want %q", got, want)
+	}
+	got, _ = logMatches(path, regexp.MustCompile(`tick \d+`))
+	if want := []string{"tick 1234", "tick 1300"}; !slices.Equal(got, want) {
+		t.Fatalf("whole match: got %q, want %q", got, want)
 	}
 }

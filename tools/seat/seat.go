@@ -65,6 +65,11 @@ type Config struct {
 	Prefs    string   `json:"prefs"`              // template path, or PrefsShared
 	Spawn    bool     `json:"spawn"`
 	RunDir   string   `json:"runDir"`
+	// SaveReplay records this instance's replay as <RunDir>/replay-<uid>.
+	SaveReplay bool `json:"saveReplay,omitempty"`
+	// PrivateCache gives the instance its own shader cache, <RunDir>/cache-<uid>
+	// (/cachedir, recovered engine only), so instances can load in parallel.
+	PrivateCache bool `json:"privateCache,omitempty"`
 
 	ICE *ICE `json:"ice,omitempty"`
 }
@@ -258,7 +263,8 @@ func (s *Seat) startAdapter(ctx context.Context) error {
 	}
 }
 
-// GameArgs is the command line a seat's game gets, for a GPGNet endpoint`n// (the seat's own, or its ICE adapter's) on gpgPort.
+// GameArgs is the command line a seat's game gets, for a GPGNet endpoint
+// (the seat's own, or its ICE adapter's) on gpgPort.
 func (c Config) GameArgs(gpgPort int) []string {
 	args := []string{
 		"/init", c.Init,
@@ -298,6 +304,15 @@ func (c Config) GameArgs(gpgPort int) []string {
 	}
 	if len(c.Position) == 2 {
 		args = append(args, "/position", strconv.Itoa(c.Position[0]), strconv.Itoa(c.Position[1]))
+	}
+	if c.SaveReplay {
+		// A path, so every instance records its own: instances sharing a
+		// profile otherwise all target LastGame and only the first gets it.
+		// The engine appends the replay extension (VCR_CreateReplay).
+		args = append(args, "/savereplay", filepath.Join(c.RunDir, fmt.Sprintf("replay-%d", c.UID)))
+	}
+	if c.PrivateCache {
+		args = append(args, "/cachedir", filepath.Join(c.RunDir, fmt.Sprintf("cache-%d", c.UID)))
 	}
 	return append(args, c.Args...)
 }

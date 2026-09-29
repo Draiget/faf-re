@@ -14,8 +14,10 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -316,6 +318,9 @@ func (l *Launcher) seatConfig(p *Player) seat.Config {
 		Window: c.Game.Window, NoSound: c.Game.NoSound, Prefs: c.Game.Prefs,
 		Spawn:  boolOr(pc.Spawn, boolOr(c.Game.Spawn, true)),
 		RunDir: c.RunDir,
+
+		SaveReplay:   c.Game.SaveReplays,
+		PrivateCache: takesCacheDir(exe),
 	}
 	if c.Game.Tile {
 		// Cascade: each window's title bar stays visible and clickable.
@@ -423,15 +428,46 @@ func (l *Launcher) Send(uid int, m gpgnet.Message) error {
 // WaitState blocks until the player's game reports state. It fails at once
 // when that game exits instead, rather than waiting out the timeout.
 func (l *Launcher) WaitState(ctx context.Context, uid int, state string) error {
+	return l.waitGameState(ctx, uid, fmt.Sprintf("GameState %q", state),
+		func(s string) bool { return s == state })
+}
+
+// WaitLoaded blocks until the player's game reports its first GameState,
+// which the engine sends only once its device and effects are loaded.
+func (l *Launcher) WaitLoaded(ctx context.Context, uid int) error {
+	return l.waitGameState(ctx, uid, "its first GameState", func(s string) bool { return s != "" })
+}
+
+// SharesCache reports whether the player's game is started by mpemu on this
+// machine with the user's shared shader cache: the engine has no /cachedir.
+// Such games must not load at the same time as one another.
+func (l *Launcher) SharesCache(uid int) bool {
+	p, err := l.Player(uid)
+	if err != nil {
+		return false
+	}
+	return p.Cfg.Agent == "" && boolOr(p.Cfg.Spawn, boolOr(l.cfg.Game.Spawn, true)) &&
+		!takesCacheDir(l.seatConfig(p).Exe)
+}
+
+// takesCacheDir reports whether the engine accepts /cachedir. The retail
+// ForgedAlliance.exe does not; the recovered main.exe builds do.
+func takesCacheDir(exe string) bool {
+	return !strings.EqualFold(filepath.Base(exe), "ForgedAlliance.exe")
+}
+
+// waitGameState blocks until the player's reported GameState satisfies want,
+// failing at once when that game exits instead of waiting out ctx.
+func (l *Launcher) waitGameState(ctx context.Context, uid int, what string, want func(state string) bool) error {
 	p, err := l.Player(uid)
 	if err != nil {
 		return err
 	}
 	gone := func() error {
-		return fmt.Errorf("player %d's game exited before reaching GameState %q (last %q)", uid, state, p.State())
+		return fmt.Errorf("player %d's game exited before reaching %s (last %q)", uid, what, p.State())
 	}
 	after := l.j.Last()
-	if p.State() == state {
+	if want(p.State()) {
 		return nil
 	}
 	if p.Gone() {
@@ -442,13 +478,14 @@ func (l *Launcher) WaitState(ctx context.Context, uid int, state string) error {
 			if r.UID != uid {
 				return false
 			}
-			if r.Kind == journal.GpgIn && r.Command == "GameState" && len(r.Args) > 0 && r.Args[0] == state {
-				return true
+			if r.Kind == journal.GpgIn && r.Command == "GameState" && len(r.Args) > 0 {
+				s, _ := r.Args[0].(string)
+				return want(s)
 			}
 			return r.Kind == journal.ProcExit || r.Kind == journal.GpgClose
 		})
 		if err != nil {
-			return fmt.Errorf("player %d never reached GameState %q (last %q): %w", uid, state, p.State(), err)
+			return fmt.Errorf("player %d never reached %s (last %q): %w", uid, what, p.State(), err)
 		}
 		if rec.Kind == journal.GpgIn {
 			return nil

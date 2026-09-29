@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -207,9 +209,23 @@ func (r *runner) step(ctx context.Context, s Step) error {
 	all := r.l.Players()
 	switch {
 	case s.Start != nil:
-		for _, uid := range s.Start.Resolve(all, r.l.Host()) {
+		uids := s.Start.Resolve(all, r.l.Host())
+		for i, uid := range uids {
 			if err := r.l.Start(ctx, uid); err != nil {
 				return err
+			}
+			// Games on one machine without a private /cachedir share the
+			// engine's shader cache, which each purges and rewrites while it
+			// loads; two loading at once can read the other's half-written
+			// effect and die with "Unable to load effect file". Let such a game
+			// finish loading before starting the next.
+			if i+1 < len(uids) && r.l.SharesCache(uid) {
+				c, cancel := withTimeout(ctx, 0, 3*time.Minute)
+				err := r.l.WaitLoaded(c, uid)
+				cancel()
+				if err != nil {
+					return err
+				}
 			}
 		}
 	case s.Host != 0:
@@ -402,7 +418,68 @@ func (r *runner) check(e Expect) []string {
 	if e.PeerStats != nil {
 		fails = append(fails, r.checkPeerStats(*e.PeerStats)...)
 	}
+	for _, la := range e.LogsAgree {
+		fails = append(fails, r.checkLogsAgree(la)...)
+	}
 	return fails
+}
+
+// checkLogsAgree compares what each listed player's game log matched, and
+// journals the matches so a failure shows what each client logged.
+func (r *runner) checkLogsAgree(la LogsAgree) []string {
+	re, err := regexp.Compile(la.Pattern)
+	if err != nil {
+		return []string{fmt.Sprintf("logsAgree %q: %v", la.Pattern, err)}
+	}
+	uids := la.UIDs.Resolve(r.l.Players(), r.l.Host())
+	if len(uids) < 2 {
+		return []string{fmt.Sprintf("logsAgree %q: needs at least two players, got %v", la.Pattern, uids)}
+	}
+	var fails []string
+	var ref []string
+	refUID := 0
+	for _, uid := range uids {
+		got, err := logMatches(filepath.Join(r.opts.RunDir, fmt.Sprintf("game-%d.log", uid)), re)
+		if err != nil {
+			fails = append(fails, fmt.Sprintf("logsAgree %q: player %d: %v", la.Pattern, uid, err))
+			continue
+		}
+		r.j.Note(journal.Note, uid, fmt.Sprintf("logsAgree %q: %d match(es)", la.Pattern, len(got)), got)
+		switch {
+		case len(got) == 0:
+			fails = append(fails, fmt.Sprintf("logsAgree %q: player %d logged no matching line", la.Pattern, uid))
+		case refUID == 0:
+			ref, refUID = got, uid
+		case !slices.Equal(got, ref):
+			fails = append(fails, fmt.Sprintf("logsAgree %q: player %d logged %q, player %d logged %q",
+				la.Pattern, uid, got, refUID, ref))
+		}
+	}
+	return fails
+}
+
+// logMatches returns one entry per matching line: the capture groups joined
+// by a space, or the whole match when the pattern has no groups.
+func logMatches(path string, re *regexp.Regexp) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var out []string
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 64<<10), 4<<20)
+	for sc.Scan() {
+		m := re.FindStringSubmatch(sc.Text())
+		switch {
+		case m == nil:
+		case len(m) == 1:
+			out = append(out, m[0])
+		default:
+			out = append(out, strings.Join(m[1:], " "))
+		}
+	}
+	return out, sc.Err()
 }
 
 // checkPeerStats reads each link's last fakegame PeerStats report:

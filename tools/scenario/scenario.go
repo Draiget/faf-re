@@ -158,6 +158,18 @@ type Expect struct {
 	// RelayOnly: every ICE candidate the adapters exchanged was a TURN relay
 	// candidate (forced relay really forced).
 	RelayOnly bool `yaml:"relayOnly"`
+	// LogsAgree: the listed players' game logs hold the same matching lines.
+	LogsAgree []LogsAgree `yaml:"logsAgree"`
+}
+
+// LogsAgree requires every listed player's game log (<run>/game-<uid>.log,
+// so players on this machine only) to have at least one line matching
+// Pattern, and the matches to be identical across players, in order. With
+// capture groups only the groups are compared, so a line can carry
+// per-client detail around the part that must agree.
+type LogsAgree struct {
+	UIDs    UIDs   `yaml:"uids"`
+	Pattern string `yaml:"pattern"`
 }
 
 // PeerStatsExpect bounds the fakegame's per-peer measurements (its last

@@ -77,6 +77,10 @@ type GameConfig struct {
 	// Spawn starts the game; false prints the command line and waits for the
 	// game to be started by hand, e.g. from a debugger.
 	Spawn *bool `yaml:"spawn"`
+	// SaveReplays makes every instance record its replay into the run
+	// directory as replay-<uid>.scfareplay, so the command streams the
+	// clients dispatched can be compared afterwards.
+	SaveReplays bool `yaml:"saveReplays"`
 }
 
 // ICEConfig configures ModeICE.

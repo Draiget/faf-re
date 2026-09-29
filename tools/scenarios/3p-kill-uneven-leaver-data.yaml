@@ -1,0 +1,50 @@
+﻿name: 3p-kill-uneven-leaver-data
+description: >
+  Charlie's game is killed after the two survivors have received different
+  amounts of its data, and nobody is told it left: after launch mpemu, like
+  the FAF server, sends no DisconnectFromPeer, and a killed process closes no
+  connection (the engine's UDP layer only marks a silent peer TIMEDOUT and
+  never reports it lost). Each survivor drops Charlie only through its own
+  Connectivity dialog (lua/ui/dialogs/disconnect.lua), which force-ejects
+  about 85 s after Charlie went quiet. Charlie's packets to Bravo are cut
+  1.5 s before the kill, so Bravo holds ~15 fewer beats of Charlie's
+  commands than Alpha. Both survivors must end Charlie's command source on
+  the same tick (the lowest of the survivors' eject reports) and stay in sync.
+timeout: 15m
+
+mode: relay
+lobby: auto
+leave: never          # FAF sends nothing after launch; spelled out here
+map: SCMP_009
+gameOptions:
+  DisconnectionDelay02: '30'
+
+game:
+  exe: '%ProgramData%\FAForever\bin\main.exe'
+  nosound: true
+  tile: true
+  saveReplays: true  # replay-<uid>: diff where each survivor ended Charlie's source
+
+players:
+  - { uid: 1, name: Alpha }
+  - { uid: 2, name: Bravo }
+  - { uid: 3, name: Charlie }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 5m }
+  - wait: 60s
+  - note: cutting Charlie -> Bravo, then killing Charlie
+  - link: { from: 3, to: 2, oneWay: true, blocked: true }
+  - wait: 1500ms
+  - kill: 3
+  - wait: 150s        # dialogs open at 5 s quiet, force-eject 85 s later
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true       # Charlie was killed by mpemu, so only 1 and 2 count
+  logsAgree:
+    - { uids: [1, 2], pattern: '(Army \d+ \S+) has been abandoned by all players' }
