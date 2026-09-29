@@ -2387,9 +2387,32 @@ namespace
       );
     }
 
+    // The module and offset of the fault. The exe is built with ASLR, so the
+    // raw address alone cannot be looked up in main.pdb afterwards.
+    HMODULE faultModule = nullptr;
+    char faultModulePath[MAX_PATH]{};
+    if (::GetModuleHandleExA(
+          GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+          static_cast<LPCSTR>(record.ExceptionAddress), &faultModule
+        ) != FALSE &&
+        ::GetModuleFileNameA(faultModule, faultModulePath, MAX_PATH) != 0u) {
+      const char* moduleName = std::strrchr(faultModulePath, '\\');
+      moduleName = moduleName != nullptr ? moduleName + 1 : faultModulePath;
+      const auto offset = faultAddress - static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(faultModule));
+      gpg::Logf("CRASH: fault is %s+0x%08X (module base 0x%08X)", moduleName, offset,
+                static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(faultModule)));
+      WriteCrashRecordLine("CRASH: fault is %s+0x%08X (module base 0x%08X)", moduleName, offset,
+                           static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(faultModule)));
+    }
+
     std::uint32_t stackFrames[64]{};
-    const std::uint32_t frameCount =
-      moho::PLAT_GetCallStack(exceptionInfo->ContextRecord, 64, stackFrames);
+    std::uint32_t frameCount = moho::PLAT_GetCallStack(exceptionInfo->ContextRecord, 64, stackFrames);
+    if (frameCount == 0u) {
+      // A fault late in shutdown comes after PLAT_Exit has released the symbol
+      // handler, and the walk then yields nothing. Bring it back for the report.
+      moho::PLAT_Init();
+      frameCount = moho::PLAT_GetCallStack(exceptionInfo->ContextRecord, 64, stackFrames);
+    }
     if (frameCount == 0u) {
       gpg::Logf("CRASH callstack: unavailable.");
       WriteCrashRecordLine("CRASH callstack: unavailable.");

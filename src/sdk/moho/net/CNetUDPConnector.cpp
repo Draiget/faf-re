@@ -916,7 +916,10 @@ void CNetUDPConnector::Entry()
     ReceiveData();
     const LONGLONG timeout = SendData();
     if (mClosed && !mIsPulling) {
-      for (const auto* connection : mConnections.owners()) {
+      // FA snapshots `next` before the delete, as ReceiveData's loop does: a
+      // plain walk steps through the deleted node's links, which faulted
+      // reading 0x20 when a client quit with several connections destroyed.
+      for (auto* connection : mConnections.owners_safe()) {
         if (connection->IsDestroyedFlagSet()) {
           delete connection;
         }
