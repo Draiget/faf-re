@@ -269,7 +269,7 @@ namespace moho
     } while (radiusSquared >= 1.0f);
 
     // Keep the original loop condition (`radiusSquared >= 1.0f`) for binary parity.
-    const float scale = std::sqrt((-2.0f * std::log(radiusSquared)) / radiusSquared);
+    const float scale = std::sqrt((-2.0f * msvc8::log(radiusSquared)) / radiusSquared);
     hasMarsagliaPair = 1;
     marsagliaPair = y * scale;
     return x * scale;

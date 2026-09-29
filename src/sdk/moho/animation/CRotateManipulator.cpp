@@ -1,4 +1,5 @@
 #include "moho/animation/CRotateManipulator.h"
+#include "legacy/math/X87Math.h"
 
 #include <cmath>
 #include <cstddef>
@@ -532,7 +533,7 @@ bool moho::CRotateManipulator::ManipulatorUpdate()
       // second argument.
       const float y =
         1.0f - (((composite.orient_.x * composite.orient_.x) + (composite.orient_.y * composite.orient_.y)) * 2.0f);
-      mGoalAngle = std::atan2(x, y);
+      mGoalAngle = msvc8::atan2(x, y);
     }
   }
 

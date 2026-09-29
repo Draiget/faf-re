@@ -13,6 +13,7 @@
 #include <d3d9.h>
 
 #include "legacy/containers/Vector.h"
+#include "platform/BinaryObjectBytes.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/gal/Device.hpp"
@@ -51,8 +52,8 @@
 
 namespace
 {
-  constexpr std::size_t kCartographicNodeStorageSize = 0x7C;
-  constexpr std::size_t kCartographicDecalNodeStorageSize = 0x30;
+  constexpr std::size_t kCartographicNodeStorageSize = platform::BinaryObjectBytes(0x7C);
+  constexpr std::size_t kCartographicDecalNodeStorageSize = platform::BinaryObjectBytes(0x30);
 
   /**
    * Address: 0x007D4000 (FUN_007D4000, sub_7D4000)

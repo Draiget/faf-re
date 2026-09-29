@@ -1,4 +1,5 @@
 #include "moho/entity/MotorFallDown.h"
+#include "legacy/math/X87Math.h"
 
 #include <cmath>
 #include <cstdint>
@@ -465,11 +466,11 @@ namespace moho
     }
 
     const float elevationAngle = mFallAngleRadians - kHalfPi;
-    const float sinTilt = std::cos(elevationAngle);
+    const float sinTilt = msvc8::cos(elevationAngle);
     const Wm3::Vec3f targetAxis{
-      std::sin(mFallDirectionRadians) * sinTilt,
-      -std::sin(elevationAngle),
-      std::cos(mFallDirectionRadians) * sinTilt,
+      msvc8::sin(mFallDirectionRadians) * sinTilt,
+      -msvc8::sin(elevationAngle),
+      msvc8::cos(mFallDirectionRadians) * sinTilt,
     };
 
     VTransform pendingTransform = entity->mVarDat.mCurTransform;
@@ -710,7 +711,7 @@ namespace moho
     )
     {
       if (!motor->mBreakOnWhack) {
-        motor->mFallDirectionRadians = std::atan2(normalXYZ[0], normalXYZ[2]);
+        motor->mFallDirectionRadians = msvc8::atan2(normalXYZ[0], normalXYZ[2]);
         motor->mBreakOnWhack = doBreak;
       }
 

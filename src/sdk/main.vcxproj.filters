@@ -552,6 +552,9 @@
     <ClCompile Include="legacy\exceptions\StdExcept.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="legacy\math\X87Math.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="gpg\core\containers\Array2D.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3343,6 +3346,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="legacy\exceptions\StdExcept.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="legacy\math\X87Math.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaParser.h">

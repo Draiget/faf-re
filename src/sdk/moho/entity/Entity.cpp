@@ -6672,7 +6672,7 @@ namespace moho
     const Wm3::Quatf& orientation = entity->mVarDat.mCurTransform.orient_;
     const float numerator = 2.0f * ((orientation.w * orientation.y) + (orientation.x * orientation.z));
     const float denominator = 1.0f - (2.0f * ((orientation.z * orientation.z) + (orientation.y * orientation.y)));
-    const double heading = std::atan2(static_cast<double>(numerator), static_cast<double>(denominator));
+    const double heading = msvc8::atan2(static_cast<double>(numerator), static_cast<double>(denominator));
     lua_pushnumber(rawState, heading);
     return 1;
   }
@@ -7944,10 +7944,10 @@ namespace moho
     const float halfHeading = heading * 0.5f;
     const float halfPitch = pitch * 0.5f;
 
-    const float cosHeading = std::cos(halfHeading);
-    const float sinHeading = std::sin(halfHeading);
-    const float cosPitch = std::cos(halfPitch);
-    const float sinPitch = std::sin(halfPitch);
+    const float cosHeading = msvc8::cos(halfHeading);
+    const float sinHeading = msvc8::sin(halfHeading);
+    const float cosPitch = msvc8::cos(halfPitch);
+    const float sinPitch = msvc8::sin(halfPitch);
 
     Wm3::Quaternionf orientation{};
     orientation.w = cosHeading * cosPitch;
@@ -8011,12 +8011,12 @@ namespace moho
    */
   Wm3::Vector3f COORDS_ForwardVector(const float heading, const float pitch) noexcept
   {
-    const float cosPitch = std::cos(pitch);
+    const float cosPitch = msvc8::cos(pitch);
 
     Wm3::Vector3f result{};
-    result.x = std::sin(heading) * cosPitch;
-    result.y = -std::sin(pitch);
-    result.z = cosPitch * std::cos(heading);
+    result.x = msvc8::sin(heading) * cosPitch;
+    result.y = -msvc8::sin(pitch);
+    result.z = cosPitch * msvc8::cos(heading);
     return result;
   }
 

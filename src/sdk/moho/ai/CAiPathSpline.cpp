@@ -1,4 +1,5 @@
 #include "moho/ai/CAiPathSpline.h"
+#include "legacy/math/X87Math.h"
 
 #include "moho/ai/IFormationInstance.h"
 
@@ -334,7 +335,7 @@ Wm3::Vector2f* RotateDirectionTowardTargetLimited(
   const float sourceLength = std::sqrt((sourceX * sourceX) + (sourceZ * sourceZ));
   const float targetLength = std::sqrt((targetX * targetX) + (targetZ * targetZ));
   const float lengthProduct = sourceLength * targetLength;
-  const float maxTurnCos = std::cos(maxTurnRadians);
+  const float maxTurnCos = msvc8::cos(maxTurnRadians);
 
   if (lengthProduct == 0.0f) {
     outDirection->x = sourceX;

@@ -1,5 +1,6 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/ai/CAiAttackerImpl.h"
+#include "legacy/math/X87Math.h"
 
 #include <typeinfo>
 
@@ -240,12 +241,12 @@ namespace
         muzzlePos = weapon->mUnit->GetBoneWorldTransform(weapon->mBone).pos_;
       }
 
-      const float targetHeading = std::atan2(targetPos.x - muzzlePos.x, targetPos.z - muzzlePos.z);
+      const float targetHeading = msvc8::atan2(targetPos.x - muzzlePos.x, targetPos.z - muzzlePos.z);
       const Wm3::Quaternionf unitOrientation = weapon->mUnit->GetTransform().orient_;
       const Wm3::Vector3f forwardAxis{0.0f, 0.0f, 1.0f};
       Wm3::Vector3f unitForward{};
       MultQuadVec(&unitForward, &forwardAxis, &unitOrientation);
-      const float unitHeading = std::atan2(unitForward.x, unitForward.z);
+      const float unitHeading = msvc8::atan2(unitForward.x, unitForward.z);
       const float arcCenterRadians = weapon->mWeaponBlueprint->HeadingArcCenter * kDegreesToRadians;
       const float arcRangeRadians = weapon->mWeaponBlueprint->HeadingArcRange * kDegreesToRadians;
       const float headingDelta = NormalizeAngleRadians(targetHeading - unitHeading - arcCenterRadians);

@@ -11,6 +11,8 @@
 #include <xmmintrin.h>
 #include <process.h>
 
+#include "platform/MmxOnX64.h"
+
 #ifndef CINTERFACE
 #define CINTERFACE
 #endif

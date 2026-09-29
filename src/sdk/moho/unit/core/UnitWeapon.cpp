@@ -1,4 +1,5 @@
 #include "moho/unit/core/UnitWeapon.h"
+#include "legacy/math/X87Math.h"
 
 #include <algorithm>
 #include <cstdarg>
@@ -345,12 +346,12 @@ namespace
         muzzlePosition = weapon->mUnit->GetBoneWorldTransform(weapon->mBone).pos_;
       }
 
-      const float targetHeading = std::atan2(targetPosition.x - muzzlePosition.x, targetPosition.z - muzzlePosition.z);
+      const float targetHeading = msvc8::atan2(targetPosition.x - muzzlePosition.x, targetPosition.z - muzzlePosition.z);
       const Wm3::Quaternionf unitOrientation = weapon->mUnit->GetTransform().orient_;
       const Wm3::Vec3f forwardAxis{0.0f, 0.0f, 1.0f};
       Wm3::Vec3f forward{};
       moho::MultQuadVec(&forward, &forwardAxis, &unitOrientation);
-      const float unitHeading = std::atan2(forward.x, forward.z);
+      const float unitHeading = msvc8::atan2(forward.x, forward.z);
 
       constexpr float kDegreesToRadians = 0.017453292f;
       const float headingArcCenter = weapon->mWeaponBlueprint->HeadingArcCenter * kDegreesToRadians;
@@ -4072,7 +4073,7 @@ namespace moho
       const float targetDistance = std::sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
 
       const float muzzleVelocity = mWeaponBlueprint->GetMuzzleVelocity(targetDistance, mSim->mRngState);
-      Wm3::Vector3f& projectileVelocity = AccessProjectileVelocity(*projectile);
+      Wm3::Vector3f& projectileVelocity = projectile->mVelocity;
       (void)Wm3::Vector3f::Normalize(&projectileVelocity);
       projectileVelocity.x *= muzzleVelocity;
       projectileVelocity.y *= muzzleVelocity;

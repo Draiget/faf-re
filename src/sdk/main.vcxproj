@@ -54,11 +54,14 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <!-- Off for the same reason as Release|Win32: /FORCE is ignored under
+         whole-program optimization. -->
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -102,14 +105,20 @@
     <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
   </PropertyGroup>
+  <!-- The x64 image is main_x64.exe so it can be staged beside the Win32
+       main.exe in $(FafRunDir): the engine finds its data from its own
+       directory, so both have to live there. -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>main_x64</TargetName>
+    <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>main_x64</TargetName>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath);$(DirectXInclude)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -229,11 +238,33 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
 if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q "$(TargetDir)$(TargetName).pdb" "$(FafRunDir)" &gt;nul</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
+  <!-- The x64 configurations mirror the Win32 ones above, with four
+       differences:
+
+         - platform\X64LayoutAsserts.h is force-included. It switches off the
+           Win32 layout static_asserts, which describe the x86 image and fail
+           on every pointer-bearing type once pointers are 8 bytes.
+         - wx and its png/jpeg/tiff/regex libraries come from
+           wxWindows-2.4.2\lib\x64 (the same patched Unicode build, compiled
+           for x64). zlib is the real 1.2.3 from dependencies\zlib-1.2.3, which
+           is x64-only and is the version the shipped binary carries.
+         - /LARGEADDRESSAWARE:NO keeps every address below 2 GB. The recovered
+           code still stores pointers in 32-bit words in places (reflection
+           serializer callbacks take the object as an int, the allocator's
+           page-owner map covers exactly 4 GB); below 2 GB those round-trip
+           exactly. Lift this once those are pointer-sized.
+         - 4 MB of stack instead of the binary's 2 MB: every frame that
+           holds pointers is bigger. -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Optimization>Disabled</Optimization>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>platform\X64LayoutAsserts.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -244,9 +275,19 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;dbghelp.lib;winmm.lib;version.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/IGNORE:4006 /HIGHENTROPYVA:NO %(AdditionalOptions)</AdditionalOptions>
+      <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ForceFileOutput>Enabled</ForceFileOutput>
+      <LargeAddressAware>false</LargeAddressAware>
+      <StackReserveSize>4000000</StackReserveSize>
     </Link>
+    <PostBuildEvent>
+      <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
+      <Command>if exist "$(FafRunDir)" xcopy /D /Y /Q "$(TargetPath)" "$(FafRunDir)" &gt;nul
+if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q "$(TargetDir)$(TargetName).pdb" "$(FafRunDir)" &gt;nul</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -254,7 +295,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>platform\X64LayoutAsserts.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -265,9 +307,19 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;dbghelp.lib;winmm.lib;version.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(DirectXLibX64);$(FafRepoRoot)dependencies\zlib-1.2.3;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/IGNORE:4006 /HIGHENTROPYVA:NO %(AdditionalOptions)</AdditionalOptions>
+      <IgnoreSpecificDefaultLibraries>msvcrtd.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ForceFileOutput>Enabled</ForceFileOutput>
+      <LargeAddressAware>false</LargeAddressAware>
+      <StackReserveSize>4000000</StackReserveSize>
     </Link>
+    <PostBuildEvent>
+      <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
+      <Command>if exist "$(FafRunDir)" xcopy /D /Y /Q "$(TargetPath)" "$(FafRunDir)" &gt;nul
+if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q "$(TargetDir)$(TargetName).pdb" "$(FafRunDir)" &gt;nul</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <!-- ClCompile order is load-bearing: MSVC emits each TU's dynamic
@@ -327,6 +379,11 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
       <ObjectFileName>$(IntDir)legacy_containers_String.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="legacy\exceptions\StdExcept.cpp" />
+    <ClCompile Include="legacy\math\X87Math.cpp" />
+    <!-- The x64 half of legacy\math\X87Math.cpp: x64 has no inline assembly. -->
+    <MASM Include="legacy\math\X87Math64.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
+    </MASM>
     <ClCompile Include="lua\LuaAssertion.cpp" />
     <ClCompile Include="gpg\gal\backends\d3d10\D3D10Interfaces.cpp" />
     <ClCompile Include="gpg\core\reflection\Reflection.cpp" />
@@ -2699,5 +2756,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>
 </Project>

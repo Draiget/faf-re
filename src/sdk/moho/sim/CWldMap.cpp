@@ -1,4 +1,5 @@
 #include "CWldMap.h"
+#include "legacy/math/X87Math.h"
 #include <cstdio>
 
 #include <algorithm>
@@ -1558,7 +1559,7 @@ namespace moho
     }
 
     gpg::MemBuffer<char> encodedTexture{};
-    msvc8::string imageFormatName{"", 0U};
+    msvc8::string imageFormatName{"", std::size_t{0}};
 
     // 0x00890B21: the return value is discarded - the call only forces the D3D
     // device online before the GAL singleton is queried.
@@ -2290,7 +2291,7 @@ namespace moho
     const double halfExtentZSquared = static_cast<double>(halfExtentZ) * static_cast<double>(halfExtentZ);
     const double halfExtentXSquared = static_cast<double>(halfExtentX) * static_cast<double>(halfExtentX);
     const float domeRadius = static_cast<float>(
-      std::sqrt(halfExtentZSquared + halfExtentXSquared) / std::cos(1.25663697719574)
+      std::sqrt(halfExtentZSquared + halfExtentXSquared) / msvc8::cos(1.25663697719574)
     );
 
     const STIMap* const map = view->mMap;
@@ -4103,7 +4104,7 @@ namespace moho
       const float halfX = bounds.Max.x - centerX;
       const float halfY = bounds.Min.y - centerY;
       const float domeRadius =
-        static_cast<float>(std::sqrt(halfX * halfX + halfY * halfY) / std::cos(1.25663697719574));
+        static_cast<float>(std::sqrt(halfX * halfX + halfY * halfY) / msvc8::cos(1.25663697719574));
       const float sunElevation = view->mMap->mWaterEnabled ? view->mMap->mWaterElevation : bounds.Min.y;
 
       const Wm3::Vector3f domeOrigin{centerX, centerY, centerZ};

@@ -1,4 +1,5 @@
 #include "QuaternionMath.h"
+#include "legacy/math/X87Math.h"
 
 #include <cstddef>
 #include <cmath>
@@ -496,14 +497,14 @@ namespace moho
     // Use the spherical formula only when the endpoints are sufficiently apart
     // and the resulting sin is finite; otherwise fall through to the lerp+normalize path.
     if ((1.0f - dot) > 0.001f) {
-      const float angle = std::acos(dot);
+      const float angle = msvc8::acos(dot);
       constexpr float kPi = 3.1415927f;
       if ((kPi - angle) >= 0.001f) {
-        const float sinAngle = std::sin(angle);
+        const float sinAngle = msvc8::sin(angle);
         if (std::isfinite(sinAngle) && sinAngle != 0.0f) {
           const float invSin = 1.0f / sinAngle;
-          const float w1 = std::sin(oneMinusT * angle) * invSin;
-          const float w2 = std::sin(tClamped * angle) * invSin;
+          const float w1 = msvc8::sin(oneMinusT * angle) * invSin;
+          const float w2 = msvc8::sin(tClamped * angle) * invSin;
           out->x = (q1->x * w1) + (rhs.x * w2);
           out->y = (q1->y * w1) + (rhs.y * w2);
           out->z = (q1->z * w1) + (rhs.z * w2);
@@ -550,7 +551,7 @@ namespace moho
     const float qy = quat->y;
     const float qz = quat->z;
 
-    float sinHalf = std::sinf(halfAngle);
+    float sinHalf = msvc8::sinf(halfAngle);
     const float axisLenSq = (qz * qz) + (qx * qx) + (qy * qy);
     if (axisLenSq <= (sinHalf * sinHalf)) {
       return false;
@@ -569,7 +570,7 @@ namespace moho
     quat->x = axis.x * sinHalf;
     quat->y = axis.y * sinHalf;
     quat->z = axis.z * sinHalf;
-    quat->w = std::cosf(halfAngle);
+    quat->w = msvc8::cosf(halfAngle);
 
     return true;
   }
@@ -670,7 +671,7 @@ namespace moho
     if (quaternion.w <= -1.0f) {
       halfAngle = kPi;
     } else if (quaternion.w < 1.0f) {
-      halfAngle = static_cast<float>(std::acos(static_cast<double>(quaternion.w)));
+      halfAngle = static_cast<float>(msvc8::acos(static_cast<double>(quaternion.w)));
     }
 
     *angleRadiansOut = halfAngle * 2.0f;
@@ -691,9 +692,9 @@ namespace moho
   {
     const float angle = Wm3::Vector3f::Normalize(&axisAngle);
     const float halfAngle = angle * 0.5f;
-    const float sinHalfAngle = std::sinf(halfAngle);
+    const float sinHalfAngle = msvc8::sinf(halfAngle);
 
-    quat->w = std::cosf(halfAngle);
+    quat->w = msvc8::cosf(halfAngle);
     quat->x = axisAngle.x * sinHalfAngle;
     quat->y = axisAngle.y * sinHalfAngle;
     quat->z = axisAngle.z * sinHalfAngle;
@@ -843,12 +844,12 @@ namespace moho
     Wm3::Vector3f* const outMatrix, const float heading, const float pitch, const float roll
   ) noexcept
   {
-    const float ch = std::cosf(heading);
-    const float sh = std::sinf(heading);
-    const float cp = std::cosf(pitch);
-    const float sp = std::sinf(pitch);
-    const float cr = std::cosf(roll);
-    const float sr = std::sinf(roll);
+    const float ch = msvc8::cosf(heading);
+    const float sh = msvc8::sinf(heading);
+    const float cp = msvc8::cosf(pitch);
+    const float sp = msvc8::sinf(pitch);
+    const float cr = msvc8::cosf(roll);
+    const float sr = msvc8::sinf(roll);
 
     const Wm3::Vector3f headingMatrix[3] = {
       Wm3::Vector3f{ch, 0.0f, sh}, Wm3::Vector3f{0.0f, 1.0f, 0.0f}, Wm3::Vector3f{-sh, 0.0f, ch}

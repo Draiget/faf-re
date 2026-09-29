@@ -6463,8 +6463,8 @@ void CDebugCanvas::AddWireOval(
 
   for (std::uint32_t i = 1; i <= precision; ++i) {
     const float angle = (static_cast<float>(i) * kTwoPi) / static_cast<float>(precision);
-    const float sinAngle = static_cast<float>(std::sin(angle));
-    const float cosAngle = static_cast<float>(std::cos(angle));
+    const float sinAngle = static_cast<float>(msvc8::sin(angle));
+    const float cosAngle = static_cast<float>(msvc8::cos(angle));
 
     const float nextX = center.x + (axis1.x * cosAngle) + (axis2.x * sinAngle);
     const float nextY = center.y + (axis1.y * cosAngle) + (axis2.y * sinAngle);
@@ -6509,8 +6509,8 @@ void CDebugCanvas::AddWireSphere(
   constexpr float kPiOver4 = 0.78539819f;
   for (int i = 0; i < 4; ++i) {
     const float angle = static_cast<float>(i) * kPiOver4;
-    const float sinAngle = static_cast<float>(std::sin(angle));
-    const float cosAngle = static_cast<float>(std::cos(angle));
+    const float sinAngle = static_cast<float>(msvc8::sin(angle));
+    const float cosAngle = static_cast<float>(msvc8::cos(angle));
 
     const Wm3::Vector3f dir{
       (basisX.x * cosAngle) + (basisY.x * sinAngle),
@@ -6523,13 +6523,13 @@ void CDebugCanvas::AddWireSphere(
 
   for (int i = 1; i <= 3; ++i) {
     const float angle = static_cast<float>(i) * kPiOver4;
-    const float centerScale = static_cast<float>(std::cos(angle)) * radius;
+    const float centerScale = static_cast<float>(msvc8::cos(angle)) * radius;
     const Wm3::Vector3f ringCenter{
       center.x + (upAxis.x * centerScale),
       center.y + (upAxis.y * centerScale),
       center.z + (upAxis.z * centerScale),
     };
-    const float ringRadius = radius * static_cast<float>(std::sin(angle));
+    const float ringRadius = radius * static_cast<float>(msvc8::sin(angle));
 
     AddWireCircle(upAxis, ringCenter, ringRadius, depth, 0x18u);
   }
@@ -6634,11 +6634,11 @@ void CDebugCanvas::AddParabolaClosedForm(
   const float dz = endPoint.z - startPoint.z;
 
   Wm3::Vector3f direction{dx, 0.0f, dz};
-  const float horizontalSpeed = static_cast<float>(std::cos(angle)) * speed;
+  const float horizontalSpeed = static_cast<float>(msvc8::cos(angle)) * speed;
   const float totalTime = std::sqrt((dx * dx) + (dz * dz)) / horizontalSpeed;
   Wm3::Vector3f::Normalize(&direction);
 
-  const float launchVertical = static_cast<float>(std::sin(angle)) * speed;
+  const float launchVertical = static_cast<float>(msvc8::sin(angle)) * speed;
   const float halfGravity = gravity * 0.5f;
 
   float previousX = startPoint.x;

@@ -1,4 +1,5 @@
 #include "moho/ai/CAiBrain.h"
+#include "legacy/math/X87Math.h"
 
 #include "legacy/algorithms/Sort.h"
 
@@ -129,8 +130,8 @@ namespace moho
 
     // Y-axis half-angle build orientation.
     const float halfAngleRad = angle * 0.017453292f * -0.5f;
-    const float sinHalf = std::sin(halfAngleRad);
-    const float cosHalf = std::cos(halfAngleRad);
+    const float sinHalf = msvc8::sin(halfAngleRad);
+    const float cosHalf = msvc8::cos(halfAngleRad);
 
     SCoordsVec2 cellPos{};
     cellPos.x = pos->x;

@@ -441,7 +441,7 @@ diff -ruN a/Applications/WglApplication.vcxproj.filters b/Applications/WglApplic
 diff -ruN a/Foundation/Foundation.vcxproj b/Foundation/Foundation.vcxproj
 --- a/Foundation/Foundation.vcxproj
 +++ b/Foundation/Foundation.vcxproj
-@@ -0,0 +1,1183 @@
+@@ -0,0 +1,1184 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 +  <ItemGroup Label="ProjectConfigurations">
@@ -579,7 +579,8 @@ diff -ruN a/Foundation/Foundation.vcxproj b/Foundation/Foundation.vcxproj
 +    <ClCompile>
 +      <WarningLevel>Level3</WarningLevel>
 +      <SDLCheck>false</SDLCheck>
-+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <!-- Same pin as Debug|Win32, for main.vcxproj's Debug|x64. -->
++      <PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 +      <ConformanceMode>false</ConformanceMode>
 +      <LanguageStandard>stdcpp20</LanguageStandard>
 +      <LanguageStandard_C>stdc17</LanguageStandard_C>

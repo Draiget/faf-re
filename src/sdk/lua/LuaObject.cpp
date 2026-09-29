@@ -1,4 +1,5 @@
 #include "LuaObject.h"
+#include "legacy/math/X87Math.h"
 
 #include <Windows.h>
 
@@ -4714,7 +4715,7 @@ extern "C"
 	int indexupvalue(FuncState* const fs, expdesc* const value, TString* const name)
 	{
 		constexpr int kLuaIntMaxMinusTwo = 0x7FFFFFFD;
-		constexpr int kUpvalueNameEntrySizeBytes = 4;
+		constexpr int kUpvalueNameEntrySizeBytes = static_cast<int>(sizeof(TString*));
 
 		Proto* const proto = fs->f;
 
@@ -11288,15 +11289,17 @@ namespace
 	 * `moho/ai/CAimManipulator.cpp`. Recorded because the hazard looks real and
 	 * gets re-proposed; the 24-bit precision control is what neutralises it.
 	 *
-	 * `std::sin` and friends here do not lower to `fsin`/`fcos`; the modern
-	 * toolchain calls the CRT's SSE2 software routines, which are vendor
-	 * independent. Same deliberate trade as the engine sites: deterministic
-	 * across CPUs, not bit-identical to the binary.
+	 * sin/cos/tan/atan/atan2 run those same x87 instructions through
+	 * `msvc8::sinf` and friends (legacy/math/X87Math.h). The CRT's software
+	 * routines would be vendor independent, but they are not the binary's, and
+	 * the x86 and x64 CRTs disagree with each other in the last bit, which would
+	 * split an x86 client from an x64 one. asin/acos/exp/log/pow compute in
+	 * double and round once, which the two CRTs agree on after the rounding.
 	 */
 	int math_sin(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(std::sin(static_cast<double>(value))));
+		lua_pushnumber(state, static_cast<lua_Number>(msvc8::sinf(value)));
 		return 1;
 	}
 
@@ -11310,7 +11313,7 @@ namespace
 	int math_cos(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(std::cos(static_cast<double>(value))));
+		lua_pushnumber(state, static_cast<lua_Number>(msvc8::cosf(value)));
 		return 1;
 	}
 
@@ -11324,7 +11327,7 @@ namespace
 	int math_tan(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(std::tan(static_cast<double>(value))));
+		lua_pushnumber(state, static_cast<lua_Number>(msvc8::tanf(value)));
 		return 1;
 	}
 
@@ -11352,10 +11355,7 @@ namespace
 	int math_atan(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(
-			state,
-			static_cast<lua_Number>(std::atan2(static_cast<double>(value), 1.0))
-		);
+		lua_pushnumber(state, static_cast<lua_Number>(msvc8::atanf(value)));
 		return 1;
 	}
 
@@ -11370,10 +11370,7 @@ namespace
 	{
 		const lua_Number numerator = luaL_checknumber(state, 1);
 		const lua_Number denominator = luaL_checknumber(state, 2);
-		lua_pushnumber(
-			state,
-			static_cast<lua_Number>(std::atan2(static_cast<double>(numerator), static_cast<double>(denominator)))
-		);
+		lua_pushnumber(state, static_cast<lua_Number>(msvc8::atan2f(numerator, denominator)));
 		return 1;
 	}
 
@@ -19531,6 +19528,9 @@ const LuaObject* LuaState::GetThreadObject() const
 	return &m_threadObj;
 }
 
+// The two bridges below are x86 register/stack adapters written in inline
+// assembly; x64 has neither inline asm nor those conventions.
+#if defined(_M_IX86)
 /**
  * Address: 0x004CCA70 (FUN_004CCA70)
  *
@@ -19579,6 +19579,7 @@ __declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(lua_State** /*stat
 		retn    4
 	}
 }
+#endif // _M_IX86
 
 /**
  * Address: 0x004CCAB0 (FUN_004CCAB0)

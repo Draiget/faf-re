@@ -5266,7 +5266,9 @@ DCT_FsriTrans(const float* const sourceCoefficients, std::int32_t* const destina
     ++packedOutput;
   }
 
-  _m_empty();
+#if defined(_M_IX86)
+  _m_empty(); // x64 has no MMX state to release
+#endif
   return b0TableAddress;
 }
 

@@ -1,5 +1,6 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/ai/CAimManipulator.h"
+#include "legacy/math/X87Math.h"
 
 #include <cmath>
 #include <cstddef>
@@ -578,7 +579,7 @@ namespace
     outDirection->z = from.z - to.z;
     outDirection->y = 0.0f;
 
-    const float cosinePitch = std::cos(pitch);
+    const float cosinePitch = msvc8::cos(pitch);
     const float horizontalMagnitude = std::sqrt((outDirection->x * outDirection->x) + (outDirection->z * outDirection->z));
     if (horizontalMagnitude > 0.0f) {
       const float scale = cosinePitch / horizontalMagnitude;
@@ -586,7 +587,7 @@ namespace
       outDirection->z *= scale;
     }
 
-    outDirection->y = -std::sin(pitch);
+    outDirection->y = -msvc8::sin(pitch);
     return outDirection;
   }
 } // namespace
@@ -750,7 +751,7 @@ moho::CAimManipulator::CAimManipulator(
 
       const RUnitBlueprintWeapon* const weaponBlueprint = this->mUnitWepBlueprint;
       this->mMinHeading =
-        std::atan2(
+        msvc8::atan2(
           ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
           1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f)
         )
@@ -1316,7 +1317,7 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
   float* currentAngleLane = nullptr;
   if ((trackingModeFlags & kTrackingModeHeading) != 0u) {
     currentAngleLane = &this->mHeading;
-    desiredAngle = std::atan2(transformedTarget.x, transformedTarget.z) + this->mHeadingOffset;
+    desiredAngle = msvc8::atan2(transformedTarget.x, transformedTarget.z) + this->mHeadingOffset;
   } else {
     const float halfCenter = minAngleCenter * kHalfScale;
     // The four consecutive stack floats handed to `MultQuadVec` as the
@@ -1324,8 +1325,8 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
     // the last two lanes, 0x00630AE2 `fcos` stores lane 0 and 0x00630AEE
     // `fsin` stores lane 1. Scalar-first, so this is a rotation about X.
     Wm3::Quaternionf pitchBasis{};
-    pitchBasis.w = std::cos(halfCenter);
-    pitchBasis.x = std::sin(halfCenter);
+    pitchBasis.w = msvc8::cos(halfCenter);
+    pitchBasis.x = msvc8::sin(halfCenter);
     pitchBasis.y = 0.0f;
     pitchBasis.z = 0.0f;
 
@@ -1404,9 +1405,9 @@ void moho::CAimManipulator::RotateHeadingBone(const bool recomputeFromAngle)
 
   if (recomputeFromAngle) {
     const float halfHeading = this->mHeading * kHalfScale;
-    this->mHeadingRot.w = std::cos(halfHeading);
+    this->mHeadingRot.w = msvc8::cos(halfHeading);
     this->mHeadingRot.x = 0.0f;
-    this->mHeadingRot.y = std::sin(halfHeading);
+    this->mHeadingRot.y = msvc8::sin(halfHeading);
     this->mHeadingRot.z = 0.0f;
   }
 
@@ -1431,8 +1432,8 @@ void moho::CAimManipulator::RotatePitchBone(const bool recomputeFromAngle)
 
   if (recomputeFromAngle) {
     const float halfPitch = (-this->mPitch) * kHalfScale;
-    this->mPitchRot.w = std::cos(halfPitch);
-    this->mPitchRot.x = std::sin(halfPitch);
+    this->mPitchRot.w = msvc8::cos(halfPitch);
+    this->mPitchRot.x = msvc8::sin(halfPitch);
     this->mPitchRot.y = 0.0f;
     this->mPitchRot.z = 0.0f;
   }

@@ -252,7 +252,7 @@ namespace moho
 
       case TASKSTATE_Processing: {
         if (mBeamupTime > 1.0f) {
-          const float blend = (std::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
+          const float blend = (msvc8::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
           mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
           if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint(); blueprint != nullptr) {
             mDestinationTransform.pos_.y -= blueprint->mSizeY;

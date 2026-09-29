@@ -1,6 +1,7 @@
 #include "moho/ui/UiRuntimeTypes.h"
 
 #include "moho/sim/BuildQueueCommandDecrement.h"
+#include "platform/BinaryObjectBytes.h"
 
 #include <boost/bind.hpp>
 #include <Windows.h>
@@ -131,12 +132,16 @@ namespace
    *
    * Zeroing first is what the binary's constructor chain leaves behind for
    * those lanes - null links and `tt = LUA_TNIL = 0`.
+   *
+   * `binaryByteSize` is the binary's x86 allocation size; on x64 the block is
+   * widened to fit the same layout with 8-byte pointers.
    */
   template <typename T>
   [[nodiscard]] T* AllocateZeroedUiObject(
-    const std::size_t byteSize
+    const std::size_t binaryByteSize
   )
   {
+    const std::size_t byteSize = platform::BinaryObjectBytes<T>(binaryByteSize);
     void* const storage = ::operator new(byteSize);
     std::memset(storage, 0, byteSize);
     return static_cast<T*>(storage);
@@ -15296,7 +15301,15 @@ bool moho::CMauiMovie::LoadFile(
   const char* const filename
 )
 {
-  if (moho::CFG_GetArgOption("/nomovie", 0u, nullptr)) {
+#if defined(_M_X64)
+  // The Sofdec movie middleware is not ported to x64 yet: it carries pointers
+  // as 32-bit words through its own layout views, and opening a movie faults.
+  // Until it is, x64 takes the same path `/nomovie` does.
+  constexpr bool kMoviePlaybackSupported = false;
+#else
+  constexpr bool kMoviePlaybackSupported = true;
+#endif
+  if (!kMoviePlaybackSupported || moho::CFG_GetArgOption("/nomovie", 0u, nullptr)) {
     return false;
   }
 

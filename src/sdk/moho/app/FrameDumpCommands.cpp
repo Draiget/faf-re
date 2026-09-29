@@ -4,6 +4,7 @@
 // `CreateDialog`/`GetClassInfo` macros before the wx class declarations are
 // parsed.
 #include "platform/WxWidgets.h"
+#include "platform/X87Precision.h"
 #include <wx/dirdlg.h>
 
 #include "moho/app/FrameDumpCommands.h"
@@ -107,7 +108,7 @@ namespace moho
       accepted = true;
     }
 
-    (void)_controlfp(_PC_24, _MCW_PC);
+    platform::SetX87PrecisionControl(_PC_24);
 
     return accepted;
   }

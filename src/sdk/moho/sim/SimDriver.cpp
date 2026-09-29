@@ -1,4 +1,6 @@
 #include "SimDriver.h"
+#include "legacy/math/X87Math.h"
+#include "platform/X87Precision.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -1152,7 +1154,7 @@ void CSimDriver::ThreadCreateSim()
 
   // The sim runs at reduced x87 precision so its arithmetic is bit-identical
   // on every machine in the game.
-  (void)::_controlfp(_PC_24, _MCW_PC);
+  platform::SetX87PrecisionControl(_PC_24);
   gpg::SetThreadName(kCurrentThreadId, "Sim");
   TIME_SetTimeBarColor(kSimThreadTimeBarColor);
 
@@ -1312,7 +1314,7 @@ void CSimDriver::ThreadRun()
         // rate climbing 2, 53, 61, 81, 94 ... So the defect is upstream in
         // whatever dispatches that console command, i.e. the input/key-binding
         // path feeding `IncreaseGameSpeed`; nothing in this file needs changing.
-        const float simRateScale = std::pow(10.0f, static_cast<float>(mClientManager->GetSimRate()) * 0.1f);
+        const float simRateScale = msvc8::pow(10.0f, static_cast<float>(mClientManager->GetSimRate()) * 0.1f);
         const float millisecondsPerBeat = (0.1f / simRateScale) * 1000.0f;
         const float leadMilliseconds =
           static_cast<float>(mNextIssueBeat - mLastDequeuedBeat) * millisecondsPerBeat - net_Lag;

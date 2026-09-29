@@ -11778,7 +11778,7 @@ int moho::cfunc_CreateUnit2L(LuaPlus::LuaState* const state)
 
   const VTransform transform(
     Wm3::Vector3f(posX, 0.0f, posZ),
-    Wm3::Quatf(std::cos(halfAngle), 0.0f, std::sin(halfAngle), 0.0f)
+    Wm3::Quatf(msvc8::cos(halfAngle), 0.0f, msvc8::sin(halfAngle), 0.0f)
   );
 
   // The binary sets the payload fields inline (an inlined SUnitConstructionParams

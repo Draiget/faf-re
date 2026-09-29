@@ -1,4 +1,5 @@
 #include "CWldSessionLoaderImpl.h"
+#include "platform/X87Precision.h"
 
 #include <cfloat>
 #include <cstring>
@@ -105,7 +106,7 @@ namespace moho
 
       // Loader threads run with the same reduced x87 precision the sim uses, so
       // map geometry loaded here rounds identically to the way it is simulated.
-      (void)::_controlfp(_PC_24, _MCW_PC);
+      platform::SetX87PrecisionControl(_PC_24);
 
       {
         const std::string marker(" World Session Load 1", 21u);

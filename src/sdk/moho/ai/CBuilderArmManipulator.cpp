@@ -1,4 +1,5 @@
 #include "moho/ai/CBuilderArmManipulator.h"
+#include "legacy/math/X87Math.h"
 
 #include <cstddef>
 #include <cstdlib>
@@ -292,7 +293,7 @@ namespace moho
         // atan2(m02, m22) - the same heading extraction the disassembly of
         // CRotateManipulator::MoveManipulator (0x00643860) spells out at
         // 0x006438CD..0x00643925.
-        mHeadingCenter = std::atan2(
+        mHeadingCenter = msvc8::atan2(
           ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
           1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f)
         );
@@ -435,15 +436,15 @@ namespace moho
     float* currentAngleLane = nullptr;
     if ((trackingModeFlags & kTrackingModeHeading) != 0u) {
       currentAngleLane = &mHeading;
-      desiredAngle = std::atan2(transformedTarget.x, transformedTarget.z);
+      desiredAngle = msvc8::atan2(transformedTarget.x, transformedTarget.z);
     } else {
       const float halfCenter = angleCenter * kHalfScale;
       // `(cos, sin, 0, 0)` in memory - a scalar-first rotation about X, the
       // same pitch basis `CAimManipulator::CheckTracking` builds at
       // 0x00630ADC..0x00630AF0.
       Wm3::Quaternionf pitchBasis{};
-      pitchBasis.w = std::cos(halfCenter);
-      pitchBasis.x = std::sin(halfCenter);
+      pitchBasis.w = msvc8::cos(halfCenter);
+      pitchBasis.x = msvc8::sin(halfCenter);
       pitchBasis.y = 0.0f;
       pitchBasis.z = 0.0f;
 
@@ -532,9 +533,9 @@ namespace moho
 
       const float halfHeading = mHeading * kHalfScale;
       Wm3::Quaternionf headingRotation{};
-      headingRotation.w = std::cos(halfHeading);
+      headingRotation.w = msvc8::cos(halfHeading);
       headingRotation.x = 0.0f;
-      headingRotation.y = std::sin(halfHeading);
+      headingRotation.y = msvc8::sin(halfHeading);
       headingRotation.z = 0.0f;
       headingBone->Rotate(headingRotation);
     }
@@ -556,8 +557,8 @@ namespace moho
 
       const float halfPitch = (-mPitch) * kHalfScale;
       Wm3::Quaternionf pitchRotation{};
-      pitchRotation.w = std::cos(halfPitch);
-      pitchRotation.x = std::sin(halfPitch);
+      pitchRotation.w = msvc8::cos(halfPitch);
+      pitchRotation.x = msvc8::sin(halfPitch);
       pitchRotation.y = 0.0f;
       pitchRotation.z = 0.0f;
       pitchBone->Rotate(pitchRotation);

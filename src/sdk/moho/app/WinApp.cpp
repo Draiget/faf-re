@@ -1,4 +1,5 @@
 #include "WinApp.h"
+#include "platform/X87Precision.h"
 
 #include "platform/Platform.h"
 
@@ -2746,7 +2747,7 @@ void moho::WIN_AppExecute(IWinApp* const app)
   wxTheApp->SetExitOnFrameDelete(true);
   wxGetApp().SetKeepGoing();
 
-  _controlfp(0x20000, 0x30000);
+  platform::SetX87PrecisionControl(_PC_24); // _controlfp(0x20000, 0x30000)
 
   bool success = true;
   bool acceptNewEvent = true;
@@ -3046,6 +3047,55 @@ std::uint32_t moho::PLAT_GetCallStack(
   }
 
   return frameCount;
+#elif defined(_M_X64)
+  // The x64 build links /LARGEADDRESSAWARE:NO, so every code address fits the
+  // 32-bit frame slots this interface was written with.
+  CONTEXT context{};
+  if (contextRecord != nullptr) {
+    context = *static_cast<const CONTEXT*>(contextRecord);
+  } else {
+    ::RtlCaptureContext(&context);
+  }
+
+  STACKFRAME64 stackFrame{};
+  stackFrame.AddrPC.Mode = AddrModeFlat;
+  stackFrame.AddrPC.Offset = context.Rip;
+  stackFrame.AddrStack.Mode = AddrModeFlat;
+  stackFrame.AddrStack.Offset = context.Rsp;
+  stackFrame.AddrFrame.Mode = AddrModeFlat;
+  stackFrame.AddrFrame.Offset = context.Rbp;
+
+  std::uint32_t frameCount = 0;
+  while (frameCount < maxFrames) {
+    if (::StackWalk64(
+          IMAGE_FILE_MACHINE_AMD64,
+          ::GetCurrentProcess(),
+          ::GetCurrentThread(),
+          &stackFrame,
+          &context,
+          nullptr,
+          ::SymFunctionTableAccess64,
+          ::SymGetModuleBase64,
+          nullptr
+        ) == FALSE) {
+      break;
+    }
+
+    DWORD64 frameAddress = stackFrame.AddrPC.Offset;
+    if (frameAddress == 0) {
+      break;
+    }
+
+    // A return address points past its call; step back into the call itself.
+    if (frameCount != 0) {
+      frameAddress -= 1;
+    }
+
+    outFrames[frameCount] = static_cast<std::uint32_t>(frameAddress);
+    ++frameCount;
+  }
+
+  return frameCount;
 #else
   (void)contextRecord;
   (void)maxFrames;
@@ -3082,7 +3132,8 @@ bool moho::PLAT_GetSymbolInfo(const std::uint32_t address, SPlatSymbolInfo* cons
   symbolStorage.symbol.SizeOfStruct = sizeof(IMAGEHLP_SYMBOL);
   symbolStorage.symbol.MaxNameLength = 233;
 
-  DWORD symbolDisplacement = 0;
+  // DWORD on x86; dbghelp maps SymGetSymFromAddr to the 64-bit form on x64.
+  DWORD_PTR symbolDisplacement = 0;
   if (::SymGetSymFromAddr(::GetCurrentProcess(), address, &symbolDisplacement, &symbolStorage.symbol) == FALSE) {
     return false;
   }
@@ -3432,18 +3483,18 @@ void moho::WIN_ShowCrashDialog(
   const std::uint32_t frameCount = PLAT_GetCallStack(contextRecord, 64, stackFrames);
   const std::uint32_t firstFrame =
     skipCallstackFrames > 0 ? static_cast<std::uint32_t>(skipCallstackFrames) : static_cast<std::uint32_t>(0);
+  // The dialog is modal and everything it shows is gone the moment it closes,
+  // so mirror the summary and the callstack into the log as well. On an
+  // unattended run - and on a run where the dialog resource fails to load, as
+  // it does in this build - the log is the only surviving record of the crash.
+  gpg::Logf("CRASH: %s", summaryText != nullptr ? static_cast<const char*>(summaryText) : "<no summary>");
   if (frameCount <= firstFrame) {
     details << "    unavailable.\n";
+    gpg::Logf("CRASH callstack: unavailable.");
   } else {
     const msvc8::string callstackText =
       PLAT_FormatCallstack(static_cast<std::int32_t>(firstFrame), static_cast<std::int32_t>(frameCount), stackFrames);
     details << callstackText.c_str();
-
-    // The dialog is modal and everything it shows is gone the moment it closes,
-    // so mirror the summary and the callstack into the log as well. On an
-    // unattended run - and on a run where the dialog resource fails to load, as
-    // it does in this build - the log is the only surviving record of the crash.
-    gpg::Logf("CRASH: %s", summaryText != nullptr ? static_cast<const char*>(summaryText) : "<no summary>");
     gpg::Logf("CRASH callstack:\n%s", callstackText.c_str());
   }
 

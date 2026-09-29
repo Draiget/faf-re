@@ -1,4 +1,5 @@
 #include "moho/entity/CollisionBeamStartupRegistrations.h"
+#include "legacy/math/X87Math.h"
 
 #include <cmath>
 #include <cstdint>
@@ -181,8 +182,8 @@ namespace moho
   void initialize_CollisionBeamTrigConstants()
   {
     constexpr float kCollisionBeamConeHalfAngleRadians = 0.39269909f;
-    const float sinValue = std::sinf(kCollisionBeamConeHalfAngleRadians);
-    gCollisionBeamConeCosine = std::cosf(kCollisionBeamConeHalfAngleRadians);
+    const float sinValue = msvc8::sinf(kCollisionBeamConeHalfAngleRadians);
+    gCollisionBeamConeCosine = msvc8::cosf(kCollisionBeamConeHalfAngleRadians);
     gCollisionBeamConeSine = sinValue;
 
     // Preserve original lane (`sinValue * 0.0f`) including signed-zero behavior.

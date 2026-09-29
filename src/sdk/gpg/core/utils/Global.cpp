@@ -431,10 +431,22 @@ namespace
         static const ProbeHeapMode sMode = [] {
             char value[8] = {};
             const DWORD written = ::GetEnvironmentVariableA("FAF_SYSHEAP", value, static_cast<DWORD>(sizeof(value)));
+#if defined(_M_X64)
+            // x64 always uses a system heap. The engine allocator is the x86
+            // binary's: its smallest size classes (4..28 bytes, step 4) cannot
+            // hold the 8-byte free-list link a freed block carries, nor give
+            // the 16-byte alignment x64 code expects from `new`, and its
+            // record, thread-cache and page-map sizes are x86 byte counts.
+            if (written != 0u && written < sizeof(value) && value[0] == '2') {
+                return ProbeHeapMode::DebugCrtHeap;
+            }
+            return ProbeHeapMode::ProcessHeap;
+#else
             if (written == 0u || written >= sizeof(value) || value[0] == '\0' || value[0] == '0') {
                 return ProbeHeapMode::Engine;
             }
             return (value[0] == '2') ? ProbeHeapMode::DebugCrtHeap : ProbeHeapMode::ProcessHeap;
+#endif
         }();
         return sMode;
     }
@@ -1634,8 +1646,13 @@ namespace
  * Registering the real callback fixes both: the reason code is whatever Windows
  * passes, and every thread exit runs it.
  */
+#if defined(_M_IX86)
 #pragma comment(linker, "/INCLUDE:__tls_used")
 #pragma comment(linker, "/INCLUDE:_gAllocatorTlsCallbackEntry")
+#else // x64 C names carry no leading underscore
+#pragma comment(linker, "/INCLUDE:_tls_used")
+#pragma comment(linker, "/INCLUDE:gAllocatorTlsCallbackEntry")
+#endif
 #pragma const_seg(".CRT$XLB")
 extern "C" const PIMAGE_TLS_CALLBACK gAllocatorTlsCallbackEntry = &TlsCallback_1;
 #pragma const_seg()
@@ -2286,6 +2303,13 @@ void* __cdecl operator new[](const std::size_t size)
 void gpg::GetHeapInfo(HeapStats* const outStats)
 {
     if (outStats == nullptr) {
+        return;
+    }
+
+    // On a system heap the engine allocator never starts, and must not be
+    // started here just to read its (empty) counters.
+    if (ProbeUseSystemHeap()) {
+        *outStats = {};
         return;
     }
 

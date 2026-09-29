@@ -1,0 +1,314 @@
+diff -ruN a/include/wx/platform.h b/include/wx/platform.h
+--- a/include/wx/platform.h
++++ b/include/wx/platform.h
+@@ -253,7 +253,9 @@
+ 
+     /* size_t is the same as unsigned int for all Windows compilers we know, */
+     /* so define it if it hadn't been done by configure yet */
+-    #if !defined(wxSIZE_T_IS_UINT) && !defined(wxSIZE_T_IS_ULONG)
++    /* FAF: except on Win64, where size_t is 64 bits and wxString needs its */
++    /* operator[](unsigned int) overloads to keep str[0u] unambiguous */
++    #if !defined(wxSIZE_T_IS_UINT) && !defined(wxSIZE_T_IS_ULONG) && !defined(_WIN64)
+         #define wxSIZE_T_IS_UINT
+     #endif
+ #endif  /* OS */
+diff -ruN a/include/wx/thread.h b/include/wx/thread.h
+--- a/include/wx/thread.h
++++ b/include/wx/thread.h
+@@ -250,7 +250,13 @@
+     // finally, we need this typedef instead of declaring m_buffer directly
+     // because otherwise the assert mentioned above wouldn't compile with some
+     // compilers (notably CodeWarrior 8)
++#ifdef _WIN64
++    // FAF: CRITICAL_SECTION is 40 bytes on Win64 (the union's pointer member
++    // gives the buffer the 8-byte alignment it needs)
++    typedef char wxCritSectBuffer[40];
++#else
+     typedef char wxCritSectBuffer[24];
++#endif
+     union
+     {
+         unsigned long m_dummy1;
+diff -ruN a/src/makevc.env b/src/makevc.env
+--- a/src/makevc.env
++++ b/src/makevc.env
+@@ -48,7 +48,13 @@
+ !endif
+ 
+ # On Alpha machines, change to CPU=ALPHA
++# FAF: follow the developer shell's target (vcvars64 sets VSCMD_ARG_TGT_ARCH=x64),
++# so the peripheral libraries (png, jpeg, tiff, regex, zlib) are archived for x64 too.
++!if "$(VSCMD_ARG_TGT_ARCH)" == "x64"
++CPU=X64
++!else
+ CPU=i386
++!endif
+ 
+ # Suffixes
+ OBJSUFF=obj
+diff -ruN a/src/msw/colordlg.cpp b/src/msw/colordlg.cpp
+--- a/src/msw/colordlg.cpp
++++ b/src/msw/colordlg.cpp
+@@ -70,7 +70,7 @@
+ // colour dialog hook proc
+ // ----------------------------------------------------------------------------
+ 
+-UINT CALLBACK wxColourDialogHookProc(HWND hwnd,
++UINT_PTR CALLBACK wxColourDialogHookProc(HWND hwnd,
+                                      UINT uiMsg,
+                                      WPARAM WXUNUSED(wParam),
+                                      LPARAM lParam)
+diff -ruN a/src/msw/combobox.cpp b/src/msw/combobox.cpp
+--- a/src/msw/combobox.cpp
++++ b/src/msw/combobox.cpp
+@@ -370,10 +370,9 @@
+     // edit control, we must subclass it as well
+     if ( !(style & wxCB_READONLY) )
+     {
+-        gs_wndprocEdit = (WXFARPROC)::SetWindowLong
+-                                      (
++        gs_wndprocEdit = (WXFARPROC)::SetWindowLongPtr(
+                                         (HWND)GetEditHWND(),
+-                                        GWL_WNDPROC,
++                                        GWLP_WNDPROC,
+                                         (LPARAM)wxComboEditWndProc
+                                       );
+     }
+diff -ruN a/src/msw/dialup.cpp b/src/msw/dialup.cpp
+--- a/src/msw/dialup.cpp
++++ b/src/msw/dialup.cpp
+@@ -1075,7 +1075,7 @@
+                               wxGetInstance()
+                              );
+ 
+-        ::SetWindowLong(ms_hwndRas, GWL_WNDPROC, (LONG) windowProc);
++        ::SetWindowLongPtr(ms_hwndRas, GWLP_WNDPROC, (LONG_PTR) windowProc);
+     }
+ 
+     m_data.hWnd = ms_hwndRas;
+diff -ruN a/src/msw/fdrepdlg.cpp b/src/msw/fdrepdlg.cpp
+--- a/src/msw/fdrepdlg.cpp
++++ b/src/msw/fdrepdlg.cpp
+@@ -50,7 +50,7 @@
+ LRESULT APIENTRY wxFindReplaceWindowProc(HWND hwnd, WXUINT nMsg,
+                                        WPARAM wParam, LPARAM lParam);
+ 
+-UINT CALLBACK wxFindReplaceDialogHookProc(HWND hwnd,
++UINT_PTR CALLBACK wxFindReplaceDialogHookProc(HWND hwnd,
+                                           UINT uiMsg,
+                                           WPARAM wParam,
+                                           LPARAM lParam);
+@@ -199,14 +199,14 @@
+     // as then we'd have infinite recursion in wxFindReplaceWindowProc
+     if ( !wxCheckWindowWndProc((WXHWND)hwnd, (WXFARPROC)wxFindReplaceWindowProc) )
+     {
+-        WNDPROC oldParentWndProc = (WNDPROC)::GetWindowLong(hwnd, GWL_WNDPROC);
++        WNDPROC oldParentWndProc = (WNDPROC)::GetWindowLongPtr(hwnd, GWLP_WNDPROC);
+         // save old wnd proc elsewhere to access it from
+         // wxFindReplaceWindowProc
+         m_oldParentWndProc = oldParentWndProc;
+-        (void)::SetWindowLong(hwnd, GWL_USERDATA, (LONG)oldParentWndProc);
++        (void)::SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)oldParentWndProc);
+ 
+         // and set the new one
+-        (void)::SetWindowLong(hwnd, GWL_WNDPROC, (LONG)wxFindReplaceWindowProc);
++        (void)::SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)wxFindReplaceWindowProc);
+     }
+ }
+ 
+@@ -217,7 +217,7 @@
+ 
+     if ( m_hwndOwner )
+     {
+-        ::SetWindowLong(m_hwndOwner, GWL_WNDPROC, (LONG)m_oldParentWndProc);
++        ::SetWindowLongPtr(m_hwndOwner, GWLP_WNDPROC, (LONG_PTR)m_oldParentWndProc);
+     }
+ }
+ 
+@@ -289,7 +289,7 @@
+         dialog->Send(event);
+     }
+ 
+-    WNDPROC wndProc = (WNDPROC)::GetWindowLong(hwnd, GWL_USERDATA);
++    WNDPROC wndProc = (WNDPROC)::GetWindowLongPtr(hwnd, GWLP_USERDATA);
+ 
+     // sanity check
+     wxASSERT_MSG( wndProc != wxFindReplaceWindowProc,
+@@ -302,7 +302,7 @@
+ // Find/replace dialog hook proc
+ // ----------------------------------------------------------------------------
+ 
+-UINT CALLBACK wxFindReplaceDialogHookProc(HWND hwnd,
++UINT_PTR CALLBACK wxFindReplaceDialogHookProc(HWND hwnd,
+                                           UINT uiMsg,
+                                           WPARAM WXUNUSED(wParam),
+                                           LPARAM lParam)
+diff -ruN a/src/msw/radiobox.cpp b/src/msw/radiobox.cpp
+--- a/src/msw/radiobox.cpp
++++ b/src/msw/radiobox.cpp
+@@ -729,10 +729,10 @@
+     HWND hwndBtn = (HWND)hWndBtn;
+ 
+     if ( !s_wndprocRadioBtn )
+-        s_wndprocRadioBtn = (WXFARPROC)::GetWindowLong(hwndBtn, GWL_WNDPROC);
++        s_wndprocRadioBtn = (WXFARPROC)::GetWindowLongPtr(hwndBtn, GWLP_WNDPROC);
+ 
+-    ::SetWindowLong(hwndBtn, GWL_WNDPROC, (long)wxRadioBtnWndProc);
+-    ::SetWindowLong(hwndBtn, GWL_USERDATA, (long)this);
++    ::SetWindowLongPtr(hwndBtn, GWLP_WNDPROC, (LONG_PTR)wxRadioBtnWndProc);
++    ::SetWindowLongPtr(hwndBtn, GWLP_USERDATA, (LONG_PTR)this);
+ #endif // __WIN32__
+ }
+ 
+@@ -887,7 +887,7 @@
+                 if ( hdr->code == TTN_NEEDTEXT )
+                 {
+                     wxRadioBox *radiobox = (wxRadioBox *)
+-                        ::GetWindowLong(hwnd, GWL_USERDATA);
++                        ::GetWindowLongPtr(hwnd, GWLP_USERDATA);
+ 
+                     wxCHECK_MSG( radiobox, 0,
+                                  wxT("radio button without radio box?") );
+@@ -909,7 +909,7 @@
+         case WM_KEYDOWN:
+             {
+                 wxRadioBox *radiobox = (wxRadioBox *)
+-                    ::GetWindowLong(hwnd, GWL_USERDATA);
++                    ::GetWindowLongPtr(hwnd, GWLP_USERDATA);
+ 
+                 wxCHECK_MSG( radiobox, 0, wxT("radio button without radio box?") );
+ 
+@@ -968,7 +968,7 @@
+         case WM_HELP:
+             {
+                 wxRadioBox *radiobox = (wxRadioBox *)
+-                        ::GetWindowLong(hwnd, GWL_USERDATA);
++                        ::GetWindowLongPtr(hwnd, GWLP_USERDATA);
+ 
+                 wxCHECK_MSG( radiobox, 0, wxT("radio button without radio box?") );
+ 
+diff -ruN a/src/msw/spinctrl.cpp b/src/msw/spinctrl.cpp
+--- a/src/msw/spinctrl.cpp
++++ b/src/msw/spinctrl.cpp
+@@ -86,7 +86,7 @@
+                                             WPARAM wParam,
+                                             LPARAM lParam)
+ {
+-    wxSpinCtrl *spin = (wxSpinCtrl *)::GetWindowLong(hwnd, GWL_USERDATA);
++    wxSpinCtrl *spin = (wxSpinCtrl *)::GetWindowLongPtr(hwnd, GWLP_USERDATA);
+ 
+     // forward some messages (the key and focus ones only so far) to
+     // the spin ctrl
+@@ -107,7 +107,7 @@
+             spin->MSWWindowProc(message, wParam, lParam);
+ 
+             // The control may have been deleted at this point, so check.
+-            if (!(::IsWindow(hwnd) && ((wxSpinCtrl *)::GetWindowLong(hwnd, GWL_USERDATA)) == spin))
++            if (!(::IsWindow(hwnd) && ((wxSpinCtrl *)::GetWindowLongPtr(hwnd, GWLP_USERDATA)) == spin))
+                 return 0;
+             break;
+ 
+@@ -123,8 +123,8 @@
+ /* static */
+ wxSpinCtrl *wxSpinCtrl::GetSpinForTextCtrl(WXHWND hwndBuddy)
+ {
+-    wxSpinCtrl *spin = (wxSpinCtrl *)::GetWindowLong((HWND)hwndBuddy,
+-                                                     GWL_USERDATA);
++    wxSpinCtrl *spin = (wxSpinCtrl *)::GetWindowLongPtr((HWND)hwndBuddy,
++                                                     GWLP_USERDATA);
+ 
+     int i = ms_allSpins.Index(spin);
+ 
+@@ -300,9 +300,9 @@
+     SetValue(initial);
+ 
+     // subclass the text ctrl to be able to intercept some events
+-    m_wndProcBuddy = (WXFARPROC)::GetWindowLong(GetBuddyHwnd(), GWL_WNDPROC);
+-    ::SetWindowLong(GetBuddyHwnd(), GWL_USERDATA, (LONG)this);
+-    ::SetWindowLong(GetBuddyHwnd(), GWL_WNDPROC, (LONG)wxBuddyTextWndProc);
++    m_wndProcBuddy = (WXFARPROC)::GetWindowLongPtr(GetBuddyHwnd(), GWLP_WNDPROC);
++    ::SetWindowLongPtr(GetBuddyHwnd(), GWLP_USERDATA, (LONG_PTR)this);
++    ::SetWindowLongPtr(GetBuddyHwnd(), GWLP_WNDPROC, (LONG_PTR)wxBuddyTextWndProc);
+ 
+     // should have the same font as the other controls
+     SetFont(GetParent()->GetFont());
+diff -ruN a/src/msw/thread.cpp b/src/msw/thread.cpp
+--- a/src/msw/thread.cpp
++++ b/src/msw/thread.cpp
+@@ -625,7 +625,7 @@
+ 
+     // get system affinity mask first
+     HANDLE hProcess = ::GetCurrentProcess();
+-    DWORD dwProcMask, dwSysMask;
++    DWORD_PTR dwProcMask, dwSysMask;
+     if ( ::GetProcessAffinityMask(hProcess, &dwProcMask, &dwSysMask) == 0 )
+     {
+         wxLogLastError(_T("GetProcessAffinityMask"));
+diff -ruN a/src/msw/tooltip.cpp b/src/msw/tooltip.cpp
+--- a/src/msw/tooltip.cpp
++++ b/src/msw/tooltip.cpp
+@@ -223,8 +223,8 @@
+ 
+ #if wxUSE_TTM_WINDOWFROMPOINT
+            // subclass the newly created control
+-           gs_wndprocToolTip = (WNDPROC)::GetWindowLong(hwnd, GWL_WNDPROC);
+-           ::SetWindowLong(hwnd, GWL_WNDPROC, (long)wxToolTipWndProc);
++           gs_wndprocToolTip = (WNDPROC)::GetWindowLongPtr(hwnd, GWLP_WNDPROC);
++           ::SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)wxToolTipWndProc);
+ #endif // wxUSE_TTM_WINDOWFROMPOINT
+        }
+     }
+diff -ruN a/src/msw/window.cpp b/src/msw/window.cpp
+--- a/src/msw/window.cpp
++++ b/src/msw/window.cpp
+@@ -1035,13 +1035,13 @@
+ 
+     wxAssociateWinWithHandle(hwnd, this);
+ 
+-    m_oldWndProc = (WXFARPROC)::GetWindowLong((HWND)hWnd, GWL_WNDPROC);
++    m_oldWndProc = (WXFARPROC)::GetWindowLongPtr((HWND)hWnd, GWLP_WNDPROC);
+ 
+     // we don't need to subclass the window of our own class (in the Windows
+     // sense of the word)
+     if ( !wxCheckWindowWndProc(hWnd, (WXFARPROC)wxWndProc) )
+     {
+-        ::SetWindowLong(hwnd, GWL_WNDPROC, (LONG) wxWndProc);
++        ::SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR) wxWndProc);
+     }
+     else
+     {
+@@ -1069,7 +1069,7 @@
+         {
+             if ( !wxCheckWindowWndProc((WXHWND)hwnd, m_oldWndProc) )
+             {
+-                ::SetWindowLong(hwnd, GWL_WNDPROC, (LONG) m_oldWndProc);
++                ::SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR) m_oldWndProc);
+             }
+ 
+             m_oldWndProc = NULL;
+@@ -3620,8 +3620,14 @@
+ 
+         wxCHECK( pMenuItem->IsKindOf(CLASSINFO(wxMenuItem)), FALSE );
+ 
+-        return pMenuItem->OnMeasureItem(&pMeasureStruct->itemWidth,
+-                                        &pMeasureStruct->itemHeight);
++        // FAF: MEASUREITEMSTRUCT holds UINTs, OnMeasureItem takes size_t;
++        // the same type only on Win32
++        size_t width = pMeasureStruct->itemWidth,
++               height = pMeasureStruct->itemHeight;
++        bool ok = pMenuItem->OnMeasureItem(&width, &height);
++        pMeasureStruct->itemWidth = (UINT)width;
++        pMeasureStruct->itemHeight = (UINT)height;
++        return ok;
+     }
+ 
+     wxWindow *item = FindItem(id);
+@@ -4900,7 +4906,7 @@
+             // do it as well, win would be already non NULL
+             if ( ::SendMessage(hwnd, WM_GETDLGCODE, 0, 0) & DLGC_RADIOBUTTON )
+             {
+-                win = (wxWindow *)::GetWindowLong(hwnd, GWL_USERDATA);
++                win = (wxWindow *)::GetWindowLongPtr(hwnd, GWLP_USERDATA);
+             }
+             //else: it's a wxRadioButton, not a radiobutton from wxRadioBox
+ #endif // wxUSE_RADIOBOX

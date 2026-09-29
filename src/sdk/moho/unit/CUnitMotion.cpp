@@ -2622,7 +2622,7 @@ namespace moho
     }
 
     const float minDiveSpeed = baseDiveSpeed * kDiveSpeedMinFactor;
-    const float curveDiveSpeed = std::sin(depthPhase * kPi) * baseDiveSpeed;
+    const float curveDiveSpeed = msvc8::sin(depthPhase * kPi) * baseDiveSpeed;
     mDivingSpeed = std::max(minDiveSpeed, curveDiveSpeed);
 
     if (movingUp) {
@@ -2798,9 +2798,9 @@ namespace moho
         const Wm3::Vector3f unitPosition = unit->GetPosition();
         const Wm3::Vector3f targetPosition = slavedTarget->GetTargetPosGun(false);
         const float targetHeading =
-          std::atan2(targetPosition.x - unitPosition.x, targetPosition.z - unitPosition.z);
+          msvc8::atan2(targetPosition.x - unitPosition.x, targetPosition.z - unitPosition.z);
         const Wm3::Vector3f forward = ForwardVectorFromQuaternion(unit->GetTransform().orient_);
-        const float unitHeading = std::atan2(forward.x, forward.z);
+        const float unitHeading = msvc8::atan2(forward.x, forward.z);
         const float headingDelta = NormalizeAngleSignedRadians(targetHeading - unitHeading);
         const float absHeadingDelta = std::fabs(headingDelta);
         const float slavedArcRange = slavedWeapon->mWeaponBlueprint->SlavedToBodyArcRange;
@@ -3189,7 +3189,7 @@ namespace moho
         ? 1.0f
         : -1.0f;
 
-    float turnDelta = std::atan2(selectedPlanarVector.x, selectedPlanarVector.z) - std::atan2(referenceVector.x, referenceVector.z);
+    float turnDelta = msvc8::atan2(selectedPlanarVector.x, selectedPlanarVector.z) - msvc8::atan2(referenceVector.x, referenceVector.z);
     if (turnDelta <= 3.1415927f) {
       if (turnDelta < -3.1415927f) {
         turnDelta += 6.2831855f;
@@ -3214,9 +3214,9 @@ namespace moho
     // the same {w, 0, y, 0} shape as `quat_45deg2`.
     const float halfTurnAngle = (turnDelta * 10.0f) * 0.5f;
     const Wm3::Quaternionf turnQuaternion{
-      std::cos(halfTurnAngle),
+      msvc8::cos(halfTurnAngle),
       0.0f,
-      std::sin(halfTurnAngle),
+      msvc8::sin(halfTurnAngle),
       0.0f,
     };
 

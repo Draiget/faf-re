@@ -1638,17 +1638,17 @@ namespace
       const float distance
     ) noexcept
     {
-      return std::exp(static_cast<float>(bucket) / 6.0f) * distance;
+      return msvc8::exp(static_cast<float>(bucket) / 6.0f) * distance;
     }
 
     [[nodiscard]] bool FindClusterEntryEdgeAtLocalCoordinate(
-      const ClusterPayloadEdgeTableRuntime& table,
+      const ClusterData& table,
       const std::uint8_t localX,
       const std::uint8_t localZ,
       std::uint32_t& outEdgeIndex
     ) noexcept
     {
-      const std::uint32_t edgeCount = static_cast<std::uint32_t>(table.mEdgeCount);
+      const std::uint32_t edgeCount = static_cast<std::uint32_t>(table.mNodeCount);
       for (std::uint32_t i = 0u; i < edgeCount; ++i) {
         if (EdgeCoordX(table, i) == localX && EdgeCoordZ(table, i) == localZ) {
           outEdgeIndex = i;
@@ -3056,7 +3056,7 @@ Cluster::Data Cluster::sDefaultConstructData = { 1, nullptr, 0u, 0u, { { 0u, 0u 
  */
 float Cluster::QuantizeEdgeCost(const float a, const float b)
 {
-    const float scaled = std::log(a / b) * 6.0f;
+    const float scaled = msvc8::log(a / b) * 6.0f;
     int quantized = static_cast<int>(std::ceil(scaled));
     if (quantized > 31) {
         quantized = 31;

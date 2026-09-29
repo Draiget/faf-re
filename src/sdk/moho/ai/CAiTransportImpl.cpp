@@ -1,4 +1,5 @@
 #include "moho/ai/CAiTransportImpl.h"
+#include "legacy/math/X87Math.h"
 #include "legacy/algorithms/Sort.h"
 
 #include <algorithm>
@@ -414,9 +415,9 @@ namespace
       return Wm3::Quatf(0.0f, 0.0f, 0.0f, 0.0f);
     }
 
-    const float yaw = std::atan2(forward.x, forward.z);
+    const float yaw = msvc8::atan2(forward.x, forward.z);
     const float halfYaw = yaw * 0.5f;
-    return Wm3::Quatf(std::cos(halfYaw), 0.0f, std::sin(halfYaw), 0.0f);
+    return Wm3::Quatf(msvc8::cos(halfYaw), 0.0f, msvc8::sin(halfYaw), 0.0f);
   }
 
   [[nodiscard]] SOCellPos InvalidCellPos() noexcept

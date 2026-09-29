@@ -1,4 +1,5 @@
 #include "moho/math/MathReflection.h"
+#include "legacy/math/X87Math.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -344,12 +345,12 @@ namespace moho
     const float halfPitch = orientation.p * 0.5f;
     const float halfYaw = orientation.y * 0.5f;
 
-    const float rollCos = std::cos(halfRoll);
-    const float rollSin = std::sin(halfRoll);
-    const float pitchCos = std::cos(halfPitch);
-    const float pitchSin = std::sin(halfPitch);
-    const float yawCos = std::cos(halfYaw);
-    const float yawSin = std::sin(halfYaw);
+    const float rollCos = msvc8::cos(halfRoll);
+    const float rollSin = msvc8::sin(halfRoll);
+    const float pitchCos = msvc8::cos(halfPitch);
+    const float pitchSin = msvc8::sin(halfPitch);
+    const float yawCos = msvc8::cos(halfYaw);
+    const float yawSin = msvc8::sin(halfYaw);
 
     Wm3::Quaternionf orientationOut{};
     orientationOut.w = (yawCos * pitchCos * rollCos) + (yawSin * pitchSin * rollSin);
@@ -2261,12 +2262,12 @@ extern "C" double __cdecl acos(double value)
     if (mxcsr == 0x1F80u) {
       unsigned int controlWord = 0;
       if (_controlfp_s(&controlWord, 0, 0) == 0 && (controlWord & 0x7Fu) == 0x7Fu) {
-        return std::atan2(std::sqrt(1.0 - (value * value)), value);
+        return msvc8::atan2(std::sqrt(1.0 - (value * value)), value);
       }
     }
   }
 
-  return std::atan2(std::sqrt(1.0 - (value * value)), value);
+  return msvc8::atan2(std::sqrt(1.0 - (value * value)), value);
 }
 
 /**

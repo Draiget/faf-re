@@ -5,6 +5,7 @@
 // the `CreateDialog`/`GetClassInfo` macros before the wx class declarations are
 // parsed.
 #include "platform/WxWidgets.h"
+#include "platform/X87Precision.h"
 #include <wx/dirdlg.h>
 
 #include "CArmyStats.h"
@@ -1036,7 +1037,7 @@ namespace moho
         );
       }
 
-      (void)_controlfp(_PC_24, _MCW_PC);
+      platform::SetX87PrecisionControl(_PC_24);
     }
 
     CAiBrain* const brain = mOwnerArmy;

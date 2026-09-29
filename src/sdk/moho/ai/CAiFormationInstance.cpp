@@ -1,4 +1,5 @@
 #include "moho/ai/CAiFormationInstance.h"
+#include "legacy/math/X87Math.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1373,7 +1374,7 @@ namespace
   /// the transform: `atan2(2(xz + wy), 1 - 2(x^2 + y^2))`.
   [[nodiscard]] float HeadingOf(const Wm3::Quatf& q) noexcept
   {
-    return std::atan2((q.z * q.x + q.y * q.w) * 2.0f, 1.0f - (q.y * q.y + q.x * q.x) * 2.0f);
+    return msvc8::atan2((q.z * q.x + q.y * q.w) * 2.0f, 1.0f - (q.y * q.y + q.x * q.x) * 2.0f);
   }
 
   /// The unit-forward vector (third rotation-matrix column) of `q`, the
@@ -1393,8 +1394,8 @@ namespace
   [[nodiscard]] Wm3::Quatf YawQuaternion(const float angle) noexcept
   {
     const float halfAngle = angle * 0.5f;
-    const float sinHalf = std::sin(halfAngle);
-    return Wm3::Quatf{std::cos(halfAngle), sinHalf * 0.0f, sinHalf, sinHalf * 0.0f};
+    const float sinHalf = msvc8::sin(halfAngle);
+    return Wm3::Quatf{msvc8::cos(halfAngle), sinHalf * 0.0f, sinHalf, sinHalf * 0.0f};
   }
 
   /// Flat (XZ) distance between two positions, `sqrtf(dz*dz + dx*dx)`.
@@ -3174,7 +3175,7 @@ namespace moho
     const float meanForwardZ = forwardZSum * (1.0f / unitCount);
 
     if (mOrientation != kZeroQuaternion) {
-      const float delta = WrapAngle(HeadingOf(mOrientation) - std::atan2(meanForwardX, meanForwardZ));
+      const float delta = WrapAngle(HeadingOf(mOrientation) - msvc8::atan2(meanForwardX, meanForwardZ));
       if (std::fabs(delta) < 1.8849558f) {
         mOrientationChange = YawQuaternion(delta);
       }
@@ -3883,7 +3884,7 @@ namespace moho
               float heading = 0.0f;
               if (unitInfo.mHeadingAngle != gpg::pInf) {
                 const float leaderHeading = HeadingOf(leader->GetTransform().orient_);
-                const float headingError = WrapAngle(leaderHeading - std::atan2(mForwardVector.x, mForwardVector.z));
+                const float headingError = WrapAngle(leaderHeading - msvc8::atan2(mForwardVector.x, mForwardVector.z));
                 const float blend = (distToLeader / maxLeaderDistance) * 0.050000001f + 0.94f;
                 heading = (1.0f - blend) * headingError + unitInfo.mHeadingAngle * blend;
               }

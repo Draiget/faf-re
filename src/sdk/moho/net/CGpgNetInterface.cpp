@@ -1,4 +1,5 @@
 #include "CGpgNetInterface.h"
+#include "platform/X87Precision.h"
 
 #include <boost/bind.hpp>
 
@@ -2166,7 +2167,7 @@ int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
   // six call sites in the binary use (0x004F2241, 0x0070C587, 0x0073D456,
   // 0x007BA56C, 0x007F57A3, 0x00885E0D). The binary never selects _PC_64
   // anywhere; a previous recovery pass read this one as _PC_64.
-  _controlfp(_PC_24, _MCW_PC);
+  platform::SetX87PrecisionControl(_PC_24);
 
   lua_pushboolean(rawState, launched ? 1 : 0);
   (void)lua_gettop(rawState);
