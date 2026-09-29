@@ -1530,7 +1530,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x007E7350 (FUN_007E7350, Moho::HardwareMeshBatchInit)
+   * Address: 0x007E7350 (FUN_007E7350)
    *
    * IDA signature:
    * Moho::HardwareMeshBatch* __userpurge Moho::HardwareMeshBatchInit@<eax>(
@@ -1539,26 +1539,24 @@ namespace moho
    *   boost::shared_ptr<RScmResource> currentResource);
    *
    * What it does:
-   * Placement-constructs one `HardwareMeshBatch` over the caller-allocated
-   * storage: runs the base `MeshBatch` constructor, installs the
-   * `HardwareMeshBatch` vtable, zero-clears the derived buffer/scratch lanes,
-   * then drives `HardwareMeshBatch::Initialize` to build the GPU buffers.
-   * Returns `batch`.
+   * The base `MeshBatch` constructor (0x007E6DA0), this class's vptr
+   * (0xE3F558), the handles and scratch pointer at +0x54..+0x64 null, then
+   * `Initialize` (0x007E7540, called directly -- the dynamic type is known)
+   * with by-value copies of both resources. It used to be spelled as a
+   * placement factory, `HardwareMeshBatchInit`, over storage the caller
+   * allocated; the caller's `operator new(0x68)` and null test are `new`.
    */
-  HardwareMeshBatch* HardwareMeshBatchInit(
-    HardwareMeshBatch* const batch,
+  HardwareMeshBatch::HardwareMeshBatch(
     const MeshLOD* const lod,
     const bool remapToReferenceResource,
     boost::shared_ptr<RScmResource> referenceResource,
     boost::shared_ptr<RScmResource> currentResource
   )
+    : MeshBatch()
+    , mStaticVertexBuffer()
+    , mDynamicVertexBuffer()
+    , mScratchVertexData(nullptr)
   {
-    // Construct the concrete object in place: the compiler-generated ctor runs
-    // the base MeshBatch ctor, installs the HardwareMeshBatch vtable, and
-    // default-initializes the derived buffer/scratch lanes (all null) — the
-    // exact effect of the binary's inlined field zeroing at 0x007E7384.
-    HardwareMeshBatch* const constructed = ::new (static_cast<void*>(batch)) HardwareMeshBatch();
-    constructed->Initialize(lod, remapToReferenceResource ? 1 : 0, referenceResource, currentResource);
-    return constructed;
+    Initialize(lod, remapToReferenceResource, referenceResource, currentResource);
   }
 } // namespace moho

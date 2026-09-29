@@ -147,6 +147,28 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007E7350 (FUN_007E7350)
+     *
+     * IDA signature:
+     * Moho::HardwareMeshBatch* __userpurge Moho::HardwareMeshBatchInit@<eax>(
+     *   HardwareMeshBatch* batch, int lod, int remap,
+     *   boost::shared_ptr<RScmResource> referenceResource,
+     *   boost::shared_ptr<RScmResource> currentResource);
+     *
+     * What it does:
+     * Base `MeshBatch` construction, this class's vptr, the derived buffer
+     * handles and scratch pointer null, then `Initialize` with the two
+     * by-value resources to build the GPU buffers. `BuildHardwareMeshBatchForLod`
+     * (0x007E8C70) reaches it as `new HardwareMeshBatch(...)`.
+     */
+    HardwareMeshBatch(
+      const MeshLOD* lod,
+      bool remapToReferenceResource,
+      boost::shared_ptr<RScmResource> referenceResource,
+      boost::shared_ptr<RScmResource> currentResource
+    );
+
+    /**
      * Address: 0x007E8B70 (FUN_007E8B70, deleting destructor lane; slot 0 of
      * `??_7HardwareMeshBatch@Moho@@6B@`, VTABLE_CONFIRMED via the vtable's data
      * xref to this address)
@@ -273,26 +295,4 @@ namespace moho
   static_assert(offsetof(HardwareMeshBatch, mScratchVertexData) == 0x64, "HardwareMeshBatch::mScratchVertexData offset must be 0x64");
   static_assert(sizeof(HardwareMeshBatch) == 0x68, "HardwareMeshBatch size must be 0x68");
 
-  /**
-   * Address: 0x007E7350 (FUN_007E7350, Moho::HardwareMeshBatchInit)
-   *
-   * IDA signature:
-   * Moho::HardwareMeshBatch* __userpurge Moho::HardwareMeshBatchInit@<eax>(
-   *   HardwareMeshBatch* batch, int lod, int remap,
-   *   boost::shared_ptr<RScmResource> referenceResource,
-   *   boost::shared_ptr<RScmResource> currentResource);
-   *
-   * What it does:
-   * Placement-initializes one freshly allocated `HardwareMeshBatch`: runs the
-   * base `MeshBatch` constructor, installs the `HardwareMeshBatch` vtable,
-   * zero-clears the derived buffer/scratch lanes, then drives
-   * `HardwareMeshBatch::Initialize` to build the GPU buffers. Returns `batch`.
-   */
-  HardwareMeshBatch* HardwareMeshBatchInit(
-    HardwareMeshBatch* batch,
-    const MeshLOD* lod,
-    bool remapToReferenceResource,
-    boost::shared_ptr<RScmResource> referenceResource,
-    boost::shared_ptr<RScmResource> currentResource
-  );
 } // namespace moho

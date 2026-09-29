@@ -2364,15 +2364,7 @@ namespace moho
         return nullptr;
       }
 
-      auto* const batch = static_cast<HardwareMeshBatch*>(::operator new(sizeof(HardwareMeshBatch)));
-      if (batch == nullptr) {
-        return nullptr;
-      }
-
-      // Placement-initialize the derived batch (base ctor + vtable install +
-      // GPU-buffer build) via the recovered HardwareMeshBatch factory, exactly
-      // as the binary calls it by name (un-orphans the HardwareMeshBatch TU).
-      return HardwareMeshBatchInit(batch, lod, remapToReferenceResource, referenceResource, currentResource);
+      return new HardwareMeshBatch(lod, remapToReferenceResource, referenceResource, currentResource);
     }
   } // namespace
 
