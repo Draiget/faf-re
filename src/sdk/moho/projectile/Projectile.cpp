@@ -11,6 +11,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
+#include "legacy/exceptions/StdExcept.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityId.h"
 #include "moho/math/GridPos.h"
@@ -250,8 +251,17 @@ namespace
       return false;
     }
 
-    LuaPlus::LuaFunction<bool> callback(script);
-    return callback(collidedEntity->mLuaObj, projectile);
+    // A script error is reported and counts as "no collision" (runtime_error,
+    // handler 0x0069F7E9; the continuation at 0x0069F7B5 returns false).
+    try {
+      LuaPlus::LuaFunction<bool> callback(script);
+      return callback(collidedEntity->mLuaObj, projectile);
+    } catch (const msvc8::runtime_error& error) {
+      moho::CScriptObject::LogScriptWarning(
+        weakGuard.OwnerLinkSlotAddress() != nullptr ? collidedEntity : nullptr, "OnCollisionCheck", error.what()
+      );
+    }
+    return false;
   }
 
   // Ray/water-plane crossing used by CheckCollision Branch A2 (asm

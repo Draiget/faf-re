@@ -10,6 +10,8 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Logging.h"
+#include "legacy/exceptions/StdExcept.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/entity/Entity.h"
@@ -654,17 +656,6 @@ namespace
     return moho::CScrLuaMetatableFactory<moho::CEconomyEvent>::Instance().Get(state);
   }
 
-  void InvokeProgressCallback(const LuaPlus::LuaObject& callback, LuaPlus::LuaObject unitObject, const float progress)
-  {
-    lua_State* const activeState = callback.GetActiveCState();
-    const int savedTop = lua_gettop(activeState);
-    const_cast<LuaPlus::LuaObject&>(callback).PushStack(activeState);
-    unitObject.PushStack(activeState);
-    lua_pushnumber(activeState, progress);
-    lua_call(activeState, 2, 1);
-    lua_settop(activeState, savedTop);
-  }
-
   /**
    * Address: 0x00775BF0 (FUN_00775BF0, sub_775BF0)
    *
@@ -1227,9 +1218,15 @@ void moho::CEconomyEvent::ProcessTick()
       --mRemainingTicks;
 
       if (!mProgressCallback.IsNil()) {
-        const float progress = 1.0f - static_cast<float>(mRemainingTicks) / static_cast<float>(mTotalTicks);
-        LuaPlus::LuaObject unitLuaObject = mUnit->GetLuaObject();
-        InvokeProgressCallback(mProgressCallback, unitLuaObject, progress);
+        // A failing progress script is logged, not propagated (FuncInfo
+        // 0x00ED65C8: runtime_error handler at 0x0077539B).
+        const LuaPlus::LuaFunction<void> progressCallback(mProgressCallback);
+        try {
+          const float progress = 1.0f - static_cast<float>(mRemainingTicks) / static_cast<float>(mTotalTicks);
+          progressCallback.Call_ObjectNum(mUnit->GetLuaObject(), progress);
+        } catch (const msvc8::runtime_error& error) {
+          gpg::Warnf("Error executing progress function: %s", error.what());
+        }
       }
 
       if (mRemainingTicks == 0) {

@@ -5553,7 +5553,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   mSyncFilter.CopyFrom(filter);
   const bool focusArmyChanged = previousFocusArmy != filter.focusArmy;
 
-  if (focusArmyChanged && mLuaState != nullptr) {
+  if (focusArmyChanged) {
     // 0x00747512..0x00747560: Lua is told about the switch with 1-based army
     // indices, except that "no focus army" stays -1 rather than becoming 0.
     const auto toLuaArmyIndex = [](const std::int32_t index) {
@@ -5562,10 +5562,14 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     // Argument order is (new, old): ground truth computes `v6` from the
     // incoming filter and `v5` from the old value and calls `Call_Int2(v6, v5)`,
     // matching `function NoteFocusArmyChanged(new, old)` in lua/SimSync.lua.
-    const LuaPlus::LuaObject noteFocusArmyChangedGlobal = mLuaState->GetGlobal("NoteFocusArmyChanged");
-    if (noteFocusArmyChangedGlobal.IsFunction()) {
-      const LuaPlus::LuaFunction<> noteFocusArmyChanged(noteFocusArmyChangedGlobal);
+    // A script failure, or a missing global (LuaFunction's own "call" type
+    // error), is logged rather than propagated (FuncInfo 0x00F1A0CC,
+    // std::exception handler 0x00747574).
+    try {
+      const LuaPlus::LuaFunction<> noteFocusArmyChanged(mLuaState->GetGlobal("NoteFocusArmyChanged"));
       noteFocusArmyChanged.Call_Int2(toLuaArmyIndex(filter.focusArmy), toLuaArmyIndex(previousFocusArmy));
+    } catch (const std::exception& error) {
+      gpg::Warnf("NoteFocusArmyChanged() puked:\n%s", error.what());
     }
   }
 
@@ -7161,13 +7165,15 @@ void Sim::Setup(LaunchInfoNew* const info)
   scenarioInfo.SetObject("ArmySetup", armySetupTable);
   mLuaState->GetGlobals().SetObject("ScenarioInfo", scenarioInfo);
 
-  // SetupSession() Lua callback.
+  // SetupSession() Lua callback. Only the call is guarded (runtime_error,
+  // FuncInfo 0x00F29640 try state 12, handler 0x00744414).
   {
-    LuaPlus::LuaFunction setupSession(mLuaState->GetGlobal("SetupSession"));
-    if (!setupSession.IsFunction()) {
-      setupSession.TypeError("call");
+    const LuaPlus::LuaFunction<> setupSession(mLuaState->GetGlobal("SetupSession"));
+    try {
+      setupSession.Call();
+    } catch (const msvc8::runtime_error& error) {
+      gpg::Warnf("Error running SetupSession in SimInit.lua: %s", error.what());
     }
-    setupSession.Call();
     ProbeTerrainOccupancy(mOGrid, "after SetupSession");
   }
 
@@ -7277,13 +7283,13 @@ void Sim::Setup(LaunchInfoNew* const info)
   }
   ProbeTerrainOccupancy(mOGrid, "after props");
 
-  // BeginSession() Lua callback.
-  {
-    LuaPlus::LuaFunction beginSession(mLuaState->GetGlobal("BeginSession"));
-    if (!beginSession.IsFunction()) {
-      beginSession.TypeError("call");
-    }
+  // BeginSession() Lua callback: lookup and call are both guarded
+  // (std::exception, FuncInfo 0x00F29640 try states 22..26, handler 0x007448AA).
+  try {
+    const LuaPlus::LuaFunction<> beginSession(mLuaState->GetGlobal("BeginSession"));
     beginSession.Call();
+  } catch (const std::exception& error) {
+    gpg::Warnf("BeginSession() failed: %s", error.what());
   }
   ProbeTerrainOccupancy(mOGrid, "after BeginSession");
 
@@ -7309,13 +7315,21 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
 {
   gpg::ReadArchive* const archive = loadInfo->mReadArchive;
 
-  // Deserialize this Sim instance from the saved archive.
-  if (!Sim::sType) {
-    Sim::sType = gpg::LookupRType(typeid(Sim));
-  }
+  // Deserialize this Sim instance from the saved archive. A failure is logged,
+  // the archive section is closed as aborted, and the error rethrown
+  // (std::exception, FuncInfo 0x00F0C2D4 try state 0, handler 0x00744C54).
   gpg::RRef ownerRef{};
-  archive->Read(Sim::sType, this, ownerRef);
-  archive->EndSection(false);
+  try {
+    if (!Sim::sType) {
+      Sim::sType = gpg::LookupRType(typeid(Sim));
+    }
+    archive->Read(Sim::sType, this, ownerRef);
+  } catch (const std::exception& error) {
+    gpg::Warnf("Error loading saved game: %s", error.what());
+    loadInfo->mReadArchive->EndSection(true);
+    throw;
+  }
+  loadInfo->mReadArchive->EndSection(false);
 
   // Refresh the heightfield bounds to the full grid.
   {
@@ -7346,25 +7360,26 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
   }
 
   // Re-sync the playable rectangle through /lua/SimSync.lua::SyncPlayableRect.
+  // Only the call is guarded (runtime_error, try state 8, handler 0x00744C11).
   {
-    LuaPlus::LuaObject simSyncModule = SCR_Import(mLuaState, "/lua/SimSync.lua");
-    LuaPlus::LuaFunction syncPlayableRect(simSyncModule["SyncPlayableRect"]);
-    if (!syncPlayableRect.IsFunction()) {
-      syncPlayableRect.TypeError("call");
+    const LuaPlus::LuaObject simSyncModule = SCR_Import(mLuaState, "/lua/SimSync.lua");
+    const LuaPlus::LuaFunction<> syncPlayableRect(simSyncModule["SyncPlayableRect"]);
+    try {
+      const gpg::Rect2i playableRect = mMapData->mPlayableRect;
+      const LuaPlus::LuaObject rectObject = SCR_ToLua<gpg::Rect2<int>>(mLuaState, playableRect);
+      syncPlayableRect.Call_Object(rectObject);
+    } catch (const msvc8::runtime_error& error) {
+      gpg::Warnf("Error running SyncPlayableRect in /lua/SimSync.lua: %s", error.what());
     }
-
-    const gpg::Rect2i playableRect = mMapData->mPlayableRect;
-    const LuaPlus::LuaObject rectObject = SCR_ToLua<gpg::Rect2<int>>(mLuaState, playableRect);
-    syncPlayableRect.Call_Object(rectObject);
   }
 
-  // Fire the OnPostLoad Lua callback.
-  {
-    LuaPlus::LuaFunction onPostLoad(mLuaState->GetGlobal("OnPostLoad"));
-    if (!onPostLoad.IsFunction()) {
-      onPostLoad.TypeError("call");
-    }
+  // Fire the OnPostLoad Lua callback; lookup and call are guarded
+  // (std::exception, try states 10..14, handler 0x00744C36).
+  try {
+    const LuaPlus::LuaFunction<> onPostLoad(mLuaState->GetGlobal("OnPostLoad"));
     onPostLoad.Call();
+  } catch (const std::exception& error) {
+    gpg::Warnf("OnPostLoad() failed: %s", error.what());
   }
 }
 

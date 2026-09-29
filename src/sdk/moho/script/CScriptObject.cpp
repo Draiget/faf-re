@@ -8,6 +8,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "lua/LuaError.h"
 #include "moho/console/CConCommand.h"
 #include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -1675,34 +1676,43 @@ bool CScriptObject::RunScriptBool(const char* const scriptName)
 
 /**
  * Address: 0x005FCA70 (FUN_005FCA70, Moho::CScriptObject::GetLuaValue)
+ *
+ * What it does:
+ * Reads `self[key]` as a number. A Lua error is caught (lua_RuntimeError,
+ * FuncInfo 0x00ED959C), reported through LogScriptWarning, and the value
+ * reads as 0 (funclet 0x005FCB2D, continuation `xorps xmm0, xmm0`).
  */
 float CScriptObject::GetLuaValue(const char* const key) const
 {
-  LuaPlus::LuaState* const state = mLuaObj.GetActiveState();
-  if (!state) {
-    return 0.0f;
+  try {
+    lua_State* const lstate = mLuaObj.GetActiveState()->GetCState();
+    const int stackTop = lua_gettop(lstate);
+    const LuaPlus::LuaObject value = mLuaObj.GetByName(key);
+    const_cast<LuaPlus::LuaObject&>(value).PushStack(lstate);
+    const float out = static_cast<float>(lua_tonumber(lstate, -1));
+    lua_settop(lstate, stackTop);
+    return out;
+  } catch (const lua_RuntimeError& error) {
+    LogScriptWarning(const_cast<CScriptObject*>(this), key, error.what());
   }
-
-  lua_State* const lstate = state->GetCState();
-  if (!lstate) {
-    return 0.0f;
-  }
-
-  const int stackTop = lua_gettop(lstate);
-  const LuaPlus::LuaObject value = mLuaObj.GetByName(key);
-  const_cast<LuaPlus::LuaObject&>(value).PushStack(lstate);
-  const float out = static_cast<float>(lua_tonumber(lstate, -1));
-  lua_settop(lstate, stackTop);
-  return out;
+  return 0.0f;
 }
 
 /**
  * Address: 0x005FCB70 (FUN_005FCB70, Moho::CScriptObject::SetLuaValue)
+ *
+ * What it does:
+ * Writes `self[key] = value`; a Lua error is caught (lua_RuntimeError,
+ * FuncInfo 0x00ED9534) and reported through LogScriptWarning.
  */
 void CScriptObject::SetLuaValue(const char* const key, const float value)
 {
-  (void)mLuaObj.GetActiveState();
-  mLuaObj.SetNumber(key, value);
+  try {
+    (void)mLuaObj.GetActiveState();
+    mLuaObj.SetNumber(key, value);
+  } catch (const lua_RuntimeError& error) {
+    LogScriptWarning(this, key, error.what());
+  }
 }
 
 /**

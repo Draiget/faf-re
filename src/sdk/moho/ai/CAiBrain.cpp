@@ -2,6 +2,7 @@
 #include "legacy/math/X87Math.h"
 
 #include "legacy/algorithms/Sort.h"
+#include "legacy/exceptions/StdExcept.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1921,12 +1922,18 @@ namespace moho
       return outResult;
     }
 
-    // Optional user-supplied Lua scorer.
+    // Optional user-supplied Lua scorer. Loading and running it are each
+    // guarded (FuncInfo 0x00F004D0: two runtime_error try blocks); a failure is
+    // logged and the vectors are scored as if the scorer had approved them.
     LuaPlus::LuaObject scorerFunctionObject;
     if (scoreFunc != nullptr) {
-      LuaPlus::LuaState* const luaState = mSim->GetLuaState();
-      LuaPlus::LuaObject scoreModule = SCR_Import(luaState, scoreScript);
-      scorerFunctionObject = scoreModule[scoreFunc];
+      try {
+        LuaPlus::LuaState* const luaState = mSim->GetLuaState();
+        LuaPlus::LuaObject scoreModule = SCR_Import(luaState, scoreScript);
+        scorerFunctionObject = scoreModule[scoreFunc];
+      } catch (const msvc8::runtime_error& error) {
+        gpg::Warnf(kAiBrainPickBestAttackVectorLoadCallbackError, error.what());
+      }
     }
 
     Wm3::Vector3f squadCenter{};
@@ -1946,12 +1953,16 @@ namespace moho
 
       // When a scorer is supplied, gate on scorer(centerX, centerZ, candidateX, candidateZ).
       if (scoreFunc != nullptr) {
-        LuaPlus::LuaFunction scorer(scorerFunctionObject);
-        const bool approved = scorer.Call_Num4_bool(
-          squadCenter.x, squadCenter.z, candidatePoint.x, candidatePoint.z
-        );
-        if (!approved) {
-          continue;
+        try {
+          LuaPlus::LuaFunction scorer(scorerFunctionObject);
+          const bool approved = scorer.Call_Num4_bool(
+            squadCenter.x, squadCenter.z, candidatePoint.x, candidatePoint.z
+          );
+          if (!approved) {
+            continue;
+          }
+        } catch (const msvc8::runtime_error& error) {
+          gpg::Warnf(kAiBrainPickBestAttackVectorRunCallbackError, error.what());
         }
       }
 

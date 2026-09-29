@@ -1164,7 +1164,14 @@ void CSimDriver::ThreadCreateSim()
   gpg::SetThreadName(kCurrentThreadId, "Sim");
   TIME_SetTimeBarColor(kSimThreadTimeBarColor);
 
-  mSim.reset(Sim_Create_exxt(boost::SharedPtrRawFromSharedBorrow(mLaunchInfo)));
+  // A throwing Sim::Create is logged and leaves `mSim` empty, which parks the
+  // driver in Failed below (std::exception, FuncInfo 0x00F29740 try state 0,
+  // handler 0x0073D4C7).
+  try {
+    mSim.reset(Sim_Create_exxt(boost::SharedPtrRawFromSharedBorrow(mLaunchInfo)));
+  } catch (const std::exception& error) {
+    gpg::Logf("Sim::Create() crashed: %s", error.what());
+  }
 
   // The launch info was only needed to build the sim; the sim owns whatever it
   // kept from it.
@@ -1211,7 +1218,19 @@ void CSimDriver::ThreadCreateSim()
     }
 
     SetStateAndNotify(EDriverState::WaitingForMainThread);
-    ExecuteDispatchStepLocked(lock);
+    // An exception out of a beat ends this thread with the driver Failed rather
+    // than taking the process down (std::exception, try state 8, handler
+    // 0x0073D774). The step may have released the lock; it is re-taken first.
+    try {
+      ExecuteDispatchStepLocked(lock);
+    } catch (const std::exception& error) {
+      gpg::Logf("Sim crashed hard in DoSimBeat(): %s", error.what());
+      if (!lock.locked()) {
+        lock.lock();
+      }
+      SetStateAndNotify(EDriverState::Failed);
+      return;
+    }
     SetStateAndNotify(EDriverState::Ready);
 
     if (mState == EDriverState::Ready) {

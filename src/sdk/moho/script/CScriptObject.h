@@ -105,8 +105,12 @@ namespace moho
 
     /**
      * Address: 0x004C7410
+     *
+     * The binary passes the object in ecx and tests it for null ("<deleted
+     * object>"), so the body never relies on a live `this`; modelled static
+     * with the object as the first argument.
      */
-    void LogScriptWarning(CScriptObject*, const char*, const char*);
+    static void LogScriptWarning(CScriptObject*, const char*, const char*);
 
     /**
      * Address: 0x004C74B0
