@@ -1,0 +1,41 @@
+﻿name: 3p-relay-lag-and-drop
+description: >
+  Three players through mpemu's UDP relay. Once in game the 1<->3 link gets
+  150 ms +/- 30 ms latency and 3% loss, then player 2 is cut off for 20 s and
+  restored, and finally player 3 crashes. The two survivors must stay in sync
+  and alive.
+timeout: 15m
+
+mode: relay
+lobby: auto
+map: SCMP_009
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: Alpha }
+  - { uid: 2, name: Bravo }
+  - { uid: 3, name: Charlie }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 5m }
+  - wait: 45s
+  - link: { from: 1, to: 3, latency: 150ms, jitter: 30ms, loss: 0.03 }
+  - wait: 45s
+  - isolate: 2
+  - wait: 20s
+  - restore: 2
+  - wait: 30s
+  - kill: 3
+  - wait: 45s
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true      # player 3 was killed by mpemu, so only 1 and 2 count

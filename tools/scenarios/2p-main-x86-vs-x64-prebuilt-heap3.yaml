@@ -1,0 +1,34 @@
+name: 2p-main-x86-vs-x64-prebuilt-heap3
+description: >
+  2p-main-x86-vs-x64 with prebuilt bases, so both simulations carry a running
+  economy and structures from the first beat and the per-beat checksums have
+  real state to compare, not two idle commanders. The x64 client runs on
+  the debug CRT heap with guard-band checks (FAF_SYSHEAP=3).
+timeout: 12m
+
+mode: direct
+lobby: auto
+map: SCMP_009
+gameOptions:
+  PrebuiltUnits: 'On'
+
+game:
+  exe: '%ProgramData%\FAForever\bin\main.exe'
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: MainX86 }
+  - { uid: 2, name: MainX64, exe: 'C:\Users\Draiget\AppData\Local\Temp\claude\g--projects-faf-main\0fdbf055-1702-4699-8733-d4eee99ffde8\scratchpad\x64fp\main_x64_heap3.cmd' }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 4m }
+  - wait: 5m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true

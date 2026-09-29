@@ -1,0 +1,33 @@
+﻿name: 2p-direct-smoke
+description: >
+  Two instances of the shipped game on loopback, no adapter. Autolobby
+  launches by itself once both are connected; the match then runs for two
+  minutes. The baseline every other scenario is compared against.
+timeout: 10m
+
+mode: direct          # direct | relay | ice
+lobby: auto           # auto (autolobby.lua) | normal (custom-game lobby, manual launch)
+map: SCMP_009
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init.lua      # resolved against %ProgramData%\FAForever\bin
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: Alpha }
+  - { uid: 2, name: Bravo }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 5m }
+  - note: both instances launched; letting the sim run
+  - wait: 2m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true

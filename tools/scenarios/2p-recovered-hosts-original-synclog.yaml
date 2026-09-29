@@ -1,0 +1,30 @@
+name: 2p-recovered-hosts-original-synclog
+description: >
+  2p-recovered-hosts-original with /synclog on both clients, so the first
+  diverging checksum input can be found by diffing the same beat's logs.
+timeout: 8m
+
+mode: direct
+lobby: auto
+map: SCMP_009
+
+game:
+  exe: '%ProgramData%\FAForever\bin\main.exe'
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: RecoveredHost, args: ['/synclog', 'G:\projects\faf-main\tools\runs\synclog\recovered'] }
+  - { uid: 2, name: Original, exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe', args: ['/synclog', 'G:\projects\faf-main\tools\runs\synclog\original'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 45s
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true

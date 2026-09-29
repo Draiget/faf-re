@@ -1,0 +1,43 @@
+[Unit]
+Description=mpemu hub (FAF multiplayer test server: icebreaker, TURN, relay, control)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# MPEMU_SECRET, MPEMU_PUBLIC_HOST, the ports and (optionally) MPEMU_PUBLIC_IP
+# live here, mode 0600, written by deploy-remote.ps1. Nothing host-specific
+# is in this file. With the secret set the API is TLS under a key derived
+# from it, so no certificate is needed.
+EnvironmentFile=/etc/mpemu/mpemu-server.env
+ExecStart=/opt/mpemu/mpemu-server \
+    -http ${MPEMU_HTTP} \
+    -public-host ${MPEMU_PUBLIC_HOST} \
+    -turn-port ${MPEMU_TURN_PORT} \
+    -turn-relay-ports ${MPEMU_TURN_RELAY_PORTS} \
+    -relay-ports ${MPEMU_RELAY_PORTS} \
+    -logs /var/lib/mpemu/logs
+Restart=on-failure
+RestartSec=3
+
+# The hub may share a small host with something that matters more (a VPN
+# server): it never gets more than half a core or 256 MiB, and yields first.
+CPUQuota=50%
+MemoryMax=256M
+Nice=10
+
+DynamicUser=yes
+StateDirectory=mpemu
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+# AF_NETLINK: the TURN server enumerates interfaces (Pion's net.Interfaces).
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

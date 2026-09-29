@@ -1,0 +1,38 @@
+﻿name: 2p-ice-turn
+description: >
+  The production path: each game sits behind faf-pioneer's WebRTC ICE
+  adapter, signalled through mpemu's icebreaker, with every connection forced
+  through mpemu's TURN relay.
+timeout: 10m
+
+mode: ice
+lobby: auto
+map: SCMP_009
+
+ice:
+  # adapter: defaults to bin\faf-adapter.exe next to mpemu.exe (build.ps1 builds it)
+  forceRelay: true
+  logLevel: 0
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: Alpha }
+  - { uid: 2, name: Bravo }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 5m }
+  - wait: 2m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  minTurnAllocations: 2
+  relayOnly: true

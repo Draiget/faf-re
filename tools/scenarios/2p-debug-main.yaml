@@ -1,0 +1,36 @@
+﻿name: 2p-debug-main
+description: >
+  Debug the recovered engine in a real two-player session. Player 1 is the
+  shipped game, started by mpemu. Player 2 is NOT started: mpemu prints its
+  command line (also written to debug-args-2.txt in the run directory) and
+  waits. Deploy your Debug build to %ProgramData%\FAForever\bin\main.exe (run
+  from anywhere else it dies in gpg::Die at startup), then in Visual Studio
+  debug that exe with working directory %ProgramData%\FAForever\bin and the
+  printed Command Arguments. The session continues as soon as it connects;
+  the console step keeps it up for as long as you need.
+timeout: 24h
+
+mode: direct
+lobby: auto
+map: SCMP_009
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: Original }
+  - { uid: 2, name: Debugged, exe: '%ProgramData%\FAForever\bin\main.exe', spawn: false }
+
+steps:
+  - start: all
+  - host: 1
+  # Take your time in the debugger: this waits up to 30 minutes for the
+  # hand-started main.exe to connect and open its lobby.
+  - waitState: { uids: [2], state: Lobby, timeout: 30m }
+  - join: others
+  - interactive: true
+
+expect:
+  noDesync: true
