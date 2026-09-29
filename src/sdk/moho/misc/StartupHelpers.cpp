@@ -5429,17 +5429,28 @@ msvc8::string moho::USER_GetAppLocalDataDir()
  * What it does:
  * Returns `<USER_GetAppLocalDataDir()> + "\\cache"` and ensures the cache
  * directory exists.
+ *
+ * [DELIBERATE-FIX] `/cachedir <dir>` replaces that directory. Retail has no
+ * such option, so every instance of one Windows user shares the cache, and
+ * each purges it and rewrites the compiled effects while it loads: games
+ * started together on one machine (mpemu) read each other's half-written
+ * effects and die in DevResInitResources. A private directory per instance
+ * removes the race. Without the option the behaviour is retail's.
  */
 msvc8::string moho::USER_GetAppCacheDir()
 {
   msvc8::string outDir;
-  const msvc8::string appLocalDir = USER_GetAppLocalDataDir();
-  if (appLocalDir.empty()) {
-    return outDir;
+  std::filesystem::path cachePath;
+  msvc8::vector<msvc8::string> cacheDirArgs;
+  if (CFG_GetArgOption("/cachedir", 1u, &cacheDirArgs) && !cacheDirArgs.empty()) {
+    cachePath = std::filesystem::path(cacheDirArgs[0].c_str());
+  } else {
+    const msvc8::string appLocalDir = USER_GetAppLocalDataDir();
+    if (appLocalDir.empty()) {
+      return outDir;
+    }
+    cachePath = std::filesystem::path(appLocalDir.c_str()) / "cache";
   }
-
-  std::filesystem::path cachePath(appLocalDir.c_str());
-  cachePath /= "cache";
 
   std::error_code createDirectoryError;
   std::filesystem::create_directories(cachePath, createDirectoryError);

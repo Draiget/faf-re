@@ -1850,6 +1850,24 @@ void CSimDriver::RequestSaveGame(CSaveGameRequestImpl* request)
   ++mOutstandingRequests;
 }
 
+namespace
+{
+  /// The current profile's ui_scale option (what FAF's options menu writes),
+  /// 1.0 when it is unset or not a number.
+  [[nodiscard]] float CurrentUiScale()
+  {
+    IUserPrefs* const prefs = USER_GetPreferences();
+    if (prefs == nullptr) {
+      return 1.0f;
+    }
+    const LuaPlus::LuaObject value = prefs->LookupCurrentOption("ui_scale");
+    if (!value.IsNumber()) {
+      return 1.0f;
+    }
+    return std::clamp(static_cast<float>(value.GetNumber()), 0.5f, 4.0f);
+  }
+} // namespace
+
 /**
  * Address: 0x0073DFE0 (FUN_0073DFE0), ISTIDriver slot 39
  *
@@ -1859,15 +1877,12 @@ void CSimDriver::RequestSaveGame(CSaveGameRequestImpl* request)
  *     float scaleX, float scaleY);
  *
  * What it does:
- * Builds the network-diagnostics HUD: an 8-column per-client table (index,
- * nickname, ping, maxsp, data, behind, avail, acks) plus a 4-line summary
- * block, measures per-column widths with a 10pt "Courier New" font, draws a
- * translucent backdrop quad, renders every cell right-justified, and strokes a
- * white 4-line border rectangle. Runs entirely under the driver lock.
- *
- * Note:
- * Several per-cell numeric columns reproduce genuine 2007 debug-HUD arithmetic
- * bugs 1:1 (documented inline). These are preserved deliberately.
+ * Builds the network-diagnostics HUD (ren_ShowNetworkStats): a 4-line summary
+ * block over a per-client table with 7 + N columns (index, nickname, ping,
+ * maxsp, data, behind, avail, then one ack column per client), measures the
+ * columns with a Courier New font, draws a translucent backdrop quad, renders
+ * the cells (numbers right-justified) and strokes a white border. Runs
+ * entirely under the driver lock.
  */
 void CSimDriver::DrawNetworkStats(
   CD3DPrimBatcher* batcher, const float anchorX, const float anchorY, const float scaleX, const float scaleY
@@ -1875,16 +1890,23 @@ void CSimDriver::DrawNetworkStats(
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock)); // 0x0073E014 do_lock / 0x0073F40D unlock
 
-  // 10pt Courier New font handle (0x0073E042). Held as a raw retained handle;
+  // Courier New font handle (0x0073E042). Held as a raw retained handle;
   // released explicitly at function exit (0x0073F3D3 releases the CountedPtr).
-  boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(10, "Courier New");
+  // Retail asks for a fixed 10pt (0x0073E03F: lea ecx, [esi+0xA]).
+  // [DELIBERATE-FIX] The point size follows the profile's ui_scale option so
+  // the HUD is as large as the rest of the UI; every measurement below comes
+  // from the font, so the whole panel scales with it. Pass 10 to go back to
+  // retail's size.
+  const int fontPoints = std::max(1, static_cast<int>(std::lround(10.0f * CurrentUiScale())));
+  boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(fontPoints, "Courier New");
   CD3DFont* const font = rawFont.px;
 
   const std::size_t numClients = mClientManager->NumberOfClients(); // 0x0073E057 (mgr slot 6)
 
-  // ---- Table columns: 8 inner string vectors. 0x0073E052..0x0073E681.
-  constexpr int kNumColumns = 8;
-  msvc8::vector<msvc8::vector<msvc8::string>> columns(kNumColumns);
+  // ---- Table columns: index, nickname, ping, maxsp, data, behind, avail, then
+  // one ack column per client (0x0073E078: numClients + 7 inner vectors).
+  constexpr std::size_t kFirstAckColumn = 7;
+  msvc8::vector<msvc8::vector<msvc8::string>> columns(numClients + kFirstAckColumn);
 
   // Header row (0x0073E098..0x0073E28F).
   columns[0].push_back(msvc8::string(""));        // 0x0073E098 index header (empty)
@@ -1895,73 +1917,66 @@ void CSimDriver::DrawNetworkStats(
   columns[5].push_back(msvc8::string(" behind")); // 0x0073E23E
   columns[6].push_back(msvc8::string(" avail"));  // 0x0073E28F
 
-  // Index column body: one " %3d" per client (0x0073E2F0..0x0073E357).
+  // Each ack column is headed by the index of the client whose data it
+  // counts (0x0073E2E8..0x0073E357: " %3d" into columns[7 + i]).
   for (std::size_t i = 0; i < numClients; ++i) {
-    columns[0].push_back(gpg::STR_Printf(" %3d", static_cast<int>(i))); // 0x0073E310
+    columns[kFirstAckColumn + i].push_back(gpg::STR_Printf(" %3d", static_cast<int>(i))); // 0x0073E310
   }
+
+  // Beat cells are relative: data and behind to the beat we last dispatched
+  // (mDispatchBeat - 1, loaded at 0x0073E091 into the slot 0x0073E499 and
+  // 0x0073E4DC read), avail and the acks to the beat that client last
+  // dispatched (GetLatestBeatDispatchedRemote at 0x0073E3F2).
+  const std::int32_t lastDispatchedBeat = mDispatchBeat - 1;
 
   // Per-client body rows (0x0073E367..0x0073E681).
   for (std::size_t i = 0; i < numClients; ++i) {
     IClient* const client = mClientManager->GetClient(static_cast<int>(i)); // 0x0073E374 (mgr slot 7)
 
-    columns[7].push_back(gpg::STR_Printf("%d: ", static_cast<int>(i))); // 0x0073E38B (acks column label)
+    columns[0].push_back(gpg::STR_Printf("%d: ", static_cast<int>(i))); // 0x0073E38B (row label)
     columns[1].push_back(client->GetNickname());                        // 0x0073E3D0 (nickname)
 
-    if (client->NoEjectionPending()) { // 0x0073E3DE (client slot 1)
-      // Retail captures the latest-dispatched-remote beat here but never uses it.
-      std::uint32_t latestBeatDispatchedRemote = 0;
-      client->GetLatestBeatDispatchedRemote(latestBeatDispatchedRemote); // 0x0073E3F2 (client slot 5)
-      (void)latestBeatDispatchedRemote; // value intentionally unused (matches retail)
-
-      const float ping = client->GetStatusMetricA();          // 0x0073E3FB (client slot 2)
-      columns[2].push_back(gpg::STR_Printf(" %7.3fms", ping)); // 0x0073E40D
-
-      columns[3].push_back(gpg::STR_Printf(" %+3d", client->GetSimRate())); // 0x0073E455 (client slot 12)
-
-      // "data" column (0x0073E489..0x0073E4BC).
-      std::uint32_t queuedBeat = 0;
-      client->GetQueuedBeat(queuedBeat); // 0x0073E495 (client slot 9)
-      // Latent 2007 debug-HUD bug preserved 1:1 (see 0x0073E499): subtracts the
-      // CSimDriver 'this' pointer from a beat counter.
-      const int dataCell =
-        static_cast<int>(queuedBeat - static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this)));
-      columns[4].push_back(gpg::STR_Printf(" %3d", dataCell)); // 0x0073E4A8
-
-      // "behind" column (0x0073E4DC..0x0073E502).
-      // Latent 2007 debug-HUD bug preserved 1:1 (see 0x0073E4E0): subtracts the
-      // client count from the 'this' pointer.
-      const int behindCell = static_cast<int>(
-        static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this)) - static_cast<std::uint32_t>(numClients));
-      columns[5].push_back(gpg::STR_Printf(" %3d", behindCell)); // 0x0073E4EF
-
-      // "avail" column (0x0073E522..0x0073E558).
-      std::uint32_t availableBeatRemote = 0;
-      client->GetAvailableBeatRemote(availableBeatRemote); // 0x0073E531 (client slot 6)
-      // Latent 2007 debug-HUD bug preserved 1:1 (see 0x0073E535): the subtrahend
-      // is an uninitialized stack dword in retail; reproduced here as 0.
-      const std::uint32_t kUninitializedAvailSubtrahend = 0;
-      const int availCell = static_cast<int>(availableBeatRemote - kUninitializedAvailSubtrahend);
-      columns[6].push_back(gpg::STR_Printf(" %3d", availCell)); // 0x0073E544
-
-      // "acks" column body (0x0073E578..0x0073E665).
-      const msvc8::vector<int32_t>* const acks = client->GetLatestAcksVector(); // 0x0073E57F (client slot 4)
-      if (!acks->empty()) {
-        for (std::size_t j = 0; j < acks->size(); ++j) {
-          // Latent 2007 debug-HUD bug preserved 1:1 (see 0x0073E5C0): subtracts the
-          // address of the driver mutex cell from each ack value.
-          const int ackCell = static_cast<int>(
-            static_cast<std::uint32_t>((*acks)[j])
-            - static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&mLock)));
-          columns[7].push_back(gpg::STR_Printf(" %3d", ackCell)); // 0x0073E5D3
-        }
-      } else {
-        columns[7].push_back(msvc8::string("")); // 0x0073E620 (empty ack cell)
-      }
-    } else {
-      // Ejection pending: pad columns 2..6 with empty cells so row counts stay
-      // aligned (0x0073E929..0x0073E9AB).
-      for (int c = 2; c <= 6; ++c) {
+    if (!client->NoEjectionPending()) { // 0x0073E3DE (client slot 1)
+      // Ejection pending: every remaining column, the ack columns included,
+      // gets an empty cell so the rows stay aligned (0x0073E929..0x0073E9AB).
+      for (std::size_t c = 2; c < columns.size(); ++c) {
         columns[c].push_back(msvc8::string("")); // 0x0073E96D
+      }
+      continue;
+    }
+
+    std::uint32_t remoteDispatchedBeat = 0;
+    client->GetLatestBeatDispatchedRemote(remoteDispatchedBeat); // 0x0073E3F2 (client slot 5)
+    const int remoteDispatched = static_cast<int>(remoteDispatchedBeat);
+
+    const float ping = client->GetStatusMetricA();          // 0x0073E3FB (client slot 2)
+    columns[2].push_back(gpg::STR_Printf(" %7.3fms", ping)); // 0x0073E40D
+
+    columns[3].push_back(gpg::STR_Printf(" %+3d", client->GetSimRate())); // 0x0073E455 (client slot 12)
+
+    // data: how far this client's queued commands run past our last dispatched beat.
+    std::uint32_t queuedBeat = 0;
+    client->GetQueuedBeat(queuedBeat); // 0x0073E495 (client slot 9)
+    columns[4].push_back(gpg::STR_Printf(" %3d", static_cast<int>(queuedBeat) - lastDispatchedBeat)); // 0x0073E499
+
+    // behind: how many beats this client's dispatch trails ours.
+    columns[5].push_back(gpg::STR_Printf(" %3d", lastDispatchedBeat - remoteDispatched)); // 0x0073E4E0
+
+    // avail: beats the client has available but not yet dispatched.
+    std::uint32_t availableBeatRemote = 0;
+    client->GetAvailableBeatRemote(availableBeatRemote); // 0x0073E531 (client slot 6)
+    columns[6].push_back(gpg::STR_Printf(" %3d", static_cast<int>(availableBeatRemote) - remoteDispatched)); // 0x0073E535
+
+    // One ack cell per client j: how far this client has acked j's data past
+    // its own dispatch. A client being ejected gets a blank cell
+    // (0x0073E5A1 GetClient(j), 0x0073E5AA NoEjectionPending, 0x0073E600).
+    const msvc8::vector<int32_t>* const acks = client->GetLatestAcksVector(); // 0x0073E57F (client slot 4)
+    for (std::size_t j = 0; j < numClients; ++j) {
+      msvc8::vector<msvc8::string>& ackColumn = columns[kFirstAckColumn + j];
+      if (mClientManager->GetClient(static_cast<int>(j))->NoEjectionPending()) {
+        ackColumn.push_back(gpg::STR_Printf(" %3d", (*acks)[j] - remoteDispatched)); // 0x0073E5C0
+      } else {
+        ackColumn.push_back(msvc8::string("")); // 0x0073E620
       }
     }
   }
@@ -2003,17 +2018,16 @@ void CSimDriver::DrawNetworkStats(
   // ---- Per-column max-advance measurement (0x0073E9BC..0x0073EB2F).
   // colWidths[c] = max advance across every cell in column c. GetAdvance's flags
   // argument is -1 (canonical "whole string" form; matches sibling HUDs).
-  std::vector<float> colWidths(static_cast<std::size_t>(kNumColumns), 0.0f); // 0x0073E9CD
+  std::vector<float> colWidths(columns.size(), 0.0f); // 0x0073E9CD
 
   // Running total table width, seeded with 6.0 (flt_E4F71C @0x0073E90E).
   float totalWidth = 6.0f;
-  for (int c = 0; c < kNumColumns; ++c) {
+  for (std::size_t c = 0; c < columns.size(); ++c) { // trip = columns.size() (0x0073E9B0)
     for (const msvc8::string& cell : columns[c]) {
       const float advance = font->GetAdvance(cell.c_str(), -1); // 0x0073EA68
-      colWidths[static_cast<std::size_t>(c)] =
-        std::max(colWidths[static_cast<std::size_t>(c)], advance); // 0x0073EA75..0x0073EA7F
+      colWidths[c] = std::max(colWidths[c], advance);           // 0x0073EA75..0x0073EA7F
     }
-    totalWidth += colWidths[static_cast<std::size_t>(c)]; // 0x0073EA9B
+    totalWidth += colWidths[c]; // 0x0073EA9B
   }
 
   // Summary lines are measured (advance + 3.0) into a running max, but the retail
@@ -2057,20 +2071,19 @@ void CSimDriver::DrawNetworkStats(
   }
 
   // ---- Text rendering (0x0073EDAD..0x0073F0B2).
-  // Glyph pen advances along +X; the row axis advances down-screen. The retail
-  // frame threads these vectors and the glyph-scale scalar through registers in a
-  // way that could not be pinned to specific lanes from the disassembly.
-  const Vector3f xAxis{1.0f, 0.0f, 0.0f}; // ds:a7 == 1.0 (glyph advance basis)
-  // UNRESOLVED: yAxis lane values not provable from the register-threaded Render
-  // frame (asm 0x0073EE0E..0x0073EE77 / 0x0073EFCB..0x0073F047). Using the
-  // canonical down-screen row axis from sibling HUD Render call sites.
-  const Vector3f yAxis{0.0f, 1.0f, 0.0f};
+  // Glyph axes. Both Render calls build them the same way: flt_E4F6E8 (-1.0)
+  // into lane y of the vector pushed as yAxis (0x0073EDF2 -> 0x0073EE0E, zeros
+  // at 0x0073EE38/0x0073EE41), flt_DFEC20 (1.0) into lane x of the one passed
+  // in ebx as xAxis (0x0073EE17 -> 0x0073EE1F, lea ebx at 0x0073EE77); again at
+  // 0x0073EFB3/0x0073EFD4. The glyph y axis points up, as in every other
+  // screen-space Render call (CD3DFont.cpp, Sim.cpp's screen text); +1 drew
+  // each glyph upside down.
+  const Vector3f xAxis{1.0f, 0.0f, 0.0f};
+  const Vector3f yAxis{0.0f, -1.0f, 0.0f};
   constexpr std::uint32_t kTextColor = 0xFFFFFFFFu; // 0x0073EE04 (a5 == 0xFFFFFFFF)
-  // UNRESOLVED: glyph-scale scalar. Retail loads flt_E4F6E8 (-1.0) and a7 (1.0)
-  // into adjacent scalar/vector lanes (asm 0x0073EDF2 / 0x0073EE17); the exact
-  // scalar passed to Render's glyphScale param is not provable from this frame.
-  // Using 0.0f ("natural glyph size") to match sibling debug-HUD Render sites.
-  constexpr float kGlyphScale = /* UNRESOLVED: Render glyphScale, asm 0x0073EE1F */ 0.0f;
+  // Render's glyph-scale parameter is unused by CD3DFont::Render (see
+  // CD3DFont.cpp); 0.0f matches the sibling debug-HUD Render sites.
+  constexpr float kGlyphScale = 0.0f;
   // Render's maxAdvance sentinel is the "NaN_206" global (asm 0x0073EDEC /
   // 0x0073EF9F) -- a quiet NaN meaning "no advance limit", matching sibling
   // debug-HUD Render call sites.
@@ -2098,8 +2111,8 @@ void CSimDriver::DrawNetworkStats(
   const std::size_t tableRowCount = columns[0].size(); // outer trip = len(columns[0]) (0x0073EEF2..0x0073EF08)
   for (std::size_t row = 0; row < tableRowCount; ++row) {
     float cellX = rectLeft + 3.0f; // running X base, reset per row (0x0073EF22..0x0073EF44)
-    for (int c = 0; c < kNumColumns; ++c) {
-      const msvc8::vector<msvc8::string>& column = columns[static_cast<std::size_t>(c)];
+    for (std::size_t c = 0; c < columns.size(); ++c) {
+      const msvc8::vector<msvc8::string>& column = columns[c];
       // The retail grid is rectangular (all data columns carry one row per
       // client); shorter columns simply contribute an empty cell for the tail
       // rows rather than reading past their storage.
@@ -2112,14 +2125,14 @@ void CSimDriver::DrawNetworkStats(
       } else {
         // Numeric columns are right-justified within their slot (0x0073EF81..0x0073EF94).
         const float advance = font->GetAdvance(cell.c_str(), -1); // 0x0073EF7C
-        originX = cellX + colWidths[static_cast<std::size_t>(c)] - advance;
+        originX = cellX + colWidths[c] - advance;
       }
 
       const Vector3f origin{originX, penY, 0.0f}; // 0x0073F009..0x0073F01B
       (void)font->Render(
         cell.c_str(), batcher, origin, xAxis, yAxis, kTextColor, kGlyphScale, kNoMaxAdvance); // 0x0073F056
 
-      cellX += colWidths[static_cast<std::size_t>(c)]; // running X += column width (0x0073F05F..0x0073F064)
+      cellX += colWidths[c]; // running X += column width (0x0073F05F..0x0073F064)
     }
     penY += rowStep; // per-row Y advance (0x0073F088..0x0073F0A7)
   }
