@@ -572,13 +572,14 @@ namespace moho
         }
 
         if (!mBuildHelper.UpdateWorkProgress()) {
-          // Not finished: keep waiting unless we are inheriting an enhancement
-          // whose subject has since gone away or stopped enhancing.
+          // Not finished: keep working. The one exception is an inherited
+          // enhancement whose subject has stopped enhancing (0x005F9D1D tests
+          // UNITSTATE_Enhancing and returns 1 while it is still set).
           if (!mInheritingWork) {
             return 1;
           }
           Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr();
-          if (buildTarget == nullptr || !buildTarget->IsUnitState(UNITSTATE_Enhancing)) {
+          if (buildTarget == nullptr || buildTarget->IsUnitState(UNITSTATE_Enhancing)) {
             return 1;
           }
         }
