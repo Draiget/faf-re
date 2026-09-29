@@ -121,6 +121,36 @@ namespace moho
     [[nodiscard]] BVIntSet& Bits() noexcept { return mBits; }
 
     /**
+     * What `Add` returns: the set the value now sits in, its position there,
+     * and whether it was newly inserted (0x10 bytes). The set pointer is
+     * `&mBits`, stored twice: once for the set, once inside the position.
+     */
+    struct AddResult
+    {
+      BVIntSet* mSet;          // +0x00
+      BVIntSetIndex mPosition; // +0x04
+      bool mWasInserted;       // +0x0C
+    };
+
+    /**
+     * Address: 0x006E5660 (FUN_006E5660, BVSet<EntId,EntIdUniverse>::Add -
+     *   `this` in ecx, `BVIntSet::Add` (0x004036A0) on `this+8`, then the
+     *   16-byte result written through the hidden return slot. Out-of-line
+     *   only in `CDecoder::DecodeEntIdSet` (0x006E4F5F); its other adds are
+     *   inlined straight to `BVIntSet::Add`. Formerly
+     *   `AddEntityIdSetValueWithScratch` over a `BVIntSetAddScratch` in
+     *   CDecoder.cpp.)
+     *
+     * What it does:
+     * Inserts `value` into the set.
+     */
+    AddResult Add(const T value)
+    {
+      const BVIntSetAddResult added = mBits.Add(static_cast<unsigned int>(value));
+      return AddResult{added.mOwnerSet, added, added.mWasInserted};
+    }
+
+    /**
      * Iterates every set value in `mBits` and invokes `fn(value)` for each.
      * Mirrors the legacy `BVSet::ForEachValue` API used across recovered
      * sim/UI code that walks selection/category sets.

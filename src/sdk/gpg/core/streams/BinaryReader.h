@@ -45,22 +45,6 @@ namespace gpg
         void Read(char* buf, size_t size) const;
 
         /**
-         * Address: 0x006E57C0 (FUN_006E57C0)
-         *
-         * IDA signature:
-         * _DWORD * __callcnv_F3 sub_6E57C0@<eax>(int a1@<eax>, _DWORD *a2@<ecx>);
-         *
-         * What it does:
-         * Reads exactly 16 bytes into `outBytes` using an inline fast path: if
-         * the stream's read window already holds >= 16 cached bytes the body
-         * copies 4 dwords directly and advances `mReadHead` by 16; otherwise it
-         * falls back to the stream's virtual `VirtRead` slot and throws
-         * `PrematureEOF` on short read. Returns `outBytes` for the caller's
-         * compound expression form.
-         */
-        std::uint32_t* ReadBytes16(std::uint32_t* outBytes) const;
-
-        /**
          * Address: 0x00540A10 (FUN_00540A10, gpg::BinaryReader::ReadInt)
          *
          * int *
@@ -133,7 +117,18 @@ namespace gpg
         }
 
         /**
-         * Value-returning helper: reads T by value.
+         * Address: 0x006E57C0 (FUN_006E57C0, ReadExact<gpg::MD5Digest>() - result in the
+         *   hidden return slot (ecx), reader in eax: four dwords from the read window
+         *   when 16 bytes are buffered, otherwise `VirtRead` + `PrematureEOF`.
+         *   `CDecoder::DecodeVerifyChecksum`. Formerly `BinaryReader::ReadBytes16`.)
+         * Address: 0x006E5830 (FUN_006E5830, ReadExact<moho::SCoordsVec2>() - the same
+         *   for 8 bytes. The original seeds the result with NaN first (the value
+         *   type's construction); a read that fails throws, so the seed is never
+         *   observed. `CDecoder::DecodeCreateUnit`. Formerly `ReadCoordsVec2OrThrow`
+         *   in CDecoder.cpp.)
+         *
+         * What it does:
+         * Reads one `T` by value.
          */
         template <class T>
         T ReadExact() const

@@ -85,60 +85,6 @@ namespace
   {
     throw XDecoderMessageError(message);
   }
-
-  struct BVIntSetAddScratch
-  {
-    moho::BVIntSet* ownerSetAlias0 = nullptr; // +0x00
-    moho::BVIntSet* ownerSetAlias1 = nullptr; // +0x04
-    std::uint32_t value = 0;                  // +0x08
-    std::uint8_t wasInserted = 0;             // +0x0C
-    std::uint8_t pad_0D_0F[0x03]{};
-  };
-  static_assert(sizeof(BVIntSetAddScratch) == 0x10, "BVIntSetAddScratch size must be 0x10");
-
-  /**
-   * Address: 0x006E5660 (FUN_006E5660, func_Moho_SetSetSize)
-   *
-   * What it does:
-   * Adds one entity-id value into one decoded `BVSet` payload and mirrors the
-   * binary helper's widened 16-byte scratch-lane writeback pattern.
-   */
-  [[nodiscard]] BVIntSetAddScratch* AddEntityIdSetValueWithScratch(
-    BVIntSetAddScratch* const outRuntime,
-    moho::BVSet<moho::EntId, moho::EntIdUniverse>* const set,
-    const std::uint32_t entityId
-  ) noexcept
-  {
-    const moho::BVIntSetAddResult addResult = set->Bits().Add(entityId);
-    outRuntime->ownerSetAlias0 = addResult.mOwnerSet;
-    outRuntime->ownerSetAlias1 = addResult.mOwnerSet;
-    outRuntime->value = addResult.mValue;
-    outRuntime->wasInserted = static_cast<std::uint8_t>(addResult.mWasInserted ? 1u : 0u);
-    return outRuntime;
-  }
-
-  /**
-   * Address: 0x006E5830 (FUN_006E5830)
-   *
-   * What it does:
-   * Seeds one `SCoordsVec2` with NaN fallback values, then reads the
-   * 8-byte coordinate payload from binary-stream storage.
-   */
-  [[nodiscard]] moho::SCoordsVec2* ReadCoordsVec2OrThrow(
-    gpg::BinaryReader& reader,
-    moho::SCoordsVec2* const outCoords
-  )
-  {
-    if (outCoords == nullptr) {
-      return nullptr;
-    }
-
-    const float nan = gpg::NaN;
-    outCoords->x = nan;
-    outCoords->z = nan;
-    reader.Read(reinterpret_cast<char*>(outCoords), sizeof(moho::SCoordsVec2));
-    return outCoords;
-  }
 } // namespace
 
 namespace moho
@@ -153,11 +99,14 @@ namespace moho
    * sink/rules/lua decode dependencies.
    */
   CDecoder::CDecoder(
-    msvc8::auto_ptr<gpg::Stream>& stream, ICommandSink* sink, RRuleGameRules* rules, LuaPlus::LuaState* luaState
+    ICommandSink* const sink,
+    msvc8::auto_ptr<gpg::Stream>& stream,
+    RRuleGameRules* const rules,
+    LuaPlus::LuaState* const luaState
   )
     : IMessageReceiver()
     , mSink(sink)
-    , mStream(stream.release())
+    , mStream(stream)
     , mRules(rules)
     , mLuaState(luaState)
   {}
@@ -167,13 +116,10 @@ namespace moho
    * Mangled: ??1CDecoder@Moho@@QAE@XZ
    *
    * What it does:
-   * Releases owned decode stream and unlinks receiver attachments.
+   * Destroys `mStream` (the recording stream, if any) as an ordinary member
+   * and unlinks the receiver from its dispatcher. The body is empty.
    */
-  CDecoder::~CDecoder()
-  {
-    delete mStream;
-    mStream = nullptr;
-  }
+  CDecoder::~CDecoder() = default;
 
   /**
    * Address: 0x006E40F0 (FUN_006E40F0)
@@ -187,17 +133,9 @@ namespace moho
   {
     (void)dispatcher;
 
-    if (mStream && message && message->mBuff.start_) {
-      const char* const begin = message->mBuff.start_;
-      const char* const end = message->mBuff.end_;
-      const std::size_t size = static_cast<std::size_t>(end - begin);
-
-      if (size <= mStream->LeftToWrite()) {
-        std::memcpy(mStream->mWriteHead, begin, size);
-        mStream->mWriteHead += size;
-      } else {
-        mStream->VirtWrite(begin, size);
-      }
+    // Record the raw message first (`Stream::Write`, inlined at 0x006E4100).
+    if (mStream.get() != nullptr) {
+      mStream->Write(message->mBuff.start_, message->mBuff.Size());
     }
 
     DecodeMessage(*message);
@@ -369,11 +307,8 @@ namespace moho
    */
   void CDecoder::DecodeVerifyChecksum(gpg::BinaryReader& reader)
   {
-    gpg::MD5Digest digest{};
+    const gpg::MD5Digest digest = reader.ReadExact<gpg::MD5Digest>();
     CSeqNo beat = 0;
-    // Routes through the 16-byte specialized helper so the linker preserves
-    // the compiler-emitted body at FUN_006E57C0 (see BinaryReader::ReadBytes16).
-    (void)reader.ReadBytes16(digest.vals);
     reader.ReadExact(beat);
     mSink->VerifyChecksum(digest, beat);
   }
@@ -423,12 +358,11 @@ namespace moho
   {
     std::uint8_t armyIndex = 0;
     msvc8::string blueprintId;
-    SCoordsVec2 pos{};
     float heading = 0.0f;
 
     reader.ReadExact(armyIndex);
     reader.ReadString(&blueprintId);
-    (void)ReadCoordsVec2OrThrow(reader, &pos);
+    const SCoordsVec2 pos = reader.ReadExact<SCoordsVec2>();
     reader.ReadExact(heading);
 
     RResId resId{};
@@ -655,8 +589,7 @@ namespace moho
    */
   void CDecoder::DecodeEndGame()
   {
-    delete mStream;
-    mStream = nullptr;
+    mStream.reset();
     mSink->EndGame();
   }
 
@@ -681,12 +614,13 @@ namespace moho
 
     const auto firstEntityId = static_cast<std::uint32_t>(rawIds[0]);
     const auto firstType = firstEntityId >> 28;
-    (void)entities.Bits().Add(firstEntityId);
+    entities.Add(rawIds[0]);
 
     if (count > 1u) {
-      BVIntSetAddScratch tailRuntime{};
-      const auto tailEntityId = static_cast<std::uint32_t>(rawIds[static_cast<std::size_t>(count - 1u)]);
-      (void)AddEntityIdSetValueWithScratch(&tailRuntime, &entities, tailEntityId);
+      // The ids arrive sorted, so adding the last one second sizes the bit
+      // set once. It is also the one `Add` the compiler left out of line
+      // (0x006E4F5F -> 0x006E5660), and it is not type-checked.
+      entities.Add(rawIds[static_cast<std::size_t>(count - 1u)]);
 
       for (std::uint32_t i = 1u; i < (count - 1u); ++i) {
         const auto entityId = static_cast<std::uint32_t>(rawIds[static_cast<std::size_t>(i)]);
@@ -701,7 +635,7 @@ namespace moho
           );
         }
 
-        (void)entities.Bits().Add(entityId);
+        entities.Add(rawIds[static_cast<std::size_t>(i)]);
       }
     }
 

@@ -43,7 +43,7 @@ namespace moho
      * sink/rules/lua decode dependencies.
      */
     CDecoder(
-      msvc8::auto_ptr<gpg::Stream>& stream, ICommandSink* sink, RRuleGameRules* rules, LuaPlus::LuaState* luaState
+      ICommandSink* sink, msvc8::auto_ptr<gpg::Stream>& stream, RRuleGameRules* rules, LuaPlus::LuaState* luaState
     );
 
     /**
@@ -51,7 +51,8 @@ namespace moho
      * Mangled: ??1CDecoder@Moho@@QAE@XZ
      *
      * What it does:
-     * Releases owned decode stream and unlinks receiver attachments.
+     * Destroys `mStream` (the recording stream, if any) as an ordinary member
+     * and unlinks the receiver from its dispatcher. The body is empty.
      */
     ~CDecoder();
 
@@ -227,8 +228,11 @@ namespace moho
     void DecodeLuaObject(gpg::BinaryReader& reader, LuaPlus::LuaObject& out);
 
   public:
-    ICommandSink* mSink = nullptr;          // +0x0C
-    gpg::Stream* mStream = nullptr;         // +0x10
+    ICommandSink* mSink = nullptr;          // +0x0C  the sim
+    // +0x10  the replay recording: every received message is appended to it,
+    // flushed at each `CMDST_Advance` and closed at `CMDST_EndGame`. Null when
+    // the session does not record.
+    msvc8::auto_ptr<gpg::Stream> mStream;
     RRuleGameRules* mRules = nullptr;       // +0x14
     LuaPlus::LuaState* mLuaState = nullptr; // +0x18
   };

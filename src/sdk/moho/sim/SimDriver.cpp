@@ -1190,7 +1190,7 @@ void CSimDriver::ThreadCreateSim()
 
   // The decoder takes the command stream (0x0073D5A4 moves it out of
   // `mStream`) and replays it into the sim.
-  mDecoder.reset(new CDecoder(mStream, mSim.get(), mSim->mRules, mSim->mLuaState));
+  mDecoder.reset(new CDecoder(mSim.get(), mStream, mSim->mRules, mSim->mLuaState));
   mClientManager->PushReceiver(0u, kSimCommandMessageUpperBound, mDecoder.get());
 
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
