@@ -938,47 +938,6 @@ namespace
     return lastLod->cutoff + moho::ren_MeshDissolve;
   }
 
-  [[nodiscard]] moho::MeshInstance::ListLink* MeshInstanceLink(moho::MeshInstance* const instance) noexcept
-  {
-    if (!instance) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::MeshInstance::ListLink*>(&instance->linkPrev);
-  }
-
-  [[nodiscard]] moho::MeshInstance* MeshInstanceFromLink(moho::MeshInstance::ListLink* const link) noexcept
-  {
-    if (!link) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::MeshInstance*>(
-      reinterpret_cast<std::uint8_t*>(link) - offsetof(moho::MeshInstance, linkPrev)
-    );
-  }
-
-  void RemoveLinkFromList(moho::MeshInstance::ListLink* const link) noexcept
-  {
-    if (!link || !link->mPrev || !link->mNext) {
-      return;
-    }
-
-    link->ListUnlink();
-  }
-
-  void InsertLinkBefore(moho::MeshInstance::ListLink* const position, moho::MeshInstance::ListLink* const link) noexcept
-  {
-    if (!position || !link || !position->mPrev) {
-      return;
-    }
-
-    link->mPrev = position->mPrev;
-    link->mNext = position;
-    position->mPrev->mNext = link;
-    position->mPrev = link;
-  }
-
   // The mesh-cache tree is `msvc8::map<MeshKey, boost::weak_ptr<Mesh>,
   // MeshKeyLess>` (Mesh.h). Its storage lifecycle - header sentinel
   // allocation (0x007E4770/0x007E2B50), buy_node (0x007E6090),
@@ -1001,17 +960,18 @@ namespace
   // second time over the same nodes, so they are gone; call sites use the
   // container operations directly.
 
-  void ResetLodBatchesForInstanceLinkList(moho::MeshInstance::ListLink& head) noexcept
+  /**
+   * Drops every live instance's cached LOD batches -- the loop `Reset`
+   * (0x007E1370) and `Shutdown` (0x007E1510) both carry inline: walk the
+   * ring, downcast each node to its `MeshInstance` (`node - 4`, the base's
+   * offset), and reset every LOD of an instance that has a mesh.
+   */
+  void ResetInstanceBatches(moho::TDatList<moho::MeshInstance, void>& instances) noexcept
   {
-    for (moho::MeshInstance::ListLink* link = head.mNext; link && link != &head; link = link->mNext) {
-      moho::MeshInstance* const instance = MeshInstanceFromLink(link);
-      if (!instance || !instance->mesh) {
-        continue;
-      }
-
-      for (moho::MeshLOD** lod = instance->mesh->lods.begin(); lod && lod != instance->mesh->lods.end(); ++lod) {
-        if (*lod) {
-          (*lod)->ResetBatches();
+    for (moho::MeshInstance* const instance : instances.owners()) {
+      if (moho::Mesh* const mesh = instance->mesh.get(); mesh != nullptr) {
+        for (moho::MeshLOD* const lod : mesh->lods) {
+          lod->ResetBatches();
         }
       }
     }
@@ -2879,8 +2839,7 @@ namespace moho
     const bool isStaticPoseArg,
     const boost::shared_ptr<Mesh> meshArg
   )
-    : linkPrev(nullptr)
-    , linkNext(nullptr)
+    : TDatListItem<MeshInstance, void>()
     , db()
     , mesh(meshArg)
     , color(colorArg)
@@ -2934,10 +2893,6 @@ namespace moho
   {
     sphere.Center = {NanValue(), NanValue(), NanValue()};
     sphere.Radius = NanValue();
-    MeshInstance::ListLink* const selfLink = MeshInstanceLink(this);
-    linkPrev = selfLink;
-    linkNext = selfLink;
-
     const boost::shared_ptr<const CAniSkel> skeleton = ResolveInitialPoseSkeleton(meshArg, isStaticPoseArg);
     curPose.reset(new CAniPose(skeleton, 1.0f));
 
@@ -2954,7 +2909,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x007DE550 (FUN_007DE550, ??1MeshInstance@Moho@@QAE@XZ)
+   * Address: 0x007DE550 (FUN_007DE550, ??1MeshInstance@Moho@@UAE@XZ)
+   * Address: 0x007DE510 (FUN_007DE510, the scalar deleting destructor in
+   * vftable 0xE3F48C's only slot: this body, then `operator delete` on flag
+   * bit 0. `delete instance` reaches it; it was hand-written as a virtual
+   * `Release(int)`.)
    */
   MeshInstance::~MeshInstance()
   {
@@ -2963,27 +2922,9 @@ namespace moho
       gpg::Warnf("[PVMESH] - inst=%p color=%08X live=%u", static_cast<void*>(this),
                  static_cast<unsigned>(color), static_cast<unsigned>(ProbePreviewMeshSet().size()));
     }
-    curPose.reset();
-    endPose.reset();
-    startPose.reset();
-    mesh.reset();
-    RemoveLinkFromList(MeshInstanceLink(this));
-  }
-
-  /**
-   * Address: 0x007DE510 (FUN_007DE510, deleting thunk)
-   *
-   * What it does:
-   * Runs destructor and conditionally frees memory when low flag bit is set.
-   */
-  void MeshInstance::Release(const std::int32_t destroyNow)
-  {
-    if ((destroyNow & 0x01) != 0) {
-      delete this;
-      return;
-    }
-
-    this->~MeshInstance();
+    // The rest is member destruction, as 0x007DE550 is: the pose and mesh
+    // shared_ptrs in reverse order, `db` (its inlined `if (mDb)` unregister at
+    // 0x007DE663), then the TDatListItem base's unlink.
   }
 
   /**
@@ -3492,7 +3433,7 @@ namespace moho
     , meshEnvironmentTex()
     , anisotropiclookupTex()
     , insectlookupTex()
-    , instanceListHead()
+    , instances()
     , instanceListSize(0)
     , deltaFrame(0.0f)
     , instanceListStateFlags(0)
@@ -3514,7 +3455,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x007DF330 (FUN_007DF330, ??1MeshRenderer@Moho@@QAE@XZ)
+   * Address: 0x007DF330 (FUN_007DF330, ??1MeshRenderer@Moho@@UAE@XZ)
+   * Address: 0x007DF260 (FUN_007DF260, the scalar deleting destructor in
+   * vftable 0xE3F494's only slot; it was hand-written as a static
+   * `DeleteWithFlag`.)
    */
   MeshRenderer::~MeshRenderer()
   {
@@ -3543,35 +3487,12 @@ namespace moho
     // ..., insectlookupTex, anisotropiclookupTex, meshEnvironmentTex,
     // dissolveTex, meshCacheTree, meshEnvironment - no explicit call needed
     // for either, and none for meshCacheTree specifically fixes the
-    // ordering bug. `instanceListHead` unlinks the same way, in its own
+    // ordering bug. `instances` unlinks the same way, in its own
     // destructor between `meshes` and the textures (0x007DF2B0 is that
     // destructor's unwind copy).
     if (gMeshRendererInstance == this) {
       gMeshRendererInstance = nullptr;
     }
-  }
-
-  /**
-   * Address: 0x007DF260 (FUN_007DF260, Moho::MeshRenderer::operator delete)
-   *
-   * What it does:
-   * Implements deleting-dtor thunk semantics for mesh-renderer runtime lanes.
-   */
-  MeshRenderer* MeshRenderer::DeleteWithFlag(
-    MeshRenderer* const object,
-    const std::uint8_t deleteFlags
-  ) noexcept
-  {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    object->~MeshRenderer();
-    if ((deleteFlags & 1u) != 0u) {
-      operator delete(object);
-    }
-
-    return object;
   }
 
   /**
@@ -3599,7 +3520,7 @@ namespace moho
     meshEnvironmentTex.reset();
     anisotropiclookupTex.reset();
     insectlookupTex.reset();
-    ResetLodBatchesForInstanceLinkList(instanceListHead);
+    ResetInstanceBatches(instances);
     meshes.clear();
 
     // FAF: the default-pool buffers the hardware batches share go too; a
@@ -3619,8 +3540,8 @@ namespace moho
     meshEnvironmentTex.reset();
     anisotropiclookupTex.reset();
     insectlookupTex.reset();
-    ResetLodBatchesForInstanceLinkList(instanceListHead);
-    RemoveLinkFromList(&instanceListHead);
+    ResetInstanceBatches(instances);
+    instances.ListUnlink();
     meshes.clear();
 
     // FAF: see Reset.
@@ -3736,9 +3657,7 @@ namespace moho
     }
 
     MeshInstance* const instance = new MeshInstance(scale, &meshSpatialDb, gameTick, color, isStaticPose, meshArg);
-    MeshInstance::ListLink* const instanceLink = MeshInstanceLink(instance);
-    RemoveLinkFromList(instanceLink);
-    InsertLinkBefore(&instanceListHead, instanceLink);
+    instance->ListLinkBefore(&instances);
     return instance;
   }
 

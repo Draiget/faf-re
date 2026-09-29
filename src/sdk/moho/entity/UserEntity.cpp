@@ -691,9 +691,7 @@ namespace moho
    */
   void UserEntity::DestroyMeshInstance()
   {
-    if (mMeshInstance) {
-      mMeshInstance->Release(1);
-    }
+    delete mMeshInstance;
 
     mMeshInstance = nullptr;
     mPosePrimary.reset();

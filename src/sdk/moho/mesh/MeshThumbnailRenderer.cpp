@@ -454,7 +454,7 @@ namespace moho
 
     // Texture-sheet upload sequence (surface acquire + device update) is still
     // being lifted with typed D3D interfaces.
-    request.meshInstance->Release(1);
+    delete request.meshInstance;
     request.meshInstance = nullptr;
     return true;
   }

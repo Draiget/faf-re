@@ -96,7 +96,7 @@ void MapImager::VirtualDtor()
  *
  * What it does:
  * Obtains the MeshRenderer singleton, deletes every MeshInstance in the
- * border mesh list via virtual Release(1), then truncates the vector
+ * border mesh list through its virtual destructor, then truncates the vector
  * (sets _Mylast back to _Myfirst, effectively clearing it).
  */
 void MapImager::ClearBorder()
@@ -104,7 +104,7 @@ void MapImager::ClearBorder()
   MeshRenderer::GetInstance();
 
   for (auto* instance : mMeshInstances) {
-    instance->Release(1);
+    delete instance;
   }
 
   mMeshInstances.clear();

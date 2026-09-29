@@ -495,7 +495,14 @@ namespace moho
     }
   };
 
-  class MeshInstance
+  /**
+   * RTTI (`.?AVMeshInstance@Moho@@`) lists one base,
+   * `TDatListItem<MeshInstance, void>` at mdisp 4: the renderer's instance
+   * ring link sits right after the vptr. The constructor (0x007DE060)
+   * self-links it first, `lea eax, [ebp+4]; mov [eax+4], eax; mov [eax], eax`,
+   * and the destructor unlinks it last, after every member.
+   */
+  class MeshInstance : public TDatListItem<MeshInstance, void>
   {
   public:
     /**
@@ -512,17 +519,15 @@ namespace moho
     );
 
     /**
-     * Address: 0x007DE550 (FUN_007DE550, ??1MeshInstance@Moho@@QAE@XZ)
-     */
-    ~MeshInstance();
-
-    /**
-     * Address: 0x007DE510 (FUN_007DE510, deleting thunk)
+     * Address: 0x007DE550 (FUN_007DE550, ??1MeshInstance@Moho@@UAE@XZ)
+     * Address: 0x007DE510 (FUN_007DE510, the scalar deleting destructor --
+     * vftable 0xE3F48C's only slot)
      *
-     * What it does:
-     * Runs destructor and conditionally frees memory when low flag bit is set.
+     * Virtual: the vftable's one slot is 0x007DE510, which calls this body and
+     * then `operator delete` when bit 0 of its flag is set -- the `??_G` MSVC
+     * emits for a virtual destructor. `delete instance` dispatches through it.
      */
-    virtual void Release(std::int32_t destroyNow);
+    virtual ~MeshInstance();
 
     /**
      * Address: 0x007DADD0 (FUN_007DADD0, ?GetMesh@MeshInstance@Moho@@QBE?AV?$shared_ptr@VMesh@Moho@@@boost@@XZ)
@@ -702,10 +707,7 @@ namespace moho
     [[nodiscard]] Wm3::AxisAlignedBox3f GetSweptAlignedBox() const;
 
   public:
-    using ListLink = TDatListItem<void, void>;
-
-    ListLink* linkPrev;           // +0x04
-    ListLink* linkNext;           // +0x08
+    // +0x04..+0x0B: the TDatListItem<MeshInstance, void> base.
     SpatialDBEntry<MeshInstance> db; // +0x0C
     boost::shared_ptr<Mesh> mesh; // +0x14
     std::int32_t color;           // +0x1C
@@ -1000,17 +1002,11 @@ namespace moho
     MeshRenderer();
 
     /**
-     * Address: 0x007DF330 (FUN_007DF330, ??1MeshRenderer@Moho@@QAE@XZ)
+     * Address: 0x007DF330 (FUN_007DF330, ??1MeshRenderer@Moho@@UAE@XZ)
+     * Address: 0x007DF260 (FUN_007DF260, the scalar deleting destructor --
+     * vftable 0xE3F494's only slot, `this` destroyed then freed on flag bit 0)
      */
     virtual ~MeshRenderer();
-
-    /**
-     * Address: 0x007DF260 (FUN_007DF260, Moho::MeshRenderer::operator delete)
-     *
-     * What it does:
-     * Implements deleting-dtor thunk semantics for mesh-renderer runtime lanes.
-     */
-    static MeshRenderer* DeleteWithFlag(MeshRenderer* object, std::uint8_t deleteFlags) noexcept;
 
     /**
      * Address: 0x007E16C0 (FUN_007E16C0, ?GetInstance@MeshRenderer@Moho@@SAPAV12@XZ)
@@ -1285,7 +1281,7 @@ namespace moho
     boost::shared_ptr<RD3DTextureResource> meshEnvironmentTex;   // +0x74
     boost::shared_ptr<RD3DTextureResource> anisotropiclookupTex; // +0x7C
     boost::shared_ptr<RD3DTextureResource> insectlookupTex;      // +0x84
-    MeshInstance::ListLink instanceListHead;                         // +0x8C
+    TDatList<MeshInstance, void> instances;                          // +0x8C
     std::int32_t instanceListSize;                                   // +0x94
     float deltaFrame;                                                // +0x98
     std::uint32_t instanceListStateFlags;                            // +0x9C
@@ -1359,7 +1355,7 @@ namespace moho
   static_assert(offsetof(MeshInstance, sphere) == 0xE0, "MeshInstance::sphere offset must be 0xE0");
   static_assert(offsetof(MeshInstance, box) == 0x108, "MeshInstance::box offset must be 0x108");
   static_assert(sizeof(MeshInstance) == 0x160, "MeshInstance size must be 0x160");
-  static_assert(sizeof(MeshInstance::ListLink) == 0x08, "MeshInstance::ListLink size must be 0x08");
+  static_assert(sizeof(TDatList<MeshInstance, void>) == 0x08, "TDatList<MeshInstance, void> size must be 0x08");
 
   // MeshRendererMeshCacheTree is msvc8::map<MeshKey, boost::weak_ptr<Mesh>,
   // MeshKeyLess> -- the 12-byte {proxy, head, size} header this size guards
@@ -1380,7 +1376,7 @@ namespace moho
     offsetof(MeshRenderer, anisotropiclookupTex) == 0x7C, "MeshRenderer::anisotropiclookupTex offset must be 0x7C"
   );
   static_assert(offsetof(MeshRenderer, insectlookupTex) == 0x84, "MeshRenderer::insectlookupTex offset must be 0x84");
-  static_assert(offsetof(MeshRenderer, instanceListHead) == 0x8C, "MeshRenderer::instanceListHead offset must be 0x8C");
+  static_assert(offsetof(MeshRenderer, instances) == 0x8C, "MeshRenderer::instances offset must be 0x8C");
   static_assert(offsetof(MeshRenderer, instanceListSize) == 0x94, "MeshRenderer::instanceListSize offset must be 0x94");
   static_assert(offsetof(MeshRenderer, deltaFrame) == 0x98, "MeshRenderer::deltaFrame offset must be 0x98");
   static_assert(
