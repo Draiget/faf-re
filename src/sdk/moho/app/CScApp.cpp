@@ -40,6 +40,7 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/WRenViewport.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/ui/IUIManager.h"
@@ -1102,14 +1103,20 @@ void CScApp::Main()
  * Mangled: ?Destroy@CScApp@@UAEXXZ
  *
  * What it does:
- * App shutdown teardown. This pass preserves screensaver restore, world/gpgnet
- * teardown, frame-window destruction, cursor unclipping, and local runtime
- * cleanup.
+ * App shutdown teardown, in the binary's order: restores the screensaver
+ * setting, tears down the world session, GPGNet and the UI, finalizes the
+ * session loader (vtable slot 6), destroys the movie manager, shuts D3D down
+ * and drops the main-window and viewport pointers, shuts sound down, destroys
+ * the Lua debug window, saves the preferences, destroys both frames and
+ * releases the cursor clip.
+ *
+ * `UI_Exit`, `DestroyMovieManagerSingleton` and `SND_Shutdown` are inlined
+ * into the binary's body (0x008D0F6E, 0x008D0F9C, 0x008D0FCA); the main
+ * window and `ren_Viewport` are the two stores at 0x008D0FB6/0x008D0FBC. The
+ * frame pointers are left as they are.
  */
 void CScApp::Destroy()
 {
-  moho::WIN_SetMainWindow(nullptr);
-
   if (!::SystemParametersInfoW(SPI_SETSCREENSAVEACTIVE, usingScreensaver, nullptr, 0)) {
     gpg::Warnf("unable to reset screensaver");
   }
@@ -1117,22 +1124,23 @@ void CScApp::Destroy()
   moho::WLD_Teardown();
   moho::GPGNET_Shutdown();
   moho::UI_Exit();
+  moho::GetWldSessionLoader()->Finalize();
+  moho::DestroyMovieManagerSingleton();
+  moho::D3D_Exit();
+  moho::WIN_SetMainWindow(nullptr);
+  moho::ren_Viewport = nullptr;
+  moho::SND_Shutdown();
+  moho::SCR_DestroyDebugWindow();
+  moho::USER_SavePreferences();
 
   if (supcomFrame != nullptr) {
     (void)supcomFrame->Destroy();
-    supcomFrame = nullptr;
   }
-
   if (frame != nullptr) {
     (void)frame->Destroy();
-    frame = nullptr;
   }
 
   ::ClipCursor(nullptr);
-  framerates.Reset();
-  firstFramePending = 1;
-  initialized = 0;
-  isMinimized = 0;
 }
 
 /**
