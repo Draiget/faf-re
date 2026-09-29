@@ -364,9 +364,11 @@ namespace
       return false;
     }
 
-    const auto* const stateView = reinterpret_cast<const UserUnitIUnitStateBridgeView*>(bridge);
+    // The bridge is `UserUnit`'s `IUnit` base (+0x148 on x86); its +0x268 is
+    // the owning unit's `mUnitVarDat.mUnitStates` (0x198 + 0x218).
+    const auto* const unit = static_cast<const UserUnit*>(bridge);
     const std::uint64_t stateMask = (std::uint64_t{1} << stateIndex);
-    return (stateView->unitStates & stateMask) != 0u;
+    return (unit->mUnitVarDat.mUnitStates & stateMask) != 0u;
   }
 
   [[nodiscard]] UserCommandQueueLinkVector* RebuildAndGetUserUnitManagerQueue(UserCommandQueue* managerPtr) noexcept;

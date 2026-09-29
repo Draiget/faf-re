@@ -3283,17 +3283,17 @@ namespace moho
     {
       out.AssignNewTable(state, 0, 0);
 
-      const RolloverUnitView& view = AsRolloverUnitView(unit);
-      if ((view.dataFlags & 0x10u) != 0u) {
+      const SSTIUnitVariableData& unitData = unit->mUnitVarDat;
+      if ((unit->mIntelStateFlags & kRolloverHasUnitDataFlag) != 0u) {
         IUnit* const bridge = GetIUnitBridge(unit);
         out.SetString("blueprintId", bridge->GetBlueprint()->mBlueprintId.c_str());
 
-        if ((view.dataFlags & 0x08u) != 0u) {
-          out.SetNumber("health", view.health);
-          out.SetNumber("maxHealth", view.maxHealth);
+        if ((unit->mIntelStateFlags & kRolloverHealthValidFlag) != 0u) {
+          out.SetNumber("health", unit->mVariableData.mHealth);
+          out.SetNumber("maxHealth", unit->mVariableData.mMaxHealth);
         }
 
-        if ((view.entityId & 0xF0000000u) == 0x30000000u) {
+        if ((unit->mParams.mEntityId & 0xF0000000u) == 0x30000000u) {
           // Placeholder / being-placed entity: sentinel values.
           out.SetNumber("kills", 0.0f);
           out.SetInteger("energyConsumed", -1);
@@ -3480,15 +3480,15 @@ namespace moho
     } else {
       BuildUserUnitRolloverInfo(result, hoveredUnit, state);
 
-      const RolloverUnitView& view = AsRolloverUnitView(hoveredUnit);
+      const SSTIUnitVariableData& hoveredData = hoveredUnit->mUnitVarDat;
 
-      if (UserEntity* const targetEntity = session->LookupEntityId(view.targetBlipId); targetEntity != nullptr) {
+      if (UserEntity* const targetEntity = session->LookupEntityId(hoveredData.mTargetBlip); targetEntity != nullptr) {
         if (UserUnit* const targetUnit = targetEntity->IsUserUnit(); targetUnit != nullptr) {
           LuaPlus::LuaObject focusTable;
           BuildFocusUnitRolloverInfo(focusTable, targetUnit, state);
           result.SetObject("focus", focusTable);
         }
-      } else if (UserEntity* const focusEntity = session->LookupEntityId(view.focusUnitId); focusEntity != nullptr) {
+      } else if (UserEntity* const focusEntity = session->LookupEntityId(hoveredData.mFocusUnit); focusEntity != nullptr) {
         if (UserUnit* const focusUnit = focusEntity->IsUserUnit(); focusUnit != nullptr) {
           LuaPlus::LuaObject focusTable;
           BuildUserUnitRolloverInfo(focusTable, focusUnit, state);

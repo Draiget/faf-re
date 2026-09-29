@@ -10491,33 +10491,29 @@ namespace moho
       weakRef.mNextOwner = nullptr;
     }
 
-    struct CommandIssueOwnerRuntimeView
-    {
-      std::uint8_t mUnknown00_20F[0x210];
-      moho::EntId mEntityId; // +0x210
-    };
-
-    static_assert(
-      offsetof(CommandIssueOwnerRuntimeView, mEntityId) == 0x210,
-      "CommandIssueOwnerRuntimeView::mEntityId offset must be 0x210"
-    );
-
     /**
      * Address: 0x00824500 (FUN_00824500, sub_824500)
      *
+     * IDA signature:
+     * Moho::UserEntity *__usercall sub_824500@<eax>(Moho::UserUnit *unit@<eax>);
+     *
      * What it does:
-     * Reads one entity-id lane at `+0x210` from command-owner runtime storage,
-     * then resolves the live `UserEntity*` through the active session entity map.
+     * Resolves the entity `unit` is currently focused on (building, repairing,
+     * assisting): reads the replicated focus id at `unit+0x210` --
+     * `mUnitVarDat` (+0x198) `.mFocusUnit` (+0x78) -- and looks it up in the
+     * active session's entity map (0x00898DC0), null when absent. The only
+     * caller, `EstimateDrawNodeWorkTicks` (0x008270DA), passes the assisting
+     * unit in `eax`; it was typed here as an anonymous "command owner" with a
+     * padded overlay over the +0x210 dword.
      */
-    [[nodiscard]] UserEntity* ResolveEntityFromCommandIssueOwner(const void* const commandOwner)
+    [[nodiscard]] UserEntity* ResolveUnitFocusEntity(const UserUnit* const unit)
     {
       CWldSession* const session = moho::WLD_GetSession();
-      if (commandOwner == nullptr || session == nullptr) {
+      if (unit == nullptr || session == nullptr) {
         return nullptr;
       }
 
-      const auto* const ownerView = static_cast<const CommandIssueOwnerRuntimeView*>(commandOwner);
-      return session->LookupEntityId(ownerView->mEntityId);
+      return session->LookupEntityId(unit->mUnitVarDat.mFocusUnit);
     }
 
     void CollectSessionUserUnits(CWldSession* const session, msvc8::vector<UserUnit*>& outUnits)
