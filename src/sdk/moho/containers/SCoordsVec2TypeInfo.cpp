@@ -8,6 +8,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -93,63 +94,16 @@ namespace moho
     Finish();
   }
 
-  /**
-   * Address: 0x0050BD10 (FUN_0050BD10, Moho::SCoordsVec2Serializer::Deserialize)
-   *
-   * What it does:
-   * Loads the 2D coordinate lanes from archive storage in binary order.
-   */
-  void SCoordsVec2Serializer::Deserialize(gpg::ReadArchive* const archive, SCoordsVec2* const coords)
+  void SCoordsVec2::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    archive->ReadFloat(&coords->x);
-    archive->ReadFloat(&coords->z);
+    archive->ReadFloat(&x);
+    archive->ReadFloat(&z);
   }
 
-  /**
-   * Address: 0x0050BD40 (FUN_0050BD40, Moho::SCoordsVec2Serializer::Serialize)
-   *
-   * What it does:
-   * Stores the 2D coordinate lanes to archive storage in binary order.
-   */
-  void SCoordsVec2Serializer::Serialize(gpg::WriteArchive* const archive, SCoordsVec2* const coords)
+  void SCoordsVec2::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    archive->WriteFloat(coords->x);
-    archive->WriteFloat(coords->z);
-  }
-
-  /**
-   * Address: 0x00BC7CE0 (FUN_00BC7CE0, dynamic initializer for the global
-   * `SCoordsVec2Serializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SCoordsVec2Serializer::SCoordsVec2Serializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&SCoordsVec2Serializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&SCoordsVec2Serializer::Serialize))
-  {}
-
-  /**
-   * Address: 0x00BF2110 (FUN_00BF2110, Moho::SCoordsVec2Serializer::~SCoordsVec2Serializer)
-   */
-  SCoordsVec2Serializer::~SCoordsVec2Serializer() = default;
-
-  /**
-   * Address: 0x0050C730 (FUN_0050C730)
-   *
-   * What it does:
-   * Lazily resolves `SCoordsVec2`'s RTTI and installs load/save callbacks
-   * from this helper into the type descriptor.
-   */
-  void SCoordsVec2Serializer::Init()
-  {
-    gpg::RType* const type = ResolveSCoordsVec2Type();
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
+    archive->WriteFloat(x);
+    archive->WriteFloat(z);
   }
 
   /**
@@ -167,10 +121,31 @@ namespace moho
 
 namespace
 {
-  // Address: 0x010AA2BC -- process-global `SCoordsVec2Serializer` singleton.
-  moho::SCoordsVec2Serializer gSCoordsVec2Serializer;
 } // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_SCoordsVec2TypeInfo_ae87f1, moho::register_SCoordsVec2TypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SCoordsVec2>`, vtable 0x00E0DD2C.
+   *
+   * Address: 0x00BC7CE0 (FUN_00BC7CE0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF2110 (FUN_00BF2110 -- the global's destructor.)
+   * Address: 0x0050BD70 (FUN_0050BD70 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0050C700 (FUN_0050C700 -- an unreferenced copy of the `gpg::SerSaveLoadHelper<SCoordsVec2>` constructor on the same global.)
+   * Address: 0x0050C730 (FUN_0050C730 -- `Init`.)
+   * Address: 0x0050BD10 (FUN_0050BD10 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x0050BD40 (FUN_0050BD40 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct SCoordsVec2Serializer : gpg::SerSaveLoadHelper<SCoordsVec2>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AA2BC -- process-global `SCoordsVec2Serializer` singleton.
+  moho::SCoordsVec2Serializer gSCoordsVec2Serializer;
+} // namespace

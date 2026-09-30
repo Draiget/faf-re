@@ -3,6 +3,8 @@
 namespace gpg
 {
 	class RType;
+	class ReadArchive;
+	class WriteArchive;
 
 	/**
 	 * Address: 0x00610EB0 (FUN_00610EB0 -- the implicit copy of one `Rect2i`
@@ -126,6 +128,19 @@ namespace gpg
 			}
 			return *this;
 		}
+
+		/**
+		 * What it does:
+		 * Loads the four bounds. The `int` and `float` specializations read
+		 * them in different orders (Reflection.cpp).
+		 */
+		void MemberDeserialize(ReadArchive* archive);
+
+		/**
+		 * What it does:
+		 * Saves the four bounds, in the same order as `MemberDeserialize`.
+		 */
+		void MemberSerialize(WriteArchive* archive) const;
 	};
 
 	using Rect2i = Rect2<int>;

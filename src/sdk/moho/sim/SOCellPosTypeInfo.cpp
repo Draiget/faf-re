@@ -7,6 +7,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -52,8 +53,6 @@ namespace
     typeInfo->bases_ = msvc8::vector<gpg::RField>{};
   }
 
-  // Address: 0x010A3334 -- process-global `SOCellPosSerializer` singleton.
-  moho::SOCellPosSerializer gSOCellPosSerializer;
 } // namespace
 
 namespace moho
@@ -167,28 +166,16 @@ namespace moho
     Finish();
   }
 
-  /**
-   * Address: 0x0050BF40 (FUN_0050BF40, Moho::SOCellPosSerializer::Deserialize)
-   *
-   * What it does:
-   * Loads the 2D cell coordinate lanes from archive storage in binary order.
-   */
-  void SOCellPosSerializer::Deserialize(gpg::ReadArchive* const archive, SOCellPos* const cellPos)
+  void SOCellPos::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    archive->ReadShort(&cellPos->x);
-    archive->ReadShort(&cellPos->z);
+    archive->ReadShort(&x);
+    archive->ReadShort(&z);
   }
 
-  /**
-   * Address: 0x0050BF70 (FUN_0050BF70, Moho::SOCellPosSerializer::Serialize)
-   *
-   * What it does:
-   * Stores the 2D cell coordinate lanes to archive storage in binary order.
-   */
-  void SOCellPosSerializer::Serialize(gpg::WriteArchive* const archive, SOCellPos* const cellPos)
+  void SOCellPos::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    archive->WriteShort(cellPos->x);
-    archive->WriteShort(cellPos->z);
+    archive->WriteShort(x);
+    archive->WriteShort(z);
   }
 
   /**
@@ -222,39 +209,6 @@ namespace moho
     (void)AcquireSOCellPosTypeInfo();
   }
 
-  /**
-   * Address: 0x00BC7D40 (FUN_00BC7D40, register_SOCellPosSerializer)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields. Confirmed real via `__xc_a` incoming xref;
-   * two other dead, zero-xref duplicate ctors exist for this same global
-   * (0x0050BFA0, and 0x0050C7A0 which installs a *different* vtable --
-   * `gpg::SerSaveLoadHelper<Moho::SOCellPos>`'s -- onto the same storage,
-   * the same "linker keeps exactly one TU-local COMDAT copy" shape
-   * documented for `gpg::PrimitiveSerHelper<T,IntType>` this session).
-   * `SOCellPosSerializer` is, in effect, the same recovery-precedent as
-   * `Rect2iSerializer`/`Rect2fSerializer` (`Reflection.h`) -- a concrete,
-   * per-type instantiation of what the binary itself demangles as
-   * `gpg::SerSaveLoadHelper<T>`, kept as its own named class here rather
-   * than folded into a template (only one instantiation exists, unlike
-   * `PrimitiveSerHelper`'s 57).
-   */
-  SOCellPosSerializer::SOCellPosSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&SOCellPosSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&SOCellPosSerializer::Serialize))
-  {}
-
-  SOCellPosSerializer::~SOCellPosSerializer() = default;
-
-  void SOCellPosSerializer::Init()
-  {
-    gpg::RType* const type = ResolveSOCellPosType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
 } // namespace moho
 
 namespace
@@ -274,3 +228,26 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_SOCellPosTypeInfo_9a89ee, moho::register_SOCellPosTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SOCellPos>`, vtable 0x00E0DD6C.
+   *
+   * Address: 0x00BC7D40 (FUN_00BC7D40 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF21A0 (FUN_00BF21A0 -- the global's destructor.)
+   * Address: 0x0050BFA0 (FUN_0050BFA0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0050C7A0 (FUN_0050C7A0 -- an unreferenced copy of the `gpg::SerSaveLoadHelper<SOCellPos>` constructor on the same global.)
+   * Address: 0x0050C7D0 (FUN_0050C7D0 -- `Init`.)
+   * Address: 0x0050BF40 (FUN_0050BF40 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x0050BF70 (FUN_0050BF70 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct SOCellPosSerializer : gpg::SerSaveLoadHelper<SOCellPos>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AA334 -- process-global `SOCellPosSerializer` singleton.
+  moho::SOCellPosSerializer gSOCellPosSerializer;
+} // namespace

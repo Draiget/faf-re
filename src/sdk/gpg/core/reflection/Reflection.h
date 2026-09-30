@@ -1091,6 +1091,8 @@ namespace gpg
    * in moho/sim/CDamage.cpp, removed 2026-09-30.)
    * Address: 0x0054CFC0 (FUN_0054CFC0 -- `RTypeOf<moho::CAniDefaultSkel>`; formerly `CachedDefaultSkelType` in
    * moho/animation/CAniDefaultSkelConstruct.cpp, removed 2026-09-30.)
+   * Address: 0x0050D390 (FUN_0050D390 -- `RTypeOf<gpg::Rect2i>`, slot 0x010C6D98; formerly `CachedRect2iType`
+   * in gpg/core/reflection/Reflection.cpp, removed 2026-10-01.)
    *
    * A pointer type is the exception: its descriptor is the pointee's
    * `RPointerType` object, which `U::GetPointerType()` constructs before it
@@ -2772,182 +2774,20 @@ namespace gpg
   /**
    * Demangled: gpg::SerSaveLoadHelper<T>
    *
-   * Canonical template for a `gpg::SerHelperBase`-derived serializer that
-   * forwards archive load/save flow into a reflected class/struct's own
-   * `MemberDeserialize(ReadArchive*)` / `MemberSerialize(WriteArchive*) const`
-   * pair. Sibling of `PrimitiveSerHelper<T,IntType>` (enum-only, casts to/from
-   * a single integral lane) but a distinct mechanism confirmed to be for
-   * class/struct `T`'s that already know how to (de)serialize their own
-   * fields -- the two are NOT naming variants of the same template.
+   * Installs `T`'s load/save hooks: the archive loads and saves a `T` through
+   * `T::MemberDeserialize` / `T::MemberSerialize`. Every helper in the binary
+   * derives an empty named struct from this
+   * (`Moho::CAniPoseSerializer : gpg::SerSaveLoadHelper<Moho::CAniPose>`), so
+   * RTTI shows two vtables per `T` that share one `Init`; the per-`T`
+   * addresses are cited on those structs.
    *
-   * `vtable_writers` shows ~56 rows demangling as `SerSaveLoadHelper<T>`.
-   * 11 of those are ENUM `T`'s (`EAlliance`, `ELayer`, `EVisibilityMode`,
-   * `EImpactType`, `ESiloType`, `EIntel`, `ECollisionType`, `EPathPointState`,
-   * `ECommandEvent`, `EThreatType`, `ESquadClass`) and are NOT real
-   * instantiations of this template at all: every one is a zero-xref,
-   * unreachable COMDAT duplicate ctor that happens to share its global's
-   * storage address with the real, `__xc_a`-reachable
-   * `PrimitiveSerHelper<EnumT,int>` instance for the same enum (established
-   * for ELayer/EVisibilityMode/EAlliance earlier this session; confirmed here
-   * to hold for all 8 remaining enum rows too -- enums cannot provide the
-   * `T::MemberDeserialize` this template calls, so they were never real
-   * candidates for it). The other ~45 rows are real class/struct
-   * instantiations (`SDelayedSubVizInfo`, `CIntelGrid`, `CAniPose`,
-   * `CAniPoseBone`, `BVIntSet`, `EntityDB`, `CCommandDB`, `CUnitCommand`,
-   * `CInfluenceMap`, ... one per reflected engine class/struct).
-   *
-   * Every real instantiation follows the identical two-address shape already
-   * established for `PrimitiveSerHelper`: a dead, zero-xref duplicate ctor at
-   * a LOW address (the address `vtable_writers` reports -- e.g. for
-   * `CAniPose`, `FUN_0054C5E0`) and the real, `__xc_a`-reachable
-   * `register_<T>Serializer` ctor at a HIGH address in the same
-   * 0x00BCxxxx-0x00BDxxxx cluster (e.g. `FUN_00BC9960` for `CAniPose`),
-   * constructing a named global `Moho::<T>Serializer`. Unlike
-   * `PrimitiveSerHelper`, every real instantiation checked gets a REAL
-   * MANGLED destructor (e.g. `??1CAniPoseSerializer@Moho@@QAE@@Z`), not a
-   * plain unlink thunk -- so this template declares a real destructor
-   * unconditionally instead of treating it as instantiation-dependent.
-   *
-   * `Init()`'s real body (confirmed from `CAniPose`'s raw asm at
-   * `FUN_0054C610` -- the SAME compiled body serves both the dead duplicate's
-   * vtable slot and the real global's vtable slot, there is only one `Init()`
-   * per `T`) caches the looked-up `RType*` directly on `T::sType` (a static
-   * member the target type itself already provides), NOT on a helper-owned
-   * static. Confirmed against `BVIntSet` and `CAniPose`, both of which
-   * already declare `static gpg::RType* sType;` at this exact cache slot.
-   * This is the one structural difference from `PrimitiveSerHelper::Init()`
-   * (which caches on its own template-static `sCachedType`, because that
-   * template is also instantiated for enums, and an enum cannot host a
-   * static member of its own).
-   *
-   * `Rect2iSerializer`/`Rect2fSerializer` (below) and `SOCellPosSerializer`
-   * (`moho/sim/SOCellPos.h`, see `git show 2f18a6b0`) are confirmed-real
-   * prior-art instantiations of this exact template -- their dead-duplicate
-   * ctors were directly traced to a `gpg::SerSaveLoadHelper<T>` vtable write
-   * onto the same storage as their real ctor. RTTI (`dumps/rtti_dump_all.hpp`)
-   * confirms `Rect2iSerializer`'s real inheritance chain is
-   * `SerHelperBase -> SerSaveLoadHelper<Rect2<int>> -> Rect2iSerializer`
-   * (`HierarchyAttribs: 0x0`, single inheritance, every base at `mdisp=0` --
-   * `mLoadCallback`/`mSaveCallback` actually belong to the
-   * `SerSaveLoadHelper<T>` level, not to `Rect2iSerializer` itself), with
-   * `Rect2iSerializer::Init()` fully overriding the generic one below (Rect2
-   * has no `MemberDeserialize`/`MemberSerialize`, so it can't use the generic
-   * path). Left as concrete `SerHelperBase`-derived classes rather than
-   * converted to inherit this template directly: it adds zero data/behavior
-   * that they don't already fully override, so collapsing the redundant
-   * intermediate level would be a source-shape change with no binary-behavior
-   * difference and nontrivial ctor-reordering risk (their existing ctors
-   * point `mLoadCallback`/`mSaveCallback` at their OWN static methods, not
-   * this template's) -- valid prior art either way; a future pass may still
-   * choose to unify them.
-   *
-   * Pilot conversions from the old `{ mHelperNext, mHelperPrev, ... }`
-   * raw-struct mimic (or `*RuntimeView`-style reach-in) shape to this
-   * template: `moho::BVIntSetSerializer`, `Moho::CAniPoseSerializer`,
-   * `Moho::CAniPoseBoneSerializer`, `Moho::CIntelGridSerializer`. ~41 real
-   * instantiations remain to convert.
-   *
-   * `Moho::CEfxTrailEmitterSerializer` (`moho/effects/rendering/
-   * CEfxTrailEmitter.cpp`) is a fresh direct instantiation (the class had no
-   * prior hand-rolled serializer at all), not a conversion -- but it flags a
-   * nuance worth checking for any of the ~41 remaining: unlike the pilot
-   * conversions above, RTTI/`vtable_writers` show it needs a real (if empty)
-   * derived class, `class CEfxTrailEmitterSerializer : public
-   * SerSaveLoadHelper<CEfxTrailEmitter> {};`, NOT a `using` alias. The
-   * binary carries two distinct adjacent vtable symbols
-   * (`??_7CEfxTrailEmitterSerializer@Moho@@6B@` at 0x00E2695C and
-   * `??_7?$SerSaveLoadHelper@VCEfxTrailEmitter@Moho@@@gpg@@6B@` at
-   * 0x00E26964, both resolving `Init()` to the same 0x006722F0 body), which
-   * a same-address `using` alias cannot produce -- check `vtable_writers`
-   * for a distinct `XSerializer@Namespace` vtable head before assuming the
-   * simpler alias shape applies to any given remaining T.
-   *
-   * `Moho::CUnitFormAndMoveTaskSerializer` (`moho/unit/tasks/
-   * CUnitFormAndMoveTask.cpp`, VFTABLE 0x00E206F8 / base VFTABLE 0x00E20700)
-   * and `Moho::CUnitUnloadUnitsSerializer` (`moho/unit/tasks/
-   * CUnitUnloadUnits.cpp`, VFTABLE 0x00E20EB8 / base VFTABLE 0x00E20EC0) hit
-   * the exact same CEfxTrailEmitter nuance -- both need the empty-derived-
-   * class shape, confirmed via the same two-distinct-adjacent-vtables test.
-   * Both also surfaced a related trap worth watching for across the ~41
-   * remaining conversions: an earlier pass at each of these two files had
-   * already recovered the template's own per-T `Deserialize`/`Serialize`
-   * bodies (e.g. 0x006199D0/0x006199E0 for `CUnitFormAndMoveTask`), but
-   * mis-modeled them as hand-written standalone free-function thunks
-   * (`CUnitFormAndMoveTaskMemberDeserializeThunk` and friends) instead of
-   * recognizing them as this template's own compiler-emitted
-   * `Deserialize`/`Serialize` for that T. The tell is the same tail-jump
-   * shape documented above for CEfxTrailEmitter's Deserialize/Serialize
-   * thunks (`mov eax, [esp+arg_0]; mov ecx, [esp+arg_4]; jmp
-   * T::MemberDeserialize`) -- when a "thunk" free function found near a
-   * `MemberDeserialize`/`MemberSerialize` pair has exactly that shape and
-   * its address is what a `SerSaveLoadHelper<T>`-shaped ctor writes into
-   * `mLoadCallback`/`mSaveCallback`, it is this template's own per-T method,
-   * not a separately hand-written forwarder -- delete the standalone
-   * free-function modeling and cite the address on the derived class instead
-   * (see either file for the corrected shape).
-   *
-   * `Moho::CUnitAssistMoveTaskSerializer` (`moho/unit/tasks/
-   * CUnitAssistMoveTask.cpp`) looks superficially like the same pattern
-   * (RTTI also lists `SerSaveLoadHelper<CUnitAssistMoveTask>` as a base) but
-   * is NOT a template instantiation of any shape: `CUnitAssistMoveTask::
-   * MemberDeserialize`/`MemberSerialize` are STATIC 4-argument forwarders
-   * (`archive, task, version, ownerRef`), not the instance-method,
-   * single-`archive`-argument shape `Deserialize`/`Serialize` below call
-   * (`object->MemberDeserialize(archive)`) -- that shape cannot be
-   * instantiated for this T with the template as currently written, so it
-   * stays a concrete `SerHelperBase`-derived class instead (matching
-   * `CUnitCarrierRetrieveSerializerHelper`/`CUnitReclaimTaskSerializer`).
-   * Confirm the real `MemberDeserialize`/`MemberSerialize` parameter count
-   * from the class header before assuming any given remaining T fits the
-   * template at all, not just which derived-class shape it needs.
-   *
-   * `Moho::CUnitTeleportTaskSerializer` and `Moho::CUnitFireAtTaskSerializer`
-   * (both `moho/unit/tasks/CUnitCallTeleport.{h,cpp}` /
-   * `moho/unit/tasks/CUnitFireAtTask.{h,cpp}` -- note `CUnitTeleportTask` is
-   * the SECOND, unrelated class declared in the `CUnitCallTeleport.*` pair;
-   * `Moho::CUnitCallTeleport` itself has its own separate, non-template
-   * serializer in `moho/serialization/CUnitCallTeleportSerializer.*` and is
-   * untouched by this instantiation) hit the exact same CEfxTrailEmitter
-   * empty-derived-class nuance -- both need a real (if empty) derived class,
-   * confirmed via the same two-distinct-adjacent-vtables test:
-   *  - T=Moho::CUnitTeleportTask: VFTABLE 0x00E20348 / base VFTABLE
-   *    0x00E20350, ctor 0x00BD0650 (no dead duplicate found), atexit
-   *    0x00BF9C60, Init 0x0060BBA0, Deserialize 0x0060AA10 (tail-calls
-   *    `MemberDeserialize` at 0x0060D270), Serialize 0x0060AA20 (tail-calls
-   *    `MemberSerialize` at 0x0060D350). Also hit the CUnitFormAndMoveTask
-   *    mis-modeling trap: an earlier pass had already recovered 0x0060AA10/
-   *    0x0060AA20 as hand-written 2-argument free functions
-   *    (`CUnitTeleportTaskSerializerLoad`/`Save`) plus `volatile`
-   *    function-pointer anchors to keep them ODR-used -- wrong signature
-   *    (the real slot is `RType::load_func_t`/`save_func_t`, 4 arguments)
-   *    and never actually invoked by anything; deleted in favor of this
-   *    template instantiation, which supplies the equivalent bodies itself.
-   *  - T=Moho::CUnitFireAtTask: VFTABLE 0x00E20394 / base VFTABLE
-   *    0x00E2039C, ctor 0x00BD06B0 (no dead duplicate found), atexit
-   *    0x00BF9CF0, Init 0x0060BC60, Deserialize 0x0060B100 (tail-jmp shape,
-   *    archive in EAX / objectPtr in ECX, into `MemberDeserialize` at
-   *    0x0060D430), Serialize 0x0060B110 (tail-calls `MemberSerialize` at
-   *    0x0060D510). This T additionally required recovering
-   *    `MemberDeserialize`/`MemberSerialize` from scratch (previously
-   *    missing entirely): `mDispatch` (`IAiCommandDispatchImpl*` at +0x30)
-   *    reflects through the `CCommandTask` base type via
-   *    `ReadPointer_CCommandTask`/`RRef_CCommandTask`+`WriteRawPointer`,
-   *    exactly the established `CUnitPatrolTask`/`CFactoryBuildTask`/
-   *    `CUnitAssistMoveTask` idiom for an `IAiCommandDispatchImpl`-typed
-   *    dispatch-task field; `mTarget` (`CAiTarget` at +0x34) is a plain
-   *    reflected-value field, same as `CUnitTeleportTask::mTarget` above and
-   *    `CUnitAttackTargetTask::mTarget`; `mWeapon` (`UnitWeapon*` at +0x54)
-   *    is a tracked pointer via `ReadPointer_UnitWeapon`/`RRef_UnitWeapon`,
-   *    exact match to `CUnitAttackTargetTask::mWeapon`; `mIsNuclear`
-   *    (`std::int32_t` at +0x58) is read/written through the `ESiloType`
-   *    reflected type (RTTI typeinfo `??_R0?AW4ESiloType@Moho@@@8`) rather
-   *    than as a raw int -- confirmed by raw asm on both the load and save
-   *    sides, and consistent with every other use of this field being an
-   *    `ESiloType` (`static_cast<ESiloType>(mIsNuclear)` in `Execute()`).
-   *    The field's own declared C++ type is left as `std::int32_t` (an
-   *    `ESiloType` retype would ripple into the ctor/`Create()` signatures,
-   *    which are out of scope here); only the archive lane's reflected type
-   *    changed to match the binary.
+   * `Deserialize` / `Serialize` are out of line only where the member is, as
+   * a `jmp` or a short forward; otherwise the member is inlined into them.
+   * Members take `(archive)`, `(archive, version)` or
+   * `(archive, version, ownerRef)`, whichever the binary's body reads. The
+   * enum instantiations `vtable_writers` also lists are unreferenced copies
+   * sharing a `PrimitiveSerHelper<E, int>` global's storage, not uses of
+   * this template.
    */
   template <class T>
   class SerSaveLoadHelper : public SerHelperBase
@@ -2961,14 +2801,7 @@ namespace gpg
     ~SerSaveLoadHelper() = default;
 
     /**
-     * Address: 0x0050C7D0 (FUN_0050C7D0 -- `Init()` for `SOCellPos`; formerly `InstallMohoSOCellPosSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x0050C910 (FUN_0050C910 -- `Init()` for `SPointVector`; formerly `InstallMohoSPointVectorSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x0055B2A0 (FUN_0055B2A0 -- `Init()` for `SSTITarget`; formerly `InstallMohoSSTITargetSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x0056CA10 (FUN_0056CA10 -- `Init()` for `CFormationInstance`; formerly `InstallMohoCFormationInstanceSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
      * Address: 0x005B9230 (FUN_005B9230 -- `Init()` for `SValuePair`; formerly `InstallMohoSValuePairSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x005E91E0 (FUN_005E91E0 -- `Init()` for `SAttachPoint`; formerly `InstallMohoSAttachPointSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x005E9490 (FUN_005E9490 -- `Init()` for `STransportPickUpInfo`; formerly `InstallMohoSTransportPickUpInfoSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x00626B30 (FUN_00626B30 -- `Init()` for `SPickUpInfo`; formerly `InstallMohoSPickUpInfoSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
      *
      * What it does:
      * Installs this helper's load/save callbacks on `T`'s type (vtable slot 0,
@@ -3138,66 +2971,6 @@ namespace gpg
 
     RType::save_construct_args_func_t mSaveConstructArgsFunc; // +0x0C
   };
-
-  /**
-   * VFTABLE: 0x00D44B44
-   * COL:  0x00E51514
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class gpg::Rect2<int>>
-   */
-  class Rect2iSerializer : public SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00905E40 (FUN_00905E40)
-     * Demangled: gpg::SerSaveLoadHelper<class gpg::Rect2<int>>::Init
-     *
-     * What it does:
-     * Binds Rect2<int> load/save callbacks onto the reflected type descriptor.
-     */
-    void Init() override;
-
-  public:
-    RType::load_func_t mLoadCallback;
-    RType::save_func_t mSaveCallback;
-  };
-  static_assert(
-    offsetof(Rect2iSerializer, mLoadCallback) == 0x0C, "Rect2iSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(Rect2iSerializer, mSaveCallback) == 0x10, "Rect2iSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(Rect2iSerializer) == 0x14, "Rect2iSerializer size must be 0x14");
-
-  /**
-   * VFTABLE: 0x00D44B3C
-   * COL:  0x00E514BC
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class gpg::Rect2<float>>
-   */
-  class Rect2fSerializer : public SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00905EE0 (FUN_00905EE0)
-     * Demangled: gpg::SerSaveLoadHelper<class gpg::Rect2<float>>::Init
-     *
-     * What it does:
-     * Binds Rect2<float> load/save callbacks onto the reflected type descriptor.
-     */
-    void Init() override;
-
-  public:
-    RType::load_func_t mLoadCallback;
-    RType::save_func_t mSaveCallback;
-  };
-  static_assert(
-    offsetof(Rect2fSerializer, mLoadCallback) == 0x0C, "Rect2fSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(Rect2fSerializer, mSaveCallback) == 0x10, "Rect2fSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(Rect2fSerializer) == 0x14, "Rect2fSerializer size must be 0x14");
 
   /**
    * Demangled: gpg::PrimitiveSerHelper<T,IntType>

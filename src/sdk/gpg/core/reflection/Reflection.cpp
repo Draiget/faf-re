@@ -178,6 +178,7 @@
 #include "lua/LuaObject.h"
 #include "Wm3Vector3.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 using namespace gpg;
 
 
@@ -438,32 +439,6 @@ namespace
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
-  }
-
-  /**
-   * Address: 0x0050D390 (FUN_0050D390)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `gpg::Rect2i`.
-   */
-  RType* CachedRect2iType()
-  {
-    RType* type = gpg::Rect2i::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(gpg::Rect2i));
-      gpg::Rect2i::sType = type;
-    }
-    return type;
-  }
-
-  RType* CachedRect2fType()
-  {
-    RType* type = gpg::Rect2f::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(gpg::Rect2f));
-      gpg::Rect2f::sType = type;
-    }
-    return type;
   }
 
   RType* CachedIntType()
@@ -3197,66 +3172,6 @@ RRef MoveUnitWeaponPointerSlotRef(void* const slotObject, RRef* const sourceRef)
     return upcast.mObj;
 }
 
-  void SerializeRect2i(WriteArchive* archive, const int objectPtr, int, RRef*)
-  {
-    auto* const rect = reinterpret_cast<gpg::Rect2i*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(rect != nullptr);
-    if (!archive || !rect) {
-      return;
-    }
-
-    archive->WriteInt(rect->x0);
-    archive->WriteInt(rect->z0);
-    archive->WriteInt(rect->x1);
-    archive->WriteInt(rect->z1);
-  }
-
-  void DeserializeRect2i(ReadArchive* archive, const int objectPtr, int, RRef*)
-  {
-    auto* const rect = reinterpret_cast<gpg::Rect2i*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(rect != nullptr);
-    if (!archive || !rect) {
-      return;
-    }
-
-    archive->ReadInt(&rect->x0);
-    archive->ReadInt(&rect->z0);
-    archive->ReadInt(&rect->x1);
-    archive->ReadInt(&rect->z1);
-  }
-
-  void SerializeRect2f(WriteArchive* archive, const int objectPtr, int, RRef*)
-  {
-    auto* const rect = reinterpret_cast<gpg::Rect2f*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(rect != nullptr);
-    if (!archive || !rect) {
-      return;
-    }
-
-    archive->WriteFloat(rect->x0);
-    archive->WriteFloat(rect->z0);
-    archive->WriteFloat(rect->x1);
-    archive->WriteFloat(rect->z1);
-  }
-
-  void DeserializeRect2f(ReadArchive* archive, const int objectPtr, int, RRef*)
-  {
-    auto* const rect = reinterpret_cast<gpg::Rect2f*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(rect != nullptr);
-    if (!archive || !rect) {
-      return;
-    }
-
-    archive->ReadFloat(&rect->x0);
-    archive->ReadFloat(&rect->z0);
-    archive->ReadFloat(&rect->x1);
-    archive->ReadFloat(&rect->z1);
-  }
-
   void AddRect2IntField(RType* typeInfo, const char* fieldName, const int offset)
   {
     typeInfo->fields_.push_back(RField(fieldName, CachedIntType(), offset));
@@ -3267,8 +3182,6 @@ RRef MoveUnitWeaponPointerSlotRef(void* const slotObject, RRef* const sourceRef)
     typeInfo->fields_.push_back(RField(fieldName, CachedFloatType(), offset));
   }
 
-  gpg::Rect2iSerializer gRect2iSerializer;
-  gpg::Rect2fSerializer gRect2fSerializer;
   gpg::RPointerType<moho::CTaskThread> gCTaskThreadPointerType;
   gpg::RPointerType<moho::CAcquireTargetTask> gCAcquireTargetTaskPointerType;
   gpg::RPointerType<moho::SimArmy> gSimArmyPointerType;
@@ -3350,12 +3263,6 @@ RRef MoveUnitWeaponPointerSlotRef(void* const slotObject, RRef* const sourceRef)
     {
       register_Rect2iTypeInfo();
       register_Rect2fTypeInfo();
-
-      gRect2iSerializer.mLoadCallback = &DeserializeRect2i;
-      gRect2iSerializer.mSaveCallback = &SerializeRect2i;
-
-      gRect2fSerializer.mLoadCallback = &DeserializeRect2f;
-      gRect2fSerializer.mSaveCallback = &SerializeRect2f;
     }
   };
 
@@ -3377,6 +3284,66 @@ struct PointerTypeRegistration
 
 PointerTypeRegistration gPointerTypeRegistration;
 } // namespace
+
+namespace gpg
+{
+  /**
+   * What it does:
+   * Reads `x0`, `z0`, `x1`, `z1`. Inlined into
+   * `gpg::SerSaveLoadHelper<gpg::Rect2i>::Deserialize` 0x00905CC0.
+   */
+  template <>
+  void Rect2<int>::MemberDeserialize(ReadArchive* const archive)
+  {
+    archive->ReadInt(&x0);
+    archive->ReadInt(&z0);
+    archive->ReadInt(&x1);
+    archive->ReadInt(&z1);
+  }
+
+  /**
+   * What it does:
+   * Writes `x0`, `z0`, `x1`, `z1`. Inlined into
+   * `gpg::SerSaveLoadHelper<gpg::Rect2i>::Serialize` 0x00905D00.
+   */
+  template <>
+  void Rect2<int>::MemberSerialize(WriteArchive* const archive) const
+  {
+    archive->WriteInt(x0);
+    archive->WriteInt(z0);
+    archive->WriteInt(x1);
+    archive->WriteInt(z1);
+  }
+
+  /**
+   * What it does:
+   * Reads `x0`, `x1`, `z0`, `z1` (+0x00, +0x08, +0x04, +0x0C): both edges on
+   * one axis, then the other, unlike `Rect2<int>`. Inlined into
+   * `gpg::SerSaveLoadHelper<gpg::Rect2f>::Deserialize` 0x00905D40.
+   */
+  template <>
+  void Rect2<float>::MemberDeserialize(ReadArchive* const archive)
+  {
+    archive->ReadFloat(&x0);
+    archive->ReadFloat(&x1);
+    archive->ReadFloat(&z0);
+    archive->ReadFloat(&z1);
+  }
+
+  /**
+   * What it does:
+   * Writes `x0`, `x1`, `z0`, `z1`. Inlined into
+   * `gpg::SerSaveLoadHelper<gpg::Rect2f>::Serialize` 0x00905D80.
+   */
+  template <>
+  void Rect2<float>::MemberSerialize(WriteArchive* const archive) const
+  {
+    archive->WriteFloat(x0);
+    archive->WriteFloat(x1);
+    archive->WriteFloat(z0);
+    archive->WriteFloat(z1);
+  }
+} // namespace gpg
 
 /**
  * Address: 0x005DE010 (FUN_005DE010, preregister_CAcquireTargetTaskPointerTypeStartup)
@@ -9772,38 +9739,6 @@ bool RType::IsDerivedFrom(const RType* baseType, int32_t* outOffset) const
 }
 
 /**
- * Address: 0x00905E40 (FUN_00905E40)
- * Demangled: gpg::SerSaveLoadHelper<class gpg::Rect2<int>>::Init
- *
- * What it does:
- * Lazily resolves Rect2<int> RTTI and installs serializer callbacks from this helper.
- */
-void gpg::Rect2iSerializer::Init()
-{
-  RType* const type = CachedRect2iType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mLoadCallback;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
- * Address: 0x00905EE0 (FUN_00905EE0)
- * Demangled: gpg::SerSaveLoadHelper<class gpg::Rect2<float>>::Init
- *
- * What it does:
- * Lazily resolves Rect2<float> RTTI and installs serializer callbacks from this helper.
- */
-void gpg::Rect2fSerializer::Init()
-{
-  RType* const type = CachedRect2fType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mLoadCallback;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
  * Address: 0x00905FD0 (FUN_00905FD0, gpg::Rect2iTypeInfo::Rect2iTypeInfo)
  *
  * What it does:
@@ -10327,3 +10262,45 @@ GPG_PREREGISTER_INIT(preregister_SimArmyPointerTypeStartup_65cf11, gpg::preregis
 GPG_PREREGISTER_INIT(preregister_ShieldPointerTypeStartup_65cf11, gpg::preregister_ShieldPointerTypeStartup)
 GPG_PREREGISTER_INIT(preregister_CDecalHandlePointerTypeStartup_65cf11, gpg::preregister_CDecalHandlePointerTypeStartup)
 GPG_PREREGISTER_INIT(preregister_SimArmyVectorTypeStartup_65cf11, gpg::preregister_SimArmyVectorTypeStartup)
+
+namespace gpg
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Rect2i>`, vtable 0x00D44B44.
+   *
+   * Address: 0x00BE9E10 (FUN_00BE9E10 -- constructs the global and registers its destructor.)
+   * Address: 0x00C09730 (FUN_00C09730 -- the global's destructor.)
+   * Address: 0x00905E40 (FUN_00905E40 -- `Init`.)
+   * Address: 0x00905CC0 (FUN_00905CC0 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x00905D00 (FUN_00905D00 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct Rect2iSerializer : gpg::SerSaveLoadHelper<Rect2i>
+  {};
+} // namespace gpg
+
+namespace
+{
+  // Address: 0x00F8E528 -- process-global `Rect2iSerializer` singleton.
+  gpg::Rect2iSerializer gRect2iSerializer;
+} // namespace
+
+namespace gpg
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Rect2f>`, vtable 0x00D44B3C.
+   *
+   * Address: 0x00BE9EB0 (FUN_00BE9EB0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C09700 (FUN_00C09700 -- the global's destructor.)
+   * Address: 0x00905EE0 (FUN_00905EE0 -- `Init`.)
+   * Address: 0x00905D40 (FUN_00905D40 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x00905D80 (FUN_00905D80 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct Rect2fSerializer : gpg::SerSaveLoadHelper<Rect2f>
+  {};
+} // namespace gpg
+
+namespace
+{
+  // Address: 0x00F8E440 -- process-global `Rect2fSerializer` singleton.
+  gpg::Rect2fSerializer gRect2fSerializer;
+} // namespace
