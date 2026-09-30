@@ -68,28 +68,6 @@ namespace moho
 
 namespace
 {
-  using ShieldPtrList = msvc8::list<moho::Shield*>;
-
-  // std::list control block: {proxy, sentinel, count} — count at +0x08.
-  struct ShieldPtrListRuntimeView
-  {
-    void* mNodeProxy;      // +0x00
-    void* mSentinelNode;   // +0x04
-    std::uint32_t mCount;  // +0x08
-  };
-  static_assert(
-    offsetof(ShieldPtrListRuntimeView, mCount) == 0x08, "ShieldPtrListRuntimeView::mCount offset must be 0x08"
-  );
-  static_assert(sizeof(ShieldPtrListRuntimeView) == 0x0C, "ShieldPtrListRuntimeView size must be 0x0C");
-
-  [[nodiscard]] int CountShieldPtrListElements(const void* const object) noexcept
-  {
-    if (object == nullptr) {
-      return 0;
-    }
-    return static_cast<int>(static_cast<const ShieldPtrListRuntimeView*>(object)->mCount);
-  }
-
   struct ShieldPtrListReflectionBootstrap
   {
     ShieldPtrListReflectionBootstrap()
@@ -123,11 +101,16 @@ namespace gpg
    * What it does:
    * Formats the inherited list lexical text with the current element count
    * (`"<base>, size=<count>"`).
+   *
+   * 0x0074CDFC/0x0074CDFE read `[ref.mObj + 8]` with no null test: the
+   * reflected object is the list itself and the count is its `size()`.
    */
   msvc8::string RListType_ShieldPtr::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
-    return gpg::STR_Printf("%s, size=%d", base.c_str(), CountShieldPtrListElements(ref.mObj));
+    return gpg::STR_Printf(
+      "%s, size=%d", base.c_str(), static_cast<int>(static_cast<const msvc8::list<moho::Shield*>*>(ref.mObj)->size())
+    );
   }
 
   /**
@@ -162,12 +145,9 @@ namespace gpg
     gpg::RRef* const ownerRef
   )
   {
-    auto* const list = reinterpret_cast<ShieldPtrList*>(
+    auto* const list = reinterpret_cast<msvc8::list<moho::Shield*>*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
     );
-    if (archive == nullptr || list == nullptr) {
-      return;
-    }
 
     unsigned int count = 0u;
     archive->ReadUInt(&count);
@@ -185,33 +165,25 @@ namespace gpg
    *
    * What it does:
    * Writes the element count, then serializes each `moho::Shield*` in list
-   * traversal order as an unowned tracked raw pointer.
+   * traversal order as an unowned tracked raw pointer, owned by `ownerRef`
+   * (0x0074E465 hands the callback's fourth argument to every write).
    */
   void RListType_ShieldPtr::SerSave(
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
-    gpg::RRef* const
+    gpg::RRef* const ownerRef
   )
   {
-    const auto* const list = reinterpret_cast<const ShieldPtrList*>(
+    const auto* const list = reinterpret_cast<const msvc8::list<moho::Shield*>*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
     );
-    if (archive == nullptr) {
-      return;
-    }
 
-    const unsigned int count = list ? static_cast<unsigned int>(list->size()) : 0u;
-    archive->WriteUInt(count);
-    if (list == nullptr) {
-      return;
-    }
-
-    const gpg::RRef emptyOwner{};
+    archive->WriteUInt(static_cast<unsigned int>(list->size()));
     for (moho::Shield* const element : *list) {
       gpg::RRef ref{};
       gpg::RRef_Shield(&ref, element);
-      gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Unowned, emptyOwner);
+      gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Unowned, *ownerRef);
     }
   }
 } // namespace gpg
