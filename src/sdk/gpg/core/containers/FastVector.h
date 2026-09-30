@@ -344,6 +344,8 @@ namespace gpg::core
      *
      * For trivially-copyable `T` this collapses to the same plain element store
      * the generic 4-byte emission (FUN_00402C20) performs.
+     * Address: 0x0092BE50 (FUN_0092BE50 -- `ConstructRangeForward` (`_Ucopy`, null-guarded byte copy) for the 1-byte `gpg::HaStar::Cluster::Edge` of `gpg::fastvector_n<Cluster::Edge, 50>` (`ClusterBuild`'s triangular edge table), emitted as a `this`-taking member (`ret 0xC`, `(first, last, dest)` order); callers 0x0092CCF0 (the reallocating insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00954250 (FUN_00954250 -- `ConstructRangeForward` for the `char` reachability flags of `gpg::fastvector_n<char, 12>` (`EraseUnconnectedNodes` 0x00954650, grown by `resize(n, 0)` 0x009545D0); the same null-guarded byte copy as 0x0092BE50 for a second instantiation, also a `this`-taking member (`ret 0xC`); callers 0x009543F0 (the reallocating insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      */
     template <class T>
     inline T* ConstructRangeForward(T* dest, const T* first, const T* const last)
@@ -779,6 +781,7 @@ namespace gpg::core
      * Address: 0x00658800 (FUN_00658800 -- the shift step of `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: per slot a refcounted assignment (release the old texture, retain the new one) rather than a raw copy; its one caller 0x00657DB0 always passes an empty source range. Formerly `RelinkCountedTextureSlotsForward` in moho/particles/CParticleTextureCountedPtr.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x00657DB0 (FUN_00657DB0 -- `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: shift through 0x00658800 (always empty here), release the vacated tail, drop `end_`; the shrink arm of `resize` 0x00657900.)
      * Address: 0x00954510 (FUN_00954510 -- `FastVector<T>::erase(first, last)` for a 12-char inline-backed lane; zero callers, unreachable; formerly `FastVectorN12CharEraseRange` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0092DAD0 (FUN_0092DAD0 -- `erase(first, last)` for `gpg::fastvector_n<gpg::HaStar::Cluster::Edge, 50>` (1-byte element): byte-copy the tail `[last, end_)` down to `first`, rebase `end_` (+0x04), return `first`, nothing when `first == last` -- the `erase(begin() + n, end())` shrink arm of `resize(n, value)` 0x0092E410; callers 0x0092E410; formerly `ShiftByteRangeLeftAndCommitEndRuntime` over a `ByteRangeStorageRuntime` overlay in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      */
     iterator erase(iterator first, iterator last)
     {

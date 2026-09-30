@@ -364,32 +364,6 @@ namespace
     return list->size;
   }
 
-  /**
-   * Address: 0x0092DED0 (FUN_0092DED0, sub_92DED0)
-   *
-   * What it does:
-   * Allocates one 40-byte intrusive node (`operator new(0x28)`) and
-   * initializes its next/prev links and 32-byte payload, guarded against
-   * null on the original allocator-failure path.
-   */
-
-  [[nodiscard]] IntrusivePayloadNode32Runtime* AllocateIntrusivePayloadNode32(
-    IntrusivePayloadNode32Runtime* const next,
-    IntrusivePayloadNode32Runtime* const prev,
-    const std::uint32_t* const payloadWords
-  )
-  {
-    auto* const node = static_cast<IntrusivePayloadNode32Runtime*>(::operator new(sizeof(IntrusivePayloadNode32Runtime)));
-    node->next = next;
-    node->prev = prev;
-    if (payloadWords != nullptr) {
-      std::memcpy(node->payload, payloadWords, sizeof(node->payload));
-    } else {
-      std::memset(node->payload, 0, sizeof(node->payload));
-    }
-    return node;
-  }
-
   [[nodiscard]] IntrusivePayloadNode24Runtime* AllocateIntrusivePayloadNode24(
     IntrusivePayloadNode24Runtime* const next,
     IntrusivePayloadNode24Runtime* const prev,
@@ -2128,45 +2102,6 @@ namespace
   }
 }
 
-/**
- * Address: 0x0092CB10 (FUN_0092CB10)
- *
- * What it does:
- * Performs one max-heap upward insertion for a 16-bit value lane and returns
- * the final parent index lane from the insertion walk.
- */
-std::int32_t PushUInt16HeapEntryUpRuntime(
-  std::uint16_t* const heapValues,
-  std::int32_t insertionIndex,
-  const std::int32_t lowerBoundIndex,
-  const std::uint16_t insertedValue
-) noexcept
-{
-  if (heapValues == nullptr || insertionIndex < 0) {
-    return insertionIndex > 0 ? (insertionIndex - 1) / 2 : insertionIndex;
-  }
-
-  std::int32_t parentIndex = (insertionIndex - 1) / 2;
-  if (lowerBoundIndex >= insertionIndex) {
-    heapValues[insertionIndex] = insertedValue;
-    return parentIndex;
-  }
-
-  while (lowerBoundIndex < insertionIndex) {
-    const std::uint16_t parentValue = heapValues[parentIndex];
-    if (parentValue >= insertedValue) {
-      break;
-    }
-
-    heapValues[insertionIndex] = parentValue;
-    insertionIndex = parentIndex;
-    parentIndex = (parentIndex - 1) / 2;
-  }
-
-  heapValues[insertionIndex] = insertedValue;
-  return parentIndex;
-}
-
 namespace
 {
   struct CopyEndCursor8ByteRuntime
@@ -3310,39 +3245,6 @@ Element16Runtime* SwapElement16TailLanesBackwardRuntime(
 }
 
 /**
- * Address: 0x0092DAD0 (FUN_0092DAD0)
- *
- * What it does:
- * Moves one byte range `[sourceBegin, end)` left to `destination` and commits
- * the updated end cursor.
- */
-struct ByteRangeStorageRuntime
-{
-  std::uint8_t* begin;
-  std::uint8_t* end;
-  std::uint8_t* capacity;
-};
-static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime size must be 0x0C");
-
-std::uint8_t* ShiftByteRangeLeftAndCommitEndRuntime(
-  ByteRangeStorageRuntime* const owner,
-  std::uint8_t* const destination,
-  const std::uint8_t* const sourceBegin
-)
-{
-  if (owner == nullptr || destination == nullptr || sourceBegin == nullptr) {
-    return destination;
-  }
-
-  std::uint8_t* const currentEnd = owner->end;
-  if (sourceBegin != currentEnd) {
-    std::memmove(destination, sourceBegin, static_cast<std::size_t>(currentEnd - sourceBegin));
-  }
-  owner->end = destination + static_cast<std::size_t>(currentEnd - sourceBegin);
-  return destination;
-}
-
-/**
  * Address: 0x008F67E0 (FUN_008F67E0)
  *
  * What it does:
@@ -3350,48 +3252,6 @@ std::uint8_t* ShiftByteRangeLeftAndCommitEndRuntime(
  * cursor lanes to null.
  */
 void ReleaseLegacyBufferTripleRuntimeC(
-  LegacyBufferTripleRuntime* const owner
-)
-{
-  ReleaseLegacyBufferTripleRuntime(owner);
-}
-
-/**
- * Address: 0x0092ECF0 (FUN_0092ECF0)
- *
- * What it does:
- * Releases one `{begin,end,capacity}` storage triple and resets all three
- * cursor lanes to null.
- */
-void ReleaseLegacyBufferTripleRuntimeD(
-  LegacyBufferTripleRuntime* const owner
-)
-{
-  ReleaseLegacyBufferTripleRuntime(owner);
-}
-
-/**
- * Address: 0x00933120 (FUN_00933120)
- *
- * What it does:
- * Releases one `{begin,end,capacity}` storage triple and resets all three
- * cursor lanes to null.
- */
-void ReleaseLegacyBufferTripleRuntimeE(
-  LegacyBufferTripleRuntime* const owner
-)
-{
-  ReleaseLegacyBufferTripleRuntime(owner);
-}
-
-/**
- * Address: 0x00933150 (FUN_00933150)
- *
- * What it does:
- * Releases one `{begin,end,capacity}` storage triple and resets all three
- * cursor lanes to null.
- */
-void ReleaseLegacyBufferTripleRuntimeF(
   LegacyBufferTripleRuntime* const owner
 )
 {
@@ -7094,45 +6954,6 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
 }
 
 /**
- * Address: 0x0092BE50 (FUN_0092BE50)
- *
- * What it does:
- * Copies one byte range `[first, last)` into an optional destination buffer
- * and returns the destination cursor advanced by copied length.
- */
-std::uint8_t* CopyByteRangeAndAdvanceRuntimeA(
-  const std::uint8_t* first,
-  const std::uint8_t* last,
-  std::uint8_t* output
-) noexcept
-{
-  while (first != last) {
-    if (output != nullptr) {
-      *output = *first;
-    }
-    ++first;
-    ++output;
-  }
-  return output;
-}
-
-/**
- * Address: 0x00954250 (FUN_00954250)
- *
- * What it does:
- * Copies one byte range `[first, last)` into an optional destination buffer
- * and returns the destination cursor advanced by copied length.
- */
-std::uint8_t* CopyByteRangeAndAdvanceRuntimeB(
-  const std::uint8_t* first,
-  const std::uint8_t* last,
-  std::uint8_t* output
-) noexcept
-{
-  return CopyByteRangeAndAdvanceRuntimeA(first, last, output);
-}
-
-/**
  * Address: 0x009C50A0 (FUN_009C50A0)
  *
  * What it does:
@@ -8618,21 +8439,6 @@ int InvokeUnaryCdeclThunkRuntime(
 )
 {
   return thunk->invoke(arg0);
-}
-
-/**
- * Address: 0x00954960 (FUN_00954960)
- *
- * What it does:
- * Unlinks one intrusive node from its current list and resets it as a
- * self-linked singleton.
- */
-void ResetIntrusiveLinkNodeRuntime(IntrusiveLinkNodeRuntime* const node) noexcept
-{
-  node->next->prev = node->prev;
-  node->prev->next = node->next;
-  node->prev = node;
-  node->next = node;
 }
 
 /**

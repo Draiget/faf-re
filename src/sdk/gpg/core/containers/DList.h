@@ -57,6 +57,7 @@ namespace gpg
      * Address: 0x00447470 (FUN_00447470 -- `DeviceExitListener`'s listener
      *   node, from its constructor's unwind path; formerly
      *   `UnlinkAndResetDeviceListenerLink`.)
+     * Address: 0x00954960 (FUN_00954960 -- the 0x10-byte cell of `BuildClusterEdgeCosts`' 9x9 search grid (0x00954A40; links +0x00/+0x04, float cost +0x08, flags +0x0C, packed cell +0x0D): the element destructor it passes to `eh vector constructor iterator` (0x00954A64, with the ctor 0x00954940), to the grid teardowns at 0x00954AB3 / 0x009550A6, and to the unwind funclet's `eh vector destructor iterator` at 0x00B5F350; no direct callers; formerly `ResetIntrusiveLinkNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      */
     ~DListItem()
     {
