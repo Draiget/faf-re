@@ -1509,9 +1509,6 @@
     <ClCompile Include="lua\LuaAssertion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="lua\LuaObjectSerializer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="lua\LuaObjectTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3012,13 +3009,7 @@
     <ClInclude Include="lua\LuaAssertion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="lua\LuaObjectSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="lua\LuaObjectTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lua\LuaStateSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaStateTypeInfo.h">

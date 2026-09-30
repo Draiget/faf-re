@@ -266,7 +266,7 @@ namespace LuaPlus
 		 * Serializes one tagged Lua value lane into write-archive format,
 		 * including named-object indirection and type-specific payload dispatch.
 		 */
-		static void MemberSerialize(gpg::WriteArchive* archive, TObject* object, int version, gpg::RRef* ownerRef);
+		void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
 		/**
 		 * Address: 0x009226F0 (FUN_009226F0, TObject::MemberDeserialize)
@@ -275,7 +275,7 @@ namespace LuaPlus
 		 * Deserializes one tagged Lua value lane from read-archive format,
 		 * including named-object lookup and type-specific payload dispatch.
 		 */
-		static void MemberDeserialize(gpg::ReadArchive* archive, TObject* object, int version, gpg::RRef* ownerRef);
+		void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 	};
 
 	// `traverseproto` (0x009154A0) walks a Proto's constant array as

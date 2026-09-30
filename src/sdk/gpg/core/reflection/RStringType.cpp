@@ -26,26 +26,6 @@ namespace
 } // namespace
 
 /**
- * Address: 0x0091E4D0 (FUN_0091E4D0, TStringSerializer::Deserialize)
- *
- * What it does:
- * Preserves the legacy TString serializer load callback lane as an
- * intentional no-op.
- */
-void TStringSerializerDeserializeNoOp(gpg::ReadArchive*, void*, int, gpg::RRef*)
-{}
-
-/**
- * Address: 0x0091E4E0 (FUN_0091E4E0, TStringSerializer::Serialize)
- *
- * What it does:
- * Preserves the legacy TString serializer save callback lane as an
- * intentional no-op.
- */
-void TStringSerializerSerializeNoOp(gpg::WriteArchive*, void*, int, gpg::RRef*)
-{}
-
-/**
  * Address: 0x008DF1C0 (FUN_008DF1C0, RStringType::GetLexical)
  *
  * What it does:

@@ -69,6 +69,20 @@ struct __declspec(align(4)) TString
 	void MemberSaveConstructArgs(
 		gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
 	);
+
+	/**
+	 * What it does:
+	 * Nothing: the construct hook built the string from its characters.
+	 * `SerSaveLoadHelper<TString>::Deserialize` 0x0091E4D0 is a bare `ret`.
+	 */
+	void MemberDeserialize(gpg::ReadArchive*) {}
+
+	/**
+	 * What it does:
+	 * Nothing: the characters went out with the construct arguments.
+	 * `SerSaveLoadHelper<TString>::Serialize` 0x0091E4E0 is a bare `ret`.
+	 */
+	void MemberSerialize(gpg::WriteArchive*) const {}
 };
 static_assert(offsetof(TString, tt) == 0x04, "TString::tt must be at +0x04");
 static_assert(offsetof(TString, marked) == 0x05, "TString::marked must be at +0x05");
@@ -119,7 +133,7 @@ struct Table
 	 * Serializes one table metatable pointer lane, dense array payload lanes,
 	 * and non-empty hash key/value lanes using the archive owner context.
 	 */
-	static void MemberSerialize(gpg::WriteArchive* archive, Table* object, int version, const gpg::RRef* ownerRef);
+	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
 	/**
 	 * Address: 0x00922950 (FUN_00922950, Table::MemberDeserialize)
@@ -128,7 +142,7 @@ struct Table
 	 * Deserializes one Lua table metatable pointer lane, dense array payload
 	 * lanes, and hashed key/value lanes under owner GC traversal lock.
 	 */
-	static void MemberDeserialize(gpg::ReadArchive* archive, Table* object, int version, const gpg::RRef& ownerRef);
+	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
 	/**
 	 * What it does:
@@ -191,7 +205,7 @@ struct Udata
 	 * Serializes userdata metatable pointer lane and typed payload bytes using
 	 * one owning Lua thread reference as archive owner context.
 	 */
-	static void MemberSerialize(gpg::WriteArchive* archive, Udata* object, int version, gpg::RRef* ownerRef);
+	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
 	/**
 	 * Address: 0x00923170 (FUN_00923170, Udata::MemberDeserialize)
@@ -200,7 +214,7 @@ struct Udata
 	 * Deserializes userdata metatable pointer lane and payload bytes under one
 	 * owning Lua thread traversal lock context.
 	 */
-	static void MemberDeserialize(gpg::ReadArchive* archive, Udata* object, int version, const gpg::RRef& ownerRef);
+	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
 	/**
 	 * What it does:
@@ -293,7 +307,7 @@ struct Proto
 	 * Serializes proto scalar metadata, constants/code/nested-proto lanes, and
 	 * debug name/source pointer lanes under the owning thread archive context.
 	 */
-	static void MemberSerialize(gpg::WriteArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
+	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
 	/**
 	 * Address: 0x00922B20 (FUN_00922B20, Proto::MemberDeserialize)
@@ -302,7 +316,7 @@ struct Proto
 	 * Deserializes proto scalar metadata, constants/code/nested-proto lanes,
 	 * and debug name/source pointer lanes, then validates bytecode consistency.
 	 */
-	static void MemberDeserialize(gpg::ReadArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
+	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
 	/**
 	 * What it does:
@@ -449,7 +463,7 @@ struct LClosure
 	 * Serializes one closure's proto pointer, global-object lane, and upvalue
 	 * pointer array lanes under the owning thread archive context.
 	 */
-	static void MemberSerialize(gpg::WriteArchive* archive, LClosure* object, int version, const gpg::RRef* ownerRef);
+	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
 	/**
 	 * Address: 0x00922AB0 (FUN_00922AB0, LClosure::MemberDeserialize)
@@ -458,7 +472,7 @@ struct LClosure
 	 * Deserializes prototype/global-object/upvalue pointer lanes for one
 	 * Lua closure object.
 	 */
-	static void MemberDeserialize(gpg::ReadArchive* archive, LClosure* object, int version, const gpg::RRef& ownerRef);
+	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
 	/**
 	 * What it does:
@@ -594,12 +608,7 @@ struct __declspec(align(8)) lua_State
 	 * Serializes raw VM stack/callframe/global/upvalue lanes for one
 	 * `lua_State` runtime object.
 	 */
-	static void MemberSerialize(
-		gpg::WriteArchive* archive,
-		lua_State* state,
-		int version,
-		const gpg::RRef* ownerRef
-	);
+	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
 	/**
 	 * Address: 0x00922DD0 (FUN_00922DD0, lua_State::MemberDeserialize)
@@ -608,12 +617,7 @@ struct __declspec(align(8)) lua_State
 	 * Restores one Lua thread stack/callframe/global/upvalue lane set from a
 	 * serialized archive payload.
 	 */
-	static void MemberDeserialize(
-		gpg::ReadArchive* archive,
-		lua_State* state,
-		int version,
-		gpg::RRef* ownerRef
-	);
+	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
 	/**
 	 * What it does:

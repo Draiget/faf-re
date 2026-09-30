@@ -128,746 +128,9 @@ gpg::RType* Udata::sType = nullptr;
 gpg::RType* LClosure::sType = nullptr;
 gpg::RType* lua_State::sType = nullptr;
 
-class TableSerializer : public gpg::SerHelperBase
-{
-public:
-	/**
-	 * Address: 0x00BEA380 (FUN_00BEA380, dynamic initializer for the global
-	 * `TableSerializer` singleton)
-	 *
-	 * What it does:
-	 * Default-constructs the `gpg::SerHelperBase` base and binds the
-	 * load/save callback fields.
-	 */
-	TableSerializer();
-
-	/**
-	 * Address: 0x00C09AF0 (FUN_00C09AF0, TableSerializer::~TableSerializer)
-	 */
-	~TableSerializer();
-
-	/**
-	 * Address: 0x009233A0 (FUN_009233A0, TableSerializer::Deserialize)
-	 *
-	 * What it does:
-	 * Forwards one serialized table payload into `Table::MemberDeserialize`
-	 * using caller-provided owner reference lane.
-	 */
-	static void Deserialize(gpg::ReadArchive* archive, Table* object, int version, gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x00920A50 (FUN_00920A50, TableSerializer::Serialize)
-	 *
-	 * What it does:
-	 * Forwards one table serialization payload into `Table::MemberSerialize`.
-	 */
-	static void Serialize(gpg::WriteArchive* archive, Table* object, int version, gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x0091FBC0 (FUN_0091FBC0, TableSerializer::Init)
-	 *
-	 * What it does:
-	 * Binds load/save callbacks into `Table` RTTI.
-	 */
-	void Init() override;
-
-	gpg::RType::load_func_t mDeserialize; // +0x0C
-	gpg::RType::save_func_t mSerialize;   // +0x10
-};
-
-static_assert(offsetof(TableSerializer, mDeserialize) == 0x0C, "TableSerializer::mDeserialize offset must be 0x0C");
-static_assert(offsetof(TableSerializer, mSerialize) == 0x10, "TableSerializer::mSerialize offset must be 0x10");
-static_assert(sizeof(TableSerializer) == 0x14, "TableSerializer size must be 0x14");
-
-/**
- * Address: 0x00BEA380 (FUN_00BEA380, dynamic initializer for the global
- * `TableSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the
- * load/save callback fields.
- */
-TableSerializer::TableSerializer()
-	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&TableSerializer::Deserialize))
-	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&TableSerializer::Serialize))
-{}
-
-/**
- * Address: 0x00C09AF0 (FUN_00C09AF0, TableSerializer::~TableSerializer)
- */
-TableSerializer::~TableSerializer() = default;
-
-/**
- * Address: 0x0091FBC0 (FUN_0091FBC0, TableSerializer::Init)
- *
- * What it does:
- * Binds load/save callbacks into `Table` RTTI.
- */
-void TableSerializer::Init()
-{
-	gpg::RType* type = Table::sType;
-	if (!type) {
-		type = gpg::LookupRType(typeid(Table));
-		Table::sType = type;
-	}
-
-	GPG_ASSERT(type->serLoadFunc_ == nullptr);
-	type->serLoadFunc_ = mDeserialize;
-	GPG_ASSERT(type->serSaveFunc_ == nullptr);
-	type->serSaveFunc_ = mSerialize;
-}
-
-/**
- * Address: 0x009233A0 (FUN_009233A0, TableSerializer::Deserialize)
- *
- * What it does:
- * Forwards one serialized table payload into `Table::MemberDeserialize`.
- */
-void TableSerializer::Deserialize(
-	gpg::ReadArchive* const archive,
-	Table* const object,
-	const int version,
-	gpg::RRef* const ownerRef
-)
-{
-	Table::MemberDeserialize(archive, object, version, *ownerRef);
-}
-
-/**
- * Address: 0x00920A50 (FUN_00920A50, TableSerializer::Serialize)
- *
- * What it does:
- * Forwards one table serialization payload into `Table::MemberSerialize`.
- */
-void TableSerializer::Serialize(
-	gpg::WriteArchive* const archive,
-	Table* const object,
-	const int version,
-	gpg::RRef* const ownerRef
-)
-{
-	Table::MemberSerialize(archive, object, version, ownerRef);
-}
-
-class LClosureSerializer : public gpg::SerHelperBase
-{
-public:
-	/**
-	 * Address: 0x00BEA490 (FUN_00BEA490, dynamic initializer for the global
-	 * `LClosureSerializer` singleton)
-	 *
-	 * What it does:
-	 * Default-constructs the `gpg::SerHelperBase` base and binds the
-	 * load/save callback fields.
-	 */
-	LClosureSerializer();
-
-	/**
-	 * Address: 0x00C09B80 (FUN_00C09B80, LClosureSerializer::~LClosureSerializer)
-	 */
-	~LClosureSerializer();
-
-	/**
-	 * Address: 0x00921370 (FUN_00921370, LClosureSerializer::Serialize)
-	 * Address: 0x0098FF80 (FUN_0098FF80)
-	 *
-	 * What it does:
-	 * Forwards one closure save lane into `LClosure::MemberSerialize`.
-	 */
-	static void Serialize(gpg::WriteArchive* archive, LClosure* object, int version, const gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x00923430 (FUN_00923430, LClosureSerializer::Deserialize)
-	 *
-	 * What it does:
-	 * Forwards one serialized closure payload into `LClosure::MemberDeserialize`
-	 * using the provided archive owner reference lane.
-	 */
-	static void Deserialize(gpg::ReadArchive* archive, LClosure* object, int version, gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x0091FD50 (FUN_0091FD50, LClosureSerializer::Init)
-	 *
-	 * What it does:
-	 * Binds load/save callbacks into `LClosure` RTTI.
-	 */
-	void Init() override;
-
-	gpg::RType::load_func_t mDeserialize; // +0x0C
-	gpg::RType::save_func_t mSerialize;   // +0x10
-};
-
-static_assert(offsetof(LClosureSerializer, mDeserialize) == 0x0C, "LClosureSerializer::mDeserialize offset must be 0x0C");
-static_assert(offsetof(LClosureSerializer, mSerialize) == 0x10, "LClosureSerializer::mSerialize offset must be 0x10");
-static_assert(sizeof(LClosureSerializer) == 0x14, "LClosureSerializer size must be 0x14");
-
-class ProtoSerializer : public gpg::SerHelperBase
-{
-public:
-	/**
-	 * Address: 0x00BEA6B0 (FUN_00BEA6B0, dynamic initializer for the global
-	 * `ProtoSerializer` singleton)
-	 *
-	 * What it does:
-	 * Default-constructs the `gpg::SerHelperBase` base and binds the
-	 * load/save callback fields.
-	 */
-	ProtoSerializer();
-
-	/**
-	 * Address: 0x00C09CA0 (FUN_00C09CA0, ProtoSerializer::~ProtoSerializer)
-	 */
-	~ProtoSerializer();
-
-	/**
-	 * Address: 0x00923520 (FUN_00923520, ProtoSerializer::Deserialize)
-	 *
-	 * What it does:
-	 * Forwards one proto load lane into `Proto::MemberDeserialize`.
-	 */
-	static void Deserialize(gpg::ReadArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x009213C0 (FUN_009213C0, ProtoSerializer::Serialize)
-	 *
-	 * What it does:
-	 * Forwards one proto save lane into `Proto::MemberSerialize`.
-	 */
-	static void Serialize(gpg::WriteArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x00920070 (FUN_00920070, ProtoSerializer::Init)
-	 *
-	 * What it does:
-	 * Binds load/save callbacks into `Proto` RTTI.
-	 */
-	void Init() override;
-
-	gpg::RType::load_func_t mDeserialize; // +0x0C
-	gpg::RType::save_func_t mSerialize;   // +0x10
-};
-
-static_assert(offsetof(ProtoSerializer, mDeserialize) == 0x0C, "ProtoSerializer::mDeserialize offset must be 0x0C");
-static_assert(offsetof(ProtoSerializer, mSerialize) == 0x10, "ProtoSerializer::mSerialize offset must be 0x10");
-static_assert(sizeof(ProtoSerializer) == 0x14, "ProtoSerializer size must be 0x14");
-
-class lua_StateSerializer : public gpg::SerHelperBase
-{
-public:
-	/**
-	 * Address: 0x00BEA7C0 (FUN_00BEA7C0, dynamic initializer for the global
-	 * `lua_StateSerializer` singleton)
-	 *
-	 * What it does:
-	 * Default-constructs the `gpg::SerHelperBase` base and binds the
-	 * load/save callback fields.
-	 */
-	lua_StateSerializer();
-
-	/**
-	 * Address: 0x00C09D30 (FUN_00C09D30, lua_StateSerializer::~lua_StateSerializer)
-	 */
-	~lua_StateSerializer();
-
-	/**
-	 * Address: 0x009235D0 (FUN_009235D0, lua_StateSerializer::Deserialize)
-	 *
-	 * What it does:
-	 * Forwards one Lua thread load lane into `lua_State::MemberDeserialize`.
-	 */
-	static void Deserialize(gpg::ReadArchive* archive, lua_State* state, int version, gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x009213F0 (FUN_009213F0, lua_StateSerializer::Serialize)
-	 *
-	 * What it does:
-	 * Forwards one Lua thread save lane into `lua_State::MemberSerialize`.
-	 */
-	static void Serialize(gpg::WriteArchive* archive, lua_State* state, int version, const gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x00920200 (FUN_00920200, lua_StateSerializer::Init)
-	 *
-	 * What it does:
-	 * Binds load/save callbacks into `lua_State` RTTI.
-	 */
-	void Init() override;
-
-	gpg::RType::load_func_t mDeserialize; // +0x0C
-	gpg::RType::save_func_t mSerialize;   // +0x10
-};
-
-static_assert(offsetof(lua_StateSerializer, mDeserialize) == 0x0C, "lua_StateSerializer::mDeserialize offset must be 0x0C");
-static_assert(offsetof(lua_StateSerializer, mSerialize) == 0x10, "lua_StateSerializer::mSerialize offset must be 0x10");
-static_assert(sizeof(lua_StateSerializer) == 0x14, "lua_StateSerializer size must be 0x14");
-
-class TObjectSerializer : public gpg::SerHelperBase
-{
-public:
-	/**
-	 * Address: 0x00BEA160 (FUN_00BEA160, dynamic initializer for the global
-	 * `TObjectSerializer` singleton)
-	 *
-	 * What it does:
-	 * Default-constructs the `gpg::SerHelperBase` base and binds the
-	 * load/save callback fields.
-	 */
-	TObjectSerializer();
-
-	/**
-	 * Address: 0x00C09DF0 (FUN_00C09DF0, TObjectSerializer::~TObjectSerializer)
-	 */
-	~TObjectSerializer();
-
-	/**
-	 * Address: 0x00921FC0 (FUN_00921FC0, TObjectSerializer::Serialize)
-	 *
-	 * What it does:
-	 * Forwards one tagged Lua value save lane into `TObject::MemberSerialize`.
-	 */
-	static void Serialize(gpg::WriteArchive* archive, TObject* object, int version, gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x00923250 (FUN_00923250, TObjectSerializer::Deserialize)
-	 *
-	 * What it does:
-	 * Forwards one tagged Lua value load lane into `TObject::MemberDeserialize`.
-	 */
-	static void Deserialize(gpg::ReadArchive* archive, TObject* object, int version, gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x0091F8A0 (FUN_0091F8A0, TObjectSerializer::Init)
-	 *
-	 * What it does:
-	 * Binds load/save callbacks into the dedicated `gpg::RType::TObject`
-	 * cache slot (see the Doxygen comment on that member in Reflection.h).
-	 */
-	void Init() override;
-
-	gpg::RType::load_func_t mDeserialize; // +0x0C
-	gpg::RType::save_func_t mSerialize;   // +0x10
-};
-
-static_assert(offsetof(TObjectSerializer, mDeserialize) == 0x0C, "TObjectSerializer::mDeserialize offset must be 0x0C");
-static_assert(offsetof(TObjectSerializer, mSerialize) == 0x10, "TObjectSerializer::mSerialize offset must be 0x10");
-static_assert(sizeof(TObjectSerializer) == 0x14, "TObjectSerializer size must be 0x14");
-
-class UdataSerializer : public gpg::SerHelperBase
-{
-public:
-	/**
-	 * Address: 0x00BEA8D0 (FUN_00BEA8D0, dynamic initializer for the global
-	 * `UdataSerializer` singleton)
-	 *
-	 * What it does:
-	 * Default-constructs the `gpg::SerHelperBase` base and binds the
-	 * load/save callback fields.
-	 */
-	UdataSerializer();
-
-	/**
-	 * Address: 0x00C09DC0 (FUN_00C09DC0, UdataSerializer::~UdataSerializer)
-	 */
-	~UdataSerializer();
-
-	/**
-	 * Address: 0x00923660 (FUN_00923660)
-	 *
-	 * What it does:
-	 * Forwards one userdata load lane into `Udata::MemberDeserialize`.
-	 */
-	static void Deserialize(gpg::ReadArchive* archive, Udata* object, int version, gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x00920D90 (FUN_00920D90)
-	 *
-	 * What it does:
-	 * Forwards one userdata save lane into `Udata::MemberSerialize`.
-	 */
-	static void Serialize(gpg::WriteArchive* archive, Udata* object, int version, gpg::RRef* ownerRef);
-
-	/**
-	 * Address: 0x00920390 (FUN_00920390, UdataSerializer::Init)
-	 *
-	 * What it does:
-	 * Binds load/save callbacks into `Udata` RTTI.
-	 */
-	void Init() override;
-
-	gpg::RType::load_func_t mDeserialize; // +0x0C
-	gpg::RType::save_func_t mSerialize;   // +0x10
-};
-
-static_assert(offsetof(UdataSerializer, mDeserialize) == 0x0C, "UdataSerializer::mDeserialize offset must be 0x0C");
-static_assert(offsetof(UdataSerializer, mSerialize) == 0x10, "UdataSerializer::mSerialize offset must be 0x10");
-static_assert(sizeof(UdataSerializer) == 0x14, "UdataSerializer size must be 0x14");
-
-/**
- * Address: 0x00BEA490 (FUN_00BEA490, dynamic initializer for the global
- * `LClosureSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the
- * load/save callback fields.
- */
-LClosureSerializer::LClosureSerializer()
-	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&LClosureSerializer::Deserialize))
-	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&LClosureSerializer::Serialize))
-{}
-
-/**
- * Address: 0x00C09B80 (FUN_00C09B80, LClosureSerializer::~LClosureSerializer)
- */
-LClosureSerializer::~LClosureSerializer() = default;
-
-/**
- * Address: 0x0091FD50 (FUN_0091FD50, LClosureSerializer::Init)
- *
- * What it does:
- * Binds load/save callbacks into `LClosure` RTTI.
- */
-void LClosureSerializer::Init()
-{
-	gpg::RType* type = LClosure::sType;
-	if (!type) {
-		type = gpg::LookupRType(typeid(LClosure));
-		LClosure::sType = type;
-	}
-
-	GPG_ASSERT(type->serLoadFunc_ == nullptr);
-	type->serLoadFunc_ = mDeserialize;
-	GPG_ASSERT(type->serSaveFunc_ == nullptr);
-	type->serSaveFunc_ = mSerialize;
-}
-
-/**
- * Address: 0x00921370 (FUN_00921370, LClosureSerializer::Serialize)
- *
- * What it does:
- * Forwards one closure save lane into `LClosure::MemberSerialize`.
- */
-void LClosureSerializer::Serialize(
-	gpg::WriteArchive* const archive,
-	LClosure* const object,
-	const int version,
-	const gpg::RRef* const ownerRef
-)
-{
-	LClosure::MemberSerialize(archive, object, version, ownerRef);
-}
-
-void LClosureSerializer::Deserialize(
-	gpg::ReadArchive* const archive,
-	LClosure* const object,
-	const int version,
-	gpg::RRef* const ownerRef
-)
-{
-	const gpg::RRef nullOwner{};
-	LClosure::MemberDeserialize(archive, object, version, ownerRef != nullptr ? *ownerRef : nullOwner);
-}
-
-/**
- * Address: 0x00BEA6B0 (FUN_00BEA6B0, dynamic initializer for the global
- * `ProtoSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the
- * load/save callback fields.
- */
-ProtoSerializer::ProtoSerializer()
-	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&ProtoSerializer::Deserialize))
-	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&ProtoSerializer::Serialize))
-{}
-
-/**
- * Address: 0x00C09CA0 (FUN_00C09CA0, ProtoSerializer::~ProtoSerializer)
- */
-ProtoSerializer::~ProtoSerializer() = default;
-
-/**
- * Address: 0x00920070 (FUN_00920070, ProtoSerializer::Init)
- *
- * What it does:
- * Binds load/save callbacks into `Proto` RTTI.
- */
-void ProtoSerializer::Init()
-{
-	gpg::RType* type = Proto::sType;
-	if (!type) {
-		type = gpg::LookupRType(typeid(Proto));
-		Proto::sType = type;
-	}
-
-	GPG_ASSERT(type->serLoadFunc_ == nullptr);
-	type->serLoadFunc_ = mDeserialize;
-	GPG_ASSERT(type->serSaveFunc_ == nullptr);
-	type->serSaveFunc_ = mSerialize;
-}
-
 namespace
 {
-	// Address: 0x00F8E72C -- process-global `TableSerializer` singleton.
-	TableSerializer gTableSerializer;
 
-	// Address: 0x00F8E77C -- process-global `ProtoSerializer` singleton.
-	ProtoSerializer gProtoSerializer;
-
-	// Address: 0x00F8E8AC -- process-global `TObjectSerializer` singleton.
-	TObjectSerializer gTObjectSerializer;
-
-	// Address: 0x00F8E768 -- process-global `LClosureSerializer` singleton.
-	LClosureSerializer gLClosureSerializer;
-
-	// Address: 0x00F8E6F0 -- process-global `UdataSerializer` singleton.
-	UdataSerializer gUdataSerializer;
-
-	// Address: 0x00F8EAAC -- process-global `lua_StateSerializer` singleton.
-	lua_StateSerializer gLuaStateSerializer;
-}
-
-/**
- * Address: 0x00923520 (FUN_00923520, ProtoSerializer::Deserialize)
- *
- * What it does:
- * Forwards one proto load lane into `Proto::MemberDeserialize`.
- */
-void ProtoSerializer::Deserialize(
-	gpg::ReadArchive* const archive,
-	Proto* const object,
-	const int version,
-	gpg::RRef* const ownerRef
-)
-{
-	Proto::MemberDeserialize(archive, object, version, ownerRef);
-}
-
-/**
- * Address: 0x009213C0 (FUN_009213C0, ProtoSerializer::Serialize)
- *
- * What it does:
- * Forwards one proto save lane into `Proto::MemberSerialize`.
- */
-void ProtoSerializer::Serialize(
-	gpg::WriteArchive* const archive,
-	Proto* const object,
-	const int version,
-	gpg::RRef* const ownerRef
-)
-{
-	Proto::MemberSerialize(archive, object, version, ownerRef);
-}
-
-/**
- * Address: 0x00BEA7C0 (FUN_00BEA7C0, dynamic initializer for the global
- * `lua_StateSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the
- * load/save callback fields.
- */
-lua_StateSerializer::lua_StateSerializer()
-	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&lua_StateSerializer::Deserialize))
-	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&lua_StateSerializer::Serialize))
-{}
-
-/**
- * Address: 0x00C09D30 (FUN_00C09D30, lua_StateSerializer::~lua_StateSerializer)
- */
-lua_StateSerializer::~lua_StateSerializer() = default;
-
-/**
- * Address: 0x00920200 (FUN_00920200, lua_StateSerializer::Init)
- *
- * What it does:
- * Binds load/save callbacks into `lua_State` RTTI.
- */
-void lua_StateSerializer::Init()
-{
-	gpg::RType* type = lua_State::sType;
-	if (!type) {
-		type = gpg::LookupRType(typeid(lua_State));
-		lua_State::sType = type;
-	}
-
-	GPG_ASSERT(type->serLoadFunc_ == nullptr);
-	type->serLoadFunc_ = mDeserialize;
-	GPG_ASSERT(type->serSaveFunc_ == nullptr);
-	type->serSaveFunc_ = mSerialize;
-}
-
-/**
- * Address: 0x009235D0 (FUN_009235D0, lua_StateSerializer::Deserialize)
- *
- * What it does:
- * Forwards one Lua thread load lane into `lua_State::MemberDeserialize`.
- */
-void lua_StateSerializer::Deserialize(
-	gpg::ReadArchive* const archive,
-	lua_State* const state,
-	const int version,
-	gpg::RRef* const ownerRef
-)
-{
-	lua_State::MemberDeserialize(archive, state, version, ownerRef);
-}
-
-/**
- * Address: 0x009213F0 (FUN_009213F0, lua_StateSerializer::Serialize)
- *
- * What it does:
- * Forwards one Lua thread save lane into `lua_State::MemberSerialize`.
- */
-void lua_StateSerializer::Serialize(
-	gpg::WriteArchive* const archive,
-	lua_State* const state,
-	const int version,
-	const gpg::RRef* const ownerRef
-)
-{
-	lua_State::MemberSerialize(archive, state, version, ownerRef);
-}
-
-/**
- * Address: 0x00BEA160 (FUN_00BEA160, dynamic initializer for the global
- * `TObjectSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the
- * load/save callback fields.
- */
-TObjectSerializer::TObjectSerializer()
-	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&TObjectSerializer::Deserialize))
-	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&TObjectSerializer::Serialize))
-{}
-
-/**
- * Address: 0x00C09DF0 (FUN_00C09DF0, TObjectSerializer::~TObjectSerializer)
- */
-TObjectSerializer::~TObjectSerializer() = default;
-
-/**
- * Address: 0x0091F8A0 (FUN_0091F8A0, TObjectSerializer::Init)
- *
- * What it does:
- * Binds load/save callbacks into the dedicated `gpg::RType::TObject` cache
- * slot (see the Doxygen comment on that member in Reflection.h).
- */
-void TObjectSerializer::Init()
-{
-	gpg::RType* type = gpg::RType::TObject;
-	if (!type) {
-		type = gpg::LookupRType(typeid(TObject));
-		gpg::RType::TObject = type;
-	}
-
-	GPG_ASSERT(type->serLoadFunc_ == nullptr);
-	type->serLoadFunc_ = mDeserialize;
-	GPG_ASSERT(type->serSaveFunc_ == nullptr);
-	type->serSaveFunc_ = mSerialize;
-}
-
-/**
- * Address: 0x00921FC0 (FUN_00921FC0, TObjectSerializer::Serialize)
- *
- * What it does:
- * Forwards one tagged Lua value save lane into `TObject::MemberSerialize`.
- */
-void TObjectSerializer::Serialize(
-	gpg::WriteArchive* const archive,
-	TObject* const object,
-	const int version,
-	gpg::RRef* const ownerRef
-)
-{
-	TObject::MemberSerialize(archive, object, version, ownerRef);
-}
-
-/**
- * Address: 0x00923250 (FUN_00923250, TObjectSerializer::Deserialize)
- *
- * What it does:
- * Forwards one tagged Lua value load lane into `TObject::MemberDeserialize`.
- */
-void TObjectSerializer::Deserialize(
-	gpg::ReadArchive* const archive,
-	TObject* const object,
-	const int version,
-	gpg::RRef* const ownerRef
-)
-{
-	TObject::MemberDeserialize(archive, object, version, ownerRef);
-}
-
-/**
- * Address: 0x00BEA8D0 (FUN_00BEA8D0, dynamic initializer for the global
- * `UdataSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the
- * load/save callback fields.
- */
-UdataSerializer::UdataSerializer()
-	: mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&UdataSerializer::Deserialize))
-	, mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&UdataSerializer::Serialize))
-{}
-
-/**
- * Address: 0x00C09DC0 (FUN_00C09DC0, UdataSerializer::~UdataSerializer)
- */
-UdataSerializer::~UdataSerializer() = default;
-
-/**
- * Address: 0x00920390 (FUN_00920390, UdataSerializer::Init)
- *
- * What it does:
- * Binds load/save callbacks into `Udata` RTTI.
- */
-void UdataSerializer::Init()
-{
-	gpg::RType* type = Udata::sType;
-	if (!type) {
-		type = gpg::LookupRType(typeid(Udata));
-		Udata::sType = type;
-	}
-
-	GPG_ASSERT(type->serLoadFunc_ == nullptr);
-	type->serLoadFunc_ = mDeserialize;
-	GPG_ASSERT(type->serSaveFunc_ == nullptr);
-	type->serSaveFunc_ = mSerialize;
-}
-
-/**
- * Address: 0x00923660 (FUN_00923660)
- *
- * What it does:
- * Forwards one userdata load lane into `Udata::MemberDeserialize`.
- */
-void UdataSerializer::Deserialize(
-	gpg::ReadArchive* const archive,
-	Udata* const object,
-	const int version,
-	gpg::RRef* const ownerRef
-)
-{
-	const gpg::RRef nullOwner{};
-	Udata::MemberDeserialize(archive, object, version, ownerRef != nullptr ? *ownerRef : nullOwner);
-}
-
-/**
- * Address: 0x00920D90 (FUN_00920D90)
- *
- * What it does:
- * Forwards one userdata save lane into `Udata::MemberSerialize`.
- */
-void UdataSerializer::Serialize(
-	gpg::WriteArchive* const archive,
-	Udata* const object,
-	const int version,
-	gpg::RRef* const ownerRef
-)
-{
-	Udata::MemberSerialize(archive, object, version, ownerRef);
 }
 
 namespace
@@ -18698,54 +17961,47 @@ void LuaState::SetState(lua_State* const state)
  * Serializes one tagged Lua value lane with optional named-object indirection
  * and type-specific payload dispatch.
  */
-void TObject::MemberSerialize(
-	gpg::WriteArchive* const archive,
-	TObject* const object,
-	const int,
-	gpg::RRef* const ownerRef
-)
+void TObject::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
-	Ensure(ownerRef != nullptr, "ownerRef");
 
-	if (object->tt > LUA_TSTRING) {
-		lua_State* const ownerState = ownerRef->TryUpcastLuaThreadState();
-		if (TString* const serializedName = ResolveSerializedNameForLuaObject(ownerState, object->value);
+	if (tt > LUA_TSTRING) {
+		lua_State* const ownerState = ownerRef.TryUpcastLuaThreadState();
+		if (TString* const serializedName = ResolveSerializedNameForLuaObject(ownerState, value);
 			serializedName != nullptr) {
 			archive->WriteInt(-2);
-			archive->WriteTString(serializedName, *ownerRef);
+			archive->WriteTString(serializedName, ownerRef);
 			return;
 		}
 	}
 
-	archive->WriteInt(object->tt);
-	switch (object->tt) {
+	archive->WriteInt(tt);
+	switch (tt) {
 	case LUA_TBOOLEAN:
-		archive->WriteInt(object->value.b);
+		archive->WriteInt(value.b);
 		return;
 	case LUA_TLIGHTUSERDATA:
 		throw gpg::SerializationError("light userdata cannot be serialized");
 	case LUA_TNUMBER:
-		archive->WriteValue(&object->value, 0);
+		archive->WriteValue(&value, 0);
 		return;
 	case LUA_TSTRING:
-		archive->WriteTString(static_cast<TString*>(object->value.p), *ownerRef);
+		archive->WriteTString(static_cast<TString*>(value.p), ownerRef);
 		return;
 	case LUA_TTABLE:
-		archive->WriteTTable(static_cast<Table*>(object->value.p), *ownerRef);
+		archive->WriteTTable(static_cast<Table*>(value.p), ownerRef);
 		return;
 	case LUA_CFUNCTION:
-		archive->WriteCFunction(static_cast<CClosure*>(object->value.p), *ownerRef);
+		archive->WriteCFunction(static_cast<CClosure*>(value.p), ownerRef);
 		return;
 	case LUA_TFUNCTION:
-		archive->WriteFunction(static_cast<LClosure*>(object->value.p), *ownerRef);
+		archive->WriteFunction(static_cast<LClosure*>(value.p), ownerRef);
 		return;
 	case LUA_TUSERDATA:
-		archive->WriteUserdata(static_cast<Udata*>(object->value.p), *ownerRef);
+		archive->WriteUserdata(static_cast<Udata*>(value.p), ownerRef);
 		return;
 	case LUA_TTHREAD:
-		archive->WriteTThread(static_cast<lua_State*>(object->value.p), *ownerRef);
+		archive->WriteTThread(static_cast<lua_State*>(value.p), ownerRef);
 		return;
 	default:
 		return;
@@ -18759,45 +18015,38 @@ void TObject::MemberSerialize(
  * Deserializes one tagged Lua value lane with named-object lookup support and
  * type-specific payload dispatch.
  */
-void TObject::MemberDeserialize(
-	gpg::ReadArchive* const archive,
-	TObject* const object,
-	const int,
-	gpg::RRef* const ownerRef
-)
+void TObject::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
-	Ensure(ownerRef != nullptr, "ownerRef");
 
 	int typeCode = LUA_TNIL;
 	archive->ReadInt(&typeCode);
 	switch (typeCode) {
 	case -2: {
-		lua_State* const ownerState = ownerRef->TryUpcastLuaThreadState();
+		lua_State* const ownerState = ownerRef.TryUpcastLuaThreadState();
 		TString* serializedName = nullptr;
-		(void)archive->ReadPointer(&serializedName, ownerRef);
+		(void)archive->ReadPointer(&serializedName, &ownerRef);
 
 		const TObject* const resolvedObject = ResolveSerializedObjectNameEntry(ownerState, serializedName);
 		if (resolvedObject->tt == LUA_TNIL) {
 			throw gpg::SerializationError("Named script object not found");
 		}
 
-		*object = *resolvedObject;
+		*this = *resolvedObject;
 		return;
 	}
 
 	case LUA_TNONE:
 	case LUA_TNIL:
-		object->tt = typeCode;
-		object->value.p = nullptr;
+		tt = typeCode;
+		value.p = nullptr;
 		return;
 
 	case LUA_TBOOLEAN: {
 		int boolValue = 0;
 		archive->ReadInt(&boolValue);
-		object->tt = LUA_TBOOLEAN;
-		object->value.b = boolValue;
+		tt = LUA_TBOOLEAN;
+		value.b = boolValue;
 		return;
 	}
 
@@ -18807,24 +18056,24 @@ void TObject::MemberDeserialize(
 	case LUA_TNUMBER: {
 		float numberValue = 0.0f;
 		archive->ReadFloat(&numberValue);
-		object->tt = LUA_TNUMBER;
-		object->value.n = numberValue;
+		tt = LUA_TNUMBER;
+		value.n = numberValue;
 		return;
 	}
 
 	case LUA_TSTRING: {
 		TString* stringValue = nullptr;
-		(void)archive->ReadPointer(&stringValue, ownerRef);
-		object->tt = LUA_TSTRING;
-		object->value.p = stringValue;
+		(void)archive->ReadPointer(&stringValue, &ownerRef);
+		tt = LUA_TSTRING;
+		value.p = stringValue;
 		return;
 	}
 
 	case LUA_TTABLE: {
 		Table* tableValue = nullptr;
-		(void)archive->ReadPointer(&tableValue, ownerRef);
-		object->tt = LUA_TTABLE;
-		object->value.p = tableValue;
+		(void)archive->ReadPointer(&tableValue, &ownerRef);
+		tt = LUA_TTABLE;
+		value.p = tableValue;
 		return;
 	}
 
@@ -18833,25 +18082,25 @@ void TObject::MemberDeserialize(
 
 	case LUA_TFUNCTION: {
 		LClosure* functionValue = nullptr;
-		(void)archive->ReadPointer(&functionValue, ownerRef);
-		object->tt = LUA_TFUNCTION;
-		object->value.p = functionValue;
+		(void)archive->ReadPointer(&functionValue, &ownerRef);
+		tt = LUA_TFUNCTION;
+		value.p = functionValue;
 		return;
 	}
 
 	case LUA_TUSERDATA: {
 		Udata* userdataValue = nullptr;
-		(void)archive->ReadPointer(&userdataValue, ownerRef);
-		object->tt = LUA_TUSERDATA;
-		object->value.p = userdataValue;
+		(void)archive->ReadPointer(&userdataValue, &ownerRef);
+		tt = LUA_TUSERDATA;
+		value.p = userdataValue;
 		return;
 	}
 
 	case LUA_TTHREAD: {
 		lua_State* threadValue = nullptr;
-		(void)archive->ReadPointer(&threadValue, ownerRef);
-		object->tt = LUA_TTHREAD;
-		object->value.p = threadValue;
+		(void)archive->ReadPointer(&threadValue, &ownerRef);
+		tt = LUA_TTHREAD;
+		value.p = threadValue;
 		return;
 	}
 
@@ -18867,25 +18116,17 @@ void TObject::MemberDeserialize(
  * Serializes one closure's proto pointer, global-object lane, and upvalue
  * pointer array lanes.
  */
-void LClosure::MemberSerialize(
-	gpg::WriteArchive* const archive,
-	LClosure* const object,
-	const int,
-	const gpg::RRef* const ownerRef
-)
+void LClosure::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
 
-	const gpg::RRef nullOwner{};
-	const gpg::RRef& owner = ownerRef != nullptr ? *ownerRef : nullOwner;
 
-	archive->WritePointer<Proto>(object->p, gpg::TrackedPointerState::Unowned, owner);
+	archive->WritePointer<Proto>(p, gpg::TrackedPointerState::Unowned, ownerRef);
 
-	archive->Write(CachedType<TObject>(gLuaTObjectType), &object->g, owner);
+	archive->Write(CachedType<TObject>(gLuaTObjectType), &g, ownerRef);
 
-	for (std::uint8_t upvalueIndex = 0; upvalueIndex < object->nupvalues; ++upvalueIndex) {
-		archive->WritePointer<UpVal>(object->upvals[upvalueIndex], gpg::TrackedPointerState::Unowned, owner);
+	for (std::uint8_t upvalueIndex = 0; upvalueIndex < nupvalues; ++upvalueIndex) {
+		archive->WritePointer<UpVal>(upvals[upvalueIndex], gpg::TrackedPointerState::Unowned, ownerRef);
 	}
 }
 
@@ -18896,56 +18137,48 @@ void LClosure::MemberSerialize(
  * Serializes proto scalar metadata, constants/code/nested-proto lanes, and
  * debug name/source pointer lanes.
  */
-void Proto::MemberSerialize(
-	gpg::WriteArchive* const archive,
-	Proto* const object,
-	const int,
-	gpg::RRef* const ownerRef
-)
+void Proto::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
 
-	const gpg::RRef nullOwner{};
-	const gpg::RRef& owner = ownerRef != nullptr ? *ownerRef : nullOwner;
 
-	archive->WriteInt(object->sizeupvalues);
-	archive->WriteInt(object->sizek);
-	archive->WriteInt(object->sizecode);
-	archive->WriteInt(object->sizelineinfo);
-	archive->WriteInt(object->sizep);
-	archive->WriteInt(object->sizelocvars);
-	archive->WriteInt(object->lineDefined);
-	archive->WriteUByte(object->nups);
-	archive->WriteUByte(object->numparams);
-	archive->WriteUByte(object->is_vararg);
-	archive->WriteUByte(object->maxstacksize);
+	archive->WriteInt(sizeupvalues);
+	archive->WriteInt(sizek);
+	archive->WriteInt(sizecode);
+	archive->WriteInt(sizelineinfo);
+	archive->WriteInt(sizep);
+	archive->WriteInt(sizelocvars);
+	archive->WriteInt(lineDefined);
+	archive->WriteUByte(nups);
+	archive->WriteUByte(numparams);
+	archive->WriteUByte(is_vararg);
+	archive->WriteUByte(maxstacksize);
 
-	for (int index = 0; index < object->sizek; ++index) {
-		archive->Write(CachedType<TObject>(gLuaTObjectType), &object->k[index], owner);
+	for (int index = 0; index < sizek; ++index) {
+		archive->Write(CachedType<TObject>(gLuaTObjectType), &k[index], ownerRef);
 	}
 
-	archive->WriteBytes(reinterpret_cast<char*>(object->code), sizeof(Instruction) * static_cast<std::size_t>(object->sizecode));
+	archive->WriteBytes(reinterpret_cast<char*>(code), sizeof(Instruction) * static_cast<std::size_t>(sizecode));
 
-	for (int index = 0; index < object->sizep; ++index) {
-		archive->WritePointer<Proto>(object->p[index], gpg::TrackedPointerState::Unowned, owner);
+	for (int index = 0; index < sizep; ++index) {
+		archive->WritePointer<Proto>(p[index], gpg::TrackedPointerState::Unowned, ownerRef);
 	}
 
-	for (int index = 0; index < object->sizelineinfo; ++index) {
-		archive->WriteInt(object->lineinfo[index]);
+	for (int index = 0; index < sizelineinfo; ++index) {
+		archive->WriteInt(lineinfo[index]);
 	}
 
-	for (int index = 0; index < object->sizelocvars; ++index) {
-		archive->WritePointer<TString>(object->locvars[index].varname, gpg::TrackedPointerState::Unowned, owner);
-		archive->WriteInt(object->locvars[index].startpc);
-		archive->WriteInt(object->locvars[index].endpc);
+	for (int index = 0; index < sizelocvars; ++index) {
+		archive->WritePointer<TString>(locvars[index].varname, gpg::TrackedPointerState::Unowned, ownerRef);
+		archive->WriteInt(locvars[index].startpc);
+		archive->WriteInt(locvars[index].endpc);
 	}
 
-	for (int index = 0; index < object->nups; ++index) {
-		archive->WritePointer<TString>(object->upvalues[index], gpg::TrackedPointerState::Unowned, owner);
+	for (int index = 0; index < nups; ++index) {
+		archive->WritePointer<TString>(upvalues[index], gpg::TrackedPointerState::Unowned, ownerRef);
 	}
 
-	archive->WritePointer<TString>(object->source, gpg::TrackedPointerState::Unowned, owner);
+	archive->WritePointer<TString>(source, gpg::TrackedPointerState::Unowned, ownerRef);
 }
 
 /**
@@ -18955,100 +18188,93 @@ void Proto::MemberSerialize(
  * Deserializes proto scalar metadata, constants/code/nested-proto lanes, and
  * debug name/source pointer lanes, then validates bytecode consistency.
  */
-void Proto::MemberDeserialize(
-	gpg::ReadArchive* const archive,
-	Proto* const object,
-	const int,
-	gpg::RRef* const ownerRef
-)
+void Proto::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
-	Ensure(ownerRef != nullptr, "ownerRef");
 
-	lua_State* const ownerState = ownerRef->TryUpcastLuaThreadState();
+	lua_State* const ownerState = ownerRef.TryUpcastLuaThreadState();
 	Ensure(ownerState != nullptr, "ownerState");
 
-	archive->ReadInt(&object->sizeupvalues);
-	archive->ReadInt(&object->sizek);
-	archive->ReadInt(&object->sizecode);
-	archive->ReadInt(&object->sizelineinfo);
-	archive->ReadInt(&object->sizep);
-	archive->ReadInt(&object->sizelocvars);
-	archive->ReadInt(&object->lineDefined);
-	archive->ReadUByte(&object->nups);
-	archive->ReadUByte(&object->numparams);
-	archive->ReadUByte(&object->is_vararg);
-	archive->ReadUByte(&object->maxstacksize);
+	archive->ReadInt(&sizeupvalues);
+	archive->ReadInt(&sizek);
+	archive->ReadInt(&sizecode);
+	archive->ReadInt(&sizelineinfo);
+	archive->ReadInt(&sizep);
+	archive->ReadInt(&sizelocvars);
+	archive->ReadInt(&lineDefined);
+	archive->ReadUByte(&nups);
+	archive->ReadUByte(&numparams);
+	archive->ReadUByte(&is_vararg);
+	archive->ReadUByte(&maxstacksize);
 
-	const gpg::RRef& owner = *ownerRef;
+	const gpg::RRef& owner = ownerRef;
 	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
 
-	object->k = static_cast<TObject*>(luaM_realloc(
+	k = static_cast<TObject*>(luaM_realloc(
 		ownerState,
 		nullptr,
 		0u,
-		static_cast<lu_mem>(sizeof(TObject) * static_cast<std::size_t>(object->sizek))
+		static_cast<lu_mem>(sizeof(TObject) * static_cast<std::size_t>(sizek))
 	));
-	for (int index = 0; index < object->sizek; ++index) {
-		archive->Read(tObjectType, &object->k[index], owner);
+	for (int index = 0; index < sizek; ++index) {
+		archive->Read(tObjectType, &k[index], owner);
 	}
 
-	object->code = static_cast<Instruction*>(luaM_realloc(
+	code = static_cast<Instruction*>(luaM_realloc(
 		ownerState,
 		nullptr,
 		0u,
-		static_cast<lu_mem>(sizeof(Instruction) * static_cast<std::size_t>(object->sizecode))
+		static_cast<lu_mem>(sizeof(Instruction) * static_cast<std::size_t>(sizecode))
 	));
 	archive->ReadBytes(
-		reinterpret_cast<char*>(object->code),
-		sizeof(Instruction) * static_cast<std::size_t>(object->sizecode)
+		reinterpret_cast<char*>(code),
+		sizeof(Instruction) * static_cast<std::size_t>(sizecode)
 	);
 
-	object->p = static_cast<Proto**>(luaM_realloc(
+	p = static_cast<Proto**>(luaM_realloc(
 		ownerState,
 		nullptr,
 		0u,
-		static_cast<lu_mem>(sizeof(Proto*) * static_cast<std::size_t>(object->sizep))
+		static_cast<lu_mem>(sizeof(Proto*) * static_cast<std::size_t>(sizep))
 	));
-	for (int index = 0; index < object->sizep; ++index) {
-		archive->ReadPointer(&object->p[index], ownerRef);
+	for (int index = 0; index < sizep; ++index) {
+		archive->ReadPointer(&p[index], &ownerRef);
 	}
 
-	object->lineinfo = static_cast<int*>(luaM_realloc(
+	lineinfo = static_cast<int*>(luaM_realloc(
 		ownerState,
 		nullptr,
 		0u,
-		static_cast<lu_mem>(sizeof(int) * static_cast<std::size_t>(object->sizelineinfo))
+		static_cast<lu_mem>(sizeof(int) * static_cast<std::size_t>(sizelineinfo))
 	));
-	for (int index = 0; index < object->sizelineinfo; ++index) {
-		archive->ReadInt(&object->lineinfo[index]);
+	for (int index = 0; index < sizelineinfo; ++index) {
+		archive->ReadInt(&lineinfo[index]);
 	}
 
-	object->locvars = static_cast<LocVar*>(luaM_realloc(
+	locvars = static_cast<LocVar*>(luaM_realloc(
 		ownerState,
 		nullptr,
 		0u,
-		static_cast<lu_mem>(sizeof(LocVar) * static_cast<std::size_t>(object->sizelocvars))
+		static_cast<lu_mem>(sizeof(LocVar) * static_cast<std::size_t>(sizelocvars))
 	));
-	for (int index = 0; index < object->sizelocvars; ++index) {
-		archive->ReadPointer(&object->locvars[index].varname, ownerRef);
-		archive->ReadInt(&object->locvars[index].startpc);
-		archive->ReadInt(&object->locvars[index].endpc);
+	for (int index = 0; index < sizelocvars; ++index) {
+		archive->ReadPointer(&locvars[index].varname, &ownerRef);
+		archive->ReadInt(&locvars[index].startpc);
+		archive->ReadInt(&locvars[index].endpc);
 	}
 
-	object->upvalues = static_cast<TString**>(luaM_realloc(
+	upvalues = static_cast<TString**>(luaM_realloc(
 		ownerState,
 		nullptr,
 		0u,
-		static_cast<lu_mem>(sizeof(TString*) * static_cast<std::size_t>(object->nups))
+		static_cast<lu_mem>(sizeof(TString*) * static_cast<std::size_t>(nups))
 	));
-	for (int index = 0; index < object->nups; ++index) {
-		archive->ReadPointer(&object->upvalues[index], ownerRef);
+	for (int index = 0; index < nups; ++index) {
+		archive->ReadPointer(&upvalues[index], &ownerRef);
 	}
 
-	archive->ReadPointer(&object->source, ownerRef);
-	if (!luaG_checkcode(object)) {
+	archive->ReadPointer(&source, &ownerRef);
+	if (!luaG_checkcode(this)) {
 		throw gpg::SerializationError("Consistency check failed: luaG_checkcode(&value)");
 	}
 }
@@ -19060,41 +18286,34 @@ void Proto::MemberDeserialize(
  * Serializes table metatable pointer lane, dense array payload lanes, and
  * non-empty hash key/value lanes.
  */
-void Table::MemberSerialize(
-	gpg::WriteArchive* const archive,
-	Table* const object,
-	const int,
-	const gpg::RRef* const ownerRef
-)
+void Table::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
-	Ensure(ownerRef != nullptr, "ownerRef");
 
-	archive->WritePointer<Table>(object->metatable, gpg::TrackedPointerState::Unowned, *ownerRef);
+	archive->WritePointer<Table>(metatable, gpg::TrackedPointerState::Unowned, ownerRef);
 
-	const int hashNodeCount = 1 << object->lsizenode;
+	const int hashNodeCount = 1 << lsizenode;
 	int nonEmptyHashCount = 0;
 	for (int hashIndex = 0; hashIndex < hashNodeCount; ++hashIndex) {
-		if (object->node[hashIndex].i_val.tt != LUA_TNIL) {
+		if (node[hashIndex].i_val.tt != LUA_TNIL) {
 			++nonEmptyHashCount;
 		}
 	}
 	archive->WriteInt(nonEmptyHashCount);
 
 	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
-	for (int arrayIndex = 0; arrayIndex < object->sizearray; ++arrayIndex) {
-		archive->Write(tObjectType, &object->array[arrayIndex], *ownerRef);
+	for (int arrayIndex = 0; arrayIndex < sizearray; ++arrayIndex) {
+		archive->Write(tObjectType, &array[arrayIndex], ownerRef);
 	}
 
 	for (int hashIndex = 0; hashIndex < hashNodeCount; ++hashIndex) {
-		Node* const node = &object->node[hashIndex];
-		if (node->i_val.tt == LUA_TNIL) {
+		const Node& slot = node[hashIndex];
+		if (slot.i_val.tt == LUA_TNIL) {
 			continue;
 		}
 
-		archive->Write(tObjectType, &node->i_key, *ownerRef);
-		archive->Write(tObjectType, &node->i_val, *ownerRef);
+		archive->Write(tObjectType, &slot.i_key, ownerRef);
+		archive->Write(tObjectType, &slot.i_val, ownerRef);
 	}
 }
 
@@ -19105,15 +18324,9 @@ void Table::MemberSerialize(
  * Deserializes table metatable pointer lane, dense-array element lanes, and
  * hashed key/value lanes under owner GC traversal lock.
  */
-void Table::MemberDeserialize(
-	gpg::ReadArchive* const archive,
-	Table* const object,
-	const int,
-	const gpg::RRef& ownerRef
-)
+void Table::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
 
 	lua_State* const ownerState = ownerRef.TryUpcastLuaThreadState();
 	Ensure(ownerState != nullptr, "ownerState");
@@ -19132,21 +18345,21 @@ void Table::MemberDeserialize(
 		}
 	} lockGuard(ownerState->l_G);
 
-	(void)archive->ReadPointer(&object->metatable, &ownerRef);
+	(void)archive->ReadPointer(&metatable, &ownerRef);
 
 	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
 	int hashEntryCount = 0;
 	archive->ReadInt(&hashEntryCount);
 
-	for (int arrayIndex = 1; arrayIndex <= object->sizearray; ++arrayIndex) {
-		TObject* const destinationSlot = luaH_setnum(ownerState, object, arrayIndex);
+	for (int arrayIndex = 1; arrayIndex <= sizearray; ++arrayIndex) {
+		TObject* const destinationSlot = luaH_setnum(ownerState, this, arrayIndex);
 		archive->Read(tObjectType, destinationSlot, ownerRef);
 	}
 
 	for (int hashIndex = 0; hashIndex < hashEntryCount; ++hashIndex) {
 		TObject key{};
 		archive->Read(tObjectType, &key, ownerRef);
-		TObject* const destinationSlot = luaH_set(ownerState, object, &key);
+		TObject* const destinationSlot = luaH_set(ownerState, this, &key);
 		archive->Read(tObjectType, destinationSlot, ownerRef);
 	}
 }
@@ -19159,57 +18372,9 @@ void Table::MemberDeserialize(
  * metatable pointer as unowned tracked reference, then serializes userdata
  * payload through the stored runtime `RType`.
  */
-void Udata::MemberSerialize(
-	gpg::WriteArchive* const archive,
-	Udata* const object,
-	const int,
-	gpg::RRef* const ownerRef
-)
+void Udata::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
-	Ensure(ownerRef != nullptr, "ownerRef");
-
-	lua_State* const ownerState = ownerRef->TryUpcastLuaThreadState();
-	Ensure(ownerState != nullptr, "ownerState");
-	Ensure(ownerState->l_G != nullptr, "ownerState->l_G");
-
-	struct GlobalStateLockGuard
-	{
-		global_State* state;
-		explicit GlobalStateLockGuard(global_State* const inState) : state(inState)
-		{
-			++state->gcTraversalLockDepth;
-		}
-		~GlobalStateLockGuard()
-		{
-			--state->gcTraversalLockDepth;
-		}
-	} lockGuard(ownerState->l_G);
-
-	archive->WritePointer<Table>(object->metatable, gpg::TrackedPointerState::Unowned, *ownerRef);
-
-	gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(object->len);
-	const void* const payload = reinterpret_cast<const std::uint8_t*>(object) + sizeof(Udata);
-	archive->Write(payloadType, payload, *ownerRef);
-}
-
-/**
- * Address: 0x00923170 (FUN_00923170, Udata::MemberDeserialize)
- *
- * What it does:
- * Deserializes userdata metatable pointer lane and typed payload bytes using
- * one owning Lua thread traversal lock lane from `ownerRef`.
- */
-void Udata::MemberDeserialize(
-	gpg::ReadArchive* const archive,
-	Udata* const object,
-	const int,
-	const gpg::RRef& ownerRef
-)
-{
-	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
 
 	lua_State* const ownerState = ownerRef.TryUpcastLuaThreadState();
 	Ensure(ownerState != nullptr, "ownerState");
@@ -19228,9 +18393,44 @@ void Udata::MemberDeserialize(
 		}
 	} lockGuard(ownerState->l_G);
 
-	(void)archive->ReadPointer(&object->metatable, &ownerRef);
-	gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(object->len);
-	void* const payload = reinterpret_cast<std::uint8_t*>(object) + sizeof(Udata);
+	archive->WritePointer<Table>(metatable, gpg::TrackedPointerState::Unowned, ownerRef);
+
+	gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(len);
+	const void* const payload = reinterpret_cast<const std::uint8_t*>(this) + sizeof(Udata);
+	archive->Write(payloadType, payload, ownerRef);
+}
+
+/**
+ * Address: 0x00923170 (FUN_00923170, Udata::MemberDeserialize)
+ *
+ * What it does:
+ * Deserializes userdata metatable pointer lane and typed payload bytes using
+ * one owning Lua thread traversal lock lane from `ownerRef`.
+ */
+void Udata::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+{
+	Ensure(archive != nullptr, "archive");
+
+	lua_State* const ownerState = ownerRef.TryUpcastLuaThreadState();
+	Ensure(ownerState != nullptr, "ownerState");
+	Ensure(ownerState->l_G != nullptr, "ownerState->l_G");
+
+	struct GlobalStateLockGuard
+	{
+		global_State* state;
+		explicit GlobalStateLockGuard(global_State* const inState) : state(inState)
+		{
+			++state->gcTraversalLockDepth;
+		}
+		~GlobalStateLockGuard()
+		{
+			--state->gcTraversalLockDepth;
+		}
+	} lockGuard(ownerState->l_G);
+
+	(void)archive->ReadPointer(&metatable, &ownerRef);
+	gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(len);
+	void* const payload = reinterpret_cast<std::uint8_t*>(this) + sizeof(Udata);
 	archive->Read(payloadType, payload, ownerRef);
 }
 
@@ -19241,21 +18441,15 @@ void Udata::MemberDeserialize(
  * Deserializes prototype/global-object/upvalue pointer lanes for one Lua
  * closure object.
  */
-void LClosure::MemberDeserialize(
-	gpg::ReadArchive* const archive,
-	LClosure* const object,
-	const int,
-	const gpg::RRef& ownerRef
-)
+void LClosure::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
 
-	archive->ReadPointer(&object->p, &ownerRef);
-	archive->Read(CachedType<TObject>(gLuaTObjectType), &object->g, ownerRef);
+	archive->ReadPointer(&p, &ownerRef);
+	archive->Read(CachedType<TObject>(gLuaTObjectType), &g, ownerRef);
 
-	UpVal** upvalueLane = object->upvals;
-	for (std::uint8_t upvalueIndex = 0; upvalueIndex < object->nupvalues; ++upvalueIndex, ++upvalueLane) {
+	UpVal** upvalueLane = upvals;
+	for (std::uint8_t upvalueIndex = 0; upvalueIndex < nupvalues; ++upvalueIndex, ++upvalueLane) {
 		archive->ReadPointer(upvalueLane, &ownerRef);
 	}
 }
@@ -19267,15 +18461,9 @@ void LClosure::MemberDeserialize(
  * Restores one Lua thread stack/callframe/global/upvalue lane set from a
  * serialized archive payload.
  */
-void lua_State::MemberDeserialize(
-	gpg::ReadArchive* const archive,
-	lua_State* const state,
-	const int,
-	gpg::RRef* const ownerRef
-)
+void lua_State::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(state != nullptr, "state");
 
 	int stackSize = 0;
 	int topIndex = 0;
@@ -19288,22 +18476,20 @@ void lua_State::MemberDeserialize(
 		throw gpg::SerializationError("Consistency check failed: 0 <= ibase && ibase <= itop && itop <= stacksize");
 	}
 
-	luaD_reallocstack(state, stackSize);
+	luaD_reallocstack(this, stackSize);
 
-	const gpg::RRef nullOwner{};
-	const gpg::RRef& owner = ownerRef != nullptr ? *ownerRef : nullOwner;
 	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
 	for (int stackIndex = 0; stackIndex < topIndex; ++stackIndex) {
-		archive->Read(tObjectType, &state->stack[stackIndex], owner);
+		archive->Read(tObjectType, &stack[stackIndex], ownerRef);
 	}
 
-	TObject* const stackBase = state->stack;
-	state->base = &stackBase[baseIndex];
-	state->top = &stackBase[topIndex];
+	TObject* const stackBase = stack;
+	base = &stackBase[baseIndex];
+	top = &stackBase[topIndex];
 
 	std::uint16_t callInfoCapacity = 0u;
 	archive->ReadUShort(&callInfoCapacity);
-	luaD_reallocCI(state, static_cast<int>(callInfoCapacity));
+	luaD_reallocCI(this, static_cast<int>(callInfoCapacity));
 
 	std::uint16_t currentCallInfoIndex = 0u;
 	archive->ReadUShort(&currentCallInfoIndex);
@@ -19311,10 +18497,10 @@ void lua_State::MemberDeserialize(
 		throw gpg::SerializationError("Consistency check failed: ici < size_ci");
 	}
 
-	state->ci = &state->base_ci[currentCallInfoIndex];
+	ci = &base_ci[currentCallInfoIndex];
 
 	for (std::uint16_t callInfoIndex = 0; callInfoIndex <= currentCallInfoIndex; ++callInfoIndex) {
-		CallInfo* const callInfo = state->base_ci + callInfoIndex;
+		CallInfo* const callInfo = base_ci + callInfoIndex;
 
 		int ciBaseByteOffset = 0;
 		int ciTopByteOffset = 0;
@@ -19327,11 +18513,11 @@ void lua_State::MemberDeserialize(
 		if (ciBaseByteOffset > ciTopByteOffset) {
 			throw gpg::SerializationError("Consistency check failed: cibase <= citop");
 		}
-		if (ciTopByteOffset > static_cast<int>(sizeof(TObject) * static_cast<std::size_t>(state->stacksize))) {
+		if (ciTopByteOffset > static_cast<int>(sizeof(TObject) * static_cast<std::size_t>(stacksize))) {
 			throw gpg::SerializationError("Consistency check failed: citop <= (int)(value.stacksize*sizeof(TObject))");
 		}
 
-		auto* const stackBytes = reinterpret_cast<std::uint8_t*>(state->stack);
+		auto* const stackBytes = reinterpret_cast<std::uint8_t*>(stack);
 		callInfo->base = reinterpret_cast<TObject*>(stackBytes + ciBaseByteOffset);
 		callInfo->top = reinterpret_cast<TObject*>(stackBytes + ciTopByteOffset);
 
@@ -19351,10 +18537,10 @@ void lua_State::MemberDeserialize(
 		}
 	}
 
-	archive->Read(tObjectType, &state->_gt, owner);
+	archive->Read(tObjectType, &_gt, ownerRef);
 
 	int upvalueLastStackIndex = topIndex;
-	GCObject** openUpvalueInsert = &state->openupval;
+	GCObject** openUpvalueInsert = &openupval;
 
 	int upvalueStackIndex = -1;
 	archive->ReadInt(&upvalueStackIndex);
@@ -19364,7 +18550,7 @@ void lua_State::MemberDeserialize(
 		}
 
 		UpVal* upvalue = nullptr;
-		archive->ReadPointer(&upvalue, &owner);
+		archive->ReadPointer(&upvalue, &ownerRef);
 		if (upvalue == nullptr) {
 			throw gpg::SerializationError("Consistency check failed: u");
 		}
@@ -19373,7 +18559,7 @@ void lua_State::MemberDeserialize(
 		}
 
 		auto* const upvalueObject = reinterpret_cast<GCObject*>(upvalue);
-		GCObject** link = &state->openupval;
+		GCObject** link = &openupval;
 		while (*link != nullptr && *link != upvalueObject) {
 			link = &(*link)->gch.next;
 		}
@@ -19382,7 +18568,7 @@ void lua_State::MemberDeserialize(
 			upvalueObject->gch.next = nullptr;
 		}
 
-		upvalue->v = &state->stack[upvalueStackIndex];
+		upvalue->v = &stack[upvalueStackIndex];
 		*openUpvalueInsert = upvalueObject;
 		openUpvalueInsert = &upvalueObject->gch.next;
 
@@ -19391,38 +18577,30 @@ void lua_State::MemberDeserialize(
 	}
 }
 
-void lua_State::MemberSerialize(
-	gpg::WriteArchive* const archive,
-	lua_State* const state,
-	const int,
-	const gpg::RRef* const ownerRef
-)
+void lua_State::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(state != nullptr, "state");
 
-	const gpg::RRef nullOwner{};
-	const gpg::RRef& owner = ownerRef != nullptr ? *ownerRef : nullOwner;
 
-	TObject* const stackBase = state->stack;
-	const int baseIndex = static_cast<int>(state->base - stackBase);
-	const int topIndex = static_cast<int>(state->top - stackBase);
+	TObject* const stackBase = stack;
+	const int baseIndex = static_cast<int>(base - stackBase);
+	const int topIndex = static_cast<int>(top - stackBase);
 
-	archive->WriteInt(state->stacksize);
+	archive->WriteInt(stacksize);
 	archive->WriteInt(baseIndex);
 	archive->WriteInt(topIndex);
 
 	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
 	for (int index = 0; index < topIndex; ++index) {
-		archive->Write(tObjectType, &stackBase[index], owner);
+		archive->Write(tObjectType, &stackBase[index], ownerRef);
 	}
 
-	archive->WriteUShort(state->size_ci);
-	const std::uint16_t currentCallInfoIndex = static_cast<std::uint16_t>(state->ci - state->base_ci);
+	archive->WriteUShort(size_ci);
+	const std::uint16_t currentCallInfoIndex = static_cast<std::uint16_t>(ci - base_ci);
 	archive->WriteUShort(currentCallInfoIndex);
 
 	for (std::uint16_t callInfoIndex = 0; callInfoIndex <= currentCallInfoIndex; ++callInfoIndex) {
-		CallInfo* const callInfo = state->base_ci + callInfoIndex;
+		CallInfo* const callInfo = base_ci + callInfoIndex;
 
 		const int callInfoBaseByteOffset = static_cast<int>(
 			reinterpret_cast<const std::uint8_t*>(callInfo->base) - reinterpret_cast<const std::uint8_t*>(stackBase)
@@ -19444,34 +18622,16 @@ void lua_State::MemberSerialize(
 		}
 	}
 
-	archive->Write(tObjectType, &state->_gt, owner);
+	archive->Write(tObjectType, &_gt, ownerRef);
 
-	for (GCObject* openUpval = state->openupval; openUpval != nullptr; openUpval = openUpval->gch.next) {
+	for (GCObject* openUpval = openupval; openUpval != nullptr; openUpval = openUpval->gch.next) {
 		UpVal* const upvalue = &openUpval->uv;
 		archive->WriteInt(static_cast<int>(upvalue->v - stackBase));
 
-		archive->WritePointer<UpVal>(upvalue, gpg::TrackedPointerState::Unowned, owner);
+		archive->WritePointer<UpVal>(upvalue, gpg::TrackedPointerState::Unowned, ownerRef);
 	}
 
 	archive->WriteInt(-1);
-}
-
-/**
- * Address: 0x0090B8F0 (FUN_0090B8F0, LuaPlus::LuaState::MemberSerialize)
- *
- * What it does:
- * Serializes root/current LuaState pointer lanes for archive ownership
- * restoration.
- */
-void LuaState::MemberSerialize(gpg::WriteArchive* const archive, LuaState* const state)
-{
-	Ensure(archive != nullptr, "archive");
-	Ensure(state != nullptr, "state");
-	Ensure(state->m_rootState != nullptr, "state->m_rootState");
-
-	archive->WritePointer<LuaPlus::LuaState>(state->m_rootState, gpg::TrackedPointerState::Unowned, gpg::RRef{});
-
-	archive->WritePointer<lua_State>(state->m_state, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 }
 
 LuaState* LuaState::GetActiveState()
@@ -19928,17 +19088,16 @@ lua_State* LuaObject::GetActiveCState() const
  * What it does:
  * Serializes LuaObject state ownership lane and TObject payload.
  */
-void LuaObject::MemberSerialize(gpg::WriteArchive* const archive, LuaObject* const object)
+void LuaObject::MemberSerialize(gpg::WriteArchive* const archive)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
 
-	archive->WritePointer<LuaPlus::LuaState>(object->m_state, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+	archive->WritePointer<LuaPlus::LuaState>(m_state, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
-	if (object->m_state != nullptr) {
+	if (m_state != nullptr) {
 		gpg::RRef ownerRef{};
-		ownerRef = gpg::MakeRRef<lua_State>(object->m_state->m_state);
-		archive->Write(CachedType<TObject>(gLuaTObjectType), &object->m_object, ownerRef);
+		ownerRef = gpg::MakeRRef<lua_State>(m_state->m_state);
+		archive->Write(CachedType<TObject>(gLuaTObjectType), &m_object, ownerRef);
 	}
 }
 
@@ -19948,28 +19107,22 @@ void LuaObject::MemberSerialize(gpg::WriteArchive* const archive, LuaObject* con
  * What it does:
  * Deserializes LuaObject state ownership lane and TObject payload.
  */
-void LuaObject::MemberDeserialize(
-	gpg::ReadArchive* const archive,
-	LuaObject* const object,
-	const int,
-	const gpg::RRef& ownerRef
-)
+void LuaObject::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
 {
 	Ensure(archive != nullptr, "archive");
-	Ensure(object != nullptr, "object");
 
 	LuaState* state = nullptr;
 	(void)archive->ReadPointer(&state, &ownerRef);
 	if (state != nullptr) {
-		object->AssignNil(state);
+		AssignNil(state);
 
 		gpg::RRef stateOwner{};
-		stateOwner = gpg::MakeRRef<lua_State>(object->m_state->m_state);
-		archive->Read(CachedType<TObject>(gLuaTObjectType), &object->m_object, stateOwner);
+		stateOwner = gpg::MakeRRef<lua_State>(m_state->m_state);
+		archive->Read(CachedType<TObject>(gLuaTObjectType), &m_object, stateOwner);
 		return;
 	}
 
-	*object = LuaObject{};
+	*this = LuaObject{};
 }
 
 /**
@@ -22384,3 +21537,132 @@ namespace gpg
 		return RRefWrapFileImpl(out, static_cast<WrapFile*>(object));
 	}
 }
+
+/**
+ * `gpg::SerSaveLoadHelper<Table>`, vtable 0x00D47030.
+ *
+ * Address: 0x00BEA380 (FUN_00BEA380 -- constructs the global and registers its destructor.)
+ * Address: 0x00C09AF0 (FUN_00C09AF0 -- the global's destructor.)
+ * Address: 0x0091FBC0 (FUN_0091FBC0 -- `Init`.)
+ * Address: 0x009233A0 (FUN_009233A0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+ * Address: 0x00920A50 (FUN_00920A50 -- `Serialize`, a forward to `MemberSerialize`.)
+ */
+struct TableSerializer : gpg::SerSaveLoadHelper<Table>
+{};
+
+namespace
+{
+	// Address: 0x00F8E72C -- process-global `TableSerializer` singleton.
+	TableSerializer gTableSerializer;
+} // namespace
+
+/**
+ * `gpg::SerSaveLoadHelper<LClosure>`, vtable 0x00D47038.
+ *
+ * Address: 0x00BEA490 (FUN_00BEA490 -- constructs the global and registers its destructor.)
+ * Address: 0x00C09B80 (FUN_00C09B80 -- the global's destructor.)
+ * Address: 0x0091FD50 (FUN_0091FD50 -- `Init`.)
+ * Address: 0x00923430 (FUN_00923430 -- `Deserialize`, a forward to `MemberDeserialize`.)
+ * Address: 0x00921370 (FUN_00921370 -- `Serialize`, a forward to `MemberSerialize`.)
+ */
+struct LClosureSerializer : gpg::SerSaveLoadHelper<LClosure>
+{};
+
+namespace
+{
+	// Address: 0x00F8E768 -- process-global `LClosureSerializer` singleton.
+	LClosureSerializer gLClosureSerializer;
+} // namespace
+
+/**
+ * `gpg::SerSaveLoadHelper<Proto>`, vtable 0x00D47040.
+ *
+ * Address: 0x00BEA6B0 (FUN_00BEA6B0 -- constructs the global and registers its destructor.)
+ * Address: 0x00C09CA0 (FUN_00C09CA0 -- the global's destructor.)
+ * Address: 0x00920070 (FUN_00920070 -- `Init`.)
+ * Address: 0x00923520 (FUN_00923520 -- `Deserialize`, a forward to `MemberDeserialize`.)
+ * Address: 0x009213C0 (FUN_009213C0 -- `Serialize`, a forward to `MemberSerialize`.)
+ */
+struct ProtoSerializer : gpg::SerSaveLoadHelper<Proto>
+{};
+
+namespace
+{
+	// Address: 0x00F8E77C -- process-global `ProtoSerializer` singleton.
+	ProtoSerializer gProtoSerializer;
+} // namespace
+
+/**
+ * `gpg::SerSaveLoadHelper<lua_State>`, vtable 0x00D47050.
+ *
+ * Address: 0x00BEA7C0 (FUN_00BEA7C0 -- constructs the global and registers its destructor.)
+ * Address: 0x00C09D30 (FUN_00C09D30 -- the global's destructor.)
+ * Address: 0x00920200 (FUN_00920200 -- `Init`.)
+ * Address: 0x009235D0 (FUN_009235D0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+ * Address: 0x009213F0 (FUN_009213F0 -- `Serialize`, a forward to `MemberSerialize`.)
+ */
+struct lua_StateSerializer : gpg::SerSaveLoadHelper<lua_State>
+{};
+
+namespace
+{
+	// Address: 0x00F8EAAC -- process-global `lua_StateSerializer` singleton.
+	lua_StateSerializer glua_StateSerializer;
+} // namespace
+
+/**
+ * `gpg::SerSaveLoadHelper<TObject>`, vtable 0x00D47010.
+ *
+ * Address: 0x00BEA160 (FUN_00BEA160 -- constructs the global and registers its destructor.)
+ * Address: 0x00C09DF0 (FUN_00C09DF0 -- the global's destructor.)
+ * Address: 0x0091F8A0 (FUN_0091F8A0 -- `Init`.)
+ * Address: 0x00923250 (FUN_00923250 -- `Deserialize`, a forward to `MemberDeserialize`.)
+ * Address: 0x00921FC0 (FUN_00921FC0 -- `Serialize`, a forward to `MemberSerialize`.)
+ */
+struct TObjectSerializer : gpg::SerSaveLoadHelper<TObject>
+{};
+
+namespace
+{
+	// Address: 0x00F8E8AC -- process-global `TObjectSerializer` singleton.
+	TObjectSerializer gTObjectSerializer;
+} // namespace
+
+/**
+ * `gpg::SerSaveLoadHelper<Udata>`, vtable 0x00D47058.
+ *
+ * Address: 0x00BEA8D0 (FUN_00BEA8D0 -- constructs the global and registers its destructor.)
+ * Address: 0x00C09DC0 (FUN_00C09DC0 -- the global's destructor.)
+ * Address: 0x00920390 (FUN_00920390 -- `Init`.)
+ * Address: 0x00923660 (FUN_00923660 -- `Deserialize`, a forward to `MemberDeserialize`.)
+ * Address: 0x00920D90 (FUN_00920D90 -- `Serialize`, a forward to `MemberSerialize`.)
+ */
+struct UdataSerializer : gpg::SerSaveLoadHelper<Udata>
+{};
+
+namespace
+{
+	// Address: 0x00F8E6F0 -- process-global `UdataSerializer` singleton.
+	UdataSerializer gUdataSerializer;
+} // namespace
+
+namespace LuaPlus
+{
+	/**
+	 * `gpg::SerSaveLoadHelper<LuaObject>`, vtable 0x00D44F5C.
+	 *
+	 * Address: 0x00BE9F50 (FUN_00BE9F50 -- constructs the global and registers its destructor.)
+	 * Address: 0x00C098B0 (FUN_00C098B0 -- the global's destructor.)
+	 * Address: 0x0090B560 (FUN_0090B560 -- `Init`.)
+	 * Address: 0x0090BE70 (FUN_0090BE70 -- `Deserialize`, a forward to `MemberDeserialize`.)
+	 * Address: 0x0090BA10 (FUN_0090BA10 -- `Serialize`, a forward to `MemberSerialize`.)
+	 */
+	struct LuaObjectSerializer : gpg::SerSaveLoadHelper<LuaObject>
+	{};
+} // namespace LuaPlus
+
+namespace
+{
+	// Address: 0x00F8E5AC -- process-global `LuaObjectSerializer` singleton.
+	LuaPlus::LuaObjectSerializer gLuaObjectSerializer;
+} // namespace

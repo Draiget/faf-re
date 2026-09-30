@@ -726,6 +726,18 @@ struct TStringConstruct : gpg::SerConstructHelper<TString>
 {};
 
 /**
+ * `gpg::SerSaveLoadHelper<TString>`, vtable 0x00D46A60.
+ *
+ * Address: 0x00BEA270 (FUN_00BEA270 -- constructs the global and registers its destructor.)
+ * Address: 0x00C09A60 (FUN_00C09A60 -- the global's destructor.)
+ * Address: 0x0091FA30 (FUN_0091FA30 -- `Init`.)
+ * Address: 0x0091E4D0 (FUN_0091E4D0 -- `Deserialize`, `MemberDeserialize` inlined.)
+ * Address: 0x0091E4E0 (FUN_0091E4E0 -- `Serialize`, `MemberSerialize` inlined.)
+ */
+struct TStringSerializer : gpg::SerSaveLoadHelper<TString>
+{};
+
+/**
  * `gpg::SerSaveConstructHelper<Table>`, vtable 0x00D47020.
  *
  * Address: 0x00BEA310 (FUN_00BEA310 -- constructs the global and registers its destructor.)
@@ -882,6 +894,9 @@ namespace
 
 	// Address: 0x00F8E704 -- process-global `TStringConstruct` singleton.
 	TStringConstruct gTStringConstruct;
+
+	// Address: 0x00F8E934 -- process-global `TStringSerializer` singleton.
+	TStringSerializer gTStringSerializer;
 
 	// Address: 0x00F8E87C -- process-global `TableSaveConstruct` singleton.
 	TableSaveConstruct gTableSaveConstruct;

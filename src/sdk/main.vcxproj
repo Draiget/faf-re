@@ -392,7 +392,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="lua\LuaError.cpp" />
     <ClCompile Include="lua\LuaObject.cpp" />
     <ClCompile Include="lua\LuaParser.cpp" />
-    <ClCompile Include="lua\LuaObjectSerializer.cpp" />
     <ClCompile Include="lua\LuaObjectTypeInfo.cpp" />
     <ClCompile Include="lua\LuaRuntimeTypeInfo.cpp" />
     <ClCompile Include="lua\LuaStateSerializer.cpp" />
@@ -1562,9 +1561,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="lua\LuaAssertion.h" />
     <ClInclude Include="lua\LuaParser.h" />
     <ClInclude Include="lua\LuaUndump.h" />
-    <ClInclude Include="lua\LuaObjectSerializer.h" />
     <ClInclude Include="lua\LuaObjectTypeInfo.h" />
-    <ClInclude Include="lua\LuaStateSerializer.h" />
     <ClInclude Include="lua\LuaStateTypeInfo.h" />
     <ClInclude Include="lua\LuaTableIterator.h" />
     <ClInclude Include="moho\ai\CAiTarget.h" />

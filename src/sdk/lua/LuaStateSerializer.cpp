@@ -1,16 +1,41 @@
-#include "lua/LuaStateSerializer.h"
 
+#include <cstddef>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace LuaPlus;
 
 namespace LuaPlus
 {
+	/**
+	 * Address: 0x0090BC90 (FUN_0090BC90 -- an unreferenced out-of-line copy;
+	 * `SerSaveLoadHelper<LuaState>::Deserialize` 0x0090BD60 inlines it.)
+	 */
+	void LuaState::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+	{
+		LuaState* rootState = nullptr;
+		archive->ReadPointer(&rootState, &ownerRef);
+
+		const gpg::RRef rootThreadRef = gpg::MakeRRef(rootState->m_state);
+		lua_State* thread = nullptr;
+		archive->ReadPointer(&thread, &rootThreadRef);
+		SetState(thread);
+	}
+
+	/**
+	 * Address: 0x0090B8F0 (FUN_0090B8F0, LuaPlus::LuaState::MemberSerialize)
+	 */
+	void LuaState::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
+	{
+		archive->WritePointer(m_rootState, gpg::TrackedPointerState::Unowned, ownerRef);
+		archive->WritePointer(m_state, gpg::TrackedPointerState::Unowned, gpg::MakeRRef(m_rootState->m_state));
+	}
+
 	void LuaState::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
 	{
 		result.SetUnowned(gpg::MakeRRef(new LuaState(UNBOUND)), 0u);
@@ -55,98 +80,31 @@ namespace LuaPlus
 
 namespace
 {
-/**
- * Address: 0x0090BC90 (FUN_0090BC90)
- *
- * What it does:
- * Reads serialized root/active Lua-state pointer lanes and rebinds the target
- * `LuaState` wrapper to the restored active lane.
- */
-void DeserializeLuaStatePointerPair(
-	gpg::ReadArchive* const archive,
-	LuaState* const state,
-	const gpg::RRef* const ownerRef
-)
-{
-	LuaState* rootState = nullptr;
-	(void)archive->ReadPointer(&rootState, ownerRef);
-
-	gpg::RRef rootStateRef{};
-	rootStateRef = gpg::MakeRRef<lua_State>(rootState->m_state);
-
-	lua_State* activeState = nullptr;
-	(void)archive->ReadPointer(&activeState, &rootStateRef);
-	state->SetState(activeState);
-}
-
 // Address: 0x00F8E5C0 -- process-global `LuaStateSaveConstruct` singleton.
 LuaStateSaveConstruct gLuaStateSaveConstruct;
 
 // Address: 0x00F8E5E4 -- process-global `LuaStateConstruct` singleton.
 LuaStateConstruct gLuaStateConstruct;
 
-// Address: 0x00F8E5D0 -- process-global `LuaStateSerializer` singleton.
-LuaStateSerializer gLuaStateSerializer;
 } // namespace
 
-/**
- * Address: 0x0090B980 (FUN_0090B980, LuaPlus::LuaStateSerializer::Serialize)
- *
- * What it does:
- * Forwards one LuaState save lane to `LuaState::MemberSerialize`.
- */
-void LuaStateSerializer::Serialize(gpg::WriteArchive* const archive, LuaState* const state)
+namespace LuaPlus
 {
-	LuaState::MemberSerialize(archive, state);
-}
+	/**
+	 * `gpg::SerSaveLoadHelper<LuaState>`, vtable 0x00D44F54.
+	 *
+	 * Address: 0x00BEA000 (FUN_00BEA000 -- constructs the global and registers its destructor.)
+	 * Address: 0x00C09880 (FUN_00C09880 -- the global's destructor.)
+	 * Address: 0x0090B6F0 (FUN_0090B6F0 -- `Init`.)
+	 * Address: 0x0090BD60 (FUN_0090BD60 -- `Deserialize`, `MemberDeserialize` inlined.)
+	 * Address: 0x0090B980 (FUN_0090B980 -- `Serialize`, a forward to `MemberSerialize`.)
+	 */
+	struct LuaStateSerializer : gpg::SerSaveLoadHelper<LuaState>
+	{};
+} // namespace LuaPlus
 
-/**
- * Address: 0x0090BD60 (FUN_0090BD60, LuaPlus::LuaStateSerializer::Deserialize)
- *
- * What it does:
- * Restores one LuaState wrapper by reading root/current pointer lanes and
- * rebinding via `LuaState::SetState`.
- */
-void LuaStateSerializer::Deserialize(
-	gpg::ReadArchive* const archive,
-	LuaState* const state,
-	const int version,
-	const gpg::RRef* const ownerRef
-)
+namespace
 {
-	(void)version;
-	DeserializeLuaStatePointerPair(archive, state, ownerRef);
-}
-
-/**
- * Address: 0x00BEA000 (FUN_00BEA000, register_LuaStateSerializer, dynamic
- * initializer for the global `LuaStateSerializer` singleton)
- */
-LuaStateSerializer::LuaStateSerializer()
-	: mSerLoadFunc(reinterpret_cast<gpg::RType::load_func_t>(&LuaStateSerializer::Deserialize))
-	, mSerSaveFunc(reinterpret_cast<gpg::RType::save_func_t>(&LuaStateSerializer::Serialize))
-{}
-
-/**
- * Address: 0x00C09880 (FUN_00C09880, ??1LuaStateSerializer@LuaPlus@@QAE@@Z)
- */
-LuaStateSerializer::~LuaStateSerializer() = default;
-
-/**
- * Address: 0x0090B6F0 (FUN_0090B6F0, LuaPlus::LuaStateSerializer::Init)
- *
- * What it does:
- * Binds LuaState load/save serializer callbacks into RTTI.
- */
-void LuaStateSerializer::Init()
-{
-	gpg::RType* type = LuaState::sType;
-	if (!type) {
-		type = gpg::LookupRType(typeid(LuaState));
-		LuaState::sType = type;
-	}
-	GPG_ASSERT(type->serLoadFunc_ == nullptr);
-	type->serLoadFunc_ = mSerLoadFunc;
-	GPG_ASSERT(type->serSaveFunc_ == nullptr);
-	type->serSaveFunc_ = mSerSaveFunc;
-}
+	// Address: 0x00F8E5D0 -- process-global `LuaStateSerializer` singleton.
+	LuaPlus::LuaStateSerializer gLuaStateSerializer;
+} // namespace
