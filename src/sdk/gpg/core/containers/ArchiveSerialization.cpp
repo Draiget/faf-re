@@ -256,39 +256,6 @@ namespace
   };
   static_assert(sizeof(SPathNeighborTypeInfo) == 0x64, "SPathNeighborTypeInfo size must be 0x64");
 
-  /**
-   * Demangled: gpg::SerSaveLoadHelper<std::pair<Moho::HPathCell,float>>
-   *
-   * Real `gpg::SerHelperBase`-derived save/load helper for the reflected
-   * `std::pair<Moho::HPathCell,float>` leaf. Previously modeled as a raw
-   * `SerSaveLoadHelperNodeRuntime` POD with a hand-built one-entry fake
-   * vtable pointing at a free function - `Init()` below is the real
-   * override (address 0x0076D6D0), dispatched through the genuine
-   * compiler-generated vtable now that this type actually inherits
-   * `gpg::SerHelperBase`.
-   */
-  class SPathNeighborSerializer : public gpg::SerHelperBase
-  {
-  public:
-    SPathNeighborSerializer();
-
-    /**
-     * Address: 0x0076D6D0 (FUN_0076D6D0, gpg::SerSaveLoadHelper_pair_HPathCell_float::Init)
-     *
-     * What it does:
-     * Binds load/save callbacks onto the reflected `std::pair<Moho::HPathCell,float>` type.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-  static_assert(offsetof(SPathNeighborSerializer, mLoadCallback) == 0x0C, "SPathNeighborSerializer::mLoadCallback offset must be 0x0C");
-  static_assert(offsetof(SPathNeighborSerializer, mSaveCallback) == 0x10, "SPathNeighborSerializer::mSaveCallback offset must be 0x10");
-  static_assert(sizeof(SPathNeighborSerializer) == 0x14, "SPathNeighborSerializer size must be 0x14");
-
-  gpg::RType* gPathNeighborCellWeightType = nullptr;
 
   /**
    * Address: 0x0076D360 (FUN_0076D360, preregister_SPathNeighborTypeInfo)
@@ -298,7 +265,7 @@ namespace
    * `std::pair<Moho::HPathCell,float>`. Reached from `sub_BDCAD0`
    * (`.CRT$XCL`/`__xc_a` static-init table), the same shape as every other
    * scalar `RType` leaf preregistration this session. Fixes a real gap:
-   * `SPathNeighborSerializer::Init` below resolves this
+   * `SerSaveLoadHelper<SPathNeighbor>::Init` resolves this
    * type via a lazy `gpg::LookupRType(typeid(std::pair<moho::HPathCell,
    * float>))`, which throws `std::runtime_error` if nothing preregistered
    * the type first - this is what the real binary runs before that consumer
@@ -308,7 +275,6 @@ namespace
   {
     static SPathNeighborTypeInfo typeInfo;
     gpg::PreRegisterRType(typeid(std::pair<moho::HPathCell, float>), &typeInfo);
-    gPathNeighborCellWeightType = &typeInfo;
     return &typeInfo;
   }
 
@@ -445,157 +411,15 @@ namespace
   }
 
   NavPathSerializer gNavPathSerializerHelper;
-  SPathNeighborSerializer gSPathNeighborSerializerHelper;
-
-  [[nodiscard]] gpg::RType* ResolveHPathCellSerializerType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::HPathCell");
-      if (sType == nullptr) {
-        sType = gpg::REF_FindTypeNamed("HPathCell");
-      }
-      if (sType == nullptr) {
-        sType = gpg::LookupRType(typeid(moho::HPathCell));
-      }
-    }
-    return sType;
-  }
-
   /**
-   * Address: 0x0076D760 (FUN_0076D760)
+   * `moho::SPathNeighborSerializer`, a `gpg::SerSaveLoadHelper<std::pair<Moho::HPathCell,float>>`:
    *
-   * What it does:
-   * Reads one `{HPathCell,float}` pair lane by deserializing the `HPathCell`
-   * head first and then one trailing float.
+   * Address: 0x0076D4D0 (FUN_0076D4D0 -- the dynamic initializer constructing this global.)
+   * Address: 0x0076D6D0 (FUN_0076D6D0 -- `Init`.)
+   * Address: 0x0076D4A0 (FUN_0076D4A0 -- `Deserialize`, into `moho::SerLoadMembers`.)
+   * Address: 0x0076D4B0 (FUN_0076D4B0 -- `Serialize`, into `moho::SerSaveMembers`.)
    */
-  void DeserializePathNeighborCellWeightPair(
-    moho::SPathNeighbor* const value,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (value == nullptr || archive == nullptr) {
-      return;
-    }
-
-    gpg::RType* const hPathCellType = ResolveHPathCellSerializerType();
-    gpg::RRef ownerRef{};
-    archive->Read(hPathCellType, &value->first, ownerRef);
-    archive->ReadFloat(&value->second);
-  }
-
-  /**
-   * Address: 0x0076D7B0 (FUN_0076D7B0)
-   *
-   * What it does:
-   * Writes one `{HPathCell,float}` pair lane by serializing the `HPathCell`
-   * head first and then one trailing float.
-   */
-  void SerializePathNeighborCellWeightPair(
-    const moho::SPathNeighbor* const value,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (value == nullptr || archive == nullptr) {
-      return;
-    }
-
-    gpg::RType* const hPathCellType = ResolveHPathCellSerializerType();
-    const gpg::RRef ownerRef{};
-    archive->Write(hPathCellType, &value->first, ownerRef);
-    archive->WriteFloat(value->second);
-  }
-
-  /**
-   * Address: 0x0076D4A0 (FUN_0076D4A0, Moho::SPathNeighborSerializer::Deserialize)
-   *
-   * What it does:
-   * Archive callback wrapper that forwards one reflected object lane into the
-   * typed path-neighbor pair read helper.
-   */
-  [[maybe_unused]] void DeserializeSPathNeighborSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const int objectStorage,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const value = reinterpret_cast<moho::SPathNeighbor*>(static_cast<std::uintptr_t>(objectStorage));
-    DeserializePathNeighborCellWeightPair(value, archive);
-  }
-
-  /**
-   * Address: 0x0076D4B0 (FUN_0076D4B0, Moho::SPathNeighborSerializer::Serialize)
-   *
-   * What it does:
-   * Archive callback wrapper that forwards one reflected object lane into the
-   * typed path-neighbor pair write helper.
-   */
-  [[maybe_unused]] void SerializeSPathNeighborSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const int objectStorage,
-    const int,
-    gpg::RRef*
-  )
-  {
-    const auto* const value =
-      reinterpret_cast<const moho::SPathNeighbor*>(static_cast<std::uintptr_t>(objectStorage));
-    SerializePathNeighborCellWeightPair(value, archive);
-  }
-
-  /**
-   * Address: 0x0076D4D0 (FUN_0076D4D0, dynamic initializer for the global
-   * `SPathNeighborSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-   * splices it into the process-global `sNewHelpers` pending list), then
-   * binds the deserialize/serialize callback pair.
-   */
-  SPathNeighborSerializer::SPathNeighborSerializer()
-    : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&DeserializeSPathNeighborSerializerCallback))
-    , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SerializeSPathNeighborSerializerCallback))
-  {}
-
-  /**
-   * Address: 0x0076D6D0 (FUN_0076D6D0, gpg::SerSaveLoadHelper_pair_HPathCell_float::Init)
-   *
-   * What it does:
-   * Binds load/save callbacks onto the reflected `std::pair<Moho::HPathCell,float>` type.
-   */
-  void SPathNeighborSerializer::Init()
-  {
-    gpg::RType* type = gPathNeighborCellWeightType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(std::pair<moho::HPathCell, float>));
-      gPathNeighborCellWeightType = type;
-    }
-
-    if (type == nullptr) {
-      return;
-    }
-
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure(
-        "!type->mSerLoadFunc",
-        84,
-        "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h"
-      );
-    }
-
-    const bool saveWasNull = type->serSaveFunc_ == nullptr;
-    type->serLoadFunc_ = mLoadCallback;
-
-    if (!saveWasNull) {
-      gpg::HandleAssertFailure(
-        "!type->mSerSaveFunc",
-        87,
-        "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h"
-      );
-    }
-
-    type->serSaveFunc_ = mSaveCallback;
-  }
+  moho::SPathNeighborSerializer gSPathNeighborSerializerHelper;
 
   [[nodiscard]] gpg::RType* CachedPathQueueImplType()
   {
@@ -2054,3 +1878,30 @@ int LuaSerializeToString(lua_State* const L)
 
   return 1;
 }
+
+namespace moho
+{
+  /**
+   * Address: 0x0076D760 (FUN_0076D760)
+   *
+   * What it does:
+   * Reads the cell through its reflected type, then the weight.
+   */
+  void SerLoadMembers(gpg::ReadArchive* const archive, SPathNeighbor& neighbor)
+  {
+    archive->Read(gpg::RTypeOf<HPathCell>(), &neighbor.first, gpg::RRef{});
+    archive->ReadFloat(&neighbor.second);
+  }
+
+  /**
+   * Address: 0x0076D7B0 (FUN_0076D7B0)
+   *
+   * What it does:
+   * Writes the cell through its reflected type, then the weight.
+   */
+  void SerSaveMembers(gpg::WriteArchive* const archive, const SPathNeighbor& neighbor)
+  {
+    archive->Write(gpg::RTypeOf<HPathCell>(), &neighbor.first, gpg::RRef{});
+    archive->WriteFloat(neighbor.second);
+  }
+} // namespace moho

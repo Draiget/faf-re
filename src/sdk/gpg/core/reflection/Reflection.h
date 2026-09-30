@@ -2725,6 +2725,32 @@ namespace gpg
   };
   static_assert(sizeof(Rect2fTypeInfo) == 0x64, "Rect2fTypeInfo size must be 0x64");
 
+  namespace detail
+  {
+    inline constexpr char kSerializationHeaderPath[] = "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+  } // namespace detail
+
+  /**
+   * What `SerSaveLoadHelper<T>` runs to load one object: `T`'s own
+   * `MemberDeserialize`. A type that cannot have one (`std::pair`) supplies an
+   * overload in its own namespace.
+   */
+  template <class T>
+  void SerLoadMembers(ReadArchive* const archive, T& object)
+  {
+    object.MemberDeserialize(archive);
+  }
+
+  /**
+   * What `SerSaveLoadHelper<T>` runs to save one object: `T`'s own
+   * `MemberSerialize`, or an overload in `T`'s namespace.
+   */
+  template <class T>
+  void SerSaveMembers(WriteArchive* const archive, const T& object)
+  {
+    object.MemberSerialize(archive);
+  }
+
   /**
    * Demangled: gpg::SerSaveLoadHelper<T>
    *
@@ -2927,19 +2953,24 @@ namespace gpg
      * Address: 0x00626B30 (FUN_00626B30 -- `Init()` for `SPickUpInfo`; formerly `InstallMohoSPickUpInfoSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
      *
      * What it does:
-     * Lazily resolves and caches `T`'s RTTI on `T::sType`, then installs this
-     * helper's load/save callbacks onto that type descriptor (vtable slot 0,
-     * dispatched once by `SerHelperBase::InitNewHelpers`).
+     * Installs this helper's load/save callbacks on `T`'s type (vtable slot 0,
+     * dispatched once by `SerHelperBase::InitNewHelpers`), asserting neither
+     * was set (serialization.h lines 84 and 87). The type comes from a lazy
+     * per-`T` slot, not a member of `T`: `SerSaveLoadHelper<std::pair<
+     * HPathCell, float>>::Init` (0x0076D6D0) is the same code as the class
+     * instantiations.
      */
     void Init() override
     {
-      if (T::sType == nullptr) {
-        T::sType = LookupRType(typeid(T));
+      RType* const type = RTypeOf<T>();
+      if (type->serLoadFunc_ != nullptr) {
+        HandleAssertFailure("!type->mSerLoadFunc", 84, detail::kSerializationHeaderPath);
       }
-      GPG_ASSERT(T::sType->serLoadFunc_ == nullptr);
-      T::sType->serLoadFunc_ = mLoadCallback;
-      GPG_ASSERT(T::sType->serSaveFunc_ == nullptr);
-      T::sType->serSaveFunc_ = mSaveCallback;
+      type->serLoadFunc_ = mLoadCallback;
+      if (type->serSaveFunc_ != nullptr) {
+        HandleAssertFailure("!type->mSerSaveFunc", 87, detail::kSerializationHeaderPath);
+      }
+      type->serSaveFunc_ = mSaveCallback;
     }
 
     /**
@@ -2949,7 +2980,7 @@ namespace gpg
      */
     static void Deserialize(ReadArchive* const archive, const int objectPtr, const int, RRef* const)
     {
-      reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+      SerLoadMembers(archive, *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr)));
     }
 
     /**
@@ -2959,7 +2990,7 @@ namespace gpg
      */
     static void Serialize(WriteArchive* const archive, const int objectPtr, const int, RRef* const)
     {
-      reinterpret_cast<const T*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+      SerSaveMembers(archive, *reinterpret_cast<const T*>(static_cast<std::uintptr_t>(objectPtr)));
     }
 
   public:
@@ -5470,9 +5501,7 @@ namespace gpg
 
     if (tracked.state == TrackedPointerState::Unowned) {
       if (tracked.type->deleteFunc_ == nullptr) {
-        HandleAssertFailure(
-          "ptrinfo.mObj.GetRType()->mDelete", 392, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h"
-        );
+        HandleAssertFailure("ptrinfo.mObj.GetRType()->mDelete", 392, detail::kSerializationHeaderPath);
       }
       tracked.sharedPtr = boost::shared_ptr<void>(tracked.object, tracked.type->deleteFunc_);
       tracked.state = TrackedPointerState::Shared;

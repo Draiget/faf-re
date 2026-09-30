@@ -56,6 +56,30 @@ namespace moho
   using SPathNeighbor = std::pair<HPathCell, float>;
 
   /**
+   * Address: 0x0076D760 (FUN_0076D760)
+   *
+   * What it does:
+   * `SerSaveLoadHelper<SPathNeighbor>`'s load: the cell through its reflected
+   * type, then the weight as a float.
+   */
+  void SerLoadMembers(gpg::ReadArchive* archive, SPathNeighbor& neighbor);
+
+  /**
+   * Address: 0x0076D7B0 (FUN_0076D7B0)
+   *
+   * What it does:
+   * `SerSaveLoadHelper<SPathNeighbor>`'s save, in the same order.
+   */
+  void SerSaveMembers(gpg::WriteArchive* archive, const SPathNeighbor& neighbor);
+
+  /**
+   * `SPathNeighbor`'s serializer (RTTI `.?AUSPathNeighborSerializer@Moho@@`,
+   * vtable 0x00E36160): the save/load helper for the pair, nothing added.
+   */
+  struct SPathNeighborSerializer : gpg::SerSaveLoadHelper<SPathNeighbor>
+  {};
+
+  /**
    * Recovered request mode latch used by CAiPathFinder.
    */
   enum EAiPathSearchType : std::int32_t
