@@ -16,6 +16,7 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/RListType.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "Entity.h"
 #include "legacy/containers/Tree.h"
@@ -1233,148 +1234,6 @@ namespace
     }
   }
 
-  class EntityDbEntityListTypeInfo final : public gpg::RType
-  {
-  public:
-    /**
-     * Address: 0x00689250 (FUN_00689250, gpg::RListType_EntityP::dtr)
-     */
-    ~EntityDbEntityListTypeInfo() override;
-
-    /**
-     * Address: 0x00685DF0 (FUN_00685DF0, gpg::RListType_EntityP::GetName)
-     * Address: 0x00BFCB60 (FUN_00BFCB60, atexit destructor of GetName's cached name)
-     *
-     * What it does:
-     * Builds `list<Entity *>` once from the `Entity*` pointer RTTI name and
-     * returns it.
-     */
-    [[nodiscard]] const char* GetName() const override
-    {
-      static const msvc8::string sName = gpg::STR_Printf("list<%s>", moho::Entity::GetPointerType()->GetName());
-      return sName.c_str();
-    }
-
-    /**
-     * Address: 0x00685E90 (FUN_00685E90, gpg::RListType_EntityP::GetLexical)
-     *
-     * What it does:
-     * Formats inherited lexical text and appends current list element count.
-     */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
-    {
-      const msvc8::string base = gpg::RType::GetLexical(ref);
-      const auto* const list = static_cast<const msvc8::list<moho::Entity*>*>(ref.mObj);
-      const int size = list ? static_cast<int>(list->size()) : 0;
-      return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
-    }
-
-    /**
-     * Address: 0x00685E70 (FUN_00685E70, gpg::RListType_EntityP::Init)
-     *
-     * What it does:
-     * Configures reflected `list<Entity*>` layout/version lanes and installs
-     * list serializer callbacks.
-     */
-    void Init() override
-    {
-      size_ = sizeof(msvc8::list<moho::Entity*>);
-      version_ = 1;
-      serLoadFunc_ = &EntityDbEntityListTypeInfo::SerLoad;
-      serSaveFunc_ = &EntityDbEntityListTypeInfo::SerSave;
-    }
-
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-  };
-  static_assert(sizeof(EntityDbEntityListTypeInfo) == 0x64, "EntityDbEntityListTypeInfo size must be 0x64");
-
-  /**
-   * Address: 0x00688FE0 (FUN_00688FE0, EntityDbEntityListTypeInfo non-deleting cleanup body)
-   *
-   * What it does:
-   * Clears reflected base/field vector lanes for one `list<Entity*>`
-   * type-info object while preserving outer storage ownership.
-   */
-  void DestroyEntityDbEntityListTypeInfoBody(EntityDbEntityListTypeInfo* const typeInfo) noexcept
-  {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
-  }
-
-  EntityDbEntityListTypeInfo::~EntityDbEntityListTypeInfo()
-  {
-    DestroyEntityDbEntityListTypeInfoBody(this);
-  }
-
-  /**
-   * Address: 0x00686B90 (FUN_00686B90, gpg::RListType_EntityP::SerLoad)
-   *
-   * What it does:
-   * Clears one reflected `list<Entity*>`, reads element count, then
-   * deserializes each tracked entity pointer in archive order.
-   */
-  void EntityDbEntityListTypeInfo::SerLoad(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    auto* const list = reinterpret_cast<msvc8::list<moho::Entity*>*>(static_cast<std::uintptr_t>(objectPtr));
-    if (archive == nullptr || list == nullptr) {
-      return;
-    }
-
-    unsigned int count = 0;
-    archive->ReadUInt(&count);
-    list->clear();
-
-    gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (unsigned int i = 0; i < count; ++i) {
-      moho::Entity* entity = nullptr;
-      (void)archive->ReadPointer(&entity, &owner);
-      list->push_back(entity);
-    }
-  }
-
-  /**
-   * Address: 0x00686C10 (FUN_00686C10, gpg::RListType_EntityP::SerSave)
-   *
-   * What it does:
-   * Writes reflected `list<Entity*>` element count, then serializes each
-   * entity pointer in list traversal order as an unowned tracked pointer.
-   */
-  void EntityDbEntityListTypeInfo::SerSave(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    const auto* const list = reinterpret_cast<const msvc8::list<moho::Entity*>*>(static_cast<std::uintptr_t>(objectPtr));
-    if (archive == nullptr) {
-      return;
-    }
-
-    const unsigned int count = list ? static_cast<unsigned int>(list->size()) : 0u;
-    archive->WriteUInt(count);
-    if (list == nullptr) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (moho::Entity* const entity : *list) {
-      gpg::RRef entityRef{};
-      entityRef = gpg::MakeRRef<moho::Entity>(entity);
-      gpg::WriteRawPointer(archive, entityRef, gpg::TrackedPointerState::Unowned, owner);
-    }
-  }
-
   /**
    * Address: 0x00BFCA70 (FUN_00BFCA70, atexit destructor of the EntityDbTypeInfo object)
    */
@@ -1390,15 +1249,6 @@ namespace
   [[nodiscard]] EntityDbIdPoolMapTypeInfo& AcquireEntityDbIdPoolMapTypeInfo()
   {
     static EntityDbIdPoolMapTypeInfo sInstance;
-    return sInstance;
-  }
-
-  /**
-   * Address: 0x00BFCBC0 (FUN_00BFCBC0, atexit destructor of the EntityDbEntityListTypeInfo object)
-   */
-  [[nodiscard]] EntityDbEntityListTypeInfo& AcquireEntityDbEntityListTypeInfo()
-  {
-    static EntityDbEntityListTypeInfo sInstance;
     return sInstance;
   }
 } // namespace
@@ -2287,15 +2137,28 @@ namespace moho
 
   /**
    * Address: 0x006890F0 (FUN_006890F0, preregister_EntityDbEntityListTypeInfo)
+   * Address: 0x00BFCBC0 (FUN_00BFCBC0, atexit destructor of the list type object)
    *
    * What it does:
-   * Constructs/preregisters RTTI metadata for `std::list<Moho::Entity *>`.
+   * Constructs the `gpg::RListType<moho::Entity*>` static, which preregisters
+   * it for `typeid(msvc8::list<moho::Entity*>)` (`EntityDB::mEntList`), and
+   * returns it.
+   *
+   * `RListType<Entity*>`:
+   *
+   * Address: 0x00689250 (FUN_00689250 -- the implicit scalar deleting destructor.)
+   * Address: 0x00688FE0 (FUN_00688FE0 -- its non-deleting body: `RType`'s field and base vectors freed.)
+   * Address: 0x00685DF0 (FUN_00685DF0 -- `GetName`, from `Entity::GetPointerType()`'s name.)
+   * Address: 0x00BFCB60 (FUN_00BFCB60 -- the atexit destructor of `GetName`'s name string.)
+   * Address: 0x00685E90 (FUN_00685E90 -- `GetLexical`.)
+   * Address: 0x00685E70 (FUN_00685E70 -- `Init`.)
+   * Address: 0x00686B90 (FUN_00686B90 -- `SerLoad`; each entity read by `ReadPointer<Entity>` 0x00680FB0.)
+   * Address: 0x00686C10 (FUN_00686C10 -- `SerSave`; each entity written `Unowned` through `MakeRRef<Entity>` 0x006805E0.)
    */
   gpg::RType* preregister_EntityDbEntityListTypeInfo()
   {
-    EntityDbEntityListTypeInfo& typeInfo = AcquireEntityDbEntityListTypeInfo();
-    gpg::PreRegisterRType(typeid(msvc8::list<moho::Entity*>), &typeInfo);
-    return &typeInfo;
+    static gpg::RListType<moho::Entity*> sInstance;
+    return &sInstance;
   }
 
   /**

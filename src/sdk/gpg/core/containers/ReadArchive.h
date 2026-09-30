@@ -302,6 +302,22 @@ namespace gpg
     ReadArchive* ReadPointerOwned(T** outValue, const gpg::RRef* ownerRef);
 
     /**
+     * `ReadPointer` into a `boost::shared_ptr<T>`: the pointer becomes shared
+     * by the archive, so every other shared read of it hands out the same
+     * control block.
+     */
+    template <class T>
+    ReadArchive* ReadPointerShared(boost::shared_ptr<T>* outValue, const gpg::RRef* ownerRef);
+
+    /**
+     * `ReadPointerShared` into a member still declared as the raw `(px, pi)`
+     * pair `boost::SharedPtrRaw<T>` rather than the `boost::shared_ptr<T>` the
+     * binary holds there.
+     */
+    template <class T>
+    ReadArchive* ReadPointerShared(boost::SharedPtrRaw<T>* outValue, const gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x0065A810 (FUN_0065A810, gpg::ReadArchive::ReadPointer_CParticleTexture)
      *
      * What it does:
@@ -355,31 +371,6 @@ namespace gpg
     TrackedPointerInfo mNullTrackedPointer;
 
     friend TrackedPointerInfo& ReadRawPointer(ReadArchive* archive, const RRef& ownerRef);
-    friend void
-    ReadPointerShared_LaunchInfoBase(boost::SharedPtrRaw<moho::LaunchInfoBase>& outPointer, ReadArchive* archive, const RRef& ownerRef);
-    friend void ReadPointerShared_SSessionSaveData(
-      boost::SharedPtrRaw<moho::SSessionSaveData>& outPointer, ReadArchive* archive, const RRef& ownerRef
-    );
-    friend void
-    ReadPointerShared_CAniPose(boost::SharedPtrRaw<moho::CAniPose>& outPointer, ReadArchive* archive, const RRef& ownerRef);
-    friend void
-    ReadPointerShared_CAniSkel(boost::SharedPtrRaw<moho::CAniSkel>& outPointer, ReadArchive* archive, const RRef& ownerRef);
-    friend void ReadPointerShared_Stats_StatItem(
-      boost::SharedPtrRaw<moho::Stats<moho::StatItem>>& outPointer, ReadArchive* archive, const RRef& ownerRef
-    );
-    friend void ReadPointerShared_ISimResources(
-      boost::SharedPtrRaw<moho::ISimResources>& outPointer, ReadArchive* archive, const RRef& ownerRef
-    );
-    friend void
-    ReadPointerShared_CIntelGrid(boost::SharedPtrRaw<moho::CIntelGrid>& outPointer, ReadArchive* archive, const RRef& ownerRef);
-    friend void ReadPointerShared_RScaResource(
-      boost::SharedPtrRaw<moho::RScaResource>& outPointer, ReadArchive* archive, const RRef& ownerRef
-    );
-    friend void ReadPointerShared_RScmResource(
-      boost::SharedPtrRaw<moho::RScmResource>& outPointer, ReadArchive* archive, const RRef& ownerRef
-    );
-    friend void
-    ReadPointerShared_STrigger(boost::SharedPtrRaw<moho::STrigger>& outPointer, ReadArchive* archive, const RRef& ownerRef);
   };
   static_assert(sizeof(ReadArchive) == 0x38, "ReadArchive size must be 0x38");
 

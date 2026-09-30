@@ -227,8 +227,7 @@ namespace moho
     archive->ReadBool(&enabled);
     mEnabled = static_cast<std::uint8_t>(enabled ? 1u : 0u);
 
-    mGrid.release();
-    gpg::ReadPointerShared_CIntelGrid2(mGrid, archive, ownerRef);
+    archive->ReadPointerShared(&mGrid, &ownerRef);
 
     archive->ReadInt(&mLastTickUpdated);
   }

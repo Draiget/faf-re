@@ -163,18 +163,6 @@ namespace
     return 1;
   }
 
-  struct ReflectedObjectDeleter
-  {
-    gpg::RType::delete_func_t deleteFunc = nullptr;
-
-    void operator()(void* const object) const noexcept
-    {
-      if (deleteFunc) {
-        deleteFunc(object);
-      }
-    }
-  };
-
   [[nodiscard]] bool IsPointerCompatibleWithExpectedType(
     const gpg::TrackedPointerInfo& tracked, gpg::RType* const expectedType
   )
@@ -183,27 +171,6 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
     return gpg::REF_UpcastPtr(source, expectedType).mObj != nullptr;
-  }
-
-  void EnsureTrackedPointerSharedOwnership(gpg::TrackedPointerInfo& tracked)
-  {
-    if (tracked.state == gpg::TrackedPointerState::Unowned) {
-      if (!tracked.type || !tracked.type->deleteFunc_) {
-        throw gpg::SerializationError("Ownership conflict while loading archive");
-      }
-
-      auto* const control = new boost::detail::sp_counted_impl_pd<void*, ReflectedObjectDeleter>(
-        tracked.object, ReflectedObjectDeleter{tracked.type->deleteFunc_}
-      );
-      tracked.sharedObject = tracked.object;
-      tracked.sharedControl = control;
-      tracked.state = gpg::TrackedPointerState::Shared;
-      return;
-    }
-
-    if (tracked.state != gpg::TrackedPointerState::Shared || !tracked.sharedObject || !tracked.sharedControl) {
-      throw gpg::SerializationError("Can't mix boost::shared_ptr with other shared pointers.");
-    }
   }
 
   template <typename TObject>
@@ -224,32 +191,6 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
     return static_cast<TObject*>(gpg::REF_UpcastPtr(source, expectedType).mObj);
-  }
-
-  template <typename TObject>
-  void ReadPointerShared(
-    boost::SharedPtrRaw<TObject>& outPointer,
-    gpg::ReadArchive* const archive,
-    const gpg::RRef& ownerRef,
-    gpg::RType* const expectedType,
-    const char* const typeName
-  )
-  {
-    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      outPointer.release();
-      return;
-    }
-
-    EnsureTrackedPointerSharedOwnership(tracked);
-    if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
-      throw gpg::SerializationError(typeName ? typeName : "Archive shared-pointer type mismatch");
-    }
-
-    boost::SharedPtrRaw<TObject> source{};
-    source.px = static_cast<TObject*>(tracked.sharedObject);
-    source.pi = tracked.sharedControl;
-    outPointer.assign_retain(source);
   }
 
   template <typename TObject>
@@ -915,9 +856,9 @@ void SPerArmyReconInfo::MemberDeserialize(gpg::ReadArchive* const archive, const
 
   const gpg::RRef ownerRef{};
   mStiMesh = ReadPointerUnowned<RMeshBlueprint>(archive, ownerRef, ResolveRMeshBlueprintType(), "RMeshBlueprint");
-  ReadPointerShared<RScmResource>(mMesh, archive, ownerRef, ResolveRScmResourceType(), "RScmResource");
-  ReadPointerShared<CAniPose>(mPriorPose, archive, ownerRef, ResolveCAniPoseType(), "CAniPose");
-  ReadPointerShared<CAniPose>(mPose, archive, ownerRef, ResolveCAniPoseType(), "CAniPose");
+  archive->ReadPointerShared(&mMesh, &ownerRef);
+  archive->ReadPointerShared(&mPriorPose, &ownerRef);
+  archive->ReadPointerShared(&mPose, &ownerRef);
   archive->ReadFloat(&mHealth);
   archive->ReadFloat(&mHealth);
   archive->ReadFloat(&mFractionComplete);

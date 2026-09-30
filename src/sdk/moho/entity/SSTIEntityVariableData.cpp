@@ -482,21 +482,6 @@ namespace
     value = loaded ? 1u : 0u;
   }
 
-  void ReadSharedRScmResourcePointer(
-    boost::shared_ptr<moho::RScmResource>& outPointer,
-    gpg::ReadArchive* const archive,
-    const gpg::RRef& ownerRef
-  )
-  {
-    static_assert(
-      sizeof(boost::shared_ptr<moho::RScmResource>) == sizeof(boost::SharedPtrRaw<moho::RScmResource>),
-      "boost::shared_ptr<RScmResource> must match legacy raw shared-pointer layout"
-    );
-
-    auto& rawPointer = *reinterpret_cast<boost::SharedPtrRaw<moho::RScmResource>*>(&outPointer);
-    gpg::ReadPointerShared_RScmResource(rawPointer, archive, ownerRef);
-  }
-
 } // namespace
 
 namespace moho
@@ -747,7 +732,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    ReadSharedRScmResourcePointer(mScmResource, archive, ownerRef);
+    archive->ReadPointerShared(&mScmResource, &ownerRef);
 
     RMeshBlueprint* meshBlueprint = const_cast<RMeshBlueprint*>(mMeshBlueprint);
     (void)archive->ReadPointer(&meshBlueprint, &ownerRef);

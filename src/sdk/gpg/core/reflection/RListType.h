@@ -79,8 +79,9 @@ namespace gpg
 
     /**
      * What it does:
-     * Reads the element count, clears the list, then for each element reads a
-     * default-constructed `T` through its reflected type and appends a copy.
+     * Reads the element count, clears the list, then reads each element into
+     * a fresh `T` (`ReadElement`: a value through its reflected type, a raw
+     * pointer or a `boost::shared_ptr` as a tracked pointer) and appends it.
      */
     static void SerLoad(ReadArchive* const archive, const int objectPtr, const int, RRef* const ownerRef)
     {
@@ -91,14 +92,14 @@ namespace gpg
       list.clear();
       for (unsigned int i = 0; i < count; ++i) {
         T value;
-        archive->Read(RTypeOf<T>(), &value, *ownerRef);
+        ReadElement(archive, value, ownerRef);
         list.push_back(value);
       }
     }
 
     /**
      * What it does:
-     * Writes the element count, then each element through its reflected type.
+     * Writes the element count, then each element (`WriteElement`).
      */
     static void SerSave(WriteArchive* const archive, const int objectPtr, const int, RRef* const ownerRef)
     {
@@ -106,7 +107,7 @@ namespace gpg
 
       archive->WriteUInt(static_cast<unsigned int>(list.size()));
       for (const T& value : list) {
-        archive->Write(RTypeOf<T>(), &value, *ownerRef);
+        WriteElement(archive, value, ownerRef);
       }
     }
   };

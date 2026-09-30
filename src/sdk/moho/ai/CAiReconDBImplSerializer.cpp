@@ -153,18 +153,6 @@ namespace
     return CachedType<EntityCategorySet>(gVisibleToReconCategoryType);
   }
 
-  struct ReflectedObjectDeleter
-  {
-    gpg::RType::delete_func_t deleteFunc = nullptr;
-
-    void operator()(void* const object) const noexcept
-    {
-      if (deleteFunc) {
-        deleteFunc(object);
-      }
-    }
-  };
-
   template <class TObject>
   [[nodiscard]] TObject* DecodeTrackedPointer(
     const gpg::TrackedPointerInfo& tracked, gpg::RType* const expectedType, const char* const mismatchMessage
@@ -188,27 +176,6 @@ namespace
     return static_cast<TObject*>(tracked.object);
   }
 
-  void EnsureTrackedPointerSharedOwnership(gpg::TrackedPointerInfo& tracked)
-  {
-    if (tracked.state == gpg::TrackedPointerState::Unowned) {
-      if (!tracked.type || !tracked.type->deleteFunc_) {
-        throw gpg::SerializationError("Ownership conflict while loading archive");
-      }
-
-      auto* const control = new boost::detail::sp_counted_impl_pd<void*, ReflectedObjectDeleter>(
-        tracked.object, ReflectedObjectDeleter{tracked.type->deleteFunc_}
-      );
-      tracked.sharedObject = tracked.object;
-      tracked.sharedControl = control;
-      tracked.state = gpg::TrackedPointerState::Shared;
-      return;
-    }
-
-    if (tracked.state != gpg::TrackedPointerState::Shared || !tracked.sharedObject || !tracked.sharedControl) {
-      throw gpg::SerializationError("Can't mix boost::shared_ptr with other shared pointers.");
-    }
-  }
-
   template <class TObject>
   void ReadPointerUnowned(
     TObject*& outPointer,
@@ -220,30 +187,6 @@ namespace
   {
     const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
     outPointer = DecodeTrackedPointer<TObject>(tracked, expectedType, mismatchMessage);
-  }
-
-  template <class TObject>
-  void ReadPointerShared(
-    boost::SharedPtrRaw<TObject>& outPointer,
-    gpg::ReadArchive* const archive,
-    const gpg::RRef& ownerRef,
-    gpg::RType* const expectedType,
-    const char* const mismatchMessage
-  )
-  {
-    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      outPointer.release();
-      return;
-    }
-
-    EnsureTrackedPointerSharedOwnership(tracked);
-    TObject* const casted = DecodeTrackedPointer<TObject>(tracked, expectedType, mismatchMessage);
-
-    boost::SharedPtrRaw<TObject> source{};
-    source.px = casted;
-    source.pi = tracked.sharedControl;
-    outPointer.assign_retain(source);
   }
 
   template <class TObject>
@@ -325,30 +268,14 @@ namespace
     ReadPointerUnowned(
       object->mIMap, archive, ownerRef, ResolveCInfluenceMapType(), "CAiReconDBImpl::mIMap type mismatch"
     );
-    ReadPointerShared(
-      object->mVisionGrid, archive, ownerRef, ResolveCIntelGridType(), "CAiReconDBImpl::mVisionGrid type mismatch"
-    );
-    ReadPointerShared(
-      object->mWaterGrid, archive, ownerRef, ResolveCIntelGridType(), "CAiReconDBImpl::mWaterGrid type mismatch"
-    );
-    ReadPointerShared(
-      object->mRadarGrid, archive, ownerRef, ResolveCIntelGridType(), "CAiReconDBImpl::mRadarGrid type mismatch"
-    );
-    ReadPointerShared(
-      object->mSonarGrid, archive, ownerRef, ResolveCIntelGridType(), "CAiReconDBImpl::mSonarGrid type mismatch"
-    );
-    ReadPointerShared(
-      object->mOmniGrid, archive, ownerRef, ResolveCIntelGridType(), "CAiReconDBImpl::mOmniGrid type mismatch"
-    );
-    ReadPointerShared(
-      object->mRCIGrid, archive, ownerRef, ResolveCIntelGridType(), "CAiReconDBImpl::mRCIGrid type mismatch"
-    );
-    ReadPointerShared(
-      object->mSCIGrid, archive, ownerRef, ResolveCIntelGridType(), "CAiReconDBImpl::mSCIGrid type mismatch"
-    );
-    ReadPointerShared(
-      object->mVCIGrid, archive, ownerRef, ResolveCIntelGridType(), "CAiReconDBImpl::mVCIGrid type mismatch"
-    );
+    archive->ReadPointerShared(&object->mVisionGrid, &ownerRef);
+    archive->ReadPointerShared(&object->mWaterGrid, &ownerRef);
+    archive->ReadPointerShared(&object->mRadarGrid, &ownerRef);
+    archive->ReadPointerShared(&object->mSonarGrid, &ownerRef);
+    archive->ReadPointerShared(&object->mOmniGrid, &ownerRef);
+    archive->ReadPointerShared(&object->mRCIGrid, &ownerRef);
+    archive->ReadPointerShared(&object->mSCIGrid, &ownerRef);
+    archive->ReadPointerShared(&object->mVCIGrid, &ownerRef);
 
     archive->ReadBool(reinterpret_cast<bool*>(&object->mFogOfWar));
 

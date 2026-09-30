@@ -11045,25 +11045,6 @@ namespace
     return cached;
   }
 
-  // Re-expresses the binary's inline shared-pointer load (which passes the
-  // shared_ptr storage straight to gpg::ReadArchive::ReadPointerShared_CAniPose)
-  // through the SharedPtrRaw view, matching SSTIEntityVariableData.cpp's
-  // ReadSharedRScmResourcePointer wrapper.
-  void ReadSharedCAniPosePointer(
-    boost::shared_ptr<moho::CAniPose>& outPointer,
-    gpg::ReadArchive* const archive,
-    const gpg::RRef& ownerRef
-  )
-  {
-    static_assert(
-      sizeof(boost::shared_ptr<moho::CAniPose>) == sizeof(boost::SharedPtrRaw<moho::CAniPose>),
-      "boost::shared_ptr<CAniPose> must match legacy raw shared-pointer layout"
-    );
-
-    auto& rawPointer = *reinterpret_cast<boost::SharedPtrRaw<moho::CAniPose>*>(&outPointer);
-    gpg::ReadPointerShared_CAniPose(rawPointer, archive, ownerRef);
-  }
-
   class UnitWeaponInfoTypeInfo final : public gpg::RType
   {
   public:
@@ -12276,8 +12257,8 @@ void SSTIUnitVariableData::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->Read(CachedEntIdType(), &mGuardedUnit, ownerRef);
   archive->Read(CachedEntIdType(), &mTargetBlip, ownerRef);
 
-  ReadSharedCAniPosePointer(mPriorSharedPose, archive, ownerRef);
-  ReadSharedCAniPosePointer(mSharedPose, archive, ownerRef);
+  archive->ReadPointerShared(&mPriorSharedPose, &ownerRef);
+  archive->ReadPointerShared(&mSharedPose, &ownerRef);
 
   archive->Read(CachedUnitWeaponInfoVectorType(), &mWeaponInfo, ownerRef);
   archive->Read(CachedUnitAttributesType(), &mAttributes, ownerRef);

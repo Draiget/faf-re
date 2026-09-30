@@ -1006,11 +1006,6 @@ ReadArchive::ReadArchive()
   , mTrackedPtrs()
   , mNullTrackedPointer{}
 {
-  mNullTrackedPointer.object = nullptr;
-  mNullTrackedPointer.type = nullptr;
-  mNullTrackedPointer.sharedObject = nullptr;
-  mNullTrackedPointer.sharedControl = nullptr;
-  mNullTrackedPointer.state = TrackedPointerState::Reserved;
   SerHelperBase::InitNewHelpers();
 }
 
@@ -1309,209 +1304,9 @@ ReadArchive* ReadArchive::ReadPointerWeak_IFormationInstance(
  */
 ReadArchive& ReadArchive::TrackPointer(const RRef& objectRef)
 {
-  TrackedPointerInfo tracked{};
-  tracked.object = objectRef.mObj;
-  tracked.type = objectRef.mType;
-  tracked.state = TrackedPointerState::Owned;
-  tracked.sharedObject = nullptr;
-  tracked.sharedControl = nullptr;
-  mTrackedPtrs.push_back(tracked);
+  mTrackedPtrs.push_back(TrackedPointerInfo{objectRef.mObj, objectRef.mType, {}, TrackedPointerState::Owned});
   return *this;
 }
-
-namespace
-{
-  /**
-   * Address: 0x009506C0 (FUN_009506C0)
-   *
-   * What it does:
-   * Copies one `TypeHandle` lane from `sourceHandle` into each destination
-   * slot for `repeatCount` entries.
-   */
-  [[maybe_unused]] void CopyConstructTypeHandleCountFromSingleSource(
-    gpg::TypeHandle* const destinationBegin,
-    const std::int32_t repeatCount,
-    const gpg::TypeHandle* const sourceHandle
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destinationBegin);
-    for (std::int32_t remaining = repeatCount; remaining > 0; --remaining) {
-      if (destinationAddress != 0u) {
-        auto* const destination = reinterpret_cast<gpg::TypeHandle*>(destinationAddress);
-        destination->type = sourceHandle->type;
-        destination->version = sourceHandle->version;
-      }
-      destinationAddress += sizeof(gpg::TypeHandle);
-    }
-  }
-
-  /**
-   * Address: 0x00950BC0 (FUN_00950BC0)
-   *
-   * What it does:
-   * Preserves one register-adapter lane for repeated type-handle copy
-   * construction from a single source lane.
-   */
-  [[maybe_unused]] void CopyConstructTypeHandleCountFromSingleSourceRegisterAdapterA(
-    gpg::TypeHandle* const destinationBegin,
-    const std::int32_t repeatCount,
-    const gpg::TypeHandle* const sourceHandle
-  ) noexcept
-  {
-    CopyConstructTypeHandleCountFromSingleSource(destinationBegin, repeatCount, sourceHandle);
-  }
-
-  /**
-   * Address: 0x009506F0 (FUN_009506F0)
-   *
-   * What it does:
-   * Copy-assigns tracked-pointer lanes from `[source, sourceEnd)` into
-   * `destination`, retaining incoming shared-control lanes and releasing
-   * replaced destination shared-control lanes.
-   */
-  [[nodiscard]] gpg::TrackedPointerInfo* MoveTrackedPointerRangeWithRetainedSharedOwners(
-    const gpg::TrackedPointerInfo* source,
-    const gpg::TrackedPointerInfo* const sourceEnd,
-    gpg::TrackedPointerInfo* destination
-  ) noexcept
-  {
-    while (source != sourceEnd) {
-      destination->object = source->object;
-      destination->type = source->type;
-      destination->state = source->state;
-
-      boost::detail::sp_counted_base* const incomingControl = source->sharedControl;
-      if (incomingControl != destination->sharedControl) {
-        if (incomingControl != nullptr) {
-          incomingControl->add_ref_copy();
-        }
-
-        if (destination->sharedControl != nullptr) {
-          destination->sharedControl->release();
-        }
-
-        destination->sharedControl = incomingControl;
-      }
-
-      destination->sharedObject = source->sharedObject;
-      ++source;
-      ++destination;
-    }
-
-    return destination;
-  }
-
-  /**
-   * Address: 0x00950790 (FUN_00950790)
-   *
-   * What it does:
-   * Copy-assigns one tracked-pointer source lane into each destination lane in
-   * `[destinationBegin, destinationEnd)`, retaining incoming shared-control
-   * lanes and releasing replaced destination shared-control lanes.
-   */
-  [[maybe_unused]] void CopyAssignTrackedPointerRangeFromSingleSourceWithRetainedSharedOwners(
-    gpg::TrackedPointerInfo* destinationBegin,
-    gpg::TrackedPointerInfo* const destinationEnd,
-    const gpg::TrackedPointerInfo* const sourceLane
-  ) noexcept
-  {
-    while (destinationBegin != destinationEnd) {
-      destinationBegin->object = sourceLane->object;
-      destinationBegin->type = sourceLane->type;
-      destinationBegin->state = sourceLane->state;
-
-      boost::detail::sp_counted_base* const incomingControl = sourceLane->sharedControl;
-      if (incomingControl != destinationBegin->sharedControl) {
-        if (incomingControl != nullptr) {
-          incomingControl->add_ref_copy();
-        }
-
-        if (destinationBegin->sharedControl != nullptr) {
-          destinationBegin->sharedControl->release();
-        }
-
-        destinationBegin->sharedControl = incomingControl;
-      }
-
-      destinationBegin->sharedObject = sourceLane->sharedObject;
-      ++destinationBegin;
-    }
-  }
-
-  /**
-   * Address: 0x00950BF0 (FUN_00950BF0)
-   *
-   * What it does:
-   * Preserves one register-adapter lane for forward tracked-pointer range copy
-   * while retaining/releasing shared-control ownership.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::TrackedPointerInfo* MoveTrackedPointerRangeWithRetainedSharedOwnersRegisterAdapterA(
-    const gpg::TrackedPointerInfo* const source,
-    const gpg::TrackedPointerInfo* const sourceEnd,
-    gpg::TrackedPointerInfo* const destination
-  ) noexcept
-  {
-    return MoveTrackedPointerRangeWithRetainedSharedOwners(source, sourceEnd, destination);
-  }
-
-  /**
-   * Address: 0x00950C30 (FUN_00950C30)
-   *
-   * What it does:
-   * Preserves one jump-only adapter lane that forwards to `FUN_00950790`.
-   */
-  [[maybe_unused]] void CopyAssignTrackedPointerRangeFromSingleSourceWithRetainedSharedOwnersRegisterAdapterA(
-    gpg::TrackedPointerInfo* const destinationBegin,
-    gpg::TrackedPointerInfo* const destinationEnd,
-    const gpg::TrackedPointerInfo* const sourceLane
-  ) noexcept
-  {
-    CopyAssignTrackedPointerRangeFromSingleSourceWithRetainedSharedOwners(
-      destinationBegin,
-      destinationEnd,
-      sourceLane
-    );
-  }
-
-  /**
-   * Address: 0x00950F20 (FUN_00950F20, func_ReleaseRefsRange_TrackedPointerInfo)
-   * Address: 0x00951510 (FUN_00951510)
-   *
-   * What it does:
-   * Releases shared control blocks for one half-open tracked-pointer range and
-   * clears released shared-pointer lanes.
-   */
-  void ReleaseTrackedPointerInfoSharedRange(
-    gpg::TrackedPointerInfo* trackedBegin,
-    gpg::TrackedPointerInfo* const trackedEnd
-  ) noexcept
-  {
-    while (trackedBegin != trackedEnd) {
-      if (trackedBegin->sharedControl != nullptr) {
-        trackedBegin->sharedControl->release();
-        trackedBegin->sharedControl = nullptr;
-        trackedBegin->sharedObject = nullptr;
-      }
-      ++trackedBegin;
-    }
-  }
-
-  /**
-   * Address: 0x00951070 (FUN_00951070)
-   *
-   * What it does:
-   * Preserves one register-adapter lane for tracked-pointer shared-control
-   * release over a half-open range.
-   */
-  [[maybe_unused]] void ReleaseTrackedPointerInfoSharedRangeRegisterAdapterA(
-    gpg::TrackedPointerInfo* const trackedBegin,
-    gpg::TrackedPointerInfo* const trackedEnd
-  ) noexcept
-  {
-    ReleaseTrackedPointerInfoSharedRange(trackedBegin, trackedEnd);
-  }
-
-} // namespace
 
 /**
  * Address: 0x00952BD0 (FUN_00952BD0)
@@ -1541,23 +1336,14 @@ namespace
  */
 void ReadArchive::EndSection(const bool)
 {
-  for (size_t i = 0; i < mTrackedPtrs.size(); ++i) {
-    TrackedPointerInfo& tracked = mTrackedPtrs[i];
-    if (tracked.state == TrackedPointerState::Unowned && tracked.object && tracked.type) {
-      RRef ref{};
-      ref.mObj = tracked.object;
-      ref.mType = tracked.type;
-      ref.Delete();
+  for (TrackedPointerInfo& tracked : mTrackedPtrs) {
+    if (tracked.state == TrackedPointerState::Unowned) {
+      RRef{tracked.object, tracked.type}.Delete();
     }
-  }
-
-  if (!mTrackedPtrs.empty()) {
-    ReleaseTrackedPointerInfoSharedRange(&mTrackedPtrs[0], &mTrackedPtrs[0] + mTrackedPtrs.size());
   }
 
   mTypeHandles.clear();
   mTrackedPtrs.clear();
-  mNullTrackedPointer = {};
 }
 
 /**

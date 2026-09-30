@@ -45,7 +45,7 @@ namespace
     archive->ReadInt(&header->mFocusArmy);
     archive->Read(gpg::ResolveSavedGameArmyInfoVectorType(), &header->mArmyInfo, NullOwnerRef());
     archive->ReadString(&header->mScenarioInfoText);
-    gpg::ReadPointerShared_LaunchInfoBase(header->mLaunchInfo, archive, NullOwnerRef());
+    archive->ReadPointerShared(&header->mLaunchInfo, &NullOwnerRef());
   }
 
   /**

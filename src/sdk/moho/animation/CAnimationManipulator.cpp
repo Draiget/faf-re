@@ -129,13 +129,13 @@ namespace
   }
 
   [[nodiscard]] const AnimationClipHeaderView*
-  GetAnimationClipHeader(const moho::CAnimationManipulator::AnimationResourceRef& ref)
+  GetAnimationClipHeader(const boost::SharedPtrRaw<moho::RScaResource>& ref)
   {
     if (!ref.px) {
       return nullptr;
     }
 
-    return ScaClipHeader(*static_cast<const moho::RScaResource*>(ref.px));
+    return ScaClipHeader(*ref.px);
   }
 
   /**
@@ -380,81 +380,6 @@ namespace
     return gVectorBoolType;
   }
 
-  struct ReflectedObjectDeleter
-  {
-    gpg::RType::delete_func_t deleteFunc = nullptr;
-
-    void operator()(void* const object) const noexcept
-    {
-      if (deleteFunc) {
-        deleteFunc(object);
-      }
-    }
-  };
-
-  void PromoteTrackedPointerToShared(gpg::TrackedPointerInfo& tracked)
-  {
-    GPG_ASSERT(tracked.type != nullptr && tracked.type->deleteFunc_ != nullptr);
-    if (!tracked.type || !tracked.type->deleteFunc_) {
-      return;
-    }
-
-    auto* const control = new boost::detail::sp_counted_impl_pd<void*, ReflectedObjectDeleter>(
-      tracked.object, ReflectedObjectDeleter{tracked.type->deleteFunc_}
-    );
-    tracked.sharedObject = tracked.object;
-    tracked.sharedControl = control;
-    tracked.state = gpg::TrackedPointerState::Shared;
-  }
-
-  void ReadSharedAnimationResourcePointer(
-    moho::CAnimationManipulator::AnimationResourceRef& outPointer,
-    gpg::ReadArchive* const archive,
-    const gpg::RRef& ownerRef
-  )
-  {
-    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      outPointer.release();
-      return;
-    }
-
-    if (tracked.state == gpg::TrackedPointerState::Unowned) {
-      PromoteTrackedPointerToShared(tracked);
-    }
-
-    GPG_ASSERT(tracked.state == gpg::TrackedPointerState::Shared);
-    GPG_ASSERT(tracked.sharedObject != nullptr && tracked.sharedControl != nullptr);
-
-    if (tracked.state != gpg::TrackedPointerState::Shared || !tracked.sharedObject || !tracked.sharedControl) {
-      outPointer.release();
-      return;
-    }
-
-    moho::CAnimationManipulator::AnimationResourceRef source{};
-    source.px = tracked.sharedObject;
-    source.pi = tracked.sharedControl;
-    outPointer.assign_retain(source);
-  }
-
-  void WriteSharedAnimationResourcePointer(
-    const moho::CAnimationManipulator::AnimationResourceRef& pointer,
-    gpg::WriteArchive* const archive,
-    const gpg::RRef& ownerRef
-  )
-  {
-    gpg::RRef objectRef{};
-    objectRef.mObj = pointer.px;
-    if (pointer.px != nullptr) {
-      objectRef.mType = static_cast<gpg::RObject*>(pointer.px)->GetClass();
-      GPG_ASSERT(objectRef.mType != nullptr);
-    } else {
-      objectRef.mType = nullptr;
-    }
-
-    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Shared, ownerRef);
-  }
-
   /**
    * Address: 0x00642A50 (FUN_00642A50, DeserializeCAnimationManipulatorState)
    *
@@ -472,7 +397,7 @@ namespace
     archive->Read(CachedIAniManipulatorTypeForSerializer(), static_cast<moho::IAniManipulator*>(object), nullOwner);
     archive->Read(CachedWeakPtrUnitType(), &object->mGoal, nullOwner);
     archive->Read(CachedVectorBoolType(), &object->mBoneMask, nullOwner);
-    ReadSharedAnimationResourcePointer(object->mAnimationRef, archive, nullOwner);
+    archive->ReadPointerShared(&object->mAnimationRef, &nullOwner);
     archive->ReadFloat(&object->mRate);
     archive->ReadFloat(&object->mAnimationTime);
     archive->ReadFloat(&object->mLastFramePosition);
@@ -531,7 +456,7 @@ namespace
     archive->Write(CachedIAniManipulatorTypeForSerializer(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(object)), nullOwner);
     archive->Write(CachedWeakPtrUnitType(), &const_cast<moho::CAnimationManipulator*>(object)->mGoal, nullOwner);
     archive->Write(CachedVectorBoolType(), const_cast<moho::SAniManipBitStorage*>(&object->mBoneMask), nullOwner);
-    WriteSharedAnimationResourcePointer(object->mAnimationRef, archive, nullOwner);
+    archive->WritePointer(object->mAnimationRef.px, gpg::TrackedPointerState::Shared, nullOwner);
     archive->WriteFloat(object->mRate);
     archive->WriteFloat(object->mAnimationTime);
     archive->WriteFloat(object->mLastFramePosition);
@@ -730,8 +655,8 @@ namespace moho
     gpg::RRef resourceRef{};
     (void)moho::GetScaResource(&resourceRef, filename);
 
-    CAnimationManipulator::AnimationResourceRef animationResource{};
-    animationResource.px = resourceRef.mObj;
+    boost::SharedPtrRaw<RScaResource> animationResource{};
+    animationResource.px = static_cast<RScaResource*>(resourceRef.mObj);
     animationResource.pi = nullptr;
 
     manipulator->SetAnimationResource(animationResource, looping);
@@ -1497,7 +1422,7 @@ namespace moho
    */
   bool CAnimationManipulator::ManipulatorUpdate()
   {
-    const auto* const resource = static_cast<const RScaResource*>(mAnimationRef.px);
+    const RScaResource* const resource = mAnimationRef.px;
     if (resource == nullptr) {
       return false;
     }
@@ -1712,13 +1637,13 @@ namespace moho
   /**
    * Address: 0x0063FBA0 (FUN_0063FBA0)
    */
-  void CAnimationManipulator::SetAnimationResource(const AnimationResourceRef& resource, const bool looping)
+  void CAnimationManipulator::SetAnimationResource(const boost::SharedPtrRaw<RScaResource>& resource, const bool looping)
   {
     if (resource.px != nullptr) {
       // 0x0063FBC1..0x0063FC5A: rebuild the watch-bone bindings from the clip's
       // bone-name table, resolving each name against the owner's skeleton.
       const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
-      const AnimationClipHeaderView* const clip = ScaClipHeader(*static_cast<const RScaResource*>(resource.px));
+      const AnimationClipHeaderView* const clip = ScaClipHeader(*resource.px);
       const std::uint32_t boneTrackCount = clip->mBoneTrackCount;
       const char* boneName = reinterpret_cast<const char*>(clip) + clip->mBoneNameTableOffset;
       ResetWatchBoneStorage();

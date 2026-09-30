@@ -97,18 +97,6 @@ namespace
     delete statItem;
   }
 
-  void ReadStatsRootShared(
-    boost::shared_ptr<moho::Stats<moho::StatItem>>& outPointer,
-    gpg::ReadArchive* const archive,
-    const gpg::RRef& ownerRef
-  )
-  {
-    boost::SharedPtrRaw<moho::Stats<moho::StatItem>> rawPointer = boost::SharedPtrRawFromSharedRetained(outPointer);
-    gpg::ReadPointerShared_Stats_StatItem(rawPointer, archive, ownerRef);
-    outPointer = boost::SharedPtrFromRawRetained(rawPointer);
-    rawPointer.release();
-  }
-
 } // namespace
 
 namespace moho
@@ -181,7 +169,8 @@ namespace moho
     archive->ReadBool(&buildStateTag);
     mBuildStateTag = static_cast<std::uint8_t>(buildStateTag ? 1u : 0u);
 
-    ReadStatsRootShared(mStatsRoot, archive, NullOwnerRef());
+    const gpg::RRef ownerRef = NullOwnerRef();
+    archive->ReadPointerShared(&mStatsRoot, &ownerRef);
 
     bool fake = false;
     archive->ReadBool(&fake);

@@ -1337,7 +1337,7 @@ namespace moho
     // per-type templated-ctor symbol (a plain `shared_ptr x(new T())` may inline it).
     boost::shared_ptr<LaunchInfoLoad> launchInfo;
     (void)boost::ConstructSharedLaunchInfoLoadFromRaw(&launchInfo, new LaunchInfoLoad());
-    gpg::ReadPointerShared_SSessionSaveData(launchInfo->mLoadSessionData, mReader, NullOwnerRef());
+    mReader->ReadPointerShared(&launchInfo->mLoadSessionData, &NullOwnerRef());
     mReader->EndSection(false);
 
     std::int32_t focusArmyIndex = mHeader.mFocusArmy;

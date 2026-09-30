@@ -14,6 +14,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/RListType.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/misc/Stats.h"
@@ -598,27 +599,6 @@ namespace
   };
   static_assert(sizeof(RFastVectorSConditionTypeInfo) == 0x68, "RFastVectorSConditionTypeInfo size must be 0x68");
 
-  struct ReflectedObjectDeleter
-  {
-    gpg::RType::delete_func_t deleteFunc = nullptr;
-
-    void operator()(void* const object) const noexcept
-    {
-      if (deleteFunc) {
-        deleteFunc(object);
-      }
-    }
-  };
-
-  [[nodiscard]] gpg::RType* CachedSharedPtrSTriggerType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(boost::shared_ptr<moho::STrigger>));
-    }
-    return cached;
-  }
-
   class RSharedPointerSTriggerTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
   public:
@@ -680,59 +660,15 @@ namespace
       return this;
     }
 
-    static void Deserialize(gpg::ReadArchive* archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    static void Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
-      auto* const out = reinterpret_cast<boost::shared_ptr<moho::STrigger>*>(objectPtr);
-      if (!archive || !out) {
-        return;
-      }
-
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, owner);
-      if (!tracked.object) {
-        *out = boost::shared_ptr<moho::STrigger>();
-        return;
-      }
-
-      if (tracked.state == gpg::TrackedPointerState::Unowned) {
-        GPG_ASSERT(tracked.type != nullptr && tracked.type->deleteFunc_ != nullptr);
-        auto* const control = new boost::detail::sp_counted_impl_pd<void*, ReflectedObjectDeleter>(
-          tracked.object, ReflectedObjectDeleter{tracked.type ? tracked.type->deleteFunc_ : nullptr}
-        );
-        tracked.sharedObject = tracked.object;
-        tracked.sharedControl = control;
-        tracked.state = gpg::TrackedPointerState::Shared;
-      }
-
-      gpg::RRef sourceRef{};
-      sourceRef.mObj = tracked.object;
-      sourceRef.mType = tracked.type ? tracked.type : moho::STrigger::StaticGetClass();
-      const gpg::RRef upcastRef = gpg::REF_UpcastPtr(sourceRef, moho::STrigger::StaticGetClass());
-      if (!upcastRef.mObj) {
-        *out = boost::shared_ptr<moho::STrigger>();
-        return;
-      }
-
-      boost::SharedPtrRaw<moho::STrigger> raw{};
-      raw.px = static_cast<moho::STrigger*>(upcastRef.mObj);
-      raw.pi = tracked.sharedControl;
-      *out = boost::SharedPtrFromRawRetained(raw);
+      archive->ReadPointerShared(reinterpret_cast<boost::shared_ptr<moho::STrigger>*>(objectPtr), ownerRef);
     }
 
-    static void Serialize(gpg::WriteArchive* archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    static void Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
-      auto* const pointer = reinterpret_cast<const boost::shared_ptr<moho::STrigger>*>(objectPtr);
-      if (!archive || !pointer) {
-        return;
-      }
-
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      const boost::SharedPtrRaw<moho::STrigger> raw = boost::SharedPtrRawFromSharedBorrow(*pointer);
-
-      gpg::RRef objectRef{};
-      objectRef.mObj = raw.px;
-      objectRef.mType = moho::STrigger::StaticGetClass();
-      gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Shared, owner);
+      const auto* const pointer = reinterpret_cast<const boost::shared_ptr<moho::STrigger>*>(objectPtr);
+      archive->WritePointer(pointer->get(), gpg::TrackedPointerState::Shared, *ownerRef);
     }
 
     /**
@@ -772,121 +708,6 @@ namespace
     }
   };
   static_assert(sizeof(RSharedPointerSTriggerTypeInfo) == 0x68, "RSharedPointerSTriggerTypeInfo size must be 0x68");
-
-  class RListSharedPtrSTriggerTypeInfo final : public gpg::RType
-  {
-  public:
-    /**
-     * Address: 0x00712F40 (FUN_00712F40, gpg::RListType_shared_ptr_STrigger::RListType_shared_ptr_STrigger)
-     *
-     * What it does:
-     * Preregisters `msvc8::list<boost::shared_ptr<moho::STrigger>>` reflection
-     * metadata at startup.
-     */
-    RListSharedPtrSTriggerTypeInfo()
-      : gpg::RType()
-    {
-      gpg::PreRegisterRType(typeid(msvc8::list<boost::shared_ptr<moho::STrigger>>), this);
-    }
-
-    /**
-     * Address: 0x00713310 (FUN_00713310, gpg::RListType_shared_ptr_STrigger::dtr)
-     */
-    ~RListSharedPtrSTriggerTypeInfo() override = default;
-
-    /**
-     * Address: 0x0070F360 (FUN_0070F360, gpg::RListType_shared_ptr_STrigger::GetName)
-     * Address: 0x00BFF880 (FUN_00BFF880, atexit destructor of GetName's cached name)
-     *
-     * What it does:
-     * Builds `list<boost::shared_ptr<STrigger>>` once and returns it.
-     */
-    [[nodiscard]] const char* GetName() const override
-    {
-      static const msvc8::string sName = gpg::STR_Printf("list<%s>", CachedSharedPtrSTriggerType()->GetName());
-      return sName.c_str();
-    }
-
-    /**
-     * Address: 0x0070F420 (FUN_0070F420, gpg::RListType_shared_ptr_STrigger::GetLexical)
-     *
-     * What it does:
-     * Formats inherited lexical text and appends current list element count.
-     */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
-    {
-      const msvc8::string base = gpg::RType::GetLexical(ref);
-      const auto* const list = static_cast<const msvc8::list<boost::shared_ptr<moho::STrigger>>*>(ref.mObj);
-      const int size = list ? static_cast<int>(list->size()) : 0;
-      return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
-    }
-
-    /**
-     * Address: 0x00710620 (FUN_00710620, gpg::RListType_shared_ptr_STrigger::SerLoad)
-     *
-     * What it does:
-     * Clears one reflected `list<shared_ptr<STrigger>>` and loads `count`
-     * shared-pointer lanes from archive stream order.
-     */
-    static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
-    {
-      auto* const list = reinterpret_cast<msvc8::list<boost::shared_ptr<moho::STrigger>>*>(objectPtr);
-      if (archive == nullptr || list == nullptr) {
-        return;
-      }
-
-      unsigned int count = 0;
-      archive->ReadUInt(&count);
-      list->clear();
-
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      for (unsigned int index = 0; index < count; ++index) {
-        boost::SharedPtrRaw<moho::STrigger> raw{};
-        gpg::ReadPointerShared_STrigger(raw, archive, owner);
-        list->push_back(boost::SharedPtrFromRawRetained(raw));
-      }
-    }
-
-    /**
-     * Address: 0x00710720 (FUN_00710720, gpg::RListType_shared_ptr_STrigger::SerSave)
-     *
-     * What it does:
-     * Writes list element count then serializes each `shared_ptr<STrigger>`
-     * element as a tracked shared pointer.
-     */
-    static void SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
-    {
-      const auto* const list = reinterpret_cast<const msvc8::list<boost::shared_ptr<moho::STrigger>>*>(objectPtr);
-      if (archive == nullptr || list == nullptr) {
-        return;
-      }
-
-      archive->WriteUInt(static_cast<unsigned int>(list->size()));
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      for (const boost::shared_ptr<moho::STrigger>& value : *list) {
-        gpg::RRef pointerRef{};
-        pointerRef = gpg::MakeRRef<moho::STrigger>(value.get());
-        gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Shared, owner);
-      }
-    }
-
-    /**
-     * Address: 0x0070F400 (FUN_0070F400, gpg::RListType_shared_ptr_STrigger::Init)
-     *
-     * What it does:
-     * Configures reflected list layout/version lanes and installs
-     * shared-pointer list load/save callbacks.
-     */
-    void Init() override
-    {
-      static_assert(sizeof(msvc8::list<boost::shared_ptr<moho::STrigger>>) == 0x0C, "msvc8::list<boost::shared_ptr<moho::STrigger>> is 0x0C bytes on x86");
-      size_ = sizeof(msvc8::list<boost::shared_ptr<moho::STrigger>>);
-      version_ = 1;
-      serLoadFunc_ = &RListSharedPtrSTriggerTypeInfo::SerLoad;
-      serSaveFunc_ = &RListSharedPtrSTriggerTypeInfo::SerSave;
-    }
-  };
-  static_assert(sizeof(RListSharedPtrSTriggerTypeInfo) == 0x64, "RListSharedPtrSTriggerTypeInfo size must be 0x64");
 
   using UnitBlueprintWeightMap = std::map<const moho::RUnitBlueprint*, float>;
   using StringToArmyStatItemMap = std::map<std::string, moho::CArmyStatItem*>;
@@ -1292,7 +1113,20 @@ namespace
 
   RFastVectorSConditionTypeInfo gFastVectorSConditionTypeInfo;
   RSharedPointerSTriggerTypeInfo gSharedPointerSTriggerTypeInfo;
-  RListSharedPtrSTriggerTypeInfo gListSharedPtrSTriggerTypeInfo;
+  /**
+   * `gpg::RListType<boost::shared_ptr<moho::STrigger>>` (the trigger lists):
+   *
+   * Address: 0x00712F40 (FUN_00712F40 -- its construction, preregistering it for
+   * `typeid(msvc8::list<boost::shared_ptr<moho::STrigger>>)`.)
+   * Address: 0x00713310 (FUN_00713310 -- the implicit scalar deleting destructor.)
+   * Address: 0x0070F360 (FUN_0070F360 -- `GetName`, from the looked-up `boost::shared_ptr<STrigger>` type's name.)
+   * Address: 0x00BFF880 (FUN_00BFF880 -- the atexit destructor of `GetName`'s name string.)
+   * Address: 0x0070F420 (FUN_0070F420 -- `GetLexical`.)
+   * Address: 0x0070F400 (FUN_0070F400 -- `Init`.)
+   * Address: 0x00710620 (FUN_00710620 -- `SerLoad`; each trigger read by `ReadPointerShared<STrigger>` 0x007142F0.)
+   * Address: 0x00710720 (FUN_00710720 -- `SerSave`; each trigger written `Shared` through `MakeRRef<STrigger>` 0x00713700.)
+   */
+  gpg::RListType<boost::shared_ptr<moho::STrigger>> gListSharedPtrSTriggerTypeInfo;
   RMapUnitBlueprintFloatTypeInfo gMapUnitBlueprintFloatTypeInfo;
   StatsCArmyStatItemTypeInfo gStatsCArmyStatItemTypeInfo;
   RMapStringArmyStatItemPtrTypeInfo gMapStringArmyStatItemPtrTypeInfo;

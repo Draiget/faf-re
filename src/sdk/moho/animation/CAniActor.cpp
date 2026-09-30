@@ -119,71 +119,6 @@ namespace
     ThrowPointerTypeMismatch(source, expectedType, fallback);
   }
 
-  struct ReflectedObjectDeleter
-  {
-    gpg::RType::delete_func_t deleteFunc = nullptr;
-
-    void operator()(void* const object) const noexcept
-    {
-      if (deleteFunc) {
-        deleteFunc(object);
-      }
-    }
-  };
-
-  void PromoteTrackedPointerToShared(gpg::TrackedPointerInfo& tracked)
-  {
-    GPG_ASSERT(tracked.type != nullptr && tracked.type->deleteFunc_ != nullptr);
-    if (!tracked.type || !tracked.type->deleteFunc_) {
-      throw gpg::SerializationError("Ownership conflict while loading archive");
-    }
-
-    auto* const control = new boost::detail::sp_counted_impl_pd<void*, ReflectedObjectDeleter>(
-      tracked.object, ReflectedObjectDeleter{tracked.type->deleteFunc_}
-    );
-    tracked.sharedObject = tracked.object;
-    tracked.sharedControl = control;
-    tracked.state = gpg::TrackedPointerState::Shared;
-  }
-
-  void ReadSharedCAniPosePointer(
-    boost::SharedPtrRaw<moho::CAniPose>& outPointer,
-    gpg::ReadArchive* const archive,
-    const gpg::RRef& ownerRef
-  )
-  {
-    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      outPointer.release();
-      return;
-    }
-
-    if (tracked.state == gpg::TrackedPointerState::Unowned) {
-      PromoteTrackedPointerToShared(tracked);
-    }
-
-    if (tracked.state != gpg::TrackedPointerState::Shared) {
-      throw gpg::SerializationError("Ownership conflict while loading archive");
-    }
-
-    if (!tracked.sharedObject || !tracked.sharedControl) {
-      throw gpg::SerializationError("Can't mix boost::shared_ptr with other shared pointers.");
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAniPoseType());
-    if (!upcast.mObj) {
-      ThrowPointerTypeMismatch(source, CachedCAniPoseType(), "CAniPose");
-    }
-
-    boost::SharedPtrRaw<moho::CAniPose> sourceShared{};
-    sourceShared.px = static_cast<moho::CAniPose*>(tracked.sharedObject);
-    sourceShared.pi = tracked.sharedControl;
-    outPointer.assign_retain(sourceShared);
-  }
-
   void WriteSharedCAniPosePointer(
     const boost::SharedPtrRaw<moho::CAniPose>& pointer,
     gpg::WriteArchive* const archive,
@@ -480,8 +415,9 @@ namespace moho
     archive->TrackPointer(MakeDerivedRef(mPose.px, CachedCAniPoseType()));
     archive->TrackPointer(MakeDerivedRef(mPriorPose.px, CachedCAniPoseType()));
 
-    ReadSharedCAniPosePointer(mPose, archive, gpg::RRef{});
-    ReadSharedCAniPosePointer(mPriorPose, archive, gpg::RRef{});
+    const gpg::RRef nullOwner{};
+    archive->ReadPointerShared(&mPose, &nullOwner);
+    archive->ReadPointerShared(&mPriorPose, &nullOwner);
     DeserializeManipulatorList(this, archive);
   }
 

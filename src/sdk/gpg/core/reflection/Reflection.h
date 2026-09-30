@@ -659,7 +659,7 @@ namespace gpg
      * Address: 0x00585270 (FUN_00585270 -- `Upcast<moho::SimArmy>`; formerly `UpcastToSimArmy` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x00585460 (FUN_00585460 -- `Upcast<moho::CAiPersonality>`; formerly `UpcastToCAiPersonality` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x005943C0 (FUN_005943C0 -- `Upcast<moho::CAiBrain>`; formerly `UpcastToCAiBrain` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x0059A030 (FUN_0059A030 -- `Upcast<`nitCommandQueueRef`>`; formerly `UpcastCUnitCommandQueueRef` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0059A030 (FUN_0059A030 -- `Upcast<moho::CUnitCommandQueue>`; formerly `UpcastCUnitCommandQueueRef` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x0059EB00 (FUN_0059EB00 -- `Upcast<moho::IFormationInstance>`; formerly `UpcastToIFormationInstance` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x005A89B0 (FUN_005A89B0 -- `Upcast<moho::Entity>`; formerly `UpcastToEntity` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x005A9A00 (FUN_005A9A00 -- `Upcast<moho::CAiPathNavigator>`; formerly `UpcastToCAiPathNavigator` in gpg/core/containers/ReadArchive.cpp.)
@@ -700,13 +700,24 @@ namespace gpg
      * Address: 0x00758230 (FUN_00758230 -- `Upcast<moho::CRandomStream>`; formerly `UpcastToCRandomStream` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x00758270 (FUN_00758270 -- `Upcast<moho::SPhysConstants>`; formerly `UpcastToSPhysConstants` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x007582B0 (FUN_007582B0 -- `Upcast<moho::IAiFormationDB>`; formerly `UpcastToIAiFormationDB` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x007586B0 (FUN_007586B0 -- `Upcast<`CCommandDb`>`; formerly `UpcastToCCommandDb` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x007586B0 (FUN_007586B0 -- `Upcast<moho::CCommandDb>`; formerly `UpcastToCCommandDb` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x007586F0 (FUN_007586F0 -- `Upcast<moho::CDecalBuffer>`; formerly `UpcastToCDecalBuffer` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x007588D0 (FUN_007588D0 -- `Upcast<moho::IEffectManager>`; formerly `UpcastToIEffectManager` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x00758AC0 (FUN_00758AC0 -- `Upcast<moho::ISoundManager>`; formerly `UpcastToISoundManager` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00758CB0 (FUN_00758CB0 -- `Upcast<`CEntityDb`>`; formerly `UpcastToCEntityDb` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x0076B6E0 (FUN_0076B6E0 -- `Upcast<`PathQueueImpl`>`; formerly `UpcastToPathQueueImpl` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00758CB0 (FUN_00758CB0 -- `Upcast<moho::CEntityDb>`; formerly `UpcastToCEntityDb` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0076B6E0 (FUN_0076B6E0 -- `Upcast<moho::PathQueue::Impl>`; formerly `UpcastToPathQueueImpl` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x0076ED90 (FUN_0076ED90 -- `Upcast<moho::CIntelPosHandle>`; formerly `UpcastToCIntelPosHandle` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0054EBC0 (FUN_0054EBC0 -- `Upcast<moho::CAniPose>`, the type check of `ReadPointerShared<moho::CAniPose>`; formerly `gpg::RRef::Upcast_CAniPose` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x005503B0 (FUN_005503B0 -- `Upcast<moho::CAniSkel>`, the type check of `ReadPointerShared<moho::CAniSkel>`; formerly `gpg::RRef::Upcast_CAniSkel` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x0055FD70 (FUN_0055FD70 -- `Upcast<moho::Stats<moho::StatItem>>`, the type check of `ReadPointerShared<moho::Stats<moho::StatItem>>`; formerly `gpg::RRef::Upcast_StatsStatItem` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x00551FA0 (FUN_00551FA0 -- `Upcast<moho::CIntelGrid>`, the type check of `ReadPointerShared<moho::CIntelGrid>`; formerly `gpg::RRef::Upcast_CIntelGrid` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x005CE6E0 (FUN_005CE6E0 -- `Upcast<moho::CIntelGrid>`, the type check of `ReadPointerShared<moho::CIntelGrid>`; formerly a second `gpg::RRef::Upcast_CIntelGrid` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x006431A0 (FUN_006431A0 -- `Upcast<moho::RScaResource>`, the type check of `ReadPointerShared<moho::RScaResource>`; formerly `gpg::RRef::Upcast_RScaResource` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x0055AB30 (FUN_0055AB30 -- `Upcast<moho::RScmResource>`, the type check of `ReadPointerShared<moho::RScmResource>`; formerly `gpg::RRef::Upcast_RScmResource` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x00714A10 (FUN_00714A10 -- `Upcast<moho::STrigger>`, the type check of `ReadPointerShared<moho::STrigger>`; formerly `gpg::RRef::Upcast_STrigger` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x008849B0 (FUN_008849B0 -- `Upcast<moho::SSessionSaveData>`, the type check of `ReadPointerShared<moho::SSessionSaveData>`; formerly `func_CastSSessionSaveData` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x007584A0 (FUN_007584A0 -- `Upcast<moho::ISimResources>`, the type check of `ReadPointerShared<moho::ISimResources>`; formerly `func_CastISimResources` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x00885110 (FUN_00885110 -- `Upcast<moho::LaunchInfoBase>`, the type check of `ReadPointerShared<moho::LaunchInfoBase>`; formerly `func_CastLaunchInfoBase` in gpg/core/containers/ArchiveSerialization.cpp.)
      *
      * What it does:
      * This reference's object as a `T*` (`REF_UpcastPtr` to `T`'s type), or
@@ -5390,6 +5401,114 @@ namespace gpg
     tracked.state = TrackedPointerState::Owned;
     return this;
   }
+
+  /**
+   * Address: 0x00884C90 (FUN_00884C90 -- `ReadPointerShared<moho::LaunchInfoBase>`, for `SSavedGameHeader::mLaunchInfo` (0x008831C0); formerly `ReadPointerShared_LaunchInfoBase`.)
+   * Address: 0x008843F0 (FUN_008843F0 -- `ReadPointerShared<moho::SSessionSaveData>`, for `LaunchInfoBase::mLoadSessionData` (`CSavedGame::CreateSinglePlayerSessionInfo` 0x008807F0); formerly `ReadPointerShared_SSessionSaveData`.)
+   * Address: 0x0055F990 (FUN_0055F990 -- `ReadPointerShared<moho::CAniPose>`, for `CAniActor` 0x0063E200, `SPerArmyReconInfo` 0x005C8DE0, `Unit` 0x0055E030; formerly `ReadPointerShared_CAniPose`.)
+   * Address: 0x0054FF20 (FUN_0054FF20 -- `ReadPointerShared<moho::CAniSkel>`, for `CAniPose::mSkeleton` (0x0054F380); formerly `ReadPointerShared_CAniSkel`.)
+   * Address: 0x0055F780 (FUN_0055F780 -- `ReadPointerShared<moho::Stats<moho::StatItem>>`, for `SSTIUnitConstantData::mStatsRoot` (0x0055DF40); formerly `ReadPointerShared_Stats_StatItem`.)
+   * Address: 0x00757900 (FUN_00757900 -- `ReadPointerShared<moho::ISimResources>`, for `Sim` 0x00754C60; formerly `ReadPointerShared_ISimResources`.)
+   * Address: 0x00551CC0 (FUN_00551CC0 -- `ReadPointerShared<moho::CIntelGrid>`, for `SSTIArmyConstantData`'s eight grids (0x00550FC0); formerly `ReadPointerShared_CIntelGrid`.)
+   * Address: 0x005CE220 (FUN_005CE220 -- `ReadPointerShared<moho::CIntelGrid>` again, a second emission for `CAiReconDBImpl`'s eight grids (0x005CCBE0), `CIntelPosHandle::mGrid` (0x00770000); formerly `ReadPointerShared_CIntelGrid2`.)
+   * Address: 0x00642F60 (FUN_00642F60 -- `ReadPointerShared<moho::RScaResource>`, for `CAnimationManipulator::mAnimationRef` (0x00642A50); formerly `ReadPointerShared_RScaResource`.)
+   * Address: 0x0055A5D0 (FUN_0055A5D0 -- `ReadPointerShared<moho::RScmResource>`, for `SSTIEntityVariableData::mScmResource` 0x00559B00, `SPerArmyReconInfo::mMesh` 0x005C8DE0; formerly `ReadPointerShared_RScmResource`.)
+   * Address: 0x007142F0 (FUN_007142F0 -- `ReadPointerShared<moho::STrigger>`, for `list<shared_ptr<STrigger>>` 0x00710620 and the `shared_ptr<STrigger>` type's load; formerly `ReadPointerShared_STrigger`.)
+   *
+   * The `boost::shared_ptr<T>` members those bodies call out of line (all
+   * formerly per-type helpers in gpg/core/containers/ArchiveSerialization.cpp):
+   *
+   * Address: 0x0054B200 (FUN_0054B200 -- `shared_ptr<moho::CAniSkel>::operator=`; callers 0x0054FF20.)
+   * Address: 0x00551ED0 (FUN_00551ED0 -- `shared_ptr<moho::CIntelGrid>::operator=`; callers 0x00551CC0.)
+   * Address: 0x005CE430 (FUN_005CE430 -- `shared_ptr<moho::CIntelGrid>::operator=`; callers 0x005CE220.)
+   * Address: 0x00714530 (FUN_00714530 -- `shared_ptr<moho::STrigger>::operator=`; callers 0x007142F0.)
+   * Address: 0x00758150 (FUN_00758150 -- `shared_ptr<moho::ISimResources>::operator=`; callers 0x00757900.)
+   * Address: 0x0087FCB0 (FUN_0087FCB0 -- `shared_ptr<moho::LaunchInfoBase>::operator=`; callers 0x00884C90.)
+   * Address: 0x00884670 (FUN_00884670 -- `shared_ptr<moho::SSessionSaveData>::operator=`; callers 0x008843F0.)
+   * Address: 0x0055FBA0 (FUN_0055FBA0 -- `shared_ptr<moho::Stats<moho::StatItem>>::operator=`; callers 0x0055F780.)
+   * Address: 0x00550130 (FUN_00550130 -- `shared_ptr<moho::CAniSkel>::reset()`; callers 0x0054FF20.)
+   * Address: 0x00551F00 (FUN_00551F00 -- `shared_ptr<moho::CIntelGrid>::reset()`; callers 0x00551CC0.)
+   * Address: 0x00550670 (FUN_00550670 -- `shared_ptr<moho::CIntelGrid>::reset()`, the null arm of 0x00551CC0/0x005CE220.)
+   * Address: 0x00714560 (FUN_00714560 -- `shared_ptr<moho::STrigger>::reset()`; callers 0x007142F0.)
+   * Address: 0x0073F5B0 (FUN_0073F5B0 -- `shared_ptr<moho::LaunchInfoBase>::reset()`; callers 0x00884C90.)
+   * Address: 0x00758180 (FUN_00758180 -- `shared_ptr<moho::ISimResources>::reset()`; callers 0x00757900.)
+   * Address: 0x008846E0 (FUN_008846E0 -- `shared_ptr<moho::SSessionSaveData>::reset()`; callers 0x008843F0.)
+   * Address: 0x0055FC00 (FUN_0055FC00 -- `shared_ptr<moho::Stats<moho::StatItem>>::reset()`; callers 0x0055F780.)
+   * Address: 0x005503F0 (FUN_005503F0 -- `static_pointer_cast<moho::CAniSkel>` of the entry's `shared_ptr<void>` (copy both words, `add_ref_copy`); callers 0x0054FF20.)
+   * Address: 0x00551FE0 (FUN_00551FE0 -- the same for `moho::CIntelGrid`; callers 0x00551CC0.)
+   * Address: 0x0055FDD0 (FUN_0055FDD0 -- the same for `moho::CAniPose`; callers 0x0055F990.)
+   * Address: 0x005CE720 (FUN_005CE720 -- the same for `moho::CIntelGrid`; callers 0x005CE220.)
+   * Address: 0x00714A50 (FUN_00714A50 -- the same for `moho::STrigger`; callers 0x007142F0.)
+   * Address: 0x007584E0 (FUN_007584E0 -- the same for `moho::ISimResources`; callers 0x00757900.)
+   * Address: 0x008849F0 (FUN_008849F0 -- the same for `moho::SSessionSaveData`; callers 0x008843F0.)
+   * Address: 0x00885150 (FUN_00885150 -- the same for `moho::LaunchInfoBase`; callers 0x00884C90.)
+   * Address: 0x0055FDB0 (FUN_0055FDB0 -- the same for `moho::Stats<moho::StatItem>`; callers 0x0055F780.)
+   * Address: 0x0055B760 (FUN_0055B760 -- `~shared_ptr<moho::Stats<moho::StatItem>>`, the cast temporary's release.)
+   *
+   * What it does:
+   * Reads one tracked pointer into `*outValue`, shared through the archive's
+   * table entry (the body is `serialization.h`'s, whose assert it carries at
+   * line 392):
+   *   - a null pointer resets `*outValue`;
+   *   - an unowned object becomes the entry's `shared_ptr<void>`, deleting it
+   *     through its reflected type, and the entry turns `Shared`;
+   *   - an owned one is an ownership conflict;
+   *   - a shared one must have come from a `boost::shared_ptr` read.
+   * An object that is not a `T` throws `SerializationError`; otherwise
+   * `*outValue` takes the entry's control block, the pointer uncast.
+   */
+  template <class T>
+  ReadArchive* ReadArchive::ReadPointerShared(boost::shared_ptr<T>* const outValue, const RRef* const ownerRef)
+  {
+    using Object = std::remove_cv_t<T>;
+
+    TrackedPointerInfo& tracked = ReadRawPointer(this, *ownerRef);
+    if (tracked.object == nullptr) {
+      outValue->reset();
+      return this;
+    }
+
+    if (tracked.state == TrackedPointerState::Unowned) {
+      if (tracked.type->deleteFunc_ == nullptr) {
+        HandleAssertFailure(
+          "ptrinfo.mObj.GetRType()->mDelete", 392, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h"
+        );
+      }
+      tracked.sharedPtr = boost::shared_ptr<void>(tracked.object, tracked.type->deleteFunc_);
+      tracked.state = TrackedPointerState::Shared;
+    } else if (tracked.state != TrackedPointerState::Shared) {
+      throw SerializationError("Ownership conflict while loading archive");
+    } else if (!tracked.sharedPtr) {
+      throw SerializationError("Can't mix boost::shared_ptr with other shared pointers.");
+    }
+
+    const RRef source{tracked.object, tracked.type};
+    if (source.Upcast<Object>() == nullptr) {
+      throw SerializationError(STR_Printf(
+        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+        "instead",
+        RTypeOf<Object>()->GetName(),
+        source.GetTypeName()
+      ).c_str());
+    }
+
+    *outValue = boost::static_pointer_cast<T>(tracked.sharedPtr);
+    return this;
+  }
+
+  /**
+   * What it does:
+   * `ReadPointerShared` into a `boost::SharedPtrRaw<T>` member: the same read
+   * into a `boost::shared_ptr<T>`, whose control block the member then takes.
+   */
+  template <class T>
+  ReadArchive* ReadArchive::ReadPointerShared(boost::SharedPtrRaw<T>* const outValue, const RRef* const ownerRef)
+  {
+    boost::shared_ptr<T> value;
+    ReadPointerShared(&value, ownerRef);
+    outValue->reset_from_owner(value);
+    return this;
+  }
   /**
    * Per-type emissions with no references in the PE (write state and source
    * -- a value, a slot or an owner field -- folded in per copy):
@@ -6076,5 +6195,67 @@ namespace gpg
       }
     }
     return RRef{object, declared};
+  }
+
+  /**
+   * What it does:
+   * Reads one element of a reflected container: a value through its own
+   * reflected type, owned by the container's owner.
+   */
+  template <class T>
+  void ReadElement(ReadArchive* const archive, T& value, const RRef* const ownerRef)
+  {
+    archive->Read(RTypeOf<T>(), &value, *ownerRef);
+  }
+
+  /**
+   * What it does:
+   * Reads one raw-pointer element: a tracked pointer the container does not own.
+   */
+  template <class T>
+  void ReadElement(ReadArchive* const archive, T*& value, const RRef* const ownerRef)
+  {
+    archive->ReadPointer(&value, ownerRef);
+  }
+
+  /**
+   * What it does:
+   * Reads one `boost::shared_ptr` element: a tracked pointer shared through the archive.
+   */
+  template <class T>
+  void ReadElement(ReadArchive* const archive, boost::shared_ptr<T>& value, const RRef* const ownerRef)
+  {
+    archive->ReadPointerShared(&value, ownerRef);
+  }
+
+  /**
+   * What it does:
+   * Writes one element of a reflected container: a value through its own
+   * reflected type, owned by the container's owner.
+   */
+  template <class T>
+  void WriteElement(WriteArchive* const archive, const T& value, const RRef* const ownerRef)
+  {
+    archive->Write(RTypeOf<T>(), &value, *ownerRef);
+  }
+
+  /**
+   * What it does:
+   * Writes one raw-pointer element as an unowned tracked pointer.
+   */
+  template <class T>
+  void WriteElement(WriteArchive* const archive, T* const& value, const RRef* const ownerRef)
+  {
+    archive->WritePointer(value, TrackedPointerState::Unowned, *ownerRef);
+  }
+
+  /**
+   * What it does:
+   * Writes one `boost::shared_ptr` element as a shared tracked pointer.
+   */
+  template <class T>
+  void WriteElement(WriteArchive* const archive, const boost::shared_ptr<T>& value, const RRef* const ownerRef)
+  {
+    archive->WritePointer(value.get(), TrackedPointerState::Shared, *ownerRef);
   }
 } // namespace gpg

@@ -23,6 +23,7 @@ namespace LuaPlus
 namespace moho
 {
   class CScrLuaInitForm;
+  class RScaResource;
   class Unit;
 
   using SAniManipBitStorage = SBitStorage32;
@@ -30,8 +31,6 @@ namespace moho
   class CAnimationManipulator : public IAniManipulator
   {
   public:
-    using AnimationResourceRef = boost::SharedPtrRaw<void>;
-
     /**
      * Address: 0x0063F380 (FUN_0063F380, ??0CAnimationManipulator@Moho@@QAE@XZ)
      *
@@ -106,7 +105,7 @@ namespace moho
     /**
      * Address: 0x0063FBA0 (FUN_0063FBA0)
      */
-    void SetAnimationResource(const AnimationResourceRef& resource, bool looping);
+    void SetAnimationResource(const boost::SharedPtrRaw<RScaResource>& resource, bool looping);
 
     /**
      * Address: 0x006412C0 (FUN_006412C0)
@@ -150,7 +149,7 @@ namespace moho
 
     WeakPtr<Unit> mGoal;                // +0x80 (intrusive weak link into goalMotionScaleUnit chain)
     SAniManipBitStorage mBoneMask;      // +0x88
-    AnimationResourceRef mAnimationRef; // +0x9C
+    boost::SharedPtrRaw<RScaResource> mAnimationRef; // +0x9C
     float mRate;                        // +0xA4
     float mAnimationTime;               // +0xA8
     float mLastFramePosition;           // +0xAC

@@ -2,18 +2,12 @@
 
 #include <cstddef>
 
+#include "boost/shared_ptr.h"
+
 namespace boost
 {
   template <class T>
   struct SharedPtrRaw;
-
-  template <class T>
-  class shared_ptr;
-
-  namespace detail
-  {
-    class sp_counted_base;
-  } // namespace detail
 } // namespace boost
 
 namespace moho
@@ -101,10 +95,11 @@ namespace gpg
    * carries: 0x00884CE6 pushes "ptrinfo.mObj.GetRType()->mDelete" alongside
    * the source path "c:\work\rts\main\code\src\libs\gpgcore/reflection/
    * serializat...". So `{object, type}` was one embedded `RRef mObj`, and
-   * `{sharedObject, sharedControl}` was one `boost::shared_ptr<void>` whose
-   * copy/assign/destroy the emissions below are. The flat spelling kept here
-   * is what every recovered call site already reads; regrouping them into the
-   * two real sub-objects is a separate pass.
+   * +0x08 is a `boost::shared_ptr<void>`: 0x00953720 copies an entry into the
+   * table with `shared_count::operator=` (0x00422A70) on +0x0C, and the
+   * construct result it copied from releases its own count as it dies
+   * (0x0094F5A0). `{object, type}` stays flat because `RRef` is defined in
+   * Reflection.h, which includes this header.
    *
    * The trailing three fields are ordered from four independent functions,
    * because a duplicate of this layout in ReadArchive.cpp had disagreed with
@@ -117,25 +112,23 @@ namespace gpg
    *   0x009506F0 copy-assigns a range - +0x0C takes the whole
    *     add-ref-new / release-old / store dance, +0x08 and +0x10 plain.
    *   0x00884C90 gates promote-to-shared on `cmp [edi+0x10], 1` (`Unowned`)
-   *     and writes 3 (`Shared`), and hands `this+0x08` to the shared-pointer
-   *     constructor as its `this`.
+   *     and writes 3 (`Shared`), and assigns a fresh `shared_ptr<void>` to
+   *     `this+0x08`.
    * `ReadArchive::EndSection` (0x00952BD0) agrees from a fifth site: it tests
    * `cmp dword ptr [eax+esi+10h], 1` to pick the entries it may delete.
+   *
+   * Address: 0x0094F5A0 (FUN_0094F5A0 -- the implicit destructor, which releases `sharedPtr`'s count; `ReadRawPointer`
+   * 0x00953720 runs it on the construct result. Formerly `ReleaseTrackedPointerSharedControl` in
+   * gpg/core/containers/ArchiveSerialization.cpp.)
    */
   struct TrackedPointerInfo
   {
     void* object = nullptr;                                    // +0x00
     RType* type = nullptr;                                     // +0x04
-    void* sharedObject = nullptr;                              // +0x08
-    boost::detail::sp_counted_base* sharedControl = nullptr;    // +0x0C
+    boost::shared_ptr<void> sharedPtr;                         // +0x08
     TrackedPointerState state = TrackedPointerState::Reserved;  // +0x10
   };
-  static_assert(
-    offsetof(TrackedPointerInfo, sharedObject) == 0x08, "TrackedPointerInfo::sharedObject offset must be 0x08"
-  );
-  static_assert(
-    offsetof(TrackedPointerInfo, sharedControl) == 0x0C, "TrackedPointerInfo::sharedControl offset must be 0x0C"
-  );
+  static_assert(offsetof(TrackedPointerInfo, sharedPtr) == 0x08, "TrackedPointerInfo::sharedPtr offset must be 0x08");
   static_assert(offsetof(TrackedPointerInfo, state) == 0x10, "TrackedPointerInfo::state offset must be 0x10");
   static_assert(sizeof(TrackedPointerInfo) == 0x14, "TrackedPointerInfo size must be 0x14");
 
@@ -146,7 +139,7 @@ namespace gpg
    * `ReadArchive` makes one per pointer on the stack, reserved and with member
    * loading on (0x00953720), asserts the hook left it reserved no longer
    * (`"constructResult.mInfo.mState != RESERVED"`, serialization.cpp line
-   * 156), moves `mInfo` into its tracked-pointer table and reads the members
+   * 156), copies `mInfo` into its tracked-pointer table and reads the members
    * only when `mLoadMembers` is still set.
    */
   class SerConstructResult
@@ -252,122 +245,6 @@ namespace gpg
    * Reads pointer token payload and resolves one tracked-pointer table lane.
    */
   TrackedPointerInfo& ReadRawPointer(ReadArchive* archive, const RRef& ownerRef);
-
-  /**
-   * Address: 0x00884C90 (FUN_00884C90)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<LaunchInfoBase>` with
-   * archive ownership-state transitions (`UNOWNED -> SHARED`) and type checking.
-   */
-  void
-  ReadPointerShared_LaunchInfoBase(boost::SharedPtrRaw<moho::LaunchInfoBase>& outPointer, ReadArchive* archive, const RRef& ownerRef);
-
-  /**
-   * Address: 0x008843F0 (FUN_008843F0)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<SSessionSaveData>`,
-   * promotes unowned lanes to shared ownership, and validates pointee type.
-   */
-  void ReadPointerShared_SSessionSaveData(
-    boost::SharedPtrRaw<moho::SSessionSaveData>& outPointer, ReadArchive* archive, const RRef& ownerRef
-  );
-
-  /**
-   * Address: 0x0055F990 (FUN_0055F990)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<CAniPose>`, promotes
-   * unowned lanes to shared ownership, and validates pointee type.
-   */
-  void
-  ReadPointerShared_CAniPose(boost::SharedPtrRaw<moho::CAniPose>& outPointer, ReadArchive* archive, const RRef& ownerRef);
-
-  /**
-   * Address: 0x0054FF20 (FUN_0054FF20)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<CAniSkel>`, promotes
-   * unowned lanes to shared ownership, and validates pointee type.
-   */
-  void
-  ReadPointerShared_CAniSkel(boost::SharedPtrRaw<moho::CAniSkel>& outPointer, ReadArchive* archive, const RRef& ownerRef);
-
-  /**
-   * Address: 0x0055F780 (FUN_0055F780)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<Stats<StatItem>>`,
-   * promotes unowned lanes to shared ownership, and validates pointee type.
-   */
-  void ReadPointerShared_Stats_StatItem(
-    boost::SharedPtrRaw<moho::Stats<moho::StatItem>>& outPointer, ReadArchive* archive, const RRef& ownerRef
-  );
-
-  /**
-   * Address: 0x00757900 (FUN_00757900)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<ISimResources>`,
-   * promotes unowned lanes to shared ownership, and validates pointee type.
-   */
-  void ReadPointerShared_ISimResources(
-    boost::SharedPtrRaw<moho::ISimResources>& outPointer, ReadArchive* archive, const RRef& ownerRef
-  );
-
-  /**
-   * Address: 0x00551CC0 (FUN_00551CC0)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<CIntelGrid>`,
-   * promotes unowned lanes to shared ownership, and validates pointee type.
-   */
-  void
-  ReadPointerShared_CIntelGrid(boost::SharedPtrRaw<moho::CIntelGrid>& outPointer, ReadArchive* archive, const RRef& ownerRef);
-
-  /**
-   * Address: 0x005CE220 (FUN_005CE220, gpg::ReadArchive::ReadPointerShared_CIntelGrid2)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<CIntelGrid>` for the
-   * legacy CIntelPosHandle serializer lane, promoting unowned entries to shared
-   * ownership and validating pointee type.
-   */
-  void
-  ReadPointerShared_CIntelGrid2(boost::SharedPtrRaw<moho::CIntelGrid>& outPointer, ReadArchive* archive, const RRef& ownerRef);
-
-  /**
-   * Address: 0x00642F60 (FUN_00642F60, gpg::ReadArchive::ReadPointerShared_RScaResource)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<RScaResource>`,
-   * promotes unowned lanes to shared ownership, and validates pointee type.
-   */
-  void ReadPointerShared_RScaResource(
-    boost::SharedPtrRaw<moho::RScaResource>& outPointer, ReadArchive* archive, const RRef& ownerRef
-  );
-
-  /**
-   * Address: 0x0055A5D0 (FUN_0055A5D0)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<RScmResource>`,
-   * promotes unowned lanes to shared ownership, and validates pointee type.
-   */
-  void ReadPointerShared_RScmResource(
-    boost::SharedPtrRaw<moho::RScmResource>& outPointer, ReadArchive* archive, const RRef& ownerRef
-  );
-
-  /**
-   * Address: 0x007142F0 (FUN_007142F0)
-   *
-   * What it does:
-   * Reads one tracked pointer lane as `boost::shared_ptr<STrigger>`,
-   * promotes unowned lanes to shared ownership, and validates pointee type.
-   */
-  void
-  ReadPointerShared_STrigger(boost::SharedPtrRaw<moho::STrigger>& outPointer, ReadArchive* archive, const RRef& ownerRef);
 
   /**
    * Address: 0x00953320 (FUN_00953320)

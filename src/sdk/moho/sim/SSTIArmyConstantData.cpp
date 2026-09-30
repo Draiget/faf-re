@@ -137,7 +137,7 @@ namespace moho
    * What it does:
    * Reads army identity lanes (`mArmyIndex` as uint, `mArmyName`, `mPlayerName`,
    * `mIsCivilian` as bool) followed by eight tracked-shared `CIntelGrid`
-   * pointers in declaration order via `ReadPointerShared_CIntelGrid`.
+   * pointers in declaration order via `ReadPointerShared<CIntelGrid>`.
    */
   void SSTIArmyConstantData::MemberDeserialize(gpg::ReadArchive* const archive)
   {
@@ -153,34 +153,16 @@ namespace moho
     mIsCivilian = static_cast<std::uint8_t>(isCivilian ? 1 : 0);
 
     // Eight tracked-shared grid pointers, in the same order MemberSerialize
-    // writes them. The binary gives each read its own zeroed owner ref rather
-    // than sharing one.
-    //
-    // `ReadPointerShared_CIntelGrid` takes a `boost::SharedPtrRaw<CIntelGrid>&`
-    // and the lanes are declared as `boost::shared_ptr<CIntelGrid>`; the two
-    // are the same (px, pi) pair, which `SharedPtrRaw::reset_from_owner`
-    // already static_asserts, so the view is taken here rather than at each of
-    // the eight call sites.
-    const auto readSharedGridPointer = [archive](boost::shared_ptr<CIntelGrid>& gridPointer) {
-      static_assert(
-        sizeof(boost::shared_ptr<CIntelGrid>) == sizeof(boost::SharedPtrRaw<CIntelGrid>),
-        "boost::shared_ptr<CIntelGrid> must have the same (px, pi) layout as SharedPtrRaw<CIntelGrid>"
-      );
-
-      const gpg::RRef ownerRef{};
-      gpg::ReadPointerShared_CIntelGrid(
-        reinterpret_cast<boost::SharedPtrRaw<CIntelGrid>&>(gridPointer), archive, ownerRef
-      );
-    };
-
-    readSharedGridPointer(mVisionReconGrid);
-    readSharedGridPointer(mWaterReconGrid);
-    readSharedGridPointer(mRadarReconGrid);
-    readSharedGridPointer(mSonarReconGrid);
-    readSharedGridPointer(mOmniReconGrid);
-    readSharedGridPointer(mRciReconGrid);
-    readSharedGridPointer(mSciReconGrid);
-    readSharedGridPointer(mVciReconGrid);
+    // writes them, each owned by nothing.
+    const gpg::RRef ownerRef{};
+    archive->ReadPointerShared(&mVisionReconGrid, &ownerRef);
+    archive->ReadPointerShared(&mWaterReconGrid, &ownerRef);
+    archive->ReadPointerShared(&mRadarReconGrid, &ownerRef);
+    archive->ReadPointerShared(&mSonarReconGrid, &ownerRef);
+    archive->ReadPointerShared(&mOmniReconGrid, &ownerRef);
+    archive->ReadPointerShared(&mRciReconGrid, &ownerRef);
+    archive->ReadPointerShared(&mSciReconGrid, &ownerRef);
+    archive->ReadPointerShared(&mVciReconGrid, &ownerRef);
   }
 
   /**

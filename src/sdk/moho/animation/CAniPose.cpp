@@ -1219,9 +1219,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    boost::SharedPtrRaw<CAniSkel> skeletonRaw{};
-    gpg::ReadPointerShared_CAniSkel(skeletonRaw, archive, nullOwner);
-    mSkeleton = boost::SharedPtrFromRawRetained(skeletonRaw);
+    archive->ReadPointerShared(&mSkeleton, &nullOwner);
     archive->ReadFloat(&mScale);
     archive->Read(CachedVTransformType(), &mLocalTransform, nullOwner);
     archive->Read(CachedFastVectorCAniPoseBoneType(), &mBones, nullOwner);

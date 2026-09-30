@@ -6704,6 +6704,8 @@ namespace msvc8
          * Address: 0x00689520 (FUN_00689520 -- a second emission of the gap fill 0x00688E20 for `msvc8::vector<moho::CEntityDbBoundedPropQueueNode>` (`EntityDB::mBoundedProps`' heap; the 0x14 `{mPriority, mBoundedTick, WeakPtr<Prop> mOwnerLink, mHandleId}` node), the node's `operator=` 0x00687A70 per slot; zero callers, unreachable; formerly `FillPrefixedWeakPtrDwordPayloadRangeFromSingleLane` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
          * Address: 0x00868D30 (FUN_00868D30 -- the `std::fill` gap-overwrite step for `msvc8::vector<moho::WeakSet<moho::UserEntity>>` (`SelectionDragger::DragRelease`'s priority buckets, element 0x0C): `WeakSet::operator=` per bucket; callers 0x00868040 and 0x00868950.)
          * Address: 0x00868950 (FUN_00868950 -- a forwarding copy of 0x00868D30.)
+         * Address: 0x00950790 (FUN_00950790 -- the `std::fill` gap-overwrite step of `_Insert_n` for `msvc8::vector<gpg::TrackedPointerInfo>` (`gpg::ReadArchive::mTrackedPtrs` at +0x14; the 0x14 entry's `boost::shared_ptr<void>` at +0x08 is what makes each step more than a word copy); callers 0x00950C30, 0x00952770; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00950C30 (FUN_00950C30 -- a jump-only adapter over 0x00950790; no callers; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -7326,6 +7328,9 @@ namespace msvc8
          * Address: 0x00868F40 (FUN_00868F40 -- one bucket's `~WeakSet` out of line.)
          * Address: 0x00868F70 (FUN_00868F70 -- the same, returning the bucket.)
          * Address: 0x008B38C0 (FUN_008B38C0 -- `_Destroy_range` for `msvc8::vector<moho::WeakPtr<moho::UserUnit>>` (`UserArmy::mAvatars`): `~WeakPtr` per element; callers 0x008B1520, `~UserArmy` 0x008B1650 (`mAvatars.clear()`), 0x008B2820, 0x008B2A70, 0x008B2B30, 0x008B2B70. Formerly `UnlinkSelectionWeakOwnerRefRangeNoReset` in moho/sim/CWldSession.cpp, removed 2026-09-30.)
+         * Address: 0x00950F20 (FUN_00950F20 -- `_Destroy_range` for `msvc8::vector<gpg::TrackedPointerInfo>` (`gpg::ReadArchive::mTrackedPtrs` at +0x14; the 0x14 entry's `boost::shared_ptr<void>` at +0x08 is what makes each step more than a word copy): `~TrackedPointerInfo` per slot, releasing each control block; callers 0x00951E40 (`erase`), `ReadArchive::EndSection` 0x00952BD0, 0x00951F06, 0x00952538, 0x00952770; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00951510 (FUN_00951510 -- a second copy of 0x00950F20; callers 0x00952770; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00951070 (FUN_00951070 -- a register-shape adapter over 0x00950F20; no callers; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -9535,6 +9540,8 @@ namespace msvc8
          * Address: 0x008B2E20 (FUN_008B2E20 -- `_Ufill`, the advance-returning adapter (`fill; return p + n`) over 0x008B39A0; zero callers, unreachable; formerly `WeakPtr<T>::FillConstructSourceFirstAdapterA`, removed 2026-09-30.)
          * Address: 0x00689310 (FUN_00689310 -- `uninit_fill_n` for `msvc8::vector<moho::CEntityDbBoundedPropQueueNode>` (`EntityDB::mBoundedProps`' heap; the 0x14 `{mPriority, mBoundedTick, WeakPtr<Prop> mOwnerLink, mHandleId}` node): `count` in ECX, the one value in ESI, each non-null slot the node's copy constructor (two words, the `WeakPtr<Prop>` pushed onto the prop's chain, the handle); callers 0x006868C0 (`push_back`), 0x006877F0 (`_Ufill`), 0x006882E0 (`_Insert_n`); formerly `ConstructPrefixedWeakPtrDwordPayloadRepeated` over a `PrefixedWeakPtrDwordPayloadLane` look-alike in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
          * Address: 0x00628AE0 (FUN_00628AE0 -- `uninit_fill_n` for `msvc8::vector<moho::SPickUpInfo>` (the 0x0C `{WeakPtr<Unit> mUnit, float mDistanceSq}` element, `CUnitLoadUnits::mPickupQueue`; each step relinks the weak node onto the source's owner chain, so the copy is never a memcpy): `count` in EDX, the one value in ESI, each non-null slot `SPickUpInfo`'s copy constructor; callers 0x00626E10 (`push_back`), 0x006274B0 (`_Ufill`), 0x00627800 (`_Insert_n`). It was cited on `uninit_copy_n`, but it never advances its source; formerly `CopyWeakPtrFloatPayloadRange` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-11.)
+         * Address: 0x009506C0 (FUN_009506C0 -- `uninit_fill_n` for `msvc8::vector<gpg::TypeHandle>` (`gpg::ReadArchive::mTypeHandles`, the 0x08 `{type, version}` element); callers 0x00950BC0, 0x00950DC0, the `push_back` 0x00952C90; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00950BC0 (FUN_00950BC0 -- a register-shape adapter over 0x009506C0; no callers; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -10399,6 +10406,8 @@ namespace msvc8
          * Address: 0x00628A60 (FUN_00628A60 -- `std::copy` for `msvc8::vector<moho::SPickUpInfo>`, `SPickUpInfo::operator=` per slot: the `WeakPtr<Unit>` relinks only when the two slots differ, then the distance; callers 0x006273B0 (`erase`), 0x00626EA0; formerly `CopyPickUpInfoWeakUnitRange` in moho/unit/tasks/CUnitLoadUnits.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x00868C80 (FUN_00868C80 -- the assigning forward copy for `msvc8::vector<moho::WeakSet<moho::UserEntity>>` (`SelectionDragger::DragRelease`'s priority buckets, element 0x0C): `WeakSet::operator=` per bucket; callers `erase` 0x00867FC0 and 0x008688D0.)
          * Address: 0x008688D0 (FUN_008688D0 -- a forwarding copy of 0x00868C80.)
+         * Address: 0x009506F0 (FUN_009506F0 -- `std::copy` for `msvc8::vector<gpg::TrackedPointerInfo>` (`gpg::ReadArchive::mTrackedPtrs` at +0x14; the 0x14 entry's `boost::shared_ptr<void>` at +0x08 is what makes each step more than a word copy): `TrackedPointerInfo::operator=` per slot; callers 0x00951E40 (`erase`), `ReadArchive::EndSection` 0x00952BD0 (`clear`), 0x00952526; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00950BF0 (FUN_00950BF0 -- a register-shape adapter over 0x009506F0; no callers; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
          */
     public:
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
