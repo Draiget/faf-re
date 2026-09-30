@@ -20,6 +20,7 @@
 namespace moho
 {
   class CArmyImpl;
+  class SimArmy;
   class CInfluenceMap;
   class Sim;
   struct SWorldBeam;
@@ -135,7 +136,7 @@ namespace moho
      * Initializes recon maps/grids from the owning army and optionally enables
      * fog-of-war vision/water grids.
      */
-    CAiReconDBImpl(CArmyImpl* army, bool fogOfWar);
+    CAiReconDBImpl(SimArmy* army, bool fogOfWar);
 
     /**
      * Address: 0x005C2300 (FUN_005C2300, scalar deleting thunk)
@@ -349,7 +350,7 @@ namespace moho
      * Allocates and constructs a CAiReconDBImpl instance.
      */
     [[nodiscard]]
-    static CAiReconDBImpl* Create(CArmyImpl* army, bool fogOfWar);
+    static CAiReconDBImpl* Create(SimArmy* army, bool fogOfWar);
 
   private:
   public:
@@ -550,7 +551,7 @@ namespace moho
     ReconBlipMap mBlipMap;      // +0x04
     msvc8::vector<ReconBlip*> mBblips;  // +0x10
     msvc8::vector<ReconBlip*> mTempBlips; // +0x20
-    CArmyImpl* mArmy;                   // +0x30
+    SimArmy* mArmy;                     // +0x30
     STIMap* mMapData;                   // +0x34
     Sim* mSim;                          // +0x38
     CInfluenceMap* mIMap;               // +0x3C

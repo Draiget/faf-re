@@ -165,7 +165,7 @@ namespace
     }
   }
 
-  [[nodiscard]] bool IsAlliedOrSameArmy(const CArmyImpl* const viewer, const CArmyImpl* const owner) noexcept
+  [[nodiscard]] bool IsAlliedOrSameArmy(const SimArmy* const viewer, const SimArmy* const owner) noexcept
   {
     if (!viewer || !owner) {
       return false;
@@ -462,7 +462,7 @@ CAiReconDBImpl::CAiReconDBImpl()
  * boost::ResetSharedPtrRawOwning at all 8 grid-assignment call sites below
  * (e.g. 0x005C00D7).
  */
-CAiReconDBImpl::CAiReconDBImpl(CArmyImpl* const army, const bool fogOfWar) :
+CAiReconDBImpl::CAiReconDBImpl(SimArmy* const army, const bool fogOfWar) :
     mBlipMap{},
     mBblips{},
     mTempBlips{},
@@ -1982,7 +1982,7 @@ void CAiReconDBImpl::ReconFlushBlipsInRect(const moho::Rect2<int>& rect)
 /**
  * Address: 0x005C36A0 (FUN_005C36A0, ??2CAiReconDBImpl@Moho@@QAE@@Z)
  */
-CAiReconDBImpl* CAiReconDBImpl::Create(CArmyImpl* const army, const bool fogOfWar)
+CAiReconDBImpl* CAiReconDBImpl::Create(SimArmy* const army, const bool fogOfWar)
 {
   return new CAiReconDBImpl(army, fogOfWar);
 }

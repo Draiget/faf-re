@@ -93,40 +93,6 @@ namespace
 
   constexpr std::uint32_t kUnitCollisionBucketFlags = 0x100u;
   constexpr std::uint32_t kReconEntityFamilyPrefix = 0x300u;
-  gpg::RType* gSimType = nullptr;
-  gpg::RType* gRMeshBlueprintType = nullptr;
-  gpg::RType* gRScmResourceType = nullptr;
-  gpg::RType* gCAniPoseType = nullptr;
-
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveRMeshBlueprintType()
-  {
-    return CachedType<RMeshBlueprint>(gRMeshBlueprintType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSimType()
-  {
-    return CachedType<Sim>(gSimType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveRScmResourceType()
-  {
-    return CachedType<RScmResource>(gRScmResourceType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCAniPoseType()
-  {
-    return CachedType<CAniPose>(gCAniPoseType);
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
@@ -161,80 +127,6 @@ namespace
     lua_pushboolean(rawState, (reconFlags & flagMask) != 0u ? 1 : 0);
     (void)lua_gettop(rawState);
     return 1;
-  }
-
-  [[nodiscard]] bool IsPointerCompatibleWithExpectedType(
-    const gpg::TrackedPointerInfo& tracked, gpg::RType* const expectedType
-  )
-  {
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-    return gpg::REF_UpcastPtr(source, expectedType).mObj != nullptr;
-  }
-
-  template <typename TObject>
-  [[nodiscard]] TObject* ReadPointerUnowned(
-    gpg::ReadArchive* const archive, const gpg::RRef& ownerRef, gpg::RType* const expectedType, const char* const typeName
-  )
-  {
-    const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
-      throw gpg::SerializationError(typeName ? typeName : "Archive pointer type mismatch");
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-    return static_cast<TObject*>(gpg::REF_UpcastPtr(source, expectedType).mObj);
-  }
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* const object, gpg::RType* const staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType ? dynamicType : staticType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
-  template <typename TObject>
-  void WritePointerWithType(
-    gpg::WriteArchive* const archive,
-    TObject* const object,
-    gpg::RType* const staticType,
-    const gpg::TrackedPointerState state,
-    const gpg::RRef& ownerRef
-  )
-  {
-    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
-    gpg::WriteRawPointer(archive, objectRef, state, ownerRef);
   }
 
   [[nodiscard]] EntId ReserveReconBlipId(Sim* const sim, Unit* const sourceUnit)
@@ -855,7 +747,7 @@ void SPerArmyReconInfo::MemberDeserialize(gpg::ReadArchive* const archive, const
   }
 
   const gpg::RRef ownerRef{};
-  mStiMesh = ReadPointerUnowned<RMeshBlueprint>(archive, ownerRef, ResolveRMeshBlueprintType(), "RMeshBlueprint");
+  archive->ReadPointer(&mStiMesh, &ownerRef);
   archive->ReadPointerShared(&mMesh, &ownerRef);
   archive->ReadPointerShared(&mPriorPose, &ownerRef);
   archive->ReadPointerShared(&mPose, &ownerRef);
@@ -881,10 +773,10 @@ void SPerArmyReconInfo::MemberSerialize(gpg::WriteArchive* const archive, const 
   }
 
   const gpg::RRef ownerRef{};
-  WritePointerWithType(archive, mStiMesh, ResolveRMeshBlueprintType(), gpg::TrackedPointerState::Unowned, ownerRef);
-  WritePointerWithType(archive, mMesh.px, ResolveRScmResourceType(), gpg::TrackedPointerState::Shared, ownerRef);
-  WritePointerWithType(archive, mPriorPose.px, ResolveCAniPoseType(), gpg::TrackedPointerState::Shared, ownerRef);
-  WritePointerWithType(archive, mPose.px, ResolveCAniPoseType(), gpg::TrackedPointerState::Shared, ownerRef);
+  archive->WritePointer(mStiMesh, gpg::TrackedPointerState::Unowned, ownerRef);
+  archive->WritePointer(mMesh.px, gpg::TrackedPointerState::Shared, ownerRef);
+  archive->WritePointer(mPriorPose.px, gpg::TrackedPointerState::Shared, ownerRef);
+  archive->WritePointer(mPose.px, gpg::TrackedPointerState::Shared, ownerRef);
   archive->WriteFloat(mHealth);
   archive->WriteFloat(mHealth);
   archive->WriteFloat(mFractionComplete);
@@ -1014,7 +906,8 @@ void ReconBlip::MemberConstruct(
   gpg::ReadArchive& archive, const int, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
 )
 {
-  Sim* const sim = ReadPointerUnowned<Sim>(&archive, ownerRef, ResolveSimType(), "Sim");
+  Sim* sim = nullptr;
+  archive.ReadPointer(&sim, &ownerRef);
   ReconBlip* const object = new (std::nothrow) ReconBlip(sim);
   result.SetUnowned(MakeReconBlipRef(object), 0u);
 }

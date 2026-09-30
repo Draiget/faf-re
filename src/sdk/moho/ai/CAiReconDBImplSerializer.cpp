@@ -37,26 +37,6 @@ namespace
   // (0x00BCDDC0) and ~CAiReconDBImplSerializer() (0x00BF7AB0).
   moho::CAiReconDBImplSerializer gCAiReconDBImplSerializer;
 
-  gpg::RType* gWeakPtrEntityType = nullptr;
-  gpg::RType* gEntIdType = nullptr;
-  gpg::RType* gReconBlipMapStorageType = nullptr;
-  gpg::RType* gReconBlipVectorType = nullptr;
-  gpg::RType* gCArmyImplType = nullptr;
-  gpg::RType* gSTIMapType = nullptr;
-  gpg::RType* gSimType = nullptr;
-  gpg::RType* gCInfluenceMapType = nullptr;
-  gpg::RType* gCIntelGridType = nullptr;
-  gpg::RType* gVisibleToReconCategoryType = nullptr;
-
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
-
   /**
    * Address: 0x005BFD90 (FUN_005BFD90, PreregisterSReconKeyTypeInfo)
    * Address: 0x00BF7960 (FUN_00BF7960, atexit destructor of the SReconKeyTypeInfo object)
@@ -71,168 +51,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* ResolveWeakPtrEntityType()
-  {
-    if (!gWeakPtrEntityType) {
-      gWeakPtrEntityType = gpg::LookupRType(typeid(WeakPtr<Entity>));
-      if (!gWeakPtrEntityType) {
-        gWeakPtrEntityType = moho::register_WeakPtr_Entity_Type_00();
-      }
-    }
-    return gWeakPtrEntityType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntIdType()
-  {
-    return CachedType<std::int32_t>(gEntIdType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveReconBlipMapStorageType()
-  {
-    if (!gReconBlipMapStorageType) {
-      gReconBlipMapStorageType = gpg::LookupRType(typeid(moho::ReconBlipMap));
-      if (!gReconBlipMapStorageType) {
-        moho::register_RMultiMapType_SReconKey_ReconBlipPtr();
-        gReconBlipMapStorageType = gpg::LookupRType(typeid(moho::ReconBlipMap));
-      }
-    }
-    return gReconBlipMapStorageType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveReconBlipVectorType()
-  {
-    if (!gReconBlipVectorType) {
-      gReconBlipVectorType = gpg::LookupRType(typeid(msvc8::vector<ReconBlip*>));
-      if (!gReconBlipVectorType) {
-        moho::register_RVectorType_ReconBlipPtr();
-        gReconBlipVectorType = gpg::LookupRType(typeid(msvc8::vector<ReconBlip*>));
-      }
-    }
-    return gReconBlipVectorType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCArmyImplType()
-  {
-    if (!gCArmyImplType) {
-      gCArmyImplType = CArmyImpl::sType ? CArmyImpl::sType : gpg::LookupRType(typeid(CArmyImpl));
-    }
-    return gCArmyImplType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSTIMapType()
-  {
-    return CachedType<STIMap>(gSTIMapType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSimType()
-  {
-    if (!gSimType) {
-      gSimType = Sim::sType ? Sim::sType : gpg::LookupRType(typeid(Sim));
-    }
-    return gSimType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCInfluenceMapType()
-  {
-    if (!gCInfluenceMapType) {
-      gCInfluenceMapType = CInfluenceMap::sType ? CInfluenceMap::sType : gpg::LookupRType(typeid(CInfluenceMap));
-    }
-    return gCInfluenceMapType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCIntelGridType()
-  {
-    if (!gCIntelGridType) {
-      gCIntelGridType = CIntelGrid::sType ? CIntelGrid::sType : gpg::LookupRType(typeid(CIntelGrid));
-    }
-    return gCIntelGridType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVisibleToReconCategoryType()
-  {
-    return CachedType<EntityCategorySet>(gVisibleToReconCategoryType);
-  }
-
-  template <class TObject>
-  [[nodiscard]] TObject* DecodeTrackedPointer(
-    const gpg::TrackedPointerInfo& tracked, gpg::RType* const expectedType, const char* const mismatchMessage
-  )
-  {
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    if (tracked.type && expectedType) {
-      gpg::RRef source{};
-      source.mObj = tracked.object;
-      source.mType = tracked.type;
-      const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-      if (!upcast.mObj) {
-        throw gpg::SerializationError(mismatchMessage ? mismatchMessage : "Archive pointer type mismatch");
-      }
-      return static_cast<TObject*>(upcast.mObj);
-    }
-
-    return static_cast<TObject*>(tracked.object);
-  }
-
-  template <class TObject>
-  void ReadPointerUnowned(
-    TObject*& outPointer,
-    gpg::ReadArchive* const archive,
-    const gpg::RRef& ownerRef,
-    gpg::RType* const expectedType,
-    const char* const mismatchMessage
-  )
-  {
-    const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
-    outPointer = DecodeTrackedPointer<TObject>(tracked, expectedType, mismatchMessage);
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* const object, gpg::RType* const staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType ? dynamicType : staticType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
-  template <class TObject>
-  void WritePointerWithType(
-    gpg::WriteArchive* const archive,
-    TObject* const object,
-    gpg::RType* const staticType,
-    const gpg::TrackedPointerState state,
-    const gpg::RRef& ownerRef
-  )
-  {
-    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
-    gpg::WriteRawPointer(archive, objectRef, state, ownerRef);
-  }
-
   /**
    * Address: 0x005CCBE0 (FUN_005CCBE0, Moho::CAiReconDBImp::MemberDeserialize)
    *
@@ -241,33 +59,14 @@ namespace
    */
   void DeserializeCAiReconDBImplMembers(CAiReconDBImpl* const object, gpg::ReadArchive* const archive)
   {
-    if (!object || !archive) {
-      return;
-    }
-
     const gpg::RRef ownerRef{};
-
-    gpg::RType* const mapType = ResolveReconBlipMapStorageType();
-    GPG_ASSERT(mapType != nullptr);
-    if (!mapType) {
-      return;
-    }
-    archive->Read(mapType, &object->mBlipMap, ownerRef);
-
-    gpg::RType* const blipVectorType = ResolveReconBlipVectorType();
-    GPG_ASSERT(blipVectorType != nullptr);
-    if (!blipVectorType) {
-      return;
-    }
-    archive->Read(blipVectorType, &object->mBblips, ownerRef);
-    archive->Read(blipVectorType, &object->mTempBlips, ownerRef);
-
-    ReadPointerUnowned(object->mArmy, archive, ownerRef, ResolveCArmyImplType(), "CAiReconDBImpl::mArmy type mismatch");
-    ReadPointerUnowned(object->mMapData, archive, ownerRef, ResolveSTIMapType(), "CAiReconDBImpl::mMapData type mismatch");
-    ReadPointerUnowned(object->mSim, archive, ownerRef, ResolveSimType(), "CAiReconDBImpl::mSim type mismatch");
-    ReadPointerUnowned(
-      object->mIMap, archive, ownerRef, ResolveCInfluenceMapType(), "CAiReconDBImpl::mIMap type mismatch"
-    );
+    archive->Read(gpg::RTypeOf<ReconBlipMap>(), &object->mBlipMap, ownerRef);
+    archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &object->mBblips, ownerRef);
+    archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &object->mTempBlips, ownerRef);
+    archive->ReadPointer(&object->mArmy, &ownerRef);
+    archive->ReadPointer(&object->mMapData, &ownerRef);
+    archive->ReadPointer(&object->mSim, &ownerRef);
+    archive->ReadPointer(&object->mIMap, &ownerRef);
     archive->ReadPointerShared(&object->mVisionGrid, &ownerRef);
     archive->ReadPointerShared(&object->mWaterGrid, &ownerRef);
     archive->ReadPointerShared(&object->mRadarGrid, &ownerRef);
@@ -276,15 +75,8 @@ namespace
     archive->ReadPointerShared(&object->mRCIGrid, &ownerRef);
     archive->ReadPointerShared(&object->mSCIGrid, &ownerRef);
     archive->ReadPointerShared(&object->mVCIGrid, &ownerRef);
-
     archive->ReadBool(reinterpret_cast<bool*>(&object->mFogOfWar));
-
-    gpg::RType* const visibleToReconCategoryType = ResolveVisibleToReconCategoryType();
-    GPG_ASSERT(visibleToReconCategoryType != nullptr);
-    if (!visibleToReconCategoryType) {
-      return;
-    }
-    archive->Read(visibleToReconCategoryType, &object->mVisibleToReconCategory, ownerRef);
+    archive->Read(gpg::RTypeOf<EntityCategorySet>(), &object->mVisibleToReconCategory, ownerRef);
   }
 
   /**
@@ -295,68 +87,24 @@ namespace
    */
   void SerializeCAiReconDBImplMembers(const CAiReconDBImpl* const object, gpg::WriteArchive* const archive)
   {
-    if (!object || !archive) {
-      return;
-    }
-
     const gpg::RRef ownerRef{};
-
-    gpg::RType* const mapType = ResolveReconBlipMapStorageType();
-    GPG_ASSERT(mapType != nullptr);
-    if (!mapType) {
-      return;
-    }
-    archive->Write(mapType, &object->mBlipMap, ownerRef);
-
-    gpg::RType* const blipVectorType = ResolveReconBlipVectorType();
-    GPG_ASSERT(blipVectorType != nullptr);
-    if (!blipVectorType) {
-      return;
-    }
-    archive->Write(blipVectorType, &object->mBblips, ownerRef);
-    archive->Write(blipVectorType, &object->mTempBlips, ownerRef);
-
-    WritePointerWithType(
-      archive, object->mArmy, ResolveCArmyImplType(), gpg::TrackedPointerState::Unowned, ownerRef
-    );
-    WritePointerWithType(archive, object->mMapData, ResolveSTIMapType(), gpg::TrackedPointerState::Unowned, ownerRef);
-    WritePointerWithType(archive, object->mSim, ResolveSimType(), gpg::TrackedPointerState::Unowned, ownerRef);
-    WritePointerWithType(
-      archive, object->mIMap, ResolveCInfluenceMapType(), gpg::TrackedPointerState::Unowned, ownerRef
-    );
-    WritePointerWithType(
-      archive, object->mVisionGrid.px, ResolveCIntelGridType(), gpg::TrackedPointerState::Shared, ownerRef
-    );
-    WritePointerWithType(
-      archive, object->mWaterGrid.px, ResolveCIntelGridType(), gpg::TrackedPointerState::Shared, ownerRef
-    );
-    WritePointerWithType(
-      archive, object->mRadarGrid.px, ResolveCIntelGridType(), gpg::TrackedPointerState::Shared, ownerRef
-    );
-    WritePointerWithType(
-      archive, object->mSonarGrid.px, ResolveCIntelGridType(), gpg::TrackedPointerState::Shared, ownerRef
-    );
-    WritePointerWithType(
-      archive, object->mOmniGrid.px, ResolveCIntelGridType(), gpg::TrackedPointerState::Shared, ownerRef
-    );
-    WritePointerWithType(
-      archive, object->mRCIGrid.px, ResolveCIntelGridType(), gpg::TrackedPointerState::Shared, ownerRef
-    );
-    WritePointerWithType(
-      archive, object->mSCIGrid.px, ResolveCIntelGridType(), gpg::TrackedPointerState::Shared, ownerRef
-    );
-    WritePointerWithType(
-      archive, object->mVCIGrid.px, ResolveCIntelGridType(), gpg::TrackedPointerState::Shared, ownerRef
-    );
-
+    archive->Write(gpg::RTypeOf<ReconBlipMap>(), &object->mBlipMap, ownerRef);
+    archive->Write(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &object->mBblips, ownerRef);
+    archive->Write(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &object->mTempBlips, ownerRef);
+    archive->WritePointer(object->mArmy, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer(object->mMapData, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer(object->mSim, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer(object->mIMap, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer(object->mVisionGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(object->mWaterGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(object->mRadarGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(object->mSonarGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(object->mOmniGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(object->mRCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(object->mSCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(object->mVCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
     archive->WriteBool(object->mFogOfWar != 0u);
-
-    gpg::RType* const visibleToReconCategoryType = ResolveVisibleToReconCategoryType();
-    GPG_ASSERT(visibleToReconCategoryType != nullptr);
-    if (!visibleToReconCategoryType) {
-      return;
-    }
-    archive->Write(visibleToReconCategoryType, &object->mVisibleToReconCategory, ownerRef);
+    archive->Write(gpg::RTypeOf<EntityCategorySet>(), &object->mVisibleToReconCategory, ownerRef);
   }
 
   // Addresses 0x005C98D0/0x005CB6C0 (the "ThunkA"/"ThunkB" save-lane
@@ -414,25 +162,9 @@ void SReconKeyTypeInfo::Init()
  */
 void SReconKey::MemberDeserialize(gpg::ReadArchive* const archive)
 {
-  if (!archive) {
-    return;
-  }
-
   const gpg::RRef ownerRef{};
-  gpg::RType* const weakPtrEntityType = ResolveWeakPtrEntityType();
-  GPG_ASSERT(weakPtrEntityType != nullptr);
-  if (!weakPtrEntityType) {
-    return;
-  }
-
-  archive->Read(weakPtrEntityType, &sourceEntity, ownerRef);
-
-  gpg::RType* const entIdType = ResolveEntIdType();
-  GPG_ASSERT(entIdType != nullptr);
-  if (!entIdType) {
-    return;
-  }
-  archive->Read(entIdType, &sourceEntityId, ownerRef);
+  archive->Read(gpg::RTypeOf<WeakPtr<Entity>>(), &sourceEntity, ownerRef);
+  archive->Read(gpg::RTypeOf<EntId>(), &sourceEntityId, ownerRef);
 }
 
 /**
@@ -440,25 +172,9 @@ void SReconKey::MemberDeserialize(gpg::ReadArchive* const archive)
  */
 void SReconKey::MemberSerialize(gpg::WriteArchive* const archive) const
 {
-  if (!archive) {
-    return;
-  }
-
   const gpg::RRef ownerRef{};
-  gpg::RType* const weakPtrEntityType = ResolveWeakPtrEntityType();
-  GPG_ASSERT(weakPtrEntityType != nullptr);
-  if (!weakPtrEntityType) {
-    return;
-  }
-
-  archive->Write(weakPtrEntityType, &sourceEntity, ownerRef);
-
-  gpg::RType* const entIdType = ResolveEntIdType();
-  GPG_ASSERT(entIdType != nullptr);
-  if (!entIdType) {
-    return;
-  }
-  archive->Write(entIdType, &sourceEntityId, ownerRef);
+  archive->Write(gpg::RTypeOf<WeakPtr<Entity>>(), &sourceEntity, ownerRef);
+  archive->Write(gpg::RTypeOf<EntId>(), &sourceEntityId, ownerRef);
 }
 
 /**
