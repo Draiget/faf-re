@@ -183,166 +183,46 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, owner);
   }
 
-  void ResizeWeakPtrVector(moho::WeakPtrVectorStorage<moho::IUnit>& storage, const std::size_t newCount)
-  {
-    const std::size_t oldCount = storage.begin ? static_cast<std::size_t>(storage.end - storage.begin) : 0u;
-    const std::size_t oldCapacity = storage.begin ? static_cast<std::size_t>(storage.capacityEnd - storage.begin) : 0u;
-
-    if (newCount < oldCount) {
-      for (std::size_t i = newCount; i < oldCount; ++i) {
-        storage.begin[i].ResetFromObject(nullptr);
-      }
-      storage.end = storage.begin + newCount;
-      return;
-    }
-
-    if (newCount > oldCapacity) {
-      std::size_t newCapacity = oldCapacity ? oldCapacity : 4u;
-      while (newCapacity < newCount) {
-        newCapacity *= 2u;
-      }
-
-      auto* const newBegin =
-        static_cast<moho::WeakPtr<moho::IUnit>*>(::operator new(sizeof(moho::WeakPtr<moho::IUnit>) * newCapacity));
-
-      for (std::size_t i = 0; i < newCapacity; ++i) {
-        newBegin[i].ownerLinkSlot = nullptr;
-        newBegin[i].nextInOwner = nullptr;
-      }
-
-      for (std::size_t i = 0; i < oldCount; ++i) {
-        newBegin[i].ResetFromOwnerLinkSlot(storage.begin[i].ownerLinkSlot);
-        storage.begin[i].ResetFromObject(nullptr);
-      }
-
-      ::operator delete(storage.begin);
-      storage.begin = newBegin;
-      storage.end = newBegin + oldCount;
-      storage.capacityEnd = newBegin + newCapacity;
-    }
-
-    for (std::size_t i = oldCount; i < newCount; ++i) {
-      storage.begin[i].ownerLinkSlot = nullptr;
-      storage.begin[i].nextInOwner = nullptr;
-    }
-    storage.end = storage.begin + newCount;
-  }
-
   /**
    * Address: 0x0056DD80 (FUN_0056DD80, FA), 0x1015C0F0 (MohoEngine)
+   *
+   * What it does:
+   * Reads the element count, resizes the `fastvector<WeakPtr<IUnit>>` to it
+   * with empty weak pointers (`resize`, 0x0056D1D0), then reads every element
+   * through the archive as a `WeakPtr<IUnit>` owned by `ownerRef`
+   * (`ReadArchive::Read`, 0x00953DA0) -- not by calling the element type's
+   * load callback directly.
    */
   void LoadFastVectorWeakPtrIUnit(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
-    auto* const storage = reinterpret_cast<moho::WeakPtrVectorStorage<moho::IUnit>*>(objectPtr);
-    GPG_ASSERT(storage != nullptr);
+    auto& weakUnits = *reinterpret_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
-
-    ResizeWeakPtrVector(*storage, static_cast<std::size_t>(count));
-
-    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
-    if (!weakPtrType->serLoadFunc_) {
-      return;
-    }
-
+    weakUnits.resize(count, moho::WeakPtr<moho::IUnit>{});
     for (unsigned int i = 0; i < count; ++i) {
-      weakPtrType->serLoadFunc_(archive, reinterpret_cast<int>(&storage->begin[i]), 0, ownerRef);
+      archive->Read(CachedWeakPtrIUnitType(), &weakUnits[i], *ownerRef);
     }
   }
 
   /**
    * Address: 0x0056DE50 (FUN_0056DE50, FA), 0x1015C1C0 (MohoEngine)
+   *
+   * What it does:
+   * Writes the element count, then every element through the archive
+   * (`WriteArchive::Write`, 0x00953CA0) owned by `ownerRef`.
    */
   void SaveFastVectorWeakPtrIUnit(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
-    auto* const storage = reinterpret_cast<moho::WeakPtrVectorStorage<moho::IUnit>*>(objectPtr);
-    GPG_ASSERT(storage != nullptr);
+    const auto& weakUnits = *reinterpret_cast<const gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(objectPtr);
 
-    const unsigned int count = storage->begin ? static_cast<unsigned int>(storage->end - storage->begin) : 0u;
+    const unsigned int count = static_cast<unsigned int>(weakUnits.Size());
     archive->WriteUInt(count);
-
-    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
-    if (!weakPtrType->serSaveFunc_) {
-      return;
-    }
-
     for (unsigned int i = 0; i < count; ++i) {
-      weakPtrType->serSaveFunc_(archive, reinterpret_cast<int>(&storage->begin[i]), 0, ownerRef);
+      archive->Write(CachedWeakPtrIUnitType(), &weakUnits[i], *ownerRef);
     }
   }
 
-  /**
-   * Address: 0x0056EFA0 (FUN_0056EFA0)
-   *
-   * What it does:
-   * Copy-assigns one `WeakPtr<IUnit>` vector storage lane from `source` into
-   * `destination`, preserving intrusive owner-chain relink semantics and
-   * resizing capacity when required.
-   */
-  [[maybe_unused]] moho::WeakPtrVectorStorage<moho::IUnit>* AssignWeakPtrIUnitVectorStorage(
-    moho::WeakPtrVectorStorage<moho::IUnit>* const destination,
-    const moho::WeakPtrVectorStorage<moho::IUnit>* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr || destination == source) {
-      return destination;
-    }
-
-    const std::size_t destinationSize =
-      (destination->begin != nullptr) ? static_cast<std::size_t>(destination->end - destination->begin) : 0u;
-    const std::size_t sourceSize = (source->begin != nullptr) ? static_cast<std::size_t>(source->end - source->begin) : 0u;
-    const std::size_t destinationCapacity = (destination->begin != nullptr)
-      ? static_cast<std::size_t>(destination->capacityEnd - destination->begin)
-      : 0u;
-
-    if (sourceSize > destinationCapacity) {
-      std::size_t grownCapacity = (destinationCapacity != 0u) ? destinationCapacity : 4u;
-      while (grownCapacity < sourceSize) {
-        grownCapacity *= 2u;
-      }
-
-      auto* const grownBegin =
-        static_cast<moho::WeakPtr<moho::IUnit>*>(::operator new(sizeof(moho::WeakPtr<moho::IUnit>) * grownCapacity));
-      for (std::size_t i = 0; i < grownCapacity; ++i) {
-        grownBegin[i].ownerLinkSlot = nullptr;
-        grownBegin[i].nextInOwner = nullptr;
-      }
-
-      for (std::size_t i = 0; i < destinationSize; ++i) {
-        grownBegin[i].ResetFromOwnerLinkSlot(destination->begin[i].ownerLinkSlot);
-        destination->begin[i].ResetFromObject(nullptr);
-      }
-
-      ::operator delete(destination->begin);
-      destination->begin = grownBegin;
-      destination->end = grownBegin + destinationSize;
-      destination->capacityEnd = grownBegin + grownCapacity;
-    }
-
-    if (destination->begin != nullptr && sourceSize > destinationSize) {
-      for (std::size_t i = destinationSize; i < sourceSize; ++i) {
-        destination->begin[i].ownerLinkSlot = nullptr;
-        destination->begin[i].nextInOwner = nullptr;
-      }
-    }
-
-    if (sourceSize != 0u) {
-      auto* const destinationBeginWeak = reinterpret_cast<moho::WeakPtr<void>*>(destination->begin);
-      auto* const sourceBeginWeak = reinterpret_cast<const moho::WeakPtr<void>*>(source->begin);
-      msvc8::vector<moho::WeakPtr<void>>::copy_or_move_assign(
-        destinationBeginWeak, sourceBeginWeak, sourceSize);
-    }
-
-    if (destinationSize > sourceSize && destination->begin != nullptr) {
-      for (std::size_t i = sourceSize; i < destinationSize; ++i) {
-        destination->begin[i].ResetFromObject(nullptr);
-      }
-    }
-
-    destination->end = (destination->begin != nullptr) ? (destination->begin + sourceSize) : nullptr;
-    return destination;
-  }
 } // namespace
 
 /**
@@ -471,47 +351,40 @@ void gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::Init()
 
 gpg::RRef gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::SubscriptIndex(void* obj, const int ind) const
 {
-  auto* const storage = static_cast<moho::WeakPtrVectorStorage<moho::IUnit>*>(obj);
-  GPG_ASSERT(storage != nullptr);
+  auto* const weakUnits = static_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(obj);
+  GPG_ASSERT(weakUnits != nullptr);
   GPG_ASSERT(ind >= 0);
   GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
 
-  if (!storage || ind < 0 || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+  if (!weakUnits || ind < 0 || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     gpg::RRef out{};
     out.mObj = nullptr;
     out.mType = CachedIUnitType();
     return out;
   }
 
-  return MakeIUnitRefFromWeakPtr(storage->begin[ind]);
+  return MakeIUnitRefFromWeakPtr((*weakUnits)[ind]);
 }
 
 size_t gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetCount(void* obj) const
 {
-  auto* const storage = static_cast<moho::WeakPtrVectorStorage<moho::IUnit>*>(obj);
-  if (!storage || !storage->begin) {
+  if (!obj) {
     return 0u;
   }
-  return static_cast<std::size_t>(storage->end - storage->begin);
+  return static_cast<const gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(obj)->Size();
 }
 
 /**
  * Address: 0x0056BF60 (FUN_0056BF60, gpg::RFastVectorType_WeakPtr_IUnit::SetCount)
  *
  * What it does:
- * Resizes the reflected `fastvector<WeakPtr<IUnit>>` lane to `count`,
- * preserving weak-link ownership semantics through the shared resize helper.
+ * Resizes the reflected `fastvector<WeakPtr<IUnit>>` to `count`, filling with
+ * an empty `WeakPtr<IUnit>` built on the stack (0x0056BF79..0x0056BF9D) and
+ * released after the `resize` (0x0056D1D0).
  */
 void gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::SetCount(void* obj, const int count) const
 {
-  auto* const storage = static_cast<moho::WeakPtrVectorStorage<moho::IUnit>*>(obj);
-  GPG_ASSERT(storage != nullptr);
-  GPG_ASSERT(count >= 0);
-  if (!storage || count < 0) {
-    return;
-  }
-
-  ResizeWeakPtrVector(*storage, static_cast<std::size_t>(count));
+  static_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(obj)->resize(static_cast<std::size_t>(count), moho::WeakPtr<moho::IUnit>{});
 }
 
 /**

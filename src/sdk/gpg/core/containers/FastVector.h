@@ -1149,6 +1149,7 @@ namespace gpg::core
     /**
      * Address: 0x009545D0 (FUN_009545D0 -- a second emission of `resize(n, value)`, for the reachability flags for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x00954650; formerly `FastVectorN12CharResize` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0092E410 (FUN_0092E410 -- `resize(n, value)` for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x009310E0, 0x00954A40; formerly `ResizeInlineBackedByteVectorWithFill` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0056D1D0 (FUN_0056D1D0 -- `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` (the 0x10 header of `CFormationInstance::mUnits`, element 0x08): shrink through 0x0056EF40, grow through `ReallocateInsert_` 0x0056D2B0, then copy-construct `value` (link at the owner head) into each new slot; callers `RFastVectorType<WeakPtr<IUnit>>::SetCount` 0x0056BF9D and its loader 0x0056DDC7; formerly `ResizeWeakPtrVector` over `WeakPtrVectorStorage` in moho/unit/core/IUnitWeakPtrReflection.cpp (RULE THREE), removed 2026-09-30.)
      */
     void resize(const size_type n, const T& value)
     {
@@ -1289,6 +1290,7 @@ namespace gpg::core
      *
      * Shrink by destroying the surplus tail, or grow by appending copies of
      * `fill` one slot at a time, advancing `end_` as each is constructed.
+     * Address: 0x0056EF40 (FUN_0056EF40 -- the shrink arm for `gpg::fastvector<moho::WeakPtr<moho::IUnit>>`, emitted out of line: unlink `[begin + n, end)` (0x0056D3C0) and pull `end` back; callers `resize` 0x0056D1EA and `AssignFrom` 0x0056EFA0.)
      */
     void ResizeFill_(const T& fill, const std::size_t newSize)
     {
@@ -1324,6 +1326,7 @@ namespace gpg::core
      * Copy `other`'s payload over this one. Public copy assignment stays deleted
      * because an inline-backed vector must not be assigned through a base
      * reference; the rebind helpers call this explicitly instead.
+     * Address: 0x0056EFA0 (FUN_0056EFA0 -- the `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` emission: assign over the live prefix (relink), grow through `ReallocateInsert_` 0x0056D2B0, copy-construct the rest, unlink a longer destination's tail (0x0056EF40). The binary's `fastvector_n<WeakPtr<IUnit>, 4>` copy constructor 0x0056B200 seats its inline block and calls this at 0x0056B236; this tree's `FastVectorN` copy constructor reaches the same end state through `ResetFrom`. Formerly `AssignWeakPtrIUnitVectorStorage` in moho/unit/core/IUnitWeakPtrReflection.cpp (orphan), removed 2026-09-30.)
      */
   public:
     void AssignFrom(const FastVectorInline& other)

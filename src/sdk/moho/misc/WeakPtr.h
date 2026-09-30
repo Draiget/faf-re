@@ -1021,13 +1021,4 @@ namespace moho
     }
   }
 
-  template <class T>
-  struct WeakPtrVectorStorage
-  {
-    WeakPtr<T>* begin;
-    WeakPtr<T>* end;
-    WeakPtr<T>* capacityEnd;
-  };
-  static_assert(sizeof(WeakPtrVectorStorage<void>) == 0x0C, "WeakPtrVectorStorage<T> must be 12 bytes");
-
 } // namespace moho
