@@ -310,9 +310,7 @@ namespace moho
     // reference into the transport's owner chain; splice it back out here.
     if (mRequiresTransportCategoryCheck != 0u && mUnit != nullptr) {
       WeakPtr<Unit>& ferryRef = mUnit->AssignedTransportRef.AsWeakPtr<Unit>();
-      if (ferryRef.IsLinkedInOwnerChain()) {
-        ferryRef.UnlinkFromOwnerChain();
-      }
+      ferryRef.UnlinkFromOwnerChain();
     }
 
     // (4) Clear the unit's move-in-progress state bit (bit 2 of UnitStateMask).
@@ -363,9 +361,7 @@ namespace moho
     }
 
     // (10) Splice the command weak reference out of its owner chain.
-    if (mCommandRef.IsLinkedInOwnerChain()) {
-      mCommandRef.UnlinkFromOwnerChain();
-    }
+    mCommandRef.UnlinkFromOwnerChain();
 
     // (11) Final unconditional relink of all three listener lanes to self. The
     // binary also rewrites each sub-object's vtable pointer to the base
@@ -606,7 +602,7 @@ namespace moho
     , Listener<ECommandEvent>()
     , mDispatchTask(dispatchTask)
     , mMoveGoal(moveGoal)
-    , mCommandRef{}
+    , mCommandRef(sourceCommand)
     , mNextCmdIsInstant(1)
     , mRequiresTransportCategoryCheck(requiresTransportCategoryCheck)
     , mIsOccupying(0)
@@ -615,9 +611,6 @@ namespace moho
     , mHasPreparedDynamicGoal(0)
     , mPad_0096_0098{0, 0}
   {
-    mCommandRef.BindObjectUnlinked(sourceCommand);
-    (void)mCommandRef.LinkIntoOwnerChainHeadUnlinked();
-
     // No `if (!mUnit) return;` here: the binary loads `[ebp+0x1c]` at
     // 0x006181A7 and immediately runs `or [eax+0x4a0], 4` at 0x006181CF with
     // no null test, so `mUnit` is an invariant of this constructor (the only

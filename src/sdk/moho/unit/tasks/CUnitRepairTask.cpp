@@ -163,7 +163,6 @@ namespace moho
     }
 
     mTargetUnit.ResetFromObject(targetUnit);
-    mBuildTargetUnit.ClearLinkState();
 
     if (mUnit != nullptr) {
       if (Unit* const target = mTargetUnit.GetObjectPtr(); target != nullptr && target->IsUnitState(UNITSTATE_Enhancing)) {

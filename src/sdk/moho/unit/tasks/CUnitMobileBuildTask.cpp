@@ -237,10 +237,7 @@ namespace moho
     , mPendingBuildEntity{}
     , mBuildRect{}
     , mBuildSkirt{}
-  {
-    mBuildUnit.ClearLinkState();
-    mPendingBuildEntity.ClearLinkState();
-  }
+  {}
 
   /**
    * Address: 0x005F6520 (FUN_005F6520, ??0CUnitMobileBuildTask@Moho@@QAE@@Z_0)
@@ -271,9 +268,6 @@ namespace moho
     , mBuildRect{}
     , mBuildSkirt{}
   {
-    mBuildUnit.ClearLinkState();
-    mPendingBuildEntity.ClearLinkState();
-
     mCommand = ResolveQueueHeadCommand(mUnit);
     if (mCommand != nullptr) {
       mCommand->AddListener(this);
@@ -756,9 +750,7 @@ namespace moho
     }
 
     mPendingBuildEntity.UnlinkFromOwnerChain();
-    mPendingBuildEntity.ClearLinkState();
     mBuildUnit.UnlinkFromOwnerChain();
-    mBuildUnit.ClearLinkState();
 
     if (!ListIsUnlinked()) {
       ListUnlink();

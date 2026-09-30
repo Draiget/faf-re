@@ -19,7 +19,6 @@ namespace moho
 
     STaskEventLinkage()
       : WeakObject()
-      , mThreadRef{nullptr, nullptr}
     {}
 
     /**

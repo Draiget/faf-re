@@ -144,24 +144,12 @@ namespace moho
     , mDispatch(static_cast<IAiCommandDispatchImpl*>(dispatchTask))
     , mBlueprint(blueprint)
     , mBuildHelper("FactoryBuild", dispatchTask ? dispatchTask->mUnit : nullptr)
-    , mRallyPointUnit{}
+    , mRallyPointUnit(rallyPointUnit)
     , mBuildCount(0)
     , mHasCommand(false)
     , mPad89{}
-    , mCommand{}
+    , mCommand(command)
   {
-    // Link rally point unit weak pointer into owner chain.
-    mRallyPointUnit.BindObjectUnlinked(rallyPointUnit);
-    if (rallyPointUnit != nullptr) {
-      (void)mRallyPointUnit.LinkIntoOwnerChainHeadUnlinked();
-    }
-
-    // Link originating command weak pointer into owner chain.
-    mCommand.BindObjectUnlinked(command);
-    if (command != nullptr) {
-      (void)mCommand.LinkIntoOwnerChainHeadUnlinked();
-    }
-
     // If the command object exists (non-null, non-sentinel), mark that we have one.
     if (mCommand.GetObjectPtr() != nullptr) {
       mHasCommand = true;

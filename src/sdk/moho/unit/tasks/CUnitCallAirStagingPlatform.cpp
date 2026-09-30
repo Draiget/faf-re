@@ -300,9 +300,8 @@ namespace moho
    */
   CUnitCallAirStagingPlatform::CUnitCallAirStagingPlatform(CCommandTask* const parentTask, Unit* const platformUnit)
     : CCommandTask(parentTask)
+    , mPlatform(platformUnit)
   {
-    mPlatform.BindObjectUnlinked(platformUnit);
-    (void)mPlatform.LinkIntoOwnerChainHeadUnlinked();
     mDone = false;
 
     if (mUnit) {

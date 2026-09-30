@@ -122,7 +122,7 @@ namespace
  */
 CWaitForTask::CWaitForTask()
   : CTask(nullptr, false)
-  , mEventLinkRef{nullptr, nullptr}
+  , mEventLinkRef()
   , mEventObject()
 {
 }
@@ -132,7 +132,7 @@ CWaitForTask::CWaitForTask()
  */
 CWaitForTask::CWaitForTask(const LuaPlus::LuaObject& payload)
   : CTask(nullptr, false)
-  , mEventLinkRef{nullptr, nullptr}
+  , mEventLinkRef()
   , mEventObject(payload)
 {
 }

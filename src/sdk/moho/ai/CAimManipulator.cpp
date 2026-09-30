@@ -601,9 +601,6 @@ namespace
  */
 moho::CAimManipulator::CAimManipulator()
 {
-  this->mUnit.ClearLinkState();
-  this->mWeapon.ClearLinkState();
-
   this->mLabel.clear();
   this->mUnitWepBlueprint = nullptr;
   this->mProjPhysBlueprint = nullptr;
@@ -661,20 +658,10 @@ moho::CAimManipulator::CAimManipulator(
   const std::int32_t boneMuzzle
 )
   : IAniManipulator(sim, weapon->mUnit->AniActor, 0)
+  , mUnit(weapon->mUnit)
+  , mWeapon(weapon)
 {
   Unit* const ownerUnit = weapon->mUnit;
-
-
-  // Head-insert the intrusive weak links (owning unit + weapon). Both nodes are
-  // freshly constructed and known-unlinked, so bind-then-head-insert mirrors the
-  // binary's open-coded list insert (no prior-link scan).
-  (void)new (static_cast<void*>(&this->mUnit)) moho::WeakPtr<moho::Unit>();
-  this->mUnit.BindObjectUnlinked(ownerUnit);
-  (void)this->mUnit.LinkIntoOwnerChainHeadUnlinked();
-
-  (void)new (static_cast<void*>(&this->mWeapon)) moho::WeakPtr<moho::UnitWeapon>();
-  this->mWeapon.BindObjectUnlinked(weapon);
-  (void)this->mWeapon.LinkIntoOwnerChainHeadUnlinked();
 
   // Label.
   (void)new (static_cast<void*>(&this->mLabel)) msvc8::string(label, std::strlen(label));

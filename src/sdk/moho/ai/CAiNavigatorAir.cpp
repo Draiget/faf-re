@@ -52,10 +52,9 @@ namespace
       return true;
     }
 
-    // The queue holds `WeakPtr<CUnitCommand>`; a head command whose node is no
-    // longer in its owner's chain is a detached command, which is what the
-    // binary's `slot == 0 || slot == 4` pair tests for.
-    return !begin->IsLinkedInOwnerChain();
+    // The queue holds `WeakPtr<CUnitCommand>`; the binary's `slot == 0 ||
+    // slot == 4` pair is the null test on the decoded command.
+    return begin->GetObjectPtr() == nullptr;
   }
 
   [[nodiscard]] bool HasMovedSincePrev(const Entity& entity) noexcept

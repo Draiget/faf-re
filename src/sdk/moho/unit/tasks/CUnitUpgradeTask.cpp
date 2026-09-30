@@ -279,7 +279,6 @@ namespace moho
     }
 
     mUpgradedUnit.UnlinkFromOwnerChain();
-    mUpgradedUnit.ClearLinkState();
   }
 
   /**

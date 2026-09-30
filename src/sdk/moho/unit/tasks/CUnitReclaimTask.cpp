@@ -296,7 +296,6 @@ namespace moho
     , mReclaimRate(0.0f)
     , mReclaimPerSecond{}
   {
-    mTargetEntity.ClearLinkState();
     mTargetPosition.x = 0.0f;
     mTargetPosition.y = 0.0f;
     mTargetPosition.z = 0.0f;

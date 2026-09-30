@@ -1946,7 +1946,6 @@ void CUnitCommand::DestroyInternal()
   if (Unit* const beacon = mUnit.GetObjectPtr(); beacon != nullptr) {
     beacon->Destroy();
     mUnit.UnlinkFromOwnerChain();
-    mUnit.ClearLinkState();
   }
 
   // 0x006E8574..0x006E85B4. The retire call is the one that matters outside

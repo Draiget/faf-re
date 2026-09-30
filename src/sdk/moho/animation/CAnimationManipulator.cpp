@@ -1412,7 +1412,7 @@ namespace moho
     Sim* const sim, CAniActor* const ownerActor, Unit* const goalMotionScaleUnit
   )
     : IAniManipulator(sim, ownerActor, 0)
-    , mGoal()
+    , mGoal(goalMotionScaleUnit)
     , mBoneMask{}
     , mAnimationRef{}
     , mRate(1.0f)
@@ -1425,13 +1425,6 @@ namespace moho
     , mDisableOnSignal(false)
     , mDirectionalAnim(false)
   {
-    // Bind the intrusive goal weak link to the optional motion-scale unit and
-    // head-insert into that unit's weak-link chain. The binary uses an
-    // open-coded head insertion (no prior-chain detach) because the node is
-    // freshly-constructed and known-unlinked here.
-    mGoal.BindObjectUnlinked(goalMotionScaleUnit);
-    (void)mGoal.LinkIntoOwnerChainHeadUnlinked();
-
     // 0x0063F4A3..0x0063F4C1: size the bone mask to the owner's skeleton and enable
     // every bone (sub_641B70 is the inlined SBitStorage32::Resize(count, true) that
     // InitializeBoneMask (0x0063EFA0) also wraps).
@@ -1490,7 +1483,6 @@ namespace moho
     mAnimationRef.release();
     mBoneMask.Reset();
     mGoal.UnlinkFromOwnerChain();
-    mGoal.ClearLinkState();
   }
 
   /**

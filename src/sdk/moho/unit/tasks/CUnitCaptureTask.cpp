@@ -203,9 +203,7 @@ namespace moho
     , mCaptureTime(0)
     , mConsumptionData(nullptr)
     , mCaptureRate{0.0f, 0.0f}
-  {
-    mTargetEntity.ClearLinkState();
-  }
+  {}
 
   /**
    * Address: 0x00603F90 (FUN_00603F90, ??0CUnitCaptureTask@Moho@@QAE@@Z)

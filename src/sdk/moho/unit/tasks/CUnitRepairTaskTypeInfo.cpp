@@ -72,10 +72,7 @@ namespace
       , mIsSilo(false)
       , mGuardAssistMode(false)
       , mInheritingWork(false)
-    {
-      mTargetUnit.ClearLinkState();
-      mBuildTargetUnit.ClearLinkState();
-    }
+    {}
 
     ~CUnitRepairTaskReflectionView() override
     {

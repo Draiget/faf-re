@@ -177,7 +177,6 @@ namespace moho
       mUnit->mUnitVarDat.mWorkProgress = 0.0f;
     }
     mFocus.UnlinkFromOwnerChain();
-    mFocus.ClearLinkState();
   }
 
   /**
@@ -209,7 +208,6 @@ namespace moho
     }
 
     mFocus.UnlinkFromOwnerChain();
-    mFocus.ClearLinkState();
     mBeingBuilt = false;
   }
 

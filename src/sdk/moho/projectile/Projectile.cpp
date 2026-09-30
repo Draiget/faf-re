@@ -309,7 +309,6 @@ namespace moho
   Projectile::Projectile(Sim* const sim)
     : Entity(sim, kProjectileCollisionBucketFlags)
   {
-    mLauncherWeak.ClearLinkState();
     mVelocity = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
     mLocalAngularVelocity = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
     mScaleVelocity = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
@@ -330,7 +329,6 @@ namespace moho
     mDamageRadius = 0.0f;
 
     mTargetPosData.targetType = EAiTargetType::AITARGET_Entity;
-    mTargetPosData.targetEntity.ClearLinkState();
     mTargetPosData.targetPoint = -1;
     mTargetPosData.targetIsMobile = false;
     mTargetPosData.PickTargetPoint();
@@ -338,7 +336,6 @@ namespace moho
     mCachedAimPoint = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
     mKeepLastAimLatch = false;
     mImpactPosition = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
-    mCollidedEntityWeak.ClearLinkState();
     mLifetimeEnd = 0u;
     mBelowWater = false;
     mBounceLimit = 0;
@@ -414,16 +411,12 @@ namespace moho
         )),
         kProjectileCollisionBucketFlags
       )
+    // The launcher link (+0x278) starts on `sourceEntity`'s chain and is
+    // re-`Set` to the resolved launcher further below; the target block
+    // (+0x2EC) is the caller's target, copied in place (0x0069B2EB-0x0069B33B).
+    , mLauncherWeak(sourceEntity)
+    , mTargetPosData(target)
   {
-    // Launcher weak link (+0x278): raw splice to the source entity's owner chain
-    // head. The binary binds unlinked + head-inserts here (fresh storage, no
-    // detach), then re-Sets to the resolved launcher further below.
-    if (sourceEntity != nullptr) {
-      mLauncherWeak.BindObjectUnlinked(sourceEntity);
-      (void)mLauncherWeak.LinkIntoOwnerChainHeadUnlinked();
-    } else {
-      mLauncherWeak.ClearLinkState();
-    }
 
     CRandomStream* const rng = sim->mRngState;
 
@@ -457,20 +450,10 @@ namespace moho
     mDamageRadius = damageRadius;
     mDamageTypeName = damageTypeName;
 
-    // Inline CAiTarget copy from `target` (asm 0x0069B2EB-0069B33B): payload copy
-    // plus target-entity weak-link splice (bind source's object slot, head-insert).
-    mTargetPosData.targetType = target.targetType;
-    mTargetPosData.targetEntity.BindObjectUnlinked(target.targetEntity.GetObjectPtr());
-    (void)mTargetPosData.targetEntity.LinkIntoOwnerChainHeadUnlinked();
-    mTargetPosData.position = target.position;
-    mTargetPosData.targetPoint = target.targetPoint;
-    mTargetPosData.targetIsMobile = target.targetIsMobile;
-
     // Runtime-lane defaults (asm zero-init block 0x0069B33E-0069B432).
     mCachedAimPoint = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
     mKeepLastAimLatch = false;
     mImpactPosition = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
-    mCollidedEntityWeak.ClearLinkState();
     mBounceLimit = 0;
     mGroundTick = 0;
     mBelowWater = false;
@@ -1110,8 +1093,8 @@ namespace moho
     // must not land alone. Letting OnImpact scripts finally execute exposes a
     // weak-pointer lifetime bug underneath: `Projectile::~Projectile` ->
     // `CAiTarget::~CAiTarget` -> `CAiTarget::UnlinkEntityTargetRef` ->
-    // `WeakPtr<Entity>::UnlinkFromOwnerChain` -> `ReplaceInOwnerChain`
-    // (`WeakPtr.h:294`) faults reading a garbage chain pointer, the sim stalls
+    // `WeakPtr<Entity>::UnlinkFromOwnerChain` faulted reading a garbage chain
+    // pointer (before `~WeakPtr` unlinked dying nodes), the sim stalls
     // back to `Game time 00:00:00`, and a clean 49-minute run becomes two
     // crashes. Fix the weak-pointer chain first, then restore the call shape.
     const char* impactTypeString = ENT_GetImpactTypeString(mImpactType);

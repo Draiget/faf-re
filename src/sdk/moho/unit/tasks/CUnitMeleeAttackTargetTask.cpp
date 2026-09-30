@@ -496,7 +496,6 @@ namespace moho
     }
 
     mTarget.targetEntity.UnlinkFromOwnerChain();
-    mTarget.targetEntity.ClearLinkState();
 
     // The base slice is a real `CCommandTask` base now, not raw storage, so the
     // compiler chains its destructor. Calling it here as well would run it

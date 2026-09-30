@@ -434,7 +434,6 @@ namespace
   {
     auto& weakLink = AsCollisionWeakLink(info.mUnit);
     weakLink.UnlinkFromOwnerChain();
-    weakLink.ClearLinkState();
   }
 } // namespace
 

@@ -35,22 +35,6 @@ namespace
 
 
 
-  void LinkKeyToSourceChain(SReconKey& key) noexcept
-  {
-    key.sourceUnit.LinkIntoOwnerChainHeadUnlinked();
-  }
-
-  /**
-   * Address: 0x005C2360 (FUN_005C2360)
-   *
-   * What it does:
-   * Unlinks one weak-link node from its owner chain.
-   */
-  void UnlinkKeyFromSourceChain(SReconKey& key) noexcept
-  {
-    key.sourceUnit.UnlinkFromOwnerChain();
-  }
-
   [[nodiscard]] std::uint32_t GetSourceEntityId(const Unit* const source) noexcept
   {
     return source ? static_cast<std::uint32_t>(source->id_) : 0u;
@@ -65,10 +49,7 @@ namespace
 
   [[nodiscard]] SReconKey MakeReconMapKey(Unit* const sourceUnit) noexcept
   {
-    SReconKey key{};
-    key.sourceUnit.BindObjectUnlinked(sourceUnit);
-    key.sourceEntityId = GetSourceEntityId(sourceUnit);
-    return key;
+    return SReconKey{WeakPtr<Unit>(sourceUnit), GetSourceEntityId(sourceUnit)};
   }
 
   [[nodiscard]] std::pair<ReconBlipMap::iterator, ReconBlipMap::iterator>

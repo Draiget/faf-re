@@ -318,9 +318,8 @@ namespace moho
    */
   CUnitCallLandTransport::CUnitCallLandTransport(CCommandTask* const parentTask, Unit* const transportUnit)
     : CCommandTask(parentTask)
+    , mTargetTransportUnit(transportUnit)
   {
-    mTargetTransportUnit.BindObjectUnlinked(transportUnit);
-    (void)mTargetTransportUnit.LinkIntoOwnerChainHeadUnlinked();
     mBeamupTime = 10.0f;
 
     const VTransform& sourceTransform = transportUnit->GetTransform();

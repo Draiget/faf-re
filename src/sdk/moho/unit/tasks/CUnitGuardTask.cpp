@@ -723,7 +723,6 @@ namespace moho
     // is cleared below.
     mSecondaryUnit.UnlinkFromOwnerChain();
     mTarget.targetEntity.UnlinkFromOwnerChain();
-    mTarget.targetEntity.ClearLinkState();
     mCommandRef.UnlinkFromOwnerChain();
     mPrimaryCommandRef.UnlinkFromOwnerChain();
 
@@ -1751,7 +1750,6 @@ namespace moho
       }
 
       mPrimaryCommandRef.UnlinkFromOwnerChain();
-      mPrimaryCommandRef.ClearLinkState();
     }
 
     const Unit* const previousGuardedUnit = mSecondaryUnit.GetObjectPtr();

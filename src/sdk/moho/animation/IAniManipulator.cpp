@@ -896,7 +896,7 @@ namespace moho
     const bool straightLegs, const float maxFootFall
   )
     : IAniManipulator(unit->SimulationRef, unit->AniActor, 0)
-    , mGoalUnit()
+    , mGoalUnit(unit)
     , mFootBoneIndex(footBoneIndex)
     , mKneeBoneIndex(kneeBoneIndex)
     , mHipBoneIndex(hipBoneIndex)
@@ -904,12 +904,6 @@ namespace moho
     , mMaxFootFall(maxFootFall)
     , mHalfLegSpan(0.0f)
   {
-    // Bind the intrusive goal weak link to the owning unit and head-insert into
-    // that unit's weak-link chain (open-coded head insertion matching the
-    // binary's freshly-constructed, known-unlinked node pattern at 0x006393D6).
-    mGoalUnit.BindObjectUnlinked(unit);
-    (void)mGoalUnit.LinkIntoOwnerChainHeadUnlinked();
-
     // Materialize the Lua userdata + script binding for this manipulator. The
     // binary unconditionally invokes `func_CreateLuaFootPlantManipulatorObject`
     // using `sim->mLuaState` (loaded as `[sim+0x8D8]` then passed in ESI to the
@@ -1051,19 +1045,11 @@ namespace moho
     const int watchedBoneIndex, const int referenceBoneIndex, const bool markSkipInterp
   )
     : IAniManipulator(goalUnit->SimulationRef, goalUnit->AniActor, 0)
-    , mGoalUnit()
-    , mTargetEntity()
+    , mGoalUnit(goalUnit)
+    , mTargetEntity(targetEntity)
     , mReferenceBoneIndex(referenceBoneIndex)
     , mPivot(0.0f, 0.0f, 0.0f)
   {
-    // Head-insert the intrusive goal (unit) and target (entity) weak links into
-    // their owners' weak-link chains, matching the binary's freshly-constructed
-    // (known-unlinked) node insertion at 0x0063448E / 0x006344B8.
-    mGoalUnit.BindObjectUnlinked(goalUnit);
-    (void)mGoalUnit.LinkIntoOwnerChainHeadUnlinked();
-    mTargetEntity.BindObjectUnlinked(targetEntity);
-    (void)mTargetEntity.LinkIntoOwnerChainHeadUnlinked();
-
     // Materialize the Lua userdata + script binding. The binary loads the sim's
     // Lua state and passes it to func_CreateLuaBoneEntityManipulatorObject.
     if (Sim* const sim = mOwnerSim; sim != nullptr && sim->mLuaState != nullptr) {
@@ -1100,10 +1086,8 @@ namespace moho
   CBoneEntityManipulator::~CBoneEntityManipulator()
   {
     mTargetEntity.UnlinkFromOwnerChain();
-    mTargetEntity.ClearLinkState();
 
     mGoalUnit.UnlinkFromOwnerChain();
-    mGoalUnit.ClearLinkState();
 
     mTargetEntity.UnlinkFromOwnerChain();
     mGoalUnit.UnlinkFromOwnerChain();

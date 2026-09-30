@@ -1863,6 +1863,12 @@ namespace
 
   /// The dragger that owns the mouse until it is released or replaced. A
   /// weak link, so a dragger that deletes itself drops out of it.
+  // Address: 0x0078E540 (FUN_0078E540 -- this global's constructor emitted
+  // out of line: both words zeroed, `this` returned.)
+  // Address: 0x0078E560 (FUN_0078E560 -- its destructor, `~WeakPtr`; ICF twin
+  // 0x00C02D50 is the copy the exit list runs. Formerly the uncalled statics
+  // `func_ResetCurrentDraggerLink` / `func_UnlinkCurrentDraggerLink`, removed
+  // 2026-09-30.)
   moho::WeakPtr<IMauiDragger> sCurrentDragger{};
   std::int32_t sCurrentDraggerKeycode = 0;
   std::uint8_t sMouseIsCaptured = 0;
@@ -9449,34 +9455,6 @@ void CMiniMapDragger::DragRelease(
 void CMiniMapDragger::OnCurrentDraggerReplaced()
 {
   delete this;
-}
-
-/**
- * Address: 0x0078E540 (FUN_0078E540, sub_78E540)
- *
- * What it does:
- * Clears both words of the global current-dragger link without touching any
- * chain, and returns the link. Nothing in the image references it.
- */
-static moho::WeakPtr<IMauiDragger>* func_ResetCurrentDraggerLink()
-{
-  sCurrentDragger.ClearLinkState();
-  return &sCurrentDragger;
-}
-
-/**
- * Address: 0x0078E560 (FUN_0078E560, sub_78E560)
- *
- * What it does:
- * Takes the global current-dragger link off its dragger's weak chain and
- * leaves its own two words as they were - the `~WeakPtr` walk, for this one
- * global. Nothing in the image references it.
- */
-static void func_UnlinkCurrentDraggerLink()
-{
-  if (sCurrentDragger.IsLinkedInOwnerChain()) {
-    (void)sCurrentDragger.ReplaceInOwnerChain(sCurrentDragger.nextInOwner);
-  }
 }
 
 /**
@@ -26585,8 +26563,7 @@ void moho::UI_ClearCurrentDragger()
   if (func_GetCurrentDraggerKeycode() != 0) {
     sCurrentDraggerKeycode = 0;
   }
-  (void)func_UnlinkCurrentDraggerLink();
-  (void)func_ResetCurrentDraggerLink();
+  sCurrentDragger.UnlinkFromOwnerChain();
   sCurrentDraggerKeycode = 0;
 }
 
@@ -27115,9 +27092,7 @@ void moho::UI_FactoryCommandQueueHandlerBeat()
 
     // 0x008361DC..0x008361F9 build a temporary weak node onto the same owner
     // chain and hand it to the rebuild worker by value.
-    WeakPtr<UserUnit> factoryLink;
-    factoryLink.BindOwnerLinkSlotUnlinked(sCurrentBuildFactory.ownerLinkSlot);
-    (void)factoryLink.LinkIntoOwnerChainHeadUnlinked();
+    WeakPtr<UserUnit> factoryLink(sCurrentBuildFactory);
 
     RebuildFactoryQueueDisplaySnapshot(snapshot, factoryLink);
 

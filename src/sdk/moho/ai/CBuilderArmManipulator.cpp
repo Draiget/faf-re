@@ -237,7 +237,7 @@ namespace moho
     const std::int32_t boneMuzzle
   )
     : IAniManipulator(sim, unit->AniActor, 0)
-    , mGoalUnit()
+    , mGoalUnit(unit)
     , mHeading(0.0f)
     , mPitch(0.0f)
     , mTrackingScriptActive(false)
@@ -249,11 +249,6 @@ namespace moho
     , mPitchMaxSlew(0.06108652427792549f)
     , mOnTarget(false)
   {
-    // Head-insert the intrusive weak goal-unit link (freshly constructed node,
-    // known-unlinked → bind-then-head-insert; mirrors the binary's list insert).
-    mGoalUnit.BindObjectUnlinked(unit);
-    (void)mGoalUnit.LinkIntoOwnerChainHeadUnlinked();
-
     // Materialize the Lua script object through the builder-arm metatable factory
     // (FUN_006371B0).
     {

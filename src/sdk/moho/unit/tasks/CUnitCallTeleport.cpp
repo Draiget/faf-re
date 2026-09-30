@@ -446,9 +446,8 @@ namespace moho
    */
   CUnitCallTeleport::CUnitCallTeleport(CCommandTask* const parentTask, Unit* const targetUnit)
     : CCommandTask(parentTask)
+    , mTargetTransportUnit(targetUnit)
   {
-    mTargetTransportUnit.BindObjectUnlinked(targetUnit);
-    (void)mTargetTransportUnit.LinkIntoOwnerChainHeadUnlinked();
     mCompletedSuccessfully = false;
     mIsOccupying = false;
 
@@ -550,12 +549,9 @@ namespace moho
   )
     : CCommandTask(parentTask)
     , mTarget(target)
-    , mTeleportBeaconUnit{}
+    , mTeleportBeaconUnit(teleportBeaconUnit)
     , mOrientation(sourceTransform.orient_)
   {
-    mTeleportBeaconUnit.BindObjectUnlinked(teleportBeaconUnit);
-    (void)mTeleportBeaconUnit.LinkIntoOwnerChainHeadUnlinked();
-
     if (mUnit && mUnit->AiNavigator) {
       mUnit->AiNavigator->AbortMove();
     }

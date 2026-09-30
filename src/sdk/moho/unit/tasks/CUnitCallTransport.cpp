@@ -383,9 +383,8 @@ namespace moho
    */
   CUnitCallTransport::CUnitCallTransport(CCommandTask* const parentTask, Unit* const transportUnit)
     : CCommandTask(parentTask)
+    , mTargetTransportUnit(transportUnit)
   {
-    mTargetTransportUnit.BindObjectUnlinked(transportUnit);
-    (void)mTargetTransportUnit.LinkIntoOwnerChainHeadUnlinked();
     mHasBeamupDestination = false;
     mBeamupTime = 10.0f;
 

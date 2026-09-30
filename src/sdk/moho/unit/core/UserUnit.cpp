@@ -7279,13 +7279,11 @@ int moho::cfunc_SetCurrentFactoryForQueueDisplayL(LuaPlus::LuaState* const state
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetCurrentFactoryForQueueDisplayHelpText, 1, argumentCount);
   }
 
-  WeakPtr<UserUnit> factoryLink;
-  {
-    const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
-    // 0x00836458: the link slot is the unit's weak-link head at +0x08.
-    factoryLink.BindObjectUnlinked(GetUserUnitOptional(userUnitObject, state));
-    (void)factoryLink.LinkIntoOwnerChainHeadUnlinked();
-  }
+  // 0x00836458: the link slot is the unit's weak-link head at +0x08. The Lua
+  // object is a temporary and dies once the pointer is built.
+  WeakPtr<UserUnit> factoryLink(
+    GetUserUnitOptional(LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1)), state)
+  );
 
   LuaPlus::LuaObject queueTable;
 

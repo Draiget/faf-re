@@ -8358,11 +8358,7 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
 
       // Re-attach the transferred child to the replacement unit. The attach payload
       // reuses the captured bone indices with an identity relative transform.
-      SEntAttachInfo attachInfo;
-      attachInfo.mAttachTargetWeak.BindObjectUnlinked(newUnit);
-      (void)attachInfo.mAttachTargetWeak.LinkIntoOwnerChainHeadUnlinked();
-      attachInfo.mParentBoneIndex = parentBoneIndex;
-      attachInfo.mChildBoneIndex = childBoneIndex;
+      SEntAttachInfo attachInfo(newUnit, childBoneIndex, parentBoneIndex, VTransform{});
 
       child->AttachTo(attachInfo);
       // Detach the temporary attach node from the replacement's weak chain; the

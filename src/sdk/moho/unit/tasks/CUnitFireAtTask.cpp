@@ -172,7 +172,6 @@ namespace moho
     }
 
     mTarget.targetEntity.UnlinkFromOwnerChain();
-    mTarget.targetEntity.ClearLinkState();
   }
 
   /**

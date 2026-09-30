@@ -29,11 +29,20 @@ namespace moho
 
 
   /**
-   * Recovered intrusive weak-pointer node layout used by Moho reflection helpers.
+   * Moho's intrusive weak pointer: an 8-byte node on a singly linked chain that
+   * its owner keeps in a `WeakObject`.
    *
-   * Binary evidence:
-   * - Weak-pointer set path (`sub_1012F320` / FA `sub_541320`) updates two dwords:
-   *   [0] owner link slot pointer, [1] next node pointer in owner chain.
+   * `ownerLinkSlot` is the address of that chain's head (the owner's
+   * `WeakObject`, or null), and `nextInOwner` threads the chain. The owner never
+   * learns who points at it: every node links itself onto the head as it gets a
+   * target, splices itself back out as it drops it, and the owner blanks
+   * whatever is still on the chain when it dies
+   * (`WeakObject::DetachAllWeakReferences`).
+   *
+   * Everything below is built on two moves, which is also how the binary reads:
+   * `LinkAtOwnerHead` (push-front) and `UnlinkFromOwner` (walk to the node and
+   * splice it out). The walk has no null test: a node with a slot is always on
+   * the chain that slot heads, so the binary never looks for the end.
    */
   template <class T>
   struct WeakPtr
@@ -59,23 +68,16 @@ namespace moho
      * moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22.)
      *
      * What it does:
-     * Initializes one weak-pointer node from an owner object pointer and links
-     * it at the head of the owner's intrusive weak-link chain.
+     * Points at `object` and links onto the front of its weak chain. A member
+     * built this way in a constructor's initialiser list is the "bind, then
+     * push-front with no prior unlink" every recovered constructor used to spell
+     * out by hand.
      */
-    explicit WeakPtr(T* object) noexcept
-      : ownerLinkSlot(nullptr)
-      , nextInOwner(nullptr)
+    explicit WeakPtr(T* const object) noexcept
+      : ownerLinkSlot(EncodeOwnerLinkSlot(object))
     {
-      BindObjectUnlinked(object);
-      (void)LinkIntoOwnerChainHeadUnlinked();
+      LinkAtOwnerHead();
     }
-
-    // Recovered aggregate-like initialization lane used by serializer/runtime
-    // wrappers that materialize weak nodes from raw intrusive fields.
-    WeakPtr(void* encodedOwnerLinkSlot, WeakPtr<T>* nextNode) noexcept
-      : ownerLinkSlot(encodedOwnerLinkSlot)
-      , nextInOwner(nextNode)
-    {}
 
     /**
      * Address: 0x00736C8F (inlined into `CDamage::CDamage(const CDamage&)`,
@@ -106,14 +108,8 @@ namespace moho
      */
     WeakPtr(const WeakPtr<T>& other) noexcept
       : ownerLinkSlot(other.ownerLinkSlot)
-      , nextInOwner(nullptr)
     {
-      if (ownerLinkSlot != nullptr) {
-        MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
-        auto** const head = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
-        nextInOwner = *head;
-        *head = this;
-      }
+      LinkAtOwnerHead();
     }
 
     /**
@@ -128,12 +124,14 @@ namespace moho
      * EDX; zero callers, no pointer or jump to it anywhere in the image. Formerly
      * `RebindBackLinkNode` in moho/entity/EntityDb.cpp (RULE THREE), removed
      * 2026-09-22.)
+     *
+     * There is no self-assignment test (0x00836B90 opens with
+     * `cmp [edx], ecx; jz ret`): assigning a node to itself compares equal
+     * slots and does nothing.
      */
     WeakPtr<T>& operator=(const WeakPtr<T>& other) noexcept
     {
-      if (this != &other) {
-        ResetFromOwnerLinkSlot(other.ownerLinkSlot);
-      }
+      ResetFromOwnerLinkSlot(other.ownerLinkSlot);
       return *this;
     }
 
@@ -182,6 +180,7 @@ namespace moho
       }
     }
 
+    /** True while this node is on an owner's chain, i.e. points at something. */
     [[nodiscard]] bool HasValue() const noexcept
     {
       return ownerLinkSlot != nullptr;
@@ -204,11 +203,6 @@ namespace moho
       return DecodeOwnerObject(ownerLinkSlot);
     }
 
-    [[nodiscard]] bool IsLinkedInOwnerChain() const noexcept
-    {
-      return ownerLinkSlot != nullptr;
-    }
-
     /**
      * True when this node refers to `object`. This is the comparison
      * `std::find` makes when a `vector<WeakPtr<T>>` is searched for a raw
@@ -229,145 +223,26 @@ namespace moho
     // the alias is gone rather than re-guarded.
 
     /**
-     * @warning This faults today once projectile impact scripts actually run.
-     * `ownerLinkSlot` is `owner + kOwnerLinkOffset`, so a node whose owner was
-     * freed without being drained dereferences into released memory here --
-     * observed reading 0xF2B8458D from
-     * `Projectile::~Projectile` -> `CAiTarget::~CAiTarget` ->
-     * `CAiTarget::UnlinkEntityTargetRef` -> `UnlinkFromOwnerChain` -> here.
-     * See [[project_onimpact_shape_and_weakptr_crash]] for the trigger.
-     *
-     * What is already ruled out: the drain itself is correct, and it does run.
-     * `CScriptObject::~CScriptObject` calls `ClearWeakObjectChain`, whose body
-     * walks the chain nulling each node's `ownerLinkSlot`/`nextInOwner` exactly
-     * as `WeakObject::DetachAllWeakReferences` does. A node that had been
-     * drained would leave `IsLinkedInOwnerChain()` false and return above.
-     *
-     * Also ruled out, so do not "fix" either: `ResetFromOwnerLinkSlot` below is
-     * correct, and so is `CAiTarget::CopyFromLinkedTarget`, which is its only
-     * interesting caller. Both match `CAiTarget`'s copy helper in the binary
-     * (0x005D5670) step for step -- it walks the old owner's chain and splices
-     * the node out (0x005D5684..0x005D5694), then sets the new slot and pushes
-     * the node onto that owner's head, `nextInOwner = *ownerHead;
-     * *ownerHead = this` (0x005D569F..0x005D56A4). The `BindOwnerLinkSlotUnlinked`
-     * doc a few lines below *does* say "without inserting into the owner's
-     * chain", but that is a different method and not the one on this path.
-     *
-     * The open lead is **which** `WeakObject` subobject was drained. Entity
-     * carries one at RTTI mdisp=4 inside `CScriptObject`, and `Unit.cpp:13838`
-     * calls a second, duplicate `ClearWeakObjectChain` on a *different* one --
-     * `static_cast<WeakObject&>(static_cast<IUnit&>(*this))`. A `WeakPtr` bound
-     * to one subobject's head is not drained by the destructor that drains the
-     * other, which would leave exactly this dangling slot.
-     *
-     * The offset half of that question is now answered, and it is *not* the
-     * bug: `WeakPtr<Entity>` takes the default `WeakPtrOwnerLinkOffset` of
-     * `sizeof(void*)`, and RTTI puts Entity's `WeakObject` at mdisp=4, so the
-     * slot `EncodeOwnerLinkSlot` produces is the same one
-     * `ClearWeakObjectChain` walks. (`UserEntity`/`UserUnit` need their 0x08
-     * specialisations because of their vtable; plain `Entity` does not.)
-     *
-     * **The owner is not a freed object at all.** Instrumenting
-     * `CAiTarget::UnlinkEntityTargetRef` with the OnImpact fix applied caught
-     * the faulting node: `slot=00C466A1 owner=00C4669D linked=1`, against 848
-     * unlinks that were all clean (`slot=0`). Two things rule out the lifetime
-     * story that the rest of this comment was chasing:
-     *
-     *  - `0x00C4669D` is **odd**, and every `Entity` is at least 4-byte
-     *    aligned, so it was never an object pointer;
-     *  - it lies inside the **module image** (base 0x00400000, ~12 MB), not the
-     *    heap -- live entities in the same run sat at 0x4F84231C, 0x55745000.
-     *    It reads like a vtable or constant-pool address.
-     *
-     * So `ownerLinkSlot` is holding a non-pointer rather than a stale one, and
-     * the drain machinery is exonerated: there is nothing for
-     * `ClearWeakObjectChain` to have missed. Look instead at how this
-     * `CAiTarget` got that value -- a layout or aliasing problem, e.g.
-     * `Projectile::mTargetPosData` at +0x2EC reading the wrong bytes, or a
-     * `CAiTarget` copied out of storage that was never constructed. `CAiTarget`
-     * itself is `= default` and `WeakPtr`'s default ctor does zero both fields,
-     * so plain default construction is not the source.
-     *
-     * The corruption is rare -- one node in 848 -- so reproduce it with the
-     * OnImpact fix from [[project_onimpact_shape_and_weakptr_crash]] applied
-     * and that same probe, rather than expecting it on demand.
+     * Drops the target: off the owner's chain, both words null. The same as
+     * `Set(nullptr)`.
      */
-    [[nodiscard]] bool ReplaceInOwnerChain(WeakPtr<T>* replacement) noexcept
-    {
-      if (!IsLinkedInOwnerChain()) {
-        return false;
-      }
-
-      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
-      auto** slot = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
-      while (*slot && *slot != this) {
-        slot = &(*slot)->nextInOwner;
-      }
-
-      if (*slot != this) {
-        return false;
-      }
-
-      *slot = replacement;
-      return true;
-    }
-
     void UnlinkFromOwnerChain() noexcept
     {
-      if (!IsLinkedInOwnerChain()) {
-        return;
-      }
-
-      if (ReplaceInOwnerChain(nextInOwner)) {
-        ownerLinkSlot = nullptr;
-        nextInOwner = nullptr;
-      }
+      ResetFromOwnerLinkSlot(nullptr);
     }
 
+    /**
+     * Blanks both words without touching any chain.
+     *
+     * Only correct on a node that is on no chain. The binary does this where a
+     * node is being built in place: `CAiTarget`'s decode from an `SSTITarget`
+     * (0x005E2650) and ground-target paths write `[this+4] = [this+8] = 0` over
+     * fresh storage.
+     */
     void ClearLinkState() noexcept
     {
       ownerLinkSlot = nullptr;
       nextInOwner = nullptr;
-    }
-
-    /**
-     * Binds an encoded owner-link slot without inserting into the owner's chain.
-     *
-     * Use this when a node payload is copied/staged first and linked later by
-     * explicit insertion logic.
-     */
-    void BindOwnerLinkSlotUnlinked(void* encodedOwnerLinkSlot) noexcept
-    {
-      ownerLinkSlot = encodedOwnerLinkSlot;
-      nextInOwner = nullptr;
-    }
-
-    /**
-     * Binds this weak node to an object owner slot without linking into the chain.
-     */
-    void BindObjectUnlinked(T* object) noexcept
-    {
-      BindOwnerLinkSlotUnlinked(EncodeOwnerLinkSlot(object));
-    }
-
-    /**
-     * Inserts one weak node at the current owner-chain head without first
-     * scanning for/removing an existing link.
-     *
-     * Precondition: node is currently unlinked from the owner chain.
-     */
-    [[nodiscard]] bool LinkIntoOwnerChainHeadUnlinked() noexcept
-    {
-      if (!HasValue()) {
-        nextInOwner = nullptr;
-        return false;
-      }
-
-      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
-      auto** const head = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
-      nextInOwner = *head;
-      *head = this;
-      return true;
     }
 
     /**
@@ -383,40 +258,20 @@ namespace moho
      * separate recoveries.
      *
      * What it does:
-     * Rebinds this weak-pointer node to a new owner-link slot, detaches the
-     * node from its previous intrusive owner chain when needed, and inserts it
-     * at the head of the new owner chain.
+     * Moves this node to the chain `newOwnerLinkSlot` heads: nothing when that
+     * is already its chain, otherwise off the old one and onto the front of the
+     * new one (or `nextInOwner = 0` for a null slot).
      * Address: 0x007A5610 (FUN_007A5610 -- `WeakPtr<T>::ResetFromOwnerLinkSlot` (unlink from the old chain, relink at the requested owner head); callers 0x007A4970; formerly `RebindIntrusiveOwnerSlotNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      */
-    void ResetFromOwnerLinkSlot(void* newOwnerLinkSlot) noexcept
+    void ResetFromOwnerLinkSlot(void* const newOwnerLinkSlot) noexcept
     {
       if (newOwnerLinkSlot == ownerLinkSlot) {
         return;
       }
 
-      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
-
-      // Detach from current owner chain.
-      if (ownerLinkSlot) {
-        auto** cursor = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
-        while (*cursor && *cursor != this) {
-          cursor = reinterpret_cast<WeakPtr<T>**>(
-            reinterpret_cast<std::uintptr_t>(*cursor) + offsetof(WeakPtr<T>, nextInOwner)
-          );
-        }
-        if (*cursor == this) {
-          *cursor = nextInOwner;
-        }
-      }
-
+      UnlinkFromOwner();
       ownerLinkSlot = newOwnerLinkSlot;
-      if (newOwnerLinkSlot) {
-        auto** const head = reinterpret_cast<WeakPtr<T>**>(newOwnerLinkSlot);
-        nextInOwner = *head;
-        *head = this;
-      } else {
-        nextInOwner = nullptr;
-      }
+      LinkAtOwnerHead();
     }
 
     /**
@@ -461,7 +316,7 @@ namespace moho
      * All three share `function_sha256` 5c93862d...: one 70-byte body,
      * emitted once per owner type.
      */
-    void ResetFromObject(T* object) noexcept
+    void ResetFromObject(T* const object) noexcept
     {
       ResetFromOwnerLinkSlot(EncodeOwnerLinkSlot(object));
     }
@@ -473,9 +328,58 @@ namespace moho
      *   separate specialization here because the generic body carried sentinel
      *   checks the binary does not have.)
      */
-    void Set(T* object) noexcept
+    void Set(T* const object) noexcept
     {
       ResetFromObject(object);
+    }
+
+  private:
+    /** The chain `ownerLinkSlot` heads: the owner's `WeakObject`, read as a node pointer. */
+    [[nodiscard]] WeakPtr<T>** OwnerChainHead() const noexcept
+    {
+      return static_cast<WeakPtr<T>**>(ownerLinkSlot);
+    }
+
+    /**
+     * Pushes this node onto the front of the chain `ownerLinkSlot` heads, or
+     * sets `nextInOwner` to null when there is none (0x0057D640..0x0057D64E):
+     *
+     *     test edx, edx / mov [eax], edx / jz null
+     *     mov  ecx, [edx]      ; head
+     *     mov  [eax+4], ecx    ; nextInOwner = head
+     *     mov  [edx], eax      ; head = this
+     */
+    void LinkAtOwnerHead() noexcept
+    {
+      if (ownerLinkSlot == nullptr) {
+        nextInOwner = nullptr;
+        return;
+      }
+
+      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
+      WeakPtr<T>** const head = OwnerChainHead();
+      nextInOwner = *head;
+      *head = this;
+    }
+
+    /**
+     * Splices this node out of the chain it is on and leaves its own two words
+     * alone (0x0057D621..0x0057D63F, and all of `~WeakPtr`). The walk stops at
+     * this node and nowhere else: there is no null test, because a node with a
+     * slot is on that slot's chain.
+     */
+    void UnlinkFromOwner() noexcept
+    {
+      if (ownerLinkSlot == nullptr) {
+        return;
+      }
+
+      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
+      WeakPtr<T>** cursor = OwnerChainHead();
+      while (*cursor != this) {
+        cursor = &(*cursor)->nextInOwner;
+      }
+      *cursor = nextInOwner;
     }
   };
 
@@ -529,6 +433,13 @@ namespace moho
    * (0x00BB3486), whose normal paths inline it. Formerly `LinkWorkFrame` /
    * `UnlinkWorkFrame` over an `STcpConnWorkFrame` overlay in
    * moho/net/CNetTCPConnector.cpp, removed 2026-09-28.)
+   * Address: 0x005C2360 (FUN_005C2360 -- the `WeakPtr<Unit>` emission, `this`
+   * in ECX: `SReconKey`'s destructor, which is nothing but its weak pointer's.
+   * Callers `CAiReconDBImpl::GenerateNewBlips` 0x005C0A70 (the key temporary
+   * built for each `mBlipMap.insert`), `ReconTick` 0x005C0C40,
+   * `ReconGetJamingBlips` 0x005C20C0 and 0x005C6210. Formerly
+   * `UnlinkKeyFromSourceChain` in moho/ai/CAiReconDBImpl.cpp, which nothing
+   * called, removed 2026-09-30.)
    *
    * IDA signature:
    * void __fastcall sub_5A6DE0(WeakPtr<T> *this@<ecx>);
@@ -556,32 +467,21 @@ namespace moho
    * still aimed at a live owner. Leaving it defaulted -- as this template did
    * until the `CDamage` ring-damage crash -- silently strands the dead node in
    * the owner's chain, and the next walk of that chain (a `Set`, another
-   * destructor, or `ClearWeakObjectChain`) dereferences whatever has since
-   * reused the storage. That is the `0xF2B8458D` / `0x00C4669D` "corrupt
-   * ownerLinkSlot" class of fault documented on `ReplaceInOwnerChain` above:
-   * the drain was always correct, the *departures* were not.
+   * destructor, or `DetachAllWeakReferences`) dereferences whatever has since
+   * reused the storage. That was the `0xF2B8458D` / `0x00C4669D` "corrupt
+   * `ownerLinkSlot`" class of fault: the owners' drains were always correct,
+   * the departures were not.
    *
-   * The `while` here additionally stops on a null cursor. The binary runs off
-   * the end instead, which cannot happen there because every live node really
-   * is in the chain it names; keeping the guard costs nothing and contains the
-   * damage if a node is ever staged with a slot it was never linked into (see
-   * `BindOwnerLinkSlotUnlinked`).
+   * The walk runs until it finds this node, exactly as the binary does. It
+   * used to stop on a null cursor as well, to survive nodes that had been given
+   * a slot without being linked onto it; the constructors that did that
+   * (`BindObjectUnlinked` followed later, or never, by a link) now construct
+   * the pointer instead.
    */
   template <class T>
   inline WeakPtr<T>::~WeakPtr() noexcept
   {
-    if (ownerLinkSlot == nullptr) {
-      return;
-    }
-
-    MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
-    auto** cursor = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
-    while (*cursor != nullptr && *cursor != this) {
-      cursor = &(*cursor)->nextInOwner;
-    }
-    if (*cursor == this) {
-      *cursor = nextInOwner;
-    }
+    UnlinkFromOwner();
   }
 
 } // namespace moho
