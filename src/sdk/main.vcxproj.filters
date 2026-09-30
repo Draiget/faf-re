@@ -6278,9 +6278,6 @@
     <ClInclude Include="moho\render\textures\detail\BatchTextureContainerHelpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\PrefetchRuntime.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\serialization\SBuildReserveInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>

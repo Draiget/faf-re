@@ -1,2625 +1,44 @@
 #include "moho/resource/ResourceManager.h"
 
-#include "legacy/containers/Set.h"
-#include "moho/resource/CResourceWatcher.h"
-#include "moho/resource/ResourceFactory.h"
-#include "moho/resource/PrefetchRuntime.h"
-#include "moho/serialization/PrefetchHandleBase.h"
-#include "moho/misc/FileWaitHandleSet.h"
-
 #include <algorithm>
-#include <chrono>
-#include <cstddef>
-#include <cstdlib>
-#include <cstdint>
-#include <cstring>
-#include <map>
-#include <mutex>
-#include <new>
-#include <stdexcept>
-#include <string>
-#include <thread>
+
 #include <Windows.h>
 
 #include "boost/bind.hpp"
-#include "boost/function/function_base.hpp"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
-#include "gpg/core/utils/BoostWrappers.h"
 #include "moho/console/CConCommand.h"
+#include "moho/misc/CVirtualFileSystem.h"
+#include "moho/misc/FileWaitHandleSet.h"
+#include "moho/resource/CResourceWatcher.h"
+#include "moho/resource/ResourceFactory.h"
+#include "moho/serialization/PrefetchHandleBase.h"
 
 namespace moho
 {
-  bool res_EnablePrefetching = true;
-  int res_PrefetcherActivityDelay = 0;
-  int res_AfterPrefetchDelay = 0;
-  bool res_SpewLoadSpam = false;
+  bool res_EnablePrefetching = true;     // 0x00F58027
+  int res_PrefetcherActivityDelay = 3;   // 0x00F58DA4, seconds
+  int res_AfterPrefetchDelay = 250;      // 0x00F58DA8, milliseconds
+  bool res_SpewLoadSpam = false;         // 0x010A6394
 } // namespace moho
 
 namespace
 {
-  using IntrusiveListLink = moho::PrefetchListLink;
-
-  struct PrefetchWatchNode
-  {
-    IntrusiveListLink mListLink; // +0x00
-    msvc8::string mPath;         // +0x08
-    void* mWatcher;              // +0x24
-    std::uint8_t mIsFinished;    // +0x28
-    std::uint8_t mPad29[3];
-  };
-
-  static_assert(offsetof(PrefetchWatchNode, mListLink) == 0x00, "PrefetchWatchNode::mListLink offset must be 0x00");
-  static_assert(offsetof(PrefetchWatchNode, mPath) == 0x08, "PrefetchWatchNode::mPath offset must be 0x08");
-  static_assert(offsetof(PrefetchWatchNode, mWatcher) == 0x24, "PrefetchWatchNode::mWatcher offset must be 0x24");
-  static_assert(offsetof(PrefetchWatchNode, mIsFinished) == 0x28, "PrefetchWatchNode::mIsFinished offset must be 0x28");
-  static_assert(sizeof(PrefetchWatchNode) == 0x2C, "PrefetchWatchNode size must be 0x2C");
-
-  using WeakSharedPair = boost::SharedCountPair;
-  using PrefetchRequestRuntime = moho::PrefetchRequestRuntime;
-  using PrefetchWeakPairRingQueueRuntime = moho::PrefetchWeakPairRingQueueRuntime;
-
-  struct DualSharedPairCleanupView
-  {
-    std::uint32_t mReserved00;    // +0x00
-    std::uint32_t mReserved04;    // +0x04
-    boost::SharedCountPair mPair0; // +0x08
-    boost::SharedCountPair mPair1; // +0x10
-  };
-
-  static_assert(offsetof(DualSharedPairCleanupView, mPair0) == 0x08, "DualSharedPairCleanupView::mPair0 offset must be 0x08");
-  static_assert(offsetof(DualSharedPairCleanupView, mPair1) == 0x10, "DualSharedPairCleanupView::mPair1 offset must be 0x10");
-  static_assert(sizeof(DualSharedPairCleanupView) == 0x18, "DualSharedPairCleanupView size must be 0x18");
-
-  /**
-   * Address: 0x004A99C0 (FUN_004A99C0)
-   *
-   * What it does:
-   * Initializes one prefetch watcher node with self-linked intrusive lanes,
-   * path text, owning watcher pointer, and cleared completion flag.
-   */
-  PrefetchWatchNode* InitializePrefetchWatchNode(
-    PrefetchWatchNode* const node,
-    const gpg::StrArg path,
-    void* const watcher
-  )
-  {
-    node->mListLink.ListResetLinks();
-    ::new (&node->mPath) msvc8::string(path ? path : "");
-    node->mWatcher = watcher;
-    node->mIsFinished = 0;
-    return node;
-  }
-
-  /**
-   * Address: 0x004A9A40 (FUN_004A9A40)
-   *
-   * What it does:
-   * Initializes one resource-prefetch request runtime entry from path + type,
-   * clears active state lanes, and resets waiter-list head to self-linked.
-   */
-  PrefetchRequestRuntime* InitializePrefetchRequestFromPath(
-    PrefetchRequestRuntime* const request,
-    const gpg::StrArg path,
-    gpg::RType* const resourceType
-  )
-  {
-    request->mResourceId.name = msvc8::string(path ? path : "");
-    request->mResourceType = resourceType;
-    request->mIsLoading = 0;
-    request->mLoadWakePending = 0;
-    request->mResolved.px = nullptr;
-    request->mResolved.pi = nullptr;
-    request->mHadLoadFailure = 0;
-    request->mPrefetch.px = nullptr;
-    request->mPrefetch.pi = nullptr;
-    request->mWaiterListHead.ListResetLinks();
-    return request;
-  }
-
-} // namespace
-
-/**
- * Address: 0x004A9AA0 (FUN_004A9AA0)
- *
- * What it does:
- * Copies the request key (resource id and type) and starts the copy idle:
- * load flags cleared, both handles empty, waiter list empty. The prefetch
- * set's node builder (0x004AED80) inlines the same body.
- */
-moho::PrefetchRequestRuntime::PrefetchRequestRuntime(const PrefetchRequestRuntime& other)
-  : mResourceId(other.mResourceId)
-  , mResourceType(other.mResourceType)
-  , mIsLoading(0)
-  , mLoadWakePending(0)
-  , mResolved{}
-  , mHadLoadFailure(0)
-  , mPrefetch{}
-{}
-
-namespace
-{
-
-  /**
-   * Address: 0x004A9B10 (FUN_004A9B10)
-   * Address: 0x00796DA0 (FUN_00796DA0, ICF twin -- identical function_sha256.
-   *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
-   *          as `ReleaseWeakOwnerFromPairLane` over the same concrete
-   *          `boost::SharedCountPair` type; that duplicate has been deleted.)
-   *
-   * What it does:
-   * Releases one weak control-block lane (`pi`) from a `(px,pi)` pair.
-   */
-  boost::detail::sp_counted_base* ReleaseWeakControlFromPair(WeakSharedPair* const weakPair) noexcept
-  {
-    return boost::SpCountedBaseWeakReleaseFromSlot(&weakPair->pi);
-  }
-
-  /**
-   * Address: 0x004A9920 (FUN_004A9920)
-   *
-   * What it does:
-   * Releases two shared control-block lanes at offsets `+0x10` then `+0x08`.
-   */
-  void ReleaseDualSharedPairs(DualSharedPairCleanupView* const view) noexcept
-  {
-    boost::ReleaseSharedControlOnly(&view->mPair1);
-    boost::ReleaseSharedControlOnly(&view->mPair0);
-  }
-
-  /**
-   * Address: 0x004AA560 (FUN_004AA560)
-   *
-   * What it does:
-   * Tears down one prefetch request runtime entry: weak-releases both control
-   * lanes, then tidies the path string. The waiter-head unlink 0x004AA560
-   * opens with is `mWaiterListHead`'s own destructor (last member, so first),
-   * which runs when the request is destroyed.
-   */
-  PrefetchRequestRuntime* DestroyPrefetchRequestRuntime(PrefetchRequestRuntime* const request) noexcept
-  {
-    (void)ReleaseWeakControlFromPair(&request->mPrefetch);
-    (void)ReleaseWeakControlFromPair(&request->mResolved);
-    request->mResourceId.name.tidy(true, 0U);
-    return request;
-  }
-
-  std::once_flag sResourceManagerOnce;
-  moho::ResourceManager* sPResourceManager = nullptr;
-
-  /**
-   * Recovered view of the hidden factory registration payload used by the
-   * bootstrap registry. The second dword is the factory key consumed by the
-   * active keyed registry.
-   */
-  struct FactoryRegistrationView
-  {
-    void* vTable;
-    unsigned int registrationKey;
-  };
-
-  [[nodiscard]] unsigned int GetFactoryRegistrationKey(const moho::ResourceFactoryBase* factory)
-  {
-    return reinterpret_cast<const FactoryRegistrationView*>(factory)->registrationKey;
-  }
-
-  // Matches `CResourceManager::PendingFactoryRegistrations` (private there).
-  using PendingFactoryRegistrations = msvc8::vector<moho::ResourceFactoryBase*, false>;
-
-  void RemovePendingFactory(PendingFactoryRegistrations& pendingFactories,
-                            const moho::ResourceFactoryBase* factory)
-  {
-    const auto factoryIt = std::find(pendingFactories.begin(), pendingFactories.end(), factory);
-    if (factoryIt != pendingFactories.end()) {
-      pendingFactories.erase(factoryIt);
-    }
-  }
-
-  [[nodiscard]] boost::SharedCountPair* ResetSharedPairToNullCore(boost::SharedCountPair* const pair) noexcept
-  {
-    if (pair == nullptr) {
-      return nullptr;
-    }
-    pair->px = nullptr;
-    pair->pi = nullptr;
-    return pair;
-  }
-
-  /**
-   * Address: 0x004ABF70 (FUN_004ABF70)
-   *
-   * What it does:
-   * Clears one shared pair to `(nullptr,nullptr)` in-place.
-   */
-  boost::SharedCountPair* ResetSharedPairToNullVariant1(boost::SharedCountPair* const pair) noexcept
-  {
-    return ResetSharedPairToNullCore(pair);
-  }
-
-  /**
-   * Address: 0x004ABF80 (FUN_004ABF80)
-   *
-   * What it does:
-   * Releases one shared control-block lane then clears one shared pair.
-   */
-  boost::SharedCountPair* ResetSharedPairReleaseControl(
-    boost::SharedCountPair* const pair
-  ) noexcept
-  {
-    if (pair == nullptr) {
-      return nullptr;
-    }
-
-    pair->px = nullptr;
-    boost::detail::sp_counted_base* const control = pair->pi;
-    pair->pi = nullptr;
-    if (control != nullptr) {
-      control->release();
-    }
-    return pair;
-  }
-
-  /**
-   * Address: 0x004AC0D0 (FUN_004AC0D0)
-   *
-   * What it does:
-   * Clears one shared pair to `(nullptr,nullptr)`.
-   */
-  boost::SharedCountPair* ResetSharedPairToNullVariant2(boost::SharedCountPair* const pair) noexcept
-  {
-    return ResetSharedPairToNullCore(pair);
-  }
-
-  [[nodiscard]] boost::SharedCountPair* BuildWeakPairFromLiveSharedCore(
-    const boost::SharedCountPair* const sourceSharedPair,
-    boost::SharedCountPair* const outWeakPair
-  ) noexcept
-  {
-    if (outWeakPair == nullptr) {
-      return nullptr;
-    }
-    if (sourceSharedPair == nullptr) {
-      outWeakPair->px = nullptr;
-      outWeakPair->pi = nullptr;
-      return outWeakPair;
-    }
-
-    outWeakPair->px = sourceSharedPair->px;
-    if (sourceSharedPair->pi != nullptr && boost::SpCountedBaseUseCount(sourceSharedPair->pi) != 0) {
-      outWeakPair->pi = boost::SpCountedBaseWeakAddRefReturn(sourceSharedPair->pi);
-      return outWeakPair;
-    }
-
-    outWeakPair->px = nullptr;
-    outWeakPair->pi = nullptr;
-    return outWeakPair;
-  }
-
-  /**
-   * Address: 0x004AC0E0 (FUN_004AC0E0)
-   *
-   * What it does:
-   * Builds one weak `(px,pi)` pair from one live shared `(px,pi)` pair;
-   * otherwise writes a null pair.
-   */
-  boost::SharedCountPair* BuildWeakPairFromLiveSharedVariant1(
-    const boost::SharedCountPair* const sourceSharedPair,
-    boost::SharedCountPair* const outWeakPair
-  ) noexcept
-  {
-    return BuildWeakPairFromLiveSharedCore(sourceSharedPair, outWeakPair);
-  }
-
-  /**
-   * Address: 0x004AC1B0 (FUN_004AC1B0)
-   *
-   * What it does:
-   * Clears one shared pair to `(nullptr,nullptr)`.
-   */
-  boost::SharedCountPair* ResetSharedPairToNullVariant3(boost::SharedCountPair* const pair) noexcept
-  {
-    return ResetSharedPairToNullVariant2(pair);
-  }
-
-  /**
-   * Address: 0x004AC1C0 (FUN_004AC1C0)
-   *
-   * What it does:
-   * Duplicate lane of weak-pair construction from one live shared pair.
-   */
-  boost::SharedCountPair* BuildWeakPairFromLiveSharedVariant2(
-    const boost::SharedCountPair* const sourceSharedPair,
-    boost::SharedCountPair* const outWeakPair
-  ) noexcept
-  {
-    return BuildWeakPairFromLiveSharedVariant1(sourceSharedPair, outWeakPair);
-  }
-
-  /**
-   * Address: 0x004AC070 (FUN_004AC070)
-   *
-   * What it does:
-   * Returns one dword-array element address from `base + index * 4`.
-   */
-  std::uintptr_t ComputeDwordElementAddress(
-    const std::uintptr_t* const baseAddressSlot,
-    const std::int32_t elementIndex
-  ) noexcept
-  {
-    return *baseAddressSlot + static_cast<std::uintptr_t>(4 * elementIndex);
-  }
-
-  /**
-   * Address: 0x004AC310 (FUN_004AC310)
-   *
-   * What it does:
-   * Copies one dword from source offset `+0x04` into output storage.
-   */
-  std::uint32_t* CopyDwordFromOffset4Variant1(
-    std::uint32_t* const outValue,
-    const std::uint8_t* const source
-  ) noexcept
-  {
-    *outValue = *reinterpret_cast<const std::uint32_t*>(source + 0x04);
-    return outValue;
-  }
-
-  /**
-   * Address: 0x004AC320 (FUN_004AC320)
-   *
-   * What it does:
-   * Copies one dword from source offset `+0x08` into output storage.
-   */
-  std::uint32_t* CopyDwordFromOffset8(
-    std::uint32_t* const outValue,
-    const std::uint8_t* const source
-  ) noexcept
-  {
-    *outValue = *reinterpret_cast<const std::uint32_t*>(source + 0x08);
-    return outValue;
-  }
-
-  /**
-   * Address: 0x004AC450 (FUN_004AC450)
-   *
-   * What it does:
-   * Duplicate lane that copies one dword from source offset `+0x04`.
-   */
-  std::uint32_t* CopyDwordFromOffset4Variant2(
-    std::uint32_t* const outValue,
-    const std::uint8_t* const source
-  ) noexcept
-  {
-    return CopyDwordFromOffset4Variant1(outValue, source);
-  }
-
-
-
-  constexpr std::uint32_t kPrefetchWeakPairRingMaxChunkCount_004AD900 = 0x0FFFFFFFU;
-
-  /**
-   * Address: 0x004AE590 (FUN_004AE590)
-   *
-   * What it does:
-   * Throws the legacy deque growth overflow error path.
-   */
-  [[noreturn]] void ThrowDequeTooLong_004AE590()
-  {
-    throw std::length_error("deque<T> too long");
-  }
-
-  /**
-   * Address: 0x004ADB30 (FUN_004ADB30)
-   *
-   * What it does:
-   * Allocates one 2-lane weak-pair chunk block for ring storage.
-   */
-  boost::SharedCountPair* AllocateWeakPairChunkBlock_004ADB30()
-  {
-    return static_cast<boost::SharedCountPair*>(::operator new(sizeof(boost::SharedCountPair) * 2U));
-  }
-
-  /**
-   * Address: 0x004AD900 (FUN_004AD900)
-   *
-   * What it does:
-   * Grows and reflows the ring chunk-pointer index while preserving queued
-   * logical order around the read cursor.
-   */
-  boost::SharedCountPair** GrowPrefetchWeakPairRingChunkIndex_004AD900(
-    PrefetchWeakPairRingQueueRuntime* const queue
-  )
-  {
-    if (queue == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t currentChunkCount = queue->mChunkCount;
-    if (currentChunkCount == kPrefetchWeakPairRingMaxChunkCount_004AD900) {
-      ThrowDequeTooLong_004AE590();
-    }
-
-    std::uint32_t growthCount = 1U;
-    std::uint32_t halfCount = currentChunkCount >> 1U;
-    if (halfCount < 8U) {
-      halfCount = 8U;
-    }
-    if (halfCount > 1U && currentChunkCount <= (kPrefetchWeakPairRingMaxChunkCount_004AD900 - halfCount)) {
-      growthCount = halfCount;
-    }
-
-    const std::uint32_t readChunk = queue->mReadCursor >> 1U;
-    const std::uint32_t newChunkCount = currentChunkCount + growthCount;
-    auto** const newChunkIndex = static_cast<boost::SharedCountPair**>(
-      newChunkCount != 0U ? ::operator new(sizeof(boost::SharedCountPair*) * newChunkCount) : ::operator new(0U)
-    );
-
-    boost::SharedCountPair** const oldChunkIndex = queue->mChunkPairBlocks;
-    if (oldChunkIndex != nullptr && currentChunkCount > 0U) {
-      const std::size_t tailCount = static_cast<std::size_t>(currentChunkCount - readChunk);
-      if (tailCount > 0U) {
-        std::memmove(
-          newChunkIndex + readChunk,
-          oldChunkIndex + readChunk,
-          tailCount * sizeof(boost::SharedCountPair*)
-        );
-      }
-
-      boost::SharedCountPair** const tailEnd = newChunkIndex + currentChunkCount;
-      if (readChunk > growthCount) {
-        if (growthCount > 0U) {
-          std::memmove(
-            tailEnd,
-            oldChunkIndex,
-            static_cast<std::size_t>(growthCount) * sizeof(boost::SharedCountPair*)
-          );
-        }
-
-        const std::size_t rotatedPrefixCount = static_cast<std::size_t>(readChunk - growthCount);
-        if (rotatedPrefixCount > 0U) {
-          std::memmove(
-            newChunkIndex,
-            oldChunkIndex + growthCount,
-            rotatedPrefixCount * sizeof(boost::SharedCountPair*)
-          );
-        }
-
-        std::memset(
-          newChunkIndex + (readChunk - growthCount),
-          0,
-          static_cast<std::size_t>(growthCount) * sizeof(boost::SharedCountPair*)
-        );
-      } else {
-        if (readChunk > 0U) {
-          std::memmove(
-            tailEnd,
-            oldChunkIndex,
-            static_cast<std::size_t>(readChunk) * sizeof(boost::SharedCountPair*)
-          );
-        }
-
-        if (growthCount != readChunk) {
-          std::memset(
-            tailEnd + readChunk,
-            0,
-            static_cast<std::size_t>(growthCount - readChunk) * sizeof(boost::SharedCountPair*)
-          );
-        }
-
-        if (readChunk > 0U) {
-          std::memset(newChunkIndex, 0, static_cast<std::size_t>(readChunk) * sizeof(boost::SharedCountPair*));
-        }
-      }
-    } else if (newChunkCount > 0U) {
-      std::memset(newChunkIndex, 0, static_cast<std::size_t>(newChunkCount) * sizeof(boost::SharedCountPair*));
-    }
-
-    ::operator delete(queue->mChunkPairBlocks);
-    queue->mChunkPairBlocks = newChunkIndex;
-    queue->mChunkCount = newChunkCount;
-    return newChunkIndex;
-  }
-
-  [[nodiscard]] boost::SharedCountPair* GetPrefetchWeakPairRingSlot(
-    PrefetchWeakPairRingQueueRuntime* const queue,
-    const std::uint32_t logicalCursor,
-    const bool allocateMissingBlock
-  ) noexcept
-  {
-    if (queue == nullptr || queue->mChunkPairBlocks == nullptr || queue->mChunkCount == 0) {
-      return nullptr;
-    }
-
-    std::uint32_t chunkIndex = logicalCursor >> 1U;
-    while (chunkIndex >= queue->mChunkCount) {
-      chunkIndex -= queue->mChunkCount;
-    }
-
-    boost::SharedCountPair*& chunkPairs = queue->mChunkPairBlocks[chunkIndex];
-    if (allocateMissingBlock && chunkPairs == nullptr) {
-      chunkPairs = AllocateWeakPairChunkBlock_004ADB30();
-      (void)ResetSharedPairToNullVariant1(&chunkPairs[0]);
-      (void)ResetSharedPairToNullVariant1(&chunkPairs[1]);
-    }
-
-    if (chunkPairs == nullptr) {
-      return nullptr;
-    }
-
-    return &chunkPairs[logicalCursor & 1U];
-  }
-
-  /**
-   * Address: 0x004ACAA0 (FUN_004ACAA0)
-   *
-   * What it does:
-   * Pops one weak pair from the prefetch ring-front cursor and weak-releases
-   * its control lane.
-   */
-  std::uint32_t PopPrefetchWeakPairRingFront(
-    PrefetchWeakPairRingQueueRuntime* const queue
-  ) noexcept
-  {
-    std::uint32_t nextCursor = queue != nullptr ? queue->mReadCursor : 0U;
-    if (queue == nullptr || queue->mQueuedCount == 0) {
-      return nextCursor;
-    }
-
-    if (boost::SharedCountPair* const slot = GetPrefetchWeakPairRingSlot(queue, queue->mReadCursor, false);
-        slot != nullptr) {
-      (void)boost::SpCountedBaseWeakReleaseFromSlot(&slot->pi);
-    }
-
-    nextCursor = queue->mReadCursor + 1U;
-    queue->mReadCursor = nextCursor;
-    if (2U * queue->mChunkCount <= nextCursor) {
-      queue->mReadCursor = 0U;
-    }
-
-    const std::uint32_t priorQueuedCount = queue->mQueuedCount--;
-    if (priorQueuedCount == 1U) {
-      queue->mReadCursor = 0U;
-    }
-
-    return queue->mReadCursor;
-  }
-
-  /**
-   * Address: 0x004ACA20 (FUN_004ACA20)
-   *
-   * What it does:
-   * Pushes one weak pair at the logical front of the prefetch ring queue.
-   */
-  boost::SharedCountPair* PushPrefetchWeakPairRingFront(
-    PrefetchWeakPairRingQueueRuntime* const queue,
-    const boost::SharedCountPair* const sourceWeakPair
-  )
-  {
-    if (queue == nullptr || sourceWeakPair == nullptr) {
-      return nullptr;
-    }
-
-    if (((queue->mReadCursor & 1U) == 0U) && queue->mChunkCount <= ((queue->mQueuedCount + 2U) >> 1U)) {
-      (void)GrowPrefetchWeakPairRingChunkIndex_004AD900(queue);
-    }
-    if (queue->mChunkCount == 0U) {
-      return nullptr;
-    }
-
-    std::uint32_t insertCursor = queue->mReadCursor;
-    if (insertCursor == 0U) {
-      insertCursor = 2U * queue->mChunkCount;
-    }
-    insertCursor -= 1U;
-
-    boost::SharedCountPair* const slot = GetPrefetchWeakPairRingSlot(queue, insertCursor, true);
-    if (slot != nullptr) {
-      slot->px = sourceWeakPair->px;
-      slot->pi = sourceWeakPair->pi;
-      if (slot->pi != nullptr) {
-        (void)boost::SpCountedBaseWeakAddRef(slot->pi);
-      }
-    }
-
-    ++queue->mQueuedCount;
-    queue->mReadCursor = insertCursor;
-    return slot;
-  }
-
-  /**
-   * Address: 0x004ACB00 (FUN_004ACB00)
-   *
-   * What it does:
-   * Pushes one weak pair at the logical back of the prefetch ring queue.
-   */
-  boost::SharedCountPair* PushPrefetchWeakPairRingBack(
-    PrefetchWeakPairRingQueueRuntime* const queue,
-    const boost::SharedCountPair* const sourceWeakPair
-  )
-  {
-    if (queue == nullptr || sourceWeakPair == nullptr) {
-      return nullptr;
-    }
-
-    if ((((queue->mQueuedCount + queue->mReadCursor) & 1U) == 0U)
-        && queue->mChunkCount <= ((queue->mQueuedCount + 2U) >> 1U)) {
-      (void)GrowPrefetchWeakPairRingChunkIndex_004AD900(queue);
-    }
-    if (queue->mChunkCount == 0U) {
-      return nullptr;
-    }
-
-    const std::uint32_t logicalInsertCursor = queue->mReadCursor + queue->mQueuedCount;
-    boost::SharedCountPair* const slot = GetPrefetchWeakPairRingSlot(queue, logicalInsertCursor, true);
-    if (slot != nullptr) {
-      slot->px = sourceWeakPair->px;
-      slot->pi = sourceWeakPair->pi;
-      if (slot->pi != nullptr) {
-        (void)boost::SpCountedBaseWeakAddRef(slot->pi);
-      }
-    }
-
-    ++queue->mQueuedCount;
-    return slot;
-  }
-
-  /**
-   * Address: 0x004ADA70 (FUN_004ADA70)
-   *
-   * What it does:
-   * Releases all queued weak control blocks, deletes all chunk blocks, and
-   * resets ring queue storage lanes.
-   */
-  void CleanupPrefetchWeakPairRingQueue_004ADA70(
-    PrefetchWeakPairRingQueueRuntime* const queue
-  ) noexcept
-  {
-    if (queue == nullptr) {
-      return;
-    }
-
-    while (queue->mQueuedCount != 0U) {
-      (void)PopPrefetchWeakPairRingFront(queue);
-    }
-
-    std::uint32_t remainingChunks = queue->mChunkCount;
-    while (remainingChunks > 0U) {
-      --remainingChunks;
-      ::operator delete(queue->mChunkPairBlocks[remainingChunks]);
-    }
-
-    ::operator delete(queue->mChunkPairBlocks);
-    queue->mChunkPairBlocks = nullptr;
-    queue->mChunkCount = 0U;
-    queue->mReadCursor = 0U;
-    queue->mQueuedCount = 0U;
-  }
-
-  /**
-   * Address: 0x004AC9E0 (FUN_004AC9E0)
-   *
-   * What it does:
-   * Thunk lane that forwards one prefetch weak-pair ring-queue cleanup request
-   * into `FUN_004ADA70`.
-   */
-  void CleanupPrefetchWeakPairRingQueueThunk(
-    PrefetchWeakPairRingQueueRuntime* const queue
-  ) noexcept
-  {
-    CleanupPrefetchWeakPairRingQueue_004ADA70(queue);
-  }
-
-
-
-  [[nodiscard]] boost::SharedCountPair SharedPairBorrowFromPrefetchShared(
-    const boost::shared_ptr<moho::PrefetchData>& sharedPayload
-  ) noexcept
-  {
-    const boost::SharedPtrRaw<moho::PrefetchData> raw = boost::SharedPtrRawFromSharedBorrow(sharedPayload);
-    boost::SharedCountPair out{};
-    out.px = raw.px;
-    out.pi = raw.pi;
-    return out;
-  }
-
-  void AssignLiveWeakPair_004AB180(
-    boost::SharedCountPair* const outWeakPair,
-    const boost::SharedCountPair* const sourcePair
-  ) noexcept
-  {
-    boost::SharedCountPair liveWeak{};
-    (void)BuildWeakPairFromLiveSharedVariant1(sourcePair, &liveWeak);
-    (void)boost::AssignWeakPairFromShared(outWeakPair, &liveWeak);
-    (void)ReleaseWeakControlFromPair(&liveWeak);
-  }
-
-  void EnqueuePrefetchPayloadBack_004AB180(
-    moho::PrefetchWeakPairRingQueueRuntime& queue,
-    const boost::shared_ptr<moho::PrefetchData>& payload
-  )
-  {
-    if (!payload) {
-      return;
-    }
-
-    const boost::SharedCountPair sharedPayloadPair = SharedPairBorrowFromPrefetchShared(payload);
-    boost::SharedCountPair weakPayloadPair{};
-    (void)boost::AssignWeakPairFromShared(&weakPayloadPair, &sharedPayloadPair);
-    (void)PushPrefetchWeakPairRingBack(&queue, &weakPayloadPair);
-    (void)ReleaseWeakControlFromPair(&weakPayloadPair);
-  }
-
-  void EnqueuePrefetchPayloadFront_004AB180(
-    moho::PrefetchWeakPairRingQueueRuntime& queue,
-    const boost::shared_ptr<moho::PrefetchData>& payload
-  )
-  {
-    if (!payload) {
-      return;
-    }
-
-    const boost::SharedCountPair sharedPayloadPair = SharedPairBorrowFromPrefetchShared(payload);
-    boost::SharedCountPair weakPayloadPair{};
-    (void)boost::AssignWeakPairFromShared(&weakPayloadPair, &sharedPayloadPair);
-    (void)PushPrefetchWeakPairRingFront(&queue, &weakPayloadPair);
-    (void)ReleaseWeakControlFromPair(&weakPayloadPair);
-  }
-
-  [[nodiscard]] boost::shared_ptr<moho::PrefetchData> PopQueuedPrefetchPayload_004AB180(
-    moho::PrefetchWeakPairRingQueueRuntime& queue
-  )
-  {
-    boost::shared_ptr<moho::PrefetchData> payload{};
-    if (queue.mQueuedCount == 0U) {
-      return payload;
-    }
-
-    const boost::SharedCountPair* const frontSlot = GetPrefetchWeakPairRingSlot(
-      &queue,
-      queue.mReadCursor,
-      false
-    );
-    if (frontSlot != nullptr && frontSlot->px != nullptr && frontSlot->pi != nullptr
-        && boost::SpCountedBaseAddRefLock(frontSlot->pi)) {
-      auto* const layout = reinterpret_cast<boost::SharedPtrLayoutView<moho::PrefetchData>*>(&payload);
-      layout->px = static_cast<moho::PrefetchData*>(frontSlot->px);
-      layout->pi = frontSlot->pi;
-    }
-
-    (void)PopPrefetchWeakPairRingFront(&queue);
-    return payload;
-  }
-
-  /**
-   * Address: 0x004ADB10 (FUN_004ADB10, nullsub_706)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004ADB10(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004ADB20 (FUN_004ADB20, nullsub_707)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004ADB20() noexcept {}
-
-  struct DwordAndBytePayload_004ADB80
-  {
-    std::uint32_t dwordLane; // +0x00
-    std::uint8_t byteLane;   // +0x04
-  };
-
-  static_assert(
-    offsetof(DwordAndBytePayload_004ADB80, dwordLane) == 0x00,
-    "DwordAndBytePayload_004ADB80::dwordLane offset must be 0x00"
-  );
-  static_assert(
-    offsetof(DwordAndBytePayload_004ADB80, byteLane) == 0x04,
-    "DwordAndBytePayload_004ADB80::byteLane offset must be 0x04"
-  );
-
-  /**
-   * Address: 0x004ADB80 (FUN_004ADB80)
-   *
-   * What it does:
-   * Copies one dword lane and one byte lane from separate sources into output.
-   */
-  DwordAndBytePayload_004ADB80* CopyDwordAndBytePayload_004ADB80(
-    DwordAndBytePayload_004ADB80* const outPayload,
-    const std::uint32_t* const dwordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    outPayload->dwordLane = *dwordSource;
-    outPayload->byteLane = *byteSource;
-    return outPayload;
-  }
-
-  /**
-   * Address: 0x004ADB90 (FUN_004ADB90)
-   *
-   * What it does:
-   * Stores one dword lane into caller-provided output storage.
-   */
-  std::uint32_t* StoreDwordLane_004ADB90(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x004ADBF0 (FUN_004ADBF0)
-   *
-   * What it does:
-   * Duplicate lane that stores one dword into output storage.
-   */
-  std::uint32_t* StoreDwordLane_004ADBF0(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return StoreDwordLane_004ADB90(outValue, value);
-  }
-
-  /**
-   * Address: 0x004ADC30 (FUN_004ADC30)
-   *
-   * What it does:
-   * Duplicate lane that copies one dword + one byte payload.
-   */
-  DwordAndBytePayload_004ADB80* CopyDwordAndBytePayload_004ADC30(
-    DwordAndBytePayload_004ADB80* const outPayload,
-    const std::uint32_t* const dwordSource,
-    const std::uint8_t* const byteSource
-  ) noexcept
-  {
-    return CopyDwordAndBytePayload_004ADB80(outPayload, dwordSource, byteSource);
-  }
-
-  /**
-   * Address: 0x004ADC40 (FUN_004ADC40)
-   *
-   * What it does:
-   * Duplicate lane that stores one dword into output storage.
-   */
-  std::uint32_t* StoreDwordLane_004ADC40(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return StoreDwordLane_004ADB90(outValue, value);
-  }
-
-  /**
-   * Address: 0x004ADC90 (FUN_004ADC90)
-   *
-   * What it does:
-   * Duplicate lane that stores one dword into output storage.
-   */
-  std::uint32_t* StoreDwordLane_004ADC90(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return StoreDwordLane_004ADB90(outValue, value);
-  }
-
-  /**
-   * Address: 0x004ADDB0 (FUN_004ADDB0)
-   *
-   * What it does:
-   * Copies one forward dword range and returns the advanced destination lane.
-   */
-  std::uint32_t* CopyDwordRangeForward_004ADDB0(
-    std::uint32_t* destination,
-    const std::uint32_t* sourceBegin,
-    const std::uint32_t* sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationLane = reinterpret_cast<std::uintptr_t>(destination);
-    while (sourceBegin != sourceEnd) {
-      if (destinationLane != 0U) {
-        *reinterpret_cast<std::uint32_t*>(destinationLane) = *sourceBegin;
-      }
-      ++sourceBegin;
-      destinationLane += sizeof(std::uint32_t);
-    }
-    return reinterpret_cast<std::uint32_t*>(destinationLane);
-  }
-
-  /**
-   * Address: 0x004AE070 (FUN_004AE070, nullsub_708)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AE070() noexcept {}
-
-  /**
-   * Address: 0x004AE230 (FUN_004AE230, nullsub_709)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
-   */
-  void NoOpHelperThunk_004AE230(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AE240 (FUN_004AE240, nullsub_710)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AE240() noexcept {}
-
-  /**
-   * Address: 0x004AE250 (FUN_004AE250, nullsub_711)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AE250() noexcept {}
-
-  struct DwordPairView_004AE290
-  {
-    std::uint32_t lane0; // +0x00
-    std::uint32_t lane1; // +0x04
-  };
-
-  static_assert(
-    offsetof(DwordPairView_004AE290, lane1) == 0x04,
-    "DwordPairView_004AE290::lane1 offset must be 0x04"
-  );
-  static_assert(
-    sizeof(DwordPairView_004AE290) == 0x08,
-    "DwordPairView_004AE290 size must be 0x08"
-  );
-
-  /**
-   * Address: 0x004AE290 (FUN_004AE290)
-   *
-   * What it does:
-   * Copies one dword at offset `+0x04` into caller-provided output storage.
-   */
-  std::uint32_t* CopyDwordLaneAtOffset4_004AE290(
-    std::uint32_t* const outLane,
-    const DwordPairView_004AE290* const sourcePair
-  ) noexcept
-  {
-    *outLane = sourcePair != nullptr ? sourcePair->lane1 : 0U;
-    return outLane;
-  }
-
-  /**
-   * Address: 0x004AE2A0 (FUN_004AE2A0)
-   *
-   * What it does:
-   * Returns one legacy max-count constant for wider node/vector lanes.
-   */
-  std::uint32_t ReadLegacyWideNodeGrowthMax_004AE2A0() noexcept
-  {
-    return 0x03FFFFFFU;
-  }
-
-  /**
-   * Address: 0x004ACB80 (FUN_004ACB80)
-   *
-   * What it does:
-   * Writes two dword lanes into one output pair storage.
-   */
-  std::uint32_t* CopyTwoDwordLanes(
-    std::uint32_t* const outPairStorage,
-    const std::uint32_t* const sourceLane0,
-    const std::uint32_t* const sourceLane1
-  ) noexcept
-  {
-    outPairStorage[0] = *sourceLane0;
-    outPairStorage[1] = *sourceLane1;
-    return outPairStorage;
-  }
-
-  /**
-   * Address: 0x004ACC30 (FUN_004ACC30)
-   *
-   * What it does:
-   * Rebinds one dword slot to the value at referenced offset `+0x04`.
-   */
-  std::uint32_t* RebindDwordSlotToOffset4(std::uint32_t* const slot) noexcept
-  {
-    const auto* const base = reinterpret_cast<const std::uint8_t*>(*slot);
-    *slot = *reinterpret_cast<const std::uint32_t*>(base + 0x04);
-    return slot;
-  }
-
-  struct LegacyPointerHeader4_004ACC70
-  {
-    std::uintptr_t lane0;
-    std::uintptr_t lane1;
-    std::uintptr_t lane2;
-    std::uintptr_t lane3;
-  };
-
-  /**
-   * Address: 0x004ACC70 (FUN_004ACC70)
-   *
-   * What it does:
-   * Initializes one legacy 4-lane pointer header with fixed self offsets.
-   */
-  LegacyPointerHeader4_004ACC70* InitializeLegacyPointerHeader4(
-    LegacyPointerHeader4_004ACC70* const header
-  ) noexcept
-  {
-    const std::uintptr_t base = reinterpret_cast<std::uintptr_t>(header);
-    header->lane0 = base + 0x10U;
-    header->lane1 = base + 0x10U;
-    header->lane2 = base + 0x30U;
-    header->lane3 = base + 0x10U;
-    return header;
-  }
-
-  /**
-   * Address: 0x004ACD60 (FUN_004ACD60)
-   *
-   * What it does:
-   * Swaps two dword lanes between two 2-lane storage slots.
-   */
-  std::uint32_t* SwapTwoDwordLanesVariant1(
-    std::uint32_t* const lhsPairStorage,
-    std::uint32_t* const rhsPairStorage
-  ) noexcept
-  {
-    std::swap(lhsPairStorage[0], rhsPairStorage[0]);
-    std::swap(lhsPairStorage[1], rhsPairStorage[1]);
-    return lhsPairStorage;
-  }
-
-  struct LegacyDwordPointerWindow4_004ACE90
-  {
-    std::uint32_t* lane0;
-    std::uint32_t* lane1;
-    std::uint32_t* lane2;
-    std::uint32_t* lane3;
-  };
-
-  /**
-   * Address: 0x004ACE90 (FUN_004ACE90)
-   *
-   * What it does:
-   * Initializes one 4-lane dword-pointer window from base + element count.
-   */
-  LegacyDwordPointerWindow4_004ACE90* InitializeDwordPointerWindow4(
-    LegacyDwordPointerWindow4_004ACE90* const window,
-    const std::uint32_t elementCount,
-    std::uint32_t* const base
-  ) noexcept
-  {
-    window->lane0 = base;
-    window->lane1 = base;
-    window->lane2 = base + elementCount;
-    window->lane3 = base;
-    return window;
-  }
-
-  /**
-   * Address: 0x004ACED0 (FUN_004ACED0, nullsub_695)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunkVariant1() noexcept {}
-
-  /**
-   * Address: 0x004ACF80 (FUN_004ACF80)
-   *
-   * What it does:
-   * Duplicate lane that swaps two dword lanes across two 2-lane slots.
-   */
-  std::uint32_t* SwapTwoDwordLanesVariant2(
-    std::uint32_t* const lhsPairStorage,
-    std::uint32_t* const rhsPairStorage
-  ) noexcept
-  {
-    return SwapTwoDwordLanesVariant1(lhsPairStorage, rhsPairStorage);
-  }
-
-  /**
-   * Address: 0x004AD0D0 (FUN_004AD0D0, nullsub_696)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunkVariant2() noexcept {}
-
-  /**
-   * Address: 0x004AD110 (FUN_004AD110)
-   *
-   * What it does:
-   * Fills one dword range from one scalar source slot and returns end pointer.
-   */
-  std::uint32_t* FillDwordRangeFromScalarSlot(
-    const std::uint32_t* const sourceSlot,
-    std::uint32_t* const destination,
-    const std::size_t count
-  ) noexcept
-  {
-    std::fill_n(destination, count, *sourceSlot);
-    return destination + count;
-  }
-
-  /**
-   * Address: 0x004AD140 (FUN_004AD140, nullsub_697)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunkVariant3(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AD150 (FUN_004AD150, nullsub_698)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunkVariant4() noexcept {}
-
-  /**
-   * Address: 0x004AD190 (FUN_004AD190, nullsub_699)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunkVariant5() noexcept {}
-
-
-
-  /**
-   * Address: 0x004AD520 (FUN_004AD520, nullsub_700)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunkVariant6() noexcept {}
-
-  /**
-   * Address: 0x004AD530 (FUN_004AD530, nullsub_701)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunkVariant7() noexcept {}
-
-  /**
-   * Address: 0x004AD550 (FUN_004AD550, nullsub_702)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunkVariant8() noexcept {}
-
-  /**
-   * Address: 0x004AD580 (FUN_004AD580, nullsub_703)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunkVariant9() noexcept {}
-
-  /**
-   * Address: 0x004AE4F0 (FUN_004AE4F0, nullsub_712)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
-   */
-  void NoOpHelperThunk_004AE4F0(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AE500 (FUN_004AE500, nullsub_713)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AE500() noexcept {}
-
-  /**
-   * Address: 0x004AE520 (FUN_004AE520, nullsub_714)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AE520() noexcept {}
-
-  /**
-   * Address: 0x004AE530 (FUN_004AE530)
-   *
-   * What it does:
-   * Returns one legacy max-count constant for wide tree/map node growth.
-   */
-  std::uint32_t ReadLegacyWideTreeGrowthMax_004AE530() noexcept
-  {
-    return 0x1FFFFFFFU;
-  }
-
-  /**
-   * Address: 0x004AE610 (FUN_004AE610, nullsub_715)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
-   */
-  void NoOpHelperThunk_004AE610(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AE620 (FUN_004AE620, nullsub_716)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AE620() noexcept {}
-
-  /**
-   * Address: 0x004AE670 (FUN_004AE670, nullsub_717)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AE670() noexcept {}
-
-  /**
-   * Address: 0x004AE680 (FUN_004AE680)
-   *
-   * What it does:
-   * Copies one caller-provided dword lane into output storage.
-   */
-  std::uint32_t* CopyDwordLane_004AE680(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outLane = value;
-    return outLane;
-  }
-
-  /**
-   * Address: 0x004AE6C0 (FUN_004AE6C0)
-   *
-   * What it does:
-   * Stores one dword address lane computed as `base + index*4`.
-   */
-  std::uint32_t* ComputeDwordAddressLane_004AE6C0(
-    std::uint32_t* const outLane,
-    const std::uint32_t* const baseAddressLane,
-    const std::int32_t elementIndex
-  ) noexcept
-  {
-    *outLane = *baseAddressLane + (static_cast<std::uint32_t>(elementIndex) * 4U);
-    return outLane;
-  }
-
-  /**
-   * Address: 0x004AE6E0 (FUN_004AE6E0)
-   *
-   * What it does:
-   * Duplicate lane that copies one caller-provided dword into output storage.
-   */
-  std::uint32_t* CopyDwordLane_004AE6E0(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return CopyDwordLane_004AE680(outLane, value);
-  }
-
-  /**
-   * Address: 0x004AE6F0 (FUN_004AE6F0)
-   *
-   * What it does:
-   * Duplicate lane that copies one caller-provided dword into output storage.
-   */
-  std::uint32_t* CopyDwordLane_004AE6F0(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return CopyDwordLane_004AE680(outLane, value);
-  }
-
-  /**
-   * Address: 0x004AE760 (FUN_004AE760)
-   *
-   * What it does:
-   * Duplicate lane that copies one caller-provided dword into output storage.
-   */
-  std::uint32_t* CopyDwordLane_004AE760(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return CopyDwordLane_004AE680(outLane, value);
-  }
-
-  /**
-   * Address: 0x004AE770 (FUN_004AE770)
-   *
-   * What it does:
-   * Stores two caller-provided dword lanes into output pair storage.
-   */
-  std::uint32_t* StoreTwoDwordLanes_004AE770(
-    std::uint32_t* const outPair,
-    const std::uint32_t lane1,
-    const std::uint32_t lane0
-  ) noexcept
-  {
-    outPair[0] = lane0;
-    outPair[1] = lane1;
-    return outPair;
-  }
-
-  /**
-   * Address: 0x004AE830 (FUN_004AE830, nullsub_718)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
-   */
-  void NoOpHelperThunk_004AE830(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AE840 (FUN_004AE840)
-   *
-   * What it does:
-   * Returns one legacy max-count constant for 0x18-byte node lanes.
-   */
-  std::uint32_t ReadLegacyNodeGrowthMax_004AE840() noexcept
-  {
-    return 0x1FFFFFFFU;
-  }
-
-  /**
-   * Address: 0x004AEBB0 (FUN_004AEBB0, nullsub_719)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
-   */
-  void NoOpHelperThunk_004AEBB0(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AEBE0 (FUN_004AEBE0)
-   *
-   * What it does:
-   * Returns one legacy max-count constant for wide-node growth.
-   */
-  std::uint32_t ReadLegacyWideNodeGrowthMax_004AEBE0() noexcept
-  {
-    return 0x1FFFFFFFU;
-  }
-
-  /**
-   * Address: 0x004AED40 (FUN_004AED40)
-   *
-   * What it does:
-   * Stores two caller-provided dword lanes into output pair storage.
-   */
-  std::uint32_t* StoreTwoDwordLanes_004AED40(
-    std::uint32_t* const outPair,
-    const std::uint32_t lane1,
-    const std::uint32_t lane0
-  ) noexcept
-  {
-    outPair[0] = lane0;
-    outPair[1] = lane1;
-    return outPair;
-  }
-
-  /**
-   * Address: 0x004AEE20 (FUN_004AEE20, nullsub_720)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
-   */
-  void NoOpHelperThunk_004AEE20(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AEEA0 (FUN_004AEEA0, nullsub_721)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
-   */
-  void NoOpHelperThunk_004AEEA0(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AEEE0 (FUN_004AEEE0, nullsub_722)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
-   */
-  void NoOpHelperThunk_004AEEE0(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AEEF0 (FUN_004AEEF0, nullsub_723)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
-   */
-  void NoOpHelperThunk_004AEEF0(const std::uint32_t /*unused*/) noexcept {}
-
-  /**
-   * Address: 0x004AEF90 (FUN_004AEF90)
-   *
-   * What it does:
-   * Rebinds one shared `(px,pi)` pair: retains incoming control, releases
-   * previously bound shared control, then stores the incoming control lane.
-   */
-  boost::SharedCountPair* AssignSharedPairRetainRelease_004AEF90(
-    const boost::SharedCountPair* const sourcePair,
-    boost::SharedCountPair* const outPair
-  ) noexcept
-  {
-    outPair->px = sourcePair->px;
-    boost::detail::sp_counted_base* const incomingControl = sourcePair->pi;
-    if (incomingControl != nullptr) {
-      incomingControl->add_ref_copy();
-    }
-
-    boost::detail::sp_counted_base* const previousControl = outPair->pi;
-    if (previousControl != nullptr) {
-      previousControl->release();
-    }
-
-    outPair->pi = incomingControl;
-    return outPair;
-  }
-
-  /**
-   * Address: 0x004AEFD0 (FUN_004AEFD0)
-   *
-   * What it does:
-   * Constructs one shared prefetch-data pointer from one raw payload pointer.
-   */
-  boost::shared_ptr<moho::PrefetchData>* ConstructSharedPrefetchDataFromRaw_004AEFD0(
-    boost::shared_ptr<moho::PrefetchData>* const outShared,
-    moho::PrefetchData* const payload
-  )
-  {
-    return boost::ConstructSharedFromRaw(outShared, payload);
-  }
-
-  /**
-   * Address: 0x004AEFF0 (FUN_004AEFF0)
-   *
-   * What it does:
-   * Copies one shared `(px,pi)` pair and retains one shared control-block ref.
-   */
-  boost::SharedCountPair* AssignSharedPairRetain_004AEFF0(
-    boost::SharedCountPair* const outPair,
-    const boost::SharedCountPair* const sourcePair
-  ) noexcept
-  {
-    return boost::AssignSharedPairRetain(outPair, sourcePair);
-  }
-
-  struct DwordTripleRuntime_004AF050
-  {
-    std::uint32_t lane0; // +0x00
-    std::uint32_t lane1; // +0x04
-    std::uint32_t lane2; // +0x08
-  };
-
-  static_assert(sizeof(DwordTripleRuntime_004AF050) == 0x0C, "DwordTripleRuntime_004AF050 size must be 0x0C");
-
-  /**
-   * Address: 0x004AF050 (FUN_004AF050)
-   *
-   * What it does:
-   * Stores three caller-provided dword lanes into output tuple storage.
-   */
-  DwordTripleRuntime_004AF050* StoreThreeDwordLanes_004AF050(
-    DwordTripleRuntime_004AF050* const outTriple,
-    const std::uint32_t lane0,
-    const std::uint32_t lane1,
-    const std::uint32_t lane2
-  ) noexcept
-  {
-    outTriple->lane0 = lane0;
-    outTriple->lane1 = lane1;
-    outTriple->lane2 = lane2;
-    return outTriple;
-  }
-
-  /**
-   * Address: 0x004AF250 (FUN_004AF250)
-   *
-   * What it does:
-   * Swaps one dword lane between two caller-provided slots.
-   */
-  std::uint32_t* SwapDwordSlots_004AF250(
-    std::uint32_t* const lhsSlot,
-    std::uint32_t* const rhsSlot
-  ) noexcept
-  {
-    const std::uint32_t temp = *rhsSlot;
-    *rhsSlot = *lhsSlot;
-    *lhsSlot = temp;
-    return lhsSlot;
-  }
-
-  /**
-   * Address: 0x004AF2C0 (FUN_004AF2C0, nullsub_724)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF2C0() noexcept {}
-
-  /**
-   * Address: 0x004AF2F0 (FUN_004AF2F0, nullsub_725)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF2F0() noexcept {}
-
-  /**
-   * Address: 0x004AF350 (FUN_004AF350, nullsub_726)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF350() noexcept {}
-
-  /**
-   * Address: 0x004AF360 (FUN_004AF360)
-   *
-   * What it does:
-   * Allocates one contiguous buffer sized `elementCount * 8` with legacy
-   * overflow guard and `std::bad_alloc` throw path.
-   */
-  void* AllocateChecked8ByteStride_004AF360(const std::uint32_t elementCount)
-  {
-    if (elementCount > 0x1FFFFFFFU) {
-      throw std::bad_alloc();
-    }
-    return ::operator new(static_cast<std::size_t>(elementCount) * 8U);
-  }
-
-  /**
-   * Address: 0x004AF3F0 (FUN_004AF3F0)
-   *
-   * What it does:
-   * Moves one dword range `[sourceBegin, sourceEnd)` into `destination` and
-   * returns the end pointer after moved lanes.
-   */
-  std::uint32_t* MoveDwordRangeAndReturnEnd_004AF3F0(
-    std::uint32_t* const destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    if (sourceEnd <= sourceBegin) {
-      return destination;
-    }
-
-    const std::size_t dwordCount = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    std::memmove(destination, sourceBegin, dwordCount * sizeof(std::uint32_t));
-    return destination + dwordCount;
-  }
-
-  /**
-   * Address: 0x004AF430 (FUN_004AF430)
-   *
-   * What it does:
-   * Copies one dword range `[sourceBegin, sourceEnd)` into the lane ending at
-   * `destinationEnd`, returning the computed destination-begin pointer.
-   */
-  std::uint32_t* CopyDwordRangeToEndAndReturnBegin_004AF430(
-    std::uint32_t* const destinationEnd,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    if (sourceEnd <= sourceBegin) {
-      return destinationEnd;
-    }
-
-    const std::size_t dwordCount = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    std::uint32_t* const destinationBegin = destinationEnd - dwordCount;
-    std::memmove(destinationBegin, sourceBegin, dwordCount * sizeof(std::uint32_t));
-    return destinationBegin;
-  }
-
-  /**
-   * Address: 0x004AF460 (FUN_004AF460)
-   *
-   * What it does:
-   * Allocates one contiguous buffer sized `elementCount * 4` with legacy
-   * overflow guard and `std::bad_alloc` throw path.
-   */
-  void* AllocateChecked4ByteStride_004AF460(const std::uint32_t elementCount)
-  {
-    if (elementCount > 0x3FFFFFFFU) {
-      throw std::bad_alloc();
-    }
-    return ::operator new(static_cast<std::size_t>(elementCount) * 4U);
-  }
-
-  /**
-   * Address: 0x004AF4B0 (FUN_004AF4B0, nullsub_727)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF4B0() noexcept {}
-
-  /**
-   * Address: 0x004AF4C0 (FUN_004AF4C0, nullsub_728)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF4C0() noexcept {}
-
-  /**
-   * Address: 0x004AF4D0 (FUN_004AF4D0, nullsub_729)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF4D0() noexcept {}
-
-  /**
-   * Address: 0x004AF4E0 (FUN_004AF4E0)
-   *
-   * What it does:
-   * Duplicate lane for checked allocation of `elementCount * 4` bytes.
-   */
-  void* AllocateChecked4ByteStride_004AF4E0(const std::uint32_t elementCount)
-  {
-    return AllocateChecked4ByteStride_004AF460(elementCount);
-  }
-
-  /**
-   * Address: 0x004AF530 (FUN_004AF530, nullsub_730)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF530() noexcept {}
-
-  /**
-   * Address: 0x004AF540 (FUN_004AF540, nullsub_731)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF540() noexcept {}
-
-  /**
-   * Address: 0x004AF550 (FUN_004AF550)
-   *
-   * What it does:
-   * Allocates one contiguous buffer sized `elementCount * 24` with legacy
-   * overflow guard and `std::bad_alloc` throw path.
-   */
-  void* AllocateChecked24ByteStride_004AF550(const std::uint32_t elementCount)
-  {
-    if (elementCount > 0x0AAAAAAAU) {
-      throw std::bad_alloc();
-    }
-    return ::operator new(static_cast<std::size_t>(elementCount) * 24U);
-  }
-
-  /**
-   * Address: 0x004AF5B0 (FUN_004AF5B0, nullsub_732)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF5B0() noexcept {}
-
-  /**
-   * Address: 0x004AF5C0 (FUN_004AF5C0)
-   *
-   * What it does:
-   * Allocates one contiguous buffer sized `elementCount * 80` with legacy
-   * overflow guard and `std::bad_alloc` throw path.
-   */
-  void* AllocateChecked80ByteStride_004AF5C0(const std::uint32_t elementCount)
-  {
-    if (elementCount > 0x03333333U) {
-      throw std::bad_alloc();
-    }
-    return ::operator new(static_cast<std::size_t>(elementCount) * 80U);
-  }
-
-  /**
-   * Address: 0x004AF610 (FUN_004AF610, nullsub_733)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF610() noexcept {}
-
-  /**
-   * Address: 0x004AF630 (FUN_004AF630, nullsub_734)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF630() noexcept {}
-
-  struct DwordPairRuntime_004AF6F0
-  {
-    std::uint32_t lane0; // +0x00
-    std::uint32_t lane1; // +0x04
-  };
-
-  static_assert(sizeof(DwordPairRuntime_004AF6F0) == 0x08, "DwordPairRuntime_004AF6F0 size must be 0x08");
-
-  /**
-   * Address: 0x004AF6D0 (FUN_004AF6D0)
-   *
-   * What it does:
-   * Stores two caller-provided dword lanes and one dereferenced lane into
-   * output triple storage.
-   */
-  DwordTripleRuntime_004AF050* StoreDwordPairAndDereferencedLane_004AF6D0(
-    DwordTripleRuntime_004AF050* const outTriple,
-    const std::uint32_t lane0,
-    const std::uint32_t lane1,
-    const std::uint32_t* const lane2Source
-  ) noexcept
-  {
-    outTriple->lane0 = lane0;
-    outTriple->lane1 = lane1;
-    outTriple->lane2 = lane2Source != nullptr ? *lane2Source : 0U;
-    return outTriple;
-  }
-
-  /**
-   * Address: 0x004AF6F0 (FUN_004AF6F0)
-   *
-   * What it does:
-   * Stores two caller-provided dword lanes into output pair storage.
-   */
-  DwordPairRuntime_004AF6F0* StoreTwoDwordLanes_004AF6F0(
-    DwordPairRuntime_004AF6F0* const outPair,
-    const std::uint32_t lane0,
-    const std::uint32_t lane1
-  ) noexcept
-  {
-    outPair->lane0 = lane0;
-    outPair->lane1 = lane1;
-    return outPair;
-  }
-
-  [[nodiscard]] std::uint32_t* StoreDwordLaneFromValueCore_004AF700(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x004AF700 (FUN_004AF700)
-   *
-   * What it does:
-   * Stores one caller-provided dword lane into output storage.
-   */
-  std::uint32_t* StoreDwordLaneFromValue_004AF700(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return StoreDwordLaneFromValueCore_004AF700(outValue, value);
-  }
-
-  /**
-   * Address: 0x004AF710 (FUN_004AF710)
-   *
-   * What it does:
-   * Copies one dword lane from source storage into output storage.
-   */
-  std::uint32_t* CopyDwordLaneFromSource_004AF710(
-    std::uint32_t* const outValue,
-    const std::uint32_t* const sourceValue
-  ) noexcept
-  {
-    *outValue = *sourceValue;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x004AF720 (FUN_004AF720)
-   *
-   * What it does:
-   * Duplicate lane of single-dword store into output storage.
-   */
-  std::uint32_t* StoreDwordLaneFromValue_004AF720(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return StoreDwordLaneFromValueCore_004AF700(outValue, value);
-  }
-
-  /**
-   * Address: 0x004AF790 (FUN_004AF790)
-   *
-   * What it does:
-   * Constructs one `boost::detail::shared_count` for prefetch payload
-   * ownership from one raw `PrefetchData*`.
-   */
-  boost::detail::shared_count* ConstructPrefetchSharedCountFromRaw_004AF790(
-    boost::detail::shared_count* const outCount,
-    moho::PrefetchData* const payload
-  )
-  {
-    return boost::ConstructSharedCountFromRaw(outCount, payload);
-  }
-
-  /**
-   * Address: 0x004AF870 (FUN_004AF870, nullsub_735)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF870() noexcept {}
-
-  [[nodiscard]] std::uint8_t ExtractHighByteCore_004AF880(const std::uint32_t packedValue) noexcept
-  {
-    return static_cast<std::uint8_t>((packedValue >> 8U) & 0xFFU);
-  }
-
-  /**
-   * Address: 0x004AF880 (FUN_004AF880)
-   *
-   * What it does:
-   * Returns the high byte from one caller-provided dword lane.
-   */
-  std::uint8_t ExtractHighByte_004AF880(const std::uint32_t packedValue) noexcept
-  {
-    return ExtractHighByteCore_004AF880(packedValue);
-  }
-
-  /**
-   * Address: 0x004AF8B0 (FUN_004AF8B0, nullsub_736)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF8B0() noexcept {}
-
-  /**
-   * Address: 0x004AF8C0 (FUN_004AF8C0)
-   *
-   * What it does:
-   * Duplicate lane of high-byte extraction from one dword input.
-   */
-  std::uint8_t ExtractHighByte_004AF8C0(const std::uint32_t packedValue) noexcept
-  {
-    return ExtractHighByteCore_004AF880(packedValue);
-  }
-
-  /**
-   * Address: 0x004AF8F0 (FUN_004AF8F0, nullsub_737)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF8F0() noexcept {}
-
-  /**
-   * Address: 0x004AF900 (FUN_004AF900)
-   *
-   * What it does:
-   * Duplicate lane of high-byte extraction from one dword input.
-   */
-  std::uint8_t ExtractHighByte_004AF900(const std::uint32_t packedValue) noexcept
-  {
-    return ExtractHighByteCore_004AF880(packedValue);
-  }
-
-  /**
-   * Address: 0x004AF930 (FUN_004AF930, nullsub_738)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF930() noexcept {}
-
-  /**
-   * Address: 0x004AF960 (FUN_004AF960)
-   *
-   * What it does:
-   * Duplicate lane of high-byte extraction from one dword input.
-   */
-  std::uint8_t ExtractHighByte_004AF960(const std::uint32_t packedValue) noexcept
-  {
-    return ExtractHighByteCore_004AF880(packedValue);
-  }
-
-  /**
-   * Address: 0x004AF9B0 (FUN_004AF9B0, nullsub_739)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AF9B0() noexcept {}
-
-  /**
-   * Address: 0x004AFA00 (FUN_004AFA00)
-   *
-   * What it does:
-   * Duplicate lane of high-byte extraction from one dword input.
-   */
-  std::uint8_t ExtractHighByte_004AFA00(const std::uint32_t packedValue) noexcept
-  {
-    return ExtractHighByteCore_004AF880(packedValue);
-  }
-
-  using PrefetchDataCountedImplStorage_004AFA60 = boost::SpCountedImplStorage<moho::PrefetchData>;
-  static_assert(
-    sizeof(PrefetchDataCountedImplStorage_004AFA60) == 0x10,
-    "PrefetchDataCountedImplStorage_004AFA60 size must be 0x10"
-  );
-
-  [[nodiscard]] void* ResolvePrefetchDataCountedImplVtable_004AFA60()
-  {
-    static void* sVtable = []() -> void* {
-      boost::detail::sp_counted_impl_p<moho::PrefetchData> probe(nullptr);
-      return *reinterpret_cast<void**>(&probe);
-    }();
-    return sVtable;
-  }
-
-  /**
-   * Address: 0x004AFA60 (FUN_004AFA60)
-   *
-   * What it does:
-   * Initializes one `sp_counted_impl_p<PrefetchData>` storage lane with
-   * use/weak counts set to one and owned payload pointer at `+0x0C`.
-   */
-  PrefetchDataCountedImplStorage_004AFA60* InitializePrefetchDataCountedImplStorage_004AFA60(
-    PrefetchDataCountedImplStorage_004AFA60* const outStorage,
-    moho::PrefetchData* const payload
-  ) noexcept
-  {
-    return boost::InitSpCountedImplStorage(
-      outStorage,
-      ResolvePrefetchDataCountedImplVtable_004AFA60(),
-      payload
-    );
-  }
-
-  void ReleasePrefetchDataSharedPairsForDelete_004AFA80(
-    moho::PrefetchData* const payload
-  ) noexcept
-  {
-    boost::ReleaseSharedControlOnly(&payload->mPrefetch);
-    boost::ReleaseSharedControlOnly(&payload->mResolved);
-  }
-
-  /**
-   * Address: 0x004AFA80 (FUN_004AFA80)
-   *
-   * What it does:
-   * Disposes one counted prefetch payload by releasing nested shared lanes
-   * then deleting the payload storage.
-   */
-  void DisposePrefetchDataCountedPayload_004AFA80(
-    const PrefetchDataCountedImplStorage_004AFA60* const countedImpl
-  ) noexcept
-  {
-    moho::PrefetchData* const payload = countedImpl != nullptr ? countedImpl->px : nullptr;
-    if (payload != nullptr) {
-      ReleasePrefetchDataSharedPairsForDelete_004AFA80(payload);
-      ::operator delete(payload);
-    }
-  }
-
-  /**
-   * Address: 0x004AFAA0 (FUN_004AFAA0)
-   *
-   * What it does:
-   * Returns legacy null get-deleter lane for counted prefetch payload storage.
-   */
-  int GetPrefetchDataCountedImplDeleterNullResult_004AFAA0(
-    const void* const typeInfoQuery
-  ) noexcept
-  {
-    return boost::LegacyGetDeleterNullResult(typeInfoQuery);
-  }
-
-  /**
-   * Address: 0x004AFAB0 (FUN_004AFAB0)
-   *
-   * What it does:
-   * Models the deleting-destructor thunk lane for prefetch counted-base
-   * storage, with optional heap delete controlled by `deleteFlag & 1`.
-   */
-  boost::detail::sp_counted_base* DestructPrefetchCountedBaseDeleting_004AFAB0(
-    boost::detail::sp_counted_base* const self,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return boost::SpCountedImplDeletingDtor(self, deleteFlag);
-  }
-
-  /**
-   * Address: 0x004AFAD0 (FUN_004AFAD0)
-   *
-   * What it does:
-   * Models the non-deleting destructor body lane for prefetch counted-base
-   * storage.
-   */
-  boost::detail::sp_counted_base* DestructPrefetchCountedBaseNonDeleting_004AFAD0(
-    boost::detail::sp_counted_base* const self
-  ) noexcept
-  {
-    return boost::SpCountedImplNonDeletingDtor(self);
-  }
-
-  /**
-   * Address: 0x004AFAE0 (FUN_004AFAE0)
-   *
-   * What it does:
-   * Releases one prefetch payload's nested shared lanes and deletes payload
-   * storage when the payload pointer is non-null.
-   */
-  void DestroyPrefetchDataPayloadIfPresent_004AFAE0(
-    moho::PrefetchData* const payload
-  ) noexcept
-  {
-    if (payload != nullptr) {
-      ReleasePrefetchDataSharedPairsForDelete_004AFA80(payload);
-      ::operator delete(payload);
-    }
-  }
-
-  struct ScopedRecursiveMutexLockRuntime_004AEF30
-  {
-    boost::recursive_mutex* mutex; // +0x00
-    std::uint8_t isLocked;         // +0x04
-    std::uint8_t pad05[3];
-  };
-
-  static_assert(
-    offsetof(ScopedRecursiveMutexLockRuntime_004AEF30, mutex) == 0x00,
-    "ScopedRecursiveMutexLockRuntime_004AEF30::mutex offset must be 0x00"
-  );
-  static_assert(
-    offsetof(ScopedRecursiveMutexLockRuntime_004AEF30, isLocked) == 0x04,
-    "ScopedRecursiveMutexLockRuntime_004AEF30::isLocked offset must be 0x04"
-  );
-  static_assert(
-    sizeof(ScopedRecursiveMutexLockRuntime_004AEF30) == 0x08,
-    "ScopedRecursiveMutexLockRuntime_004AEF30 size must be 0x08"
-  );
-
-  /**
-   * Address: 0x004AEF30 (FUN_004AEF30)
-   *
-   * What it does:
-   * Validates one scoped recursive lock lane, enters one condition wait by
-   * unlocking with cv-state transfer, blocks, then re-acquires the lock.
-   */
-  void WaitConditionWithScopedRecursiveLock_004AEF30(
-    ScopedRecursiveMutexLockRuntime_004AEF30* const scopedLock,
-    boost::detail::condition_impl* const conditionImpl
-  )
-  {
-    if (scopedLock == nullptr || scopedLock->isLocked == 0) {
-      throw boost::lock_error();
-    }
-
-    using LockOps_004AEF30 = boost::detail::thread::lock_ops<boost::recursive_mutex>;
-    LockOps_004AEF30::lock_state state{};
-    conditionImpl->enter_wait();
-    LockOps_004AEF30::unlock(*scopedLock->mutex, state);
-    conditionImpl->do_wait();
-    LockOps_004AEF30::lock(*scopedLock->mutex, state);
-  }
-
-  struct PrefetchThreadCallableBuffer_004AFB20
-  {
-    std::uint32_t lane0; // +0x00
-    std::uint32_t lane1; // +0x04
-    std::uint32_t lane2; // +0x08
-    std::uint32_t lane3; // +0x0C
-  };
-
-  static_assert(sizeof(PrefetchThreadCallableBuffer_004AFB20) == 0x10, "PrefetchThreadCallableBuffer_004AFB20 size must be 0x10");
-
-  using PrefetchThreadEntryThunk_004AFDE0 = void(__thiscall *)(char*);
-
-  using PrefetchThreadBindType_004AFDF0 = boost::_bi::bind_t<
-    void,
-    boost::_mfi::mf0<void, moho::ResourceManager>,
-    boost::_bi::list1<boost::_bi::value<moho::ResourceManager*>>
-  >;
-
-  using PrefetchThreadManagerFn_004AFDF0 = void(__cdecl *)(
-    const PrefetchThreadCallableBuffer_004AFB20*,
-    PrefetchThreadCallableBuffer_004AFB20*,
-    boost::detail::function::functor_manager_operation_type
-  );
-
-  using PrefetchThreadInvokerFn_004AFDE0 = void(__cdecl *)(
-    PrefetchThreadCallableBuffer_004AFB20*,
-    moho::ResourceManager*
-  );
-
-  struct PrefetchThreadCallableVtable_004AF810
-  {
-    PrefetchThreadManagerFn_004AFDF0 manager; // +0x00
-    PrefetchThreadInvokerFn_004AFDE0 invoker; // +0x04
-  };
-
-  static_assert(sizeof(PrefetchThreadCallableVtable_004AF810) == 0x08, "PrefetchThreadCallableVtable_004AF810 size must be 0x08");
-
-  struct PrefetchThreadCallableRuntime_004AF070
-  {
-    PrefetchThreadCallableVtable_004AF810* vtable;  // +0x00
-    std::uint32_t reserved04;                       // +0x04
-    PrefetchThreadCallableBuffer_004AFB20 payload;  // +0x08
-  };
-
-  static_assert(sizeof(PrefetchThreadCallableRuntime_004AF070) == 0x18, "PrefetchThreadCallableRuntime_004AF070 size must be 0x18");
-
-  std::uint32_t sPrefetchThreadCallableInitFlags_004AF810 = 0;
-  PrefetchThreadCallableVtable_004AF810 sPrefetchThreadCallableVtable_004AF810{};
-
-  /**
-   * Address: 0x004AFB20 (FUN_004AFB20)
-   *
-   * What it does:
-   * Builds one 4-lane callable payload; rejects placement when guard reports
-   * failure, otherwise copies lanes into caller output when provided.
-   */
-  bool BuildPrefetchThreadCallablePayload_004AFB20(
-    PrefetchThreadCallableBuffer_004AFB20* const outPayload,
-    const std::uint32_t lane0,
-    const std::uint32_t lane1,
-    const std::uint32_t lane2,
-    const std::uint32_t lane3
-  ) noexcept
-  {
-    const PrefetchThreadCallableBuffer_004AFB20 pending{
-      lane0,
-      lane1,
-      lane2,
-      lane3
-    };
-
-    // The inlined placement guard lane (`sub_412B30`) evaluates false in the
-    // recovered binary path here, so payload construction proceeds.
-    const bool shouldRejectPlacement = false;
-    if (shouldRejectPlacement) {
-      return false;
-    }
-
-    if (outPayload != nullptr) {
-      *outPayload = pending;
-    }
-    return true;
-  }
-
-  /**
-   * Address: 0x004AFDE0 (FUN_004AFDE0)
-   *
-   * What it does:
-   * Invokes one bound prefetch-thread callable by computing adjusted `this`
-   * pointer lane (`lane1 + lane2`) and jumping through callable entry lane.
-   */
-  void InvokePrefetchThreadCallable_004AFDE0(
-    PrefetchThreadCallableBuffer_004AFB20* const callablePayload,
-    moho::ResourceManager* const /*unusedContext*/
-  )
-  {
-    const auto entryThunk = reinterpret_cast<PrefetchThreadEntryThunk_004AFDE0>(
-      static_cast<std::uintptr_t>(callablePayload->lane0)
-    );
-    char* const objectBase = reinterpret_cast<char*>(static_cast<std::uintptr_t>(callablePayload->lane1));
-    const std::uintptr_t thisOffset = static_cast<std::uintptr_t>(callablePayload->lane2);
-    entryThunk(objectBase + thisOffset);
-  }
-
-  /**
-   * Address: 0x004AFDF0 (FUN_004AFDF0)
-   *
-   * What it does:
-   * Manages one prefetch-thread callable payload for clone/destroy/type-check/
-   * type-query operations.
-   */
-  void ManagePrefetchThreadCallable_004AFDF0(
-    const PrefetchThreadCallableBuffer_004AFB20* const inPayload,
-    PrefetchThreadCallableBuffer_004AFB20* const outPayload,
-    const boost::detail::function::functor_manager_operation_type operation
-  )
-  {
-    using Operation_004AFDF0 = boost::detail::function::functor_manager_operation_type;
-
-    if (operation == Operation_004AFDF0::get_functor_type_tag) {
-      outPayload->lane0 = static_cast<std::uint32_t>(
-        reinterpret_cast<std::uintptr_t>(&typeid(PrefetchThreadBindType_004AFDF0))
-      );
-      return;
-    }
-
-    if (operation == Operation_004AFDF0::clone_functor_tag) {
-      if (outPayload != nullptr) {
-        *outPayload = *inPayload;
-      }
-      return;
-    }
-
-    if (operation == Operation_004AFDF0::destroy_functor_tag) {
-      return;
-    }
-
-    const auto* const checkType = reinterpret_cast<const std::type_info*>(
-      static_cast<std::uintptr_t>(outPayload->lane0)
-    );
-    outPayload->lane0 = (checkType != nullptr && (*checkType == typeid(PrefetchThreadBindType_004AFDF0)))
-      ? static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(inPayload))
-      : 0U;
-  }
-
-  [[nodiscard]] PrefetchThreadCallableVtable_004AF810* InitializePrefetchThreadCallableVtableGlobalCore_004AFB00() noexcept
-  {
-    sPrefetchThreadCallableVtable_004AF810.invoker = &InvokePrefetchThreadCallable_004AFDE0;
-    sPrefetchThreadCallableVtable_004AF810.manager = &ManagePrefetchThreadCallable_004AFDF0;
-    return &sPrefetchThreadCallableVtable_004AF810;
-  }
-
-  /**
-   * Address: 0x004AFB00 (FUN_004AFB00)
-   *
-   * What it does:
-   * Stores the prefetch callable invoker/manager pair in global vtable
-   * storage and returns that global vtable address.
-   */
-  PrefetchThreadCallableVtable_004AF810* InitializePrefetchThreadCallableVtableGlobal_004AFB00(
-    const std::uint32_t /*unusedLane0*/,
-    const std::uint32_t /*unusedLane1*/,
-    const std::uint32_t /*unusedLane2*/,
-    const std::uint32_t /*unusedLane3*/
-  ) noexcept
-  {
-    return InitializePrefetchThreadCallableVtableGlobalCore_004AFB00();
-  }
-
-  /**
-   * Address: 0x004AFC30 (FUN_004AFC30)
-   *
-   * What it does:
-   * Duplicate lane of global prefetch callable vtable initialization.
-   */
-  void InitializePrefetchThreadCallableVtableGlobal_004AFC30(
-    const std::uint32_t /*unusedLane0*/,
-    const std::uint32_t /*unusedLane1*/,
-    const std::uint32_t /*unusedLane2*/,
-    const std::uint32_t /*unusedLane3*/
-  ) noexcept
-  {
-    (void)InitializePrefetchThreadCallableVtableGlobalCore_004AFB00();
-  }
-
-  /**
-   * Address: 0x004AFC90 (FUN_004AFC90, nullsub_740)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AFC90() noexcept {}
-
-  /**
-   * Address: 0x004AFCC0 (FUN_004AFCC0, nullsub_741)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AFCC0() noexcept {}
-
-  /**
-   * Address: 0x004AFD20 (FUN_004AFD20)
-   *
-   * What it does:
-   * Duplicate lane of global prefetch callable vtable initialization.
-   */
-  void InitializePrefetchThreadCallableVtableGlobal_004AFD20(
-    const std::uint32_t /*unusedLane0*/,
-    const std::uint32_t /*unusedLane1*/,
-    const std::uint32_t /*unusedLane2*/,
-    const std::uint32_t /*unusedLane3*/,
-    const std::uint32_t /*unusedLane4*/
-  ) noexcept
-  {
-    (void)InitializePrefetchThreadCallableVtableGlobalCore_004AFB00();
-  }
-
-  /**
-   * Address: 0x004AFD40 (FUN_004AFD40, nullsub_742)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AFD40() noexcept {}
-
-  /**
-   * Address: 0x004AFF00 (FUN_004AFF00, nullsub_743)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AFF00() noexcept {}
-
-  /**
-   * Address: 0x004AFF10 (FUN_004AFF10, nullsub_744)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AFF10() noexcept {}
-
-  /**
-   * Address: 0x004AF810 (FUN_004AF810)
-   *
-   * What it does:
-   * Lazily initializes one callable vtable pair, builds payload lanes at
-   * output `+0x08`, and stores vtable pointer at output `+0x00` when build
-   * succeeds (otherwise stores null).
-   */
-  PrefetchThreadCallableVtable_004AF810* AssignPrefetchThreadCallableVtable_004AF810(
-    PrefetchThreadCallableRuntime_004AF070* const outCallable,
-    const std::uint32_t lane0,
-    const std::uint32_t lane1,
-    const std::uint32_t lane2,
-    const std::uint32_t lane3
-  ) noexcept
-  {
-    if ((sPrefetchThreadCallableInitFlags_004AF810 & 1U) == 0U) {
-      sPrefetchThreadCallableInitFlags_004AF810 |= 1U;
-      sPrefetchThreadCallableVtable_004AF810.invoker = &InvokePrefetchThreadCallable_004AFDE0;
-      sPrefetchThreadCallableVtable_004AF810.manager = &ManagePrefetchThreadCallable_004AFDF0;
-    }
-
-    PrefetchThreadCallableVtable_004AF810* const resolvedVtable =
-      BuildPrefetchThreadCallablePayload_004AFB20(&outCallable->payload, lane0, lane1, lane2, lane3)
-      ? &sPrefetchThreadCallableVtable_004AF810
-      : nullptr;
-    outCallable->vtable = resolvedVtable;
-    return resolvedVtable;
-  }
-
-  /**
-   * Address: 0x004AF070 (FUN_004AF070)
-   *
-   * What it does:
-   * Clears callable vtable lane and then assigns one lazily-built callable
-   * payload/vtable tuple from four caller-provided dword lanes.
-   */
-  PrefetchThreadCallableRuntime_004AF070* InitializePrefetchThreadCallable_004AF070(
-    PrefetchThreadCallableRuntime_004AF070* const outCallable,
-    const std::uint32_t lane0,
-    const std::uint32_t lane1,
-    const std::uint32_t lane2,
-    const std::uint32_t lane3
-  ) noexcept
-  {
-    outCallable->vtable = nullptr;
-    (void)AssignPrefetchThreadCallableVtable_004AF810(outCallable, lane0, lane1, lane2, lane3);
-    return outCallable;
-  }
-
-  /**
-   * Address: 0x004AC7D0 (FUN_004AC7D0)
-   *
-   * What it does:
-   * Returns lower-bound iterator for one factory registration key.
-   */
-  // Matches `CResourceManager::ActiveFactoryRegistrations` (private there).
-  using ActiveFactoryRegistrations = msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>;
-
-
-
-
-  /**
-   * MSVC8's `std::set<T>::iterator` was mutable -- the const-element rule
-   * arrived with C++11 -- and the shipped code updates request state in place
-   * through it. `msvc8::set` follows the modern rule, so the writes go through
-   * this one accessor instead of a cast at every site; the two ordering fields
-   * are never touched.
-   */
-  [[nodiscard]] PrefetchRequestRuntime& MutableRequest(const moho::PrefetchRequestSet::iterator it) noexcept
-  {
-    return const_cast<PrefetchRequestRuntime&>(*it);
-  }
-
-  /**
-   * The probe element a lookup needs. MSVC8's `std::set` keys on the whole
-   * element, and the shipped call sites build exactly this 0x40 temporary in a
-   * stack slot before `lower_bound` and tear it down straight afterwards
-   * (`0x004AB7EC` / `0x004AB804` around `0x004AD790`).
-   */
-  struct PrefetchRequestProbe
-  {
-    PrefetchRequestProbe(const char* const canonicalPath, gpg::RType* const resourceType)
-    {
-      (void)InitializePrefetchRequestFromPath(&mRequest, canonicalPath, resourceType);
-    }
-
-    ~PrefetchRequestProbe() { (void)DestroyPrefetchRequestRuntime(&mRequest); }
-
-    PrefetchRequestProbe(const PrefetchRequestProbe&) = delete;
-    PrefetchRequestProbe& operator=(const PrefetchRequestProbe&) = delete;
-
-    [[nodiscard]] const PrefetchRequestRuntime& get() const noexcept { return mRequest; }
-
-    PrefetchRequestRuntime mRequest{};
-  };
-
-  /**
-   * `mPrefetch` is the payload handle; `boost::SharedCountPair` is the same
-   * `{px, pn}` pair a `weak_ptr` is, and the shipped code locks it here
-   * (`0x004AC1C0` tests the strong count at `[pn+4]` before retaining).
-   */
-  [[nodiscard]] boost::shared_ptr<moho::PrefetchData> LockPrefetchPayload(
-    const PrefetchRequestRuntime& request
-  ) noexcept
-  {
-    return reinterpret_cast<const boost::weak_ptr<moho::PrefetchData>&>(request.mPrefetch).lock();
-  }
-
-  /**
-   * Address: 0x004AD890 (FUN_004AD890, nullsub_704)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AD890() noexcept {}
-
-  /**
-   * Address: 0x004AD8A0 (FUN_004AD8A0, nullsub_705)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  void NoOpHelperThunk_004AD8A0() noexcept {}
-
-  [[nodiscard]] msvc8::string ResolvePrefetchPath(const char* const path)
-  {
-    if (path != nullptr && path[0] != '\0' && (path[0] != '/' || path[1] == '/')) {
-      return msvc8::string(path);
-    }
-
-    moho::FILE_EnsureWaitHandleSet();
-    moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
-    if (waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr) {
-      return {};
-    }
-
-    msvc8::string mountedPath{};
-    (void)waitHandleSet->mHandle->FindFile(&mountedPath, path != nullptr ? path : "", nullptr);
-    return mountedPath;
-  }
-
-  [[nodiscard]] bool TryResolveResourcePathForGet(
-    const char* const path,
-    msvc8::string* const outPath
-  )
-  {
-    if (outPath == nullptr) {
-      return false;
-    }
-    *outPath = msvc8::string();
-
-    if (path == nullptr || path[0] == '\0') {
-      return false;
-    }
-
-    if (path[0] == '/' && path[1] != '/') {
-      const char second = path[1];
-      if (second == ':' || second == '/' || second == '\0') {
-        return false;
-      }
-
-      *outPath = ResolvePrefetchPath(path);
-      return !outPath->empty();
-    }
-
-    *outPath = msvc8::string(path);
-    return true;
-  }
-
-  [[nodiscard]] bool HasWatcherNodeForRequest(
-    const PrefetchRequestRuntime& request,
-    const moho::CResourceWatcher* const watcher
-  ) noexcept
-  {
-    if (watcher == nullptr) {
-      return true;
-    }
-
-    const IntrusiveListLink* const head = &request.mWaiterListHead;
-    for (const IntrusiveListLink* it = head->mNext; it != head; it = it->mNext) {
-      const auto* const node = reinterpret_cast<const PrefetchWatchNode*>(it);
-      if (node->mWatcher == watcher) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  void AppendWatcherNodeReference(
-    moho::CResourceWatcher* const watcher,
-    PrefetchWatchNode* const watchNode
-  )
-  {
-    if (watcher == nullptr || watchNode == nullptr) {
-      return;
-    }
-
-    auto** begin = reinterpret_cast<PrefetchWatchNode**>(watcher->mWatchedBegin);
-    auto** end = reinterpret_cast<PrefetchWatchNode**>(watcher->mWatchedEnd);
-    auto** capacityEnd = reinterpret_cast<PrefetchWatchNode**>(watcher->mWatchedStorageEnd);
-    auto** const inlineOrigin = reinterpret_cast<PrefetchWatchNode**>(watcher->mWatchedStorageOrigin);
-
-    if (end == capacityEnd) {
-      const std::size_t oldSize = static_cast<std::size_t>(end - begin);
-      const std::size_t oldCapacity = static_cast<std::size_t>(capacityEnd - begin);
-      std::size_t newCapacity = oldCapacity + (oldCapacity >> 1U);
-      if (newCapacity < oldSize + 1U) {
-        newCapacity = oldSize + 1U;
-      }
-      if (newCapacity == 0U) {
-        newCapacity = 1U;
-      }
-
-      auto** const newStorage = static_cast<PrefetchWatchNode**>(
-        ::operator new[](newCapacity * sizeof(PrefetchWatchNode*))
-      );
-      if (oldSize > 0U) {
-        std::memmove(newStorage, begin, oldSize * sizeof(PrefetchWatchNode*));
-      }
-
-      if (begin != inlineOrigin) {
-        ::operator delete[](begin);
-      }
-
-      begin = newStorage;
-      end = newStorage + oldSize;
-      capacityEnd = newStorage + newCapacity;
-      watcher->mWatchedBegin = begin;
-      watcher->mWatchedEnd = end;
-      watcher->mWatchedStorageEnd = capacityEnd;
-    }
-
-    *end = watchNode;
-    ++end;
-    watcher->mWatchedEnd = end;
-  }
-
-  constexpr const char* kResSpewLoadSpamDescription = "If true, spew spam with each resource load.";
-  constexpr const char* kResEnablePrefetchingDescription = "If true, enable prefetching.";
-  constexpr const char* kResPrefetcherActivityDelayDescription =
-    "Number of seconds to delay prefetching after there is foreground disk activity.";
-  constexpr const char* kResAfterPrefetchDelayDescription =
-    "Number of milliseconds to nap after prefetching something.  So the prefetcher thread doesn't bog us down too much.";
+  // `boost::TIME_UTC`. Spelled by value: C11's `TIME_UTC` macro (also 1) is
+  // back in force once boost/thread/xtime.hpp restores it, and hides boost's
+  // enumerator everywhere outside that header.
+  constexpr int kClockUtc = 1;
+
+  moho::ResourceManager* sResourceManager = nullptr; // 0x010A6398
+  boost::once_flag sResourceManagerOnce = BOOST_ONCE_INIT; // 0x010A639C
 
   /**
    * Address: 0x00BC5AC0 (FUN_00BC5AC0, dynamic initializer for `gTConVar_res_SpewLoadSpam`)
    * Address: 0x00BF04F0 (FUN_00BF04F0, dynamic atexit destructor for `gTConVar_res_SpewLoadSpam`)
    */
   moho::TConVar<bool> gTConVar_res_SpewLoadSpam(
-    "res_SpewLoadSpam",
-    kResSpewLoadSpamDescription,
-    &moho::res_SpewLoadSpam
+    "res_SpewLoadSpam", "If true, spew spam with each resource load.", &moho::res_SpewLoadSpam
   );
 
   /**
@@ -2627,9 +46,7 @@ namespace
    * Address: 0x00BF0520 (FUN_00BF0520, dynamic atexit destructor for `gTConVar_res_EnablePrefetching`)
    */
   moho::TConVar<bool> gTConVar_res_EnablePrefetching(
-    "res_EnablePrefetching",
-    kResEnablePrefetchingDescription,
-    &moho::res_EnablePrefetching
+    "res_EnablePrefetching", "If true, enable prefetching.", &moho::res_EnablePrefetching
   );
 
   /**
@@ -2638,7 +55,7 @@ namespace
    */
   moho::TConVar<int> gTConVar_res_PrefetcherActivityDelay(
     "res_PrefetcherActivityDelay",
-    kResPrefetcherActivityDelayDescription,
+    "Number of seconds to delay prefetching after there is foreground disk activity.",
     &moho::res_PrefetcherActivityDelay
   );
 
@@ -2648,731 +65,520 @@ namespace
    */
   moho::TConVar<int> gTConVar_res_AfterPrefetchDelay(
     "res_AfterPrefetchDelay",
-    kResAfterPrefetchDelayDescription,
+    "Number of milliseconds to nap after prefetching something.  So the prefetcher thread doesn't bog us down too much.",
     &moho::res_AfterPrefetchDelay
   );
 
-  void DestroyResourceManager()
+  /**
+   * MSVC8's `std::set<T>::iterator` was mutable -- the const-element rule came
+   * with C++11 -- and the shipped code updates a record in place through it.
+   * `msvc8::set` follows the modern rule, so those writes go through this one
+   * accessor; the two ordering fields are never touched.
+   */
+  [[nodiscard]] moho::ResourceRecord& Record(const moho::ResourceRecordSet::iterator it) noexcept
   {
-    delete sPResourceManager;
-    sPResourceManager = nullptr;
+    return const_cast<moho::ResourceRecord&>(*it);
   }
 
-  void EnsureResourceManagerOnce()
+  /**
+   * `/dir/file` names a file in the mounted file system; anything else not
+   * starting with a single `/` (a relative name, or `//host/...`) is used as
+   * given.
+   */
+  [[nodiscard]] bool IsLiteralName(const char* const path) noexcept
   {
-    if (sPResourceManager != nullptr) {
-      return;
-    }
+    return path != nullptr && path[0] != '\0' && (path[0] != '/' || path[1] == '/');
+  }
 
-    sPResourceManager = new moho::ResourceManager();
-    std::atexit(&DestroyResourceManager);
+  /**
+   * Where the mounted file system puts `path`; empty when it has no such file.
+   */
+  [[nodiscard]] msvc8::string FindMountedFile(const char* const path)
+  {
+    msvc8::string found;
+    (void)moho::FILE_GetWaitHandleSet()->mHandle->FindFile(&found, path, nullptr);
+    return found;
+  }
+
+  /**
+   * Sleeps until `until` with the manager unlocked.
+   */
+  void SleepUnlocked(boost::recursive_mutex::scoped_lock& lock, const boost::xtime& until)
+  {
+    lock.unlock();
+    boost::thread::sleep(until);
+    lock.lock();
   }
 } // namespace
 
-
-/**
- * Address: 0x004A9DD0 (FUN_004A9DD0)
- * Mangled: ??0ResourceManager@Moho@@QAE@@Z
- *
- * What it does:
- * Initializes singleton resource-manager startup state.
- */
-moho::ResourceManager::ResourceManager()
-  : CDiskWatchListener(nullptr)
-  , mLock()
-  , mFactoriesActivated(false)
-  , mWorkerWakeCondition()
-  , mWorkerIdleCondition()
-  , mWorkerThread(nullptr)
-  , mActiveLoadCount(0)
+namespace moho
 {
-}
+  /**
+   * Address: 0x004A99C0 (FUN_004A99C0)
+   */
+  ResourceWatch::ResourceWatch(const gpg::StrArg path, CResourceWatcher* const watcher)
+    : mPath(path)
+    , mWatcher(watcher)
+    , mNotifying(false)
+  {}
 
-/**
- * Address: 0x004A9C00 (FUN_004A9C00)
- * Mangled context: teardown helper used by singleton cleanup.
- */
-moho::ResourceManager::~ResourceManager()
-{
-  ShutdownBackgroundThread();
-  CleanupPrefetchWeakPairRingQueue_004ADA70(&mPrefetchPayloadQueue);
-}
+  /**
+   * Address: 0x004A9A40 (FUN_004A9A40)
+   */
+  ResourceRecord::ResourceRecord(const gpg::StrArg name, const gpg::RType* const type)
+    : mId{msvc8::string(name)}
+    , mType(type)
+    , mLoading(false)
+    , mReloadPending(false)
+    , mLoadFailed(false)
+  {}
 
-/**
- * Address: 0x00BF05B0 (FUN_00BF05B0, ??1ResourceManager@Moho@@QAE@@Z)
- *
- * What it does:
- * Thunk lane that forwards one resource-manager teardown request into
- * `FUN_004A9C00`.
- */
-void DestroyResourceManagerRuntimeAdapter(moho::ResourceManager* const manager) noexcept
-{
-  if (manager != nullptr) {
-    manager->~ResourceManager();
-  }
-}
+  /**
+   * Address: 0x004A9AA0 (FUN_004A9AA0)
+   */
+  ResourceRecord::ResourceRecord(const ResourceRecord& other)
+    : mId(other.mId)
+    , mType(other.mType)
+    , mLoading(false)
+    , mReloadPending(false)
+    , mLoadFailed(false)
+  {}
 
-/**
- * Address: 0x004A9B90 (FUN_004A9B90)
- *
- * What it does:
- * Overrides disk-watch filtering and accepts every incoming event.
- */
-bool moho::ResourceManager::FilterEvent(const SDiskWatchEvent& event)
-{
-  (void)event;
-  return true;
-}
-
-/**
- * Address: 0x004AB780 (FUN_004AB780, ?OnDiskWatchEvent@ResourceManager@Moho@@UAEXABUSDiskWatchEvent@2@@Z)
- *
- * What it does:
- * Invalidates all matching prefetch request entries for the changed path,
- * clears cached runtime/payload pairs, then notifies attached watchers.
- */
-void moho::ResourceManager::OnDiskWatchEvent(const SDiskWatchEvent& event)
-{
-  boost::recursive_mutex::scoped_lock workerLock(mLock);
-
-  const PrefetchRequestProbe rangeBeginProbe(event.mPath.c_str(), nullptr);
-  const auto rangeBegin = mPrefetchRequests.lower_bound(rangeBeginProbe.get());
-
-  const PrefetchRequestProbe rangeEndProbe(
-    event.mPath.c_str(), reinterpret_cast<gpg::RType*>(static_cast<std::uintptr_t>(~0u))
-  );
-  const auto rangeEnd = mPrefetchRequests.upper_bound(rangeEndProbe.get());
-  if (rangeBegin == rangeEnd) {
-    return;
+  /**
+   * Address: 0x004A9DD0 (FUN_004A9DD0, ??0ResourceManager@Moho@@QAE@@Z)
+   */
+  ResourceManager::ResourceManager()
+    : CDiskWatchListener(nullptr)
+    , mRunning(false)
+    , mLoadsInProgress(0)
+  {
+    boost::xtime_get(&mLastLoadTime, kClockUtc);
+    DISK_AddWatchListener(this);
   }
 
-  std::vector<PrefetchWatchNode*> changedWatchNodes{};
-  for (auto requestIt = rangeBegin; requestIt != rangeEnd; ++requestIt) {
-    PrefetchRequestRuntime& request = MutableRequest(requestIt);
+  /**
+   * Address: 0x004A9C00 (FUN_004A9C00)
+   */
+  ResourceManager::~ResourceManager() = default;
 
-    if (request.mIsLoading != 0) {
-      request.mLoadWakePending = 1;
-    }
-
-    request.mResolved.px = nullptr;
-    (void)ReleaseWeakControlFromPair(&request.mResolved);
-    request.mHadLoadFailure = 0;
-
-    boost::shared_ptr<PrefetchData> payload = LockPrefetchPayload(request);
-    if (payload) {
-      (void)ResetSharedPairReleaseControl(&payload->mResolved);
-      (void)ResetSharedPairReleaseControl(&payload->mPrefetch);
-    }
-
-    request.mPrefetch.px = nullptr;
-    (void)ReleaseWeakControlFromPair(&request.mPrefetch);
-
-    IntrusiveListLink* const waiterHead = &request.mWaiterListHead;
-    for (IntrusiveListLink* waiterNode = waiterHead->mNext; waiterNode != waiterHead; waiterNode = waiterNode->mNext) {
-      auto* const watchNode = reinterpret_cast<PrefetchWatchNode*>(waiterNode);
-      watchNode->mIsFinished = 1;
-      changedWatchNodes.push_back(watchNode);
-    }
+  /**
+   * Address: 0x004A9B90 (FUN_004A9B90)
+   *
+   * What it does:
+   * Takes every event: the records decide what a path means.
+   */
+  bool ResourceManager::FilterEvent(const SDiskWatchEvent&)
+  {
+    return true;
   }
 
-  for (PrefetchWatchNode* const watchNode : changedWatchNodes) {
-    if (watchNode == nullptr) {
-      continue;
-    }
-
-    if (watchNode->mWatcher != nullptr) {
-      auto* const watcher = static_cast<CResourceWatcher*>(watchNode->mWatcher);
-      watcher->OnResourceChanged(watchNode->mPath.c_str());
-      watchNode->mIsFinished = 0;
-      continue;
-    }
-
-    watchNode->mPath.tidy(true, 0U);
-    watchNode->mListLink.ListUnlink();
-    watchNode->mListLink.ListResetLinks();
-    ::operator delete(watchNode);
-  }
-}
-
-/**
- * Address: 0x004AA090 (FUN_004AA090)
- *
- * What it does:
- * Marks factory bootstrap as active and drains pending startup hooks.
- */
-void moho::ResourceManager::ActivatePendingFactories()
-{
-  boost::recursive_mutex::scoped_lock lock(mLock);
-  mFactoriesActivated = true;
-
-  if (mPendingFactoryRegistrations.empty()) {
-    return;
-  }
-
-  for (ResourceFactoryBase* const factory : mPendingFactoryRegistrations) {
-    factory->Init();
-    const unsigned int registrationKey = GetFactoryRegistrationKey(factory);
-    mActiveFactoryRegistrationsByKey[registrationKey] = factory;
-  }
-
-  mPendingFactoryRegistrations.clear();
-}
-
-/**
- * Address: 0x004A9F30 (FUN_004A9F30)
- *
- * What it does:
- * Registers one factory into the pending lane before activation, then stores
- * it in the active keyed registry once bootstrap is live.
- */
-void moho::ResourceManager::AttachFactory(ResourceFactoryBase* const factory)
-{
-  boost::recursive_mutex::scoped_lock lock(mLock);
-
-  if (!mFactoriesActivated) {
-    mPendingFactoryRegistrations.push_back(factory);
-    return;
-  }
-
-  const unsigned int registrationKey = GetFactoryRegistrationKey(factory);
-  mActiveFactoryRegistrationsByKey[registrationKey] = factory;
-}
-
-/**
- * Address: 0x004A9FC0 (FUN_004A9FC0)
- *
- * What it does:
- * Removes one factory from both the pending bootstrap lane and the active
- * keyed registry.
- */
-void moho::ResourceManager::DetachFactory(ResourceFactoryBase* const factory)
-{
-  boost::recursive_mutex::scoped_lock lock(mLock);
-
-  RemovePendingFactory(mPendingFactoryRegistrations, factory);
-  const unsigned int registrationKey = GetFactoryRegistrationKey(factory);
-  const auto activeFactoryIt = mActiveFactoryRegistrationsByKey.lower_bound(registrationKey);
-  if (activeFactoryIt != mActiveFactoryRegistrationsByKey.end() && activeFactoryIt->first == registrationKey) {
-    (void)mActiveFactoryRegistrationsByKey.erase(activeFactoryIt);
-  }
-}
-
-/**
- * Address: 0x004AB600 (FUN_004AB600)
- *
- * What it does:
- * Returns one active factory registration lane from lower-bound lookup by key.
- */
-moho::ResourceFactoryBase* moho::ResourceManager::FindFactoryByRegistrationKey(const unsigned int registrationKey)
-{
-  const auto it = mActiveFactoryRegistrationsByKey.lower_bound(registrationKey);
-  if (it == mActiveFactoryRegistrationsByKey.end()) {
-    return nullptr;
-  }
-  return it->second;
-}
-
-/**
- * Address: 0x004AB620 (FUN_004AB620, func_ManageWatchedResources)
- *
- * What it does:
- * Flushes watched-resource node ownership for one watcher and resets watcher
- * storage back to inline mode.
- */
-void moho::ResourceManager::ManageWatchedResources(CResourceWatcher* const watcher)
-{
-  if (watcher == nullptr) {
-    return;
-  }
-
-  boost::recursive_mutex::scoped_lock lock(mLock);
-  auto** watchedBegin = reinterpret_cast<PrefetchWatchNode**>(watcher->mWatchedBegin);
-  auto** watchedEnd = reinterpret_cast<PrefetchWatchNode**>(watcher->mWatchedEnd);
-  if (watchedBegin != nullptr && watchedEnd != nullptr) {
-    for (auto** it = watchedBegin; it != watchedEnd; ++it) {
-      PrefetchWatchNode* const node = *it;
-      if (node == nullptr) {
-        continue;
-      }
-
-      if (node->mIsFinished != 0) {
-        node->mWatcher = nullptr;
-        continue;
-      }
-
-      node->mPath.tidy(true, 0U);
-      node->mListLink.ListUnlink();
-      node->mListLink.ListResetLinks();
-      ::operator delete(node);
-    }
-  }
-
-  auto** const watchedInlineOrigin = reinterpret_cast<PrefetchWatchNode**>(watcher->mWatchedStorageOrigin);
-  if (watchedBegin != watchedInlineOrigin) {
-    ::operator delete[](watchedBegin);
-    watcher->mWatchedBegin = watchedInlineOrigin;
-    watcher->mWatchedStorageEnd = watchedInlineOrigin != nullptr ? watchedInlineOrigin[0] : nullptr;
-  }
-
-  watcher->mWatchedEnd = watcher->mWatchedBegin;
-}
-
-/**
- * Address: 0x004AA160 (FUN_004AA160, sub_4AA160)
- *
- * What it does:
- * Clears the worker-running flag, wakes worker wait conditions, then joins
- * and releases the worker thread object.
- */
-void moho::ResourceManager::ShutdownBackgroundThread()
-{
-  boost::thread* workerToDestroy = nullptr;
+  /**
+   * Address: 0x004AB780 (FUN_004AB780, ?OnDiskWatchEvent@ResourceManager@Moho@@UAEXABUSDiskWatchEvent@2@@Z)
+   *
+   * What it does:
+   * Every record for the path, of any type, forgets its resource, its load
+   * failure and its prefetched data; a load in progress is told to run again.
+   * The watchers are gathered first and told afterwards, still under the lock.
+   * A watch whose watcher died during its own callback is freed here, since
+   * `DetachWatcher` left it for this loop.
+   */
+  void ResourceManager::OnDiskWatchEvent(const SDiskWatchEvent& event)
   {
     boost::recursive_mutex::scoped_lock lock(mLock);
-    mFactoriesActivated = false;
 
-    if (mWorkerThread != nullptr) {
-      mWorkerWakeCondition.notify_all();
-      mWorkerIdleCondition.notify_all();
-      workerToDestroy = mWorkerThread;
+    const ResourceRecordSet::iterator first = mRecords.lower_bound(ResourceRecord(event.mPath.c_str(), nullptr));
+    const ResourceRecordSet::iterator last = mRecords.upper_bound(
+      ResourceRecord(event.mPath.c_str(), reinterpret_cast<const gpg::RType*>(~std::uintptr_t{0}))
+    );
+    if (first == last) {
+      return;
+    }
+
+    gpg::fastvector_n<ResourceWatch*, 8> changed;
+    for (ResourceRecordSet::iterator it = first; it != last; ++it) {
+      ResourceRecord& record = Record(it);
+      if (record.mLoading) {
+        record.mReloadPending = true;
+      }
+      record.mResource.reset();
+      record.mLoadFailed = false;
+
+      const boost::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
+      if (prefetch) {
+        prefetch->mPrefetchData.reset();
+        prefetch->mResource.reset();
+      }
+
+      for (ResourceWatch* const watch : record.mWatches.owners()) {
+        watch->mNotifying = true;
+        changed.push_back(watch);
+      }
+    }
+
+    for (ResourceWatch* const watch : changed) {
+      if (watch->mWatcher != nullptr) {
+        watch->mWatcher->OnResourceChanged(watch->mPath.c_str());
+        watch->mNotifying = false;
+      } else {
+        delete watch;
+      }
     }
   }
 
-  if (workerToDestroy != nullptr) {
-    try {
-      workerToDestroy->join();
-    } catch (...) {
-      // Boost 1.34 does not expose joinable(); preserve best-effort shutdown.
+  /**
+   * Address: 0x004AA090 (FUN_004AA090)
+   */
+  void ResourceManager::ActivatePendingFactories()
+  {
+    boost::recursive_mutex::scoped_lock lock(mLock);
+    mRunning = true;
+    for (ResourceFactoryBase* const factory : mPendingFactories) {
+      factory->Init();
+      mFactories.insert(std::make_pair(factory->mResourceType, factory));
     }
-    mWorkerThread = nullptr;
-    delete workerToDestroy;
+    mPendingFactories.clear();
   }
-}
 
-/**
- * Address: 0x004AB180 (FUN_004AB180, func_PrefetchThread)
- *
- * What it does:
- * Worker-thread loop that drains queued prefetch payloads and runs factory
- * preload dispatch while coordinating wake/idle conditions.
- */
-void moho::ResourceManager::PrefetchThreadMain()
-{
-  gpg::SetThreadName(0xFFFFFFFFU, "Prefetcher thread.");
-  (void)::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+  /**
+   * Address: 0x004A9F30 (FUN_004A9F30, Moho::ResourceManager::AttachFactory)
+   *
+   * What it does:
+   * Before the manager starts, a factory waits in the pending list; after, it
+   * registers under its resource type straight away.
+   */
+  void ResourceManager::AttachFactory(ResourceFactoryBase* const factory)
+  {
+    boost::recursive_mutex::scoped_lock lock(mLock);
+    if (mRunning) {
+      mFactories.insert(std::make_pair(factory->mResourceType, factory));
+    } else {
+      mPendingFactories.push_back(factory);
+    }
+  }
 
-  boost::recursive_mutex::scoped_lock workerLock(mLock);
+  /**
+   * Address: 0x004A9FC0 (FUN_004A9FC0)
+   */
+  void ResourceManager::DetachFactory(ResourceFactoryBase* const factory)
+  {
+    boost::recursive_mutex::scoped_lock lock(mLock);
 
-  while (mFactoriesActivated) {
-    if (!moho::res_EnablePrefetching) {
-      workerLock.unlock();
-      std::this_thread::sleep_for(std::chrono::seconds(10));
-      workerLock.lock();
-      continue;
+    const auto registered = mFactories.find(factory->mResourceType);
+    if (registered != mFactories.end()) {
+      mFactories.erase(registered);
     }
 
-    if (mPrefetchPayloadQueue.mQueuedCount == 0U) {
-      mWorkerWakeCondition.wait(workerLock);
-      continue;
+    const auto pending = std::find(mPendingFactories.begin(), mPendingFactories.end(), factory);
+    if (pending != mPendingFactories.end()) {
+      mPendingFactories.erase(pending);
     }
+  }
 
-    if (mActiveLoadCount != 0U) {
-      mWorkerIdleCondition.wait(workerLock);
-      continue;
+  /**
+   * Address: 0x004AB600 (FUN_004AB600)
+   */
+  ResourceFactoryBase* ResourceManager::FindFactory(const gpg::RType* const type)
+  {
+    return mFactories.find(type)->second;
+  }
+
+  /**
+   * Address: 0x004AB620 (FUN_004AB620, func_ManageWatchedResources)
+   */
+  void ResourceManager::DetachWatcher(CResourceWatcher* const watcher)
+  {
+    boost::recursive_mutex::scoped_lock lock(mLock);
+    for (ResourceWatch* const watch : watcher->mWatches) {
+      if (watch->mNotifying) {
+        watch->mWatcher = nullptr;
+      } else {
+        delete watch;
+      }
     }
+    watcher->mWatches.ResetStorageToInline();
+  }
 
-    if (moho::res_PrefetcherActivityDelay > 0) {
-      const auto nextAllowed =
-        mLastResolveTime + std::chrono::seconds(moho::res_PrefetcherActivityDelay);
-      const auto now = std::chrono::steady_clock::now();
-      if (now < nextAllowed) {
-        workerLock.unlock();
-        std::this_thread::sleep_for(nextAllowed - now);
-        workerLock.lock();
+  /**
+   * Address: 0x004AA160 (FUN_004AA160)
+   */
+  void ResourceManager::ShutdownBackgroundThread()
+  {
+    boost::recursive_mutex::scoped_lock lock(mLock);
+    mRunning = false;
+    if (mPrefetchThread) {
+      mPrefetchQueued.notify_all();
+      mLoadFinished.notify_all();
+      lock.unlock();
+      mPrefetchThread->join();
+      mPrefetchThread.reset();
+    }
+  }
+
+  /**
+   * Address: 0x004AB180 (FUN_004AB180, func_PrefetchThread)
+   *
+   * What it does:
+   * Runs at idle priority. Waits while prefetching is switched off (checking
+   * every ten seconds), while the queue is empty, while a foreground load is
+   * running, and for `res_PrefetcherActivityDelay` seconds after the last
+   * one. Then it takes the front prefetch and, unless the resource is already
+   * loaded, loading, or known to fail, preloads it with the manager unlocked.
+   * A file change during the preload puts it back at the front of the queue.
+   * After each preload it naps `res_AfterPrefetchDelay` milliseconds.
+   */
+  void ResourceManager::PrefetchThread()
+  {
+    gpg::SetThreadName(0xFFFFFFFFu, "Prefetcher thread.");
+    (void)::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_IDLE);
+
+    boost::recursive_mutex::scoped_lock lock(mLock);
+    while (mRunning) {
+      if (!res_EnablePrefetching) {
+        boost::xtime until;
+        boost::xtime_get(&until, kClockUtc);
+        until.sec += 10;
+        SleepUnlocked(lock, until);
         continue;
       }
-    }
 
-    boost::shared_ptr<PrefetchData> payload = PopQueuedPrefetchPayload_004AB180(mPrefetchPayloadQueue);
-    if (!payload || payload->mRequest == nullptr) {
-      continue;
-    }
-
-    PrefetchRequestRuntime* const request = payload->mRequest;
-    if (request->mIsLoading != 0 || request->mHadLoadFailure != 0) {
-      continue;
-    }
-
-    AssignLiveWeakPair_004AB180(&payload->mPrefetch, &request->mResolved);
-    if (payload->mPrefetch.px != nullptr) {
-      continue;
-    }
-
-    ResourceFactoryBase* const factory =
-      FindFactoryByRegistrationKey(static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(request->mResourceType)));
-    request->mIsLoading = 1;
-
-    workerLock.unlock();
-
-    boost::SharedCountPair prefetchedData{};
-    (void)ResetSharedPairToNullVariant1(&prefetchedData);
-    if (factory != nullptr) {
-      if (moho::res_SpewLoadSpam && request->mResourceType != nullptr) {
-        gpg::Debugf("Prefetching %s resource from %s", request->mResourceType->GetName(), request->mResourceId.name.c_str());
+      if (mPrefetchQueue.empty()) {
+        mPrefetchQueued.wait(lock);
+        continue;
       }
-      (void)factory->PreloadResourcePair(
-        &prefetchedData,
-        request->mResourceId.name.c_str(),
-        request->mResourceType
-      );
-    }
 
-    workerLock.lock();
+      if (mLoadsInProgress != 0) {
+        mLoadFinished.wait(lock);
+        continue;
+      }
 
-    (void)boost::AssignWeakPairFromShared(&payload->mResolved, &prefetchedData);
-    boost::ReleaseSharedControlOnly(&prefetchedData);
+      boost::xtime now;
+      boost::xtime_get(&now, kClockUtc);
+      boost::xtime quietUntil = mLastLoadTime;
+      quietUntil.sec += res_PrefetcherActivityDelay;
+      if (boost::xtime_cmp(now, quietUntil) < 0) {
+        SleepUnlocked(lock, quietUntil);
+        continue;
+      }
 
-    if (request->mLoadWakePending != 0) {
-      request->mLoadWakePending = 0;
-      EnqueuePrefetchPayloadFront_004AB180(mPrefetchPayloadQueue, payload);
-    }
+      const boost::shared_ptr<PrefetchData> prefetch = boost::LockWeak(mPrefetchQueue.front());
+      mPrefetchQueue.pop_front();
+      if (!prefetch) {
+        continue;
+      }
 
-    request->mIsLoading = 0;
-    mWorkerIdleCondition.notify_all();
+      ResourceRecord* const record = prefetch->mRecord;
+      if (record->mLoading || record->mLoadFailed) {
+        continue;
+      }
 
-    if (moho::res_AfterPrefetchDelay > 0) {
-      workerLock.unlock();
-      std::this_thread::sleep_for(std::chrono::seconds(moho::res_AfterPrefetchDelay));
-      workerLock.lock();
-    }
-  }
-}
+      prefetch->mResource = boost::LockWeak(record->mResource);
+      if (prefetch->mResource) {
+        continue;
+      }
 
-/**
- * Address: 0x004AAC20 (FUN_004AAC20, Moho::ResourceManager::CreatePrefetchData)
- *
- * boost::shared_ptr<Moho::PrefetchData> &,const char *,gpg::RType *
- *
- * What it does:
- * Canonicalizes one path, resolves/creates one keyed prefetch runtime entry,
- * and returns the shared payload handle for that entry.
- */
-boost::shared_ptr<moho::PrefetchData>* moho::ResourceManager::CreatePrefetchData(
-  boost::shared_ptr<PrefetchData>* const outPrefetchData,
-  const char* const path,
-  gpg::RType* const resourceType
-)
-{
-  if (outPrefetchData == nullptr) {
-    return nullptr;
-  }
+      ResourceFactoryBase* const factory = FindFactory(record->mType);
+      record->mLoading = true;
+      lock.unlock();
+      if (res_SpewLoadSpam) {
+        gpg::Debugf("Prefetching %s resource from %s", record->mType->GetName(), record->mId.name.c_str());
+      }
+      prefetch->mPrefetchData = factory->Preload(record->mId.name.c_str(), factory->mPrefetchType);
+      lock.lock();
 
-  boost::recursive_mutex::scoped_lock lock(mLock);
-  outPrefetchData->reset();
+      if (record->mReloadPending) {
+        record->mReloadPending = false;
+        mPrefetchQueue.push_front(prefetch);
+      }
+      mLoadFinished.notify_all();
+      record->mLoading = false;
 
-  const msvc8::string canonicalPath = ResolvePrefetchPath(path);
-  if (canonicalPath.empty()) {
-    return outPrefetchData;
-  }
-
-  const PrefetchRequestProbe probe(canonicalPath.c_str(), resourceType);
-  const auto requestLookup = mPrefetchRequests.insert(probe.get());
-  PrefetchRequestRuntime& request = MutableRequest(requestLookup.first);
-  if (requestLookup.second || request.mResourceId.name.empty()) {
-    (void)InitializePrefetchRequestFromPath(&request, canonicalPath.c_str(), resourceType);
-  }
-
-  boost::shared_ptr<PrefetchData> payload = LockPrefetchPayload(request);
-  if (!payload) {
-    payload.reset(new PrefetchData{});
-    payload->mRequest = &request;
-    (void)ResetSharedPairToNullVariant1(&payload->mResolved);
-    (void)ResetSharedPairToNullVariant3(&payload->mPrefetch);
-
-    (void)ReleaseWeakControlFromPair(&request.mPrefetch);
-    const auto* const payloadSharedPair = reinterpret_cast<const boost::SharedCountPair*>(&payload);
-    (void)BuildWeakPairFromLiveSharedVariant2(payloadSharedPair, &request.mPrefetch);
-  }
-
-  boost::SharedCountPair resolvedWeak{};
-  (void)BuildWeakPairFromLiveSharedVariant1(&request.mResolved, &resolvedWeak);
-  const bool requestHasResolvedResource = (resolvedWeak.px != nullptr);
-  (void)ReleaseWeakControlFromPair(&resolvedWeak);
-
-  if (!requestHasResolvedResource) {
-    EnqueuePrefetchPayloadBack_004AB180(mPrefetchPayloadQueue, payload);
-    if (mWorkerThread != nullptr) {
-      mWorkerWakeCondition.notify_all();
-    } else {
-      mWorkerThread = new boost::thread(boost::bind(&moho::ResourceManager::PrefetchThreadMain, this));
+      boost::xtime napUntil;
+      boost::xtime_get(&napUntil, kClockUtc);
+      napUntil.nsec += res_AfterPrefetchDelay * 1000000;
+      while (napUntil.nsec >= 1000000000) {
+        napUntil.nsec -= 1000000000;
+        ++napUntil.sec;
+      }
+      SleepUnlocked(lock, napUntil);
     }
   }
 
-  *outPrefetchData = payload;
-  return outPrefetchData;
-}
-
-/**
- * Address: 0x004AA690 (FUN_004AA690)
- *
- * What it does:
- * Waits for in-flight loads, performs one resource load/finish dispatch lane,
- * and publishes resolved weak state for the request runtime entry.
- */
-boost::SharedCountPair* moho::ResourceManager::ResolvePendingResourceRequest(
-  boost::SharedCountPair* const outResource,
-  PrefetchRequestRuntime& request,
-  boost::recursive_mutex::scoped_lock& workerLock
-)
-{
-  if (outResource == nullptr) {
-    return nullptr;
-  }
-
-  boost::SharedCountPair pendingPrefetchWeak{};
-  (void)BuildWeakPairFromLiveSharedVariant2(&request.mPrefetch, &pendingPrefetchWeak);
-
-  struct PendingWeakReleaseGuard
+  /**
+   * Address: 0x004AAC20 (FUN_004AAC20, func_CreatePrefetchData)
+   */
+  PrefetchHandleBase ResourceManager::PrefetchResource(const gpg::StrArg path, const gpg::RType* const type)
   {
-    boost::SharedCountPair* weakPair;
-    ~PendingWeakReleaseGuard()
-    {
-      if (weakPair != nullptr) {
-        (void)ReleaseWeakControlFromPair(weakPair);
+    boost::recursive_mutex::scoped_lock lock(mLock);
+
+    const msvc8::string name = IsLiteralName(path) ? msvc8::string(path) : FindMountedFile(path);
+    if (name.empty()) {
+      return PrefetchHandleBase();
+    }
+
+    ResourceRecord& record = Record(mRecords.insert(ResourceRecord(name.c_str(), type)).first);
+
+    boost::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
+    if (!prefetch) {
+      prefetch = boost::shared_ptr<PrefetchData>(new PrefetchData(&record));
+      record.mPrefetch = prefetch;
+    }
+
+    if (const boost::shared_ptr<void> resource = boost::LockWeak(record.mResource); !resource) {
+      mPrefetchQueue.push_back(prefetch);
+      if (mPrefetchThread) {
+        mPrefetchQueued.notify_all();
+      } else {
+        mPrefetchThread.reset(new boost::thread(boost::bind(&ResourceManager::PrefetchThread, this)));
       }
     }
-  } pendingWeakGuard{&pendingPrefetchWeak};
 
-  while (request.mIsLoading != 0) {
-    mWorkerIdleCondition.wait(workerLock);
+    PrefetchHandleBase handle(prefetch);
+    return handle;
   }
 
-  (void)BuildWeakPairFromLiveSharedVariant1(&request.mResolved, outResource);
-  if (outResource->px == nullptr && request.mHadLoadFailure == 0) {
-    ResourceFactoryBase* const factory =
-      FindFactoryByRegistrationKey(static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(request.mResourceType)));
+  /**
+   * Address: 0x004AA220 (FUN_004AA220, Moho::ResourceManager::GetResource)
+   *
+   * What it does:
+   * A name that is neither literal nor a VFS path (empty, or `/:`...) is
+   * rejected with a warning; a VFS path the mounted file system has no file
+   * for loads as nothing. A watcher is registered once per record, under the
+   * path the caller gave.
+   */
+  boost::shared_ptr<void> ResourceManager::GetResource(
+    const gpg::StrArg path, CResourceWatcher* const watcher, const gpg::RType* const type
+  )
+  {
+    boost::recursive_mutex::scoped_lock lock(mLock);
 
-    request.mIsLoading = 1;
-    ++mActiveLoadCount;
+    msvc8::string name;
+    if (IsLiteralName(path)) {
+      name = path;
+    } else if (path != nullptr && path[0] == '/' && path[1] != ':' && path[1] != '/') {
+      name = FindMountedFile(path);
+      if (name.empty()) {
+        return boost::shared_ptr<void>();
+      }
+    } else {
+      gpg::Warnf("GetResource: Invalid name \"%s\"", path);
+      return boost::shared_ptr<void>();
+    }
 
-    while (true) {
-      workerLock.unlock();
+    ResourceRecord& record = Record(mRecords.insert(ResourceRecord(name.c_str(), type)).first);
 
-      boost::SharedCountPair loadedResource{};
-      (void)ResetSharedPairToNullVariant1(&loadedResource);
-
-      if (pendingPrefetchWeak.px != nullptr) {
-        auto* const prefetchPayload = static_cast<PrefetchData*>(pendingPrefetchWeak.px);
-        if (prefetchPayload->mResolved.px != nullptr) {
-          if (moho::res_SpewLoadSpam && request.mResourceType != nullptr) {
-            gpg::Debugf(
-              "Finishing %s resource prefetched from %s",
-              request.mResourceType->GetName(),
-              request.mResourceId.name.c_str()
-            );
-          }
-
-          if (factory != nullptr) {
-            (void)factory->LoadResourceFromPrefetchPair(
-              &loadedResource,
-              request.mResourceId.name.c_str(),
-              request.mResourceType,
-              &prefetchPayload->mResolved,
-              nullptr
-            );
-          }
-
-          (void)ResetSharedPairReleaseControl(&prefetchPayload->mResolved);
-        } else {
-          if (moho::res_SpewLoadSpam && request.mResourceType != nullptr) {
-            gpg::Debugf("Loading %s resource from %s", request.mResourceType->GetName(), request.mResourceId.name.c_str());
-          }
-
-          if (factory != nullptr) {
-            (void)factory->LoadResourcePair(
-              &loadedResource,
-              request.mResourceId.name.c_str(),
-              request.mResourceType
-            );
-          }
-        }
-
-        (void)AssignSharedPairRetainRelease_004AEF90(&prefetchPayload->mPrefetch, outResource);
-      } else {
-        if (moho::res_SpewLoadSpam && request.mResourceType != nullptr) {
-          gpg::Debugf("Loading %s resource from %s", request.mResourceType->GetName(), request.mResourceId.name.c_str());
-        }
-
-        if (factory != nullptr) {
-          (void)factory->LoadResourcePair(
-            &loadedResource,
-            request.mResourceId.name.c_str(),
-            request.mResourceType
-          );
+    if (watcher != nullptr) {
+      bool watching = false;
+      for (const ResourceWatch* const watch : record.mWatches.owners()) {
+        if (watch->mWatcher == watcher) {
+          watching = true;
+          break;
         }
       }
+      if (!watching) {
+        ResourceWatch* const watch = new ResourceWatch(path, watcher);
+        record.mWatches.push_back(watch);
+        watcher->mWatches.push_back(watch);
+      }
+    }
 
-      // Publish the freshly loaded resource into the request's cache slot
-      // while a strong reference still exists. `mResolved` is the manager's
-      // owning handle - the cache-hit path above reads it back through
-      // `BuildWeakPairFromLiveSharedVariant1`, and callers of RES_GetResource
-      // only ever receive a weak handle. Dropping `loadedResource` without
-      // storing it first destroys the resource the instant this scope ends, so
-      // every caller's `.lock()` returns null even though the factory loaded
-      // the file perfectly well.
-      (void)AssignSharedPairRetainRelease_004AEF90(&loadedResource, &request.mResolved);
-      boost::ReleaseSharedControlOnly(&loadedResource);
+    return LoadRecord(record, lock);
+  }
 
-      workerLock.lock();
+  /**
+   * Address: 0x004AA690 (FUN_004AA690)
+   */
+  boost::shared_ptr<void> ResourceManager::LoadRecord(ResourceRecord& record, boost::recursive_mutex::scoped_lock& lock)
+  {
+    const boost::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
+    while (record.mLoading) {
+      mLoadFinished.wait(lock);
+    }
 
-      if (request.mLoadWakePending == 0) {
+    boost::shared_ptr<void> resource = boost::LockWeak(record.mResource);
+    if (resource || record.mLoadFailed) {
+      return resource;
+    }
+
+    ResourceFactoryBase* const factory = FindFactory(record.mType);
+    record.mLoading = true;
+    ++mLoadsInProgress;
+    while (true) {
+      lock.unlock();
+      if (prefetch && prefetch->mPrefetchData) {
+        if (res_SpewLoadSpam) {
+          gpg::Debugf("Finishing %s resource prefetched from %s", record.mType->GetName(), record.mId.name.c_str());
+        }
+        resource = factory->LoadFrom(record.mId.name.c_str(), record.mType, prefetch->mPrefetchData, factory->mPrefetchType);
+        prefetch->mPrefetchData.reset();
+      } else {
+        if (res_SpewLoadSpam) {
+          gpg::Debugf("Loading %s resource from %s", record.mType->GetName(), record.mId.name.c_str());
+        }
+        resource = factory->Load(record.mId.name.c_str(), record.mType);
+      }
+      if (prefetch) {
+        prefetch->mResource = resource;
+      }
+      lock.lock();
+
+      if (!record.mReloadPending) {
         break;
       }
-
-      request.mLoadWakePending = 0;
+      record.mReloadPending = false;
     }
 
-    (void)BuildWeakPairFromLiveSharedVariant1(&request.mResolved, outResource);
-    if (outResource->px == nullptr) {
-      request.mHadLoadFailure = 1;
+    boost::AssignWeakFromShared(record.mResource, resource);
+    if (!resource) {
+      record.mLoadFailed = true;
     }
+    record.mLoading = false;
+    --mLoadsInProgress;
+    boost::xtime_get(&mLastLoadTime, kClockUtc);
+    mLoadFinished.notify_all();
+    return resource;
+  }
 
-    request.mIsLoading = 0;
-    if (mActiveLoadCount > 0U) {
-      --mActiveLoadCount;
+  /**
+   * Address: 0x004A9BA0 (FUN_004A9BA0, func_EnsureResourceManager)
+   * Address: 0x00BF05B0 (FUN_00BF05B0, ??1ResourceManager@Moho@@QAE@@Z)
+   */
+  void RES_EnsureResourceManager()
+  {
+    static ResourceManager sInstance; // 0x01104160
+    sResourceManager = &sInstance;
+  }
+
+  ResourceManager* RES_GetResourceManager()
+  {
+    if (sResourceManager == nullptr) {
+      boost::call_once(&RES_EnsureResourceManager, sResourceManagerOnce);
     }
-    mLastResolveTime = std::chrono::steady_clock::now();
-    mWorkerIdleCondition.notify_all();
+    return sResourceManager;
   }
 
-  return outResource;
-}
-
-/**
- * Address: 0x004AA220 (FUN_004AA220, Moho::ResourceManager::GetResource)
- *
- * boost::weak_ptr<gpg::RObject> &,const char *,Moho::CResourceWatcher *,gpg::RType *
- *
- * What it does:
- * Canonicalizes one resource path, ensures one typed request runtime lane,
- * attaches optional watcher tracking, and resolves one weak resource handle
- * while preserving lock-drop/reacquire semantics around factory calls.
- */
-boost::SharedCountPair* moho::ResourceManager::GetResource(
-  boost::SharedCountPair* const outResource,
-  const char* const path,
-  CResourceWatcher* const resourceWatcher,
-  gpg::RType* const resourceType
-)
-{
-  if (outResource == nullptr) {
-    return nullptr;
+  /**
+   * Address: 0x004ABEE0 (FUN_004ABEE0, ?RES_GetResource@Moho@@YA?AV?$shared_ptr@X@boost@@VStrArg@gpg@@PAVCResourceWatcher@1@PBVRType@5@@Z)
+   */
+  boost::shared_ptr<void> RES_GetResource(
+    const gpg::StrArg path, CResourceWatcher* const resourceWatcher, const gpg::RType* const resourceType
+  )
+  {
+    return RES_GetResourceManager()->GetResource(path, resourceWatcher, resourceType);
   }
 
-  boost::recursive_mutex::scoped_lock workerLock(mLock);
-
-  (void)ResetSharedPairToNullVariant1(outResource);
-
-  const bool invalidPath =
-    (path == nullptr || path[0] == '\0')
-    || (path[0] == '/' && path[1] != '/' && (path[1] == ':' || path[1] == '/' || path[1] == '\0'));
-
-  msvc8::string canonicalPath{};
-  if (!TryResolveResourcePathForGet(path, &canonicalPath)) {
-    if (invalidPath) {
-      gpg::Warnf("GetResource: Invalid name \"%s\"", path != nullptr ? path : "");
-    }
-    return outResource;
+  /**
+   * Address: 0x004ABE80 (FUN_004ABE80)
+   */
+  void RES_ActivatePendingFactories()
+  {
+    RES_GetResourceManager()->ActivatePendingFactories();
   }
 
-  const PrefetchRequestProbe probe(canonicalPath.c_str(), resourceType);
-  const auto requestLookup = mPrefetchRequests.insert(probe.get());
-  PrefetchRequestRuntime& request = MutableRequest(requestLookup.first);
-  if (requestLookup.second || request.mResourceId.name.empty()) {
-    // The set's copy (0x004A9AA0) already took only the key and left the
-    // waiter list empty; this rebuilds the entry from the path as well.
-    (void)InitializePrefetchRequestFromPath(&request, canonicalPath.c_str(), resourceType);
+  /**
+   * Address: 0x004ABEB0 (FUN_004ABEB0, ?RES_Exit@Moho@@YAXXZ)
+   */
+  void RES_Exit()
+  {
+    RES_GetResourceManager()->ShutdownBackgroundThread();
   }
-
-  if (resourceWatcher != nullptr && !HasWatcherNodeForRequest(request, resourceWatcher)) {
-    auto* const watchNode = static_cast<PrefetchWatchNode*>(::operator new(sizeof(PrefetchWatchNode)));
-    (void)InitializePrefetchWatchNode(watchNode, path != nullptr ? path : "", resourceWatcher);
-    watchNode->mListLink.ListLinkBefore(&request.mWaiterListHead);
-    AppendWatcherNodeReference(resourceWatcher, watchNode);
-  }
-
-  return ResolvePendingResourceRequest(outResource, request, workerLock);
-}
-
-bool moho::ResourceManager::AreFactoriesActivated() const
-{
-  boost::recursive_mutex::scoped_lock lock(mLock);
-  return mFactoriesActivated;
-}
-
-/**
- * Address: 0x004A9BA0 (FUN_004A9BA0, func_EnsureResourceManager)
- *
- * What it does:
- * Ensures singleton creation for startup paths that require a live manager.
- */
-void moho::RES_EnsureResourceManager()
-{
-  std::call_once(sResourceManagerOnce, &EnsureResourceManagerOnce);
-}
-
-moho::ResourceManager* moho::RES_GetResourceManager()
-{
-  RES_EnsureResourceManager();
-  return sPResourceManager;
-}
-
-/**
- * Address: 0x004ABEE0 (FUN_004ABEE0, ?RES_GetResource@Moho@@...)
- *
- * What it does:
- * Ensures singleton initialization and forwards one resource lookup to
- * `ResourceManager::GetResource`.
- */
-boost::SharedCountPair* moho::RES_GetResource(
-  boost::SharedCountPair* const outResource,
-  const char* const path,
-  CResourceWatcher* const resourceWatcher,
-  gpg::RType* const resourceType
-)
-{
-  ResourceManager* const manager = RES_GetResourceManager();
-  if (manager == nullptr || outResource == nullptr) {
-    return outResource;
-  }
-
-  return manager->GetResource(outResource, path, resourceWatcher, resourceType);
-}
-
-/**
-  * Alias of FUN_004AA090 (non-canonical helper lane).
- *
- * What it does:
- * Executes the startup pending-factory activation phase on the singleton.
- */
-void moho::RES_ActivatePendingFactories()
-{
-  ResourceManager* const manager = RES_GetResourceManager();
-  if (manager != nullptr) {
-    manager->ActivatePendingFactories();
-  }
-}
-
-/**
- * Address: 0x004ABEB0 (FUN_004ABEB0, ?RES_Exit@Moho@@YAXXZ)
- *
- * What it does:
- * Ensures the singleton exists and runs resource-manager worker shutdown.
- */
-void moho::RES_Exit()
-{
-  ResourceManager* const manager = RES_GetResourceManager();
-  if (manager != nullptr) {
-    manager->ShutdownBackgroundThread();
-  }
-}
+} // namespace moho

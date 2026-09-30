@@ -63,7 +63,7 @@ namespace moho
      * A node is not a value: neighbours point at it by address, so a copy that
      * took over `mPrev`/`mNext` would claim a place in a ring that never
      * linked it. The only two link holders the binary copies both rebuild
-     * their own links instead: `PrefetchRequestRuntime`'s copy (0x004A9AA0)
+     * their own links instead: `ResourceRecord`'s copy (0x004A9AA0)
      * self-links its waiter head, and `SEntitySetTemplateUnit`'s assignment
      * (inlined in 0x007056A0) leaves its links alone. Owners that are copied
      * spell out what they copy.
@@ -166,8 +166,8 @@ namespace moho
      *   removed 2026-09-28.)
      * Address: 0x00484B00 (FUN_00484B00 -- `CNetTCPConnector::mPartials`';
      *   formerly `ResetPartialListHead`, called from the destructor body.)
-     * Address: 0x004A9B30 (FUN_004A9B30 -- `PrefetchRequestRuntime::
-     *   mWaiterListHead`'s; formerly `UnlinkIntrusiveListNode`.)
+     * Address: 0x004A9B30 (FUN_004A9B30 -- `ResourceRecord::
+     *   mWatches`'s; formerly `UnlinkIntrusiveListNode`.)
      * Address: 0x004ACF00 (FUN_004ACF00 -- a second ResourceManager emission;
      *   zero callers; formerly `UnlinkIntrusivePairLinkNode`.)
      * Address: 0x004E1F70 (FUN_004E1F70 -- a CSndParams emission; zero

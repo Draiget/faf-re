@@ -104,8 +104,13 @@ namespace moho
 
     /**
      * Address: 0x0063FBA0 (FUN_0063FBA0)
+     *
+     * What it does:
+     * Starts `resource` from its first frame: rebinds the watched bones to the
+     * clip's bone names (or clears them when there is no clip), adopts the
+     * clip, and resets the playback time.
      */
-    void SetAnimationResource(const boost::SharedPtrRaw<RScaResource>& resource, bool looping);
+    void SetAnimationResource(bool looping, boost::shared_ptr<RScaResource> resource);
 
     /**
      * Address: 0x006412C0 (FUN_006412C0)
@@ -149,7 +154,7 @@ namespace moho
 
     WeakPtr<Unit> mGoal;                // +0x80 (intrusive weak link into goalMotionScaleUnit chain)
     SAniManipBitStorage mBoneMask;      // +0x88
-    boost::SharedPtrRaw<RScaResource> mAnimationRef; // +0x9C
+    boost::shared_ptr<RScaResource> mAnimationRef; // +0x9C
     float mRate;                        // +0xA4
     float mAnimationTime;               // +0xA8
     float mLastFramePosition;           // +0xAC

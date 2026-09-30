@@ -129,13 +129,13 @@ namespace
   }
 
   [[nodiscard]] const AnimationClipHeaderView*
-  GetAnimationClipHeader(const boost::SharedPtrRaw<moho::RScaResource>& ref)
+  GetAnimationClipHeader(const boost::shared_ptr<moho::RScaResource>& ref)
   {
-    if (!ref.px) {
+    if (!ref) {
       return nullptr;
     }
 
-    return ScaClipHeader(*ref.px);
+    return ScaClipHeader(*ref);
   }
 
   /**
@@ -456,7 +456,7 @@ namespace
     archive->Write(CachedIAniManipulatorTypeForSerializer(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(object)), nullOwner);
     archive->Write(CachedWeakPtrUnitType(), &const_cast<moho::CAnimationManipulator*>(object)->mGoal, nullOwner);
     archive->Write(CachedVectorBoolType(), const_cast<moho::SAniManipBitStorage*>(&object->mBoneMask), nullOwner);
-    archive->WritePointer(object->mAnimationRef.px, gpg::TrackedPointerState::Shared, nullOwner);
+    archive->WritePointer(object->mAnimationRef.get(), gpg::TrackedPointerState::Shared, nullOwner);
     archive->WriteFloat(object->mRate);
     archive->WriteFloat(object->mAnimationTime);
     archive->WriteFloat(object->mLastFramePosition);
@@ -652,14 +652,7 @@ namespace moho
       looping = loopingArg.GetBoolean();
     }
 
-    gpg::RRef resourceRef{};
-    (void)moho::GetScaResource(&resourceRef, filename);
-
-    boost::SharedPtrRaw<RScaResource> animationResource{};
-    animationResource.px = static_cast<RScaResource*>(resourceRef.mObj);
-    animationResource.pi = nullptr;
-
-    manipulator->SetAnimationResource(animationResource, looping);
+    manipulator->SetAnimationResource(looping, moho::GetScaResource(filename));
     lua_settop(rawState, 1);
     return 1;
   }
@@ -1396,7 +1389,7 @@ namespace moho
    */
   CAnimationManipulator::~CAnimationManipulator()
   {
-    mAnimationRef.release();
+    mAnimationRef.reset();
     mBoneMask.Reset();
     mGoal.UnlinkFromOwnerChain();
   }
@@ -1422,7 +1415,7 @@ namespace moho
    */
   bool CAnimationManipulator::ManipulatorUpdate()
   {
-    const RScaResource* const resource = mAnimationRef.px;
+    const RScaResource* const resource = mAnimationRef.get();
     if (resource == nullptr) {
       return false;
     }
@@ -1617,7 +1610,7 @@ namespace moho
   bool CAnimationManipulator::UpdateTriggeredState()
   {
     const float duration = GetAnimationDuration();
-    const bool missingAnimation = (mAnimationRef.px == nullptr);
+    const bool missingAnimation = !mAnimationRef;
     const bool zeroRate = (mRate == 0.0f);
     const bool reachedStart = (mRate < 0.0f) && (mAnimationTime == 0.0f);
     const bool reachedEnd = (mRate > 0.0f) && (mAnimationTime == duration);
@@ -1637,13 +1630,13 @@ namespace moho
   /**
    * Address: 0x0063FBA0 (FUN_0063FBA0)
    */
-  void CAnimationManipulator::SetAnimationResource(const boost::SharedPtrRaw<RScaResource>& resource, const bool looping)
+  void CAnimationManipulator::SetAnimationResource(const bool looping, boost::shared_ptr<RScaResource> resource)
   {
-    if (resource.px != nullptr) {
+    if (resource) {
       // 0x0063FBC1..0x0063FC5A: rebuild the watch-bone bindings from the clip's
       // bone-name table, resolving each name against the owner's skeleton.
       const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
-      const AnimationClipHeaderView* const clip = ScaClipHeader(*resource.px);
+      const AnimationClipHeaderView* const clip = ScaClipHeader(*resource);
       const std::uint32_t boneTrackCount = clip->mBoneTrackCount;
       const char* boneName = reinterpret_cast<const char*>(clip) + clip->mBoneNameTableOffset;
       ResetWatchBoneStorage();
@@ -1654,9 +1647,9 @@ namespace moho
       }
     } else {
       ResetWatchBoneStorage();
-      mAnimationRef.release();
+      resource.reset();
     }
-    mAnimationRef.assign_retain(resource);
+    mAnimationRef = resource;
     mAnimationTime = 0.0f;
     mLastFramePosition = -1.0f;
     mLooping = looping;

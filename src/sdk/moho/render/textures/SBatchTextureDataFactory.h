@@ -12,7 +12,6 @@ namespace moho
   class SBatchTextureDataFactory final : public ResourceFactory<SBatchTextureData>
   {
   public:
-    using PrefetchDataHandle = ResourceHandle;
 
     /**
      * Address: 0x00448030 (FUN_00448030, Moho::SBatchTextureDataFactory::SBatchTextureDataFactory)
@@ -37,13 +36,11 @@ namespace moho
     /**
      * Address: 0x00447DD0 (FUN_00447DD0, Moho::SBatchTextureDataFactory::LoadImpl)
      *
-     * boost::shared_ptr<moho::SBatchTextureData> &,const char *
-     *
      * What it does:
      * Decodes one mapped texture payload through the active D3D9 device and
      * stores DXT blocks into `SBatchTextureData`.
      */
-    ResourceHandle& LoadImpl(ResourceHandle& outResource, const char* path) override;
+    boost::shared_ptr<SBatchTextureData> LoadImpl(gpg::StrArg path) override;
   };
 
   static_assert(sizeof(ResourceFactory<SBatchTextureData>) == 0x0C, "ResourceFactory<SBatchTextureData> size must be 0x0C");

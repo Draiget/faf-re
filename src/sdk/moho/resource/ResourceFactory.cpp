@@ -1,8 +1,6 @@
 #include "moho/resource/ResourceFactory.h"
 
-#include <cstdlib>
 #include <cstring>
-#include <new>
 
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/resource/RScmResource.h"
@@ -40,72 +38,35 @@ namespace moho
   }
 
   /**
-   * Address: 0x005396F0 (FUN_005396F0, Moho::ResourceFactory_RScmResource::Init)
+   * Address: 0x00539290 (FUN_00539290)
    *
    * What it does:
-   * Resolves cached `RScmResource` RTTI and updates the prefetch/resource
-   * type lanes used by factory virtual dispatch.
-   */
-  void CScmResourceFactory::Init()
-  {
-    gpg::RType* firstResolvedType = RScmResource::sType;
-    if (firstResolvedType == nullptr) {
-      firstResolvedType = gpg::LookupRType(typeid(RScmResource));
-      RScmResource::sType = firstResolvedType;
-    }
-
-    gpg::RType* resolvedType = firstResolvedType;
-    if (resolvedType == nullptr) {
-      resolvedType = gpg::LookupRType(typeid(RScmResource));
-      RScmResource::sType = resolvedType;
-    }
-
-    mPrefetchType = firstResolvedType;
-    mResourceType = resolvedType;
-  }
-
-  /**
-   * Address: 0x00539290 (FUN_00539290) -- vtable slot 4, the pure slot
-   * `ResourceFactory<RScmResource>` declares. Slots 1..3 stay the
-   * template's own `Load`/`Preload`/`LoadFrom` in both vftables.
+   * Reads one SCM file and wraps it in an `RScmResource`; a missing file or
+   * one shorter than the 0x30-byte header loads as nothing.
    *
-   * What it does:
-   * Reads one SCM payload from disk, validates minimum byte length, then
-   * materializes one `RScmResource` bound to aliased file bytes.
+   * The binary hands the file buffer's own control block to the resource
+   * (0x00539E40 aliases `mBegin` onto it); this copies the bytes into a buffer
+   * the resource owns instead, since boost 1.34 has no aliasing constructor.
    */
-  CScmResourceFactory::ResourceHandle&
-  CScmResourceFactory::LoadImpl(ResourceHandle& outResource, const char* const path)
+  boost::shared_ptr<RScmResource> CScmResourceFactory::LoadImpl(const gpg::StrArg path)
   {
-    outResource.reset();
-
-    gpg::MemBuffer<char> fileBytes = DISK_ReadFile(path);
+    const gpg::MemBuffer<char> fileBytes = DISK_ReadFile(path);
     if (fileBytes.mBegin == nullptr) {
-      return outResource;
+      return {};
     }
 
-    const std::size_t byteCount = static_cast<std::size_t>(fileBytes.mEnd - fileBytes.mBegin);
+    const std::size_t byteCount = fileBytes.Size();
     if (byteCount < 0x30u) {
-      return outResource;
+      return {};
     }
 
-    auto* const scmBytes = new (std::nothrow) char[byteCount];
-    if (scmBytes == nullptr) {
-      return outResource;
-    }
+    auto* const scmBytes = new char[byteCount];
     std::memcpy(scmBytes, fileBytes.mBegin, byteCount);
-
     const boost::shared_ptr<const SScmFile> scmFile(
-      reinterpret_cast<const SScmFile*>(scmBytes),
-      &DeleteScmFileBuffer
+      reinterpret_cast<const SScmFile*>(scmBytes), &DeleteScmFileBuffer
     );
 
-    RScmResource* const rawResource = new (std::nothrow) RScmResource(path, scmFile);
-    if (rawResource == nullptr) {
-      return outResource;
-    }
-
-    ConstructSharedRScmResourceFromRaw(&outResource, rawResource);
-    return outResource;
+    boost::shared_ptr<RScmResource> resource;
+    return *ConstructSharedRScmResourceFromRaw(&resource, new RScmResource(path, scmFile));
   }
-
 } // namespace moho

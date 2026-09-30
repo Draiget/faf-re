@@ -268,30 +268,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x004ABF30 (FUN_004ABF30, Moho::RES_PrefetchResource)
+   * Address: 0x004ABF30 (FUN_004ABF30, ?RES_PrefetchResource@Moho@@YA?AVPrefetchHandleBase@1@VStrArg@gpg@@PBVRType@4@@Z)
    *
    * What it does:
-   * Ensures the resource-manager singleton and forwards prefetch-handle
-   * creation to `ResourceManager::CreatePrefetchData`.
+   * `ResourceManager::PrefetchResource` on the singleton.
    */
-  boost::shared_ptr<PrefetchData>* RES_PrefetchResource(
-    boost::shared_ptr<PrefetchData>* const outPrefetchData,
-    const gpg::StrArg resourcePath,
-    const gpg::RType* const type
-  )
+  PrefetchHandleBase RES_PrefetchResource(const gpg::StrArg resourcePath, const gpg::RType* const type)
   {
-    if (outPrefetchData == nullptr) {
-      return nullptr;
-    }
-
-    RES_EnsureResourceManager();
-    ResourceManager* const manager = RES_GetResourceManager();
-    if (manager == nullptr) {
-      outPrefetchData->reset();
-      return outPrefetchData;
-    }
-
-    return manager->CreatePrefetchData(outPrefetchData, resourcePath, const_cast<gpg::RType*>(type));
+    return RES_GetResourceManager()->PrefetchResource(resourcePath, type);
   }
 
   /**
@@ -360,9 +344,7 @@ namespace moho
 
     const gpg::TypeHandle typeHandle = archive->ReadTypeHandle();
 
-    boost::shared_ptr<PrefetchData> payload{};
-    RES_PrefetchResource(&payload, resourcePath.c_str(), typeHandle.type);
-    mPtr = payload;
+    *this = RES_PrefetchResource(resourcePath.c_str(), typeHandle.type);
   }
 
   /**
@@ -370,8 +352,8 @@ namespace moho
    */
   const msvc8::string& PrefetchHandleBase::GetName() const
   {
-    GPG_ASSERT(mPtr.get() != nullptr && mPtr->mRequest != nullptr);
-    return mPtr->mRequest->mResourceId.name;
+    GPG_ASSERT(mPtr.get() != nullptr && mPtr->mRecord != nullptr);
+    return mPtr->mRecord->mId.name;
   }
 
   /**
@@ -379,8 +361,8 @@ namespace moho
    */
   gpg::RType* PrefetchHandleBase::GetResourceRType() const
   {
-    GPG_ASSERT(mPtr.get() != nullptr && mPtr->mRequest != nullptr);
-    return mPtr->mRequest->mResourceType;
+    GPG_ASSERT(mPtr.get() != nullptr && mPtr->mRecord != nullptr);
+    return const_cast<gpg::RType*>(mPtr->mRecord->mType);
   }
 } // namespace moho
 

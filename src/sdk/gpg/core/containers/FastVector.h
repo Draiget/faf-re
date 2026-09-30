@@ -177,6 +177,10 @@ namespace gpg::core
      * Address: 0x00954250 (FUN_00954250 -- `ConstructRangeForward` for the `char` reachability flags of `gpg::fastvector_n<char, 12>` (`EraseUnconnectedNodes` 0x00954650, grown by `resize(n, 0)` 0x009545D0); the same null-guarded byte copy as 0x0092BE50 for a second instantiation, also a `this`-taking member (`ret 0xC`); callers 0x009543F0 (the reallocating insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      * Address: 0x0061CA20 (FUN_0061CA20 -- `ConstructRangeForward` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`: each non-null slot `WeakPtr`'s copy constructor, pushed onto its target's chain; the `_Ucopy` of the reallocating insert 0x0061C940. Formerly `CopyIntrusiveWeakRefRangeRelink`, removed 2026-09-30.)
      * Address: 0x008AFB90 (FUN_008AFB90 -- `ConstructRangeForward` for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28): `if (dest) new (dest) SoundHandleRecord(*src)` per slot, the copy constructor 0x008AECF0 that pushes the new slot onto its loop handle's chain and copies the tracked-entity set; the three slices of the reallocating insert 0x008AF760. It was cited on the assignment lane, with the chain relink and the set copy modelled as passes after the grow (`RebuildSoundHandleOwnerChains`, `RefreshTrackedEntitySetAfterRelocation`, removed 2026-09-30); the second one emptied every relocated slot's set instead of copying it.)
+     * Address: 0x004ADDB0 (FUN_004ADDB0 -- `ConstructRangeForward` for `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8), the
+     * null-guarded pointer copy of the inserting and reallocating paths
+     * (0x004ACD80, 0x004ADCE0); formerly `CopyDwordRangeForward_004ADDB0` in
+     * moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
      */
     template <class T>
     inline T* ConstructRangeForward(T* dest, const T* first, const T* const last)
@@ -776,6 +780,8 @@ namespace gpg::core
      * Address: 0x0065A340 (FUN_0065A340 -- `BindInlineStorage` for `unsigned int`: the same body with the count folded to 26 (`lea edx,[ecx+0x68]`). Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity26` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x0065F380 (FUN_0065F380 -- `BindInlineStorage` for `unsigned int` with the count folded to 294. Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity294` in moho/render/EmitterTypeTypeInfo.cpp (RULE THREE), removed 2026-09-23.)
      * Address: 0x0065A350 (FUN_0065A350 -- `BindInlineStorage` for `unsigned int`: the same body with the count folded to 2 (`lea edx,[ecx+8]`). Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity2` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x004ACE90 (FUN_004ACE90 -- the by-count `BindInlineStorage` for `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8). Zero callers, unreachable; formerly `InitializeDwordPointerWindow4` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x004ACC70 (FUN_004ACC70 -- the N = 8 form with the count folded (`lea ecx,[eax+0x10]; lea edx,[ecx+0x20]`), `OnDiskWatchEvent`'s local. Zero callers, unreachable; formerly `InitializeLegacyPointerHeader4` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
      */
     void BindInlineStorage(T* const storage, const size_type count) noexcept
     {
@@ -833,6 +839,11 @@ namespace gpg::core
      * insert_range` -- the ordered insert `Unit::GuardedByList` and the
      * formation weak-ref sets perform; its reallocating branch is
      * 0x00710E90, cited on `ReallocateInsert_`.)
+     * Address: 0x004ACD80 (FUN_004ACD80 -- `InsertRange` for `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8): the
+     * `push_back`s of `ResourceManager::GetResource` (0x004AA220) and
+     * `OnDiskWatchEvent` (0x004AB780) and 0x004AC050; growth doubles. It was
+     * cited on `msvc8::vector::insert`; formerly `InsertDwordRangeIntoVectorRuntime`
+     * in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
      *
      * What it does:
      * Inserts `[first, last)` at `pos`, growing storage when the run no longer
@@ -937,6 +948,9 @@ namespace gpg::core
      * range to the new block and rebases `end_`)
      * Address: 0x00553A80 (FUN_00553A80, the `Moho::SOCellPos` instantiation
      * reached from the reflected `SetCount`/`SerLoad` resize at 0x005532F0.)
+     * Address: 0x004ADCE0 (FUN_004ADCE0 -- the same step for `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8);
+     * callers 0x004ACD80. It was cited on `msvc8::vector::insert`; formerly
+     * `ReallocateAndSpliceDwordRange_004ADCE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
      *
      * Buy a `newCapacity` block, uninitialized-copy the prefix, the inserted
      * run and the suffix into it, then retire the old storage: when it was the

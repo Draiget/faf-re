@@ -120,9 +120,7 @@ namespace moho
       RScmResource::sType = resourceType;
     }
 
-    boost::weak_ptr<RScmResource> resolved{};
-    (void)RES_GetResource(&resolved, path, resourceWatcher, resourceType);
-    return resolved.lock();
+    return boost::static_pointer_cast<RScmResource>(RES_GetResource(path, resourceWatcher, resourceType));
   }
 
   /**

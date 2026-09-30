@@ -322,9 +322,7 @@ void SetConstructResultSharedScaResource(
     RScaResource::sType = resourceType;
   }
 
-  const boost::shared_ptr<void>& sharedAny =
-    reinterpret_cast<const boost::shared_ptr<void>&>(resource);
-  result->SetShared(sharedAny, resourceType, 1u);
+  result->SetShared(boost::shared_ptr<void>(resource), resourceType, 1u);
 }
 
 /**
@@ -340,17 +338,7 @@ void Construct_RScaResource(
 {
   msvc8::string resourcePath{};
   archive->ReadString(&resourcePath);
-
-  gpg::RType* resourceType = RScaResource::sType;
-  if (resourceType == nullptr) {
-    resourceType = gpg::LookupRType(typeid(RScaResource));
-    RScaResource::sType = resourceType;
-  }
-
-  boost::weak_ptr<RScaResource> weakResource{};
-  (void)RES_GetResource(&weakResource, resourcePath.c_str(), nullptr, resourceType);
-  const boost::shared_ptr<RScaResource> sharedResource = weakResource.lock();
-  SetConstructResultSharedScaResource(result, sharedResource);
+  SetConstructResultSharedScaResource(result, GetScaResource(resourcePath.c_str()));
 }
 
 /**
@@ -392,33 +380,6 @@ void SaveConstructArgs_RScaResourceThunk(
 )
 {
   SaveConstructArgs_RScaResource(archive, objectPtr, version, ownerRef, result);
-}
-
-/**
- * Address: 0x0053AD00 (FUN_0053AD00, Moho::ResourceFactory_RScaResource::Init)
- *
- * What it does:
- * Resolves cached `RScaResource` RTTI and updates the prefetch/resource
- * type lanes used by factory virtual dispatch.
- */
-void CScaResourceFactory::Init()
-{
-  (void)preregister_RScaResourceTypeInfo();
-
-  gpg::RType* firstResolvedType = RScaResource::sType;
-  if (firstResolvedType == nullptr) {
-    firstResolvedType = gpg::LookupRType(typeid(RScaResource));
-    RScaResource::sType = firstResolvedType;
-  }
-
-  gpg::RType* resolvedType = firstResolvedType;
-  if (resolvedType == nullptr) {
-    resolvedType = gpg::LookupRType(typeid(RScaResource));
-    RScaResource::sType = resolvedType;
-  }
-
-  mPrefetchType = firstResolvedType;
-  mResourceType = resolvedType;
 }
 
 /**
@@ -496,48 +457,29 @@ bool RScaResource::LoadScaFile(const char* filename)
 
 /**
  * Address: 0x0053AAD0 (FUN_0053AAD0)
- * Mangled: ?Load@CScaResourceFactory@Moho@@UAEAAV?$shared_ptr@VRScaResource@Moho@@@boost@@AAV34@PBD@Z
- *
- * IDA signature:
- * boost::shared_ptr<Moho::RScaResource>* __thiscall
- * Moho::CScaResourceFactory::Load(
- *   Moho::CScaResourceFactory *this,
- *   boost::shared_ptr<Moho::RScaResource>* outResource,
- *   const char* path);
  *
  * What it does:
- * Allocates a fresh `RScaResource`, parses the SCA file via `LoadScaFile`,
- * and resets the out handle to null when parsing fails.
+ * Allocates a fresh `RScaResource` straight into the returned handle, parses
+ * the SCA file via `LoadScaFile`, and empties the handle when parsing fails.
  */
-CScaResourceFactory::ResourceHandle&
-CScaResourceFactory::LoadImpl(ResourceHandle& outResource, const char* const path)
+boost::shared_ptr<RScaResource> CScaResourceFactory::LoadImpl(const gpg::StrArg path)
 {
-  auto* const rawResource = new (std::nothrow) RScaResource();
-  outResource.reset(rawResource);
-
-  if (rawResource == nullptr) {
-    return outResource;
+  boost::shared_ptr<RScaResource> resource(new RScaResource());
+  if (!resource->LoadScaFile(path)) {
+    resource.reset();
   }
-
-  if (!rawResource->LoadScaFile(path)) {
-    outResource.reset();
-  }
-
-  return outResource;
+  return resource;
 }
 
 /**
  * Address: 0x0053B100 (FUN_0053B100)
  *
- * IDA signature:
- * gpg::RRef* __cdecl Moho::func_GetScaResource(gpg::RRef* outRef, const char* path);
- *
  * What it does:
- * Resolves the cached `RScaResource` reflection type, fetches a weak handle
- * via `RES_GetResource`, packages it as a typed `gpg::RRef` into `outRef`,
- * then drops the temporary weak-ptr reference count.
+ * Asks the resource manager for the animation at `path` and returns it as an
+ * owning handle: `RES_GetResource`'s `shared_ptr<void>` is converted in place
+ * (0x0053B2C0) and the temporary released.
  */
-gpg::RRef* GetScaResource(gpg::RRef* const outRef, const char* const path)
+boost::shared_ptr<RScaResource> GetScaResource(const gpg::StrArg path)
 {
   gpg::RType* resourceType = RScaResource::sType;
   if (resourceType == nullptr) {
@@ -545,21 +487,10 @@ gpg::RRef* GetScaResource(gpg::RRef* const outRef, const char* const path)
     RScaResource::sType = resourceType;
   }
 
-  boost::weak_ptr<RScaResource> weakResource{};
-  (void)RES_GetResource(&weakResource, path, nullptr, resourceType);
-
-  // The binary packages the live referent and reflected type into the RRef
-  // and then releases the temporary weak count when `weakResource` falls out
-  // of scope. The locked shared_ptr's referent is the same pointer the binary
-  // read directly from the weak_ptr `px` lane.
-  if (const boost::shared_ptr<RScaResource> liveResource = weakResource.lock(); liveResource) {
-    outRef->mObj = liveResource.get();
-  } else {
-    outRef->mObj = nullptr;
-  }
-  outRef->mType = resourceType;
-  { static int sScaBudget = 12; if (sScaBudget > 0) { --sScaBudget; gpg::Warnf("[SCADIAG] path='%s' weakExpired=%d useCount=%ld obj=%p", path != nullptr ? path : "", weakResource.expired() ? 1 : 0, weakResource.use_count(), outRef->mObj); } } // TEMPORARY PROBE (do not commit)
-  return outRef;
+  const boost::shared_ptr<RScaResource> resource =
+    boost::static_pointer_cast<RScaResource>(RES_GetResource(path, nullptr, resourceType));
+  { static int sScaBudget = 12; if (sScaBudget > 0) { --sScaBudget; gpg::Warnf("[SCADIAG] path='%s' useCount=%ld obj=%p", path != nullptr ? path : "", resource.use_count(), resource.get()); } } // TEMPORARY PROBE (do not commit)
+  return resource;
 }
 
 /**

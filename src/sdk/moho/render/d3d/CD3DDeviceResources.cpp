@@ -110,10 +110,9 @@ namespace moho
     )
     {
       gpg::RType* const resourceType = resource_reflection::ResolveRD3DTextureResourceType();
-
-      boost::weak_ptr<RD3DTextureResource> weakResource{};
-      (void)RES_GetResource(&weakResource, path != nullptr ? path : "", resourceWatcher, resourceType);
-      outTexture = weakResource.lock();
+      outTexture = boost::static_pointer_cast<RD3DTextureResource>(
+        RES_GetResource(path != nullptr ? path : "", resourceWatcher, resourceType)
+      );
       return outTexture;
     }
 
@@ -131,7 +130,7 @@ namespace moho
     {
       outTexture.reset();
       if (textureFactory != nullptr) {
-        textureFactory->LoadImpl(outTexture, path);
+        outTexture = textureFactory->LoadImpl(path);
       }
       return outTexture;
     }
@@ -150,10 +149,8 @@ namespace moho
     {
       EnsureTextureTypeRegistered();
 
-      outPrefetchData.reset();
-      RES_PrefetchResource(&outPrefetchData, path, RD3DTextureResource::sType);
-
-      if (!outPrefetchData) {
+      const PrefetchHandleBase handle = RES_PrefetchResource(path, RD3DTextureResource::sType);
+      if (!handle.mPtr) {
         const msvc8::string errorText = gpg::STR_Printf(
           "Prefetch couldn't find file %s",
           path != nullptr ? path : ""
@@ -161,6 +158,7 @@ namespace moho
         throw std::runtime_error(errorText.c_str());
       }
 
+      outPrefetchData = handle.mPtr;
       return outPrefetchData;
     }
 

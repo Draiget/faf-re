@@ -6,6 +6,7 @@
 #include "boost/shared_ptr.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "moho/resource/CResourceWatcher.h"
 #include "Wm3Vector3.h"
 
 namespace gpg
@@ -59,7 +60,7 @@ namespace moho
    * cloud layers, horizon lookup textures, and associated D3D vertex/index
    * buffers for the dome and decal geometry.
    */
-  class SkyDome
+  class SkyDome : public CResourceWatcher
   {
   public:
     /**
@@ -91,23 +92,19 @@ namespace moho
     SkyDome();
 
     /**
-     * Address: 0x008175D0 (FUN_008175D0, Moho::SkyDome::Destroy)
+     * Address: 0x008175D0 (FUN_008175D0, Moho::SkyDome::Func1)
      *
-     * Vtable slot 0 of ??_7SkyDome@Moho@@6B@ (0x00E422A0); the destructor is
-     * slot 1. The order matters and is not a matter of taste: MSVC numbers
-     * virtuals in declaration order, so declaring the destructor first -- as
-     * this header did -- puts it in slot 0 and leaves the class one slot short,
-     * with Destroy demoted to a non-virtual nothing can dispatch to.
-     *
-     * That this is virtual at all is settled by the image rather than inferred:
-     * 0x008175D0 has exactly one reference in the whole binary, the vtable
-     * entry at 0x00E422A0. There is no direct call or jump to it anywhere, not
-     * even from ~SkyDome, so the slot is its only entry point.
+     * Vtable slot 0 of ??_7SkyDome@Moho@@6B@ (0x00E422A0), the one slot of the
+     * `CResourceWatcher` base (RTTI lists it); it takes the changed path
+     * (`ret 4`). The destructor is slot 1. Its only reference in the binary is
+     * that vtable entry: the resource manager reaches it through the watches
+     * `CreateTextures` registers.
      *
      * What it does:
-     * Releases all D3D resource handles and resets rendering state.
+     * Releases all D3D resource handles and resets rendering state, so the
+     * next render reloads the textures.
      */
-    virtual void Destroy();
+    void OnResourceChanged(gpg::StrArg resourcePath) override;
 
     /**
      * Address: 0x00814CD0 (FUN_00814CD0, ??1SkyDome@Moho@@UAE@XZ)
@@ -343,18 +340,7 @@ namespace moho
 
   public:
     // --- Layout from constructor ASM evidence ---
-    // `SkyDome` doesn't C++-inherit `CResourceWatcher` (its own vtable at
-    // 0x00E422A0 shows no evidence of a stacked base-class slot region) but
-    // lays out these bytes identically - `CreateTextures` reinterpret_casts
-    // `this` to `CResourceWatcher*` to reuse `ResourceManager::
-    // ManageWatchedResources`. Named/typed to match, rather than left as an
-    // opaque byte blob the constructor can silently leave uninitialized.
-    std::uint32_t mWatcherFlags = 0;                              // +0x04
-    void* mWatchedBegin = nullptr;                                // +0x08
-    void* mWatchedEnd = nullptr;                                  // +0x0C
-    void* mWatchedStorageEnd = nullptr;                           // +0x10
-    void* mWatchedStorageOrigin = nullptr;                        // +0x14
-    void* mWatchedInline[2]{};                                    // +0x18
+    // +0x00..+0x20 is the `CResourceWatcher` base.
     Wm3::Vector3f mDomeOrigin{0.0f, 0.0f, 0.0f};                 // +0x20
     Wm3::Vector3f mDomeShapeParams{0.0f, 512.0f, 1.2566371f};    // +0x2C (height/radius/start-angle)
     std::int32_t mWidth = 16;                                     // +0x38
@@ -405,12 +391,6 @@ namespace moho
     boost::shared_ptr<gpg::gal::Texture> mCloudsTexture;       // +0x21C
   };
 
-  static_assert(offsetof(SkyDome, mWatcherFlags) == 0x04, "SkyDome::mWatcherFlags offset must be 0x04");
-  static_assert(offsetof(SkyDome, mWatchedBegin) == 0x08, "SkyDome::mWatchedBegin offset must be 0x08");
-  static_assert(offsetof(SkyDome, mWatchedEnd) == 0x0C, "SkyDome::mWatchedEnd offset must be 0x0C");
-  static_assert(offsetof(SkyDome, mWatchedStorageEnd) == 0x10, "SkyDome::mWatchedStorageEnd offset must be 0x10");
-  static_assert(offsetof(SkyDome, mWatchedStorageOrigin) == 0x14, "SkyDome::mWatchedStorageOrigin offset must be 0x14");
-  static_assert(offsetof(SkyDome, mWatchedInline) == 0x18, "SkyDome::mWatchedInline offset must be 0x18");
   static_assert(offsetof(SkyDome, mDomeOrigin) == 0x20, "SkyDome::mDomeOrigin offset must be 0x20");
   static_assert(offsetof(SkyDome, mDomeShapeParams) == 0x2C, "SkyDome::mDomeShapeParams offset must be 0x2C");
   static_assert(offsetof(SkyDome, mWidth) == 0x38, "SkyDome::mWidth offset must be 0x38");
@@ -426,5 +406,8 @@ namespace moho
   static_assert(offsetof(SkyDome, mNeedsRebuild) == 0x1C8, "SkyDome::mNeedsRebuild offset must be 0x1C8");
   static_assert(offsetof(SkyDome, mCirrusTex) == 0x214, "SkyDome::mCirrusTex offset must be 0x214");
   static_assert(offsetof(SkyDome, mCloudsTexture) == 0x21C, "SkyDome::mCloudsTexture offset must be 0x21C");
-  static_assert(sizeof(SkyDome) == 0x224, "SkyDome size must be 0x224");
+  // The members end at 0x224; the `CResourceWatcher` base's 8-aligned vector
+  // rounds the class to 0x228 (`CWldTerrainRes` places the next member at
+  // `mSkyDome + 0x228`).
+  static_assert(sizeof(SkyDome) == 0x228, "SkyDome size must be 0x228");
 } // namespace moho

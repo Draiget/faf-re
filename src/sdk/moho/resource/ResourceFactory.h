@@ -1,77 +1,58 @@
 #pragma once
 
-#include <typeinfo>
-
+#include "boost/noncopyable.hpp"
 #include "boost/shared_ptr.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/resource/RScmResource.h"
-
-namespace gpg
-{
-  class RType;
-  RType* LookupRType(const std::type_info& typeInfo);
-} // namespace gpg
 
 namespace moho
 {
   /**
    * VFTABLE: 0x00E07614
    * COL: 0x00E61FA0
+   *
+   * The type-erased face of a resource loader. `ResourceManager` keeps its
+   * factories keyed on `mResourceType` and drives them through the four slots
+   * below; the typed templates underneath forward each one into a typed
+   * `*Impl` that a concrete factory fills in.
    */
-  class ResourceFactoryBase
+  class ResourceFactoryBase : private boost::noncopyable
   {
   public:
     /**
      * Address: 0x00A82547 (FUN_00A82547, _purecall slot)
      *
      * What it does:
-     * Startup hook consumed by `ResourceManager::AttachFactory`. Pure, not
-     * optional: every one of `ResourceFactoryBase`'s 4 vftable slots points
-     * at `_purecall`, as the address above already records, so the base
-     * supplies no body. The `{}` that used to be here would have answered a
-     * dispatch for any factory that forgot to override it.
+     * Resolves `mResourceType` / `mPrefetchType`. `ResourceManager::
+     * ActivatePendingFactories` (0x004AA090) calls it before registering the
+     * factory under `mResourceType`.
      */
     virtual void Init() = 0;
 
     /**
-     * Address: 0x004AA9DE / 0x004AAA09 call lane in FUN_004AA690
-     *
-     * What it does:
-     * Type-erased resource-load dispatch used by `ResourceManager` resolve
-     * paths that operate on raw `(px,pi)` pair lanes.
+     * Slot 1. `ResourceManager::LoadRequest` (0x004AAA24) calls it with the
+     * request's type when nothing was prefetched.
      */
-    virtual boost::SharedCountPair* LoadResourcePair(
-      boost::SharedCountPair* outResourcePair,
-      const char* path,
-      gpg::RType* resourceType
-    ) = 0;
+    virtual boost::shared_ptr<void> Load(gpg::StrArg path, const gpg::RType* type) = 0;
 
     /**
-     * Address: 0x004AB371 call lane in FUN_004AB180
-     *
-     * What it does:
-     * Type-erased prefetch dispatch used by prefetch-thread resolve lanes.
+     * Slot 2. The prefetch thread (0x004AB441) calls it with `mPrefetchType`.
      */
-    virtual boost::SharedCountPair* PreloadResourcePair(
-      boost::SharedCountPair* outPrefetchPair,
-      const char* path,
-      gpg::RType* resourceType
-    ) = 0;
+    virtual boost::shared_ptr<void> Preload(gpg::StrArg path, const gpg::RType* type) = 0;
 
     /**
-     * Address: 0x004AA845 call lane in FUN_004AA690
-     *
-     * What it does:
-     * Type-erased load-from-prefetched-data dispatch used by manager resolve
-     * paths when a prefetch payload is already available.
+     * Slot 3. `ResourceManager::LoadRequest` (0x004AA845) calls it when the
+     * prefetch thread already produced `prefetchData`.
      */
-    virtual boost::SharedCountPair* LoadResourceFromPrefetchPair(
-      boost::SharedCountPair* outResourcePair,
-      const char* path,
-      gpg::RType* resourceType,
-      const boost::SharedCountPair* prefetchPair,
-      gpg::RType* prefetchType
+    virtual boost::shared_ptr<void> LoadFrom(
+      gpg::StrArg path, const gpg::RType* type, boost::shared_ptr<void> prefetchData, const gpg::RType* prefetchType
     ) = 0;
+
+    /** What `Load` produces; the manager's registration key (factory +0x04). */
+    const gpg::RType* mResourceType = nullptr; // +0x04
+    /** What `Preload` produces and `LoadFrom` consumes (factory +0x08). */
+    const gpg::RType* mPrefetchType = nullptr; // +0x08
 
   protected:
     /**
@@ -91,15 +72,17 @@ namespace moho
     ~ResourceFactoryBase();
   };
 
-  static_assert(sizeof(ResourceFactoryBase) == 0x04, "ResourceFactoryBase size must be 0x04");
+  static_assert(sizeof(ResourceFactoryBase) == 0x0C, "ResourceFactoryBase size must be 0x0C");
 
-  template <typename TResource>
+  /**
+   * A factory whose prefetch step produces the resource itself: `Preload`
+   * defaults to `LoadImpl` and `LoadFrom` hands the prefetched object straight
+   * back, so a concrete factory only supplies `LoadImpl`.
+   */
+  template <class T>
   class ResourceFactory : public ResourceFactoryBase
   {
   public:
-    using ResourceHandle = boost::shared_ptr<TResource>;
-    using PrefetchHandle = boost::shared_ptr<TResource>;
-
     /**
      * Address: 0x00539200 (FUN_00539200, Moho::ResourceFactory_RScmResource::ResourceFactory_RScmResource)
      * Address: 0x0053AA40 (FUN_0053AA40, Moho::ResourceFactory_RScaResource::ResourceFactory_RScaResource)
@@ -114,229 +97,132 @@ namespace moho
 
     /**
      * Address: 0x0044A320 (FUN_0044A320, Moho::ResourceFactory_SBatchTextureData::Init)
+     * Address: 0x005396F0 (FUN_005396F0, Moho::ResourceFactory_RScmResource::Init)
+     * Address: 0x0053AD00 (FUN_0053AD00, Moho::ResourceFactory_RScaResource::Init)
      *
      * What it does:
-     * Resolves reflected resource type metadata and updates both resource and
-     * prefetch type lanes for this factory.
+     * Both type slots are `T`: the prefetch step produces the resource itself.
+     * The binary resolves the cached type twice, prefetch slot first.
      */
     void Init() override
     {
-      gpg::RType* firstResolvedType = TResource::sType;
-      if (firstResolvedType == nullptr) {
-        firstResolvedType = gpg::LookupRType(typeid(TResource));
-        TResource::sType = firstResolvedType;
-      }
-
-      gpg::RType* resolvedType = firstResolvedType;
-      if (resolvedType == nullptr) {
-        resolvedType = gpg::LookupRType(typeid(TResource));
-        TResource::sType = resolvedType;
-      }
-
-      mPrefetchType = firstResolvedType;
-      mResourceType = resolvedType;
+      mPrefetchType = gpg::RTypeOf<T>();
+      mResourceType = gpg::RTypeOf<T>();
     }
 
     /**
      * Address: 0x0044A420 (FUN_0044A420, Moho::ResourceFactory_SBatchTextureData::Load)
-     * Address: 0x005397F0 (FUN_005397F0, Moho::ResourceFactory_RScmResource::Load wrapper)
-     * Address: 0x0053AE00 (FUN_0053AE00, Moho::ResourceFactory_RScaResource::Load wrapper)
-     *
-     * What it does:
-     * Forwards load requests into `LoadImpl` using one temporary handle lane.
+     * Address: 0x005397F0 (FUN_005397F0, Moho::ResourceFactory_RScmResource::Load)
+     * Address: 0x0053AE00 (FUN_0053AE00, Moho::ResourceFactory_RScaResource::Load)
      */
-    // NOT virtual, despite forwarding to a virtual `*Impl`. The binary's factory
-    // vtable is seven slots -- Init, Load, Preload, LoadFrom, LoadImpl,
-    // PreloadImpl, LoadFromImpl -- read straight off
-    // ??_7?$ResourceFactory@VRScmResource@Moho@@@Moho@@6B@ (0x00E163D0) and
-    // ??_7CScmResourceFactory@Moho@@6B@ (0x00E163B0), which agree slot for slot.
-    // Slots 1..3 are already declared on ResourceFactoryBase (as the
-    // type-erased `*ResourcePair` forms ResourceManager dispatches through --
-    // slot 3 is the `mov edx, [eax+0Ch]` / `call edx` at 0x004AA83B-0x004AA845).
-    // Declaring these typed forms `virtual` as well gave each of them a fresh
-    // slot of its own after the base's four, pushing LoadImpl/PreloadImpl/
-    // LoadFromImpl from slots 4/5/6 down to 7/8/9 -- so every dispatch through
-    // this hierarchy landed on the wrong function.
-    ResourceHandle& Load(ResourceHandle& outResource, const char* path)
+    boost::shared_ptr<void> Load(const gpg::StrArg path, const gpg::RType*) override
     {
-      ResourceHandle loadedResource;
-      LoadImpl(loadedResource, path);
-      outResource = loadedResource;
-      return outResource;
+      return LoadImpl(path);
     }
 
     /**
      * Address: 0x0044A4D0 (FUN_0044A4D0, Moho::ResourceFactory_SBatchTextureData::Preload)
-     * Address: 0x005398A0 (FUN_005398A0, Moho::ResourceFactory_RScmResource::Preload wrapper)
-     * Address: 0x0053AEB0 (FUN_0053AEB0, Moho::ResourceFactory_RScaResource::Preload wrapper)
-     *
-     * What it does:
-     * Forwards preload requests into `PreloadImpl` using one temporary handle lane.
+     * Address: 0x005398A0 (FUN_005398A0, Moho::ResourceFactory_RScmResource::Preload)
+     * Address: 0x0053AEB0 (FUN_0053AEB0, Moho::ResourceFactory_RScaResource::Preload)
      */
-    PrefetchHandle& Preload(PrefetchHandle& outPrefetchData, const char* path)
+    boost::shared_ptr<void> Preload(const gpg::StrArg path, const gpg::RType*) override
     {
-      PrefetchHandle prefetchedData;
-      PreloadImpl(prefetchedData, path);
-      outPrefetchData = prefetchedData;
-      return outPrefetchData;
+      return PreloadImpl(path);
     }
 
     /**
      * Address: 0x0044A580 (FUN_0044A580, Moho::ResourceFactory_SBatchTextureData::LoadFrom)
-     *
-     * What it does:
-     * Forwards load-from-prefetch requests into `LoadFromImpl`.
+     * Address: 0x00539950 (FUN_00539950, Moho::ResourceFactory_RScmResource::LoadFrom)
+     * Address: 0x0053AF60 (FUN_0053AF60, Moho::ResourceFactory_RScaResource::LoadFrom)
      */
-    ResourceHandle& LoadFrom(ResourceHandle& outResource, const char* path, PrefetchHandle prefetchData)
+    boost::shared_ptr<void> LoadFrom(
+      const gpg::StrArg path, const gpg::RType*, const boost::shared_ptr<void> prefetchData, const gpg::RType*
+    ) override
     {
-      PrefetchHandle prefetchCopy = prefetchData;
-      ResourceHandle loadedResource;
-      LoadFromImpl(loadedResource, path, prefetchCopy);
-      outResource = loadedResource;
-      return outResource;
+      return LoadFromImpl(path, boost::static_pointer_cast<T>(prefetchData));
     }
 
-    /**
-     * What it does:
-     * Loads one resource instance from `path`.
-     */
-    virtual ResourceHandle& LoadImpl(ResourceHandle& outResource, const char* path) = 0;
+    /** Slot 4, pure here; the concrete factory's loader. */
+    virtual boost::shared_ptr<T> LoadImpl(gpg::StrArg path) = 0;
 
     /**
      * Address: 0x0044A360 (FUN_0044A360, Moho::ResourceFactory_SBatchTextureData::PreloadImpl)
      * Address: 0x00539730 (FUN_00539730, Moho::ResourceFactory_RScmResource::PreloadImpl)
      * Address: 0x0053AD40 (FUN_0053AD40, Moho::ResourceFactory_RScaResource::PreloadImpl)
-     *
-     * What it does:
-     * Default prefetch implementation that reuses `LoadImpl`.
      */
-    virtual PrefetchHandle& PreloadImpl(PrefetchHandle& outPrefetchData, const char* path)
+    virtual boost::shared_ptr<T> PreloadImpl(const gpg::StrArg path)
     {
-      return LoadImpl(outPrefetchData, path);
+      return LoadImpl(path);
     }
 
     /**
+     * Address: 0x0044A390 (FUN_0044A390, Moho::ResourceFactory_SBatchTextureData::LoadFromImpl)
      * Address: 0x00539760 (FUN_00539760, Moho::ResourceFactory_RScmResource::LoadFromImpl)
      * Address: 0x0053AD70 (FUN_0053AD70, Moho::ResourceFactory_RScaResource::LoadFromImpl)
-     * Address: 0x0044A390 (FUN_0044A390, Moho::ResourceFactory_SBatchTextureData::LoadFromImpl)
-     *
-     * What it does:
-     * Default load-from-prefetch implementation that returns the prefetch lane.
      */
-    virtual ResourceHandle& LoadFromImpl(ResourceHandle& outResource, const char* path, PrefetchHandle prefetchData)
+    virtual boost::shared_ptr<T> LoadFromImpl(gpg::StrArg, const boost::shared_ptr<T> prefetchData)
     {
-      (void)path;
-      outResource = prefetchData;
-      return outResource;
+      return prefetchData;
+    }
+  };
+
+  /**
+   * A factory whose prefetch step produces a different object `P` (raw file
+   * bytes, say) that `LoadFromImpl` turns into the resource. All three `*Impl`
+   * slots are pure (vftable 0x00E02958 holds `_purecall` in slots 4-6).
+   */
+  template <class T, class P>
+  class ResourceFactoryPreload : public ResourceFactoryBase
+  {
+  public:
+    /**
+     * Address: 0x0043E470 (FUN_0043E470, ??0ResourceFactoryPreload@Moho@@QAE@@Z)
+     */
+    ResourceFactoryPreload() = default;
+
+    /**
+     * Address: 0x004434E0 (FUN_004434E0, Moho::ResourceFactoryPreload_RD3DTextureResource::Init)
+     */
+    void Init() override
+    {
+      mPrefetchType = gpg::RTypeOf<P>();
+      mResourceType = gpg::RTypeOf<T>();
     }
 
     /**
-     * Address: 0x004AA9DE / 0x004AAA09 call lane in FUN_004AA690
+     * Address: 0x00443530 (FUN_00443530, Moho::ResourceFactoryPreload_RD3DTextureResource::Load)
      */
-    boost::SharedCountPair* LoadResourcePair(
-      boost::SharedCountPair* const outResourcePair,
-      const char* const path,
-      gpg::RType* const resourceType
-    ) override
+    boost::shared_ptr<void> Load(const gpg::StrArg path, const gpg::RType*) override
     {
-      (void)resourceType;
-      if (outResourcePair == nullptr) {
-        return nullptr;
-      }
-
-      ResourceHandle loadedResource{};
-      (void)Load(loadedResource, path);
-      *outResourcePair = SharedPairFromHandleRetained(loadedResource);
-      return outResourcePair;
+      return LoadImpl(path);
     }
 
     /**
-     * Address: 0x004AB371 call lane in FUN_004AB180
+     * Address: 0x004435E0 (FUN_004435E0, Moho::ResourceFactoryPreload_RD3DTextureResource::Preload)
      */
-    boost::SharedCountPair* PreloadResourcePair(
-      boost::SharedCountPair* const outPrefetchPair,
-      const char* const path,
-      gpg::RType* const resourceType
-    ) override
+    boost::shared_ptr<void> Preload(const gpg::StrArg path, const gpg::RType*) override
     {
-      (void)resourceType;
-      if (outPrefetchPair == nullptr) {
-        return nullptr;
-      }
-
-      PrefetchHandle prefetchedResource{};
-      (void)Preload(prefetchedResource, path);
-      *outPrefetchPair = SharedPairFromHandleRetained(prefetchedResource);
-      return outPrefetchPair;
+      return PreloadImpl(path);
     }
 
     /**
-     * Address: 0x004AA845 call lane in FUN_004AA690
+     * Address: 0x00443690 (FUN_00443690, Moho::ResourceFactoryPreload_RD3DTextureResource::LoadFrom)
      */
-    boost::SharedCountPair* LoadResourceFromPrefetchPair(
-      boost::SharedCountPair* const outResourcePair,
-      const char* const path,
-      gpg::RType* const resourceType,
-      const boost::SharedCountPair* const prefetchPair,
-      gpg::RType* const prefetchType
+    boost::shared_ptr<void> LoadFrom(
+      const gpg::StrArg path, const gpg::RType*, const boost::shared_ptr<void> prefetchData, const gpg::RType*
     ) override
     {
-      (void)resourceType;
-      (void)prefetchType;
-      if (outResourcePair == nullptr) {
-        return nullptr;
-      }
-
-      const PrefetchHandle prefetchHandle = HandleFromSharedPairRetained<PrefetchHandle>(prefetchPair);
-      ResourceHandle loadedResource{};
-      (void)LoadFrom(loadedResource, path, prefetchHandle);
-      *outResourcePair = SharedPairFromHandleRetained(loadedResource);
-      return outResourcePair;
+      return LoadFromImpl(path, boost::static_pointer_cast<P>(prefetchData));
     }
 
-  protected:
-    gpg::RType* mResourceType = nullptr; // +0x04
-    gpg::RType* mPrefetchType = nullptr; // +0x08
-
-  private:
-    template <class HandleT>
-    [[nodiscard]] static boost::SharedCountPair SharedPairFromHandleRetained(const HandleT& handle) noexcept
-    {
-      const boost::SharedPtrRaw<typename HandleT::element_type> raw =
-        boost::SharedPtrRawFromSharedBorrow(handle);
-      boost::SharedCountPair pair{};
-      pair.px = raw.px;
-      pair.pi = raw.pi;
-      if (pair.pi != nullptr) {
-        pair.pi->add_ref_copy();
-      }
-      return pair;
-    }
-
-    template <class HandleT>
-    [[nodiscard]] static HandleT HandleFromSharedPairRetained(const boost::SharedCountPair* const pair) noexcept
-    {
-      HandleT handle{};
-      if (pair == nullptr) {
-        return handle;
-      }
-
-      auto* const layout =
-        reinterpret_cast<boost::SharedPtrLayoutView<typename HandleT::element_type>*>(&handle);
-      layout->px = static_cast<typename HandleT::element_type*>(pair->px);
-      layout->pi = pair->pi;
-      if (layout->pi != nullptr) {
-        layout->pi->add_ref_copy();
-      }
-      return handle;
-    }
+    virtual boost::shared_ptr<T> LoadImpl(gpg::StrArg path) = 0;
+    virtual boost::shared_ptr<P> PreloadImpl(gpg::StrArg path) = 0;
+    virtual boost::shared_ptr<T> LoadFromImpl(gpg::StrArg path, boost::shared_ptr<P> prefetchData) = 0;
   };
 
   class CScmResourceFactory final : public ResourceFactory<RScmResource>
   {
   public:
-    using ResourceHandle = boost::shared_ptr<RScmResource>;
-
     /**
      * Address: 0x005391A0 (FUN_005391A0, Moho::CScmResourceFactory::CScmResourceFactory)
      *
@@ -357,28 +243,15 @@ namespace moho
     ~CScmResourceFactory() = default;
 
     /**
-     * Address: 0x005396F0 (FUN_005396F0, Moho::ResourceFactory_RScmResource::Init)
-     *
-     * What it does:
-     * Resolves cached `RScmResource` RTTI and updates the prefetch/resource
-     * type lanes used by factory virtual dispatch.
-     */
-    void Init() override;
-
-    /**
      * Address: 0x00539290 (FUN_00539290)
-     * Primary vtable slot 4 -- the pure slot `ResourceFactory<RScmResource>`
-     * declares and this class fills in. Read off
-     * ??_7CScmResourceFactory@Moho@@6B@ (0x00E163B0), whose slot 4 holds
-     * this body where the template's own vftable holds `_purecall`; slots
-     * 1..3 are the template's `Load`/`Preload`/`LoadFrom` in BOTH vftables,
-     * so this class overrides neither of them.
+     * Vtable slot 4 of ??_7CScmResourceFactory@Moho@@6B@ (0x00E163B0), the
+     * only slot it overrides; slots 0..3 and 5..6 are the template's.
      *
      * What it does:
-     * Reads one SCM payload from disk, validates minimum byte length, then
-     * materializes one `RScmResource` bound to aliased file bytes.
+     * Reads one SCM file and wraps it in an `RScmResource`; files shorter than
+     * the 0x30-byte header load as nothing.
      */
-    ResourceHandle& LoadImpl(ResourceHandle& outResource, const char* path) override;
+    boost::shared_ptr<RScmResource> LoadImpl(gpg::StrArg path) override;
   };
 
   static_assert(sizeof(CScmResourceFactory) == 0x0C, "CScmResourceFactory size must be 0x0C");

@@ -5,6 +5,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/resource/ResourceManager.h"
 #include "moho/serialization/PrefetchHandleBase.h"
 
 namespace moho
@@ -53,16 +54,16 @@ namespace moho
       return;
     }
 
-    GPG_ASSERT(handle->mPtr.get() != nullptr && handle->mPtr->mRequest != nullptr);
-    if (!handle->mPtr || handle->mPtr->mRequest == nullptr) {
+    GPG_ASSERT(handle->mPtr.get() != nullptr && handle->mPtr->mRecord != nullptr);
+    if (!handle->mPtr || handle->mPtr->mRecord == nullptr) {
       msvc8::string emptyPath{};
       archive->WriteString(&emptyPath);
       archive->WriteRefCounts(nullptr);
       return;
     }
 
-    archive->WriteString(&handle->mPtr->mRequest->mResourceId.name);
-    archive->WriteRefCounts(handle->mPtr->mRequest->mResourceType);
+    archive->WriteString(&handle->mPtr->mRecord->mId.name);
+    archive->WriteRefCounts(handle->mPtr->mRecord->mType);
   }
 
   /**

@@ -505,9 +505,9 @@ namespace moho
         SBatchTextureData::sType = resourceType;
       }
 
-      boost::weak_ptr<SBatchTextureData> weakData{};
-      (void)RES_GetResource(&weakData, filename != nullptr ? filename : "", nullptr, resourceType);
-      return weakData.lock();
+      return boost::static_pointer_cast<SBatchTextureData>(
+        RES_GetResource(filename != nullptr ? filename : "", nullptr, resourceType)
+      );
     }
   } // namespace
 

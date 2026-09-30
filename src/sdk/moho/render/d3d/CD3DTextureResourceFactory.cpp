@@ -16,73 +16,27 @@ namespace moho
 {
   namespace
   {
-    [[nodiscard]] bool IsDdsTexturePath(const char* const path)
-    {
-      if (path == nullptr || path[0] == '\0') {
-        return false;
-      }
-
-      const char* const extension = FILE_Ext(path);
-      return extension != nullptr && _stricmp(extension, "dds") == 0;
-    }
-
     /**
      * Address: 0x0043DEB0 (FUN_0043DEB0, gpg::MemBuffer::MapFromFile)
      *
-     * const char *
-     *
      * What it does:
-     * Compatibility wrapper for `gpg::MemBuffer::MapFromFile` used by DDS texture loads.
+     * Memory-maps a DDS file; an out-of-line wrapper over `DISK_MemoryMapFile`.
      */
-    [[nodiscard]] gpg::MemBuffer<const char> MapFromFile(const char* const path)
+    [[nodiscard]] gpg::MemBuffer<const char> MapFromFile(const gpg::StrArg path)
     {
       return DISK_MemoryMapFile(path);
     }
 
-    [[nodiscard]] gpg::MemBuffer<const char> LoadTextureFileBytes(const char* const path)
+    /**
+     * What it does:
+     * The texture file's bytes; both texture loaders inline this.
+     */
+    [[nodiscard]] gpg::MemBuffer<const char> MapTextureFile(const gpg::StrArg path)
     {
-      if (path == nullptr || path[0] == '\0') {
-        return {};
-      }
-
-      if (IsDdsTexturePath(path)) {
-        return MapFromFile(path);
-      }
-
-      return DISK_MemoryMapFile(path);
+      gpg::MemBuffer<const char> data;
+      data = _stricmp(FILE_Ext(path), "dds") == 0 ? MapFromFile(path) : DISK_MemoryMapFile(path);
+      return data;
     }
-
-    template <class HandleT>
-    [[nodiscard]] boost::SharedCountPair SharedPairFromHandleRetained(const HandleT& handle) noexcept
-    {
-      const boost::SharedPtrRaw<typename HandleT::element_type> raw =
-        boost::SharedPtrRawFromSharedBorrow(handle);
-      boost::SharedCountPair pair{};
-      pair.px = raw.px;
-      pair.pi = raw.pi;
-      if (pair.pi != nullptr) {
-        pair.pi->add_ref_copy();
-      }
-      return pair;
-    }
-
-    template <class HandleT>
-    [[nodiscard]] HandleT HandleFromSharedPairRetained(const boost::SharedCountPair* const pair) noexcept
-    {
-      HandleT handle{};
-      if (pair == nullptr) {
-        return handle;
-      }
-
-      auto* const layout = reinterpret_cast<boost::SharedPtrLayoutView<typename HandleT::element_type>*>(&handle);
-      layout->px = static_cast<typename HandleT::element_type*>(pair->px);
-      layout->pi = pair->pi;
-      if (layout->pi != nullptr) {
-        layout->pi->add_ref_copy();
-      }
-      return handle;
-    }
-
   } // namespace
 
   /**
@@ -99,208 +53,48 @@ namespace moho
   }
 
   /**
-   * Address: 0x004434E0 (FUN_004434E0, ResourceFactoryPreload_RD3DTextureResource::Init)
-   *
-   * What it does:
-   * Resolves and caches the reflected type of the produced resource
-   * (`RD3DTextureResource`) and of the prefetch payload
-   * (`gpg::MemBuffer<const char>`), then stores both into the factory's
-   * resource/prefetch type lanes. Unlike the templated `ResourceFactory<T>::Init`
-   * the two lanes carry distinct types, which is why this override is hand-written.
-   */
-  void CD3DTextureResourceFactory::Init()
-  {
-    mResourceType = resource_reflection::ResolveRD3DTextureResourceType();
-    mPrefetchType = resource_reflection::ResolveMemBufferConstType();
-  }
-
-  /**
-   * Address: 0x00443530 (FUN_00443530)
-   *
-   * boost::shared_ptr<RD3DTextureResource> &,const char *
-   *
-   * What it does:
-   * Forwards texture load requests into implementation lane.
-   */
-  CD3DTextureResourceFactory::TextureResourceHandle&
-  CD3DTextureResourceFactory::Load(TextureResourceHandle& outTexture, const char* const path)
-  {
-    return LoadImpl(outTexture, path);
-  }
-
-  /**
-   * Address: 0x004435E0 (FUN_004435E0)
-   *
-   * boost::shared_ptr<gpg::MemBuffer<const char>> &,const char *
-   *
-   * What it does:
-   * Forwards texture prefetch requests into implementation lane.
-   */
-  CD3DTextureResourceFactory::PrefetchDataHandle&
-  CD3DTextureResourceFactory::Preload(PrefetchDataHandle& outPrefetchData, const char* const path)
-  {
-    return PreloadImpl(outPrefetchData, path);
-  }
-
-  /**
-   * Address: 0x00443690 (FUN_00443690)
-   *
-   * boost::shared_ptr<RD3DTextureResource> &,const char *,boost::shared_ptr<gpg::MemBuffer<const char>>
-   *
-   * What it does:
-   * Forwards load-from-prefetched-data requests into implementation lane.
-   */
-  CD3DTextureResourceFactory::TextureResourceHandle&
-  CD3DTextureResourceFactory::LoadFrom(
-    TextureResourceHandle& outTexture,
-    const char* const path,
-    PrefetchDataHandle prefetchData
-  )
-  {
-    return LoadFromImpl(outTexture, path, prefetchData);
-  }
-
-  /**
-   * Address: 0x004AA9DE / 0x004AAA09 call lane in FUN_004AA690
-   */
-  boost::SharedCountPair* CD3DTextureResourceFactory::LoadResourcePair(
-    boost::SharedCountPair* const outResourcePair,
-    const char* const path,
-    gpg::RType* const resourceType
-  )
-  {
-    (void)resourceType;
-    if (outResourcePair == nullptr) {
-      return nullptr;
-    }
-
-    TextureResourceHandle loadedTexture{};
-    (void)Load(loadedTexture, path);
-    *outResourcePair = SharedPairFromHandleRetained(loadedTexture);
-    return outResourcePair;
-  }
-
-  /**
-   * Address: 0x004AB371 call lane in FUN_004AB180
-   */
-  boost::SharedCountPair* CD3DTextureResourceFactory::PreloadResourcePair(
-    boost::SharedCountPair* const outPrefetchPair,
-    const char* const path,
-    gpg::RType* const resourceType
-  )
-  {
-    (void)resourceType;
-    if (outPrefetchPair == nullptr) {
-      return nullptr;
-    }
-
-    PrefetchDataHandle prefetchedTexture{};
-    (void)Preload(prefetchedTexture, path);
-    *outPrefetchPair = SharedPairFromHandleRetained(prefetchedTexture);
-    return outPrefetchPair;
-  }
-
-  /**
-   * Address: 0x004AA845 call lane in FUN_004AA690
-   */
-  boost::SharedCountPair* CD3DTextureResourceFactory::LoadResourceFromPrefetchPair(
-    boost::SharedCountPair* const outResourcePair,
-    const char* const path,
-    gpg::RType* const resourceType,
-    const boost::SharedCountPair* const prefetchPair,
-    gpg::RType* const prefetchType
-  )
-  {
-    (void)resourceType;
-    (void)prefetchType;
-    if (outResourcePair == nullptr) {
-      return nullptr;
-    }
-
-    const PrefetchDataHandle prefetchData = HandleFromSharedPairRetained<PrefetchDataHandle>(prefetchPair);
-    TextureResourceHandle loadedTexture{};
-    (void)LoadFrom(loadedTexture, path, prefetchData);
-    *outResourcePair = SharedPairFromHandleRetained(loadedTexture);
-    return outResourcePair;
-  }
-
-  /**
    * Address: 0x0043DED0 (FUN_0043DED0)
-   *
-   * boost::shared_ptr<RD3DTextureResource> &,const char *
-   *
-   * What it does:
-   * Loads one texture file payload and initializes one RD3DTextureResource instance.
    */
-  CD3DTextureResourceFactory::TextureResourceHandle&
-  CD3DTextureResourceFactory::LoadImpl(TextureResourceHandle& outTexture, const char* const path)
+  boost::shared_ptr<RD3DTextureResource> CD3DTextureResourceFactory::LoadImpl(const gpg::StrArg path)
   {
-    outTexture.reset();
-
-    gpg::MemBuffer<const char> textureBytes = LoadTextureFileBytes(path);
-    if (textureBytes.mBegin == nullptr) {
-      return outTexture;
+    if (path != nullptr && path[0] != '\0') {
+      const gpg::MemBuffer<const char> data = MapTextureFile(path);
+      if (data.mBegin != nullptr) {
+        boost::shared_ptr<RD3DTextureResource> resource(new RD3DTextureResource(path));
+        if (resource->Init(data)) {
+          return resource;
+        }
+      }
     }
-
-    TextureResourceHandle resource(new RD3DTextureResource(path));
-    if (!resource || !resource->Init(textureBytes)) {
-      outTexture.reset();
-      return outTexture;
-    }
-
-    outTexture = resource;
-    return outTexture;
+    return boost::shared_ptr<RD3DTextureResource>();
   }
 
   /**
    * Address: 0x0043E0C0 (FUN_0043E0C0)
-   *
-   * boost::shared_ptr<gpg::MemBuffer<const char>> &,const char *
-   *
-   * What it does:
-   * Loads one texture file payload into prefetch shared buffer wrapper.
    */
-  CD3DTextureResourceFactory::PrefetchDataHandle&
-  CD3DTextureResourceFactory::PreloadImpl(PrefetchDataHandle& outPrefetchData, const char* const path)
+  boost::shared_ptr<gpg::MemBuffer<const char>> CD3DTextureResourceFactory::PreloadImpl(const gpg::StrArg path)
   {
-    outPrefetchData.reset();
-
-    gpg::MemBuffer<const char> textureBytes = LoadTextureFileBytes(path);
-    if (textureBytes.mBegin == nullptr) {
-      return outPrefetchData;
+    if (path != nullptr && path[0] != '\0') {
+      const gpg::MemBuffer<const char> data = MapTextureFile(path);
+      if (data.mBegin != nullptr) {
+        return boost::shared_ptr<gpg::MemBuffer<const char>>(new gpg::MemBuffer<const char>(data));
+      }
     }
-
-    outPrefetchData.reset(new PrefetchData(textureBytes));
-    return outPrefetchData;
+    return boost::shared_ptr<gpg::MemBuffer<const char>>();
   }
 
   /**
    * Address: 0x0043E200 (FUN_0043E200)
-   *
-   * boost::shared_ptr<RD3DTextureResource> &,const char *,boost::shared_ptr<gpg::MemBuffer<const char>>
-   *
-   * What it does:
-   * Builds one RD3DTextureResource from already-prefetched bytes.
    */
-  CD3DTextureResourceFactory::TextureResourceHandle& CD3DTextureResourceFactory::LoadFromImpl(
-    TextureResourceHandle& outTexture,
-    const char* const path,
-    PrefetchDataHandle prefetchData
+  boost::shared_ptr<RD3DTextureResource> CD3DTextureResourceFactory::LoadFromImpl(
+    const gpg::StrArg path, const boost::shared_ptr<gpg::MemBuffer<const char>> prefetchData
   )
   {
-    outTexture.reset();
-    if (!prefetchData || prefetchData->mBegin == nullptr) {
-      return outTexture;
+    boost::shared_ptr<RD3DTextureResource> resource(new RD3DTextureResource(path));
+    if (!resource->Init(*prefetchData)) {
+      return boost::shared_ptr<RD3DTextureResource>();
     }
-
-    TextureResourceHandle resource(new RD3DTextureResource(path));
-    if (!resource || !resource->Init(*prefetchData)) {
-      outTexture.reset();
-      return outTexture;
-    }
-
-    outTexture = resource;
-    return outTexture;
+    return resource;
   }
 } // namespace moho
 

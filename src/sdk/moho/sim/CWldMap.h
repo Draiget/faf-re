@@ -1417,8 +1417,7 @@ namespace moho
     std::uint8_t mEditMode;                                // +0x009
     std::uint8_t mUnknown00A_00B[0x02];                    // +0x00A
     Cartographic mCartographic;                            // +0x00C
-    SkyDome mSkyDome;                                      // +0x0B0
-    std::uint8_t mUnknown2D4_2D7[0x04];                    // +0x2D4
+    SkyDome mSkyDome;                                      // +0x0B0 (0x228, 8-aligned)
     float mLightingMultiplier;                             // +0x2D8
     Wm3::Vector3f mSunDirection;                           // +0x2DC
     Wm3::Vector3f mSunAmbience;                            // +0x2E8

@@ -15,25 +15,19 @@ namespace moho
   /**
    * Address: 0x00447DD0 (FUN_00447DD0, Moho::SBatchTextureDataFactory::LoadImpl)
    */
-  SBatchTextureDataFactory::ResourceHandle&
-  SBatchTextureDataFactory::LoadImpl(ResourceHandle& outResource, const char* const path)
+  boost::shared_ptr<SBatchTextureData> SBatchTextureDataFactory::LoadImpl(const gpg::StrArg path)
   {
-    outResource.reset();
-
     if (path == nullptr || !gpg::gal::Device::IsReady()) {
-      return outResource;
+      return {};
     }
 
     const gpg::MemBuffer<const char> mappedFile = DISK_MemoryMapFile(path);
-    ResourceHandle decodedData(new SBatchTextureData());
-    if (!decodedData) {
-      return outResource;
-    }
+    boost::shared_ptr<SBatchTextureData> decodedData(new SBatchTextureData());
 
     gpg::MemBuffer<char> decodedBlocks;
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     if (device == nullptr) {
-      return outResource;
+      return {};
     }
 
     const auto mappedBytes = static_cast<std::uint32_t>(mappedFile.mEnd - mappedFile.mBegin);
@@ -46,11 +40,9 @@ namespace moho
     );
 
     if (!CopyBatchTextureDataFromMemBuffer(*decodedData, decodedBlocks)) {
-      return outResource;
+      return {};
     }
-
-    outResource = decodedData;
-    return outResource;
+    return decodedData;
   }
 
   /**

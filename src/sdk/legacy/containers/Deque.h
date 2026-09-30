@@ -148,6 +148,13 @@ namespace msvc8
          * 0x0074DF10, reached from `Sim::Sim`'s unwind path 0x007434D0 and from
          * `Sim::~Sim`.)
          * Address: 0x00740860 (FUN_00740860 -- `~deque` for `msvc8::deque<Moho::SSyncData*>` (`SSyncDataQueue::mSyncdat`), a one-instruction `jmp` to its teardown body 0x007411A0 (cited on `clear()`), the same shape as 0x0074C940; reached only from unwind funclets: 0x00BAC240 (0x0073FA70), 0x00BAC260 (0x0073BA10), 0x00BAC280 (`SSyncDataQueue::~SSyncDataQueue` 0x0073B940) and 0x00BBB9A7 (`CSimDriver::~CSimDriver` 0x0073BA50); formerly `ForwardOwnerCleanupThunkRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x004ADA70 (FUN_004ADA70 -- `~deque` for `msvc8::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): `pop_back`
+         *   until empty, releasing each `weak_ptr`, then the nodes from the top of
+         *   the map down and the map. `~ResourceManager` 0x004A9C00; formerly
+         *   `CleanupPrefetchWeakPairRingQueue_004ADA70` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x004AC9E0 (FUN_004AC9E0 -- a one-instruction `jmp` to 0x004ADA70,
+         *   reached from `~ResourceManager` and the constructor's unwind path;
+         *   formerly `CleanupPrefetchWeakPairRingQueueThunk`.)
          */
         ~deque()
         {
@@ -273,6 +280,16 @@ namespace msvc8
          * Address: 0x008B55D0 (FUN_008B55D0 -- that instantiation's one-element
          *          node allocator: `0xFFFFFFFF / n < 0x50` throws `bad_alloc`,
          *          else `operator new(0x50 * n)`; `allocate_node` here.)
+         * Address: 0x004ACB00 (FUN_004ACB00 -- `push_back` for `msvc8::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): the
+         *          element is a `weak_ptr` built from the queued `shared_ptr`.
+         *          `ResourceManager::PrefetchResource` 0x004AAC20; formerly
+         *          `PushPrefetchWeakPairRingBack` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x004AF360 (FUN_004AF360 -- that instantiation's node
+         *          allocator, `0xFFFFFFFF / n < 8` throws `bad_alloc`; formerly
+         *          `AllocateChecked8ByteStride_004AF360`.)
+         * Address: 0x004ADB30 (FUN_004ADB30 -- `allocate_node` for the same
+         *          deque, `n = 2` into 0x004AF360; unreferenced; formerly
+         *          `AllocateWeakPairChunkBlock_004ADB30`.)
          */
         void push_back(const T& v)
         {
@@ -296,6 +313,11 @@ namespace msvc8
          * straight-line "decrement offset, then construct" version this
          * replaced would leave `_Myoff` pointing at an uninitialized slot
          * if `T`'s copy constructor throws.
+         *
+         * Address: 0x004ACA20 (FUN_004ACA20 -- `push_front` for `msvc8::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): a
+         *   prefetch the file changed under goes back to the front.
+         *   `ResourceManager::PrefetchThread` 0x004AB180; formerly
+         *   `PushPrefetchWeakPairRingFront` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
          */
         void push_front(const T& v)
         {
@@ -333,6 +355,9 @@ namespace msvc8
 
         /**
          * Address: 0x007BB400 (FUN_007BB400, msvc8::deque<Moho::SNetCommand>::pop_front)
+         * Address: 0x004ACAA0 (FUN_004ACAA0 -- `pop_front` for `msvc8::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2), releasing the
+         *          front `weak_ptr`; `ResourceManager::PrefetchThread` 0x004AB180;
+         *          formerly `PopPrefetchWeakPairRingFront` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
          *
          * What it does:
          * Destroys the front element, advances the begin offset (wrapping
@@ -495,6 +520,16 @@ namespace msvc8
          *          kBlockSize==4 instantiation; sole caller is
          *          `FUN_007408F0` = `push_back`, called from
          *          `SSyncDataQueue::PushBack` guard `FUN_0073F940`)
+         * Address: 0x004AD900 (FUN_004AD900 -- `_Growmap` for `msvc8::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2), ceiling
+         *          0x0FFFFFFF; its callers are `push_back` 0x004ACB00 and
+         *          `push_front` 0x004ACA20; formerly
+         *          `GrowPrefetchWeakPairRingChunkIndex_004AD900` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x004AE590 (FUN_004AE590 -- that instantiation's `_Xlen`,
+         *          `throw length_error("deque<T> too long")`; formerly
+         *          `ThrowDequeTooLong_004AE590`.)
+         * Address: 0x004AF4E0 (FUN_004AF4E0 -- that instantiation's map
+         *          allocator, `0xFFFFFFFF / n < 4` throws `bad_alloc`; formerly
+         *          `AllocateChecked4ByteStride_004AF4E0`.)
          *
          * What it does:
          * Classic Dinkumware `_Growmap`: grows the node map by

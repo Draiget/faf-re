@@ -141,27 +141,13 @@ namespace moho
    * What it does:
    * Initializes all sky dome rendering state to defaults — horizon/sky colors,
    * texture paths, zero-initialized shared_ptr resource handles, and copies
-   * static cirrus data. Also inlines `CResourceWatcher::CResourceWatcher`
-   * (0x007DD660) to set up the watched-resource small-vector in inline mode
-   * (`mWatchedBegin`/`mWatchedEnd` pointing at `mWatchedInline`, empty range) -
-   * previously left uninitialized here, which made `CreateTextures`'s
-   * `mWatchedBegin != mWatchedEnd` guard read garbage stack/heap bytes and
-   * crash inside `ManageWatchedResources` the first time a sky dome rendered.
+   * static cirrus data. The `CResourceWatcher` base constructor (0x007DD660)
+   * is inlined first.
    */
   SkyDome::SkyDome()
-    : mWatcherFlags(0)
-    , mWatchedBegin(mWatchedInline)
-    , mWatchedEnd(mWatchedInline)
-    , mWatchedStorageEnd(std::end(mWatchedInline))
-    , mWatchedStorageOrigin(mWatchedInline)
-    , mWatchedInline{}
-    , mHorizonLookupPath("/textures/environment/horizonLookup.dds")
+    : mHorizonLookupPath("/textures/environment/horizonLookup.dds")
     , mCirrusTexPath("/textures/environment/cirrus000.dds")
-  {
-    // Legacy small-vector reset path reads `*(origin)` as fallback storage
-    // end - see CResourceWatcher::CResourceWatcher for the same idiom.
-    mWatchedInline[0] = mWatchedStorageEnd;
-  }
+  {}
 
   /**
    * Address: 0x008158D0 (FUN_008158D0, ?SetCirrusContext@SkyDome@Moho@@QAEXMABV?$Vector3@M@Wm3@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
@@ -265,13 +251,9 @@ namespace moho
    *
    * What it does:
    * Tears the dome down: releases the sky resources through `Reset`, empties
-   * the decal upload list and frees its sentinel, then inlines
-   * `CResourceWatcher::~CResourceWatcher` (0x007DA8D0) - flush any pending
-   * watched-resource nodes through the resource manager, then free
-   * non-inline watched storage - since `SkyDome` doesn't C++-inherit
-   * `CResourceWatcher` (see the field comment above) so there is no real
-   * base dtor to do this automatically. Every other member (the shared_ptr
-   * lanes) unwinds on its own in reverse declaration order.
+   * the decal upload list and frees its sentinel; the members then unwind in
+   * reverse declaration order and the `CResourceWatcher` base destructor
+   * (0x007DA8D0) runs inlined last.
    *
    * The emission runs to 601 instructions, but roughly 190 of those are the
    * compiler's own `boost::shared_ptr` member releases, which C++ performs
@@ -280,18 +262,6 @@ namespace moho
   SkyDome::~SkyDome()
   {
     Reset();
-
-    if (mWatchedBegin != mWatchedEnd) {
-      if (ResourceManager* const manager = RES_GetResourceManager(); manager != nullptr) {
-        manager->ManageWatchedResources(reinterpret_cast<CResourceWatcher*>(this));
-      }
-    }
-
-    if (mWatchedBegin != mWatchedStorageOrigin) {
-      ::operator delete[](mWatchedBegin);
-      mWatchedBegin = mWatchedStorageOrigin;
-      mWatchedStorageEnd = *reinterpret_cast<void**>(mWatchedStorageOrigin);
-    }
   }
 
   /**
@@ -464,12 +434,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x008175D0 (FUN_008175D0, Moho::SkyDome::Destroy)
+   * Address: 0x008175D0 (FUN_008175D0, Moho::SkyDome::Func1)
    *
    * What it does:
    * Releases sky texture resource handles used by runtime sky layers.
    */
-void SkyDome::Destroy()
+void SkyDome::OnResourceChanged(const gpg::StrArg)
 {
     mDecalUploads.clear();
     mHorizonLookupTex = {};
@@ -516,12 +486,8 @@ void SkyDome::Destroy()
    * tracks resources, it first flushes/re-registers them with the resource
    * manager so the loaded textures participate in hot-reload.
    *
-   * SkyDome derives its runtime layout from CResourceWatcher (its constructor
-   * inlines the watcher init at 0x008149E0 and the +0x04/+0x08 fields are the
-   * watcher flag / watched-resource small-vector). The binary passes `this`
-   * (viewed as CResourceWatcher*) as the resource-lookup owner argument; the
-   * recovered CD3DDeviceResources::GetTexture ignores that slot, but it is
-   * preserved here for 1:1 fidelity with the original call.
+   * The dome passes itself as the watcher for every texture it loads, so a
+   * changed texture comes back to `OnResourceChanged`.
    */
   void SkyDome::CreateTextures()
   {
@@ -530,17 +496,10 @@ void SkyDome::Destroy()
       return;
     }
 
-    // SkyDome shares CResourceWatcher's layout (watcher init is inlined into
-    // the SkyDome constructor); use the typed watcher view for the tracked-
-    // resource flush and for the resource-lookup owner argument.
-    auto* const watcher = reinterpret_cast<CResourceWatcher*>(this);
-
-    // When this watcher already tracks resources, flush/re-register them with
-    // the resource manager (mirrors ~CResourceWatcher's watched-vector guard).
-    if (watcher->mWatchedBegin != watcher->mWatchedEnd) {
-      if (ResourceManager* const manager = RES_GetResourceManager(); manager != nullptr) {
-        manager->ManageWatchedResources(watcher);
-      }
+    // Drop the watches from the previous load before registering new ones.
+    CResourceWatcher* const watcher = this;
+    if (!mWatches.empty()) {
+      RES_GetResourceManager()->DetachWatcher(watcher);
     }
 
     CD3DDevice* const device = D3D_GetDevice();

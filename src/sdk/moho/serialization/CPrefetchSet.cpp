@@ -156,9 +156,7 @@ namespace moho
         LuaPlus::LuaObject& valueObject = valuesIterator.GetValue();
         const char* const resourcePath = valueObject.GetString();
 
-        PrefetchHandleBase handle{};
-        RES_PrefetchResource(&handle.mPtr, resourcePath, prefetchType);
-        nextHandles.push_back(handle);
+        nextHandles.push_back(RES_PrefetchResource(resourcePath, prefetchType));
 
         valuesIterator.Next();
       }

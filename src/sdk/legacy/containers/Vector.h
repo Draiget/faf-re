@@ -2385,6 +2385,7 @@ namespace msvc8
          * Address: 0x008F7B30 (FUN_008F7B30 -- `operator=` from a fresh empty vector -- `~AdapterD3D10`'s `modes_ = {}` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x00900630, 0x00900A70; formerly `DestroyAdapterModeVectorStorage` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x005EA480 (FUN_005EA480 -- `operator=` -- assign the common prefix, then copy-construct or destroy the tail and rebind `_Mylast`. Reached from `RVectorType_SAiReservedTransportBone::SerLoad`'s `*storage = loaded` for `msvc8::vector<moho::SAiReservedTransportBone>` (the reflected reserved-bone vector; the 0x1C element owns an inner `msvc8::vector<int>` and a self-unlinking `WeakPtr<Unit>`); callers 0x005E5300, 0x005E5670, 0x005E96DF; formerly `AssignReservedTransportBoneVector` in moho/ai/IAiTransport.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00942B60 (FUN_00942B60 -- `operator=`: self-check, then clear, copy-and-destroy, copy-and-`_Ucopy`, or free-`_Buy`-`_Ucopy` by size and capacity, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); `EffectContext::operator=` 0x00942CF0 reaches it through `mMacros = other.mMacros` (0x00942D49); formerly `AssignEffectContextLane54` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x006DE1C0 (FUN_006DE1C0 -- `operator=` for `msvc8::vector<moho::EntityCategorySet>` (`CSquad::mCats`, 0x28-byte element; `this` in EAX): self-check, clear on an empty source, assign-over plus destroy when shrinking, assign-over plus `_Ucopy` into slack, else free and rebuy; callers 0x00724810 (`CSquad::SetPrioritizedTargetList`), 0x00725990, 0x0072E940; formerly filed as `CSquad::SetPrioritizedTargetList` itself in moho/sim/CSquad.cpp, corrected 2026-09-30.)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;
@@ -4026,7 +4027,7 @@ namespace msvc8
          * Address: 0x008F7C50 (FUN_008F7C50 -- `push_back` for the 0x13C-byte `gpg::gal::AdapterModeD3D10` (each entry owns an inner `msvc8::vector<DXGI_MODE_DESC>`); callers 0x008F7CF0; formerly `AppendAdapterModeEntry` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008F7230 (FUN_008F7230 -- `push_back` for the inner `msvc8::vector<DXGI_MODE_DESC>`; callers 0x008F7453, 0x008F7CF0; formerly `AppendDisplayModeToAdapterModeEntry` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008F65B0 (FUN_008F65B0 -- `push_back` for the inner `msvc8::vector<DXGI_MODE_DESC>`; callers 0x008F6650, 0x008F6710, 0x008F7230; formerly `AppendDisplayModeToAdapterModeEntry` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x004AC330 (FUN_004AC330 -- `push_back` for `msvc8::vector<moho::ResourceFactoryBase*, false>` (`CResourceManager::mPendingFactoryRegistrations`, +0x40); callers 0x004A9F30; formerly `AppendPendingFactoryRegistration` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AC330 (FUN_004AC330 -- `push_back` for `msvc8::vector<moho::ResourceFactoryBase*>` (`ResourceManager::mPendingFactories`, +0x3C); callers 0x004A9F30; formerly `AppendPendingFactoryRegistration` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004DB2A0 (FUN_004DB2A0 -- `push_back` -- the grow-or-place tail append for `msvc8::vector<void*>` (`AudioEngineImpl::mBanks` at +0x08 and `mHandles` at +0x18; the 0x10 `{proxy, first, last, end}` head); callers 0x004DA500; formerly `PushBackNonNullAudioHandleStorageEntryA` in moho/audio/AudioEngine.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004DB440 (FUN_004DB440 -- a second emission of that `push_back` for `msvc8::vector<void*>` (`AudioEngineImpl::mBanks` at +0x08 and `mHandles` at +0x18; the 0x10 `{proxy, first, last, end}` head); callers 0x004DA500; formerly `PushBackNonNullAudioHandleStorageEntryB` in moho/audio/AudioEngine.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x005C4AB0 (FUN_005C4AB0 -- `push_back` -- store at the end and bump it, growing when full for `msvc8::vector<moho::ReconBlip*>` (`CAiReconDBImpl::mBblips`, the by-index blip table); zero callers, unreachable; formerly `PushBackBlipPointerWithGrowth` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-11.)
@@ -4046,6 +4047,7 @@ namespace msvc8
          * Address: 0x008B2770 (FUN_008B2770 -- `push_back` for `msvc8::vector<WeakPtr<UserUnit>>` (8-byte element, `UserArmy::mAvatars` +0x1E8); caller `AddArmyAvatar` 0x008B2429; formerly `InsertWeakPtrVectorObjectAt` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
          * Address: 0x00626E10 (FUN_00626E10 -- `push_back` for `msvc8::vector<moho::SPickUpInfo>`: `_Ufill` of one slot when capacity remains, else `insert(end(), value)` 0x00627340; callers 0x00625110 (`CUnitLoadUnits::DoTask`), 0x006270E0 (`SerLoad`); formerly `PushBackSPickUpInfoWithRelink` in moho/ai/SPickUpInfoVectorReflection.cpp, removed 2026-09-30.)
          * Address: 0x007AEB10 (FUN_007AEB10 -- `push_back` for `msvc8::vector<moho::GeomCamera3>`; caller `CAM_GetAllCameras` 0x007AAD20; formerly in moho/render/camera/GeomCamera3.cpp (RULE ONE), removed 2026-09-30 as `AppendGeomCameraViewAndReturnEnd`.)
+         * Address: 0x00733480 (FUN_00733480 -- `push_back` for `msvc8::vector<PlatoonUnitSearchEntry>` (8-byte `{Unit*, float}`, `cfunc_CPlatoonFormPlatoonL`'s nearest-first candidates): `uninit_fill_n` 0x00733C40 of one slot when there is room, else `insert(end, v)` 0x007336C0; caller 0x0072D8F0; formerly `AppendPlatoonUnitSearchEntry` in moho/sim/CPlatoon.cpp (RULE ONE), removed 2026-09-30.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -5245,8 +5247,8 @@ namespace msvc8
          * Address: 0x007336C0 (FUN_007336C0, sub_7336C0) --
          * `msvc8::vector<PlatoonUnitSearchEntry>::insert(iterator, const T&)`
          * for the 8-byte `{Unit*, float}` element (`CPlatoon.cpp`'s
-         * `AppendPlatoonUnitSearchEntry`/`cfunc_CPlatoonFormPlatoonL`
-         * nearest-first candidate scratch vector). `max_size` folds to
+         * `cfunc_CPlatoonFormPlatoonL` nearest-first candidate scratch
+         * vector). `max_size` folds to
          * 0x1FFFFFFF (`0xFFFFFFFF / 8`, throw helper `FUN_00733910`). Unlike
          * this member's usual "capture offset, tail-call the count-form
          * with `count=1`" shape, this emission is fully fused in place --
@@ -5255,26 +5257,22 @@ namespace msvc8
          * the current last element into the freshly grown slot through
          * the calling-convention bridge `FUN_00733A80` (cited below on
          * `uninit_move_n`) then shifts the remainder via `FUN_00733AD0`
-         * (not yet individually recovered -- its existing citation in
-         * `CPlatoon.cpp` as `CopyPlatoonPriorityEntryRangeBackward` names
-         * the wrong element type, a `PlatoonPriorityEntry`/
-         * `PlatoonUnitSearchEntry` shape collision this pass did not
-         * resolve); the `tail == 0` (append) sub-case calls the same
-         * bridge with a zero-length range (a structural no-op) and
-         * constructs the new value in place via `FUN_00733C40` (not yet
-         * recovered). The reallocation branch grows 1.5x, allocates via
+         * (`copy_backward_assign`) and fills the gap via `FUN_00733AB0`
+         * (the `std::fill` step, cited on the count-form `insert`); the
+         * `tail == 0` (append) sub-case calls the same bridge with a
+         * zero-length range (a structural no-op) and constructs the new
+         * value in place via `FUN_00733C40` (`uninit_fill_n`). The
+         * reallocation branch grows 1.5x, allocates via
          * `FUN_00733AF0`, and relocates the head/tail spans through two
          * more calls into `FUN_00734440` (the same core `FUN_00733A80`
          * bridges into). Reached from this element's `push_back`
-         * (`FUN_00733480`/`AppendPlatoonUnitSearchEntry`, `CPlatoon.cpp`,
-         * already recovered) capacity-full path, itself reached from
+         * (`FUN_00733480`, cited on `push_back`) capacity-full path, itself
+         * reached from
          * `cfunc_CPlatoonFormPlatoonL`'s (`FUN_0072D8F0`, already
          * recovered) nearest-first candidate filter -- previously that
          * filter used a locally-duplicated `CandidateDistance` struct and
          * a real `std::vector` instead of `PlatoonUnitSearchEntry`/
-         * `msvc8::vector`, which meant `AppendPlatoonUnitSearchEntry` was
-         * an orphan `[[maybe_unused]]` helper with the wrong container
-         * type entirely; both fixed in the same pass as this citation.
+         * `msvc8::vector`; the call site is now `nearbyUnits.push_back`.
          * Previously `blocked` on `needs_ida`; stays `skip` per the
          * established fused-emission precedent (`FUN_0084F200`), now with
          * concrete caller evidence instead of an unsupported claim.
@@ -5554,7 +5552,11 @@ namespace msvc8
          * Address: 0x00497B40 (FUN_00497B40 -- the capacity-full path of `push_back` for the 0x38-byte `SBeamVertex` element (`insert(end(), value)`, 1.5x growth, max_size 0x4444444); caller 0x00495DA0 (`AppendBeamRenderVertex`, `vertices.push_back(vertex)`).)
          * Address: 0x00692870 (FUN_00692870 -- `vector<T>::insert(pos, value)` for a 28-byte float[7] element (iterator returned through the hidden result slot); callers 0x00692700; formerly `InsertFloat7LaneAndRebaseCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00852350 (FUN_00852350 -- `vector<T>::insert(pos, value)` for a 12-byte element; callers 0x008522A0; formerly `InsertElement12LaneAndStoreRebasedCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x004ADDE0 (FUN_004ADDE0 -- `insert(pos, value)` for a 4-byte element; callers 0x004AC330, 0x004AD027; formerly `InsertSingleDwordIntoLegacyVector_004ADDE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004ADDE0 (FUN_004ADDE0 -- `insert(pos, value)` for a 4-byte element (`ResourceManager::mPendingFactories`); callers 0x004AC330, 0x004AD027; formerly `InsertSingleDwordIntoLegacyVector_004ADDE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AD110 (FUN_004AD110 -- the count fill `_Ufill` of that insert; callers 0x004ADDE0; formerly `FillDwordRangeFromScalarSlot` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x004AF3F0 (FUN_004AF3F0 -- `std::copy` (`memmove`, returning the end) of that insert; callers 0x004ADDE0; formerly `MoveDwordRangeAndReturnEnd_004AF3F0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x004AF430 (FUN_004AF430 -- `copy_backward` of that insert; callers 0x004ADDE0; formerly `CopyDwordRangeToEndAndReturnBegin_004AF430` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x004AF460 (FUN_004AF460 -- the checked `n * 4` `allocate` (also reached from 0x004AD0BC, 0x004AE09F) of that insert; callers 0x004ADDE0; formerly `AllocateChecked4ByteStride_004AF460` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x004F7F50 (FUN_004F7F50 -- single-value `insert(pos, value)` for the 0x28-byte `moho::CWinLogLine` (the log window's line lists), the capacity-full path of `push_back`: offset, `_Insert_n` 0x004F88B0, `begin() + offset`; caller 0x004F6FBE (0x004F6F40). Formerly `InsertVectorWinLogLineAtEnd` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x004F8CA0 (FUN_004F8CA0 -- single-value `insert(pos, value)` for the managed-dialog registry `msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element); caller 0x004F811C (0x004F80F0). Formerly `InsertManagedWindowSlotIntoWindowsVector` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x004F9050 (FUN_004F9050 -- the same insert for the managed-frame registry `msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`; caller 0x004F826C (0x004F8240). Formerly `InsertManagedWindowSlotIntoFramesVector` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
@@ -6707,6 +6709,7 @@ namespace msvc8
          * Address: 0x00868950 (FUN_00868950 -- a forwarding copy of 0x00868D30.)
          * Address: 0x00950790 (FUN_00950790 -- the `std::fill` gap-overwrite step of `_Insert_n` for `msvc8::vector<gpg::TrackedPointerInfo>` (`gpg::ReadArchive::mTrackedPtrs` at +0x14; the 0x14 entry's `boost::shared_ptr<void>` at +0x08 is what makes each step more than a word copy); callers 0x00950C30, 0x00952770; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x00950C30 (FUN_00950C30 -- a jump-only adapter over 0x00950790; no callers; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00733AB0 (FUN_00733AB0 -- the `std::fill` gap-overwrite step for `msvc8::vector<PlatoonUnitSearchEntry>` (8-byte `{Unit*, float}`); caller 0x007336C0; formerly `FillPlatoonPriorityEntryRange` over an invented 8-byte `PlatoonPriorityEntry` in moho/sim/CPlatoon.cpp (RULE ONE), removed 2026-09-30.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -6786,8 +6789,6 @@ namespace msvc8
 
         /**
          * Address: 0x004FA880 (FUN_004FA880 -- `insert(pos, first, last)` for the 0x28-byte `moho::CWinLogLine`: `CWinLogTarget::MergePendingLines` (0x004F6A50) appends the pending lines to the committed ones at `end()`. Its steps are `_Xlen` 0x004F8BB0, `_Allocate` 0x004FA650, `_Umove` 0x004FB680 / 0x004FA5E0, `_Ucopy` 0x004FB600 / 0x004FB150, `std::copy` 0x004FB190 and `_Destroy` 0x004FAC00. Formerly `AppendVectorWinLogLineRange` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), a `push_back` loop; removed 2026-09-24.)
-         * Address: 0x004ACD80 (FUN_004ACD80 -- `insert(pos, first, last)` for a 4-byte element; callers 0x004AA220, 0x004AB780, 0x004AC050; formerly `InsertDwordRangeIntoVectorRuntime` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x004ADCE0 (FUN_004ADCE0 -- that insert's reallocating branch (buy, copy the prefix, splice the inserted run, copy the suffix, free the old block); callers 0x004ACD80; formerly `ReallocateAndSpliceDwordRange_004ADCE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          *
          * What it does:
          * VC8's forward-iterator `_Insert(where, first, last)`. Without room it
@@ -9992,9 +9993,8 @@ namespace msvc8
          * convention bridge into `FUN_00734440` (this instantiation's real
          * move core, not yet individually recovered) for `msvc8::vector<
          * PlatoonUnitSearchEntry>` (8-byte `{Unit*, float}` element;
-         * `CPlatoon.cpp`'s `AppendPlatoonUnitSearchEntry`/
-         * `cfunc_CPlatoonFormPlatoonL` nearest-first candidate scratch
-         * vector). A pure register/stack reshuffle with no logic of its
+         * `CPlatoon.cpp`'s `cfunc_CPlatoonFormPlatoonL` nearest-first
+         * candidate scratch vector). A pure register/stack reshuffle with no logic of its
          * own -- 15 bytes of setup, one `call FUN_00734440`, `retn 8` --
          * confirmed against the `.asm`. Called twice from `insert(pos,
          * value)`'s emission for this instantiation (`FUN_007336C0`, cited
@@ -10603,6 +10603,7 @@ namespace msvc8
          * Address: 0x006898B0 (FUN_006898B0 -- another emission of that `copy_backward`, the destination end in EAX instead of ECX; zero callers; formerly `CopyPrefixedWeakPtrDwordPayloadRangeBackwardAdapterB`, removed 2026-09-30.)
          * Address: 0x00868EB0 (FUN_00868EB0 -- `copy_backward` for `msvc8::vector<moho::WeakSet<moho::UserEntity>>` (`SelectionDragger::DragRelease`'s priority buckets, element 0x0C): `WeakSet::operator=` per bucket, walking down; callers 0x00868960 and 0x00868D80.)
          * Address: 0x00868D80 (FUN_00868D80 -- a forwarding copy of 0x00868EB0.)
+         * Address: 0x00733AD0 (FUN_00733AD0 -- `copy_backward` for `msvc8::vector<PlatoonUnitSearchEntry>` (8-byte `{Unit*, float}`); caller 0x007336C0 (`insert`); formerly `CopyPlatoonPriorityEntryRangeBackward` over an invented 8-byte `PlatoonPriorityEntry` in moho/sim/CPlatoon.cpp (RULE ONE), removed 2026-09-30.)
          */
     public:
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
@@ -11387,6 +11388,7 @@ namespace msvc8
          * Address: 0x008D6570 (FUN_008D6570 -- `_Xlen` for the bucket array of `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp); caller 0x008D5DD4 (`_Insert_n` 0x008D5D70).)
          * Address: 0x0076C730 (FUN_0076C730 -- `_Xlen` for `msvc8::vector<moho::OccupySourceBinding>` (`PathTables::Impl::mSources`); callers 0x0076C1D9, 0x0076C490 (`_Insert_n`). Its old anchor sat on a stale block in the excluded moho/misc/CrtRuntimeHelpers.cpp.)
          * Address: 0x0076CA70 (FUN_0076CA70 -- `_Xlen` for `msvc8::vector<gpg::HaStar::ClusterMap*>` (`PathTables::Impl::mMaps`); callers 0x0076C309, 0x0076C850 (`_Insert_n`).)
+         * Address: 0x00733910 (FUN_00733910 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<PlatoonUnitSearchEntry>` (max_size 0x1FFFFFFF); callers 0x007335A0, 0x007336C0.)
          */
         [[noreturn]] static void throw_too_long()
         {
