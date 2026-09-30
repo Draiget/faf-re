@@ -69,14 +69,15 @@ namespace moho
     CEntityDbBoundedPropQueueRuntime() noexcept = default;
 
     /**
-     * Address: 0x00684360 (FUN_00684360)
-     *
-     * What it does:
-     * Releases the bounded-prop queue lanes: unlinks each node's
-     * owner-chain link, then empties `heap` and `handleSlots` (which frees
-     * their backing storage).
+     * Address: 0x00684360 (FUN_00684360 -- the implicit destructor, emitted
+     * out of line with `this` in EDI and called only from `~EntityDB`
+     * 0x006843B0 for `mBoundedProps`. Members go last-declared first:
+     * `handleSlots`' storage is freed, then `heap`'s nodes are destroyed
+     * through `destroy_range` 0x006892E0, each `WeakPtr<Prop>` unlinking
+     * itself, and its storage freed. Formerly `Reset()`, which `~CEntityDb`
+     * called by hand and which tore `heap` down first, removed 2026-09-30.)
      */
-    void Reset() noexcept;
+    ~CEntityDbBoundedPropQueueRuntime() = default;
 
     /**
      * Address: 0x006859F0 (FUN_006859F0)

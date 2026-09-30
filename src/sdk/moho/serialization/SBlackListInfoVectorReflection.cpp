@@ -10,7 +10,6 @@
 
 namespace
 {
-  using SBlackListInfoVector = msvc8::vector<moho::SBlackListInfo>;
   using SBlackListInfoVectorType = gpg::RVectorType<moho::SBlackListInfo>;
 
   /**
@@ -36,101 +35,47 @@ namespace
    * Address: 0x006DC070 (FUN_006DC070, sub_6DC070)
    *
    * What it does:
-   * Loads a `vector<SBlackListInfo>` payload and replaces destination storage.
+   * `vector<SBlackListInfo>`'s load callback. Reads the count, `reserve`s a
+   * staging vector (0x006DC9F0), then per element reads one `SBlackListInfo`
+   * into a temporary under an empty owner and `push_back`s it (0x006DB150);
+   * the temporary's `WeakPtr<Entity>` unlinks itself at 0x006DC123. The
+   * staging vector is swapped into the destination and the old elements die
+   * with it. Nothing is null-tested.
    */
-  void LoadSBlackListInfoVector(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadSBlackListInfoVector(gpg::ReadArchive* const archive, const int objectPtr, int, gpg::RRef*)
   {
-    auto* const storage = reinterpret_cast<SBlackListInfoVector*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(storage != nullptr);
-    if (!archive || !storage) {
-      return;
-    }
+    auto& storage = *reinterpret_cast<msvc8::vector<moho::SBlackListInfo>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    SBlackListInfoVector loaded{};
-    const std::size_t targetCount = static_cast<std::size_t>(count);
-    if (targetCount > 0u) {
-      // Pre-grow the destination to `count` capacity, then materialize one
-      // empty SBlackListInfo per slot before deserialization writes into it.
-      // This mirrors the binary's reserve(count) + uninitialized-fill path
-      // (FUN_006DC9F0, msvc8::vector<SBlackListInfo>::reserve) rather than a
-      // resize(), which would route through reallocate_to instead of reserve.
-      loaded.reserve(targetCount);
-      // reserve() has already sized capacity to exactly targetCount, so this
-      // resize takes _Insert_n's in-place branch and does not reallocate.
-      loaded.resize(targetCount, moho::SBlackListInfo{});
-    }
-
-    gpg::RType* const elementType = ResolveSBlackListInfoType();
-    if (!elementType) {
-      *storage = loaded;
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    msvc8::vector<moho::SBlackListInfo> loaded;
+    loaded.reserve(count);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, &loaded[static_cast<std::size_t>(i)], owner);
+      moho::SBlackListInfo element;
+      archive->Read(ResolveSBlackListInfoType(), &element, gpg::RRef{});
+      loaded.push_back(element);
     }
 
-    *storage = loaded;
+    storage.swap(loaded);
   }
 
   /**
    * Address: 0x006DC1C0 (FUN_006DC1C0, sub_6DC1C0)
    *
    * What it does:
-   * Writes a `vector<SBlackListInfo>` payload element-by-element.
+   * `vector<SBlackListInfo>`'s save callback: the count, then each element
+   * through the reflected `SBlackListInfo` type with the caller's owner.
+   * Nothing is null-tested.
    */
-  void SaveSBlackListInfoVector(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveSBlackListInfoVector(gpg::WriteArchive* const archive, const int objectPtr, int, gpg::RRef* const ownerRef)
   {
-    auto* const storage = reinterpret_cast<const SBlackListInfoVector*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(storage != nullptr);
-    if (!archive || !storage) {
-      return;
-    }
-
-    const unsigned int count = static_cast<unsigned int>(storage->size());
+    const auto& storage = *reinterpret_cast<const msvc8::vector<moho::SBlackListInfo>*>(objectPtr);
+    const unsigned int count = static_cast<unsigned int>(storage.size());
     archive->WriteUInt(count);
-
-    gpg::RType* const elementType = ResolveSBlackListInfoType();
-    if (!elementType) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, &(*storage)[static_cast<std::size_t>(i)], owner);
+      archive->Write(ResolveSBlackListInfoType(), &storage[i], *ownerRef);
     }
-  }
-
-  /**
-   * Address: 0x006DCB10 (FUN_006DCB10)
-   *
-   * What it does:
-   * Adjusts one `vector<SBlackListInfo>` length to `requestedCount` and uses
-   * one caller-provided fill lane for growth.
-   */
-  [[nodiscard]] std::size_t ResizeSBlackListInfoVectorWithFill(
-    SBlackListInfoVector& storage,
-    const std::size_t requestedCount,
-    const moho::SBlackListInfo& fillValue
-  )
-  {
-    const std::size_t currentCount = storage.size();
-    if (currentCount < requestedCount) {
-      storage.resize(requestedCount, fillValue);
-      return requestedCount;
-    }
-
-    if (requestedCount < currentCount) {
-      storage.resize(requestedCount);
-    }
-
-    return requestedCount;
   }
 
   struct SBlackListInfoVectorReflectionBootstrap
@@ -236,7 +181,7 @@ void gpg::RVectorType<moho::SBlackListInfo>::Init()
  */
 gpg::RRef gpg::RVectorType<moho::SBlackListInfo>::SubscriptIndex(void* const obj, const int ind) const
 {
-  auto* const storage = static_cast<SBlackListInfoVector*>(obj);
+  auto* const storage = static_cast<msvc8::vector<moho::SBlackListInfo>*>(obj);
   GPG_ASSERT(storage != nullptr);
   GPG_ASSERT(ind >= 0);
   GPG_ASSERT(storage != nullptr && static_cast<std::size_t>(ind) < storage->size());
@@ -260,23 +205,21 @@ size_t gpg::RVectorType<moho::SBlackListInfo>::GetCount(void* const obj) const
     return 0u;
   }
 
-  return static_cast<const SBlackListInfoVector*>(obj)->size();
+  return static_cast<const msvc8::vector<moho::SBlackListInfo>*>(obj)->size();
 }
 
 /**
  * Address: 0x006DB760 (FUN_006DB760, gpg::RVectorType_SBlackListInfo::SetCount)
+ *
+ * What it does:
+ * `resize(count, SBlackListInfo())` (0x006DCB10), the default entry built on
+ * the stack as the by-value fill argument. The binary zeroes only its weak
+ * pointer (MSVC8's `T()` left `mValue` as it found it); value-initialisation
+ * here zeroes `mValue` too. Nothing is null-tested.
  */
 void gpg::RVectorType<moho::SBlackListInfo>::SetCount(void* const obj, const int count) const
 {
-  auto* const storage = static_cast<SBlackListInfoVector*>(obj);
-  GPG_ASSERT(storage != nullptr);
-  GPG_ASSERT(count >= 0);
-  if (!storage || count < 0) {
-    return;
-  }
-
-  const moho::SBlackListInfo zeroFill{};
-  (void)ResizeSBlackListInfoVectorWithFill(*storage, static_cast<std::size_t>(count), zeroFill);
+  static_cast<msvc8::vector<moho::SBlackListInfo>*>(obj)->resize(static_cast<std::size_t>(count), moho::SBlackListInfo());
 }
 
 /**

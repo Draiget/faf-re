@@ -139,105 +139,6 @@ namespace
     return lhsMetric > rhsMetric;
   }
 
-  /**
-   * Address: 0x00628A60 (FUN_00628A60)
-   *
-   * What it does:
-   * Copies pickup-entry weak-unit lanes and distance payload lanes from one
-   * source range into one destination range while preserving intrusive-owner
-   * weak-link integrity for each copied entry.
-   */
-  [[maybe_unused]] moho::SPickUpInfo* CopyPickUpInfoWeakUnitRange(
-    moho::SPickUpInfo* destinationBegin,
-    const moho::SPickUpInfo* sourceBegin,
-    const moho::SPickUpInfo* sourceEnd
-  ) noexcept
-  {
-    moho::SPickUpInfo* write = destinationBegin;
-    const moho::SPickUpInfo* read = sourceBegin;
-    while (read != sourceEnd) {
-      if (read->mUnit.ownerLinkSlot != write->mUnit.ownerLinkSlot) {
-        write->mUnit.ResetFromOwnerLinkSlot(read->mUnit.ownerLinkSlot);
-      }
-      write->mDistanceSq = read->mDistanceSq;
-      ++write;
-      ++read;
-    }
-    return write;
-  }
-
-  /**
-   * Address: 0x00628AB0 (FUN_00628AB0)
-   *
-   * What it does:
-   * Unlinks each pickup-entry weak-unit lane in `[begin, end)` from the unit
-   * owner-chain intrusive list without changing vector capacity.
-   */
-  [[maybe_unused]] void UnlinkPickUpInfoWeakUnitRange(
-    moho::SPickUpInfo* begin,
-    moho::SPickUpInfo* end
-  ) noexcept
-  {
-    for (; begin != end; ++begin) {
-      auto** ownerCursor = reinterpret_cast<moho::WeakPtr<moho::Unit>**>(begin->mUnit.ownerLinkSlot);
-      if (ownerCursor == nullptr) {
-        continue;
-      }
-
-      while (*ownerCursor != &begin->mUnit) {
-        ownerCursor = &(*ownerCursor)->nextInOwner;
-      }
-      *ownerCursor = begin->mUnit.nextInOwner;
-    }
-  }
-
-  /**
-   * Address: 0x006273B0 (FUN_006273B0, Moho::CUnitLoadUnits::ErasePickUpInfoRange)
-   *
-   * IDA signature:
-   * _DWORD *__userpurge sub_6273B0@<eax>(int a1@<edi>, _DWORD *a2, int a3, int a4);
-   *
-   * What it does:
-   * Erases the half-open range `[rangeBegin, rangeEnd)` from the
-   * `mPickupQueue` lane by copying the live tail `[rangeEnd, end)` down to
-   * `rangeBegin` with weak-link-aware element copy, unlinking the now-dead
-   * tail window `[newEnd, end)` from each unit's owner weak-list, and
-   * shrinking the active end cursor lane to `newEnd`. The resulting iterator
-   * `rangeBegin` is written to `*outIterator` and returned, matching the
-   * MSVC8 `std::vector<SPickUpInfo>::erase` range-overload instantiation.
-   */
-  [[nodiscard]] moho::SPickUpInfo** ErasePickUpInfoRange(
-    msvc8::vector<moho::SPickUpInfo>& storage,
-    moho::SPickUpInfo** const outIterator,
-    moho::SPickUpInfo* const rangeBegin,
-    moho::SPickUpInfo* const rangeEnd
-  ) noexcept
-  {
-    if (rangeBegin != rangeEnd && !storage.empty()) {
-      // Shift `[rangeEnd, view.end)` down to `rangeBegin`. The helper
-      // preserves each SPickUpInfo's intrusive weak-unit owner-chain link
-      // as it relocates the entry.
-      moho::SPickUpInfo* const newEnd = CopyPickUpInfoWeakUnitRange(rangeBegin, rangeEnd, storage.end());
-
-      // Unlink the now-vacated tail `[newEnd, view.end)` from each unit's
-      // owner weak-list so the erased slots release their weak-pointer
-      // subscriptions without touching vector capacity.
-      UnlinkPickUpInfoWeakUnitRange(newEnd, storage.end());
-
-      // Shrink the active run to `newEnd`; capacity is untouched, matching
-      // the binary's erase-in-place. The elements are already unlinked above,
-      // so the run is shortened without re-running destructors.
-      while (storage.end() != newEnd) {
-        storage.pop_back_no_destroy();
-      }
-    }
-
-    if (outIterator != nullptr) {
-      *outIterator = rangeBegin;
-    }
-    return outIterator;
-  }
-
   void RunUnitScript(moho::Unit* const unit, const char* const scriptName)
   {
     if (unit == nullptr || scriptName == nullptr) {
@@ -518,9 +419,8 @@ namespace moho
     for (std::size_t index = 0; index < mPickupQueue.size();) {
       Unit* const candidate = mPickupQueue[index].GetUnit();
       if (!IsUsableUnitSlot(candidate) || candidate->IsDead()) {
-        moho::SPickUpInfo* const erasePos = mPickupQueue.data() + index;
-        moho::SPickUpInfo* eraseResult = nullptr;
-        (void)ErasePickUpInfoRange(mPickupQueue, &eraseResult, erasePos, erasePos + 1);
+        SPickUpInfo* const rejected = mPickupQueue.begin() + index;
+        mPickupQueue.erase(rejected, rejected + 1);
         continue;
       }
 
@@ -540,9 +440,8 @@ namespace moho
 
         ++index;
       } else {
-        moho::SPickUpInfo* const erasePos = mPickupQueue.data() + index;
-        moho::SPickUpInfo* eraseResult = nullptr;
-        (void)ErasePickUpInfoRange(mPickupQueue, &eraseResult, erasePos, erasePos + 1);
+        SPickUpInfo* const rejected = mPickupQueue.begin() + index;
+        mPickupQueue.erase(rejected, rejected + 1);
         rejectedByCapacity = true;
       }
     }

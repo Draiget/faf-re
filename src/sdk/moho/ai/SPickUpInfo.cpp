@@ -45,72 +45,21 @@ namespace moho
 {
   gpg::RType* SPickUpInfo::sType = nullptr;
 
-  SPickUpInfo::SPickUpInfo() noexcept
-    : mUnit{}
-    , mDistanceSq(0.0f)
-  {}
-
-  SPickUpInfo::SPickUpInfo(Unit* const unit, const float distanceSquared) noexcept
-    : SPickUpInfo()
-  {
-    BindUnitAndDistanceSquared(unit, distanceSquared);
-  }
-
-  SPickUpInfo::SPickUpInfo(const SPickUpInfo& source) noexcept
-    : SPickUpInfo()
-  {
-    mUnit.ResetFromOwnerLinkSlot(source.mUnit.ownerLinkSlot);
-    mDistanceSq = source.mDistanceSq;
-  }
-
-  SPickUpInfo& SPickUpInfo::operator=(const SPickUpInfo& source) noexcept
-  {
-    if (this == &source) {
-      return *this;
-    }
-
-    if (mUnit.ownerLinkSlot != source.mUnit.ownerLinkSlot) {
-      mUnit.ResetFromOwnerLinkSlot(source.mUnit.ownerLinkSlot);
-    }
-    mDistanceSq = source.mDistanceSq;
-    return *this;
-  }
-
-  Unit* SPickUpInfo::GetUnit() const noexcept
-  {
-    return mUnit.GetObjectPtr();
-  }
-
-  SPickUpInfo::~SPickUpInfo()
-  {
-    UnlinkWeakUnitLane();
-  }
-
   /**
    * Address: 0x006246A0 (FUN_006246A0)
    *
    * What it does:
-   * Binds this entry's weak-unit link from `unit` and stores the provided
-   * distance-squared lane.
+   * Links `mUnit` at the head of `unit`'s weak chain and stores the squared
+   * distance.
    */
-  void SPickUpInfo::BindUnitAndDistanceSquared(Unit* const unit, const float distanceSquared) noexcept
-  {
-    mUnit.BindObjectUnlinked(unit);
-    (void)mUnit.LinkIntoOwnerChainHeadUnlinked();
-    mDistanceSq = distanceSquared;
-  }
+  SPickUpInfo::SPickUpInfo(Unit* const unit, const float distanceSquared) noexcept
+    : mUnit(unit)
+    , mDistanceSq(distanceSquared)
+  {}
 
-  /**
-   * Address: 0x00624AA0 (FUN_00624AA0)
-   *
-   * What it does:
-   * Unlinks this entry from the current unit weak-owner intrusive chain.
-   */
-  void SPickUpInfo::UnlinkWeakUnitLane() noexcept
+  Unit* SPickUpInfo::GetUnit() const noexcept
   {
-    if (mUnit.IsLinkedInOwnerChain()) {
-      (void)mUnit.ReplaceInOwnerChain(mUnit.nextInOwner);
-    }
+    return mUnit.GetObjectPtr();
   }
 
   /**

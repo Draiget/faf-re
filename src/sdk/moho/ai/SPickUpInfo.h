@@ -28,11 +28,42 @@ namespace moho
   {
     static gpg::RType* sType;
 
-    SPickUpInfo() noexcept;
+    SPickUpInfo() noexcept = default;
+
+    /**
+     * Address: 0x006246A0 (FUN_006246A0)
+     *
+     * What it does:
+     * Links `mUnit` at the head of `unit`'s weak chain (`unit + 4`, or a null
+     * slot for a null unit) and stores the squared distance. Emitted out of
+     * line, the entry in EAX, the unit in ECX, the distance in XMM0; caller
+     * `CUnitLoadUnits::DoTask` (0x00625110), one per pickup candidate.
+     */
     SPickUpInfo(Unit* unit, float distanceSquared) noexcept;
-    SPickUpInfo(const SPickUpInfo& source) noexcept;
-    SPickUpInfo& operator=(const SPickUpInfo& source) noexcept;
-    ~SPickUpInfo();
+
+    SPickUpInfo(const SPickUpInfo&) noexcept = default;
+
+    /**
+     * Address: 0x00628FD0 (FUN_00628FD0 -- the implicit assignment emitted out
+     * of line, the destination in EAX and the source in EDX: `mUnit`'s
+     * `operator=` (relink only when the two slots differ), then the distance.
+     * No self-assignment test; equal slots make it a no-op. Callers: the
+     * pickup-queue sort's `iter_swap` 0x0062A130 and `_Pop_heap` 0x0062A7F0
+     * (legacy/algorithms/Sort.h). Formerly
+     * `AssignWeakPtrFloatPayloadLaneWithRelink` over a `WeakPtrPayloadLane<float>`
+     * look-alike in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
+     */
+    SPickUpInfo& operator=(const SPickUpInfo&) noexcept = default;
+
+    /**
+     * Address: 0x00624AA0 (FUN_00624AA0 -- the destructor emitted out of line,
+     * `this` in ECX: `mUnit` walks the unit's weak chain to itself and splices
+     * itself out. Callers include the comparator 0x006248D0 (its by-value
+     * operands), `CUnitLoadUnits::DoTask` 0x00625110, `SerLoad` 0x006270E0 and
+     * the vector's `_Insert_n` 0x00627800. Formerly the hand-written
+     * `UnlinkWeakUnitLane`, removed 2026-09-30.)
+     */
+    ~SPickUpInfo() = default;
 
     /**
      * Address: 0x00627EB0 (FUN_00627EB0)
@@ -54,27 +85,8 @@ namespace moho
     // `WeakObject`, which needs `Unit` complete.
     [[nodiscard]] Unit* GetUnit() const noexcept;
 
-  private:
-    /**
-     * Address: 0x006246A0 (FUN_006246A0)
-     *
-     * What it does:
-     * Binds this entry's weak-unit link from `unit` and stores the provided
-     * distance-squared lane.
-     */
-    void BindUnitAndDistanceSquared(Unit* unit, float distanceSquared) noexcept;
-
-    /**
-     * Address: 0x00624AA0 (FUN_00624AA0)
-     *
-     * What it does:
-     * Unlinks this entry from the current unit weak-owner intrusive chain.
-     */
-    void UnlinkWeakUnitLane() noexcept;
-
-  public:
-    WeakPtr<Unit> mUnit; // +0x00
-    float mDistanceSq;   // +0x08
+    WeakPtr<Unit> mUnit;     // +0x00
+    float mDistanceSq = 0.0f; // +0x08
   };
 
   static_assert(sizeof(SPickUpInfo) == 0x0C, "SPickUpInfo size must be 0x0C");

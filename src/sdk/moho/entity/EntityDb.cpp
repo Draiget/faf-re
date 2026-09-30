@@ -66,6 +66,17 @@ namespace moho
      */
     ~CEntityDbBoundedPropQueueNode() noexcept = default;
 
+    /**
+     * Address: 0x00687A70 (FUN_00687A70 -- the implicit assignment emitted out
+     * of line, destination in EAX and source in ESI: the two words, then
+     * `mOwnerLink = other.mOwnerLink` (relinked only when the two slots
+     * differ, the old chain walked with no null test), then `mHandleId`.
+     * Callers: `Swap` 0x00687530 (`std::swap`), the vector's gap fill
+     * 0x00688E20 and `copy_backward` 0x00688E50 (cited on Vector.h).
+     * Formerly `CopyPrefixedWeakPtrDwordPayloadLane` over a
+     * `PrefixedWeakPtrDwordPayloadLane` look-alike of this struct in
+     * moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
+     */
     CEntityDbBoundedPropQueueNode& operator=(const CEntityDbBoundedPropQueueNode&) noexcept = default;
 
     /**
@@ -92,33 +103,6 @@ namespace moho
       , mOwnerLink(ownerLink)
       , mHandleId(handleId)
     {}
-
-    /**
-     * Address: 0x006892E0 (FUN_006892E0)
-     * Address: 0x006877E0 (FUN_006877E0, confirmed pure tail-call trampoline
-     *          -- `.c` decompile is exactly `sub_6892E0(a1, a2)`, no other
-     *          logic of its own)
-     * Address: 0x00688D00 (FUN_00688D00, confirmed pure tail-call trampoline
-     *          -- `.c` decompile is exactly `sub_6892E0(a1, a2)`, no other
-     *          logic of its own)
-     *
-     * IDA signature:
-     * void __usercall sub_6892E0(int a1@<edx>, int a2@<esi>);
-     *
-     * What it does:
-     * Unlinks each node's owner-chain link in [begin, end) from whatever
-     * intrusive weak-observer chain it currently belongs to. Shared by
-     * every bounded-prop queue teardown/shrink path (queue reset,
-     * swap-to-tail removal, etc).
-     */
-    static void UnlinkRange(
-      CEntityDbBoundedPropQueueNode* begin, CEntityDbBoundedPropQueueNode* const end
-    ) noexcept
-    {
-      for (; begin != nullptr && begin != end; ++begin) {
-        begin->mOwnerLink.UnlinkFromOwnerChain();
-      }
-    }
 
     /**
      * Address: 0x00683C70 (FUN_00683C70 -- this comparison emitted out of line
@@ -1472,10 +1456,10 @@ namespace moho
    */
   CEntityDb::~CEntityDb()
   {
-    mBoundedProps.Reset();
-
-    // `mRegisteredEntitySets` unlinks itself as a member (0x006843F0); the
-    // sets still on it are left linked to each other.
+    // Every member tears itself down, last declared first: `mBoundedProps`
+    // (its destructor 0x00684360), then `mRegisteredEntitySets`, which
+    // unlinks itself (0x006843F0) and leaves the sets still on it linked to
+    // each other.
   }
 
   /**
@@ -1748,15 +1732,12 @@ namespace moho
    * correct. `.asm`-confirmed: the entry array sits at `[queue+4]` and the
    * position map at `[queue+0x14]` (`mov eax,[eax+4]` / `mov edx,[eax+14h]`
    * -- the `_Myfirst` of two `msvc8::vector`s at `+0x00`/`+0x10`). Each
-   * 0x14-byte slot is `{priority, boundedTick, WeakPtr-shaped owner link
-   * (backLinkSlot/nextInChain), id}` -- the owner-link pair is the same
-   * 20-byte shape as `PrefixedWeakPtrDwordPayloadLane`
-   * (`moho/misc/WeakPtr.h`), so the swap's owner-chain relink (`mov
-   * edx,[eax]` / `mov [eax],ecx` at 0x0068756B) reuses the already-recovered
-   * `CopyPrefixedWeakPtrDwordPayloadLane` (0x00687A70) semantics via
-   * `std::swap` on the node. The position map is then rewritten for both
-   * slots (`map[id] = heapIndex` at 0x006875A0-0x006875B4) -- the step a
-   * plain byte swap would miss.
+   * 0x14-byte slot is one `CEntityDbBoundedPropQueueNode`, and `std::swap`
+   * on two of them is a copy into a temporary and two assignments through
+   * the node's `operator=` (0x00687A70), which relinks each `mOwnerLink`
+   * (`mov edx,[eax]` / `mov [eax],ecx` at 0x0068756B). The position map is
+   * then rewritten for both slots (`map[id] = heapIndex` at
+   * 0x006875A0-0x006875B4) -- the step a plain byte swap would miss.
    *
    * Was previously modeled as a second, address-uncited expression of this
    * same operation (`SwapPriorityQueueEntries` against a private
@@ -1934,8 +1915,10 @@ namespace moho
    * already the tail) and sifts the moved node back down to restore the
    * heap invariant, releases the removed node's handle id back to the
    * free-handle list (mirrors the algorithm already recovered at
-   * 0x00687690, `PushBoundedPropHandleFreeList`), unlinks the removed
-   * node's owner-chain link, then shrinks `heap` by one node.
+   * 0x00687690, `PushBoundedPropHandleFreeList`), then `pop_back()`s the
+   * removed node, whose `WeakPtr<Prop>` unlinks itself as it is destroyed.
+   * There is no empty test up front: the binary takes `size() - 1`
+   * directly, and only `pop_back`'s own test guards the tail.
    *
    * Common inner step of `AddBoundedProp` (evict head when queue is full),
    * `RemoveBoundedProp` (explicit removal by handle), and `Prop::~Prop`
@@ -1943,39 +1926,17 @@ namespace moho
    */
   void CEntityDbBoundedPropQueueRuntime::PopAt(const std::int32_t index) noexcept
   {
-    if (heap.empty()) {
-      return;
-    }
-
     const std::int32_t lastIndex = static_cast<std::int32_t>(heap.size()) - 1;
     if (index != lastIndex) {
       Swap(index, lastIndex);
       SiftDown(index, lastIndex);
     }
 
-    CEntityDbBoundedPropQueueNode& tail = heap.begin()[lastIndex];
-    const std::int32_t releasedHandle = tail.mHandleId;
-    std::int32_t* const slots = handleSlots.begin();
-    slots[releasedHandle] = lastHandle;
+    const std::int32_t releasedHandle = heap.back().mHandleId;
+    handleSlots[releasedHandle] = lastHandle;
     lastHandle = releasedHandle;
 
-    CEntityDbBoundedPropQueueNode::UnlinkRange(&tail, &tail + 1);
     heap.pop_back();
-  }
-
-  /**
-   * Address: 0x00684360 (FUN_00684360)
-   *
-   * What it does:
-   * Releases the bounded-prop queue lanes: unlinks each node's owner-chain
-   * link, then empties `heap` and `handleSlots` (which frees their backing
-   * storage, matching the binary's `::operator delete` of both buffers).
-   */
-  void CEntityDbBoundedPropQueueRuntime::Reset() noexcept
-  {
-    CEntityDbBoundedPropQueueNode::UnlinkRange(heap.begin(), heap.end());
-    heap.tidy();
-    handleSlots.tidy();
   }
 
   /**
