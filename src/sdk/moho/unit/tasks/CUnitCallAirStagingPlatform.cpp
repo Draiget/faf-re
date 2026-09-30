@@ -16,6 +16,7 @@
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -376,23 +377,17 @@ namespace moho
    * Loads base command-task state plus air-staging platform weak pointer and
    * completion flag from archive data.
    */
-  void CUnitCallAirStagingPlatform::MemberDeserialize(
-    gpg::ReadArchive* const archive,
-    CUnitCallAirStagingPlatform* const task,
-    int,
-    gpg::RRef*
-  )
+  void CUnitCallAirStagingPlatform::MemberDeserialize(gpg::ReadArchive* const archive, int, const gpg::RRef&)
   {
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(task != nullptr);
-    if (!archive || !task) {
+    if (!archive) {
       return;
     }
 
     gpg::RRef nullOwner{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(task), nullOwner);
-    archive->Read(CachedWeakPtrUnitType(), &task->mPlatform, nullOwner);
-    archive->ReadBool(&task->mDone);
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), nullOwner);
+    archive->Read(CachedWeakPtrUnitType(), &mPlatform, nullOwner);
+    archive->ReadBool(&mDone);
   }
 
   /**
@@ -402,92 +397,19 @@ namespace moho
    * Saves base command-task state plus air-staging platform weak pointer and
    * completion flag into archive data.
    */
-  void CUnitCallAirStagingPlatform::MemberSerialize(
-    gpg::WriteArchive* const archive,
-    const CUnitCallAirStagingPlatform* const task,
-    int,
-    gpg::RRef*
-  )
+  void CUnitCallAirStagingPlatform::MemberSerialize(gpg::WriteArchive* const archive, int, const gpg::RRef&) const
   {
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(task != nullptr);
-    if (!archive || !task) {
+    if (!archive) {
       return;
     }
 
     gpg::RRef nullOwner{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(task), nullOwner);
-    archive->Write(CachedWeakPtrUnitType(), &task->mPlatform, nullOwner);
-    archive->WriteBool(task->mDone);
+    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), nullOwner);
+    archive->Write(CachedWeakPtrUnitType(), &mPlatform, nullOwner);
+    archive->WriteBool(mDone);
   }
 
-  /**
-   * Address: 0x00602F80 (FUN_00602F80)
-   *
-   * What it does:
-   * Preserves one deserialize callback thunk lane for call-air-staging task
-   * serializer registration.
-   */
-  [[maybe_unused]] void CUnitCallAirStagingPlatformMemberDeserializeAdapterLaneA(
-    gpg::ReadArchive* const archive,
-    CUnitCallAirStagingPlatform* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallAirStagingPlatform::MemberDeserialize(archive, task, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00602F90 (FUN_00602F90)
-   *
-   * What it does:
-   * Preserves one serialize callback thunk lane for call-air-staging task
-   * serializer registration.
-   */
-  [[maybe_unused]] void CUnitCallAirStagingPlatformMemberSerializeAdapterLaneA(
-    gpg::WriteArchive* const archive,
-    const CUnitCallAirStagingPlatform* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallAirStagingPlatform::MemberSerialize(archive, task, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x006031B0 (FUN_006031B0)
-   *
-   * What it does:
-   * Alternate deserialize callback thunk lane for call-air-staging task
-   * serializer registration.
-   */
-  [[maybe_unused]] void CUnitCallAirStagingPlatformMemberDeserializeAdapterLaneB(
-    gpg::ReadArchive* const archive,
-    CUnitCallAirStagingPlatform* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallAirStagingPlatform::MemberDeserialize(archive, task, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x006031C0 (FUN_006031C0)
-   *
-   * What it does:
-   * Alternate serialize callback thunk lane for call-air-staging task serializer
-   * registration.
-   */
-  [[maybe_unused]] void CUnitCallAirStagingPlatformMemberSerializeAdapterLaneB(
-    gpg::WriteArchive* const archive,
-    const CUnitCallAirStagingPlatform* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallAirStagingPlatform::MemberSerialize(archive, task, version, ownerRef);
-  }
 } // namespace moho
 
 namespace gpg
@@ -531,3 +453,28 @@ namespace gpg
     return outRef;
   }
 } // namespace gpg
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitCallAirStagingPlatform>`, vtable 0x00E1FDF4.
+   *
+   * Address: 0x00BCFD80 (FUN_00BCFD80 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF97D0 (FUN_00BF97D0 -- the global's destructor.)
+   * Address: 0x00602F80 (FUN_00602F80 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x00602F90 (FUN_00602F90 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x006031B0 (FUN_006031B0 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x006031C0 (FUN_006031C0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x006025F0 (FUN_006025F0 -- `Init`.)
+   * Address: 0x00601C20 (FUN_00601C20 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00601C30 (FUN_00601C30 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitCallAirStagingPlatformSerializer : gpg::SerSaveLoadHelper<CUnitCallAirStagingPlatform>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B0E2C -- process-global `CUnitCallAirStagingPlatformSerializer` singleton.
+  moho::CUnitCallAirStagingPlatformSerializer gCUnitCallAirStagingPlatformSerializer;
+} // namespace

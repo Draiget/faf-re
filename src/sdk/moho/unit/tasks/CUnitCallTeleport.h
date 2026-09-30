@@ -54,7 +54,7 @@ namespace moho
      * Loads base command-task state plus teleport-task weak-unit and status
      * flags from archive data.
      */
-    static void MemberDeserialize(gpg::ReadArchive* archive, CUnitCallTeleport* task, int version, gpg::RRef* ownerRef);
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
     /**
      * Address: 0x00603D60 (FUN_00603D60)
@@ -63,7 +63,7 @@ namespace moho
      * Saves base command-task state plus teleport-task weak-unit and status
      * flags into archive data.
      */
-    static void MemberSerialize(gpg::WriteArchive* archive, const CUnitCallTeleport* task, int version, gpg::RRef* ownerRef);
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
 
     /**
      * Address: 0x006013D0 (FUN_006013D0, Moho::CUnitCallTeleport::TaskTick)
@@ -249,6 +249,9 @@ namespace moho
    * template's 4-argument `RType::load_func_t`/`save_func_t`, confirmed by
    * the real ctor (0x00BD0650) storing those two addresses directly into
    * `mLoadCallback`/`mSaveCallback`.
+   *
+   * Address: 0x0060C580 (FUN_0060C580 -- an unreferenced copy of `Serialize`, `jmp` into
+   * `MemberSerialize` 0x0060D350.)
    */
   class CUnitTeleportTaskSerializer final : public gpg::SerSaveLoadHelper<CUnitTeleportTask>
   {

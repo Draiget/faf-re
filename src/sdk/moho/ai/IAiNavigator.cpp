@@ -1290,7 +1290,7 @@ IAiNavigator::~IAiNavigator() = default;
  * Loads IAiNavigator broadcaster listener payload through reflected
  * `Broadcaster<EAiNavigatorEvent>` metadata.
  */
-void IAiNavigator::MemberDeserialize(IAiNavigator* const object, gpg::ReadArchive* const archive)
+void IAiNavigator::MemberDeserialize(gpg::ReadArchive* const archive)
 {
   if (!archive) {
     return;
@@ -1299,7 +1299,7 @@ void IAiNavigator::MemberDeserialize(IAiNavigator* const object, gpg::ReadArchiv
   const gpg::RRef ownerRef{};
   archive->Read(
     CachedBroadcasterEAiNavigatorEventType(),
-    object ? static_cast<void*>(static_cast<Broadcaster<EAiNavigatorEvent>*>(object)) : nullptr,
+    this ? static_cast<void*>(static_cast<Broadcaster<EAiNavigatorEvent>*>(this)) : nullptr,
     ownerRef
   );
 }
@@ -1311,7 +1311,7 @@ void IAiNavigator::MemberDeserialize(IAiNavigator* const object, gpg::ReadArchiv
  * Saves IAiNavigator broadcaster listener payload through reflected
  * `Broadcaster<EAiNavigatorEvent>` metadata.
  */
-void IAiNavigator::MemberSerialize(const IAiNavigator* const object, gpg::WriteArchive* const archive)
+void IAiNavigator::MemberSerialize(gpg::WriteArchive* const archive) const
 {
   if (!archive) {
     return;
@@ -1320,7 +1320,7 @@ void IAiNavigator::MemberSerialize(const IAiNavigator* const object, gpg::WriteA
   const gpg::RRef ownerRef{};
   archive->Write(
     CachedBroadcasterEAiNavigatorEventType(),
-    object ? static_cast<const void*>(static_cast<const Broadcaster<EAiNavigatorEvent>*>(object)) : nullptr,
+    this ? static_cast<const void*>(static_cast<const Broadcaster<EAiNavigatorEvent>*>(this)) : nullptr,
     ownerRef
   );
 }
@@ -1367,3 +1367,24 @@ namespace
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(RegisterBroadcasterEAiNavigatorEventType_2f6ef0, RegisterBroadcasterEAiNavigatorEventType)
 GPG_PREREGISTER_INIT(RegisterListenerEAiNavigatorEventType_2f6ef0, RegisterListenerEAiNavigatorEventType)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<IAiNavigator>`, vtable 0x00E1C068.
+   *
+   * Address: 0x00BCC6C0 (FUN_00BCC6C0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF6D60 (FUN_00BF6D60 -- the global's destructor.)
+   * Address: 0x005A71A0 (FUN_005A71A0 -- `Init`.)
+   * Address: 0x005A32D0 (FUN_005A32D0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005A32E0 (FUN_005A32E0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct IAiNavigatorSerializer : gpg::SerSaveLoadHelper<IAiNavigator>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE788 -- process-global `IAiNavigatorSerializer` singleton.
+  moho::IAiNavigatorSerializer gIAiNavigatorSerializer;
+} // namespace

@@ -63,6 +63,7 @@
 #include "moho/unit/tasks/CUnitUpgradeTask.h"
 #include "moho/unit/tasks/CUnitWaitForFerryTask.h"
 #include "moho/script/CUnitScriptTask.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -1141,64 +1142,36 @@ void IAiCommandDispatchImpl::MemberConstruct(
 /**
  * Address: 0x00599C80 (FUN_00599C80, Moho::IAiCommandDispatchImpl::MemberDeserialize)
  */
-void IAiCommandDispatchImpl::MemberDeserialize(gpg::ReadArchive* const archive, IAiCommandDispatchImpl* const object)
-{
-  if (!archive || !object) {
-    return;
-  }
-
-  const gpg::RRef ownerRef{};
-  archive->Read(CachedCCommandTaskType(), object, ownerRef);
-
-  bool state = false;
-  archive->ReadBool(&state);
-  object->mState = state ? 1u : 0u;
-
-  object->mCommandQueue = ReadCommandQueuePointer(archive, ownerRef);
-}
-
-/**
- * Address: 0x00599A30 (FUN_00599A30)
- *
- * What it does:
- * Serializer bridge thunk that forwards to `IAiCommandDispatchImpl::MemberDeserialize`.
- */
-[[maybe_unused]] void IAiCommandDispatchImplMemberDeserializeBridgeA(
-  gpg::ReadArchive* const archive,
-  IAiCommandDispatchImpl* const object
-)
-{
-  IAiCommandDispatchImpl::MemberDeserialize(archive, object);
-}
-
-/**
- * Address: 0x00599C60 (FUN_00599C60)
- *
- * What it does:
- * Serializer bridge thunk that forwards to `IAiCommandDispatchImpl::MemberDeserialize`.
- */
-[[maybe_unused]] void IAiCommandDispatchImplMemberDeserializeBridgeB(
-  gpg::ReadArchive* const archive,
-  IAiCommandDispatchImpl* const object
-)
-{
-  IAiCommandDispatchImpl::MemberDeserialize(archive, object);
-}
-
-/**
- * Address: 0x00599CF0 (FUN_00599CF0, Moho::IAiCommandDispatchImpl::MemberSerialize)
- */
-void IAiCommandDispatchImpl::MemberSerialize(const IAiCommandDispatchImpl* const object, gpg::WriteArchive* const archive)
+void IAiCommandDispatchImpl::MemberDeserialize(gpg::ReadArchive* const archive)
 {
   if (!archive) {
     return;
   }
 
   const gpg::RRef ownerRef{};
-  archive->Write(CachedCCommandTaskType(), object, ownerRef);
-  archive->WriteBool(object && object->mState != 0u);
+  archive->Read(CachedCCommandTaskType(), this, ownerRef);
 
-  const gpg::RRef queueRef = MakeCommandQueueRef(object ? object->mCommandQueue : nullptr);
+  bool state = false;
+  archive->ReadBool(&state);
+  mState = state ? 1u : 0u;
+
+  mCommandQueue = ReadCommandQueuePointer(archive, ownerRef);
+}
+
+/**
+ * Address: 0x00599CF0 (FUN_00599CF0, Moho::IAiCommandDispatchImpl::MemberSerialize)
+ */
+void IAiCommandDispatchImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  archive->Write(CachedCCommandTaskType(), this, ownerRef);
+  archive->WriteBool(this && mState != 0u);
+
+  const gpg::RRef queueRef = MakeCommandQueueRef(this ? mCommandQueue : nullptr);
   gpg::WriteRawPointer(archive, queueRef, gpg::TrackedPointerState::Unowned, ownerRef);
 }
 
@@ -1221,4 +1194,29 @@ namespace
 {
   // Address: 0x010AE404 -- process-global `IAiCommandDispatchImplConstruct` singleton.
   moho::IAiCommandDispatchImplConstruct gIAiCommandDispatchImplConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<IAiCommandDispatchImpl>`, vtable 0x00E1B408.
+   *
+   * Address: 0x00BCBF00 (FUN_00BCBF00 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF66F0 (FUN_00BF66F0 -- the global's destructor.)
+   * Address: 0x00599A30 (FUN_00599A30 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x00599C60 (FUN_00599C60 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x00599A40 (FUN_00599A40 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x00599C70 (FUN_00599C70 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005996D0 (FUN_005996D0 -- `Init`.)
+   * Address: 0x005993C0 (FUN_005993C0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005993D0 (FUN_005993D0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct IAiCommandDispatchImplSerializer : gpg::SerSaveLoadHelper<IAiCommandDispatchImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE324 -- process-global `IAiCommandDispatchImplSerializer` singleton.
+  moho::IAiCommandDispatchImplSerializer gIAiCommandDispatchImplSerializer;
 } // namespace

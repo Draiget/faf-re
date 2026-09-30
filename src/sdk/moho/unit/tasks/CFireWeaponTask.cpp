@@ -258,19 +258,17 @@ int CFireWeaponTask::Execute()
  * Loads the reflected base task, weapon pointer, unit pointer, and fire clock
  * from archive storage.
  */
-void CFireWeaponTask::MemberDeserialize(gpg::ReadArchive* const archive, CFireWeaponTask* const task, int /*version*/, gpg::RRef* ownerRef)
+void CFireWeaponTask::MemberDeserialize(gpg::ReadArchive* const archive, int /*version*/, const gpg::RRef& ownerRef)
 {
   GPG_ASSERT(archive != nullptr);
-  GPG_ASSERT(task != nullptr);
-  if (!archive || !task) {
+  if (!archive) {
     return;
   }
 
-  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-  archive->Read(CachedRType<CTask>(), task, owner);
-  task->mWeapon = ReadTrackedPointer<UnitWeapon>(archive, CachedRType<UnitWeapon>(), owner);
-  task->mUnit = ReadTrackedPointer<Unit>(archive, CachedRType<Unit>(), owner);
-  archive->ReadInt(&task->mFireClock);
+  archive->Read(CachedRType<CTask>(), this, ownerRef);
+  mWeapon = ReadTrackedPointer<UnitWeapon>(archive, CachedRType<UnitWeapon>(), ownerRef);
+  mUnit = ReadTrackedPointer<Unit>(archive, CachedRType<Unit>(), ownerRef);
+  archive->ReadInt(&mFireClock);
 }
 
 /**
@@ -280,21 +278,17 @@ void CFireWeaponTask::MemberDeserialize(gpg::ReadArchive* const archive, CFireWe
  * Saves the reflected base task, weapon pointer, unit pointer, and fire clock
  * into archive storage.
  */
-void CFireWeaponTask::MemberSerialize(
-  gpg::WriteArchive* const archive, const CFireWeaponTask* const task, int /*version*/, gpg::RRef* ownerRef
-)
+void CFireWeaponTask::MemberSerialize(gpg::WriteArchive* const archive, int /*version*/, const gpg::RRef& ownerRef) const
 {
   GPG_ASSERT(archive != nullptr);
-  GPG_ASSERT(task != nullptr);
-  if (!archive || !task) {
+  if (!archive) {
     return;
   }
 
-  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-  archive->Write(CachedRType<CTask>(), task, owner);
-  WriteTrackedPointer(archive, task->mWeapon, gpg::TrackedPointerState::Unowned, owner);
-  WriteTrackedPointer(archive, task->mUnit, gpg::TrackedPointerState::Unowned, owner);
-  archive->WriteInt(task->mFireClock);
+  archive->Write(CachedRType<CTask>(), this, ownerRef);
+  WriteTrackedPointer(archive, mWeapon, gpg::TrackedPointerState::Unowned, ownerRef);
+  WriteTrackedPointer(archive, mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
+  archive->WriteInt(mFireClock);
 }
 } // namespace moho
 
@@ -312,4 +306,28 @@ namespace
   };
 
   FireWeaponTaskReflectionBootstrap gFireWeaponTaskReflectionBootstrap;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CFireWeaponTask>`, vtable 0x00E2E2EC.
+   *
+   * Address: 0x00BD8890 (FUN_00BD8890 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFE710 (FUN_00BFE710 -- the global's destructor.)
+   * Address: 0x006DD3C0 (FUN_006DD3C0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x006DE5F0 (FUN_006DE5F0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x006DD3B0 (FUN_006DD3B0 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x006DB850 (FUN_006DB850 -- `Init`.)
+   * Address: 0x006D3EF0 (FUN_006D3EF0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006D3F00 (FUN_006D3F00 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CFireWeaponTaskSerializer : gpg::SerSaveLoadHelper<CFireWeaponTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B7BC4 -- process-global `CFireWeaponTaskSerializer` singleton.
+  moho::CFireWeaponTaskSerializer gCFireWeaponTaskSerializer;
 } // namespace

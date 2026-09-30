@@ -55,7 +55,7 @@ namespace moho
      * Loads reflected base lanes (`IAiNavigator`, `CScriptObject`, `CTask`)
      * followed by unit pointer, ignore-formation flag, and navigator status.
      */
-    static void MemberDeserialize(CAiNavigatorImpl* object, gpg::ReadArchive* archive, int version);
+    void MemberDeserialize(gpg::ReadArchive* archive, int version);
 
     /**
      * Address: 0x005A8DD0 (FUN_005A8DD0, Moho::CAiNavigatorImpl::MemberSerialize)
@@ -64,7 +64,7 @@ namespace moho
      * Saves reflected base lanes (`IAiNavigator`, `CScriptObject`, `CTask`)
      * followed by unit pointer, ignore-formation flag, and navigator status.
      */
-    static void MemberSerialize(const CAiNavigatorImpl* object, gpg::WriteArchive* archive, int version);
+    void MemberSerialize(gpg::WriteArchive* archive, int version) const;
 
     /**
      * Address: 0x005A33A0 (FUN_005A33A0, ?GetClass@CAiNavigatorImpl@Moho@@UBEPAVRType@gpg@@XZ)

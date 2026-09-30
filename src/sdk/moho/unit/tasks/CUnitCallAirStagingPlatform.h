@@ -56,8 +56,7 @@ namespace moho
      * Loads base command-task state plus air-staging platform weak pointer and
      * completion flag from archive data.
      */
-    static void
-    MemberDeserialize(gpg::ReadArchive* archive, CUnitCallAirStagingPlatform* task, int version, gpg::RRef* ownerRef);
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
     /**
      * Address: 0x00603E80 (FUN_00603E80)
@@ -66,8 +65,7 @@ namespace moho
      * Saves base command-task state plus air-staging platform weak pointer and
      * completion flag into archive data.
      */
-    static void
-    MemberSerialize(gpg::WriteArchive* archive, const CUnitCallAirStagingPlatform* task, int version, gpg::RRef* ownerRef);
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
 
     /**
      * Address: 0x00601E00 (FUN_00601E00, Moho::CUnitCallAirStagingPlatform::TaskTick)

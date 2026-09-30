@@ -57,7 +57,7 @@ namespace moho
      * Loads base navigator state, destination weak link, current target, goal
      * position, and formation-tracking flag.
      */
-    static void MemberDeserialize(CAiNavigatorAir* object, gpg::ReadArchive* archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x005A91F0 (FUN_005A91F0, Moho::CAiNavigatorAir::MemberSerialize)
@@ -66,7 +66,7 @@ namespace moho
      * Saves base navigator state, destination weak link, current target, goal
      * position, and formation-tracking flag.
      */
-    static void MemberSerialize(const CAiNavigatorAir* object, gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x005A4C60 (FUN_005A4C60)

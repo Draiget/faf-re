@@ -52,7 +52,7 @@ namespace moho
      * Loads base command-task state, transport weak pointer, beamup flags, and
      * two transform lanes for one `CUnitCallTransport` object.
      */
-    static void MemberDeserialize(gpg::ReadArchive* archive, CUnitCallTransport* task, int version, gpg::RRef* ownerRef);
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
     /**
      * Address: 0x006039A0 (FUN_006039A0)
@@ -61,7 +61,7 @@ namespace moho
      * Saves base command-task state, transport weak pointer, beamup flags, and
      * two transform lanes for one `CUnitCallTransport` object.
      */
-    static void MemberSerialize(gpg::WriteArchive* archive, const CUnitCallTransport* task, int version, gpg::RRef* ownerRef);
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
 
     /**
      * Address: 0x005FFC70 (FUN_005FFC70, Moho::CUnitCallTransport::TaskTick)

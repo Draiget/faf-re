@@ -9,6 +9,7 @@
 #include "moho/ai/IAiSteering.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -237,21 +238,21 @@ CAiNavigatorLand::~CAiNavigatorLand()
  * Loads base navigator state, owned path-navigator pointer, destination-unit
  * weak link, and goal rectangle payload.
  */
-void CAiNavigatorLand::MemberDeserialize(CAiNavigatorLand* const object, gpg::ReadArchive* const archive)
+void CAiNavigatorLand::MemberDeserialize(gpg::ReadArchive* const archive)
 {
   if (!archive) {
     return;
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(CachedCAiNavigatorImplType(), object, ownerRef);
+  archive->Read(CachedCAiNavigatorImplType(), this, ownerRef);
 
   CAiPathNavigator* const loadedPathNavigator =
     ReadPointerWithType<CAiPathNavigator>(archive, ownerRef, CachedCAiPathNavigatorType());
 
-  if (object) {
-    CAiPathNavigator* const oldPathNavigator = object->mPathNavigator;
-    object->mPathNavigator = loadedPathNavigator;
+  if (this) {
+    CAiPathNavigator* const oldPathNavigator = mPathNavigator;
+    mPathNavigator = loadedPathNavigator;
     if (oldPathNavigator) {
       delete oldPathNavigator;
     }
@@ -262,14 +263,14 @@ void CAiNavigatorLand::MemberDeserialize(CAiNavigatorLand* const object, gpg::Re
   WeakPtr<Entity> destinationEntity{};
   archive->Read(
     CachedWeakEntityType(),
-    object ? static_cast<void*>(&object->mDestinationEntity) : static_cast<void*>(&destinationEntity),
+    this ? static_cast<void*>(&mDestinationEntity) : static_cast<void*>(&destinationEntity),
     ownerRef
   );
 
   SAiNavigatorGoal goal{};
   archive->Read(
     CachedSAiNavigatorGoalType(),
-    object ? static_cast<void*>(&object->mGoal) : static_cast<void*>(&goal),
+    this ? static_cast<void*>(&mGoal) : static_cast<void*>(&goal),
     ownerRef
   );
 }
@@ -281,18 +282,18 @@ void CAiNavigatorLand::MemberDeserialize(CAiNavigatorLand* const object, gpg::Re
  * Saves base navigator state, owned path-navigator pointer,
  * destination-unit weak link, and goal rectangle payload.
  */
-void CAiNavigatorLand::MemberSerialize(const CAiNavigatorLand* const object, gpg::WriteArchive* const archive)
+void CAiNavigatorLand::MemberSerialize(gpg::WriteArchive* const archive) const
 {
   if (!archive) {
     return;
   }
 
   const gpg::RRef ownerRef{};
-  archive->Write(CachedCAiNavigatorImplType(), object, ownerRef);
+  archive->Write(CachedCAiNavigatorImplType(), this, ownerRef);
 
   WritePointerWithType(
     archive,
-    object ? object->mPathNavigator : nullptr,
+    this ? mPathNavigator : nullptr,
     CachedCAiPathNavigatorType(),
     gpg::TrackedPointerState::Owned,
     ownerRef
@@ -301,14 +302,14 @@ void CAiNavigatorLand::MemberSerialize(const CAiNavigatorLand* const object, gpg
   const WeakPtr<Entity> destinationEntity{};
   archive->Write(
     CachedWeakEntityType(),
-    object ? static_cast<const void*>(&object->mDestinationEntity) : static_cast<const void*>(&destinationEntity),
+    this ? static_cast<const void*>(&mDestinationEntity) : static_cast<const void*>(&destinationEntity),
     ownerRef
   );
 
   const SAiNavigatorGoal goal{};
   archive->Write(
     CachedSAiNavigatorGoalType(),
-    object ? static_cast<const void*>(&object->mGoal) : static_cast<const void*>(&goal),
+    this ? static_cast<const void*>(&mGoal) : static_cast<const void*>(&goal),
     ownerRef
   );
 }
@@ -613,4 +614,29 @@ namespace
 {
   // Address: 0x010AE85C -- process-global `CAiNavigatorLandConstruct` singleton.
   moho::CAiNavigatorLandConstruct gCAiNavigatorLandConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiNavigatorLand>`, vtable 0x00E1C100.
+   *
+   * Address: 0x00BCC7E0 (FUN_00BCC7E0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF6EB0 (FUN_00BF6EB0 -- the global's destructor.)
+   * Address: 0x005A7E60 (FUN_005A7E60 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005A8790 (FUN_005A8790 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005A4820 (FUN_005A4820 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005A4850 (FUN_005A4850 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005A7430 (FUN_005A7430 -- `Init`.)
+   * Address: 0x005A47D0 (FUN_005A47D0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005A47E0 (FUN_005A47E0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiNavigatorLandSerializer : gpg::SerSaveLoadHelper<CAiNavigatorLand>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AEC14 -- process-global `CAiNavigatorLandSerializer` singleton.
+  moho::CAiNavigatorLandSerializer gCAiNavigatorLandSerializer;
 } // namespace

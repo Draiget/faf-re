@@ -93,7 +93,7 @@ namespace moho
      * state: the `IAniManipulator` base, the goal weak-pointer lane, and every
      * builder-arm tracking parameter.
      */
-    static void MemberDeserialize(CBuilderArmManipulator* object, gpg::ReadArchive* archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x00637640 (FUN_00637640)
@@ -103,7 +103,7 @@ namespace moho
      * state: the `IAniManipulator` base, the goal weak-pointer lane, and every
      * builder-arm tracking parameter.
      */
-    static void MemberSerialize(const CBuilderArmManipulator* object, gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   private:
     /**

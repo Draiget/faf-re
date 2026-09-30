@@ -252,31 +252,31 @@ gpg::RType* CAiSiloBuildImpl::sType = nullptr;
 /**
  * Address: 0x005D04A0 (FUN_005D04A0, Moho::SSiloBuildInfo::MemberDeserialize)
  */
-void SSiloBuildInfo::MemberDeserialize(gpg::ReadArchive* const archive, SSiloBuildInfo* const info)
+void SSiloBuildInfo::MemberDeserialize(gpg::ReadArchive* const archive)
 {
-  if (!archive || !info) {
+  if (!archive) {
     return;
   }
 
   const gpg::RRef owner{};
-  info->mWeapon = ReadPointerWithType<UnitWeapon>(archive, owner, ResolveUnitWeaponType());
-  archive->ReadInt(&info->mAmmo);
-  archive->ReadInt(&info->mMaxStorageCount);
+  mWeapon = ReadPointerWithType<UnitWeapon>(archive, owner, ResolveUnitWeaponType());
+  archive->ReadInt(&mAmmo);
+  archive->ReadInt(&mMaxStorageCount);
 }
 
 /**
  * Address: 0x005D04F0 (FUN_005D04F0, Moho::SSiloBuildInfo::MemberSerialize)
  */
-void SSiloBuildInfo::MemberSerialize(const SSiloBuildInfo* const info, gpg::WriteArchive* const archive)
+void SSiloBuildInfo::MemberSerialize(gpg::WriteArchive* const archive) const
 {
-  if (!archive || !info) {
+  if (!archive) {
     return;
   }
 
   const gpg::RRef owner{};
-  WritePointerWithType(archive, info->mWeapon, ResolveUnitWeaponType(), gpg::TrackedPointerState::Unowned, owner);
-  archive->WriteInt(info->mAmmo);
-  archive->WriteInt(info->mMaxStorageCount);
+  WritePointerWithType(archive, mWeapon, ResolveUnitWeaponType(), gpg::TrackedPointerState::Unowned, owner);
+  archive->WriteInt(mAmmo);
+  archive->WriteInt(mMaxStorageCount);
 }
 
 /**
@@ -751,4 +751,25 @@ namespace
 {
   // Address: 0x010AFDA0 -- process-global `CAiSiloBuildImplSerializer` singleton.
   moho::CAiSiloBuildImplSerializer gCAiSiloBuildImplSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SSiloBuildInfo>`, vtable 0x00E1DD94.
+   *
+   * Address: 0x00BCE0B0 (FUN_00BCE0B0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7EA0 (FUN_00BF7EA0 -- the global's destructor.)
+   * Address: 0x005CFB60 (FUN_005CFB60 -- `Init`.)
+   * Address: 0x005CEC70 (FUN_005CEC70 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005CEC80 (FUN_005CEC80 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SSiloBuildInfoSerializer : gpg::SerSaveLoadHelper<SSiloBuildInfo>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AFD8C -- process-global `SSiloBuildInfoSerializer` singleton.
+  moho::SSiloBuildInfoSerializer gSSiloBuildInfoSerializer;
 } // namespace

@@ -25,6 +25,7 @@
 #include "moho/sim/SFootprint.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -1316,7 +1317,7 @@ CAiNavigatorImpl::~CAiNavigatorImpl()
  * Loads reflected base lanes (`IAiNavigator`, `CScriptObject`, `CTask`)
  * followed by unit pointer, ignore-formation flag, and navigator status.
  */
-void CAiNavigatorImpl::MemberDeserialize(CAiNavigatorImpl* const object, gpg::ReadArchive* const archive, const int version)
+void CAiNavigatorImpl::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
 {
   if (!archive) {
     return;
@@ -1327,13 +1328,13 @@ void CAiNavigatorImpl::MemberDeserialize(CAiNavigatorImpl* const object, gpg::Re
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(CachedIAiNavigatorType(), object, ownerRef);
+  archive->Read(CachedIAiNavigatorType(), this, ownerRef);
   archive->Read(
     CachedCScriptObjectType(),
-    object ? static_cast<void*>(static_cast<CScriptObject*>(object)) : nullptr,
+    this ? static_cast<void*>(static_cast<CScriptObject*>(this)) : nullptr,
     ownerRef
   );
-  archive->Read(CachedCTaskType(), object ? static_cast<void*>(static_cast<CTask*>(object)) : nullptr, ownerRef);
+  archive->Read(CachedCTaskType(), this ? static_cast<void*>(static_cast<CTask*>(this)) : nullptr, ownerRef);
 
   Unit* const loadedUnit = ReadPointerWithType<Unit>(archive, ownerRef, CachedUnitType());
 
@@ -1343,13 +1344,10 @@ void CAiNavigatorImpl::MemberDeserialize(CAiNavigatorImpl* const object, gpg::Re
   EAiNavigatorStatus status = AINAVSTATUS_Idle;
   archive->Read(CachedEAiNavigatorStatusType(), &status, ownerRef);
 
-  if (!object) {
-    return;
-  }
 
-  object->mUnit = loadedUnit;
-  object->mIgnoreFormation = ignoreFormation ? 1u : 0u;
-  object->mStatus = status;
+  mUnit = loadedUnit;
+  mIgnoreFormation = ignoreFormation ? 1u : 0u;
+  mStatus = status;
 }
 
 /**
@@ -1359,11 +1357,7 @@ void CAiNavigatorImpl::MemberDeserialize(CAiNavigatorImpl* const object, gpg::Re
  * Saves reflected base lanes (`IAiNavigator`, `CScriptObject`, `CTask`)
  * followed by unit pointer, ignore-formation flag, and navigator status.
  */
-void CAiNavigatorImpl::MemberSerialize(
-  const CAiNavigatorImpl* const object,
-  gpg::WriteArchive* const archive,
-  const int version
-)
+void CAiNavigatorImpl::MemberSerialize(gpg::WriteArchive* const archive, const int version) const
 {
   if (!archive) {
     return;
@@ -1374,29 +1368,29 @@ void CAiNavigatorImpl::MemberSerialize(
   }
 
   const gpg::RRef ownerRef{};
-  archive->Write(CachedIAiNavigatorType(), object, ownerRef);
+  archive->Write(CachedIAiNavigatorType(), this, ownerRef);
   archive->Write(
     CachedCScriptObjectType(),
-    object ? static_cast<const void*>(static_cast<const CScriptObject*>(object)) : nullptr,
+    this ? static_cast<const void*>(static_cast<const CScriptObject*>(this)) : nullptr,
     ownerRef
   );
   archive->Write(
     CachedCTaskType(),
-    object ? static_cast<const void*>(static_cast<const CTask*>(object)) : nullptr,
+    this ? static_cast<const void*>(static_cast<const CTask*>(this)) : nullptr,
     ownerRef
   );
 
   WritePointerWithType(
     archive,
-    object ? object->mUnit : nullptr,
+    this ? mUnit : nullptr,
     CachedUnitType(),
     gpg::TrackedPointerState::Unowned,
     ownerRef
   );
 
-  archive->WriteBool(object && object->mIgnoreFormation != 0u);
+  archive->WriteBool(this && mIgnoreFormation != 0u);
 
-  const EAiNavigatorStatus status = object ? object->mStatus : AINAVSTATUS_Idle;
+  const EAiNavigatorStatus status = this ? mStatus : AINAVSTATUS_Idle;
   archive->Write(CachedEAiNavigatorStatusType(), &status, ownerRef);
 }
 
@@ -1556,4 +1550,28 @@ namespace
   };
 
   const CAiNavigatorImplLuaFuncDefBootstrap gCAiNavigatorImplLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiNavigatorImpl>`, vtable 0x00E1C0A8.
+   *
+   * Address: 0x00BCC720 (FUN_00BCC720 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF6DF0 (FUN_00BF6DF0 -- the global's destructor.)
+   * Address: 0x005A3A30 (FUN_005A3A30 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x005A3A60 (FUN_005A3A60 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005A3A90 (FUN_005A3A90 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005A72A0 (FUN_005A72A0 -- `Init`.)
+   * Address: 0x005A39F0 (FUN_005A39F0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005A3A10 (FUN_005A3A10 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiNavigatorImplSerializer : gpg::SerSaveLoadHelper<CAiNavigatorImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE79C -- process-global `CAiNavigatorImplSerializer` singleton.
+  moho::CAiNavigatorImplSerializer gCAiNavigatorImplSerializer;
 } // namespace

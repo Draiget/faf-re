@@ -39,7 +39,7 @@ namespace moho
      * Loads the footprint rectangle and deposit resource type from a reflected
      * archive stream into one `ResourceDeposit` payload.
      */
-    static void MemberDeserialize(ResourceDeposit* object, gpg::ReadArchive* archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x00548760 (FUN_00548760, Moho::ResourceDeposit::MemberSerialize)
@@ -49,7 +49,7 @@ namespace moho
      * serializing the footprint rectangle first and the resource-type lane
      * second.
      */
-    static void MemberSerialize(ResourceDeposit* object, gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive);
 
     /**
      * Address: 0x00546170 (FUN_00546170, Moho::ResourceDeposit::Intersects)

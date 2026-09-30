@@ -41,14 +41,6 @@ namespace moho
    */
   void register_CAimManipulatorTypeInfo();
 
-  /**
-   * Address: 0x00BD2290 (FUN_00BD2290, register_CAimManipulatorSerializer)
-   *
-   * What it does:
-   * Registers `CAimManipulator` serializer startup owner and installs
-   * process-exit cleanup.
-   */
-  void register_CAimManipulatorSerializer();
 
   /**
    * Address: 0x00BD2350 (FUN_00BD2350, register_CScrLuaMetatableFactory_CAimManipulator_Index)

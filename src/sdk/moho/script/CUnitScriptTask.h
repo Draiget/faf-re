@@ -88,7 +88,7 @@ namespace moho
      * Loads command-task/script-object base lanes plus source-command and Lua
      * payload members from archive storage.
      */
-    static void MemberDeserialize(gpg::ReadArchive* archive, CUnitScriptTask* task, int version);
+    void MemberDeserialize(gpg::ReadArchive* archive, int version);
 
     /**
      * Address: 0x00624550 (FUN_00624550, Moho::CUnitScriptTask::MemberSerialize)
@@ -97,7 +97,7 @@ namespace moho
      * Saves command-task/script-object base lanes plus source-command and Lua
      * payload members into archive storage.
      */
-    static void MemberSerialize(CUnitScriptTask* task, gpg::WriteArchive* archive, int version);
+    void MemberSerialize(gpg::WriteArchive* archive, int version);
 
     /**
      * Address: 0x00622FC0 (FUN_00622FC0, CUnitScriptTask primary-slot update)

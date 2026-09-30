@@ -1,3 +1,4 @@
+#include <cstddef>
 #include "moho/sim/ManipulatorStartupRegistrations.h"
 
 #include <algorithm>
@@ -12,7 +13,6 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAimManipulator.h"
-#include "moho/ai/CAimManipulatorSerializer.h"
 #include "moho/ai/CAimManipulatorTypeInfo.h"
 #include "moho/animation/CSlideManipulator.h"
 #include "moho/animation/CStorageManipulator.h"
@@ -1173,7 +1173,6 @@ namespace
       (void)moho::register_sim_SimInits_mForms_offVariant2();
       (void)moho::register_CAimManipulatorLuaBaseClass();
       moho::register_CAimManipulatorTypeInfo();
-      moho::register_CAimManipulatorSerializer();
       (void)moho::register_CScrLuaMetatableFactory_CAimManipulator_Index();
       (void)moho::register_CScrLuaMetatableFactory_IAniManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant4();

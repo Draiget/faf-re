@@ -19,6 +19,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -126,30 +127,27 @@ namespace moho
    * `IAniManipulator` base state, goal weak-pointer lane, and all builder-arm
    * tracking parameters.
    */
-  void CBuilderArmManipulator::MemberDeserialize(
-    CBuilderArmManipulator* const object,
-    gpg::ReadArchive* const archive
-  )
+  void CBuilderArmManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    if (!archive || !object) {
+    if (!archive) {
       return;
     }
 
     const gpg::RRef owner{};
-    archive->Read(CachedIAniManipulatorType(), static_cast<IAniManipulator*>(object), owner);
-    archive->Read(CachedWeakPtrUnitType(), &object->mGoalUnit, owner);
+    archive->Read(CachedIAniManipulatorType(), static_cast<IAniManipulator*>(this), owner);
+    archive->Read(CachedWeakPtrUnitType(), &mGoalUnit, owner);
 
-    archive->ReadFloat(&object->mHeading);
-    archive->ReadFloat(&object->mPitch);
-    archive->ReadInt(&object->mReferenceBoneIdx);
-    archive->ReadBool(&object->mTrackingScriptActive);
-    archive->ReadFloat(&object->mHeadingCenter);
-    archive->ReadFloat(&object->mHeadingHalfArc);
-    archive->ReadFloat(&object->mHeadingMaxSlew);
-    archive->ReadFloat(&object->mPitchCenter);
-    archive->ReadFloat(&object->mPitchHalfArc);
-    archive->ReadFloat(&object->mPitchMaxSlew);
-    archive->ReadBool(&object->mOnTarget);
+    archive->ReadFloat(&mHeading);
+    archive->ReadFloat(&mPitch);
+    archive->ReadInt(&mReferenceBoneIdx);
+    archive->ReadBool(&mTrackingScriptActive);
+    archive->ReadFloat(&mHeadingCenter);
+    archive->ReadFloat(&mHeadingHalfArc);
+    archive->ReadFloat(&mHeadingMaxSlew);
+    archive->ReadFloat(&mPitchCenter);
+    archive->ReadFloat(&mPitchHalfArc);
+    archive->ReadFloat(&mPitchMaxSlew);
+    archive->ReadBool(&mOnTarget);
   }
 
   /**
@@ -163,30 +161,27 @@ namespace moho
    * Serializes one `CBuilderArmManipulator` lane by saving IAniManipulator
    * base state, goal weak-pointer lane, and all builder-arm tracking fields.
    */
-  void CBuilderArmManipulator::MemberSerialize(
-    const CBuilderArmManipulator* const object,
-    gpg::WriteArchive* const archive
-  )
+  void CBuilderArmManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    if (!archive || !object) {
+    if (!archive) {
       return;
     }
 
     const gpg::RRef owner{};
-    archive->Write(CachedIAniManipulatorType(), object, owner);
-    archive->Write(CachedWeakPtrUnitType(), &object->mGoalUnit, owner);
+    archive->Write(CachedIAniManipulatorType(), this, owner);
+    archive->Write(CachedWeakPtrUnitType(), &mGoalUnit, owner);
 
-    archive->WriteFloat(object->mHeading);
-    archive->WriteFloat(object->mPitch);
-    archive->WriteInt(object->mReferenceBoneIdx);
-    archive->WriteBool(object->mTrackingScriptActive);
-    archive->WriteFloat(object->mHeadingCenter);
-    archive->WriteFloat(object->mHeadingHalfArc);
-    archive->WriteFloat(object->mHeadingMaxSlew);
-    archive->WriteFloat(object->mPitchCenter);
-    archive->WriteFloat(object->mPitchHalfArc);
-    archive->WriteFloat(object->mPitchMaxSlew);
-    archive->WriteBool(object->mOnTarget);
+    archive->WriteFloat(mHeading);
+    archive->WriteFloat(mPitch);
+    archive->WriteInt(mReferenceBoneIdx);
+    archive->WriteBool(mTrackingScriptActive);
+    archive->WriteFloat(mHeadingCenter);
+    archive->WriteFloat(mHeadingHalfArc);
+    archive->WriteFloat(mHeadingMaxSlew);
+    archive->WriteFloat(mPitchCenter);
+    archive->WriteFloat(mPitchHalfArc);
+    archive->WriteFloat(mPitchMaxSlew);
+    archive->WriteBool(mOnTarget);
   }
 
   /**
@@ -613,3 +608,24 @@ namespace moho
   }
 } // namespace moho
 
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CBuilderArmManipulator>`, vtable 0x00E217C4.
+   *
+   * Address: 0x00BD25B0 (FUN_00BD25B0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFAAC0 (FUN_00BFAAC0 -- the global's destructor.)
+   * Address: 0x00635B20 (FUN_00635B20 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00636F80 (FUN_00636F80 -- `Init`.)
+   * Address: 0x00635AF0 (FUN_00635AF0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00635B00 (FUN_00635B00 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CBuilderArmManipulatorSerializer : gpg::SerSaveLoadHelper<CBuilderArmManipulator>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B24BC -- process-global `CBuilderArmManipulatorSerializer` singleton.
+  moho::CBuilderArmManipulatorSerializer gCBuilderArmManipulatorSerializer;
+} // namespace

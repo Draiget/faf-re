@@ -83,7 +83,7 @@ namespace moho
      * Deserializes pointer/category/float/caps/bool lanes into one
      * `UnitAttributes` object.
      */
-    static void MemberDeserialize(gpg::ReadArchive* archive, UnitAttributes* attributes);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x0055DD80 (FUN_0055DD80, Moho::UnitAttributes::MemberSerialize)
@@ -92,7 +92,7 @@ namespace moho
      * Serializes pointer/category/float/caps/bool lanes from one
      * `UnitAttributes` object.
      */
-    static void MemberSerialize(const UnitAttributes* attributes, gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   static_assert(offsetof(UnitAttributes, blueprint) == 0x00, "UnitAttributes::blueprint offset must be 0x00");

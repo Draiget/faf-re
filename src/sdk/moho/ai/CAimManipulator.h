@@ -185,7 +185,7 @@ namespace moho
      * What it does:
      * Loads serialized `CAimManipulator` member lanes from archive state.
      */
-    static void MemberDeserialize(CAimManipulator* object, gpg::ReadArchive* archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x006339D0 (FUN_006339D0, Moho::CAimManipulator::MemberSerialize)
@@ -193,7 +193,7 @@ namespace moho
      * What it does:
      * Saves serialized `CAimManipulator` member lanes into archive state.
      */
-    static void MemberSerialize(const CAimManipulator* object, gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x00630CB0 (FUN_00630CB0, Moho::CAimManipulator::SetFiringArc)

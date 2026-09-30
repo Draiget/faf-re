@@ -59,7 +59,7 @@ namespace moho
      * Loads base navigator state, owned path-navigator pointer, destination-unit
      * weak link, and goal rectangle payload.
      */
-    static void MemberDeserialize(CAiNavigatorLand* object, gpg::ReadArchive* archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x005A9030 (FUN_005A9030, Moho::CAiNavigatorLand::MemberSerialize)
@@ -68,7 +68,7 @@ namespace moho
      * Saves base navigator state, owned path-navigator pointer,
      * destination-unit weak link, and goal rectangle payload.
      */
-    static void MemberSerialize(const CAiNavigatorLand* object, gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x005A3ED0 (FUN_005A3ED0)

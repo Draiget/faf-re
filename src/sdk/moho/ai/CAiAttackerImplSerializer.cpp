@@ -1,4 +1,3 @@
-#include "moho/ai/CAiAttackerImplSerializer.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -36,16 +35,6 @@ namespace
     for (T*& value : storage) {
       value = nullptr;
     }
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiAttackerImplType()
-  {
-    gpg::RType* cached = CAiAttackerImpl::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CAiAttackerImpl));
-      CAiAttackerImpl::sType = cached;
-    }
-    return cached;
   }
 
   [[nodiscard]] gpg::RType* CachedIAiAttackerType()
@@ -97,18 +86,6 @@ namespace
     return cached;
   }
 
-  // Address: 0x010B01E4 -- process-global `CAiAttackerImplSerializer`
-  // singleton. Constructing it runs CAiAttackerImplSerializer::
-  // CAiAttackerImplSerializer() (0x00BCE8D0), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction. Its destructor (~CAiAttackerImplSerializer,
-  // 0x00BF8430) runs at normal static-duration teardown, matching the real
-  // binary's atexit registration. Two additional zero-caller, zero-xref
-  // duplicate emissions of the same unlink/self-link sequence hardcoded to
-  // this global exist at 0x005D8480 (FUN_005D8480) and 0x005D84B0
-  // (FUN_005D84B0).
-  moho::CAiAttackerImplSerializer gCAiAttackerImplSerializer;
 } // namespace
 
 /**
@@ -179,9 +156,9 @@ void CAiAttackerImpl::SerializePointerVectors(gpg::WriteArchive* const archive, 
  * Restores attacker base/interface payload plus serialized member lanes in the
  * original read order.
  */
-void CAiAttackerImpl::MemberDeserialize(CAiAttackerImpl* const object, gpg::ReadArchive* const archive)
+void CAiAttackerImpl::MemberDeserialize(gpg::ReadArchive* const archive)
 {
-  if (!archive || !object) {
+  if (!archive) {
     return;
   }
 
@@ -200,28 +177,28 @@ void CAiAttackerImpl::MemberDeserialize(CAiAttackerImpl* const object, gpg::Read
     return;
   }
 
-  const gpg::RRef trackedStageRef(&object->mStage, stageType);
+  const gpg::RRef trackedStageRef(&mStage, stageType);
   (void)archive->TrackPointer(trackedStageRef);
 
   gpg::RRef ownerRef{};
-  archive->Read(attackerType, static_cast<IAiAttacker*>(object), ownerRef);
+  archive->Read(attackerType, static_cast<IAiAttacker*>(this), ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->ReadPointer(&object->mUnit, &ownerRef);
+  archive->ReadPointer(&mUnit, &ownerRef);
 
-  DeserializePointerVectors(archive, object);
-
-  ownerRef = gpg::RRef{};
-  archive->Read(stageType, &object->mStage, ownerRef);
+  DeserializePointerVectors(archive, this);
 
   ownerRef = gpg::RRef{};
-  archive->Read(threadType, &object->mThread, ownerRef);
+  archive->Read(stageType, &mStage, ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->Read(targetType, &object->mDesiredTarget, ownerRef);
+  archive->Read(threadType, &mThread, ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->Read(reportingType, &object->mReportingState, ownerRef);
+  archive->Read(targetType, &mDesiredTarget, ownerRef);
+
+  ownerRef = gpg::RRef{};
+  archive->Read(reportingType, &mReportingState, ownerRef);
 }
 
 /**
@@ -231,13 +208,13 @@ void CAiAttackerImpl::MemberDeserialize(CAiAttackerImpl* const object, gpg::Read
  * Serializes attacker base/interface payload plus serialized member lanes in
  * the original write order.
  */
-void CAiAttackerImpl::MemberSerialize(const CAiAttackerImpl* const object, gpg::WriteArchive* const archive)
+void CAiAttackerImpl::MemberSerialize(gpg::WriteArchive* const archive) const
 {
-  if (!archive || !object) {
+  if (!archive) {
     return;
   }
 
-  auto* const mutableObject = const_cast<CAiAttackerImpl*>(object);
+  auto* const mutableObject = const_cast<CAiAttackerImpl*>(this);
   gpg::RType* const attackerType = CachedIAiAttackerType();
   gpg::RType* const stageType = CachedCTaskStageType();
   gpg::RType* const threadType = CachedWeakPtrCTaskThreadType();
@@ -257,23 +234,23 @@ void CAiAttackerImpl::MemberSerialize(const CAiAttackerImpl* const object, gpg::
   (void)archive->PreCreatedPtr(trackedStageRef);
 
   gpg::RRef ownerRef{};
-  archive->Write(attackerType, static_cast<const IAiAttacker*>(object), ownerRef);
+  archive->Write(attackerType, static_cast<const IAiAttacker*>(this), ownerRef);
 
-  archive->WritePointer<moho::Unit>(object->mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
+  archive->WritePointer<moho::Unit>(mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
 
-  SerializePointerVectors(archive, object);
-
-  ownerRef = gpg::RRef{};
-  archive->Write(stageType, &object->mStage, ownerRef);
+  SerializePointerVectors(archive, this);
 
   ownerRef = gpg::RRef{};
-  archive->Write(threadType, &object->mThread, ownerRef);
+  archive->Write(stageType, &mStage, ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->Write(targetType, &object->mDesiredTarget, ownerRef);
+  archive->Write(threadType, &mThread, ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->Write(reportingType, &object->mReportingState, ownerRef);
+  archive->Write(targetType, &mDesiredTarget, ownerRef);
+
+  ownerRef = gpg::RRef{};
+  archive->Write(reportingType, &mReportingState, ownerRef);
 }
 
 // Addresses 0x005DEBB0/0x005E04B0 (deserialize "ThunkA"/"ThunkB" pair) and
@@ -283,89 +260,25 @@ void CAiAttackerImpl::MemberSerialize(const CAiAttackerImpl* const object, gpg::
 // Deserialize`/`Serialize` below already call `CAiAttackerImpl::
 // MemberDeserialize`/`MemberSerialize` directly.
 
-/**
- * Address: 0x005D8430 (FUN_005D8430, Moho::CAiAttackerImplSerializer::Deserialize)
- *
- * What it does:
- * Forwards one serializer load callback into `CAiAttackerImpl::MemberDeserialize`.
- */
-void CAiAttackerImplSerializer::Deserialize(
-  gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-)
+namespace moho
 {
-  auto* const object = reinterpret_cast<CAiAttackerImpl*>(static_cast<std::uintptr_t>(objectPtr));
-  CAiAttackerImpl::MemberDeserialize(object, archive);
-}
+  /**
+   * `gpg::SerSaveLoadHelper<CAiAttackerImpl>`, vtable 0x00E1EAE4.
+   *
+   * Address: 0x00BCE8D0 (FUN_00BCE8D0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF8430 (FUN_00BF8430 -- the global's destructor.)
+   * Address: 0x005D8480 (FUN_005D8480 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005D84B0 (FUN_005D84B0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005DC0D0 (FUN_005DC0D0 -- `Init`.)
+   * Address: 0x005D8430 (FUN_005D8430 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005D8440 (FUN_005D8440 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiAttackerImplSerializer : gpg::SerSaveLoadHelper<CAiAttackerImpl>
+  {};
+} // namespace moho
 
-/**
- * Address: 0x005D8440 (FUN_005D8440, Moho::CAiAttackerImplSerializer::Serialize)
- *
- * What it does:
- * Forwards one serializer save callback into `CAiAttackerImpl::MemberSerialize`.
- */
-void CAiAttackerImplSerializer::Serialize(
-  gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-)
+namespace
 {
-  const auto* const object = reinterpret_cast<const CAiAttackerImpl*>(static_cast<std::uintptr_t>(objectPtr));
-  CAiAttackerImpl::MemberSerialize(object, archive);
-}
-
-/**
- * Address: 0x00BCE8D0 (FUN_00BCE8D0, dynamic initializer for the global
- * `CAiAttackerImplSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`) and binds the load/save callback fields.
- */
-CAiAttackerImplSerializer::CAiAttackerImplSerializer()
-  : mLoadCallback(&CAiAttackerImplSerializer::Deserialize)
-  , mSaveCallback(&CAiAttackerImplSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BF8430 (FUN_00BF8430, Moho::CAiAttackerImplSerializer::~CAiAttackerImplSerializer)
- *
- * What it does:
- * Unlinks this helper node from whatever intrusive list it currently sits
- * in and restores a self-linked sentinel state.
- */
-CAiAttackerImplSerializer::~CAiAttackerImplSerializer() = default;
-
-/**
- * Address: 0x005DC0D0 (FUN_005DC0D0)
- *
- * What it does:
- * Lazily resolves `CAiAttackerImpl` RTTI and installs load/save callbacks
- * from this helper object into the type descriptor.
- */
-void CAiAttackerImplSerializer::Init()
-{
-  gpg::RType* const type = CachedCAiAttackerImplType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
-  if (!type) {
-    return;
-  }
-
-  type->serLoadFunc_ = mLoadCallback;
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
- * Address: 0x010B01E4 caller lane (`CAiAttackerImplTypeInfo.cpp`'s reflection
- * bootstrap sequence)
- *
- * What it does:
- * Historically forced construction of the (then lazily-constructed)
- * `CAiAttackerImplSerializer` singleton from an explicit registration
- * sequence. `gCAiAttackerImplSerializer` is now a genuine namespace-scope
- * global, so its constructor already runs unconditionally at static-init
- * time; this call is kept only so `CAiAttackerImplTypeInfo.cpp`'s existing
- * bootstrap sequence does not need editing.
- */
-void moho::register_CAiAttackerImplSerializer()
-{
-}
+  // Address: 0x010B01E4 -- process-global `CAiAttackerImplSerializer` singleton.
+  moho::CAiAttackerImplSerializer gCAiAttackerImplSerializer;
+} // namespace

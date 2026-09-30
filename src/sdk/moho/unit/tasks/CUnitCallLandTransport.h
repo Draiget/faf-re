@@ -51,8 +51,7 @@ namespace moho
      * What it does:
      * Loads base command-task state plus land-transport serialization fields.
      */
-    static void
-    MemberDeserialize(gpg::ReadArchive* archive, CUnitCallLandTransport* task, int version, gpg::RRef* ownerRef);
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
     /**
      * Address: 0x00603BC0 (FUN_00603BC0)
@@ -60,8 +59,7 @@ namespace moho
      * What it does:
      * Saves base command-task state plus land-transport serialization fields.
      */
-    static void
-    MemberSerialize(gpg::WriteArchive* archive, const CUnitCallLandTransport* task, int version, gpg::RRef* ownerRef);
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
 
     /**
      * Address: 0x00600880 (FUN_00600880, Moho::CUnitCallLandTransport::TaskTick)

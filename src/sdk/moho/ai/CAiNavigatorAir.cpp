@@ -144,40 +144,40 @@ CAiNavigatorAir::~CAiNavigatorAir()
  * Loads base navigator state, destination weak link, current target, goal
  * position, and formation-tracking flag.
  */
-void CAiNavigatorAir::MemberDeserialize(CAiNavigatorAir* const object, gpg::ReadArchive* const archive)
+void CAiNavigatorAir::MemberDeserialize(gpg::ReadArchive* const archive)
 {
   if (!archive) {
     return;
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(CachedCAiNavigatorImplType(), object, ownerRef);
+  archive->Read(CachedCAiNavigatorImplType(), this, ownerRef);
 
   WeakPtr<Entity> destination{};
   archive->Read(
     CachedWeakEntityType(),
-    object ? static_cast<void*>(&object->mDestinationEntity) : static_cast<void*>(&destination),
+    this ? static_cast<void*>(&mDestinationEntity) : static_cast<void*>(&destination),
     ownerRef
   );
 
   Wm3::Vector3f currentTarget = Wm3::Vector3f::Zero();
   archive->Read(
     CachedVector3fType(),
-    object ? static_cast<void*>(&object->mCurrentTargetPos) : static_cast<void*>(&currentTarget),
+    this ? static_cast<void*>(&mCurrentTargetPos) : static_cast<void*>(&currentTarget),
     ownerRef
   );
 
   Wm3::Vector3f goalPos = Wm3::Vector3f::Zero();
   archive->Read(
     CachedVector3fType(),
-    object ? static_cast<void*>(&object->mGoalPos) : static_cast<void*>(&goalPos),
+    this ? static_cast<void*>(&mGoalPos) : static_cast<void*>(&goalPos),
     ownerRef
   );
 
   bool trackFormation = false;
   archive->ReadBool(&trackFormation);
-  if (object) {
-    object->mTrackFormationTarget = trackFormation ? 1u : 0u;
+  if (this) {
+    mTrackFormationTarget = trackFormation ? 1u : 0u;
   }
 }
 
@@ -188,37 +188,37 @@ void CAiNavigatorAir::MemberDeserialize(CAiNavigatorAir* const object, gpg::Read
  * Saves base navigator state, destination weak link, current target, goal
  * position, and formation-tracking flag.
  */
-void CAiNavigatorAir::MemberSerialize(const CAiNavigatorAir* const object, gpg::WriteArchive* const archive)
+void CAiNavigatorAir::MemberSerialize(gpg::WriteArchive* const archive) const
 {
   if (!archive) {
     return;
   }
 
   const gpg::RRef ownerRef{};
-  archive->Write(CachedCAiNavigatorImplType(), object, ownerRef);
+  archive->Write(CachedCAiNavigatorImplType(), this, ownerRef);
 
   const WeakPtr<Entity> destination{};
   archive->Write(
     CachedWeakEntityType(),
-    object ? static_cast<const void*>(&object->mDestinationEntity) : static_cast<const void*>(&destination),
+    this ? static_cast<const void*>(&mDestinationEntity) : static_cast<const void*>(&destination),
     ownerRef
   );
 
   const Wm3::Vector3f currentTarget = Wm3::Vector3f::Zero();
   archive->Write(
     CachedVector3fType(),
-    object ? static_cast<const void*>(&object->mCurrentTargetPos) : static_cast<const void*>(&currentTarget),
+    this ? static_cast<const void*>(&mCurrentTargetPos) : static_cast<const void*>(&currentTarget),
     ownerRef
   );
 
   const Wm3::Vector3f goalPos = Wm3::Vector3f::Zero();
   archive->Write(
     CachedVector3fType(),
-    object ? static_cast<const void*>(&object->mGoalPos) : static_cast<const void*>(&goalPos),
+    this ? static_cast<const void*>(&mGoalPos) : static_cast<const void*>(&goalPos),
     ownerRef
   );
 
-  archive->WriteBool(object && object->mTrackFormationTarget != 0u);
+  archive->WriteBool(this && mTrackFormationTarget != 0u);
 }
 
 /**
@@ -642,4 +642,32 @@ namespace
 {
   // Address: 0x010AE848 -- process-global `CAiNavigatorAirConstruct` singleton.
   moho::CAiNavigatorAirConstruct gCAiNavigatorAirConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiNavigatorAir>`, vtable 0x00E1C150.
+   *
+   * Address: 0x00BCC880 (FUN_00BCC880 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF6F70 (FUN_00BF6F70 -- the global's destructor.)
+   * Address: 0x005A7F30 (FUN_005A7F30 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x005A7F40 (FUN_005A7F40 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005A8950 (FUN_005A8950 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x005A8960 (FUN_005A8960 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005A5700 (FUN_005A5700 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005A5730 (FUN_005A5730 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005A5760 (FUN_005A5760 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005A7550 (FUN_005A7550 -- `Init`.)
+   * Address: 0x005A56D0 (FUN_005A56D0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005A56E0 (FUN_005A56E0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiNavigatorAirSerializer : gpg::SerSaveLoadHelper<CAiNavigatorAir>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AEC28 -- process-global `CAiNavigatorAirSerializer` singleton.
+  moho::CAiNavigatorAirSerializer gCAiNavigatorAirSerializer;
 } // namespace

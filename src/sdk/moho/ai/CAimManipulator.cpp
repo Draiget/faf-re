@@ -34,6 +34,7 @@
 #include "moho/task/CTaskEvent.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
@@ -1882,47 +1883,47 @@ int moho::cfunc_CAimManipulatorSetAimHeadingOffsetL(LuaPlus::LuaState* const sta
  * What it does:
  * Loads serialized `CAimManipulator` member lanes from archive state.
  */
-void moho::CAimManipulator::MemberDeserialize(CAimManipulator* const object, gpg::ReadArchive* const archive)
+void moho::CAimManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
 {
-  if (object == nullptr || archive == nullptr) {
+  if (this == nullptr || archive == nullptr) {
     return;
   }
 
   const gpg::RRef ownerRef = NullOwnerRef();
 
-  archive->Read(CachedIAniManipulatorType(), object, ownerRef);
-  archive->Read(CachedWeakPtrUnitType(), &object->mUnit, ownerRef);
-  archive->Read(CachedWeakPtrUnitWeaponType(), &object->mWeapon, ownerRef);
-  archive->ReadString(&object->mLabel);
+  archive->Read(CachedIAniManipulatorType(), this, ownerRef);
+  archive->Read(CachedWeakPtrUnitType(), &mUnit, ownerRef);
+  archive->Read(CachedWeakPtrUnitWeaponType(), &mWeapon, ownerRef);
+  archive->ReadString(&mLabel);
 
-  archive->ReadPointer(&object->mUnitWepBlueprint, &ownerRef);
+  archive->ReadPointer(&mUnitWepBlueprint, &ownerRef);
 
-  if (UnitWeapon* const weapon = object->mWeapon.GetObjectPtr(); weapon != nullptr) {
+  if (UnitWeapon* const weapon = mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* projectileBlueprint = weapon->mProjectileBlueprint;
     archive->ReadPointer(&projectileBlueprint, &ownerRef);
     if (projectileBlueprint != nullptr) {
-      object->mProjPhysBlueprint = &projectileBlueprint->Physics;
+      mProjPhysBlueprint = &projectileBlueprint->Physics;
     }
   }
 
-  archive->ReadBool(&object->mEnabled);
-  archive->ReadFloat(&object->mHeading);
-  archive->ReadFloat(&object->mPitch);
-  archive->ReadInt(&object->mMuzzleBone);
-  archive->ReadBool(&object->mIsTracking);
-  archive->ReadFloat(&object->mMinHeading);
-  archive->ReadFloat(&object->mMaxHeading);
-  archive->ReadFloat(&object->mHeadingMaxSlew);
-  archive->ReadFloat(&object->mMinPitch);
-  archive->ReadFloat(&object->mMaxPitch);
-  archive->ReadFloat(&object->mPitchMaxSlew);
-  archive->ReadBool(&object->mOnTarget);
-  archive->ReadBool(&object->mUnknownBoolE1);
-  archive->ReadInt(&object->mResetPoseTime);
-  archive->ReadInt(&object->mResetTime);
-  archive->Read(CachedQuaternionfType(), &object->mHeadingRot, ownerRef);
-  archive->Read(CachedQuaternionfType(), &object->mPitchRot, ownerRef);
-  archive->ReadFloat(&object->mHeadingOffset);
+  archive->ReadBool(&mEnabled);
+  archive->ReadFloat(&mHeading);
+  archive->ReadFloat(&mPitch);
+  archive->ReadInt(&mMuzzleBone);
+  archive->ReadBool(&mIsTracking);
+  archive->ReadFloat(&mMinHeading);
+  archive->ReadFloat(&mMaxHeading);
+  archive->ReadFloat(&mHeadingMaxSlew);
+  archive->ReadFloat(&mMinPitch);
+  archive->ReadFloat(&mMaxPitch);
+  archive->ReadFloat(&mPitchMaxSlew);
+  archive->ReadBool(&mOnTarget);
+  archive->ReadBool(&mUnknownBoolE1);
+  archive->ReadInt(&mResetPoseTime);
+  archive->ReadInt(&mResetTime);
+  archive->Read(CachedQuaternionfType(), &mHeadingRot, ownerRef);
+  archive->Read(CachedQuaternionfType(), &mPitchRot, ownerRef);
+  archive->ReadFloat(&mHeadingOffset);
 }
 
 /**
@@ -1931,9 +1932,9 @@ void moho::CAimManipulator::MemberDeserialize(CAimManipulator* const object, gpg
  * What it does:
  * Saves serialized `CAimManipulator` member lanes into archive state.
  */
-void moho::CAimManipulator::MemberSerialize(const CAimManipulator* const object, gpg::WriteArchive* const archive)
+void moho::CAimManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
 {
-  if (object == nullptr || archive == nullptr) {
+  if (this == nullptr || archive == nullptr) {
     return;
   }
 
@@ -1943,16 +1944,16 @@ void moho::CAimManipulator::MemberSerialize(const CAimManipulator* const object,
   // the binary hands `mLabel` to the non-const `WriteString` and refreshes
   // `mProjPhysBlueprint` from the weapon's current projectile blueprint before
   // writing it out. Name that aliasing once here instead of casting per site.
-  CAimManipulator* const self = const_cast<CAimManipulator*>(object);
+  CAimManipulator* const self = const_cast<CAimManipulator*>(this);
 
-  archive->Write(CachedIAniManipulatorType(), object, ownerRef);
-  archive->Write(CachedWeakPtrUnitType(), &object->mUnit, ownerRef);
-  archive->Write(CachedWeakPtrUnitWeaponType(), &object->mWeapon, ownerRef);
+  archive->Write(CachedIAniManipulatorType(), this, ownerRef);
+  archive->Write(CachedWeakPtrUnitType(), &mUnit, ownerRef);
+  archive->Write(CachedWeakPtrUnitWeaponType(), &mWeapon, ownerRef);
   archive->WriteString(&self->mLabel);
 
-  archive->WritePointer<moho::RUnitBlueprintWeapon>(object->mUnitWepBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
+  archive->WritePointer<moho::RUnitBlueprintWeapon>(mUnitWepBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
 
-  if (UnitWeapon* const weapon = object->mWeapon.GetObjectPtr(); weapon != nullptr) {
+  if (UnitWeapon* const weapon = mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* const projectileBlueprint = weapon->mProjectileBlueprint;
     archive->WritePointer<moho::RProjectileBlueprint>(projectileBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
     if (projectileBlueprint != nullptr) {
@@ -1960,24 +1961,24 @@ void moho::CAimManipulator::MemberSerialize(const CAimManipulator* const object,
     }
   }
 
-  archive->WriteBool(object->mEnabled);
-  archive->WriteFloat(object->mHeading);
-  archive->WriteFloat(object->mPitch);
-  archive->WriteInt(object->mMuzzleBone);
-  archive->WriteBool(object->mIsTracking);
-  archive->WriteFloat(object->mMinHeading);
-  archive->WriteFloat(object->mMaxHeading);
-  archive->WriteFloat(object->mHeadingMaxSlew);
-  archive->WriteFloat(object->mMinPitch);
-  archive->WriteFloat(object->mMaxPitch);
-  archive->WriteFloat(object->mPitchMaxSlew);
-  archive->WriteBool(object->mOnTarget);
-  archive->WriteBool(object->mUnknownBoolE1);
-  archive->WriteInt(object->mResetPoseTime);
-  archive->WriteInt(object->mResetTime);
-  archive->Write(CachedQuaternionfType(), &object->mHeadingRot, ownerRef);
-  archive->Write(CachedQuaternionfType(), &object->mPitchRot, ownerRef);
-  archive->WriteFloat(object->mHeadingOffset);
+  archive->WriteBool(mEnabled);
+  archive->WriteFloat(mHeading);
+  archive->WriteFloat(mPitch);
+  archive->WriteInt(mMuzzleBone);
+  archive->WriteBool(mIsTracking);
+  archive->WriteFloat(mMinHeading);
+  archive->WriteFloat(mMaxHeading);
+  archive->WriteFloat(mHeadingMaxSlew);
+  archive->WriteFloat(mMinPitch);
+  archive->WriteFloat(mMaxPitch);
+  archive->WriteFloat(mPitchMaxSlew);
+  archive->WriteBool(mOnTarget);
+  archive->WriteBool(mUnknownBoolE1);
+  archive->WriteInt(mResetPoseTime);
+  archive->WriteInt(mResetTime);
+  archive->Write(CachedQuaternionfType(), &mHeadingRot, ownerRef);
+  archive->Write(CachedQuaternionfType(), &mPitchRot, ownerRef);
+  archive->WriteFloat(mHeadingOffset);
 }
 
 namespace gpg
@@ -2052,4 +2053,26 @@ namespace
   };
 
   const CAimManipulatorLuaFuncDefBootstrap gCAimManipulatorLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAimManipulator>`, vtable 0x00E21420.
+   *
+   * Address: 0x00BD2290 (FUN_00BD2290 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFA960 (FUN_00BFA960 -- the global's destructor.)
+   * Address: 0x00630060 (FUN_00630060 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00632D80 (FUN_00632D80 -- `Init`.)
+   * Address: 0x00630030 (FUN_00630030 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00630040 (FUN_00630040 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAimManipulatorSerializer : gpg::SerSaveLoadHelper<CAimManipulator>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B2148 -- process-global `CAimManipulatorSerializer` singleton.
+  moho::CAimManipulatorSerializer gCAimManipulatorSerializer;
 } // namespace

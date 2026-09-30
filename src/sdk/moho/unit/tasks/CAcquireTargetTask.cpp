@@ -26,6 +26,7 @@
 #include "moho/task/ETaskStatus.h"
 #include "moho/unit/core/EFireStateTypeInfo.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -805,61 +806,47 @@ namespace moho
   /**
    * Address: 0x005E16A0 (FUN_005E16A0, Moho::CAcquireTargetTask::MemberDeserialize)
    */
-  void CAcquireTargetTask::MemberDeserialize(
-    gpg::ReadArchive* const archive,
-    CAcquireTargetTask* const task,
-    const int /*version*/,
-    gpg::RRef* const ownerRef
-  )
+  void CAcquireTargetTask::MemberDeserialize(gpg::ReadArchive* const archive, const int /*version*/, const gpg::RRef& ownerRef)
   {
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(task != nullptr);
-    if (!archive || !task) {
+    if (!archive) {
       return;
     }
 
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
 
     gpg::RType* const baseTaskType = CachedCTaskType();
-    archive->Read(baseTaskType, task, owner);
+    archive->Read(baseTaskType, this, ownerRef);
 
-    task->mWeapon = ReadTrackedPointer<UnitWeapon>(archive, owner);
-    task->mAttacker = ReadTrackedPointer<CAiAttackerImpl>(archive, owner);
-    task->mUnit = ReadTrackedPointer<Unit>(archive, owner);
-    archive->ReadInt(&task->mTargetCooldown);
+    mWeapon = ReadTrackedPointer<UnitWeapon>(archive, ownerRef);
+    mAttacker = ReadTrackedPointer<CAiAttackerImpl>(archive, ownerRef);
+    mUnit = ReadTrackedPointer<Unit>(archive, ownerRef);
+    archive->ReadInt(&mTargetCooldown);
 
-    bool updateAttackerState = (task->mUpdateAttackerState != 0u);
+    bool updateAttackerState = (mUpdateAttackerState != 0u);
     archive->ReadBool(&updateAttackerState);
-    task->mUpdateAttackerState = updateAttackerState ? 1u : 0u;
+    mUpdateAttackerState = updateAttackerState ? 1u : 0u;
   }
 
   /**
    * Address: 0x005E1750 (FUN_005E1750, Moho::CAcquireTargetTask::MemberSerialize)
    */
-  void CAcquireTargetTask::MemberSerialize(
-    gpg::WriteArchive* const archive,
-    const CAcquireTargetTask* const task,
-    const int /*version*/,
-    gpg::RRef* const ownerRef
-  )
+  void CAcquireTargetTask::MemberSerialize(gpg::WriteArchive* const archive, const int /*version*/, const gpg::RRef& ownerRef) const
   {
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(task != nullptr);
-    if (!archive || !task) {
+    if (!archive) {
       return;
     }
 
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
 
     gpg::RType* const baseTaskType = CachedCTaskType();
-    archive->Write(baseTaskType, task, owner);
+    archive->Write(baseTaskType, this, ownerRef);
 
-    WriteTrackedPointer(archive, task->mWeapon, gpg::TrackedPointerState::Unowned, owner);
-    WriteTrackedPointer(archive, task->mAttacker, gpg::TrackedPointerState::Unowned, owner);
-    WriteTrackedPointer(archive, task->mUnit, gpg::TrackedPointerState::Unowned, owner);
+    WriteTrackedPointer(archive, mWeapon, gpg::TrackedPointerState::Unowned, ownerRef);
+    WriteTrackedPointer(archive, mAttacker, gpg::TrackedPointerState::Unowned, ownerRef);
+    WriteTrackedPointer(archive, mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->WriteInt(task->mTargetCooldown);
-    archive->WriteBool(task->mUpdateAttackerState != 0u);
+    archive->WriteInt(mTargetCooldown);
+    archive->WriteBool(mUpdateAttackerState != 0u);
   }
 
   /**
@@ -907,3 +894,24 @@ namespace moho
     return false;
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAcquireTargetTask>`, vtable 0x00E1EB24.
+   *
+   * Address: 0x00BCE930 (FUN_00BCE930 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF84C0 (FUN_00BF84C0 -- the global's destructor.)
+   * Address: 0x005DC190 (FUN_005DC190 -- `Init`.)
+   * Address: 0x005D9870 (FUN_005D9870 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005D9880 (FUN_005D9880 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAcquireTargetTaskSerializer : gpg::SerSaveLoadHelper<CAcquireTargetTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B016C -- process-global `CAcquireTargetTaskSerializer` singleton.
+  moho::CAcquireTargetTaskSerializer gCAcquireTargetTaskSerializer;
+} // namespace

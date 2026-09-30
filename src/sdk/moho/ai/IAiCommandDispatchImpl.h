@@ -187,7 +187,7 @@ namespace moho
      * Loads reflected `CCommandTask` base state, dispatch state byte, and
      * `CUnitCommandQueue*` pointer lane.
      */
-    static void MemberDeserialize(gpg::ReadArchive* archive, IAiCommandDispatchImpl* object);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x00599CF0 (FUN_00599CF0, Moho::IAiCommandDispatchImpl::MemberSerialize)
@@ -196,7 +196,7 @@ namespace moho
      * Saves reflected `CCommandTask` base state, dispatch state byte, and
      * `CUnitCommandQueue*` pointer lane.
      */
-    static void MemberSerialize(const IAiCommandDispatchImpl* object, gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     static gpg::RType* sType;

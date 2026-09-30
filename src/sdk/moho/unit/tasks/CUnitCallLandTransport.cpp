@@ -21,6 +21,7 @@
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -343,27 +344,21 @@ namespace moho
    * What it does:
    * Loads base command-task state plus land-transport serialization fields.
    */
-  void CUnitCallLandTransport::MemberDeserialize(
-    gpg::ReadArchive* const archive,
-    CUnitCallLandTransport* const task,
-    int,
-    gpg::RRef*
-  )
+  void CUnitCallLandTransport::MemberDeserialize(gpg::ReadArchive* const archive, int, const gpg::RRef&)
   {
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(task != nullptr);
-    if (!archive || !task) {
+    if (!archive) {
       return;
     }
 
     gpg::RRef nullOwner{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(task), nullOwner);
-    archive->Read(CachedWeakPtrUnitType(), &task->mTargetTransportUnit, nullOwner);
-    archive->ReadBool(&task->mHasBeamupDestination);
-    archive->ReadFloat(&task->mBeamupTime);
-    archive->Read(CachedVTransformType(), &task->mSourceTransform, nullOwner);
-    archive->Read(CachedVTransformType(), &task->mDestinationTransform, nullOwner);
-    archive->ReadBool(&task->mIsOccupying);
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), nullOwner);
+    archive->Read(CachedWeakPtrUnitType(), &mTargetTransportUnit, nullOwner);
+    archive->ReadBool(&mHasBeamupDestination);
+    archive->ReadFloat(&mBeamupTime);
+    archive->Read(CachedVTransformType(), &mSourceTransform, nullOwner);
+    archive->Read(CachedVTransformType(), &mDestinationTransform, nullOwner);
+    archive->ReadBool(&mIsOccupying);
   }
 
   /**
@@ -372,96 +367,23 @@ namespace moho
    * What it does:
    * Saves base command-task state plus land-transport serialization fields.
    */
-  void CUnitCallLandTransport::MemberSerialize(
-    gpg::WriteArchive* const archive,
-    const CUnitCallLandTransport* const task,
-    int,
-    gpg::RRef*
-  )
+  void CUnitCallLandTransport::MemberSerialize(gpg::WriteArchive* const archive, int, const gpg::RRef&) const
   {
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(task != nullptr);
-    if (!archive || !task) {
+    if (!archive) {
       return;
     }
 
     gpg::RRef nullOwner{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(task), nullOwner);
-    archive->Write(CachedWeakPtrUnitType(), &task->mTargetTransportUnit, nullOwner);
-    archive->WriteBool(task->mHasBeamupDestination);
-    archive->WriteFloat(task->mBeamupTime);
-    archive->Write(CachedVTransformType(), &task->mSourceTransform, nullOwner);
-    archive->Write(CachedVTransformType(), &task->mDestinationTransform, nullOwner);
-    archive->WriteBool(task->mIsOccupying);
+    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), nullOwner);
+    archive->Write(CachedWeakPtrUnitType(), &mTargetTransportUnit, nullOwner);
+    archive->WriteBool(mHasBeamupDestination);
+    archive->WriteFloat(mBeamupTime);
+    archive->Write(CachedVTransformType(), &mSourceTransform, nullOwner);
+    archive->Write(CachedVTransformType(), &mDestinationTransform, nullOwner);
+    archive->WriteBool(mIsOccupying);
   }
 
-  /**
-   * Address: 0x00602E80 (FUN_00602E80)
-   *
-   * What it does:
-   * Preserves one deserialize callback thunk lane for call-land-transport task
-   * serializer registration.
-   */
-  [[maybe_unused]] void CUnitCallLandTransportMemberDeserializeAdapterLaneA(
-    gpg::ReadArchive* const archive,
-    CUnitCallLandTransport* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallLandTransport::MemberDeserialize(archive, task, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00602E90 (FUN_00602E90)
-   *
-   * What it does:
-   * Preserves one serialize callback thunk lane for call-land-transport task
-   * serializer registration.
-   */
-  [[maybe_unused]] void CUnitCallLandTransportMemberSerializeAdapterLaneA(
-    gpg::WriteArchive* const archive,
-    const CUnitCallLandTransport* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallLandTransport::MemberSerialize(archive, task, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00603170 (FUN_00603170)
-   *
-   * What it does:
-   * Alternate deserialize callback thunk lane for call-land-transport task
-   * serializer registration.
-   */
-  [[maybe_unused]] void CUnitCallLandTransportMemberDeserializeAdapterLaneB(
-    gpg::ReadArchive* const archive,
-    CUnitCallLandTransport* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallLandTransport::MemberDeserialize(archive, task, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00603180 (FUN_00603180)
-   *
-   * What it does:
-   * Alternate serialize callback thunk lane for call-land-transport task
-   * serializer registration.
-   */
-  [[maybe_unused]] void CUnitCallLandTransportMemberSerializeAdapterLaneB(
-    gpg::WriteArchive* const archive,
-    const CUnitCallLandTransport* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallLandTransport::MemberSerialize(archive, task, version, ownerRef);
-  }
 } // namespace moho
 
 namespace gpg
@@ -502,3 +424,28 @@ namespace gpg
     return outRef;
   }
 } // namespace gpg
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitCallLandTransport>`, vtable 0x00E1FD5C.
+   *
+   * Address: 0x00BCFCC0 (FUN_00BCFCC0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF96B0 (FUN_00BF96B0 -- the global's destructor.)
+   * Address: 0x00602E80 (FUN_00602E80 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x00602E90 (FUN_00602E90 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x00603170 (FUN_00603170 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x00603180 (FUN_00603180 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x00602470 (FUN_00602470 -- `Init`.)
+   * Address: 0x00600700 (FUN_00600700 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00600710 (FUN_00600710 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitCallLandTransportSerializer : gpg::SerSaveLoadHelper<CUnitCallLandTransport>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B0FDC -- process-global `CUnitCallLandTransportSerializer` singleton.
+  moho::CUnitCallLandTransportSerializer gCUnitCallLandTransportSerializer;
+} // namespace

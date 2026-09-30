@@ -128,7 +128,7 @@ namespace moho
      * Loads the reflected base task, weapon pointer, attacker pointer, owning
      * unit, and task-side recovery lanes from archive storage.
      */
-    static void MemberDeserialize(gpg::ReadArchive* archive, CAcquireTargetTask* task, int version, gpg::RRef* ownerRef);
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
     /**
      * Address: 0x005E1750 (FUN_005E1750, Moho::CAcquireTargetTask::MemberSerialize)
@@ -137,12 +137,7 @@ namespace moho
      * Saves the reflected base task, weapon pointer, attacker pointer, owning
      * unit, and task-side recovery lanes to archive storage.
      */
-    static void MemberSerialize(
-      gpg::WriteArchive* archive,
-      const CAcquireTargetTask* task,
-      int version,
-      gpg::RRef* ownerRef
-    );
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
 
     /**
      * Address: 0x005D8C40 (FUN_005D8C40, Moho::CAcquireTargetTask::CheckAutoInitiate)

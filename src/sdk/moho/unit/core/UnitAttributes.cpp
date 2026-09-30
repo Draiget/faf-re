@@ -206,38 +206,38 @@ namespace moho
    * Deserializes pointer/category/float/caps/bool lanes into one
    * `UnitAttributes` object.
    */
-  void UnitAttributes::MemberDeserialize(gpg::ReadArchive* const archive, UnitAttributes* const attributes)
+  void UnitAttributes::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef ownerRef{};
 
-    auto* blueprint = const_cast<RUnitBlueprint*>(attributes->blueprint);
-    archive->ReadPointer(&blueprint, &ownerRef);
-    attributes->blueprint = blueprint;
+    auto* loadedBlueprint = const_cast<RUnitBlueprint*>(blueprint);
+    archive->ReadPointer(&loadedBlueprint, &ownerRef);
+    blueprint = loadedBlueprint;
 
-    archive->Read(CachedEntityCategorySetType(), &attributes->restrictionCategory, ownerRef);
-    archive->ReadFloat(&attributes->spawnElevationOffset);
-    archive->ReadFloat(&attributes->moveSpeedMult);
-    archive->ReadFloat(&attributes->accelerationMult);
-    archive->ReadFloat(&attributes->turnMult);
-    archive->ReadFloat(&attributes->breakOffTriggerMult);
-    archive->ReadFloat(&attributes->breakOffDistanceMult);
-    archive->ReadFloat(&attributes->consumptionPerSecondEnergy);
-    archive->ReadFloat(&attributes->consumptionPerSecondMass);
-    archive->ReadFloat(&attributes->productionPerSecondEnergy);
-    archive->ReadFloat(&attributes->productionPerSecondMass);
-    archive->ReadFloat(&attributes->buildRate);
-    archive->ReadFloat(&attributes->regenRate);
+    archive->Read(CachedEntityCategorySetType(), &restrictionCategory, ownerRef);
+    archive->ReadFloat(&spawnElevationOffset);
+    archive->ReadFloat(&moveSpeedMult);
+    archive->ReadFloat(&accelerationMult);
+    archive->ReadFloat(&turnMult);
+    archive->ReadFloat(&breakOffTriggerMult);
+    archive->ReadFloat(&breakOffDistanceMult);
+    archive->ReadFloat(&consumptionPerSecondEnergy);
+    archive->ReadFloat(&consumptionPerSecondMass);
+    archive->ReadFloat(&productionPerSecondEnergy);
+    archive->ReadFloat(&productionPerSecondMass);
+    archive->ReadFloat(&buildRate);
+    archive->ReadFloat(&regenRate);
 
-    auto commandCaps = static_cast<ERuleBPUnitCommandCaps>(attributes->commandCapsMask);
+    auto commandCaps = static_cast<ERuleBPUnitCommandCaps>(commandCapsMask);
     archive->Read(CachedCommandCapsType(), &commandCaps, ownerRef);
-    attributes->commandCapsMask = static_cast<std::uint32_t>(commandCaps);
+    commandCapsMask = static_cast<std::uint32_t>(commandCaps);
 
-    auto toggleCaps = static_cast<ERuleBPUnitToggleCaps>(attributes->toggleCapsMask);
+    auto toggleCaps = static_cast<ERuleBPUnitToggleCaps>(toggleCapsMask);
     archive->Read(CachedToggleCapsType(), &toggleCaps, ownerRef);
-    attributes->toggleCapsMask = static_cast<std::uint32_t>(toggleCaps);
+    toggleCapsMask = static_cast<std::uint32_t>(toggleCaps);
 
-    archive->ReadBool(&attributes->mReclaimable);
-    archive->ReadBool(&attributes->mCapturable);
+    archive->ReadBool(&mReclaimable);
+    archive->ReadBool(&mCapturable);
   }
 
   /**
@@ -247,34 +247,34 @@ namespace moho
    * Serializes pointer/category/float/caps/bool lanes from one
    * `UnitAttributes` object.
    */
-  void UnitAttributes::MemberSerialize(const UnitAttributes* const attributes, gpg::WriteArchive* const archive)
+  void UnitAttributes::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef ownerRef{};
 
-    archive->WritePointer<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(attributes->blueprint), gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(blueprint), gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedEntityCategorySetType(), &attributes->restrictionCategory, ownerRef);
-    archive->WriteFloat(attributes->spawnElevationOffset);
-    archive->WriteFloat(attributes->moveSpeedMult);
-    archive->WriteFloat(attributes->accelerationMult);
-    archive->WriteFloat(attributes->turnMult);
-    archive->WriteFloat(attributes->breakOffTriggerMult);
-    archive->WriteFloat(attributes->breakOffDistanceMult);
-    archive->WriteFloat(attributes->consumptionPerSecondEnergy);
-    archive->WriteFloat(attributes->consumptionPerSecondMass);
-    archive->WriteFloat(attributes->productionPerSecondEnergy);
-    archive->WriteFloat(attributes->productionPerSecondMass);
-    archive->WriteFloat(attributes->buildRate);
-    archive->WriteFloat(attributes->regenRate);
+    archive->Write(CachedEntityCategorySetType(), &restrictionCategory, ownerRef);
+    archive->WriteFloat(spawnElevationOffset);
+    archive->WriteFloat(moveSpeedMult);
+    archive->WriteFloat(accelerationMult);
+    archive->WriteFloat(turnMult);
+    archive->WriteFloat(breakOffTriggerMult);
+    archive->WriteFloat(breakOffDistanceMult);
+    archive->WriteFloat(consumptionPerSecondEnergy);
+    archive->WriteFloat(consumptionPerSecondMass);
+    archive->WriteFloat(productionPerSecondEnergy);
+    archive->WriteFloat(productionPerSecondMass);
+    archive->WriteFloat(buildRate);
+    archive->WriteFloat(regenRate);
 
-    const auto commandCaps = static_cast<ERuleBPUnitCommandCaps>(attributes->commandCapsMask);
+    const auto commandCaps = static_cast<ERuleBPUnitCommandCaps>(commandCapsMask);
     archive->Write(CachedCommandCapsType(), &commandCaps, ownerRef);
 
-    const auto toggleCaps = static_cast<ERuleBPUnitToggleCaps>(attributes->toggleCapsMask);
+    const auto toggleCaps = static_cast<ERuleBPUnitToggleCaps>(toggleCapsMask);
     archive->Write(CachedToggleCapsType(), &toggleCaps, ownerRef);
 
-    archive->WriteBool(attributes->mReclaimable);
-    archive->WriteBool(attributes->mCapturable);
+    archive->WriteBool(mReclaimable);
+    archive->WriteBool(mCapturable);
   }
 } // namespace moho
 
@@ -294,3 +294,24 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_UnitAttributesTypeInfo_ff51a9, moho::preregister_UnitAttributesTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<UnitAttributes>`, vtable 0x00E187DC.
+   *
+   * Address: 0x00BCA5E0 (FUN_00BCA5E0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF5390 (FUN_00BF5390 -- the global's destructor.)
+   * Address: 0x0055CAE0 (FUN_0055CAE0 -- `Init`.)
+   * Address: 0x0055C350 (FUN_0055C350 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0055C360 (FUN_0055C360 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct UnitAttributesSerializer : gpg::SerSaveLoadHelper<UnitAttributes>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ACCF8 -- process-global `UnitAttributesSerializer` singleton.
+  moho::UnitAttributesSerializer gUnitAttributesSerializer;
+} // namespace

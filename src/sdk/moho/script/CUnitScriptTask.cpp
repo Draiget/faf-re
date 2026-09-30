@@ -30,6 +30,7 @@
 #include "moho/unit/tasks/CUnitMoveTask.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/render/camera/VTransform.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -772,108 +773,52 @@ moho::CScrLuaInitForm* moho::func_LUnitMoveNear_LuaFuncDef()
  */
 namespace moho
 {
-[[maybe_unused]] void DeserializeCUnitScriptTaskThunkVariantA(
-  const int version,
-  CUnitScriptTask* const task,
-  gpg::ReadArchive* const archive
-)
-{
-  CUnitScriptTask::MemberDeserialize(archive, task, version);
-}
-
-/**
- * Address: 0x00624190 (FUN_00624190, serializer load thunk alias)
- *
- * What it does:
- * Tail-forwards a second CUnitScriptTask serializer-load thunk alias into
- * `CUnitScriptTask::MemberDeserialize`.
- */
-[[maybe_unused]] void DeserializeCUnitScriptTaskThunkVariantB(
-  const int version,
-  CUnitScriptTask* const task,
-  gpg::ReadArchive* const archive
-)
-{
-  CUnitScriptTask::MemberDeserialize(archive, task, version);
-}
-
-/**
- * Address: 0x00623F00 (FUN_00623F00, serializer save thunk alias)
- *
- * What it does:
- * Tail-forwards one CUnitScriptTask serializer-save thunk alias into
- * `CUnitScriptTask::MemberSerialize`.
- */
-[[maybe_unused]] void SerializeCUnitScriptTaskThunkVariantA(
-  const int version,
-  gpg::WriteArchive* const archive,
-  CUnitScriptTask* const task
-)
-{
-  CUnitScriptTask::MemberSerialize(task, archive, version);
-}
-
-/**
- * Address: 0x006241A0 (FUN_006241A0, serializer save thunk alias)
- *
- * What it does:
- * Tail-forwards a second CUnitScriptTask serializer-save thunk alias into
- * `CUnitScriptTask::MemberSerialize`.
- */
-[[maybe_unused]] void SerializeCUnitScriptTaskThunkVariantB(
-  const int version,
-  gpg::WriteArchive* const archive,
-  CUnitScriptTask* const task
-)
-{
-  CUnitScriptTask::MemberSerialize(task, archive, version);
-}
 } // namespace moho
 
 /**
  * Address: 0x00624450 (FUN_00624450, Moho::CUnitScriptTask::MemberDeserialize)
  */
-void CUnitScriptTask::MemberDeserialize(gpg::ReadArchive* const archive, CUnitScriptTask* const task, const int version)
+void CUnitScriptTask::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
 {
   if (version < 1) {
     throw gpg::SerializationError("unsupported version of CUnitScriptTask");
   }
 
   gpg::RRef owner{};
-  archive->Read(CachedCCommandTaskType(), task, owner);
+  archive->Read(CachedCCommandTaskType(), this, owner);
 
-  CScriptObject* const scriptObject = task ? static_cast<CScriptObject*>(task) : nullptr;
+  CScriptObject* const scriptObject = this ? static_cast<CScriptObject*>(this) : nullptr;
   gpg::RRef scriptOwner{};
   archive->Read(CachedCScriptObjectType(), scriptObject, scriptOwner);
 
   gpg::RRef pointerOwner{};
-  task->mSourceCommand = ReadTrackedCUnitCommandPointer(archive, pointerOwner);
+  mSourceCommand = ReadTrackedCUnitCommandPointer(archive, pointerOwner);
 
   gpg::RRef luaOwner{};
-  archive->Read(CachedLuaObjectType(), &task->mSourceLuaObj, luaOwner);
+  archive->Read(CachedLuaObjectType(), &mSourceLuaObj, luaOwner);
 }
 
 /**
  * Address: 0x00624550 (FUN_00624550, Moho::CUnitScriptTask::MemberSerialize)
  */
-void CUnitScriptTask::MemberSerialize(CUnitScriptTask* const task, gpg::WriteArchive* const archive, const int version)
+void CUnitScriptTask::MemberSerialize(gpg::WriteArchive* const archive, const int version)
 {
   if (version < 1) {
     throw gpg::SerializationError("unsupported version of CUnitScriptTask");
   }
 
   gpg::RRef owner{};
-  archive->Write(CachedCCommandTaskType(), task, owner);
+  archive->Write(CachedCCommandTaskType(), this, owner);
 
-  CScriptObject* const scriptObject = task ? static_cast<CScriptObject*>(task) : nullptr;
+  CScriptObject* const scriptObject = this ? static_cast<CScriptObject*>(this) : nullptr;
   gpg::RRef scriptOwner{};
   archive->Write(CachedCScriptObjectType(), scriptObject, scriptOwner);
 
-  const gpg::RRef sourceCommandRef = MakeCUnitCommandRef(task->mSourceCommand);
+  const gpg::RRef sourceCommandRef = MakeCUnitCommandRef(mSourceCommand);
   gpg::WriteRawPointer(archive, sourceCommandRef, gpg::TrackedPointerState::Unowned, scriptOwner);
 
   gpg::RRef luaOwner{};
-  archive->Write(CachedLuaObjectType(), &task->mSourceLuaObj, luaOwner);
+  archive->Write(CachedLuaObjectType(), &mSourceLuaObj, luaOwner);
 }
 
 /**
@@ -981,4 +926,28 @@ namespace
   };
 
   const CUnitScriptTaskLuaFuncDefBootstrap gCUnitScriptTaskLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitScriptTask>`, vtable 0x00E20C98.
+   *
+   * Address: 0x00BD19A0 (FUN_00BD19A0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFA470 (FUN_00BFA470 -- the global's destructor.)
+   * Address: 0x00624190 (FUN_00624190 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x00623F00 (FUN_00623F00 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x006241A0 (FUN_006241A0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x00623BB0 (FUN_00623BB0 -- `Init`.)
+   * Address: 0x00622EA0 (FUN_00622EA0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00622EC0 (FUN_00622EC0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitScriptTaskSerializer : gpg::SerSaveLoadHelper<CUnitScriptTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B1D30 -- process-global `CUnitScriptTaskSerializer` singleton.
+  moho::CUnitScriptTaskSerializer gCUnitScriptTaskSerializer;
 } // namespace

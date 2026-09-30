@@ -63,7 +63,7 @@ namespace moho
      * Loads the reflected base task, weapon pointer, unit pointer, and fire
      * clock from archive storage.
      */
-    static void MemberDeserialize(gpg::ReadArchive* archive, CFireWeaponTask* task, int version, gpg::RRef* ownerRef);
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
     /**
      * Address: 0x006DF300 (FUN_006DF300, MemberSerialize)
@@ -72,7 +72,7 @@ namespace moho
      * Saves the reflected base task, weapon pointer, unit pointer, and fire
      * clock into archive storage.
      */
-    static void MemberSerialize(gpg::WriteArchive* archive, const CFireWeaponTask* task, int version, gpg::RRef* ownerRef);
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
 
   public:
     std::uint32_t mReserved18;

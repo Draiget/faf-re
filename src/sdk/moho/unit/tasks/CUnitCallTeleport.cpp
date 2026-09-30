@@ -28,6 +28,7 @@
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
@@ -722,19 +723,18 @@ namespace moho
    * Loads base command-task state plus teleport-task weak-unit and status
    * flags from archive data.
    */
-  void CUnitCallTeleport::MemberDeserialize(gpg::ReadArchive* const archive, CUnitCallTeleport* const task, int, gpg::RRef*)
+  void CUnitCallTeleport::MemberDeserialize(gpg::ReadArchive* const archive, int, const gpg::RRef&)
   {
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(task != nullptr);
-    if (!archive || !task) {
+    if (!archive) {
       return;
     }
 
     gpg::RRef nullOwner{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(task), nullOwner);
-    archive->Read(CachedWeakPtrUnitType(), &task->mTargetTransportUnit, nullOwner);
-    archive->ReadBool(&task->mCompletedSuccessfully);
-    archive->ReadBool(&task->mIsOccupying);
+    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), nullOwner);
+    archive->Read(CachedWeakPtrUnitType(), &mTargetTransportUnit, nullOwner);
+    archive->ReadBool(&mCompletedSuccessfully);
+    archive->ReadBool(&mIsOccupying);
   }
 
   /**
@@ -744,93 +744,18 @@ namespace moho
    * Saves base command-task state plus teleport-task weak-unit and status
    * flags into archive data.
    */
-  void CUnitCallTeleport::MemberSerialize(
-    gpg::WriteArchive* const archive,
-    const CUnitCallTeleport* const task,
-    int,
-    gpg::RRef*
-  )
+  void CUnitCallTeleport::MemberSerialize(gpg::WriteArchive* const archive, int, const gpg::RRef&) const
   {
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(task != nullptr);
-    if (!archive || !task) {
+    if (!archive) {
       return;
     }
 
     gpg::RRef nullOwner{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(task), nullOwner);
-    archive->Write(CachedWeakPtrUnitType(), &task->mTargetTransportUnit, nullOwner);
-    archive->WriteBool(task->mCompletedSuccessfully);
-    archive->WriteBool(task->mIsOccupying);
-  }
-
-  /**
-   * Address: 0x00602F00 (FUN_00602F00)
-   * Address: 0x0060C580 (FUN_0060C580)
-   *
-   * What it does:
-   * Preserves one deserialize callback thunk lane for call-teleport task
-   * serializer registration.
-   */
-  [[maybe_unused]] void CUnitCallTeleportMemberDeserializeAdapterLaneA(
-    gpg::ReadArchive* const archive,
-    CUnitCallTeleport* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallTeleport::MemberDeserialize(archive, task, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00602F10 (FUN_00602F10)
-   *
-   * What it does:
-   * Preserves one serialize callback thunk lane for call-teleport task
-   * serializer registration.
-   */
-  [[maybe_unused]] void CUnitCallTeleportMemberSerializeAdapterLaneA(
-    gpg::WriteArchive* const archive,
-    const CUnitCallTeleport* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallTeleport::MemberSerialize(archive, task, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00603190 (FUN_00603190)
-   *
-   * What it does:
-   * Alternate deserialize callback thunk lane for call-teleport task serializer
-   * registration.
-   */
-  [[maybe_unused]] void CUnitCallTeleportMemberDeserializeAdapterLaneB(
-    gpg::ReadArchive* const archive,
-    CUnitCallTeleport* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallTeleport::MemberDeserialize(archive, task, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x006031A0 (FUN_006031A0)
-   *
-   * What it does:
-   * Alternate serialize callback thunk lane for call-teleport task serializer
-   * registration.
-   */
-  [[maybe_unused]] void CUnitCallTeleportMemberSerializeAdapterLaneB(
-    gpg::WriteArchive* const archive,
-    const CUnitCallTeleport* const task,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    CUnitCallTeleport::MemberSerialize(archive, task, version, ownerRef);
+    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), nullOwner);
+    archive->Write(CachedWeakPtrUnitType(), &mTargetTransportUnit, nullOwner);
+    archive->WriteBool(mCompletedSuccessfully);
+    archive->WriteBool(mIsOccupying);
   }
 
   namespace
@@ -916,3 +841,28 @@ namespace gpg
     return outRef;
   }
 } // namespace gpg
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitCallTeleport>`, vtable 0x00E1FDA8.
+   *
+   * Address: 0x00BCFD20 (FUN_00BCFD20 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF9740 (FUN_00BF9740 -- the global's destructor.)
+   * Address: 0x00602F00 (FUN_00602F00 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x00602F10 (FUN_00602F10 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x00603190 (FUN_00603190 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x006031A0 (FUN_006031A0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x00602530 (FUN_00602530 -- `Init`.)
+   * Address: 0x006011F0 (FUN_006011F0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00601200 (FUN_00601200 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitCallTeleportSerializer : gpg::SerSaveLoadHelper<CUnitCallTeleport>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B0EF8 -- process-global `CUnitCallTeleportSerializer` singleton.
+  moho::CUnitCallTeleportSerializer gCUnitCallTeleportSerializer;
+} // namespace

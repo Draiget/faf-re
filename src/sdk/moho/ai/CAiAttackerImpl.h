@@ -381,7 +381,7 @@ namespace moho
      * Loads the serialized attacker state lanes and repopulates owned pointer
      * vectors.
      */
-    static void MemberDeserialize(CAiAttackerImpl* object, gpg::ReadArchive* archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x005E1520 (FUN_005E1520, Moho::CAiAttackerImpl::MemberSerialize)
@@ -390,7 +390,7 @@ namespace moho
      * Saves attacker base, pointer-vector, stage/thread, desired-target, and
      * reporting-state lanes.
      */
-    static void MemberSerialize(const CAiAttackerImpl* object, gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x005D85B0 (FUN_005D85B0, Moho::CAiAttackerImpl::DeserializePointerVectors)
