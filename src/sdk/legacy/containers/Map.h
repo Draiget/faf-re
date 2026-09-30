@@ -227,7 +227,6 @@ namespace msvc8
         [[nodiscard]] size_type count(const key_type& k) const { return tree_.count(k); }
 
         /**
-         * Address: 0x0082CEA0 (FUN_0082CEA0, sub_82CEA0 -- the iterator-returning `lower_bound` wrapper over the `WeakEntitySetUserEntity` tree descent at 0x0082E560 (`LowerBoundWeakEntitySetNode`, CWldSession.cpp). Reached from sub_826140, sub_8281E0, sub_82BA20, sub_8B4300 and `cfunc_UserUnitHasUnloadCommandQueuedUpL` (0x008C2810).)
          * Address: 0x00423A00 (FUN_00423A00 -- the key comparison every descent makes, `msvc8::string::operator<` on the probe and the node key for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00423AD0, 0x00432450, 0x004327A0; formerly `IsAnimTextureCacheKeyLess` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00424670 (FUN_00424670 -- `lower_bound` for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004233D0, 0x004237C0, 0x00423C40; formerly `LowerBoundAnimTextureCacheEntry` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          */

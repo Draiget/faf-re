@@ -3,39 +3,72 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "moho/collision/CColPrimitiveBox3f.h"
+#include "moho/entity/UserEntity.h"
+#include "moho/mesh/Mesh.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/unit/Broadcaster.h"
+#include "Wm3AxisAlignedBox3.h"
+#include "Wm3Box3.h"
 
 namespace moho
 {
   static_assert(sizeof(IdleUnitSelector) == 0x20, "IdleUnitSelector complete-object size must be 0x20");
 
+  namespace
+  {
+    /**
+     * Address: 0x00868690 (FUN_00868690)
+     *
+     * What it does:
+     * The test `OnEvent` uses to decide the selection changed. Both empty is
+     * the same, one empty is different; otherwise every entry of `lhs` is
+     * compared with every entry of `rhs` and any mismatch is a difference. So
+     * two non-empty sets only count as the same when each holds one unit and
+     * it is the same unit. Each `begin()` prunes, as every walk does.
+     */
+    [[nodiscard]] bool HoldTheSameUnit(const WeakSet<UserEntity>& lhs, const WeakSet<UserEntity>& rhs)
+    {
+      const bool lhsEmpty = lhs.begin() == lhs.end();
+      if (lhsEmpty && rhs.begin() == rhs.end()) {
+        return true;
+      }
+      if ((lhs.begin() == lhs.end()) != (rhs.begin() == rhs.end())) {
+        return false;
+      }
+
+      for (UserEntity* const left : lhs) {
+        for (UserEntity* const right : rhs) {
+          if (left != right) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    IdleUnitSelector& GlobalIdleUnitSelector() noexcept;
+  } // namespace
+
   /**
    * Address: 0x00865490 (FUN_00865490, IdleUnitSelector process-global constructor)
    *
    * What it does:
-   * Initializes `mIdleSet` as an empty weak-entity set: buys the self-linked
-   * sentinel head through `InitWeakEntitySetHead` and clears the trailing
-   * `mSizeMirrorOrUnused` lane. Matches the binary's explicit field-by-field
-   * setup - `WeakEntitySetUserEntity`/`SSelectionSetUserEntity` are bare
-   * structs with no member default constructors of their own.
+   * `mIdleSet` comes up empty and the focus cycle at step 0.
    */
   IdleUnitSelector::IdleUnitSelector()
-  {
-    InitWeakEntitySetHead(mIdleSet);
-    mIdleSet.mSizeMirrorOrUnused = 0u;
-  }
+    : mIdleSet()
+    , mFocusStep(0)
+  {}
 
   /**
    * Address: 0x00865780 (FUN_00865780, IdleUnitSelector process-global
    * destructor)
    *
    * What it does:
-   * Tears `mIdleSet` down completely - full-range erase followed by
-   * `operator delete` on the head sentinel - then unlinks the listener node
-   * from its current session-listener lane, leaving it self-linked. The
-   * tree teardown is this body; the unlink is the `Listener` base's
-   * destructor.
+   * `mIdleSet`'s destructor (full-range erase, free the head), then the
+   * `Listener` base's unlink; the body itself is empty.
    *
    * The binary reaches this destructor through a compiler-generated,
    * argument-less thunk (`FUN_00C07510`, `void sub_C07510() { sub_865780();
@@ -48,10 +81,7 @@ namespace moho
    * atexit registration automatically, so `FUN_00C07510`/the explicit
    * `atexit()` call have no separate source-level counterpart here.
    */
-  IdleUnitSelector::~IdleUnitSelector()
-  {
-    DestroyWeakEntitySet(mIdleSet);
-  }
+  IdleUnitSelector::~IdleUnitSelector() = default;
 
   /**
    * Address: 0x008656A0 (FUN_008656A0)
@@ -81,31 +111,55 @@ namespace moho
    * Address: 0x00865540 (FUN_00865540)
    *
    * What it does:
-   * Compares `mIdleSet`'s live entity keys against `event.mCurrentSelection`
-   * via `HasSameLiveEntitySet`; when they differ, destroys every tracked
-   * idle-set node and resets the red-black tree head back to its empty
-   * self-linked sentinel state, including the `mSizeMirrorOrUnused` lane.
-   *
-   * The binary inlines the reset as a direct
-   * `DestroySubtree(mHead->mParent)` call plus three head self-loop stores
-   * (it does not go through `EraseRange`'s generic range-erase dispatch).
-   * `DestroySubtree` is a private `SSelectionSetUserEntity` member, so this
-   * reuses the public `EraseRange` full-range fast path instead - for a
-   * `first == mHead->mLeft, last == mHead` call, `EraseRange` performs the
-   * identical `DestroySubtree(head->mParent)` + head self-loop + `mSize = 0`
-   * sequence internally. `mSizeMirrorOrUnused` is reset explicitly afterward
-   * to match the binary's final store, since `EraseRange` does not touch
-   * that lane.
+   * `this` is the `Listener` sub-object (+0x04). Unless the new selection
+   * holds the same unit as the cycle's copy (0x00868690), the copy is cleared
+   * (the set's whole-tree erase, `_Erase` 0x007B0870) and the cycle restarts.
    */
   void IdleUnitSelector::OnEvent(const SSelectionEvent event)
   {
-    if (mIdleSet.HasSameLiveEntitySet(*event.mCurrentSelection)) {
+    if (HoldTheSameUnit(mIdleSet, *event.mCurrentSelection)) {
       return;
     }
 
-    SSelectionNodeUserEntity* cursor = mIdleSet.mHead->mLeft;
-    (void)mIdleSet.EraseRange(&cursor, mIdleSet.mHead->mLeft, mIdleSet.mHead);
-    mIdleSet.mSizeMirrorOrUnused = 0u;
+    mIdleSet.Clear();
+    mFocusStep = 0;
+  }
+
+  void IdleUnitSelector::CycleCameraFocus(const WeakSet<UserEntity>& selection, CameraImpl* const camera)
+  {
+    IdleUnitSelector& selector = GlobalIdleUnitSelector();
+    switch (selector.mFocusStep) {
+      case 0:
+        selector.mFocusStep = 1;
+        selector.mIdleSet = selection;
+        return;
+
+      case 1:
+        camera->TargetEntities(selection, false, camera->CameraGetTargetZoom(), 0.0f);
+        selector.mFocusStep = 2;
+        return;
+
+      case 2: {
+        UserEntity* const first = *selection.begin();
+        MeshInstance* const meshInstance = first->mMeshInstance;
+        const Wm3::Box3f* meshBox = &Invalid<Wm3::Box3f>();
+        if (meshInstance != nullptr) {
+          meshInstance->UpdateInterpolatedFields();
+          meshBox = &meshInstance->box;
+        }
+        const Wm3::Box3f orientedBox(*meshBox);
+        Wm3::AxisAlignedBox3f frameBox{};
+        orientedBox.ComputeAABB(frameBox.Min, frameBox.Max);
+
+        camera->TargetBox(frameBox, 0.0f);
+        camera->TargetNothing();
+        selector.mFocusStep = 1;
+        return;
+      }
+
+      default:
+        return;
+    }
   }
 
   namespace

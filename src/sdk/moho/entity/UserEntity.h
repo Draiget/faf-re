@@ -11,7 +11,7 @@
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/WeakObject.h"
 #include "moho/render/camera/VTransform.h"
-#include "moho/sim/WeakEntitySet.h"
+#include "moho/misc/WeakObject.h"
 #include "moho/vision/VisionDB.h"
 #include "Wm3Box3.h"
 
@@ -36,17 +36,17 @@ namespace moho
      * +0x04 untouched (0x008B85E0): the binary pads the vfptr to 8, which MSVC
      * does only for a member with 8-byte alignment, and that member is not
      * identified yet. Until it is, this recovery's base sits at +0x04 and the
-     * +0x08 chain is `mIUnitChainHead`, so the entity names it here.
+     * +0x08 chain is the `mWeakObject` member, so the entity names it here.
      */
     [[nodiscard]] static void* WeakLinkHeadOf(UserEntity* const entity) noexcept
     {
-      return entity != nullptr ? static_cast<void*>(&entity->mIUnitChainHead) : nullptr;
+      return entity != nullptr ? static_cast<void*>(&entity->mWeakObject) : nullptr;
     }
 
     [[nodiscard]] static UserEntity* FromWeakLinkHead(void* const head) noexcept
     {
       return head != nullptr
-        ? reinterpret_cast<UserEntity*>(static_cast<std::byte*>(head) - offsetof(UserEntity, mIUnitChainHead))
+        ? reinterpret_cast<UserEntity*>(static_cast<std::byte*>(head) - offsetof(UserEntity, mWeakObject))
         : nullptr;
     }
 
@@ -302,11 +302,10 @@ namespace moho
     // intrusive chain of `WeakPtr<UserEntity>` nodes that name this entity.
     // It used to be restated here as a second field, which pushed every
     // offset below it four bytes past the binary.
-    /// Head of the intrusive chain of selection weak-references naming this
-    /// entity. `CameraImpl`'s `LinkSelectionWeakOwnerRef` pushes each
-    /// `SSelectionWeakRefUserEntity` onto this slot, and `~UserEntity` drains
-    /// it at 0x008B8892 by nulling both words of every node.
-    SSelectionWeakRefUserEntity* mIUnitChainHead; // 0x08
+    /// RTTI's `WeakObject` base: the chain every `WeakPtr<UserEntity>` and
+    /// `WeakPtr<UserUnit>` naming this entity links into (a `WeakSet` entry,
+    /// a camera target, a bracket). `~UserEntity` drains it at 0x008B8892.
+    WeakObject mWeakObject;                       // 0x08
     CWldSession* mSession;                        // 0x0C
     /// The entity's registration in the session's mesh spatial database. The
     /// constructor registers it at 0x008B8721 against `CWldSession + 0x50`
@@ -354,7 +353,7 @@ namespace moho
   // shifting every unit field.
   static_assert(sizeof(UserEntity) == 0x148, "UserEntity size must be 0x148");
   static_assert(offsetof(UserEntity, mSession) == 0x0C, "UserEntity::mSession offset must be 0x0C");
-  static_assert(offsetof(UserEntity, mIUnitChainHead) == 0x08, "UserEntity::mIUnitChainHead offset must be 0x08");
+  static_assert(offsetof(UserEntity, mWeakObject) == 0x08, "UserEntity::mWeakObject offset must be 0x08");
   static_assert(offsetof(UserEntity, mSpatialDbEntry) == 0x10, "UserEntity::mSpatialDbEntry offset must be 0x10");
   static_assert(offsetof(UserEntity, mVisionHandle) == 0x18, "UserEntity::mVisionHandle offset must be 0x18");
   static_assert(offsetof(UserEntity, mPosePrimary) == 0x1C, "UserEntity::mPosePrimary offset must be 0x1C");

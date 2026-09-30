@@ -1,4 +1,5 @@
 #include "moho/sim/CCommandLuaFunctionRegistrations.h"
+#include "moho/sim/IdleUnitSelector.h"
 
 #include <algorithm>
 #include <bit>
@@ -420,25 +421,7 @@ namespace
     return selectedUnits;
   }
 
-  // The selection weak-set lifetime helpers (`InitializeLocalSelectionSet`,
-  // `DestroyLocalSelectionSet`, `ScopedLocalSelectionSet`,
-  // `ScopedCopiedSelectionSet`) live with the type they manage, in
-  // `moho/sim/CWldSession.h`.
-
-  // ---- UISelectionByCategory support (FUN_008662B0 / FUN_00865590) ----
-
-  // Selection weak-set nodes link into the entity's weak chain; their slot
-  // decodes like any `WeakPtr<UserEntity>`.
-  [[nodiscard]] moho::UserEntity* DecodeSelectionEntity(const moho::SSelectionWeakRefUserEntity& weakRef) noexcept
-  {
-    return moho::WeakPtr<moho::UserEntity>::DecodeOwnerObject(weakRef.mOwnerLinkSlot);
-  }
-
-  // File-static camera-focus cycle state for CycleCameraFocusOnSelection.
-  // Decompiler globals: dword_10C4424 (3-state 0/1/2) + stru_10C4418 (a
-  // persistent selection snapshot, lazily constructed).
-  int gCameraFocusCycleState = 0;
-  moho::SSelectionSetUserEntity* gCameraFocusCycleSelection = nullptr;
+  // ---- UISelectionByCategory support (FUN_008662B0) ----
 
   [[nodiscard]] const Wm3::Box3f* SelectionEntityMeshBox(moho::UserEntity* const entity)
   {
@@ -448,61 +431,6 @@ namespace
       return &meshInstance->box;
     }
     return &moho::Invalid<Wm3::Box3f>();
-  }
-
-  /**
-   * Address: 0x00865590 (FUN_00865590, sub_865590, CycleCameraFocusOnSelection)
-   *
-   * What it does:
-   * Three-state camera focus cycler over a selection weak-set. State 0 snapshots
-   * the selection and arms the cycle; state 1 frames all selected entities with a
-   * zoomed multi-target; state 2 frames the first entity's mesh box then releases
-   * tracking. Advances the static cycle state each call.
-   */
-  void CycleCameraFocusOnSelection(moho::SSelectionSetUserEntity* const selection, moho::CameraImpl* const camera)
-  {
-    if (gCameraFocusCycleState == 0) {
-      gCameraFocusCycleState = 1;
-      if (gCameraFocusCycleSelection == nullptr) {
-        gCameraFocusCycleSelection = new moho::SSelectionSetUserEntity{};
-        InitializeLocalSelectionSet(*gCameraFocusCycleSelection);
-      }
-      if (selection != gCameraFocusCycleSelection) {
-        moho::SSelectionNodeUserEntity* eraseCursor = nullptr;
-        (void)gCameraFocusCycleSelection->EraseRange(
-          &eraseCursor, gCameraFocusCycleSelection->mHead->mLeft, gCameraFocusCycleSelection->mHead
-        );
-        for (moho::SSelectionNodeUserEntity* node =
-               moho::SSelectionSetUserEntity::find(selection, selection->mHead->mLeft, &node);
-             node != selection->mHead;) {
-          if (moho::UserEntity* const entity = DecodeSelectionEntity(node->mEnt); entity != nullptr) {
-            moho::SSelectionSetUserEntity::AddResult addResult{};
-            (void)moho::SSelectionSetUserEntity::Add(&addResult, gCameraFocusCycleSelection, entity);
-          }
-          moho::SSelectionSetUserEntity::Iterator_inc(&node);
-          node = moho::SSelectionSetUserEntity::find(selection, node, &node);
-        }
-      }
-      return;
-    }
-
-    if (gCameraFocusCycleState == 1) {
-      const float targetZoom = camera->CameraGetTargetZoom();
-      camera->TargetEntities(*selection, false, targetZoom, 0.0f);
-      gCameraFocusCycleState = 2;
-      return;
-    }
-
-    // gCameraFocusCycleState == 2: frame the first selected entity's mesh box.
-    moho::SSelectionNodeUserEntity* firstNode = nullptr;
-    firstNode = moho::SSelectionSetUserEntity::find(selection, selection->mHead->mLeft, &firstNode);
-    const Wm3::Box3f orientedBox(*SelectionEntityMeshBox(DecodeSelectionEntity(firstNode->mEnt)));
-    Wm3::AxisAlignedBox3f frameBox{};
-    orientedBox.ComputeAABB(frameBox.Min, frameBox.Max);
-
-    camera->TargetBox(frameBox, 0.0f);
-    camera->TargetNothing();
-    gCameraFocusCycleState = 1;
   }
 
   /**
@@ -542,20 +470,11 @@ namespace
     // Parse the category expression once (RRuleGameRules slot 23).
     const moho::EntityCategorySet parsedCategory = session->mRules->ParseEntityCategory(categoryExpr);
 
-    // Result set: start empty, optionally seed with the current selection.
-    moho::ScopedLocalSelectionSet resultGuard{};
-    moho::SSelectionSetUserEntity& resultSet = resultGuard.get();
-    if (addToSelection && &resultSet != &session->mSelection) {
-      for (moho::SSelectionNodeUserEntity* seedNode =
-             moho::SSelectionSetUserEntity::find(&session->mSelection, session->mSelection.mHead->mLeft, &seedNode);
-           seedNode != session->mSelection.mHead;) {
-        if (moho::UserEntity* const seedEntity = DecodeSelectionEntity(seedNode->mEnt); seedEntity != nullptr) {
-          moho::SSelectionSetUserEntity::AddResult addResult{};
-          (void)moho::SSelectionSetUserEntity::Add(&addResult, &resultSet, seedEntity);
-        }
-        moho::SSelectionSetUserEntity::Iterator_inc(&seedNode);
-        seedNode = moho::SSelectionSetUserEntity::find(&session->mSelection, seedNode, &seedNode);
-      }
+    // Result set: start empty, optionally seed with the current selection
+    // (`operator=`, its `_Copy` 0x00867B20).
+    moho::WeakSet<moho::UserEntity> resultSet;
+    if (addToSelection) {
+      resultSet = session->mSelection;
     }
 
     // ---- Per-candidate filter ----
@@ -617,33 +536,25 @@ namespace
         }
       } else if (!iunit->IsUnitState(moho::UNITSTATE_BeingUpgraded)) {
         // Add every passing unit (skip units mid-upgrade).
-        moho::SSelectionSetUserEntity::AddResult addResult{};
-        (void)moho::SSelectionSetUserEntity::Add(&addResult, &resultSet, candidate);
+        (void)resultSet.Add(candidate);
       }
     }
 
     if (nearestToMouse && nearestEntity != nullptr) {
-      moho::SSelectionSetUserEntity::AddResult addResult{};
-      (void)moho::SSelectionSetUserEntity::Add(&addResult, &resultSet, nearestEntity);
+      (void)resultSet.Add(nearestEntity);
     }
 
     // ---- Optional camera framing of the result ----
-    moho::SSelectionNodeUserEntity* probeNode = nullptr;
-    probeNode = moho::SSelectionSetUserEntity::find(&resultSet, resultSet.mHead->mLeft, &probeNode);
-    if (probeNode != resultSet.mHead && doCameraTarget && camera != nullptr) {
+    if (!resultSet.Empty() && doCameraTarget && camera != nullptr) {
       if (mustBeIdle) {
-        CycleCameraFocusOnSelection(&resultSet, camera);
-      } else if (resultSet.size() == 1) {
-        moho::SSelectionNodeUserEntity* firstNode = nullptr;
-        firstNode = moho::SSelectionSetUserEntity::find(&resultSet, resultSet.mHead->mLeft, &firstNode);
-        camera->TargetEntityBox(DecodeSelectionEntity(firstNode->mEnt), 0.0f);
+        moho::IdleUnitSelector::CycleCameraFocus(resultSet, camera);
+      } else if (resultSet.Size() == 1) {
+        camera->TargetEntityBox(*resultSet.begin(), 0.0f);
       } else {
         // Combined AABB over all selected entities, then frame it.
         Wm3::AxisAlignedBox3f combined = moho::Empty<Wm3::AxisAlignedBox3f>();
-        for (moho::SSelectionNodeUserEntity* node =
-               moho::SSelectionSetUserEntity::find(&resultSet, resultSet.mHead->mLeft, &node);
-             node != resultSet.mHead;) {
-          const Wm3::Box3f orientedBox(*SelectionEntityMeshBox(DecodeSelectionEntity(node->mEnt)));
+        for (moho::UserEntity* const entity : resultSet) {
+          const Wm3::Box3f orientedBox(*SelectionEntityMeshBox(entity));
           Wm3::AxisAlignedBox3f entityBox{};
           orientedBox.ComputeAABB(entityBox.Min, entityBox.Max);
 
@@ -653,9 +564,6 @@ namespace
           if (entityBox.Max.x >  combined.Max.x) { combined.Max.x = entityBox.Max.x; }
           if (entityBox.Max.y >  combined.Max.y) { combined.Max.y = entityBox.Max.y; }
           if (entityBox.Max.z >  combined.Max.z) { combined.Max.z = entityBox.Max.z; }
-
-          moho::SSelectionSetUserEntity::Iterator_inc(&node);
-          node = moho::SSelectionSetUserEntity::find(&resultSet, node, &node);
         }
 
         camera->TargetBox(combined, 0.0f);
@@ -701,8 +609,8 @@ namespace
     auto* const spatialDb = session->GetEntitySpatialDbStorage();
     (void)spatialDb->Collect(collected, moho::ENTITYTYPE_Unit);
 
-    moho::SSelectionSetUserEntity originalSelection(session->mSelection);
-    moho::SSelectionSetUserEntity expandedSelection(session->mSelection);
+    moho::WeakSet<moho::UserEntity> originalSelection(session->mSelection);
+    moho::WeakSet<moho::UserEntity> expandedSelection(session->mSelection);
 
     const msvc8::string wallCategory("WALL");
 
@@ -716,22 +624,15 @@ namespace
       }
 
       bool sharesBlueprintWithSelection = false;
-      for (moho::SSelectionNodeUserEntity* node = moho::SSelectionSetUserEntity::find(
-             &originalSelection, originalSelection.mHead->mLeft, &node
-           );
-           node != originalSelection.mHead;
-           moho::SSelectionSetUserEntity::Iterator_inc(&node),
-             node = moho::SSelectionSetUserEntity::find(&originalSelection, node, &node)) {
-        const moho::UserEntity* const selectedEntity = DecodeSelectionEntity(node->mEnt);
-        if (selectedEntity != nullptr && selectedEntity->mParams.mBlueprint == candidate->mParams.mBlueprint) {
+      for (const moho::UserEntity* const selectedEntity : originalSelection) {
+        if (selectedEntity->mParams.mBlueprint == candidate->mParams.mBlueprint) {
           sharesBlueprintWithSelection = true;
           break;
         }
       }
 
       if (sharesBlueprintWithSelection && !candidate->IsUnitState(moho::UNITSTATE_BeingUpgraded)) {
-        moho::SSelectionSetUserEntity::AddResult addResult{};
-        (void)moho::SSelectionSetUserEntity::Add(&addResult, &expandedSelection, candidate);
+        (void)expandedSelection.Add(candidate);
       }
     }
 
@@ -2404,35 +2305,15 @@ namespace moho
     // sync-driver as an "add" info-pair (asm 0x84177C-0x8417F6).
     if (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical
         || commandType == EUnitCommandType::UNITCOMMAND_BuildSiloNuke) {
-      // Local mirror of DecodeSelectedUserEntity / DecodeUserEntityFromSelectionSlot:
-      // the weak-set stores &UserEntity::mIUnitChainHead (offset 0x08) in
-      // mOwnerLinkSlot; null or the tombstone sentinel (void*)8 decode to null.
-      const auto decodeSelectionSlot = [](const SSelectionWeakRefUserEntity& weakRef) -> UserEntity* {
-        constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
-        const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-        if (raw == 0 || raw == kSelectionOwnerLinkOffset) {
-          return nullptr;
-        }
-        return reinterpret_cast<UserEntity*>(raw - kSelectionOwnerLinkOffset);
-      };
-
       const char* const commandKey = (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical)
         ? "SiloBuildTactical"
         : "SiloBuildNuke";
 
-      SSelectionSetUserEntity& selection = session->mSelection;
-      SSelectionNodeUserEntity* node = nullptr;
-      node = SSelectionSetUserEntity::find(&selection, selection.mHead->mLeft, &node);
-      while (node != selection.mHead) {
-        if (UserEntity* const selectedEntity = decodeSelectionSlot(node->mEnt); selectedEntity != nullptr) {
-          // sSimDriver global read fresh each iteration (asm reloads it in-loop).
-          if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
-            driver->ProcessInfoPair(selectedEntity->mParams.mEntityId, commandKey, "add");
-          }
+      for (UserEntity* const selectedEntity : session->mSelection) {
+        // sSimDriver global read fresh each iteration (asm reloads it in-loop).
+        if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
+          driver->ProcessInfoPair(selectedEntity->mParams.mEntityId, commandKey, "add");
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
       return 0;
     }
@@ -2532,17 +2413,10 @@ namespace moho
         ? "SiloBuildTactical"
         : "SiloBuildNuke";
 
-      SSelectionSetUserEntity& selection = session->mSelection;
-      SSelectionNodeUserEntity* node = nullptr;
-      node = SSelectionSetUserEntity::find(&selection, selection.mHead->mLeft, &node);
-      while (node != selection.mHead) {
-        if (UserEntity* const selectedEntity = DecodeSelectionEntity(node->mEnt); selectedEntity != nullptr) {
-          if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
-            driver->ProcessInfoPair(selectedEntity->mParams.mEntityId, commandKey, "add");
-          }
+      for (UserEntity* const selectedEntity : session->mSelection) {
+        if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
+          driver->ProcessInfoPair(selectedEntity->mParams.mEntityId, commandKey, "add");
         }
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
       return 0;
     }
@@ -2562,25 +2436,17 @@ namespace moho
       factoryCommand.mBlueprint = static_cast<RUnitBlueprint*>(blueprint);
 
       const msvc8::string factoryCategory("FACTORY");
-      SSelectionSetUserEntity& selection = session->mSelection;
-      SSelectionNodeUserEntity* node = nullptr;
-      node = SSelectionSetUserEntity::find(&selection, selection.mHead->mLeft, &node);
-      while (node != selection.mHead) {
-        if (UserEntity* const selectedEntity = DecodeSelectionEntity(node->mEnt); selectedEntity != nullptr) {
-          UserUnit* const selectedUnit = selectedEntity->IsUserUnit();
-          const moho::IUnit* const factoryUnit = moho::GetIUnitBridge(selectedUnit);
-          if (selectedUnit != nullptr && factoryUnit != nullptr && !factoryUnit->IsDead()
-              && selectedEntity->IsInCategory(factoryCategory)) {
-            ScopedLocalSelectionSet oneUnit{};
-            SSelectionSetUserEntity::AddResult addResult{};
-            SSelectionSetUserEntity::Add(&addResult, &oneUnit.get(), selectedEntity);
-            for (int remaining = repeatCount; remaining > 0; --remaining) {
-              ISSUE_Command(oneUnit.get(), factoryCommand, clearQueue);
-            }
+      for (UserEntity* const selectedEntity : session->mSelection) {
+        UserUnit* const selectedUnit = selectedEntity->IsUserUnit();
+        const moho::IUnit* const factoryUnit = moho::GetIUnitBridge(selectedUnit);
+        if (selectedUnit != nullptr && factoryUnit != nullptr && !factoryUnit->IsDead()
+            && selectedEntity->IsInCategory(factoryCategory)) {
+          WeakSet<UserEntity> oneUnit;
+          (void)oneUnit.Add(selectedEntity);
+          for (int remaining = repeatCount; remaining > 0; --remaining) {
+            ISSUE_Command(oneUnit, factoryCommand, clearQueue);
           }
         }
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
       return 0;
     }
@@ -2920,15 +2786,11 @@ namespace moho
 
     const bool clear = LuaPlus::LuaStackObject(state, 1).GetBoolean();
 
-    // Snapshot the current selection so the scan is not perturbed by later state.
-    // CopySessionSelectionSet allocates + populates the head in one pass (matching
-    // the binary's raw-weak-set + FUN_00822210 idiom), so the snapshot must NOT
-    // pre-allocate its own head.
-    ScopedCopiedSelectionSet selectionSnapshot{};
-    (void)CopySessionSelectionSet(&selectionSnapshot.get(), &session->mSelection);
+    // Snapshot the current selection (the copy constructor, 0x00822210).
+    WeakSet<UserEntity> selectionSnapshot(session->mSelection);
 
     // The dock-capable subset of the selection; docks are issued to this set.
-    ScopedLocalSelectionSet dockTargets{};
+    WeakSet<UserEntity> dockTargets;
 
     // XZ centroid accumulator over the dock-capable units, and their count.
     float centroidX = 0.0f;
@@ -2937,12 +2799,8 @@ namespace moho
 
     // --- Phase 1: collect dock-capable selected units + accumulate the centroid. ---
     {
-      SSelectionSetUserEntity& snapshot = selectionSnapshot.get();
-      SSelectionNodeUserEntity* node = nullptr;
-      node = SSelectionSetUserEntity::find(&snapshot, snapshot.mHead->mLeft, &node);
-      while (node != snapshot.mHead) {
-        UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
-        UserUnit* const unit = (entity != nullptr) ? entity->IsUserUnit() : nullptr;
+      for (UserEntity* const entity : selectionSnapshot) {
+        UserUnit* const unit = entity->IsUserUnit();
         if (unit != nullptr) {
           IUnit* const bridge = GetIUnitBridge(unit);
           if ((bridge->GetAttributes().commandCapsMask & kRuleUccDock) != 0u) {
@@ -2957,14 +2815,10 @@ namespace moho
               centroidZ += anchorPos.z;
             }
 
-            SSelectionSetUserEntity::AddResult addResult{};
-            (void)SSelectionSetUserEntity::Add(&addResult, &dockTargets.get(), entity);
+            (void)dockTargets.Add(entity);
             dockCapableCount += 1.0f;
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&snapshot, node, &node);
       }
     }
 
@@ -3053,14 +2907,14 @@ namespace moho
     });
 
     if (!candidates.empty()) {
-      const std::int32_t dockCapableSize = dockTargets.get().size();
+      const std::int32_t dockCapableSize = static_cast<std::int32_t>(dockTargets.Size());
       if (dockCapableSize <= candidates.front().freeCapacity) {
         // The nearest platform can hold the entire dock-capable set: one command.
         SSTICommandIssueData command(EUnitCommandType::UNITCOMMAND_Dock);
         command.mTarget.mEnt = candidates.front().platform->mParams.mEntityId;
         command.mTarget.mType = EAiTargetType::AITARGET_Entity;
         command.mTarget.mPos = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
-        ISSUE_Command(dockTargets.get(), command, clear);
+        ISSUE_Command(dockTargets, command, clear);
       } else {
         // Distribute the selection across nearby platforms by free-capacity share.
         // Gather platforms within (nearestDistance + 100)^2 and total their capacity.
@@ -3100,7 +2954,7 @@ namespace moho
         const float quotaScale = (capacityRatio > 1.0f) ? capacityRatio : 1.0f;
 
         // Walk the dock-capable set, filling each platform up to its scaled quota.
-        SSelectionSetUserEntity& dockSet = dockTargets.get();
+        WeakSet<UserEntity>& dockSet = dockTargets;
         for (const DockCandidate& platformSlot : nearbyPlatforms) {
           // Quota = round-to-nearest(freeCapacity * scale), rounding up on any
           // positive remainder above the rounded value (matches x87 frndint + adjust).
@@ -3112,28 +2966,16 @@ namespace moho
           }
 
           // Build a fresh weak-set of up to `quota` units drawn from the dock set.
-          ScopedLocalSelectionSet quotaUnits{};
-          SSelectionNodeUserEntity* cursor = nullptr;
-          cursor = SSelectionSetUserEntity::find(&dockSet, dockSet.mHead->mLeft, &cursor);
-          while (cursor != dockSet.mHead) {
-            if (quotaUnits.get().size() >= quota) {
+          WeakSet<UserEntity> quotaUnits;
+          for (UserEntity* const unitEntity : dockSet) {
+            if (static_cast<std::int32_t>(quotaUnits.Size()) >= quota) {
               break;
             }
-
-            if (UserEntity* const unitEntity = DecodeSelectionEntity(cursor->mEnt); unitEntity != nullptr) {
-              SSelectionSetUserEntity::AddResult addResult{};
-              (void)SSelectionSetUserEntity::Add(&addResult, &quotaUnits.get(), unitEntity);
-            }
-
-            SSelectionSetUserEntity::Iterator_inc(&cursor);
-            cursor = SSelectionSetUserEntity::find(&dockSet, cursor, &cursor);
+            (void)quotaUnits.Add(unitEntity);
           }
 
           // If nothing could be assigned to this platform, stop distributing.
-          SSelectionNodeUserEntity* firstAssigned = nullptr;
-          firstAssigned =
-            SSelectionSetUserEntity::find(&quotaUnits.get(), quotaUnits.get().mHead->mLeft, &firstAssigned);
-          if (firstAssigned == quotaUnits.get().mHead) {
+          if (quotaUnits.Empty()) {
             break;
           }
 
@@ -3141,7 +2983,7 @@ namespace moho
           command.mTarget.mEnt = platformSlot.platform->mParams.mEntityId;
           command.mTarget.mType = EAiTargetType::AITARGET_Entity;
           command.mTarget.mPos = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
-          ISSUE_Command(quotaUnits.get(), command, clear);
+          ISSUE_Command(quotaUnits, command, clear);
         }
       }
     }
@@ -3149,10 +2991,8 @@ namespace moho
     // --- Voice-over feedback on one representative selected entity. ---
     UserEntity* representative = nullptr;
     {
-      SSelectionSetUserEntity& snapshot = selectionSnapshot.get();
-      SSelectionNodeUserEntity* firstLive = nullptr;
-      firstLive = SSelectionSetUserEntity::find(&snapshot, snapshot.mHead->mLeft, &firstLive);
-      representative = DecodeSelectionEntity(firstLive->mEnt);
+      const auto firstLive = selectionSnapshot.begin();
+      representative = firstLive != selectionSnapshot.end() ? *firstLive : nullptr;
     }
 
     if (representative != nullptr) {
@@ -3636,14 +3476,8 @@ namespace moho
       return 0;
     }
 
-    ScopedLocalSelectionSet selectionGuard{};
-    SSelectionSetUserEntity& selection = selectionGuard.get();
-    SSelectionSetUserEntity::AddResult addResult{};
-    (void)SSelectionSetUserEntity::Add(
-      &addResult,
-      &selection,
-      static_cast<UserEntity*>(unit)
-    );
+    WeakSet<UserEntity> selection;
+    (void)selection.Add(unit);
 
     session->SetSelection(selection);
 

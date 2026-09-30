@@ -8283,30 +8283,15 @@ namespace
     moho::UserCommandIssueHelper& helper
   )
   {
-    moho::SSelectionSetUserEntity* const cursorEntities = moho::ResolveCommandIssueCursorEntities(helper);
-    if (cursorEntities == nullptr || cursorEntities->mHead == nullptr) {
-      return false;
-    }
-
     const moho::CmdId orderId = helper.mConstantData.cmd;
-
-    moho::SSelectionNodeUserEntity* node = nullptr;
-    (void)cursorEntities->PruneTombstonesAndFindLive(&node, cursorEntities->mHead->mLeft);
-
-    while (node != cursorEntities->mHead) {
-      if (moho::UserEntity* const entity = moho::ResolveWeakEntitySetNodeEntity(*node); entity != nullptr) {
-        auto* const unit = static_cast<moho::UserUnit*>(entity);
-        if (unit->mUnitVarDat.mWorkProgress > 0.0f && unit->IsUnitState(moho::UNITSTATE_Building)) {
-          const moho::UserCommandIssueHelper* const currentOrder =
-            moho::ResolveUserUnitFrontCommandIssueHelper(entity->GetCommandQueue());
-          if (currentOrder != nullptr && currentOrder->mConstantData.cmd == orderId) {
-            return true;
-          }
+    for (moho::UserUnit* const unit : *moho::ResolveCommandIssueCursorEntities(helper)) {
+      if (unit->mUnitVarDat.mWorkProgress > 0.0f && unit->IsUnitState(moho::UNITSTATE_Building)) {
+        const moho::UserCommandIssueHelper* const currentOrder =
+          moho::ResolveUserUnitFrontCommandIssueHelper(unit->GetCommandQueue());
+        if (currentOrder != nullptr && currentOrder->mConstantData.cmd == orderId) {
+          return true;
         }
       }
-
-      moho::SSelectionSetUserEntity::Iterator_inc(&node);
-      (void)cursorEntities->PruneTombstonesAndFindLive(&node, node);
     }
 
     return false;
@@ -21406,29 +21391,6 @@ namespace
   }
 
   /**
-   * Resolves one weak-set node's recorded link slot back to its owning
-   * `UserEntity` by subtracting `offsetof(UserEntity, mIUnitChainHead)`.
-   *
-   * The engine never emits this as a function - every weak-set walk inlines
-   * it, which is why `CWldSession.cpp` (`DecodeSelectedUserEntity`) and
-   * `SelectionListener.cpp` (`ResolveSelectedUserEntity`) each carry their own
-   * copy. This is the same decode for this TU's two walks in
-   * `CUIWorldView::HandleEvent` (0x008706B0 and, through `sub_7B2920`,
-   * 0x00871077).
-   */
-  [[nodiscard]] moho::UserEntity* ResolveWeakSetOwnerEntity(
-    const moho::SSelectionWeakRefUserEntity& weakRef
-  ) noexcept
-  {
-    constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(moho::UserEntity, mIUnitChainHead);
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-    if (raw < kSelectionOwnerLinkOffset) {
-      return nullptr;
-    }
-    return reinterpret_cast<moho::UserEntity*>(raw - kSelectionOwnerLinkOffset);
-  }
-
-  /**
    * Drops any pending drag formation.
    *
    * The binary open-codes this three-line tail at four separate points in
@@ -21443,7 +21405,7 @@ namespace
     moho::CWldSession& session
   )
   {
-    moho::ScopedLocalUnitSet formationUnitsGuard{};
+    const moho::WeakSet<moho::UserUnit> formationUnits;
 
     moho::CFormation* const formation = session.mCurFormation;
     formation->mReady = false;
@@ -21485,19 +21447,14 @@ static void ApplyDragFormationAndDispatchLeftCommand(
 
   const moho::ERuleBPUnitCommandCaps leftCommandCaps = view->mLeftMouseCommand.mCommandCaps;
   if (leftCommandCaps == moho::RULEUCC_Attack || leftCommandCaps == moho::RULEUCC_Move) {
-    moho::ScopedLocalUnitSet formationUnitsGuard{};
-    moho::WeakUnitSetUserUnit& formationUnits = formationUnitsGuard.get();
+    moho::WeakSet<moho::UserUnit> formationUnits;
     session.GetSelectionUnits(formationUnits);
 
     moho::CFormation* const formation = session.mCurFormation;
 
-    // 0x0087037F-0x008703A9: prune from the left-most node and compare the
-    // first live node against the head sentinel - "is anything selected still
-    // alive".
-    moho::SSelectionNodeUserEntity* firstLive = formationUnits.mHead->mLeft;
-    firstLive = moho::SSelectionSetUserEntity::find(&formationUnits, firstLive, &firstLive);
-
-    if (firstLive == formationUnits.mHead) {
+    // 0x0087037F-0x008703A9: `Empty()` inlined, `SkipDead` (0x007B29C0) from
+    // the leftmost node against the head.
+    if (formationUnits.Empty()) {
       formation->mReady = false;
       formation->Reset();
     } else {
@@ -21594,23 +21551,17 @@ bool moho::CUIWorldView::HandleEvent(
       UICommandModeData uiCommandMode{};
       UI_GetCommandMode(uiCommandMode);
 
-      ScopedLocalUnitSet selectionGuard{};
-      WeakUnitSetUserUnit& selectedUnits = selectionGuard.get();
+      WeakSet<UserUnit> selectedUnits;
       mWldSession->GetSelectionUnits(selectedUnits);
 
       // Does any selected unit already participate in the hovered command?
+      // (`begin` 0x007B25F0 at 0x0087069F, `++` 0x007F0490 at 0x008706D8.)
       bool selectionExcluded = false;
-      WeakUnitSetUserUnit::FindResult cursor{};
-      (void)selectedUnits.First(&cursor);
-      while (cursor.mRes != selectedUnits.mHead) {
-        // The scan hands the decoded entity straight over as a unit - there is
-        // no `IsUserUnit` filter on this path (0x008706B0-0x008706C6).
-        auto* const selectedUnit = reinterpret_cast<UserUnit*>(ResolveWeakSetOwnerEntity(cursor.mRes->mEnt));
+      for (UserUnit* const selectedUnit : selectedUnits) {
         if (IsCommandCandidateExcludedByCachedRelation(*hoveredCommand, selectedUnit)) {
           selectionExcluded = true;
           break;
         }
-        (void)WeakUnitSetUserUnit::Next(&cursor);
       }
 
       const bool inOrderMode = uiCommandMode.mMode == "order";
@@ -21856,7 +21807,7 @@ bool moho::CUIWorldView::HandleEvent(
       static_cast<unsigned>(eventData.mModifiers),
       static_cast<int>(mCommandData.mMode),
       static_cast<unsigned>(mCommandData.mCommandCaps),
-      mWldSession->GetSelection().size(),
+      static_cast<int>(mWldSession->GetSelection().Size()),
       static_cast<void*>(cursorInfo.HoveredEntity()),
       static_cast<unsigned>(cursorInfo.mHitValid),
       cursorInfo.mMouseWorldPos.x,
@@ -21867,14 +21818,13 @@ bool moho::CUIWorldView::HandleEvent(
     if (mCommandData.mMode != COMMOD_Order) {
       return false;
     }
-    if (mWldSession->GetSelection().size() == 0) {
+    if (mWldSession->GetSelection().Size() == 0) {
       return false;
     }
 
     const bool useLastQueuedDestination = (eventData.mModifiers & MEM_Shift) != 0;
 
-    ScopedLocalUnitSet formationUnitsGuard{};
-    WeakUnitSetUserUnit& formationUnits = formationUnitsGuard.get();
+    WeakSet<UserUnit> formationUnits;
     mWldSession->GetSelectionUnits(formationUnits);
     mWldSession->mCurFormation->ProcessMouse(
       &formationUnits, true, cursorInfo.mMouseWorldPos, useLastQueuedDestination
@@ -21903,15 +21853,9 @@ bool moho::CUIWorldView::HandleEvent(
           FindCommandIssueHelperInSession(mWldSession, cursorInfo.mIsDragger);
         hoveredCommand != nullptr
       ) {
-        SSelectionSetUserEntity& unitsUnderCursor = *ResolveCommandIssueCursorEntities(*hoveredCommand);
-
-        SSelectionSetUserEntity::FindResult cursor{};
-        (void)unitsUnderCursor.First(&cursor);
-        while (cursor.mRes != unitsUnderCursor.mHead) {
-          ISSUE_RemoveCommandFromUnitQueue(
-            hoveredCommand, reinterpret_cast<UserUnit*>(ResolveWeakSetOwnerEntity(cursor.mRes->mEnt))
-          );
-          (void)SSelectionSetUserEntity::Next(&cursor);
+        // `begin` 0x007B25F0 at 0x00871065, `++` 0x007F0490 at 0x0087108C.
+        for (UserUnit* const unit : *ResolveCommandIssueCursorEntities(*hoveredCommand)) {
+          ISSUE_RemoveCommandFromUnitQueue(hoveredCommand, unit);
         }
       }
     } else {
@@ -27165,7 +27109,7 @@ void moho::UI_StopCursorText()
 
 namespace moho
 {
-  SSelectionSetUserEntity sSelectionBrackets{};
+  WeakSet<UserEntity> sSelectionBrackets;
 }
 
 namespace
@@ -27177,22 +27121,6 @@ namespace
   // the sentinel in `SelectionBracketRenderer.cpp`, so both readers share one
   // object instead of silently splitting the list in two.
 
-  void LinkBlinkyBoxUnitOwner(
-    moho::UserEntity* const entity,
-    moho::SSelectionWeakRefUserEntity& weakRef
-  ) noexcept
-  {
-    if (entity == nullptr) {
-      weakRef.mOwnerLinkSlot = nullptr;
-      weakRef.mNextOwner = nullptr;
-      return;
-    }
-
-    auto** const ownerLinkSlot = reinterpret_cast<moho::SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
-    weakRef.mOwnerLinkSlot = ownerLinkSlot;
-    weakRef.mNextOwner = *ownerLinkSlot;
-    *ownerLinkSlot = &weakRef;
-  }
 } // namespace
 
 /**
@@ -27211,7 +27139,7 @@ void moho::func_PushBlinkyBox(
 {
   auto* const blinkyBox = new moho::BlinkyBox{};
 
-  LinkBlinkyBoxUnitOwner(entity, blinkyBox->mUnit);
+  blinkyBox->mUnit.ResetFromObject(entity);
   blinkyBox->mCurDuration = 0.0f;
   blinkyBox->mCurCycleTime = 0.0f;
   blinkyBox->mOnTime = onTime;
@@ -27229,28 +27157,11 @@ void moho::func_PushBlinkyBox(
  * Adds one user-unit lane into the global selection-bracket weak-set and
  * returns the raw register lane value from WeakSet_UserEntity::Add.
  */
-std::int32_t moho::func_AddSelectionBracketUserUnit(
+void moho::func_AddSelectionBracketUserUnit(
   UserUnit* const unit
 )
 {
-  SSelectionSetUserEntity::AddResult addResult;
-  return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(
-    SSelectionSetUserEntity::Add(&addResult, &sSelectionBrackets, reinterpret_cast<UserEntity*>(unit))
-  ));
-}
-
-/**
- * Address: 0x007FDAB0 (FUN_007FDAB0)
- *
- * What it does:
- * Drops all nodes from the global selection-bracket weak-set by taking the
- * full-range erase path, then returns the head-sentinel lane value.
- */
-std::int32_t moho::func_ClearSelectionBracketUserUnits()
-{
-  SSelectionNodeUserEntity* cursor = sSelectionBrackets.mHead != nullptr ? sSelectionBrackets.mHead->mLeft : nullptr;
-  (void)sSelectionBrackets.EraseRange(&cursor, cursor, sSelectionBrackets.mHead);
-  return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(sSelectionBrackets.mHead));
+  (void)sSelectionBrackets.Add(unit);
 }
 
 /**

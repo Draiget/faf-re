@@ -17,30 +17,6 @@
 namespace
 {
   /**
-   * Resolves an `SSelectionWeakRefUserEntity` link slot back to its owning
-   * `UserEntity` by subtracting `offsetof(UserEntity, mIUnitChainHead)` from
-   * the recorded weak-link slot, matching `DecodeSelectedUserEntity` in
-   * CWldSession.cpp. Returns nullptr when the slot is null or below the
-   * adjustment threshold.
-   */
-  [[nodiscard]] moho::UserEntity* ResolveSelectedUserEntity(
-    const moho::SSelectionWeakRefUserEntity& weakRef
-  ) noexcept
-  {
-    if (!weakRef.mOwnerLinkSlot) {
-      return nullptr;
-    }
-
-    constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(moho::UserEntity, mIUnitChainHead);
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-    if (raw < kSelectionOwnerLinkOffset) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::UserEntity*>(raw - kSelectionOwnerLinkOffset);
-  }
-
-  /**
    * Resolves a UserUnit's embedded IUnit subobject (at `+0x148`, the
    * `IUnit` base sub-object), matching the `ResolveIUnitBridge` helper
    * in CWldSession.cpp.
@@ -51,43 +27,25 @@ namespace
   }
 
   /**
-   * Walks one selection-set RB-tree from the leftmost live entry to the head
-   * sentinel and emits each live entry's `UserUnit` Lua handle into the
-   * `outTable` at sequential 1-based indices.
+   * Walks one selection set and appends each unit's Lua handle to `outTable`
+   * at 1-based indices.
    *
-   * Binary fidelity note: the first phase of FUN_00869060 invokes
-   * `Moho::WeakSet_UserEntity::Iterator::inc` as an out-of-line call; phases
-   * 2–4 inline the same red-black tree successor walk. The
-   * `SSelectionSetUserEntity::Iterator_inc` method we call here is the
-   * recovered out-of-line lane, and gives bit-identical successor ordering
-   * for both shapes.
+   * FUN_00869060 calls the set's `++` out of line for the first table and
+   * inlines the same successor walk for the other three.
    */
   void AppendSelectionSetUnitsToLuaSequence(
-    moho::SSelectionSetUserEntity* const selectionSet,
+    const moho::WeakSet<moho::UserEntity>* const selectionSet,
     LuaPlus::LuaObject& outTable
   )
   {
-    if (selectionSet == nullptr || selectionSet->mHead == nullptr) {
-      return;
-    }
-
     std::int32_t luaIndex = 1;
-
-    moho::SSelectionNodeUserEntity* cursor = selectionSet->mHead->mLeft;
-    cursor = moho::SSelectionSetUserEntity::find(selectionSet, cursor, &cursor);
-    while (cursor != selectionSet->mHead) {
-      moho::UserEntity* const entity = ResolveSelectedUserEntity(cursor->mEnt);
-      moho::UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
-      moho::IUnit* const unitBridge = ResolveUserUnitBridge(userUnit);
-
+    for (moho::UserEntity* const entity : *selectionSet) {
+      moho::IUnit* const unitBridge = ResolveUserUnitBridge(entity->IsUserUnit());
       if (unitBridge != nullptr) {
         LuaPlus::LuaObject unitLuaObj = unitBridge->GetLuaObject();
         outTable.SetObject(luaIndex, unitLuaObj);
         ++luaIndex;
       }
-
-      moho::SSelectionSetUserEntity::Iterator_inc(&cursor);
-      cursor = moho::SSelectionSetUserEntity::find(selectionSet, cursor, &cursor);
     }
   }
 } // namespace
@@ -126,9 +84,8 @@ namespace moho
    * selection sets carried by `event`, then dispatches them to
    * `/lua/ui/game/gamemain.lua:OnSelectionChanged(prev, current, added, removed)`.
    *
-   * For each selection set, the helper walks the red-black tree from the
-   * leftmost live entry, resolves each `SSelectionWeakRefUserEntity` back to
-   * its owning `UserEntity`, dispatches the virtual `IsUserUnit()` to filter
+   * For each selection set, the helper walks the live entries, dispatches the
+   * virtual `IsUserUnit()` to filter
    * out non-unit entities, and pushes the unit's `GetLuaObject()` handle into
    * the destination table at the next 1-based sequence index. Lua-level
    * errors raised during the OnSelectionChanged callback are caught and

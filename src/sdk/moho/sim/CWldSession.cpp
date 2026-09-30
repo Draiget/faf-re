@@ -1745,7 +1745,7 @@ namespace moho
     /**
      * Address: 0x008281E0 (FUN_008281E0, sub_8281E0)
      * Address: 0x00831110 (FUN_00831110, sub_831110) - now
-     * `SSelectionSetUserEntity::HasCommonLiveEntityWith`
+     * `WeakSet<UserEntity>::HasCommonLiveEntityWith`
      *
      * What it does:
      * Picks the style state a command-graph draw node renders with this
@@ -5972,10 +5972,8 @@ namespace moho
 
     if (UserEntity* const hoveredEntity = mSession->GetHoveredUserEntity(); hoveredEntity != nullptr) {
       if (UserUnit* const hoveredUnit = hoveredEntity->IsUserUnit(); hoveredUnit != nullptr) {
-        SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*ownerHelper);
-        SSelectionSetUserEntity::FindResult found{};
-        (void)SSelectionSetUserEntity::Find(&found, cursorEntities, hoveredUnit);
-        if (found.mRes != cursorEntities->mHead) {
+        WeakSet<UserUnit>* const cursorEntities = ResolveCommandIssueCursorEntities(*ownerHelper);
+        if (cursorEntities->Find(hoveredUnit) != cursorEntities->end()) {
           return ECommandNodeHighlightState::Highlighted;
         }
       }
@@ -5991,6 +5989,52 @@ namespace moho
 
     return ECommandNodeHighlightState::Normal;
   }
+
+  namespace
+  {
+    /**
+     * Address: 0x00831110 (FUN_00831110)
+     *
+     * IDA signature:
+     * bool __usercall sub_831110@<al>(Moho::WeakSet_UserUnit *units@<eax>,
+     *     Moho::WeakSet_UserEntity *entities@<ecx>);
+     *
+     * What it does:
+     * Whether a unit set and an entity set share a live member. Both are ordered
+     * by address, so it walks them together: the lower front steps (`++`
+     * 0x0066ADD0 + 0x0066A330 on the entities, 0x007B4D90 + 0x007B29C0 on the
+     * units), an equal pair is a hit, and either set running out is a miss.
+     * Callers `DrawNodeSharesLiveEntityWithSelection` (0x00828280) and
+     * `ResolveCursorHighlightCommandId` (0x00829800).
+     */
+    [[nodiscard]] bool SharesALiveEntity(const WeakSet<UserEntity>& entities, const WeakSet<UserUnit>& units)
+    {
+      auto entity = entities.begin();
+      if (entity == entities.end()) {
+        return false;
+      }
+      auto unit = units.begin();
+      if (unit == units.end()) {
+        return false;
+      }
+
+      for (;;) {
+        UserEntity* const left = *entity;
+        UserEntity* const right = *unit;
+        if (left < right) {
+          if (++entity == entities.end()) {
+            return false;
+          }
+        } else if (right < left) {
+          if (++unit == units.end()) {
+            return false;
+          }
+        } else {
+          return true;
+        }
+      }
+    }
+  } // namespace
 
   /**
    * Address: 0x00828280 (FUN_00828280, sub_828280)
@@ -6012,8 +6056,7 @@ namespace moho
       return false;
     }
 
-    SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*ownerHelper);
-    return cursorEntities->HasCommonLiveEntityWith(mSession->GetSelection());
+    return SharesALiveEntity(mSession->GetSelection(), *ResolveCommandIssueCursorEntities(*ownerHelper));
   }
 
   /**
@@ -6188,8 +6231,7 @@ namespace moho
 
       bool preemptsByLiveSelection = false;
       if (helper != nullptr) {
-        SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*helper);
-        preemptsByLiveSelection = cursorEntities->HasCommonLiveEntityWith(mSession->GetSelection());
+        preemptsByLiveSelection = SharesALiveEntity(mSession->GetSelection(), *ResolveCommandIssueCursorEntities(*helper));
       }
 
       if (bestScaledDistance > scaledDistance || preemptsByLiveSelection) {
@@ -6717,7 +6759,7 @@ namespace moho
         return;
       }
 
-      UserUnit* const subject = PickPathPreviewSubject(const_cast<SSelectionSetUserEntity&>(session->GetSelection()));
+      UserUnit* const subject = PickPathPreviewSubject(const_cast<WeakSet<UserEntity>&>(session->GetSelection()));
       if (subject == nullptr) {
         return;
       }
@@ -6767,7 +6809,7 @@ namespace moho
 
     const LuaPlus::LuaObject waypointModule = SCR_Import(g_UIManager->mLuaState, "/lua/ui/game/commandwaypoint.lua");
     LuaPlus::LuaFunction<float> calculateWaypointLineWidth{waypointModule["CalculateWaypointLineWidth"]};
-    const float luaWidth = calculateWaypointLineWidth(static_cast<unsigned int>(session->GetSelection().size()));
+    const float luaWidth = calculateWaypointLineWidth(static_cast<unsigned int>(session->GetSelection().Size()));
 
     const float finalWidth = (maxWidthTerm + luaWidth) * ui_WaypointLineScale;
 
@@ -6941,7 +6983,7 @@ namespace moho
     // The orphan and visibility sets are `CWldSession::mOrphans` (+0x42C) and
     // `CWldSession::mVizUpdates` (+0x438), two bare 12-byte `WeakSet<UserEntity>`
     // headers; they were reached through two padded overlays here that laid a
-    // 16-byte `SSelectionSetUserEntity` over each. The cursor snapshot at
+    // 16-byte `WeakSet<UserEntity>` over each. The cursor snapshot at
     // +0x4B0 is `CWldSession::CursorInfo()`, not a third padded overlay.
 
     template <typename TNode>
@@ -7009,48 +7051,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x0066A300 (FUN_0066A300)
-     *
-     * What it does:
-     * Resolves one `UserEntity*` from one weak-set index lane by loading the
-     * node weak-owner slot and returning `ownerLinkSlot - 8` when linked.
-     */
-    [[nodiscard]] UserEntity*
-      DecodeSelectionIndexOwner(const SSelectionSetUserEntity::Index* const index) noexcept
-    {
-      constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
-#if defined(MOHO_ABI_MSVC8_COMPAT)
-      static_assert(kSelectionOwnerLinkOffset == 0x08, "UserEntity selection weak-link offset must stay 0x08");
-#endif
-
-      void* const ownerLinkSlot = index->mNode->mEnt.mOwnerLinkSlot;
-      if (ownerLinkSlot == nullptr) {
-        return nullptr;
-      }
-
-      return reinterpret_cast<UserEntity*>(static_cast<std::byte*>(ownerLinkSlot) - kSelectionOwnerLinkOffset);
-    }
-
-    [[nodiscard]] UserEntity* DecodeSelectedUserEntity(const SSelectionWeakRefUserEntity& weakRef)
-    {
-      if (!weakRef.mOwnerLinkSlot) {
-        return nullptr;
-      }
-
-      constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
-#if defined(MOHO_ABI_MSVC8_COMPAT)
-      static_assert(kSelectionOwnerLinkOffset == 0x08, "UserEntity selection weak-link offset must stay 0x08");
-#endif
-
-      const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-      if (raw < kSelectionOwnerLinkOffset) {
-        return nullptr;
-      }
-
-      return reinterpret_cast<UserEntity*>(raw - kSelectionOwnerLinkOffset);
-    }
-
-    /**
      * Address: 0x0081FD2B..0x0081FD4E (inlined into
      * `Moho::SCommandModeData::HandleEvent`, FUN_0081FCD0)
      *
@@ -7107,18 +7107,12 @@ namespace moho
       return std::find(entities.begin(), entities.end(), entity) != entities.end();
     }
 
-    void CollectSelectionEntities(const SSelectionSetUserEntity& selection, msvc8::vector<UserEntity*>& outEntities)
+    void CollectSelectionEntities(const WeakSet<UserEntity>& selection, msvc8::vector<UserEntity*>& outEntities)
     {
       outEntities.clear();
 
-      const SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr) {
-        return;
-      }
-
-      for (const SSelectionNodeUserEntity* node = head->mLeft; node && node != head; node = NextTreeNode(node)) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
-        if (entity == nullptr || ContainsEntityPtr(outEntities, entity)) {
+      for (UserEntity* const entity : selection) {
+        if (ContainsEntityPtr(outEntities, entity)) {
           continue;
         }
         outEntities.push_back(entity);
@@ -7132,24 +7126,13 @@ namespace moho
      * Returns true when at least one live entity in the current selection is in
      * the `TELEPORTATION` category.
      */
-    [[nodiscard]] bool SelectionContainsTeleportationUnit(SSelectionSetUserEntity& selection)
+    [[nodiscard]] bool SelectionContainsTeleportationUnit(WeakSet<UserEntity>& selection)
     {
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr) {
-        return false;
-      }
-
       msvc8::string teleportationCategory("TELEPORTATION");
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
-      while (node != head) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      for (UserEntity* const entity : selection) {
         if (entity != nullptr && entity->IsInCategory(teleportationCategory)) {
           return true;
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
 
       return false;
@@ -7180,16 +7163,8 @@ namespace moho
         return false;
       }
 
-      SSelectionSetUserEntity& selection = session.mSelection;
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr) {
-        return true;
-      }
-
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
-      while (node != head) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      WeakSet<UserEntity>& selection = session.mSelection;
+      for (UserEntity* const entity : selection) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
         IUnit* const iunit = GetIUnitBridge(userUnit);
         if (userUnit != nullptr && iunit != nullptr && !iunit->IsDead() && !iunit->DestroyQueued()) {
@@ -7198,9 +7173,6 @@ namespace moho
             return false;
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
 
       return true;
@@ -7236,7 +7208,7 @@ namespace moho
      * `HandleEvent` is recovered below and calls this by name.
      */
     [[nodiscard]] bool CanRestartMoveCommandAsPatrol(
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       UserCommandIssueHelper* const helper
     )
     {
@@ -7244,16 +7216,9 @@ namespace moho
         return false;
       }
 
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr) {
-        return false;
-      }
-
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
 
       const EUnitCommandType commandType = ResolveCommandIssueHelperCommandType(*helper);
-      if (node == head ||
+      if (selection.Empty() ||
           (commandType != EUnitCommandType::UNITCOMMAND_Move &&
            commandType != EUnitCommandType::UNITCOMMAND_FormMove)) {
         return false;
@@ -7261,8 +7226,7 @@ namespace moho
 
       const msvc8::string podCategory("POD");
 
-      while (node != head) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      for (UserEntity* const entity : selection) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
         IUnit* const iunit = GetIUnitBridge(userUnit);
 
@@ -7284,9 +7248,6 @@ namespace moho
             }
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
 
       return true;
@@ -7312,7 +7273,7 @@ namespace moho
      * selection set still live in a register from the
      * `CanRestartMoveCommandAsPatrol` call immediately before it.
      */
-    void RestartMoveCommandAsPatrol(SSelectionSetUserEntity& selection, UserCommandIssueHelper* const helper)
+    void RestartMoveCommandAsPatrol(WeakSet<UserEntity>& selection, UserCommandIssueHelper* const helper)
     {
       const EUnitCommandType originalCommandType = ResolveCommandIssueHelperCommandType(*helper);
       const EUnitCommandType restartCommandType =
@@ -7320,16 +7281,7 @@ namespace moho
           ? EUnitCommandType::UNITCOMMAND_Patrol
           : EUnitCommandType::UNITCOMMAND_FormPatrol;
 
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr) {
-        return;
-      }
-
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
-
-      while (node != head) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      for (UserEntity* const entity : selection) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
         IUnit* const iunit = GetIUnitBridge(userUnit);
 
@@ -7338,9 +7290,6 @@ namespace moho
             RestartQueuedCommandsFromHelper(manager, helper, originalCommandType, restartCommandType);
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
     }
 
@@ -7377,26 +7326,18 @@ namespace moho
      * to the terrain when this returns false.
      */
     [[nodiscard]] bool ResolveGroupMoveAnchorOrDetectPatrol(
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       Wm3::Vector3f& outAnchor,
       const bool skipPatrolCheck
     )
     {
       outAnchor = Wm3::Vector3f::Zero();
 
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr) {
-        return false;
-      }
-
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
 
       std::int32_t eligibleCount = 0;
       Wm3::Vector3f anchorOverride = Wm3::Vector3f::Zero();
 
-      while (node != head) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      for (UserEntity* const entity : selection) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
 
         if (userUnit != nullptr) {
@@ -7434,9 +7375,6 @@ namespace moho
             }
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
 
       if (const Wm3::Vector3f zero = Wm3::Vector3f::Zero(); anchorOverride != zero) {
@@ -7483,23 +7421,15 @@ namespace moho
      * command-capability arm.
      */
     [[nodiscard]] bool ResolveGroupFerryAnchorOrDetectFerry(
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       Wm3::Vector3f& outAnchor
     )
     {
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr) {
-        return true;
-      }
-
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
 
       std::int32_t eligibleCount = 0;
       bool allFerrying = true;
 
-      while (node != head) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      for (UserEntity* const entity : selection) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
 
         if (userUnit != nullptr) {
@@ -7528,9 +7458,6 @@ namespace moho
             }
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
 
       if (eligibleCount > 0) {
@@ -7567,20 +7494,17 @@ namespace moho
      * (`ISSUE_DecreaseCommandCount`) instead of a duplicate being stacked.
      */
     [[nodiscard]] UserCommandIssueHelper* FindColocatedQueuedBuildOrder(
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       const Wm3::Vector3f& dragPosition,
       const REntityBlueprint* const candidateBlueprint
     )
     {
-      if (selection.size() != 1) {
+      if (selection.Size() != 1) {
         return nullptr;
       }
 
-      SSelectionNodeUserEntity* node = selection.mHead->mLeft;
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
-
-      UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
-      UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+      UserEntity* const entity = *selection.begin();
+      UserUnit* const userUnit = entity->IsUserUnit();
       if (userUnit == nullptr) {
         return nullptr;
       }
@@ -7625,33 +7549,20 @@ namespace moho
      * selection ahead of a rally-point-aware factory command.
      */
     void SplitSelectionByRallyPointCategory(
-      SSelectionSetUserEntity& source,
-      SSelectionSetUserEntity& rallyPointSet,
-      SSelectionSetUserEntity& otherSet
+      WeakSet<UserEntity>& source,
+      WeakSet<UserEntity>& rallyPointSet,
+      WeakSet<UserEntity>& otherSet
     )
     {
       const msvc8::string rallyPointCategory("RALLYPOINT");
 
-      SSelectionNodeUserEntity* const head = source.mHead;
-      if (head == nullptr) {
-        return;
-      }
 
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&source, node, &node);
-
-      while (node != head) {
-        if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt); entity != nullptr) {
-          SSelectionSetUserEntity::AddResult addResult{};
-          if (entity->IsInCategory(rallyPointCategory)) {
-            (void)SSelectionSetUserEntity::Add(&addResult, &rallyPointSet, entity);
-          } else {
-            (void)SSelectionSetUserEntity::Add(&addResult, &otherSet, entity);
-          }
+      for (UserEntity* const entity : source) {
+        if (entity->IsInCategory(rallyPointCategory)) {
+          (void)rallyPointSet.Add(entity);
+        } else {
+          (void)otherSet.Add(entity);
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&source, node, &node);
       }
     }
 
@@ -7680,9 +7591,9 @@ namespace moho
      * the `RULEUCC_Transport` arm's no-extra-selection branch (0x008213D6).
      */
     void SplitSelectionForFerryCommand(
-      SSelectionSetUserEntity& source,
-      SSelectionSetUserEntity& airTransportSet,
-      SSelectionSetUserEntity& landUnitSet
+      WeakSet<UserEntity>& source,
+      WeakSet<UserEntity>& airTransportSet,
+      WeakSet<UserEntity>& landUnitSet
     )
     {
       const msvc8::string transportationCategory("TRANSPORTATION");
@@ -7690,16 +7601,7 @@ namespace moho
       const msvc8::string airStagingCategory("AIRSTAGINGPLATFORM");
       const msvc8::string landCategory("LAND");
 
-      SSelectionNodeUserEntity* const head = source.mHead;
-      if (head == nullptr) {
-        return;
-      }
-
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&source, node, &node);
-
-      while (node != head) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      for (UserEntity* const entity : source) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
         IUnit* const iunit = GetIUnitBridge(userUnit);
 
@@ -7707,16 +7609,12 @@ namespace moho
           const bool isAirTransport = entity->IsInCategory(transportationCategory) &&
             (entity->IsInCategory(airCategory) || entity->IsInCategory(airStagingCategory));
 
-          SSelectionSetUserEntity::AddResult addResult{};
           if (isAirTransport) {
-            (void)SSelectionSetUserEntity::Add(&addResult, &airTransportSet, entity);
+            (void)airTransportSet.Add(entity);
           } else if (entity->IsInCategory(landCategory)) {
-            (void)SSelectionSetUserEntity::Add(&addResult, &landUnitSet, entity);
+            (void)landUnitSet.Add(entity);
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&source, node, &node);
       }
     }
 
@@ -7742,36 +7640,23 @@ namespace moho
      * same command aimed at the structure's world position instead.
      */
     void SplitSelectionByRebuilderCategory(
-      SSelectionSetUserEntity& source,
-      SSelectionSetUserEntity& nonRebuilderSet,
-      SSelectionSetUserEntity& rebuilderSet
+      WeakSet<UserEntity>& source,
+      WeakSet<UserEntity>& nonRebuilderSet,
+      WeakSet<UserEntity>& rebuilderSet
     )
     {
       const msvc8::string rebuilderCategory("REBUILDER");
 
-      SSelectionNodeUserEntity* const head = source.mHead;
-      if (head == nullptr) {
-        return;
-      }
-
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&source, node, &node);
-
-      while (node != head) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      for (UserEntity* const entity : source) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
 
         if (userUnit != nullptr) {
-          SSelectionSetUserEntity::AddResult addResult{};
           if (userUnit->IsInCategory(rebuilderCategory)) {
-            (void)SSelectionSetUserEntity::Add(&addResult, &rebuilderSet, entity);
+            (void)rebuilderSet.Add(entity);
           } else {
-            (void)SSelectionSetUserEntity::Add(&addResult, &nonRebuilderSet, entity);
+            (void)nonRebuilderSet.Add(entity);
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&source, node, &node);
       }
     }
 
@@ -7797,21 +7682,12 @@ namespace moho
      * `UNITCOMMAND_AggressiveMove` immediately afterward when non-empty.
      */
     void SplitSelectionForAggressiveMove(
-      SSelectionSetUserEntity& source,
-      SSelectionSetUserEntity& aggressiveMoveSet,
-      SSelectionSetUserEntity& otherSet
+      WeakSet<UserEntity>& source,
+      WeakSet<UserEntity>& aggressiveMoveSet,
+      WeakSet<UserEntity>& otherSet
     )
     {
-      SSelectionNodeUserEntity* const head = source.mHead;
-      if (head == nullptr) {
-        return;
-      }
-
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&source, node, &node);
-
-      while (node != head) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      for (UserEntity* const entity : source) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
 
         if (userUnit != nullptr) {
@@ -7819,16 +7695,12 @@ namespace moho
           const bool eligible = iunit != nullptr && iunit->IsMobile() &&
             userUnit->mUnitVarDat.mFireState == FIRESTATE_ReturnFire;
 
-          SSelectionSetUserEntity::AddResult addResult{};
           if (eligible) {
-            (void)SSelectionSetUserEntity::Add(&addResult, &aggressiveMoveSet, entity);
+            (void)aggressiveMoveSet.Add(entity);
           } else {
-            (void)SSelectionSetUserEntity::Add(&addResult, &otherSet, entity);
+            (void)otherSet.Add(entity);
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&source, node, &node);
       }
     }
 
@@ -7848,1526 +7720,16 @@ namespace moho
       return true;
     }
 
-    // EraseSelectionNodeAndAdvance is declared in CWldSession.h (hoisted to
-    // external linkage below the anonymous namespace at 0x0066A550/0x007B30D0)
-    // and is visible here via that include.
-
-    void ClearSelectionSet(SSelectionSetUserEntity& selection)
-    {
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr) {
-        selection.mSize = 0u;
-        selection.mSizeMirrorOrUnused = 0u;
-        return;
-      }
-
-      SSelectionNodeUserEntity* cursor = head->mLeft;
-      (void)selection.EraseRange(&cursor, head->mLeft, head);
-      selection.mSizeMirrorOrUnused = selection.mSize;
-    }
-
-    void BuildSelectionSyncMask(const SSelectionSetUserEntity& selection, SSyncFilterMaskBlock& outMask)
+    void BuildSelectionSyncMask(const WeakSet<UserEntity>& selection, SSyncFilterMaskBlock& outMask)
     {
       BVIntSet selectionIds{};
-      const SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head != nullptr) {
-        for (const SSelectionNodeUserEntity* node = head->mLeft; node && node != head; node = NextTreeNode(node)) {
-          UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
-          if (entity == nullptr || entity->IsUserUnit() == nullptr) {
-            continue;
-          }
+      for (UserEntity* const entity : selection) {
+        if (entity->IsUserUnit() != nullptr) {
           (void)selectionIds.Add(static_cast<unsigned int>(entity->mParams.mEntityId));
         }
       }
 
       outMask = selectionIds;
-    }
-
-    [[nodiscard]] bool IsSelectionNil(const SSelectionNodeUserEntity* const node)
-    {
-      return node == nullptr || node->mIsSentinel != 0u;
-    }
-
-    /**
-     * Address: 0x007B3D00 (FUN_007B3D00, sub_7B3D00)
-     *
-     * What it does:
-     * Leftmost-descent half of `EraseSelectionNodeAndAdvance`'s two-child
-     * splice case (`spliceTarget = SelectionMin(node->mRight, head)`):
-     * walks `_Left` while `!_Isnil` (`_Isnil` confirmed at node+0x19 from the
-     * `.asm`, matching `SSelectionNodeUserEntity::mIsSentinel`). IDA typed
-     * the tree `std::map_uint_WeakPtr_UserEntity` here, but it is the same
-     * `WeakEntitySetUserEntity` node this file already models -- the
-     * `_Isnil` offset and the sole caller (`FUN_007B30D0`, this file's
-     * `EraseSelectionNodeAndAdvance`) both confirm it. No separate loop
-     * body needed; the shape is byte-for-byte this member's own.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity*
-    SelectionMin(SSelectionNodeUserEntity* node, SSelectionNodeUserEntity* const head)
-    {
-      while (!IsSelectionNil(node) && !IsSelectionNil(node->mLeft)) {
-        node = node->mLeft;
-      }
-      return IsSelectionNil(node) ? head : node;
-    }
-
-    /**
-     * Address: 0x0066AC70 (FUN_0066AC70, Moho::WeakSet_UserEntity::next's
-     * rightmost-descent step -- called from `FUN_0066A550`, this file's
-     * `EraseSelectionNodeAndAdvance` emission for the `mSelection`
-     * call-site instantiation)
-     * Address: 0x007B3CE0 (FUN_007B3CE0, sub_7B3CE0 -- the sibling
-     * emission reached from `FUN_007B30D0`, the other
-     * `EraseSelectionNodeAndAdvance` call-site instantiation)
-     *
-     * What it does:
-     * Rightmost-descent half of the same erase (`SelectionMax`): walks
-     * `_Right` (node+0x08) while `!_Isnil` (node+0x19). Both addresses are
-     * the same `SelectionMax` algorithm compiled once per call site of
-     * `EraseSelectionNodeAndAdvance` (`CWldSession::mSelection` and the
-     * `CFormation::mParticipants`/other weak-set callers hoisted onto this
-     * shared function); confirmed against the `.asm` (`cmp byte ptr
-     * [ecx+19h], 0` in both).
-     */
-    [[nodiscard]] SSelectionNodeUserEntity*
-    SelectionMax(SSelectionNodeUserEntity* node, SSelectionNodeUserEntity* const head)
-    {
-      while (!IsSelectionNil(node) && !IsSelectionNil(node->mRight)) {
-        node = node->mRight;
-      }
-      return IsSelectionNil(node) ? head : node;
-    }
-
-    void RecomputeSelectionExtrema(WeakEntitySetUserEntity& selection)
-    {
-      if (selection.mHead == nullptr) {
-        return;
-      }
-
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      SSelectionNodeUserEntity* const root = head->mParent;
-      if (IsSelectionNil(root)) {
-        head->mParent = head;
-        head->mLeft = head;
-        head->mRight = head;
-        return;
-      }
-
-      head->mLeft = SelectionMin(root, head);
-      head->mRight = SelectionMax(root, head);
-    }
-
-    void ReplaceSelectionSubtree(
-      WeakEntitySetUserEntity& selection,
-      SSelectionNodeUserEntity* const oldNode,
-      SSelectionNodeUserEntity* const newNode
-    )
-    {
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      if (oldNode->mParent == head) {
-        head->mParent = newNode;
-      } else if (oldNode == oldNode->mParent->mLeft) {
-        oldNode->mParent->mLeft = newNode;
-      } else {
-        oldNode->mParent->mRight = newNode;
-      }
-
-      if (!IsSelectionNil(newNode)) {
-        newNode->mParent = oldNode->mParent;
-      }
-    }
-
-    void RotateSelectionLeft(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node)
-    {
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      SSelectionNodeUserEntity* const pivot = node->mRight;
-      node->mRight = pivot->mLeft;
-      if (!IsSelectionNil(pivot->mLeft)) {
-        pivot->mLeft->mParent = node;
-      }
-
-      pivot->mParent = node->mParent;
-      if (node->mParent == head) {
-        head->mParent = pivot;
-      } else if (node == node->mParent->mLeft) {
-        node->mParent->mLeft = pivot;
-      } else {
-        node->mParent->mRight = pivot;
-      }
-
-      pivot->mLeft = node;
-      node->mParent = pivot;
-    }
-
-    void RotateSelectionRight(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node)
-    {
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      SSelectionNodeUserEntity* const pivot = node->mLeft;
-      node->mLeft = pivot->mRight;
-      if (!IsSelectionNil(pivot->mRight)) {
-        pivot->mRight->mParent = node;
-      }
-
-      pivot->mParent = node->mParent;
-      if (node->mParent == head) {
-        head->mParent = pivot;
-      } else if (node == node->mParent->mRight) {
-        node->mParent->mRight = pivot;
-      } else {
-        node->mParent->mLeft = pivot;
-      }
-
-      pivot->mRight = node;
-      node->mParent = pivot;
-    }
-
-    [[nodiscard]] std::uint32_t SelectionKeyFromEntity(const UserEntity* const entity) noexcept
-    {
-      return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entity));
-    }
-
-    /**
-     * Address: 0x007FDFE0 (FUN_007FDFE0, std::map<unsigned int,WeakPtr<UserEntity>>::find
-     * — lower-bound descent by uint key, matching this function's direct
-     * equality-during-descent shape to the same effect. Emitted via
-     * FindSelectionNodeByKey's real callers: FindSelectionNodeByEntityGuarded
-     * (0x00867780, above) and this file's other selection-lookup sites.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity*
-    FindSelectionNodeByKey(const WeakEntitySetUserEntity& selection, const std::uint32_t key)
-    {
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr) {
-        return nullptr;
-      }
-
-      SSelectionNodeUserEntity* node = head->mParent;
-      while (!IsSelectionNil(node)) {
-        if (key < node->mKey) {
-          node = node->mLeft;
-        } else if (node->mKey < key) {
-          node = node->mRight;
-        } else {
-          return node;
-        }
-      }
-
-      return head;
-    }
-
-    /**
-     * Address: 0x007AE140 (FUN_007AE140)
-     *
-     * What it does:
-     * Initializes one selection weak-owner lane and links it into
-     * `entity->mIUnitChainHead`.
-     */
-    void LinkSelectionWeakOwnerRef(UserEntity* const entity, SSelectionWeakRefUserEntity& weakRef)
-    {
-      weakRef.mOwnerLinkSlot = nullptr;
-      weakRef.mNextOwner = nullptr;
-      if (entity == nullptr) {
-        return;
-      }
-
-      auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
-      weakRef.mOwnerLinkSlot = ownerLinkSlot;
-      weakRef.mNextOwner = *ownerLinkSlot;
-      *ownerLinkSlot = &weakRef;
-    }
-
-    class ScopedSelectionOwnerLinkGuard
-    {
-    public:
-      explicit ScopedSelectionOwnerLinkGuard(UserEntity* const entity) noexcept
-      {
-        mOwnerLinkSlot = entity ? reinterpret_cast<SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead) : nullptr;
-        if (!mOwnerLinkSlot) {
-          return;
-        }
-
-        mPrev = *mOwnerLinkSlot;
-        *mOwnerLinkSlot = MarkerNode();
-      }
-
-      ~ScopedSelectionOwnerLinkGuard()
-      {
-        Restore();
-      }
-
-      ScopedSelectionOwnerLinkGuard(const ScopedSelectionOwnerLinkGuard&) = delete;
-      ScopedSelectionOwnerLinkGuard& operator=(const ScopedSelectionOwnerLinkGuard&) = delete;
-
-    private:
-      [[nodiscard]] SSelectionWeakRefUserEntity* MarkerNode() noexcept
-      {
-        return reinterpret_cast<SSelectionWeakRefUserEntity*>(&mOwnerLinkSlot);
-      }
-
-      void Restore() noexcept
-      {
-        if (!mOwnerLinkSlot) {
-          return;
-        }
-
-        auto** cursor = mOwnerLinkSlot;
-        const SSelectionWeakRefUserEntity* const marker = MarkerNode();
-        while (*cursor != marker) {
-          cursor = &((*cursor)->mNextOwner);
-        }
-
-        *cursor = mPrev;
-        mOwnerLinkSlot = nullptr;
-        mPrev = nullptr;
-      }
-
-    private:
-      SSelectionWeakRefUserEntity** mOwnerLinkSlot = nullptr;
-      SSelectionWeakRefUserEntity* mPrev = nullptr;
-    };
-
-    /**
-     * Address: 0x007B09E0 (FUN_007B09E0, sub_7B09E0)
-     *
-     * What it does:
-     * Initializes one freshly allocated selection node with head/parent links,
-     * copies key + owner-link lane from `sourceNode`, relinks that owner chain,
-     * and writes color/sentinel flags.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity* InitializeSelectionCloneNodeFromSource(
-      SSelectionNodeUserEntity* const destinationNode,
-      SSelectionNodeUserEntity* const headNode,
-      const SSelectionNodeUserEntity* const sourceNode,
-      SSelectionNodeUserEntity* const parentNode,
-      const std::uint8_t color
-    ) noexcept
-    {
-      destinationNode->mLeft = headNode;
-      destinationNode->mParent = parentNode;
-      destinationNode->mRight = headNode;
-      destinationNode->mKey = sourceNode->mKey;
-
-      auto** const ownerHead =
-        reinterpret_cast<SSelectionWeakRefUserEntity**>(sourceNode->mEnt.mOwnerLinkSlot);
-      destinationNode->mEnt.mOwnerLinkSlot = sourceNode->mEnt.mOwnerLinkSlot;
-      if (ownerHead != nullptr) {
-        destinationNode->mEnt.mNextOwner = *ownerHead;
-        *ownerHead = &destinationNode->mEnt;
-      } else {
-        destinationNode->mEnt.mNextOwner = nullptr;
-      }
-
-      destinationNode->mColor = color;
-      destinationNode->mIsSentinel = 0u;
-      return destinationNode;
-    }
-
-    /**
-     * Address: 0x007B06F0 (FUN_007B06F0, sub_7B06F0)
-     *
-     * What it does:
-     * Allocates one selection node and initializes it from one source node
-     * via `InitializeSelectionCloneNodeFromSource(...)`.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity* AllocateSelectionCloneNodeFromSource(
-      SSelectionNodeUserEntity* const headNode,
-      SSelectionNodeUserEntity* const parentNode,
-      const SSelectionNodeUserEntity* const sourceNode,
-      const std::uint8_t color
-    )
-    {
-      auto* const destinationNode =
-        static_cast<SSelectionNodeUserEntity*>(::operator new(sizeof(SSelectionNodeUserEntity), std::nothrow));
-      if (destinationNode != nullptr) {
-        (void)InitializeSelectionCloneNodeFromSource(destinationNode, headNode, sourceNode, parentNode, color);
-      }
-      return destinationNode;
-    }
-
-    /**
-     * Address: 0x00867EE0 (FUN_00867EE0, sub_867EE0)
-     *
-     * What it does:
-     * Recursively clones one source selection subtree under `parentNode`,
-     * preserving key/color and owner-link chain semantics.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity* CloneSelectionSubtreeIntoSet(
-      SSelectionSetUserEntity* const destinationSet,
-      const SSelectionNodeUserEntity* const sourceNode,
-      SSelectionNodeUserEntity* const parentNode
-    )
-    {
-      SSelectionNodeUserEntity* const headNode = destinationSet->mHead;
-      if (sourceNode == nullptr || sourceNode->mIsSentinel != 0u) {
-        return headNode;
-      }
-
-      SSelectionNodeUserEntity* const clonedNode = AllocateSelectionCloneNodeFromSource(
-        headNode,
-        parentNode,
-        sourceNode,
-        sourceNode->mColor
-      );
-      if (clonedNode == nullptr) {
-        return headNode;
-      }
-
-      clonedNode->mLeft = CloneSelectionSubtreeIntoSet(destinationSet, sourceNode->mLeft, clonedNode);
-      clonedNode->mRight = CloneSelectionSubtreeIntoSet(destinationSet, sourceNode->mRight, clonedNode);
-      return clonedNode;
-    }
-
-    /**
-     * Address: 0x00867B20 (FUN_00867B20, sub_867B20)
-     *
-     * What it does:
-     * Rebuilds one destination selection set from one source set by cloning
-     * the source root subtree and then recomputing left/right extrema lanes.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity* CloneSelectionTreeFromStorage(
-      SSelectionSetUserEntity* const destinationSet,
-      const SSelectionSetUserEntity* const sourceSet
-    )
-    {
-      SSelectionNodeUserEntity* const destinationHead = destinationSet->mHead;
-      destinationHead->mParent =
-        CloneSelectionSubtreeIntoSet(destinationSet, sourceSet->mHead->mParent, destinationHead);
-      destinationSet->mSize = sourceSet->mSize;
-
-      SSelectionNodeUserEntity* result = destinationHead->mParent;
-      if (result->mIsSentinel != 0u) {
-        destinationHead->mLeft = destinationHead;
-        destinationHead->mRight = destinationHead;
-        return result;
-      }
-
-      SSelectionNodeUserEntity* leftMost = result;
-      while (leftMost->mLeft->mIsSentinel == 0u) {
-        leftMost = leftMost->mLeft;
-      }
-      destinationHead->mLeft = leftMost;
-
-      SSelectionNodeUserEntity* rightMostParent = destinationHead->mParent;
-      result = rightMostParent->mRight;
-      while (result->mIsSentinel == 0u) {
-        rightMostParent = result;
-        result = result->mRight;
-      }
-      destinationHead->mRight = rightMostParent;
-      return result;
-    }
-
-    /**
-     * Address: 0x00867780 (FUN_00867780, sub_867780)
-     *
-     * What it does:
-     * Resolves one weak-set tree node for `entity` using the transient
-     * owner-link guard lane, then writes one `{set,node}` cursor pair.
-     *
-     * Takes the bare 12-byte `WeakSet<UserEntity>` header: the body reads only
-     * `mHead`, and `CWldSession::RemoveFromVizUpdate` (0x00894243) hands it
-     * the bare visibility set at `session+0x438`.
-     */
-    [[nodiscard]] WeakEntitySetUserEntity::FindResult* FindSelectionNodeByEntityGuarded(
-      WeakEntitySetUserEntity::FindResult* const outResult,
-      WeakEntitySetUserEntity* const set,
-      UserEntity* const entity
-    )
-    {
-      if (outResult == nullptr) {
-        return nullptr;
-      }
-
-      outResult->mSet = set;
-      outResult->mRes = (set != nullptr) ? set->mHead : nullptr;
-      if (set == nullptr) {
-        return outResult;
-      }
-
-      ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-      outResult->mRes = FindSelectionNodeByKey(*set, SelectionKeyFromEntity(entity));
-      return outResult;
-    }
-
-    void FixupAfterSelectionInsert(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* node)
-    {
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      while (node != head->mParent && node->mParent->mColor == 0u) {
-        SSelectionNodeUserEntity* const parent = node->mParent;
-        SSelectionNodeUserEntity* const grand = parent->mParent;
-        if (parent == grand->mLeft) {
-          SSelectionNodeUserEntity* const uncle = grand->mRight;
-          if (uncle->mColor == 0u) {
-            parent->mColor = 1u;
-            uncle->mColor = 1u;
-            grand->mColor = 0u;
-            node = grand;
-          } else {
-            if (node == parent->mRight) {
-              node = parent;
-              RotateSelectionLeft(selection, node);
-            }
-            node->mParent->mColor = 1u;
-            grand->mColor = 0u;
-            RotateSelectionRight(selection, grand);
-          }
-        } else {
-          SSelectionNodeUserEntity* const uncle = grand->mLeft;
-          if (uncle->mColor == 0u) {
-            parent->mColor = 1u;
-            uncle->mColor = 1u;
-            grand->mColor = 0u;
-            node = grand;
-          } else {
-            if (node == parent->mLeft) {
-              node = parent;
-              RotateSelectionRight(selection, node);
-            }
-            node->mParent->mColor = 1u;
-            grand->mColor = 0u;
-            RotateSelectionLeft(selection, grand);
-          }
-        }
-      }
-
-      head->mParent->mColor = 1u;
-    }
-
-    /**
-     * Takes the bare 12-byte header (not `SSelectionSetUserEntity&`): the body
-     * below only ever touches `selection.mHead`/`selection.mSize` plus the
-     * already base-typed `FixupAfterSelectionInsert`/`RecomputeSelectionExtrema`,
-     * never the derived `mSizeMirrorOrUnused` lane, so it is one more entry in
-     * the same "declared on the bare header" family as `EraseRange`/`find`/
-     * `Iterator_inc`/`RecomputeSelectionExtrema` above. Widened (originally
-     * `SSelectionSetUserEntity&`) so `WeakEntitySetUserEntity::Add` can reuse it
-     * for the bare-header vector-of-sets growth lane (see WeakEntitySet.h).
-     */
-    [[nodiscard]] bool InsertSelectionEntity(
-      WeakEntitySetUserEntity& selection,
-      UserEntity* const entity,
-      SSelectionNodeUserEntity** const outNode = nullptr
-    )
-    {
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr || entity == nullptr) {
-        if (outNode != nullptr) {
-          *outNode = head;
-        }
-        return false;
-      }
-
-      const std::uint32_t key = SelectionKeyFromEntity(entity);
-      SSelectionNodeUserEntity* parent = head;
-      SSelectionNodeUserEntity* probe = head->mParent;
-      while (!IsSelectionNil(probe)) {
-        parent = probe;
-        if (key < probe->mKey) {
-          probe = probe->mLeft;
-        } else if (probe->mKey < key) {
-          probe = probe->mRight;
-        } else {
-          if (outNode != nullptr) {
-            *outNode = probe;
-          }
-          return false;
-        }
-      }
-
-      auto* const inserted = static_cast<SSelectionNodeUserEntity*>(::operator new(sizeof(SSelectionNodeUserEntity)));
-      inserted->mLeft = head;
-      inserted->mRight = head;
-      inserted->mParent = parent;
-      inserted->mKey = key;
-      inserted->mColor = 0u;
-      inserted->mIsSentinel = 0u;
-      inserted->pad_1A[0] = 0u;
-      inserted->pad_1A[1] = 0u;
-      LinkSelectionWeakOwnerRef(entity, inserted->mEnt);
-
-      if (parent == head) {
-        head->mParent = inserted;
-      } else if (key < parent->mKey) {
-        parent->mLeft = inserted;
-      } else {
-        parent->mRight = inserted;
-      }
-
-      ++selection.mSize;
-      FixupAfterSelectionInsert(selection, inserted);
-      RecomputeSelectionExtrema(selection);
-      if (outNode != nullptr) {
-        *outNode = inserted;
-      }
-      return true;
-    }
-
-    struct SelectionInsertFindResult
-    {
-      SSelectionNodeUserEntity* node;
-      bool inserted;
-    };
-
-    /**
-     * Address: 0x007B25C0 (FUN_007B25C0)
-     *
-     * What it does:
-     * Initializes one weak-set storage header with a fresh sentinel node and
-     * resets its live-node count to zero.
-     */
-    [[nodiscard]] SSelectionSetUserEntity* InitializeSelectionSetHeadStorage(
-      SSelectionSetUserEntity* const set
-    )
-    {
-      SSelectionNodeUserEntity* const head = AllocateWeakEntitySetHead();
-      set->mHead = head;
-      head->mIsSentinel = 1u;
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      set->mSize = 0u;
-      return set;
-    }
-
-    /**
-     * Address: 0x007B25F0 (FUN_007B25F0)
-     *
-     * What it does:
-     * Starts at the set head's left-most node, prunes tombstones, and writes
-     * one `{set,node}` result pair for weak-set iteration callers.
-     */
-    [[nodiscard]] WeakEntitySetUserEntity::FindResult* BuildSelectionFindResultFromHeadLeft(
-      WeakEntitySetUserEntity* const set,
-      WeakEntitySetUserEntity::FindResult* const outResult
-    )
-    {
-      SSelectionNodeUserEntity* node = set->mHead->mLeft;
-      (void)PruneTombstonesAndFindLive(*set, &node, node);
-      outResult->mSet = set;
-      outResult->mRes = node;
-      return outResult;
-    }
-
-    /**
-     * Address: 0x008484E0 (FUN_008484E0)
-     *
-     * What it does:
-     * Advances one weak-set cursor by one RB-tree successor and writes the next
-     * live-node `{set,node}` result pair after tombstone filtering.
-     */
-    [[nodiscard]] SSelectionSetUserEntity::FindResult* BuildSelectionFindResultFromNextCursor(
-      SSelectionSetUserEntity* const set,
-      const SSelectionSetUserEntity::FindResult* const cursor,
-      SSelectionSetUserEntity::FindResult* const outResult
-    )
-    {
-      if (outResult == nullptr) {
-        return nullptr;
-      }
-
-      SSelectionNodeUserEntity* node = (cursor != nullptr) ? cursor->mRes : nullptr;
-      if (set != nullptr && node != nullptr) {
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(set, node, &node);
-      }
-
-      outResult->mSet = set;
-      outResult->mRes = node;
-      return outResult;
-    }
-
-    /**
-     * Address: 0x00822A50 (FUN_00822A50, sub_822A50)
-     *
-     * What it does:
-     * Decrements one weak-set RB-tree iterator cursor to its predecessor.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity*
-    DecrementSelectionCursor(SSelectionSetUserEntity* const set, SSelectionNodeUserEntity* const cursor)
-    {
-      if (set == nullptr || set->mHead == nullptr || cursor == nullptr) {
-        return nullptr;
-      }
-
-      SSelectionNodeUserEntity* const head = set->mHead;
-      if (cursor == head) {
-        return head->mRight;
-      }
-
-      if (!IsSelectionNil(cursor->mLeft)) {
-        return SelectionMax(cursor->mLeft, head);
-      }
-
-      SSelectionNodeUserEntity* node = cursor;
-      SSelectionNodeUserEntity* parent = node->mParent;
-      while (parent != nullptr && parent != head && node == parent->mLeft) {
-        node = parent;
-        parent = parent->mParent;
-      }
-
-      return (parent != nullptr) ? parent : head;
-    }
-
-    /**
-     * Address: 0x00822AB0 (FUN_00822AB0, sub_822AB0)
-     *
-     * What it does:
-     * Initializes one selection-tree node payload from one entity key and links
-     * the embedded weak-owner lane into the entity intrusive chain.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity* InitSelectionNodeValueAndWeakLink(
-      SSelectionNodeUserEntity* const node,
-      WeakEntitySetUserEntity* const set,
-      UserEntity* const entity
-    )
-    {
-      if (node == nullptr || set == nullptr || set->mHead == nullptr) {
-        return nullptr;
-      }
-
-      SSelectionNodeUserEntity* const head = set->mHead;
-      node->mLeft = head;
-      node->mRight = head;
-      node->mParent = head;
-      node->mKey = SelectionKeyFromEntity(entity);
-      node->mColor = 0u;
-      node->mIsSentinel = 0u;
-      node->pad_1A[0] = 0u;
-      node->pad_1A[1] = 0u;
-      LinkSelectionWeakOwnerRef(entity, node->mEnt);
-      return node;
-    }
-
-    /**
-     * Address: 0x008229E0 (FUN_008229E0, sub_8229E0)
-     *
-     * What it does:
-     * Allocates one selection-tree node and initializes it for one entity key.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity*
-    AllocateAndInitSelectionNode(WeakEntitySetUserEntity* const set, UserEntity* const entity)
-    {
-      if (set == nullptr || set->mHead == nullptr) {
-        return nullptr;
-      }
-
-      auto* const node = static_cast<SSelectionNodeUserEntity*>(::operator new(sizeof(SSelectionNodeUserEntity)));
-      return InitSelectionNodeValueAndWeakLink(node, set, entity);
-    }
-
-    /**
-     * Address: 0x00822670 (FUN_00822670, sub_822670)
-     *
-     * What it does:
-     * Inserts one entity key into the selection weak-set RB-tree and returns
-     * `{node,inserted}`.
-     */
-    [[nodiscard]] SelectionInsertFindResult* InsertSelectionNodeAndRebalance(
-      SelectionInsertFindResult* const outResult,
-      WeakEntitySetUserEntity* const set,
-      UserEntity* const entity
-    )
-    {
-      outResult->node = (set != nullptr) ? set->mHead : nullptr;
-      outResult->inserted = false;
-
-      if (set == nullptr || set->mHead == nullptr) {
-        return outResult;
-      }
-
-      if (set->mSize >= 0x15555554u) {
-        throw std::length_error("map/set<T> too long");
-      }
-
-      SSelectionNodeUserEntity* const head = set->mHead;
-      const std::uint32_t key = SelectionKeyFromEntity(entity);
-      SSelectionNodeUserEntity* parent = head;
-      SSelectionNodeUserEntity* probe = head->mParent;
-      while (!IsSelectionNil(probe)) {
-        parent = probe;
-        if (key < probe->mKey) {
-          probe = probe->mLeft;
-        } else if (probe->mKey < key) {
-          probe = probe->mRight;
-        } else {
-          outResult->node = probe;
-          return outResult;
-        }
-      }
-
-      SSelectionNodeUserEntity* const inserted = AllocateAndInitSelectionNode(set, entity);
-      inserted->mParent = parent;
-      if (parent == head) {
-        head->mParent = inserted;
-      } else if (key < parent->mKey) {
-        parent->mLeft = inserted;
-      } else {
-        parent->mRight = inserted;
-      }
-
-      ++set->mSize;
-      FixupAfterSelectionInsert(*set, inserted);
-      RecomputeSelectionExtrema(*set);
-      outResult->node = inserted;
-      outResult->inserted = true;
-      return outResult;
-    }
-
-    /**
-     * Address: 0x00822420 (FUN_00822420, sub_822420)
-     *
-     * What it does:
-     * Performs one find-or-insert operation for the selection weak-set key lane
-     * and returns `{node,inserted}`.
-     *
-     * Takes the bare 12-byte header so both weak-set instantiations share it:
-     * the binary reads only the head at `[set+4]` (0x0082242A) and the live
-     * count at `[set+8]` (0x00822688), never the extra `+0x0C` selection lane,
-     * and this body is the one `WeakSet<UserUnit>::Add` (0x00822270) calls
-     * directly at 0x008222D2.
-     */
-    [[nodiscard]] SelectionInsertFindResult* FindOrInsertSelectionNodeByUserEntity(
-      SelectionInsertFindResult* const outResult,
-      WeakEntitySetUserEntity* const set,
-      UserEntity* const entity
-    )
-    {
-      outResult->node = (set != nullptr) ? set->mHead : nullptr;
-      outResult->inserted = false;
-
-      if (set == nullptr || set->mHead == nullptr) {
-        return outResult;
-      }
-
-      SSelectionNodeUserEntity* const found = FindSelectionNodeByKey(*set, SelectionKeyFromEntity(entity));
-      if (found != nullptr && found != set->mHead) {
-        outResult->node = found;
-        return outResult;
-      }
-
-      return InsertSelectionNodeAndRebalance(outResult, set, entity);
-    }
-
-    [[nodiscard]] std::uint32_t SelectionKeyFromEntityPointerLane(const UserEntity* const* const entityLane) noexcept
-    {
-      return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entityLane != nullptr ? *entityLane : nullptr));
-    }
-
-    /**
-     * Address: 0x008B3130 (FUN_008B3130)
-     * Address: 0x00867E90 (FUN_00867E90)
-     *
-     * What it does:
-     * Standard VC8 `_Tree::equal_range`: one descent tracking the last node
-     * whose key compares greater than `key` (the upper bound) and a second
-     * tracking the last node whose key does not compare less (the lower bound),
-     * both starting from `mHead->mParent` and stopping at the nil sentinel.
-     *
-     * The two addresses are the same 34-instruction body emitted twice -- same
-     * mnemonics, same 80 bytes, same field offsets (`mKey` at +0x0C, the nil
-     * flag at +0x19) -- once per copy of the erase-by-key lane above.
-     */
-    void ResolveSelectionEqualRangeByKey(
-      WeakEntitySetUserEntity* const set,
-      const std::uint32_t key,
-      SSelectionNodeUserEntity*& outLowerBound,
-      SSelectionNodeUserEntity*& outUpperBound
-    ) noexcept
-    {
-      if (set == nullptr || set->mHead == nullptr) {
-        outLowerBound = nullptr;
-        outUpperBound = nullptr;
-        return;
-      }
-
-      SSelectionNodeUserEntity* upperBound = set->mHead;
-      SSelectionNodeUserEntity* probe = upperBound->mParent;
-      while (!IsSelectionNil(probe)) {
-        if (key >= probe->mKey) {
-          probe = probe->mRight;
-        } else {
-          upperBound = probe;
-          probe = probe->mLeft;
-        }
-      }
-
-      SSelectionNodeUserEntity* lowerBound = set->mHead;
-      probe = lowerBound->mParent;
-      while (!IsSelectionNil(probe)) {
-        if (probe->mKey >= key) {
-          lowerBound = probe;
-          probe = probe->mLeft;
-        } else {
-          probe = probe->mRight;
-        }
-      }
-
-      outLowerBound = lowerBound;
-      outUpperBound = upperBound;
-    }
-
-    [[nodiscard]] SSelectionNodeUserEntity** InsertSelectionNodeUsingHint(
-      SSelectionNodeUserEntity* const parentHint,
-      SSelectionSetUserEntity* const set,
-      SSelectionNodeUserEntity** const outNode,
-      const bool insertLeft,
-      UserEntity* const entity
-    )
-    {
-      if (outNode == nullptr) {
-        return nullptr;
-      }
-
-      *outNode = (set != nullptr) ? set->mHead : nullptr;
-      if (set == nullptr || set->mHead == nullptr || parentHint == nullptr) {
-        return outNode;
-      }
-
-      if (set->mSize >= 0x15555554u) {
-        throw std::length_error("map/set<T> too long");
-      }
-
-      SSelectionNodeUserEntity* const inserted = AllocateAndInitSelectionNode(set, entity);
-      inserted->mParent = parentHint;
-      ++set->mSize;
-
-      SSelectionNodeUserEntity* const head = set->mHead;
-      if (parentHint == head) {
-        head->mParent = inserted;
-        head->mLeft = inserted;
-        head->mRight = inserted;
-      } else if (insertLeft) {
-        parentHint->mLeft = inserted;
-        if (parentHint == head->mLeft) {
-          head->mLeft = inserted;
-        }
-      } else {
-        parentHint->mRight = inserted;
-        if (parentHint == head->mRight) {
-          head->mRight = inserted;
-        }
-      }
-
-      FixupAfterSelectionInsert(*set, inserted);
-      RecomputeSelectionExtrema(*set);
-      *outNode = inserted;
-      return outNode;
-    }
-
-    [[nodiscard]] std::int32_t EraseSelectionKeyRangeAndCount(
-      const UserEntity* const* entityLane,
-      WeakEntitySetUserEntity* set
-    );
-
-    [[nodiscard]] SSelectionNodeUserEntity** FindOrInsertSelectionNodeWithHint(
-      SSelectionSetUserEntity* set,
-      UserEntity* const* entityLane,
-      SSelectionNodeUserEntity** outNode,
-      SSelectionNodeUserEntity* hintNode
-    );
-
-    /**
-     * Address: 0x008B2E70 (FUN_008B2E70, sub_8B2E70)
-     * Address: 0x00867AC0 (FUN_00867AC0, sub_867AC0)
-     *
-     * What it does:
-     * VC8's `_Tree::erase(const key_type&)`: resolve the equal-key range,
-     * count it by walking the iterator, erase the whole range, return the
-     * count. The key arrives by address because the binary passes it as a
-     * `const key_type&`, and the key type here is the `UserEntity*` itself.
-     *
-     * Emitted twice. At 0x00867AC0 the set arrives in `eax` and the key lane
-     * in `ebx`, and the caller at 0x008676E0 keeps that return value as its
-     * own -- it never reassigns `eax` after the call.
-     */
-    [[nodiscard]] std::int32_t EraseSelectionKeyRangeAndCount(
-      const UserEntity* const* const entityLane,
-      WeakEntitySetUserEntity* const set
-    )
-    {
-      SSelectionNodeUserEntity* first = nullptr;
-      SSelectionNodeUserEntity* last = nullptr;
-      ResolveSelectionEqualRangeByKey(set, SelectionKeyFromEntityPointerLane(entityLane), first, last);
-
-      std::int32_t erasedCount = 0;
-      SSelectionNodeUserEntity* cursor = first;
-      while (cursor != last) {
-        ++erasedCount;
-        SSelectionSetUserEntity::Iterator_inc(&cursor);
-      }
-
-      if (set != nullptr) {
-        SSelectionNodeUserEntity* eraseCursor = first;
-        (void)set->EraseRange(&eraseCursor, first, last);
-      }
-      return erasedCount;
-    }
-
-    /**
-     * Address: 0x008B4D00 (FUN_008B4D00, sub_8B4D00)
-     *
-     * What it does:
-     * Guards one entity weak-owner intrusive lane, resolves one hint-aware
-     * selection node for that entity key, and writes `{set,node}` output.
-     */
-    [[nodiscard]] SSelectionSetUserEntity::FindResult* FindSelectionNodeWithHintGuardedByOwnerLink(
-      SSelectionSetUserEntity::FindResult* const outResult,
-      SSelectionSetUserEntity* const set,
-      const SSelectionSetUserEntity::FindResult* const hintCursor,
-      UserEntity* const entity
-    )
-    {
-      if (outResult == nullptr) {
-        return nullptr;
-      }
-
-      ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-      UserEntity* entityKey = entity;
-      SSelectionNodeUserEntity* const hintNode = (hintCursor != nullptr) ? hintCursor->mRes : nullptr;
-      (void)FindOrInsertSelectionNodeWithHint(set, &entityKey, &outResult->mRes, hintNode);
-      outResult->mSet = set;
-      return outResult;
-    }
-
-    /**
-     * Address: 0x008B4F50 (FUN_008B4F50, sub_8B4F50)
-     *
-     * What it does:
-     * Performs one hint-aware find/insert operation in the selection weak-set:
-     * when hint ordering proves a legal insertion side it inserts directly,
-     * otherwise it falls back to canonical find-or-insert.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity** FindOrInsertSelectionNodeWithHint(
-      SSelectionSetUserEntity* const set,
-      UserEntity* const* const entityLane,
-      SSelectionNodeUserEntity** const outNode,
-      SSelectionNodeUserEntity* hintNode
-    )
-    {
-      if (outNode == nullptr) {
-        return nullptr;
-      }
-
-      if (set == nullptr || set->mHead == nullptr || entityLane == nullptr) {
-        *outNode = (set != nullptr) ? set->mHead : nullptr;
-        return outNode;
-      }
-
-      SSelectionNodeUserEntity* const head = set->mHead;
-      if (hintNode == nullptr) {
-        hintNode = head;
-      }
-
-      const std::uint32_t key = SelectionKeyFromEntityPointerLane(entityLane);
-      UserEntity* const entity = const_cast<UserEntity*>(*entityLane);
-
-      if (set->mSize == 0u) {
-        return InsertSelectionNodeUsingHint(head, set, outNode, true, entity);
-      }
-
-      SSelectionNodeUserEntity* const originalHint = hintNode;
-      if (hintNode == head->mLeft) {
-        if (key < hintNode->mKey) {
-          return InsertSelectionNodeUsingHint(originalHint, set, outNode, true, entity);
-        }
-      } else if (hintNode == head) {
-        SSelectionNodeUserEntity* const rightMost = head->mRight;
-        if (rightMost->mKey < key) {
-          return InsertSelectionNodeUsingHint(rightMost, set, outNode, false, entity);
-        }
-      } else if (
-        key >= hintNode->mKey
-        || ((hintNode = DecrementSelectionCursor(set, hintNode)), hintNode != nullptr && hintNode->mKey >= key)
-      ) {
-        SSelectionNodeUserEntity* nextHint = originalHint;
-        SSelectionSetUserEntity::Iterator_inc(&nextHint);
-        const bool keyNotLessThanSuccessor = nextHint != head && key >= nextHint->mKey;
-        if (originalHint->mKey >= key || keyNotLessThanSuccessor) {
-          SelectionInsertFindResult findResult{};
-          *outNode = FindOrInsertSelectionNodeByUserEntity(&findResult, set, entity)->node;
-          return outNode;
-        }
-
-        if (originalHint->mRight->mIsSentinel != 0u) {
-          return InsertSelectionNodeUsingHint(originalHint, set, outNode, false, entity);
-        }
-        return InsertSelectionNodeUsingHint(nextHint, set, outNode, true, entity);
-      } else {
-        if (hintNode->mRight->mIsSentinel == 0u) {
-          return InsertSelectionNodeUsingHint(originalHint, set, outNode, true, entity);
-        }
-        return InsertSelectionNodeUsingHint(hintNode, set, outNode, false, entity);
-      }
-
-      SelectionInsertFindResult findResult{};
-      *outNode = FindOrInsertSelectionNodeByUserEntity(&findResult, set, entity)->node;
-      return outNode;
-    }
-
-    /**
-     * Address: 0x00822C50 (FUN_00822C50, sub_822C50)
-     *
-     * What it does:
-     * Initializes one destination weak-set from one source iterator range by
-     * copying live user-entity keys into a fresh RB-tree head/sentinel shape.
-     */
-    [[nodiscard]] SSelectionSetUserEntity* InitSelectionSetFromIteratorRange(
-      SSelectionSetUserEntity* const destination,
-      SSelectionSetUserEntity* const source,
-      SSelectionNodeUserEntity* first,
-      SSelectionNodeUserEntity* const last
-    )
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-
-      InitializeSelectionSetHeadStorage(destination);
-
-      if (source == nullptr || source->mHead == nullptr) {
-        return destination;
-      }
-
-      while (first != nullptr && first != last) {
-        if (UserEntity* const entity = DecodeSelectedUserEntity(first->mEnt); entity != nullptr) {
-          SSelectionSetUserEntity::AddResult addResult{};
-          (void)SSelectionSetUserEntity::Add(&addResult, destination, entity);
-        }
-
-        SSelectionSetUserEntity::Iterator_inc(&first);
-        first = SSelectionSetUserEntity::find(source, first, &first);
-      }
-
-      return destination;
-    }
-
-    /**
-     * Address: 0x00822210 (FUN_00822210, sub_822210)
-     *
-     * What it does:
-     * Copies one source selection weak-set into one destination weak-set by
-     * starting from the first live source node and cloning the full iterator
-     * range into a fresh destination tree.
-     */
-    [[nodiscard]] SSelectionSetUserEntity* CopySelectionSetFromOther(
-      SSelectionSetUserEntity* const destination,
-      SSelectionSetUserEntity* const source
-    )
-    {
-      if (source == nullptr || source->mHead == nullptr) {
-        return InitSelectionSetFromIteratorRange(destination, source, nullptr, nullptr);
-      }
-
-      SSelectionNodeUserEntity* first = source->mHead->mLeft;
-      first = SSelectionSetUserEntity::find(source, first, &first);
-      return InitSelectionSetFromIteratorRange(destination, source, first, source->mHead);
-    }
-
-    struct SelectionWeakSetStorageRuntimeView
-    {
-      void* mAllocProxy;               // +0x00
-      SSelectionNodeUserEntity* mHead; // +0x04
-      std::uint32_t mSize;             // +0x08
-    };
-
-    static_assert(
-      sizeof(SelectionWeakSetStorageRuntimeView) == 0x0C,
-      "SelectionWeakSetStorageRuntimeView size must be 0x0C"
-    );
-
-    struct SelectionWeakSetStorageVectorRuntimeView
-    {
-      void* mProxy;                                // +0x00
-      SelectionWeakSetStorageRuntimeView* mBegin;  // +0x04
-      SelectionWeakSetStorageRuntimeView* mEnd;    // +0x08
-      SelectionWeakSetStorageRuntimeView* mCapacityEnd; // +0x0C
-    };
-
-    static_assert(
-      sizeof(SelectionWeakSetStorageVectorRuntimeView) == 0x10,
-      "SelectionWeakSetStorageVectorRuntimeView size must be 0x10"
-    );
-
-    /**
-     * Address: 0x00868E50 (FUN_00868E50, sub_868E50)
-     *
-     * What it does:
-     * Releases one weak-set map storage lane by erasing all nodes, deleting
-     * the head sentinel, and zeroing `{head,size}`.
-     */
-    [[nodiscard]] std::int32_t
-    ReleaseSelectionWeakSetStorageCompat(SelectionWeakSetStorageRuntimeView* const storage)
-    {
-      if (storage == nullptr) {
-        return 0;
-      }
-
-      if (storage->mHead != nullptr) {
-        auto* const set = reinterpret_cast<SSelectionSetUserEntity*>(storage);
-        SSelectionNodeUserEntity* cursor = nullptr;
-        (void)set->EraseRange(&cursor, set->mHead->mLeft, set->mHead);
-        ::operator delete(storage->mHead);
-      }
-
-      storage->mHead = nullptr;
-      storage->mSize = 0u;
-      return 0;
-    }
-
-    /**
-     * Address: 0x00868CC0 (FUN_00868CC0, sub_868CC0)
-     *
-     * What it does:
-     * Releases one half-open weak-set storage range by erasing each set and
-     * deleting each per-set tree head sentinel.
-     */
-    void ReleaseSelectionWeakSetStorageRange(
-      SelectionWeakSetStorageRuntimeView* rangeBegin,
-      SelectionWeakSetStorageRuntimeView* const rangeEnd
-    )
-    {
-      while (rangeBegin != rangeEnd) {
-        (void)ReleaseSelectionWeakSetStorageCompat(rangeBegin);
-        ++rangeBegin;
-      }
-    }
-
-    /**
-     * Address: 0x00865720 (FUN_00865720, sub_865720)
-     *
-     * What it does:
-     * Assigns one selection weak-set from another by rebuilding destination
-     * storage from source live entries.
-     */
-    [[nodiscard]] SSelectionSetUserEntity* AssignSelectionSetFromOther(
-      SelectionWeakSetStorageRuntimeView* const sourceStorage,
-      SSelectionSetUserEntity* const destinationSet
-    )
-    {
-      auto* const sourceSet = reinterpret_cast<SSelectionSetUserEntity*>(sourceStorage);
-      if (destinationSet == nullptr || destinationSet == sourceSet) {
-        return destinationSet;
-      }
-
-      if (destinationSet->mHead != nullptr) {
-        SSelectionNodeUserEntity* eraseCursor = nullptr;
-        (void)destinationSet->EraseRange(&eraseCursor, destinationSet->mHead->mLeft, destinationSet->mHead);
-        ::operator delete(destinationSet->mHead);
-      }
-
-      destinationSet->mHead = nullptr;
-      destinationSet->mSize = 0u;
-      destinationSet->mSizeMirrorOrUnused = 0u;
-
-      SSelectionSetUserEntity rebuilt{};
-      (void)CopySelectionSetFromOther(&rebuilt, sourceSet);
-      destinationSet->mHead = rebuilt.mHead;
-      destinationSet->mSize = rebuilt.mSize;
-      destinationSet->mSizeMirrorOrUnused = rebuilt.mSize;
-      return destinationSet;
-    }
-
-    /**
-     * Address: 0x00865750 (FUN_00865750)
-     *
-     * What it does:
-     * Compatibility entrypoint for selection weak-set assignment that rebuilds
-     * one destination set from one source storage lane and returns destination.
-     */
-    [[nodiscard]] SSelectionSetUserEntity* AssignSelectionSetFromStorageLane(
-      SelectionWeakSetStorageRuntimeView* const sourceStorage,
-      SSelectionSetUserEntity* const destinationSet
-    )
-    {
-      return AssignSelectionSetFromOther(sourceStorage, destinationSet);
-    }
-
-    /**
-     * Address: 0x00867800 (FUN_00867800)
-     *
-     * What it does:
-     * Alternate calling-lane entrypoint for selection weak-set assignment from
-     * one source set into one destination set.
-     */
-    [[nodiscard]] SSelectionSetUserEntity* AssignSelectionSetFromSetLane(
-      SSelectionSetUserEntity* const destinationSet,
-      SSelectionSetUserEntity* const sourceSet
-    )
-    {
-      return AssignSelectionSetFromOther(
-        reinterpret_cast<SelectionWeakSetStorageRuntimeView*>(sourceSet),
-        destinationSet
-      );
-    }
-
-    /**
-     * Address: 0x00867840 (FUN_00867840, sub_867840)
-     *
-     * What it does:
-     * Releases vector-backed weak-set storage and resets begin/end/capacity
-     * pointers to the empty state.
-     */
-    void ReleaseSelectionWeakSetStorageVector(
-      SelectionWeakSetStorageVectorRuntimeView* const storage
-    )
-    {
-      if (storage == nullptr) {
-        return;
-      }
-
-      if (storage->mBegin != nullptr) {
-        ReleaseSelectionWeakSetStorageRange(storage->mBegin, storage->mEnd);
-        ::operator delete(storage->mBegin);
-      }
-
-      storage->mBegin = nullptr;
-      storage->mEnd = nullptr;
-      storage->mCapacityEnd = nullptr;
-    }
-
-    /**
-     * Address: 0x00867CD0 (FUN_00867CD0)
-     *
-     * What it does:
-     * Compatibility entrypoint that releases vector-backed weak-set storage and
-     * rewires begin/end/capacity to null.
-     */
-    void ReleaseSelectionWeakSetStorageVectorAndReset(
-      SelectionWeakSetStorageVectorRuntimeView* const storage
-    )
-    {
-      ReleaseSelectionWeakSetStorageVector(storage);
-    }
-
-    /**
-     * Address: 0x00868C80 (FUN_00868C80, sub_868C80)
-     *
-     * What it does:
-     * Copies one half-open weak-set storage range forward, assigning each
-     * destination lane from the corresponding source lane.
-     */
-    [[nodiscard]] SelectionWeakSetStorageRuntimeView* CopySelectionWeakSetStorageRangeForward(
-      SelectionWeakSetStorageRuntimeView* destination,
-      SelectionWeakSetStorageRuntimeView* sourceBegin,
-      SelectionWeakSetStorageRuntimeView* sourceEnd
-    )
-    {
-      SelectionWeakSetStorageRuntimeView* dst = destination;
-      SelectionWeakSetStorageRuntimeView* src = sourceBegin;
-      while (src != sourceEnd) {
-        if (dst != src) {
-          (void)ReleaseSelectionWeakSetStorageCompat(dst);
-          (void)CopySelectionSetFromOther(
-            reinterpret_cast<SSelectionSetUserEntity*>(dst),
-            reinterpret_cast<SSelectionSetUserEntity*>(src)
-          );
-        }
-
-        ++src;
-        ++dst;
-      }
-
-      return dst;
-    }
-
-    /**
-     * Address: 0x00868020 (FUN_00868020, sub_868020)
-     *
-     * What it does:
-     * Compatibility adapter lane that forwards one empty weak-set storage range
-     * into `ReleaseSelectionWeakSetStorageRange(...)` and returns zero status.
-     */
-    [[nodiscard]] std::int32_t ReleaseSelectionWeakSetStorageRangeEmptyAdapter(
-      SelectionWeakSetStorageRuntimeView* const rangeBegin
-    )
-    {
-      ReleaseSelectionWeakSetStorageRange(rangeBegin, rangeBegin);
-      return 0;
-    }
-
-    /**
-     * Address: 0x008688D0 (FUN_008688D0, sub_8688D0)
-     *
-     * What it does:
-     * Compatibility adapter lane that forwards one null-bounds weak-set storage
-     * copy into `CopySelectionWeakSetStorageRangeForward(...)`.
-     */
-    [[nodiscard]] SelectionWeakSetStorageRuntimeView*
-    CopySelectionWeakSetStorageRangeForwardNullSourceAdapter(
-      SelectionWeakSetStorageRuntimeView* const destination
-    )
-    {
-      return CopySelectionWeakSetStorageRangeForward(destination, nullptr, nullptr);
-    }
-
-    /**
-     * Address: 0x00867FC0 (FUN_00867FC0, sub_867FC0)
-     *
-     * What it does:
-     * Erases one half-open weak-set storage range from a vector lane by
-     * shifting the tail forward and releasing trailing stale slots.
-     */
-    [[nodiscard]] SelectionWeakSetStorageRuntimeView**
-    EraseSelectionWeakSetStorageVectorRange(
-      SelectionWeakSetStorageVectorRuntimeView* const storage,
-      SelectionWeakSetStorageRuntimeView** const outIterator,
-      SelectionWeakSetStorageRuntimeView* eraseBegin,
-      SelectionWeakSetStorageRuntimeView* eraseEnd
-    )
-    {
-      SelectionWeakSetStorageRuntimeView* iteratorResult = eraseBegin;
-      if (storage != nullptr && eraseBegin != eraseEnd) {
-        SelectionWeakSetStorageRuntimeView* const previousEnd = storage->mEnd;
-        SelectionWeakSetStorageRuntimeView* const newEnd =
-          CopySelectionWeakSetStorageRangeForward(eraseBegin, eraseEnd, previousEnd);
-        ReleaseSelectionWeakSetStorageRange(newEnd, previousEnd);
-        storage->mEnd = newEnd;
-      }
-
-      if (outIterator != nullptr) {
-        *outIterator = iteratorResult;
-      }
-      return outIterator;
-    }
-
-    /**
-     * Address: 0x00868D30 (FUN_00868D30, sub_868D30)
-     *
-     * What it does:
-     * Fills one destination weak-set storage range with one source value lane.
-     * Returns the last copied destination lane (or `fillValue` when no copy ran).
-     */
-    [[nodiscard]] SelectionWeakSetStorageRuntimeView* FillSelectionWeakSetStorageRange(
-      SelectionWeakSetStorageRuntimeView* destinationBegin,
-      SelectionWeakSetStorageRuntimeView* fillValue,
-      SelectionWeakSetStorageRuntimeView* destinationEnd
-    )
-    {
-      SelectionWeakSetStorageRuntimeView* result = fillValue;
-      for (SelectionWeakSetStorageRuntimeView* dst = destinationBegin; dst != destinationEnd; ++dst) {
-        if (dst == fillValue) {
-          continue;
-        }
-
-        (void)ReleaseSelectionWeakSetStorageCompat(dst);
-        (void)CopySelectionSetFromOther(
-          reinterpret_cast<SSelectionSetUserEntity*>(dst),
-          reinterpret_cast<SSelectionSetUserEntity*>(fillValue)
-        );
-        result = dst;
-      }
-
-      return result;
-    }
-
-    /**
-     * Address: 0x00868EB0 (FUN_00868EB0, sub_868EB0)
-     *
-     * What it does:
-     * Copies one half-open weak-set storage range backward, assigning each
-     * destination lane from the matching source lane in reverse order.
-     */
-    [[nodiscard]] SelectionWeakSetStorageRuntimeView* CopySelectionWeakSetStorageRangeBackward(
-      SelectionWeakSetStorageRuntimeView* destinationEnd,
-      SelectionWeakSetStorageRuntimeView* sourceEnd,
-      SelectionWeakSetStorageRuntimeView* sourceBegin
-    )
-    {
-      SelectionWeakSetStorageRuntimeView* dst = destinationEnd;
-      SelectionWeakSetStorageRuntimeView* src = sourceEnd;
-      while (src != sourceBegin) {
-        --src;
-        --dst;
-
-        if (dst == src) {
-          continue;
-        }
-
-        (void)ReleaseSelectionWeakSetStorageCompat(dst);
-        (void)CopySelectionSetFromOther(
-          reinterpret_cast<SSelectionSetUserEntity*>(dst),
-          reinterpret_cast<SSelectionSetUserEntity*>(src)
-        );
-      }
-
-      return dst;
-    }
-
-    /**
-     * Address: 0x00868900 (FUN_00868900)
-     *
-     * What it does:
-     * Compatibility adapter that forwards one weak-set storage half-open range
-     * into `ReleaseSelectionWeakSetStorageRange(...)`.
-     */
-    void ReleaseSelectionWeakSetStorageRangeAdapter(
-      SelectionWeakSetStorageRuntimeView* const rangeBegin,
-      SelectionWeakSetStorageRuntimeView* const rangeEnd
-    )
-    {
-      ReleaseSelectionWeakSetStorageRange(rangeBegin, rangeEnd);
-    }
-
-    /**
-     * Address: 0x00868950 (FUN_00868950)
-     *
-     * What it does:
-     * Register-shape adapter for `FillSelectionWeakSetStorageRange(...)`.
-     */
-    [[nodiscard]] SelectionWeakSetStorageRuntimeView* FillSelectionWeakSetStorageRangeAdapter(
-      SelectionWeakSetStorageRuntimeView* const destinationBegin,
-      SelectionWeakSetStorageRuntimeView* const fillValue,
-      SelectionWeakSetStorageRuntimeView* const destinationEnd
-    )
-    {
-      return FillSelectionWeakSetStorageRange(destinationBegin, fillValue, destinationEnd);
-    }
-
-    /**
-     * Address: 0x00868D80 (FUN_00868D80)
-     *
-     * What it does:
-     * Compatibility adapter that forwards one legacy lane shape with null
-     * source bounds into `CopySelectionWeakSetStorageRangeBackward(...)`.
-     */
-    [[nodiscard]] SelectionWeakSetStorageRuntimeView*
-    CopySelectionWeakSetStorageRangeBackwardNullSourceAdapter(
-      const SelectionWeakSetStorageRuntimeView* const unusedLaneA,
-      const SelectionWeakSetStorageRuntimeView* const unusedLaneB,
-      SelectionWeakSetStorageRuntimeView* const destinationEnd
-    )
-    {
-      return CopySelectionWeakSetStorageRangeBackward(destinationEnd, nullptr, nullptr);
-    }
-
-    /**
-     * Address: 0x00868F40 (FUN_00868F40)
-     *
-     * What it does:
-     * Releases one weak-set storage lane, clears `{head,size}`, and returns
-     * zero for legacy caller lanes that consume integer status.
-     */
-    [[nodiscard]] std::int32_t ReleaseSelectionWeakSetStorageAndReturnStatus(
-      SelectionWeakSetStorageRuntimeView* const storage
-    )
-    {
-      (void)ReleaseSelectionWeakSetStorageCompat(storage);
-      return 0;
-    }
-
-    /**
-     * Address: 0x00868F70 (FUN_00868F70)
-     *
-     * What it does:
-     * Releases one weak-set storage lane and returns the original storage
-     * pointer for pointer-returning compatibility callers.
-     */
-    [[nodiscard]] SelectionWeakSetStorageRuntimeView* ReleaseSelectionWeakSetStorageAndReturnStorage(
-      SelectionWeakSetStorageRuntimeView* const storage
-    )
-    {
-      (void)ReleaseSelectionWeakSetStorageCompat(storage);
-      return storage;
     }
 
     struct RawPointerTripletRuntimeView
@@ -9594,20 +7956,6 @@ namespace moho
     {}
 
     /**
-     * Address: 0x008229B0 (FUN_008229B0, sub_8229B0)
-     *
-     * What it does:
-     * Performs one selection-cursor decrement and returns the updated cursor lane.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity* StepSelectionCursorBackward(
-      SSelectionSetUserEntity* const set,
-      SSelectionNodeUserEntity* const cursor
-    )
-    {
-      return DecrementSelectionCursor(set, cursor);
-    }
-
-    /**
      * Address: 0x008229C0 (FUN_008229C0, sub_8229C0)
      *
      * What it does:
@@ -9822,131 +8170,6 @@ namespace moho
       return destination;
     }
 
-    void FixupAfterSelectionErase(
-      WeakEntitySetUserEntity& selection,
-      SSelectionNodeUserEntity* node,
-      SSelectionNodeUserEntity* nodeParent
-    )
-    {
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      SSelectionNodeUserEntity* parent = !IsSelectionNil(node) ? node->mParent : nodeParent;
-      while (node != head->mParent && (IsSelectionNil(node) || node->mColor == 1u)) {
-        if (parent == nullptr) {
-          break;
-        }
-
-        if (node == parent->mLeft) {
-          SSelectionNodeUserEntity* sibling = parent->mRight;
-          if (sibling == head) {
-            node = parent;
-            parent = node->mParent;
-            continue;
-          }
-          if (sibling->mColor == 0u) {
-            sibling->mColor = 1;
-            parent->mColor = 0;
-            RotateSelectionLeft(selection, parent);
-            sibling = parent->mRight;
-          }
-
-          const bool leftBlack = IsSelectionNil(sibling->mLeft) || sibling->mLeft->mColor == 1u;
-          const bool rightBlack = IsSelectionNil(sibling->mRight) || sibling->mRight->mColor == 1u;
-          if (leftBlack && rightBlack) {
-            sibling->mColor = 0;
-            node = parent;
-            parent = node->mParent;
-            continue;
-          }
-
-          if (IsSelectionNil(sibling->mRight) || sibling->mRight->mColor == 1u) {
-            if (!IsSelectionNil(sibling->mLeft)) {
-              sibling->mLeft->mColor = 1;
-            }
-            sibling->mColor = 0;
-            RotateSelectionRight(selection, sibling);
-            sibling = parent->mRight;
-          }
-
-          sibling->mColor = parent->mColor;
-          parent->mColor = 1;
-          if (!IsSelectionNil(sibling->mRight)) {
-            sibling->mRight->mColor = 1;
-          }
-          RotateSelectionLeft(selection, parent);
-          node = head->mParent;
-          break;
-        }
-
-        SSelectionNodeUserEntity* sibling = parent->mLeft;
-        if (sibling == head) {
-          node = parent;
-          parent = node->mParent;
-          continue;
-        }
-        if (sibling->mColor == 0u) {
-          sibling->mColor = 1;
-          parent->mColor = 0;
-          RotateSelectionRight(selection, parent);
-          sibling = parent->mLeft;
-        }
-
-        const bool rightBlack = IsSelectionNil(sibling->mRight) || sibling->mRight->mColor == 1u;
-        const bool leftBlack = IsSelectionNil(sibling->mLeft) || sibling->mLeft->mColor == 1u;
-        if (rightBlack && leftBlack) {
-          sibling->mColor = 0;
-          node = parent;
-          parent = node->mParent;
-          continue;
-        }
-
-        if (IsSelectionNil(sibling->mLeft) || sibling->mLeft->mColor == 1u) {
-          if (!IsSelectionNil(sibling->mRight)) {
-            sibling->mRight->mColor = 1;
-          }
-          sibling->mColor = 0;
-          RotateSelectionLeft(selection, sibling);
-          sibling = parent->mLeft;
-        }
-
-        sibling->mColor = parent->mColor;
-        parent->mColor = 1;
-        if (!IsSelectionNil(sibling->mLeft)) {
-          sibling->mLeft->mColor = 1;
-        }
-        RotateSelectionRight(selection, parent);
-        node = head->mParent;
-        break;
-      }
-
-      if (!IsSelectionNil(node)) {
-        node->mColor = 1u;
-      }
-    }
-
-    /**
-     * Address: 0x0066AF90 (FUN_0066AF90)
-     *
-     * What it does:
-     * Unlinks one weak-ref node from its intrusive owner chain and returns the
-     * final owner-link cursor slot without resetting the weak-ref lanes.
-     */
-    [[nodiscard]] SSelectionWeakRefUserEntity**
-    UnlinkSelectionWeakOwnerRefNoReset(SSelectionWeakRefUserEntity& weakRef) noexcept
-    {
-      auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
-      if (ownerLinkSlot != nullptr) {
-        while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
-          ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
-        }
-
-        if (*ownerLinkSlot == &weakRef) {
-          *ownerLinkSlot = weakRef.mNextOwner;
-        }
-      }
-
-      return ownerLinkSlot;
-    }
-
     // `UserTarget` (UserTarget.h) is what the three padded "anchor" views that
     // used to live here described: `{kind, weak entity link, position}` at
     // +0x00/+0x04/+0x0C is `UserTarget` member for member, the "history" was
@@ -10033,37 +8256,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x0082E560 (FUN_0082E560, sub_82E560)
-     *
-     * What it does:
-     * Standard red-black-tree lower-bound walk over a `WeakEntitySetUserEntity`
-     * tree: returns the first node whose key is `>= key`, or the tree's own
-     * sentinel head when no such node exists. Node shape (mLeft/mParent/mRight,
-     * key at +0xC, `mIsSentinel` at +0x19) matches `SSelectionNodeUserEntity`
-     * exactly - this is the same node layout `WeakEntitySet.h` already models,
-     * just walked for nearest-match rather than exact-match (contrast
-     * `FindWeakEntitySetNodeByKey` in UserUnit.cpp, an exact-match walk over
-     * the same node shape).
-     */
-    [[nodiscard]] SSelectionNodeUserEntity* LowerBoundWeakEntitySetNode(
-      const WeakEntitySetUserEntity& tree, const std::uint32_t key
-    ) noexcept
-    {
-      SSelectionNodeUserEntity* const head = tree.mHead;
-      SSelectionNodeUserEntity* candidate = head;
-      SSelectionNodeUserEntity* node = head->mParent;
-      while (node->mIsSentinel == 0u) {
-        if (key <= node->mKey) {
-          candidate = node;
-          node = node->mLeft;
-        } else {
-          node = node->mRight;
-        }
-      }
-      return (candidate == head || key < candidate->mKey) ? head : candidate;
-    }
-
-    /**
      * Address: 0x008B4300 (FUN_008B4300, sub_8B4300)
      *
      * What it does:
@@ -10075,21 +8267,18 @@ namespace moho
      * entity id is in the replicated `mVariableData.mEntIds` (0x008B43B7..).
      *
      * The per-event lookup is `WeakSet<UserUnit>::find(candidateUnit)` over the
-     * event's `mUnits` (`sub_82CEA0`, which takes the unit in `eax` from the
-     * second stack argument at 0x008B4363/0x008B438D and keys the tree walk
-     * `sub_82E560` with it). It used to be keyed with the dword at
+     * event's `mUnits` (`WeakSet<UserUnit>::Find`, 0x0082CEA0, which takes the
+     * unit in `eax` from the second stack argument at 0x008B4363/0x008B438D and
+     * runs the set's `find` 0x0082E560 on it). It used to be keyed with the dword at
      * `helper+0xB8` instead -- the local queue's own first word, read through
      * a padded view -- so no local select/deselect edit ever matched and every
      * answer came from the replicated id list.
      *
-     * `sub_82CEA0` also brackets the lookup with a transient weak guard on the
-     * unit; nothing runs between its link and its unlink, so it is omitted.
      */
     [[nodiscard]] bool IsCandidateExcludedByCachedRelation(
       const UserCommandIssueHelper& helper, UserUnit* const candidateUnit
     ) noexcept
     {
-      const std::uint32_t candidateKey = SelectionKeyFromEntity(candidateUnit);
       for (std::size_t index = helper.mLocalQueue.size(); index != 0u; --index) {
         const UserCommandIssueLocalEvent& event = helper.mLocalQueue[index - 1u];
         if (event.mType != ECommandIssueEvent::SelectUnit && event.mType != ECommandIssueEvent::DeselectUnit) {
@@ -10099,7 +8288,7 @@ namespace moho
         // 0x008B4370/0x008B439A: the binary runs this lookup twice for a
         // `SelectUnit` edit (an early "listed" exit, then the shared gate);
         // nothing observable happens in between, so it is computed once.
-        const bool listed = LowerBoundWeakEntitySetNode(event.mUnits, candidateKey) != event.mUnits.mHead;
+        const bool listed = event.mUnits.Find(candidateUnit) != event.mUnits.end();
         if (!listed) {
           continue;
         }
@@ -10138,7 +8327,7 @@ namespace moho
    *
    * The successor step inside the walk is the `map<EntId, WeakPtr<UserEntity>>`
    * `_Inc` emission at 0x007B4D90 (carried on `msvc8::detail::rb_increment`).
-   * It is spelled with this file's `SSelectionSetUserEntity::Iterator_inc`
+   * It is spelled with this file's `WeakSet<UserEntity>::Iterator_inc`
    * shape, which is the same body over the same node type and matches the
    * binary's `_Node**` out-parameter call at 0x00826DE8.
    */
@@ -10178,18 +8367,15 @@ namespace moho
         return 0;
     }
 
-    SSelectionSetUserEntity* const targeted = ResolveCommandIssueCursorEntities(*helper);
-
-    // The walk runs over a pruned *copy* rather than the helper's live cache:
-    // the range constructor (0x00831310) drops the source's tombstones as it
-    // reads. The copy's destructor is the binary's erase-range +
-    // `operator delete(mHead)` pair at 0x00826E6D/0x00826EC0, which runs on
-    // both the answered and the gave-up exit.
-    WeakEntitySetUserEntity liveTargets(targeted->begin(), targeted->end());
+    // The walk runs over a copy of the helper's units rather than the live
+    // cache: the copy constructor (the set's range constructor 0x00831310)
+    // drops the source's dead entries as it reads. The copy's destructor is
+    // the erase-range + `operator delete(mHead)` pair at 0x00826E6D/0x00826EC0,
+    // which runs on both the answered and the gave-up exit.
+    const WeakSet<UserUnit> liveTargets(*ResolveCommandIssueCursorEntities(*helper));
 
     float slowestSpeed = std::numeric_limits<float>::max();
-    for (UserEntity* const entity : liveTargets) {
-      auto* const unit = static_cast<UserUnit*>(entity);
+    for (UserUnit* const unit : liveTargets) {
       // Air units are held to their airspeed and everything else to its ground
       // speed. A unit with no positive speed of either kind is skipped rather
       // than making the whole orderline infinitely slow.
@@ -10436,30 +8622,6 @@ namespace moho
 
       *outPosition = ResolvePositionFromTarget(ResolveCommandIssueTarget(helper));
       return outPosition;
-    }
-
-    /**
-     * Address: 0x008B38C0 (FUN_008B38C0)
-     *
-     * What it does:
-     * Unlinks each weak-ref node in one half-open `[begin,end)` range from its
-     * intrusive owner chain without resetting link fields.
-     */
-    void UnlinkSelectionWeakOwnerRefRangeNoReset(
-      SSelectionWeakRefUserEntity* const begin,
-      SSelectionWeakRefUserEntity* const end
-    ) noexcept
-    {
-      for (SSelectionWeakRefUserEntity* weakRef = begin; weakRef != end; ++weakRef) {
-        (void)UnlinkSelectionWeakOwnerRefNoReset(*weakRef);
-      }
-    }
-
-    void UnlinkSelectionWeakOwnerRef(SSelectionWeakRefUserEntity& weakRef)
-    {
-      (void)UnlinkSelectionWeakOwnerRefNoReset(weakRef);
-      weakRef.mOwnerLinkSlot = nullptr;
-      weakRef.mNextOwner = nullptr;
     }
 
     /**
@@ -10807,20 +8969,13 @@ namespace moho
         }
       }
 
-      SSelectionSetUserEntity& selection = session->mSelection;
-      SSelectionNodeUserEntity* node = selection.mHead->mLeft;
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
-      while (node != selection.mHead) {
-        if (UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt); selectedEntity != nullptr) {
-          if (UserUnit* const selectedUnit = selectedEntity->IsUserUnit(); selectedUnit != nullptr) {
-            if (selectedUnit->CanAttackTarget(hoverEntity, true)) {
-              return true;
-            }
+      WeakSet<UserEntity>& selection = session->mSelection;
+      for (UserEntity* const selectedEntity : selection) {
+        if (UserUnit* const selectedUnit = selectedEntity->IsUserUnit(); selectedUnit != nullptr) {
+          if (selectedUnit->CanAttackTarget(hoverEntity, true)) {
+            return true;
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
 
       return false;
@@ -10841,7 +8996,7 @@ namespace moho
      * `UserUnit*` by the decompiler but only ever used through UserEntity
      * members, so the recovered parameter is typed as the base `UserEntity*`.
      */
-    [[nodiscard]] bool SelectionHasTransportForTarget(SSelectionSetUserEntity* const selection, UserEntity* const hoverEntity)
+    [[nodiscard]] bool SelectionHasTransportForTarget(WeakSet<UserEntity>* const selection, UserEntity* const hoverEntity)
     {
       if (hoverEntity == nullptr) {
         return false;
@@ -10856,10 +9011,7 @@ namespace moho
         return false;
       }
 
-      SSelectionSetUserEntity::FindResult cursor{};
-      (void)selection->First(&cursor);
-      while (cursor.mRes != selection->mHead) {
-        UserEntity* const selectedEntity = DecodeSelectedUserEntity(cursor.mRes->mEnt);
+      for (UserEntity* const selectedEntity : *selection) {
         UserUnit* const transporter = selectedEntity ? selectedEntity->IsUserUnit() : nullptr;
         if (transporter != nullptr) {
           IUnit* const transporterBridge = GetIUnitBridge(transporter);
@@ -10921,9 +9073,6 @@ namespace moho
             }
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&cursor.mRes);
-        cursor.mRes = SSelectionSetUserEntity::find(cursor.mSet, cursor.mRes, &cursor.mRes);
       }
 
       return false;
@@ -10943,7 +9092,7 @@ namespace moho
      * AIRSTAGINGPLATFORM) against the hovered unit's air capability. Returns
      * true on the first accepted selected unit.
      */
-    [[nodiscard]] bool HoverTransportAcceptsSelection(SSelectionSetUserEntity* const selection, UserEntity* const hoverEntity)
+    [[nodiscard]] bool HoverTransportAcceptsSelection(WeakSet<UserEntity>* const selection, UserEntity* const hoverEntity)
     {
       if (hoverEntity == nullptr) {
         return false;
@@ -10961,12 +9110,7 @@ namespace moho
         return false;
       }
 
-      SSelectionSetUserEntity::FindResult cursor{};
-      (void)selection->First(&cursor);
-      while (cursor.mRes != selection->mHead) {
-        // The binary rejects both null and the encoded sentinel (v5 == 8);
-        // DecodeSelectedUserEntity returns nullptr for both, so one guard covers it.
-        UserEntity* const candidate = DecodeSelectedUserEntity(cursor.mRes->mEnt);
+      for (UserEntity* const candidate : *selection) {
         if (candidate != nullptr) {
           // Group 1: TELEPORTATION(candidate) or EXPERIMENTAL(hover).
           bool teleOrExperimental;
@@ -11014,9 +9158,6 @@ namespace moho
             }
           }
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&cursor.mRes);
-        cursor.mRes = SSelectionSetUserEntity::find(cursor.mSet, cursor.mRes, &cursor.mRes);
       }
 
       return false;
@@ -11036,22 +9177,16 @@ namespace moho
      * entity's blueprint ordinal against it; `EntityCategory::HasBlueprint`
      * expresses that same membership test.
      */
-    [[nodiscard]] bool AllSelectedAreFactories(SSelectionSetUserEntity* const selection, CWldSession* const session)
+    [[nodiscard]] bool AllSelectedAreFactories(WeakSet<UserEntity>* const selection, CWldSession* const session)
     {
       const EntityCategorySet* const factoryCategory =
         static_cast<RRuleGameRules*>(session->mRules)->GetEntityCategory("FACTORY");
 
-      SSelectionNodeUserEntity* node = selection->mHead->mLeft;
-      node = SSelectionSetUserEntity::find(selection, node, &node);
-      while (node != selection->mHead) {
-        UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+      for (UserEntity* const selectedEntity : *selection) {
         if (selectedEntity == nullptr
             || !EntityCategory::HasBlueprint(selectedEntity->mParams.mBlueprint, factoryCategory)) {
           return false;
         }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(selection, node, &node);
       }
 
       return true;
@@ -11131,11 +9266,7 @@ namespace moho
     EntityCategorySet assistingCategory{};
     (void)func_EntityCategoryAdd(engineerCategory, &assistingCategory, factoryCategory);
 
-    SSelectionSetUserEntity* const assistingUnits = ResolveCommandIssueCursorEntities(*helper);
-    SSelectionNodeUserEntity* node = nullptr;
-    (void)assistingUnits->PruneTombstonesAndFindLive(&node, assistingUnits->mHead->mLeft);
-    while (node != assistingUnits->mHead) {
-      auto* const unit = static_cast<UserUnit*>(ResolveWeakEntitySetNodeEntity(*node));
+    for (UserUnit* const unit : *ResolveCommandIssueCursorEntities(*helper)) {
       const RUnitBlueprint* const blueprint = GetIUnitBridge(unit)->GetBlueprint();
 
       if (assistingCategory.ContainsBit(blueprint->mCategoryBitIndex) && orderedBlueprint != nullptr) {
@@ -11169,9 +9300,6 @@ namespace moho
           gpg::Warnf("Error estimating work time: %s", exception.what());
         }
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      (void)assistingUnits->PruneTombstonesAndFindLive(&node, node);
     }
 
     if (combinedBuildRate <= 0.0f) {
@@ -11183,96 +9311,6 @@ namespace moho
     return static_cast<std::int32_t>(
       (remainingWorkFraction * kCommandGraphTicksPerSecond) / combinedBuildRate
     );
-  }
-
-  /**
-   * Address: 0x0066A550 (FUN_0066A550, Moho::WeakSet_UserEntity::next)
-   * Address: 0x007B30D0 (FUN_007B30D0, std::map<unsigned int,WeakPtr<UserEntity>>::erase
-   * — identical node-splice/rebalance/return-next shape, a separate
-   * per-call-site emission of the same std::_Tree::erase(iterator) operation;
-   * reached via CWldSession.cpp's own EraseSelectionNodeAndAdvance callers)
-   *
-   * What it does:
-   * Erases one `UserEntity` weak-set node from the selection RB-tree, unlinks
-   * its intrusive weak-owner chain lane, and returns the next in-order node.
-   *
-   * Hoisted to external linkage (was file-local in the anonymous namespace
-   * above) and declared in CWldSession.h so `CFormation::ChooseFormation`
-   * (CFormation.cpp) can prune its own selection-set walk the same way
-   * `SSelectionSetUserEntity::PruneTombstonesAndFindLive`/`EraseRange` do.
-   */
-  [[nodiscard]] SSelectionNodeUserEntity*
-  EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node)
-  {
-    if (selection.mHead == nullptr || IsSelectionNil(node)) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    SSelectionNodeUserEntity* const next = NextTreeNode(node);
-
-    SSelectionNodeUserEntity* removed = node;
-    SSelectionNodeUserEntity* spliceTarget = node;
-    std::uint8_t removedColor = spliceTarget->mColor;
-    SSelectionNodeUserEntity* fixNode = head;
-    SSelectionNodeUserEntity* fixParent = head;
-
-    if (IsSelectionNil(node->mLeft)) {
-      fixNode = node->mRight;
-      fixParent = node->mParent;
-      ReplaceSelectionSubtree(selection, node, node->mRight);
-    } else if (IsSelectionNil(node->mRight)) {
-      fixNode = node->mLeft;
-      fixParent = node->mParent;
-      ReplaceSelectionSubtree(selection, node, node->mLeft);
-    } else {
-      spliceTarget = SelectionMin(node->mRight, head);
-      removedColor = spliceTarget->mColor;
-      fixNode = spliceTarget->mRight;
-      if (spliceTarget->mParent == node) {
-        fixParent = spliceTarget;
-        if (!IsSelectionNil(fixNode)) {
-          fixNode->mParent = spliceTarget;
-        }
-      } else {
-        fixParent = spliceTarget->mParent;
-        ReplaceSelectionSubtree(selection, spliceTarget, spliceTarget->mRight);
-        spliceTarget->mRight = node->mRight;
-        spliceTarget->mRight->mParent = spliceTarget;
-      }
-
-      ReplaceSelectionSubtree(selection, node, spliceTarget);
-      spliceTarget->mLeft = node->mLeft;
-      spliceTarget->mLeft->mParent = spliceTarget;
-      spliceTarget->mColor = node->mColor;
-    }
-
-    UnlinkSelectionWeakOwnerRef(removed->mEnt);
-    ::operator delete(removed);
-
-    if (selection.mSize > 0u) {
-      --selection.mSize;
-    }
-    if (removedColor == 1u) {
-      FixupAfterSelectionErase(selection, fixNode, fixParent);
-    }
-
-    RecomputeSelectionExtrema(selection);
-    return next;
-  }
-
-  /**
-   * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):
-   * copies one source selection weak-set into a fresh destination weak-set.
-   * Forwards to the file-local `CopySelectionSetFromOther` (FUN_00822210), which
-   * the dock worker uses to snapshot `CWldSession::mSelection` before scanning it.
-   */
-  SSelectionSetUserEntity* CopySessionSelectionSet(
-    SSelectionSetUserEntity* const destination,
-    const SSelectionSetUserEntity* const source
-  )
-  {
-    return CopySelectionSetFromOther(destination, const_cast<SSelectionSetUserEntity*>(source));
   }
 
   /**
@@ -11433,794 +9471,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x007AE1B0 (FUN_007AE1B0, Moho::WeakSet_UserEntity::Add)
-   *
-   * What it does:
-   * Inserts one user-entity pointer key into the selection weak-set tree and
-   * returns `{ownerSet,node,inserted}` in `outResult`.
-   */
-  SSelectionSetUserEntity::AddResult* SSelectionSetUserEntity::Add(
-    AddResult* const outResult,
-    SSelectionSetUserEntity* const set,
-    UserEntity* const entity
-  )
-  {
-    GPG_ASSERT(outResult != nullptr);
-    if (!outResult) {
-      return nullptr;
-    }
-
-    outResult->mOwnerSet = set;
-    outResult->mNode = (set != nullptr) ? set->mHead : nullptr;
-    outResult->mWasInserted = 0u;
-    outResult->mReserved09_0B[0] = 0u;
-    outResult->mReserved09_0B[1] = 0u;
-    outResult->mReserved09_0B[2] = 0u;
-
-    if (set == nullptr) {
-      return outResult;
-    }
-
-    ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-    SSelectionNodeUserEntity* node = set->mHead;
-    const bool inserted = InsertSelectionEntity(*set, entity, &node);
-    outResult->mNode = node;
-    outResult->mWasInserted = inserted ? 1u : 0u;
-    return outResult;
-  }
-
-  /**
-   * Address: 0x007FDD50 (FUN_007FDD50, Moho::WeakSet_UserEntity::Find)
-   *
-   * What it does:
-   * Resolves one weak-set tree node for `entity` and writes one `{set,node}`
-   * cursor pair to `outResult`.
-   */
-  /**
-   * Address: 0x008676E0 (FUN_008676E0, sub_8676E0)
-   * Address: 0x008B2890 (FUN_008B2890, sub_8B2890)
-   *
-   * What it does:
-   * Removes every entry keyed by `entity` from a weak set. The binary parks a
-   * marker in the entity's weak-owner chain for the duration of the erase and
-   * unwinds it afterwards, so the node teardown cannot lose the chain; that
-   * guard is what `ScopedSelectionOwnerLinkGuard` reproduces.
-   *
-   * The erase itself is the container's erase-by-key lane, not an open-coded
-   * find-and-unlink: at 0x008676E0 the guard is spliced in, `sub_867AC0` is
-   * called with the set in `eax` and `&entity` in `ecx`, the guard is unwound,
-   * and the count `sub_867AC0` returned is left in `eax` as this function's
-   * own result. Emitted a second time at 0x008B2890.
-   */
-  bool SSelectionSetUserEntity::Erase(WeakEntitySetUserEntity& set, UserEntity* const entity)
-  {
-    if (set.mHead == nullptr || entity == nullptr) {
-      return false;
-    }
-
-    ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-    UserEntity* entityKey = entity;
-    return EraseSelectionKeyRangeAndCount(&entityKey, &set) != 0;
-  }
-
-  SSelectionSetUserEntity::FindResult* SSelectionSetUserEntity::Find(
-    FindResult* const outResult,
-    SSelectionSetUserEntity* const set,
-    UserEntity* const entity
-  )
-  {
-    GPG_ASSERT(outResult != nullptr);
-    if (outResult == nullptr) {
-      return nullptr;
-    }
-
-    outResult->mSet = set;
-    outResult->mRes = (set != nullptr) ? set->mHead : nullptr;
-    if (set == nullptr) {
-      return outResult;
-    }
-
-    return FindSelectionNodeByEntityGuarded(outResult, set, entity);
-  }
-
-  /**
-   * Address: 0x007B59B0 (FUN_007B59B0, Moho::WeakSet_UserEntity::size)
-   *
-   * What it does:
-   * Counts live weak-set tree nodes by in-order traversal of the selection
-   * RB-tree lane.
-   */
-  std::int32_t SSelectionSetUserEntity::size() const
-  {
-    const SSelectionNodeUserEntity* const head = mHead;
-    if (head == nullptr) {
-      return 0;
-    }
-
-    auto isSentinel = [](const SSelectionNodeUserEntity* const node) -> bool {
-      return node == nullptr || node->mIsSentinel != 0u;
-    };
-
-    std::int32_t count = 0;
-    const SSelectionNodeUserEntity* node = head->mLeft;
-    while (!isSentinel(node) && node != head) {
-      ++count;
-
-      if (!isSentinel(node->mRight)) {
-        node = node->mRight;
-        while (!isSentinel(node->mLeft)) {
-          node = node->mLeft;
-        }
-        continue;
-      }
-
-      const SSelectionNodeUserEntity* parent = node->mParent;
-      while (!isSentinel(parent) && node == parent->mRight) {
-        node = parent;
-        parent = parent->mParent;
-      }
-      node = parent;
-    }
-
-    return count;
-  }
-
-  /**
-   * Address: 0x007B2620 (FUN_007B2620, sub_7B2620)
-   *
-   * What it does:
-   * Returns true when tombstone pruning from the left-most weak-set node
-   * reaches the head sentinel immediately.
-   */
-  bool SSelectionSetUserEntity::IsEmptyAfterPrune()
-  {
-    SSelectionNodeUserEntity* firstLive = nullptr;
-    SSelectionNodeUserEntity* const head = mHead;
-    (void)PruneTombstonesAndFindLive(&firstLive, head->mLeft);
-    return firstLive == head;
-  }
-
-  /**
-   * Address: 0x0066A090 (FUN_0066A090, sub_66A090)
-   *
-   * What it does:
-   * Resolves the first live node from `mHead->mLeft` through `find` and
-   * returns true when that result is the head sentinel.
-   */
-  bool SSelectionSetUserEntity::IsEmptyFromHeadFind()
-  {
-    const SSelectionNodeUserEntity* const head = mHead;
-    if (head == nullptr) {
-      return true;
-    }
-
-    SSelectionNodeUserEntity* found = nullptr;
-    return find(this, head->mLeft, &found) == head;
-  }
-
-  /**
-   * Address: 0x00863760 (FUN_00863760, sub_863760)
-   *
-   * What it does:
-   * Counts live weak-set entries in this set that are ALSO present in `other`.
-   *
-   * The increment is gated the other way round from the name this body used to
-   * carry. 0x008637A8 calls the `other`-side `Find`, 0x008637AD compares the
-   * returned `mRes` against `other`'s head sentinel, and 0x008637B0 `jz`
-   * SKIPS the `add [count], 1` at 0x008637B2 -- so the entry is counted when
-   * `mRes != other.mHead`, i.e. when it WAS found. Recovered as "absent", it
-   * returned the complement.
-   *
-   * Its only binary caller is `SelectionDragger`'s shift-drag arm
-   * (0x0086393D, inside FUN_00863870), which compares the result against the
-   * dragged set's own size. With the complement the comparison inverted, so a
-   * shift band-box over units that were NOT yet selected took the arm that
-   * keeps only the untouched part of the current selection -- dropping them --
-   * instead of the arm that merges the two sets. That is the "shift box does
-   * not add the units" behaviour.
-   */
-  std::int32_t SSelectionSetUserEntity::CountEntitiesPresentIn(const SSelectionSetUserEntity& other) const
-  {
-    auto* const thisMutable = const_cast<SSelectionSetUserEntity*>(this);
-    auto* const otherMutable = const_cast<SSelectionSetUserEntity*>(&other);
-    if (thisMutable->mHead == nullptr) {
-      return 0;
-    }
-
-    std::int32_t presentCount = 0;
-    SSelectionNodeUserEntity* node = thisMutable->mHead->mLeft;
-    node = SSelectionSetUserEntity::find(thisMutable, node, &node);
-    while (node != thisMutable->mHead) {
-      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
-      SSelectionSetUserEntity::FindResult foundInOther{};
-      (void)FindSelectionNodeByEntityGuarded(&foundInOther, otherMutable, selectedEntity);
-      if (foundInOther.mRes != otherMutable->mHead) {
-        ++presentCount;
-      }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(thisMutable, node, &node);
-    }
-
-    return presentCount;
-  }
-
-  /**
-   * Recovery-local complement of `CountEntitiesPresentIn`: counts live entries
-   * of this set that are absent from `other`.
-   *
-   * This is NOT a separate binary body. `HasSameLiveEntitySet` (0x00868690)
-   * inlines its own comparison walk rather than calling 0x00863760, so this
-   * helper exists only to keep that recovery expressible; the binary's
-   * 0x00863760 is `CountEntitiesPresentIn` above.
-   */
-  std::int32_t SSelectionSetUserEntity::CountEntitiesMissingFrom(const SSelectionSetUserEntity& other) const
-  {
-    auto* const thisMutable = const_cast<SSelectionSetUserEntity*>(this);
-    auto* const otherMutable = const_cast<SSelectionSetUserEntity*>(&other);
-    if (thisMutable->mHead == nullptr) {
-      return 0;
-    }
-
-    std::int32_t missingCount = 0;
-    SSelectionNodeUserEntity* node = thisMutable->mHead->mLeft;
-    node = SSelectionSetUserEntity::find(thisMutable, node, &node);
-    while (node != thisMutable->mHead) {
-      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
-      SSelectionSetUserEntity::FindResult foundInOther{};
-      (void)FindSelectionNodeByEntityGuarded(&foundInOther, otherMutable, selectedEntity);
-      if (foundInOther.mRes == otherMutable->mHead) {
-        ++missingCount;
-      }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(thisMutable, node, &node);
-    }
-
-    return missingCount;
-  }
-
-  /**
-   * Address: 0x00868690 (FUN_00868690, sub_868690)
-   *
-   * What it does:
-   * Returns true when this set and `other` contain the same live entity keys.
-   */
-  bool SSelectionSetUserEntity::HasSameLiveEntitySet(const SSelectionSetUserEntity& other) const
-  {
-    const auto* const thisHead = mHead;
-    const auto* const otherHead = other.mHead;
-    if (thisHead == nullptr || otherHead == nullptr) {
-      return thisHead == otherHead;
-    }
-
-    auto* thisMutable = const_cast<SSelectionSetUserEntity*>(this);
-    auto* otherMutable = const_cast<SSelectionSetUserEntity*>(&other);
-
-    SSelectionNodeUserEntity* thisFirst = thisHead->mLeft;
-    thisFirst = SSelectionSetUserEntity::find(thisMutable, thisFirst, &thisFirst);
-    SSelectionNodeUserEntity* otherFirst = otherHead->mLeft;
-    otherFirst = SSelectionSetUserEntity::find(otherMutable, otherFirst, &otherFirst);
-
-    const bool thisEmpty = (thisFirst == thisHead);
-    const bool otherEmpty = (otherFirst == otherHead);
-    if (thisEmpty != otherEmpty) {
-      return false;
-    }
-    if (thisEmpty) {
-      return true;
-    }
-
-    return (CountEntitiesMissingFrom(other) == 0) && (other.CountEntitiesMissingFrom(*this) == 0);
-  }
-
-  /**
-   * Address: 0x00831110 (FUN_00831110, sub_831110)
-   *
-   * What it does: see the header.
-   */
-  bool SSelectionSetUserEntity::HasCommonLiveEntityWith(const SSelectionSetUserEntity& other) const
-  {
-    auto* const thisMutable = const_cast<SSelectionSetUserEntity*>(this);
-    auto* const otherMutable = const_cast<SSelectionSetUserEntity*>(&other);
-    if (thisMutable->mHead == nullptr || otherMutable->mHead == nullptr) {
-      return false;
-    }
-
-    SSelectionNodeUserEntity* node = thisMutable->mHead->mLeft;
-    node = SSelectionSetUserEntity::find(thisMutable, node, &node);
-    while (node != thisMutable->mHead) {
-      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
-      SSelectionSetUserEntity::FindResult foundInOther{};
-      (void)FindSelectionNodeByEntityGuarded(&foundInOther, otherMutable, selectedEntity);
-      if (foundInOther.mRes != otherMutable->mHead) {
-        return true;
-      }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(thisMutable, node, &node);
-    }
-
-    return false;
-  }
-
-  /**
-   * Address: 0x007B0870 (FUN_007B0870, sub_7B0870)
-   *
-   * What it does:
-   * Recursively destroys one weak-set subtree and unlinks each node from its
-   * user-entity weak-owner intrusive lane before delete.
-   */
-  /**
-   * Address: 0x007B4640 (FUN_007B4640, `_Tree::_Buynode()`)
-   * Address: 0x007B08D0 (FUN_007B08D0, byte-identical sibling `_Buynode()`
-   * emission reached through the other checked-28-byte-allocator instance,
-   * 0x007B1420, rather than 0x007B4FA0 -- same neutral-node shape, same
-   * ecx=1/null-links/colour-black/sentinel-cleared body)
-   *
-   * IDA signature:
-   * SSelectionNodeUserEntity* __usercall sub_7B4640@<eax>();
-   *
-   * What it does:
-   * Buys one neutral red-black tree node: `ecx = 1` into the shared checked
-   * 28-byte allocator, then all three links nulled, colour black and the
-   * sentinel flag cleared. Every weak-entity set in the engine comes up
-   * through this lane -- fourteen recovered callers reach it.
-   */
-  SSelectionNodeUserEntity* WeakEntitySetUserEntity::BuyNode()
-  {
-    auto* const node =
-      msvc8::detail::allocate_checked<SSelectionNodeUserEntity>(1u);
-    node->mLeft = nullptr;
-    node->mParent = nullptr;
-    node->mRight = nullptr;
-    node->mColor = 1u;
-    node->mIsSentinel = 0u;
-    // The binary writes only +0x18 and +0x19 here; the two padding bytes at
-    // +0x1A keep whatever the allocator handed back, so they are left alone.
-    return node;
-  }
-
-  void WeakEntitySetUserEntity::DestroySubtree(SSelectionNodeUserEntity* node)
-  {
-    SSelectionNodeUserEntity* cursor = node;
-    while (cursor != nullptr && cursor->mIsSentinel == 0u) {
-      DestroySubtree(cursor->mRight);
-
-      SSelectionNodeUserEntity* const left = cursor->mLeft;
-      UnlinkSelectionWeakOwnerRef(cursor->mEnt);
-      ::operator delete(cursor);
-      cursor = left;
-    }
-  }
-
-  /**
-   * Address: 0x007AF740 (FUN_007AF740, sub_7AF740)
-   *
-   * What it does:
-   * Erases one half-open weak-set node range `[first,last)`. For full-range
-   * erases (`first == mHead->mLeft` and `last == mHead`) it drops the whole
-   * subtree in one pass and resets tree head links to empty sentinels.
-   */
-  SSelectionNodeUserEntity** WeakEntitySetUserEntity::EraseRange(
-    SSelectionNodeUserEntity** const outNode,
-    SSelectionNodeUserEntity* const first,
-    SSelectionNodeUserEntity* const last
-  )
-  {
-    SSelectionNodeUserEntity* const head = mHead;
-    if (head == nullptr) {
-      *outNode = nullptr;
-      return outNode;
-    }
-
-    SSelectionNodeUserEntity* node = first;
-    if (first == head->mLeft && last == head) {
-      DestroySubtree(head->mParent);
-      head->mParent = head;
-      mSize = 0u;
-      head->mLeft = head;
-      head->mRight = head;
-      *outNode = head->mLeft;
-      return outNode;
-    }
-
-    while (node != last) {
-      SSelectionNodeUserEntity* const eraseNode = node;
-      if (eraseNode->mIsSentinel == 0u) {
-        node = NextTreeNode(node);
-      }
-
-      (void)EraseSelectionNodeAndAdvance(*this, eraseNode);
-    }
-
-    *outNode = node;
-    return outNode;
-  }
-
-  // Forward declaration: the free-function definition sits further down this
-  // file (right after WeakEntitySetUserEntity::Next), but WeakEntitySetUserEntity
-  // ::IsEmptyAfterPrune below needs it in scope earlier.
-  SSelectionNodeUserEntity** PruneTombstonesAndFindLive(
-    WeakEntitySetUserEntity& set, SSelectionNodeUserEntity** outNode, SSelectionNodeUserEntity* start
-  );
-
-  /**
-   * Address: 0x007ABDE0 (FUN_007ABDE0, sub_7ABDE0)
-   * Address: 0x007ABE10 (FUN_007ABE10, sub_7ABE10)
-   *
-   * What it does:
-   * Clears all weak-set nodes, destroys the tree head sentinel, and resets
-   * storage links/counters for this set. Bare-header sibling of
-   * `SSelectionSetUserEntity::ReleaseStorage` (same body, declared separately
-   * there because that call site is reached with the derived type already in
-   * hand); the destructor below forwards to this one.
-   */
-  std::int32_t WeakEntitySetUserEntity::ReleaseStorage()
-  {
-    if (mHead == nullptr) {
-      mSize = 0u;
-      return 0;
-    }
-
-    SSelectionNodeUserEntity* node = nullptr;
-    (void)EraseRange(&node, mHead->mLeft, mHead);
-    ::operator delete(mHead);
-    mHead = nullptr;
-    mSize = 0u;
-    return 0;
-  }
-
-  WeakEntitySetUserEntity::~WeakEntitySetUserEntity()
-  {
-    (void)ReleaseStorage();
-  }
-
-  /**
-   * Address: 0x00868DB0 (FUN_00868DB0) + 0x00822210 (FUN_00822210) - see the
-   * declaration in WeakEntitySet.h for the full evidence trail. Mirrors
-   * `CopySelectionSetFromOther`'s range-clone shape (find the first live
-   * source node, walk it with `Iterator_inc`/`find`, insert each live entity
-   * into the fresh destination), generalized onto the bare header so it can
-   * serve as this type's copy constructor.
-   */
-  WeakEntitySetUserEntity::WeakEntitySetUserEntity(const WeakEntitySetUserEntity& other)
-  {
-    InitWeakEntitySetHead(*this);
-    if (other.mHead == nullptr) {
-      return;
-    }
-
-    auto& otherMutable = const_cast<WeakEntitySetUserEntity&>(other);
-    SSelectionNodeUserEntity* node = otherMutable.mHead->mLeft;
-    node = SSelectionSetUserEntity::find(&otherMutable, node, &node);
-    while (node != otherMutable.mHead) {
-      if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt); entity != nullptr) {
-        (void)InsertSelectionEntity(*this, entity);
-      }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(&otherMutable, node, &node);
-    }
-  }
-
-  /**
-   * Deep copy-assignment. See the declaration in WeakEntitySet.h for why the
-   * implicit member-wise one could not be left in place.
-   */
-  WeakEntitySetUserEntity& WeakEntitySetUserEntity::operator=(const WeakEntitySetUserEntity& other)
-  {
-    if (this == &other) {
-      return *this;
-    }
-
-    // Drop this set's own nodes and sentinel before taking the source's
-    // contents; `ReleaseStorage` leaves `mHead` null, which is exactly the
-    // state `InitWeakEntitySetHead` expects to build a fresh sentinel from.
-    (void)ReleaseStorage();
-    InitWeakEntitySetHead(*this);
-
-    if (other.mHead == nullptr) {
-      return *this;
-    }
-
-    auto& otherMutable = const_cast<WeakEntitySetUserEntity&>(other);
-    SSelectionNodeUserEntity* node = otherMutable.mHead->mLeft;
-    node = SSelectionSetUserEntity::find(&otherMutable, node, &node);
-    while (node != otherMutable.mHead) {
-      if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt); entity != nullptr) {
-        (void)InsertSelectionEntity(*this, entity);
-      }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(&otherMutable, node, &node);
-    }
-
-    return *this;
-  }
-
-  /**
-   * Address: 0x007AE1B0 (FUN_007AE1B0, Moho::WeakSet_UserEntity::Add) - bare-
-   * header sibling of `SSelectionSetUserEntity::Add` below, generalized the
-   * same way `find`/`Iterator_inc`/`EraseRange` already are on this header.
-   * Feeds the `msvc8::vector<WeakSet<UserEntity>>::resize` growth lane cited
-   * on `msvc8::vector<T>::insert`/`uninit_fill_n` in Vector.h.
-   *
-   * What it does:
-   * Inserts one user-entity pointer key into the weak-set tree and returns
-   * `{ownerSet,node,inserted}` in `outResult`.
-   */
-  WeakEntitySetUserEntity::AddResult* WeakEntitySetUserEntity::Add(
-    AddResult* const outResult,
-    WeakEntitySetUserEntity* const set,
-    UserEntity* const entity
-  )
-  {
-    GPG_ASSERT(outResult != nullptr);
-    if (!outResult) {
-      return nullptr;
-    }
-
-    outResult->mOwnerSet = set;
-    outResult->mNode = (set != nullptr) ? set->mHead : nullptr;
-    outResult->mWasInserted = 0u;
-    outResult->mReserved09_0B[0] = 0u;
-    outResult->mReserved09_0B[1] = 0u;
-    outResult->mReserved09_0B[2] = 0u;
-
-    if (set == nullptr) {
-      return outResult;
-    }
-
-    ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-    SSelectionNodeUserEntity* node = set->mHead;
-    const bool inserted = InsertSelectionEntity(*set, entity, &node);
-    outResult->mNode = node;
-    outResult->mWasInserted = inserted ? 1u : 0u;
-    return outResult;
-  }
-
-  /**
-   * Address: 0x0066A090 (FUN_0066A090, sub_66A090) - bare-header sibling of
-   * `SSelectionSetUserEntity::IsEmptyAfterPrune`, generalized the same way
-   * `EraseRange`/`ReleaseStorage` are on this header.
-   *
-   * What it does:
-   * Returns true when tombstone pruning from the left-most node reaches the
-   * head sentinel immediately (no live weak-set entries remain).
-   */
-  bool WeakEntitySetUserEntity::IsEmptyAfterPrune()
-  {
-    SSelectionNodeUserEntity* firstLive = nullptr;
-    SSelectionNodeUserEntity* const head = mHead;
-    (void)moho::PruneTombstonesAndFindLive(*this, &firstLive, head->mLeft);
-    return firstLive == head;
-  }
-
-  /**
-   * Address: 0x007B29C0 (FUN_007B29C0, sub_7B29C0)
-   *
-   * What it does:
-   * Advances from `start` to the first live weak-set node, deleting tombstone
-   * entries (null/`(void*)8` owner-link slots) as it goes. Generalized over the
-   * shared `WeakEntitySetUserEntity` header (declared in CWldSession.h) rather
-   * than left as an `SSelectionSetUserEntity` member, since the only field this
-   * touches is `mHead` (common to every weak-entity-set instantiation) and it
-   * forwards straight into `EraseSelectionNodeAndAdvance`, which already takes
-   * the same shared base. `CFormation::Finalize` (CFormation.cpp) calls this
-   * directly on `mParticipants` (a `WeakUnitSetUserUnit`), exactly as the binary
-   * does by pointing `this` at `CFormation`'s own `+0x00` participant set.
-   */
-  SSelectionNodeUserEntity** PruneTombstonesAndFindLive(
-    WeakEntitySetUserEntity& set,
-    SSelectionNodeUserEntity** const outNode,
-    SSelectionNodeUserEntity* const start
-  )
-  {
-    SSelectionNodeUserEntity* node = start;
-    if (set.mHead == nullptr) {
-      *outNode = nullptr;
-      return outNode;
-    }
-
-    while (node != set.mHead) {
-      void* const ownerLinkSlot = node->mEnt.mOwnerLinkSlot;
-      if (ownerLinkSlot != nullptr && ownerLinkSlot != reinterpret_cast<void*>(8)) {
-        break;
-      }
-
-      node = EraseSelectionNodeAndAdvance(set, node);
-    }
-
-    *outNode = node;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x007B29C0 (FUN_007B29C0, sub_7B29C0)
-   *
-   * Thin forwarder preserving the original member-call shape for every existing
-   * `SSelectionSetUserEntity`-typed caller in this file; the real body now lives
-   * in the free `moho::PruneTombstonesAndFindLive` above.
-   */
-  SSelectionNodeUserEntity** SSelectionSetUserEntity::PruneTombstonesAndFindLive(
-    SSelectionNodeUserEntity** const outNode,
-    SSelectionNodeUserEntity* const start
-  )
-  {
-    return moho::PruneTombstonesAndFindLive(*this, outNode, start);
-  }
-
-  /**
-   * Address: 0x007ABDE0 (FUN_007ABDE0, sub_7ABDE0)
-   * Address: 0x007ABE10 (FUN_007ABE10, sub_7ABE10)
-   *
-   * What it does:
-   * Clears all weak-set nodes, destroys the tree head sentinel, and resets
-   * storage links/counters for this set.
-   */
-  std::int32_t SSelectionSetUserEntity::ReleaseStorage()
-  {
-    if (mHead == nullptr) {
-      mSize = 0u;
-      return 0;
-    }
-
-    SSelectionNodeUserEntity* node = nullptr;
-    (void)EraseRange(&node, mHead->mLeft, mHead);
-    ::operator delete(mHead);
-    mHead = nullptr;
-    mSize = 0u;
-    return 0;
-  }
-
-  /**
-   * Address: 0x0066ADD0 (FUN_0066ADD0, Moho::WeakSet_UserEntity::Iterator::inc)
-   * Address: 0x00856860 (FUN_00856860)
-   *
-   * What it does:
-   * Standard MSVC red-black tree successor iterator. If the current node has
-   * a non-sentinel right subtree, descends to its leftmost descendant. Otherwise
-   * climbs ancestors until reaching one whose right child is not the current
-   * traversal path. No-op when already at the sentinel.
-   */
-  void SSelectionSetUserEntity::Iterator_inc(SSelectionNodeUserEntity** const cursor)
-  {
-    SSelectionNodeUserEntity* node = *cursor;
-    if (node->mIsSentinel != 0u) {
-      return;
-    }
-
-    SSelectionNodeUserEntity* right = node->mRight;
-    if (right->mIsSentinel != 0u) {
-      // No right subtree: climb until we find an ancestor that we came from the left of.
-      SSelectionNodeUserEntity* parent = node->mParent;
-      while (parent->mIsSentinel == 0u) {
-        if (*cursor != parent->mRight) {
-          break;
-        }
-        *cursor = parent;
-        parent = parent->mParent;
-      }
-      *cursor = parent;
-    } else {
-      // Has right subtree: leftmost descendant of right child is the successor.
-      SSelectionNodeUserEntity* leftmost = right->mLeft;
-      while (leftmost->mIsSentinel == 0u) {
-        right = leftmost;
-        leftmost = leftmost->mLeft;
-      }
-      *cursor = right;
-    }
-  }
-
-  /**
-   * Address: 0x0066A330 (FUN_0066A330, Moho::WeakSet_UserEntity::find)
-   *
-   * What it does:
-   * Walks forward from `start` and uses the prune helper to remove tombstone
-   * entries (null/`(void*)8` owner-link slots), returning the first live node
-   * or `mHead` (sentinel) when no live entries remain.
-   */
-  SSelectionNodeUserEntity* SSelectionSetUserEntity::find(
-    WeakEntitySetUserEntity* const set,
-    SSelectionNodeUserEntity* const start,
-    SSelectionNodeUserEntity** const outNode)
-  {
-    if (set == nullptr) {
-      if (outNode != nullptr) {
-        *outNode = nullptr;
-      }
-      return nullptr;
-    }
-
-    SSelectionNodeUserEntity* node = start;
-    (void)moho::PruneTombstonesAndFindLive(*set, &node, node);
-    *outNode = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x0066A060 (FUN_0066A060, Moho::WeakSet_UserEntity::First)
-   * Address: 0x007B25F0 (FUN_007B25F0, sub_7B25F0)
-   *
-   * What it does:
-   * Starts weak-set iteration from the head-left node and stores one
-   * `{set,node}` cursor pair into `outResult`.
-   *
-   * 0x007B25F0 is the `WeakSet<UserUnit>` emission of this exact body; the two
-   * are byte-identical, which is why one definition serves both. See the
-   * declaration in WeakEntitySet.h for the emission-level evidence.
-   */
-  WeakEntitySetUserEntity::FindResult* WeakEntitySetUserEntity::First(FindResult* const outResult)
-  {
-    return BuildSelectionFindResultFromHeadLeft(this, outResult);
-  }
-
-  /**
-   * Address: 0x007F0490 (FUN_007F0490, sub_7F0490)
-   *
-   * IDA signature:
-   * Moho::WeakSet_UserEntity_FindRes *__stdcall sub_7F0490(
-   *     Moho::WeakSet_UserEntity_FindRes *cursor);
-   *
-   * What it does:
-   * Advances one weak-set iteration cursor by exactly one live node: the
-   * red-black successor step, then tombstone filtering through `find` against
-   * the set the cursor already carries. The filtered node is written back into
-   * `cursor->mRes` and the cursor is returned.
-   *
-   * This is the `++it` half of the `First`/`Next` pair `CUIWorldView::HandleEvent`
-   * drives its two weak-set scans with (0x008706D8 and 0x0087108C).
-   */
-  WeakEntitySetUserEntity::FindResult* WeakEntitySetUserEntity::Next(FindResult* const cursor)
-  {
-    SSelectionSetUserEntity::Iterator_inc(&cursor->mRes);
-    cursor->mRes = SSelectionSetUserEntity::find(cursor->mSet, cursor->mRes, &cursor->mRes);
-    return cursor;
-  }
-
-  /**
-   * Address: 0x00831310 (FUN_00831310, sub_831310)
-   *
-   * What it does:
-   * Range constructor. Each source entity is added through `Add`, which
-   * brackets the tree insert (0x00822420) with a stack weak guard on the
-   * entity, exactly as the binary does at 0x0083137A..0x008313E1.
-   */
-  WeakEntitySetUserEntity::WeakEntitySetUserEntity(iterator first, const iterator last)
-  {
-    InitWeakEntitySetHead(*this);
-    for (; first != last; ++first) {
-      AddResult added{};
-      (void)Add(&added, this, *first);
-    }
-  }
-
-  std::int32_t WeakEntitySetUserEntity::Count()
-  {
-    std::int32_t count = 0;
-    for (iterator it = begin(); it != end(); ++it) {
-      ++count;
-    }
-    return count;
-  }
-
-  /**
-   * Address: 0x007AE7E0 (FUN_007AE7E0, Moho::WeakSet_UserEntity::Iterator::Next)
-   *
-   * What it does:
-   * Advances one weak-set iterator cursor with `Iterator_inc`, then filters to
-   * the next live node via `find`, storing the resulting node back into `mNode`.
-   */
-  SSelectionSetUserEntity::Index* SSelectionSetUserEntity::Index::Next()
-  {
-    SSelectionSetUserEntity::Iterator_inc(&mNode);
-    mNode = SSelectionSetUserEntity::find(mOwnerSet, mNode, &mNode);
-    return this;
-  }
-
-  /**
    * Address: 0x00896F00 (FUN_00896F00) init path (FUN_00896F00 -> sub_89A930).
    */
   SSessionSaveData::SSessionSaveData()
@@ -12281,25 +9531,9 @@ namespace moho
     // head and silently drops the entry, so unit picking, band-box
     // selection and every area query see an empty database. That is
     // `mEntitySpatialDb`'s own constructor, run as a member in that order.
-    // 0x00893214-0x0089323D, immediately after that ctor: the extra-selection
-    // weak set at +0xE0 gets its head sentinel built inline, exactly like every
-    // other `WeakSet<UserEntity>` in this class --
-    //
-    //   0x00893214: call sub_7B08D0            ; BuyNode
-    //   0x00893219: mov  [ebp+0E4h], eax       ; set.mHead = node
-    //   0x0089321F: mov  byte ptr [eax+19h], 1 ; node->mIsSentinel = 1
-    //   0x00893229: mov  [eax+4], eax          ; mRight  = head
-    //   0x00893232: mov  [eax], eax            ; mLeft   = head
-    //   0x0089323A: mov  [eax+8], eax          ; mParent = head
-    //   0x0089323D: mov  [ebp+0E8h], ebx       ; set.mSize = 0
-    //
-    // Without it `mHead` stayed null and
-    // the set read as permanently empty: `IsEmptyFromHeadFind` short-circuits
-    // on a null head and `GetExtraSelectList` returns a blank clone. Every
-    // cargo unit the player picked out of a transport's panel was therefore
-    // dropped on the floor, and `IssueTransportOrderForDrag` always took the
-    // unload-EVERYTHING branch instead of the unload-specific one.
-    InitializeLocalSelectionSet(ExtraSelectionView());
+    // 0x00893214-0x0089323D, immediately after that ctor, is `mExtraSelection`'s
+    // own constructor (the head bought through 0x007B08D0, self-linked, count
+    // zero).
     // mBuildTemplates (gpg::fastvector_n<SBuildTemplateInfo, 16>) already rebound
     // itself to inline storage via its own default constructor, which runs
     // implicitly before this body -- matching the binary's per-member subobject
@@ -12324,12 +9558,8 @@ namespace moho
     mDebugCanvas = {};
     mBeatDebugCanvas = {};
     mSimResources = {};
-    // Both weak-entity sets get their head sentinel here, exactly as the
-    // binary does at 0x00893358 / 0x0089338C. Leaving them null is not a
-    // harmless deferral: every insert path checks the head first and silently
-    // does nothing without it, which is why visibility updates never ran.
-    InitWeakEntitySetHead(mOrphans);
-    InitWeakEntitySetHead(mVizUpdates);
+    // `mOrphans` and `mVizUpdates` are constructed as members (0x00893358 /
+    // 0x0089338C).
 
     mGameTick = 0;
     mLastBeatWasTick = 0;
@@ -12367,26 +9597,9 @@ namespace moho
       IsCheatsEnabled = false;
     }
 
-    // The session's selection set is a real weak-entity set and needs its
-    // sentinel head, exactly like every locally-built selection set in this
-    // file. Ground truth, 0x00893465..0x00893497:
-    //
-    //   call sub_7B08D0                ; AllocateWeakEntitySetHead
-    //   mov  [ebp+4A4h], eax           ; mSelection.mHead   (0x04A0 + 0x04)
-    //   mov  byte ptr [eax+19h], 1     ; head->mIsSentinel
-    //   mov  [eax+4], eax              ; head->mParent = head
-    //   mov  [eax], eax                ; head->mLeft   = head
-    //   mov  [eax+8], eax              ; head->mRight  = head
-    //   mov  [ebp+4A8h], ebx           ; mSelection.mSize = 0
-    //   mov  [ebp+4ACh], ebx           ; mSizeMirrorOrUnused = 0
-    //
-    // Leaving mHead null made `SetSelection`'s copy-back guard
-    // (`mSelection.mHead != nullptr`) fail every time, so the session never
-    // retained a selection: `GetSelectedUnits` always returned nil and the
-    // in-game UI kept its orders and construction panels hidden.
-    mSelection.mAllocProxy = nullptr;
-    (void)InitializeSelectionSetHeadStorage(&mSelection);
-    mSelection.mSizeMirrorOrUnused = 0;
+    // `mSelection` is constructed as a member (0x00893465..0x00893491); the
+    // word after it is zeroed at 0x00893497.
+    mSelectionSize = 0;
 
     // 0x0089349D..0x008934D9 is `MouseInfo`'s default constructor, inlined
     // over the cursor lane this class still spells out field by field
@@ -12680,7 +9893,7 @@ namespace moho
    * What it does:
    * Returns the current world-session selection weak-set.
    */
-  const SSelectionSetUserEntity& CWldSession::GetSelection() const
+  const WeakSet<UserEntity>& CWldSession::GetSelection() const
   {
     return mSelection;
   }
@@ -12689,22 +9902,13 @@ namespace moho
    * Address: 0x00896730 (FUN_00896730, ?GetExtraSelectList@CWldSession@Moho@@QBE?AV?$WeakSet@VUserEntity@Moho@@@2@XZ)
    *
    * What it does:
-   * Returns one by-value clone of the extra-selection weak-set by copying the
-   * live iterator range `[find(head->left), head)` into caller-owned storage.
+   * A copy of the extra-select list: `WeakSet`'s copy constructor inlined,
+   * `begin()` pruning the source and the set's range constructor (0x00822C50)
+   * adding the live entries.
    */
-  SSelectionSetUserEntity CWldSession::GetExtraSelectList() const
+  WeakSet<UserEntity> CWldSession::GetExtraSelectList() const
   {
-    SSelectionSetUserEntity outSelection{};
-    SSelectionSetUserEntity* const extraSelection = const_cast<SSelectionSetUserEntity*>(&ExtraSelectionView());
-    if (extraSelection == nullptr || extraSelection->mHead == nullptr) {
-      (void)InitSelectionSetFromIteratorRange(&outSelection, extraSelection, nullptr, nullptr);
-      return outSelection;
-    }
-
-    SSelectionNodeUserEntity* first = extraSelection->mHead->mLeft;
-    first = SSelectionSetUserEntity::find(extraSelection, first, &first);
-    (void)InitSelectionSetFromIteratorRange(&outSelection, extraSelection, first, extraSelection->mHead);
-    return outSelection;
+    return mExtraSelection;
   }
 
   /**
@@ -12894,9 +10098,9 @@ namespace moho
    * pre-scan's cursor-membership test is
    * `LowerBoundWeakEntitySetNode(*cursorEntities, (uint32_t)hoveredEntity)
    * != cursorEntities->mHead`, with `cursorEntities` the
-   * `SSelectionSetUserEntity` (`: WeakEntitySetUserEntity`)
+   * `WeakSet<UserEntity>` (`: WeakSet<UserEntity>`)
    * `ResolveCommandIssueCursorEntities` returns for that command's helper -
-   * confirmed reachable via `WeakEntitySetUserEntity::First`'s own doc
+   * confirmed reachable via `WeakSet<UserEntity>::First`'s own doc
    * comment ("CUIWorldView::HandleEvent... at 0x00871065 over a command
    * helper's under-cursor set").
    *
@@ -12974,9 +10178,8 @@ namespace moho
       }
 
       if (hoveredEntity != nullptr) {
-        SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*helper);
-        const auto hoveredKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(hoveredEntity));
-        if (LowerBoundWeakEntitySetNode(*cursorEntities, hoveredKey) != cursorEntities->mHead) {
+        WeakSet<UserUnit>* const cursorEntities = ResolveCommandIssueCursorEntities(*helper);
+        if (cursorEntities->Find(static_cast<UserUnit*>(hoveredEntity)) != cursorEntities->end()) {
           anyHighlight = true;
           break;
         }
@@ -13213,22 +10416,6 @@ namespace moho
   }
 
   /**
-   * Address context: 0x00896870 (`ClearExtraSelectList`) field lane.
-   */
-  SSelectionSetUserEntity& CWldSession::ExtraSelectionView()
-  {
-    return mExtraSelection;
-  }
-
-  /**
-   * Address context: 0x00896870 (`ClearExtraSelectList`) field lane.
-   */
-  const SSelectionSetUserEntity& CWldSession::ExtraSelectionView() const
-  {
-    return mExtraSelection;
-  }
-
-  /**
    * Address: 0x00896780 (FUN_00896780, ?AddToExtraSelectList@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
    *
    * What it does:
@@ -13237,16 +10424,15 @@ namespace moho
    */
   void CWldSession::AddToExtraSelectList(UserEntity* const entity)
   {
-    UnloadDragDiagLine("[XSEL] Add entity=%p sizeBefore=%u", static_cast<void*>(entity), ExtraSelectionView().mSize);
+    UnloadDragDiagLine("[XSEL] Add entity=%p sizeBefore=%u", static_cast<void*>(entity), static_cast<unsigned>(mExtraSelection.Size()));
     UICommandModeData commandModeData{};
     commandModeData.mMode = msvc8::string("order", 5u);
     commandModeData.mPayload.AssignNewTable(mState, 0, 0);
     commandModeData.mPayload.SetString("name", "RULEUCC_Transport");
     UI_StartCommandMode(commandModeData);
 
-    SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
-    (void)InsertSelectionEntity(extraSelection, entity);
-    UnloadDragDiagLine("[XSEL] Add done sizeAfter=%u", extraSelection.mSize);
+    (void)mExtraSelection.Add(entity);
+    UnloadDragDiagLine("[XSEL] Add done sizeAfter=%u", static_cast<unsigned>(mExtraSelection.Size()));
   }
 
   /**
@@ -13258,8 +10444,7 @@ namespace moho
    */
   void CWldSession::RemoveFromExtraSelectList(UserEntity* const entity)
   {
-    SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
-    UnloadDragDiagLine("[XSEL] Remove entity=%p size=%u", static_cast<void*>(entity), extraSelection.mSize);
+    UnloadDragDiagLine("[XSEL] Remove entity=%p size=%u", static_cast<void*>(entity), static_cast<unsigned>(mExtraSelection.Size()));
 
     // 0x00896844 `call sub_8676E0` -- the erase's result is pushed nowhere and
     // never tested. The emptiness re-check that follows is unconditional:
@@ -13275,9 +10460,9 @@ namespace moho
     // RULEUCC_Transport command mode `AddToExtraSelectList` started: every
     // later right-click then issues a transport order instead of the default
     // attack/move, which is why clicking an enemy unit appeared to do nothing.
-    (void)SSelectionSetUserEntity::Erase(extraSelection, entity);
+    (void)mExtraSelection.Remove(entity);
 
-    if (extraSelection.IsEmptyFromHeadFind()) {
+    if (mExtraSelection.Empty()) {
       UI_EndCommandMode();
     }
   }
@@ -13291,20 +10476,16 @@ namespace moho
    */
   void CWldSession::ClearExtraSelectList()
   {
-    SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
-    UnloadDragDiagLine("[XSEL] Clear size=%u", extraSelection.mSize);
-    // 0x00896881-0x00896896: the emptiness test is `find(head->left) == head`,
-    // not a raw `head->left == head` -- `find` walks past weak entries whose
-    // target has died, so a set holding only dead nodes counts as empty here.
-    if (extraSelection.IsEmptyFromHeadFind()) {
+    UnloadDragDiagLine("[XSEL] Clear size=%u", static_cast<unsigned>(mExtraSelection.Size()));
+    // 0x00896881-0x00896896: `Empty()`, which prunes, so a set holding only
+    // dead entries counts as empty. Then the whole-tree erase (0x008968A1..)
+    // and the end of command mode. The word after the set (+0xEC) is not
+    // touched; this used to store the count there.
+    if (mExtraSelection.Empty()) {
       return;
     }
 
-    SSelectionNodeUserEntity* const head = extraSelection.mHead;
-
-    SSelectionNodeUserEntity* node = head->mLeft;
-    (void)extraSelection.EraseRange(&node, head->mLeft, head);
-    extraSelection.mSizeMirrorOrUnused = extraSelection.mSize;
+    mExtraSelection.Clear();
     UI_EndCommandMode();
   }
 
@@ -13317,23 +10498,10 @@ namespace moho
    */
   bool CWldSession::UnitFirstInSelection(const UserUnit* const unit) const
   {
-    SSelectionSetUserEntity& selection = const_cast<SSelectionSetUserEntity&>(mSelection);
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    if (head == nullptr) {
-      return true;
-    }
-
-    SSelectionNodeUserEntity* node = head->mLeft;
-    SSelectionSetUserEntity::find(&selection, node, &node);
-    while (node != head) {
-      const UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
-      const UserUnit* const selectedUnit = selectedEntity ? selectedEntity->IsUserUnit() : nullptr;
-      if (selectedUnit != unit) {
+    for (UserEntity* const selectedEntity : mSelection) {
+      if (selectedEntity->IsUserUnit() != unit) {
         return false;
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      SSelectionSetUserEntity::find(&selection, node, &node);
     }
 
     return true;
@@ -13411,8 +10579,7 @@ namespace moho
     // the weak-set insert.
     entity->mMarkedForDeletion = 1;
 
-    WeakEntitySetUserEntity::AddResult addResult{};
-    (void)WeakEntitySetUserEntity::Add(&addResult, &mOrphans, entity);
+    (void)mOrphans.Add(entity);
   }
 
   /**
@@ -13429,8 +10596,7 @@ namespace moho
       return;
     }
 
-    WeakEntitySetUserEntity::AddResult added{};
-    (void)WeakEntitySetUserEntity::Add(&added, &mVizUpdates, entity);
+    (void)mVizUpdates.Add(entity);
   }
 
   /**
@@ -13447,14 +10613,10 @@ namespace moho
       return;
     }
 
-    WeakEntitySetUserEntity::FindResult found{};
-    (void)FindSelectionNodeByEntityGuarded(&found, &mVizUpdates, entity);
-    if (found.mRes == mVizUpdates.mHead) {
-      return;
+    const WeakSet<UserEntity>::iterator found = mVizUpdates.Find(entity);
+    if (found != mVizUpdates.end()) {
+      (void)mVizUpdates.Erase(found);
     }
-
-    SSelectionNodeUserEntity* next = EraseSelectionNodeAndAdvance(mVizUpdates, found.mRes);
-    (void)SSelectionSetUserEntity::find(&mVizUpdates, next, &next);
   }
 
   /**
@@ -13510,77 +10672,31 @@ namespace moho
    */
   void CWldSession::CheckForNecessaryUIRefresh()
   {
-    const std::uint32_t previousSelectionSize = mSelection.mSize;
-    bool needsSelectionRefresh = false;
+    const std::size_t selectionSize = mSelection.Size();
+    bool needsRefresh = false;
 
-    msvc8::vector<UserEntity*> filteredSelection{};
-    filteredSelection.reserve(static_cast<std::size_t>(previousSelectionSize));
-
-    const SSelectionNodeUserEntity* const head = mSelection.mHead;
-    if (head != nullptr) {
-      for (const SSelectionNodeUserEntity* node = head->mLeft; node != nullptr && node != head; node = NextTreeNode(node)
-      ) {
-        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
-        if (entity == nullptr) {
-          needsSelectionRefresh = true;
-          continue;
-        }
-
-        if (entity->RequiresUIRefresh()) {
-          needsSelectionRefresh = true;
-        }
-
-        if (entity->mVariableData.mIsDead != 0u) {
-          needsSelectionRefresh = true;
-          continue;
-        }
-
-        if (!ContainsEntityPtr(filteredSelection, entity)) {
-          filteredSelection.push_back(entity);
-        }
+    // Every live, not-dead entry is kept; an entry that asks for a UI refresh
+    // (vtable +0x2C) or decodes to nothing flags one.
+    WeakSet<UserEntity> keptSelection;
+    for (UserEntity* const entity : mSelection) {
+      if (entity == nullptr) {
+        needsRefresh = true;
+        continue;
+      }
+      if (entity->RequiresUIRefresh()) {
+        needsRefresh = true;
+      }
+      if (entity->mVariableData.mIsDead == 0u) {
+        (void)keptSelection.Add(entity);
       }
     }
 
-    // `mSelection`'s own +0x0C lane (absolute +0x4AC): the selection set is a
-    // 12-byte `WeakSet<UserEntity>` header plus this mirror of its size.
-    const auto maxSelectionSizeRuntime = static_cast<std::int32_t>(mSelection.mSizeMirrorOrUnused);
-    const std::uint32_t maxSelectionSize = maxSelectionSizeRuntime > 0 ? static_cast<std::uint32_t>(maxSelectionSizeRuntime)
-                                                                        : 0u;
-    const std::uint32_t liveSelectionSize = static_cast<std::uint32_t>(filteredSelection.size());
-
-    // 0x008944BE / 0x008944CE / 0x008944DB: the same three-way gate, and when
-    // any arm takes it the body does exactly one thing -- 0x008944E7
-    // `call ?SetSelection@CWldSession@Moho@@QAEXABV?$WeakSet@VUserEntity@Moho@@@2@@Z`.
-    // The whole function is `size`, the local-set init, the prune walk, `size`,
-    // `SetSelection`, then the local set's teardown; there is no second
-    // comparison, no in-place rebuild of `mSelection`, no driver sync-mask
-    // update and no `UI_EndCommandMode`.
-    //
-    // This used to rebuild `mSelection` by hand and then suppress the publish
-    // behind its own `AreEntitySetsEqual` check. `SetSelection` is what
-    // computes the added/removed sets and broadcasts `SSelectionEvent` to the
-    // listeners the UI is built on, so gating it on entity-set identity meant
-    // any change that keeps the same entities -- a transport whose cargo list
-    // changed underneath it -- never reached the UI, and the construction
-    // panel's `SetSecondaryDisplay('attached')` only re-ran when the player
-    // re-selected. `SetSelection` already skips its own broadcast when nothing
-    // actually changed, so the guard here was both wrong and redundant.
-    //
-    // The `UI_EndCommandMode()` this also used to run is worse: this function
-    // is called from the session beat, so it tore down whatever command mode
-    // was active every beat.
-    if (!needsSelectionRefresh && !(previousSelectionSize < maxSelectionSize) && !(liveSelectionSize < previousSelectionSize
-        )) {
-      return;
+    // 0x008944BC..0x008944DB, then `SetSelection` 0x008944E7. `SetSelection`
+    // works out what changed and broadcasts it; this only decides whether to
+    // call it.
+    if (needsRefresh || selectionSize < mSelectionSize || keptSelection.Size() < selectionSize) {
+      SetSelection(keptSelection);
     }
-
-    ScopedLocalSelectionSet refreshedSelectionGuard{};
-    SSelectionSetUserEntity& refreshedSelection = refreshedSelectionGuard.get();
-    for (UserEntity* const entity : filteredSelection) {
-      (void)InsertSelectionEntity(refreshedSelection, entity);
-    }
-
-    SetSelection(refreshedSelection);
   }
 
   /**
@@ -13623,18 +10739,12 @@ namespace moho
   {
     std::int32_t selectableTemplateUnitCount = 0;
 
-    SSelectionSetUserEntity::FindResult cursor{};
-    (void)mSelection.First(&cursor);
-    while (cursor.mRes != mSelection.mHead) {
-      UserEntity* const selectedEntity = DecodeSelectedUserEntity(cursor.mRes->mEnt);
+    for (UserEntity* const selectedEntity : mSelection) {
       UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
       const IUnit* const selectedBridge = GetIUnitBridge(selectedUnit);
       if (selectedBridge != nullptr && !selectedBridge->IsMobile() && !selectedBridge->IsDead()) {
         ++selectableTemplateUnitCount;
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&cursor.mRes);
-      cursor.mRes = SSelectionSetUserEntity::find(&mSelection, cursor.mRes, &cursor.mRes);
     }
 
     if (selectableTemplateUnitCount <= 0) {
@@ -13648,10 +10758,8 @@ namespace moho
     float maxX = -10000.0f;
     float maxY = -10000.0f;
 
-    (void)mSelection.First(&cursor);
-    while (cursor.mRes != mSelection.mHead) {
-      UserEntity* const selectedEntity = DecodeSelectedUserEntity(cursor.mRes->mEnt);
-      UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
+    for (UserEntity* const selectedEntity : mSelection) {
+      UserUnit* const selectedUnit = selectedEntity->IsUserUnit();
       IUnit* const selectedBridge = GetIUnitBridge(selectedUnit);
       if (selectedBridge != nullptr && !selectedBridge->IsMobile() && !selectedBridge->IsDead()) {
         SBuildTemplateInfo templateInfo{};
@@ -13677,9 +10785,6 @@ namespace moho
 
         mBuildTemplates.push_back(templateInfo);
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&cursor.mRes);
-      cursor.mRes = SSelectionSetUserEntity::find(&mSelection, cursor.mRes, &cursor.mRes);
     }
 
     SortBuildTemplateRangeByOrder(mBuildTemplates.begin(), mBuildTemplates.end());
@@ -13921,7 +11026,7 @@ namespace moho
      *
      * (Stranded note: the helper this documented is no longer in this file.
      * The pruning cursor that sat under it, 0x008955F2..0x00895667, is now
-     * `WeakEntitySetUserEntity::begin()` over `mOrphans`/`mVizUpdates`.)
+     * `WeakSet<UserEntity>::begin()` over `mOrphans`/`mVizUpdates`.)
      */
   } // namespace
 
@@ -13987,8 +11092,7 @@ namespace moho
       FocusArmy = beat.mFocusArmy;
       USER_GetSound()->SetListenerArmy(ArmyAtIndexOrNull(userArmies, FocusArmy));
 
-      ScopedLocalSelectionSet clearedSelection;
-      SetSelection(clearedSelection.get());
+      SetSelection(WeakSet<UserEntity>());
     }
 
     USER_GetSound()->UpdateSoundRequests(beat.mAudioRequests);
@@ -14402,17 +11506,7 @@ namespace moho
   {
     outUnits.clear();
 
-    const SSelectionNodeUserEntity* const head = mSelection.mHead;
-    if (!head) {
-      return;
-    }
-
-    for (const SSelectionNodeUserEntity* node = head->mLeft; node && node != head; node = NextTreeNode(node)) {
-      UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
-      if (!entity) {
-        continue;
-      }
-
+    for (UserEntity* const entity : mSelection) {
       UserUnit* const userUnit = entity->IsUserUnit();
       if (!userUnit) {
         continue;
@@ -14428,36 +11522,16 @@ namespace moho
    * Address: 0x00896000 (FUN_00896000, ?GetSelectionUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
    *
    * What it does:
-   * Inserts every live selected `UserUnit` into `outUnits` through
-   * `WeakSet<UserUnit>::Add`, walking the selection with the shared
-   * tombstone-pruning `find`/`Iterator_inc` pair.
-   *
-   * The walk prunes tombstoned nodes out of the tree as it goes, which is why
-   * the shipped `QBE` (const) member mutates the selection: the const_cast
-   * below reproduces that exactly rather than papering over it.
+   * Adds every selected unit to `outUnits` (`WeakSet<UserUnit>::Add`
+   * 0x00822270). The walk prunes the selection's dead entries as it goes, so
+   * this `QBE` (const) member does change the tree.
    */
-  void CWldSession::GetSelectionUnits(WeakUnitSetUserUnit& outUnits) const
+  void CWldSession::GetSelectionUnits(WeakSet<UserUnit>& outUnits) const
   {
-    SSelectionSetUserEntity& selection = const_cast<SSelectionSetUserEntity&>(mSelection);
-
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    SSelectionNodeUserEntity* node = head->mLeft;
-    node = SSelectionSetUserEntity::find(&selection, node, &node);
-
-    while (node != head) {
-      if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt); entity != nullptr) {
-        if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
-          WeakUnitSetUserUnit::AddResult added{};
-          (void)WeakUnitSetUserUnit::Add(&added, &outUnits, unit);
-        }
+    for (UserEntity* const entity : mSelection) {
+      if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
+        (void)outUnits.Add(unit);
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
     }
   }
 
@@ -14473,17 +11547,7 @@ namespace moho
     outUnits.clear();
 
     const UserEntity* const hoveredTarget = this->GetHoveredUserEntity();
-    const SSelectionNodeUserEntity* const head = mSelection.mHead;
-    if (!head) {
-      return;
-    }
-
-    for (const SSelectionNodeUserEntity* node = head->mLeft; node && node != head; node = NextTreeNode(node)) {
-      UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
-      if (!entity) {
-        continue;
-      }
-
+    for (UserEntity* const entity : mSelection) {
       UserUnit* const userUnit = entity->IsUserUnit();
       if (!userUnit) {
         continue;
@@ -14505,10 +11569,7 @@ namespace moho
     {
       static int sProbe = 0;
       if (sProbe++ < 40) {
-        std::size_t selected = 0;
-        for (const SSelectionNodeUserEntity* n = head->mLeft; n && n != head; n = NextTreeNode(n)) {
-          ++selected;
-        }
+        const std::size_t selected = mSelection.Size();
         gpg::Warnf(
           "[CLICKDIAG] GetValidAttackingUnits hovered=%p hoveredIsUnit=%d selected=%u valid=%u",
           static_cast<const void*>(hoveredTarget),
@@ -14550,23 +11611,15 @@ namespace moho
     commandIssueData.mIndex = helper->mConstantData.cmd;
     commandIssueData.mBlueprint = reinterpret_cast<RUnitBlueprint*>(helper->mConstantData.blueprint);
 
-    // Collect the helper's cached cursor entities as raw UserUnit* lanes (the
-    // increase path pushes every decoded entity unconditionally, no IsUserUnit
-    // filter). The set is rebuilt-if-dirty by the UserUnit-side bridge.
+    // The command's units: a copy of the helper's cursor set (rebuilt first if
+    // dirty, 0x008B43F0; copied through the range constructor 0x00831310),
+    // then every unit of the copy into a vector sized by its `Size()`
+    // (0x00838AE0). The copy is destroyed on the way out (0x008B0E61).
+    const WeakSet<UserUnit> cursorUnits(*ResolveCommandIssueCursorEntities(*helper));
     gpg::fastvector<UserUnit*> selectedUnits{};
-    SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*helper);
-    if (cursorEntities->mSize > 0u) {
-      selectedUnits.reserve(cursorEntities->mSize);
-    }
-
-    SSelectionNodeUserEntity* node = nullptr;
-    cursorEntities->PruneTombstonesAndFindLive(&node, cursorEntities->mHead->mLeft);
-    while (node != cursorEntities->mHead) {
-      if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt)) {
-        selectedUnits.push_back(reinterpret_cast<UserUnit*>(entity));
-      }
-      node = NextTreeNode(node);
-      cursorEntities->PruneTombstonesAndFindLive(&node, node);
+    selectedUnits.reserve(cursorUnits.Size());
+    for (UserUnit* const unit : cursorUnits) {
+      selectedUnits.push_back(unit);
     }
 
     // Issue the reconstructed factory-build command once per requested count;
@@ -14742,27 +11795,20 @@ namespace moho
    * overload (CWldSession.cpp).
    */
   void ISSUE_FactoryCommand(
-    const SSelectionSetUserEntity& entities, const SSTICommandIssueData& commandIssueData, const bool clearQueue
+    const WeakSet<UserEntity>& entities, const SSTICommandIssueData& commandIssueData, const bool clearQueue
   )
   {
     gpg::fastvector_n<UserUnit*, 2> selectedUnits{};
-    const std::int32_t entityCount = entities.size();
+    const std::int32_t entityCount = static_cast<std::int32_t>(entities.Size());
     if (entityCount > 0) {
       selectedUnits.reserve(static_cast<std::size_t>(entityCount));
     }
 
-    SSelectionSetUserEntity* const mutableEntities = const_cast<SSelectionSetUserEntity*>(&entities);
-    SSelectionNodeUserEntity* node = nullptr;
-    node = SSelectionSetUserEntity::find(mutableEntities, mutableEntities->mHead->mLeft, &node);
-    while (node != mutableEntities->mHead) {
-      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+    for (UserEntity* const selectedEntity : entities) {
       UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
       if (selectedUnit != nullptr) {
         selectedUnits.push_back(selectedUnit);
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(mutableEntities, node, &node);
     }
 
     ISSUE_FactoryCommand(selectedUnits, commandIssueData, clearQueue);
@@ -14838,24 +11884,14 @@ namespace moho
    * (FUN_0081FCD0, recovered in this file), from the `RULEUCC_Attack` arm
    * at 0x0081FDB9 when the event replaces a command the same drag issued.
    */
-  void ISSUE_RemoveLastCommand(SSelectionSetUserEntity& entities)
+  void ISSUE_RemoveLastCommand(WeakSet<UserEntity>& entities)
   {
     gpg::fastvector<UserUnit*> units{};
-    units.reserve(static_cast<std::size_t>(entities.size()));
+    units.reserve(entities.Size());
 
-    if (SSelectionNodeUserEntity* const head = entities.mHead; head != nullptr) {
-      SSelectionNodeUserEntity* node = head->mLeft;
-      node = SSelectionSetUserEntity::find(&entities, node, &node);
-
-      while (node != head) {
-        if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt); entity != nullptr) {
-          if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
-            units.push_back(unit);
-          }
-        }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&entities, node, &node);
+    for (UserEntity* const entity : entities) {
+      if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
+        units.push_back(unit);
       }
     }
 
@@ -14940,7 +11976,7 @@ namespace moho
    * anonymous-namespace body directly.
    */
   bool CanRestartSelectionMoveCommandAsPatrol(
-    SSelectionSetUserEntity& selection,
+    WeakSet<UserEntity>& selection,
     UserCommandIssueHelper* const helper
   )
   {
@@ -15033,7 +12069,7 @@ namespace moho
 
     /// Issues `commandType` at the hovered entity for the whole selection.
     void IssueOrderAtEntity(
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       const EUnitCommandType commandType,
       const UserEntity& target,
       const bool clearQueue
@@ -15046,7 +12082,7 @@ namespace moho
 
     /// Issues `commandType` at a world position for the whole selection.
     void IssueOrderAtGround(
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       const EUnitCommandType commandType,
       const Wm3::Vector3f& worldPos,
       const bool clearQueue
@@ -15094,25 +12130,23 @@ namespace moho
      */
     void IssueAttackMoveToGround(
       CWldSession& session,
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       const Wm3::Vector3f& dragWorldPos,
       const bool formationModifier,
       const bool clearQueue
     )
     {
-      ScopedLocalSelectionSet otherGuard{};
-      ScopedLocalSelectionSet aggressiveMoveGuard{};
-      SSelectionSetUserEntity& otherUnits = otherGuard.get();
-      SSelectionSetUserEntity& aggressiveMoveUnits = aggressiveMoveGuard.get();
+      WeakSet<UserEntity> otherUnits;
+      WeakSet<UserEntity> aggressiveMoveUnits;
       SplitSelectionForAggressiveMove(selection, aggressiveMoveUnits, otherUnits);
 
-      if (!aggressiveMoveUnits.IsEmptyFromHeadFind()) {
+      if (!aggressiveMoveUnits.Empty()) {
         const CFormation& formation = *session.mCurFormation;
         SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_AggressiveMove);
         ApplyFormationLanes(commandData, formation);
 
         Wm3::Vector3f destination = dragWorldPos;
-        if (aggressiveMoveUnits.size() > 1 && formationModifier) {
+        if (aggressiveMoveUnits.Size() > 1 && formationModifier) {
           commandData.mCommandType = EUnitCommandType::UNITCOMMAND_FormAggressiveMove;
           destination = formation.mFinish;
         }
@@ -15121,7 +12155,7 @@ namespace moho
         ISSUE_Command(aggressiveMoveUnits, commandData, clearQueue);
       }
 
-      if (!otherUnits.IsEmptyFromHeadFind()) {
+      if (!otherUnits.Empty()) {
         IssueOrderAtGround(otherUnits, EUnitCommandType::UNITCOMMAND_Attack, dragWorldPos, clearQueue);
       }
     }
@@ -15146,7 +12180,7 @@ namespace moho
     void IssueMoveOrderForDrag(
       CommandModeData& commandMode,
       CWldSession& session,
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       const bool attackMoveModifier,
       const bool queueModifier,
       const bool clearQueue
@@ -15154,10 +12188,8 @@ namespace moho
     {
       const Wm3::Vector3f& dragWorldPos = commandMode.mMouseDragStart.mMouseWorldPos;
 
-      ScopedLocalSelectionSet rallyPointGuard{};
-      ScopedLocalSelectionSet otherGuard{};
-      SSelectionSetUserEntity& rallyPointUnits = rallyPointGuard.get();
-      SSelectionSetUserEntity& otherUnits = otherGuard.get();
+      WeakSet<UserEntity> rallyPointUnits;
+      WeakSet<UserEntity> otherUnits;
       SplitSelectionByRallyPointCategory(selection, rallyPointUnits, otherUnits);
 
       const EUnitCommandType moveCommand = attackMoveModifier
@@ -15167,7 +12199,7 @@ namespace moho
         ? EUnitCommandType::UNITCOMMAND_FormAggressiveMove
         : EUnitCommandType::UNITCOMMAND_FormMove;
 
-      if (!otherUnits.IsEmptyFromHeadFind()) {
+      if (!otherUnits.Empty()) {
         const CFormation& formation = *session.mCurFormation;
         SSTICommandIssueData commandData(moveCommand);
         ApplyFormationLanes(commandData, formation);
@@ -15177,7 +12209,7 @@ namespace moho
         // way the RULEUCC_Attack arm above does; in the shipped FAF binary the
         // `jnz` that did so is NOP'd out at 0x0082074D-0x0082074E, leaving only
         // the settled-formation test. Recovered as shipped.
-        if (otherUnits.size() > 1 && IsFormationSettled(formation)) {
+        if (otherUnits.Size() > 1 && IsFormationSettled(formation)) {
           commandData.mCommandType = formMoveCommand;
           destination = formation.mFinish;
         }
@@ -15202,7 +12234,7 @@ namespace moho
         ISSUE_Command(otherUnits, commandData, clearQueue);
       }
 
-      if (!rallyPointUnits.IsEmptyFromHeadFind()) {
+      if (!rallyPointUnits.Empty()) {
         SSTICommandIssueData rallyCommandData(moveCommand);
         SetGroundTarget(rallyCommandData, dragWorldPos);
         ISSUE_FactoryCommand(rallyPointUnits, rallyCommandData, clearQueue);
@@ -15226,7 +12258,7 @@ namespace moho
     void IssueGuardOrderForDrag(
       CommandModeData& commandMode,
       CWldSession& session,
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       UserEntity* const hovered,
       const bool queueModifier,
       const bool clearQueue
@@ -15250,10 +12282,8 @@ namespace moho
           return;
         }
 
-        ScopedLocalSelectionSet nonRebuilderGuard{};
-        ScopedLocalSelectionSet rebuilderGuard{};
-        SSelectionSetUserEntity& nonRebuilders = nonRebuilderGuard.get();
-        SSelectionSetUserEntity& rebuilders = rebuilderGuard.get();
+        WeakSet<UserEntity> nonRebuilders;
+        WeakSet<UserEntity> rebuilders;
         SplitSelectionByRebuilderCategory(selection, nonRebuilders, rebuilders);
 
         {
@@ -15271,32 +12301,22 @@ namespace moho
         return;
       }
 
-      ScopedLocalUnitSet formationUnitsGuard{};
-      ScopedLocalSelectionSet guardTargetGuard{};
-      WeakUnitSetUserUnit& formationUnits = formationUnitsGuard.get();
-      SSelectionSetUserEntity& guardTargets = guardTargetGuard.get();
+      WeakSet<UserUnit> formationUnits;
+      WeakSet<UserEntity> guardTargets;
 
-      SSelectionSetUserEntity::FindResult cursor{};
-      (void)selection.First(&cursor);
-      SSelectionSetUserEntity::Index iterator{&selection, cursor.mRes};
-      while (iterator.mNode != selection.mHead) {
-        UserEntity* const entity = DecodeSelectionIndexOwner(&iterator);
+      for (UserEntity* const entity : selection) {
         const REntityBlueprint* const blueprint = entity != nullptr ? entity->mParams.mBlueprint : nullptr;
         if (blueprint != nullptr && blueprint->IsMobile()) {
-          SSelectionSetUserEntity::AddResult targetAdd{};
-          (void)SSelectionSetUserEntity::Add(&targetAdd, &guardTargets, entity);
+          (void)guardTargets.Add(entity);
 
           if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
-            WeakUnitSetUserUnit::AddResult participantAdd{};
-            (void)WeakUnitSetUserUnit::Add(&participantAdd, &formationUnits, unit);
+            (void)formationUnits.Add(unit);
           }
         }
-
-        (void)iterator.Next();
       }
 
       CFormation& formation = *session.mCurFormation;
-      if (guardTargets.size() > 1) {
+      if (guardTargets.Size() > 1) {
         formation.ChooseFormation(dragWorldPos, formationUnits, queueModifier);
         if (formation.mBestFormation >= 0) {
           SSTICommandIssueData commandData(UnitCommandCapToCommandType(commandMode.mCommandCaps));
@@ -15308,7 +12328,7 @@ namespace moho
         return;
       }
 
-      if (!guardTargets.IsEmptyFromHeadFind()) {
+      if (!guardTargets.Empty()) {
         IssueOrderAtGround(
           guardTargets, UnitCommandCapToCommandType(commandMode.mCommandCaps), dragWorldPos, clearQueue
         );
@@ -15334,7 +12354,7 @@ namespace moho
     void IssuePatrolOrderForDrag(
       CommandModeData& commandMode,
       CWldSession& session,
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       UserEntity* const hovered,
       const bool queueModifier,
       const bool clearQueue
@@ -15342,35 +12362,25 @@ namespace moho
     {
       const Wm3::Vector3f& dragWorldPos = commandMode.mMouseDragStart.mMouseWorldPos;
 
-      ScopedLocalSelectionSet rallyPointGuard{};
-      ScopedLocalSelectionSet otherGuard{};
-      SSelectionSetUserEntity& rallyPointUnits = rallyPointGuard.get();
-      SSelectionSetUserEntity& otherUnits = otherGuard.get();
+      WeakSet<UserEntity> rallyPointUnits;
+      WeakSet<UserEntity> otherUnits;
       SplitSelectionByRallyPointCategory(selection, rallyPointUnits, otherUnits);
 
       CFormation& formation = *session.mCurFormation;
       SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_Patrol);
       SetGroundTarget(commandData, dragWorldPos);
 
-      if (selection.size() > 1) {
+      if (selection.Size() > 1) {
         if (IsFormationSettled(formation)) {
           commandData.mCommandType = EUnitCommandType::UNITCOMMAND_FormPatrol;
           ApplyFormationLanes(commandData, formation);
         } else {
-          ScopedLocalUnitSet formationUnitsGuard{};
-          WeakUnitSetUserUnit& formationUnits = formationUnitsGuard.get();
+          WeakSet<UserUnit> formationUnits;
 
-          SSelectionSetUserEntity::FindResult cursor{};
-          (void)selection.First(&cursor);
-          SSelectionSetUserEntity::Index iterator{&selection, cursor.mRes};
-          while (iterator.mNode != selection.mHead) {
-            UserEntity* const entity = DecodeSelectionIndexOwner(&iterator);
+          for (UserEntity* const entity : selection) {
             if (UserUnit* const unit = entity != nullptr ? entity->IsUserUnit() : nullptr; unit != nullptr) {
-              WeakUnitSetUserUnit::AddResult participantAdd{};
-              (void)WeakUnitSetUserUnit::Add(&participantAdd, &formationUnits, unit);
+              (void)formationUnits.Add(unit);
             }
-
-            (void)iterator.Next();
           }
 
           const Wm3::Vector3f& formationAnchor =
@@ -15385,7 +12395,7 @@ namespace moho
         }
       }
 
-      if (!otherUnits.IsEmptyFromHeadFind()) {
+      if (!otherUnits.Empty()) {
         Wm3::Vector3f groupAnchor(0.0f, 0.0f, 0.0f);
         if (ResolveGroupMoveAnchorOrDetectPatrol(selection, groupAnchor, !queueModifier)) {
           ISSUE_Command(otherUnits, commandData, clearQueue);
@@ -15399,7 +12409,7 @@ namespace moho
         }
       }
 
-      if (!rallyPointUnits.IsEmptyFromHeadFind()) {
+      if (!rallyPointUnits.Empty()) {
         Wm3::Vector3f groupAnchor(0.0f, 0.0f, 0.0f);
         if (ResolveGroupMoveAnchorOrDetectPatrol(selection, groupAnchor, !queueModifier)) {
           ISSUE_FactoryCommand(rallyPointUnits, commandData, clearQueue);
@@ -15428,18 +12438,16 @@ namespace moho
      */
     void IssueFerryOrderForDrag(
       CWldSession& session,
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       const Wm3::Vector3f& dragWorldPos,
       const bool clearQueue
     )
     {
-      ScopedLocalSelectionSet airTransportGuard{};
-      ScopedLocalSelectionSet landUnitGuard{};
-      SSelectionSetUserEntity& airTransports = airTransportGuard.get();
-      SSelectionSetUserEntity& landUnits = landUnitGuard.get();
+      WeakSet<UserEntity> airTransports;
+      WeakSet<UserEntity> landUnits;
       SplitSelectionForFerryCommand(selection, airTransports, landUnits);
 
-      if (airTransports.IsEmptyFromHeadFind()) {
+      if (airTransports.Empty()) {
         return;
       }
 
@@ -15482,7 +12490,7 @@ namespace moho
      */
     void IssueTransportOrderForDrag(
       CWldSession& session,
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       UserEntity* const hovered,
       const Wm3::Vector3f& dragWorldPos,
       const bool clearQueue
@@ -15509,32 +12517,21 @@ namespace moho
         }
       }
 
-      ScopedCopiedSelectionSet extraSelectionGuard{};
-      SSelectionSetUserEntity& extraSelection = extraSelectionGuard.get();
-      extraSelection = session.GetExtraSelectList();
+      WeakSet<UserEntity> extraSelection = session.GetExtraSelectList();
 
-      if (!extraSelection.IsEmptyFromHeadFind()) {
-        ScopedCopiedSelectionSet unloadGuard{};
-        SSelectionSetUserEntity& unloadTargets = unloadGuard.get();
-        (void)CopySelectionSetFromOther(&unloadTargets, &selection);
+      if (!extraSelection.Empty()) {
+        WeakSet<UserEntity> unloadTargets(selection);
 
         bool onlyPods = true;
-        SSelectionSetUserEntity::FindResult cursor{};
-        (void)extraSelection.First(&cursor);
-        SSelectionSetUserEntity::Index iterator{&extraSelection, cursor.mRes};
-        while (iterator.mNode != extraSelection.mHead) {
-          UserEntity* const entity = DecodeSelectionIndexOwner(&iterator);
-          if (entity != nullptr && entity->mVariableData.mIsDead == 0u && entity->IsUserUnit() != nullptr) {
-            SSelectionSetUserEntity::AddResult addResult{};
-            (void)SSelectionSetUserEntity::Add(&addResult, &unloadTargets, entity);
+        for (UserEntity* const entity : extraSelection) {
+          if (entity->mVariableData.mIsDead == 0u && entity->IsUserUnit() != nullptr) {
+            (void)unloadTargets.Add(entity);
 
             const msvc8::string podCategory("POD");
             if (!entity->IsInCategory(podCategory)) {
               onlyPods = false;
             }
           }
-
-          (void)iterator.Next();
         }
 
         const EUnitCommandType unloadCommand = onlyPods
@@ -15547,37 +12544,28 @@ namespace moho
         );
         IssueOrderAtGround(unloadTargets, unloadCommand, dragWorldPos, clearQueue);
       } else {
-        ScopedLocalSelectionSet airTransportGuard{};
-        ScopedLocalSelectionSet landUnitGuard{};
-        SSelectionSetUserEntity& airTransports = airTransportGuard.get();
-        SSelectionSetUserEntity& landUnits = landUnitGuard.get();
+        WeakSet<UserEntity> airTransports;
+        WeakSet<UserEntity> landUnits;
         SplitSelectionForFerryCommand(selection, airTransports, landUnits);
 
-        if (airTransports.IsEmptyFromHeadFind() || landUnits.IsEmptyFromHeadFind()) {
+        if (airTransports.Empty() || landUnits.Empty()) {
           // TEMPORARY PROBE -- unload-subset triage, delete when resolved. This
           // is the arm that unloads EVERYTHING; reaching it means the extra
           // selection (the cargo the player picked) came back empty.
           UnloadDragDiagLine(
             "[UNLOADDRAG] unload-ALL branch: extraSelectionEmpty=1 airEmpty=%d landEmpty=%d pos=(%.1f,%.1f) "
             "cloneSize=%u",
-            airTransports.IsEmptyFromHeadFind() ? 1 : 0, landUnits.IsEmptyFromHeadFind() ? 1 : 0,
-            dragWorldPos.x, dragWorldPos.z, extraSelection.mSize
+            airTransports.Empty() ? 1 : 0, landUnits.Empty() ? 1 : 0,
+            dragWorldPos.x, dragWorldPos.z, static_cast<unsigned>(extraSelection.Size())
           );
           IssueOrderAtGround(
             selection, EUnitCommandType::UNITCOMMAND_TransportUnloadUnits, dragWorldPos, clearQueue
           );
         } else {
-          SSelectionSetUserEntity::FindResult cursor{};
-          (void)airTransports.First(&cursor);
-          SSelectionSetUserEntity::Index iterator{&airTransports, cursor.mRes};
-          while (iterator.mNode != airTransports.mHead) {
-            UserEntity* const entity = DecodeSelectionIndexOwner(&iterator);
-            if (entity != nullptr && entity->mVariableData.mIsDead == 0u && entity->IsUserUnit() != nullptr) {
-              SSelectionSetUserEntity::AddResult addResult{};
-              (void)SSelectionSetUserEntity::Add(&addResult, &landUnits, entity);
+          for (UserEntity* const entity : airTransports) {
+            if (entity->mVariableData.mIsDead == 0u && entity->IsUserUnit() != nullptr) {
+              (void)landUnits.Add(entity);
             }
-
-            (void)iterator.Next();
           }
 
           IssueOrderAtGround(landUnits, EUnitCommandType::UNITCOMMAND_AssistMove, dragWorldPos, clearQueue);
@@ -15599,7 +12587,7 @@ namespace moho
      * carrier overrides that and is always loaded along with its cargo.
      */
     void IssueCallTransportOrderForDrag(
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       UserEntity& hovered,
       const bool clearQueue
     )
@@ -15611,26 +12599,22 @@ namespace moho
       SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_TransportLoadUnits);
       SetEntityTarget(commandData, hovered);
 
-      ScopedLocalSelectionSet rallyPointGuard{};
-      ScopedLocalSelectionSet otherGuard{};
-      SSelectionSetUserEntity& rallyPointUnits = rallyPointGuard.get();
-      SSelectionSetUserEntity& otherUnits = otherGuard.get();
+      WeakSet<UserEntity> rallyPointUnits;
+      WeakSet<UserEntity> otherUnits;
       SplitSelectionByRallyPointCategory(selection, rallyPointUnits, otherUnits);
 
       const bool loadHoveredTransportToo = (!hoveredIsFerryBeacon && !hoveredIsAirStaging) || hoveredIsCarrier;
 
-      if (!otherUnits.IsEmptyFromHeadFind()) {
+      if (!otherUnits.Empty()) {
         if (loadHoveredTransportToo) {
-          SSelectionSetUserEntity::AddResult addResult{};
-          (void)SSelectionSetUserEntity::Add(&addResult, &otherUnits, &hovered);
+          (void)otherUnits.Add(&hovered);
         }
         ISSUE_Command(otherUnits, commandData, clearQueue);
       }
 
-      if (!rallyPointUnits.IsEmptyFromHeadFind()) {
+      if (!rallyPointUnits.Empty()) {
         if (loadHoveredTransportToo) {
-          SSelectionSetUserEntity::AddResult addResult{};
-          (void)SSelectionSetUserEntity::Add(&addResult, &rallyPointUnits, &hovered);
+          (void)rallyPointUnits.Add(&hovered);
         }
         ISSUE_FactoryCommand(rallyPointUnits, commandData, clearQueue);
       }
@@ -15649,7 +12633,7 @@ namespace moho
      * nilled out first so the sim never sees it).
      */
     void IssueScriptCommandForDrag(
-      SSelectionSetUserEntity& selection,
+      WeakSet<UserEntity>& selection,
       UserEntity* const hovered,
       const Wm3::Vector3f& dragWorldPos,
       const bool clearQueue
@@ -15701,7 +12685,7 @@ namespace moho
      */
     void DispatchBuildCommandMode(CommandModeData& commandMode, CWldSession& session, const bool clearQueue)
     {
-      SSelectionSetUserEntity& selection = session.mSelection;
+      WeakSet<UserEntity>& selection = session.mSelection;
       const Wm3::Vector3f& dragWorldPos = commandMode.mMouseDragStart.mMouseWorldPos;
       const auto* const buildBlueprint = static_cast<const RUnitBlueprint*>(commandMode.mBlueprint);
 
@@ -15752,7 +12736,7 @@ namespace moho
       const bool clearQueue
     )
     {
-      SSelectionSetUserEntity& selection = session.mSelection;
+      WeakSet<UserEntity>& selection = session.mSelection;
       const Wm3::Vector3f& dragWorldPos = commandMode.mMouseDragStart.mMouseWorldPos;
 
       switch (commandMode.mCommandCaps) {
@@ -15783,7 +12767,7 @@ namespace moho
           const CFormation& formation = *session.mCurFormation;
           SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_Attack);
           ApplyFormationLanes(commandData, formation);
-          if (selection.size() > 1 && (formationModifier || IsFormationSettled(formation))) {
+          if (selection.Size() > 1 && (formationModifier || IsFormationSettled(formation))) {
             commandData.mCommandType = EUnitCommandType::UNITCOMMAND_FormAttack;
           }
           SetEntityTarget(commandData, *hovered);
@@ -16105,29 +13089,22 @@ namespace moho
    * lanes and forwards to the explicit-unit `UI_VerifyScriptCommand` overload.
    */
   LuaPlus::LuaObject UI_VerifyScriptCommand(
-    const SSelectionSetUserEntity& entities,
+    const WeakSet<UserEntity>& entities,
     const SSTICommandIssueData& commandIssueData,
     const bool doClear
   )
   {
     gpg::fastvector_n<UserUnit*, 2> selectedUnits{};
-    const std::int32_t entityCount = entities.size();
+    const std::int32_t entityCount = static_cast<std::int32_t>(entities.Size());
     if (entityCount > 0) {
       selectedUnits.reserve(static_cast<std::size_t>(entityCount));
     }
 
-    SSelectionSetUserEntity* const mutableEntities = const_cast<SSelectionSetUserEntity*>(&entities);
-    SSelectionNodeUserEntity* node = nullptr;
-    node = SSelectionSetUserEntity::find(mutableEntities, mutableEntities->mHead->mLeft, &node);
-    while (node != mutableEntities->mHead) {
-      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+    for (UserEntity* const selectedEntity : entities) {
       UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
       if (selectedUnit != nullptr) {
         selectedUnits.push_back(selectedUnit);
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(mutableEntities, node, &node);
     }
 
     return UI_VerifyScriptCommand(selectedUnits, commandIssueData, doClear);
@@ -16181,29 +13158,22 @@ namespace moho
    * lanes and forwards to the explicit-unit `UI_OnCommandIssued` overload.
    */
   void UI_OnCommandIssued(
-    const SSelectionSetUserEntity& entities,
+    const WeakSet<UserEntity>& entities,
     const SSTICommandIssueData& commandIssueData,
     const bool doClear
   )
   {
     gpg::fastvector_n<UserUnit*, 2> selectedUnits{};
-    const std::int32_t entityCount = entities.size();
+    const std::int32_t entityCount = static_cast<std::int32_t>(entities.Size());
     if (entityCount > 0) {
       selectedUnits.reserve(static_cast<std::size_t>(entityCount));
     }
 
-    SSelectionSetUserEntity* const mutableEntities = const_cast<SSelectionSetUserEntity*>(&entities);
-    SSelectionNodeUserEntity* node = nullptr;
-    node = SSelectionSetUserEntity::find(mutableEntities, mutableEntities->mHead->mLeft, &node);
-    while (node != mutableEntities->mHead) {
-      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+    for (UserEntity* const selectedEntity : entities) {
       UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
       if (selectedUnit != nullptr) {
         selectedUnits.push_back(selectedUnit);
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(mutableEntities, node, &node);
     }
 
     UI_OnCommandIssued(selectedUnits, commandIssueData, doClear);
@@ -16224,84 +13194,25 @@ namespace moho
    * takes the command payload by value (copy-constructed on the stack here).
    */
   void ISSUE_Command(
-    const SSelectionSetUserEntity& entities,
+    const WeakSet<UserEntity>& entities,
     const SSTICommandIssueData& commandIssueData,
     const bool clearQueue
   )
   {
     gpg::fastvector_n<UserUnit*, 2> selectedUnits{};
-    const std::int32_t entityCount = entities.size();
+    const std::int32_t entityCount = static_cast<std::int32_t>(entities.Size());
     if (entityCount > 0) {
       selectedUnits.reserve(static_cast<std::size_t>(entityCount));
     }
 
-    SSelectionSetUserEntity* const mutableEntities = const_cast<SSelectionSetUserEntity*>(&entities);
-    SSelectionNodeUserEntity* node = nullptr;
-    node = SSelectionSetUserEntity::find(mutableEntities, mutableEntities->mHead->mLeft, &node);
-    while (node != mutableEntities->mHead) {
-      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+    for (UserEntity* const selectedEntity : entities) {
       UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
       if (selectedUnit != nullptr) {
         selectedUnits.push_back(selectedUnit);
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(mutableEntities, node, &node);
     }
 
     ISSUE_Command(selectedUnits, commandIssueData, clearQueue);
-  }
-
-  /**
-   * Address: 0x00822270 (FUN_00822270, sub_822270)
-   *
-   * IDA signature:
-   * Moho::WeakSet_UserUnit_FindResBool *__userpurge sub_822270@<eax>(
-   *     Moho::WeakSet_UserUnit_FindResBool *result@<esi>,
-   *     Moho::WeakSet_UserUnit *set,
-   *     Moho::UserUnit *unit);
-   *
-   * What it does:
-   * Inserts one unit key into a `WeakSet<UserUnit>` and returns the
-   * `{iterator, inserted}` pair through the caller-supplied sret slot
-   * (`[esi+0]=set`, `[esi+4]=node`, `[esi+8]=inserted`, 0x00822306..0x0082230C).
-   *
-   * The map insert is bracketed by an intrusive weak guard so the unit cannot
-   * be destroyed out from under the tree while it rebalances: a stack
-   * `WeakPtr<UserUnit>` is pushed onto the unit's weak-owner use-list before
-   * the insert (0x008222A9-0x008222B3, reaching the `WeakObject` sub-object
-   * with the same `+ 8` adjust `WeakSet<UserEntity>::Add` uses at 0x007AE1DA)
-   * and spliced back out afterwards by walking the chain until the slot that
-   * points at it is found (0x008222DF-0x008222F8). The splice also runs on the
-   * throwing path, through the EH funclet at 0x00B94260 - which is why the
-   * guard is expressed as an RAII object here.
-   *
-   * `unit` is reinterpreted rather than statically upcast because `UserUnit`
-   * has no reconstructed definition in this tree yet; the binary itself does
-   * no adjustment either - both `Add` emissions derive the `WeakObject`
-   * sub-object from the raw element pointer with the identical `add eax, 8`,
-   * which is only possible if `UserUnit`'s `UserEntity` sub-object sits at
-   * offset zero.
-   */
-  WeakUnitSetUserUnit::AddResult* WeakUnitSetUserUnit::Add(
-    AddResult* const outResult,
-    WeakUnitSetUserUnit* const set,
-    UserUnit* const unit
-  )
-  {
-    outResult->mOwnerSet = set;
-    outResult->mNode = (set != nullptr) ? set->mHead : nullptr;
-    outResult->mWasInserted = 0u;
-
-    UserEntity* const entity = reinterpret_cast<UserEntity*>(unit);
-    ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-
-    SelectionInsertFindResult insertResult{};
-    (void)FindOrInsertSelectionNodeByUserEntity(&insertResult, set, entity);
-
-    outResult->mNode = insertResult.node;
-    outResult->mWasInserted = insertResult.inserted ? 1u : 0u;
-    return outResult;
   }
 
   /**
@@ -16327,67 +13238,34 @@ namespace moho
    * `{previous,current,added,removed}` selection-event payload, updates
    * max-selection bookkeeping, and refreshes sync-filter mask B when changed.
    */
-  void CWldSession::SetSelection(const SSelectionSetUserEntity& selection)
+  void CWldSession::SetSelection(const WeakSet<UserEntity>& selection)
   {
-    SSelectionSetUserEntity addedEntities{};
-    addedEntities.mAllocProxy = nullptr;
-    addedEntities.mHead = AllocateWeakEntitySetHead();
-    addedEntities.mSize = 0u;
-    addedEntities.mSizeMirrorOrUnused = 0u;
-
-    SSelectionSetUserEntity removedEntities{};
-    removedEntities.mAllocProxy = nullptr;
-    removedEntities.mHead = AllocateWeakEntitySetHead();
-    removedEntities.mSize = 0u;
-    removedEntities.mSizeMirrorOrUnused = 0u;
-
     bool selectionChanged = false;
 
-    msvc8::vector<UserEntity*> nextSelectionEntities{};
-    CollectSelectionEntities(selection, nextSelectionEntities);
-    for (UserEntity* const entity : nextSelectionEntities) {
-      if (entity == nullptr) {
-        continue;
-      }
-
-      SSelectionSetUserEntity::FindResult found{};
-      (void)FindSelectionNodeByEntityGuarded(&found, &mSelection, entity);
-      if (found.mRes == mSelection.mHead) {
+    // What the new selection adds (`Find` 0x00867780 on the current one) and
+    // what it drops (`Find` 0x007FDD50 on the new one).
+    WeakSet<UserEntity> addedEntities;
+    for (UserEntity* const entity : selection) {
+      if (mSelection.Find(entity) == mSelection.end()) {
         selectionChanged = true;
-        SSelectionSetUserEntity::AddResult addResult{};
-        (void)SSelectionSetUserEntity::Add(&addResult, &addedEntities, entity);
+        (void)addedEntities.Add(entity);
       }
     }
 
-    msvc8::vector<UserEntity*> currentSelectionEntities{};
-    CollectSelectionEntities(mSelection, currentSelectionEntities);
-    SSelectionSetUserEntity* const incomingSelection = const_cast<SSelectionSetUserEntity*>(&selection);
-    for (UserEntity* const entity : currentSelectionEntities) {
-      if (entity == nullptr || incomingSelection == nullptr) {
-        continue;
-      }
-
-      SSelectionSetUserEntity::FindResult found{};
-      (void)FindSelectionNodeByEntityGuarded(&found, incomingSelection, entity);
-      if (found.mRes == incomingSelection->mHead) {
+    WeakSet<UserEntity> removedEntities;
+    for (UserEntity* const entity : mSelection) {
+      if (selection.Find(entity) == selection.end()) {
         selectionChanged = true;
-        SSelectionSetUserEntity::AddResult addResult{};
-        (void)SSelectionSetUserEntity::Add(&addResult, &removedEntities, entity);
+        (void)removedEntities.Add(entity);
       }
     }
 
-    mSelectionBroadcaster.BroadcastEvent(
-      SSelectionEvent{&mSelection, incomingSelection, &addedEntities, &removedEntities}
-    );
+    mSelectionBroadcaster.BroadcastEvent(SSelectionEvent{&mSelection, &selection, &addedEntities, &removedEntities});
 
-    if (&mSelection != incomingSelection && mSelection.mHead != nullptr && incomingSelection != nullptr &&
-      incomingSelection->mHead != nullptr) {
-      SSelectionNodeUserEntity* eraseCursor = mSelection.mHead->mLeft;
-      (void)mSelection.EraseRange(&eraseCursor, mSelection.mHead->mLeft, mSelection.mHead);
-      (void)CloneSelectionTreeFromStorage(&mSelection, incomingSelection);
-    }
-
-    mSelection.mSizeMirrorOrUnused = static_cast<std::uint32_t>(mSelection.size());
+    // 0x00896357..0x00896370: the set's assignment (self test, whole-tree
+    // erase 0x007AF740, `_Copy` 0x00867B20), then the live count at +0x4AC.
+    mSelection = selection;
+    mSelectionSize = static_cast<std::uint32_t>(mSelection.Size());
 
     if (selectionChanged) {
       if (ISTIDriver* const activeDriver = sSimDriver.get(); activeDriver != nullptr) {
@@ -16398,31 +13276,18 @@ namespace moho
 
       UI_EndCommandMode();
     }
-
-    (void)removedEntities.ReleaseStorage();
-    (void)addedEntities.ReleaseStorage();
   }
 
   void CWldSession::SetSelectionUnits(const msvc8::vector<UserUnit*>& units)
   {
-    SSelectionSetUserEntity nextSelection{};
-    nextSelection.mAllocProxy = nullptr;
-    nextSelection.mHead = AllocateWeakEntitySetHead();
-    nextSelection.mSize = 0u;
-    nextSelection.mSizeMirrorOrUnused = 0u;
-
+    WeakSet<UserEntity> nextSelection;
     for (UserUnit* const unit : units) {
-      if (unit == nullptr) {
-        continue;
+      if (unit != nullptr) {
+        (void)nextSelection.Add(unit);
       }
-
-      UserEntity* const entity = reinterpret_cast<UserEntity*>(unit);
-      SSelectionSetUserEntity::AddResult addResult{};
-      (void)SSelectionSetUserEntity::Add(&addResult, &nextSelection, entity);
     }
 
     SetSelection(nextSelection);
-    (void)nextSelection.ReleaseStorage();
   }
 
   /**
@@ -16937,17 +13802,9 @@ namespace moho
     // `find`/`Iterator::inc` over `mSelection`; the per-entity value added to
     // the set is that unit's owning army index).
     BVIntSet selectedArmies{};
-    if (mSelection.mHead != nullptr) {
-      SSelectionNodeUserEntity* node = nullptr;
-      node = SSelectionSetUserEntity::find(&mSelection, mSelection.mHead->mLeft, &node);
-      while (node != mSelection.mHead) {
-        if (UserEntity* const entity = ResolveWeakEntitySetNodeEntity(*node);
-            entity != nullptr && entity->mArmy != nullptr) {
-          (void)selectedArmies.Add(static_cast<unsigned int>(entity->mArmy->mArmyIndex));
-        }
-
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&mSelection, node, &node);
+    for (UserEntity* const entity : mSelection) {
+      if (entity->mArmy != nullptr) {
+        (void)selectedArmies.Add(static_cast<unsigned int>(entity->mArmy->mArmyIndex));
       }
     }
 
@@ -17106,24 +13963,19 @@ namespace moho
     // tree already uses to reach the concrete instance (Unit.cpp).
     CAiFormationInstance* const instance =
       reinterpret_cast<CAiFormationInstance*>(formation->mCurInstance);
-    WeakUnitSetUserUnit& participants = formation->mParticipants;
+    WeakSet<UserUnit>& participants = formation->mParticipants;
 
-    SSelectionNodeUserEntity* node = nullptr;
-    (void)PruneTombstonesAndFindLive(participants, &node, participants.mHead->mLeft);
-    while (node != participants.mHead) {
-      UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
-      if (entity != nullptr) {
-        // `mParticipants` only ever holds units, so the entity doubles as a
-        // `UserUnit` and its `IUnit` bridge subobject at +0x148 is what every
+    for (UserUnit* const unit : participants) {
+      {
+        // The unit's `IUnit` bridge sub-object at +0x148 is what every
         // formation-side call below is handed.
-        UserUnit* const unit = reinterpret_cast<UserUnit*>(entity);
         IUnit* const bridge = GetIUnitBridge(unit);
         Unit* const formationUnit = reinterpret_cast<Unit*>(bridge);
 
         if (!bridge->IsDead() && instance->Contains(formationUnit, false)
-            && entity->GetAttachmentParent() == nullptr) {
+            && unit->GetAttachmentParent() == nullptr) {
           const RUnitBlueprint* const blueprint = bridge->GetBlueprint();
-          const RMeshBlueprint* const meshBlueprint = entity->mVariableData.mMeshBlueprint;
+          const RMeshBlueprint* const meshBlueprint = unit->mVariableData.mMeshBlueprint;
           if (!meshBlueprint->mLods.empty()) {
             SCoordsVec2 slot{};
             instance->GetFormationPosition(&slot, formationUnit, nullptr);
@@ -17188,9 +14040,6 @@ namespace moho
           }
         }
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      (void)PruneTombstonesAndFindLive(participants, &node, node);
     }
   }
 
@@ -18149,9 +14998,7 @@ namespace moho
 
       const bool isHovered = entity == GetHoveredUserEntity();
 
-      SSelectionSetUserEntity::FindResult selectionFind{};
-      const bool isSelected =
-        FindSelectionNodeByEntityGuarded(&selectionFind, &mSelection, entity)->mRes != mSelection.mHead;
+      const bool isSelected = mSelection.Find(entity) != mSelection.end();
 
       boost::shared_ptr<CD3DBatchTexture> icon =
         PickUnitStrategicIconTexture(aux, iconData, isSelected, selectedVariantEligible, isHovered);
@@ -20059,25 +16906,12 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
   BVIntSet categoryOrdinals;
   ERuleBPUnitCommandCaps selectionCommandCaps = RULEUCC_None;
   {
-    SSelectionSetUserEntity& selection = wldSession->mSelection;
-    // `mHead` is null for an empty/not-yet-populated selection (e.g. the very
-    // first mouse-move event, before the player has selected anything) --
-    // see the identical guard on the same field in the sibling
-    // SelectionContainsTeleportationUnit above. An empty selection simply
-    // contributes no caps.
-    if (selection.mHead != nullptr) {
-      SSelectionNodeUserEntity* node = selection.mHead->mLeft;
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
-      while (node != selection.mHead) {
-        UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
-        (void)categoryOrdinals.Add(static_cast<unsigned int>(selectedEntity->mParams.mBlueprint->mCategoryBitIndex));
-        if (UserUnit* const selectedUnit = selectedEntity->IsUserUnit()) {
-          selectionCommandCaps = static_cast<ERuleBPUnitCommandCaps>(
-            selectionCommandCaps | GetIUnitBridge(selectedUnit)->GetAttributes().commandCapsMask
-          );
-        }
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&selection, node, &node);
+    for (UserEntity* const selectedEntity : wldSession->mSelection) {
+      (void)categoryOrdinals.Add(static_cast<unsigned int>(selectedEntity->mParams.mBlueprint->mCategoryBitIndex));
+      if (UserUnit* const selectedUnit = selectedEntity->IsUserUnit()) {
+        selectionCommandCaps = static_cast<ERuleBPUnitCommandCaps>(
+          selectionCommandCaps | GetIUnitBridge(selectedUnit)->GetAttributes().commandCapsMask
+        );
       }
     }
   }

@@ -3534,7 +3534,7 @@
     <ClInclude Include="moho\sim\UserArmy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\WeakEntitySet.h">
+    <ClInclude Include="moho\misc\WeakSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\WldSessionInfo.h">

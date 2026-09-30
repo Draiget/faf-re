@@ -3461,6 +3461,8 @@ namespace msvc8
          * Address: 0x006E2180 (FUN_006E2180 -- `tidy()` for `msvc8::vector<moho::CmdId>` (`FactoryQueueDisplayItem::commands`), `this` in ESI: free, null the triple; the catch arm of that vector's copy constructor 0x006E2E60, reached from `FactoryQueueDisplayItem`'s copy constructor 0x00837670 (`commands(other.commands)`); caller 0x006E2E60; formerly `ReleaseLegacyBufferTripleRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x0084F1D0 (FUN_0084F1D0 -- `tidy()` for `msvc8::vector<wxEvtHandler*>`, `this` in ESI: free, null the triple; the catch arm of that vector's copy constructor 0x0084F4D0, which `msvc8::vector<msvc8::vector<wxEvtHandler*>>`'s `uninit_fill_n` 0x0084FE00, `_Umove` 0x00850190 and `_Insert_n` 0x0084EE20 run per inner vector (`SuspendInputWindowEventHandlersAndFlushQueue`'s `suspended.resize(...)`, UiRuntimeTypes.cpp); caller 0x0084F4D0; formerly `ReleaseLegacyBufferTripleRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x008F67E0 (FUN_008F67E0 -- `tidy()` for `msvc8::vector<DXGI_MODE_DESC>` (the D3D10 adapter-mode list), `__thiscall`: free, null the triple; the catch arm of that vector's copy constructor 0x008F6D20; caller 0x008F6D20; formerly `ReleaseLegacyBufferTripleRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00867840 (FUN_00867840 -- `_Tidy` for `msvc8::vector<moho::WeakSet<moho::UserEntity>>` (`SelectionDragger::DragRelease`'s priority buckets, element 0x0C): `~WeakSet` per bucket, free, null the triple; caller `DragRelease` 0x00863870.)
+         * Address: 0x00867CD0 (FUN_00867CD0 -- the same body again; no caller.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -4472,6 +4474,7 @@ namespace msvc8
  * Address: 0x00767D00 (FUN_00767D00 -- `erase(first, last)` for `msvc8::vector<gpg::AStarOpenHeap<TCell>::Entry>` (the open heap's `mEntries`, 0x0C `{mPriority, mNode, mHandle}` POD element), `this` in EBX, result through the hidden slot in EAX: the tail copied down three dwords per slot, `last_` rebased; callers 0x007672E0 (`AStarOpenHeap::clear`'s `mEntries.clear()`, VC8's `erase(begin(), end())`) and 0x00767750 (an unreferenced out-of-line `clear()`); formerly `CompactWordVectorTailFromCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
  * Address: 0x005FBF60 (FUN_005FBF60 -- `erase(first, last)` for `msvc8::vector<WeakPtr<CUnitCommand>>`; VC8's `clear()` is `erase(begin(), end())`, called so by `CUnitCommandQueue::ClearCommandQueue` 0x006EE346.)
          * Address: 0x006273B0 (FUN_006273B0 -- `erase(first, last)` for `msvc8::vector<moho::SPickUpInfo>`: `std::copy` 0x00628A60 of the tail down, `destroy_range` 0x00628AB0 of the vacated end, `last_ = newEnd`. `CUnitLoadUnits::DoTask` (0x00625110) erases one rejected candidate with it and clears the queue with it (`clear()` is `erase(begin(), end())`), as does the constructor 0x00624B70; formerly `ErasePickUpInfoRange` in moho/unit/tasks/CUnitLoadUnits.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00867FC0 (FUN_00867FC0 -- `erase(first, last)` for `msvc8::vector<moho::WeakSet<moho::UserEntity>>` (`SelectionDragger::DragRelease`'s priority buckets, element 0x0C): assign the tail down (0x00868C80), destroy what is left over; caller 0x00867B90.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -6697,6 +6700,8 @@ namespace msvc8
  * Address: 0x008B2B70 (FUN_008B2B70 -- `_Insert_n` for `msvc8::vector<WeakPtr<UserUnit>>` (8-byte element, max_size 0x1FFFFFFF); `insert(pos, value)` inlined into `AddArmyAvatar` calls it at 0x008B23D2; formerly `EnsureWeakPtrVectorCapacity` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
          * Address: 0x007A6030 (FUN_007A6030 -- the gap fill (VC8's `std::fill`: `WeakPtr::operator=` from the one value, per slot) of `_Insert_n` 0x007A5A70 for `msvc8::vector<moho::WeakPtr<moho::CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp); callers 0x007A5A70, 0x007A5EB0; formerly `WeakPtr<T>::AssignFillRange` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
          * Address: 0x00689520 (FUN_00689520 -- a second emission of the gap fill 0x00688E20 for `msvc8::vector<moho::CEntityDbBoundedPropQueueNode>` (`EntityDB::mBoundedProps`' heap; the 0x14 `{mPriority, mBoundedTick, WeakPtr<Prop> mOwnerLink, mHandleId}` node), the node's `operator=` 0x00687A70 per slot; zero callers, unreachable; formerly `FillPrefixedWeakPtrDwordPayloadRangeFromSingleLane` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00868D30 (FUN_00868D30 -- the `std::fill` gap-overwrite step for `msvc8::vector<moho::WeakSet<moho::UserEntity>>` (`SelectionDragger::DragRelease`'s priority buckets, element 0x0C): `WeakSet::operator=` per bucket; callers 0x00868040 and 0x00868950.)
+         * Address: 0x00868950 (FUN_00868950 -- a forwarding copy of 0x00868D30.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -7313,6 +7318,12 @@ namespace msvc8
          * Address: 0x00688D00 (FUN_00688D00 -- another tail-jump into 0x006892E0; zero callers.)
          * Address: 0x00628AB0 (FUN_00628AB0 -- `destroy_range` for `msvc8::vector<moho::SPickUpInfo>`: `~WeakPtr<Unit>` per slot; callers 0x006273B0 (`erase`), 0x00624B70 / 0x00624CC0 (`CUnitLoadUnits`'s constructor unwind and destructor), 0x006270E0 (`SerLoad`'s old storage), 0x00626EA0; formerly `UnlinkPickUpInfoWeakUnitRange` in moho/unit/tasks/CUnitLoadUnits.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x007A5FB0 (FUN_007A5FB0 -- `destroy_range` for `msvc8::vector<moho::WeakPtr<moho::CMauiControl>>` (`sInputCapture`): `~WeakPtr` per slot, no write to the node; callers 0x007A58C0 (`erase`), 0x007A5970, 0x007A5A70 (`_Insert_n`), 0x007A5780. Formerly `UnlinkWeakPtrRangeWithoutClearing` in moho/misc/WeakPtr.h, whose two source callers fed it `SWeakRefSlot` fastvectors, removed 2026-09-30.)
+         * Address: 0x00868CC0 (FUN_00868CC0 -- `_Destroy_range` for `msvc8::vector<moho::WeakSet<moho::UserEntity>>` (`SelectionDragger::DragRelease`'s priority buckets, element 0x0C): `~WeakSet` per bucket.)
+         * Address: 0x00868900 (FUN_00868900 -- a forwarding copy of 0x00868CC0.)
+         * Address: 0x00868020 (FUN_00868020 -- the same for an empty range; no caller.)
+         * Address: 0x00868F40 (FUN_00868F40 -- one bucket's `~WeakSet` out of line.)
+         * Address: 0x00868F70 (FUN_00868F70 -- the same, returning the bucket.)
+         * Address: 0x008B38C0 (FUN_008B38C0 -- `_Destroy_range` for `msvc8::vector<moho::WeakPtr<moho::UserUnit>>` (`UserArmy::mAvatars`): `~WeakPtr` per element; callers 0x008B1520, `~UserArmy` 0x008B1650 (`mAvatars.clear()`), 0x008B2820, 0x008B2A70, 0x008B2B30, 0x008B2B70. Formerly `UnlinkSelectionWeakOwnerRefRangeNoReset` in moho/sim/CWldSession.cpp, removed 2026-09-30.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -10384,6 +10395,8 @@ namespace msvc8
          * Address: 0x00942770 (FUN_00942770 -- the `std::copy` bridge into it (three zero tag bytes pushed) for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x00942C79; formerly `CopyAssignEffectMacroRangeBridge` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x008EA190 (FUN_008EA190 -- `std::copy` (`_Copy_opt`) for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF8CC, 0x008EF943 (`operator=` 0x008EF870), 0x008EA708 (`erase` 0x008EA6F0); formerly `CopyPackedAdapterModeTailRange` over a `PackedAdapterModeRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00628A60 (FUN_00628A60 -- `std::copy` for `msvc8::vector<moho::SPickUpInfo>`, `SPickUpInfo::operator=` per slot: the `WeakPtr<Unit>` relinks only when the two slots differ, then the distance; callers 0x006273B0 (`erase`), 0x00626EA0; formerly `CopyPickUpInfoWeakUnitRange` in moho/unit/tasks/CUnitLoadUnits.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00868C80 (FUN_00868C80 -- the assigning forward copy for `msvc8::vector<moho::WeakSet<moho::UserEntity>>` (`SelectionDragger::DragRelease`'s priority buckets, element 0x0C): `WeakSet::operator=` per bucket; callers `erase` 0x00867FC0 and 0x008688D0.)
+         * Address: 0x008688D0 (FUN_008688D0 -- a forwarding copy of 0x00868C80.)
          */
     public:
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
@@ -10575,6 +10588,8 @@ namespace msvc8
          * Address: 0x0084FD30 (FUN_0084FD30 -- `copy_backward` of `_Insert_n`'s in-place tail shift for `msvc8::vector<msvc8::vector<wxEvtHandler*>>` (`SuspendInputWindowEventHandlersAndFlushQueue`'s `suspended`, UiRuntimeTypes.cpp; element 0x10), `first` in ESI, `last` in ECX, `destLast` in EAX: VC8's `_Move_backward_opt` for a `_Swap_move_tag` element, so each slot is `vector::swap` (`first_`/`last_`/`end_` exchanged, proxies untouched) rather than this member's copy-assignment -- observably the same, since `_Insert_n` fills the vacated gap afterwards; caller 0x0084F8C0 (the `_Unchecked_move_backward` adapter `_Insert_n` 0x0084EE20 calls); formerly `SwapElement16TailLanesBackwardRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x00689570 (FUN_00689570 -- `copy_backward` for `msvc8::vector<moho::CEntityDbBoundedPropQueueNode>` (`EntityDB::mBoundedProps`' heap; the 0x14 `{mPriority, mBoundedTick, WeakPtr<Prop> mOwnerLink, mHandleId}` node), the node's `operator=` 0x00687A70 per slot; zero callers (the live emission is 0x00688E50); formerly `CopyPrefixedWeakPtrDwordPayloadRangeBackwardAdapterA` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
          * Address: 0x006898B0 (FUN_006898B0 -- another emission of that `copy_backward`, the destination end in EAX instead of ECX; zero callers; formerly `CopyPrefixedWeakPtrDwordPayloadRangeBackwardAdapterB`, removed 2026-09-30.)
+         * Address: 0x00868EB0 (FUN_00868EB0 -- `copy_backward` for `msvc8::vector<moho::WeakSet<moho::UserEntity>>` (`SelectionDragger::DragRelease`'s priority buckets, element 0x0C): `WeakSet::operator=` per bucket, walking down; callers 0x00868960 and 0x00868D80.)
+         * Address: 0x00868D80 (FUN_00868D80 -- a forwarding copy of 0x00868EB0.)
          */
     public:
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
@@ -11999,6 +12014,7 @@ namespace msvc8
          * Address: 0x005CFE10 (FUN_005CFE10 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for `msvc8::list<moho::ESiloType>` (`CAiSiloBuildImpl::mSiloTypes` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x005CED30, 0x005CEDF0, 0x005CF130; formerly `ClearSiloTypeList` in moho/ai/CAiSiloBuildImpl.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x0081A550 (FUN_0081A550 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for `msvc8::list<moho::SkyDomeDecalVertices>` (`SkyDome::mDecalUploads` at +0xB4; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x28 vertex block}` 0x30); callers 0x008149E0, 0x00814CD0, 0x0081A463; formerly `ClearSkyDomeDecalUploadList` in moho/render/SkyDome.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x0077C9A0 (FUN_0077C9A0 -- `clear` for `msvc8::list<Moho::SDecalInfo>` (unlink all, `_Mysize = 0`, then destroy each node's `SDecalInfo` -- its string and two-string array -- and free it); caller `RListType_SDecalInfo::SerLoad` 0x0077B299; formerly `ClearSDecalInfoListStorage` in moho/render/CDecalTypes.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x007AE580 (FUN_007AE580 -- `clear()` for `msvc8::list<moho::WeakPtr<moho::UserEntity>>` (`CameraImpl::mTargetEntities`, node 0x10): header relinked, count zeroed, then each node's `~WeakPtr` (0x0066AF90) and free; callers `~CameraImpl`, `TargetEntities` 0x007A8640 and `TargetNoseCam` 0x007A8A20. Formerly `CameraTargetListClear`, removed 2026-09-30.)
          */
         void clear()
         {
@@ -12134,6 +12150,7 @@ namespace msvc8
          * Address: 0x008583D0 (FUN_008583D0 -- `insert(pos, v)` for `msvc8::list<SCommandFeedbackBlip>` (`sCommandFeedbackBlips` in moho/ui/UiRuntimeTypes.cpp; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x0C blip}` 0x14),
          *   reached from `sCommandFeedbackBlips.push_back(blip)` in `cfunc_AddCommandFeedbackBlipL`
          *   0x00857BE0; formerly `InsertCommandFeedbackBlipBeforeNode`.)
+         * Address: 0x007AE4E0 (FUN_007AE4E0 -- `insert(end(), value)` for `msvc8::list<moho::WeakPtr<moho::UserEntity>>` (`CameraImpl::mTargetEntities`, node 0x10): node bought, the `WeakPtr` copied onto the entity's chain, linked before the head; callers `CameraImpl::CameraFollow` (the new active target) and the `TargetEntities`/`TargetNoseCam` fills. Formerly `CameraTargetListAppendWeakRef` in moho/render/camera/CameraImpl.cpp, removed 2026-09-30.)
          */
         iterator insert(const_iterator pos, const value_type& v)
         {

@@ -3,14 +3,14 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "moho/sim/WeakEntitySet.h"
+#include "moho/misc/WeakSet.h"
 #include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
 namespace moho
 {
   class IFormationInstance;
-  struct SSelectionSetUserEntity;
+  class UserUnit;
 
   class CFormation
   {
@@ -79,24 +79,17 @@ namespace moho
      * previous value only when the lookup itself returns `-1`, defaulting to
      * `0` when both are `-1`).
      *
-     * `selection`'s decompiled `std::vector*` typing is a decompiler
-     * type-confusion (see the field doc on `mParticipants` above). It is the
-     * shared 12-byte `{allocProxy, mHead, mSize}` weak-set header, and the two
-     * call sites in the binary hand in *different* instantiations of it:
-     *   - `CFormation::ProcessMouse` (0x00838800) forwards the session's
-     *     `WeakSet<UserEntity>` selection straight through;
-     *   - `Moho::SCommandModeData::HandleEvent` (0x0081FCD0, CWldSession.cpp)
-     *     and `sub_870310` build a transient `WeakSet<UserUnit>` first
-     *     (`WeakSet<UserUnit>::Add` 0x00822270 / `CWldSession::GetSelectionUnits`
-     *     0x00896000) and hand that in instead.
-     * The body only ever touches the shared header (`sub_7B29C0`
-     * `PruneTombstonesAndFindLive`, `sub_7B4D90` iterator-inc, `sub_7B30D0`
-     * tombstone erase), so the parameter is typed as the common base rather
-     * than as either derived set.
+     * `selection` is a `WeakSet<UserUnit>`: the walk runs that
+     * instantiation's `SkipDead` (0x007B29C0), tree `++` (0x007B4D90) and
+     * `erase` (0x007B30D0), and every caller builds one first --
+     * `ProcessMouse` (0x00838800), `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, CWldSession.cpp) and the drag helper at 0x00870310, each
+     * through `CWldSession::GetSelectionUnits` (0x00896000) or
+     * `WeakSet<UserUnit>::Add` (0x00822270).
      */
     void ChooseFormation(
       const Wm3::Vector3f& mouseWorldPos,
-      WeakEntitySetUserEntity& selection,
+      WeakSet<UserUnit>& selection,
       bool useLastQueuedDestination
     );
 
@@ -127,16 +120,14 @@ namespace moho
      *     Wm3::Vector3f *mousePos, bool a5);
      *
      * What it does:
-     * `a1`'s decompiled `std::vector*` typing is the same decompiler
-     * type-confusion `ChooseFormation` and `PruneTombstonesAndFindLive`
-     * already document -- it is really the world session's
-     * `SSelectionSetUserEntity*`. When the trigger flag is clear, or the
+     * `a1` is the caller's `WeakSet<UserUnit>` (built by
+     * `CWldSession::GetSelectionUnits`). When the trigger flag is clear, or the
      * selection prunes down to no live entity, this drops the formation
      * (`mReady = false`, `Reset()`); otherwise it marks the formation ready
      * and forwards straight into `ChooseFormation()`/`Finalize()`.
      */
     void ProcessMouse(
-      WeakEntitySetUserEntity* selection,
+      WeakSet<UserUnit>* selection,
       bool triggerActive,
       const Wm3::Vector3f& mousePos,
       bool useLastQueuedDestination
@@ -164,17 +155,12 @@ namespace moho
     void LuaFinalize();
 
   public:
-    /// The set of units currently participating in the drag-formation, a
-    /// `WeakSet<UserUnit>` embedded at `this + 0x00`: `ChooseFormation`
-    /// (0x008384C0) inserts each unit it visits by calling
-    /// `WeakSet<UserUnit>::Add` (0x00822270) with `this` verbatim as the "set"
-    /// argument - the ASM repurposes `ebp` to hold `this` for the whole
-    /// function and pushes it unadjusted - and `Finalize` (0x008382A0) walks it
-    /// back out via `sub_7B29C0` (`PruneTombstonesAndFindLive`) to build the
-    /// `CFormationInstance`'s unit list. `Reset()`/`~CFormation()` tear the
-    /// tree down through the same intrusive owner-chain unlink every other
-    /// weak set in the engine uses.
-    WeakUnitSetUserUnit mParticipants; // +0x00 { proxy, mHead@+0x04, mSize@+0x08 }
+    /// The units taking part in the drag formation: `ChooseFormation`
+    /// (0x008384C0) adds each unit it visits (`WeakSet<UserUnit>::Add`
+    /// 0x00822270, `this` pushed as the set), and `Finalize` (0x008382A0) walks
+    /// them to build the `CFormationInstance`'s unit list. `Reset()` clears it
+    /// and `~CFormation()` destroys it as a member.
+    WeakSet<UserUnit> mParticipants;   // +0x00
     IFormationInstance* mCurInstance;  // +0x0C
     bool mReady;                       // +0x10
     std::uint8_t mPad11[0x03];         // +0x11

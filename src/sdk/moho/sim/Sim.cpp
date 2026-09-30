@@ -2355,8 +2355,7 @@ namespace
       events.push_back(event);
     }
 
-    WeakUnitSetUserUnit::AddResult added{};
-    (void)WeakUnitSetUserUnit::Add(&added, &events.back().mUnits, unit);
+    (void)events.back().mUnits.Add(unit);
   }
 
   CUnitCommand* FindCommandById(CCommandDb* commandDb, const CmdId cmdId)
@@ -16034,15 +16033,15 @@ int moho::cfunc_GetIdleEngineersL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetIdleEngineersHelpText, 0, argumentCount);
   }
 
-  WeakUnitSetUserUnit idleUnits = session->GetFocusArmy()->GetIdleEngineers();
-  if (idleUnits.Count() == 0) {
+  WeakSet<UserUnit> idleUnits = session->GetFocusArmy()->GetIdleEngineers();
+  if (idleUnits.Size() == 0) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
     return 1;
   }
 
   LuaPlus::LuaObject resultTable(state);
-  resultTable.AssignNewTable(state, idleUnits.Count(), 0u);
+  resultTable.AssignNewTable(state, static_cast<std::int32_t>(idleUnits.Size()), 0u);
 
   std::int32_t luaIndex = 1;
   for (UserUnit* const unit : idleUnits) {
@@ -16110,15 +16109,15 @@ int moho::cfunc_GetIdleFactoriesL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetIdleFactoriesHelpText, 0, argumentCount);
   }
 
-  WeakUnitSetUserUnit idleUnits = session->GetFocusArmy()->GetIdleFactories();
-  if (idleUnits.Count() == 0) {
+  WeakSet<UserUnit> idleUnits = session->GetFocusArmy()->GetIdleFactories();
+  if (idleUnits.Size() == 0) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
     return 1;
   }
 
   LuaPlus::LuaObject resultTable(state);
-  resultTable.AssignNewTable(state, idleUnits.Count(), 0u);
+  resultTable.AssignNewTable(state, static_cast<std::int32_t>(idleUnits.Size()), 0u);
 
   std::int32_t luaIndex = 1;
   for (UserUnit* const unit : idleUnits) {

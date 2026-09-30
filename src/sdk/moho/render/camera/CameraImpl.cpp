@@ -169,8 +169,6 @@ namespace
   constexpr const char* kCameraAccTypeFastInSlowOutName = "FastInSlowOut";
   constexpr const char* kCameraAccTypeSlowInOutName = "SlowInOut";
 
-  using moho::CameraTargetEntityList;
-  using moho::CameraTargetEntityNode;
   using moho::CameraTimeSourceRuntime;
 
   class GameTimeSource final : public CameraTimeSourceRuntime
@@ -387,47 +385,6 @@ namespace
     camera->mTargetTimeLeft = 0.0f;
   }
 
-  void UnlinkSelectionWeakOwnerRef(moho::SSelectionWeakRefUserEntity& weakRef) noexcept
-  {
-    auto** ownerLinkSlot = reinterpret_cast<moho::SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
-    if (ownerLinkSlot == nullptr) {
-      weakRef.mOwnerLinkSlot = nullptr;
-      weakRef.mNextOwner = nullptr;
-      return;
-    }
-
-    while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
-      ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
-    }
-
-    if (*ownerLinkSlot == &weakRef) {
-      *ownerLinkSlot = weakRef.mNextOwner;
-    }
-
-    weakRef.mOwnerLinkSlot = nullptr;
-    weakRef.mNextOwner = nullptr;
-  }
-
-  void LinkSelectionWeakOwnerRef(moho::UserEntity* const entity, moho::SSelectionWeakRefUserEntity& weakRef) noexcept
-  {
-    weakRef.mOwnerLinkSlot = nullptr;
-    weakRef.mNextOwner = nullptr;
-    if (entity == nullptr) {
-      return;
-    }
-
-    // `mIUnitChainHead` is already the chain head of these nodes, so no cast:
-    // the slot the entity publishes is exactly a `SSelectionWeakRefUserEntity*`.
-    moho::SSelectionWeakRefUserEntity** const ownerLinkSlot = &entity->mIUnitChainHead;
-    weakRef.mOwnerLinkSlot = ownerLinkSlot;
-    weakRef.mNextOwner = *ownerLinkSlot;
-    *ownerLinkSlot = &weakRef;
-  }
-
-  // The selection weak-set lifetime helpers live with the type they manage,
-  // in `moho/sim/CWldSession.h`: `moho::ScopedLocalSelectionSet` owns the head
-  // sentinel and tears the set down through the engine's own `EraseRange`.
-
   [[nodiscard]] moho::UserEntity* FindSessionEntityById(moho::CWldSession* const session, const std::int32_t entityId)
   {
     return session != nullptr ? session->LookupEntityId(static_cast<moho::EntId>(entityId)) : nullptr;
@@ -436,7 +393,7 @@ namespace
   void AppendLuaEntityIdArrayToSelectionSet(
     LuaPlus::LuaState* const state,
     const int tableArgIndex,
-    moho::SSelectionSetUserEntity& outSet
+    moho::WeakSet<moho::UserEntity>& outSet
   )
   {
     lua_State* const rawState = state->m_state;
@@ -457,156 +414,19 @@ namespace
 
       const int entityId = entityIdText != nullptr ? std::atoi(entityIdText) : 0;
       if (moho::UserEntity* const entity = FindSessionEntityById(session, entityId); entity != nullptr) {
-        moho::SSelectionSetUserEntity::AddResult addResult{};
-        (void)moho::SSelectionSetUserEntity::Add(&addResult, &outSet, entity);
+        (void)outSet.Add(entity);
       }
     }
   }
 
-  void CameraTargetListIncrementSize(CameraTargetEntityList& list)
-  {
-    if (list.mSize == 0x1FFFFFFF) {
-      throw std::length_error("list<T> too long");
-    }
-    ++list.mSize;
-  }
-
-  void EnsureCameraTargetListInitialized(CameraTargetEntityList& list)
-  {
-    if (list.mHead != nullptr) {
-      return;
-    }
-
-    auto* const head = static_cast<CameraTargetEntityNode*>(::operator new(sizeof(CameraTargetEntityNode)));
-    head->mNext = head;
-    head->mPrev = head;
-    head->mWeakRef.mOwnerLinkSlot = nullptr;
-    head->mWeakRef.mNextOwner = nullptr;
-    list.mAllocProxy = nullptr;
-    list.mHead = head;
-    list.mSize = 0;
-  }
-
-  /**
-   * Address: 0x007AE4E0 (FUN_007AE4E0, helper lane behind CameraImpl::CameraFollow)
-   *
-   * What it does:
-   * Appends one target weak-ref node into the camera's target list and returns
-   * the newly appended node so follow state can keep a typed active cursor.
-   *
-   * `::operator new(sizeof(CameraTargetEntityNode))` below is FUN_007AFA40's
-   * checked-allocate-and-init emission (via the checked wrapper FUN_007B1160,
-   * elementSize=0x10 matching CameraTargetEntityNode's own static_assert)
-   * plus the same field-init/list-link sequence this function performs
-   * inline; behaviorally identical for the fixed count=1 call pattern used
-   * here (the overflow guard is unreachable for a 16-byte single-node alloc).
-   */
-  [[nodiscard]] CameraTargetEntityNode* CameraTargetListAppendWeakRef(
-    CameraTargetEntityList& list, const moho::SSelectionWeakRefUserEntity& weakRef
-  )
-  {
-    EnsureCameraTargetListInitialized(list);
-    auto* const node = static_cast<CameraTargetEntityNode*>(::operator new(sizeof(CameraTargetEntityNode)));
-    node->mNext = list.mHead;
-    node->mPrev = list.mHead->mPrev;
-    node->mWeakRef.mOwnerLinkSlot = weakRef.mOwnerLinkSlot;
-
-    auto** ownerLinkSlot = reinterpret_cast<moho::SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
-    if (ownerLinkSlot == nullptr) {
-      node->mWeakRef.mNextOwner = nullptr;
-    } else {
-      node->mWeakRef.mNextOwner = *ownerLinkSlot;
-      *ownerLinkSlot = &node->mWeakRef;
-    }
-
-    CameraTargetListIncrementSize(list);
-    list.mHead->mPrev = node;
-    node->mPrev->mNext = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x007AE580 (FUN_007AE580, CameraTargetListClear)
-   *
-   * IDA signature:
-   * int __usercall sub_7AE580@<eax>(int a1@<edi>);  // a1 = &CameraImpl::mTargetEntities
-   *
-   * What it does:
-   * Clears one camera-target intrusive weak-ref list: resets the head sentinel
-   * to point at itself, zeros `mSize`, and walks every previously-live node,
-   * unlinking its `SSelectionWeakRefUserEntity` from the owning entity's
-   * weak-ref chain before releasing the node through `::operator delete`.
-   * Called from `CameraImpl::~CameraImpl`, `CameraImpl::TargetEntities`, and
-   * `CameraImpl::TargetNoseCam` to wipe the prior target set before building
-   * the new one.
-   */
-  void CameraTargetListClear(CameraTargetEntityList& list)
-  {
-    EnsureCameraTargetListInitialized(list);
-
-    CameraTargetEntityNode* node = list.mHead->mNext;
-    list.mHead->mNext = list.mHead;
-    list.mHead->mPrev = list.mHead;
-    list.mSize = 0;
-
-    while (node != list.mHead) {
-      CameraTargetEntityNode* const next = node->mNext;
-      UnlinkSelectionWeakOwnerRef(node->mWeakRef);
-      ::operator delete(node);
-      node = next;
-    }
-  }
-
-  void CameraTargetListEraseNode(CameraTargetEntityList& list, CameraTargetEntityNode* const node)
-  {
-    if (node == nullptr || node == list.mHead) {
-      return;
-    }
-
-    node->mPrev->mNext = node->mNext;
-    node->mNext->mPrev = node->mPrev;
-    UnlinkSelectionWeakOwnerRef(node->mWeakRef);
-    ::operator delete(node);
-    --list.mSize;
-  }
-
-  void CopySelectionSetToCameraTargetList(const moho::SSelectionSetUserEntity& sourceSet, CameraTargetEntityList& outList)
-  {
-    if (sourceSet.mHead == nullptr) {
-      return;
-    }
-
-    moho::SSelectionNodeUserEntity* cursor = nullptr;
-    moho::SSelectionNodeUserEntity* node =
-      moho::SSelectionSetUserEntity::find(const_cast<moho::SSelectionSetUserEntity*>(&sourceSet), sourceSet.mHead->mLeft, &cursor);
-    while (node != sourceSet.mHead) {
-      (void)CameraTargetListAppendWeakRef(outList, node->mEnt);
-      moho::SSelectionSetUserEntity::Iterator_inc(&cursor);
-      node = moho::SSelectionSetUserEntity::find(
-        const_cast<moho::SSelectionSetUserEntity*>(&sourceSet), cursor, &cursor
-      );
-    }
-  }
-
-  [[nodiscard]] moho::UserEntity* DecodeUserEntityWeakRef(const moho::SSelectionWeakRefUserEntity& weakRef) noexcept
-  {
-    constexpr std::uintptr_t kOwnerOffset = offsetof(moho::UserEntity, mIUnitChainHead);
-
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-    if (raw == 0u || raw == kOwnerOffset || raw < kOwnerOffset) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::UserEntity*>(raw - kOwnerOffset);
-  }
-
   [[nodiscard]] moho::UserEntity* ActiveCameraTargetEntity(const moho::CameraImpl& camera) noexcept
   {
-    CameraTargetEntityNode* const node = camera.mActiveTargetEntityNode;
-    if (node == nullptr || node == camera.mTargetEntities.mHead) {
+    using TargetList = msvc8::list<moho::WeakPtr<moho::UserEntity>>;
+    const TargetList::const_iterator active = camera.mActiveTarget;
+    if (active == TargetList::const_iterator{} || active == camera.mTargetEntities.end()) {
       return nullptr;
     }
-    return DecodeUserEntityWeakRef(node->mWeakRef);
+    return active->GetObjectPtr();
   }
 
   [[nodiscard]] float HeadingFromEntityOrientation(const Wm3::Quatf& orientation) noexcept
@@ -695,24 +515,6 @@ namespace
     return fallbackSet;
   }
 
-  /**
-   * Address: 0x007AEFA0 (FUN_007AEFA0, target-list head allocator)
-   *
-   * What it does:
-   * Allocates one `CameraTargetEntityNode` head sentinel through the intrusive
-   * list-node allocator (`sub_7B1160(1)`) and self-links its `mNext`/`mPrev`
-   * back-links. The constructor stores the returned sentinel into
-   * `mTargetEntities.mHead` and zeroes `mSize`; the sentinel's `mWeakRef` and
-   * the list's `mAllocProxy` word are intentionally left untouched here (the
-   * binary defers those to first use).
-   */
-  [[nodiscard]] CameraTargetEntityNode* AllocateSelfLinkedCameraTargetHead()
-  {
-    auto* const head = static_cast<CameraTargetEntityNode*>(::operator new(sizeof(CameraTargetEntityNode)));
-    head->mNext = head;
-    head->mPrev = head;
-    return head;
-  }
 } // namespace
 
 namespace moho
@@ -844,11 +646,6 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
   mPivot.x = 0.0f;
   mPivot.y = 0.0f;
 
-  // Intrusive target-entity list: install a self-linked head sentinel and an
-  // empty size; the active-node cursor starts detached.
-  mTargetEntities.mHead = AllocateSelfLinkedCameraTargetHead();
-  mTargetEntities.mSize = 0;
-  mActiveTargetEntityNode = nullptr;
 
   // Default to the wall-clock (System) time source and null both slots before
   // installing them (mirrors the binary's 2-element eh-vector zero-fill).
@@ -940,8 +737,8 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
  * What it does:
  * Reverses construction of one runtime camera. Detaches each of the three
  * inline frustum/spotter weak-vector lanes from their tracked entity owners
- * and releases any heap-grown storage. Tears down the intrusive target weak
- * list (`mTargetEntities`) and frees its head sentinel. Releases the two
+ * and releases any heap-grown storage. `mTargetEntities` goes as a member
+ * (`clear` 0x007AE580, then the head). Releases the two
  * heap-allocated `CameraTimeSourceRuntime` slots (`SystemTimeSource` at index
  * 0 and `GameTimeSource` at index 1) through their scalar-deleting vtable
  * slot (mirroring the binary's `eh vector destructor iterator`). Destroys
@@ -996,14 +793,6 @@ moho::CameraImpl::~CameraImpl()
     delete source;
     source = nullptr;
   }
-
-  // Clear the intrusive target-entity weak list, then release the heap-
-  // allocated head sentinel (allocated by `EnsureCameraTargetListInitialized`
-  // during construction or first append). The runtime view's pointer is
-  // nulled afterwards so any future use is detectable.
-  CameraTargetListClear(mTargetEntities);
-  ::operator delete(mTargetEntities.mHead);
-  mTargetEntities.mHead = nullptr;
 
   // The embedded `GeomCamera3` (which releases solid-frustum heap storage)
   // and the `mName` `msvc8::string` are destroyed by the compiler after this
@@ -1270,12 +1059,8 @@ void moho::CameraImpl::CameraFollow(const SCamFollowParams& followParams)
     return;
   }
 
-  moho::SSelectionWeakRefUserEntity weakRef{};
-  LinkSelectionWeakOwnerRef(nextTarget, weakRef);
-  CameraTargetEntityNode* const nextNode = CameraTargetListAppendWeakRef(mTargetEntities, weakRef);
-  if (nextNode != nullptr) {
-    mActiveTargetEntityNode = nextNode;
-  }
+  // 0x007AE4E0: the new node goes in at the end and becomes the active target.
+  mActiveTarget = mTargetEntities.insert(mTargetEntities.end(), WeakPtr<UserEntity>(nextTarget));
 
   mTargetTimeLeft = followParams.mTargetTimeLeft;
 }
@@ -1549,12 +1334,7 @@ moho::UserEntity* moho::CameraImpl::GetTargetEntity() const
     return nullptr;
   }
 
-  const CameraTargetEntityNode* const node = mActiveTargetEntityNode;
-  if (node == nullptr || node == mTargetEntities.mHead) {
-    return nullptr;
-  }
-
-  return DecodeUserEntityWeakRef(node->mWeakRef);
+  return ActiveCameraTargetEntity(*this);
 }
 
 /**
@@ -2195,7 +1975,7 @@ void moho::CameraImpl::UpdateTargets(const float interpolationAlpha, const float
       // rotation revert when we were previously in rotated mode.
       mTargetTime = 1u;
       const bool wasEntityMode = (mTargetType == kCameraTargetTypeEntity);
-      if (wasEntityMode && mTargetEntities.mSize <= 1) {
+      if (wasEntityMode && mTargetEntities.size() <= 1) {
         BroadcastEvent(SCameraTracking{mName, 0});
       }
       const bool wasRotated = (mIsRotated != 0u);
@@ -2987,7 +2767,7 @@ void moho::CameraImpl::TargetEntityBox(UserEntity* const entity, const float sec
  * entity-tracking mode with broadcaster notifications.
  */
 void moho::CameraImpl::TargetEntities(
-  const SSelectionSetUserEntity& entities,
+  const WeakSet<UserEntity>& entities,
   const bool trackEntities,
   const float zoom,
   const float seconds
@@ -3005,11 +2785,15 @@ void moho::CameraImpl::TargetEntities(
 
   mTargetTimeLeft = 0.0f;
   mTargetTime = 0u;
-  CameraTargetListClear(mTargetEntities);
-  CopySelectionSetToCameraTargetList(entities, mTargetEntities);
+  mTargetEntities.clear();
+  for (UserEntity* const entity : entities) {
+    if (entity != nullptr) {
+      mTargetEntities.push_back(WeakPtr<UserEntity>(entity));
+    }
+  }
 
-  mActiveTargetEntityNode = mTargetEntities.mHead != nullptr ? mTargetEntities.mHead->mNext : nullptr;
-  if (mTargetEntities.mSize == 0) {
+  mActiveTarget = mTargetEntities.begin();
+  if (mTargetEntities.size() == 0) {
     return;
   }
 
@@ -3046,28 +2830,22 @@ void moho::CameraImpl::TargetEntities(
  */
 void moho::CameraImpl::TargetNextEntity()
 {
-  if (mTargetEntities.mSize == 0 || mTargetEntities.mHead == nullptr) {
+  if (mTargetEntities.size() == 0) {
     return;
   }
 
   while (true) {
-    CameraTargetEntityNode* active = mActiveTargetEntityNode;
-    if (active == nullptr) {
-      active = mTargetEntities.mHead;
-      mActiveTargetEntityNode = active;
+    if (mActiveTarget == decltype(mActiveTarget){}) {
+      mActiveTarget = mTargetEntities.end();
+    }
+    if (mActiveTarget != mTargetEntities.end()) {
+      ++mActiveTarget;
+    }
+    if (mActiveTarget == mTargetEntities.end()) {
+      mActiveTarget = mTargetEntities.begin();
     }
 
-    if (active != mTargetEntities.mHead) {
-      mActiveTargetEntityNode = active->mNext;
-    }
-
-    if (mActiveTargetEntityNode == mTargetEntities.mHead) {
-      mActiveTargetEntityNode = mTargetEntities.mHead->mNext;
-    }
-
-    active = mActiveTargetEntityNode;
-    const UserEntity* const activeEntity =
-      (active != nullptr && active != mTargetEntities.mHead) ? DecodeUserEntityWeakRef(active->mWeakRef) : nullptr;
+    const UserEntity* const activeEntity = ActiveCameraTargetEntity(*this);
     if (activeEntity != nullptr) {
       mTargetType = kCameraTargetTypeEntity;
       mTargetTimeLeft = 0.0f;
@@ -3078,13 +2856,9 @@ void moho::CameraImpl::TargetNextEntity()
 
     BroadcastEvent(SCameraTracking{mName, 0});
 
-    CameraTargetEntityNode* const next = (active != nullptr) ? active->mNext : nullptr;
-    if (active != nullptr && active != mTargetEntities.mHead) {
-      CameraTargetListEraseNode(mTargetEntities, active);
-    }
-
-    mActiveTargetEntityNode = next;
-    if (mTargetEntities.mSize == 0) {
+    // The dead target's node goes; the cursor moves to the one after it.
+    mActiveTarget = mTargetEntities.erase(mActiveTarget);
+    if (mTargetEntities.size() == 0) {
       return;
     }
   }
@@ -3100,7 +2874,7 @@ void moho::CameraImpl::TargetNextEntity()
  * current transform plus pitch-adjust lane.
  */
 void moho::CameraImpl::TargetNoseCam(
-  const SSelectionSetUserEntity& entities,
+  const WeakSet<UserEntity>& entities,
   const float pitchAdjust,
   const float zoom,
   const float seconds,
@@ -3113,11 +2887,15 @@ void moho::CameraImpl::TargetNoseCam(
 
   mTargetTimeLeft = 0.0f;
   mTargetTime = 0u;
-  CameraTargetListClear(mTargetEntities);
-  CopySelectionSetToCameraTargetList(entities, mTargetEntities);
+  mTargetEntities.clear();
+  for (UserEntity* const entity : entities) {
+    if (entity != nullptr) {
+      mTargetEntities.push_back(WeakPtr<UserEntity>(entity));
+    }
+  }
 
-  mActiveTargetEntityNode = mTargetEntities.mHead != nullptr ? mTargetEntities.mHead->mNext : nullptr;
-  if (mTargetEntities.mSize == 0) {
+  mActiveTarget = mTargetEntities.begin();
+  if (mTargetEntities.size() == 0) {
     return;
   }
 
@@ -3964,8 +3742,7 @@ int moho::cfunc_CameraImplTrackEntitiesL(LuaPlus::LuaState* const state)
   }
   const float zoom = static_cast<float>(lua_tonumber(rawState, 3));
 
-  moho::ScopedLocalSelectionSet entitySetGuard{};
-  SSelectionSetUserEntity& entitySet = entitySetGuard.get();
+  WeakSet<UserEntity> entitySet;
   AppendLuaEntityIdArrayToSelectionSet(state, 2, entitySet);
 
   camera->TargetEntities(entitySet, true, zoom, seconds);
@@ -4015,8 +3792,7 @@ int moho::cfunc_CameraImplTargetEntitiesL(LuaPlus::LuaState* const state)
   }
   const float zoom = static_cast<float>(lua_tonumber(rawState, 3));
 
-  moho::ScopedLocalSelectionSet entitySetGuard{};
-  SSelectionSetUserEntity& entitySet = entitySetGuard.get();
+  WeakSet<UserEntity> entitySet;
   AppendLuaEntityIdArrayToSelectionSet(state, 2, entitySet);
 
   camera->TargetEntities(entitySet, false, zoom, seconds);
@@ -4059,12 +3835,10 @@ int moho::cfunc_CameraImplNoseCamL(LuaPlus::LuaState* const state)
     entityIdArg.TypeError("string");
   }
 
-  moho::ScopedLocalSelectionSet entitySetGuard{};
-  SSelectionSetUserEntity& entitySet = entitySetGuard.get();
+  WeakSet<UserEntity> entitySet;
   const int entityId = entityIdText != nullptr ? std::atoi(entityIdText) : 0;
   if (UserEntity* const entity = FindSessionEntityById(moho::WLD_GetActiveSession(), entityId); entity != nullptr) {
-    SSelectionSetUserEntity::AddResult addResult{};
-    (void)SSelectionSetUserEntity::Add(&addResult, &entitySet, entity);
+    (void)entitySet.Add(entity);
   }
 
   const LuaPlus::LuaStackObject transitionArg(state, 6);

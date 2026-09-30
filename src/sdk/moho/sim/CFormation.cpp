@@ -26,19 +26,6 @@
 
 namespace
 {
-  [[nodiscard]] moho::UserEntity* DecodeSelectionEntity(
-    const moho::SSelectionWeakRefUserEntity& weakEntityRef
-  ) noexcept
-  {
-    constexpr std::uintptr_t kWeakOwnerOffset = offsetof(moho::UserEntity, mIUnitChainHead);
-    const std::uintptr_t rawOwnerSlot = reinterpret_cast<std::uintptr_t>(weakEntityRef.mOwnerLinkSlot);
-    if (rawOwnerSlot == 0u || rawOwnerSlot < kWeakOwnerOffset) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::UserEntity*>(rawOwnerSlot - kWeakOwnerOffset);
-  }
-
   /**
    * Address: 0x008381E0 (FUN_008381E0, func_GetFormationType)
    *
@@ -46,40 +33,30 @@ namespace
    * Walks one weak-selection set, classifies live units by movement layer, and
    * returns formation-type lane `0` (surface), `1` (air), or `2` (mixed).
    */
-  std::int32_t DetermineSelectionFormationType(
-    moho::WeakEntitySetUserEntity& selection
-  ) noexcept
+  std::int32_t DetermineSelectionFormationType(moho::WeakSet<moho::UserUnit>& selection)
   {
     constexpr std::int32_t kFormationTypeSurface = 0;
     constexpr std::int32_t kFormationTypeAir = 1;
     constexpr std::int32_t kFormationTypeMixed = 2;
 
-    if (selection.mHead == nullptr) {
-      return kFormationTypeSurface;
-    }
-
-    moho::SSelectionNodeUserEntity* node = nullptr;
-    (void)moho::PruneTombstonesAndFindLive(selection, &node, selection.mHead->mLeft);
-    if (node == selection.mHead) {
+    auto it = selection.begin();
+    if (it == selection.end()) {
       return kFormationTypeSurface;
     }
 
     bool hasAirUnits = false;
     bool hasSurfaceUnits = false;
 
-    while (node != selection.mHead) {
-      // Every selection entry is a unit: the binary casts without a check and
-      // dispatches `GetBlueprint` (IUnit slot 7, through the sub-object at
-      // UserUnit+0x148), then tests `Physics.MotionType` (+0x290).
-      auto* const unit = static_cast<moho::UserUnit*>(DecodeSelectionEntity(node->mEnt));
+    // Every entry is a unit; `GetBlueprint` is IUnit slot 7, through the
+    // sub-object at UserUnit+0x148, and the test is `Physics.MotionType`
+    // (+0x290).
+    for (; it != selection.end(); ++it) {
+      moho::UserUnit* const unit = *it;
       if (unit->GetBlueprint()->Physics.MotionType == moho::RULEUMT_Air) {
         hasAirUnits = true;
       } else {
         hasSurfaceUnits = true;
       }
-
-      moho::SSelectionSetUserEntity::Iterator_inc(&node);
-      (void)moho::PruneTombstonesAndFindLive(selection, &node, node);
     }
 
     if (!hasAirUnits) {
@@ -88,66 +65,6 @@ namespace
     return hasSurfaceUnits ? kFormationTypeMixed : kFormationTypeAir;
   }
 
-  /**
-   * Allocates one `SSelectionNodeUserEntity`-shaped tree node for
-   * `CFormation`'s own participating-unit weak-set (see the field doc on
-   * `CFormation::mParticipants`). Kept as a local nothrow allocator (rather than
-   * reusing `moho::AllocateWeakEntitySetHead()`, moho/sim/WeakEntitySet.h)
-   * because `CFormation::CFormation` (0x00838070) is asm-verified to use a
-   * `nothrow` allocation with an explicit null check, unlike the shared
-   * helper's throwing `::operator new`.
-   */
-  [[nodiscard]] moho::SSelectionNodeUserEntity* AllocateFormationNode()
-  {
-    auto* const node =
-      static_cast<moho::SSelectionNodeUserEntity*>(::operator new(sizeof(moho::SSelectionNodeUserEntity), std::nothrow));
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    node->mLeft = nullptr;
-    node->mParent = nullptr;
-    node->mRight = nullptr;
-    node->mKey = 0u;
-    node->mEnt.mOwnerLinkSlot = nullptr;
-    node->mEnt.mNextOwner = nullptr;
-    node->mColor = 1u;
-    node->mIsSentinel = 0u;
-    node->pad_1A[0] = 0u;
-    node->pad_1A[1] = 0u;
-    return node;
-  }
-
-  /**
-   * Address: 0x007B45E0 (FUN_007B45E0, sub_7B45E0)
-   *
-   * What it does:
-   * Recursively destroys one formation-node subtree in left-chain order,
-   * unlinking each node from the owner-link lane rooted at `mEnt.mOwnerLinkSlot`
-   * (the same intrusive owner-chain-head slot every weak-entity-set node in
-   * the engine uses; see `SSelectionWeakRefUserEntity`).
-   */
-  void DestroyFormationNodeTreeWithOwnerUnlink(moho::SSelectionNodeUserEntity* node)
-  {
-    moho::SSelectionNodeUserEntity* cursor = node;
-    while (cursor != nullptr && cursor->mIsSentinel == 0u) {
-      DestroyFormationNodeTreeWithOwnerUnlink(cursor->mRight);
-
-      moho::SSelectionNodeUserEntity* const left = cursor->mLeft;
-      auto* const owner = static_cast<moho::SSelectionNodeUserEntity*>(cursor->mEnt.mOwnerLinkSlot);
-      if (owner != nullptr) {
-        auto* slotLane = reinterpret_cast<std::uintptr_t*>(&owner->mLeft);
-        auto** const needle = reinterpret_cast<moho::SSelectionNodeUserEntity**>(&cursor->mEnt.mOwnerLinkSlot);
-        while (reinterpret_cast<moho::SSelectionNodeUserEntity**>(*slotLane) != needle) {
-          slotLane = reinterpret_cast<std::uintptr_t*>(*slotLane + sizeof(std::uint32_t));
-        }
-        *slotLane = reinterpret_cast<std::uintptr_t>(cursor->mEnt.mNextOwner);
-      }
-
-      ::operator delete(cursor);
-      cursor = left;
-    }
-  }
 } // namespace
 
 namespace moho
@@ -172,15 +89,6 @@ namespace moho
     , mTimeLeft(0.5f)
     , mLastUpdate(0.0f)
   {
-    SSelectionNodeUserEntity* const head = AllocateFormationNode();
-    mParticipants.mHead = head;
-    if (head != nullptr) {
-      head->mIsSentinel = 1u;
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-    }
-
     Reset();
   }
 
@@ -188,22 +96,14 @@ namespace moho
    * Address: 0x0089B370 (FUN_0089B370, ??1CFormation@Moho@@QAE@XZ)
    *
    * What it does:
-   * Releases the active formation-instance lane, destroys the RB-tree node
-   * chain under the sentinel head, and clears node-head/count ownership.
+   * Releases the formation instance; `mParticipants` is then destroyed as a
+   * member (the set's `_Tidy`, its subtree erase at 0x007B45E0).
    */
   CFormation::~CFormation()
   {
     IFormationInstance* const curInstance = mCurInstance;
     mCurInstance = nullptr;
     delete curInstance;
-
-    SSelectionNodeUserEntity* const nodeHead = mParticipants.mHead;
-    if (nodeHead != nullptr) {
-      DestroyFormationNodeTreeWithOwnerUnlink(nodeHead->mParent);
-      ::operator delete(nodeHead);
-      mParticipants.mHead = nullptr;
-    }
-    mParticipants.mSize = 0u;
   }
 
   /**
@@ -211,13 +111,9 @@ namespace moho
    */
   void CFormation::Reset()
   {
-    if (SSelectionNodeUserEntity* const nodeHead = mParticipants.mHead; nodeHead != nullptr) {
-      DestroyFormationNodeTreeWithOwnerUnlink(nodeHead->mParent);
-      nodeHead->mParent = nodeHead;
-      nodeHead->mLeft = nodeHead;
-      nodeHead->mRight = nodeHead;
-    }
-    mParticipants.mSize = 0u;
+    // The set's whole-tree erase: `_Erase(root)` (0x007B45E0), head relinked
+    // to itself, count zero.
+    mParticipants.Clear();
 
     IFormationInstance* const curInstance = mCurInstance;
     mCurInstance = nullptr;
@@ -310,29 +206,14 @@ namespace moho
    */
   void CFormation::ChooseFormation(
     const Wm3::Vector3f& mouseWorldPos,
-    WeakEntitySetUserEntity& selection,
+    WeakSet<UserUnit>& selection,
     const bool useLastQueuedDestination
   )
   {
     mStart = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
 
-    // Walk the incoming selection, pruning tombstones exactly as
-    // SSelectionSetUserEntity's own erase-walking members do (PruneTombstonesAndFindLive
-    // deletes each tombstone it passes, matching the binary's fused
-    // advance-then-erase loop).
-    SSelectionNodeUserEntity* node = nullptr;
-    (void)PruneTombstonesAndFindLive(selection, &node, selection.mHead->mLeft);
-    while (node != selection.mHead) {
-      UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
-      UserUnit* const unit = (entity != nullptr) ? reinterpret_cast<UserUnit*>(entity) : nullptr;
-
-      // Track every visited unit in this formation's own participant weak set.
-      // The binary calls `WeakSet<UserUnit>::Add` (0x00822270) here with `this`
-      // pushed verbatim as the set argument, which is exactly `mParticipants`
-      // at `this + 0x00`; the discarded `{iterator, inserted}` pair is the sret
-      // slot the call site never reads back.
-      WeakUnitSetUserUnit::AddResult participantAdd{};
-      (void)WeakUnitSetUserUnit::Add(&participantAdd, &mParticipants, unit);
+    for (UserUnit* const unit : selection) {
+      (void)mParticipants.Add(unit);
 
       Wm3::Vector3f unitPosition(0.0f, 0.0f, 0.0f);
       bool haveQueuedPosition = false;
@@ -352,12 +233,9 @@ namespace moho
       mStart.x += unitPosition.x;
       mStart.y += unitPosition.y;
       mStart.z += unitPosition.z;
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      (void)PruneTombstonesAndFindLive(selection, &node, node);
     }
 
-    const std::int32_t participantCount = mParticipants.Count();
+    const std::int32_t participantCount = static_cast<std::int32_t>(mParticipants.Size());
     if (participantCount == 0) {
       constexpr float kFltMax = 3.4028235e38f;
       mStart = Wm3::Vector3f(kFltMax, kFltMax, kFltMax);
@@ -417,39 +295,16 @@ namespace moho
     LuaPlus::LuaState* const state = session->mState;
     RRuleGameRulesImpl* const gamerules = session->mRules;
 
-    // Collect every live, still-mobile, unattached participant unit into a
-    // transient weak-ref set. `mParticipants` is a `WeakUnitSetUserUnit`, not
-    // an `SSelectionSetUserEntity` -- the binary calls the exact same prune
-    // routine on it anyway (0x00838313/0x008383CC point `this` straight at
-    // `CFormation`'s own `+0x00`), which is why `PruneTombstonesAndFindLive`
-    // is generalized over the shared `WeakEntitySetUserEntity` header rather
-    // than reinterpret_cast-ed through the wrong set type here. The collected
-    // set feeds `CFormationInstance::Create`'s `mUnits` directly; each
-    // `push_back` below is the binary's construct-a-`WeakPtr<IUnit>`, push,
-    // destroy-the-temporary sequence at 0x0083836D..0x008383B6, and the
+    // Every live participant that is not dead, not being built and not
+    // attached. Each `push_back` is the binary's construct-a-`WeakPtr<IUnit>`,
+    // push, destroy-the-temporary sequence at 0x0083836D..0x008383B6, and the
     // vector's destructor is the unlink-and-free at 0x00838464..0x008384A3.
     gpg::fastvector_n<WeakPtr<IUnit>, 4> collectedUnits{};
-
-    SSelectionNodeUserEntity* node = nullptr;
-    (void)PruneTombstonesAndFindLive(mParticipants, &node, mParticipants.mHead->mLeft);
-    while (node != mParticipants.mHead) {
-      // `DecodeSelectionEntity` recovers the live `UserEntity*` (or `nullptr`
-      // for a tombstone) from the node's weak-ref pair; `mParticipants` only
-      // ever stores units inserted through `WeakUnitSetUserUnit::Add(UserUnit*)`,
-      // so every non-null result is safely a `UserUnit*` too (same
-      // reinterpret_cast `Add`'s own body already relies on, since `UserUnit`'s
-      // `UserEntity` base sits at offset zero).
-      UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
-      if (entity != nullptr) {
-        UserUnit* const candidateUnit = reinterpret_cast<UserUnit*>(entity);
-        IUnit* const iunitBridge = GetIUnitBridge(candidateUnit);
-        if (!iunitBridge->IsDead() && !entity->IsBeingBuilt() && entity->GetAttachmentParent() == nullptr) {
-          collectedUnits.push_back(WeakPtr<IUnit>(iunitBridge));
-        }
+    for (UserUnit* const unit : mParticipants) {
+      IUnit* const iunitBridge = GetIUnitBridge(unit);
+      if (!iunitBridge->IsDead() && !unit->IsBeingBuilt() && unit->GetAttachmentParent() == nullptr) {
+        collectedUnits.push_back(WeakPtr<IUnit>(iunitBridge));
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      (void)PruneTombstonesAndFindLive(mParticipants, &node, node);
     }
 
     const auto formationType = static_cast<EFormationType>(mType);
@@ -499,24 +354,19 @@ namespace moho
    *     Wm3::Vector3f *mousePos, bool a5);
    *
    * What it does:
-   * `a1`'s decompiled `std::vector*` typing is the same decompiler
-   * type-confusion `ChooseFormation` and `PruneTombstonesAndFindLive`
-   * already document -- it is really the world session's
-   * `SSelectionSetUserEntity*`. When the trigger flag is clear, or the
-   * selection prunes down to no live entity, this drops the formation
+   * `a1` is the caller's `WeakSet<UserUnit>`. When the trigger flag is clear,
+   * or the selection prunes down to no live entity, this drops the formation
    * (`mReady = false`, `Reset()`); otherwise it marks the formation ready
    * and forwards straight into `ChooseFormation()`/`Finalize()`.
    */
   void CFormation::ProcessMouse(
-    WeakEntitySetUserEntity* const selection,
+    WeakSet<UserUnit>* const selection,
     const bool triggerActive,
     const Wm3::Vector3f& mousePos,
     const bool useLastQueuedDestination
   )
   {
-    SSelectionNodeUserEntity* firstLive = nullptr;
-    const bool hasLiveSelection = triggerActive
-      && (*PruneTombstonesAndFindLive(*selection, &firstLive, selection->mHead->mLeft) != selection->mHead);
+    const bool hasLiveSelection = triggerActive && !selection->Empty();
 
     if (!hasLiveSelection) {
       mReady = false;

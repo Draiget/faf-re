@@ -9,7 +9,7 @@
 #include "moho/math/Vector2f.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/script/CScriptEvent.h"
-#include "moho/sim/WeakEntitySet.h"
+#include "moho/misc/WeakSet.h"
 #include "moho/unit/Broadcaster.h"
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Vector3.h"
@@ -34,7 +34,6 @@ namespace moho
   class STIMap;
   class UserEntity;
   enum ECamTimeSource : std::int32_t;
-  struct SSelectionSetUserEntity;
 
   struct SCamShakeParams
   {
@@ -102,43 +101,6 @@ namespace moho
   static_assert(sizeof(SCamShakeState) == 0x24, "SCamShakeState size must be 0x24");
   static_assert(offsetof(SCamShakeState, mElapsed) == 0x1C, "SCamShakeState::mElapsed offset must be 0x1C");
   static_assert(offsetof(SCamShakeState, mScale) == 0x20, "SCamShakeState::mScale offset must be 0x20");
-
-  /**
-   * One node of `CameraImpl::mTargetEntities`. The `{next, prev, value}` shape
-   * over a 0x0C `{proxy, head, size}` head is the MSVC8 `std::list` node; the
-   * value is a weak reference that splices itself into the target entity's
-   * owner chain, which is why the node is created and destroyed through the
-   * helpers in `CameraImpl.cpp` rather than by a plain allocator.
-   */
-  struct CameraTargetEntityNode
-  {
-    CameraTargetEntityNode* mNext = nullptr; // +0x00
-    CameraTargetEntityNode* mPrev = nullptr; // +0x04
-    SSelectionWeakRefUserEntity mWeakRef{};  // +0x08
-  };
-
-  static_assert(sizeof(CameraTargetEntityNode) == 0x10, "CameraTargetEntityNode size must be 0x10");
-  static_assert(
-    offsetof(CameraTargetEntityNode, mWeakRef) == 0x08,
-    "CameraTargetEntityNode::mWeakRef offset must be 0x08"
-  );
-
-  /**
-   * The head of that list: allocator proxy, self-linked sentinel node, count.
-   * Byte-identical to `msvc8::list<SSelectionWeakRefUserEntity>`, whose
-   * `_Container_base` proxy sits at +0x00 with `_Myhead` at +0x04 and
-   * `_Mysize` at +0x08.
-   */
-  struct CameraTargetEntityList
-  {
-    void* mAllocProxy = nullptr;             // +0x00
-    CameraTargetEntityNode* mHead = nullptr; // +0x04
-    std::int32_t mSize = 0;                  // +0x08
-  };
-
-  static_assert(sizeof(CameraTargetEntityList) == 0x0C, "CameraTargetEntityList size must be 0x0C");
-  static_assert(offsetof(CameraTargetEntityList, mHead) == 0x04, "CameraTargetEntityList::mHead offset must be 0x04");
-  static_assert(offsetof(CameraTargetEntityList, mSize) == 0x08, "CameraTargetEntityList::mSize offset must be 0x08");
 
   /**
    * Abstract time source behind `CameraImpl::mTimeSources`. Two concrete
@@ -233,7 +195,7 @@ namespace moho
 
     /// Slot 12.
     virtual void TargetEntities(
-      const SSelectionSetUserEntity& entities,
+      const WeakSet<UserEntity>& entities,
       bool trackEntities,
       float zoom,
       float seconds
@@ -640,7 +602,7 @@ namespace moho
      * tracked or untracked multi-entity target behavior.
      */
     void TargetEntities(
-      const SSelectionSetUserEntity& entities,
+      const WeakSet<UserEntity>& entities,
       bool trackEntities,
       float zoom,
       float seconds
@@ -1014,7 +976,7 @@ namespace moho
      * transition seconds, and transition parameter lanes.
      */
     void TargetNoseCam(
-      const SSelectionSetUserEntity& entities,
+      const WeakSet<UserEntity>& entities,
       float pitchAdjust,
       float zoom,
       float seconds,
@@ -1118,8 +1080,12 @@ namespace moho
     std::int32_t mTargetType = 0;                              // +0x37C
     Wm3::Vec3f mTargetLocation{};                              // +0x380
     Wm3::AxisAlignedBox3f mTargetBox{};                        // +0x38C
-    CameraTargetEntityList mTargetEntities{};                  // +0x3A4
-    CameraTargetEntityNode* mActiveTargetEntityNode = nullptr; // +0x3B0
+    /// The entities the camera is framing or following. Each node's value is a
+    /// `WeakPtr` pushed onto its entity's chain: `push_back` 0x007AE4E0,
+    /// `clear` 0x007AE580, the head bought through 0x007AEFA0.
+    msvc8::list<WeakPtr<UserEntity>> mTargetEntities;          // +0x3A4
+    /// The entity being followed; a default iterator until the first target.
+    msvc8::list<WeakPtr<UserEntity>>::iterator mActiveTarget;  // +0x3B0
     float mTargetTimeLeft = 0.0f;                              // +0x3B4
     std::uint8_t mTargetTime = 0;                              // +0x3B8
     std::uint8_t mPadding0x3B9_[3]{};                          // +0x3B9
@@ -1191,10 +1157,7 @@ namespace moho
   static_assert(offsetof(CameraImpl, mTargetLocation) == 0x380, "CameraImpl::mTargetLocation offset must be 0x380");
   static_assert(offsetof(CameraImpl, mTargetBox) == 0x38C, "CameraImpl::mTargetBox offset must be 0x38C");
   static_assert(offsetof(CameraImpl, mTargetEntities) == 0x3A4, "CameraImpl::mTargetEntities offset must be 0x3A4");
-  static_assert(
-    offsetof(CameraImpl, mActiveTargetEntityNode) == 0x3B0,
-    "CameraImpl::mActiveTargetEntityNode offset must be 0x3B0"
-  );
+  static_assert(offsetof(CameraImpl, mActiveTarget) == 0x3B0, "CameraImpl::mActiveTarget offset must be 0x3B0");
   static_assert(offsetof(CameraImpl, mTargetTimeLeft) == 0x3B4, "CameraImpl::mTargetTimeLeft offset must be 0x3B4");
   static_assert(offsetof(CameraImpl, mTargetTime) == 0x3B8, "CameraImpl::mTargetTime offset must be 0x3B8");
   static_assert(offsetof(CameraImpl, mTimeSource) == 0x3BC, "CameraImpl::mTimeSource offset must be 0x3BC");

@@ -11,7 +11,7 @@
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
-#include "moho/sim/WeakEntitySet.h"
+#include "moho/misc/WeakSet.h"
 #include "Wm3Vector3.h"
 
 namespace LuaPlus
@@ -145,11 +145,12 @@ namespace moho
      *     Moho::UserArmy *this@<eax>, Moho::WeakSet_UserUnit *out);
      *
      * What it does:
-     * Returns a pruned copy of the idle-engineer registry: `begin()` over
-     * `mEngineers` (0x007B29C0) feeds the range constructor (0x00831310).
+     * Returns a copy of the idle-engineer registry: `WeakSet`'s copy
+     * constructor, `begin()` over `mEngineers` (0x007B29C0) feeding the set's
+     * range constructor (0x00831310), so the copy holds live units only.
      * `cfunc_GetIdleEngineersL` (0x008BCF89) walks the copy.
      */
-    [[nodiscard]] WeakUnitSetUserUnit GetIdleEngineers();
+    [[nodiscard]] WeakSet<UserUnit> GetIdleEngineers();
 
     /**
      * Address: 0x008B25C0 (FUN_008B25C0)
@@ -158,7 +159,7 @@ namespace moho
      * The same body as `GetIdleEngineers` over `mFactories` (+0x204).
      * `cfunc_GetIdleFactoriesL` (0x008BD219) walks the copy.
      */
-    [[nodiscard]] WeakUnitSetUserUnit GetIdleFactories();
+    [[nodiscard]] WeakSet<UserUnit> GetIdleFactories();
 
   public:
     // 0x00..0x80 is the inherited `SSTIArmyConstantData` payload.
@@ -192,11 +193,11 @@ namespace moho
 
     /// Idle-engineer registry, populated from `UserUnit::Tick` (FUN_008B2520)
     /// and read by `GetIdleEngineers` (FUN_008BCEF0).
-    WeakUnitSetUserUnit mEngineers; // 0x1F8
+    WeakSet<UserUnit> mEngineers; // 0x1F8
 
     /// Idle-factory registry, populated from `UserUnit::Tick` (FUN_008B2590)
     /// and read by `GetIdleFactories` (FUN_008BD180).
-    WeakUnitSetUserUnit mFactories; // 0x204
+    WeakSet<UserUnit> mFactories; // 0x204
   };
 
   /**
@@ -235,6 +236,6 @@ namespace moho
   static_assert(offsetof(UserArmy, mAvatars) == 0x1E8, "UserArmy::mAvatars offset must be 0x1E8");
   static_assert(offsetof(UserArmy, mEngineers) == 0x1F8, "UserArmy::mEngineers offset must be 0x1F8");
   static_assert(offsetof(UserArmy, mFactories) == 0x204, "UserArmy::mFactories offset must be 0x204");
-  static_assert(sizeof(WeakEntitySetUserEntity) == 0x0C, "WeakEntitySetUserEntity size must be 0x0C");
+  static_assert(sizeof(WeakSet<UserUnit>) == 0x0C, "WeakSet<UserUnit> size must be 0x0C");
   static_assert(sizeof(UserArmy) == 0x210, "UserArmy size must be 0x210");
 } // namespace moho

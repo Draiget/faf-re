@@ -1954,12 +1954,12 @@ void moho::UI_ShowRenameDialog()
     return;
   }
 
-  if (session->mSelection.mSize == 0u) {
+  if (session->mSelection.Empty()) {
     PrintLocalizedConsoleLine(kUIRenameSelectionRequiredLocToken);
     return;
   }
 
-  if (session->mSelection.mSize > 1u) {
+  if (session->mSelection.Size() > 1u) {
     PrintLocalizedConsoleLine(kUIRenameSingleSelectionLocToken);
     return;
   }
@@ -2402,29 +2402,6 @@ void moho::CON_DestroySelectedUnits(const msvc8::vector<msvc8::string>& args)
 namespace
 {
   /**
-   * Resolves one `UserEntity*` from a selection weak-ref slot, matching the
-   * `DecodeSelectedUserEntity` helper recovered in CWldSession.cpp. The
-   * selection set stores `&UserEntity::mIUnitChainHead` (offset +0x08) in
-   * `mOwnerLinkSlot`; subtracting that offset yields the owning entity.
-   * Tombstoned slots (null pointer or sentinel `(void*)8`) decode to nullptr.
-   */
-  [[nodiscard]] moho::UserEntity* DecodeUserEntityFromSelectionSlot(
-    const moho::SSelectionWeakRefUserEntity& weakRef) noexcept
-  {
-    void* const ownerLinkSlot = weakRef.mOwnerLinkSlot;
-    if (ownerLinkSlot == nullptr || ownerLinkSlot == reinterpret_cast<void*>(static_cast<std::uintptr_t>(8u))) {
-      return nullptr;
-    }
-
-    constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(moho::UserEntity, mIUnitChainHead);
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(ownerLinkSlot);
-    if (raw < kSelectionOwnerLinkOffset) {
-      return nullptr;
-    }
-    return reinterpret_cast<moho::UserEntity*>(raw - kSelectionOwnerLinkOffset);
-  }
-
-  /**
    * Returns the bitwise `commandCapsMask` flag (UnitAttributes +0x60) for one
    * recovered user-unit selection entry, or 0 when the entity is not a
    * user-unit. Walks the typed `IUnit` bridge subobject the binary stores at
@@ -2446,49 +2423,27 @@ namespace
    * the selection has at least one such unit.
    */
   [[nodiscard]] bool SelectionHasUnitWithCommandCap(
-    moho::SSelectionSetUserEntity& selection, const std::uint32_t requiredCapsMask
+    const moho::WeakSet<moho::UserEntity>& selection, const std::uint32_t requiredCapsMask
   )
   {
-    moho::SSelectionNodeUserEntity* const head = selection.mHead;
-    if (head == nullptr) {
-      return false;
-    }
-
-    moho::SSelectionNodeUserEntity* node = head->mLeft;
-    node = moho::SSelectionSetUserEntity::find(&selection, node, &node);
-    while (node != head) {
-      moho::UserEntity* const entity = DecodeUserEntityFromSelectionSlot(node->mEnt);
-      if (entity != nullptr) {
-        if (moho::UserUnit* const userUnit = entity->IsUserUnit(); userUnit != nullptr) {
-          if ((GetUserUnitCommandCapsMask(userUnit) & requiredCapsMask) != 0u) {
-            return true;
-          }
+    for (moho::UserEntity* const entity : selection) {
+      if (moho::UserUnit* const userUnit = entity->IsUserUnit(); userUnit != nullptr) {
+        if ((GetUserUnitCommandCapsMask(userUnit) & requiredCapsMask) != 0u) {
+          return true;
         }
       }
-
-      moho::SSelectionSetUserEntity::Iterator_inc(&node);
-      node = moho::SSelectionSetUserEntity::find(&selection, node, &node);
     }
-
     return false;
   }
 
   /**
-   * The first live selection entry, or `nullptr` when the selection holds only
-   * tombstones. The binary reaches it by starting at the tree's left-most node
-   * and letting `find` prune dead weak-links forward; both `UI_TrackUnit` and
-   * `RenameUnit` open with exactly that probe.
+   * The first live selected entity, or `nullptr` when none is left: `begin()`
+   * from the leftmost node. Both `UI_TrackUnit` and `RenameUnit` open with it.
    */
-  [[nodiscard]] moho::SSelectionNodeUserEntity* FirstLiveSelectionNode(moho::SSelectionSetUserEntity& selection)
+  [[nodiscard]] moho::UserEntity* FirstLiveSelectedEntity(const moho::WeakSet<moho::UserEntity>& selection)
   {
-    moho::SSelectionNodeUserEntity* const head = selection.mHead;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    moho::SSelectionNodeUserEntity* cursor = nullptr;
-    moho::SSelectionNodeUserEntity* const node = moho::SSelectionSetUserEntity::find(&selection, head->mLeft, &cursor);
-    return node != head ? node : nullptr;
+    const auto first = selection.begin();
+    return first != selection.end() ? *first : nullptr;
   }
 } // namespace
 
@@ -2518,9 +2473,8 @@ void moho::CON_CopySelectedUnitsToClipboard(const msvc8::vector<msvc8::string>& 
     return;
   }
 
-  SSelectionSetUserEntity& selection = session->mSelection;
-  SSelectionNodeUserEntity* const head = selection.mHead;
-  if (head == nullptr || FirstLiveSelectionNode(selection) == nullptr) {
+  WeakSet<UserEntity>& selection = session->mSelection;
+  if (FirstLiveSelectedEntity(selection) == nullptr) {
     return;
   }
 
@@ -2528,21 +2482,12 @@ void moho::CON_CopySelectedUnitsToClipboard(const msvc8::vector<msvc8::string>& 
   // entity to find the selection's centroid.
   float sumX = 0.0f;
   float sumZ = 0.0f;
-  {
-    SSelectionNodeUserEntity* node = head->mLeft;
-    node = SSelectionSetUserEntity::find(&selection, node, &node);
-    while (node != head) {
-      if (UserEntity* const entity = DecodeUserEntityFromSelectionSlot(node->mEnt); entity != nullptr) {
-        sumX += entity->mVariableData.mCurTransform.pos_.x;
-        sumZ += entity->mVariableData.mCurTransform.pos_.z;
-      }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
-    }
+  for (UserEntity* const entity : selection) {
+    sumX += entity->mVariableData.mCurTransform.pos_.x;
+    sumZ += entity->mVariableData.mCurTransform.pos_.z;
   }
 
-  const double inverseSelectionSize = 1.0 / static_cast<double>(static_cast<unsigned int>(selection.size()));
+  const double inverseSelectionSize = 1.0 / static_cast<double>(static_cast<unsigned int>(selection.Size()));
   const float centroidX = static_cast<float>(sumX * inverseSelectionSize);
   const float centroidZ = static_cast<float>(sumZ * inverseSelectionSize);
 
@@ -2551,10 +2496,8 @@ void moho::CON_CopySelectedUnitsToClipboard(const msvc8::vector<msvc8::string>& 
   // centroid, its blueprint id, and its owning army index.
   msvc8::string commandScript;
   {
-    SSelectionNodeUserEntity* node = head->mLeft;
-    node = SSelectionSetUserEntity::find(&selection, node, &node);
-    while (node != head) {
-      if (UserEntity* const entity = DecodeUserEntityFromSelectionSlot(node->mEnt); entity != nullptr) {
+    for (UserEntity* const entity : selection) {
+      {
         if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
           const VTransform& transform = unit->mVariableData.mCurTransform;
           const float relX = transform.pos_.x - centroidX;
@@ -2582,9 +2525,6 @@ void moho::CON_CopySelectedUnitsToClipboard(const msvc8::vector<msvc8::string>& 
           commandScript += commandLine;
         }
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(&selection, node, &node);
     }
   }
 
@@ -2714,7 +2654,7 @@ void moho::UI_TrackUnit(const msvc8::vector<msvc8::string>& args)
     return;
   }
 
-  SSelectionSetUserEntity& selection = session->mSelection;
+  WeakSet<UserEntity>& selection = session->mSelection;
 
   for (std::size_t tokenIndex = 1u; tokenIndex < tokenCount; ++tokenIndex) {
     CameraImpl* const camera = CAM_GetManager()->GetCamera(TokenDataOrEmpty(ConCommandArg(args, tokenIndex)));
@@ -2722,13 +2662,13 @@ void moho::UI_TrackUnit(const msvc8::vector<msvc8::string>& args)
       continue;
     }
 
-    SSelectionNodeUserEntity* const firstLiveNode = FirstLiveSelectionNode(selection);
-    if (firstLiveNode == nullptr) {
+    UserEntity* const firstSelected = FirstLiveSelectedEntity(selection);
+    if (firstSelected == nullptr) {
       camera->TargetNothing();
       continue;
     }
 
-    if (DecodeUserEntityFromSelectionSlot(firstLiveNode->mEnt) == camera->GetTargetEntity()) {
+    if (firstSelected == camera->GetTargetEntity()) {
       camera->TargetNothing();
       continue;
     }
@@ -2759,20 +2699,19 @@ void moho::RenameUnit(const msvc8::vector<msvc8::string>& args)
     return;
   }
 
-  SSelectionSetUserEntity& selection = session->mSelection;
-  SSelectionNodeUserEntity* const firstLiveNode = FirstLiveSelectionNode(selection);
-  if (firstLiveNode == nullptr) {
+  WeakSet<UserEntity>& selection = session->mSelection;
+  UserEntity* const selectedEntity = FirstLiveSelectedEntity(selection);
+  if (selectedEntity == nullptr) {
     PrintLocalizedConsoleLine(kRenameUnitSelectionRequiredLocToken);
     return;
   }
 
-  if (selection.size() > 1) {
+  if (selection.Size() > 1) {
     PrintLocalizedConsoleLine(kRenameUnitSingleSelectionLocToken);
     return;
   }
 
-  UserEntity* const selectedEntity = DecodeUserEntityFromSelectionSlot(firstLiveNode->mEnt);
-  UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
+  UserUnit* const selectedUnit = selectedEntity->IsUserUnit();
   if (selectedUnit == nullptr) {
     PrintLocalizedConsoleLine(kRenameUnitSelectionRequiredLocToken);
     return;
@@ -3438,15 +3377,12 @@ namespace
    * test the set against its head sentinel and once more to read the surviving
    * node's weak owner-link slot back into an entity pointer.
    */
-  [[nodiscard]] moho::UserEntity* FirstLiveSelectedUserEntity(moho::SSelectionSetUserEntity& selection)
+  [[nodiscard]] moho::UserEntity* FirstLiveSelectedUserEntity(const moho::WeakSet<moho::UserEntity>& selection)
   {
-    if (selection.IsEmptyFromHeadFind()) {
+    if (selection.Empty()) {
       return nullptr;
     }
-
-    moho::SSelectionNodeUserEntity* liveNode = nullptr;
-    (void)moho::SSelectionSetUserEntity::find(&selection, selection.mHead->mLeft, &liveNode);
-    return liveNode != nullptr ? DecodeUserEntityFromSelectionSlot(liveNode->mEnt) : nullptr;
+    return *selection.begin();
   }
 } // namespace
 

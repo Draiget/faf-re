@@ -8,6 +8,8 @@
 
 namespace moho
 {
+  class CameraImpl;
+
   /**
    * IdleUnitSelector
    *
@@ -33,7 +35,8 @@ namespace moho
    *   +0x00 ISessionListener vftable
    *   +0x04 Listener<SSelectionEvent> vftable
    *   +0x08 the listener node (Listener<SSelectionEvent>'s DListItem)
-   *   +0x10 mIdleSet (SSelectionSetUserEntity, own field)
+   *   +0x10 mIdleSet (WeakSet<UserEntity>)
+   *   +0x1C mFocusStep
    * Complete-object size 0x20.
    *
    * `FUN_00865490` (the process-global constructor / static-init thunk,
@@ -61,11 +64,8 @@ namespace moho
      * constructor)
      *
      * What it does:
-     * Brings the idle-set head up as an empty self-linked sentinel through
-     * the now-recovered `InitWeakEntitySetHead` and zeroes the trailing
-     * `mSizeMirrorOrUnused` lane, matching the binary's explicit field-by-field
-     * setup (this type has no member default constructors of its own - every
-     * owner initializes it explicitly).
+     * The two bases, then `mIdleSet` (its head bought through 0x007B08D0) and
+     * `mFocusStep = 0`.
      */
     IdleUnitSelector();
 
@@ -74,11 +74,8 @@ namespace moho
      * destructor)
      *
      * What it does:
-     * Tears the idle-set tree down completely (full-range erase plus
-     * `operator delete` on the head sentinel, matching
-     * `DestroyWeakEntitySet`) and unlinks this node from whatever
-     * session-listener lane it is still attached to, leaving the node
-     * self-linked.
+     * Nothing of its own: `mIdleSet` is destroyed as a member, then the
+     * `Listener` base unlinks the node.
      *
      * The binary calls this through a compiler-generated, argument-less
      * "destroy this one static object" thunk (`FUN_00C07510`) registered
@@ -119,14 +116,32 @@ namespace moho
      * void __thiscall sub_865540(Listener<SSelectionEvent> *this, SSelectionEvent event);
      *
      * What it does:
-     * Compares `mIdleSet` against `event.mCurrentSelection` by live-entity
-     * membership; when they no longer match, clears every tracked idle-set
-     * node and resets the tree head back to its empty self-linked sentinel
-     * state.
+     * When the new selection is not the one the focus cycle holds (the
+     * comparison at 0x00868690), forgets it and restarts the cycle.
      */
     void OnEvent(SSelectionEvent event) override;
 
+    /**
+     * Address: 0x00865590 (FUN_00865590)
+     *
+     * IDA signature:
+     * void __usercall sub_865590(Moho::WeakSet_UserEntity *selection@<eax>,
+     *     Moho::CameraImpl *camera@<ecx>);
+     *
+     * What it does:
+     * One step of the idle-unit camera cycle over `selection`, the idle units
+     * `SelectUnitsByCategory` (0x008662B0) just picked:
+     *   0. keep a copy of the selection in `mIdleSet` and arm the cycle;
+     *   1. frame all of them at the camera's target zoom;
+     *   2. frame the first one's mesh box, then stop tracking.
+     * Step 2 goes back to 1. `OnEvent` restarts at 0 when the selection
+     * changes. The body addresses the process-global selector directly
+     * (0x010C4418, 0x010C4424).
+     */
+    static void CycleCameraFocus(const WeakSet<UserEntity>& selection, CameraImpl* camera);
+
   private:
-    SSelectionSetUserEntity mIdleSet{}; // +0x10
+    WeakSet<UserEntity> mIdleSet; // +0x10 (the selection the focus cycle is stepping through)
+    std::int32_t mFocusStep;      // +0x1C (0, 1 or 2; see `CycleCameraFocus`)
   };
 } // namespace moho

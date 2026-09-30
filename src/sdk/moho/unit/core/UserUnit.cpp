@@ -189,10 +189,6 @@ namespace
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
   constexpr float kEconomyPerSecondToUiRate = 10.0f;
-  // A selection weak-ref's owner-link slot is `&entity->mIUnitChainHead`
-  // (`LinkWeakEntityOwner` below), so the entity is the slot minus that
-  // member's offset (0x08 on x86).
-  constexpr std::uintptr_t kUserEntityWeakOwnerOffset = offsetof(UserEntity, mIUnitChainHead);
 
   enum class UserUnitIntelLane : std::int32_t
   {
@@ -396,602 +392,6 @@ namespace
     return self->mVisionHandle;
   }
 
-  template <typename TNode>
-  [[nodiscard]] bool IsWeakEntitySentinelNode(const TNode* const node) noexcept
-  {
-    return node == nullptr || node->mIsSentinel != 0u;
-  }
-
-  template <typename TNode>
-  [[nodiscard]] TNode* NextWeakEntityNode(TNode* node) noexcept
-  {
-    if (node == nullptr || IsWeakEntitySentinelNode(node)) {
-      return node;
-    }
-
-    if (!IsWeakEntitySentinelNode(node->mRight)) {
-      node = node->mRight;
-      while (!IsWeakEntitySentinelNode(node->mLeft)) {
-        node = node->mLeft;
-      }
-      return node;
-    }
-
-    TNode* parent = node->mParent;
-    while (!IsWeakEntitySentinelNode(parent) && node == parent->mRight) {
-      node = parent;
-      parent = parent->mParent;
-    }
-    return parent;
-  }
-
-  [[nodiscard]] std::uint32_t WeakEntitySetKey(const UserEntity* const entity) noexcept
-  {
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entity));
-  }
-
-  void LinkWeakEntityOwner(UserEntity* const entity, SSelectionWeakRefUserEntity& weakRef) noexcept
-  {
-    weakRef.mOwnerLinkSlot = nullptr;
-    weakRef.mNextOwner = nullptr;
-    if (entity == nullptr) {
-      return;
-    }
-
-    auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
-    weakRef.mOwnerLinkSlot = ownerLinkSlot;
-    weakRef.mNextOwner = *ownerLinkSlot;
-    *ownerLinkSlot = &weakRef;
-  }
-
-  void UnlinkWeakEntityOwner(SSelectionWeakRefUserEntity& weakRef) noexcept
-  {
-    auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
-    if (ownerLinkSlot == nullptr) {
-      return;
-    }
-
-    while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
-      ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
-    }
-
-    if (*ownerLinkSlot == &weakRef) {
-      *ownerLinkSlot = weakRef.mNextOwner;
-    }
-
-    weakRef.mOwnerLinkSlot = nullptr;
-    weakRef.mNextOwner = nullptr;
-  }
-
-  /**
-   * The helper's cursor list IS an engine weak-entity set:
-   * `mCursorEntitySet` is a `WeakEntitySetUserEntity`: the
-   * same 12-byte `{proxy, head, size}` header, and `func_GetEntitiesUnderCursor`
-   * (0x008B43F0) hands `&helper->cursorEntitySet` (`v1 + 17`, the object at
-   * `helper+0xCC`) straight to the weak-set tidy and insert lanes.
-   *
-   * This has to be a reference to that object, never a copy.
-   * `WeakEntitySetUserEntity`'s destructor calls `ReleaseStorage()`, which
-   * erases every node AND frees the head sentinel -- so the stack copy these
-   * helpers used to build shared the helper's head node and freed it on the way
-   * out. Every later insert then walked a freed tree, which is the access
-   * violation the build-placement preview hit on its next frame.
-   *
-   * `mSizeMirrorOrUnused` (+0x0C) is deliberately never written through this
-   * reference: the helper's set is the bare 12-byte header (the helper is 0xD8
-   * bytes and the set ends it), so that word belongs to whatever follows.
-   */
-  [[nodiscard]] SSelectionSetUserEntity& IssueCursorWeakSet(WeakEntitySetUserEntity& set) noexcept
-  {
-    return static_cast<SSelectionSetUserEntity&>(set);
-  }
-
-  [[nodiscard]] UserEntity* DecodeSelectionWeakOwnerUserEntity(
-    const SSelectionWeakRefUserEntity& weakRef
-  ) noexcept
-  {
-    const std::uintptr_t ownerLinkSlot = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-    if (ownerLinkSlot <= kUserEntityWeakOwnerOffset) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<UserEntity*>(ownerLinkSlot - kUserEntityWeakOwnerOffset);
-  }
-
-  void ClearIssueWeakSetKeepHead(WeakEntitySetUserEntity& set) noexcept
-  {
-    SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
-    if (tree.mHead == nullptr) {
-      return;
-    }
-
-    SSelectionNodeUserEntity* eraseCursor = tree.mHead->mLeft;
-    (void)tree.EraseRange(&eraseCursor, tree.mHead->mLeft, tree.mHead);
-  }
-
-  void PruneIssueWeakSetTombstones(WeakEntitySetUserEntity& set) noexcept
-  {
-    SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
-    if (tree.mHead == nullptr) {
-      return;
-    }
-
-    SSelectionNodeUserEntity* cursor = tree.mHead->mLeft;
-    cursor = *tree.PruneTombstonesAndFindLive(&cursor, cursor);
-    while (cursor != tree.mHead) {
-      SSelectionSetUserEntity::Iterator_inc(&cursor);
-      cursor = SSelectionSetUserEntity::find(&tree, cursor, &cursor);
-    }
-  }
-
-  void AddIssueWeakSetEntity(WeakEntitySetUserEntity& set, UserEntity* const entity) noexcept
-  {
-    SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
-    if (entity == nullptr || tree.mHead == nullptr) {
-      return;
-    }
-
-    SSelectionSetUserEntity::AddResult addResult{};
-    (void)SSelectionSetUserEntity::Add(&addResult, &tree, entity);
-  }
-
-  void EraseIssueWeakSetEntity(WeakEntitySetUserEntity& set, UserEntity* const entity) noexcept
-  {
-    if (entity == nullptr) {
-      return;
-    }
-
-    SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
-    if (tree.mHead == nullptr) {
-      return;
-    }
-
-    while (true) {
-      SSelectionSetUserEntity::FindResult found{};
-      (void)SSelectionSetUserEntity::Find(&found, &tree, entity);
-      if (found.mRes == tree.mHead) {
-        break;
-      }
-
-      SSelectionNodeUserEntity* next = found.mRes;
-      SSelectionSetUserEntity::Iterator_inc(&next);
-      next = SSelectionSetUserEntity::find(&tree, next, &next);
-
-      SSelectionNodeUserEntity* eraseCursor = found.mRes;
-      (void)tree.EraseRange(&eraseCursor, found.mRes, next);
-    }
-  }
-
-  void MergeIssueWeakSetEntities(
-    WeakEntitySetUserEntity& destination,
-    WeakEntitySetUserEntity& source
-  ) noexcept
-  {
-    SSelectionSetUserEntity& sourceTree = IssueCursorWeakSet(source);
-    if (sourceTree.mHead == nullptr) {
-      return;
-    }
-
-    SSelectionNodeUserEntity* cursor = sourceTree.mHead->mLeft;
-    cursor = *sourceTree.PruneTombstonesAndFindLive(&cursor, cursor);
-    while (cursor != sourceTree.mHead) {
-      if (UserEntity* const entity = DecodeSelectionWeakOwnerUserEntity(cursor->mEnt); entity != nullptr) {
-        AddIssueWeakSetEntity(destination, entity);
-      }
-
-      SSelectionSetUserEntity::Iterator_inc(&cursor);
-      cursor = SSelectionSetUserEntity::find(&sourceTree, cursor, &cursor);
-    }
-  }
-
-  void EraseIssueWeakSetEntities(
-    WeakEntitySetUserEntity& destination,
-    WeakEntitySetUserEntity& source
-  ) noexcept
-  {
-    SSelectionSetUserEntity& sourceTree = IssueCursorWeakSet(source);
-    if (sourceTree.mHead == nullptr) {
-      return;
-    }
-
-    SSelectionNodeUserEntity* cursor = sourceTree.mHead->mLeft;
-    cursor = *sourceTree.PruneTombstonesAndFindLive(&cursor, cursor);
-    while (cursor != sourceTree.mHead) {
-      if (UserEntity* const entity = DecodeSelectionWeakOwnerUserEntity(cursor->mEnt); entity != nullptr) {
-        EraseIssueWeakSetEntity(destination, entity);
-      }
-
-      SSelectionSetUserEntity::Iterator_inc(&cursor);
-      cursor = SSelectionSetUserEntity::find(&sourceTree, cursor, &cursor);
-    }
-  }
-
-  [[nodiscard]] SSelectionNodeUserEntity*
-  FindWeakEntitySetNodeByKey(const WeakEntitySetUserEntity& selection, const std::uint32_t key) noexcept
-  {
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    SSelectionNodeUserEntity* node = head->mParent;
-    while (!IsWeakEntitySentinelNode(node)) {
-      if (key < node->mKey) {
-        node = node->mLeft;
-      } else if (node->mKey < key) {
-        node = node->mRight;
-      } else {
-        return node;
-      }
-    }
-
-    return head;
-  }
-
-  [[nodiscard]] SSelectionNodeUserEntity*
-  WeakEntitySelectionMin(SSelectionNodeUserEntity* node, SSelectionNodeUserEntity* const head) noexcept
-  {
-    while (!IsWeakEntitySentinelNode(node) && !IsWeakEntitySentinelNode(node->mLeft)) {
-      node = node->mLeft;
-    }
-    return IsWeakEntitySentinelNode(node) ? head : node;
-  }
-
-  [[nodiscard]] SSelectionNodeUserEntity*
-  WeakEntitySelectionMax(SSelectionNodeUserEntity* node, SSelectionNodeUserEntity* const head) noexcept
-  {
-    while (!IsWeakEntitySentinelNode(node) && !IsWeakEntitySentinelNode(node->mRight)) {
-      node = node->mRight;
-    }
-    return IsWeakEntitySentinelNode(node) ? head : node;
-  }
-
-  void RecomputeWeakEntitySetExtrema(WeakEntitySetUserEntity& selection) noexcept
-  {
-    if (selection.mHead == nullptr) {
-      return;
-    }
-
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    SSelectionNodeUserEntity* const root = head->mParent;
-    if (IsWeakEntitySentinelNode(root)) {
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      return;
-    }
-
-    head->mLeft = WeakEntitySelectionMin(root, head);
-    head->mRight = WeakEntitySelectionMax(root, head);
-  }
-
-  void ReplaceWeakEntitySubtree(
-    WeakEntitySetUserEntity& selection,
-    SSelectionNodeUserEntity* const oldNode,
-    SSelectionNodeUserEntity* const newNode
-  ) noexcept
-  {
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    if (oldNode->mParent == head) {
-      head->mParent = newNode;
-    } else if (oldNode == oldNode->mParent->mLeft) {
-      oldNode->mParent->mLeft = newNode;
-    } else {
-      oldNode->mParent->mRight = newNode;
-    }
-
-    if (!IsWeakEntitySentinelNode(newNode)) {
-      newNode->mParent = oldNode->mParent;
-    }
-  }
-
-  void RotateWeakEntityLeft(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
-  {
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    SSelectionNodeUserEntity* const pivot = node->mRight;
-    node->mRight = pivot->mLeft;
-    if (!IsWeakEntitySentinelNode(pivot->mLeft)) {
-      pivot->mLeft->mParent = node;
-    }
-
-    pivot->mParent = node->mParent;
-    if (node->mParent == head) {
-      head->mParent = pivot;
-    } else if (node == node->mParent->mLeft) {
-      node->mParent->mLeft = pivot;
-    } else {
-      node->mParent->mRight = pivot;
-    }
-
-    pivot->mLeft = node;
-    node->mParent = pivot;
-  }
-
-  void RotateWeakEntityRight(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
-  {
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    SSelectionNodeUserEntity* const pivot = node->mLeft;
-    node->mLeft = pivot->mRight;
-    if (!IsWeakEntitySentinelNode(pivot->mRight)) {
-      pivot->mRight->mParent = node;
-    }
-
-    pivot->mParent = node->mParent;
-    if (node->mParent == head) {
-      head->mParent = pivot;
-    } else if (node == node->mParent->mRight) {
-      node->mParent->mRight = pivot;
-    } else {
-      node->mParent->mLeft = pivot;
-    }
-
-    pivot->mRight = node;
-    node->mParent = pivot;
-  }
-
-  void FixupWeakEntityInsert(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* node) noexcept
-  {
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    while (node != head->mParent && node->mParent->mColor == 0u) {
-      SSelectionNodeUserEntity* const parent = node->mParent;
-      SSelectionNodeUserEntity* const grand = parent->mParent;
-      if (parent == grand->mLeft) {
-        SSelectionNodeUserEntity* const uncle = grand->mRight;
-        if (uncle->mColor == 0u) {
-          parent->mColor = 1u;
-          uncle->mColor = 1u;
-          grand->mColor = 0u;
-          node = grand;
-        } else {
-          if (node == parent->mRight) {
-            node = parent;
-            RotateWeakEntityLeft(selection, node);
-          }
-          node->mParent->mColor = 1u;
-          grand->mColor = 0u;
-          RotateWeakEntityRight(selection, grand);
-        }
-      } else {
-        SSelectionNodeUserEntity* const uncle = grand->mLeft;
-        if (uncle->mColor == 0u) {
-          parent->mColor = 1u;
-          uncle->mColor = 1u;
-          grand->mColor = 0u;
-          node = grand;
-        } else {
-          if (node == parent->mLeft) {
-            node = parent;
-            RotateWeakEntityRight(selection, node);
-          }
-          node->mParent->mColor = 1u;
-          grand->mColor = 0u;
-          RotateWeakEntityLeft(selection, grand);
-        }
-      }
-    }
-
-    head->mParent->mColor = 1u;
-  }
-
-  void FixupWeakEntityErase(
-    WeakEntitySetUserEntity& selection,
-    SSelectionNodeUserEntity* node,
-    SSelectionNodeUserEntity* nodeParent
-  ) noexcept
-  {
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    SSelectionNodeUserEntity* parent = !IsWeakEntitySentinelNode(node) ? node->mParent : nodeParent;
-    while (node != head->mParent && (IsWeakEntitySentinelNode(node) || node->mColor == 1u)) {
-      if (parent == nullptr) {
-        break;
-      }
-
-      if (node == parent->mLeft) {
-        SSelectionNodeUserEntity* sibling = parent->mRight;
-        if (sibling == head) {
-          node = parent;
-          parent = node->mParent;
-          continue;
-        }
-        if (sibling->mColor == 0u) {
-          sibling->mColor = 1u;
-          parent->mColor = 0u;
-          RotateWeakEntityLeft(selection, parent);
-          sibling = parent->mRight;
-        }
-
-        const bool leftBlack = IsWeakEntitySentinelNode(sibling->mLeft) || sibling->mLeft->mColor == 1u;
-        const bool rightBlack = IsWeakEntitySentinelNode(sibling->mRight) || sibling->mRight->mColor == 1u;
-        if (leftBlack && rightBlack) {
-          sibling->mColor = 0u;
-          node = parent;
-          parent = node->mParent;
-          continue;
-        }
-
-        if (IsWeakEntitySentinelNode(sibling->mRight) || sibling->mRight->mColor == 1u) {
-          if (!IsWeakEntitySentinelNode(sibling->mLeft)) {
-            sibling->mLeft->mColor = 1u;
-          }
-          sibling->mColor = 0u;
-          RotateWeakEntityRight(selection, sibling);
-          sibling = parent->mRight;
-        }
-
-        sibling->mColor = parent->mColor;
-        parent->mColor = 1u;
-        if (!IsWeakEntitySentinelNode(sibling->mRight)) {
-          sibling->mRight->mColor = 1u;
-        }
-        RotateWeakEntityLeft(selection, parent);
-        node = head->mParent;
-        break;
-      }
-
-      SSelectionNodeUserEntity* sibling = parent->mLeft;
-      if (sibling == head) {
-        node = parent;
-        parent = node->mParent;
-        continue;
-      }
-      if (sibling->mColor == 0u) {
-        sibling->mColor = 1u;
-        parent->mColor = 0u;
-        RotateWeakEntityRight(selection, parent);
-        sibling = parent->mLeft;
-      }
-
-      const bool rightBlack = IsWeakEntitySentinelNode(sibling->mRight) || sibling->mRight->mColor == 1u;
-      const bool leftBlack = IsWeakEntitySentinelNode(sibling->mLeft) || sibling->mLeft->mColor == 1u;
-      if (rightBlack && leftBlack) {
-        sibling->mColor = 0u;
-        node = parent;
-        parent = node->mParent;
-        continue;
-      }
-
-      if (IsWeakEntitySentinelNode(sibling->mLeft) || sibling->mLeft->mColor == 1u) {
-        if (!IsWeakEntitySentinelNode(sibling->mRight)) {
-          sibling->mRight->mColor = 1u;
-        }
-        sibling->mColor = 0u;
-        RotateWeakEntityLeft(selection, sibling);
-        sibling = parent->mLeft;
-      }
-
-      sibling->mColor = parent->mColor;
-      parent->mColor = 1u;
-      if (!IsWeakEntitySentinelNode(sibling->mLeft)) {
-        sibling->mLeft->mColor = 1u;
-      }
-      RotateWeakEntityRight(selection, parent);
-      node = head->mParent;
-      break;
-    }
-
-    if (!IsWeakEntitySentinelNode(node)) {
-      node->mColor = 1u;
-    }
-  }
-
-  [[nodiscard]] SSelectionNodeUserEntity*
-  EraseWeakEntityNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
-  {
-    if (selection.mHead == nullptr || IsWeakEntitySentinelNode(node)) {
-      return node;
-    }
-
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    SSelectionNodeUserEntity* const next = NextWeakEntityNode(node);
-    SSelectionNodeUserEntity* removed = node;
-    SSelectionNodeUserEntity* spliceTarget = node;
-    std::uint8_t removedColor = spliceTarget->mColor;
-    SSelectionNodeUserEntity* fixNode = head;
-    SSelectionNodeUserEntity* fixParent = head;
-
-    if (IsWeakEntitySentinelNode(node->mLeft)) {
-      fixNode = node->mRight;
-      fixParent = node->mParent;
-      ReplaceWeakEntitySubtree(selection, node, node->mRight);
-    } else if (IsWeakEntitySentinelNode(node->mRight)) {
-      fixNode = node->mLeft;
-      fixParent = node->mParent;
-      ReplaceWeakEntitySubtree(selection, node, node->mLeft);
-    } else {
-      spliceTarget = WeakEntitySelectionMin(node->mRight, head);
-      removedColor = spliceTarget->mColor;
-      fixNode = spliceTarget->mRight;
-      if (spliceTarget->mParent == node) {
-        fixParent = spliceTarget;
-        if (!IsWeakEntitySentinelNode(fixNode)) {
-          fixNode->mParent = spliceTarget;
-        }
-      } else {
-        fixParent = spliceTarget->mParent;
-        ReplaceWeakEntitySubtree(selection, spliceTarget, spliceTarget->mRight);
-        spliceTarget->mRight = node->mRight;
-        spliceTarget->mRight->mParent = spliceTarget;
-      }
-
-      ReplaceWeakEntitySubtree(selection, node, spliceTarget);
-      spliceTarget->mLeft = node->mLeft;
-      spliceTarget->mLeft->mParent = spliceTarget;
-      spliceTarget->mColor = node->mColor;
-    }
-
-    UnlinkWeakEntityOwner(removed->mEnt);
-    ::operator delete(removed);
-
-    if (selection.mSize > 0u) {
-      --selection.mSize;
-    }
-    if (removedColor == 1u) {
-      FixupWeakEntityErase(selection, fixNode, fixParent);
-    }
-
-    RecomputeWeakEntitySetExtrema(selection);
-    return next;
-  }
-
-  [[nodiscard]] bool InsertWeakEntitySet(WeakEntitySetUserEntity& selection, UserEntity* const entity) noexcept
-  {
-    SSelectionNodeUserEntity* const head = selection.mHead;
-    if (head == nullptr || entity == nullptr) {
-      return false;
-    }
-
-    const std::uint32_t key = WeakEntitySetKey(entity);
-    SSelectionNodeUserEntity* parent = head;
-    SSelectionNodeUserEntity* probe = head->mParent;
-    while (!IsWeakEntitySentinelNode(probe)) {
-      parent = probe;
-      if (key < probe->mKey) {
-        probe = probe->mLeft;
-      } else if (probe->mKey < key) {
-        probe = probe->mRight;
-      } else {
-        return false;
-      }
-    }
-
-    auto* const inserted = static_cast<SSelectionNodeUserEntity*>(::operator new(sizeof(SSelectionNodeUserEntity)));
-    inserted->mLeft = head;
-    inserted->mRight = head;
-    inserted->mParent = parent;
-    inserted->mKey = key;
-    inserted->mColor = 0u;
-    inserted->mIsSentinel = 0u;
-    inserted->pad_1A[0] = 0u;
-    inserted->pad_1A[1] = 0u;
-    LinkWeakEntityOwner(entity, inserted->mEnt);
-
-    if (parent == head) {
-      head->mParent = inserted;
-    } else if (key < parent->mKey) {
-      parent->mLeft = inserted;
-    } else {
-      parent->mRight = inserted;
-    }
-
-    ++selection.mSize;
-    FixupWeakEntityInsert(selection, inserted);
-    RecomputeWeakEntitySetExtrema(selection);
-    return true;
-  }
-
-  /**
-   * Address: 0x008676E0 (FUN_008676E0, sub_8676E0)
-   *
-   * The erase itself lives on the type, in CWldSession.cpp, so the session
-   * selection, the extra-select list and the army idle registries all remove
-   * entries the same way — including the weak-owner guard the binary holds
-   * across the erase, which this file's open-coded version was missing.
-   */
-  [[nodiscard]] bool EraseWeakEntitySet(WeakEntitySetUserEntity& selection, UserEntity* const entity) noexcept
-  {
-    return SSelectionSetUserEntity::Erase(selection, entity);
-  }
-
   /**
    * Address: 0x008C06A0 (FUN_008C06A0)
    *
@@ -1009,17 +409,13 @@ namespace
       return;
     }
 
-    ScopedCopiedSelectionSet selection{};
-    (void)CopySessionSelectionSet(&selection.get(), &entity->mSession->mSelection);
-
-    SSelectionSetUserEntity::FindResult found{};
-    (void)SSelectionSetUserEntity::Find(&found, &selection.get(), entity);
-    if (found.mRes == selection.get().mHead) {
+    WeakSet<UserEntity> selection(entity->mSession->mSelection);
+    if (selection.Find(entity) == selection.end()) {
       return;
     }
 
-    (void)SSelectionSetUserEntity::Erase(selection.get(), entity);
-    entity->mSession->SetSelection(selection.get());
+    (void)selection.Remove(entity);
+    entity->mSession->SetSelection(selection);
   }
 
   /**
@@ -1078,7 +474,7 @@ namespace
       return false;
     }
 
-    return InsertWeakEntitySet(army->mEngineers, static_cast<UserEntity*>(unit));
+    return army->mEngineers.Add(unit).second;
   }
 
   /**
@@ -1093,7 +489,7 @@ namespace
       return false;
     }
 
-    return InsertWeakEntitySet(army->mFactories, static_cast<UserEntity*>(unit));
+    return army->mFactories.Add(unit).second;
   }
 
   /**
@@ -2227,25 +1623,28 @@ namespace
    * seeds from stored cursor entity-id lanes, then replays queued issue events
    * (`type 0` merge, `type 3` erase) into the cache and returns that set.
    */
-  [[nodiscard]] WeakEntitySetUserEntity* GetEntitiesUnderCursor(UserCommandIssueHelper& helper) noexcept
+  [[nodiscard]] WeakSet<UserUnit>* GetEntitiesUnderCursor(UserCommandIssueHelper& helper) noexcept
   {
     if (helper.mVariableDataDirty != 0u) {
       helper.mVariableDataDirty = 0u;
-      ClearIssueWeakSetKeepHead(helper.mCursorEntitySet);
+      helper.mCursorEntitySet.Clear();
 
+      // 0x008B4450..0x008B4495: every stored id, found or not, goes through
+      // `Add` (0x00822270); a miss adds a dead entry the next walk drops.
       for (const EntId entityId : helper.mVariableData.mEntIds) {
         UserEntity* const entity = FindSessionEntityById(WLD_GetActiveSession(), static_cast<std::int32_t>(entityId));
-        AddIssueWeakSetEntity(helper.mCursorEntitySet, entity);
+        (void)helper.mCursorEntitySet.Add(static_cast<UserUnit*>(entity));
       }
 
       msvc8::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
       for (std::size_t index = 0; index != events.size(); ++index) {
         UserCommandIssueLocalEvent& event = events[index];
         if (event.mType == ECommandIssueEvent::DeselectUnit) {
-          EraseIssueWeakSetEntities(helper.mCursorEntitySet, event.mUnits);
+          for (UserUnit* const unit : event.mUnits) {
+            (void)helper.mCursorEntitySet.Remove(unit);
+          }
         } else if (event.mType == ECommandIssueEvent::SelectUnit) {
-          PruneIssueWeakSetTombstones(helper.mCursorEntitySet);
-          MergeIssueWeakSetEntities(helper.mCursorEntitySet, event.mUnits);
+          helper.mCursorEntitySet.Add(event.mUnits.begin(), event.mUnits.end());
         }
       }
     }
@@ -2939,10 +2338,7 @@ namespace moho
     , mCount(0)
     , mTarget()
     , mCells()
-  {
-    mUnits.mHead = AllocateWeakEntitySetHead();
-    mUnits.mSize = 0u;
-  }
+  {}
 
   /**
    * Address: 0x008B3EC0 (FUN_008B3EC0, struct_CommandIssueHelper::struct_CommandIssueHelper)
@@ -2966,10 +2362,8 @@ namespace moho
     , mReservedB3(0u)
     , mDueSeqNo(dueSeqNo)
     , mLocalQueue{}
-    , mCursorEntitySet{}
+    , mCursorEntitySet()
   {
-    mCursorEntitySet.mHead = AllocateWeakEntitySetHead();
-    mCursorEntitySet.mSize = 0u;
     { static int c = 0; if (c++ < 200) gpg::Warnf("[HELPER] ctor cmd=0x%08X delWhenDue=%u dueSeq=%d this=%p", static_cast<unsigned>(constantData.cmd), static_cast<unsigned>(deleteWhenDue), dueSeqNo, static_cast<void*>(this)); } // TEMPORARY PROBE (do not commit)
   }
 
@@ -2985,7 +2379,7 @@ namespace moho
     const auto dueDelta = static_cast<std::int32_t>(
       static_cast<std::uint32_t>(mDueSeqNo) - static_cast<std::uint32_t>(beat)
     );
-    { static int c = 0; if (mDeleteWhenDue != 0u && c++ < 200) gpg::Warnf("[HELPER] due cmd=0x%08X dueSeq=%d beat=%d delta=%d cursor=%u", static_cast<unsigned>(mConstantData.cmd), mDueSeqNo, beat, dueDelta, mCursorEntitySet.mSize); } // TEMPORARY PROBE (do not commit)
+    { static int c = 0; if (mDeleteWhenDue != 0u && c++ < 200) gpg::Warnf("[HELPER] due cmd=0x%08X dueSeq=%d beat=%d delta=%d cursor=%u", static_cast<unsigned>(mConstantData.cmd), mDueSeqNo, beat, dueDelta, static_cast<unsigned>(mCursorEntitySet.Size())); } // TEMPORARY PROBE (do not commit)
     if (mDeleteWhenDue != 0u && dueDelta <= 0) {
       this->~UserCommandIssueHelper();
       ::operator delete(this);
@@ -3031,9 +2425,9 @@ namespace moho
     return ResolveHelperCommandType(helper);
   }
 
-  SSelectionSetUserEntity* ResolveCommandIssueCursorEntities(UserCommandIssueHelper& helper) noexcept
+  WeakSet<UserUnit>* ResolveCommandIssueCursorEntities(UserCommandIssueHelper& helper) noexcept
   {
-    return static_cast<SSelectionSetUserEntity*>(GetEntitiesUnderCursor(helper));
+    return GetEntitiesUnderCursor(helper);
   }
 
   /**
@@ -3070,11 +2464,6 @@ namespace moho
     }
 
     return false;
-  }
-
-  UserEntity* ResolveWeakEntitySetNodeEntity(const SSelectionNodeUserEntity& node) noexcept
-  {
-    return WeakPtr<UserEntity>::DecodeOwnerObject(node.mEnt.mOwnerLinkSlot);
   }
 
   UserCommandIssueHelper* ResolveUserUnitFrontCommandIssueHelper(UserCommandQueue* const manager) noexcept
@@ -3401,10 +2790,10 @@ UserUnit::~UserUnit()
       UnregisterUserArmyPrioritySelectionSlot(this, army);
     } else if (mQueueEmptyCached) {
       if (mIsFactory) {
-        (void)EraseWeakEntitySet(army->mFactories, entityView);
+        (void)army->mFactories.Remove(this);
       }
       if (mIsEngineer) {
-        (void)EraseWeakEntitySet(army->mEngineers, entityView);
+        (void)army->mEngineers.Remove(this);
       }
     }
   }
@@ -3414,19 +2803,13 @@ UserUnit::~UserUnit()
   // was itself selected, so an off-screen death never steals the player's
   // current selection.
   if (mUnitVarDat.mSelectionInheritorId != ToRaw(EEntityIdSentinel::Invalid)) {
-    ScopedCopiedSelectionSet selectionSnapshot{};
-    (void)CopySessionSelectionSet(&selectionSnapshot.get(), &entityView->mSession->mSelection);
-
-    SSelectionSetUserEntity::FindResult selfInSelection{};
-    (void)SSelectionSetUserEntity::Find(&selfInSelection, &selectionSnapshot.get(), entityView);
-
-    if (selfInSelection.mRes != selectionSnapshot.get().mHead) {
+    WeakSet<UserEntity> selectionSnapshot(entityView->mSession->mSelection);
+    if (selectionSnapshot.Find(entityView) != selectionSnapshot.end()) {
       UserEntity* const inheritor =
         entityView->mSession->LookupEntityId(static_cast<EntId>(mUnitVarDat.mSelectionInheritorId));
       if (inheritor != nullptr) {
-        SSelectionSetUserEntity::AddResult inserted{};
-        (void)SSelectionSetUserEntity::Add(&inserted, &selectionSnapshot.get(), inheritor);
-        entityView->mSession->SetSelection(selectionSnapshot.get());
+        (void)selectionSnapshot.Add(inheritor);
+        entityView->mSession->SetSelection(selectionSnapshot);
 
         if (UserUnit* const inheritorUnit = inheritor->IsUserUnit(); inheritorUnit != nullptr) {
           UserUnit::AddToSelectionSet(inheritorUnit, this);
@@ -3846,10 +3229,10 @@ void UserUnit::Tick(const std::int32_t seqNo)
         UnregisterUserArmyPrioritySelectionSlot(this, army);
       } else if (mQueueEmptyCached) {
           if (mIsFactory) {
-          (void)EraseWeakEntitySet(army->mFactories, entityView);
+          (void)army->mFactories.Remove(this);
         }
         if (mIsEngineer) {
-          (void)EraseWeakEntitySet(army->mEngineers, entityView);
+          (void)army->mEngineers.Remove(this);
         }
       }
     }
@@ -3868,14 +3251,14 @@ void UserUnit::Tick(const std::int32_t seqNo)
         if (isQueueEmpty) {
           (void)InsertIdleEngineerWeakSetEntry(this, army);
         } else {
-          (void)EraseWeakEntitySet(army->mEngineers, entityView);
+          (void)army->mEngineers.Remove(this);
         }
       }
       if (mIsFactory) {
         if (isQueueEmpty) {
           (void)InsertIdleFactoryWeakSetEntry(this, army);
         } else {
-          (void)EraseWeakEntitySet(army->mFactories, entityView);
+          (void)army->mFactories.Remove(this);
         }
       }
     }
@@ -6777,11 +6160,7 @@ int moho::cfunc_UserUnitGetCreatorL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
-  const auto creatorOwnerSlot = reinterpret_cast<std::uintptr_t>(userUnit->mCreator.ownerLinkSlot);
-  UserEntity* creatorEntity = nullptr;
-  if (creatorOwnerSlot > kUserEntityWeakOwnerOffset) {
-    creatorEntity = reinterpret_cast<UserEntity*>(creatorOwnerSlot - kUserEntityWeakOwnerOffset);
-  }
+  UserEntity* const creatorEntity = userUnit->mCreator.GetObjectPtr();
 
   if (creatorEntity != nullptr) {
     if (UserUnit* const creatorUnit = creatorEntity->IsUserUnit(); creatorUnit != nullptr) {

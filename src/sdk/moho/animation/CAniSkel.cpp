@@ -17,6 +17,7 @@
 #include "moho/math/QuaternionMath.h"
 #include "moho/resource/SScmFile.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/unit/core/UserUnit.h"
 #include "Wm3Vector3.h"
 #include "legacy/algorithms/Sort.h"
 
@@ -533,8 +534,7 @@ namespace
    * `Moho::ANI_DumpSkeleton`'s per-parent-bone dedup map is a real
    * `msvc8::map<std::uint32_t, msvc8::set<std::uint32_t>>` (see the
    * `operator[]`/`insert_unique`/`erase_range` citations in
-   * `legacy/containers/Map.h` and `RbTree.h`, and `WeakEntitySetUserEntity::
-   * BuyNode`/`alloc_raw` in `WeakEntitySet.h`/`RbTree.h`) - a hand-rolled
+   * `legacy/containers/Map.h` and `RbTree.h`) - a hand-rolled
    * `AniSkeletonVisitedBoneNodeLanes` node struct used to stand in for that
    * template before those instantiations were identified and cited; it and
    * its `InitializeAniSkeletonVisitedBoneNode`/`StageAniSkeletonVisitedBoneNode`
@@ -543,37 +543,6 @@ namespace
    * below in favor of `Moho::ANI_DumpSkeleton` building and tearing down its
    * dedup tree and selection set through those typed containers directly.
    */
-
-  /**
-   * Address: 0x007B2372-0x007B2385 (inlined in `Moho::ANI_DumpSkeleton`,
-   * FUN_007B22B0)
-   *
-   * What it does:
-   * Resolves the `UserEntity*` a selection weak-ref slot points at, or null
-   * for an empty/tombstoned slot (`nullptr` or the sentinel `(void*)8`).
-   * Same `WeakObject` sub-object `-offsetof(UserEntity, mIUnitChainHead)`
-   * adjust as `DecodeUserEntityFromSelectionSlot` (CConCommand.cpp) and
-   * `DecodeSelectionEntity` (CFormation.cpp); re-homed here as this file's
-   * own copy of the pattern rather than reaching into another TU's
-   * anonymous namespace.
-   */
-  [[nodiscard]] moho::UserEntity* DecodeAniSkeletonSelectionEntity(
-    const moho::SSelectionWeakRefUserEntity& weakRef
-  ) noexcept
-  {
-    void* const ownerLinkSlot = weakRef.mOwnerLinkSlot;
-    if (ownerLinkSlot == nullptr || ownerLinkSlot == reinterpret_cast<void*>(static_cast<std::uintptr_t>(8u))) {
-      return nullptr;
-    }
-
-    constexpr std::uintptr_t kWeakOwnerOffset = offsetof(moho::UserEntity, mIUnitChainHead);
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(ownerLinkSlot);
-    if (raw < kWeakOwnerOffset) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::UserEntity*>(raw - kWeakOwnerOffset);
-  }
 
   /**
    * The record `PrintAniSkeletonBoneHierarchy` (FUN_007B2050) reads through
@@ -1016,23 +985,20 @@ namespace moho
    *
    * The dedup map (`dedupTree`) and its nested per-parent sets, and the
    * transient selection snapshot (`selectionGuard`), are released by their
-   * own destructors at scope exit - the same cleanup the binary performs
-   * explicitly (`erase_range` + `operator delete` on both, cited in
-   * `legacy/containers/RbTree.h` / `moho/sim/WeakEntitySet.h`).
+   * own destructors at scope exit - the binary's `erase_range` +
+   * `operator delete` on both.
    */
   void ANI_DumpSkeleton()
   {
-    ScopedLocalUnitSet selectionGuard;
-    WeakUnitSetUserUnit& selection = selectionGuard.get();
+    WeakSet<UserUnit> selection;
     // 0x007B22FD/0x007B2308: reads the global session and calls straight
     // through with no null check - reproduced as-is.
     WLD_GetActiveSession()->GetSelectionUnits(selection);
 
+    // 0x007B2372-0x007B2385: the first live unit, if any.
     UserEntity* selectedEntity = nullptr;
-    if (!selection.IsEmptyAfterPrune()) {
-      SSelectionNodeUserEntity* liveNode = nullptr;
-      (void)PruneTombstonesAndFindLive(selection, &liveNode, selection.mHead->mLeft);
-      selectedEntity = DecodeAniSkeletonSelectionEntity(liveNode->mEnt);
+    if (!selection.Empty()) {
+      selectedEntity = *selection.begin();
     }
 
     if (selectedEntity == nullptr) {

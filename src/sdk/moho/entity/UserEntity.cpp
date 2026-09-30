@@ -90,23 +90,6 @@ namespace
     out.reset(pose);
   }
 
-  /**
-   * Drains one intrusive chain of selection weak-references, nulling both
-   * words of every node. `~UserEntity` runs this over `mIUnitChainHead` at
-   * 0x008B8892: it re-reads the head each iteration (`mov eax, [esi+8]`),
-   * publishes `node->mNextOwner` into it (`mov [esi+8], ecx`), then clears
-   * `mOwnerLinkSlot` and `mNextOwner` (`mov [eax], ebx` / `mov [eax+4], ebx`).
-   */
-  void ResetLinkChain(moho::SSelectionWeakRefUserEntity*& head) noexcept
-  {
-    while (head) {
-      moho::SSelectionWeakRefUserEntity* const next = head->mNextOwner;
-      head->mOwnerLinkSlot = nullptr;
-      head->mNextOwner = nullptr;
-      head = next;
-    }
-  }
-
   void CopyPoseState(moho::CAniPose& dst, const moho::CAniPose& src)
   {
     dst.mScale = src.mScale;
@@ -214,7 +197,7 @@ namespace moho
    */
   UserEntity::UserEntity(CWldSession& session, const SCreateEntityParams& createParams)
     : WeakObject()
-    , mIUnitChainHead(nullptr)
+    , mWeakObject()
     , mSession(&session)
     , mSpatialDbEntry{}
     , mVisionHandle(nullptr)
@@ -290,7 +273,9 @@ namespace moho
     // former `DestroySpatialDbMeshInstanceStorage` wrapper is gone. It cited
     // 0x008B8790, which is not a function at all (no progress-db entry, no
     // callers, unreachable); that address is the constructor's unwind funclet.
-    ResetLinkChain(mIUnitChainHead);
+    // 0x008B8892: re-read the head, publish the node's next into it, blank
+    // both of the node's words.
+    mWeakObject.DetachAllWeakReferences();
   }
 
   /**

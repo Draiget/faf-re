@@ -2,7 +2,9 @@
 
 namespace moho
 {
-  struct SSelectionSetUserEntity;
+  class UserEntity;
+  template <class T>
+  class WeakSet;
 
   /**
    * SSelectionEvent
@@ -18,16 +20,15 @@ namespace moho
    *   where the lanes are built from `&mSelection`, `incomingSelection`,
    *   `&addedEntities`, `&removedEntities` in this order.
    *
-   * The event is passed by value: each lane is a pointer to a
-   * `SSelectionSetUserEntity` (a.k.a. `WeakSet<UserEntity>`) that the listener
-   * reads but does not own.
+   * The event is passed by value: each lane points at a `WeakSet<UserEntity>`
+   * the listener reads but does not own.
    */
   struct SSelectionEvent
   {
-    SSelectionSetUserEntity* mPreviousSelection; // +0x00
-    SSelectionSetUserEntity* mCurrentSelection;  // +0x04
-    SSelectionSetUserEntity* mAddedEntities;     // +0x08
-    SSelectionSetUserEntity* mRemovedEntities;   // +0x0C
+    const WeakSet<UserEntity>* mPreviousSelection; // +0x00
+    const WeakSet<UserEntity>* mCurrentSelection;  // +0x04
+    const WeakSet<UserEntity>* mAddedEntities;     // +0x08
+    const WeakSet<UserEntity>* mRemovedEntities;   // +0x0C
   };
 
   static_assert(sizeof(SSelectionEvent) == 0x10, "SSelectionEvent size must be 0x10");

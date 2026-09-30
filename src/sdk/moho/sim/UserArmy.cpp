@@ -7,6 +7,7 @@
 #include "moho/console/CVarAccess.h"
 #include "moho/math/GridPos.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/unit/core/UserUnit.h"
 
 namespace moho
 {
@@ -46,9 +47,6 @@ namespace moho
     , mEngineers{}
     , mFactories{}
   {
-    InitWeakEntitySetHead(mEngineers);
-    InitWeakEntitySetHead(mFactories);
-
     // 0x008B15DA..0x008B1624: the binary then runs the same three `clear()`
     // calls the destructor opens with (see `~UserArmy`) before assigning the
     // payload. All three registries were just brought up empty - the avatar
@@ -77,33 +75,20 @@ namespace moho
   {
     // ---- destructor body (0x008B1668..0x008B16F1) --------------------------
     //
-    // 0x008B1693: `mAvatars.clear()`. MSVC8's `vector::erase(begin(), end())`
-    // runs `_Destroy` over the erased run, and for a weak-pointer element that
-    // is the owner-chain detach at FUN_008B38C0. `WeakPtr<UserUnit>` has no
-    // detaching destructor in the recovered model, so the detach is spelled
-    // out here. `UnlinkFromOwnerChain` additionally blanks the record's own
-    // two link lanes, which the binary leaves dirty - the buffer is released a
-    // few instructions later, so that is not observable.
-    for (WeakPtr<UserUnit>& avatar : mAvatars) {
-      avatar.UnlinkFromOwnerChain();
-    }
+    // 0x008B1693: `mAvatars.clear()`, whose `_Destroy` is `~WeakPtr` per
+    // element (the owner-chain splice at FUN_008B38C0).
     mAvatars.clear();
 
-    // 0x008B16AA / 0x008B16DB: both idle registries are cleared while their
-    // head sentinels stay alive. The compiler inlined the full-range fast path
-    // of `EraseRange` at both sites.
-    ClearWeakEntitySet(mEngineers);
-    ClearWeakEntitySet(mFactories);
+    // 0x008B16AA / 0x008B16DB: both idle registries are cleared, the set's
+    // whole-tree erase inlined at each site.
+    mEngineers.Clear();
+    mFactories.Clear();
 
     // ---- member unwind (0x008B16F4..0x008B17A9) ----------------------------
     //
-    // `WeakEntitySetUserEntity` and `WeakObject` are raw ABI aggregates with no
-    // destructors of their own, so the two teardown steps the compiler emitted
-    // for them are written out here, in the binary's order: factories first,
-    // then engineers.
-    DestroyWeakEntitySet(mFactories);
-    DestroyWeakEntitySet(mEngineers);
-
+    // The compiler then destroys `mFactories` and `mEngineers` (erase and free
+    // the head) and `mAvatars` (free the buffer, 0x008B1761).
+    //
     // 0x008B1778..0x008B179E: drop every weak reference still aimed at this
     // army, blanking each node as it leaves the chain. The binary runs this
     // after releasing the avatar buffer (0x008B1761); here `~mAvatars` releases
@@ -126,17 +111,17 @@ namespace moho
   /**
    * Address: 0x008B2550 (FUN_008B2550)
    */
-  WeakUnitSetUserUnit UserArmy::GetIdleEngineers()
+  WeakSet<UserUnit> UserArmy::GetIdleEngineers()
   {
-    return WeakUnitSetUserUnit(mEngineers.begin(), mEngineers.end());
+    return mEngineers;
   }
 
   /**
    * Address: 0x008B25C0 (FUN_008B25C0)
    */
-  WeakUnitSetUserUnit UserArmy::GetIdleFactories()
+  WeakSet<UserUnit> UserArmy::GetIdleFactories()
   {
-    return WeakUnitSetUserUnit(mFactories.begin(), mFactories.end());
+    return mFactories;
   }
 
   /**

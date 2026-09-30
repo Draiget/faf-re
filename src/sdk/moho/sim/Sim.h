@@ -19,7 +19,7 @@
 #include "moho/render/RDebugOverlay.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/SSTICommandSource.h"
-#include "moho/sim/WeakEntitySet.h"
+#include "moho/misc/WeakSet.h"
 #include "moho/task/CTaskThread.h"
 #include "SDesyncInfo.h"
 #include "SSyncFilter.h"

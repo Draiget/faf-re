@@ -353,6 +353,7 @@ namespace moho
      *     mov  ecx, [edx]      ; head
      *     mov  [eax+4], ecx    ; nextInOwner = head
      *     mov  [edx], eax      ; head = this
+     * Address: 0x007AE140 (FUN_007AE140 -- the `WeakPtr<UserEntity>` emission: `slot = entity ? entity + 8 : 0`, pushed onto the chain; no caller, a retained copy. Formerly `LinkSelectionWeakOwnerRef` in moho/sim/CWldSession.cpp, removed 2026-09-30.)
      */
     void LinkAtOwnerHead() noexcept
     {
@@ -372,6 +373,7 @@ namespace moho
      * alone (0x0057D621..0x0057D63F, and all of `~WeakPtr`). The walk stops at
      * this node and nowhere else: there is no null test, because a node with a
      * slot is on that slot's chain.
+     * Address: 0x0066AF90 (FUN_0066AF90 -- the `WeakPtr<UserEntity>` emission of the splice-out walk, returning the slot it stopped on; callers the camera's target-list node teardown 0x007A71B0, 0x007A75A0, `TargetEntities` 0x007A8640, `TargetNoseCam` 0x007A8A20 and 0x00842920. Formerly `UnlinkSelectionWeakOwnerRefNoReset` in moho/sim/CWldSession.cpp, removed 2026-09-30.)
      */
     void UnlinkFromOwner() noexcept
     {

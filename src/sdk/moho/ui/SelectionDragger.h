@@ -1,5 +1,6 @@
 #pragma once
 
+#include "moho/misc/WeakSet.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -19,12 +20,11 @@ namespace moho
   class CWldTerrainDecal;
   class IDecalManager;
   class RD3DTextureResource;
-  struct SSelectionSetUserEntity;
 
   // Global selection-bracket weak-set, defined in moho/ui/UiRuntimeTypes.cpp.
   // SelectionDragger2D::~SelectionDragger2D() (0x00864D10) clears it as part of
   // its derived-destructor body.
-  extern SSelectionSetUserEntity sSelectionBrackets;
+  extern WeakSet<UserEntity> sSelectionBrackets;
 
   /**
    * Interface layer between `IMauiDragger` and the concrete selection
@@ -105,18 +105,18 @@ namespace moho
    *
    * Slot +0x08 (`SelectionDragger::DragRelease`, 0x00863870, 485 instructions)
    * is a genuine override, recovered in SelectionDragger.cpp. Its no-modifier
-   * branch drives a per-priority `SSelectionSetUserEntity` bucket vector; the
+   * branch drives a per-priority `WeakSet<UserEntity>` bucket vector; the
    * three CWldSession.cpp-local helpers this slot used to depend on
    * (`CopySelectionSetFromOther` 0x00822210, `FindSelectionNodeByEntityGuarded`
    * 0x00867780, `ReleaseSelectionWeakSetStorageRange` 0x00868CC0) are all
    * file-private (anonymous namespace) to that TU, so the recovered body does
    * not call them directly - it reaches the identical observable behavior
-   * through the already-public `SSelectionSetUserEntity` API instead (`Find`,
+   * through the already-public `WeakSet<UserEntity>` API instead (`Find`,
    * `find`, `Add`, `Iterator_inc`, `IsEmptyAfterPrune`, `ReleaseStorage`) plus
    * this file's own `AddSelectionRange`/`DecodeSelectionEntity` helpers. The
    * bucket-vector growth path (0x00867890/0x00867B90/0x00868040, a hand-rolled
-   * `vector<WeakEntitySetUserEntity>::resize`) is likewise not ported literally;
-   * the recovered body grows an `msvc8::vector<SSelectionSetUserEntity>`
+   * `vector<WeakSet<UserEntity>>::resize`) is likewise not ported literally;
+   * the recovered body grows an `msvc8::vector<WeakSet<UserEntity>>`
    * through the already-recovered generic `resize()` plus a per-slot
    * `InitializeLocalSelectionSet()` call, matching the binary's per-element
    * defensive-copy-of-an-empty-source semantics without needing the raw
@@ -575,5 +575,5 @@ namespace moho
    * Builds the selectable user-entity weak-set currently covered by one active
    * selection dragger.
    */
-  void CollectSelectionDraggerEntities(SSelectionSetUserEntity& outSelection, SelectionDragger& dragger);
+  void CollectSelectionDraggerEntities(WeakSet<UserEntity>& outSelection, SelectionDragger& dragger);
 } // namespace moho

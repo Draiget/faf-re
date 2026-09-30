@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "moho/containers/TDatList.h"
-#include "moho/sim/WeakEntitySet.h"
+#include "moho/misc/WeakSet.h"
 
 namespace moho
 {
@@ -27,7 +27,7 @@ namespace moho
    */
   struct BlinkyBox final : TDatListItem<BlinkyBox, void>
   {
-    SSelectionWeakRefUserEntity mUnit; // +0x08
+    WeakPtr<UserEntity> mUnit;         // +0x08
     std::uint8_t mIsOn;                // +0x10
     std::uint8_t pad_11_13[3]{};       // +0x11
     float mCurDuration;                // +0x14
@@ -142,9 +142,8 @@ namespace moho
    * Empties the process-global `sSelectionBrackets` weak-set in place,
    * keeping its head sentinel: destroys the whole node subtree and resets the
    * head's parent/left/right links back to the empty-state self-reference
-   * plus a zero size. The full-range `EraseRange` below takes exactly that
-   * one-pass path, which is where the binary's direct `DestroySubtree` call
-   * at 0x007FDABE plus the 0x007FDAC3-0x007FDAE1 head reset come from.
+   * plus a zero size: the set's whole-tree erase, `_Erase(root)` at
+   * 0x007FDABE and the head reset at 0x007FDAC3-0x007FDAE1.
    *
    * Lives here rather than with the dragger because 0x007FDAB0 sits directly
    * after this module's own bodies (`RenUI` 0x007FD490, the blinky-box lane

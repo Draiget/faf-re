@@ -17,7 +17,7 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/sim/SimDriver.h"
-#include "moho/sim/WeakEntitySet.h"
+#include "moho/misc/WeakSet.h"
 #include "platform/Platform.h"
 #include "Wm3AxisAlignedBox3.h"
 
@@ -853,22 +853,11 @@ namespace moho
   [[nodiscard]] EUnitCommandType
     ResolveCommandIssueHelperCommandType(const UserCommandIssueHelper& helper) noexcept;
 
-  struct SSelectionSetUserEntity;
-
   // Exposes the file-local func_GetEntitiesUnderCursor (FUN_008B43F0) to the
-  // recovered `ISSUE_IncreaseCommandCount` keystone in CWldSession.cpp: rebuilds
-  // (when dirty) and returns the helper's cached cursor-entity weak-set as the
-  // shared selection-set type both TUs iterate (identical head/size tree layout).
-  [[nodiscard]] SSelectionSetUserEntity*
+  // other TUs that walk a command's units: rebuilds the helper's cursor set
+  // when dirty and returns it.
+  [[nodiscard]] WeakSet<UserUnit>*
     ResolveCommandIssueCursorEntities(UserCommandIssueHelper& helper) noexcept;
-
-  struct SSelectionNodeUserEntity;
-
-  // Exposes the file-local weak-owner decode - the `slot - 8` adjust every
-  // weak-set walk in the binary open-codes - so other TUs iterating a shared
-  // cursor-entity set resolve nodes to entities without restating it. Returns
-  // null for both the null and the `(void*)8` tombstone slot.
-  [[nodiscard]] UserEntity* ResolveWeakEntitySetNodeEntity(const SSelectionNodeUserEntity& node) noexcept;
 
   /**
    * Address: 0x008BED50 (FUN_008BED50, sub_8BED50)

@@ -102,43 +102,20 @@ namespace
   }
 
   /**
-   * Resolves the `UserEntity` behind one selection weak-set node, the decode
-   * `func_RenUI` open-codes at every one of its four draw sites
-   * (`lea ecx, [eax-8]`, e.g. 0x007FD56C). The `-8` is
-   * `WeakPtrOwnerLinkOffset<UserEntity>` - `UserEntity::mIUnitChainHead`.
-   */
-  [[nodiscard]] moho::UserEntity* DecodeSelectionEntity(
-    const moho::SSelectionWeakRefUserEntity& weakRef
-  ) noexcept
-  {
-    return moho::WeakPtr<moho::UserEntity>::DecodeOwnerObject(weakRef.mOwnerLinkSlot);
-  }
-
-  /**
    * Draws the shared player brackets over every live entry of one selection
-   * weak-set. Mirrors both copies of the loop the binary emits back to back at
+   * set: both copies of the loop the binary emits back to back at
    * 0x007FD545..0x007FD596 (session selection) and 0x007FD5B3..0x007FD62F
-   * (`sSelectionBrackets`): prune to the first live node with `find`, draw,
-   * step the iterator, prune again, stop at the head sentinel.
+   * (`sSelectionBrackets`).
    */
   void DrawSelectionSetBrackets(
-    moho::SSelectionSetUserEntity& selection,
+    const moho::WeakSet<moho::UserEntity>& selection,
     moho::CD3DPrimBatcher& batcher,
     const moho::GeomCamera3& camera,
     const float interpolationAlpha
   )
   {
-    moho::SSelectionNodeUserEntity* const head = selection.mHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    moho::SSelectionNodeUserEntity* node = nullptr;
-    node = moho::SSelectionSetUserEntity::find(&selection, head->mLeft, &node);
-    while (node != head) {
-      moho::DrawSelectionBrackets(DecodeSelectionEntity(node->mEnt), &batcher, &camera, interpolationAlpha);
-      moho::SSelectionSetUserEntity::Iterator_inc(&node);
-      node = moho::SSelectionSetUserEntity::find(&selection, node, &node);
+    for (moho::UserEntity* const entity : selection) {
+      moho::DrawSelectionBrackets(entity, &batcher, &camera, interpolationAlpha);
     }
   }
 
@@ -202,7 +179,7 @@ namespace
   {
     for (const auto* node = moho::sBlinkyBoxes.mNext; node != &moho::sBlinkyBoxes; node = node->mNext) {
       const auto* const box = static_cast<const moho::BlinkyBox*>(node);
-      if (DecodeSelectionEntity(box->mUnit) == entity) {
+      if (box->mUnit.GetObjectPtr() == entity) {
         return true;
       }
     }
@@ -397,7 +374,7 @@ namespace moho
 
     // 0x007FD4E5..0x007FD4FC: the shared-texture pass runs whenever *either*
     // set still holds a live entry.
-    if (!session->mSelection.IsEmptyFromHeadFind() || !sSelectionBrackets.IsEmptyFromHeadFind()) {
+    if (!session->mSelection.Empty() || !sSelectionBrackets.Empty()) {
       const boost::shared_ptr<CD3DBatchTexture> playerBrackets =
         CD3DBatchTexture::FromFile(kSelectionBracketTexturePath, 1u);
 
@@ -415,10 +392,7 @@ namespace moho
     // of the selection.
     UserEntity* const hoveredEntity = session->GetHoveredUserEntity();
     if (!IsEntityBlinking(hoveredEntity) && hoveredEntity != nullptr) {
-      SSelectionSetUserEntity::FindResult selectionHit{};
-      (void)SSelectionSetUserEntity::Find(&selectionHit, &session->mSelection, hoveredEntity);
-
-      if (selectionHit.mRes == session->mSelection.mHead && hoveredEntity->IsUserUnit() != nullptr) {
+      if (session->mSelection.Find(hoveredEntity) == session->mSelection.end() && hoveredEntity->IsUserUnit() != nullptr) {
         const boost::shared_ptr<CD3DBatchTexture> bracketTexture =
           hoveredEntity->GetSelectionBracketTexture(session->GetFocusArmy());
 
@@ -452,7 +426,7 @@ namespace moho
     auto* node = sBlinkyBoxes.mNext;
     while (node != &sBlinkyBoxes) {
       auto* const box = static_cast<BlinkyBox*>(node);
-      UserEntity* const blinkingEntity = DecodeSelectionEntity(box->mUnit);
+      UserEntity* const blinkingEntity = box->mUnit.GetObjectPtr();
 
       if (blinkingEntity == nullptr || box->mCurDuration > box->mTotalTime) {
         // 0x007FD9AE: expired or dead entries are spliced out and reset to a
@@ -463,7 +437,7 @@ namespace moho
 
       if (AdvanceBlinkyBoxCycle(*box, elapsedSeconds)) {
         DrawArmyColouredBrackets(
-          DecodeSelectionEntity(box->mUnit), session->GetFocusArmy(), *batcher, *camera, interpolationAlpha
+          box->mUnit.GetObjectPtr(), session->GetFocusArmy(), *batcher, *camera, interpolationAlpha
         );
       }
 
@@ -479,20 +453,12 @@ namespace moho
    * What it does:
    * Empties `sSelectionBrackets` in place, keeping its head sentinel.
    *
-   * The binary open-codes the full-tree teardown - `DestroySubtree(head->
-   * mParent)` at 0x007FDABE, then `head->mParent = head->mLeft = head->mRight
-   * = head` and `mSize = 0` at 0x007FDAC3-0x007FDAE1. That is precisely the
-   * one-pass branch `EraseRange` takes when the range spans the whole tree,
-   * and `DestroySubtree` is private to the set, so the erase is reached
-   * through the owning public API rather than duplicated here.
-   *
-   * The head is dereferenced with no null guard, matching the binary: the
-   * global set is head-allocated at startup and this lane never sees an
-   * unbuilt set.
+   * The set's whole-tree erase inlined: `_Erase(head->mParent)` at 0x007FDABE,
+   * then `head->mParent = head->mLeft = head->mRight = head` and a zero count
+   * at 0x007FDAC3-0x007FDAE1.
    */
   void ClearSelectionBrackets()
   {
-    SSelectionNodeUserEntity* cursor = sSelectionBrackets.mHead->mLeft;
-    (void)sSelectionBrackets.EraseRange(&cursor, cursor, sSelectionBrackets.mHead);
+    sSelectionBrackets.Clear();
   }
 } // namespace moho

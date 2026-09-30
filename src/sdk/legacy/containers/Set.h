@@ -50,6 +50,30 @@ namespace msvc8
         explicit set(const key_compare& comp) : tree_(comp) {}
 
         /**
+         * Address: 0x00822C50 (FUN_00822C50 -- `set(first, last)` for
+         *   `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>`, the source a
+         *   `WeakSet` walk: `_Init` (the head bought through 0x007B08D0,
+         *   isNil=1, self-linked, count zero), then per element the `Entry` the
+         *   source's `T*` converts to, `insert` 0x007AEDC0, `~Entry`, and the
+         *   source's pruning `++`. Caller the `WeakSet` copy constructor
+         *   0x00822210.)
+         * Address: 0x00831310 (FUN_00831310 -- the same body for
+         *   `WeakSet<moho::UserUnit>::Entry`, inserting through 0x00822420;
+         *   callers `UserArmy::GetIdleEngineers`/`GetIdleFactories` (0x008B2550 /
+         *   0x008B25C0), `EstimateEdgeTravelTicks` (0x00826C50) and
+         *   `ISSUE_IncreaseCommandCount` (0x008B0C80), each copying a set.)
+         *
+         * What it does:
+         * VC8's `_Tree(_Iter _First, _Iter _Last)`: an empty tree, then
+         * `insert(_First, _Last)`.
+         */
+        template<class InputIt>
+        set(InputIt first, InputIt last)
+        {
+            insert(first, last);
+        }
+
+        /**
          * Address: 0x008C5B10 (FUN_008C5B10, msvc8::set<msvc8::string>::set(const set&))
          *
          * What it does:
@@ -139,6 +163,32 @@ namespace msvc8
         }
 
         std::pair<iterator, bool> insert(value_type&& v) { return emplace(std::move(v)); }
+
+        /**
+         * Address: 0x00868AF0 (FUN_00868AF0 -- `insert(first, last)` for
+         *   `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` over a
+         *   `gpg::fastvector<moho::UserEntity*>` range: a stack `Entry` per
+         *   element, `insert` 0x007AEDC0, `~Entry`; `WeakSet::Add(first, last)`
+         *   for `SelectionDragger`'s collected entities.)
+         * Address: 0x00868A00 (FUN_00868A00 -- the same over another
+         *   `WeakSet<UserEntity>`'s iterators, whose `++` (0x0066ADD0 +
+         *   0x0066A330) prunes the source; `SelectionDragger::DragRelease`
+         *   0x00863870 merges sets through it.)
+         *
+         * VC8's `_Tree::insert(_Iter _First, _Iter _Last)`: `insert(*_First)` per
+         * element. `*first` may convert to `value_type`; binding that result to a
+         * const reference keeps VC8's single `insert(const value_type&)` path
+         * (search, then buy the node) rather than the move overload's
+         * node-first `emplace`.
+         */
+        template<class InputIt>
+        void insert(InputIt first, const InputIt last)
+        {
+            for (; first != last; ++first) {
+                const value_type& value = *first;
+                insert(value);
+            }
+        }
 
         template<class... Args>
         std::pair<iterator, bool> emplace(Args&&... args)

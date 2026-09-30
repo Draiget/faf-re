@@ -9798,18 +9798,10 @@ namespace moho
    * Address: 0x007FDA90 (FUN_007FDA90)
    *
    * What it does:
-   * Adds one user-unit lane into the global selection-bracket weak-set.
+   * `sSelectionBrackets.Add(unit)` emitted out of line; nothing in the image
+   * calls or points at it (no call edge, no rel32 or abs32 reference).
    */
-  std::int32_t func_AddSelectionBracketUserUnit(UserUnit* unit);
-
-  /**
-   * Address: 0x007FDAB0 (FUN_007FDAB0)
-   *
-   * What it does:
-   * Clears the global selection-bracket weak-set subtree and restores empty
-   * head links.
-   */
-  std::int32_t func_ClearSelectionBracketUserUnits();
+  void func_AddSelectionBracketUserUnit(UserUnit* unit);
 
   /**
    * Address: 0x00857B60 (FUN_00857B60, cfunc_AddCommandFeedbackBlip)

@@ -24,7 +24,7 @@
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/VisibilityRect.h"
 #include "moho/command/CommandManager.h"
-#include "moho/sim/WeakEntitySet.h"
+#include "moho/misc/WeakSet.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/task/CTaskThread.h"
 #include "Wm3Vector2.h"
@@ -317,366 +317,6 @@ namespace moho
   static_assert(offsetof(SSessionSaveNodeMap, mHead) == 0x04, "SSessionSaveNodeMap::mHead offset must be 0x04");
   static_assert(offsetof(SSessionSaveNodeMap, mSize) == 0x08, "SSessionSaveNodeMap::mSize offset must be 0x08");
 
-  /**
-   * The session's selection weak-set: the shipped 12-byte
-   * `WeakSet<UserEntity>` tree header plus the extra selection lane at
-   * `+0x0C` that the session-side sets carry. `UserArmy`'s idle registries
-   * embed the bare `WeakEntitySetUserEntity` instead — they sit 12 bytes
-   * apart at +0x1F8 and +0x204.
-   */
-  struct SSelectionSetUserEntity : WeakEntitySetUserEntity
-  {
-    std::uint32_t mSizeMirrorOrUnused; // +0x0C
-
-    struct Index
-    {
-      SSelectionSetUserEntity* mOwnerSet; // +0x00
-      SSelectionNodeUserEntity* mNode;    // +0x04
-
-      /**
-       * Address: 0x007AE7E0 (FUN_007AE7E0, Moho::WeakSet_UserEntity::Iterator::Next)
-       *
-       * What it does:
-       * Advances iterator cursor one RB-tree successor and then skips tombstone
-       * nodes through `find`, updating `mNode` in-place.
-       */
-      [[nodiscard]] Index* Next();
-    };
-
-    struct AddResult : Index
-    {
-      std::uint8_t mWasInserted;          // +0x08
-      std::uint8_t mReserved09_0B[3]{};   // +0x09
-    };
-
-    // `FindResult`, `First` and `Next` live on the shared
-    // `WeakEntitySetUserEntity` header (WeakEntitySet.h): the linker folded
-    // those three bodies across both weak-set instantiations, so they belong
-    // to the tree header both instantiations share rather than to this one.
-
-    /**
-     * Address: 0x007AE1B0 (FUN_007AE1B0, Moho::WeakSet_UserEntity::Add)
-     *
-     * What it does:
-     * Inserts one user-entity pointer key into the selection weak-set tree and
-     * returns `{ownerSet,node,inserted}` in `outResult`.
-     */
-    [[nodiscard]] static AddResult*
-      Add(AddResult* outResult, SSelectionSetUserEntity* set, UserEntity* entity);
-
-    /**
-     * Address: 0x007FDD50 (FUN_007FDD50, Moho::WeakSet_UserEntity::Find)
-     *
-     * What it does:
-     * Resolves one weak-set tree node by user-entity key and writes one
-     * `{set,node}` pair to `outResult`, using the transient weak-link guard lane
-     * required by the original weak-pointer map lookup path.
-     */
-    [[nodiscard]] static FindResult*
-      Find(FindResult* outResult, SSelectionSetUserEntity* set, UserEntity* entity);
-
-    /**
-     * Address: 0x008676E0 (FUN_008676E0, sub_8676E0)
-     *
-     * IDA signature:
-     * int __stdcall sub_8676E0(int a1, int a2);
-     *
-     * What it does:
-     * Removes one user-entity key from a weak set, holding the transient
-     * weak-link guard across the erase exactly as the binary does, and reports
-     * whether a live node was actually removed.
-     *
-     * Takes the 12-byte base so the session selection, the extra-select list
-     * and the per-army idle registries all share one erase.
-     */
-    static bool Erase(WeakEntitySetUserEntity& set, UserEntity* entity);
-
-    /**
-     * Address: 0x007B59B0 (FUN_007B59B0, Moho::WeakSet_UserEntity::size)
-     *
-     * What it does:
-     * Counts live weak-set tree nodes by in-order traversal of the selection
-     * RB-tree lane.
-     */
-    [[nodiscard]] std::int32_t size() const;
-
-    /**
-     * Address: 0x007B2620 (FUN_007B2620, sub_7B2620)
-     *
-     * What it does:
-     * Returns true when tombstone pruning from the left-most node reaches the
-     * head sentinel immediately (no live weak-set entries remain).
-     */
-    [[nodiscard]] bool IsEmptyAfterPrune();
-
-    /**
-     * Address: 0x0066A090 (FUN_0066A090, sub_66A090)
-     *
-     * What it does:
-     * Starts from the tree left-most lane and returns true when `find`
-     * resolves directly to the head sentinel (no live weak-set entries).
-     */
-    [[nodiscard]] bool IsEmptyFromHeadFind();
-
-    /**
-     * Address: 0x00863760 (FUN_00863760, sub_863760)
-     *
-     * What it does:
-     * Counts live weak-set entries in this set that are absent from `other`.
-     */
-    /**
-     * Address: 0x00863760 (FUN_00863760, sub_863760)
-     *
-     * Counts live entries of this set that are ALSO present in `other`. See the
-     * definition for the increment-gating evidence; this is the quantity
-     * `SelectionDragger`'s shift-drag arm compares against the dragged set's
-     * size.
-     */
-    [[nodiscard]] std::int32_t CountEntitiesPresentIn(const SSelectionSetUserEntity& other) const;
-
-    /** Recovery-local complement of `CountEntitiesPresentIn` (not a binary body). */
-    [[nodiscard]] std::int32_t CountEntitiesMissingFrom(const SSelectionSetUserEntity& other) const;
-
-    /**
-     * Address: 0x00868690 (FUN_00868690, sub_868690)
-     *
-     * What it does:
-     * Returns true when this set and `other` contain the same live entity keys.
-     */
-    [[nodiscard]] bool HasSameLiveEntitySet(const SSelectionSetUserEntity& other) const;
-
-    /**
-     * Address: 0x00831110 (FUN_00831110, sub_831110)
-     *
-     * What it does:
-     * Returns true when this set and `other` share at least one live entity.
-     * The binary walks both trees as a sorted merge (both are ordered by the
-     * same `UserEntity*` key); this is expressed as a per-element membership
-     * test against `other` instead, which returns the identical boolean for
-     * every input - the merge's only externally observable effect is the
-     * early-exit on first match, which the membership-test loop preserves.
-     */
-    [[nodiscard]] bool HasCommonLiveEntityWith(const SSelectionSetUserEntity& other) const;
-
-    /**
-     * Address: 0x0066A330 (FUN_0066A330, Moho::WeakSet_UserEntity::find)
-     *
-     * What it does:
-     * Walks forward from `start` through the RB-tree using `next`, skipping
-     * tombstone entries (whose embedded `WeakObject_IUnit*` is null or the
-     * sentinel `(void*)8`), and returns the first live entry or `mHead`
-     * (sentinel) if none remains. Result is written to `*outNode`.
-     */
-    [[nodiscard]] static SSelectionNodeUserEntity*
-      find(WeakEntitySetUserEntity* set, SSelectionNodeUserEntity* start, SSelectionNodeUserEntity** outNode);
-
-    /**
-     * Address: 0x007B29C0 (FUN_007B29C0, sub_7B29C0)
-     *
-     * What it does:
-     * Starting at `start`, removes tombstone weak-set entries (null/`(void*)8`
-     * owner-link slots) until reaching one live node or the head sentinel.
-     * Writes the resulting node to `*outNode`.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity**
-      PruneTombstonesAndFindLive(SSelectionNodeUserEntity** outNode, SSelectionNodeUserEntity* start);
-
-
-    /**
-     * Address: 0x007ABDE0 (FUN_007ABDE0, sub_7ABDE0)
-     * Address: 0x007ABE10 (FUN_007ABE10, sub_7ABE10)
-     *
-     * What it does:
-     * Clears all weak-set nodes, destroys the tree head sentinel, and resets
-     * persistent storage pointers/counters.
-     */
-    std::int32_t ReleaseStorage();
-
-    /**
-     * Address: 0x0066ADD0 (FUN_0066ADD0, Moho::WeakSet_UserEntity::Iterator::inc)
-     *
-     * What it does:
-     * Standard MSVC red-black tree successor: if the current node has a right
-     * child, descends to its leftmost descendant; otherwise climbs ancestors
-     * until reaching one whose right child is not the current path. No-op when
-     * the current node is already the sentinel.
-     */
-    static void Iterator_inc(SSelectionNodeUserEntity** cursor);
-
-  };
-
-  static_assert(sizeof(SSelectionSetUserEntity) == 0x10, "SSelectionSetUserEntity size must be 0x10");
-  static_assert(
-    offsetof(SSelectionSetUserEntity, mHead) == 0x04, "SSelectionSetUserEntity::mHead offset must be 0x04"
-  );
-  static_assert(offsetof(SSelectionSetUserEntity, mSize) == 0x08, "SSelectionSetUserEntity::mSize offset must be 0x08");
-  static_assert(
-    offsetof(SSelectionSetUserEntity, mSizeMirrorOrUnused) == 0x0C,
-    "SSelectionSetUserEntity::mSizeMirrorOrUnused offset must be 0x0C"
-  );
-  static_assert(sizeof(SSelectionSetUserEntity::Index) == 0x08, "SSelectionSetUserEntity::Index size must be 0x08");
-  static_assert(
-    offsetof(SSelectionSetUserEntity::AddResult, mWasInserted) == 0x08,
-    "SSelectionSetUserEntity::AddResult::mWasInserted offset must be 0x08"
-  );
-  static_assert(sizeof(SSelectionSetUserEntity::AddResult) == 0x0C, "SSelectionSetUserEntity::AddResult size must be 0x0C");
-  static_assert(sizeof(SSelectionSetUserEntity::FindResult) == 0x08, "SSelectionSetUserEntity::FindResult size must be 0x08");
-
-  /** Brings one selection weak-set up empty, head sentinel included. */
-  inline void InitializeLocalSelectionSet(SSelectionSetUserEntity& set)
-  {
-    InitWeakEntitySetHead(set);
-    set.mSizeMirrorOrUnused = 0u;
-  }
-
-  /**
-   * Address: 0x008B16A1..0x008B16F1 (inlined into `UserArmy::~UserArmy`,
-   *          FUN_008B1650, for the two army idle registries)
-   *
-   * What it does:
-   * Erases every node of one bare `WeakSet<UserEntity>` while keeping the head
-   * sentinel alive, through the shared full-range erase (FUN_007AF740).
-   */
-  inline void ClearWeakEntitySet(WeakEntitySetUserEntity& set) noexcept
-  {
-    SSelectionNodeUserEntity* const head = set.mHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    // `EraseRange` is a member of the bare 12-byte header, so it runs on the
-    // set itself. This used to stage the call through a by-value
-    // `SSelectionSetUserEntity` copy aliasing `set.mHead`; that type inherits
-    // `~WeakEntitySetUserEntity` -> `ReleaseStorage()` -> `operator delete`
-    // on the head, so the staged copy freed the caller's head sentinel on its
-    // way out of scope and `DestroyWeakEntitySet` then freed it again. That
-    // double free poisoned the 28-byte allocator lane and surfaced as the
-    // band-box / move-order crashes.
-    SSelectionNodeUserEntity* outNode = nullptr;
-    (void)set.EraseRange(&outNode, head->mLeft, head);
-  }
-
-  /**
-   * Address: 0x008B16F9..0x008B1743 (inlined into `UserArmy::~UserArmy`,
-   *          FUN_008B1650; the out-of-line twin is FUN_007B2530)
-   *
-   * What it does:
-   * Tears one weak-entity set down completely: full-range erase followed by
-   * `operator delete` on the head sentinel, leaving `{mHead, mSize}` zeroed.
-   * The allocator-proxy lane is deliberately left alone - the binary's
-   * `_Tidy()` emission never touches it.
-   */
-  inline void DestroyWeakEntitySet(WeakEntitySetUserEntity& set) noexcept
-  {
-    SSelectionNodeUserEntity* const head = set.mHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    ClearWeakEntitySet(set);
-    ::operator delete(head);
-    set.mHead = nullptr;
-    set.mSize = 0u;
-  }
-
-  /**
-   * Address: 0x007AE270 (FUN_007AE270)
-   *
-   * Mirrors the engine teardown chain: `EraseRange` over the whole tree
-   * (FUN_007AF740) followed by `operator delete` on the head sentinel.
-   *
-   * IDA labels the symbol `Broadcaster<SCameraTracking>::RemoveListener`
-   * because it types the set header as a broadcaster; the two callers are
-   * `CWldSession::DoBeat` and 0x00822C50, both tearing down a local selection
-   * set, which is what the body actually does.
-   * Tolerates a null head so a never-populated set still tears down cleanly.
-   */
-  inline void DestroyLocalSelectionSet(SSelectionSetUserEntity& set) noexcept
-  {
-    if (set.mHead == nullptr) {
-      return;
-    }
-
-    DestroyWeakEntitySet(set);
-    set.mAllocProxy = nullptr;
-    set.mSizeMirrorOrUnused = 0u;
-  }
-
-  /**
-   * A transient selection weak-set that owns its head sentinel: the shape the
-   * binary builds on the stack whenever it needs to stage a selection before
-   * handing it to `CWldSession::SetSelection`.
-   *
-   * `SSelectionSetUserEntity` itself stays a raw ABI aggregate (it is embedded
-   * by value in `CWldSession` at +0x4A0, whose lifetime the engine drives), so
-   * the ownership lives here rather than in a destructor on the layout type.
-   */
-  class ScopedLocalSelectionSet final
-  {
-  public:
-    ScopedLocalSelectionSet() { InitializeLocalSelectionSet(mSet); }
-    ~ScopedLocalSelectionSet() { DestroyLocalSelectionSet(mSet); }
-
-    ScopedLocalSelectionSet(const ScopedLocalSelectionSet&) = delete;
-    ScopedLocalSelectionSet& operator=(const ScopedLocalSelectionSet&) = delete;
-
-    [[nodiscard]] SSelectionSetUserEntity& get() noexcept { return mSet; }
-    [[nodiscard]] const SSelectionSetUserEntity& get() const noexcept { return mSet; }
-
-  private:
-    SSelectionSetUserEntity mSet{};
-  };
-
-  /**
-   * `ScopedLocalSelectionSet`'s `WeakSet<UserUnit>` sibling: the transient
-   * participant set `Moho::SCommandModeData::HandleEvent` (0x0081FCD0) builds
-   * on the stack before handing it to `CFormation::ChooseFormation`.
-   *
-   * The two instantiations are byte-identical (see `WeakUnitSetUserUnit`'s own
-   * doc comment), so the head sentinel/teardown reuse the shared helpers; only
-   * the C++ element type differs, which is what keeps `WeakSet<UserUnit>::Add`
-   * (0x00822270) apart from `WeakSet<UserEntity>::Add` (0x007AE1B0).
-   *
-   * Address: 0x007B25C0 (ctor emission) / 0x007B2530 (dtor emission).
-   */
-  class ScopedLocalUnitSet final
-  {
-  public:
-    ScopedLocalUnitSet() { InitWeakEntitySetHead(mSet); }
-    ~ScopedLocalUnitSet() { DestroyWeakEntitySet(mSet); }
-
-    ScopedLocalUnitSet(const ScopedLocalUnitSet&) = delete;
-    ScopedLocalUnitSet& operator=(const ScopedLocalUnitSet&) = delete;
-
-    [[nodiscard]] WeakUnitSetUserUnit& get() noexcept { return mSet; }
-    [[nodiscard]] const WeakUnitSetUserUnit& get() const noexcept { return mSet; }
-
-  private:
-    WeakUnitSetUserUnit mSet{};
-  };
-
-  /**
-   * Like `ScopedLocalSelectionSet`, but leaves the head storage unallocated so
-   * a copy routine (`CopySessionSelectionSet`) allocates and populates it in
-   * one pass, matching the binary's raw-weak-set + `CopySelectionSetFromOther`
-   * idiom.
-   */
-  class ScopedCopiedSelectionSet final
-  {
-  public:
-    ScopedCopiedSelectionSet() = default;
-    ~ScopedCopiedSelectionSet() { DestroyLocalSelectionSet(mSet); }
-
-    ScopedCopiedSelectionSet(const ScopedCopiedSelectionSet&) = delete;
-    ScopedCopiedSelectionSet& operator=(const ScopedCopiedSelectionSet&) = delete;
-
-    [[nodiscard]] SSelectionSetUserEntity& get() noexcept { return mSet; }
-    [[nodiscard]] const SSelectionSetUserEntity& get() const noexcept { return mSet; }
-
-  private:
-    SSelectionSetUserEntity mSet{};
-  };
-
   struct SSessionSaveData
   {
     static gpg::RType* sType;
@@ -815,7 +455,7 @@ namespace moho
      * What it does:
      * Returns the current world-session selection weak-set.
      */
-    [[nodiscard]] const SSelectionSetUserEntity& GetSelection() const;
+    [[nodiscard]] const WeakSet<UserEntity>& GetSelection() const;
 
     /**
      * Address: 0x00896730 (FUN_00896730, ?GetExtraSelectList@CWldSession@Moho@@QBE?AV?$WeakSet@VUserEntity@Moho@@@2@XZ)
@@ -824,7 +464,7 @@ namespace moho
      * Returns a by-value copy of the world-session extra-selection weak-set
      * using the same iterator-range clone path as the original binary.
      */
-    [[nodiscard]] SSelectionSetUserEntity GetExtraSelectList() const;
+    [[nodiscard]] WeakSet<UserEntity> GetExtraSelectList() const;
 
     /**
      * Address: 0x00896580 (FUN_00896580, ?GetCursorInfo@CWldSession@Moho@@QBEABUUICursorInfo@2@XZ)
@@ -1061,7 +701,7 @@ namespace moho
      * side by side deliberately - the divergence is real and wants a separate
      * reconciliation pass, not a silent retype here.
      */
-    void GetSelectionUnits(WeakUnitSetUserUnit& outUnits) const;
+    void GetSelectionUnits(WeakSet<UserUnit>& outUnits) const;
 
     /**
      * Address: 0x00896090 (FUN_00896090, ?GetValidAttackingUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
@@ -1089,7 +729,7 @@ namespace moho
      * one `{previous,current,added,removed}` selection-event payload, updates
      * max-selection bookkeeping, and refreshes sync-filter mask B when changed.
      */
-    void SetSelection(const SSelectionSetUserEntity& selection);
+    void SetSelection(const WeakSet<UserEntity>& selection);
 
     /**
      * Address context:
@@ -1451,14 +1091,6 @@ namespace moho
      */
     [[nodiscard]] bool ValidateFocusArmyRequest(int index);
 
-    /**
-     * Address context: 0x00896870 (`ClearExtraSelectList`) field lane.
-     *
-     * What it does:
-     * Returns the extra-selection weak-set, `mExtraSelection` (+0xE0).
-     */
-    [[nodiscard]] SSelectionSetUserEntity& ExtraSelectionView();
-    [[nodiscard]] const SSelectionSetUserEntity& ExtraSelectionView() const;
 
   public:
     // `SetSelection` (0x00896140) broadcasts with `esi = session`, and the
@@ -1504,7 +1136,8 @@ namespace moho
     /// The extra-selection set (`GetExtraSelectList` / `ClearExtraSelectList`,
     /// the units picked out of a transport's cargo panel). Its head sentinel is
     /// built inline at 0x00893214..0x0089323D, right after the spatial db.
-    SSelectionSetUserEntity mExtraSelection;                // 0x00E0
+    WeakSet<UserEntity> mExtraSelection;                    // 0x00E0
+    std::uint32_t mPad00EC;                                 // 0x00EC (never written)
     /**
      * The active build templates, a `gpg::fastvector_n<SBuildTemplateInfo, 16>`
      * -- confirmed by the mangled names of `GetActiveBuildTemplate` and
@@ -1551,12 +1184,12 @@ namespace moho
     /// A bare 12-byte `WeakSet<UserEntity>`: the visibility set starts right
     /// after it, and the destructor tears the two down as members, 0x438 first
     /// (0x00893D64) then 0x42C.
-    WeakEntitySetUserEntity mOrphans;                       // 0x042C
+    WeakSet<UserEntity> mOrphans;                           // 0x042C
     /// Entities whose visibility must be re-evaluated on the next beat:
     /// `AddToVizUpdate` adds (0x00894215, the same `Add` as above),
     /// `RemoveFromVizUpdate` finds and erases (0x00894238), `DoBeat` calls
     /// `UpdateVisibility` on every live entry (0x0089564A..).
-    WeakEntitySetUserEntity mVizUpdates;                    // 0x0438
+    WeakSet<UserEntity> mVizUpdates;                        // 0x0438
     LuaPlus::LuaObject mScenarioInfo;                       // 0x0444
     std::int32_t mGameTick;                                 // 0x0458
     std::int32_t mLastBeatWasTick;                          // 0x045C
@@ -1600,7 +1233,10 @@ namespace moho
     /// `src/sdk` and are removed; see `Vector.h`'s `FUN_007530C0` citation
     /// for the full evidence chain.
     msvc8::vector<SExtraUnitData> mSyncExtraUnitData;      // 0x0490
-    SSelectionSetUserEntity mSelection;                     // 0x04A0
+    WeakSet<UserEntity> mSelection;                         // 0x04A0
+    /// `mSelection`'s live count as of the last `SetSelection` (stored at
+    /// 0x00896387); `0x008943E0` compares a rebuilt selection against it.
+    std::uint32_t mSelectionSize;                           // 0x04AC
     /// These five members are one flattened `MouseInfo` - the cursor snapshot
     /// the session keeps. `FUN_00852C10` hands `this + 0x4B0` straight to
     /// `GetLeftMouseButtonAction(out, const MouseInfo*, int)` at 0x00852C39,
@@ -1673,6 +1309,7 @@ namespace moho
   // above pin the interior; this pins the end.
   static_assert(sizeof(CWldSession) == 0x508, "CWldSession size must be 0x508");
   static_assert(offsetof(CWldSession, FocusArmy) == 0x488, "CWldSession::FocusArmy offset must be 0x488");
+  static_assert(offsetof(CWldSession, mSelectionSize) == 0x4AC, "CWldSession::mSelectionSize offset must be 0x4AC");
   static_assert(offsetof(CWldSession, mSelection) == 0x4A0, "CWldSession::mSelection offset must be 0x4A0");
   static_assert(
     offsetof(CWldSession, mCursorWorldState) == 0x4B0, "CWldSession::mCursorWorldState offset must be 0x4B0"
@@ -1773,7 +1410,7 @@ namespace moho
    * lanes and forwards to the explicit-unit `UI_VerifyScriptCommand` overload.
    */
   [[nodiscard]] LuaPlus::LuaObject UI_VerifyScriptCommand(
-    const SSelectionSetUserEntity& entities,
+    const WeakSet<UserEntity>& entities,
     const SSTICommandIssueData& commandIssueData,
     bool doClear
   );
@@ -1801,7 +1438,7 @@ namespace moho
    * lanes and forwards to the explicit-unit `UI_OnCommandIssued` overload.
    */
   void UI_OnCommandIssued(
-    const SSelectionSetUserEntity& entities,
+    const WeakSet<UserEntity>& entities,
     const SSTICommandIssueData& commandIssueData,
     bool doClear
   );
@@ -1839,7 +1476,7 @@ namespace moho
    * the selection and forwards to the `fastvector` overload.
    */
   void ISSUE_FactoryCommand(
-    const SSelectionSetUserEntity& entities, const SSTICommandIssueData& commandIssueData, bool clearQueue
+    const WeakSet<UserEntity>& entities, const SSTICommandIssueData& commandIssueData, bool clearQueue
   );
 
   /**
@@ -1937,7 +1574,7 @@ namespace moho
    * "convert moves into patrol" cursor banner.
    */
   [[nodiscard]] bool CanRestartSelectionMoveCommandAsPatrol(
-    SSelectionSetUserEntity& selection,
+    WeakSet<UserEntity>& selection,
     UserCommandIssueHelper* helper
   );
 
@@ -1951,7 +1588,7 @@ namespace moho
    * CWldSession.cpp.
    */
   void ISSUE_Command(
-    const SSelectionSetUserEntity& entities,
+    const WeakSet<UserEntity>& entities,
     const SSTICommandIssueData& commandIssueData,
     bool clearQueue
   );
@@ -2027,16 +1664,6 @@ namespace moho
   void ReanchorCommandGraphDrawNode(UICommandGraph& graph, CmdId cmdId);
 
   /**
-   * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):
-   * clones one source selection weak-set into `destination`, returning it.
-   * Wraps the CWldSession.cpp-local `CopySelectionSetFromOther` (FUN_00822210).
-   */
-  SSelectionSetUserEntity* CopySessionSelectionSet(
-    SSelectionSetUserEntity* destination,
-    const SSelectionSetUserEntity* source
-  );
-
-  /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker: resolves the world
    * position seeded from one unit's last-queued command-graph anchor history.
    * Wraps the CWldSession.cpp-local `ResolveCommandIssueTargetPosition`
@@ -2088,44 +1715,6 @@ namespace moho
    * `outUnits`. Wraps the CWldSession.cpp-local `CollectSessionUserUnits`.
    */
   void GetSessionUserUnits(CWldSession* session, msvc8::vector<UserUnit*>& outUnits);
-
-  /**
-   * Address: 0x0066A550 (FUN_0066A550, Moho::WeakSet_UserEntity::next)
-   * Address: 0x007B30D0 (FUN_007B30D0, std::map<unsigned int,WeakPtr<UserEntity>>::erase
-   * — identical node-splice/rebalance/return-next shape, a separate
-   * per-call-site emission of the same std::_Tree::erase(iterator) operation)
-   *
-   * What it does:
-   * Erases one `UserEntity` weak-set node from a selection RB-tree, unlinks
-   * its intrusive weak-owner chain lane, and returns the next in-order node.
-   * Declared here (moved to external linkage from its original CWldSession.cpp
-   * anonymous namespace) so `CFormation::ChooseFormation` (CFormation.cpp) can
-   * prune its own selection-set walk exactly as `SSelectionSetUserEntity::
-   * PruneTombstonesAndFindLive`/`EraseRange` do in this file.
-   */
-  [[nodiscard]] SSelectionNodeUserEntity*
-    EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* node);
-
-  /**
-   * Address: 0x007B29C0 (FUN_007B29C0, sub_7B29C0)
-   *
-   * What it does:
-   * Advances from `start` to the first live weak-set node, deleting tombstone
-   * entries (null/`(void*)8` owner-link slots) as it goes. Generalized over the
-   * shared `WeakEntitySetUserEntity` base (moved to external linkage from
-   * `SSelectionSetUserEntity::PruneTombstonesAndFindLive`, which now forwards
-   * here) so `CFormation::Finalize` (CFormation.cpp) can prune its own
-   * `mParticipants` walk the same way: `mParticipants` is a `WeakUnitSetUserUnit`,
-   * not an `SSelectionSetUserEntity`, but both share the identical 12-byte
-   * `{allocProxy, mHead, mSize}` header this function only ever touches, and the
-   * binary itself calls this exact routine (0x00838313/0x008383CC) with `this`
-   * pointed straight at `CFormation::mParticipants` (offset 0 of `CFormation`).
-   */
-  [[nodiscard]] SSelectionNodeUserEntity** PruneTombstonesAndFindLive(
-    WeakEntitySetUserEntity& set,
-    SSelectionNodeUserEntity** outNode,
-    SSelectionNodeUserEntity* start
-  );
 
   /**
    * Address context:
@@ -2542,7 +2131,7 @@ namespace moho
    * member). Sole caller is `DrawPathPreview` above. See that definition for
    * the full doc comment.
    */
-  [[nodiscard]] UserUnit* PickPathPreviewSubject(SSelectionSetUserEntity& selection);
+  [[nodiscard]] UserUnit* PickPathPreviewSubject(WeakSet<UserEntity>& selection);
 
   /**
    * Not a distinct binary function - `UICommandGraph` is only a complete

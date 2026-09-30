@@ -296,32 +296,20 @@ namespace moho
    * `UserUnit+0x148` (`sizeof(UserEntity)`), slot 7 `GetBlueprint`, and tests
    * `IsBeingBuilt` through slot 13 of the primary vtable.
    */
-  UserUnit* PickPathPreviewSubject(SSelectionSetUserEntity& selection)
+  UserUnit* PickPathPreviewSubject(WeakSet<UserEntity>& selection)
   {
-    if (selection.mHead == nullptr) {
-      return nullptr;
-    }
-
     UserUnit* subject = nullptr;
     float deepest = 0.0f;
 
-    SSelectionNodeUserEntity* node = nullptr;
-    (void)selection.PruneTombstonesAndFindLive(&node, selection.mHead->mLeft);
-
-    while (node != selection.mHead) {
-      if (UserEntity* const entity = ResolveWeakEntitySetNodeEntity(*node); entity != nullptr) {
-        if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
-          const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-          if (blueprint != nullptr && blueprint->Physics.ResolvedFootprint != nullptr && !unit->IsBeingBuilt()
-              && blueprint->mSizeZ > deepest) {
-            deepest = blueprint->mSizeZ;
-            subject = unit;
-          }
+    for (UserEntity* const entity : selection) {
+      if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
+        const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+        if (blueprint != nullptr && blueprint->Physics.ResolvedFootprint != nullptr && !unit->IsBeingBuilt()
+            && blueprint->mSizeZ > deepest) {
+          deepest = blueprint->mSizeZ;
+          subject = unit;
         }
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      (void)selection.PruneTombstonesAndFindLive(&node, node);
     }
 
     return subject;

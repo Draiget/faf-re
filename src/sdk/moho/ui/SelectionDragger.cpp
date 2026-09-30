@@ -94,46 +94,6 @@ namespace
     return invalidCoord;
   }
 
-  [[nodiscard]] moho::UserEntity* DecodeSelectionEntity(
-    const moho::SSelectionWeakRefUserEntity& weakRef
-  ) noexcept
-  {
-    if (weakRef.mOwnerLinkSlot == nullptr) {
-      return nullptr;
-    }
-
-    constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(moho::UserEntity, mIUnitChainHead);
-#if defined(MOHO_ABI_MSVC8_COMPAT)
-    static_assert(kSelectionOwnerLinkOffset == 0x08, "UserEntity selection weak-link offset must stay 0x08");
-#endif
-
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-    if (raw < kSelectionOwnerLinkOffset) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::UserEntity*>(raw - kSelectionOwnerLinkOffset);
-  }
-
-  /**
-   * Address: 0x00868AF0 (FUN_00868AF0)
-   *
-   * What it does:
-   * Imports one collected `UserEntity*` range into a selection weak-set,
-   * preserving the original weak-owner guard semantics through
-   * `SSelectionSetUserEntity::Add`.
-   */
-  void AddCollectedEntitiesToSelection(
-    moho::SSelectionSetUserEntity& selection,
-    const gpg::fastvector<moho::UserEntity*>& entities
-  )
-  {
-    for (moho::UserEntity* const entity : entities) {
-      moho::SSelectionSetUserEntity::AddResult addResult{};
-      (void)moho::SSelectionSetUserEntity::Add(&addResult, &selection, entity);
-    }
-  }
-
   /**
    * Address: 0x00863E20 (FUN_00863E20)
    *
@@ -143,68 +103,45 @@ namespace
    * `CWldSession::CanSelectUnit`.
    */
   void PruneDraggedSelectionToSelectableUnits(
-    moho::SSelectionSetUserEntity& selection,
+    moho::WeakSet<moho::UserEntity>& selection,
     moho::CWldSession& session
   )
   {
-    if (selection.mHead == nullptr) {
-      return;
-    }
-
-    moho::SSelectionNodeUserEntity* node = selection.mHead->mLeft;
-    node = moho::SSelectionSetUserEntity::find(&selection, node, &node);
-    while (node != selection.mHead) {
-      moho::UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
-      if (session.CanSelectUnit(reinterpret_cast<moho::UserUnit*>(entity))) {
-        moho::SSelectionSetUserEntity::Iterator_inc(&node);
-        node = moho::SSelectionSetUserEntity::find(&selection, node, &node);
-        continue;
+    for (auto it = selection.begin(); it != selection.end();) {
+      if (session.CanSelectUnit(static_cast<moho::UserUnit*>(*it))) {
+        ++it;
+      } else {
+        it = selection.Erase(it);
       }
-
-      moho::SSelectionNodeUserEntity* next = node;
-      moho::SSelectionSetUserEntity::Iterator_inc(&next);
-      next = moho::SSelectionSetUserEntity::find(&selection, next, &next);
-      (void)selection.EraseRange(&node, node, next);
-      node = next;
     }
   }
 
   /**
-   * Address: 0x00868A00 (FUN_00868A00)
+   * Address: 0x00863760 (FUN_00863760)
    *
    * What it does:
-   * Adds every live entity from one weak-set iterator range into another
-   * selection weak-set.
+   * How many live entries of `set` `other` also holds: `other.Find` per entry
+   * (0x008637A8), counted when the result is not `other`'s head (0x008637AD /
+   * 0x008637B0).
    *
-   * Invocation: `SelectionDragger::DragRelease` (0x00863870) calls this three
-   * times - once per shift-modifier sub-branch to merge the current session
-   * selection into a fresh scratch set, once to merge the dragged set into
-   * the current selection on the "genuinely new entities" path, and once to
-   * pull the winning priority bucket's entries into the final result set.
-   *
-   * `source` takes the bare `WeakEntitySetUserEntity&` header (not
-   * `SSelectionSetUserEntity&`): the body only ever passes it to `find`,
-   * which is already declared on the shared header, so it can walk either the
-   * derived selection sets or a bare `priorityBuckets` element unchanged.
+   * Its only caller is `DragRelease`'s shift arm (0x0086393D), which compares
+   * the count with the dragged set's size. It used to count the entries NOT
+   * in `other` instead, which inverted that comparison: a shift band-box over
+   * units that were not yet selected deselected the rest of the selection
+   * rather than adding them.
    */
-  moho::SSelectionNodeUserEntity* AddSelectionRange(
-    moho::SSelectionSetUserEntity& destination,
-    moho::WeakEntitySetUserEntity& source,
-    moho::SSelectionNodeUserEntity* first,
-    moho::SSelectionNodeUserEntity* const last
+  [[nodiscard]] std::size_t CountEntitiesAlsoIn(
+    const moho::WeakSet<moho::UserEntity>& set,
+    const moho::WeakSet<moho::UserEntity>& other
   )
   {
-    moho::SSelectionNodeUserEntity* node = first;
-    while (node != last) {
-      moho::UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
-      moho::SSelectionSetUserEntity::AddResult addResult{};
-      (void)moho::SSelectionSetUserEntity::Add(&addResult, &destination, entity);
-
-      moho::SSelectionSetUserEntity::Iterator_inc(&node);
-      node = moho::SSelectionSetUserEntity::find(&source, node, &node);
+    std::size_t count = 0;
+    for (moho::UserEntity* const entity : set) {
+      if (other.Find(entity) != other.end()) {
+        ++count;
+      }
     }
-
-    return node;
+    return count;
   }
 
   /**
@@ -379,15 +316,13 @@ namespace moho
    *     `mSelectionMeshScale{X,Y,Z}` lanes. The first non-empty bucket becomes
    *     the new selection.
    *
-   * This body does not call the three CWldSession.cpp-local helpers the
-   * binary uses internally (`CopySelectionSetFromOther`,
-   * `FindSelectionNodeByEntityGuarded`, the vector<WeakEntitySetUserEntity>
-   * growth chain rooted at 0x00867890) because those are file-private
-   * (anonymous namespace) to that translation unit. The same observable
-   * behavior is reached through the public `SSelectionSetUserEntity` API
-   * (`Find`, `find`, `Add`, `Iterator_inc`, `IsEmptyAfterPrune`,
-   * `ReleaseStorage`), this file's `AddSelectionRange`/`DecodeSelectionEntity`
-   * helpers, and the already-recovered generic `msvc8::vector<T>::resize`.
+   * The shift arm is the binary's: a copy of the session selection (the
+   * `WeakSet` copy constructor 0x00822210), the count (0x00863760) against the
+   * dragged set's `Size()` (0x007B59B0), then either the kept set (`Find` and
+   * `Add` per entry) or the merge (`Add(first, last)`, 0x00868A00), each handed
+   * to `SetSelection` (0x00896140). The unmodified arm runs past 0x00863C13 into
+   * FAF's patch section (`jmp 0x012913F1`); the priority-bucket body below is
+   * this recovery's reading of it.
    *
    * Invocation: vtable slot +0x08 of `??_7SelectionDragger@Moho@@6B@`,
    * `??_7SelectionDragger2D@Moho@@6B@` and `??_7SelectionDragger3D@Moho@@6B@`
@@ -407,160 +342,86 @@ namespace moho
       return;
     }
 
-    ScopedLocalSelectionSet draggedSelectionGuard{};
-    SSelectionSetUserEntity& draggedSelection = draggedSelectionGuard.get();
+    WeakSet<UserEntity> draggedSelection;
     CollectSelectionDraggerEntities(draggedSelection, *this);
 
     // TEMPORARY PROBE -- band-box triage, delete when resolved.
-    gpg::Warnf("[BOXDIAG] release drag=(%.0f,%.0f) dragged=%d", mX0, mY0, draggedSelection.size());
+    gpg::Warnf("[BOXDIAG] release drag=(%.0f,%.0f) dragged=%d", mX0, mY0, static_cast<int>(draggedSelection.Size()));
 
     if ((eventData->mModifiers & MEM_Shift) != 0u) {
-      // The binary treats `mSess->mSelection` as mutable here (its own
-      // tombstone-pruning walk mutates the tree in place); `GetSelection()`
-      // only exposes a const accessor, so bridge that recovery-added
-      // restriction rather than the original's actual mutability.
-      auto& liveSelection = const_cast<SSelectionSetUserEntity&>(mSess->GetSelection());
+      WeakSet<UserEntity> currentSelection(mSess->GetSelection());
 
-      ScopedLocalSelectionSet currentSelectionGuard{};
-      SSelectionSetUserEntity& currentSelection = currentSelectionGuard.get();
-      if (liveSelection.mHead != nullptr) {
-        SSelectionNodeUserEntity* first = liveSelection.mHead->mLeft;
-        first = SSelectionSetUserEntity::find(&liveSelection, first, &first);
-        (void)AddSelectionRange(currentSelection, liveSelection, first, liveSelection.mHead);
-      }
-
-      // 0x0086393D calls sub_863760, which counts the dragged entities that are
-      // ALREADY in the current selection (see CountEntitiesPresentIn), and
-      // 0x0086394E/0x00863950 compare that against the dragged set's own size,
-      // taking this arm when it is not below. So this arm is "every dragged
-      // entity was already selected" -- a shift band-box re-drawn over an
-      // existing selection, which deselects it.
-      const std::int32_t alreadySelected = draggedSelection.CountEntitiesPresentIn(currentSelection);
-      if (alreadySelected >= draggedSelection.size()) {
-        // Every dragged entity was already selected: keep only the
-        // currently-selected entities the drag did not cover (toggle off).
-        ScopedLocalSelectionSet keptSelectionGuard{};
-        SSelectionSetUserEntity& keptSelection = keptSelectionGuard.get();
-
-        SSelectionNodeUserEntity* node = currentSelection.mHead->mLeft;
-        node = SSelectionSetUserEntity::find(&currentSelection, node, &node);
-        while (node != currentSelection.mHead) {
-          UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
-
-          SSelectionSetUserEntity::FindResult found{};
-          (void)SSelectionSetUserEntity::Find(&found, &draggedSelection, entity);
-          if (found.mRes == draggedSelection.mHead) {
-            SSelectionSetUserEntity::AddResult addResult{};
-            (void)SSelectionSetUserEntity::Add(&addResult, &keptSelection, entity);
+      // 0x0086393D..0x00863950: every dragged entity was already selected --
+      // a shift band-box over an existing selection deselects it.
+      if (CountEntitiesAlsoIn(draggedSelection, currentSelection) >= draggedSelection.Size()) {
+        WeakSet<UserEntity> keptSelection;
+        for (UserEntity* const entity : currentSelection) {
+          if (draggedSelection.Find(entity) == draggedSelection.end()) {
+            (void)keptSelection.Add(entity);
           }
-
-          SSelectionSetUserEntity::Iterator_inc(&node);
-          node = SSelectionSetUserEntity::find(&currentSelection, node, &node);
         }
-
         mSess->SetSelection(keptSelection);
       } else {
-        // At least one dragged entity was not already selected: merge the
-        // current selection into the dragged set and select the union, so a
-        // shift band-box over fresh units ADDS them.
-        SSelectionNodeUserEntity* first = currentSelection.mHead->mLeft;
-        first = SSelectionSetUserEntity::find(&currentSelection, first, &first);
-        (void)AddSelectionRange(draggedSelection, currentSelection, first, currentSelection.mHead);
-
+        // At least one dragged entity was new: select the union.
+        draggedSelection.Add(currentSelection.begin(), currentSelection.end());
         mSess->SetSelection(draggedSelection);
       }
     } else {
       // No modifier: group intersected entities into per-priority buckets and
-      // select the first non-empty one. Buckets are indexed 1-based in the
-      // binary (bucket 0 is never used), so `priorityBuckets[i]` holds
-      // priority `i + 1`.
-      //
-      // Element type is the bare 12-byte `WeakEntitySetUserEntity` (not the
-      // 16-byte `SSelectionSetUserEntity`), matching the binary's own
-      // 12-byte-stride bucket vector exactly: `priorityBuckets.resize(...)`
-      // below is the real, literal source-level call site for the vector's
-      // growth machinery (FUN_00867890 -> FUN_00867B90 -> FUN_00868040 ->
-      // FUN_00868580 -> FUN_00868DB0, cited on `msvc8::vector<T>::resize`/
-      // `insert`/`uninit_fill_n` in Vector.h), and the 1-arg `resize(n)`
-      // overload's implicit `T()` default value, copy-constructed into every
-      // new slot, is what used to need the explicit post-hoc
-      // `InitializeLocalSelectionSet()` loop this replaces -- the fresh empty
-      // head each new bucket needs now comes from
-      // `WeakEntitySetUserEntity`'s own copy constructor (WeakEntitySet.h),
-      // exactly as the binary's per-element defensive-copy-of-an-empty-source
-      // does.
-      msvc8::vector<WeakEntitySetUserEntity> priorityBuckets;
+      // select the first non-empty one. Buckets are indexed 1-based (bucket 0
+      // is never used), so `priorityBuckets[i]` holds priority `i + 1`; a new
+      // bucket is a copy of an empty set (`resize` 0x00867890 ->
+      // `uninit_fill_n` 0x00868DB0 -> the copy constructor 0x00822210).
+      msvc8::vector<WeakSet<UserEntity>> priorityBuckets;
       const CGeomSolid3 selectionSolid = BuildSelectionSolid();
 
-      SSelectionNodeUserEntity* node = draggedSelection.mHead->mLeft;
-      node = SSelectionSetUserEntity::find(&draggedSelection, node, &node);
-      while (node != draggedSelection.mHead) {
-        UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
-        UserUnit* const unit = (entity != nullptr) ? entity->IsUserUnit() : nullptr;
-
-        if (unit != nullptr) {
-          const IUnit* const unitBridge = GetIUnitBridge(unit);
-          // Skip stationary entities that are actively mid-upgrade.
-          if (unitBridge->IsMobile() || !unitBridge->IsUnitState(UNITSTATE_BeingUpgraded)) {
-            MeshInstance* const meshInstance = unit->mMeshInstance;
-            if (meshInstance != nullptr) {
-              meshInstance->UpdateInterpolatedFields();
-              Wm3::Box3f scoredBox = meshInstance->box;
-
-              const RUnitBlueprint* const blueprint = unitBridge->GetBlueprint();
-              scoredBox.Extent[1] *= blueprint->mSelectionMeshScaleX;
-              scoredBox.Extent[2] *= blueprint->mSelectionMeshScaleY;
-              scoredBox.Extent[0] *= blueprint->mSelectionMeshScaleZ;
-
-              if (selectionSolid.Intersects(scoredBox)) {
-                const bool forceLowPriority = unit->mVariableData.mIsBeingBuilt == 1u
-                  && unit->IsInCategory(msvc8::string("LOWSELECTPRIO", 13u));
-                const std::int32_t priority = forceLowPriority ? 6 : blueprint->General.SelectionPriority;
-                const std::uint32_t bucketIndex = (priority > 1) ? static_cast<std::uint32_t>(priority) : 1u;
-
-                if (priorityBuckets.size() < bucketIndex) {
-                  // `resize(bucketIndex)` alone is now the whole story: the
-                  // 1-arg overload default-constructs one blank
-                  // `WeakEntitySetUserEntity` temporary and copy-constructs it
-                  // into every new slot (Vector.h `resize`/`uninit_fill_n`,
-                  // element ctor/copy-ctor in WeakEntitySet.h) - each new
-                  // bucket comes up as a real, freshly-headed empty set
-                  // without a separate post-hoc init pass.
-                  priorityBuckets.resize(bucketIndex);
-                }
-
-                WeakEntitySetUserEntity::AddResult addResult{};
-                (void)WeakEntitySetUserEntity::Add(&addResult, &priorityBuckets[bucketIndex - 1u], unit);
-              }
-            }
-          }
+      for (UserEntity* const entity : draggedSelection) {
+        UserUnit* const unit = entity->IsUserUnit();
+        if (unit == nullptr) {
+          continue;
         }
 
-        SSelectionSetUserEntity::Iterator_inc(&node);
-        node = SSelectionSetUserEntity::find(&draggedSelection, node, &node);
+        const IUnit* const unitBridge = GetIUnitBridge(unit);
+        // Skip stationary entities that are actively mid-upgrade.
+        if (!unitBridge->IsMobile() && unitBridge->IsUnitState(UNITSTATE_BeingUpgraded)) {
+          continue;
+        }
+
+        MeshInstance* const meshInstance = unit->mMeshInstance;
+        if (meshInstance == nullptr) {
+          continue;
+        }
+
+        meshInstance->UpdateInterpolatedFields();
+        Wm3::Box3f scoredBox = meshInstance->box;
+
+        const RUnitBlueprint* const blueprint = unitBridge->GetBlueprint();
+        scoredBox.Extent[1] *= blueprint->mSelectionMeshScaleX;
+        scoredBox.Extent[2] *= blueprint->mSelectionMeshScaleY;
+        scoredBox.Extent[0] *= blueprint->mSelectionMeshScaleZ;
+
+        if (selectionSolid.Intersects(scoredBox)) {
+          const bool forceLowPriority = unit->mVariableData.mIsBeingBuilt == 1u
+            && unit->IsInCategory(msvc8::string("LOWSELECTPRIO", 13u));
+          const std::int32_t priority = forceLowPriority ? 6 : blueprint->General.SelectionPriority;
+          const std::uint32_t bucketIndex = (priority > 1) ? static_cast<std::uint32_t>(priority) : 1u;
+
+          if (priorityBuckets.size() < bucketIndex) {
+            priorityBuckets.resize(bucketIndex);
+          }
+          (void)priorityBuckets[bucketIndex - 1u].Add(unit);
+        }
       }
 
-      ScopedLocalSelectionSet resultSelectionGuard{};
-      SSelectionSetUserEntity& resultSelection = resultSelectionGuard.get();
-      for (WeakEntitySetUserEntity& bucket : priorityBuckets) {
-        if (bucket.mHead != nullptr && !bucket.IsEmptyAfterPrune()) {
-          SSelectionNodeUserEntity* first = bucket.mHead->mLeft;
-          first = SSelectionSetUserEntity::find(&bucket, first, &first);
-          (void)AddSelectionRange(resultSelection, bucket, first, bucket.mHead);
+      WeakSet<UserEntity> resultSelection;
+      for (const WeakSet<UserEntity>& bucket : priorityBuckets) {
+        if (!bucket.Empty()) {
+          resultSelection.Add(bucket.begin(), bucket.end());
           break;
         }
       }
 
       mSess->SetSelection(resultSelection);
-
-      // Explicit release here (rather than waiting on `priorityBuckets`'s own
-      // destructor at scope-exit) keeps the binary's observed teardown point;
-      // `WeakEntitySetUserEntity::~WeakEntitySetUserEntity` still runs after,
-      // but `ReleaseStorage()` is idempotent (no-ops once `mHead` is null), so
-      // that second pass is a no-op rather than a double-free.
-      for (WeakEntitySetUserEntity& bucket : priorityBuckets) {
-        (void)bucket.ReleaseStorage();
-      }
     }
   }
 
@@ -627,9 +488,7 @@ namespace moho
    */
   SelectionDragger2D::~SelectionDragger2D()
   {
-    SSelectionNodeUserEntity* cursor =
-      sSelectionBrackets.mHead != nullptr ? sSelectionBrackets.mHead->mLeft : nullptr;
-    (void)sSelectionBrackets.EraseRange(&cursor, cursor, sSelectionBrackets.mHead);
+    sSelectionBrackets.Clear();
   }
 
   /**
@@ -666,29 +525,15 @@ namespace moho
     // stretched even if the cursor returns to the press point (0x00864E34).
     mStretch = static_cast<std::uint8_t>(mStretch | (stretchedPastClick ? 1u : 0u));
 
-    SSelectionSetUserEntity draggedSelection{};
-    InitializeLocalSelectionSet(draggedSelection);
+    WeakSet<UserEntity> draggedSelection;
     CollectSelectionDraggerEntities(draggedSelection, *this);
 
-    // Drop last frame's brackets. The binary open-codes the full-range erase
-    // (`DestroySubtree(head->mParent)` plus the head/size reset) at
-    // 0x00864E71-0x00864EA4; `EraseRange` over `[head->mLeft, head)` is that
-    // same teardown through the one owning helper.
-    SSelectionNodeUserEntity* bracketCursor =
-      sSelectionBrackets.mHead != nullptr ? sSelectionBrackets.mHead->mLeft : nullptr;
-    (void)sSelectionBrackets.EraseRange(&bracketCursor, bracketCursor, sSelectionBrackets.mHead);
-
-    SSelectionNodeUserEntity* node = draggedSelection.mHead->mLeft;
-    node = SSelectionSetUserEntity::find(&draggedSelection, node, &node);
-    while (node != draggedSelection.mHead) {
-      SSelectionSetUserEntity::AddResult addResult{};
-      (void)SSelectionSetUserEntity::Add(&addResult, &sSelectionBrackets, DecodeSelectionEntity(node->mEnt));
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(&draggedSelection, node, &node);
+    // Drop last frame's brackets (the whole-tree erase inlined at
+    // 0x00864E71-0x00864EA4), then add everything the drag covers.
+    sSelectionBrackets.Clear();
+    for (UserEntity* const entity : draggedSelection) {
+      (void)sSelectionBrackets.Add(entity);
     }
-
-    (void)draggedSelection.ReleaseStorage();
   }
 
   /**
@@ -852,9 +697,7 @@ namespace moho
       decalManager->DestroyDecal(waterAlbedoDecal);
     }
 
-    SSelectionNodeUserEntity* cursor =
-      sSelectionBrackets.mHead != nullptr ? sSelectionBrackets.mHead->mLeft : nullptr;
-    (void)sSelectionBrackets.EraseRange(&cursor, cursor, sSelectionBrackets.mHead);
+    sSelectionBrackets.Clear();
   }
 
   /**
@@ -958,19 +801,12 @@ namespace moho
     ApplyHighlightDecalTransform(mAlbedoDecal, alignedDragExtent, mPos, headingRotation);
     ApplyHighlightDecalTransform(mWaterAlbedoDecal, alignedDragExtent, mPos, headingRotation);
 
-    ScopedLocalSelectionSet draggedSelection;
-    CollectSelectionDraggerEntities(draggedSelection.get(), *this);
+    WeakSet<UserEntity> draggedSelection;
+    CollectSelectionDraggerEntities(draggedSelection, *this);
 
     ClearSelectionBrackets();
-
-    SSelectionNodeUserEntity* node = draggedSelection.get().mHead->mLeft;
-    node = SSelectionSetUserEntity::find(&draggedSelection.get(), node, &node);
-    while (node != draggedSelection.get().mHead) {
-      SSelectionSetUserEntity::AddResult addResult{};
-      (void)SSelectionSetUserEntity::Add(&addResult, &sSelectionBrackets, DecodeSelectionEntity(node->mEnt));
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      node = SSelectionSetUserEntity::find(&draggedSelection.get(), node, &node);
+    for (UserEntity* const entity : draggedSelection) {
+      (void)sSelectionBrackets.Add(entity);
     }
   }
 
@@ -1104,7 +940,7 @@ namespace moho
    * spatial DB, imports them into `outSelection`, and prunes anything the
    * session is not allowed to select.
    */
-  void CollectSelectionDraggerEntities(SSelectionSetUserEntity& outSelection, SelectionDragger& dragger)
+  void CollectSelectionDraggerEntities(WeakSet<UserEntity>& outSelection, SelectionDragger& dragger)
   {
     if (!dragger.HasActiveSelectionDrag()) {
       return;
@@ -1119,7 +955,7 @@ namespace moho
     auto* const spatialDb = dragger.mSess->GetEntitySpatialDbStorage();
     (void)spatialDb->CollectInVolume(collectedEntities, ENTITYTYPE_Unit, &selectionSolid);
 
-    AddCollectedEntitiesToSelection(outSelection, collectedEntities);
+    outSelection.Add(collectedEntities.begin(), collectedEntities.end());
     PruneDraggedSelectionToSelectableUnits(outSelection, *dragger.mSess);
   }
 } // namespace moho

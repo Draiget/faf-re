@@ -10,7 +10,7 @@
 #include "moho/command/SSTICommandVariableData.h"
 #include "moho/command/UserTarget.h"
 #include "moho/sim/SOCellPos.h"
-#include "moho/sim/WeakEntitySet.h"
+#include "moho/misc/WeakSet.h"
 
 namespace moho
 {
@@ -74,7 +74,7 @@ namespace moho
   {
     CmdId mCmdId;                           // +0x00: the sim beat the edit is due on
     ECommandIssueEvent mType;               // +0x04
-    WeakUnitSetUserUnit mUnits;             // +0x08: SelectUnit / DeselectUnit
+    WeakSet<UserUnit> mUnits;             // +0x08: SelectUnit / DeselectUnit
     std::int32_t mCount;                    // +0x14: IncreaseCount / DecreaseCount
     UserTarget mTarget;                     // +0x18: SetTarget
     EUnitCommandType mCommandType;          // +0x30: SetCommandType
@@ -121,9 +121,11 @@ namespace moho
     /// Local edits not yet confirmed by the sim, oldest first. Block size 1
     /// (0x50-byte element), so each map slot owns one event.
     msvc8::deque<UserCommandIssueLocalEvent> mLocalQueue; // +0x0B8
-    /// Entities the command applies to, rebuilt from `mVariableData.mEntIds`
-    /// plus the queued select/deselect edits (`GetEntitiesUnderCursor`, 0x008B43F0).
-    WeakEntitySetUserEntity mCursorEntitySet;             // +0x0CC
+    /// Units the command applies to, rebuilt from `mVariableData.mEntIds`
+    /// plus the queued select/deselect edits (`GetEntitiesUnderCursor`, 0x008B43F0,
+    /// which runs the `WeakSet<UserUnit>` bodies: `Add` 0x00822270, `Remove`
+    /// 0x008B2890, `SkipDead` 0x007B29C0).
+    WeakSet<UserUnit> mCursorEntitySet;               // +0x0CC
 
     /**
      * Address: 0x008B3EC0 (FUN_008B3EC0, struct_CommandIssueHelper::struct_CommandIssueHelper)
