@@ -4860,6 +4860,9 @@
     <ClInclude Include="moho\path\SNamedFootprint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\path\SNamedFootprintTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\path\SNavGoal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -5821,6 +5824,7 @@
     
     <ClInclude Include="gpg\core\reflection\RStringType.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="gpg\core\reflection\RTypeTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClInclude Include="gpg\core\reflection\RListType.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="gpg\core\reflection\RTypeTypeInfo.h"><Filter>Header Files</Filter></ClInclude>
     <ClCompile Include="gpg\core\reflection\voidTypeInfo.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClInclude Include="gpg\core\reflection\voidTypeInfo.h"><Filter>Header Files</Filter></ClInclude>

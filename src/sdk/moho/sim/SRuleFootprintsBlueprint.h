@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Vector.h"
 #include "moho/path/SNamedFootprint.h"
 
 namespace gpg
@@ -13,42 +14,26 @@ namespace gpg
 namespace moho
 {
   /**
-   * Intrusive list node used by `SRuleFootprintsBlueprint`.
+   * The rules' footprint table: every `SNamedFootprint` `/lua/footprints.lua`
+   * specs through `SpecFootprints`, in spec order, so a footprint's `mIndex`
+   * is its position in the list.
    *
-   * Evidence:
-   * - 0x0052AAE0 (FUN_0052AAE0): list walk uses node `next` at +0x00 and
-   *   returns `node + 0x08` as `SNamedFootprint*`.
-   */
-  struct SRuleFootprintNode
-  {
-    SRuleFootprintNode* next; // +0x00
-    SRuleFootprintNode* prev; // +0x04
-    SNamedFootprint value;    // +0x08
-  };
-
-  static_assert(offsetof(SRuleFootprintNode, value) == 0x08, "SRuleFootprintNode::value offset must be 0x08");
-  static_assert(sizeof(SRuleFootprintNode) == 0x38, "SRuleFootprintNode size must be 0x38");
-
-  /**
-   * Address: 0x00513ED0 (FUN_00513ED0, SRuleFootprintsBlueprintTypeInfo::Init)
-   *
-   * What it does:
-   * Reflects runtime rule footprint table container (`sizeof = 0x0C`).
+   * `SRuleFootprintsBlueprintTypeInfo::Init` 0x00513ED0 reflects it as one
+   * field, `Footprints`, of type `list<SNamedFootprint>` at offset 0
+   * (`AddField` 0x005146E0). The owner's constructor 0x00529120 buys the list
+   * head (`_Buy_head` 0x0052CB30) and its destructor 0x00529700 runs the
+   * list's `_Tidy` 0x00514340: both are this member's construction and
+   * destruction.
    */
   struct SRuleFootprintsBlueprint
   {
     static gpg::RType* sType;
 
-    void* mAllocProxy;         // +0x00
-    SRuleFootprintNode* mHead; // +0x04 (circular list sentinel node)
-    std::uint32_t mSize;       // +0x08
+    msvc8::list<SNamedFootprint> mFootprints; // +0x00
   };
 
   static_assert(
-    offsetof(SRuleFootprintsBlueprint, mHead) == 0x04, "SRuleFootprintsBlueprint::mHead offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SRuleFootprintsBlueprint, mSize) == 0x08, "SRuleFootprintsBlueprint::mSize offset must be 0x08"
+    offsetof(SRuleFootprintsBlueprint, mFootprints) == 0x00, "SRuleFootprintsBlueprint::mFootprints offset must be 0x00"
   );
   static_assert(sizeof(SRuleFootprintsBlueprint) == 0x0C, "SRuleFootprintsBlueprint size must be 0x0C");
 

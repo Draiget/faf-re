@@ -1,5 +1,6 @@
 #include "moho/sim/SRuleFootprintsBlueprint.h"
 
+#include <cstddef>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
@@ -9,27 +10,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x005146E0 (FUN_005146E0, gpg::RType::AddField_list_SNamedFootprint_0x0Footprints)
-   *
-   * What it does:
-   * Adds the reflected `std::list<SNamedFootprint>` field named `Footprints`
-   * at offset `0x00`.
-   */
-  gpg::RField* AddNamedFootprintsField(gpg::RType* const owner)
-  {
-    if (!owner) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!owner->initFinished_);
-    gpg::RField field{};
-    field.mName = "Footprints";
-    field.mType = moho::preregister_SNamedFootprintListTypeInfo();
-    owner->fields_.push_back(field);
-    return &owner->fields_.back();
-  }
-
   class SRuleFootprintsBlueprintTypeInfo final : public gpg::RType
   {
   public:
@@ -63,7 +43,8 @@ namespace
      * Address: 0x00513FA0 (FUN_00513FA0, Moho::SRuleFootprintsBlueprintTypeInfo::AddFields)
      *
      * What it does:
-     * Forwards to the shared helper that reflects the `Footprints` list field.
+     * Reflects the `Footprints` list: a tail jump into its `AddField`
+     * 0x005146E0.
      */
     static gpg::RField* AddFields(gpg::RType* typeInfo);
   };
@@ -101,11 +82,14 @@ namespace
    * Address: 0x00513FA0 (FUN_00513FA0, Moho::SRuleFootprintsBlueprintTypeInfo::AddFields)
    *
    * What it does:
-   * Forwards to the shared helper that reflects the `Footprints` list field.
+   * Reflects the `Footprints` list: a tail jump into its `AddField`
+   * 0x005146E0.
    */
   gpg::RField* SRuleFootprintsBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    return AddNamedFootprintsField(typeInfo);
+    return typeInfo->AddField<msvc8::list<moho::SNamedFootprint>>(
+      "Footprints", offsetof(moho::SRuleFootprintsBlueprint, mFootprints)
+    );
   }
 
   /**

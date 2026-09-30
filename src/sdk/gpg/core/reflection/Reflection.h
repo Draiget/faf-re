@@ -1004,6 +1004,40 @@ namespace gpg
   void PreRegisterRType(const std::type_info& typeInfo, RType* type);
 
   /**
+   * The reflected type of `T`, looked up once and kept in one cache slot per
+   * `T` for the whole program: `RListType<SNamedFootprint>`'s `GetName`,
+   * `SerLoad` and `SerSave` all read 0x010C6DC4, `list<ESiloType>`'s read
+   * 0x010C6D78, and `Rect2<int>`'s 0x010C6D98 is shared by 21 functions in
+   * seven translation units. Each read is the inlined
+   * `if (!slot) slot = LookupRType(typeid(T));`.
+   *
+   * Where `T` declares its own `static RType* sType` (`SDecalInfo`,
+   * 0x010C76F8) the binary's slot is that member. The slot here is the
+   * template's own: a `T::sType` test would also find a base class's member
+   * through a derived `T` and hand back the base's type. Both slots hold the
+   * same lookup.
+   *
+   * A pointer type is the exception: its descriptor is the pointee's
+   * `RPointerType` object, which `U::GetPointerType()` constructs before it
+   * looks `U*` up, so the lookup goes through that function
+   * (`RListType<Entity*>::GetName` 0x00685DF0 calls `Entity::GetPointerType`
+   * 0x0067CFA0).
+   */
+  template <class T>
+  [[nodiscard]] RType* RTypeOf()
+  {
+    if constexpr (std::is_pointer_v<T>) {
+      return std::remove_pointer_t<T>::GetPointerType();
+    } else {
+      static RType* sType = nullptr;
+      if (sType == nullptr) {
+        sType = LookupRType(typeid(T));
+      }
+      return sType;
+    }
+  }
+
+  /**
    * Address: 0x005DE010 (FUN_005DE010, preregister_CAcquireTargetTaskPointerTypeStartup)
    *
    * What it does:
@@ -4419,14 +4453,22 @@ namespace gpg
       return static_cast<int>(reinterpret_cast<std::uintptr_t>(b) - reinterpret_cast<std::uintptr_t>(t));
     }
 
+    /**
+     * Address: 0x005146E0 (FUN_005146E0 -- `AddField<msvc8::list<moho::SNamedFootprint>>`, with its name
+     * `"Footprints"` and offset 0 folded in: `SRuleFootprintsBlueprintTypeInfo::AddFields` 0x00513FA0 and
+     * `Init` 0x00513ED0 reach it with the type in ESI.)
+     *
+     * What it does:
+     * Appends one reflected field of type `T` at `offset`: asserts the type is
+     * still open (`"!mInitFinished"`, reflection.h line 734), then pushes
+     * `{name, RTypeOf<T>(), offset}` and hands back the new entry.
+     */
     template <class T>
-    RField* AddField(const char* name, int offset)
+    RField* AddField(const char* const name, const int offset)
     {
-      GPG_ASSERT(!initFinished_); // if (this->mInitFinished) { gpg::HandleAssertFailure("!mInitFinished", 734,
-                                  // "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/reflection.h"); }
-      RField f{name, const_cast<RType*>(T::StaticGetClass()), offset};
-      this->fields_.push_back(f);
-      return &this->fields_.back();
+      GPG_ASSERT(!initFinished_);
+      fields_.push_back(RField{name, RTypeOf<T>(), offset});
+      return &fields_.back();
     }
 
     template <class T, class B>

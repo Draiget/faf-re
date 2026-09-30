@@ -150,18 +150,6 @@ namespace moho
       return *reinterpret_cast<boost::mutex*>(&rules.mLockStorage[0]);
     }
 
-    [[nodiscard]] SRuleFootprintNode* AllocateFootprintSentinelNode() noexcept
-    {
-      auto* const sentinel = new (std::nothrow) SRuleFootprintNode{};
-      if (sentinel == nullptr) {
-        return nullptr;
-      }
-
-      sentinel->next = sentinel;
-      sentinel->prev = sentinel;
-      return sentinel;
-    }
-
     template <typename TValue>
     [[nodiscard]] TValue* StoreAdapterLane(TValue* const outValue, const TValue value) noexcept
     {
@@ -729,26 +717,6 @@ namespace moho
       }
     }
 
-    void DestroyRuleFootprintsStorage(SRuleFootprintsBlueprint& footprints) noexcept
-    {
-      SRuleFootprintNode* const sentinel = footprints.mHead;
-      if (sentinel == nullptr) {
-        footprints.mSize = 0u;
-        return;
-      }
-
-      SRuleFootprintNode* node = sentinel->next;
-      while (node != nullptr && node != sentinel) {
-        SRuleFootprintNode* const next = node->next;
-        delete node;
-        node = next;
-      }
-
-      delete sentinel;
-      footprints.mHead = nullptr;
-      footprints.mSize = 0u;
-    }
-
   } // namespace
 
   // The `owner` handle written below (mCategoryFallback's universe lane and
@@ -871,10 +839,6 @@ namespace moho
     // real, empty `msvc8::vector<RRuleGameRulesLuaExportBinding>` (null
     // proxy/first_/last_/end_) -- no separate field-by-field reset needed
     // now that it is a real vector rather than a hand-rolled pointer quad.
-
-    mFootprints.mAllocProxy = nullptr;
-    mFootprints.mHead = AllocateFootprintSentinelNode();
-    mFootprints.mSize = 0u;
 
     // Each map builds its own sentinel head in its constructor; the binary
     // open-codes that seven times here, once per table, through a per-table
@@ -1044,8 +1008,6 @@ namespace moho
     // Each map's destructor frees its own nodes and sentinel head; the
     // binary open-codes that teardown seven times here, in reverse
     // declaration order, which is what member destruction does anyway.
-
-    DestroyRuleFootprintsStorage(mFootprints);
 
     delete mLuaState;
     mLuaState = nullptr;
@@ -1238,28 +1200,23 @@ namespace moho
   const SNamedFootprint* RRuleGameRulesImpl::FindFootprint(const SFootprint& footprint, const char* name) const
   {
     (void)name;
-    const auto* const footprints = GetFootprints();
-    const auto* const sentinel = footprints ? footprints->mHead : nullptr;
-    if (!sentinel) {
-      return nullptr;
-    }
-
     const std::uint8_t targetOccupancy = static_cast<std::uint8_t>(footprint.mOccupancyCaps);
     int bestDistance = std::numeric_limits<std::int16_t>::max();
     const SNamedFootprint* bestFootprint = nullptr;
 
-    for (auto* node = sentinel->next; node && node != sentinel; node = node->next) {
-      const std::uint8_t candidateOccupancy = static_cast<std::uint8_t>(node->value.mOccupancyCaps);
+    // 0x0052AAE3: the walk reads `mFootprints`' head straight off `this`.
+    for (const SNamedFootprint& candidate : mFootprints.mFootprints) {
+      const std::uint8_t candidateOccupancy = static_cast<std::uint8_t>(candidate.mOccupancyCaps);
       if (candidateOccupancy != targetOccupancy) {
         continue;
       }
 
-      const int dx = std::abs(static_cast<int>(node->value.mSizeX) - static_cast<int>(footprint.mSizeX));
-      const int dz = std::abs(static_cast<int>(node->value.mSizeZ) - static_cast<int>(footprint.mSizeZ));
+      const int dx = std::abs(static_cast<int>(candidate.mSizeX) - static_cast<int>(footprint.mSizeX));
+      const int dz = std::abs(static_cast<int>(candidate.mSizeZ) - static_cast<int>(footprint.mSizeZ));
       const int distance = std::max(dx, dz);
       if (distance < bestDistance) {
         bestDistance = distance;
-        bestFootprint = &node->value;
+        bestFootprint = &candidate;
       }
     }
 

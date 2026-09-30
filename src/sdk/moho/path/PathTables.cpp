@@ -1595,13 +1595,13 @@ namespace moho
     mImpl->mWidth = width;
     mImpl->mHeight = height;
 
-    const std::size_t footprintCount = footprints.mSize;
+    const std::size_t footprintCount = footprints.mFootprints.size();
     mImpl->mSources.resize(footprintCount);
     mImpl->mMaps.resize(footprintCount);
 
     std::int32_t index = 0;
-    for (const SRuleFootprintNode* node = footprints.mHead->next; node != footprints.mHead; node = node->next, ++index) {
-      SNamedFootprint& footprint = const_cast<SNamedFootprint&>(node->value);
+    for (const SNamedFootprint& entry : footprints.mFootprints) {
+      SNamedFootprint& footprint = const_cast<SNamedFootprint&>(entry);
       if (index != footprint.mIndex) {
         gpg::HandleAssertFailure("i == fp.mIndex", 113, "c:\\work\\rts\\main\\code\\src\\sim\\PathTables.cpp");
       }
@@ -1623,6 +1623,7 @@ namespace moho
         2u,
         area
       );
+      ++index;
     }
   }
 

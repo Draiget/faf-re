@@ -1435,43 +1435,6 @@ namespace
     return sim != nullptr ? sim->mMapData : nullptr;
   }
 
-  [[nodiscard]] bool HasNamedFootprint(
-    const SRuleFootprintsBlueprint& footprintTable,
-    const msvc8::string& footprintName
-  ) noexcept
-  {
-    const SRuleFootprintNode* const sentinel = footprintTable.mHead;
-    if (!sentinel) {
-      return false;
-    }
-
-    for (const SRuleFootprintNode* node = sentinel->next; node && node != sentinel; node = node->next) {
-      if (node->value.mName == footprintName) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  void AppendNamedFootprint(SRuleFootprintsBlueprint& footprintTable, const SNamedFootprint& footprint)
-  {
-    SRuleFootprintNode* const sentinel = footprintTable.mHead;
-    if (!sentinel) {
-      return;
-    }
-
-    SRuleFootprintNode* const tail = sentinel->prev ? sentinel->prev : sentinel;
-    auto* const node = new SRuleFootprintNode{};
-    node->value = footprint;
-    node->next = sentinel;
-    node->prev = tail;
-
-    tail->next = node;
-    sentinel->prev = node;
-    ++footprintTable.mSize;
-  }
-
   [[nodiscard]] CScrLuaInitFormSet& SimLuaInitSet()
   {
     if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
@@ -11102,19 +11065,19 @@ int moho::cfunc_SpecFootprintsL(LuaPlus::LuaState* const state)
   // `LoadBlueprints` runs, so resolving through the sim left the footprint table
   // empty and every ground unit's `ResolvedFootprint` null.
   RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
-  if (!rules || !rules->mFootprints.mHead) {
+  if (!rules) {
     return 0;
   }
 
   gpg::ScopedLogContext footprintScope("Initializing footprint groups");
 
-  SRuleFootprintsBlueprint& footprintTable = rules->mFootprints;
+  msvc8::list<SNamedFootprint>& footprints = rules->mFootprints.mFootprints;
   lua_State* const rawState = state->m_state;
   const LuaPlus::LuaObject footprintSpecsObject(LuaPlus::LuaStackObject(state, 1));
   const int footprintSpecCount = footprintSpecsObject.GetCount();
   for (int luaIndex = 1; luaIndex <= footprintSpecCount; ++luaIndex) {
     SNamedFootprint footprint{};
-    footprint.mIndex = static_cast<std::int32_t>(footprintTable.mSize);
+    footprint.mIndex = static_cast<std::int32_t>(footprints.size());
 
     lua_rawgeti(rawState, 1, luaIndex);
     const LuaPlus::LuaObject footprintObject(LuaPlus::LuaStackObject(state, lua_gettop(rawState)));
@@ -11152,12 +11115,19 @@ int moho::cfunc_SpecFootprintsL(LuaPlus::LuaState* const state)
       footprint.mFlags = static_cast<EFootprintFlags>(flagsObject.GetInteger());
     }
 
-    if (HasNamedFootprint(footprintTable, footprint.mName)) {
-      gpg::Warnf("Ignoring duplicate footprint spec %s", footprint.mName.c_str());
-      continue;
+    // 0x005288AC..0x00528942: the scan runs to the end, warning at every
+    // entry of the same name, and the spec is appended only when none matched.
+    bool isDuplicate = false;
+    for (const SNamedFootprint& existing : footprints) {
+      if (existing.mName == footprint.mName) {
+        isDuplicate = true;
+        gpg::Warnf("Ignoring duplicate footprint spec %s", footprint.mName.c_str());
+      }
     }
 
-    AppendNamedFootprint(footprintTable, footprint);
+    if (!isDuplicate) {
+      footprints.push_back(footprint);
+    }
   }
 
   return 0;

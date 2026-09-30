@@ -1,247 +1,27 @@
-#include "legacy/containers/Vector.h"
-#include "moho/path/SNamedFootprint.h"
-#include "moho/sim/SRuleFootprintsBlueprint.h"
+#include "moho/path/SNamedFootprintTypeInfo.h"
 
-#include <cstdint>
-#include <cstdlib>
-#include <list>
-#include <new>
-#include <stdexcept>
+#include <cstddef>
 #include <typeinfo>
 
-#include "gpg/core/containers/String.h"
-#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/RListType.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "moho/path/SNamedFootprint.h"
 
-namespace
+namespace moho
 {
-  template <class T>
-  [[nodiscard]] gpg::RType* ResolveType()
+  static_assert(sizeof(gpg::RListType<SNamedFootprint>) == 0x64, "RListType<SNamedFootprint> size must be 0x64");
+
+  SNamedFootprintTypeInfo::SNamedFootprintTypeInfo()
+    : gpg::RType()
   {
-    return gpg::LookupRType(typeid(T));
+    gpg::PreRegisterRType(typeid(SNamedFootprint), this);
   }
-
-  /**
-   * Address: 0x00514680 (FUN_00514680)
-   *
-   * What it does:
-   * Resolves/caches `SFootprint` RTTI and appends it as a base descriptor of
-   * the current `SNamedFootprint` typeinfo object.
-   */
-  void AddSFootprintBaseDescriptor(gpg::RType* const owner)
-  {
-    if (!owner) {
-      return;
-    }
-
-    static gpg::RType* cachedSFootprintType = nullptr;
-    gpg::RType* baseType = cachedSFootprintType;
-    if (!baseType) {
-      baseType = ResolveType<moho::SFootprint>();
-      cachedSFootprintType = baseType;
-    }
-    if (!baseType) {
-      return;
-    }
-
-    GPG_ASSERT(!owner->initFinished_);
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    owner->AddBase(baseField);
-  }
-
-  void AddFieldDescriptor(gpg::RType* const owner, const char* const name, gpg::RType* const fieldType, const int offset)
-  {
-    if (!owner || !fieldType) {
-      return;
-    }
-
-    GPG_ASSERT(!owner->initFinished_);
-    gpg::RField field{};
-    field.mName = name;
-    field.mType = fieldType;
-    field.mOffset = offset;
-    owner->fields_.push_back(field);
-  }
-
-  struct SFootprintScalarRuntimeView
-  {
-    std::uint32_t packedFootprintHeader; // +0x00 (size/caps/flags lane)
-    std::uint32_t maxSlopeBits; // +0x04
-    std::uint32_t minWaterDepthBits; // +0x08
-    std::uint32_t maxWaterDepthBits; // +0x0C
-  };
-  static_assert(
-    offsetof(SFootprintScalarRuntimeView, maxSlopeBits) == 0x4,
-    "SFootprintScalarRuntimeView::maxSlopeBits offset must be 0x4"
-  );
-  static_assert(
-    offsetof(SFootprintScalarRuntimeView, minWaterDepthBits) == 0x8,
-    "SFootprintScalarRuntimeView::minWaterDepthBits offset must be 0x8"
-  );
-  static_assert(
-    offsetof(SFootprintScalarRuntimeView, maxWaterDepthBits) == 0xC,
-    "SFootprintScalarRuntimeView::maxWaterDepthBits offset must be 0xC"
-  );
-  static_assert(sizeof(SFootprintScalarRuntimeView) == 0x10, "SFootprintScalarRuntimeView size must be 0x10");
-
-  /**
-   * Address: 0x00514870 (FUN_00514870)
-   *
-   * What it does:
-   * Allocates raw storage for `count` intrusive `SRuleFootprintNode` objects
-   * and throws `std::bad_alloc` if the byte-count would overflow 32-bit lanes.
-   */
-  [[nodiscard]] moho::SRuleFootprintNode* AllocateSRuleFootprintNodeBlock(const unsigned int count)
-  {
-    if (count == 0u || (0xFFFFFFFFu / count) < sizeof(moho::SRuleFootprintNode)) {
-      throw std::bad_alloc();
-    }
-
-    return static_cast<moho::SRuleFootprintNode*>(
-      operator new(static_cast<std::size_t>(count) * sizeof(moho::SRuleFootprintNode))
-    );
-  }
-
-  /**
-   * Address: 0x00514640 (FUN_00514640)
-   *
-   * What it does:
-   * Allocates one intrusive `SRuleFootprintNode` storage slot.
-   */
-  [[nodiscard]] moho::SRuleFootprintNode* AllocateSingleSRuleFootprintNode()
-  {
-    return AllocateSRuleFootprintNodeBlock(1u);
-  }
-
-  /**
-   * Address: 0x00514960 (FUN_00514960, func_CopySNamedFootprint)
-   *
-   * What it does:
-   * Copies footprint scalar lanes, resets destination string to SSO-empty,
-   * then copies full `mName` and trailing `mIndex`.
-   */
-  [[nodiscard]] moho::SNamedFootprint* CopySNamedFootprintValue(
-    const moho::SNamedFootprint* const source,
-    moho::SNamedFootprint* const destination
-  )
-  {
-    GPG_ASSERT(source != nullptr);
-    GPG_ASSERT(destination != nullptr);
-    if (!source || !destination) {
-      return destination;
-    }
-
-    destination->mSizeX = source->mSizeX;
-    destination->mSizeZ = source->mSizeZ;
-    destination->mOccupancyCaps = source->mOccupancyCaps;
-    destination->mFlags = source->mFlags;
-    destination->mMaxSlope = source->mMaxSlope;
-    destination->mMinWaterDepth = source->mMinWaterDepth;
-    destination->mMaxWaterDepth = source->mMaxWaterDepth;
-    destination->mName.reset_and_assign(source->mName);
-    destination->mIndex = source->mIndex;
-    return destination;
-  }
-
-  struct SNamedFootprintListNodeRuntime
-  {
-    SNamedFootprintListNodeRuntime* next; // +0x00
-    SNamedFootprintListNodeRuntime* prev; // +0x04
-    moho::SNamedFootprint value; // +0x08
-  };
-  static_assert(
-    offsetof(SNamedFootprintListNodeRuntime, value) == 0x8,
-    "SNamedFootprintListNodeRuntime::value offset must be 0x8"
-  );
-
-  struct SNamedFootprintListRuntimeView
-  {
-    std::uint32_t allocatorProxy; // +0x00
-    SNamedFootprintListNodeRuntime* sentinel; // +0x04
-    std::uint32_t count; // +0x08
-  };
-  static_assert(
-    offsetof(SNamedFootprintListRuntimeView, sentinel) == 0x4,
-    "SNamedFootprintListRuntimeView::sentinel offset must be 0x4"
-  );
-  static_assert(
-    offsetof(SNamedFootprintListRuntimeView, count) == 0x8,
-    "SNamedFootprintListRuntimeView::count offset must be 0x8"
-  );
-
-  [[nodiscard]] std::uint32_t IncrementSNamedFootprintListCountOrThrow(
-    SNamedFootprintListRuntimeView* const listRuntime
-  )
-  {
-    constexpr std::uint32_t kLegacyListMaxCount = 0x05555555u;
-    if (listRuntime->count == kLegacyListMaxCount) {
-      throw std::length_error("list<T> too long");
-    }
-
-    ++listRuntime->count;
-    return listRuntime->count;
-  }
-
-  [[nodiscard]] std::size_t CountSNamedFootprintList(const void* const obj) noexcept
-  {
-    if (!obj) {
-      return 0u;
-    }
-
-    const auto* const list = static_cast<const msvc8::list<moho::SNamedFootprint>*>(obj);
-    return list ? list->size() : 0u;
-  }
-
-  [[nodiscard]] const gpg::RRef& NullOwnerRef() noexcept
-  {
-    static const gpg::RRef kNullOwner{nullptr, nullptr};
-    return kNullOwner;
-  }
-
-  void LoadSNamedFootprintList(gpg::ReadArchive* archive, int objectPtr, int unused, gpg::RRef* ownerRef);
-  void SaveSNamedFootprintList(gpg::WriteArchive* archive, int objectPtr, int unused, gpg::RRef* ownerRef);
-
-  class SNamedFootprintTypeInfo final : public gpg::RType
-  {
-  public:
-    /**
-     * Address: 0x00513DA0 (FUN_00513DA0, Moho::SNamedFootprintTypeInfo::dtr)
-     *
-     * What it does:
-     * Destroys reflected field/base storage through the inherited `gpg::RType`
-     * teardown lane.
-     */
-    ~SNamedFootprintTypeInfo() override;
-
-    /**
-     * Address: 0x00513D90 (FUN_00513D90, Moho::SNamedFootprintTypeInfo::GetName)
-     *
-     * What it does:
-     * Returns the RTTI label for `SNamedFootprint`.
-     */
-    [[nodiscard]] const char* GetName() const override;
-
-    /**
-     * Address: 0x00513D50 (FUN_00513D50, Moho::SNamedFootprintTypeInfo::Init)
-     *
-     * What it does:
-     * Registers the base `SFootprint` metadata plus the `Name` and `Index`
-     * reflected fields.
-     */
-    void Init() override;
-  };
-
-  static_assert(sizeof(SNamedFootprintTypeInfo) == 0x64, "SNamedFootprintTypeInfo size must be 0x64");
 
   /**
    * Address: 0x00513DA0 (FUN_00513DA0, Moho::SNamedFootprintTypeInfo::dtr)
    *
    * What it does:
-   * Destroys reflected field/base storage through the inherited `gpg::RType`
-   * teardown lane.
+   * Releases the reflected field and base vector storage.
    */
   SNamedFootprintTypeInfo::~SNamedFootprintTypeInfo() = default;
 
@@ -249,7 +29,7 @@ namespace
    * Address: 0x00513D90 (FUN_00513D90, Moho::SNamedFootprintTypeInfo::GetName)
    *
    * What it does:
-   * Returns the RTTI label for `SNamedFootprint`.
+   * Returns the reflected type label for `SNamedFootprint`.
    */
   const char* SNamedFootprintTypeInfo::GetName() const
   {
@@ -260,210 +40,61 @@ namespace
    * Address: 0x00513D50 (FUN_00513D50, Moho::SNamedFootprintTypeInfo::Init)
    *
    * What it does:
-   * Registers the base `SFootprint` metadata plus the `Name` and `Index`
-   * reflected fields.
+   * Sets the reflected size, installs the base and fields, and finalizes the
+   * type.
    */
   void SNamedFootprintTypeInfo::Init()
   {
-    size_ = sizeof(moho::SNamedFootprint);
+    size_ = sizeof(SNamedFootprint);
     gpg::RType::Init();
-
-    AddSFootprintBaseDescriptor(this);
-    AddFieldDescriptor(this, "Name", ResolveType<msvc8::string>(), offsetof(moho::SNamedFootprint, mName));
-    AddFieldDescriptor(this, "Index", ResolveType<int>(), offsetof(moho::SNamedFootprint, mIndex));
-
+    AddFields(this);
     Finish();
   }
 
-  class SNamedFootprintListTypeInfo final : public gpg::RType
-  {
-  public:
-    /**
-     * Address: 0x00514AB0 (FUN_00514AB0, gpg::RListType_SNamedFootprint::dtr)
-     */
-    ~SNamedFootprintListTypeInfo() override;
-
-    /**
-     * Address: 0x00513FB0 (FUN_00513FB0, gpg::RListType_SNamedFootprint::GetName)
-     * Address: 0x00BF28E0 (FUN_00BF28E0, atexit destructor of GetName's cached name)
-     *
-     * What it does:
-     * Builds `list<SNamedFootprint>` once and returns it.
-     */
-    [[nodiscard]] const char* GetName() const override
-    {
-      static const msvc8::string sName =
-        gpg::STR_Printf("list<%s>", moho::preregister_SNamedFootprintTypeInfo()->GetName());
-      return sName.c_str();
-    }
-
-    /**
-     * Address: 0x00514070 (FUN_00514070, gpg::RListType_SNamedFootprint::GetLexical)
-     *
-     * What it does:
-     * Formats the inherited list lexical text with the current list size.
-     */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
-
-    /**
-     * Address: 0x00514050 (FUN_00514050, gpg::RListType_SNamedFootprint::Init)
-     *
-     * What it does:
-     * Marks the reflected list as versioned and wires archive callbacks.
-     */
-    void Init() override;
-  };
-
-  static_assert(sizeof(SNamedFootprintListTypeInfo) == 0x64, "SNamedFootprintListTypeInfo size must be 0x64");
-
-  SNamedFootprintListTypeInfo::~SNamedFootprintListTypeInfo() = default;
-
   /**
-   * Address: 0x00514070 (FUN_00514070, gpg::RListType_SNamedFootprint::GetLexical)
+   * Address: 0x00514680 (FUN_00514680)
    *
    * What it does:
-   * Formats the inherited list lexical text with the current list size.
+   * Registers `SFootprint` as this type's reflected base at offset 0, looking
+   * its type up once into `SFootprint::sType` (0x010C6D94).
    */
-  msvc8::string SNamedFootprintListTypeInfo::GetLexical(const gpg::RRef& ref) const
+  void SNamedFootprintTypeInfo::AddBase_SFootprint(gpg::RType* const typeInfo)
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
-    return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountSNamedFootprintList(ref.mObj)));
+    if (SFootprint::sType == nullptr) {
+      SFootprint::sType = gpg::LookupRType(typeid(SFootprint));
+    }
+
+    gpg::RType* const baseType = SFootprint::sType;
+    typeInfo->AddBase(gpg::RField{baseType->GetName(), baseType, 0, 0, nullptr});
   }
 
   /**
-   * Address: 0x00514050 (FUN_00514050, gpg::RListType_SNamedFootprint::Init)
+   * Address: 0x00513E40 (the out-of-line copy, not an IDA function and with no references in the PE:
+   * `Init` 0x00513D50 inlines it)
    *
    * What it does:
-   * Marks the reflected list as versioned and wires archive callbacks.
+   * The `SFootprint` base, then `Name` (`AddField_string` 0x0050E1F0) and
+   * `Index` (`AddField_int` 0x004EDC10).
    */
-  void SNamedFootprintListTypeInfo::Init()
+  void SNamedFootprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    size_ = sizeof(msvc8::list<moho::SNamedFootprint>);
-    version_ = 1;
-    serLoadFunc_ = &LoadSNamedFootprintList;
-    serSaveFunc_ = &SaveSNamedFootprintList;
+    AddBase_SFootprint(typeInfo);
+    typeInfo->AddFieldString("Name", offsetof(SNamedFootprint, mName));
+    typeInfo->AddFieldInt("Index", offsetof(SNamedFootprint, mIndex));
   }
 
-  bool gSNamedFootprintTypeInfoPreregistered = false;
-  bool gSNamedFootprintListTypeInfoPreregistered = false;
-
-  /**
-   * Address: 0x00BF2820 (FUN_00BF2820, atexit destructor of the SNamedFootprintTypeInfo object)
-   */
-  [[nodiscard]] SNamedFootprintTypeInfo* AcquireSNamedFootprintTypeInfo()
-  {
-    static SNamedFootprintTypeInfo sInstance;
-    return &sInstance;
-  }
-
-  /**
-   * Address: 0x00BF2910 (FUN_00BF2910, atexit destructor of the SNamedFootprintListTypeInfo object)
-   */
-  [[nodiscard]] SNamedFootprintListTypeInfo* AcquireSNamedFootprintListTypeInfo()
-  {
-    static SNamedFootprintListTypeInfo sInstance;
-    return &sInstance;
-  }
-
-  /**
-   * Address: 0x00514110 (FUN_00514110, gpg::RListType_SNamedFootprint::SerLoad)
-   *
-   * What it does:
-   * Reads a uint count then iteratively reflects each `SNamedFootprint`
-   * element from the archive into the destination list.
-   */
-  void LoadSNamedFootprintList(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
-  {
-    auto* const list = reinterpret_cast<msvc8::list<moho::SNamedFootprint>*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(list != nullptr);
-    if (!archive || !list) {
-      return;
-    }
-
-    unsigned int count = 0;
-    archive->ReadUInt(&count);
-
-    msvc8::list<moho::SNamedFootprint> loaded{};
-    gpg::RType* const elementType = moho::preregister_SNamedFootprintTypeInfo();
-    const gpg::RRef& owner = ownerRef ? *ownerRef : NullOwnerRef();
-    for (unsigned int i = 0; i < count; ++i) {
-      loaded.emplace_back();
-      archive->Read(elementType, &loaded.back(), owner);
-    }
-
-    list->swap(loaded);
-  }
-
-  /**
-   * Address: 0x00514240 (FUN_00514240, gpg::RListType_SNamedFootprint::SerSave)
-   *
-   * What it does:
-   * Writes list element count, then reflects each `SNamedFootprint` value to
-   * the archive with the incoming owner context.
-   */
-  void SaveSNamedFootprintList(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
-  )
-  {
-    auto* const list = reinterpret_cast<const msvc8::list<moho::SNamedFootprint>*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    if (!archive) {
-      return;
-    }
-
-    const unsigned int count = list ? static_cast<unsigned int>(list->size()) : 0u;
-    archive->WriteUInt(count);
-
-    if (!list) {
-      return;
-    }
-
-    gpg::RType* const elementType = moho::preregister_SNamedFootprintTypeInfo();
-    const gpg::RRef& owner = ownerRef ? *ownerRef : NullOwnerRef();
-    for (const moho::SNamedFootprint& footprint : *list) {
-      archive->Write(elementType, &footprint, owner);
-    }
-  }
-
-  struct SNamedFootprintTypeInfoBootstrap
-  {
-    SNamedFootprintTypeInfoBootstrap()
-    {
-      (void)moho::register_SNamedFootprintTypeInfoStartup();
-    }
-  };
-
-  [[maybe_unused]] SNamedFootprintTypeInfoBootstrap gSNamedFootprintTypeInfoBootstrap;
-
-  struct SNamedFootprintListTypeInfoBootstrap
-  {
-    SNamedFootprintListTypeInfoBootstrap()
-    {
-      (void)moho::register_SNamedFootprintListTypeInfoStartup();
-    }
-  };
-
-  [[maybe_unused]] SNamedFootprintListTypeInfoBootstrap gSNamedFootprintListTypeInfoBootstrap;
-} // namespace
-
-namespace moho
-{
   /**
    * Address: 0x00513CF0 (FUN_00513CF0, preregister_SNamedFootprintTypeInfo)
+   * Address: 0x00BF2820 (FUN_00BF2820, atexit destructor of the SNamedFootprintTypeInfo object)
    *
    * What it does:
-   * Constructs and preregisters startup RTTI storage for `SNamedFootprint`.
+   * Constructs the `SNamedFootprintTypeInfo` static at 0x010AA9A8, which
+   * preregisters it, and returns it.
    */
   gpg::RType* preregister_SNamedFootprintTypeInfo()
   {
-    gpg::RType* const typeInfo = AcquireSNamedFootprintTypeInfo();
-    if (!gSNamedFootprintTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(SNamedFootprint), typeInfo);
-      gSNamedFootprintTypeInfoPreregistered = true;
-    }
-
-    return typeInfo;
+    static SNamedFootprintTypeInfo sInstance;
+    return &sInstance;
   }
 
   /**
@@ -479,19 +110,17 @@ namespace moho
 
   /**
    * Address: 0x005149D0 (FUN_005149D0, preregister_SNamedFootprintListTypeInfo)
+   * Address: 0x00BF2910 (FUN_00BF2910, atexit destructor of the list type object)
    *
    * What it does:
-   * Constructs and preregisters startup RTTI storage for `msvc8::list<SNamedFootprint>`.
+   * Constructs the `gpg::RListType<SNamedFootprint>` static at 0x011047E8,
+   * which preregisters it for `typeid(msvc8::list<SNamedFootprint>)`, and
+   * returns it.
    */
   gpg::RType* preregister_SNamedFootprintListTypeInfo()
   {
-    gpg::RType* const typeInfo = AcquireSNamedFootprintListTypeInfo();
-    if (!gSNamedFootprintListTypeInfoPreregistered) {
-      gpg::PreRegisterRType(typeid(msvc8::list<SNamedFootprint>), typeInfo);
-      gSNamedFootprintListTypeInfoPreregistered = true;
-    }
-
-    return typeInfo;
+    static gpg::RListType<SNamedFootprint> sInstance;
+    return &sInstance;
   }
 
   /**
@@ -506,11 +135,7 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_SNamedFootprintTypeInfoStartup_dd003b, moho::register_SNamedFootprintTypeInfoStartup)
 GPG_PREREGISTER_INIT(register_SNamedFootprintListTypeInfoStartup_dd003b, moho::register_SNamedFootprintListTypeInfoStartup)
-
-GPG_PREREGISTER_INIT(preregister_SNamedFootprintTypeInfo_dd003b, moho::preregister_SNamedFootprintTypeInfo)
-GPG_PREREGISTER_INIT(preregister_SNamedFootprintListTypeInfo_dd003b, moho::preregister_SNamedFootprintListTypeInfo)
