@@ -14,6 +14,13 @@ namespace LuaPlus
   class LuaObject;
 }
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+} // namespace gpg
+
 namespace moho
 {
   class CArmyImpl;
@@ -246,6 +253,17 @@ namespace moho
      * one InfluenceGrid per map cell.
      */
     CInfluenceMap(std::int32_t gridSize, Sim* sim, CArmyImpl* army);
+
+    /**
+     * Address: 0x00717670 (FUN_00717670)
+     *
+     * What it does:
+     * Builds a new `CInfluenceMap` for an archive load and hands it back unowned; its
+     * members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x007163A0 (FUN_007163A0, ??1CInfluenceMap@Moho@@QAE@Z)

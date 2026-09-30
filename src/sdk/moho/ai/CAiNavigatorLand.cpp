@@ -585,3 +585,32 @@ void CAiNavigatorLand::ApplyGoalAndStartPathing(const SAiNavigatorGoal& goal)
     mPathNavigator->BeginThinking();
   }
 }
+
+namespace moho
+{
+  /**
+   * Address: 0x005A4740 (FUN_005A4740)
+   */
+  void CAiNavigatorLand::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CAiNavigatorLand()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CAiNavigatorLand>`, vtable 0x00E1C0F0.
+   *
+   * Address: 0x00BCC7A0 (FUN_00BCC7A0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF6E80 (FUN_00BF6E80 -- the global's destructor.)
+   * Address: 0x005A73B0 (FUN_005A73B0 -- `Init`.)
+   * Address: 0x005A4730 (FUN_005A4730 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x005A7DF0 (FUN_005A7DF0 -- `Delete`.)
+   */
+  struct CAiNavigatorLandConstruct : gpg::SerConstructHelper<CAiNavigatorLand>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE85C -- process-global `CAiNavigatorLandConstruct` singleton.
+  moho::CAiNavigatorLandConstruct gCAiNavigatorLandConstruct;
+} // namespace

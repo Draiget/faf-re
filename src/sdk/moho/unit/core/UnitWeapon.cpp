@@ -58,6 +58,7 @@
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "moho/misc/DiagnosticBudget.h"
 #include "moho/sim/SimStartupRegistrations.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 namespace
 {
@@ -4339,84 +4340,84 @@ namespace moho
   /**
    * Address: 0x006DF3A0 (FUN_006DF3A0, Moho::UnitWeapon::MemberDeserialize)
    */
-  void UnitWeapon::MemberDeserialize(gpg::ReadArchive& archive)
+  void UnitWeapon::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef ownerRef{};
 
-    archive.Read(CScriptEvent::StaticGetClass(), this, ownerRef);
-    mSim = ReadTrackedPointer<Sim>(archive, ownerRef);
-    mWeaponBlueprint = ReadTrackedPointer<RUnitBlueprintWeapon>(archive, ownerRef);
-    mProjectileBlueprint = ReadTrackedPointer<RProjectileBlueprint>(archive, ownerRef);
-    mAttacker = ReadTrackedPointer<IAiAttacker>(archive, ownerRef);
-    archive.Read(CachedRType<CWeaponAttributes>(), &mAttributes, ownerRef);
-    mUnit = ReadTrackedPointer<Unit>(archive, ownerRef);
-    archive.ReadInt(&mWeaponIndex);
-    archive.ReadInt(&mBone);
+    archive->Read(CScriptEvent::StaticGetClass(), this, ownerRef);
+    mSim = ReadTrackedPointer<Sim>(*archive, ownerRef);
+    mWeaponBlueprint = ReadTrackedPointer<RUnitBlueprintWeapon>(*archive, ownerRef);
+    mProjectileBlueprint = ReadTrackedPointer<RProjectileBlueprint>(*archive, ownerRef);
+    mAttacker = ReadTrackedPointer<IAiAttacker>(*archive, ownerRef);
+    archive->Read(CachedRType<CWeaponAttributes>(), &mAttributes, ownerRef);
+    mUnit = ReadTrackedPointer<Unit>(*archive, ownerRef);
+    archive->ReadInt(&mWeaponIndex);
+    archive->ReadInt(&mBone);
 
     bool enabled = (mEnabled != 0u);
-    archive.ReadBool(&enabled);
+    archive->ReadBool(&enabled);
     mEnabled = enabled ? 1u : 0u;
 
-    archive.ReadString(&mLabel);
-    archive.Read(CachedRType<CAiTarget>(), &mTarget, ownerRef);
+    archive->ReadString(&mLabel);
+    archive->Read(CachedRType<CAiTarget>(), &mTarget, ownerRef);
 
     CFireWeaponTask* const oldTask = mFireWeaponTask;
-    mFireWeaponTask = ReadTrackedPointer<CFireWeaponTask>(archive, ownerRef);
+    mFireWeaponTask = ReadTrackedPointer<CFireWeaponTask>(*archive, ownerRef);
     if (oldTask) {
       delete oldTask;
     }
 
     bool canFire = (mCanFire != 0u);
-    archive.ReadBool(&canFire);
+    archive->ReadBool(&canFire);
     mCanFire = canFire ? 1u : 0u;
 
-    archive.Read(CachedRType<EntityCategorySet>(), &mCat1, ownerRef);
-    archive.Read(CachedRType<EntityCategorySet>(), &mCat2, ownerRef);
-    archive.Read(CachedRType<ELayer>(), &mFireTargetLayerCaps, ownerRef);
-    archive.ReadFloat(&mFiringRandomness);
-    archive.Read(CachedRType<msvc8::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
-    archive.Read(CachedRType<msvc8::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
-    archive.ReadInt(&mUnknown170);
+    archive->Read(CachedRType<EntityCategorySet>(), &mCat1, ownerRef);
+    archive->Read(CachedRType<EntityCategorySet>(), &mCat2, ownerRef);
+    archive->Read(CachedRType<ELayer>(), &mFireTargetLayerCaps, ownerRef);
+    archive->ReadFloat(&mFiringRandomness);
+    archive->Read(CachedRType<msvc8::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
+    archive->Read(CachedRType<msvc8::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
+    archive->ReadInt(&mUnknown170);
 
     bool unknown174 = (mUnknown174 != 0u);
-    archive.ReadBool(&unknown174);
+    archive->ReadBool(&unknown174);
     mUnknown174 = unknown174 ? 1u : 0u;
 
-    archive.Read(CachedRType<Wm3::Vector3f>(), &mAimingAt, ownerRef);
-    archive.ReadInt(&mShotsAtTarget);
+    archive->Read(CachedRType<Wm3::Vector3f>(), &mAimingAt, ownerRef);
+    archive->ReadInt(&mShotsAtTarget);
   }
 
   /**
    * Address: 0x006DF6E0 (FUN_006DF6E0, Moho::UnitWeapon::MemberSerialize)
    */
-  void UnitWeapon::MemberSerialize(gpg::WriteArchive& archive) const
+  void UnitWeapon::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef ownerRef{};
 
-    archive.Write(CScriptEvent::StaticGetClass(), this, ownerRef);
-    WriteTrackedPointer(archive, mSim, gpg::TrackedPointerState::Unowned, ownerRef);
-    WriteTrackedPointer(archive, mWeaponBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
-    WriteTrackedPointer(archive, mProjectileBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
-    WriteTrackedPointer(archive, mAttacker, gpg::TrackedPointerState::Unowned, ownerRef);
-    archive.Write(CachedRType<CWeaponAttributes>(), &mAttributes, ownerRef);
-    WriteTrackedPointer(archive, mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
-    archive.WriteInt(mWeaponIndex);
-    archive.WriteInt(mBone);
-    archive.WriteBool(mEnabled != 0u);
-    archive.WriteString(const_cast<msvc8::string*>(&mLabel));
-    archive.Write(CachedRType<CAiTarget>(), &mTarget, ownerRef);
-    WriteTrackedPointer(archive, mFireWeaponTask, gpg::TrackedPointerState::Owned, ownerRef);
-    archive.WriteBool(mCanFire != 0u);
-    archive.Write(CachedRType<EntityCategorySet>(), &mCat1, ownerRef);
-    archive.Write(CachedRType<EntityCategorySet>(), &mCat2, ownerRef);
-    archive.Write(CachedRType<ELayer>(), &mFireTargetLayerCaps, ownerRef);
-    archive.WriteFloat(mFiringRandomness);
-    archive.Write(CachedRType<msvc8::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
-    archive.Write(CachedRType<msvc8::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
-    archive.WriteInt(mUnknown170);
-    archive.WriteBool(mUnknown174 != 0u);
-    archive.Write(CachedRType<Wm3::Vector3f>(), &mAimingAt, ownerRef);
-    archive.WriteInt(mShotsAtTarget);
+    archive->Write(CScriptEvent::StaticGetClass(), this, ownerRef);
+    WriteTrackedPointer(*archive, mSim, gpg::TrackedPointerState::Unowned, ownerRef);
+    WriteTrackedPointer(*archive, mWeaponBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
+    WriteTrackedPointer(*archive, mProjectileBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
+    WriteTrackedPointer(*archive, mAttacker, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->Write(CachedRType<CWeaponAttributes>(), &mAttributes, ownerRef);
+    WriteTrackedPointer(*archive, mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WriteInt(mWeaponIndex);
+    archive->WriteInt(mBone);
+    archive->WriteBool(mEnabled != 0u);
+    archive->WriteString(const_cast<msvc8::string*>(&mLabel));
+    archive->Write(CachedRType<CAiTarget>(), &mTarget, ownerRef);
+    WriteTrackedPointer(*archive, mFireWeaponTask, gpg::TrackedPointerState::Owned, ownerRef);
+    archive->WriteBool(mCanFire != 0u);
+    archive->Write(CachedRType<EntityCategorySet>(), &mCat1, ownerRef);
+    archive->Write(CachedRType<EntityCategorySet>(), &mCat2, ownerRef);
+    archive->Write(CachedRType<ELayer>(), &mFireTargetLayerCaps, ownerRef);
+    archive->WriteFloat(mFiringRandomness);
+    archive->Write(CachedRType<msvc8::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
+    archive->Write(CachedRType<msvc8::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
+    archive->WriteInt(mUnknown170);
+    archive->WriteBool(mUnknown174 != 0u);
+    archive->Write(CachedRType<Wm3::Vector3f>(), &mAimingAt, ownerRef);
+    archive->WriteInt(mShotsAtTarget);
   }
 } // namespace moho
 
@@ -4481,4 +4482,48 @@ namespace
   };
 
   const UnitWeaponLuaFuncDefBootstrap gUnitWeaponLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x006D7A80 (FUN_006D7A80)
+   */
+  void UnitWeapon::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new UnitWeapon()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<UnitWeapon>`, vtable 0x00E2E2FC.
+   *
+   * Address: 0x00BD88F0 (FUN_00BD88F0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFE7A0 (FUN_00BFE7A0 -- the global's destructor.)
+   * Address: 0x006DB960 (FUN_006DB960 -- `Init`.)
+   * Address: 0x006D7A70 (FUN_006D7A70 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x006DD740 (FUN_006DD740 -- `Delete`.)
+   */
+  struct UnitWeaponConstruct : gpg::SerConstructHelper<UnitWeapon>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<UnitWeapon>`, vtable 0x00E2E30C.
+   *
+   * Address: 0x00BD8930 (FUN_00BD8930 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFE7D0 (FUN_00BFE7D0 -- the global's destructor.)
+   * Address: 0x006DB9E0 (FUN_006DB9E0 -- `Init`.)
+   * Address: 0x006D7B10 (FUN_006D7B10 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006D7B20 (FUN_006D7B20 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct UnitWeaponSerializer : gpg::SerSaveLoadHelper<UnitWeapon>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B76E4 -- process-global `UnitWeaponConstruct` singleton.
+  moho::UnitWeaponConstruct gUnitWeaponConstruct;
+
+  // Address: 0x010B76F8 -- process-global `UnitWeaponSerializer` singleton.
+  moho::UnitWeaponSerializer gUnitWeaponSerializer;
 } // namespace

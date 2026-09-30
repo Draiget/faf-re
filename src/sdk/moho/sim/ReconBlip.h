@@ -221,10 +221,7 @@ namespace moho
      * returns it as an unowned construct result.
      */
     static void MemberConstruct(
-      gpg::ReadArchive& archive,
-      int version,
-      const gpg::RRef& ownerRef,
-      gpg::SerConstructResult& result
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
     );
 
     /**

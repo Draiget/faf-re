@@ -15,6 +15,7 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/misc/DiagnosticBudget.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 using namespace moho;
 
@@ -613,3 +614,32 @@ void CAiNavigatorAir::UpdateCurrentTargetFromFormation()
   mCurrentTargetPos = mGoalPos;
   ApplyCurrentTargetToMotion();
 }
+
+namespace moho
+{
+  /**
+   * Address: 0x005A5640 (FUN_005A5640)
+   */
+  void CAiNavigatorAir::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CAiNavigatorAir()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CAiNavigatorAir>`, vtable 0x00E1C140.
+   *
+   * Address: 0x00BCC840 (FUN_00BCC840 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF6F40 (FUN_00BF6F40 -- the global's destructor.)
+   * Address: 0x005A74D0 (FUN_005A74D0 -- `Init`.)
+   * Address: 0x005A5630 (FUN_005A5630 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x005A7ED0 (FUN_005A7ED0 -- `Delete`.)
+   */
+  struct CAiNavigatorAirConstruct : gpg::SerConstructHelper<CAiNavigatorAir>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE848 -- process-global `CAiNavigatorAirConstruct` singleton.
+  moho::CAiNavigatorAirConstruct gCAiNavigatorAirConstruct;
+} // namespace

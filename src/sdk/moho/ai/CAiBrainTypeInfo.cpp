@@ -53,25 +53,6 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
-  // Address: 0x00581890 (FUN_00581890, sub_581890) -- generic, type-erased
-  // "delete this reflected object" callback: reads the object's own vtable
-  // slot 2 (`+0x08`) and calls it with the scalar-delete flag hardcoded to
-  // 1. One of a 36-way ICF-identical `delete_func_t` thunk family
-  // (canonical twin `FUN_00510AA0`). This exact address's own real
-  // registration site (`moho::CAiBrainConstruct::mDeleteCallback`,
-  // instruction 0x00BCB409 in CAiBrainConstruct.cpp) is already served by
-  // the typed `DeleteConstructedCAiBrain` specialization there -- see its
-  // doc comment for the vtable-slot equivalence proof
-  // (`CAiBrain::~CAiBrain()`'s own scalar-deleting-destructor thunk,
-  // `FUN_00579F30`, sits at the identical slot 2 of `CAiBrain`'s vtable).
-  // No registration site anywhere in this binary needs the raw generic
-  // dispatcher as its own named function: recovering it as
-  // `delete static_cast<gpg::RObject*>(object)` behind a `void*` parameter
-  // would be exactly the raw vtable-slot-magic this project's
-  // reconstruction-fidelity contract forbids, and nothing in `src/sdk/**`
-  // has a source-level call to it (RULE ONE / no-orphan-helper rule) --
-  // so this address intentionally has no dedicated recovered function here.
-
   struct CAiBrainTypeInfoStartupBootstrap
   {
     CAiBrainTypeInfoStartupBootstrap()

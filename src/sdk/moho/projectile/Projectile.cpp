@@ -1723,20 +1723,12 @@ namespace moho
    * object through the archive ctor lane, and publishes it as unowned
    * construct output.
    */
-  void Projectile::MemberConstruct(gpg::ReadArchive* const archive, gpg::SerConstructResult* const result)
+  void Projectile::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(result != nullptr);
-    if (!archive || !result) {
-      return;
-    }
-
-    Sim* ownerSim = nullptr;
-    gpg::RRef ownerRef{};
-    (void)archive->ReadPointer(&ownerSim, &ownerRef);
-
-    Projectile* const object = new (std::nothrow) Projectile(ownerSim);
-    result->SetUnowned(MakeProjectileRef(object), 0u);
+    Sim* sim = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&sim, &owner);
+    result.SetUnowned(gpg::MakeRRef(new Projectile(sim)), 0u);
   }
 
   /**
@@ -1881,3 +1873,54 @@ namespace moho
   }
 
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<Projectile>`, vtable 0x00E297C4.
+   *
+   * Address: 0x00BD6440 (FUN_00BD6440 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFD6A0 (FUN_00BFD6A0 -- the global's destructor.)
+   * Address: 0x0069EC00 (FUN_0069EC00 -- `Init`.)
+   * Address: 0x0069E500 (FUN_0069E500 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x0069F880 (FUN_0069F880 -- `Delete`.)
+   */
+  struct ProjectileConstruct : gpg::SerConstructHelper<Projectile>
+  {};
+
+  /**
+   * `gpg::SerSaveConstructHelper<Projectile>`, vtable 0x00E297B4.
+   *
+   * Address: 0x00BD6410 (FUN_00BD6410 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFD670 (FUN_00BFD670 -- the global's destructor.)
+   * Address: 0x0069E340 (FUN_0069E340 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0069EB80 (FUN_0069EB80 -- `Init`.)
+   * Address: 0x0069E370 (FUN_0069E370 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
+   */
+  struct ProjectileSaveConstruct : gpg::SerSaveConstructHelper<Projectile>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<Projectile>`, vtable 0x00E297D4.
+   *
+   * Address: 0x00BD6480 (FUN_00BD6480 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFD6D0 (FUN_00BFD6D0 -- the global's destructor.)
+   * Address: 0x0069EC80 (FUN_0069EC80 -- `Init`.)
+   * Address: 0x0069E5D0 (FUN_0069E5D0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0069E5E0 (FUN_0069E5E0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct ProjectileSerializer : gpg::SerSaveLoadHelper<Projectile>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B548C -- process-global `ProjectileConstruct` singleton.
+  moho::ProjectileConstruct gProjectileConstruct;
+
+  // Address: 0x010B55D0 -- process-global `ProjectileSaveConstruct` singleton.
+  moho::ProjectileSaveConstruct gProjectileSaveConstruct;
+
+  // Address: 0x010B5524 -- process-global `ProjectileSerializer` singleton.
+  moho::ProjectileSerializer gProjectileSerializer;
+} // namespace

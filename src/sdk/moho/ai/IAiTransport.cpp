@@ -12,7 +12,6 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/CAiTransportImpl.h"
-#include "moho/ai/CAiTransportImplConstruct.h"
 #include "moho/ai/CAiTransportImplSerializer.h"
 #include "moho/ai/CAiTransportImplTypeInfo.h"
 #include "moho/ai/EAiTransportEventTypeInfo.h"
@@ -1119,7 +1118,6 @@ namespace
       (void)moho::register_IAiTransportTypeInfo();
       (void)moho::register_IAiTransportSerializer();
       (void)moho::register_CAiTransportImplTypeInfo();
-      (void)moho::register_CAiTransportImplConstruct();
       (void)moho::register_CAiTransportImplSerializer();
       (void)moho::register_RBroadcasterRType_EAiTransportEvent();
       (void)moho::register_RListenerRType_EAiTransportEvent();

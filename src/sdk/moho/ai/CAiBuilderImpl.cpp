@@ -700,3 +700,32 @@ const RUnitBlueprint* CAiBuilderImpl::BuilderGetNextRebuildStructure(SOCellPos& 
   outCellPos = bestCell;
   return bestBlueprint;
 }
+
+namespace moho
+{
+  /**
+   * Address: 0x0059FD90 (FUN_0059FD90)
+   */
+  void CAiBuilderImpl::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CAiBuilderImpl()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CAiBuilderImpl>`, vtable 0x00E1B7FC.
+   *
+   * Address: 0x00BCC2E0 (FUN_00BCC2E0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF6AC0 (FUN_00BF6AC0 -- the global's destructor.)
+   * Address: 0x005A0650 (FUN_005A0650 -- `Init`.)
+   * Address: 0x0059FD80 (FUN_0059FD80 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x005A1C80 (FUN_005A1C80 -- `Delete`.)
+   */
+  struct CAiBuilderImplConstruct : gpg::SerConstructHelper<CAiBuilderImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE644 -- process-global `CAiBuilderImplConstruct` singleton.
+  moho::CAiBuilderImplConstruct gCAiBuilderImplConstruct;
+} // namespace

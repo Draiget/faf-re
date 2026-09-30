@@ -718,7 +718,7 @@ namespace moho
      * What it does:
      * Deserializes runtime `Unit` state lanes for the given archive version.
      */
-    static void MemberDeserialize(gpg::ReadArchive* archive, Unit* unit, int version);
+    void MemberDeserialize(gpg::ReadArchive* archive, int version);
 
     /**
      * Address: 0x006B33A0 (FUN_006B33A0, Moho::Unit::MemberSerialize)
@@ -726,7 +726,7 @@ namespace moho
      * What it does:
      * Serializes runtime `Unit` state lanes for the given archive version.
      */
-    static void MemberSerialize(gpg::WriteArchive* archive, Unit* unit, int version);
+    void MemberSerialize(gpg::WriteArchive* archive, int version);
 
     /**
      * Address: 0x006AD5D0 (FUN_006AD5D0, ?SerEconomyEvents@Unit@Moho@@AAEXAAVReadArchive@gpg@@H@Z)

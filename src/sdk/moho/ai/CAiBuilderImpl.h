@@ -12,6 +12,13 @@ namespace gpg
   class WriteArchive;
 } // namespace gpg
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+} // namespace gpg
+
 namespace moho
 {
   class Unit;
@@ -50,6 +57,17 @@ namespace moho
      * VFTable SLOT: 0
      */
     ~CAiBuilderImpl() override;
+
+    /**
+     * Address: 0x0059FD90 (FUN_0059FD90)
+     *
+     * What it does:
+     * Builds a new `CAiBuilderImpl` for an archive load and hands it back unowned; its
+     * members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x005A2460 (FUN_005A2460, Moho::CAiBuilderImpl::MemberDeserialize)

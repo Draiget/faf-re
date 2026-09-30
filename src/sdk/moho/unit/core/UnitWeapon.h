@@ -25,6 +25,13 @@ namespace LuaPlus
   class LuaState;
 }
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+} // namespace gpg
+
 namespace moho
 {
   class CAiAttackerImpl;
@@ -238,12 +245,23 @@ namespace moho
     UnitWeapon* SetFireTargetLayerCaps(ELayer layerMask);
 
     /**
+     * Address: 0x006D7A80 (FUN_006D7A80)
+     *
+     * What it does:
+     * Builds a new `UnitWeapon` for an archive load and hands it back unowned; its
+     * members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
      * Address: 0x006DF3A0 (FUN_006DF3A0, Moho::UnitWeapon::MemberDeserialize)
      *
      * What it does:
      * Loads the serialized `UnitWeapon` payload from archive storage.
      */
-    void MemberDeserialize(gpg::ReadArchive& archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x006DF6E0 (FUN_006DF6E0, Moho::UnitWeapon::MemberSerialize)
@@ -251,7 +269,7 @@ namespace moho
      * What it does:
      * Saves the serialized `UnitWeapon` payload into archive storage.
      */
-    void MemberSerialize(gpg::WriteArchive& archive) const;
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x006D5DE0 (FUN_006D5DE0, Moho::UnitWeapon::PickNewTargetAimSpot)

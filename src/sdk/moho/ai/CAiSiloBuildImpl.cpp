@@ -323,18 +323,9 @@ CAiSiloBuildImpl::~CAiSiloBuildImpl()
 /**
  * Address: 0x005CF850 (FUN_005CF850, Moho::CAiSiloBuildImpl::MemberConstruct)
  */
-void CAiSiloBuildImpl::MemberConstruct(gpg::SerConstructResult* const result)
+void CAiSiloBuildImpl::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
 {
-  CAiSiloBuildImpl* const object = new (std::nothrow) CAiSiloBuildImpl();
-  if (!result) {
-    delete object;
-    return;
-  }
-
-  gpg::RRef objectRef{};
-  objectRef.mObj = object;
-  objectRef.mType = ResolveCAiSiloBuildImplType();
-  result->SetUnowned(objectRef, 0u);
+  result.SetUnowned(gpg::MakeRRef(new CAiSiloBuildImpl()), 0u);
 }
 
 /**
@@ -718,3 +709,24 @@ void CAiSiloBuildImpl::SiloTick()
     return;
   }
 }
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<CAiSiloBuildImpl>`, vtable 0x00E1DE38.
+   *
+   * Address: 0x00BCE110 (FUN_00BCE110 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7F30 (FUN_00BF7F30 -- the global's destructor.)
+   * Address: 0x005CFEB0 (FUN_005CFEB0 -- `Init`.)
+   * Address: 0x005CF840 (FUN_005CF840 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x005D0870 (FUN_005D0870 -- `Delete`.)
+   */
+  struct CAiSiloBuildImplConstruct : gpg::SerConstructHelper<CAiSiloBuildImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AFC34 -- process-global `CAiSiloBuildImplConstruct` singleton.
+  moho::CAiSiloBuildImplConstruct gCAiSiloBuildImplConstruct;
+} // namespace

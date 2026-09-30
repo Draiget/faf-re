@@ -148,7 +148,9 @@ namespace moho
      * Allocates one `CAiTransportImpl` instance and publishes it via
      * `SerConstructResult::SetUnowned`.
      */
-    static void MemberConstruct(gpg::SerConstructResult* result);
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x005EEE30 (FUN_005EEE30, Moho::CAiTransportImpl::MemberDeserialize)

@@ -232,123 +232,27 @@ namespace moho
   static_assert(sizeof(EntityTypeInfo) == 0x64, "EntityTypeInfo size must be 0x64");
 
   /**
-   * VFTABLE: 0x00E276DC
-   * COL: 0x00E7FFE4
+   * `gpg::SerSaveConstructHelper<Entity>`, vtable 0x00E276D4.
+   *
+   * Address: 0x00BD4FE0 (FUN_00BD4FE0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFC810 (FUN_00BFC810 -- the global's destructor.)
+   * Address: 0x0067C500 (FUN_0067C500 -- `Init`.)
+   * Address: 0x0067B3E0 (FUN_0067B3E0 -- `SaveConstructArgs`, a forward to `MemberSaveConstructArgs`.)
    */
-  class EntitySaveConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD4FE0 (FUN_00BD4FE0, dynamic initializer for the global
-     * `EntitySaveConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * save-construct-args callback field. Plain unlink atexit target,
-     * modeled as the compiler's implicit static-destructor registration.
-     */
-    EntitySaveConstruct();
-
-    /**
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~EntitySaveConstruct();
-
-    /**
-     * Address: 0x0067B3E0 (FUN_0067B3E0, Moho::EntitySaveConstruct::Construct)
-     *
-     * What it does:
-     * Forwards save-construct callback flow into `Entity::MemberSaveConstructArgs`.
-     */
-    static void Construct(
-      gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef*, gpg::SerSaveConstructArgsResult* result
-    );
-
-    /**
-     * Address: 0x0067C500 (FUN_0067C500, gpg::SerSaveConstructHelper_Entity::Init)
-     *
-     * What it does:
-     * Binds save-construct callback into reflected RTTI for `Entity`.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::save_construct_args_func_t mConstructCallback; // +0x0C
-  };
-
-  static_assert(
-    offsetof(EntitySaveConstruct, mConstructCallback) == 0x0C,
-    "EntitySaveConstruct::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(sizeof(EntitySaveConstruct) == 0x10, "EntitySaveConstruct size must be 0x10");
+  struct EntitySaveConstruct : gpg::SerSaveConstructHelper<Entity>
+  {};
 
   /**
-   * VFTABLE: 0x00E276EC
-   * COL: 0x00E7FF38
+   * `gpg::SerConstructHelper<Entity>`, vtable 0x00E276E4.
+   *
+   * Address: 0x00BD5010 (FUN_00BD5010 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFC840 (FUN_00BFC840 -- the global's destructor.)
+   * Address: 0x0067C580 (FUN_0067C580 -- `Init`.)
+   * Address: 0x0067B550 (FUN_0067B550 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x0067F5D0 (FUN_0067F5D0 -- `Delete`.)
    */
-  class EntityConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD5010 (FUN_00BD5010, dynamic initializer for the global
-     * `EntityConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields. Plain unlink atexit target,
-     * modeled as the compiler's implicit static-destructor registration.
-     */
-    EntityConstruct();
-
-    /**
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~EntityConstruct();
-
-    /**
-     * Address: 0x0067B550 (FUN_0067B550, Moho::EntityConstruct::Construct)
-     *
-     * What it does:
-     * Forwards construct callback flow into `Entity::MemberConstruct`.
-     */
-    static void Construct(
-      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
-    );
-
-    /**
-     * Address: 0x0067F5D0 (FUN_0067F5D0, Moho::EntityConstruct::Deconstruct)
-     *
-     * What it does:
-     * Executes virtual deleting-dtor lane for one constructed `Entity`.
-     */
-    static void Deconstruct(void* objectPtr);
-
-    /**
-     * Address: 0x0067C580 (FUN_0067C580, gpg::SerConstructHelper_Entity::Init)
-     *
-     * What it does:
-     * Binds construct/delete callbacks into reflected RTTI for `Entity`.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mConstructCallback;   // +0x0C
-    gpg::RType::delete_func_t mDeconstructCallback;     // +0x10
-  };
-
-  static_assert(
-    offsetof(EntityConstruct, mConstructCallback) == 0x0C,
-    "EntityConstruct::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EntityConstruct, mDeconstructCallback) == 0x10,
-    "EntityConstruct::mDeconstructCallback offset must be 0x10"
-  );
-  static_assert(sizeof(EntityConstruct) == 0x14, "EntityConstruct size must be 0x14");
+  struct EntityConstruct : gpg::SerConstructHelper<Entity>
+  {};
 } // namespace moho
 
 namespace
@@ -369,7 +273,6 @@ namespace
   gpg::RType* gVTransformType = nullptr;
   gpg::RType* gCScriptObjectType = nullptr;
   gpg::RType* gCTaskType = nullptr;
-  gpg::RType* gEntityType = nullptr;
 
   template <typename TObject>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& slot)
@@ -388,11 +291,6 @@ namespace
   [[nodiscard]] gpg::RType* ResolvePositionHistoryType()
   {
     return ResolveCachedType<moho::PositionHistory>(moho::PositionHistory::sType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntityType()
-  {
-    return ResolveCachedType<moho::Entity>(gEntityType);
   }
 
   [[nodiscard]] gpg::RType* ResolveWeakPtrEntityType()
@@ -1128,100 +1026,6 @@ namespace moho
     (void)AddPendingCoordsField(this);
     Finish();
   }
-
-  /**
-   * Address: 0x0067B3E0 (FUN_0067B3E0, Moho::EntitySaveConstruct::Construct)
-   */
-  void EntitySaveConstruct::Construct(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    auto* const entity = reinterpret_cast<Entity*>(objectPtr);
-    if (!archive || !entity || !result) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-    entity->MemberSaveConstructArgs(*archive, version, ownerRef, *result);
-  }
-
-  /**
-   * Address: 0x0067C500 (FUN_0067C500, gpg::SerSaveConstructHelper_Entity::Init)
-   *
-   * What it does:
-   * Resolves `Entity` RTTI and binds save-construct callback lane.
-   */
-  void EntitySaveConstruct::Init()
-  {
-    gpg::RType* const type = ResolveEntityType();
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr || type->serSaveConstructArgsFunc_ == mConstructCallback);
-    type->serSaveConstructArgsFunc_ = mConstructCallback;
-  }
-
-  /**
-   * Address: 0x00BD4FE0 (FUN_00BD4FE0, dynamic initializer for the global
-   * `EntitySaveConstruct` singleton)
-   */
-  EntitySaveConstruct::EntitySaveConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::save_construct_args_func_t>(&EntitySaveConstruct::Construct))
-  {}
-
-  EntitySaveConstruct::~EntitySaveConstruct() = default;
-
-  /**
-   * Address: 0x0067B550 (FUN_0067B550, Moho::EntityConstruct::Construct)
-   */
-  void
-  EntityConstruct::Construct(gpg::ReadArchive* const archive, const int version, gpg::RRef* const, gpg::SerConstructResult* const result)
-  {
-    if (!archive || !result) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-    Entity::MemberConstruct(*archive, version, ownerRef, *result);
-  }
-
-  /**
-   * Address: 0x0067F5D0 (FUN_0067F5D0, Moho::EntityConstruct::Deconstruct)
-   */
-  void EntityConstruct::Deconstruct(void* const objectPtr)
-  {
-    // `if (p) p->[slot 2](1)`: the virtual scalar deleting destructor of
-    // `Entity` (~Entity is VFTable slot 2), i.e. a plain `delete`.
-    delete static_cast<Entity*>(objectPtr);
-  }
-
-  /**
-   * Address: 0x0067C580 (FUN_0067C580, gpg::SerConstructHelper_Entity::Init)
-   *
-   * What it does:
-   * Resolves `Entity` RTTI and binds construct/delete callback lanes.
-   */
-  void EntityConstruct::Init()
-  {
-    gpg::RType* const type = ResolveEntityType();
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mConstructCallback);
-    GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == mDeconstructCallback);
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeconstructCallback;
-  }
-
-  /**
-   * Address: 0x00BD5010 (FUN_00BD5010, dynamic initializer for the global
-   * `EntityConstruct` singleton)
-   */
-  EntityConstruct::EntityConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&EntityConstruct::Construct))
-    , mDeconstructCallback(&EntityConstruct::Deconstruct)
-  {}
-
-  EntityConstruct::~EntityConstruct() = default;
 
   /**
    * Address: 0x00BD4F00 (FUN_00BD4F00, register_SEntAttachInfoTypeInfo)

@@ -520,12 +520,6 @@ namespace
  * `CScriptObject` base (0x005D6CF0) and the `IAiAttacker` base, whose
  * listener ring unlinks at 0x005D6CFB.
  *
- * Caller chain: CAiAttackerImplConstruct::Deconstruct
- *   (CAiAttackerImplConstruct.cpp:156) calls
- *   `delete static_cast<CAiAttackerImpl*>(object)` which invokes
- *   the scalar deleting dtor; the deserialization callback that
- *   triggers `Deconstruct` is registered at CRT static-init by
- *   `register_CAiAttackerImplConstruct` (same chain as the ctor).
  */
 CAiAttackerImpl::~CAiAttackerImpl()
 {
@@ -567,9 +561,6 @@ CAiAttackerImpl::~CAiAttackerImpl()
  * then `CScriptObject` at +0x0C), then the members: `mUnit` null, `mStage`
  * constructed, both vectors, `mThread` and `mDesiredTarget` empty, and
  * `mReportingState` zero. The body adds the binary's `targetPoint = -1`.
- * Called from `ConstructCAiAttackerImplForResult` (in
- * `CAiAttackerImplConstruct.cpp`) via the `SerConstruct` callback registered
- * at process init by `register_CAiAttackerImplConstruct`.
  */
 CAiAttackerImpl::CAiAttackerImpl() noexcept
 {
@@ -579,6 +570,37 @@ CAiAttackerImpl::CAiAttackerImpl() noexcept
   // source line and so stays here.
   mDesiredTarget.targetPoint = -1;
 }
+
+/**
+ * Address: 0x005D83A0 (FUN_005D83A0)
+ */
+void CAiAttackerImpl::MemberConstruct(
+  gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result
+)
+{
+  result.SetUnowned(gpg::MakeRRef(new CAiAttackerImpl()), 0u);
+}
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<CAiAttackerImpl>`, vtable 0x00E1EAD4.
+   *
+   * Address: 0x00BCE890 (FUN_00BCE890 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF8400 (FUN_00BF8400 -- the global's destructor.)
+   * Address: 0x005DC050 (FUN_005DC050 -- `Init`.)
+   * Address: 0x005D8390 (FUN_005D8390 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x005DEB50 (FUN_005DEB50 -- `Delete`.)
+   */
+  struct CAiAttackerImplConstruct : gpg::SerConstructHelper<CAiAttackerImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B028C -- process-global `CAiAttackerImplConstruct` singleton.
+  moho::CAiAttackerImplConstruct gCAiAttackerImplConstruct;
+} // namespace
 
 /**
  * Address: 0x005D6AA0 (FUN_005D6AA0, Moho::CAiAttackerImpl::CAiAttackerImpl)

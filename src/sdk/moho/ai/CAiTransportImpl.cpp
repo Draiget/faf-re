@@ -583,17 +583,9 @@ CAiTransportImpl::~CAiTransportImpl()
  * Allocates one `CAiTransportImpl` object and publishes it via
  * `SerConstructResult::SetUnowned`.
  */
-void CAiTransportImpl::MemberConstruct(gpg::SerConstructResult* const result)
+void CAiTransportImpl::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
 {
-  CAiTransportImpl* const object = new (std::nothrow) CAiTransportImpl{};
-  if (!result) {
-    return;
-  }
-
-  gpg::RRef objectRef{};
-  objectRef.mObj = object;
-  objectRef.mType = ResolveCAiTransportImplType();
-  result->SetUnowned(objectRef, 0u);
+  result.SetUnowned(gpg::MakeRRef(new CAiTransportImpl()), 0u);
 }
 
 /**
@@ -2008,3 +2000,24 @@ bool CAiTransportImpl::TransportIsTeleportBeaconReady() const
   }
   return beacon->IsNavigatorIdle();
 }
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<CAiTransportImpl>`, vtable 0x00E1F4AC.
+   *
+   * Address: 0x00BCEF10 (FUN_00BCEF10 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF8C40 (FUN_00BF8C40 -- the global's destructor.)
+   * Address: 0x005E9BB0 (FUN_005E9BB0 -- `Init`.)
+   * Address: 0x005E84F0 (FUN_005E84F0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x005EC380 (FUN_005EC380 -- `Delete`.)
+   */
+  struct CAiTransportImplConstruct : gpg::SerConstructHelper<CAiTransportImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B087C -- process-global `CAiTransportImplConstruct` singleton.
+  moho::CAiTransportImplConstruct gCAiTransportImplConstruct;
+} // namespace

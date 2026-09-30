@@ -11,7 +11,6 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/RListType.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
-#include "moho/ai/CAiSiloBuildImplConstruct.h"
 #include "moho/ai/CAiSiloBuildImplSerializer.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -219,7 +218,6 @@ namespace
       moho::register_SSiloBuildInfoTypeInfo();
       (void)moho::register_SSiloBuildInfoSerializer();
       moho::register_CAiSiloBuildImplTypeInfo();
-      (void)moho::register_CAiSiloBuildImplConstruct();
       (void)moho::register_CAiSiloBuildImplSerializer();
       moho::register_ESiloTypeListTypeInfo();
     }

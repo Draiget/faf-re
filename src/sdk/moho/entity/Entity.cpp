@@ -1961,16 +1961,7 @@ namespace moho
     gpg::SerSaveConstructArgsResult& result
   )
   {
-    static gpg::RType* sSimType = nullptr;
-    if (!sSimType) {
-      sSimType = gpg::LookupRType(typeid(Sim));
-    }
-
-    gpg::RRef simRef{};
-    simRef.mObj = SimulationRef;
-    simRef.mType = SimulationRef ? sSimType : nullptr;
-
-    gpg::WriteRawPointer(&archive, simRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    archive.WritePointer(SimulationRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
     result.SetUnowned(0u);
   }
 
@@ -1984,31 +1975,10 @@ namespace moho
    */
   void Entity::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    static gpg::RType* sSimType = nullptr;
-    static gpg::RType* sEntityType = nullptr;
-    if (!sSimType) {
-      sSimType = gpg::LookupRType(typeid(Sim));
-    }
-    if (!sEntityType) {
-      sEntityType = gpg::LookupRType(typeid(Entity));
-    }
-
-    Sim* ownerSim = nullptr;
-    const gpg::TrackedPointerInfo trackedOwner = gpg::ReadRawPointer(&archive, gpg::RRef{});
-    if (trackedOwner.object != nullptr) {
-      gpg::RRef sourceRef{};
-      sourceRef.mObj = trackedOwner.object;
-      sourceRef.mType = trackedOwner.type;
-      const gpg::RRef upcastOwner = gpg::REF_UpcastPtr(sourceRef, sSimType);
-      ownerSim = static_cast<Sim*>(upcastOwner.mObj);
-    }
-
-    (void)ownerSim;
-    Entity* const object = nullptr;
-    gpg::RRef objectRef{};
-    objectRef.mObj = object;
-    objectRef.mType = object ? object->GetClass() : sEntityType;
-    result.SetUnowned(objectRef, 0u);
+    Sim* sim = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&sim, &owner);
+    result.SetUnowned(gpg::MakeRRef(new Entity(sim, 0x800u)), 0u);
   }
 
   /**

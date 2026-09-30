@@ -256,7 +256,7 @@ namespace moho
     // private access of those passes (mangled `AAE` = private __thiscall) is
     // preserved by granting WRenViewport friendship rather than widening them
     // to public.
-    friend struct WRenViewport;
+    friend class WRenViewport;
 
     /**
      * Address: 0x00818B40 (FUN_00818B40)

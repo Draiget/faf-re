@@ -27,6 +27,7 @@
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 namespace gpg
 {
@@ -3072,3 +3073,32 @@ GPG_PREREGISTER_INIT(preregister_RMapType_uint_int_9e247f, preregister_RMapType_
 GPG_PREREGISTER_INIT(preregister_RMapType_uint_InfluenceMapEntry_9e247f, preregister_RMapType_uint_InfluenceMapEntry)
 GPG_PREREGISTER_INIT(preregister_RVectorType_InfluenceGrid_9e247f, preregister_RVectorType_InfluenceGrid)
 GPG_PREREGISTER_INIT(preregister_RVectorType_SThreat_9e247f, preregister_RVectorType_SThreat)
+
+namespace moho
+{
+  /**
+   * Address: 0x00717670 (FUN_00717670)
+   */
+  void CInfluenceMap::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CInfluenceMap()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CInfluenceMap>`, vtable 0x00E3175C.
+   *
+   * Address: 0x00BDA680 (FUN_00BDA680 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFFF10 (FUN_00BFFF10 -- the global's destructor.)
+   * Address: 0x00718AE0 (FUN_00718AE0 -- `Init`.)
+   * Address: 0x00717660 (FUN_00717660 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x0071CAA0 (FUN_0071CAA0 -- `Delete`.)
+   */
+  struct CInfluenceMapConstruct : gpg::SerConstructHelper<CInfluenceMap>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B92CC -- process-global `CInfluenceMapConstruct` singleton.
+  moho::CInfluenceMapConstruct gCInfluenceMapConstruct;
+} // namespace

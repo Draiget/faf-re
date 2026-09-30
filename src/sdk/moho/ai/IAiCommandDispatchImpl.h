@@ -177,7 +177,7 @@ namespace moho
      * unowned construct result payload.
      */
     static void MemberConstruct(
-      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
     );
 
     /**

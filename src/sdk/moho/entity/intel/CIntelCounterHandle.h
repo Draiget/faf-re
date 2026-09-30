@@ -11,6 +11,13 @@ namespace gpg
   class WriteArchive;
 } // namespace gpg
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+} // namespace gpg
+
 namespace moho
 {
   class CAiReconDBImpl;
@@ -55,6 +62,17 @@ namespace moho
      * intel-handle ownership.
      */
     ~CIntelCounterHandle();
+
+    /**
+     * Address: 0x0076F910 (FUN_0076F910)
+     *
+     * What it does:
+     * Builds a new `CIntelCounterHandle` for an archive load and hands it back unowned; its
+     * members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x00770120 (FUN_00770120, Moho::CIntelCounterHandle::MemberDeserialize)

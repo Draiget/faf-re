@@ -2976,26 +2976,138 @@ namespace gpg
     /**
      * What it does:
      * Reflection load callback that forwards archive-load flow into
-     * `T::MemberDeserialize`.
+     * `T::MemberDeserialize`, with the archived version when `T`'s takes one
+     * (`Unit`'s rejects versions below 1).
      */
-    static void Deserialize(ReadArchive* const archive, const int objectPtr, const int, RRef* const)
+    static void Deserialize(ReadArchive* const archive, const int objectPtr, const int version, RRef* const)
     {
-      SerLoadMembers(archive, *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr)));
+      T& object = *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr));
+      if constexpr (requires { object.MemberDeserialize(archive, version); }) {
+        object.MemberDeserialize(archive, version);
+      } else {
+        SerLoadMembers(archive, object);
+      }
     }
 
     /**
      * What it does:
      * Reflection save callback that forwards archive-save flow into
-     * `T::MemberSerialize`.
+     * `T::MemberSerialize`, with the version when `T`'s takes one.
      */
-    static void Serialize(WriteArchive* const archive, const int objectPtr, const int, RRef* const)
+    static void Serialize(WriteArchive* const archive, const int objectPtr, const int version, RRef* const)
     {
-      SerSaveMembers(archive, *reinterpret_cast<const T*>(static_cast<std::uintptr_t>(objectPtr)));
+      T& object = *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr));
+      if constexpr (requires { object.MemberSerialize(archive, version); }) {
+        object.MemberSerialize(archive, version);
+      } else {
+        SerSaveMembers(archive, static_cast<const T&>(object));
+      }
     }
 
   public:
     RType::load_func_t mLoadCallback; // +0x0C
     RType::save_func_t mSaveCallback; // +0x10
+  };
+
+  /**
+   * Demangled: gpg::SerConstructHelper<T>
+   *
+   * Installs `T`'s load-construct hook: the archive builds a `T` through
+   * `T::MemberConstruct` instead of default-constructing it and loading the
+   * members over it, and frees one it no longer owns with a plain `delete`.
+   * Every helper in the binary derives an empty named struct from this
+   * (`Moho::EntityConstruct : gpg::SerConstructHelper<Moho::Entity>`); the
+   * per-`T` addresses are cited on those structs.
+   *
+   * `Construct` is out of line only where `MemberConstruct` is, as a 5- or
+   * 8-instruction forward (whole-program optimisation drops the arguments
+   * `MemberConstruct` never reads, so a 5-instruction one pushes the result
+   * alone); otherwise `MemberConstruct` is inlined into it. `Delete` is
+   * `delete static_cast<T*>(object)`: the deleting destructor through the
+   * vtable for a polymorphic `T`, the destructor and `operator delete`
+   * otherwise, and `operator delete` alone for a trivially destructible one.
+   */
+  template <class T>
+  struct SerConstructHelper : SerHelperBase
+  {
+    SerConstructHelper()
+      : mConstructFunc(&SerConstructHelper::Construct)
+      , mDeleteFunc(&SerConstructHelper::Delete)
+    {}
+
+    /**
+     * What it does:
+     * Installs the construct and delete hooks on `T`'s type, asserting no
+     * construct hook was installed before (serialization.h line 231). The
+     * delete hook is stored unchecked.
+     */
+    void Init() override
+    {
+      RType* const type = RTypeOf<T>();
+      if (type->serConstructFunc_ != nullptr) {
+        HandleAssertFailure("!type->mSerConstructFunc", 231, detail::kSerializationHeaderPath);
+      }
+      type->serConstructFunc_ = mConstructFunc;
+      type->deleteFunc_ = mDeleteFunc;
+    }
+
+    static void Construct(ReadArchive* const archive, const int version, RRef* const ownerRef, SerConstructResult* const result)
+    {
+      T::MemberConstruct(*archive, version, *ownerRef, *result);
+    }
+
+    static void Delete(void* const object)
+    {
+      delete static_cast<T*>(object);
+    }
+
+    RType::construct_func_t mConstructFunc; // +0x0C
+    RType::delete_func_t mDeleteFunc;       // +0x10
+  };
+
+  /**
+   * Demangled: gpg::SerSaveConstructHelper<T>
+   *
+   * Installs `T`'s save-construct hook: before its members, the archive
+   * writes what `T::MemberConstruct` will need to rebuild the object, through
+   * `T::MemberSaveConstructArgs`, which also reports how the pointer is owned.
+   * Paired with a `SerConstructHelper<T>`, and like it always derived into an
+   * empty named struct (`Moho::EntitySaveConstruct`) where the per-`T`
+   * addresses are cited.
+   */
+  template <class T>
+  struct SerSaveConstructHelper : SerHelperBase
+  {
+    SerSaveConstructHelper()
+      : mSaveConstructArgsFunc(&SerSaveConstructHelper::SaveConstructArgs)
+    {}
+
+    /**
+     * What it does:
+     * Installs the save-construct hook on `T`'s type, asserting none was
+     * installed before (serialization.h line 189).
+     */
+    void Init() override
+    {
+      RType* const type = RTypeOf<T>();
+      if (type->serSaveConstructArgsFunc_ != nullptr) {
+        HandleAssertFailure("!type->mSerSaveConstructArgsFunc", 189, detail::kSerializationHeaderPath);
+      }
+      type->serSaveConstructArgsFunc_ = mSaveConstructArgsFunc;
+    }
+
+    static void SaveConstructArgs(
+      WriteArchive* const archive,
+      void* const object,
+      const int version,
+      RRef* const ownerRef,
+      SerSaveConstructArgsResult* const result
+    )
+    {
+      static_cast<T*>(object)->MemberSaveConstructArgs(*archive, version, *ownerRef, *result);
+    }
+
+    RType::save_construct_args_func_t mSaveConstructArgsFunc; // +0x0C
   };
 
   /**

@@ -13419,8 +13419,8 @@ Unit::Unit(const SUnitConstructionParams& params)
  *
  * What it does:
  * Reflection construct-callback. Reads the owning `Sim*` from the archive,
- * allocates and constructs a fresh `Unit` on it, then publishes the constructed
- * object (paired with its owning Sim) to the `SerConstructResult` as unowned.
+ * allocates and constructs a fresh `Unit` on it, then publishes it to the
+ * `SerConstructResult` as unowned.
  */
 void Unit::MemberConstruct(
   gpg::ReadArchive& archive,
@@ -13430,25 +13430,9 @@ void Unit::MemberConstruct(
 )
 {
   Sim* sim = nullptr;
-  gpg::RRef nullOwner{};
-  archive.ReadPointer(&sim, &nullOwner);
-
-  Unit* unit = nullptr;
-  void* const storage = ::operator new(sizeof(Unit));
-  if (storage != nullptr) {
-    unit = new (storage) Unit(sim);
-  }
-
-  gpg::RRef unitRef{};
-  unitRef = gpg::MakeRRef<moho::Unit>(unit);
-
-  // SetUnowned records the constructed object paired with its owning Sim: the
-  // binary keeps RRef_Unit's base-adjusted object pointer but stores the Sim in
-  // the ref's second slot rather than the Unit RType.
-  gpg::RRef constructed{};
-  constructed.mObj = unitRef.mObj;
-  constructed.mType = reinterpret_cast<gpg::RType*>(sim);
-  result.SetUnowned(constructed, 0u);
+  const gpg::RRef owner{};
+  archive.ReadPointer(&sim, &owner);
+  result.SetUnowned(gpg::MakeRRef(new Unit(sim)), 0u);
 }
 
 /**
@@ -17322,11 +17306,11 @@ namespace
 } // namespace
 
 /**
- * Address: 0x006B33A0 (FUN_006B33A0, ?MemberSerialize@Unit@Moho@@SAXPAVWriteArchive@gpg@@PAV12@H@Z)
+ * Address: 0x006B33A0 (FUN_006B33A0)
  * Mangled: Moho::Unit::MemberSerialize
  *
  * IDA signature:
- * void __userpurge Moho::Unit::MemberSerialize(BinaryWriteArchive *archive@<eax>, Moho::Unit *unit@<ecx>, int vers);
+ * void __userpurge Moho::Unit::MemberSerialize(BinaryWriteArchive *archive@<eax>, Moho::Unit *this@<ecx>, int version);
  *
  * What it does:
  * Serializes every runtime `Unit` state lane, in declaration order, into the
@@ -17336,9 +17320,9 @@ namespace
  * cached recon/blip state. Throws `gpg::SerializationError` for archive
  * versions below 1.
  */
-void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, const int vers)
+void Unit::MemberSerialize(gpg::WriteArchive* const archive, const int version)
 {
-  if (vers < 1) {
+  if (version < 1) {
     throw gpg::SerializationError("unsupported version.");
   }
 
@@ -17346,122 +17330,122 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
   const gpg::RRef unowned{};
 
   // Entity base sub-object (adjusted `this + 0x08`).
-  archive->Write(ResolveUnitSerializerType<Entity>(), static_cast<const Entity*>(unit), ownerRef);
+  archive->Write(ResolveUnitSerializerType<Entity>(), static_cast<const Entity*>(this), ownerRef);
 
   // Constant / variable unit-data payloads.
-  archive->Write(ResolveUnitSerializerType<SSTIUnitConstantData>(), &unit->mConstDat, ownerRef);
-  archive->Write(ResolveUnitSerializerType<SSTIUnitVariableData>(), &unit->VarDat(), ownerRef);
+  archive->Write(ResolveUnitSerializerType<SSTIUnitConstantData>(), &mConstDat, ownerRef);
+  archive->Write(ResolveUnitSerializerType<SSTIUnitVariableData>(), &VarDat(), ownerRef);
 
   // Owned AI / motion / command sidecar pointers (tracked OWNED lanes).
   {
-    archive->WritePointer<moho::IAiSteering>(unit->AiSteering, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiSteering>(AiSteering, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    archive->WritePointer<moho::CUnitMotion>(unit->UnitMotion, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::CUnitMotion>(UnitMotion, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    archive->WritePointer<moho::CUnitCommandQueue>(unit->CommandQueue, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::CUnitCommandQueue>(CommandQueue, gpg::TrackedPointerState::Owned, unowned);
   }
 
   // Weak-reference lanes.
-  archive->Write(ResolveUnitSerializerType<WeakPtr<Unit>>(), &unit->CreatorRef, ownerRef);
-  archive->Write(ResolveUnitSerializerType<WeakPtr<Unit>>(), &unit->TransportedByRef, ownerRef);
-  archive->Write(ResolveUnitSerializerType<WeakPtr<Unit>>(), &unit->AssignedTransportRef, ownerRef);
-  archive->Write(ResolveUnitSerializerType<WeakPtr<Entity>>(), &unit->FocusEntityRef, ownerRef);
-  archive->Write(ResolveUnitSerializerType<WeakPtr<Entity>>(), &unit->TargetBlipEntityRef, ownerRef);
-  archive->Write(ResolveUnitSerializerType<WeakPtr<Unit>>(), &unit->GuardedUnitRef, ownerRef);
+  archive->Write(ResolveUnitSerializerType<WeakPtr<Unit>>(), &CreatorRef, ownerRef);
+  archive->Write(ResolveUnitSerializerType<WeakPtr<Unit>>(), &TransportedByRef, ownerRef);
+  archive->Write(ResolveUnitSerializerType<WeakPtr<Unit>>(), &AssignedTransportRef, ownerRef);
+  archive->Write(ResolveUnitSerializerType<WeakPtr<Entity>>(), &FocusEntityRef, ownerRef);
+  archive->Write(ResolveUnitSerializerType<WeakPtr<Entity>>(), &TargetBlipEntityRef, ownerRef);
+  archive->Write(ResolveUnitSerializerType<WeakPtr<Unit>>(), &GuardedUnitRef, ownerRef);
 
   // Guarded-position vector and guarded-by unit set.
-  archive->Write(ResolveUnitSerializerType<Wm3::Vector3f>(), &unit->GuardedPos, ownerRef);
-  archive->Write(ResolveUnitSerializerType<EntitySetTemplate<Unit>>(), &unit->GuardedByList, ownerRef);
+  archive->Write(ResolveUnitSerializerType<Wm3::Vector3f>(), &GuardedPos, ownerRef);
+  archive->Write(ResolveUnitSerializerType<EntitySetTemplate<Unit>>(), &GuardedByList, ownerRef);
 
   // Owned formation instance.
   {
     gpg::RRef ref{};
-    gpg::RRef_IFormationInstance(&ref, unit->GuardFormation);
+    gpg::RRef_IFormationInstance(&ref, GuardFormation);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
 
-  archive->WriteBool(unit->mNeedsKillCleanup);
-  archive->WriteInt(unit->mCreationTick);
+  archive->WriteBool(mNeedsKillCleanup);
+  archive->WriteInt(mCreationTick);
 
   // Owned extra economy storage.
   {
-    archive->WritePointer<moho::CEconStorage>(unit->mExtraStorage, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::CEconStorage>(mExtraStorage, gpg::TrackedPointerState::Owned, unowned);
   }
 
-  archive->WriteInt(unit->PriorityBoost);
+  archive->WriteInt(PriorityBoost);
 
   // Owned consumption (upkeep) request.
   {
-    archive->WritePointer<moho::CEconRequest>(unit->mConsumptionData, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::CEconRequest>(mConsumptionData, gpg::TrackedPointerState::Owned, unowned);
   }
 
-  archive->WriteBool(unit->ConsumptionActive);
-  archive->WriteBool(unit->ProductionActive);
-  archive->WriteFloat(unit->ResourceConsumed);
+  archive->WriteBool(ConsumptionActive);
+  archive->WriteBool(ProductionActive);
+  archive->WriteFloat(ResourceConsumed);
 
   // Owned animation actor.
   {
-    archive->WritePointer<moho::CAniActor>(unit->AniActor, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::CAniActor>(AniActor, gpg::TrackedPointerState::Owned, unowned);
   }
 
   // Owned AI implementation lanes.
   {
-    archive->WritePointer<moho::IAiAttacker>(unit->AiAttacker, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiAttacker>(AiAttacker, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    archive->WritePointer<moho::IAiCommandDispatch>(unit->AiCommandDispatch, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiCommandDispatch>(AiCommandDispatch, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    archive->WritePointer<moho::IAiNavigator>(unit->AiNavigator, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiNavigator>(AiNavigator, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    archive->WritePointer<moho::IAiBuilder>(unit->AiBuilder, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiBuilder>(AiBuilder, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    archive->WritePointer<moho::IAiSiloBuild>(unit->AiSiloBuild, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiSiloBuild>(AiSiloBuild, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    archive->WritePointer<moho::IAiTransport>(unit->AiTransport, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiTransport>(AiTransport, gpg::TrackedPointerState::Owned, unowned);
   }
 
-  archive->WriteBool(unit->FootprintDown);
-  archive->WriteFloat(unit->TransportLoadFactor);
+  archive->WriteBool(FootprintDown);
+  archive->WriteFloat(TransportLoadFactor);
 
   // Armor-multiplier map (`std::map<std::string,float>` reflection lane).
   archive->Write(
     ResolveUnitSerializerType<std::map<std::string, float>>(),
-    &unit->ArmorMultipliers,
+    &ArmorMultipliers,
     ownerRef
   );
 
   // Owned economy-event pointer list terminated by a null lane.
-  unit->SerEconomyEvents(*archive, vers);
+  SerEconomyEvents(*archive, version);
 
-  archive->WriteUByte(unit->CurrentTerrainType);
-  archive->WriteBool(unit->mDebugAIStates);
+  archive->WriteUByte(CurrentTerrainType);
+  archive->WriteBool(mDebugAIStates);
 
-  archive->Write(ResolveUnitSerializerType<SInfoCache>(), &unit->mInfoCache, ownerRef);
-  archive->Write(ResolveUnitSerializerType<gpg::Rect2i>(), &UnitOccupationRect(*unit), ownerRef);
+  archive->Write(ResolveUnitSerializerType<SInfoCache>(), &mInfoCache, ownerRef);
+  archive->Write(ResolveUnitSerializerType<gpg::Rect2i>(), &UnitOccupationRect(*this), ownerRef);
   archive->Write(
     ResolveUnitSerializerType<gpg::fastvector<WeakPtr<Entity>>>(),
-    &unit->mBlipsInRange,
+    &mBlipsInRange,
     ownerRef
   );
 
-  archive->WriteUInt(static_cast<unsigned int>(unit->mBlipLastUpdateTick));
-  archive->WriteBool(unit->mIsNotPod);
-  archive->WriteBool(unit->mIsEngineer);
-  archive->WriteBool(unit->mIsNaval);
-  archive->WriteBool(unit->mIsAir);
-  archive->WriteBool(unit->mIsMelee);
-  archive->WriteBool(unit->mUsesGridBasedMotion);
-  archive->WriteInt(unit->CaptorCount);
+  archive->WriteUInt(static_cast<unsigned int>(mBlipLastUpdateTick));
+  archive->WriteBool(mIsNotPod);
+  archive->WriteBool(mIsEngineer);
+  archive->WriteBool(mIsNaval);
+  archive->WriteBool(mIsAir);
+  archive->WriteBool(mIsMelee);
+  archive->WriteBool(mUsesGridBasedMotion);
+  archive->WriteInt(CaptorCount);
 
   archive->Write(
     ResolveUnitSerializerType<gpg::fastvector<ReconBlip*>>(),
-    &unit->mReconBlips,
+    &mReconBlips,
     ownerRef
   );
 }
@@ -17471,7 +17455,7 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
  * Mangled: Moho::Unit::MemberDeserialize
  *
  * IDA signature:
- * void __userpurge Moho::Unit::MemberDeserialize(gpg::ReadArchive *archive@<eax>, Moho::Unit *unit@<esi>, int vers);
+ * void __userpurge Moho::Unit::MemberDeserialize(gpg::ReadArchive *archive@<eax>, Moho::Unit *this@<esi>, int version);
  *
  * What it does:
  * Mirror of `MemberSerialize`: reads every runtime `Unit` state lane back in
@@ -17481,27 +17465,27 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
  * refresh collision when a collision shape is present). Throws
  * `gpg::SerializationError` for archive versions below 1.
  */
-void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, const int vers)
+void Unit::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
 {
-  if (vers < 1) {
+  if (version < 1) {
     throw gpg::SerializationError("unsupported version.");
   }
 
   const gpg::RRef ownerRef{};
 
   // Entity base sub-object (adjusted `this + 0x08`).
-  archive->Read(ResolveUnitSerializerType<Entity>(), static_cast<Entity*>(unit), ownerRef);
+  archive->Read(ResolveUnitSerializerType<Entity>(), static_cast<Entity*>(this), ownerRef);
 
   // Constant / variable unit-data payloads.
-  archive->Read(ResolveUnitSerializerType<SSTIUnitConstantData>(), &unit->mConstDat, ownerRef);
-  archive->Read(ResolveUnitSerializerType<SSTIUnitVariableData>(), &unit->VarDat(), ownerRef);
+  archive->Read(ResolveUnitSerializerType<SSTIUnitConstantData>(), &mConstDat, ownerRef);
+  archive->Read(ResolveUnitSerializerType<SSTIUnitVariableData>(), &VarDat(), ownerRef);
 
   // Steering: read new owned pointer, swap in, release prior instance.
   {
     IAiSteering* steering = nullptr;
     archive->ReadPointerOwned(&steering, &ownerRef);
-    IAiSteering* const prior = unit->AiSteering;
-    unit->AiSteering = steering;
+    IAiSteering* const prior = AiSteering;
+    AiSteering = steering;
     delete prior;
   }
 
@@ -17509,8 +17493,8 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   {
     CUnitMotion* motion = nullptr;
     archive->ReadPointerOwned(&motion, &ownerRef);
-    CUnitMotion* const prior = unit->UnitMotion;
-    unit->UnitMotion = motion;
+    CUnitMotion* const prior = UnitMotion;
+    UnitMotion = motion;
     delete prior;
   }
 
@@ -17518,41 +17502,41 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   {
     CUnitCommandQueue* queue = nullptr;
     archive->ReadPointerOwned(&queue, &ownerRef);
-    CUnitCommandQueue* const prior = unit->CommandQueue;
-    unit->CommandQueue = queue;
+    CUnitCommandQueue* const prior = CommandQueue;
+    CommandQueue = queue;
     delete prior;
   }
 
   // Weak-reference lanes.
-  archive->Read(ResolveUnitSerializerType<WeakPtr<Unit>>(), &unit->CreatorRef, ownerRef);
-  archive->Read(ResolveUnitSerializerType<WeakPtr<Unit>>(), &unit->TransportedByRef, ownerRef);
-  archive->Read(ResolveUnitSerializerType<WeakPtr<Unit>>(), &unit->AssignedTransportRef, ownerRef);
-  archive->Read(ResolveUnitSerializerType<WeakPtr<Entity>>(), &unit->FocusEntityRef, ownerRef);
-  archive->Read(ResolveUnitSerializerType<WeakPtr<Entity>>(), &unit->TargetBlipEntityRef, ownerRef);
-  archive->Read(ResolveUnitSerializerType<WeakPtr<Unit>>(), &unit->GuardedUnitRef, ownerRef);
+  archive->Read(ResolveUnitSerializerType<WeakPtr<Unit>>(), &CreatorRef, ownerRef);
+  archive->Read(ResolveUnitSerializerType<WeakPtr<Unit>>(), &TransportedByRef, ownerRef);
+  archive->Read(ResolveUnitSerializerType<WeakPtr<Unit>>(), &AssignedTransportRef, ownerRef);
+  archive->Read(ResolveUnitSerializerType<WeakPtr<Entity>>(), &FocusEntityRef, ownerRef);
+  archive->Read(ResolveUnitSerializerType<WeakPtr<Entity>>(), &TargetBlipEntityRef, ownerRef);
+  archive->Read(ResolveUnitSerializerType<WeakPtr<Unit>>(), &GuardedUnitRef, ownerRef);
 
   // Guarded-position vector and guarded-by unit set.
-  archive->Read(ResolveUnitSerializerType<Wm3::Vector3f>(), &unit->GuardedPos, ownerRef);
-  archive->Read(ResolveUnitSerializerType<EntitySetTemplate<Unit>>(), &unit->GuardedByList, ownerRef);
+  archive->Read(ResolveUnitSerializerType<Wm3::Vector3f>(), &GuardedPos, ownerRef);
+  archive->Read(ResolveUnitSerializerType<EntitySetTemplate<Unit>>(), &GuardedByList, ownerRef);
 
   // Formation instance (deleted through the reflection deleting-destructor slot).
   {
     IFormationInstance* formation = nullptr;
     archive->ReadPointerOwned(&formation, &ownerRef);
-    IFormationInstance* const prior = unit->GuardFormation;
-    unit->GuardFormation = static_cast<CAiFormationInstance*>(formation);
+    IFormationInstance* const prior = GuardFormation;
+    GuardFormation = static_cast<CAiFormationInstance*>(formation);
     delete prior;
   }
 
-  archive->ReadBool(&unit->mNeedsKillCleanup);
-  archive->ReadInt(&unit->mCreationTick);
+  archive->ReadBool(&mNeedsKillCleanup);
+  archive->ReadInt(&mCreationTick);
 
   // Extra economy storage: detach from its economy then free raw storage.
   {
     CEconStorage* storage = nullptr;
     archive->ReadPointerOwned(&storage, &ownerRef);
-    CEconStorage* const prior = unit->mExtraStorage;
-    unit->mExtraStorage = storage;
+    CEconStorage* const prior = mExtraStorage;
+    mExtraStorage = storage;
     if (prior) {
       if (prior->mEconomy) {
         prior->Chng(-1);
@@ -17561,30 +17545,30 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
     }
   }
 
-  archive->ReadInt(&unit->PriorityBoost);
+  archive->ReadInt(&PriorityBoost);
 
   // Consumption (upkeep) request: unlink its intrusive node then free storage.
   {
     CEconRequest* request = nullptr;
     archive->ReadPointerOwned(&request, &ownerRef);
-    CEconRequest* const prior = unit->mConsumptionData;
-    unit->mConsumptionData = request;
+    CEconRequest* const prior = mConsumptionData;
+    mConsumptionData = request;
     if (prior) {
       prior->mNode.ListUnlink();
       ::operator delete(prior);
     }
   }
 
-  archive->ReadBool(&unit->ConsumptionActive);
-  archive->ReadBool(&unit->ProductionActive);
-  archive->ReadFloat(&unit->ResourceConsumed);
+  archive->ReadBool(&ConsumptionActive);
+  archive->ReadBool(&ProductionActive);
+  archive->ReadFloat(&ResourceConsumed);
 
   // Animation actor.
   {
     CAniActor* actor = nullptr;
     archive->ReadPointerOwned(&actor, &ownerRef);
-    CAniActor* const prior = unit->AniActor;
-    unit->AniActor = actor;
+    CAniActor* const prior = AniActor;
+    AniActor = actor;
     delete prior;
   }
 
@@ -17592,101 +17576,101 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   {
     IAiAttacker* attacker = nullptr;
     archive->ReadPointerOwned(&attacker, &ownerRef);
-    CAiAttackerImpl* const prior = unit->AiAttacker;
-    unit->AiAttacker = static_cast<CAiAttackerImpl*>(attacker);
+    CAiAttackerImpl* const prior = AiAttacker;
+    AiAttacker = static_cast<CAiAttackerImpl*>(attacker);
     delete prior;
   }
   {
     IAiCommandDispatch* dispatch = nullptr;
     archive->ReadPointerOwned(&dispatch, &ownerRef);
-    IAiCommandDispatchImpl* const prior = unit->AiCommandDispatch;
-    unit->AiCommandDispatch = static_cast<IAiCommandDispatchImpl*>(dispatch);
+    IAiCommandDispatchImpl* const prior = AiCommandDispatch;
+    AiCommandDispatch = static_cast<IAiCommandDispatchImpl*>(dispatch);
     delete prior;
   }
   {
     IAiNavigator* navigator = nullptr;
     archive->ReadPointerOwned(&navigator, &ownerRef);
-    IAiNavigator* const prior = unit->AiNavigator;
-    unit->AiNavigator = navigator;
+    IAiNavigator* const prior = AiNavigator;
+    AiNavigator = navigator;
     delete prior;
   }
   {
     IAiBuilder* builder = nullptr;
     archive->ReadPointerOwned(&builder, &ownerRef);
-    IAiBuilder* const prior = unit->AiBuilder;
-    unit->AiBuilder = builder;
+    IAiBuilder* const prior = AiBuilder;
+    AiBuilder = builder;
     delete prior;
   }
   {
     IAiSiloBuild* siloBuild = nullptr;
     archive->ReadPointerOwned(&siloBuild, &ownerRef);
-    CAiSiloBuildImpl* const prior = unit->AiSiloBuild;
-    unit->AiSiloBuild = static_cast<CAiSiloBuildImpl*>(siloBuild);
+    CAiSiloBuildImpl* const prior = AiSiloBuild;
+    AiSiloBuild = static_cast<CAiSiloBuildImpl*>(siloBuild);
     delete prior;
   }
   {
     IAiTransport* transport = nullptr;
     archive->ReadPointerOwned(&transport, &ownerRef);
-    IAiTransport* const prior = unit->AiTransport;
-    unit->AiTransport = transport;
+    IAiTransport* const prior = AiTransport;
+    AiTransport = transport;
     delete prior;
   }
 
-  archive->ReadBool(&unit->FootprintDown);
-  archive->ReadFloat(&unit->TransportLoadFactor);
+  archive->ReadBool(&FootprintDown);
+  archive->ReadFloat(&TransportLoadFactor);
 
   // Armor-multiplier map (`std::map<std::string,float>` reflection lane).
   archive->Read(
     ResolveUnitSerializerType<std::map<std::string, float>>(),
-    &unit->ArmorMultipliers,
+    &ArmorMultipliers,
     ownerRef
   );
 
   // Owned economy-event pointer list terminated by a null lane.
-  unit->SerEconomyEvents(*archive, vers);
+  SerEconomyEvents(*archive, version);
 
-  archive->ReadUByte(&unit->CurrentTerrainType);
-  archive->ReadBool(&unit->mDebugAIStates);
+  archive->ReadUByte(&CurrentTerrainType);
+  archive->ReadBool(&mDebugAIStates);
 
-  archive->Read(ResolveUnitSerializerType<SInfoCache>(), &unit->mInfoCache, ownerRef);
-  archive->Read(ResolveUnitSerializerType<gpg::Rect2i>(), &UnitOccupationRect(*unit), ownerRef);
+  archive->Read(ResolveUnitSerializerType<SInfoCache>(), &mInfoCache, ownerRef);
+  archive->Read(ResolveUnitSerializerType<gpg::Rect2i>(), &UnitOccupationRect(*this), ownerRef);
   archive->Read(
     ResolveUnitSerializerType<gpg::fastvector<WeakPtr<Entity>>>(),
-    &unit->mBlipsInRange,
+    &mBlipsInRange,
     ownerRef
   );
 
-  archive->ReadUInt(reinterpret_cast<unsigned int*>(&unit->mBlipLastUpdateTick));
-  archive->ReadBool(&unit->mIsNotPod);
-  archive->ReadBool(&unit->mIsEngineer);
-  archive->ReadBool(&unit->mIsNaval);
-  archive->ReadBool(&unit->mIsAir);
-  archive->ReadBool(&unit->mIsMelee);
-  archive->ReadBool(&unit->mUsesGridBasedMotion);
-  archive->ReadInt(&unit->CaptorCount);
+  archive->ReadUInt(reinterpret_cast<unsigned int*>(&mBlipLastUpdateTick));
+  archive->ReadBool(&mIsNotPod);
+  archive->ReadBool(&mIsEngineer);
+  archive->ReadBool(&mIsNaval);
+  archive->ReadBool(&mIsAir);
+  archive->ReadBool(&mIsMelee);
+  archive->ReadBool(&mUsesGridBasedMotion);
+  archive->ReadInt(&CaptorCount);
 
   archive->Read(
     ResolveUnitSerializerType<gpg::fastvector<ReconBlip*>>(),
-    &unit->mReconBlips,
+    &mReconBlips,
     ownerRef
   );
 
   // Post-load fixups: re-occupy ground, re-mark the occupation rect on the
   // O-grid when it is non-degenerate, then refresh collision when present.
-  if (unit->FootprintDown) {
-    unit->ExecuteOccupyGround();
+  if (FootprintDown) {
+    ExecuteOccupyGround();
   }
 
-  if (!IsCollisionRectEquivalentToZero(GetReservedOgridRect(*unit))) {
-    if (unit->SimulationRef && unit->SimulationRef->mOGrid) {
-      unit->SimulationRef->mOGrid->OccupyRect(UnitOccupationRect(*unit));
+  if (!IsCollisionRectEquivalentToZero(GetReservedOgridRect(*this))) {
+    if (SimulationRef && SimulationRef->mOGrid) {
+      SimulationRef->mOGrid->OccupyRect(UnitOccupationRect(*this));
     }
   }
 
-  unit->NeedSyncGameData = true;
+  NeedSyncGameData = true;
 
-  if (unit->CollisionExtents) {
-    unit->UpdateCollision();
+  if (CollisionExtents) {
+    UpdateCollision();
   }
 }
 
@@ -17858,4 +17842,54 @@ namespace
   };
 
   const UnitLuaFuncDefBootstrap gUnitLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<Unit>`, vtable 0x00E2A810.
+   *
+   * Address: 0x00BD6B20 (FUN_00BD6B20 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFDA00 (FUN_00BFDA00 -- the global's destructor.)
+   * Address: 0x006AE9A0 (FUN_006AE9A0 -- `Init`.)
+   * Address: 0x006AD3A0 (FUN_006AD3A0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x006B1010 (FUN_006B1010 -- `Delete`.)
+   */
+  struct UnitConstruct : gpg::SerConstructHelper<Unit>
+  {};
+
+  /**
+   * `gpg::SerSaveConstructHelper<Unit>`, vtable 0x00E2A800.
+   *
+   * Address: 0x00BD6AF0 (FUN_00BD6AF0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFD9D0 (FUN_00BFD9D0 -- the global's destructor.)
+   * Address: 0x006AE920 (FUN_006AE920 -- `Init`.)
+   * Address: 0x006AD210 (FUN_006AD210 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
+   */
+  struct UnitSaveConstruct : gpg::SerSaveConstructHelper<Unit>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<Unit>`, vtable 0x00E2A820.
+   *
+   * Address: 0x00BD6B60 (FUN_00BD6B60 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFDA30 (FUN_00BFDA30 -- the global's destructor.)
+   * Address: 0x006AEA20 (FUN_006AEA20 -- `Init`.)
+   * Address: 0x006AD470 (FUN_006AD470 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006AD490 (FUN_006AD490 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct UnitSerializer : gpg::SerSaveLoadHelper<Unit>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B5BB4 -- process-global `UnitConstruct` singleton.
+  moho::UnitConstruct gUnitConstruct;
+
+  // Address: 0x010B5AE8 -- process-global `UnitSaveConstruct` singleton.
+  moho::UnitSaveConstruct gUnitSaveConstruct;
+
+  // Address: 0x010B5B80 -- process-global `UnitSerializer` singleton.
+  moho::UnitSerializer gUnitSerializer;
 } // namespace

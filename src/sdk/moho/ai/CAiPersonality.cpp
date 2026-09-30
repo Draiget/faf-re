@@ -2191,3 +2191,32 @@ namespace
 
   const CAiPersonalityLuaFuncDefBootstrap gCAiPersonalityLuaFuncDefBootstrap{};
 } // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x005B69F0 (FUN_005B69F0)
+   */
+  void CAiPersonality::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CAiPersonality()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CAiPersonality>`, vtable 0x00E1CA98.
+   *
+   * Address: 0x00BCD620 (FUN_00BCD620 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7710 (FUN_00BF7710 -- the global's destructor.)
+   * Address: 0x005B92D0 (FUN_005B92D0 -- `Init`.)
+   * Address: 0x005B69E0 (FUN_005B69E0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x005B9580 (FUN_005B9580 -- `Delete`.)
+   */
+  struct CAiPersonalityConstruct : gpg::SerConstructHelper<CAiPersonality>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AF130 -- process-global `CAiPersonalityConstruct` singleton.
+  moho::CAiPersonalityConstruct gCAiPersonalityConstruct;
+} // namespace

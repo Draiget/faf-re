@@ -1132,18 +1132,10 @@ void IAiCommandDispatchImpl::IssueRefuelTask(Unit* const unit)
  * Address: 0x00599330 (FUN_00599330, Moho::IAiCommandDispatchImpl::MemberConstruct)
  */
 void IAiCommandDispatchImpl::MemberConstruct(
-  gpg::ReadArchive* const,
-  const int,
-  gpg::RRef* const,
-  gpg::SerConstructResult* const result
+  gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result
 )
 {
-  if (!result) {
-    return;
-  }
-
-  IAiCommandDispatchImpl* const object = new (std::nothrow) IAiCommandDispatchImplConstructed();
-  result->SetUnowned(MakeDispatchObjectRef(object), 0u);
+  result.SetUnowned(MakeDispatchObjectRef(new IAiCommandDispatchImplConstructed()), 0u);
 }
 
 /**
@@ -1209,3 +1201,24 @@ void IAiCommandDispatchImpl::MemberSerialize(const IAiCommandDispatchImpl* const
   const gpg::RRef queueRef = MakeCommandQueueRef(object ? object->mCommandQueue : nullptr);
   gpg::WriteRawPointer(archive, queueRef, gpg::TrackedPointerState::Unowned, ownerRef);
 }
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<IAiCommandDispatchImpl>`, vtable 0x00E1B3F8.
+   *
+   * Address: 0x00BCBEC0 (FUN_00BCBEC0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF66C0 (FUN_00BF66C0 -- the global's destructor.)
+   * Address: 0x00599650 (FUN_00599650 -- `Init`.)
+   * Address: 0x00599320 (FUN_00599320 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x005999D0 (FUN_005999D0 -- `Delete`.)
+   */
+  struct IAiCommandDispatchImplConstruct : gpg::SerConstructHelper<IAiCommandDispatchImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE404 -- process-global `IAiCommandDispatchImplConstruct` singleton.
+  moho::IAiCommandDispatchImplConstruct gIAiCommandDispatchImplConstruct;
+} // namespace

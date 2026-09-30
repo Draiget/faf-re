@@ -7,6 +7,13 @@
 #include "moho/ai/CAiPathNavigator.h"
 #include "moho/misc/WeakPtr.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+} // namespace gpg
+
 namespace moho
 {
   /**
@@ -33,6 +40,17 @@ namespace moho
      * VFTable SLOT: 0
      */
     ~CAiNavigatorLand() override;
+
+    /**
+     * Address: 0x005A4740 (FUN_005A4740)
+     *
+     * What it does:
+     * Builds a new `CAiNavigatorLand` for an archive load and hands it back unowned; its
+     * members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x005A8F40 (FUN_005A8F40, Moho::CAiNavigatorLand::MemberDeserialize)

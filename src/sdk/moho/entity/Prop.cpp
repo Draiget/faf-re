@@ -27,6 +27,7 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/math/QuaternionMath.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 namespace moho
 {
@@ -971,4 +972,50 @@ namespace
   };
 
   const PropLuaFuncDefBootstrap gPropLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x006FA6B0 (FUN_006FA6B0)
+   */
+  void Prop::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    Sim* sim = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&sim, &owner);
+    result.SetUnowned(gpg::MakeRRef(new Prop(sim)), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<Prop>`, vtable 0x00E2F4E4.
+   *
+   * Address: 0x00BD98D0 (FUN_00BD98D0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF200 (FUN_00BFF200 -- the global's destructor.)
+   * Address: 0x006FA9E0 (FUN_006FA9E0 -- `Init`.)
+   * Address: 0x006FA690 (FUN_006FA690 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x006FADD0 (FUN_006FADD0 -- `Delete`.)
+   */
+  struct PropConstruct : gpg::SerConstructHelper<Prop>
+  {};
+
+  /**
+   * `gpg::SerSaveConstructHelper<Prop>`, vtable 0x00E2F4D4.
+   *
+   * Address: 0x00BD98A0 (FUN_00BD98A0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF1D0 (FUN_00BFF1D0 -- the global's destructor.)
+   * Address: 0x006FA960 (FUN_006FA960 -- `Init`.)
+   * Address: 0x006FA500 (FUN_006FA500 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
+   */
+  struct PropSaveConstruct : gpg::SerSaveConstructHelper<Prop>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B8754 -- process-global `PropConstruct` singleton.
+  moho::PropConstruct gPropConstruct;
+
+  // Address: 0x010B86DC -- process-global `PropSaveConstruct` singleton.
+  moho::PropSaveConstruct gPropSaveConstruct;
 } // namespace

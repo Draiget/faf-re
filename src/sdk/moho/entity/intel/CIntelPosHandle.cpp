@@ -399,3 +399,32 @@ namespace moho
     }
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * Address: 0x0076F350 (FUN_0076F350)
+   */
+  void CIntelPosHandle::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CIntelPosHandle(0u, boost::SharedPtrRaw<CIntelGrid>{})), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CIntelPosHandle>`, vtable 0x00E3630C.
+   *
+   * Address: 0x00BDCCB0 (FUN_00BDCCB0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C01EA0 (FUN_00C01EA0 -- the global's destructor.)
+   * Address: 0x0076FA80 (FUN_0076FA80 -- `Init`.)
+   * Address: 0x0076F340 (FUN_0076F340 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x0076FCB0 (FUN_0076FCB0 -- `Delete`.)
+   */
+  struct CIntelPosHandleConstruct : gpg::SerConstructHelper<CIntelPosHandle>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BB3EC -- process-global `CIntelPosHandleConstruct` singleton.
+  moho::CIntelPosHandleConstruct gCIntelPosHandleConstruct;
+} // namespace

@@ -14,9 +14,9 @@ namespace LuaPlus
 namespace gpg
 {
   class ReadArchive;
+  class RRef;
   class SerConstructResult;
   class WriteArchive;
-  class SerSaveConstructArgsResult;
 } // namespace gpg
 
 namespace moho
@@ -91,6 +91,29 @@ namespace moho
      * Runtime type probe override for shield entities.
      */
     Shield* IsShield() override;
+
+    /**
+     * Address: 0x00776860 (FUN_00776860)
+     *
+     * What it does:
+     * Reads the owning `Sim*` and builds a new shield on it for an archive
+     * load; its members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * What it does:
+     * A shield saves nothing of its own: it loads its `Entity` base.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * What it does:
+     * Saves its `Entity` base.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   /**
@@ -117,181 +140,6 @@ namespace moho
    * `spec.Owner`, creates one `Shield`, and pushes its Lua object.
    */
   int cfunc__c_CreateShieldL(LuaPlus::LuaState* state);
-
-  /**
-   * Address: 0x00776860 (FUN_00776860)
-   *
-   * What it does:
-   * Reads one owning `Sim*` lane from archive, constructs one `Shield`, and
-   * returns it through serializer construct-result output.
-   */
-  void ConstructShieldForSerializerFromArchive(gpg::ReadArchive* archive, gpg::SerConstructResult* result);
-
-  /**
-   * Address: 0x00776840 (FUN_00776840)
-   *
-   * What it does:
-   * Serializer construct-callback thunk that forwards to
-   * `ConstructShieldForSerializerFromArchive`.
-   */
-  void ConstructShieldSerializerThunk(
-    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
-  );
-
-  /**
-   * VFTABLE: 0x00E3713C
-   * COL: 0x00E90E54
-   */
-  class ShieldSaveConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BDD520 (FUN_00BDD520, dynamic initializer for the global
-     * `ShieldSaveConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * save-construct-args callback field to `SaveConstructArgs`.
-     */
-    ShieldSaveConstruct();
-
-    /**
-     * Address: 0x00C02590 (FUN_00C02590, dynamic-initializer atexit target)
-     *
-     * What it does:
-     * Unlinks this helper node from the intrusive helper list.
-     */
-    ~ShieldSaveConstruct();
-
-    /**
-     * Address: 0x007766B0 (FUN_007766B0, Moho::ShieldSaveConstruct::SaveConstructArgs)
-     *
-     * What it does:
-     * Writes the owning `Sim*` (read from the `Shield` object's inherited
-     * `Entity::SimulationRef` field at +0x148) as an unowned tracked pointer.
-     */
-    static void SaveConstructArgs(
-      gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult* result
-    );
-
-    /**
-     * Address: 0x00776D20 (FUN_00776D20, Moho::ShieldSaveConstruct::Init)
-     *
-     * What it does:
-     * Binds save-construct-args callback into Shield RTTI (`serSaveConstructArgsFunc_`).
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc;
-  };
-
-  static_assert(
-    offsetof(ShieldSaveConstruct, mSerSaveConstructArgsFunc) == 0x0C,
-    "ShieldSaveConstruct::mSerSaveConstructArgsFunc offset must be 0x0C"
-  );
-
-  /**
-   * VFTABLE: 0x00E3714C
-   * COL: 0x00E90DA8
-   */
-  class ShieldConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BDD550 (FUN_00BDD550, dynamic initializer for the global
-     * `ShieldConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields.
-     */
-    ShieldConstruct();
-
-    /**
-     * Address: 0x00C025C0 (FUN_00C025C0, dynamic-initializer atexit target)
-     *
-     * What it does:
-     * Unlinks this helper node from the intrusive helper list.
-     */
-    ~ShieldConstruct();
-
-    /**
-     * Address: 0x00776DA0 (FUN_00776DA0, Moho::ShieldConstruct::Init)
-     *
-     * What it does:
-     * Binds construct/delete callbacks into Shield RTTI (`serConstructFunc_`, `deleteFunc_`).
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mSerConstructFunc;
-    gpg::RType::delete_func_t mDeleteFunc;
-  };
-
-  static_assert(
-    offsetof(ShieldConstruct, mSerConstructFunc) == 0x0C,
-    "ShieldConstruct::mSerConstructFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ShieldConstruct, mDeleteFunc) == 0x10, "ShieldConstruct::mDeleteFunc offset must be 0x10"
-  );
-
-  /**
-   * VFTABLE: 0x00E3715C
-   * COL: 0x00E90CFC
-   */
-  class ShieldSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BDD590 (FUN_00BDD590, dynamic initializer for the global
-     * `ShieldSerializer` singleton)
-     */
-    ShieldSerializer();
-
-    /**
-     * Address: 0x00C025F0 (FUN_00C025F0, dynamic-initializer atexit target)
-     *
-     * What it does:
-     * Unlinks this helper node from the intrusive helper list.
-     */
-    ~ShieldSerializer();
-
-    /**
-     * Address: 0x00776910 (FUN_00776910, Moho::ShieldSerializer::Deserialize)
-     *
-     * What it does:
-     * `Shield` declares no fields beyond its inherited `Entity` state, so its
-     * load callback simply redispatches through `Entity`'s own reflected
-     * read path instead of walking Shield-specific members.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00776950 (FUN_00776950, Moho::ShieldSerializer::Serialize)
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00776E20 (FUN_00776E20, Moho::ShieldSerializer::Init)
-     *
-     * What it does:
-     * Binds load/save serializer callbacks into Shield RTTI (`serLoadFunc_`, `serSaveFunc_`).
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-
-  static_assert(
-    offsetof(ShieldSerializer, mSerLoadFunc) == 0x0C, "ShieldSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ShieldSerializer, mSerSaveFunc) == 0x10, "ShieldSerializer::mSerSaveFunc offset must be 0x10"
-  );
 
   /**
    * VFTABLE: 0x00E37104
@@ -333,8 +181,5 @@ namespace moho
   };
 
   static_assert(sizeof(Shield) == 0x270, "Shield size must be 0x270");
-  static_assert(sizeof(ShieldSaveConstruct) == 0x10, "ShieldSaveConstruct size must be 0x10");
-  static_assert(sizeof(ShieldConstruct) == 0x14, "ShieldConstruct size must be 0x14");
-  static_assert(sizeof(ShieldSerializer) == 0x14, "ShieldSerializer size must be 0x14");
   static_assert(sizeof(ShieldTypeInfo) == 0x64, "ShieldTypeInfo size must be 0x64");
 } // namespace moho

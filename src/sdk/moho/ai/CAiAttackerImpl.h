@@ -30,6 +30,8 @@ namespace gpg::core
 namespace gpg
 {
   class ReadArchive;
+  class RRef;
+  class SerConstructResult;
   class WriteArchive;
 }
 
@@ -405,6 +407,17 @@ namespace moho
      * Saves owned `UnitWeapon*` and `CAcquireTargetTask*` pointer vectors.
      */
     static void SerializePointerVectors(gpg::WriteArchive* archive, const CAiAttackerImpl* object);
+
+    /**
+     * Address: 0x005D83A0 (FUN_005D83A0)
+     *
+     * What it does:
+     * Builds a default attacker for an archive load and hands it back
+     * unowned; its members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     // `WeaponExtraData` / `TryGetWeaponExtraData` / `ReadExtraDataValue` used to
     // sit here, reading a weapon through a `WeaponEmitterEntryView` reach-in

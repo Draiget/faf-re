@@ -841,14 +841,12 @@ ReconBlip::~ReconBlip()
  * Reads serializer construct args (`Sim*`), allocates one `ReconBlip`, and
  * returns it as an unowned construct result.
  */
-void ReconBlip::MemberConstruct(
-  gpg::ReadArchive& archive, const int, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-)
+void ReconBlip::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
 {
   Sim* sim = nullptr;
-  archive.ReadPointer(&sim, &ownerRef);
-  ReconBlip* const object = new (std::nothrow) ReconBlip(sim);
-  result.SetUnowned(MakeReconBlipRef(object), 0u);
+  const gpg::RRef owner{};
+  archive.ReadPointer(&sim, &owner);
+  result.SetUnowned(gpg::MakeRRef(new ReconBlip(sim)), 0u);
 }
 
 /**
@@ -1382,4 +1380,39 @@ namespace
   };
 
   const ReconBlipLuaFuncDefBootstrap gReconBlipLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<ReconBlip>`, vtable 0x00E1DA54.
+   *
+   * Address: 0x00BCDCA0 (FUN_00BCDCA0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7900 (FUN_00BF7900 -- the global's destructor.)
+   * Address: 0x005C4330 (FUN_005C4330 -- `Init`.)
+   * Address: 0x005BFBC0 (FUN_005BFBC0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x005C9070 (FUN_005C9070 -- `Delete`.)
+   */
+  struct ReconBlipConstruct : gpg::SerConstructHelper<ReconBlip>
+  {};
+
+  /**
+   * `gpg::SerSaveConstructHelper<ReconBlip>`, vtable 0x00E1DA44.
+   *
+   * Address: 0x00BCDC70 (FUN_00BCDC70 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF78D0 (FUN_00BF78D0 -- the global's destructor.)
+   * Address: 0x005C42B0 (FUN_005C42B0 -- `Init`.)
+   * Address: 0x005BFA30 (FUN_005BFA30 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
+   */
+  struct ReconBlipSaveConstruct : gpg::SerSaveConstructHelper<ReconBlip>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AF7FC -- process-global `ReconBlipConstruct` singleton.
+  moho::ReconBlipConstruct gReconBlipConstruct;
+
+  // Address: 0x010AFB44 -- process-global `ReconBlipSaveConstruct` singleton.
+  moho::ReconBlipSaveConstruct gReconBlipSaveConstruct;
 } // namespace

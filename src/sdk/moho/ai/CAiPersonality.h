@@ -14,6 +14,13 @@
 
 struct lua_State;
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+} // namespace gpg
+
 namespace moho
 {
   class Sim;
@@ -82,6 +89,17 @@ namespace moho
      * and fills all profile ranges/string lists.
      */
     void ReadData();
+
+    /**
+     * Address: 0x005B69F0 (FUN_005B69F0)
+     *
+     * What it does:
+     * Builds a new `CAiPersonality` for an archive load and hands it back unowned; its
+     * members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x005B96A0 (FUN_005B96A0, Moho::CAiPersonality::MemberDeserialize)

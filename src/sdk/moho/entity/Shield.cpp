@@ -95,22 +95,6 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
-  /**
-   * Address: 0x00776FC0 (FUN_00776FC0)
-   *
-   * What it does:
-   * Deletes one `Shield` object when the pointer lane is non-null.
-   */
-  void DeleteShieldIfPresent(void* const object)
-  {
-    auto* const shield = static_cast<moho::Shield*>(object);
-    if (!shield) {
-      return;
-    }
-
-    delete shield;
-  }
-
   void UnlinkShieldFromSimList(moho::Shield* const shield)
   {
     if (!shield || !shield->SimulationRef) {
@@ -123,13 +107,6 @@ namespace
     }
   }
 
-  // Address: 0x0010BBB4C -- process-global `ShieldSaveConstruct` singleton.
-  moho::ShieldSaveConstruct gShieldSaveConstruct;
-  // Address: 0x0010BBA9C -- process-global `ShieldConstruct` singleton.
-  moho::ShieldConstruct gShieldConstruct;
-  // Address: 0x0010BB38 -- process-global `ShieldSerializer` singleton
-  // (`Moho__ShieldSerializer` in the raw disassembly).
-  moho::ShieldSerializer gShieldSerializer;
 } // namespace
 
 namespace moho
@@ -184,49 +161,23 @@ namespace moho
 
   /**
    * Address: 0x00776860 (FUN_00776860)
-   *
-   * What it does:
-   * Reads one owning `Sim*` lane from archive, constructs one `Shield`, and
-   * returns it through serializer construct-result output.
    */
-  void ConstructShieldForSerializerFromArchive(gpg::ReadArchive* const archive, gpg::SerConstructResult* const result)
+  void Shield::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    if (archive == nullptr || result == nullptr) {
-      return;
-    }
-
-    Sim* ownerSim = nullptr;
-    const gpg::RRef nullOwner{};
-    (void)archive->ReadPointer(&ownerSim, &nullOwner);
-
-    Shield* object = nullptr;
-    void* const storage = ::operator new(sizeof(Shield), std::nothrow);
-    if (storage != nullptr) {
-      try {
-        object = new (storage) Shield(ownerSim);
-      } catch (...) {
-        ::operator delete(storage);
-        throw;
-      }
-    }
-
-    gpg::RRef objectRef{};
-    objectRef = gpg::MakeRRef<moho::Shield>(object);
-    result->SetUnowned(objectRef, 0u);
+    Sim* sim = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&sim, &owner);
+    result.SetUnowned(gpg::MakeRRef(new Shield(sim)), 0u);
   }
 
-  /**
-   * Address: 0x00776840 (FUN_00776840)
-   *
-   * What it does:
-   * Serializer construct-callback thunk that forwards to
-   * `ConstructShieldForSerializerFromArchive`.
-   */
-  void ConstructShieldSerializerThunk(
-    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
+  void Shield::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    ConstructShieldForSerializerFromArchive(archive, result);
+    archive->Read(CachedEntityType(), static_cast<Entity*>(this), gpg::RRef{});
+  }
+
+  void Shield::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->Write(CachedEntityType(), static_cast<const Entity*>(this), gpg::RRef{});
   }
 
   /**
@@ -375,162 +326,39 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDD520 (FUN_00BDD520, dynamic initializer for the global
-   * `ShieldSaveConstruct` singleton)
+   * `gpg::SerSaveConstructHelper<Shield>`, vtable 0x00E3713C.
    *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * save-construct-args callback field to `SaveConstructArgs`.
+   * Address: 0x00BDD520 (FUN_00BDD520 -- constructs the global and registers its destructor.)
+   * Address: 0x00C02590 (FUN_00C02590 -- the global's destructor.)
+   * Address: 0x00776D20 (FUN_00776D20 -- `Init`.)
+   * Address: 0x007766B0 (FUN_007766B0 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
    */
-  ShieldSaveConstruct::ShieldSaveConstruct()
-    : mSerSaveConstructArgsFunc(
-        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&ShieldSaveConstruct::SaveConstructArgs)
-      )
-  {}
+  struct ShieldSaveConstruct : gpg::SerSaveConstructHelper<Shield>
+  {};
 
   /**
-   * Address: 0x00C02590 (FUN_00C02590, dynamic-initializer atexit target)
+   * `gpg::SerConstructHelper<Shield>`, vtable 0x00E3714C.
    *
-   * `FUN_00776700` and `FUN_00776730` are duplicate-emission twins of this
-   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
-   * addresses); they have no distinct source-level body of their own.
+   * Address: 0x00BDD550 (FUN_00BDD550 -- constructs the global and registers its destructor.)
+   * Address: 0x00C025C0 (FUN_00C025C0 -- the global's destructor.)
+   * Address: 0x00776DA0 (FUN_00776DA0 -- `Init`.)
+   * Address: 0x00776840 (FUN_00776840 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x00776FC0 (FUN_00776FC0 -- `Delete`.)
    */
-  ShieldSaveConstruct::~ShieldSaveConstruct() = default;
+  struct ShieldConstruct : gpg::SerConstructHelper<Shield>
+  {};
 
   /**
-   * Address: 0x007766B0 (FUN_007766B0, Moho::ShieldSaveConstruct::SaveConstructArgs)
+   * `gpg::SerSaveLoadHelper<Shield>`, vtable 0x00E3715C.
    *
-   * What it does:
-   * Writes the owning `Sim*` (read from the `Shield` object's inherited
-   * `Entity::SimulationRef` field at +0x148) as an unowned tracked pointer.
+   * Address: 0x00BDD590 (FUN_00BDD590 -- constructs the global and registers its destructor.)
+   * Address: 0x00C025F0 (FUN_00C025F0 -- the global's destructor.)
+   * Address: 0x00776E20 (FUN_00776E20 -- `Init`.)
+   * Address: 0x00776910 (FUN_00776910 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x00776950 (FUN_00776950 -- `Serialize`, `MemberSerialize` inlined.)
    */
-  void ShieldSaveConstruct::SaveConstructArgs(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const,
-    gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    auto* const shield = reinterpret_cast<Shield*>(objectPtr);
-    if (archive == nullptr || shield == nullptr) {
-      return;
-    }
-
-    archive->WritePointer<moho::Sim>(shield->SimulationRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
-
-    if (result != nullptr) {
-      result->SetUnowned(0u);
-    }
-  }
-
-  /**
-   * Address: 0x00776D20 (FUN_00776D20, Moho::ShieldSaveConstruct::Init)
-   *
-   * What it does:
-   * Binds save-construct-args callback into Shield RTTI (`serSaveConstructArgsFunc_`).
-   */
-  void ShieldSaveConstruct::Init()
-  {
-    gpg::RType* const type = CachedShieldType();
-    GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr);
-    type->serSaveConstructArgsFunc_ = mSerSaveConstructArgsFunc;
-  }
-
-  /**
-   * Address: 0x00BDD550 (FUN_00BDD550, dynamic initializer for the global
-   * `ShieldConstruct` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * construct/delete callback fields.
-   */
-  ShieldConstruct::ShieldConstruct()
-    : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructShieldSerializerThunk))
-    , mDeleteFunc(&DeleteShieldIfPresent)
-  {}
-
-  /**
-   * Address: 0x00C025C0 (FUN_00C025C0, dynamic-initializer atexit target)
-   *
-   * `FUN_007767E0` and `FUN_00776810` are duplicate-emission twins of this
-   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
-   * addresses); they have no distinct source-level body of their own.
-   */
-  ShieldConstruct::~ShieldConstruct() = default;
-
-  /**
-   * Address: 0x00776DA0 (FUN_00776DA0, Moho::ShieldConstruct::Init)
-   *
-   * What it does:
-   * Binds construct/delete callbacks into Shield RTTI (`serConstructFunc_`, `deleteFunc_`).
-   */
-  void ShieldConstruct::Init()
-  {
-    gpg::RType* const type = CachedShieldType();
-    GPG_ASSERT(type->serConstructFunc_ == nullptr);
-    type->serConstructFunc_ = mSerConstructFunc;
-    type->deleteFunc_ = mDeleteFunc;
-  }
-
-  /**
-   * Address: 0x00BDD590 (FUN_00BDD590, dynamic initializer for the global
-   * `ShieldSerializer` singleton)
-   */
-  ShieldSerializer::ShieldSerializer()
-    : mSerLoadFunc(&ShieldSerializer::Deserialize)
-    , mSerSaveFunc(&ShieldSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00C025F0 (FUN_00C025F0, dynamic-initializer atexit target)
-   */
-  ShieldSerializer::~ShieldSerializer() = default;
-
-  /**
-   * Address: 0x00776910 (FUN_00776910, Moho::ShieldSerializer::Deserialize)
-   *
-   * What it does:
-   * `Shield` declares no fields beyond its inherited `Entity` state, so its
-   * load callback simply redispatches through `Entity`'s own reflected read
-   * path (dynamic RTTI-tag dispatch resolves the concrete derived type)
-   * instead of walking Shield-specific members.
-   */
-  void ShieldSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    gpg::RRef ownerRef{};
-    archive->Read(CachedEntityType(), reinterpret_cast<void*>(static_cast<std::uintptr_t>(objectPtr)), ownerRef);
-  }
-
-  /**
-   * Address: 0x00776950 (FUN_00776950, Moho::ShieldSerializer::Serialize)
-   */
-  void ShieldSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    gpg::RRef ownerRef{};
-    archive->Write(
-      CachedEntityType(), reinterpret_cast<const void*>(static_cast<std::uintptr_t>(objectPtr)), ownerRef
-    );
-  }
-
-  /**
-   * Address: 0x00776E20 (FUN_00776E20, Moho::ShieldSerializer::Init)
-   *
-   * What it does:
-   * Binds load/save serializer callbacks into Shield RTTI (`serLoadFunc_`, `serSaveFunc_`).
-   */
-  void ShieldSerializer::Init()
-  {
-    gpg::RType* const type = CachedShieldType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
+  struct ShieldSerializer : gpg::SerSaveLoadHelper<Shield>
+  {};
 
   /**
    * Address: 0x007763E0 (FUN_007763E0, sub_7763E0)
@@ -563,6 +391,18 @@ namespace moho
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_ShieldTypeInfo_0bcbf6, moho::preregister_ShieldTypeInfo)
+
+namespace
+{
+  // Address: 0x010BBB4C -- process-global `ShieldSaveConstruct` singleton.
+  moho::ShieldSaveConstruct gShieldSaveConstruct;
+
+  // Address: 0x010BBA9C -- process-global `ShieldConstruct` singleton.
+  moho::ShieldConstruct gShieldConstruct;
+
+  // Address: 0x010BBB38 -- process-global `ShieldSerializer` singleton.
+  moho::ShieldSerializer gShieldSerializer;
+} // namespace
 
 namespace
 {

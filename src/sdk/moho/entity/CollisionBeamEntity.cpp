@@ -481,21 +481,12 @@ namespace moho
   /**
    * Address: 0x00673A50 (FUN_00673A50, Moho::CollisionBeamEntity::MemberConstruct)
    */
-  void CollisionBeamEntity::MemberConstruct(
-    gpg::ReadArchive& archive,
-    const int,
-    const gpg::RRef& ownerRef,
-    gpg::SerConstructResult& result
-  )
+  void CollisionBeamEntity::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    Sim* ownerSim = nullptr;
-    (void)archive.ReadPointer(&ownerSim, &ownerRef);
-
-    CollisionBeamEntity* const object = new CollisionBeamEntity(ownerSim);
-
-    gpg::RRef objectRef{};
-    objectRef = gpg::MakeRRef<moho::CollisionBeamEntity>(object);
-    result.SetUnowned(objectRef, 0u);
+    Sim* sim = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&sim, &owner);
+    result.SetUnowned(gpg::MakeRRef(new CollisionBeamEntity(sim)), 0u);
   }
 
   /**
@@ -562,3 +553,38 @@ namespace moho
     archive->WriteInt(mCollisionCheckTickCounter);
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<CollisionBeamEntity>`, vtable 0x00E26F84.
+   *
+   * Address: 0x00BD4C90 (FUN_00BD4C90 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFC370 (FUN_00BFC370 -- the global's destructor.)
+   * Address: 0x00674F60 (FUN_00674F60 -- `Init`.)
+   * Address: 0x00673A30 (FUN_00673A30 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x00675570 (FUN_00675570 -- `Delete`.)
+   */
+  struct CollisionBeamEntityConstruct : gpg::SerConstructHelper<CollisionBeamEntity>
+  {};
+
+  /**
+   * `gpg::SerSaveConstructHelper<CollisionBeamEntity>`, vtable 0x00E26F74.
+   *
+   * Address: 0x00BD4C60 (FUN_00BD4C60 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFC340 (FUN_00BFC340 -- the global's destructor.)
+   * Address: 0x00674EE0 (FUN_00674EE0 -- `Init`.)
+   * Address: 0x006738A0 (FUN_006738A0 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
+   */
+  struct CollisionBeamEntitySaveConstruct : gpg::SerSaveConstructHelper<CollisionBeamEntity>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B41A4 -- process-global `CollisionBeamEntityConstruct` singleton.
+  moho::CollisionBeamEntityConstruct gCollisionBeamEntityConstruct;
+
+  // Address: 0x010B4240 -- process-global `CollisionBeamEntitySaveConstruct` singleton.
+  moho::CollisionBeamEntitySaveConstruct gCollisionBeamEntitySaveConstruct;
+} // namespace

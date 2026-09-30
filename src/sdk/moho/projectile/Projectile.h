@@ -176,7 +176,9 @@ namespace moho
     /**
      * Address: 0x0069E520 (FUN_0069E520, Moho::Projectile::MemberConstruct)
      */
-    static void MemberConstruct(gpg::ReadArchive* archive, gpg::SerConstructResult* result);
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x006A0370 (FUN_006A0370, Moho::Projectile::MemberDeserialize)

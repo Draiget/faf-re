@@ -5,7 +5,6 @@
 #include <typeinfo>
 
 #include "moho/ai/CAiAttackerImpl.h"
-#include "moho/ai/CAiAttackerImplConstruct.h"
 #include "moho/ai/CAiAttackerImplSerializer.h"
 #include "moho/ai/LAiAttackerImplSerializer.h"
 #include "moho/ai/LAiAttackerImplTypeInfo.h"
@@ -54,7 +53,6 @@ namespace
       (void)moho::register_LAiAttackerImplTypeInfo();
       (void)moho::register_CAiAttackerImplSerializer();
       (void)moho::register_LAiAttackerImplSerializer();
-      (void)moho::register_CAiAttackerImplConstruct();
     }
   };
 
