@@ -1,5 +1,5 @@
-#include "moho/resource/CSimResourcesSerializer.h"
 
+#include <cstddef>
 #include <cstdlib>
 #include <typeinfo>
 
@@ -8,6 +8,7 @@
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/ResourceDeposit.h"
 #include "moho/resource/ResourceReflectionHelpers.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -26,54 +27,49 @@ namespace
     return sType;
   }
 
-  // Address: 0x010ABFDC -- process-global `CSimResourcesSerializer` singleton
-  // (constructed by FUN_00BC96D0, self-registering via `__xc_a`; see
-  // CSimResourcesSerializer.h for the real-ctor/atexit-target/dead-duplicate
-  // evidence).
-  moho::CSimResourcesSerializer gCSimResourcesSerializer;
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00546B80 (FUN_00546B80, Moho::CSimResourcesSerializer::Deserialize)
+   * Inlined into `gpg::SerSaveLoadHelper<CSimResources>::Deserialize` 0x00546B80.
    */
-  void CSimResourcesSerializer::Deserialize(gpg::ReadArchive* const archive, int objectPtr, int, gpg::RRef*)
+  void CSimResources::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    CSimResources* const object = reinterpret_cast<CSimResources*>(objectPtr);
     gpg::RType* const vectorType = ResolveResourceDepositVectorType();
     GPG_ASSERT(vectorType != nullptr);
-    archive->Read(vectorType, &object->deposits_, NullOwnerRef());
+    archive->Read(vectorType, &deposits_, NullOwnerRef());
   }
 
   /**
-   * Address: 0x00546BD0 (FUN_00546BD0, Moho::CSimResourcesSerializer::Serialize)
+   * Inlined into `gpg::SerSaveLoadHelper<CSimResources>::Serialize` 0x00546BD0.
    */
-  void CSimResourcesSerializer::Serialize(gpg::WriteArchive* const archive, int objectPtr, int, gpg::RRef*)
+  void CSimResources::MemberSerialize(gpg::WriteArchive* const archive)
   {
-    CSimResources* const object = reinterpret_cast<CSimResources*>(objectPtr);
     gpg::RType* const vectorType = ResolveResourceDepositVectorType();
     GPG_ASSERT(vectorType != nullptr);
-    archive->Write(vectorType, &object->deposits_, NullOwnerRef());
+    archive->Write(vectorType, &deposits_, NullOwnerRef());
   }
-
-  /**
-   * Address: 0x00547870 (FUN_00547870, gpg::SerSaveLoadHelper_CSimResources::Init)
-   */
-  void CSimResourcesSerializer::Init()
-  {
-    gpg::RType* const typeInfo = resource_reflection::ResolveCSimResourcesType();
-    resource_reflection::RegisterSerializeCallbacks(typeInfo, mDeserialize, mSerialize);
-  }
-
-  /**
-   * Address: 0x00BC96D0 (FUN_00BC96D0, dynamic initializer for the global
-   * `CSimResourcesSerializer` singleton)
-   */
-  CSimResourcesSerializer::CSimResourcesSerializer()
-    : mDeserialize(&CSimResourcesSerializer::Deserialize)
-    , mSerialize(&CSimResourcesSerializer::Serialize)
-  {}
-
-  CSimResourcesSerializer::~CSimResourcesSerializer() = default;
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CSimResources>`, vtable 0x00E171E4.
+   *
+   * Address: 0x00BC96D0 (FUN_00BC96D0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF42C0 (FUN_00BF42C0 -- the global's destructor.)
+   * Address: 0x00546C20 (FUN_00546C20 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00547870 (FUN_00547870 -- `Init`.)
+   * Address: 0x00546B80 (FUN_00546B80 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x00546BD0 (FUN_00546BD0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct CSimResourcesSerializer : gpg::SerSaveLoadHelper<CSimResources>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ABFDC -- process-global `CSimResourcesSerializer` singleton.
+  moho::CSimResourcesSerializer gCSimResourcesSerializer;
+} // namespace

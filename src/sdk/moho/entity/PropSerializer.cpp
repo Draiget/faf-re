@@ -4,6 +4,7 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Prop.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -20,60 +21,58 @@ namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x006F9BE0 (FUN_006F9BE0, Moho::SPropPriorityInfoSerializer::Deserialize)
-   */
-  void SPropPriorityInfoSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const info = reinterpret_cast<SPropPriorityInfo*>(objectPtr);
-    if (archive == nullptr || info == nullptr) {
-      return;
-    }
-
-    archive->ReadInt(&info->mPriority);
-    archive->ReadInt(&info->mBoundedTick);
-  }
-
-  /**
-   * Address: 0x006F9C10 (FUN_006F9C10, Moho::SPropPriorityInfoSerializer::Serialize)
-   */
-  void SPropPriorityInfoSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    const auto* const info = reinterpret_cast<const SPropPriorityInfo*>(objectPtr);
-    if (archive == nullptr || info == nullptr) {
-      return;
-    }
-
-    archive->WriteInt(info->mPriority);
-    archive->WriteInt(info->mBoundedTick);
-  }
-
-  /**
-   * Address: 0x00BD9840 (FUN_00BD9840, dynamic initializer for the global
-   * `SPropPriorityInfoSerializer` singleton)
-   */
-  SPropPriorityInfoSerializer::SPropPriorityInfoSerializer()
-    : mDeserialize(&SPropPriorityInfoSerializer::Deserialize)
-    , mSerialize(&SPropPriorityInfoSerializer::Serialize)
-  {}
-
-  SPropPriorityInfoSerializer::~SPropPriorityInfoSerializer() = default;
-
-  /**
-   * Address: 0x006FA8C0 (FUN_006FA8C0, gpg::SerSaveLoadHelper_SPropPriorityInfo::Init)
-   */
-  void SPropPriorityInfoSerializer::Init()
-  {
-    gpg::RType* const type = ResolveSerializerType<SPropPriorityInfo>(SPropPriorityInfo::sType);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
 } // namespace moho
 
 namespace
 {
+} // namespace
+
+namespace moho
+{
+  /**
+   * Inlined into `gpg::SerSaveLoadHelper<SPropPriorityInfo>::Deserialize` 0x006F9BE0.
+   */
+  void SPropPriorityInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    archive->ReadInt(&mPriority);
+    archive->ReadInt(&mBoundedTick);
+  }
+
+  /**
+   * Inlined into `gpg::SerSaveLoadHelper<SPropPriorityInfo>::Serialize` 0x006F9C10.
+   */
+  void SPropPriorityInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    archive->WriteInt(mPriority);
+    archive->WriteInt(mBoundedTick);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SPropPriorityInfo>`, vtable 0x00E2F4C4.
+   *
+   * Address: 0x00BD9840 (FUN_00BD9840 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF140 (FUN_00BFF140 -- the global's destructor.)
+   * Address: 0x006FA8C0 (FUN_006FA8C0 -- `Init`.)
+   * Address: 0x006F9BE0 (FUN_006F9BE0 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x006F9C10 (FUN_006F9C10 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct SPropPriorityInfoSerializer : gpg::SerSaveLoadHelper<SPropPriorityInfo>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B8710 -- process-global `SPropPriorityInfoSerializer` singleton.
   moho::SPropPriorityInfoSerializer gSPropPriorityInfoSerializer;
 } // namespace

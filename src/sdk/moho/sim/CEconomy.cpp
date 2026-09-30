@@ -66,14 +66,6 @@ namespace
   constexpr int kSerializationSaveLine = 87;
   constexpr int kSerializationConstructLine = 231;
 
-  // Address: 0x010ACF84 -- process-global `SEconValueSerializer` singleton.
-  // Constructing it runs SEconValueSerializer::SEconValueSerializer()
-  // (0x00BCA870), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction.
-  moho::SEconValueSerializer gSEconValueSerializer;
-
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeTypedRef(TObject* const object, gpg::RType* const staticType) noexcept
   {
@@ -179,94 +171,6 @@ namespace moho
   }
 
   gpg::RType* CEconomy::sType = nullptr;
-
-  /**
-   * Address: 0x00BCA870 (FUN_00BCA870, register_SEconValueSerializer)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SEconValueSerializer::SEconValueSerializer()
-    : mLoadCallback(&SEconValueSerializer::Deserialize)
-    , mSaveCallback(&SEconValueSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BF56C0 (FUN_00BF56C0, Moho::SEconValueSerializer::~SEconValueSerializer)
-   *
-   * What it does:
-   * Unlinks this helper node from whatever intrusive list it currently sits
-   * in and restores a self-linked sentinel state.
-   */
-  SEconValueSerializer::~SEconValueSerializer() = default;
-
-  /**
-   * Address: 0x00563C50 (FUN_00563C50, Moho::SEconValueSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade for `SEconValue`. Reads the two-float
-   * (energy, mass) pair directly through the archive; `SEconValue` has no
-   * MemberDeserialize of its own, matching the binary's inline field reads.
-   */
-  void SEconValueSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const value = reinterpret_cast<SEconValue*>(objectPtr);
-    if (archive == nullptr || value == nullptr) {
-      return;
-    }
-    archive->ReadFloat(&value->energy);
-    archive->ReadFloat(&value->mass);
-  }
-
-  /**
-   * Address: 0x00563C80 (FUN_00563C80, Moho::SEconValueSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback facade for `SEconValue`. Writes the two-float
-   * (energy, mass) pair directly through the archive; `SEconValue` has no
-   * MemberSerialize of its own, matching the binary's inline field writes.
-   */
-  void SEconValueSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    const auto* const value = reinterpret_cast<const SEconValue*>(objectPtr);
-    if (archive == nullptr || value == nullptr) {
-      return;
-    }
-    archive->WriteFloat(value->energy);
-    archive->WriteFloat(value->mass);
-  }
-
-  /**
-   * Address: 0x00564010 (FUN_00564010, gpg::SerSaveLoadHelper_SEconValue::Init)
-   *
-   * What it does:
-   * Lazily resolves `SEconValue` RTTI and installs load/save callbacks from
-   * this helper object into the type descriptor.
-   */
-  void SEconValueSerializer::Init()
-  {
-    gpg::RType* const type = CachedSEconValueType();
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kLoadAssertText, kSerializationLoadLine, kSerializationSourcePath);
-    }
-    const bool saveAlreadySet = type->serSaveFunc_ != nullptr;
-    type->serLoadFunc_ = mLoadCallback;
-    if (saveAlreadySet) {
-      gpg::HandleAssertFailure(kSaveAssertText, kSerializationSaveLine, kSerializationSourcePath);
-    }
-    type->serSaveFunc_ = mSaveCallback;
-  }
 
   /**
    * Address: 0x00771880 (FUN_00771880, struct_EconomyData::struct_EconomyData)
@@ -923,4 +827,52 @@ namespace
 {
   // Address: 0x010ACF98 -- process-global `SEconTotalsSerializer` singleton.
   moho::SEconTotalsSerializer gSEconTotalsSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * Inlined into `gpg::SerSaveLoadHelper<SEconValue>::Deserialize` 0x00563C50.
+   */
+  void SEconValue::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+    archive->ReadFloat(&energy);
+    archive->ReadFloat(&mass);
+  }
+
+  /**
+   * Inlined into `gpg::SerSaveLoadHelper<SEconValue>::Serialize` 0x00563C80.
+   */
+  void SEconValue::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (archive == nullptr) {
+      return;
+    }
+    archive->WriteFloat(energy);
+    archive->WriteFloat(mass);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SEconValue>`, vtable 0x00E189AC.
+   *
+   * Address: 0x00BCA870 (FUN_00BCA870 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF56C0 (FUN_00BF56C0 -- the global's destructor.)
+   * Address: 0x00564010 (FUN_00564010 -- `Init`.)
+   * Address: 0x00563C50 (FUN_00563C50 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x00563C80 (FUN_00563C80 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct SEconValueSerializer : gpg::SerSaveLoadHelper<SEconValue>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ACF84 -- process-global `SEconValueSerializer` singleton.
+  moho::SEconValueSerializer gSEconValueSerializer;
 } // namespace

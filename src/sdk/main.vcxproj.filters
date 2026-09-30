@@ -2457,9 +2457,6 @@
     <ClInclude Include="moho\resource\CSimResources.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\CSimResourcesSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\resource\CSimResourcesTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3228,9 +3225,6 @@
     <ClInclude Include="moho\serialization\CPrefetchSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\serialization\CPrefetchSetSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\serialization\CFireWeaponTaskTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3733,9 +3727,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\LAiAttackerImpl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\ai\LAiAttackerImplSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\LAiAttackerImplTypeInfo.h">
@@ -4251,9 +4242,6 @@
     <ClInclude Include="moho\sim\CollisionShape.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\COGridSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\sim\GridTraversalLine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -4740,9 +4728,6 @@
     <ClInclude Include="moho\resource\RResId.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\RResIdSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\resource\blueprints\BlueprintConstructSerializationHelpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -4926,9 +4911,6 @@
     <ClInclude Include="moho\audio\SParamKey.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\audio\SParamKeySerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\audio\SParamKeyTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -5074,9 +5056,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\HPathCellTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\ai\HPathCellSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\path\PathTablesTypeInfo.h">

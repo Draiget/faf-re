@@ -11,6 +11,7 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -226,39 +227,9 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, owner);
   }
 
-  /**
-   * Address: 0x00406EC0 (FUN_00406EC0, Moho::CTaskEventSerializer::Deserialize)
-   *
-   * What it does:
-   * Loads trigger flag and event wait-link intrusive list.
-   */
-  void DeserializeCTaskEvent(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
-  {
-    auto* const event = reinterpret_cast<CTaskEvent*>(objectPtr);
-    GPG_ASSERT(event != nullptr);
-    archive->ReadBool(&event->mTriggered);
-    event->DeserializeWaitLinks(archive);
-  }
-
-  /**
-   * Address: 0x00406EF0 (FUN_00406EF0, Moho::CTaskEventSerializer::Serialize)
-   *
-   * What it does:
-   * Saves trigger flag and event wait-link intrusive list.
-   */
-  void SerializeCTaskEvent(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
-  {
-    auto* const event = reinterpret_cast<CTaskEvent*>(objectPtr);
-    GPG_ASSERT(event != nullptr);
-    archive->WriteBool(event->mTriggered);
-    event->SerializeWaitLinks(archive);
-  }
-
   // Address: 0x010A664C -- process-global `STaskEventLinkageSerializer` singleton.
   STaskEventLinkageSerializer gSTaskEventLinkageSerializer;
 
-  // Address: 0x010A6638 -- process-global `CTaskEventSerializer` singleton.
-  CTaskEventSerializer gCTaskEventSerializer;
   RWeakPtrType<STaskEventLinkage> gRWeakPtrTypeSTaskEventLinkage{};
 
   /**
@@ -712,40 +683,6 @@ void CTaskEvent::SerializeWaitLinks(gpg::WriteArchive* const archive) const
 }
 
 /**
- * Address: 0x00BC2F50 (FUN_00BC2F50, dynamic initializer for the global
- * `CTaskEventSerializer` singleton)
- */
-CTaskEventSerializer::CTaskEventSerializer()
-  : mSerLoadFunc(&DeserializeCTaskEvent)
-  , mSerSaveFunc(&SerializeCTaskEvent)
-{}
-
-/**
- * Address: 0x00BEE1D0 (FUN_00BEE1D0, Moho::CTaskEventSerializer::~CTaskEventSerializer)
- */
-CTaskEventSerializer::~CTaskEventSerializer() = default;
-
-/**
- * Address: 0x00407620 (FUN_00407620, ?Init@CTaskEventSerializer@Moho@@UAEXXZ)
- *
- * What it does:
- * Installs CTaskEvent RTTI serialization callbacks.
- */
-void CTaskEventSerializer::Init()
-{
-  gpg::RType* type = CTaskEvent::sType;
-  if (!type) {
-    type = gpg::LookupRType(typeid(CTaskEvent));
-    CTaskEvent::sType = type;
-  }
-
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mSerLoadFunc;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSerSaveFunc;
-}
-
-/**
  * Address: 0x00406AD0 (FUN_00406AD0, Moho::CTaskEventTypeInfo::CTaskEventTypeInfo)
  */
 CTaskEventTypeInfo::CTaskEventTypeInfo()
@@ -822,3 +759,45 @@ namespace
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_STaskEventLinkageTypeInfo_7aa7c0, moho::register_STaskEventLinkageTypeInfo)
 GPG_PREREGISTER_INIT(register_CTaskEventTypeInfo_7aa7c0, moho::register_CTaskEventTypeInfo)
+
+namespace moho
+{
+  /**
+   * Inlined into `gpg::SerSaveLoadHelper<CTaskEvent>::Deserialize` 0x00406EC0.
+   */
+  void CTaskEvent::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->ReadBool(&mTriggered);
+    DeserializeWaitLinks(archive);
+  }
+
+  /**
+   * Inlined into `gpg::SerSaveLoadHelper<CTaskEvent>::Serialize` 0x00406EF0.
+   */
+  void CTaskEvent::MemberSerialize(gpg::WriteArchive* const archive)
+  {
+    archive->WriteBool(mTriggered);
+    SerializeWaitLinks(archive);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CTaskEvent>`, vtable 0x00E0020C.
+   *
+   * Address: 0x00BC2F50 (FUN_00BC2F50 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEE1D0 (FUN_00BEE1D0 -- the global's destructor.)
+   * Address: 0x00407620 (FUN_00407620 -- `Init`.)
+   * Address: 0x00406EC0 (FUN_00406EC0 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x00406EF0 (FUN_00406EF0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct CTaskEventSerializer : gpg::SerSaveLoadHelper<CTaskEvent>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A6638 -- process-global `CTaskEventSerializer` singleton.
+  moho::CTaskEventSerializer gCTaskEventSerializer;
+} // namespace

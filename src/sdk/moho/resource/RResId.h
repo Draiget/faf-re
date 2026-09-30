@@ -16,6 +16,18 @@ namespace moho
    */
   struct RResId
   {
+    /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<RResId>::Serialize` 0x004A96B0.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<RResId>::Deserialize` 0x004A9690.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     static gpg::RType* sType;
 
     [[nodiscard]] static gpg::RType* StaticGetClass();

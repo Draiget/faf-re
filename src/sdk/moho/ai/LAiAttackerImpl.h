@@ -22,6 +22,18 @@ namespace moho
   {
   public:
     /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<LAiAttackerImpl>::Serialize` 0x005D61D0.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<LAiAttackerImpl>::Deserialize` 0x005D61A0.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x005D5F30 (FUN_005D5F30, Moho::LAiAttackerImpl::LAiAttackerImpl)
      *
      * What it does:

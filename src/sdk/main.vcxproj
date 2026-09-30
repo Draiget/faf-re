@@ -1445,7 +1445,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\core\containers\FastVectorSOCellPosReflection.h" />
     <ClInclude Include="moho\serialization\PrefetchHandleBaseVectorReflection.h" />
     <ClInclude Include="moho\serialization\CPrefetchSet.h" />
-    <ClInclude Include="moho\serialization\CPrefetchSetSerializer.h" />
     <ClInclude Include="moho\serialization\CFireWeaponTaskTypeInfo.h" />
     <ClInclude Include="moho\serialization\CWeaponAttributesTypeInfo.h" />
     <ClInclude Include="moho\serialization\WeakUnitSetSerializer.h" />
@@ -1592,7 +1591,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\audio\SAudioRequest.h" />
     <ClInclude Include="moho\audio\SAudioRequestTypeInfo.h" />
     <ClInclude Include="moho\audio\SParamKey.h" />
-    <ClInclude Include="moho\audio\SParamKeySerializer.h" />
     <ClInclude Include="moho\audio\SParamKeyTypeInfo.h" />
     <ClInclude Include="moho\audio\SofdecRuntime.h" />
     <ClInclude Include="moho\app\CScApp.h" />
@@ -1752,7 +1750,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\render\textures\SBatchTextureData.h" />
     <ClInclude Include="moho\render\textures\SBatchTextureDataFactory.h" />
     <ClInclude Include="moho\resource\RResId.h" />
-    <ClInclude Include="moho\resource\RResIdSerializer.h" />
     <ClInclude Include="moho\resource\blueprints\BlueprintConstructSerializationHelpers.h" />
     <ClInclude Include="moho\resource\blueprints\RBeamBlueprint.h" />
     <ClInclude Include="moho\resource\blueprints\RBeamBlueprintTypeInfo.h" />
@@ -1835,7 +1832,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\CDebugCanvas.h" />
     <ClInclude Include="moho\sim\COGrid.h" />
     <ClInclude Include="moho\sim\CollisionShape.h" />
-    <ClInclude Include="moho\sim\COGridSerializer.h" />
     <ClInclude Include="moho\sim\GridTraversalLine.h" />
     <ClInclude Include="moho\sim\CMersenneTwister.h" />
     <ClInclude Include="moho\sim\CMersenneTwisterTypeInfo.h" />
@@ -1922,7 +1918,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\SPickUpInfo.h" />
     <ClInclude Include="moho\ai\SPickUpInfoVectorReflection.h" />
     <ClInclude Include="moho\ai\LAiAttackerImpl.h" />
-    <ClInclude Include="moho\ai\LAiAttackerImplSerializer.h" />
     <ClInclude Include="moho\ai\LAiAttackerImplTypeInfo.h" />
     <ClInclude Include="moho\ai\AITarget_LuaFuncDef.h" />
     <ClInclude Include="moho\lua\CLuaConOutputHandler.h" />
@@ -1947,7 +1942,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\SPickUpInfoTypeInfo.h" />
     <ClInclude Include="moho\sim\CSquadTypeInfo.h" />
     <ClInclude Include="moho\ai\HPathCellTypeInfo.h" />
-    <ClInclude Include="moho\ai\HPathCellSerializer.h" />
     <ClInclude Include="moho\path\PathTablesTypeInfo.h" />
     <ClInclude Include="moho\entity\SScrollerTypeInfo.h" />
     <ClInclude Include="moho\render\SDecalInfoTypeInfo.h" />
@@ -2099,7 +2093,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\particles\SWorldParticle.h" />
     <ClInclude Include="moho\particles\SWorldTrail.h" />
     <ClInclude Include="moho\resource\CSimResources.h" />
-    <ClInclude Include="moho\resource\CSimResourcesSerializer.h" />
     <ClInclude Include="moho\resource\CSimResourcesTypeInfo.h" />
     <ClInclude Include="moho\resource\CAniResourceSkel.h" />
     <ClInclude Include="moho\resource\CAniResourceSkelTypeInfo.h" />

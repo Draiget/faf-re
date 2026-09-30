@@ -1,79 +1,63 @@
-#include "moho/resource/RResIdSerializer.h"
 
+#include <cstddef>
 #include <cstdlib>
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/resource/RResId.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
-  // Address: 0x010A8924 -- process-global `RResIdSerializer` singleton
-  // (constructed by FUN_00BC5A80, self-registering via `__xc_a`; see
-  // RResIdSerializer.h for the real-ctor/atexit-target/dead-duplicate
-  // evidence).
-  moho::RResIdSerializer gRResIdSerializer;
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x004A9690 (FUN_004A9690, Moho::RResIdSerializer::Deserialize)
+   * Inlined into `gpg::SerSaveLoadHelper<RResId>::Deserialize` 0x004A9690.
    */
-  void RResIdSerializer::Deserialize(gpg::ReadArchive* const archive, int objectPtr, int, gpg::RRef*)
+  void RResId::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    auto* const resourceId = reinterpret_cast<RResId*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(resourceId != nullptr);
-    if (!archive || !resourceId) {
+    if (!archive) {
       return;
     }
 
-    archive->ReadString(&resourceId->name);
+    archive->ReadString(&name);
   }
 
   /**
-   * Address: 0x004A96B0 (FUN_004A96B0, Moho::RResIdSerializer::Serialize)
+   * Inlined into `gpg::SerSaveLoadHelper<RResId>::Serialize` 0x004A96B0.
    */
-  void RResIdSerializer::Serialize(gpg::WriteArchive* const archive, int objectPtr, int, gpg::RRef*)
+  void RResId::MemberSerialize(gpg::WriteArchive* const archive)
   {
-    auto* const resourceId = reinterpret_cast<RResId*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(resourceId != nullptr);
-    if (!archive || !resourceId) {
+    if (!archive) {
       return;
     }
 
-    archive->WriteString(&resourceId->name);
+    archive->WriteString(&name);
   }
-
-  /**
-   * Address: 0x004A9790 (FUN_004A9790, gpg::SerSaveLoadHelper<Moho::RResId>::Init)
-   */
-  void RResIdSerializer::Init()
-  {
-    gpg::RType* const type = RResId::StaticGetClass();
-    GPG_ASSERT(type != nullptr);
-    if (!type) {
-      return;
-    }
-
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BC5A80 (FUN_00BC5A80, dynamic initializer for the global
-   * `RResIdSerializer` singleton)
-   */
-  RResIdSerializer::RResIdSerializer()
-    : mDeserialize(&RResIdSerializer::Deserialize)
-    , mSerialize(&RResIdSerializer::Serialize)
-  {}
-
-  RResIdSerializer::~RResIdSerializer() = default;
 } // namespace moho
 
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<RResId>`, vtable 0x00E073BC.
+   *
+   * Address: 0x00BC5A80 (FUN_00BC5A80 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF04C0 (FUN_00BF04C0 -- the global's destructor.)
+   * Address: 0x004A9790 (FUN_004A9790 -- `Init`.)
+   * Address: 0x004A9690 (FUN_004A9690 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004A96B0 (FUN_004A96B0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct RResIdSerializer : gpg::SerSaveLoadHelper<RResId>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A8924 -- process-global `RResIdSerializer` singleton.
+  moho::RResIdSerializer gRResIdSerializer;
+} // namespace

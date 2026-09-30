@@ -14,6 +14,18 @@ namespace moho
   class CPrefetchSet
   {
   public:
+    /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<CPrefetchSet>::Serialize` 0x004A5630.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<CPrefetchSet>::Deserialize` 0x004A55F0.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
     static gpg::RType* sType;
 
     /**

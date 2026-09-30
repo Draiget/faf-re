@@ -35,6 +35,18 @@ namespace moho
    */
   struct HPathCell
   {
+    /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<HPathCell>::Serialize` 0x00762FA0.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<HPathCell>::Deserialize` 0x00762F80.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     std::uint16_t x;
     std::uint16_t z;
 

@@ -13,6 +13,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/StatItem.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -181,8 +182,6 @@ namespace
     );
     throw std::runtime_error(msg.c_str());
   }
-
-  CTaskSerializer gCTaskSerializer{};
 
   struct CTaskReflectionBootstrap
   {
@@ -375,73 +374,6 @@ CTaskThread* CTask::CreateTaskThread(CTask* const dispatch, CTaskStage* const st
 }
 
 /**
- * Address: 0x00BC2FE0 (FUN_00BC2FE0, dynamic initializer for the global
- * `CTaskSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the load/save
- * callback fields. A dead, zero-incoming-xref duplicate of this ctor body
- * also exists at 0x00408E80 (never reached from `__xc_a`).
- */
-CTaskSerializer::CTaskSerializer()
-  : mSerLoadFunc(&CTaskSerializer::Deserialize)
-  , mSerSaveFunc(&CTaskSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BEE310 (FUN_00BEE310, Moho::CTaskSerializer::~CTaskSerializer)
- */
-CTaskSerializer::~CTaskSerializer() = default;
-
-/**
- * Address: 0x00408E00 (FUN_00408E00, Moho::CTaskSerializer::Deserialize)
- *
- * What it does:
- * Reads one weak task pointer from archive payload and intentionally discards
- * it (binary callback keeps stack-link restoration in thread-level helpers).
- */
-void CTaskSerializer::Deserialize(
-  gpg::ReadArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const ownerRef
-)
-{
-  auto* const task = reinterpret_cast<CTask*>(objectPtr);
-  GPG_ASSERT(task != nullptr);
-  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-  CTask* subtask = task->mSubtask;
-  subtask = ReadCTaskPointer(archive, owner);
-  (void)subtask;
-}
-
-/**
- * Address: 0x00408E40 (FUN_00408E40, Moho::CTaskSerializer::Serialize)
- *
- * What it does:
- * Saves the task-chain link (`mSubtask`) as unowned tracked pointer.
- */
-void CTaskSerializer::Serialize(
-  gpg::WriteArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const ownerRef
-)
-{
-  auto* const task = reinterpret_cast<CTask*>(objectPtr);
-  GPG_ASSERT(task != nullptr);
-  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-  const gpg::RRef subtaskRef = MakeCTaskRef(task->mSubtask);
-  gpg::WriteRawPointer(archive, subtaskRef, gpg::TrackedPointerState::Unowned, owner);
-}
-
-/**
- * Address: 0x0040A290 (FUN_0040A290, sub_40A290)
- */
-void CTaskSerializer::Init()
-{
-  gpg::RType* const type = CachedCTaskType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mSerLoadFunc;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSerSaveFunc;
-}
-
-/**
  * Address: 0x00408B90 (FUN_00408B90, scalar deleting destructor thunk)
  */
 CTaskTypeInfo::~CTaskTypeInfo() = default;
@@ -470,3 +402,47 @@ void CTaskTypeInfo::Init()
 GPG_PREREGISTER_INIT(register_CTaskTypeInfo_e70b77, moho::register_CTaskTypeInfo)
 
 GPG_PREREGISTER_INIT(InitializeCTaskTypeInfoStorage_e70b77, InitializeCTaskTypeInfoStorage)
+
+namespace moho
+{
+  /**
+   * Inlined into `gpg::SerSaveLoadHelper<CTask>::Deserialize` 0x00408E00.
+   */
+  void CTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    CTask* subtask = mSubtask;
+    subtask = ReadCTaskPointer(archive, gpg::RRef{});
+    (void)subtask;
+  }
+
+  /**
+   * Inlined into `gpg::SerSaveLoadHelper<CTask>::Serialize` 0x00408E40.
+   */
+  void CTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const gpg::RRef subtaskRef = MakeCTaskRef(mSubtask);
+    gpg::WriteRawPointer(archive, subtaskRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CTask>`, vtable 0x00E00358.
+   *
+   * Address: 0x00BC2FE0 (FUN_00BC2FE0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEE310 (FUN_00BEE310 -- the global's destructor.)
+   * Address: 0x00408E80 (FUN_00408E80 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0040A290 (FUN_0040A290 -- `Init`.)
+   * Address: 0x00408E00 (FUN_00408E00 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x00408E40 (FUN_00408E40 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct CTaskSerializer : gpg::SerSaveLoadHelper<CTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A67A4 -- process-global `CTaskSerializer` singleton.
+  moho::CTaskSerializer gCTaskSerializer;
+} // namespace

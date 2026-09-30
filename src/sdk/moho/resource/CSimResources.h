@@ -21,6 +21,18 @@ namespace moho
   class CSimResources : public ISimResources
   {
   public:
+    /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<CSimResources>::Serialize` 0x00546BD0.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<CSimResources>::Deserialize` 0x00546B80.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     static gpg::RType* sType;
 
     /**

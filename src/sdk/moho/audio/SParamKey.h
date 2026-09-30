@@ -9,6 +9,12 @@ namespace gpg
   class RType;
 }
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   /**
@@ -19,6 +25,18 @@ namespace moho
    */
   struct SParamKey
   {
+    /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<SParamKey>::Serialize` 0x004DF010.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<SParamKey>::Deserialize` 0x004DEFD0.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     inline static gpg::RType* sType = nullptr;
 
     msvc8::string mCueName;                // +0x00

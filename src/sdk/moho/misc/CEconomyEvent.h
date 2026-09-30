@@ -33,6 +33,18 @@ namespace moho
    */
   struct SEconValue
   {
+    /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<SEconValue>::Serialize` 0x00563C80.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<SEconValue>::Deserialize` 0x00563C50.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     float energy;
     float mass;
 

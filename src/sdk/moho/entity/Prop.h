@@ -28,6 +28,18 @@ namespace moho
 
   struct SPropPriorityInfo
   {
+    /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<SPropPriorityInfo>::Serialize` 0x006F9C10.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<SPropPriorityInfo>::Deserialize` 0x006F9BE0.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     std::int32_t mPriority;    // +0x00
     std::int32_t mBoundedTick; // +0x04
 

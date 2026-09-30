@@ -1,75 +1,61 @@
-#include "moho/sim/COGridSerializer.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
 #include "moho/sim/COGrid.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCOGridType()
-  {
-    gpg::RType* type = moho::COGrid::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::COGrid));
-      moho::COGrid::sType = type;
-    }
-    GPG_ASSERT(type != nullptr);
-    return type;
-  }
+} // namespace
+
+namespace moho
+{
+} // namespace moho
+
+namespace
+{
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00BDAAB0 (FUN_00BDAAB0, dynamic initializer for the global
-   * `COGridSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
+   * Inlined into `gpg::SerSaveLoadHelper<COGrid>::Deserialize` 0x00722CC0.
    */
-  COGridSerializer::COGridSerializer()
-    : mLoadCallback(&COGridSerializer::Deserialize)
-    , mSaveCallback(&COGridSerializer::Serialize)
-  {}
-
-  COGridSerializer::~COGridSerializer() = default;
-
-  /**
-   * Address: 0x00722CC0 (FUN_00722CC0, Moho::COGridSerializer::Deserialize)
-   */
-  void COGridSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void COGrid::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    auto* const grid = reinterpret_cast<COGrid*>(static_cast<std::uintptr_t>(objectPtr));
     gpg::RRef selfRef{};
-    selfRef = gpg::MakeRRef<moho::COGrid>(grid);
+    selfRef = gpg::MakeRRef<moho::COGrid>(this);
     archive->TrackPointer(selfRef);
   }
 
   /**
-   * Address: 0x00722D00 (FUN_00722D00, Moho::COGridSerializer::Serialize)
+   * Inlined into `gpg::SerSaveLoadHelper<COGrid>::Serialize` 0x00722D00.
    */
-  void COGridSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void COGrid::MemberSerialize(gpg::WriteArchive* const archive)
   {
-    auto* const grid = reinterpret_cast<COGrid*>(static_cast<std::uintptr_t>(objectPtr));
     gpg::RRef selfRef{};
-    selfRef = gpg::MakeRRef<moho::COGrid>(grid);
+    selfRef = gpg::MakeRRef<moho::COGrid>(this);
     archive->PreCreatedPtr(selfRef);
   }
+} // namespace moho
 
+namespace moho
+{
   /**
-   * Address: 0x00722F90 (FUN_00722F90, gpg::SerSaveLoadHelper_COGrid::Init)
+   * `gpg::SerSaveLoadHelper<COGrid>`, vtable 0x00E3195C.
+   *
+   * Address: 0x00BDAAB0 (FUN_00BDAAB0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C003E0 (FUN_00C003E0 -- the global's destructor.)
+   * Address: 0x00722D40 (FUN_00722D40 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00722F90 (FUN_00722F90 -- `Init`.)
+   * Address: 0x00722CC0 (FUN_00722CC0 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x00722D00 (FUN_00722D00 -- `Serialize`, `MemberSerialize` inlined.)
    */
-  void COGridSerializer::Init()
-  {
-    gpg::RType* const type = CachedCOGridType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
+  struct COGridSerializer : gpg::SerSaveLoadHelper<COGrid>
+  {};
 } // namespace moho
 
 namespace

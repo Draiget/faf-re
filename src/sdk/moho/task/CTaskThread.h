@@ -138,6 +138,18 @@ namespace moho
   class CTaskStage
   {
   public:
+    /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<CTaskStage>::Serialize` 0x00409C20.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<CTaskStage>::Deserialize` 0x00409BF0.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     static gpg::RType* sType;
 
     TDatList<CTaskThread, void> mThreads;       // 0x00
@@ -200,61 +212,6 @@ namespace moho
    *   per-frame user task-stage update.
    */
   extern CTaskStage* sUserStage;
-
-  class CTaskStageSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC30E0 (FUN_00BC30E0, dynamic initializer for the global
-     * `CTaskStageSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    CTaskStageSerializer();
-
-    /**
-     * Address: 0x00BEE460 (FUN_00BEE460, Moho::CTaskStageSerializer::~CTaskStageSerializer)
-     */
-    ~CTaskStageSerializer();
-
-    /**
-     * Address: 0x00409BF0 (FUN_00409BF0, Moho::CTaskStageSerializer::Deserialize)
-     *
-     * What it does:
-     * Loads active flag and owned/staged thread list.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00409C20 (FUN_00409C20, Moho::CTaskStageSerializer::Serialize)
-     *
-     * What it does:
-     * Saves active flag and owned/staged thread list.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0040A7F0 (FUN_0040A7F0, Moho::CTaskStageSerializer::Init)
-     *
-     * What it does:
-     * Binds load/save serializer callbacks into CTaskStage RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
-  static_assert(
-    offsetof(CTaskStageSerializer, mSerLoadFunc) == 0x0C, "CTaskStageSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CTaskStageSerializer, mSerSaveFunc) == 0x10, "CTaskStageSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CTaskStageSerializer) == 0x14, "CTaskStageSerializer size must be 0x14");
 
   class CTaskStageTypeInfo : public gpg::RType
   {

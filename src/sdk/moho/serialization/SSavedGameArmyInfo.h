@@ -17,6 +17,18 @@ namespace moho
    */
   struct SSavedGameArmyInfo
   {
+    /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<SSavedGameArmyInfo>::Serialize` 0x00880060.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<SSavedGameArmyInfo>::Deserialize` 0x00880040.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     static gpg::RType* sType;
 
     [[nodiscard]] static gpg::RType* StaticGetClass();
@@ -46,77 +58,4 @@ namespace moho
 
   static_assert(sizeof(SSavedGameArmyInfoTypeInfo) == 0x64, "SSavedGameArmyInfoTypeInfo size must be 0x64");
 
-  class SSavedGameArmyInfoSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BE6FE0 (FUN_00BE6FE0, register_SSavedGameArmyInfoSerializer,
-     * dynamic initializer for the global `SSavedGameArmyInfoSerializer`
-     * singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    SSavedGameArmyInfoSerializer();
-
-    /**
-     * Address: 0x00C07CC0 (FUN_00C07CC0)
-     *
-     * IDA never produced a mangled name for this one (unlike its siblings'
-     * `??1...Serializer@Moho@@QAE@@Z` destructors) -- confirmed real by its
-     * single code xref, the real ctor's `atexit` push at 0x00BE6FEA, and a
-     * body that operates directly on the `SSavedGameArmyInfoSerializer`
-     * global (not a parameterized/shared thunk).
-     */
-    ~SSavedGameArmyInfoSerializer();
-
-    /**
-     * Address: 0x00880040 (FUN_00880040, Moho::SSavedGameArmyInfoSerializer::Deserialize)
-     *
-     * What it does:
-     * Loads one `SSavedGameArmyInfo::mPlayerName` lane via
-     * `gpg::ReadArchive::ReadString` (vtable slot 2).
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00880060 (FUN_00880060, Moho::SSavedGameArmyInfoSerializer::Serialize)
-     *
-     * What it does:
-     * Saves one `SSavedGameArmyInfo::mPlayerName` lane via
-     * `gpg::WriteArchive::WriteString` (vtable slot 2).
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00882090 (FUN_00882090, Moho::SSavedGameArmyInfoSerializer::Init)
-     *
-     * This body is ICF-folded/shared with vtable slot 0 of the
-     * never-constructed `gpg::SerSaveLoadHelper<SSavedGameArmyInfo>` template
-     * instantiation (`??_7?$SerSaveLoadHelper@USSavedGameArmyInfo@Moho@@@gpg@@6B@`,
-     * confirmed to have zero vtable-writer ctors anywhere in the binary).
-     * `SSavedGameArmyInfoSerializer` is not derived through that template:
-     * `SSavedGameArmyInfo` has no `MemberDeserialize`/`MemberSerialize` pair
-     * for the template to forward into in the first place.
-     *
-     * What it does:
-     * Binds SSavedGameArmyInfo serializer callbacks into RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
-  static_assert(
-    offsetof(SSavedGameArmyInfoSerializer, mSerLoadFunc) == 0x0C,
-    "SSavedGameArmyInfoSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SSavedGameArmyInfoSerializer, mSerSaveFunc) == 0x10,
-    "SSavedGameArmyInfoSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(SSavedGameArmyInfoSerializer) == 0x14, "SSavedGameArmyInfoSerializer size must be 0x14");
 } // namespace moho

@@ -170,6 +170,18 @@ namespace moho
   class COGrid
   {
   public:
+    /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<COGrid>::Serialize` 0x00722D00.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<COGrid>::Deserialize` 0x00722CC0.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     inline static gpg::RType* sType = nullptr;
 
     /**

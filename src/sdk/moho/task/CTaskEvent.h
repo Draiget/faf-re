@@ -115,6 +115,7 @@ namespace moho
      */
     static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
+
     /**
      * Address: 0x004069F0 (FUN_004069F0, Moho::STaskEventLinkageSerializer::Serialize)
      * Alias:   0x00407950 (FUN_00407950, duplicate callback body)
@@ -291,6 +292,18 @@ namespace moho
   {
   public:
     /**
+     * What it does:
+     * Saves this object's members. Inlined into `gpg::SerSaveLoadHelper<CTaskEvent>::Serialize` 0x00406EF0.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * What it does:
+     * Loads this object's members. Inlined into `gpg::SerSaveLoadHelper<CTaskEvent>::Deserialize` 0x00406EC0.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x00406C10 (FUN_00406C10, ??0CTaskEvent@Moho@@QAE@XZ)
      *
      * What it does:
@@ -354,45 +367,6 @@ namespace moho
   static_assert(sizeof(CTaskEvent) == 0x10, "CTaskEvent size must be 0x10");
   static_assert(offsetof(CTaskEvent, mTriggered) == 0x04, "CTaskEvent::mTriggered offset must be 0x04");
   static_assert(offsetof(CTaskEvent, mWaitLinks) == 0x08, "CTaskEvent::mWaitLinks offset must be 0x08");
-
-  class CTaskEventSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC2F50 (FUN_00BC2F50, dynamic initializer for the global
-     * `CTaskEventSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    CTaskEventSerializer();
-
-    /**
-     * Address: 0x00BEE1D0 (FUN_00BEE1D0, Moho::CTaskEventSerializer::~CTaskEventSerializer)
-     */
-    ~CTaskEventSerializer();
-
-    /**
-     * Address: 0x00407620 (FUN_00407620, ?Init@CTaskEventSerializer@Moho@@UAEXXZ)
-     *
-     * What it does:
-     * Binds CTaskEvent load/save serializer callbacks into RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
-  static_assert(
-    offsetof(CTaskEventSerializer, mSerLoadFunc) == 0x0C, "CTaskEventSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CTaskEventSerializer, mSerSaveFunc) == 0x10, "CTaskEventSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CTaskEventSerializer) == 0x14, "CTaskEventSerializer size must be 0x14");
 
   class CTaskEventTypeInfo : public gpg::RType
   {

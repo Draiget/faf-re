@@ -67,9 +67,6 @@ namespace
     return &sInstance;
   }
 
-  // Address: 0x010A6834 -- process-global `CTaskStageSerializer` singleton.
-  moho::CTaskStageSerializer gCTaskStageSerializerHelper;
-
   struct CTaskThreadSerializerRegistration
   {
     CTaskThreadSerializerRegistration()
@@ -106,19 +103,6 @@ namespace moho
     (void)InitializeCTaskStageTypeInfoStorage();
   }
 
-  /**
-   * Address: 0x00BC30E0 (FUN_00BC30E0, dynamic initializer for the global
-   * `CTaskStageSerializer` singleton)
-   */
-  CTaskStageSerializer::CTaskStageSerializer()
-    : mSerLoadFunc(&CTaskStageSerializer::Deserialize)
-    , mSerSaveFunc(&CTaskStageSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BEE460 (FUN_00BEE460, Moho::CTaskStageSerializer::~CTaskStageSerializer)
-   */
-  CTaskStageSerializer::~CTaskStageSerializer() = default;
 } // namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

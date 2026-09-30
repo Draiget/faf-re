@@ -1,77 +1,60 @@
-#include "moho/serialization/CPrefetchSetSerializer.h"
 
+#include <cstddef>
 #include "gpg/core/utils/Global.h"
 #include "moho/serialization/CPrefetchSet.h"
 #include "moho/serialization/PrefetchHandleBaseVectorReflection.h"
+#include "gpg/core/reflection/Reflection.h"
+
+namespace moho
+{
+} // namespace moho
+
+namespace
+{
+} // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00BC5990 (FUN_00BC5990, dynamic initializer for the global
-   * `CPrefetchSetSerializer` singleton)
+   * Inlined into `gpg::SerSaveLoadHelper<CPrefetchSet>::Deserialize` 0x004A55F0.
+   */
+  void CPrefetchSet::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    archive->Read(gpg::ResolvePrefetchHandleBaseVectorType(), this, ownerRef);
+  }
+
+  /**
+   * Inlined into `gpg::SerSaveLoadHelper<CPrefetchSet>::Serialize` 0x004A5630.
+   */
+  void CPrefetchSet::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    archive->Write(gpg::ResolvePrefetchHandleBaseVectorType(), this, ownerRef);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CPrefetchSet>`, vtable 0x00E07324.
    *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
+   * Address: 0x00BC5990 (FUN_00BC5990 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF03A0 (FUN_00BF03A0 -- the global's destructor.)
+   * Address: 0x004A5F50 (FUN_004A5F50 -- `Init`.)
+   * Address: 0x004A55F0 (FUN_004A55F0 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004A5630 (FUN_004A5630 -- `Serialize`, `MemberSerialize` inlined.)
    */
-  CPrefetchSetSerializer::CPrefetchSetSerializer()
-    : mDeserialize(&CPrefetchSetSerializer::Deserialize)
-    , mSerialize(&CPrefetchSetSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BF03A0 (FUN_00BF03A0, Moho::CPrefetchSetSerializer::~CPrefetchSetSerializer)
-   */
-  CPrefetchSetSerializer::~CPrefetchSetSerializer() = default;
-
-  /**
-   * Address: 0x004A55F0 (FUN_004A55F0, Moho::CPrefetchSetSerializer::Deserialize)
-   */
-  void CPrefetchSetSerializer::Deserialize(gpg::ReadArchive* const archive, int objectPtr, int, gpg::RRef* ownerRef)
-  {
-    auto* const setObject = reinterpret_cast<CPrefetchSet*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(setObject != nullptr);
-    if (!archive || !setObject) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Read(gpg::ResolvePrefetchHandleBaseVectorType(), setObject, owner);
-  }
-
-  /**
-   * Address: 0x004A5630 (FUN_004A5630, Moho::CPrefetchSetSerializer::Serialize)
-   */
-  void CPrefetchSetSerializer::Serialize(gpg::WriteArchive* const archive, int objectPtr, int, gpg::RRef* ownerRef)
-  {
-    auto* const setObject = reinterpret_cast<CPrefetchSet*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(setObject != nullptr);
-    if (!archive || !setObject) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Write(gpg::ResolvePrefetchHandleBaseVectorType(), setObject, owner);
-  }
-
-  /**
-   * Address: 0x004A5F50 (FUN_004A5F50)
-   */
-  void CPrefetchSetSerializer::Init()
-  {
-    gpg::RType* const type = CPrefetchSet::StaticGetClass();
-    GPG_ASSERT(type != nullptr);
-    if (!type) {
-      return;
-    }
-
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
+  struct CPrefetchSetSerializer : gpg::SerSaveLoadHelper<CPrefetchSet>
+  {};
 } // namespace moho
 
 namespace
