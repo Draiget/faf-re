@@ -28,7 +28,31 @@ namespace
   // Address: 0x010B9804 -- process-global `PrimitiveSerHelper<ESquadClass,int>`
   // singleton (constructed by FUN_00BDAB80; see ESquadClassTypeInfo.h for the
   // dead-duplicate-ctor and dead-sibling-writer evidence).
-  moho::ESquadClassPrimitiveSerializer gESquadClassSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ESquadClass,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4ESquadClass@Moho@@H@gpg'`):
+   * `FUN_00BDAB80` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at `FUN_0072A4A0`. A third writer for the same global's storage address,
+   * `FUN_0072A9F0` (demangled `gpg::SerSaveLoadHelper<Moho::ESquadClass>`),
+   * is itself zero-xref/unreachable -- same sibling-writer pattern already
+   * documented for `EAlliance`/`ELayer`/`EVisibilityMode` on the template
+   * itself (see `Reflection.h`). There is no real `SerSaveLoadHelper<
+   * ESquadClass>` instance in this binary; only the `PrimitiveSerHelper`
+   * instantiation is ever constructed.
+   *
+   * The real ctor's tail pushes plain, unmangled `FUN_00C00440` as its
+   * `atexit` target (bare unlink-then-self-link shape, matching
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) -- modeled by the template's own real
+   * destructor, no explicit `atexit` call needed. `FUN_00723C60`/
+   * `FUN_00723C90` are dead, zero-xref duplicate-emission twins of that
+   * exact `FUN_00C00440` body (function_sha256-confirmed), formerly modeled
+   * in `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneBD` and its two reset thunks; removed in
+   * favor of this citation.
+   */
+  gpg::PrimitiveSerHelper<moho::ESquadClass, int> gESquadClassSerializer;
 } // namespace
 
 namespace moho

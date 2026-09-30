@@ -10,6 +10,12 @@
 
 namespace
 {
+
+
+
+  // Address: 0x010AB05C -- process-global `PrimitiveSerHelper<
+  // ERuleBPUnitMovementType,int>` singleton (constructed by FUN_00BC8930,
+  // self-registering via `__xc_a`).
   /**
    * Demangled: gpg::PrimitiveSerHelper<enum Moho::ERuleBPUnitMovementType,int>
    *
@@ -33,8 +39,11 @@ namespace
    * `RUnitBlueprintEnumTypeInfoBootstrap` constructor -- absent from the
    * real ctor's disassembly; removed.
    */
-  using ERuleBPUnitMovementTypePrimitiveSerializer = gpg::PrimitiveSerHelper<moho::ERuleBPUnitMovementType, int>;
+  gpg::PrimitiveSerHelper<moho::ERuleBPUnitMovementType, int> gERuleBPUnitMovementTypePrimitiveSerializer;
 
+  // Address: 0x010AB41C -- process-global `PrimitiveSerHelper<
+  // ERuleBPUnitCommandCaps,int>` singleton (constructed by FUN_00BC8990,
+  // self-registering via `__xc_a`).
   /**
    * Demangled: gpg::PrimitiveSerHelper<enum Moho::ERuleBPUnitCommandCaps,int>
    *
@@ -46,8 +55,11 @@ namespace
    * `atexit(&sub_BF3220)`. Two zero-xref duplicate unlink emissions
    * (`FUN_0051FFA0`, `FUN_0051FFD0`) are dead ICF twins.
    */
-  using ERuleBPUnitCommandCapsPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::ERuleBPUnitCommandCaps, int>;
+  gpg::PrimitiveSerHelper<moho::ERuleBPUnitCommandCaps, int> gERuleBPUnitCommandCapsPrimitiveSerializer;
 
+  // Address: 0x010AB1C4 -- process-global `PrimitiveSerHelper<
+  // ERuleBPUnitToggleCaps,int>` singleton (constructed by FUN_00BC89F0,
+  // self-registering via `__xc_a`).
   /**
    * Demangled: gpg::PrimitiveSerHelper<enum Moho::ERuleBPUnitToggleCaps,int>
    *
@@ -59,22 +71,7 @@ namespace
    * `atexit(&sub_BF3260)`. Two zero-xref duplicate unlink emissions
    * (`FUN_00520190`, `FUN_005201C0`) are dead ICF twins.
    */
-  using ERuleBPUnitToggleCapsPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::ERuleBPUnitToggleCaps, int>;
-
-  // Address: 0x010AB05C -- process-global `PrimitiveSerHelper<
-  // ERuleBPUnitMovementType,int>` singleton (constructed by FUN_00BC8930,
-  // self-registering via `__xc_a`).
-  ERuleBPUnitMovementTypePrimitiveSerializer gERuleBPUnitMovementTypePrimitiveSerializer;
-
-  // Address: 0x010AB41C -- process-global `PrimitiveSerHelper<
-  // ERuleBPUnitCommandCaps,int>` singleton (constructed by FUN_00BC8990,
-  // self-registering via `__xc_a`).
-  ERuleBPUnitCommandCapsPrimitiveSerializer gERuleBPUnitCommandCapsPrimitiveSerializer;
-
-  // Address: 0x010AB1C4 -- process-global `PrimitiveSerHelper<
-  // ERuleBPUnitToggleCaps,int>` singleton (constructed by FUN_00BC89F0,
-  // self-registering via `__xc_a`).
-  ERuleBPUnitToggleCapsPrimitiveSerializer gERuleBPUnitToggleCapsPrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::ERuleBPUnitToggleCaps, int> gERuleBPUnitToggleCapsPrimitiveSerializer;
 
   void AddEnumEntry(gpg::REnumType* const typeInfo, const char* const token, const int value)
   {

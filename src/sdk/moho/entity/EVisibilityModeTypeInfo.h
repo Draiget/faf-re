@@ -42,27 +42,6 @@ namespace moho
 
   static_assert(sizeof(EVisibilityModeTypeInfo) == 0x78, "EVisibilityModeTypeInfo size must be 0x78");
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EVisibilityMode,int>
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4EVisibilityMode@Moho@@H@gpg'`):
-   * `FUN_00BC7AF0` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
-   * at `FUN_0050A740` in the same instantiation family. Previously modeled
-   * in this file as a hand-rolled `{ void* mVtable; SerHelperBase*
-   * mHelperNext, mHelperPrev; ... }` POD plus manual
-   * `InitializeSerializerNode`/`UnlinkSerializerNode` splicing and an eager
-   * `register_EVisibilityModePrimitiveSerializer()` bootstrap call -- none
-   * of which the real binary does; `SerHelperBase`'s own ctor performs the
-   * real self-registration onto the pending-helper list.
-   *
-   * A second, unrelated writer shares this global's storage address
-   * (`FUN_0050AA40`, demangled
-   * `gpg::SerSaveLoadHelper<enum Moho::EVisibilityMode>`) but is itself
-   * zero-xref/unreachable too -- a separate, still-unrecovered template
-   * family, not modeled here.
-   */
-  using EVisibilityModePrimitiveSerializer = gpg::PrimitiveSerHelper<EVisibilityMode, int>;
 
   /**
    * Address: 0x0050A100 (FUN_0050A100, preregister_EVisibilityModeTypeInfo)

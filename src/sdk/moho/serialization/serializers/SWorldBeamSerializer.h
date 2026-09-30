@@ -73,16 +73,4 @@ namespace moho
   static_assert(offsetof(SWorldBeamSerializer, mSerialize) == 0x10, "SWorldBeamSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(SWorldBeamSerializer) == 0x14, "SWorldBeamSerializer size must be 0x14");
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::SWorldBeam::BlendMode,int>
-   * VFTABLE: never constructed prior to this recovery -- see the ctor
-   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4BlendMode@SWorldBeam@Moho@@H@gpg'`,
-   * i.e. `BlendMode` nested inside `SWorldBeam`, not the top-level enum
-   * some sibling classes use): `FUN_00BC5300` (real, `__xc_a`-reachable).
-   * No dead low-address duplicate found for this one.
-   */
-  using SWorldBeamBlendModePrimitiveSerializer = gpg::PrimitiveSerHelper<SWorldBeam::BlendMode, int>;
 } // namespace moho

@@ -48,26 +48,6 @@ namespace moho
     void AddEnums();
   };
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EEconResource,int>
-   * VFTABLE: never constructed prior to this recovery -- see the ctor
-   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4EEconResource@Moho@@H@gpg'`):
-   * `FUN_00BCA810` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
-   * at a lower address in the same instantiation family.
-   *
-   * `~PrimitiveSerHelper()`'s compiler-emitted static-destructor
-   * registration for this instantiation is `FUN_00BF5630` (atexit target
-   * pushed by the real ctor above); `FUN_00563AB0`/`FUN_00563AE0` are dead,
-   * zero-xref duplicate-emission twins of that exact body
-   * (function_sha256-confirmed), formerly modeled in
-   * `moho/containers/LegacyContainerFillLanes.cpp` as
-   * `gGlobalIntrusiveSentinelLaneK` and its two reset thunks; removed in
-   * favor of this citation.
-   */
-  using EEconResourcePrimitiveSerializer = gpg::PrimitiveSerHelper<EEconResource, int>;
 
   static_assert(sizeof(EEconResourceTypeInfo) == 0x78, "EEconResourceTypeInfo size must be 0x78");
 

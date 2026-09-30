@@ -250,7 +250,8 @@ namespace moho
    * `archive->Read/Write(CachedIAniManipulatorType(), ...)` helper every
    * other manipulator in this family uses.
    */
-  using CCollisionManipulatorSerializer = gpg::SerSaveLoadHelper<CCollisionManipulator>;
+  struct CCollisionManipulatorSerializer : gpg::SerSaveLoadHelper<CCollisionManipulator>
+  {};
 
   /**
    * VFTABLE: 0x00E21A00

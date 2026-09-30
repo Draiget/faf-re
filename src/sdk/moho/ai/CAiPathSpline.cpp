@@ -426,6 +426,14 @@ namespace
 
   static_assert(sizeof(FastVectorCPathPointTypeInfo) == 0x68, "FastVectorCPathPointTypeInfo size must be 0x68");
 
+} // namespace
+
+namespace
+{
+  // Address: 0x010AE1EC -- process-global `PrimitiveSerHelper<ECollisionType,int>`
+  // singleton (constructed by FUN_00BCBD70, self-registering via `__xc_a`;
+  // see the class Doxygen above for the real-ctor/atexit-target/dead-writer
+  // evidence).
   /**
    * Demangled: gpg::PrimitiveSerHelper<enum Moho::ECollisionType,int>
    *
@@ -455,16 +463,7 @@ namespace
    * the binary's real `?$PrimitiveSerHelper@W4ECollisionType@Moho@@H@gpg`
    * symbol). Collapsed into the canonical template alias.
    */
-  using ECollisionTypePrimitiveSerializer = gpg::PrimitiveSerHelper<ECollisionType, int>;
-} // namespace
-
-namespace
-{
-  // Address: 0x010AE1EC -- process-global `PrimitiveSerHelper<ECollisionType,int>`
-  // singleton (constructed by FUN_00BCBD70, self-registering via `__xc_a`;
-  // see the class Doxygen above for the real-ctor/atexit-target/dead-writer
-  // evidence).
-  ECollisionTypePrimitiveSerializer gECollisionTypePrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::ECollisionType, int> gECollisionTypePrimitiveSerializer;
 
   // Address: 0x010AE29C -- process-global `SCollisionInfoSerializer`
   // singleton. Constructing it runs SCollisionInfoSerializer::
@@ -480,7 +479,42 @@ namespace
   // singleton (constructed by FUN_00BD20E0, self-registering via `__xc_a`;
   // see CAiPathSpline.h for the real-ctor/atexit-target/dead-writer
   // evidence).
-  moho::EPathPointStatePrimitiveSerializer gEPathPointStatePrimitiveSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EPathPointState,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EPathPointState@Moho@@H@gpg'`):
+   * `FUN_00BD20E0` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at `FUN_0062F840`. A third writer for the same global's storage address,
+   * `FUN_0062F9C0` (demangled `gpg::SerSaveLoadHelper<Moho::EPathPointState>`),
+   * is itself zero-xref/unreachable too -- same "dead sibling-writer"
+   * pattern documented for `EAlliance`/`ELayer`/`EVisibilityMode`/
+   * `ESquadClass`/`EThreatType`/`ESiloType` on the `PrimitiveSerHelper`
+   * template itself (see `Reflection.h`); all three already correctly
+   * classified in the progress DB by an earlier pass this session.
+   *
+   * Confirmed via raw asm: the real ctor default-constructs
+   * `gpg::SerHelperBase`, binds `mDeserialize`/`mSerialize` to
+   * `FUN_0062F980`/`FUN_0062F9A0`, installs the
+   * `PrimitiveSerHelper<EPathPointState,int>` vtable, and explicitly
+   * registers `atexit(&sub_BFA7F0)` -- confirmed bare unlink-then-self-link
+   * shape matching the helper node's unlink (`gpg::DListItem::ListUnlink`) -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   * `FUN_0062F5F0`/`FUN_0062F620` are dead, zero-xref duplicate-emission
+   * twins of that exact `FUN_00BFA7F0` atexit body (function_sha256-
+   * confirmed; distinct from the ctor-side dead duplicates `FUN_0062F840`/
+   * `FUN_0062F9C0` above), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneW` and its two reset thunks; removed in
+   * favor of this citation.
+   *
+   * Previously modeled as its own hand-rolled `SerHelperBase`-derived class
+   * (correctly identifying the real ctor/vtable, but not actually reusing
+   * the shared template, so its compiled vtable identity would diverge from
+   * the binary's real `?$PrimitiveSerHelper@W4EPathPointState@Moho@@H@gpg`
+   * symbol). Collapsed into the canonical template alias.
+   */
+  gpg::PrimitiveSerHelper<moho::EPathPointState, int> gEPathPointStatePrimitiveSerializer;
 
   // Address: 0x010B204C -- process-global `CPathPointSerializer` singleton.
   // Constructing it runs MSVC's compiler-generated dynamic initializer for

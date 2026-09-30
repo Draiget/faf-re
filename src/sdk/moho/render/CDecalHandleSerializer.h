@@ -29,5 +29,6 @@ namespace moho
    * explicitly null, so the reflection callbacks were never actually
    * installed under that shape.
    */
-  using CDecalHandleSerializer = gpg::SerSaveLoadHelper<CDecalHandle>;
+  struct CDecalHandleSerializer : gpg::SerSaveLoadHelper<CDecalHandle>
+  {};
 } // namespace moho

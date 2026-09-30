@@ -78,29 +78,5 @@ namespace moho
   );
   static_assert(sizeof(SWorldParticleSerializer) == 0x14, "SWorldParticleSerializer size must be 0x14");
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::SWorldParticle::BlendMode,int>
-   * VFTABLE: never constructed prior to this recovery -- see the ctor
-   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4BlendMode@SWorldParticle@Moho@@H@gpg'`,
-   * i.e. `BlendMode` nested inside `SWorldParticle` -- a distinct
-   * instantiation from `SWorldBeam::BlendMode`'s, converted separately):
-   * `FUN_00BC53C0` (real, `__xc_a`-reachable). No dead low-address
-   * duplicate found for this one.
-   */
-  using SWorldParticleBlendModePrimitiveSerializer = gpg::PrimitiveSerHelper<SWorldParticle::BlendMode, int>;
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::SWorldParticle::ZMode,int>
-   * VFTABLE: never constructed prior to this recovery -- see the ctor
-   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4ZMode@SWorldParticle@Moho@@H@gpg'`):
-   * `FUN_00BC5420` (real, `__xc_a`-reachable). No dead low-address
-   * duplicate found for this one.
-   */
-  using SWorldParticleZModePrimitiveSerializer = gpg::PrimitiveSerHelper<SWorldParticle::ZMode, int>;
 } // namespace moho

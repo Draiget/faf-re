@@ -111,7 +111,8 @@ namespace
    *  - Deserialize(): 0x005F2690
    *  - Serialize(): 0x005F26A0
    */
-  using CUnitAttackTargetTaskSerializer = gpg::SerSaveLoadHelper<moho::CUnitAttackTargetTask>;
+  struct CUnitAttackTargetTaskSerializer : gpg::SerSaveLoadHelper<moho::CUnitAttackTargetTask>
+  {};
 
   // Address: 0x00BCF4C0 (FUN_00BCF4C0, register_CUnitAttackTargetTaskSerializer)
   // -- MSVC's own compiler-generated dynamic initializer for this global runs

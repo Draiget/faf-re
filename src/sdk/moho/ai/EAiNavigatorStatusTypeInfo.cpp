@@ -24,7 +24,33 @@ namespace
   // Address: 0x010AE774 -- process-global `PrimitiveSerHelper<EAiNavigatorStatus,int>`
   // singleton (constructed by FUN_00BCC600, self-registering via `__xc_a`; see
   // EAiNavigatorStatusTypeInfo.h for the real-ctor/atexit-target evidence).
-  moho::EAiNavigatorStatusPrimitiveSerializer gEAiNavigatorStatusPrimitiveSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EAiNavigatorStatus,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EAiNavigatorStatus@Moho@@H@gpg'`):
+   * `FUN_00BCC600` (real, `__xc_a`-reachable, sole writer -- no dead
+   * duplicate ctor found for this instantiation). This address's IDA export
+   * already carried synthetic struct names (`gpg::PrimitiveSerHelper_
+   * EAiNavigatorStatus`), confirming via raw asm: default-constructs
+   * `gpg::SerHelperBase`, binds `mDeserialize`/`mSerialize` to
+   * `FUN_005A76B0`/`FUN_005A76D0`, installs the
+   * `PrimitiveSerHelper<EAiNavigatorStatus,int>` vtable, and pushes
+   * `FUN_00BF6C90` (IDA-labeled `??1PrimitiveSerHelper_EAiNavigatorStatus@
+   * gpg@@QAE@@Z` -- a synthetic/heuristic name, not real MSVC mangling for
+   * this template) as its `atexit` target; confirmed to be the same bare
+   * unlink-then-self-link shape as every other instantiation's atexit
+   * target, matching the helper node's unlink (`gpg::DListItem::ListUnlink`) -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_EAiNavigatorStatusPrimitiveSerializer()`
+   * free function eagerly invoked a second time from this file's own
+   * `EAiNavigatorStatusTypeInfoBootstrap` constructor -- absent from the
+   * real ctor's disassembly (`FUN_00BCC600` already self-registers via
+   * `__xc_a`); removed.
+   */
+  gpg::PrimitiveSerHelper<moho::EAiNavigatorStatus, int> gEAiNavigatorStatusPrimitiveSerializer;
 } // namespace
 
 /**

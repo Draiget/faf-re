@@ -140,7 +140,8 @@ namespace moho
    *  - Deserialize(): 0x00646F60
    *  - Serialize(): 0x00646F70
    */
-  using CSlideManipulatorSerializer = gpg::SerSaveLoadHelper<CSlideManipulator>;
+  struct CSlideManipulatorSerializer : gpg::SerSaveLoadHelper<CSlideManipulator>
+  {};
 
   class CSlideManipulatorTypeInfo : public gpg::RType
   {

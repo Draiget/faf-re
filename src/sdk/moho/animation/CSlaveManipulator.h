@@ -132,7 +132,8 @@ namespace moho
    * `serSaveFunc_` slots -- i.e. the reflection callbacks were never
    * actually installed. This template instantiation fixes both defects.
    */
-  using CSlaveManipulatorSerializer = gpg::SerSaveLoadHelper<CSlaveManipulator>;
+  struct CSlaveManipulatorSerializer : gpg::SerSaveLoadHelper<CSlaveManipulator>
+  {};
 
   class CSlaveManipulatorTypeInfo : public gpg::RType
   {

@@ -9,23 +9,6 @@
 
 namespace
 {
-  /**
-   * `gpg::PrimitiveSerHelper<T,int>` aliases for the five `EUnitMotion*`
-   * enums. Kept file-local (not exposed in UnitMotionEnumTypeInfo.h) since
-   * `EUnitMotionVertEvent` is declared in CUnitMotion.h rather than the
-   * shared EUnitMotionEnums.h, and this .cpp already includes CUnitMotion.h
-   * for CUnitMotion::MemberDeserialize/MemberSerialize elsewhere in the
-   * translation unit -- pulling that header into UnitMotionEnumTypeInfo.h
-   * just for one alias would add unwanted weight to every includer. Matches
-   * the original file's own architecture, where the hand-rolled
-   * EnumPrimitiveSerializer<TEnum> template mimic was likewise anonymous-
-   * namespace-local, never declared in the header.
-   */
-  using EUnitMotionStatePrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EUnitMotionState, int>;
-  using EUnitMotionCarrierEventPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EUnitMotionCarrierEvent, int>;
-  using EUnitMotionHorzEventPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EUnitMotionHorzEvent, int>;
-  using EUnitMotionVertEventPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EUnitMotionVertEvent, int>;
-  using EUnitMotionTurnEventPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EUnitMotionTurnEvent, int>;
 
   /**
    * Per-instantiation `gpg::PrimitiveSerHelper<T,int>` dynamic-initializer
@@ -46,13 +29,37 @@ namespace
    * (0x00BFDEA0/0x00BFDEE0/0x00BFDF20/0x00BFDF60/0x00BFDFA0/0x00BFDFE0) are
    * now implicit via the template's declared destructor -- no explicit
    * register_/cleanup_ pair is needed.
+   *
+   * `gpg::PrimitiveSerHelper<T,int>` aliases for the five `EUnitMotion*`
+   * enums. Kept file-local (not exposed in UnitMotionEnumTypeInfo.h) since
+   * `EUnitMotionVertEvent` is declared in CUnitMotion.h rather than the
+   * shared EUnitMotionEnums.h, and this .cpp already includes CUnitMotion.h
+   * for CUnitMotion::MemberDeserialize/MemberSerialize elsewhere in the
+   * translation unit -- pulling that header into UnitMotionEnumTypeInfo.h
+   * just for one alias would add unwanted weight to every includer. Matches
+   * the original file's own architecture, where the hand-rolled
+   * EnumPrimitiveSerializer<TEnum> template mimic was likewise anonymous-
+   * namespace-local, never declared in the header.
    */
-  EUnitMotionStatePrimitiveSerializer gEUnitMotionStatePrimitiveSerializer;
-  EUnitMotionCarrierEventPrimitiveSerializer gEUnitMotionCarrierEventPrimitiveSerializer;
-  EUnitMotionHorzEventPrimitiveSerializer gEUnitMotionHorzEventPrimitiveSerializer;
-  EUnitMotionVertEventPrimitiveSerializer gEUnitMotionVertEventPrimitiveSerializer;
-  EUnitMotionTurnEventPrimitiveSerializer gEUnitMotionTurnEventPrimitiveSerializer;
-  moho::EAirCombatStatePrimitiveSerializer gEAirCombatStatePrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::EUnitMotionState, int> gEUnitMotionStatePrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::EUnitMotionCarrierEvent, int> gEUnitMotionCarrierEventPrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::EUnitMotionHorzEvent, int> gEUnitMotionHorzEventPrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::EUnitMotionVertEvent, int> gEUnitMotionVertEventPrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::EUnitMotionTurnEvent, int> gEUnitMotionTurnEventPrimitiveSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EAirCombatState,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EAirCombatState@Moho@@H@gpg'`):
+   * `FUN_00BD71E0` (real, `__xc_a`-reachable; no dead duplicate found for
+   * this instantiation). `Init()` confirmed at `FUN_006BA740` via the RTTI
+   * vftable dump (`vftable@0xE2AC98` slot 0) -- previously mis-cited in
+   * `ArchiveSerialization.cpp` as a generic
+   * `InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EAirCombatState")`
+   * dispatch; the real body does a direct `typeid`/cached-type lookup and
+   * hardcoded callback install, matching this template's `Init()` exactly.
+   */
+  gpg::PrimitiveSerHelper<moho::EAirCombatState, int> gEAirCombatStatePrimitiveSerializer;
 } // namespace
 
 namespace moho

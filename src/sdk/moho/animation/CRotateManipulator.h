@@ -157,7 +157,8 @@ namespace moho
    *  - Deserialize(): 0x00643570
    *  - Serialize(): 0x00643580
    */
-  using CRotateManipulatorSerializer = gpg::SerSaveLoadHelper<CRotateManipulator>;
+  struct CRotateManipulatorSerializer : gpg::SerSaveLoadHelper<CRotateManipulator>
+  {};
 
   class CRotateManipulatorTypeInfo : public gpg::RType
   {

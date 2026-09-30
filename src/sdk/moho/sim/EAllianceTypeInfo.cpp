@@ -31,8 +31,27 @@ namespace
    * `register_EAlliancePrimitiveSerializer()` call from a bootstrap struct
    * to run its equivalent logic; the real binary never does that -- the
    * global's own dynamic initializer is the entire registration.
+   *
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EAlliance,int>
+   * VFTABLE: never constructed prior to this recovery -- see the ctor
+   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EAlliance@Moho@@H@gpg'`):
+   * `FUN_00BC7A30` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at 0x0050A600 (compiler/linker artifact, no source line -- see the
+   * class-level Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h).
+   *
+   * The previous raw-struct recovery of this instantiation also modeled a
+   * "secondary" startup thunk at 0x0050A960 as if it were a duplicate
+   * emission of this same ctor. It is not: per `vtable_writers`, 0x0050A960
+   * is the (itself dead, zero-xref) ctor of the unrelated template
+   * instantiation `gpg::SerSaveLoadHelper<Moho::EAlliance>`
+   * (`class_name='?$SerSaveLoadHelper@W4EAlliance@Moho@@@gpg'`), a distinct
+   * ~50-instantiation template family (see `ArchiveSerialization.cpp` and
+   * friends) that has not been canonicalized and is out of scope here.
    */
-  moho::EAlliancePrimitiveSerializer gEAlliancePrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::EAlliance, int> gEAlliancePrimitiveSerializer;
 
   /**
    * Address: 0x00509D60 (FUN_00509D60, EAllianceTypeInfo construct/register lane)

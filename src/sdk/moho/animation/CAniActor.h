@@ -254,7 +254,8 @@ namespace moho
    *  - Deserialize(): 0x0063B0A0
    *  - Serialize(): 0x0063B0C0
    */
-  using CAniActorSerializer = gpg::SerSaveLoadHelper<CAniActor>;
+  struct CAniActorSerializer : gpg::SerSaveLoadHelper<CAniActor>
+  {};
 
   class CAniActorTypeInfo : public gpg::RType
   {

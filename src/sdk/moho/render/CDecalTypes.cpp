@@ -154,7 +154,8 @@ namespace
    * this codebase as unreliable (the real body does a typeid/RTTI-pointer
    * `LookupRType`, not a by-name string lookup); left untouched here.
    */
-  using SDecalInfoSerializer = gpg::SerSaveLoadHelper<moho::SDecalInfo>;
+  struct SDecalInfoSerializer : gpg::SerSaveLoadHelper<moho::SDecalInfo>
+  {};
 
   // Address: 0x00BDD820 (dynamic initializer for the global
   // `SDecalInfoSerializer` singleton, __xc_a-reachable) -- MSVC's own

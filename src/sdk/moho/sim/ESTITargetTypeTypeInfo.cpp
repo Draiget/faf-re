@@ -34,8 +34,35 @@ namespace
    * `src/sdk` (no register function existed for it at all), so
    * `ESTITargetType`'s serialize/deserialize callbacks were never
    * installed under any code path.
+   *
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ESTITargetType,int>
+   * VFTABLE: never constructed prior to this recovery -- see the ctor
+   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4ESTITargetType@Moho@@H@gpg'`):
+   * `FUN_00BCA2B0` (real, `__xc_a`-reachable). Unlike `EAlliance`/
+   * `EImpactType`, this instantiation has no dead low-address duplicate
+   * ctor in `vtable_writers` -- only the one real emission.
+   *
+   * `FUN_00BCA2B0` was previously mis-tagged `external_dependency` ("OS/CRT/
+   * library dependency") in the progress DB; raw asm shows it is plainly
+   * engine code -- constructs our own `gpg::SerHelperBase` base, writes our
+   * own `PrimitiveSerHelper<ESTITargetType,int>` vtable, and installs
+   * `sub_55B310`/`sub_55B330` (this instantiation's Deserialize/Serialize)
+   * as callback fields, the same shape as every other confirmed real ctor
+   * in this family.
+   *
+   * `~PrimitiveSerHelper()`'s compiler-emitted static-destructor
+   * registration for this instantiation is `FUN_00BF50E0` (atexit target
+   * pushed by the real ctor above); `FUN_0055AF80`/`FUN_0055AFB0` are dead,
+   * zero-xref duplicate-emission twins of that exact body
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneG` and its two reset thunks; removed in
+   * favor of this citation.
    */
-  moho::ESTITargetTypePrimitiveSerializer gESTITargetTypePrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::ESTITargetType, int> gESTITargetTypePrimitiveSerializer;
 } // namespace
 
 /**

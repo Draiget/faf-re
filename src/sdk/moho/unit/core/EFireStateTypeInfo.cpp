@@ -17,8 +17,33 @@ namespace
    * `gpg::SerHelperBase::InitNewHelpers`). This is an independent `__xc_a`
    * static initializer, separate from `EFireStateTypeInfo`'s own
    * initializer above.
+   *
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EFireState,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EFireState@Moho@@H@gpg'`):
+   * `FUN_00BCA4C0` (real, `__xc_a`-reachable; no dead duplicate found for
+   * this instantiation). `Init()` confirmed at `FUN_0055C900` via the RTTI
+   * vftable dump (`vftable@0xE1871C` slot 0) -- previously mis-cited in
+   * `ArchiveSerialization.cpp` as a generic
+   * `InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EFireState")`
+   * dispatch; the real body does a direct `typeid`/`sType`-cache lookup and
+   * hardcoded callback install, matching this template's `Init()` exactly
+   * (same mis-citation family already caught this session for
+   * ESTITargetType/EResourceType/EUnitCommandType/CAniPose/CAniPoseBone).
+   * `Deserialize`/`Serialize` at 0x0055D3E0/0x0055D400 already matched this
+   * template's generic bodies exactly (no fabricated null-check).
+   *
+   * `~PrimitiveSerHelper()`'s compiler-emitted static-destructor
+   * registration for this instantiation is `FUN_00BF5230` (atexit target
+   * pushed by the real ctor above); `FUN_0055BAB0`/`FUN_0055BAE0` are dead,
+   * zero-xref duplicate-emission twins of that exact body
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneI` and its two reset thunks; removed in
+   * favor of this citation.
    */
-  moho::EFireStatePrimitiveSerializer gEFireStatePrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::EFireState, int> gEFireStatePrimitiveSerializer;
 } // namespace
 
 namespace moho

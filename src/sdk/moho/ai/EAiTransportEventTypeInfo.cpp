@@ -25,7 +25,36 @@ namespace
   // singleton (constructed by FUN_00BCED30, self-registering via `__xc_a`; see
   // EAiTransportEventTypeInfo.h for the real-ctor/atexit-target/dead-duplicate
   // evidence).
-  moho::EAiTransportEventPrimitiveSerializer gEAiTransportEventPrimitiveSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EAiTransportEvent,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EAiTransportEvent@Moho@@H@gpg'`):
+   * `FUN_00BCED30` (real, `__xc_a`-reachable). Confirmed via raw asm:
+   * default-constructs `gpg::SerHelperBase`, binds `mLoadCallback`/
+   * `mSaveCallback` to `FUN_005E9DD0`/`FUN_005E9DF0`, installs the
+   * `PrimitiveSerHelper<EAiTransportEvent,int>` vtable, and pushes plain
+   * unmangled `FUN_00BF8970` (bare unlink-then-self-link shape, matching
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * Unlike the other AI enum serializers in this cluster, this global has
+   * TWO dead zero-caller/zero-xref duplicate ctors sharing its storage
+   * address (both write the same fields, neither calls `atexit`, so
+   * neither is ever live): `FUN_005E8B60` and `FUN_005E9E10`. The previous
+   * recovery wrongly modeled `FUN_005E9E10` as a helper function CALLED BY
+   * `register_EAiTransportEventPrimitiveSerializer()` -- the real ctor's
+   * disassembly sets its fields inline and calls no such helper. Both dead
+   * duplicates marked `skip`.
+   *
+   * The previous recovery also modeled this as a hand-rolled raw-struct
+   * mimic of `SerHelperBase` plus a fabricated
+   * `register_EAiTransportEventPrimitiveSerializer()` free function eagerly
+   * invoked a second time from `IAiTransport.cpp`'s
+   * `IAiTransportReflectionBootstrap` constructor -- absent from the real
+   * ctor's disassembly; removed from both files.
+   */
+  gpg::PrimitiveSerHelper<moho::EAiTransportEvent, int> gEAiTransportEventPrimitiveSerializer;
 
   // NOTE: FUN_005E3E80 ("zero_EAiTransportEventRuntimeLanes" in the prior
   // recovery) was removed from this file. It is a real, distinct 117-byte

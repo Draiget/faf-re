@@ -28,8 +28,18 @@ namespace
    * bootstrap struct that also triple-registered the type info (bootstrap
    * ctor + two separate GPG_PREREGISTER_INIT entries for the same
    * descriptor).
+   *
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EIntel,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EIntel@Moho@@H@gpg'`): `FUN_00BC7BB0`
+   * (real, `__xc_a`-reachable) vs. a dead, zero-xref duplicate ctor at
+   * `FUN_0050A880` (same low-address/high-address shape already established
+   * for every other `PrimitiveSerHelper<T,int>` instantiation). `Init()`
+   * confirmed at `FUN_0050A8B0` via the RTTI vftable dump (`vftable@0xE0DB94`
+   * slot 0) -- matches this template's `Init()` exactly.
    */
-  moho::EIntelPrimitiveSerializer gEIntelPrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::EIntel, int> gEIntelPrimitiveSerializer;
 } // namespace
 
 namespace moho

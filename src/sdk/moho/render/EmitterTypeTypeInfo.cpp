@@ -26,8 +26,32 @@ namespace
    * global was a hand-rolled POD that never actually inherited
    * `SerHelperBase`, so `EmitterType`'s serialize/deserialize callbacks
    * were never installed under any code path.
+   *
+   * Demangled: gpg::PrimitiveSerHelper<enum moho::EmitterType,int>
+   * VFTABLE: 0x00E2416C
+   * COL: 0x00E7E4A8
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EmitterType@Moho@@H@gpg'`):
+   * `FUN_00BD42B0` (real, `__xc_a`-reachable; no dead low-address duplicate
+   * found for this instantiation). Previously modeled in this file as a
+   * hand-rolled `{ void* mVtable; SerHelperBase* mHelperNext, mHelperPrev;
+   * ... }` POD plus manual `InitializeHelperNode`/`UnlinkHelperNode`
+   * splicing and an eager `register_EmitterTypePrimitiveSerializer()`
+   * bootstrap call -- none of which the real binary does; `SerHelperBase`'s
+   * own ctor performs the real self-registration onto the pending-helper
+   * list.
+   *
+   * `~PrimitiveSerHelper()`'s compiler-emitted static-destructor
+   * registration for this instantiation is `FUN_00BFBD20` (atexit target
+   * pushed by the real ctor above); `FUN_0065DF80`/`FUN_0065DFB0` are dead,
+   * zero-xref duplicate-emission twins of that exact body
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneX` and its two reset thunks; removed in
+   * favor of this citation.
    */
-  moho::EmitterTypePrimitiveSerializer gEmitterTypePrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::EmitterType, int> gEmitterTypePrimitiveSerializer;
 
   /**
    * Address: 0x00BFBD10 (FUN_00BFBD10, atexit destructor of the moho::EmitterTypeTypeInfo object)

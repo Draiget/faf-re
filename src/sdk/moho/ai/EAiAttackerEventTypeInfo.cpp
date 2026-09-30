@@ -24,7 +24,29 @@ namespace
   // Address: 0x010B0304 -- process-global `PrimitiveSerHelper<EAiAttackerEvent,int>`
   // singleton (constructed by FUN_00BCE770, self-registering via `__xc_a`; see
   // EAiAttackerEventTypeInfo.h for the real-ctor/atexit-target evidence).
-  moho::EAiAttackerEventPrimitiveSerializer gEAiAttackerEventPrimitiveSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EAiAttackerEvent,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EAiAttackerEvent@Moho@@H@gpg'`):
+   * `FUN_00BCE770` (real, `__xc_a`-reachable, sole writer -- no dead
+   * duplicate ctor found for this instantiation). Confirmed via raw asm:
+   * default-constructs `gpg::SerHelperBase`, binds `mLoadCallback`/
+   * `mSaveCallback` to `FUN_005DC390`/`FUN_005DC3B0`, installs the
+   * `PrimitiveSerHelper<EAiAttackerEvent,int>` vtable, and pushes plain
+   * unmangled `FUN_00BF8250` (bare unlink-then-self-link shape, matching
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_EAiAttackerEventPrimitiveSerializer()`
+   * free function eagerly invoked a second time from `IAiAttacker.cpp`'s
+   * `IAiAttackerReflectionBootstrap` constructor -- that second call is
+   * absent from the real ctor's disassembly (`FUN_00BCE770` already
+   * self-registers via `__xc_a` like every other `PrimitiveSerHelper<T,int>`
+   * instantiation); removed from both files.
+   */
+  gpg::PrimitiveSerHelper<moho::EAiAttackerEvent, int> gEAiAttackerEventPrimitiveSerializer;
 } // namespace
 
 /**

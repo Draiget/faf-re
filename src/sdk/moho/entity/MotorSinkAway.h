@@ -170,7 +170,8 @@ namespace moho
    *  - Deserialize(): 0x00696880
    *  - Serialize(): 0x00696890
    */
-  using MotorSinkAwaySerializer = gpg::SerSaveLoadHelper<MotorSinkAway>;
+  struct MotorSinkAwaySerializer : gpg::SerSaveLoadHelper<MotorSinkAway>
+  {};
 
   class MotorSinkAwayConstruct : public gpg::SerHelperBase
   {

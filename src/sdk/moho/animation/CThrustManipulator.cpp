@@ -363,7 +363,8 @@ namespace moho
    *  - Deserialize(): 0x0064A330 (tail-calls `MemberDeserialize` at 0x0064B6E0)
    *  - Serialize(): 0x0064A340 (tail-calls `MemberSerialize` at 0x0064B890)
    */
-  using CThrustManipulatorSerializer = gpg::SerSaveLoadHelper<CThrustManipulator>;
+  struct CThrustManipulatorSerializer : gpg::SerSaveLoadHelper<CThrustManipulator>
+  {};
 
   /**
    * Address: 0x0064B300 (FUN_0064B300, ?AddBase_IAniManipulator@CThrustManipulatorTypeInfo@Moho@@SGXPAVRType@gpg@@@Z)

@@ -147,7 +147,8 @@ namespace moho
    *  - Deserialize(): 0x0050C170
    *  - Serialize(): 0x0050C180
    */
-  using SNavGoalSerializer = gpg::SerSaveLoadHelper<SNavGoal>;
+  struct SNavGoalSerializer : gpg::SerSaveLoadHelper<SNavGoal>
+  {};
 
   static_assert(sizeof(SNavGoalTypeInfo) == 0x64, "SNavGoalTypeInfo size must be 0x64");
 

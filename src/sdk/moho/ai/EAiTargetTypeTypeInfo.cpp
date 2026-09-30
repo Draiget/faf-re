@@ -37,7 +37,27 @@ namespace
   // Address: 0x010B049C -- process-global `PrimitiveSerHelper<EAiTargetType,int>`
   // singleton (constructed by FUN_00BCEBF0, self-registering via `__xc_a`; see
   // EAiTargetTypeTypeInfo.h for the real-ctor/atexit-target evidence).
-  moho::EAiTargetTypePrimitiveSerializer gEAiTargetTypePrimitiveSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EAiTargetType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EAiTargetType@Moho@@H@gpg'`):
+   * `FUN_00BCEBF0` (real, `__xc_a`-reachable, sole writer -- no dead
+   * duplicate ctor found). Confirmed via raw asm: default-constructs
+   * `gpg::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback` to
+   * `FUN_005E35B0`/`FUN_005E35D0`, installs the
+   * `PrimitiveSerHelper<EAiTargetType,int>` vtable, and pushes plain
+   * unmangled `FUN_00BF8880` (bare unlink-then-self-link shape, matching
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_EAiTargetTypePrimitiveSerializer()`
+   * free function eagerly invoked a second time from this file's own
+   * `EAiTargetTypeTypeInfoBootstrap` constructor -- absent from the real
+   * ctor's disassembly; removed.
+   */
+  gpg::PrimitiveSerHelper<moho::EAiTargetType, int> gEAiTargetTypePrimitiveSerializer;
 } // namespace
 
 /**

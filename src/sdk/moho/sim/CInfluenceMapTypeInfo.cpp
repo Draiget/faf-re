@@ -13,7 +13,42 @@ namespace
   // Address: 0x010B9448 -- process-global `PrimitiveSerHelper<EThreatType,int>`
   // singleton (constructed by FUN_00BDA3A0; see CInfluenceMapTypeInfo.h for
   // the dead-duplicate-ctor and dead-sibling-writer evidence).
-  moho::EThreatTypePrimitiveSerializer gEThreatTypeSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EThreatType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EThreatType@Moho@@H@gpg'`):
+   * `FUN_00BDA3A0` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at `FUN_007188D0`. A third writer for the same global's storage address,
+   * `FUN_00719FF0` (demangled `gpg::SerSaveLoadHelper<Moho::EThreatType>`),
+   * is itself zero-xref/unreachable -- same sibling-writer pattern already
+   * documented for `EAlliance`/`ELayer`/`EVisibilityMode`/`ESquadClass` on
+   * the template itself (see `Reflection.h`). There is no real
+   * `SerSaveLoadHelper<EThreatType>` instance in this binary; only the
+   * `PrimitiveSerHelper` instantiation is ever constructed.
+   *
+   * The real ctor's tail pushes plain, unmangled `FUN_00BFFCA0` as its
+   * `atexit` target (bare unlink-then-self-link shape, matching
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) -- modeled by the template's own real
+   * destructor, no explicit `atexit` call needed. `FUN_007156F0`/
+   * `FUN_00715720` are dead, zero-xref duplicate-emission twins of that
+   * exact `FUN_00BFFCA0` body (function_sha256-confirmed), formerly modeled
+   * in `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneAY` and its two reset thunks; removed in
+   * favor of this citation.
+   *
+   * Previously a hand-rolled `{ void* mVtable; SerHelperBase*, SerHelperBase*;
+   * ...}` mimic named `EThreatTypeSerializerHelperStorage` lived in
+   * SThreatSerializer.cpp, entirely disconnected from this real global
+   * (`dword_10B9448`/`Moho__PrimitiveSerHelper<EThreatType,int>`): its own
+   * storage was a separate anonymous-namespace static, its two
+   * "initializer" functions had no real caller beyond a local bootstrap in
+   * that file, and its one real address citation (0x007188D0) actually
+   * pointed at the dead duplicate ctor, not this real one. Removed as
+   * fabricated/orphaned; this alias is the correct, evidence-backed
+   * recovery.
+   */
+  gpg::PrimitiveSerHelper<moho::EThreatType, int> gEThreatTypeSerializer;
 }
 
 namespace moho

@@ -339,35 +339,10 @@ namespace moho
    * `EStatTypePrimitiveSerializer`/`EPulseModePrimitiveSerializer` aliases
    * below already used the correct shape.
    */
-  using StatItemSerializer = gpg::SerSaveLoadHelper<StatItem>;
+  struct StatItemSerializer : gpg::SerSaveLoadHelper<StatItem>
+  {};
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EStatType,int>
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4EStatType@Moho@@H@gpg'`):
-   * `FUN_00BC3600` (real, `__xc_a`-reachable; no dead low-address duplicate
-   * found for this instantiation). Previously modeled in this file as a
-   * hand-rolled `{ void* mVtable; SerHelperBase* mHelperNext, mHelperPrev;
-   * ... }` POD that was never actually constructed anywhere in `src/sdk`
-   * (a plain global of this wrong type, with no real `SerHelperBase` base,
-   * never self-registers onto the pending-helper list) -- `EStatType`'s
-   * serialize/deserialize callbacks were never installed under any code
-   * path. `SerHelperBase`'s own ctor now performs the real
-   * self-registration.
-   */
-  using EStatTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EStatType, int>;
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EPulseMode,int>
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4EPulseMode@Moho@@H@gpg'`):
-   * `FUN_00BC3660` (real, `__xc_a`-reachable; no dead low-address duplicate
-   * found for this instantiation). Same "never actually constructed" defect
-   * as `EStatTypePrimitiveSerializer` above.
-   */
-  using EPulseModePrimitiveSerializer = gpg::PrimitiveSerHelper<EPulseMode, int>;
 
   /**
    * VFTABLE: 0x00E01104

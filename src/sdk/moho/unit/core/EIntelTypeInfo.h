@@ -62,18 +62,6 @@ namespace moho
 
   static_assert(sizeof(EIntelTypeInfo) == 0x78, "EIntelTypeInfo size must be 0x78");
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EIntel,int>
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4EIntel@Moho@@H@gpg'`): `FUN_00BC7BB0`
-   * (real, `__xc_a`-reachable) vs. a dead, zero-xref duplicate ctor at
-   * `FUN_0050A880` (same low-address/high-address shape already established
-   * for every other `PrimitiveSerHelper<T,int>` instantiation). `Init()`
-   * confirmed at `FUN_0050A8B0` via the RTTI vftable dump (`vftable@0xE0DB94`
-   * slot 0) -- matches this template's `Init()` exactly.
-   */
-  using EIntelPrimitiveSerializer = gpg::PrimitiveSerHelper<EIntel, int>;
 
   /**
    * Address: 0x00BC7B90 (FUN_00BC7B90, register_EIntelTypeInfo)

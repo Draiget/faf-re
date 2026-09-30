@@ -387,7 +387,8 @@ namespace moho
    * `LaunchInfoNew::MemberDeserialize`/`MemberSerialize`, matching the
    * template exactly.
    */
-  using LaunchInfoNewSerializer = gpg::SerSaveLoadHelper<LaunchInfoNew>;
+  struct LaunchInfoNewSerializer : gpg::SerSaveLoadHelper<LaunchInfoNew>
+  {};
 
   /**
    * Address: 0x00544800 (FUN_00544800, preregister_ArmyLaunchInfoVectorTypeStartup)

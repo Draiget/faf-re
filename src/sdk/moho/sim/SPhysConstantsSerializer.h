@@ -23,5 +23,6 @@ namespace moho
    *  - Deserialize(): 0x00699C10
    *  - Serialize(): 0x00699C50
    */
-  using SPhysConstantsSerializer = gpg::SerSaveLoadHelper<SPhysConstants>;
+  struct SPhysConstantsSerializer : gpg::SerSaveLoadHelper<SPhysConstants>
+  {};
 } // namespace moho

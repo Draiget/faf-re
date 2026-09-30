@@ -20,7 +20,8 @@ namespace moho
    *  - Deserialize(): 0x004015A0
    *  - Serialize(): 0x004015B0
    */
-  using BVIntSetSerializer = gpg::SerSaveLoadHelper<BVIntSet>;
+  struct BVIntSetSerializer : gpg::SerSaveLoadHelper<BVIntSet>
+  {};
 
   /**
    * Address: 0x00BC2D00 (FUN_00BC2D00, register_BVIntSetSerializer)

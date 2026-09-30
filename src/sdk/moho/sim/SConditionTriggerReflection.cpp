@@ -77,72 +77,6 @@ namespace
   };
   static_assert(sizeof(ETriggerOperatorTypeInfo) == 0x78, "ETriggerOperatorTypeInfo size must be 0x78");
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ETriggerOperator,int>
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4ETriggerOperator@Moho@@H@gpg'`):
-   * `FUN_00BDA000` (real, `__xc_a`-reachable at depth 0, sole writer to
-   * global storage 0x010B8F78 -- no dead duplicate ctor found). Confirmed
-   * via raw asm: default-constructs `gpg::SerHelperBase`, binds
-   * `mLoadCallback`/`mSaveCallback` to `FUN_0070F8E0`/`FUN_0070F900`,
-   * installs the `PrimitiveSerHelper<ETriggerOperator,int>` vtable, and
-   * pushes plain unmangled `FUN_00BFF580` (bare unlink-then-self-link shape,
-   * matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target --
-   * modeled by the template's own real destructor, no explicit `atexit`
-   * call needed. `FUN_0070AF50`/`FUN_0070AF80` are dead, zero-xref
-   * duplicate-emission twins of that exact `FUN_00BFF580` body
-   * (function_sha256-confirmed), formerly modeled in
-   * `moho/containers/LegacyContainerFillLanes.cpp` as
-   * `gGlobalIntrusiveSentinelLaneAU` and its two reset thunks; removed in
-   * favor of this citation.
-   *
-   * `FUN_0070F8E0`/`FUN_0070F900` decompile byte-identically to this
-   * template's own generic `Deserialize`/`Serialize` (archive->ReadInt /
-   * WriteInt through vtable slot 9 / offset 0x24 on a plain `int` lane, no
-   * branches at all) -- this instantiation needs no per-type override.
-   *
-   * `FUN_0070E510` is this template's own `Init()` body (confirmed via raw
-   * asm: thiscall on the helper, reads `this+0x0C`/`this+0x10`, writes the
-   * looked-up `ETriggerOperator` RType's `serLoadFunc_`/`serSaveFunc_` with
-   * the usual `"!type->mSerLoadFunc"`/`"!type->mSerSaveFunc"` asserts,
-   * including the same IDA-mislabeled `Moho::ETriggerOperator::sType`
-   * global that is really this template's own per-instantiation
-   * `sCachedType` static -- see the `PrimitiveSerHelper` class comment in
-   * Reflection.h). It is a vtable-slot-0 target shared by both the real
-   * `PrimitiveSerHelper<ETriggerOperator,int>` vtable (0x00E31060) and a
-   * dead, zero-writer `SerSaveLoadHelper<ETriggerOperator>` sibling vtable
-   * (0x00E31068), same shared-body pattern documented on `PrimitiveSerHelper`
-   * for ESquadClass/EThreatType/EScrollType.
-   *
-   * This resolves what looked like two competing binding mechanisms for the
-   * same enum: a 2026-08-26 `ArchiveSerialization.cpp` dead-duplicate audit
-   * independently flagged `FUN_0070E510` as a second candidate distinct from
-   * this file's own `register_ETriggerOperatorPrimitiveSerializer`
-   * (previously cited at 0x00BDA000). They are not competitors -- ground-
-   * truth asm shows `FUN_00BDA000` is the real ctor and `FUN_0070E510` is
-   * that same ctor's `Init()` method; both belong to this one
-   * self-registering `PrimitiveSerHelper<ETriggerOperator,int>`
-   * instantiation, and neither is a dead/unreachable duplicate of the other.
-   *
-   * The previous recovery modeled `register_ETriggerOperatorPrimitiveSerializer`
-   * as an eager free function -- `LookupRType(typeid(ETriggerOperator))`
-   * followed by directly storing `&DeserializeETriggerOperator`/
-   * `&SerializeETriggerOperator` onto the type's `serLoadFunc_`/
-   * `serSaveFunc_` -- called from `SConditionTriggerBootstrap`'s
-   * constructor. Ground-truth asm at 0x00BDA000 contains no `LookupRType`
-   * call, no `typeid` push, and no direct field store at all: it is the
-   * standard `SerHelperBase`-derived ctor shape (base-ctor call, callback
-   * fields, vtable install, `atexit`) used by every other confirmed
-   * `PrimitiveSerHelper<T,int>` instantiation in this codebase -- the
-   * "fabricated eager register free-function" anti-pattern the
-   * `PrimitiveSerHelper` class comment (Reflection.h) already warns about.
-   * `DeserializeETriggerOperator`/`SerializeETriggerOperator` likewise added
-   * `if (archive && value)` null checks absent from `FUN_0070F8E0`/
-   * `FUN_0070F900`'s real, unconditional bodies. Both are replaced by this
-   * self-registering template instantiation, the actual live wiring.
-   */
-  using ETriggerOperatorPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::ETriggerOperator, int>;
 
   class SConditionTypeInfo final : public gpg::RType
   {
@@ -1102,7 +1036,72 @@ namespace
   // Moho::ETriggerOperator,int>` singleton (constructed by FUN_00BDA000,
   // self-registering via `__xc_a`; see `ETriggerOperatorPrimitiveSerializer`
   // above for the full real-ctor/Init/atexit evidence).
-  ETriggerOperatorPrimitiveSerializer gETriggerOperatorPrimitiveSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ETriggerOperator,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4ETriggerOperator@Moho@@H@gpg'`):
+   * `FUN_00BDA000` (real, `__xc_a`-reachable at depth 0, sole writer to
+   * global storage 0x010B8F78 -- no dead duplicate ctor found). Confirmed
+   * via raw asm: default-constructs `gpg::SerHelperBase`, binds
+   * `mLoadCallback`/`mSaveCallback` to `FUN_0070F8E0`/`FUN_0070F900`,
+   * installs the `PrimitiveSerHelper<ETriggerOperator,int>` vtable, and
+   * pushes plain unmangled `FUN_00BFF580` (bare unlink-then-self-link shape,
+   * matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target --
+   * modeled by the template's own real destructor, no explicit `atexit`
+   * call needed. `FUN_0070AF50`/`FUN_0070AF80` are dead, zero-xref
+   * duplicate-emission twins of that exact `FUN_00BFF580` body
+   * (function_sha256-confirmed), formerly modeled in
+   * `moho/containers/LegacyContainerFillLanes.cpp` as
+   * `gGlobalIntrusiveSentinelLaneAU` and its two reset thunks; removed in
+   * favor of this citation.
+   *
+   * `FUN_0070F8E0`/`FUN_0070F900` decompile byte-identically to this
+   * template's own generic `Deserialize`/`Serialize` (archive->ReadInt /
+   * WriteInt through vtable slot 9 / offset 0x24 on a plain `int` lane, no
+   * branches at all) -- this instantiation needs no per-type override.
+   *
+   * `FUN_0070E510` is this template's own `Init()` body (confirmed via raw
+   * asm: thiscall on the helper, reads `this+0x0C`/`this+0x10`, writes the
+   * looked-up `ETriggerOperator` RType's `serLoadFunc_`/`serSaveFunc_` with
+   * the usual `"!type->mSerLoadFunc"`/`"!type->mSerSaveFunc"` asserts,
+   * including the same IDA-mislabeled `Moho::ETriggerOperator::sType`
+   * global that is really this template's own per-instantiation
+   * `sCachedType` static -- see the `PrimitiveSerHelper` class comment in
+   * Reflection.h). It is a vtable-slot-0 target shared by both the real
+   * `PrimitiveSerHelper<ETriggerOperator,int>` vtable (0x00E31060) and a
+   * dead, zero-writer `SerSaveLoadHelper<ETriggerOperator>` sibling vtable
+   * (0x00E31068), same shared-body pattern documented on `PrimitiveSerHelper`
+   * for ESquadClass/EThreatType/EScrollType.
+   *
+   * This resolves what looked like two competing binding mechanisms for the
+   * same enum: a 2026-08-26 `ArchiveSerialization.cpp` dead-duplicate audit
+   * independently flagged `FUN_0070E510` as a second candidate distinct from
+   * this file's own `register_ETriggerOperatorPrimitiveSerializer`
+   * (previously cited at 0x00BDA000). They are not competitors -- ground-
+   * truth asm shows `FUN_00BDA000` is the real ctor and `FUN_0070E510` is
+   * that same ctor's `Init()` method; both belong to this one
+   * self-registering `PrimitiveSerHelper<ETriggerOperator,int>`
+   * instantiation, and neither is a dead/unreachable duplicate of the other.
+   *
+   * The previous recovery modeled `register_ETriggerOperatorPrimitiveSerializer`
+   * as an eager free function -- `LookupRType(typeid(ETriggerOperator))`
+   * followed by directly storing `&DeserializeETriggerOperator`/
+   * `&SerializeETriggerOperator` onto the type's `serLoadFunc_`/
+   * `serSaveFunc_` -- called from `SConditionTriggerBootstrap`'s
+   * constructor. Ground-truth asm at 0x00BDA000 contains no `LookupRType`
+   * call, no `typeid` push, and no direct field store at all: it is the
+   * standard `SerHelperBase`-derived ctor shape (base-ctor call, callback
+   * fields, vtable install, `atexit`) used by every other confirmed
+   * `PrimitiveSerHelper<T,int>` instantiation in this codebase -- the
+   * "fabricated eager register free-function" anti-pattern the
+   * `PrimitiveSerHelper` class comment (Reflection.h) already warns about.
+   * `DeserializeETriggerOperator`/`SerializeETriggerOperator` likewise added
+   * `if (archive && value)` null checks absent from `FUN_0070F8E0`/
+   * `FUN_0070F900`'s real, unconditional bodies. Both are replaced by this
+   * self-registering template instantiation, the actual live wiring.
+   */
+  gpg::PrimitiveSerHelper<moho::ETriggerOperator, int> gETriggerOperatorPrimitiveSerializer;
 
   SConditionTypeInfo gSConditionTypeInfo;
   SConditionSerializer gSConditionSerializer;

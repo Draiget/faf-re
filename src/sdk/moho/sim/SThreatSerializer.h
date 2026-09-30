@@ -24,5 +24,6 @@ namespace moho
    *  - Deserialize(): 0x00717AF0
    *  - Serialize(): 0x00717B00
    */
-  using SThreatSerializer = gpg::SerSaveLoadHelper<SThreat>;
+  struct SThreatSerializer : gpg::SerSaveLoadHelper<SThreat>
+  {};
 } // namespace moho

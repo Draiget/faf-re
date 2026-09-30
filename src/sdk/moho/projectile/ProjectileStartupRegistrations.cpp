@@ -463,6 +463,10 @@ namespace
    */
   RManyToOneListenerProjectileImpactTypeInfo::~RManyToOneListenerProjectileImpactTypeInfo() = default;
 
+
+  // Address: 0x010B55E4 -- process-global `PrimitiveSerHelper<
+  // EProjectileImpactEvent,int>` singleton (constructed by FUN_00BD6350,
+  // self-registering via `__xc_a`).
   /**
    * Demangled: gpg::PrimitiveSerHelper<enum Moho::EProjectileImpactEvent,int>
    *
@@ -487,12 +491,7 @@ namespace
    * by a fabricated eager double-registration from this file's own
    * `ProjectileStartupBootstrap` constructor.
    */
-  using EProjectileImpactEventPrimitiveSerializer = gpg::PrimitiveSerHelper<moho::EProjectileImpactEvent, int>;
-
-  // Address: 0x010B55E4 -- process-global `PrimitiveSerHelper<
-  // EProjectileImpactEvent,int>` singleton (constructed by FUN_00BD6350,
-  // self-registering via `__xc_a`).
-  EProjectileImpactEventPrimitiveSerializer gEProjectileImpactEventPrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::EProjectileImpactEvent, int> gEProjectileImpactEventPrimitiveSerializer;
 
   // Address: 0x010B55AC -- process-global `CProjectileAttributesSerializer`
   // singleton (constructed by FUN_00BD63B0, self-registering via `__xc_a`;

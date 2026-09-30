@@ -25,8 +25,19 @@ namespace
    * bootstrap struct to run its equivalent logic; the real binary never
    * does that -- the global's own dynamic initializer is the entire
    * registration.
+   *
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::SWorldParticle::BlendMode,int>
+   * VFTABLE: never constructed prior to this recovery -- see the ctor
+   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4BlendMode@SWorldParticle@Moho@@H@gpg'`,
+   * i.e. `BlendMode` nested inside `SWorldParticle` -- a distinct
+   * instantiation from `SWorldBeam::BlendMode`'s, converted separately):
+   * `FUN_00BC53C0` (real, `__xc_a`-reachable). No dead low-address
+   * duplicate found for this one.
    */
-  moho::SWorldParticleBlendModePrimitiveSerializer gSWorldParticleBlendModePrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::SWorldParticle::BlendMode, int> gSWorldParticleBlendModePrimitiveSerializer;
 
   /**
    * Address: 0x00BC5420 (FUN_00BC5420, dynamic initializer for the global
@@ -37,8 +48,17 @@ namespace
    * load/save callback fields (vtable slot 0 `Init()` dispatched later by
    * `gpg::SerHelperBase::InitNewHelpers`). Same "never actually registered
    * before this recovery" story as `SWorldParticle::BlendMode` above.
+   *
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::SWorldParticle::ZMode,int>
+   * VFTABLE: never constructed prior to this recovery -- see the ctor
+   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4ZMode@SWorldParticle@Moho@@H@gpg'`):
+   * `FUN_00BC5420` (real, `__xc_a`-reachable). No dead low-address
+   * duplicate found for this one.
    */
-  moho::SWorldParticleZModePrimitiveSerializer gSWorldParticleZModePrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::SWorldParticle::ZMode, int> gSWorldParticleZModePrimitiveSerializer;
 
   template <typename TType>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cached)

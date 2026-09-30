@@ -25,8 +25,18 @@ namespace
    * bootstrap struct to run its equivalent logic; the real binary never
    * does that -- the global's own dynamic initializer is the entire
    * registration.
+   *
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::SWorldBeam::BlendMode,int>
+   * VFTABLE: never constructed prior to this recovery -- see the ctor
+   * Doxygen block on `gpg::PrimitiveSerHelper` in Reflection.h.
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4BlendMode@SWorldBeam@Moho@@H@gpg'`,
+   * i.e. `BlendMode` nested inside `SWorldBeam`, not the top-level enum
+   * some sibling classes use): `FUN_00BC5300` (real, `__xc_a`-reachable).
+   * No dead low-address duplicate found for this one.
    */
-  moho::SWorldBeamBlendModePrimitiveSerializer gSWorldBeamBlendModePrimitiveSerializer;
+  gpg::PrimitiveSerHelper<moho::SWorldBeam::BlendMode, int> gSWorldBeamBlendModePrimitiveSerializer;
 
   template <typename TType>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cached)

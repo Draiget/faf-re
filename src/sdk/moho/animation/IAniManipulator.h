@@ -320,7 +320,8 @@ namespace moho
    * template instantiation fixes both defects; sibling
    * `CBoneEntityManipulatorSerializer` below already used the correct shape.
    */
-  using CFootPlantManipulatorSerializer = gpg::SerSaveLoadHelper<CFootPlantManipulator>;
+  struct CFootPlantManipulatorSerializer : gpg::SerSaveLoadHelper<CFootPlantManipulator>
+  {};
 
   class CBoneEntityManipulator : public IAniManipulator
   {
@@ -471,7 +472,8 @@ namespace moho
    * template instance fixes both: no more runtime-view duplicate layout, and
    * the global's own static initializer wires the callbacks unconditionally.
    */
-  using CBoneEntityManipulatorSerializer = gpg::SerSaveLoadHelper<CBoneEntityManipulator>;
+  struct CBoneEntityManipulatorSerializer : gpg::SerSaveLoadHelper<CBoneEntityManipulator>
+  {};
 
   /**
    * Owns reflected metadata for `CFootPlantManipulator`.
@@ -711,7 +713,8 @@ namespace moho
    * defects; sibling `CBoneEntityManipulatorSerializer` in this same header
    * already used the correct shape.
    */
-  using IAniManipulatorSerializer = gpg::SerSaveLoadHelper<IAniManipulator>;
+  struct IAniManipulatorSerializer : gpg::SerSaveLoadHelper<IAniManipulator>
+  {};
 
   class IAniManipulatorTypeInfo : public gpg::RType
   {

@@ -95,7 +95,8 @@ namespace moho
    *  - Deserialize(): 0x00507010
    *  - Serialize(): 0x00507020
    */
-  using SDelayedSubVizInfoSerializer = gpg::SerSaveLoadHelper<SDelayedSubVizInfo>;
+  struct SDelayedSubVizInfoSerializer : gpg::SerSaveLoadHelper<SDelayedSubVizInfo>
+  {};
 
   /**
    * Address: 0x00BC78E0 (FUN_00BC78E0, register_SDelayedSubVizInfoSerializer)

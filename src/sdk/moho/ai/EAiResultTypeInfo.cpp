@@ -15,7 +15,29 @@ namespace
   // singleton (constructed by FUN_00BD0530, self-registering via `__xc_a`;
   // see the per-instantiation address list on gpg::PrimitiveSerHelper in
   // Reflection.h for the real-ctor/atexit-target evidence).
-  moho::EAiResultPrimitiveSerializer gEAiResultPrimitiveSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EAiResult,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4EAiResult@Moho@@H@gpg'`):
+   * `FUN_00BD0530` (real, `__xc_a`-reachable, sole writer -- no dead
+   * duplicate ctor found for this instantiation). Confirmed via raw asm:
+   * default-constructs `gpg::SerHelperBase`, binds `mLoadCallback`/
+   * `mSaveCallback` to `FUN_0060BCD0`/`FUN_0060BCF0`, installs the
+   * `PrimitiveSerHelper<EAiResult,int>` vtable, and pushes plain unmangled
+   * `FUN_00BF9AB0` (bare unlink-then-self-link shape, matching
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target. `Init()` is
+   * `FUN_0060B980`, found via a vtable-slot xref search on
+   * `??_7?$PrimitiveSerHelper@W4EAiResult@Moho@@H@gpg@@6B@`; its body
+   * matches the template's `Init()` exactly.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` (`EAiResultPrimitiveSerializer`) with bespoke free
+   * `Deserialize_EAiResult`/`Serialize_EAiResult` functions at those same
+   * two addresses -- redundant with the template's own generic
+   * `Deserialize`/`Serialize`, so removed in favor of this alias.
+   */
+  gpg::PrimitiveSerHelper<moho::EAiResult, int> gEAiResultPrimitiveSerializer;
 
   /**
    * Address: 0x00608B70 (FUN_00608B70, sub_608B70)

@@ -58,27 +58,6 @@ namespace moho
     void Init() override;
   };
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EPathType,int>
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4EPathType@Moho@@H@gpg'`):
-   * `FUN_00BCD290` (real, `__xc_a`-reachable, sole writer -- no dead
-   * duplicate ctor found). Confirmed via raw asm: default-constructs
-   * `gpg::SerHelperBase`, binds `mLoadCallback`/`mSaveCallback` to
-   * `FUN_005B4E90`/`FUN_005B4EB0`, installs the
-   * `PrimitiveSerHelper<EPathType,int>` vtable, and pushes plain unmangled
-   * `FUN_00BF7420` (bare unlink-then-self-link shape, matching
-   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- modeled by the
-   * template's own real destructor, no explicit `atexit` call needed.
-   *
-   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
-   * `SerHelperBase` plus a fabricated `register_EPathTypePrimitiveSerializer()`
-   * free function eagerly invoked a second time from this file's own
-   * `EPathTypeTypeInfoBootstrap` constructor -- absent from the real ctor's
-   * disassembly; removed.
-   */
-  using EPathTypePrimitiveSerializer = gpg::PrimitiveSerHelper<EPathType, int>;
 
   static_assert(sizeof(EPathTypeTypeInfo) == 0x78, "EPathTypeTypeInfo size must be 0x78");
 

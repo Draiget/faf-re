@@ -147,7 +147,8 @@ namespace moho
    * were never actually written. This template instantiation fixes both
    * defects.
    */
-  using CStorageManipulatorSerializer = gpg::SerSaveLoadHelper<CStorageManipulator>;
+  struct CStorageManipulatorSerializer : gpg::SerSaveLoadHelper<CStorageManipulator>
+  {};
 
   LuaPlus::LuaObject* func_CreateLuaCStorageManipulator(
     LuaPlus::LuaObject* object,

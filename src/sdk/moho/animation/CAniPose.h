@@ -479,7 +479,8 @@ namespace moho
    *  - Deserialize(): 0x0054BA00
    *  - Serialize(): 0x0054BA10
    */
-  using CAniPoseSerializer = gpg::SerSaveLoadHelper<CAniPose>;
+  struct CAniPoseSerializer : gpg::SerSaveLoadHelper<CAniPose>
+  {};
 
   /**
    * VFTABLE: 0x00E174B0
@@ -494,5 +495,6 @@ namespace moho
    *  - Deserialize(): 0x0054BF70
    *  - Serialize(): 0x0054BF80
    */
-  using CAniPoseBoneSerializer = gpg::SerSaveLoadHelper<CAniPoseBone>;
+  struct CAniPoseBoneSerializer : gpg::SerSaveLoadHelper<CAniPoseBone>
+  {};
 } // namespace moho

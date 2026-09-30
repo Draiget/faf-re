@@ -40,33 +40,6 @@ namespace moho
     void AddEnums();
   };
 
-  /**
-   * Demangled: gpg::PrimitiveSerHelper<enum Moho::EUnitState,int>
-   *
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='?$PrimitiveSerHelper@W4EUnitState@Moho@@H@gpg'`):
-   * `FUN_00BCA520` (real, `__xc_a`-reachable; no dead duplicate found for
-   * this instantiation). `Init()` confirmed at `FUN_0055C9A0` via the RTTI
-   * vftable dump (`vftable@0xE1875C` slot 0) -- previously mis-cited in
-   * `ArchiveSerialization.cpp` as a generic
-   * `InstallSerSaveLoadHelperCallbacksByTypeName(helper, "Moho::EUnitState")`
-   * dispatch; the real body does a direct `typeid`/`sType`-cache lookup and
-   * hardcoded callback install, matching this template's `Init()` exactly
-   * (same mis-citation family already caught this session for
-   * ESTITargetType/EResourceType/EUnitCommandType/CAniPose/CAniPoseBone).
-   * `Deserialize`/`Serialize` at 0x0055D450/0x0055D470 already matched this
-   * template's generic bodies exactly (no fabricated null-check).
-   *
-   * `~PrimitiveSerHelper()`'s compiler-emitted static-destructor
-   * registration for this instantiation is `FUN_00BF5270` (atexit target
-   * pushed by the real ctor above); `FUN_0055BFC0`/`FUN_0055BFF0` are dead,
-   * zero-xref duplicate-emission twins of that exact body
-   * (function_sha256-confirmed), formerly modeled in
-   * `moho/containers/LegacyContainerFillLanes.cpp` as
-   * `gGlobalIntrusiveSentinelLaneJ` and its two reset thunks; removed in
-   * favor of this citation.
-   */
-  using EUnitStatePrimitiveSerializer = gpg::PrimitiveSerHelper<EUnitState, int>;
 
   static_assert(sizeof(EUnitState) == 0x04, "EUnitState size must be 0x04");
   static_assert(sizeof(EUnitStateTypeInfo) == 0x78, "EUnitStateTypeInfo size must be 0x78");

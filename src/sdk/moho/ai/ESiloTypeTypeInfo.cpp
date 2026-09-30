@@ -21,7 +21,37 @@ namespace
   // singleton (constructed by FUN_00BC7B50, self-registering via `__xc_a`; see
   // ESiloTypeTypeInfo.h for the real-ctor/atexit-target/dead-duplicate
   // evidence).
-  moho::ESiloTypePrimitiveSerializer gESiloTypePrimitiveSerializer;
+  /**
+   * Demangled: gpg::PrimitiveSerHelper<enum Moho::ESiloType,int>
+   *
+   * Real ctor confirmed via the callgraph index's `vtable_writers` table
+   * (`class_name='?$PrimitiveSerHelper@W4ESiloType@Moho@@H@gpg'`):
+   * `FUN_00BC7B50` (real, `__xc_a`-reachable) vs. a dead zero-xref duplicate
+   * at `FUN_0050A7E0` (same fields, no `atexit` call -- confirmed via raw
+   * asm never live). A third writer for the same global's storage address,
+   * `FUN_0050AAB0` (demangled `gpg::SerSaveLoadHelper<Moho::ESiloType>`), is
+   * itself zero-xref/unreachable too -- same "dead sibling-writer" pattern
+   * already documented for `EAlliance`/`ELayer`/`EVisibilityMode`/
+   * `ESquadClass`/`EThreatType` on the `PrimitiveSerHelper` template itself
+   * (see `Reflection.h`); already corrected to `skip` in the progress DB by
+   * an earlier pass this session. There is no real
+   * `SerSaveLoadHelper<ESiloType>` instance in this binary.
+   *
+   * Confirmed via raw asm: the real ctor default-constructs
+   * `gpg::SerHelperBase`, binds `mDeserialize`/`mSerialize` to
+   * `FUN_0050AA70`/`FUN_0050AA90`, installs the
+   * `PrimitiveSerHelper<ESiloType,int>` vtable, and pushes plain unmangled
+   * `FUN_00BF1FE0` (bare unlink-then-self-link shape, matching
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- modeled by the
+   * template's own real destructor, no explicit `atexit` call needed.
+   *
+   * The previous recovery modeled this as a hand-rolled raw-struct mimic of
+   * `SerHelperBase` plus a fabricated `register_ESiloTypePrimitiveSerializer()`
+   * free function eagerly invoked a second time from this file's own
+   * `ESiloTypeTypeInfoBootstrap` constructor -- absent from the real ctor's
+   * disassembly; removed.
+   */
+  gpg::PrimitiveSerHelper<moho::ESiloType, int> gESiloTypePrimitiveSerializer;
 } // namespace
 
 namespace moho
