@@ -3428,6 +3428,7 @@ namespace moho
      *    lanes. They belong on `msvc8::vector<T>` in
      *    src/sdk/legacy/containers/Vector.h next to the other per-type
      *    emissions listed there, not as a second set of container primitives.
+     * Address: 0x0085F740 (FUN_0085F740 -- the implicit copy constructor `UnitIconData(const UnitIconData&)`, emitted out of line for `msvc8::vector<UnitIconData>`'s placement copies: member-wise in declaration order (the two pointers, the three floats through `fld`/`fstp`, each `shared_ptr` with a `lock xadd` +1 on the non-null control block's `use_count_` at +0x18/+0x20/+0x28, then the five flag bytes up to +0x30), no release, so a construction rather than `operator=` 0x0085CB00; callers 0x0085F414 (`_Insert_n` 0x0085F3F0's `_Tmp = _Val`), 0x0085FDC8 (`_Uninit_fill_n` 0x0085FDB0), 0x0085FFC9 (`_Uninit_copy` 0x0085FFB0), 0x0085FFF8 (0x0085FFE0), and the null-guarded tail jumps 0x0085FE64 / 0x0085FF24 (`_Construct` / `allocator::construct`, nothing references them); formerly `CopyRefCountedPayload49Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      */
     struct UnitIconData
     {
@@ -3449,7 +3450,8 @@ namespace moho
       bool mSuppressBaseIcon = false;  // +0x2F
       /// Formation-preview ghost rather than a live unit.
       bool mIsFormationGhost = false;  // +0x30
-      std::uint8_t pad_0031_0033[0x03]{};
+      // +0x31..+0x33 is alignment padding, not a member: neither the copy
+      // constructor (0x0085F740) nor `operator=` (0x0085CB00) copies it.
     };
 
     static_assert(sizeof(UnitIconData) == 0x34, "UnitIconData size must be 0x34");
