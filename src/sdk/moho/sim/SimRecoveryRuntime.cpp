@@ -2124,27 +2124,6 @@ namespace
 }
 
 /**
- * Address: 0x006E2180 (FUN_006E2180)
- *
- * What it does:
- * Releases one legacy contiguous storage lane and resets begin/end/capacity
- * cursors to null.
- */
-void ReleaseLegacyBufferTripleRuntime(
-  LegacyBufferTripleRuntime* const owner
-)
-{
-  if (owner == nullptr) {
-    return;
-  }
-
-  ::operator delete(owner->begin);
-  owner->begin = nullptr;
-  owner->end = nullptr;
-  owner->capacity = nullptr;
-}
-
-/**
  * Address: 0x00687AF0 (FUN_00687AF0)
  *
  * What it does:
@@ -2165,57 +2144,6 @@ moho::SimSubRes2* CopyIdPoolHistoryRingRuntime(
     destination->PushSnapshot(AsIdPoolSnapshot(source->mData[index]));
   }
   return destination;
-}
-
-/**
- * Address: 0x006DEB10 (FUN_006DEB10)
- *
- * IDA signature:
- * void __usercall sub_6DEB10(void *dst@<eax>, const void *source@<esi>, uint count@<edx>);
- *
- * What it does:
- * Broadcast-fills `count` copies of one 12-byte lane at `dst`, advancing by
- * 0xC per slot. `lane0` is copied verbatim from `source`; when non-null it is
- * treated as the address of an intrusive list head slot: the slot's current
- * value is captured into the new copy's `lane1` ("next"), then the slot is
- * overwritten with the new copy's own address (classic `push_front`-style
- * intrusive-list insert). When `source->lane0` is null, `lane1` is zeroed
- * instead. `lane2` is a plain verbatim field copy. Called with count=1 from
- * the function below (0x006DB1B0) and from 0x006DBE81.
- *
- * Known divergence: the callers' capacity-available fast paths dispatch
- * through this link-aware fill, but their existing recovered bodies below
- * call the generic `AppendTrivialValue` helper instead, which elides the
- * link side effect (it treats the 12-byte element as plain-copy trivial).
- * Not reworked in this pass: the element type is shared by several unrelated
- * 12-byte lane kinds in this file, so retyping it needs its own dedicated
- * pass rather than a narrow fix here.
- */
-
-/**
- * Address: 0x006E0A40 (FUN_006E0A40)
- *
- * What it does:
- * Releases one CommandDatabase-owned node buffer and clears ownership lanes.
- */
-std::int32_t ReleaseCommandDatabaseNodeBufferRuntime(
-  OwnedBufferRuntime* const owner
-)
-{
-  return ResetOwnedBufferRuntime(owner);
-}
-
-/**
- * Address: 0x00715440 (FUN_00715440)
- *
- * What it does:
- * Releases one influence-grid entry tree head and clears set ownership lanes.
- */
-std::int32_t ResetInfluenceGridEntryStorageRuntime(
-  OwnedBufferRuntime* const owner
-)
-{
-  return ResetOwnedBufferRuntime(owner);
 }
 
 struct DwordTimerLaneRuntime
@@ -2340,30 +2268,6 @@ std::int32_t AccumulateTimerElapsedMicrosecondsRuntime(
 }
 
 /**
- * Address: 0x00753630 (FUN_00753630)
- *
- * What it does:
- * Rebuilds one opaque pointer lane when requested/current lanes differ, then
- * returns the requested lane through `outValue`.
- */
-std::uint32_t* AssignRebuiltOpaqueLaneRuntimeA(
-  OpaqueLaneRebuildRuntime* const context,
-  std::uint32_t* const outValue,
-  const std::uint32_t requestedLane,
-  const std::uint32_t currentLane
-)
-{
-  if (context != nullptr && requestedLane != currentLane) {
-    context->storage = RebuildOpaqueLaneStorage(context->storage, static_cast<std::size_t>(requestedLane), false);
-  }
-
-  if (outValue != nullptr) {
-    *outValue = requestedLane;
-  }
-  return outValue;
-}
-
-/**
  * Address: unresolved -- DB-integrity fix: this body was previously cited
  * at `0x007536D0`. That address's real `.c` decompilation is
  * `sub_7536D0(int a1, _DWORD* a2, int a3, int a4)`, an empty-source-clear
@@ -2398,153 +2302,11 @@ std::uint32_t* AssignRebuiltOpaqueLaneRuntimeB(
   return outValue;
 }
 
-/**
- * Address: 0x00767D00 (FUN_00767D00)
- *
- * What it does:
- * Compacts one trailing 12-byte-word lane range `[sourceCursor, end)` into
- * `destination` and advances the owner vector end cursor to the compacted tail.
- */
-std::uint32_t** CompactWordVectorTailFromCursorRuntime(
-  std::uint32_t** const outBeginStorage,
-  CacheWordVectorRuntime* const runtime,
-  std::uint32_t* const destination,
-  std::uint32_t* sourceCursor
-)
-{
-  if (destination != sourceCursor) {
-    std::uint32_t* const sourceEnd = runtime->end;
-    std::uint32_t* writeCursor = destination;
-    if (sourceCursor != sourceEnd) {
-      do {
-        writeCursor[0] = sourceCursor[0];
-        writeCursor[1] = sourceCursor[1];
-        writeCursor[2] = sourceCursor[2];
-        sourceCursor += 3;
-        writeCursor += 3;
-      } while (sourceCursor != sourceEnd);
-    }
-    runtime->end = writeCursor;
-  }
-
-  *outBeginStorage = destination;
-  return outBeginStorage;
-}
-
 // 0x005347A0 is `msvc8::vector<Moho::RBlueprint*>::push_back`, recovered as a
 // real container call in moho::AppendBlueprintOrdinal (Sim.cpp). The
 // type-erased `LegacyVectorStorageRuntime<std::uint32_t>` stand-in that used to
 // claim this address here duplicated the container and has been removed —
 // one address, one function.
-
-/**
- * Address: 0x00545280 (FUN_00545280)
- *
- * What it does:
- * Resets one swap-backed dynamic array lane to its fallback storage block and
- * refreshes cached cursor/first-value lanes.
- */
-std::uint32_t ResetSwapBackedArrayRuntimeA(
-  SwapBackedArrayRuntimeA* const runtime
-)
-{
-  if (runtime == nullptr) {
-    return 0u;
-  }
-
-  if (runtime->activeBuffer == runtime->fallbackBuffer) {
-    runtime->cursor = runtime->activeBuffer;
-    return runtime->activeBuffer != nullptr ? *runtime->activeBuffer : 0u;
-  }
-
-  ::operator delete[](runtime->activeBuffer);
-  runtime->activeBuffer = runtime->fallbackBuffer;
-  runtime->cachedFirst = runtime->activeBuffer != nullptr ? *runtime->activeBuffer : 0u;
-  runtime->cursor = runtime->activeBuffer;
-  return runtime->cachedFirst;
-}
-
-/**
- * Address: 0x0055D940 (FUN_0055D940)
- *
- * What it does:
- * Destroys one contiguous range of `UnitWeaponInfo` entries (`0x98` bytes per
- * lane).
- */
-std::uint8_t* DestroyUnitWeaponInfoRangeRuntime(
-  std::uint8_t* const begin,
-  const std::uint8_t* const end
-)
-{
-  if (begin == nullptr) {
-    return nullptr;
-  }
-
-  for (std::uint8_t* cursor = begin; cursor != end; cursor += 152u) {
-    reinterpret_cast<moho::UnitWeaponInfo*>(cursor)->~UnitWeaponInfo();
-  }
-  return begin;
-}
-
-/**
- * Address: 0x006DF040 (FUN_006DF040)
- *
- * What it does:
- * Resets one swap-backed dynamic array lane (`+0x10` storage block) to fallback
- * storage and refreshes cached lanes.
- */
-std::uint32_t ResetSwapBackedArrayRuntimeB(
-  SwapBackedArrayRuntimeB* const runtime
-)
-{
-  if (runtime == nullptr) {
-    return 0u;
-  }
-
-  if (runtime->activeBuffer == runtime->fallbackBuffer) {
-    runtime->cursor = runtime->activeBuffer;
-    return runtime->activeBuffer != nullptr ? *runtime->activeBuffer : 0u;
-  }
-
-  ::operator delete[](runtime->activeBuffer);
-  runtime->activeBuffer = runtime->fallbackBuffer;
-  runtime->cachedFirst = runtime->activeBuffer != nullptr ? *runtime->activeBuffer : 0u;
-  runtime->cursor = runtime->activeBuffer;
-  return runtime->cachedFirst;
-}
-
-/**
- * Address: 0x00767C70 (FUN_00767C70)
- *
- * What it does:
- * Collapses one tagged-insert cursor (`end = begin` when non-empty) and emits
- * one tagged insert call with key `9`.
- */
-std::int32_t ResetCursorAndInsertTaggedWordRuntime(
-  const std::uint32_t* const value,
-  TaggedInsertCursorRuntime* const cursor,
-  const TaggedInsertRuntimeFn insertFn
-)
-{
-  if (value == nullptr || cursor == nullptr) {
-    return 0;
-  }
-
-  std::uint32_t localValue = *value;
-  if (cursor->begin != cursor->end) {
-    cursor->end = cursor->begin;
-  }
-
-  if (insertFn != nullptr) {
-    return insertFn(cursor->begin, 9u, &localValue);
-  }
-
-  if (cursor->begin != nullptr) {
-    *cursor->begin = localValue;
-    return static_cast<std::int32_t>(localValue);
-  }
-  return 0;
-}
 
 /**
  * Address: 0x00A9A4B1 (FUN_00A9A4B1)
@@ -2648,36 +2410,6 @@ void AddUnitRangeFromPointerWordsRuntime(
 
   *outValue = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(array->entries[mappedIndex]));
   return outValue;
-}
-
-/**
- * Address: 0x0056E7E0 (FUN_0056E7E0)
- *
- * What it does:
- * Normalizes one contiguous formation lane range by restoring each record to
- * fallback storage and updating cached cursors.
- */
-std::uint32_t* NormalizeFormationLaneRangeRuntime(
-  std::uint32_t* laneBegin,
-  std::uint32_t* const laneEnd
-)
-{
-  std::uint32_t* lastResult = laneBegin;
-  while (laneBegin != laneEnd) {
-    const std::uint32_t activeWord = laneBegin[12];
-    const std::uint32_t fallbackWord = laneBegin[15];
-    if (activeWord != fallbackWord) {
-      ::operator delete[](reinterpret_cast<void*>(static_cast<std::uintptr_t>(activeWord)));
-      laneBegin[12] = fallbackWord;
-      const auto* const fallback = reinterpret_cast<const std::uint32_t*>(static_cast<std::uintptr_t>(fallbackWord));
-      laneBegin[14] = fallback != nullptr ? *fallback : 0u;
-      lastResult = reinterpret_cast<std::uint32_t*>(laneBegin[14]);
-    }
-
-    laneBegin[13] = laneBegin[12];
-    laneBegin += 18;
-  }
-  return lastResult;
 }
 
 /**
@@ -3192,57 +2924,6 @@ DistanceVector2dRuntime* InitializeDistanceVector2dRuntime(
 }
 
 /**
- * Address: 0x0084F1D0 (FUN_0084F1D0)
- *
- * What it does:
- * Releases one `{begin,end,capacity}` storage triple and resets all three
- * cursor lanes to null.
- */
-void ReleaseLegacyBufferTripleRuntimeB(
-  LegacyBufferTripleRuntime* const owner
-)
-{
-  ReleaseLegacyBufferTripleRuntime(owner);
-}
-
-/**
- * Address: 0x0084FD30 (FUN_0084FD30)
- *
- * What it does:
- * Swaps trailing three dword lanes (`+0x04/+0x08/+0x0C`) between two 16-byte
- * ranges while iterating backward.
- */
-Element16Runtime* SwapElement16TailLanesBackwardRuntime(
-  Element16Runtime* destinationEnd,
-  Element16Runtime* sourceEnd,
-  Element16Runtime* const sourceBegin
-) noexcept
-{
-  while (sourceEnd != sourceBegin) {
-    --sourceEnd;
-    --destinationEnd;
-    std::swap(destinationEnd->lanes[1], sourceEnd->lanes[1]);
-    std::swap(destinationEnd->lanes[2], sourceEnd->lanes[2]);
-    std::swap(destinationEnd->lanes[3], sourceEnd->lanes[3]);
-  }
-  return destinationEnd;
-}
-
-/**
- * Address: 0x008F67E0 (FUN_008F67E0)
- *
- * What it does:
- * Releases one `{begin,end,capacity}` storage triple and resets all three
- * cursor lanes to null.
- */
-void ReleaseLegacyBufferTripleRuntimeC(
-  LegacyBufferTripleRuntime* const owner
-)
-{
-  ReleaseLegacyBufferTripleRuntime(owner);
-}
-
-/**
  * Address: 0x009A8550 (FUN_009A8550)
  *
  * What it does:
@@ -3341,55 +3022,6 @@ std::uint32_t ClassifyDoubleExponentMaskRuntime(
   const std::uint32_t highWord = static_cast<std::uint32_t>(bits >> 32u);
   const std::uint32_t exponentMask = highWord & 0x7FF00000u;
   return exponentMask == 0x7FF00000u ? highWord : exponentMask;
-}
-
-/**
- * Address: 0x0057EA30 (FUN_0057EA30)
- *
- * What it does:
- * Unlinks one dual back-reference lane by patching both owner chains rooted at
- * `+0x08` and `+0x10`.
- */
-std::uint32_t* UnlinkDualBackReferenceRuntime(
-  const std::uint32_t nodeAddress
-)
-{
-  auto* const link = reinterpret_cast<LinkPatchRuntime*>(static_cast<std::uintptr_t>(nodeAddress + 8u));
-  if (link == nullptr) {
-    return nullptr;
-  }
-
-  std::uint32_t* result = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(link->lane08));
-
-  if (link->lane10 != 0u) {
-    auto* cursor = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(link->lane10));
-    const std::uintptr_t target = reinterpret_cast<std::uintptr_t>(&link->lane10);
-    std::uint32_t guard = 0u;
-    while (cursor != nullptr && guard < 0x100000u) {
-      if (*cursor == static_cast<std::uint32_t>(target)) {
-        *cursor = link->lane14;
-        break;
-      }
-      cursor = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(*cursor + 4u));
-      ++guard;
-    }
-  }
-
-  if (link->lane08 != 0u) {
-    result = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(link->lane08));
-    const std::uintptr_t target = reinterpret_cast<std::uintptr_t>(&link->lane08);
-    std::uint32_t guard = 0u;
-    while (result != nullptr && guard < 0x100000u) {
-      if (*result == static_cast<std::uint32_t>(target)) {
-        *result = link->lane0C;
-        break;
-      }
-      result = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(*result + 4u));
-      ++guard;
-    }
-  }
-
-  return result;
 }
 
 /**
@@ -4872,38 +4504,6 @@ int UpdateSelectedEntryBoundsRuntime(
   quad[2] = 0.0f;
   quad[3] = entryView.minZ();
   return submitQuadFn != nullptr ? submitQuadFn(quad, owner) : result;
-}
-
-/**
- * Address: 0x007F2DA0 (FUN_007F2DA0)
- *
- * What it does:
- * Clones one tree storage lane when source root differs from current token and
- * swaps the owner root pointer to the new clone.
- */
-void* CloneTreeStorageIntoOwnerRuntime(
-  void* const currentToken,
-  TreeStorageOwnerRuntime* const owner,
-  void* const sourceRoot,
-  const CloneTreeStorageFn cloneStorageFn,
-  const CloneTreePayloadFn clonePayloadFn
-)
-{
-  if (owner == nullptr) {
-    return sourceRoot;
-  }
-
-  if (sourceRoot != currentToken && cloneStorageFn != nullptr) {
-    void* const previousRoot = owner->treeStorage;
-    void* const clonedRoot = cloneStorageFn(0u, 0u, 0u, sourceRoot);
-    if (clonedRoot != nullptr) {
-      if (clonePayloadFn != nullptr) {
-        clonePayloadFn(clonedRoot, previousRoot);
-      }
-      owner->treeStorage = clonedRoot;
-    }
-  }
-  return sourceRoot;
 }
 
 using DeferredSimDriverBindRuntime = boost::_bi::bind_t<

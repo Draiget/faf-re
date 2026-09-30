@@ -134,6 +134,21 @@ namespace moho
      * exercised when `other` is also empty in every observed call site.
      */
     CameraUserEntityWeakRef* AssignRange(const CameraFrustumUserEntityList& other);
+
+    /**
+     * Address: 0x007F2DA0 (FUN_007F2DA0)
+     *
+     * What it does:
+     * The lane's `erase(first, last)`: assigns the surviving tail
+     * `[last, mFinish)` down onto `first` through `WeakPtr`'s relinking
+     * assignment (0x007F3BE0, the `copy_or_move_assign` emission), unlinks
+     * the vacated slots `[newFinish, mFinish)` from their entities' weak
+     * chains (0x007AF240, `UnlinkIntrusiveWeakRefRange`), rebases `mFinish`
+     * and returns `first`; an empty range changes nothing. `this` arrives in
+     * EBX and `last` in EDX. Sole caller: `AssignRange`'s truncate branch
+     * (0x007F2181), as `Erase(newFinish, mFinish)`.
+     */
+    CameraUserEntityWeakRef* Erase(CameraUserEntityWeakRef* first, CameraUserEntityWeakRef* last);
     /**
      * Address: inlined - emitted at 0x007EEB13..0x007EEB52 inside
      * `RangeRenderer::Render` (FUN_007EEA00), and again in the lane teardown

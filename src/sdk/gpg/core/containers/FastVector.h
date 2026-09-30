@@ -303,6 +303,8 @@ namespace gpg::core
      * `resize(21, value)`. Previously tagged `external_dependency` as an
      * "all-external-callees thunk"; its one external callee is
      * `::operator delete`, and the body is this template.)
+     * Address: 0x0055D940 (FUN_0055D940 -- `DestroyRange` for `gpg::fastvector_n<moho::UnitWeaponInfo, 1>` (`SSTIUnitVariableData::mWeaponInfo`, element 0x98): `first` in EAX, `last` in EBX, `~UnitWeaponInfo` (0x0055D170) per slot; callers 0x00561D90 (`AssignFrom`'s shrink tail, `DestroyRange(newEnd, end_)`), 0x0055D260 (`resize`), 0x0055D840, and unboxed code at 0x0055D7FA; formerly `DestroyUnitWeaponInfoRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0056E7E0 (FUN_0056E7E0 -- `DestroyRange` for `gpg::fastvector_n<SFormationRunScriptCandidate, 16>` (CAiFormationInstance.cpp, element 0x48): `first` in EAX, `last` in EBX; each inlined `~SFormationRunScriptCandidate` is the reset of `category.mBits.mWords` at `+0x30`; callers 0x00567300 (`CFormationInstance::RunScript`'s three scope exits of the candidate vector), 0x0056C8A0 / 0x0056C900 / 0x0056E7A0 (out-of-line `~FastVectorN` emissions), 0x0056FAB0 (`GrowInsertDeepCopy`'s old-range teardown and catch rollback); formerly `NormalizeFormationLaneRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      */
     template <class T>
     inline void DestroyRange(T* first, T* const last) noexcept
@@ -980,6 +982,8 @@ namespace gpg::core
      * has nothing left to do.
      * Address: 0x0056B4D0 (FUN_0056B4D0 -- the destructor of `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the element destructor the `eh vector destructor iterator` runs for `mOffsetInfo[2]` in `~CFormationInstance`.)
      * Address: 0x0057E9D0 (FUN_0057E9D0 -- the destructor of `gpg::fastvector_n<Moho::CollisionResult, 10>`, the stack buffer every COGrid collision query fills; its 12 callers are the scope exits of those locals (`Sim::LocationIsFree`, `Projectile::CheckCollision`, `CUnitMotion::ProcessSurfaceCollisionFromLastMove`, ...). The FUN_00401DE0 body with `this` in ESI instead of ECX and the vector at +0x00; no element loop, `CollisionResult` being trivially destructible.)
+     * Address: 0x00545280 (FUN_00545280 -- the FUN_00401DE0 body with `this` in ESI: the destructor of the `gpg::fastvector_n<unsigned int, 2>` at `+0x08` of `moho::BVIntSet` (`mWords`), i.e. the implicit `~ArmyLaunchInfo` / `~BVIntSet` of the 0x20-byte element of `msvc8::vector<moho::ArmyLaunchInfo>`; callers 0x00545130 (`uninit_fill_n`), 0x005454A0 / 0x005457A0 / 0x00545880 (the `uninit_copy_n` bodies' catch rollback loops, stride 0x20); formerly `ResetSwapBackedArrayRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x006DF040 (FUN_006DF040 -- the same destructor body for the `gpg::fastvector_n<unsigned int, 2>` at `+0x10` of `moho::EntityCategorySet` (`mBits.mWords`), i.e. the implicit `~BVSet` of the 0x28-byte element of `msvc8::vector<moho::EntityCategorySet>`, `this` in ESI; callers 0x006DEA30 (`uninit_fill_n`), 0x006DFFF0 / 0x006E0400 (`uninit_copy_n`), 0x006E00A0 -- each a catch rollback loop, stride 0x28; formerly `ResetSwapBackedArrayRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      */
     ~FastVectorInline()
     {

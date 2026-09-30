@@ -18,6 +18,7 @@ namespace moho
    *
    * What it is:
    * One reserved-build entry containing a weak unit lane and a weak command lane.
+   * Address: 0x0057EA30 (FUN_0057EA30 -- the implicit `std::pair<const Wm3::Vector2i, SBuildReserveInfo>::~pair` emitted out of line, `this` in EDX: `add edx, 8` to `.second`, then `~WeakPtr<CUnitCommand>` on `mCom` and `~WeakPtr<Unit>` on `mUnit`, each the owner-chain splice-out; callers 0x0057D910 (`msvc8::map<Wm3::Vector2i, SBuildReserveInfo>::operator[]`'s `value_type(key, T())` temporary), 0x00582550 / 0x00582560 / 0x0057F2C0 / 0x00581E50 (the tree's node-value destroy, `edx = node + 0x0C`), EH funclets 0x00B98AEB / 0x00B98B3B; formerly `UnlinkDualBackReferenceRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
    */
   struct SBuildReserveInfo
   {

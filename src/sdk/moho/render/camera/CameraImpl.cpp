@@ -1881,12 +1881,7 @@ moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::AssignRange(
       sourceSize
     );
 
-    CameraUserEntityWeakRef* const newFinish = mStart + sourceSize;
-    gpg::core::detail::UnlinkIntrusiveWeakRefRange(
-      reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(newFinish),
-      reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mFinish)
-    );
-    mFinish = newFinish;
+    (void)Erase(mStart + sourceSize, mFinish);
     return mStart;
   }
 
@@ -1913,6 +1908,37 @@ moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::AssignRange(
   (void)insertedEnd;
 
   return mStart;
+}
+
+/**
+ * Address: 0x007F2DA0 (FUN_007F2DA0)
+ *
+ * What it does:
+ * The lane's `erase(first, last)`: shifts `[last, mFinish)` down onto `first`
+ * through the relinking `WeakPtr` assignment, unlinks the vacated tail from
+ * its entities' weak chains, rebases `mFinish` and returns `first`.
+ */
+moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::Erase(
+  CameraUserEntityWeakRef* const first,
+  CameraUserEntityWeakRef* const last
+)
+{
+  if (first != last) {
+    const std::size_t tailCount = static_cast<std::size_t>(mFinish - last);
+    msvc8::vector<moho::WeakPtr<void>>::copy_or_move_assign(
+      reinterpret_cast<WeakPtr<void>*>(first),
+      reinterpret_cast<const WeakPtr<void>*>(last),
+      tailCount
+    );
+
+    CameraUserEntityWeakRef* const newFinish = first + tailCount;
+    gpg::core::detail::UnlinkIntrusiveWeakRefRange(
+      reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(newFinish),
+      reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mFinish)
+    );
+    mFinish = newFinish;
+  }
+  return first;
 }
 
 /**
