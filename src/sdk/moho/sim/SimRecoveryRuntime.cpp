@@ -2129,22 +2129,6 @@ namespace
 }
 
 /**
- * Address: 0x0092C3F0 (FUN_0092C3F0)
- *
- * What it does:
- * Swaps two 12-byte heap-entry lanes and updates the reverse-index map for
- * both moved entry ids.
- */
-std::int32_t* SwapIndexedPriorityQueueEntriesRuntime(
-  IndexedPriorityQueueRuntimeOwner* const owner,
-  const std::int32_t leftIndex,
-  const std::int32_t rightIndex
-) noexcept
-{
-  return SwapPriorityQueueEntriesAndUpdateReverseIndex(owner, leftIndex, rightIndex);
-}
-
-/**
  * Address: 0x0092CB10 (FUN_0092CB10)
  *
  * What it does:
@@ -2280,19 +2264,6 @@ moho::SimSubRes2* CopyIdPoolHistoryRingRuntime(
  * Releases one CommandDatabase-owned node buffer and clears ownership lanes.
  */
 std::int32_t ReleaseCommandDatabaseNodeBufferRuntime(
-  OwnedBufferRuntime* const owner
-)
-{
-  return ResetOwnedBufferRuntime(owner);
-}
-
-/**
- * Address: 0x006FD8B0 (FUN_006FD8B0)
- *
- * What it does:
- * Releases one CArmyStats-owned node buffer and clears ownership lanes.
- */
-std::int32_t ReleaseArmyStatsNodeBufferRuntime(
   OwnedBufferRuntime* const owner
 )
 {
@@ -2525,29 +2496,6 @@ std::uint32_t** CompactWordVectorTailFromCursorRuntime(
   return outBeginStorage;
 }
 
-/**
- * Address: 0x007672E0 (FUN_007672E0)
- *
- * What it does:
- * Finalizes one cached word-vector lane, synchronizes staged begin/end cursors,
- * and invalidates the cached index lane.
- */
-std::int32_t FinalizeWordVectorCacheStateRuntime(
-  CacheWordVectorRuntime* const runtime
-)
-{
-  std::uint32_t* compactedBegin = nullptr;
-  (void)CompactWordVectorTailFromCursorRuntime(&compactedBegin, runtime, runtime->begin, runtime->end);
-
-  if (runtime->stagedBeginIndex != runtime->stagedEndIndex) {
-    compactedBegin = nullptr;
-    runtime->stagedEndIndex = runtime->stagedBeginIndex;
-  }
-
-  runtime->cachedIndex = -1;
-  return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(compactedBegin));
-}
-
 // 0x005347A0 is `msvc8::vector<Moho::RBlueprint*>::push_back`, recovered as a
 // real container call in moho::AppendBlueprintOrdinal (Sim.cpp). The
 // type-erased `LegacyVectorStorageRuntime<std::uint32_t>` stand-in that used to
@@ -2628,42 +2576,6 @@ std::uint32_t ResetSwapBackedArrayRuntimeB(
   runtime->cachedFirst = runtime->activeBuffer != nullptr ? *runtime->activeBuffer : 0u;
   runtime->cursor = runtime->activeBuffer;
   return runtime->cachedFirst;
-}
-
-/**
- * Address: 0x00705B30 (FUN_00705B30)
- *
- * What it does:
- * Resets one linked owner lane to fallback array storage and unlinks the node
- * from its intrusive next/prev chain.
- */
-LinkedBufferOwnerRuntime* ResetLinkedBufferOwnerRuntime(
-  LinkedBufferOwnerRuntime* const owner
-)
-{
-  if (owner == nullptr) {
-    return nullptr;
-  }
-
-  if (owner->activeBuffer != owner->fallbackBuffer) {
-    ::operator delete[](owner->activeBuffer);
-    owner->activeBuffer = owner->fallbackBuffer;
-    owner->cachedFirst = owner->activeBuffer != nullptr ? *owner->activeBuffer : 0u;
-  }
-  owner->cursor = owner->activeBuffer;
-
-  LinkedBufferOwnerRuntime* const previous = owner->prev;
-  LinkedBufferOwnerRuntime* const next = owner->next;
-  if (next != nullptr) {
-    next->prev = previous;
-  }
-  if (previous != nullptr) {
-    previous->next = next;
-  }
-
-  owner->prev = owner;
-  owner->next = owner;
-  return previous;
 }
 
 /**
@@ -3631,39 +3543,6 @@ void ReleaseLegacyBufferTripleRuntimeD(
 }
 
 /**
- * Address: 0x00930440 (FUN_00930440)
- *
- * What it does:
- * Acquires one slot id from a free-list lane when available; otherwise appends
- * one new pointer lane and returns its index.
- */
-std::int32_t AcquireOrReusePointerSlotRuntime(
-  std::int32_t* const freeHead,
-  LegacyVectorStorageRuntime<std::int32_t*>* const vector,
-  std::int32_t* const value
-)
-{
-  if (freeHead == nullptr || vector == nullptr) {
-    return -1;
-  }
-
-  if (*freeHead == -1) {
-    const std::int32_t index = static_cast<std::int32_t>(VectorSize(*vector));
-    (void)AppendTrivialValue(vector, value);
-    return index;
-  }
-
-  const std::int32_t reusedIndex = *freeHead;
-  if (vector->begin == nullptr || reusedIndex < 0) {
-    return -1;
-  }
-
-  *freeHead = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(vector->begin[reusedIndex]));
-  vector->begin[reusedIndex] = value;
-  return reusedIndex;
-}
-
-/**
  * Address: 0x00933120 (FUN_00933120)
  *
  * What it does:
@@ -4509,31 +4388,6 @@ std::int16_t ScalePackedDoubleWordsRuntimeAdapter(
 }
 
 /**
- * Address: 0x00886FB0 (FUN_00886FB0)
- * Address: 0x00886D80 (FUN_00886D80, Moho::WaveParameters scalar-deleting destructor)
- *
- * What it does:
- * Releases both legacy string lanes in one wave-parameters object and resets
- * them to empty-inline form. `FUN_00886D80` is the vtable-slot-0 wrapper the
- * binary calls through `delete`: it invokes this body then, when the low bit
- * of its `deleteFlag` argument is set, frees the object with `operator delete`
- * -- ordinary C++ `delete` semantics, not modeled as a separate function here.
- */
-void ResetWaveParametersStringsRuntime(
-  WaveParametersRuntime* const parameters,
-  void* const waveParametersVtable
-)
-{
-  if (parameters == nullptr) {
-    return;
-  }
-
-  parameters->vtable = waveParametersVtable;
-  parameters->lane20Text.tidy(true, 0U);
-  parameters->lane04Text.tidy(true, 0U);
-}
-
-/**
  * Address: 0x0088B2A0 (FUN_0088B2A0)
  *
  * What it does:
@@ -4568,24 +4422,6 @@ void ResetWaveParametersStringsRuntime(
   destination->lane80 = source->lane80;
   destination->lane84 = source->lane84;
   return destination;
-}
-
-/**
- * Address: 0x0088AB00 (FUN_0088AB00)
- *
- * What it does:
- * Copy-constructs one wave-parameters object by rebinding its vtable lane,
- * default-constructing both embedded string lanes, and copying payload lanes.
- */
-[[nodiscard]] WaveParametersRuntime* CopyConstructWaveParametersRuntime(
-  const WaveParametersRuntime* const source,
-  WaveParametersRuntime* const destination
-)
-{
-  destination->vtable = source->vtable;
-  ::new (static_cast<void*>(&destination->lane04Text)) msvc8::string();
-  ::new (static_cast<void*>(&destination->lane20Text)) msvc8::string();
-  return CopyWaveParametersPayloadRuntime(source, destination);
 }
 
 /**
@@ -4627,28 +4463,6 @@ int DestroyWxButtonRuntime(
 
   button->vtable = wxButtonVtable;
   return wxControlDtorFn != nullptr ? wxControlDtorFn(button) : 0;
-}
-
-/**
- * Address: 0x004EAA50 (FUN_004EAA50)
- *
- * What it does:
- * Initializes one shared NaN word-pair lane once and returns the pair base.
- */
-std::uint32_t* GetOrInitializeNaNWordPairRuntime(
-  const std::uint32_t nanWord
-)
-{
-  static std::uint32_t initializationFlags = 0u;
-  static std::uint32_t nanWords[2] = {0u, 0u};
-
-  if ((initializationFlags & 1u) == 0u) {
-    initializationFlags |= 1u;
-    nanWords[0] = nanWord;
-    nanWords[1] = nanWord;
-  }
-
-  return nanWords;
 }
 
 /**
@@ -5513,68 +5327,6 @@ void DestroyPrimBatcherObjectRuntime(
     destructorFn(batcher);
   }
   ::operator delete(batcher);
-}
-
-/**
- * Address: 0x0080D8B0 (FUN_0080D8B0)
- *
- * What it does:
- * Quantizes three float coordinates into ceil-rounded unsigned 16-bit lanes
- * and stores homogeneous `w=1`.
- */
-std::uint16_t* QuantizeFloatTripletToWord4Runtime(
-  std::uint16_t* const outWord4,
-  const float x,
-  const float y,
-  const float z
-)
-{
-  outWord4[0] = static_cast<std::uint16_t>(std::ceil(static_cast<double>(x)));
-  outWord4[1] = static_cast<std::uint16_t>(std::ceil(static_cast<double>(y)));
-  outWord4[2] = static_cast<std::uint16_t>(std::ceil(static_cast<double>(z)));
-  outWord4[3] = 1u;
-  return outWord4;
-}
-
-/**
- * Address: 0x0080DE80 (FUN_0080DE80)
- *
- * What it does:
- * Reads a 3x3 index neighborhood from the tesselator and emits 8 triangles
- * covering the patch around `(column, rowToken)`.
- */
-void EmitPatchTrianglesFromTesselatorRuntime(
-  const std::int32_t column,
-  void* const tesselator,
-  const std::uint8_t* const rowToken,
-  const TesselatorGetIndexFn getIndexFn,
-  const TesselatorAddTriangleFn addTriangleFn
-)
-{
-  if (tesselator == nullptr || rowToken == nullptr || getIndexFn == nullptr || addTriangleFn == nullptr) {
-    return;
-  }
-
-  const std::uint32_t source = getIndexFn(tesselator, 0u, rowToken + 0u, column);
-  const std::uint32_t topMid = getIndexFn(tesselator, 0u, rowToken + 1u, column);
-  const std::uint32_t topRight = getIndexFn(tesselator, 0u, rowToken + 2u, column);
-
-  const std::uint32_t midLeft = getIndexFn(tesselator, 0u, rowToken + 0u, column + 1);
-  const std::uint32_t center = getIndexFn(tesselator, 0u, rowToken + 1u, column + 1);
-  const std::uint32_t midRight = getIndexFn(tesselator, 0u, rowToken + 2u, column + 1);
-
-  const std::uint32_t bottomLeft = getIndexFn(tesselator, 0u, rowToken + 0u, column + 2);
-  const std::uint32_t bottomMid = getIndexFn(tesselator, 0u, rowToken + 1u, column + 2);
-  const std::uint32_t bottomRight = getIndexFn(tesselator, 0u, rowToken + 2u, column + 2);
-
-  addTriangleFn(tesselator, source, topMid, center);
-  addTriangleFn(tesselator, source, center, midLeft);
-  addTriangleFn(tesselator, topMid, topRight, midRight);
-  addTriangleFn(tesselator, topMid, midRight, center);
-  addTriangleFn(tesselator, midLeft, center, bottomMid);
-  addTriangleFn(tesselator, midLeft, bottomMid, bottomLeft);
-  addTriangleFn(tesselator, center, midRight, bottomRight);
-  addTriangleFn(tesselator, center, bottomRight, bottomMid);
 }
 
 using DeferredSimDriverBindRuntime = boost::_bi::bind_t<
@@ -7770,23 +7522,6 @@ int UpdateCachedResolvedValueRuntimeB(
 }
 
 /**
- * Address: 0x006638B0 (FUN_006638B0)
- *
- * What it does:
- * Queries viewport bounds and applies an updated rectangle with width scaled
- * to one-third.
- */
-int QueryAndApplyViewportThirdWidthRuntime(
-  ViewportQueryRuntime* const owner
-)
-{
-  int width = 0;
-  int height = 0;
-  owner->vtable->queryBounds(owner, &width, &height);
-  return owner->vtable->applyBounds(owner, -1, -1, width / 3, height, 0);
-}
-
-/**
  * Address: 0x00A4FD90 (FUN_00A4FD90)
  *
  * What it does:
@@ -8546,38 +8281,6 @@ int DispatchSsoPayloadToDestinationRuntime(
 }
 
 /**
- * Address: 0x0088FBA0 (FUN_0088FBA0)
- *
- * What it does:
- * Invokes one unary callback with SSO payload selection (`inline` for len<16,
- * heap pointer otherwise).
- */
-int InvokeUnarySsoPayloadCallbackRuntime(
-  const SsoUnaryCallbackHandleRuntime* const handle
-)
-{
-  const SsoUnaryCallbackRuntime* const object = handle->object;
-  const void* const payload = ResolveSsoPayloadPointer(object->storage.heapPayload, object->storage.inlinePayload, object->payloadLength);
-  return object->callback(payload);
-}
-
-/**
- * Address: 0x0088FC40 (FUN_0088FC40)
- *
- * What it does:
- * Invokes one binary callback with selected SSO payload and callback-state lane
- * at offset `+0x20`.
- */
-void InvokeBinarySsoPayloadCallbackRuntime(
-  const SsoBinaryCallbackHandleRuntime* const handle
-) noexcept
-{
-  const SsoBinaryCallbackRuntime* const object = handle->object;
-  const void* const payload = ResolveSsoPayloadPointer(object->storage.heapPayload, object->storage.inlinePayload, object->payloadLength);
-  object->callback(payload, object->callbackState);
-}
-
-/**
  * Address: 0x00964A10 (FUN_00964A10)
  *
  * What it does:
@@ -9073,17 +8776,6 @@ int InvokeContextUnaryThunkRuntime(
 )
 {
   return thunk->invoke(thunk->context, arg0);
-}
-
-/**
- * Address: 0x0088FCE0 (FUN_0088FCE0)
- *
- * What it does:
- * Invokes one cdecl binary thunk with two stored payload lanes.
- */
-int InvokeStoredBinaryCdeclThunkRuntime(const CdeclBinaryThunkRuntime* const thunk)
-{
-  return thunk->invoke(thunk->arg0, thunk->arg1);
 }
 
 /**
