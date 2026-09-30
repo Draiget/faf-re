@@ -2314,15 +2314,6 @@ CScrLuaMetatableFactory<UserUnit>& CScrLuaMetatableFactory<UserUnit>::Instance()
  */
 namespace moho
 {
-  CommandIssueObserverChain::~CommandIssueObserverChain() noexcept
-  {
-    for (CommandIssueObserverLink* link = mHead; mHead != nullptr; link = mHead) {
-      mHead = link->mNext;
-      link->mOwnerLinkSlot = nullptr;
-      link->mNext = nullptr;
-    }
-  }
-
   /**
    * Address: 0x008B3DC0 (FUN_008B3DC0, sub_8B3DC0)
    *
@@ -2352,7 +2343,7 @@ namespace moho
     const std::uint8_t deleteWhenDue,
     const std::int32_t dueSeqNo
   )
-    : mObserverLinks{}
+    : WeakObject()
     , mConstantData(constantData)
     , mVariableData()
     , mVariableDataTailPad{}
@@ -2412,7 +2403,11 @@ namespace moho
   UserCommandIssueHelper::~UserCommandIssueHelper() noexcept
   {
     DiscardActiveSessionCommandIssueHelper(*this);
-    // `mCursorEntitySet`, then `mLocalQueue` (0x008B5210), are destroyed as members.
+    // `mCursorEntitySet`, then `mLocalQueue` (0x008B5210), are destroyed as
+    // members. The binary drops the weak references after them, as the
+    // inlined `WeakObject` teardown (0x008B4049); no member holds a
+    // reference to this helper, so running it here is the same.
+    DetachAllWeakReferences();
   }
 
   UserCommandIssueHelper* FindCommandIssueHelperInSession(CWldSession* const session, const CmdId commandId) noexcept

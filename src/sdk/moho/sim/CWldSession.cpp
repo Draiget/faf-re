@@ -1351,73 +1351,6 @@ namespace moho
     struct HashListNode2C;
 
     /**
-     * Head of the intrusive chain of graph nodes that reference one command.
-     * This is a view onto the first field of the engine's per-command issue
-     * helper: 0x00826140 stores `&node.mHelperLink` straight into the helper's
-     * leading pointer, and every walk of the chain starts by dereferencing it.
-     */
-    struct CommandGraphHelperHead;
-
-    /**
-     * One node's membership in a command's chain. The chain is threaded
-     * pointer-to-pointer: the helper's head points at a link, and each link's
-     * `mNext` points at the following link, so unlinking only ever needs the
-     * slot that currently refers to this link.
-     */
-    struct CommandGraphHelperLink
-    {
-      CommandGraphHelperHead* mHead; // +0x00
-      CommandGraphHelperLink* mNext; // +0x04
-
-      /**
-       * Splices this link out of whichever command's chain currently holds it.
-       *
-       * The chain is threaded pointer-to-pointer, so the only way to find the
-       * slot that refers to this link is to walk from the head. The leading
-       * null test is not redundant bookkeeping on our side - the binary really
-       * does re-test the head at every unlink site (0x00826568 in the draw-node
-       * destructor, 0x00829041 in `CreateMeshes`), because a node whose command
-       * has already been retired carries a null head.
-       *
-       * Leaves `mHead`/`mNext` untouched: every caller either overwrites them
-       * immediately via `LinkInto` or is destroying the node.
-       */
-      void UnlinkFromChain() noexcept
-      {
-        if (mHead == nullptr) {
-          return;
-        }
-
-        CommandGraphHelperLink** slot = &mHead->mFirst;
-        while (*slot != this) {
-          slot = &(*slot)->mNext;
-        }
-        *slot = mNext;
-      }
-
-      /**
-       * Publishes this link at the front of `head`'s chain, or clears it when
-       * `head` is null. Matches 0x0082905E..0x0082906D and the identical block
-       * the draw-node relocate helper runs at 0x0082D54B.
-       */
-      void LinkInto(CommandGraphHelperHead* const head) noexcept
-      {
-        mHead = head;
-        if (head != nullptr) {
-          mNext = head->mFirst;
-          head->mFirst = this;
-        } else {
-          mNext = nullptr;
-        }
-      }
-    };
-
-    struct CommandGraphHelperHead
-    {
-      CommandGraphHelperLink* mFirst; // +0x00
-    };
-
-    /**
      * One dword lane in the engine's four-pointer `gpg::fastvector` shape, with
      * inline storage for a single element.
      *
@@ -1445,7 +1378,8 @@ namespace moho
     struct UICommandGraphDrawNode
     {
       CmdId mCommandId;                    // +0x00
-      CommandGraphHelperLink mHelperLink;  // +0x04
+      /// The command's issue helper; its chain holds every draw node for it.
+      WeakPtr<UserCommandIssueHelper> mHelperLink; // +0x04
       Wm3::Vector3f mPositionSum;          // +0x0C
       float mWeight;                       // +0x18
       std::uint8_t mHasResolvedPosition;   // +0x1C
@@ -3921,7 +3855,7 @@ namespace moho
    */
   UICommandGraph::UICommandGraphDrawNode::UICommandGraphDrawNode()
     : mCommandId(-1)
-    , mHelperLink{nullptr, nullptr}
+    , mHelperLink()
     , mPositionSum(0.0f, 0.0f, 0.0f)
     , mWeight(0.0f)
     , mHasResolvedPosition(0u)
@@ -3942,8 +3876,7 @@ namespace moho
     mLaneA.ResetStorageToInline();
 
     mMeshInstance.release();
-
-    mHelperLink.UnlinkFromChain();
+    // `mHelperLink` unlinks as the last member (0x008265E8).
   }
 
   /**
@@ -4117,10 +4050,10 @@ namespace moho
   {
     destination->mCommandId = source.mCommandId;
 
-    // Re-publishes the *destination* into the source's chain without unlinking
-    // the source - the binary leaves both links pointing into it until the
-    // source node is destroyed separately by its caller.
-    destination->mHelperLink.LinkInto(source.mHelperLink.mHead);
+    // `WeakPtr`'s copy constructor into the raw destination slot: the copy
+    // joins the source's helper chain, and the source stays on it until its
+    // caller destroys it.
+    ::new (static_cast<void*>(&destination->mHelperLink)) WeakPtr<UserCommandIssueHelper>(source.mHelperLink);
 
     destination->mPositionSum = source.mPositionSum;
     destination->mWeight = source.mWeight;
@@ -5483,7 +5416,7 @@ namespace moho
       return;
     }
 
-    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    auto* const helper = drawNode.mHelperLink.GetObjectPtr();
     if (helper == nullptr) {
       return;
     }
@@ -5580,24 +5513,16 @@ namespace moho
       // re-pointed at whichever helper owns its command id right now. A node
       // with no chain membership at all is left alone - it never had an owner
       // and the rebuild pass is what gives it one.
-      if (drawNode.mHelperLink.mHead != nullptr) {
-        auto* const owner = reinterpret_cast<CommandGraphHelperHead*>(
-          FindCommandIssueHelperInSession(mSession, drawNode.mCommandId)
-        );
-        if (owner != drawNode.mHelperLink.mHead) {
-          drawNode.mHelperLink.UnlinkFromChain();
-          drawNode.mHelperLink.LinkInto(owner);
-        }
+      if (drawNode.mHelperLink.HasValue()) {
+        drawNode.mHelperLink.ResetFromObject(FindCommandIssueHelperInSession(mSession, drawNode.mCommandId));
       }
 
       // First time this node resolves to a live command, seed its anchor from
       // the command's own history. `mWeight` becomes 1 because this table keys
       // one node per command - the centroid is that single position, unlike the
       // queue-head table where the weight counts the units sharing the queue.
-      if (drawNode.mHelperLink.mHead != nullptr && drawNode.mHasResolvedPosition == 0u) {
-        drawNode.mPositionSum = ResolveCommandGraphAnchorWorldPosition(
-          *reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead)
-        );
+      if (drawNode.mHelperLink.HasValue() && drawNode.mHasResolvedPosition == 0u) {
+        drawNode.mPositionSum = ResolveCommandGraphAnchorWorldPosition(*drawNode.mHelperLink.GetObjectPtr());
         drawNode.mWeight = 1.0f;
       }
     }
@@ -5965,7 +5890,7 @@ namespace moho
     const UICommandGraphDrawNode& drawNode
   ) const
   {
-    auto* const ownerHelper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    auto* const ownerHelper = drawNode.mHelperLink.GetObjectPtr();
     if (ownerHelper == nullptr) {
       return ECommandNodeHighlightState::Normal;
     }
@@ -6051,7 +5976,7 @@ namespace moho
     const UICommandGraphDrawNode& drawNode
   ) const
   {
-    auto* const ownerHelper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    auto* const ownerHelper = drawNode.mHelperLink.GetObjectPtr();
     if (ownerHelper == nullptr) {
       return false;
     }
@@ -6079,7 +6004,7 @@ namespace moho
     const GeomCamera3& camera, CD3DPrimBatcher& batcher, UICommandGraphDrawNode& drawNode
   ) const
   {
-    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    auto* const helper = drawNode.mHelperLink.GetObjectPtr();
     if (helper == nullptr) {
       return;
     }
@@ -6213,7 +6138,7 @@ namespace moho
       const float scaledTolerance = worldTolerance * depthW;
       float scaledDistance = depthW * pixelDistance;
 
-      auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+      auto* const helper = drawNode.mHelperLink.GetObjectPtr();
       if (helper != nullptr && ResolveCommandIssueHelperCommandType(*helper) == EUnitCommandType::UNITCOMMAND_Ferry) {
         // Ferry waypoints get a small extra tolerance bonus so a ferry order's
         // markers are easier to pick back up under the cursor.
@@ -6271,7 +6196,7 @@ namespace moho
     if (!drawNode.mMeshInstance.px) {
       return;
     }
-    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    auto* const helper = drawNode.mHelperLink.GetObjectPtr();
     if (helper == nullptr) {
       return;
     }
@@ -6346,7 +6271,7 @@ namespace moho
     const GeomCamera3& camera, const UICommandGraphDrawNode& drawNode, CD3DPrimBatcher& batcher
   ) const
   {
-    if (drawNode.mHelperLink.mHead == nullptr) {
+    if (!drawNode.mHelperLink.HasValue()) {
       return;
     }
 
@@ -6355,7 +6280,7 @@ namespace moho
       return;
     }
 
-    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    auto* const helper = drawNode.mHelperLink.GetObjectPtr();
     const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
     const CommandGraphNode& node = mNodes[static_cast<std::size_t>(commandType)];
 
@@ -6448,7 +6373,7 @@ namespace moho
     if (toNode == nullptr) {
       return;
     }
-    auto* const ownerHelper = reinterpret_cast<UserCommandIssueHelper*>(toNode->mHelperLink.mHead);
+    auto* const ownerHelper = toNode->mHelperLink.GetObjectPtr();
     if (ownerHelper == nullptr) {
       return;
     }
@@ -8347,7 +8272,7 @@ namespace moho
     // Unguarded exactly as the binary is (0x00826CFB feeds `[esi+4]` straight
     // into the type resolver): an edge only exists because `LinkCommandGraphEdge`
     // published it from two draw nodes that already carry a helper.
-    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(edge.mToNode->mHelperLink.mHead);
+    auto* const helper = edge.mToNode->mHelperLink.GetObjectPtr();
 
     switch (ResolveCommandIssueHelperCommandType(*helper)) {
       case EUnitCommandType::UNITCOMMAND_Move:
@@ -9224,7 +9149,7 @@ namespace moho
   {
     LuaPlus::LuaState* const state = GetUiManagerGlobalLaneA()->mLuaState;
 
-    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    auto* const helper = drawNode.mHelperLink.GetObjectPtr();
     if (helper == nullptr) {
       return 0;
     }
@@ -10019,7 +9944,7 @@ namespace moho
       fromNode.mLaneB.push_back(edge);
       toNode.mLaneA.push_back(edge);
 
-      auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(toNode.mHelperLink.mHead);
+      auto* const helper = toNode.mHelperLink.GetObjectPtr();
       const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
       const UICommandGraph::CommandGraphNode& style = graph.mNodes[static_cast<std::size_t>(commandType)];
 
@@ -10078,39 +10003,14 @@ namespace moho
    * can call it too" - its own doc comment already anticipated this exact
    * call site).
    *
-   * The queue pre-scan (0x00826295-0x008262E2) walks `queue`'s
-   * `UserCommandQueueEntry` range calling `func_GetEntitiesUnderCursor` per
-   * entry and testing membership via `sub_82CEA0` (0x0082CEA0). Resolved by
-   * reading 0x0082CEA0 and its own `sub_82E560` callee directly, rather than
-   * assuming the shape from that address's other two recovered call sites
-   * (`IsCandidateExcludedByCachedRelation` above and
-   * `LowerBoundWeakEntitySetNode`'s own caller, both of which wrap a *fixed*
-   * lookup key baked into the caller - here the key is
-   * `GetHoveredUserEntity()`'s result, which is genuinely a third distinct
-   * calling shape): `sub_82CEA0(hoveredEntity@eax, outSlot@edi,
-   * cursorSet@stack)` threads a transient node through `hoveredEntity+8`'s
-   * own chain around the call (an inert scope-guard dance, per
-   * `IsCandidateExcludedByCachedRelation`'s own note on this same address),
-   * then calls `sub_82E560(cursorSet@ecx, outSlot@eax, &hoveredEntity@ebx)` -
-   * `sub_82E560` itself (read directly, not just its cited shape) loads
-   * `[ebx]` as the raw search key and descends comparing it against
-   * `node+0xC`, the exact `LowerBoundWeakEntitySetNode` shape. So the
-   * pre-scan's cursor-membership test is
-   * `LowerBoundWeakEntitySetNode(*cursorEntities, (uint32_t)hoveredEntity)
-   * != cursorEntities->mHead`, with `cursorEntities` the
-   * `WeakSet<UserEntity>` (`: WeakSet<UserEntity>`)
-   * `ResolveCommandIssueCursorEntities` returns for that command's helper -
-   * confirmed reachable via `WeakSet<UserEntity>::First`'s own doc
-   * comment ("CUIWorldView::HandleEvent... at 0x00871065 over a command
-   * helper's under-cursor set").
+   * The queue pre-scan (0x00826295-0x008262E2) walks the queue's entries,
+   * asking each command's helper for its entities-under-cursor set
+   * (`GetEntitiesUnderCursor`) and testing the hovered entity against it with
+   * `WeakSet<UserUnit>::Find` (0x0082CEA0, set `find` 0x0082E560).
    *
-   * The intrusive helper-link splice (`v25->val0` chain walk at
-   * 0x008261B0-0x00826200) is `CommandGraphHelperLink::UnlinkFromChain()` +
-   * `LinkInto()` on a freshly-defaulted node, whose `mHelperLink.mHead` is
-   * always null - `UnlinkFromChain()` is a no-op on a null head, so the
-   * splice collapses to a plain `LinkInto(&helper's chain head)`, expressed
-   * below as such (no fresh node has ever been linked to a *different*
-   * helper for `UnlinkFromChain` to have real work to do).
+   * A draw node that has no helper yet joins the one it was just found for
+   * (0x008261B0-0x00826200): the unlink the binary runs first is a no-op on
+   * the empty `WeakPtr`, so it is `ResetFromObject(helper)`.
    *
    * The Attack/FormAttack anchor test reads the kind of the helper's current
    * `UserTarget` (`ResolveCommandIssueTarget`, 0x008B4080) and releases that
@@ -10213,12 +10113,12 @@ namespace moho
       UICommandGraph::UICommandGraphDrawNode* const currentNode =
         UICommandGraph::FindOrInsertCommandGraphDrawNode(helperKey, graph.mMapAB0);
 
-      if (currentNode->mHelperLink.mHead == nullptr) {
+      if (!currentNode->mHelperLink.HasValue()) {
         // First touch: publish the command id, join the owning helper's
         // draw-node chain, and seed the node's own anchor position/weight
         // from the helper's command history.
         currentNode->mCommandId = static_cast<CmdId>(helper->mConstantData.cmd);
-        currentNode->mHelperLink.LinkInto(reinterpret_cast<UICommandGraph::CommandGraphHelperHead*>(helper));
+        currentNode->mHelperLink.ResetFromObject(helper);
         currentNode->mPositionSum = ResolveCommandGraphAnchorWorldPosition(*helper);
         currentNode->mWeight = 1.0f;
       }

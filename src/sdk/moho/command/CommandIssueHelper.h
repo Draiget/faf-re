@@ -10,32 +10,11 @@
 #include "moho/command/SSTICommandVariableData.h"
 #include "moho/command/UserTarget.h"
 #include "moho/sim/SOCellPos.h"
+#include "moho/misc/WeakObject.h"
 #include "moho/misc/WeakSet.h"
 
 namespace moho
 {
-
-  struct CommandIssueObserverLink
-  {
-    void* mOwnerLinkSlot;            // +0x00
-    CommandIssueObserverLink* mNext; // +0x04
-  };
-  static_assert(sizeof(CommandIssueObserverLink) == 0x08, "CommandIssueObserverLink size must be 0x08");
-
-  struct CommandIssueObserverChain
-  {
-    CommandIssueObserverLink* mHead; // +0x00
-
-    /**
-     * Inlined block from FUN_008B3F80.
-     *
-     * What it does:
-     * Detaches every helper-owned queue/manager back-link node without
-     * releasing node storage; ownership belongs to the linked queue entries.
-     */
-    ~CommandIssueObserverChain() noexcept;
-  };
-  static_assert(sizeof(CommandIssueObserverChain) == 0x04, "CommandIssueObserverChain size must be 0x04");
 
   /**
    * Kind of one local command-issue event. The values are the literals the
@@ -107,9 +86,15 @@ namespace moho
   static_assert(offsetof(UserCommandIssueLocalEvent, mCells) == 0x38, "UserCommandIssueLocalEvent::mCells offset must be 0x38");
   static_assert(sizeof(UserCommandIssueLocalEvent) == 0x50, "UserCommandIssueLocalEvent size must be 0x50");
 
-  struct UserCommandIssueHelper
+  /**
+   * The UI's record of one issued command. It can be weakly referenced: the
+   * command queues' link runs and the command graph's draw nodes hold
+   * `WeakPtr<UserCommandIssueHelper>`s, whose owner slot is the helper itself
+   * (`WeakObject` at +0x00, so the decode is `slot - 0`). The destructor
+   * detaches them last, after every member (0x008B4049..0x008B4060).
+   */
+  struct UserCommandIssueHelper : WeakObject
   {
-    CommandIssueObserverChain mObserverLinks; // +0x000
     SSTICommandConstantData mConstantData;    // +0x004
     SSTICommandVariableData mVariableData;    // +0x040
     std::uint8_t mVariableDataTailPad[0x04];  // +0x0AC
@@ -161,7 +146,6 @@ namespace moho
     ~UserCommandIssueHelper() noexcept;
   };
 
-  static_assert(offsetof(UserCommandIssueHelper, mObserverLinks) == 0x000, "UserCommandIssueHelper::mObserverLinks offset must be 0x000");
   static_assert(offsetof(UserCommandIssueHelper, mConstantData) == 0x004, "UserCommandIssueHelper::mConstantData offset must be 0x004");
   static_assert(offsetof(UserCommandIssueHelper, mVariableData) == 0x040, "UserCommandIssueHelper::mVariableData offset must be 0x040");
   static_assert(
