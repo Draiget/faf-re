@@ -809,7 +809,7 @@ namespace moho
       const Wm3::Vec3f targetPos = routeCommand->mTarget.GetTargetPosGun(false);
       const SNavGoal unloadGoal(mUnit->GetFootprint().ToCellPos(targetPos));
 
-      SCommandUnitSet commandUnits{};
+      SEntitySetTemplateUnit commandUnits{};
       (void)CUnitUnloadUnits::Create(mDispatch, &unloadGoal, &commandUnits, routeCommand);
     }
 

@@ -18,6 +18,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/Sim.h"
 
 using namespace moho;
@@ -182,33 +183,19 @@ namespace
    * Address: 0x0062EE40 (FUN_0062EE40)
    *
    * What it does:
-   * Scans one unit set's weak-entry lane and returns which movement buckets it
-   * spans: `0 = no air bucket`, `1 = only air bucket`, `2 = mixed buckets`.
-   *
-   * A unit counts as air when its blueprint's `Physics.MotionType` is
-   * `RULEUMT_Air`. The binary reaches that through vtable slot 7 and a raw
-   * `+0x290` read: slot 7 is `Unit::GetBlueprint` (0x006A8B20, annotated
-   * `Slot: 7` in Unit.h), and `+0x290` lands in `Physics` (which starts at
-   * `RUnitBlueprint + 0x278`) at its `MotionType` field (`Physics + 0x18`).
-   * The compared constant 2 is `RULEUMT_Air`.
-   *
-   * The unit set is taken type-erased because the vtable slot is: both
-   * `moho::SEntitySetTemplateUnit` (GetScriptIndex) and `moho::SCommandUnitSet`
-   * (GetScriptName) reach it as a `void*`. What lives at `+0x08` in both is the
-   * set's own `gpg::core::FastVectorN<CScriptObject*, 4>`, so the scan below
-   * walks that container rather than a bespoke `{begin, end}` view of it, and
-   * unbiases each entry through `SCommandUnitSet::UnitFromEntry` -- the same
-   * -0x08 subobject adjustment, written as the downcast it is.
+   * The formation bucket of a unit set: Surface when no unit flies, Air when
+   * every unit does, Mixed otherwise. Each entry is the unit's `Entity`, so the
+   * unit is its `-8` downcast (0x0062EE51..0x0062EE5A). The binary calls
+   * `GetBlueprint` on it without a null test; a null entry is counted as
+   * non-air here rather than faulting.
    */
-  [[nodiscard]] int ResolveFormationBucketTypeFromUnitSet(const void* const unitSet)
+  [[nodiscard]] int ResolveFormationBucketTypeFromUnitSet(const moho::SEntitySetTemplateUnit* const unitSet)
   {
     if (unitSet == nullptr) {
       return 0;
     }
 
-    const auto& entries = *reinterpret_cast<const gpg::core::FastVectorN<moho::CScriptObject*, 4>*>(
-      static_cast<const std::uint8_t*>(unitSet) + offsetof(moho::SCommandUnitSet, mVec)
-    );
+    const auto& entries = unitSet->mVec;
     if (entries.empty()) {
       return 0;
     }
@@ -216,8 +203,8 @@ namespace
     bool hasAirBucket = false;
     bool hasNonAirBucket = false;
 
-    for (const moho::CScriptObject* const entry : entries) {
-      const moho::Unit* const unit = moho::SCommandUnitSet::UnitFromEntry(entry);
+    for (const moho::Entity* const entry : entries) {
+      const moho::Unit* const unit = static_cast<const moho::Unit*>(entry);
       const moho::RUnitBlueprint* const blueprint = (unit != nullptr) ? unit->GetBlueprint() : nullptr;
 
       if (blueprint != nullptr && blueprint->Physics.MotionType == moho::RULEUMT_Air) {
@@ -707,7 +694,7 @@ void CAiFormationDBImpl::RemoveFormation(CAiFormationInstance* const formation)
 /**
  * Address: 0x0059C0C0 (FUN_0059C0C0)
  */
-const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const void* const unitSet)
+const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const SEntitySetTemplateUnit* const unitSet)
 {
   if (!mSim) {
     return nullptr;
@@ -724,7 +711,7 @@ const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const void*
 /**
  * Address: 0x0059C0F0 (FUN_0059C0F0)
  */
-int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const void* const unitSet)
+int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const SEntitySetTemplateUnit* const unitSet)
 {
   if (!mSim) {
     return 0;
@@ -747,10 +734,11 @@ int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const void*
  *     Wm3::Quaternionf ori, int commandType);
  *
  * What it does:
- * Turns every word of the caller's unit set into a live `WeakPtr<IUnit>` in
- * a transient `fastvector_n<WeakPtr<IUnit>,4>` (0x0059C168-0x0059C224: the
- * temporary link at 0x0059C18A, its `push_back` through `sub_56B2F0` or the
- * inline append, and its unlink), builds the formation on the sim's rules
+ * Turns every unit of the caller's set into a `WeakPtr<IUnit>` in a transient
+ * `fastvector_n<WeakPtr<IUnit>,4>` (0x0059C168-0x0059C224: the entry's `-8`
+ * downcast to its unit at 0x0059C176, the temporary link at 0x0059C18A, its
+ * `push_back` through `sub_56B2F0` or the inline append, and its unlink). A
+ * null entry still pushes an empty pointer. It then builds the formation on the sim's rules
  * and Lua state (`::operator new(0x330)` plus the inlined
  * `CAiFormationInstance` constructor at 0x0059C1F6-0x0059C22B), appends it
  * to `mFormInstances` -- even a null one, exactly as the binary does -- and
@@ -758,7 +746,7 @@ int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const void*
  * free at 0x0059C2FB-0x0059C32E.
  */
 CAiFormationInstance* CAiFormationDBImpl::NewFormation(
-  const SWeakUnitRefList* const unitWeakSet,
+  const SEntitySetTemplateUnit* const unitSet,
   const char* const scriptName,
   const SCoordsVec2* const formationCenter,
   const float orientX,
@@ -769,8 +757,8 @@ CAiFormationInstance* CAiFormationDBImpl::NewFormation(
 )
 {
   gpg::fastvector_n<WeakPtr<IUnit>, 4> units;
-  for (const SFormationUnitWeakRef& ref : *unitWeakSet) {
-    units.push_back(WeakPtr<IUnit>(WeakPtr<IUnit>::DecodeOwnerObject(ref.DecodeOwnerChainHead())));
+  for (Entity* const entry : unitSet->mVec) {
+    units.push_back(WeakPtr<IUnit>(static_cast<Unit*>(entry)));
   }
 
   // The by-value `Wm3::Quaternionf` argument spreads over four stack slots

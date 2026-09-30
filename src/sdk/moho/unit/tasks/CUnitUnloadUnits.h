@@ -17,7 +17,7 @@ namespace gpg
 namespace moho
 {
   class CUnitCommand;
-  struct SCommandUnitSet;
+  struct SEntitySetTemplateUnit;
 
   /**
    * Task lane used by transport unload command flow.
@@ -55,7 +55,7 @@ namespace moho
       CUnitCommand* ownerCommand,
       CCommandTask* dispatchTask,
       const SNavGoal& unloadGoal,
-      const SCommandUnitSet& commandUnits
+      const SEntitySetTemplateUnit& commandUnits
     );
 
     /**
@@ -68,7 +68,7 @@ namespace moho
     static CUnitUnloadUnits* Create(
       CCommandTask* dispatchTask,
       const SNavGoal* unloadGoal,
-      const SCommandUnitSet* commandUnits,
+      const SEntitySetTemplateUnit* commandUnits,
       CUnitCommand* ownerCommand
     );
 

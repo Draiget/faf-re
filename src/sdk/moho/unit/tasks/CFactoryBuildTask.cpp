@@ -463,15 +463,14 @@ namespace moho
         // Select a TRANSPORTATION guard that is ferrying, preferring one that is
         // not currently moving; stop at the first stationary transport.
         Unit* selectedTransport = nullptr;
-        for (const SGuardedByWeakOwnerSlot& guardSlot : terminalGuarded->GuardedByList.mSlots) {
-          const std::uintptr_t encoded = reinterpret_cast<std::uintptr_t>(guardSlot.ownerLinkSlot);
-          if (encoded == 0) {
+        for (Entity* const entry : terminalGuarded->GuardedByList.mVec) {
+          if (entry == nullptr) {
             break;
           }
-          if (encoded <= 0x8u) {
+          Unit* const guardUnit = static_cast<Unit*>(entry);
+          if (guardUnit == nullptr) {
             continue;
           }
-          Unit* const guardUnit = reinterpret_cast<Unit*>(encoded - 0x8u);
           if (!guardUnit->IsInCategory("TRANSPORTATION") || !guardUnit->IsUnitState(UNITSTATE_Ferrying)) {
             continue;
           }

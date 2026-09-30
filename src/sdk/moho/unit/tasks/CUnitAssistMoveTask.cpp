@@ -497,7 +497,7 @@ namespace moho
     unloadGoal.aux3 = 0;
     unloadGoal.aux4 = 0;
 
-    SCommandUnitSet commandUnits{};
+    SEntitySetTemplateUnit commandUnits{};
     (void)CUnitUnloadUnits::Create(mDispatchTask, &unloadGoal, &commandUnits, nullptr);
 
     mTaskState = TASKSTATE_Preparing;

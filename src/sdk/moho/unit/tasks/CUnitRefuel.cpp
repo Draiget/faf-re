@@ -81,8 +81,8 @@ namespace
       return false;
     }
 
-    for (moho::CScriptObject* const entry : command->mUnitSet.mVec) {
-      moho::Unit* const candidate = moho::SCommandUnitSet::UnitFromEntry(entry);
+    for (moho::Entity* const entry : command->mUnitSet.mVec) {
+      moho::Unit* const candidate = static_cast<moho::Unit*>(entry);
       if (!candidate || !candidate->mIsAir) {
         continue;
       }

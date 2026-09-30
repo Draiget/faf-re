@@ -529,11 +529,8 @@ namespace
 
         if (CUnitCommand::GetTarget(command) == unit) {
           SEntitySetTemplateUnit workingSet;
-          for (CScriptObject* const entry : command->mUnitSet.mVec) {
-            if (!SCommandUnitSet::IsUsableEntry(entry)) {
-              continue;
-            }
-            if (Unit* const setUnit = SCommandUnitSet::UnitFromEntry(entry)) {
+          for (Entity* const entry : command->mUnitSet.mVec) {
+            if (Unit* const setUnit = static_cast<Unit*>(entry)) {
               (void)workingSet.AddUnit(setUnit);
             }
           }
@@ -599,11 +596,8 @@ namespace
         }
 
         Unit* first = nullptr;
-        for (CScriptObject* const entry : command->mUnitSet.mVec) {
-          if (!SCommandUnitSet::IsUsableEntry(entry)) {
-            continue;
-          }
-          Unit* const setUnit = SCommandUnitSet::UnitFromEntry(entry);
+        for (Entity* const entry : command->mUnitSet.mVec) {
+          Unit* const setUnit = static_cast<Unit*>(entry);
           if (setUnit == nullptr || setUnit == unit) {
             continue;
           }
@@ -764,11 +758,8 @@ namespace
 
         SEntitySetTemplateUnit transportSet;
         SEntitySetTemplateUnit mobileLandSet;
-        for (CScriptObject* const entry : command->mUnitSet.mVec) {
-          if (!SCommandUnitSet::IsUsableEntry(entry)) {
-            continue;
-          }
-          Unit* const setUnit = SCommandUnitSet::UnitFromEntry(entry);
+        for (Entity* const entry : command->mUnitSet.mVec) {
+          Unit* const setUnit = static_cast<Unit*>(entry);
           if (setUnit == nullptr) {
             continue;
           }

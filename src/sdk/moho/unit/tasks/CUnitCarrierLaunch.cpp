@@ -95,7 +95,7 @@ namespace moho
   CUnitCarrierLaunch::CUnitCarrierLaunch(
     CCommandTask* const parentTask,
     const SNavGoal& launchGoal,
-    const SCommandUnitSet& commandUnits
+    const SEntitySetTemplateUnit& commandUnits
   )
     : CCommandTask(parentTask)
     , mLaunchGoal(launchGoal)
@@ -103,12 +103,8 @@ namespace moho
     , mPad55{}
     , mCarriedUnits()
   {
-    for (CScriptObject* const entry : commandUnits.mVec) {
-      if (!SCommandUnitSet::IsUsableEntry(entry)) {
-        continue;
-      }
-
-      Unit* const candidate = SCommandUnitSet::UnitFromEntry(entry);
+    for (Entity* const entry : commandUnits.mVec) {
+      Unit* const candidate = static_cast<Unit*>(entry);
       if (!candidate || candidate->IsDead() || candidate == mUnit) {
         continue;
       }
@@ -157,7 +153,7 @@ namespace moho
   CUnitCarrierLaunch* CUnitCarrierLaunch::Create(
     CCommandTask* const parentTask,
     const SNavGoal* const launchGoal,
-    const SCommandUnitSet* const commandUnits
+    const SEntitySetTemplateUnit* const commandUnits
   )
   {
     void* const storage = ::operator new(sizeof(CUnitCarrierLaunch));

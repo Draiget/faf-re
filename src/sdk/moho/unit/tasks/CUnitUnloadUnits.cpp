@@ -203,7 +203,7 @@ namespace moho
     CUnitCommand* const ownerCommand,
     CCommandTask* const dispatchTask,
     const SNavGoal& unloadGoal,
-    const SCommandUnitSet& commandUnits
+    const SEntitySetTemplateUnit& commandUnits
   )
     : CCommandTask(dispatchTask)
     , mUnloadGoal(unloadGoal)
@@ -216,12 +216,8 @@ namespace moho
     mOwnerCommandLinkLane.ResetFromObject(ownerCommand);
     mUnit->SimulationRef->mEntityDB->RegisterEntitySet(mLoadedUnits);
 
-    for (CScriptObject* const entry : commandUnits.mVec) {
-      if (!SCommandUnitSet::IsUsableEntry(entry)) {
-        continue;
-      }
-
-      Unit* const candidate = SCommandUnitSet::UnitFromEntry(entry);
+    for (Entity* const entry : commandUnits.mVec) {
+      Unit* const candidate = static_cast<Unit*>(entry);
       if (candidate == nullptr || candidate->IsDead() || candidate == mUnit) {
         continue;
       }
@@ -449,7 +445,7 @@ namespace moho
   CUnitUnloadUnits* CUnitUnloadUnits::Create(
     CCommandTask* const dispatchTask,
     const SNavGoal* const unloadGoal,
-    const SCommandUnitSet* const commandUnits,
+    const SEntitySetTemplateUnit* const commandUnits,
     CUnitCommand* const ownerCommand
   )
   {

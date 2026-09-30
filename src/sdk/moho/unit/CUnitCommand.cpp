@@ -205,11 +205,6 @@ namespace
     return CScrLuaMetatableFactory<CUnitCommand>::Instance().Get(state);
   }
 
-  [[nodiscard]] bool IsUsableCommandUnitEntry(const CScriptObject* const entry) noexcept
-  {
-    return SCommandUnitSet::IsUsableEntry(entry);
-  }
-
   constexpr std::uint32_t kNoTargetEntityId = 0xF0000000u;
   constexpr const char* kCommandTypeKey = "CommandType";
   constexpr const char* kXKey = "X";
@@ -556,32 +551,16 @@ namespace
     return static_cast<const Broadcaster<ECommandEvent>*>(command);
   }
 
-  void CopyUnitSetFromEntitySet(const EntitySetTemplate<Unit>& source, SCommandUnitSet& destination)
-  {
-    destination.mVec = gpg::core::FastVectorN<CScriptObject*, 4>{};
-    for (Unit* const* it = source.begin(); it != source.end(); ++it) {
-      if (!*it) {
-        continue;
-      }
-      (void)destination.InsertUnitSorted(*it);
-    }
-  }
-
-  void BuildEntitySetFromCommandUnitSet(const SCommandUnitSet& source, EntitySetTemplate<Unit>& destination)
+  void CopyUnitSetFromEntitySet(const EntitySetTemplate<Unit>& source, SEntitySetTemplateUnit& destination)
   {
     destination.Clear();
-    for (CScriptObject* const entry : source.mVec) {
-      if (!SCommandUnitSet::IsUsableEntry(entry)) {
-        continue;
-      }
+    destination.AddUnits(source);
+  }
 
-      const Unit* const unit = SCommandUnitSet::UnitFromEntry(entry);
-      if (!unit) {
-        continue;
-      }
-
-      (void)destination.Add(const_cast<Unit*>(unit));
-    }
+  void BuildEntitySetFromCommandUnitSet(const SEntitySetTemplateUnit& source, EntitySetTemplate<Unit>& destination)
+  {
+    destination.Clear();
+    source.CopyTo(destination);
   }
 
   struct CUnitCommandByteAt110RuntimeView
@@ -1013,122 +992,6 @@ namespace
 
 } // namespace
 
-CScriptObject* SCommandUnitSet::EntryFromUnit(Unit* const unit) noexcept
-{
-  if (!unit) {
-    return nullptr;
-  }
-
-  // The command unit-set stores the CScriptObject subobject, which sits at
-  // +0x08 inside a Unit: `Unit : IUnit, Entity` with `sizeof(IUnit) == 0x08`,
-  // and `Entity : CScriptObject, CTask` puts CScriptObject at Entity's own
-  // offset 0. IUnit derives from WeakObject rather than CScriptObject, so
-  // there is exactly one CScriptObject in the hierarchy and the conversion is
-  // unambiguous. Letting the compiler apply that adjustment is both the
-  // original source form and the one that stays correct if the base list
-  // moves; the previous `raw + sizeof(IUnit)` hardcoded the answer.
-  return static_cast<CScriptObject*>(unit);
-}
-
-Unit* SCommandUnitSet::UnitFromEntry(CScriptObject* const entry) noexcept
-{
-  return const_cast<Unit*>(UnitFromEntry(static_cast<const CScriptObject*>(entry)));
-}
-
-const Unit* SCommandUnitSet::UnitFromEntry(const CScriptObject* const entry) noexcept
-{
-  if (!entry) {
-    return nullptr;
-  }
-
-  // Inverse of EntryFromUnit: the stored entry is the CScriptObject subobject
-  // of a Unit, so this is the corresponding downcast. static_cast applies the
-  // same -0x08 adjustment the compiler used on the way in, instead of the
-  // hand-written `raw - sizeof(IUnit)` this replaces.
-  return static_cast<const Unit*>(entry);
-}
-
-EntId SCommandUnitSet::EntryEntityId(const CScriptObject* const entry) noexcept
-{
-  if (!entry || !SCommandUnitSet::IsUsableEntry(entry)) {
-    return static_cast<EntId>(0x7FFFFFFF);
-  }
-
-  const Unit* const unit = UnitFromEntry(entry);
-  return unit ? unit->GetEntityId() : static_cast<EntId>(0x7FFFFFFF);
-}
-
-std::size_t SCommandUnitSet::LowerBoundByEntityId(const EntId targetId) const noexcept
-{
-  std::size_t first = 0;
-  std::size_t count = mVec.size();
-  while (count != 0) {
-    const std::size_t step = count / 2;
-    const std::size_t probeIndex = first + step;
-    const EntId probeId = EntryEntityId(mVec[probeIndex]);
-    if (probeId < targetId) {
-      first = probeIndex + 1;
-      count -= step + 1;
-    } else {
-      count = step;
-    }
-  }
-
-  return first;
-}
-
-bool SCommandUnitSet::InsertUnitSorted(Unit* const unit)
-{
-  if (!unit) {
-    return false;
-  }
-
-  const EntId unitId = unit->GetEntityId();
-  const std::size_t index = LowerBoundByEntityId(unitId);
-  CScriptObject* const entry = EntryFromUnit(unit);
-  const std::size_t size = mVec.size();
-
-  if (index < size && mVec[index] == entry) {
-    return false;
-  }
-
-  if (size == mVec.Capacity()) {
-    mVec.Reserve(size != 0 ? (size * 2) : 4u);
-  }
-
-  CScriptObject** const begin = mVec.start_;
-  if (size > index) {
-    std::memmove(begin + index + 1, begin + index, (size - index) * sizeof(*begin));
-  }
-
-  begin[index] = entry;
-  mVec.end_ = begin + size + 1;
-  return true;
-}
-
-bool SCommandUnitSet::RemoveUnitSorted(Unit* const unit)
-{
-  const EntId unitId = unit ? unit->GetEntityId() : 0;
-  const std::size_t index = LowerBoundByEntityId(unitId);
-  const std::size_t size = mVec.size();
-  if (index >= size) {
-    return false;
-  }
-
-  CScriptObject* const expected = EntryFromUnit(unit);
-  if (mVec[index] != expected) {
-    return false;
-  }
-
-  CScriptObject** const begin = mVec.start_;
-  if (index + 1 < size) {
-    std::memmove(begin + index, begin + index + 1, (size - index - 1) * sizeof(*begin));
-  }
-
-  mVec.end_ = begin + size - 1;
-  return true;
-}
-
 /**
  * Address: 0x006E7FF0 (FUN_006E7FF0, ??0CUnitCommand@Moho@@AAE@XZ)
  *
@@ -1493,7 +1356,7 @@ void CUnitCommand::AddUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitCommand>
     return;
   }
 
-  if (!mUnitSet.InsertUnitSorted(unit)) {
+  if (!mUnitSet.AddUnit(unit)) {
     return;
   }
 
@@ -1522,7 +1385,7 @@ void CUnitCommand::AddUnit(Unit* const unit)
     return;
   }
 
-  if (!mUnitSet.InsertUnitSorted(unit)) {
+  if (!mUnitSet.AddUnit(unit)) {
     return;
   }
 
@@ -1546,7 +1409,7 @@ void CUnitCommand::AddUnit(Unit* const unit)
  */
 void CUnitCommand::RemoveUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue)
 {
-  if (!mUnitSet.RemoveUnitSorted(unit)) {
+  if (!mUnitSet.RemoveUnit(unit)) {
     return;
   }
 
@@ -1572,7 +1435,7 @@ void CUnitCommand::RemoveUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitComma
  */
 void CUnitCommand::RemoveUnit(Unit* const unit)
 {
-  if (!mUnitSet.RemoveUnitSorted(unit)) {
+  if (!mUnitSet.RemoveUnit(unit)) {
     return;
   }
 
@@ -1774,20 +1637,9 @@ void CUnitCommand::Move(Unit* const unit, CUnitCommand* const command)
   SCoordsVec2 formationCenter{};
   formationCenter.x = targetPos.x;
   formationCenter.z = targetPos.z;
-  // Eight slots live inline; Append spills to the heap past that, so the set
-  // needs no up-front reserve.
-  SFormationUnitWeakRefSet weakSet{};
-  for (CScriptObject* const entry : command->mUnitSet.mVec) {
-    Unit* const queuedUnit = SCommandUnitSet::UnitFromEntry(entry);
-    if (!queuedUnit) {
-      continue;
-    }
-
-    weakSet.Append(SFormationUnitWeakRef::FromUnit(queuedUnit));
-  }
-
+  // 0x006E89D4: the formation is built straight from the command's unit set.
   CAiFormationInstance* const newFormation = formationDb->NewFormation(
-    &weakSet,
+    &command->mUnitSet,
     scriptName,
     &formationCenter,
     command->mConstDat.origin.x,
@@ -1873,20 +1725,16 @@ void CUnitCommand::DecreaseCount(const int amount)
   }
 
   // Iterate a copy: RemoveCommandFromQueue mutates the command's own unit set.
-  msvc8::vector<CScriptObject*> assignedUnits{};
+  msvc8::vector<Entity*> assignedUnits{};
   assignedUnits.reserve(mUnitSet.mVec.size());
-  for (CScriptObject* const entry : mUnitSet.mVec) {
+  for (Entity* const entry : mUnitSet.mVec) {
     assignedUnits.push_back(entry);
   }
 
-  for (CScriptObject* const entry : assignedUnits) {
-    // The binary dereferences straight through here; the tombstone tag this
-    // set uses for erased slots would make that a null read, so skip those.
-    if (!SCommandUnitSet::IsUsableEntry(entry)) {
-      continue;
-    }
-
-    Unit* const unit = SCommandUnitSet::UnitFromEntry(entry);
+  for (Entity* const entry : assignedUnits) {
+    // The binary dereferences straight through here; a null entry would be a
+    // null read, so skip it.
+    Unit* const unit = static_cast<Unit*>(entry);
     if (unit == nullptr || !unit->CommandQueue->RemoveCommandFromQueue(this)) {
       continue;
     }
@@ -1982,7 +1830,7 @@ void CUnitCommand::DestroyInternal()
   }
 
   // +0x0F8 command unit-set vector payload.
-  mUnitSet.mVec = gpg::core::FastVectorN<CScriptObject*, 4>{};
+  mUnitSet.mVec = gpg::core::FastVectorN<Entity*, 4>{};
 
   // +0x0068 legacy msvc8::string payload in constant command data.
   mConstDat.unk2 = msvc8::string{};
@@ -2028,12 +1876,8 @@ void CUnitCommand::RefreshPublishedCommandEvent(const bool forceRefresh, SSyncDa
   }
 
   publishedUnitEntityIds.clear();
-  for (CScriptObject* const entry : mUnitSet.mVec) {
-    if (!IsUsableCommandUnitEntry(entry)) {
-      continue;
-    }
-
-    Unit* const unit = SCommandUnitSet::UnitFromEntry(entry);
+  for (Entity* const entry : mUnitSet.mVec) {
+    Unit* const unit = static_cast<Unit*>(entry);
     if (!unit || unit->mVarDat.mVisibilityHidden == 0u) {
       continue;
     }

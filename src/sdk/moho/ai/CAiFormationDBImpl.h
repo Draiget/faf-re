@@ -44,12 +44,12 @@ namespace moho
     /**
      * Address: 0x0059C0C0 (FUN_0059C0C0)
      */
-    const char* GetScriptName(int scriptIndex, const void* unitSet) override;
+    const char* GetScriptName(int scriptIndex, const SEntitySetTemplateUnit* unitSet) override;
 
     /**
      * Address: 0x0059C0F0 (FUN_0059C0F0)
      */
-    int GetScriptIndex(gpg::StrArg scriptName, const void* unitSet) override;
+    int GetScriptIndex(gpg::StrArg scriptName, const SEntitySetTemplateUnit* unitSet) override;
 
     /**
      * Address: 0x0059C060 (FUN_0059C060)
@@ -65,7 +65,7 @@ namespace moho
      * Address: 0x0059C120 (FUN_0059C120)
      */
     CAiFormationInstance* NewFormation(
-      const SWeakUnitRefList* unitWeakSet,
+      const SEntitySetTemplateUnit* unitSet,
       const char* scriptName,
       const SCoordsVec2* formationCenter,
       float orientX,

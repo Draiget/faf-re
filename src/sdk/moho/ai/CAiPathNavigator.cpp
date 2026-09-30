@@ -814,12 +814,8 @@ namespace
     }
 
     bool hasSurfaceTransitionUnit = false;
-    for (CScriptObject* const entry : currentCommand->mUnitSet.mVec) {
-      if (!SCommandUnitSet::IsUsableEntry(entry)) {
-        continue;
-      }
-
-      Unit* const candidateUnit = SCommandUnitSet::UnitFromEntry(entry);
+    for (Entity* const entry : currentCommand->mUnitSet.mVec) {
+      Unit* const candidateUnit = static_cast<Unit*>(entry);
       if (!candidateUnit || candidateUnit->IsDead() || candidateUnit->DestroyQueued()) {
         continue;
       }

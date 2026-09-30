@@ -25,6 +25,7 @@
 #include "moho/ai/IAiFormationDB.h"
 #include "moho/containers/TDatList.h"
 #include "moho/entity/Entity.h"
+#include "moho/sim/ArmyUnitSet.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/misc/WeakPtr.h"
 #include "Wm3Vector3.h"
@@ -171,49 +172,6 @@ namespace moho
   LuaPlus::LuaObject* func_GetUnitFactory(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
 
 
-  /**
-   * Encoded weak-owner slot lane used by Unit guarded-by lists.
-   *
-   * Evidence:
-   * - `cfunc_UnitGetGuardsL` (0x006CD4E0) iterates dword slots and decodes
-   *   each non-null value as `(slot - 0x8)` before calling `Entity::GetLuaObject`.
-   */
-  /// The guard ring and the formation weak-ref set store the same 4-byte
-  /// encoded owner-link slot, so they share one type; `ownerLinkSlot` is the
-  /// pointer spelling of `SFormationUnitWeakRef::ownerLinkSlotWord`.
-  using SGuardedByWeakOwnerSlot = SFormationUnitWeakRef;
-  static_assert(sizeof(SGuardedByWeakOwnerSlot) == 0x04, "SGuardedByWeakOwnerSlot size must be 0x04");
-
-  /**
-   * Runtime guarded-by list lane stored in `Unit` at +0x4F8.
-   *
-   * Layout evidence:
-   * - `cfunc_UnitGetGuardsL` copies from `unit+0x500` into a local
-   *   fastvector runtime view after seeding a preceding 8-byte intrusive node.
-   * - Both `Unit` constructors (0x006A5050 `Unit(Sim*)` at 0x006A5130-0x006A5165,
-   *   and 0x006A53F0 `Unit(const SUnitConstructionParams&)`) seed `mSlots`'
-   *   begin/end/metadata to `unit+0x510` and capacityEnd to `unit+0x520`, i.e.
-   *   the fastvector small-buffer is the 4-slot window at `unit+0x510..0x520`.
-   *   That window was previously mismodeled as a phantom `OccupyGroundToken`
-   *   (zero real uses) + padding; it is `mSlots`' inline storage.
-   */
-  struct SGuardedByRuntimeList : SWeakUnitRefList
-  {
-    // mOwnerNode +0x00 and mSlots +0x08 come from SWeakUnitRefList, which is
-    // the shape CAiFormationDBImpl::NewFormation takes - so the guard ring can
-    // be handed to it directly.
-    SGuardedByWeakOwnerSlot mInlineSlots[4]; // +0x18 (small-buffer storage backing mSlots)
-  };
-  static_assert(sizeof(SGuardedByRuntimeList) == 0x28, "SGuardedByRuntimeList size must be 0x28");
-  static_assert(
-    offsetof(SGuardedByRuntimeList, mOwnerNode) == 0x00, "SGuardedByRuntimeList::mOwnerNode offset must be 0x00"
-  );
-  static_assert(
-    offsetof(SGuardedByRuntimeList, mSlots) == 0x08, "SGuardedByRuntimeList::mSlots offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SGuardedByRuntimeList, mInlineSlots) == 0x18, "SGuardedByRuntimeList::mInlineSlots offset must be 0x18"
-  );
 
   /**
    * Packed pair emitted by Unit::GetExtraData during sync-filter serialization.
@@ -2058,7 +2016,9 @@ namespace moho
     WeakPtr<Unit> GuardedUnitRef;                         // 0x04E0
     Wm3::Vector3f GuardedPos;                            // 0x04E8
     char pad_04F4[4];                                    // 0x04F4
-    SGuardedByRuntimeList GuardedByList;                 // 0x04F8 (spans 0x04F8..0x0520; mInlineSlots own 0x0510..0x0520)
+    /// The units guarding this one: an `EntitySetTemplate<Unit>` (the serializer's type), kept in
+    /// entity-id order by the set's `Add` 0x0057DDD0 / `Remove` 0x005E8960.
+    SEntitySetTemplateUnit GuardedByList; // 0x04F8
     IFormationInstance* GuardFormation;                  // 0x0520
     bool mNeedsKillCleanup;            // 0x0524: tested in Sim::AdvanceBeat, cleared by Unit::KillCleanup (0x006A8790)
     char pad_0525[0x03];               // 0x0525

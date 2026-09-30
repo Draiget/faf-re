@@ -2822,18 +2822,13 @@ namespace
   }
 
   [[nodiscard]] bool CommandUnitSetMatchesSelection(
-    const SCommandUnitSet& commandUnits,
+    const SEntitySetTemplateUnit& commandUnits,
     const SEntitySetTemplateUnit& selectedUnits
   ) noexcept
   {
     std::size_t commandUnitCount = 0;
-    for (CScriptObject* const* it = commandUnits.mVec.begin(); it != commandUnits.mVec.end(); ++it) {
-      const CScriptObject* const entry = *it;
-      if (!SCommandUnitSet::IsUsableEntry(entry)) {
-        continue;
-      }
-
-      if (SCommandUnitSet::UnitFromEntry(entry) != nullptr) {
+    for (const Entity* const entry : commandUnits.mVec) {
+      if (static_cast<const Unit*>(entry) != nullptr) {
         ++commandUnitCount;
       }
     }
@@ -2849,13 +2844,8 @@ namespace
       }
 
       bool found = false;
-      for (CScriptObject* const* jt = commandUnits.mVec.begin(); jt != commandUnits.mVec.end(); ++jt) {
-        const CScriptObject* const entry = *jt;
-        if (!SCommandUnitSet::IsUsableEntry(entry)) {
-          continue;
-        }
-
-        const Unit* const commandUnit = SCommandUnitSet::UnitFromEntry(entry);
+      for (const Entity* const entry : commandUnits.mVec) {
+        const Unit* const commandUnit = static_cast<const Unit*>(entry);
         if (commandUnit == selectedUnit) {
           found = true;
           break;
@@ -7905,15 +7895,15 @@ bool Sim::OkayToMessWith(CUnitCommand* cmd)
     return false;
   }
 
-  CScriptObject** unitSetIt = cmd->mUnitSet.mVec.begin();
-  CScriptObject** unitSetEnd = cmd->mUnitSet.mVec.end();
+  Entity** unitSetIt = cmd->mUnitSet.mVec.begin();
+  Entity** unitSetEnd = cmd->mUnitSet.mVec.end();
   if (unitSetIt == unitSetEnd) {
     return true;
   }
 
   while (unitSetIt != unitSetEnd) {
-    CScriptObject* scriptObject = *unitSetIt;
-    if (!SCommandUnitSet::IsUsableEntry(scriptObject)) {
+    Unit* const unit = static_cast<Unit*>(*unitSetIt);
+    if (unit == nullptr) {
       if (!CheatsEnabled()) {
         return false;
       }
@@ -7921,7 +7911,7 @@ bool Sim::OkayToMessWith(CUnitCommand* cmd)
       continue;
     }
 
-    Entity* entity = static_cast<Entity*>(scriptObject);
+    Entity* entity = unit;
     if (!OkayToMessWith(entity)) {
       return false;
     }
@@ -8823,13 +8813,13 @@ void Sim::RemoveCommandFromUnitQueue(const CmdId cmdId, const EntId unitId)
   }
 
   Entity* matchedEntity = nullptr;
-  for (CScriptObject** it = command->mUnitSet.mVec.begin(); it != command->mUnitSet.mVec.end(); ++it) {
-    CScriptObject* scriptObject = *it;
-    if (!SCommandUnitSet::IsUsableEntry(scriptObject)) {
+  for (Entity* const entry : command->mUnitSet.mVec) {
+    Unit* const unit = static_cast<Unit*>(entry);
+    if (unit == nullptr) {
       continue;
     }
 
-    Entity* entity = static_cast<Entity*>(scriptObject);
+    Entity* entity = unit;
     if (entity->id_ == unitId) {
       matchedEntity = entity;
       break;

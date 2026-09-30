@@ -15,6 +15,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/unit/core/Unit.h"
 
 namespace
 {
@@ -24,17 +25,17 @@ namespace
     return kNullOwner;
   }
 
-  [[nodiscard]] std::uint32_t ResolveCommandUnitEntryAddressForDump(const moho::CScriptObject* const entry) noexcept
+  [[nodiscard]] std::uint32_t ResolveCommandUnitEntryAddressForDump(const moho::Entity* const entry) noexcept
   {
     if (entry == nullptr) {
       return 0u;
     }
 
-    if (!moho::SCommandUnitSet::IsUsableEntry(entry)) {
+    // An entry whose unit is null is printed as the raw word.
+    const moho::Unit* const unit = static_cast<const moho::Unit*>(entry);
+    if (unit == nullptr) {
       return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entry));
     }
-
-    const moho::Unit* const unit = moho::SCommandUnitSet::UnitFromEntry(entry);
     return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(unit));
   }
 
@@ -60,7 +61,7 @@ namespace
     }
     stream << gpg::STR_Printf("    %d Unit%s\n", unitCount, unitSuffix).c_str();
 
-    for (const moho::CScriptObject* const entry : entries) {
+    for (const moho::Entity* const entry : entries) {
       stream << gpg::STR_Printf("      0x%08x\n", ResolveCommandUnitEntryAddressForDump(entry)).c_str();
     }
   }

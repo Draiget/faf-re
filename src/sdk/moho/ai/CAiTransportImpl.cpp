@@ -1025,6 +1025,9 @@ IFormationInstance* CAiTransportImpl::TransportGetWaitingFormation() const
  */
 void CAiTransportImpl::TransportGenerateWaitingFormationForUnits(const EntitySetTemplate<Unit>& units)
 {
+  // 0x005E5F57: the set's vector takes `units`' contents (`AddAll`, a
+  // replace, not a merge).
+  mUnitSet30.Clear();
   mUnitSet30.AddUnits(units);
   if (!mUnit || !mUnit->SimulationRef || !mUnit->SimulationRef->mFormationDB) {
     return;
@@ -1034,17 +1037,6 @@ void CAiTransportImpl::TransportGenerateWaitingFormationForUnits(const EntitySet
   const char* const formationName = blueprint ? blueprint->AI.GuardFormationName.c_str() : nullptr;
   if (!formationName) {
     return;
-  }
-
-  SFormationUnitWeakRefSet weakSet{};
-  for (Entity* const* it = mUnitSet30.mVec.begin(); it != mUnitSet30.mVec.end(); ++it) {
-    Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
-    if (!unit) {
-      continue;
-    }
-
-    const SFormationUnitWeakRef ref = SFormationUnitWeakRef::FromUnit(unit);
-    weakSet.Append(ref);
   }
 
   SCoordsVec2 center{};
@@ -1058,8 +1050,9 @@ void CAiTransportImpl::TransportGenerateWaitingFormationForUnits(const EntitySet
   }
 
   CAiFormationDBImpl* const formationDB = mUnit->SimulationRef->mFormationDB;
+  // 0x005E6087: the formation is built straight from `mUnitSet30`.
   auto* const formation = formationDB->NewFormation(
-    &weakSet,
+    &mUnitSet30,
     formationName,
     &center,
     orientation.x,

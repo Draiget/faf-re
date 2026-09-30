@@ -20,6 +20,7 @@ namespace moho
   class CAiFormationInstance;
   class RRuleGameRules;
   class Unit;
+  struct SEntitySetTemplateUnit;
 
   /**
    * Formation script bucket type used by `/lua/formations.lua`.
@@ -31,77 +32,6 @@ namespace moho
     Air = 1,
     Mixed = 2,
   };
-
-  /**
-   * 32-bit intrusive weak-unit slot word used by the formation creation path.
-   *
-   * Evidence:
-   * - `FUN_0059C120` walks source entries as 4-byte words and re-links through
-   *   owner-chain slot heads before passing a temporary linked view to
-   *   `CFormationInstance` ctor (`FUN_005694B0`).
-   */
-  struct SFormationUnitWeakRef
-  {
-    /// The same word spelled two ways: guard-ring code handles it as the
-    /// encoded owner-link slot pointer, formation code as a raw word.
-    union
-    {
-      std::uint32_t ownerLinkSlotWord;
-      void* ownerLinkSlot;
-    };
-
-    [[nodiscard]] static SFormationUnitWeakRef FromUnit(Unit* unit) noexcept;
-    [[nodiscard]] std::uint32_t* DecodeOwnerChainHead() const noexcept;
-  };
-  static_assert(sizeof(SFormationUnitWeakRef) == 0x04, "SFormationUnitWeakRef size must be 0x04");
-
-  /**
-   * The capacity-independent head of a weak-unit reference set: an owner-chain
-   * node followed by the slot lane. `CAiFormationDBImpl::NewFormation`
-   * (0x0059C120) takes one of these by pointer and reads the lane at +0x08
-   * (`mov esi,[edi+8]` / `mov eax,[edi+0Ch]`), which is why the lane cannot sit
-   * at offset 0 the way a plain `fastvector_n` would put it.
-   *
-   * `Unit::GuardedByList` (`SGuardedByRuntimeList`) is the same shape with four
-   * inline slots instead of eight; the two should eventually share this head.
-   */
-  struct SWeakUnitRefList
-  {
-    TDatListItem<void, void> mOwnerNode;                             // +0x00
-    gpg::core::FastVectorInline<SFormationUnitWeakRef> mSlots;       // +0x08
-
-    [[nodiscard]] const SFormationUnitWeakRef* begin() const noexcept { return mSlots.begin(); }
-    [[nodiscard]] const SFormationUnitWeakRef* end() const noexcept { return mSlots.end(); }
-    [[nodiscard]] bool empty() const noexcept { return mSlots.empty(); }
-  };
-  static_assert(sizeof(SWeakUnitRefList) == 0x18, "SWeakUnitRefList size must be 0x18");
-  static_assert(offsetof(SWeakUnitRefList, mSlots) == 0x08, "SWeakUnitRefList::mSlots offset must be 0x08");
-
-  /**
-   * A weak-unit reference set with room for eight slots before it has to reach
-   * the heap. Sized from the binary: the lane starts at +0x18 and the whole
-   * object is 0x38 bytes, so the inline run is exactly eight entries.
-   */
-  struct SFormationUnitWeakRefSet : SWeakUnitRefList
-  {
-    SFormationUnitWeakRef mInlineSlots[8]; // +0x18
-
-    SFormationUnitWeakRefSet() noexcept
-    {
-      mSlots.BindInlineStorage(mInlineSlots, 8);
-    }
-
-    /// Append one reference, spilling to the heap once the inline run is full.
-    void Append(const SFormationUnitWeakRef& ref)
-    {
-      mSlots.PushBack(ref);
-    }
-  };
-  static_assert(sizeof(SFormationUnitWeakRefSet) == 0x38, "SFormationUnitWeakRefSet size must be 0x38");
-  static_assert(
-    offsetof(SFormationUnitWeakRefSet, mInlineSlots) == 0x18,
-    "SFormationUnitWeakRefSet::mInlineSlots offset must be 0x18"
-  );
 
   /**
    * One entry of the slot table `/lua/formations.lua` hands back: the
@@ -320,12 +250,12 @@ namespace moho
      * What it does:
      * Returns the script-name string for a formation script index, selecting the
      * formation bucket from the passed unit set's composition. The PDB mangles the
-     * second parameter as `EFormationType`, but the binary actually passes a
-     * type-erased unit-set pointer (`SEntitySetTemplateUnit`/`SCommandUnitSet`)
-     * whose unit composition `ResolveFormationBucketTypeFromUnitSet` scans to
-     * derive the bucket -- it is NOT a caller-chosen formation-type enum.
+     * second parameter as `EFormationType`, but the body hands it to the set
+     * scan 0x0062EE40 (`ResolveFormationBucketTypeFromUnitSet`), which reads
+     * its `{begin, end}` at +0x08/+0x0C: it is the unit set, not a caller-chosen
+     * formation-type enum.
      */
-    virtual const char* GetScriptName(int scriptIndex, const void* unitSet) = 0;
+    virtual const char* GetScriptName(int scriptIndex, const SEntitySetTemplateUnit* unitSet) = 0;
 
     /**
      * Address: 0x0059C0F0 (FUN_0059C0F0)
@@ -334,10 +264,9 @@ namespace moho
      * What it does:
      * Resolves a formation script name into its zero-based index within the
      * bucket derived from the passed unit set. As with GetScriptName, the second
-     * parameter is a type-erased unit-set pointer that the PDB mislabels as
-     * `EFormationType`.
+     * parameter is the unit set, which the PDB mislabels as `EFormationType`.
      */
-    virtual int GetScriptIndex(gpg::StrArg scriptName, const void* unitSet) = 0;
+    virtual int GetScriptIndex(gpg::StrArg scriptName, const SEntitySetTemplateUnit* unitSet) = 0;
 
     /**
      * Address: 0x0059C060 (FUN_0059C060)
@@ -361,11 +290,11 @@ namespace moho
      * Address: 0x0059C120 (FUN_0059C120)
      *
      * What it does:
-     * Builds a temporary linked weak-unit view, constructs a new formation
-     * instance, then appends it to this DB.
+     * Builds the formation's `WeakPtr<IUnit>` run from the unit set,
+     * constructs a new formation instance, then appends it to this DB.
      */
     virtual CAiFormationInstance* NewFormation(
-      const SWeakUnitRefList* unitWeakSet,
+      const SEntitySetTemplateUnit* unitSet,
       const char* scriptName,
       const SCoordsVec2* formationCenter,
       float orientX,

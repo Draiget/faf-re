@@ -1362,73 +1362,6 @@ namespace
     return label;
   }
 
-  [[nodiscard]] std::uintptr_t GuardedByOwnerSlotWord(const SGuardedByWeakOwnerSlot& slot) noexcept
-  {
-    return reinterpret_cast<std::uintptr_t>(slot.ownerLinkSlot);
-  }
-
-  // `GuardedByList` is an entity set: each slot holds the guard's `Entity`
-  // subobject, which RTTI places at mdisp=8 inside `Unit` (`Unit : IUnit, Entity`,
-  // IUnit being 8 bytes). The add helper stores `lea edx,[ecx+8]` (0x0057DE03)
-  // and `cfunc_UnitGetGuardsL` recovers the unit with a null-guarded
-  // `lea ecx,[eax-8]` (0x006CD5C6) -- i.e. the two static_casts below.
-  [[nodiscard]] SGuardedByWeakOwnerSlot EncodeGuardedByOwnerSlot(const Unit* const owner) noexcept
-  {
-    SGuardedByWeakOwnerSlot slot{};
-    slot.ownerLinkSlot = const_cast<Entity*>(static_cast<const Entity*>(owner));
-    return slot;
-  }
-
-  // Returns the guarding UNIT, not its Entity subobject. This used to hand back
-  // the unit's address typed as `Entity*`, eight bytes short of the real Entity
-  // base, so `cfunc_UnitGetGuardsL` read `mLuaObj` out of the IUnit head and
-  // faulted the first time the AI asked a factory for its assisting engineers.
-  [[nodiscard]] Unit* DecodeGuardedByOwnerSlot(const SGuardedByWeakOwnerSlot slot) noexcept
-  {
-    return static_cast<Unit*>(static_cast<Entity*>(slot.ownerLinkSlot));
-  }
-
-  [[nodiscard]] bool RemoveGuardedByOwner(SGuardedByRuntimeList& guardedByList, const Unit* const guardUnit) noexcept
-  {
-    if (guardUnit == nullptr || guardedByList.mSlots.begin() == nullptr) {
-      return false;
-    }
-
-    const std::uintptr_t targetSlotWord = GuardedByOwnerSlotWord(EncodeGuardedByOwnerSlot(guardUnit));
-    SGuardedByWeakOwnerSlot* cursor = guardedByList.mSlots.begin();
-    while (cursor != guardedByList.mSlots.end() && GuardedByOwnerSlotWord(*cursor) < targetSlotWord) {
-      ++cursor;
-    }
-
-    if (cursor == guardedByList.mSlots.end() || GuardedByOwnerSlotWord(*cursor) != targetSlotWord) {
-      return false;
-    }
-
-    (void)guardedByList.mSlots.erase(cursor);
-    return true;
-  }
-
-  void AddGuardedByOwner(SGuardedByRuntimeList& guardedByList, const Unit* const guardUnit)
-  {
-    if (guardUnit == nullptr) {
-      return;
-    }
-
-    const SGuardedByWeakOwnerSlot targetSlot = EncodeGuardedByOwnerSlot(guardUnit);
-    const std::uintptr_t targetSlotWord = GuardedByOwnerSlotWord(targetSlot);
-
-    SGuardedByWeakOwnerSlot* insertPos = guardedByList.mSlots.begin();
-    while (insertPos != guardedByList.mSlots.end() && GuardedByOwnerSlotWord(*insertPos) < targetSlotWord) {
-      ++insertPos;
-    }
-
-    if (insertPos != guardedByList.mSlots.end() && GuardedByOwnerSlotWord(*insertPos) == targetSlotWord) {
-      return;
-    }
-
-    (void)guardedByList.mSlots.InsertRange(insertPos, &targetSlot, &targetSlot + 1);
-  }
-
   void ClearGuardFormation(Unit* const unit)
   {
     if (unit == nullptr) {
@@ -4287,8 +4220,10 @@ int moho::cfunc_UnitGetGuardsL(LuaPlus::LuaState* const state)
   guardsTable.AssignNewTable(state, 0, 0);
 
   int guardIndex = 1;
-  for (const SGuardedByWeakOwnerSlot& guardSlot : unit->GuardedByList.mSlots) {
-    Unit* const guardUnit = DecodeGuardedByOwnerSlot(guardSlot);
+  // Each entry is the guard's `Entity`; the unit is its null-guarded `-8`
+  // downcast (0x006CD5C6).
+  for (Entity* const entry : unit->GuardedByList.mVec) {
+    Unit* const guardUnit = static_cast<Unit*>(entry);
     if (guardUnit == nullptr) {
       continue;
     }
@@ -11584,8 +11519,8 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
 
   // Snapshot the guard slots first: SetGuardedUnit mutates source->GuardedByList.
   msvc8::vector<Unit*> guards;
-  for (const SGuardedByWeakOwnerSlot& slot : source->GuardedByList.mSlots) {
-    guards.push_back(DecodeGuardedByOwnerSlot(slot));
+  for (Entity* const entry : source->GuardedByList.mVec) {
+    guards.push_back(static_cast<Unit*>(entry));
   }
   for (Unit* const guard : guards) {
     if (guard != nullptr) {
@@ -12709,11 +12644,11 @@ namespace
   void ClearGuardedByOwners(Unit& unit)
   {
     std::vector<Unit*> guardedByUnits;
-    if (!unit.GuardedByList.mSlots.empty()) {
-      guardedByUnits.reserve(unit.GuardedByList.mSlots.Size());
+    if (!unit.GuardedByList.Empty()) {
+      guardedByUnits.reserve(unit.GuardedByList.Size());
 
-      for (const SGuardedByWeakOwnerSlot& slot : unit.GuardedByList.mSlots) {
-        Unit* const guardedByUnit = DecodeGuardedByOwnerSlot(slot);
+      for (Entity* const entry : unit.GuardedByList.mVec) {
+        Unit* const guardedByUnit = static_cast<Unit*>(entry);
         if (guardedByUnit != nullptr) {
           guardedByUnits.push_back(guardedByUnit);
         }
@@ -12724,8 +12659,8 @@ namespace
       guardedByUnit->SetGuardedUnit(nullptr);
     }
 
-    unit.GuardedByList.mSlots.ResetStorageToInline();
-    unit.GuardedByList.mOwnerNode.ListUnlinkSelf();
+    unit.GuardedByList.mVec.ResetStorageToInline();
+    unit.GuardedByList.ListUnlinkSelf();
     unit.SetGuardedUnit(nullptr);
   }
 
@@ -12909,7 +12844,7 @@ void Unit::HandleResourceManagement()
  */
 void Unit::UpdateGuardFormation()
 {
-  if (GuardFormation != nullptr || GuardedByList.empty()) {
+  if (GuardFormation != nullptr || GuardedByList.Empty()) {
     return;
   }
 
@@ -13087,10 +13022,8 @@ Unit::Unit(Sim* sim) : IUnit(), Entity(sim, ENTITYTYPE_Unit)
   GuardedPos.y = 0.0f;
   GuardedPos.z = 0.0f;
 
-  // GuardedByList.mOwnerNode self-links via its TDatListItem ctor (member init).
-  // Bind the slot lane to its own inline small-buffer: empty, with capacity for
-  // four slots ending at GuardFormation.
-  GuardedByList.mSlots.BindInlineStorage(GuardedByList.mInlineSlots, 4);
+  // `GuardedByList` constructs as a member: its list node self-linked, its
+  // vector on the four inline slots that end at `GuardFormation`.
 
   GuardFormation = nullptr;
   mNeedsKillCleanup = false;
@@ -13225,8 +13158,6 @@ Unit::Unit(const SUnitConstructionParams& params)
   GuardedPos.x = 0.0f;
   GuardedPos.y = 0.0f;
   GuardedPos.z = 0.0f;
-
-  GuardedByList.mSlots.BindInlineStorage(GuardedByList.mInlineSlots, 4);
 
   GuardFormation = nullptr;
   mNeedsKillCleanup = false;
@@ -15261,7 +15192,7 @@ void Unit::SetGuardedUnit(Unit* const guarded)
 {
   Unit* const oldGuardedUnit = GuardedUnitRef.GetObjectPtr();
   if (oldGuardedUnit != nullptr) {
-    (void)RemoveGuardedByOwner(oldGuardedUnit->GuardedByList, this);
+    (void)oldGuardedUnit->GuardedByList.RemoveUnit(this); // 0x005E8960
     ClearGuardFormation(oldGuardedUnit);
   }
 
@@ -15269,7 +15200,7 @@ void Unit::SetGuardedUnit(Unit* const guarded)
 
   Unit* const newGuardedUnit = GuardedUnitRef.GetObjectPtr();
   if (newGuardedUnit != nullptr) {
-    AddGuardedByOwner(newGuardedUnit->GuardedByList, this);
+    (void)newGuardedUnit->GuardedByList.AddUnit(this); // 0x0057DDD0
     ClearGuardFormation(newGuardedUnit);
   }
 
@@ -15287,7 +15218,7 @@ void Unit::SetGuardedUnit(Unit* const guarded)
 void Unit::RemoveGuardedByUnit(Unit* const guardedByUnit)
 {
   if (guardedByUnit != nullptr) {
-    AddGuardedByOwner(GuardedByList, guardedByUnit);
+    (void)GuardedByList.AddUnit(guardedByUnit); // 0x0057DDD0
   }
 
   ClearGuardFormation(this);

@@ -13,6 +13,7 @@
 #include "moho/command/SSTICommandVariableData.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/sim/ArmyUnitSet.h"
 
 namespace gpg
 {
@@ -33,45 +34,6 @@ namespace moho
   struct SOCellPos;
   struct SSTICommandIssueData;
   struct SSyncData;
-
-  struct SCommandUnitSet
-  {
-    // Command unit-set uses 0x8 as an erased/tombstone entry marker.
-    static constexpr std::uintptr_t kErasedEntryTag = 8u;
-
-    static bool IsUsableEntry(const CScriptObject* scriptObject)
-    {
-      return scriptObject != nullptr && reinterpret_cast<std::uintptr_t>(scriptObject) != kErasedEntryTag;
-    }
-
-    [[nodiscard]] static CScriptObject* EntryFromUnit(Unit* unit) noexcept;
-    [[nodiscard]] static Unit* UnitFromEntry(CScriptObject* entry) noexcept;
-    [[nodiscard]] static const Unit* UnitFromEntry(const CScriptObject* entry) noexcept;
-    [[nodiscard]] static EntId EntryEntityId(const CScriptObject* entry) noexcept;
-    [[nodiscard]] std::size_t LowerBoundByEntityId(EntId targetId) const noexcept;
-    [[nodiscard]] bool InsertUnitSorted(Unit* unit);
-    [[nodiscard]] bool RemoveUnitSorted(Unit* unit);
-
-    /**
-     * Self-linked intrusive-node prefix (ground truth: `FUN_006E81B0` inits
-     * both slots to `&this->mUnitSet` before touching `mVec`, at absolute
-     * +0xF0/+0xF4 relative to a `CUnitCommand*`). Never observed linked to
-     * any other `SCommandUnitSet`; role beyond "self-linked sentinel" is not
-     * yet identified. Field order (this member first) matches
-     * `TDatListItem`'s own construction-order convention; the exact
-     * mPrev/mNext-vs-decompiler's-next/previous naming is immaterial for a
-     * self-linked node since both slots hold the identical value either way.
-     */
-    TDatListItem<SCommandUnitSet, void> mListNode;
-
-    // Ground truth: start/end/capacity/originalVec == &mVec+0x08 (an empty,
-    // 4-element-inline SBO vector) until the set holds a 5th unit, matching
-    // FastVectorN<CScriptObject*,4>'s own 0x20-byte shape exactly
-    // (FastVector.h's own `FastVectorN<uint,4> must be 0x20` size assert).
-    gpg::core::FastVectorN<CScriptObject*, 4> mVec;
-  };
-
-  static_assert(sizeof(SCommandUnitSet) == 0x28, "moho::SCommandUnitSet size must be 0x28");
 
   class CUnitCommand : public CScriptObject, public Broadcaster<ECommandEvent>, public InstanceCounter<CUnitCommand>
   {
@@ -374,7 +336,9 @@ namespace moho
     // Ground truth: never written in the constructor (FUN_006E81B0), sits
     // immediately before mUnitSet at +0xEC. Purpose not yet identified.
     void* unk1;
-    SCommandUnitSet mUnitSet;
+    /// The units the command applies to: an `EntitySetTemplate<Unit>` (entries are each unit's `Entity`),
+    /// kept in entity-id order by the set's `Add` 0x0057DDD0 / `Remove` 0x005E8960.
+    SEntitySetTemplateUnit mUnitSet;
     CAiFormationInstance* mFormationInstance;
     CAiTarget mTarget;
     // Monotonic per-command serial assigned from Sim counter (not mConstDat.cmd).

@@ -15,7 +15,7 @@ namespace gpg
 
 namespace moho
 {
-  struct SCommandUnitSet;
+  struct SEntitySetTemplateUnit;
 
   /**
    * Task lane used for carrier unit launch command flow.
@@ -42,7 +42,7 @@ namespace moho
      * launch-goal state, collects candidate carried units, and links the set
      * into the simulation registered-set lane.
      */
-    CUnitCarrierLaunch(CCommandTask* parentTask, const SNavGoal& launchGoal, const SCommandUnitSet& commandUnits);
+    CUnitCarrierLaunch(CCommandTask* parentTask, const SNavGoal& launchGoal, const SEntitySetTemplateUnit& commandUnits);
 
     /**
      * Address: 0x00606F90 (FUN_00606F90, Moho::CUnitCarrierLaunch::~CUnitCarrierLaunch)
@@ -63,7 +63,7 @@ namespace moho
     static CUnitCarrierLaunch* Create(
       CCommandTask* parentTask,
       const SNavGoal* launchGoal,
-      const SCommandUnitSet* commandUnits
+      const SEntitySetTemplateUnit* commandUnits
     );
 
     /**
