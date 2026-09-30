@@ -167,7 +167,7 @@ namespace LuaPlus
 
     if (isNamedReference) {
       TString* serializedName = nullptr;
-      (void)archive->ReadPointer_TString(&serializedName, ref);
+      (void)archive->ReadPointer(&serializedName, ref);
 
       TString* const serializeMapName = luaS_newlstr(state, "__serialize_object_for_name", 0x1Bu);
       const TObject* const serializeMapObject =

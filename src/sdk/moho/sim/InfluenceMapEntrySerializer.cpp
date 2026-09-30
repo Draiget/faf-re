@@ -5,6 +5,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CInfluenceMap.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 
 namespace
 {
@@ -36,13 +37,13 @@ namespace
     archive->ReadUInt(&entry->entityId);
 
     moho::SimArmy* sourceArmy = nullptr;
-    archive->ReadPointer_SimArmy(&sourceArmy, &owner);
+    archive->ReadPointer(&sourceArmy, &owner);
     entry->sourceArmy = static_cast<moho::CArmyImpl*>(sourceArmy);
 
     archive->Read(CachedType<Wm3::Vec3f>(gVec3fType), &entry->lastPosition, owner);
 
     moho::RUnitBlueprint* sourceBlueprint = nullptr;
-    archive->ReadPointer_RUnitBlueprint(&sourceBlueprint, &owner);
+    archive->ReadPointer(&sourceBlueprint, &owner);
     entry->sourceBlueprint = sourceBlueprint;
 
     int sourceLayer = 0;

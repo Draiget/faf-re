@@ -12,6 +12,9 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "moho/entity/PositionHistory.h"
+#include "moho/sim/SPhysBody.h"
+#include "moho/sim/SPhysConstants.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
@@ -2723,36 +2726,6 @@ namespace
     (void)WriteTrackedPointerFromRefBuilder(archive, buildRef, value, trackedState);
   }
 
-  [[nodiscard]] gpg::ReadArchive* ReadPointerOwned_CEconStorageCompat(
-    moho::CEconStorage** const outValue, gpg::ReadArchive* const archive, const gpg::RRef* const ownerRef
-  )
-  {
-    // Delegate to the canonical gpg::ReadArchive method recovered from
-    // FUN_006B4F70 so all CEconStorage owned-pointer reads funnel through one
-    // typed implementation.
-    return archive ? archive->ReadPointerOwned_CEconStorage(outValue, ownerRef) : archive;
-  }
-
-  [[nodiscard]] gpg::ReadArchive* ReadPointerOwned_CTextureScrollerCompat(
-    moho::CTextureScroller** const outValue, gpg::ReadArchive* const archive, const gpg::RRef* const ownerRef
-  )
-  {
-    // Delegate to the canonical gpg::ReadArchive method recovered from
-    // FUN_00682DB0 so all CTextureScroller owned-pointer reads funnel
-    // through one typed implementation.
-    return archive ? archive->ReadPointerOwned_CTextureScroller(outValue, ownerRef) : archive;
-  }
-
-  [[nodiscard]] gpg::ReadArchive* ReadPointerOwned_PathQueueCompat(
-    moho::PathQueue** const outValue, gpg::ReadArchive* const archive, const gpg::RRef* const ownerRef
-  )
-  {
-    // Delegate to the canonical gpg::ReadArchive method recovered from
-    // FUN_00707460 so all PathQueue owned-pointer reads funnel through one
-    // typed implementation.
-    return archive ? archive->ReadPointerOwned_PathQueue(outValue, ownerRef) : archive;
-  }
-
   [[nodiscard]] gpg::RType* ResolveCThrustManipulatorArchiveAdapterType()
   {
     static gpg::RType* sType = nullptr;
@@ -3146,7 +3119,7 @@ namespace
   )
   {
     moho::CFireWeaponTask* loadedValue = nullptr;
-    archive->ReadPointerOwned_CFireWeaponTask(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CFireWeaponTask* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3166,7 +3139,7 @@ namespace
     gpg::RRef* const ownerRef, moho::IAiAttacker** const valueSlot, gpg::ReadArchive* const archive
   )
   {
-    return archive->ReadPointer_IAiAttacker(valueSlot, ownerRef);
+    return archive->ReadPointer(valueSlot, ownerRef);
   }
 
   /**
@@ -3184,7 +3157,7 @@ namespace
     moho::CFireWeaponTask** const valueSlot
   )
   {
-    gpg::ReadArchive* const result = archive->ReadPointerOwned_CFireWeaponTask(&seedValue, ownerRef);
+    gpg::ReadArchive* const result = archive->ReadPointerOwned(&seedValue, ownerRef);
     moho::CFireWeaponTask* const previousValue = *valueSlot;
     *valueSlot = seedValue;
     if (previousValue != nullptr) {
@@ -3205,7 +3178,7 @@ namespace
   )
   {
     moho::CRandomStream* loadedValue = nullptr;
-    archive->ReadPointerOwned_CRandomStream(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CRandomStream* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3227,7 +3200,7 @@ namespace
   )
   {
     moho::SPhysConstants* loadedValue = nullptr;
-    archive->ReadPointerOwned_SPhysConstants(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::SPhysConstants* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3247,7 +3220,7 @@ namespace
   )
   {
     moho::IAiFormationDB* loadedValue = nullptr;
-    archive->ReadPointerOwned_IAiFormationDB(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IAiFormationDB* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3269,7 +3242,7 @@ namespace
   )
   {
     moho::CCommandDb* loadedValue = nullptr;
-    archive->ReadPointerOwned_CCommandDB(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CCommandDb* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3292,7 +3265,7 @@ namespace
   )
   {
     moho::CDecalBuffer* loadedValue = nullptr;
-    archive->ReadPointerOwned_CDecalBuffer(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CDecalBuffer* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3315,7 +3288,7 @@ namespace
   )
   {
     moho::IEffectManager* loadedValue = nullptr;
-    archive->ReadPointerOwned_IEffectManager(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IEffectManager* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3338,7 +3311,7 @@ namespace
   )
   {
     moho::ISoundManager* loadedValue = nullptr;
-    archive->ReadPointerOwned_ISoundManager(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::ISoundManager* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3358,7 +3331,7 @@ namespace
   )
   {
     moho::CEntityDb* loadedValue = nullptr;
-    archive->ReadPointerOwned_EntityDB(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CEntityDb* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3381,7 +3354,7 @@ namespace
   )
   {
     moho::CCommandDb* loadedValue = nullptr;
-    archive->ReadPointerOwned_CCommandDB(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CCommandDb* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3403,7 +3376,7 @@ namespace
   )
   {
     moho::CDecalBuffer* loadedValue = nullptr;
-    archive->ReadPointerOwned_CDecalBuffer(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CDecalBuffer* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3425,7 +3398,7 @@ namespace
   )
   {
     moho::CEntityDb* loadedValue = nullptr;
-    archive->ReadPointerOwned_EntityDB(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CEntityDb* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -3938,7 +3911,7 @@ namespace
   )
   {
     moho::CIntelPosHandle* loadedValue = nullptr;
-    archive->ReadPointerOwned_CIntelPosHandle(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CIntelPosHandle* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4651,7 +4624,7 @@ namespace
   )
   {
     moho::CAiPersonality* loadedValue = nullptr;
-    archive->ReadPointerOwned_CAiPersonality(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CAiPersonality* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4675,7 +4648,7 @@ namespace
   )
   {
     moho::CEconRequest* loadedValue = nullptr;
-    archive->ReadPointerOwned_CEconRequest(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::TDatListItem<void, void>* const previousNode = *valueSlot;
     *valueSlot = loadedValue != nullptr ? &loadedValue->mNode : nullptr;
@@ -4700,7 +4673,7 @@ namespace
   )
   {
     moho::CAiPathSpline* loadedValue = nullptr;
-    archive->ReadPointerOwned_CAiPathSpline(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CAiPathSpline* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4721,7 +4694,7 @@ namespace
   )
   {
     moho::CAiPathSpline* loadedValue = nullptr;
-    archive->ReadPointerOwned_CAiPathSpline(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CAiPathSpline* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4742,7 +4715,7 @@ namespace
   )
   {
     moho::PositionHistory* loadedValue = nullptr;
-    archive->ReadPointerOwned_PositionHistory(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::PositionHistory* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4762,7 +4735,7 @@ namespace
   )
   {
     moho::CColPrimitiveBase* loadedValue = nullptr;
-    archive->ReadPointerOwned_CColPrimitiveBase(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CColPrimitiveBase* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4782,7 +4755,7 @@ namespace
   )
   {
     moho::CTextureScroller* loadedValue = nullptr;
-    ReadPointerOwned_CTextureScrollerCompat(&loadedValue, archive, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CTextureScroller* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4804,7 +4777,7 @@ namespace
   )
   {
     moho::SPhysBody* loadedValue = nullptr;
-    archive->ReadPointerOwned_SPhysBody(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::SPhysBody* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4824,7 +4797,7 @@ namespace
   )
   {
     moho::Motor* loadedValue = nullptr;
-    archive->ReadPointerOwned_Motor(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::Motor* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4844,7 +4817,7 @@ namespace
     const gpg::RRef* const ownerRef, gpg::ReadArchive* const archive, moho::EntitySetBase** const valueSlot
   )
   {
-    archive->ReadPointer_EntitySetBase(valueSlot, ownerRef);
+    archive->ReadPointer(valueSlot, ownerRef);
     return archive;
   }
 
@@ -4858,7 +4831,7 @@ namespace
     const gpg::RRef* const ownerRef, moho::EntitySetBase** const valueSlot, gpg::ReadArchive* const archive
   )
   {
-    return archive->ReadPointer_EntitySetBase(valueSlot, ownerRef);
+    return archive->ReadPointer(valueSlot, ownerRef);
   }
 
   /**
@@ -4871,7 +4844,7 @@ namespace
     const gpg::RRef* const ownerRef, gpg::ReadArchive* const archive, moho::SPhysConstants** const valueSlot
   )
   {
-    archive->ReadPointer_SPhysConstants(valueSlot, ownerRef);
+    archive->ReadPointer(valueSlot, ownerRef);
     return archive;
   }
 
@@ -4885,7 +4858,7 @@ namespace
     const gpg::RRef* const ownerRef, moho::SPhysConstants** const valueSlot, gpg::ReadArchive* const archive
   )
   {
-    return archive->ReadPointer_SPhysConstants(valueSlot, ownerRef);
+    return archive->ReadPointer(valueSlot, ownerRef);
   }
 
   /**
@@ -4900,7 +4873,7 @@ namespace
   )
   {
     moho::IAiSteering* loadedValue = nullptr;
-    archive->ReadPointerOwned_IAiSteering(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IAiSteering* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4922,7 +4895,7 @@ namespace
   )
   {
     moho::IFormationInstance* loadedValue = nullptr;
-    archive->ReadPointerOwned_IFormationInstance(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IFormationInstance* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4942,7 +4915,7 @@ namespace
   )
   {
     moho::IAiAttacker* loadedValue = nullptr;
-    archive->ReadPointerOwned_IAiAttacker(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IAiAttacker* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4964,7 +4937,7 @@ namespace
   )
   {
     moho::IAiCommandDispatch* loadedValue = nullptr;
-    archive->ReadPointerOwned_IAiCommandDispatch(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IAiCommandDispatch* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -4986,7 +4959,7 @@ namespace
   )
   {
     moho::IAiNavigator* loadedValue = nullptr;
-    archive->ReadPointerOwned_IAiNavigator(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IAiNavigator* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5008,7 +4981,7 @@ namespace
   )
   {
     moho::IAiBuilder* loadedValue = nullptr;
-    archive->ReadPointerOwned_IAiBuilder(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IAiBuilder* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5030,7 +5003,7 @@ namespace
   )
   {
     moho::IAiSiloBuild* loadedValue = nullptr;
-    archive->ReadPointerOwned_IAiSiloBuild(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IAiSiloBuild* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5052,7 +5025,7 @@ namespace
   )
   {
     moho::IAiTransport* loadedValue = nullptr;
-    archive->ReadPointerOwned_IAiTransport(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IAiTransport* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5074,7 +5047,7 @@ namespace
   )
   {
     moho::CEconStorage* loadedValue = nullptr;
-    (void)ReadPointerOwned_CEconStorageCompat(&loadedValue, archive, ownerRef);
+    (void)archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CEconStorage* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5098,7 +5071,7 @@ namespace
   )
   {
     moho::CAniActor* loadedValue = nullptr;
-    archive->ReadPointerOwned_CAniActor(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CAniActor* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5213,7 +5186,7 @@ namespace
   )
   {
     moho::CAiBrain* loadedValue = nullptr;
-    archive->ReadPointerOwned_CAiBrain(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CAiBrain* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5235,7 +5208,7 @@ namespace
   )
   {
     moho::IAiReconDB* loadedValue = nullptr;
-    archive->ReadPointerOwned_IAiReconDB(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::IAiReconDB* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5257,7 +5230,7 @@ namespace
   )
   {
     moho::CEconomy* loadedValue = nullptr;
-    archive->ReadPointerOwned_CEconomy(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CEconomy* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5279,7 +5252,7 @@ namespace
   )
   {
     moho::CArmyStats* loadedValue = nullptr;
-    archive->ReadPointerOwned_CArmyStats(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CArmyStats* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5303,7 +5276,7 @@ namespace
   )
   {
     moho::CInfluenceMap* loadedValue = nullptr;
-    archive->ReadPointerOwned_CInfluenceMap(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CInfluenceMap* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5338,7 +5311,7 @@ namespace
   )
   {
     moho::CEconomy* loadedValue = nullptr;
-    archive->ReadPointerOwned_CEconomy(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CEconomy* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5359,7 +5332,7 @@ namespace
   )
   {
     moho::CArmyStats* loadedValue = nullptr;
-    archive->ReadPointerOwned_CArmyStats(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CArmyStats* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5382,7 +5355,7 @@ namespace
   )
   {
     moho::CInfluenceMap* loadedValue = nullptr;
-    archive->ReadPointerOwned_CInfluenceMap(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CInfluenceMap* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
@@ -5404,7 +5377,7 @@ namespace
   )
   {
     moho::PathQueue* loadedValue = nullptr;
-    ReadPointerOwned_PathQueueCompat(&loadedValue, archive, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
     moho::PathQueue::Move(valueSlot, loadedValue);
   }
 
@@ -5464,7 +5437,7 @@ namespace
   )
   {
     moho::CArmyStatItem* loadedValue = nullptr;
-    archive->ReadPointerOwned_CArmyStatItem(&loadedValue, ownerRef);
+    archive->ReadPointerOwned(&loadedValue, ownerRef);
 
     moho::CArmyStatItem* const previousValue = *valueSlot;
     *valueSlot = loadedValue;

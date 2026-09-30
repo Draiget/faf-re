@@ -5020,7 +5020,7 @@ void Sim::SerArmies(gpg::ReadArchive* const archive)
   gpg::RRef nullOwner{};
   for (std::size_t i = 0; i < static_cast<std::size_t>(armyCount); ++i) {
     SimArmy* loadedArmy = nullptr;
-    archive->ReadPointerOwned_SimArmy(&loadedArmy, &nullOwner);
+    archive->ReadPointerOwned(&loadedArmy, &nullOwner);
     mArmiesList[i] = static_cast<CArmyImpl*>(loadedArmy);
   }
 }
@@ -5065,11 +5065,11 @@ void Sim::SerDirtyEnts(gpg::ReadArchive* const archive)
 
   gpg::RRef ownerRef{};
   Entity* entity = nullptr;
-  (void)archive->ReadPointer_Entity(&entity, &ownerRef);
+  (void)archive->ReadPointer(&entity, &ownerRef);
   while (entity != nullptr) {
     entity->ListLinkBefore(&mCoordEntities);
     ownerRef = gpg::RRef{};
-    (void)archive->ReadPointer_Entity(&entity, &ownerRef);
+    (void)archive->ReadPointer(&entity, &ownerRef);
   }
 }
 

@@ -6,6 +6,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/REntityBlueprintTypeInfo.h"
+#include "moho/entity/REntityBlueprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -72,7 +73,7 @@ namespace moho
     archive->Read(quatType, &origin, ownerRef);
 
     archive->ReadFloat(&unk1);
-    (void)archive->ReadPointer_REntityBlueprint(&blueprint, &ownerRef);
+    (void)archive->ReadPointer(&blueprint, &ownerRef);
     archive->ReadString(&unk2);
   }
 

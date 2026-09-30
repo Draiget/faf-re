@@ -23,13 +23,13 @@ void DeserializeLuaStatePointerPair(
 )
 {
 	LuaState* rootState = nullptr;
-	(void)archive->ReadPointer_LuaState(&rootState, ownerRef);
+	(void)archive->ReadPointer(&rootState, ownerRef);
 
 	gpg::RRef rootStateRef{};
 	(void)gpg::RRef_lua_State(&rootStateRef, rootState->m_state);
 
 	lua_State* activeState = nullptr;
-	(void)archive->ReadPointer_lua_State(&activeState, &rootStateRef);
+	(void)archive->ReadPointer(&activeState, &rootStateRef);
 	state->SetState(activeState);
 }
 

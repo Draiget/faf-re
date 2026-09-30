@@ -909,7 +909,7 @@ namespace
     archive->Read(entIdType, &entry->entityId, owner);
 
     moho::SimArmy* sourceArmy = nullptr;
-    archive->ReadPointer_SimArmy(&sourceArmy, &owner);
+    archive->ReadPointer(&sourceArmy, &owner);
     entry->sourceArmy = reinterpret_cast<moho::CArmyImpl*>(sourceArmy);
 
     static gpg::RType* vector3fType = nullptr;
@@ -919,7 +919,7 @@ namespace
     archive->Read(vector3fType, &entry->lastPosition, owner);
 
     moho::RUnitBlueprint* sourceBlueprint = nullptr;
-    archive->ReadPointer_RUnitBlueprint(&sourceBlueprint, &owner);
+    archive->ReadPointer(&sourceBlueprint, &owner);
     entry->sourceBlueprint = sourceBlueprint;
 
     static gpg::RType* layerType = nullptr;

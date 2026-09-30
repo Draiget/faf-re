@@ -216,7 +216,7 @@ namespace
     if (version < 2) {
       moho::CAniPose* discardedAniPose = nullptr;
       const gpg::RRef nullOwner{};
-      archive->ReadPointer_CAniPose(&discardedAniPose, &nullOwner);
+      archive->ReadPointer(&discardedAniPose, &nullOwner);
     }
 
     archive->ReadInt(&binding->mBoneIndex);

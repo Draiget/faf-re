@@ -13456,7 +13456,7 @@ void Unit::MemberConstruct(
 {
   Sim* sim = nullptr;
   gpg::RRef nullOwner{};
-  archive.ReadPointer_Sim(&sim, &nullOwner);
+  archive.ReadPointer(&sim, &nullOwner);
 
   Unit* unit = nullptr;
   void* const storage = ::operator new(sizeof(Unit));
@@ -15334,13 +15334,13 @@ void Unit::SerEconomyEvents(gpg::ReadArchive& archive, const int)
 {
   CEconomyEvent* economyEvent = nullptr;
   gpg::RRef ownerRef{};
-  archive.ReadPointerOwned_CEconomyEvent(&economyEvent, &ownerRef);
+  archive.ReadPointerOwned(&economyEvent, &ownerRef);
 
   while (economyEvent != nullptr) {
     mEconomyEventListHead.push_back(economyEvent);
     economyEvent = nullptr;
     ownerRef = gpg::RRef{};
-    archive.ReadPointerOwned_CEconomyEvent(&economyEvent, &ownerRef);
+    archive.ReadPointerOwned(&economyEvent, &ownerRef);
   }
 }
 
@@ -17566,7 +17566,7 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   // Steering: read new owned pointer, swap in, release prior instance.
   {
     IAiSteering* steering = nullptr;
-    archive->ReadPointerOwned_IAiSteering(&steering, &ownerRef);
+    archive->ReadPointerOwned(&steering, &ownerRef);
     IAiSteering* const prior = unit->AiSteering;
     unit->AiSteering = steering;
     delete prior;
@@ -17575,7 +17575,7 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   // Unit motion.
   {
     CUnitMotion* motion = nullptr;
-    archive->ReadPointerOwned_CUnitMotion(&motion, &ownerRef);
+    archive->ReadPointerOwned(&motion, &ownerRef);
     CUnitMotion* const prior = unit->UnitMotion;
     unit->UnitMotion = motion;
     delete prior;
@@ -17584,7 +17584,7 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   // Command queue.
   {
     CUnitCommandQueue* queue = nullptr;
-    archive->ReadPointerOwned_CUnitCommandQueue(&queue, &ownerRef);
+    archive->ReadPointerOwned(&queue, &ownerRef);
     CUnitCommandQueue* const prior = unit->CommandQueue;
     unit->CommandQueue = queue;
     delete prior;
@@ -17605,7 +17605,7 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   // Formation instance (deleted through the reflection deleting-destructor slot).
   {
     IFormationInstance* formation = nullptr;
-    archive->ReadPointerOwned_IFormationInstance(&formation, &ownerRef);
+    archive->ReadPointerOwned(&formation, &ownerRef);
     IFormationInstance* const prior = unit->GuardFormation;
     unit->GuardFormation = static_cast<CAiFormationInstance*>(formation);
     delete prior;
@@ -17617,7 +17617,7 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   // Extra economy storage: detach from its economy then free raw storage.
   {
     CEconStorage* storage = nullptr;
-    archive->ReadPointerOwned_CEconStorage(&storage, &ownerRef);
+    archive->ReadPointerOwned(&storage, &ownerRef);
     CEconStorage* const prior = unit->mExtraStorage;
     unit->mExtraStorage = storage;
     if (prior) {
@@ -17633,7 +17633,7 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   // Consumption (upkeep) request: unlink its intrusive node then free storage.
   {
     CEconRequest* request = nullptr;
-    archive->ReadPointerOwned_CEconRequest(&request, &ownerRef);
+    archive->ReadPointerOwned(&request, &ownerRef);
     CEconRequest* const prior = unit->mConsumptionData;
     unit->mConsumptionData = request;
     if (prior) {
@@ -17649,7 +17649,7 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   // Animation actor.
   {
     CAniActor* actor = nullptr;
-    archive->ReadPointerOwned_CAniActor(&actor, &ownerRef);
+    archive->ReadPointerOwned(&actor, &ownerRef);
     CAniActor* const prior = unit->AniActor;
     unit->AniActor = actor;
     delete prior;
@@ -17658,42 +17658,42 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
   // AI implementation lanes.
   {
     IAiAttacker* attacker = nullptr;
-    archive->ReadPointerOwned_IAiAttacker(&attacker, &ownerRef);
+    archive->ReadPointerOwned(&attacker, &ownerRef);
     CAiAttackerImpl* const prior = unit->AiAttacker;
     unit->AiAttacker = static_cast<CAiAttackerImpl*>(attacker);
     delete prior;
   }
   {
     IAiCommandDispatch* dispatch = nullptr;
-    archive->ReadPointerOwned_IAiCommandDispatch(&dispatch, &ownerRef);
+    archive->ReadPointerOwned(&dispatch, &ownerRef);
     IAiCommandDispatchImpl* const prior = unit->AiCommandDispatch;
     unit->AiCommandDispatch = static_cast<IAiCommandDispatchImpl*>(dispatch);
     delete prior;
   }
   {
     IAiNavigator* navigator = nullptr;
-    archive->ReadPointerOwned_IAiNavigator(&navigator, &ownerRef);
+    archive->ReadPointerOwned(&navigator, &ownerRef);
     IAiNavigator* const prior = unit->AiNavigator;
     unit->AiNavigator = navigator;
     delete prior;
   }
   {
     IAiBuilder* builder = nullptr;
-    archive->ReadPointerOwned_IAiBuilder(&builder, &ownerRef);
+    archive->ReadPointerOwned(&builder, &ownerRef);
     IAiBuilder* const prior = unit->AiBuilder;
     unit->AiBuilder = builder;
     delete prior;
   }
   {
     IAiSiloBuild* siloBuild = nullptr;
-    archive->ReadPointerOwned_IAiSiloBuild(&siloBuild, &ownerRef);
+    archive->ReadPointerOwned(&siloBuild, &ownerRef);
     CAiSiloBuildImpl* const prior = unit->AiSiloBuild;
     unit->AiSiloBuild = static_cast<CAiSiloBuildImpl*>(siloBuild);
     delete prior;
   }
   {
     IAiTransport* transport = nullptr;
-    archive->ReadPointerOwned_IAiTransport(&transport, &ownerRef);
+    archive->ReadPointerOwned(&transport, &ownerRef);
     IAiTransport* const prior = unit->AiTransport;
     unit->AiTransport = transport;
     delete prior;

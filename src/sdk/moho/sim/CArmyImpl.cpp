@@ -1438,7 +1438,7 @@ namespace moho
       // binary stores the pointer as `void*` on CArmyImpl but the archive lane
       // is typed PathQueue and the upcast/ownership transition must match.
       moho::PathQueue* loadedPathQueue = nullptr;
-      (void)archive->ReadPointerOwned_PathQueue(&loadedPathQueue, &owner);
+      (void)archive->ReadPointerOwned(&loadedPathQueue, &owner);
       ReplacePathFinderOwnedPointer(PathFinder, loadedPathQueue);
     }
 

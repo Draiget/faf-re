@@ -315,10 +315,10 @@ namespace
     }
 
     moho::Listener<moho::ECommandEvent>* listener = nullptr;
-    archive->ReadPointer_Listener_ECommandEvent(&listener, ownerRef);
+    archive->ReadPointer(&listener, ownerRef);
     while (listener != nullptr) {
       broadcaster->AddListener(listener);
-      archive->ReadPointer_Listener_ECommandEvent(&listener, ownerRef);
+      archive->ReadPointer(&listener, ownerRef);
     }
   }
 
@@ -382,10 +382,10 @@ namespace
     }
 
     moho::Listener<moho::EUnitCommandQueueStatus>* listener = nullptr;
-    archive->ReadPointer_Listener_EUnitCommandQueueStatus(&listener, ownerRef);
+    archive->ReadPointer(&listener, ownerRef);
     while (listener != nullptr) {
       broadcaster->AddListener(listener);
-      archive->ReadPointer_Listener_EUnitCommandQueueStatus(&listener, ownerRef);
+      archive->ReadPointer(&listener, ownerRef);
     }
   }
 

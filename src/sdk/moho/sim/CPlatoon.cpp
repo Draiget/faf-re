@@ -484,13 +484,13 @@ namespace
 
     moho::CSquad* loadedSquad = nullptr;
     gpg::RRef ownerRef{};
-    archive->ReadPointerOwned_CSquad(&loadedSquad, &ownerRef);
+    archive->ReadPointerOwned(&loadedSquad, &ownerRef);
     while (loadedSquad != nullptr) {
       platoon->mSquadList.PushBack(loadedSquad);
 
       loadedSquad = nullptr;
       ownerRef = {};
-      archive->ReadPointerOwned_CSquad(&loadedSquad, &ownerRef);
+      archive->ReadPointerOwned(&loadedSquad, &ownerRef);
     }
 
     return archive;
@@ -1276,7 +1276,7 @@ namespace moho
   void CSquad::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     gpg::RRef ownerRef{};
-    archive->ReadPointer_Sim(&mSim, &ownerRef);
+    archive->ReadPointer(&mSim, &ownerRef);
     archive->Read(CachedUnitSetTypeForCSquadSerializer(), &mUnits, ownerRef);
 
     ownerRef = {};
@@ -1329,11 +1329,11 @@ namespace moho
     archive->Read(CachedCScriptObjectTypeForCPlatoonSerializer(), this, ownerRef);
 
     ownerRef = {};
-    archive->ReadPointer_Sim(&mSim, &ownerRef);
+    archive->ReadPointer(&mSim, &ownerRef);
 
     ownerRef = {};
     SimArmy* army = nullptr;
-    archive->ReadPointer_SimArmy(&army, &ownerRef);
+    archive->ReadPointer(&army, &ownerRef);
     mArmy = army;
 
     (void)ReadPlatoonSquadsFromArchive(archive, this);

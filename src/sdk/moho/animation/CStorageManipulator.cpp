@@ -705,7 +705,7 @@ namespace moho
 
     archive->Read(IAniManipulator::StaticGetClass(), this, ownerRef);
 
-    archive->ReadPointer_Unit(&mUnit, &ownerRef);
+    archive->ReadPointer(&mUnit, &ownerRef);
 
     gpg::RType* const vector3Type = CachedVector3fType();
     archive->Read(vector3Type, &mMax, ownerRef);

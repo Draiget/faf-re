@@ -10545,22 +10545,6 @@ gpg::RRef* AssignCurrentUIStateRefAdapter(RRef* const out)
 }
 
 /**
- * Address: 0x004C1690 (FUN_004C1690, gpg::RRef::CastLuaState)
- *
- * What it does:
- * Upcasts this reflected reference to one `LuaPlus::LuaState` pointer lane.
- */
-LuaPlus::LuaState* RRef::CastLuaState()
-{
-  if (!gLuaStateRRefType) {
-    gLuaStateRRefType = gpg::LookupRType(typeid(LuaPlus::LuaState));
-  }
-
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(*this, gLuaStateRRefType);
-  return static_cast<LuaPlus::LuaState*>(upcast.mObj);
-}
-
-/**
  * Address: 0x00920400 (FUN_00920400, gpg::RRef::TryUpcast_lua_State)
  *
  * What it does:
@@ -11744,7 +11728,7 @@ void gpg::DeserializeSimArmyPtrVector(ReadArchive* const archive, const int vect
     const gpg::RRef emptyOwner{};
     for (unsigned int i = 0; i < count; ++i) {
         moho::SimArmy* element = nullptr;
-        archive->ReadPointer_SimArmy(&element, &emptyOwner);
+        archive->ReadPointer(&element, &emptyOwner);
         loaded.push_back(element);
     }
 

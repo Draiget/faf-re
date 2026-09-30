@@ -307,7 +307,7 @@ namespace moho
 
     CUnitCommand* command = nullptr;
     gpg::RRef ownerRef{};
-    (void)archive->ReadPointerOwned_CUnitCommand(&command, &ownerRef);
+    (void)archive->ReadPointerOwned(&command, &ownerRef);
 
     while (command != nullptr) {
       BVIntSet& releasedLowIds = pool.mReleasedLows;
@@ -334,7 +334,7 @@ namespace moho
       ownerRef.mObj = nullptr;
       ownerRef.mType = nullptr;
       command = nullptr;
-      (void)archive->ReadPointerOwned_CUnitCommand(&command, &ownerRef);
+      (void)archive->ReadPointerOwned(&command, &ownerRef);
     }
   }
 

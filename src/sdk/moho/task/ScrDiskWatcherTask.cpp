@@ -286,8 +286,10 @@ void ScrDiskWatcherTask::Construct(
     return;
   }
 
+  // 0x004C0ACE: the owner is an empty reference on the stack.
   LuaPlus::LuaState* luaState = nullptr;
-  (void)archive->ReadPointer_LuaState(&luaState, nullptr);
+  const gpg::RRef nullOwner{};
+  (void)archive->ReadPointer(&luaState, &nullOwner);
   ScrDiskWatcherTask* const task = new ScrDiskWatcherTask(luaState);
 
   gpg::RRef taskRef{};

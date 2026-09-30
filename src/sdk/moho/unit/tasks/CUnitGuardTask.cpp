@@ -367,7 +367,7 @@ namespace moho
     archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
 
     gpg::RRef commandTaskRef{};
-    archive->ReadPointer_CCommandTask(&mCommandTask, &commandTaskRef);
+    archive->ReadPointer(&mCommandTask, &commandTaskRef);
 
     const gpg::RRef primaryCommandOwnerRef{};
     archive->Read(CachedWeakPtrCUnitCommandType(), &mPrimaryCommandRef, primaryCommandOwnerRef);

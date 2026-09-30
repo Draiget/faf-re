@@ -1895,11 +1895,11 @@ void moho::CAimManipulator::MemberDeserialize(CAimManipulator* const object, gpg
   archive->Read(CachedWeakPtrUnitWeaponType(), &object->mWeapon, ownerRef);
   archive->ReadString(&object->mLabel);
 
-  archive->ReadPointer_RUnitBlueprintWeapon(&object->mUnitWepBlueprint, &ownerRef);
+  archive->ReadPointer(&object->mUnitWepBlueprint, &ownerRef);
 
   if (UnitWeapon* const weapon = object->mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* projectileBlueprint = weapon->mProjectileBlueprint;
-    archive->ReadPointer_RProjectileBlueprint(&projectileBlueprint, &ownerRef);
+    archive->ReadPointer(&projectileBlueprint, &ownerRef);
     if (projectileBlueprint != nullptr) {
       object->mProjPhysBlueprint = &projectileBlueprint->Physics;
     }

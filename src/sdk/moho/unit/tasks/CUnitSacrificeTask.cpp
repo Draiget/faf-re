@@ -249,7 +249,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
     archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
-    archive->ReadPointer_CUnitCommand(&mCommand, &ownerRef);
+    archive->ReadPointer(&mCommand, &ownerRef);
     archive->Read(CachedWeakPtrUnitType(), &mTargetUnit, ownerRef);
   }
 

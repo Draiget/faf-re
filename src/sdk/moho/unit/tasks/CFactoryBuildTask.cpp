@@ -199,11 +199,11 @@ namespace moho
     archive->Read(ResolveCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
 
     CCommandTask* dispatchTask = nullptr;
-    archive->ReadPointer_CCommandTask(&dispatchTask, &ownerRef);
+    archive->ReadPointer(&dispatchTask, &ownerRef);
     mDispatch = static_cast<IAiCommandDispatchImpl*>(dispatchTask);
 
     RUnitBlueprint* blueprint = nullptr;
-    archive->ReadPointer_RUnitBlueprint(&blueprint, &ownerRef);
+    archive->ReadPointer(&blueprint, &ownerRef);
     mBlueprint = blueprint;
 
     archive->Read(ResolveCBuildTaskHelperType(), &mBuildHelper, ownerRef);

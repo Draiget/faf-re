@@ -450,10 +450,10 @@ void moho::RBroadcasterRType_EAiTransportEvent::SerLoad(
   }
 
   moho::Listener<moho::EAiTransportEvent>* listener = nullptr;
-  archive->ReadPointer_Listener_EAiTransportEvent(&listener, ownerRef);
+  archive->ReadPointer(&listener, ownerRef);
   while (listener != nullptr) {
     broadcaster->AddListener(listener);
-    archive->ReadPointer_Listener_EAiTransportEvent(&listener, ownerRef);
+    archive->ReadPointer(&listener, ownerRef);
   }
 }
 

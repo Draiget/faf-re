@@ -421,11 +421,11 @@ namespace moho
     archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
 
     CCommandTask* dispatchAsCommandTask = nullptr;
-    archive->ReadPointer_CCommandTask(&dispatchAsCommandTask, &ownerRef);
+    archive->ReadPointer(&dispatchAsCommandTask, &ownerRef);
     mDispatch = static_cast<IAiCommandDispatchImpl*>(dispatchAsCommandTask);
 
     archive->Read(CachedCAiTargetType(), &mTarget, ownerRef);
-    archive->ReadPointer_UnitWeapon(&mWeapon, &ownerRef);
+    archive->ReadPointer(&mWeapon, &ownerRef);
     archive->Read(CachedESiloTypeType(), &mIsNuclear, ownerRef);
   }
 

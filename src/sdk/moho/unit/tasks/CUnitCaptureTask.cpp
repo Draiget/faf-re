@@ -556,14 +556,14 @@ namespace moho
 
     const gpg::RRef nullOwner{};
     archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), nullOwner);
-    archive->ReadPointer_CUnitCommand(&mCommand, &nullOwner);
+    archive->ReadPointer(&mCommand, &nullOwner);
     archive->Read(CachedWeakPtrEntityType(), &mTargetEntity, nullOwner);
     archive->ReadBool(&mHasStarted);
     archive->ReadInt(&mCaptureProgress);
     archive->ReadInt(&mCaptureTime);
 
     CEconRequest* loadedConsumption = nullptr;
-    archive->ReadPointerOwned_CEconRequest(&loadedConsumption, &nullOwner);
+    archive->ReadPointerOwned(&loadedConsumption, &nullOwner);
 
     CEconRequest* previousConsumption = mConsumptionData;
     mConsumptionData = loadedConsumption;

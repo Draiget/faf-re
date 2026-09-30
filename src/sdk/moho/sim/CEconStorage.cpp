@@ -440,7 +440,7 @@ namespace moho
 
     const gpg::RRef nullOwner{};
 
-    (void)archive->ReadPointer_CEconomy(&mEconomy, &nullOwner);
+    (void)archive->ReadPointer(&mEconomy, &nullOwner);
 
     gpg::RType* const econValueType = CachedSEconValueType();
     GPG_ASSERT(econValueType != nullptr);

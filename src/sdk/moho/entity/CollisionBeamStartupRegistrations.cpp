@@ -295,7 +295,7 @@ namespace gpg
     (void)version;
 
     moho::ManyToOneListener<moho::ECollisionBeamEvent>* listener = nullptr;
-    (void)archive->ReadPointer_ManyToOneListener_ECollisionBeamEvent(&listener, ownerRef);
+    (void)archive->ReadPointer(&listener, ownerRef);
     broadcaster->SetListener(listener);
   }
 } // namespace gpg

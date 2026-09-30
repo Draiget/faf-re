@@ -78,8 +78,8 @@ namespace moho
     const gpg::RRef ownerRef{};
     archive->Read(ResolveVector3fType(), &position, ownerRef);
     archive->ReadInt(reinterpret_cast<int*>(&layer));
-    (void)archive->ReadPointer_CSndParams(&params, &ownerRef);
-    (void)archive->ReadPointer_HSound(&sound, &ownerRef);
+    (void)archive->ReadPointer(&params, &ownerRef);
+    (void)archive->ReadPointer(&sound, &ownerRef);
   }
 
   /**

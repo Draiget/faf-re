@@ -868,7 +868,7 @@ void CLuaTask::MemberDeserialize(gpg::ReadArchive* const archive)
 {
   gpg::RRef ownerRef{};
   moho::ReadCTaskBase(archive, this, ownerRef);
-  (void)archive->ReadPointer_LuaState(&mLuaState, &ownerRef);
+  (void)archive->ReadPointer(&mLuaState, &ownerRef);
   archive->ReadInt(&mResumeArgCount);
 
   if (mLuaState) {

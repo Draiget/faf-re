@@ -337,7 +337,7 @@ namespace moho
   {
     RRuleGameRules* gameRules = nullptr;
     gpg::RRef ownerRef{};
-    archive->ReadPointer_RRuleGameRules(&gameRules, &ownerRef);
+    archive->ReadPointer(&gameRules, &ownerRef);
 
     msvc8::string serializedId{};
     archive->ReadString(&serializedId);

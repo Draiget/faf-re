@@ -735,7 +735,7 @@ namespace moho
     archive->Read(ResolveFastVectorSEfxCurveType(), &mCurves, nullOwner);
 
     const gpg::RRef blueprintOwner{};
-    (void)archive->ReadPointer_REmitterBlueprint(&mBlueprint, &blueprintOwner);
+    (void)archive->ReadPointer(&mBlueprint, &blueprintOwner);
 
     archive->ReadFloat(&mTotalEmissions);
     archive->ReadInt(reinterpret_cast<int*>(&mLife));

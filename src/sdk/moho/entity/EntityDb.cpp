@@ -1337,7 +1337,7 @@ namespace
     gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       moho::Entity* entity = nullptr;
-      (void)archive->ReadPointer_Entity(&entity, &owner);
+      (void)archive->ReadPointer(&entity, &owner);
       list->push_back(entity);
     }
   }

@@ -97,10 +97,10 @@ namespace
     }
 
     moho::Listener<moho::EFormationdStatus>* listener = nullptr;
-    archive->ReadPointer_Listener_EFormationdStatus(&listener, ownerRef);
+    archive->ReadPointer(&listener, ownerRef);
     while (listener != nullptr) {
       broadcaster->AddListener(listener);
-      archive->ReadPointer_Listener_EFormationdStatus(&listener, ownerRef);
+      archive->ReadPointer(&listener, ownerRef);
     }
   }
 
@@ -2226,8 +2226,8 @@ namespace moho
       archive->Read(baseType, this, ownerRef);
     }
 
-    (void)archive->ReadPointer_LuaState(&mState, &ownerRef);
-    (void)archive->ReadPointer_RRuleGameRules(&mGamerules, &ownerRef);
+    (void)archive->ReadPointer(&mState, &ownerRef);
+    (void)archive->ReadPointer(&mGamerules, &ownerRef);
 
     ReadFormationField(archive, CachedEUnitCommandTypeType(), &mCommandType, ownerRef);
     ReadFormationField(archive, CachedFastVectorWeakPtrIUnitType(), &mUnits, ownerRef);

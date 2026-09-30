@@ -369,7 +369,7 @@ namespace moho
       offsetof(CUnitWaitForFerryTask, mDispatch) == 0x30,
       "CUnitWaitForFerryTask::mDispatch offset must be 0x30"
     );
-    archive->ReadPointer_CCommandTask(reinterpret_cast<CCommandTask**>(&mDispatch), &ownerRef);
+    archive->ReadPointer(reinterpret_cast<CCommandTask**>(&mDispatch), &ownerRef);
 
     archive->Read(CachedWeakPtrUnitTypeForFerrySerializer(), &mFerryUnit, ownerRef);
     archive->Read(CachedSNavGoalTypeForFerrySerializer(), &mMoveGoal, ownerRef);

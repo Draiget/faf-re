@@ -1023,7 +1023,7 @@ namespace moho
   void PathQueue::Impl::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     gpg::RRef ownerRef{};
-    archive->ReadPointer_PathTables(&mOwner, &ownerRef);
+    archive->ReadPointer(&mOwner, &ownerRef);
 
     static gpg::RType* dlistType = nullptr;
     if (dlistType == nullptr) {
@@ -1262,7 +1262,7 @@ namespace moho
   {
     Impl* loaded = nullptr;
     const gpg::RRef owner{};
-    (void)archive->ReadPointerOwned_PathQueue_Impl(&loaded, &owner);
+    (void)archive->ReadPointerOwned(&loaded, &owner);
     mImpl.reset(loaded);
   }
 

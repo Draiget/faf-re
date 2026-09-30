@@ -155,7 +155,7 @@ namespace gpg
 
     for (unsigned int i = 0u; i < count; ++i) {
       moho::Shield* element = nullptr;
-      archive->ReadPointer_Shield(&element, ownerRef);
+      archive->ReadPointer(&element, ownerRef);
       list->push_back(element);
     }
   }

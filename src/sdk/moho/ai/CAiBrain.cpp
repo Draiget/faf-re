@@ -2184,11 +2184,11 @@ void CAiBrain::MemberDeserialize(gpg::ReadArchive* const archive)
     archive->Read(scriptObjectType, static_cast<CScriptObject*>(this), owner);
   }
 
-  (void)archive->ReadPointer_SimArmy(reinterpret_cast<moho::SimArmy**>(&mArmy), &owner);
-  (void)archive->ReadPointer_SimArmy(reinterpret_cast<moho::SimArmy**>(&mCurrentEnemy), &owner);
+  (void)archive->ReadPointer(reinterpret_cast<moho::SimArmy**>(&mArmy), &owner);
+  (void)archive->ReadPointer(reinterpret_cast<moho::SimArmy**>(&mCurrentEnemy), &owner);
 
   CAiPersonality* loadedPersonality = nullptr;
-  (void)archive->ReadPointerOwned_CAiPersonality(&loadedPersonality, &owner);
+  (void)archive->ReadPointerOwned(&loadedPersonality, &owner);
   CAiPersonality* const previousPersonality = mPersonality;
   mPersonality = loadedPersonality;
   delete previousPersonality;
@@ -2207,18 +2207,18 @@ void CAiBrain::MemberDeserialize(gpg::ReadArchive* const archive)
     archive->Read(buildReserveMapType, &mBuildStructureMap, owner);
   }
 
-  (void)archive->ReadPointer_Sim(&mSim, &owner);
+  (void)archive->ReadPointer(&mSim, &owner);
 
   CTaskStage* loadedAiThreadStage = nullptr;
-  (void)archive->ReadPointerOwned_CTaskStage(&loadedAiThreadStage, &owner);
+  (void)archive->ReadPointerOwned(&loadedAiThreadStage, &owner);
   ReplaceOwnedTaskStage(mAiThreadStage, loadedAiThreadStage);
 
   CTaskStage* loadedAttackerThreadStage = nullptr;
-  (void)archive->ReadPointerOwned_CTaskStage(&loadedAttackerThreadStage, &owner);
+  (void)archive->ReadPointerOwned(&loadedAttackerThreadStage, &owner);
   ReplaceOwnedTaskStage(mAttackerThreadStage, loadedAttackerThreadStage);
 
   CTaskStage* loadedReservedThreadStage = nullptr;
-  (void)archive->ReadPointerOwned_CTaskStage(&loadedReservedThreadStage, &owner);
+  (void)archive->ReadPointerOwned(&loadedReservedThreadStage, &owner);
   ReplaceOwnedTaskStage(mReservedThreadStage, loadedReservedThreadStage);
 
   gpg::RType* const categorySetType = CachedEntityCategorySetType();

@@ -11,6 +11,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/REntityBlueprintTypeInfo.h"
+#include "moho/entity/REntityBlueprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -267,7 +268,7 @@ namespace moho
     const gpg::RRef nullOwner{};
 
     DeserializeEntIdField(&mEntityId, archive);
-    archive->ReadPointer_REntityBlueprint(&mBlueprint, &nullOwner);
+    archive->ReadPointer(&mBlueprint, &nullOwner);
     archive->ReadUInt(&mTickCreated);
   }
 

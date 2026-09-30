@@ -387,7 +387,7 @@ namespace moho
     archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
 
     gpg::RRef dispatchTaskRef{};
-    archive->ReadPointer_CCommandTask(&mDispatchTask, &dispatchTaskRef);
+    archive->ReadPointer(&mDispatchTask, &dispatchTaskRef);
 
     const gpg::RRef moveGoalOwnerRef{};
     archive->Read(CachedSNavGoalType(), &mMoveGoal, moveGoalOwnerRef);

@@ -375,10 +375,10 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerLoad(
   }
 
   moho::Listener<moho::EAiNavigatorEvent>* listener = nullptr;
-  archive->ReadPointer_Listener_EAiNavigatorEvent(&listener, ownerRef);
+  archive->ReadPointer(&listener, ownerRef);
   while (listener != nullptr) {
     broadcaster->AddListener(listener);
-    archive->ReadPointer_Listener_EAiNavigatorEvent(&listener, ownerRef);
+    archive->ReadPointer(&listener, ownerRef);
   }
 }
 

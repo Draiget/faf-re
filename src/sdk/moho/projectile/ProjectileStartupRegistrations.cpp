@@ -3013,7 +3013,7 @@ namespace gpg
     (void)version;
 
     moho::ManyToOneListener<moho::EProjectileImpactEvent>* listener = nullptr;
-    (void)archive->ReadPointer_ManyToOneListener_EProjectileImpactEvent(&listener, ownerRef);
+    (void)archive->ReadPointer(&listener, ownerRef);
     broadcaster->SetListener(listener);
   }
 } // namespace gpg

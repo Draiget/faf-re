@@ -153,7 +153,7 @@ namespace moho
 
     gpg::RRef blueprintRef{};
     RUnitBlueprint* toBlueprint = const_cast<RUnitBlueprint*>(mToBlueprint);
-    archive->ReadPointer_RUnitBlueprint(&toBlueprint, &blueprintRef);
+    archive->ReadPointer(&toBlueprint, &blueprintRef);
     mToBlueprint = toBlueprint;
 
     if (gpg::RType* const buildHelperType = ResolveCachedType<CBuildTaskHelper>()) {

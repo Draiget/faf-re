@@ -945,12 +945,12 @@ namespace moho
     archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
 
     CCommandTask* dispatchTask = static_cast<CCommandTask*>(mDispatch);
-    archive->ReadPointer_CCommandTask(&dispatchTask, &ownerRef);
+    archive->ReadPointer(&dispatchTask, &ownerRef);
     mDispatch = static_cast<IAiCommandDispatchImpl*>(dispatchTask);
 
-    archive->ReadPointer_CUnitCommand(&mBoundCommand, &ownerRef);
+    archive->ReadPointer(&mBoundCommand, &ownerRef);
 
-    archive->ReadPointer_IFormationInstance(&mFormationInstance, &ownerRef);
+    archive->ReadPointer(&mFormationInstance, &ownerRef);
 
     archive->Read(CachedSNavGoalType(), &mGoal, ownerRef);
 

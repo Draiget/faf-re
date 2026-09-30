@@ -794,7 +794,7 @@ namespace moho
 
     const gpg::RRef nullOwner{};
 
-    (void)archive->ReadPointer_Entity(&mEntity, &nullOwner);
+    (void)archive->ReadPointer(&mEntity, &nullOwner);
 
     (void)DeserializeSScrollerConfigPayload(&mScroller, archive);
 

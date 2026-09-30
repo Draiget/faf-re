@@ -1742,7 +1742,7 @@ namespace moho
 
     Sim* ownerSim = nullptr;
     gpg::RRef ownerRef{};
-    (void)archive->ReadPointer_Sim(&ownerSim, &ownerRef);
+    (void)archive->ReadPointer(&ownerSim, &ownerRef);
 
     Projectile* const object = new (std::nothrow) Projectile(ownerSim);
     result->SetUnowned(MakeProjectileRef(object), 0u);

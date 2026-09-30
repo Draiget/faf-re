@@ -41,7 +41,7 @@ namespace
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->ReadPointer_IFormationInstance(&vec[i], &owner);
+      archive->ReadPointer(&vec[i], &owner);
     }
   }
 

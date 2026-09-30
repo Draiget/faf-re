@@ -444,10 +444,10 @@ namespace moho
     }
 
     gpg::RRef ownerRef{};
-    archive->ReadPointer_Unit(&mUnit, &ownerRef);
+    archive->ReadPointer(&mUnit, &ownerRef);
 
     ownerRef = gpg::RRef{};
-    archive->ReadPointer_Sim(&mSim, &ownerRef);
+    archive->ReadPointer(&mSim, &ownerRef);
 
     gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
     GPG_ASSERT(weakUnitType != nullptr);

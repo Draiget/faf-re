@@ -905,12 +905,12 @@ namespace moho
     archive->Read(CachedCBuildTaskHelperType(), &mBuildHelper, ownerRef);
 
     // 3. command pointer lane (offset 0x84).
-    archive->ReadPointer_CUnitCommand(&mCommand, &ownerRef);
+    archive->ReadPointer(&mCommand, &ownerRef);
 
     // 4. blueprint pointer lane (offset 0x88). ReadPointer_RUnitBlueprint wants
     //    a non-const `RUnitBlueprint**`; round-trip through a mutable local.
     RUnitBlueprint* blueprint = const_cast<RUnitBlueprint*>(mBlueprint);
-    archive->ReadPointer_RUnitBlueprint(&blueprint, &ownerRef);
+    archive->ReadPointer(&blueprint, &ownerRef);
     mBlueprint = blueprint;
 
     // 5-7. build transform payloads (offsets 0x8C / 0x98 / 0xA8).

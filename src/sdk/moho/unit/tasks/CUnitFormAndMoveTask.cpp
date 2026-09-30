@@ -240,7 +240,7 @@ namespace moho
     archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), owner);
 
     IFormationInstance* formationBase = static_cast<IFormationInstance*>(mFormation);
-    archive->ReadPointer_IFormationInstance(&formationBase, &owner);
+    archive->ReadPointer(&formationBase, &owner);
     mFormation = static_cast<CAiFormationInstance*>(formationBase);
 
     bool arrivalSatisfied = (mFormationArrivalSatisfied != 0u);

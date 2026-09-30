@@ -292,7 +292,7 @@ namespace
     const gpg::RRef emptyOwner{};
     const gpg::RRef* const effectiveOwner = ownerRef ? ownerRef : &emptyOwner;
     for (unsigned int i = 0; i < count; ++i) {
-      archive->ReadPointer_Entity(&vec[i], effectiveOwner);
+      archive->ReadPointer(&vec[i], effectiveOwner);
     }
   }
 

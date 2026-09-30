@@ -18740,7 +18740,7 @@ void TObject::MemberDeserialize(
 	case -2: {
 		lua_State* const ownerState = ownerRef->TryUpcastLuaThreadState();
 		TString* serializedName = nullptr;
-		(void)archive->ReadPointer_TString(&serializedName, ownerRef);
+		(void)archive->ReadPointer(&serializedName, ownerRef);
 
 		const TObject* const resolvedObject = ResolveSerializedObjectNameEntry(ownerState, serializedName);
 		if (resolvedObject->tt == LUA_TNIL) {
@@ -18778,7 +18778,7 @@ void TObject::MemberDeserialize(
 
 	case LUA_TSTRING: {
 		TString* stringValue = nullptr;
-		(void)archive->ReadPointer_TString(&stringValue, ownerRef);
+		(void)archive->ReadPointer(&stringValue, ownerRef);
 		object->tt = LUA_TSTRING;
 		object->value.p = stringValue;
 		return;
@@ -18786,7 +18786,7 @@ void TObject::MemberDeserialize(
 
 	case LUA_TTABLE: {
 		Table* tableValue = nullptr;
-		(void)archive->ReadPointer_Table(&tableValue, ownerRef);
+		(void)archive->ReadPointer(&tableValue, ownerRef);
 		object->tt = LUA_TTABLE;
 		object->value.p = tableValue;
 		return;
@@ -18797,7 +18797,7 @@ void TObject::MemberDeserialize(
 
 	case LUA_TFUNCTION: {
 		LClosure* functionValue = nullptr;
-		(void)archive->ReadPointer_LClosure(&functionValue, ownerRef);
+		(void)archive->ReadPointer(&functionValue, ownerRef);
 		object->tt = LUA_TFUNCTION;
 		object->value.p = functionValue;
 		return;
@@ -18805,7 +18805,7 @@ void TObject::MemberDeserialize(
 
 	case LUA_TUSERDATA: {
 		Udata* userdataValue = nullptr;
-		(void)archive->ReadPointer_Udata(&userdataValue, ownerRef);
+		(void)archive->ReadPointer(&userdataValue, ownerRef);
 		object->tt = LUA_TUSERDATA;
 		object->value.p = userdataValue;
 		return;
@@ -18813,7 +18813,7 @@ void TObject::MemberDeserialize(
 
 	case LUA_TTHREAD: {
 		lua_State* threadValue = nullptr;
-		(void)archive->ReadPointer_lua_State(&threadValue, ownerRef);
+		(void)archive->ReadPointer(&threadValue, ownerRef);
 		object->tt = LUA_TTHREAD;
 		object->value.p = threadValue;
 		return;
@@ -18988,7 +18988,7 @@ void Proto::MemberDeserialize(
 		static_cast<lu_mem>(sizeof(Proto*) * static_cast<std::size_t>(object->sizep))
 	));
 	for (int index = 0; index < object->sizep; ++index) {
-		archive->ReadPointer_Proto(&object->p[index], ownerRef);
+		archive->ReadPointer(&object->p[index], ownerRef);
 	}
 
 	object->lineinfo = static_cast<int*>(luaM_realloc(
@@ -19008,7 +19008,7 @@ void Proto::MemberDeserialize(
 		static_cast<lu_mem>(sizeof(LocVar) * static_cast<std::size_t>(object->sizelocvars))
 	));
 	for (int index = 0; index < object->sizelocvars; ++index) {
-		archive->ReadPointer_TString(&object->locvars[index].varname, ownerRef);
+		archive->ReadPointer(&object->locvars[index].varname, ownerRef);
 		archive->ReadInt(&object->locvars[index].startpc);
 		archive->ReadInt(&object->locvars[index].endpc);
 	}
@@ -19020,10 +19020,10 @@ void Proto::MemberDeserialize(
 		static_cast<lu_mem>(sizeof(TString*) * static_cast<std::size_t>(object->nups))
 	));
 	for (int index = 0; index < object->nups; ++index) {
-		archive->ReadPointer_TString(&object->upvalues[index], ownerRef);
+		archive->ReadPointer(&object->upvalues[index], ownerRef);
 	}
 
-	archive->ReadPointer_TString(&object->source, ownerRef);
+	archive->ReadPointer(&object->source, ownerRef);
 	if (!luaG_checkcode(object)) {
 		throw gpg::SerializationError("Consistency check failed: luaG_checkcode(&value)");
 	}
@@ -19110,7 +19110,7 @@ void Table::MemberDeserialize(
 		}
 	} lockGuard(ownerState->l_G);
 
-	(void)archive->ReadPointer_Table(&object->metatable, &ownerRef);
+	(void)archive->ReadPointer(&object->metatable, &ownerRef);
 
 	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
 	int hashEntryCount = 0;
@@ -19208,7 +19208,7 @@ void Udata::MemberDeserialize(
 		}
 	} lockGuard(ownerState->l_G);
 
-	(void)archive->ReadPointer_Table(&object->metatable, &ownerRef);
+	(void)archive->ReadPointer(&object->metatable, &ownerRef);
 	gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(object->len);
 	void* const payload = reinterpret_cast<std::uint8_t*>(object) + sizeof(Udata);
 	archive->Read(payloadType, payload, ownerRef);
@@ -19231,12 +19231,12 @@ void LClosure::MemberDeserialize(
 	Ensure(archive != nullptr, "archive");
 	Ensure(object != nullptr, "object");
 
-	archive->ReadPointer_Proto(&object->p, &ownerRef);
+	archive->ReadPointer(&object->p, &ownerRef);
 	archive->Read(CachedType<TObject>(gLuaTObjectType), &object->g, ownerRef);
 
 	UpVal** upvalueLane = object->upvals;
 	for (std::uint8_t upvalueIndex = 0; upvalueIndex < object->nupvalues; ++upvalueIndex, ++upvalueLane) {
-		archive->ReadPointer_UpVal(upvalueLane, &ownerRef);
+		archive->ReadPointer(upvalueLane, &ownerRef);
 	}
 }
 
@@ -19344,7 +19344,7 @@ void lua_State::MemberDeserialize(
 		}
 
 		UpVal* upvalue = nullptr;
-		archive->ReadPointer_UpVal(&upvalue, &owner);
+		archive->ReadPointer(&upvalue, &owner);
 		if (upvalue == nullptr) {
 			throw gpg::SerializationError("Consistency check failed: u");
 		}
@@ -19947,7 +19947,7 @@ void LuaObject::MemberDeserialize(
 	Ensure(object != nullptr, "object");
 
 	LuaState* state = nullptr;
-	(void)archive->ReadPointer_LuaState(&state, &ownerRef);
+	(void)archive->ReadPointer(&state, &ownerRef);
 	if (state != nullptr) {
 		object->AssignNil(state);
 

@@ -1203,7 +1203,7 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, CUnitComma
     archive->Read(broadcasterType, BroadcasterSubobjectPtr(command), ownerRef);
   }
 
-  (void)archive->ReadPointer_Sim(&command->mSim, &ownerRef);
+  (void)archive->ReadPointer(&command->mSim, &ownerRef);
 
   if (gpg::RType* const constDataType = ResolveCachedType<SSTICommandConstantData>()) {
     archive->Read(constDataType, &command->mConstDat, ownerRef);

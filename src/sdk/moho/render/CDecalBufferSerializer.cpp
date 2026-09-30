@@ -9,6 +9,7 @@
 #include "moho/render/CDecalBuffer.h"
 #include "moho/render/CDecalHandle.h"
 #include "moho/sim/IdPool.h"
+#include "moho/sim/Sim.h"
 
 namespace gpg
 {
@@ -158,7 +159,7 @@ namespace moho
   void CDecalBufferLoadCallback(gpg::ReadArchive* const ar, CDecalBuffer* const buf)
   {
     const gpg::RRef simRef{};
-    (void)ar->ReadPointer_Sim(&buf->mSim, &simRef);
+    (void)ar->ReadPointer(&buf->mSim, &simRef);
 
     ar->Read(CachedIdPoolType(), &buf->mPool, gpg::RRef{});
 

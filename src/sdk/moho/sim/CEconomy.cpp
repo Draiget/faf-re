@@ -901,11 +901,11 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
 
   gpg::RRef ownerRef{};
   CEconRequest* request = nullptr;
-  (void)archive->ReadPointer_CEconRequest(&request, &ownerRef);
+  (void)archive->ReadPointer(&request, &ownerRef);
   while (request != nullptr) {
     request->mNode.ListLinkAfter(&mConsumptionData);
     ownerRef = gpg::RRef{};
-    (void)archive->ReadPointer_CEconRequest(&request, &ownerRef);
+    (void)archive->ReadPointer(&request, &ownerRef);
   }
 }
 
@@ -924,7 +924,7 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
 
     const gpg::RRef nullOwner{};
 
-    (void)archive->ReadPointer_Sim(&mSim, &nullOwner);
+    (void)archive->ReadPointer(&mSim, &nullOwner);
     archive->ReadInt(&mIndex);
     archive->Read(CachedSEconValueType(), &mResources, nullOwner);
     archive->Read(CachedSEconValueType(), &mPendingResources, nullOwner);
@@ -933,7 +933,7 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
     // Canonical owned-pointer read (recovered from FUN_006B4F70): enforces
     // UNOWNED->OWNED transition and raises SerializationError on type mismatch.
     CEconStorage* loadedExtraStorage = nullptr;
-    (void)archive->ReadPointerOwned_CEconStorage(&loadedExtraStorage, &nullOwner);
+    (void)archive->ReadPointerOwned(&loadedExtraStorage, &nullOwner);
 
     CEconStorage* const previousExtraStorage = mExtraStorage;
     mExtraStorage = loadedExtraStorage;

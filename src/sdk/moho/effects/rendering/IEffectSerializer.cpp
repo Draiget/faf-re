@@ -32,7 +32,7 @@ namespace
     archive->Read(CachedCScriptObjectType(), static_cast<moho::CScriptObject*>(effect), nullOwner);
 
     moho::IEffectManager* manager = nullptr;
-    archive->ReadPointer_IEffectManager(&manager, &nullOwner);
+    archive->ReadPointer(&manager, &nullOwner);
     effect->mManager = manager;
 
     archive->ReadInt(&effect->mScriptObjectToken);

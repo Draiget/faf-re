@@ -498,7 +498,7 @@ namespace moho
   )
   {
     Sim* ownerSim = nullptr;
-    (void)archive.ReadPointer_Sim(&ownerSim, &ownerRef);
+    (void)archive.ReadPointer(&ownerSim, &ownerRef);
 
     CollisionBeamEntity* const object = new CollisionBeamEntity(ownerSim);
 

@@ -307,7 +307,7 @@ namespace moho
 
     const gpg::RRef nullOwner{};
     archive->Read(CEffectImpl::StaticGetClass(), static_cast<CEffectImpl*>(this), nullOwner);
-    (void)archive->ReadPointer_RTrailBlueprint(&mTrailBlueprint, &nullOwner);
+    (void)archive->ReadPointer(&mTrailBlueprint, &nullOwner);
 
     archive->ReadInt(&mTrailLength);
     archive->ReadFloat(&mTotalTicks);

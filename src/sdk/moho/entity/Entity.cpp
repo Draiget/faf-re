@@ -1757,12 +1757,12 @@ namespace moho
 
     // Owning army (UNOWNED).
     auto* army = static_cast<SimArmy*>(ArmyRef);
-    (void)archive->ReadPointer_SimArmy(&army, &owner);
+    (void)archive->ReadPointer(&army, &owner);
     ArmyRef = static_cast<CArmyImpl*>(army);
 
     archive->Read(CachedVTransformType(), &mPendingTransform, owner);
 
-    (void)archive->ReadPointerOwned_PositionHistory(&mPositionHistory, &owner);
+    (void)archive->ReadPointerOwned(&mPositionHistory, &owner);
 
     archive->ReadFloat(&mPendingVelocityScale);
 
@@ -1770,7 +1770,7 @@ namespace moho
     archive->ReadInt(&lastTickProcessed);
     mLastTickProcessed = static_cast<std::uint32_t>(lastTickProcessed);
 
-    (void)archive->ReadPointerOwned_CColPrimitiveBase(&CollisionExtents, &owner);
+    (void)archive->ReadPointerOwned(&CollisionExtents, &owner);
 
     archive->Read(CachedAttachedEntitiesType(), &mAttachedEntities, owner);
     archive->Read(CachedAttachInfoType(), &mAttachInfo, owner);
@@ -1787,7 +1787,7 @@ namespace moho
 
     archive->Read(CachedResIdType(), &mResId, owner);
 
-    (void)archive->ReadPointerOwned_CIntel(&mIntelManager, &owner);
+    (void)archive->ReadPointerOwned(&mIntelManager, &owner);
 
     gpg::RType* const visibilityType = CachedVisibilityModeTypeForSerialize();
     archive->Read(visibilityType, &mVizToFocusPlayer, owner);
@@ -1795,8 +1795,8 @@ namespace moho
     archive->Read(visibilityType, &mVizToEnemies, owner);
     archive->Read(visibilityType, &mVizToNeutrals, owner);
 
-    (void)archive->ReadPointerOwned_CTextureScroller(&mScroller, &owner);
-    (void)archive->ReadPointerOwned_SPhysBody(&mPhysBody, &owner);
+    (void)archive->ReadPointerOwned(&mScroller, &owner);
+    (void)archive->ReadPointerOwned(&mPhysBody, &owner);
 
     bool realtimeStatsEnabled = false;
     archive->ReadBool(&realtimeStatsEnabled);
@@ -1806,7 +1806,7 @@ namespace moho
 
     archive->Read(CachedShooterSetType(), &mShooters, owner);
 
-    (void)archive->ReadPointerOwned_Motor(&mMotor, &owner);
+    (void)archive->ReadPointerOwned(&mMotor, &owner);
 
     archive->Read(CachedCollisionBoxType(), &mAABox, owner);
   }

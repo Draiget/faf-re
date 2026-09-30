@@ -209,7 +209,7 @@ namespace moho
 
     Sim* ownerSim = nullptr;
     const gpg::RRef nullOwner{};
-    (void)archive->ReadPointer_Sim(&ownerSim, &nullOwner);
+    (void)archive->ReadPointer(&ownerSim, &nullOwner);
 
     Shield* object = nullptr;
     void* const storage = ::operator new(sizeof(Shield), std::nothrow);

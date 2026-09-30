@@ -1033,14 +1033,14 @@ void CAiSteeringImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->Read(taskType, static_cast<CTask*>(this), ownerRef);
 
   CAiPathSpline* loadedPath = nullptr;
-  archive->ReadPointerOwned_CAiPathSpline(&loadedPath, &ownerRef);
+  archive->ReadPointerOwned(&loadedPath, &ownerRef);
   CAiPathSpline* const previousPath = mPath;
   mPath = loadedPath;
   if (previousPath) {
     previousPath->~CAiPathSpline();
   }
 
-  archive->ReadPointer_Unit(&mOwnerUnit, &ownerRef);
+  archive->ReadPointer(&mOwnerUnit, &ownerRef);
   archive->ReadUInt(reinterpret_cast<unsigned int*>(&mWaypointCount));
 
   gpg::RType* const vector3Type = ResolveVector3fType();
@@ -1066,7 +1066,7 @@ void CAiSteeringImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   }
   archive->Read(layerType, &mMovementLayer, ownerRef);
 
-  archive->ReadPointer_CUnitMotion(&mUnitMotion, &ownerRef);
+  archive->ReadPointer(&mUnitMotion, &ownerRef);
 
   gpg::RType* const collisionInfoType = ResolveSCollisionInfoType();
   GPG_ASSERT(collisionInfoType != nullptr);

@@ -929,7 +929,7 @@ namespace
     for (unsigned int index = 0u; index < count; ++index) {
       moho::RUnitBlueprint* blueprint = nullptr;
       float value = 0.0f;
-      archive->ReadPointer_RUnitBlueprint(&blueprint, &owner);
+      archive->ReadPointer(&blueprint, &owner);
       archive->ReadFloat(&value);
       (*destination)[blueprint] = value;
     }
@@ -1005,7 +1005,7 @@ namespace
       msvc8::string key{};
       moho::CArmyStatItem* value = nullptr;
       archive->ReadString(&key);
-      archive->ReadPointer_CArmyStatItem(&value, &owner);
+      archive->ReadPointer(&value, &owner);
       (*destination)[key.c_str()] = value;
     }
   }
@@ -1065,7 +1065,7 @@ namespace
     boost::mutex::scoped_lock lock(*stats->mLock);
     moho::CArmyStatItem* loadedRoot = nullptr;
     const gpg::RRef owner{};
-    archive->ReadPointerOwned_CArmyStatItem(&loadedRoot, &owner);
+    archive->ReadPointerOwned(&loadedRoot, &owner);
 
     moho::CArmyStatItem* const previousRoot = stats->mItem;
     stats->mItem = loadedRoot;

@@ -120,7 +120,7 @@ namespace
     for (;;) {
       moho::HSound* sound = nullptr;
       const gpg::RRef owner{};
-      archive->ReadPointer_HSound(&sound, &owner);
+      archive->ReadPointer(&sound, &owner);
       if (!sound) {
         break;
       }

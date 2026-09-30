@@ -131,7 +131,7 @@ void CAiAttackerImpl::DeserializePointerVectors(gpg::ReadArchive* const archive,
 
   for (unsigned int i = 0; i < weaponCount; ++i) {
     gpg::RRef ownerRef{};
-    archive->ReadPointerOwned_UnitWeapon(&object->mWeapons[static_cast<std::size_t>(i)], &ownerRef);
+    archive->ReadPointerOwned(&object->mWeapons[static_cast<std::size_t>(i)], &ownerRef);
   }
 
   unsigned int taskCount = 0;
@@ -140,7 +140,7 @@ void CAiAttackerImpl::DeserializePointerVectors(gpg::ReadArchive* const archive,
 
   for (unsigned int i = 0; i < taskCount; ++i) {
     gpg::RRef ownerRef{};
-    archive->ReadPointerOwned_CAcquireTargetTask(&object->mTasks[static_cast<std::size_t>(i)], &ownerRef);
+    archive->ReadPointerOwned(&object->mTasks[static_cast<std::size_t>(i)], &ownerRef);
   }
 }
 
@@ -211,7 +211,7 @@ void CAiAttackerImpl::MemberDeserialize(CAiAttackerImpl* const object, gpg::Read
   archive->Read(attackerType, static_cast<IAiAttacker*>(object), ownerRef);
 
   ownerRef = gpg::RRef{};
-  archive->ReadPointer_Unit(&object->mUnit, &ownerRef);
+  archive->ReadPointer(&object->mUnit, &ownerRef);
 
   DeserializePointerVectors(archive, object);
 

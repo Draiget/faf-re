@@ -247,7 +247,7 @@ void CDecalBuffer::ReadDecalHandles(gpg::ReadArchive* const ar)
   for (;;) {
     gpg::RRef ownerRef{};
     CDecalHandle* handle = nullptr;
-    (void)ar->ReadPointerOwned_CDecalHandle(&handle, &ownerRef);
+    (void)ar->ReadPointerOwned(&handle, &ownerRef);
     if (handle == nullptr) {
       return;
     }

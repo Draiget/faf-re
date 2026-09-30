@@ -750,7 +750,7 @@ namespace moho
     ReadSharedRScmResourcePointer(mScmResource, archive, ownerRef);
 
     RMeshBlueprint* meshBlueprint = const_cast<RMeshBlueprint*>(mMeshBlueprint);
-    (void)archive->ReadPointer_RMeshBlueprint(&meshBlueprint, &ownerRef);
+    (void)archive->ReadPointer(&meshBlueprint, &ownerRef);
     mMeshBlueprint = meshBlueprint;
 
     gpg::RType* const vector3Type = ResolveVector3fType();
@@ -782,8 +782,8 @@ namespace moho
     archive->ReadFloat(&mScrollBeatEnd.x);
     archive->ReadFloat(&mScrollBeatEnd.y);
 
-    (void)archive->ReadPointer_CSndParams2(&mAmbientSound, &ownerRef);
-    (void)archive->ReadPointer_CSndParams2(&mRumbleSound, &ownerRef);
+    (void)archive->ReadPointer(&mAmbientSound, &ownerRef);
+    (void)archive->ReadPointer(&mRumbleSound, &ownerRef);
 
     ReadBoolByte(archive, mVisibilityHidden);
 

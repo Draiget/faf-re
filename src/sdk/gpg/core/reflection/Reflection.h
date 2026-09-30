@@ -11,6 +11,8 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -653,13 +655,65 @@ namespace gpg
     void Delete();                           // 0x008D8800
 
     /**
-     * Address: 0x004C1690 (FUN_004C1690, gpg::RRef::CastLuaState)
+     * Address: 0x004C1690 (FUN_004C1690 -- `Upcast<LuaPlus::LuaState>`; formerly `RRef::CastLuaState`.)
+     * Address: 0x00585270 (FUN_00585270 -- `Upcast<moho::SimArmy>`; formerly `UpcastToSimArmy` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00585460 (FUN_00585460 -- `Upcast<moho::CAiPersonality>`; formerly `UpcastToCAiPersonality` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005943C0 (FUN_005943C0 -- `Upcast<moho::CAiBrain>`; formerly `UpcastToCAiBrain` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0059A030 (FUN_0059A030 -- `Upcast<`nitCommandQueueRef`>`; formerly `UpcastCUnitCommandQueueRef` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0059EB00 (FUN_0059EB00 -- `Upcast<moho::IFormationInstance>`; formerly `UpcastToIFormationInstance` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005A89B0 (FUN_005A89B0 -- `Upcast<moho::Entity>`; formerly `UpcastToEntity` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005A9A00 (FUN_005A9A00 -- `Upcast<moho::CAiPathNavigator>`; formerly `UpcastToCAiPathNavigator` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005ACC60 (FUN_005ACC60 -- `Upcast<moho::PathQueue>`; formerly `UpcastToPathQueue` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005B1B90 (FUN_005B1B90 -- `Upcast<moho::CAiPathFinder>`; formerly `UpcastToCAiPathFinder` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005CE500 (FUN_005CE500 -- `Upcast<moho::CInfluenceMap>`; formerly `UpcastToCInfluenceMap` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005D1710 (FUN_005D1710 -- `Upcast<moho::UnitWeapon>`; formerly `UpcastToUnitWeapon` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005D1C30 (FUN_005D1C30 -- `Upcast<moho::CEconRequest>`; formerly `UpcastToCEconRequest` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005D5280 (FUN_005D5280 -- `Upcast<moho::CAiPathSpline>`; formerly `UpcastToCAiPathSpline` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005D52C0 (FUN_005D52C0 -- `Upcast<moho::CUnitMotion>`; formerly `UpcastToCUnitMotion` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005E0680 (FUN_005E0680 -- `Upcast<moho::CAcquireTargetTask>`; formerly `UpcastToCAcquireTargetTask` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x005F5240 (FUN_005F5240 -- `Upcast<moho::CUnitCommand>`; formerly `UpcastToCUnitCommand` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0063D720 (FUN_0063D720 -- `Upcast<moho::IAniManipulator>`; formerly `UpcastToIAniManipulator` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0063EDD0 (FUN_0063EDD0 -- `Upcast<moho::CAniActor>`; formerly `UpcastToCAniActor` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006587A0 (FUN_006587A0 -- `Upcast<moho::IEffect>`; formerly `UpcastToIEffect` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00671140 (FUN_00671140 -- `Upcast<moho::CDecalHandle>`; formerly `UpcastToCDecalHandle` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00680F10 (FUN_00680F10 -- `Upcast<moho::PositionHistory>`; formerly `UpcastToPositionHistory` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006831F0 (FUN_006831F0 -- `Upcast<moho::CColPrimitiveBase>`; formerly `UpcastToCColPrimitiveBase` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006833E0 (FUN_006833E0 -- `Upcast<moho::CIntel>`; formerly `UpcastToCIntel` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006835C0 (FUN_006835C0 -- `Upcast<moho::CTextureScroller>`; formerly `UpcastToCTextureScroller` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006837A0 (FUN_006837A0 -- `Upcast<moho::SPhysBody>`; formerly `UpcastToSPhysBody` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00683980 (FUN_00683980 -- `Upcast<moho::Motor>`; formerly `UpcastToMotor` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006B21A0 (FUN_006B21A0 -- `Upcast<moho::CEconomyEvent>`; formerly `UpcastToCEconomyEvent` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006B5990 (FUN_006B5990 -- `Upcast<moho::IAiSteering>`; formerly `UpcastToIAiSteering` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006B5B80 (FUN_006B5B80 -- `Upcast<moho::CEconStorage>`; formerly `UpcastToCEconStorage` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006B5D60 (FUN_006B5D60 -- `Upcast<moho::IAiAttacker>`; formerly `UpcastToIAiAttacker` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006B5F50 (FUN_006B5F50 -- `Upcast<moho::IAiCommandDispatch>`; formerly `UpcastToIAiCommandDispatch` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006B6140 (FUN_006B6140 -- `Upcast<moho::IAiNavigator>`; formerly `UpcastToIAiNavigator` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006B6330 (FUN_006B6330 -- `Upcast<moho::IAiBuilder>`; formerly `UpcastToIAiBuilder` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006B6520 (FUN_006B6520 -- `Upcast<moho::IAiSiloBuild>`; formerly `UpcastToIAiSiloBuild` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006B6710 (FUN_006B6710 -- `Upcast<moho::IAiTransport>`; formerly `UpcastToIAiTransport` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006E07A0 (FUN_006E07A0 -- `Upcast<moho::CFireWeaponTask>`; formerly `UpcastToCFireWeaponTask` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00707600 (FUN_00707600 -- `Upcast<moho::IAiReconDB>`; formerly `UpcastToIAiReconDB` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x007077F0 (FUN_007077F0 -- `Upcast<moho::CEconomy>`; formerly `UpcastToCEconomy` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x007079D0 (FUN_007079D0 -- `Upcast<moho::CArmyStats>`; formerly `UpcastToCArmyStats` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x007149D0 (FUN_007149D0 -- `Upcast<moho::CArmyStatItem>`; formerly `UpcastToCArmyStatItem` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0072B0E0 (FUN_0072B0E0 -- `Upcast<moho::CSquad>`; formerly `UpcastToCSquad` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00758230 (FUN_00758230 -- `Upcast<moho::CRandomStream>`; formerly `UpcastToCRandomStream` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00758270 (FUN_00758270 -- `Upcast<moho::SPhysConstants>`; formerly `UpcastToSPhysConstants` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x007582B0 (FUN_007582B0 -- `Upcast<moho::IAiFormationDB>`; formerly `UpcastToIAiFormationDB` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x007586B0 (FUN_007586B0 -- `Upcast<`CCommandDb`>`; formerly `UpcastToCCommandDb` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x007586F0 (FUN_007586F0 -- `Upcast<moho::CDecalBuffer>`; formerly `UpcastToCDecalBuffer` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x007588D0 (FUN_007588D0 -- `Upcast<moho::IEffectManager>`; formerly `UpcastToIEffectManager` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00758AC0 (FUN_00758AC0 -- `Upcast<moho::ISoundManager>`; formerly `UpcastToISoundManager` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00758CB0 (FUN_00758CB0 -- `Upcast<`CEntityDb`>`; formerly `UpcastToCEntityDb` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0076B6E0 (FUN_0076B6E0 -- `Upcast<`PathQueueImpl`>`; formerly `UpcastToPathQueueImpl` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0076ED90 (FUN_0076ED90 -- `Upcast<moho::CIntelPosHandle>`; formerly `UpcastToCIntelPosHandle` in gpg/core/containers/ReadArchive.cpp.)
      *
      * What it does:
-     * Upcasts this reflected reference to `LuaPlus::LuaState` and returns null
-     * when the runtime type is not LuaState-compatible.
+     * This reference's object as a `T*` (`REF_UpcastPtr` to `T`'s type), or
+     * null when it is not a `T`.
      */
-    [[nodiscard]] LuaPlus::LuaState* CastLuaState();
+    template <class T>
+    [[nodiscard]] T* Upcast() const;
 
     /**
      * Address: 0x00920400 (FUN_00920400, gpg::RRef::TryUpcast_lua_State)
@@ -1043,6 +1097,14 @@ namespace gpg
       }
       return sType;
     }
+  }
+
+  RRef REF_UpcastPtr(const RRef& source, const RType* targetType);
+
+  template <class T>
+  T* RRef::Upcast() const
+  {
+    return static_cast<T*>(REF_UpcastPtr(*this, RTypeOf<T>()).mObj);
   }
 
   /**
@@ -6980,5 +7042,194 @@ namespace gpg
     constexpr std::uintptr_t kProbeAddress = 0x1000u;
     auto* const derived = reinterpret_cast<Derived*>(kProbeAddress);
     return static_cast<int>(reinterpret_cast<std::uintptr_t>(static_cast<Base*>(derived)) - kProbeAddress);
+  }
+  /**
+   * Address: 0x004081E0 (FUN_004081E0 -- `ReadPointer<moho::STaskEventLinkage>`; formerly `ReadPointer_STaskEventLinkage`.)
+   * Address: 0x0040B640 (FUN_0040B640 -- `ReadPointer<moho::CTask>`; formerly `ReadPointer_CTask`.)
+   * Address: 0x0040C4A0 (FUN_0040C4A0 -- `ReadPointer<moho::CTaskThread>`; formerly `ReadPointer_CTaskThread`.)
+   * Address: 0x0040D650 (FUN_0040D650 -- `ReadPointer<moho::CTaskStage>`; formerly `ReadPointer_CTaskStage`.)
+   * Address: 0x004C1520 (FUN_004C1520 -- `ReadPointer<LuaPlus::LuaState>`; formerly `ReadPointer_LuaState`.)
+   * Address: 0x004E63A0 (FUN_004E63A0 -- `ReadPointer<moho::CSndParams>`; formerly `ReadPointer_CSndParams`.)
+   * Address: 0x004E64E0 (FUN_004E64E0 -- `ReadPointer<moho::HSound>`; formerly `ReadPointer_HSound`.)
+   * Address: 0x005096E0 (FUN_005096E0 -- `ReadPointer<moho::STIMap>`; formerly `ReadPointer_STIMap`.)
+   * Address: 0x00511790 (FUN_00511790 -- `ReadPointer<moho::RRuleGameRules>`; formerly `ReadPointer_RRuleGameRules`.)
+   * Address: 0x005375C0 (FUN_005375C0 -- `ReadPointer<moho::RRuleGameRules>` (a second copy); formerly `ReadPointer_RRuleGameRules`.)
+   * Address: 0x00527480 (FUN_00527480 -- `ReadPointer<moho::RUnitBlueprint>`; formerly `ReadPointer_RUnitBlueprint2`.)
+   * Address: 0x00541E00 (FUN_00541E00 -- `ReadPointer<moho::IUnit>`; formerly `ReadPointer_IUnit`.)
+   * Address: 0x00554E80 (FUN_00554E80 -- `ReadPointer<moho::REntityBlueprint>`; formerly `ReadPointer_REntityBlueprint`.)
+   * Address: 0x0055A7E0 (FUN_0055A7E0 -- `ReadPointer<moho::RMeshBlueprint>`; formerly `ReadPointer_RMeshBlueprint`.)
+   * Address: 0x0055A920 (FUN_0055A920 -- `ReadPointer<moho::CSndParams>`; formerly `ReadPointer_CSndParams2`.)
+   * Address: 0x0055F640 (FUN_0055F640 -- `ReadPointer<moho::RUnitBlueprint>`; formerly `ReadPointer_RUnitBlueprint`.)
+   * Address: 0x00571230 (FUN_00571230 -- `ReadPointer<moho::Listener<moho::EFormationdStatus>>`; formerly `ReadPointer_Listener_EFormationdStatus`.)
+   * Address: 0x00584D30 (FUN_00584D30 -- `ReadPointer<moho::SimArmy>`; formerly `ReadPointer_SimArmy`.)
+   * Address: 0x00584FB0 (FUN_00584FB0 -- `ReadPointer<moho::Sim>`; formerly `ReadPointer_Sim`.)
+   * Address: 0x00599ED0 (FUN_00599ED0 -- `ReadPointer<moho::CUnitCommandQueue>`; formerly `ReadPointer_CUnitCommandQueue`.)
+   * Address: 0x0059E810 (FUN_0059E810 -- `ReadPointer<moho::IFormationInstance>`; formerly `ReadPointer_IFormationInstance`.)
+   * Address: 0x005A2900 (FUN_005A2900 -- `ReadPointer<moho::Unit>`; formerly `ReadPointer_Unit`.)
+   * Address: 0x005A8130 (FUN_005A8130 -- `ReadPointer<moho::Listener<moho::EAiNavigatorEvent>>`; formerly `ReadPointer_Listener_EAiNavigatorEvent`.)
+   * Address: 0x005AC9A0 (FUN_005AC9A0 -- `ReadPointer<moho::PathQueue>`; formerly `ReadPointer_PathQueue`.)
+   * Address: 0x005ACAE0 (FUN_005ACAE0 -- `ReadPointer<moho::COGrid>`; formerly `ReadPointer_COGrid`.)
+   * Address: 0x005CC370 (FUN_005CC370 -- `ReadPointer<moho::ReconBlip>`; formerly `ReadPointer_ReconBlip`.)
+   * Address: 0x005CE0E0 (FUN_005CE0E0 -- `ReadPointer<moho::CInfluenceMap>`; formerly `ReadPointer_CInfluenceMap`.)
+   * Address: 0x005D13E0 (FUN_005D13E0 -- `ReadPointer<moho::UnitWeapon>`; formerly `ReadPointer_UnitWeapon`.)
+   * Address: 0x005D5120 (FUN_005D5120 -- `ReadPointer<moho::CUnitMotion>`; formerly `ReadPointer_CUnitMotion`.)
+   * Address: 0x005DF0F0 (FUN_005DF0F0 -- `ReadPointer<moho::Listener<moho::EAiAttackerEvent>>`; formerly `ReadPointer_Listener_EAiAttackerEvent`.)
+   * Address: 0x005E10B0 (FUN_005E10B0 -- `ReadPointer<moho::CAcquireTargetTask>`; formerly `ReadPointer_CAcquireTargetTask`.)
+   * Address: 0x005E21D0 (FUN_005E21D0 -- `ReadPointer<moho::CAiAttackerImpl>`; formerly `ReadPointer_CAiAttackerImpl`.)
+   * Address: 0x005EC540 (FUN_005EC540 -- `ReadPointer<moho::Listener<moho::EAiTransportEvent>>`; formerly `ReadPointer_Listener_EAiTransportEvent`.)
+   * Address: 0x005F2170 (FUN_005F2170 -- `ReadPointer<moho::CCommandTask>`; formerly `ReadPointer_CCommandTask`.)
+   * Address: 0x005F5100 (FUN_005F5100 -- `ReadPointer<moho::CUnitCommand>`; formerly `ReadPointer_CUnitCommand`.)
+   * Address: 0x0060D940 (FUN_0060D940 -- `ReadPointer<moho::EAiResult>`; formerly `ReadPointer_EAiResult`.)
+   * Address: 0x00633FB0 (FUN_00633FB0 -- `ReadPointer<moho::RUnitBlueprintWeapon>`; formerly `ReadPointer_RUnitBlueprintWeapon`.)
+   * Address: 0x006340F0 (FUN_006340F0 -- `ReadPointer<moho::RProjectileBlueprint>`; formerly `ReadPointer_RProjectileBlueprint`.)
+   * Address: 0x0063E530 (FUN_0063E530 -- `ReadPointer<moho::CAniPose>`; formerly `ReadPointer_CAniPose`.)
+   * Address: 0x0063EC70 (FUN_0063EC70 -- `ReadPointer<moho::CAniActor>`; formerly `ReadPointer_CAniActor`.)
+   * Address: 0x006607B0 (FUN_006607B0 -- `ReadPointer<moho::REmitterBlueprint>`; formerly `ReadPointer_REmitterBlueprint`.)
+   * Address: 0x006729C0 (FUN_006729C0 -- `ReadPointer<moho::RTrailBlueprint>`; formerly `ReadPointer_RTrailBlueprint`.)
+   * Address: 0x006756E0 (FUN_006756E0 -- `ReadPointer<moho::ManyToOneListener<moho::ECollisionBeamEvent>>`; formerly `ReadPointer_ManyToOneListener_ECollisionBeamEvent`.)
+   * Address: 0x006761B0 (FUN_006761B0 -- `ReadPointer<moho::IEffect>`; formerly `ReadPointer_IEffect`.)
+   * Address: 0x00680FB0 (FUN_00680FB0 -- `ReadPointer<moho::Entity>`; formerly `ReadPointer_Entity`.)
+   * Address: 0x006895A0 (FUN_006895A0 -- `ReadPointer<moho::EntitySetBase>`; formerly `ReadPointer_EntitySetBase`.)
+   * Address: 0x00698900 (FUN_00698900 -- `ReadPointer<moho::SPhysConstants>`; formerly `ReadPointer_SPhysConstants`.)
+   * Address: 0x0069F920 (FUN_0069F920 -- `ReadPointer<moho::ManyToOneListener<moho::EProjectileImpactEvent>>`; formerly `ReadPointer_ManyToOneListener_EProjectileImpactEvent`.)
+   * Address: 0x006BC1E0 (FUN_006BC1E0 -- `ReadPointer<moho::CPathPoint>`; formerly `ReadPointer_CPathPoint`.)
+   * Address: 0x006E0500 (FUN_006E0500 -- `ReadPointer<moho::IAiAttacker>`; formerly `ReadPointer_IAiAttacker`.)
+   * Address: 0x006EB870 (FUN_006EB870 -- `ReadPointer<moho::Listener<moho::ECommandEvent>>`; formerly `ReadPointer_Listener_ECommandEvent`.)
+   * Address: 0x006F8F60 (FUN_006F8F60 -- `ReadPointer<moho::Listener<moho::EUnitCommandQueueStatus>>`; formerly `ReadPointer_Listener_EUnitCommandQueueStatus`.)
+   * Address: 0x00713F30 (FUN_00713F30 -- `ReadPointer<moho::CAiBrain>`; formerly `ReadPointer_CAiBrain`.)
+   * Address: 0x007141B0 (FUN_007141B0 -- `ReadPointer<moho::CArmyStatItem>`; formerly `ReadPointer_CArmyStatItem`.)
+   * Address: 0x007545A0 (FUN_007545A0 -- `ReadPointer<moho::Shield>`; formerly `ReadPointer_Shield`.)
+   * Address: 0x0076A8E0 (FUN_0076A8E0 -- `ReadPointer<moho::IPathTraveler>`; formerly `ReadPointer_IPathTraveler`.)
+   * Address: 0x0076B1C0 (FUN_0076B1C0 -- `ReadPointer<moho::PathTables>`; formerly `ReadPointer_PathTables`.)
+   * Address: 0x007703A0 (FUN_007703A0 -- `ReadPointer<moho::IAiReconDB>`; formerly `ReadPointer_IAiReconDB`.)
+   * Address: 0x00771550 (FUN_00771550 -- `ReadPointer<moho::IEffectManager>`; formerly `ReadPointer_IEffectManager`.)
+   * Address: 0x007745F0 (FUN_007745F0 -- `ReadPointer<moho::CEconRequest>`; formerly `ReadPointer_CEconRequest`.)
+   * Address: 0x00774BF0 (FUN_00774BF0 -- `ReadPointer<moho::CEconomy>`; formerly `ReadPointer_CEconomy`.)
+   * Address: 0x0090BA60 (FUN_0090BA60 -- `ReadPointer<lua_State>`; formerly `ReadPointer_lua_State`.)
+   * Address: 0x00921830 (FUN_00921830 -- `ReadPointer<TString>`; formerly `ReadPointer_TString`.)
+   * Address: 0x00921950 (FUN_00921950 -- `ReadPointer<Table>`; formerly `ReadPointer_Table`.)
+   * Address: 0x00921A70 (FUN_00921A70 -- `ReadPointer<LClosure>`; formerly `ReadPointer_LClosure`.)
+   * Address: 0x00921B90 (FUN_00921B90 -- `ReadPointer<Udata>`; formerly `ReadPointer_Udata`.)
+   * Address: 0x00921CB0 (FUN_00921CB0 -- `ReadPointer<Proto>`; formerly `ReadPointer_Proto`.)
+   * Address: 0x00921DD0 (FUN_00921DD0 -- `ReadPointer<UpVal>`; formerly `ReadPointer_UpVal`.)
+   *
+   * What it does:
+   * Reads one tracked pointer (`ReadRawPointer` 0x00953720) and stores its
+   * object as a `T*`: a null pointer reads as null, and an object that is not
+   * a `T` throws `SerializationError`. Ownership is left as it is.
+   */
+  template <class T>
+  ReadArchive* ReadArchive::ReadPointer(T** const outValue, const RRef* const ownerRef)
+  {
+    const TrackedPointerInfo& tracked = ReadRawPointer(this, *ownerRef);
+    const RRef source{tracked.object, tracked.type};
+    if (source.mObj == nullptr) {
+      *outValue = nullptr;
+      return this;
+    }
+
+    *outValue = source.Upcast<T>();
+    if (*outValue == nullptr) {
+      throw SerializationError(STR_Printf(
+        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+        "instead",
+        RTypeOf<T>()->GetName(),
+        source.GetTypeName()
+      ).c_str());
+    }
+    return this;
+  }
+
+  /**
+   * Address: 0x00407A50 (FUN_00407A50 -- `ReadPointerOwned<moho::STaskEventLinkage>`; formerly `ReadPointerOwned_STaskEventLinkage`.)
+   * Address: 0x0040B530 (FUN_0040B530 -- `ReadPointerOwned<moho::CTask>`; formerly `ReadPointerOwned_CTask`.)
+   * Address: 0x0040B800 (FUN_0040B800 -- `ReadPointerOwned<moho::CTaskThread>`; formerly `ReadPointerOwned_CTaskThread`.)
+   * Address: 0x0041A3D0 (FUN_0041A3D0 -- `ReadPointerOwned<moho::StatItem>`; formerly `ReadPointerOwned_StatItem`.)
+   * Address: 0x004CC550 (FUN_004CC550 -- `ReadPointerOwned<LuaPlus::LuaState>`; formerly `ReadPointerOwned_LuaState`.)
+   * Address: 0x00584E70 (FUN_00584E70 -- `ReadPointerOwned<moho::CAiPersonality>`; formerly `ReadPointerOwned_CAiPersonality`.)
+   * Address: 0x005850F0 (FUN_005850F0 -- `ReadPointerOwned<moho::CTaskStage>`; formerly `ReadPointerOwned_CTaskStage`.)
+   * Address: 0x005A98A0 (FUN_005A98A0 -- `ReadPointerOwned<moho::CAiPathNavigator>`; formerly `ReadPointerOwned_CAiPathNavigator`.)
+   * Address: 0x005B1A50 (FUN_005B1A50 -- `ReadPointerOwned<moho::CAiPathFinder>`; formerly `ReadPointerOwned_CAiPathFinder`.)
+   * Address: 0x005D1AD0 (FUN_005D1AD0 -- `ReadPointerOwned<moho::CEconRequest>`; formerly `ReadPointerOwned_CEconRequest`.)
+   * Address: 0x005D4FE0 (FUN_005D4FE0 -- `ReadPointerOwned<moho::CAiPathSpline>`; formerly `ReadPointerOwned_CAiPathSpline`.)
+   * Address: 0x005DEC30 (FUN_005DEC30 -- `ReadPointerOwned<moho::UnitWeapon>`; formerly `ReadPointerOwned_UnitWeapon`.)
+   * Address: 0x005DED40 (FUN_005DED40 -- `ReadPointerOwned<moho::CAcquireTargetTask>`; formerly `ReadPointerOwned_CAcquireTargetTask`.)
+   * Address: 0x0063CB90 (FUN_0063CB90 -- `ReadPointerOwned<moho::IAniManipulator>`; formerly `ReadPointerOwned_IAniManipulator`.)
+   * Address: 0x0066C350 (FUN_0066C350 -- `ReadPointerOwned<moho::IEffect>`; formerly `ReadPointerOwned_IEffect`.)
+   * Address: 0x006829F0 (FUN_006829F0 -- `ReadPointerOwned<moho::PositionHistory>`; formerly `ReadPointerOwned_PositionHistory`.)
+   * Address: 0x00682B30 (FUN_00682B30 -- `ReadPointerOwned<moho::CColPrimitiveBase>`; formerly `ReadPointerOwned_CColPrimitiveBase`.)
+   * Address: 0x00682C70 (FUN_00682C70 -- `ReadPointerOwned<moho::CIntel>`; formerly `ReadPointerOwned_CIntel`.)
+   * Address: 0x00682DB0 (FUN_00682DB0 -- `ReadPointerOwned<moho::CTextureScroller>`; formerly `ReadPointerOwned_CTextureScroller`.)
+   * Address: 0x00682EF0 (FUN_00682EF0 -- `ReadPointerOwned<moho::SPhysBody>`; formerly `ReadPointerOwned_SPhysBody`.)
+   * Address: 0x00683030 (FUN_00683030 -- `ReadPointerOwned<moho::Motor>`; formerly `ReadPointerOwned_Motor`.)
+   * Address: 0x00688AC0 (FUN_00688AC0 -- `ReadPointerOwned<moho::Entity>`; formerly `ReadPointerOwned_Entity`.)
+   * Address: 0x006B10F0 (FUN_006B10F0 -- `ReadPointerOwned<moho::CEconomyEvent>`; formerly `ReadPointerOwned_CEconomyEvent`.)
+   * Address: 0x006B4A70 (FUN_006B4A70 -- `ReadPointerOwned<moho::IAiSteering>`; formerly `ReadPointerOwned_IAiSteering`.)
+   * Address: 0x006B4BB0 (FUN_006B4BB0 -- `ReadPointerOwned<moho::CUnitMotion>`; formerly `ReadPointerOwned_CUnitMotion`.)
+   * Address: 0x006B4CF0 (FUN_006B4CF0 -- `ReadPointerOwned<moho::CUnitCommandQueue>`; formerly `ReadPointerOwned_CUnitCommandQueue`.)
+   * Address: 0x006B4E30 (FUN_006B4E30 -- `ReadPointerOwned<moho::IFormationInstance>`; formerly `ReadPointerOwned_IFormationInstance`.)
+   * Address: 0x006B4F70 (FUN_006B4F70 -- `ReadPointerOwned<moho::CEconStorage>`; formerly `ReadPointerOwned_CEconStorage`.)
+   * Address: 0x006B50B0 (FUN_006B50B0 -- `ReadPointerOwned<moho::CAniActor>`; formerly `ReadPointerOwned_CAniActor`.)
+   * Address: 0x006B51F0 (FUN_006B51F0 -- `ReadPointerOwned<moho::IAiAttacker>`; formerly `ReadPointerOwned_IAiAttacker`.)
+   * Address: 0x006B5330 (FUN_006B5330 -- `ReadPointerOwned<moho::IAiCommandDispatch>`; formerly `ReadPointerOwned_IAiCommandDispatch`.)
+   * Address: 0x006B5470 (FUN_006B5470 -- `ReadPointerOwned<moho::IAiNavigator>`; formerly `ReadPointerOwned_IAiNavigator`.)
+   * Address: 0x006B55B0 (FUN_006B55B0 -- `ReadPointerOwned<moho::IAiBuilder>`; formerly `ReadPointerOwned_IAiBuilder`.)
+   * Address: 0x006B56F0 (FUN_006B56F0 -- `ReadPointerOwned<moho::IAiSiloBuild>`; formerly `ReadPointerOwned_IAiSiloBuild`.)
+   * Address: 0x006B5830 (FUN_006B5830 -- `ReadPointerOwned<moho::IAiTransport>`; formerly `ReadPointerOwned_IAiTransport`.)
+   * Address: 0x006E0640 (FUN_006E0640 -- `ReadPointerOwned<moho::CFireWeaponTask>`; formerly `ReadPointerOwned_CFireWeaponTask`.)
+   * Address: 0x006E2B60 (FUN_006E2B60 -- `ReadPointerOwned<moho::CUnitCommand>`; formerly `ReadPointerOwned_CUnitCommand`.)
+   * Address: 0x007040E0 (FUN_007040E0 -- `ReadPointerOwned<moho::CPlatoon>`; formerly `ReadPointerOwned_CPlatoon`.)
+   * Address: 0x00706E20 (FUN_00706E20 -- `ReadPointerOwned<moho::CAiBrain>`; formerly `ReadPointerOwned_CAiBrain`.)
+   * Address: 0x00706F60 (FUN_00706F60 -- `ReadPointerOwned<moho::IAiReconDB>`; formerly `ReadPointerOwned_IAiReconDB`.)
+   * Address: 0x007070A0 (FUN_007070A0 -- `ReadPointerOwned<moho::CEconomy>`; formerly `ReadPointerOwned_CEconomy`.)
+   * Address: 0x007071E0 (FUN_007071E0 -- `ReadPointerOwned<moho::CArmyStats>`; formerly `ReadPointerOwned_CArmyStats`.)
+   * Address: 0x00707320 (FUN_00707320 -- `ReadPointerOwned<moho::CInfluenceMap>`; formerly `ReadPointerOwned_CInfluenceMap`.)
+   * Address: 0x00707460 (FUN_00707460 -- `ReadPointerOwned<moho::PathQueue>`; formerly `ReadPointerOwned_PathQueue`.)
+   * Address: 0x00714070 (FUN_00714070 -- `ReadPointerOwned<moho::CArmyStatItem>`; formerly `ReadPointerOwned_CArmyStatItem`.)
+   * Address: 0x0072ACD0 (FUN_0072ACD0 -- `ReadPointerOwned<moho::CSquad>`; formerly `ReadPointerOwned_CSquad`.)
+   * Address: 0x00750FD0 (FUN_00750FD0 -- `ReadPointerOwned<moho::SimArmy>`; formerly `ReadPointerOwned_SimArmy`.)
+   * Address: 0x00757540 (FUN_00757540 -- `ReadPointerOwned<moho::CRandomStream>`; formerly `ReadPointerOwned_CRandomStream`.)
+   * Address: 0x00757680 (FUN_00757680 -- `ReadPointerOwned<moho::SPhysConstants>`; formerly `ReadPointerOwned_SPhysConstants`.)
+   * Address: 0x007577C0 (FUN_007577C0 -- `ReadPointerOwned<moho::IAiFormationDB>`; formerly `ReadPointerOwned_IAiFormationDB`.)
+   * Address: 0x00757B10 (FUN_00757B10 -- `ReadPointerOwned<moho::CCommandDb>`; formerly `ReadPointerOwned_CCommandDB`.)
+   * Address: 0x00757C50 (FUN_00757C50 -- `ReadPointerOwned<moho::CDecalBuffer>`; formerly `ReadPointerOwned_CDecalBuffer`.)
+   * Address: 0x00757D90 (FUN_00757D90 -- `ReadPointerOwned<moho::IEffectManager>`; formerly `ReadPointerOwned_IEffectManager`.)
+   * Address: 0x00757ED0 (FUN_00757ED0 -- `ReadPointerOwned<moho::ISoundManager>`; formerly `ReadPointerOwned_ISoundManager`.)
+   * Address: 0x00758010 (FUN_00758010 -- `ReadPointerOwned<moho::CEntityDb>`; formerly `ReadPointerOwned_EntityDB`.)
+   * Address: 0x0076B570 (FUN_0076B570 -- `ReadPointerOwned<moho::PathQueue::Impl>`; formerly `ReadPointerOwned_PathQueue_Impl`.)
+   * Address: 0x0076EC30 (FUN_0076EC30 -- `ReadPointerOwned<moho::CIntelPosHandle>`; formerly `ReadPointerOwned_CIntelPosHandle`.)
+   * Address: 0x0077D7A0 (FUN_0077D7A0 -- `ReadPointerOwned<moho::CDecalHandle>`; formerly `ReadPointerOwned_CDecalHandle`.)
+   *
+   * What it does:
+   * `ReadPointer`, for a pointer whose object the reader takes ownership of:
+   * the pointer must still be unowned (`"Ownership conflict while loading
+   * archive"` otherwise), and it is marked owned once the upcast succeeds.
+   */
+  template <class T>
+  ReadArchive* ReadArchive::ReadPointerOwned(T** const outValue, const RRef* const ownerRef)
+  {
+    TrackedPointerInfo& tracked = ReadRawPointer(this, *ownerRef);
+    if (tracked.object == nullptr) {
+      *outValue = nullptr;
+      return this;
+    }
+
+    if (tracked.state != TrackedPointerState::Unowned) {
+      throw SerializationError("Ownership conflict while loading archive");
+    }
+
+    const RRef source{tracked.object, tracked.type};
+    *outValue = source.Upcast<T>();
+    if (*outValue == nullptr) {
+      throw SerializationError(STR_Printf(
+        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+        "instead",
+        RTypeOf<T>()->GetName(),
+        source.GetTypeName()
+      ).c_str());
+    }
+
+    tracked.state = TrackedPointerState::Owned;
+    return this;
   }
 } // namespace gpg

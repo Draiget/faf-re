@@ -7,6 +7,7 @@
 #include "moho/audio/AudioReflectionHelpers.h"
 #include "moho/audio/CSimSoundManager.h"
 #include "moho/audio/ISoundManager.h"
+#include "moho/sim/Sim.h"
 
 namespace gpg
 {
@@ -69,7 +70,7 @@ namespace moho
   {
     Sim* sim = nullptr;
     const gpg::RRef nullOwner{};
-    (void)archive->ReadPointer_Sim(&sim, &nullOwner);
+    (void)archive->ReadPointer(&sim, &nullOwner);
 
     CSimSoundManager* const object = new (std::nothrow) CSimSoundManager(sim);
     gpg::RRef objectRef{};

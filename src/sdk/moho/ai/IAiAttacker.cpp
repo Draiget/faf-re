@@ -338,10 +338,10 @@ void moho::RBroadcasterRType_EAiAttackerEvent::SerLoad(
   }
 
   moho::Listener<moho::EAiAttackerEvent>* listener = nullptr;
-  archive->ReadPointer_Listener_EAiAttackerEvent(&listener, ownerRef);
+  archive->ReadPointer(&listener, ownerRef);
   while (listener != nullptr) {
     broadcaster->AddListener(listener);
-    archive->ReadPointer_Listener_EAiAttackerEvent(&listener, ownerRef);
+    archive->ReadPointer(&listener, ownerRef);
   }
 }
 
@@ -450,7 +450,7 @@ void gpg::RVectorType_UnitWeaponPtr::SerLoad(
   loaded.reserve(static_cast<std::size_t>(count));
   for (unsigned int i = 0; i < count; ++i) {
     moho::UnitWeapon* value = nullptr;
-    archive->ReadPointer_UnitWeapon(&value, ownerRef);
+    archive->ReadPointer(&value, ownerRef);
     loaded.push_back(value);
   }
 
@@ -593,7 +593,7 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SerLoad(
   loaded.reserve(static_cast<std::size_t>(count));
   for (unsigned int i = 0; i < count; ++i) {
     moho::CAcquireTargetTask* value = nullptr;
-    archive->ReadPointer_CAcquireTargetTask(&value, ownerRef);
+    archive->ReadPointer(&value, ownerRef);
     loaded.push_back(value);
   }
 

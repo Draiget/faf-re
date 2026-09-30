@@ -1049,14 +1049,14 @@ namespace moho
     const gpg::RRef ownerRef{};
 
     archive->Read(CachedCCommandTaskType(), commandTask, ownerRef);
-    archive->ReadPointer_CCommandTask(&mDispatchTask, &ownerRef);
-    archive->ReadPointer_CUnitCommand(&mCommand, &ownerRef);
+    archive->ReadPointer(&mDispatchTask, &ownerRef);
+    archive->ReadPointer(&mCommand, &ownerRef);
 
     IFormationInstance* formationBase = static_cast<IFormationInstance*>(mFormation);
-    archive->ReadPointer_IFormationInstance(&formationBase, &ownerRef);
+    archive->ReadPointer(&formationBase, &ownerRef);
     mFormation = static_cast<CAiFormationInstance*>(formationBase);
 
-    archive->ReadPointer_UnitWeapon(&mWeapon, &ownerRef);
+    archive->ReadPointer(&mWeapon, &ownerRef);
     archive->Read(CachedCAiTargetType(), &mTarget, ownerRef);
     archive->Read(CachedVector3fType(), &mTargetPosition, ownerRef);
 

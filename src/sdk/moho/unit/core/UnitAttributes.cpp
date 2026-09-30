@@ -211,7 +211,7 @@ namespace moho
     const gpg::RRef ownerRef{};
 
     auto* blueprint = const_cast<RUnitBlueprint*>(attributes->blueprint);
-    archive->ReadPointer_RUnitBlueprint(&blueprint, &ownerRef);
+    archive->ReadPointer(&blueprint, &ownerRef);
     attributes->blueprint = blueprint;
 
     archive->Read(CachedEntityCategorySetType(), &attributes->restrictionCategory, ownerRef);

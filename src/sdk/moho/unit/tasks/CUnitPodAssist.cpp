@@ -601,7 +601,7 @@ namespace moho
     archive->Read(CachedCCommandTaskType(), this, baseRef);
 
     const gpg::RRef ptrRef{};
-    archive->ReadPointer_CCommandTask(&mDispatchTask, &ptrRef);
+    archive->ReadPointer(&mDispatchTask, &ptrRef);
 
     const gpg::RRef weakRef{};
     archive->Read(CachedWeakPtrUnitType(), &mAssistTarget, weakRef);

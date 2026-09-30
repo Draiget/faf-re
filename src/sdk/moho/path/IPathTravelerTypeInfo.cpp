@@ -169,12 +169,12 @@ void gpg::RDListType_IPathTraveler::SerLoad(
   // list comes back in the order it was saved. The tree linked after the
   // head, reversing it.
   moho::IPathTraveler* traveler = nullptr;
-  archive->ReadPointer_IPathTraveler(&traveler, ownerRef);
+  archive->ReadPointer(&traveler, ownerRef);
   while (traveler != nullptr) {
     listHead->push_back(traveler);
 
     traveler = nullptr;
-    archive->ReadPointer_IPathTraveler(&traveler, ownerRef);
+    archive->ReadPointer(&traveler, ownerRef);
   }
 }
 

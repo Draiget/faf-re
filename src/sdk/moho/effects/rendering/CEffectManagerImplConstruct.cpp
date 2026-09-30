@@ -25,7 +25,7 @@ namespace
 
     moho::Sim* ownerSim = nullptr;
     const gpg::RRef ownerRef{};
-    (void)archive->ReadPointer_Sim(&ownerSim, &ownerRef);
+    (void)archive->ReadPointer(&ownerSim, &ownerRef);
     return ownerSim;
   }
 

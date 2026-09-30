@@ -1079,7 +1079,7 @@ namespace moho
     archive->Read(CachedFerryTaskCCommandTaskType(), static_cast<CCommandTask*>(this), owner);
 
     CCommandTask* dispatchAsCommandTask = nullptr;
-    archive->ReadPointer_CCommandTask(&dispatchAsCommandTask, &owner);
+    archive->ReadPointer(&dispatchAsCommandTask, &owner);
     mDispatch = static_cast<IAiCommandDispatchImpl*>(dispatchAsCommandTask);
 
     archive->ReadInt(&mCommandIndex);
