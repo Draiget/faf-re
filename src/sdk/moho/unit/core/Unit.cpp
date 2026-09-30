@@ -13577,8 +13577,8 @@ Unit::~Unit()
   ClearUnitWeakReferences(*this);
   DestroyUnitEconomyRequest(mConsumptionData);
   DestroyUnitExtraStorage(mExtraStorage);
-
-  static_cast<IUnit&>(*this).DetachAllWeakReferences();
+  // After the members and `~Entity` (0x006A7369), the `IUnit` base's
+  // `WeakObject` drops its weak references (0x006A736E).
 }
 
 /**

@@ -1675,10 +1675,8 @@ namespace moho
   {
     DiscardActiveSessionCommandIssueHelper(*this);
     // `mCursorEntitySet`, then `mLocalQueue` (0x008B5210), are destroyed as
-    // members. The binary drops the weak references after them, as the
-    // inlined `WeakObject` teardown (0x008B4049); no member holds a
-    // reference to this helper, so running it here is the same.
-    DetachAllWeakReferences();
+    // members, and the `WeakObject` base drops the weak references last
+    // (0x008B4049).
   }
 
   UserCommandIssueHelper* FindCommandIssueHelperInSession(CWldSession* const session, const CmdId commandId) noexcept

@@ -544,8 +544,8 @@ CTaskEvent::CTaskEvent()
 STaskEventLinkage::~STaskEventLinkage()
 {
   mThreadRef.ResetFromObject(nullptr);
-
-  DetachAllWeakReferences();
+  // The `WeakObject` base then drops the weak references (0x00406D59), and the
+  // `TDatListItem` base unlinks from the wait list.
 }
 
 /**

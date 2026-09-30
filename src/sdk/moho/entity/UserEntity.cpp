@@ -258,8 +258,9 @@ namespace moho
     // Member teardown invokes SSTIEntityVariableData::~SSTIEntityVariableData
     // (0x00560310) during standard C++ member destruction.
 
-    // Matches the two intrusive-list teardown loops at +0x30 and +0x08.
-    mAmbientLoop.DetachAllWeakReferences();
+    // The members then run in reverse: `mVariableData` (0x00560310),
+    // `mAmbientLoop`'s `WeakObject` drain (0x008B87E2), the two poses,
+    // `mSpatialDbEntry`, and last the `WeakObject` at +0x08 (0x008B8892).
 
     if (mVisionHandle) {
       delete mVisionHandle;
@@ -273,9 +274,6 @@ namespace moho
     // former `DestroySpatialDbMeshInstanceStorage` wrapper is gone. It cited
     // 0x008B8790, which is not a function at all (no progress-db entry, no
     // callers, unreachable); that address is the constructor's unwind funclet.
-    // 0x008B8892: re-read the head, publish the node's next into it, blank
-    // both of the node's words.
-    mWeakObject.DetachAllWeakReferences();
   }
 
   /**

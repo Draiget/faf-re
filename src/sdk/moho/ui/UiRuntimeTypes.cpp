@@ -7783,14 +7783,10 @@ int moho::cfunc_CMauiFrameSetTargetHeadL(
  *   0x0078DB33  mov  [ecx+4], esi   ; head = next
  *   0x0078DB36  mov  [eax], edx     ; node->ownerLinkSlot = nullptr
  *   0x0078DB38  mov  [eax+4], edx   ; node->nextInOwner   = nullptr
- * which is exactly `WeakObject::DetachAllWeakReferences()`. Every derived
- * dragger destructor in the image inlines this same block rather than calling
- * it, so it is the single owner of the teardown.
+ * which is the `WeakObject` base's destructor. Every derived dragger
+ * destructor in the image inlines this same block rather than calling it.
  */
-moho::IMauiDragger::~IMauiDragger()
-{
-  DetachAllWeakReferences();
-}
+moho::IMauiDragger::~IMauiDragger() = default;
 
 /**
  * Address: 0x0078DB50 (slot +0x04 of ??_7IMauiDragger@Moho@@6B@, VA 0x00E38DC0)

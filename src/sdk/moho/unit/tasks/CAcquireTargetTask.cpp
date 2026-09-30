@@ -332,15 +332,12 @@ namespace moho
    * Address: 0x005D8970 (FUN_005D8970, Moho::CAcquireTargetTask::~CAcquireTargetTask body)
    *
    * What it does:
-   * Decrements acquire-target instance stats, clears both listener weak-link
-   * chains, and runs base-task teardown.
+   * Nothing of its own. The bases run in reverse: the instance counter, the
+   * two listeners' `WeakObject` drains (+0x20 at 0x005D89B9, +0x18 at
+   * 0x005D89E2), then `~CTask` (0x00408CB0).
    * Slot: 0
    */
-  CAcquireTargetTask::~CAcquireTargetTask()
-  {
-    static_cast<ManyToOneListener_ECollisionBeamEvent&>(*this).DetachAllWeakReferences();
-    static_cast<ManyToOneListener_EProjectileImpactEvent&>(*this).DetachAllWeakReferences();
-  }
+  CAcquireTargetTask::~CAcquireTargetTask() = default;
 
   /**
    * Address: 0x005D8D10 (FUN_005D8D10, Moho::CAcquireTargetTask::TaskTick)

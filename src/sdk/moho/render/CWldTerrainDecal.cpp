@@ -305,11 +305,9 @@ namespace moho
     // destructor, the `mDb != nullptr` guard and the call into `Unregister`
     // 0x00501BC0. No source line writes that call.
 
-    // 0x0089CC5C..0x0089CC7B: the same head-reloading drain
-    // `~CScriptObject` (0x004C7340) carries, over the `WeakObject` base at
-    // +0x04. It is what leaves `ScriptedDecal`/`SelectionDragger3D`'s decal
-    // lanes empty rather than dangling when the manager destroys a decal.
-    DetachAllWeakReferences();
+    // 0x0089CC5C..0x0089CC7B is the `WeakObject` base's destructor over its
+    // head at +0x04. It is what leaves `ScriptedDecal`/`SelectionDragger3D`'s
+    // decal lanes empty rather than dangling when the manager destroys a decal.
   }
 
   /**

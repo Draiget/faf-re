@@ -1468,12 +1468,10 @@ moho::WWinManagedDialog::WWinManagedDialog(
  * Address: 0x004F40A0 (FUN_004F40A0)
  *
  * What it does:
- * Detaches every weak reference still aimed at this dialog; ~wxDialog follows.
+ * Nothing of its own: the `WeakObject` base drops the weak references
+ * (0x004F40AE), then ~wxDialog follows.
  */
-moho::WWinManagedDialog::~WWinManagedDialog()
-{
-  DetachAllWeakReferences();
-}
+moho::WWinManagedDialog::~WWinManagedDialog() = default;
 
 /**
  * Address: 0x004F40E0 (FUN_004F40E0)
@@ -1509,12 +1507,10 @@ moho::WWinManagedFrame::WWinManagedFrame(
  * Address: 0x004F4230 (FUN_004F4230)
  *
  * What it does:
- * Detaches every weak reference still aimed at this frame; ~wxFrame follows.
+ * Nothing of its own: the `WeakObject` base drops the weak references
+ * (0x004F423E), then ~wxFrame follows.
  */
-moho::WWinManagedFrame::~WWinManagedFrame()
-{
-  DetachAllWeakReferences();
-}
+moho::WWinManagedFrame::~WWinManagedFrame() = default;
 
 namespace moho
 {

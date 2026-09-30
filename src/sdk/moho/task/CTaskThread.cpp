@@ -352,11 +352,6 @@ namespace
     }
   }
 
-  void ClearTaskEventLinks(CTaskThread* const thread)
-  {
-    thread->DetachAllWeakReferences();
-  }
-
   /**
    * Address: 0x004091F0 (FUN_004091F0, func_Dispatch)
    *
@@ -604,7 +599,8 @@ CTaskThread::CTaskThread()
 CTaskThread::~CTaskThread()
 {
   PopTaskStack(this);
-  ClearTaskEventLinks(this);
+  // The bases then run in reverse: `InstanceCounter` (0x0040913A), the
+  // `WeakObject` drain (0x00409149), and the `TDatListItem` unlink.
 }
 
 /**

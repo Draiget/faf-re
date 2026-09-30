@@ -139,8 +139,8 @@ namespace moho
  * unlinks in its destructor at 0x00484BC1.
  *
  * The weak-reference detach at 0x00484BD5 runs after both of those member
- * destructors, where `WeakObject`'s teardown sits; any `Pull` frame still on
- * the stack sees its `WeakPtr<CNetTCPConnector>` go null.
+ * destructors: it is the `WeakObject` base's destructor. Any `Pull` frame still
+ * on the stack sees its `WeakPtr<CNetTCPConnector>` go null.
  */
 CNetTCPConnector::~CNetTCPConnector()
 {
@@ -151,8 +151,6 @@ CNetTCPConnector::~CNetTCPConnector()
   if (mSocket != INVALID_SOCKET) {
     ::closesocket(mSocket);
   }
-
-  DetachAllWeakReferences();
 }
 
 /**

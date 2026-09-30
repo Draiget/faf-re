@@ -479,4 +479,9 @@ namespace moho
     }
   }
 
+  inline WeakObject::~WeakObject() noexcept
+  {
+    DetachAllWeakReferences();
+  }
+
 } // namespace moho

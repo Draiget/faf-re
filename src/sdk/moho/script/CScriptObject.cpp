@@ -603,9 +603,9 @@ CScriptObject::CScriptObject(
  * Address: 0x004C7340 (FUN_004C7340, Moho::CScriptObject::~CScriptObject)
  *
  * What it does:
- * Clears Lua `_c_object` back-reference and unlinks all intrusive
- * weak-reference nodes owned by this object; the `InstanceCounter` base then
- * takes the instance count back.
+ * Clears the Lua `_c_object` back-reference. The bases then run in reverse:
+ * `InstanceCounter` takes the instance count back (0x004C73BB), and the
+ * `WeakObject` base drops every weak reference (0x004C73BF).
  */
 CScriptObject::~CScriptObject()
 {
@@ -615,8 +615,6 @@ CScriptObject::~CScriptObject()
       *scriptObjectSlot = nullptr;
     }
   }
-
-  DetachAllWeakReferences();
 }
 
 /**

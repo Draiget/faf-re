@@ -87,14 +87,9 @@ namespace moho
     // ---- member unwind (0x008B16F4..0x008B17A9) ----------------------------
     //
     // The compiler then destroys `mFactories` and `mEngineers` (erase and free
-    // the head) and `mAvatars` (free the buffer, 0x008B1761).
-    //
-    // 0x008B1778..0x008B179E: drop every weak reference still aimed at this
-    // army, blanking each node as it leaves the chain. The binary runs this
-    // after releasing the avatar buffer (0x008B1761); here `~mAvatars` releases
-    // that buffer once this body returns. The two operations touch disjoint
-    // storage, so the swap is not observable.
-    mWeakRefs.DetachAllWeakReferences();
+    // the head), `mAvatars` (free the buffer, 0x008B1761), and `mWeakRefs`,
+    // whose destructor drops every weak reference still aimed at this army
+    // (0x008B1778..0x008B179E).
 
     // 0x008B17A9 `IArmy::~IArmy`: the `SSTIArmyVariableData` member followed by
     // the `SSTIArmyConstantData` base subobject, both emitted by the compiler.
