@@ -2995,12 +2995,16 @@ namespace gpg
      * What it does:
      * Reflection load callback that forwards archive-load flow into
      * `T::MemberDeserialize`, with the archived version when `T`'s takes one
-     * (`Unit`'s rejects versions below 1).
+     * (`Unit`'s rejects versions below 1) and the owner reference when it
+     * takes that too (the Lua objects read their payload against the
+     * owning thread).
      */
-    static void Deserialize(ReadArchive* const archive, const int objectPtr, const int version, RRef* const)
+    static void Deserialize(ReadArchive* const archive, const int objectPtr, const int version, RRef* const ownerRef)
     {
       T& object = *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr));
-      if constexpr (requires { object.MemberDeserialize(archive, version); }) {
+      if constexpr (requires { object.MemberDeserialize(archive, version, *ownerRef); }) {
+        object.MemberDeserialize(archive, version, *ownerRef);
+      } else if constexpr (requires { object.MemberDeserialize(archive, version); }) {
         object.MemberDeserialize(archive, version);
       } else {
         SerLoadMembers(archive, object);
@@ -3010,12 +3014,15 @@ namespace gpg
     /**
      * What it does:
      * Reflection save callback that forwards archive-save flow into
-     * `T::MemberSerialize`, with the version when `T`'s takes one.
+     * `T::MemberSerialize`, with the version and the owner reference when
+     * `T`'s takes them.
      */
-    static void Serialize(WriteArchive* const archive, const int objectPtr, const int version, RRef* const)
+    static void Serialize(WriteArchive* const archive, const int objectPtr, const int version, RRef* const ownerRef)
     {
       T& object = *reinterpret_cast<T*>(static_cast<std::uintptr_t>(objectPtr));
-      if constexpr (requires { object.MemberSerialize(archive, version); }) {
+      if constexpr (requires { object.MemberSerialize(archive, version, *ownerRef); }) {
+        object.MemberSerialize(archive, version, *ownerRef);
+      } else if constexpr (requires { object.MemberSerialize(archive, version); }) {
         object.MemberSerialize(archive, version);
       } else {
         SerSaveMembers(archive, static_cast<const T&>(object));

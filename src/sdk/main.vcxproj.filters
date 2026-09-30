@@ -1614,12 +1614,6 @@
     <ClCompile Include="lua\LuaRuntimeTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="lua\LuaStateConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="lua\LuaStateSaveConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="lua\LuaStateSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3181,12 +3175,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaObjectTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lua\LuaStateConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lua\LuaStateSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaStateSerializer.h">

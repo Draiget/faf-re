@@ -388,7 +388,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="gpg\gal\backends\d3d10\D3D10Interfaces.cpp" />
     <ClCompile Include="gpg\core\reflection\Reflection.cpp" />
     <ClCompile Include="lua\LuaTableIterator.cpp" />
-    <ClCompile Include="lua\LuaStateConstruct.cpp" />
     <ClCompile Include="lua\LuaDump.cpp" />
     <ClCompile Include="lua\LuaError.cpp" />
     <ClCompile Include="lua\LuaObject.cpp" />
@@ -396,7 +395,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="lua\LuaObjectSerializer.cpp" />
     <ClCompile Include="lua\LuaObjectTypeInfo.cpp" />
     <ClCompile Include="lua\LuaRuntimeTypeInfo.cpp" />
-    <ClCompile Include="lua\LuaStateSaveConstruct.cpp" />
     <ClCompile Include="lua\LuaStateSerializer.cpp" />
     <ClCompile Include="lua\LuaStateTypeInfo.cpp" />
     <ClCompile Include="moho\lua\UnrecoveredLuaCallbackStubs.cpp" />
@@ -1614,8 +1612,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="lua\LuaUndump.h" />
     <ClInclude Include="lua\LuaObjectSerializer.h" />
     <ClInclude Include="lua\LuaObjectTypeInfo.h" />
-    <ClInclude Include="lua\LuaStateConstruct.h" />
-    <ClInclude Include="lua\LuaStateSaveConstruct.h" />
     <ClInclude Include="lua\LuaStateSerializer.h" />
     <ClInclude Include="lua\LuaStateTypeInfo.h" />
     <ClInclude Include="lua\LuaTableIterator.h" />

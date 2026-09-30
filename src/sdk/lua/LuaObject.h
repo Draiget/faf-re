@@ -1078,6 +1078,44 @@ namespace LuaPlus
 		 */
 		explicit LuaState(LuaState* parentState);
 
+		/// Selects the constructor that leaves the wrapper unbound.
+		enum Unbound
+		{
+			UNBOUND
+		};
+
+		/**
+		 * Address: 0x0090A5D0 (FUN_0090A5D0)
+		 *
+		 * What it does:
+		 * Builds a wrapper bound to nothing: no thread, no root, no tracked
+		 * objects. An archive load makes one (`MemberConstruct`) and
+		 * `LuaStateSerializer` binds it to its restored thread.
+		 */
+		explicit LuaState(Unbound);
+
+		/**
+		 * What it does:
+		 * Builds an unbound wrapper for an archive load, handed back unowned.
+		 * Inlined into `SerConstructHelper<LuaState>::Construct` 0x0090B860.
+		 */
+		static void MemberConstruct(
+			gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+		);
+
+		/**
+		 * Address: 0x0090BA20 (FUN_0090BA20 -- an unreferenced out-of-line copy;
+		 * `SerSaveConstructHelper<LuaState>::SaveConstructArgs` 0x0090BC50
+		 * inlines it.)
+		 *
+		 * What it does:
+		 * Refuses to save the root state itself; a thread wrapper is saved
+		 * unowned with no arguments.
+		 */
+		void MemberSaveConstructArgs(
+			gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+		);
+
 		/**
 		 * Address: 0x0090A600 (FUN_0090A600, LuaPlus::LuaState::~LuaState)
 		 *

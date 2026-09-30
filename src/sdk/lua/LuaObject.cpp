@@ -949,6 +949,7 @@ namespace
 
 extern "C"
 {
+	Udata* luaS_newudata(lua_State* L, gpg::RType* type);
 	void luaC_collectgarbage(lua_State* L);
 	void luaC_link(lua_State* L, GCObject* object, int typeTag);
 	int luaC_sweep(lua_State* L, int all);
@@ -4794,8 +4795,6 @@ namespace
 	}
 	constexpr std::uint16_t kLuaMaxCallInfoFrames = 0x1000u;
 
-	// Defined below; both are the fork's own userdata builders.
-	[[nodiscard]] Udata* CreateDefaultConstructedUserdata(lua_State* state, gpg::RType* type);
 	[[nodiscard]] gpg::RRef BuildRefFromUserdata(Udata* userdata);
 
 	/**
@@ -4824,7 +4823,7 @@ namespace
 	{
 		Udata* userdata = nullptr;
 		if (type != nullptr) {
-			userdata = CreateDefaultConstructedUserdata(state, type);
+			userdata = luaS_newudata(state, type);
 		} else {
 			userdata = static_cast<Udata*>(luaM_realloc(state, nullptr, 0u, sizeof(Udata)));
 			userdata->len = 0u;
@@ -4847,42 +4846,46 @@ namespace
 		return outRef;
 	}
 
-	/**
-	 * Address: 0x00924A10 (FUN_00924A10, luaS_newudata)
-	 *
-	 * What it does:
-	 * Allocates one reflected userdata payload for `type`, default-constructs
-	 * the payload through the registered `ctorRefFunc_`, and links userdata into
-	 * the root userdata list.
-	 */
-	[[nodiscard]] Udata* CreateDefaultConstructedUserdata(lua_State* const state, gpg::RType* const type)
-	{
-		if (type->ctorRefFunc_ == nullptr) {
-			luaG_runerror(state, "type %s is not default constructible", type->GetName());
-		}
+} // namespace
 
-		const std::size_t userdataSize = sizeof(Udata) + static_cast<std::size_t>(type->size_);
-		Udata* const userdata = static_cast<Udata*>(luaM_realloc(state, nullptr, 0u, userdataSize));
-
-		try {
-			void* const payload = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
-			(void)type->ctorRefFunc_(payload);
-		} catch (...) {
-			(void)luaM_realloc(state, userdata, userdataSize, 0u);
-			throw;
-		}
-
-		userdata->len = reinterpret_cast<std::size_t>(type);
-		userdata->tt = LUA_TUSERDATA;
-		userdata->marked = (type->dtrFunc_ != nullptr) ? 2u : 0u;
-
-		global_State* const globalState = state->l_G;
-		userdata->metatable = DefaultUserdataMetatable(globalState);
-		userdata->next = globalState->rootudata;
-		globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
-		return userdata;
+/**
+ * Address: 0x00924A10 (FUN_00924A10, luaS_newudata)
+ *
+ * What it does:
+ * Allocates one reflected userdata payload for `type`, default-constructs
+ * the payload through the registered `ctorRefFunc_`, and links userdata into
+ * the root userdata list.
+ */
+extern "C" Udata* luaS_newudata(lua_State* const state, gpg::RType* const type)
+{
+	if (type->ctorRefFunc_ == nullptr) {
+		luaG_runerror(state, "type %s is not default constructible", type->GetName());
 	}
 
+	const std::size_t userdataSize = sizeof(Udata) + static_cast<std::size_t>(type->size_);
+	Udata* const userdata = static_cast<Udata*>(luaM_realloc(state, nullptr, 0u, userdataSize));
+
+	try {
+		void* const payload = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
+		(void)type->ctorRefFunc_(payload);
+	} catch (...) {
+		(void)luaM_realloc(state, userdata, userdataSize, 0u);
+		throw;
+	}
+
+	userdata->len = reinterpret_cast<std::size_t>(type);
+	userdata->tt = LUA_TUSERDATA;
+	userdata->marked = (type->dtrFunc_ != nullptr) ? 2u : 0u;
+
+	global_State* const globalState = state->l_G;
+	userdata->metatable = DefaultUserdataMetatable(globalState);
+	userdata->next = globalState->rootudata;
+	globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
+	return userdata;
+}
+
+namespace
+{
 	/**
 	 * Address: 0x00924AF0 (FUN_00924AF0, luaS_newudata2)
 	 *
@@ -8486,7 +8489,7 @@ namespace
 				// free, which underflowed `nblocks` and left it permanently above
 				// `GCthreshold`, so `luaC_checkGC` ran a full collection on every
 				// single allocation from then on. Must mirror the allocation in
-				// `CreateDefaultConstructedUserdata` exactly.
+				// `luaS_newudata` exactly.
 				const auto* const ud = reinterpret_cast<const Udata*>(object);
 				const auto* const type = reinterpret_cast<const gpg::RType*>(ud->len);
 				const lu_mem udataByteSize = static_cast<lu_mem>(sizeof(Udata) + type->size_);
@@ -14954,6 +14957,22 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x00914F40 (FUN_00914F40, luaF_newupval)
+	 *
+	 * What it does:
+	 * Allocates an upvalue, links it for collection and points `v` at its own
+	 * `value`, making it a closed upvalue. The value itself is left for the
+	 * caller: the only one is the archive load, which reads it next.
+	 */
+	UpVal* luaF_newupval(lua_State* const state)
+	{
+		auto* const upvalue = static_cast<UpVal*>(luaM_realloc(state, nullptr, 0u, sizeof(UpVal)));
+		upvalue->v = &upvalue->value;
+		luaC_link(state, reinterpret_cast<GCObject*>(upvalue), LUA_TUPVALUE);
+		return upvalue;
+	}
+
+	/**
 	 * Address: 0x009138D0 (FUN_009138D0, luaD_reallocstack)
 	 *
 	 * IDA signature:
@@ -18499,6 +18518,23 @@ LuaState::LuaState(LuaState* const parentState)
 }
 
 /**
+ * Address: 0x0090A5D0 (FUN_0090A5D0)
+ *
+ * What it does:
+ * Zeroes every binding and default-constructs `m_threadObj`; the argument
+ * only selects this overload.
+ */
+LuaState::LuaState(Unbound)
+	: m_state(nullptr),
+	  m_luaTask(nullptr),
+	  m_ownState(0),
+	  m_threadObj(),
+	  m_rootState(nullptr),
+	  m_headObject{nullptr, nullptr},
+	  m_tailObject{nullptr, nullptr}
+{}
+
+/**
  * Address: 0x0090A600 (FUN_0090A600, LuaPlus::LuaState::~LuaState)
  *
  * What it does:
@@ -20624,7 +20660,7 @@ gpg::RRef LuaObject::AssignNewUserData(LuaState* state, const gpg::RType* type)
 	lua_State* const lstate = state->m_state;
 	Ensure(lstate != nullptr, "state->m_state");
 
-	Udata* const userdata = CreateDefaultConstructedUserdata(lstate, const_cast<gpg::RType*>(type));
+	Udata* const userdata = luaS_newudata(lstate, const_cast<gpg::RType*>(type));
 	m_object.tt = static_cast<int>(userdata->tt);
 	m_object.value.p = userdata;
 	return BuildRefFromUserdata(userdata);

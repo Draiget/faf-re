@@ -2,10 +2,56 @@
 
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
 
 using namespace LuaPlus;
+
+namespace LuaPlus
+{
+	void LuaState::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+	{
+		result.SetUnowned(gpg::MakeRRef(new LuaState(UNBOUND)), 0u);
+	}
+
+	/**
+	 * Address: 0x0090BA20 (FUN_0090BA20)
+	 */
+	void LuaState::MemberSaveConstructArgs(
+		gpg::WriteArchive&, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+	)
+	{
+		if (m_rootState == this) {
+			throw gpg::SerializationError("Consistency check failed: !isMainThread");
+		}
+		result.SetUnowned(0u);
+	}
+
+	/**
+	 * `gpg::SerSaveConstructHelper<LuaState>`, vtable 0x00D44F4C.
+	 *
+	 * Address: 0x00BE9F90 (FUN_00BE9F90 -- constructs the global and registers its destructor.)
+	 * Address: 0x00C09820 (FUN_00C09820 -- the global's destructor.)
+	 * Address: 0x0090B5F0 (FUN_0090B5F0 -- `Init`.)
+	 * Address: 0x0090BC50 (FUN_0090BC50 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
+	 */
+	struct LuaStateSaveConstruct : gpg::SerSaveConstructHelper<LuaState>
+	{};
+
+	/**
+	 * `gpg::SerConstructHelper<LuaState>`, vtable 0x00D44EE0.
+	 *
+	 * Address: 0x00BE9FC0 (FUN_00BE9FC0 -- constructs the global and registers its destructor.)
+	 * Address: 0x00C09850 (FUN_00C09850 -- the global's destructor.)
+	 * Address: 0x0090B670 (FUN_0090B670 -- `Init`.)
+	 * Address: 0x0090B860 (FUN_0090B860 -- `Construct`, `MemberConstruct` inlined.)
+	 * Address: 0x0090B1C0 (FUN_0090B1C0 -- `Delete`.)
+	 */
+	struct LuaStateConstruct : gpg::SerConstructHelper<LuaState>
+	{};
+} // namespace LuaPlus
 
 namespace
 {
@@ -32,6 +78,12 @@ void DeserializeLuaStatePointerPair(
 	(void)archive->ReadPointer(&activeState, &rootStateRef);
 	state->SetState(activeState);
 }
+
+// Address: 0x00F8E5C0 -- process-global `LuaStateSaveConstruct` singleton.
+LuaStateSaveConstruct gLuaStateSaveConstruct;
+
+// Address: 0x00F8E5E4 -- process-global `LuaStateConstruct` singleton.
+LuaStateConstruct gLuaStateConstruct;
 
 // Address: 0x00F8E5D0 -- process-global `LuaStateSerializer` singleton.
 LuaStateSerializer gLuaStateSerializer;

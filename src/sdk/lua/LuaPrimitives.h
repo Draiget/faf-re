@@ -139,6 +139,8 @@ namespace gpg
 	class RRef;
 	class WriteArchive;
 	class ReadArchive;
+	class SerConstructResult;
+	class SerSaveConstructArgsResult;
 }
 
 struct global_State;
