@@ -17,7 +17,8 @@
 #include "moho/math/GridPos.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
-#include "moho/math/Wm3DistanceFafExtras.h"
+#include "moho/math/Wm3Segment3FafExtras.h"
+#include "Wm3DistVector3Segment3.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -294,20 +295,6 @@ namespace
     return true;
   }
 
-  // Squared distance from `point` to the swept `segment`, also emitting the
-  // closest point on the segment. Wraps the recovered
-  // Wm3::DistVector3Segment3f::GetSquared (FUN_00A484F0) — the same primitive the
-  // binary constructs inline in CheckCollision Branch C (asm 0x0069D66C:
-  // ??0DistVector3Segment3@Wm3@@; 0x0069D692: GetSquared; 0x0069D706: GetEndPoint).
-  // The closest-point-on-segment output is exactly DistVector3Segment3::GetEndPoint.
-  [[nodiscard]] float DistPointToSegmentSquared(
-    const Wm3::Vector3f& point,
-    const Wm3::Segment3f& segment,
-    Wm3::Vector3f* closestOnSegment
-  ) noexcept
-  {
-    return Wm3::DistVector3Segment3fGetSquared(point, segment, closestOnSegment);
-  }
 } // namespace
 
 namespace moho
@@ -1517,11 +1504,11 @@ namespace moho
       Entity* const target = mTargetPosData.GetEntity();
       if (target != nullptr && target->IsProjectile() != nullptr &&
           target->CollisionExtents == nullptr) {
-        // Closest point on the swept segment to the target's world position, and
-        // its squared distance (asm 0x0069D66C: DistVector3Segment3(target->mVarDat.mCurTransform.pos_,
-        // segment); 0x0069D692: GetSquared; 0x0069D706: GetEndPoint).
-        Wm3::Vector3f closestOnSegment{};
-        const float distSq = DistPointToSegmentSquared(target->mVarDat.mCurTransform.pos_, segment, &closestOnSegment);
+        // Squared distance from the target's world position to the swept segment:
+        // Wild Magic's DistVector3Segment3f on the stack (ctor 0x00A48030 at
+        // 0x0069D67F, GetSquared 0x00A484F0 at 0x0069D692).
+        Wm3::DistVector3Segment3f targetDistance(target->mVarDat.mCurTransform.pos_, segment);
+        const float distSq = targetDistance.GetSquared();
 
         // Hit radius squared = |target velocity|^2 + 0.5 (asm 0x0069D69B: target
         // GetVelocity() via vtable slot 15 (+0x3C); 0x0069D6D4: + flt_E4F724 == 0.5).
@@ -1532,6 +1519,9 @@ namespace moho
 
         // asm 0x0069D6DC: proceed only when distSq <= hitRadiusSq (jb skips otherwise).
         if (distSq <= hitRadiusSq && RunProjectileOnCollisionCheckScript(target, this)) {
+          // The query's closest point on the segment (GetClosestPoint1,
+          // 0x00A39230 at 0x0069D706), read once the script agrees.
+          const Wm3::Vector3f& closestOnSegment = targetDistance.GetClosestPoint1();
           // Fraction of the segment consumed at the closest point
           // (asm 0x0069D719-0x0069D7F1): |closest - curPos| / |nextPos - curPos|,
           // clamped to [0, 1].

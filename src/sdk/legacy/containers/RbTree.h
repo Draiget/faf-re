@@ -1769,17 +1769,11 @@ namespace msvc8
              * for other zero-xref duplicate emissions. Two sibling
              * emissions of the identical shape, 0x00A52870/0x00A52A40 (also
              * isNil-independent, in the same address neighbourhood as
-             * `m_kHull` above), are already separately recovered as
-             * `AreQueryTreeOwnerKeyCursorsNil17NotEqualLaneA`/`...LaneB` in
-             * `moho/math/Wm3DistanceFafExtras.cpp` -- a
-             * `QueryTreeOwnerKeyCursorNil17`-typed reach-in wrapper around
-             * this exact comparison. That is real RULE ONE debt (a bespoke
-             * per-instantiation wrapper duplicating this member instead of
-             * calling it directly), left as-is here rather than folded in:
-             * it already has real, working, cited behavior, and collapsing
-             * it into a direct `rb_iterator` usage is a separate, larger
-             * pass through that file's whole `QueryTree*` family, not an
-             * opportunistic one-line change.
+             * `m_kHull` above), are Wild Magic's own `std::set` emissions,
+             * linked from Foundation.lib. Their transcriptions
+             * (`AreQueryTreeOwnerKeyCursorsNil17NotEqualLaneA`/`...LaneB` in
+             * `moho/math/Wm3DistanceFafExtras.cpp`) went with that file; both
+             * addresses are `external_dependency`.
              *
              * The `call sub_A84A40` at the top of 0x00A55150 falls through
              * into the comparison exactly like the constructor/`operator++`/

@@ -720,7 +720,7 @@
     <ClCompile Include="moho\math\MathReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\math\Wm3DistanceFafExtras.cpp">
+    <ClCompile Include="moho\math\Wm3Segment3FafExtras.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\math\Wm3AxisAlignedBox3FafExtras.cpp">
@@ -3399,7 +3399,7 @@
     <ClInclude Include="moho\math\MathReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\math\Wm3DistanceFafExtras.h">
+    <ClInclude Include="moho\math\Wm3Segment3FafExtras.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\math\Wm3AxisAlignedBox3FafExtras.h">

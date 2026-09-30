@@ -1148,7 +1148,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\unit\EUnitCommandQueueStatusTypeInfo.cpp" />
     <ClCompile Include="moho\unit\CUnitCommand.cpp" />
     <ClCompile Include="moho\vision\VisionDB.cpp" />
-    <ClCompile Include="moho\math\Wm3DistanceFafExtras.cpp" />
+    <ClCompile Include="moho\math\Wm3Segment3FafExtras.cpp" />
     <ClCompile Include="moho\math\Wm3AxisAlignedBox3FafExtras.cpp" />
     <ClCompile Include="cri\sofdec\SofdecExternalStubs.cpp" />
     <ClCompile Include="cri\sofdec\SofdecMpvRuntime.cpp" />
@@ -2592,7 +2592,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="util\Debug.h" />
     <ClInclude Include="moho\misc\TypeInfo.h" />
     <ClInclude Include="util\VTCall.h" />
-    <ClInclude Include="moho\math\Wm3DistanceFafExtras.h" />
+    <ClInclude Include="moho\math\Wm3Segment3FafExtras.h" />
     <ClInclude Include="moho\math\Wm3AxisAlignedBox3FafExtras.h" />
   
     <ClInclude Include="gpg\core\reflection\RBoolType.h" />

@@ -63,7 +63,7 @@
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/STIMap.h"
 #include "moho/math/Vector3f.h"
-#include "moho/math/Wm3DistanceFafExtras.h"
+#include "moho/math/Wm3Segment3FafExtras.h"
 #include "platform/Platform.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/CUnitCommandQueue.h"

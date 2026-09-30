@@ -36,7 +36,7 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
-#include "moho/math/Wm3DistanceFafExtras.h"
+#include "moho/math/Wm3Segment3FafExtras.h"
 #include "Wm3Box3.h"
 #include "moho/misc/DiagnosticBudget.h"
 

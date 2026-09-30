@@ -1,5 +1,4 @@
 #include <cstdio>
-#include "moho/math/Wm3DistanceFafExtras.h"
 #include "Mesh.h"
 
 #include <algorithm>
@@ -512,6 +511,14 @@ namespace
    * What it does:
    * Scans one leaf `SpatialShardData` lane and appends all entity owners whose
    * node AABBs intersect the query `bounds` for requested type masks.
+   *
+   * The box tests here and in `CollectInBox` are Wild Magic's inline
+   * `AxisAlignedBox3<float>::TestIntersection` (Wm3AxisAlignedBox3.inl),
+   * emitted into this code as one out-of-line body:
+   * Address: 0x00506010 (FUN_00506010, Wm3::AxisAlignedBox3<float>::TestIntersection)
+   * `this` is the query `bounds` (edi) and the argument the stored box (edx) at
+   * 0x00502972, 0x00502A00 and 0x00503C1B, which is the binary's comparison
+   * order: `Max[i] < box.Min[i]`, then `Min[i] > box.Max[i]`.
    */
   template <class T>
   void CollectInBoxFromLeafData(
@@ -521,7 +528,7 @@ namespace
     gpg::fastvector<T*>& destination
   )
   {
-    if (SpatialShardDataHasNoRequestedType(data, type) || !Wm3::AxisAlignedBox3fIntersects(bounds, data.mBounds)) {
+    if (SpatialShardDataHasNoRequestedType(data, type) || !bounds.TestIntersection(data.mBounds)) {
       return;
     }
 
@@ -532,7 +539,7 @@ namespace
     const std::uint32_t typeBits = EntityTypeBits(type);
 
     const auto intersectsQuery = [&bounds](const Wm3::AxisAlignedBox3f& nodeBox) {
-      return Wm3::AxisAlignedBox3fIntersects(nodeBox, bounds);
+      return bounds.TestIntersection(nodeBox);
     };
 
     if ((typeBits & kSpatialEntityTypeUnit) != 0u) {
@@ -1389,7 +1396,7 @@ namespace moho
     gpg::fastvector<T*>& destination
   )
   {
-    if (SpatialShardHasNoRequestedType(*shard, type) || !Wm3::AxisAlignedBox3fIntersects(shard->mBounds, bounds)) {
+    if (SpatialShardHasNoRequestedType(*shard, type) || !bounds.TestIntersection(shard->mBounds)) {
       return;
     }
 

@@ -8,7 +8,8 @@
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/ui/EMauiKeyCodeTypeInfo.h"
 #include "legacy/containers/List.h"
-#include "moho/math/Wm3DistanceFafExtras.h"
+#include "moho/math/Wm3Segment3FafExtras.h"
+#include "Wm3DistVector3Segment3.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/render/ProjectileArcRenderer.h"
 #include "moho/render/camera/CameraImpl.h"
@@ -243,6 +244,10 @@ namespace moho
    * recurses against the newly inserted node while the right half recurses
    * against the original position - which is what leaves `simplified` in path
    * order without a sort.
+   *
+   * Each sample's distance is a Wild Magic `DistVector3Segment3f` built per
+   * iteration (ctor 0x00A48030, `Get` 0x00A480E0) and destroyed after the
+   * farthest-point update (`~Distance` 0x00A38C40 at 0x0082A1EC).
    */
   void SimplifyPathSpan(
     const msvc8::vector<Wm3::Vector3f>& points,
@@ -258,7 +263,8 @@ namespace moho
     std::int32_t farthest = -1;
     float farthestDistance = 0.0f;
     for (std::int32_t index = first + 1; index < last; ++index) {
-      const float distance = Wm3::DistVector3Segment3fGet(points[index], span);
+      Wm3::DistVector3Segment3f pointDistance(points[index], span);
+      const float distance = pointDistance.Get();
       if (distance > farthestDistance) {
         farthestDistance = distance;
         farthest = index;
