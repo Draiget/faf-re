@@ -29,7 +29,6 @@ namespace gpg
     void SetUnowned(const RRef& ref, unsigned int flags);
   };
 
-  void SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1(gpg::WriteArchive* archive, int ownerToken);
 } // namespace gpg
 
 namespace
@@ -1073,6 +1072,25 @@ namespace
   }
 
   /**
+   * Address: 0x00710340 (FUN_00710340)
+   *
+   * What it does:
+   * Writes the root stat item as an owned pointer with no owner, under the
+   * stats lock: `RRef_CArmyStatItem` 0x00713BE0, then `WriteRawPointer`
+   * 0x00953320 with state 2. The lock is taken on `+0x08` itself
+   * (`lea esi, [edi+8]`), so the binary's lock is embedded where this layout
+   * keeps a pointer; the load half above locks the same way.
+   */
+  void SerializeStatsCArmyStatItemOwnedRoot(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+  {
+    auto* const stats = reinterpret_cast<moho::Stats<moho::CArmyStatItem>*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    );
+    boost::mutex::scoped_lock lock(*stats->mLock);
+    archive->WritePointer(stats->mItem, gpg::TrackedPointerState::Owned, gpg::RRef{});
+  }
+
+  /**
    * Address: 0x007103D0 (FUN_007103D0)
    *
    * What it does:
@@ -1202,8 +1220,7 @@ namespace
       size_ = sizeof(moho::Stats<moho::CArmyStatItem>);
       version_ = 1;
       serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(&DeserializeStatsCArmyStatItemOwnedRootLane);
-      serSaveFunc_ =
-        reinterpret_cast<gpg::RType::save_func_t>(&gpg::SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1);
+      serSaveFunc_ = &SerializeStatsCArmyStatItemOwnedRoot;
       serConstructFunc_ = reinterpret_cast<gpg::RType::construct_func_t>(&ConstructStatsCArmyStatItemForSerializer);
       deleteFunc_ = &DeleteStatsCArmyStatItemOwnedObject;
     }

@@ -288,6 +288,13 @@ namespace gpg
          */
         WriteArchive* WriteCFunction(CClosure* closure, const gpg::RRef& ownerRef);
 
+        /**
+         * Writes one tracked pointer in `state`; defined, with the addresses of its
+         * instantiations, after `RType` in gpg/core/reflection/Reflection.h.
+         */
+        template <class T>
+        WriteArchive* WritePointer(T* value, TrackedPointerState state, const RRef& ownerRef);
+
     protected:
         /**
          * Both are the legacy 12-byte `{proxy, head, size}` map heads, not the
