@@ -4045,6 +4045,7 @@ namespace msvc8
          *   `AddInputCaptureControl` 0x007A4540. Formerly `AppendInputCaptureWeakReference`.)
          * Address: 0x008B2770 (FUN_008B2770 -- `push_back` for `msvc8::vector<WeakPtr<UserUnit>>` (8-byte element, `UserArmy::mAvatars` +0x1E8); caller `AddArmyAvatar` 0x008B2429; formerly `InsertWeakPtrVectorObjectAt` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
          * Address: 0x00626E10 (FUN_00626E10 -- `push_back` for `msvc8::vector<moho::SPickUpInfo>`: `_Ufill` of one slot when capacity remains, else `insert(end(), value)` 0x00627340; callers 0x00625110 (`CUnitLoadUnits::DoTask`), 0x006270E0 (`SerLoad`); formerly `PushBackSPickUpInfoWithRelink` in moho/ai/SPickUpInfoVectorReflection.cpp, removed 2026-09-30.)
+         * Address: 0x007AEB10 (FUN_007AEB10 -- `push_back` for `msvc8::vector<moho::GeomCamera3>`; caller `CAM_GetAllCameras` 0x007AAD20; formerly in moho/render/camera/GeomCamera3.cpp (RULE ONE), removed 2026-09-30 as `AppendGeomCameraViewAndReturnEnd`.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -10408,6 +10409,7 @@ namespace msvc8
          * Address: 0x008688D0 (FUN_008688D0 -- a forwarding copy of 0x00868C80.)
          * Address: 0x009506F0 (FUN_009506F0 -- `std::copy` for `msvc8::vector<gpg::TrackedPointerInfo>` (`gpg::ReadArchive::mTrackedPtrs` at +0x14; the 0x14 entry's `boost::shared_ptr<void>` at +0x08 is what makes each step more than a word copy): `TrackedPointerInfo::operator=` per slot; callers 0x00951E40 (`erase`), `ReadArchive::EndSection` 0x00952BD0 (`clear`), 0x00952526; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x00950BF0 (FUN_00950BF0 -- a register-shape adapter over 0x009506F0; no callers; formerly in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00741850 (FUN_00741850 -- `std::copy` for `msvc8::vector<moho::GeomCamera3>` (0x2C8 element): `GeomCamera3::operator=` 0x007421C0 per slot; callers 0x00740F00, 0x0073F630; formerly in moho/render/camera/GeomCamera3.cpp (RULE ONE), removed 2026-09-30 as `CopyGeomCameraRangeAndReturnEnd`.)
          */
     public:
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {

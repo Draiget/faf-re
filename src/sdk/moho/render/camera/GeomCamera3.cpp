@@ -242,117 +242,6 @@ namespace
     camera->solid2.ResizePlanes(kFrustumPlaneCount, defaultPlane);
   }
 
-  /**
-   * Address: 0x00742BF0 (FUN_00742BF0, func_CpyCamera)
-   *
-   * What it does:
-   * Copies full geometric camera state except local solid/viewport flag lanes.
-   */
-  [[nodiscard]] moho::GeomCamera3* CopyGeomCameraStatePreservingFlags(
-    moho::GeomCamera3* const destination, const moho::GeomCamera3& source
-  )
-  {
-    destination->tranform.orient_.x = source.tranform.orient_.x;
-    destination->tranform.orient_.y = source.tranform.orient_.y;
-    destination->tranform.orient_.z = source.tranform.orient_.z;
-    destination->tranform.orient_.w = source.tranform.orient_.w;
-    destination->tranform.pos_ = source.tranform.pos_;
-
-    destination->projection = source.projection;
-    destination->view = source.view;
-    destination->viewProjection = source.viewProjection;
-    destination->inverseProjection = source.inverseProjection;
-    destination->inverseView = source.inverseView;
-    destination->inverseViewProjection = source.inverseViewProjection;
-    destination->solid1 = source.solid1;
-    destination->solid2 = source.solid2;
-    destination->lodScale = source.lodScale;
-    destination->viewport = source.viewport;
-    return destination;
-  }
-
-
-
-
-
-
-
-  [[nodiscard]] moho::GeomCamera3* CopyGeomCameraIfPresent(
-    moho::GeomCamera3* const destination,
-    const moho::GeomCamera3* const source
-  )
-  {
-    if (source == nullptr) {
-      return nullptr;
-    }
-
-    return CopyGeomCameraStatePreservingFlags(destination, *source);
-  }
-
-
-
-
-
-
-
-
-  /**
-   * Address: 0x007AEB10 (FUN_007AEB10, helper lane behind CAM_GetAllCameras)
-   *
-   * What it does:
-   * Appends one `GeomCamera3` view to a legacy vector and returns the new end
-   * cursor after any buffer growth has completed.
-   */
-  [[maybe_unused, nodiscard]] moho::GeomCamera3* AppendGeomCameraViewAndReturnEnd(
-    msvc8::vector<moho::GeomCamera3>& cameras, const moho::GeomCamera3& camera
-  )
-  {
-    cameras.push_back(camera);
-    return cameras.empty() ? nullptr : &cameras[0] + cameras.size();
-  }
-
-  struct GeomCameraVectorCloneRuntimeView
-  {
-    std::uint32_t runtimeLane00 = 0;
-    moho::GeomCamera3* first = nullptr; // +0x04
-    moho::GeomCamera3* last = nullptr;  // +0x08
-    moho::GeomCamera3* end = nullptr;   // +0x0C
-  };
-  static_assert(
-    offsetof(GeomCameraVectorCloneRuntimeView, first) == 0x04,
-    "GeomCameraVectorCloneRuntimeView::first offset must be 0x04"
-  );
-  static_assert(
-    offsetof(GeomCameraVectorCloneRuntimeView, last) == 0x08,
-    "GeomCameraVectorCloneRuntimeView::last offset must be 0x08"
-  );
-  static_assert(
-    offsetof(GeomCameraVectorCloneRuntimeView, end) == 0x0C,
-    "GeomCameraVectorCloneRuntimeView::end offset must be 0x0C"
-  );
-
-
-  struct DwordVectorCloneRuntimeView
-  {
-    std::uint32_t runtimeLane00 = 0;
-    std::uint32_t* first = nullptr; // +0x04
-    std::uint32_t* last = nullptr;  // +0x08
-    std::uint32_t* end = nullptr;   // +0x0C
-  };
-  static_assert(
-    offsetof(DwordVectorCloneRuntimeView, first) == 0x04,
-    "DwordVectorCloneRuntimeView::first offset must be 0x04"
-  );
-  static_assert(
-    offsetof(DwordVectorCloneRuntimeView, last) == 0x08,
-    "DwordVectorCloneRuntimeView::last offset must be 0x08"
-  );
-  static_assert(
-    offsetof(DwordVectorCloneRuntimeView, end) == 0x0C,
-    "DwordVectorCloneRuntimeView::end offset must be 0x0C"
-  );
-
-
   [[nodiscard]] moho::VMatrix4 BuildLookAtMatrix(
     const Wm3::Vector3f& eye, const Wm3::Vector3f& target, const Wm3::Vector3f& up
   ) noexcept
@@ -521,58 +410,6 @@ namespace moho
 
     InitializeFrustumStorage(this);
     Init(viewTransform, projectionMatrix);
-  }
-
-  /**
-   * Address: 0x007421C0 (FUN_007421C0, func_CpyCamera)
-   *
-   * What it does:
-   * Copies transform, view/projection matrix lanes, frustum solids, LOD scale,
-   * and viewport matrix lanes from `rhs`.
-   */
-  GeomCamera3& GeomCamera3::operator=(const GeomCamera3& rhs)
-  {
-    (void)CopyGeomCameraStatePreservingFlags(this, rhs);
-    return *this;
-  }
-
-  /**
-   * Address: 0x00741850 (FUN_00741850, func_CpyGeomCameras)
-   *
-   * What it does:
-   * Copies one half-open source camera range into destination storage by
-   * calling `GeomCamera3::operator=` per element and returns destination end.
-   */
-  [[nodiscard]] GeomCamera3* CopyGeomCameraRangeAndReturnEnd(
-    const GeomCamera3* sourceBegin,
-    GeomCamera3* destinationBegin,
-    const GeomCamera3* sourceEnd
-  )
-  {
-    const GeomCamera3* source = sourceBegin;
-    GeomCamera3* destination = destinationBegin;
-    while (source != sourceEnd) {
-      (void)CopyGeomCameraStatePreservingFlags(destination, *source);
-      ++source;
-      ++destination;
-    }
-
-    return destination;
-  }
-
-
-
-  /**
-   * Address: 0x00742970 (FUN_00742970, ??1GeomCamera3@Moho@@QAE@XZ)
-   *
-   * What it does:
-   * Releases heap-backed frustum-plane lanes and restores both solids to inline
-   * storage prior to member dtors.
-   */
-  GeomCamera3::~GeomCamera3()
-  {
-    solid2.planes_.ResetStorageToInline();
-    solid1.planes_.ResetStorageToInline();
   }
 
   /**
@@ -1057,9 +894,10 @@ namespace moho
    *
    * The binary unrolls all eight corners; the loop here is the same
    * arithmetic, and the enclosing min/max is order-independent so the
-   * corner ordering does not have to match. Element indexing is taken from
-   * the decompiled reads: component c uses matrix elements c, c+4, c+8 and
-   * c+12, so the fourth component is the perspective divisor.
+   * corner ordering does not have to match. Each corner is the row vector
+   * `(x, y, z, 1)` times the matrix: component c of the result is
+   * `r[0][c] * x + r[1][c] * y + r[2][c] * z + r[3][c]`, and the fourth is
+   * the perspective divisor.
    */
   Wm3::AxisAlignedBox3f* ProjectBoxByMatrix(
     const VMatrix4* const matrix,
@@ -1067,27 +905,14 @@ namespace moho
     Wm3::AxisAlignedBox3f* const outBox
   )
   {
-    const auto* const m = reinterpret_cast<const float*>(matrix);
-
     Wm3::Vector3f corners[kProjectedCornerCount]{};
     for (int index = 0; index < kProjectedCornerCount; ++index) {
       const float x = ((index & 1) != 0) ? box->Max.X() : box->Min.X();
       const float y = ((index & 2) != 0) ? box->Max.Y() : box->Min.Y();
       const float z = ((index & 4) != 0) ? box->Max.Z() : box->Min.Z();
 
-      const float projected[4] = {
-        (m[0] * x) + (m[4] * y) + (m[8] * z) + m[12],
-        (m[1] * x) + (m[5] * y) + (m[9] * z) + m[13],
-        (m[2] * x) + (m[6] * y) + (m[10] * z) + m[14],
-        (m[3] * x) + (m[7] * y) + (m[11] * z) + m[15]
-      };
-
-      const float inverseW = 1.0f / projected[3];
-      corners[index] = Wm3::Vector3f(
-        projected[0] * inverseW,
-        projected[1] * inverseW,
-        projected[2] * inverseW
-      );
+      const ProjectionPoint projected = ProjectFromMatrix(*matrix, x, y, z);
+      corners[index] = Wm3::Vector3f(projected.x, projected.y, projected.z);
     }
 
     return EncloseCornerSet(outBox, corners);

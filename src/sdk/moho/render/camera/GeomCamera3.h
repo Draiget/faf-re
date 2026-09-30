@@ -39,13 +39,23 @@ namespace moho
     GeomCamera3();
 
     /**
+     * Address: 0x00742BF0 (FUN_00742BF0, func_CpyCamera)
+     *
+     * What it does:
+     * The implicit copy: every member in order, the two solids through
+     * `CGeomSolid3`'s copy constructor (0x004718F0). The padding at +0x19C
+     * and +0x2C4 is not copied.
+     */
+    GeomCamera3(const GeomCamera3&) = default;
+
+    /**
      * Address: 0x00742970 (FUN_00742970, ??1GeomCamera3@Moho@@QAE@XZ)
      *
      * What it does:
-     * Releases frustum-plane heap buffers for both solids and rebinds each
-     * lane to inline storage before member teardown.
+     * The implicit destructor: `solid2` then `solid1`, each `fastvector_n`
+     * freeing a heap block and falling back to its inline window.
      */
-    ~GeomCamera3();
+    ~GeomCamera3() = default;
 
     /**
      * Address: 0x0046FFA0 (FUN_0046FFA0, Moho::GeomCamera3::GeomCamera3)
@@ -62,10 +72,10 @@ namespace moho
      * Address: 0x007421C0 (FUN_007421C0, func_CpyCamera)
      *
      * What it does:
-     * Copies transform, projection/view matrices, frustum solids, LOD scale,
-     * and viewport matrix lanes from `rhs` while preserving local flag lanes.
+     * The implicit assignment: every member in order, the two solids through
+     * `CGeomSolid3::operator=` (0x00471A30).
      */
-    GeomCamera3& operator=(const GeomCamera3& rhs);
+    GeomCamera3& operator=(const GeomCamera3&) = default;
 
     /**
      * Address: 0x004700A0 (FUN_004700A0, Moho::GeomCamera3::Init)
@@ -227,19 +237,6 @@ namespace moho
      */
     void ViewInitPerspective(float fovXRadians, float fovYRadians, float nearDepth, float farDepth);
   };
-
-  /**
-   * Address: 0x00741850 (FUN_00741850, func_CpyGeomCameras)
-   *
-   * What it does:
-   * Copies one half-open `GeomCamera3` range into destination storage using
-   * `GeomCamera3::operator=` for each element and returns destination end.
-   */
-  [[nodiscard]] GeomCamera3* CopyGeomCameraRangeAndReturnEnd(
-    const GeomCamera3* sourceBegin,
-    GeomCamera3* destinationBegin,
-    const GeomCamera3* sourceEnd
-  );
 
   /**
    * Address: 0x004EFDD0 (FUN_004EFDD0, Moho::VEC_D3DProjectionMatrixFOV)
