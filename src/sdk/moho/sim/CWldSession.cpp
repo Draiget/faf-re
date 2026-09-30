@@ -2832,177 +2832,16 @@ namespace moho
     }
   }
 
-  namespace
-  {
-    struct CommandGraphLane64RuntimeView
-    {
-      std::uint8_t mPad00_63[0x64];
-      std::uint32_t mValue; // +0x64
-    };
-
-    static_assert(
-      offsetof(CommandGraphLane64RuntimeView, mValue) == 0x64,
-      "CommandGraphLane64RuntimeView::mValue offset must be 0x64"
-    );
-
-    struct CommandGraphLane458RuntimeView
-    {
-      std::uint8_t mPad00_457[0x458];
-      std::uint32_t mValue; // +0x458
-    };
-
-    static_assert(
-      offsetof(CommandGraphLane458RuntimeView, mValue) == 0x458,
-      "CommandGraphLane458RuntimeView::mValue offset must be 0x458"
-    );
-
-    struct DwordPairRuntimeView
-    {
-      std::uint32_t mFirst;   // +0x00
-      std::uint32_t mSecond;  // +0x04
-    };
-
-    /**
-     * Address: 0x00824330 (FUN_00824330, sub_824330)
-     *
-     * What it does:
-     * Returns one first-dword lane from one command-graph helper payload.
-     */
-    [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane0(const void* const value) noexcept
-    {
-      if (value == nullptr) {
-        return 0u;
-      }
-      return *static_cast<const std::uint32_t*>(value);
-    }
-
-    /**
-     * Address: 0x00824380 (FUN_00824380, sub_824380)
-     *
-     * What it does:
-     * Returns one dword lane at `+0x64` from one command-graph runtime payload.
-     */
-    [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane64(const void* const value) noexcept
-    {
-      if (value == nullptr) {
-        return 0u;
-      }
-      return static_cast<const CommandGraphLane64RuntimeView*>(value)->mValue;
-    }
-
-    /**
-     * Address: 0x00824470 (FUN_00824470, sub_824470)
-     *
-     * What it does:
-     * Returns one dword lane at `+0x458` from one command-graph runtime payload.
-     */
-    [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane458(const void* const value) noexcept
-    {
-      if (value == nullptr) {
-        return 0u;
-      }
-      return static_cast<const CommandGraphLane458RuntimeView*>(value)->mValue;
-    }
-
-    /**
-     * Address: 0x00824480 (FUN_00824480, sub_824480)
-     *
-     * IDA signature:
-     * Moho::UserTarget *__usercall sub_824480@<eax>(
-     *     Moho::UserTarget *this@<eax>, Moho::UserEntity *entity@<ecx>);
-     *
-     * What it does:
-     * `UserTarget`'s entity constructor: stores `UserTargetType::Entity` and
-     * links `targetEntity` at the head of `entity`'s weak-owner chain (the
-     * `WeakObject` head at `entity+8` on x86), or leaves it empty for a null
-     * entity. The position is not written. Its one caller is
-     * `ProcessCommandDrag`'s cached-target arm (0x00829EAB), which builds the
-     * re-acquired target this way right before `ISSUE_SetCommandTarget`.
-     * The link used to be spelled out by hand through a padded overlay of the
-     * owner's `+0x08` head and a three-word view of the target.
-     */
-    [[nodiscard]] UserTarget* ConstructEntityUserTarget(UserTarget* const target, UserEntity* const entity) noexcept
-    {
-      if (target == nullptr) {
-        return nullptr;
-      }
-
-      target->targetType = UserTargetType::Entity;
-      ::new (static_cast<void*>(&target->targetEntity)) WeakPtr<UserEntity>(entity);
-      return target;
-    }
-
-    /**
-     * Address: 0x008244D0 (FUN_008244D0, sub_8244D0)
-     *
-     * What it does:
-     * Returns one first-dword lane from one command-graph helper payload.
-     */
-    [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane0Alt(const void* const value) noexcept
-    {
-      if (value == nullptr) {
-        return 0u;
-      }
-      return *static_cast<const std::uint32_t*>(value);
-    }
-
-    /**
-     * Address: 0x00824540 (FUN_00824540, sub_824540)
-     *
-     * What it does:
-     * Copies one second-dword lane from source payload into destination dword.
-     */
-    [[nodiscard]] std::uint32_t* CopyRuntimeLane4ToDword(
-      std::uint32_t* const destination,
-      const void* const source
-    ) noexcept
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-      if (source == nullptr) {
-        *destination = 0u;
-      } else {
-        *destination = *(reinterpret_cast<const std::uint32_t*>(source) + 1);
-      }
-      return destination;
-    }
-
-    /**
-     * Address: 0x008245D0 (FUN_008245D0, sub_8245D0)
-     *
-     * What it does:
-     * Writes one two-dword pair payload (`first`,`second`) to destination.
-     */
-    [[nodiscard]] DwordPairRuntimeView* InitDwordPairRuntimeLane(
-      DwordPairRuntimeView* const destination,
-      const std::uint32_t second,
-      const std::uint32_t first
-    ) noexcept
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-      destination->mFirst = first;
-      destination->mSecond = second;
-      return destination;
-    }
-
-    /**
-     * Address: 0x00825FF0 (FUN_00825FF0, sub_825FF0)
-     *
-     * What it does:
-     * Sets one byte lane to `1` and returns destination.
-     */
-    [[nodiscard]] std::uint8_t* SetByteLaneTrue(std::uint8_t* const destination) noexcept
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-      *destination = 1u;
-      return destination;
-    }
-  } // namespace
+  /**
+   * Address: 0x00824480 (FUN_00824480, sub_824480)
+   *
+   * What it does:
+   * See the declaration in UserTarget.h.
+   */
+  UserTarget::UserTarget(UserEntity* const entity) noexcept
+    : targetType(UserTargetType::Entity)
+    , targetEntity(entity)
+  {}
 
   /**
    * Address: 0x00823B40 (FUN_00823B40, struct_BuildTemplate::struct_BuildTemplate)
@@ -8474,9 +8313,7 @@ namespace moho
                    static_cast<void*>(cachedTargetEntity), static_cast<void*>(closest),
                    static_cast<unsigned>(candidates.size()), clampedPos.x, clampedPos.y, clampedPos.z);
         if (closest != nullptr) {
-          UserTarget entityTarget{};
-          entityTarget.targetType = UserTargetType::Entity;
-          entityTarget.targetEntity.ResetFromObject(closest);
+          const UserTarget entityTarget(closest);
           ISSUE_SetCommandTarget(helper, entityTarget);
         }
         return;

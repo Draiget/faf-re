@@ -36,6 +36,25 @@ namespace moho
    */
   struct UserTarget
   {
+    UserTarget() = default;
+
+    /**
+     * Address: 0x00824480 (FUN_00824480, sub_824480)
+     *
+     * IDA signature:
+     * Moho::UserTarget *__usercall sub_824480@<eax>(
+     *     Moho::UserTarget *this@<eax>, Moho::UserEntity *entity@<ecx>);
+     *
+     * What it does:
+     * An entity target: stores `UserTargetType::Entity` and links
+     * `targetEntity` onto `entity`'s weak chain (empty for a null entity).
+     * The binary leaves the position unwritten; `Wm3::Vector3`'s default
+     * constructor zeroes it here, which nothing reads. Its one caller is
+     * `ProcessCommandDrag`'s cached-target arm (0x00829EAB). Defined in
+     * CWldSession.cpp, where `UserEntity` is complete.
+     */
+    explicit UserTarget(UserEntity* entity) noexcept;
+
     UserTargetType targetType{UserTargetType::None}; // +0x00
     WeakPtr<UserEntity> targetEntity;                // +0x04
     Wm3::Vector3<float> position;                    // +0x0C
