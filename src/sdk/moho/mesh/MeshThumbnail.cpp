@@ -15,7 +15,6 @@ namespace moho
    */
   MeshThumbnail::MeshThumbnail()
     : requestId(0)
-    , mPad0C_0F{}
     , camera()
     , meshInstance(nullptr)
     , orientation()

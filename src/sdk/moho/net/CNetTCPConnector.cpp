@@ -32,9 +32,8 @@ namespace moho
     u_short mPort;
     std::uint16_t mPad0x16;
     gpg::PipeStream mStream;
+    // The binary allocates 0xB8 bytes: 0xB4..0xB7 is `CMessage`'s own tail padding.
     CMessage mMessage;
-    // Binary allocates 0xB8 bytes for this object; 0xB4..0xB7 is tail padding.
-    std::uint32_t mPad0xB4;
 
     /**
      * Address: 0x00484660 (FUN_00484660, Moho::SPartialConnection::SPartialConnection)
@@ -122,7 +121,6 @@ namespace moho
   static_assert(offsetof(SPartialConnection, mPort) == 0x14, "SPartialConnection::mPort must be +0x14");
   static_assert(offsetof(SPartialConnection, mStream) == 0x18, "SPartialConnection::mStream must be +0x18");
   static_assert(offsetof(SPartialConnection, mMessage) == 0x60, "SPartialConnection::mMessage must be +0x60");
-  static_assert(offsetof(SPartialConnection, mPad0xB4) == 0xB4, "SPartialConnection::mPad0xB4 must be +0xB4");
   static_assert(sizeof(SPartialConnection) == 0xB8, "SPartialConnection size must be 0xB8");
 } // namespace moho
 

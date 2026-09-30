@@ -78,9 +78,9 @@ namespace moho
     virtual ~MeshThumbnail();
 
   public:
-    std::uint8_t mReserved04_07[0x04];               // +0x04 (observed gap in ctor/copy helper)
+    // +0x04 is the vfptr's padding and +0x0C the camera's: the class is
+    // 8-aligned through `camera`, and the constructor and copy skip both.
     std::uint32_t requestId;                         // +0x08
-    std::uint8_t mPad0C_0F[0x04];                    // +0x0C
     GeomCamera3 camera;                              // +0x10
     MeshInstance* meshInstance;                      // +0x2D8
     Wm3::Quatf orientation;                          // +0x2DC
@@ -89,9 +89,7 @@ namespace moho
     boost::shared_ptr<ID3DTextureSheet> outputSheet; // +0x300
   };
 
-  static_assert(offsetof(MeshThumbnail, mReserved04_07) == 0x04, "MeshThumbnail::mReserved04_07 offset must be 0x04");
   static_assert(offsetof(MeshThumbnail, requestId) == 0x08, "MeshThumbnail::requestId offset must be 0x08");
-  static_assert(offsetof(MeshThumbnail, mPad0C_0F) == 0x0C, "MeshThumbnail::mPad0C_0F offset must be 0x0C");
   static_assert(offsetof(MeshThumbnail, camera) == 0x10, "MeshThumbnail::camera offset must be 0x10");
   static_assert(offsetof(MeshThumbnail, meshInstance) == 0x2D8, "MeshThumbnail::meshInstance offset must be 0x2D8");
   static_assert(offsetof(MeshThumbnail, orientation) == 0x2DC, "MeshThumbnail::orientation offset must be 0x2DC");

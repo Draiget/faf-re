@@ -78,9 +78,9 @@ namespace moho
   static_assert(sizeof(SimSubRes2) == 0xC88, "SimSubRes2 size must be 0xC88");
 
   /**
-   * `IdPool` requires 8-byte alignment in the shipped binary, even though every
-   * member declared below is individually 4-byte (or smaller) aligned. Evidence,
-   * converging from four independent sites:
+   * `IdPool` is 8-byte aligned in the shipped binary, through `mReleasedLows`'
+   * words (an 8-aligned `gpg::fastvector_n`). Evidence, converging from four
+   * independent sites:
    *   - `CEntityDb::mIdPoolTree`'s node (`msvc8::map<std::uint32_t, IdPool>`,
    *     `EntityDb.h`) places `IdPool` at node+0x18, one 4-byte word after the
    *     node's `key`+0x10..0x14 -- i.e. a forced pad word between key and
@@ -101,7 +101,7 @@ namespace moho
    *     multiple of 8, so this alignment is free everywhere `IdPool` is already
    *     embedded -- it changes no existing `offsetof`/`sizeof` assertion.
    */
-  class alignas(8) IdPool
+  class IdPool
   {
   public:
     static gpg::RType* sType;

@@ -994,7 +994,6 @@ CUnitCommand::CUnitCommand()
   , mSim(nullptr)
   , mConstDat{}
   , mVarDat{}
-  , unk1(nullptr)
   , mUnitSet{}
   , mFormationInstance(nullptr)
   , mTarget{}
@@ -1062,7 +1061,6 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
   , mSim(sim)
   , mConstDat{}
   , mVarDat{}
-  , unk1(nullptr)
   , mUnitSet{}
   , mFormationInstance(nullptr)
   , mTarget{}

@@ -12,7 +12,18 @@ namespace moho
 {
   class IWldTerrainRes;
 
-  class CTesselator
+  /**
+   * The tesselator interface (`??_7ITesselator@Moho@@6B@`, 0x00E41BC0): its
+   * destructor in slot 0 and `_purecall` in the other 11. It has no fields,
+   * so `CTesselator`'s start right behind the vfptr at +0x04 although the
+   * whole object is 8-aligned (through its `CGeomSolid3`).
+   *
+   * Address: 0x0080B9A0 (FUN_0080B9A0 -- the constructor, which only stores the vtable; formerly
+   * `InitializeITesselatorVTableThiscall` over an `ITesselatorRuntimeView` in CTesselator.cpp.)
+   * Address: 0x0080EBA0 (FUN_0080EBA0 -- a second emission of it that returns `this`; formerly
+   * `InitializeITesselatorVTableReturnLane`.)
+   */
+  class ITesselator
   {
   public:
     struct Rect16
@@ -24,6 +35,50 @@ namespace moho
     };
     static_assert(sizeof(Rect16) == 0x08, "CTesselator::Rect16 size must be 0x08");
 
+    /**
+     * Address: 0x0080B9B0 (FUN_0080B9B0, ITesselator's scalar deleting destructor, slot 0)
+     */
+    virtual ~ITesselator();
+
+    virtual void Rebuild(GeomCamera3* camera, IWldTerrainRes* terrainResource) = 0;
+    [[nodiscard]] virtual Rect16* GetRectCacheData() const = 0;
+    [[nodiscard]] virtual std::uint16_t* GetCollisionIndexData() const = 0;
+    [[nodiscard]] virtual std::int32_t GetRectCacheCount() const = 0;
+    [[nodiscard]] virtual std::int32_t GetCollisionIndexCount() const = 0;
+    [[nodiscard]] virtual std::int32_t GetSkirtIndexStart() const = 0;
+    [[nodiscard]] virtual std::int32_t GetSkirtVertexStart() const = 0;
+    virtual bool CollectClippedCollisionIndicesInRect(
+      std::int32_t queryXMin,
+      std::int32_t queryZMin,
+      std::int32_t queryXMax,
+      std::int32_t queryZMax,
+      std::int32_t* outBaselineIndexCount,
+      std::uint32_t* outAddedIndexCount,
+      std::int32_t* outMinRectIndex,
+      std::int32_t* outMaxRectIndex
+    ) = 0;
+    [[nodiscard]] virtual float GetHeightScale() const = 0;
+    [[nodiscard]] virtual bool Tesselate(
+      std::int32_t queryX,
+      std::int32_t queryZ,
+      std::int32_t querySize,
+      std::int32_t* outRangeStart,
+      std::uint32_t* outRangeCount,
+      std::int32_t* outMinValue,
+      std::int32_t* outMaxValue
+    ) = 0;
+    virtual std::uint16_t* EmitCollisionQuad(
+      const Wm3::Vector3f* corners,
+      std::int32_t* outIndexStart,
+      std::uint32_t* outIndexCount,
+      std::int32_t* outRectStart,
+      std::uint32_t* outLastRectIndex
+    ) = 0;
+  };
+
+  class CTesselator : public ITesselator
+  {
+  public:
     struct SplitWorkNode
     {
       std::int32_t rangeStart;
@@ -45,7 +100,7 @@ namespace moho
      * Releases heap-backed storage for all FastVectorN lanes and rebinds them
      * to their inline buffers before unwinding base object state.
      */
-    virtual ~CTesselator();
+    ~CTesselator() override;
 
     /**
      * Address: 0x0080C8D0 (FUN_0080C8D0, Moho::CTesselator::Func1)
@@ -59,7 +114,7 @@ namespace moho
      * the heightfield in per-block tiles (`TesselateTile`) and appends a
      * skirt strip along each block's outer edges (`TesselateData`).
      */
-    virtual void Rebuild(GeomCamera3* camera, IWldTerrainRes* terrainResource);
+    void Rebuild(GeomCamera3* camera, IWldTerrainRes* terrainResource) override;
 
     /**
      * Address: 0x0080BCC0 (FUN_0080BCC0, Moho::CTesselator::GetVec1)
@@ -71,7 +126,7 @@ namespace moho
      *
      *   mov eax, [ecx+90h] ; retn
      */
-    [[nodiscard]] virtual Rect16* GetRectCacheData() const;
+    [[nodiscard]] Rect16* GetRectCacheData() const override;
 
     /**
      * Address: 0x0080BCD0 (FUN_0080BCD0, Moho::CTesselator::GetVec2)
@@ -83,7 +138,7 @@ namespace moho
      *
      *   mov eax, [ecx+7EFE0h] ; retn
      */
-    [[nodiscard]] virtual std::uint16_t* GetCollisionIndexData() const;
+    [[nodiscard]] std::uint16_t* GetCollisionIndexData() const override;
 
     /**
      * Address: 0x0080BCE0 (FUN_0080BCE0, Moho::CTesselator::Size1)
@@ -93,7 +148,7 @@ namespace moho
      * Element count of the rect cache. `Rect16` is 8 bytes, which is the
      * `sar eax, 3` the binary performs on the byte span.
      */
-    [[nodiscard]] virtual std::int32_t GetRectCacheCount() const;
+    [[nodiscard]] std::int32_t GetRectCacheCount() const override;
 
     /**
      * Address: 0x0080BCF0 (FUN_0080BCF0, Moho::CTesselator::Size2)
@@ -103,7 +158,7 @@ namespace moho
      * Element count of the triangle-index lane (`sar eax, 1` - 16-bit
      * elements).
      */
-    [[nodiscard]] virtual std::int32_t GetCollisionIndexCount() const;
+    [[nodiscard]] std::int32_t GetCollisionIndexCount() const override;
 
     /**
      * Address: 0x0080BD00 (FUN_0080BD00, Moho::CTesselator::GetSize2)
@@ -114,7 +169,7 @@ namespace moho
      * binary's slot names are crossed over: `GetSize2` answers the *index*
      * mark while `Size2` answers the index *count*.
      */
-    [[nodiscard]] virtual std::int32_t GetSkirtIndexStart() const;
+    [[nodiscard]] std::int32_t GetSkirtIndexStart() const override;
 
     /**
      * Address: 0x0080BD10 (FUN_0080BD10, Moho::CTesselator::GetSize1)
@@ -123,7 +178,7 @@ namespace moho
      * What it does:
      * Rect-cache index at which the terrain skirt's vertices start.
      */
-    [[nodiscard]] virtual std::int32_t GetSkirtVertexStart() const;
+    [[nodiscard]] std::int32_t GetSkirtVertexStart() const override;
 
     /**
      * Address: 0x0080BD20 (FUN_0080BD20, Moho::CTesselator::Func6)
@@ -139,7 +194,7 @@ namespace moho
      * touched `mCollisionRectLut` index delta plus the touched `mRectCache`
      * vertex-index range.
      */
-    virtual bool CollectClippedCollisionIndicesInRect(
+    bool CollectClippedCollisionIndicesInRect(
       std::int32_t queryXMin,
       std::int32_t queryZMin,
       std::int32_t queryXMax,
@@ -148,7 +203,7 @@ namespace moho
       std::uint32_t* outAddedIndexCount,
       std::int32_t* outMinRectIndex,
       std::int32_t* outMaxRectIndex
-    );
+    ) override;
 
     /**
      * Address: 0x0080D2E0 (FUN_0080D2E0, Moho::CTesselator::GetHeightScale)
@@ -160,7 +215,7 @@ namespace moho
      * Returns the fixed terrain height quantization scale (1/128) bound into the
      * terrain effect's `HeightScale` shader var by the terrain renderers.
      */
-    [[nodiscard]] virtual float GetHeightScale() const;
+    [[nodiscard]] float GetHeightScale() const override;
 
     /**
      * Address: 0x0080BEC0 (FUN_0080BEC0, Moho::CTesselator::Tesselate)
@@ -169,7 +224,7 @@ namespace moho
      * Resolves one query rectangle against split-work quadtree lanes and
      * accumulates matching output ranges/min-max lanes.
      */
-    [[nodiscard]] virtual bool Tesselate(
+    [[nodiscard]] bool Tesselate(
       std::int32_t queryX,
       std::int32_t queryZ,
       std::int32_t querySize,
@@ -177,7 +232,7 @@ namespace moho
       std::uint32_t* outRangeCount,
       std::int32_t* outMinValue,
       std::int32_t* outMaxValue
-    );
+    ) override;
 
     /**
      * Address: 0x0080C120 (FUN_0080C120, Moho::CTesselator::Func9)
@@ -186,13 +241,13 @@ namespace moho
      * Emits four quantized rect-cache entries from one quad corner array and
      * appends six triangle-index words to the collision index lane.
      */
-    virtual std::uint16_t* EmitCollisionQuad(
+    std::uint16_t* EmitCollisionQuad(
       const Wm3::Vector3f* corners,
       std::int32_t* outIndexStart,
       std::uint32_t* outIndexCount,
       std::int32_t* outRectStart,
       std::uint32_t* outLastRectIndex
-    );
+    ) override;
 
     /**
      * Address: 0x0080BAA0 (??0CTesselator@Moho@@QAE@@Z)
@@ -350,8 +405,7 @@ namespace moho
     float mWaterElevation;              // +0x88
     float mMinY;                        // +0x8C
     gpg::core::FastVectorN<Rect16, 65000> mRectCache;             // +0x90
-    gpg::core::FastVectorN<std::uint16_t, 25> mCollisionRectLut;  // +0x7EFE0
-    std::uint32_t mUnused7F024 = 0u;                              // +0x7F024
+    gpg::core::FastVectorN<std::uint16_t, 25> mCollisionRectLut;  // +0x7EFE0 (0x42 bytes, padded to 0x48)
 
     /**
      * Index into `mCollisionRectLut` at which the terrain skirt's indices

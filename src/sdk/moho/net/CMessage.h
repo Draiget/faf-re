@@ -224,5 +224,7 @@ namespace moho
     void Clear() noexcept;
   };
 
-  static_assert(sizeof(CMessage) == 0x54, "CMessage size must be 0x54");
+  // 0x54 bytes of fields, 8-aligned through `mBuff`: both owners leave the word
+  // after it unwritten (`CNetTCPConnection` +0xD24, `CReplayClient` +0x134).
+  static_assert(sizeof(CMessage) == 0x58, "CMessage size must be 0x58");
 } // namespace moho

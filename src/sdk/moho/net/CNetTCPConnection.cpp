@@ -213,7 +213,6 @@ CNetTCPConnection::CNetTCPConnection(
   , mHasShutdownOutput(0)
   , mPad0xCCD{}
   , mDatagram()
-  , mPad0xD24(0)
   , mPushFailed(0)
   , mPullFailed(0)
   , mScheduleDestroy(0)

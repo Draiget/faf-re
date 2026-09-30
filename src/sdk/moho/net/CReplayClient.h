@@ -111,8 +111,7 @@ namespace moho
     void ReplayThread();
 
     gpg::Stream* mReplayStream{nullptr};     // 0x0D8
-    CMessage mReplayMessage;                 // 0x0E0
-    std::uint32_t mReserved134{0};           // 0x134
+    CMessage mReplayMessage;                 // 0x0E0, 8-aligned (0x0DC and 0x134 are padding)
     std::int32_t mReplayBeat{0};             // 0x138
     bool mCurrentSourceAllowed{false};       // 0x13C
     std::uint8_t mReserved13D[3]{};          // 0x13D

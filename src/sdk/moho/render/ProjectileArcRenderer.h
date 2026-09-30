@@ -49,7 +49,7 @@ namespace moho
    *   - `FUN_00860D20` (the copy-assign) touches exactly `+0`, `+8`, `+3096`,
    *     `+3100`, `+3104`, `+3108` and `+3112`, matching the members below.
    */
-  struct alignas(8) ProjectileArcTrack
+  struct ProjectileArcTrack
   {
     /**
      * Set when the owning projectile was seen this frame. The draw pass clears
@@ -59,15 +59,11 @@ namespace moho
     bool mActive = false; // +0x0000
 
     /**
-     * Screen-trail sample positions, oldest first.
-     *
-     * `alignas(8)` because the binary's `fastvector_n` is 8-aligned: the
-     * track starts with a single byte yet the vector begins at `+0x08`, and
-     * the tail pads from `0xC29` out to `0xC30`. The simplified
-     * `gpg::fastvector_n` model in this tree is only 4-aligned, so the
-     * alignment has to be restated here to reproduce the binary's layout.
+     * Screen-trail sample positions, oldest first. The vector is 8-aligned,
+     * so it begins at `+0x08` behind the single byte above, and the track's
+     * tail pads from `0xC29` out to `0xC30`.
      */
-    alignas(8) gpg::fastvector_n<Wm3::Vector3f, kProjectileArcInlineSamples> mSamples{}; // +0x0008
+    gpg::fastvector_n<Wm3::Vector3f, kProjectileArcInlineSamples> mSamples{}; // +0x0008
 
     /** Frames since the last sample was appended. */
     std::int32_t mTicksSinceSample = 0; // +0x0C18
@@ -126,6 +122,7 @@ namespace moho
     offsetof(ProjectileArcTrack, mVisible) == 0x0C28, "ProjectileArcTrack::mVisible offset must be 0x0C28"
   );
   static_assert(sizeof(ProjectileArcTrack) == 0x0C30, "ProjectileArcTrack size must be 0x0C30");
+  static_assert(alignof(ProjectileArcTrack) == 8, "ProjectileArcTrack must be 8-aligned");
 
   /** Arc tracks keyed by entity id. Head node at 0x010C4318, so the map object starts at 0x010C4314. */
   using ProjectileArcTable = msvc8::map<std::int32_t, ProjectileArcTrack>;

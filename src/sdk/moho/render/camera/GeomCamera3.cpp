@@ -489,9 +489,7 @@ namespace moho
    * both frustum solids with six planes.
    */
   GeomCamera3::GeomCamera3()
-    : solidFlags(0)
-    , lodScale(1.0f)
-    , viewportFlags(0)
+    : lodScale(1.0f)
   {
     tranform.orient_ = Wm3::Quatf::Identity();
     tranform.pos_ = {0.0f, 0.0f, 0.0f};
@@ -514,9 +512,7 @@ namespace moho
    * from caller-provided transform and projection.
    */
   GeomCamera3::GeomCamera3(const VTransform& viewTransform, const gpg::gal::Matrix& projectionMatrix)
-    : solidFlags(0)
-    , lodScale(1.0f)
-    , viewportFlags(0)
+    : lodScale(1.0f)
   {
     tranform.orient_ = Wm3::Quatf::Identity();
     tranform.pos_ = {0.0f, 0.0f, 0.0f};

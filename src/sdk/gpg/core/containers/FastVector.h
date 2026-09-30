@@ -1179,6 +1179,17 @@ namespace gpg::core
   /**
    * Small-buffer optimized vector: `FastVectorInline<T>`'s head plus the
    * inline window it anchors.
+   *
+   * 8-byte aligned whatever `T` is. Every owner in the binary puts one at an
+   * 8-aligned offset and pads around it: `GeomCamera3` leaves +0x19C and
+   * +0x2C4 unwritten around its two `CGeomSolid3` plane vectors (its
+   * constructor 0x0046FE30 and copy 0x00742BF0 skip both words);
+   * `CUserSoundManager` pads +0x04 after its vfptr and +0x13C after
+   * `SoundHandleIdPool` (0x24 bytes of `{BVIntSet, next id}`, so 0x28 in the
+   * binary); `BVIntSet`'s copy 0x00401E10 skips +0x04 before its words;
+   * `ProjectileArcTrack` puts its samples at +0x08 behind a single bool and
+   * pads 0xC29 to 0xC30; `Shadow` leaves +0x04 behind its vfptr. Every
+   * instantiation whose size the tree asserts is a multiple of 8.
    */
   template <class T, size_t N>
   class FastVectorN : public FastVectorInline<T>
@@ -1212,7 +1223,7 @@ namespace gpg::core
      * safe: an abandoned inline slot after a heap grow is not a live object
      * whose destructor would run a second time.
      */
-    alignas(T) std::byte inlineVec_[N * ElemSize];
+    alignas(8) alignas(T) std::byte inlineVec_[N * ElemSize];
 
     [[nodiscard]] T* InlineStorage() noexcept
     {

@@ -1614,7 +1614,6 @@ namespace moho
     : WeakObject()
     , mConstantData(constantData)
     , mVariableData()
-    , mVariableDataTailPad{}
     , mReservedB0(0u)
     , mDeleteWhenDue(deleteWhenDue)
     , mVariableDataDirty(1u)

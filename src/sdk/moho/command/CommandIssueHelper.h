@@ -96,8 +96,7 @@ namespace moho
   struct UserCommandIssueHelper : WeakObject
   {
     SSTICommandConstantData mConstantData;    // +0x004
-    SSTICommandVariableData mVariableData;    // +0x040
-    std::uint8_t mVariableDataTailPad[0x04];  // +0x0AC
+    SSTICommandVariableData mVariableData;    // +0x040 (0x70 with its tail padding)
     std::uint8_t mReservedB0;                 // +0x0B0
     std::uint8_t mDeleteWhenDue;              // +0x0B1
     std::uint8_t mVariableDataDirty;          // +0x0B2
@@ -148,10 +147,6 @@ namespace moho
 
   static_assert(offsetof(UserCommandIssueHelper, mConstantData) == 0x004, "UserCommandIssueHelper::mConstantData offset must be 0x004");
   static_assert(offsetof(UserCommandIssueHelper, mVariableData) == 0x040, "UserCommandIssueHelper::mVariableData offset must be 0x040");
-  static_assert(
-    offsetof(UserCommandIssueHelper, mVariableDataTailPad) == 0x0AC,
-    "UserCommandIssueHelper::mVariableDataTailPad offset must be 0x0AC"
-  );
   static_assert(offsetof(UserCommandIssueHelper, mReservedB0) == 0x0B0, "UserCommandIssueHelper::mReservedB0 offset must be 0x0B0");
   static_assert(offsetof(UserCommandIssueHelper, mDeleteWhenDue) == 0x0B1, "UserCommandIssueHelper::mDeleteWhenDue offset must be 0x0B1");
   static_assert(

@@ -439,7 +439,7 @@ namespace moho
     void Update(const GeomCamera3& camera, float elapsedSeconds, std::int32_t tick);
 
   public:
-    std::uint32_t mReserved04;                            // +0x04
+    // +0x04 is the hole MSVC leaves after the vfptr of an 8-aligned class.
     // The wave system's own spatial database, 0x90 bytes inline. It used to
     // be an 8-byte handle plus an opaque mRuntimeBlock10[0x8C] tail -- the
     // same split the mesh renderer carried, because one flat type had to
@@ -452,7 +452,6 @@ namespace moho
     gpg::fastvector_n<WaveGenerator*, 100> mGeneratorCache; // +0xA8
   };
 
-  static_assert(offsetof(WaveSystem, mReserved04) == 0x04, "WaveSystem::mReserved04 offset must be 0x04");
   static_assert(
     offsetof(WaveSystem, mSpatialMeshInstance) == 0x08,
     "WaveSystem::mSpatialMeshInstance offset must be 0x08"

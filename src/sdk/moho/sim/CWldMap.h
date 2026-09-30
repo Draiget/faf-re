@@ -395,22 +395,189 @@ namespace moho
   static_assert(sizeof(SChartSize) == 0x08, "SChartSize size must be 0x08");
 
   /**
-   * Recovered leading layout for IWldTerrainRes.
-   * Only fields used by 0x0089E710 are mapped here.
+   * The terrain interface every consumer holds. Its vtable
+   * (`??_7IWldTerrainRes@Moho@@6B@`, 0x00E4BC14) has its own destructor in
+   * slot 0 and `_purecall` in the other 76; `CWldTerrainRes` is the only
+   * implementation. The one field is the map it owns, at +0x04: a vfptr-only
+   * base keeps it there, which is how the derived object can be 8-aligned
+   * (through `WaveSystem`'s `fastvector_n`) and still read `[this+4]` as the
+   * map.
    */
   class IWldTerrainRes
   {
   public:
-
     /**
      * Address: 0x0089E870 (FUN_0089E870, IWldTerrainRes scalar-deleting destructor)
      *
      * What it does:
-     * Tears down the owned `mMap` (the terrain's real runtime
-     * `STIMap`, reached through the same `reinterpret_cast` this class's other
-     * accessors already use) before the base object is released.
+     * Deletes the owned `mMap`.
      */
     virtual ~IWldTerrainRes();
+
+    [[nodiscard]] virtual bool GetBool() const = 0;
+    [[nodiscard]] virtual const Cartographic& GetCartographic() const = 0;
+    [[nodiscard]] virtual Cartographic& GetCartographic() = 0;
+    [[nodiscard]] virtual const SkyDome& GetSkyDome() const = 0;
+    [[nodiscard]] virtual SkyDome& GetSkyDome() = 0;
+    virtual void SetSkycube(const msvc8::string& texturePath) = 0;
+    [[nodiscard]] virtual const msvc8::string& GetSkycubeFile() const = 0;
+    [[nodiscard]] virtual boost::shared_ptr<ID3DTextureSheet> GetSkycube() const = 0;
+    virtual void SetBackground(const msvc8::string& texturePath) = 0;
+    [[nodiscard]] virtual const msvc8::string& GetBackgroundFile() const = 0;
+    [[nodiscard]] virtual boost::shared_ptr<ID3DTextureSheet> GetBackground() const = 0;
+    virtual void AddEnvLookup(const msvc8::string& environmentKey, const msvc8::string& texturePath) = 0;
+    virtual void RemoveEnvLookup(const msvc8::string& environmentKey) = 0;
+    [[nodiscard]] virtual boost::shared_ptr<ID3DTextureSheet> GetEnvLookup(const msvc8::string& environmentKey) const = 0;
+    virtual void EnumerateEnvLookup(TerrainEnvironmentLookupPairs& outPairs) const = 0;
+    virtual void ClearEnvLookup() = 0;
+    virtual void SetTopographicSamples(std::int32_t sampleCount) = 0;
+    [[nodiscard]] virtual std::int32_t GetTopographicSamples() const = 0;
+    virtual void SetHypsometricColor(std::int32_t colorIndex, std::uint32_t colorValue) = 0;
+    [[nodiscard]] virtual std::uint32_t GetHypsometricColor(std::int32_t colorIndex) const = 0;
+    virtual void SetImagerElevationOffset(float elevationOffset) = 0;
+    [[nodiscard]] virtual float GetImagerElevationOffset() const = 0;
+    virtual bool Reset(SChartSize chartSize, LuaPlus::LuaState* state) = 0;
+    [[nodiscard]] virtual Wm3::AxisAlignedBox3f GetWorldBounds() const = 0;
+    [[nodiscard]] virtual StratumMaterial& GetStratumMaterial() = 0;
+    [[nodiscard]] virtual WaveSystem* GetWaveSystem() = 0;
+    virtual void UpdateWaveSystem(const GeomCamera3& camera, float elapsedSeconds, std::int32_t tick) = 0;
+    [[nodiscard]] virtual boost::shared_ptr<ID3DTextureSheet> GetWaterMap() const = 0;
+    virtual void UpdateWaterMap(const gpg::Rect2i& rect) = 0;
+    virtual void UpdateWaterMap() = 0;
+    [[nodiscard]] virtual Wm3::Vector2f GetWaterMapSize() const = 0;
+    virtual void UpdateNormalMap(const gpg::Rect2i& rect) = 0;
+    virtual void NotifyMapChange(const gpg::Rect2i& rect) = 0;
+    [[nodiscard]] virtual gpg::BitArray2D* GetDebugDirtyTerrain() = 0;
+    [[nodiscard]] virtual const msvc8::list<gpg::Rect2i>& GetDebugDirtyRects() const = 0;
+    [[nodiscard]] virtual std::int32_t GetNormalMapCount() = 0;
+    [[nodiscard]] virtual SNormalMapInfo GetNormalMapInfo(std::int32_t index) const = 0;
+    virtual void UpdateStratumMask(
+      std::int32_t stratumIndex,
+      const std::uint8_t* sourceMask,
+      std::int32_t columnStart,
+      std::int32_t rowStart,
+      std::int32_t columnEnd,
+      std::int32_t rowEnd
+    ) = 0;
+    virtual void UpdateStratumMask(std::int32_t stratumIndex, const std::uint8_t* sourceMask) = 0;
+    virtual void GetStratumMask(std::int32_t stratumIndex, std::uint8_t* outMask) = 0;
+    [[nodiscard]] virtual float GetLightingMultiplier() const = 0;
+    virtual void SetLightingMultiplier(const float& multiplier) = 0;
+    [[nodiscard]] virtual Wm3::Vector3f GetSunDirection() const = 0;
+    virtual void SetSunDirection(const Wm3::Vector3f& direction) = 0;
+    [[nodiscard]] virtual Wm3::Vector3f GetSunAmbience() const = 0;
+    virtual void SetSunAmbience(const Wm3::Vector3f& ambience) = 0;
+    [[nodiscard]] virtual Wm3::Vector3f GetSunColor() const = 0;
+    virtual void SetSunColor(const Wm3::Vector3f& color) = 0;
+    [[nodiscard]] virtual Wm3::Vector3f GetShadowFillColor() const = 0;
+    virtual void SetShadowFillColor(const Wm3::Vector3f& color) = 0;
+    [[nodiscard]] virtual Vector4f GetSpecularColor() const = 0;
+    virtual void SetSpecularColor(const Vector4f& color) = 0;
+    [[nodiscard]] virtual float GetBloom() const = 0;
+    virtual void SetBloom(float bloom) = 0;
+    [[nodiscard]] virtual const SFogInfo& GetFogInfo() const = 0;
+    virtual void SetFogInfo(const SFogInfo& fogInfo) = 0;
+    virtual void WaterEnabled(bool enabled) = 0;
+    virtual void SetWaterElevation(float elevation) = 0;
+    virtual void SetWaterElevationDeep(float elevation) = 0;
+    virtual void SetWaterElevationAbyss(float elevation) = 0;
+    [[nodiscard]] virtual bool SetPlayableMapRect(const VisibilityRect& rect) = 0;
+    [[nodiscard]] virtual const VisibilityRect* GetPlayableMapRect(VisibilityRect& outRect) const = 0;
+    [[nodiscard]] virtual bool IsInPlayableRect(const Wm3::Vec3f& worldPos) = 0;
+    virtual void SetWaterShaderProperties(const CWaterShaderProperties& properties) = 0;
+    [[nodiscard]] virtual CWaterShaderProperties* GetWaterShaderProperties() = 0;
+    [[nodiscard]] virtual std::uint8_t* GetWaterFoam() = 0;
+    [[nodiscard]] virtual std::uint8_t* GetWaterFlatness() = 0;
+    [[nodiscard]] virtual std::uint8_t* GetWaterDepthBias() = 0;
+    [[nodiscard]] virtual bool IsInEditMode() const = 0;
+    virtual void EnterEditMode(CBackgroundTaskControl& loadControl) = 0;
+    virtual void ExitEditMode() = 0;
+    virtual void SyncTerrain(const CHeightField* source) = 0;
+    [[nodiscard]]
+    virtual bool Load(gpg::BinaryReader& reader, LuaPlus::LuaState* state, CBackgroundTaskControl& loadControl) = 0;
+    virtual bool Save(gpg::BinaryWriter& writer) = 0;
+    [[nodiscard]] virtual bool Finalize() = 0;
+    [[nodiscard]] virtual IDecalManager* GetDecalManager() = 0;
+
+  protected:
+    /**
+     * Address: 0x008A74D0 (FUN_008A74D0, IWldTerrainRes ctor lane)
+     *
+     * What it does:
+     * Initializes one terrain-resource interface base and clears playable-rect
+     * source ownership to null.
+     */
+    IWldTerrainRes();
+
+  public:
+    /**
+     * Not a distinct binary function - every caller inlines the same
+     * `mMap->mHeightField.get()` chase (`IWldTerrainRes+0x04` ->
+     * `STIMap+0x00`), `CUIWorldView`'s build-drag adjacency pass
+     * (`sub_854B70`) among them.
+     */
+    [[nodiscard]] CHeightField* GetHeightField() const;
+
+    /**
+     * Not a distinct binary function - every caller inlines the same
+     * `mMap->mWaterEnabled` field read.
+     * Promoted to a public accessor for the same reason as `GetHeightField()`.
+     */
+    [[nodiscard]] bool IsWaterEnabled() const;
+
+    /**
+     * Not a distinct binary function - every caller inlines the same
+     * `mMap->mWaterElevation` field read.
+     * Promoted to a public accessor for the same reason as `GetHeightField()`.
+     */
+    [[nodiscard]] float GetWaterElevation() const;
+
+    /**
+     * Address: 0x00811210 (FUN_00811210, Moho::CWldTerrainRes::GetHeightAt)
+     *
+     * What it does:
+     * Returns one clamped terrain height sample at `(x,z)` converted from
+     * 16-bit height words into world height units (`* 1/128`).
+     */
+    [[nodiscard]] float GetHeightAt(std::int32_t x, std::int32_t z) const;
+
+    /**
+     * The terrain's map data, owned by this interface: `~IWldTerrainRes`
+     * deletes it, `GetPlayableMapRect` reads `mPlayableRect` out of it at
+     * +0x08, and every consumer that reaches `[terrainRes+0x04]` in the binary
+     * - the cartographic view, the splat and clutter passes, the map imager,
+     * the console's map queries - follows it straight into `STIMap`.
+     */
+    STIMap* mMap;                                          // +0x004
+  };
+
+  /**
+   * The terrain resource (`??_7CWldTerrainRes@Moho@@6B@`, 0x00E4BD54): every
+   * slot of `IWldTerrainRes` implemented, and the sky, lighting, strata,
+   * water, normal maps and decals behind them.
+   */
+  class CWldTerrainRes final : public IWldTerrainRes
+  {
+  public:
+    /**
+     * Address: 0x008A0AD0 (FUN_008A0AD0, ??0CWldTerrainRes@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Sets the lighting, sun, hypsometric and imager defaults and nulls the
+     * owned buffers; every member with a constructor builds itself.
+     */
+    CWldTerrainRes();
+
+    /**
+     * Address: 0x008A0D60 (FUN_008A0D60, ??1CWldTerrainRes@Moho@@UAE@XZ)
+     * Address: 0x008A74B0 (FUN_008A74B0, ??_ECWldTerrainRes@Moho@@UAEPAXI@Z -- the scalar deleting destructor, slot 0)
+     *
+     * What it does:
+     * Frees the raw owned buffers (decal manager, debug dirty bitmap, water
+     * masks, edit words); the members then destroy themselves and
+     * `~IWldTerrainRes` deletes the map.
+     */
+    ~CWldTerrainRes() override;
 
     /**
      * Address: 0x008A1030 (FUN_008A1030, Moho::CWldTerrainRes::GetBool)
@@ -418,7 +585,7 @@ namespace moho
      * What it does:
      * Returns the terrain runtime boolean lane at `+0x08`.
      */
-    [[nodiscard]] virtual bool GetBool() const;
+    [[nodiscard]] bool GetBool() const override;
 
     /**
      * Address: 0x008A1050 (FUN_008A1050, ?GetCartographic@CWldTerrainRes@Moho@@UBEABVCartographic@2@XZ)
@@ -426,7 +593,7 @@ namespace moho
      * What it does:
      * Returns read-only access to terrain cartographic runtime state.
      */
-    [[nodiscard]] virtual const Cartographic& GetCartographic() const;
+    [[nodiscard]] const Cartographic& GetCartographic() const override;
 
     /**
      * Address: 0x008A1040 (FUN_008A1040, ?GetCartographic@CWldTerrainRes@Moho@@UAEAAVCartographic@2@XZ)
@@ -434,7 +601,7 @@ namespace moho
      * What it does:
      * Returns mutable access to terrain cartographic runtime state.
      */
-    [[nodiscard]] virtual Cartographic& GetCartographic();
+    [[nodiscard]] Cartographic& GetCartographic() override;
 
     /**
      * Address: 0x008A1070 (FUN_008A1070, ?GetSkyDome@CWldTerrainRes@Moho@@UBEABVSkyDome@2@XZ)
@@ -442,7 +609,7 @@ namespace moho
      * What it does:
      * Returns read-only access to terrain skydome runtime state.
      */
-    [[nodiscard]] virtual const SkyDome& GetSkyDome() const;
+    [[nodiscard]] const SkyDome& GetSkyDome() const override;
 
     /**
      * Address: 0x008A1060 (FUN_008A1060, ?GetSkyDome@CWldTerrainRes@Moho@@UAEAAVSkyDome@2@XZ)
@@ -450,7 +617,7 @@ namespace moho
      * What it does:
      * Returns mutable access to terrain skydome runtime state.
      */
-    [[nodiscard]] virtual SkyDome& GetSkyDome();
+    [[nodiscard]] SkyDome& GetSkyDome() override;
 
     /**
      * Address: 0x008A11C0 (FUN_008A11C0, ?SetSkycube@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
@@ -459,7 +626,7 @@ namespace moho
      * Stores terrain skycube texture path and resolves the corresponding D3D
      * texture resource handle.
      */
-    virtual void SetSkycube(const msvc8::string& texturePath);
+    void SetSkycube(const msvc8::string& texturePath) override;
 
     /**
      * Address: 0x008A12C0 (FUN_008A12C0,
@@ -470,7 +637,7 @@ namespace moho
      * The skycube counterpart of `GetBackgroundFile`: `lea eax, [ecx+980h];
      * retn`, returning the stored path by reference.
      */
-    [[nodiscard]] virtual const msvc8::string& GetSkycubeFile() const;
+    [[nodiscard]] const msvc8::string& GetSkycubeFile() const override;
 
     /**
      * Address: 0x008A12D0 (FUN_008A12D0, ?GetSkycube@CWldTerrainRes@Moho@@UBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
@@ -478,7 +645,7 @@ namespace moho
      * What it does:
      * Returns one retained shared texture handle for terrain skycube.
      */
-    [[nodiscard]] virtual boost::shared_ptr<ID3DTextureSheet> GetSkycube() const;
+    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetSkycube() const override;
 
     /**
      * Address: 0x008A1080 (FUN_008A1080, ?SetBackground@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
@@ -487,7 +654,7 @@ namespace moho
      * Stores terrain background texture path and resolves the corresponding D3D
      * texture resource handle.
      */
-    virtual void SetBackground(const msvc8::string& texturePath);
+    void SetBackground(const msvc8::string& texturePath) override;
 
     /**
      * Address: 0x008A1180 (FUN_008A1180,
@@ -498,7 +665,7 @@ namespace moho
      * Returns the path `SetBackground` stored, by reference. The whole body is
      * `lea eax, [ecx+95Ch]; retn` -- the string itself, not a copy.
      */
-    [[nodiscard]] virtual const msvc8::string& GetBackgroundFile() const;
+    [[nodiscard]] const msvc8::string& GetBackgroundFile() const override;
 
     /**
      * Address: 0x008A1190 (FUN_008A1190, ?GetBackground@CWldTerrainRes@Moho@@UBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
@@ -506,7 +673,7 @@ namespace moho
      * What it does:
      * Returns one retained shared texture handle for terrain background.
      */
-    [[nodiscard]] virtual boost::shared_ptr<ID3DTextureSheet> GetBackground() const;
+    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetBackground() const override;
 
     /**
      * Address: 0x008A1300 (FUN_008A1300)
@@ -516,7 +683,7 @@ namespace moho
      * Resolves one environment texture path and upserts it into the
      * terrain environment-lookup map keyed by environment id.
      */
-    virtual void AddEnvLookup(const msvc8::string& environmentKey, const msvc8::string& texturePath);
+    void AddEnvLookup(const msvc8::string& environmentKey, const msvc8::string& texturePath) override;
 
     /**
      * Address: 0x008A13F0 (FUN_008A13F0)
@@ -525,7 +692,7 @@ namespace moho
      * What it does:
      * Removes one environment-lookup map entry by key when present.
      */
-    virtual void RemoveEnvLookup(const msvc8::string& environmentKey);
+    void RemoveEnvLookup(const msvc8::string& environmentKey) override;
 
     /**
      * Address: 0x008A1430 (FUN_008A1430)
@@ -534,7 +701,7 @@ namespace moho
      * What it does:
      * Returns one environment texture handle by key, with `<default>` fallback.
      */
-    [[nodiscard]] virtual boost::shared_ptr<ID3DTextureSheet> GetEnvLookup(const msvc8::string& environmentKey) const;
+    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetEnvLookup(const msvc8::string& environmentKey) const override;
 
     /**
      * Address: 0x008A1500 (FUN_008A1500)
@@ -543,7 +710,7 @@ namespace moho
      * What it does:
      * Rebuilds caller-provided list with all environment-key/name pairs in map order.
      */
-    virtual void EnumerateEnvLookup(TerrainEnvironmentLookupPairs& outPairs) const;
+    void EnumerateEnvLookup(TerrainEnvironmentLookupPairs& outPairs) const override;
 
     /**
      * Address: 0x008A1640 (FUN_008A1640)
@@ -552,7 +719,7 @@ namespace moho
      * What it does:
      * Clears all environment-lookup entries and resets map head links to empty.
      */
-    virtual void ClearEnvLookup();
+    void ClearEnvLookup() override;
 
     /**
      * Address: 0x008A1680 (FUN_008A1680, ?SetTopographicSamples@CWldTerrainRes@Moho@@UAEXH@Z)
@@ -560,7 +727,7 @@ namespace moho
      * What it does:
      * Sets the active topographic sample-count lane.
      */
-    virtual void SetTopographicSamples(std::int32_t sampleCount);
+    void SetTopographicSamples(std::int32_t sampleCount) override;
 
     /**
      * Address: 0x008A1690 (FUN_008A1690, ?GetTopographicSamples@CWldTerrainRes@Moho@@UBEHXZ)
@@ -568,7 +735,7 @@ namespace moho
      * What it does:
      * Returns the active topographic sample-count lane.
      */
-    [[nodiscard]] virtual std::int32_t GetTopographicSamples() const;
+    [[nodiscard]] std::int32_t GetTopographicSamples() const override;
 
     /**
      * Address: 0x008A16A0 (FUN_008A16A0)
@@ -577,7 +744,7 @@ namespace moho
      * What it does:
      * Writes one indexed hypsometric color lane.
      */
-    virtual void SetHypsometricColor(std::int32_t colorIndex, std::uint32_t colorValue);
+    void SetHypsometricColor(std::int32_t colorIndex, std::uint32_t colorValue) override;
 
     /**
      * Address: 0x008A16C0 (FUN_008A16C0)
@@ -586,7 +753,7 @@ namespace moho
      * What it does:
      * Returns one indexed hypsometric color lane.
      */
-    [[nodiscard]] virtual std::uint32_t GetHypsometricColor(std::int32_t colorIndex) const;
+    [[nodiscard]] std::uint32_t GetHypsometricColor(std::int32_t colorIndex) const override;
 
     /**
      * Address: 0x008A16D0 (FUN_008A16D0, ?SetImagerElevationOffset@CWldTerrainRes@Moho@@UAEXM@Z)
@@ -594,7 +761,7 @@ namespace moho
      * What it does:
      * Sets the terrain imager elevation offset lane.
      */
-    virtual void SetImagerElevationOffset(float elevationOffset);
+    void SetImagerElevationOffset(float elevationOffset) override;
 
     /**
      * Address: 0x008A16F0 (FUN_008A16F0, ?GetImagerElevationOffset@CWldTerrainRes@Moho@@UBEMXZ)
@@ -602,7 +769,7 @@ namespace moho
      * What it does:
      * Returns the terrain imager elevation offset lane.
      */
-    [[nodiscard]] virtual float GetImagerElevationOffset() const;
+    [[nodiscard]] float GetImagerElevationOffset() const override;
 
     /**
      * Address: 0x008A6220 (FUN_008A6220)
@@ -634,7 +801,7 @@ namespace moho
      * `IWldTerrainRes` model has no `CWldMap` friendship and `CWldMap::MapNew`
      * dispatches this slot directly at 0x00890D69.)
      */
-    virtual bool Reset(SChartSize chartSize, LuaPlus::LuaState* state);
+    bool Reset(SChartSize chartSize, LuaPlus::LuaState* state) override;
 
     /**
      * Address: 0x008A6A60 (FUN_008A6A60, ?GetWorldBounds@CWldTerrainRes@Moho@@EBE?AV?$AxisAlignedBox3@M@Wm3@@XZ)
@@ -642,7 +809,7 @@ namespace moho
      * What it does:
      * Returns terrain world-space bounds derived from the map heightfield.
      */
-    [[nodiscard]] virtual Wm3::AxisAlignedBox3f GetWorldBounds() const;
+    [[nodiscard]] Wm3::AxisAlignedBox3f GetWorldBounds() const override;
 
     /**
      * Address: 0x008A49D0 (FUN_008A49D0, ?GetStratumMaterial@CWldTerrainRes@Moho@@UAEAAVStratumMaterial@2@XZ)
@@ -650,7 +817,7 @@ namespace moho
      * What it does:
      * Returns mutable access to the owned terrain stratum material set.
      */
-    [[nodiscard]] virtual StratumMaterial& GetStratumMaterial();
+    [[nodiscard]] StratumMaterial& GetStratumMaterial() override;
 
     /**
      * Address: 0x008A5010 (FUN_008A5010, ?GetWaveSystem@CWldTerrainRes@Moho@@EAEPAVWaveSystem@2@XZ)
@@ -658,7 +825,7 @@ namespace moho
      * What it does:
      * Returns the owned terrain wave-system object.
      */
-    [[nodiscard]] virtual WaveSystem* GetWaveSystem();
+    [[nodiscard]] WaveSystem* GetWaveSystem() override;
 
     /**
      * Address: 0x008A5020 (FUN_008A5020, ?UpdateWaveSystem@CWldTerrainRes@Moho@@UAEXABVGeomCamera3@2@MH@Z)
@@ -666,7 +833,7 @@ namespace moho
      * What it does:
      * Forwards one camera/timestep update into terrain wave simulation.
      */
-    virtual void UpdateWaveSystem(const GeomCamera3& camera, float elapsedSeconds, std::int32_t tick);
+    void UpdateWaveSystem(const GeomCamera3& camera, float elapsedSeconds, std::int32_t tick) override;
 
     /**
      * Address: 0x008A5040 (FUN_008A5040, ?GetWaterMap@CWldTerrainRes@Moho@@UBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
@@ -674,7 +841,7 @@ namespace moho
      * What it does:
      * Returns one retained shared texture handle for the terrain water map.
      */
-    [[nodiscard]] virtual boost::shared_ptr<ID3DTextureSheet> GetWaterMap() const;
+    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetWaterMap() const override;
 
     /**
      * Address: 0x008A50F0 (FUN_008A50F0, ?UpdateWaterMap@CWldTerrainRes@Moho@@UAEXABV?$Rect2@H@gpg@@@Z)
@@ -683,7 +850,7 @@ namespace moho
      * Rebuilds one clipped rectangle of the half-resolution RGBA water-map
      * texture from terrain height samples and water mask lanes.
      */
-    virtual void UpdateWaterMap(const gpg::Rect2i& rect);
+    void UpdateWaterMap(const gpg::Rect2i& rect) override;
 
     /**
      * Address: 0x008A50C0 (FUN_008A50C0, ?UpdateWaterMap@CWldTerrainRes@Moho@@UAEXXZ)
@@ -692,7 +859,7 @@ namespace moho
      * Rebuilds the full half-resolution RGBA water-map texture from terrain
      * height samples and water mask lanes.
      */
-    virtual void UpdateWaterMap();
+    void UpdateWaterMap() override;
 
     /**
      * Address: 0x008A5070 (FUN_008A5070, ?GetWaterMapSize@CWldTerrainRes@Moho@@UBE?AV?$Vector2@M@Wm3@@XZ)
@@ -701,7 +868,7 @@ namespace moho
      * Returns half-resolution terrain water-map dimensions derived from the
      * backing heightfield (`(width - 1) / 2`, `(height - 1) / 2`).
      */
-    [[nodiscard]] virtual Wm3::Vector2f GetWaterMapSize() const;
+    [[nodiscard]] Wm3::Vector2f GetWaterMapSize() const override;
 
     /**
      * Address: 0x008A5BC0 (FUN_008A5BC0, ?UpdateNormalMap@CWldTerrainRes@Moho@@EAEXABV?$Rect2@H@gpg@@@Z)
@@ -709,7 +876,7 @@ namespace moho
      * What it does:
      * Rebuilds one caller-provided rectangle of terrain normal-map data.
      */
-    virtual void UpdateNormalMap(const gpg::Rect2i& rect);
+    void UpdateNormalMap(const gpg::Rect2i& rect) override;
 
     /**
      * Address: 0x008A5730 (FUN_008A5730, ?NotifyMapChange@CWldTerrainRes@Moho@@EAEXABV?$Rect2@H@gpg@@@Z)
@@ -718,7 +885,7 @@ namespace moho
      * Routes one map-change rectangle through normal-map updates, then records
      * the affected half-resolution region in debug dirty masks.
      */
-    virtual void NotifyMapChange(const gpg::Rect2i& rect);
+    void NotifyMapChange(const gpg::Rect2i& rect) override;
 
     /**
      * Address: 0x008A54B0 (FUN_008A54B0, ?GetDebugDirtyTerrain@CWldTerrainRes@Moho@@EAEPAVBitArray2D@gpg@@XZ)
@@ -726,7 +893,7 @@ namespace moho
      * What it does:
      * Returns debug dirty-region bitmask storage.
      */
-    [[nodiscard]] virtual gpg::BitArray2D* GetDebugDirtyTerrain();
+    [[nodiscard]] gpg::BitArray2D* GetDebugDirtyTerrain() override;
 
     /**
      * Address: 0x008A54C0 (FUN_008A54C0, ?GetDebugDirtyRects@CWldTerrainRes@Moho@@UBEABV?$list@V?$Rect2@H@gpg@@V?$allocator@V?$Rect2@H@gpg@@@std@@@std@@XZ)
@@ -734,7 +901,7 @@ namespace moho
      * What it does:
      * Returns the debug dirty-rectangle list lane.
      */
-    [[nodiscard]] virtual const msvc8::list<gpg::Rect2i>& GetDebugDirtyRects() const;
+    [[nodiscard]] const msvc8::list<gpg::Rect2i>& GetDebugDirtyRects() const override;
 
     /**
      * Address: 0x008A5FB0 (FUN_008A5FB0, ?GetNormalMapCount@CWldTerrainRes@Moho@@EAEHXZ)
@@ -742,7 +909,7 @@ namespace moho
      * What it does:
      * Returns number of active normal-map tile handles.
      */
-    [[nodiscard]] virtual std::int32_t GetNormalMapCount();
+    [[nodiscard]] std::int32_t GetNormalMapCount() override;
 
     /**
      * Address: 0x008A6020 (FUN_008A6020, ?GetNormalMapInfo@CWldTerrainRes@Moho@@EAE?AUSNormalMapInfo@2@H@Z)
@@ -751,7 +918,7 @@ namespace moho
      * Builds shader-ready UV scale/offset lanes and texture ownership for one
      * normal-map tile index.
      */
-    [[nodiscard]] virtual SNormalMapInfo GetNormalMapInfo(std::int32_t index) const;
+    [[nodiscard]] SNormalMapInfo GetNormalMapInfo(std::int32_t index) const override;
 
     /**
      * Address: 0x008A4ED0 (FUN_008A4ED0, ?UpdateStratumMask@CWldTerrainRes@Moho@@UAEXHPBEHHHH@Z)
@@ -760,14 +927,14 @@ namespace moho
      * Routes one stratum-byte mask update into the matching packed RGBA
      * channel lane of stratum-mask texture 0/1.
      */
-    virtual void UpdateStratumMask(
+    void UpdateStratumMask(
       std::int32_t stratumIndex,
       const std::uint8_t* sourceMask,
       std::int32_t columnStart,
       std::int32_t rowStart,
       std::int32_t columnEnd,
       std::int32_t rowEnd
-    );
+    ) override;
 
     /**
      * Address: 0x008A4EA0 (FUN_008A4EA0, ?UpdateStratumMask@CWldTerrainRes@Moho@@UAEXHPBE@Z)
@@ -783,7 +950,7 @@ namespace moho
      * the half-chart dimensions `Reset` seeded at 0x008A65B3/0x008A65B9 when it
      * created the mask textures.
      */
-    virtual void UpdateStratumMask(std::int32_t stratumIndex, const std::uint8_t* sourceMask);
+    void UpdateStratumMask(std::int32_t stratumIndex, const std::uint8_t* sourceMask) override;
 
     /**
      * Address: 0x008A4F90 (FUN_008A4F90, ?GetStratumMask@CWldTerrainRes@Moho@@UAEXHPAE@Z)
@@ -792,7 +959,7 @@ namespace moho
      * Selects one stratum-mask texture/channel lane and exports unpacked mask
      * bytes through `GetTextureChannel`.
      */
-    virtual void GetStratumMask(std::int32_t stratumIndex, std::uint8_t* outMask);
+    void GetStratumMask(std::int32_t stratumIndex, std::uint8_t* outMask) override;
 
     /**
      * Address: 0x008A6AB0 (FUN_008A6AB0, ?GetLightingMultiplier@CWldTerrainRes@Moho@@UBEMXZ)
@@ -800,7 +967,7 @@ namespace moho
      * What it does:
      * Returns terrain lighting multiplier.
      */
-    [[nodiscard]] virtual float GetLightingMultiplier() const;
+    [[nodiscard]] float GetLightingMultiplier() const override;
 
     /**
      * Address: 0x008A6AC0 (FUN_008A6AC0, ?SetLightingMultiplier@CWldTerrainRes@Moho@@EAEXABM@Z)
@@ -808,7 +975,7 @@ namespace moho
      * What it does:
      * Sets terrain lighting multiplier.
      */
-    virtual void SetLightingMultiplier(const float& multiplier);
+    void SetLightingMultiplier(const float& multiplier) override;
 
     /**
      * Address: 0x008A6AD0 (FUN_008A6AD0, ?GetSunDirection@CWldTerrainRes@Moho@@EBE?AV?$Vector3@M@Wm3@@XZ)
@@ -816,7 +983,7 @@ namespace moho
      * What it does:
      * Returns sun direction vector.
      */
-    [[nodiscard]] virtual Wm3::Vector3f GetSunDirection() const;
+    [[nodiscard]] Wm3::Vector3f GetSunDirection() const override;
 
     /**
      * Address: 0x008A6B00 (FUN_008A6B00, ?SetSunDirection@CWldTerrainRes@Moho@@EAEXABV?$Vector3@M@Wm3@@@Z)
@@ -824,7 +991,7 @@ namespace moho
      * What it does:
      * Sets sun direction vector.
      */
-    virtual void SetSunDirection(const Wm3::Vector3f& direction);
+    void SetSunDirection(const Wm3::Vector3f& direction) override;
 
     /**
      * Address: 0x008A6B30 (FUN_008A6B30, ?GetSunAmbience@CWldTerrainRes@Moho@@EBE?AV?$Vector3@M@Wm3@@XZ)
@@ -832,7 +999,7 @@ namespace moho
      * What it does:
      * Returns sun ambience vector.
      */
-    [[nodiscard]] virtual Wm3::Vector3f GetSunAmbience() const;
+    [[nodiscard]] Wm3::Vector3f GetSunAmbience() const override;
 
     /**
      * Address: 0x008A6B60 (FUN_008A6B60, ?SetSunAmbience@CWldTerrainRes@Moho@@EAEXABV?$Vector3@M@Wm3@@@Z)
@@ -840,7 +1007,7 @@ namespace moho
      * What it does:
      * Sets sun ambience vector.
      */
-    virtual void SetSunAmbience(const Wm3::Vector3f& ambience);
+    void SetSunAmbience(const Wm3::Vector3f& ambience) override;
 
     /**
      * Address: 0x008A6C70 (FUN_008A6C70, ?GetSunColor@CWldTerrainRes@Moho@@EBE?AV?$Vector3@M@Wm3@@XZ)
@@ -848,7 +1015,7 @@ namespace moho
      * What it does:
      * Returns sun color vector.
      */
-    [[nodiscard]] virtual Wm3::Vector3f GetSunColor() const;
+    [[nodiscard]] Wm3::Vector3f GetSunColor() const override;
 
     /**
      * Address: 0x008A6CA0 (FUN_008A6CA0, ?SetSunColor@CWldTerrainRes@Moho@@EAEXABV?$Vector3@M@Wm3@@@Z)
@@ -856,7 +1023,7 @@ namespace moho
      * What it does:
      * Sets sun color vector.
      */
-    virtual void SetSunColor(const Wm3::Vector3f& color);
+    void SetSunColor(const Wm3::Vector3f& color) override;
 
     /**
      * Address: 0x008A6CD0 (FUN_008A6CD0, ?GetShadowFillColor@CWldTerrainRes@Moho@@EBE?AV?$Vector3@M@Wm3@@XZ)
@@ -864,7 +1031,7 @@ namespace moho
      * What it does:
      * Returns shadow-fill color vector.
      */
-    [[nodiscard]] virtual Wm3::Vector3f GetShadowFillColor() const;
+    [[nodiscard]] Wm3::Vector3f GetShadowFillColor() const override;
 
     /**
      * Address: 0x008A6D00 (FUN_008A6D00, ?SetShadowFillColor@CWldTerrainRes@Moho@@EAEXABV?$Vector3@M@Wm3@@@Z)
@@ -872,7 +1039,7 @@ namespace moho
      * What it does:
      * Sets shadow-fill color vector.
      */
-    virtual void SetShadowFillColor(const Wm3::Vector3f& color);
+    void SetShadowFillColor(const Wm3::Vector3f& color) override;
 
     /**
      * Address: 0x008A6B90 (FUN_008A6B90, ?GetSpecularColor@CWldTerrainRes@Moho@@EBE?AVVector4f@2@XZ)
@@ -880,7 +1047,7 @@ namespace moho
      * What it does:
      * Returns terrain specular color vector.
      */
-    [[nodiscard]] virtual Vector4f GetSpecularColor() const;
+    [[nodiscard]] Vector4f GetSpecularColor() const override;
 
     /**
      * Address: 0x008A6BC0 (FUN_008A6BC0, ?SetSpecularColor@CWldTerrainRes@Moho@@EAEXABVVector4f@2@@Z)
@@ -888,7 +1055,7 @@ namespace moho
      * What it does:
      * Sets terrain specular color vector.
      */
-    virtual void SetSpecularColor(const Vector4f& color);
+    void SetSpecularColor(const Vector4f& color) override;
 
     /**
      * Address: 0x008A6BF0 (FUN_008A6BF0, ?GetBloom@CWldTerrainRes@Moho@@UBEMXZ)
@@ -896,7 +1063,7 @@ namespace moho
      * What it does:
      * Returns terrain bloom strength lane.
      */
-    [[nodiscard]] virtual float GetBloom() const;
+    [[nodiscard]] float GetBloom() const override;
 
     /**
      * Address: 0x008A6C00 (FUN_008A6C00, ?SetBloom@CWldTerrainRes@Moho@@EAEXM@Z)
@@ -904,7 +1071,7 @@ namespace moho
      * What it does:
      * Sets terrain bloom strength lane.
      */
-    virtual void SetBloom(float bloom);
+    void SetBloom(float bloom) override;
 
     /**
      * Address: 0x008A6C20 (FUN_008A6C20, ?GetFogInfo@CWldTerrainRes@Moho@@EBEABUSFogInfo@2@XZ)
@@ -912,7 +1079,7 @@ namespace moho
      * What it does:
      * Returns read-only terrain fog parameter block.
      */
-    [[nodiscard]] virtual const SFogInfo& GetFogInfo() const;
+    [[nodiscard]] const SFogInfo& GetFogInfo() const override;
 
     /**
      * Address: 0x008A6C30 (FUN_008A6C30, ?SetFogInfo@CWldTerrainRes@Moho@@EAEXABUSFogInfo@2@@Z)
@@ -920,7 +1087,7 @@ namespace moho
      * What it does:
      * Updates primary terrain fog parameter lanes.
      */
-    virtual void SetFogInfo(const SFogInfo& fogInfo);
+    void SetFogInfo(const SFogInfo& fogInfo) override;
 
     /**
      * Address: 0x008A6D30 (FUN_008A6D30, ?WaterEnabled@CWldTerrainRes@Moho@@EAEX_N@Z)
@@ -928,7 +1095,7 @@ namespace moho
      * What it does:
      * Toggles world-map water rendering/logic enabled flag.
      */
-    virtual void WaterEnabled(bool enabled);
+    void WaterEnabled(bool enabled) override;
 
     /**
      * Address: 0x008A6D40 (FUN_008A6D40, ?SetWaterElevation@CWldTerrainRes@Moho@@EAEXM@Z)
@@ -936,7 +1103,7 @@ namespace moho
      * What it does:
      * Sets world-map surface water elevation.
      */
-    virtual void SetWaterElevation(float elevation);
+    void SetWaterElevation(float elevation) override;
 
     /**
      * Address: 0x008A6D60 (FUN_008A6D60, ?SetWaterElevationDeep@CWldTerrainRes@Moho@@EAEXM@Z)
@@ -944,7 +1111,7 @@ namespace moho
      * What it does:
      * Sets world-map deep-water threshold elevation.
      */
-    virtual void SetWaterElevationDeep(float elevation);
+    void SetWaterElevationDeep(float elevation) override;
 
     /**
      * Address: 0x008A6D80 (FUN_008A6D80, ?SetWaterElevationAbyss@CWldTerrainRes@Moho@@EAEXM@Z)
@@ -952,7 +1119,7 @@ namespace moho
      * What it does:
      * Sets world-map abyss-water threshold elevation.
      */
-    virtual void SetWaterElevationAbyss(float elevation);
+    void SetWaterElevationAbyss(float elevation) override;
 
     /**
      * Address: 0x008A6DA0 (FUN_008A6DA0, ?SetPlayableMapRect@CWldTerrainRes@Moho@@EAEXABV?$Rect2@H@gpg@@@Z)
@@ -961,7 +1128,7 @@ namespace moho
      * Writes one playable-map rectangle through the owned terrain map and emits
      * warning text when bounds are invalid.
      */
-    [[nodiscard]] virtual bool SetPlayableMapRect(const VisibilityRect& rect);
+    [[nodiscard]] bool SetPlayableMapRect(const VisibilityRect& rect) override;
 
     /**
      * Address: 0x0089E710 (FUN_0089E710, ?GetPlayableMapRect@IWldTerrainRes@Moho@@UBE?AV?$Rect2@H@gpg@@XZ)
@@ -970,7 +1137,7 @@ namespace moho
      * Copies playable map bounds from terrain-res internal storage into `outRect`
      * and returns `&outRect`.
      */
-    [[nodiscard]] virtual const VisibilityRect* GetPlayableMapRect(VisibilityRect& outRect) const;
+    [[nodiscard]] const VisibilityRect* GetPlayableMapRect(VisibilityRect& outRect) const override;
 
     /**
      * Address: 0x008A6DD0 (FUN_008A6DD0, ?IsInPlayableRect@CWldTerrainRes@Moho@@EAE_NABV?$Vector3@M@Wm3@@@Z)
@@ -979,7 +1146,7 @@ namespace moho
      * Checks whether one world-space position lies inside the playable map
      * rectangle bounds.
      */
-    [[nodiscard]] virtual bool IsInPlayableRect(const Wm3::Vec3f& worldPos);
+    [[nodiscard]] bool IsInPlayableRect(const Wm3::Vec3f& worldPos) override;
 
     /**
      * Address: 0x008A6E20 (FUN_008A6E20, ?SetWaterShaderProperties@CWldTerrainRes@Moho@@EAEXABVCWaterShaderProperties@2@@Z)
@@ -987,7 +1154,7 @@ namespace moho
      * What it does:
      * Copies one water-shader property block into terrain state.
      */
-    virtual void SetWaterShaderProperties(const CWaterShaderProperties& properties);
+    void SetWaterShaderProperties(const CWaterShaderProperties& properties) override;
 
     /**
      * Address: 0x008A6E40 (FUN_008A6E40, ?GetWaterShaderProperties@CWldTerrainRes@Moho@@EAEPAVCWaterShaderProperties@2@XZ)
@@ -995,7 +1162,7 @@ namespace moho
      * What it does:
      * Returns mutable pointer to the owned water-shader property block.
      */
-    [[nodiscard]] virtual CWaterShaderProperties* GetWaterShaderProperties();
+    [[nodiscard]] CWaterShaderProperties* GetWaterShaderProperties() override;
 
     /**
      * Address: 0x008A6E50 (FUN_008A6E50, ?GetWaterFoam@CWldTerrainRes@Moho@@EAEPAEZX)
@@ -1003,7 +1170,7 @@ namespace moho
      * What it does:
      * Returns terrain water-foam mask buffer.
      */
-    [[nodiscard]] virtual std::uint8_t* GetWaterFoam();
+    [[nodiscard]] std::uint8_t* GetWaterFoam() override;
 
     /**
      * Address: 0x008A6E60 (FUN_008A6E60, ?GetWaterFlatness@CWldTerrainRes@Moho@@EAEPAEZX)
@@ -1011,7 +1178,7 @@ namespace moho
      * What it does:
      * Returns terrain water-flatness mask buffer.
      */
-    [[nodiscard]] virtual std::uint8_t* GetWaterFlatness();
+    [[nodiscard]] std::uint8_t* GetWaterFlatness() override;
 
     /**
      * Address: 0x008A6E70 (FUN_008A6E70, ?GetWaterDepthBias@CWldTerrainRes@Moho@@EAEPAEXZ)
@@ -1023,7 +1190,7 @@ namespace moho
      * declaration here: `mov eax, [ecx+9D0h]; retn`, the same shape as its two
      * neighbours at +0x9C8 and +0x9CC.
      */
-    [[nodiscard]] virtual std::uint8_t* GetWaterDepthBias();
+    [[nodiscard]] std::uint8_t* GetWaterDepthBias() override;
 
     /**
      * Address: 0x008A6E80 (FUN_008A6E80, ?IsInEditMode@CWldTerrainRes@Moho@@EBE_NXZ)
@@ -1031,7 +1198,7 @@ namespace moho
      * What it does:
      * Returns true when terrain-resource edit mode is enabled.
      */
-    [[nodiscard]] virtual bool IsInEditMode() const;
+    [[nodiscard]] bool IsInEditMode() const override;
 
     /**
      * Address: 0x008A6E90 (FUN_008A6E90, ?EnterEditMode@CWldTerrainRes@Moho@@EAEXAAVCBackgroundTaskControl@2@@Z)
@@ -1040,7 +1207,7 @@ namespace moho
      * Enables terrain edit mode, prepares packed edit-word lanes, and clones
      * dynamic map/stratum textures into edit-safe instances.
      */
-    virtual void EnterEditMode(CBackgroundTaskControl& loadControl);
+    void EnterEditMode(CBackgroundTaskControl& loadControl) override;
 
     /**
      * Address: 0x008A7130 (FUN_008A7130, ?ExitEditMode@CWldTerrainRes@Moho@@EAEXXZ)
@@ -1049,7 +1216,7 @@ namespace moho
      * Flushes packed edit-word lanes into water-map texture and restores
      * runtime texture instances after edit mode.
      */
-    virtual void ExitEditMode();
+    void ExitEditMode() override;
 
     /**
      * Address: 0x008A5890 (FUN_008A5890, ?SyncTerrain@CWldTerrainRes@Moho@@EAEXPBVCHeightField@2@@Z)
@@ -1059,7 +1226,7 @@ namespace moho
      * the live map heightfield for camera-visible regions, then clears synced
      * dirty lanes and refreshes terrain error bounds.
      */
-    virtual void SyncTerrain(const CHeightField* source);
+    void SyncTerrain(const CHeightField* source) override;
 
     /**
      * Address: 0x008A1700 (FUN_008A1700, CWldTerrainRes::Load implementation path)
@@ -1069,7 +1236,7 @@ namespace moho
      * terrain state for the active world map.
      */
     [[nodiscard]]
-    virtual bool Load(gpg::BinaryReader& reader, LuaPlus::LuaState* state, CBackgroundTaskControl& loadControl);
+    bool Load(gpg::BinaryReader& reader, LuaPlus::LuaState* state, CBackgroundTaskControl& loadControl) override;
 
     /**
      * Address: 0x008A30B0 (FUN_008A30B0, ?Save@CWldTerrainRes@Moho@@UAE_NAAVBinaryWriter@gpg@@@Z)
@@ -1089,7 +1256,7 @@ namespace moho
      * masks, the water map, the water foam/flatness/depth-bias planes, the
      * terrain-type grid, the sky dome, and the decal set.
      */
-    virtual bool Save(gpg::BinaryWriter& writer);
+    bool Save(gpg::BinaryWriter& writer) override;
 
     /**
      * Address: 0x008A2DD0 (FUN_008A2DD0, ?Finalize@CWldTerrainRes@Moho@@UAE_NXZ)
@@ -1098,7 +1265,7 @@ namespace moho
      * Finalizes terrain runtime resources and returns whether the pass
      * completed without requiring deferred map-change handling.
      */
-    [[nodiscard]] virtual bool Finalize();
+    [[nodiscard]] bool Finalize() override;
 
     /**
      * Address: 0x008A7400 (FUN_008A7400, ?GetDecalManager@CWldTerrainRes@Moho@@EAEPAVIDecalManager@2@XZ)
@@ -1106,15 +1273,7 @@ namespace moho
      * What it does:
      * Returns terrain decal-manager lane.
      */
-    [[nodiscard]] virtual IDecalManager* GetDecalManager();
-    /**
-     * Address: 0x008A74D0 (FUN_008A74D0, IWldTerrainRes ctor lane)
-     *
-     * What it does:
-     * Initializes one terrain-resource interface base and clears playable-rect
-     * source ownership to null.
-     */
-    IWldTerrainRes();
+    [[nodiscard]] IDecalManager* GetDecalManager() override;
 
     /**
      * Address: 0x008A4040 (FUN_008A4040, ?LoadTexturing@CWldTerrainRes@Moho@@QAEXAAVBinaryReader@gpg@@I@Z)
@@ -1136,38 +1295,9 @@ namespace moho
      */
     void LoadLayer(CStratumMaterial& outLayer, gpg::BinaryReader& reader);
 
-    /**
-     * Not a distinct binary function - every caller below inlines the same
-     * `mMap->mHeightField.get()` chase through the terrain runtime view
-     * (`IWldTerrainRes+0x04` -> `STIMap+0x00`). Promoted to a public accessor
-     * so callers outside this TU (`CUIWorldView`'s build-drag adjacency
-     * pass, `sub_854B70`) don't need their own copy of the file-private
-     * `TerrainRuntimeView` reinterpret-cast.
-     */
-    [[nodiscard]] CHeightField* GetHeightField() const;
 
-    /**
-     * Not a distinct binary function - every caller inlines the same
-     * `mMap->mWaterEnabled` field read through the terrain runtime view.
-     * Promoted to a public accessor for the same reason as `GetHeightField()`.
-     */
-    [[nodiscard]] bool IsWaterEnabled() const;
 
-    /**
-     * Not a distinct binary function - every caller inlines the same
-     * `mMap->mWaterElevation` field read through the terrain runtime view.
-     * Promoted to a public accessor for the same reason as `GetHeightField()`.
-     */
-    [[nodiscard]] float GetWaterElevation() const;
 
-    /**
-     * Address: 0x00811210 (FUN_00811210, Moho::CWldTerrainRes::GetHeightAt)
-     *
-     * What it does:
-     * Returns one clamped terrain height sample at `(x,z)` converted from
-     * 16-bit height words into world height units (`* 1/128`).
-     */
-    [[nodiscard]] float GetHeightAt(std::int32_t x, std::int32_t z) const;
 
     /**
      * Address: 0x008A7410 (FUN_008A7410, ?CreateWaterMasks@CWldTerrainRes@Moho@@AAEXHH@Z)
@@ -1283,14 +1413,6 @@ namespace moho
     void UpdateNormalMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect);
 
   public:
-    /**
-     * The terrain's map data, owned by this interface: `~IWldTerrainRes`
-     * deletes it, `GetPlayableMapRect` reads `mPlayableRect` out of it at
-     * +0x08, and every consumer that reaches `[terrainRes+0x04]` in the binary
-     * - the cartographic view, the splat and clutter passes, the map imager,
-     * the console's map queries - follows it straight into `STIMap`.
-     */
-    STIMap* mMap;                                          // +0x004
     std::uint8_t mBool;                                    // +0x008
     std::uint8_t mEditMode;                                // +0x009
     std::uint8_t mUnknown00A_00B[0x02];                    // +0x00A
@@ -1349,135 +1471,138 @@ namespace moho
     WaveSystem mWaveSystem;                                // +0x9E8
     CDecalManager* mDecalManager;                          // +0xC30
     std::uint8_t mUnknownC34_C37[0x04];                    // +0xC34
+
   };
 
+  static_assert(sizeof(IWldTerrainRes) == 0x08, "IWldTerrainRes size must be 0x08");
+  static_assert(alignof(CWldTerrainRes) == 8, "CWldTerrainRes must be 8-aligned");
   static_assert(
-    sizeof(IWldTerrainRes) == 0xC38,
-    "IWldTerrainRes size must be 0xC38"
+    sizeof(CWldTerrainRes) == 0xC38,
+    "CWldTerrainRes size must be 0xC38"
   );
   static_assert(
     offsetof(IWldTerrainRes, mMap) == 0x004,
     "IWldTerrainRes::mMap offset must be 0x004"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mBool) == 0x008,
-    "IWldTerrainRes::mBool offset must be 0x008"
+    offsetof(CWldTerrainRes, mBool) == 0x008,
+    "CWldTerrainRes::mBool offset must be 0x008"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mEditMode) == 0x009,
-    "IWldTerrainRes::mEditMode offset must be 0x009"
+    offsetof(CWldTerrainRes, mEditMode) == 0x009,
+    "CWldTerrainRes::mEditMode offset must be 0x009"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mCartographic) == 0x00C,
-    "IWldTerrainRes::mCartographic offset must be 0x00C"
+    offsetof(CWldTerrainRes, mCartographic) == 0x00C,
+    "CWldTerrainRes::mCartographic offset must be 0x00C"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mSkyDome) == 0x0B0,
-    "IWldTerrainRes::mSkyDome offset must be 0x0B0"
+    offsetof(CWldTerrainRes, mSkyDome) == 0x0B0,
+    "CWldTerrainRes::mSkyDome offset must be 0x0B0"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mLightingMultiplier) == 0x2D8,
-    "IWldTerrainRes::mLightingMultiplier offset must be 0x2D8"
+    offsetof(CWldTerrainRes, mLightingMultiplier) == 0x2D8,
+    "CWldTerrainRes::mLightingMultiplier offset must be 0x2D8"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mSpecularColor) == 0x30C,
-    "IWldTerrainRes::mSpecularColor offset must be 0x30C"
+    offsetof(CWldTerrainRes, mSpecularColor) == 0x30C,
+    "CWldTerrainRes::mSpecularColor offset must be 0x30C"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mBloom) == 0x31C,
-    "IWldTerrainRes::mBloom offset must be 0x31C"
+    offsetof(CWldTerrainRes, mBloom) == 0x31C,
+    "CWldTerrainRes::mBloom offset must be 0x31C"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mFogInfo) == 0x320,
-    "IWldTerrainRes::mFogInfo offset must be 0x320"
+    offsetof(CWldTerrainRes, mFogInfo) == 0x320,
+    "CWldTerrainRes::mFogInfo offset must be 0x320"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mTopographicSamples) == 0x334,
-    "IWldTerrainRes::mTopographicSamples offset must be 0x334"
+    offsetof(CWldTerrainRes, mTopographicSamples) == 0x334,
+    "CWldTerrainRes::mTopographicSamples offset must be 0x334"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mHypsometricColor) == 0x338,
-    "IWldTerrainRes::mHypsometricColor offset must be 0x338"
+    offsetof(CWldTerrainRes, mHypsometricColor) == 0x338,
+    "CWldTerrainRes::mHypsometricColor offset must be 0x338"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mImagerElevationOffset) == 0x34C,
-    "IWldTerrainRes::mImagerElevationOffset offset must be 0x34C"
+    offsetof(CWldTerrainRes, mImagerElevationOffset) == 0x34C,
+    "CWldTerrainRes::mImagerElevationOffset offset must be 0x34C"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mWaterShaderProperties) == 0x350,
-    "IWldTerrainRes::mWaterShaderProperties offset must be 0x350"
+    offsetof(CWldTerrainRes, mWaterShaderProperties) == 0x350,
+    "CWldTerrainRes::mWaterShaderProperties offset must be 0x350"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mStrata) == 0x4AC,
-    "IWldTerrainRes::mStrata offset must be 0x4AC"
+    offsetof(CWldTerrainRes, mStrata) == 0x4AC,
+    "CWldTerrainRes::mStrata offset must be 0x4AC"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mNormalMap) == 0x948,
-    "IWldTerrainRes::mNormalMap offset must be 0x948"
+    offsetof(CWldTerrainRes, mNormalMap) == 0x948,
+    "CWldTerrainRes::mNormalMap offset must be 0x948"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mNormalMapWidth) == 0x954,
-    "IWldTerrainRes::mNormalMapWidth offset must be 0x954"
+    offsetof(CWldTerrainRes, mNormalMapWidth) == 0x954,
+    "CWldTerrainRes::mNormalMapWidth offset must be 0x954"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mNormalMapHeight) == 0x958,
-    "IWldTerrainRes::mNormalMapHeight offset must be 0x958"
+    offsetof(CWldTerrainRes, mNormalMapHeight) == 0x958,
+    "CWldTerrainRes::mNormalMapHeight offset must be 0x958"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mBackgroundFile) == 0x95C,
-    "IWldTerrainRes::mBackgroundFile offset must be 0x95C"
+    offsetof(CWldTerrainRes, mBackgroundFile) == 0x95C,
+    "CWldTerrainRes::mBackgroundFile offset must be 0x95C"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mBackgroundTexture) == 0x978,
-    "IWldTerrainRes::mBackgroundTexture offset must be 0x978"
+    offsetof(CWldTerrainRes, mBackgroundTexture) == 0x978,
+    "CWldTerrainRes::mBackgroundTexture offset must be 0x978"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mSkycubeFile) == 0x980,
-    "IWldTerrainRes::mSkycubeFile offset must be 0x980"
+    offsetof(CWldTerrainRes, mSkycubeFile) == 0x980,
+    "CWldTerrainRes::mSkycubeFile offset must be 0x980"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mSkycubeTexture) == 0x99C,
-    "IWldTerrainRes::mSkycubeTexture offset must be 0x99C"
+    offsetof(CWldTerrainRes, mSkycubeTexture) == 0x99C,
+    "CWldTerrainRes::mSkycubeTexture offset must be 0x99C"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mEnvLookup) == 0x9A4,
-    "IWldTerrainRes::mEnvLookup offset must be 0x9A4"
+    offsetof(CWldTerrainRes, mEnvLookup) == 0x9A4,
+    "CWldTerrainRes::mEnvLookup offset must be 0x9A4"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mEditWordBuffer) == 0x9B0,
-    "IWldTerrainRes::mEditWordBuffer offset must be 0x9B0"
+    offsetof(CWldTerrainRes, mEditWordBuffer) == 0x9B0,
+    "CWldTerrainRes::mEditWordBuffer offset must be 0x9B0"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mWaterMapTexture) == 0x9C0,
-    "IWldTerrainRes::mWaterMapTexture offset must be 0x9C0"
+    offsetof(CWldTerrainRes, mWaterMapTexture) == 0x9C0,
+    "CWldTerrainRes::mWaterMapTexture offset must be 0x9C0"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mWaterFoam) == 0x9C8,
-    "IWldTerrainRes::mWaterFoam offset must be 0x9C8"
+    offsetof(CWldTerrainRes, mWaterFoam) == 0x9C8,
+    "CWldTerrainRes::mWaterFoam offset must be 0x9C8"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mWaterFlatness) == 0x9CC,
-    "IWldTerrainRes::mWaterFlatness offset must be 0x9CC"
+    offsetof(CWldTerrainRes, mWaterFlatness) == 0x9CC,
+    "CWldTerrainRes::mWaterFlatness offset must be 0x9CC"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mWaterDepthBias) == 0x9D0,
-    "IWldTerrainRes::mWaterDepthBias offset must be 0x9D0"
+    offsetof(CWldTerrainRes, mWaterDepthBias) == 0x9D0,
+    "CWldTerrainRes::mWaterDepthBias offset must be 0x9D0"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mDebugDirtyTerrain) == 0x9D4,
-    "IWldTerrainRes::mDebugDirtyTerrain offset must be 0x9D4"
+    offsetof(CWldTerrainRes, mDebugDirtyTerrain) == 0x9D4,
+    "CWldTerrainRes::mDebugDirtyTerrain offset must be 0x9D4"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mDebugDirtyRects) == 0x9D8,
-    "IWldTerrainRes::mDebugDirtyRects offset must be 0x9D8"
+    offsetof(CWldTerrainRes, mDebugDirtyRects) == 0x9D8,
+    "CWldTerrainRes::mDebugDirtyRects offset must be 0x9D8"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mWaveSystem) == 0x9E8,
-    "IWldTerrainRes::mWaveSystem offset must be 0x9E8"
+    offsetof(CWldTerrainRes, mWaveSystem) == 0x9E8,
+    "CWldTerrainRes::mWaveSystem offset must be 0x9E8"
   );
   static_assert(
-    offsetof(IWldTerrainRes, mDecalManager) == 0xC30,
-    "IWldTerrainRes::mDecalManager offset must be 0xC30"
+    offsetof(CWldTerrainRes, mDecalManager) == 0xC30,
+    "CWldTerrainRes::mDecalManager offset must be 0xC30"
   );
 
   /**

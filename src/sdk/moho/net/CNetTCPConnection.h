@@ -187,8 +187,7 @@ namespace moho
     std::uint32_t mSendBufferSize{0};             // +0xCC8
     std::uint8_t mHasShutdownOutput{0};           // +0xCCC
     std::uint8_t mPad0xCCD[3]{};                  // +0xCCD
-    CMessage mDatagram;                           // +0xCD0
-    std::uint32_t mPad0xD24{0};                   // +0xD24
+    CMessage mDatagram;                           // +0xCD0 (+0xD24 is its tail padding)
     std::uint8_t mPushFailed{0};                  // +0xD28
     std::uint8_t mPullFailed{0};                  // +0xD29
     std::uint8_t mScheduleDestroy{0};             // +0xD2A

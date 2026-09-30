@@ -221,7 +221,9 @@ namespace moho
     offsetof(SSTICommandVariableData, mCount) == 0x64, "SSTICommandVariableData::mCount offset must be 0x64"
   );
   static_assert(offsetof(SSTICommandVariableData, v23) == 0x68, "SSTICommandVariableData::v23 offset must be 0x68");
-  static_assert(sizeof(SSTICommandVariableData) == 0x6C, "SSTICommandVariableData size must be 0x6C");
+  // 8-aligned through its two `fastvector_n`s, so 0x70: `CUnitCommand`'s
+  // constructor 0x006E81B0 builds it at +0x80 and the unit set at +0xF0.
+  static_assert(sizeof(SSTICommandVariableData) == 0x70, "SSTICommandVariableData size must be 0x70");
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSTICommandVariableDataSerializer, mSerLoadFunc) == 0x0C,
     "SSTICommandVariableDataSerializer::mSerLoadFunc offset must be 0x0C"

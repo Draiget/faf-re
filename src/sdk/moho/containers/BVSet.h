@@ -43,12 +43,12 @@ namespace moho
    * map's nodes put their value at `node+0x10` rather than `node+0x0C` and
    * come out 0x60 bytes rather than 0x54 (`FUN_005569C0` / `FUN_005579D0`).
    *
-   * The alignment is this record's, not `BVIntSet`'s: `SoundHandleIdPool`
-   * (`{BVIntSet, std::uint32_t}`, CUserSoundManager.h) is 0x24, so the
-   * embedded set alone does not round anything up to eight.
+   * The alignment is `BVIntSet`'s, whose words are an 8-aligned
+   * `gpg::fastvector_n`. (`SoundHandleIdPool`, `{BVIntSet, std::uint32_t}`,
+   * is 0x28 for the same reason.)
    */
   template <class T, class U>
-  struct alignas(8) BVSet
+  struct BVSet
   {
     // `EntIdUniverse` is empty (sizeof 1); `mReserved04` keeps `mBits` at
     // +0x08 either way.

@@ -666,8 +666,7 @@ namespace moho
    * inline generator-cache storage window.
    */
   WaveSystem::WaveSystem()
-    : mReserved04(0)
-    , mSpatialMeshInstance()
+    : mSpatialMeshInstance()
     , mReserved98(0)
     , mWaveGenerators()
     , mGeneratorCache()

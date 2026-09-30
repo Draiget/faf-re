@@ -778,10 +778,8 @@ namespace moho
    * voice engine.
    */
   CUserSoundManager::CUserSoundManager()
-    : mReserved04(0u)
-    , mRecentOneShotKeys()
+    : mRecentOneShotKeys()
     , mLoopHandleIdPool()
-    , mReserved13C(0u)
     , mSoundHandles()
     , mPendingDestroyCues()
     , mActiveLoops()

@@ -91,7 +91,10 @@ namespace moho
     float mPlayingSeconds;             // +0x24
   };
 
-  static_assert(sizeof(SoundHandleIdPool) == 0x24, "SoundHandleIdPool size must be 0x24");
+  // 0x24 bytes of fields, 8-aligned through BVIntSet's words: the constructor
+  // 0x008AA7A0 writes +0x00, +0x08..+0x14 and +0x20, and CUserSoundManager's
+  // next member starts 0x28 on.
+  static_assert(sizeof(SoundHandleIdPool) == 0x28, "SoundHandleIdPool size must be 0x28");
   static_assert(offsetof(SoundHandleIdPool, mFreeIds) == 0x00, "SoundHandleIdPool::mFreeIds offset must be 0x00");
   static_assert(offsetof(SoundHandleIdPool, mNextId) == 0x20, "SoundHandleIdPool::mNextId offset must be 0x20");
 
@@ -412,10 +415,8 @@ namespace moho
     EFilterType FilterSound(const CSndParams* params, ELayer layer, const Wm3::Vec3f* worldPos) const;
 
   public:
-    std::uint32_t mReserved04;                               // +0x04
-    gpg::fastvector_n<std::uint32_t, 64> mRecentOneShotKeys; // +0x08
+    gpg::fastvector_n<std::uint32_t, 64> mRecentOneShotKeys; // +0x08, 8-aligned behind the vfptr
     SoundHandleIdPool mLoopHandleIdPool;                     // +0x118
-    std::uint32_t mReserved13C;                              // +0x13C
     gpg::fastvector_n<SoundHandleRecord, 256> mSoundHandles; // +0x140
 
     msvc8::set<IXACTCue*> mPendingDestroyCues; // +0x2950

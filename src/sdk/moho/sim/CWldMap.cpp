@@ -651,7 +651,7 @@ namespace
   }
 
 
-  void RebuildWaterMapRect(moho::IWldTerrainRes& terrainRes, const gpg::Rect2i& updateRect)
+  void RebuildWaterMapRect(moho::CWldTerrainRes& terrainRes, const gpg::Rect2i& updateRect)
   {
     constexpr float kNoWaterElevation = -10000.0f;
     auto* const terrainView = (&terrainRes);
@@ -736,141 +736,6 @@ namespace
     }
 
     terrainRes.UpdateTexture(visualView->mWaterMapTexture, visualView->mEditWordBuffer.begin);
-  }
-
-  /**
-   * Address: 0x008A0AD0 (FUN_008A0AD0, ??0CWldTerrainRes@Moho@@QAE@XZ)
-   * Mangled: ??0CWldTerrainRes@Moho@@QAE@XZ
-   *
-   * IDA signature:
-   * Moho::CWldTerrainRes *__thiscall Moho::CWldTerrainRes::CWldTerrainRes(Moho::CWldTerrainRes *this);
-   *
-   * What it does:
-   * Fills the terrain-resource object's scalar lighting/fog/hypsometric
-   * defaults and nulls its raw owning-pointer lanes.
-   *
-   * Sub-object construction (Cartographic, SkyDome, CWaterShaderProperties,
-   * StratumMaterial, WaveSystem, the two strings, the texture handles, the
-   * env-lookup map's self-linked sentinel head and the debug dirty-rect list's)
-   * is *not* written here: those are members of `IWldTerrainRes`, so MSVC emits
-   * their default construction as part of `IWldTerrainRes()`, which
-   * `WLD_CreateTerrainRes` has already run over this storage. An earlier pass
-   * placement-new'd each of them a second time, which leaked every sentinel
-   * head the implicit construction had just allocated.
-   *
-   * The IWldTerrainRes base vtable + mMap lane are installed
-   * by the base ctor at the factory before this fills the derived fields.
-   */
-  void ConstructTerrainResFields(moho::IWldTerrainRes& view) noexcept
-  {
-    view.mBool = 0;
-    view.mEditMode = 0;
-
-    view.mLightingMultiplier = 1.5f;
-    view.mSunDirection.x = 0.70700002f;
-    view.mSunDirection.y = 0.70700002f;
-    view.mSunDirection.z = 0.0f;
-    view.mSunAmbience.x = 0.2f;
-    view.mSunAmbience.y = 0.2f;
-    view.mSunAmbience.z = 0.2f;
-    view.mSunColor.x = 1.0f;
-    view.mSunColor.y = 1.0f;
-    view.mSunColor.z = 1.0f;
-    view.mShadowFillColor.x = 0.69999999f;
-    view.mShadowFillColor.y = 0.69999999f;
-    view.mShadowFillColor.z = 0.75f;
-    view.mSpecularColor.x = 0.0f;
-    view.mSpecularColor.y = 0.0f;
-    view.mSpecularColor.z = 0.0f;
-    view.mSpecularColor.w = 0.0f;
-    view.mBloom = 0.079999998f;
-    view.mTopographicSamples = 20;
-    view.mImagerElevationOffset = 0.0f;
-
-    view.mEditWordBuffer.begin = nullptr;
-    view.mEditWordBuffer.end = nullptr;
-    view.mEditWordBuffer.capacityEnd = nullptr;
-
-    view.mWaterFoam = nullptr;
-    view.mWaterFlatness = nullptr;
-    view.mWaterDepthBias = nullptr;
-    view.mDebugDirtyTerrain = nullptr;
-
-    view.mDecalManager = nullptr;
-
-    view.mHypsometricColor[0] = 0xFF0E3EFFu;
-    view.mHypsometricColor[1] = 0xFF215CFFu;
-    view.mHypsometricColor[2] = 0xFF4785FFu;
-    view.mHypsometricColor[3] = 0xFF4C9D32u;
-    view.mHypsometricColor[4] = 0xFFFFFFFFu;
-  }
-
-  /**
-   * Address: 0x008A0D60 (FUN_008A0D60, ??1CWldTerrainRes@Moho@@UAE@XZ)
-   * Mangled: ??1CWldTerrainRes@Moho@@UAE@XZ
-   *
-   * IDA signature:
-   * void __thiscall Moho::CWldTerrainRes::~CWldTerrainRes(Moho::CWldTerrainRes *this);
-   *
-   * What it does:
-   * Releases the terrain-resource object's raw owning-pointer lanes: the decal
-   * manager's virtual delete, the debug dirty-terrain bitmap, the three water
-   * mask buffers and the edit-word buffer's block. None of those is a member
-   * with a destructor, so none of them is emitted for us.
-   *
-   * Every *member* teardown the binary's `~CWldTerrainRes` performs -
-   * WaveSystem, the debug dirty-rect list, the water-map/skycube/background
-   * texture handles, the env-lookup map, the two strings, the normal-map handle
-   * array, and the strata/water-shader/skydome/cartographic sub-objects - is
-   * emitted by MSVC as part of `~IWldTerrainRes`, which `DestroyTerrainRes`'s
-   * `delete` runs immediately after this. Writing them out here as well
-   * destroyed each of them twice: `~rb_tree()` nulls `head_` on its first run,
-   * so the second `std::destroy_at(&view.mEnvLookup)` reached
-   * `erase_range(leftmost(), header())` with a null header and faulted
-   * (0xC0000005 reading 0x00000000 in `rb_tree::leftmost`) on every exit from a
-   * loaded map. The owned `STIMap` is likewise `~IWldTerrainRes`'s own body
-   * (`delete mMap`), not this function's.
-   */
-  void DestroyTerrainResFields(moho::IWldTerrainRes& view) noexcept
-  {
-    // mDecalManager: virtual scalar-deleting dtor dispatch (delete p).
-    if (view.mDecalManager != nullptr) {
-      delete view.mDecalManager;
-      view.mDecalManager = nullptr;
-    }
-
-    if (view.mDebugDirtyTerrain != nullptr) {
-      view.mDebugDirtyTerrain->~BitArray2D();
-      ::operator delete(view.mDebugDirtyTerrain);
-    }
-
-    ::operator delete[](view.mWaterDepthBias);
-    ::operator delete[](view.mWaterFlatness);
-    ::operator delete[](view.mWaterFoam);
-
-    if (view.mEditWordBuffer.begin != nullptr) {
-      ::operator delete(view.mEditWordBuffer.begin);
-    }
-    view.mEditWordBuffer.begin = nullptr;
-    view.mEditWordBuffer.end = nullptr;
-    view.mEditWordBuffer.capacityEnd = nullptr;
-  }
-
-  /**
-   * Address: 0x008A74B0 (FUN_008A74B0, ??_ECWldTerrainRes@Moho@@UAEPAXI@Z)
-   *
-   * What it does:
-   * Scalar deleting destructor (vtable slot 0): runs the terrain-resource
-   * teardown then frees the block. Realized as the DestroyTerrainRes delete
-   * path below.
-   */
-  void DestroyTerrainRes(moho::IWldTerrainRes* const terrainRes) noexcept
-  {
-    if (terrainRes == nullptr) {
-      return;
-    }
-    DestroyTerrainResFields(*terrainRes);
-    delete terrainRes;
   }
 
   /**
@@ -1199,6 +1064,117 @@ namespace moho
   }
 
   /**
+   * Address: 0x008A0AD0 (FUN_008A0AD0, ??0CWldTerrainRes@Moho@@QAE@XZ)
+   * Mangled: ??0CWldTerrainRes@Moho@@QAE@XZ
+   *
+   * IDA signature:
+   * Moho::CWldTerrainRes *__thiscall Moho::CWldTerrainRes::CWldTerrainRes(Moho::CWldTerrainRes *this);
+   *
+   * What it does:
+   * Fills the terrain-resource object's scalar lighting/fog/hypsometric
+   * defaults and nulls its raw owning-pointer lanes.
+   *
+   * The members with constructors (Cartographic, SkyDome,
+   * CWaterShaderProperties, StratumMaterial, WaveSystem, the two strings, the
+   * texture handles, the env-lookup map and the debug dirty-rect list) build
+   * themselves, after `IWldTerrainRes()` has set the vtable and nulled `mMap`.
+   */
+  CWldTerrainRes::CWldTerrainRes()
+  {
+    mBool = 0;
+    mEditMode = 0;
+
+    mLightingMultiplier = 1.5f;
+    mSunDirection.x = 0.70700002f;
+    mSunDirection.y = 0.70700002f;
+    mSunDirection.z = 0.0f;
+    mSunAmbience.x = 0.2f;
+    mSunAmbience.y = 0.2f;
+    mSunAmbience.z = 0.2f;
+    mSunColor.x = 1.0f;
+    mSunColor.y = 1.0f;
+    mSunColor.z = 1.0f;
+    mShadowFillColor.x = 0.69999999f;
+    mShadowFillColor.y = 0.69999999f;
+    mShadowFillColor.z = 0.75f;
+    mSpecularColor.x = 0.0f;
+    mSpecularColor.y = 0.0f;
+    mSpecularColor.z = 0.0f;
+    mSpecularColor.w = 0.0f;
+    mBloom = 0.079999998f;
+    mTopographicSamples = 20;
+    mImagerElevationOffset = 0.0f;
+
+    mEditWordBuffer.begin = nullptr;
+    mEditWordBuffer.end = nullptr;
+    mEditWordBuffer.capacityEnd = nullptr;
+
+    mWaterFoam = nullptr;
+    mWaterFlatness = nullptr;
+    mWaterDepthBias = nullptr;
+    mDebugDirtyTerrain = nullptr;
+
+    mDecalManager = nullptr;
+
+    mHypsometricColor[0] = 0xFF0E3EFFu;
+    mHypsometricColor[1] = 0xFF215CFFu;
+    mHypsometricColor[2] = 0xFF4785FFu;
+    mHypsometricColor[3] = 0xFF4C9D32u;
+    mHypsometricColor[4] = 0xFFFFFFFFu;
+  }
+
+  /**
+   * Address: 0x008A0D60 (FUN_008A0D60, ??1CWldTerrainRes@Moho@@UAE@XZ)
+   * Mangled: ??1CWldTerrainRes@Moho@@UAE@XZ
+   *
+   * IDA signature:
+   * void __thiscall Moho::CWldTerrainRes::~CWldTerrainRes(Moho::CWldTerrainRes *this);
+   *
+   * What it does:
+   * Releases the terrain-resource object's raw owning-pointer lanes: the decal
+   * manager's virtual delete, the debug dirty-terrain bitmap, the three water
+   * mask buffers and the edit-word buffer's block. None of those is a member
+   * with a destructor, so none of them is emitted for us.
+   *
+   * Every *member* teardown the binary's `~CWldTerrainRes` performs -
+   * WaveSystem, the debug dirty-rect list, the water-map/skycube/background
+   * texture handles, the env-lookup map, the two strings, the normal-map handle
+   * array, and the strata/water-shader/skydome/cartographic sub-objects - is
+   * emitted by MSVC as part of `~IWldTerrainRes`, which `DestroyTerrainRes`'s
+   * `delete` runs immediately after this. Writing them out here as well
+   * destroyed each of them twice: `~rb_tree()` nulls `head_` on its first run,
+   * so the second `std::destroy_at(&view.mEnvLookup)` reached
+   * `erase_range(leftmost(), header())` with a null header and faulted
+   * (0xC0000005 reading 0x00000000 in `rb_tree::leftmost`) on every exit from a
+   * loaded map. The owned `STIMap` is likewise `~IWldTerrainRes`'s own body
+   * (`delete mMap`), not this function's.
+   */
+  CWldTerrainRes::~CWldTerrainRes()
+  {
+    // mDecalManager: virtual scalar-deleting dtor dispatch (delete p).
+    if (mDecalManager != nullptr) {
+      delete mDecalManager;
+      mDecalManager = nullptr;
+    }
+
+    if (mDebugDirtyTerrain != nullptr) {
+      mDebugDirtyTerrain->~BitArray2D();
+      ::operator delete(mDebugDirtyTerrain);
+    }
+
+    ::operator delete[](mWaterDepthBias);
+    ::operator delete[](mWaterFlatness);
+    ::operator delete[](mWaterFoam);
+
+    if (mEditWordBuffer.begin != nullptr) {
+      ::operator delete(mEditWordBuffer.begin);
+    }
+    mEditWordBuffer.begin = nullptr;
+    mEditWordBuffer.end = nullptr;
+    mEditWordBuffer.capacityEnd = nullptr;
+  }
+
+  /**
    * Address: 0x008A7B90 (FUN_008A7B90, ?WLD_CreateTerrainRes@Moho@@YAPAVIWldTerrainRes@1@XZ)
    * Mangled: ?WLD_CreateTerrainRes@Moho@@YAPAVIWldTerrainRes@1@XZ
    *
@@ -1206,26 +1182,13 @@ namespace moho
    * Moho::CWldTerrainRes *__cdecl Moho::WLD_CreateTerrainRes();
    *
    * What it does:
-   * Allocates one 0xC38-byte terrain-resource block, installs the concrete
-   * IWldTerrainRes vtable via the base constructor, then constructs its full
-   * field graph (CWldTerrainRes ctor, FUN_008A0AD0), returning it through the
-   * IWldTerrainRes interface pointer. Used by world-map load/new flows.
+   * Allocates and constructs one `CWldTerrainRes` (0xC38 bytes; the binary's
+   * plain `operator new` and MSVC8's null check before the constructor
+   * 0x008A0AD0), returned as the interface. Used by world-map load/new flows.
    */
   IWldTerrainRes* WLD_CreateTerrainRes()
   {
-    static_assert(sizeof(IWldTerrainRes) == 0xC38, "CWldTerrainRes storage must be 0xC38");
-
-    auto* const rawStorage = static_cast<IWldTerrainRes*>(::operator new(sizeof(IWldTerrainRes)));
-    if (rawStorage == nullptr) {
-      return nullptr;
-    }
-
-    // Base ctor installs the (now concrete) IWldTerrainRes vtable at +0x00 and
-    // zeroes the mMap lane at +0x04. The derived field graph
-    // is then filled over the same storage via the runtime overlay.
-    IWldTerrainRes* const terrainRes = new (rawStorage) IWldTerrainRes();
-    ConstructTerrainResFields(*rawStorage);
-    return terrainRes;
+    return new (std::nothrow) CWldTerrainRes();
   }
 
   /**
@@ -1585,7 +1548,7 @@ namespace moho
    * Copies playable map bounds from terrain-res internal storage into `outRect`
    * and returns `&outRect`.
    */
-  const VisibilityRect* IWldTerrainRes::GetPlayableMapRect(VisibilityRect& outRect) const
+  const VisibilityRect* CWldTerrainRes::GetPlayableMapRect(VisibilityRect& outRect) const
   {
     outRect = VisibilityRect::FromRect2i(mMap->mPlayableRect);
     return &outRect;
@@ -1598,7 +1561,7 @@ namespace moho
    * Writes one playable-map rectangle through the owned terrain map and emits
    * warning text when bounds are invalid.
    */
-  bool IWldTerrainRes::SetPlayableMapRect(const VisibilityRect& rect)
+  bool CWldTerrainRes::SetPlayableMapRect(const VisibilityRect& rect)
   {
     STIMap* const map = mMap;
     if (map == nullptr) {
@@ -1620,7 +1583,7 @@ namespace moho
    * What it does:
    * Returns true when `worldPos` lies within the terrain playable rectangle.
    */
-  bool IWldTerrainRes::IsInPlayableRect(const Wm3::Vec3f& worldPos)
+  bool CWldTerrainRes::IsInPlayableRect(const Wm3::Vec3f& worldPos)
   {
     const STIMap* const map = mMap;
     const gpg::Rect2i& playableRect = map->mPlayableRect;
@@ -1638,7 +1601,7 @@ namespace moho
    * Stores terrain background texture path and resolves the corresponding D3D
    * texture resource handle.
    */
-  void IWldTerrainRes::SetBackground(const msvc8::string& texturePath)
+  void CWldTerrainRes::SetBackground(const msvc8::string& texturePath)
   {
     auto* const view = this;
     view->mBackgroundFile = texturePath;
@@ -1660,7 +1623,7 @@ namespace moho
    * Stores terrain skycube texture path and resolves the corresponding D3D
    * texture resource handle.
    */
-  void IWldTerrainRes::SetSkycube(const msvc8::string& texturePath)
+  void CWldTerrainRes::SetSkycube(const msvc8::string& texturePath)
   {
     auto* const view = this;
     view->mSkycubeFile = texturePath;
@@ -1681,7 +1644,7 @@ namespace moho
    * What it does:
    * Returns one retained shared texture handle for terrain background.
    */
-  boost::shared_ptr<ID3DTextureSheet> IWldTerrainRes::GetBackground() const
+  boost::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetBackground() const
   {
     return boost::static_pointer_cast<ID3DTextureSheet>(mBackgroundTexture);
   }
@@ -1692,7 +1655,7 @@ namespace moho
    * What it does:
    * Returns one retained shared texture handle for terrain skycube.
    */
-  boost::shared_ptr<ID3DTextureSheet> IWldTerrainRes::GetSkycube() const
+  boost::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetSkycube() const
   {
     return boost::static_pointer_cast<ID3DTextureSheet>(mSkycubeTexture);
   }
@@ -1702,7 +1665,7 @@ namespace moho
    *
    * What it does: see the header -- returns the stored path by reference.
    */
-  const msvc8::string& IWldTerrainRes::GetBackgroundFile() const
+  const msvc8::string& CWldTerrainRes::GetBackgroundFile() const
   {
     return mBackgroundFile;
   }
@@ -1712,7 +1675,7 @@ namespace moho
    *
    * What it does: see the header -- returns the stored path by reference.
    */
-  const msvc8::string& IWldTerrainRes::GetSkycubeFile() const
+  const msvc8::string& CWldTerrainRes::GetSkycubeFile() const
   {
     return mSkycubeFile;
   }
@@ -1740,7 +1703,7 @@ namespace moho
    * `map[key] = value` assignment, on both the cache-hit and cache-miss
    * paths alike.
    */
-  void IWldTerrainRes::AddEnvLookup(const msvc8::string& environmentKey, const msvc8::string& texturePath)
+  void CWldTerrainRes::AddEnvLookup(const msvc8::string& environmentKey, const msvc8::string& texturePath)
   {
     ID3DDeviceResources::TextureResourceHandle texture;
     if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
@@ -1760,7 +1723,7 @@ namespace moho
    * What it does:
    * Removes one environment-lookup entry by key when the key exists.
    */
-  void IWldTerrainRes::RemoveEnvLookup(const msvc8::string& environmentKey)
+  void CWldTerrainRes::RemoveEnvLookup(const msvc8::string& environmentKey)
   {
     moho::TerrainEnvironmentLookupMap& map = mEnvLookup;
     (void)map.erase(environmentKey);
@@ -1773,7 +1736,7 @@ namespace moho
    * What it does:
    * Returns one environment texture by key, with `<default>` fallback.
    */
-  boost::shared_ptr<ID3DTextureSheet> IWldTerrainRes::GetEnvLookup(const msvc8::string& environmentKey) const
+  boost::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetEnvLookup(const msvc8::string& environmentKey) const
   {
     const moho::TerrainEnvironmentLookupMap& map = mEnvLookup;
 
@@ -1812,7 +1775,7 @@ namespace moho
    * Clears and rebuilds one destination list with all environment map
    * key/name pairs in RB-tree iteration order.
    */
-  void IWldTerrainRes::EnumerateEnvLookup(TerrainEnvironmentLookupPairs& outPairs) const
+  void CWldTerrainRes::EnumerateEnvLookup(TerrainEnvironmentLookupPairs& outPairs) const
   {
     (void)outPairs.erase(outPairs.begin(), outPairs.end());
 
@@ -1830,7 +1793,7 @@ namespace moho
    * Clears all nodes rooted at the environment-lookup tree root and resets
    * head links/size to the empty-map sentinel state.
    */
-  void IWldTerrainRes::ClearEnvLookup()
+  void CWldTerrainRes::ClearEnvLookup()
   {
     mEnvLookup.clear();
   }
@@ -1868,7 +1831,7 @@ namespace moho
    * What it does:
    * Returns the terrain runtime boolean lane at `+0x08`.
    */
-  bool IWldTerrainRes::GetBool() const
+  bool CWldTerrainRes::GetBool() const
   {
     return mBool != 0;
   }
@@ -1879,7 +1842,7 @@ namespace moho
    * What it does:
    * Returns mutable access to terrain cartographic runtime state.
    */
-  Cartographic& IWldTerrainRes::GetCartographic()
+  Cartographic& CWldTerrainRes::GetCartographic()
   {
     return mCartographic;
   }
@@ -1890,7 +1853,7 @@ namespace moho
    * What it does:
    * Returns read-only access to terrain cartographic runtime state.
    */
-  const Cartographic& IWldTerrainRes::GetCartographic() const
+  const Cartographic& CWldTerrainRes::GetCartographic() const
   {
     return mCartographic;
   }
@@ -1901,7 +1864,7 @@ namespace moho
    * What it does:
    * Returns mutable access to terrain skydome runtime state.
    */
-  SkyDome& IWldTerrainRes::GetSkyDome()
+  SkyDome& CWldTerrainRes::GetSkyDome()
   {
     return mSkyDome;
   }
@@ -1912,7 +1875,7 @@ namespace moho
    * What it does:
    * Returns read-only access to terrain skydome runtime state.
    */
-  const SkyDome& IWldTerrainRes::GetSkyDome() const
+  const SkyDome& CWldTerrainRes::GetSkyDome() const
   {
     return mSkyDome;
   }
@@ -1923,7 +1886,7 @@ namespace moho
    * What it does:
    * Sets the active topographic sample-count lane.
    */
-  void IWldTerrainRes::SetTopographicSamples(const std::int32_t sampleCount)
+  void CWldTerrainRes::SetTopographicSamples(const std::int32_t sampleCount)
   {
     mTopographicSamples = sampleCount;
   }
@@ -1934,7 +1897,7 @@ namespace moho
    * What it does:
    * Returns the active topographic sample-count lane.
    */
-  std::int32_t IWldTerrainRes::GetTopographicSamples() const
+  std::int32_t CWldTerrainRes::GetTopographicSamples() const
   {
     return mTopographicSamples;
   }
@@ -1946,7 +1909,7 @@ namespace moho
    * What it does:
    * Writes one indexed hypsometric color lane.
    */
-  void IWldTerrainRes::SetHypsometricColor(const std::int32_t colorIndex, const std::uint32_t colorValue)
+  void CWldTerrainRes::SetHypsometricColor(const std::int32_t colorIndex, const std::uint32_t colorValue)
   {
     mHypsometricColor[static_cast<std::size_t>(colorIndex)] = colorValue;
   }
@@ -1958,7 +1921,7 @@ namespace moho
    * What it does:
    * Returns one indexed hypsometric color lane.
    */
-  std::uint32_t IWldTerrainRes::GetHypsometricColor(const std::int32_t colorIndex) const
+  std::uint32_t CWldTerrainRes::GetHypsometricColor(const std::int32_t colorIndex) const
   {
     return mHypsometricColor[static_cast<std::size_t>(colorIndex)];
   }
@@ -1969,7 +1932,7 @@ namespace moho
    * What it does:
    * Sets the terrain imager elevation offset lane.
    */
-  void IWldTerrainRes::SetImagerElevationOffset(const float elevationOffset)
+  void CWldTerrainRes::SetImagerElevationOffset(const float elevationOffset)
   {
     mImagerElevationOffset = elevationOffset;
   }
@@ -1980,7 +1943,7 @@ namespace moho
    * What it does:
    * Returns the terrain imager elevation offset lane.
    */
-  float IWldTerrainRes::GetImagerElevationOffset() const
+  float CWldTerrainRes::GetImagerElevationOffset() const
   {
     return mImagerElevationOffset;
   }
@@ -1991,7 +1954,7 @@ namespace moho
    * What it does:
    * Returns the owned terrain wave-system object.
    */
-  WaveSystem* IWldTerrainRes::GetWaveSystem()
+  WaveSystem* CWldTerrainRes::GetWaveSystem()
   {
     return &mWaveSystem;
   }
@@ -2002,7 +1965,7 @@ namespace moho
    * What it does:
    * Returns one retained shared texture handle for the terrain water map.
    */
-  boost::shared_ptr<ID3DTextureSheet> IWldTerrainRes::GetWaterMap() const
+  boost::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetWaterMap() const
   {
     return boost::static_pointer_cast<ID3DTextureSheet>(mWaterMapTexture);
   }
@@ -2014,7 +1977,7 @@ namespace moho
    * Returns half-resolution terrain water-map dimensions derived from current
    * heightfield extents.
    */
-  Wm3::Vector2f IWldTerrainRes::GetWaterMapSize() const
+  Wm3::Vector2f CWldTerrainRes::GetWaterMapSize() const
   {
     const auto* const view = this;
     const CHeightField* const field = view->mMap->mHeightField.get();
@@ -2029,7 +1992,7 @@ namespace moho
    * What it does:
    * Forwards one camera/timestep update into terrain wave simulation.
    */
-  void IWldTerrainRes::UpdateWaveSystem(const GeomCamera3& camera, const float elapsedSeconds, const std::int32_t tick)
+  void CWldTerrainRes::UpdateWaveSystem(const GeomCamera3& camera, const float elapsedSeconds, const std::int32_t tick)
   {
     mWaveSystem.Update(camera, elapsedSeconds, tick);
   }
@@ -2040,7 +2003,7 @@ namespace moho
    * What it does:
    * Returns debug dirty-region bitmask storage.
    */
-  gpg::BitArray2D* IWldTerrainRes::GetDebugDirtyTerrain()
+  gpg::BitArray2D* CWldTerrainRes::GetDebugDirtyTerrain()
   {
     return mDebugDirtyTerrain;
   }
@@ -2051,7 +2014,7 @@ namespace moho
    * What it does:
    * Returns the debug dirty-rectangle list lane.
    */
-  const msvc8::list<gpg::Rect2i>& IWldTerrainRes::GetDebugDirtyRects() const
+  const msvc8::list<gpg::Rect2i>& CWldTerrainRes::GetDebugDirtyRects() const
   {
     return mDebugDirtyRects;
   }
@@ -2062,7 +2025,7 @@ namespace moho
    * What it does:
    * Returns number of active normal-map tile handles.
    */
-  std::int32_t IWldTerrainRes::GetNormalMapCount()
+  std::int32_t CWldTerrainRes::GetNormalMapCount()
   {
     const auto* const view = this;
     if (view->mNormalMap.begin() == nullptr) {
@@ -2107,7 +2070,7 @@ namespace moho
    * reconfigures the sky dome from the fresh world bounds. Always returns true
    * (`0x008A6A46: mov al, 1`).
    */
-  bool IWldTerrainRes::Reset(const SChartSize chartSize, LuaPlus::LuaState* const state)
+  bool CWldTerrainRes::Reset(const SChartSize chartSize, LuaPlus::LuaState* const state)
   {
     auto* const view = this;
     auto* const normalView = this;
@@ -2166,7 +2129,7 @@ namespace moho
     // 0x008A6422-0x008A6449: the binary inlines `CWldTerrainRes::ClearEnvLookup`
     // (0x008A1640) here - same subtree sweep plus sentinel rebind - so the call is
     // made statically to keep the non-virtual shape the compiler emitted.
-    IWldTerrainRes::ClearEnvLookup();
+    CWldTerrainRes::ClearEnvLookup();
 
     // 0x008A644C-0x008A6588: reinstate the single `<default>` environment entry.
     // Note the texture request at 0x008A64B7 passes the string literal directly,
@@ -2309,7 +2272,7 @@ namespace moho
    * What it does:
    * Returns world bounds computed from the terrain heightfield hierarchy.
    */
-  Wm3::AxisAlignedBox3f IWldTerrainRes::GetWorldBounds() const
+  Wm3::AxisAlignedBox3f CWldTerrainRes::GetWorldBounds() const
   {
     const auto* const view = this;
     const CHeightField* const field = view->mMap->mHeightField.get();
@@ -2330,7 +2293,7 @@ namespace moho
    * What it does:
    * Returns terrain lighting multiplier.
    */
-  float IWldTerrainRes::GetLightingMultiplier() const
+  float CWldTerrainRes::GetLightingMultiplier() const
   {
     return mLightingMultiplier;
   }
@@ -2341,7 +2304,7 @@ namespace moho
    * What it does:
    * Sets terrain lighting multiplier.
    */
-  void IWldTerrainRes::SetLightingMultiplier(const float& multiplier)
+  void CWldTerrainRes::SetLightingMultiplier(const float& multiplier)
   {
     mLightingMultiplier = multiplier;
   }
@@ -2352,7 +2315,7 @@ namespace moho
    * What it does:
    * Returns sun direction vector.
    */
-  Wm3::Vector3f IWldTerrainRes::GetSunDirection() const
+  Wm3::Vector3f CWldTerrainRes::GetSunDirection() const
   {
     return mSunDirection;
   }
@@ -2363,7 +2326,7 @@ namespace moho
    * What it does:
    * Sets sun direction vector.
    */
-  void IWldTerrainRes::SetSunDirection(const Wm3::Vector3f& direction)
+  void CWldTerrainRes::SetSunDirection(const Wm3::Vector3f& direction)
   {
     mSunDirection = direction;
   }
@@ -2374,7 +2337,7 @@ namespace moho
    * What it does:
    * Returns sun ambience vector.
    */
-  Wm3::Vector3f IWldTerrainRes::GetSunAmbience() const
+  Wm3::Vector3f CWldTerrainRes::GetSunAmbience() const
   {
     return mSunAmbience;
   }
@@ -2385,7 +2348,7 @@ namespace moho
    * What it does:
    * Sets sun ambience vector.
    */
-  void IWldTerrainRes::SetSunAmbience(const Wm3::Vector3f& ambience)
+  void CWldTerrainRes::SetSunAmbience(const Wm3::Vector3f& ambience)
   {
     mSunAmbience = ambience;
   }
@@ -2396,7 +2359,7 @@ namespace moho
    * What it does:
    * Returns terrain specular color vector.
    */
-  Vector4f IWldTerrainRes::GetSpecularColor() const
+  Vector4f CWldTerrainRes::GetSpecularColor() const
   {
     return mSpecularColor;
   }
@@ -2407,7 +2370,7 @@ namespace moho
    * What it does:
    * Sets terrain specular color vector.
    */
-  void IWldTerrainRes::SetSpecularColor(const Vector4f& color)
+  void CWldTerrainRes::SetSpecularColor(const Vector4f& color)
   {
     mSpecularColor = color;
   }
@@ -2418,7 +2381,7 @@ namespace moho
    * What it does:
    * Returns terrain bloom strength lane.
    */
-  float IWldTerrainRes::GetBloom() const
+  float CWldTerrainRes::GetBloom() const
   {
     return mBloom;
   }
@@ -2429,7 +2392,7 @@ namespace moho
    * What it does:
    * Sets terrain bloom strength lane.
    */
-  void IWldTerrainRes::SetBloom(const float bloom)
+  void CWldTerrainRes::SetBloom(const float bloom)
   {
     mBloom = bloom;
   }
@@ -2440,7 +2403,7 @@ namespace moho
    * What it does:
    * Returns read-only terrain fog parameter block.
    */
-  const SFogInfo& IWldTerrainRes::GetFogInfo() const
+  const SFogInfo& CWldTerrainRes::GetFogInfo() const
   {
     return mFogInfo;
   }
@@ -2451,7 +2414,7 @@ namespace moho
    * What it does:
    * Updates primary terrain fog parameter lanes.
    */
-  void IWldTerrainRes::SetFogInfo(const SFogInfo& fogInfo)
+  void CWldTerrainRes::SetFogInfo(const SFogInfo& fogInfo)
   {
     auto* const view = this;
     view->mFogInfo.mStartDistance = fogInfo.mStartDistance;
@@ -2467,7 +2430,7 @@ namespace moho
    * What it does:
    * Returns sun color vector.
    */
-  Wm3::Vector3f IWldTerrainRes::GetSunColor() const
+  Wm3::Vector3f CWldTerrainRes::GetSunColor() const
   {
     return mSunColor;
   }
@@ -2478,7 +2441,7 @@ namespace moho
    * What it does:
    * Sets sun color vector.
    */
-  void IWldTerrainRes::SetSunColor(const Wm3::Vector3f& color)
+  void CWldTerrainRes::SetSunColor(const Wm3::Vector3f& color)
   {
     mSunColor = color;
   }
@@ -2489,7 +2452,7 @@ namespace moho
    * What it does:
    * Returns shadow-fill color vector.
    */
-  Wm3::Vector3f IWldTerrainRes::GetShadowFillColor() const
+  Wm3::Vector3f CWldTerrainRes::GetShadowFillColor() const
   {
     return mShadowFillColor;
   }
@@ -2500,7 +2463,7 @@ namespace moho
    * What it does:
    * Sets shadow-fill color vector.
    */
-  void IWldTerrainRes::SetShadowFillColor(const Wm3::Vector3f& color)
+  void CWldTerrainRes::SetShadowFillColor(const Wm3::Vector3f& color)
   {
     mShadowFillColor = color;
   }
@@ -2511,7 +2474,7 @@ namespace moho
    * What it does:
    * Toggles world-map water rendering/logic enabled flag.
    */
-  void IWldTerrainRes::WaterEnabled(const bool enabled)
+  void CWldTerrainRes::WaterEnabled(const bool enabled)
   {
     mMap->mWaterEnabled = static_cast<std::uint8_t>(enabled ? 1u : 0u);
   }
@@ -2522,7 +2485,7 @@ namespace moho
    * What it does:
    * Sets world-map surface water elevation.
    */
-  void IWldTerrainRes::SetWaterElevation(const float elevation)
+  void CWldTerrainRes::SetWaterElevation(const float elevation)
   {
     mMap->mWaterElevation = elevation;
   }
@@ -2533,7 +2496,7 @@ namespace moho
    * What it does:
    * Sets world-map deep-water threshold elevation.
    */
-  void IWldTerrainRes::SetWaterElevationDeep(const float elevation)
+  void CWldTerrainRes::SetWaterElevationDeep(const float elevation)
   {
     mMap->mWaterElevationDeep = elevation;
   }
@@ -2544,7 +2507,7 @@ namespace moho
    * What it does:
    * Sets world-map abyss-water threshold elevation.
    */
-  void IWldTerrainRes::SetWaterElevationAbyss(const float elevation)
+  void CWldTerrainRes::SetWaterElevationAbyss(const float elevation)
   {
     mMap->mWaterElevationAbyss = elevation;
   }
@@ -2555,7 +2518,7 @@ namespace moho
    * What it does:
    * Copies one water-shader property block into terrain state.
    */
-  void IWldTerrainRes::SetWaterShaderProperties(const CWaterShaderProperties& properties)
+  void CWldTerrainRes::SetWaterShaderProperties(const CWaterShaderProperties& properties)
   {
     auto* const view = this;
     if (&properties != &view->mWaterShaderProperties) {
@@ -2570,7 +2533,7 @@ namespace moho
    * What it does:
    * Returns mutable pointer to the owned water-shader property block.
    */
-  CWaterShaderProperties* IWldTerrainRes::GetWaterShaderProperties()
+  CWaterShaderProperties* CWldTerrainRes::GetWaterShaderProperties()
   {
     return &mWaterShaderProperties;
   }
@@ -2581,7 +2544,7 @@ namespace moho
    * What it does:
    * Returns terrain water-foam mask buffer.
    */
-  std::uint8_t* IWldTerrainRes::GetWaterFoam()
+  std::uint8_t* CWldTerrainRes::GetWaterFoam()
   {
     return mWaterFoam;
   }
@@ -2592,7 +2555,7 @@ namespace moho
    * What it does:
    * Returns terrain water-flatness mask buffer.
    */
-  std::uint8_t* IWldTerrainRes::GetWaterFlatness()
+  std::uint8_t* CWldTerrainRes::GetWaterFlatness()
   {
     return mWaterFlatness;
   }
@@ -2603,7 +2566,7 @@ namespace moho
    * What it does: see the header -- the third water mask, alongside the foam
    * and flatness masks either side of it.
    */
-  std::uint8_t* IWldTerrainRes::GetWaterDepthBias()
+  std::uint8_t* CWldTerrainRes::GetWaterDepthBias()
   {
     return mWaterDepthBias;
   }
@@ -2614,7 +2577,7 @@ namespace moho
    * What it does:
    * Returns true when terrain-resource edit mode is enabled.
    */
-  bool IWldTerrainRes::IsInEditMode() const
+  bool CWldTerrainRes::IsInEditMode() const
   {
     return mEditMode != 0;
   }
@@ -2626,7 +2589,7 @@ namespace moho
    * Enables terrain edit mode, prepares packed edit-word storage, clones
    * editable stratum/water textures, then rebuilds full water-map contents.
    */
-  void IWldTerrainRes::EnterEditMode(CBackgroundTaskControl& loadControl)
+  void CWldTerrainRes::EnterEditMode(CBackgroundTaskControl& loadControl)
   {
     (void)loadControl;
 
@@ -2661,7 +2624,7 @@ namespace moho
    * Flushes packed edit-word pixels into water-map texture, clears edit-mode
    * flag, and restores runtime texture instances.
    */
-  void IWldTerrainRes::ExitEditMode()
+  void CWldTerrainRes::ExitEditMode()
   {
     auto* const runtimeView = this;
     auto* const normalView = this;
@@ -2707,7 +2670,7 @@ namespace moho
    * What it does:
    * Returns terrain decal-manager lane.
    */
-  IDecalManager* IWldTerrainRes::GetDecalManager()
+  IDecalManager* CWldTerrainRes::GetDecalManager()
   {
     return mDecalManager;
   }
@@ -2719,7 +2682,7 @@ namespace moho
    * Reallocates water foam/flatness/depth-bias mask lanes and initializes each
    * lane to binary default fill values (0x00/0xFF/0x7F).
    */
-  void IWldTerrainRes::CreateWaterMasks(const std::int32_t width, const std::int32_t height)
+  void CWldTerrainRes::CreateWaterMasks(const std::int32_t width, const std::int32_t height)
   {
     const std::uint32_t maskSizeBytes = static_cast<std::uint32_t>(width * height);
     auto* const view = this;
@@ -2750,7 +2713,7 @@ namespace moho
    * Rebuilds the full water-map texture area by forwarding sentinel bounds to
    * the rectangle lane.
    */
-  void IWldTerrainRes::UpdateWaterMap()
+  void CWldTerrainRes::UpdateWaterMap()
   {
     gpg::Rect2i fullRect{};
     fullRect.x0 = static_cast<std::int32_t>(0x80000000u);
@@ -2766,7 +2729,7 @@ namespace moho
    * What it does:
    * Rebuilds one caller-provided rectangle of the water-map texture.
    */
-  void IWldTerrainRes::UpdateWaterMap(const gpg::Rect2i& rect)
+  void CWldTerrainRes::UpdateWaterMap(const gpg::Rect2i& rect)
   {
     RebuildWaterMapRect(*this, rect);
   }
@@ -2778,7 +2741,7 @@ namespace moho
    * Rebuilds one caller-provided rectangle of the water-map texture while
    * preserving the original (unused) background-task-control signature lane.
    */
-  void IWldTerrainRes::UpdateWaterMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect)
+  void CWldTerrainRes::UpdateWaterMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect)
   {
     (void)loadControl;
     RebuildWaterMapRect(*this, rect);
@@ -2791,7 +2754,7 @@ namespace moho
    * Computes normal-map tile dimensions/count, allocates one dynamic texture
    * per tile, then rebuilds full normal-map coverage.
    */
-  void IWldTerrainRes::InitNormalMap(CBackgroundTaskControl& loadControl)
+  void CWldTerrainRes::InitNormalMap(CBackgroundTaskControl& loadControl)
   {
     auto* const normalView = this;
     CHeightField* const field = normalView->mMap->mHeightField.get();
@@ -2861,7 +2824,7 @@ namespace moho
    * Syncs queued dirty terrain rectangles from a source heightfield into the
    * active map field for camera-visible regions and updates dirty/error lanes.
    */
-  void IWldTerrainRes::SyncTerrain(const CHeightField* const source)
+  void CWldTerrainRes::SyncTerrain(const CHeightField* const source)
   {
     RCamManager* const cameraManager = CAM_GetManager();
     CameraImpl* const camera = cameraManager != nullptr ? cameraManager->GetCamera("WorldCamera") : nullptr;
@@ -2944,7 +2907,7 @@ namespace moho
    * What it does:
    * Rebuilds one caller-provided normal-map rectangle with a null progress lane.
    */
-  void IWldTerrainRes::UpdateNormalMap(const gpg::Rect2i& rect)
+  void CWldTerrainRes::UpdateNormalMap(const gpg::Rect2i& rect)
   {
     CBackgroundTaskControl loadControl{};
     loadControl.mHandle = nullptr;
@@ -2958,7 +2921,7 @@ namespace moho
    * Rebuilds one clipped normal-map rectangle across all normal-map tiles and
    * encodes each 4x4 block to DXT payload lanes.
    */
-  void IWldTerrainRes::UpdateNormalMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect)
+  void CWldTerrainRes::UpdateNormalMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect)
   {
     auto* const normalView = this;
     const std::int32_t tileWidth = normalView->mNormalMapWidth;
@@ -3080,7 +3043,7 @@ namespace moho
    * one was already under construction stalled the render thread for around
    * a minute inside `CWldSession::DoBeat`.
    */
-  void IWldTerrainRes::NotifyMapChange(const gpg::Rect2i& rect)
+  void CWldTerrainRes::NotifyMapChange(const gpg::Rect2i& rect)
   {
     if (!GetBool() && Finalize()) {
       return;
@@ -3108,7 +3071,7 @@ namespace moho
    * Locks one dynamic texture sheet and copies packed RGBA source rows into
    * each destination pitch row before unlocking.
    */
-  void IWldTerrainRes::UpdateTexture(
+  void CWldTerrainRes::UpdateTexture(
     boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet, const std::uint32_t* const sourcePixels
   )
   {
@@ -3147,7 +3110,7 @@ namespace moho
    * What it does:
    * Clears one lockable texture-sheet payload to zero over every mapped row.
    */
-  void IWldTerrainRes::ClearTexture(boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet)
+  void CWldTerrainRes::ClearTexture(boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet)
   {
     CD3DDynamicTextureSheet* const sheet = textureSheet.get();
     if (sheet == nullptr) {
@@ -3180,7 +3143,7 @@ namespace moho
    * Updates one channel lane in a locked terrain RGBA texture from
    * caller-supplied byte-mask rows over `[rowStart,rowEnd) x [columnStart,columnEnd)`.
    */
-  void IWldTerrainRes::UpdateTextureChannel(
+  void CWldTerrainRes::UpdateTextureChannel(
     const std::int32_t rowStart,
     const std::int32_t columnEnd,
     boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
@@ -3233,7 +3196,7 @@ namespace moho
    * Locks one packed RGBA texture, extracts one caller-selected channel lane
    * from each texel, writes unpacked bytes row-by-row, then unlocks.
    */
-  void IWldTerrainRes::GetTextureChannel(
+  void CWldTerrainRes::GetTextureChannel(
     boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
     const std::uint32_t channelMask,
     const std::uint32_t channelShift,
@@ -3281,7 +3244,7 @@ namespace moho
    * Selects one packed channel lane from stratum texture 0/1 and forwards one
    * byte-mask rectangle update through `UpdateTextureChannel`.
    */
-  void IWldTerrainRes::UpdateStratumMask(
+  void CWldTerrainRes::UpdateStratumMask(
     const std::int32_t stratumIndex,
     const std::uint8_t* const sourceMask,
     const std::int32_t columnStart,
@@ -3322,7 +3285,7 @@ namespace moho
    *
    * What it does: see the header -- the whole-mask form of the overload above.
    */
-  void IWldTerrainRes::UpdateStratumMask(const std::int32_t stratumIndex, const std::uint8_t* const sourceMask)
+  void CWldTerrainRes::UpdateStratumMask(const std::int32_t stratumIndex, const std::uint8_t* const sourceMask)
   {
     const auto* const view = this;
     UpdateStratumMask(stratumIndex, sourceMask, 0, 0, view->mStrata.mStratumMaskWidth, view->mStrata.mStratumMaskHeight);
@@ -3335,7 +3298,7 @@ namespace moho
    * Selects one stratum-mask texture/channel lane and forwards unpacking to
    * `GetTextureChannel`.
    */
-  void IWldTerrainRes::GetStratumMask(const std::int32_t stratumIndex, std::uint8_t* const outMask)
+  void CWldTerrainRes::GetStratumMask(const std::int32_t stratumIndex, std::uint8_t* const outMask)
   {
     static constexpr std::uint32_t kChannelMask[4] = {
       0xFF00FFFFu,
@@ -3361,7 +3324,7 @@ namespace moho
    * Builds shader-ready UV scale/offset lanes and texture ownership for one
    * normal-map tile index.
    */
-  SNormalMapInfo IWldTerrainRes::GetNormalMapInfo(const std::int32_t index) const
+  SNormalMapInfo CWldTerrainRes::GetNormalMapInfo(const std::int32_t index) const
   {
     SNormalMapInfo outInfo{};
 
@@ -3404,7 +3367,7 @@ namespace moho
    * payload by constructing one default property block and replacing the
    * currently owned instance.
    */
-  void IWldTerrainRes::SetWaterDefaults()
+  void CWldTerrainRes::SetWaterDefaults()
   {
     CWaterShaderProperties defaults{};
     SetWaterShaderProperties(defaults);
@@ -3416,7 +3379,7 @@ namespace moho
    * What it does:
    * Returns mutable access to the owned terrain stratum-material set.
    */
-  StratumMaterial& IWldTerrainRes::GetStratumMaterial()
+  StratumMaterial& CWldTerrainRes::GetStratumMaterial()
   {
     return mStrata;
   }
@@ -3428,7 +3391,7 @@ namespace moho
    * Replaces current terrain strata with default descriptors, then reapplies
    * map-size scaling to each configured layer.
    */
-  void IWldTerrainRes::SetStratumDefaults()
+  void CWldTerrainRes::SetStratumDefaults()
   {
     auto* const normalView = this;
     normalView->mStrata = StratumMaterial{};
@@ -3454,11 +3417,9 @@ namespace moho
    * the three water byte planes, the terrain-type grid, the sky dome and the
    * cartographic decals. Always reports success.
    */
-  bool IWldTerrainRes::Save(gpg::BinaryWriter& writer)
+  bool CWldTerrainRes::Save(gpg::BinaryWriter& writer)
   {
-    IWldTerrainRes& view = *this;
-    IWldTerrainRes& normalView = *this;
-    STIMap& map = *view.mMap;
+    STIMap& map = *mMap;
     const CHeightField& heightField = *map.mHeightField.get();
 
     // 0x008A30D8-0x008A31DF: version, cell extents (samples - 1), the fixed
@@ -3474,50 +3435,50 @@ namespace moho
     );
 
     // 0x008A31FA: latch the shader's composite capability before persisting it.
-    ResolveTerrainCompositeShaderUsage(view.mStrata);
-    writer.Write(view.mStrata.byte1);
-    writer.WriteString(view.mStrata.mShaderName);
-    writer.WriteString(view.mBackgroundFile);
-    writer.WriteString(view.mSkycubeFile);
+    ResolveTerrainCompositeShaderUsage(mStrata);
+    writer.Write(mStrata.byte1);
+    writer.WriteString(mStrata.mShaderName);
+    writer.WriteString(mBackgroundFile);
+    writer.WriteString(mSkycubeFile);
 
     // 0x008A324C-0x008A3344: entry count, then key/environment-name pairs in
     // in-order tree traversal.
-    writer.Write(static_cast<std::uint32_t>(view.mEnvLookup.size()));
-    for (const auto& [key, value] : view.mEnvLookup) {
+    writer.Write(static_cast<std::uint32_t>(mEnvLookup.size()));
+    for (const auto& [key, value] : mEnvLookup) {
       writer.WriteString(key);
       writer.WriteString(value.mEnvironmentName);
     }
 
-    writer.Write(view.mLightingMultiplier);
+    writer.Write(mLightingMultiplier);
 
-    writer.Write(view.mSunDirection.x);
-    writer.Write(view.mSunDirection.y);
-    writer.Write(view.mSunDirection.z);
+    writer.Write(mSunDirection.x);
+    writer.Write(mSunDirection.y);
+    writer.Write(mSunDirection.z);
 
-    writer.Write(view.mSunAmbience.x);
-    writer.Write(view.mSunAmbience.y);
-    writer.Write(view.mSunAmbience.z);
+    writer.Write(mSunAmbience.x);
+    writer.Write(mSunAmbience.y);
+    writer.Write(mSunAmbience.z);
 
-    writer.Write(view.mSunColor.x);
-    writer.Write(view.mSunColor.y);
-    writer.Write(view.mSunColor.z);
+    writer.Write(mSunColor.x);
+    writer.Write(mSunColor.y);
+    writer.Write(mSunColor.z);
 
-    writer.Write(view.mShadowFillColor.x);
-    writer.Write(view.mShadowFillColor.y);
-    writer.Write(view.mShadowFillColor.z);
+    writer.Write(mShadowFillColor.x);
+    writer.Write(mShadowFillColor.y);
+    writer.Write(mShadowFillColor.z);
 
-    writer.Write(view.mSpecularColor.x);
-    writer.Write(view.mSpecularColor.y);
-    writer.Write(view.mSpecularColor.z);
-    writer.Write(view.mSpecularColor.w);
+    writer.Write(mSpecularColor.x);
+    writer.Write(mSpecularColor.y);
+    writer.Write(mSpecularColor.z);
+    writer.Write(mSpecularColor.w);
 
-    writer.Write(view.mBloom);
+    writer.Write(mBloom);
 
-    writer.Write(view.mFogStartDistance);
-    writer.Write(view.mFogCutoffDistance);
-    writer.Write(view.mFogMinClamp);
-    writer.Write(view.mFogMaxClamp);
-    writer.Write(view.mFogCurveExponent);
+    writer.Write(mFogStartDistance);
+    writer.Write(mFogCutoffDistance);
+    writer.Write(mFogMinClamp);
+    writer.Write(mFogMaxClamp);
+    writer.Write(mFogCurveExponent);
 
     // 0x008A3722-0x008A3836: the three water planes fall back to the
     // -10000 sentinel whenever the map has water disabled.
@@ -3526,49 +3487,49 @@ namespace moho
     writer.Write(map.mWaterEnabled != 0 ? map.mWaterElevationDeep : kNoWaterElevationSentinel);
     writer.Write(map.mWaterEnabled != 0 ? map.mWaterElevationAbyss : kNoWaterElevationSentinel);
 
-    view.mWaterShaderProperties.Save(writer);
-    view.mWaveSystem.Save(writer);
+    mWaterShaderProperties.Save(writer);
+    mWaveSystem.Save(writer);
 
-    writer.Write(view.mTopographicSamples);
-    writer.Write(view.mHypsometricColor[0]);
-    writer.Write(view.mHypsometricColor[1]);
-    writer.Write(view.mHypsometricColor[2]);
-    writer.Write(view.mHypsometricColor[3]);
-    writer.Write(view.mHypsometricColor[4]);
-    writer.Write(view.mImagerElevationOffset);
+    writer.Write(mTopographicSamples);
+    writer.Write(mHypsometricColor[0]);
+    writer.Write(mHypsometricColor[1]);
+    writer.Write(mHypsometricColor[2]);
+    writer.Write(mHypsometricColor[3]);
+    writer.Write(mHypsometricColor[4]);
+    writer.Write(mImagerElevationOffset);
 
     SaveTexturing(writer);
 
     // 0x008A398A-0x008A3B17: normal-map tile grid, then one archived sheet per
     // tile.
-    writer.Write(view.mNormalMapWidth);
-    writer.Write(view.mNormalMapHeight);
+    writer.Write(mNormalMapWidth);
+    writer.Write(mNormalMapHeight);
 
-    const moho::TerrainNormalMapHandleArray& normalMap = normalView.mNormalMap;
+    const moho::TerrainNormalMapHandleArray& normalMap = mNormalMap;
     const std::int32_t normalMapSheetCount = static_cast<std::int32_t>(normalMap.size());
     writer.Write(normalMapSheetCount);
     for (std::int32_t sheetIndex = 0; sheetIndex < normalMapSheetCount; ++sheetIndex) {
       SaveTerrainSheetToArchive(writer, normalMap[sheetIndex].get(), kTerrainRawSheetFormat);
     }
 
-    SaveTerrainSheetToArchive(writer, AsDynamicSheet(normalView.mStrata.mStratumMask0), kTerrainMaskSheetFormat);
-    SaveTerrainSheetToArchive(writer, AsDynamicSheet(normalView.mStrata.mStratumMask1), kTerrainMaskSheetFormat);
+    SaveTerrainSheetToArchive(writer, AsDynamicSheet(mStrata.mStratumMask0), kTerrainMaskSheetFormat);
+    SaveTerrainSheetToArchive(writer, AsDynamicSheet(mStrata.mStratumMask1), kTerrainMaskSheetFormat);
 
     // 0x008A3D49: the water map is stored as a one-element sheet array.
     constexpr std::int32_t kWaterMapSheetCount = 1;
     writer.Write(kWaterMapSheetCount);
-    SaveTerrainSheetToArchive(writer, view.mWaterMapTexture.get(), kTerrainRawSheetFormat);
+    SaveTerrainSheetToArchive(writer, mWaterMapTexture.get(), kTerrainRawSheetFormat);
 
     // 0x008A3E90-0x008A3F2C: the three per-texel water byte planes are sized
     // from the water map's own dimensions.
     Wm3::Vector3f waterMapDimensions{};
-    (void)view.mWaterMapTexture->GetDimensions(&waterMapDimensions);
+    (void)mWaterMapTexture->GetDimensions(&waterMapDimensions);
     const std::size_t waterPlaneBytes =
       static_cast<std::size_t>(static_cast<std::int32_t>(waterMapDimensions.y * waterMapDimensions.x));
 
-    writer.Write(reinterpret_cast<const char*>(view.mWaterFoam), waterPlaneBytes);
-    writer.Write(reinterpret_cast<const char*>(view.mWaterFlatness), waterPlaneBytes);
-    writer.Write(reinterpret_cast<const char*>(view.mWaterDepthBias), waterPlaneBytes);
+    writer.Write(reinterpret_cast<const char*>(mWaterFoam), waterPlaneBytes);
+    writer.Write(reinterpret_cast<const char*>(mWaterFlatness), waterPlaneBytes);
+    writer.Write(reinterpret_cast<const char*>(mWaterDepthBias), waterPlaneBytes);
 
     const TerrainTypeGrid& terrainTypeGrid = map.mTerrainType;
     writer.Write(
@@ -3576,8 +3537,8 @@ namespace moho
       static_cast<std::size_t>(terrainTypeGrid.width) * static_cast<std::size_t>(terrainTypeGrid.height)
     );
 
-    view.mSkyDome.Save(writer);
-    view.mCartographic.WriteDecals(writer);
+    mSkyDome.Save(writer);
+    mCartographic.WriteDecals(writer);
     return true;
   }
 
@@ -3588,7 +3549,7 @@ namespace moho
    * Serializes stratum-layer texture path/size lanes in save-order, then
    * delegates decal-manager persistence.
    */
-  void IWldTerrainRes::SaveTexturing(gpg::BinaryWriter& writer)
+  void CWldTerrainRes::SaveTexturing(gpg::BinaryWriter& writer)
   {
     const StratumMaterial& strata = mStrata;
 
@@ -3629,7 +3590,7 @@ namespace moho
    * (outLayer.mPath), then reads a 4-byte value straight into the layer's
    * float size (outLayer.mSize @ +0x34).
    */
-  void IWldTerrainRes::LoadLayer(CStratumMaterial& outLayer, gpg::BinaryReader& reader)
+  void CWldTerrainRes::LoadLayer(CStratumMaterial& outLayer, gpg::BinaryReader& reader)
   {
     // Binary reads the string into a temporary, then assign()s the full range
     // into outLayer.mPath; the temporary is destroyed inline. RAII on `scratch`
@@ -3657,10 +3618,9 @@ namespace moho
    * layers (albedo-first / normal-second). For legacy versions (< 54) it reads
    * the historical flat layout, then forwards to the decal manager's Load.
    */
-  void IWldTerrainRes::LoadTexturing(gpg::BinaryReader& reader, const std::uint32_t version)
+  void CWldTerrainRes::LoadTexturing(gpg::BinaryReader& reader, const std::uint32_t version)
   {
-    IWldTerrainRes* const view = this;
-    StratumMaterial& strata = view->mStrata;
+    StratumMaterial& strata = mStrata;
 
     if (version < 54) {
       // Legacy flat texturing layout.
@@ -3746,7 +3706,7 @@ namespace moho
       LoadLayer(strata.mStratum7NormalTexture, reader);
     }
 
-    view->mDecalManager->Load(reader, version);
+    mDecalManager->Load(reader, version);
   }
 
   /**
@@ -3769,14 +3729,12 @@ namespace moho
    * grid; legacy album/normal strings; skydome (loaded or derived); and
    * cartographic decals. Returns true on success.
    */
-  bool IWldTerrainRes::Load(
+  bool CWldTerrainRes::Load(
     gpg::BinaryReader& reader,
     LuaPlus::LuaState* const state,
     CBackgroundTaskControl& loadControl
   )
   {
-    IWldTerrainRes* const view = this;
-    IWldTerrainRes* const visualView = this;
 
     // The stratum-mask utility sheets are resolved through the device-resources
     // object captured at entry (mirrors the SetBackground/SetSkycube idiom), not
@@ -3803,8 +3761,8 @@ namespace moho
 
     // Build a fresh STIMap and adopt it, destroying any previous map.
     {
-      STIMap* const oldMap = view->mMap;
-      view->mMap = new STIMap(mapWidth, mapHeight);
+      STIMap* const oldMap = mMap;
+      mMap = new STIMap(mapWidth, mapHeight);
       if (oldMap != nullptr) {
         oldMap->~STIMap();
         ::operator delete(oldMap);
@@ -3812,7 +3770,7 @@ namespace moho
     }
 
     // Heightfield samples: width*height uint16 values read straight into data.
-    CHeightField* const field = view->mMap->mHeightField.get();
+    CHeightField* const field = mMap->mHeightField.get();
     reader.Read(
       reinterpret_cast<char*>(field->data),
       static_cast<std::size_t>(2 * field->width * field->height)
@@ -3820,8 +3778,8 @@ namespace moho
 
     // Fresh decal manager (destroy the previous through its virtual dtor).
     {
-      CDecalManager* const oldDecalManager = view->mDecalManager;
-      view->mDecalManager = CDecalManager::Create(this);
+      CDecalManager* const oldDecalManager = mDecalManager;
+      mDecalManager = CDecalManager::Create(this);
       if (oldDecalManager != nullptr) {
         delete oldDecalManager;
       }
@@ -3832,7 +3790,7 @@ namespace moho
       field->Rescale(heightScale * 128.0f);
     }
 
-    view->mMap->LoadTerrainTypes(state);
+    mMap->LoadTerrainTypes(state);
     TickLoadingProgress(loadControl);
 
     // Full-rect bounds + error refresh (asm passes 0..0x7FFFFFFF, which the
@@ -3842,15 +3800,15 @@ namespace moho
     fullRect.z0 = 0;
     fullRect.x1 = 0x7FFFFFFF;
     fullRect.z1 = 0x7FFFFFFF;
-    view->mMap->mHeightField.get()->UpdateBounds(fullRect);
+    mMap->mHeightField.get()->UpdateBounds(fullRect);
     TickLoadingProgress(loadControl);
-    view->mMap->mHeightField.get()->UpdateError(loadControl, fullRect);
+    mMap->mHeightField.get()->UpdateError(loadControl, fullRect);
     TickLoadingProgress(loadControl);
 
     // Debug dirty-terrain bitmap sized to half resolution.
     {
-      gpg::BitArray2D* const oldDirty = visualView->mDebugDirtyTerrain;
-      visualView->mDebugDirtyTerrain = new gpg::BitArray2D(
+      gpg::BitArray2D* const oldDirty = mDebugDirtyTerrain;
+      mDebugDirtyTerrain = new gpg::BitArray2D(
         static_cast<std::int32_t>(mapWidth) / 2,
         static_cast<std::int32_t>(mapHeight) / 2
       );
@@ -3861,20 +3819,20 @@ namespace moho
     }
 
     // Fog defaults installed before the streamed floats overwrite most lanes.
-    view->mFogStartDistance = 1.0f;
-    view->mFogCutoffDistance = 1.0f;
-    view->mFogMinClamp = 1.0f;
-    view->mFogMaxClamp = 0.0f;
-    view->mFogCurveExponent = 1000.0f;
+    mFogStartDistance = 1.0f;
+    mFogCutoffDistance = 1.0f;
+    mFogMinClamp = 1.0f;
+    mFogMaxClamp = 0.0f;
+    mFogCurveExponent = 1000.0f;
 
     // Stratum shader byte1 (version-gated), shader name, background, skycube.
-    view->mStrata.byte1 = version < 0x36u ? std::uint8_t{0} : reader.ReadChar();
+    mStrata.byte1 = version < 0x36u ? std::uint8_t{0} : reader.ReadChar();
     {
       msvc8::string shaderName;
       reader.ReadString(&shaderName);
-      view->mStrata.mShaderName.assign(shaderName, 0u, 0xFFFFFFFFu);
+      mStrata.mShaderName.assign(shaderName, 0u, 0xFFFFFFFFu);
     }
-    view->mStrata.byte0 = 0;
+    mStrata.byte0 = 0;
     {
       msvc8::string backgroundPath;
       reader.ReadString(&backgroundPath);
@@ -3905,38 +3863,38 @@ namespace moho
     }
 
     // 24 streamed lighting/sun/ambience/color/shadow/specular/bloom/fog floats.
-    reader.ReadExact(view->mLightingMultiplier);
-    reader.ReadExact(view->mSunDirection.x);
-    reader.ReadExact(view->mSunDirection.y);
-    reader.ReadExact(view->mSunDirection.z);
-    reader.ReadExact(view->mSunAmbience.x);
-    reader.ReadExact(view->mSunAmbience.y);
-    reader.ReadExact(view->mSunAmbience.z);
-    reader.ReadExact(view->mSunColor.x);
-    reader.ReadExact(view->mSunColor.y);
-    reader.ReadExact(view->mSunColor.z);
-    reader.ReadExact(view->mShadowFillColor.x);
-    reader.ReadExact(view->mShadowFillColor.y);
-    reader.ReadExact(view->mShadowFillColor.z);
-    reader.ReadExact(view->mSpecularColor.x);
-    reader.ReadExact(view->mSpecularColor.y);
-    reader.ReadExact(view->mSpecularColor.z);
-    reader.ReadExact(view->mSpecularColor.w);
-    reader.ReadExact(view->mBloom);
-    reader.ReadExact(view->mFogStartDistance);
-    reader.ReadExact(view->mFogCutoffDistance);
-    reader.ReadExact(view->mFogMinClamp);
-    reader.ReadExact(view->mFogMaxClamp);
-    reader.ReadExact(view->mFogCurveExponent);
+    reader.ReadExact(mLightingMultiplier);
+    reader.ReadExact(mSunDirection.x);
+    reader.ReadExact(mSunDirection.y);
+    reader.ReadExact(mSunDirection.z);
+    reader.ReadExact(mSunAmbience.x);
+    reader.ReadExact(mSunAmbience.y);
+    reader.ReadExact(mSunAmbience.z);
+    reader.ReadExact(mSunColor.x);
+    reader.ReadExact(mSunColor.y);
+    reader.ReadExact(mSunColor.z);
+    reader.ReadExact(mShadowFillColor.x);
+    reader.ReadExact(mShadowFillColor.y);
+    reader.ReadExact(mShadowFillColor.z);
+    reader.ReadExact(mSpecularColor.x);
+    reader.ReadExact(mSpecularColor.y);
+    reader.ReadExact(mSpecularColor.z);
+    reader.ReadExact(mSpecularColor.w);
+    reader.ReadExact(mBloom);
+    reader.ReadExact(mFogStartDistance);
+    reader.ReadExact(mFogCutoffDistance);
+    reader.ReadExact(mFogMinClamp);
+    reader.ReadExact(mFogMaxClamp);
+    reader.ReadExact(mFogCurveExponent);
 
     // Water enable byte + three water elevations (stored on the map).
-    view->mMap->mWaterEnabled = reader.ReadChar() != 0;
-    reader.ReadExact(view->mMap->mWaterElevation);
-    reader.ReadExact(view->mMap->mWaterElevationDeep);
-    reader.ReadExact(view->mMap->mWaterElevationAbyss);
+    mMap->mWaterEnabled = reader.ReadChar() != 0;
+    reader.ReadExact(mMap->mWaterElevation);
+    reader.ReadExact(mMap->mWaterElevationDeep);
+    reader.ReadExact(mMap->mWaterElevationAbyss);
 
-    view->mWaterShaderProperties.Load(version, reader);
-    view->mWaveSystem.Load(
+    mWaterShaderProperties.Load(version, reader);
+    mWaveSystem.Load(
       static_cast<std::int32_t>(version),
       static_cast<std::int32_t>(mapHeight),
       static_cast<std::int32_t>(mapWidth),
@@ -3946,22 +3904,22 @@ namespace moho
 
     // Topographic samples + hypsometric palette + imager offset.
     if (version < 0x38u) {
-      view->mTopographicSamples = 20;
-      view->mHypsometricColor[0] = 0xFF0E3EFFu;
-      view->mHypsometricColor[1] = 0xFF215CFFu;
-      view->mHypsometricColor[2] = 0xFF4785FFu;
-      view->mHypsometricColor[3] = 0xFF4C9D32u;
-      view->mHypsometricColor[4] = 0xFFFFFFFFu;
+      mTopographicSamples = 20;
+      mHypsometricColor[0] = 0xFF0E3EFFu;
+      mHypsometricColor[1] = 0xFF215CFFu;
+      mHypsometricColor[2] = 0xFF4785FFu;
+      mHypsometricColor[3] = 0xFF4C9D32u;
+      mHypsometricColor[4] = 0xFFFFFFFFu;
     } else {
-      reader.ReadExact(view->mTopographicSamples);
-      reader.ReadExact(view->mHypsometricColor[0]);
-      reader.ReadExact(view->mHypsometricColor[1]);
-      reader.ReadExact(view->mHypsometricColor[2]);
-      reader.ReadExact(view->mHypsometricColor[3]);
-      reader.ReadExact(view->mHypsometricColor[4]);
+      reader.ReadExact(mTopographicSamples);
+      reader.ReadExact(mHypsometricColor[0]);
+      reader.ReadExact(mHypsometricColor[1]);
+      reader.ReadExact(mHypsometricColor[2]);
+      reader.ReadExact(mHypsometricColor[3]);
+      reader.ReadExact(mHypsometricColor[4]);
     }
     if (version >= 0x39u) {
-      reader.ReadExact(view->mImagerElevationOffset);
+      reader.ReadExact(mImagerElevationOffset);
     }
 
     LoadTexturing(reader, version);
@@ -3998,7 +3956,7 @@ namespace moho
         if (maskResources != nullptr) {
           maskResources->GetTextureSheet(sheet, "_utilitya_mask.dds", payload.data(), payload.size());
         }
-        view->mStrata.mStratumMask0.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheet));
+        mStrata.mStratumMask0.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheet));
       }
       TickLoadingProgress(loadControl);
       {
@@ -4012,7 +3970,7 @@ namespace moho
         if (maskResources != nullptr) {
           maskResources->GetTextureSheet(sheet, "_utilityb_mask.dds", payload.data(), payload.size());
         }
-        view->mStrata.mStratumMask1.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheet));
+        mStrata.mStratumMask1.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheet));
       }
       TickLoadingProgress(loadControl);
     } else {
@@ -4032,8 +3990,8 @@ namespace moho
             maskResources->GetTextureSheet(sheetA, "_utilitya_mask.dds", payload.data(), payload.size());
             maskResources->GetTextureSheet(sheetB, "_utilityb_mask.dds", payload.data(), payload.size());
           }
-          view->mStrata.mStratumMask0.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheetA));
-          view->mStrata.mStratumMask1.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheetB));
+          mStrata.mStratumMask0.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheetA));
+          mStrata.mStratumMask1.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheetB));
         }
         TickLoadingProgress(loadControl);
       }
@@ -4060,7 +4018,7 @@ namespace moho
           if (resources != nullptr) {
             resources->GetTextureSheet(sheet, sheetLocation.c_str(), payload.data(), payload.size());
           }
-          AdoptWaterMapSheetFromResource(visualView->mWaterMapTexture, sheet);
+          AdoptWaterMapSheetFromResource(mWaterMapTexture, sheet);
         }
         TickLoadingProgress(loadControl);
       }
@@ -4068,18 +4026,18 @@ namespace moho
 
     // Water masks (foam / flatness / depth-bias) sized to half resolution, read
     // as raw grids straight into their freshly allocated lanes.
-    const std::int32_t maskTileX = (view->mMap->mHeightField.get()->width - 1) >> 1;
-    const std::int32_t maskTileY = (view->mMap->mHeightField.get()->height - 1) >> 1;
+    const std::int32_t maskTileX = (mMap->mHeightField.get()->width - 1) >> 1;
+    const std::int32_t maskTileY = (mMap->mHeightField.get()->height - 1) >> 1;
     const std::size_t maskBytes = static_cast<std::size_t>(maskTileX * maskTileY);
     CreateWaterMasks(maskTileX, maskTileY);
-    reader.Read(reinterpret_cast<char*>(visualView->mWaterFoam), maskBytes);
-    reader.Read(reinterpret_cast<char*>(visualView->mWaterFlatness), maskBytes);
-    reader.Read(reinterpret_cast<char*>(visualView->mWaterDepthBias), maskBytes);
+    reader.Read(reinterpret_cast<char*>(mWaterFoam), maskBytes);
+    reader.Read(reinterpret_cast<char*>(mWaterFlatness), maskBytes);
+    reader.Read(reinterpret_cast<char*>(mWaterDepthBias), maskBytes);
     TickLoadingProgress(loadControl);
 
     // Terrain-type grid: raw read into the map terrain-type storage.
     {
-      STIMap* const map = view->mMap;
+      STIMap* const map = mMap;
       const std::size_t terrainTypeBytes =
         static_cast<std::size_t>(map->mTerrainType.width * map->mTerrainType.height);
       reader.Read(reinterpret_cast<char*>(map->mTerrainType.data), terrainTypeBytes);
@@ -4095,7 +4053,7 @@ namespace moho
 
     // Skydome: loaded directly from 0x3A onward, else derived from world bounds.
     if (version >= 0x3Au) {
-      view->mSkyDome.Load(version, reader);
+      mSkyDome.Load(version, reader);
     } else {
       const Wm3::AxisAlignedBox3f bounds = GetWorldBounds();
       const float centerX = (bounds.Max.x + bounds.Min.x) * 0.5f;
@@ -4105,15 +4063,15 @@ namespace moho
       const float halfY = bounds.Min.y - centerY;
       const float domeRadius =
         static_cast<float>(std::sqrt(halfX * halfX + halfY * halfY) / msvc8::cos(1.25663697719574));
-      const float sunElevation = view->mMap->mWaterEnabled ? view->mMap->mWaterElevation : bounds.Min.y;
+      const float sunElevation = mMap->mWaterEnabled ? mMap->mWaterElevation : bounds.Min.y;
 
       const Wm3::Vector3f domeOrigin{centerX, centerY, centerZ};
-      view->mSkyDome.SetupHorizonAndCirrus(domeOrigin, sunElevation, domeRadius);
+      mSkyDome.SetupHorizonAndCirrus(domeOrigin, sunElevation, domeRadius);
     }
 
     // Cartographic decals from 0x3B onward.
     if (version >= 0x3Bu) {
-      view->mCartographic.ReadDecals(version, reader);
+      mCartographic.ReadDecals(version, reader);
     }
 
     return true;
@@ -4135,7 +4093,7 @@ namespace moho
    * (mBool) it sets to 1 on success; each null-sheet allocation throws
    * gpg::gal::Error (matching sub_940560 + _CxxThrowException).
    */
-  bool IWldTerrainRes::Finalize()
+  bool CWldTerrainRes::Finalize()
   {
     auto* const runtimeView = this;
     auto* const normalView = this;
@@ -4226,7 +4184,7 @@ namespace moho
 
     IWldTerrainRes* const terrainRes = mTerrainRes;
     mTerrainRes = nullptr;
-    DestroyTerrainRes(terrainRes);
+    delete terrainRes;
 
     CWldProps* const props = mProps;
     mProps = nullptr;
@@ -4245,7 +4203,7 @@ namespace moho
     Reset();
 
     DestroyWldProps(mProps);
-    DestroyTerrainRes(mTerrainRes);
+    delete mTerrainRes;
     DestroyPreviewChunk(mMapPreviewChunk);
   }
 
@@ -4271,7 +4229,7 @@ namespace moho
     IWldTerrainRes* const newTerrainRes = WLD_CreateTerrainRes();
     IWldTerrainRes* const previousTerrainRes = mTerrainRes;
     mTerrainRes = newTerrainRes;
-    DestroyTerrainRes(previousTerrainRes);
+    delete previousTerrainRes;
 
     // 0x00890D60-0x00890D77: the binary dereferences the freshly stored terrain
     // resource without a null check and ignores the returned status byte.
@@ -4344,7 +4302,7 @@ namespace moho
     IWldTerrainRes* const newTerrainRes = WLD_CreateTerrainRes();
     IWldTerrainRes* const previousTerrainRes = mTerrainRes;
     mTerrainRes = newTerrainRes;
-    DestroyTerrainRes(previousTerrainRes);
+    delete previousTerrainRes;
     if (mTerrainRes == nullptr || !mTerrainRes->Load(reader, state, loadControl)) {
       return false;
     }

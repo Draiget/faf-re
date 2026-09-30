@@ -33,11 +33,10 @@ namespace moho
    * writes +0x04 - the hole MSVC leaves after the vfptr of an 8-aligned class -
    * and WRenViewport, which embeds one at +0x4F0, is allocated with
    * operator new(0x21A8) although its last field ends at +0x21A4. The
-   * alignment comes from mCamera: GeomCamera3's CGeomSolid3 planes are a
-   * fastvector_n, whose inline buffer is 8-aligned in the binary but not yet
-   * in gpg::core::FastVectorN. Until it is, the class carries it.
+   * alignment comes from mCamera: GeomCamera3's CGeomSolid3 planes are an
+   * 8-aligned fastvector_n.
    */
-  class alignas(8) Shadow
+  class Shadow
   {
   public:
     /**
@@ -156,12 +155,8 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<CD3DRenderTarget> GetShadowTexture() const;
 
   public:
-    // Alignment padding after the vfptr (see the class comment): never written
-    // by the constructor, and nothing reads it. Explicit because the alignment
-    // is declared on the class rather than coming from mCamera, and a
-    // class-level alignas does not make MSVC pad the vfptr.
-    std::uint32_t mUnusedHeaderWord;                      // +0x04
-
+    // +0x04 is the hole MSVC leaves after the vfptr of an 8-aligned class
+    // (see the class comment): the constructor never writes it.
     std::int32_t mShadowFidelity;                         // +0x08
     bool mShadowBlurEnabled;                              // +0x0C
     std::uint8_t mPadding0D_0F[0x03];                     // +0x0D
@@ -211,4 +206,5 @@ namespace moho
     "Shadow::mUnreferencedResources offset must be 0x308"
   );
   static_assert(sizeof(Shadow) == 0x318, "Shadow size must be 0x318");
+  static_assert(alignof(Shadow) == 8, "Shadow must be 8-aligned");
 } // namespace moho

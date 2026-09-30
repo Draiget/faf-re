@@ -332,10 +332,7 @@ namespace moho
     // empty `boost::noncopyable`, so the first member lands at +0x40.
     Sim* mSim;
     SSTICommandConstantData mConstDat;
-    SSTICommandVariableData mVarDat;
-    // Ground truth: never written in the constructor (FUN_006E81B0), sits
-    // immediately before mUnitSet at +0xEC. Purpose not yet identified.
-    void* unk1;
+    SSTICommandVariableData mVarDat; // +0x80 (+0xEC is its tail padding)
     /// The units the command applies to: an `EntitySetTemplate<Unit>` (entries are each unit's `Entity`),
     /// kept in entity-id order by the set's `Add` 0x0057DDD0 / `Remove` 0x005E8960.
     SEntitySetTemplateUnit mUnitSet;

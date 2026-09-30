@@ -24,12 +24,10 @@ namespace moho
     gpg::gal::Matrix inverseProjection;     // +0x0DC
     gpg::gal::Matrix inverseView;           // +0x11C
     gpg::gal::Matrix inverseViewProjection; // +0x15C
-    std::uint32_t solidFlags;               // +0x19C
-    CGeomSolid3 solid1;                     // +0x1A0
+    CGeomSolid3 solid1;                     // +0x1A0, 8-aligned (+0x19C is padding)
     CGeomSolid3 solid2;                     // +0x210
     float lodScale;                         // +0x280
-    VMatrix4 viewport;                      // +0x284
-    std::uint32_t viewportFlags;            // +0x2C4
+    VMatrix4 viewport;                      // +0x284 (+0x2C4 is tail padding)
 
     /**
      * Address: 0x0046FE30 (FUN_0046FE30, Moho::GeomCamera3::GeomCamera3)
