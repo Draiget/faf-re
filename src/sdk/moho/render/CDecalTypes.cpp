@@ -218,18 +218,6 @@ namespace
   SDecalInfoSerializer gSDecalInfoSerializer;
 
   /**
-   * Address: 0x0077C9A0 (FUN_0077C9A0)
-   *
-   * What it does:
-   * Clears one reflected `list<SDecalInfo>` payload and resets its sentinel
-   * links through the legacy list container API.
-   */
-  void ClearSDecalInfoListStorage(msvc8::list<moho::SDecalInfo>& list)
-  {
-    list.clear();
-  }
-
-  /**
    * Address: 0x0077E940 (FUN_0077E940)
    *
    * What it does:
@@ -400,6 +388,9 @@ void gpg::RListType_SDecalInfo::Init()
  * What it does:
  * Clears one reflected `list<SDecalInfo>`, reads element count, then
  * deserializes each decal entry in archive order.
+ *
+ * Every entry is read owned by `*ownerRef` (0x0077B369); neither the archive,
+ * the list nor the element type is null-tested.
  */
 void gpg::RListType_SDecalInfo::SerLoad(
   gpg::ReadArchive* const archive,
@@ -411,23 +402,13 @@ void gpg::RListType_SDecalInfo::SerLoad(
   auto* const list = reinterpret_cast<msvc8::list<moho::SDecalInfo>*>(
     static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
   );
-  if (archive == nullptr || list == nullptr) {
-    return;
-  }
 
   unsigned int count = 0u;
   archive->ReadUInt(&count);
-  ClearSDecalInfoListStorage(*list);
-
-  gpg::RType* const elementType = CachedSDecalInfoType();
-  if (elementType == nullptr) {
-    return;
-  }
-
-  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  list->clear();
   for (unsigned int i = 0u; i < count; ++i) {
     moho::SDecalInfo value{};
-    archive->Read(elementType, &value, owner);
+    archive->Read(CachedSDecalInfoType(), &value, *ownerRef);
     list->push_back(value);
   }
 }
@@ -438,6 +419,8 @@ void gpg::RListType_SDecalInfo::SerLoad(
  * What it does:
  * Writes reflected `list<SDecalInfo>` element count, then serializes each
  * entry in list traversal order.
+ *
+ * Every entry is written owned by `*ownerRef` (0x0077B460); no null tests.
  */
 void gpg::RListType_SDecalInfo::SerSave(
   gpg::WriteArchive* const archive,
@@ -449,24 +432,9 @@ void gpg::RListType_SDecalInfo::SerSave(
   const auto* const list = reinterpret_cast<const msvc8::list<moho::SDecalInfo>*>(
     static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
   );
-  if (archive == nullptr) {
-    return;
-  }
-
-  const unsigned int count = list ? static_cast<unsigned int>(list->size()) : 0u;
-  archive->WriteUInt(count);
-  if (list == nullptr) {
-    return;
-  }
-
-  gpg::RType* const elementType = CachedSDecalInfoType();
-  if (elementType == nullptr) {
-    return;
-  }
-
-  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  archive->WriteUInt(static_cast<unsigned int>(list->size()));
   for (const moho::SDecalInfo& value : *list) {
-    archive->Write(elementType, &value, owner);
+    archive->Write(CachedSDecalInfoType(), &value, *ownerRef);
   }
 }
 
