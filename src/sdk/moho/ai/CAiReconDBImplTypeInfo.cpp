@@ -542,7 +542,7 @@ namespace
       const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
       (void)storage->insert({key, DecodeTrackedReconBlipPointer(tracked)});
 
-      key.sourceUnit.UnlinkFromOwnerChain();
+      key.sourceEntity.UnlinkFromOwnerChain();
     }
   }
 

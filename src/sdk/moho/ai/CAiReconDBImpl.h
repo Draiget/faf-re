@@ -72,12 +72,22 @@ namespace moho
    * - 0x005C5AF0 (insert path)
    *
    * What it does:
-   * Stores source-unit weak-link state plus source entity id used as
-   * map-order key for per-source blip range traversal.
+   * A weak pointer to the blip's source entity plus that entity's id; only the
+   * id takes part in the ordering.
+   *
+   * The pointer is a `WeakPtr<Entity>`, on the entity's own chain: every key
+   * the binary builds encodes `unit ? (unit + 8) + 4 : 0`, the `Unit` ->
+   * `Entity` -> `WeakObject` casts (`GenerateNewBlips` 0x005C0AE0..0x005C0AE7,
+   * `ReconGetJamingBlips` 0x005C2110..0x005C2117), `ReconTick` decodes it as
+   * `slot - 4` and tests `Entity`'s `DestroyQueued` byte (0x005C0E62,
+   * 0x005C0E75), and the serializer (0x005C90F0) reads and writes it through
+   * the `WeakPtr<Entity>` type. It was declared `WeakPtr<Unit>`, which put the
+   * keys on the unit's `IUnit` chain instead and saved that slot under a type
+   * that decodes it four bytes off.
    */
   struct SReconKey
   {
-    WeakPtr<Unit> sourceUnit; // +0x00
+    WeakPtr<Entity> sourceEntity; // +0x00
     std::uint32_t sourceEntityId; // +0x08
 
     /**
@@ -99,7 +109,7 @@ namespace moho
     static gpg::RType* sType;
   };
   static_assert(sizeof(SReconKey) == 0x0C, "SReconKey size must be 0x0C");
-  static_assert(offsetof(SReconKey, sourceUnit) == 0x00, "SReconKey::sourceUnit offset must be 0x00");
+  static_assert(offsetof(SReconKey, sourceEntity) == 0x00, "SReconKey::sourceEntity offset must be 0x00");
   static_assert(offsetof(SReconKey, sourceEntityId) == 0x08, "SReconKey::sourceEntityId offset must be 0x08");
 
   /**

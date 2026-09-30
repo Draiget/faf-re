@@ -248,7 +248,7 @@ namespace moho
     template <class... Ts>
     LuaPlus::LuaObject RunScript(const char* name, Ts... args)
     {
-      const WeakObject::ScopedWeakLinkGuard weakGuard(this);
+      const WeakPtr<CScriptObject> weakGuard(this);
 
       LuaPlus::LuaObject script;
       FindScript(&script, name);
@@ -261,9 +261,9 @@ namespace moho
         LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{script};
         return fn(self, args...);
       } catch (const std::exception& ex) {
-        LogScriptWarning(weakGuard.OwnerLinkSlotAddress() ? this : nullptr, name ? name : "<unknown>", ex.what());
+        LogScriptWarning(weakGuard.GetObjectPtr(), name ? name : "<unknown>", ex.what());
       } catch (...) {
-        LogScriptWarning(weakGuard.OwnerLinkSlotAddress() ? this : nullptr, name ? name : "<unknown>", "unknown exception");
+        LogScriptWarning(weakGuard.GetObjectPtr(), name ? name : "<unknown>", "unknown exception");
       }
       return {};
     }

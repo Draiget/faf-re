@@ -7,6 +7,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/math/Vector2f.h"
 #include "moho/math/Vector3f.h"
+#include "moho/misc/WeakPtr.h"
 
 namespace gpg
 {
@@ -203,41 +204,16 @@ namespace moho
   BuildHeadingQuaternionFromDirection2D(const Wm3::Vector2f* direction, Wm3::Quaternionf* outOrientation) noexcept;
 
   /**
-   * Intrusive collision-link header paired with steering collision state.
-   */
-  struct SCollisionLink
-  {
-    void* mUnitIntrusiveSlot; // +0x00 (stores Unit+0x04 style intrusive slot, not Unit*)
-    void* mNextInUnitChain;   // +0x04
-
-    [[nodiscard]]
-    Unit* ResolveUnitFromIntrusiveSlot() const noexcept;
-
-    [[nodiscard]]
-    void** GetIntrusiveSlotAddress() const noexcept;
-
-    [[nodiscard]]
-    bool HasLinkedUnit() const noexcept;
-
-    void AssignUnit(Unit* unit) noexcept;
-
-    void ClearLink() noexcept;
-  };
-
-  static_assert(sizeof(SCollisionLink) == 0x08, "SCollisionLink size must be 0x08");
-  static_assert(
-    offsetof(SCollisionLink, mUnitIntrusiveSlot) == 0x00, "SCollisionLink::mUnitIntrusiveSlot offset must be 0x00"
-  );
-  static_assert(
-    offsetof(SCollisionLink, mNextInUnitChain) == 0x04, "SCollisionLink::mNextInUnitChain offset must be 0x04"
-  );
-
-  /**
    * Address: 0x00596790 (FUN_00596790, SCollisionInfoTypeInfo::Init size evidence)
    */
   struct SCollisionInfo
   {
-    SCollisionLink mUnit;   // +0x00
+    // The unit on collision course. The binary reads it with `WeakPtr<Unit>`'s
+    // decode 0x0057D540 and writes it with its `Set` 0x0057D4F0
+    // (`PredictCollisionForSteerings` 0x00597BE5 / 0x00597CA9), and the
+    // serializer names the `WeakPtr<Unit>` type. It was an `SCollisionLink`
+    // look-alike read through a `WeakPtr<IUnit>` cast.
+    WeakPtr<Unit> mUnit;    // +0x00
     Wm3::Vector3f mPos;     // +0x08
     ECollisionType mCollisionType; // +0x14
     std::int32_t mTickGate;        // +0x18 (used as sim-tick gate when mCollisionType == COLLISIONTYPE_1)

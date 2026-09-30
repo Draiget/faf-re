@@ -258,18 +258,6 @@ namespace
     throw gpg::SerializationError(msg.c_str());
   }
 
-  [[nodiscard]] CScriptObject* ResolveWarningObject(const WeakObject::ScopedWeakLinkGuard& guard)
-  {
-    const WeakObject::WeakLinkSlot* const ownerLinkSlot = guard.OwnerLinkSlotAddress();
-    if (!ownerLinkSlot) {
-      return nullptr;
-    }
-
-    return WeakPtr<CScriptObject>::DecodeOwnerObject(
-      reinterpret_cast<void*>(const_cast<WeakObject::WeakLinkSlot*>(ownerLinkSlot))
-    );
-  }
-
 } // namespace
 
 gpg::RType* CUnitScriptTask::sType = nullptr;
@@ -893,14 +881,14 @@ void CUnitScriptTask::MemberSerialize(CUnitScriptTask* const task, gpg::WriteArc
  */
 int CUnitScriptTask::Execute()
 {
-  WeakObject::ScopedWeakLinkGuard weakGuard(static_cast<WeakObject*>(static_cast<CScriptObject*>(this)));
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   try {
     return CScriptObject::TaskTick();
   } catch (const std::exception& ex) {
-    LogScriptWarning(ResolveWarningObject(weakGuard), mTaskScriptPath.c_str(), ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), mTaskScriptPath.c_str(), ex.what());
   } catch (...) {
-    LogScriptWarning(ResolveWarningObject(weakGuard), mTaskScriptPath.c_str(), "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), mTaskScriptPath.c_str(), "unknown exception");
   }
 
   return -1;

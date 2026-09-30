@@ -491,34 +491,6 @@ namespace
   }
 
   /**
-    * Alias of FUN_006B0940 (non-canonical helper lane).
-   *
-   * Mirrors the weak-object intrusive guard chain used by callback wrappers.
-   * Shared guard mechanics live in WeakObject so callback helpers do not
-   * duplicate owner-link traversal logic.
-   */
-  class CallbackWeakGuard final
-  {
-  public:
-    explicit CallbackWeakGuard(CScriptObject* obj) : m_guard(static_cast<WeakObject*>(obj)) {}
-
-    [[nodiscard]]
-    CScriptObject* ResolveObjectForWarning() const
-    {
-      const WeakObject::WeakLinkSlot* const ownerLinkSlot = m_guard.OwnerLinkSlotAddress();
-      if (!ownerLinkSlot) {
-        return nullptr;
-      }
-      return WeakPtr<CScriptObject>::DecodeOwnerObject(
-        reinterpret_cast<void*>(const_cast<WeakObject::WeakLinkSlot*>(ownerLinkSlot))
-      );
-    }
-
-  private:
-    WeakObject::ScopedWeakLinkGuard m_guard;
-  };
-
-  /**
    * Address: 0x00795509 (FUN_00795509, func_CMauiEdit_OnCharPressed_LogError)
    *
    * What it does:
@@ -526,11 +498,11 @@ namespace
    * during `CScriptObject::RunScriptOnCharPressed`.
    */
   [[maybe_unused]] void LogOnCharPressedExceptionWarning(
-    const CallbackWeakGuard& weakGuard,
+    const WeakPtr<CScriptObject>& weakGuard,
     const std::exception& exceptionObject
   )
   {
-    if (CScriptObject* const warningOwner = weakGuard.ResolveObjectForWarning(); warningOwner != nullptr) {
+    if (CScriptObject* const warningOwner = weakGuard.GetObjectPtr(); warningOwner != nullptr) {
       warningOwner->LogScriptWarning(
         warningOwner,
         "OnCharPressed",
@@ -839,18 +811,9 @@ void CScriptObject::LogScriptWarning(CScriptObject* obj, const char* which, cons
  */
 bool CScriptObject::RunScriptBool(const char* const name, const LuaPlus::LuaObject& arg)
 {
-  const WeakObject::ScopedWeakLinkGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
-  const auto resolveWarningTarget = [&weakGuard]() -> CScriptObject* {
-    const WeakObject::WeakLinkSlot* const ownerLinkSlot = weakGuard.OwnerLinkSlotAddress();
-    if (!ownerLinkSlot) {
-      return nullptr;
-    }
-
-    return WeakPtr<CScriptObject>::DecodeOwnerObject(
-      reinterpret_cast<void*>(const_cast<WeakObject::WeakLinkSlot*>(ownerLinkSlot))
-    );
-  };
+  const auto resolveWarningTarget = [&weakGuard]() -> CScriptObject* { return weakGuard.GetObjectPtr(); };
 
   LuaPlus::LuaObject script;
   FindScript(&script, name);
@@ -1372,7 +1335,7 @@ namespace
  */
 void CScriptObject::CallbackStr(const char* callback)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, callback);
@@ -1396,10 +1359,10 @@ void CScriptObject::CallbackStr(const char* callback)
     lua_settop(lstate, stackTop);
   } catch (const std::exception& ex) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), callback ? callback : "<unknown>", ex.what());
   } catch (...) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), callback ? callback : "<unknown>", "unknown exception");
   }
 }
 
@@ -1408,7 +1371,7 @@ void CScriptObject::CallbackStr(const char* callback)
  */
 void CScriptObject::CallbackStr(const char* callback, const char** arg0)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, callback);
@@ -1433,10 +1396,10 @@ void CScriptObject::CallbackStr(const char* callback, const char** arg0)
     lua_settop(lstate, stackTop);
   } catch (const std::exception& ex) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), callback ? callback : "<unknown>", ex.what());
   } catch (...) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), callback ? callback : "<unknown>", "unknown exception");
   }
 }
 
@@ -1445,7 +1408,7 @@ void CScriptObject::CallbackStr(const char* callback, const char** arg0)
  */
 void CScriptObject::CallbackStr(const char* callback, const char** arg0, const char** arg1)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, callback);
@@ -1471,10 +1434,10 @@ void CScriptObject::CallbackStr(const char* callback, const char** arg0, const c
     lua_settop(lstate, stackTop);
   } catch (const std::exception& ex) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), callback ? callback : "<unknown>", ex.what());
   } catch (...) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), callback ? callback : "<unknown>", "unknown exception");
   }
 }
 
@@ -1483,7 +1446,7 @@ void CScriptObject::CallbackStr(const char* callback, const char** arg0, const c
  */
 void CScriptObject::CallbackInt(const char* callback, const int value)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, callback);
@@ -1508,10 +1471,10 @@ void CScriptObject::CallbackInt(const char* callback, const int value)
     lua_settop(lstate, stackTop);
   } catch (const std::exception& ex) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), callback ? callback : "<unknown>", ex.what());
   } catch (...) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), callback ? callback : "<unknown>", "unknown exception");
   }
 }
 
@@ -1520,7 +1483,7 @@ void CScriptObject::CallbackInt(const char* callback, const int value)
  */
 void CScriptObject::LuaPCall(const char* scriptName, const char* const* args, LuaPlus::LuaObject* obj)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1546,10 +1509,10 @@ void CScriptObject::LuaPCall(const char* scriptName, const char* const* args, Lu
     lua_settop(lstate, stackTop);
   } catch (const std::exception& ex) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1558,7 +1521,7 @@ void CScriptObject::LuaPCall(const char* scriptName, const char* const* args, Lu
  */
 void CScriptObject::RunScriptInt(const char* const scriptName, const int intValue)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1570,9 +1533,9 @@ void CScriptObject::RunScriptInt(const char* const scriptName, const int intValu
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, intValue);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1581,7 +1544,7 @@ void CScriptObject::RunScriptInt(const char* const scriptName, const int intValu
  */
 float CScriptObject::RunScriptObjNum(const char* const scriptName)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1594,9 +1557,9 @@ float CScriptObject::RunScriptObjNum(const char* const scriptName)
     const LuaPlus::LuaObject result = fn(mLuaObj);
     return LuaValueToFloat(result);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 
   return 0.0f;
@@ -1607,7 +1570,7 @@ float CScriptObject::RunScriptObjNum(const char* const scriptName)
  */
 void CScriptObject::RunScriptWeapon(const char* const scriptName, UnitWeapon* const weapon)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1619,9 +1582,9 @@ void CScriptObject::RunScriptWeapon(const char* const scriptName, UnitWeapon* co
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, weapon);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1630,7 +1593,7 @@ void CScriptObject::RunScriptWeapon(const char* const scriptName, UnitWeapon* co
  */
 void CScriptObject::RunScriptUnit(const char* const scriptName, Unit* const unit)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1642,9 +1605,9 @@ void CScriptObject::RunScriptUnit(const char* const scriptName, Unit* const unit
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, unit);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1653,7 +1616,7 @@ void CScriptObject::RunScriptUnit(const char* const scriptName, Unit* const unit
  */
 bool CScriptObject::RunScriptBool(const char* const scriptName)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1666,9 +1629,9 @@ bool CScriptObject::RunScriptBool(const char* const scriptName)
     const LuaPlus::LuaObject result = fn(mLuaObj);
     return LuaValueToBool(result);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 
   return false;
@@ -1720,7 +1683,7 @@ void CScriptObject::SetLuaValue(const char* const key, const float value)
  */
 void CScriptObject::RunScriptWeakUnit(const char* const scriptName, const WeakPtr<Unit>& unitLink)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1733,9 +1696,9 @@ void CScriptObject::RunScriptWeakUnit(const char* const scriptName, const WeakPt
     const LuaPlus::LuaObject unitObject = ResolveUnitLuaObjectFromWeakLink(unitLink, mLuaObj);
     fn(mLuaObj, unitObject);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1744,7 +1707,7 @@ void CScriptObject::RunScriptWeakUnit(const char* const scriptName, const WeakPt
  */
 void CScriptObject::RunScriptWeakEntity(const char* const scriptName, const WeakPtr<Entity>& entityLink)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1757,9 +1720,9 @@ void CScriptObject::RunScriptWeakEntity(const char* const scriptName, const Weak
     const LuaPlus::LuaObject entityObject = ResolveEntityLuaObjectFromWeakLink(entityLink, mLuaObj);
     fn(mLuaObj, entityObject);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1768,7 +1731,7 @@ void CScriptObject::RunScriptWeakEntity(const char* const scriptName, const Weak
  */
 void CScriptObject::CallString(const char* const scriptName, const std::string& stringValue)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1781,9 +1744,9 @@ void CScriptObject::CallString(const char* const scriptName, const std::string& 
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, valueCopy);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1798,7 +1761,7 @@ void CScriptObject::RunScriptStringNum3(
   const float c
 )
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1810,9 +1773,9 @@ void CScriptObject::RunScriptStringNum3(
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, text ? text : "", a, b, c);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1872,7 +1835,7 @@ namespace
  */
 void CScriptObject::RunScriptStringUnit(const char* const scriptName, const char* const text, Unit* const unit)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1884,9 +1847,9 @@ void CScriptObject::RunScriptStringUnit(const char* const scriptName, const char
     LuaPlus::LuaFunction<void> fn{script};
     CallLuaFunctionObjectStringUnit(fn, mLuaObj, text ? text : "", unit);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1895,7 +1858,7 @@ void CScriptObject::RunScriptStringUnit(const char* const scriptName, const char
  */
 void CScriptObject::RunScriptEntity(const char* const scriptName, Entity* const entityArg)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1907,9 +1870,9 @@ void CScriptObject::RunScriptEntity(const char* const scriptName, Entity* const 
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, entityArg);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1918,7 +1881,7 @@ void CScriptObject::RunScriptEntity(const char* const scriptName, Entity* const 
  */
 void CScriptObject::RunScriptNum2(const char* const scriptName, const float a, const float b)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1930,9 +1893,9 @@ void CScriptObject::RunScriptNum2(const char* const scriptName, const float a, c
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, a, b);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1941,7 +1904,7 @@ void CScriptObject::RunScriptNum2(const char* const scriptName, const float a, c
  */
 void CScriptObject::RunScriptWithBool(const char* const scriptName, const bool value)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1953,9 +1916,9 @@ void CScriptObject::RunScriptWithBool(const char* const scriptName, const bool v
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, value);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1968,7 +1931,7 @@ void CScriptObject::RunScriptObjectString(
   const char* const text
 )
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -1980,9 +1943,9 @@ void CScriptObject::RunScriptObjectString(
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, objectArg, text ? text : "");
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -1991,7 +1954,7 @@ void CScriptObject::RunScriptObjectString(
  */
 void CScriptObject::RunScriptNum(const char* const scriptName, const float value)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -2003,9 +1966,9 @@ void CScriptObject::RunScriptNum(const char* const scriptName, const float value
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, value);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -2014,7 +1977,7 @@ void CScriptObject::RunScriptNum(const char* const scriptName, const float value
  */
 void CScriptObject::RunScriptStringNum(const char* const scriptName, const char* const text, const float value)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -2026,9 +1989,9 @@ void CScriptObject::RunScriptStringNum(const char* const scriptName, const char*
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, text ? text : "", value);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -2037,7 +2000,7 @@ void CScriptObject::RunScriptStringNum(const char* const scriptName, const char*
  */
 bool CScriptObject::RunScriptStringBool(const char* const scriptName, const std::string& value)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -2051,9 +2014,9 @@ bool CScriptObject::RunScriptStringBool(const char* const scriptName, const std:
     const LuaPlus::LuaObject result = fn(mLuaObj, valueCopy);
     return LuaValueToBool(result);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 
   return false;
@@ -2068,7 +2031,7 @@ void CScriptObject::RunScriptIntObject(
   const LuaPlus::LuaObject& objectArg
 )
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -2080,9 +2043,9 @@ void CScriptObject::RunScriptIntObject(
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, intValue, objectArg);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 }
 
@@ -2093,7 +2056,7 @@ bool CScriptObject::RunScriptOnCharPressed(const int keyCode)
 {
   constexpr const char* kOnCharPressed = "OnCharPressed";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnCharPressed);
@@ -2108,7 +2071,7 @@ bool CScriptObject::RunScriptOnCharPressed(const int keyCode)
   } catch (const std::exception& ex) {
     LogOnCharPressedExceptionWarning(weakGuard, ex);
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnCharPressed, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnCharPressed, "unknown exception");
   }
 
   return false;
@@ -2129,7 +2092,7 @@ LuaPlus::LuaObject CScriptObject::RunScriptCreateWreckageProp(const float reclai
 {
   constexpr const char* kCreateWreckageProp = "CreateWreckageProp";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kCreateWreckageProp);
@@ -2141,9 +2104,9 @@ LuaPlus::LuaObject CScriptObject::RunScriptCreateWreckageProp(const float reclai
     LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{script};
     return fn(mLuaObj, reclaimFraction);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kCreateWreckageProp, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kCreateWreckageProp, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kCreateWreckageProp, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kCreateWreckageProp, "unknown exception");
   }
 
   return {};
@@ -2156,7 +2119,7 @@ void CScriptObject::RunScriptOnAdjacentTo(Unit* const sourceUnit, Unit* const ad
 {
   constexpr const char* kOnAdjacentTo = "OnAdjacentTo";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnAdjacentTo);
@@ -2168,9 +2131,9 @@ void CScriptObject::RunScriptOnAdjacentTo(Unit* const sourceUnit, Unit* const ad
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, sourceUnit, adjacentUnit);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnAdjacentTo, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnAdjacentTo, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnAdjacentTo, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnAdjacentTo, "unknown exception");
   }
 }
 
@@ -2181,7 +2144,7 @@ LuaPlus::LuaObject CScriptObject::GetWeaponClass(const LuaPlus::LuaObject& weapo
 {
   constexpr const char* kGetWeaponClass = "GetWeaponClass";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kGetWeaponClass);
@@ -2193,9 +2156,9 @@ LuaPlus::LuaObject CScriptObject::GetWeaponClass(const LuaPlus::LuaObject& weapo
     LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{script};
     return fn(mLuaObj, weaponBlueprintClass);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kGetWeaponClass, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kGetWeaponClass, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kGetWeaponClass, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kGetWeaponClass, "unknown exception");
   }
 
   return {};
@@ -2206,7 +2169,7 @@ LuaPlus::LuaObject CScriptObject::GetWeaponClass(const LuaPlus::LuaObject& weapo
  */
 bool CScriptObject::RunScriptUnitBool(const char* const scriptName, Unit* const unitArg)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, scriptName);
@@ -2219,9 +2182,9 @@ bool CScriptObject::RunScriptUnitBool(const char* const scriptName, Unit* const 
     const LuaPlus::LuaObject result = fn(mLuaObj, unitArg);
     return LuaValueToBool(result);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
   }
 
   return false;
@@ -2232,7 +2195,7 @@ bool CScriptObject::RunScriptUnitBool(const char* const scriptName, Unit* const 
  */
 void CScriptObject::LuaCall(const char* fileName, LuaPlus::LuaObject* obj)
 {
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, fileName);
@@ -2257,10 +2220,10 @@ void CScriptObject::LuaCall(const char* fileName, LuaPlus::LuaObject* obj)
     lua_settop(lstate, stackTop);
   } catch (const std::exception& ex) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), fileName ? fileName : "<unknown>", ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), fileName ? fileName : "<unknown>", ex.what());
   } catch (...) {
     lua_settop(lstate, stackTop);
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), fileName ? fileName : "<unknown>", "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), fileName ? fileName : "<unknown>", "unknown exception");
   }
 }
 
@@ -2271,7 +2234,7 @@ void CScriptObject::RunScriptUnitOnDamage(Unit* const sourceUnit, const int amou
 {
   constexpr const char* kOnDamage = "OnDamage";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnDamage);
@@ -2283,9 +2246,9 @@ void CScriptObject::RunScriptUnitOnDamage(Unit* const sourceUnit, const int amou
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, sourceUnit, amount, canTakeDamageFlag, "Damage");
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnDamage, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnDamage, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnDamage, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnDamage, "unknown exception");
   }
 }
 
@@ -2299,7 +2262,7 @@ void CScriptObject::OnStopBuild(const WeakPtr<Unit>& unitLink, const std::string
 {
   constexpr const char* kOnStopBuild = "OnStopBuild";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnStopBuild);
@@ -2318,9 +2281,9 @@ void CScriptObject::OnStopBuild(const WeakPtr<Unit>& unitLink, const std::string
     // `lua_pushlstring` for the reason (0x005FD744), before `lua_call`.
     fn(mLuaObj, unitObject, reason);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStopBuild, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnStopBuild, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStopBuild, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnStopBuild, "unknown exception");
   }
 }
 
@@ -2334,7 +2297,7 @@ void CScriptObject::RunScriptOnStartBuild(Unit* const focusUnit, const std::stri
 {
   constexpr const char* kOnStartBuild = "OnStartBuild";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnStartBuild);
@@ -2346,9 +2309,9 @@ void CScriptObject::RunScriptOnStartBuild(Unit* const focusUnit, const std::stri
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, focusUnit, buildAction);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStartBuild, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnStartBuild, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStartBuild, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnStartBuild, "unknown exception");
   }
 }
 
@@ -2366,7 +2329,7 @@ void CScriptObject::RunScriptOnBuildProgress(
 {
   constexpr const char* kOnBuildProgress = "OnBuildProgress";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnBuildProgress);
@@ -2379,9 +2342,9 @@ void CScriptObject::RunScriptOnBuildProgress(
     const LuaPlus::LuaObject sourceUnitObject = ResolveUnitLuaObjectFromWeakLink(sourceUnitLink, mLuaObj);
     fn(mLuaObj, sourceUnitObject, previousProgress, currentProgress);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnBuildProgress, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnBuildProgress, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnBuildProgress, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnBuildProgress, "unknown exception");
   }
 }
 
@@ -2399,7 +2362,7 @@ void CScriptObject::RunScriptOnIntelChange(
 {
   constexpr const char* kOnIntelChange = "OnIntelChange";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnIntelChange);
@@ -2411,9 +2374,9 @@ void CScriptObject::RunScriptOnIntelChange(
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, blip, intelSenseName, gained);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnIntelChange, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnIntelChange, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnIntelChange, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnIntelChange, "unknown exception");
   }
 }
 
@@ -2432,7 +2395,7 @@ float CScriptObject::RunScriptOnGetDamageAbsorption(
 {
   constexpr const char* kOnGetDamageAbsorption = "OnGetDamageAbsorption";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnGetDamageAbsorption);
@@ -2449,9 +2412,9 @@ float CScriptObject::RunScriptOnGetDamageAbsorption(
     LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{script};
     return CallObjectWeakEntityNumStringNum(fn, selfObject, amount, damageTypeCopy, guardedSource);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnGetDamageAbsorption, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnGetDamageAbsorption, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnGetDamageAbsorption, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnGetDamageAbsorption, "unknown exception");
   }
 
   return 0.0f;
@@ -2472,7 +2435,7 @@ void CScriptObject::RunScriptEntityOnDamage(
 {
   constexpr const char* kOnDamage = "OnDamage";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnDamage);
@@ -2489,9 +2452,9 @@ void CScriptObject::RunScriptEntityOnDamage(
     weakSource.ResetFromObject(sourceLink.GetObjectPtr());
     CallObjectNumObjectStringWeakEntity(fn, selfObject, amount, payloadObject, damageTypeCopy, weakSource);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnDamage, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnDamage, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnDamage, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnDamage, "unknown exception");
   }
 }
 
@@ -2511,7 +2474,7 @@ void CScriptObject::RunScriptOnCollision(
 {
   constexpr const char* kOnCollision = "OnCollision";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnCollision);
@@ -2523,9 +2486,9 @@ void CScriptObject::RunScriptOnCollision(
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, otherUnit, collisionParamA, collisionParamB, collisionParamC, collisionParamD);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnCollision, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnCollision, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnCollision, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnCollision, "unknown exception");
   }
 }
 
@@ -2543,7 +2506,7 @@ void CScriptObject::RunScriptOnBeingBuiltProgress(
 {
   constexpr const char* kOnBeingBuiltProgress = "OnBeingBuiltProgress";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnBeingBuiltProgress);
@@ -2555,9 +2518,9 @@ void CScriptObject::RunScriptOnBeingBuiltProgress(
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, sourceUnit, progress, buildRate);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnBeingBuiltProgress, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnBeingBuiltProgress, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnBeingBuiltProgress, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnBeingBuiltProgress, "unknown exception");
   }
 }
 
@@ -2571,7 +2534,7 @@ void CScriptObject::StartTransportBeamUp(const WeakPtr<Unit>& sourceUnitLink, co
 {
   constexpr const char* kOnStartTransportBeamUp = "OnStartTransportBeamUp";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnStartTransportBeamUp);
@@ -2584,9 +2547,9 @@ void CScriptObject::StartTransportBeamUp(const WeakPtr<Unit>& sourceUnitLink, co
     const LuaPlus::LuaObject sourceUnitObject = ResolveUnitLuaObjectFromWeakLink(sourceUnitLink, mLuaObj);
     fn(mLuaObj, attachBone, sourceUnitObject);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStartTransportBeamUp, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnStartTransportBeamUp, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStartTransportBeamUp, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnStartTransportBeamUp, "unknown exception");
   }
 }
 
@@ -2604,7 +2567,7 @@ void CScriptObject::RunScriptOnTeleportUnit(
 {
   constexpr const char* kOnTeleportUnit = "OnTeleportUnit";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnTeleportUnit);
@@ -2616,9 +2579,9 @@ void CScriptObject::RunScriptOnTeleportUnit(
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, argA, argB, argC);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnTeleportUnit, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnTeleportUnit, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnTeleportUnit, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnTeleportUnit, "unknown exception");
   }
 }
 
@@ -2632,7 +2595,7 @@ void CScriptObject::RunScriptUnitOnKilled(Entity* const sourceEntity, const char
 {
   constexpr const char* kOnKilled = "OnKilled";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnKilled);
@@ -2644,9 +2607,9 @@ void CScriptObject::RunScriptUnitOnKilled(Entity* const sourceEntity, const char
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, sourceEntity, reason, value);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnKilled, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnKilled, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnKilled, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnKilled, "unknown exception");
   }
 }
 
@@ -2663,7 +2626,7 @@ void CScriptObject::RunScriptOnTerrainTypeChange(
 {
   constexpr const char* kOnTerrainTypeChange = "OnTerrainTypeChange";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnTerrainTypeChange);
@@ -2675,9 +2638,9 @@ void CScriptObject::RunScriptOnTerrainTypeChange(
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, oldTerrain, newTerrain);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnTerrainTypeChange, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnTerrainTypeChange, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnTerrainTypeChange, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnTerrainTypeChange, "unknown exception");
   }
 }
 
@@ -2691,7 +2654,7 @@ void CScriptObject::RunScriptOnStopBeingBuilt(const WeakPtr<Unit>& sourceUnitLin
 {
   constexpr const char* kOnStopBeingBuilt = "OnStopBeingBuilt";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnStopBeingBuilt);
@@ -2704,9 +2667,9 @@ void CScriptObject::RunScriptOnStopBeingBuilt(const WeakPtr<Unit>& sourceUnitLin
     const LuaPlus::LuaObject sourceUnitObject = ResolveUnitLuaObjectFromWeakLink(sourceUnitLink, mLuaObj);
     fn(mLuaObj, sourceUnitObject, layerName ? layerName : "");
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStopBeingBuilt, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnStopBeingBuilt, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStopBeingBuilt, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnStopBeingBuilt, "unknown exception");
   }
 }
 
@@ -2720,7 +2683,7 @@ bool CScriptObject::RunScriptOnCollisionCheckWeapon(UnitWeapon* const weapon)
 {
   constexpr const char* kOnCollisionCheckWeapon = "OnCollisionCheckWeapon";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnCollisionCheckWeapon);
@@ -2733,9 +2696,9 @@ bool CScriptObject::RunScriptOnCollisionCheckWeapon(UnitWeapon* const weapon)
     const LuaPlus::LuaObject result = fn(mLuaObj, weapon);
     return LuaValueToBool(result);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnCollisionCheckWeapon, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnCollisionCheckWeapon, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnCollisionCheckWeapon, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnCollisionCheckWeapon, "unknown exception");
   }
 
   return false;
@@ -2751,7 +2714,7 @@ void CScriptObject::RunScriptPropOnKilled(Prop* const sourceProp, const char* co
 {
   constexpr const char* kOnKilled = "OnKilled";
 
-  CallbackWeakGuard weakGuard(this);
+  const WeakPtr<CScriptObject> weakGuard(this);
 
   LuaPlus::LuaObject script;
   FindScript(&script, kOnKilled);
@@ -2763,9 +2726,9 @@ void CScriptObject::RunScriptPropOnKilled(Prop* const sourceProp, const char* co
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, sourceProp, reason, value);
   } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnKilled, ex.what());
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnKilled, ex.what());
   } catch (...) {
-    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnKilled, "unknown exception");
+    LogScriptWarning(weakGuard.GetObjectPtr(), kOnKilled, "unknown exception");
   }
 }
 

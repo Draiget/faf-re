@@ -484,4 +484,14 @@ namespace moho
     UnlinkFromOwner();
   }
 
+  inline void WeakObject::DetachAllWeakReferences() noexcept
+  {
+    while (weakLinkHead_ != nullptr) {
+      WeakPtr<void>* const node = weakLinkHead_;
+      weakLinkHead_ = node->nextInOwner;
+      node->ownerLinkSlot = nullptr;
+      node->nextInOwner = nullptr;
+    }
+  }
+
 } // namespace moho

@@ -3451,7 +3451,7 @@ namespace moho
       inWorld = cursor.mHitValid != 0;
     }
 
-    moho::WeakObject::ScopedWeakLinkGuard hoverGuard(hoverOwner);
+    const WeakPtr<UserEntity> hoverGuard(hoveredEntity);
 
     LuaPlus::LuaObject result;
 

@@ -3314,31 +3314,6 @@ namespace
     cursor->SetDefaultTexture(texturePath);
   }
 
-  class ScriptCallbackWeakGuard final
-  {
-  public:
-    explicit ScriptCallbackWeakGuard(
-      moho::CScriptObject* const scriptObject
-    ) noexcept
-      : m_guard(static_cast<moho::WeakObject*>(scriptObject))
-    {}
-
-    [[nodiscard]] moho::CScriptObject* ResolveObjectForWarning() const noexcept
-    {
-      const moho::WeakObject::WeakLinkSlot* const ownerLinkSlot = m_guard.OwnerLinkSlotAddress();
-      if (!ownerLinkSlot) {
-        return nullptr;
-      }
-
-      return moho::WeakPtr<moho::CScriptObject>::DecodeOwnerObject(
-        reinterpret_cast<void*>(const_cast<moho::WeakObject::WeakLinkSlot*>(ownerLinkSlot))
-      );
-    }
-
-  private:
-    moho::WeakObject::ScopedWeakLinkGuard m_guard;
-  };
-
   /**
    * Address: 0x0078A839 (FUN_0078A839)
    *
@@ -22733,7 +22708,7 @@ bool moho::CMauiControl::OnHide(
 )
 {
   CScriptObject* const scriptObject = this;
-  ScriptCallbackWeakGuard weakGuard(scriptObject);
+  const WeakPtr<CScriptObject> weakGuard(scriptObject);
 
   LuaPlus::LuaObject callbackObject{};
   scriptObject->FindScript(&callbackObject, "OnHide");
@@ -22745,7 +22720,7 @@ bool moho::CMauiControl::OnHide(
     LuaPlus::LuaFunction<bool> callback(callbackObject);
     return callback(mLuaObj, hidden);
   } catch (const std::exception& exception) {
-    LogOnHideCallbackException(weakGuard.ResolveObjectForWarning(), exception);
+    LogOnHideCallbackException(weakGuard.GetObjectPtr(), exception);
   }
 
   return false;
@@ -22779,7 +22754,7 @@ bool moho::CMauiControl::GetIsScrollable(
 )
 {
   CScriptObject* const scriptObject = this;
-  WeakObject::ScopedWeakLinkGuard weakGuard(scriptObject);
+  const WeakPtr<CScriptObject> weakGuard(scriptObject);
 
   LuaPlus::LuaObject callbackObject{};
   scriptObject->FindScript(&callbackObject, "IsScrollable");

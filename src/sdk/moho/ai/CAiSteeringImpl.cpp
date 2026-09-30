@@ -505,7 +505,7 @@ namespace
       return;
     }
 
-    if (collisionInfo->mUnit.ResolveUnitFromIntrusiveSlot() == secondaryUnit) {
+    if (collisionInfo->mUnit.GetObjectPtr() == secondaryUnit) {
       ResetCollisionInfo(*collisionInfo);
     }
 
@@ -561,14 +561,14 @@ namespace
       if (UnitsWillCollide(
             secondaryVelocity, *secondaryUnit, *primaryUnit, secondaryPos, primaryPos, primaryVelocity, ignoreBraking
           )) {
-        const float existingCollisionDistSq = collisionInfo->mUnit.HasLinkedUnit()
+        const float existingCollisionDistSq = collisionInfo->mUnit.GetObjectPtr() != nullptr
           ? Wm3::Vector3f::DistanceSq3D(secondaryPos, collisionInfo->mPos)
           : 9999.0f;
         const float newCollisionDistSq = Wm3::Vector3f::DistanceSq3D(secondaryPos, primaryPos);
         if (existingCollisionDistSq > newCollisionDistSq) {
           collisionInfo->mCollisionType = COLLISIONTYPE_1;
           collisionInfo->mPos = primaryPos;
-          collisionInfo->mUnit.AssignUnit(secondaryUnit);
+          collisionInfo->mUnit.Set(secondaryUnit);
           collisionInfo->mTickGate = pathStep + tickBase;
           return;
         }
@@ -663,7 +663,7 @@ namespace
   void ResolvePossibleCollisionState(CAiSteeringImpl& steering)
   {
     Unit* const owner = steering.mOwnerUnit;
-    Unit* const collisionUnit = steering.mCollisionInfo.mUnit.ResolveUnitFromIntrusiveSlot();
+    Unit* const collisionUnit = steering.mCollisionInfo.mUnit.GetObjectPtr();
     if (!owner || !collisionUnit || !owner->AiSteering) {
       return;
     }
@@ -825,7 +825,7 @@ namespace
 
   void DrawCollisionDebugOverlay(const CAiSteeringImpl& steering, CDebugCanvas& debugCanvas)
   {
-    Unit* const collisionUnit = steering.mCollisionInfo.mUnit.ResolveUnitFromIntrusiveSlot();
+    Unit* const collisionUnit = steering.mCollisionInfo.mUnit.GetObjectPtr();
     if (!collisionUnit || !steering.mOwnerUnit) {
       return;
     }

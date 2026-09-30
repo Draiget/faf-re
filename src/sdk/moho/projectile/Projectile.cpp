@@ -244,7 +244,7 @@ namespace
 
     // Intrusive weak-link guard on the collided entity for the duration of the
     // script call (asm 0x0069F6C1-0x0069F6F0 owner-chain register/unregister).
-    moho::WeakObject::ScopedWeakLinkGuard weakGuard(static_cast<moho::WeakObject*>(collidedEntity));
+    const moho::WeakPtr<moho::Entity> weakGuard(collidedEntity);
 
     LuaPlus::LuaObject script;
     collidedEntity->FindScript(&script, "OnCollisionCheck");
@@ -259,7 +259,7 @@ namespace
       return callback(collidedEntity->mLuaObj, projectile);
     } catch (const msvc8::runtime_error& error) {
       moho::CScriptObject::LogScriptWarning(
-        weakGuard.OwnerLinkSlotAddress() != nullptr ? collidedEntity : nullptr, "OnCollisionCheck", error.what()
+        weakGuard.GetObjectPtr(), "OnCollisionCheck", error.what()
       );
     }
     return false;

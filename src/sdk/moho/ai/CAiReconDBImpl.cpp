@@ -49,7 +49,7 @@ namespace
 
   [[nodiscard]] SReconKey MakeReconMapKey(Unit* const sourceUnit) noexcept
   {
-    return SReconKey{WeakPtr<Unit>(sourceUnit), GetSourceEntityId(sourceUnit)};
+    return SReconKey{WeakPtr<Entity>(sourceUnit), GetSourceEntityId(sourceUnit)};
   }
 
   [[nodiscard]] std::pair<ReconBlipMap::iterator, ReconBlipMap::iterator>
@@ -661,9 +661,9 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     // Falling back to `blip->GetSourceUnit()` here used to resurrect a source
     // the weak pointer had already given up on, so the entry never left the map
     // and its recon record never cleared -- a blip stranded visible forever.
-    Unit* const sourceUnit = node->first.sourceUnit.GetObjectPtr();
+    Entity* const source = node->first.sourceEntity.GetObjectPtr();
 
-    if (!sourceUnit || sourceUnit->DestroyQueued()) {
+    if (!source || source->DestroyQueuedFlag != 0u) {
       // 0x005C0E9B `cmp byte ptr [edi+278h], 0` -- `mDeleteWhenStale`, which the
       // constructor sets to `sourceUnit->IsMobile()` (ReconBlip.cpp:1071). So a
       // MOBILE source drops its blip outright, and a STRUCTURE keeps it as a
@@ -1917,31 +1917,24 @@ ReconBlip* CAiReconDBImpl::ReconGetBlip(Unit* const unit) const
  * Address: 0x005C20C0 (FUN_005C20C0)
  *
  * What it does:
- * Returns non-fake recon blips for one source unit while holding a weak-link
- * guard on the source object during map traversal.
+ * Returns `unit`'s blips that this army does not know to be fake. The probe
+ * key is a real `SReconKey` built from the unit (0x005C2110..0x005C2145: the
+ * weak pointer linked onto the entity's chain, then its id), alive for the
+ * whole walk and unlinked at 0x005C21A9; `equal_range` (0x005C49B0) runs on
+ * it. Each blip's per-army record is `mReconDat[armyIndex]` (0x34 stride at
+ * +0x4C4), and a blip is added unless `RECON_KnownFake` (bit 5) is set. The
+ * binary tests nothing else: no null or `DestroyQueued` check on the unit, no
+ * null blip, and no re-seeding of the map.
  */
 EntitySetTemplate<Entity> CAiReconDBImpl::ReconGetJamingBlips(Unit* const unit)
 {
   EntitySetTemplate<Entity> out{};
-  if (!unit || unit->DestroyQueued() || !mArmy) {
-    return out;
-  }
-
-  WeakObject::ScopedWeakLinkGuard sourceGuard(static_cast<WeakObject*>(static_cast<CScriptObject*>(unit)));
-
-  SeedReconMapFromBlipList(this);
-  auto [it, end] = FindReconBlipRange(this, unit);
-  while (it != end) {
-    const auto node = it++;
-
-    ReconBlip* const blip = node->second;
-    if (!blip) {
-      continue;
-    }
-
-    SPerArmyReconInfo* const recon = GetPerArmyReconSlot(blip, mArmy->mConstDat.mArmyIndex);
-    if (recon && (recon->mReconFlags & static_cast<std::uint32_t>(RECON_KnownFake)) == 0u) {
-      out.Add(reinterpret_cast<Entity*>(blip));
+  const SReconKey probe = MakeReconMapKey(unit);
+  for (auto [it, end] = mBlipMap.equal_range(probe); it != end; ++it) {
+    ReconBlip* const blip = it->second;
+    const SPerArmyReconInfo& recon = blip->mReconDat[mArmy->mConstDat.mArmyIndex];
+    if ((recon.mReconFlags & static_cast<std::uint32_t>(RECON_KnownFake)) == 0u) {
+      out.Add(blip);
     }
   }
   return out;

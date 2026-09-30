@@ -31,7 +31,6 @@ using namespace moho;
 
 namespace
 {
-  using CollisionLinkWeakUnit = WeakPtr<IUnit>;
   constexpr float kDegreesToSteeringRadiansPerTick = 0.0017453292f;
   constexpr float kSpeedScalePerTick = 0.1f;
   constexpr float kAccelerationScalePerTick = 0.0099999998f;
@@ -39,25 +38,6 @@ namespace
   constexpr float kTurnSinePolyB = 0.16605f;
   constexpr float kTurnVectorUnitTolerance = 0.001f;
 
-  static_assert(sizeof(CollisionLinkWeakUnit) == sizeof(SCollisionLink), "SCollisionLink/WeakPtr<IUnit> layout mismatch");
-  static_assert(
-    offsetof(CollisionLinkWeakUnit, ownerLinkSlot) == offsetof(SCollisionLink, mUnitIntrusiveSlot),
-    "SCollisionLink::mUnitIntrusiveSlot owner slot mismatch"
-  );
-  static_assert(
-    offsetof(CollisionLinkWeakUnit, nextInOwner) == offsetof(SCollisionLink, mNextInUnitChain),
-    "SCollisionLink::mNextInUnitChain next slot mismatch"
-  );
-
-  [[nodiscard]] CollisionLinkWeakUnit& AsCollisionWeakLink(SCollisionLink& link) noexcept
-  {
-    return *reinterpret_cast<CollisionLinkWeakUnit*>(&link);
-  }
-
-  [[nodiscard]] const CollisionLinkWeakUnit& AsCollisionWeakLink(const SCollisionLink& link) noexcept
-  {
-    return *reinterpret_cast<const CollisionLinkWeakUnit*>(&link);
-  }
 } // namespace
 
 /**
@@ -399,43 +379,6 @@ BuildHeadingQuaternionFromDirection2D(const Wm3::Vector2f* const direction, Wm3:
   return outOrientation;
 }
 } // namespace moho
-
-Unit* SCollisionLink::ResolveUnitFromIntrusiveSlot() const noexcept
-{
-  if (IUnit* const iunit = AsCollisionWeakLink(*this).GetObjectPtr()) {
-    return iunit->IsUnit();
-  }
-  return nullptr;
-}
-
-void** SCollisionLink::GetIntrusiveSlotAddress() const noexcept
-{
-  return reinterpret_cast<void**>(AsCollisionWeakLink(*this).ownerLinkSlot);
-}
-
-bool SCollisionLink::HasLinkedUnit() const noexcept
-{
-  return AsCollisionWeakLink(*this).HasValue();
-}
-
-void SCollisionLink::AssignUnit(Unit* const unit) noexcept
-{
-  AsCollisionWeakLink(*this).ResetFromObject(static_cast<IUnit*>(unit));
-}
-
-void SCollisionLink::ClearLink() noexcept
-{
-  AsCollisionWeakLink(*this).ResetFromOwnerLinkSlot(nullptr);
-}
-
-namespace
-{
-  void RemoveFromIntrusiveCollisionChain(SCollisionInfo& info)
-  {
-    auto& weakLink = AsCollisionWeakLink(info.mUnit);
-    weakLink.UnlinkFromOwnerChain();
-  }
-} // namespace
 
 gpg::RType* CAiPathSpline::sType = nullptr;
 gpg::RType* SContinueInfo::sType = nullptr;
@@ -827,7 +770,7 @@ namespace
  */
 void moho::ResetCollisionInfo(SCollisionInfo& info)
 {
-  RemoveFromIntrusiveCollisionChain(info);
+  info.mUnit.UnlinkFromOwnerChain();
   info.mPos = Wm3::Vector3f::Zero();
   info.mCollisionType = COLLISIONTYPE_None;
   info.mTickGate = -1;
@@ -873,7 +816,7 @@ void SCollisionInfo::MemberSerialize(gpg::WriteArchive* const archive) const
   GPG_ASSERT(vectorType != nullptr);
   GPG_ASSERT(collisionType != nullptr);
 
-  archive->Write(weakUnitType, const_cast<SCollisionLink*>(&mUnit), ownerRef);
+  archive->Write(weakUnitType, const_cast<WeakPtr<Unit>*>(&mUnit), ownerRef);
   archive->Write(vectorType, const_cast<Wm3::Vector3f*>(&mPos), ownerRef);
   archive->Write(collisionType, const_cast<ECollisionType*>(&mCollisionType), ownerRef);
   archive->WriteUInt(static_cast<unsigned int>(mTickGate));

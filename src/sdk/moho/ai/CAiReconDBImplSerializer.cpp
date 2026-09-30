@@ -498,7 +498,7 @@ void SReconKey::MemberDeserialize(gpg::ReadArchive* const archive)
     return;
   }
 
-  archive->Read(weakPtrEntityType, &sourceUnit, ownerRef);
+  archive->Read(weakPtrEntityType, &sourceEntity, ownerRef);
 
   gpg::RType* const entIdType = ResolveEntIdType();
   GPG_ASSERT(entIdType != nullptr);
@@ -524,7 +524,7 @@ void SReconKey::MemberSerialize(gpg::WriteArchive* const archive) const
     return;
   }
 
-  archive->Write(weakPtrEntityType, &sourceUnit, ownerRef);
+  archive->Write(weakPtrEntityType, &sourceEntity, ownerRef);
 
   gpg::RType* const entIdType = ResolveEntIdType();
   GPG_ASSERT(entIdType != nullptr);

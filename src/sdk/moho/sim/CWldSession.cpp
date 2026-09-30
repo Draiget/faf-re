@@ -112,8 +112,6 @@
 
 namespace
 {
-  static_assert(sizeof(moho::WeakObject::WeakLinkNodeView) == 0x8, "WeakLinkNodeView size must be 0x8");
-
   // TEMPORARY PROBE SINK -- unload-subset triage, delete when resolved.
   // gpg::Warnf reaches nothing unless `/log <name>` installed a target, so the
   // drag-unload probes append here instead. The file lands beside the exe.
