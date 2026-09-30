@@ -234,6 +234,22 @@ namespace moho
    */
   struct SInfoCache
   {
+    /**
+     * Address: 0x006B0580 (FUN_006B0580)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
+
+    /**
+     * Address: 0x006B04B0 (FUN_006B04B0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
     // Address: cached RTTI lane read/written by
     // `SInfoCacheSerializer::Init` (0x006AE810); see
     // `moho/unit/core/SInfoCacheReflection.cpp`.

@@ -25,6 +25,22 @@ namespace moho
    */
   struct CWeaponAttributes
   {
+    /**
+     * Address: 0x006DF180 (FUN_006DF180)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x006DF0C0 (FUN_006DF0C0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     RUnitBlueprintWeapon* mBlueprint; // +0x00
     /**
      * Negative means "not overridden": the getter falls back to the

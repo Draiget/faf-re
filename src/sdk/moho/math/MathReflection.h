@@ -71,6 +71,22 @@ namespace moho
 
   struct VAxes3
   {
+    /**
+     * Address: 0x004EE100 (FUN_004EE100)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x004EE050 (FUN_004EE050)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     VAxes3() = default;
 
     /**
@@ -760,63 +776,6 @@ namespace moho
     void Init() override;
   };
 
-  class VAxes3Serializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC6F60 (FUN_00BC6F60, dynamic initializer for the global
-     * `VAxes3Serializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields to the `DeserializeVAxes3SerializerThunk`/
-     * `SerializeVAxes3SerializerThunk` forwarders below -- not directly to
-     * `Deserialize`/`Serialize`, since those take a concrete `VAxes3*`
-     * rather than the generic `load_func_t`/`save_func_t` object-storage-int
-     * shape every other class in this file reinterpret-casts around.
-     */
-    VAxes3Serializer();
-
-    /**
-     * Address: 0x00BF16B0 (FUN_00BF16B0, Moho::VAxes3Serializer::~VAxes3Serializer)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state. IDA named this
-     * address a plain `sub_BF16B0` rather than the mangled destructor
-     * symbol, but its raw asm is byte-for-byte the same unlink+self-link
-     * shape as every other class's mangled dtor in this file (confirmed
-     * against `??1AxisAlignedBox3fSerializer@Moho@@QAE@@Z` at 0x00BF1230) --
-     * same `ResetLinks()` semantics, modeled the same way.
-     */
-    ~VAxes3Serializer();
-
-    /**
-     * Address: 0x004EE050 (FUN_004EE050, Moho::VAxes3Serializer::Deserialize)
-     */
-    static void Deserialize(gpg::ReadArchive* archive, VAxes3* axes);
-
-    /**
-     * Address: 0x004EE100 (FUN_004EE100, Moho::VAxes3Serializer::Serialize)
-     */
-    static void Serialize(gpg::WriteArchive* archive, VAxes3* axes);
-
-    /**
-     * Address: 0x004ED640 (FUN_004ED640, Moho::VAxes3Serializer::Init)
-     *
-     * What it does:
-     * Resolves `Moho::VAxes3` RTTI and installs the load/save callbacks for
-     * this helper. Also the vtable slot-0 target shared with the
-     * RTTI-inferred `gpg::SerSaveLoadHelper<Moho::VAxes3>` vtable head
-     * (0x00E0BEF8) -- one function, two vtable-head symbols.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mDeserialize; // +0x0C
-    gpg::RType::save_func_t mSerialize;   // +0x10
-  };
-
   /**
    * Address: 0x004ECBD0 (FUN_004ECBD0, Moho::VEC_LookAt)
    *
@@ -976,10 +935,6 @@ namespace moho
   static_assert(offsetof(VEulers3Serializer, mDeserialize) == 0x0C, "VEulers3Serializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(VEulers3Serializer, mSerialize) == 0x10, "VEulers3Serializer::mSerialize offset must be 0x10");
   static_assert(sizeof(VEulers3Serializer) == 0x14, "VEulers3Serializer size must be 0x14");
-
-  static_assert(offsetof(VAxes3Serializer, mDeserialize) == 0x0C, "VAxes3Serializer::mDeserialize offset must be 0x0C");
-  static_assert(offsetof(VAxes3Serializer, mSerialize) == 0x10, "VAxes3Serializer::mSerialize offset must be 0x10");
-  static_assert(sizeof(VAxes3Serializer) == 0x14, "VAxes3Serializer size must be 0x14");
 
   static_assert(sizeof(VEulers3) == 0x0C, "VEulers3 size must be 0x0C");
   static_assert(offsetof(VEulers3, r) == 0x00, "VEulers3::r offset must be 0x00");

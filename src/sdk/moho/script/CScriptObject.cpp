@@ -19,6 +19,7 @@
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/entity/Prop.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -2778,3 +2779,24 @@ void CScriptObject::LuaInvoke3_DiscardReturn(
   lua_call(lstate, 3, 1);
   lua_settop(lstate, stackTop);
 }
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CScriptObject>`, vtable 0x00E092B0.
+   *
+   * Address: 0x00BC6080 (FUN_00BC6080 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF0980 (FUN_00BF0980 -- the global's destructor.)
+   * Address: 0x004C7D50 (FUN_004C7D50 -- `Init`.)
+   * Address: 0x004C79E0 (FUN_004C79E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x004C79F0 (FUN_004C79F0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CScriptObjectSerializer : gpg::SerSaveLoadHelper<CScriptObject>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A8B1C -- process-global `CScriptObjectSerializer` singleton.
+  moho::CScriptObjectSerializer gCScriptObjectSerializer;
+} // namespace

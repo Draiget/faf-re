@@ -128,6 +128,22 @@ namespace moho
 
   struct InfluenceMapEntry
   {
+    /**
+     * Address: 0x0071CC30 (FUN_0071CC30)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
+
+    /**
+     * Address: 0x0071CB20 (FUN_0071CB20)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
     static gpg::RType* sType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
@@ -168,6 +184,22 @@ namespace moho
   class InfluenceGrid
   {
   public:
+    /**
+     * Address: 0x0071D010 (FUN_0071D010)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
+
+    /**
+     * Address: 0x0071CF30 (FUN_0071CF30)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
     static gpg::RType* sType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
@@ -234,6 +266,22 @@ namespace moho
   class CInfluenceMap
   {
   public:
+    /**
+     * Address: 0x0071F400 (FUN_0071F400)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
+
+    /**
+     * Address: 0x0071F330 (FUN_0071F330)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
     static gpg::RType* sType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
 

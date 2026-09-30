@@ -1,5 +1,5 @@
-#include "moho/effects/rendering/CEffectImplSerializer.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <typeinfo>
@@ -12,6 +12,7 @@
 #include "moho/math/VMatrix4.h"
 #include "moho/misc/CountedObject.h"
 #include "moho/resource/CParticleTexture.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -45,29 +46,33 @@ namespace
     return ResolveCachedType<gpg::fastvector<msvc8::string>>(gFastVectorStringType);
   }
 
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x0065AFA0 (FUN_0065AFA0, CEffectImplSerializer::DeserializeCore)
    *
    * What it does:
    * Reads `CEffectImpl` base lane and member payload lanes into the object.
    */
-  void DeserializeCEffectImplCore(moho::CEffectImpl* const object, gpg::ReadArchive* const archive)
+  void CEffectImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    if (!object || !archive) {
+    if (!archive) {
       return;
     }
 
-    archive->Read(moho::IEffect::StaticGetClass(), object, gpg::RRef{});
-    archive->Read(ResolveFastVectorFloatType(), &object->mParams, gpg::RRef{});
-    archive->Read(ResolveFastVectorCountedParticleTextureType(), &object->mParticleTextures, gpg::RRef{});
-    archive->Read(ResolveFastVectorStringType(), &object->mStrings, gpg::RRef{});
+    archive->Read(moho::IEffect::StaticGetClass(), this, gpg::RRef{});
+    archive->Read(ResolveFastVectorFloatType(), &mParams, gpg::RRef{});
+    archive->Read(ResolveFastVectorCountedParticleTextureType(), &mParticleTextures, gpg::RRef{});
+    archive->Read(ResolveFastVectorStringType(), &mStrings, gpg::RRef{});
     archive->Read(
-      ResolveCachedType<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType), &object->mEntityInfo, gpg::RRef{}
+      ResolveCachedType<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType), &mEntityInfo, gpg::RRef{}
     );
-    bool newAttachment = (object->mNewAttachment != 0);
+    bool newAttachment = (mNewAttachment != 0);
     archive->ReadBool(&newAttachment);
-    object->mNewAttachment = newAttachment ? 1u : 0u;
-    archive->Read(ResolveCachedType<moho::VMatrix4>(moho::VMatrix4::sType), &object->mMatrix, gpg::RRef{});
+    mNewAttachment = newAttachment ? 1u : 0u;
+    archive->Read(ResolveCachedType<moho::VMatrix4>(moho::VMatrix4::sType), &mMatrix, gpg::RRef{});
   }
 
   /**
@@ -76,86 +81,41 @@ namespace
    * What it does:
    * Writes `CEffectImpl` base lane and member payload lanes from the object.
    */
-  void SerializeCEffectImplCore(const moho::CEffectImpl* const object, gpg::WriteArchive* const archive)
+  void CEffectImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    if (!object || !archive) {
+    if (!archive) {
       return;
     }
 
-    archive->Write(moho::IEffect::StaticGetClass(), object, gpg::RRef{});
-    archive->Write(ResolveFastVectorFloatType(), &object->mParams, gpg::RRef{});
-    archive->Write(ResolveFastVectorCountedParticleTextureType(), &object->mParticleTextures, gpg::RRef{});
-    archive->Write(ResolveFastVectorStringType(), &object->mStrings, gpg::RRef{});
+    archive->Write(moho::IEffect::StaticGetClass(), this, gpg::RRef{});
+    archive->Write(ResolveFastVectorFloatType(), &mParams, gpg::RRef{});
+    archive->Write(ResolveFastVectorCountedParticleTextureType(), &mParticleTextures, gpg::RRef{});
+    archive->Write(ResolveFastVectorStringType(), &mStrings, gpg::RRef{});
     archive->Write(
-      ResolveCachedType<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType), &object->mEntityInfo, gpg::RRef{}
+      ResolveCachedType<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType), &mEntityInfo, gpg::RRef{}
     );
-    archive->WriteBool(object->mNewAttachment != 0);
-    archive->Write(ResolveCachedType<moho::VMatrix4>(moho::VMatrix4::sType), &object->mMatrix, gpg::RRef{});
+    archive->WriteBool(mNewAttachment != 0);
+    archive->Write(ResolveCachedType<moho::VMatrix4>(moho::VMatrix4::sType), &mMatrix, gpg::RRef{});
   }
-
-  // Address: 0x010B3ADC -- process-global `CEffectImplSerializer` singleton.
-  // Constructing it runs CEffectImplSerializer::CEffectImplSerializer()
-  // (0x00BD40E0), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction.
-  moho::CEffectImplSerializer gCEffectImplSerializer;
-
-} // namespace
+} // namespace moho
 
 namespace moho
 {
   /**
-   * Address: 0x00BD40E0 (FUN_00BD40E0, register_CEffectImplSerializer)
+   * `gpg::SerSaveLoadHelper<CEffectImpl>`, vtable 0x00E23E3C.
    *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the load/save
-   * callback fields; the compiler registers the destructor with `atexit`.
+   * Address: 0x00BD40E0 (FUN_00BD40E0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFBA20 (FUN_00BFBA20 -- the global's destructor.)
+   * Address: 0x0065A2C0 (FUN_0065A2C0 -- `Init`.)
+   * Address: 0x006598A0 (FUN_006598A0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006598B0 (FUN_006598B0 -- `Serialize`, a forward to `MemberSerialize`.)
    */
-  CEffectImplSerializer::CEffectImplSerializer()
-    : mLoadCallback(&CEffectImplSerializer::Deserialize)
-    , mSaveCallback(&CEffectImplSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BFBA20 (FUN_00BFBA20, dynamic atexit destructor for `gCEffectImplSerializer`)
-   *
-   * What it does:
-   * Unlinks this helper node from the serializer-helper list (the
-   * `TDatListItem` base destructor). The compiler registers it with
-   * `atexit` from the global's dynamic initializer (0x00BD40E0).
-   * `FUN_006598F0` and `FUN_00659920` are
-   * unreferenced out-of-line copies of the same body.
-   */
-  CEffectImplSerializer::~CEffectImplSerializer() = default;
-
-  /**
-   * Address: 0x006598A0 (FUN_006598A0, Moho::CEffectImplSerializer::Deserialize)
-   */
-  void CEffectImplSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<CEffectImpl*>(static_cast<std::uintptr_t>(objectPtr));
-    DeserializeCEffectImplCore(object, archive);
-  }
-
-  /**
-   * Address: 0x006598B0 (FUN_006598B0, Moho::CEffectImplSerializer::Serialize)
-   */
-  void CEffectImplSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<CEffectImpl*>(static_cast<std::uintptr_t>(objectPtr));
-    SerializeCEffectImplCore(object, archive);
-  }
-
-  /**
-   * Address: 0x0065A2C0 (FUN_0065A2C0, gpg::SerSaveLoadHelper_CEffectImpl::Init)
-   */
-  void CEffectImplSerializer::Init()
-  {
-    gpg::RType* const type = CEffectImpl::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
+  struct CEffectImplSerializer : gpg::SerSaveLoadHelper<CEffectImpl>
+  {};
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010B3ADC -- process-global `CEffectImplSerializer` singleton.
+  moho::CEffectImplSerializer gCEffectImplSerializer;
+} // namespace

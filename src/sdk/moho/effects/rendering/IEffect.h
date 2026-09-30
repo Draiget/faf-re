@@ -31,6 +31,22 @@ namespace moho
   class IEffect : public CScriptObject, public TDatListItem<IEffect, void>, public InstanceCounter<IEffect>
   {
   public:
+    /**
+     * Address: 0x00771450 (FUN_00771450)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x007713E0 (FUN_007713E0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     static gpg::RType* sType;
     static gpg::RType* sPointerType;
 

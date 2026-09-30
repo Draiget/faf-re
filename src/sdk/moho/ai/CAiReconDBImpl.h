@@ -121,6 +121,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005CCDE0 (FUN_005CCDE0)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x005CCBE0 (FUN_005CCBE0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x005C0290 (FUN_005C0290, ??0CAiReconDBImpl@Moho@@QAE@XZ)
      *
      * What it does:

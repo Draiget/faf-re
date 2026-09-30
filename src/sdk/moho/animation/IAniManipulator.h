@@ -21,6 +21,22 @@ namespace moho
 
   struct SAniManipBinding
   {
+    /**
+     * Address: 0x0063CD00 (FUN_0063CD00)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
+
+    /**
+     * Address: 0x0063CCA0 (FUN_0063CCA0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
     std::int32_t mBoneIndex; // +0x00
     std::int32_t mFlags;     // +0x04
 

@@ -28,6 +28,7 @@
 #include "moho/sim/Sim.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace gpg
 {
@@ -755,238 +756,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x0071CF30 (FUN_0071CF30, deserialize_InfluenceGrid_record)
-   *
-   * What it does:
-   * Deserializes one `InfluenceGrid` payload in archive field order:
-   * `entries`, `threats`, aggregate threat, and decay lanes.
-   */
-  void DeserializeInfluenceGridRecord(
-    gpg::ReadArchive* const archive,
-    moho::InfluenceGrid* const grid,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive == nullptr || grid == nullptr) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-
-    gpg::RType* const entryMapType = CachedInfluenceMapEntryMapType();
-    GPG_ASSERT(entryMapType != nullptr);
-    if (!entryMapType) {
-      return;
-    }
-    archive->Read(entryMapType, &grid->entries, owner);
-
-    gpg::RType* const threatVectorType = CachedSThreatVectorType();
-    GPG_ASSERT(threatVectorType != nullptr);
-    if (!threatVectorType) {
-      return;
-    }
-    archive->Read(threatVectorType, &grid->threats, owner);
-
-    gpg::RType* const threatType = CachedSThreatType();
-    GPG_ASSERT(threatType != nullptr);
-    if (!threatType) {
-      return;
-    }
-    archive->Read(threatType, &grid->threat, owner);
-    archive->Read(threatType, &grid->decay, owner);
-  }
-
-  /**
-   * Address: 0x0071D010 (FUN_0071D010, serialize_InfluenceGrid_record)
-   *
-   * What it does:
-   * Serializes one `InfluenceGrid` payload in archive field order:
-   * `entries`, `threats`, aggregate threat, and decay lanes.
-   */
-  void SerializeInfluenceGridRecord(
-    gpg::WriteArchive* const archive,
-    const moho::InfluenceGrid* const grid,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive == nullptr || grid == nullptr) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-
-    gpg::RType* const entryMapType = CachedInfluenceMapEntryMapType();
-    GPG_ASSERT(entryMapType != nullptr);
-    if (!entryMapType) {
-      return;
-    }
-    archive->Write(entryMapType, grid, owner);
-
-    gpg::RType* const threatVectorType = CachedSThreatVectorType();
-    GPG_ASSERT(threatVectorType != nullptr);
-    if (!threatVectorType) {
-      return;
-    }
-    archive->Write(threatVectorType, &grid->threats, owner);
-
-    gpg::RType* const threatType = CachedSThreatType();
-    GPG_ASSERT(threatType != nullptr);
-    if (!threatType) {
-      return;
-    }
-    archive->Write(threatType, &grid->threat, owner);
-    archive->Write(threatType, &grid->decay, owner);
-  }
-
-  /**
-   * Address: 0x00717CF0 (FUN_00717CF0)
-   *
-   * What it does:
-   * Read-callback thunk for `InfluenceGrid` archive lanes that forwards to
-   * `DeserializeInfluenceGridRecord` (`FUN_0071CF30`).
-   */
-  void DeserializeInfluenceGridRecordCallbackThunk(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    DeserializeInfluenceGridRecord(
-      archive,
-      PointerFromArchiveInt<moho::InfluenceGrid>(objectPtr),
-      ownerRef
-    );
-  }
-
-  /**
-   * Address: 0x00717D00 (FUN_00717D00)
-   *
-   * What it does:
-   * Write-callback thunk for `InfluenceGrid` archive lanes that forwards to
-   * `SerializeInfluenceGridRecord` (`FUN_0071D010`).
-   */
-  void SerializeInfluenceGridRecordCallbackThunk(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    SerializeInfluenceGridRecord(
-      archive,
-      ConstPointerFromArchiveInt<moho::InfluenceGrid>(objectPtr),
-      ownerRef
-    );
-  }
-
-  /**
-   * Address: 0x0071CB20 (FUN_0071CB20, deserialize_InfluenceMapEntry_record)
-   *
-   * What it does:
-   * Deserializes one `InfluenceMapEntry` payload in archive field order:
-   * `EntId`, `SimArmy*`, `Vector3f` position, `RUnitBlueprint*`, `ELayer`,
-   * detail flag, threat magnitude/decay, and decay tick count.
-   */
-  void DeserializeInfluenceMapEntryRecord(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    auto* const entry = PointerFromArchiveInt<moho::InfluenceMapEntry>(objectPtr);
-    if (archive == nullptr || entry == nullptr) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-
-    static gpg::RType* entIdType = nullptr;
-    if (entIdType == nullptr) {
-      entIdType = gpg::LookupRType(typeid(moho::EntId));
-    }
-    archive->Read(entIdType, &entry->entityId, owner);
-
-    moho::SimArmy* sourceArmy = nullptr;
-    archive->ReadPointer(&sourceArmy, &owner);
-    entry->sourceArmy = reinterpret_cast<moho::CArmyImpl*>(sourceArmy);
-
-    static gpg::RType* vector3fType = nullptr;
-    if (vector3fType == nullptr) {
-      vector3fType = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    archive->Read(vector3fType, &entry->lastPosition, owner);
-
-    moho::RUnitBlueprint* sourceBlueprint = nullptr;
-    archive->ReadPointer(&sourceBlueprint, &owner);
-    entry->sourceBlueprint = sourceBlueprint;
-
-    static gpg::RType* layerType = nullptr;
-    if (layerType == nullptr) {
-      layerType = gpg::LookupRType(typeid(moho::ELayer));
-    }
-    archive->Read(layerType, &entry->sourceLayer, owner);
-
-    bool isDetailed = false;
-    archive->ReadBool(&isDetailed);
-    entry->isDetailed = isDetailed ? 1u : 0u;
-
-    archive->ReadFloat(&entry->threatStrength);
-    archive->ReadFloat(&entry->threatDecay);
-    archive->ReadInt(&entry->decayTicks);
-  }
-
-  /**
-   * Address: 0x0071CC30 (FUN_0071CC30, serialize_InfluenceMapEntry_record)
-   *
-   * What it does:
-   * Serializes one `InfluenceMapEntry` payload in archive field order using
-   * unowned pointer lanes for `SimArmy*` and `RUnitBlueprint*`.
-   */
-  void SerializeInfluenceMapEntryRecord(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    const auto* const entry = ConstPointerFromArchiveInt<moho::InfluenceMapEntry>(objectPtr);
-    if (archive == nullptr || entry == nullptr) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-
-    static gpg::RType* entIdType = nullptr;
-    if (entIdType == nullptr) {
-      entIdType = gpg::LookupRType(typeid(moho::EntId));
-    }
-    archive->Write(entIdType, &entry->entityId, owner);
-
-    archive->WritePointer<moho::SimArmy>(reinterpret_cast<moho::SimArmy*>(entry->sourceArmy), gpg::TrackedPointerState::Unowned, owner);
-
-    static gpg::RType* vector3fType = nullptr;
-    if (vector3fType == nullptr) {
-      vector3fType = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    archive->Write(vector3fType, &entry->lastPosition, owner);
-
-    archive->WritePointer<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(entry->sourceBlueprint), gpg::TrackedPointerState::Unowned, owner);
-
-    static gpg::RType* layerType = nullptr;
-    if (layerType == nullptr) {
-      layerType = gpg::LookupRType(typeid(moho::ELayer));
-    }
-    archive->Write(layerType, &entry->sourceLayer, owner);
-
-    archive->WriteBool(entry->isDetailed != 0u);
-    archive->WriteFloat(entry->threatStrength);
-    archive->WriteFloat(entry->threatDecay);
-    archive->WriteInt(entry->decayTicks);
-  }
-
   struct RRefPairRuntime
   {
     void* object;      // +0x00
@@ -1049,40 +818,6 @@ namespace
     outRefPair->object = ref.mObj;
     outRefPair->type = ref.mType;
     return outRefPair;
-  }
-
-  /**
-   * Address: 0x007178F0 (FUN_007178F0)
-   *
-   * What it does:
-   * Read-callback thunk for `InfluenceMapEntry` archive lanes that forwards to
-   * `DeserializeInfluenceMapEntryRecord` (`FUN_0071CB20`).
-   */
-  void DeserializeInfluenceMapEntryRecordCallbackThunk(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    DeserializeInfluenceMapEntryRecord(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00717900 (FUN_00717900)
-   *
-   * What it does:
-   * Write-callback thunk for `InfluenceMapEntry` archive lanes that forwards
-   * to `SerializeInfluenceMapEntryRecord` (`FUN_0071CC30`).
-   */
-  void SerializeInfluenceMapEntryRecordCallbackThunk(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    SerializeInfluenceMapEntryRecord(archive, objectPtr, version, ownerRef);
   }
 
   // Addresses 0x007189D0/0x0071A0C0 (the "ThunkA"/"ThunkB" iterator-advance
@@ -3101,4 +2836,217 @@ namespace
 {
   // Address: 0x010B92CC -- process-global `CInfluenceMapConstruct` singleton.
   moho::CInfluenceMapConstruct gCInfluenceMapConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x0071CF30 (FUN_0071CF30, deserialize_InfluenceGrid_record)
+   *
+   * What it does:
+   * Deserializes one `InfluenceGrid` payload in archive field order:
+   * `entries`, `threats`, aggregate threat, and decay lanes.
+   */
+  void InfluenceGrid::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  {
+    if (archive == nullptr || this == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef;
+
+    gpg::RType* const entryMapType = CachedInfluenceMapEntryMapType();
+    GPG_ASSERT(entryMapType != nullptr);
+    if (!entryMapType) {
+      return;
+    }
+    archive->Read(entryMapType, &entries, owner);
+
+    gpg::RType* const threatVectorType = CachedSThreatVectorType();
+    GPG_ASSERT(threatVectorType != nullptr);
+    if (!threatVectorType) {
+      return;
+    }
+    archive->Read(threatVectorType, &threats, owner);
+
+    gpg::RType* const threatType = CachedSThreatType();
+    GPG_ASSERT(threatType != nullptr);
+    if (!threatType) {
+      return;
+    }
+    archive->Read(threatType, &threat, owner);
+    archive->Read(threatType, &decay, owner);
+  }
+
+  /**
+   * Address: 0x0071D010 (FUN_0071D010, serialize_InfluenceGrid_record)
+   *
+   * What it does:
+   * Serializes one `InfluenceGrid` payload in archive field order:
+   * `entries`, `threats`, aggregate threat, and decay lanes.
+   */
+  void InfluenceGrid::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
+  {
+    if (archive == nullptr || this == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef;
+
+    gpg::RType* const entryMapType = CachedInfluenceMapEntryMapType();
+    GPG_ASSERT(entryMapType != nullptr);
+    if (!entryMapType) {
+      return;
+    }
+    archive->Write(entryMapType, this, owner);
+
+    gpg::RType* const threatVectorType = CachedSThreatVectorType();
+    GPG_ASSERT(threatVectorType != nullptr);
+    if (!threatVectorType) {
+      return;
+    }
+    archive->Write(threatVectorType, &threats, owner);
+
+    gpg::RType* const threatType = CachedSThreatType();
+    GPG_ASSERT(threatType != nullptr);
+    if (!threatType) {
+      return;
+    }
+    archive->Write(threatType, &threat, owner);
+    archive->Write(threatType, &decay, owner);
+  }
+
+  /**
+   * Address: 0x0071CB20 (FUN_0071CB20, deserialize_InfluenceMapEntry_record)
+   *
+   * What it does:
+   * Deserializes one `InfluenceMapEntry` payload in archive field order:
+   * `EntId`, `SimArmy*`, `Vector3f` position, `RUnitBlueprint*`, `ELayer`,
+   * detail flag, threat magnitude/decay, and decay tick count.
+   */
+  void InfluenceMapEntry::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+
+    static gpg::RType* entIdType = nullptr;
+    if (entIdType == nullptr) {
+      entIdType = gpg::LookupRType(typeid(moho::EntId));
+    }
+    archive->Read(entIdType, &entityId, ownerRef);
+
+    moho::SimArmy* loadedArmy = nullptr;
+    archive->ReadPointer(&loadedArmy, &ownerRef);
+    sourceArmy = reinterpret_cast<moho::CArmyImpl*>(loadedArmy);
+
+    static gpg::RType* vector3fType = nullptr;
+    if (vector3fType == nullptr) {
+      vector3fType = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    archive->Read(vector3fType, &lastPosition, ownerRef);
+
+    moho::RUnitBlueprint* loadedBlueprint = nullptr;
+    archive->ReadPointer(&loadedBlueprint, &ownerRef);
+    sourceBlueprint = loadedBlueprint;
+
+    static gpg::RType* layerType = nullptr;
+    if (layerType == nullptr) {
+      layerType = gpg::LookupRType(typeid(moho::ELayer));
+    }
+    archive->Read(layerType, &sourceLayer, ownerRef);
+
+    bool loadedDetailed = false;
+    archive->ReadBool(&loadedDetailed);
+    isDetailed = loadedDetailed ? 1u : 0u;
+
+    archive->ReadFloat(&threatStrength);
+    archive->ReadFloat(&threatDecay);
+    archive->ReadInt(&decayTicks);
+  }
+
+  /**
+   * Address: 0x0071CC30 (FUN_0071CC30, serialize_InfluenceMapEntry_record)
+   *
+   * What it does:
+   * Serializes one `InfluenceMapEntry` payload in archive field order using
+   * unowned pointer lanes for `SimArmy*` and `RUnitBlueprint*`.
+   */
+  void InfluenceMapEntry::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+
+    static gpg::RType* entIdType = nullptr;
+    if (entIdType == nullptr) {
+      entIdType = gpg::LookupRType(typeid(moho::EntId));
+    }
+    archive->Write(entIdType, &entityId, ownerRef);
+
+    archive->WritePointer<moho::SimArmy>(reinterpret_cast<moho::SimArmy*>(sourceArmy), gpg::TrackedPointerState::Unowned, ownerRef);
+
+    static gpg::RType* vector3fType = nullptr;
+    if (vector3fType == nullptr) {
+      vector3fType = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    archive->Write(vector3fType, &lastPosition, ownerRef);
+
+    archive->WritePointer<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(sourceBlueprint), gpg::TrackedPointerState::Unowned, ownerRef);
+
+    static gpg::RType* layerType = nullptr;
+    if (layerType == nullptr) {
+      layerType = gpg::LookupRType(typeid(moho::ELayer));
+    }
+    archive->Write(layerType, &sourceLayer, ownerRef);
+
+    archive->WriteBool(isDetailed != 0u);
+    archive->WriteFloat(threatStrength);
+    archive->WriteFloat(threatDecay);
+    archive->WriteInt(decayTicks);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<InfluenceGrid>`, vtable 0x00E31914.
+   *
+   * Address: 0x00BDA7E0 (FUN_00BDA7E0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C000F0 (FUN_00C000F0 -- the global's destructor.)
+   * Address: 0x00719410 (FUN_00719410 -- `Init`.)
+   * Address: 0x00717CF0 (FUN_00717CF0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00717D00 (FUN_00717D00 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct InfluenceGridSerializer : gpg::SerSaveLoadHelper<InfluenceGrid>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B9204 -- process-global `InfluenceGridSerializer` singleton.
+  moho::InfluenceGridSerializer gInfluenceGridSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<InfluenceMapEntry>`, vtable 0x00E317AC.
+   *
+   * Address: 0x00BDA720 (FUN_00BDA720 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFFFD0 (FUN_00BFFFD0 -- the global's destructor.)
+   * Address: 0x00718C00 (FUN_00718C00 -- `Init`.)
+   * Address: 0x007178F0 (FUN_007178F0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00717900 (FUN_00717900 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct InfluenceMapEntrySerializer : gpg::SerSaveLoadHelper<InfluenceMapEntry>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B9470 -- process-global `InfluenceMapEntrySerializer` singleton.
+  moho::InfluenceMapEntrySerializer gInfluenceMapEntrySerializer;
 } // namespace

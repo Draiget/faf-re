@@ -25,6 +25,7 @@
 #include "moho/sim/Sim.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace gpg
 {
@@ -493,11 +494,6 @@ namespace
    */
   gpg::PrimitiveSerHelper<moho::EProjectileImpactEvent, int> gEProjectileImpactEventPrimitiveSerializer;
 
-  // Address: 0x010B55AC -- process-global `CProjectileAttributesSerializer`
-  // singleton (constructed by FUN_00BD63B0, self-registering via `__xc_a`;
-  // see CProjectileAttributes.h for the real-ctor/atexit-target evidence).
-  moho::CProjectileAttributesSerializer gCProjectileAttributesSerializer;
-
   /**
    * Address: 0x00BFD540 (FUN_00BFD540, atexit destructor of the EProjectileImpactEventTypeInfo object)
    */
@@ -549,39 +545,6 @@ namespace
 
 namespace
 {
-  /**
-   * Address: 0x0069F470 (FUN_0069F470)
-   */
-  void Deserialize_CProjectileAttributesBody(
-    gpg::ReadArchive* archive,
-    moho::CProjectileAttributes& attributes,
-    const gpg::RRef& ownerRef
-  )
-  {
-    attributes.mBlueprint = ReadProjectileBlueprintPointer(archive, ownerRef);
-    archive->ReadFloat(&attributes.mMaxZigZag);
-    archive->ReadFloat(&attributes.mZigZagFrequency);
-    archive->ReadFloat(&attributes.mDetonateAboveHeight);
-    archive->ReadFloat(&attributes.mDetonateBelowHeight);
-  }
-
-  /**
-   * Address: 0x0069F4D0 (FUN_0069F4D0)
-   */
-  void Serialize_CProjectileAttributesBody(
-    gpg::WriteArchive* archive,
-    const moho::CProjectileAttributes& attributes,
-    const gpg::RRef& ownerRef
-  )
-  {
-    gpg::RRef blueprintRef = MakeProjectileBlueprintRef(attributes.mBlueprint);
-    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
-    archive->WriteFloat(attributes.mMaxZigZag);
-    archive->WriteFloat(attributes.mZigZagFrequency);
-    archive->WriteFloat(attributes.mDetonateAboveHeight);
-    archive->WriteFloat(attributes.mDetonateBelowHeight);
-  }
-
   struct ProjectileStartupBootstrap
   {
     ProjectileStartupBootstrap()
@@ -2819,75 +2782,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0069A990 (FUN_0069A990, Moho::CProjectileAttributesSerializer::Deserialize)
-   */
-  void CProjectileAttributesSerializer::Deserialize(
-    gpg::ReadArchive* archive,
-    int objectPtr,
-    int,
-    gpg::RRef* ownerRef
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    gpg::RRef owner{};
-    if (ownerRef != nullptr) {
-      owner = *ownerRef;
-    }
-
-    auto& attributes = *reinterpret_cast<CProjectileAttributes*>(static_cast<std::uintptr_t>(objectPtr));
-    Deserialize_CProjectileAttributesBody(archive, attributes, owner);
-  }
-
-  /**
-   * Address: 0x0069A9A0 (FUN_0069A9A0, Moho::CProjectileAttributesSerializer::Serialize)
-   */
-  void CProjectileAttributesSerializer::Serialize(
-    gpg::WriteArchive* archive,
-    int objectPtr,
-    int,
-    gpg::RRef* ownerRef
-  )
-  {
-    if (archive == nullptr || objectPtr == 0) {
-      return;
-    }
-
-    gpg::RRef owner{};
-    if (ownerRef != nullptr) {
-      owner = *ownerRef;
-    }
-
-    const auto& attributes = *reinterpret_cast<const CProjectileAttributes*>(static_cast<std::uintptr_t>(objectPtr));
-    Serialize_CProjectileAttributesBody(archive, attributes, owner);
-  }
-
-  /**
-   * Address: 0x0069E900 (FUN_0069E900, serializer registration lane)
-   */
-  void CProjectileAttributesSerializer::Init()
-  {
-    gpg::RType* const typeInfo = CachedCProjectileAttributesType();
-    GPG_ASSERT(typeInfo->serLoadFunc_ == nullptr || typeInfo->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(typeInfo->serSaveFunc_ == nullptr || typeInfo->serSaveFunc_ == mSerialize);
-    typeInfo->serLoadFunc_ = mDeserialize;
-    typeInfo->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BD63B0 (FUN_00BD63B0, dynamic initializer for the global
-   * `CProjectileAttributesSerializer` singleton)
-   */
-  CProjectileAttributesSerializer::CProjectileAttributesSerializer()
-    : mDeserialize(&CProjectileAttributesSerializer::Deserialize)
-    , mSerialize(&CProjectileAttributesSerializer::Serialize)
-  {}
-
-  CProjectileAttributesSerializer::~CProjectileAttributesSerializer() = default;
-
-  /**
    * Address: 0x00BD6330 (FUN_00BD6330, register_EProjectileImpactEventTypeInfo)
    */
   void register_EProjectileImpactEventTypeInfo()
@@ -3016,3 +2910,52 @@ namespace gpg
     broadcaster->SetListener(listener);
   }
 } // namespace gpg
+
+namespace moho
+{
+  /**
+   * Address: 0x0069F470 (FUN_0069F470)
+   */
+  void CProjectileAttributes::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  {
+    mBlueprint = ReadProjectileBlueprintPointer(archive, ownerRef);
+    archive->ReadFloat(&mMaxZigZag);
+    archive->ReadFloat(&mZigZagFrequency);
+    archive->ReadFloat(&mDetonateAboveHeight);
+    archive->ReadFloat(&mDetonateBelowHeight);
+  }
+
+  /**
+   * Address: 0x0069F4D0 (FUN_0069F4D0)
+   */
+  void CProjectileAttributes::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
+  {
+    gpg::RRef blueprintRef = MakeProjectileBlueprintRef(mBlueprint);
+    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WriteFloat(mMaxZigZag);
+    archive->WriteFloat(mZigZagFrequency);
+    archive->WriteFloat(mDetonateAboveHeight);
+    archive->WriteFloat(mDetonateBelowHeight);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CProjectileAttributes>`, vtable 0x00E29774.
+   *
+   * Address: 0x00BD63B0 (FUN_00BD63B0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFD5E0 (FUN_00BFD5E0 -- the global's destructor.)
+   * Address: 0x0069E900 (FUN_0069E900 -- `Init`.)
+   * Address: 0x0069A990 (FUN_0069A990 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0069A9A0 (FUN_0069A9A0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CProjectileAttributesSerializer : gpg::SerSaveLoadHelper<CProjectileAttributes>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B55AC -- process-global `CProjectileAttributesSerializer` singleton.
+  moho::CProjectileAttributesSerializer gCProjectileAttributesSerializer;
+} // namespace

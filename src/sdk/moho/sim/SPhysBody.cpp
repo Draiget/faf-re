@@ -14,6 +14,7 @@
 #include "moho/math/QuaternionMath.h"
 #include "moho/render/camera/VTransform.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
@@ -30,9 +31,6 @@ namespace
     static moho::SPhysBodyTypeInfo sInstance;
     return &sInstance;
   }
-
-  // Address: 0x010B53A0 -- process-global `SPhysBodySerializer` singleton.
-  moho::SPhysBodySerializer gSPhysBodySerializer;
 
   [[nodiscard]] gpg::RType* CachedSPhysBodyType()
   {
@@ -72,43 +70,6 @@ namespace
     return cached;
   }
 
-  /**
-   * Address: 0x00698A60 (FUN_00698A60, serializer load body)
-   */
-  void DeserializeSPhysBodyBody(moho::SPhysBody* const object, gpg::ReadArchive* const archive)
-  {
-    if (!object || !archive) {
-      return;
-    }
-
-    const gpg::RRef nullOwner{};
-    archive->ReadFloat(&object->mMass);
-    archive->Read(CachedVector3fType(), &object->mInvInertiaTensor, nullOwner);
-    archive->Read(CachedVector3fType(), &object->mCollisionOffset, nullOwner);
-    archive->Read(CachedVector3fType(), &object->mPos, nullOwner);
-    archive->Read(CachedQuaternionfType(), &object->mOrientation, nullOwner);
-    archive->Read(CachedVector3fType(), &object->mVelocity, nullOwner);
-    archive->Read(CachedVector3fType(), &object->mWorldImpulse, nullOwner);
-  }
-
-  /**
-   * Address: 0x00698BC0 (FUN_00698BC0, serializer save body)
-   */
-  void SerializeSPhysBodyBody(const moho::SPhysBody* const object, gpg::WriteArchive* const archive)
-  {
-    if (!object || !archive) {
-      return;
-    }
-
-    const gpg::RRef nullOwner{};
-    archive->WriteFloat(object->mMass);
-    archive->Write(CachedVector3fType(), &object->mInvInertiaTensor, nullOwner);
-    archive->Write(CachedVector3fType(), &object->mCollisionOffset, nullOwner);
-    archive->Write(CachedVector3fType(), &object->mPos, nullOwner);
-    archive->Write(CachedQuaternionfType(), &object->mOrientation, nullOwner);
-    archive->Write(CachedVector3fType(), &object->mVelocity, nullOwner);
-    archive->Write(CachedVector3fType(), &object->mWorldImpulse, nullOwner);
-  }
 } // namespace
 
 namespace moho
@@ -705,61 +666,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006982A0 (FUN_006982A0, Moho::SPhysBodySerializer::Deserialize)
-   *
-   * What it does:
-   * Tail-calls the recovered deserialize body.
-   */
-  void SPhysBodySerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    DeserializeSPhysBodyBody(reinterpret_cast<SPhysBody*>(objectPtr), archive);
-  }
-
-  /**
-   * Address: 0x006982B0 (FUN_006982B0, Moho::SPhysBodySerializer::Serialize)
-   *
-   * What it does:
-   * Tail-calls the recovered serialize body.
-   */
-  void SPhysBodySerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    SerializeSPhysBodyBody(reinterpret_cast<const SPhysBody*>(objectPtr), archive);
-  }
-
-  /**
-   * Address: 0x00BD5F10 (FUN_00BD5F10, dynamic initializer for the global
-   * `SPhysBodySerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links into the
-   * pending helper list) and binds the load/save callback fields.
-   */
-  SPhysBodySerializer::SPhysBodySerializer()
-    : mDeserialize(&SPhysBodySerializer::Deserialize)
-    , mSerialize(&SPhysBodySerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BFD390 (FUN_00BFD390, Moho::SPhysBodySerializer::~SPhysBodySerializer)
-   */
-  SPhysBodySerializer::~SPhysBodySerializer() = default;
-
-  /**
-   * Address: 0x00698760 (FUN_00698760, Moho::SPhysBodySerializer::Init)
-   *
-   * What it does:
-   * Binds load/save callbacks into `SPhysBody`'s reflected RTTI.
-   */
-  void SPhysBodySerializer::Init()
-  {
-    gpg::RType* const type = CachedSPhysBodyType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x00BD5E80 (FUN_00BD5E80, register_SPhysBodyTypeInfo)
    */
   void register_SPhysBodyTypeInfo()
@@ -841,4 +747,67 @@ namespace
 
   // Address: 0x010B5314 -- process-global `SPhysBodyConstruct` singleton.
   moho::SPhysBodyConstruct gSPhysBodyConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00698A60 (FUN_00698A60, serializer load body)
+   */
+  void SPhysBody::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    archive->ReadFloat(&mMass);
+    archive->Read(CachedVector3fType(), &mInvInertiaTensor, nullOwner);
+    archive->Read(CachedVector3fType(), &mCollisionOffset, nullOwner);
+    archive->Read(CachedVector3fType(), &mPos, nullOwner);
+    archive->Read(CachedQuaternionfType(), &mOrientation, nullOwner);
+    archive->Read(CachedVector3fType(), &mVelocity, nullOwner);
+    archive->Read(CachedVector3fType(), &mWorldImpulse, nullOwner);
+  }
+
+  /**
+   * Address: 0x00698BC0 (FUN_00698BC0, serializer save body)
+   */
+  void SPhysBody::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    archive->WriteFloat(mMass);
+    archive->Write(CachedVector3fType(), &mInvInertiaTensor, nullOwner);
+    archive->Write(CachedVector3fType(), &mCollisionOffset, nullOwner);
+    archive->Write(CachedVector3fType(), &mPos, nullOwner);
+    archive->Write(CachedQuaternionfType(), &mOrientation, nullOwner);
+    archive->Write(CachedVector3fType(), &mVelocity, nullOwner);
+    archive->Write(CachedVector3fType(), &mWorldImpulse, nullOwner);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SPhysBody>`, vtable 0x00E29344.
+   *
+   * Address: 0x00BD5F10 (FUN_00BD5F10 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFD390 (FUN_00BFD390 -- the global's destructor.)
+   * Address: 0x006982C0 (FUN_006982C0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00698760 (FUN_00698760 -- `Init`.)
+   * Address: 0x006982A0 (FUN_006982A0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006982B0 (FUN_006982B0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SPhysBodySerializer : gpg::SerSaveLoadHelper<SPhysBody>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B539C -- process-global `SPhysBodySerializer` singleton.
+  moho::SPhysBodySerializer gSPhysBodySerializer;
 } // namespace

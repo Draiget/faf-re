@@ -1,4 +1,3 @@
-#include "moho/audio/CSimSoundManagerSerializer.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -10,19 +9,11 @@
 #include "moho/audio/AudioReflectionHelpers.h"
 #include "moho/audio/CSimSoundManager.h"
 #include "moho/audio/ISoundManager.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
   using LoopNode = moho::TDatListItem<moho::HSound, void>;
-
-  // Address: 0x010BAF04 -- process-global `CSimSoundManagerSerializer`
-  // singleton. Constructing it runs CSimSoundManagerSerializer::
-  // CSimSoundManagerSerializer() (0x00BDC590, IDA's own inferred name for
-  // this address is register_CSimSoundManagerSerializer), which splices
-  // this helper into gpg::SerHelperBase::sNewHelpers;
-  // gpg::SerHelperBase::InitNewHelpers() later dispatches Init() on it from
-  // within the first ReadArchive/WriteArchive construction.
-  moho::CSimSoundManagerSerializer gCSimSoundManagerSerializer;
 
   void SerializeAudioRequestFastVectorRuntime(
     gpg::WriteArchive* archive,
@@ -155,6 +146,10 @@ namespace
     archive->WritePointer<moho::HSound>(nullptr, gpg::TrackedPointerState::Unowned, gpg::RRef{});
   }
 
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x00762B40 (FUN_00762B40)
    *
@@ -162,31 +157,16 @@ namespace
    * Deserializes one `CSimSoundManager` lane by loading `ISoundManager` base
    * state, queued request vector lanes, then active-loop pointer lanes.
    */
-  void DeserializeCSimSoundManagerSerializerBody(moho::CSimSoundManager* const manager, gpg::ReadArchive* const archive)
+  void CSimSoundManager::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    if (!manager || !archive) {
+    if (!archive) {
       return;
     }
 
     const gpg::RRef owner{};
-    archive->Read(CachedISoundManagerType(), static_cast<moho::ISoundManager*>(manager), owner);
-    archive->Read(CachedAudioRequestVectorType(), &manager->mRequests, owner);
-    DeserializeCSimSoundManagerLoopList(manager, archive);
-  }
-
-  /**
-   * Address: 0x00762810 (FUN_00762810)
-   *
-   * What it does:
-   * Bridge thunk that forwards one `CSimSoundManager` deserialize lane to the
-   * canonical serializer body.
-   */
-  [[maybe_unused]] void DeserializeCSimSoundManagerSerializerBodyThunk(
-    moho::CSimSoundManager* const manager,
-    gpg::ReadArchive* const archive
-  )
-  {
-    DeserializeCSimSoundManagerSerializerBody(manager, archive);
+    archive->Read(CachedISoundManagerType(), static_cast<moho::ISoundManager*>(this), owner);
+    archive->Read(CachedAudioRequestVectorType(), &mRequests, owner);
+    DeserializeCSimSoundManagerLoopList(this, archive);
   }
 
   /**
@@ -197,98 +177,43 @@ namespace
    * Serializes one `CSimSoundManager` lane by writing `ISoundManager` base
    * state, queued request vector lanes, then active-loop pointer lanes.
    */
-  void SerializeCSimSoundManagerSerializerBody(const moho::CSimSoundManager* const manager, gpg::WriteArchive* const archive)
+  void CSimSoundManager::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    if (!manager || !archive) {
+    if (!archive) {
       return;
     }
 
     const gpg::RRef owner{};
     archive->Write(
       CachedISoundManagerType(),
-      const_cast<moho::ISoundManager*>(static_cast<const moho::ISoundManager*>(manager)),
+      const_cast<moho::ISoundManager*>(static_cast<const moho::ISoundManager*>(this)),
       owner
     );
-    archive->Write(CachedAudioRequestVectorType(), &manager->mRequests, owner);
-    SerializeCSimSoundManagerLoopList(manager, archive);
+    archive->Write(CachedAudioRequestVectorType(), &mRequests, owner);
+    SerializeCSimSoundManagerLoopList(this, archive);
   }
-} // namespace
+} // namespace moho
 
 namespace moho
 {
   /**
-   * Address: 0x00762440 (FUN_00762440)
+   * `gpg::SerSaveLoadHelper<CSimSoundManager>`, vtable 0x00E35ABC.
    *
-   * What it does:
-   * Reflection load callback wrapper for `CSimSoundManager`.
+   * Address: 0x00BDC590 (FUN_00BDC590 -- constructs the global and registers its destructor.)
+   * Address: 0x00C015C0 (FUN_00C015C0 -- the global's destructor.)
+   * Address: 0x00762810 (FUN_00762810 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x00762440 (FUN_00762440 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x00762450 (FUN_00762450 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x00761E90 (FUN_00761E90 -- `Init`.)
+   * Address: 0x007612E0 (FUN_007612E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00761300 (FUN_00761300 -- `Serialize`, a forward to `MemberSerialize`.)
    */
-  void CSimSoundManagerSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
-  )
-  {
-    (void)version;
-    (void)ownerRef;
-
-    auto* const manager = reinterpret_cast<CSimSoundManager*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-    );
-    DeserializeCSimSoundManagerSerializerBody(manager, archive);
-  }
-
-  /**
-   * Address: 0x00762450 (FUN_00762450)
-   *
-   * What it does:
-   * Reflection save callback wrapper for `CSimSoundManager`.
-   */
-  void CSimSoundManagerSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
-  )
-  {
-    (void)version;
-    (void)ownerRef;
-
-    auto* const manager = reinterpret_cast<CSimSoundManager*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-    );
-    SerializeCSimSoundManagerSerializerBody(manager, archive);
-  }
-
-  /**
-   * Address: 0x00BDC590 (FUN_00BDC590, dynamic initializer for the global
-   * `CSimSoundManagerSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links and
-   * splices into `sNewHelpers`), binds the load/save callback fields, and
-   * registers process-exit cleanup.
-   */
-  CSimSoundManagerSerializer::CSimSoundManagerSerializer()
-    : mLoadCallback(&CSimSoundManagerSerializer::Deserialize)
-    , mSaveCallback(&CSimSoundManagerSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00C015C0 (FUN_00C015C0, dynamic atexit destructor for `gCSimSoundManagerSerializer`)
-   *
-   * What it does:
-   * Unlinks this helper node from the serializer-helper list (the
-   * `TDatListItem` base destructor). The compiler registers it with
-   * `atexit` from the global's dynamic initializer (0x00BDC590).
-   * `FUN_00761350` and `FUN_00761380` are
-   * unreferenced out-of-line copies of the same body.
-   */
-  CSimSoundManagerSerializer::~CSimSoundManagerSerializer() = default;
-
-  /**
-   * Address: 0x00761E90 (FUN_00761E90, gpg::SerSaveLoadHelper_CSimSoundManager::Init)
-   *
-   * What it does:
-   * Resolves `CSimSoundManager` RTTI and installs load/save callbacks.
-   */
-  void CSimSoundManagerSerializer::Init()
-  {
-    gpg::RType* const typeInfo = audio_reflection::ResolveCSimSoundManagerType();
-    audio_reflection::RegisterSerializeCallbacks(typeInfo, mLoadCallback, mSaveCallback);
-  }
+  struct CSimSoundManagerSerializer : gpg::SerSaveLoadHelper<CSimSoundManager>
+  {};
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010BAF04 -- process-global `CSimSoundManagerSerializer` singleton.
+  moho::CSimSoundManagerSerializer gCSimSoundManagerSerializer;
+} // namespace

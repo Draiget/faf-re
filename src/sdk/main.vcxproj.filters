@@ -894,9 +894,6 @@
     <ClCompile Include="moho\ai\CAiSteeringImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\ai\CAiSteeringImplSerializer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\ai\CAiSteeringImplTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1441,9 +1438,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\script\CScriptObject.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\script\CScriptObjectSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\script\CScriptObjectTypeInfo.cpp">
@@ -2202,9 +2196,6 @@
     <ClCompile Include="moho\ai\CAiTarget.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\ai\CAiTargetSerializer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\ai\SOffsetInfoTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2598,16 +2589,10 @@
     <ClInclude Include="moho\sim\CArmyImplTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\CArmyStatItemSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\sim\CArmyStatItemTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\CInfluenceMap.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\sim\CInfluenceMapSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\CInfluenceMapTypeInfo.h">
@@ -2616,13 +2601,7 @@
     <ClInclude Include="moho\sim\CVFSImpl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\InfluenceGridSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\sim\InfluenceGridTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\sim\InfluenceMapEntrySerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\InfluenceMapEntryTypeInfo.h">
@@ -2814,9 +2793,6 @@
     <ClInclude Include="moho\serialization\PrefetchHandleBaseTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\serialization\CWeaponAttributesSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\serialization\CWeaponAttributesTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2932,9 +2908,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\script\CScriptObject.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\script\CScriptObjectSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\script\CScriptObjectTypeInfo.h">
@@ -3129,9 +3102,6 @@
     <ClInclude Include="moho\sim\ReconBlip.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\ReconBlipSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\sim\ReconBlipTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3271,9 +3241,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\serialization\SBlackListInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\serialization\SBlackListInfoSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\serialization\SBlackListInfoTypeInfo.h">
@@ -3699,9 +3666,6 @@
     <ClInclude Include="moho\ai\CAiSteeringImpl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\ai\CAiSteeringImplSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\ai\CAiSteeringImplTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3712,9 +3676,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\IAiAttacker.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\ai\IAiAttackerSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\IAiAttackerTypeInfo.h">
@@ -4407,16 +4368,10 @@
     <ClInclude Include="moho\effects\rendering\CEffectImpl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\effects\rendering\CEffectImplSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\effects\rendering\CEffectImplTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\effects\rendering\CEffectManagerImpl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\effects\rendering\CEffectManagerImplSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\effects\rendering\CEffectManagerImplTypeInfo.h">
@@ -4543,9 +4498,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\effects\rendering\IEffectManagerTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\effects\rendering\IEffectSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\effects\rendering\IEffectTypeInfo.h">
@@ -5121,9 +5073,6 @@
     <ClInclude Include="moho\ai\ESiloTypeTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\ai\CAiTargetSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\ai\SOffsetInfoTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -5522,9 +5471,6 @@
     <ClInclude Include="moho\ai\SPointVector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\animation\CAnimationManipulatorSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\animation\CAnimationManipulatorTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -5532,9 +5478,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\animation\IAniManipulatorTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\audio\CSimSoundManagerSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\audio\CSimSoundManagerTypeInfo.h">

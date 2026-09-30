@@ -29,6 +29,7 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/CUnitMotion.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -1680,3 +1681,24 @@ IAiSteering* moho::AI_CreateSteering(Unit* const unit, CUnitMotion* const motion
 {
   return new CAiSteeringImpl(unit, motion, layer);
 }
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiSteeringImpl>`, vtable 0x00E1E148.
+   *
+   * Address: 0x00BCE4A0 (FUN_00BCE4A0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF8190 (FUN_00BF8190 -- the global's destructor.)
+   * Address: 0x005D3EB0 (FUN_005D3EB0 -- `Init`.)
+   * Address: 0x005D3B70 (FUN_005D3B70 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005D3B80 (FUN_005D3B80 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiSteeringImplSerializer : gpg::SerSaveLoadHelper<CAiSteeringImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AFDD0 -- process-global `CAiSteeringImplSerializer` singleton.
+  moho::CAiSteeringImplSerializer gCAiSteeringImplSerializer;
+} // namespace

@@ -1,5 +1,5 @@
-#include "moho/serialization/CWeaponAttributesSerializer.h"
 
+#include <cstddef>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -12,6 +12,149 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/serialization/SBlackListInfoVectorReflection.h"
 #include "moho/unit/core/CWeaponAttributes.h"
+#include "gpg/core/reflection/Reflection.h"
+
+namespace
+{
+  [[nodiscard]] gpg::RType* CachedRUnitBlueprintWeaponType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintWeapon));
+    }
+
+    return cached;
+  }
+
+  gpg::RType* gLegacyEntityCategorySetVectorType = nullptr;
+  gpg::RType* gLegacySBlackListInfoVectorType = nullptr;
+
+  [[nodiscard]] moho::RUnitBlueprintWeapon* ReadRUnitBlueprintWeaponPointer(
+    gpg::ReadArchive* archive, const gpg::RRef& ownerRef
+  )
+  {
+    const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedRUnitBlueprintWeaponType());
+    if (upcast.mObj) {
+      return static_cast<moho::RUnitBlueprintWeapon*>(upcast.mObj);
+    }
+
+    const char* const expected = CachedRUnitBlueprintWeaponType() ? CachedRUnitBlueprintWeaponType()->GetName() : "RUnitBlueprintWeapon";
+    const char* const actual = source.GetTypeName();
+    const msvc8::string msg = gpg::STR_Printf(
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
+      expected ? expected : "RUnitBlueprintWeapon",
+      actual ? actual : "null"
+    );
+    throw gpg::SerializationError(msg.c_str());
+  }
+
+  [[nodiscard]] gpg::RRef MakeRUnitBlueprintWeaponRef(moho::RUnitBlueprintWeapon* value)
+  {
+    gpg::RRef ref{};
+    ref.mObj = value;
+    ref.mType = CachedRUnitBlueprintWeaponType();
+    return ref;
+  }
+
+} // namespace
+
+namespace moho
+{
+} // namespace moho
+
+namespace
+{
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x006DF0C0 (FUN_006DF0C0, serializer load thunk alias)
+   *
+   * What it does:
+   * Loads the same `CWeaponAttributes` lanes as `FUN_006D3780`, but always
+   * uses an empty owner-ref lane for the weapon-pointer read path.
+   */
+  void CWeaponAttributes::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr || this == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    mBlueprint = ReadRUnitBlueprintWeaponPointer(archive, owner);
+    archive->ReadFloat(&mFiringTolerance);
+    archive->ReadFloat(&mRateOfFire);
+    archive->ReadFloat(&mMinRadius);
+    archive->ReadFloat(&mMaxRadius);
+    archive->ReadFloat(&mMinRadiusSq);
+    archive->ReadFloat(&mMaxRadiusSq);
+    archive->ReadString(&mType);
+    archive->ReadFloat(&mDamageRadius);
+    archive->ReadFloat(&mDamage);
+    archive->ReadFloat(&mUnknown_0044);
+    archive->ReadFloat(&mUnknown_0048);
+  }
+
+  /**
+   * Address: 0x006DF180 (FUN_006DF180, save body)
+   *
+   * What it does:
+   * Saves the reflected pointer/string/float lanes for `CWeaponAttributes`.
+   */
+  void CWeaponAttributes::MemberSerialize(gpg::WriteArchive* const archive)
+  {
+    const gpg::RRef owner{};
+
+    gpg::RRef blueprintRef = MakeRUnitBlueprintWeaponRef(mBlueprint);
+    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, owner);
+    archive->WriteFloat(mFiringTolerance);
+    archive->WriteFloat(mRateOfFire);
+    archive->WriteFloat(mMinRadius);
+    archive->WriteFloat(mMaxRadius);
+    archive->WriteFloat(mMinRadiusSq);
+    archive->WriteFloat(mMaxRadiusSq);
+    archive->WriteString(const_cast<msvc8::string*>(&mType));
+    archive->WriteFloat(mDamageRadius);
+    archive->WriteFloat(mDamage);
+    archive->WriteFloat(mUnknown_0044);
+    archive->WriteFloat(mUnknown_0048);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CWeaponAttributes>`, vtable 0x00E2E228.
+   *
+   * Address: 0x00BD87D0 (FUN_00BD87D0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFE5F0 (FUN_00BFE5F0 -- the global's destructor.)
+   * Address: 0x006D37B0 (FUN_006D37B0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x006DD290 (FUN_006DD290 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x006DD2A0 (FUN_006DD2A0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x006DE5D0 (FUN_006DE5D0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x006DB4C0 (FUN_006DB4C0 -- `Init`.)
+   * Address: 0x006D3780 (FUN_006D3780 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006D3790 (FUN_006D3790 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CWeaponAttributesSerializer : gpg::SerSaveLoadHelper<CWeaponAttributes>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B7C70 -- process-global `CWeaponAttributesSerializer` singleton.
+  moho::CWeaponAttributesSerializer gCWeaponAttributesSerializer;
+} // namespace
 
 namespace
 {
@@ -20,16 +163,6 @@ namespace
     static gpg::RType* cached = nullptr;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::CWeaponAttributes));
-    }
-
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedRUnitBlueprintWeaponType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintWeapon));
     }
 
     return cached;
@@ -44,9 +177,6 @@ namespace
     }
     return cached;
   }
-
-  gpg::RType* gLegacyEntityCategorySetVectorType = nullptr;
-  gpg::RType* gLegacySBlackListInfoVectorType = nullptr;
 
   /**
    * Address: 0x006E03B0 (FUN_006E03B0)
@@ -269,240 +399,4 @@ namespace
   {
     WriteObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
   }
-
-  [[nodiscard]] moho::RUnitBlueprintWeapon* ReadRUnitBlueprintWeaponPointer(
-    gpg::ReadArchive* archive, const gpg::RRef& ownerRef
-  )
-  {
-    const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedRUnitBlueprintWeaponType());
-    if (upcast.mObj) {
-      return static_cast<moho::RUnitBlueprintWeapon*>(upcast.mObj);
-    }
-
-    const char* const expected = CachedRUnitBlueprintWeaponType() ? CachedRUnitBlueprintWeaponType()->GetName() : "RUnitBlueprintWeapon";
-    const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
-      expected ? expected : "RUnitBlueprintWeapon",
-      actual ? actual : "null"
-    );
-    throw gpg::SerializationError(msg.c_str());
-  }
-
-  [[nodiscard]] gpg::RRef MakeRUnitBlueprintWeaponRef(moho::RUnitBlueprintWeapon* value)
-  {
-    gpg::RRef ref{};
-    ref.mObj = value;
-    ref.mType = CachedRUnitBlueprintWeaponType();
-    return ref;
-  }
-
-  /**
-   * Address: 0x006D3780 (FUN_006D3780, load body)
-   *
-   * What it does:
-   * Loads the reflected pointer/string/float lanes for `CWeaponAttributes`.
-   */
-  void LoadCWeaponAttributes(
-    gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef
-  )
-  {
-    auto* const attributes = reinterpret_cast<moho::CWeaponAttributes*>(objectPtr);
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-
-    attributes->mBlueprint = ReadRUnitBlueprintWeaponPointer(archive, owner);
-    archive->ReadFloat(&attributes->mFiringTolerance);
-    archive->ReadFloat(&attributes->mRateOfFire);
-    archive->ReadFloat(&attributes->mMinRadius);
-    archive->ReadFloat(&attributes->mMaxRadius);
-    archive->ReadFloat(&attributes->mMinRadiusSq);
-    archive->ReadFloat(&attributes->mMaxRadiusSq);
-    archive->ReadString(&attributes->mType);
-    archive->ReadFloat(&attributes->mDamageRadius);
-    archive->ReadFloat(&attributes->mDamage);
-    archive->ReadFloat(&attributes->mUnknown_0044);
-    archive->ReadFloat(&attributes->mUnknown_0048);
-  }
-
-  /**
-   * Address: 0x006DF0C0 (FUN_006DF0C0, serializer load thunk alias)
-   *
-   * What it does:
-   * Loads the same `CWeaponAttributes` lanes as `FUN_006D3780`, but always
-   * uses an empty owner-ref lane for the weapon-pointer read path.
-   */
-  void LoadCWeaponAttributesNoOwnerRef(
-    gpg::ReadArchive* const archive,
-    moho::CWeaponAttributes* const attributes
-  )
-  {
-    if (archive == nullptr || attributes == nullptr) {
-      return;
-    }
-
-    const gpg::RRef owner{};
-    attributes->mBlueprint = ReadRUnitBlueprintWeaponPointer(archive, owner);
-    archive->ReadFloat(&attributes->mFiringTolerance);
-    archive->ReadFloat(&attributes->mRateOfFire);
-    archive->ReadFloat(&attributes->mMinRadius);
-    archive->ReadFloat(&attributes->mMaxRadius);
-    archive->ReadFloat(&attributes->mMinRadiusSq);
-    archive->ReadFloat(&attributes->mMaxRadiusSq);
-    archive->ReadString(&attributes->mType);
-    archive->ReadFloat(&attributes->mDamageRadius);
-    archive->ReadFloat(&attributes->mDamage);
-    archive->ReadFloat(&attributes->mUnknown_0044);
-    archive->ReadFloat(&attributes->mUnknown_0048);
-  }
-
-  /**
-   * Address: 0x006DD290 (FUN_006DD290)
-   *
-   * What it does:
-   * Jump-thunk alias that forwards to the no-owner-ref load body.
-   */
-  [[maybe_unused]] void LoadCWeaponAttributesNoOwnerRefThunk(
-    gpg::ReadArchive* const archive,
-    moho::CWeaponAttributes* const attributes
-  )
-  {
-    LoadCWeaponAttributesNoOwnerRef(archive, attributes);
-  }
-
-  /**
-   * Address: 0x006DF180 (FUN_006DF180, save body)
-   *
-   * What it does:
-   * Saves the reflected pointer/string/float lanes for `CWeaponAttributes`.
-   */
-  void SaveCWeaponAttributesBody_006DF180(
-    moho::CWeaponAttributes* attributes, gpg::WriteArchive* archive
-  )
-  {
-    const gpg::RRef owner{};
-
-    gpg::RRef blueprintRef = MakeRUnitBlueprintWeaponRef(attributes->mBlueprint);
-    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, owner);
-    archive->WriteFloat(attributes->mFiringTolerance);
-    archive->WriteFloat(attributes->mRateOfFire);
-    archive->WriteFloat(attributes->mMinRadius);
-    archive->WriteFloat(attributes->mMaxRadius);
-    archive->WriteFloat(attributes->mMinRadiusSq);
-    archive->WriteFloat(attributes->mMaxRadiusSq);
-    archive->WriteString(const_cast<msvc8::string*>(&attributes->mType));
-    archive->WriteFloat(attributes->mDamageRadius);
-    archive->WriteFloat(attributes->mDamage);
-    archive->WriteFloat(attributes->mUnknown_0044);
-    archive->WriteFloat(attributes->mUnknown_0048);
-  }
-
-  /**
-   * Address: 0x006DD2A0 (FUN_006DD2A0, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards one CWeaponAttributes serialize thunk alias into the
-   * shared save body (`FUN_006DF180`).
-   */
-  void SaveCWeaponAttributesThunkVariantA(
-    moho::CWeaponAttributes* attributes, gpg::WriteArchive* archive
-  )
-  {
-    SaveCWeaponAttributesBody_006DF180(attributes, archive);
-  }
-
-  /**
-   * Address: 0x006DE5D0 (FUN_006DE5D0, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards a second CWeaponAttributes serialize thunk alias into the
-   * shared save body (`FUN_006DF180`).
-   */
-  void SaveCWeaponAttributesThunkVariantB(
-    moho::CWeaponAttributes* attributes, gpg::WriteArchive* archive
-  )
-  {
-    SaveCWeaponAttributesBody_006DF180(attributes, archive);
-  }
-
-  /**
-   * Address: 0x006D3790 (FUN_006D3790, save callback bridge)
-   *
-   * What it does:
-   * Adapts serializer callback ABI and forwards to `FUN_006DF180` body.
-   */
-  void SaveCWeaponAttributes(
-    gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/
-  )
-  {
-    auto* const attributes = reinterpret_cast<moho::CWeaponAttributes*>(objectPtr);
-    SaveCWeaponAttributesBody_006DF180(attributes, archive);
-  }
-} // namespace
-
-namespace moho
-{
-  /**
-   * Address: 0x00BD87D0 (FUN_00BD87D0, dynamic initializer for the global
-   * `CWeaponAttributesSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  CWeaponAttributesSerializer::CWeaponAttributesSerializer()
-    : mDeserialize(&CWeaponAttributesSerializer::Deserialize)
-    , mSerialize(&CWeaponAttributesSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BFE5F0 (FUN_00BFE5F0, Moho::CWeaponAttributesSerializer::~CWeaponAttributesSerializer)
-   */
-  CWeaponAttributesSerializer::~CWeaponAttributesSerializer() = default;
-
-  /**
-    * Alias of FUN_006D3780 (non-canonical helper lane).
-   */
-  void CWeaponAttributesSerializer::Deserialize(
-    gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
-  )
-  {
-    LoadCWeaponAttributes(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-    * Alias of FUN_006D3790 (non-canonical helper lane).
-   */
-  void CWeaponAttributesSerializer::Serialize(
-    gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
-  )
-  {
-    SaveCWeaponAttributes(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x006DB4C0 (FUN_006DB4C0, Moho::CWeaponAttributesSerializer::RegisterSerializeFunctions)
-   */
-  void CWeaponAttributesSerializer::Init()
-  {
-    gpg::RType* const type = CachedCWeaponAttributesType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-} // namespace moho
-
-namespace
-{
-  // Address: 0x010B7C70 -- process-global `CWeaponAttributesSerializer` singleton.
-  moho::CWeaponAttributesSerializer gCWeaponAttributesSerializer;
 } // namespace

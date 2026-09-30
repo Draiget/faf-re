@@ -20,6 +20,22 @@ namespace moho
    */
   struct SBlackListInfo
   {
+    /**
+     * Address: 0x006DD300 (FUN_006DD300)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x006DD2B0 (FUN_006DD2B0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     static gpg::RType* sType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
 

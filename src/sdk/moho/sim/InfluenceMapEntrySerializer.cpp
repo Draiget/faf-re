@@ -1,5 +1,6 @@
-#include "moho/sim/InfluenceMapEntrySerializer.h"
 
+#include <cstddef>
+#include "gpg/core/reflection/Reflection.h"
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -9,125 +10,14 @@
 
 namespace
 {
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
-
   gpg::RType* gVec3fType = nullptr;
 
-  // Alias of FUN_007178F0 behavior from CInfluenceMap.cpp.
-  void DeserializeInfluenceMapEntrySerializerBridge(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    auto* const entry = reinterpret_cast<moho::InfluenceMapEntry*>(objectPtr);
-    if (!archive || !entry) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->ReadUInt(&entry->entityId);
-
-    moho::SimArmy* sourceArmy = nullptr;
-    archive->ReadPointer(&sourceArmy, &owner);
-    entry->sourceArmy = static_cast<moho::CArmyImpl*>(sourceArmy);
-
-    archive->Read(CachedType<Wm3::Vec3f>(gVec3fType), &entry->lastPosition, owner);
-
-    moho::RUnitBlueprint* sourceBlueprint = nullptr;
-    archive->ReadPointer(&sourceBlueprint, &owner);
-    entry->sourceBlueprint = sourceBlueprint;
-
-    int sourceLayer = 0;
-    archive->ReadInt(&sourceLayer);
-    entry->sourceLayer = sourceLayer;
-
-    bool isDetailed = false;
-    archive->ReadBool(&isDetailed);
-    entry->isDetailed = isDetailed ? 1u : 0u;
-
-    archive->ReadFloat(&entry->threatStrength);
-    archive->ReadFloat(&entry->threatDecay);
-    archive->ReadInt(&entry->decayTicks);
-  }
-
-  // Alias of FUN_00717900 behavior from CInfluenceMap.cpp.
-  void SerializeInfluenceMapEntrySerializerBridge(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    const auto* const entry = reinterpret_cast<const moho::InfluenceMapEntry*>(objectPtr);
-    if (!archive || !entry) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->WriteUInt(entry->entityId);
-
-    archive->WritePointer<moho::SimArmy>(static_cast<moho::SimArmy*>(entry->sourceArmy), gpg::TrackedPointerState::Unowned, owner);
-
-    archive->Write(CachedType<Wm3::Vec3f>(gVec3fType), const_cast<Wm3::Vec3f*>(&entry->lastPosition), owner);
-
-    archive->WritePointer<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(entry->sourceBlueprint), gpg::TrackedPointerState::Unowned, owner);
-
-    archive->WriteInt(entry->sourceLayer);
-    archive->WriteBool(entry->isDetailed != 0u);
-    archive->WriteFloat(entry->threatStrength);
-    archive->WriteFloat(entry->threatDecay);
-    archive->WriteInt(entry->decayTicks);
-  }
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00BDA720 (FUN_00BDA720, dynamic initializer for the global
-   * `InfluenceMapEntrySerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  InfluenceMapEntrySerializer::InfluenceMapEntrySerializer()
-    : mLoadCallback(&DeserializeInfluenceMapEntrySerializerBridge)
-    , mSaveCallback(&SerializeInfluenceMapEntrySerializerBridge)
-  {}
-
-  /**
-   * Address: 0x00BFFFD0 (FUN_00BFFFD0, atexit target registered by the real
-   * ctor above)
-   */
-  InfluenceMapEntrySerializer::~InfluenceMapEntrySerializer() = default;
-
-  /**
-   * Address: 0x00718C00 (FUN_00718C00, gpg::SerSaveLoadHelper_InfluenceMapEntry::Init)
-   *
-   * IDA signature:
-   * void __thiscall gpg::SerSaveLoadHelper_InfluenceMapEntry::Init(_DWORD *this);
-   */
-  void InfluenceMapEntrySerializer::Init()
-  {
-    gpg::RType* const type = InfluenceMapEntry::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
 } // namespace moho
 
 namespace
 {
-  // Address: 0x010B9470 -- process-global `InfluenceMapEntrySerializer` singleton.
-  moho::InfluenceMapEntrySerializer gInfluenceMapEntrySerializer;
 } // namespace

@@ -1,7 +1,6 @@
 #include "moho/ai/IAiAttacker.h"
 #include "moho/ai/EAiAttackerEvent.h"
 #include "moho/ai/EAiAttackerEventTypeInfo.h"
-#include "moho/ai/IAiAttackerSerializer.h"
 #include "moho/ai/IAiAttackerTypeInfo.h"
 
 #include <cstddef>
@@ -773,7 +772,6 @@ namespace
     {
       moho::register_EAiAttackerEventTypeInfo();
       (void)moho::register_IAiAttackerTypeInfo();
-      (void)moho::register_IAiAttackerSerializer();
       (void)moho::register_RBroadcasterRType_EAiAttackerEvent();
       (void)moho::register_RListenerRType_EAiAttackerEvent();
       (void)moho::register_RVectorType_UnitWeaponPtr();

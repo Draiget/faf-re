@@ -14,6 +14,22 @@ namespace moho
   class CEffectImpl : public IEffect
   {
   public:
+    /**
+     * Address: 0x0065B110 (FUN_0065B110)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x0065AFA0 (FUN_0065AFA0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     static gpg::RType* sType;
 
     /**

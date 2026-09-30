@@ -68,6 +68,22 @@ namespace moho
    */
   struct SPhysBody
   {
+    /**
+     * Address: 0x00698BC0 (FUN_00698BC0)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00698A60 (FUN_00698A60)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     static gpg::RType* sType;
 
     SPhysBody() = default;
@@ -233,75 +249,6 @@ namespace moho
   };
 
   static_assert(sizeof(SPhysBodyTypeInfo) == 0x64, "SPhysBodyTypeInfo size must be 0x64");
-
-  /**
-   * VFTABLE: 0x00E29344 (`??_7SPhysBodySerializer@Moho@@6B@`)
-   *
-   * This helper's `Init()` body is byte-identical to
-   * `gpg::SerSaveLoadHelper<Moho::SPhysBody>::Init()` -- the linker ICF-folds
-   * both classes' slot-0 target onto the same address (FUN_00698760;
-   * confirmed via two separate `vftable`-slot data xrefs into that one
-   * address). The binary also contains a fully-formed, separately-emitted
-   * `gpg::SerSaveConstructHelper`-style ctor for the template instantiation
-   * itself (FUN_00698730, sets `gpg::SerSaveLoadHelper<Moho::SPhysBody>::
-   * vftable` on this same global) -- but it has zero incoming xrefs and is
-   * never invoked; the confirmed live path (FUN_00BD5F10, reachable from
-   * `__xc_a`) installs `SPhysBodySerializer`'s own vtable instead. Kept as
-   * its own concrete class, same precedent as `Rect2iSerializer`/
-   * `Box3fSerializer`; the dead template ctor and a second dead out-of-line
-   * copy of this class's own ctor (FUN_006982C0) are `skip`.
-   */
-  class SPhysBodySerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD5F10 (FUN_00BD5F10, dynamic initializer for the global
-     * `SPhysBodySerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    SPhysBodySerializer();
-
-    /**
-     * Address: 0x00BFD390 (FUN_00BFD390, Moho::SPhysBodySerializer::~SPhysBodySerializer)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~SPhysBodySerializer();
-
-    /**
-     * Address: 0x006982A0 (FUN_006982A0, Moho::SPhysBodySerializer::Deserialize)
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x006982B0 (FUN_006982B0, Moho::SPhysBodySerializer::Serialize)
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00698760 (FUN_00698760, Moho::SPhysBodySerializer::Init)
-     *
-     * What it does:
-     * Binds load/save callbacks into `SPhysBody`'s reflected RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mDeserialize; // +0x0C
-    gpg::RType::save_func_t mSerialize;   // +0x10
-  };
-
-  static_assert(
-    offsetof(SPhysBodySerializer, mDeserialize) == 0x0C,
-    "SPhysBodySerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(offsetof(SPhysBodySerializer, mSerialize) == 0x10, "SPhysBodySerializer::mSerialize offset must be 0x10");
-  static_assert(sizeof(SPhysBodySerializer) == 0x14, "SPhysBodySerializer size must be 0x14");
 
   /**
    * Address: 0x00BD5E80 (FUN_00BD5E80, register_SPhysBodyTypeInfo)

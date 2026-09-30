@@ -14,6 +14,7 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
@@ -23,20 +24,6 @@ namespace moho
 namespace
 {
   using TypeInfo = moho::SInfoCacheTypeInfo;
-  using Serializer = moho::SInfoCacheSerializer;
-
-  /**
-   * Address: 0x00BD6A90 (FUN_00BD6A90, dynamic initializer for the global
-   * `SInfoCacheSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
-   * `gpg::SerHelperBase::InitNewHelpers`). This is an independent `__xc_a`
-   * static initializer, separate from `SInfoCacheTypeInfo`'s own
-   * initializer below.
-   */
-  Serializer gSInfoCacheSerializer{};
 
   /**
    * Address: 0x00BFD8E0 (FUN_00BFD8E0, atexit destructor of the SInfoCacheTypeInfo object)
@@ -167,66 +154,6 @@ namespace
   }
 
   /**
-   * Address: 0x006B04B0 (FUN_006B04B0, Moho::SInfoCacheSerializer::Deserialize)
-   *
-   * What it does:
-   * Loads the raw formation pointer, reflected weak unit pointer, and trailing
-   * scalar/vector lanes for `SInfoCache`.
-   */
-  void LoadSInfoCacheBody(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
-  {
-    auto* const info = AsSInfoCacheView(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(info != nullptr);
-    if (!archive || !info) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    info->mFormationLayer =
-      reinterpret_cast<moho::CFormationInstance*>(ReadTrackedPointer<moho::IFormationInstance>(archive, owner));
-
-    archive->Read(CachedWeakPtrIUnitType(), &info->mFormationLeadRef, owner);
-    archive->ReadInt(&info->mFormationPriorityOrder);
-    archive->ReadBool(&info->mHasFormationSpeedData);
-    archive->ReadFloat(&info->mFormationTopSpeed);
-    archive->ReadFloat(&info->mFormationDistanceMetric);
-    archive->Read(CachedVector3fType(), &info->mFormationHeadingHint, owner);
-  }
-
-  /**
-   * Address: 0x006B0580 (FUN_006B0580, Moho::SInfoCacheSerializer::Serialize)
-   *
-   * What it does:
-   * Saves the raw formation pointer, reflected weak unit pointer, and trailing
-   * scalar/vector lanes for `SInfoCache`.
-   */
-  void SaveSInfoCacheBody(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
-  {
-    const auto* const info = AsConstSInfoCacheView(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(info != nullptr);
-    if (!archive || !info) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    WriteTrackedPointer(
-      archive,
-      reinterpret_cast<const moho::IFormationInstance*>(info->mFormationLayer),
-      gpg::TrackedPointerState::Unowned,
-      owner
-    );
-
-    archive->Write(CachedWeakPtrIUnitType(), &info->mFormationLeadRef, owner);
-    archive->WriteInt(info->mFormationPriorityOrder);
-    archive->WriteBool(info->mHasFormationSpeedData);
-    archive->WriteFloat(info->mFormationTopSpeed);
-    archive->WriteFloat(info->mFormationDistanceMetric);
-    archive->Write(CachedVector3fType(), &info->mFormationHeadingHint, owner);
-  }
-
-  /**
    * Address: 0x00BD6A70 (FUN_00BD6A70, register_SInfoCacheTypeInfo)
    *
    * What it does:
@@ -286,67 +213,79 @@ namespace moho
     Finish();
   }
 
-  /**
-    * Alias of FUN_006B04B0 (non-canonical helper lane).
-   */
-  void SInfoCacheSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    LoadSInfoCacheBody(archive, objectPtr, version, ownerRef);
-  }
 
   /**
-    * Alias of FUN_006B0580 (non-canonical helper lane).
-   */
-  void SInfoCacheSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    SaveSInfoCacheBody(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00BD6A90 (FUN_00BD6A90, register_SInfoCacheSerializer)
+   * Address: 0x006B04B0 (FUN_006B04B0, Moho::SInfoCacheSerializer::Deserialize)
    *
    * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
+   * Loads the raw formation pointer, reflected weak unit pointer, and trailing
+   * scalar/vector lanes for `SInfoCache`.
    */
-  SInfoCacheSerializer::SInfoCacheSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&SInfoCacheSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&SInfoCacheSerializer::Serialize))
-  {}
-
-  /**
-   * Address: 0x00BFD940 (FUN_00BFD940, sub_BFD940)
-   */
-  SInfoCacheSerializer::~SInfoCacheSerializer() = default;
-
-  /**
-   * Address: 0x006AE810 (FUN_006AE810, gpg::SerSaveLoadHelper<Moho::SInfoCache>::Init)
-   *
-   * What it does:
-   * Binds `SInfoCache` load/save callbacks into its RTTI descriptor; caches
-   * the resolved type on `SInfoCache::sType`.
-   */
-  void SInfoCacheSerializer::Init()
+  void SInfoCache::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
   {
-    if (SInfoCache::sType == nullptr) {
-      SInfoCache::sType = gpg::LookupRType(typeid(SInfoCache));
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
     }
 
-    gpg::RType* const type = SInfoCache::sType;
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
+    mFormationLayer =
+      reinterpret_cast<moho::CFormationInstance*>(ReadTrackedPointer<moho::IFormationInstance>(archive, ownerRef));
+
+    archive->Read(CachedWeakPtrIUnitType(), &mFormationLeadRef, ownerRef);
+    archive->ReadInt(&mFormationPriorityOrder);
+    archive->ReadBool(&mHasFormationSpeedData);
+    archive->ReadFloat(&mFormationTopSpeed);
+    archive->ReadFloat(&mFormationDistanceMetric);
+    archive->Read(CachedVector3fType(), &mFormationHeadingHint, ownerRef);
   }
 
+  /**
+   * Address: 0x006B0580 (FUN_006B0580, Moho::SInfoCacheSerializer::Serialize)
+   *
+   * What it does:
+   * Saves the raw formation pointer, reflected weak unit pointer, and trailing
+   * scalar/vector lanes for `SInfoCache`.
+   */
+  void SInfoCache::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    WriteTrackedPointer(
+      archive,
+      reinterpret_cast<const moho::IFormationInstance*>(mFormationLayer),
+      gpg::TrackedPointerState::Unowned,
+      ownerRef
+    );
+
+    archive->Write(CachedWeakPtrIUnitType(), &mFormationLeadRef, ownerRef);
+    archive->WriteInt(mFormationPriorityOrder);
+    archive->WriteBool(mHasFormationSpeedData);
+    archive->WriteFloat(mFormationTopSpeed);
+    archive->WriteFloat(mFormationDistanceMetric);
+    archive->Write(CachedVector3fType(), &mFormationHeadingHint, ownerRef);
+  }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SInfoCache>`, vtable 0x00E2A7F0.
+   *
+   * Address: 0x00BD6A90 (FUN_00BD6A90 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFD940 (FUN_00BFD940 -- the global's destructor.)
+   * Address: 0x006AE810 (FUN_006AE810 -- `Init`.)
+   * Address: 0x006A4FA0 (FUN_006A4FA0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006A4FB0 (FUN_006A4FB0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SInfoCacheSerializer : gpg::SerSaveLoadHelper<SInfoCache>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B5B5C -- process-global `SInfoCacheSerializer` singleton.
+  moho::SInfoCacheSerializer gSInfoCacheSerializer;
+} // namespace

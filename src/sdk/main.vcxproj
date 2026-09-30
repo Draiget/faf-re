@@ -579,7 +579,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\misc\ScrWatch.cpp" />
     <ClCompile Include="moho\misc\TreeData.cpp" />
     <ClCompile Include="moho\misc\ScrWatchCtrl.cpp" />
-    <ClCompile Include="moho\script\CScriptObjectSerializer.cpp" />
     <ClCompile Include="moho\script\CScriptObject.cpp" />
     <ClCompile Include="moho\lua\CScrLuaObjectFactory.cpp" />
     <ClCompile Include="moho\ai\AirPlatformExtractor.cpp" />
@@ -800,7 +799,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\ai\ESiloBuildStageTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiSiloBuildImplTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiSteeringImpl.cpp" />
-    <ClCompile Include="moho\ai\CAiSteeringImplSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiSiloBuildImplSerializer.cpp" />
     <ClCompile Include="moho\ai\IAiSteeringTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiSteeringImplTypeInfo.cpp" />
@@ -821,7 +819,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\effects\rendering\IEffectManager.cpp" />
     <ClCompile Include="moho\ai\EAiTargetTypeTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiTargetTypeInfo.cpp" />
-    <ClCompile Include="moho\ai\CAiTargetSerializer.cpp" />
     <ClCompile Include="moho\ai\AITarget_LuaFuncDef.cpp" />
     <ClCompile Include="moho\lua\CScrLuaBaseClassSpec.cpp" />
     <ClCompile Include="moho\ai\EAiTransportEventTypeInfo.cpp" />
@@ -1451,12 +1448,10 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\serialization\CPrefetchSet.h" />
     <ClInclude Include="moho\serialization\CPrefetchSetSerializer.h" />
     <ClInclude Include="moho\serialization\CFireWeaponTaskTypeInfo.h" />
-    <ClInclude Include="moho\serialization\CWeaponAttributesSerializer.h" />
     <ClInclude Include="moho\serialization\CWeaponAttributesTypeInfo.h" />
     <ClInclude Include="moho\serialization\WeakUnitSetSerializer.h" />
     <ClInclude Include="moho\serialization\WeakUnitSetTypeInfo.h" />
     <ClInclude Include="moho\serialization\SBlackListInfo.h" />
-    <ClInclude Include="moho\serialization\SBlackListInfoSerializer.h" />
     <ClInclude Include="moho\serialization\SBlackListInfoTypeInfo.h" />
     <ClInclude Include="moho\serialization\SBlackListInfoVectorReflection.h" />
     <ClInclude Include="moho\net\INetNATTraversalProviderWeakPtrReflection.h" />
@@ -1683,7 +1678,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\mesh\Mesh.h" />
     <ClInclude Include="moho\mesh\SpatialDb.h" />
     <ClInclude Include="moho\effects\rendering\CEffectImpl.h" />
-    <ClInclude Include="moho\effects\rendering\CEffectImplSerializer.h" />
     <ClInclude Include="moho\effects\rendering\CEffectImplTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEfxBeam.h" />
     <ClInclude Include="moho\effects\rendering\CEfxBeamTypeInfo.h" />
@@ -1692,7 +1686,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\effects\rendering\CEfxTrailEmitter.h" />
     <ClInclude Include="moho\effects\rendering\CEfxEmitterTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEffectManagerImpl.h" />
-    <ClInclude Include="moho\effects\rendering\CEffectManagerImplSerializer.h" />
     <ClInclude Include="moho\effects\rendering\CEffectManagerImplTypeInfo.h" />
     <ClInclude Include="moho\render\CDecalBuffer.h" />
     <ClInclude Include="moho\render\IDecalGroup.h" />
@@ -1732,7 +1725,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\effects\rendering\IEffect.h" />
     <ClInclude Include="moho\effects\rendering\IEffectManager.h" />
     <ClInclude Include="moho\effects\rendering\IEffectManagerTypeInfo.h" />
-    <ClInclude Include="moho\effects\rendering\IEffectSerializer.h" />
     <ClInclude Include="moho\effects\rendering\IEffectTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\IEffectWeakPtrReflection.h" />
     <ClInclude Include="moho\render\IEdRenderHook.h" />
@@ -1906,12 +1898,10 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\CAiSiloBuildImplSerializer.h" />
     <ClInclude Include="moho\ai\CAiSiloBuildImplTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiSteeringImpl.h" />
-    <ClInclude Include="moho\ai\CAiSteeringImplSerializer.h" />
     <ClInclude Include="moho\ai\CAiSteeringImplTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiTransportImpl.h" />
     <ClInclude Include="moho\ai\CAiTransportImplTypeInfo.h" />
     <ClInclude Include="moho\ai\IAiAttacker.h" />
-    <ClInclude Include="moho\ai\IAiAttackerSerializer.h" />
     <ClInclude Include="moho\ai\IAiAttackerTypeInfo.h" />
     <ClInclude Include="moho\ai\IAiBuilder.h" />
     <ClInclude Include="moho\ai\IAiBuilderTypeInfo.h" />
@@ -1956,7 +1946,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\EPathTypeTypeInfo.h" />
     <ClInclude Include="moho\ai\ESearchTypeTypeInfo.h" />
     <ClInclude Include="moho\ai\ESiloTypeTypeInfo.h" />
-    <ClInclude Include="moho\ai\CAiTargetSerializer.h" />
     <ClInclude Include="moho\ai\SOffsetInfoTypeInfo.h" />
     <ClInclude Include="moho\ai\SPickUpInfoTypeInfo.h" />
     <ClInclude Include="moho\sim\CSquadTypeInfo.h" />
@@ -2143,7 +2132,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\script\CUnitScriptTaskTypeInfo.h" />
     <ClInclude Include="moho\script\CScriptEvent.h" />
     <ClInclude Include="moho\script\CScriptObject.h" />
-    <ClInclude Include="moho\script\CScriptObjectSerializer.h" />
     <ClInclude Include="moho\script\CScriptObjectTypeInfo.h" />
     <ClInclude Include="moho\misc\ScrActivation.h" />
     <ClInclude Include="moho\misc\ScrBreakpoint.h" />
@@ -2174,21 +2162,17 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\SPhysConstantsSerializer.h" />
     <ClInclude Include="moho\sim\SPhysBody.h" />
     <ClInclude Include="moho\sim\CArmyImplTypeInfo.h" />
-    <ClInclude Include="moho\sim\CArmyStatItemSerializer.h" />
     <ClInclude Include="moho\sim\CArmyStatItemTypeInfo.h" />
     <ClInclude Include="moho\sim\CArmyStats.h" />
     <ClInclude Include="moho\sim\CArmyStatsTypeInfo.h" />
     <ClInclude Include="moho\sim\CInfluenceMap.h" />
-    <ClInclude Include="moho\sim\CInfluenceMapSerializer.h" />
     <ClInclude Include="moho\sim\CInfluenceMapTypeInfo.h" />
     <ClInclude Include="moho\sim\EAllianceTypeInfo.h" />
     <ClInclude Include="moho\sim\ESquadClassTypeInfo.h" />
     <ClInclude Include="moho\sim\EGenericIconTypeTypeInfo.h" />
     <ClInclude Include="moho\sim\EImpactTypeTypeInfo.h" />
     <ClInclude Include="moho\sim\CVFSImpl.h" />
-    <ClInclude Include="moho\sim\InfluenceGridSerializer.h" />
     <ClInclude Include="moho\sim\InfluenceGridTypeInfo.h" />
-    <ClInclude Include="moho\sim\InfluenceMapEntrySerializer.h" />
     <ClInclude Include="moho\sim\InfluenceMapEntryTypeInfo.h" />
     <ClInclude Include="moho\sim\SConditionTriggerTypes.h" />
     <ClInclude Include="moho\sim\SThreatSerializer.h" />
@@ -2216,7 +2200,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\ISTIDriver.h" />
     <ClInclude Include="moho\sim\PauseListener.h" />
     <ClInclude Include="moho\sim\ReconBlip.h" />
-    <ClInclude Include="moho\sim\ReconBlipSerializer.h" />
     <ClInclude Include="moho\sim\ReconBlipTypeInfo.h" />
     <ClInclude Include="moho\sim\RRuleGameRules.h" />
     <ClInclude Include="moho\sim\SelectionListener.h" />
@@ -2451,11 +2434,9 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\IFormationInstance.h" />
     <ClInclude Include="moho\ai\SAiReservedTransportBone.h" />
     <ClInclude Include="moho\ai\SPointVector.h" />
-    <ClInclude Include="moho\animation\CAnimationManipulatorSerializer.h" />
     <ClInclude Include="moho\animation\CAnimationManipulatorTypeInfo.h" />
     <ClInclude Include="moho\animation\IAniManipulatorSerializer.h" />
     <ClInclude Include="moho\animation\IAniManipulatorTypeInfo.h" />
-    <ClInclude Include="moho\audio\CSimSoundManagerSerializer.h" />
     <ClInclude Include="moho\audio\CSimSoundManagerTypeInfo.h" />
     <ClInclude Include="moho\audio\ISoundManagerSerializer.h" />
     <ClInclude Include="moho\audio\ISoundManagerTypeInfo.h" />

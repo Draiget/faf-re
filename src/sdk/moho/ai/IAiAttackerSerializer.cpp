@@ -1,26 +1,17 @@
-#include "moho/ai/IAiAttackerSerializer.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
 
 #include "moho/ai/IAiAttacker.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedIAiAttackerType()
-  {
-    gpg::RType* type = IAiAttacker::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(IAiAttacker));
-      IAiAttacker::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* CachedAttackerBroadcasterType()
   {
     gpg::RType* type = Broadcaster<EAiAttackerEvent>::sType;
@@ -31,140 +22,60 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x005D5C50 (FUN_005D5C50)
-   *
-   * What it does:
-   * Forwards one IAiAttacker load-callback lane to
-   * `IAiAttackerSerializer::Deserialize`.
-   */
-  void IAiAttackerDeserializeThunk(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    IAiAttackerSerializer::Deserialize(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x005D5C60 (FUN_005D5C60)
-   *
-   * What it does:
-   * Forwards one IAiAttacker save-callback lane to
-   * `IAiAttackerSerializer::Serialize`.
-   */
-  void IAiAttackerSerializeThunk(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    IAiAttackerSerializer::Serialize(archive, objectPtr, version, ownerRef);
-  }
-
-  // Address: 0x010B0344 -- process-global `IAiAttackerSerializer` singleton.
-  // Constructing it runs IAiAttackerSerializer::IAiAttackerSerializer()
-  // (0x00BCE7D0), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction.
-  moho::IAiAttackerSerializer gIAiAttackerSerializer;
-
 } // namespace
 
-/**
- * Address: 0x005DE8D0 (FUN_005DE8D0, sub_5DE8D0)
- */
-void IAiAttackerSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+namespace moho
 {
-  if (!archive) {
-    return;
+  /**
+   * Address: 0x005DE8D0 (FUN_005DE8D0, sub_5DE8D0)
+   */
+  void IAiAttacker::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& const)
+  {
+    if (!archive) {
+      return;
+    }
+
+    void* const broadcasterLane = (this != nullptr) ? static_cast<void*>(static_cast<Broadcaster<EAiAttackerEvent>*>(this)) : nullptr;
+    gpg::RType* const broadcasterType = CachedAttackerBroadcasterType();
+    GPG_ASSERT(broadcasterType != nullptr);
+    const gpg::RRef ownerRef{};
+    archive->Read(broadcasterType, broadcasterLane, ownerRef);
   }
 
-  IAiAttacker* const attacker = reinterpret_cast<IAiAttacker*>(static_cast<std::uintptr_t>(objectPtr));
-  void* const broadcasterLane = (attacker != nullptr) ? static_cast<void*>(static_cast<Broadcaster<EAiAttackerEvent>*>(attacker)) : nullptr;
-  gpg::RType* const broadcasterType = CachedAttackerBroadcasterType();
-  GPG_ASSERT(broadcasterType != nullptr);
-  const gpg::RRef ownerRef{};
-  archive->Read(broadcasterType, broadcasterLane, ownerRef);
-}
+  /**
+   * Address: 0x005DE920 (FUN_005DE920, sub_5DE920)
+   */
+  void IAiAttacker::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& const) const
+  {
+    if (!archive) {
+      return;
+    }
 
-/**
- * Address: 0x005DE920 (FUN_005DE920, sub_5DE920)
- */
-void IAiAttackerSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  if (!archive) {
-    return;
+    const void* const broadcasterLane = (this != nullptr) ? static_cast<const void*>(static_cast<const Broadcaster<EAiAttackerEvent>*>(this)) : nullptr;
+    gpg::RType* const broadcasterType = CachedAttackerBroadcasterType();
+    GPG_ASSERT(broadcasterType != nullptr);
+    const gpg::RRef ownerRef{};
+    archive->Write(broadcasterType, broadcasterLane, ownerRef);
   }
+} // namespace moho
 
-  const IAiAttacker* const attacker = reinterpret_cast<const IAiAttacker*>(static_cast<std::uintptr_t>(objectPtr));
-  const void* const broadcasterLane = (attacker != nullptr) ? static_cast<const void*>(static_cast<const Broadcaster<EAiAttackerEvent>*>(attacker)) : nullptr;
-  gpg::RType* const broadcasterType = CachedAttackerBroadcasterType();
-  GPG_ASSERT(broadcasterType != nullptr);
-  const gpg::RRef ownerRef{};
-  archive->Write(broadcasterType, broadcasterLane, ownerRef);
-}
-
-/**
- * Address: 0x00BCE7D0 (FUN_00BCE7D0, dynamic initializer for the global
- * `IAiAttackerSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`), binds the load/save callback fields, and registers
- * process-exit cleanup.
- */
-IAiAttackerSerializer::IAiAttackerSerializer()
-  : mLoadCallback(&IAiAttackerDeserializeThunk)
-  , mSaveCallback(&IAiAttackerSerializeThunk)
-{}
-
-/**
- * Address: 0x00BF82E0 (FUN_00BF82E0, dynamic atexit destructor for `gIAiAttackerSerializer`)
- *
- * What it does:
- * Unlinks this helper node from the serializer-helper list (the
- * `TDatListItem` base destructor). The compiler registers it with
- * `atexit` from the global's dynamic initializer (0x00BCE7D0).
- * `FUN_005D5CA0` and `FUN_005D5CD0` are
- * unreferenced out-of-line copies of the same body.
- */
-IAiAttackerSerializer::~IAiAttackerSerializer() = default;
-
-/**
- * Address: 0x005DBC90 (FUN_005DBC90, gpg::SerSaveLoadHelper_IAiAttacker::Init)
- *
- * What it does:
- * Lazily resolves IAiAttacker RTTI and installs load/save callbacks from this
- * helper object into the type descriptor.
- */
-void IAiAttackerSerializer::Init()
+namespace moho
 {
-  gpg::RType* const type = CachedIAiAttackerType();
+  /**
+   * `gpg::SerSaveLoadHelper<IAiAttacker>`, vtable 0x00E1E9B8.
+   *
+   * Address: 0x00BCE7D0 (FUN_00BCE7D0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF82E0 (FUN_00BF82E0 -- the global's destructor.)
+   * Address: 0x005DBC90 (FUN_005DBC90 -- `Init`.)
+   * Address: 0x005D5C50 (FUN_005D5C50 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005D5C60 (FUN_005D5C60 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct IAiAttackerSerializer : gpg::SerSaveLoadHelper<IAiAttacker>
+  {};
+} // namespace moho
 
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mLoadCallback;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
- * Address: 0x010B0344 caller lane (`IAiAttacker.cpp`'s reflection bootstrap
- * sequence)
- *
- * What it does:
- * Historically forced construction of the (then lazily-constructed)
- * `IAiAttackerSerializer` singleton from an explicit registration sequence.
- * `gIAiAttackerSerializer` is now a genuine namespace-scope global, so its
- * constructor already runs unconditionally at static-init time; this call is
- * kept only so `IAiAttacker.cpp`'s existing bootstrap sequence does not need
- * editing.
- */
-int moho::register_IAiAttackerSerializer()
+namespace
 {
-  return 0;
-}
+  // Address: 0x010B0344 -- process-global `IAiAttackerSerializer` singleton.
+  moho::IAiAttackerSerializer gIAiAttackerSerializer;
+} // namespace

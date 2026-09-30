@@ -1,11 +1,12 @@
-#include "moho/effects/rendering/CEffectManagerImplSerializer.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/effects/rendering/IEffect.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -51,6 +52,10 @@ namespace
     gpg::WriteRawPointer(archive, effectRef, gpg::TrackedPointerState::Owned, ownerRef);
   }
 
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x0066BD00 (FUN_0066BD00, DeserializeActiveEffectsList_CEffectManagerImpl)
    *
@@ -58,11 +63,9 @@ namespace
    * Reads owned `IEffect` pointers from archive until null terminator and
    * relinks each effect into `CEffectManagerImpl::mActiveEffects`.
    */
-  void DeserializeActiveEffectsList_CEffectManagerImpl(
-    gpg::ReadArchive* const archive, moho::CEffectManagerImpl* const object
-  )
+  void CEffectManagerImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    if (!archive || !object) {
+    if (!archive) {
       return;
     }
 
@@ -71,7 +74,7 @@ namespace
       if (effect == nullptr) {
         break;
       }
-      effect->ListLinkBefore(&object->mActiveEffects);
+      effect->ListLinkBefore(&mActiveEffects);
     }
   }
 
@@ -82,98 +85,37 @@ namespace
    * Writes `mActiveEffects` entries as owned tracked pointers, followed by a
    * null-pointer terminator.
    */
-  void SerializeActiveEffectsList_CEffectManagerImpl(
-    const moho::CEffectManagerImpl* const object, gpg::WriteArchive* const archive
-  )
+  void CEffectManagerImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    if (!archive || !object) {
+    if (!archive) {
       return;
     }
 
-    for (moho::IEffect* const effect : object->mActiveEffects.owners()) {
+    for (moho::IEffect* const effect : mActiveEffects.owners()) {
       WriteOwnedIEffectPointer(archive, effect, gpg::RRef{});
     }
 
     WriteOwnedIEffectPointer(archive, nullptr, gpg::RRef{});
   }
-
-  /**
-   * Address: 0x0066BBD0 (FUN_0066BBD0, Deserialize_CEffectManagerImpl)
-   *
-   * What it does:
-   * Serializer callback wrapper that forwards to the active-effects list load
-   * routine.
-   */
-  void Deserialize_CEffectManagerImpl(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<moho::CEffectManagerImpl*>(static_cast<std::uintptr_t>(objectPtr));
-    DeserializeActiveEffectsList_CEffectManagerImpl(archive, object);
-  }
-
-  /**
-   * Address: 0x0066BBE0 (FUN_0066BBE0, Serialize_CEffectManagerImpl)
-   *
-   * What it does:
-   * Serializer callback wrapper that forwards to the active-effects list save
-   * routine.
-   */
-  void Serialize_CEffectManagerImpl(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<moho::CEffectManagerImpl*>(static_cast<std::uintptr_t>(objectPtr));
-    SerializeActiveEffectsList_CEffectManagerImpl(object, archive);
-  }
-
-  // Address: 0x010B3D2C -- process-global `CEffectManagerImplSerializer`
-  // singleton. Constructing it runs
-  // CEffectManagerImplSerializer::CEffectManagerImplSerializer()
-  // (0x00BD4600), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction.
-  moho::CEffectManagerImplSerializer gCEffectManagerImplSerializer;
-
-} // namespace
+} // namespace moho
 
 namespace moho
 {
   /**
-   * Address: 0x00BD4600 (FUN_00BD4600, register_CEffectManagerImplSerializer)
+   * `gpg::SerSaveLoadHelper<CEffectManagerImpl>`, vtable 0x00E25E80.
    *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the load/save
-   * callback fields; the compiler registers the destructor with `atexit`.
+   * Address: 0x00BD4600 (FUN_00BD4600 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFC060 (FUN_00BFC060 -- the global's destructor.)
+   * Address: 0x0066C160 (FUN_0066C160 -- `Init`.)
+   * Address: 0x0066BBD0 (FUN_0066BBD0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0066BBE0 (FUN_0066BBE0 -- `Serialize`, a forward to `MemberSerialize`.)
    */
-  CEffectManagerImplSerializer::CEffectManagerImplSerializer()
-    : mLoadCallback(&Deserialize_CEffectManagerImpl)
-    , mSaveCallback(&Serialize_CEffectManagerImpl)
-  {}
-
-  /**
-   * Address: 0x00BFC060 (FUN_00BFC060, dynamic atexit destructor for `gCEffectManagerImplSerializer`)
-   *
-   * What it does:
-   * Unlinks this helper node from the serializer-helper list (the
-   * `TDatListItem` base destructor). The compiler registers it with
-   * `atexit` from the global's dynamic initializer (0x00BD4600).
-   * `FUN_0066BC20` and `FUN_0066BC50` are
-   * unreferenced out-of-line copies of the same body.
-   */
-  CEffectManagerImplSerializer::~CEffectManagerImplSerializer() = default;
-
-  /**
-   * Address: 0x0066C160 (FUN_0066C160, gpg::SerSaveLoadHelper_CEffectManagerImpl::Init)
-   *
-   * IDA signature:
-   * void (__cdecl *__thiscall gpg::SerSaveLoadHelper_CEffectManagerImpl::Init(
-   *   void (__cdecl **this)(gpg::WriteArchive *, void *obj, int version, const gpg::RRef *a5)))
-   * (gpg::ReadArchive *arch, void *obj, int cont, gpg::RRef *res);
-   */
-  void CEffectManagerImplSerializer::Init()
-  {
-    gpg::RType* const type = CEffectManagerImpl::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
+  struct CEffectManagerImplSerializer : gpg::SerSaveLoadHelper<CEffectManagerImpl>
+  {};
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010B3D2C -- process-global `CEffectManagerImplSerializer` singleton.
+  moho::CEffectManagerImplSerializer gCEffectManagerImplSerializer;
+} // namespace

@@ -14,6 +14,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/sim/STIMap.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -98,9 +99,6 @@ namespace
   moho::ArmyLaunchInfoTypeInfo gArmyLaunchInfoTypeInfo;
   ArmyLaunchInfoVectorTypeInfo gArmyLaunchInfoVectorTypeInfo;
   moho::LaunchInfoBaseTypeInfo gLaunchInfoBaseTypeInfo;
-
-  // Address: 0x010ABED0 -- process-global `LaunchInfoBaseSerializer` singleton.
-  moho::LaunchInfoBaseSerializer gLaunchInfoBaseSerializer;
 
   // Address: 0x010ABD74 -- process-global `ArmyLaunchInfoSerializer` singleton.
   moho::ArmyLaunchInfoSerializer gArmyLaunchInfoSerializer;
@@ -658,62 +656,6 @@ namespace
   [[noreturn]] void ThrowSerializationError(const char* message)
   {
     throw gpg::SerializationError(message ? message : "");
-  }
-
-  /**
-   * Address: 0x00544180 (FUN_00544180)
-   *
-   * What it does:
-   * Loads LaunchInfoBase fields in archive order:
-   * game-mods text, scenario-info text, army launch info, command-source
-   * control lanes, language, and cheat flag.
-   */
-  void LoadLaunchInfoBase(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
-  {
-    auto* const info = reinterpret_cast<moho::LaunchInfoBase*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(info != nullptr);
-    if (!archive || !info) {
-      return;
-    }
-
-    archive->ReadString(&info->mGameMods);
-    archive->ReadString(&info->mScenarioInfo);
-
-    gpg::RType* const vectorType = ResolveArmyLaunchInfoVectorType();
-    archive->Read(vectorType, &info->mArmyLaunchInfo, NullOwnerRef());
-
-    archive->ReadInt(&info->mCommandSources.v4);
-    archive->ReadInt(&info->mCommandSources.mOriginalSource);
-    archive->ReadString(&info->mLanguage);
-    archive->ReadBool(&info->mCheatsEnabled);
-  }
-
-  /**
-   * Address: 0x00544220 (FUN_00544220)
-   *
-   * What it does:
-   * Saves LaunchInfoBase fields in the same order as the load callback.
-   */
-  void SaveLaunchInfoBase(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
-  {
-    auto* const info = reinterpret_cast<moho::LaunchInfoBase*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(info != nullptr);
-    if (!archive || !info) {
-      return;
-    }
-
-    archive->WriteString(&info->mGameMods);
-    archive->WriteString(&info->mScenarioInfo);
-
-    gpg::RType* const vectorType = ResolveArmyLaunchInfoVectorType();
-    archive->Write(vectorType, &info->mArmyLaunchInfo, NullOwnerRef());
-
-    archive->WriteInt(info->mCommandSources.v4);
-    archive->WriteInt(info->mCommandSources.mOriginalSource);
-    archive->WriteString(&info->mLanguage);
-    archive->WriteBool(info->mCheatsEnabled);
   }
 
   bool gLaunchInfoBaseTypeRegistered = false;
@@ -1503,67 +1445,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00542550 (FUN_00542550, Moho::LaunchInfoBaseSerializer::Deserialize)
-   *
-   * What it does:
-   * Archive callback thunk forwarding into LaunchInfoBase load body.
-   */
-  void LaunchInfoBaseSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    LoadLaunchInfoBase(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00542560 (FUN_00542560, Moho::LaunchInfoBaseSerializer::Serialize)
-   *
-   * What it does:
-   * Archive callback thunk forwarding into LaunchInfoBase save body.
-   */
-  void LaunchInfoBaseSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    SaveLaunchInfoBase(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00543190 (FUN_00543190, sub_543190)
-   *
-   * What it does:
-   * Registers load/save callbacks into LaunchInfoBase RTTI.
-   */
-  void LaunchInfoBaseSerializer::Init()
-  {
-    gpg::RType* const type = LaunchInfoBase::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  /**
-   * Address: 0x00BC94C0 (FUN_00BC94C0, dynamic initializer for the global
-   * `LaunchInfoBaseSerializer` singleton)
-   */
-  LaunchInfoBaseSerializer::LaunchInfoBaseSerializer()
-    : mSerLoadFunc(&LaunchInfoBaseSerializer::Deserialize)
-    , mSerSaveFunc(&LaunchInfoBaseSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BF4020 (FUN_00BF4020, Moho::LaunchInfoBaseSerializer::~LaunchInfoBaseSerializer)
-   */
-  LaunchInfoBaseSerializer::~LaunchInfoBaseSerializer() = default;
-
-  /**
    * Address: 0x00BC9500 (FUN_00BC9500, register_LaunchInfoNewTypeInfo)
    */
   void register_LaunchInfoNewTypeInfo()
@@ -1650,3 +1531,79 @@ GPG_PREREGISTER_INIT(preregister_ArmyLaunchInfoVectorTypeStartup_05cb74, moho::p
 
 GPG_PREREGISTER_INIT(RegisterArmyLaunchInfoTypeInfoStartup_05cb74, RegisterArmyLaunchInfoTypeInfoStartup)
 GPG_PREREGISTER_INIT(EnsureLaunchInfoBaseTypeRegistered_05cb74, EnsureLaunchInfoBaseTypeRegistered)
+
+namespace moho
+{
+  /**
+   * Address: 0x00544180 (FUN_00544180)
+   *
+   * What it does:
+   * Loads LaunchInfoBase fields in archive order:
+   * game-mods text, scenario-info text, army launch info, command-source
+   * control lanes, language, and cheat flag.
+   */
+  void LaunchInfoBase::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    archive->ReadString(&mGameMods);
+    archive->ReadString(&mScenarioInfo);
+
+    gpg::RType* const vectorType = ResolveArmyLaunchInfoVectorType();
+    archive->Read(vectorType, &mArmyLaunchInfo, NullOwnerRef());
+
+    archive->ReadInt(&mCommandSources.v4);
+    archive->ReadInt(&mCommandSources.mOriginalSource);
+    archive->ReadString(&mLanguage);
+    archive->ReadBool(&mCheatsEnabled);
+  }
+
+  /**
+   * Address: 0x00544220 (FUN_00544220)
+   *
+   * What it does:
+   * Saves LaunchInfoBase fields in the same order as the load callback.
+   */
+  void LaunchInfoBase::MemberSerialize(gpg::WriteArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    archive->WriteString(&mGameMods);
+    archive->WriteString(&mScenarioInfo);
+
+    gpg::RType* const vectorType = ResolveArmyLaunchInfoVectorType();
+    archive->Write(vectorType, &mArmyLaunchInfo, NullOwnerRef());
+
+    archive->WriteInt(mCommandSources.v4);
+    archive->WriteInt(mCommandSources.mOriginalSource);
+    archive->WriteString(&mLanguage);
+    archive->WriteBool(mCheatsEnabled);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<LaunchInfoBase>`, vtable 0x00E16EE0.
+   *
+   * Address: 0x00BC94C0 (FUN_00BC94C0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF4020 (FUN_00BF4020 -- the global's destructor.)
+   * Address: 0x00543190 (FUN_00543190 -- `Init`.)
+   * Address: 0x00542550 (FUN_00542550 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00542560 (FUN_00542560 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct LaunchInfoBaseSerializer : gpg::SerSaveLoadHelper<LaunchInfoBase>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ABED0 -- process-global `LaunchInfoBaseSerializer` singleton.
+  moho::LaunchInfoBaseSerializer gLaunchInfoBaseSerializer;
+} // namespace

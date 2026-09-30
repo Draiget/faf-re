@@ -456,6 +456,22 @@ namespace moho
   class EntitySetBase : public EntitySetTemplate<Entity>
   {
   public:
+    /**
+     * Address: 0x00694640 (FUN_00694640)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x006945D0 (FUN_006945D0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     inline static gpg::RType* sType = nullptr;
   };
 

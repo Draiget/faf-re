@@ -160,6 +160,22 @@ namespace moho
   class ReconBlip : public Entity, public InstanceCounter<ReconBlip>
   {
   public:
+    /**
+     * Address: 0x005CC9F0 (FUN_005CC9F0)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x005CC880 (FUN_005CC880)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
     static gpg::RType* sType;

@@ -24,12 +24,6 @@ using namespace moho;
 namespace
 {
 
-  // Address: 0x010AF824 -- process-global `CAiReconDBImplSerializer`
-  // singleton. Same construction/teardown shape as `gSReconKeySerializer`
-  // above, via CAiReconDBImplSerializer::CAiReconDBImplSerializer()
-  // (0x00BCDDC0) and ~CAiReconDBImplSerializer() (0x00BF7AB0).
-  moho::CAiReconDBImplSerializer gCAiReconDBImplSerializer;
-
   /**
    * Address: 0x005BFD90 (FUN_005BFD90, PreregisterSReconKeyTypeInfo)
    * Address: 0x00BF7960 (FUN_00BF7960, atexit destructor of the SReconKeyTypeInfo object)
@@ -42,62 +36,6 @@ namespace
     static SReconKeyTypeInfo sInstance;
     gpg::PreRegisterRType(typeid(SReconKey), &sInstance);
     return &sInstance;
-  }
-
-  /**
-   * Address: 0x005CCBE0 (FUN_005CCBE0, Moho::CAiReconDBImp::MemberDeserialize)
-   *
-   * What it does:
-   * Deserializes CAiReconDBImpl reflected member lanes in binary order.
-   */
-  void DeserializeCAiReconDBImplMembers(CAiReconDBImpl* const object, gpg::ReadArchive* const archive)
-  {
-    const gpg::RRef ownerRef{};
-    archive->Read(gpg::RTypeOf<ReconBlipMap>(), &object->mBlipMap, ownerRef);
-    archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &object->mBblips, ownerRef);
-    archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &object->mTempBlips, ownerRef);
-    archive->ReadPointer(&object->mArmy, &ownerRef);
-    archive->ReadPointer(&object->mMapData, &ownerRef);
-    archive->ReadPointer(&object->mSim, &ownerRef);
-    archive->ReadPointer(&object->mIMap, &ownerRef);
-    archive->ReadPointerShared(&object->mVisionGrid, &ownerRef);
-    archive->ReadPointerShared(&object->mWaterGrid, &ownerRef);
-    archive->ReadPointerShared(&object->mRadarGrid, &ownerRef);
-    archive->ReadPointerShared(&object->mSonarGrid, &ownerRef);
-    archive->ReadPointerShared(&object->mOmniGrid, &ownerRef);
-    archive->ReadPointerShared(&object->mRCIGrid, &ownerRef);
-    archive->ReadPointerShared(&object->mSCIGrid, &ownerRef);
-    archive->ReadPointerShared(&object->mVCIGrid, &ownerRef);
-    archive->ReadBool(reinterpret_cast<bool*>(&object->mFogOfWar));
-    archive->Read(gpg::RTypeOf<EntityCategorySet>(), &object->mVisibleToReconCategory, ownerRef);
-  }
-
-  /**
-   * Address: 0x005CCDE0 (FUN_005CCDE0, Moho::CAiReconDBImp::MemberSerialize)
-   *
-   * What it does:
-   * Serializes CAiReconDBImpl reflected member lanes in binary order.
-   */
-  void SerializeCAiReconDBImplMembers(const CAiReconDBImpl* const object, gpg::WriteArchive* const archive)
-  {
-    const gpg::RRef ownerRef{};
-    archive->Write(gpg::RTypeOf<ReconBlipMap>(), &object->mBlipMap, ownerRef);
-    archive->Write(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &object->mBblips, ownerRef);
-    archive->Write(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &object->mTempBlips, ownerRef);
-    archive->WritePointer(object->mArmy, gpg::TrackedPointerState::Unowned, ownerRef);
-    archive->WritePointer(object->mMapData, gpg::TrackedPointerState::Unowned, ownerRef);
-    archive->WritePointer(object->mSim, gpg::TrackedPointerState::Unowned, ownerRef);
-    archive->WritePointer(object->mIMap, gpg::TrackedPointerState::Unowned, ownerRef);
-    archive->WritePointer(object->mVisionGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(object->mWaterGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(object->mRadarGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(object->mSonarGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(object->mOmniGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(object->mRCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(object->mSCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(object->mVCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WriteBool(object->mFogOfWar != 0u);
-    archive->Write(gpg::RTypeOf<EntityCategorySet>(), &object->mVisibleToReconCategory, ownerRef);
   }
 
   // Addresses 0x005C98D0/0x005CB6C0 (the "ThunkA"/"ThunkB" save-lane
@@ -178,56 +116,6 @@ void moho::register_SReconKeyTypeInfo()
   (void)PreregisterSReconKeyTypeInfo();
 }
 
-/**
- * Address: 0x005C2910 (FUN_005C2910, Moho::CAiReconDBImplSerializer::Deserialize)
- */
-void CAiReconDBImplSerializer::Deserialize(
-  gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-)
-{
-  auto* const object = reinterpret_cast<CAiReconDBImpl*>(static_cast<std::uintptr_t>(objectPtr));
-  DeserializeCAiReconDBImplMembers(object, archive);
-}
-
-/**
- * Address: 0x005C2920 (FUN_005C2920, Moho::CAiReconDBImplSerializer::Serialize)
- */
-void CAiReconDBImplSerializer::Serialize(
-  gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-)
-{
-  auto* const object = reinterpret_cast<CAiReconDBImpl*>(static_cast<std::uintptr_t>(objectPtr));
-  SerializeCAiReconDBImplMembers(object, archive);
-}
-
-/**
- * Address: 0x00BCDDC0 (FUN_00BCDDC0, dynamic initializer for the global
- * `CAiReconDBImplSerializer` singleton)
- */
-CAiReconDBImplSerializer::CAiReconDBImplSerializer()
-  : mSerLoadFunc(&CAiReconDBImplSerializer::Deserialize)
-  , mSerSaveFunc(&CAiReconDBImplSerializer::Serialize)
-{}
-
-CAiReconDBImplSerializer::~CAiReconDBImplSerializer() = default;
-
-/**
- * Address: 0x005C4EE0 (FUN_005C4EE0, Moho::CAiReconDBImplSerializer::Init)
- */
-void CAiReconDBImplSerializer::Init()
-{
-  gpg::RType* type = CAiReconDBImpl::sType;
-  if (!type) {
-    type = gpg::LookupRType(typeid(CAiReconDBImpl));
-    CAiReconDBImpl::sType = type;
-  }
-
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mSerLoadFunc);
-  type->serLoadFunc_ = mSerLoadFunc;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerSaveFunc);
-  type->serSaveFunc_ = mSerSaveFunc;
-}
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
@@ -254,4 +142,84 @@ namespace
 {
   // Address: 0x010AF89C -- process-global `SReconKeySerializer` singleton.
   moho::SReconKeySerializer gSReconKeySerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x005CCBE0 (FUN_005CCBE0, Moho::CAiReconDBImp::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes CAiReconDBImpl reflected member lanes in binary order.
+   */
+  void CAiReconDBImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef ownerRef{};
+    archive->Read(gpg::RTypeOf<ReconBlipMap>(), &mBlipMap, ownerRef);
+    archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mBblips, ownerRef);
+    archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
+    archive->ReadPointer(&mArmy, &ownerRef);
+    archive->ReadPointer(&mMapData, &ownerRef);
+    archive->ReadPointer(&mSim, &ownerRef);
+    archive->ReadPointer(&mIMap, &ownerRef);
+    archive->ReadPointerShared(&mVisionGrid, &ownerRef);
+    archive->ReadPointerShared(&mWaterGrid, &ownerRef);
+    archive->ReadPointerShared(&mRadarGrid, &ownerRef);
+    archive->ReadPointerShared(&mSonarGrid, &ownerRef);
+    archive->ReadPointerShared(&mOmniGrid, &ownerRef);
+    archive->ReadPointerShared(&mRCIGrid, &ownerRef);
+    archive->ReadPointerShared(&mSCIGrid, &ownerRef);
+    archive->ReadPointerShared(&mVCIGrid, &ownerRef);
+    archive->ReadBool(reinterpret_cast<bool*>(&mFogOfWar));
+    archive->Read(gpg::RTypeOf<EntityCategorySet>(), &mVisibleToReconCategory, ownerRef);
+  }
+
+  /**
+   * Address: 0x005CCDE0 (FUN_005CCDE0, Moho::CAiReconDBImp::MemberSerialize)
+   *
+   * What it does:
+   * Serializes CAiReconDBImpl reflected member lanes in binary order.
+   */
+  void CAiReconDBImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const gpg::RRef ownerRef{};
+    archive->Write(gpg::RTypeOf<ReconBlipMap>(), &mBlipMap, ownerRef);
+    archive->Write(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mBblips, ownerRef);
+    archive->Write(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
+    archive->WritePointer(mArmy, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer(mMapData, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer(mSim, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer(mIMap, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer(mVisionGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mWaterGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mRadarGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mSonarGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mOmniGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mRCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mSCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mVCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WriteBool(mFogOfWar != 0u);
+    archive->Write(gpg::RTypeOf<EntityCategorySet>(), &mVisibleToReconCategory, ownerRef);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiReconDBImpl>`, vtable 0x00E1DB44.
+   *
+   * Address: 0x00BCDDC0 (FUN_00BCDDC0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7AB0 (FUN_00BF7AB0 -- the global's destructor.)
+   * Address: 0x005C4EE0 (FUN_005C4EE0 -- `Init`.)
+   * Address: 0x005C2910 (FUN_005C2910 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005C2920 (FUN_005C2920 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiReconDBImplSerializer : gpg::SerSaveLoadHelper<CAiReconDBImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AF824 -- process-global `CAiReconDBImplSerializer` singleton.
+  moho::CAiReconDBImplSerializer gCAiReconDBImplSerializer;
 } // namespace

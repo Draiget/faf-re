@@ -39,8 +39,6 @@ namespace
   moho::QuaternionfSerializer gQuaternionfSerializer;
   // Address: 0x010A974C -- process-global `VEulers3Serializer` singleton.
   moho::VEulers3Serializer gVEulers3Serializer;
-  // Address: 0x010A992C -- process-global `VAxes3Serializer` singleton.
-  moho::VAxes3Serializer gVAxes3Serializer;
 
   [[nodiscard]] gpg::RType* ResolveVector3fType()
   {
@@ -1387,72 +1385,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EE050 (FUN_004EE050, Moho::VAxes3Serializer::Deserialize)
-   */
-  void VAxes3Serializer::Deserialize(gpg::ReadArchive* const archive, VAxes3* const axes)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(axes != nullptr);
-    if (archive == nullptr || axes == nullptr) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-    archive->Read(ResolveVector3fType(), &axes->vX, ownerRef);
-    archive->Read(ResolveVector3fType(), &axes->vY, ownerRef);
-    archive->Read(ResolveVector3fType(), &axes->vZ, ownerRef);
-  }
-
-  /**
-   * Address: 0x004EE100 (FUN_004EE100, Moho::VAxes3Serializer::Serialize)
-   */
-  void VAxes3Serializer::Serialize(gpg::WriteArchive* const archive, VAxes3* const axes)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(axes != nullptr);
-    if (archive == nullptr || axes == nullptr) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-    archive->Write(ResolveVector3fType(), &axes->vX, ownerRef);
-    archive->Write(ResolveVector3fType(), &axes->vY, ownerRef);
-    archive->Write(ResolveVector3fType(), &axes->vZ, ownerRef);
-  }
-
-  /**
    * `FUN_004EC530`/`FUN_004EC560` (cleanup_VAxes3SerializerVariant1/2)
    * removed here: both are zero-xref dead duplicate unlink-helper fragments
    * (confirmed via `FUN_004EC530.xrefs.txt`/`FUN_004EC560.xrefs.txt`,
    * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-
-  /**
-   * Address: 0x00BC6F60 (FUN_00BC6F60, dynamic initializer for the global
-   * `VAxes3Serializer` singleton)
-   */
-  VAxes3Serializer::VAxes3Serializer()
-    : mDeserialize(&DeserializeVAxes3SerializerThunk)
-    , mSerialize(&SerializeVAxes3SerializerThunk)
-  {
-  }
-
-  /**
-   * Address: 0x00BF16B0 (FUN_00BF16B0, Moho::VAxes3Serializer::~VAxes3Serializer)
-   */
-  VAxes3Serializer::~VAxes3Serializer() = default;
-
-  /**
-   * Address: 0x004ED640 (FUN_004ED640, Moho::VAxes3Serializer::Init)
-   */
-  void VAxes3Serializer::Init()
-  {
-    gpg::RType* const type = ResolveVAxes3Type();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
 
   /**
    * Address: 0x004ECBD0 (FUN_004ECBD0, Moho::VEC_LookAt)
@@ -1566,10 +1503,6 @@ namespace moho
       return;
     }
 
-    VAxes3Serializer::Deserialize(
-      archive,
-      reinterpret_cast<VAxes3*>(static_cast<std::uintptr_t>(objectPtr))
-    );
   }
 
   /**
@@ -1583,10 +1516,6 @@ namespace moho
       return;
     }
 
-    VAxes3Serializer::Serialize(
-      archive,
-      reinterpret_cast<VAxes3*>(static_cast<std::uintptr_t>(objectPtr))
-    );
   }
 
   /**
@@ -2286,4 +2215,60 @@ namespace
 {
   // Address: 0x010A9A14 -- process-global `VMatrix4Serializer` singleton.
   moho::VMatrix4Serializer gVMatrix4Serializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x004EE050 (FUN_004EE050, Moho::VAxes3Serializer::Deserialize)
+   */
+  void VAxes3::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (archive == nullptr || this == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Read(ResolveVector3fType(), &vX, ownerRef);
+    archive->Read(ResolveVector3fType(), &vY, ownerRef);
+    archive->Read(ResolveVector3fType(), &vZ, ownerRef);
+  }
+
+  /**
+   * Address: 0x004EE100 (FUN_004EE100, Moho::VAxes3Serializer::Serialize)
+   */
+  void VAxes3::MemberSerialize(gpg::WriteArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (archive == nullptr || this == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Write(ResolveVector3fType(), &vX, ownerRef);
+    archive->Write(ResolveVector3fType(), &vY, ownerRef);
+    archive->Write(ResolveVector3fType(), &vZ, ownerRef);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<VAxes3>`, vtable 0x00E0BEF0.
+   *
+   * Address: 0x00BC6F60 (FUN_00BC6F60 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF16B0 (FUN_00BF16B0 -- the global's destructor.)
+   * Address: 0x004ED640 (FUN_004ED640 -- `Init`.)
+   * Address: 0x004EC4E0 (FUN_004EC4E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x004EC4F0 (FUN_004EC4F0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct VAxes3Serializer : gpg::SerSaveLoadHelper<VAxes3>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A992C -- process-global `VAxes3Serializer` singleton.
+  moho::VAxes3Serializer gVAxes3Serializer;
 } // namespace

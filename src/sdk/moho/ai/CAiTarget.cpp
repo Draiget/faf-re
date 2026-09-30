@@ -18,6 +18,7 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -208,100 +209,6 @@ void CAiTarget::CopyFromLinkedTarget(const CAiTarget& source)
 void CAiTarget::UnlinkEntityTargetRef()
 {
   targetEntity.UnlinkFromOwnerChain();
-}
-
-/**
- * Address: 0x005E3880 (FUN_005E3880)
- *
- * What it does:
- * Deserializes reflected CAiTarget payload fields in fixed binary order.
- */
-void CAiTarget::DeserializeFromArchive(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
-{
-  auto* const target = reinterpret_cast<CAiTarget*>(objectPtr);
-  GPG_ASSERT(archive != nullptr);
-  GPG_ASSERT(target != nullptr);
-  if (!archive || !target) {
-    return;
-  }
-
-  const gpg::RRef nullOwner{};
-  archive->Read(CachedEAiTargetType(), &target->targetType, nullOwner);
-  archive->Read(CachedWeakPtrEntityType(), &target->targetEntity, nullOwner);
-  archive->Read(CachedVector3fType(), &target->position, nullOwner);
-  archive->ReadInt(&target->targetPoint);
-  archive->ReadBool(&target->targetIsMobile);
-}
-
-/**
- * Address: 0x005E3950 (FUN_005E3950)
- *
- * What it does:
- * Serializes reflected CAiTarget payload fields in fixed binary order.
- */
-void CAiTarget::SerializeToArchive(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
-{
-  const auto* const target = reinterpret_cast<const CAiTarget*>(objectPtr);
-  GPG_ASSERT(archive != nullptr);
-  GPG_ASSERT(target != nullptr);
-  if (!archive || !target) {
-    return;
-  }
-
-  const gpg::RRef nullOwner{};
-  archive->Write(CachedEAiTargetType(), &target->targetType, nullOwner);
-  archive->Write(CachedWeakPtrEntityType(), &target->targetEntity, nullOwner);
-  archive->Write(CachedVector3fType(), &target->position, nullOwner);
-  archive->WriteInt(target->targetPoint);
-  archive->WriteBool(target->targetIsMobile);
-}
-
-/**
- * Address: 0x005E3640 (FUN_005E3640, serializer load thunk alias)
- *
- * What it does:
- * Tail-forwards one CAiTarget serializer-load thunk alias into
- * `CAiTarget::DeserializeFromArchive`.
- */
-void DeserializeCAiTargetThunkVariantA(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef)
-{
-  CAiTarget::DeserializeFromArchive(archive, objectPtr, version, ownerRef);
-}
-
-/**
- * Address: 0x005E3650 (FUN_005E3650, serializer save thunk alias)
- *
- * What it does:
- * Tail-forwards one CAiTarget serializer-save thunk alias into
- * `CAiTarget::SerializeToArchive`.
- */
-void SerializeCAiTargetThunkVariantA(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef)
-{
-  CAiTarget::SerializeToArchive(archive, objectPtr, version, ownerRef);
-}
-
-/**
- * Address: 0x005E3870 (FUN_005E3870, serializer save thunk alias)
- *
- * What it does:
- * Tail-forwards a second CAiTarget serializer-save thunk alias into
- * `CAiTarget::SerializeToArchive`.
- */
-void SerializeCAiTargetThunkVariantB(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef)
-{
-  CAiTarget::SerializeToArchive(archive, objectPtr, version, ownerRef);
-}
-
-/**
- * Address: 0x005E3860 (FUN_005E3860, serializer load thunk alias)
- *
- * What it does:
- * Tail-forwards an additional CAiTarget serializer-load thunk alias into
- * `CAiTarget::DeserializeFromArchive`.
- */
-void DeserializeCAiTargetThunkVariantB(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef)
-{
-  CAiTarget::DeserializeFromArchive(archive, objectPtr, version, ownerRef);
 }
 
 /**
@@ -808,3 +715,74 @@ void moho::SCR_FromLuaCopy_CAiTarget(CAiTarget& outTarget, const LuaPlus::LuaObj
   outTarget.targetPoint = -1;
   outTarget.targetIsMobile = false;
 }
+
+namespace moho
+{
+  /**
+   * Address: 0x005E3880 (FUN_005E3880)
+   *
+   * What it does:
+   * Deserializes reflected CAiTarget payload fields in fixed binary order.
+   */
+  void CAiTarget::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    archive->Read(CachedEAiTargetType(), &targetType, nullOwner);
+    archive->Read(CachedWeakPtrEntityType(), &targetEntity, nullOwner);
+    archive->Read(CachedVector3fType(), &position, nullOwner);
+    archive->ReadInt(&targetPoint);
+    archive->ReadBool(&targetIsMobile);
+  }
+
+  /**
+   * Address: 0x005E3950 (FUN_005E3950)
+   *
+   * What it does:
+   * Serializes reflected CAiTarget payload fields in fixed binary order.
+   */
+  void CAiTarget::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    archive->Write(CachedEAiTargetType(), &targetType, nullOwner);
+    archive->Write(CachedWeakPtrEntityType(), &targetEntity, nullOwner);
+    archive->Write(CachedVector3fType(), &position, nullOwner);
+    archive->WriteInt(targetPoint);
+    archive->WriteBool(targetIsMobile);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiTarget>`, vtable 0x00E1ED54.
+   *
+   * Address: 0x00BCEC50 (FUN_00BCEC50 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF8910 (FUN_00BF8910 -- the global's destructor.)
+   * Address: 0x005E3640 (FUN_005E3640 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x005E3860 (FUN_005E3860 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x005E3650 (FUN_005E3650 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005E3870 (FUN_005E3870 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005E2E60 (FUN_005E2E60 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005E3540 (FUN_005E3540 -- `Init`.)
+   * Address: 0x005E2E00 (FUN_005E2E00 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005E2E10 (FUN_005E2E10 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiTargetSerializer : gpg::SerSaveLoadHelper<CAiTarget>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B05B4 -- process-global `CAiTargetSerializer` singleton.
+  moho::CAiTargetSerializer gCAiTargetSerializer;
+} // namespace

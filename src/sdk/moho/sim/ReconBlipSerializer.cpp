@@ -1,4 +1,3 @@
-#include "moho/sim/ReconBlipSerializer.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -8,6 +7,7 @@
 #include "moho/sim/ReconBlip.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeakPtrReflection.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -92,44 +92,6 @@ namespace
     return moho::SPerArmyReconInfo::sType;
   }
 
-  /**
-   * Address: 0x005CC880 (FUN_005CC880)
-   *
-   * What it does:
-   * Deserializes `ReconBlip` reflected member lanes in binary order.
-   */
-  void DeserializeReconBlipMembers(moho::ReconBlip* const object, gpg::ReadArchive* const archive)
-  {
-    const gpg::RRef ownerRef{};
-
-    archive->Read(ResolveEntityType(), static_cast<moho::Entity*>(object), ownerRef);
-    archive->Read(ResolveWeakPtrUnitType(), &object->mCreator, ownerRef);
-    archive->ReadBool(reinterpret_cast<bool*>(&object->mDeleteWhenStale));
-    archive->Read(ResolveVector3fType(), &object->mJamOffset, ownerRef);
-    archive->Read(ResolveUnitConstDataType(), &object->mUnitConstDat, ownerRef);
-    archive->Read(ResolveUnitVarDataType(), &object->mUnitVarDat, ownerRef);
-    archive->Read(ResolvePerArmyReconInfoVectorType(), &object->mReconDat, ownerRef);
-  }
-
-  /**
-   * Address: 0x005CC9F0 (FUN_005CC9F0)
-   *
-   * What it does:
-   * Serializes `ReconBlip` reflected member lanes in binary order.
-   */
-  void SerializeReconBlipMembers(const moho::ReconBlip* const object, gpg::WriteArchive* const archive)
-  {
-    const gpg::RRef ownerRef{};
-
-    archive->Write(ResolveEntityType(), static_cast<const moho::Entity*>(object), ownerRef);
-    archive->Write(ResolveWeakPtrUnitType(), &object->mCreator, ownerRef);
-    archive->WriteBool(object->mDeleteWhenStale != 0u);
-    archive->Write(ResolveVector3fType(), &object->mJamOffset, ownerRef);
-    archive->Write(ResolveUnitConstDataType(), &object->mUnitConstDat, ownerRef);
-    archive->Write(ResolveUnitVarDataType(), &object->mUnitVarDat, ownerRef);
-    archive->Write(ResolvePerArmyReconInfoVectorType(), &object->mReconDat, ownerRef);
-  }
-
   // Addresses 0x005C90D0/0x005CAF90 (deserialize "ThunkA"/"ThunkB" pair) and
   // 0x005C90E0/0x005CAFA0 (serialize "ThunkA"/"ThunkB" pair) formerly modeled
   // here are dead: zero data_refs and zero call_edges in the callgraph index
@@ -140,67 +102,71 @@ namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x005BFC90 (FUN_005BFC90, Moho::ReconBlipSerializer::Deserialize)
-   */
-  void ReconBlipSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-  {
-    auto* const object = reinterpret_cast<ReconBlip*>(static_cast<std::uintptr_t>(objectPtr));
-    DeserializeReconBlipMembers(object, archive);
-  }
-
-  /**
-   * Address: 0x005BFCA0 (FUN_005BFCA0, Moho::ReconBlipSerializer::Serialize)
-   */
-  void ReconBlipSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-  {
-    auto* const object = reinterpret_cast<const ReconBlip*>(static_cast<std::uintptr_t>(objectPtr));
-    SerializeReconBlipMembers(object, archive);
-  }
-
-  /**
-   * Address: 0x005C43B0 (FUN_005C43B0, gpg::SerSaveLoadHelper_ReconBlip::Init)
-   *
-   * What it does:
-   * Lazily resolves ReconBlip RTTI and installs load/save callbacks
-   * from this helper into the type descriptor.
-   */
-  void ReconBlipSerializer::Init()
-  {
-    gpg::RType* const type = ReconBlip::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  /**
-   * Address: 0x00BCDCE0 (FUN_00BCDCE0, register_ReconBlipSerializer)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields; the compiler registers the destructor with
-   * `atexit`.
-   */
-  ReconBlipSerializer::ReconBlipSerializer()
-    : mLoadCallback(&ReconBlipSerializer::Deserialize)
-    , mSaveCallback(&ReconBlipSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BF7930 (FUN_00BF7930, dynamic atexit destructor for `gReconBlipSerializer`)
-   *
-   * What it does:
-   * Unlinks this helper node from the serializer-helper list (the
-   * `TDatListItem` base destructor). `FUN_005BFCE0` and `FUN_005BFD10` are
-   * unreferenced out-of-line copies of the same body.
-   */
-  ReconBlipSerializer::~ReconBlipSerializer() = default;
 } // namespace moho
 
 namespace
 {
 
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x005CC880 (FUN_005CC880)
+   *
+   * What it does:
+   * Deserializes `ReconBlip` reflected member lanes in binary order.
+   */
+  void ReconBlip::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef ownerRef{};
+
+    archive->Read(ResolveEntityType(), static_cast<moho::Entity*>(this), ownerRef);
+    archive->Read(ResolveWeakPtrUnitType(), &mCreator, ownerRef);
+    archive->ReadBool(reinterpret_cast<bool*>(&mDeleteWhenStale));
+    archive->Read(ResolveVector3fType(), &mJamOffset, ownerRef);
+    archive->Read(ResolveUnitConstDataType(), &mUnitConstDat, ownerRef);
+    archive->Read(ResolveUnitVarDataType(), &mUnitVarDat, ownerRef);
+    archive->Read(ResolvePerArmyReconInfoVectorType(), &mReconDat, ownerRef);
+  }
+
+  /**
+   * Address: 0x005CC9F0 (FUN_005CC9F0)
+   *
+   * What it does:
+   * Serializes `ReconBlip` reflected member lanes in binary order.
+   */
+  void ReconBlip::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const gpg::RRef ownerRef{};
+
+    archive->Write(ResolveEntityType(), static_cast<const moho::Entity*>(this), ownerRef);
+    archive->Write(ResolveWeakPtrUnitType(), &mCreator, ownerRef);
+    archive->WriteBool(mDeleteWhenStale != 0u);
+    archive->Write(ResolveVector3fType(), &mJamOffset, ownerRef);
+    archive->Write(ResolveUnitConstDataType(), &mUnitConstDat, ownerRef);
+    archive->Write(ResolveUnitVarDataType(), &mUnitVarDat, ownerRef);
+    archive->Write(ResolvePerArmyReconInfoVectorType(), &mReconDat, ownerRef);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<ReconBlip>`, vtable 0x00E1DA64.
+   *
+   * Address: 0x00BCDCE0 (FUN_00BCDCE0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7930 (FUN_00BF7930 -- the global's destructor.)
+   * Address: 0x005C43B0 (FUN_005C43B0 -- `Init`.)
+   * Address: 0x005BFC90 (FUN_005BFC90 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005BFCA0 (FUN_005BFCA0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct ReconBlipSerializer : gpg::SerSaveLoadHelper<ReconBlip>
+  {};
+} // namespace moho
+
+namespace
+{
   // Address: 0x010AF810 -- process-global `ReconBlipSerializer` singleton.
   moho::ReconBlipSerializer gReconBlipSerializer;
 } // namespace

@@ -21,6 +21,13 @@ namespace gpg::core
   class FastVectorN;
 } // namespace gpg::core
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class CAcquireTargetTask;
@@ -42,6 +49,22 @@ namespace moho
   class IAiAttacker : public Broadcaster<EAiAttackerEvent>
   {
   public:
+    /**
+     * Address: 0x005DE920 (FUN_005DE920)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
+
+    /**
+     * Address: 0x005DE8D0 (FUN_005DE8D0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
     /**
      * Address: 0x005D6A80 (FUN_005D6A80)
      *

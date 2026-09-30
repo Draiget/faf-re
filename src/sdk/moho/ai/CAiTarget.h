@@ -24,6 +24,22 @@ namespace moho
   class CAiTarget
   {
   public:
+    /**
+     * Address: 0x005E3950 (FUN_005E3950)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x005E3880 (FUN_005E3880)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     CAiTarget() = default;
 
     /**
@@ -181,21 +197,7 @@ namespace moho
      */
     void EncodeToSSTITarget(SSTITarget& out) const;
 
-    /**
-     * Address: 0x005E3880 (FUN_005E3880)
-     *
-     * What it does:
-     * Deserializes reflected `CAiTarget` fields from archive stream.
-     */
-    static void DeserializeFromArchive(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
-    /**
-     * Address: 0x005E3950 (FUN_005E3950)
-     *
-     * What it does:
-     * Serializes reflected `CAiTarget` fields into archive stream.
-     */
-    static void SerializeToArchive(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
   private:
     /**

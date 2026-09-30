@@ -16,6 +16,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00608DF0 (FUN_00608DF0)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
+
+    /**
+     * Address: 0x00608DE0 (FUN_00608DE0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
+    /**
      * Address: 0x00598B30 (FUN_00598B30, scalar deleting thunk)
      * Address: 0x00608E90 (FUN_00608E90, non-deleting body)
      *
@@ -95,63 +111,6 @@ namespace moho
     EAiResult* mDispatchResult;   // 0x28
     EAiResult mLinkResult;        // 0x2C
   };
-
-  class CCommandTaskSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD0590 (FUN_00BD0590, dynamic initializer for the global
-     * `CCommandTaskSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    CCommandTaskSerializer();
-
-    /**
-     * Address: 0x00BF9B40 (FUN_00BF9B40, Moho::CCommandTaskSerializer::~CCommandTaskSerializer)
-     */
-    ~CCommandTaskSerializer();
-
-    /**
-     * Address: 0x00608DE0 (FUN_00608DE0, Moho::CCommandTaskSerializer::Deserialize)
-     *
-     * What it does:
-     * Loads base-task state, unit/sim pointers, task state, and dispatch-result
-     * lanes while pre-tracking the in-object result value pointer.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00608DF0 (FUN_00608DF0, Moho::CCommandTaskSerializer::Serialize)
-     *
-     * What it does:
-     * Saves base-task state, unit/sim pointers, task state, and dispatch-result
-     * lanes while pre-registering the in-object result value pointer.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0060BA20 (FUN_0060BA20, sub_60BA20)
-     *
-     * What it does:
-     * Binds load/save serializer callbacks into CCommandTask RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
-  static_assert(
-    offsetof(CCommandTaskSerializer, mSerLoadFunc) == 0x0C, "CCommandTaskSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CCommandTaskSerializer, mSerSaveFunc) == 0x10, "CCommandTaskSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CCommandTaskSerializer) == 0x14, "CCommandTaskSerializer size must be 0x14");
 
   class CCommandTaskTypeInfo : public gpg::RType
   {

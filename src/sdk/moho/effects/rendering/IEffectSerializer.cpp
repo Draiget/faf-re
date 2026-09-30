@@ -1,5 +1,5 @@
-#include "moho/effects/rendering/IEffectSerializer.h"
 
+#include <cstddef>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -8,6 +8,7 @@
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/script/CScriptObject.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -17,25 +18,6 @@ namespace
       moho::CScriptObject::sType = gpg::LookupRType(typeid(moho::CScriptObject));
     }
     return moho::CScriptObject::sType;
-  }
-
-  /**
-   * Address: 0x007713E0 (FUN_007713E0, deserialize body)
-   *
-   * What it does:
-   * Loads `CScriptObject` base payload, then reads one unowned
-   * `IEffectManager*` pointer lane and one trailing integer lane.
-   */
-  void DeserializeIEffectBody(moho::IEffect* const effect, gpg::ReadArchive* const archive)
-  {
-    const gpg::RRef nullOwner{};
-    archive->Read(CachedCScriptObjectType(), static_cast<moho::CScriptObject*>(effect), nullOwner);
-
-    moho::IEffectManager* manager = nullptr;
-    archive->ReadPointer(&manager, &nullOwner);
-    effect->mManager = manager;
-
-    archive->ReadInt(&effect->mScriptObjectToken);
   }
 
   /**
@@ -52,6 +34,29 @@ namespace
     return archive;
   }
 
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x007713E0 (FUN_007713E0, deserialize body)
+   *
+   * What it does:
+   * Loads `CScriptObject` base payload, then reads one unowned
+   * `IEffectManager*` pointer lane and one trailing integer lane.
+   */
+  void IEffect::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef nullOwner{};
+    archive->Read(CachedCScriptObjectType(), static_cast<moho::CScriptObject*>(this), nullOwner);
+
+    moho::IEffectManager* manager = nullptr;
+    archive->ReadPointer(&manager, &nullOwner);
+    mManager = manager;
+
+    archive->ReadInt(&mScriptObjectToken);
+  }
+
   /**
    * Address: 0x00771450 (FUN_00771450, serialize body)
    *
@@ -59,90 +64,35 @@ namespace
    * Saves `CScriptObject` base payload, then writes one unowned
    * `IEffectManager*` pointer lane and one trailing integer lane.
    */
-  void SerializeIEffectBody(const moho::IEffect* const effect, gpg::WriteArchive* const archive)
+  void IEffect::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef nullOwner{};
-    archive->Write(CachedCScriptObjectType(), static_cast<const moho::CScriptObject*>(effect), nullOwner);
+    archive->Write(CachedCScriptObjectType(), static_cast<const moho::CScriptObject*>(this), nullOwner);
 
-    moho::IEffectManager* manager = effect->GetManager();
+    moho::IEffectManager* manager = GetManager();
     (void)SerializeIEffectManagerPointer(&manager, archive);
 
-    archive->WriteInt(effect->mScriptObjectToken);
+    archive->WriteInt(mScriptObjectToken);
   }
-
-  // Address: 0x010BB514 -- process-global `IEffectSerializer` singleton.
-  // Constructing it runs IEffectSerializer::IEffectSerializer()
-  // (0x00BDCF00), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction.
-  moho::IEffectSerializer gIEffectSerializer;
-} // namespace
+} // namespace moho
 
 namespace moho
 {
   /**
-   * Address: 0x00BDCF00 (FUN_00BDCF00, register_IEffectSerializer)
+   * `gpg::SerSaveLoadHelper<IEffect>`, vtable 0x00E36BC4.
    *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
+   * Address: 0x00BDCF00 (FUN_00BDCF00 -- constructs the global and registers its destructor.)
+   * Address: 0x00C020E0 (FUN_00C020E0 -- the global's destructor.)
+   * Address: 0x007712D0 (FUN_007712D0 -- `Init`.)
+   * Address: 0x007711E0 (FUN_007711E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x007711F0 (FUN_007711F0 -- `Serialize`, a forward to `MemberSerialize`.)
    */
-  IEffectSerializer::IEffectSerializer()
-    : mLoadCallback(&IEffectSerializer::Deserialize)
-    , mSaveCallback(&IEffectSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00C020E0 (FUN_00C020E0, Moho::IEffectSerializer::~IEffectSerializer)
-   *
-   * What it does:
-   * Unlinks this helper node from whatever intrusive list it currently sits
-   * in and restores a self-linked sentinel state.
-   */
-  IEffectSerializer::~IEffectSerializer() = default;
-
-  /**
-   * Address: 0x007711E0 (FUN_007711E0, Moho::IEffectSerializer::Deserialize)
-   *
-   * What it does:
-   * Adapts serializer callback ABI and forwards to `FUN_007713E0` body.
-   */
-  void IEffectSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    auto* const effect = reinterpret_cast<IEffect*>(objectPtr);
-    DeserializeIEffectBody(effect, archive);
-  }
-
-  /**
-   * Address: 0x007711F0 (FUN_007711F0, Moho::IEffectSerializer::Serialize)
-   *
-   * What it does:
-   * Adapts serializer callback ABI and forwards to `FUN_00771450` body.
-   */
-  void IEffectSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    auto* const effect = reinterpret_cast<IEffect*>(objectPtr);
-    SerializeIEffectBody(effect, archive);
-  }
-
-  /**
-   * Address: 0x007712D0 (FUN_007712D0, gpg::SerSaveLoadHelper_IEffect::Init)
-   *
-   * IDA signature:
-   * void (__cdecl *__thiscall gpg::SerSaveLoadHelper_IEffect::Init(_DWORD *this))
-   * (gpg::ReadArchive *, int, int, gpg::RRef *);
-   */
-  void IEffectSerializer::Init()
-  {
-    gpg::RType* const type = IEffect::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
+  struct IEffectSerializer : gpg::SerSaveLoadHelper<IEffect>
+  {};
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010BB514 -- process-global `IEffectSerializer` singleton.
+  moho::IEffectSerializer gIEffectSerializer;
+} // namespace

@@ -8,6 +8,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -17,73 +18,7 @@ namespace
     return kNullOwner;
   }
 
-  /**
-   * Address: 0x008831C0 (FUN_008831C0)
-   *
-   * What it does:
-   * Loads SSavedGameHeader payload fields and shared LaunchInfoBase pointer.
-   * Single caller (the 0x00880260 thunk); the compiler passes `archive`
-   * through `esi` and `objectPtr` through `edi` at the machine-code level
-   * instead of the normal 4-arg cdecl stack shape, which is why this body
-   * is a free function rather than the field-bound callback itself.
-   */
-  void LoadSavedGameHeader(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef*)
-  {
-    auto* const header = reinterpret_cast<moho::SSavedGameHeader*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(header != nullptr);
-    if (!archive || !header) {
-      return;
-    }
-
-    if (version < 3) {
-      throw std::runtime_error("WrongVersion");
-    }
-
-    archive->ReadInt(&header->mVersion);
-    archive->ReadString(&header->mMapName);
-    archive->ReadInt(&header->mFocusArmy);
-    archive->Read(gpg::ResolveSavedGameArmyInfoVectorType(), &header->mArmyInfo, NullOwnerRef());
-    archive->ReadString(&header->mScenarioInfoText);
-    archive->ReadPointerShared(&header->mLaunchInfo, &NullOwnerRef());
-  }
-
-  /**
-   * Address: 0x00883280 (FUN_00883280)
-   *
-   * What it does:
-   * Saves SSavedGameHeader payload fields and LaunchInfoBase shared pointer lane.
-   * Single caller (the 0x00880280 thunk); same register-passing shape as
-   * LoadSavedGameHeader/0x008831C0.
-   */
-  void SaveSavedGameHeader(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef*)
-  {
-    auto* const header = reinterpret_cast<const moho::SSavedGameHeader*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(header != nullptr);
-    if (!archive || !header) {
-      return;
-    }
-
-    if (version < 3) {
-      throw std::runtime_error("WrongVersion");
-    }
-
-    archive->WriteInt(header->mVersion);
-    archive->WriteString(const_cast<msvc8::string*>(&header->mMapName));
-    archive->WriteInt(header->mFocusArmy);
-    archive->Write(gpg::ResolveSavedGameArmyInfoVectorType(), &header->mArmyInfo, NullOwnerRef());
-    archive->WriteString(const_cast<msvc8::string*>(&header->mScenarioInfoText));
-
-    gpg::RRef launchInfoRef{};
-    gpg::RRef_LaunchInfoBase(&launchInfoRef, header->mLaunchInfo.px);
-    gpg::WriteRawPointer(archive, launchInfoRef, gpg::TrackedPointerState::Shared, NullOwnerRef());
-  }
-
   moho::SSavedGameHeaderTypeInfo gSavedGameHeaderTypeInfo;
-
-  // Address: 0x010C4D74 -- process-global `SSavedGameHeaderSerializer` singleton.
-  moho::SSavedGameHeaderSerializer gSavedGameHeaderSerializer;
 
   /**
    * Address: 0x00880110 (FUN_00880110, preregister_SSavedGameHeaderTypeInfo)
@@ -182,57 +117,91 @@ namespace moho
     Finish();
   }
 
-  /**
-   * Address: 0x00880260 (FUN_00880260, Moho::SSavedGameHeaderSerializer::Deserialize)
-   */
-  void SSavedGameHeaderSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
-  )
-  {
-    LoadSavedGameHeader(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00880280 (FUN_00880280, Moho::SSavedGameHeaderSerializer::Serialize)
-   */
-  void SSavedGameHeaderSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
-  )
-  {
-    SaveSavedGameHeader(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00BE7040 (FUN_00BE7040, register_SSavedGameHeaderSerializer,
-   * dynamic initializer for the global `SSavedGameHeaderSerializer`
-   * singleton)
-   */
-  SSavedGameHeaderSerializer::SSavedGameHeaderSerializer()
-    : mSerLoadFunc(&SSavedGameHeaderSerializer::Deserialize)
-    , mSerSaveFunc(&SSavedGameHeaderSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00C07D50 (FUN_00C07D50, ??1SSavedGameHeaderSerializer@Moho@@QAE@@Z)
-   */
-  SSavedGameHeaderSerializer::~SSavedGameHeaderSerializer() = default;
-
-  /**
-   * Address: 0x00882330 (FUN_00882330, Moho::SSavedGameHeaderSerializer::Init)
-   *
-   * What it does:
-   * Registers save/load callbacks for SSavedGameHeader.
-   */
-  void SSavedGameHeaderSerializer::Init()
-  {
-    gpg::RType* const type = SSavedGameHeader::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
 } // namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_SSavedGameHeaderTypeInfo_84f4eb, preregister_SSavedGameHeaderTypeInfo)
+
+namespace moho
+{
+  /**
+   * Address: 0x008831C0 (FUN_008831C0)
+   *
+   * What it does:
+   * Loads SSavedGameHeader payload fields and shared LaunchInfoBase pointer.
+   * Single caller (the 0x00880260 thunk); the compiler passes `archive`
+   * through `esi` and `objectPtr` through `edi` at the machine-code level
+   * instead of the normal 4-arg cdecl stack shape, which is why this body
+   * is a free function rather than the field-bound callback itself.
+   */
+  void SSavedGameHeader::MemberDeserialize(gpg::ReadArchive* const archive, const int version, const gpg::RRef&)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    if (version < 3) {
+      throw std::runtime_error("WrongVersion");
+    }
+
+    archive->ReadInt(&mVersion);
+    archive->ReadString(&mMapName);
+    archive->ReadInt(&mFocusArmy);
+    archive->Read(gpg::ResolveSavedGameArmyInfoVectorType(), &mArmyInfo, NullOwnerRef());
+    archive->ReadString(&mScenarioInfoText);
+    archive->ReadPointerShared(&mLaunchInfo, &NullOwnerRef());
+  }
+
+  /**
+   * Address: 0x00883280 (FUN_00883280)
+   *
+   * What it does:
+   * Saves SSavedGameHeader payload fields and LaunchInfoBase shared pointer lane.
+   * Single caller (the 0x00880280 thunk); same register-passing shape as
+   * LoadSavedGameHeader/0x008831C0.
+   */
+  void SSavedGameHeader::MemberSerialize(gpg::WriteArchive* const archive, const int version, const gpg::RRef&) const
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    if (version < 3) {
+      throw std::runtime_error("WrongVersion");
+    }
+
+    archive->WriteInt(mVersion);
+    archive->WriteString(const_cast<msvc8::string*>(&mMapName));
+    archive->WriteInt(mFocusArmy);
+    archive->Write(gpg::ResolveSavedGameArmyInfoVectorType(), &mArmyInfo, NullOwnerRef());
+    archive->WriteString(const_cast<msvc8::string*>(&mScenarioInfoText));
+
+    gpg::RRef launchInfoRef{};
+    gpg::RRef_LaunchInfoBase(&launchInfoRef, mLaunchInfo.px);
+    gpg::WriteRawPointer(archive, launchInfoRef, gpg::TrackedPointerState::Shared, NullOwnerRef());
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SSavedGameHeader>`, vtable 0x00E49D74.
+   *
+   * Address: 0x00BE7040 (FUN_00BE7040 -- constructs the global and registers its destructor.)
+   * Address: 0x00C07D50 (FUN_00C07D50 -- the global's destructor.)
+   * Address: 0x00882330 (FUN_00882330 -- `Init`.)
+   * Address: 0x00880260 (FUN_00880260 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x00880280 (FUN_00880280 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct SSavedGameHeaderSerializer : gpg::SerSaveLoadHelper<SSavedGameHeader>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010C4D74 -- process-global `SSavedGameHeaderSerializer` singleton.
+  moho::SSavedGameHeaderSerializer gSSavedGameHeaderSerializer;
+} // namespace

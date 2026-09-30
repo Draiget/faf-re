@@ -39,6 +39,22 @@ namespace moho
   class CDecalBuffer
   {
   public:
+    /**
+     * Address: 0x0077F160 (FUN_0077F160)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* ar) const;
+
+    /**
+     * Address: 0x0077F0F0 (FUN_0077F0F0)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* ar);
+
     static gpg::RType* sType;
 
     /**

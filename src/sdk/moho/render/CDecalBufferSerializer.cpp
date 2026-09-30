@@ -10,6 +10,7 @@
 #include "moho/render/CDecalHandle.h"
 #include "moho/sim/IdPool.h"
 #include "moho/sim/Sim.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace gpg
 {
@@ -19,11 +20,6 @@ namespace gpg
 
 namespace
 {
-  // Address: 0x010BBD0C -- process-global `CDecalBufferSerializer` singleton
-  // (constructed by FUN_00BDD880, self-registering via `__xc_a`; see
-  // CDecalBufferSerializer.h for the real-ctor/atexit-target/dead-duplicate
-  // evidence).
-  moho::CDecalBufferSerializer gCDecalBufferSerializer;
 
   [[nodiscard]] gpg::RType* CachedIdPoolType()
   {
@@ -33,56 +29,6 @@ namespace
       moho::IdPool::sType = type;
     }
     return type;
-  }
-
-  /**
-   * Address: 0x00779C40 (FUN_00779C40, Moho::CDecalBufferSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback lane for `CDecalBuffer`. In the binary this is a
-   * calling-convention adapter (`jmp sub_77F160`) that reorders the reflection
-   * `(WriteArchive*, objectPtr, ...)` arguments into the `__usercall` save body.
-   * Recovered here as the typed callback that forwards to
-   * `CDecalBufferSaveCallback`.
-   */
-  void CDecalBufferSerializeLane(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const buffer = reinterpret_cast<const moho::CDecalBuffer*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-    );
-    if (archive != nullptr && buffer != nullptr) {
-      moho::CDecalBufferSaveCallback(archive, buffer);
-    }
-  }
-
-  /**
-   * Address: 0x00779C30 (FUN_00779C30, Moho::CDecalBufferSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback lane for `CDecalBuffer`. In the binary this is a
-   * calling-convention adapter (`jmp sub_77F0F0`) that reorders the reflection
-   * `(ReadArchive*, objectPtr, ...)` arguments into the `__usercall` load body.
-   * Recovered here as the typed callback that forwards to
-   * `CDecalBufferLoadCallback`.
-   */
-  void CDecalBufferDeserializeLane(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const buffer = reinterpret_cast<moho::CDecalBuffer*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-    );
-    if (archive != nullptr && buffer != nullptr) {
-      moho::CDecalBufferLoadCallback(archive, buffer);
-    }
   }
 
 } // namespace
@@ -117,26 +63,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0077F160 (FUN_0077F160)
-   *
-   * IDA signature:
-   * void __usercall sub_77F160(BinaryWriteArchive *ar@<eax>, Moho::CDecalBuffer *buf@<esi>);
-   *
-   * What it does:
-   * Save body for one `CDecalBuffer`: writes the owning `Sim` (+0x00) as an
-   * unowned tracked pointer, the `IdPool` sub-object (+0x08) via reflection with
-   * a lazily-resolved `RType`, then the owned decal-handle list.
-   */
-  void CDecalBufferSaveCallback(gpg::WriteArchive* const ar, const CDecalBuffer* const buf)
-  {
-    ar->WritePointer<moho::Sim>(buf->mSim, gpg::TrackedPointerState::Unowned, gpg::RRef{});
-
-    ar->Write(CachedIdPoolType(), &buf->mPool, gpg::RRef{});
-
-    WriteDecalHandles(buf, ar);
-  }
-
-  /**
    * Address: 0x0077F0F0 (FUN_0077F0F0)
    *
    * IDA signature:
@@ -149,41 +75,55 @@ namespace moho
    * its own zeroed owner reference, matching the two locals the binary clears
    * at 0x0077F106 and 0x0077F11A.
    */
-  void CDecalBufferLoadCallback(gpg::ReadArchive* const ar, CDecalBuffer* const buf)
+  void CDecalBuffer::MemberDeserialize(gpg::ReadArchive* const ar)
   {
     const gpg::RRef simRef{};
-    (void)ar->ReadPointer(&buf->mSim, &simRef);
+    (void)ar->ReadPointer(&mSim, &simRef);
 
-    ar->Read(CachedIdPoolType(), &buf->mPool, gpg::RRef{});
+    ar->Read(CachedIdPoolType(), &mPool, gpg::RRef{});
 
-    buf->ReadDecalHandles(ar);
+    ReadDecalHandles(ar);
   }
 
   /**
-   * Address: 0x0077AB00 (FUN_0077AB00, gpg::SerSaveLoadHelper_CDecalBuffer::Init)
+   * Address: 0x0077F160 (FUN_0077F160)
    *
    * IDA signature:
-   * void (__cdecl *__thiscall gpg::SerSaveLoadHelper_CDecalBuffer::Init(
-   *   void (__cdecl **this)(gpg::WriteArchive *, void *obj, int version, const gpg::RRef *a5)))
-   * (gpg::ReadArchive *arch, void *obj, int cont, gpg::RRef *res);
+   * void __usercall sub_77F160(BinaryWriteArchive *ar@<eax>, Moho::CDecalBuffer *buf@<esi>);
+   *
+   * What it does:
+   * Save body for one `CDecalBuffer`: writes the owning `Sim` (+0x00) as an
+   * unowned tracked pointer, the `IdPool` sub-object (+0x08) via reflection with
+   * a lazily-resolved `RType`, then the owned decal-handle list.
    */
-  void CDecalBufferSerializer::Init()
+  void CDecalBuffer::MemberSerialize(gpg::WriteArchive* const ar) const
   {
-    gpg::RType* const type = CDecalBuffer::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
+    ar->WritePointer<moho::Sim>(mSim, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+
+    ar->Write(CachedIdPoolType(), &mPool, gpg::RRef{});
+
+    WriteDecalHandles(this, ar);
   }
-
-  /**
-   * Address: 0x00BDD880 (FUN_00BDD880, dynamic initializer for the global
-   * `CDecalBufferSerializer` singleton)
-   */
-  CDecalBufferSerializer::CDecalBufferSerializer()
-    : mLoadCallback(&CDecalBufferDeserializeLane)
-    , mSaveCallback(&CDecalBufferSerializeLane)
-  {}
-
-  CDecalBufferSerializer::~CDecalBufferSerializer() = default;
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CDecalBuffer>`, vtable 0x00E373D8.
+   *
+   * Address: 0x00BDD880 (FUN_00BDD880 -- constructs the global and registers its destructor.)
+   * Address: 0x00C028B0 (FUN_00C028B0 -- the global's destructor.)
+   * Address: 0x00779C50 (FUN_00779C50 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0077AB00 (FUN_0077AB00 -- `Init`.)
+   * Address: 0x00779C30 (FUN_00779C30 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00779C40 (FUN_00779C40 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CDecalBufferSerializer : gpg::SerSaveLoadHelper<CDecalBuffer>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BBD0C -- process-global `CDecalBufferSerializer` singleton.
+  moho::CDecalBufferSerializer gCDecalBufferSerializer;
+} // namespace

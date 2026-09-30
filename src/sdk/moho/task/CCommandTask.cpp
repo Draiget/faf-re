@@ -15,12 +15,12 @@
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
 namespace
 {
-  CCommandTaskSerializer gCCommandTaskSerializer{};
 
   bool gCCommandTaskTypeInfoPreregistered = false;
 
@@ -422,43 +422,6 @@ Unit* CCommandTask::GetUnit() const noexcept
 }
 
 /**
- * Address: 0x00608DE0 (FUN_00608DE0, Moho::CCommandTaskSerializer::Deserialize)
- * Address: 0x0060CFC0 (FUN_0060CFC0, shared callback body)
- */
-void CCommandTaskSerializer::Deserialize(
-  gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-)
-{
-  auto* const task = reinterpret_cast<CCommandTask*>(static_cast<std::uintptr_t>(objectPtr));
-  GPG_ASSERT(archive != nullptr);
-  GPG_ASSERT(task != nullptr);
-  if (!archive || !task) {
-    return;
-  }
-
-  const gpg::RRef owner{};
-  archive->TrackPointer(MakeEAiResultRef(&task->mLinkResult));
-
-  gpg::RType* taskType = CTask::sType;
-  if (!taskType) {
-    taskType = CachedCTaskType();
-    CTask::sType = taskType;
-  }
-  archive->Read(taskType, static_cast<CTask*>(task), owner);
-
-  task->mUnit = ReadTypedPointer<Unit>(archive, owner, CachedUnitType(), "Unit");
-  task->mSim = ReadTypedPointer<Sim>(archive, owner, CachedSimType(), "Sim");
-
-  int taskState = 0;
-  archive->ReadInt(&taskState);
-  task->mTaskState = static_cast<ETaskState>(taskState);
-
-  gpg::RType* aiResultType = CachedEAiResultType();
-  archive->Read(aiResultType, &task->mLinkResult, owner);
-  task->mDispatchResult = ReadTypedPointer<EAiResult>(archive, owner, aiResultType, "EAiResult");
-}
-
-/**
  * Address: 0x0060C270 (FUN_0060C270, serializer load thunk alias)
  *
  * What it does:
@@ -469,7 +432,6 @@ void DeserializeCCommandTaskThunkVariantA(
   gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
-  CCommandTaskSerializer::Deserialize(archive, objectPtr, version, ownerRef);
 }
 
 /**
@@ -483,43 +445,6 @@ void DeserializeCCommandTaskThunkVariantB(
   gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
-  CCommandTaskSerializer::Deserialize(archive, objectPtr, version, ownerRef);
-}
-
-/**
- * Address: 0x00608DF0 (FUN_00608DF0, Moho::CCommandTaskSerializer::Serialize)
- * Address: 0x0060D0C0 (FUN_0060D0C0, shared callback body)
- */
-void CCommandTaskSerializer::Serialize(
-  gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-)
-{
-  auto* const task = reinterpret_cast<CCommandTask*>(static_cast<std::uintptr_t>(objectPtr));
-  GPG_ASSERT(archive != nullptr);
-  GPG_ASSERT(task != nullptr);
-  if (!archive || !task) {
-    return;
-  }
-
-  const gpg::RRef owner{};
-  archive->PreCreatedPtr(MakeEAiResultRef(&task->mLinkResult));
-
-  gpg::RType* taskType = CTask::sType;
-  if (!taskType) {
-    taskType = CachedCTaskType();
-    CTask::sType = taskType;
-  }
-  archive->Write(taskType, static_cast<const CTask*>(task), owner);
-
-  gpg::WriteRawPointer(archive, MakeDerivedRef(task->mUnit, CachedUnitType()), gpg::TrackedPointerState::Unowned, owner);
-  gpg::WriteRawPointer(archive, MakeDerivedRef(task->mSim, CachedSimType()), gpg::TrackedPointerState::Unowned, owner);
-  archive->WriteInt(static_cast<int>(task->mTaskState));
-
-  gpg::RType* const aiResultType = CachedEAiResultType();
-  archive->Write(aiResultType, &task->mLinkResult, owner);
-  gpg::WriteRawPointer(
-    archive, MakeEAiResultRef(task->mDispatchResult), gpg::TrackedPointerState::Unowned, owner
-  );
 }
 
 /**
@@ -533,7 +458,6 @@ void SerializeCCommandTaskThunkVariantA(
   gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
-  CCommandTaskSerializer::Serialize(archive, objectPtr, version, ownerRef);
 }
 
 /**
@@ -547,40 +471,6 @@ void SerializeCCommandTaskThunkVariantB(
   gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
 )
 {
-  CCommandTaskSerializer::Serialize(archive, objectPtr, version, ownerRef);
-}
-
-/**
- * Address: 0x00BD0590 (FUN_00BD0590, dynamic initializer for the global
- * `CCommandTaskSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the load/save
- * callback fields.
- */
-CCommandTaskSerializer::CCommandTaskSerializer()
-  : mSerLoadFunc(&CCommandTaskSerializer::Deserialize)
-  , mSerSaveFunc(&CCommandTaskSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BF9B40 (FUN_00BF9B40, Moho::CCommandTaskSerializer::~CCommandTaskSerializer)
- */
-CCommandTaskSerializer::~CCommandTaskSerializer() = default;
-
-/**
- * Address: 0x0060BA20 (FUN_0060BA20, sub_60BA20)
- *
- * What it does:
- * Binds load/save serializer callbacks into CCommandTask RTTI.
- */
-void CCommandTaskSerializer::Init()
-{
-  gpg::RType* const type = CachedCCommandTaskType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mSerLoadFunc;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSerSaveFunc;
 }
 
 /**
@@ -682,3 +572,92 @@ namespace
 GPG_PREREGISTER_INIT(register_CCommandTaskTypeInfo_7e4818, moho::register_CCommandTaskTypeInfo)
 
 GPG_PREREGISTER_INIT(AcquireCCommandTaskTypeInfo_7e4818, AcquireCCommandTaskTypeInfo)
+
+namespace moho
+{
+  /**
+   * Address: 0x00608DE0 (FUN_00608DE0, Moho::CCommandTaskSerializer::Deserialize)
+   * Address: 0x0060CFC0 (FUN_0060CFC0, shared callback body)
+   */
+  void CCommandTask::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& const)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->TrackPointer(MakeEAiResultRef(&mLinkResult));
+
+    gpg::RType* taskType = CTask::sType;
+    if (!taskType) {
+      taskType = CachedCTaskType();
+      CTask::sType = taskType;
+    }
+    archive->Read(taskType, static_cast<CTask*>(this), owner);
+
+    mUnit = ReadTypedPointer<Unit>(archive, owner, CachedUnitType(), "Unit");
+    mSim = ReadTypedPointer<Sim>(archive, owner, CachedSimType(), "Sim");
+
+    int taskState = 0;
+    archive->ReadInt(&taskState);
+    mTaskState = static_cast<ETaskState>(taskState);
+
+    gpg::RType* aiResultType = CachedEAiResultType();
+    archive->Read(aiResultType, &mLinkResult, owner);
+    mDispatchResult = ReadTypedPointer<EAiResult>(archive, owner, aiResultType, "EAiResult");
+  }
+
+  /**
+   * Address: 0x00608DF0 (FUN_00608DF0, Moho::CCommandTaskSerializer::Serialize)
+   * Address: 0x0060D0C0 (FUN_0060D0C0, shared callback body)
+   */
+  void CCommandTask::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& const)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->PreCreatedPtr(MakeEAiResultRef(&mLinkResult));
+
+    gpg::RType* taskType = CTask::sType;
+    if (!taskType) {
+      taskType = CachedCTaskType();
+      CTask::sType = taskType;
+    }
+    archive->Write(taskType, static_cast<const CTask*>(this), owner);
+
+    gpg::WriteRawPointer(archive, MakeDerivedRef(mUnit, CachedUnitType()), gpg::TrackedPointerState::Unowned, owner);
+    gpg::WriteRawPointer(archive, MakeDerivedRef(mSim, CachedSimType()), gpg::TrackedPointerState::Unowned, owner);
+    archive->WriteInt(static_cast<int>(mTaskState));
+
+    gpg::RType* const aiResultType = CachedEAiResultType();
+    archive->Write(aiResultType, &mLinkResult, owner);
+    gpg::WriteRawPointer(
+      archive, MakeEAiResultRef(mDispatchResult), gpg::TrackedPointerState::Unowned, owner
+    );
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CCommandTask>`, vtable 0x00E202B0.
+   *
+   * Address: 0x00BD0590 (FUN_00BD0590 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF9B40 (FUN_00BF9B40 -- the global's destructor.)
+   * Address: 0x0060BA20 (FUN_0060BA20 -- `Init`.)
+   * Address: 0x00608DE0 (FUN_00608DE0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00608DF0 (FUN_00608DF0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CCommandTaskSerializer : gpg::SerSaveLoadHelper<CCommandTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B1364 -- process-global `CCommandTaskSerializer` singleton.
+  moho::CCommandTaskSerializer gCCommandTaskSerializer;
+} // namespace

@@ -32,6 +32,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00642BB0 (FUN_00642BB0)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00642A50 (FUN_00642A50)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x0063F380 (FUN_0063F380, ??0CAnimationManipulator@Moho@@QAE@XZ)
      *
      * What it does:
@@ -542,71 +558,6 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetDirectionalAnimL(LuaPlus::LuaState* state);
 
-  class CAnimationManipulatorSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD2DF0 (FUN_00BD2DF0, register_CAnimationManipulatorSerializer,
-     * dynamic initializer for the global `CAnimationManipulatorSerializer`
-     * singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     *
-     * A dead, zero-xref duplicate ctor with the identical body exists at
-     * 0x0063F2F0 (no `atexit`-registered dtor push, unreachable) -- skip.
-     */
-    CAnimationManipulatorSerializer();
-
-    /**
-     * Address: 0x00BFB020 (FUN_00BFB020, Moho::CAnimationManipulatorSerializer::~CAnimationManipulatorSerializer)
-     */
-    ~CAnimationManipulatorSerializer();
-
-    /**
-     * Address: 0x0063F2C0 (FUN_0063F2C0, Moho::CAnimationManipulatorSerializer::Deserialize)
-     *
-     * What it does:
-     * Loads `CAnimationManipulator` serialization payload (base IAniManipulator
-     * lane, goal-link lane, bit-mask lane, shared animation resource, and
-     * playback/flag scalars) into an existing object.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0063F2D0 (FUN_0063F2D0, Moho::CAnimationManipulatorSerializer::Serialize)
-     *
-     * What it does:
-     * Saves `CAnimationManipulator` serialization payload (base IAniManipulator
-     * lane, goal-link lane, bit-mask lane, shared animation resource, and
-     * playback/flag scalars) from an existing object.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00641EF0 (FUN_00641EF0, Moho::CAnimationManipulatorSerializer::Init)
-     *
-     * This body is ICF-folded/shared with vtable slot 0 of the
-     * never-constructed `gpg::SerSaveLoadHelper<CAnimationManipulator>`
-     * template instantiation
-     * (`??_7?$SerSaveLoadHelper@VCAnimationManipulator@Moho@@@gpg@@6B@`,
-     * confirmed to have zero vtable-writer ctors anywhere in the binary).
-     * `CAnimationManipulatorSerializer` is not derived through that template:
-     * Deserialize/Serialize forward into free functions
-     * (`DeserializeCAnimationManipulatorState`/`SerializeCAnimationManipulatorState`),
-     * not a `CAnimationManipulator::MemberDeserialize`/`MemberSerialize` pair.
-     *
-     * What it does:
-     * Installs CAnimationManipulator load/save callbacks into RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
   class CAnimationManipulatorTypeInfo : public gpg::RType
   {
   public:
@@ -674,14 +625,5 @@ namespace moho
     "CAnimationManipulator::mDirectionalAnim offset must be 0xB5"
   );
   static_assert(sizeof(CAnimationManipulator) == 0xB8, "CAnimationManipulator size must be 0xB8");
-  static_assert(
-    offsetof(CAnimationManipulatorSerializer, mSerLoadFunc) == 0x0C,
-    "CAnimationManipulatorSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CAnimationManipulatorSerializer, mSerSaveFunc) == 0x10,
-    "CAnimationManipulatorSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CAnimationManipulatorSerializer) == 0x14, "CAnimationManipulatorSerializer size must be 0x14");
   static_assert(sizeof(CAnimationManipulatorTypeInfo) == 0x64, "CAnimationManipulatorTypeInfo size must be 0x64");
 } // namespace moho

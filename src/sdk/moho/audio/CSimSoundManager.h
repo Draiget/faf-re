@@ -27,6 +27,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00762820 (FUN_00762820)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00762B40 (FUN_00762B40)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x00760C80 (FUN_00760C80)
      *
      * Sim* ownerSim

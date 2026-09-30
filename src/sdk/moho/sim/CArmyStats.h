@@ -86,6 +86,22 @@ namespace moho
   class CArmyStatItem : public StatItem
   {
   public:
+    /**
+     * Address: 0x007147D0 (FUN_007147D0)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00714750 (FUN_00714750)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     static gpg::RType* sType;
     static gpg::RType* sPointerType;
     [[nodiscard]] static gpg::RType* StaticGetClass();

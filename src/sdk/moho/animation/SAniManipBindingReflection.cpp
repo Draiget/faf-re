@@ -24,48 +24,7 @@ namespace moho
     void Init() override;
   };
 
-  class SAniManipBindingSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD2BC0 (FUN_00BD2BC0, dynamic initializer for the global
-     * `SAniManipBindingSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    SAniManipBindingSerializer();
-
-    /**
-     * Address: 0x00BFAD90 (FUN_00BFAD90, Moho::SAniManipBindingSerializer::~SAniManipBindingSerializer)
-     */
-    ~SAniManipBindingSerializer();
-
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0063C2B0 (FUN_0063C2B0, Moho::SAniManipBindingSerializer::Init)
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mLoadCallback; // +0x0C
-    gpg::RType::save_func_t mSaveCallback; // +0x10
-  };
-
   static_assert(sizeof(SAniManipBindingTypeInfo) == 0x64, "SAniManipBindingTypeInfo size must be 0x64");
-  static_assert(
-    offsetof(SAniManipBindingSerializer, mLoadCallback) == 0x0C,
-    "SAniManipBindingSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SAniManipBindingSerializer, mSaveCallback) == 0x10,
-    "SAniManipBindingSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(SAniManipBindingSerializer) == 0x14, "SAniManipBindingSerializer size must be 0x14");
-
   /**
    * Address: 0x0063B270 (FUN_0063B270, preregister_SAniManipBindingTypeInfo)
    *
@@ -131,11 +90,7 @@ namespace gpg
 namespace
 {
   using SAniManipBindingTypeInfo = moho::SAniManipBindingTypeInfo;
-  using SAniManipBindingSerializer = moho::SAniManipBindingSerializer;
   using FastVectorSAniManipBindingType = gpg::RFastVectorType<moho::SAniManipBinding>;
-
-  // Address: 0x010B28C8 -- process-global `SAniManipBindingSerializer` singleton.
-  SAniManipBindingSerializer gSAniManipBindingSerializer;
 
   /**
    * Address: 0x00BFAD30 (FUN_00BFAD30, atexit destructor of the SAniManipBindingTypeInfo object)
@@ -193,67 +148,6 @@ namespace
     outView->capacityEnd = inlineStorageBase + 2;
     outView->inlineStorage = inlineStorageBase;
     return outView;
-  }
-
-  /**
-   * Address: 0x0063CCA0 (FUN_0063CCA0, sub_63CCA0)
-   *
-   * IDA signature:
-   * int __usercall sub_63CCA0@<eax>(int a1@<eax>, gpg::ReadArchive *a2@<ecx>, int a3);
-   *
-   * What it does:
-   * Deserializes one `SAniManipBinding` payload (one `int` bone index plus a
-   * pair of `ushort`/`short` halves combined into the 32-bit flag word). When
-   * loading a pre-version-2 archive, also drains and discards a legacy
-   * `CAniPose*` pointer slot that older snapshots wrote ahead of the fields.
-   */
-  void DeserializeSAniManipBindingFields(
-    moho::SAniManipBinding* const binding,
-    gpg::ReadArchive* const archive,
-    const int version
-  )
-  {
-    if (version < 2) {
-      moho::CAniPose* discardedAniPose = nullptr;
-      const gpg::RRef nullOwner{};
-      archive->ReadPointer(&discardedAniPose, &nullOwner);
-    }
-
-    archive->ReadInt(&binding->mBoneIndex);
-    unsigned short lowFlags = 0;
-    short highFlags = 0;
-    archive->ReadUShort(&lowFlags);
-    archive->ReadShort(&highFlags);
-
-    const std::uint32_t combined =
-      static_cast<std::uint32_t>(lowFlags)
-      | (static_cast<std::uint32_t>(static_cast<std::uint16_t>(highFlags)) << 16);
-    binding->mFlags = static_cast<std::int32_t>(combined);
-  }
-
-  /**
-   * Address: 0x0063CD00 (FUN_0063CD00)
-   *
-   * What it does:
-   * Serializes one `SAniManipBinding`, preserving the version-1 raw-pointer
-   * compatibility lane when older archive versions are requested.
-   */
-  void SerializeSAniManipBindingFields(
-    const moho::SAniManipBinding* const binding,
-    gpg::WriteArchive* const archive,
-    const int version
-  )
-  {
-    if (version < 2) {
-      const gpg::RRef nullRef{};
-      const gpg::RRef nullOwner{};
-      gpg::WriteRawPointer(archive, nullRef, gpg::TrackedPointerState::Unowned, nullOwner);
-    }
-
-    archive->WriteInt(binding->mBoneIndex);
-    const std::uint32_t rawFlags = static_cast<std::uint32_t>(binding->mFlags);
-    archive->WriteUShort(static_cast<unsigned short>(rawFlags & 0xFFFFu));
-    archive->WriteShort(static_cast<short>((rawFlags >> 16) & 0xFFFFu));
   }
 
   /**
@@ -335,53 +229,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0063B3B0 (FUN_0063B3B0, Moho::SAniManipBindingSerializer::Deserialize)
-   */
-  void SAniManipBindingSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const
-  )
-  {
-    if (!archive || objectPtr == 0) {
-      return;
-    }
-
-    DeserializeSAniManipBindingFields(reinterpret_cast<SAniManipBinding*>(objectPtr), archive, version);
-  }
-
-  /**
-   * Address: 0x0063B3D0 (FUN_0063B3D0, Moho::SAniManipBindingSerializer::Serialize)
-   */
-  void SAniManipBindingSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const
-  )
-  {
-    if (!archive || objectPtr == 0) {
-      return;
-    }
-
-    SerializeSAniManipBindingFields(reinterpret_cast<const SAniManipBinding*>(objectPtr), archive, version);
-  }
-
-  /**
-   * Address: 0x0063C2B0 (FUN_0063C2B0, Moho::SAniManipBindingSerializer::Init)
-   */
-  void SAniManipBindingSerializer::Init()
-  {
-    gpg::RType* const type = CachedSAniManipBindingType();
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
-    type->serLoadFunc_ = mLoadCallback;
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  /**
    * Address: 0x0063B270 (FUN_0063B270, preregister_SAniManipBindingTypeInfo)
    */
   gpg::RType* preregister_SAniManipBindingTypeInfo()
@@ -400,19 +247,6 @@ namespace moho
     (void)preregister_SAniManipBindingTypeInfo();
   }
 
-  /**
-   * Address: 0x00BFAD90 (FUN_00BFAD90, Moho::SAniManipBindingSerializer::~SAniManipBindingSerializer)
-   */
-  SAniManipBindingSerializer::~SAniManipBindingSerializer() = default;
-
-  /**
-   * Address: 0x00BD2BC0 (FUN_00BD2BC0, dynamic initializer for the global
-   * `SAniManipBindingSerializer` singleton)
-   */
-  SAniManipBindingSerializer::SAniManipBindingSerializer()
-    : mLoadCallback(&SAniManipBindingSerializer::Deserialize)
-    , mSaveCallback(&SAniManipBindingSerializer::Serialize)
-  {}
 } // namespace moho
 
 namespace gpg
@@ -545,3 +379,80 @@ namespace
 GPG_PREREGISTER_INIT(preregister_SAniManipBindingTypeInfo_c664d9, moho::preregister_SAniManipBindingTypeInfo)
 GPG_PREREGISTER_INIT(preregister_FastVectorSAniManipBindingType_c664d9, moho::preregister_FastVectorSAniManipBindingType)
 GPG_PREREGISTER_INIT(register_FastVectorSAniManipBindingType_c664d9, moho::register_FastVectorSAniManipBindingType)
+
+namespace moho
+{
+  /**
+   * Address: 0x0063CCA0 (FUN_0063CCA0, sub_63CCA0)
+   *
+   * IDA signature:
+   * int __usercall sub_63CCA0@<eax>(int a1@<eax>, gpg::ReadArchive *a2@<ecx>, int a3);
+   *
+   * What it does:
+   * Deserializes one `SAniManipBinding` payload (one `int` bone index plus a
+   * pair of `ushort`/`short` halves combined into the 32-bit flag word). When
+   * loading a pre-version-2 archive, also drains and discards a legacy
+   * `CAniPose*` pointer slot that older snapshots wrote ahead of the fields.
+   */
+  void SAniManipBinding::MemberDeserialize(gpg::ReadArchive* const archive, const int version, const gpg::RRef&)
+  {
+    if (version < 2) {
+      moho::CAniPose* discardedAniPose = nullptr;
+      const gpg::RRef nullOwner{};
+      archive->ReadPointer(&discardedAniPose, &nullOwner);
+    }
+
+    archive->ReadInt(&mBoneIndex);
+    unsigned short lowFlags = 0;
+    short highFlags = 0;
+    archive->ReadUShort(&lowFlags);
+    archive->ReadShort(&highFlags);
+
+    const std::uint32_t combined =
+      static_cast<std::uint32_t>(lowFlags)
+      | (static_cast<std::uint32_t>(static_cast<std::uint16_t>(highFlags)) << 16);
+    mFlags = static_cast<std::int32_t>(combined);
+  }
+
+  /**
+   * Address: 0x0063CD00 (FUN_0063CD00)
+   *
+   * What it does:
+   * Serializes one `SAniManipBinding`, preserving the version-1 raw-pointer
+   * compatibility lane when older archive versions are requested.
+   */
+  void SAniManipBinding::MemberSerialize(gpg::WriteArchive* const archive, const int version, const gpg::RRef&) const
+  {
+    if (version < 2) {
+      const gpg::RRef nullRef{};
+      const gpg::RRef nullOwner{};
+      gpg::WriteRawPointer(archive, nullRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    }
+
+    archive->WriteInt(mBoneIndex);
+    const std::uint32_t rawFlags = static_cast<std::uint32_t>(mFlags);
+    archive->WriteUShort(static_cast<unsigned short>(rawFlags & 0xFFFFu));
+    archive->WriteShort(static_cast<short>((rawFlags >> 16) & 0xFFFFu));
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SAniManipBinding>`, vtable 0x00E21F14.
+   *
+   * Address: 0x00BD2BC0 (FUN_00BD2BC0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFAD90 (FUN_00BFAD90 -- the global's destructor.)
+   * Address: 0x0063C2B0 (FUN_0063C2B0 -- `Init`.)
+   * Address: 0x0063B3B0 (FUN_0063B3B0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0063B3D0 (FUN_0063B3D0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct SAniManipBindingSerializer : gpg::SerSaveLoadHelper<SAniManipBinding>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B28C8 -- process-global `SAniManipBindingSerializer` singleton.
+  moho::SAniManipBindingSerializer gSAniManipBindingSerializer;
+} // namespace

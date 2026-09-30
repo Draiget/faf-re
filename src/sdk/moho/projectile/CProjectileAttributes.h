@@ -25,6 +25,22 @@ namespace moho
   struct CProjectileAttributes
   {
     /**
+     * Address: 0x0069F4D0 (FUN_0069F4D0)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
+
+    /**
+     * Address: 0x0069F470 (FUN_0069F470)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
+    /**
      * Address: 0x0069A4A0 (FUN_0069A4A0, Moho::CProjectileAttributes::CProjectileAttributes)
      *
      * What it does:
@@ -95,69 +111,6 @@ namespace moho
   };
 
   static_assert(sizeof(CProjectileAttributesTypeInfo) == 0x64, "CProjectileAttributesTypeInfo size must be 0x64");
-
-  /**
-   * Real ctor confirmed via the callgraph index's `vtable_writers` table
-   * (`class_name='CProjectileAttributesSerializer@Moho'`): `FUN_00BD63B0`
-   * (real, sole writer, `__xc_a`-reachable). Confirmed via raw asm:
-   * default-constructs `gpg::SerHelperBase`, binds `mDeserialize`/
-   * `mSerialize` to `FUN_0069A990`/`FUN_0069A9A0`, installs the
-   * `CProjectileAttributesSerializer` vtable, and pushes plain unmangled
-   * `FUN_00BFD5E0` (bare unlink-then-self-link shape, matching
-   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- no eager
-   * `RegisterSerializeFunctions`/`Init()` call exists in the real ctor.
-   */
-  class CProjectileAttributesSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD63B0 (FUN_00BD63B0, dynamic initializer for the global
-     * `CProjectileAttributesSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    CProjectileAttributesSerializer();
-
-    /**
-     * Address: 0x00BFD5E0 (FUN_00BFD5E0, Moho::CProjectileAttributesSerializer::~CProjectileAttributesSerializer)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~CProjectileAttributesSerializer();
-
-    /**
-     * Address: 0x0069A990 (FUN_0069A990, Moho::CProjectileAttributesSerializer::Deserialize)
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0069A9A0 (FUN_0069A9A0, Moho::CProjectileAttributesSerializer::Serialize)
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0069E900 (FUN_0069E900, serializer registration lane)
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mDeserialize; // +0x0C
-    gpg::RType::save_func_t mSerialize;   // +0x10
-  };
-
-  static_assert(
-    offsetof(CProjectileAttributesSerializer, mDeserialize) == 0x0C,
-    "CProjectileAttributesSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CProjectileAttributesSerializer, mSerialize) == 0x10,
-    "CProjectileAttributesSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(CProjectileAttributesSerializer) == 0x14, "CProjectileAttributesSerializer size must be 0x14");
 
   /**
    * Address: 0x00BD6390 (FUN_00BD6390, register_CProjectileAttributesTypeInfo)
