@@ -1493,9 +1493,6 @@ namespace msvc8
          * Address: 0x008B37D0 (FUN_008B37D0 -- `_Allocate` for a 4-byte element.)
          * Address: 0x008B5690 (FUN_008B5690 -- `_Allocate` for a 4-byte element.)
          * Address: 0x008B80A0 (FUN_008B80A0 -- `_Allocate` for a 4-byte element.)
-         * Address: 0x00A53A20 (FUN_00A53A20 -- `_Allocate` for a 4-byte element.)
-         * Address: 0x00A53CB0 (FUN_00A53CB0 -- `_Allocate` for a 4-byte element.)
-         * Address: 0x00A53D30 (FUN_00A53D30 -- `_Allocate` for a 4-byte element.)
          * Address: 0x005CA040 (FUN_005CA040 -- `_Allocate` for a 4-byte element.)
          * Address: 0x00935B20 (FUN_00935B20 -- `_Allocate` for a 4-byte element.)
          * Address: 0x00537F80 (FUN_00537F80 -- `_Allocate` for a 4-byte element with the `count == 0 -> operator new(0)` shortcut inlined (`WaveSystem`'s generator vector grow).)
@@ -1504,7 +1501,6 @@ namespace msvc8
          * Address: 0x00946AA0 (FUN_00946AA0 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
          * Address: 0x00946B40 (FUN_00946B40 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
          * Address: 0x0094F340 (FUN_0094F340 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
-         * Address: 0x00A3A530 (FUN_00A3A530 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
          * Address: 0x005A1DF0 (FUN_005A1DF0 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
          * Address: 0x005ABB00 (FUN_005ABB00 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
          * Address: 0x007CC140 (FUN_007CC140 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
@@ -1679,18 +1675,6 @@ namespace msvc8
         // existed with this exact meaning, just unreachable from outside the
         // class.
         /**
-         * Address: 0x00A72140 (FUN_00A72140 -- `_SECURE_SCL` `_Vector_const_iterator::operator-` for 8-/16-byte elements (same-owner check through `_invalid_parameter`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72170 (FUN_00A72170 -- `_SECURE_SCL` `_Vector_const_iterator::operator-` for 8-/16-byte elements (same-owner check through `_invalid_parameter`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72640 (FUN_00A72640 -- `_SECURE_SCL` `_Vector_const_iterator::operator-` for 8-/16-byte elements (same-owner check through `_invalid_parameter`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72670 (FUN_00A72670 -- `_SECURE_SCL` `_Vector_const_iterator::operator-` for 8-/16-byte elements (same-owner check through `_invalid_parameter`); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72560 (FUN_00A72560 -- `_SECURE_SCL` `_Vector_iterator(ptr, owner)` constructors for 8-/16-byte elements; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A725A0 (FUN_00A725A0 -- `_SECURE_SCL` `_Vector_iterator(ptr, owner)` constructors for 8-/16-byte elements; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72B80 (FUN_00A72B80 -- `_SECURE_SCL` `_Vector_iterator(ptr, owner)` constructors for 8-/16-byte elements; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72BC0 (FUN_00A72BC0 -- `_SECURE_SCL` `_Vector_iterator(ptr, owner)` constructors for 8-/16-byte elements; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72F90 (FUN_00A72F90 -- `_SECURE_SCL` checked `begin()`/`end()` iterator constructions; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72FC0 (FUN_00A72FC0 -- `_SECURE_SCL` checked `begin()`/`end()` iterator constructions; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72FF0 (FUN_00A72FF0 -- `_SECURE_SCL` checked `begin()`/`end()` iterator constructions; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A73020 (FUN_00A73020 -- `_SECURE_SCL` checked `begin()`/`end()` iterator constructions; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x004FDD50 (FUN_004FDD50 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x005440B0 (FUN_005440B0 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00544120 (FUN_00544120 -- `_Vector_iterator(ptr)` copy-through constructors (store one pointer into the iterator slot); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
@@ -1785,8 +1769,6 @@ namespace msvc8
          * value)` below with a default-constructed temporary (see the
          * addresses above), so this delegates the same way rather than
          * modelling a distinct value-construct-in-place mechanic.
-         * Address: 0x00A744F0 (FUN_00A744F0 -- `vector(count)` for an 8-byte element, a zero temporary forwarded into 0x00A74370; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A74520 (FUN_00A74520 -- `vector(count)` for a 16-byte element, forwarded into 0x00A74430; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x0053FDA0 (FUN_0053FDA0 -- `vector<uint32>(count)`, a zero temporary forwarded into 0x005400A0; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         explicit vector(std::size_t count) : vector(count, T()) {
@@ -1805,8 +1787,6 @@ namespace msvc8
          * Construct with count copies of value
          * Address: 0x007402B0 (FUN_007402B0 -- `vector<float>(count, value)`: `CSimDriver::DrawNetworkStats` (0x0073DFE0, SimDriver.cpp).)
          * Address: 0x005400A0 (FUN_005400A0 -- `vector<uint32>(count, value)`: `CClientManagerImpl::CClientManagerImpl` (0x0053DF20).)
-         * Address: 0x00A74370 (FUN_00A74370 -- `vector(count, value)` for an 8-byte element (buy at 0x00A72080, fill at 0x00A72C30).)
-         * Address: 0x00A74430 (FUN_00A74430 -- `vector(count, value)` for a 16-byte element (buy at 0x00A720E0, fill at 0x00A72C70).)
  * Address: 0x008D6480 (FUN_008D6480 -- `vector<list<unsigned>::iterator>(9, end())`, the bucket array
  *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp)'s constructor 0x008D5350 builds: `_Allocate(9)` (0x008D6F60), then the fill 0x008D72F0.)
  * Address: 0x00642180 (FUN_00642180 -- this constructor's `_Construct_n` body (`_Buy` 0x00443950, `_Ufill` 0x00445430, then `last_ = first_ + count`) for `msvc8::vector<unsigned int>`, the word vector `_Myvec` of VC8 `vector<bool>` (`moho::SBitStorage32`, +0x04); usercall this=ESI, count=EDI, &value on the stack, `ret 4`; callers 0x00641B70 (`vector<bool>(count, true)`: `_Mysize = 0`, `_Myvec(_Nw(count), ~0u)`, `_Trim(count)` 0x00444780; reached from `CAnimationManipulator::CAnimationManipulator` 0x0063F460) and 0x00641F60 (the untokenized `vector<unsigned int>(count, value)` thiscall shell around it, zero references); formerly `TryResolveLookupAndCacheRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
@@ -2756,8 +2736,6 @@ namespace msvc8
          * Address: 0x004A4870 (FUN_004A4870 -- out-of-line `&first_[i]` for the 20-byte `gpg::RField` (`msvc8::vector<RField>`, `RType::fields_`): `lea eax,[eax+eax*4]; lea eax,[ecx+eax*4]`, `ret 4`; zero callers, no xrefs, and byte-identical twins at 0x008D8870/0x0094EAA0 that /OPT:ICF did not fold: a linker-retained copy nothing runs. Formerly `ResolveFieldVectorElement` over `RFieldVectorRuntimeView` in moho/sim/Sim.cpp (RULE THREE), removed 2026-09-22.)
          * Address: 0x00547730 (FUN_00547730 -- out-of-line `&first_[i]` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00547740 (FUN_00547740 -- out-of-line `&first_[i]` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A724E0 (FUN_00A724E0 -- `_SECURE_SCL` checked `operator[]` (owner and bounds validated through `_invalid_parameter`) for an 8-/16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72510 (FUN_00A72510 -- `_SECURE_SCL` checked `operator[]` (owner and bounds validated through `_invalid_parameter`) for an 8-/16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00507F70 (FUN_00507F70 -- `operator[]` (`first_ + index`) for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `DelayedSubVizLanePointerAt` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x00508470 (FUN_00508470 -- a second copy of that subscript; zero callers. Formerly `DelayedSubVizVectorPointerAt`.)
          * Address: 0x00496BB0 (FUN_00496BB0 -- `operator[]` for `msvc8::vector<SParticleRenderWorkItem*>`; zero callers, unreachable. Formerly a per-type free function in moho/particles/ParticleRenderBuckets.cpp (RULE ONE), removed 2026-09-10.)
@@ -9410,14 +9388,8 @@ namespace msvc8
          * Address: 0x00540BB0 (FUN_00540BB0 -- `_Fill_n` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x0067F770 (FUN_0067F770 -- `_Fill_n` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x0054EC30 (FUN_0054EC30 -- `_Uninit_fill_n` for an 8-byte element (`vector(count, value)` at 0x00A74370).)
-         * Address: 0x00A72C30 (FUN_00A72C30 -- `_Uninit_fill_n` for an 8-byte element (`vector(count, value)` at 0x00A74370).)
          * Address: 0x0054DCC0 (FUN_0054DCC0 -- register/cdecl/stdcall bridges into the 8-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x0054E2F0 (FUN_0054E2F0 -- register/cdecl/stdcall bridges into the 8-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A73060 (FUN_00A73060 -- register/cdecl/stdcall bridges into the 8-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A73D50 (FUN_00A73D50 -- register/cdecl/stdcall bridges into the 8-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A72C70 (FUN_00A72C70 -- `_Uninit_fill_n` for a 16-byte element (`vector(count, value)` at 0x00A74430).)
-         * Address: 0x00A730A0 (FUN_00A730A0 -- cdecl/stdcall bridges into the 16-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A73DA0 (FUN_00A73DA0 -- cdecl/stdcall bridges into the 16-byte `_Uninit_fill_n`; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00AC3AE0 (FUN_00AC3AE0 -- `_Fill`/`_Fill_n` for a 4-byte element (0x00AC4110).)
          * Address: 0x00AC3E90 (FUN_00AC3E90 -- `_Fill`/`_Fill_n` for a 4-byte element (0x00AC4110).)
          * Address: 0x004D5390 (FUN_004D5390 -- `_Fill` for a 0x54 `{{msvc8::string x3}}` element (`WxRuntimeTypes`, 0x004D45B0).)
@@ -10451,8 +10423,6 @@ namespace msvc8
          * Address: 0x0088AF20 (FUN_0088AF20 -- `_Copy_backward_opt` for a 4-byte element: one `memmove` ending at the destination end, the tail shift of `_Insert_n` (`vector<EntId>` 0x0067D660, `vector<uint32>` 0x007027A0, `CWldSplat` 0x0087A830/0x0087B1C0, `WaveSystem` 0x0088A7B0).)
          * Address: 0x0078B3E0 (FUN_0078B3E0 -- `_Copy_backward_opt` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x0059DC90 (FUN_0059DC90 -- `_Copy_backward_opt` for a 16-byte element (`FastVector.h` 0x0059CC10 and the `double` sort at 0x00A73BD0).)
-         * Address: 0x00A72A90 (FUN_00A72A90 -- `_Copy_backward_opt` for a 16-byte element (`FastVector.h` 0x0059CC10 and the `double` sort at 0x00A73BD0).)
-         * Address: 0x00A72EC0 (FUN_00A72EC0 -- register bridge into the 16-byte `_Copy_backward_opt` at 0x00A72A90; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00594140 (FUN_00594140 -- `_Copy_backward_opt` for a 12-byte element (0x00592460, 0x005C7B10).)
          * Address: 0x005CA0F0 (FUN_005CA0F0 -- `_Copy_backward_opt` for a 12-byte element (0x00592460, 0x005C7B10).)
          * Address: 0x008DA320 (FUN_008DA320 -- `_Copy_backward_opt` for an 8-byte element (0x008DCB70).)
@@ -10920,9 +10890,6 @@ namespace msvc8
          * sizeof(T) == 0x14 (20, `count > 0xFFFFFFFF/20` throws, zero-count
          * guarded ahead of the reciprocal division to avoid a div-by-zero
          * trap):
-         * Address: 0x00A53BD0 (FUN_00A53BD0, sole caller FUN_00A55857 is an
-         * untracked code fragment, not a separately recovered function; no
-         * concrete `T` identified yet)
          *
          * sizeof(T) == 0x18 (24, same zero-count-guarded reciprocal-division
          * shape as the 0x14 emission above):
@@ -11022,23 +10989,6 @@ namespace msvc8
          * each wrapper address and verifying the `call` displacement lands
          * exactly on the address below (not inferred from proximity
          * alone):
-         * Address: 0x00A53AD0 (FUN_00A53AD0) -- sizeof(T)==4, max_size
-         * 0x3FFFFFFF; wrapper at 0x00A55580 (`E8 44 E5 FF FF` @0x00A55587).
-         * Address: 0x00A53C40 (FUN_00A53C40) -- sizeof(T)==0x14, max_size
-         * 0x0CCCCCCC; wrapper at 0x00A558D0 (`E8 64 E3 FF FF` @0x00A558D7).
-         * Address: 0x00A53E10 (FUN_00A53E10) -- sizeof(T)==0x24, max_size
-         * 0x071C71C7; wrapper at 0x00A55B80 (`E8 84 E2 FF FF` @0x00A55B87).
-         * Address: 0x00A53EB0 (FUN_00A53EB0) -- sizeof(T)==0x24 (distinct
-         * `function_sha256` from 0x00A53E10 -- a second, separate 36-byte
-         * instantiation, not an ICF twin), same max_size; wrapper at
-         * 0x00A55BE0 (`E8 C4 E2 FF FF` @0x00A55BE7).
-         * Follow-up: the four wrapper addresses above should be
-         * (re-)exported from IDA as their own functions -- they were
-         * silently skipped by the auto-analysis pass, most likely because
-         * they sit between `0xCC` padding rather than after a `retn` the
-         * analyzer followed -- so they get their own token/xrefs/meta.json
-         * and can be recovered as the one-arg `allocate(size_t)` overload
-         * calling this member by name.
          *
          * sizeof(T) == 0x28 (40 bytes, owner not confirmed):
          * Address: 0x0092C150 (FUN_0092C150) -- max_size 0x0666666,
@@ -11154,8 +11104,6 @@ namespace msvc8
          * template, not an ICF twin of it.
          * Address: 0x0054E0C0 (FUN_0054E0C0 -- `_Allocate` for an 88-byte element.)
          * Address: 0x007F3670 (FUN_007F3670 -- `_Allocate` for a 192-byte element.)
-         * Address: 0x00A72080 (FUN_00A72080 -- `_Allocate` for an 8-byte element, the buy step of `vector(count, value)` at 0x00A74370.)
-         * Address: 0x00A720E0 (FUN_00A720E0 -- `_Allocate` for a 16-byte element, the buy step of `vector(count, value)` at 0x00A74430.)
          * Address: 0x00525FE0 (FUN_00525FE0 -- `_Allocate` for a 4-byte element.)
          * Address: 0x005628C0 (FUN_005628C0 -- `_Allocate` for a 4-byte element.)
          * Address: 0x005822E0 (FUN_005822E0 -- `_Allocate` for a 4-byte element.)

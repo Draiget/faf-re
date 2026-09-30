@@ -100,29 +100,6 @@ namespace msvc8
             rhs = temp;
         }
 
-        /**
-         * Address: 0x00A73B30 (FUN_00A73B30, `_Insertion_sort` for an 8-byte
-         * `{float x, y;}` pair -- reached from `_Sort`'s (`FUN_00A740D0`,
-         * cited on `sort_impl` below) small-range fallback, `<= 32` elements)
-         * Address: 0x00A73BD0 (FUN_00A73BD0, the `double` (8-byte scalar)
-         * instantiation, reached from `_Sort`'s (`FUN_00A741A0`, cited below)
-         * small-range fallback)
-         */
-        /**
-         * Address: 0x00A72D40 (FUN_00A72D40, `make_heap` for the float-pair
-         * instantiation, reached from `_Sort`'s (`FUN_00A740D0`) ideal-budget-
-         * exhausted heapsort fallback)
-         * Address: 0x00A72E20 (FUN_00A72E20, the `double` instantiation's
-         * `make_heap`, reached from `_Sort`'s (`FUN_00A741A0`) same fallback)
-         */
-        /**
-         * Address: 0x00A73E20 (FUN_00A73E20, `sort_heap` for the float-pair
-         * instantiation, called right after `make_heap` (`FUN_00A72D40`) in
-         * `_Sort`'s (`FUN_00A740D0`) heapsort fallback)
-         * Address: 0x00A73E70 (FUN_00A73E70, the `double` instantiation's
-         * `sort_heap`, called after `FUN_00A72E20` in `_Sort`'s
-         * (`FUN_00A741A0`) same fallback)
-         */
 
         /**
          * Address: 0x00595AC0 (the `_Med3` lane called first from
@@ -439,7 +416,6 @@ namespace msvc8
          * Address: 0x005501E0 (FUN_005501E0 -- `_Push_heap` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
          * Address: 0x008DA500 (FUN_008DA500 -- `_Push_heap` for the `gpg::RField` instantiation (the settle-upward half the `_Adjust_heap` at 0x008DAF60 calls).)
          * Address: 0x00595F40 (FUN_00595F40 -- `_Push_heap` for the `SDepositCandidate` instantiation (called from the `_Adjust_heap` at 0x00595DF0).)
-         * Address: 0x00A72840 (FUN_00A72840 -- `_Adjust_heap` for the 8-byte `{float, dword}` instantiation (`make_heap` 0x00A72D40 / `sort_heap` 0x00A73E20); its `_Push_heap` half is 0x00A72360.)
          */
         template <class T, class Compare>
         /**
@@ -582,8 +558,6 @@ namespace msvc8
          * Address: 0x00575660 (FUN_00575660 -- `pop_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00550280 (FUN_00550280 -- `_Pop_heap`/`_Pop_heap_hole` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00550450 (FUN_00550450 -- `_Pop_heap`/`_Pop_heap_hole` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A73F50 (FUN_00A73F50 -- thunks into the `{float, dword}`/`double` `sort_heap` bodies at 0x00A73E20/0x00A73E70; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00A73F60 (FUN_00A73F60 -- thunks into the `{float, dword}`/`double` `sort_heap` bodies at 0x00A73E20/0x00A73E70; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         template <class T, class Compare>
         /**
@@ -645,16 +619,6 @@ namespace msvc8
          * compiler-emission glue is supposed to have no separate body);
          * corrected to skip/cited-here.)
          *
-         * Address: 0x00A730D0 (FUN_00A730D0, the 8-byte `{float x, y;}` pair
-         * instantiation -- pivot pick at `sub_A72CB0` (a bare `median3`, not
-         * the ninther: this instantiation's own driver, `FUN_00A740D0` cited
-         * on `sort_impl` below, never exercises `select_ninther`'s branch in
-         * the surviving call sites), then the same two-scan-loop-plus-
-         * equal-run-gathering shape as the instantiations above, with raw
-         * 2-dword swaps inlined at each `iter_swap` point.)
-         * Address: 0x00A73500 (FUN_00A73500, the `double` (8-byte scalar)
-         * instantiation -- same shape as `0x00A730D0`, pivot pick at
-         * `sub_A72D90`, swaps widened to 4-dword lanes to move a `double`.)
          * Address: 0x00733D10 (FUN_00733D10, a second 8-byte `{float x, y;}`
          * pair instantiation at a different call site -- pivot pick at
          * `sub_7340C0`, otherwise byte-for-byte the same partition shape as
@@ -801,25 +765,6 @@ namespace msvc8
          * external. Wrong: the three-way-compare/partition/heap *control
          * flow* is this project's own `_Sort<RField*>` emission: engine
          * code that happens to call CRT primitives, not CRT code itself.)
-         *
-         * Address: 0x00A740D0 (FUN_00A740D0, the 8-byte `{float x, y;}` pair
-         * instantiation. Element stride confirmed from `((char*)a2-(char*)a1)
-         * >> 3`; ideal budget decays via the same `a3/2/2 + a3/2` "three
-         * quarters" step; partitions through `FUN_00A730D0` (cited on
-         * `unguarded_partition` above), falls to `FUN_00A73B30`
-         * (`insertion_sort`) under 32 elements, and to `FUN_00A72D40` +
-         * `FUN_00A73E20` (`make_heap` + `sort_heap`) once the budget is
-         * exhausted -- recurses into whichever partition half is smaller and
-         * loops on the larger, same bounded-stack-depth shape as this
-         * template. Calls itself recursively at both `sub_A740D0(v9, v4,
-         * a3)` and `sub_A740D0(v3, v8, a3)`, the same "call set" signature
-         * the `SBuildTemplateInfo`/`gpg::RField` instantiations above were
-         * identified by.)
-         * Address: 0x00A741A0 (FUN_00A741A0, the `double` (8-byte scalar)
-         * instantiation -- same shape as `0x00A740D0` one dword-width wider
-         * throughout (`>> 4` stride, `0xFFFFFFF0` masks), partitions through
-         * `FUN_00A73500`, falls to `FUN_00A73BD0` / `FUN_00A72E20` +
-         * `FUN_00A73E70`.)
          */
         /**
          * Address: 0x005734F0 (FUN_005734F0 -- `_Sort` driver for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp): partition, recurse into the smaller half, heapsort fallback.)
@@ -889,10 +834,6 @@ namespace msvc8
      * Address: 0x0071FEE0 (FUN_0071FEE0 -- `_Med3` for a float[4] element ordered by lane 3 descending; callers 0x0071F870; formerly `SortThreeFloat4ByLane3DescendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x00760690 (FUN_00760690 -- `_Med3` for an `(id, score)` element ordered by score descending; callers 0x007604A0; formerly `SortThreeDwordPairsByScoreDescendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x007604A0 (FUN_007604A0 -- `_Median` (the ninther pivot pick) for an `(id, score)` element ordered by score descending; callers 0x007600A0; formerly `SelectDwordPairScoreDescendingNintherPivotRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x00A727C0 (FUN_00A727C0 -- `_Med3` for a float[2] element ordered by lane 0; callers 0x00A72CB0 (unreached); formerly `SortThreeFloat2ByLane0AscendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x00A728C0 (FUN_00A728C0 -- `_Med3` for a 16-byte element ordered by its leading double; callers 0x00A72D90 (unreached); formerly `SortThreeDword4ByDoubleKeyAscendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x00A72CB0 (FUN_00A72CB0 -- `_Median` (the ninther pivot pick) for a float[2] element; callers 0x00A730D0 (unreached); formerly `SelectFloat2NintherPivotForIntrosortRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x00A72D90 (FUN_00A72D90 -- `_Median` (the ninther pivot pick) for a 16-byte element ordered by its leading double; callers 0x00A73500 (unreached); formerly `SelectDword4NintherPivotForIntrosortRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0071CA80 (FUN_0071CA80 -- `std::sort(first, last, comp)`'s entry (`_Sort(first, last, last - first, comp)`) for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; zero callers, unreachable; formerly `SortFloat4LaneRangeDispatcherWithSpanBudget` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x00627FD0 (FUN_00627FD0 -- `std::sort` entry (`_Sort(first, last, (last - first) / 12, comp)` into 0x00628740) for the `moho::SPickUpInfo` instantiation of `CUnitLoadUnits::DoTask`'s pickup-queue sort (CUnitLoadUnits.cpp); zero callers, unreachable: `DoTask` inlines this entry and calls the driver directly.)
      * Address: 0x0084A2E0 (FUN_0084A2E0 -- `std::sort` entry into 0x0084A890 for the `DockCandidate` by-`distSq` instantiation of `cfunc_IssueDockCommandL`'s sort (CCommandLuaFunctionRegistrations.cpp); zero callers, unreachable: the caller inlines it.)

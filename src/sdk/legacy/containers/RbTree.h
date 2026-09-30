@@ -219,49 +219,6 @@ namespace msvc8
          * when the erased node was the tree's leftmost.
          */
         /**
-         * Address: 0x00A52650 (FUN_00A52650, sub_A52650) -- CORRECTED: not
-         * this project's `msvc8::set<std::uint32_t>` (an earlier pass in this
-         * session mis-labelled it that way). Real identity (commit
-         * `ea2e46c3`): `std::set<HullTriangle3<float>*>`'s `rb_min`,
-         * isNil@+0x11 -- `Wm3::ConvexHull3<float>::m_kHull`. Walks `_Left`
-         * (node+0x00) while `!_Isnil` (node+0x11), matching this member
-         * exactly. Reached from `erase_node`'s WildMagic emission for this
-         * instantiation (`FUN_00A633D0`, cited on `erase_node` above) to
-         * re-seat `head->left`, transitively from `~ConvexHull3<float>()`
-         * (0x00A66440). WildMagic is CLAUDE.md's named terminal
-         * `external_dependency` category -- kept here as cross-reference
-         * confirmation only; see `recovered_progress.json`.
-         * Address: 0x00A526A0 (FUN_00A526A0) -- byte-identical ICF twin of
-         * 0x00A52650, reached instead from `ConvexHull3<double>`'s sibling
-         * `erase_node` emission (`FUN_00A63690`) -- same classification.
-         *
-         * Address: 0x00A3A170 (FUN_00A3A170, sub_A3A170) -- a distinct
-         * 8-byte-value ("Nil21") tree instantiation, isNil@+0x15, genuinely
-         * this project's own (not traced to WildMagic). Same walk, one
-         * addressing-mode step removed (`__cdecl` locals instead of the
-         * `for`-loop shape above; behaviourally identical). Re-homed out of
-         * `moho/math/Wm3DistanceFafExtras.cpp`'s `QueryTree` reach-in cluster
-         * (`QueryTreeLeftmostNil21LaneC`). This body is an ICF twin of an
-         * already-`skip`'d 6-member group anchored at `FUN_008D8C50`
-         * (`src/sdk/gpg/core/reflection/Reflection.cpp`, reached from
-         * `func_PopTreeNode`) -- cited here on its own confirmed evidence
-         * (read directly against its `.c` export, not inferred from the twin
-         * group). Marked `skip` in `recovered_progress.json`: its sole caller
-         * `FUN_00A3E450` (and that function's own caller `FUN_00A3E800`) are
-         * independently verified "transitively unreachable, 2 hops deep" by
-         * a prior pass. Owning field/class not pinned down.
-         *
-         * Address: 0x00A52BF0 (FUN_00A52BF0, sub_A52BF0) -- CORRECTED: not
-         * this project's own tree. Real identity: `kTerminator`, a
-         * `std::map<int, TerminatorData>` local to `Wm3::ConvexHull3<Real>::
-         * Update` (see `FUN_00A63DD0`/`FUN_00A64110`'s `erase_node`
-         * emissions, `external_dependency`), a 20-byte-value ("Nil33") tree,
-         * isNil@+0x21. Same walk. Re-homed out of `QueryTreeLeftmostNil33LaneA`
-         * in the same `QueryTree` reach-in cluster. WildMagic terminal
-         * category; cross-reference confirmation only.
-         * Address: 0x00A52D40 (FUN_00A52D40) -- byte-identical ICF twin of
-         * 0x00A52BF0, reached from `FUN_00A64110`'s sibling emission; same
-         * classification.
          */
         /**
          * Address: 0x0094EE60 (FUN_0094EE60, sub_94EE60) -- leftmost
@@ -495,36 +452,6 @@ namespace msvc8
          * member exactly. Reached from `erase_node`'s emission for this
          * instantiation (`FUN_00687CC0`, cited below) via `rb_max(fix)`
          * when the erased node was the tree's rightmost.
-         *
-         * Address: 0x00A52630 (FUN_00A52630, sub_A52630) -- CORRECTED: not
-         * this project's own tree (see `rb_min`'s 0x00A52650 note above for
-         * the full correction). Real identity: `std::set<HullTriangle3<
-         * float>*>`'s `rb_max`, isNil@+0x11, `Wm3::ConvexHull3<float>::
-         * m_kHull`. Walks `_Right` (node+0x08) while `!_Isnil` (node+0x11),
-         * matching this member exactly. Reached from `erase_node`'s WildMagic
-         * emission for this instantiation (`FUN_00A633D0`, cited on
-         * `erase_node` above) to re-seat `head->right`, transitively from
-         * `~ConvexHull3<float>()` (0x00A66440). WildMagic terminal category;
-         * cross-reference confirmation only.
-         * Address: 0x00A52680 (FUN_00A52680) -- byte-identical ICF twin of
-         * 0x00A52630, reached instead from `ConvexHull3<double>`'s sibling
-         * `erase_node` emission (`FUN_00A63690`) -- same classification.
-         *
-         * Address: 0x00A3A240 (FUN_00A3A240, sub_A3A240) -- the same 8-byte-
-         * value ("Nil21") tree instantiation cited on `rb_min`'s 0x00A3A170
-         * above, isNil@+0x15, genuinely this project's own. Same `skip`
-         * rationale as that member (transitively-unreachable caller chain,
-         * plus ICF twin of an already-`skip`'d Reflection.cpp group) -- see
-         * its note. Owning field/class not pinned down.
-         *
-         * Address: 0x00A52BD0 (FUN_00A52BD0, sub_A52BD0) -- CORRECTED: not
-         * this project's own tree. Real identity: `kTerminator` (`std::map<
-         * int, TerminatorData>` local to `ConvexHull3<Real>::Update`, see
-         * `rb_min`'s 0x00A52BF0 note above), isNil@+0x21. WildMagic terminal
-         * category; cross-reference confirmation only.
-         * Address: 0x00A52D20 (FUN_00A52D20) -- byte-identical ICF twin of
-         * 0x00A52BD0, reached from `FUN_00A64110`'s sibling emission; same
-         * classification.
          */
         /**
          * Address: 0x0094F010 (FUN_0094F010, sub_94F010) -- rightmost
@@ -863,21 +790,6 @@ namespace msvc8
          * below, `FUN_009470C0` `operator++(int)` cited below,
          * `FUN_009499C0` insert-with-hint not independently exported in
          * this pass). Same DB-integrity correction as 0x00946830 above.
-         *
-         * Address: 0x00A3A8D0 (FUN_00A3A8D0, sub_A3A8D0) -- another
-         * `isNil@+0x15`, 8-byte-value instantiation's `_Inc`. `.asm`-confirmed:
-         * nil-check, `if (!right->isNil) return rb_min(right);` else climb
-         * `parent` while `n==parent->right` -- matches this member field for
-         * field. Largest fan-in of this file's `rb_increment` siblings (12
-         * incoming code xrefs): called from this instantiation's
-         * `erase_node` successor-capture step (`sub_A3E450`, cited on
-         * `erase_node` below) and `erase_range`'s per-element loop
-         * (`sub_A3E800`, cited on `erase_range` below). Reached, per those
-         * members' own citations, from two independently PE-byte-verified
-         * EH-cleanup tail-jumps inside WildMagic-shaped functions
-         * (`sub_A3E9C0`/`sub_A40060`) that each carry a local instance of
-         * this same tree as scratch storage -- owning engine class not yet
-         * pinned down beyond that.
          *
          * Address: 0x008A9090 (FUN_008A9090, IDA-inferred name
          * `std::map_string_Env::Iterator::inc`) -- `msvc8::map<msvc8::string,
@@ -1396,38 +1308,6 @@ namespace msvc8
              */
             rb_iterator() noexcept = default;
             /**
-             * Address: 0x00A552D0 (FUN_00A552D0, sub_A552D0) Address:
-             * 0x00A55670 (FUN_00A55670, sub_A55670) -- the shipped VS2005
-             * Release build's `_SECURE_SCL=1` *checked* iterator constructor
-             * for a `Wm3::ConvexHull3<Real>`-family tree instantiation
-             * (isNil-independent shape; owner not pinned to one specific
-             * field for these two addresses specifically -- sibling of the
-             * checked `operator++`/`operator--`/`operator!=` emissions cited
-             * below, all confirmed WildMagic). Both were previously
-             * `blocked` citing a `CrtRuntimeHelpers.cpp` source path that
-             * does not contain either address (2026-08-24 DB-integrity bulk
-             * revert); corrected in `recovered_progress.json` alongside this
-             * citation. Real shape: `*this = 0; this[1] = a2 (node); if
-             * (!a3 (owner)) sub_A84A40(); this[0] = a3; return this;` --
-             * i.e. the shipped iterator for these instantiations is a real
-             * Dinkumware-style *checked* iterator, two words wide (`{_Mycont,
-             * _Ptr}`), not this member's one-word shape. The `owner`
-             * argument is validated (non-null) via the `_SECURE_SCL` trap
-             * `sub_A84A40` (`_invalid_parameter`, cited on `operator++`/
-             * `operator--`/`operator!=` below) -- the `call sub_A84A40`
-             * falls through into the remaining stores exactly like every
-             * other checked emission cited in this file, so a null `owner`
-             * changes nothing about the constructed iterator's node field --
-             * and is never read again by any checked emission this file has
-             * traced; it exists purely so a *later* checked operation can
-             * fail fast on a default-constructed or cross-container
-             * iterator. Dropping the validated-but-otherwise-inert `owner`
-             * parameter and keeping only the node argument reproduces this
-             * constructor's success-path behavior exactly -- see the
-             * `proxy_` field's comment on `rb_tree` below for the
-             * established "checked-container machinery is real in the
-             * binary but deliberately unmodeled because it never changes
-             * observable behavior" policy this follows.
              * Address: 0x005A0BB0 (FUN_005A0BB0 -- an iterator built from a node and stored through a caller slot for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `StoreRebuildIteratorNodeLaneAdapterA` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x005A0C00 (FUN_005A0C00 -- a second emission of that iterator store for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `StoreRebuildIteratorNodeLaneAdapterB` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x005A1280 (FUN_005A1280 -- a third emission of that iterator store for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `StoreRebuildIteratorNodeLaneAdapterC` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
@@ -1500,20 +1380,6 @@ namespace msvc8
              * independently exported in this pass.
              */
             /**
-             * Address: 0x00A52760 (FUN_00A52760, sub_A52760) Address:
-             * 0x00A52930 (FUN_00A52930, sub_A52930) -- the checked
-             * (`_SECURE_SCL=1`) `operator++()` for `Wm3::ConvexHull3<float>`/
-             * `<double>::m_kHull` (`std::set<HullTriangle3<Real>*>`,
-             * vendored `dependencies/WildMagic3p8/Foundation/Containment/
-             * Wm3ConvexHull3.h:89`), isNil@+0x11 -- `external_dependency`,
-             * WildMagic is not engine code, kept here purely as
-             * cross-reference confirmation of this member's shape (matching
-             * this file's existing `rb_min`/`rb_max`/`erase_node` WildMagic
-             * cross-references elsewhere). Address: 0x00A52CB0
-             * (FUN_00A52CB0) Address: 0x00A52E00 (FUN_00A52E00) -- the same
-             * checked `operator++()` for the same class's `Update()`-local
-             * `std::map<int, TerminatorData>` ("kTerminator"), isNil@+0x21
-             * (also `external_dependency`, same WildMagic exclusion).
              *
              * All four are real two-word checked iterators (`{_Mycont,
              * _Ptr}`, cited on the constructor above): `this[0]` is the
@@ -1669,23 +1535,6 @@ namespace msvc8
              * mismatch harmless only because neither had a real caller.)
              */
             /**
-             * Address: 0x00A528A0 (FUN_00A528A0, sub_A528A0) Address:
-             * 0x00A526D0 (FUN_00A526D0, sub_A526D0) -- the checked
-             * (`_SECURE_SCL=1`) `operator--()` sibling of the `operator++()`
-             * pair cited above: `Wm3::ConvexHull3<float>`/`<double>::
-             * m_kHull`'s checked iterator decrement, isNil@+0x11 --
-             * `external_dependency`, WildMagic, cross-reference only (both
-             * addresses were previously mis-marked `recovered` citing
-             * `CrtRuntimeHelpers.cpp` -- that file does not contain either
-             * address; corrected in `recovered_progress.json` alongside this
-             * citation). Address: 0x00A52C20 (FUN_00A52C20) Address:
-             * 0x00A52D70 (FUN_00A52D70) -- the same checked `operator--()`
-             * for the `Update()`-local `std::map<int, TerminatorData>`
-             * ("kTerminator") pair cited on `operator++()` above, isNil@+0x21
-             * (also `external_dependency`; note enriched alongside this
-             * citation from a generic "all-external-callees thunk" batch
-             * classification to this specific identity -- the terminal
-             * status was already correct).
              *
              * All four are the two-word checked iterator shape cited on the
              * constructor above. Full asm trace of 0x00A528A0
@@ -1754,26 +1603,6 @@ namespace msvc8
                 return node_ == other.node();
             }
             /**
-             * Address: 0x00A55150 (FUN_00A55150, sub_A55150) -- the checked
-             * (`_SECURE_SCL=1`) `operator!=()` for the same two-word checked
-             * iterator family cited on the constructor/`operator++`/
-             * `operator--` above: `if (!this[0] || this[0]!=other[0])
-             * sub_A84A40(); return this[1]!=other[1];`. Owning
-             * `msvc8::map`/`msvc8::set` instantiation not pinned for this
-             * specific address (isNil-independent shape -- `operator!=`
-             * never reads the node's isNil byte, so it carries no
-             * owner-identifying offset); zero incoming xrefs/callers found
-             * in the callgraph index, the same "compiler emits the same
-             * body more than once, only some copies are ever reached from a
-             * live caller" pattern already documented throughout this file
-             * for other zero-xref duplicate emissions. Two sibling
-             * emissions of the identical shape, 0x00A52870/0x00A52A40 (also
-             * isNil-independent, in the same address neighbourhood as
-             * `m_kHull` above), are Wild Magic's own `std::set` emissions,
-             * linked from Foundation.lib. Their transcriptions
-             * (`AreQueryTreeOwnerKeyCursorsNil17NotEqualLaneA`/`...LaneB` in
-             * `moho/math/Wm3DistanceFafExtras.cpp`) went with that file; both
-             * addresses are `external_dependency`.
              *
              * The `call sub_A84A40` at the top of 0x00A55150 falls through
              * into the comparison exactly like the constructor/`operator++`/
@@ -2477,28 +2306,6 @@ namespace msvc8
              * instantiation's unwind path in its own cold section rather
              * than sharing `FUN_007CC2B0`'s.
              *
-             * Address: 0x00A3E8D0 (FUN_00A3E8D0, sub_A3E8D0) -- another
-             * instantiation's `~rb_tree()`: `erase_range(leftmost(),
-             * header())` (`sub_A3E800`, cited below) then `operator
-             * delete(head_)`, zero head/size -- matches this member
-             * exactly.
-             * Address: 0x00A3E910 (FUN_00A3E910, sub_A3E910) --
-             * byte-identical sibling emission of the same destructor.
-             * Address: 0x00A3E950 (FUN_00A3E950, sub_A3E950) --
-             * byte-identical sibling emission of the same destructor;
-             * reached from two independently PE-byte-verified EH-cleanup
-             * tail-jumps (`0x00B75B81`: `E9 CA 8D EC FF`, `0x00B75BC1`:
-             * `E9 8A 8D EC FF`, both confirmed by direct PE byte read to
-             * land exactly here) inside WildMagic-shaped functions
-             * `sub_A3E9C0`/`sub_A40060`, each carrying a local instance of
-             * this tree as scratch storage. All three of 0x00A3E8D0/
-             * 0x00A3E910/0x00A3E950 were previously `skip`
-             * ("transitively unreachable" / "exhaustively byte-verified
-             * ZERO references" -- both claims from a byte-scan pass that
-             * did not cover the EH-cleanup PE section these jumps live
-             * in); corrected to `recovered` after independently
-             * re-verifying the jump targets by direct PE byte read.
-             *
              * Address: 0x006A5380 (FUN_006A5380, sub_6A5380) -- `msvc8::
              * map<msvc8::string, float>::~rb_tree()` -- `Unit::
              * ArmorMultipliers` in `moho/unit/core/Unit.h`. `IDA signature:
@@ -3116,30 +2923,6 @@ namespace msvc8
             }
 
             /**
-             * Address: 0x00A59E20 (FUN_00A59E20, sub_A59E20) -- CORRECTED:
-             * an earlier pass in this session mis-labelled this
-             * `msvc8::set<std::uint32_t>, owner unidentified`. Real identity
-             * (confirmed by a concurrent pass, commit `ea2e46c3`):
-             * `std::set<HullTriangle3<float>*>::equal_range`, isNil@+0x11 (a
-             * bare 4-byte pointer value_type, not a `uint32_t` this project
-             * owns) -- `Wm3::ConvexHull3<float>::m_kHull`
-             * (`dependencies/WildMagic3p8/Foundation/Containment/
-             * Wm3ConvexHull3.h:89`), reached from `m_kHull.erase(pkTri)`
-             * (`Wm3ConvexHull3.cpp:324`, cited in full on `erase(const
-             * key_type&)` below). WildMagic is CLAUDE.md's named terminal
-             * `external_dependency` category -- kept here purely as
-             * cross-reference confirmation that this member's shape matches
-             * a real, independent MSVC8-compiled `_Tree::equal_range`
-             * emission, not as engine recovery work; see
-             * `recovered_progress.json`. `this`=ecx=tree, `a2`=hidden
-             * struct-return slot for the `pair<iterator,iterator>` (4
-             * dwords), `a3`=`const key_type&` -- a real `__thiscall` member,
-             * not a free function taking a tree pointer, despite how the
-             * decompiler originally rendered it (and despite how a prior
-             * pass mis-recovered it as one: `BuildQueryTreeEqualRangeNil17LaneA`
-             * in `moho/math/Wm3DistanceFafExtras.cpp`, deleted).
-             * Address: 0x00A59E80 (FUN_00A59E80) -- byte-identical ICF twin
-             * of 0x00A59E20 (`function_icf_twins`); same external classification.
              *
              * What it does:
              * The shipped body computes the upper bound first, then the lower
@@ -3336,31 +3119,6 @@ namespace msvc8
              * duplicate.)
              */
             /**
-             * Address: 0x00A5D810 (FUN_00A5D810, sub_A5D810) -- CORRECTED:
-             * not this project's own tree (an earlier pass in this session
-             * left this "owner not yet pinned down"). Real identity:
-             * `kTerminator`, a `std::map<int, TerminatorData>` local to
-             * `Wm3::ConvexHull3<Real>::Update` (see `rb_min`'s 0x00A52BF0
-             * note above; `FUN_00A63DD0`/`FUN_00A64110` are this same local's
-             * `erase_node`), a 20-byte-value ("Nil33") tree, isNil@+0x21.
-             * Confirmed via `.asm`: real `this`=ecx (thiscall), one stack arg
-             * = `const key_type&` (dereferenced for the descent's key), one
-             * stack arg = a hidden-return-pointer slot the body writes
-             * `{node, owner}` into before returning (`retn 8` pops both stack
-             * args) -- the same "store-into-hidden-return-pointer adapter"
-             * convention as `lower_bound_node`'s `FUN_006E1D30` cited above,
-             * just for this member: lower-bound descent (`cursor->key >=
-             * *key` walking left, else right) inlined directly rather than
-             * calling out to `lower_bound_node`, then the same nil-or-key-
-             * less rejection this member performs. Sole caller in this sweep
-             * is `FUN_00A666F0`, confirmed `Wm3::ConvexHull3<float>::
-             * Update(HullTriangle3<float>*&, int)` itself, correctly
-             * `external_dependency` (not a mis-tag, as an earlier pass in
-             * this session guessed). WildMagic terminal category;
-             * cross-reference confirmation only.
-             * Address: 0x00A5D8A0 (FUN_00A5D8A0) -- byte-identical ICF twin
-             * of 0x00A5D810, reached from `FUN_00A66C00`'s sibling emission
-             * (`ConvexHull3<double>::Update`) -- same classification.
              *
              * Address: 0x008A8150 (FUN_008A8150, sub_8A8150) -- `msvc8::map<
              * msvc8::string, moho::TerrainEnvironmentLookupEntry>::
@@ -4591,15 +4349,6 @@ namespace msvc8
              * claim survived checking the primary decompiled evidence.
              */
             /**
-             * Address: 0x00A633D0 (FUN_00A633D0, `std::set<HullTriangle3<float>*>::
-             * erase(const_iterator)` -- colour/nil pair at `[node+0x10]`/
-             * `[node+0x11]`, a smaller node than every other instantiation cited
-             * above since the value_type is a bare 4-byte pointer)
-             * Address: 0x00A63690 (FUN_00A63690, sibling emission of the same
-             * member for `std::set<HullTriangle3<double>*>` -- same colour/nil
-             * offsets, same `invalid map/set<T> iterator` throw and guarded
-             * `_Mysize` decrement, byte-for-byte the same node shape since a
-             * `HullTriangle3<double>*` is still a 4-byte pointer)
              *
              * Owner identified in a later pass: `Wm3::ConvexHull3<Real>::m_kHull`
              * (`dependencies/WildMagic3p8/Foundation/Containment/Wm3ConvexHull3.h:89`),
@@ -4987,21 +4736,6 @@ namespace msvc8
              * precedents above), this member and its two rotate/two
              * extremum helpers are genuine compiled emissions of real
              * template code, kept `recovered` rather than `skip`.
-             *
-             * Address: 0x00A3E450 (FUN_00A3E450, sub_A3E450) -- the
-             * `isNil@+0x15` instantiation cited on `rb_increment`/
-             * `rotate_left`/`buy_head`/`destroy_subtree` above's
-             * `erase_node`, opening with the identical `_Isnil` check +
-             * `out_of_range("invalid map/set<T> iterator")` throw and
-             * successor-capture-before-unlink shape (calls this
-             * instantiation's `rb_increment`, `sub_A3A8D0`, cited above).
-             * Sole caller is this instantiation's `erase_range`
-             * (`sub_A3E800`, cited below) via its per-element loop. Real
-             * reachability traces through `sub_A3E800`'s own citation to
-             * `~rb_tree()` (`sub_A3E8D0`/`sub_A3E910`/`sub_A3E950`, cited
-             * above) and, independently, to the same WildMagic EH-cleanup
-             * tail-jumps documented there -- correcting a prior
-             * "transitively unreachable" verdict that missed those jumps.
              *
              * Address: 0x00856950 (FUN_00856950, sub_856950) -- `msvc8::
              * map<CmdId, boost::shared_ptr<MeshInstance>>::erase_node` for
@@ -5722,24 +5456,6 @@ namespace msvc8
              * source path the address never appeared in; this is the real
              * source.
              *
-             * Address: 0x00A3E800 (FUN_00A3E800, sub_A3E800) -- the same
-             * `isNil@+0x15` instantiation's `erase_range`. Fast path
-             * (`first==leftmost() && last==header()`) calls `sub_A3CF30`
-             * (`destroy_subtree`, cited above); general path loops
-             * `sub_A3A8D0` (`rb_increment`, cited above) + `sub_A3E450`
-             * (`erase_node`, cited above) per element -- field-for-field
-             * match to this member's body. Reached from three
-             * byte-identical `~rb_tree()` emissions (`sub_A3E8D0`/
-             * `sub_A3E910`/`sub_A3E950`, cited above) plus, independently,
-             * from EH-cleanup tail-jumps inside two WildMagic-shaped
-             * functions (`sub_A3E9C0`, already `external_dependency`;
-             * `sub_A40060`) -- both verified by direct PE byte read
-             * (`0x00B75B81`/`0x00B75BC1`, both `E9` rel32 landing on
-             * `sub_A3E950`). Was previously `skip` ("transitively
-             * unreachable, verified 2 hops deep" -- a byte-scanner pass
-             * that missed these EH-section jumps); corrected to
-             * `recovered`.
-             *
              * Address: 0x008564E0 (FUN_008564E0, sub_8564E0) --
              * `msvc8::map<CmdId, boost::shared_ptr<MeshInstance>>::
              * erase_range` for `moho::CBuildDragPreview::
@@ -5951,34 +5667,6 @@ namespace msvc8
             }
 
             /**
-             * Address: 0x00A65B60 (FUN_00A65B60, sub_A65B60) -- CORRECTED: an
-             * earlier pass in this session mis-labelled this `msvc8::set<
-             * std::uint32_t>, owner unidentified`. Real identity (commit
-             * `ea2e46c3`): `std::set<HullTriangle3<float>*>::erase(const
-             * key_type&)`, isNil@+0x11 -- `Wm3::ConvexHull3<float>::m_kHull`
-             * (`dependencies/WildMagic3p8/Foundation/Containment/
-             * Wm3ConvexHull3.h:89`). `this`=ecx=tree, one stack arg = `const
-             * key_type&`, `retn 4` -- a real `__thiscall` member. Source line
-             * is `m_kHull.erase(pkTri)` in `ConvexHull3<Real>::Update`
-             * (`Wm3ConvexHull3.cpp:324`). WildMagic is CLAUDE.md's named
-             * terminal `external_dependency` category -- kept here purely as
-             * cross-reference confirmation of this member's shape, not as
-             * engine recovery work; see `recovered_progress.json`.
-             * Was `EraseQueryTreeKeyRangeNil17LaneA` in `moho/math/
-             * Wm3DistanceFafExtras.cpp` (deleted), which hand-rolled this
-             * exact algorithm as an uncited private RB-tree reimplementation
-             * (`QueryTreeCountNodesInRange`/`QueryTreeEraseRange`/
-             * `QueryTreeEraseSingleNode`/`QueryTreeRotateLeft`/
-             * `QueryTreeRotateRight`, none of which carried an `Address:`
-             * citation) instead of naming this shared template -- or, since
-             * the real owner is external, instead of simply noting "this is
-             * `m_kHull.erase(pkTri)`, WildMagic, external_dependency" the way
-             * this citation now does.
-             * Address: 0x00A65C10 (FUN_00A65C10, sub_A65C10) -- a second,
-             * non-ICF-folded real emission of the same member (confirmed
-             * distinct from 0x00A65B60 via `_callgraph_index.sqlite`'s
-             * `function_icf_twins` view: zero twins recorded for either
-             * address) -- was `EraseQueryTreeKeyRangeNil17LaneB`.
              *
              * What it does:
              * `equal_range(k)` locates `[first,last)`, then the shipped body
@@ -6653,30 +6341,6 @@ namespace msvc8
              * Reached from `AddOrGetExportBinding`'s claim of a fresh
              * binding slot in RRuleGameRules.cpp, via
              * `msvc8::set<uint32_t>`'s default constructor.)
-             * Address: 0x00A583C0 (FUN_00A583C0, `alloc_raw` half of buy_head
-             * for the "unidentified map<int32_t,T> instantiation" family
-             * already cited on `buy_node` below (sibling node-buy
-             * FUN_00A58450, 36-byte node, at 0x00A58450 -- immediately
-             * adjacent in the binary): `operator new(0x14)`, zeroes the
-             * three link dwords, sets byte+0x10=1/byte+0x11=0. Its caller
-             * FUN_00A5A000 (4 callers of its own: FUN_00A5A000/
-             * FUN_00A5D943/FUN_00A66233/FUN_00A67840) does the self-link and
-             * flag fixup this template's `buy_head()` performs inline --
-             * `left=parent=right=self`, then overwrites byte+0x11=1 (isNil)
-             * -- the same allocate/self-link split already documented for
-             * FUN_0052F370 above. Node shape (20 bytes, no value slot) is
-             * head-only, matching a `msvc8::set<int32_t>`-style sentinel for
-             * the same map whose value-bearing node buy is FUN_00A58450.)
-             * Address: 0x00A58370 (FUN_00A58370, another `alloc_raw` half of
-             * buy_head for a sibling "unidentified map<int32_t,T>
-             * instantiation" -- byte-for-byte the same shape as FUN_00A583C0
-             * above (`operator new(0x14)`, zero the three link dwords,
-             * byte+0x10=1/byte+0x11=0), but a distinct COMDAT with its own
-             * caller family: FUN_00A59FC0 (call at 0x00A59FC3), FUN_00A5D913,
-             * FUN_00A66203, and FUN_00A67120 (call at 0x00A671E2) -- none
-             * recovered yet, so the owning map/set instantiation is not
-             * identified. Same 20-byte headless-node shape as FUN_00A583C0's
-             * cluster.)
              */
             /**
              * Address: 0x00684230 (FUN_00684230, `Moho::EntityDB::EntityDB` --
@@ -6782,16 +6446,6 @@ namespace msvc8
              * carried this exact evidence and disclosure; it is preserved
              * here verbatim now that the real container performs the fusion
              * instead.)
-             *
-             * Address: 0x00A3CEE0 (FUN_00A3CEE0, sub_A3CEE0) -- the same
-             * `isNil@+0x15` instantiation cited on `rb_increment`/
-             * `rotate_left` above's own header-node allocator: `operator
-             * new(0x18)`, `left=parent=right=0`, `color=1`(black), `isnil=0`
-             * -- NOT self-linked, distinct from this member's plain shape
-             * (see `FUN_0083C220` below for the same "does not self-link"
-             * split variant this file already documents on `FUN_00556DE0`
-             * above). Called from `erase_range`'s fast whole-tree-clear path
-             * (`sub_A3E800`, cited below) for this instantiation.
              *
              * Address: 0x0083C220 (FUN_0083C220, sub_83C220) -- `msvc8::map<
              * UiKeyMask, ...>`-family `gUiKeyRepeatMap`'s (`moho/ui/
@@ -6963,13 +6617,6 @@ namespace msvc8
              * Address: 0x0049A7B0 (FUN_0049A7B0, the trail-segment pool's node allocate
              * and link)
              * Address: 0x0049EC00 (FUN_0049EC00, its node-array allocate)
-             */
-            /**
-             * Address: 0x00A58450 (FUN_00A58450, the unidentified `map<int32_t, T>`
-             * instantiation's node buy -- `operator new(0x24)`, writes the three
-             * link fields at `+0x00`/`+0x04`/`+0x08`, copy-constructs the 20-byte
-             * value at `+0x0C`, colour at `+0x20`, nil at `+0x21`. Reached from
-             * `insert_at`'s call site cited above (0x00A63950).)
              */
             /**
              * Address: 0x00581370 (FUN_00581370, `msvc8::map<Wm3::Vector2i,
@@ -7868,15 +7515,6 @@ namespace msvc8
              * citing a `CrtRuntimeHelpers.cpp` source path the address
              * never appeared in; this is the real source.
              *
-             * Address: 0x00A3CF30 (FUN_00A3CF30, sub_A3CF30) -- the same
-             * `isNil@+0x15` instantiation cited on `rb_increment`/
-             * `rotate_left`/`buy_head` above's recursive subtree-free: `if
-             * (!isNil) { do { destroy_subtree(right); tmp=left; delete
-             * this; this=tmp; } while (!isNil); }` -- matches this member
-             * exactly, including the genuine self-recursive call at
-             * 0x00A3CF47. Called from `erase_range`'s fast whole-tree-clear
-             * path (`sub_A3E800`, cited below) for this instantiation.
-             *
              * Address: 0x004E4530 (FUN_004E4530, sub_4E4530) --
              * `sSndParamsCache`'s (`gSndParamsHashCache` @ 0x010A9288 in
              * `moho/audio/CSndParams.cpp`) own `destroy_subtree` -- the third of this file's three
@@ -8164,10 +7802,6 @@ namespace msvc8
              * These belong to `std::map<std::string, CArmyStatItem*>` -- `CArmyStats::mNameIndex` -- whose node is 0x30. The colour/nil pair they rewrite sits at `[node+0x2C]`/`[node+0x2D]`, which is what separates them from the 0x18 blueprint-stat node in the same file.
              */
             /**
-             * Address: 0x00A52800 (FUN_00A52800)
-             * Address: 0x00A529D0 (FUN_00A529D0, byte-identical ICF twin of
-             * 0x00A52800 -- same rotate_left body, folded to one binary symbol,
-             * both call sites reached independently)
              *
              * An unidentified `map<int32_t, T>` instantiation somewhere in the
              * 0x00A5xxxx-0x00A67xxx address neighbourhood (node layout: right@0,
@@ -8203,8 +7837,6 @@ namespace msvc8
              * branch.
              */
             /**
-             * Address: 0x00A553F0 (FUN_00A553F0)
-             * Address: 0x00A55520 (FUN_00A55520, byte-identical sibling emission)
              *
              * Left-rotate lanes for the same two `[node+0x10]`/`[node+0x11]`
              * colour/nil instantiations cited on `erase_node` above, reached
@@ -8403,16 +8035,6 @@ namespace msvc8
              * exactly the three `LEFT-ROTATE` call sites CLRS's algorithm
              * makes, confirmed independently against this member's own
              * unambiguous body, not just the caller's shape.
-             *
-             * Address: 0x00A3A950 (FUN_00A3A950, sub_A3A950) -- the
-             * `isNil@+0x15` instantiation cited on `rb_increment` above's own
-             * `_Lrotate`. `.asm`-confirmed classic Dinkumware left-rotate:
-             * `x->right=y->left; if(!y->left->isNil) y->left->parent=x;
-             * y->parent=x->parent; if(x==root) root=y; else if(x==parent->
-             * left) parent->left=y; else parent->right=y; y->left=x;
-             * x->parent=y;` -- matches this member exactly. Called from that
-             * instantiation's `erase_node` rebalance loop (`sub_A3E450`,
-             * cited on `erase_node` below).
              */
             /**
              * Address: 0x00849D40 (FUN_00849D40 -- `rotate_left` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from `erase_node` 0x00849900.)
@@ -8521,8 +8143,6 @@ namespace msvc8
              * `rotate_left`'s `FUN_007B3590` twin above.
              */
             /**
-             * Address: 0x00A553A0 (FUN_00A553A0)
-             * Address: 0x00A554D0 (FUN_00A554D0, byte-identical sibling emission)
              *
              * Right-rotate lanes for the same two `[node+0x10]`/`[node+0x11]`
              * colour/nil instantiations cited on `erase_node` above, reached
@@ -8562,23 +8182,6 @@ namespace msvc8
              * `EntityDb.h`. Mirror of `rotate_left`'s FUN_006880A0 above,
              * same instantiation. Reached from `insert_at`'s emission
              * FUN_00687280's fixup loop, cited above.)
-             */
-            /**
-             * Address: 0x00A55930 (FUN_00A55930, the right rotate for the same
-             * unidentified `map<int32_t, T>` instantiation cited on
-             * `rotate_left` above (0x00A52800/0x00A529D0) and on `insert_at`'s
-             * link-and-rebalance fixup loop (0x00A63950) -- swapped field
-             * order confirmed (`right@0`/`parent@+4`/`left@+8`, isNil byte at
-             * +0x21): reads `n->left` at `[edx+8]`, `pivot->right` at `[eax]`,
-             * writes `n->left = pivot->right` at `[edx+8]`, the root/
-             * parent-side branch at `[ecx+4]`/`[ecx]`/`[ecx+8]` mirroring
-             * `rotate_left`'s own root/parent-side branch with right and left
-             * swapped, and finishes `pivot->right = n` / `n->parent = pivot`
-             * via field 0 and field+4 exactly as this method's generic body
-             * does. Reached from `insert_at`'s fixup loop (0x00A63950) via the
-             * same caller chain cited there (0x00A656A0 -> 0x00A65D00 ->
-             * 0x00A66270 -> 0x00A666F0 -> ...); owning class still not traced
-             * in this pass, matching the sibling citation.)
              */
             /**
              * Address: 0x006E1FD0 (FUN_006E1FD0, the command-id map's right
@@ -8812,12 +8415,6 @@ namespace msvc8
              * Address: 0x00594F80 (FUN_00594F80, the name-index map's recolour-and-rotate
              * fixup after a link -- it writes only the colour byte at `[node+0x2C]`)
              * Address: 0x00594B10 (FUN_00594B10, the link half that precedes it)
-             * Address: 0x00A63950 (FUN_00A63950, the link-and-rebalance half for
-             * the unidentified `map<int32_t, T>` instantiation cited on
-             * `rotate_left` above -- same `map/set<T> too long` throw guard,
-             * buy-node call, and fixup loop shape calling `rotate_left`
-             * (0x00A52800/0x00A529D0) on both the left- and right-uncle-red
-             * branches; owning class not traced in this pass)
              */
             /**
              * Address: 0x0077B600 (FUN_0077B600, inner bucket link-and-rebalance)
