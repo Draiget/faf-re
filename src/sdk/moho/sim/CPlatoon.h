@@ -47,7 +47,9 @@ namespace moho
   enum ECompareType : std::int32_t;
 
   /**
-   * Recovered `CPlatoon` runtime object.
+   * An AI platoon: a named group of squads (`mSquadList`) owned by one army,
+   * scripted through `/lua/platoon.lua`. Every unit the platoon holds is in
+   * exactly one of its squads.
    */
   class CPlatoon : public CScriptObject, public InstanceCounter<CPlatoon>
   {
@@ -58,8 +60,8 @@ namespace moho
      * Address: 0x0072A300 (FUN_0072A300, Moho::CPlatoon::operator new)
      *
      * What it does:
-     * Allocates one 0x110-byte platoon object and runs constructor lane
-     * (`FUN_00724CC0`) with the provided ownership/plan names.
+     * Allocates one 0x110-byte platoon and runs the scripted constructor
+     * (0x00724CC0) with the given name and AI plan.
      */
     static CPlatoon* Create(Sim* sim, CArmyImpl* army, const char* platoonName, const char* aiPlan);
 
@@ -67,8 +69,8 @@ namespace moho
      * Address: 0x00724BA0 (FUN_00724BA0, Moho::CPlatoon::CPlatoon)
      *
      * What it does:
-     * Constructs one serializer-facing platoon object with zeroed runtime
-     * lanes and no `OnCreate` script dispatch.
+     * Serializer construction: empty squads and names, zero stats, and no
+     * `OnCreate` script call.
      */
     CPlatoon();
 
@@ -76,8 +78,8 @@ namespace moho
      * Address: 0x00724CC0 (FUN_00724CC0, Moho::CPlatoon::CPlatoon)
      *
      * What it does:
-     * Constructs one script-backed platoon object, initializes squad/name
-     * lanes, and dispatches script `OnCreate(plan)`.
+     * Binds the `/lua/platoon.lua` class, stores the name and plan, and calls
+     * the script's `OnCreate(plan)`.
      */
     CPlatoon(Sim* sim, CArmyImpl* army, const char* platoonName, const char* aiPlan);
 
@@ -85,8 +87,8 @@ namespace moho
      * Address: 0x0072A0D0 (FUN_0072A0D0, sub_72A0D0)
      *
      * What it does:
-     * Allocates one default platoon object and publishes it through serializer
-     * construct-result lanes as an unowned reflected reference.
+     * Allocates one default platoon and hands it to the serializer as an
+     * unowned reference.
      */
     static void ConstructForSerializer(gpg::SerConstructResult* result);
 
@@ -94,8 +96,8 @@ namespace moho
      * Address: 0x00724EB0 (FUN_00724EB0, Moho::CPlatoon::~CPlatoon)
      *
      * What it does:
-     * Destroys owned squad objects and clears dynamic squad storage back to
-     * inline lanes; the `InstanceCounter<CPlatoon>` base takes the count back.
+     * Deletes every squad and returns the squad list to its inline storage;
+     * the `InstanceCounter<CPlatoon>` base takes the count back.
      */
     ~CPlatoon() override;
 
@@ -113,8 +115,8 @@ namespace moho
      * Address: 0x00729F90 (FUN_00729F90, Moho::CPlatoon::SquadHasState)
      *
      * What it does:
-     * Returns whether the selected squad class (or all squads) contains at
-     * least one unit with the requested unit state.
+     * Returns whether the selected squad class (or, for the all-classes
+     * selector, any assigned class) has a live unit in `state`.
      */
     static bool SquadHasState(ESquadClass squadClass, CPlatoon* platoon, EUnitState state);
 
@@ -122,8 +124,7 @@ namespace moho
      * Address: 0x007251D0 (FUN_007251D0, Moho::CPlatoon::IsInPlatoon)
      *
      * What it does:
-     * Returns whether the provided unit pointer is currently present in any
-     * squad lane of this platoon.
+     * Returns whether any squad holds `unit`.
      */
     bool IsInPlatoon(const Unit* unit) const;
 
@@ -131,18 +132,33 @@ namespace moho
      * Address: 0x00725220 (FUN_00725220, Moho::CPlatoon::GetSquadClass)
      *
      * What it does:
-     * Scans all squad lanes and returns the class of the first squad
-     * containing the provided unit; otherwise returns `SQUADCLASS_Unassigned`.
+     * Returns the class of the first squad holding `unit`, or
+     * `SQUADCLASS_Unassigned` when none does.
      */
     ESquadClass GetSquadClass(const Unit* unit) const;
+
+    /**
+     * Address: 0x007241F0 (FUN_007241F0)
+     *
+     * IDA signature:
+     * void __userpurge sub_7241F0(Moho::SEntitySetTemplateUnit *units@<eax>,
+     *   Moho::CSquad *squad, Moho::CPlatoon *this);
+     *
+     * What it does:
+     * Adds `units` to `squad` and drops the cached Lua unit list. The
+     * out-of-line copy has no caller; it is inlined into
+     * `AppendUnitsToSquad(ESquadClass, ...)` (0x00725280), `ReturnUnitsTo`
+     * (0x00725410), `FormPlatoon` (0x0072E0A7) and the two brain bindings that
+     * build platoons.
+     */
+    void AppendUnitsToSquad(CSquad* squad, const SEntitySetTemplateUnit& units);
 
     /**
      * Address: 0x00725280 (FUN_00725280, sub_725280)
      *
      * What it does:
-     * Finds the first squad lane matching `squadClass` and appends all units
-     * from `units` into that squad's unit set, then invalidates cached Lua
-     * unit-list state.
+     * Adds `units` to the squad of class `squadClass`, if there is one, and
+     * drops the cached Lua unit list either way.
      */
     void AppendUnitsToSquad(ESquadClass squadClass, const SEntitySetTemplateUnit& units);
 
@@ -150,8 +166,8 @@ namespace moho
      * Address: 0x007252D0 (FUN_007252D0, sub_7252D0)
      *
      * What it does:
-     * Builds a one-unit temporary set for `unit`, appends it into the first
-     * matching `squadClass` lane, and invalidates cached Lua unit-list state.
+     * Wraps `unit` in a one-unit set and adds it to the squad of class
+     * `squadClass`.
      */
     void AppendUnitToSquad(ESquadClass squadClass, Unit* unit);
 
@@ -159,9 +175,22 @@ namespace moho
      * Address: 0x00725630 (FUN_00725630, Moho::CPlatoon::GetSquad)
      *
      * What it does:
-     * Returns the first squad lane matching `squadClass`, or null when absent.
+     * Returns the first squad of class `squadClass`, or null. The squad
+     * pointers themselves are never null-tested. Inlined at almost every
+     * lookup in CPlatoon.cpp: a scan comparing `[squad+0x30]`, then a test
+     * of the result.
      */
-    CSquad* GetSquad(ESquadClass squadClass);
+    [[nodiscard]] CSquad* GetSquad(ESquadClass squadClass) const;
+
+    /**
+     * Address: 0x00725770 (FUN_00725770, sub_725770)
+     *
+     * What it does:
+     * Returns the union of every squad's units as a new set (built in the
+     * caller's return slot, `ret 4`). Empty squads are skipped; each other
+     * squad's units are copied out (0x00723A50) and range-added (0x006F8F10).
+     */
+    [[nodiscard]] SEntitySetTemplateUnit GetPlatoonUnits() const;
 
     /**
      * Address: 0x00725CF0 (FUN_00725CF0, Moho::CPlatoon::FindClosestUnitToPos)
@@ -218,11 +247,21 @@ namespace moho
       float radius);
 
     /**
+     * Address: 0x00725990 (FUN_00725990, sub_725990)
+     *
+     * What it does:
+     * Replaces the target-priority list of the squad of class `squadClass`,
+     * if there is one. The out-of-line copy has no caller; the
+     * `SetPrioritizedTargetList` binding (0x0072E940) inlines it.
+     */
+    void SetPrioritizedTargetList(ESquadClass squadClass, const msvc8::vector<EntityCategorySet>& categories);
+
+    /**
      * Address: 0x00725660 (FUN_00725660, Moho::CPlatoon::CountUnassignedUnitsWithBP)
      *
      * What it does:
-     * Finds this platoon's unassigned squad and returns how many live units in
-     * that lane match `blueprintId`.
+     * Counts the live units of blueprint `blueprintId` in the unassigned
+     * squad, or 0 when there is none.
      */
     [[nodiscard]] int CountUnassignedUnitsWithBP(const char* blueprintId);
 
@@ -230,8 +269,8 @@ namespace moho
      * Address: 0x007256A0 (FUN_007256A0, Moho::CPlatoon::CountUnassignedUnitsInCategory)
      *
      * What it does:
-     * Finds this platoon's unassigned squad and returns how many live units in
-     * that lane match `categorySet`.
+     * Counts the live units in `categorySet` in the unassigned squad, or 0
+     * when there is none.
      */
     [[nodiscard]] int CountUnassignedUnitsInCategory(const EntityCategorySet* categorySet);
 
@@ -239,18 +278,18 @@ namespace moho
      * Address: 0x00725840 (FUN_00725840, sub_725840)
      *
      * What it does:
-     * Returns the total unit-slot count across all squad lanes.
+     * Returns the number of units across all squads (squad pointers are not
+     * null-tested). No direct caller; the brain's `GetPlatoonsList` inlines
+     * the same sum.
      */
-    [[nodiscard]] int CountAllSquadUnitSlots() const;
+    [[nodiscard]] int CountUnits() const;
 
     /**
      * Address: 0x00725730 (FUN_00725730, Moho::CPlatoon::GetUnassignedUnitsWithBP)
      *
      * What it does:
-     * Locates this platoon's `SQUADCLASS_Unassigned` squad and forwards to
-     * `CSquad::AppendUnitsWithBP` to collect up to `maxCount` live units
-     * matching `blueprintId` into `outUnits`. No-op when there is no
-     * unassigned squad.
+     * Adds up to `maxCount` live units of blueprint `blueprintId` from the
+     * unassigned squad to `outUnits`. No-op when there is no unassigned squad.
      */
     void GetUnassignedUnitsWithBP(const char* blueprintId, int maxCount, SEntitySetTemplateUnit& outUnits);
 
@@ -258,9 +297,8 @@ namespace moho
      * Address: 0x007256E0 (FUN_007256E0, Moho::CPlatoon::GetUnassignedUnitsInCategory)
      *
      * What it does:
-     * Locates this platoon's `SQUADCLASS_Unassigned` squad and forwards to
-     * `CSquad::AppendUnitsInCategory` to collect up to `maxCount` live units
-     * matching `categorySet` into `outUnits`.
+     * Adds up to `maxCount` live units in `categorySet` from the unassigned
+     * squad to `outUnits`. No-op when there is no unassigned squad.
      */
     void GetUnassignedUnitsInCategory(const EntityCategorySet* categorySet, int maxCount, SEntitySetTemplateUnit& outUnits);
 
@@ -268,10 +306,20 @@ namespace moho
      * Address: 0x007261B0 (FUN_007261B0, Moho::CPlatoon::Stop)
      *
      * What it does:
-     * Stops one requested squad lane (or all lanes) by clearing queued unit
-     * commands and stopping active attacker controllers.
+     * Stops the squad of class `squadClass`; with the all-classes selector,
+     * stops every assigned squad.
      */
     void Stop(ESquadClass squadClass);
+
+    /**
+     * Address: 0x00726210 (FUN_00726210, sub_726210)
+     *
+     * What it does:
+     * Drops the cached Lua unit list, takes every unit out of the selected
+     * squads, and orders the live ones to self-destruct
+     * (`UNITCOMMAND_DestroySelf`). Called by the `Destroy` binding (0x00731570).
+     */
+    void DestroySquads(ESquadClass squadClass);
 
     /**
      * Address: 0x00728A70 (FUN_00728A70, Moho::CPlatoon::LoadUnits)
@@ -324,6 +372,16 @@ namespace moho
      * when applicable, else Attack. Returns the issued command weak-links.
      */
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> AttackTarget(Entity* target, ESquadClass squadClass);
+
+    /**
+     * Address: 0x00728420 (FUN_00728420, func_IssueGuardTargetToPlatoon)
+     *
+     * What it does:
+     * Orders the platoon to guard `target`: one `UNITCOMMAND_Guard` for the
+     * whole platoon when it has a named formation, otherwise one per requested
+     * Attack/Artillery squad. Returns the issued command weak-links.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> GuardTarget(Unit* target, ESquadClass squadClass);
 
     /**
      * Address: 0x00727740 (FUN_00727740, Moho::CPlatoon::MoveToTarget)
@@ -379,14 +437,6 @@ namespace moho
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> AggressiveMoveToLocation(Wm3::Vector3f& pos, ESquadClass squadClass);
 
     /**
-     * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
-     *
-     * What it does:
-     * Gathers transport/carrier units across all squads and issues one
-     * `UNITCOMMAND_TransportUnloadUnits` to `targetPos`, returning the issued
-     * command weak-links.
-     */
-    /**
      * Address: 0x007291C0 (FUN_007291C0, Moho::CPlatoon::UnloadUnitsAtLocation)
      *
      * What it does:
@@ -397,14 +447,22 @@ namespace moho
      */
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UnloadUnitsAtLocation(const EntityCategorySet* category, Wm3::Vector3f& pos);
 
+    /**
+     * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
+     *
+     * What it does:
+     * Gathers transport/carrier units across all squads and issues one
+     * `UNITCOMMAND_TransportUnloadUnits` to `targetPos`, returning the issued
+     * command weak-links.
+     */
     [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UnloadAllAtLocation(const Wm3::Vector3f& targetPos);
 
     /**
      * Address: 0x00729FE0 (FUN_00729FE0, Moho::CPlatoon::SquadsHaveOrders)
      *
      * What it does:
-     * Returns true when all assigned squad classes (1..5) are idle
-     * (no active unit command in those lanes).
+     * Returns true when every assigned squad (classes 1..5) that exists is
+     * idle.
      */
     bool AssignedSquadsAreIdle() const;
 
@@ -412,16 +470,13 @@ namespace moho
      * Address: 0x00725150 (FUN_00725150, Moho::CPlatoon::SwitchAIPlan)
      *
      * What it does:
-     * Replaces the active platoon AI plan string and dispatches
-     * `OnDestroy/OnCreate` script callbacks when the plan actually changes.
+     * Replaces the AI plan and, when it actually changes, calls the script's
+     * `OnDestroy` and then `OnCreate(plan)`.
      */
     void SwitchAIPlan(const char* planName);
 
     /**
      * Address: 0x0072B720 (FUN_0072B720, Moho::CPlatoon::GetArmy)
-     *
-     * What it does:
-     * Returns this platoon's owning army lane.
      */
     [[nodiscard]] SimArmy* GetArmy() const;
 
@@ -429,72 +484,60 @@ namespace moho
      * Address: 0x0072B7A0 (FUN_0072B7A0, Moho::CPlatoon::GetLifetimeStat1)
      *
      * What it does:
-     * Returns the first integer lifetime-stat lane.
+     * Returns the number of enemy units this platoon's units have killed.
      */
-    [[nodiscard]] std::int32_t GetLifetimeStat1() const;
+    [[nodiscard]] std::int32_t GetKills() const;
 
     /**
      * Address: 0x0072B7B0 (FUN_0072B7B0, Moho::CPlatoon::GetLifetimeStat2)
      *
      * What it does:
-     * Returns the second integer lifetime-stat lane.
+     * Returns the number of this platoon's units that have been killed.
      */
-    [[nodiscard]] std::int32_t GetLifetimeStat2() const;
+    [[nodiscard]] std::int32_t GetLosses() const;
 
     /**
      * Address: 0x0072B790 (FUN_0072B790, sub_72B790)
      *
      * What it does:
-     * Sets the disband-on-idle lane and returns this platoon.
+     * Marks the platoon to be disbanded once its assigned squads go idle, and
+     * returns it.
      */
     CPlatoon* MarkDisbandOnIdle();
 
     /**
      * Address: 0x0072B7C0 (FUN_0072B7C0, sub_72B7C0)
-     *
-     * What it does:
-     * Returns the third floating lifetime-stat lane.
      */
-    [[nodiscard]] float GetLifetimeStat3() const;
+    [[nodiscard]] float GetDamageDealt() const;
 
     /**
      * Address: 0x0072B7D0 (FUN_0072B7D0, sub_72B7D0)
-     *
-     * What it does:
-     * Returns the fourth floating lifetime-stat lane.
      */
-    [[nodiscard]] float GetLifetimeStat4() const;
+    [[nodiscard]] float GetDamageReceived() const;
 
     /**
      * Address: 0x0072B7F0 (FUN_0072B7F0, sub_72B7F0)
      *
      * What it does:
-     * Returns whether the cached Lua unit-list lane is present.
+     * Returns whether `mLuaUnitList` is current.
      */
     [[nodiscard]] bool HasLuaUnitList() const;
 
     /**
      * Address: 0x00736D70 (FUN_00736D70, sub_736D70)
-     *
-     * What it does:
-     * Adds one delta to the third floating lifetime-stat lane.
      */
-    CPlatoon* AddLifetimeStat3(float delta);
+    CPlatoon* AddDamageDealt(float amount);
 
     /**
      * Address: 0x00736D90 (FUN_00736D90, sub_736D90)
-     *
-     * What it does:
-     * Adds one delta to the fourth floating lifetime-stat lane.
      */
-    CPlatoon* AddLifetimeStat4(float delta);
+    CPlatoon* AddDamageReceived(float amount);
 
     /**
      * Address: 0x0072B730 (FUN_0072B730, Moho::CPlatoon::SetPlatoonFormationOverride)
      *
      * What it does:
-     * Stores one Lua-visible formation override string (empty string clears
-     * the override lane).
+     * Replaces the formation name; an empty string clears it.
      */
     void SetPlatoonFormationOverride(const msvc8::string& formationName);
 
@@ -502,26 +545,29 @@ namespace moho
      * Address: 0x00725410 (FUN_00725410, Moho::CPlatoon::PullUnassignedUnitsFrom)
      *
      * What it does:
-     * Moves this platoon's currently owned unit set into the army-pool
-     * unassigned lane and invalidates cached Lua unit lists.
+     * Disbands this platoon into `armyPool`: every squad's units move into
+     * the pool's unassigned squad, the squads are deleted, and the squad list
+     * is emptied. Does nothing (beyond dropping this platoon's cached Lua list)
+     * when the pool has no unassigned squad.
      */
-    void PullUnassignedUnitsFrom(CPlatoon* armyPool);
+    void ReturnUnitsTo(CPlatoon* armyPool);
 
     /**
      * Address: 0x007253B0 (FUN_007253B0, Moho::CPlatoon::RemoveUnit)
      *
      * What it does:
-     * Clears the cached Lua unit list flag, finds the squad that owns the
-     * requested entity, and removes that unit from the first matching squad.
+     * Drops the cached Lua unit list and takes `unit` out of the first squad
+     * that holds it.
      */
-    void RemoveUnit(Entity* unit);
+    void RemoveUnit(Unit* unit);
 
     /**
      * Address: 0x0072B3C0 (FUN_0072B3C0, Moho::CPlatoon::MemberDeserialize)
      *
      * What it does:
-     * Loads `CScriptObject` base state, sim/army pointers, squad list, name
-     * strings, and lifetime stat lanes, in binary archive order.
+     * Loads the `CScriptObject` base, sim and army pointers, owned squads,
+     * the four names, the disband flag and the lifetime stats, in archive
+     * order.
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
 
@@ -529,8 +575,7 @@ namespace moho
      * Address: 0x0072B4D0 (FUN_0072B4D0, Moho::CPlatoon::MemberSerialize)
      *
      * What it does:
-     * Saves `CScriptObject` base state, sim/army pointers, squad list, name
-     * strings, and lifetime stat lanes, in binary archive order.
+     * Saves the fields `MemberDeserialize` loads, in the same order.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
@@ -543,14 +588,14 @@ namespace moho
     msvc8::string mPlan;                        // +0x8C
     msvc8::string mUniqueName;                  // +0xA8
     msvc8::string mFormation;                   // +0xC4
-    std::uint8_t mDisbandOnIdle;                // +0xE0
+    bool mDisbandOnIdle;                        // +0xE0
     std::uint8_t mPad_0x0E1[3];                 // +0xE1
-    std::int32_t mLifetimeStat1;                // +0xE4
-    std::int32_t mLifetimeStat2;                // +0xE8
-    float mLifetimeStat3;                       // +0xEC
-    float mLifetimeStat4;                       // +0xF0
-    LuaPlus::LuaObject mLuaUnitList;            // +0xF4
-    std::uint8_t mHasLuaList;                   // +0x108
+    std::int32_t mKills;                        // +0xE4 enemy units killed (Unit.cpp death path)
+    std::int32_t mLosses;                       // +0xE8 own units killed
+    float mDamageDealt;                         // +0xEC (CDamage, `Units_TotalDamageDealt`)
+    float mDamageReceived;                      // +0xF0 (CDamage, `Units_TotalDamageReceive`)
+    LuaPlus::LuaObject mLuaUnitList;            // +0xF4 cached `GetPlatoonUnits` table
+    bool mHasLuaList;                           // +0x108 whether mLuaUnitList is current
     std::uint8_t mPad_0x109[7];                 // +0x109
   };
   static_assert(offsetof(CPlatoon, mSim) == 0x34, "CPlatoon::mSim offset must be 0x34");
@@ -561,10 +606,10 @@ namespace moho
   static_assert(offsetof(CPlatoon, mUniqueName) == 0xA8, "CPlatoon::mUniqueName offset must be 0xA8");
   static_assert(offsetof(CPlatoon, mFormation) == 0xC4, "CPlatoon::mFormation offset must be 0xC4");
   static_assert(offsetof(CPlatoon, mDisbandOnIdle) == 0xE0, "CPlatoon::mDisbandOnIdle offset must be 0xE0");
-  static_assert(offsetof(CPlatoon, mLifetimeStat1) == 0xE4, "CPlatoon::mLifetimeStat1 offset must be 0xE4");
-  static_assert(offsetof(CPlatoon, mLifetimeStat2) == 0xE8, "CPlatoon::mLifetimeStat2 offset must be 0xE8");
-  static_assert(offsetof(CPlatoon, mLifetimeStat3) == 0xEC, "CPlatoon::mLifetimeStat3 offset must be 0xEC");
-  static_assert(offsetof(CPlatoon, mLifetimeStat4) == 0xF0, "CPlatoon::mLifetimeStat4 offset must be 0xF0");
+  static_assert(offsetof(CPlatoon, mKills) == 0xE4, "CPlatoon::mKills offset must be 0xE4");
+  static_assert(offsetof(CPlatoon, mLosses) == 0xE8, "CPlatoon::mLosses offset must be 0xE8");
+  static_assert(offsetof(CPlatoon, mDamageDealt) == 0xEC, "CPlatoon::mDamageDealt offset must be 0xEC");
+  static_assert(offsetof(CPlatoon, mDamageReceived) == 0xF0, "CPlatoon::mDamageReceived offset must be 0xF0");
   static_assert(offsetof(CPlatoon, mLuaUnitList) == 0xF4, "CPlatoon::mLuaUnitList offset must be 0xF4");
   static_assert(offsetof(CPlatoon, mHasLuaList) == 0x108, "CPlatoon::mHasLuaList offset must be 0x108");
   static_assert(sizeof(CPlatoon) == 0x110, "CPlatoon size must be 0x110");

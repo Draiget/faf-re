@@ -1015,7 +1015,7 @@ namespace
 
   [[nodiscard]] bool PlatoonDisbandsOnIdle(const moho::CPlatoon* const platoon)
   {
-    return platoon != nullptr && platoon->mDisbandOnIdle != 0u;
+    return platoon != nullptr && platoon->mDisbandOnIdle;
   }
 
   [[nodiscard]] bool IsPlatoonUniqueNameEmpty(const moho::CPlatoon* const platoon)
@@ -1716,7 +1716,7 @@ namespace moho
 
       if (PlatoonDisbandsOnIdle(platoon) && platoon != nullptr && platoon->AssignedSquadsAreIdle()) {
         if (armyPool != nullptr && platoon != armyPool) {
-          platoon->PullUnassignedUnitsFrom(armyPool);
+          platoon->ReturnUnitsTo(armyPool);
         }
         shouldDisband = true;
       }
@@ -1855,7 +1855,7 @@ namespace moho
       }
 
       if (armyPool != nullptr) {
-        current->PullUnassignedUnitsFrom(armyPool);
+        current->ReturnUnitsTo(armyPool);
       }
       platoons.erase(platoonIt);
       RunPlatoonOnDestroyAndDelete(current);
@@ -1885,7 +1885,7 @@ namespace moho
       }
 
       if (armyPool != nullptr && platoon != armyPool) {
-        platoon->PullUnassignedUnitsFrom(armyPool);
+        platoon->ReturnUnitsTo(armyPool);
       }
 
       platoons.erase(platoonIt);

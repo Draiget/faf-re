@@ -387,11 +387,11 @@ namespace moho
    *   - When the instigator has an army, accumulates
    *     `DamageStats_TotalDamageDealt` and the per-blueprint
    *     `Units_TotalDamageDealt` lane and adds `amount` to that army's
-   *     platoon-for-instigator `mLifetimeStat3` accumulator.
+   *     platoon-for-instigator `mDamageDealt` accumulator.
    *   - When the target has an army, mirrors the same accumulation into
    *     `DamageStats_TotalDamageReceived` /
    *     `Units_TotalDamageReceive` and the target platoon's
-   *     `mLifetimeStat4` lane.
+   *     `mDamageReceived`.
    *   - When the post-armor amount is positive, logs
    *     `"DealDamage(target=0x%08x, amt=%.1f)"`, packs `mVector` into a
    *     Lua vec3, and invokes the target's `OnDamage` script callback.
@@ -510,7 +510,7 @@ namespace moho
               &squadClass
             );
             if (platoon != nullptr) {
-              platoon->mLifetimeStat3 += postArmorAmount;
+              platoon->mDamageDealt += postArmorAmount;
             }
           }
         }
@@ -549,7 +549,7 @@ namespace moho
               &squadClass
             );
             if (platoon != nullptr) {
-              platoon->mLifetimeStat4 += postArmorAmount;
+              platoon->mDamageReceived += postArmorAmount;
             }
           }
         }

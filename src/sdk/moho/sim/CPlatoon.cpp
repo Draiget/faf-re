@@ -88,14 +88,12 @@ namespace
   using moho::EntityCategorySet;
   using moho::Unit;
 
-  constexpr ESquadClass kAllSquadsClass = static_cast<ESquadClass>(6);
-  constexpr ESquadClass kUnassignedSquadClass = static_cast<ESquadClass>(0);
+  // One past SQUADCLASS_Scout: the "every assigned class" selector the Lua
+  // bindings default to. ESquadClassTypeInfo registers no name for it.
+  constexpr ESquadClass kAllSquadClasses = static_cast<ESquadClass>(6);
   // Sentinel entity id for ground-target commands (mirrors the value in
   // CCommandLuaFunctionRegistrations.cpp; the engine uses -0x10000000).
   constexpr std::int32_t kGroundTargetEntitySentinel = -0x10000000;
-  // All-squad-classes sentinel used by the patrol/attack/move Lua bindings: applies
-  // to every assigned squad class. Not one of the ESquadClass enum's named members.
-  constexpr std::int32_t kAllSquadClassesSentinel = 6;
   constexpr int kLuaNumberTypeTag = 3;
 
   constexpr const char* kCanConsiderFormingPlatoonHelpText = "CPlatoon:CanConsiderFormingPlatoon()";
@@ -209,7 +207,7 @@ namespace
    * Address: 0x00723AA0 (FUN_00723AA0)
    *
    * What it does:
-   * Resolves and caches RTTI for one `CPlatoon` lane.
+   * Resolves and caches the `CPlatoon` reflection type.
    */
   [[nodiscard]] gpg::RType* CachedCPlatoonType()
   {
@@ -258,8 +256,8 @@ namespace
    * Address: 0x0072ABD0 (FUN_0072ABD0)
    *
    * What it does:
-   * Registers `CScriptObject` as reflected base at zero offset for the
-   * platoon runtime type descriptor lane.
+   * Registers `CScriptObject` as the reflected base of `CPlatoon`, at
+   * offset 0.
    */
   void AddBase_CSCcriptObject(gpg::RType* const typeInfo)
   {
@@ -277,19 +275,12 @@ namespace
    * Address: 0x00724B90 (FUN_00724B90)
    *
    * What it does:
-   * Thin thunk lane that forwards to `AddBase_CSCcriptObject`.
+   * Forwards to `AddBase_CSCcriptObject`.
    */
   [[maybe_unused]] void AddBase_CSCcriptObjectThunk(gpg::RType* const typeInfo)
   {
     AddBase_CSCcriptObject(typeInfo);
   }
-
-  struct PlatoonPriorityEntry
-  {
-    std::int32_t payload = 0; // +0x00
-    float priority = 0.0f; // +0x04
-  };
-  static_assert(sizeof(PlatoonPriorityEntry) == 0x8, "PlatoonPriorityEntry size must be 0x8");
 
   struct PlatoonUnitSearchEntry
   {
@@ -298,162 +289,9 @@ namespace
   };
   static_assert(sizeof(PlatoonUnitSearchEntry) == 0x8, "PlatoonUnitSearchEntry size must be 0x8");
 
-  /**
-   * Address: 0x00733AB0 (FUN_00733AB0)
-   *
-   * What it does:
-   * Fills one `[destinationBegin, destinationEnd)` range with a repeated
-   * platoon-priority entry.
-   */
-  [[maybe_unused]] PlatoonPriorityEntry* FillPlatoonPriorityEntryRange(
-    PlatoonPriorityEntry* destinationBegin,
-    PlatoonPriorityEntry* const destinationEnd,
-    const PlatoonPriorityEntry& value
-  ) noexcept
-  {
-    while (destinationBegin != destinationEnd) {
-      *destinationBegin = value;
-      ++destinationBegin;
-    }
-    return destinationBegin;
-  }
-
-  /**
-   * Address: 0x00733AD0 (FUN_00733AD0)
-   *
-   * What it does:
-   * Copies one platoon-priority range backward into destination storage.
-   */
-  [[maybe_unused]] PlatoonPriorityEntry* CopyPlatoonPriorityEntryRangeBackward(
-    PlatoonPriorityEntry* destinationEnd,
-    const PlatoonPriorityEntry* const sourceBegin,
-    const PlatoonPriorityEntry* sourceEnd
-  ) noexcept
-  {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
-  }
-
   // 0x00736450 / 0x00736470 are `rb_max`/`rb_min` of `sSimConList`'s
   // `msvc8::map` (node 0x30, isNil@+0x2D), cited on those members in
   // legacy/containers/RbTree.h.
-
-  [[nodiscard]] moho::Unit* DecodeSquadUnit(moho::Entity* const entry) noexcept
-  {
-    // Null, or a null unit's Entity subobject (`raw <= 8` on x86).
-    const auto raw = reinterpret_cast<std::uintptr_t>(entry);
-    if (raw <= static_cast<std::uintptr_t>(gpg::BaseSubobjectOffset<moho::Unit, moho::Entity>())) {
-      return nullptr;
-    }
-
-    return static_cast<moho::Unit*>(entry);
-  }
-
-  [[nodiscard]] moho::CSquad* FindSquadByClass(
-    moho::CPlatoon& platoonRuntime,
-    const ESquadClass squadClass
-  ) noexcept
-  {
-    for (moho::CSquad** squadLane = platoonRuntime.mSquadList.begin(); squadLane != platoonRuntime.mSquadList.end(); ++squadLane) {
-      moho::CSquad* const squadView = *squadLane;
-      if (!squadView || squadView->mSquadClass != squadClass) {
-        continue;
-      }
-
-      return squadView;
-    }
-
-    return nullptr;
-  }
-
-  [[nodiscard]] bool SquadContainsUnit(const moho::CSquad* const squad, const Unit* const targetUnit) noexcept
-  {
-    if (!squad || !targetUnit) {
-      return false;
-    }
-
-    for (auto unitSlot = squad->mUnits.mVec.begin(); unitSlot != squad->mUnits.mVec.end(); ++unitSlot) {
-      if (DecodeSquadUnit(*unitSlot) == targetUnit) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  void BuildPlatoonUnitSet(const moho::CPlatoon& platoonRuntime, SEntitySetTemplateUnit& outSet);
-
-  [[nodiscard]] bool ComputeSquadCenter(const moho::CSquad* const squad, Wm3::Vector3f& outCenter) noexcept
-  {
-    if (!squad) {
-      return false;
-    }
-
-    squad->GetCenter(&outCenter);
-    return true;
-  }
-
-  [[nodiscard]] bool ComputePlatoonCenter(const moho::CPlatoon& platoonRuntime, Wm3::Vector3f& outCenter) noexcept
-  {
-    SEntitySetTemplateUnit platoonUnits{};
-    BuildPlatoonUnitSet(platoonRuntime, platoonUnits);
-
-    float sumX = 0.0f;
-    float sumY = 0.0f;
-    float sumZ = 0.0f;
-    std::uint32_t unitCount = 0u;
-
-    for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entityIt);
-      if (!unit) {
-        continue;
-      }
-
-      const Wm3::Vec3f& unitPosition = unit->GetPosition();
-      sumX += unitPosition.x;
-      sumY += unitPosition.y;
-      sumZ += unitPosition.z;
-      ++unitCount;
-    }
-
-    if (unitCount == 0u) {
-      return false;
-    }
-
-    const float inverseCount = 1.0f / static_cast<float>(unitCount);
-    outCenter.x = sumX * inverseCount;
-    outCenter.y = sumY * inverseCount;
-    outCenter.z = sumZ * inverseCount;
-    return true;
-  }
-
-  /**
-   * Address: 0x00725770 (FUN_00725770, sub_725770)
-   *
-   * What it does:
-   * Rebuilds one sorted unique unit-entity set by merging all squad unit lanes
-   * currently referenced by the platoon.
-   */
-  void BuildPlatoonUnitSet(const moho::CPlatoon& platoonRuntime, SEntitySetTemplateUnit& outSet)
-  {
-    outSet.Clear();
-    outSet.ListResetLinks();
-
-    for (moho::CSquad* const* squadLane = platoonRuntime.mSquadList.begin(); squadLane != platoonRuntime.mSquadList.end(); ++squadLane) {
-      const moho::CSquad* const squad = *squadLane;
-      if (!squad || squad->mUnits.mVec.begin() == squad->mUnits.mVec.end()) {
-        continue;
-      }
-
-      for (auto unitSlot = squad->mUnits.mVec.begin(); unitSlot != squad->mUnits.mVec.end(); ++unitSlot) {
-        (void)outSet.AddUnit(DecodeSquadUnit(*unitSlot));
-      }
-    }
-  }
 
   /**
    * Address: 0x0072A210 (FUN_0072A210, sub_72A210)
@@ -461,7 +299,7 @@ namespace
    * What it does:
    * Reads the platoon's owned squad pointers from the archive and appends each
    * recovered squad into the platoon's squad storage until the archive returns
-   * a null pointer lane.
+   * a null pointer.
    */
   [[nodiscard]] gpg::ReadArchive* ReadPlatoonSquadsFromArchive(
     gpg::ReadArchive* const archive,
@@ -490,8 +328,8 @@ namespace
    * Address: 0x0072A290 (FUN_0072A290)
    *
    * What it does:
-   * Writes each squad pointer lane as `owned`, then emits a null-squad
-   * `unowned` terminator lane for platoon squad-list serialization.
+   * Writes each squad pointer as owned, then a null unowned squad pointer
+   * that ends the list.
    */
   void WritePlatoonSquadPointersToArchive(
     gpg::WriteArchive* const archive,
@@ -511,42 +349,6 @@ namespace
     terminatorRef.mObj = nullptr;
     terminatorRef.mType = CachedCSquadType();
     gpg::WriteRawPointer(archive, terminatorRef, gpg::TrackedPointerState::Unowned, ownerRef);
-  }
-
-  /**
-   * Address: 0x00733480 (FUN_00733480, sub_733480)
-   *
-   * What it does:
-   * Appends one platoon unit-search entry to the bounded result lane used by
-   * `FormPlatoon()`'s nearest-first candidate filtering. Checked-capacity
-   * fast append (constructs in place at `_Mylast`), else tail-calls the
-   * reallocating single-insert grow path `msvc8::vector<PlatoonUnitSearchEntry>::
-   * insert(iterator, const T&)` (`FUN_007336C0`).
-   */
-  void AppendPlatoonUnitSearchEntry(
-    msvc8::vector<PlatoonUnitSearchEntry>& entries,
-    moho::Unit* const unit,
-    const float distanceSq
-  )
-  {
-    entries.push_back(PlatoonUnitSearchEntry{unit, distanceSq});
-  }
-
-  /**
-   * Address: 0x00723A50 (FUN_00723A50, copy_CSquadUnits_into_EntitySet)
-   *
-   * What it does:
-   * Copy-constructs destination `SEntitySetTemplateUnit` from one squad's
-   * `mUnits` lane and returns destination.
-   */
-  [[nodiscard]] SEntitySetTemplateUnit*
-  CopyCSquadUnitsIntoEntitySet(SEntitySetTemplateUnit* const destination, const CSquad* const squad)
-  {
-    if (destination == nullptr || squad == nullptr) {
-      return destination;
-    }
-
-    return ::new (destination) SEntitySetTemplateUnit(squad->mUnits);
   }
 
   enum class PlatoonThreatType : std::int32_t
@@ -617,31 +419,6 @@ namespace
     return unit && !unit->IsDead() && !unit->DestroyQueued();
   }
 
-  /**
-   * Address: 0x00724EE8 (FUN_00724EE8, inlined into Moho::CPlatoon::~CPlatoon
-   * at 0x00724EB0)
-   *
-   * What it does:
-   * Destroys and frees one owned `CSquad`. `CSquad` has no vtable (confirmed:
-   * the real binary calls `Moho::CSquad::~CSquad()` directly by symbol, not
-   * through any indirection) -- an earlier recovery of this function
-   * fabricated a vtable-slot-2 dispatch through `*(void***)squad`, which in
-   * fact reads `squad->mSim` (offset 0x00) as a fake vtable and calls
-   * whatever 8 bytes live at `mSim+0x08` as a function pointer whenever
-   * `mSim != nullptr` -- i.e. for essentially every live squad reaching this
-   * point. Matches the already-correct sibling call site at line ~1659 in
-   * this file.
-   */
-  void DestroyOwnedSquad(moho::CSquad* const squad) noexcept
-  {
-    if (squad == nullptr) {
-      return;
-    }
-
-    squad->~CSquad();
-    ::operator delete(squad);
-  }
-
   [[nodiscard]] float ReadSquaredRadiusArg(LuaPlus::LuaState* const state, const int stackIndex)
   {
     LuaPlus::LuaStackObject radiusArg(state, stackIndex);
@@ -651,150 +428,6 @@ namespace
 
     const float radius = static_cast<float>(lua_tonumber(state->m_state, stackIndex));
     return radius * radius;
-  }
-
-  /**
-   * Address: 0x00724820 (FUN_00724820, Moho::CSquad::Stop)
-   *
-   * What it does:
-   * Iterates one squad's unit slot vector and stops each live unit by clearing
-   * its command queue and stopping its attacker controller when present.
-   */
-  void StopSquad(moho::CSquad* const squad)
-  {
-    if (!squad) {
-      return;
-    }
-
-    for (auto unitSlot = squad->mUnits.mVec.begin(); unitSlot != squad->mUnits.mVec.end(); ++unitSlot) {
-      moho::Unit* const unit = DecodeSquadUnit(*unitSlot);
-      if (!unit || unit->IsDead()) {
-        continue;
-      }
-
-      if (moho::CUnitCommandQueue* const commandQueue = unit->CommandQueue; commandQueue) {
-        commandQueue->ClearCommandQueue();
-      }
-
-      if (moho::CAiAttackerImpl* const attacker = unit->AiAttacker; attacker) {
-        attacker->Stop();
-      }
-    }
-  }
-
-  /**
-   * Address: 0x00724150 (FUN_00724150, Moho::CSquad::RemoveUnit)
-   *
-   * What it does:
-   * Searches one squad's unit slot vector for a matching entity, removes the
-   * matched slot by compacting trailing entries, and preserves first-match
-   * behavior.
-   */
-  void RemoveUnitFromSquad(moho::CSquad* const squad, const moho::Entity* const entity)
-  {
-    if (!squad || !entity) {
-      return;
-    }
-
-    auto& units = squad->mUnits.mVec;
-    for (auto match = units.begin(); match != units.end(); ++match) {
-      const moho::Unit* const unit = DecodeSquadUnit(*match);
-      if (unit != nullptr && static_cast<const moho::Entity*>(unit) == entity) {
-        // First match only: compact the tail down one slot.
-        (void)units.erase(match);
-        return;
-      }
-    }
-  }
-
-  /**
-   * Address: 0x007241C0 (FUN_007241C0)
-   *
-   * What it does:
-   * Removes every entity referenced by `units` from `squad` using
-   * `RemoveUnitFromSquad` one-by-one.
-   */
-  [[maybe_unused]] void RemoveUnitSetMembersFromSquad(
-    moho::CSquad& squad,
-    const SEntitySetTemplateUnit& units
-  )
-  {
-    for (moho::Entity* const* unitIt = units.mVec.begin(); unitIt != units.mVec.end(); ++unitIt) {
-      const Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*unitIt);
-      RemoveUnitFromSquad(&squad, unit != nullptr ? static_cast<const moho::Entity*>(unit) : nullptr);
-    }
-  }
-
-  /**
-   * Address: 0x007241F0 (FUN_007241F0)
-   *
-   * What it does:
-   * Appends the source unit range into destination set and invalidates the
-   * platoon's cached Lua unit-list flag.
-   */
-  [[maybe_unused]] void AppendUnitSetRangeAndInvalidateLuaCache(
-    const SEntitySetTemplateUnit& sourceUnits,
-    SEntitySetTemplateUnit& destinationUnits,
-    moho::CPlatoon& platoonRuntime
-  )
-  {
-    destinationUnits.AddRange(sourceUnits.mVec.begin(), sourceUnits.mVec.end());
-    platoonRuntime.mHasLuaList = 0u;
-  }
-
-  /**
-   * Address: 0x00724810 (FUN_00724810, Moho::ApplySquadPrioritizedTargetList)
-   *
-   * IDA signature:
-   * int __userpurge sub_724810@<eax>(
-   *   std::vector_EntityCategory *a1@<eax>,   // source category vector
-   *   int a2);                                // CSquad*
-   *
-   * What it does:
-   * One-shot register-order wrapper that forwards `categorySource` into
-   * `CSquad::SetPrioritizedTargetList`. The binary emitted this trampoline
-   * because the caller threads the source vector pointer through `eax` and
-   * the squad pointer through the stack lane, while `SetPrioritizedTargetList`
-   * expects `&mCats` (squad+0x50) in `eax`.
-   */
-  void ApplySquadPrioritizedTargetList(
-    CSquad& squad,
-    const msvc8::vector<EntityCategorySet>& categorySource
-  )
-  {
-    squad.SetPrioritizedTargetList(categorySource);
-  }
-
-  /**
-   * Address: 0x00725990 (FUN_00725990, Moho::ApplyPlatoonSquadPrioritizedTargetList)
-   *
-   * IDA signature:
-   * int __fastcall sub_725990(
-   *   int a1,                                 // CPlatoon*
-   *   int a2,                                 // ESquadClass (squadClass selector)
-   *   std::vector_EntityCategory *a3);        // source category vector
-   *
-   * What it does:
-   * Walks the platoon's squad-pointer vector (`mSquadStart..mSquadList.end()`) until
-   * one squad reports the requested `squadClass`, then forwards
-   * `categorySource` into that squad's `SetPrioritizedTargetList`. Missing or
-   * mismatched squads short-circuit to no-op.
-   */
-  void ApplyPlatoonSquadPrioritizedTargetList(
-    moho::CPlatoon& platoonRuntime,
-    const ESquadClass squadClass,
-    const msvc8::vector<EntityCategorySet>& categorySource
-  )
-  {
-    for (moho::CSquad** squadLane = platoonRuntime.mSquadList.begin(); squadLane != platoonRuntime.mSquadList.end(); ++squadLane) {
-      moho::CSquad* const squadRuntime = *squadLane;
-      if (squadRuntime == nullptr || squadRuntime->mSquadClass != squadClass) {
-        continue;
-      }
-      auto& squad = *squadRuntime;
-      ApplySquadPrioritizedTargetList(squad, categorySource);
-      return;
-    }
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
@@ -921,7 +554,7 @@ namespace moho
    *
    * What it does:
    * Resolves `(platoon, squadClass, targetUnit)` from Lua, locates the
-   * matching squad lane, and returns whether that squad can attack the
+   * matching squad, and returns whether that squad can attack the
    * requested unit.
    */
   int cfunc_CPlatoonCanAttackTargetL(LuaPlus::LuaState* state);
@@ -1025,7 +658,7 @@ namespace moho
    * Address: 0x0072B1D0 (FUN_0072B1D0)
    *
    * What it does:
-   * Rebinds the startup metatable-factory index lane for
+   * Assigns the metatable-factory index of
    * `CScrLuaMetatableFactory<CPlatoon>` and returns that singleton.
    */
   [[maybe_unused]] CScrLuaMetatableFactory<CPlatoon>* startup_CScrLuaMetatableFactory_CPlatoon_Index()
@@ -1088,14 +721,14 @@ namespace moho
     , mPlan()
     , mUniqueName()
     , mFormation()
-    , mDisbandOnIdle(0u)
+    , mDisbandOnIdle(false)
     , mPad_0x0E1{0u, 0u, 0u}
-    , mLifetimeStat1(0)
-    , mLifetimeStat2(0)
-    , mLifetimeStat3(0.0f)
-    , mLifetimeStat4(0.0f)
+    , mKills(0)
+    , mLosses(0)
+    , mDamageDealt(0.0f)
+    , mDamageReceived(0.0f)
     , mLuaUnitList()
-    , mHasLuaList(0u)
+    , mHasLuaList(false)
     , mPad_0x109{0u, 0u, 0u, 0u, 0u, 0u, 0u}
   {}
 
@@ -1127,14 +760,14 @@ namespace moho
     , mPlan()
     , mUniqueName()
     , mFormation()
-    , mDisbandOnIdle(0u)
+    , mDisbandOnIdle(false)
     , mPad_0x0E1{0u, 0u, 0u}
-    , mLifetimeStat1(0)
-    , mLifetimeStat2(0)
-    , mLifetimeStat3(0.0f)
-    , mLifetimeStat4(0.0f)
+    , mKills(0)
+    , mLosses(0)
+    , mDamageDealt(0.0f)
+    , mDamageReceived(0.0f)
     , mLuaUnitList()
-    , mHasLuaList(0u)
+    , mHasLuaList(false)
     , mPad_0x109{0u, 0u, 0u, 0u, 0u, 0u, 0u}
   {
     if (platoonName != nullptr) {
@@ -1153,7 +786,7 @@ namespace moho
    * Address: 0x0072A0C0 (FUN_0072A0C0)
    *
    * What it does:
-   * Forwards one platoon serializer construct thunk lane to
+   * Forwards the platoon serializer's construct callback to
    * `CPlatoon::ConstructForSerializer`. Address-taken into
    * `CPlatoonConstruct::mConstructCallback`.
    */
@@ -1311,7 +944,7 @@ namespace moho
    *
    * What it does:
    * Loads `CScriptObject` base state, sim/army pointers, squad list, name
-   * strings, and lifetime stat lanes, in binary archive order.
+   * strings, and lifetime stats, in archive order.
    */
   void CPlatoon::MemberDeserialize(gpg::ReadArchive* const archive)
   {
@@ -1334,11 +967,11 @@ namespace moho
 
     bool disbandOnIdle = false;
     archive->ReadBool(&disbandOnIdle);
-    mDisbandOnIdle = disbandOnIdle ? 1u : 0u;
-    archive->ReadInt(&mLifetimeStat1);
-    archive->ReadInt(&mLifetimeStat2);
-    archive->ReadFloat(&mLifetimeStat3);
-    archive->ReadFloat(&mLifetimeStat4);
+    mDisbandOnIdle = disbandOnIdle;
+    archive->ReadInt(&mKills);
+    archive->ReadInt(&mLosses);
+    archive->ReadFloat(&mDamageDealt);
+    archive->ReadFloat(&mDamageReceived);
   }
 
   /**
@@ -1346,7 +979,7 @@ namespace moho
    *
    * What it does:
    * Saves `CScriptObject` base state, sim/army pointers, squad list, name
-   * strings, and lifetime stat lanes, in binary archive order.
+   * strings, and lifetime stats, in archive order.
    */
   void CPlatoon::MemberSerialize(gpg::WriteArchive* const archive) const
   {
@@ -1367,11 +1000,11 @@ namespace moho
     archive->WriteString(const_cast<msvc8::string*>(&mPlan));
     archive->WriteString(const_cast<msvc8::string*>(&mUniqueName));
     archive->WriteString(const_cast<msvc8::string*>(&mFormation));
-    archive->WriteBool(mDisbandOnIdle != 0u);
-    archive->WriteInt(mLifetimeStat1);
-    archive->WriteInt(mLifetimeStat2);
-    archive->WriteFloat(mLifetimeStat3);
-    archive->WriteFloat(mLifetimeStat4);
+    archive->WriteBool(mDisbandOnIdle);
+    archive->WriteInt(mKills);
+    archive->WriteInt(mLosses);
+    archive->WriteFloat(mDamageDealt);
+    archive->WriteFloat(mDamageReceived);
   }
 
   /**
@@ -1436,7 +1069,7 @@ namespace moho
    * Address: 0x00C004D0 (FUN_00C004D0, Moho::CSquadConstruct::~CSquadConstruct)
    *
    * `FUN_007248B0` and `FUN_007248E0` are duplicate-emission twins of this
-   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * exact unlink/reset body (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
   CSquadConstruct::~CSquadConstruct() = default;
@@ -1491,7 +1124,7 @@ namespace moho
    * Address: 0x00C00590 (FUN_00C00590, Moho::CPlatoonConstruct::~CPlatoonConstruct)
    *
    * `FUN_0072A060` and `FUN_0072A090` are duplicate-emission twins of this
-   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
+   * exact unlink/reset body (same `ResetLinks()` shape, folded to separate
    * addresses); they have no distinct source-level body of their own.
    */
   CPlatoonConstruct::~CPlatoonConstruct() = default;
@@ -1632,224 +1265,156 @@ namespace moho
    */
   CPlatoon::~CPlatoon()
   {
-    for (CSquad** squadIt = mSquadList.begin(); squadIt != mSquadList.end(); ++squadIt) {
-      DestroyOwnedSquad(*squadIt);
+    for (CSquad* const squad : mSquadList) {
+      delete squad;
     }
     mSquadList.ResetStorageToInline();
   }
 
   /**
    * Address: 0x00725630 (FUN_00725630, Moho::CPlatoon::GetSquad)
-   *
-   * What it does:
-   * Returns the first squad lane matching `squadClass`, or null when absent.
    */
-  CSquad* CPlatoon::GetSquad(const ESquadClass squadClass)
+  CSquad* CPlatoon::GetSquad(const ESquadClass squadClass) const
   {
-    auto& runtimeView = *this;
-    moho::CSquad* const squadView = FindSquadByClass(runtimeView, squadClass);
-    return squadView;
+    for (CSquad* const squad : mSquadList) {
+      if (squad->mSquadClass == squadClass) {
+        return squad;
+      }
+    }
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x00725770 (FUN_00725770, sub_725770)
+   */
+  SEntitySetTemplateUnit CPlatoon::GetPlatoonUnits() const
+  {
+    SEntitySetTemplateUnit units;
+    for (const CSquad* const squad : mSquadList) {
+      if (squad != nullptr && !squad->mUnits.Empty()) {
+        const SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+        units.AddRange(squadUnits.mVec.begin(), squadUnits.mVec.end());
+      }
+    }
+    return units;
   }
 
   /**
    * Address: 0x00725660 (FUN_00725660, Moho::CPlatoon::CountUnassignedUnitsWithBP)
-   *
-   * What it does:
-   * Returns the count of live unassigned-squad units whose blueprint id
-   * matches `blueprintId`, or zero when no unassigned squad exists.
    */
   int CPlatoon::CountUnassignedUnitsWithBP(const char* const blueprintId)
   {
-    auto& runtimeView = *this;
-    moho::CSquad* const squadView = FindSquadByClass(runtimeView, ESquadClass::Unassigned);
-    if (squadView == nullptr) {
-      return 0;
-    }
-
-    return squadView->CountUnitsWithBP(blueprintId);
+    const CSquad* const squad = GetSquad(ESquadClass::Unassigned);
+    return squad != nullptr ? squad->CountUnitsWithBP(blueprintId) : 0;
   }
 
   /**
    * Address: 0x007256A0 (FUN_007256A0, Moho::CPlatoon::CountUnassignedUnitsInCategory)
-   *
-   * What it does:
-   * Returns the count of live unassigned-squad units matching `categorySet`,
-   * or zero when no unassigned squad exists.
    */
   int CPlatoon::CountUnassignedUnitsInCategory(const EntityCategorySet* const categorySet)
   {
-    auto& runtimeView = *this;
-    moho::CSquad* const squadView = FindSquadByClass(runtimeView, ESquadClass::Unassigned);
-    if (squadView == nullptr) {
-      return 0;
-    }
-
-    return squadView->CountUnitsInCategory(categorySet);
+    const CSquad* const squad = GetSquad(ESquadClass::Unassigned);
+    return squad != nullptr ? squad->CountUnitsInCategory(categorySet) : 0;
   }
 
   /**
    * Address: 0x007256E0 (FUN_007256E0, Moho::CPlatoon::GetUnassignedUnitsInCategory)
-   *
-   * What it does:
-   * Walks platoon squad lanes to find the first `SQUADCLASS_Unassigned` squad
-   * and forwards category-filtered appends into `outUnits`.
    */
   void CPlatoon::GetUnassignedUnitsInCategory(
     const EntityCategorySet* const categorySet, const int maxCount, SEntitySetTemplateUnit& outUnits
   )
   {
-    auto& runtimeView = *this;
-    for (moho::CSquad** squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
-      moho::CSquad* const squadView = *squadLane;
-      if (squadView == nullptr || squadView->mSquadClass != ESquadClass::Unassigned) {
-        continue;
-      }
-
-      squadView->AppendUnitsInCategory(categorySet, maxCount, outUnits);
-      return;
+    if (CSquad* const squad = GetSquad(ESquadClass::Unassigned)) {
+      squad->AppendUnitsInCategory(categorySet, maxCount, outUnits);
     }
   }
 
   /**
    * Address: 0x00725730 (FUN_00725730, Moho::CPlatoon::GetUnassignedUnitsWithBP)
-   *
-   * What it does:
-   * Looks up this platoon's `SQUADCLASS_Unassigned` squad (if any) and
-   * forwards the blueprint-id filter and `maxCount` cap to
-   * `CSquad::AppendUnitsWithBP`, which appends the matching live units into
-   * `outUnits`. No-op when the platoon has no unassigned squad.
    */
   void CPlatoon::GetUnassignedUnitsWithBP(
     const char* const blueprintId, const int maxCount, SEntitySetTemplateUnit& outUnits
   )
   {
-    CSquad* const unassignedSquad = GetSquad(ESquadClass::Unassigned);
-    if (unassignedSquad == nullptr) {
-      return;
+    if (CSquad* const squad = GetSquad(ESquadClass::Unassigned)) {
+      squad->AppendUnitsWithBP(blueprintId, maxCount, outUnits);
     }
-    unassignedSquad->AppendUnitsWithBP(blueprintId, maxCount, outUnits);
   }
 
   /**
    * Address: 0x00725840 (FUN_00725840, sub_725840)
    */
-  int CPlatoon::CountAllSquadUnitSlots() const
+  int CPlatoon::CountUnits() const
   {
-    const auto& runtimeView = *this;
-    int unitSlotCount = 0;
-    for (moho::CSquad* const* squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
-      const moho::CSquad* const squad = *squadLane;
-      unitSlotCount += static_cast<int>(squad->mUnits.mVec.end() - squad->mUnits.mVec.begin());
+    int count = 0;
+    for (const CSquad* const squad : mSquadList) {
+      count += static_cast<int>(squad->mUnits.Size());
     }
-    return unitSlotCount;
+    return count;
   }
 
   /**
    * Address: 0x007253B0 (FUN_007253B0, Moho::CPlatoon::RemoveUnit)
-   *
-   * What it does:
-   * Clears the platoon Lua unit cache flag, walks each squad lane, and removes
-   * the first matching entity from the owning squad.
    */
-  void CPlatoon::RemoveUnit(Entity* const unit)
+  void CPlatoon::RemoveUnit(Unit* const unit)
   {
-    auto& runtimeView = *this;
-    runtimeView.mHasLuaList = 0u;
-
-    for (moho::CSquad** squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
-      moho::CSquad* const squadView = *squadLane;
-      if (!squadView) {
-        continue;
-      }
-
-      for (auto unitSlot = squadView->mUnits.mVec.begin(); unitSlot != squadView->mUnits.mVec.end(); ++unitSlot) {
-        const moho::Unit* const squadUnit = DecodeSquadUnit(*unitSlot);
-        if (squadUnit != nullptr && static_cast<const moho::Entity*>(squadUnit) == unit) {
-          RemoveUnitFromSquad(squadView, unit);
-          return;
-        }
+    mHasLuaList = false;
+    for (CSquad* const squad : mSquadList) {
+      if (squad->HasUnit(unit)) {
+        squad->RemoveUnit(unit);
+        return;
       }
     }
   }
 
   /**
    * Address: 0x007251D0 (FUN_007251D0, Moho::CPlatoon::IsInPlatoon)
-   *
-   * What it does:
-   * Returns whether the provided unit pointer is currently present in any
-   * squad lane of this platoon.
    */
   bool CPlatoon::IsInPlatoon(const Unit* const unit) const
   {
-    if (!unit) {
-      return false;
-    }
-
-    const auto& runtimeView = *this;
-    for (moho::CSquad* const* squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
-      if (SquadContainsUnit(*squadLane, unit)) {
+    for (const CSquad* const squad : mSquadList) {
+      if (squad->HasUnit(unit)) {
         return true;
       }
     }
-
     return false;
   }
 
   /**
    * Address: 0x00725220 (FUN_00725220, Moho::CPlatoon::GetSquadClass)
-   *
-   * What it does:
-   * Scans all squad lanes and returns the class of the first squad containing
-   * the provided unit; otherwise returns `SQUADCLASS_Unassigned`.
    */
   ESquadClass CPlatoon::GetSquadClass(const Unit* const unit) const
   {
-    if (!unit) {
-      return kUnassignedSquadClass;
-    }
-
-    const auto& runtimeView = *this;
-    for (moho::CSquad* const* squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
-      const moho::CSquad* const squadView = *squadLane;
-      if (SquadContainsUnit(squadView, unit)) {
-        return squadView->mSquadClass;
+    for (const CSquad* const squad : mSquadList) {
+      if (squad->HasUnit(unit)) {
+        return squad->mSquadClass;
       }
     }
+    return ESquadClass::Unassigned;
+  }
 
-    return kUnassignedSquadClass;
+  /**
+   * Address: 0x007241F0 (FUN_007241F0)
+   */
+  void CPlatoon::AppendUnitsToSquad(CSquad* const squad, const SEntitySetTemplateUnit& units)
+  {
+    squad->mUnits.AddRange(units.mVec.begin(), units.mVec.end());
+    mHasLuaList = false;
   }
 
   /**
    * Address: 0x00725280 (FUN_00725280, sub_725280)
-   *
-   * What it does:
-   * Finds the first squad lane matching `squadClass`, appends every entry in
-   * `units` into that squad's entity set, and clears the Lua unit-list cache
-   * validity flag on this platoon.
    */
   void CPlatoon::AppendUnitsToSquad(const ESquadClass squadClass, const SEntitySetTemplateUnit& units)
   {
-    auto& runtimeView = *this;
-    for (moho::CSquad** squadLane = runtimeView.mSquadList.begin(); squadLane != runtimeView.mSquadList.end(); ++squadLane) {
-      moho::CSquad* const squadView = *squadLane;
-      if (squadView == nullptr || squadView->mSquadClass != squadClass) {
-        continue;
-      }
-
-      squadView->mUnits.AddRange(units.mVec.begin(), units.mVec.end());
-      break;
+    if (CSquad* const squad = GetSquad(squadClass)) {
+      AppendUnitsToSquad(squad, units);
     }
-
-    runtimeView.mHasLuaList = 0u;
+    mHasLuaList = false;
   }
 
   /**
    * Address: 0x007252D0 (FUN_007252D0, sub_7252D0)
-   *
-   * What it does:
-   * Builds a one-unit temporary set around `unit`, forwards into
-   * `AppendUnitsToSquad`, and preserves the Lua unit-list cache invalidation
-   * side effect for this platoon.
    */
   void CPlatoon::AppendUnitToSquad(const ESquadClass squadClass, Unit* const unit)
   {
@@ -1859,62 +1424,53 @@ namespace moho
   }
 
   /**
+   * Address: 0x00725990 (FUN_00725990, sub_725990)
+   */
+  void CPlatoon::SetPrioritizedTargetList(
+    const ESquadClass squadClass, const msvc8::vector<EntityCategorySet>& categories
+  )
+  {
+    if (CSquad* const squad = GetSquad(squadClass)) {
+      squad->SetPrioritizedTargetList(categories);
+    }
+  }
+
+  /**
    * Address: 0x00729F90 (FUN_00729F90, Moho::CPlatoon::SquadHasState)
    *
    * What it does:
-   * Returns whether the requested squad class has at least one unit in the
-   * requested state (`SQUADCLASS_all` checks all assigned classes 1..5).
+   * The binary looks up `GetSquad(squadClass)` on every pass, not the class
+   * being scanned, so with the all-classes selector (no squad has class 6)
+   * the answer is always false. Kept as the binary has it.
    */
   bool CPlatoon::SquadHasState(const ESquadClass squadClass, CPlatoon* const platoon, const EUnitState state)
   {
-    if (!platoon) {
-      return false;
-    }
-
-    for (std::int32_t checkedClass = 1; checkedClass < static_cast<std::int32_t>(kAllSquadsClass); ++checkedClass) {
-      if (squadClass != kAllSquadsClass && static_cast<std::int32_t>(squadClass) != checkedClass) {
+    for (std::int32_t checkedClass = 1; checkedClass < static_cast<std::int32_t>(kAllSquadClasses); ++checkedClass) {
+      if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != checkedClass) {
         continue;
       }
 
-      // Preserve original call lane: this method always queries GetSquad using
-      // the incoming squadClass token, even during SQUADCLASS_all scanning.
-      CSquad* const squad = platoon->GetSquad(squadClass);
+      const CSquad* const squad = platoon->GetSquad(squadClass);
       if (squad != nullptr && squad->HasUnitWithState(state)) {
         return true;
       }
     }
-
     return false;
   }
 
   /**
    * Address: 0x007261B0 (FUN_007261B0, Moho::CPlatoon::Stop)
-   *
-   * What it does:
-   * Stops all non-unassigned squads when `squadClass == 6`, otherwise stops the
-   * first squad matching the requested class.
    */
   void CPlatoon::Stop(const ESquadClass squadClass)
   {
-    auto& runtimeView = *this;
-    if (squadClass == kAllSquadsClass) {
-      for (moho::CSquad** squad = runtimeView.mSquadList.begin(); squad != runtimeView.mSquadList.end(); ++squad) {
-        moho::CSquad* const squadView = *squad;
-        if (squadView && squadView->mSquadClass != kUnassignedSquadClass) {
-          StopSquad(squadView);
+    if (squadClass == kAllSquadClasses) {
+      for (CSquad* const squad : mSquadList) {
+        if (squad != nullptr && squad->mSquadClass != ESquadClass::Unassigned) {
+          squad->Stop();
         }
       }
-      return;
-    }
-
-    for (moho::CSquad** squad = runtimeView.mSquadList.begin(); squad != runtimeView.mSquadList.end(); ++squad) {
-      moho::CSquad* const squadView = *squad;
-      if (!squadView || squadView->mSquadClass != squadClass) {
-        continue;
-      }
-
-      StopSquad(squadView);
-      return;
+    } else if (CSquad* const squad = GetSquad(squadClass)) {
+      squad->Stop();
     }
   }
 
@@ -1934,7 +1490,7 @@ namespace moho
     SEntitySetTemplateUnit transportUnits{};
     SEntitySetTemplateUnit unitsToLoad{};
 
-    for (int squadClassValue = 1; squadClassValue < static_cast<int>(kAllSquadsClass); ++squadClassValue) {
+    for (int squadClassValue = 1; squadClassValue < static_cast<int>(kAllSquadClasses); ++squadClassValue) {
       CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassValue));
       if (squad == nullptr) {
         continue;
@@ -2025,39 +1581,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x007247A0 (FUN_007247A0, Moho::CSquad::UnitHasOrder)
-   *
-   * What it does:
-   * Returns true when the squad has no live unit with an active command at
-   * queue-head; returns false as soon as one active queued command is found.
-   */
-  [[nodiscard]] bool SquadHasNoActiveOrders(const moho::CSquad* const squad) noexcept
-  {
-    if (!squad) {
-      return true;
-    }
-
-    for (auto unitSlot = squad->mUnits.mVec.begin(); unitSlot != squad->mUnits.mVec.end(); ++unitSlot) {
-      Unit* const unit = DecodeSquadUnit(*unitSlot);
-      if (!unit || unit->IsDead()) {
-        continue;
-      }
-
-      const CUnitCommandQueue* const commandQueue = unit->CommandQueue;
-      if (!commandQueue || commandQueue->mCommandVec.empty()) {
-        continue;
-      }
-
-      const WeakPtr<CUnitCommand>& commandLink = commandQueue->mCommandVec.front();
-      if (commandLink.GetObjectPtr() != nullptr) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  /**
    * Address: 0x00729FE0 (FUN_00729FE0, Moho::CPlatoon::SquadsHaveOrders)
    *
    * What it does:
@@ -2066,25 +1589,12 @@ namespace moho
    */
   bool CPlatoon::AssignedSquadsAreIdle() const
   {
-    const auto& runtimeView = *this;
-
-    for (std::int32_t squadClass = 1; squadClass < static_cast<std::int32_t>(kAllSquadsClass); ++squadClass) {
-      moho::CSquad* matchingSquad = nullptr;
-      for (moho::CSquad* const* squad = runtimeView.mSquadList.begin(); squad != runtimeView.mSquadList.end(); ++squad) {
-        moho::CSquad* const squadView = *squad;
-        if (!squadView || static_cast<std::int32_t>(squadView->mSquadClass) != squadClass) {
-          continue;
-        }
-
-        matchingSquad = squadView;
-        break;
-      }
-
-      if (matchingSquad && !SquadHasNoActiveOrders(matchingSquad)) {
+    for (std::int32_t squadClass = 1; squadClass < static_cast<std::int32_t>(kAllSquadClasses); ++squadClass) {
+      const CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClass));
+      if (squad != nullptr && !squad->IsIdle()) {
         return false;
       }
     }
-
     return true;
   }
 
@@ -2098,15 +1608,14 @@ namespace moho
   void CPlatoon::SwitchAIPlan(const char* const planName)
   {
     const char* const normalizedPlan = (planName != nullptr) ? planName : "";
-    auto& runtimeView = *this;
-    if (runtimeView.mPlan == normalizedPlan) {
+    if (mPlan == normalizedPlan) {
       return;
     }
 
     CScriptObject* const scriptObject = this;
     scriptObject->RunScript("OnDestroy");
 
-    runtimeView.mPlan.assign(normalizedPlan);
+    mPlan.assign(normalizedPlan);
 
     const char* callbackArg = normalizedPlan;
     scriptObject->CallbackStr("OnCreate", &callbackArg);
@@ -2114,9 +1623,6 @@ namespace moho
 
   /**
    * Address: 0x0072B720 (FUN_0072B720, Moho::CPlatoon::GetArmy)
-   *
-   * What it does:
-   * Returns this platoon's owning army lane.
    */
   SimArmy* CPlatoon::GetArmy() const
   {
@@ -2125,24 +1631,18 @@ namespace moho
 
   /**
    * Address: 0x0072B7A0 (FUN_0072B7A0, Moho::CPlatoon::GetLifetimeStat1)
-   *
-   * What it does:
-   * Returns the first integer lifetime-stat lane.
    */
-  std::int32_t CPlatoon::GetLifetimeStat1() const
+  std::int32_t CPlatoon::GetKills() const
   {
-    return mLifetimeStat1;
+    return mKills;
   }
 
   /**
    * Address: 0x0072B7B0 (FUN_0072B7B0, Moho::CPlatoon::GetLifetimeStat2)
-   *
-   * What it does:
-   * Returns the second integer lifetime-stat lane.
    */
-  std::int32_t CPlatoon::GetLifetimeStat2() const
+  std::int32_t CPlatoon::GetLosses() const
   {
-    return mLifetimeStat2;
+    return mLosses;
   }
 
   /**
@@ -2150,24 +1650,24 @@ namespace moho
    */
   CPlatoon* CPlatoon::MarkDisbandOnIdle()
   {
-    mDisbandOnIdle = 1u;
+    mDisbandOnIdle = true;
     return this;
   }
 
   /**
    * Address: 0x0072B7C0 (FUN_0072B7C0, sub_72B7C0)
    */
-  float CPlatoon::GetLifetimeStat3() const
+  float CPlatoon::GetDamageDealt() const
   {
-    return mLifetimeStat3;
+    return mDamageDealt;
   }
 
   /**
    * Address: 0x0072B7D0 (FUN_0072B7D0, sub_72B7D0)
    */
-  float CPlatoon::GetLifetimeStat4() const
+  float CPlatoon::GetDamageReceived() const
   {
-    return mLifetimeStat4;
+    return mDamageReceived;
   }
 
   /**
@@ -2175,32 +1675,29 @@ namespace moho
    */
   bool CPlatoon::HasLuaUnitList() const
   {
-    return mHasLuaList != 0u;
+    return mHasLuaList;
   }
 
   /**
    * Address: 0x00736D70 (FUN_00736D70, sub_736D70)
    */
-  CPlatoon* CPlatoon::AddLifetimeStat3(const float delta)
+  CPlatoon* CPlatoon::AddDamageDealt(const float amount)
   {
-    mLifetimeStat3 += delta;
+    mDamageDealt += amount;
     return this;
   }
 
   /**
    * Address: 0x00736D90 (FUN_00736D90, sub_736D90)
    */
-  CPlatoon* CPlatoon::AddLifetimeStat4(const float delta)
+  CPlatoon* CPlatoon::AddDamageReceived(const float amount)
   {
-    mLifetimeStat4 += delta;
+    mDamageReceived += amount;
     return this;
   }
 
   /**
    * Address: 0x0072B730 (FUN_0072B730, Moho::CPlatoon::SetPlatoonFormationOverride)
-   *
-   * What it does:
-   * Replaces the platoon formation override string lane.
    */
   void CPlatoon::SetPlatoonFormationOverride(const msvc8::string& formationName)
   {
@@ -2211,34 +1708,31 @@ namespace moho
    * Address: 0x00725410 (FUN_00725410, Moho::CPlatoon::PullUnassignedUnitsFrom)
    *
    * What it does:
-   * Moves this platoon's current unit set into the army-pool platoon
-   * unassigned lane and invalidates Lua unit-list caches on both platoons.
+   * `this` is EDI and the pool ECX (CArmyImpl::DisbandPlatoon 0x0070058E);
+   * the inlined `AppendUnitsToSquad` clears EDI's flag, which pins which is
+   * which. Each squad's units are copied out (0x00723A50), removed from it
+   * (0x007241C0 inlined), the squad is deleted, and the copy lands in the
+   * pool's unassigned squad (0x007241F0 inlined). The earlier recovery
+   * instead handed the units to `SimArmy::AssignUnitsToPlatoon(units,
+   * "ArmyPool")` and left the squads alive; the binary never calls it.
    */
-  void CPlatoon::PullUnassignedUnitsFrom(CPlatoon* const armyPool)
+  void CPlatoon::ReturnUnitsTo(CPlatoon* const armyPool)
   {
-    constexpr const char* kArmyPoolName = "ArmyPool";
+    mHasLuaList = false;
 
-    auto& runtimeView = *this;
-    runtimeView.mHasLuaList = 0u;
-
-    if (armyPool == nullptr || runtimeView.mArmy == nullptr) {
+    CSquad* const poolSquad = armyPool->GetSquad(ESquadClass::Unassigned);
+    if (poolSquad == nullptr) {
       return;
     }
+    armyPool->mHasLuaList = false;
 
-    auto& armyPoolRuntimeView = *armyPool;
-    if (FindSquadByClass(armyPoolRuntimeView, kUnassignedSquadClass) == nullptr) {
-      return;
+    for (CSquad* const squad : mSquadList) {
+      const SEntitySetTemplateUnit units = squad->GetUnitSet();
+      squad->RemoveUnits(units);
+      delete squad;
+      AppendUnitsToSquad(poolSquad, units);
     }
-
-    SEntitySetTemplateUnit unitsToTransfer{};
-    BuildPlatoonUnitSet(runtimeView, unitsToTransfer);
-    if (unitsToTransfer.mVec.empty()) {
-      return;
-    }
-
-    runtimeView.mArmy->AssignUnitsToPlatoon(&unitsToTransfer, kArmyPoolName);
-    runtimeView.mHasLuaList = 0u;
-    armyPoolRuntimeView.mHasLuaList = 0u;
+    mSquadList.ResetStorageToInline();
   }
 
   /**
@@ -2310,8 +1804,7 @@ namespace moho
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *platoon;
-    CAiPersonality* const personality = runtimeView.mArmy->GetArmyBrain()->mPersonality;
+    CAiPersonality* const personality = platoon->mArmy->GetArmyBrain()->mPersonality;
 
     if (personality != nullptr) {
       personality->mLuaObj.PushStack(state);
@@ -2368,8 +1861,7 @@ namespace moho
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *platoon;
-    runtimeView.mArmy->GetArmyBrain()->mLuaObj.PushStack(state);
+    platoon->mArmy->GetArmyBrain()->mLuaObj.PushStack(state);
     return 1;
   }
 
@@ -2419,8 +1911,7 @@ namespace moho
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *platoon;
-    const CAiBrain* const brain = runtimeView.mArmy->GetArmyBrain();
+    const CAiBrain* const brain = platoon->mArmy->GetArmyBrain();
 
     lua_pushnumber(state->m_state, static_cast<float>(brain->mArmy->mVarDat.mFaction + 1));
     (void)lua_gettop(state->m_state);
@@ -2496,8 +1987,7 @@ namespace moho
 
     const LuaPlus::LuaObject uniqueNameObject(LuaPlus::LuaStackObject(state, 2));
     if (platoon != nullptr && uniqueNameObject.IsString()) {
-      auto& runtimeView = *platoon;
-      runtimeView.mUniqueName.assign(uniqueNameObject.GetString());
+      platoon->mUniqueName.assign(uniqueNameObject.GetString());
     }
 
     return 1;
@@ -2555,9 +2045,8 @@ namespace moho
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    const auto& runtimeView = *platoon;
 
-    lua_pushstring(state->m_state, runtimeView.mUniqueName.c_str());
+    lua_pushstring(state->m_state, platoon->mUniqueName.c_str());
     (void)lua_gettop(state->m_state);
     return 1;
   }
@@ -2607,8 +2096,7 @@ namespace moho
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    const auto& runtimeView = *platoon;
-    const CAiBrain* const armyBrain = runtimeView.mArmy->GetArmyBrain();
+    const CAiBrain* const armyBrain = platoon->mArmy->GetArmyBrain();
 
     lua_pushstring(state->m_state, armyBrain->mCurrentPlan.c_str());
     (void)lua_gettop(state->m_state);
@@ -2687,8 +2175,8 @@ namespace moho
    * Address: 0x0072C380 (FUN_0072C380, cfunc_CPlatoonGetPlatoonPositionL)
    *
    * What it does:
-   * Resolves one platoon and returns the average world position of all units
-   * currently present in its squad lanes.
+   * Returns the mean position of the platoon's units, or nil when it has
+   * none.
    */
   int cfunc_CPlatoonGetPlatoonPositionL(LuaPlus::LuaState* const state)
   {
@@ -2699,16 +2187,23 @@ namespace moho
 
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    const auto& runtimeView = *platoon;
 
-    Wm3::Vector3f platoonCenter{};
-    if (!ComputePlatoonCenter(runtimeView, platoonCenter)) {
+    const SEntitySetTemplateUnit units = platoon->GetPlatoonUnits();
+    if (units.Size() == 0u) {
       lua_pushnil(state->m_state);
       (void)lua_gettop(state->m_state);
       return 1;
     }
 
-    LuaPlus::LuaObject centerObject = SCR_ToLua<Wm3::Vector3<float>>(state, platoonCenter);
+    // Every entry is summed, and the divide is `Vector3f::operator/=`, which
+    // gives FLT_MAX components for a zero divisor (0x0072C4C3..0x0072C526).
+    Wm3::Vector3f center = Wm3::Vector3f::ZERO;
+    for (Entity* const entity : units.mVec) {
+      center += static_cast<Unit*>(entity)->GetPosition();
+    }
+    center /= static_cast<float>(units.Size());
+
+    LuaPlus::LuaObject centerObject = SCR_ToLua<Wm3::Vector3<float>>(state, center);
     centerObject.PushStack(state);
     return 1;
   }
@@ -2760,7 +2255,6 @@ namespace moho
 
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *platoon;
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
@@ -2773,23 +2267,18 @@ namespace moho
     }
     SCR_GetEnum(state, squadClassName, enumRef);
 
-    moho::CSquad* const squad = FindSquadByClass(runtimeView, squadClass);
-    if (!squad) {
+    const CSquad* const squad = platoon->GetSquad(squadClass);
+    if (squad == nullptr) {
       lua_pushnil(state->m_state);
       (void)lua_gettop(state->m_state);
       return 1;
     }
 
-    if (runtimeView.mArmy != nullptr) {
-      (void)runtimeView.mArmy->GetArmyBrain();
-    }
+    // The binary makes this call and drops the result (0x0072C775..0x0072C77D).
+    (void)platoon->mArmy->GetArmyBrain();
 
     Wm3::Vector3f squadCenter{};
-    if (!ComputeSquadCenter(squad, squadCenter)) {
-      lua_pushnil(state->m_state);
-      (void)lua_gettop(state->m_state);
-      return 1;
-    }
+    (void)squad->GetCenter(&squadCenter);
 
     LuaPlus::LuaObject centerObject = SCR_ToLua<Wm3::Vector3<float>>(state, squadCenter);
     centerObject.PushStack(state);
@@ -2842,7 +2331,6 @@ namespace moho
 
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *platoon;
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
@@ -2855,17 +2343,13 @@ namespace moho
     }
     SCR_GetEnum(state, squadClassName, enumRef);
 
-    moho::CSquad* const squad = FindSquadByClass(runtimeView, squadClass);
-    if (!squad) {
+    const CSquad* const squad = platoon->GetSquad(squadClass);
+    if (squad == nullptr) {
       lua_pushnil(state->m_state);
       (void)lua_gettop(state->m_state);
       return 1;
     }
 
-    // moho::CSquad is a flat-field spelling of CSquad: its
-    // mUnitSlotBegin/mUnitSlotEnd at +0x10/+0x14 are mUnits.mVec's begin/end,
-    // and mSquadClass lands at +0x30 right past mUnits. The binary calls
-    // CSquad::GetUnits out of line here rather than open-coding the fill.
     LuaPlus::LuaObject unitTable{};
     (void)squad->GetUnits(&unitTable, state);
 
@@ -2913,9 +2397,8 @@ namespace moho
 
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
-    auto& runtimeView = *platoon;
 
-    SimArmy* const army = runtimeView.mArmy;
+    SimArmy* const army = platoon->mArmy;
     Sim* const sim = army ? army->GetSim() : nullptr;
 
     CSimConVarBase* const runOpponentAiConVar = &moho::gSimConVar_AI_RunOpponentAI;
@@ -3412,12 +2895,10 @@ namespace moho
       return 1;
     }
 
-    auto& runtimeView = *platoon;
-    if (runtimeView.mHasLuaList == 0u) {
-      SEntitySetTemplateUnit platoonUnits{};
-      BuildPlatoonUnitSet(runtimeView, platoonUnits);
+    if (!platoon->mHasLuaList) {
+      const SEntitySetTemplateUnit platoonUnits = platoon->GetPlatoonUnits();
 
-      runtimeView.mLuaUnitList.AssignNewTable(state, static_cast<int>(platoonUnits.Size()), 0);
+      platoon->mLuaUnitList.AssignNewTable(state, static_cast<int>(platoonUnits.Size()), 0);
       std::int32_t luaIndex = 1;
       for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {
         Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entityIt);
@@ -3426,14 +2907,14 @@ namespace moho
         }
 
         LuaPlus::LuaObject unitObject = unit->GetLuaObject();
-        runtimeView.mLuaUnitList.Insert(luaIndex, unitObject);
+        platoon->mLuaUnitList.Insert(luaIndex, unitObject);
         ++luaIndex;
       }
 
-      runtimeView.mHasLuaList = 1u;
+      platoon->mHasLuaList = true;
     }
 
-    runtimeView.mLuaUnitList.PushStack(state);
+    platoon->mLuaUnitList.PushStack(state);
     return 1;
   }
 
@@ -3689,7 +3170,7 @@ namespace moho
           const float deltaZ = unitPosition.z - center.z;
           const float distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
           if (radiusSquared > distanceSquared) {
-            AppendPlatoonUnitSearchEntry(nearbyUnits, unit, distanceSquared);
+            nearbyUnits.push_back(PlatoonUnitSearchEntry{unit, distanceSquared});
           }
         }
 
@@ -3719,19 +3200,11 @@ namespace moho
 
       newPlatoon->mArmy->RemoveUnitsFromPlatoons(&ref);
 
-      CSquad* squad = nullptr;
-      for (CSquad** squadIt = newPlatoon->mSquadList.begin(); squadIt != newPlatoon->mSquadList.end(); ++squadIt) {
-        if (*squadIt != nullptr && (*squadIt)->mSquadClass == squadClass) {
-          squad = *squadIt;
-          break;
-        }
-      }
+      CSquad* squad = newPlatoon->GetSquad(squadClass);
       if (squad == nullptr) {
         squad = CSquad::AllocateOnPlatoon(newPlatoon, squadClass, squadClassName);
       }
-
-      squad->mUnits.AddRange(ref.mVec.begin(), ref.mVec.end());
-      newPlatoon->mHasLuaList = 0;
+      newPlatoon->AppendUnitsToSquad(squad, ref);
     }
 
     newPlatoon->mLuaUnitList.PushStack(state);
@@ -3847,8 +3320,7 @@ namespace moho
         }
       }
 
-      auto& runtime = *platoon;
-      ApplyPlatoonSquadPrioritizedTargetList(runtime, squadClass, prioritizedCategories);
+      platoon->SetPrioritizedTargetList(squadClass, prioritizedCategories);
     }
 
     return 0;
@@ -4624,15 +4096,14 @@ namespace moho
     }
     SCR_GetEnum(state, squadClassName, enumRef);
 
-    auto& runtimeView = *platoon;
-    moho::CSquad* const squadView = FindSquadByClass(runtimeView, squadClass);
-    if (squadView == nullptr) {
+    CSquad* const squad = platoon->GetSquad(squadClass);
+    if (squad == nullptr) {
       return 0;
     }
 
     const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 3));
     Unit* const targetUnit = SCR_FromLua_Unit(targetObject);
-    const bool canAttack = squadView->CanAttackTarget(targetUnit);
+    const bool canAttack = squad->CanAttackTarget(targetUnit);
 
     lua_pushboolean(state->m_state, canAttack ? 1 : 0);
     (void)lua_gettop(state->m_state);
@@ -4704,7 +4175,7 @@ namespace moho
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
 
-    ESquadClass squadClass = kAllSquadsClass;
+    ESquadClass squadClass = kAllSquadClasses;
     if (argumentCount > 1) {
       gpg::RRef enumRef{};
       enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
@@ -4770,7 +4241,7 @@ namespace moho
     commandIssueData.mTarget.mPos.z = 0.0f;
 
     if (useFormation) {
-      commandIssueData.unk38 = formationScriptIndex;  // FormAttack formation-script lane
+      commandIssueData.unk38 = formationScriptIndex;  // formation script index
       commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
       commandIssueData.unk4C = 1.0f;                   // FormAttack orientation weight
     }
@@ -4805,30 +4276,20 @@ namespace moho
 
     if (mFormation.empty()) {
       // Per-squad attack: only the Attack (1) and Artillery (2) squad classes.
-      const auto& runtime = *this;
       for (std::int32_t squadClassIndex = 1; squadClassIndex <= 2; ++squadClassIndex) {
-        if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
-            static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
           continue;
         }
 
-        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-          CSquad* const squad = *squadLane;
-          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-            continue;
-          }
-
-          SEntitySetTemplateUnit squadUnits{};
-          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
           const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
           IssuePlatoonAttackCommand(mSim, squadUnits, target, formationScriptIndex, issuedCommands);
-          break;
         }
       }
     } else {
       // Platoon-wide formation attack.
-      SEntitySetTemplateUnit platoonUnits{};
-      BuildPlatoonUnitSet(*this, platoonUnits);
+      SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonAttackCommand(mSim, platoonUnits, target, formationScriptIndex, issuedCommands);
     }
@@ -4860,7 +4321,7 @@ namespace moho
     const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
     Entity* const target = SCR_FromLua_Entity(targetObject, state);
 
-    ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
+    ESquadClass squadClass = kAllSquadClasses;
     if (lua_gettop(state->m_state) > 2) {
       gpg::RRef enumRef{};
       enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
@@ -4952,7 +4413,7 @@ namespace moho
     commandIssueData.mTarget.mPos.z = 0.0f;
 
     if (useFormation) {
-      commandIssueData.unk38 = formationScriptIndex;  // FormMove formation-script lane
+      commandIssueData.unk38 = formationScriptIndex;  // formation script index
       commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
       commandIssueData.unk4C = 1.0f;                   // FormMove orientation weight
     }
@@ -4988,21 +4449,14 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
-    const auto& runtime = *this;
 
     if (useTransports) {
       SEntitySetTemplateUnit transports{};
       SEntitySetTemplateUnit moveSet{};
 
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-          CSquad* const squad = *squadLane;
-          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-            continue;
-          }
-
-          SEntitySetTemplateUnit squadUnits{};
-          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
 
           // Collect alive transports from every class.
           for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
@@ -5020,11 +4474,9 @@ namespace moho
           }
 
           // Only the requested classes' units join the move set.
-          if (static_cast<std::int32_t>(squadClass) == kAllSquadClassesSentinel ||
-              static_cast<std::int32_t>(squadClass) == squadClassIndex) {
+          if (squadClass == kAllSquadClasses || static_cast<std::int32_t>(squadClass) == squadClassIndex) {
             moveSet.AddRange(squadUnits.mVec.begin(), squadUnits.mVec.end());
           }
-          break;
         }
       }
 
@@ -5035,28 +4487,19 @@ namespace moho
         IssuePlatoonMoveCommand(mSim, moveSet, target, -1, issuedCommands);
       }
     } else if (!mFormation.empty()) {
-      SEntitySetTemplateUnit platoonUnits{};
-      BuildPlatoonUnitSet(runtime, platoonUnits);
+      SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonMoveCommand(mSim, platoonUnits, target, formationScriptIndex, issuedCommands);
     } else {
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-        if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
-            static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
           continue;
         }
 
-        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-          CSquad* const squad = *squadLane;
-          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-            continue;
-          }
-
-          SEntitySetTemplateUnit squadUnits{};
-          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
           const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
           IssuePlatoonMoveCommand(mSim, squadUnits, target, formationScriptIndex, issuedCommands);
-          break;
         }
       }
     }
@@ -5091,7 +4534,7 @@ namespace moho
     LuaPlus::LuaStackObject useTransportsArg(state, 3);
     const bool useTransports = useTransportsArg.GetBoolean();
 
-    ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
+    ESquadClass squadClass = kAllSquadClasses;
     if (lua_gettop(state->m_state) > 3) {
       gpg::RRef enumRef{};
       enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
@@ -5181,7 +4624,7 @@ namespace moho
     commandIssueData.mTarget.mPos = target;
 
     if (useFormation) {
-      commandIssueData.unk38 = formationScriptIndex;  // FormMove formation-script lane
+      commandIssueData.unk38 = formationScriptIndex;  // formation script index
       commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
       commandIssueData.unk4C = 1.0f;                   // FormMove orientation weight
     }
@@ -5226,21 +4669,14 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
-    const auto& runtime = *this;
 
     if (useTransports) {
       SEntitySetTemplateUnit transports{};
       SEntitySetTemplateUnit moveSet{};
 
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-          CSquad* const squad = *squadLane;
-          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-            continue;
-          }
-
-          SEntitySetTemplateUnit squadUnits{};
-          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
 
           for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
             Entity* const entity = *entry;
@@ -5256,11 +4692,9 @@ namespace moho
             }
           }
 
-          if (static_cast<std::int32_t>(squadClass) == kAllSquadClassesSentinel ||
-              static_cast<std::int32_t>(squadClass) == squadClassIndex) {
+          if (squadClass == kAllSquadClasses || static_cast<std::int32_t>(squadClass) == squadClassIndex) {
             moveSet.AddRange(squadUnits.mVec.begin(), squadUnits.mVec.end());
           }
-          break;
         }
       }
 
@@ -5271,28 +4705,19 @@ namespace moho
         IssuePlatoonMoveToLocationCommand(mSim, moveSet, pos, -1, issuedCommands);
       }
     } else if (!mFormation.empty()) {
-      SEntitySetTemplateUnit platoonUnits{};
-      BuildPlatoonUnitSet(runtime, platoonUnits);
+      SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonMoveToLocationCommand(mSim, platoonUnits, pos, formationScriptIndex, issuedCommands);
     } else {
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-        if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
-            static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
           continue;
         }
 
-        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-          CSquad* const squad = *squadLane;
-          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-            continue;
-          }
-
-          SEntitySetTemplateUnit squadUnits{};
-          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
           const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
           IssuePlatoonMoveToLocationCommand(mSim, squadUnits, pos, formationScriptIndex, issuedCommands);
-          break;
         }
       }
     }
@@ -5333,7 +4758,7 @@ namespace moho
       LuaPlus::LuaState::Error(state, "Platoon:MoveToTarget Passed in an invalid target point");
     }
 
-    ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
+    ESquadClass squadClass = kAllSquadClasses;
     if (lua_gettop(state->m_state) > 3) {
       gpg::RRef enumRef{};
       enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
@@ -5402,7 +4827,7 @@ namespace moho
    *
    * Unlike Move/Patrol, AggressiveMove always selects the Form* variant whenever a
    * formation script exists (`formationScriptIndex >= 0`) with no unit-count gate,
-   * and always writes the orientation lane (script lane clamped to >= 0, zero
+   * and always writes the orientation (script index clamped to >= 0, zero
    * quaternion, weight 1.0f) regardless of the chosen variant.
    */
   static void IssuePlatoonAggressiveMoveCommand(
@@ -5420,7 +4845,7 @@ namespace moho
     commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
     commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(kGroundTargetEntitySentinel);
     commandIssueData.mTarget.mPos = pos;
-    commandIssueData.unk38 = formationScriptIndex > 0 ? formationScriptIndex : 0;  // formation-script lane, clamped to >= 0
+    commandIssueData.unk38 = formationScriptIndex > 0 ? formationScriptIndex : 0;  // formation script index, clamped to >= 0
     commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
     commandIssueData.unk4C = 1.0f;                                                 // orientation weight
 
@@ -5459,31 +4884,21 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
-    const auto& runtime = *this;
 
     if (mFormation.empty()) {
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-        if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
-            static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
           continue;
         }
 
-        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-          CSquad* const squad = *squadLane;
-          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-            continue;
-          }
-
-          SEntitySetTemplateUnit squadUnits{};
-          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
           const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
           IssuePlatoonAggressiveMoveCommand(mSim, squadUnits, pos, formationScriptIndex, issuedCommands);
-          break;
         }
       }
     } else {
-      SEntitySetTemplateUnit platoonUnits{};
-      BuildPlatoonUnitSet(runtime, platoonUnits);
+      SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonAggressiveMoveCommand(mSim, platoonUnits, pos, formationScriptIndex, issuedCommands);
     }
@@ -5515,7 +4930,7 @@ namespace moho
       LuaPlus::LuaState::Error(state, "Platoon:AggressiveMoveToLocation Passed in an invalid target point");
     }
 
-    ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
+    ESquadClass squadClass = kAllSquadClasses;
     if (lua_gettop(state->m_state) > 2) {
       gpg::RRef enumRef{};
       enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
@@ -5600,16 +5015,9 @@ namespace moho
     targetPos.y = surfaceElevation;
 
     SEntitySetTemplateUnit transports{};
-    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-        CSquad* const squad = *squadLane;
-        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-          continue;
-        }
-
-        SEntitySetTemplateUnit squadUnits{};
-        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+      if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
           Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
           if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt()) {
@@ -5619,7 +5027,6 @@ namespace moho
             (void)transports.AddUnit(unit);
           }
         }
-        break;
       }
     }
 
@@ -5752,7 +5159,7 @@ namespace moho
    * What it does:
    * Resolves `(platoon, category)`, issues platoon transport-load commands,
    * builds a Lua array of resulting command objects, and unlinks temporary
-   * weak-command lanes before returning.
+   * weak command links before returning.
    */
   int cfunc_CPlatoonLoadUnitsL(LuaPlus::LuaState* const state)
   {
@@ -5818,16 +5225,9 @@ namespace moho
     pos.y = surfaceElevation;
 
     SEntitySetTemplateUnit unitsToUnload{};
-    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-        CSquad* const squad = *squadLane;
-        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-          continue;
-        }
-
-        SEntitySetTemplateUnit squadUnits{};
-        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+      if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
           Unit* const carrier = SEntitySetTemplateUnit::UnitFromEntry(*entry);
           if (carrier == nullptr || carrier->IsDead() || carrier->IsBeingBuilt()) {
@@ -5853,7 +5253,6 @@ namespace moho
             (void)unitsToUnload.AddUnit(carrier);
           }
         }
-        break;
       }
     }
 
@@ -5963,16 +5362,9 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     SEntitySetTemplateUnit carriers{};
-    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-        CSquad* const squad = *squadLane;
-        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-          continue;
-        }
-
-        SEntitySetTemplateUnit squadUnits{};
-        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+      if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
           Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
           if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt()) {
@@ -5982,7 +5374,6 @@ namespace moho
             (void)carriers.AddUnit(unit);
           }
         }
-        break;
       }
     }
 
@@ -6103,7 +5494,7 @@ namespace moho
     commandIssueData.mTarget.mPos = target;
 
     if (useFormation) {
-      commandIssueData.unk38 = formationScriptIndex;  // FormPatrol formation-script lane
+      commandIssueData.unk38 = formationScriptIndex;  // formation script index
       commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
       commandIssueData.unk4C = 1.0f;                   // FormPatrol orientation weight
     }
@@ -6141,32 +5532,22 @@ namespace moho
 
     // Platoon-wide formation patrol.
     if (!mFormation.empty()) {
-      SEntitySetTemplateUnit platoonUnits{};
-      BuildPlatoonUnitSet(*this, platoonUnits);
+      SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonPatrolCommand(mSim, platoonUnits, target, formationScriptIndex);
       return;
     }
 
     // Per-squad-class patrol: each requested class patrols on its own.
-    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      if (static_cast<std::int32_t>(squadClass) != kAllSquadClassesSentinel &&
-          static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+      if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
         continue;
       }
 
-      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-        CSquad* const squad = *squadLane;
-        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-          continue;
-        }
-
-        SEntitySetTemplateUnit squadUnits{};
-        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+      if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
         const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
         IssuePlatoonPatrolCommand(mSim, squadUnits, target, formationScriptIndex);
-        break;
       }
     }
   }
@@ -6198,7 +5579,7 @@ namespace moho
       LuaPlus::LuaState::Error(state, "Platoon:Patrol Passed in an invalid target point");
     }
 
-    ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
+    ESquadClass squadClass = kAllSquadClasses;
     if (lua_gettop(state->m_state) > 2) {
       gpg::RRef enumRef{};
       enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
@@ -6247,19 +5628,8 @@ namespace moho
 
   /**
    * Address: 0x00728420 (FUN_00728420, func_IssueGuardTargetToPlatoon)
-   *
-   * What it does:
-   * Issues `UNITCOMMAND_Guard` (target = `guardTarget`) on the platoon's units
-   * and returns the created command links. When the platoon has no formation
-   * name it issues one command per matching squad class (1..2, or all when
-   * `kAllSquadsClass`); otherwise it issues a single command on the whole merged
-   * platoon unit set.
    */
-  static msvc8::vector<WeakPtr<CUnitCommand>> IssueGuardTargetToPlatoon(
-    CPlatoon* const platoon,
-    Unit* const guardTarget,
-    const ESquadClass squadClass
-  )
+  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::GuardTarget(Unit* const guardTarget, const ESquadClass squadClass)
   {
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
@@ -6271,34 +5641,25 @@ namespace moho
       commandIssueData.mTarget.mPos.y = 0.0f;
       commandIssueData.mTarget.mPos.z = 0.0f;
 
-      CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(platoon->mSim, units, commandIssueData, false);
+      CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, units, commandIssueData, false);
       if (issuedCommand != nullptr) {
         issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
       }
     };
 
-    if (platoon->mFormation.empty()) {
-      const auto& runtime = *platoon;
+    if (mFormation.empty()) {
       for (std::int32_t squadClassIndex = 1; squadClassIndex <= 2; ++squadClassIndex) {
-        if (squadClass != kAllSquadsClass && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
           continue;
         }
 
-        for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-          CSquad* const squad = *squadLane;
-          if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-            continue;
-          }
-
-          SEntitySetTemplateUnit squadUnits{};
-          CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+        if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
           issueGuardOnUnits(squadUnits);
-          break;
         }
       }
     } else {
-      SEntitySetTemplateUnit formationUnits{};
-      BuildPlatoonUnitSet(*platoon, formationUnits);
+      SEntitySetTemplateUnit formationUnits = GetPlatoonUnits();
       issueGuardOnUnits(formationUnits);
     }
 
@@ -6310,7 +5671,7 @@ namespace moho
    *
    * What it does:
    * Parses `(platoon, targetUnit, [squadClass])`, issues guard orders on the
-   * platoon via `IssueGuardTargetToPlatoon`, returns the issued commands as a
+   * platoon via `CPlatoon::GuardTarget`, returns the issued commands as a
    * Lua array, then releases the weak command links.
    */
   int cfunc_CPlatoonGuardTargetL(LuaPlus::LuaState* const state)
@@ -6333,7 +5694,7 @@ namespace moho
     const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
     Unit* const guardTarget = SCR_FromLua_Unit(targetObject);
 
-    ESquadClass squadClass = kAllSquadsClass;
+    ESquadClass squadClass = kAllSquadClasses;
     if (lua_gettop(state->m_state) > 2) {
       gpg::RRef enumRef{};
       enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
@@ -6347,7 +5708,7 @@ namespace moho
       SCR_GetEnum(state, squadClassName, enumRef);
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = IssueGuardTargetToPlatoon(platoon, guardTarget, squadClass);
+    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->GuardTarget(guardTarget, squadClass);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -6399,49 +5760,32 @@ namespace moho
   }
 
   /**
-   * Address: 0x00726210 (FUN_00726210, sub_726210, CPlatoon destroy-squads helper)
-   *
-   * What it does:
-   * Clears the platoon's cached Lua unit list, then for each matching squad
-   * class detaches every unit from its squad and queues `UNITCOMMAND_DestroySelf`
-   * on the live members.
+   * Address: 0x00726210 (FUN_00726210, sub_726210)
    */
-  static void DestroyPlatoonSquads(CPlatoon* const platoon, const ESquadClass squadClass)
+  void CPlatoon::DestroySquads(const ESquadClass squadClass)
   {
-    auto& runtime = *platoon;
-    runtime.mHasLuaList = 0u;
+    mHasLuaList = false;
 
     SEntitySetTemplateUnit doomedUnits{};
-    for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      if (squadClass != kAllSquadsClass && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+    for (std::int32_t squadClassIndex = 1; squadClassIndex < static_cast<std::int32_t>(kAllSquadClasses); ++squadClassIndex) {
+      if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
         continue;
       }
 
-      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-        moho::CSquad* const squadView = *squadLane;
-        if (squadView == nullptr || static_cast<std::int32_t>(squadView->mSquadClass) != squadClassIndex) {
-          continue;
-        }
-
-        SEntitySetTemplateUnit squadUnits{};
-        CopyCSquadUnitsIntoEntitySet(&squadUnits, squadView);
-
-        // Live members get the destroy order; every member is detached from the squad.
-        for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
-          Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+      if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+        const SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+        for (Entity* const entity : squadUnits.mVec) {
+          Unit* const unit = static_cast<Unit*>(entity);
           if (unit != nullptr && !unit->IsDead()) {
             (void)doomedUnits.AddUnit(unit);
           }
         }
-        for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
-          RemoveUnitFromSquad(squadView, SEntitySetTemplateUnit::UnitFromEntry(*entry));
-        }
-        break;
+        squad->RemoveUnits(squadUnits);
       }
     }
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_DestroySelf);
-    (void)IssueCommandToSelectedUnits(platoon->mSim, doomedUnits, commandIssueData, false);
+    (void)IssueCommandToSelectedUnits(mSim, doomedUnits, commandIssueData, false);
   }
 
   /**
@@ -6449,7 +5793,7 @@ namespace moho
    *
    * What it does:
    * Parses `(platoon, [squadClass])`, and when the platoon is still alive,
-   * destroys the selected squads via `DestroyPlatoonSquads`.
+   * destroys the selected squads via `CPlatoon::DestroySquads`.
    */
   int cfunc_CPlatoonDestroyL(LuaPlus::LuaState* const state)
   {
@@ -6463,7 +5807,7 @@ namespace moho
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoonOpt(platoonObject, state);
     if (platoon != nullptr) {
-      ESquadClass squadClass = kAllSquadsClass;
+      ESquadClass squadClass = kAllSquadClasses;
       if (lua_gettop(state->m_state) > 1) {
         gpg::RRef enumRef{};
         enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
@@ -6477,7 +5821,7 @@ namespace moho
         SCR_GetEnum(state, squadClassName, enumRef);
       }
 
-      DestroyPlatoonSquads(platoon, squadClass);
+      platoon->DestroySquads(squadClass);
     }
 
     return 0;
@@ -6529,9 +5873,7 @@ namespace moho
    */
   void CPlatoon::GetFerryBeacons(SEntitySetTemplateUnit& outBeacons)
   {
-    const auto& runtime = *this;
-    SEntitySetTemplateUnit platoonUnits{};
-    BuildPlatoonUnitSet(runtime, platoonUnits);
+    SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
 
     for (Entity* const* entry = platoonUnits.mVec.begin(); entry != platoonUnits.mVec.end(); ++entry) {
       Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
@@ -6631,16 +5973,9 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     SEntitySetTemplateUnit loadableUnits{};
-    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-        CSquad* const squad = *squadLane;
-        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-          continue;
-        }
-
-        SEntitySetTemplateUnit squadUnits{};
-        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+      if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
           Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
           if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt() || !unit->IsMobile()) {
@@ -6654,7 +5989,6 @@ namespace moho
             (void)loadableUnits.AddUnit(unit);
           }
         }
-        break;
       }
     }
 
@@ -6755,7 +6089,7 @@ namespace moho
    *
    * What it does:
    * Accumulates units from the matching squad classes (1..5, or all when
-   * `kAllSquadsClass`) into one set, appends the teleporter unit, and issues a
+   * `kAllSquadClasses`) into one set, appends the teleporter unit, and issues a
    * single `UNITCOMMAND_TransportLoadUnits` targeting the teleporter. Returns
    * the issued command weak-links.
    */
@@ -6764,24 +6098,16 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     SEntitySetTemplateUnit selectedUnits{};
-    const auto& runtime = *this;
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      if (squadClass != kAllSquadsClass && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+      if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
         continue;
       }
 
-      for (moho::CSquad* const* squadLane = runtime.mSquadList.begin(); squadLane != runtime.mSquadList.end(); ++squadLane) {
-        CSquad* const squad = *squadLane;
-        if (squad == nullptr || static_cast<std::int32_t>(squad->mSquadClass) != squadClassIndex) {
-          continue;
-        }
-
-        SEntitySetTemplateUnit squadUnits{};
-        CopyCSquadUnitsIntoEntitySet(&squadUnits, squad);
+      if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
+        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
           (void)selectedUnits.AddUnit(SEntitySetTemplateUnit::UnitFromEntry(*entry));
         }
-        break;
       }
     }
 
@@ -6832,7 +6158,7 @@ namespace moho
     const LuaPlus::LuaObject teleporterObject(LuaPlus::LuaStackObject(state, 2));
     Unit* const teleporter = SCR_FromLua_Unit(teleporterObject);
 
-    ESquadClass squadClass = kAllSquadsClass;
+    ESquadClass squadClass = kAllSquadClasses;
     if (lua_gettop(state->m_state) > 2) {
       gpg::RRef enumRef{};
       enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
@@ -6902,7 +6228,7 @@ namespace moho
    *
    * What it does:
    * Resolves `(platoon, formationName)` from Lua, maps `"None"` to empty text,
-   * and stores the formation override lane.
+   * and stores the formation override.
    */
   int cfunc_CPlatoonSetPlatoonFormationOverrideL(LuaPlus::LuaState* const state)
   {
@@ -6981,7 +6307,7 @@ namespace moho
    * Address: 0x00732350 (FUN_00732350, cfunc_CPlatoonGetPlatoonLifetimeStatsL)
    *
    * What it does:
-   * Resolves one platoon and pushes its four persisted lifetime stat lanes, or
+   * Resolves one platoon and pushes its four lifetime stats (kills, losses, damage dealt, damage received), or
    * `nil` when the platoon object is absent.
    */
   int cfunc_CPlatoonGetPlatoonLifetimeStatsL(LuaPlus::LuaState* const state)
@@ -6999,13 +6325,13 @@ namespace moho
       return 1;
     }
 
-    lua_pushnumber(state->m_state, static_cast<float>(platoon->GetLifetimeStat1()));
+    lua_pushnumber(state->m_state, static_cast<float>(platoon->GetKills()));
     (void)lua_gettop(state->m_state);
-    lua_pushnumber(state->m_state, static_cast<float>(platoon->GetLifetimeStat2()));
+    lua_pushnumber(state->m_state, static_cast<float>(platoon->GetLosses()));
     (void)lua_gettop(state->m_state);
-    lua_pushnumber(state->m_state, platoon->GetLifetimeStat3());
+    lua_pushnumber(state->m_state, platoon->GetDamageDealt());
     (void)lua_gettop(state->m_state);
-    lua_pushnumber(state->m_state, platoon->GetLifetimeStat4());
+    lua_pushnumber(state->m_state, platoon->GetDamageReceived());
     (void)lua_gettop(state->m_state);
     return 4;
   }
@@ -7071,9 +6397,7 @@ namespace moho
     const EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
     const PlatoonThreatType threatType = ParsePlatoonThreatType(threatTypeName);
 
-    auto& runtimeView = *platoon;
-    SEntitySetTemplateUnit platoonUnits{};
-    BuildPlatoonUnitSet(runtimeView, platoonUnits);
+    SEntitySetTemplateUnit platoonUnits = platoon->GetPlatoonUnits();
 
     float totalThreat = 0.0f;
     for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {
@@ -7166,9 +6490,7 @@ namespace moho
     const float radiusSq = ReadSquaredRadiusArg(state, 5);
     const PlatoonThreatType threatType = ParsePlatoonThreatType(threatTypeName);
 
-    auto& runtimeView = *platoon;
-    SEntitySetTemplateUnit platoonUnits{};
-    BuildPlatoonUnitSet(runtimeView, platoonUnits);
+    SEntitySetTemplateUnit platoonUnits = platoon->GetPlatoonUnits();
 
     float totalThreat = 0.0f;
     for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {
@@ -7260,9 +6582,7 @@ namespace moho
     const Wm3::Vector3f position = SCR_FromLuaCopy<Wm3::Vector3<float>>(positionObject);
     const float radiusSq = ReadSquaredRadiusArg(state, 4);
 
-    auto& runtimeView = *platoon;
-    SEntitySetTemplateUnit platoonUnits{};
-    BuildPlatoonUnitSet(runtimeView, platoonUnits);
+    SEntitySetTemplateUnit platoonUnits = platoon->GetPlatoonUnits();
 
     int matchingCount = 0;
     for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {
@@ -7342,9 +6662,7 @@ namespace moho
     LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
     const EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
-    auto& runtimeView = *platoon;
-    SEntitySetTemplateUnit platoonUnits{};
-    BuildPlatoonUnitSet(runtimeView, platoonUnits);
+    SEntitySetTemplateUnit platoonUnits = platoon->GetPlatoonUnits();
 
     int matchingCount = 0;
     for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {

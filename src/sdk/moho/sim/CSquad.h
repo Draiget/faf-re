@@ -93,6 +93,59 @@ namespace moho
     [[nodiscard]] static CSquad* AllocateOnPlatoon(CPlatoon* parentPlatoon, ESquadClass squadClass, const char* name);
 
     /**
+     * Address: 0x00723A50 (FUN_00723A50, copy_CSquadUnits_into_EntitySet)
+     *
+     * IDA signature:
+     * Moho::SEntitySetTemplateUnit *__usercall sub_723A50@<eax>(
+     *   Moho::SEntitySetTemplateUnit *result@<esi>, Moho::CSquad *this@<edx>);
+     *
+     * What it does:
+     * Returns a copy of `mUnits` (copy constructor 0x00579500) in the
+     * caller's return slot. The platoon's order functions take one before
+     * commanding a squad; `CPlatoon::GetPlatoonUnits` takes one per squad.
+     * Emitted first in the translation unit, ahead of `CPlatoon::GetClass`,
+     * as an inline from this header is.
+     */
+    [[nodiscard]] SEntitySetTemplateUnit GetUnitSet() const
+    {
+      return mUnits;
+    }
+
+    /**
+     * What it does:
+     * Returns whether `unit` is one of this squad's units, by a linear scan
+     * (`p ? p - 8 : 0` per entry). Never emitted out of line: inlined into
+     * `CPlatoon::IsInPlatoon` (0x007251D0), `CPlatoon::GetSquadClass`
+     * (0x00725220) and `CPlatoon::RemoveUnit` (0x007253B0). Not
+     * `mUnits.ContainsUnit`, which is the binary search.
+     */
+    [[nodiscard]] bool HasUnit(const Unit* unit) const;
+
+    /**
+     * Address: 0x00724150 (FUN_00724150, Moho::CSquad::RemoveUnit)
+     *
+     * IDA signature:
+     * void __usercall Moho::CSquad::RemoveUnit(Moho::CSquad *this@<ebx>, Moho::Unit *unit@<eax>);
+     *
+     * What it does:
+     * Erases the first entry that is `unit`, closing the gap with `memmove`.
+     */
+    void RemoveUnit(Unit* unit);
+
+    /**
+     * Address: 0x007241C0 (FUN_007241C0)
+     *
+     * IDA signature:
+     * void __usercall sub_7241C0(Moho::CSquad *this@<eax>, Moho::SEntitySetTemplateUnit *units@<edi>);
+     *
+     * What it does:
+     * `RemoveUnit` for every unit in `units`. The out-of-line copy has no
+     * caller; it is inlined into `CPlatoon::ReturnUnitsTo` (0x00725410) and
+     * `CPlatoon::DestroySquads` (0x00726210).
+     */
+    void RemoveUnits(const SEntitySetTemplateUnit& units);
+
+    /**
      * Address: 0x00724220 (FUN_00724220, Moho::CSquad::CountUnitsWithBP)
      *
      * What it does:
@@ -124,10 +177,27 @@ namespace moho
      * Address: 0x00724750 (FUN_00724750, Moho::CSquad::HasUnitWithState)
      *
      * What it does:
-     * Returns true when any live unit in this squad reports the requested
-     * unit-state lane.
+     * Returns true when any live unit in this squad is in `state`.
      */
     [[nodiscard]] bool HasUnitWithState(EUnitState state) const;
+
+    /**
+     * Address: 0x007247A0 (FUN_007247A0, Moho::CSquad::UnitHasOrder)
+     *
+     * What it does:
+     * Returns true unless some live unit has a command at the head of its
+     * queue. The IDB name reads the result backwards.
+     */
+    [[nodiscard]] bool IsIdle() const;
+
+    /**
+     * Address: 0x00724820 (FUN_00724820, Moho::CSquad::Stop)
+     *
+     * What it does:
+     * Clears every live unit's command queue (no null test on the queue) and
+     * stops its attacker, when it has one.
+     */
+    void Stop();
 
     /**
      * Address: 0x0072B700 (FUN_0072B700, Moho::CSquad::GetUnits)
@@ -179,16 +249,18 @@ namespace moho
     [[nodiscard]] Wm3::Vector3f* GetCenter(Wm3::Vector3f* outPos) const;
 
     /**
-     * Address: 0x006DE1C0 (FUN_006DE1C0, Moho::CSquad::SetPrioritizedTargetList)
+     * Address: 0x00724810 (FUN_00724810)
+     *
+     * IDA signature:
+     * int __userpurge sub_724810@<eax>(std::vector_EntityCategory *categories@<eax>, Moho::CSquad *this);
      *
      * What it does:
-     * Replaces this squad's prioritized target-category vector (`mCats`) with
-     * the contents of `categorySource`. The fast-path (capacity already large
-     * enough) does an in-place vector assignment; otherwise the existing
-     * storage is destroyed and a fresh buffer is allocated to fit the new
-     * size. Self-assignment is a no-op.
+     * `mCats = categories`: moves `this` to `&mCats` in EAX and calls
+     * `msvc8::vector<EntityCategorySet>::operator=` (0x006DE1C0). The
+     * out-of-line copy has no caller; `CPlatoon::SetPrioritizedTargetList`
+     * (0x00725990, itself inlined into the Lua binding 0x0072E940) inlines it.
      */
-    void SetPrioritizedTargetList(const msvc8::vector<EntityCategorySet>& categorySource);
+    void SetPrioritizedTargetList(const msvc8::vector<EntityCategorySet>& categories);
 
     /**
      * Address: 0x0072B200 (FUN_0072B200, Moho::CSquad::MemberDeserialize)

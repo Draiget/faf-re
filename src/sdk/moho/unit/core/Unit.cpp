@@ -16466,7 +16466,7 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
     if (CPlatoon* const platoon =
           ArmyRef->GetPlatoonFor(this, &squadClass);
         platoon != nullptr) {
-      ++platoon->mLifetimeStat2;
+      ++platoon->mLosses;
     }
   }
 
@@ -16483,7 +16483,7 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
           &instigatorSquadClass
         );
         instigatorPlatoon != nullptr) {
-      ++instigatorPlatoon->mLifetimeStat1;
+      ++instigatorPlatoon->mKills;
     }
   }
 

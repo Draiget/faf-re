@@ -496,7 +496,7 @@ namespace
   //                wrong and is the reason it is gone. See
   //                `cfunc_CAiBrainGetPlatoonsListL` below for the asm.
   //
-  // The two counting helpers are `CPlatoon::CountAllSquadUnitSlots()`
+  // The two counting helpers are `CPlatoon::CountUnits()`
   // (0x00725840), the same loop with the same per-squad `end_ - start_`.
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
@@ -7388,7 +7388,7 @@ int moho::cfunc_CAiBrainGetPlatoonsListL(LuaPlus::LuaState* const state)
       continue;
     }
 
-    if (platoon->CountAllSquadUnitSlots() > 0) {
+    if (platoon->CountUnits() > 0) {
       outPlatoons.Insert(platoonLuaIndex, platoon->mLuaObj);
       ++platoonLuaIndex;
     }
@@ -8417,9 +8417,7 @@ int moho::cfunc_CAiBrainAssignUnitsToPlatoonL(LuaPlus::LuaState* const state)
     destinationSquad = CSquad::AllocateOnPlatoon(targetPlatoon, squadClass, squadNameObject.GetString());
   }
 
-  destinationSquad->mUnits.AddRange(incomingUnits.mVec.begin(), incomingUnits.mVec.end());
-
-  targetPlatoon->mHasLuaList = 0;
+  targetPlatoon->AppendUnitsToSquad(destinationSquad, incomingUnits);
   (void)targetPlatoon->RunScript("OnUnitsAddedToPlatoon");
   return 1;
 }
@@ -8554,8 +8552,7 @@ int moho::cfunc_CAiBrainMakePlatoonL(LuaPlus::LuaState* const state)
       destinationSquad = CSquad::AllocateOnPlatoon(newPlatoon, squadClass, squadNameObject.GetString());
     }
 
-    destinationSquad->mUnits.AddRange(pulledUnits.mVec.begin(), pulledUnits.mVec.end());
-    newPlatoon->mHasLuaList = 0;
+    newPlatoon->AppendUnitsToSquad(destinationSquad, pulledUnits);
   }
 
   newPlatoon->mLuaObj.PushStack(state);
