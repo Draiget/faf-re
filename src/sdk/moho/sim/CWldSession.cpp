@@ -10030,8 +10030,8 @@ namespace moho
     // `resolvedLinks` directly, as this did, sees an empty run in the steady
     // state, so no unit ever contributed a node and the whole shift-held
     // command graph drew nothing.
-    UserCommandQueueLinkVector* const queueLinks = GetUserUnitManagerQueueLinks(queue);
-    if (queueLinks == nullptr || queueLinks->begin == queueLinks->end) {
+    auto* const queueLinks = GetUserUnitManagerQueueLinks(queue);
+    if (queueLinks == nullptr || queueLinks->empty()) {
       return;
     }
 
@@ -10041,21 +10041,9 @@ namespace moho
       return;
     }
 
-    // UserCommandQueueEntry is opaque outside UserUnit.cpp's own TU (see
-    // UserCommandQueue.h) - this is its byte-compatible {helper, link} view.
-    struct UserCommandQueueEntryView
-    {
-      UserCommandIssueHelper* helper; // +0x00
-      void* link;                     // +0x04
-    };
-    static_assert(sizeof(UserCommandQueueEntryView) == 0x08, "UserCommandQueueEntryView size must be 0x08");
-
-    auto* const entries = reinterpret_cast<UserCommandQueueEntryView*>(queueLinks->begin);
-    auto* const entriesEnd = reinterpret_cast<UserCommandQueueEntryView*>(queueLinks->end);
-
     // Queue-head node: keyed by the first resolved link's helper pointer,
     // accumulates every unit sharing this queue's centroid.
-    const auto queueHeadKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entries[0].helper));
+    const auto queueHeadKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(queueLinks->front().GetObjectPtr()));
     UICommandGraph::UICommandGraphDrawNode* queueHeadNode =
       UICommandGraph::FindOrInsertCommandGraphDrawNode(queueHeadKey, graph.mMapAB1);
     queueHeadNode->mPositionSum.x += entity.mVariableData.mCurTransform.pos_.x;
@@ -10071,8 +10059,8 @@ namespace moho
     // queue's chain to render highlighted, until the matching command is
     // reached.
     bool anyHighlight = false;
-    for (UserCommandQueueEntryView* entry = entries; entry != entriesEnd; ++entry) {
-      UserCommandIssueHelper* const helper = entry->helper;
+    for (const WeakPtr<UserCommandIssueHelper>& link : *queueLinks) {
+      UserCommandIssueHelper* const helper = link.GetObjectPtr();
       if (helper == nullptr) {
         continue;
       }
@@ -10097,8 +10085,8 @@ namespace moho
     std::int32_t previousCommandType = 0;
     UICommandGraph::UICommandGraphDrawNode* anchorNode = nullptr;
 
-    for (UserCommandQueueEntryView* entry = entries; entry != entriesEnd; ++entry) {
-      UserCommandIssueHelper* const helper = entry->helper;
+    for (const WeakPtr<UserCommandIssueHelper>& link : *queueLinks) {
+      UserCommandIssueHelper* const helper = link.GetObjectPtr();
       if (helper == nullptr) {
         continue;
       }

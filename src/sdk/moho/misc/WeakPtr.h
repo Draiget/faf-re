@@ -374,6 +374,7 @@ namespace moho
      * this node and nowhere else: there is no null test, because a node with a
      * slot is on that slot's chain.
      * Address: 0x0066AF90 (FUN_0066AF90 -- the `WeakPtr<UserEntity>` emission of the splice-out walk, returning the slot it stopped on; callers the camera's target-list node teardown 0x007A71B0, 0x007A75A0, `TargetEntities` 0x007A8640, `TargetNoseCam` 0x007A8A20 and 0x00842920. Formerly `UnlinkSelectionWeakOwnerRefNoReset` in moho/sim/CWldSession.cpp, removed 2026-09-30.)
+     * Address: 0x0082BA90 (FUN_0082BA90 -- the `WeakPtr<UserCommandIssueHelper>` emission, the destructor of the rebuild's inserted stack link (0x008B7211 in 0x008B6F60). Formerly `UnlinkCommandQueueOwnerEntry` in moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
      */
     void UnlinkFromOwner() noexcept
     {

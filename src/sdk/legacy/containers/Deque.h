@@ -152,9 +152,6 @@ namespace msvc8
         ~deque()
         {
             clear();
-#if !MSVC8_DEQUE_DISABLE_FREE
-            release_all();
-#endif
         }
 
         deque(const deque&) = delete;
@@ -204,17 +201,33 @@ namespace msvc8
          * resets offset" convention. Element dtors still run here for
          * non-trivial T so this stays real `clear()` semantics; only the
          * offset reset was missing before this citation.
+         * Address: 0x008B7B50 (FUN_008B7B50 -- `_Tidy` for
+         * `msvc8::deque<Moho::UserManagerHelperEntry>` (`UserCommandQueue::
+         * issueQueue`, 0x10-byte element, block size 1): the drain, each node
+         * from the top of the map down, then the map. Reached from
+         * `issueQueue.clear()` in `ResetUserUnitManagerState` 0x008B6E60, from
+         * `~UserCommandQueue` 0x008B6BE0 and through the `~deque` thunks
+         * 0x008B7640 / 0x008B7740. Formerly `ClearUserManagerIssueQueue` in
+         * moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
+         * Address: 0x008B7640 (FUN_008B7640 -- a one-instruction `jmp` to
+         * 0x008B7B50, that instantiation's `~deque`; zero callers.)
+         * Address: 0x008B7740 (FUN_008B7740 -- a second such `jmp`; zero callers.)
          */
         void clear()
         {
-            // `_Tidy`'s `while (!empty()) pop_back();`: last element first.
+            // VC8's `clear` is `_Tidy`: `pop_back` until empty (last element
+            // first), then every node from the top of the map down, then the
+            // map itself. The recovery used to stop after the drain and keep
+            // the storage; the binary frees it (0x008B7B50 below).
             while (_Mysize != 0)
             {
                 ptr_at(_Mysize - 1)->~T();
                 if (--_Mysize == 0)
                     _Myoff = 0;
             }
-            // Keep nodes and map for capacity, as Dinkumware typically did
+#if !MSVC8_DEQUE_DISABLE_FREE
+            release_all();
+#endif
         }
 
         /**
@@ -226,6 +239,15 @@ namespace msvc8
          * SimulationRef->mDeletionQueue.push_back(this) in Entity::Destroy
          * (Entity.cpp:4559).
          * Address: 0x007408F0 (FUN_007408F0, msvc8::deque<Moho::SSyncData*>::
+         * Address: 0x008B76D0 (FUN_008B76D0 -- `push_back` for
+         *          `msvc8::deque<Moho::UserManagerHelperEntry>` (block size 1):
+         *          `_Growmap` 0x008B79E0 when `_Mapsize <= _Mysize + 1`, the node
+         *          allocated through 0x008B8010, the 0x10-byte edit copied in.
+         *          Callers: the queue edits `UserUnitManagerAdd` 0x008B6DE0,
+         *          `ResetUserUnitManagerState` 0x008B6E60 and
+         *          `RecordUnitManagerCommandHelperRemoval` 0x008B6EE0. Formerly
+         *          `PushUserManagerIssue` in moho/unit/core/UserUnit.cpp,
+         *          removed 2026-09-30.)
          *          push_back -- same body, 4-byte T / kBlockSize==4
          *          instantiation; sole caller is `SSyncDataQueue::PushBack`'s
          *          guard `FUN_0073F940`, see SimDriver.cpp).
@@ -455,6 +477,13 @@ namespace msvc8
 
         /**
          * Address: 0x007BB920 (FUN_007BB920, msvc8::deque<Moho::SNetCommand>::_Growmap)
+         * Address: 0x008B79E0 (FUN_008B79E0 -- `_Growmap` for
+         *          `msvc8::deque<Moho::UserManagerHelperEntry>`, block size 1, its
+         *          map allocated through 0x008B80A0; reached from `push_back`
+         *          0x008B76D0. Formerly `GrowUserManagerIssueQueueMap` in
+         *          moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
+         * Address: 0x008B7E00 (FUN_008B7E00 -- that instantiation's `_Xlen`,
+         *          `throw length_error("deque<T> too long")`.)
          * Address: 0x008B50A0 (FUN_008B50A0 -- `_Growmap` for
          *          `msvc8::deque<Moho::UserCommandIssueLocalEvent>`, block size
          *          1; its map allocator is 0x008B5690.)

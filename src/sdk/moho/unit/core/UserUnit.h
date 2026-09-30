@@ -39,7 +39,7 @@ namespace moho
   enum class EUnitCommandType : std::int32_t;
   class UserEntity;
   struct UserCommandIssueHelper;
-  struct UserCommandQueue;
+  class UserCommandQueue;
   // Opaque cross-TU handle to the runtime user command-issue helper / command-graph
   // anchor-history object (same binary object surfaced under two names). Used only as
   // an incomplete pointer by the IssueDockCommand worker.
@@ -923,7 +923,7 @@ namespace moho
    * `primaryLinks`. `AddCommandQueueToCommandGraph` (CWldSession.cpp) did
    * exactly that and so never saw a single queued order.
    */
-  [[nodiscard]] UserCommandQueueLinkVector* GetUserUnitManagerQueueLinks(UserCommandQueue* manager) noexcept;
+  [[nodiscard]] gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* GetUserUnitManagerQueueLinks(UserCommandQueue* manager) noexcept;
 
   /**
    * Address: 0x008B6E60 (FUN_008B6E60, struct_UserUnitManager::reset)
