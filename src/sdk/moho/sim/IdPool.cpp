@@ -344,3 +344,24 @@ void IdPool::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->WriteInt(static_cast<int>(nextLowId));
   archive->Write(CachedBVIntSetType(), &compactedReleased, NullOwnerRef());
 }
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<IdPool>`, vtable 0x00DFFFE8.
+   *
+   * Address: 0x00BC2DA0 (FUN_00BC2DA0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEE060 (FUN_00BEE060 -- the global's destructor.)
+   * Address: 0x00403DC0 (FUN_00403DC0 -- `Init`.)
+   * Address: 0x00403B90 (FUN_00403B90 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00403BA0 (FUN_00403BA0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct IdPoolSerializer : gpg::SerSaveLoadHelper<IdPool>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A6584 -- process-global `IdPoolSerializer` singleton.
+  moho::IdPoolSerializer gIdPoolSerializer;
+} // namespace

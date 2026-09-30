@@ -78,6 +78,7 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "moho/misc/DiagnosticBudget.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace gpg
 {
@@ -8341,4 +8342,27 @@ namespace
   };
 
   const EntityLuaFuncDefBootstrap gEntityLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Entity>`, vtable 0x00E276F4.
+   *
+   * Address: 0x00BD5050 (FUN_00BD5050 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFC870 (FUN_00BFC870 -- the global's destructor.)
+   * Address: 0x0067F640 (FUN_0067F640 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x006807A0 (FUN_006807A0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x0067C600 (FUN_0067C600 -- `Init`.)
+   * Address: 0x0067B630 (FUN_0067B630 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0067B640 (FUN_0067B640 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct EntitySerializer : gpg::SerSaveLoadHelper<Entity>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B43E4 -- process-global `EntitySerializer` singleton.
+  moho::EntitySerializer gEntitySerializer;
 } // namespace

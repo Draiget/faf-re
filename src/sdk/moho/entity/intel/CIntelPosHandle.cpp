@@ -428,3 +428,24 @@ namespace
   // Address: 0x010BB3EC -- process-global `CIntelPosHandleConstruct` singleton.
   moho::CIntelPosHandleConstruct gCIntelPosHandleConstruct;
 } // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CIntelPosHandle>`, vtable 0x00E3631C.
+   *
+   * Address: 0x00BDCCF0 (FUN_00BDCCF0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C01ED0 (FUN_00C01ED0 -- the global's destructor.)
+   * Address: 0x0076FB00 (FUN_0076FB00 -- `Init`.)
+   * Address: 0x0076F3D0 (FUN_0076F3D0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0076F3E0 (FUN_0076F3E0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CIntelPosHandleSerializer : gpg::SerSaveLoadHelper<CIntelPosHandle>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BB414 -- process-global `CIntelPosHandleSerializer` singleton.
+  moho::CIntelPosHandleSerializer gCIntelPosHandleSerializer;
+} // namespace

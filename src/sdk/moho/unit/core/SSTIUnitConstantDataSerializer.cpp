@@ -12,6 +12,7 @@
 #include "moho/misc/Stats.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -30,19 +31,6 @@ namespace
       Finish();
     }
   };
-
-  /**
-   * Address: 0x00BCA640 (FUN_00BCA640, dynamic initializer for the global
-   * `SSTIUnitConstantDataSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
-   * `gpg::SerHelperBase::InitNewHelpers`). This is an independent `__xc_a`
-   * static initializer, separate from `SSTIUnitConstantDataTypeInfo`'s own
-   * initializer.
-   */
-  moho::SSTIUnitConstantDataSerializer gSSTIUnitConstantDataSerializer;
 
   [[nodiscard]] gpg::RRef NullOwnerRef() noexcept
   {
@@ -200,81 +188,30 @@ namespace moho
     archive->WriteBool(mFake != 0u);
   }
 
-  /**
-   * Address: 0x0055C550 (FUN_0055C550, Moho::SSTIUnitConstantDataSerializer::Deserialize)
-   *
-   * What it does:
-   * Forwards archive load flow into `SSTIUnitConstantData::MemberDeserialize`.
-   */
-  void SSTIUnitConstantDataSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const /*ownerRef*/
-  )
-  {
-    auto* const object = reinterpret_cast<SSTIUnitConstantData*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberDeserialize(archive, version);
-  }
-
-  /**
-   * Address: 0x0055C570 (FUN_0055C570, Moho::SSTIUnitConstantDataSerializer::Serialize)
-   *
-   * What it does:
-   * Forwards archive save flow into `SSTIUnitConstantData::MemberSerialize`.
-   */
-  void SSTIUnitConstantDataSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const /*ownerRef*/
-  )
-  {
-    const auto* const object = reinterpret_cast<const SSTIUnitConstantData*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberSerialize(archive, version);
-  }
-
-  /**
-   * Address: 0x00BCA640 (FUN_00BCA640, register_SSTIUnitConstantDataSerializer)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SSTIUnitConstantDataSerializer::SSTIUnitConstantDataSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&SSTIUnitConstantDataSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&SSTIUnitConstantDataSerializer::Serialize))
-  {}
-
-  /**
-   * Address: 0x00BF5420 (FUN_00BF5420, Moho::SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer)
-   */
-  SSTIUnitConstantDataSerializer::~SSTIUnitConstantDataSerializer() = default;
-
-  /**
-   * Address: 0x0055CB80 (FUN_0055CB80, gpg::SerSaveLoadHelper<Moho::SSTIUnitConstantData>::Init lane)
-   *
-   * What it does:
-   * Binds serializer load/save callbacks into `SSTIUnitConstantData` RTTI;
-   * caches the resolved type on `SSTIUnitConstantData::sType`. Real body
-   * resolves via a direct `gpg::LookupRType(typeid(SSTIUnitConstantData))`,
-   * not via `preregister_SSTIUnitConstantDataTypeInfo()` (prior recovery's
-   * fallback path called the wrong helper).
-   */
-  void SSTIUnitConstantDataSerializer::Init()
-  {
-    if (SSTIUnitConstantData::sType == nullptr) {
-      SSTIUnitConstantData::sType = gpg::LookupRType(typeid(SSTIUnitConstantData));
-    }
-
-    gpg::RType* const type = SSTIUnitConstantData::sType;
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
 } // namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_SSTIUnitConstantDataTypeInfo_f5d847, moho::preregister_SSTIUnitConstantDataTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SSTIUnitConstantData>`, vtable 0x00E1881C.
+   *
+   * Address: 0x00BCA640 (FUN_00BCA640 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF5420 (FUN_00BF5420 -- the global's destructor.)
+   * Address: 0x0055C590 (FUN_0055C590 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0055CB80 (FUN_0055CB80 -- `Init`.)
+   * Address: 0x0055C550 (FUN_0055C550 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x0055C570 (FUN_0055C570 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct SSTIUnitConstantDataSerializer : gpg::SerSaveLoadHelper<SSTIUnitConstantData>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ACBE0 -- process-global `SSTIUnitConstantDataSerializer` singleton.
+  moho::SSTIUnitConstantDataSerializer gSSTIUnitConstantDataSerializer;
+} // namespace

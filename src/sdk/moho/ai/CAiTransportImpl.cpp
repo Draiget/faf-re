@@ -32,6 +32,7 @@
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -2020,4 +2021,28 @@ namespace
 {
   // Address: 0x010B087C -- process-global `CAiTransportImplConstruct` singleton.
   moho::CAiTransportImplConstruct gCAiTransportImplConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiTransportImpl>`, vtable 0x00E1F4BC.
+   *
+   * Address: 0x00BCEF50 (FUN_00BCEF50 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF8C70 (FUN_00BF8C70 -- the global's destructor.)
+   * Address: 0x005E85B0 (FUN_005E85B0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x005EC3F0 (FUN_005EC3F0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005EDCC0 (FUN_005EDCC0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005E9C30 (FUN_005E9C30 -- `Init`.)
+   * Address: 0x005E8590 (FUN_005E8590 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005E85A0 (FUN_005E85A0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiTransportImplSerializer : gpg::SerSaveLoadHelper<CAiTransportImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B07D8 -- process-global `CAiTransportImplSerializer` singleton.
+  moho::CAiTransportImplSerializer gCAiTransportImplSerializer;
 } // namespace

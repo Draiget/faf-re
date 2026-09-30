@@ -434,7 +434,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\misc\ThreadSafeCountedObjectTypeInfo.cpp" />
     <ClCompile Include="moho\misc\CVirtualFileSystem.cpp" />
     <ClCompile Include="moho\sim\IdPoolTypeInfo.cpp" />
-    <ClCompile Include="moho\sim\IdPoolSerializer.cpp" />
     <ClCompile Include="moho\projectile\Projectile.cpp" />
     <ClCompile Include="moho\task\CTaskEvent.cpp" />
     <ClCompile Include="moho\task\CTaskThread.cpp" />
@@ -721,7 +720,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\entity\EntityCategoryTypeInfo.cpp" />
     <ClCompile Include="moho\entity\CTextureScroller.cpp" />
     <ClCompile Include="moho\entity\Entity.cpp" />
-    <ClCompile Include="moho\entity\EntitySerializer.cpp" />
     <ClCompile Include="moho\command\SSTITarget.cpp" />
     <ClCompile Include="moho\entity\SSTIEntityConstantData.cpp" />
     <ClCompile Include="moho\entity\SSTIEntityVariableData.cpp" />
@@ -753,15 +751,11 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\SimDebugCommandRegistrations.cpp" />
     <ClCompile Include="moho\serialization\typeinfo\ECompareTypeTypeInfo.cpp" />
     <ClCompile Include="moho\serialization\typeinfo\SBuildReserveInfoTypeInfo.cpp" />
-    <ClCompile Include="moho\serialization\serializers\SBuildReserveInfoSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiBrainTypeInfo.cpp" />
-    <ClCompile Include="moho\ai\CAiBrainSerializer.cpp" />
-    <ClCompile Include="moho\ai\CFormationInstanceSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiBrain.cpp" />
     <ClCompile Include="moho\ai\CAiBrainLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\ai\CAiBuilderImpl.cpp" />
     <ClCompile Include="moho\sim\SMassInfoTypeInfo.cpp" />
-    <ClCompile Include="moho\sim\SMassInfoSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiPathSpline.cpp" />
     <ClCompile Include="moho\ai\IAiCommandDispatchTypeInfo.cpp" />
     <ClCompile Include="moho\ai\IAiFormationDB.cpp" />
@@ -769,16 +763,13 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\ai\IAiCommandDispatchImplSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiFormationInstanceTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CFormationInstanceTypeInfo.cpp" />
-    <ClCompile Include="moho\ai\CAiFormationInstanceSerializer.cpp" />
     <ClCompile Include="moho\ai\IAiFormationDBTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiFormationDBImplTypeInfo.cpp" />
-    <ClCompile Include="moho\ai\CAiFormationDBImplSerializer.cpp" />
     <ClCompile Include="moho\ai\IAiBuilderTypeInfo.cpp" />
     <ClCompile Include="moho\ai\IAiCommandDispatch.cpp" />
     <ClCompile Include="moho\ai\IAiCommandDispatchImpl.cpp" />
     <ClCompile Include="moho\ai\CAiBuilderImplTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiFormationDBImpl.cpp" />
-    <ClCompile Include="moho\ai\CAiBuilderImplSerializer.cpp" />
     <ClCompile Include="moho\ai\EAiNavigatorStatusTypeInfo.cpp" />
     <ClCompile Include="moho\ai\EAiNavigatorEventTypeInfo.cpp" />
     <ClCompile Include="moho\ai\IAiNavigatorTypeInfo.cpp" />
@@ -795,16 +786,12 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\ai\IAiNavigator.cpp" />
     <ClCompile Include="moho\ai\ESearchTypeTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiPathFinderTypeInfo.cpp" />
-    <ClCompile Include="moho\ai\CAiPathFinderSerializer.cpp" />
     <ClCompile Include="moho\ai\EAiPathNavigatorStateTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiPathNavigatorTypeInfo.cpp" />
-    <ClCompile Include="moho\ai\CAiPathNavigatorSerializer.cpp" />
     <ClCompile Include="moho\ai\EPathTypeTypeInfo.cpp" />
     <ClCompile Include="moho\ai\SContinueInfoTypeInfo.cpp" />
     <ClCompile Include="moho\animation\CAniDefaultSkel.cpp" />
-    <ClCompile Include="moho\ai\SContinueInfoSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiPathSplineTypeInfo.cpp" />
-    <ClCompile Include="moho\ai\CAiPathSplineSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiPersonalitySerializer.cpp" />
     <ClCompile Include="moho\ai\CAiPersonalityTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiReconDBImpl.cpp" />
@@ -859,7 +846,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\ai\SPickUpInfo.cpp" />
     <ClCompile Include="moho\ai\IAiTransportSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiTransportImplTypeInfo.cpp" />
-    <ClCompile Include="moho\ai\CAiTransportImplSerializer.cpp" />
     <ClCompile Include="moho\unit\core\UnitLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\ai\IAiTransport.cpp" />
     <ClCompile Include="moho\unit\UnitLuaFactoryIndexRegistrations.cpp" />
@@ -874,7 +860,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTask.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitRepairTask.cpp" />
-      <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTaskSerializer.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitUpgradeTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitRefuel.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitRepairTaskTypeInfo.cpp" />
@@ -936,7 +921,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\ManipulatorStartupRegistrations.cpp" />
     <ClCompile Include="moho\script\CUnitScriptTaskSerializer.cpp" />
     <ClCompile Include="moho\ai\SPickUpInfoTypeInfo.cpp" />
-    <ClCompile Include="moho\unit\tasks\CUnitLoadUnitsSerializer.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitLoadUnitsTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitUnloadUnits.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitUnloadUnitsTypeInfo.cpp" />
@@ -993,7 +977,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\effects\rendering\CEfxBeamTypeInfo.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxTrailEmitterTypeInfo.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxEmitter.cpp" />
-    <ClCompile Include="moho\effects\rendering\CEfxEmitterSerializer.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxTrailEmitter.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxBeamSerializer.cpp" />
     <ClCompile Include="moho\effects\rendering\CEffectImplTypeInfo.cpp" />
@@ -1016,7 +999,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\entity\CollisionBeamStartupRegistrations.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamEntity.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamEntityTypeInfo.cpp" />
-    <ClCompile Include="moho\entity\CollisionBeamEntitySerializer.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamEntityLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\effects\rendering\IEffectWeakPtrReflection.cpp" />
     <ClCompile Include="moho\render\IEdRenderHook.cpp" />
@@ -1108,9 +1090,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\entity\PropTypeInfo.cpp" />
     <ClCompile Include="moho\entity\PropSerializer.cpp" />
     <ClCompile Include="moho\sim\SimArmyTypeInfo.cpp" />
-    <ClCompile Include="moho\sim\SimArmySerializer.cpp" />
     <ClCompile Include="moho\sim\CArmyImplTypeInfo.cpp" />
-    <ClCompile Include="moho\sim\CArmyImplSerializer.cpp" />
     <ClCompile Include="moho\sim\ArmyUnitSetVectorReflection.cpp" />
     <ClCompile Include="moho\sim\CArmyLuaFunctionRegistrations.cpp" />
     <ClCompile Include="moho\sim\SConditionTriggerReflection.cpp" />
@@ -1120,7 +1100,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\CArmyStats.cpp" />
     <ClCompile Include="moho\sim\CArmyStatItemSerializer.cpp" />
     <ClCompile Include="moho\sim\CArmyStatsTypeInfo.cpp" />
-    <ClCompile Include="moho\sim\CArmyStatsSerializer.cpp" />
     <ClCompile Include="moho\sim\CInfluenceMapTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CInfluenceMap.cpp" />
     <ClCompile Include="moho\sim\CInfluenceMapSerializer.cpp" />
@@ -1163,10 +1142,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\entity\intel\CIntelTypeInfo.cpp" />
     <ClCompile Include="moho\entity\intel\CIntelCounterHandle.cpp" />
     <ClCompile Include="moho\entity\intel\CIntelPosHandleTypeInfo.cpp" />
-    <ClCompile Include="moho\entity\intel\CIntelPosHandleSerializer.cpp" />
     <ClCompile Include="moho\entity\intel\CIntelCounterHandleTypeInfo.cpp" />
     <ClCompile Include="moho\entity\intel\CIntelPosHandle.cpp" />
-    <ClCompile Include="moho\entity\intel\CIntelCounterHandleSerializer.cpp" />
     <ClCompile Include="moho\render\EEmitterCurveTypeInfo.cpp" />
     <ClCompile Include="moho\render\EEmitterParamTypeInfo.cpp" />
     <ClCompile Include="moho\render\EBeamParamTypeInfo.cpp" />
@@ -1647,7 +1624,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\audio\IUserSoundManager.h" />
     <ClInclude Include="moho\audio\ISoundManager.h" />
     <ClInclude Include="moho\audio\SAudioRequest.h" />
-    <ClInclude Include="moho\audio\SAudioRequestSerializer.h" />
     <ClInclude Include="moho\audio\SAudioRequestTypeInfo.h" />
     <ClInclude Include="moho\audio\SParamKey.h" />
     <ClInclude Include="moho\audio\SParamKeySerializer.h" />
@@ -1687,7 +1663,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\entity\EntityDb.h" />
     <ClInclude Include="moho\entity\CollisionBeamStartupRegistrations.h" />
     <ClInclude Include="moho\entity\CollisionBeamEntity.h" />
-    <ClInclude Include="moho\entity\CollisionBeamEntitySerializer.h" />
     <ClInclude Include="moho\entity\ECollisionBeamEvent.h" />
     <ClInclude Include="moho\entity\EntityCategoryLookupResolver.h" />
     <ClInclude Include="moho\entity\EntityCategoryReflection.h" />
@@ -1701,10 +1676,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\entity\intel\CIntelSerializer.h" />
     <ClInclude Include="moho\entity\intel\CIntelTypeInfo.h" />
     <ClInclude Include="moho\entity\intel\CIntelCounterHandle.h" />
-    <ClInclude Include="moho\entity\intel\CIntelCounterHandleSerializer.h" />
     <ClInclude Include="moho\entity\intel\CIntelCounterHandleTypeInfo.h" />
     <ClInclude Include="moho\entity\intel\CIntelPosHandle.h" />
-    <ClInclude Include="moho\entity\intel\CIntelPosHandleSerializer.h" />
     <ClInclude Include="moho\entity\intel\CIntelPosHandleTypeInfo.h" />
     <ClInclude Include="moho\entity\EntityShield.h" />
     <ClInclude Include="moho\entity\MotorFallDown.h" />
@@ -1745,7 +1718,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\effects\rendering\CEfxBeamTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEfxTrailEmitterTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEfxEmitter.h" />
-    <ClInclude Include="moho\effects\rendering\CEfxEmitterSerializer.h" />
     <ClInclude Include="moho\effects\rendering\CEfxTrailEmitter.h" />
     <ClInclude Include="moho\effects\rendering\CEfxEmitterTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEffectManagerImpl.h" />
@@ -1874,7 +1846,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\TSimConVarInstanceUInt8.h" />
     <ClInclude Include="moho\sim\IdPool.h" />
     <ClInclude Include="moho\sim\IdPoolTypeInfo.h" />
-    <ClInclude Include="moho\sim\IdPoolSerializer.h" />
     <ClInclude Include="moho\sim\SMinMaxTypeInfo.h" />
     <ClInclude Include="moho\misc\ID3DDeviceResources.h" />
     <ClInclude Include="moho\misc\DName.h" />
@@ -1932,18 +1903,13 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\CAiBrain.h" />
     <ClInclude Include="moho\ai\EEconResourceTypeInfo.h" />
     <ClInclude Include="moho\ai\EFormationdStatusTypeInfo.h" />
-    <ClInclude Include="moho\ai\CAiBrainSerializer.h" />
-    <ClInclude Include="moho\ai\CFormationInstanceSerializer.h" />
     <ClInclude Include="moho\ai\CAiBrainTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiBuilderImpl.h" />
-    <ClInclude Include="moho\ai\CAiBuilderImplSerializer.h" />
     <ClInclude Include="moho\ai\CAiBuilderImplTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiFormationDBImpl.h" />
-    <ClInclude Include="moho\ai\CAiFormationDBImplSerializer.h" />
     <ClInclude Include="moho\ai\CAiFormationDBImplTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiFormationInstance.h" />
     <ClInclude Include="moho\ai\IFormationInstanceCountedPtrReflection.h" />
-    <ClInclude Include="moho\ai\CAiFormationInstanceSerializer.h" />
     <ClInclude Include="moho\ai\CAiFormationInstanceTypeInfo.h" />
     <ClInclude Include="moho\ai\CFormationInstanceTypeInfo.h" />
     <ClInclude Include="moho\ai\CBuilderArmManipulator.h" />
@@ -1962,11 +1928,9 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\CAiNavigatorLandSerializer.h" />
     <ClInclude Include="moho\ai\CAiNavigatorLandTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiPathFinder.h" />
-    <ClInclude Include="moho\ai\CAiPathFinderSerializer.h" />
     <ClInclude Include="moho\ai\CAiPathFinderTypeInfo.h" />
     <ClInclude Include="moho\ai\HPathCellVectorReflection.h" />
     <ClInclude Include="moho\ai\CAiPathNavigator.h" />
-    <ClInclude Include="moho\ai\CAiPathNavigatorSerializer.h" />
     <ClInclude Include="moho\ai\CAiPathNavigatorTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiPersonality.h" />
     <ClInclude Include="moho\ai\CAiPersonalityLuaFunctionThunks.h" />
@@ -1982,7 +1946,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\CAiSteeringImplSerializer.h" />
     <ClInclude Include="moho\ai\CAiSteeringImplTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiTransportImpl.h" />
-    <ClInclude Include="moho\ai\CAiTransportImplSerializer.h" />
     <ClInclude Include="moho\ai\CAiTransportImplTypeInfo.h" />
     <ClInclude Include="moho\ai\IAiAttacker.h" />
     <ClInclude Include="moho\ai\IAiAttackerSerializer.h" />
@@ -2028,7 +1991,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\lua\CScrLuaInitForm.h" />
     <ClInclude Include="moho\lua\CScrLuaObjectFactory.h" />
     <ClInclude Include="moho\ai\AirPlatformExtractor.h" />
-    <ClInclude Include="moho\ai\CAiPathSplineSerializer.h" />
     <ClInclude Include="moho\ai\CAiPathSplineTypeInfo.h" />
     <ClInclude Include="moho\ai\EPathTypeTypeInfo.h" />
     <ClInclude Include="moho\ai\ESearchTypeTypeInfo.h" />
@@ -2055,13 +2017,11 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\ESiloBuildStageTypeInfo.h" />
     <ClInclude Include="moho\ai\EAiTransportEventTypeInfo.h" />
     <ClInclude Include="moho\ai\EAirCombatStateTypeInfo.h" />
-    <ClInclude Include="moho\ai\SAiReservedTransportBoneSerializer.h" />
     <ClInclude Include="moho\ai\SAiReservedTransportBoneTypeInfo.h" />
     <ClInclude Include="moho\ai\SAttachPointSerializer.h" />
     <ClInclude Include="moho\ai\SAttachPointTypeInfo.h" />
     <ClInclude Include="moho\ai\STransportPickUpInfoSerializer.h" />
     <ClInclude Include="moho\ai\STransportPickUpInfoTypeInfo.h" />
-    <ClInclude Include="moho\ai\SContinueInfoSerializer.h" />
     <ClInclude Include="moho\ai\SContinueInfoTypeInfo.h" />
     <ClInclude Include="moho\app\WinApp.h" />
     <ClInclude Include="moho\collision\AABB.h" />
@@ -2082,7 +2042,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\core\Thread.h" />
     <ClInclude Include="moho\entity\CTextureScroller.h" />
     <ClInclude Include="moho\entity\Entity.h" />
-    <ClInclude Include="moho\entity\EntitySerializer.h" />
     <ClInclude Include="moho\entity\ELayerTypeInfo.h" />
     <ClInclude Include="moho\entity\SSTIEntityConstantData.h" />
     <ClInclude Include="moho\entity\EVisibilityModeTypeInfo.h" />
@@ -2143,9 +2102,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\serialization\PrefetchHandleBase.h" />
     <ClInclude Include="moho\serialization\PrefetchHandleBaseSerializer.h" />
     <ClInclude Include="moho\serialization\PrefetchHandleBaseTypeInfo.h" />
-    <ClInclude Include="moho\serialization\serializers\SBuildReserveInfoSerializer.h" />
-    <ClInclude Include="moho\serialization\serializers\SWorldBeamSerializer.h" />
-    <ClInclude Include="moho\serialization\serializers\SWorldParticleSerializer.h" />
     <ClInclude Include="moho\serialization\typeinfo\SWorldBeamTypeInfo.h" />
     <ClInclude Include="moho\serialization\typeinfo\SWorldParticleTypeInfo.h" />
     <ClInclude Include="moho\serialization\typeinfo\SBatchTextureDataTypeInfo.h" />
@@ -2259,12 +2215,10 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\SPhysConstantsTypeInfo.h" />
     <ClInclude Include="moho\sim\SPhysConstantsSerializer.h" />
     <ClInclude Include="moho\sim\SPhysBody.h" />
-    <ClInclude Include="moho\sim\CArmyImplSerializer.h" />
     <ClInclude Include="moho\sim\CArmyImplTypeInfo.h" />
     <ClInclude Include="moho\sim\CArmyStatItemSerializer.h" />
     <ClInclude Include="moho\sim\CArmyStatItemTypeInfo.h" />
     <ClInclude Include="moho\sim\CArmyStats.h" />
-    <ClInclude Include="moho\sim\CArmyStatsSerializer.h" />
     <ClInclude Include="moho\sim\CArmyStatsTypeInfo.h" />
     <ClInclude Include="moho\sim\CInfluenceMap.h" />
     <ClInclude Include="moho\sim\CInfluenceMapSerializer.h" />
@@ -2293,7 +2247,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\CEconStorageTypeInfo.h" />
     <ClInclude Include="moho\sim\CEconRequestTypeInfo.h" />
     <ClInclude Include="moho\sim\SMassInfo.h" />
-    <ClInclude Include="moho\sim\SMassInfoSerializer.h" />
     <ClInclude Include="moho\sim\SMassInfoTypeInfo.h" />
     <ClInclude Include="moho\sim\SSessionSaveDataTypeInfo.h" />
     <ClInclude Include="moho\sim\CWldSessionLoaderImpl.h" />
@@ -2315,7 +2268,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\SimConVarAccess.h" />
     <ClInclude Include="moho\sim\CEconomy.h" />
     <ClInclude Include="moho\sim\SimArmy.h" />
-    <ClInclude Include="moho\sim\SimArmySerializer.h" />
     <ClInclude Include="moho\sim\SimArmyTypeInfo.h" />
     <ClInclude Include="moho\sim\SimDriver.h" />
     <ClInclude Include="moho\sim\SimThreadRole.h" />
@@ -2423,7 +2375,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\unit\tasks\CUnitReclaimTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitReclaimTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTask.h" />
-    <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTaskSerializer.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitRepairTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitRepairTaskTypeInfo.h" />
@@ -2438,7 +2389,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\unit\tasks\CUnitPodAssist.h" />
     <ClInclude Include="moho\unit\tasks\CUnitPodAssistTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitLoadUnits.h" />
-    <ClInclude Include="moho\unit\tasks\CUnitLoadUnitsSerializer.h" />
     <ClInclude Include="moho\unit\tasks\CUnitLoadUnitsTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitUnloadUnits.h" />
     <ClInclude Include="moho\unit\tasks\CUnitUnloadUnitsTypeInfo.h" />

@@ -19,6 +19,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/sim/CRandomStream.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -40,8 +41,6 @@ namespace
   moho::VEulers3Serializer gVEulers3Serializer;
   // Address: 0x010A992C -- process-global `VAxes3Serializer` singleton.
   moho::VAxes3Serializer gVAxes3Serializer;
-  // Address: 0x010A9A14 -- process-global `VMatrix4Serializer` singleton.
-  moho::VMatrix4Serializer gVMatrix4Serializer;
 
   [[nodiscard]] gpg::RType* ResolveVector3fType()
   {
@@ -1623,68 +1622,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x004F0220 (FUN_004F0220, Moho::VMatrix4Serializer::Deserialize)
-   */
-  void VMatrix4Serializer::Deserialize(gpg::ReadArchive* const archive, VMatrix4* const matrix)
-  {
-    if (matrix == nullptr) {
-      return;
-    }
-
-    matrix->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x004F0230 (FUN_004F0230, Moho::VMatrix4Serializer::Serialize)
-   */
-  void VMatrix4Serializer::Serialize(gpg::WriteArchive* const archive, VMatrix4* const matrix)
-  {
-    if (matrix == nullptr) {
-      return;
-    }
-
-    matrix->MemberSerialize(archive);
-  }
-
-  /**
    * `FUN_004F0270`/`FUN_004F02A0` (cleanup_VMatrix4SerializerVariant1/2)
    * removed here: both are zero-xref dead duplicate unlink-helper fragments
    * (confirmed via `FUN_004F0270.xrefs.txt`/`FUN_004F02A0.xrefs.txt`,
    * `xrefs_total: 0`). Marked `skip` in the progress DB.
    */
-
-  /**
-   * Address: 0x00BC70B0 (FUN_00BC70B0, dynamic initializer for the global
-   * `VMatrix4Serializer` singleton)
-   */
-  VMatrix4Serializer::VMatrix4Serializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&VMatrix4Serializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&VMatrix4Serializer::Serialize))
-  {
-  }
-
-  /**
-   * Address: 0x00BF1740 (FUN_00BF1740, Moho::VMatrix4Serializer::~VMatrix4Serializer)
-   */
-  VMatrix4Serializer::~VMatrix4Serializer() = default;
-
-  /**
-   * Address: 0x004F0300 (FUN_004F0300, Moho::VMatrix4Serializer::Init)
-   */
-  void VMatrix4Serializer::Init()
-  {
-    gpg::RType* type = VMatrix4::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(VMatrix4));
-      VMatrix4::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
 
   /**
    * Address: 0x004F0390 (FUN_004F0390, Moho::VMatrix4::MemberDeserialize)
@@ -2324,3 +2266,24 @@ GPG_PREREGISTER_INIT(register_QuaternionfTypeInfo_e3917f, moho::register_Quatern
 GPG_PREREGISTER_INIT(register_VEulers3TypeInfo_e3917f, moho::register_VEulers3TypeInfo)
 GPG_PREREGISTER_INIT(register_VAxes3TypeInfo_e3917f, moho::register_VAxes3TypeInfo)
 GPG_PREREGISTER_INIT(register_VMatrix4TypeInfo_e3917f, moho::register_VMatrix4TypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<VMatrix4>`, vtable 0x00E0BF3C.
+   *
+   * Address: 0x00BC70B0 (FUN_00BC70B0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1740 (FUN_00BF1740 -- the global's destructor.)
+   * Address: 0x004F0300 (FUN_004F0300 -- `Init`.)
+   * Address: 0x004F0220 (FUN_004F0220 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x004F0230 (FUN_004F0230 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct VMatrix4Serializer : gpg::SerSaveLoadHelper<VMatrix4>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A9A14 -- process-global `VMatrix4Serializer` singleton.
+  moho::VMatrix4Serializer gVMatrix4Serializer;
+} // namespace

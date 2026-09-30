@@ -39,7 +39,7 @@ namespace moho
      * What it does:
      * Saves weak `Unit` and weak `CUnitCommand` payload lanes to archive storage.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     WeakPtr<Unit> mUnit;         // +0x00
     WeakPtr<CUnitCommand> mCom;  // +0x08

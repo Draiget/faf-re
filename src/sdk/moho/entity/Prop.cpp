@@ -1019,3 +1019,24 @@ namespace
   // Address: 0x010B86DC -- process-global `PropSaveConstruct` singleton.
   moho::PropSaveConstruct gPropSaveConstruct;
 } // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Prop>`, vtable 0x00E2F4F4.
+   *
+   * Address: 0x00BD9910 (FUN_00BD9910 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF230 (FUN_00BFF230 -- the global's destructor.)
+   * Address: 0x006FAA60 (FUN_006FAA60 -- `Init`.)
+   * Address: 0x006FA760 (FUN_006FA760 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006FA780 (FUN_006FA780 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct PropSerializer : gpg::SerSaveLoadHelper<Prop>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B86FC -- process-global `PropSerializer` singleton.
+  moho::PropSerializer gPropSerializer;
+} // namespace

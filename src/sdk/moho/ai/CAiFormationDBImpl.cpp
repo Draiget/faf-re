@@ -780,3 +780,26 @@ CAiFormationInstance* CAiFormationDBImpl::NewFormation(
   mFormInstances.Append(formationForAppend);
   return formation;
 }
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiFormationDBImpl>`, vtable 0x00E1B5EC.
+   *
+   * Address: 0x00BCC1D0 (FUN_00BCC1D0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF6890 (FUN_00BF6890 -- the global's destructor.)
+   * Address: 0x0059C6C0 (FUN_0059C6C0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x0059C6F0 (FUN_0059C6F0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x0059CBA0 (FUN_0059CBA0 -- `Init`.)
+   * Address: 0x0059C670 (FUN_0059C670 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0059C680 (FUN_0059C680 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiFormationDBImplSerializer : gpg::SerSaveLoadHelper<CAiFormationDBImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE4E0 -- process-global `CAiFormationDBImplSerializer` singleton.
+  moho::CAiFormationDBImplSerializer gCAiFormationDBImplSerializer;
+} // namespace

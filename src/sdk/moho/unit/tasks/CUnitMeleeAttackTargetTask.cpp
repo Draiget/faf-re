@@ -36,6 +36,7 @@
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
@@ -1421,8 +1422,7 @@ namespace moho
    * Serializes base command-task state, melee-task pointer lanes, target
    * payload, navigation flags, destination cell, and planted-state lane.
    */
-  void CUnitMeleeAttackTargetTask::MemberSerialize(gpg::WriteArchive* const archive)
-  {
+  void CUnitMeleeAttackTargetTask::MemberSerialize(gpg::WriteArchive* const archive) const{
     if (archive == nullptr) {
       return;
     }
@@ -1451,70 +1451,6 @@ namespace moho
     archive->WriteBool(mPlanted);
   }
 
-  /**
-   * Address: 0x006153F0 (FUN_006153F0, Moho::CUnitMeleeAttackTargetTaskSerializer::Deserialize)
-   *
-   * What it does:
-   * Load-callback thunk that forwards one melee-task serializer lane into
-   * `CUnitMeleeAttackTargetTask::MemberDeserialize`.
-   */
-  void CUnitMeleeAttackTargetTaskSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const task =
-      reinterpret_cast<CUnitMeleeAttackTargetTask*>(static_cast<std::uintptr_t>(objectPtr));
-    if (task == nullptr) {
-      return;
-    }
-    task->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00615400 (FUN_00615400, Moho::CUnitMeleeAttackTargetTaskSerializer::Serialize)
-   *
-   * What it does:
-   * Save-callback thunk that forwards one melee-task serializer lane into
-   * `CUnitMeleeAttackTargetTask::MemberSerialize`.
-   */
-  void CUnitMeleeAttackTargetTaskSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const task =
-      reinterpret_cast<CUnitMeleeAttackTargetTask*>(static_cast<std::uintptr_t>(objectPtr));
-    if (task == nullptr) {
-      return;
-    }
-    task->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x006177B0 (FUN_006177B0, gpg::SerSaveLoadHelper<Moho::CUnitMeleeAttackTargetTask>::Init)
-   *
-   * What it does:
-   * Resolves melee-task RTTI and binds this helper's load/save callbacks into
-   * the reflected type descriptor.
-   */
-  void CUnitMeleeAttackTargetTaskSerializer::Init()
-  {
-    gpg::RType* type = CUnitMeleeAttackTargetTask::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(CUnitMeleeAttackTargetTask));
-      CUnitMeleeAttackTargetTask::sType = type;
-    }
-
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
 } // namespace moho
 
 namespace gpg
@@ -1561,29 +1497,29 @@ namespace gpg
 
 namespace
 {
-  moho::CUnitMeleeAttackTargetTaskSerializer gCUnitMeleeAttackTargetTaskSerializer;
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00BD0E00 (FUN_00BD0E00, dynamic initializer for `gCUnitMeleeAttackTargetTaskSerializer`)
-   *
-   * What it does:
-   * Binds this helper's load/save callbacks.
-   */
-  CUnitMeleeAttackTargetTaskSerializer::CUnitMeleeAttackTargetTaskSerializer()
-    : mDeserialize(&CUnitMeleeAttackTargetTaskSerializer::Deserialize)
-    , mSerialize(&CUnitMeleeAttackTargetTaskSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BF9F90 (FUN_00BF9F90, dynamic atexit destructor for `gCUnitMeleeAttackTargetTaskSerializer`)
-   *
-   * What it does:
-   * Unlinks this helper node from the serializer-helper list (the
-   * `TDatListItem` base destructor). `FUN_00615450` and `FUN_00615480` are
-   * unreferenced out-of-line copies of the same body.
-   */
-  CUnitMeleeAttackTargetTaskSerializer::~CUnitMeleeAttackTargetTaskSerializer() = default;
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitMeleeAttackTargetTask>`, vtable 0x00E205C0.
+   *
+   * Address: 0x00BD0E00 (FUN_00BD0E00 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF9F90 (FUN_00BF9F90 -- the global's destructor.)
+   * Address: 0x006177B0 (FUN_006177B0 -- `Init`.)
+   * Address: 0x006153F0 (FUN_006153F0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00615400 (FUN_00615400 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitMeleeAttackTargetTaskSerializer : gpg::SerSaveLoadHelper<CUnitMeleeAttackTargetTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B17B4 -- process-global `CUnitMeleeAttackTargetTaskSerializer` singleton.
+  moho::CUnitMeleeAttackTargetTaskSerializer gCUnitMeleeAttackTargetTaskSerializer;
+} // namespace

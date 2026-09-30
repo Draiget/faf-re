@@ -1210,3 +1210,24 @@ namespace moho
     }
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CEfxEmitter>`, vtable 0x00E241C0.
+   *
+   * Address: 0x00BD4310 (FUN_00BD4310 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFBDB0 (FUN_00BFBDB0 -- the global's destructor.)
+   * Address: 0x0065F150 (FUN_0065F150 -- `Init`.)
+   * Address: 0x0065E140 (FUN_0065E140 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0065E150 (FUN_0065E150 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CEfxEmitterSerializer : gpg::SerSaveLoadHelper<CEfxEmitter>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B3C64 -- process-global `CEfxEmitterSerializer` singleton.
+  moho::CEfxEmitterSerializer gCEfxEmitterSerializer;
+} // namespace

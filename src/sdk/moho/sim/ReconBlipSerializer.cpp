@@ -141,57 +141,6 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x005BE4C0 (FUN_005BE4C0, Moho::SPerArmyReconInfoSerializer::Deserialize)
-   */
-  void SPerArmyReconInfoSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const
-  )
-  {
-    auto* const object = reinterpret_cast<SPerArmyReconInfo*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberDeserialize(archive, version);
-  }
-
-  /**
-   * Address: 0x005BE4E0 (FUN_005BE4E0, Moho::SPerArmyReconInfoSerializer::Serialize)
-   */
-  void SPerArmyReconInfoSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const
-  )
-  {
-    auto* const object = reinterpret_cast<SPerArmyReconInfo*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberSerialize(archive, version);
-  }
-
-  /**
-   * Address: 0x00BCDBD0 (FUN_00BCDBD0, register_SPerArmyReconInfoSerializer)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SPerArmyReconInfoSerializer::SPerArmyReconInfoSerializer()
-    : mLoadCallback(&SPerArmyReconInfoSerializer::Deserialize)
-    , mSaveCallback(&SPerArmyReconInfoSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BF7840 (FUN_00BF7840, Moho::SPerArmyReconInfoSerializer::~SPerArmyReconInfoSerializer)
-   */
-  SPerArmyReconInfoSerializer::~SPerArmyReconInfoSerializer() = default;
-
-  /**
-   * Address: 0x005C3DE0 (FUN_005C3DE0, Moho::SPerArmyReconInfoSerializer::RegisterSerializeFunctions)
-   */
-  void SPerArmyReconInfoSerializer::Init()
-  {
-    gpg::RType* const type = ResolvePerArmyReconInfoType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  /**
    * Address: 0x005BFC90 (FUN_005BFC90, Moho::ReconBlipSerializer::Deserialize)
    */
   void ReconBlipSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
@@ -251,8 +200,6 @@ namespace moho
 
 namespace
 {
-  // Address: 0x010AF854 -- process-global `SPerArmyReconInfoSerializer` singleton.
-  moho::SPerArmyReconInfoSerializer gSPerArmyReconInfoSerializer;
 
   // Address: 0x010AF810 -- process-global `ReconBlipSerializer` singleton.
   moho::ReconBlipSerializer gReconBlipSerializer;

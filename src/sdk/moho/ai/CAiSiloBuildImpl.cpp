@@ -19,6 +19,7 @@
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -729,4 +730,25 @@ namespace
 {
   // Address: 0x010AFC34 -- process-global `CAiSiloBuildImplConstruct` singleton.
   moho::CAiSiloBuildImplConstruct gCAiSiloBuildImplConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiSiloBuildImpl>`, vtable 0x00E1DE48.
+   *
+   * Address: 0x00BCE150 (FUN_00BCE150 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7F60 (FUN_00BF7F60 -- the global's destructor.)
+   * Address: 0x005CFF30 (FUN_005CFF30 -- `Init`.)
+   * Address: 0x005CF8D0 (FUN_005CF8D0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005CF8E0 (FUN_005CF8E0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiSiloBuildImplSerializer : gpg::SerSaveLoadHelper<CAiSiloBuildImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AFDA0 -- process-global `CAiSiloBuildImplSerializer` singleton.
+  moho::CAiSiloBuildImplSerializer gCAiSiloBuildImplSerializer;
 } // namespace

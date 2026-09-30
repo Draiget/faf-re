@@ -2530,3 +2530,24 @@ namespace moho
     return PathCapacityBoth;
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CArmyImpl>`, vtable 0x00E2FC2C.
+   *
+   * Address: 0x00BD9C20 (FUN_00BD9C20 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF410 (FUN_00BFF410 -- the global's destructor.)
+   * Address: 0x00701DD0 (FUN_00701DD0 -- `Init`.)
+   * Address: 0x00701000 (FUN_00701000 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00701010 (FUN_00701010 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CArmyImplSerializer : gpg::SerSaveLoadHelper<CArmyImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B8964 -- process-global `CArmyImplSerializer` singleton.
+  moho::CArmyImplSerializer gCArmyImplSerializer;
+} // namespace

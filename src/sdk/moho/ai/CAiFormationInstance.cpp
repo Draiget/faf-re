@@ -4119,3 +4119,47 @@ GPG_PREREGISTER_INIT(preregister_RMapType_EntId_SUnitOffsetInfo_12dfcf, moho::pr
 GPG_PREREGISTER_INIT(preregister_RBroadcasterRType_EFormationdStatus_12dfcf, moho::preregister_RBroadcasterRType_EFormationdStatus)
 GPG_PREREGISTER_INIT(preregister_RListenerRType_EFormationdStatus_12dfcf, moho::preregister_RListenerRType_EFormationdStatus)
 GPG_PREREGISTER_INIT(preregister_RMapType_EntId_SCoordsVec2_12dfcf, moho::preregister_RMapType_EntId_SCoordsVec2)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiFormationInstance>`, vtable 0x00E1B51C.
+   *
+   * Address: 0x00BCC150 (FUN_00BCC150 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF67A0 (FUN_00BF67A0 -- the global's destructor.)
+   * Address: 0x0059BF40 (FUN_0059BF40 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x0059BF70 (FUN_0059BF70 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x0059C820 (FUN_0059C820 -- `Init`.)
+   * Address: 0x0059BEE0 (FUN_0059BEE0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0059BEF0 (FUN_0059BEF0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiFormationInstanceSerializer : gpg::SerSaveLoadHelper<CAiFormationInstance>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE424 -- process-global `CAiFormationInstanceSerializer` singleton.
+  moho::CAiFormationInstanceSerializer gCAiFormationInstanceSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CFormationInstance>`, vtable 0x00E19134.
+   *
+   * Address: 0x00BCAC40 (FUN_00BCAC40 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF5AA0 (FUN_00BF5AA0 -- the global's destructor.)
+   * Address: 0x0056CA10 (FUN_0056CA10 -- `Init`.)
+   * Address: 0x0056A860 (FUN_0056A860 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0056A870 (FUN_0056A870 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CFormationInstanceSerializer : gpg::SerSaveLoadHelper<CFormationInstance>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AD2EC -- process-global `CFormationInstanceSerializer` singleton.
+  moho::CFormationInstanceSerializer gCFormationInstanceSerializer;
+} // namespace

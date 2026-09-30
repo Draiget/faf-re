@@ -321,3 +321,25 @@ namespace moho
     archive->WriteBool(hasMarsagliaPair);
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CRandomStream>`, vtable 0x00E005C4.
+   *
+   * Address: 0x00BC3380 (FUN_00BC3380 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEE780 (FUN_00BEE780 -- the global's destructor.)
+   * Address: 0x0040F200 (FUN_0040F200 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0040F380 (FUN_0040F380 -- `Init`.)
+   * Address: 0x0040F1D0 (FUN_0040F1D0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0040F1E0 (FUN_0040F1E0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CRandomStreamSerializer : gpg::SerSaveLoadHelper<CRandomStream>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A6A14 -- process-global `CRandomStreamSerializer` singleton.
+  moho::CRandomStreamSerializer gCRandomStreamSerializer;
+} // namespace

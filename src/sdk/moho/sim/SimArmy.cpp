@@ -117,3 +117,24 @@ namespace moho
    */
   SimArmy::~SimArmy() = default;
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SimArmy>`, vtable 0x00E2FAC4.
+   *
+   * Address: 0x00BD9BC0 (FUN_00BD9BC0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF380 (FUN_00BFF380 -- the global's destructor.)
+   * Address: 0x00701610 (FUN_00701610 -- `Init`.)
+   * Address: 0x006FDB60 (FUN_006FDB60 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006FDB70 (FUN_006FDB70 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SimArmySerializer : gpg::SerSaveLoadHelper<SimArmy>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B8A48 -- process-global `SimArmySerializer` singleton.
+  moho::SimArmySerializer gSimArmySerializer;
+} // namespace

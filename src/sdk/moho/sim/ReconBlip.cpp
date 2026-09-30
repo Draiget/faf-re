@@ -1416,3 +1416,24 @@ namespace
   // Address: 0x010AFB44 -- process-global `ReconBlipSaveConstruct` singleton.
   moho::ReconBlipSaveConstruct gReconBlipSaveConstruct;
 } // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SPerArmyReconInfo>`, vtable 0x00E1D99C.
+   *
+   * Address: 0x00BCDBD0 (FUN_00BCDBD0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7840 (FUN_00BF7840 -- the global's destructor.)
+   * Address: 0x005C3DE0 (FUN_005C3DE0 -- `Init`.)
+   * Address: 0x005BE4C0 (FUN_005BE4C0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005BE4E0 (FUN_005BE4E0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct SPerArmyReconInfoSerializer : gpg::SerSaveLoadHelper<SPerArmyReconInfo>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AFB54 -- process-global `SPerArmyReconInfoSerializer` singleton.
+  moho::SPerArmyReconInfoSerializer gSPerArmyReconInfoSerializer;
+} // namespace

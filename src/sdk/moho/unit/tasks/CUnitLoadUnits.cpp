@@ -28,6 +28,7 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
 #include "moho/misc/DiagnosticBudget.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
@@ -781,3 +782,24 @@ namespace moho
     archive->WriteBool(mCompletedSuccessfully);
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitLoadUnits>`, vtable 0x00E20E6C.
+   *
+   * Address: 0x00BD1CB0 (FUN_00BD1CB0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFA5B0 (FUN_00BFA5B0 -- the global's destructor.)
+   * Address: 0x00626F90 (FUN_00626F90 -- `Init`.)
+   * Address: 0x00624FF0 (FUN_00624FF0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00625000 (FUN_00625000 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitLoadUnitsSerializer : gpg::SerSaveLoadHelper<CUnitLoadUnits>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B1E1C -- process-global `CUnitLoadUnitsSerializer` singleton.
+  moho::CUnitLoadUnitsSerializer gCUnitLoadUnitsSerializer;
+} // namespace

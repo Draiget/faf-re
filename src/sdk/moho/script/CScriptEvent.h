@@ -120,74 +120,11 @@ namespace moho
      * What it does:
      * Saves `CTaskEvent` and `CScriptObject` base subobjects into archive.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     static gpg::RType* sType;
   };
-
-  class CScriptEventSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC6240 (FUN_00BC6240, register_CScriptEventSerializer,
-     * dynamic initializer for the global `CScriptEventSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    CScriptEventSerializer();
-
-    /**
-     * Address: 0x00BF0B80 (FUN_00BF0B80, ??1CScriptEventSerializer@Moho@@QAE@@Z)
-     */
-    ~CScriptEventSerializer();
-
-    /**
-     * Address: 0x004CA280 (FUN_004CA280, Moho::CScriptEventSerializer::Deserialize)
-     *
-     * What it does:
-     * Serializer load thunk forwarding into `CScriptEvent::MemberDeserialize`.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x004CA290 (FUN_004CA290, Moho::CScriptEventSerializer::Serialize)
-     *
-     * What it does:
-     * Serializer save thunk forwarding into `CScriptEvent::MemberSerialize`.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x004CB0A0 (FUN_004CB0A0, Moho::CScriptEventSerializer::Init)
-     *
-     * This body is ICF-folded/shared with vtable slot 0 of the
-     * never-constructed `gpg::SerSaveLoadHelper<CScriptEvent>` template
-     * instantiation (`??_7?$SerSaveLoadHelper@VCScriptEvent@Moho@@@gpg@@6B@`,
-     * confirmed to have zero vtable-writer ctors anywhere in the binary).
-     * `CScriptEventSerializer` is not derived through that template: its real
-     * ctor (0x00BC6240) writes `??_7CScriptEventSerializer@Moho@@6B@` directly
-     * onto the object with no intermediate vtable write, and
-     * `CScriptEvent::MemberSerialize` is not `const`-qualified, so it does not
-     * fit the template's `const T*` forwarding shape exactly.
-     *
-     * What it does:
-     * Binds CScriptEvent serializer callbacks into RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-  static_assert(
-    offsetof(CScriptEventSerializer, mSerLoadFunc) == 0x0C, "CScriptEventSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CScriptEventSerializer, mSerSaveFunc) == 0x10, "CScriptEventSerializer::mSerSaveFunc offset must be 0x10"
-  );
 
   class CScriptEventTypeInfo : public gpg::RType
   {
@@ -936,7 +873,6 @@ namespace moho
   CScriptEvent* SCR_GetScriptEventFromLuaObject(const LuaPlus::LuaObject& object);
 
   static_assert(sizeof(CScriptEvent) == 0x44, "CScriptEvent size must be 0x44");
-  static_assert(sizeof(CScriptEventSerializer) == 0x14, "CScriptEventSerializer size must be 0x14");
   static_assert(sizeof(CScriptEventTypeInfo) == 0x64, "CScriptEventTypeInfo size must be 0x64");
 
   /**

@@ -20,16 +20,6 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedCAiSiloBuildImplType()
-  {
-    gpg::RType* type = CAiSiloBuildImpl::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CAiSiloBuildImpl));
-      CAiSiloBuildImpl::sType = type;
-    }
-    return type;
-  }
-
   // Address: 0x010AFD8C -- process-global `SSiloBuildInfoSerializer`
   // singleton. Constructing it runs SSiloBuildInfoSerializer::
   // SSiloBuildInfoSerializer() (0x00BCE0B0), which splices this helper into
@@ -39,13 +29,6 @@ namespace
   // 0x00BF7EA0) runs at normal static-duration teardown, matching the real
   // binary's atexit registration.
   SSiloBuildInfoSerializer gSSiloBuildInfoSerializer;
-
-  // Address: 0x010AFDA0 -- process-global `CAiSiloBuildImplSerializer`
-  // singleton. Constructing it runs CAiSiloBuildImplSerializer::
-  // CAiSiloBuildImplSerializer() (0x00BCE150), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; the compiler registers its destructor with
-  // `atexit`.
-  CAiSiloBuildImplSerializer gCAiSiloBuildImplSerializer;
 
 } // namespace
 
@@ -120,79 +103,6 @@ void SSiloBuildInfoSerializer::Init()
 int moho::register_SSiloBuildInfoSerializer()
 {
   return 0;
-}
-
-/**
- * Address: 0x005CF8D0 (FUN_005CF8D0, Moho::CAiSiloBuildImplSerializer::Deserialize)
- */
-void CAiSiloBuildImplSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  auto* const object = reinterpret_cast<CAiSiloBuildImpl*>(static_cast<std::uintptr_t>(objectPtr));
-  if (!archive || !object) {
-    return;
-  }
-
-  object->MemberDeserialize(archive);
-}
-
-/**
- * Address: 0x005CF8E0 (FUN_005CF8E0, Moho::CAiSiloBuildImplSerializer::Serialize)
- */
-void CAiSiloBuildImplSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  auto* const object = reinterpret_cast<const CAiSiloBuildImpl*>(static_cast<std::uintptr_t>(objectPtr));
-  if (!archive || !object) {
-    return;
-  }
-
-  object->MemberSerialize(archive);
-}
-
-/**
- * Address: 0x00BCE150 (FUN_00BCE150, dynamic initializer for the global
- * `CAiSiloBuildImplSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices into
- * `sNewHelpers`) and binds the load/save callback fields; the compiler
- * registers the destructor with `atexit`.
- */
-CAiSiloBuildImplSerializer::CAiSiloBuildImplSerializer()
-  : mLoadCallback(&CAiSiloBuildImplSerializer::Deserialize)
-  , mSaveCallback(&CAiSiloBuildImplSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BF7F60 (FUN_00BF7F60, dynamic atexit destructor for `gCAiSiloBuildImplSerializer`)
- *
- * What it does:
- * Unlinks this helper node from the serializer-helper list (the
- * `TDatListItem` base destructor). The compiler registers it with
- * `atexit` from the global's dynamic initializer (0x00BCE150).
- * `FUN_005CF920` and `FUN_005CF950` are
- * unreferenced out-of-line copies of the same body.
- */
-CAiSiloBuildImplSerializer::~CAiSiloBuildImplSerializer() = default;
-
-/**
- * Address: 0x005CFF30 (FUN_005CFF30)
- *
- * void ()
- *
- * IDA signature:
- * void (__cdecl *__thiscall sub_5CFF30(_DWORD *this))(gpg::ReadArchive *, int, int, gpg::RRef *);
- *
- * What it does:
- * Lazily resolves CAiSiloBuildImpl RTTI and installs load/save callbacks from
- * this helper object into the type descriptor.
- */
-void CAiSiloBuildImplSerializer::Init()
-{
-  gpg::RType* const type = CachedCAiSiloBuildImplType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mLoadCallback;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSaveCallback;
 }
 
 /**

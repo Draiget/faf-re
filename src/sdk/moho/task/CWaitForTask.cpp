@@ -13,12 +13,12 @@
 #include "moho/script/CScriptEvent.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
 namespace
 {
-  moho::CWaitForTaskSerializer gCWaitForTaskSerializer{};
 
   /**
    * Address: 0x004CA330 (FUN_004CA330, CWaitForTask startup type-info pre-registration)
@@ -155,8 +155,7 @@ void CWaitForTask::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x004CC460 (FUN_004CC460, Moho::CWaitForTask::MemberDeserialize in export label)
  */
-void CWaitForTask::MemberSerialize(gpg::WriteArchive* const archive)
-{
+void CWaitForTask::MemberSerialize(gpg::WriteArchive* const archive) const{
   gpg::RType* luaObjectType = LuaPlus::LuaObject::sType;
   if (!luaObjectType) {
     luaObjectType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
@@ -167,68 +166,6 @@ void CWaitForTask::MemberSerialize(gpg::WriteArchive* const archive)
   moho::WriteCTaskBase(archive, this, ownerRef);
   WeakPtr_STaskEventLinkage::Write(archive, &mEventLinkRef, ownerRef);
   archive->Write(luaObjectType, &mEventObject, ownerRef);
-}
-
-/**
- * Address: 0x00BC62E0 (FUN_00BC62E0, dynamic initializer for the global
- * `CWaitForTaskSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the load/save
- * callback fields.
- */
-CWaitForTaskSerializer::CWaitForTaskSerializer()
-  : mSerLoadFunc(&CWaitForTaskSerializer::Deserialize)
-  , mSerSaveFunc(&CWaitForTaskSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BF0C40 (FUN_00BF0C40, Moho::CWaitForTaskSerializer::~CWaitForTaskSerializer)
- *
- * What it does:
- * Mangled `??1CWaitForTaskSerializer@Moho@@QAE@@Z` dtor calling the shared
- * unlink body. Two zero-incoming-xref duplicate emissions of this same
- * unlink shape also exist (0x004CA830, 0x004CA860); neither is reachable
- * from anywhere in the binary.
- */
-CWaitForTaskSerializer::~CWaitForTaskSerializer() = default;
-
-/**
- * Address: 0x004CA7E0 (FUN_004CA7E0, CWaitForTaskSerializer::Deserialize callback)
- * Chain:   0x004CC3B0 (FUN_004CC3B0)
- */
-void CWaitForTaskSerializer::Deserialize(
-  gpg::ReadArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
-)
-{
-  auto* const task = reinterpret_cast<CWaitForTask*>(objectPtr);
-  GPG_ASSERT(task != nullptr);
-  task->MemberDeserialize(archive);
-}
-
-/**
- * Address: 0x004CA7F0 (FUN_004CA7F0, CWaitForTaskSerializer::Serialize callback)
- * Chain:   0x004CC460 (FUN_004CC460)
- */
-void CWaitForTaskSerializer::Serialize(
-  gpg::WriteArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
-)
-{
-  auto* const task = reinterpret_cast<CWaitForTask*>(objectPtr);
-  GPG_ASSERT(task != nullptr);
-  task->MemberSerialize(archive);
-}
-
-/**
- * Address: 0x004CB230 (FUN_004CB230, sub_4CB230)
- */
-void CWaitForTaskSerializer::Init()
-{
-  gpg::RType* const type = CachedCWaitForTaskType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mSerLoadFunc;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSerSaveFunc;
 }
 
 /**
@@ -299,4 +236,25 @@ namespace
 {
   // Address: 0x010A8D2C -- process-global `CWaitForTaskConstruct` singleton.
   moho::CWaitForTaskConstruct gCWaitForTaskConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CWaitForTask>`, vtable 0x00E09A24.
+   *
+   * Address: 0x00BC62E0 (FUN_00BC62E0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF0C40 (FUN_00BF0C40 -- the global's destructor.)
+   * Address: 0x004CB230 (FUN_004CB230 -- `Init`.)
+   * Address: 0x004CA7E0 (FUN_004CA7E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x004CA7F0 (FUN_004CA7F0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CWaitForTaskSerializer : gpg::SerSaveLoadHelper<CWaitForTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A8D40 -- process-global `CWaitForTaskSerializer` singleton.
+  moho::CWaitForTaskSerializer gCWaitForTaskSerializer;
 } // namespace

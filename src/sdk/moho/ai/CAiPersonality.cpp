@@ -17,6 +17,7 @@
 #include "moho/misc/Stats.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -2219,4 +2220,29 @@ namespace
 {
   // Address: 0x010AF130 -- process-global `CAiPersonalityConstruct` singleton.
   moho::CAiPersonalityConstruct gCAiPersonalityConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiPersonality>`, vtable 0x00E1CAA8.
+   *
+   * Address: 0x00BCD660 (FUN_00BCD660 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7740 (FUN_00BF7740 -- the global's destructor.)
+   * Address: 0x005B6AE0 (FUN_005B6AE0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005B6B10 (FUN_005B6B10 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005B95F0 (FUN_005B95F0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005B9660 (FUN_005B9660 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005B9350 (FUN_005B9350 -- `Init`.)
+   * Address: 0x005B6A80 (FUN_005B6A80 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005B6A90 (FUN_005B6A90 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiPersonalitySerializer : gpg::SerSaveLoadHelper<CAiPersonality>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AF154 -- process-global `CAiPersonalitySerializer` singleton.
+  moho::CAiPersonalitySerializer gCAiPersonalitySerializer;
 } // namespace

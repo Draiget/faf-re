@@ -17,16 +17,6 @@
 // (0x00BC3360) is independently __xc_a-reachable.
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCRandomStreamType()
-  {
-    gpg::RType* type = moho::CRandomStream::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CRandomStream));
-      moho::CRandomStream::sType = type;
-    }
-    return type;
-  }
-
   /**
    * Address: 0x00BEE720 (FUN_00BEE720, atexit destructor of the CRandomStreamTypeInfo object)
    */
@@ -50,76 +40,10 @@ namespace moho
     (void)AcquireCRandomStreamTypeInfo();
   }
 
-  /**
-   * Address: 0x00BC3380 (FUN_00BC3380, dynamic initializer for the global
-   * `CRandomStreamSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  CRandomStreamSerializer::CRandomStreamSerializer()
-    : mLoadCallback(&CRandomStreamSerializer::Deserialize)
-    , mSaveCallback(&CRandomStreamSerializer::Serialize)
-  {}
-
-  CRandomStreamSerializer::~CRandomStreamSerializer() = default;
-
-  /**
-   * Address: 0x0040F1D0 (FUN_0040F1D0, Moho::CRandomStreamSerializer::Deserialize)
-   */
-  void CRandomStreamSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*
-  )
-  {
-    auto* const object = reinterpret_cast<CRandomStream*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(object != nullptr);
-    if (!archive || !object) {
-      return;
-    }
-
-    object->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0040F1E0 (FUN_0040F1E0, Moho::CRandomStreamSerializer::Serialize)
-   */
-  void CRandomStreamSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*
-  )
-  {
-    const auto* const object = reinterpret_cast<const CRandomStream*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(object != nullptr);
-    if (!archive || !object) {
-      return;
-    }
-
-    object->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x0040F380 (FUN_0040F380, gpg::SerSaveLoadHelper<class Moho::CRandomStream>::Init)
-   *
-   * What it does:
-   * Resolves CRandomStream RTTI and installs load/save callbacks from this helper.
-   */
-  void CRandomStreamSerializer::Init()
-  {
-    gpg::RType* const type = CachedCRandomStreamType();
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
 } // namespace moho
 
 namespace
 {
-  // Address: 0x010A6A14 -- process-global `CRandomStreamSerializer` singleton.
-  moho::CRandomStreamSerializer gCRandomStreamSerializer;
 } // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

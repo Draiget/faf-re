@@ -124,7 +124,7 @@ namespace moho
      * reflected `Write`; the placement-retry counter via the virtual `WriteInt`
      * slot; and the two weak links via reflected `Write`.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x005F7440 (FUN_005F7440, Moho::CUnitMobileBuildTask::TaskTick)

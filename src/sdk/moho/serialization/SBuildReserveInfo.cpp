@@ -5,6 +5,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/unit/CUnitCommandWeakPtrReflection.h"
 #include "moho/unit/core/UnitWeakPtrReflection.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -69,7 +70,7 @@ namespace moho
   /**
    * Address: 0x005817B0 (FUN_005817B0, Moho::SBuildReserveInfo::MemberSerialize)
    */
-  void SBuildReserveInfo::MemberSerialize(gpg::WriteArchive* const archive)
+  void SBuildReserveInfo::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     if (!archive) {
       return;
@@ -83,3 +84,23 @@ namespace moho
   }
 } // namespace moho
 
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SBuildReserveInfo>`, vtable 0x00E19A08.
+   *
+   * Address: 0x00BCB390 (FUN_00BCB390 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF6230 (FUN_00BF6230 -- the global's destructor.)
+   * Address: 0x0057E1D0 (FUN_0057E1D0 -- `Init`.)
+   * Address: 0x00579A70 (FUN_00579A70 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00579A80 (FUN_00579A80 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SBuildReserveInfoSerializer : gpg::SerSaveLoadHelper<SBuildReserveInfo>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AD644 -- process-global `SBuildReserveInfoSerializer` singleton.
+  moho::SBuildReserveInfoSerializer gSBuildReserveInfoSerializer;
+} // namespace

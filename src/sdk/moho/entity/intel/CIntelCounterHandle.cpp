@@ -405,3 +405,24 @@ namespace
   // Address: 0x010BB400 -- process-global `CIntelCounterHandleConstruct` singleton.
   moho::CIntelCounterHandleConstruct gCIntelCounterHandleConstruct;
 } // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CIntelCounterHandle>`, vtable 0x00E3636C.
+   *
+   * Address: 0x00BDCD90 (FUN_00BDCD90 -- constructs the global and registers its destructor.)
+   * Address: 0x00C01F90 (FUN_00C01F90 -- the global's destructor.)
+   * Address: 0x0076FC20 (FUN_0076FC20 -- `Init`.)
+   * Address: 0x0076F990 (FUN_0076F990 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0076F9A0 (FUN_0076F9A0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CIntelCounterHandleSerializer : gpg::SerSaveLoadHelper<CIntelCounterHandle>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BB48C -- process-global `CIntelCounterHandleSerializer` singleton.
+  moho::CIntelCounterHandleSerializer gCIntelCounterHandleSerializer;
+} // namespace

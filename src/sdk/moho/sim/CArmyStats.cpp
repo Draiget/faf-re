@@ -39,6 +39,7 @@
 #include "moho/sim/Sim.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -1458,4 +1459,25 @@ namespace
 
   // Address: 0x010B902C -- process-global `CArmyStatsSaveConstruct` singleton.
   moho::CArmyStatsSaveConstruct gCArmyStatsSaveConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CArmyStats>`, vtable 0x00E31298.
+   *
+   * Address: 0x00BDA210 (FUN_00BDA210 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF850 (FUN_00BFF850 -- the global's destructor.)
+   * Address: 0x0070F5E0 (FUN_0070F5E0 -- `Init`.)
+   * Address: 0x0070E1F0 (FUN_0070E1F0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0070E200 (FUN_0070E200 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CArmyStatsSerializer : gpg::SerSaveLoadHelper<CArmyStats>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B8FB4 -- process-global `CArmyStatsSerializer` singleton.
+  moho::CArmyStatsSerializer gCArmyStatsSerializer;
 } // namespace

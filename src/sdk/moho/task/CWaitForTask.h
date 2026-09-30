@@ -76,7 +76,7 @@ namespace moho
      * What it does:
      * Saves base `CTask`, wait-link weak pointer, and Lua payload object to archive.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     // 0x18: reserved/unknown dword (constructors 0x004CA470/0x004CA520 do not initialize it).
@@ -84,57 +84,6 @@ namespace moho
     WeakPtr<STaskEventLinkage> mEventLinkRef; // 0x1C
     LuaPlus::LuaObject mEventObject;          // 0x24
   };
-
-  class CWaitForTaskSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC62E0 (FUN_00BC62E0, dynamic initializer for the global
-     * `CWaitForTaskSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    CWaitForTaskSerializer();
-
-    /**
-     * Address: 0x00BF0C40 (FUN_00BF0C40, Moho::CWaitForTaskSerializer::~CWaitForTaskSerializer)
-     */
-    ~CWaitForTaskSerializer();
-
-    /**
-     * Address: 0x004CA7E0 (FUN_004CA7E0, CWaitForTaskSerializer::Deserialize callback)
-     * Chain:   0x004CC3B0 (FUN_004CC3B0)
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x004CA7F0 (FUN_004CA7F0, CWaitForTaskSerializer::Serialize callback)
-     * Chain:   0x004CC460 (FUN_004CC460)
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x004CB230 (FUN_004CB230, sub_4CB230)
-     *
-     * What it does:
-     * Binds load/save serializer callbacks into CWaitForTask RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
-  static_assert(
-    offsetof(CWaitForTaskSerializer, mSerLoadFunc) == 0x0C, "CWaitForTaskSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CWaitForTaskSerializer, mSerSaveFunc) == 0x10, "CWaitForTaskSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CWaitForTaskSerializer) == 0x14, "CWaitForTaskSerializer size must be 0x14");
 
   class CWaitForTaskTypeInfo : public gpg::RType
   {

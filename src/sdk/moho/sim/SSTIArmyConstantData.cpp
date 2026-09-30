@@ -10,6 +10,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/sim/CIntelGrid.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -190,79 +191,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC9AB0 (FUN_00BC9AB0, dynamic initializer for the global
-   * `SSTIArmyConstantDataSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SSTIArmyConstantDataSerializer::SSTIArmyConstantDataSerializer()
-    : mLoadCallback(&SSTIArmyConstantDataSerializer::Deserialize)
-    , mSaveCallback(&SSTIArmyConstantDataSerializer::Serialize)
-  {}
-
-  SSTIArmyConstantDataSerializer::~SSTIArmyConstantDataSerializer() = default;
-
-  /**
-   * Address: 0x005507F0 (FUN_005507F0, Moho::SSTIArmyConstantDataSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade for `SSTIArmyConstantData`. Forwards
-   * the reflected object pointer to
-   * `SSTIArmyConstantData::MemberDeserialize` (FUN_00550FC0 body); `version`
-   * and the owner-ref lane are unused by the member (mirrors the binary
-   * tail call).
-   */
-  void SSTIArmyConstantDataSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*
-  )
-  {
-    auto* const data = reinterpret_cast<SSTIArmyConstantData*>(static_cast<std::intptr_t>(objectPtr));
-    if (data == nullptr) {
-      return;
-    }
-    data->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00550810 (FUN_00550810, Moho::SSTIArmyConstantDataSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback facade for `SSTIArmyConstantData`. Forwards
-   * the reflected object pointer to
-   * `SSTIArmyConstantData::MemberSerialize` (FUN_005510C0 body); `version`
-   * and the owner-ref lane are unused by the member (mirrors the binary
-   * tail call).
-   */
-  void SSTIArmyConstantDataSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*
-  )
-  {
-    const auto* const data = reinterpret_cast<const SSTIArmyConstantData*>(static_cast<std::intptr_t>(objectPtr));
-    if (data == nullptr) {
-      return;
-    }
-    data->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00550CF0 (FUN_00550CF0, shared Init() body)
-   */
-  void SSTIArmyConstantDataSerializer::Init()
-  {
-    if (SSTIArmyConstantData::sType == nullptr) {
-      SSTIArmyConstantData::sType = gpg::LookupRType(typeid(SSTIArmyConstantData));
-    }
-
-    gpg::RType* const type = SSTIArmyConstantData::sType;
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  /**
    * Address: 0x00BC9F80 (FUN_00BC9F80, dynamic initializer for the global
    * `EntIdSerializer` singleton)
    *
@@ -320,9 +248,28 @@ namespace moho
 
 namespace
 {
-  // Address: 0x010AC3DC -- process-global `SSTIArmyConstantDataSerializer` singleton.
-  moho::SSTIArmyConstantDataSerializer gSSTIArmyConstantDataSerializer;
 
   // Address: 0x010AC890 -- process-global `EntIdSerializer` singleton.
   moho::EntIdSerializer gEntIdSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SSTIArmyConstantData>`, vtable 0x00E17534.
+   *
+   * Address: 0x00BC9AB0 (FUN_00BC9AB0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF47E0 (FUN_00BF47E0 -- the global's destructor.)
+   * Address: 0x00550CF0 (FUN_00550CF0 -- `Init`.)
+   * Address: 0x005507F0 (FUN_005507F0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00550810 (FUN_00550810 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SSTIArmyConstantDataSerializer : gpg::SerSaveLoadHelper<SSTIArmyConstantData>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AC3DC -- process-global `SSTIArmyConstantDataSerializer` singleton.
+  moho::SSTIArmyConstantDataSerializer gSSTIArmyConstantDataSerializer;
 } // namespace

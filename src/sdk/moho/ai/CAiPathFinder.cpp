@@ -26,6 +26,7 @@
 #include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -1481,3 +1482,26 @@ HPathCell CAiPathFinder::LastPathCell(const SNavPath& path)
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_RBroadcasterRType_NavPath_d4632f, preregister_RBroadcasterRType_NavPath)
 GPG_PREREGISTER_INIT(preregister_RListenerRType_NavPath_d4632f, preregister_RListenerRType_NavPath)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiPathFinder>`, vtable 0x00E1C40C.
+   *
+   * Address: 0x00BCCD70 (FUN_00BCCD70 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7240 (FUN_00BF7240 -- the global's destructor.)
+   * Address: 0x005AAC80 (FUN_005AAC80 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005AACB0 (FUN_005AACB0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005AB210 (FUN_005AB210 -- `Init`.)
+   * Address: 0x005AAC30 (FUN_005AAC30 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005AAC40 (FUN_005AAC40 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiPathFinderSerializer : gpg::SerSaveLoadHelper<CAiPathFinder>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AED04 -- process-global `CAiPathFinderSerializer` singleton.
+  moho::CAiPathFinderSerializer gCAiPathFinderSerializer;
+} // namespace

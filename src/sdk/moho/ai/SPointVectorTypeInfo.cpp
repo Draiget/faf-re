@@ -9,6 +9,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -16,16 +17,6 @@ namespace
 {
   using SPointVectorVector = msvc8::vector<moho::SPointVector>;
   using SPointVectorVectorType = gpg::RVectorType<moho::SPointVector>;
-
-  // Address: 0x010AA230 -- process-global `SPointVectorSerializer` singleton.
-  // Constructing it runs SPointVectorSerializer::SPointVectorSerializer()
-  // (0x00BC7E00), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction. Its destructor (~SPointVectorSerializer,
-  // 0x00BF22C0) runs at normal static-duration teardown, matching the real
-  // binary's atexit registration.
-  SPointVectorSerializer gSPointVectorSerializer;
 
   /**
    * Address: 0x00BF2260 (FUN_00BF2260, atexit destructor of the SPointVectorTypeInfo object)
@@ -304,64 +295,6 @@ void SPointVector::MemberSerialize(gpg::WriteArchive* const archive) const
 }
 
 /**
- * What it does:
- * Binds the `SPointVector` serializer callbacks into reflected RTTI.
- */
-/**
- * Address: 0x00BC7E00 (FUN_00BC7E00, dynamic initializer for the global
- * `SPointVectorSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`) and binds the load/save callback fields.
- */
-SPointVectorSerializer::SPointVectorSerializer()
-  : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&SPointVectorSerializer::Deserialize))
-  , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SPointVectorSerializer::Serialize))
-{}
-
-/**
- * Address: 0x00BF22C0 (FUN_00BF22C0, ??1SPointVectorSerializer@Moho@@QAE@@Z)
- *
- * What it does:
- * Unlinks this helper node from whatever intrusive list it currently sits in
- * and restores a self-linked sentinel state.
- */
-SPointVectorSerializer::~SPointVectorSerializer() = default;
-
-void SPointVectorSerializer::Init()
-{
-  gpg::RType* const type = CachedSPointVectorType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
-  type->serLoadFunc_ = mLoadCallback;
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
- * Address: 0x0050C360 (FUN_0050C360, Moho::SPointVectorSerializer::Deserialize)
- *
- * What it does:
- * Forwards archive load requests into `SPointVector::MemberDeserialize`.
- */
-void SPointVectorSerializer::Deserialize(gpg::ReadArchive* const archive, SPointVector* const value)
-{
-  value->MemberDeserialize(archive);
-}
-
-/**
- * Address: 0x0050C370 (FUN_0050C370, Moho::SPointVectorSerializer::Serialize)
- *
- * What it does:
- * Forwards archive save requests into `SPointVector::MemberSerialize`.
- */
-void SPointVectorSerializer::Serialize(gpg::WriteArchive* const archive, SPointVector* const value)
-{
-  value->MemberSerialize(archive);
-}
-
-/**
  * Address: 0x0057DF60 (FUN_0057DF60, gpg::RVectorType_SPointVector::GetName)
  * Address: 0x00BF6350 (FUN_00BF6350, atexit destructor of GetName's cached name)
  *
@@ -611,3 +544,25 @@ namespace
 GPG_PREREGISTER_INIT(register_SPointVectorTypeInfo_169786, moho::register_SPointVectorTypeInfo)
 
 GPG_PREREGISTER_INIT(register_SPointVectorVectorType_169786, moho::register_SPointVectorVectorType)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SPointVector>`, vtable 0x00E0DDEC.
+   *
+   * Address: 0x00BC7E00 (FUN_00BC7E00 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF22C0 (FUN_00BF22C0 -- the global's destructor.)
+   * Address: 0x0050C380 (FUN_0050C380 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0050C910 (FUN_0050C910 -- `Init`.)
+   * Address: 0x0050C360 (FUN_0050C360 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0050C370 (FUN_0050C370 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SPointVectorSerializer : gpg::SerSaveLoadHelper<SPointVector>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AA230 -- process-global `SPointVectorSerializer` singleton.
+  moho::SPointVectorSerializer gSPointVectorSerializer;
+} // namespace

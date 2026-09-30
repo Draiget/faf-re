@@ -1,25 +1,15 @@
-#include "moho/ai/SAiReservedTransportBoneSerializer.h"
 
 #include <cstdint>
 #include <typeinfo>
 
 #include "moho/ai/SAiReservedTransportBone.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
 namespace
 {
-  // Address: 0x010B0864 -- process-global `SAiReservedTransportBoneSerializer`
-  // singleton. Constructing it runs SAiReservedTransportBoneSerializer::
-  // SAiReservedTransportBoneSerializer() (0x00BCED90), which splices this
-  // helper into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::
-  // InitNewHelpers() later dispatches Init() on it from within the first
-  // ReadArchive/WriteArchive construction. Its destructor
-  // (~SAiReservedTransportBoneSerializer, 0x00BF8A00) runs at normal
-  // static-duration teardown, matching the real binary's atexit
-  // registration.
-  SAiReservedTransportBoneSerializer gSAiReservedTransportBoneSerializer;
 
   [[nodiscard]] gpg::RType* CachedWeakUnitType()
   {
@@ -40,15 +30,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedSAiReservedTransportBoneType()
-  {
-    gpg::RType* type = SAiReservedTransportBone::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(SAiReservedTransportBone));
-      SAiReservedTransportBone::sType = type;
-    }
-    return type;
-  }
 } // namespace
 
 /**
@@ -146,93 +127,23 @@ void SAiReservedTransportBone::MemberSerialize(gpg::WriteArchive* const archive)
   archive->Write(intVectorType, &reservedBones, ownerRef);
 }
 
-/**
- * Address: 0x005E40A0 (FUN_005E40A0, SAiReservedTransportBoneSerializer::Deserialize)
- */
-void SAiReservedTransportBoneSerializer::Deserialize(
-  gpg::ReadArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
+namespace moho
 {
-  if (!archive || objectPtr == 0) {
-    return;
-  }
+  /**
+   * `gpg::SerSaveLoadHelper<SAiReservedTransportBone>`, vtable 0x00E1F270.
+   *
+   * Address: 0x00BCED90 (FUN_00BCED90 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF8A00 (FUN_00BF8A00 -- the global's destructor.)
+   * Address: 0x005E8F70 (FUN_005E8F70 -- `Init`.)
+   * Address: 0x005E40A0 (FUN_005E40A0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005E40B0 (FUN_005E40B0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SAiReservedTransportBoneSerializer : gpg::SerSaveLoadHelper<SAiReservedTransportBone>
+  {};
+} // namespace moho
 
-  auto* const bone = reinterpret_cast<SAiReservedTransportBone*>(static_cast<std::uintptr_t>(objectPtr));
-  bone->MemberDeserialize(archive);
-}
-
-/**
- * Address: 0x005E40B0 (FUN_005E40B0, SAiReservedTransportBoneSerializer::Serialize)
- */
-void SAiReservedTransportBoneSerializer::Serialize(
-  gpg::WriteArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const
-)
+namespace
 {
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  auto* const bone = reinterpret_cast<const SAiReservedTransportBone*>(static_cast<std::uintptr_t>(objectPtr));
-  bone->MemberSerialize(archive);
-}
-
-/**
- * Address: 0x00BCED90 (FUN_00BCED90, dynamic initializer for the global
- * `SAiReservedTransportBoneSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`) and binds the load/save callback fields.
- */
-SAiReservedTransportBoneSerializer::SAiReservedTransportBoneSerializer()
-  : mLoadCallback(&SAiReservedTransportBoneSerializer::Deserialize)
-  , mSaveCallback(&SAiReservedTransportBoneSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BF8A00 (FUN_00BF8A00, ??1SAiReservedTransportBoneSerializer@Moho@@QAE@@Z)
- *
- * What it does:
- * Unlinks this helper node from whatever intrusive list it currently sits in
- * and restores a self-linked sentinel state.
- */
-SAiReservedTransportBoneSerializer::~SAiReservedTransportBoneSerializer() = default;
-
-/**
- * Address: 0x005E8F70 (FUN_005E8F70)
- *
- * What it does:
- * Lazily resolves SAiReservedTransportBone RTTI and installs load/save
- * callbacks from this helper object into the type descriptor.
- */
-void SAiReservedTransportBoneSerializer::Init()
-{
-  gpg::RType* const type = CachedSAiReservedTransportBoneType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
-  type->serLoadFunc_ = mLoadCallback;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
- * Address: 0x00BCED90 caller lane (`IAiTransport.cpp`'s reflection bootstrap
- * sequence)
- *
- * What it does:
- * Historically forced construction of the (then lazily-constructed)
- * `SAiReservedTransportBoneSerializer` singleton from an explicit
- * registration sequence. `gSAiReservedTransportBoneSerializer` is now a
- * genuine namespace-scope global, so its constructor already runs
- * unconditionally at static-init time; this call is kept only so
- * `IAiTransport.cpp`'s existing bootstrap sequence does not need editing.
- */
-int moho::register_SAiReservedTransportBoneSerializer()
-{
-  return 0;
-}
+  // Address: 0x010B0864 -- process-global `SAiReservedTransportBoneSerializer` singleton.
+  moho::SAiReservedTransportBoneSerializer gSAiReservedTransportBoneSerializer;
+} // namespace

@@ -4,6 +4,7 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -129,3 +130,24 @@ namespace moho
     archive->Write(ResolveSWorldBeamBlendModeType(), &mBlendMode, nullOwner);
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SWorldBeam>`, vtable 0x00E062F0.
+   *
+   * Address: 0x00BC5360 (FUN_00BC5360 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEFED0 (FUN_00BEFED0 -- the global's destructor.)
+   * Address: 0x0048FB50 (FUN_0048FB50 -- `Init`.)
+   * Address: 0x0048F480 (FUN_0048F480 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0048F490 (FUN_0048F490 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SWorldBeamSerializer : gpg::SerSaveLoadHelper<SWorldBeam>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A8010 -- process-global `SWorldBeamSerializer` singleton.
+  moho::SWorldBeamSerializer gSWorldBeamSerializer;
+} // namespace

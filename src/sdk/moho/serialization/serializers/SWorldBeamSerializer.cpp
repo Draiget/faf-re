@@ -1,5 +1,6 @@
-#include "moho/serialization/serializers/SWorldBeamSerializer.h"
 
+#include <cstddef>
+#include "gpg/core/reflection/Reflection.h"
 #include <cstdint>
 #include <typeinfo>
 
@@ -10,7 +11,6 @@
 
 namespace
 {
-  moho::SWorldBeamSerializer gSWorldBeamSerializer;
 
   /**
    * Address: 0x00BC5300 (FUN_00BC5300, dynamic initializer for the global
@@ -38,76 +38,8 @@ namespace
    */
   gpg::PrimitiveSerHelper<moho::SWorldBeam::BlendMode, int> gSWorldBeamBlendModePrimitiveSerializer;
 
-  template <typename TType>
-  [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cached)
-  {
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(TType));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSWorldBeamType()
-  {
-    return ResolveCachedType<moho::SWorldBeam>(moho::SWorldBeam::sType);
-  }
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00BC5360 (FUN_00BC5360, reigster_SWorldBeamSerializer)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SWorldBeamSerializer::SWorldBeamSerializer()
-    : mDeserialize(&SWorldBeamSerializer::Deserialize)
-    , mSerialize(&SWorldBeamSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BEFED0 (FUN_00BEFED0, Moho::SWorldBeamSerializer::~SWorldBeamSerializer)
-   *
-   * What it does:
-   * Unlinks the `SWorldBeamSerializer` helper node and rewires self-links.
-   */
-  SWorldBeamSerializer::~SWorldBeamSerializer() = default;
-
-  /**
-   * Address: 0x0048F480 (Moho::SWorldBeamSerializer::Deserialize)
-   */
-  void SWorldBeamSerializer::Deserialize(
-    gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/
-  )
-  {
-    auto* const object = reinterpret_cast<SWorldBeam*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0048F490 (Moho::SWorldBeamSerializer::Serialize)
-   */
-  void SWorldBeamSerializer::Serialize(
-    gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/
-  )
-  {
-    const auto* const object = reinterpret_cast<const SWorldBeam*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x0048FB50 (gpg::SerSaveLoadHelper_SWorldBeam::Init)
-   */
-  void SWorldBeamSerializer::Init()
-  {
-    gpg::RType* const type = ResolveSWorldBeamType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
 } // namespace moho

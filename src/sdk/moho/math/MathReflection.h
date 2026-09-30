@@ -879,52 +879,6 @@ namespace moho
     void Init() override;
   };
 
-  class VMatrix4Serializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC70B0 (FUN_00BC70B0, dynamic initializer for the global
-     * `VMatrix4Serializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    VMatrix4Serializer();
-
-    /**
-     * Address: 0x00BF1740 (FUN_00BF1740, Moho::VMatrix4Serializer::~VMatrix4Serializer)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~VMatrix4Serializer();
-
-    /**
-     * Address: 0x004F0220 (FUN_004F0220, Moho::VMatrix4Serializer::Deserialize)
-     */
-    static void Deserialize(gpg::ReadArchive* archive, VMatrix4* matrix);
-
-    /**
-     * Address: 0x004F0230 (FUN_004F0230, Moho::VMatrix4Serializer::Serialize)
-     */
-    static void Serialize(gpg::WriteArchive* archive, VMatrix4* matrix);
-
-    /**
-     * Address: 0x004F0300 (FUN_004F0300, Moho::VMatrix4Serializer::Init)
-     *
-     * What it does:
-     * Resolves `Moho::VMatrix4` RTTI (cached on `VMatrix4::sType`) and
-     * installs the load/save callbacks for this helper.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mDeserialize; // +0x0C
-    gpg::RType::save_func_t mSerialize;   // +0x10
-  };
-
   /**
    * Address: 0x00BC6C40 (FUN_00BC6C40, register_AxisAlignedBox3fTypeInfo)
    */
@@ -1026,10 +980,6 @@ namespace moho
   static_assert(offsetof(VAxes3Serializer, mDeserialize) == 0x0C, "VAxes3Serializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(VAxes3Serializer, mSerialize) == 0x10, "VAxes3Serializer::mSerialize offset must be 0x10");
   static_assert(sizeof(VAxes3Serializer) == 0x14, "VAxes3Serializer size must be 0x14");
-
-  static_assert(offsetof(VMatrix4Serializer, mDeserialize) == 0x0C, "VMatrix4Serializer::mDeserialize offset must be 0x0C");
-  static_assert(offsetof(VMatrix4Serializer, mSerialize) == 0x10, "VMatrix4Serializer::mSerialize offset must be 0x10");
-  static_assert(sizeof(VMatrix4Serializer) == 0x14, "VMatrix4Serializer size must be 0x14");
 
   static_assert(sizeof(VEulers3) == 0x0C, "VEulers3 size must be 0x0C");
   static_assert(offsetof(VEulers3, r) == 0x00, "VEulers3::r offset must be 0x00");

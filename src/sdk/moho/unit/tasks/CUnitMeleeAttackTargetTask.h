@@ -121,7 +121,7 @@ namespace moho
      * Serializes base command-task state, melee-task pointer lanes, target
      * payload, navigation flags, destination cell, and planted-state lane.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   private:
     /**
@@ -308,86 +308,6 @@ namespace moho
 
   static_assert(sizeof(CUnitMeleeAttackTargetTask) == 0x90, "CUnitMeleeAttackTargetTask size must be 0x90");
 
-  /**
-   * Serializer helper for `CUnitMeleeAttackTargetTask`.
-   *
-   * VFTABLE: 0x00E205C0 (`??_7CUnitMeleeAttackTargetTaskSerializer@Moho@@6B@`)
-   * Also installed as: 0x00E205C8 (`??_7?$SerSaveLoadHelper@VCUnitMeleeAttackTargetTask@Moho@@@gpg@@6B@`)
-   *
-   * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
-   * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
-   * load/save callback lanes@0x0C-0x13. Total 0x14 bytes, matching every
-   * other `SerHelperBase`-derived serializer in this codebase.
-   */
-  class CUnitMeleeAttackTargetTaskSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD0E00 (FUN_00BD0E00, dynamic initializer for the global
-     * `CUnitMeleeAttackTargetTaskSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the load/save callback fields; the compiler registers the
-     * destructor with `atexit`.
-     */
-    CUnitMeleeAttackTargetTaskSerializer();
-
-    /**
-     * Address: 0x00BF9F90 (FUN_00BF9F90, dynamic atexit destructor for `gCUnitMeleeAttackTargetTaskSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_00615450` and `FUN_00615480` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~CUnitMeleeAttackTargetTaskSerializer();
-
-    /**
-     * Address: 0x006153F0 (FUN_006153F0, Moho::CUnitMeleeAttackTargetTaskSerializer::Deserialize)
-     *
-     * What it does:
-     * Load-callback thunk that forwards one melee-task serializer lane into
-     * `CUnitMeleeAttackTargetTask::MemberDeserialize`.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00615400 (FUN_00615400, Moho::CUnitMeleeAttackTargetTaskSerializer::Serialize)
-     *
-     * What it does:
-     * Save-callback thunk that forwards one melee-task serializer lane into
-     * `CUnitMeleeAttackTargetTask::MemberSerialize`.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x006177B0 (FUN_006177B0, gpg::SerSaveLoadHelper<Moho::CUnitMeleeAttackTargetTask>::Init)
-     *
-     * What it does:
-     * Resolves melee-task RTTI and binds this helper's load/save callbacks
-     * into the type descriptor.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mDeserialize; // +0x0C
-    gpg::RType::save_func_t mSerialize;   // +0x10
-  };
-
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskSerializer, mDeserialize) == 0x0C,
-    "CUnitMeleeAttackTargetTaskSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskSerializer, mSerialize) == 0x10,
-    "CUnitMeleeAttackTargetTaskSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(
-    sizeof(CUnitMeleeAttackTargetTaskSerializer) == 0x14,
-    "CUnitMeleeAttackTargetTaskSerializer size must be 0x14"
-  );
 } // namespace moho
 
 namespace gpg

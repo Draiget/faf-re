@@ -17,19 +17,12 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
 namespace
 {
-  // Address: 0x010AF89C -- process-global `SReconKeySerializer` singleton.
-  // Constructing it runs SReconKeySerializer::SReconKeySerializer()
-  // (0x00BCDD40), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction. Its destructor (~SReconKeySerializer,
-  // 0x00BF79C0) runs at normal static-duration teardown.
-  moho::SReconKeySerializer gSReconKeySerializer;
 
   // Address: 0x010AF824 -- process-global `CAiReconDBImplSerializer`
   // singleton. Same construction/teardown shape as `gSReconKeySerializer`
@@ -178,60 +171,6 @@ void SReconKey::MemberSerialize(gpg::WriteArchive* const archive) const
 }
 
 /**
- * Address: 0x005BFED0 (FUN_005BFED0, Moho::SReconKeySerializer::Deserialize)
- */
-void SReconKeySerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  auto* const key = reinterpret_cast<SReconKey*>(objectPtr);
-  if (!key) {
-    return;
-  }
-
-  key->MemberDeserialize(archive);
-}
-
-/**
- * Address: 0x005BFEE0 (FUN_005BFEE0, Moho::SReconKeySerializer::Serialize)
- */
-void SReconKeySerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  auto* const key = reinterpret_cast<SReconKey*>(objectPtr);
-  if (!key) {
-    return;
-  }
-
-  key->MemberSerialize(archive);
-}
-
-/**
- * Address: 0x00BCDD40 (FUN_00BCDD40, dynamic initializer for the global
- * `SReconKeySerializer` singleton)
- */
-SReconKeySerializer::SReconKeySerializer()
-  : mSerLoadFunc(&SReconKeySerializer::Deserialize)
-  , mSerSaveFunc(&SReconKeySerializer::Serialize)
-{}
-
-SReconKeySerializer::~SReconKeySerializer() = default;
-
-/**
- * Address: 0x005C4450 (FUN_005C4450, Moho::SReconKeySerializer::Init)
- */
-void SReconKeySerializer::Init()
-{
-  gpg::RType* type = SReconKey::sType;
-  if (!type) {
-    type = gpg::LookupRType(typeid(SReconKey));
-    SReconKey::sType = type;
-  }
-
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mSerLoadFunc);
-  type->serLoadFunc_ = mSerLoadFunc;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerSaveFunc);
-  type->serSaveFunc_ = mSerSaveFunc;
-}
-
-/**
  * Address: 0x00BCDD20 (FUN_00BCDD20, register_SReconKeyTypeInfo)
  */
 void moho::register_SReconKeyTypeInfo()
@@ -295,3 +234,24 @@ void CAiReconDBImplSerializer::Init()
 GPG_PREREGISTER_INIT(register_SReconKeyTypeInfo_e639f8, moho::register_SReconKeyTypeInfo)
 
 GPG_PREREGISTER_INIT(PreregisterSReconKeyTypeInfo_e639f8, PreregisterSReconKeyTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SReconKey>`, vtable 0x00E1DAA4.
+   *
+   * Address: 0x00BCDD40 (FUN_00BCDD40 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF79C0 (FUN_00BF79C0 -- the global's destructor.)
+   * Address: 0x005C4450 (FUN_005C4450 -- `Init`.)
+   * Address: 0x005BFED0 (FUN_005BFED0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005BFEE0 (FUN_005BFEE0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SReconKeySerializer : gpg::SerSaveLoadHelper<SReconKey>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AF89C -- process-global `SReconKeySerializer` singleton.
+  moho::SReconKeySerializer gSReconKeySerializer;
+} // namespace

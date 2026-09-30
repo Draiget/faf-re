@@ -102,7 +102,7 @@ namespace moho
      * Serializes the fixed `SSTIArmyConstantData` (+0x00) and
      * `SSTIArmyVariableData` (+0x80) lanes of the IArmy payload.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x00579430 (FUN_00579430, Moho::IArmy::GetAllianceWith)

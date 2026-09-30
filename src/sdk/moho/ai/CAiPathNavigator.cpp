@@ -21,6 +21,7 @@
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -1793,3 +1794,25 @@ void CAiPathNavigator::MemberSerialize(gpg::WriteArchive* const archive, const i
   archive->WriteInt(mTickBucket13);
 }
 
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiPathNavigator>`, vtable 0x00E1C6E4.
+   *
+   * Address: 0x00BCD040 (FUN_00BCD040 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF73C0 (FUN_00BF73C0 -- the global's destructor.)
+   * Address: 0x005AFC50 (FUN_005AFC50 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005AFC80 (FUN_005AFC80 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005B0130 (FUN_005B0130 -- `Init`.)
+   * Address: 0x005AFBE0 (FUN_005AFBE0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005AFC00 (FUN_005AFC00 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct CAiPathNavigatorSerializer : gpg::SerSaveLoadHelper<CAiPathNavigator>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AEF44 -- process-global `CAiPathNavigatorSerializer` singleton.
+  moho::CAiPathNavigatorSerializer gCAiPathNavigatorSerializer;
+} // namespace

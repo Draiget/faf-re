@@ -8,6 +8,7 @@
 #include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -100,67 +101,29 @@ namespace moho
     archive->WriteString(const_cast<msvc8::string*>(&unk2));
   }
 
+} // namespace moho
+
+namespace
+{
+} // namespace
+
+// Phase-1 pre-registration: run these descriptor registrations ahead of
+// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_SSTICommandConstantDataTypeInfo_0f3565, moho::preregister_SSTICommandConstantDataTypeInfo)
+
+namespace moho
+{
   /**
-   * Address: 0x00BC9CA0 (FUN_00BC9CA0, dynamic initializer for the global
-   * `SSTICommandConstantDataSerializer` singleton)
+   * `gpg::SerSaveLoadHelper<SSTICommandConstantData>`, vtable 0x00E17A74.
+   *
+   * Address: 0x00BC9CA0 (FUN_00BC9CA0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF49F0 (FUN_00BF49F0 -- the global's destructor.)
+   * Address: 0x00552E00 (FUN_00552E00 -- `Init`.)
+   * Address: 0x00552810 (FUN_00552810 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00552820 (FUN_00552820 -- `Serialize`, a forward to `MemberSerialize`.)
    */
-  SSTICommandConstantDataSerializer::SSTICommandConstantDataSerializer()
-    : mSerLoadFunc(&SSTICommandConstantDataSerializer::Deserialize)
-    , mSerSaveFunc(&SSTICommandConstantDataSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BF49F0 (FUN_00BF49F0, Moho::SSTICommandConstantDataSerializer::~SSTICommandConstantDataSerializer)
-   */
-  SSTICommandConstantDataSerializer::~SSTICommandConstantDataSerializer() = default;
-
-  /**
-   * Address: 0x00552810 (FUN_00552810, Moho::SSTICommandConstantDataSerializer::Deserialize)
-   */
-  void SSTICommandConstantDataSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*
-  )
-  {
-    auto* const data = reinterpret_cast<SSTICommandConstantData*>(objectPtr);
-    if (!archive || !data) {
-      return;
-    }
-
-    data->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00552820 (FUN_00552820, Moho::SSTICommandConstantDataSerializer::Serialize)
-   */
-  void SSTICommandConstantDataSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*
-  )
-  {
-    const auto* const data = reinterpret_cast<const SSTICommandConstantData*>(objectPtr);
-    if (!archive || !data) {
-      return;
-    }
-
-    data->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00552E00 (FUN_00552E00, Moho::SSTICommandConstantDataSerializer::Init)
-   */
-  void SSTICommandConstantDataSerializer::Init()
-  {
-    gpg::RType* type = SSTICommandConstantData::sType;
-    if (type == nullptr) {
-      type = preregister_SSTICommandConstantDataTypeInfo();
-      SSTICommandConstantData::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
+  struct SSTICommandConstantDataSerializer : gpg::SerSaveLoadHelper<SSTICommandConstantData>
+  {};
 } // namespace moho
 
 namespace
@@ -168,7 +131,3 @@ namespace
   // Address: 0x010AC540 -- process-global `SSTICommandConstantDataSerializer` singleton.
   moho::SSTICommandConstantDataSerializer gSSTICommandConstantDataSerializer;
 } // namespace
-
-// Phase-1 pre-registration: run these descriptor registrations ahead of
-// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SSTICommandConstantDataTypeInfo_0f3565, moho::preregister_SSTICommandConstantDataTypeInfo)

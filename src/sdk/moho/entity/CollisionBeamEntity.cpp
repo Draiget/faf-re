@@ -25,6 +25,7 @@
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/unit/tasks/CAcquireTargetTask.h"
 #include "Wm3Box3.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -587,4 +588,25 @@ namespace
 
   // Address: 0x010B4240 -- process-global `CollisionBeamEntitySaveConstruct` singleton.
   moho::CollisionBeamEntitySaveConstruct gCollisionBeamEntitySaveConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CollisionBeamEntity>`, vtable 0x00E26F94.
+   *
+   * Address: 0x00BD4CD0 (FUN_00BD4CD0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFC3A0 (FUN_00BFC3A0 -- the global's destructor.)
+   * Address: 0x00674FE0 (FUN_00674FE0 -- `Init`.)
+   * Address: 0x00673B00 (FUN_00673B00 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00673B10 (FUN_00673B10 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CollisionBeamEntitySerializer : gpg::SerSaveLoadHelper<CollisionBeamEntity>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B421C -- process-global `CollisionBeamEntitySerializer` singleton.
+  moho::CollisionBeamEntitySerializer gCollisionBeamEntitySerializer;
 } // namespace

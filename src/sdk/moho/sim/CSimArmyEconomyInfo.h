@@ -62,7 +62,7 @@ namespace moho
      * serializer, then emits the u64 energy/mass max-storage fields through
      * the archive's WriteUInt64 virtual slot.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x00585920 (FUN_00585920, Moho::SEconTotals::MaxStorageOf)

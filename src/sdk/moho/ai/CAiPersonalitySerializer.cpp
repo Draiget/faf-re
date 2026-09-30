@@ -133,41 +133,6 @@ namespace
   static_assert(sizeof(SValuePairSerializer) == 0x14, "SValuePairSerializer size must be 0x14");
 
   /**
-   * Address: 0x005B95F0 (FUN_005B95F0, j_Moho::CAiPersonality::MemberSerialize)
-   * Address: 0x0087CF70 (FUN_0087CF70)
-   *
-   * What it does:
-   * Thin forwarding thunk to `CAiPersonality::MemberSerialize`.
-   */
-  [[maybe_unused]] void CAiPersonalityMemberSerializeThunk(
-    moho::CAiPersonality* const personality, gpg::WriteArchive* const archive
-  )
-  {
-    if (!personality) {
-      return;
-    }
-
-    personality->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x005B9660 (FUN_005B9660, j_Moho::CAiPersonality::MemberSerialize_0)
-   *
-   * What it does:
-   * Secondary forwarding thunk to `CAiPersonality::MemberSerialize`.
-   */
-  [[maybe_unused]] void CAiPersonalityMemberSerializeThunkSecondary(
-    moho::CAiPersonality* const personality, gpg::WriteArchive* const archive
-  )
-  {
-    if (!personality) {
-      return;
-    }
-
-    personality->MemberSerialize(archive);
-  }
-
-  /**
    * Address: 0x00BF7620 (FUN_00BF7620, atexit destructor of the SValuePairTypeInfo object)
    */
   [[nodiscard]] SValuePairTypeInfo* AcquireSValuePairTypeInfo()
@@ -198,16 +163,6 @@ namespace
     return typeInfo;
   }
 
-  [[nodiscard]] gpg::RType* CachedCAiPersonalityType()
-  {
-    gpg::RType* type = CAiPersonality::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CAiPersonality));
-      CAiPersonality::sType = type;
-    }
-    return type;
-  }
-
   // Address: 0x010AF168 -- process-global `SValuePairSerializer` singleton.
   // Constructing it runs SValuePairSerializer::SValuePairSerializer()
   // (0x00BCD5C0), which splices this helper into
@@ -218,15 +173,6 @@ namespace
   // binary's atexit registration.
   SValuePairSerializer gSValuePairSerializer;
 
-  // Address: 0x010AF154 -- process-global `CAiPersonalitySerializer`
-  // singleton. Constructing it runs CAiPersonalitySerializer::
-  // CAiPersonalitySerializer() (0x00BCD660), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction. Its destructor (~CAiPersonalitySerializer,
-  // 0x00BF7740) runs at normal static-duration teardown, matching the real
-  // binary's atexit registration.
-  moho::CAiPersonalitySerializer gCAiPersonalitySerializer;
 } // namespace
 
 /**
@@ -300,69 +246,6 @@ void SValuePairSerializer::Init()
 void moho::register_SValuePairTypeInfo()
 {
   (void)preregister_SValuePairTypeInfo();
-}
-
-/**
- * Address: 0x005B6A80 (FUN_005B6A80, Moho::CAiPersonalitySerializer::Deserialize)
- */
-void CAiPersonalitySerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  auto* const personality = reinterpret_cast<CAiPersonality*>(static_cast<std::uintptr_t>(objectPtr));
-  personality->MemberDeserialize(archive);
-}
-
-/**
- * Address: 0x005B6A90 (FUN_005B6A90, Moho::CAiPersonalitySerializer::Serialize)
- */
-void CAiPersonalitySerializer::Serialize(
-  gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
-)
-{
-  auto* const personality = reinterpret_cast<CAiPersonality*>(static_cast<std::uintptr_t>(objectPtr));
-  if (ownerRef != nullptr) {
-    personality->MemberSerialize(archive);
-    return;
-  }
-
-  CAiPersonalityMemberSerializeThunk(personality, archive);
-}
-
-/**
- * Address: 0x00BCD660 (FUN_00BCD660, dynamic initializer for the global
- * `CAiPersonalitySerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`) and binds the load/save callback fields.
- */
-CAiPersonalitySerializer::CAiPersonalitySerializer()
-  : mLoadCallback(&CAiPersonalitySerializer::Deserialize)
-  , mSaveCallback(&CAiPersonalitySerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BF7740 (FUN_00BF7740, Moho::CAiPersonalitySerializer::~CAiPersonalitySerializer)
- *
- * What it does:
- * Unlinks this helper node from whatever intrusive list it currently sits
- * in and restores a self-linked sentinel state.
- */
-CAiPersonalitySerializer::~CAiPersonalitySerializer() = default;
-
-/**
- * Address: 0x005B9350 (FUN_005B9350)
- *
- * What it does:
- * Lazily resolves CAiPersonality RTTI and installs load/save callbacks from
- * this helper object into the type descriptor.
- */
-void CAiPersonalitySerializer::Init()
-{
-  gpg::RType* type = CachedCAiPersonalityType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mLoadCallback;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSaveCallback;
 }
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

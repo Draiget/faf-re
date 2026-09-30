@@ -74,10 +74,6 @@ namespace
   // WriteArchive construction.
   moho::SEconValueSerializer gSEconValueSerializer;
 
-  // Address: 0x010ACF98 -- process-global `SEconTotalsSerializer` singleton.
-  // Same registration/dispatch mechanism as gSEconValueSerializer above.
-  moho::SEconTotalsSerializer gSEconTotalsSerializer;
-
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeTypedRef(TObject* const object, gpg::RType* const staticType) noexcept
   {
@@ -261,90 +257,6 @@ namespace moho
   void SEconValueSerializer::Init()
   {
     gpg::RType* const type = CachedSEconValueType();
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kLoadAssertText, kSerializationLoadLine, kSerializationSourcePath);
-    }
-    const bool saveAlreadySet = type->serSaveFunc_ != nullptr;
-    type->serLoadFunc_ = mLoadCallback;
-    if (saveAlreadySet) {
-      gpg::HandleAssertFailure(kSaveAssertText, kSerializationSaveLine, kSerializationSourcePath);
-    }
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  /**
-   * Address: 0x00BCA8D0 (FUN_00BCA8D0, register_SEconTotalsSerializer)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SEconTotalsSerializer::SEconTotalsSerializer()
-    : mLoadCallback(&SEconTotalsSerializer::Deserialize)
-    , mSaveCallback(&SEconTotalsSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BF5750 (FUN_00BF5750, Moho::SEconTotalsSerializer::~SEconTotalsSerializer)
-   *
-   * What it does:
-   * Unlinks this helper node from whatever intrusive list it currently sits
-   * in and restores a self-linked sentinel state.
-   */
-  SEconTotalsSerializer::~SEconTotalsSerializer() = default;
-
-  /**
-   * Address: 0x00563E80 (FUN_00563E80, Moho::SEconTotalsSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade for `SEconTotals`. Forwards the
-   * reflected object pointer to `SEconTotals::MemberDeserialize`.
-   */
-  void SEconTotalsSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const totals = reinterpret_cast<SEconTotals*>(objectPtr);
-    if (totals == nullptr) {
-      return;
-    }
-    totals->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00563E90 (FUN_00563E90, Moho::SEconTotalsSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback facade for `SEconTotals`. Forwards the
-   * reflected object pointer to `SEconTotals::MemberSerialize`.
-   */
-  void SEconTotalsSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const totals = reinterpret_cast<SEconTotals*>(objectPtr);
-    if (totals == nullptr) {
-      return;
-    }
-    totals->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x005640B0 (FUN_005640B0, gpg::SerSaveLoadHelper_SEconTotals::Init)
-   *
-   * What it does:
-   * Lazily resolves `SEconTotals` RTTI and installs load/save callbacks from
-   * this helper object into the type descriptor.
-   */
-  void SEconTotalsSerializer::Init()
-  {
-    gpg::RType* const type = CachedSEconTotalsType();
     if (type->serLoadFunc_ != nullptr) {
       gpg::HandleAssertFailure(kLoadAssertText, kSerializationLoadLine, kSerializationSourcePath);
     }
@@ -921,8 +833,7 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
    * u64 max-storage energy/mass fields through the archive's WriteUInt64
    * virtual slot. Mirrors the binary's lazy LookupRType caching sequence.
    */
-  void SEconTotals::MemberSerialize(gpg::WriteArchive* const archive)
-  {
+  void SEconTotals::MemberSerialize(gpg::WriteArchive* const archive) const{
     const gpg::RRef nullOwner{};
 
     gpg::RType* const econValueType = CachedSEconValueType();
@@ -990,4 +901,25 @@ namespace
 
   // Address: 0x010BB7E0 -- process-global `CEconomySerializer` singleton.
   moho::CEconomySerializer gCEconomySerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SEconTotals>`, vtable 0x00E189EC.
+   *
+   * Address: 0x00BCA8D0 (FUN_00BCA8D0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF5750 (FUN_00BF5750 -- the global's destructor.)
+   * Address: 0x005640B0 (FUN_005640B0 -- `Init`.)
+   * Address: 0x00563E80 (FUN_00563E80 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00563E90 (FUN_00563E90 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SEconTotalsSerializer : gpg::SerSaveLoadHelper<SEconTotals>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ACF98 -- process-global `SEconTotalsSerializer` singleton.
+  moho::SEconTotalsSerializer gSEconTotalsSerializer;
 } // namespace

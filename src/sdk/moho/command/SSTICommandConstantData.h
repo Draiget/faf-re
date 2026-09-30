@@ -49,61 +49,6 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
-  class SSTICommandConstantDataSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC9CA0 (FUN_00BC9CA0, dynamic initializer for the global
-     * `SSTICommandConstantDataSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields. Confirmed real (RTTI class name
-     * `SSTICommandConstantDataSerializer@Moho`, a standalone class, NOT a
-     * `SerSaveLoadHelper<T>` template instantiation despite following the
-     * same `T::sType`-caching idiom in `Init()`).
-     */
-    SSTICommandConstantDataSerializer();
-
-    /**
-     * Address: 0x00BF49F0 (FUN_00BF49F0, Moho::SSTICommandConstantDataSerializer::~SSTICommandConstantDataSerializer)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state. The real ctor
-     * pushes this mangled destructor symbol as its atexit target.
-     */
-    ~SSTICommandConstantDataSerializer();
-
-    /**
-     * Address: 0x00552810 (FUN_00552810, Moho::SSTICommandConstantDataSerializer::Deserialize)
-     *
-     * What it does:
-     * Forwards archive-load callback flow into `SSTICommandConstantData::MemberDeserialize`.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00552820 (FUN_00552820, Moho::SSTICommandConstantDataSerializer::Serialize)
-     *
-     * What it does:
-     * Forwards archive-save callback flow into `SSTICommandConstantData::MemberSerialize`.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00552E00 (FUN_00552E00, Moho::SSTICommandConstantDataSerializer::Init)
-     *
-     * What it does:
-     * Binds load/save serializer callbacks into `SSTICommandConstantData` RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
   static_assert(offsetof(SSTICommandConstantData, cmd) == 0x00, "SSTICommandConstantData::cmd offset must be 0x00");
   static_assert(offsetof(SSTICommandConstantData, mFormationScriptIndex) == 0x04, "SSTICommandConstantData::mFormationScriptIndex offset must be 0x04");
   static_assert(
@@ -117,18 +62,6 @@ namespace moho
     offsetof(SSTICommandConstantData, unk2) == 0x20, "SSTICommandConstantData::unk2 offset must be 0x20"
   );
   static_assert(sizeof(SSTICommandConstantData) == 0x3C, "SSTICommandConstantData size must be 0x3C");
-  static_assert(
-    offsetof(SSTICommandConstantDataSerializer, mSerLoadFunc) == 0x0C,
-    "SSTICommandConstantDataSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SSTICommandConstantDataSerializer, mSerSaveFunc) == 0x10,
-    "SSTICommandConstantDataSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(
-    sizeof(SSTICommandConstantDataSerializer) == 0x14, "SSTICommandConstantDataSerializer size must be 0x14"
-  );
-
   /**
    * Address: 0x00552630 (FUN_00552630, preregister_SSTICommandConstantDataTypeInfo)
    *

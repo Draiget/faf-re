@@ -4,6 +4,7 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -145,3 +146,24 @@ namespace moho
     archive->Write(ResolveSWorldParticleZModeType(), &mZMode, nullOwner);
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SWorldParticle>`, vtable 0x00E063B0.
+   *
+   * Address: 0x00BC5480 (FUN_00BC5480 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEFFE0 (FUN_00BEFFE0 -- the global's destructor.)
+   * Address: 0x0048FD30 (FUN_0048FD30 -- `Init`.)
+   * Address: 0x0048F8D0 (FUN_0048F8D0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0048F8E0 (FUN_0048F8E0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SWorldParticleSerializer : gpg::SerSaveLoadHelper<SWorldParticle>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A8104 -- process-global `SWorldParticleSerializer` singleton.
+  moho::SWorldParticleSerializer gSWorldParticleSerializer;
+} // namespace

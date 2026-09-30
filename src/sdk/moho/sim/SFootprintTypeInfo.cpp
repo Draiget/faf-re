@@ -10,6 +10,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/sim/SFootprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -140,55 +141,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0050C5A0 (FUN_0050C5A0, Moho::SFootprintSerializer::Deserialize)
-   *
-   * What it does:
-   * Forwards archive loading to `SFootprint::MemberDeserialize`.
-   */
-  void SFootprintSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*
-  )
-  {
-    auto* const footprint = reinterpret_cast<SFootprint*>(objectPtr);
-    GPG_ASSERT(footprint != nullptr);
-    GPG_ASSERT(archive != nullptr);
-    footprint->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0050C5B0 (FUN_0050C5B0, Moho::SFootprintSerializer::Serialize)
-   *
-   * What it does:
-   * Forwards archive saving to `SFootprint::MemberSerialize`.
-   */
-  void SFootprintSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*
-  )
-  {
-    auto* const footprint = reinterpret_cast<SFootprint*>(objectPtr);
-    GPG_ASSERT(footprint != nullptr);
-    GPG_ASSERT(archive != nullptr);
-    footprint->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x0050C9B0 (FUN_0050C9B0, shared Init() body -- also serves the
-   * dead SerSaveLoadHelper<SFootprint> duplicate's vtable slot 0)
-   */
-  void SFootprintSerializer::Init()
-  {
-    if (SFootprint::sType == nullptr) {
-      SFootprint::sType = gpg::LookupRType(typeid(SFootprint));
-    }
-
-    gpg::RType* const type = SFootprint::sType;
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x00BC7E40 (FUN_00BC7E40, register_SFootprintTypeInfo)
    *
    * What it does:
@@ -199,31 +151,35 @@ namespace moho
     (void)AcquireSFootprintTypeInfo();
   }
 
-  /**
-   * Address: 0x00BC7E60 (FUN_00BC7E60, dynamic initializer for the global
-   * `SFootprintSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SFootprintSerializer::SFootprintSerializer()
-    : mDeserialize(&SFootprintSerializer::Deserialize)
-    , mSerialize(&SFootprintSerializer::Serialize)
-  {}
-
-  SFootprintSerializer::~SFootprintSerializer() noexcept = default;
 } // namespace moho
 
 namespace
 {
-  // Address: 0x010AA42C -- process-global `SFootprintSerializer` singleton.
-  // (SFootprintTypeInfo's own registration is independently __xc_a-reachable
-  // through GPG_PREREGISTER_INIT below; the two are unrelated hierarchies.)
-  moho::SFootprintSerializer gSFootprintSerializer;
 } // namespace
 
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_SFootprintTypeInfo_d68759, moho::register_SFootprintTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SFootprint>`, vtable 0x00E0DE2C.
+   *
+   * Address: 0x00BC7E60 (FUN_00BC7E60 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF2350 (FUN_00BF2350 -- the global's destructor.)
+   * Address: 0x0050C5D0 (FUN_0050C5D0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0050C9B0 (FUN_0050C9B0 -- `Init`.)
+   * Address: 0x0050C5A0 (FUN_0050C5A0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0050C5B0 (FUN_0050C5B0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SFootprintSerializer : gpg::SerSaveLoadHelper<SFootprint>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AA42C -- process-global `SFootprintSerializer` singleton.
+  moho::SFootprintSerializer gSFootprintSerializer;
+} // namespace

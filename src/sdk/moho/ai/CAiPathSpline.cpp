@@ -26,6 +26,7 @@
 #include "moho/math/Vector3f.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -464,16 +465,6 @@ namespace
    * symbol). Collapsed into the canonical template alias.
    */
   gpg::PrimitiveSerHelper<moho::ECollisionType, int> gECollisionTypePrimitiveSerializer;
-
-  // Address: 0x010AE29C -- process-global `SCollisionInfoSerializer`
-  // singleton. Constructing it runs SCollisionInfoSerializer::
-  // SCollisionInfoSerializer() (0x00BCBDD0), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction. Its destructor (~SCollisionInfoSerializer,
-  // 0x00BF65B0) runs at normal static-duration teardown, matching the real
-  // binary's atexit registration.
-  moho::SCollisionInfoSerializer gSCollisionInfoSerializer;
 
   // Address: 0x010B2038 -- process-global `PrimitiveSerHelper<EPathPointState,int>`
   // singleton (constructed by FUN_00BD20E0, self-registering via `__xc_a`;
@@ -1906,65 +1897,6 @@ void FastVectorCPathPointTypeInfo::SetCount(void* obj, const int count) const
 }
 
 /**
- * Address: 0x00596870 (FUN_00596870, Moho::SCollisionInfoSerializer::Deserialize)
- */
-void SCollisionInfoSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  auto* const info = reinterpret_cast<SCollisionInfo*>(static_cast<std::uintptr_t>(objectPtr));
-  if (archive == nullptr || info == nullptr) {
-    return;
-  }
-  info->MemberDeserialize(archive);
-}
-
-/**
- * Address: 0x00596880 (FUN_00596880, Moho::SCollisionInfoSerializer::Serialize)
- */
-void SCollisionInfoSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  auto* const info = reinterpret_cast<SCollisionInfo*>(static_cast<std::uintptr_t>(objectPtr));
-  if (archive == nullptr || info == nullptr) {
-    return;
-  }
-  info->MemberSerialize(archive);
-}
-
-/**
- * Address: 0x00BCBDD0 (FUN_00BCBDD0, dynamic initializer for the global
- * `SCollisionInfoSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`) and binds the load/save callback fields.
- */
-SCollisionInfoSerializer::SCollisionInfoSerializer()
-  : mDeserialize(&SCollisionInfoSerializer::Deserialize)
-  , mSerialize(&SCollisionInfoSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BF65B0 (FUN_00BF65B0, ??1SCollisionInfoSerializer@Moho@@QAE@@Z)
- *
- * What it does:
- * Unlinks this helper node from whatever intrusive list it currently sits in
- * and restores a self-linked sentinel state.
- */
-SCollisionInfoSerializer::~SCollisionInfoSerializer() = default;
-
-/**
- * Address: 0x00598390 (FUN_00598390, gpg::SerSaveLoadHelper<Moho::SCollisionInfo>::Init)
- */
-void SCollisionInfoSerializer::Init()
-{
-  gpg::RType* const type = ResolveSCollisionInfoType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mDeserialize;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSerialize;
-}
-
-/**
  * Address: 0x0062F9F0 (FUN_0062F9F0, Moho::CPathPoint::MemberDeserialize)
  *
  * What it does:
@@ -2108,3 +2040,72 @@ GPG_PREREGISTER_INIT(register_FastVectorCPathPointType_9ee641, moho::register_Fa
 GPG_PREREGISTER_INIT(preregister_FastVectorCPathPointType_9ee641, preregister_FastVectorCPathPointType)
 GPG_PREREGISTER_INIT(construct_EPathPointStateTypeInfo_9ee641, construct_EPathPointStateTypeInfo)
 GPG_PREREGISTER_INIT(construct_CPathPointTypeInfo_9ee641, construct_CPathPointTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiPathSpline>`, vtable 0x00E1C8DC.
+   *
+   * Address: 0x00BCD350 (FUN_00BCD350 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF7540 (FUN_00BF7540 -- the global's destructor.)
+   * Address: 0x005B24F0 (FUN_005B24F0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005B2520 (FUN_005B2520 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005B56F0 (FUN_005B56F0 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x005B5700 (FUN_005B5700 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005B5A70 (FUN_005B5A70 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x005B5A80 (FUN_005B5A80 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005B48E0 (FUN_005B48E0 -- `Init`.)
+   * Address: 0x005B24A0 (FUN_005B24A0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005B24B0 (FUN_005B24B0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiPathSplineSerializer : gpg::SerSaveLoadHelper<CAiPathSpline>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AF098 -- process-global `CAiPathSplineSerializer` singleton.
+  moho::CAiPathSplineSerializer gCAiPathSplineSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SCollisionInfo>`, vtable 0x00E1B320.
+   *
+   * Address: 0x00BCBDD0 (FUN_00BCBDD0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF65B0 (FUN_00BF65B0 -- the global's destructor.)
+   * Address: 0x00598390 (FUN_00598390 -- `Init`.)
+   * Address: 0x00596870 (FUN_00596870 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00596880 (FUN_00596880 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SCollisionInfoSerializer : gpg::SerSaveLoadHelper<SCollisionInfo>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE29C -- process-global `SCollisionInfoSerializer` singleton.
+  moho::SCollisionInfoSerializer gSCollisionInfoSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SContinueInfo>`, vtable 0x00E1C89C.
+   *
+   * Address: 0x00BCD2F0 (FUN_00BCD2F0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF74B0 (FUN_00BF74B0 -- the global's destructor.)
+   * Address: 0x005B4820 (FUN_005B4820 -- `Init`.)
+   * Address: 0x005B2290 (FUN_005B2290 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005B22A0 (FUN_005B22A0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SContinueInfoSerializer : gpg::SerSaveLoadHelper<SContinueInfo>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AEF74 -- process-global `SContinueInfoSerializer` singleton.
+  moho::SContinueInfoSerializer gSContinueInfoSerializer;
+} // namespace

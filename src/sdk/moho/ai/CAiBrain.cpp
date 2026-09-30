@@ -71,6 +71,7 @@
 #include "moho/unit/core/Unit.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
@@ -8803,4 +8804,27 @@ namespace
 {
   // Address: 0x010AD510 -- process-global `CAiBrainConstruct` singleton.
   moho::CAiBrainConstruct gCAiBrainConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiBrain>`, vtable 0x00E19A58.
+   *
+   * Address: 0x00BCB430 (FUN_00BCB430 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF62F0 (FUN_00BF62F0 -- the global's destructor.)
+   * Address: 0x00579DE0 (FUN_00579DE0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x00579E10 (FUN_00579E10 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x0057E460 (FUN_0057E460 -- `Init`.)
+   * Address: 0x00579D90 (FUN_00579D90 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00579DA0 (FUN_00579DA0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiBrainSerializer : gpg::SerSaveLoadHelper<CAiBrain>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AD79C -- process-global `CAiBrainSerializer` singleton.
+  moho::CAiBrainSerializer gCAiBrainSerializer;
 } // namespace

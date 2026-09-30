@@ -1,5 +1,6 @@
-#include "moho/serialization/serializers/SWorldParticleSerializer.h"
 
+#include <cstddef>
+#include "gpg/core/reflection/Reflection.h"
 #include <cstdint>
 #include <typeinfo>
 
@@ -10,7 +11,6 @@
 
 namespace
 {
-  moho::SWorldParticleSerializer gSWorldParticleSerializer;
 
   /**
    * Address: 0x00BC53C0 (FUN_00BC53C0, dynamic initializer for the global
@@ -60,77 +60,8 @@ namespace
    */
   gpg::PrimitiveSerHelper<moho::SWorldParticle::ZMode, int> gSWorldParticleZModePrimitiveSerializer;
 
-  template <typename TType>
-  [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cached)
-  {
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(TType));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSWorldParticleType()
-  {
-    return ResolveCachedType<moho::SWorldParticle>(moho::SWorldParticle::sType);
-  }
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00BC5480 (FUN_00BC5480, register_SWorldParticleSerializer)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  SWorldParticleSerializer::SWorldParticleSerializer()
-    : mDeserialize(&SWorldParticleSerializer::Deserialize)
-    , mSerialize(&SWorldParticleSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BEFFE0 (FUN_00BEFFE0, Moho::SWorldParticleSerializer::~SWorldParticleSerializer)
-   *
-   * What it does:
-   * Unlinks the `SWorldParticleSerializer` helper node and rewires
-   * self-links.
-   */
-  SWorldParticleSerializer::~SWorldParticleSerializer() = default;
-
-  /**
-   * Address: 0x0048F8D0 (Moho::SWorldParticleSerializer::Deserialize)
-   */
-  void SWorldParticleSerializer::Deserialize(
-    gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/
-  )
-  {
-    auto* const object = reinterpret_cast<SWorldParticle*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0048F8E0 (Moho::SWorldParticleSerializer::Serialize)
-   */
-  void SWorldParticleSerializer::Serialize(
-    gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/
-  )
-  {
-    const auto* const object = reinterpret_cast<const SWorldParticle*>(static_cast<std::uintptr_t>(objectPtr));
-    object->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x0048FD30 (Moho::SWorldParticleSerializer::Init)
-   */
-  void SWorldParticleSerializer::Init()
-  {
-    gpg::RType* const type = ResolveSWorldParticleType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
 } // namespace moho

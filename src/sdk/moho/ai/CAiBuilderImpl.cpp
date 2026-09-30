@@ -729,3 +729,28 @@ namespace
   // Address: 0x010AE644 -- process-global `CAiBuilderImplConstruct` singleton.
   moho::CAiBuilderImplConstruct gCAiBuilderImplConstruct;
 } // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CAiBuilderImpl>`, vtable 0x00E1B80C.
+   *
+   * Address: 0x00BCC320 (FUN_00BCC320 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF6AF0 (FUN_00BF6AF0 -- the global's destructor.)
+   * Address: 0x0059FE70 (FUN_0059FE70 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x0059FEA0 (FUN_0059FEA0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x005A1CF0 (FUN_005A1CF0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005A21F0 (FUN_005A21F0 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x005A06D0 (FUN_005A06D0 -- `Init`.)
+   * Address: 0x0059FE20 (FUN_0059FE20 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0059FE30 (FUN_0059FE30 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CAiBuilderImplSerializer : gpg::SerSaveLoadHelper<CAiBuilderImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE5CC -- process-global `CAiBuilderImplSerializer` singleton.
+  moho::CAiBuilderImplSerializer gCAiBuilderImplSerializer;
+} // namespace

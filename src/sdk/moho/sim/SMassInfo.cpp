@@ -81,3 +81,24 @@ namespace moho
     archive->WriteFloat(mVal);
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SMassInfo>`, vtable 0x00E1AF4C.
+   *
+   * Address: 0x00BCB700 (FUN_00BCB700 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF64C0 (FUN_00BF64C0 -- the global's destructor.)
+   * Address: 0x00591B90 (FUN_00591B90 -- `Init`.)
+   * Address: 0x00585E10 (FUN_00585E10 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00585E20 (FUN_00585E20 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SMassInfoSerializer : gpg::SerSaveLoadHelper<SMassInfo>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AE004 -- process-global `SMassInfoSerializer` singleton.
+  moho::SMassInfoSerializer gSMassInfoSerializer;
+} // namespace
