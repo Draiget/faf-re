@@ -22,6 +22,12 @@
 #endif
 #endif
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   /**
@@ -94,6 +100,18 @@ namespace moho
      * Multiplies all scalar lanes by one uniform scalar.
      */
     Vector4f& operator*=(float scalar) noexcept;
+
+    /**
+     * What it does:
+     * Reads `x`, `y`, `z`, `w`. Inlined into `gpg::SerSaveLoadHelper<Vector4f>::Deserialize` 0x004EAF70.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * What it does:
+     * Writes `x`, `y`, `z`, `w`. Inlined into `gpg::SerSaveLoadHelper<Vector4f>::Serialize` 0x004EAFB0.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
 #if MOHO_USE_SSE2
     // Unaligned load/store keeps ABI alignment at 4 bytes.

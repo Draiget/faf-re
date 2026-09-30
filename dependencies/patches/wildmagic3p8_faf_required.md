@@ -6,6 +6,13 @@
 > nothing is applied at build time. `docker/scripts/Apply-Patches.ps1` verifies
 > it by content instead (358 added lines, all confirmed present).
 >
+> **The archive predates three later additions (2026-10-01)**: the
+> `Wm3::IVector2<Int>` / `Wm3::IVector3<Int>` headers, the serialize-hook
+> declarations on `Vector2`, `Vector3`, `Quaternion` and `AxisAlignedBox3`,
+> and the removal of the `Vector2<int>`/`Vector3<int>` typedefs. Until the
+> archive is re-cut from a tree with this patch applied, `Apply-Patches.ps1`
+> reports those lines missing, and the SDK does not compile against it.
+>
 > The archive also carries two things this patch does **not** cover, and which
 > would be lost if the tree were rebuilt from a vendor release:
 >   * the `.vcxproj` files (`Foundation`, `Dx9Renderer`, `Dx9Application`),
@@ -36,6 +43,8 @@ Patched files in `wildmagic3p8_faf_required.patch`:
 
 - `Foundation/Math/Wm3AxisAlignedBox3.h`
 - `Foundation/Math/Wm3Box3.h`
+- `Foundation/Math/Wm3IVector2.h` (new file)
+- `Foundation/Math/Wm3IVector3.h` (new file)
 - `Foundation/Math/Wm3Quaternion.h`
 - `Foundation/Math/Wm3Quaternion.inl`
 - `Foundation/Math/Wm3Sphere3.h`
@@ -75,12 +84,34 @@ do not collide with — upstream's instance methods (`Length`, `Dot`, `Cross`,
 `Normalize`).
 
 A handful of FAF SDK aliases are also added next to the upstream typedefs:
-`Vector2i`/`Vec2`/`Vec2f`/`Vec2i`, `Vector3i`/`Vec3`/`Vec3f`/`Vec3i`, and
-`Quat`/`Quatf`. Two free-function helpers are added at the end of
+`Vec2`/`Vec2f`, `Vec3`/`Vec3f`, and `Quat`/`Quatf`. `Vector2i`/`Vec2i` and
+`Vector3i`/`Vec3i` are not `Vector2<int>`/`Vector3<int>`: see the IVector
+section below. Two free-function helpers are added at the end of
 `Wm3Vector3.h` (`Wm3::Vector3fIsntNaN` and `Wm3::SqrtfBinary`, both originally
 recovered from the FA binary), and one at the end of `Wm3Quaternion.h`
 (`Wm3::MultiplyQuaternionVector`, the FA `FUN_00452D40` quaternion-vector
 helper).
+
+`Vector2`, `Vector3` and `Quaternion` also get `MemberSerialize` /
+`MemberDeserialize` declarations, the hooks `gpg::SerSaveLoadHelper<T>` calls.
+The float specializations are defined in `src/sdk/moho/math/MathReflection.cpp`.
+
+### IVector2 / IVector3: GPG's integer vectors (new files)
+
+The FA binary has no `Wm3::Vector2<int>` or `Wm3::Vector3<int>`. Its RTTI
+names GPG's own `Wm3::IVector2<int>` and `Wm3::IVector3<int>`: the key of
+`CAiBrain::mBuildStructureMap`, the two `gpg::SerSaveLoadHelper`
+instantiations, and the return type in
+`RD3DTextureResource::SheetGetOriginalTextureDimensions`'s mangled name.
+`Wm3IVector2.h` / `Wm3IVector3.h` define them (x/y[/z] over an `Int[N]`
+union, `operator[]`, `X()`/`Y()`/`Z()`, `==`/`!=`, serialize hooks), and
+`Wm3Vector2.h` / `Wm3Vector3.h` include them and drop their `int` typedefs,
+so `Vector2i`/`Vec2i`/`Vector3i`/`Vec3i` now name the GPG types.
+
+`IVector2::operator<` compares component by component as signed ints, the
+two-iteration `jl`/`jg` loop the map lower-bound walk at 0x005808D0 inlines.
+`Vector2<int>`'s `memcmp` ordering, which the SDK used before, sorts
+little-endian bytes and put the build-structure map in a different order.
 
 ### AxisAlignedBox3: typed Min/Max as Vector3<Real>
 
@@ -91,7 +122,9 @@ indexes `Min[0]`/`Max[2]` continues to work via `Vector3<Real>::operator[]`. FAF
 SDK consumers gain `bounds.Min.x` / `bounds.Max.z` field-style access. A
 two-vector brace ctor `AxisAlignedBox3(const Vector3<Real>& min, const
 Vector3<Real>& max)` is added so the SDK helpers that build empty/invalid
-sentinels via `{minVec, maxVec}` keep compiling.
+sentinels via `{minVec, maxVec}` keep compiling. `MemberSerialize` /
+`MemberDeserialize` are declared as on `Box3`; the float specializations are
+in `src/sdk/moho/math/MathReflection.cpp`.
 
 ### Box3: helper API for the FAF OBB consumers
 

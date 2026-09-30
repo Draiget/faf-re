@@ -23,162 +23,11 @@
 
 namespace
 {
-  // Address: 0x010A9634 -- process-global `Vector2iSerializer` singleton.
-  moho::Vector2iSerializer gVector2iSerializer;
-  // Address: 0x010A9648 -- process-global `Vector3iSerializer` singleton.
-  moho::Vector3iSerializer gVector3iSerializer;
-  // Address: 0x010A965C -- process-global `Vector2fSerializer` singleton.
-  moho::Vector2fSerializer gVector2fSerializer;
-  // Address: 0x010A97C4 -- process-global `Vector3fSerializer` singleton.
-  moho::Vector3fSerializer gVector3fSerializer;
-  // Address: 0x010A98B4 -- process-global `Vector4fSerializer` singleton.
-  moho::Vector4fSerializer gVector4fSerializer;
-  // Address: 0x010A983C -- process-global `QuaternionfSerializer` singleton.
-  moho::QuaternionfSerializer gQuaternionfSerializer;
-  // Address: 0x010A974C -- process-global `VEulers3Serializer` singleton.
-  moho::VEulers3Serializer gVEulers3Serializer;
-
   [[nodiscard]] gpg::RType* ResolveVector3fType()
   {
     static gpg::RType* cached = nullptr;
     if (cached == nullptr) {
       cached = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x004ED140 (FUN_004ED140) call site.
-   *
-   * What it does:
-   * Lazily resolves and caches the `Wm3::AxisAlignedBox3f` reflection type,
-   * mirroring the binary's per-type cached `sType` static used by
-   * `AxisAlignedBox3fSerializer::Init`.
-   */
-  [[nodiscard]] gpg::RType* ResolveAxisAlignedBox3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(Wm3::AxisAlignedBox3f));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x004ED1E0 (FUN_004ED1E0) call site.
-   *
-   * What it does:
-   * Lazily resolves and caches the `Wm3::Vector2i` reflection type, mirroring
-   * the binary's per-type cached `sType` static used by
-   * `Vector2iSerializer::Init`.
-   */
-  [[nodiscard]] gpg::RType* ResolveVector2iType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector2i));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x004ED280 (FUN_004ED280) call site.
-   *
-   * What it does:
-   * Lazily resolves and caches the `Wm3::Vector3i` reflection type, mirroring
-   * the binary's per-type cached `sType` static used by
-   * `Vector3iSerializer::Init`.
-   */
-  [[nodiscard]] gpg::RType* ResolveVector3iType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3i));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x004ED320 (FUN_004ED320) call site.
-   *
-   * What it does:
-   * Lazily resolves and caches the `Wm3::Vector2<float>` reflection type,
-   * mirroring the binary's per-type cached `sType` static used by
-   * `Vector2fSerializer::Init`.
-   */
-  [[nodiscard]] gpg::RType* ResolveVector2fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector2<float>));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x004ED460 (FUN_004ED460) call site.
-   *
-   * What it does:
-   * Lazily resolves and caches the `moho::Vector4f` reflection type,
-   * mirroring the binary's per-type cached `sType` static used by
-   * `Vector4fSerializer::Init`.
-   */
-  [[nodiscard]] gpg::RType* ResolveVector4fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::Vector4f));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x004ED500 (FUN_004ED500) call site.
-   *
-   * What it does:
-   * Lazily resolves and caches the `Wm3::Quaternion<float>` reflection type,
-   * mirroring the binary's per-type cached `sType` static used by
-   * `QuaternionfSerializer::Init`.
-   */
-  [[nodiscard]] gpg::RType* ResolveQuaternionfType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(Wm3::Quaternion<float>));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x004ED5A0 (FUN_004ED5A0) call site.
-   *
-   * What it does:
-   * Lazily resolves and caches the `moho::VEulers3` reflection type,
-   * mirroring the binary's per-type cached `sType` static used by
-   * `VEulers3Serializer::Init`.
-   */
-  [[nodiscard]] gpg::RType* ResolveVEulers3Type()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::VEulers3));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x004ED640 (FUN_004ED640) call site.
-   *
-   * What it does:
-   * Lazily resolves and caches the `moho::VAxes3` reflection type, mirroring
-   * the binary's per-type cached `sType` static used by
-   * `VAxes3Serializer::Init`.
-   */
-  [[nodiscard]] gpg::RType* ResolveVAxes3Type()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::VAxes3));
     }
     return cached;
   }
@@ -536,15 +385,6 @@ namespace moho
   }
 
   /**
-   * `FUN_004EA1A0`/`FUN_004EA1D0` (cleanup_AxisAlignedBox3fSerializerVariant1/2)
-   * removed here: both are zero-xref dead duplicate unlink-helper fragments
-   * (confirmed via `FUN_004EA1A0.xrefs.txt`/`FUN_004EA1D0.xrefs.txt`,
-   * `xrefs_total: 0`), matching the same pattern already found and skipped
-   * across every other file in this campaign (e.g. `CColPrimitiveBox3f.cpp`'s
-   * `FUN_004FF8D0`/`FUN_004FF900`). Marked `skip` in the progress DB.
-   */
-
-  /**
    * Address: 0x004EA200 (FUN_004EA200, Moho::Vector2iTypeInfo::Vector2iTypeInfo)
    */
   Vector2iTypeInfo::Vector2iTypeInfo()
@@ -576,70 +416,6 @@ namespace moho
     AddField<int>("x", offsetof(Vector2i, x));
     AddField<int>("y", offsetof(Vector2i, y));
     Finish();
-  }
-
-  /**
-   * Address: 0x004EA370 (FUN_004EA370, Moho::Vector2iSerializer::Deserialize)
-   */
-  void Vector2iSerializer::Deserialize(gpg::ReadArchive* const archive, Vector2i* const vector)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(vector != nullptr);
-    if (archive == nullptr || vector == nullptr) {
-      return;
-    }
-
-    archive->ReadInt(&vector->x);
-    archive->ReadInt(&vector->y);
-  }
-
-  /**
-   * Address: 0x004EA3A0 (FUN_004EA3A0, Moho::Vector2iSerializer::Serialize)
-   */
-  void Vector2iSerializer::Serialize(gpg::WriteArchive* const archive, Vector2i* const vector)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(vector != nullptr);
-    if (archive == nullptr || vector == nullptr) {
-      return;
-    }
-
-    archive->WriteInt(vector->x);
-    archive->WriteInt(vector->y);
-  }
-
-  /**
-   * `FUN_004EA400`/`FUN_004EA430` (cleanup_Vector2iSerializerVariant1/2)
-   * removed here: both are zero-xref dead duplicate unlink-helper fragments
-   * (confirmed via `FUN_004EA400.xrefs.txt`/`FUN_004EA430.xrefs.txt`,
-   * `xrefs_total: 0`). Marked `skip` in the progress DB.
-   */
-
-  /**
-   * Address: 0x00BC6CC0 (FUN_00BC6CC0, dynamic initializer for the global
-   * `Vector2iSerializer` singleton)
-   */
-  Vector2iSerializer::Vector2iSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Vector2iSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Vector2iSerializer::Serialize))
-  {
-  }
-
-  /**
-   * Address: 0x00BF12C0 (FUN_00BF12C0, Moho::Vector2iSerializer::~Vector2iSerializer)
-   */
-  Vector2iSerializer::~Vector2iSerializer() = default;
-
-  /**
-   * Address: 0x004ED1E0 (FUN_004ED1E0, Moho::Vector2iSerializer::Init)
-   */
-  void Vector2iSerializer::Init()
-  {
-    gpg::RType* const type = ResolveVector2iType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -678,72 +454,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EA650 (FUN_004EA650, Moho::Vector3iSerializer::Deserialize)
-   */
-  void Vector3iSerializer::Deserialize(gpg::ReadArchive* const archive, Vector3i* const vector)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(vector != nullptr);
-    if (archive == nullptr || vector == nullptr) {
-      return;
-    }
-
-    archive->ReadInt(&vector->x);
-    archive->ReadInt(&vector->y);
-    archive->ReadInt(&vector->z);
-  }
-
-  /**
-   * Address: 0x004EA690 (FUN_004EA690, Moho::Vector3iSerializer::Serialize)
-   */
-  void Vector3iSerializer::Serialize(gpg::WriteArchive* const archive, Vector3i* const vector)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(vector != nullptr);
-    if (archive == nullptr || vector == nullptr) {
-      return;
-    }
-
-    archive->WriteInt(vector->x);
-    archive->WriteInt(vector->y);
-    archive->WriteInt(vector->z);
-  }
-
-  /**
-   * `FUN_004EA700`/`FUN_004EA730` (cleanup_Vector3iSerializerVariant1/2)
-   * removed here: both are zero-xref dead duplicate unlink-helper fragments
-   * (confirmed via `FUN_004EA700.xrefs.txt`/`FUN_004EA730.xrefs.txt`,
-   * `xrefs_total: 0`). Marked `skip` in the progress DB.
-   */
-
-  /**
-   * Address: 0x00BC6D20 (FUN_00BC6D20, dynamic initializer for the global
-   * `Vector3iSerializer` singleton)
-   */
-  Vector3iSerializer::Vector3iSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Vector3iSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Vector3iSerializer::Serialize))
-  {
-  }
-
-  /**
-   * Address: 0x00BF1350 (FUN_00BF1350, Moho::Vector3iSerializer::~Vector3iSerializer)
-   */
-  Vector3iSerializer::~Vector3iSerializer() = default;
-
-  /**
-   * Address: 0x004ED280 (FUN_004ED280, Moho::Vector3iSerializer::Init)
-   */
-  void Vector3iSerializer::Init()
-  {
-    gpg::RType* const type = ResolveVector3iType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x004EA7C0 (FUN_004EA7C0, Moho::Vector2fTypeInfo::Vector2fTypeInfo)
    */
   Vector2fTypeInfo::Vector2fTypeInfo()
@@ -777,70 +487,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EA930 (FUN_004EA930, Moho::Vector2fSerializer::Deserialize)
-   */
-  void Vector2fSerializer::Deserialize(gpg::ReadArchive* const archive, Vector2f* const vector)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(vector != nullptr);
-    if (archive == nullptr || vector == nullptr) {
-      return;
-    }
-
-    archive->ReadFloat(&vector->x);
-    archive->ReadFloat(&vector->y);
-  }
-
-  /**
-   * Address: 0x004EA960 (FUN_004EA960, Moho::Vector2fSerializer::Serialize)
-   */
-  void Vector2fSerializer::Serialize(gpg::WriteArchive* const archive, Vector2f* const vector)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(vector != nullptr);
-    if (archive == nullptr || vector == nullptr) {
-      return;
-    }
-
-    archive->WriteFloat(vector->x);
-    archive->WriteFloat(vector->y);
-  }
-
-  /**
-   * `FUN_004EA9C0`/`FUN_004EA9F0` (cleanup_Vector2fSerializerVariant1/2)
-   * removed here: both are zero-xref dead duplicate unlink-helper fragments
-   * (confirmed via `FUN_004EA9C0.xrefs.txt`/`FUN_004EA9F0.xrefs.txt`,
-   * `xrefs_total: 0`). Marked `skip` in the progress DB.
-   */
-
-  /**
-   * Address: 0x00BC6D80 (FUN_00BC6D80, dynamic initializer for the global
-   * `Vector2fSerializer` singleton)
-   */
-  Vector2fSerializer::Vector2fSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Vector2fSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Vector2fSerializer::Serialize))
-  {
-  }
-
-  /**
-   * Address: 0x00BF13E0 (FUN_00BF13E0, Moho::Vector2fSerializer::~Vector2fSerializer)
-   */
-  Vector2fSerializer::~Vector2fSerializer() = default;
-
-  /**
-   * Address: 0x004ED320 (FUN_004ED320, Moho::Vector2fSerializer::Init)
-   */
-  void Vector2fSerializer::Init()
-  {
-    gpg::RType* const type = ResolveVector2fType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x004EAA90 (FUN_004EAA90, Moho::Vector3fTypeInfo::Vector3fTypeInfo)
    */
   Vector3fTypeInfo::Vector3fTypeInfo()
@@ -871,72 +517,6 @@ namespace moho
     gpg::RType::Init();
     RegisterXyzFloatReflectionFields(this);
     Finish();
-  }
-
-  /**
-   * Address: 0x004EAC20 (FUN_004EAC20, Moho::Vector3fSerializer::Deserialize)
-   */
-  void Vector3fSerializer::Deserialize(gpg::ReadArchive* const archive, Vector3f* const vector)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(vector != nullptr);
-    if (archive == nullptr || vector == nullptr) {
-      return;
-    }
-
-    archive->ReadFloat(&vector->x);
-    archive->ReadFloat(&vector->y);
-    archive->ReadFloat(&vector->z);
-  }
-
-  /**
-   * Address: 0x004EAC60 (FUN_004EAC60, Moho::Vector3fSerializer::Serialize)
-   */
-  void Vector3fSerializer::Serialize(gpg::WriteArchive* const archive, Vector3f* const vector)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(vector != nullptr);
-    if (archive == nullptr || vector == nullptr) {
-      return;
-    }
-
-    archive->WriteFloat(vector->x);
-    archive->WriteFloat(vector->y);
-    archive->WriteFloat(vector->z);
-  }
-
-  /**
-   * `FUN_004EACD0`/`FUN_004EAD00` (cleanup_Vector3fSerializerVariant1/2)
-   * removed here: both are zero-xref dead duplicate unlink-helper fragments
-   * (confirmed via `FUN_004EACD0.xrefs.txt`/`FUN_004EAD00.xrefs.txt`,
-   * `xrefs_total: 0`). Marked `skip` in the progress DB.
-   */
-
-  /**
-   * Address: 0x00BC6DE0 (FUN_00BC6DE0, dynamic initializer for the global
-   * `Vector3fSerializer` singleton)
-   */
-  Vector3fSerializer::Vector3fSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Vector3fSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Vector3fSerializer::Serialize))
-  {
-  }
-
-  /**
-   * Address: 0x00BF1470 (FUN_00BF1470, Moho::Vector3fSerializer::~Vector3fSerializer)
-   */
-  Vector3fSerializer::~Vector3fSerializer() = default;
-
-  /**
-   * Address: 0x004ED3C0 (FUN_004ED3C0, Moho::Vector3fSerializer::Init)
-   */
-  void Vector3fSerializer::Init()
-  {
-    gpg::RType* const type = ResolveVector3fType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -976,74 +556,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EAF70 (FUN_004EAF70, Moho::Vector4fSerializer::Deserialize)
-   */
-  void Vector4fSerializer::Deserialize(gpg::ReadArchive* const archive, Vector4f* const vector)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(vector != nullptr);
-    if (archive == nullptr || vector == nullptr) {
-      return;
-    }
-
-    archive->ReadFloat(&vector->x);
-    archive->ReadFloat(&vector->y);
-    archive->ReadFloat(&vector->z);
-    archive->ReadFloat(&vector->w);
-  }
-
-  /**
-   * Address: 0x004EAFB0 (FUN_004EAFB0, Moho::Vector4fSerializer::Serialize)
-   */
-  void Vector4fSerializer::Serialize(gpg::WriteArchive* const archive, Vector4f* const vector)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(vector != nullptr);
-    if (archive == nullptr || vector == nullptr) {
-      return;
-    }
-
-    archive->WriteFloat(vector->x);
-    archive->WriteFloat(vector->y);
-    archive->WriteFloat(vector->z);
-    archive->WriteFloat(vector->w);
-  }
-
-  /**
-   * `FUN_004EB030`/`FUN_004EB060` (cleanup_Vector4fSerializerVariant1/2)
-   * removed here: both are zero-xref dead duplicate unlink-helper fragments
-   * (confirmed via `FUN_004EB030.xrefs.txt`/`FUN_004EB060.xrefs.txt`,
-   * `xrefs_total: 0`). Marked `skip` in the progress DB.
-   */
-
-  /**
-   * Address: 0x00BC6E40 (FUN_00BC6E40, dynamic initializer for the global
-   * `Vector4fSerializer` singleton)
-   */
-  Vector4fSerializer::Vector4fSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&Vector4fSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&Vector4fSerializer::Serialize))
-  {
-  }
-
-  /**
-   * Address: 0x00BF1500 (FUN_00BF1500, Moho::Vector4fSerializer::~Vector4fSerializer)
-   */
-  Vector4fSerializer::~Vector4fSerializer() = default;
-
-  /**
-   * Address: 0x004ED460 (FUN_004ED460, Moho::Vector4fSerializer::Init)
-   */
-  void Vector4fSerializer::Init()
-  {
-    gpg::RType* const type = ResolveVector4fType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x004EB120 (FUN_004EB120, Moho::QuaternionfTypeInfo::QuaternionfTypeInfo)
    */
   QuaternionfTypeInfo::QuaternionfTypeInfo()
@@ -1077,74 +589,6 @@ namespace moho
     AddField<float>("y", offsetof(Quaternionf, y));
     AddField<float>("z", offsetof(Quaternionf, z));
     Finish();
-  }
-
-  /**
-   * Address: 0x004EB2D0 (FUN_004EB2D0, Moho::QuaternionfSerializer::Deserialize)
-   */
-  void QuaternionfSerializer::Deserialize(gpg::ReadArchive* const archive, Quaternionf* const quaternion)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(quaternion != nullptr);
-    if (archive == nullptr || quaternion == nullptr) {
-      return;
-    }
-
-    archive->ReadFloat(&quaternion->y);
-    archive->ReadFloat(&quaternion->z);
-    archive->ReadFloat(&quaternion->w);
-    archive->ReadFloat(&quaternion->x);
-  }
-
-  /**
-   * Address: 0x004EB310 (FUN_004EB310, Moho::QuaternionfSerializer::Serialize)
-   */
-  void QuaternionfSerializer::Serialize(gpg::WriteArchive* const archive, Quaternionf* const quaternion)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(quaternion != nullptr);
-    if (archive == nullptr || quaternion == nullptr) {
-      return;
-    }
-
-    archive->WriteFloat(quaternion->y);
-    archive->WriteFloat(quaternion->z);
-    archive->WriteFloat(quaternion->w);
-    archive->WriteFloat(quaternion->x);
-  }
-
-  /**
-   * `FUN_004EB390`/`FUN_004EB3C0` (cleanup_QuaternionfSerializerVariant1/2)
-   * removed here: both are zero-xref dead duplicate unlink-helper fragments
-   * (confirmed via `FUN_004EB390.xrefs.txt`/`FUN_004EB3C0.xrefs.txt`,
-   * `xrefs_total: 0`). Marked `skip` in the progress DB.
-   */
-
-  /**
-   * Address: 0x00BC6EA0 (FUN_00BC6EA0, dynamic initializer for the global
-   * `QuaternionfSerializer` singleton)
-   */
-  QuaternionfSerializer::QuaternionfSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&QuaternionfSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&QuaternionfSerializer::Serialize))
-  {
-  }
-
-  /**
-   * Address: 0x00BF1590 (FUN_00BF1590, Moho::QuaternionfSerializer::~QuaternionfSerializer)
-   */
-  QuaternionfSerializer::~QuaternionfSerializer() = default;
-
-  /**
-   * Address: 0x004ED500 (FUN_004ED500, Moho::QuaternionfSerializer::Init)
-   */
-  void QuaternionfSerializer::Init()
-  {
-    gpg::RType* const type = ResolveQuaternionfType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
   }
 
   /**
@@ -1195,72 +639,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EC100 (FUN_004EC100, Moho::VEulers3Serializer::Deserialize)
-   */
-  void VEulers3Serializer::Deserialize(gpg::ReadArchive* const archive, VEulers3* const eulers)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(eulers != nullptr);
-    if (archive == nullptr || eulers == nullptr) {
-      return;
-    }
-
-    archive->ReadFloat(&eulers->r);
-    archive->ReadFloat(&eulers->p);
-    archive->ReadFloat(&eulers->y);
-  }
-
-  /**
-   * Address: 0x004EC140 (FUN_004EC140, Moho::VEulers3Serializer::Serialize)
-   */
-  void VEulers3Serializer::Serialize(gpg::WriteArchive* const archive, VEulers3* const eulers)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(eulers != nullptr);
-    if (archive == nullptr || eulers == nullptr) {
-      return;
-    }
-
-    archive->WriteFloat(eulers->r);
-    archive->WriteFloat(eulers->p);
-    archive->WriteFloat(eulers->y);
-  }
-
-  /**
-   * `FUN_004EC1B0`/`FUN_004EC1E0` (cleanup_VEulers3SerializerVariant1/2)
-   * removed here: both are zero-xref dead duplicate unlink-helper fragments
-   * (confirmed via `FUN_004EC1B0.xrefs.txt`/`FUN_004EC1E0.xrefs.txt`,
-   * `xrefs_total: 0`). Marked `skip` in the progress DB.
-   */
-
-  /**
-   * Address: 0x00BC6F00 (FUN_00BC6F00, dynamic initializer for the global
-   * `VEulers3Serializer` singleton)
-   */
-  VEulers3Serializer::VEulers3Serializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&VEulers3Serializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&VEulers3Serializer::Serialize))
-  {
-  }
-
-  /**
-   * Address: 0x00BF1620 (FUN_00BF1620, Moho::VEulers3Serializer::~VEulers3Serializer)
-   */
-  VEulers3Serializer::~VEulers3Serializer() = default;
-
-  /**
-   * Address: 0x004ED5A0 (FUN_004ED5A0, Moho::VEulers3Serializer::Init)
-   */
-  void VEulers3Serializer::Init()
-  {
-    gpg::RType* const type = ResolveVEulers3Type();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x004EC360 (FUN_004EC360, Moho::VAxes3TypeInfo::VAxes3TypeInfo)
    */
   VAxes3TypeInfo::VAxes3TypeInfo()
@@ -1294,13 +672,6 @@ namespace moho
     AddField<Wm3::Vector3f>("vZ", offsetof(VAxes3, vZ));
     Finish();
   }
-
-  /**
-   * `FUN_004EC530`/`FUN_004EC560` (cleanup_VAxes3SerializerVariant1/2)
-   * removed here: both are zero-xref dead duplicate unlink-helper fragments
-   * (confirmed via `FUN_004EC530.xrefs.txt`/`FUN_004EC560.xrefs.txt`,
-   * `xrefs_total: 0`). Marked `skip` in the progress DB.
-   */
 
   /**
    * Address: 0x004ECBD0 (FUN_004ECBD0, Moho::VEC_LookAt)
@@ -1404,32 +775,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EC4E0 (FUN_004EC4E0, Moho::VAxes3Serializer::DeserializeThunk)
-   */
-  void DeserializeVAxes3SerializerThunk(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    if (objectPtr == 0) {
-      return;
-    }
-
-  }
-
-  /**
-   * Address: 0x004EC4F0 (FUN_004EC4F0, Moho::VAxes3Serializer::SerializeThunk)
-   */
-  void SerializeVAxes3SerializerThunk(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    if (objectPtr == 0) {
-      return;
-    }
-
-  }
-
-  /**
    * Address: 0x004F00E0 (FUN_004F00E0, Moho::VMatrix4TypeInfo::VMatrix4TypeInfo)
    */
   VMatrix4TypeInfo::VMatrix4TypeInfo()
@@ -1460,13 +805,6 @@ namespace moho
     gpg::RType::Init();
     Finish();
   }
-
-  /**
-   * `FUN_004F0270`/`FUN_004F02A0` (cleanup_VMatrix4SerializerVariant1/2)
-   * removed here: both are zero-xref dead duplicate unlink-helper fragments
-   * (confirmed via `FUN_004F0270.xrefs.txt`/`FUN_004F02A0.xrefs.txt`,
-   * `xrefs_total: 0`). Marked `skip` in the progress DB.
-   */
 
   /**
    * Address: 0x004F0390 (FUN_004F0390, Moho::VMatrix4::MemberDeserialize)
@@ -2114,6 +1452,8 @@ namespace moho
    *
    * Address: 0x00BC70B0 (FUN_00BC70B0 -- constructs the global and registers its destructor.)
    * Address: 0x00BF1740 (FUN_00BF1740 -- the global's destructor.)
+   * Address: 0x004F0270 (FUN_004F0270 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004F02A0 (FUN_004F02A0 -- an unreferenced copy of the global's destructor.)
    * Address: 0x004F0300 (FUN_004F0300 -- `Init`.)
    * Address: 0x004F0220 (FUN_004F0220 -- `Deserialize`, a forward to `MemberDeserialize`.)
    * Address: 0x004F0230 (FUN_004F0230 -- `Serialize`, a forward to `MemberSerialize`.)
@@ -2170,6 +1510,8 @@ namespace moho
    *
    * Address: 0x00BC6F60 (FUN_00BC6F60 -- constructs the global and registers its destructor.)
    * Address: 0x00BF16B0 (FUN_00BF16B0 -- the global's destructor.)
+   * Address: 0x004EC530 (FUN_004EC530 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004EC560 (FUN_004EC560 -- an unreferenced copy of the global's destructor.)
    * Address: 0x004ED640 (FUN_004ED640 -- `Init`.)
    * Address: 0x004EC4E0 (FUN_004EC4E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
    * Address: 0x004EC4F0 (FUN_004EC4F0 -- `Serialize`, a forward to `MemberSerialize`.)
@@ -2183,6 +1525,162 @@ namespace
   // Address: 0x010A992C -- process-global `VAxes3Serializer` singleton.
   moho::VAxes3Serializer gVAxes3Serializer;
 } // namespace
+
+namespace Wm3
+{
+  /**
+   * What it does:
+   * Reads `x`, `y`. Inlined into `gpg::SerSaveLoadHelper<Wm3::Vector2i>::Deserialize` 0x004EA370.
+   */
+  template <>
+  void IVector2<int>::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->ReadInt(&x);
+    archive->ReadInt(&y);
+  }
+
+  /**
+   * What it does:
+   * Writes `x`, `y`. Inlined into `gpg::SerSaveLoadHelper<Wm3::Vector2i>::Serialize` 0x004EA3A0.
+   */
+  template <>
+  void IVector2<int>::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteInt(x);
+    archive->WriteInt(y);
+  }
+
+  /**
+   * What it does:
+   * Reads `x`, `y`, `z`. Inlined into `gpg::SerSaveLoadHelper<Wm3::Vector3i>::Deserialize` 0x004EA650.
+   */
+  template <>
+  void IVector3<int>::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->ReadInt(&x);
+    archive->ReadInt(&y);
+    archive->ReadInt(&z);
+  }
+
+  /**
+   * What it does:
+   * Writes `x`, `y`, `z`. Inlined into `gpg::SerSaveLoadHelper<Wm3::Vector3i>::Serialize` 0x004EA690.
+   */
+  template <>
+  void IVector3<int>::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteInt(x);
+    archive->WriteInt(y);
+    archive->WriteInt(z);
+  }
+
+  /**
+   * What it does:
+   * Reads `x`, `y`. Inlined into `gpg::SerSaveLoadHelper<Wm3::Vector2f>::Deserialize` 0x004EA930.
+   */
+  template <>
+  void Vector2<float>::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->ReadFloat(&x);
+    archive->ReadFloat(&y);
+  }
+
+  /**
+   * What it does:
+   * Writes `x`, `y`. Inlined into `gpg::SerSaveLoadHelper<Wm3::Vector2f>::Serialize` 0x004EA960.
+   */
+  template <>
+  void Vector2<float>::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteFloat(x);
+    archive->WriteFloat(y);
+  }
+
+  /**
+   * What it does:
+   * Reads `x`, `y`, `z`. Inlined into `gpg::SerSaveLoadHelper<Wm3::Vector3f>::Deserialize` 0x004EAC20.
+   */
+  template <>
+  void Vector3<float>::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->ReadFloat(&x);
+    archive->ReadFloat(&y);
+    archive->ReadFloat(&z);
+  }
+
+  /**
+   * What it does:
+   * Writes `x`, `y`, `z`. Inlined into `gpg::SerSaveLoadHelper<Wm3::Vector3f>::Serialize` 0x004EAC60.
+   */
+  template <>
+  void Vector3<float>::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteFloat(x);
+    archive->WriteFloat(y);
+    archive->WriteFloat(z);
+  }
+
+  /**
+   * What it does:
+   * Reads `x`, `y`, `z`, then `w` (+0x04, +0x08, +0x0C, +0x00). Inlined into
+   * `gpg::SerSaveLoadHelper<Wm3::Quaternionf>::Deserialize` 0x004EB2D0.
+   */
+  template <>
+  void Quaternion<float>::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->ReadFloat(&x);
+    archive->ReadFloat(&y);
+    archive->ReadFloat(&z);
+    archive->ReadFloat(&w);
+  }
+
+  /**
+   * What it does:
+   * Writes `x`, `y`, `z`, then `w`. Inlined into
+   * `gpg::SerSaveLoadHelper<Wm3::Quaternionf>::Serialize` 0x004EB310.
+   */
+  template <>
+  void Quaternion<float>::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteFloat(x);
+    archive->WriteFloat(y);
+    archive->WriteFloat(z);
+    archive->WriteFloat(w);
+  }
+} // namespace Wm3
+
+namespace moho
+{
+  void Vector4f::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->ReadFloat(&x);
+    archive->ReadFloat(&y);
+    archive->ReadFloat(&z);
+    archive->ReadFloat(&w);
+  }
+
+  void Vector4f::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteFloat(x);
+    archive->WriteFloat(y);
+    archive->WriteFloat(z);
+    archive->WriteFloat(w);
+  }
+
+  void VEulers3::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->ReadFloat(&r);
+    archive->ReadFloat(&p);
+    archive->ReadFloat(&y);
+  }
+
+  void VEulers3::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteFloat(r);
+    archive->WriteFloat(p);
+    archive->WriteFloat(y);
+  }
+} // namespace moho
 
 namespace Wm3
 {
@@ -2228,6 +1726,8 @@ namespace moho
    *
    * Address: 0x00BC6C60 (FUN_00BC6C60 -- constructs the global and registers its destructor.)
    * Address: 0x00BF1230 (FUN_00BF1230 -- the global's destructor.)
+   * Address: 0x004EA1A0 (FUN_004EA1A0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004EA1D0 (FUN_004EA1D0 -- an unreferenced copy of the global's destructor.)
    * Address: 0x004ED140 (FUN_004ED140 -- `Init`.)
    * Address: 0x004EA140 (FUN_004EA140 -- `Deserialize`, a forward to `MemberDeserialize`.)
    * Address: 0x004EA150 (FUN_004EA150 -- `Serialize`, a forward to `MemberSerialize`.)
@@ -2240,4 +1740,165 @@ namespace
 {
   // Address: 0x010A96D4 -- process-global `AxisAlignedBox3fSerializer` singleton.
   moho::AxisAlignedBox3fSerializer gAxisAlignedBox3fSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Wm3::Vector2i>`, vtable 0x00E0BD30.
+   *
+   * Address: 0x00BC6CC0 (FUN_00BC6CC0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF12C0 (FUN_00BF12C0 -- the global's destructor.)
+   * Address: 0x004EA400 (FUN_004EA400 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004EA430 (FUN_004EA430 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004ED1E0 (FUN_004ED1E0 -- `Init`.)
+   * Address: 0x004EA370 (FUN_004EA370 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004EA3A0 (FUN_004EA3A0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct Vector2iSerializer : gpg::SerSaveLoadHelper<Wm3::Vector2i>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A9634 -- process-global `Vector2iSerializer` singleton.
+  moho::Vector2iSerializer gVector2iSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Wm3::Vector3i>`, vtable 0x00E0BD70.
+   *
+   * Address: 0x00BC6D20 (FUN_00BC6D20 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1350 (FUN_00BF1350 -- the global's destructor.)
+   * Address: 0x004EA700 (FUN_004EA700 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004EA730 (FUN_004EA730 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004ED280 (FUN_004ED280 -- `Init`.)
+   * Address: 0x004EA650 (FUN_004EA650 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004EA690 (FUN_004EA690 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct Vector3iSerializer : gpg::SerSaveLoadHelper<Wm3::Vector3i>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A9648 -- process-global `Vector3iSerializer` singleton.
+  moho::Vector3iSerializer gVector3iSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Wm3::Vector2f>`, vtable 0x00E0BDB0.
+   *
+   * Address: 0x00BC6D80 (FUN_00BC6D80 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF13E0 (FUN_00BF13E0 -- the global's destructor.)
+   * Address: 0x004EA9C0 (FUN_004EA9C0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004EA9F0 (FUN_004EA9F0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004ED320 (FUN_004ED320 -- `Init`.)
+   * Address: 0x004EA930 (FUN_004EA930 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004EA960 (FUN_004EA960 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct Vector2fSerializer : gpg::SerSaveLoadHelper<Wm3::Vector2f>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A965C -- process-global `Vector2fSerializer` singleton.
+  moho::Vector2fSerializer gVector2fSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Wm3::Vector3f>`, vtable 0x00E0BDF0.
+   *
+   * Address: 0x00BC6DE0 (FUN_00BC6DE0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1470 (FUN_00BF1470 -- the global's destructor.)
+   * Address: 0x004EACD0 (FUN_004EACD0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004EAD00 (FUN_004EAD00 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004ED3C0 (FUN_004ED3C0 -- `Init`.)
+   * Address: 0x004EAC20 (FUN_004EAC20 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004EAC60 (FUN_004EAC60 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct Vector3fSerializer : gpg::SerSaveLoadHelper<Wm3::Vector3f>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A97C4 -- process-global `Vector3fSerializer` singleton.
+  moho::Vector3fSerializer gVector3fSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Vector4f>`, vtable 0x00E0BE30.
+   *
+   * Address: 0x00BC6E40 (FUN_00BC6E40 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1500 (FUN_00BF1500 -- the global's destructor.)
+   * Address: 0x004EB030 (FUN_004EB030 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004EB060 (FUN_004EB060 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004ED460 (FUN_004ED460 -- `Init`.)
+   * Address: 0x004EAF70 (FUN_004EAF70 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004EAFB0 (FUN_004EAFB0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct Vector4fSerializer : gpg::SerSaveLoadHelper<Vector4f>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A98B4 -- process-global `Vector4fSerializer` singleton.
+  moho::Vector4fSerializer gVector4fSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Wm3::Quaternionf>`, vtable 0x00E0BE70.
+   *
+   * Address: 0x00BC6EA0 (FUN_00BC6EA0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1590 (FUN_00BF1590 -- the global's destructor.)
+   * Address: 0x004EB390 (FUN_004EB390 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004EB3C0 (FUN_004EB3C0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004ED500 (FUN_004ED500 -- `Init`.)
+   * Address: 0x004EB2D0 (FUN_004EB2D0 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004EB310 (FUN_004EB310 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct QuaternionfSerializer : gpg::SerSaveLoadHelper<Wm3::Quaternionf>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A983C -- process-global `QuaternionfSerializer` singleton.
+  moho::QuaternionfSerializer gQuaternionfSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<VEulers3>`, vtable 0x00E0BEB0.
+   *
+   * Address: 0x00BC6F00 (FUN_00BC6F00 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1620 (FUN_00BF1620 -- the global's destructor.)
+   * Address: 0x004EC1B0 (FUN_004EC1B0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004EC1E0 (FUN_004EC1E0 -- an unreferenced copy of the global's destructor.)
+   * Address: 0x004ED5A0 (FUN_004ED5A0 -- `Init`.)
+   * Address: 0x004EC100 (FUN_004EC100 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004EC140 (FUN_004EC140 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct VEulers3Serializer : gpg::SerSaveLoadHelper<VEulers3>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A974C -- process-global `VEulers3Serializer` singleton.
+  moho::VEulers3Serializer gVEulers3Serializer;
 } // namespace

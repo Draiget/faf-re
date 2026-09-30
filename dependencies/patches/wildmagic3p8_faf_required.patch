@@ -1,16 +1,23 @@
 diff --git a/Foundation/Math/Wm3AxisAlignedBox3.h b/Foundation/Math/Wm3AxisAlignedBox3.h
 --- a/Foundation/Math/Wm3AxisAlignedBox3.h
 +++ b/Foundation/Math/Wm3AxisAlignedBox3.h
-@@ -13,6 +13,8 @@
+@@ -13,6 +13,15 @@
  
  #include "Wm3FoundationLIB.h"
  #include "Wm3System.h"
 +// FAF MOD: needed for the Vector3<Real>-typed Min/Max members below.
 +#include "Wm3Vector3.h"
++
++// FAF MOD: forward decls for the FAF reflection serialize hooks added below.
++namespace gpg
++{
++    class ReadArchive;
++    class WriteArchive;
++}
  
  namespace Wm3
  {
-@@ -29,6 +31,11 @@ public:
+@@ -29,6 +38,11 @@ public:
      AxisAlignedBox3 (Real fXMin, Real fXMax, Real fYMin, Real fYMax,
          Real fZMin, Real fZMax);
  
@@ -22,7 +29,7 @@ diff --git a/Foundation/Math/Wm3AxisAlignedBox3.h b/Foundation/Math/Wm3AxisAlign
      // Overlap testing is in the strict sense.  If the two boxes are just
      // touching along a common edge, the boxes are reported as overlapping.
      bool HasXOverlap (const AxisAlignedBox3& rkBox) const;
-@@ -42,8 +49,14 @@ public:
+@@ -42,8 +56,19 @@ public:
      bool FindIntersection (const AxisAlignedBox3& rkBox,
          AxisAlignedBox3& rkIntr) const;
  
@@ -36,6 +43,11 @@ diff --git a/Foundation/Math/Wm3AxisAlignedBox3.h b/Foundation/Math/Wm3AxisAlign
 +    // were originally written against).
 +    Vector3<Real> Min;
 +    Vector3<Real> Max;
++
++    // FAF MOD: serialize hooks used by the FAF reflection system. The float
++    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
++    void MemberDeserialize (gpg::ReadArchive* archive);
++    void MemberSerialize (gpg::WriteArchive* archive) const;
  };
  
  #include "Wm3AxisAlignedBox3.inl"
@@ -122,19 +134,189 @@ diff --git a/Foundation/Math/Wm3Box3.h b/Foundation/Math/Wm3Box3.h
  };
  
  #include "Wm3Box3.inl"
+diff --git a/Foundation/Math/Wm3IVector2.h b/Foundation/Math/Wm3IVector2.h
+new file mode 100644
+--- /dev/null
++++ b/Foundation/Math/Wm3IVector2.h
+@@ -0,0 +1,85 @@
++// FAF MOD: GPG's integer 2-vector. Not part of upstream Wild Magic 3.8; the
++// FA binary's RTTI names it `Wm3::IVector2<int>` (the key of
++// CAiBrain::mBuildStructureMap, gpg::SerSaveLoadHelper<Wm3::IVector2<int>>,
++// the return type of RD3DTextureResource::SheetGetOriginalTextureDimensions).
++// There is no `Wm3::Vector2<int>` anywhere in the binary.
++
++#ifndef WM3IVECTOR2_H
++#define WM3IVECTOR2_H
++
++namespace gpg
++{
++    class ReadArchive;
++    class WriteArchive;
++}
++
++namespace Wm3
++{
++
++template <class Int>
++class IVector2
++{
++public:
++    // construction
++    constexpr IVector2 () noexcept : m_aiTuple{Int(0), Int(0)} {}
++    constexpr IVector2 (Int iX, Int iY) noexcept : m_aiTuple{iX, iY} {}
++
++    // coordinate access
++    Int operator[] (int i) const { return m_aiTuple[i]; }
++    Int& operator[] (int i) { return m_aiTuple[i]; }
++    Int X () const { return x; }
++    Int& X () { return x; }
++    Int Y () const { return y; }
++    Int& Y () { return y; }
++
++    // comparison
++    bool operator== (const IVector2& rkV) const
++    {
++        return x == rkV.x && y == rkV.y;
++    }
++    bool operator!= (const IVector2& rkV) const
++    {
++        return !(*this == rkV);
++    }
++
++    // Lexicographic, component by component, signed. The build-structure
++    // map's lower-bound walk (0x005808D0) inlines it as a two-iteration
++    // `jl`/`jg` loop.
++    bool operator< (const IVector2& rkV) const
++    {
++        for (int i = 0; i < 2; ++i)
++        {
++            if (m_aiTuple[i] < rkV.m_aiTuple[i])
++            {
++                return true;
++            }
++            if (m_aiTuple[i] > rkV.m_aiTuple[i])
++            {
++                return false;
++            }
++        }
++        return false;
++    }
++
++    // Serialize hooks used by the FAF reflection system. The int
++    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
++    void MemberDeserialize (gpg::ReadArchive* archive);
++    void MemberSerialize (gpg::WriteArchive* archive) const;
++
++    union
++    {
++        Int m_aiTuple[2];
++        struct
++        {
++            Int x;
++            Int y;
++        };
++    };
++};
++
++typedef IVector2<int> Vector2i;
++typedef IVector2<int> Vec2i;
++
++}
++
++#endif
+diff --git a/Foundation/Math/Wm3IVector3.h b/Foundation/Math/Wm3IVector3.h
+new file mode 100644
+--- /dev/null
++++ b/Foundation/Math/Wm3IVector3.h
+@@ -0,0 +1,68 @@
++// FAF MOD: GPG's integer 3-vector. Not part of upstream Wild Magic 3.8; the
++// FA binary's RTTI names it `Wm3::IVector3<int>`
++// (gpg::SerSaveLoadHelper<Wm3::IVector3<int>>). There is no
++// `Wm3::Vector3<int>` anywhere in the binary.
++
++#ifndef WM3IVECTOR3_H
++#define WM3IVECTOR3_H
++
++namespace gpg
++{
++    class ReadArchive;
++    class WriteArchive;
++}
++
++namespace Wm3
++{
++
++template <class Int>
++class IVector3
++{
++public:
++    // construction
++    constexpr IVector3 () noexcept : m_aiTuple{Int(0), Int(0), Int(0)} {}
++    constexpr IVector3 (Int iX, Int iY, Int iZ) noexcept : m_aiTuple{iX, iY, iZ} {}
++
++    // coordinate access
++    Int operator[] (int i) const { return m_aiTuple[i]; }
++    Int& operator[] (int i) { return m_aiTuple[i]; }
++    Int X () const { return x; }
++    Int& X () { return x; }
++    Int Y () const { return y; }
++    Int& Y () { return y; }
++    Int Z () const { return z; }
++    Int& Z () { return z; }
++
++    // comparison
++    bool operator== (const IVector3& rkV) const
++    {
++        return x == rkV.x && y == rkV.y && z == rkV.z;
++    }
++    bool operator!= (const IVector3& rkV) const
++    {
++        return !(*this == rkV);
++    }
++
++    // Serialize hooks used by the FAF reflection system. The int
++    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
++    void MemberDeserialize (gpg::ReadArchive* archive);
++    void MemberSerialize (gpg::WriteArchive* archive) const;
++
++    union
++    {
++        Int m_aiTuple[3];
++        struct
++        {
++            Int x;
++            Int y;
++            Int z;
++        };
++    };
++};
++
++typedef IVector3<int> Vector3i;
++typedef IVector3<int> Vec3i;
++
++}
++
++#endif
 diff --git a/Foundation/Math/Wm3Quaternion.h b/Foundation/Math/Wm3Quaternion.h
 --- a/Foundation/Math/Wm3Quaternion.h
 +++ b/Foundation/Math/Wm3Quaternion.h
-@@ -13,6 +13,8 @@
+@@ -13,6 +13,15 @@
  
  #include "Wm3FoundationLIB.h"
  #include "Wm3Matrix3.h"
 +// FAF MOD: needed by the static helpers added below.
 +#include <cmath>
++
++// FAF MOD: forward decls for the FAF reflection serialize hooks added below.
++namespace gpg
++{
++    class ReadArchive;
++    class WriteArchive;
++}
  
  namespace Wm3
  {
-@@ -25,8 +27,11 @@ public:
+@@ -25,8 +34,11 @@ public:
      // necessarily a unit length vector in 4D.
  
      // construction
@@ -148,7 +330,7 @@ diff --git a/Foundation/Math/Wm3Quaternion.h b/Foundation/Math/Wm3Quaternion.h
      Quaternion (const Quaternion& rkQ);
  
      // quaternion for the input rotation matrix
-@@ -138,9 +143,169 @@ public:
+@@ -138,9 +150,174 @@ public:
      WM3_ITEM static const Quaternion IDENTITY;  // the identity rotation
      WM3_ITEM static const Quaternion ZERO;
  
@@ -315,12 +497,17 @@ diff --git a/Foundation/Math/Wm3Quaternion.h b/Foundation/Math/Wm3Quaternion.h
 +        }
 +        return out;
 +    }
++
++    // FAF MOD: serialize hooks used by the FAF reflection system. The float
++    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
++    void MemberDeserialize (gpg::ReadArchive* archive);
++    void MemberSerialize (gpg::WriteArchive* archive) const;
  
 +private:
      // support for comparisons
      int CompareArrays (const Quaternion& rkQ) const;
  
-@@ -155,6 +320,27 @@ Quaternion<Real> operator* (Real fScalar, const Quaternion<Real>& rkQ);
+@@ -155,6 +332,27 @@ Quaternion<Real> operator* (Real fScalar, const Quaternion<Real>& rkQ);
  
  typedef Quaternion<float> Quaternionf;
  typedef Quaternion<double> Quaterniond;
@@ -413,16 +600,25 @@ diff --git a/Foundation/Math/Wm3Sphere3.h b/Foundation/Math/Wm3Sphere3.h
 diff --git a/Foundation/Math/Wm3Vector2.h b/Foundation/Math/Wm3Vector2.h
 --- a/Foundation/Math/Wm3Vector2.h
 +++ b/Foundation/Math/Wm3Vector2.h
-@@ -13,6 +13,8 @@
+@@ -13,6 +13,17 @@
  
  #include "Wm3FoundationLIB.h"
  #include "Wm3Math.h"
 +// FAF MOD: needed by the static helpers added below.
 +#include <cmath>
++// FAF MOD: GPG's integer vector, which is what `Vector2i` names.
++#include "Wm3IVector2.h"
++
++// FAF MOD: forward decls for the FAF reflection serialize hooks added below.
++namespace gpg
++{
++    class ReadArchive;
++    class WriteArchive;
++}
  
  namespace Wm3
  {
-@@ -22,8 +24,10 @@ class Vector2
+@@ -22,8 +33,10 @@ class Vector2
  {
  public:
      // construction
@@ -435,7 +631,7 @@ diff --git a/Foundation/Math/Wm3Vector2.h b/Foundation/Math/Wm3Vector2.h
      Vector2 (const Real* afTuple);
      Vector2 (const Vector2& rkV);
  
-@@ -102,11 +106,44 @@ public:
+@@ -102,11 +115,49 @@ public:
      WM3_ITEM static const Vector2 UNIT_X;
      WM3_ITEM static const Vector2 UNIT_Y;
  
@@ -474,6 +670,11 @@ diff --git a/Foundation/Math/Wm3Vector2.h b/Foundation/Math/Wm3Vector2.h
 +        return Vector2(v.x * inv, v.y * inv);
 +    }
 +
++    // FAF MOD: serialize hooks used by the FAF reflection system. The float
++    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
++    void MemberDeserialize (gpg::ReadArchive* archive);
++    void MemberSerialize (gpg::WriteArchive* archive) const;
++
  private:
      // support for comparisons
      int CompareArrays (const Vector2& rkV) const;
@@ -482,15 +683,13 @@ diff --git a/Foundation/Math/Wm3Vector2.h b/Foundation/Math/Wm3Vector2.h
  };
  
  // arithmetic operations
-@@ -121,6 +158,11 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector2<Real>& rkV);
+@@ -121,6 +172,9 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector2<Real>& rkV);
  
  typedef Vector2<float> Vector2f;
  typedef Vector2<double> Vector2d;
 +// FAF MOD: aliases used by FAF SDK consumers.
-+typedef Vector2<int> Vector2i;
 +template <class Real> using Vec2 = Vector2<Real>;
 +typedef Vector2<float> Vec2f;
-+typedef Vector2<int> Vec2i;
  
  }
  
@@ -522,17 +721,26 @@ diff --git a/Foundation/Math/Wm3Vector2.inl b/Foundation/Math/Wm3Vector2.inl
 diff --git a/Foundation/Math/Wm3Vector3.h b/Foundation/Math/Wm3Vector3.h
 --- a/Foundation/Math/Wm3Vector3.h
 +++ b/Foundation/Math/Wm3Vector3.h
-@@ -13,6 +13,9 @@
+@@ -13,6 +13,18 @@
  
  #include "Wm3FoundationLIB.h"
  #include "Wm3Math.h"
 +// FAF MOD: needed by the static helpers added below.
 +#include <cmath>
 +#include <limits>
++// FAF MOD: GPG's integer vector, which is what `Vector3i` names.
++#include "Wm3IVector3.h"
++
++// FAF MOD: forward decls for the FAF reflection serialize hooks added below.
++namespace gpg
++{
++    class ReadArchive;
++    class WriteArchive;
++}
  
  namespace Wm3
  {
-@@ -22,8 +25,11 @@ class Vector3
+@@ -22,8 +34,11 @@ class Vector3
  {
  public:
      // construction
@@ -546,7 +754,7 @@ diff --git a/Foundation/Math/Wm3Vector3.h b/Foundation/Math/Wm3Vector3.h
      Vector3 (const Real* afTuple);
      Vector3 (const Vector3& rkV);
  
-@@ -106,11 +112,152 @@ public:
+@@ -106,11 +121,157 @@ public:
      WM3_ITEM static const Vector3 UNIT_Y;
      WM3_ITEM static const Vector3 UNIT_Z;
  
@@ -693,6 +901,11 @@ diff --git a/Foundation/Math/Wm3Vector3.h b/Foundation/Math/Wm3Vector3.h
 +        Vector3::LimitLengthTo(*this, maxLen, eps);
 +    }
 +
++    // FAF MOD: serialize hooks used by the FAF reflection system. The float
++    // specializations are defined in src/sdk/moho/math/MathReflection.cpp.
++    void MemberDeserialize (gpg::ReadArchive* archive);
++    void MemberSerialize (gpg::WriteArchive* archive) const;
++
  private:
      // support for comparisons
      int CompareArrays (const Vector3& rkV) const;
@@ -701,15 +914,13 @@ diff --git a/Foundation/Math/Wm3Vector3.h b/Foundation/Math/Wm3Vector3.h
  };
  
  // arithmetic operations
-@@ -125,6 +272,27 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector3<Real>& rkV);
+@@ -125,6 +286,25 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector3<Real>& rkV);
  
  typedef Vector3<float> Vector3f;
  typedef Vector3<double> Vector3d;
 +// FAF MOD: aliases that the FAF SDK's hand-recovered code originally used.
-+typedef Vector3<int> Vector3i;
 +template <class Real> using Vec3 = Vector3<Real>;
 +typedef Vector3<float> Vec3f;
-+typedef Vector3<int> Vec3i;
 +
 +// FAF MOD: free function helpers from the FAF SDK's hand-recovered Vector3 API.
 +// Preserved here so consumer code calling them as free functions continues

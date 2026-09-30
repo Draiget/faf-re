@@ -4,6 +4,7 @@
 
 #include "boost/shared_ptr.h"
 #include "moho/unit/Broadcaster.h"
+#include "Wm3IVector2.h"
 
 struct tagRECT;
 using RECT = tagRECT;
@@ -19,13 +20,6 @@ namespace gpg::gal
   class DeviceContext;
   class TextureContext;
 } // namespace gpg::gal
-
-namespace Wm3
-{
-  template <class T>
-  class Vector2;
-  using Vector2i = Vector2<int>;
-} // namespace Wm3
 
 namespace moho
 {
