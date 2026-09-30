@@ -17,26 +17,6 @@ namespace
     return sInstance;
   }
 
-  gpg::RType* CachedFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(float));
-    }
-    return cached;
-  }
-
-  void AddFieldWithDescription(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int offset,
-    const char* const description
-  )
-  {
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
-  }
-
   struct RUnitBlueprintDefenseShieldTypeInfoBootstrap
   {
     RUnitBlueprintDefenseShieldTypeInfoBootstrap()
@@ -83,8 +63,8 @@ namespace moho
   {
     size_ = sizeof(RUnitBlueprintDefenseShield);
     gpg::RType::Init();
-    AddFieldWithDescription(this, "ShieldSize", CachedFloatType(), offsetof(RUnitBlueprintDefenseShield, ShieldSize), "Shield diameter");
-    AddFieldWithDescription(this, "RegenAssistMult", CachedFloatType(), offsetof(RUnitBlueprintDefenseShield, RegenAssistMult), "Regen assist multiplier");
+    AddField<float>("ShieldSize", offsetof(RUnitBlueprintDefenseShield, ShieldSize), 3, "Shield diameter");
+    AddField<float>("RegenAssistMult", offsetof(RUnitBlueprintDefenseShield, RegenAssistMult), 3, "Regen assist multiplier");
     Finish();
   }
 

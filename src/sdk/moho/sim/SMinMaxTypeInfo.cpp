@@ -17,8 +17,8 @@ namespace
    */
   gpg::RField* AddSMinMaxFloatFields(gpg::RType* const type)
   {
-    type->AddFieldFloat("Min", 0);
-    return type->AddFieldFloat("Max", 4);
+    type->AddField<float>("Min", 0);
+    return type->AddField<float>("Max", 4);
   }
 
   template <typename TObject>
@@ -125,8 +125,8 @@ namespace moho
   {
     size_ = sizeof(SMinMax<std::uint32_t>);
     gpg::RType::Init();
-    AddFieldUInt("Min", 0);
-    AddFieldUInt("Max", 4);
+    AddField<unsigned int>("Min", 0);
+    AddField<unsigned int>("Max", 4);
     Finish();
   }
 } // namespace moho

@@ -102,7 +102,7 @@ namespace
     baseField.mName = entityType->GetName();
     baseField.mType = entityType;
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }

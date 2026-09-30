@@ -51,29 +51,6 @@ namespace
     return gCachedQuaternionfType;
   }
 
-  void AddRTypeField(gpg::RType& type, const char* const name, const std::type_info& fieldTypeInfo, const int offset)
-  {
-    type.fields_.push_back(gpg::RField{name, gpg::LookupRType(fieldTypeInfo), offset});
-  }
-
-  /**
-   * Address: 0x004F08F0 (FUN_004F08F0, gpg::RType::AddField_Quaternionf_0x0r)
-   *
-   * What it does:
-   * Adds the reflected `Quaternionf` field named `r` at offset `0x00`.
-   */
-  void AddQuaternionRotationField(gpg::RType& type)
-  {
-    GPG_ASSERT(!type.initFinished_);
-
-    gpg::RType* quaternionType = ResolveQuaternionfType();
-
-    gpg::RField field{};
-    field.mName = "r";
-    field.mType = quaternionType;
-    type.fields_.push_back(field);
-  }
-
   // Address: 0x010A9B40 -- process-global `VTransformSerializer` singleton
   // (constructed by FUN_00BC7170, self-registering via `__xc_a`; see
   // VTransform.h for the real-ctor/atexit-target/dead-duplicate evidence).
@@ -423,8 +400,8 @@ namespace moho
   {
     size_ = sizeof(VTransform);
     gpg::RType::Init();
-    AddRTypeField(*this, "t", typeid(Wm3::Vector3f), offsetof(VTransform, pos_));
-    AddQuaternionRotationField(*this);
+    AddField<Wm3::Vector3f>("t", offsetof(VTransform, pos_));
+    AddField<Wm3::Quaternionf>("r", offsetof(VTransform, orient_));
     Finish();
   }
 

@@ -28,44 +28,6 @@ namespace
     return cached;
   }
 
-  gpg::RType* CachedFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(float));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedBoolType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(bool));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedMeshLodVectorType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::vector<moho::RMeshBlueprintLOD>));
-    }
-    return cached;
-  }
-
-  void AddFieldWithDescription(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int offset,
-    const char* const description
-  )
-  {
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
-  }
-
   struct RMeshBlueprintTypeInfoBootstrap
   {
     RMeshBlueprintTypeInfoBootstrap()
@@ -114,26 +76,9 @@ namespace moho
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
-  }
-
-  /**
-   * Address: 0x0051A330 (FUN_0051A330, gpg::RType::AddField_vector_RMeshBlueprintLOD_0x60LODs)
-   *
-   * What it does:
-   * Appends the reflected `LODs` field descriptor at offset `0x60`.
-   */
-  gpg::RField* RMeshBlueprintTypeInfo::AddFieldLods(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("LODs", CachedMeshLodVectorType(), offsetof(RMeshBlueprint, mLods), 0, nullptr));
-    return &typeInfo->fields_.back();
   }
 
   /**
@@ -144,19 +89,13 @@ namespace moho
    */
   void RMeshBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* const lodsField = AddFieldLods(typeInfo);
-    lodsField->v4 = 3;
+    gpg::RField* const lodsField = typeInfo->AddField<msvc8::vector<moho::RMeshBlueprintLOD>>("LODs", offsetof(RMeshBlueprint, mLods));
+    lodsField->mFlags = 3;
     lodsField->mDesc = "List of LOD info";
-    AddFieldWithDescription(
-      typeInfo,
-      "IconFadeInZoom",
-      CachedFloatType(),
-      offsetof(RMeshBlueprint, mIconFadeInZoom),
-      "Zoom level at which to start fading in the strategic icon"
-    );
-    AddFieldWithDescription(typeInfo, "SortOrder", CachedFloatType(), offsetof(RMeshBlueprint, mSortOrder), "Sort order of mesh we render smallest to largest");
-    AddFieldWithDescription(typeInfo, "UniformScale", CachedFloatType(), offsetof(RMeshBlueprint, mUniformScale), "Uniform scale factor");
-    AddFieldWithDescription(typeInfo, "StraddleWater", CachedBoolType(), offsetof(RMeshBlueprint, mStraddleWater), "Render both above and below the water.");
+    typeInfo->AddField<float>("IconFadeInZoom", offsetof(RMeshBlueprint, mIconFadeInZoom), 3, "Zoom level at which to start fading in the strategic icon");
+    typeInfo->AddField<float>("SortOrder", offsetof(RMeshBlueprint, mSortOrder), 3, "Sort order of mesh we render smallest to largest");
+    typeInfo->AddField<float>("UniformScale", offsetof(RMeshBlueprint, mUniformScale), 3, "Uniform scale factor");
+    typeInfo->AddField<bool>("StraddleWater", offsetof(RMeshBlueprint, mStraddleWater), 3, "Render both above and below the water.");
   }
 
   /**

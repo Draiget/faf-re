@@ -161,7 +161,7 @@ namespace
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = gpg::BaseSubobjectOffset<moho::IFormationInstance, moho::Broadcaster<moho::EFormationdStatus>>();
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }

@@ -79,8 +79,8 @@ namespace moho
   void SNamedFootprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
     AddBase_SFootprint(typeInfo);
-    typeInfo->AddFieldString("Name", offsetof(SNamedFootprint, mName));
-    typeInfo->AddFieldInt("Index", offsetof(SNamedFootprint, mIndex));
+    typeInfo->AddField<msvc8::string>("Name", offsetof(SNamedFootprint, mName));
+    typeInfo->AddField<int>("Index", offsetof(SNamedFootprint, mIndex));
   }
 
   /**

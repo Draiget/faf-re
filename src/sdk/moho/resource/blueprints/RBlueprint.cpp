@@ -19,24 +19,6 @@ namespace
 {
   using TypeInfo = moho::RBlueprintTypeInfo;
 
-  [[nodiscard]] gpg::RType* CachedStringType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::string));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIntType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(int));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedRObjectType()
   {
     static gpg::RType* cached = nullptr;
@@ -53,19 +35,6 @@ namespace
   {
     static TypeInfo sInstance;
     return sInstance;
-  }
-
-  [[nodiscard]] gpg::RField* AddTypedField(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int offset
-  )
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset));
-    return &typeInfo->fields_.back();
   }
 
   struct SerializerCallbackRuntimeView
@@ -340,7 +309,7 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
   baseField.mName = rObjectType->GetName();
   baseField.mType = rObjectType;
   baseField.mOffset = 0;
-  baseField.v4 = 0;
+  baseField.mFlags = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);
 }
@@ -386,19 +355,19 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
    */
   gpg::RField* RBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* field = AddTypedField(typeInfo, "BlueprintId", CachedStringType(), offsetof(RBlueprint, mBlueprintId));
-    field->v4 = 1;
+    gpg::RField* field = typeInfo->AddField<msvc8::string>("BlueprintId", offsetof(RBlueprint, mBlueprintId));
+    field->mFlags = 1;
     field->mDesc = "Blueprint Id";
 
-    field = AddTypedField(typeInfo, "Description", CachedStringType(), offsetof(RBlueprint, mDescription));
-    field->v4 = 3;
+    field = typeInfo->AddField<msvc8::string>("Description", offsetof(RBlueprint, mDescription));
+    field->mFlags = 3;
     field->mDesc = "Generic type of unit (non-display name)";
 
-    field = AddTypedField(typeInfo, "Source", CachedStringType(), offsetof(RBlueprint, mSource));
-    field->v4 = 1;
+    field = typeInfo->AddField<msvc8::string>("Source", offsetof(RBlueprint, mSource));
+    field->mFlags = 1;
     field->mDesc = "File this blueprint was defined in";
 
-    return AddTypedField(typeInfo, "BlueprintOrdinal", CachedIntType(), offsetof(RBlueprint, mBlueprintOrdinal));
+    return typeInfo->AddField<int>("BlueprintOrdinal", offsetof(RBlueprint, mBlueprintOrdinal));
   }
 
   /**

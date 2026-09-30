@@ -28,31 +28,6 @@ namespace
     return cached;
   }
 
-  gpg::RType* CachedRResIdType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RResId));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedBoolType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(bool));
-    }
-    return cached;
-  }
-
-  void AddFieldWithDescription(
-    gpg::RType* typeInfo, const char* fieldName, gpg::RType* fieldType, const int offset, const char* description
-  )
-  {
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
-  }
-
   /**
    * Address: 0x0050F120 (FUN_0050F120)
    *
@@ -143,10 +118,10 @@ void REffectBlueprintTypeInfo::AddBase_RObject(gpg::RType* typeInfo)
    */
   void REffectBlueprintTypeInfo::AddFields()
   {
-    AddFieldWithDescription(this, "BlueprintId", CachedRResIdType(), offsetof(REffectBlueprint, BlueprintId), "Blueprint ID");
-    AddFieldWithDescription(this, "HighFidelity", CachedBoolType(), offsetof(REffectBlueprint, HighFidelity), "Allowed in high fidelity");
-    AddFieldWithDescription(this, "MedFidelity", CachedBoolType(), offsetof(REffectBlueprint, MedFidelity), "Allowed in medium fidelity");
-    AddFieldWithDescription(this, "LowFidelity", CachedBoolType(), offsetof(REffectBlueprint, LowFidelity), "Allowed in low fidelity");
+    AddField<moho::RResId>("BlueprintId", offsetof(REffectBlueprint, BlueprintId), 3, "Blueprint ID");
+    AddField<bool>("HighFidelity", offsetof(REffectBlueprint, HighFidelity), 3, "Allowed in high fidelity");
+    AddField<bool>("MedFidelity", offsetof(REffectBlueprint, MedFidelity), 3, "Allowed in medium fidelity");
+    AddField<bool>("LowFidelity", offsetof(REffectBlueprint, LowFidelity), 3, "Allowed in low fidelity");
   }
 
   /**

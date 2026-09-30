@@ -314,7 +314,7 @@ namespace moho
     baseField.mName = CachedCColPrimitiveBaseType()->GetName();
     baseField.mType = CachedCColPrimitiveBaseType();
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }

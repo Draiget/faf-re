@@ -44,33 +44,6 @@ namespace
 
   static_assert(sizeof(VectorTypeInfo) == 0x68, "VectorTypeInfo size must be 0x68");
 
-  [[nodiscard]] gpg::RType* CachedStringType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::string));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(float));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedBoolType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(bool));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedRMeshBlueprintLODType()
   {
     static gpg::RType* cached = nullptr;
@@ -313,17 +286,6 @@ namespace
     return sInstance;
   }
 
-  void AddFieldWithDescription(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int offset,
-    const char* const description
-  )
-  {
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
-  }
-
   struct RMeshBlueprintLODTypeInfoBootstrap
   {
     RMeshBlueprintLODTypeInfoBootstrap()
@@ -372,35 +334,17 @@ namespace moho
    */
   void RMeshBlueprintLODTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "MeshName", CachedStringType(), offsetof(RMeshBlueprintLOD, mMeshName), "Name of mesh to use for this LOD");
-    AddFieldWithDescription(typeInfo, "AlbedoName", CachedStringType(), offsetof(RMeshBlueprintLOD, mAlbedoName), "Name of the albedo to use for this LOD");
-    AddFieldWithDescription(typeInfo, "NormalsName", CachedStringType(), offsetof(RMeshBlueprintLOD, mNormalsName), "Name of the normal map to use for this LOD");
-    AddFieldWithDescription(typeInfo, "SpecularName", CachedStringType(), offsetof(RMeshBlueprintLOD, mSpecularName), "Name of the specular map to use for this LOD");
-    AddFieldWithDescription(typeInfo, "LookupName", CachedStringType(), offsetof(RMeshBlueprintLOD, mLookupName), "Name of the lookup map to use for this LOD");
-    AddFieldWithDescription(typeInfo, "SecondaryName", CachedStringType(), offsetof(RMeshBlueprintLOD, mSecondaryName), "Name of the secondary map to use for this LOD");
-    AddFieldWithDescription(typeInfo, "ShaderName", CachedStringType(), offsetof(RMeshBlueprintLOD, mShaderName), "Name of the shader group to use for this LOD");
-    AddFieldWithDescription(typeInfo, "LODCutoff", CachedFloatType(), offsetof(RMeshBlueprintLOD, mLodCutoff), "Zoom level at which this guy starts fading out");
-    AddFieldWithDescription(
-      typeInfo,
-      "Scrolling",
-      CachedBoolType(),
-      offsetof(RMeshBlueprintLOD, mScrolling),
-      "True if this requires texture scrolling in the shader"
-    );
-    AddFieldWithDescription(
-      typeInfo,
-      "Occlude",
-      CachedBoolType(),
-      offsetof(RMeshBlueprintLOD, mOcclude),
-      "True if this may occlude other meshes (for silhouette generation)"
-    );
-    AddFieldWithDescription(
-      typeInfo,
-      "Silhouette",
-      CachedBoolType(),
-      offsetof(RMeshBlueprintLOD, mSilhouette),
-      "True if this can generate a silhouette if blocked by an occluder"
-    );
+    typeInfo->AddField<msvc8::string>("MeshName", offsetof(RMeshBlueprintLOD, mMeshName), 3, "Name of mesh to use for this LOD");
+    typeInfo->AddField<msvc8::string>("AlbedoName", offsetof(RMeshBlueprintLOD, mAlbedoName), 3, "Name of the albedo to use for this LOD");
+    typeInfo->AddField<msvc8::string>("NormalsName", offsetof(RMeshBlueprintLOD, mNormalsName), 3, "Name of the normal map to use for this LOD");
+    typeInfo->AddField<msvc8::string>("SpecularName", offsetof(RMeshBlueprintLOD, mSpecularName), 3, "Name of the specular map to use for this LOD");
+    typeInfo->AddField<msvc8::string>("LookupName", offsetof(RMeshBlueprintLOD, mLookupName), 3, "Name of the lookup map to use for this LOD");
+    typeInfo->AddField<msvc8::string>("SecondaryName", offsetof(RMeshBlueprintLOD, mSecondaryName), 3, "Name of the secondary map to use for this LOD");
+    typeInfo->AddField<msvc8::string>("ShaderName", offsetof(RMeshBlueprintLOD, mShaderName), 3, "Name of the shader group to use for this LOD");
+    typeInfo->AddField<float>("LODCutoff", offsetof(RMeshBlueprintLOD, mLodCutoff), 3, "Zoom level at which this guy starts fading out");
+    typeInfo->AddField<bool>("Scrolling", offsetof(RMeshBlueprintLOD, mScrolling), 3, "True if this requires texture scrolling in the shader");
+    typeInfo->AddField<bool>("Occlude", offsetof(RMeshBlueprintLOD, mOcclude), 3, "True if this may occlude other meshes (for silhouette generation)");
+    typeInfo->AddField<bool>("Silhouette", offsetof(RMeshBlueprintLOD, mSilhouette), 3, "True if this can generate a silhouette if blocked by an occluder");
   }
 
   /**

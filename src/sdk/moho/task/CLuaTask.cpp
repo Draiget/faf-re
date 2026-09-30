@@ -1056,7 +1056,7 @@ void CLuaTaskTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
   baseField.mName = taskType->GetName();
   baseField.mType = taskType;
   baseField.mOffset = 0;
-  baseField.v4 = 0;
+  baseField.mFlags = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);
 }

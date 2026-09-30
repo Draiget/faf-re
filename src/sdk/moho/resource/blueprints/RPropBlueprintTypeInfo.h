@@ -53,29 +53,6 @@ namespace moho
      */
     static void AddBaseREntityBlueprint(gpg::RType* typeInfo);
 
-    /**
-     * Address: 0x0051DF00 (FUN_0051DF00, gpg::RType::AddField_RPropBlueprintDisplay_0x17CDisplay)
-     *
-     * What it does:
-     * Appends the `Display` reflected field entry (`+0x17C`).
-     */
-    static gpg::RField* AddFieldDisplay(gpg::RType* typeInfo);
-
-    /**
-     * Address: 0x0051DF80 (FUN_0051DF80, gpg::RType::AddField_RPropBlueprintDefense_0x19CDefense)
-     *
-     * What it does:
-     * Appends the `Defense` reflected field entry (`+0x19C`).
-     */
-    static gpg::RField* AddFieldDefense(gpg::RType* typeInfo);
-
-    /**
-     * Address: 0x0051E000 (FUN_0051E000, gpg::RType::AddField_RPropBlueprintEconomy_0x1A4Economy)
-     *
-     * What it does:
-     * Appends the `Economy` reflected field entry (`+0x1A4`).
-     */
-    static gpg::RField* AddFieldEconomy(gpg::RType* typeInfo);
   };
 
   /**

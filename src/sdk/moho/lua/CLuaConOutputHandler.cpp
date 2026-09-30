@@ -314,7 +314,7 @@ void moho::CLuaConOutputHandlerTypeInfo::AddBaseRObject(gpg::RType* const typeIn
   baseField.mName = rObjectType->GetName();
   baseField.mType = rObjectType;
   baseField.mOffset = gpg::BaseSubobjectOffset<CLuaConOutputHandler, gpg::RObject>();
-  baseField.v4 = 0;
+  baseField.mFlags = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);
 }

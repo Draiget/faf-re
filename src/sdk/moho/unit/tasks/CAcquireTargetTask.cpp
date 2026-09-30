@@ -145,7 +145,7 @@ namespace
     field.mName = baseType->GetName();
     field.mType = baseType;
     field.mOffset = offset;
-    field.v4 = 0;
+    field.mFlags = 0;
     field.mDesc = nullptr;
     ownerType->AddBase(field);
   }

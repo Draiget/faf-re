@@ -61,13 +61,6 @@ namespace moho
      */
     static void AddFields(gpg::RType* typeInfo);
 
-    /**
-     * Address: 0x005132B0 (FUN_005132B0, gpg::RType::AddField_ECollisionShape_0xA8CollisionShape)
-     *
-     * What it does:
-     * Appends the `CollisionShape` reflected field entry (`+0xA8`).
-     */
-    static gpg::RField* AddFieldCollisionShape(gpg::RType* typeInfo);
   };
 
   /**

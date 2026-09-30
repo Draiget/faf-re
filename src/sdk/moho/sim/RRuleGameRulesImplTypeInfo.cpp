@@ -86,7 +86,7 @@ namespace moho
     baseField.mType = RRuleGameRules::StaticGetClass();
     baseField.mName = baseField.mType->GetName();
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }

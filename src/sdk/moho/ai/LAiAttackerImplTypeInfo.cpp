@@ -99,7 +99,7 @@ void __stdcall LAiAttackerImplTypeInfo::AddBase_CTask(gpg::RType* const typeInfo
   baseField.mName = baseType->GetName();
   baseField.mType = baseType;
   baseField.mOffset = 0;
-  baseField.v4 = 0;
+  baseField.mFlags = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);
 }

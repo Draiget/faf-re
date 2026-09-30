@@ -3591,7 +3591,7 @@ RField::RField()
   : mName(nullptr)
   , mType(nullptr)
   , mOffset(0)
-  , v4(0)
+  , mFlags(0)
   , mDesc(nullptr)
 {}
 
@@ -3599,7 +3599,7 @@ RField::RField(const char* name, RType* type, const int offset)
   : mName(name)
   , mType(type)
   , mOffset(offset)
-  , v4(0)
+  , mFlags(0)
   , mDesc(nullptr)
 {}
 
@@ -3607,7 +3607,7 @@ RField::RField(const char* name, RType* type, const int offset, const int v, con
   : mName(name)
   , mType(type)
   , mOffset(offset)
-  , v4(v)
+  , mFlags(v)
   , mDesc(desc)
 {}
 
@@ -10612,7 +10612,7 @@ void AddBaseIfPresent(RType* const typeInfo, RType* const baseType, const std::i
   baseField.mName = baseType->GetName();
   baseField.mType = baseType;
   baseField.mOffset = offset;
-  baseField.v4 = 0;
+  baseField.mFlags = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);
 }
@@ -13623,7 +13623,7 @@ void RType::AddBase(const RField& field)
       field.mOffset + source.mOffset
     };
 
-    out.v4 = source.v4;
+    out.mFlags = source.mFlags;
     out.mDesc = source.mDesc;
 
     fields_.push_back(out);
@@ -13654,138 +13654,6 @@ void RType::RegisterType()
 }
 
 /**
- * Address: 0x0040DFA0 (FUN_0040DFA0, gpg::RType::AddField_float)
- */
-RField* RType::AddFieldFloat(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedFloatType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x0040E020 (FUN_0040E020, gpg::RType::AddField_uint)
- */
-RField* RType::AddFieldUInt(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedUIntType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x004EDC10 (FUN_004EDC10, gpg::RType::AddField_int)
- */
-RField* RType::AddFieldInt(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedIntType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x00510DD0 (FUN_00510DD0, gpg::RType::AddFieldBool)
- */
-RField* RType::AddFieldBool(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedBoolType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x0050E1F0 (FUN_0050E1F0, gpg::RType::AddField_string)
- */
-RField* RType::AddFieldString(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedStringType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x004EDFD0 (FUN_004EDFD0, gpg::RType::AddField_Vector3f)
- */
-RField* RType::AddFieldVector3f(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedVector3fType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x00510D50 (FUN_00510D50, gpg::RType::AddField_RResId)
- */
-RField* RType::AddFieldRResId(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedRResIdType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x0050D010 (FUN_0050D010, gpg::RType::AddField_uchar)
- */
-RField* RType::AddFieldUChar(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedUCharType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x00510F10 (FUN_00510F10, gpg::RType::AddField_REmitterBlueprintCurve)
- */
-RField* RType::AddFieldEmitterBlueprintCurve(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedEmitterBlueprintCurveType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x00510FF0 (FUN_00510FF0, gpg::RType::AddField_Vector4f)
- */
-RField* RType::AddFieldVector4f(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedVector4fType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x00513230 (FUN_00513230, gpg::RType::AddField_vector_string)
- */
-RField* RType::AddFieldVectorString(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedVectorStringType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
- * Address: 0x00513330 (FUN_00513330, gpg::RType::AddField_SFootprint)
- */
-RField* RType::AddFieldSFootprint(const char* const name, const int offset)
-{
-  GPG_ASSERT(!initFinished_);
-  RField field{name, CachedSFootprintType(), offset};
-  fields_.push_back(field);
-  return &fields_.back();
-}
-
-/**
  * Address: 0x004EA0E0 (FUN_004EA0E0, gpg::RType::AddBlueprintAxisAlignedBox3f)
  *
  * What it does:
@@ -13794,12 +13662,12 @@ RField* RType::AddFieldSFootprint(const char* const name, const int offset)
  */
 void RType::AddBlueprintAxisAlignedBox3f()
 {
-  AddFieldFloat("min0", 0x00);
-  AddFieldFloat("min1", 0x04);
-  AddFieldFloat("min2", 0x08);
-  AddFieldFloat("max0", 0x0C);
-  AddFieldFloat("max1", 0x10);
-  AddFieldFloat("max2", 0x14);
+  AddField<float>("min0", 0x00);
+  AddField<float>("min1", 0x04);
+  AddField<float>("min2", 0x08);
+  AddField<float>("max0", 0x0C);
+  AddField<float>("max1", 0x10);
+  AddField<float>("max2", 0x14);
 }
 
 const RField* RType::GetFieldNamed(const char* name) const

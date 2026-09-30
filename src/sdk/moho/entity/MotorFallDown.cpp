@@ -553,7 +553,7 @@ namespace moho
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = gpg::RType::BaseSubobjectOffset<MotorFallDown, CScriptObject>();
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }
@@ -569,7 +569,7 @@ namespace moho
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }

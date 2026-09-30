@@ -43,15 +43,6 @@ namespace
   // Address: 0x010A9A14 -- process-global `VMatrix4Serializer` singleton.
   moho::VMatrix4Serializer gVMatrix4Serializer;
 
-  [[nodiscard]] gpg::RType* ResolveIntType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(int));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* ResolveVector3fType()
   {
     static gpg::RType* cached = nullptr;
@@ -197,22 +188,6 @@ namespace
     return cached;
   }
 
-  gpg::RField* AddIntFieldToType(gpg::RType* const typeInfo, const char* const name, const int offset)
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField{name, ResolveIntType(), offset});
-    return &typeInfo->fields_.back();
-  }
-
-  gpg::RField* AddVector3fFieldToType(gpg::RType* const typeInfo, const char* const name, const int offset)
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField{name, ResolveVector3fType(), offset});
-    return &typeInfo->fields_.back();
-  }
-
   /**
    * Address: 0x004EABF0 (FUN_004EABF0)
    *
@@ -227,9 +202,9 @@ namespace
       return nullptr;
     }
 
-    typeInfo->AddFieldFloat("x", 0);
-    typeInfo->AddFieldFloat("y", 4);
-    return typeInfo->AddFieldFloat("z", 8);
+    typeInfo->AddField<float>("x", 0);
+    typeInfo->AddField<float>("y", 4);
+    return typeInfo->AddField<float>("z", 8);
   }
 
   /**
@@ -246,8 +221,8 @@ namespace
       return nullptr;
     }
 
-    typeInfo->AddFieldFloat("x", 0);
-    return typeInfo->AddFieldFloat("y", 4);
+    typeInfo->AddField<float>("x", 0);
+    return typeInfo->AddField<float>("y", 4);
   }
 
   /**
@@ -690,8 +665,8 @@ namespace moho
   {
     size_ = sizeof(Vector2i);
     gpg::RType::Init();
-    AddIntFieldToType(this, "x", offsetof(Vector2i, x));
-    AddIntFieldToType(this, "y", offsetof(Vector2i, y));
+    AddField<int>("x", offsetof(Vector2i, x));
+    AddField<int>("y", offsetof(Vector2i, y));
     Finish();
   }
 
@@ -788,9 +763,9 @@ namespace moho
   {
     size_ = sizeof(Vector3i);
     gpg::RType::Init();
-    AddIntFieldToType(this, "x", offsetof(Vector3i, x));
-    AddIntFieldToType(this, "y", offsetof(Vector3i, y));
-    AddIntFieldToType(this, "z", offsetof(Vector3i, z));
+    AddField<int>("x", offsetof(Vector3i, x));
+    AddField<int>("y", offsetof(Vector3i, y));
+    AddField<int>("z", offsetof(Vector3i, z));
     Finish();
   }
 
@@ -1085,10 +1060,10 @@ namespace moho
   {
     size_ = sizeof(Vector4f);
     gpg::RType::Init();
-    AddFieldFloat("x", offsetof(Vector4f, x));
-    AddFieldFloat("y", offsetof(Vector4f, y));
-    AddFieldFloat("z", offsetof(Vector4f, z));
-    AddFieldFloat("w", offsetof(Vector4f, w));
+    AddField<float>("x", offsetof(Vector4f, x));
+    AddField<float>("y", offsetof(Vector4f, y));
+    AddField<float>("z", offsetof(Vector4f, z));
+    AddField<float>("w", offsetof(Vector4f, w));
     Finish();
   }
 
@@ -1189,10 +1164,10 @@ namespace moho
   {
     size_ = sizeof(Quaternionf);
     gpg::RType::Init();
-    AddFieldFloat("w", offsetof(Quaternionf, w));
-    AddFieldFloat("x", offsetof(Quaternionf, x));
-    AddFieldFloat("y", offsetof(Quaternionf, y));
-    AddFieldFloat("z", offsetof(Quaternionf, z));
+    AddField<float>("w", offsetof(Quaternionf, w));
+    AddField<float>("x", offsetof(Quaternionf, x));
+    AddField<float>("y", offsetof(Quaternionf, y));
+    AddField<float>("z", offsetof(Quaternionf, z));
     Finish();
   }
 
@@ -1299,13 +1274,13 @@ namespace moho
     // the next AddField* grows that vector. Holding all three and renaming
     // afterwards writes through two dangling pointers - and because an RField
     // begins with mName, that write lands on the freed block's free-list link.
-    if (gpg::RField* const roll = AddFieldFloat("r", offsetof(VEulers3, r))) {
+    if (gpg::RField* const roll = AddField<float>("r", offsetof(VEulers3, r))) {
       roll->mName = "Roll";
     }
-    if (gpg::RField* const pitch = AddFieldFloat("p", offsetof(VEulers3, p))) {
+    if (gpg::RField* const pitch = AddField<float>("p", offsetof(VEulers3, p))) {
       pitch->mName = "Pitch";
     }
-    if (gpg::RField* const yaw = AddFieldFloat("y", offsetof(VEulers3, y))) {
+    if (gpg::RField* const yaw = AddField<float>("y", offsetof(VEulers3, y))) {
       yaw->mName = "Yaw";
     }
     Finish();
@@ -1406,9 +1381,9 @@ namespace moho
   {
     size_ = sizeof(VAxes3);
     gpg::RType::Init();
-    AddVector3fFieldToType(this, "vX", offsetof(VAxes3, vX));
-    AddVector3fFieldToType(this, "vY", offsetof(VAxes3, vY));
-    AddVector3fFieldToType(this, "vZ", offsetof(VAxes3, vZ));
+    AddField<Wm3::Vector3f>("vX", offsetof(VAxes3, vX));
+    AddField<Wm3::Vector3f>("vY", offsetof(VAxes3, vY));
+    AddField<Wm3::Vector3f>("vZ", offsetof(VAxes3, vZ));
     Finish();
   }
 

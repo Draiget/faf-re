@@ -1017,6 +1017,14 @@ namespace gpg
    * through a derived `T` and hand back the base's type. Both slots hold the
    * same lookup.
    *
+   * Out-of-line copies with no callers:
+   *
+   * Address: 0x0073AAC0 (FUN_0073AAC0 -- `RTypeOf<moho::CDamageMethod>`, slot 0x010C768C; formerly
+   * `CachedDamageMethodType` in moho/sim/CDamage.cpp, which also called `preregister_CDamageEMethodTypeInfo`
+   * first -- the binary does not; removed 2026-09-30.)
+   * Address: 0x0073AAE0 (FUN_0073AAE0 -- `RTypeOf<moho::SMinMax<float>>`; formerly `CachedSMinMaxFloatType`
+   * in moho/sim/CDamage.cpp, removed 2026-09-30.)
+   *
    * A pointer type is the exception: its descriptor is the pointee's
    * `RPointerType` object, which `U::GetPointerType()` constructs before it
    * looks `U*` up, so the lookup goes through that function
@@ -4018,7 +4026,10 @@ namespace gpg
     const char* mName;
     RType* mType;
     int mOffset;
-    int v4;
+    /// Access flags: the reference editor (`WRefEditDialog::AddChildren`
+    /// 0x004A4260) lets a field be edited when `(mFlags & 3) == 3`. Blueprint
+    /// ids and source paths are registered as 1, tunables as 3.
+    int mFlags;
     const char* mDesc;
 
     RField();
@@ -4294,102 +4305,6 @@ namespace gpg
     void RegisterType();
 
     /**
-     * Address: 0x0040DFA0 (FUN_0040DFA0, gpg::RType::AddField_float)
-     *
-     * What it does:
-     * Appends one reflected `float` field descriptor.
-     */
-    RField* AddFieldFloat(const char* name, int offset);
-
-    /**
-     * Address: 0x0040E020 (FUN_0040E020, gpg::RType::AddField_uint)
-     *
-     * What it does:
-     * Appends one reflected `unsigned int` field descriptor.
-     */
-    RField* AddFieldUInt(const char* name, int offset);
-
-    /**
-     * Address: 0x004EDC10 (FUN_004EDC10, gpg::RType::AddField_int)
-     *
-     * What it does:
-     * Appends one reflected `int` field descriptor.
-     */
-    RField* AddFieldInt(const char* name, int offset);
-
-    /**
-     * Address: 0x00510DD0 (FUN_00510DD0, gpg::RType::AddFieldBool)
-     *
-     * What it does:
-     * Appends one reflected `bool` field descriptor.
-     */
-    RField* AddFieldBool(const char* name, int offset);
-
-    /**
-     * Address: 0x0050E1F0 (FUN_0050E1F0, gpg::RType::AddField_string)
-     *
-     * What it does:
-     * Appends one reflected `msvc8::string` field descriptor.
-     */
-    RField* AddFieldString(const char* name, int offset);
-
-    /**
-     * Address: 0x004EDFD0 (FUN_004EDFD0, gpg::RType::AddField_Vector3f)
-     *
-     * What it does:
-     * Appends one reflected `Wm3::Vector3f` field descriptor.
-     */
-    RField* AddFieldVector3f(const char* name, int offset);
-
-    /**
-     * Address: 0x00510D50 (FUN_00510D50, gpg::RType::AddField_RResId)
-     *
-     * What it does:
-     * Appends one reflected `moho::RResId` field descriptor.
-     */
-    RField* AddFieldRResId(const char* name, int offset);
-
-    /**
-     * Address: 0x0050D010 (FUN_0050D010, gpg::RType::AddField_uchar)
-     *
-     * What it does:
-     * Appends one reflected `unsigned char` field descriptor.
-     */
-    RField* AddFieldUChar(const char* name, int offset);
-
-    /**
-     * Address: 0x00510F10 (FUN_00510F10, gpg::RType::AddField_REmitterBlueprintCurve)
-     *
-     * What it does:
-     * Appends one reflected `moho::REmitterBlueprintCurve` field descriptor.
-     */
-    RField* AddFieldEmitterBlueprintCurve(const char* name, int offset);
-
-    /**
-     * Address: 0x00510FF0 (FUN_00510FF0, gpg::RType::AddField_Vector4f)
-     *
-     * What it does:
-     * Appends one reflected `moho::Vector4f` field descriptor.
-     */
-    RField* AddFieldVector4f(const char* name, int offset);
-
-    /**
-     * Address: 0x00513230 (FUN_00513230, gpg::RType::AddField_vector_string)
-     *
-     * What it does:
-     * Appends one reflected `msvc8::vector<msvc8::string>` field descriptor.
-     */
-    RField* AddFieldVectorString(const char* name, int offset);
-
-    /**
-     * Address: 0x00513330 (FUN_00513330, gpg::RType::AddField_SFootprint)
-     *
-     * What it does:
-     * Appends one reflected `moho::SFootprint` field descriptor.
-     */
-    RField* AddFieldSFootprint(const char* name, int offset);
-
-    /**
      * Address: 0x004EA0E0 (FUN_004EA0E0, gpg::RType::AddBlueprintAxisAlignedBox3f)
      *
      * What it does:
@@ -4454,9 +4369,79 @@ namespace gpg
     }
 
     /**
+     * Address: 0x0040DFA0 (FUN_0040DFA0 -- `AddField<float>`, binary name `AddField_float`.)
+     * Address: 0x0040E020 (FUN_0040E020 -- `AddField<unsigned int>`, binary name `AddField_uint`.)
+     * Address: 0x004EDC10 (FUN_004EDC10 -- `AddField<int>`, binary name `AddField_int`.)
+     * Address: 0x00510DD0 (FUN_00510DD0 -- `AddField<bool>`, binary name `AddFieldBool`.)
+     * Address: 0x0050E1F0 (FUN_0050E1F0 -- `AddField<msvc8::string>`, binary name `AddField_string`.)
+     * Address: 0x004EDFD0 (FUN_004EDFD0 -- `AddField<Wm3::Vector3f>`, binary name `AddField_Vector3f`.)
+     * Address: 0x00510D50 (FUN_00510D50 -- `AddField<moho::RResId>`, binary name `AddField_RResId`.)
+     * Address: 0x0050D010 (FUN_0050D010 -- `AddField<unsigned char>`, binary name `AddField_uchar`.)
+     * Address: 0x00510F10 (FUN_00510F10 -- `AddField<moho::REmitterBlueprintCurve>`, binary name `AddField_REmitterBlueprintCurve`.)
+     * Address: 0x00510FF0 (FUN_00510FF0 -- `AddField<moho::Vector4f>`, binary name `AddField_Vector4f`.)
+     * Address: 0x00513230 (FUN_00513230 -- `AddField<msvc8::vector<msvc8::string>>`, binary name `AddField_vector_string`.)
+     * Address: 0x00513330 (FUN_00513330 -- `AddField<moho::SFootprint>`, binary name `AddField_SFootprint`.)
      * Address: 0x005146E0 (FUN_005146E0 -- `AddField<msvc8::list<moho::SNamedFootprint>>`, with its name
      * `"Footprints"` and offset 0 folded in: `SRuleFootprintsBlueprintTypeInfo::AddFields` 0x00513FA0 and
      * `Init` 0x00513ED0 reach it with the type in ESI.)
+     * Address: 0x004F08F0 (FUN_004F08F0 -- `AddField<Wm3::Quaternionf>("r", ...)` for `VTransform::orient_`, name and offset folded in;
+     * formerly `AddQuaternionRotationField in moho/render/camera/VTransform.cpp` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x005132B0 (FUN_005132B0 -- `AddField<moho::ECollisionShape>("CollisionShape", ...)` for `REntityBlueprint::mCollisionShape`, name and offset folded in;
+     * formerly `REntityBlueprintTypeInfo::AddFieldCollisionShape` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0051A330 (FUN_0051A330 -- `AddField<msvc8::vector<moho::RMeshBlueprintLOD>>("LODs", ...)` for `RMeshBlueprint::mLods`, name and offset folded in;
+     * formerly `RMeshBlueprintTypeInfo::AddFieldLods` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0051CDC0 (FUN_0051CDC0 -- `AddField<moho::RProjectileBlueprintDisplay>("Display", ...)` for `RProjectileBlueprint::Display`, name and offset folded in;
+     * formerly `RProjectileBlueprintTypeInfo::AddFieldDisplay` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0051CE40 (FUN_0051CE40 -- `AddField<moho::RProjectileBlueprintEconomy>("Economy", ...)` for `RProjectileBlueprint::Economy`, name and offset folded in;
+     * formerly `RProjectileBlueprintTypeInfo::AddFieldEconomy` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0051CEC0 (FUN_0051CEC0 -- `AddField<moho::RProjectileBlueprintPhysics>("Physics", ...)` for `RProjectileBlueprint::Physics`, name and offset folded in;
+     * formerly `RProjectileBlueprintTypeInfo::AddFieldPhysics` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0051DF00 (FUN_0051DF00 -- `AddField<moho::RPropBlueprintDisplay>("Display", ...)` for `RPropBlueprint::Display`, name and offset folded in;
+     * formerly `RPropBlueprintTypeInfo::AddFieldDisplay` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0051DF80 (FUN_0051DF80 -- `AddField<moho::RPropBlueprintDefense>("Defense", ...)` for `RPropBlueprint::Defense`, name and offset folded in;
+     * formerly `RPropBlueprintTypeInfo::AddFieldDefense` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0051E000 (FUN_0051E000 -- `AddField<moho::RPropBlueprintEconomy>("Economy", ...)` for `RPropBlueprint::Economy`, name and offset folded in;
+     * formerly `RPropBlueprintTypeInfo::AddFieldEconomy` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x005252A0 (FUN_005252A0 -- `AddField<moho::ERuleBPUnitCommandCaps>("CommandCaps", ...)` for `RUnitBlueprintGeneral::CommandCaps`, name and offset folded in;
+     * formerly `RUnitBlueprintGeneralTypeInfo::AddFieldCommandCaps` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525320 (FUN_00525320 -- `AddField<moho::ERuleBPUnitToggleCaps>("ToggleCaps", ...)` for `RUnitBlueprintGeneral::ToggleCaps`, name and offset folded in;
+     * formerly `RUnitBlueprintGeneralTypeInfo::AddFieldToggleCaps` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525420 (FUN_00525420 -- `AddField<moho::ELayer>("BuildOnLayerCaps", ...)` for `RUnitBlueprintPhysics::BuildOnLayerCapsMask`, name and offset folded in;
+     * formerly `RUnitBlueprintPhysicsTypeInfo::AddFieldBuildOnLayerCaps` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x005254A0 (FUN_005254A0 -- `AddField<moho::ERuleBPUnitBuildRestriction>("BuildRestriction", ...)` for `RUnitBlueprintPhysics::BuildRestriction`, name and offset folded in;
+     * formerly `RUnitBlueprintPhysicsTypeInfo::AddFieldBuildRestriction` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x005255A0 (FUN_005255A0 -- `AddField<moho::RUnitBlueprintDefenseShield>("Shield", ...)` for `RUnitBlueprintDefense::Shield`, name and offset folded in;
+     * formerly `RUnitBlueprintDefenseTypeInfo::AddFieldShield` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x005256A0 (FUN_005256A0 -- `AddField<moho::UnitWeaponRangeCategory>("RangeCategory", ...)` for `RUnitBlueprintWeapon::RangeCategory`, name and offset folded in;
+     * formerly `RUnitBlueprintWeaponTypeInfo::AddFieldRangeCategory` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525720 (FUN_00525720 -- `AddField<moho::ERuleBPUnitWeaponBallisticArc>("BallisticArc", ...)` for `RUnitBlueprintWeapon::BallisticArc`, name and offset folded in;
+     * formerly `RUnitBlueprintWeaponTypeInfo::AddFieldBallisticArc` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x005257A0 (FUN_005257A0 -- `AddField<moho::ERuleBPUnitWeaponTargetType>("TargetType", ...)` for `RUnitBlueprintWeapon::TargetType`, name and offset folded in;
+     * formerly `RUnitBlueprintWeaponTypeInfo::AddFieldTargetType` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525880 (FUN_00525880 -- `AddField<moho::RUnitBlueprintGeneral>("General", ...)` for `RUnitBlueprint::General`, name and offset folded in;
+     * formerly `RUnitBlueprintTypeInfo::AddFieldGeneral` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525900 (FUN_00525900 -- `AddField<moho::RUnitBlueprintDisplay>("Display", ...)` for `RUnitBlueprint::Display`, name and offset folded in;
+     * formerly `RUnitBlueprintTypeInfo::AddFieldDisplaySection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525980 (FUN_00525980 -- `AddField<moho::RUnitBlueprintPhysics>("Physics", ...)` for `RUnitBlueprint::Physics`, name and offset folded in;
+     * formerly `RUnitBlueprintTypeInfo::AddFieldPhysicsSection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525A00 (FUN_00525A00 -- `AddField<moho::RUnitBlueprintAir>("Air", ...)` for `RUnitBlueprint::Air`, name and offset folded in;
+     * formerly `RUnitBlueprintTypeInfo::AddFieldAirSection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525A80 (FUN_00525A80 -- `AddField<moho::RUnitBlueprintTransport>("Transport", ...)` for `RUnitBlueprint::Transport`, name and offset folded in;
+     * formerly `RUnitBlueprintTypeInfo::AddFieldTransportSection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525B00 (FUN_00525B00 -- `AddField<moho::RUnitBlueprintDefense>("Defense", ...)` for `RUnitBlueprint::Defense`, name and offset folded in;
+     * formerly `RUnitBlueprintTypeInfo::AddFieldDefenseSection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525B80 (FUN_00525B80 -- `AddField<moho::RUnitBlueprintAI>("AI", ...)` for `RUnitBlueprint::AI`, name and offset folded in;
+     * formerly `RUnitBlueprintTypeInfo::AddFieldAiSection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525C00 (FUN_00525C00 -- `AddField<moho::RUnitBlueprintIntel>("Intel", ...)` for `RUnitBlueprint::Intel`, name and offset folded in;
+     * formerly `RUnitBlueprintTypeInfo::AddFieldIntelSection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525C80 (FUN_00525C80 -- `AddField<msvc8::vector<moho::RUnitBlueprintWeapon>>("Weapons", ...)` for `RUnitBlueprint::Weapons`, name and offset folded in;
+     * formerly `RUnitBlueprintTypeInfo::AddFieldWeaponSection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525D00 (FUN_00525D00 -- `AddField<moho::RUnitBlueprintEconomy>("Economy", ...)` for `RUnitBlueprint::Economy`, name and offset folded in;
+     * formerly `RUnitBlueprintTypeInfo::AddFieldEconomySection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0073A710 (FUN_0073A710 -- `AddField<moho::CDamageMethod>("Method", ...)` for `CDamage::mMethod`, name and offset folded in;
+     * formerly `CDamageTypeInfo::AddFieldMethod` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0073A790 (FUN_0073A790 -- `AddField<moho::SMinMax<float>>("MinMaxRadius", ...)` for `CDamage::mRadius`, name and offset folded in;
+     * formerly `CDamageTypeInfo::AddFieldMinMaxRadius` (RULE ONE), removed 2026-09-30.)
      *
      * What it does:
      * Appends one reflected field of type `T` at `offset`: asserts the type is
@@ -4469,6 +4454,22 @@ namespace gpg
       GPG_ASSERT(!initFinished_);
       fields_.push_back(RField{name, RTypeOf<T>(), offset});
       return &fields_.back();
+    }
+
+    /**
+     * What it does:
+     * `AddField<T>(name, offset)`, then the entry's access flags and editor
+     * description, stored at the call site: `RBeamBlueprintTypeInfo::AddFields`
+     * 0x0050FB90 calls `AddField_float` 0x0040DFA0 and writes `[eax+0x0C] = 3`,
+     * `[eax+0x10] = desc` after each field.
+     */
+    template <class T>
+    RField* AddField(const char* const name, const int offset, const int flags, const char* const desc)
+    {
+      RField* const field = AddField<T>(name, offset);
+      field->mFlags = flags;
+      field->mDesc = desc;
+      return field;
     }
 
     template <class T, class B>

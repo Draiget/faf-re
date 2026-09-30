@@ -29,78 +29,6 @@ namespace
     return cached;
   }
 
-  gpg::RType* CachedGeneralType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintGeneral));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedDisplayType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintDisplay));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedPhysicsType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintPhysics));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedAirType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintAir));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedTransportType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintTransport));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedDefenseType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintDefense));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedAiType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintAI));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedIntelType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintIntel));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x005263B0 (FUN_005263B0, preregister_VectorRUnitBlueprintWeaponTypeStartup)
    *
@@ -111,27 +39,6 @@ namespace
   [[nodiscard]] gpg::RType* preregister_VectorRUnitBlueprintWeaponTypeStartup()
   {
     return moho::preregister_VectorRUnitBlueprintWeaponType();
-  }
-
-  gpg::RType* CachedWeaponVectorType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = preregister_VectorRUnitBlueprintWeaponTypeStartup();
-      if (!cached) {
-        cached = gpg::LookupRType(typeid(msvc8::vector<moho::RUnitBlueprintWeapon>));
-      }
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedEconomyType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintEconomy));
-    }
-    return cached;
   }
 
   struct RUnitBlueprintTypeInfoBootstrap
@@ -183,179 +90,9 @@ namespace moho
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
-  }
-
-  /**
-   * Address: 0x00525880 (FUN_00525880, gpg::RType::AddField_RUnitBlueprintGeneral_0x17CGeneral)
-   *
-   * What it does:
-   * Appends the reflected `General` section field descriptor at offset `0x17C`.
-   */
-  gpg::RField* RUnitBlueprintTypeInfo::AddFieldGeneral(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("General", CachedGeneralType(), offsetof(RUnitBlueprint, General), 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
-  /**
-   * Address: 0x00525900 (FUN_00525900, gpg::RType::AddField_RUnitBlueprintDisplay_0x200Display)
-   *
-   * What it does:
-   * Appends the reflected `Display` section field descriptor at offset `0x200`.
-   */
-  gpg::RField* RUnitBlueprintTypeInfo::AddFieldDisplaySection(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Display", CachedDisplayType(), offsetof(RUnitBlueprint, Display), 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
-  /**
-   * Address: 0x00525980 (FUN_00525980, gpg::RType::AddField_RUnitBlueprintPhysics_0x278Physics)
-   *
-   * What it does:
-   * Appends the reflected `Physics` section field descriptor at offset `0x278`.
-   */
-  gpg::RField* RUnitBlueprintTypeInfo::AddFieldPhysicsSection(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Physics", CachedPhysicsType(), offsetof(RUnitBlueprint, Physics), 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
-  /**
-   * Address: 0x00525A00 (FUN_00525A00, gpg::RType::AddField_RUnitBlueprintAir_0x368Air)
-   *
-   * What it does:
-   * Appends the reflected `Air` section field descriptor at offset `0x368`.
-   */
-  gpg::RField* RUnitBlueprintTypeInfo::AddFieldAirSection(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Air", CachedAirType(), offsetof(RUnitBlueprint, Air), 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
-  /**
-   * Address: 0x00525A80 (FUN_00525A80, gpg::RType::AddField_RUnitBlueprintTransport_0x3F8Transport)
-   *
-   * What it does:
-   * Appends the reflected `Transport` section field descriptor at offset `0x3F8`.
-   */
-  gpg::RField* RUnitBlueprintTypeInfo::AddFieldTransportSection(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Transport", CachedTransportType(), offsetof(RUnitBlueprint, Transport), 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
-  /**
-   * Address: 0x00525B00 (FUN_00525B00, gpg::RType::AddField_RUnitBlueprintDefense_0x420Defense)
-   *
-   * What it does:
-   * Appends the reflected `Defense` section field descriptor at offset `0x420`.
-   */
-  gpg::RField* RUnitBlueprintTypeInfo::AddFieldDefenseSection(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Defense", CachedDefenseType(), offsetof(RUnitBlueprint, Defense), 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
-  /**
-   * Address: 0x00525B80 (FUN_00525B80, gpg::RType::AddField_RUnitBlueprintAI_0x460AI)
-   *
-   * What it does:
-   * Appends the reflected `AI` section field descriptor at offset `0x460`.
-   */
-  gpg::RField* RUnitBlueprintTypeInfo::AddFieldAiSection(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("AI", CachedAiType(), offsetof(RUnitBlueprint, AI), 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
-  /**
-   * Address: 0x00525C00 (FUN_00525C00, gpg::RType::AddField_RUnitBlueprintIntel_0x330Intel)
-   *
-   * What it does:
-   * Appends the reflected `Intel` section field descriptor at offset `0x330`.
-   */
-  gpg::RField* RUnitBlueprintTypeInfo::AddFieldIntelSection(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Intel", CachedIntelType(), offsetof(RUnitBlueprint, Intel), 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
-  /**
-   * Address: 0x00525C80 (FUN_00525C80, gpg::RType::AddField_vector_RUnitBlueprintWeapon_0x4D4Weapons)
-   *
-   * What it does:
-   * Appends the reflected `Weapons` section field descriptor at offset `0x4D4`.
-   */
-  gpg::RField* RUnitBlueprintTypeInfo::AddFieldWeaponSection(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Weapons", CachedWeaponVectorType(), offsetof(RUnitBlueprint, Weapons), 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
-  /**
-   * Address: 0x00525D00 (FUN_00525D00, gpg::RType::AddField_RUnitBlueprintEconomy_0x4E8Economy)
-   *
-   * What it does:
-   * Appends the reflected `Economy` section field descriptor at offset `0x4E8`.
-   */
-  gpg::RField* RUnitBlueprintTypeInfo::AddFieldEconomySection(gpg::RType* const typeInfo)
-  {
-    if (!typeInfo) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(!typeInfo->initFinished_);
-    typeInfo->fields_.push_back(gpg::RField("Economy", CachedEconomyType(), offsetof(RUnitBlueprint, Economy), 0, nullptr));
-    return &typeInfo->fields_.back();
   }
 
   /**
@@ -366,45 +103,45 @@ namespace moho
    */
   void RUnitBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* const generalField = AddFieldGeneral(typeInfo);
-    generalField->v4 = 3;
+    gpg::RField* const generalField = typeInfo->AddField<moho::RUnitBlueprintGeneral>("General", offsetof(RUnitBlueprint, General));
+    generalField->mFlags = 3;
     generalField->mDesc = "General information for the unit";
 
-    gpg::RField* const displayField = AddFieldDisplaySection(typeInfo);
-    displayField->v4 = 3;
+    gpg::RField* const displayField = typeInfo->AddField<moho::RUnitBlueprintDisplay>("Display", offsetof(RUnitBlueprint, Display));
+    displayField->mFlags = 3;
     displayField->mDesc = "Display information for the unit";
 
-    gpg::RField* const physicsField = AddFieldPhysicsSection(typeInfo);
-    physicsField->v4 = 3;
+    gpg::RField* const physicsField = typeInfo->AddField<moho::RUnitBlueprintPhysics>("Physics", offsetof(RUnitBlueprint, Physics));
+    physicsField->mFlags = 3;
     physicsField->mDesc = "Physics information for the unit";
 
-    gpg::RField* const airField = AddFieldAirSection(typeInfo);
-    airField->v4 = 3;
+    gpg::RField* const airField = typeInfo->AddField<moho::RUnitBlueprintAir>("Air", offsetof(RUnitBlueprint, Air));
+    airField->mFlags = 3;
     airField->mDesc = "Air control information for the unit";
 
-    gpg::RField* const transportField = AddFieldTransportSection(typeInfo);
-    transportField->v4 = 3;
+    gpg::RField* const transportField = typeInfo->AddField<moho::RUnitBlueprintTransport>("Transport", offsetof(RUnitBlueprint, Transport));
+    transportField->mFlags = 3;
     transportField->mDesc = "Transport related information for the unit";
 
-    gpg::RField* const defenseField = AddFieldDefenseSection(typeInfo);
-    defenseField->v4 = 3;
+    gpg::RField* const defenseField = typeInfo->AddField<moho::RUnitBlueprintDefense>("Defense", offsetof(RUnitBlueprint, Defense));
+    defenseField->mFlags = 3;
     defenseField->mDesc = "Defense information for the unit";
 
-    gpg::RField* const aiField = AddFieldAiSection(typeInfo);
-    aiField->v4 = 3;
+    gpg::RField* const aiField = typeInfo->AddField<moho::RUnitBlueprintAI>("AI", offsetof(RUnitBlueprint, AI));
+    aiField->mFlags = 3;
     aiField->mDesc = "AI information for the unit";
 
-    gpg::RField* const intelField = AddFieldIntelSection(typeInfo);
-    intelField->v4 = 3;
+    gpg::RField* const intelField = typeInfo->AddField<moho::RUnitBlueprintIntel>("Intel", offsetof(RUnitBlueprint, Intel));
+    intelField->mFlags = 3;
     intelField->mDesc = "Intel information for the unit";
 
-    gpg::RField* const weaponField = AddFieldWeaponSection(typeInfo);
+    gpg::RField* const weaponField = typeInfo->AddField<msvc8::vector<moho::RUnitBlueprintWeapon>>("Weapons", offsetof(RUnitBlueprint, Weapons));
     weaponField->mName = "Weapon";
-    weaponField->v4 = 3;
+    weaponField->mFlags = 3;
     weaponField->mDesc = "Weapon information for the unit";
 
-    gpg::RField* const economyField = AddFieldEconomySection(typeInfo);
-    economyField->v4 = 3;
+    gpg::RField* const economyField = typeInfo->AddField<moho::RUnitBlueprintEconomy>("Economy", offsetof(RUnitBlueprint, Economy));
+    economyField->mFlags = 3;
     economyField->mDesc = "Economy information for the unit";
   }
 

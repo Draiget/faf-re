@@ -31,47 +31,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedPropDisplayType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RPropBlueprintDisplay));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedPropDefenseType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RPropBlueprintDefense));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedPropEconomyType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RPropBlueprintEconomy));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RField* AppendField(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int fieldOffset
-  )
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(!typeInfo->initFinished_);
-
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, fieldOffset, 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
   struct RPropBlueprintTypeInfoBootstrap
   {
     RPropBlueprintTypeInfoBootstrap()
@@ -175,33 +134,9 @@ namespace moho
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
-  }
-
-  /**
-   * Address: 0x0051DF00 (FUN_0051DF00, gpg::RType::AddField_RPropBlueprintDisplay_0x17CDisplay)
-   */
-  gpg::RField* RPropBlueprintTypeInfo::AddFieldDisplay(gpg::RType* const typeInfo)
-  {
-    return AppendField(typeInfo, "Display", CachedPropDisplayType(), offsetof(RPropBlueprint, Display));
-  }
-
-  /**
-   * Address: 0x0051DF80 (FUN_0051DF80, gpg::RType::AddField_RPropBlueprintDefense_0x19CDefense)
-   */
-  gpg::RField* RPropBlueprintTypeInfo::AddFieldDefense(gpg::RType* const typeInfo)
-  {
-    return AppendField(typeInfo, "Defense", CachedPropDefenseType(), offsetof(RPropBlueprint, Defense));
-  }
-
-  /**
-   * Address: 0x0051E000 (FUN_0051E000, gpg::RType::AddField_RPropBlueprintEconomy_0x1A4Economy)
-   */
-  gpg::RField* RPropBlueprintTypeInfo::AddFieldEconomy(gpg::RType* const typeInfo)
-  {
-    return AppendField(typeInfo, "Economy", CachedPropEconomyType(), offsetof(RPropBlueprint, Economy));
   }
 
   /**
@@ -213,16 +148,16 @@ namespace moho
     AddBaseREntityBlueprint(this);
     gpg::RType::Init();
 
-    gpg::RField* const displayField = AddFieldDisplay(this);
-    displayField->v4 = 3;
+    gpg::RField* const displayField = AddField<moho::RPropBlueprintDisplay>("Display", offsetof(RPropBlueprint, Display));
+    displayField->mFlags = 3;
     displayField->mDesc = "Display information for the unit";
 
-    gpg::RField* const defenseField = AddFieldDefense(this);
-    defenseField->v4 = 3;
+    gpg::RField* const defenseField = AddField<moho::RPropBlueprintDefense>("Defense", offsetof(RPropBlueprint, Defense));
+    defenseField->mFlags = 3;
     defenseField->mDesc = "Defense information for the unit";
 
-    gpg::RField* const economyField = AddFieldEconomy(this);
-    economyField->v4 = 3;
+    gpg::RField* const economyField = AddField<moho::RPropBlueprintEconomy>("Economy", offsetof(RPropBlueprint, Economy));
+    economyField->mFlags = 3;
     economyField->mDesc = "Economy information for the unit";
 
     Finish();

@@ -17,12 +17,12 @@ namespace
    */
   gpg::RField* AddProjectileDamageFloatFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* const damageField = typeInfo->AddFieldFloat("Damage", offsetof(moho::Projectile, mDamage));
-    damageField->v4 = 1;
+    gpg::RField* const damageField = typeInfo->AddField<float>("Damage", offsetof(moho::Projectile, mDamage));
+    damageField->mFlags = 1;
     damageField->mDesc = "Damage per hit (configured by weapon)";
 
-    gpg::RField* const damageRadiusField = typeInfo->AddFieldFloat("DamageRadius", offsetof(moho::Projectile, mDamageRadius));
-    damageRadiusField->v4 = 1;
+    gpg::RField* const damageRadiusField = typeInfo->AddField<float>("DamageRadius", offsetof(moho::Projectile, mDamageRadius));
+    damageRadiusField->mFlags = 1;
     damageRadiusField->mDesc = "Radius to inflict damage within (configured by weapon)";
     return damageRadiusField;
   }
@@ -100,7 +100,7 @@ namespace moho
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }

@@ -61,7 +61,7 @@ namespace
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo.AddBase(baseField);
   }
@@ -80,7 +80,7 @@ namespace
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = gpg::BaseSubobjectOffset<CAiNavigatorImpl, CTask>();
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo.AddBase(baseField);
   }
@@ -100,7 +100,7 @@ namespace
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = gpg::BaseSubobjectOffset<CAiNavigatorImpl, CScriptObject>();
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo.AddBase(baseField);
   }

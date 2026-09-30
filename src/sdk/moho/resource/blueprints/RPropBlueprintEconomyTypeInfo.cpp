@@ -20,25 +20,6 @@ namespace
     return sInstance;
   }
 
-  gpg::RType* CachedFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(float));
-    }
-    return cached;
-  }
-
-  void AddFieldWithDescription(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int offset,
-    const char* const description
-  )
-  {
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
-  }
 } // namespace
 
 namespace moho
@@ -72,8 +53,8 @@ namespace moho
   {
     size_ = sizeof(RPropBlueprintEconomy);
     gpg::RType::Init();
-    AddFieldWithDescription(this, "ReclaimMassMax", CachedFloatType(), offsetof(RPropBlueprintEconomy, ReclaimMassMax), "Max Reclaimable mass resource.");
-    AddFieldWithDescription(this, "ReclaimEnergyMax", CachedFloatType(), offsetof(RPropBlueprintEconomy, ReclaimEnergyMax), "Max Reclaimable Energy resource.");
+    AddField<float>("ReclaimMassMax", offsetof(RPropBlueprintEconomy, ReclaimMassMax), 3, "Max Reclaimable mass resource.");
+    AddField<float>("ReclaimEnergyMax", offsetof(RPropBlueprintEconomy, ReclaimEnergyMax), 3, "Max Reclaimable Energy resource.");
     Finish();
   }
 

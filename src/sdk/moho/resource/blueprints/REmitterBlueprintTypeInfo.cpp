@@ -46,76 +46,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedRResIdType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RResId));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedBoolType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(bool));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(float));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedInt32Type()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(std::int32_t));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedStringType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::string));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RField* AddFieldWithDescription(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int offset,
-    const char* const description
-  )
-  {
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
-    return &typeInfo->fields_.back();
-  }
-
-  [[nodiscard]] gpg::RField* AddEmitterCurveFieldWithDescription(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    const int offset,
-    const char* const description
-  )
-  {
-    gpg::RField* const field = typeInfo->AddFieldEmitterBlueprintCurve(fieldName, offset);
-    field->v4 = 3;
-    field->mDesc = description;
-    return field;
-  }
-
   [[nodiscard]] gpg::RRef MakeEmitterBlueprintRef(moho::REmitterBlueprint* object)
   {
     gpg::RRef out{};
@@ -215,7 +145,7 @@ void REmitterBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeI
   baseField.mName = effectType->GetName();
   baseField.mType = effectType;
   baseField.mOffset = 0;
-  baseField.v4 = 0;
+  baseField.mFlags = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);
 }
@@ -238,84 +168,53 @@ void REmitterBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeI
    */
   void REmitterBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "BlueprintId", CachedRResIdType(), offsetof(REmitterBlueprint, BlueprintId), "Blueprint ID");
-    AddEmitterCurveFieldWithDescription(typeInfo, "SizeCurve", offsetof(REmitterBlueprint, SizeCurve), "Size of emitter over time");
-    AddEmitterCurveFieldWithDescription(typeInfo, "XDirectionCurve", offsetof(REmitterBlueprint, XDirectionCurve), "X direction");
-    AddEmitterCurveFieldWithDescription(typeInfo, "YDirectionCurve", offsetof(REmitterBlueprint, YDirectionCurve), "Y direction");
-    AddEmitterCurveFieldWithDescription(typeInfo, "ZDirectionCurve", offsetof(REmitterBlueprint, ZDirectionCurve), "Z direction");
-    AddEmitterCurveFieldWithDescription(typeInfo, "EmitRateCurve", offsetof(REmitterBlueprint, EmitRateCurve), "EmitRateCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "LifetimeCurve", offsetof(REmitterBlueprint, LifetimeCurve), "LifetimeCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "VelocityCurve", offsetof(REmitterBlueprint, VelocityCurve), "VelocityCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "XAccelCurve", offsetof(REmitterBlueprint, XAccelCurve), "XAccelCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "YAccelCurve", offsetof(REmitterBlueprint, YAccelCurve), "YAccelCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "ZAccelCurve", offsetof(REmitterBlueprint, ZAccelCurve), "ZAccelCurve");
-    AddEmitterCurveFieldWithDescription(
-      typeInfo,
-      "ResistanceCurve",
-      offsetof(REmitterBlueprint, ResistanceCurve),
-      "drag coefficient (actually, the drag coefficient divied by the mass)"
-    );
-    AddEmitterCurveFieldWithDescription(typeInfo, "StartSizeCurve", offsetof(REmitterBlueprint, StartSizeCurve), "StartSizeCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "EndSizeCurve", offsetof(REmitterBlueprint, EndSizeCurve), "EndSizeCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "InitialRotationCurve", offsetof(REmitterBlueprint, InitialRotationCurve), "InitialRotationCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "RotationRateCurve", offsetof(REmitterBlueprint, RotationRateCurve), "RotationRateCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "FrameRateCurve", offsetof(REmitterBlueprint, FrameRateCurve), "FrameRateCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "TextureSelectionCurve", offsetof(REmitterBlueprint, TextureSelectionCurve), "TextureSelectionCurve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "XPosCurve", offsetof(REmitterBlueprint, XPosCurve), "X Offset Curve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "YPosCurve", offsetof(REmitterBlueprint, YPosCurve), "Y Offset Curve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "ZPosCurve", offsetof(REmitterBlueprint, ZPosCurve), "Z Offset Curve");
-    AddEmitterCurveFieldWithDescription(typeInfo, "RampSelectionCurve", offsetof(REmitterBlueprint, RampSelectionCurve), "RampSelectionCurve");
-    AddFieldWithDescription(typeInfo, "LocalVelocity", CachedBoolType(), offsetof(REmitterBlueprint, LocalVelocity), "Is velocity attached to bone");
-    AddFieldWithDescription(typeInfo, "LocalAcceleration", CachedBoolType(), offsetof(REmitterBlueprint, LocalAcceleration), "Is acceleration attached to bone");
-    AddFieldWithDescription(typeInfo, "Gravity", CachedBoolType(), offsetof(REmitterBlueprint, Gravity), "Gravity enabled?");
-    AddFieldWithDescription(
-      typeInfo, "AlignRotation", CachedBoolType(), offsetof(REmitterBlueprint, AlignRotation), "Align the rotation of the particle with direction?"
-    );
-    AddFieldWithDescription(
-      typeInfo, "AlignToBone", CachedBoolType(), offsetof(REmitterBlueprint, AlignToBone), "Align the intitial rotation of the particle to the bone"
-    );
-    AddFieldWithDescription(
-      typeInfo, "EmitIfVisible", CachedBoolType(), offsetof(REmitterBlueprint, EmitIfVisible), "Emit particles ONLY if this is emitter is visible"
-    );
-    AddFieldWithDescription(
-      typeInfo, "ParticleResistance", CachedBoolType(), offsetof(REmitterBlueprint, ParticleResistance), "true to enable the use of drag on a particle"
-    );
-    AddFieldWithDescription(
-      typeInfo, "CatchupEmit", CachedBoolType(), offsetof(REmitterBlueprint, CatchupEmit), "catchup particles for the ticks that we weren't visible"
-    );
-    AddFieldWithDescription(
-      typeInfo,
-      "CreateIfVisible",
-      CachedBoolType(),
-      offsetof(REmitterBlueprint, CreateIfVisible),
-      "when this emitter is initially created only create and emit if visible"
-    );
-    AddFieldWithDescription(typeInfo, "Flat", CachedBoolType(), offsetof(REmitterBlueprint, Flat), "Make the particles flat in world space.");
-    AddFieldWithDescription(typeInfo, "InterpolateEmission", CachedBoolType(), offsetof(REmitterBlueprint, InterpolateEmission), "Interpolate emission over tick");
-    AddFieldWithDescription(
-      typeInfo, "SnapToWaterline", CachedBoolType(), offsetof(REmitterBlueprint, SnapToWaterline), "Snap underwater emission to the waterline"
-    );
-    AddFieldWithDescription(typeInfo, "OnlyEmitOnWater", CachedBoolType(), offsetof(REmitterBlueprint, OnlyEmitOnWater), "Only emit if over water");
-    AddFieldWithDescription(
-      typeInfo, "TextureStripcount", CachedFloatType(), offsetof(REmitterBlueprint, TextureStripCount), "Number of strips in the animated texture"
-    );
-    AddFieldWithDescription(typeInfo, "SortOrder", CachedFloatType(), offsetof(REmitterBlueprint, SortOrder), "Sort order of particles emitted");
-    AddFieldWithDescription(typeInfo, "Lifetime", CachedFloatType(), offsetof(REmitterBlueprint, Lifetime), "Lifetime of emitter in ticks");
-    AddFieldWithDescription(typeInfo, "LODCutoff", CachedFloatType(), offsetof(REmitterBlueprint, LODCutoff), "Distance emission cuts out.");
-    AddFieldWithDescription(typeInfo, "Repeattime", CachedFloatType(), offsetof(REmitterBlueprint, RepeatTime), "Repeattime of emitter in ticks");
-    AddFieldWithDescription(
-      typeInfo, "TextureFramecount", CachedFloatType(), offsetof(REmitterBlueprint, TextureFrameCount), "number of frames in texture we are using."
-    );
-    AddFieldWithDescription(typeInfo, "Blendmode", CachedInt32Type(), offsetof(REmitterBlueprint, BlendMode), "Blendmode for this emitter.");
+    typeInfo->AddField<moho::RResId>("BlueprintId", offsetof(REmitterBlueprint, BlueprintId), 3, "Blueprint ID");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("SizeCurve", offsetof(REmitterBlueprint, SizeCurve), 3, "Size of emitter over time");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("XDirectionCurve", offsetof(REmitterBlueprint, XDirectionCurve), 3, "X direction");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("YDirectionCurve", offsetof(REmitterBlueprint, YDirectionCurve), 3, "Y direction");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("ZDirectionCurve", offsetof(REmitterBlueprint, ZDirectionCurve), 3, "Z direction");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("EmitRateCurve", offsetof(REmitterBlueprint, EmitRateCurve), 3, "EmitRateCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("LifetimeCurve", offsetof(REmitterBlueprint, LifetimeCurve), 3, "LifetimeCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("VelocityCurve", offsetof(REmitterBlueprint, VelocityCurve), 3, "VelocityCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("XAccelCurve", offsetof(REmitterBlueprint, XAccelCurve), 3, "XAccelCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("YAccelCurve", offsetof(REmitterBlueprint, YAccelCurve), 3, "YAccelCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("ZAccelCurve", offsetof(REmitterBlueprint, ZAccelCurve), 3, "ZAccelCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("ResistanceCurve", offsetof(REmitterBlueprint, ResistanceCurve), 3, "drag coefficient (actually, the drag coefficient divied by the mass)");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("StartSizeCurve", offsetof(REmitterBlueprint, StartSizeCurve), 3, "StartSizeCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("EndSizeCurve", offsetof(REmitterBlueprint, EndSizeCurve), 3, "EndSizeCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("InitialRotationCurve", offsetof(REmitterBlueprint, InitialRotationCurve), 3, "InitialRotationCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("RotationRateCurve", offsetof(REmitterBlueprint, RotationRateCurve), 3, "RotationRateCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("FrameRateCurve", offsetof(REmitterBlueprint, FrameRateCurve), 3, "FrameRateCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("TextureSelectionCurve", offsetof(REmitterBlueprint, TextureSelectionCurve), 3, "TextureSelectionCurve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("XPosCurve", offsetof(REmitterBlueprint, XPosCurve), 3, "X Offset Curve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("YPosCurve", offsetof(REmitterBlueprint, YPosCurve), 3, "Y Offset Curve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("ZPosCurve", offsetof(REmitterBlueprint, ZPosCurve), 3, "Z Offset Curve");
+    typeInfo->AddField<moho::REmitterBlueprintCurve>("RampSelectionCurve", offsetof(REmitterBlueprint, RampSelectionCurve), 3, "RampSelectionCurve");
+    typeInfo->AddField<bool>("LocalVelocity", offsetof(REmitterBlueprint, LocalVelocity), 3, "Is velocity attached to bone");
+    typeInfo->AddField<bool>("LocalAcceleration", offsetof(REmitterBlueprint, LocalAcceleration), 3, "Is acceleration attached to bone");
+    typeInfo->AddField<bool>("Gravity", offsetof(REmitterBlueprint, Gravity), 3, "Gravity enabled?");
+    typeInfo->AddField<bool>("AlignRotation", offsetof(REmitterBlueprint, AlignRotation), 3, "Align the rotation of the particle with direction?");
+    typeInfo->AddField<bool>("AlignToBone", offsetof(REmitterBlueprint, AlignToBone), 3, "Align the intitial rotation of the particle to the bone");
+    typeInfo->AddField<bool>("EmitIfVisible", offsetof(REmitterBlueprint, EmitIfVisible), 3, "Emit particles ONLY if this is emitter is visible");
+    typeInfo->AddField<bool>("ParticleResistance", offsetof(REmitterBlueprint, ParticleResistance), 3, "true to enable the use of drag on a particle");
+    typeInfo->AddField<bool>("CatchupEmit", offsetof(REmitterBlueprint, CatchupEmit), 3, "catchup particles for the ticks that we weren't visible");
+    typeInfo->AddField<bool>("CreateIfVisible", offsetof(REmitterBlueprint, CreateIfVisible), 3, "when this emitter is initially created only create and emit if visible");
+    typeInfo->AddField<bool>("Flat", offsetof(REmitterBlueprint, Flat), 3, "Make the particles flat in world space.");
+    typeInfo->AddField<bool>("InterpolateEmission", offsetof(REmitterBlueprint, InterpolateEmission), 3, "Interpolate emission over tick");
+    typeInfo->AddField<bool>("SnapToWaterline", offsetof(REmitterBlueprint, SnapToWaterline), 3, "Snap underwater emission to the waterline");
+    typeInfo->AddField<bool>("OnlyEmitOnWater", offsetof(REmitterBlueprint, OnlyEmitOnWater), 3, "Only emit if over water");
+    typeInfo->AddField<float>("TextureStripcount", offsetof(REmitterBlueprint, TextureStripCount), 3, "Number of strips in the animated texture");
+    typeInfo->AddField<float>("SortOrder", offsetof(REmitterBlueprint, SortOrder), 3, "Sort order of particles emitted");
+    typeInfo->AddField<float>("Lifetime", offsetof(REmitterBlueprint, Lifetime), 3, "Lifetime of emitter in ticks");
+    typeInfo->AddField<float>("LODCutoff", offsetof(REmitterBlueprint, LODCutoff), 3, "Distance emission cuts out.");
+    typeInfo->AddField<float>("Repeattime", offsetof(REmitterBlueprint, RepeatTime), 3, "Repeattime of emitter in ticks");
+    typeInfo->AddField<float>("TextureFramecount", offsetof(REmitterBlueprint, TextureFrameCount), 3, "number of frames in texture we are using.");
+    typeInfo->AddField<std::int32_t>("Blendmode", offsetof(REmitterBlueprint, BlendMode), 3, "Blendmode for this emitter.");
 
-    gpg::RField* const textureNameField = AddFieldWithDescription(
-      typeInfo, "TextureName", CachedStringType(), offsetof(REmitterBlueprint, TextureName), "Name of texture we are using for this particle"
-    );
+    gpg::RField* const textureNameField = typeInfo->AddField<msvc8::string>("TextureName", offsetof(REmitterBlueprint, TextureName), 3, "Name of texture we are using for this particle");
     textureNameField->mName = "Texture";
 
-    gpg::RField* const rampTextureNameField = AddFieldWithDescription(
-      typeInfo, "RampTextureName", CachedStringType(), offsetof(REmitterBlueprint, RampTextureName), "Name of ramp texture we are using for this particle"
-    );
+    gpg::RField* const rampTextureNameField = typeInfo->AddField<msvc8::string>("RampTextureName", offsetof(REmitterBlueprint, RampTextureName), 3, "Name of ramp texture we are using for this particle");
     rampTextureNameField->mName = "RampTexture";
   }
 

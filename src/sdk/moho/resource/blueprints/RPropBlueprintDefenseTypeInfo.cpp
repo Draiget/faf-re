@@ -20,25 +20,6 @@ namespace
     return sInstance;
   }
 
-  gpg::RType* CachedFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(float));
-    }
-    return cached;
-  }
-
-  void AddFieldWithDescription(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int offset,
-    const char* const description
-  )
-  {
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
-  }
 } // namespace
 
 namespace moho
@@ -72,8 +53,8 @@ namespace moho
   {
     size_ = sizeof(RPropBlueprintDefense);
     gpg::RType::Init();
-    AddFieldWithDescription(this, "MaxHealth", CachedFloatType(), offsetof(RPropBlueprintDefense, MaxHealth), "Max health value for the prop");
-    AddFieldWithDescription(this, "Health", CachedFloatType(), offsetof(RPropBlueprintDefense, Health), "Starting health value for the prop");
+    AddField<float>("MaxHealth", offsetof(RPropBlueprintDefense, MaxHealth), 3, "Max health value for the prop");
+    AddField<float>("Health", offsetof(RPropBlueprintDefense, Health), 3, "Starting health value for the prop");
     Finish();
   }
 

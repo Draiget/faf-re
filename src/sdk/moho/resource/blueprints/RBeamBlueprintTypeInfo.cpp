@@ -38,45 +38,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(float));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedInt32Type()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(std::int32_t));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedStringType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::string));
-    }
-    return cached;
-  }
-
-  gpg::RField* AddFieldWithDescription(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int offset,
-    const char* const description
-  )
-  {
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
-    return &typeInfo->fields_.back();
-  }
-
   [[nodiscard]] gpg::RRef MakeBeamBlueprintRef(moho::RBeamBlueprint* object)
   {
     gpg::RRef out{};
@@ -179,7 +140,7 @@ void RBeamBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo
   baseField.mName = effectType->GetName();
   baseField.mType = effectType;
   baseField.mOffset = 0;
-  baseField.v4 = 0;
+  baseField.mFlags = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);
 }
@@ -202,21 +163,21 @@ void RBeamBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo
    */
   void RBeamBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "Length", CachedFloatType(), offsetof(RBeamBlueprint, Length), "Total length of beam");
-    AddFieldWithDescription(typeInfo, "Lifetime", CachedFloatType(), offsetof(RBeamBlueprint, Lifetime), "Lifetime of the emitter");
-    AddFieldWithDescription(typeInfo, "Thickness", CachedFloatType(), offsetof(RBeamBlueprint, Thickness), "Thickness of the beam");
-    AddFieldWithDescription(typeInfo, "LODCutoff", CachedFloatType(), offsetof(RBeamBlueprint, LODCutoff), "cutoff distance");
-    AddFieldWithDescription(typeInfo, "TextureName", CachedStringType(), offsetof(RBeamBlueprint, TextureName), "Filename of texture");
-    gpg::RField* const startColorField = typeInfo->AddFieldVector4f("StartColor", offsetof(RBeamBlueprint, StartColor));
-    startColorField->v4 = 3;
+    typeInfo->AddField<float>("Length", offsetof(RBeamBlueprint, Length), 3, "Total length of beam");
+    typeInfo->AddField<float>("Lifetime", offsetof(RBeamBlueprint, Lifetime), 3, "Lifetime of the emitter");
+    typeInfo->AddField<float>("Thickness", offsetof(RBeamBlueprint, Thickness), 3, "Thickness of the beam");
+    typeInfo->AddField<float>("LODCutoff", offsetof(RBeamBlueprint, LODCutoff), 3, "cutoff distance");
+    typeInfo->AddField<msvc8::string>("TextureName", offsetof(RBeamBlueprint, TextureName), 3, "Filename of texture");
+    gpg::RField* const startColorField = typeInfo->AddField<moho::Vector4f>("StartColor", offsetof(RBeamBlueprint, StartColor));
+    startColorField->mFlags = 3;
     startColorField->mDesc = "RGBA start color of beam";
-    gpg::RField* const endColorField = typeInfo->AddFieldVector4f("EndColor", offsetof(RBeamBlueprint, EndColor));
-    endColorField->v4 = 3;
+    gpg::RField* const endColorField = typeInfo->AddField<moho::Vector4f>("EndColor", offsetof(RBeamBlueprint, EndColor));
+    endColorField->mFlags = 3;
     endColorField->mDesc = "RGBA end color of beam";
-    AddFieldWithDescription(typeInfo, "UShift", CachedFloatType(), offsetof(RBeamBlueprint, UShift), "U Texture shift of beam texture");
-    AddFieldWithDescription(typeInfo, "VShift", CachedFloatType(), offsetof(RBeamBlueprint, VShift), "V Texture shift of beam texture");
-    AddFieldWithDescription(typeInfo, "RepeatRate", CachedFloatType(), offsetof(RBeamBlueprint, RepeatRate), "How often the texture repeats per ogrid");
-    AddFieldWithDescription(typeInfo, "Blendmode", CachedInt32Type(), offsetof(RBeamBlueprint, BlendMode), "blendmode of this beam");
+    typeInfo->AddField<float>("UShift", offsetof(RBeamBlueprint, UShift), 3, "U Texture shift of beam texture");
+    typeInfo->AddField<float>("VShift", offsetof(RBeamBlueprint, VShift), 3, "V Texture shift of beam texture");
+    typeInfo->AddField<float>("RepeatRate", offsetof(RBeamBlueprint, RepeatRate), 3, "How often the texture repeats per ogrid");
+    typeInfo->AddField<std::int32_t>("Blendmode", offsetof(RBeamBlueprint, BlendMode), 3, "blendmode of this beam");
   }
 
   /**

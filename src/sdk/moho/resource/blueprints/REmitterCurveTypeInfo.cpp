@@ -64,15 +64,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(float));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedEmitterCurveKeyType()
   {
     if (!moho::REmitterCurveKey::sType) {
@@ -93,15 +84,6 @@ namespace
       moho::REmitterBlueprintCurve::sType = gpg::LookupRType(typeid(moho::REmitterBlueprintCurve));
     }
     return moho::REmitterBlueprintCurve::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEmitterCurveKeyVectorType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CurveKeyVector));
-    }
-    return cached;
   }
 
   struct EmitterCurveValueTriplet
@@ -715,17 +697,6 @@ namespace
     return typeInfo;
   }
 
-  void AddFieldWithDescription(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int offset,
-    const char* const description
-  )
-  {
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
-  }
-
   struct REmitterCurveTypeInfoBootstrap
   {
     REmitterCurveTypeInfoBootstrap()
@@ -773,7 +744,7 @@ namespace moho
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }
@@ -783,8 +754,8 @@ namespace moho
    */
   void REmitterBlueprintCurveTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "XRange", CachedFloatType(), offsetof(REmitterBlueprintCurve, XRange), "Range of X for this curve.");
-    AddFieldWithDescription(typeInfo, "Keys", CachedEmitterCurveKeyVectorType(), offsetof(REmitterBlueprintCurve, Keys), "Keys for this curve.");
+    typeInfo->AddField<float>("XRange", offsetof(REmitterBlueprintCurve, XRange), 3, "Range of X for this curve.");
+    typeInfo->AddField<CurveKeyVector>("Keys", offsetof(REmitterBlueprintCurve, Keys), 3, "Keys for this curve.");
   }
 
   /**
@@ -855,7 +826,7 @@ namespace moho
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }
@@ -865,9 +836,9 @@ namespace moho
    */
   void REmitterCurveKeyTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "x", CachedFloatType(), offsetof(REmitterCurveKey, X), "X pos of this curve.");
-    AddFieldWithDescription(typeInfo, "y", CachedFloatType(), offsetof(REmitterCurveKey, Y), "Y pos of this curve.");
-    AddFieldWithDescription(typeInfo, "z", CachedFloatType(), offsetof(REmitterCurveKey, Z), "Z size of this curve.");
+    typeInfo->AddField<float>("x", offsetof(REmitterCurveKey, X), 3, "X pos of this curve.");
+    typeInfo->AddField<float>("y", offsetof(REmitterCurveKey, Y), 3, "Y pos of this curve.");
+    typeInfo->AddField<float>("z", offsetof(REmitterCurveKey, Z), 3, "Z size of this curve.");
   }
 
   /**

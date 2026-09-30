@@ -151,21 +151,6 @@ namespace moho
      */
     static void AddFields(gpg::RType* typeInfo);
 
-    /**
-     * Address: 0x0073A710 (FUN_0073A710, gpg::RType::AddField_CDamage_EMethod_0x34Method)
-     *
-     * What it does:
-     * Appends reflected `Method` enum lane at `+0x34`.
-     */
-    static gpg::RField* AddFieldMethod(gpg::RType* typeInfo);
-
-    /**
-     * Address: 0x0073A790 (FUN_0073A790, gpg::RType::AddField_SMinMax_float_0x48MinMaxRadius)
-     *
-     * What it does:
-     * Appends reflected `MinMaxRadius` lane (`SMinMax<float>`) at `+0x48`.
-     */
-    static gpg::RField* AddFieldMinMaxRadius(gpg::RType* typeInfo);
   };
 
   static_assert(sizeof(CDamageTypeInfo) == 0x64, "CDamageTypeInfo size must be 0x64");

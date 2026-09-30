@@ -18,35 +18,6 @@ namespace
     return sInstance;
   }
 
-  gpg::RType* CachedFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(float));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedRResIdType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RResId));
-    }
-    return cached;
-  }
-
-  void AddFieldWithDescription(
-    gpg::RType* const typeInfo,
-    const char* const fieldName,
-    gpg::RType* const fieldType,
-    const int offset,
-    const char* const description
-  )
-  {
-    typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
-  }
-
   struct RPropBlueprintDisplayTypeInfoBootstrap
   {
     RPropBlueprintDisplayTypeInfoBootstrap()
@@ -92,14 +63,8 @@ namespace moho
   {
     size_ = sizeof(RPropBlueprintDisplay);
     gpg::RType::Init();
-    AddFieldWithDescription(
-      this,
-      "MeshBlueprint",
-      CachedRResIdType(),
-      offsetof(RPropBlueprintDisplay, MeshBlueprint),
-      "Name of mesh blueprint to use. Leave blank to use default mesh."
-    );
-    AddFieldWithDescription(this, "UniformScale", CachedFloatType(), offsetof(RPropBlueprintDisplay, UniformScale), "Uniform scale to apply to mesh");
+    AddField<moho::RResId>("MeshBlueprint", offsetof(RPropBlueprintDisplay, MeshBlueprint), 3, "Name of mesh blueprint to use. Leave blank to use default mesh.");
+    AddField<float>("UniformScale", offsetof(RPropBlueprintDisplay, UniformScale), 3, "Uniform scale to apply to mesh");
     Finish();
   }
 

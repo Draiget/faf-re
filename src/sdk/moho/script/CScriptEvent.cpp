@@ -3000,7 +3000,7 @@ void CScriptEventTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
   baseField.mName = scriptObjectType->GetName();
   baseField.mType = scriptObjectType;
   baseField.mOffset = gpg::BaseSubobjectOffset<CScriptEvent, CScriptObject>();
-  baseField.v4 = 0;
+  baseField.mFlags = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);
 }
@@ -3015,7 +3015,7 @@ void CScriptEventTypeInfo::AddBase_CTaskEvent(gpg::RType* const typeInfo)
   baseField.mName = taskEventType->GetName();
   baseField.mType = taskEventType;
   baseField.mOffset = 0;
-  baseField.v4 = 0;
+  baseField.mFlags = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);
 }

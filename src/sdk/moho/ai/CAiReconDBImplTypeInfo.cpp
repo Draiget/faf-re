@@ -369,7 +369,7 @@ namespace
     field.mName = baseType->GetName();
     field.mType = baseType;
     field.mOffset = 0;
-    field.v4 = 0;
+    field.mFlags = 0;
     field.mDesc = nullptr;
     typeInfo->AddBase(field);
   }

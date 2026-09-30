@@ -75,37 +75,6 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x0073AAC0 (FUN_0073AAC0)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `CDamageMethod`.
-   */
-  [[nodiscard]] gpg::RType* CachedDamageMethodType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      (void)moho::preregister_CDamageEMethodTypeInfo();
-      cached = gpg::LookupRType(typeid(moho::CDamageMethod));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x0073AAE0 (FUN_0073AAE0)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `SMinMax<float>`.
-   */
-  [[nodiscard]] gpg::RType* CachedSMinMaxFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SMinMax<float>));
-    }
-    return cached;
-  }
-
   [[nodiscard]] LuaPlus::LuaObject CreateDamageLuaFactoryObject(moho::Sim* const sim)
   {
     LuaPlus::LuaObject scriptFactory{};
@@ -338,39 +307,9 @@ namespace moho
     baseField.mName = scriptObjectType->GetName();
     baseField.mType = scriptObjectType;
     baseField.mOffset = 0;
-    baseField.v4 = 0;
+    baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
-  }
-
-  /**
-   * Address: 0x0073A710 (FUN_0073A710, gpg::RType::AddField_CDamage_EMethod_0x34Method)
-   *
-   * What it does:
-   * Appends reflected `Method` enum lane at `+0x34`.
-   */
-  gpg::RField* CDamageTypeInfo::AddFieldMethod(gpg::RType* const typeInfo)
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(!typeInfo->initFinished_);
-
-    typeInfo->fields_.push_back(gpg::RField("Method", CachedDamageMethodType(), offsetof(CDamage, mMethod), 0, nullptr));
-    return &typeInfo->fields_.back();
-  }
-
-  /**
-   * Address: 0x0073A790 (FUN_0073A790, gpg::RType::AddField_SMinMax_float_0x48MinMaxRadius)
-   *
-   * What it does:
-   * Appends reflected `MinMaxRadius` lane (`SMinMax<float>`) at `+0x48`.
-   */
-  gpg::RField* CDamageTypeInfo::AddFieldMinMaxRadius(gpg::RType* const typeInfo)
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(!typeInfo->initFinished_);
-
-    typeInfo->fields_.push_back(gpg::RField("MinMaxRadius", CachedSMinMaxFloatType(), offsetof(CDamage, mRadius), 0, nullptr));
-    return &typeInfo->fields_.back();
   }
 
   /**
@@ -381,15 +320,15 @@ namespace moho
    */
   void CDamageTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    (void)AddFieldMethod(typeInfo);
-    (void)AddFieldMinMaxRadius(typeInfo);
-    typeInfo->AddFieldVector3f("Origin", offsetof(CDamage, mOrigin));
-    typeInfo->AddFieldFloat("Amount", offsetof(CDamage, mAmount));
-    typeInfo->AddFieldString("Type", offsetof(CDamage, mType));
-    typeInfo->AddFieldBool("DamageFriendly", offsetof(CDamage, mDamageFriendly));
-    typeInfo->AddFieldBool("DamageNeutral", offsetof(CDamage, mDamageNeutral));
-    typeInfo->AddFieldBool("DamageSelf", offsetof(CDamage, mDamageSelf));
-    typeInfo->AddFieldVector3f("Vector", offsetof(CDamage, mVector));
+    (void)typeInfo->AddField<moho::CDamageMethod>("Method", offsetof(CDamage, mMethod));
+    (void)typeInfo->AddField<moho::SMinMax<float>>("MinMaxRadius", offsetof(CDamage, mRadius));
+    typeInfo->AddField<Wm3::Vector3f>("Origin", offsetof(CDamage, mOrigin));
+    typeInfo->AddField<float>("Amount", offsetof(CDamage, mAmount));
+    typeInfo->AddField<msvc8::string>("Type", offsetof(CDamage, mType));
+    typeInfo->AddField<bool>("DamageFriendly", offsetof(CDamage, mDamageFriendly));
+    typeInfo->AddField<bool>("DamageNeutral", offsetof(CDamage, mDamageNeutral));
+    typeInfo->AddField<bool>("DamageSelf", offsetof(CDamage, mDamageSelf));
+    typeInfo->AddField<Wm3::Vector3f>("Vector", offsetof(CDamage, mVector));
   }
 
   /**

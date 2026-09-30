@@ -441,7 +441,7 @@ void moho::WRefEditDialog::AddChildren(const wxTreeItemId& parent, const gpg::RR
   for (int i = 0; i < fieldCount; ++i) {
     const gpg::RField& field = ref.mType->fields_[i];
     const gpg::RRef value = ref.GetField(i);
-    const wxTreeItemId item = AddItem(parent, field.mName, value, (field.v4 & 3) == 3);
+    const wxTreeItemId item = AddItem(parent, field.mName, value, (field.mFlags & 3) == 3);
     mTree->SetItemText(item, 1, wxString(value.GetLexical().c_str(), wxConvUTF8));
     mTree->SetItemText(item, 2, wxString(field.mDesc, wxConvUTF8));
   }

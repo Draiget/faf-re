@@ -92,7 +92,7 @@ void IAiAttackerTypeInfo::AddBase_Broadcaster_EAiAttackerEvent(gpg::RType* const
   baseField.mName = baseType->GetName();
   baseField.mType = baseType;
   baseField.mOffset = offsetof(IAiAttacker, mListeners);
-  baseField.v4 = 0;
+  baseField.mFlags = 0;
   baseField.mDesc = nullptr;
   typeInfo->AddBase(baseField);
 }
