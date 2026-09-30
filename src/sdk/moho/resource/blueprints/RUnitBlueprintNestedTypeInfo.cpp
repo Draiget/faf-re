@@ -154,7 +154,7 @@ namespace
         return out;
       }
 
-      gpg::RRef_float(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+      out = gpg::MakeRRef<float>(&(*storage)[static_cast<std::size_t>(ind)]);
       return out;
     }
 

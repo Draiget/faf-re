@@ -833,7 +833,7 @@ namespace moho
     const gpg::RRef nullOwner{};
 
     gpg::RRef entityRef{};
-    gpg::RRef_Entity(&entityRef, mEntity);
+    entityRef = gpg::MakeRRef<moho::Entity>(mEntity);
     gpg::WriteRawPointer(archive, entityRef, gpg::TrackedPointerState::Unowned, nullOwner);
 
     SerializeSScrollerConfigPayload(mScroller, archive);

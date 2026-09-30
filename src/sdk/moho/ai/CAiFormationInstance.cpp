@@ -135,11 +135,11 @@ namespace
     gpg::RRef pointerRef{};
 
     for (moho::Listener<moho::EFormationdStatus>* const listener : broadcaster->mListeners.owners()) {
-      (void)gpg::RRef_Listener_EFormationdStatus(&pointerRef, listener);
+      pointerRef = gpg::MakeRRef<moho::Listener<moho::EFormationdStatus>>(listener);
       gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
     }
 
-    (void)gpg::RRef_Listener_EFormationdStatus(&pointerRef, nullptr);
+    pointerRef = gpg::MakeRRef<moho::Listener<moho::EFormationdStatus>>(nullptr);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 
@@ -2182,9 +2182,9 @@ namespace moho
     }
 
     gpg::RRef pointerRef{};
-    (void)gpg::RRef_LuaState(&pointerRef, mState);
+    pointerRef = gpg::MakeRRef<LuaPlus::LuaState>(mState);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
-    (void)gpg::RRef_RRuleGameRules(&pointerRef, mGamerules);
+    pointerRef = gpg::MakeRRef<moho::RRuleGameRules>(mGamerules);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     WriteFormationField(archive, CachedEUnitCommandTypeType(), &self->mCommandType, ownerRef);

@@ -343,7 +343,7 @@ namespace
     }
 
     gpg::RRef out{};
-    gpg::RRef_CAiReconDBImpl(&out, constructed);
+    out = gpg::MakeRRef<moho::CAiReconDBImpl>(constructed);
     return out;
   }
 

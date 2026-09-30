@@ -78,7 +78,7 @@ namespace LuaPlus
           archive->WriteBool(true);
 
           gpg::RRef nameRef{};
-          (void)gpg::RRef_TString(&nameRef, static_cast<TString*>(resolvedName->value.p));
+          nameRef = gpg::MakeRRef<TString>(static_cast<TString*>(resolvedName->value.p));
           gpg::WriteRawPointer(archive, nameRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
           result->SetOwned(1u);
           return;

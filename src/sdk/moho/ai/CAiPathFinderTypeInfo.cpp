@@ -171,7 +171,7 @@ gpg::RRef CAiPathFinderTypeInfo::NewRef()
 {
   auto* const pathFinder = new (std::nothrow) CAiPathFinder();
   gpg::RRef out{};
-  (void)gpg::RRef_CAiPathFinder(&out, pathFinder);
+  out = gpg::MakeRRef<moho::CAiPathFinder>(pathFinder);
   return out;
 }
 
@@ -201,7 +201,7 @@ gpg::RRef CAiPathFinderTypeInfo::CtrRef(void* const objectStorage)
   }
 
   gpg::RRef out{};
-  (void)gpg::RRef_CAiPathFinder(&out, pathFinder);
+  out = gpg::MakeRRef<moho::CAiPathFinder>(pathFinder);
   return out;
 }
 

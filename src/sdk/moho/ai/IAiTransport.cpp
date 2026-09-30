@@ -482,11 +482,11 @@ void moho::RBroadcasterRType_EAiTransportEvent::SerSave(
   gpg::RRef pointerRef{};
 
   for (moho::Listener<moho::EAiTransportEvent>* const listener : broadcaster->mListeners.owners()) {
-    (void)gpg::RRef_Listener_EAiTransportEvent(&pointerRef, listener);
+    pointerRef = gpg::MakeRRef<moho::Listener<moho::EAiTransportEvent>>(listener);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 
-  (void)gpg::RRef_Listener_EAiTransportEvent(&pointerRef, nullptr);
+  pointerRef = gpg::MakeRRef<moho::Listener<moho::EAiTransportEvent>>(nullptr);
   gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
 }
 

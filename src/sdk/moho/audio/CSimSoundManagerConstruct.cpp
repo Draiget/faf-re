@@ -74,7 +74,7 @@ namespace moho
 
     CSimSoundManager* const object = new (std::nothrow) CSimSoundManager(sim);
     gpg::RRef objectRef{};
-    gpg::RRef_ISoundManager(&objectRef, object);
+    objectRef = gpg::MakeRRef<moho::ISoundManager>(object);
     result->SetUnowned(objectRef, 0u);
   }
 

@@ -959,11 +959,11 @@ namespace moho
 
     // 3. command pointer lane (offset 0x84): typed RRef then unowned raw pointer.
     gpg::RRef pointerRef{};
-    (void)gpg::RRef_CUnitCommand(&pointerRef, mCommand);
+    pointerRef = gpg::MakeRRef<moho::CUnitCommand>(mCommand);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     // 4. blueprint pointer lane (offset 0x88).
-    (void)gpg::RRef_RUnitBlueprint(&pointerRef, const_cast<RUnitBlueprint*>(mBlueprint));
+    pointerRef = gpg::MakeRRef<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(mBlueprint));
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     // 5-7. build transform payloads (offsets 0x8C / 0x98 / 0xA8).

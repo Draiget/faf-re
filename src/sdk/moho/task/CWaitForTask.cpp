@@ -53,7 +53,8 @@ namespace
    */
   [[maybe_unused]] gpg::RRef* StoreCWaitForTaskRef(gpg::RRef* const outRef, CWaitForTask* const task)
   {
-    return gpg::RRef_CWaitForTask(outRef, task);
+    *outRef = gpg::MakeRRef<moho::CWaitForTask>(task);
+    return outRef;
   }
 
   /**
@@ -75,7 +76,7 @@ namespace
     }
 
     gpg::RRef taskRef{};
-    (void)gpg::RRef_CWaitForTask(&taskRef, task);
+    taskRef = gpg::MakeRRef<moho::CWaitForTask>(task);
     result->SetUnowned(taskRef, 0u);
   }
 

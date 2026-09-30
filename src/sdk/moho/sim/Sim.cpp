@@ -4994,7 +4994,7 @@ void Sim::SerArmies(gpg::WriteArchive* const archive)
   gpg::RRef ownerRef{};
   for (CArmyImpl* const army : mArmiesList) {
     gpg::RRef armyRef{};
-    gpg::RRef_SimArmy(&armyRef, army);
+    armyRef = gpg::MakeRRef<moho::SimArmy>(army);
     gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Owned, ownerRef);
   }
 }
@@ -5041,12 +5041,12 @@ void Sim::SerDirtyEnts(gpg::WriteArchive* const archive)
   const gpg::RRef nullOwner{};
   for (Entity* const entity : mCoordEntities.owners()) {
     gpg::RRef entityRef{};
-    gpg::RRef_Entity(&entityRef, entity);
+    entityRef = gpg::MakeRRef<moho::Entity>(entity);
     gpg::WriteRawPointer(archive, entityRef, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 
   gpg::RRef tailRef{};
-  gpg::RRef_Entity(&tailRef, nullptr);
+  tailRef = gpg::MakeRRef<moho::Entity>(nullptr);
   gpg::WriteRawPointer(archive, tailRef, gpg::TrackedPointerState::Unowned, nullOwner);
 }
 
@@ -5135,16 +5135,14 @@ namespace
   void CollectSimArchiveRoots(moho::Sim* const sim, gpg::RRef (&outRoots)[9])
   {
     outRoots[0] = MakeSimOwnerRef(sim);
-    (void)gpg::RRef_LuaState(&outRoots[1], sim->mLuaState);
-    (void)gpg::RRef_RRuleGameRules(&outRoots[2], sim->mRules);
-    (void)gpg::RRef_SRuleFootprintsBlueprint(
-      &outRoots[3], const_cast<moho::SRuleFootprintsBlueprint*>(sim->mRules->GetFootprints())
-    );
+    outRoots[1] = gpg::MakeRRef<LuaPlus::LuaState>(sim->mLuaState);
+    outRoots[2] = gpg::MakeRRef<moho::RRuleGameRules>(sim->mRules);
+    outRoots[3] = gpg::MakeRRef<moho::SRuleFootprintsBlueprint>(const_cast<moho::SRuleFootprintsBlueprint*>(sim->mRules->GetFootprints()));
     (void)gpg::RRef_STIMap(&outRoots[4], sim->mMapData);
-    (void)gpg::RRef_PathTables(&outRoots[5], sim->mPathTables);
-    (void)gpg::RRef_CTaskStage(&outRoots[6], &sim->mTaskStageA);
-    (void)gpg::RRef_CTaskStage(&outRoots[7], &sim->mDiskWatcherTaskStage);
-    (void)gpg::RRef_CTaskStage(&outRoots[8], &sim->mTaskStageB);
+    outRoots[5] = gpg::MakeRRef<moho::PathTables>(sim->mPathTables);
+    outRoots[6] = gpg::MakeRRef<moho::CTaskStage>(&sim->mTaskStageA);
+    outRoots[7] = gpg::MakeRRef<moho::CTaskStage>(&sim->mDiskWatcherTaskStage);
+    outRoots[8] = gpg::MakeRRef<moho::CTaskStage>(&sim->mTaskStageB);
   }
 } // namespace
 
@@ -8473,7 +8471,7 @@ void Sim::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, const gpg
 
     EFireState fireState = static_cast<EFireState>(0);
     gpg::RRef fireStateRef{};
-    (void)gpg::RRef_EFireState(&fireStateRef, &fireState);
+    fireStateRef = gpg::MakeRRef<moho::EFireState>(&fireState);
     (void)fireStateRef.SetLexical(val);
     if (static_cast<std::uint32_t>(fireState) <= 2u) {
       unit->SetFireState(static_cast<int>(fireState));
@@ -11432,7 +11430,7 @@ namespace
   void InitUnitBlueprintFromLua(LuaPlus::LuaObject& luaBlueprint, RUnitBlueprint* const blueprint)
   {
     gpg::RRef destination{};
-    (void)gpg::RRef_RUnitBlueprint(&destination, blueprint);
+    destination = gpg::MakeRRef<moho::RUnitBlueprint>(blueprint);
 
     LuaPlus::LuaObject source(luaBlueprint);
     (void)SCR_LuaBuildObject(source, destination, true);
@@ -11440,14 +11438,14 @@ namespace
     blueprint->OnInitBlueprint();
 
     gpg::RRef resolved{};
-    (void)gpg::RRef_RUnitBlueprint(&resolved, blueprint);
+    resolved = gpg::MakeRRef<moho::RUnitBlueprint>(blueprint);
     SCR_RObjectToLuaMerge(resolved, luaBlueprint);
   }
 
   void InitPropBlueprintFromLua(LuaPlus::LuaObject& luaBlueprint, RPropBlueprint* const blueprint)
   {
     gpg::RRef destination{};
-    (void)gpg::RRef_RPropBlueprint(&destination, blueprint);
+    destination = gpg::MakeRRef<moho::RPropBlueprint>(blueprint);
 
     LuaPlus::LuaObject source(luaBlueprint);
     (void)SCR_LuaBuildObject(source, destination, true);
@@ -11455,14 +11453,14 @@ namespace
     blueprint->OnInitBlueprint();
 
     gpg::RRef resolved{};
-    (void)gpg::RRef_RPropBlueprint(&resolved, blueprint);
+    resolved = gpg::MakeRRef<moho::RPropBlueprint>(blueprint);
     SCR_RObjectToLuaMerge(resolved, luaBlueprint);
   }
 
   void InitProjectileBlueprintFromLua(LuaPlus::LuaObject& luaBlueprint, RProjectileBlueprint* const blueprint)
   {
     gpg::RRef destination{};
-    (void)gpg::RRef_RProjectileBlueprint(&destination, blueprint);
+    destination = gpg::MakeRRef<moho::RProjectileBlueprint>(blueprint);
 
     LuaPlus::LuaObject source(luaBlueprint);
     (void)SCR_LuaBuildObject(source, destination, true);
@@ -11470,14 +11468,14 @@ namespace
     blueprint->OnInitBlueprint();
 
     gpg::RRef resolved{};
-    (void)gpg::RRef_RProjectileBlueprint(&resolved, blueprint);
+    resolved = gpg::MakeRRef<moho::RProjectileBlueprint>(blueprint);
     SCR_RObjectToLuaMerge(resolved, luaBlueprint);
   }
 
   void InitMeshBlueprintFromLua(LuaPlus::LuaObject& luaBlueprint, RMeshBlueprint* const blueprint)
   {
     gpg::RRef destination{};
-    (void)gpg::RRef_RMeshBlueprint(&destination, blueprint);
+    destination = gpg::MakeRRef<moho::RMeshBlueprint>(blueprint);
 
     LuaPlus::LuaObject source(luaBlueprint);
     (void)SCR_LuaBuildObject(source, destination, true);
@@ -11485,7 +11483,7 @@ namespace
     blueprint->OnInitBlueprint();
 
     gpg::RRef resolved{};
-    (void)gpg::RRef_RMeshBlueprint(&resolved, blueprint);
+    resolved = gpg::MakeRRef<moho::RMeshBlueprint>(blueprint);
     SCR_RObjectToLuaMerge(resolved, luaBlueprint);
   }
 
@@ -11861,7 +11859,8 @@ namespace
       rules->mTrailBlueprints,
       "trail emitter",
       [](gpg::RRef* const out, RTrailBlueprint* const trailBlueprint) {
-        return gpg::RRef_RTrailBlueprint(out, trailBlueprint);
+        *out = gpg::MakeRRef<moho::RTrailBlueprint>(trailBlueprint);
+        return out;
       }
     );
     return 0;
@@ -11888,7 +11887,8 @@ namespace
       rules->mEmitterBlueprints,
       "particle emitter",
       [](gpg::RRef* const out, REmitterBlueprint* const emitterBlueprint) {
-        return gpg::RRef_REmitterBlueprint(out, emitterBlueprint);
+        *out = gpg::MakeRRef<moho::REmitterBlueprint>(emitterBlueprint);
+        return out;
       }
     );
     return 0;
@@ -11914,7 +11914,8 @@ namespace
       rules->mBeamBlueprints,
       "beam effect",
       [](gpg::RRef* const out, RBeamBlueprint* const beamBlueprint) {
-        return gpg::RRef_RBeamBlueprint(out, beamBlueprint);
+        *out = gpg::MakeRRef<moho::RBeamBlueprint>(beamBlueprint);
+        return out;
       }
     );
     return 0;

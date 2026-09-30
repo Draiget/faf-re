@@ -34,7 +34,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeCUnitUpgradeTaskRef(moho::CUnitUpgradeTask* const task)
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitUpgradeTask(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitUpgradeTask>(task);
     return ref;
   }
 } // namespace

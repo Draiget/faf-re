@@ -108,7 +108,7 @@ namespace LuaPlus
     );
 
     gpg::RRef ownedRef{};
-    (void)gpg::RRef_TString(&ownedRef, stringObject);
+    ownedRef = gpg::MakeRRef<TString>(stringObject);
     result->SetOwned(ownedRef, 0u);
   }
 
@@ -186,7 +186,7 @@ namespace LuaPlus
       }
 
       gpg::RRef sharedRef{};
-      (void)gpg::RRef_Table(&sharedRef, static_cast<Table*>(resolvedObject->value.p));
+      sharedRef = gpg::MakeRRef<Table>(static_cast<Table*>(resolvedObject->value.p));
       result->SetOwned(sharedRef, 1u);
       return;
     }
@@ -199,7 +199,7 @@ namespace LuaPlus
     Table* const newTable = luaH_new(state, narray, static_cast<int>(lnhash));
 
     gpg::RRef ownedRef{};
-    (void)gpg::RRef_Table(&ownedRef, newTable);
+    ownedRef = gpg::MakeRRef<Table>(newTable);
     result->SetOwned(ownedRef, 0u);
   }
 
@@ -250,7 +250,7 @@ namespace LuaPlus
     LClosure* const closure = luaF_newLclosure(state, static_cast<int>(upvalueCount), &state->_gt);
 
     gpg::RRef ownedRef{};
-    (void)gpg::RRef_LClosure(&ownedRef, closure);
+    ownedRef = gpg::MakeRRef<LClosure>(closure);
     result->SetOwned(ownedRef, 0u);
   }
 
@@ -297,7 +297,7 @@ namespace LuaPlus
     UpVal* const upvalue = luaF_newupval(state);
 
     gpg::RRef ownedRef{};
-    (void)gpg::RRef_UpVal(&ownedRef, upvalue);
+    ownedRef = gpg::MakeRRef<UpVal>(upvalue);
     result->SetOwned(ownedRef, 0u);
   }
 
@@ -438,7 +438,7 @@ namespace LuaPlus
     Proto* const proto = luaF_newproto(state);
 
     gpg::RRef ownedRef{};
-    (void)gpg::RRef_Proto(&ownedRef, proto);
+    ownedRef = gpg::MakeRRef<Proto>(proto);
     result->SetOwned(ownedRef, 0u);
   }
 
@@ -483,7 +483,7 @@ namespace LuaPlus
   {
     LuaState* const state = new LuaState(static_cast<LuaState*>(nullptr));
     gpg::RRef stateRef{};
-    (void)gpg::RRef_LuaState(&stateRef, state);
+    stateRef = gpg::MakeRRef<LuaPlus::LuaState>(state);
     result->SetUnowned(stateRef, 0u);
   }
 
@@ -540,14 +540,14 @@ namespace LuaPlus
 
     if (isUnowned) {
       gpg::RRef stateRef{};
-      (void)gpg::RRef_lua_State(&stateRef, state);
+      stateRef = gpg::MakeRRef<lua_State>(state);
       result->SetUnowned(stateRef, 1u);
       return;
     }
 
     lua_State* const newThread = luaE_newthread(state);
     gpg::RRef ownedRef{};
-    (void)gpg::RRef_lua_State(&ownedRef, newThread);
+    ownedRef = gpg::MakeRRef<lua_State>(newThread);
     result->SetOwned(ownedRef, 0u);
   }
 
@@ -595,7 +595,7 @@ namespace LuaPlus
 
     Udata* const userdata = AllocateTypedUserdata(state, typeHandle.type);
     gpg::RRef ownedRef{};
-    (void)gpg::RRef_Udata(&ownedRef, userdata);
+    ownedRef = gpg::MakeRRef<Udata>(userdata);
     result->SetOwned(ownedRef, 0u);
   }
 

@@ -266,7 +266,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_RUnitBlueprint(&ref, blueprint);
+    ref = gpg::MakeRRef<moho::RUnitBlueprint>(blueprint);
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
@@ -285,7 +285,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_RUnitBlueprintWeapon(&ref, weaponBlueprint);
+    ref = gpg::MakeRRef<moho::RUnitBlueprintWeapon>(weaponBlueprint);
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
@@ -301,7 +301,7 @@ namespace
   [[maybe_unused]] gpg::RRef* BuildFloatRefIntoOutput(float* const value, gpg::RRef* const out)
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_float(&ref, value);
+    ref = gpg::MakeRRef<float>(value);
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
@@ -320,7 +320,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_IAiCommandDispatchImpl(&ref, value);
+    ref = gpg::MakeRRef<moho::IAiCommandDispatchImpl>(value);
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
@@ -339,7 +339,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_IFormationInstance_P(&ref, value);
+    ref = gpg::MakeRRef<moho::IFormationInstance*>(value);
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
@@ -358,7 +358,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_CAiFormationDBImpl(&ref, value);
+    ref = gpg::MakeRRef<moho::CAiFormationDBImpl>(value);
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
@@ -396,7 +396,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_CAiBuilderImpl(&ref, value);
+    ref = gpg::MakeRRef<moho::CAiBuilderImpl>(value);
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
@@ -415,7 +415,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_RUnitBlueprint_P(&ref, value);
+    ref = gpg::MakeRRef<moho::RUnitBlueprint*>(value);
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
@@ -434,7 +434,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_CPathPoint(&ref, value);
+    ref = gpg::MakeRRef<moho::CPathPoint>(value);
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
@@ -969,89 +969,48 @@ RType* CachedRBlueprintType()
     return out;
   }
 
-  gpg::RType* gUIntRRefType = nullptr;
   thread_local TypeInfoCache3 gUIntRRefCache{false, {}};
-  gpg::RType* gIntRRefType = nullptr;
   thread_local TypeInfoCache3 gIntRRefCache{false, {}};
-  gpg::RType* gFloatRRefType = nullptr;
   thread_local TypeInfoCache3 gFloatRRefCache{false, {}};
-  gpg::RType* gBoolRRefType = nullptr;
   thread_local TypeInfoCache3 gBoolRRefCache{false, {}};
-  gpg::RType* gVectorBoolReferenceRRefType = nullptr;
   thread_local TypeInfoCache3 gVectorBoolReferenceRRefCache{false, {}};
-  gpg::RType* gVector3fRRefType = nullptr;
   thread_local TypeInfoCache3 gVector3fRRefCache{false, {}};
-  gpg::RType* gStringRRefType = nullptr;
   thread_local TypeInfoCache3 gStringRRefCache{false, {}};
-  gpg::RType* gCharRRefType = nullptr;
   thread_local TypeInfoCache3 gCharRRefCache{false, {}};
-  gpg::RType* gShortRRefType = nullptr;
   thread_local TypeInfoCache3 gShortRRefCache{false, {}};
-  gpg::RType* gLongRRefType = nullptr;
   thread_local TypeInfoCache3 gLongRRefCache{false, {}};
-  gpg::RType* gSCharRRefType = nullptr;
   thread_local TypeInfoCache3 gSCharRRefCache{false, {}};
-  gpg::RType* gUCharRRefType = nullptr;
   thread_local TypeInfoCache3 gUCharRRefCache{false, {}};
-  gpg::RType* gUShortRRefType = nullptr;
   thread_local TypeInfoCache3 gUShortRRefCache{false, {}};
-  gpg::RType* gULongRRefType = nullptr;
   thread_local TypeInfoCache3 gULongRRefCache{false, {}};
-  gpg::RType* gEEconResourceRRefType = nullptr;
   thread_local TypeInfoCache3 gEEconResourceRRefCache{false, {}};
-  gpg::RType* gEAllianceRRefType = nullptr;
   thread_local TypeInfoCache3 gEAllianceRRefCache{false, {}}; 
-  gpg::RType* gETriggerOperatorRRefType = nullptr;
   thread_local TypeInfoCache3 gETriggerOperatorRRefCache{false, {}};
-  gpg::RType* gECompareTypeRRefType = nullptr;
   thread_local TypeInfoCache3 gECompareTypeRRefCache{false, {}};
-  gpg::RType* gESquadClassRRefType = nullptr;
   thread_local TypeInfoCache3 gESquadClassRRefCache{false, {}}; 
-  gpg::RType* gEReconFlagsRRefType = nullptr;
   thread_local TypeInfoCache3 gEReconFlagsRRefCache{false, {}};
-  gpg::RType* gEAiTargetTypeRRefType = nullptr;
   thread_local TypeInfoCache3 gEAiTargetTypeRRefCache{false, {}};
-  gpg::RType* gESTITargetTypeRRefType = nullptr;
   thread_local TypeInfoCache3 gESTITargetTypeRRefCache{false, {}};
-  gpg::RType* gEMauiScrollAxisRRefType = nullptr;
   thread_local TypeInfoCache3 gEMauiScrollAxisRRefCache{false, {}};
-  gpg::RType* gEMauiKeyCodeRRefType = nullptr;
   thread_local TypeInfoCache3 gEMauiKeyCodeRRefCache{false, {}};
-  gpg::RType* gEMauiEventTypeRRefType = nullptr;
   thread_local TypeInfoCache3 gEMauiEventTypeRRefCache{false, {}};
-  gpg::RType* gEUnitCommandTypeRRefType = nullptr;
   thread_local TypeInfoCache3 gEUnitCommandTypeRRefCache{false, {}}; 
-  gpg::RType* gEAiResultRRefType = nullptr;
   thread_local TypeInfoCache3 gEAiResultRRefCache{false, {}}; 
   gpg::RType* gEUIStateRRefType = nullptr;
   thread_local TypeInfoCache3 gEUIStateRRefCache{false, {}};
-  gpg::RType* gEVisibilityModeRRefType = nullptr;
   thread_local TypeInfoCache3 gEVisibilityModeRRefCache{false, {}};
-  gpg::RType* gEUnitStateRRefType = nullptr;
   thread_local TypeInfoCache3 gEUnitStateRRefCache{false, {}};
-  gpg::RType* gEFireStateRRefType = nullptr;
   thread_local TypeInfoCache3 gEFireStateRRefCache{false, {}}; 
-  gpg::RType* gELayerRRefType = nullptr;
   thread_local TypeInfoCache3 gELayerRRefCache{false, {}};
-  gpg::RType* gENetProtocolRRefType = nullptr;
   thread_local TypeInfoCache3 gENetProtocolRRefCache{false, {}};
-  gpg::RType* gEIntelRRefType = nullptr;
   thread_local TypeInfoCache3 gEIntelRRefCache{false, {}}; 
-  gpg::RType* gEThreatTypeRRefType = nullptr;
   thread_local TypeInfoCache3 gEThreatTypeRRefCache{false, {}};
-  gpg::RType* gERuleBPUnitToggleCapsRRefType = nullptr;
   thread_local TypeInfoCache3 gERuleBPUnitToggleCapsRRefCache{false, {}}; 
-  gpg::RType* gERuleBPUnitCommandCapsRRefType = nullptr;
   thread_local TypeInfoCache3 gERuleBPUnitCommandCapsRRefCache{false, {}};
-  gpg::RType* gESpecialFileTypeRRefType = nullptr;
   thread_local TypeInfoCache3 gESpecialFileTypeRRefCache{false, {}};
-  gpg::RType* gEGenericIconTypeRRefType = nullptr;
   thread_local TypeInfoCache3 gEGenericIconTypeRRefCache{false, {}};
-  gpg::RType* gCTaskThreadRRefType = nullptr;
   thread_local TypeInfoCache3 gCTaskThreadRRefCache{false, {}};
-  gpg::RType* gCLuaTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCLuaTaskRRefCache{false, {}};
-  gpg::RType* gCWaitForTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCWaitForTaskRRefCache{false, {}};
   gpg::RType* gCFootPlantManipulatorRRefType = nullptr;
   thread_local TypeInfoCache3 gCFootPlantManipulatorRRefCache{false, {}};
@@ -1062,102 +1021,60 @@ RType* CachedRBlueprintType()
   thread_local TypeInfoCache3 gCStorageManipulatorRRefCache{false, {}};
   gpg::RType* gCThrustManipulatorRRefType = nullptr;
   thread_local TypeInfoCache3 gCThrustManipulatorRRefCache{false, {}};
-  gpg::RType* gCAniActorRRefType = nullptr;
   thread_local TypeInfoCache3 gCAniActorRRefCache{false, {}};
-  gpg::RType* gIAniManipulatorRRefType = nullptr;
   thread_local TypeInfoCache3 gIAniManipulatorRRefCache{false, {}};
-  gpg::RType* gSAniManipBindingRRefType = nullptr;
   thread_local TypeInfoCache3 gSAniManipBindingRRefCache{false, {}};
-  gpg::RType* gCAcquireTargetTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCAcquireTargetTaskRRefCache{false, {}};
-  gpg::RType* gCFireWeaponTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCFireWeaponTaskRRefCache{false, {}};
-  gpg::RType* gCUnitCaptureTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitCaptureTaskRRefCache{false, {}};
-  gpg::RType* gCUnitGetBuiltTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitGetBuiltTaskRRefCache{false, {}};
-  gpg::RType* gCUnitGuardTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitGuardTaskRRefCache{false, {}};
-  gpg::RType* gCUnitUnloadUnitsRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitUnloadUnitsRRefCache{false, {}};
-  gpg::RType* gCFactoryBuildTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCFactoryBuildTaskRRefCache{false, {}};
-  gpg::RType* gCUnitCarrierLandRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitCarrierLandRRefCache{false, {}};
-  gpg::RType* gCUnitCarrierLaunchRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitCarrierLaunchRRefCache{false, {}};
-  gpg::RType* gCUnitCarrierRetrieveRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitCarrierRetrieveRRefCache{false, {}};
-  gpg::RType* gCUnitMobileBuildTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitMobileBuildTaskRRefCache{false, {}};
-  gpg::RType* gCUnitRepairTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitRepairTaskRRefCache{false, {}};
-  gpg::RType* gCUnitSacrificeTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitSacrificeTaskRRefCache{false, {}};
-  gpg::RType* gCUnitTeleportTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitTeleportTaskRRefCache{false, {}};
-  gpg::RType* gCUnitUpgradeTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitUpgradeTaskRRefCache{false, {}};
   thread_local TypeInfoCache3 gManyToOneListenerEProjectileImpactEventRRefCache{false, {}};
-  gpg::RType* gCAiAttackerImplRRefType = nullptr;
   thread_local TypeInfoCache3 gCAiAttackerImplRRefCache{false, {}};
-  gpg::RType* gCAiTransportImplRRefType = nullptr;
   thread_local TypeInfoCache3 gCAiTransportImplRRefCache{false, {}};
-  gpg::RType* gCAiReconDBImplRRefType = nullptr;
   thread_local TypeInfoCache3 gCAiReconDBImplRRefCache{false, {}};
-  gpg::RType* gCAiSteeringImplRRefType = nullptr;
   thread_local TypeInfoCache3 gCAiSteeringImplRRefCache{false, {}};
   thread_local TypeInfoCache3 gCAiSiloBuildImplRRefCache{false, {}};
-  gpg::RType* gLAiAttackerImplRRefType = nullptr;
   thread_local TypeInfoCache3 gLAiAttackerImplRRefCache{false, {}};
-  gpg::RType* gIAiSteeringRRefType = nullptr;
   thread_local TypeInfoCache3 gIAiSteeringRRefCache{false, {}};
   thread_local TypeInfoCache3 gIAiCommandDispatchImplRRefCache{false, {}};
-  gpg::RType* gIAiCommandDispatchRRefType = nullptr;
   thread_local TypeInfoCache3 gIAiCommandDispatchRRefCache{false, {}};
-  gpg::RType* gIAiNavigatorRRefType = nullptr;
   thread_local TypeInfoCache3 gIAiNavigatorRRefCache{false, {}};
-  gpg::RType* gIAiBuilderRRefType = nullptr;
   thread_local TypeInfoCache3 gIAiBuilderRRefCache{false, {}};
-  gpg::RType* gIAiSiloBuildRRefType = nullptr;
   thread_local TypeInfoCache3 gIAiSiloBuildRRefCache{false, {}};
-  gpg::RType* gIAiTransportRRefType = nullptr;
   thread_local TypeInfoCache3 gIAiTransportRRefCache{false, {}};
-  gpg::RType* gListenerECommandEventRRefType = nullptr;
   thread_local TypeInfoCache3 gListenerECommandEventRRefCache{false, {}};
-  gpg::RType* gListenerEUnitCommandQueueStatusRRefType = nullptr;
   thread_local TypeInfoCache3 gListenerEUnitCommandQueueStatusRRefCache{false, {}};
-  gpg::RType* gListenerNavPathRRefType = nullptr;
   thread_local TypeInfoCache3 gListenerNavPathRRefCache{false, {}};
-  gpg::RType* gListenerEAiNavigatorEventRRefType = nullptr;
   thread_local TypeInfoCache3 gListenerEAiNavigatorEventRRefCache{false, {}};
-  gpg::RType* gListenerEAiAttackerEventRRefType = nullptr;
   thread_local TypeInfoCache3 gListenerEAiAttackerEventRRefCache{false, {}};
-  gpg::RType* gListenerEAiTransportEventRRefType = nullptr;
   thread_local TypeInfoCache3 gListenerEAiTransportEventRRefCache{false, {}};
-  gpg::RType* gListenerEFormationdStatusRRefType = nullptr;
   thread_local TypeInfoCache3 gListenerEFormationdStatusRRefCache{false, {}};
   gpg::RType* gSAssignedLocInfoRRefType = nullptr;
   gpg::RType* gSPickUpInfoRRefType = nullptr;
-  gpg::RType* gSAttachPointRRefType = nullptr;
   thread_local TypeInfoCache3 gSAttachPointRRefCache{false, {}};
-  gpg::RType* gSPointVectorRRefType = nullptr;
   thread_local TypeInfoCache3 gSPointVectorRRefCache{false, {}};
   thread_local TypeInfoCache3 gSAiReservedTransportBoneRRefCache{false, {}};
-  gpg::RType* gIAiFormationDBRRefType = nullptr;
   thread_local TypeInfoCache3 gIAiFormationDBRRefCache{false, {}};
-  gpg::RType* gISimResourcesRRefType = nullptr;
   thread_local TypeInfoCache3 gISimResourcesRRefCache{false, {}};
   thread_local TypeInfoCache3 gIAiAttackerRRefCache{false, {}};
   thread_local TypeInfoCache3 gIAiReconDBRRefCache{false, {}};
-  gpg::RType* gIPathTravelerRRefType = nullptr;
   thread_local TypeInfoCache3 gIPathTravelerRRefCache{false, {}};
   gpg::RType* gShieldRRefType = nullptr;
   thread_local TypeInfoCache3 gShieldRRefCache{false, {}};
   thread_local TypeInfoCache3 gIEffectManagerRRefCache{false, {}};
   thread_local TypeInfoCache3 gReconBlipRRefCache{false, {}};
   thread_local TypeInfoCache3 gSPerArmyReconInfoRRefCache{false, {}};
-  gpg::RType* gIEffectRRefType = nullptr;
   thread_local TypeInfoCache3 gIEffectRRefCache{false, {}};
   gpg::RType* gCEffectManagerImplRRefType = nullptr;
   thread_local TypeInfoCache3 gCEffectManagerImplRRefCache{false, {}};
@@ -1169,87 +1086,55 @@ RType* CachedRBlueprintType()
   gpg::RType* gCEfxTrailEmitterRRefType = nullptr;
   thread_local TypeInfoCache3 gCEfxTrailEmitterRRefCache{false, {}};
   thread_local TypeInfoCache3 gCEfxBeamRRefCache{false, {}};
-  gpg::RType* gCountedPtrCParticleTextureRRefType = nullptr;
   thread_local TypeInfoCache3 gCountedPtrCParticleTextureRRefCache{false, {}};
-  gpg::RType* gSEfxCurveRRefType = nullptr;
   thread_local TypeInfoCache3 gSEfxCurveRRefCache{false, {}};
-  gpg::RType* gCAniPoseRRefType = nullptr;
   thread_local TypeInfoCache3 gCAniPoseRRefCache{false, {}}; 
-  gpg::RType* gCAniPoseBoneRRefType = nullptr;
   thread_local TypeInfoCache3 gCAniPoseBoneRRefCache{false, {}};
-  gpg::RType* gSharedPtrCAniPoseRRefType = nullptr;
   thread_local TypeInfoCache3 gSharedPtrCAniPoseRRefCache{false, {}};
   thread_local TypeInfoCache3 gCScriptObjectRRefCache{false, {}};
   thread_local TypeInfoCache3 gCScriptEventRRefCache{false, {}};
-  gpg::RType* gCSndParamsRRefType = nullptr;
   thread_local TypeInfoCache3 gCSndParamsRRefCache{false, {}};
-  gpg::RType* gCSndVarRRefType = nullptr;
   thread_local TypeInfoCache3 gCSndVarRRefCache{false, {}};
-  gpg::RType* gHSoundRRefType = nullptr;
   thread_local TypeInfoCache3 gHSoundRRefCache{false, {}};
-  gpg::RType* gISoundManagerRRefType = nullptr;
   thread_local TypeInfoCache3 gISoundManagerRRefCache{false, {}};
   thread_local TypeInfoCache3 gSAudioRequestRRefCache{false, {}};
   gpg::RType* gSPhysConstantsRRefType = nullptr;
   thread_local TypeInfoCache3 gSPhysConstantsRRefCache{false, {}};
-  gpg::RType* gSPhysBodyRRefType = nullptr;
   thread_local TypeInfoCache3 gSPhysBodyRRefCache{false, {}};
-  gpg::RType* gEntityRRefType = nullptr;
   thread_local TypeInfoCache3 gEntityRRefCache{false, {}};
   thread_local TypeInfoCache3 gCollisionBeamEntityRRefCache{false, {}};
   thread_local TypeInfoCache3 gPropRRefCache{false, {}};
-  gpg::RType* gEntIdRRefType = nullptr;
   thread_local TypeInfoCache3 gEntIdRRefCache{false, {}};
-  gpg::RType* gWeakPtrEntityRRefType = nullptr;
   thread_local TypeInfoCache3 gWeakPtrEntityRRefCache{false, {}};
-  gpg::RType* gEntityDBRRefType = nullptr;
   thread_local TypeInfoCache3 gEntityDBRRefCache{false, {}};
   thread_local TypeInfoCache3 gEntitySetBaseRRefCache{false, {}};
-  gpg::RType* gUnitRRefType = nullptr;
   thread_local TypeInfoCache3 gUnitRRefCache{false, {}}; 
-  gpg::RType* gIUnitRRefType = nullptr;
   thread_local TypeInfoCache3 gIUnitRRefCache{false, {}};
-  gpg::RType* gWeakPtrIUnitRRefType = nullptr;
   thread_local TypeInfoCache3 gWeakPtrIUnitRRefCache{false, {}};
-  gpg::RType* gSSTIEntityAttachInfoRRefType = nullptr;
   thread_local TypeInfoCache3 gSSTIEntityAttachInfoRRefCache{false, {}};
-  gpg::RType* gPathQueueRRefType = nullptr;
   thread_local TypeInfoCache3 gPathQueueRRefCache{false, {}};
-  gpg::RType* gRUnitBlueprintRRefType = nullptr;
   thread_local TypeInfoCache3 gRUnitBlueprintRRefCache{false, {}}; 
-  gpg::RType* gRBlueprintRRefType = nullptr;
   thread_local TypeInfoCache3 gRBlueprintRRefCache{false, {}};
-  gpg::RType* gRUnitBlueprintWeaponRRefType = nullptr;
   thread_local TypeInfoCache3 gRUnitBlueprintWeaponRRefCache{false, {}}; 
-  gpg::RType* gRRuleGameRulesRRefType = nullptr;
   thread_local TypeInfoCache3 gRRuleGameRulesRRefCache{false, {}};  
   thread_local TypeInfoCache3 gSRuleFootprintsBlueprintRRefCache{false, {}};
   thread_local TypeInfoCache3 gRScmResourceRRefCache{false, {}};
-  gpg::RType* gResourceDepositRRefType = nullptr;
   thread_local TypeInfoCache3 gResourceDepositRRefCache{false, {}};
-  gpg::RType* gREmitterBlueprintRRefType = nullptr;
   thread_local TypeInfoCache3 gREmitterBlueprintRRefCache{false, {}};
   thread_local TypeInfoCache3 gREmitterCurveKeyRRefCache{false, {}};
-  gpg::RType* gREmitterBlueprintCurveRRefType = nullptr;
   thread_local TypeInfoCache3 gREmitterBlueprintCurveRRefCache{false, {}};
   thread_local TypeInfoCache3 gRBeamBlueprintRRefCache{false, {}};
-  gpg::RType* gRTrailBlueprintRRefType = nullptr;
   thread_local TypeInfoCache3 gRTrailBlueprintRRefCache{false, {}};
   thread_local TypeInfoCache3 gRProjectileBlueprintRRefCache{false, {}};
   thread_local TypeInfoCache3 gProjectileRRefCache{false, {}};
   thread_local TypeInfoCache3 gRMeshBlueprintRRefCache{false, {}};
-  gpg::RType* gRMeshBlueprintLODRRefType = nullptr;
   thread_local TypeInfoCache3 gRMeshBlueprintLODRRefCache{false, {}};
   thread_local TypeInfoCache3 gRPropBlueprintRRefCache{false, {}};
-  gpg::RType* gCColPrimitiveSphere3fRRefType = nullptr;
   thread_local TypeInfoCache3 gCColPrimitiveSphere3fRRefCache{false, {}};
-  gpg::RType* gCColPrimitiveBox3fRRefType = nullptr;
   thread_local TypeInfoCache3 gCColPrimitiveBox3fRRefCache{false, {}};
-  gpg::RType* gCColPrimitiveBaseRRefType = nullptr;
   thread_local TypeInfoCache3 gCColPrimitiveBaseRRefCache{false, {}};
   thread_local TypeInfoCache3 gMotorRRefCache{false, {}};
   thread_local TypeInfoCache3 gEntityCategorySetRRefCache{false, {}};
-  gpg::RType* gCOGridRRefType = nullptr;
   thread_local TypeInfoCache3 gCOGridRRefCache{false, {}}; 
   thread_local TypeInfoCache3 gCAiBrainRRefCache{false, {}}; 
   thread_local TypeInfoCache3 gCAiPersonalityRRefCache{false, {}};
@@ -1259,34 +1144,22 @@ RType* CachedRBlueprintType()
   thread_local TypeInfoCache3 gCAiPathNavigatorRRefCache{false, {}};
   thread_local TypeInfoCache3 gCAiPathFinderRRefCache{false, {}};
   thread_local TypeInfoCache3 gCAiPathSplineRRefCache{false, {}};
-  gpg::RType* gCAiFormationInstanceRRefType = nullptr;
   thread_local TypeInfoCache3 gCAiFormationInstanceRRefCache{false, {}};
-  gpg::RType* gCAiFormationDBImplRRefType = nullptr;
   thread_local TypeInfoCache3 gCAiFormationDBImplRRefCache{false, {}};
   thread_local TypeInfoCache3 gSimArmyRRefCache{false, {}}; 
   thread_local TypeInfoCache3 gCArmyImplRRefCache{false, {}};
-  gpg::RType* gLaunchInfoNewRRefType = nullptr;
   thread_local TypeInfoCache3 gLaunchInfoNewRRefCache{false, {}};
-  gpg::RType* gCSimResourcesRRefType = nullptr;
   thread_local TypeInfoCache3 gCSimResourcesRRefCache{false, {}};
-  gpg::RType* gCUnitCommandRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitCommandRRefCache{false, {}}; 
-  gpg::RType* gWeakPtrCUnitCommandRRefType = nullptr;
   thread_local TypeInfoCache3 gWeakPtrCUnitCommandRRefCache{false, {}};
-  gpg::RType* gCCommandDbRRefType = nullptr;
   thread_local TypeInfoCache3 gCCommandDbRRefCache{false, {}};
   thread_local TypeInfoCache3 gCUnitCommandQueueRRefCache{false, {}};
-  gpg::RType* gUnitWeaponRRefType = nullptr;
   thread_local TypeInfoCache3 gUnitWeaponRRefCache{false, {}};
-  gpg::RType* gCRandomStreamRRefType = nullptr;
   thread_local TypeInfoCache3 gCRandomStreamRRefCache{false, {}};
   gpg::RType* gCPathPointRRefType = nullptr;
   thread_local TypeInfoCache3 gCPathPointRRefCache{false, {}};
-  gpg::RType* gSOCellPosRRefType = nullptr;
   thread_local TypeInfoCache3 gSOCellPosRRefCache{false, {}};
-  gpg::RType* gHPathCellRRefType = nullptr;
   thread_local TypeInfoCache3 gHPathCellRRefCache{false, {}};
-  gpg::RType* gPathTablesRRefType = nullptr;
   thread_local TypeInfoCache3 gPathTablesRRefCache{false, {}};
   thread_local TypeInfoCache3 gCArmyStatsRRefCache{false, {}};
   thread_local TypeInfoCache3 gStatsCArmyStatItemRRefCache{false, {}};
@@ -1310,29 +1183,17 @@ RType* CachedRBlueprintType()
   thread_local TypeInfoCache3 gCIntelPosHandleRRefCache{false, {}};
   thread_local TypeInfoCache3 gCIntelCounterHandleRRefCache{false, {}};
   thread_local TypeInfoCache3 gCUnitMotionRRefCache{false, {}};
-  gpg::RType* gCPlatoonRRefType = nullptr;
   thread_local TypeInfoCache3 gCPlatoonRRefCache{false, {}}; 
-  gpg::RType* gSSessionSaveDataRRefType = nullptr;
   thread_local TypeInfoCache3 gSSessionSaveDataRRefCache{false, {}};
-  gpg::RType* gIdPoolRRefType = nullptr;
   thread_local TypeInfoCache3 gIdPoolRRefCache{false, {}};
-  gpg::RType* gCLuaConOutputHandlerRRefType = nullptr;
   thread_local TypeInfoCache3 gCLuaConOutputHandlerRRefCache{false, {}};
-  gpg::RType* gLuaStateRRefType = nullptr;
   thread_local TypeInfoCache3 gLuaStateRRefCache{false, {}};
-  gpg::RType* gTStringRRefType = nullptr;
   thread_local TypeInfoCache3 gTStringRRefCache{false, {}};
-  gpg::RType* gTableRRefType = nullptr;
   thread_local TypeInfoCache3 gTableRRefCache{false, {}};
-  gpg::RType* gLClosureRRefType = nullptr;
   thread_local TypeInfoCache3 gLClosureRRefCache{false, {}};
-  gpg::RType* gCClosureRRefType = nullptr;
   thread_local TypeInfoCache3 gCClosureRRefCache{false, {}};
-  gpg::RType* gUdataRRefType = nullptr;
   thread_local TypeInfoCache3 gUdataRRefCache{false, {}};
-  gpg::RType* gUpValRRefType = nullptr;
   thread_local TypeInfoCache3 gUpValRRefCache{false, {}};
-  gpg::RType* gProtoRRefType = nullptr;
   thread_local TypeInfoCache3 gProtoRRefCache{false, {}};
   gpg::RType* gLuaRawStateRRefType = nullptr;
   thread_local TypeInfoCache3 gLuaRawStateRRefCache{false, {}};
@@ -2161,7 +2022,7 @@ RRef CopyReconBlipPointerSlotRef(RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_ReconBlip_P(&out, slot);
+    out = gpg::MakeRRef<moho::ReconBlip*>(slot);
     return out;
 }
 
@@ -2174,7 +2035,7 @@ RRef CopyReconBlipPointerSlotRef(RRef* const sourceRef)
 RRef ConstructReconBlipPointerSlotRef(void* const slotObject)
 {
     RRef out{};
-    gpg::RRef_ReconBlip_P(&out, static_cast<moho::ReconBlip**>(slotObject));
+    out = gpg::MakeRRef<moho::ReconBlip*>(static_cast<moho::ReconBlip**>(slotObject));
     return out;
 }
 
@@ -2196,7 +2057,7 @@ RRef MoveReconBlipPointerSlotRef(void* const slotObject, RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_ReconBlip_P(&out, resolvedSlot);
+    out = gpg::MakeRRef<moho::ReconBlip*>(resolvedSlot);
     return out;
 }
 
@@ -2212,7 +2073,8 @@ RRef MoveReconBlipPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RRef* const out
 )
 {
-    return gpg::RRef_CAiPathSpline(out, value);
+    *out = gpg::MakeRRef<moho::CAiPathSpline>(value);
+    return out;
 }
 
 /**
@@ -2227,7 +2089,8 @@ RRef MoveReconBlipPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RRef* const out
 )
 {
-    return gpg::RRef_CAiPersonality(out, value);
+    *out = gpg::MakeRRef<moho::CAiPersonality>(value);
+    return out;
 }
 
 /**
@@ -2242,7 +2105,8 @@ RRef MoveReconBlipPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RRef* const out
 )
 {
-    return gpg::RRef_EReconFlags(out, value);
+    *out = gpg::MakeRRef<moho::EReconFlags>(value);
+    return out;
 }
 
 /**
@@ -2257,7 +2121,8 @@ RRef MoveReconBlipPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RRef* const out
 )
 {
-    return gpg::RRef_SPerArmyReconInfo(out, value);
+    *out = gpg::MakeRRef<moho::SPerArmyReconInfo>(value);
+    return out;
 }
 
 /**
@@ -2272,7 +2137,8 @@ RRef MoveReconBlipPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RRef* const out
 )
 {
-    return gpg::RRef_ReconBlip_P(out, value);
+    *out = gpg::MakeRRef<moho::ReconBlip*>(value);
+    return out;
 }
 
 /**
@@ -2287,7 +2153,8 @@ RRef MoveReconBlipPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RRef* const out
 )
 {
-    return gpg::RRef_CAiReconDBImpl(out, value);
+    *out = gpg::MakeRRef<moho::CAiReconDBImpl>(value);
+    return out;
 }
 
 /**
@@ -2310,7 +2177,7 @@ RRef CopyIEffectPointerSlotRef(RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_IEffect_P(&out, slot);
+    out = gpg::MakeRRef<moho::IEffect*>(slot);
     return out;
 }
 
@@ -2323,7 +2190,7 @@ RRef CopyIEffectPointerSlotRef(RRef* const sourceRef)
 RRef ConstructIEffectPointerSlotRef(void* const slotObject)
 {
     RRef out{};
-    gpg::RRef_IEffect_P(&out, static_cast<moho::IEffect**>(slotObject));
+    out = gpg::MakeRRef<moho::IEffect*>(static_cast<moho::IEffect**>(slotObject));
     return out;
 }
 
@@ -2345,7 +2212,7 @@ RRef MoveIEffectPointerSlotRef(void* const slotObject, RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_IEffect_P(&out, resolvedSlot);
+    out = gpg::MakeRRef<moho::IEffect*>(resolvedSlot);
     return out;
 }
 
@@ -2369,7 +2236,7 @@ RRef CopyCEconomyEventPointerSlotRef(RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_CEconomyEvent_P(&out, slot);
+    out = gpg::MakeRRef<moho::CEconomyEvent*>(slot);
     return out;
 }
 
@@ -2383,7 +2250,7 @@ RRef CopyCEconomyEventPointerSlotRef(RRef* const sourceRef)
 RRef ConstructCEconomyEventPointerSlotRef(void* const slotObject)
 {
     RRef out{};
-    gpg::RRef_CEconomyEvent_P(&out, static_cast<moho::CEconomyEvent**>(slotObject));
+    out = gpg::MakeRRef<moho::CEconomyEvent*>(static_cast<moho::CEconomyEvent**>(slotObject));
     return out;
 }
 
@@ -2405,7 +2272,7 @@ RRef MoveCEconomyEventPointerSlotRef(void* const slotObject, RRef* const sourceR
     }
 
     RRef out{};
-    gpg::RRef_CEconomyEvent_P(&out, resolvedSlot);
+    out = gpg::MakeRRef<moho::CEconomyEvent*>(resolvedSlot);
     return out;
 }
 
@@ -2429,7 +2296,7 @@ RRef MoveCEconomyEventPointerSlotRef(void* const slotObject, RRef* const sourceR
     }
 
     RRef out{};
-    gpg::RRef_SimArmy_P(&out, slot);
+    out = gpg::MakeRRef<moho::SimArmy*>(slot);
     return out;
 }
 
@@ -2442,7 +2309,7 @@ RRef MoveCEconomyEventPointerSlotRef(void* const slotObject, RRef* const sourceR
 [[maybe_unused]] RRef ConstructSimArmyPointerSlotRef(void* const slotObject)
 {
     RRef out{};
-    gpg::RRef_SimArmy_P(&out, static_cast<moho::SimArmy**>(slotObject));
+    out = gpg::MakeRRef<moho::SimArmy*>(static_cast<moho::SimArmy**>(slotObject));
     return out;
 }
 
@@ -2464,7 +2331,7 @@ RRef MoveCEconomyEventPointerSlotRef(void* const slotObject, RRef* const sourceR
     }
 
     RRef out{};
-    gpg::RRef_SimArmy_P(&out, resolvedSlot);
+    out = gpg::MakeRRef<moho::SimArmy*>(resolvedSlot);
     return out;
 }
 
@@ -2478,7 +2345,7 @@ RRef MoveCEconomyEventPointerSlotRef(void* const slotObject, RRef* const sourceR
 [[maybe_unused]] RRef CopyShieldPointerSlotRef(moho::Shield** const slot)
 {
     RRef out{};
-    gpg::RRef_Shield_P(&out, slot);
+    out = gpg::MakeRRef<moho::Shield*>(slot);
     return out;
 }
 
@@ -2500,7 +2367,7 @@ RRef MoveCEconomyEventPointerSlotRef(void* const slotObject, RRef* const sourceR
     }
 
     RRef out{};
-    gpg::RRef_Shield_P(&out, resolvedSlot);
+    out = gpg::MakeRRef<moho::Shield*>(resolvedSlot);
     return out;
 }
 
@@ -2514,7 +2381,7 @@ RRef MoveCEconomyEventPointerSlotRef(void* const slotObject, RRef* const sourceR
 [[maybe_unused]] RRef CopyCDecalHandlePointerSlotRef(moho::CDecalHandle** const slot)
 {
     RRef out{};
-    gpg::RRef_CDecalHandle_P(&out, slot);
+    out = gpg::MakeRRef<moho::CDecalHandle*>(slot);
     return out;
 }
 
@@ -2536,7 +2403,7 @@ RRef MoveCEconomyEventPointerSlotRef(void* const slotObject, RRef* const sourceR
     }
 
     RRef out{};
-    gpg::RRef_CDecalHandle_P(&out, resolvedSlot);
+    out = gpg::MakeRRef<moho::CDecalHandle*>(resolvedSlot);
     return out;
 }
 
@@ -2914,7 +2781,7 @@ RRef NewCScriptObjectPointerSlotRef()
 {
     auto* const slot = static_cast<moho::CScriptObject**>(::operator new(sizeof(moho::CScriptObject*)));
     RRef out{};
-    gpg::RRef_CScriptObject_P(&out, slot);
+    out = gpg::MakeRRef<moho::CScriptObject*>(slot);
     return out;
 }
 
@@ -2935,7 +2802,7 @@ RRef CopyCScriptObjectPointerSlotRef(RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_CScriptObject_P(&out, slot);
+    out = gpg::MakeRRef<moho::CScriptObject*>(slot);
     return out;
 }
 
@@ -2948,7 +2815,7 @@ RRef CopyCScriptObjectPointerSlotRef(RRef* const sourceRef)
 RRef ConstructCScriptObjectPointerSlotRef(void* const slotObject)
 {
     RRef out{};
-    gpg::RRef_CScriptObject_P(&out, static_cast<moho::CScriptObject**>(slotObject));
+    out = gpg::MakeRRef<moho::CScriptObject*>(static_cast<moho::CScriptObject**>(slotObject));
     return out;
 }
 
@@ -2969,7 +2836,7 @@ RRef MoveCScriptObjectPointerSlotRef(void* const slotObject, RRef* const sourceR
     }
 
     RRef out{};
-    gpg::RRef_CScriptObject_P(&out, slot);
+    out = gpg::MakeRRef<moho::CScriptObject*>(slot);
     return out;
 }
 
@@ -3039,7 +2906,7 @@ RRef NewCSndParamsPointerSlotRef()
 {
     auto* const slot = static_cast<moho::CSndParams**>(::operator new(sizeof(moho::CSndParams*)));
     RRef out{};
-    gpg::RRef_CSndParams_P(&out, slot);
+    out = gpg::MakeRRef<moho::CSndParams*>(slot);
     return out;
 }
 
@@ -3062,7 +2929,7 @@ RRef CopyCSndParamsPointerSlotRef(RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_CSndParams_P(&out, slot);
+    out = gpg::MakeRRef<moho::CSndParams*>(slot);
     return out;
 }
 
@@ -3075,7 +2942,7 @@ RRef CopyCSndParamsPointerSlotRef(RRef* const sourceRef)
 RRef ConstructCSndParamsPointerSlotRef(void* const slotObject)
 {
     RRef out{};
-    gpg::RRef_CSndParams_P(&out, static_cast<moho::CSndParams**>(slotObject));
+    out = gpg::MakeRRef<moho::CSndParams*>(static_cast<moho::CSndParams**>(slotObject));
     return out;
 }
 
@@ -3100,7 +2967,7 @@ RRef MoveCSndParamsPointerSlotRef(void* const slotObject, RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_CSndParams_P(&out, slot);
+    out = gpg::MakeRRef<moho::CSndParams*>(slot);
     return out;
 }
 
@@ -3114,7 +2981,7 @@ RRef NewRBlueprintPointerSlotRef()
 {
     auto* const slot = static_cast<moho::RBlueprint**>(::operator new(sizeof(moho::RBlueprint*)));
     RRef out{};
-    gpg::RRef_RBlueprint_P(&out, slot);
+    out = gpg::MakeRRef<moho::RBlueprint*>(slot);
     return out;
 }
 
@@ -3138,7 +3005,7 @@ RRef CopyRBlueprintPointerSlotRef(RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_RBlueprint_P(&out, slot);
+    out = gpg::MakeRRef<moho::RBlueprint*>(slot);
     return out;
 }
 
@@ -3151,7 +3018,7 @@ RRef CopyRBlueprintPointerSlotRef(RRef* const sourceRef)
 RRef ConstructRBlueprintPointerSlotRef(void* const slotObject)
 {
     RRef out{};
-    gpg::RRef_RBlueprint_P(&out, static_cast<moho::RBlueprint**>(slotObject));
+    out = gpg::MakeRRef<moho::RBlueprint*>(static_cast<moho::RBlueprint**>(slotObject));
     return out;
 }
 
@@ -3170,7 +3037,7 @@ RRef MoveRBlueprintPointerSlotRef(void* const slotObject, RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_RBlueprint_P(&out, slot);
+    out = gpg::MakeRRef<moho::RBlueprint*>(slot);
     return out;
 }
 
@@ -3184,7 +3051,7 @@ RRef NewRUnitBlueprintPointerSlotRef()
 {
     auto* const slot = static_cast<moho::RUnitBlueprint**>(::operator new(sizeof(moho::RUnitBlueprint*)));
     RRef out{};
-    gpg::RRef_RUnitBlueprint_P(&out, slot);
+    out = gpg::MakeRRef<moho::RUnitBlueprint*>(slot);
     return out;
 }
 
@@ -3209,7 +3076,7 @@ RRef CopyRUnitBlueprintPointerSlotRef(RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_RUnitBlueprint_P(&out, slot);
+    out = gpg::MakeRRef<moho::RUnitBlueprint*>(slot);
     return out;
 }
 
@@ -3223,7 +3090,7 @@ RRef CopyRUnitBlueprintPointerSlotRef(RRef* const sourceRef)
 RRef ConstructRUnitBlueprintPointerSlotRef(void* const slotObject)
 {
     RRef out{};
-    gpg::RRef_RUnitBlueprint_P(&out, static_cast<moho::RUnitBlueprint**>(slotObject));
+    out = gpg::MakeRRef<moho::RUnitBlueprint*>(static_cast<moho::RUnitBlueprint**>(slotObject));
     return out;
 }
 
@@ -3242,7 +3109,7 @@ RRef MoveRUnitBlueprintPointerSlotRef(void* const slotObject, RRef* const source
     }
 
     RRef out{};
-    gpg::RRef_RUnitBlueprint_P(&out, slot);
+    out = gpg::MakeRRef<moho::RUnitBlueprint*>(slot);
     return out;
 }
 
@@ -3256,7 +3123,7 @@ RRef NewUnitWeaponPointerSlotRef()
 {
     auto* const slot = static_cast<moho::UnitWeapon**>(::operator new(sizeof(moho::UnitWeapon*)));
     RRef out{};
-    gpg::RRef_UnitWeapon_P(&out, slot);
+    out = gpg::MakeRRef<moho::UnitWeapon*>(slot);
     return out;
 }
 
@@ -3280,7 +3147,7 @@ RRef CopyUnitWeaponPointerSlotRef(RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_UnitWeapon_P(&out, slot);
+    out = gpg::MakeRRef<moho::UnitWeapon*>(slot);
     return out;
 }
 
@@ -3293,7 +3160,7 @@ RRef CopyUnitWeaponPointerSlotRef(RRef* const sourceRef)
 RRef ConstructUnitWeaponPointerSlotRef(void* const slotObject)
 {
     RRef out{};
-    gpg::RRef_UnitWeapon_P(&out, static_cast<moho::UnitWeapon**>(slotObject));
+    out = gpg::MakeRRef<moho::UnitWeapon*>(static_cast<moho::UnitWeapon**>(slotObject));
     return out;
 }
 
@@ -3312,7 +3179,7 @@ RRef MoveUnitWeaponPointerSlotRef(void* const slotObject, RRef* const sourceRef)
     }
 
     RRef out{};
-    gpg::RRef_UnitWeapon_P(&out, slot);
+    out = gpg::MakeRRef<moho::UnitWeapon*>(slot);
     return out;
 }
 
@@ -3947,28 +3814,6 @@ void gpg::SerHelperBase::InitNewHelpers()
 }
 
 /**
- * Address: 0x00403020 (FUN_00403020, gpg::RRef_uint)
- *
- * What it does:
- * Builds a reflection reference for `unsigned int` using cached RTTI lookups.
- */
-gpg::RRef* RRef_uint(RRef* const out, unsigned int* const value)
-{
-  return BuildTypedRefWithCache<unsigned int>(out, value, typeid(unsigned int), gUIntRRefType, gUIntRRefCache);
-}
-
-/**
- * Address: 0x00583450 (FUN_00583450, gpg::RRef_int)
- *
- * What it does:
- * Builds a reflection reference for `int` using cached RTTI lookups.
- */
-gpg::RRef* RRef_int(RRef* const out, int* const value)
-{
-  return BuildTypedRefWithCache<int>(out, value, typeid(int), gIntRRefType, gIntRRefCache);
-}
-
-/**
  * Address: 0x00582080 (FUN_00582080, gpg::RRef_int pack lane)
  *
  * What it does:
@@ -3978,32 +3823,10 @@ gpg::RRef* RRef_int(RRef* const out, int* const value)
 gpg::RRef* PackRRef_int(RRef* const out, int* const value)
 {
   RRef tmp{};
-  (void)RRef_int(&tmp, value);
+  tmp = gpg::MakeRRef<int>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00526FD0 (FUN_00526FD0, gpg::RRef_float)
- *
- * What it does:
- * Builds a reflection reference for `float` using cached RTTI lookups.
- */
-gpg::RRef* RRef_float(RRef* const out, float* const value)
-{
-  return BuildTypedRefWithCache<float>(out, value, typeid(float), gFloatRRefType, gFloatRRefCache);
-}
-
-/**
- * Address: 0x005832B0 (FUN_005832B0, gpg::RRef_bool)
- *
- * What it does:
- * Builds a reflection reference for `bool` using cached RTTI lookups.
- */
-gpg::RRef* RRef_bool(RRef* const out, bool* const value)
-{
-  return BuildTypedRefWithCache<bool>(out, value, typeid(bool), gBoolRRefType, gBoolRRefCache);
 }
 
 /**
@@ -4016,28 +3839,10 @@ gpg::RRef* RRef_bool(RRef* const out, bool* const value)
 gpg::RRef* PackRRef_bool(RRef* const out, bool* const value)
 {
   RRef tmp{};
-  (void)RRef_bool(&tmp, value);
+  tmp = gpg::MakeRRef<bool>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00642860 (FUN_00642860, gpg::RRef__Vb_reference)
- *
- * What it does:
- * Builds a reflection reference for one legacy `std::vector<bool>::reference`
- * proxy value pointer.
- */
-gpg::RRef* RRef_VectorBoolReference(RRef* const out, std::vector<bool>::reference* const value)
-{
-  return BuildTypedRefWithCache<std::vector<bool>::reference>(
-    out,
-    value,
-    typeid(std::vector<bool>::reference),
-    gVectorBoolReferenceRRefType,
-    gVectorBoolReferenceRRefCache
-  );
 }
 
 /**
@@ -4053,21 +3858,10 @@ gpg::RRef* RRef_VectorBoolReference(RRef* const out, std::vector<bool>::referenc
 )
 {
   RRef tmp{};
-  (void)RRef_VectorBoolReference(&tmp, value);
+  tmp = gpg::MakeRRef<std::vector<bool>::reference>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00517940 (FUN_00517940, gpg::RRef_Vector3f)
- *
- * What it does:
- * Builds a reflection reference for `Wm3::Vector3f` using cached RTTI lookups.
- */
-gpg::RRef* RRef_Vector3f(RRef* const out, Wm3::Vector3f* const value)
-{
-  return BuildTypedRefWithCache<Wm3::Vector3f>(out, value, typeid(Wm3::Vector3f), gVector3fRRefType, gVector3fRRefCache);
 }
 
 /**
@@ -4087,22 +3881,10 @@ gpg::RRef* RRef_Vector3f(RRef* const out, Wm3::Vector3f* const value)
   }
 
   gpg::RRef temp{};
-  (void)gpg::RRef_Vector3f(&temp, value);
+  temp = gpg::MakeRRef<Wm3::Vector3f>(value);
   out->mObj = temp.mObj;
   out->mType = temp.mType;
   return out;
-}
-
-/**
- * Address: 0x00513760 (FUN_00513760, gpg::RRef_string)
- *
- * What it does:
- * Builds a reflection reference for `msvc8::string` using cached RTTI
- * lookups.
- */
-gpg::RRef* RRef_string(RRef* const out, msvc8::string* const value)
-{
-  return BuildTypedRefWithCache<msvc8::string>(out, value, typeid(msvc8::string), gStringRRefType, gStringRRefCache);
 }
 
 /**
@@ -4122,102 +3904,10 @@ gpg::RRef* RRef_string(RRef* const out, msvc8::string* const value)
   }
 
   gpg::RRef temp{};
-  (void)gpg::RRef_string(&temp, value);
+  temp = gpg::MakeRRef<msvc8::string>(value);
   out->mObj = temp.mObj;
   out->mType = temp.mType;
   return out;
-}
-
-/**
- * Address: 0x008E0A60 (FUN_008E0A60, gpg::RRef_char)
- *
- * What it does:
- * Builds a reflection reference for `char` using cached RTTI lookups.
- */
-gpg::RRef* RRef_char(RRef* const out, char* const value)
-{
-  return BuildTypedRefWithCache<char>(out, value, typeid(char), gCharRRefType, gCharRRefCache);
-}
-
-/**
- * Address: 0x008E0C00 (FUN_008E0C00, gpg::RRef_short)
- *
- * What it does:
- * Builds a reflection reference for `short` using cached RTTI lookups.
- */
-gpg::RRef* RRef_short(RRef* const out, short* const value)
-{
-  return BuildTypedRefWithCache<short>(out, value, typeid(short), gShortRRefType, gShortRRefCache);
-}
-
-/**
- * Address: 0x008E0DE0 (FUN_008E0DE0, gpg::RRef_long)
- *
- * What it does:
- * Builds a reflection reference for `long` using cached RTTI lookups.
- */
-gpg::RRef* RRef_long(RRef* const out, long* const value)
-{
-  return BuildTypedRefWithCache<long>(out, value, typeid(long), gLongRRefType, gLongRRefCache);
-}
-
-/**
- * Address: 0x008E0FC0 (FUN_008E0FC0, gpg::RRef_schar)
- *
- * What it does:
- * Builds a reflection reference for `signed char` using cached RTTI lookups.
- */
-gpg::RRef* RRef_schar(RRef* const out, signed char* const value)
-{
-  return BuildTypedRefWithCache<signed char>(out, value, typeid(signed char), gSCharRRefType, gSCharRRefCache);
-}
-
-/**
- * Address: 0x00736A30 (FUN_00736A30, gpg::RRef_uchar)
- *
- * What it does:
- * Builds a reflection reference for `unsigned char` using cached RTTI
- * lookups.
- */
-gpg::RRef* RRef_uchar(RRef* const out, unsigned char* const value)
-{
-  return BuildTypedRefWithCache<unsigned char>(out, value, typeid(unsigned char), gUCharRRefType, gUCharRRefCache);
-}
-
-/**
- * Address: 0x008E11A0 (FUN_008E11A0, gpg::RRef_ushort)
- *
- * What it does:
- * Builds a reflection reference for `unsigned short` using cached RTTI
- * lookups.
- */
-gpg::RRef* RRef_ushort(RRef* const out, unsigned short* const value)
-{
-  return BuildTypedRefWithCache<unsigned short>(
-    out,
-    value,
-    typeid(unsigned short),
-    gUShortRRefType,
-    gUShortRRefCache
-  );
-}
-
-/**
- * Address: 0x008E1380 (FUN_008E1380, gpg::RRef_ulong)
- *
- * What it does:
- * Builds a reflection reference for `unsigned long` using cached RTTI
- * lookups.
- */
-gpg::RRef* RRef_ulong(RRef* const out, unsigned long* const value)
-{
-  return BuildTypedRefWithCache<unsigned long>(
-    out,
-    value,
-    typeid(unsigned long),
-    gULongRRefType,
-    gULongRRefCache
-  );
 }
 
 /**
@@ -4229,7 +3919,7 @@ gpg::RRef* RRef_ulong(RRef* const out, unsigned long* const value)
 gpg::RRef* AssignUIntRef(RRef* const out, unsigned int* const value)
 {
   RRef tmp{};
-  RRef_uint(&tmp, value);
+  tmp = gpg::MakeRRef<unsigned int>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -4245,28 +3935,10 @@ gpg::RRef* AssignUIntRef(RRef* const out, unsigned int* const value)
 gpg::RRef* AssignULongRef(RRef* const out, unsigned long* const value)
 {
   RRef tmp{};
-  RRef_ulong(&tmp, value);
+  tmp = gpg::MakeRRef<unsigned long>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00593520 (FUN_00593520, gpg::RRef_EEconResource)
- *
- * What it does:
- * Builds a reflection reference for `moho::EEconResource` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EEconResource(RRef* const out, moho::EEconResource* const value)
-{
-  return BuildTypedRefWithCache<moho::EEconResource>(
-    out,
-    value,
-    typeid(moho::EEconResource),
-    gEEconResourceRRefType,
-    gEEconResourceRRefCache
-  );
 }
 
 /**
@@ -4279,136 +3951,10 @@ gpg::RRef* RRef_EEconResource(RRef* const out, moho::EEconResource* const value)
 gpg::RRef* AssignEEconResourceRefAdapter(RRef* const out, moho::EEconResource* const value)
 {
   RRef tmp{};
-  RRef_EEconResource(&tmp, value);
+  tmp = gpg::MakeRRef<moho::EEconResource>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005937D0 (FUN_005937D0, gpg::RRef_EAlliance)
- *
- * What it does:
- * Builds a reflection reference for `moho::EAlliance` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EAlliance(RRef* const out, moho::EAlliance* const value)
-{
-  return BuildTypedRefWithCache<moho::EAlliance>(
-    out,
-    value,
-    typeid(moho::EAlliance),
-    gEAllianceRRefType,
-    gEAllianceRRefCache
-  );
-}
-
-/**
- * Address: 0x00593380 (FUN_00593380, gpg::RRef_ETriggerOperator)
- *
- * What it does:
- * Builds a reflection reference for `moho::ETriggerOperator` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_ETriggerOperator(RRef* const out, moho::ETriggerOperator* const value)
-{
-  return BuildTypedRefWithCache<moho::ETriggerOperator>(
-    out,
-    value,
-    typeid(moho::ETriggerOperator),
-    gETriggerOperatorRRefType,
-    gETriggerOperatorRRefCache
-  );
-}
-
-/**
- * Address: 0x00593D60 (FUN_00593D60, gpg::RRef_ECompareType)
- *
- * What it does:
- * Builds a reflection reference for `moho::ECompareType` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_ECompareType(RRef* const out, moho::ECompareType* const value)
-{
-  return BuildTypedRefWithCache<moho::ECompareType>(
-    out,
-    value,
-    typeid(moho::ECompareType),
-    gECompareTypeRRefType,
-    gECompareTypeRRefCache
-  );
-}
-
-/**
- * Address: 0x00593BC0 (FUN_00593BC0, gpg::RRef_ESquadClass)
- *
- * What it does:
- * Builds a reflection reference for `moho::ESquadClass` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_ESquadClass(RRef* const out, moho::ESquadClass* const value)
-{
-  return BuildTypedRefWithCache<moho::ESquadClass>(
-    out,
-    value,
-    typeid(moho::ESquadClass),
-    gESquadClassRRefType,
-    gESquadClassRRefCache
-  );
-}
-
-/**
- * Address: 0x005CB020 (FUN_005CB020, gpg::RRef_EReconFlags)
- *
- * What it does:
- * Builds a reflection reference for `moho::EReconFlags` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EReconFlags(RRef* const out, moho::EReconFlags* const value)
-{
-  return BuildTypedRefWithCache<moho::EReconFlags>(
-    out,
-    value,
-    typeid(moho::EReconFlags),
-    gEReconFlagsRRefType,
-    gEReconFlagsRRefCache
-  );
-}
-
-/**
- * Address: 0x005E3660 (FUN_005E3660, gpg::RRef_EAiTargetType)
- *
- * What it does:
- * Builds a reflection reference for `moho::EAiTargetType` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EAiTargetType(RRef* const out, moho::EAiTargetType* const value)
-{
-  return BuildTypedRefWithCache<moho::EAiTargetType>(
-    out,
-    value,
-    typeid(moho::EAiTargetType),
-    gEAiTargetTypeRRefType,
-    gEAiTargetTypeRRefCache
-  );
-}
-
-/**
- * Address: 0x0084A6F0 (FUN_0084A6F0, gpg::RRef_ESTITargetType)
- *
- * What it does:
- * Builds a reflection reference for `moho::ESTITargetType` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_ESTITargetType(RRef* const out, moho::ESTITargetType* const value)
-{
-  return BuildTypedRefWithCache<moho::ESTITargetType>(
-    out,
-    value,
-    typeid(moho::ESTITargetType),
-    gESTITargetTypeRRefType,
-    gESTITargetTypeRRefCache
-  );
 }
 
 /**
@@ -4421,7 +3967,7 @@ gpg::RRef* RRef_ESTITargetType(RRef* const out, moho::ESTITargetType* const valu
 gpg::RRef* AssignESTITargetTypeRef(RRef* const out, moho::ESTITargetType* const value)
 {
   RRef tmp{};
-  RRef_ESTITargetType(&tmp, value);
+  tmp = gpg::MakeRRef<moho::ESTITargetType>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -4437,28 +3983,10 @@ gpg::RRef* AssignESTITargetTypeRef(RRef* const out, moho::ESTITargetType* const 
 gpg::RRef* AssignESquadClassRef(RRef* const out, moho::ESquadClass* const value)
 {
   RRef tmp{};
-  RRef_ESquadClass(&tmp, value);
+  tmp = gpg::MakeRRef<moho::ESquadClass>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0078B020 (FUN_0078B020, gpg::RRef_EMauiScrollAxis)
- *
- * What it does:
- * Builds a reflection reference for `moho::EMauiScrollAxis` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EMauiScrollAxis(RRef* const out, moho::EMauiScrollAxis* const value)
-{
-  return BuildTypedRefWithCache<moho::EMauiScrollAxis>(
-    out,
-    value,
-    typeid(moho::EMauiScrollAxis),
-    gEMauiScrollAxisRRefType,
-    gEMauiScrollAxisRRefCache
-  );
 }
 
 /**
@@ -4471,46 +3999,10 @@ gpg::RRef* RRef_EMauiScrollAxis(RRef* const out, moho::EMauiScrollAxis* const va
 gpg::RRef* AssignEMauiScrollAxisRef(RRef* const out, moho::EMauiScrollAxis* const value)
 {
   RRef tmp{};
-  RRef_EMauiScrollAxis(&tmp, value);
+  tmp = gpg::MakeRRef<moho::EMauiScrollAxis>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0078E880 (FUN_0078E880, gpg::RRef_EMauiKeyCode)
- *
- * What it does:
- * Builds a reflection reference for `moho::EMauiKeyCode` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EMauiKeyCode(RRef* const out, moho::EMauiKeyCode* const value)
-{
-  return BuildTypedRefWithCache<moho::EMauiKeyCode>(
-    out,
-    value,
-    typeid(moho::EMauiKeyCode),
-    gEMauiKeyCodeRRefType,
-    gEMauiKeyCodeRRefCache
-  );
-}
-
-/**
- * Address: 0x00795E00 (FUN_00795E00, gpg::RRef_EMauiEventType)
- *
- * What it does:
- * Builds a reflection reference for `moho::EMauiEventType` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EMauiEventType(RRef* const out, moho::EMauiEventType* const value)
-{
-  return BuildTypedRefWithCache<moho::EMauiEventType>(
-    out,
-    value,
-    typeid(moho::EMauiEventType),
-    gEMauiEventTypeRRefType,
-    gEMauiEventTypeRRefCache
-  );
 }
 
 /**
@@ -4523,28 +4015,10 @@ gpg::RRef* RRef_EMauiEventType(RRef* const out, moho::EMauiEventType* const valu
 gpg::RRef* AssignEMauiEventTypeRef(RRef* const out, moho::EMauiEventType* const value)
 {
   RRef tmp{};
-  RRef_EMauiEventType(&tmp, value);
+  tmp = gpg::MakeRRef<moho::EMauiEventType>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00831EC0 (FUN_00831EC0, gpg::RRef_EUnitCommandType)
- *
- * What it does:
- * Builds a reflection reference for `moho::EUnitCommandType` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EUnitCommandType(RRef* const out, moho::EUnitCommandType* const value)
-{
-  return BuildTypedRefWithCache<moho::EUnitCommandType>(
-    out,
-    value,
-    typeid(moho::EUnitCommandType),
-    gEUnitCommandTypeRRefType,
-    gEUnitCommandTypeRRefCache
-  );
 }
 
 /**
@@ -4557,7 +4031,7 @@ gpg::RRef* RRef_EUnitCommandType(RRef* const out, moho::EUnitCommandType* const 
 gpg::RRef* AssignEUnitCommandTypeRefPrimary(RRef* const out, moho::EUnitCommandType* const value)
 {
   RRef tmp{};
-  RRef_EUnitCommandType(&tmp, value);
+  tmp = gpg::MakeRRef<moho::EUnitCommandType>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -4573,64 +4047,10 @@ gpg::RRef* AssignEUnitCommandTypeRefPrimary(RRef* const out, moho::EUnitCommandT
 gpg::RRef* AssignEUnitCommandTypeRefSecondary(RRef* const out, moho::EUnitCommandType* const value)
 {
   RRef tmp{};
-  RRef_EUnitCommandType(&tmp, value);
+  tmp = gpg::MakeRRef<moho::EUnitCommandType>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0060D7A0 (FUN_0060D7A0, gpg::RRef_EAiResult)
- *
- * What it does:
- * Builds a reflection reference for `moho::EAiResult` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EAiResult(RRef* const out, moho::EAiResult* const value)
-{
-  return BuildTypedRefWithCache<moho::EAiResult>(
-    out,
-    value,
-    typeid(moho::EAiResult),
-    gEAiResultRRefType,
-    gEAiResultRRefCache
-  );
-}
-
-/**
- * Address: 0x00692DB0 (FUN_00692DB0, gpg::RRef_EVisibilityMode)
- *
- * What it does:
- * Builds a reflection reference for `moho::EVisibilityMode` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EVisibilityMode(RRef* const out, moho::EVisibilityMode* const value)
-{
-  return BuildTypedRefWithCache<moho::EVisibilityMode>(
-    out,
-    value,
-    typeid(moho::EVisibilityMode),
-    gEVisibilityModeRRefType,
-    gEVisibilityModeRRefCache
-  );
-}
-
-/**
- * Address: 0x006B1C90 (FUN_006B1C90, gpg::RRef_EUnitState)
- *
- * What it does:
- * Builds a reflection reference for `moho::EUnitState` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EUnitState(RRef* const out, moho::EUnitState* const value)
-{
-  return BuildTypedRefWithCache<moho::EUnitState>(
-    out,
-    value,
-    typeid(moho::EUnitState),
-    gEUnitStateRRefType,
-    gEUnitStateRRefCache
-  );
 }
 
 /**
@@ -4643,28 +4063,10 @@ gpg::RRef* RRef_EUnitState(RRef* const out, moho::EUnitState* const value)
 gpg::RRef* PackRRef_EUnitState(RRef* const out, moho::EUnitState* const value)
 {
   RRef tmp{};
-  (void)RRef_EUnitState(&tmp, value);
+  tmp = gpg::MakeRRef<moho::EUnitState>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x006D2150 (FUN_006D2150, gpg::RRef_EFireState)
- *
- * What it does:
- * Builds a reflection reference for `moho::EFireState` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EFireState(RRef* const out, moho::EFireState* const value)
-{
-  return BuildTypedRefWithCache<moho::EFireState>(
-    out,
-    value,
-    typeid(moho::EFireState),
-    gEFireStateRRefType,
-    gEFireStateRRefCache
-  );
 }
 
 /**
@@ -4677,98 +4079,10 @@ gpg::RRef* RRef_EFireState(RRef* const out, moho::EFireState* const value)
 gpg::RRef* PackRRef_EFireState(RRef* const out, moho::EFireState* const value)
 {
   RRef tmp{};
-  RRef_EFireState(&tmp, value);
+  tmp = gpg::MakeRRef<moho::EFireState>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x006DD790 (FUN_006DD790, gpg::RRef_ELayer)
- *
- * What it does:
- * Builds a reflection reference for `moho::ELayer` using cached RTTI lookup.
- */
-gpg::RRef* RRef_ELayer(RRef* const out, moho::ELayer* const value)
-{
-  return BuildTypedRefWithCache<moho::ELayer>(
-    out,
-    value,
-    typeid(moho::ELayer),
-    gELayerRRefType,
-    gELayerRRefCache
-  );
-}
-
-/**
- * Address: 0x007CB300 (FUN_007CB300, gpg::RRef_ENetProtocol)
- *
- * What it does:
- * Builds a reflection reference for network protocol enum lanes using cached
- * RTTI lookup (`moho::ENetProtocolType`, binary symbol tag `ENetProtocol`).
- */
-gpg::RRef* RRef_ENetProtocol(RRef* const out, moho::ENetProtocolType* const value)
-{
-  return BuildTypedRefWithCache<moho::ENetProtocolType>(
-    out,
-    value,
-    typeid(moho::ENetProtocolType),
-    gENetProtocolRRefType,
-    gENetProtocolRRefCache
-  );
-}
-
-/**
- * Address: 0x00692F50 (FUN_00692F50, gpg::RRef_EIntel)
- *
- * What it does:
- * Builds a reflection reference for `moho::EIntel` using cached RTTI lookup.
- */
-gpg::RRef* RRef_EIntel(RRef* const out, moho::EIntel* const value)
-{
-  return BuildTypedRefWithCache<moho::EIntel>(
-    out,
-    value,
-    typeid(moho::EIntel),
-    gEIntelRRefType,
-    gEIntelRRefCache
-  );
-}
-
-/**
- * Address: 0x00593F00 (FUN_00593F00, gpg::RRef_EThreatType)
- *
- * What it does:
- * Builds a reflection reference for `moho::EThreatType` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EThreatType(RRef* const out, moho::EThreatType* const value)
-{
-  return BuildTypedRefWithCache<moho::EThreatType>(
-    out,
-    value,
-    typeid(moho::EThreatType),
-    gEThreatTypeRRefType,
-    gEThreatTypeRRefCache
-  );
-}
-
-/**
- * Address: 0x006D1FB0 (FUN_006D1FB0, gpg::RRef_ERuleBPUnitToggleCaps)
- *
- * What it does:
- * Builds a reflection reference for `moho::ERuleBPUnitToggleCaps` using
- * cached RTTI lookup.
- */
-gpg::RRef* RRef_ERuleBPUnitToggleCaps(RRef* const out, moho::ERuleBPUnitToggleCaps* const value)
-{
-  return BuildTypedRefWithCache<moho::ERuleBPUnitToggleCaps>(
-    out,
-    value,
-    typeid(moho::ERuleBPUnitToggleCaps),
-    gERuleBPUnitToggleCapsRRefType,
-    gERuleBPUnitToggleCapsRRefCache
-  );
 }
 
 /**
@@ -4784,46 +4098,10 @@ gpg::RRef* AssignERuleBPUnitToggleCapsRefAdapter(
 )
 {
   RRef tmp{};
-  RRef_ERuleBPUnitToggleCaps(&tmp, value);
+  tmp = gpg::MakeRRef<moho::ERuleBPUnitToggleCaps>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x006D22F0 (FUN_006D22F0, gpg::RRef_ERuleBPUnitCommandCaps)
- *
- * What it does:
- * Builds a reflection reference for `moho::ERuleBPUnitCommandCaps` using
- * cached RTTI lookup.
- */
-gpg::RRef* RRef_ERuleBPUnitCommandCaps(RRef* const out, moho::ERuleBPUnitCommandCaps* const value)
-{
-  return BuildTypedRefWithCache<moho::ERuleBPUnitCommandCaps>(
-    out,
-    value,
-    typeid(moho::ERuleBPUnitCommandCaps),
-    gERuleBPUnitCommandCapsRRefType,
-    gERuleBPUnitCommandCapsRRefCache
-  );
-}
-
-/**
- * Address: 0x0084ACA0 (FUN_0084ACA0, gpg::RRef_ESpecialFileType)
- *
- * What it does:
- * Builds a reflection reference for `moho::ESpecialFileType` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_ESpecialFileType(RRef* const out, moho::ESpecialFileType* const value)
-{
-  return BuildTypedRefWithCache<moho::ESpecialFileType>(
-    out,
-    value,
-    typeid(moho::ESpecialFileType),
-    gESpecialFileTypeRRefType,
-    gESpecialFileTypeRRefCache
-  );
 }
 
 /**
@@ -4840,28 +4118,10 @@ gpg::RRef* AssignESpecialFileTypeRefAdapter(
 )
 {
   RRef tmp{};
-  RRef_ESpecialFileType(&tmp, value);
+  tmp = gpg::MakeRRef<moho::ESpecialFileType>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0085FB70 (FUN_0085FB70, gpg::RRef_EGenericIconType)
- *
- * What it does:
- * Builds a reflection reference for `moho::EGenericIconType` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_EGenericIconType(RRef* const out, moho::EGenericIconType* const value)
-{
-  return BuildTypedRefWithCache<moho::EGenericIconType>(
-    out,
-    value,
-    typeid(moho::EGenericIconType),
-    gEGenericIconTypeRRefType,
-    gEGenericIconTypeRRefCache
-  );
 }
 
 /**
@@ -4874,28 +4134,10 @@ gpg::RRef* RRef_EGenericIconType(RRef* const out, moho::EGenericIconType* const 
 gpg::RRef* AssignEGenericIconTypeRef(RRef* const out, moho::EGenericIconType* const value)
 {
   RRef tmp{};
-  RRef_EGenericIconType(&tmp, value);
+  tmp = gpg::MakeRRef<moho::EGenericIconType>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0040C030 (FUN_0040C030, gpg::RRef_CTaskThread_P)
- *
- * What it does:
- * Builds a reflection reference for `moho::CTaskThread` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CTaskThread(RRef* const out, moho::CTaskThread* const value)
-{
-  return BuildTypedRefWithCache<moho::CTaskThread>(
-    out,
-    value,
-    typeid(moho::CTaskThread),
-    gCTaskThreadRRefType,
-    gCTaskThreadRRefCache
-  );
 }
 
 /**
@@ -5138,24 +4380,6 @@ gpg::RRef* RRef_CThrustManipulator(RRef* const out, moho::CThrustManipulator* co
 }
 
 /**
- * Address: 0x0063D230 (FUN_0063D230, gpg::RRef_CAniActor)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAniActor` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CAniActor(RRef* const out, moho::CAniActor* const value)
-{
-  return BuildTypedRefWithCache<moho::CAniActor>(
-    out,
-    value,
-    typeid(moho::CAniActor),
-    gCAniActorRRefType,
-    gCAniActorRRefCache
-  );
-}
-
-/**
  * Address: 0x0063CAE0 (FUN_0063CAE0)
  *
  * What it does:
@@ -5164,28 +4388,10 @@ gpg::RRef* RRef_CAniActor(RRef* const out, moho::CAniActor* const value)
 [[maybe_unused]] gpg::RRef* PackRRef_CAniActor(RRef* const out, moho::CAniActor* const value)
 {
   RRef tmp{};
-  (void)RRef_CAniActor(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAniActor>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0063D3F0 (FUN_0063D3F0, gpg::RRef_IAniManipulator)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAniManipulator` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_IAniManipulator(RRef* const out, moho::IAniManipulator* const value)
-{
-  return BuildTypedRefWithCache<moho::IAniManipulator>(
-    out,
-    value,
-    typeid(moho::IAniManipulator),
-    gIAniManipulatorRRefType,
-    gIAniManipulatorRRefCache
-  );
 }
 
 /**
@@ -5200,28 +4406,10 @@ gpg::RRef* RRef_IAniManipulator(RRef* const out, moho::IAniManipulator* const va
 )
 {
   RRef tmp{};
-  (void)RRef_IAniManipulator(&tmp, value);
+  tmp = gpg::MakeRRef<moho::IAniManipulator>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0063D800 (FUN_0063D800, gpg::RRef_SAniManipBinding)
- *
- * What it does:
- * Builds a reflected reference for one `moho::SAniManipBinding` value
- * pointer.
- */
-gpg::RRef* RRef_SAniManipBinding(RRef* const out, moho::SAniManipBinding* const value)
-{
-  return BuildTypedRefWithCache<moho::SAniManipBinding>(
-    out,
-    value,
-    typeid(moho::SAniManipBinding),
-    gSAniManipBindingRRefType,
-    gSAniManipBindingRRefCache
-  );
 }
 
 /**
@@ -5236,26 +4424,9 @@ gpg::RRef* RRef_SAniManipBinding(RRef* const out, moho::SAniManipBinding* const 
 )
 {
   RRef tmp{};
-  (void)RRef_SAniManipBinding(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SAniManipBinding>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
-  return out;
-}
-
-/**
- * Address: 0x0063D5A0 (FUN_0063D5A0, gpg::RRef_IAniManipulator_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::IAniManipulator*` slot.
- */
-gpg::RRef* RRef_IAniManipulator_P(RRef* const out, moho::IAniManipulator** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::IAniManipulator::GetPointerType();
   return out;
 }
 
@@ -5271,333 +4442,10 @@ gpg::RRef* RRef_IAniManipulator_P(RRef* const out, moho::IAniManipulator** const
 )
 {
   RRef tmp{};
-  (void)RRef_IAniManipulator_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::IAniManipulator*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005E04D0 (FUN_005E04D0, gpg::RRef_CAcquireTargetTask)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAcquireTargetTask` using cached
- * RTTI lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CAcquireTargetTask(RRef* const out, moho::CAcquireTargetTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CAcquireTargetTask>(
-    out,
-    value,
-    typeid(moho::CAcquireTargetTask),
-    gCAcquireTargetTaskRRefType,
-    gCAcquireTargetTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x006DED40 (FUN_006DED40, gpg::RRef_CFireWeaponTask)
- *
- * What it does:
- * Builds a reflection reference for `moho::CFireWeaponTask` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CFireWeaponTask(RRef* const out, moho::CFireWeaponTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CFireWeaponTask>(
-    out,
-    value,
-    typeid(moho::CFireWeaponTask),
-    gCFireWeaponTaskRRefType,
-    gCFireWeaponTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x006058B0 (FUN_006058B0, gpg::RRef_CUnitCaptureTask)
- * Mangled: ?RRef_CUnitCaptureTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitCaptureTask@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitCaptureTask(gpg::RRef *out, Moho::CUnitCaptureTask *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitCaptureTask*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CUnitCaptureTask(RRef* const out, moho::CUnitCaptureTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitCaptureTask>(
-    out,
-    value,
-    typeid(moho::CUnitCaptureTask),
-    gCUnitCaptureTaskRRefType,
-    gCUnitCaptureTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x0060CAB0 (FUN_0060CAB0, gpg::RRef_CUnitGetBuiltTask)
- * Mangled: ?RRef_CUnitGetBuiltTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitGetBuiltTask@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitGetBuiltTask(gpg::RRef *out, Moho::CUnitGetBuiltTask *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitGetBuiltTask*`,
- * preserving dynamic-derived ownership and base-offset adjustment. Caches
- * `typeid` -> `RType*` resolution in a TLS 3-slot MRU table to avoid
- * re-entering `gpg::LookupRType` for each call. Asserts
- * `IsDerivedFrom(runtime, declared)` when the caller's value is polymorphically
- * derived.
- */
-gpg::RRef* RRef_CUnitGetBuiltTask(RRef* const out, moho::CUnitGetBuiltTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitGetBuiltTask>(
-    out,
-    value,
-    typeid(moho::CUnitGetBuiltTask),
-    gCUnitGetBuiltTaskRRefType,
-    gCUnitGetBuiltTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x00614BA0 (FUN_00614BA0, gpg::RRef_CUnitGuardTask)
- * Mangled: ?RRef_CUnitGuardTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitGuardTask@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitGuardTask(gpg::RRef *out, Moho::CUnitGuardTask *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitGuardTask*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CUnitGuardTask(RRef* const out, moho::CUnitGuardTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitGuardTask>(
-    out,
-    value,
-    typeid(moho::CUnitGuardTask),
-    gCUnitGuardTaskRRefType,
-    gCUnitGuardTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x005FE1E0 (FUN_005FE1E0, gpg::RRef_CFactoryBuildTask)
- * Mangled: ?RRef_CFactoryBuildTask@gpg@@YAPAURRef@1@AAU21@PAVCFactoryBuildTask@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CFactoryBuildTask(gpg::RRef *out, Moho::CFactoryBuildTask *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CFactoryBuildTask*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CFactoryBuildTask(RRef* const out, moho::CFactoryBuildTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CFactoryBuildTask>(
-    out,
-    value,
-    typeid(moho::CFactoryBuildTask),
-    gCFactoryBuildTaskRRefType,
-    gCFactoryBuildTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x00608240 (FUN_00608240, gpg::RRef_CUnitCarrierLand)
- * Mangled: ?RRef_CUnitCarrierLand@gpg@@YAPAURRef@1@AAU21@PAVCUnitCarrierLand@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitCarrierLand(gpg::RRef *out, Moho::CUnitCarrierLand *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitCarrierLand*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CUnitCarrierLand(RRef* const out, moho::CUnitCarrierLand* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitCarrierLand>(
-    out,
-    value,
-    typeid(moho::CUnitCarrierLand),
-    gCUnitCarrierLandRRefType,
-    gCUnitCarrierLandRRefCache
-  );
-}
-
-/**
- * Address: 0x006083F0 (FUN_006083F0, gpg::RRef_CUnitCarrierLaunch)
- * Mangled: ?RRef_CUnitCarrierLaunch@gpg@@YAPAURRef@1@AAU21@PAVCUnitCarrierLaunch@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitCarrierLaunch(gpg::RRef *out, Moho::CUnitCarrierLaunch *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitCarrierLaunch*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CUnitCarrierLaunch(RRef* const out, moho::CUnitCarrierLaunch* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitCarrierLaunch>(
-    out,
-    value,
-    typeid(moho::CUnitCarrierLaunch),
-    gCUnitCarrierLaunchRRefType,
-    gCUnitCarrierLaunchRRefCache
-  );
-}
-
-/**
- * Address: 0x00608090 (FUN_00608090, gpg::RRef_CUnitCarrierRetrieve)
- * Mangled: ?RRef_CUnitCarrierRetrieve@gpg@@YAPAURRef@1@AAU21@PAVCUnitCarrierRetrieve@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitCarrierRetrieve(gpg::RRef *out, Moho::CUnitCarrierRetrieve *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitCarrierRetrieve*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CUnitCarrierRetrieve(RRef* const out, moho::CUnitCarrierRetrieve* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitCarrierRetrieve>(
-    out,
-    value,
-    typeid(moho::CUnitCarrierRetrieve),
-    gCUnitCarrierRetrieveRRefType,
-    gCUnitCarrierRetrieveRRefCache
-  );
-}
-
-/**
- * Address: 0x005FDCD0 (FUN_005FDCD0, gpg::RRef_CUnitMobileBuildTask)
- * Mangled: ?RRef_CUnitMobileBuildTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitMobileBuildTask@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitMobileBuildTask(gpg::RRef *out, Moho::CUnitMobileBuildTask *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitMobileBuildTask*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CUnitMobileBuildTask(RRef* const out, moho::CUnitMobileBuildTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitMobileBuildTask>(
-    out,
-    value,
-    typeid(moho::CUnitMobileBuildTask),
-    gCUnitMobileBuildTaskRRefType,
-    gCUnitMobileBuildTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x005FE030 (FUN_005FE030, gpg::RRef_CUnitRepairTask)
- * Mangled: ?RRef_CUnitRepairTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitRepairTask@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitRepairTask(gpg::RRef *out, Moho::CUnitRepairTask *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitRepairTask*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CUnitRepairTask(RRef* const out, moho::CUnitRepairTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitRepairTask>(
-    out,
-    value,
-    typeid(moho::CUnitRepairTask),
-    gCUnitRepairTaskRRefType,
-    gCUnitRepairTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x005FE390 (FUN_005FE390, gpg::RRef_CUnitSacrificeTask)
- * Mangled: ?RRef_CUnitSacrificeTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitSacrificeTask@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitSacrificeTask(gpg::RRef *out, Moho::CUnitSacrificeTask *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitSacrificeTask*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CUnitSacrificeTask(RRef* const out, moho::CUnitSacrificeTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitSacrificeTask>(
-    out,
-    value,
-    typeid(moho::CUnitSacrificeTask),
-    gCUnitSacrificeTaskRRefType,
-    gCUnitSacrificeTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x0060CC60 (FUN_0060CC60, gpg::RRef_CUnitTeleportTask)
- * Mangled: ?RRef_CUnitTeleportTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitTeleportTask@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitTeleportTask(gpg::RRef *out, Moho::CUnitTeleportTask *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitTeleportTask*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CUnitTeleportTask(RRef* const out, moho::CUnitTeleportTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitTeleportTask>(
-    out,
-    value,
-    typeid(moho::CUnitTeleportTask),
-    gCUnitTeleportTaskRRefType,
-    gCUnitTeleportTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x005FDE80 (FUN_005FDE80, gpg::RRef_CUnitUpgradeTask)
- * Mangled: ?RRef_CUnitUpgradeTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitUpgradeTask@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_CUnitUpgradeTask(gpg::RRef *out, Moho::CUnitUpgradeTask *value);
- *
- * What it does:
- * Builds one typed reflection reference for `moho::CUnitUpgradeTask*`,
- * preserving dynamic-derived ownership and base-offset adjustment.
- */
-gpg::RRef* RRef_CUnitUpgradeTask(RRef* const out, moho::CUnitUpgradeTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitUpgradeTask>(
-    out,
-    value,
-    typeid(moho::CUnitUpgradeTask),
-    gCUnitUpgradeTaskRRefType,
-    gCUnitUpgradeTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x00628DB0 (FUN_00628DB0, gpg::RRef_CUnitUnloadUnits)
- *
- * What it does:
- * Builds a typed reflection ref for one `CUnitUnloadUnits`, using the cached
- * declared type when the runtime type matches it exactly and looking the
- * actual type up otherwise.
- */
-gpg::RRef* RRef_CUnitUnloadUnits(RRef* const out, moho::CUnitUnloadUnits* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitUnloadUnits>(
-    out,
-    value,
-    typeid(moho::CUnitUnloadUnits),
-    gCUnitUnloadUnitsRRefType,
-    gCUnitUnloadUnitsRRefCache
-  );
 }
 
 /**
@@ -5613,47 +4461,9 @@ gpg::RRef* RRef_CUnitUnloadUnits(RRef* const out, moho::CUnitUnloadUnits* const 
   }
 
   RRef tmp{};
-  (void)RRef_CFireWeaponTask(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CFireWeaponTask>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
-  return out;
-}
-
-/**
- * Address: 0x006A00F0 (FUN_006A00F0, gpg::RRef_ManyToOneListener_EProjectileImpactEvent)
- *
- * What it does:
- * Builds a reflection reference for `ManyToOneListener<EProjectileImpactEvent>`
- * using cached RTTI lookup and derived-type normalization.
- */
-gpg::RRef* RRef_ManyToOneListener_EProjectileImpactEvent(
-  RRef* const out,
-  moho::ManyToOneListener<moho::EProjectileImpactEvent>* const value
-)
-{
-  return BuildTypedRefWithCache<moho::ManyToOneListener<moho::EProjectileImpactEvent>>(
-    out,
-    value,
-    typeid(moho::ManyToOneListener<moho::EProjectileImpactEvent>),
-    moho::ManyToOneListener<moho::EProjectileImpactEvent>::sType,
-    gManyToOneListenerEProjectileImpactEventRRefCache
-  );
-}
-
-/**
- * Address: 0x005E08D0 (FUN_005E08D0, gpg::RRef_CAcquireTargetTask_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::CAcquireTargetTask*` slot.
- */
-gpg::RRef* RRef_CAcquireTargetTask_P(RRef* const out, moho::CAcquireTargetTask** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::CAcquireTargetTask::GetPointerType();
   return out;
 }
 
@@ -5674,39 +4484,10 @@ gpg::RRef* PackRRef_CAcquireTargetTask_P(
   }
 
   RRef tmp{};
-  (void)RRef_CAcquireTargetTask_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAcquireTargetTask*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0059E080 (FUN_0059E080, gpg::RRef_IFormationInstance_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::IFormationInstance*` slot.
- */
-gpg::RRef* RRef_IFormationInstance_P(RRef* const out, moho::IFormationInstance** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::IFormationInstance::GetPointerType();
-  return out;
-}
-
-/**
- * Address: 0x0066C650 (FUN_0066C650, gpg::RRef_IEffect)
- *
- * What it does:
- * Builds a reflection reference for `moho::IEffect` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_IEffect(RRef* const out, moho::IEffect* const value)
-{
-  return BuildTypedRefWithCache<moho::IEffect>(out, value, typeid(moho::IEffect), gIEffectRRefType, gIEffectRRefCache);
 }
 
 /**
@@ -5754,28 +4535,10 @@ gpg::RRef* PackRRef_CEffectManagerImpl(RRef* const out, moho::CEffectManagerImpl
 gpg::RRef* PackRRef_IEffect(RRef* const out, moho::IEffect* const value)
 {
   RRef tmp{};
-  (void)RRef_IEffect(&tmp, value);
+  tmp = gpg::MakeRRef<moho::IEffect>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00658860 (FUN_00658860, gpg::RRef_CEfxBeam)
- *
- * What it does:
- * Builds a reflection reference for `moho::CEfxBeam` using `CEfxBeam::sType`
- * cache and derived-type normalization.
- */
-gpg::RRef* RRef_CEfxBeam(RRef* const out, moho::CEfxBeam* const value)
-{
-  return BuildTypedRefWithCache<moho::CEfxBeam>(
-    out,
-    value,
-    typeid(moho::CEfxBeam),
-    moho::CEfxBeam::sType,
-    gCEfxBeamRRefCache
-  );
 }
 
 /**
@@ -5788,31 +4551,10 @@ gpg::RRef* RRef_CEfxBeam(RRef* const out, moho::CEfxBeam* const value)
 gpg::RRef* PackRRef_CEfxBeam(RRef* const out, moho::CEfxBeam* const value)
 {
   RRef tmp{};
-  (void)RRef_CEfxBeam(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CEfxBeam>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0065ADC0 (FUN_0065ADC0, gpg::RRef_CountedPtr_CParticleTexture)
- *
- * What it does:
- * Builds a reflected reference for one counted particle-texture pointer
- * wrapper.
- */
-gpg::RRef* RRef_CountedPtr_CParticleTexture(
-  RRef* const out,
-  moho::CountedPtr<moho::CParticleTexture>* const value
-)
-{
-  return BuildTypedRefWithCache<moho::CountedPtr<moho::CParticleTexture>>(
-    out,
-    value,
-    typeid(moho::CountedPtr<moho::CParticleTexture>),
-    gCountedPtrCParticleTextureRRefType,
-    gCountedPtrCParticleTextureRRefCache
-  );
 }
 
 /**
@@ -5828,27 +4570,10 @@ gpg::RRef* PackRRef_CountedPtr_CParticleTexture(
 )
 {
   RRef tmp{};
-  (void)RRef_CountedPtr_CParticleTexture(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CountedPtr<moho::CParticleTexture>>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0065FCF0 (FUN_0065FCF0, gpg::RRef_SEfxCurve)
- *
- * What it does:
- * Builds a reflected reference for one `moho::SEfxCurve` value pointer.
- */
-gpg::RRef* RRef_SEfxCurve(RRef* const out, moho::SEfxCurve* const value)
-{
-  return BuildTypedRefWithCache<moho::SEfxCurve>(
-    out,
-    value,
-    typeid(moho::SEfxCurve),
-    gSEfxCurveRRefType,
-    gSEfxCurveRRefCache
-  );
 }
 
 /**
@@ -5861,7 +4586,7 @@ gpg::RRef* RRef_SEfxCurve(RRef* const out, moho::SEfxCurve* const value)
 gpg::RRef* PackRRef_SEfxCurve(RRef* const out, moho::SEfxCurve* const value)
 {
   RRef tmp{};
-  (void)RRef_SEfxCurve(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SEfxCurve>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -5939,23 +4664,6 @@ gpg::RRef* PackRRef_CEfxTrailEmitter(RRef* const out, moho::CEfxTrailEmitter* co
 }
 
 /**
- * Address: 0x0066C800 (FUN_0066C800, gpg::RRef_IEffect_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::IEffect*` slot.
- */
-gpg::RRef* RRef_IEffect_P(RRef* const out, moho::IEffect** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::IEffect::GetPointerType();
-  return out;
-}
-
-/**
  * Address: 0x0066D0E0 (FUN_0066D0E0, gpg::RRef_IEffect_P pack lane)
  *
  * What it does:
@@ -5965,81 +4673,10 @@ gpg::RRef* RRef_IEffect_P(RRef* const out, moho::IEffect** const value)
 gpg::RRef* PackRRef_IEffect_P(RRef* const out, moho::IEffect** const value)
 {
   RRef tmp{};
-  (void)RRef_IEffect_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::IEffect*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0054EA20 (FUN_0054EA20, gpg::RRef_CAniPose)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAniPose` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CAniPose(RRef* const out, moho::CAniPose* const value)
-{
-  return BuildTypedRefWithCache<moho::CAniPose>(
-    out,
-    value,
-    typeid(moho::CAniPose),
-    gCAniPoseRRefType,
-    gCAniPoseRRefCache
-  );
-}
-
-/**
- * Address: 0x0054E690 (FUN_0054E690, gpg::RRef_CAniPoseBone)
- *
- * What it does:
- * Builds a reflected reference for one `moho::CAniPoseBone` value pointer.
- */
-gpg::RRef* RRef_CAniPoseBone(RRef* const out, moho::CAniPoseBone* const value)
-{
-  return BuildTypedRefWithCache<moho::CAniPoseBone>(
-    out,
-    value,
-    typeid(moho::CAniPoseBone),
-    gCAniPoseBoneRRefType,
-    gCAniPoseBoneRRefCache
-  );
-}
-
-/**
- * Address: 0x0063EAD0 (FUN_0063EAD0, gpg::RRef_shared_ptr_CAniPose)
- *
- * What it does:
- * Builds a reflection reference for `boost::shared_ptr<moho::CAniPose>` using
- * cached RTTI lookup.
- */
-gpg::RRef* RRef_shared_ptr_CAniPose(RRef* const out, boost::shared_ptr<moho::CAniPose>* const value)
-{
-  return BuildTypedRefWithCache<boost::shared_ptr<moho::CAniPose>>(
-    out,
-    value,
-    typeid(boost::shared_ptr<moho::CAniPose>),
-    gSharedPtrCAniPoseRRefType,
-    gSharedPtrCAniPoseRRefCache
-  );
-}
-
-/**
- * Address: 0x004C9030 (FUN_004C9030, gpg::RRef_CScriptObject)
- *
- * What it does:
- * Builds a reflected reference for one `moho::CScriptObject` pointer with
- * derived-type normalization.
- */
-gpg::RRef* RRef_CScriptObject(RRef* const out, moho::CScriptObject* const value)
-{
-  return BuildTypedRefWithCache<moho::CScriptObject>(
-    out,
-    value,
-    typeid(moho::CScriptObject),
-    moho::CScriptObject::sType,
-    gCScriptObjectRRefCache
-  );
 }
 
 /**
@@ -6052,177 +4689,10 @@ gpg::RRef* RRef_CScriptObject(RRef* const out, moho::CScriptObject* const value)
 [[maybe_unused]] static gpg::RRef* CopyScriptObjectRefToOutput(moho::CScriptObject* const value, gpg::RRef* const out)
 {
   gpg::RRef ref{};
-  gpg::RRef_CScriptObject(&ref, value);
+  ref = gpg::MakeRRef<moho::CScriptObject>(value);
   out->mObj = ref.mObj;
   out->mType = ref.mType;
   return out;
-}
-
-/**
- * Address: 0x004C8C30 (FUN_004C8C30, gpg::RRef_CScriptObject_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::CScriptObject*` slot.
- */
-gpg::RRef* RRef_CScriptObject_P(RRef* const out, moho::CScriptObject** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::CScriptObject::GetPointerType();
-  return out;
-}
-
-/**
- * Address: 0x004CC040 (FUN_004CC040, gpg::RRef_CScriptEvent)
- *
- * What it does:
- * Builds a reflection reference for `moho::CScriptEvent` using
- * `CScriptEvent::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CScriptEvent(RRef* const out, moho::CScriptEvent* const value)
-{
-  return BuildTypedRefWithCache<moho::CScriptEvent>(
-    out,
-    value,
-    typeid(moho::CScriptEvent),
-    moho::CScriptEvent::sType,
-    gCScriptEventRRefCache
-  );
-}
-
-/**
- * Address: 0x004CBB60 (FUN_004CBB60, gpg::RRef_CLuaTask)
- *
- * What it does:
- * Builds a reflection reference for `moho::CLuaTask` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CLuaTask(RRef* const out, moho::CLuaTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CLuaTask>(
-    out,
-    value,
-    typeid(moho::CLuaTask),
-    gCLuaTaskRRefType,
-    gCLuaTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x004CBE70 (FUN_004CBE70, gpg::RRef_CWaitForTask)
- *
- * What it does:
- * Builds a reflection reference for `moho::CWaitForTask` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CWaitForTask(RRef* const out, moho::CWaitForTask* const value)
-{
-  return BuildTypedRefWithCache<moho::CWaitForTask>(
-    out,
-    value,
-    typeid(moho::CWaitForTask),
-    gCWaitForTaskRRefType,
-    gCWaitForTaskRRefCache
-  );
-}
-
-/**
- * Address: 0x004E5730 (FUN_004E5730, gpg::RRef_CSndParams)
- *
- * What it does:
- * Builds a reflection reference for `moho::CSndParams` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CSndParams(RRef* const out, moho::CSndParams* const value)
-{
-  return BuildTypedRefWithCache<moho::CSndParams>(
-    out,
-    value,
-    typeid(moho::CSndParams),
-    gCSndParamsRRefType,
-    gCSndParamsRRefCache
-  );
-}
-
-/**
- * Address: 0x004E6200 (FUN_004E6200, gpg::RRef_CSndParams_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::CSndParams*` slot.
- */
-gpg::RRef* RRef_CSndParams_P(RRef* const out, moho::CSndParams** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::CSndParams::GetPointerType();
-  return out;
-}
-
-/**
- * Address: 0x004E5590 (FUN_004E5590, gpg::RRef_CSndVar)
- *
- * What it does:
- * Builds a reflection reference for `moho::CSndVar` using cached RTTI
- * lookups.
- */
-gpg::RRef* RRef_CSndVar(RRef* const out, moho::CSndVar* const value)
-{
-  return BuildTypedRefWithCache<moho::CSndVar>(out, value, typeid(moho::CSndVar), gCSndVarRRefType, gCSndVarRRefCache);
-}
-
-/**
- * Address: 0x004E6720 (FUN_004E6720, gpg::RRef_HSound)
- *
- * What it does:
- * Builds a reflection reference for `moho::HSound` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_HSound(RRef* const out, moho::HSound* const value)
-{
-  return BuildTypedRefWithCache<moho::HSound>(out, value, typeid(moho::HSound), gHSoundRRefType, gHSoundRRefCache);
-}
-
-/**
- * Address: 0x00758B00 (FUN_00758B00, gpg::RRef_ISoundManager)
- * Address: 0x00762410 (FUN_00762410)
- *
- * What it does:
- * Builds a reflection reference for `moho::ISoundManager` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_ISoundManager(RRef* const out, moho::ISoundManager* const value)
-{
-  return BuildTypedRefWithCache<moho::ISoundManager>(
-    out,
-    value,
-    typeid(moho::ISoundManager),
-    gISoundManagerRRefType,
-    gISoundManagerRRefCache
-  );
-}
-
-/**
- * Address: 0x00762890 (FUN_00762890, gpg::RRef_SAudioRequest)
- * Address: 0x00762560 (FUN_00762560)
- *
- * What it does:
- * Builds a reflection reference for `moho::SAudioRequest` object pointers.
- */
-gpg::RRef* RRef_SAudioRequest(RRef* const out, moho::SAudioRequest* const value)
-{
-  return BuildTypedRefWithCache<moho::SAudioRequest>(
-    out,
-    value,
-    typeid(moho::SAudioRequest),
-    moho::SAudioRequest::sType,
-    gSAudioRequestRRefCache
-  );
 }
 
 /**
@@ -6249,43 +4719,8 @@ gpg::RRef* RRef_SAudioRequestArraySlot(
     return out;
   }
 
-  return RRef_SAudioRequest(out, firstElement + static_cast<std::ptrdiff_t>(index));
-}
-
-/**
- * Address: 0x006805E0 (FUN_006805E0, gpg::RRef_Entity)
- *
- * What it does:
- * Builds a reflection reference for `moho::Entity` using `Entity::sType`
- * cache and derived-type normalization.
- */
-gpg::RRef* RRef_Entity(RRef* const out, moho::Entity* const value)
-{
-  return BuildTypedRefWithCache<moho::Entity>(
-    out,
-    value,
-    typeid(moho::Entity),
-    gEntityRRefType,
-    gEntityRRefCache
-  );
-}
-
-/**
- * Address: 0x00675DB0 (FUN_00675DB0, gpg::RRef_CollisionBeamEntity)
- *
- * What it does:
- * Builds a reflection reference for `moho::CollisionBeamEntity` using
- * `CollisionBeamEntity::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CollisionBeamEntity(RRef* const out, moho::CollisionBeamEntity* const value)
-{
-  return BuildTypedRefWithCache<moho::CollisionBeamEntity>(
-    out,
-    value,
-    typeid(moho::CollisionBeamEntity),
-    moho::CollisionBeamEntity::sType,
-    gCollisionBeamEntityRRefCache
-  );
+  *out = gpg::MakeRRef<moho::SAudioRequest>(firstElement + static_cast<std::ptrdiff_t>(index));
+  return out;
 }
 
 /**
@@ -6302,28 +4737,10 @@ gpg::RRef* AssignCollisionBeamEntityRef(RRef* const out, moho::CollisionBeamEnti
   }
 
   RRef tmp{};
-  RRef_CollisionBeamEntity(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CollisionBeamEntity>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x006FAF20 (FUN_006FAF20, gpg::RRef_Prop)
- *
- * What it does:
- * Builds a reflection reference for `moho::Prop` using `Prop::sType` cache and
- * derived-type normalization.
- */
-gpg::RRef* RRef_Prop(RRef* const out, moho::Prop* const value)
-{
-  return BuildTypedRefWithCache<moho::Prop>(
-    out,
-    value,
-    typeid(moho::Prop),
-    moho::Prop::sType,
-    gPropRRefCache
-  );
 }
 
 /**
@@ -6336,21 +4753,10 @@ gpg::RRef* RRef_Prop(RRef* const out, moho::Prop* const value)
 gpg::RRef* PackRRef_Prop(RRef* const out, moho::Prop* const value)
 {
   RRef tmp{};
-  (void)RRef_Prop(&tmp, value);
+  tmp = gpg::MakeRRef<moho::Prop>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005541F0 (FUN_005541F0, gpg::RRef_EntId)
- *
- * What it does:
- * Builds a reflected reference for one entity-id scalar lane.
- */
-gpg::RRef* RRef_EntId(RRef* const out, std::int32_t* const value)
-{
-  return BuildTypedRefWithCache<std::int32_t>(out, value, typeid(std::int32_t), gEntIdRRefType, gEntIdRRefCache);
 }
 
 /**
@@ -6367,26 +4773,9 @@ gpg::RRef* PackRRef_EntId(RRef* const out, std::int32_t* const value)
   }
 
   RRef tmp{};
-  (void)RRef_EntId(&tmp, value);
+  tmp = gpg::MakeRRef<std::int32_t>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
-  return out;
-}
-
-/**
- * Address: 0x006807B0 (FUN_006807B0, gpg::RRef_Entity_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::Entity*` slot.
- */
-gpg::RRef* RRef_Entity_P(RRef* const out, moho::Entity** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::Entity::GetPointerType();
   return out;
 }
 
@@ -6400,27 +4789,10 @@ gpg::RRef* RRef_Entity_P(RRef* const out, moho::Entity** const value)
 gpg::RRef* PackRRef_Entity_P(RRef* const out, moho::Entity** const value)
 {
   RRef tmp{};
-  (void)RRef_Entity_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::Entity*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x006B21E0 (FUN_006B21E0, gpg::RRef_WeakPtr_Entity)
- *
- * What it does:
- * Builds a reflected reference for one `WeakPtr<Entity>` wrapper value.
- */
-gpg::RRef* RRef_WeakPtr_Entity(RRef* const out, moho::WeakPtr<moho::Entity>* const value)
-{
-  return BuildTypedRefWithCache<moho::WeakPtr<moho::Entity>>(
-    out,
-    value,
-    typeid(moho::WeakPtr<moho::Entity>),
-    gWeakPtrEntityRRefType,
-    gWeakPtrEntityRRefCache
-  );
 }
 
 /**
@@ -6433,28 +4805,10 @@ gpg::RRef* RRef_WeakPtr_Entity(RRef* const out, moho::WeakPtr<moho::Entity>* con
 gpg::RRef* PackRRef_WeakPtr_Entity(RRef* const out, moho::WeakPtr<moho::Entity>* const value)
 {
   RRef tmp{};
-  (void)RRef_WeakPtr_Entity(&tmp, value);
+  tmp = gpg::MakeRRef<moho::WeakPtr<moho::Entity>>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00689360 (FUN_00689360, gpg::RRef_EntityDB)
- *
- * What it does:
- * Builds a reflection reference for `moho::CEntityDb` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_EntityDB(RRef* const out, moho::CEntityDb* const value)
-{
-  return BuildTypedRefWithCache<moho::CEntityDb>(
-    out,
-    value,
-    typeid(moho::CEntityDb),
-    gEntityDBRRefType,
-    gEntityDBRRefCache
-  );
 }
 
 /**
@@ -6467,46 +4821,10 @@ gpg::RRef* RRef_EntityDB(RRef* const out, moho::CEntityDb* const value)
 gpg::RRef* AssignEntityDBRef(RRef* const out, moho::CEntityDb* const value)
 {
   RRef tmp{};
-  RRef_EntityDB(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CEntityDb>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00689920 (FUN_00689920, gpg::RRef_EntitySetBase)
- *
- * What it does:
- * Builds a reflection reference for `moho::EntitySetBase` using
- * `EntitySetBase::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_EntitySetBase(RRef* const out, moho::EntitySetBase* const value)
-{
-  return BuildTypedRefWithCache<moho::EntitySetBase>(
-    out,
-    value,
-    typeid(moho::EntitySetBase),
-    moho::EntitySetBase::sType,
-    gEntitySetBaseRRefCache
-  );
-}
-
-/**
- * Address: 0x00698D80 (FUN_00698D80, gpg::RRef_SPhysConstants)
- *
- * What it does:
- * Builds a reflection reference for `moho::SPhysConstants` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_SPhysConstants(RRef* const out, moho::SPhysConstants* const value)
-{
-  return BuildTypedRefWithCache<moho::SPhysConstants>(
-    out,
-    value,
-    typeid(moho::SPhysConstants),
-    gSPhysConstantsRRefType,
-    gSPhysConstantsRRefCache
-  );
 }
 
 /**
@@ -6519,7 +4837,7 @@ gpg::RRef* RRef_SPhysConstants(RRef* const out, moho::SPhysConstants* const valu
 gpg::RRef* PackRRef_SPhysConstantsA(RRef* const out, moho::SPhysConstants* const value)
 {
   RRef tmp{};
-  (void)RRef_SPhysConstants(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SPhysConstants>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -6535,28 +4853,10 @@ gpg::RRef* PackRRef_SPhysConstantsA(RRef* const out, moho::SPhysConstants* const
 gpg::RRef* PackRRef_SPhysConstantsB(RRef* const out, moho::SPhysConstants* const value)
 {
   RRef tmp{};
-  (void)RRef_SPhysConstants(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SPhysConstants>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x006837E0 (FUN_006837E0, gpg::RRef_SPhysBody)
- *
- * What it does:
- * Builds a reflection reference for `moho::SPhysBody` using cached RTTI
- * lookup.
- */
-gpg::RRef* RRef_SPhysBody(RRef* const out, moho::SPhysBody* const value)
-{
-  return BuildTypedRefWithCache<moho::SPhysBody>(
-    out,
-    value,
-    typeid(moho::SPhysBody),
-    gSPhysBodyRRefType,
-    gSPhysBodyRRefCache
-  );
 }
 
 /**
@@ -6569,22 +4869,10 @@ gpg::RRef* RRef_SPhysBody(RRef* const out, moho::SPhysBody* const value)
 gpg::RRef* AssignSPhysBodyRef(RRef* const out, moho::SPhysBody* const value)
 {
   RRef tmp{};
-  RRef_SPhysBody(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SPhysBody>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005A2A40 (FUN_005A2A40, gpg::RRef_Unit)
- *
- * What it does:
- * Builds a reflection reference for `moho::Unit` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_Unit(RRef* const out, moho::Unit* const value)
-{
-  return BuildTypedRefWithCache<moho::Unit>(out, value, typeid(moho::Unit), gUnitRRefType, gUnitRRefCache);
 }
 
 /**
@@ -6597,22 +4885,10 @@ gpg::RRef* RRef_Unit(RRef* const out, moho::Unit* const value)
 gpg::RRef* PackRRef_Unit(RRef* const out, moho::Unit* const value)
 {
   RRef tmp{};
-  (void)RRef_Unit(&tmp, value);
+  tmp = gpg::MakeRRef<moho::Unit>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00541C50 (FUN_00541C50, gpg::RRef_IUnit)
- *
- * What it does:
- * Builds a reflection reference for `moho::IUnit` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_IUnit(RRef* const out, moho::IUnit* const value)
-{
-  return BuildTypedRefWithCache<moho::IUnit>(out, value, typeid(moho::IUnit), gIUnitRRefType, gIUnitRRefCache);
 }
 
 /**
@@ -6625,27 +4901,10 @@ gpg::RRef* RRef_IUnit(RRef* const out, moho::IUnit* const value)
 gpg::RRef* PackRRef_IUnit(RRef* const out, moho::IUnit* const value)
 {
   RRef tmp{};
-  (void)RRef_IUnit(&tmp, value);
+  tmp = gpg::MakeRRef<moho::IUnit>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005725F0 (FUN_005725F0, gpg::RRef_WeakPtr_IUnit)
- *
- * What it does:
- * Builds a reflected reference for one `WeakPtr<IUnit>` wrapper value.
- */
-gpg::RRef* RRef_WeakPtr_IUnit(RRef* const out, moho::WeakPtr<moho::IUnit>* const value)
-{
-  return BuildTypedRefWithCache<moho::WeakPtr<moho::IUnit>>(
-    out,
-    value,
-    typeid(moho::WeakPtr<moho::IUnit>),
-    gWeakPtrIUnitRRefType,
-    gWeakPtrIUnitRRefCache
-  );
 }
 
 /**
@@ -6658,33 +4917,10 @@ gpg::RRef* RRef_WeakPtr_IUnit(RRef* const out, moho::WeakPtr<moho::IUnit>* const
 gpg::RRef* PackRRef_WeakPtr_IUnit(RRef* const out, moho::WeakPtr<moho::IUnit>* const value)
 {
   RRef tmp{};
-  (void)RRef_WeakPtr_IUnit(&tmp, value);
+  tmp = gpg::MakeRRef<moho::WeakPtr<moho::IUnit>>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00559790 (FUN_00559790, gpg::RRef_SSTIEntityAttachInfo)
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_SSTIEntityAttachInfo(gpg::RRef *a1, Moho::SSTIEntityAttachInfo *a2);
- *
- * What it does:
- * Builds a reflection reference for one `moho::SSTIEntityAttachInfo`
- * pointer using the cached RTTI lookup + 3-slot derived-type
- * normalization helper, matching the binary's TLS-cached lookup +
- * `IsDerivedFrom` adjustment chain.
- */
-gpg::RRef* RRef_SSTIEntityAttachInfo(RRef* const out, moho::SSTIEntityAttachInfo* const value)
-{
-  return BuildTypedRefWithCache<moho::SSTIEntityAttachInfo>(
-    out,
-    value,
-    typeid(moho::SSTIEntityAttachInfo),
-    gSSTIEntityAttachInfoRRefType,
-    gSSTIEntityAttachInfoRRefCache
-  );
 }
 
 /**
@@ -6701,33 +4937,10 @@ gpg::RRef* PackRRef_SSTIEntityAttachInfo(RRef* const out, moho::SSTIEntityAttach
   }
 
   RRef tmp{};
-  (void)RRef_SSTIEntityAttachInfo(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SSTIEntityAttachInfo>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005ACCA0 (FUN_005ACCA0, gpg::RRef_PathQueue)
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_PathQueue(gpg::RRef *a1, Moho::PathQueue *a2);
- *
- * What it does:
- * Builds a reflection reference for one `moho::PathQueue` pointer
- * using the cached RTTI lookup + 3-slot derived-type normalization
- * helper, matching the binary's TLS-cached lookup + `IsDerivedFrom`
- * adjustment chain.
- */
-gpg::RRef* RRef_PathQueue(RRef* const out, moho::PathQueue* const value)
-{
-  return BuildTypedRefWithCache<moho::PathQueue>(
-    out,
-    value,
-    typeid(moho::PathQueue),
-    gPathQueueRRefType,
-    gPathQueueRRefCache
-  );
 }
 
 /**
@@ -6744,46 +4957,10 @@ gpg::RRef* PackRRef_PathQueue(RRef* const out, moho::PathQueue* const value)
   }
 
   RRef tmp{};
-  (void)RRef_PathQueue(&tmp, value);
+  tmp = gpg::MakeRRef<moho::PathQueue>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00526C80 (FUN_00526C80, gpg::RRef_RUnitBlueprint)
- *
- * What it does:
- * Builds a reflection reference for `moho::RUnitBlueprint` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_RUnitBlueprint(RRef* const out, moho::RUnitBlueprint* const value)
-{
-  return BuildTypedRefWithCache<moho::RUnitBlueprint>(
-    out,
-    value,
-    typeid(moho::RUnitBlueprint),
-    gRUnitBlueprintRRefType,
-    gRUnitBlueprintRRefCache
-  );
-}
-
-/**
- * Address: 0x0050E2A0 (FUN_0050E2A0, gpg::RRef_RBlueprint)
- *
- * What it does:
- * Builds a reflection reference for `moho::RBlueprint` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_RBlueprint(RRef* const out, moho::RBlueprint* const value)
-{
-  return BuildTypedRefWithCache<moho::RBlueprint>(
-    out,
-    value,
-    typeid(moho::RBlueprint),
-    gRBlueprintRRefType,
-    gRBlueprintRRefCache
-  );
 }
 
 /**
@@ -6796,26 +4973,9 @@ gpg::RRef* RRef_RBlueprint(RRef* const out, moho::RBlueprint* const value)
 gpg::RRef* PackRRef_RBlueprint(RRef* const out, moho::RBlueprint* const value)
 {
   RRef tmp{};
-  (void)RRef_RBlueprint(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RBlueprint>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
-  return out;
-}
-
-/**
- * Address: 0x00557BD0 (FUN_00557BD0, gpg::RRef_RBlueprint_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::RBlueprint*` slot.
- */
-gpg::RRef* RRef_RBlueprint_P(RRef* const out, moho::RBlueprint** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::RBlueprint::GetPointerType();
   return out;
 }
 
@@ -6833,64 +4993,10 @@ gpg::RRef* PackRRef_RBlueprintPointer(RRef* const out, moho::RBlueprint** const 
   }
 
   RRef tmp{};
-  (void)RRef_RBlueprint_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RBlueprint*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005A22A0 (FUN_005A22A0, gpg::RRef_RUnitBlueprint_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::RUnitBlueprint*` slot.
- */
-gpg::RRef* RRef_RUnitBlueprint_P(RRef* const out, moho::RUnitBlueprint** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::RUnitBlueprint::GetPointerType();
-  return out;
-}
-
-/**
- * Address: 0x00526E30 (FUN_00526E30, gpg::RRef_RUnitBlueprintWeapon)
- *
- * What it does:
- * Builds a reflection reference for one `moho::RUnitBlueprintWeapon` value
- * pointer.
- */
-gpg::RRef* RRef_RUnitBlueprintWeapon(RRef* const out, moho::RUnitBlueprintWeapon* const value)
-{
-  return BuildTypedRefWithCache<moho::RUnitBlueprintWeapon>(
-    out,
-    value,
-    typeid(moho::RUnitBlueprintWeapon),
-    gRUnitBlueprintWeaponRRefType,
-    gRUnitBlueprintWeaponRRefCache
-  );
-}
-
-/**
- * Address: 0x00511940 (FUN_00511940, gpg::RRef_RRuleGameRules)
- * Address: 0x00756190 (FUN_00756190)
- *
- * What it does:
- * Builds a reflection reference for `moho::RRuleGameRules` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_RRuleGameRules(RRef* const out, moho::RRuleGameRules* const value)
-{
-  return BuildTypedRefWithCache<moho::RRuleGameRules>(
-    out,
-    value,
-    typeid(moho::RRuleGameRules),
-    gRRuleGameRulesRRefType,
-    gRRuleGameRulesRRefCache
-  );
 }
 
 /**
@@ -6901,27 +5007,8 @@ gpg::RRef* RRef_RRuleGameRules(RRef* const out, moho::RRuleGameRules* const valu
  */
 gpg::RRef* AssignRRuleGameRulesRef(RRef* const out, moho::RRuleGameRules* const value)
 {
-  RRef_RRuleGameRules(out, value);
+  *out = gpg::MakeRRef<moho::RRuleGameRules>(value);
   return out;
-}
-
-/**
- * Address: 0x00536BA0 (FUN_00536BA0, gpg::RRef_SRuleFootprintsBlueprint)
- * Address: 0x007561C0 (FUN_007561C0)
- *
- * What it does:
- * Builds a reflection reference for `moho::SRuleFootprintsBlueprint` using
- * cached RTTI lookup.
- */
-gpg::RRef* RRef_SRuleFootprintsBlueprint(RRef* const out, moho::SRuleFootprintsBlueprint* const value)
-{
-  return BuildTypedRefWithCache<moho::SRuleFootprintsBlueprint>(
-    out,
-    value,
-    typeid(moho::SRuleFootprintsBlueprint),
-    moho::SRuleFootprintsBlueprint::sType,
-    gSRuleFootprintsBlueprintRRefCache
-  );
 }
 
 /**
@@ -6934,45 +5021,10 @@ gpg::RRef* RRef_SRuleFootprintsBlueprint(RRef* const out, moho::SRuleFootprintsB
 gpg::RRef* AssignSRuleFootprintsBlueprintRef(RRef* const out, moho::SRuleFootprintsBlueprint* const value)
 {
   RRef tmp{};
-  RRef_SRuleFootprintsBlueprint(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SRuleFootprintsBlueprint>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0055AB70 (FUN_0055AB70, gpg::RRef_RScmResource)
- *
- * What it does:
- * Builds a reflection reference for `moho::RScmResource` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_RScmResource(RRef* const out, moho::RScmResource* const value)
-{
-  return BuildTypedRefWithCache<moho::RScmResource>(
-    out,
-    value,
-    typeid(moho::RScmResource),
-    moho::RScmResource::sType,
-    gRScmResourceRRefCache
-  );
-}
-
-/**
- * Address: 0x00549200 (FUN_00549200, gpg::RRef_ResourceDeposit)
- *
- * What it does:
- * Builds a reflected reference for one `moho::ResourceDeposit` value pointer.
- */
-gpg::RRef* RRef_ResourceDeposit(RRef* const out, moho::ResourceDeposit* const value)
-{
-  return BuildTypedRefWithCache<moho::ResourceDeposit>(
-    out,
-    value,
-    typeid(moho::ResourceDeposit),
-    gResourceDepositRRefType,
-    gResourceDepositRRefCache
-  );
 }
 
 /**
@@ -6986,28 +5038,10 @@ gpg::RRef* RRef_ResourceDeposit(RRef* const out, moho::ResourceDeposit* const va
 gpg::RRef* PackRRef_ResourceDeposit(RRef* const out, moho::ResourceDeposit* const value)
 {
   RRef tmp{};
-  (void)RRef_ResourceDeposit(&tmp, value);
+  tmp = gpg::MakeRRef<moho::ResourceDeposit>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00511250 (FUN_00511250, gpg::RRef_REmitterBlueprint)
- *
- * What it does:
- * Builds a reflection reference for `moho::REmitterBlueprint` using
- * `REmitterBlueprint::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_REmitterBlueprint(RRef* const out, moho::REmitterBlueprint* const value)
-{
-  return BuildTypedRefWithCache<moho::REmitterBlueprint>(
-    out,
-    value,
-    typeid(moho::REmitterBlueprint),
-    moho::REmitterBlueprint::sType,
-    gREmitterBlueprintRRefCache
-  );
 }
 
 /**
@@ -7020,28 +5054,10 @@ gpg::RRef* RRef_REmitterBlueprint(RRef* const out, moho::REmitterBlueprint* cons
 gpg::RRef* PackRRef_REmitterBlueprint(RRef* const out, moho::REmitterBlueprint* const value)
 {
   RRef tmp{};
-  (void)RRef_REmitterBlueprint(&tmp, value);
+  tmp = gpg::MakeRRef<moho::REmitterBlueprint>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00517AE0 (FUN_00517AE0, gpg::RRef_REmitterCurveKey)
- *
- * What it does:
- * Builds a reflection reference for `moho::REmitterCurveKey` using
- * `REmitterCurveKey::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_REmitterCurveKey(RRef* const out, moho::REmitterCurveKey* const value)
-{
-  return BuildTypedRefWithCache<moho::REmitterCurveKey>(
-    out,
-    value,
-    typeid(moho::REmitterCurveKey),
-    moho::REmitterCurveKey::sType,
-    gREmitterCurveKeyRRefCache
-  );
 }
 
 /**
@@ -7061,28 +5077,10 @@ gpg::RRef* RRef_REmitterCurveKey(RRef* const out, moho::REmitterCurveKey* const 
   }
 
   gpg::RRef temp{};
-  (void)gpg::RRef_REmitterCurveKey(&temp, value);
+  temp = gpg::MakeRRef<moho::REmitterCurveKey>(value);
   out->mObj = temp.mObj;
   out->mType = temp.mType;
   return out;
-}
-
-/**
- * Address: 0x00517D20 (FUN_00517D20, gpg::RRef_REmitterBlueprintCurve)
- *
- * What it does:
- * Builds a reflection reference for `moho::REmitterBlueprintCurve` using
- * cached RTTI lookups and derived-type normalization.
- */
-gpg::RRef* RRef_REmitterBlueprintCurve(RRef* const out, moho::REmitterBlueprintCurve* const value)
-{
-  return BuildTypedRefWithCache<moho::REmitterBlueprintCurve>(
-    out,
-    value,
-    typeid(moho::REmitterBlueprintCurve),
-    gREmitterBlueprintCurveRRefType,
-    gREmitterBlueprintCurveRRefCache
-  );
 }
 
 /**
@@ -7103,28 +5101,10 @@ gpg::RRef* RRef_REmitterBlueprintCurve(RRef* const out, moho::REmitterBlueprintC
   }
 
   gpg::RRef temp{};
-  (void)gpg::RRef_REmitterBlueprintCurve(&temp, value);
+  temp = gpg::MakeRRef<moho::REmitterBlueprintCurve>(value);
   out->mObj = temp.mObj;
   out->mType = temp.mType;
   return out;
-}
-
-/**
- * Address: 0x005115B0 (FUN_005115B0, gpg::RRef_RBeamBlueprint)
- *
- * What it does:
- * Builds a reflection reference for `moho::RBeamBlueprint` using
- * `RBeamBlueprint::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RBeamBlueprint(RRef* const out, moho::RBeamBlueprint* const value)
-{
-  return BuildTypedRefWithCache<moho::RBeamBlueprint>(
-    out,
-    value,
-    typeid(moho::RBeamBlueprint),
-    moho::RBeamBlueprint::sType,
-    gRBeamBlueprintRRefCache
-  );
 }
 
 /**
@@ -7137,28 +5117,10 @@ gpg::RRef* RRef_RBeamBlueprint(RRef* const out, moho::RBeamBlueprint* const valu
 gpg::RRef* PackRRef_RBeamBlueprint(RRef* const out, moho::RBeamBlueprint* const value)
 {
   RRef tmp{};
-  (void)RRef_RBeamBlueprint(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RBeamBlueprint>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00511400 (FUN_00511400, gpg::RRef_RTrailBlueprint)
- *
- * What it does:
- * Builds a reflection reference for `moho::RTrailBlueprint` using
- * `RTrailBlueprint::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RTrailBlueprint(RRef* const out, moho::RTrailBlueprint* const value)
-{
-  return BuildTypedRefWithCache<moho::RTrailBlueprint>(
-    out,
-    value,
-    typeid(moho::RTrailBlueprint),
-    moho::RTrailBlueprint::sType,
-    gRTrailBlueprintRRefCache
-  );
 }
 
 /**
@@ -7171,47 +5133,10 @@ gpg::RRef* RRef_RTrailBlueprint(RRef* const out, moho::RTrailBlueprint* const va
 gpg::RRef* PackRRef_RTrailBlueprint(RRef* const out, moho::RTrailBlueprint* const value)
 {
   RRef tmp{};
-  (void)RRef_RTrailBlueprint(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RTrailBlueprint>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0051CFF0 (FUN_0051CFF0, gpg::RRef_RProjectileBlueprint)
- *
- * What it does:
- * Builds a reflection reference for `moho::RProjectileBlueprint` using
- * `RProjectileBlueprint::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RProjectileBlueprint(RRef* const out, moho::RProjectileBlueprint* const value)
-{
-  return BuildTypedRefWithCache<moho::RProjectileBlueprint>(
-    out,
-    value,
-    typeid(moho::RProjectileBlueprint),
-    moho::RProjectileBlueprint::sType,
-    gRProjectileBlueprintRRefCache
-  );
-}
-
-/**
- * Address: 0x0069FEA0 (FUN_0069FEA0, gpg::RRef_Projectile)
- *
- * What it does:
- * Builds a reflected reference for one `moho::Projectile` object pointer.
- * `moho::Projectile` is polymorphic, so `BuildTypedRefWithCache` resolves the
- * runtime type via `typeid(*value)` and the per-type `sType`/TLS cache.
- */
-gpg::RRef* RRef_Projectile(RRef* const out, moho::Projectile* const value)
-{
-  return BuildTypedRefWithCache<moho::Projectile>(
-    out,
-    value,
-    typeid(moho::Projectile),
-    moho::Projectile::sType,
-    gProjectileRRefCache
-  );
 }
 
 /**
@@ -7231,100 +5156,10 @@ gpg::RRef* RRef_Projectile(RRef* const out, moho::Projectile* const value)
   }
 
   gpg::RRef temp{};
-  (void)gpg::RRef_RProjectileBlueprint(&temp, value);
+  temp = gpg::MakeRRef<moho::RProjectileBlueprint>(value);
   out->mObj = temp.mObj;
   out->mType = temp.mType;
   return out;
-}
-
-/**
- * Address: 0x0051AAE0 (FUN_0051AAE0, gpg::RRef_RMeshBlueprint)
- *
- * What it does:
- * Builds a reflection reference for `moho::RMeshBlueprint` using
- * `RMeshBlueprint::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RMeshBlueprint(RRef* const out, moho::RMeshBlueprint* const value)
-{
-  return BuildTypedRefWithCache<moho::RMeshBlueprint>(
-    out,
-    value,
-    typeid(moho::RMeshBlueprint),
-    moho::RMeshBlueprint::sType,
-    gRMeshBlueprintRRefCache
-  );
-}
-
-/**
- * Address: 0x0051AC90 (FUN_0051AC90, gpg::RRef_RMeshBlueprintLOD)
- *
- * What it does:
- * Builds a reflected reference for one `moho::RMeshBlueprintLOD` value
- * pointer.
- */
-gpg::RRef* RRef_RMeshBlueprintLOD(RRef* const out, moho::RMeshBlueprintLOD* const value)
-{
-  return BuildTypedRefWithCache<moho::RMeshBlueprintLOD>(
-    out,
-    value,
-    typeid(moho::RMeshBlueprintLOD),
-    gRMeshBlueprintLODRRefType,
-    gRMeshBlueprintLODRRefCache
-  );
-}
-
-/**
- * Address: 0x0051E130 (FUN_0051E130, gpg::RRef_RPropBlueprint)
- *
- * What it does:
- * Builds a reflection reference for `moho::RPropBlueprint` using
- * `RPropBlueprint::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RPropBlueprint(RRef* const out, moho::RPropBlueprint* const value)
-{
-  return BuildTypedRefWithCache<moho::RPropBlueprint>(
-    out,
-    value,
-    typeid(moho::RPropBlueprint),
-    moho::RPropBlueprint::sType,
-    gRPropBlueprintRRefCache
-  );
-}
-
-/**
- * Address: 0x00500730 (FUN_00500730, gpg::RRef_CColPrimitive_Sphere3f)
- *
- * What it does:
- * Builds a reflection reference for one sphere collision primitive using
- * cached RTTI lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CColPrimitive_Sphere3f(RRef* const out, moho::CColPrimitive<Wm3::Sphere3f>* const value)
-{
-  return BuildTypedRefWithCache<moho::CColPrimitive<Wm3::Sphere3f>>(
-    out,
-    value,
-    typeid(moho::CColPrimitive<Wm3::Sphere3f>),
-    gCColPrimitiveSphere3fRRefType,
-    gCColPrimitiveSphere3fRRefCache
-  );
-}
-
-/**
- * Address: 0x005008E0 (FUN_005008E0, gpg::RRef_CColPrimitive_Box3f)
- *
- * What it does:
- * Builds a reflection reference for one box collision primitive using cached
- * RTTI lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CColPrimitive_Box3f(RRef* const out, moho::CColPrimitive<Wm3::Box3f>* const value)
-{
-  return BuildTypedRefWithCache<moho::CColPrimitive<Wm3::Box3f>>(
-    out,
-    value,
-    typeid(moho::CColPrimitive<Wm3::Box3f>),
-    gCColPrimitiveBox3fRRefType,
-    gCColPrimitiveBox3fRRefCache
-  );
 }
 
 /**
@@ -7340,7 +5175,7 @@ gpg::RRef* AssignCColPrimitiveSphere3fRef(
 )
 {
   RRef tmp{};
-  RRef_CColPrimitive_Sphere3f(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CColPrimitive<Wm3::Sphere3f>>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -7359,28 +5194,10 @@ gpg::RRef* AssignCColPrimitiveBox3fRef(
 )
 {
   RRef tmp{};
-  RRef_CColPrimitive_Box3f(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CColPrimitive<Wm3::Box3f>>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00537250 (FUN_00537250, gpg::RRef_EntityCategory)
- *
- * What it does:
- * Builds a reflection reference for `moho::EntityCategorySet` using
- * `EntityCategorySet::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_EntityCategory(RRef* const out, moho::EntityCategorySet* const value)
-{
-  return BuildTypedRefWithCache<moho::EntityCategorySet>(
-    out,
-    value,
-    typeid(moho::EntityCategorySet),
-    moho::EntityCategorySet::sType,
-    gEntityCategorySetRRefCache
-  );
 }
 
 /**
@@ -7394,28 +5211,10 @@ gpg::RRef* RRef_EntityCategory(RRef* const out, moho::EntityCategorySet* const v
 gpg::RRef* AssignEntityCategoryRef(RRef* const out, moho::EntityCategorySet* const value)
 {
   RRef tmp{};
-  RRef_EntityCategory(&tmp, value);
+  tmp = gpg::MakeRRef<moho::EntityCategorySet>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005ACE80 (FUN_005ACE80, gpg::RRef_COGrid)
- *
- * What it does:
- * Builds a reflection reference for `moho::COGrid` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_COGrid(RRef* const out, moho::COGrid* const value)
-{
-  return BuildTypedRefWithCache<moho::COGrid>(
-    out,
-    value,
-    typeid(moho::COGrid),
-    gCOGridRRefType,
-    gCOGridRRefCache
-  );
 }
 
 /**
@@ -7428,46 +5227,10 @@ gpg::RRef* RRef_COGrid(RRef* const out, moho::COGrid* const value)
 gpg::RRef* AssignCOGridRef(RRef* const out, moho::COGrid* const value)
 {
   RRef tmp{};
-  RRef_COGrid(&tmp, value);
+  tmp = gpg::MakeRRef<moho::COGrid>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005852B0 (FUN_005852B0, gpg::RRef_SimArmy)
- *
- * What it does:
- * Builds a reflection reference for `moho::SimArmy` using `SimArmy::sType`
- * cache and derived-type normalization.
- */
-gpg::RRef* RRef_SimArmy(RRef* const out, moho::SimArmy* const value)
-{
-  return BuildTypedRefWithCache<moho::SimArmy>(
-    out,
-    value,
-    typeid(moho::SimArmy),
-    moho::SimArmy::sType,
-    gSimArmyRRefCache
-  );
-}
-
-/**
- * Address: 0x007057D0 (FUN_007057D0, gpg::RRef_CArmyImpl)
- *
- * What it does:
- * Builds a reflection reference for `moho::CArmyImpl` using `CArmyImpl::sType`
- * cache and derived-type normalization.
- */
-gpg::RRef* RRef_CArmyImpl(RRef* const out, moho::CArmyImpl* const value)
-{
-  return BuildTypedRefWithCache<moho::CArmyImpl>(
-    out,
-    value,
-    typeid(moho::CArmyImpl),
-    moho::CArmyImpl::sType,
-    gCArmyImplRRefCache
-  );
 }
 
 /**
@@ -7480,26 +5243,9 @@ gpg::RRef* RRef_CArmyImpl(RRef* const out, moho::CArmyImpl* const value)
 gpg::RRef* PackRRef_CArmyImpl(RRef* const out, moho::CArmyImpl* const value)
 {
   RRef tmp{};
-  (void)RRef_CArmyImpl(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CArmyImpl>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
-  return out;
-}
-
-/**
- * Address: 0x00753910 (FUN_00753910, gpg::RRef_SimArmy_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::SimArmy*` slot.
- */
-gpg::RRef* RRef_SimArmy_P(RRef* const out, moho::SimArmy** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::SimArmy::GetPointerType();
   return out;
 }
 
@@ -7513,7 +5259,7 @@ gpg::RRef* RRef_SimArmy_P(RRef* const out, moho::SimArmy** const value)
 gpg::RRef* PackRRef_SimArmy_P(RRef* const out, moho::SimArmy** const value)
 {
   RRef tmp{};
-  (void)RRef_SimArmy_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SimArmy*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -7529,7 +5275,7 @@ gpg::RRef* PackRRef_SimArmy_P(RRef* const out, moho::SimArmy** const value)
 gpg::RRef* PackRRef_SimArmy(RRef* const out, moho::SimArmy* const value)
 {
   RRef tmp{};
-  (void)RRef_SimArmy(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SimArmy>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -7543,24 +5289,6 @@ gpg::RRef* PackRRef_SimArmy(RRef* const out, moho::SimArmy* const value)
 // re-homed into the specialization (one-address-one-function).
 
 /**
- * Address: 0x00544EE0 (FUN_00544EE0, gpg::RRef_LaunchInfoNew)
- *
- * What it does:
- * Builds a reflection reference for `moho::LaunchInfoNew` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_LaunchInfoNew(RRef* const out, moho::LaunchInfoNew* const value)
-{
-  return BuildTypedRefWithCache<moho::LaunchInfoNew>(
-    out,
-    value,
-    typeid(moho::LaunchInfoNew),
-    gLaunchInfoNewRRefType,
-    gLaunchInfoNewRRefCache
-  );
-}
-
-/**
  * Address: 0x005446D0 (FUN_005446D0, gpg::RRef_LaunchInfoNew pack lane)
  *
  * What it does:
@@ -7570,7 +5298,7 @@ gpg::RRef* RRef_LaunchInfoNew(RRef* const out, moho::LaunchInfoNew* const value)
 gpg::RRef* PackRRef_LaunchInfoNew(RRef* const out, moho::LaunchInfoNew* const value)
 {
   RRef tmp{};
-  (void)RRef_LaunchInfoNew(&tmp, value);
+  tmp = gpg::MakeRRef<moho::LaunchInfoNew>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -7611,24 +5339,6 @@ gpg::RRef* PackRRef_ArmyLaunchInfo(RRef* const out, moho::ArmyLaunchInfo* const 
 }
 
 /**
- * Address: 0x00549550 (FUN_00549550, gpg::RRef_CSimResources)
- *
- * What it does:
- * Builds a reflection reference for `moho::CSimResources` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CSimResources(RRef* const out, moho::CSimResources* const value)
-{
-  return BuildTypedRefWithCache<moho::CSimResources>(
-    out,
-    value,
-    typeid(moho::CSimResources),
-    gCSimResourcesRRefType,
-    gCSimResourcesRRefCache
-  );
-}
-
-/**
  * Address: 0x00548BD0 (FUN_00548BD0, gpg::RRef_CSimResources pack lane)
  *
  * What it does:
@@ -7638,28 +5348,10 @@ gpg::RRef* RRef_CSimResources(RRef* const out, moho::CSimResources* const value)
 gpg::RRef* PackRRef_CSimResources(RRef* const out, moho::CSimResources* const value)
 {
   RRef tmp{};
-  (void)RRef_CSimResources(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CSimResources>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00582B50 (FUN_00582B50, gpg::RRef_CAiBrain)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiBrain` using `CAiBrain::sType`
- * cache and derived-type normalization.
- */
-gpg::RRef* RRef_CAiBrain(RRef* const out, moho::CAiBrain* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiBrain>(
-    out,
-    value,
-    typeid(moho::CAiBrain),
-    moho::CAiBrain::sType,
-    gCAiBrainRRefCache
-  );
 }
 
 /**
@@ -7672,172 +5364,10 @@ gpg::RRef* RRef_CAiBrain(RRef* const out, moho::CAiBrain* const value)
 gpg::RRef* PackRRef_CAiBrain(RRef* const out, moho::CAiBrain* const value)
 {
   RRef tmp{};
-  (void)RRef_CAiBrain(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAiBrain>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005854A0 (FUN_005854A0, gpg::RRef_CAiPersonality)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiPersonality` using
- * `CAiPersonality::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CAiPersonality(RRef* const out, moho::CAiPersonality* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiPersonality>(
-    out,
-    value,
-    typeid(moho::CAiPersonality),
-    moho::CAiPersonality::sType,
-    gCAiPersonalityRRefCache
-  );
-}
-
-/**
- * Address: 0x005A2030 (FUN_005A2030, gpg::RRef_CAiBuilderImpl)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiBuilderImpl` using
- * `CAiBuilderImpl::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CAiBuilderImpl(RRef* const out, moho::CAiBuilderImpl* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiBuilderImpl>(
-    out,
-    value,
-    typeid(moho::CAiBuilderImpl),
-    moho::CAiBuilderImpl::sType,
-    gCAiBuilderImplRRefCache
-  );
-}
-
-/**
- * Address: 0x0059E2E0 (FUN_0059E2E0, gpg::RRef_CAiFormationInstance)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiFormationInstance` using cached
- * RTTI lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CAiFormationInstance(RRef* const out, moho::CAiFormationInstance* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiFormationInstance>(
-    out,
-    value,
-    typeid(moho::CAiFormationInstance),
-    gCAiFormationInstanceRRefType,
-    gCAiFormationInstanceRRefCache
-  );
-}
-
-/**
- * Address: 0x0059E490 (FUN_0059E490, gpg::RRef_CAiFormationDBImpl)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiFormationDBImpl` using cached
- * RTTI lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CAiFormationDBImpl(RRef* const out, moho::CAiFormationDBImpl* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiFormationDBImpl>(
-    out,
-    value,
-    typeid(moho::CAiFormationDBImpl),
-    gCAiFormationDBImplRRefType,
-    gCAiFormationDBImplRRefCache
-  );
-}
-
-/**
- * Address: 0x005A85D0 (FUN_005A85D0, gpg::RRef_CAiNavigatorLand)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiNavigatorLand` using
- * `CAiNavigatorLand::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CAiNavigatorLand(RRef* const out, moho::CAiNavigatorLand* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiNavigatorLand>(
-    out,
-    value,
-    typeid(moho::CAiNavigatorLand),
-    moho::CAiNavigatorLand::sType,
-    gCAiNavigatorLandRRefCache
-  );
-}
-
-/**
- * Address: 0x005A87A0 (FUN_005A87A0, gpg::RRef_CAiNavigatorAir)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiNavigatorAir` using
- * `CAiNavigatorAir::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CAiNavigatorAir(RRef* const out, moho::CAiNavigatorAir* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiNavigatorAir>(
-    out,
-    value,
-    typeid(moho::CAiNavigatorAir),
-    moho::CAiNavigatorAir::sType,
-    gCAiNavigatorAirRRefCache
-  );
-}
-
-/**
- * Address: 0x005A9A40 (FUN_005A9A40, gpg::RRef_CAiPathNavigator)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiPathNavigator` using
- * `CAiPathNavigator::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CAiPathNavigator(RRef* const out, moho::CAiPathNavigator* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiPathNavigator>(
-    out,
-    value,
-    typeid(moho::CAiPathNavigator),
-    moho::CAiPathNavigator::sType,
-    gCAiPathNavigatorRRefCache
-  );
-}
-
-/**
- * Address: 0x005ABD20 (FUN_005ABD20, gpg::RRef_CAiPathFinder)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiPathFinder` using
- * `CAiPathFinder::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CAiPathFinder(RRef* const out, moho::CAiPathFinder* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiPathFinder>(
-    out,
-    value,
-    typeid(moho::CAiPathFinder),
-    moho::CAiPathFinder::sType,
-    gCAiPathFinderRRefCache
-  );
-}
-
-/**
- * Address: 0x005B5D60 (FUN_005B5D60, gpg::RRef_CAiPathSpline)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiPathSpline` using
- * `CAiPathSpline::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CAiPathSpline(RRef* const out, moho::CAiPathSpline* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiPathSpline>(
-    out,
-    value,
-    typeid(moho::CAiPathSpline),
-    moho::CAiPathSpline::sType,
-    gCAiPathSplineRRefCache
-  );
 }
 
 /**
@@ -7893,24 +5423,6 @@ gpg::RRef* RRef_SPickUpInfo(RRef* const out, moho::SPickUpInfo* const value)
 }
 
 /**
- * Address: 0x005F5280 (FUN_005F5280, gpg::RRef_CUnitCommand)
- *
- * What it does:
- * Builds a reflection reference for `moho::CUnitCommand` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CUnitCommand(RRef* const out, moho::CUnitCommand* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitCommand>(
-    out,
-    value,
-    typeid(moho::CUnitCommand),
-    gCUnitCommandRRefType,
-    gCUnitCommandRRefCache
-  );
-}
-
-/**
  * Address: 0x006E3DB0 (FUN_006E3DB0)
  *
  * What it does:
@@ -7920,44 +5432,9 @@ gpg::RRef* RRef_CUnitCommand(RRef* const out, moho::CUnitCommand* const value)
 gpg::RRef* PackRRef_CUnitCommand(RRef* const out, moho::CUnitCommand* const value)
 {
   RRef tmp{};
-  (void)RRef_CUnitCommand(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CUnitCommand>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
-  return out;
-}
-
-/**
- * Address: 0x006E3150 (FUN_006E3150, gpg::RRef_CCommandDB)
- *
- * What it does:
- * Builds a reflection reference for `moho::CCommandDb` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CCommandDB(RRef* const out, moho::CCommandDb* const value)
-{
-  return BuildTypedRefWithCache<moho::CCommandDb>(
-    out,
-    value,
-    typeid(moho::CCommandDb),
-    gCCommandDbRRefType,
-    gCCommandDbRRefCache
-  );
-}
-
-/**
- * Address: 0x006E3310 (FUN_006E3310, gpg::RRef_CUnitCommand_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::CUnitCommand*` slot.
- */
-gpg::RRef* RRef_CUnitCommand_P(RRef* const out, moho::CUnitCommand** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::CUnitCommand::GetPointerType();
   return out;
 }
 
@@ -7971,30 +5448,10 @@ gpg::RRef* RRef_CUnitCommand_P(RRef* const out, moho::CUnitCommand** const value
 gpg::RRef* PackRRef_CUnitCommand_P(RRef* const out, moho::CUnitCommand** const value)
 {
   RRef tmp{};
-  (void)RRef_CUnitCommand_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CUnitCommand*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x006EC1D0 (FUN_006EC1D0, gpg::RRef_WeakPtr_CUnitCommand)
- *
- * What it does:
- * Builds a reflected reference for one `WeakPtr<CUnitCommand>` wrapper value.
- */
-gpg::RRef* RRef_WeakPtr_CUnitCommand(
-  RRef* const out,
-  moho::WeakPtr<moho::CUnitCommand>* const value
-)
-{
-  return BuildTypedRefWithCache<moho::WeakPtr<moho::CUnitCommand>>(
-    out,
-    value,
-    typeid(moho::WeakPtr<moho::CUnitCommand>),
-    gWeakPtrCUnitCommandRRefType,
-    gWeakPtrCUnitCommandRRefCache
-  );
 }
 
 /**
@@ -8014,28 +5471,10 @@ gpg::RRef* PackRRef_WeakPtr_CUnitCommand(
   }
 
   RRef tmp{};
-  (void)RRef_WeakPtr_CUnitCommand(&tmp, value);
+  tmp = gpg::MakeRRef<moho::WeakPtr<moho::CUnitCommand>>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0059A070 (FUN_0059A070, gpg::RRef_CUnitCommandQueue)
- *
- * What it does:
- * Builds a reflection reference for `moho::CUnitCommandQueue` using
- * `CUnitCommandQueue::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CUnitCommandQueue(RRef* const out, moho::CUnitCommandQueue* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitCommandQueue>(
-    out,
-    value,
-    typeid(moho::CUnitCommandQueue),
-    moho::CUnitCommandQueue::sType,
-    gCUnitCommandQueueRRefCache
-  );
 }
 
 /**
@@ -8048,28 +5487,10 @@ gpg::RRef* RRef_CUnitCommandQueue(RRef* const out, moho::CUnitCommandQueue* cons
 gpg::RRef* PackRRef_CUnitCommandQueue(RRef* const out, moho::CUnitCommandQueue* const value)
 {
   RRef tmp{};
-  (void)RRef_CUnitCommandQueue(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CUnitCommandQueue>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005D1750 (FUN_005D1750, gpg::RRef_UnitWeapon)
- *
- * What it does:
- * Builds a reflection reference for `moho::UnitWeapon` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_UnitWeapon(RRef* const out, moho::UnitWeapon* const value)
-{
-  return BuildTypedRefWithCache<moho::UnitWeapon>(
-    out,
-    value,
-    typeid(moho::UnitWeapon),
-    gUnitWeaponRRefType,
-    gUnitWeaponRRefCache
-  );
 }
 
 /**
@@ -8085,7 +5506,7 @@ gpg::RRef* PackRRef_UnitWeapon(RRef* const out, moho::UnitWeapon* const value)
   }
 
   RRef tmp{};
-  (void)RRef_UnitWeapon(&tmp, value);
+  tmp = gpg::MakeRRef<moho::UnitWeapon>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -8130,23 +5551,6 @@ gpg::RRef* PackRRef_UnitWeaponInfo(RRef* const out, moho::UnitWeaponInfo* const 
 }
 
 /**
- * Address: 0x005E0750 (FUN_005E0750, gpg::RRef_UnitWeapon_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::UnitWeapon*` slot.
- */
-gpg::RRef* RRef_UnitWeapon_P(RRef* const out, moho::UnitWeapon** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::UnitWeapon::GetPointerType();
-  return out;
-}
-
-/**
  * Address: 0x005DF090 (FUN_005DF090)
  *
  * What it does:
@@ -8159,21 +5563,10 @@ gpg::RRef* PackRRef_UnitWeapon_P(RRef* const out, moho::UnitWeapon** const value
   }
 
   RRef tmp{};
-  (void)RRef_UnitWeapon_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::UnitWeapon*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x004041F0 (FUN_004041F0, gpg::RRef_IdPool)
- *
- * What it does:
- * Builds a reflection reference for `moho::IdPool` using cached RTTI lookups.
- */
-gpg::RRef* RRef_IdPool(RRef* const out, moho::IdPool* const value)
-{
-  return BuildTypedRefWithCache<moho::IdPool>(out, value, typeid(moho::IdPool), gIdPoolRRefType, gIdPoolRRefCache);
 }
 
 /**
@@ -8185,62 +5578,10 @@ gpg::RRef* RRef_IdPool(RRef* const out, moho::IdPool* const value)
 gpg::RRef* AssignIdPoolRef(RRef* const out, moho::IdPool* const value)
 {
   RRef tmp{};
-  RRef_IdPool(&tmp, value);
+  tmp = gpg::MakeRRef<moho::IdPool>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0040F600 (FUN_0040F600, gpg::RRef_CRandomStream)
- *
- * What it does:
- * Builds a reflection reference for `moho::CRandomStream` using cached RTTI lookups.
- */
-gpg::RRef* RRef_CRandomStream(RRef* const out, moho::CRandomStream* const value)
-{
-  return BuildTypedRefWithCache<moho::CRandomStream>(
-    out,
-    value,
-    typeid(moho::CRandomStream),
-    gCRandomStreamRRefType,
-    gCRandomStreamRRefCache
-  );
-}
-
-/**
- * Address: 0x005B5A90 (FUN_005B5A90, gpg::RRef_CPathPoint)
- *
- * What it does:
- * Builds a reflection reference for a `moho::CPathPoint` object pointer with
- * cached RTTI lookup.
- */
-gpg::RRef* RRef_CPathPoint(RRef* const out, moho::CPathPoint* const value)
-{
-  return BuildTypedRefWithCache<moho::CPathPoint>(
-    out,
-    value,
-    typeid(moho::CPathPoint),
-    gCPathPointRRefType,
-    gCPathPointRRefCache
-  );
-}
-
-/**
- * Address: 0x00554390 (FUN_00554390, gpg::RRef_SOCellPos)
- *
- * What it does:
- * Builds a reflected reference for one `moho::SOCellPos` value pointer.
- */
-gpg::RRef* RRef_SOCellPos(RRef* const out, moho::SOCellPos* const value)
-{
-  return BuildTypedRefWithCache<moho::SOCellPos>(
-    out,
-    value,
-    typeid(moho::SOCellPos),
-    gSOCellPosRRefType,
-    gSOCellPosRRefCache
-  );
 }
 
 /**
@@ -8278,23 +5619,6 @@ gpg::RRef* PackRRef_SOffsetInfo(RRef* const out, moho::SOffsetInfo* const value)
 }
 
 /**
- * Address: 0x00764280 (FUN_00764280, gpg::RRef_HPathCell)
- *
- * What it does:
- * Builds a reflection reference for `moho::HPathCell` object pointers.
- */
-gpg::RRef* RRef_HPathCell(RRef* const out, moho::HPathCell* const value)
-{
-  return BuildTypedRefWithCache<moho::HPathCell>(
-    out,
-    value,
-    typeid(moho::HPathCell),
-    gHPathCellRRefType,
-    gHPathCellRRefCache
-  );
-}
-
-/**
  * Address: 0x00763C20 (FUN_00763C20, sub_763C20)
  *
  * What it does:
@@ -8304,47 +5628,10 @@ gpg::RRef* RRef_HPathCell(RRef* const out, moho::HPathCell* const value)
 gpg::RRef* AssignHPathCellRef(RRef* const out, moho::HPathCell* const value)
 {
   RRef tmp{};
-  RRef_HPathCell(&tmp, value);
+  tmp = gpg::MakeRRef<moho::HPathCell>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x007571F0 (FUN_007571F0, gpg::RRef_PathTables)
- * Address: 0x00756220 (FUN_00756220)
- *
- * What it does:
- * Builds a reflection reference for `moho::PathTables` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_PathTables(RRef* const out, moho::PathTables* const value)
-{
-  return BuildTypedRefWithCache<moho::PathTables>(
-    out,
-    value,
-    typeid(moho::PathTables),
-    gPathTablesRRefType,
-    gPathTablesRRefCache
-  );
-}
-
-/**
- * Address: 0x00707A10 (FUN_00707A10, gpg::RRef_CArmyStats)
- *
- * What it does:
- * Builds a reflection reference for `moho::CArmyStats` using
- * `CArmyStats::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CArmyStats(RRef* const out, moho::CArmyStats* const value)
-{
-  return BuildTypedRefWithCache<moho::CArmyStats>(
-    out,
-    value,
-    typeid(moho::CArmyStats),
-    moho::CArmyStats::sType,
-    gCArmyStatsRRefCache
-  );
 }
 
 /**
@@ -8360,28 +5647,10 @@ gpg::RRef* RRef_CArmyStats(RRef* const out, moho::CArmyStats* const value)
   }
 
   RRef tmp{};
-  (void)RRef_CArmyStats(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CArmyStats>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x007139C0 (FUN_007139C0, gpg::RRef_Stats_CArmyStatItem)
- *
- * What it does:
- * Builds a reflection reference for `moho::Stats<moho::CArmyStatItem>` using
- * cached RTTI lookup and derived-type normalization.
- */
-gpg::RRef* RRef_Stats_CArmyStatItem(RRef* const out, moho::Stats<moho::CArmyStatItem>* const value)
-{
-  return BuildTypedRefWithCache<moho::Stats<moho::CArmyStatItem>>(
-    out,
-    value,
-    typeid(moho::Stats<moho::CArmyStatItem>),
-    moho::Stats<moho::CArmyStatItem>::sType,
-    gStatsCArmyStatItemRRefCache
-  );
 }
 
 /**
@@ -8400,26 +5669,9 @@ gpg::RRef* RRef_Stats_CArmyStatItem(RRef* const out, moho::Stats<moho::CArmyStat
   }
 
   RRef tmp{};
-  (void)RRef_Stats_CArmyStatItem(&tmp, value);
+  tmp = gpg::MakeRRef<moho::Stats<moho::CArmyStatItem>>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
-  return out;
-}
-
-/**
- * Address: 0x00713D90 (FUN_00713D90, gpg::RRef_CArmyStatItem_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::CArmyStatItem*` slot.
- */
-gpg::RRef* RRef_CArmyStatItem_P(RRef* const out, moho::CArmyStatItem** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::CArmyStatItem::GetPointerType();
   return out;
 }
 
@@ -8433,72 +5685,9 @@ gpg::RRef* RRef_CArmyStatItem_P(RRef* const out, moho::CArmyStatItem** const val
 gpg::RRef* AssignCArmyStatItemPointerRef(RRef* const out, moho::CArmyStatItem** const value)
 {
   RRef tmp{};
-  RRef_CArmyStatItem_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CArmyStatItem*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
-  return out;
-}
-
-/**
- * Address: 0x005CADE0 (FUN_005CADE0, gpg::RRef_ReconBlip)
- *
- * What it does:
- * Builds a reflection reference for `moho::ReconBlip` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_ReconBlip(RRef* const out, moho::ReconBlip* const value)
-{
-  return BuildTypedRefWithCache<moho::ReconBlip>(out, value, typeid(moho::ReconBlip), moho::ReconBlip::sType, gReconBlipRRefCache);
-}
-
-/**
- * Address: 0x005CB790 (FUN_005CB790, gpg::RRef_SPerArmyReconInfo)
- *
- * What it does:
- * Builds a reflection reference for `moho::SPerArmyReconInfo` object pointers.
- */
-gpg::RRef* RRef_SPerArmyReconInfo(RRef* const out, moho::SPerArmyReconInfo* const value)
-{
-  return BuildTypedRefWithCache<moho::SPerArmyReconInfo>(
-    out,
-    value,
-    typeid(moho::SPerArmyReconInfo),
-    moho::SPerArmyReconInfo::sType,
-    gSPerArmyReconInfoRRefCache
-  );
-}
-
-/**
- * Address: 0x005CB930 (FUN_005CB930, gpg::RRef_ReconBlip_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::ReconBlip*` slot.
- */
-gpg::RRef* RRef_ReconBlip_P(RRef* const out, moho::ReconBlip** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::ReconBlip::GetPointerType();
-  return out;
-}
-
-/**
- * Address: 0x006B2020 (FUN_006B2020, gpg::RRef_CEconomyEvent_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::CEconomyEvent*` slot.
- */
-gpg::RRef* RRef_CEconomyEvent_P(RRef* const out, moho::CEconomyEvent** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::CEconomyEvent::GetPointerType();
   return out;
 }
 
@@ -8512,28 +5701,10 @@ gpg::RRef* RRef_CEconomyEvent_P(RRef* const out, moho::CEconomyEvent** const val
 gpg::RRef* PackRRef_CEconomyEvent_P(RRef* const out, moho::CEconomyEvent** const value)
 {
   RRef tmp{};
-  (void)RRef_CEconomyEvent_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CEconomyEvent*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x006B3AD0 (FUN_006B3AD0, gpg::RRef_CEconomyEvent)
- *
- * What it does:
- * Builds a reflection reference for `moho::CEconomyEvent` using
- * `CEconomyEvent::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CEconomyEvent(RRef* const out, moho::CEconomyEvent* const value)
-{
-  return BuildTypedRefWithCache<moho::CEconomyEvent>(
-    out,
-    value,
-    typeid(moho::CEconomyEvent),
-    moho::CEconomyEvent::sType,
-    gCEconomyEventRRefCache
-  );
 }
 
 /**
@@ -8546,28 +5717,10 @@ gpg::RRef* RRef_CEconomyEvent(RRef* const out, moho::CEconomyEvent* const value)
 gpg::RRef* AssignCEconomyEventRef(RRef* const out, moho::CEconomyEvent* const value)
 {
   RRef tmp{};
-  RRef_CEconomyEvent(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CEconomyEvent>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00758730 (FUN_00758730, gpg::RRef_CDecalBuffer)
- *
- * What it does:
- * Builds a reflection reference for `moho::CDecalBuffer` using
- * `CDecalBuffer::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CDecalBuffer(RRef* const out, moho::CDecalBuffer* const value)
-{
-  return BuildTypedRefWithCache<moho::CDecalBuffer>(
-    out,
-    value,
-    typeid(moho::CDecalBuffer),
-    moho::CDecalBuffer::sType,
-    gCDecalBufferRRefCache
-  );
 }
 
 /**
@@ -8583,26 +5736,9 @@ gpg::RRef* PackRRef_CDecalBuffer(RRef* const out, moho::CDecalBuffer* const valu
   }
 
   RRef temporary{};
-  (void)RRef_CDecalBuffer(&temporary, value);
+  temporary = gpg::MakeRRef<moho::CDecalBuffer>(value);
   out->mObj = temporary.mObj;
   out->mType = temporary.mType;
-  return out;
-}
-
-/**
- * Address: 0x0077E540 (FUN_0077E540, gpg::RRef_CDecalHandle_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::CDecalHandle*` slot.
- */
-gpg::RRef* RRef_CDecalHandle_P(RRef* const out, moho::CDecalHandle** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::CDecalHandle::GetPointerType();
   return out;
 }
 
@@ -8619,7 +5755,7 @@ gpg::RRef* PackRRef_CDecalHandle_P(RRef* const out, moho::CDecalHandle** const v
   }
 
   RRef temporary{};
-  (void)RRef_CDecalHandle_P(&temporary, value);
+  temporary = gpg::MakeRRef<moho::CDecalHandle*>(value);
   out->mObj = temporary.mObj;
   out->mType = temporary.mType;
   return out;
@@ -8630,24 +5766,6 @@ gpg::RRef* PackRRef_CDecalHandle_P(RRef* const out, moho::CDecalHandle** const v
 // that specialization (one-address-one-function). The earlier free-helper
 // transcriptions (BuildCDecalHandlePointerLexical / BuildCDecalHandlePointerTypeName)
 // were the same two addresses and have been re-homed into the specialization.
-
-/**
- * Address: 0x0077E390 (FUN_0077E390, gpg::RRef_CDecalHandle)
- *
- * What it does:
- * Builds a reflection reference for `moho::CDecalHandle` using
- * `CDecalHandle::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CDecalHandle(RRef* const out, moho::CDecalHandle* const value)
-{
-  return BuildTypedRefWithCache<moho::CDecalHandle>(
-    out,
-    value,
-    typeid(moho::CDecalHandle),
-    moho::CDecalHandle::sType,
-    gCDecalHandleRRefCache
-  );
-}
 
 /**
  * Address: 0x0077DB30 (FUN_0077DB30)
@@ -8662,7 +5780,7 @@ gpg::RRef* PackRRef_CDecalHandle(RRef* const out, moho::CDecalHandle* const valu
   }
 
   RRef temporary{};
-  (void)RRef_CDecalHandle(&temporary, value);
+  temporary = gpg::MakeRRef<moho::CDecalHandle>(value);
   out->mObj = temporary.mObj;
   out->mType = temporary.mType;
   return out;
@@ -8673,24 +5791,6 @@ gpg::RRef* PackRRef_CDecalHandle(RRef* const out, moho::CDecalHandle* const valu
 // specialization (one-address-one-function). The earlier free-helper
 // transcription (RRef_CDecalHandleArraySlot) was the same address and has been
 // re-homed into the specialization.
-
-/**
- * Address: 0x005E0300 (FUN_005E0300, gpg::RRef_CAiAttackerImpl)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiAttackerImpl` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_CAiAttackerImpl(RRef* const out, moho::CAiAttackerImpl* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiAttackerImpl>(
-    out,
-    value,
-    typeid(moho::CAiAttackerImpl),
-    gCAiAttackerImplRRefType,
-    gCAiAttackerImplRRefCache
-  );
-}
 
 /**
  * Address: 0x005DEB80 (FUN_005DEB80)
@@ -8705,28 +5805,10 @@ gpg::RRef* PackRRef_CAiAttackerImpl(RRef* const out, moho::CAiAttackerImpl* cons
   }
 
   RRef tmp{};
-  (void)RRef_CAiAttackerImpl(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAiAttackerImpl>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005EDB00 (FUN_005EDB00, gpg::RRef_CAiTransportImpl)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiTransportImpl` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_CAiTransportImpl(RRef* const out, moho::CAiTransportImpl* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiTransportImpl>(
-    out,
-    value,
-    typeid(moho::CAiTransportImpl),
-    gCAiTransportImplRRefType,
-    gCAiTransportImplRRefCache
-  );
 }
 
 /**
@@ -8739,46 +5821,10 @@ gpg::RRef* RRef_CAiTransportImpl(RRef* const out, moho::CAiTransportImpl* const 
 gpg::RRef* PackRRef_CAiTransportImpl(RRef* const out, moho::CAiTransportImpl* const value)
 {
   RRef tmp{};
-  (void)RRef_CAiTransportImpl(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAiTransportImpl>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005CC0D0 (FUN_005CC0D0, gpg::RRef_CAiReconDBImpl)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiReconDBImpl` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_CAiReconDBImpl(RRef* const out, moho::CAiReconDBImpl* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiReconDBImpl>(
-    out,
-    value,
-    typeid(moho::CAiReconDBImpl),
-    gCAiReconDBImplRRefType,
-    gCAiReconDBImplRRefCache
-  );
-}
-
-/**
- * Address: 0x005D4730 (FUN_005D4730, gpg::RRef_CAiSteeringImpl)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiSteeringImpl` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_CAiSteeringImpl(RRef* const out, moho::CAiSteeringImpl* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiSteeringImpl>(
-    out,
-    value,
-    typeid(moho::CAiSteeringImpl),
-    gCAiSteeringImplRRefType,
-    gCAiSteeringImplRRefCache
-  );
 }
 
 /**
@@ -8794,28 +5840,10 @@ gpg::RRef* PackRRef_CAiSteeringImpl(RRef* const out, moho::CAiSteeringImpl* cons
   }
 
   RRef tmp{};
-  (void)RRef_CAiSteeringImpl(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAiSteeringImpl>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005D0E70 (FUN_005D0E70, gpg::RRef_CAiSiloBuildImpl)
- *
- * What it does:
- * Builds a reflection reference for `moho::CAiSiloBuildImpl` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_CAiSiloBuildImpl(RRef* const out, moho::CAiSiloBuildImpl* const value)
-{
-  return BuildTypedRefWithCache<moho::CAiSiloBuildImpl>(
-    out,
-    value,
-    typeid(moho::CAiSiloBuildImpl),
-    moho::CAiSiloBuildImpl::sType,
-    gCAiSiloBuildImplRRefCache
-  );
 }
 
 /**
@@ -8831,334 +5859,10 @@ gpg::RRef* PackRRef_CAiSiloBuildImpl(RRef* const out, moho::CAiSiloBuildImpl* co
   }
 
   RRef tmp{};
-  (void)RRef_CAiSiloBuildImpl(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAiSiloBuildImpl>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005E0E80 (FUN_005E0E80, gpg::RRef_LAiAttackerImpl)
- *
- * What it does:
- * Builds a reflection reference for `moho::LAiAttackerImpl` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_LAiAttackerImpl(RRef* const out, moho::LAiAttackerImpl* const value)
-{
-  return BuildTypedRefWithCache<moho::LAiAttackerImpl>(
-    out,
-    value,
-    typeid(moho::LAiAttackerImpl),
-    gLAiAttackerImplRRefType,
-    gLAiAttackerImplRRefCache
-  );
-}
-
-/**
- * Address: 0x006B5DA0 (FUN_006B5DA0, gpg::RRef_IAiAttacker)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAiAttacker` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IAiAttacker(RRef* const out, moho::IAiAttacker* const value)
-{
-  return BuildTypedRefWithCache<moho::IAiAttacker>(
-    out,
-    value,
-    typeid(moho::IAiAttacker),
-    moho::IAiAttacker::sType,
-    gIAiAttackerRRefCache
-  );
-}
-
-/**
- * Address: 0x006B59D0 (FUN_006B59D0, gpg::RRef_IAiSteering)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAiSteering` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IAiSteering(RRef* const out, moho::IAiSteering* const value)
-{
-  return BuildTypedRefWithCache<moho::IAiSteering>(
-    out,
-    value,
-    typeid(moho::IAiSteering),
-    gIAiSteeringRRefType,
-    gIAiSteeringRRefCache
-  );
-}
-
-/**
- * Address: 0x006B5F90 (FUN_006B5F90, gpg::RRef_IAiCommandDispatch)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAiCommandDispatch` using cached
- * RTTI lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IAiCommandDispatch(RRef* const out, moho::IAiCommandDispatch* const value)
-{
-  return BuildTypedRefWithCache<moho::IAiCommandDispatch>(
-    out,
-    value,
-    typeid(moho::IAiCommandDispatch),
-    gIAiCommandDispatchRRefType,
-    gIAiCommandDispatchRRefCache
-  );
-}
-
-/**
- * Address: 0x00599AB0 (FUN_00599AB0, gpg::RRef_IAiCommandDispatchImpl)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAiCommandDispatchImpl` using
- * cached RTTI lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IAiCommandDispatchImpl(RRef* const out, moho::IAiCommandDispatchImpl* const value)
-{
-  return BuildTypedRefWithCache<moho::IAiCommandDispatchImpl>(
-    out,
-    value,
-    typeid(moho::IAiCommandDispatchImpl),
-    moho::IAiCommandDispatchImpl::sType,
-    gIAiCommandDispatchImplRRefCache
-  );
-}
-
-/**
- * Address: 0x006B6180 (FUN_006B6180, gpg::RRef_IAiNavigator)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAiNavigator` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IAiNavigator(RRef* const out, moho::IAiNavigator* const value)
-{
-  return BuildTypedRefWithCache<moho::IAiNavigator>(
-    out,
-    value,
-    typeid(moho::IAiNavigator),
-    gIAiNavigatorRRefType,
-    gIAiNavigatorRRefCache
-  );
-}
-
-/**
- * Address: 0x006B6370 (FUN_006B6370, gpg::RRef_IAiBuilder)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAiBuilder` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IAiBuilder(RRef* const out, moho::IAiBuilder* const value)
-{
-  return BuildTypedRefWithCache<moho::IAiBuilder>(
-    out,
-    value,
-    typeid(moho::IAiBuilder),
-    gIAiBuilderRRefType,
-    gIAiBuilderRRefCache
-  );
-}
-
-/**
- * Address: 0x006B6560 (FUN_006B6560, gpg::RRef_IAiSiloBuild)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAiSiloBuild` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IAiSiloBuild(RRef* const out, moho::IAiSiloBuild* const value)
-{
-  return BuildTypedRefWithCache<moho::IAiSiloBuild>(
-    out,
-    value,
-    typeid(moho::IAiSiloBuild),
-    gIAiSiloBuildRRefType,
-    gIAiSiloBuildRRefCache
-  );
-}
-
-/**
- * Address: 0x006B6750 (FUN_006B6750, gpg::RRef_IAiTransport)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAiTransport` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IAiTransport(RRef* const out, moho::IAiTransport* const value)
-{
-  return BuildTypedRefWithCache<moho::IAiTransport>(
-    out,
-    value,
-    typeid(moho::IAiTransport),
-    gIAiTransportRRefType,
-    gIAiTransportRRefCache
-  );
-}
-
-/**
- * Address: 0x006EC620 (FUN_006EC620, gpg::RRef_Listener_ECommandEvent)
- *
- * What it does:
- * Builds a reflection reference for `Listener<ECommandEvent>` using cached
- * RTTI lookup and derived-type normalization.
- */
-gpg::RRef* RRef_Listener_ECommandEvent(RRef* const out, moho::Listener<moho::ECommandEvent>* const value)
-{
-  return BuildTypedRefWithCache<moho::Listener<moho::ECommandEvent>>(
-    out,
-    value,
-    typeid(moho::Listener<moho::ECommandEvent>),
-    gListenerECommandEventRRefType,
-    gListenerECommandEventRRefCache
-  );
-}
-
-/**
- * Address: 0x006F9410 (FUN_006F9410, gpg::RRef_Listener_EUnitCommandQueueStatus)
- *
- * What it does:
- * Builds a reflection reference for `Listener<EUnitCommandQueueStatus>` using
- * cached RTTI lookup and derived-type normalization.
- */
-gpg::RRef* RRef_Listener_EUnitCommandQueueStatus(
-  RRef* const out,
-  moho::Listener<moho::EUnitCommandQueueStatus>* const value
-)
-{
-  return BuildTypedRefWithCache<moho::Listener<moho::EUnitCommandQueueStatus>>(
-    out,
-    value,
-    typeid(moho::Listener<moho::EUnitCommandQueueStatus>),
-    gListenerEUnitCommandQueueStatusRRefType,
-    gListenerEUnitCommandQueueStatusRRefCache
-  );
-}
-
-/**
- * Address: 0x00764460 (FUN_00764460, gpg::RRef_Listener_NavPath)
- *
- * What it does:
- * Builds a reflection reference for `Listener<const SNavPath&>` using cached
- * RTTI lookup and derived-type normalization.
- */
-gpg::RRef* RRef_Listener_NavPath(RRef* const out, moho::Listener<const moho::SNavPath&>* const value)
-{
-  return BuildTypedRefWithCache<moho::Listener<const moho::SNavPath&>>(
-    out,
-    value,
-    typeid(moho::Listener<const moho::SNavPath&>),
-    gListenerNavPathRRefType,
-    gListenerNavPathRRefCache
-  );
-}
-
-/**
- * Address: 0x005A8A40 (FUN_005A8A40, gpg::RRef_Listener_EAiNavigatorEvent)
- *
- * What it does:
- * Builds a reflection reference for `Listener<EAiNavigatorEvent>` using cached
- * RTTI lookup and derived-type normalization.
- */
-gpg::RRef*
-RRef_Listener_EAiNavigatorEvent(RRef* const out, moho::Listener<moho::EAiNavigatorEvent>* const value)
-{
-  return BuildTypedRefWithCache<moho::Listener<moho::EAiNavigatorEvent>>(
-    out,
-    value,
-    typeid(moho::Listener<moho::EAiNavigatorEvent>),
-    gListenerEAiNavigatorEventRRefType,
-    gListenerEAiNavigatorEventRRefCache
-  );
-}
-
-/**
- * Address: 0x005E0A90 (FUN_005E0A90, gpg::RRef_Listener_EAiAttackerEvent)
- *
- * What it does:
- * Builds a reflection reference for `Listener<EAiAttackerEvent>` using cached
- * RTTI lookup and derived-type normalization.
- */
-gpg::RRef*
-RRef_Listener_EAiAttackerEvent(RRef* const out, moho::Listener<moho::EAiAttackerEvent>* const value)
-{
-  return BuildTypedRefWithCache<moho::Listener<moho::EAiAttackerEvent>>(
-    out,
-    value,
-    typeid(moho::Listener<moho::EAiAttackerEvent>),
-    gListenerEAiAttackerEventRRefType,
-    gListenerEAiAttackerEventRRefCache
-  );
-}
-
-/**
- * Address: 0x005EE1B0 (FUN_005EE1B0, gpg::RRef_Listener_EAiTransportEvent)
- *
- * What it does:
- * Builds a reflection reference for `Listener<EAiTransportEvent>` using cached
- * RTTI lookup and derived-type normalization.
- */
-gpg::RRef*
-RRef_Listener_EAiTransportEvent(RRef* const out, moho::Listener<moho::EAiTransportEvent>* const value)
-{
-  return BuildTypedRefWithCache<moho::Listener<moho::EAiTransportEvent>>(
-    out,
-    value,
-    typeid(moho::Listener<moho::EAiTransportEvent>),
-    gListenerEAiTransportEventRRefType,
-    gListenerEAiTransportEventRRefCache
-  );
-}
-
-/**
- * Address: 0x00572C90 (FUN_00572C90, gpg::RRef_Listener_EFormationdStatus)
- * Mangled: ?RRef_Listener_EFormationdStatus@gpg@@YAPAVRRef@1@PAV01@PAV?$Listener@W4EFormationdStatus@Moho@@@Moho@@@Z
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_Listener_EFormationdStatus(
- *   gpg::RRef *arg0, Moho::Listener_EFormationdStatus *a1);
- *
- * What it does:
- * Builds a reflection reference for `Listener<EFormationdStatus>` using cached
- * RTTI lookup and derived-type normalization. When the runtime type matches the
- * declared type the pair is written directly; otherwise the runtime type is
- * resolved through the 3-entry per-thread cache and the object pointer is
- * adjusted by the base sub-object offset returned by
- * `gpg::RType::IsDerivedFrom`.
- */
-gpg::RRef* RRef_Listener_EFormationdStatus(
-  RRef* const out,
-  moho::Listener<moho::EFormationdStatus>* const value
-)
-{
-  return BuildTypedRefWithCache<moho::Listener<moho::EFormationdStatus>>(
-    out,
-    value,
-    typeid(moho::Listener<moho::EFormationdStatus>),
-    gListenerEFormationdStatusRRefType,
-    gListenerEFormationdStatusRRefCache
-  );
-}
-
-/**
- * Address: 0x005EDD30 (FUN_005EDD30, gpg::RRef_SAiReservedTransportBone)
- *
- * What it does:
- * Builds a reflection reference for `moho::SAiReservedTransportBone` object
- * pointers.
- */
-gpg::RRef* RRef_SAiReservedTransportBone(RRef* const out, moho::SAiReservedTransportBone* const value)
-{
-  return BuildTypedRefWithCache<moho::SAiReservedTransportBone>(
-    out,
-    value,
-    typeid(moho::SAiReservedTransportBone),
-    moho::SAiReservedTransportBone::sType,
-    gSAiReservedTransportBoneRRefCache
-  );
 }
 
 /**
@@ -9171,27 +5875,10 @@ gpg::RRef* RRef_SAiReservedTransportBone(RRef* const out, moho::SAiReservedTrans
 gpg::RRef* PackRRef_SAiReservedTransportBone(RRef* const out, moho::SAiReservedTransportBone* const value)
 {
   RRef tmp{};
-  (void)RRef_SAiReservedTransportBone(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SAiReservedTransportBone>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005EDED0 (FUN_005EDED0, gpg::RRef_SAttachPoint)
- *
- * What it does:
- * Builds a reflection reference for `moho::SAttachPoint` object pointers.
- */
-gpg::RRef* RRef_SAttachPoint(RRef* const out, moho::SAttachPoint* const value)
-{
-  return BuildTypedRefWithCache<moho::SAttachPoint>(
-    out,
-    value,
-    typeid(moho::SAttachPoint),
-    gSAttachPointRRefType,
-    gSAttachPointRRefCache
-  );
 }
 
 /**
@@ -9204,27 +5891,10 @@ gpg::RRef* RRef_SAttachPoint(RRef* const out, moho::SAttachPoint* const value)
 gpg::RRef* PackRRef_SAttachPoint(RRef* const out, moho::SAttachPoint* const value)
 {
   RRef tmp{};
-  (void)RRef_SAttachPoint(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SAttachPoint>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00582F00 (FUN_00582F00, gpg::RRef_SPointVector)
- *
- * What it does:
- * Builds a reflected reference for one `moho::SPointVector` value pointer.
- */
-gpg::RRef* RRef_SPointVector(RRef* const out, moho::SPointVector* const value)
-{
-  return BuildTypedRefWithCache<moho::SPointVector>(
-    out,
-    value,
-    typeid(moho::SPointVector),
-    gSPointVectorRRefType,
-    gSPointVectorRRefCache
-  );
 }
 
 /**
@@ -9237,152 +5907,9 @@ gpg::RRef* RRef_SPointVector(RRef* const out, moho::SPointVector* const value)
 gpg::RRef* PackRRef_SPointVector(RRef* const out, moho::SPointVector* const value)
 {
   RRef tmp{};
-  (void)RRef_SPointVector(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SPointVector>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
-  return out;
-}
-
-/**
- * Address: 0x007582F0 (FUN_007582F0, gpg::RRef_IAiFormationDB)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAiFormationDB` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IAiFormationDB(RRef* const out, moho::IAiFormationDB* const value)
-{
-  return BuildTypedRefWithCache<moho::IAiFormationDB>(
-    out,
-    value,
-    typeid(moho::IAiFormationDB),
-    gIAiFormationDBRRefType,
-    gIAiFormationDBRRefCache
-  );
-}
-
-/**
- * Address: 0x00758500 (FUN_00758500, gpg::RRef_ISimResources)
- *
- * What it does:
- * Builds a reflection reference for `moho::ISimResources` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_ISimResources(RRef* const out, moho::ISimResources* const value)
-{
-  return BuildTypedRefWithCache<moho::ISimResources>(
-    out,
-    value,
-    typeid(moho::ISimResources),
-    gISimResourcesRRefType,
-    gISimResourcesRRefCache
-  );
-}
-
-/**
- * Address: 0x00683230 (FUN_00683230, gpg::RRef_CColPrimitiveBase)
- *
- * What it does:
- * Builds a reflection reference for `moho::CColPrimitiveBase` using cached
- * RTTI lookup and derived-type normalization.
- */
-gpg::RRef* RRef_CColPrimitiveBase(RRef* const out, moho::CColPrimitiveBase* const value)
-{
-  return BuildTypedRefWithCache<moho::CColPrimitiveBase>(
-    out,
-    value,
-    typeid(moho::CColPrimitiveBase),
-    gCColPrimitiveBaseRRefType,
-    gCColPrimitiveBaseRRefCache
-  );
-}
-
-/**
- * Address: 0x006839C0 (FUN_006839C0, gpg::RRef_Motor)
- *
- * What it does:
- * Builds a reflection reference for `moho::Motor` using
- * `Motor::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_Motor(RRef* const out, moho::Motor* const value)
-{
-  return BuildTypedRefWithCache<moho::Motor>(
-    out,
-    value,
-    typeid(moho::Motor),
-    moho::Motor::sType,
-    gMotorRRefCache
-  );
-}
-
-/**
- * Address: 0x00707640 (FUN_00707640, gpg::RRef_IAiReconDB)
- *
- * What it does:
- * Builds a reflection reference for `moho::IAiReconDB` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IAiReconDB(RRef* const out, moho::IAiReconDB* const value)
-{
-  return BuildTypedRefWithCache<moho::IAiReconDB>(
-    out,
-    value,
-    typeid(moho::IAiReconDB),
-    moho::IAiReconDB::sType,
-    gIAiReconDBRRefCache
-  );
-}
-
-/**
- * Address: 0x0076AE70 (FUN_0076AE70, gpg::RRef_IPathTraveler)
- *
- * What it does:
- * Builds a reflection reference for `moho::IPathTraveler` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IPathTraveler(RRef* const out, moho::IPathTraveler* const value)
-{
-  return BuildTypedRefWithCache<moho::IPathTraveler>(
-    out,
-    value,
-    typeid(moho::IPathTraveler),
-    gIPathTravelerRRefType,
-    gIPathTravelerRRefCache
-  );
-}
-
-/**
- * Address: 0x00753FC0 (FUN_00753FC0, gpg::RRef_Shield)
- *
- * What it does:
- * Builds a reflection reference for `moho::Shield` using cached RTTI lookup
- * and derived-type normalization.
- */
-gpg::RRef* RRef_Shield(RRef* const out, moho::Shield* const value)
-{
-  return BuildTypedRefWithCache<moho::Shield>(
-    out,
-    value,
-    typeid(moho::Shield),
-    gShieldRRefType,
-    gShieldRRefCache
-  );
-}
-
-/**
- * Address: 0x007542F0 (FUN_007542F0, gpg::RRef_Shield_P)
- *
- * What it does:
- * Builds a reflected reference for one `moho::Shield*` slot.
- */
-gpg::RRef* RRef_Shield_P(RRef* const out, moho::Shield** const value)
-{
-  if (!out) {
-    return nullptr;
-  }
-
-  out->mObj = value;
-  out->mType = moho::Shield::GetPointerType();
   return out;
 }
 
@@ -9396,7 +5923,7 @@ gpg::RRef* RRef_Shield_P(RRef* const out, moho::Shield** const value)
 gpg::RRef* PackRRef_Shield(RRef* const out, moho::Shield* const value)
 {
   RRef tmp{};
-  (void)RRef_Shield(&tmp, value);
+  tmp = gpg::MakeRRef<moho::Shield>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -9412,7 +5939,7 @@ gpg::RRef* PackRRef_Shield(RRef* const out, moho::Shield* const value)
 gpg::RRef* PackRRef_Shield_P(RRef* const out, moho::Shield** const value)
 {
   RRef tmp{};
-  (void)RRef_Shield_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::Shield*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -9425,41 +5952,6 @@ gpg::RRef* PackRRef_Shield_P(RRef* const out, moho::Shield** const value)
 // the same two addresses and have been re-homed into the specialization.
 
 /**
- * Address: 0x00758910 (FUN_00758910, gpg::RRef_IEffectManager)
- *
- * What it does:
- * Builds a reflection reference for `moho::IEffectManager` using cached RTTI
- * lookup and derived-type normalization.
- */
-gpg::RRef* RRef_IEffectManager(RRef* const out, moho::IEffectManager* const value)
-{
-  return BuildTypedRefWithCache<moho::IEffectManager>(
-    out,
-    value,
-    typeid(moho::IEffectManager),
-    moho::IEffectManager::sType,
-    gIEffectManagerRRefCache
-  );
-}
-
-/**
- * Address: 0x00680D70 (FUN_00680D70, gpg::RRef_PositionHistory)
- *
- * What it does:
- * Builds a reflection reference for `moho::PositionHistory` object pointers.
- */
-gpg::RRef* RRef_PositionHistory(RRef* const out, moho::PositionHistory* const value)
-{
-  return BuildTypedRefWithCache<moho::PositionHistory>(
-    out,
-    value,
-    typeid(moho::PositionHistory),
-    moho::PositionHistory::sType,
-    gPositionHistoryRRefCache
-  );
-}
-
-/**
  * Address: 0x0067FB70 (FUN_0067FB70, sub_67FB70)
  *
  * What it does:
@@ -9469,27 +5961,10 @@ gpg::RRef* RRef_PositionHistory(RRef* const out, moho::PositionHistory* const va
 gpg::RRef* AssignPositionHistoryRef(RRef* const out, moho::PositionHistory* const value)
 {
   RRef tmp{};
-  RRef_PositionHistory(&tmp, value);
+  tmp = gpg::MakeRRef<moho::PositionHistory>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00713700 (FUN_00713700, gpg::RRef_STrigger)
- *
- * What it does:
- * Builds a reflection reference for `moho::STrigger` object pointers.
- */
-gpg::RRef* RRef_STrigger(RRef* const out, moho::STrigger* const value)
-{
-  return BuildTypedRefWithCache<moho::STrigger>(
-    out,
-    value,
-    typeid(moho::STrigger),
-    moho::STrigger::sType,
-    gSTriggerRRefCache
-  );
 }
 
 /**
@@ -9505,27 +5980,10 @@ gpg::RRef* RRef_STrigger(RRef* const out, moho::STrigger* const value)
   }
 
   RRef tmp{};
-  (void)RRef_STrigger(&tmp, value);
+  tmp = gpg::MakeRRef<moho::STrigger>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00713560 (FUN_00713560, gpg::RRef_SCondition)
- *
- * What it does:
- * Builds a reflection reference for `moho::SCondition` object pointers.
- */
-gpg::RRef* RRef_SCondition(RRef* const out, moho::SCondition* const value)
-{
-  return BuildTypedRefWithCache<moho::SCondition>(
-    out,
-    value,
-    typeid(moho::SCondition),
-    moho::SCondition::sType,
-    gSConditionRRefCache
-  );
 }
 
 /**
@@ -9541,80 +5999,10 @@ gpg::RRef* RRef_SCondition(RRef* const out, moho::SCondition* const value)
   }
 
   RRef tmp{};
-  (void)RRef_SCondition(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SCondition>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005CE540 (FUN_005CE540, gpg::RRef_CInfluenceMap)
- *
- * What it does:
- * Builds a reflection reference for `moho::CInfluenceMap` using
- * `CInfluenceMap::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CInfluenceMap(RRef* const out, moho::CInfluenceMap* const value)
-{
-  return BuildTypedRefWithCache<moho::CInfluenceMap>(
-    out,
-    value,
-    typeid(moho::CInfluenceMap),
-    moho::CInfluenceMap::sType,
-    gCInfluenceMapRRefCache
-  );
-}
-
-/**
- * Address: 0x0071E410 (FUN_0071E410, gpg::RRef_InfluenceGrid)
- *
- * What it does:
- * Builds a reflection reference for `moho::InfluenceGrid` object pointers.
- */
-gpg::RRef* RRef_InfluenceGrid(RRef* const out, moho::InfluenceGrid* const value)
-{
-  return BuildTypedRefWithCache<moho::InfluenceGrid>(
-    out,
-    value,
-    typeid(moho::InfluenceGrid),
-    moho::InfluenceGrid::sType,
-    gInfluenceGridRRefCache
-  );
-}
-
-/**
- * Address: 0x0071E5B0 (FUN_0071E5B0, gpg::RRef_SThreat)
- *
- * What it does:
- * Builds a reflection reference for `moho::SThreat` object pointers.
- */
-gpg::RRef* RRef_SThreat(RRef* const out, moho::SThreat* const value)
-{
-  return BuildTypedRefWithCache<moho::SThreat>(
-    out,
-    value,
-    typeid(moho::SThreat),
-    moho::SThreat::sType,
-    gSThreatRRefCache
-  );
-}
-
-/**
- * Address: 0x0064C960 (FUN_0064C960, gpg::RRef_RDebugCollision)
- *
- * What it does:
- * Builds a reflection reference for `moho::RDebugCollision` using
- * `RDebugCollision::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RDebugCollision(RRef* const out, moho::RDebugCollision* const value)
-{
-  return BuildTypedRefWithCache<moho::RDebugCollision>(
-    out,
-    value,
-    typeid(moho::RDebugCollision),
-    moho::RDebugCollision::sType,
-    gRDebugCollisionRRefCache
-  );
 }
 
 /**
@@ -9633,28 +6021,10 @@ gpg::RRef* RRef_RDebugCollision(RRef* const out, moho::RDebugCollision* const va
   }
 
   RRef tmp{};
-  (void)RRef_RDebugCollision(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RDebugCollision>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0064FBC0 (FUN_0064FBC0, gpg::RRef_RDebugGrid)
- *
- * What it does:
- * Builds a reflection reference for `moho::RDebugGrid` using
- * `RDebugGrid::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RDebugGrid(RRef* const out, moho::RDebugGrid* const value)
-{
-  return BuildTypedRefWithCache<moho::RDebugGrid>(
-    out,
-    value,
-    typeid(moho::RDebugGrid),
-    moho::RDebugGrid::sType,
-    gRDebugGridRRefCache
-  );
 }
 
 /**
@@ -9673,28 +6043,10 @@ gpg::RRef* RRef_RDebugGrid(RRef* const out, moho::RDebugGrid* const value)
   }
 
   RRef tmp{};
-  (void)RRef_RDebugGrid(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RDebugGrid>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0064FD70 (FUN_0064FD70, gpg::RRef_RDebugRadar)
- *
- * What it does:
- * Builds a reflection reference for `moho::RDebugRadar` using
- * `RDebugRadar::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RDebugRadar(RRef* const out, moho::RDebugRadar* const value)
-{
-  return BuildTypedRefWithCache<moho::RDebugRadar>(
-    out,
-    value,
-    typeid(moho::RDebugRadar),
-    moho::RDebugRadar::sType,
-    gRDebugRadarRRefCache
-  );
 }
 
 /**
@@ -9713,28 +6065,10 @@ gpg::RRef* RRef_RDebugRadar(RRef* const out, moho::RDebugRadar* const value)
   }
 
   RRef tmp{};
-  (void)RRef_RDebugRadar(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RDebugRadar>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00651200 (FUN_00651200, gpg::RRef_RDebugNavPath)
- *
- * What it does:
- * Builds a reflection reference for `moho::RDebugNavPath` using
- * `RDebugNavPath::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RDebugNavPath(RRef* const out, moho::RDebugNavPath* const value)
-{
-  return BuildTypedRefWithCache<moho::RDebugNavPath>(
-    out,
-    value,
-    typeid(moho::RDebugNavPath),
-    moho::RDebugNavPath::sType,
-    gRDebugNavPathRRefCache
-  );
 }
 
 /**
@@ -9747,28 +6081,10 @@ gpg::RRef* RRef_RDebugNavPath(RRef* const out, moho::RDebugNavPath* const value)
 gpg::RRef* PackRRef_RDebugNavPath(RRef* const out, moho::RDebugNavPath* const value)
 {
   RRef tmp{};
-  (void)RRef_RDebugNavPath(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RDebugNavPath>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x006513B0 (FUN_006513B0, gpg::RRef_RDebugNavWaypoints)
- *
- * What it does:
- * Builds a reflection reference for `moho::RDebugNavWaypoints` using
- * `RDebugNavWaypoints::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RDebugNavWaypoints(RRef* const out, moho::RDebugNavWaypoints* const value)
-{
-  return BuildTypedRefWithCache<moho::RDebugNavWaypoints>(
-    out,
-    value,
-    typeid(moho::RDebugNavWaypoints),
-    moho::RDebugNavWaypoints::sType,
-    gRDebugNavWaypointsRRefCache
-  );
 }
 
 /**
@@ -9782,28 +6098,10 @@ gpg::RRef* RRef_RDebugNavWaypoints(RRef* const out, moho::RDebugNavWaypoints* co
 gpg::RRef* PackRRef_RDebugNavWaypoints(RRef* const out, moho::RDebugNavWaypoints* const value)
 {
   RRef tmp{};
-  (void)RRef_RDebugNavWaypoints(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RDebugNavWaypoints>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00651560 (FUN_00651560, gpg::RRef_RDebugNavSteering)
- *
- * What it does:
- * Builds a reflection reference for `moho::RDebugNavSteering` using
- * `RDebugNavSteering::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RDebugNavSteering(RRef* const out, moho::RDebugNavSteering* const value)
-{
-  return BuildTypedRefWithCache<moho::RDebugNavSteering>(
-    out,
-    value,
-    typeid(moho::RDebugNavSteering),
-    moho::RDebugNavSteering::sType,
-    gRDebugNavSteeringRRefCache
-  );
 }
 
 /**
@@ -9816,28 +6114,10 @@ gpg::RRef* RRef_RDebugNavSteering(RRef* const out, moho::RDebugNavSteering* cons
 gpg::RRef* PackRRef_RDebugNavSteering(RRef* const out, moho::RDebugNavSteering* const value)
 {
   RRef tmp{};
-  (void)RRef_RDebugNavSteering(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RDebugNavSteering>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00653C50 (FUN_00653C50, gpg::RRef_RDebugWeapons)
- *
- * What it does:
- * Builds a reflection reference for `moho::RDebugWeapons` using
- * `RDebugWeapons::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_RDebugWeapons(RRef* const out, moho::RDebugWeapons* const value)
-{
-  return BuildTypedRefWithCache<moho::RDebugWeapons>(
-    out,
-    value,
-    typeid(moho::RDebugWeapons),
-    moho::RDebugWeapons::sType,
-    gRDebugWeaponsRRefCache
-  );
 }
 
 /**
@@ -9850,28 +6130,10 @@ gpg::RRef* RRef_RDebugWeapons(RRef* const out, moho::RDebugWeapons* const value)
 gpg::RRef* PackRRef_RDebugWeapons(RRef* const out, moho::RDebugWeapons* const value)
 {
   RRef tmp{};
-  (void)RRef_RDebugWeapons(&tmp, value);
+  tmp = gpg::MakeRRef<moho::RDebugWeapons>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00683420 (FUN_00683420, gpg::RRef_CIntel)
- *
- * What it does:
- * Builds a reflection reference for `moho::CIntel` using
- * `CIntel::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CIntel(RRef* const out, moho::CIntel* const value)
-{
-  return BuildTypedRefWithCache<moho::CIntel>(
-    out,
-    value,
-    typeid(moho::CIntel),
-    moho::CIntel::sType,
-    gCIntelRRefCache
-  );
 }
 
 /**
@@ -9884,28 +6146,10 @@ gpg::RRef* RRef_CIntel(RRef* const out, moho::CIntel* const value)
 gpg::RRef* AssignCIntelRef(RRef* const out, moho::CIntel* const value)
 {
   RRef tmp{};
-  RRef_CIntel(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CIntel>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0076EDD0 (FUN_0076EDD0, gpg::RRef_CIntelPosHandle)
- *
- * What it does:
- * Builds a reflection reference for `moho::CIntelPosHandle` using
- * `CIntelPosHandle::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CIntelPosHandle(RRef* const out, moho::CIntelPosHandle* const value)
-{
-  return BuildTypedRefWithCache<moho::CIntelPosHandle>(
-    out,
-    value,
-    typeid(moho::CIntelPosHandle),
-    moho::CIntelPosHandle::sType,
-    gCIntelPosHandleRRefCache
-  );
 }
 
 /**
@@ -9918,28 +6162,10 @@ gpg::RRef* RRef_CIntelPosHandle(RRef* const out, moho::CIntelPosHandle* const va
 gpg::RRef* AssignCIntelPosHandleRef(RRef* const out, moho::CIntelPosHandle* const value)
 {
   RRef tmp{};
-  RRef_CIntelPosHandle(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CIntelPosHandle>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0076FE30 (FUN_0076FE30, gpg::RRef_CIntelCounterHandle)
- *
- * What it does:
- * Builds a reflection reference for `moho::CIntelCounterHandle` using
- * `CIntelCounterHandle::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CIntelCounterHandle(RRef* const out, moho::CIntelCounterHandle* const value)
-{
-  return BuildTypedRefWithCache<moho::CIntelCounterHandle>(
-    out,
-    value,
-    typeid(moho::CIntelCounterHandle),
-    moho::CIntelCounterHandle::sType,
-    gCIntelCounterHandleRRefCache
-  );
 }
 
 /**
@@ -9952,28 +6178,10 @@ gpg::RRef* RRef_CIntelCounterHandle(RRef* const out, moho::CIntelCounterHandle* 
 [[maybe_unused]] gpg::RRef* AssignCIntelCounterHandleRef(RRef* const out, moho::CIntelCounterHandle* const value)
 {
   RRef tmp{};
-  RRef_CIntelCounterHandle(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CIntelCounterHandle>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x005D5300 (FUN_005D5300, gpg::RRef_CUnitMotion)
- *
- * What it does:
- * Builds a reflection reference for `moho::CUnitMotion` using
- * `CUnitMotion::sType` cache and derived-type normalization.
- */
-gpg::RRef* RRef_CUnitMotion(RRef* const out, moho::CUnitMotion* const value)
-{
-  return BuildTypedRefWithCache<moho::CUnitMotion>(
-    out,
-    value,
-    typeid(moho::CUnitMotion),
-    moho::CUnitMotion::sType,
-    gCUnitMotionRRefCache
-  );
 }
 
 /**
@@ -9986,7 +6194,7 @@ gpg::RRef* RRef_CUnitMotion(RRef* const out, moho::CUnitMotion* const value)
 gpg::RRef* PackRRef_CUnitMotion(RRef* const out, moho::CUnitMotion* const value)
 {
   RRef tmp{};
-  (void)RRef_CUnitMotion(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CUnitMotion>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -10001,28 +6209,10 @@ gpg::RRef* PackRRef_CUnitMotion(RRef* const out, moho::CUnitMotion* const value)
 gpg::RRef* AssignCRandomStreamRef(RRef* const out, moho::CRandomStream* const value)
 {
   RRef tmp{};
-  RRef_CRandomStream(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CRandomStream>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00705120 (FUN_00705120, gpg::RRef_CPlatoon)
- *
- * What it does:
- * Builds a reflection reference for `moho::CPlatoon` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_CPlatoon(RRef* const out, moho::CPlatoon* const value)
-{
-  return BuildTypedRefWithCache<moho::CPlatoon>(
-    out,
-    value,
-    typeid(moho::CPlatoon),
-    gCPlatoonRRefType,
-    gCPlatoonRRefCache
-  );
 }
 
 /**
@@ -10035,28 +6225,10 @@ gpg::RRef* RRef_CPlatoon(RRef* const out, moho::CPlatoon* const value)
 gpg::RRef* AssignCPlatoonRef(RRef* const out, moho::CPlatoon* const value)
 {
   RRef tmp{};
-  RRef_CPlatoon(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CPlatoon>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x00884A10 (FUN_00884A10, gpg::RRef_SSessionSaveData)
- *
- * What it does:
- * Builds a reflection reference for `moho::SSessionSaveData` using cached
- * RTTI lookup and derived-type normalization.
- */
-gpg::RRef* RRef_SSessionSaveData(RRef* const out, moho::SSessionSaveData* const value)
-{
-  return BuildTypedRefWithCache<moho::SSessionSaveData>(
-    out,
-    value,
-    typeid(moho::SSessionSaveData),
-    gSSessionSaveDataRRefType,
-    gSSessionSaveDataRRefCache
-  );
 }
 
 /**
@@ -10069,69 +6241,10 @@ gpg::RRef* RRef_SSessionSaveData(RRef* const out, moho::SSessionSaveData* const 
 [[maybe_unused]] gpg::RRef* AssignSSessionSaveDataRef(RRef* const out, moho::SSessionSaveData* const value)
 {
   RRef tmp{};
-  RRef_SSessionSaveData(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SSessionSaveData>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x004220D0 (FUN_004220D0, gpg::RRef_CLuaConOutputHandler)
- *
- * What it does:
- * Builds a reflection reference for `moho::CLuaConOutputHandler` using cached
- * RTTI lookup and derived-type normalization.
- */
-gpg::RRef* RRef_CLuaConOutputHandler(RRef* const out, moho::CLuaConOutputHandler* const value)
-{
-  return BuildTypedRefWithCache<moho::CLuaConOutputHandler>(
-    out,
-    value,
-    typeid(moho::CLuaConOutputHandler),
-    gCLuaConOutputHandlerRRefType,
-    gCLuaConOutputHandlerRRefCache
-  );
-}
-
-/**
- * Address: 0x004C16D0 (FUN_004C16D0, gpg::RRef_LuaState)
- * Address: 0x00756160 (FUN_00756160)
- *
- * What it does:
- * Builds a reflection reference for `LuaPlus::LuaState` using cached RTTI
- * lookups and derived-type normalization.
- */
-gpg::RRef* RRef_LuaState(RRef* const out, LuaPlus::LuaState* const value)
-{
-  return BuildTypedRefWithCache<LuaPlus::LuaState>(
-    out,
-    value,
-    typeid(LuaPlus::LuaState),
-    gLuaStateRRefType,
-    gLuaStateRRefCache
-  );
-}
-
-/**
- * Address: 0x0091E550 (FUN_0091E550, gpg::RRef_TString)
- *
- * What it does:
- * Builds a reflection reference for `TString` object pointers.
- */
-gpg::RRef* RRef_TString(RRef* const out, TString* const value)
-{
-  return BuildTypedRefWithCache<TString>(out, value, typeid(TString), gTStringRRefType, gTStringRRefCache);
-}
-
-/**
- * Address: 0x0091E730 (FUN_0091E730, gpg::RRef_Table)
- *
- * What it does:
- * Builds a reflection reference for `Table` object pointers.
- */
-gpg::RRef* RRef_Table(RRef* const out, Table* const value)
-{
-  return BuildTypedRefWithCache<Table>(out, value, typeid(Table), gTableRRefType, gTableRRefCache);
 }
 
 /**
@@ -10144,82 +6257,10 @@ gpg::RRef* RRef_Table(RRef* const out, Table* const value)
 gpg::RRef* AssignTableRef(RRef* const out, Table* const value)
 {
   RRef tmp{};
-  RRef_Table(&tmp, value);
+  tmp = gpg::MakeRRef<Table>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
-}
-
-/**
- * Address: 0x0091E900 (FUN_0091E900, gpg::RRef_LClosure)
- *
- * What it does:
- * Builds a reflection reference for Lua `LClosure` object pointers.
- */
-gpg::RRef* RRef_LClosure(RRef* const out, LClosure* const value)
-{
-  return BuildTypedRefWithCache<LClosure>(out, value, typeid(LClosure), gLClosureRRefType, gLClosureRRefCache);
-}
-
-/**
- * Address: 0x0091F170 (FUN_0091F170, gpg::RRef_CClosure)
- *
- * What it does:
- * Builds a reflection reference for Lua `CClosure` object pointers.
- */
-gpg::RRef* RRef_CClosure(RRef* const out, CClosure* const value)
-{
-  return BuildTypedRefWithCache<CClosure>(out, value, typeid(CClosure), gCClosureRRefType, gCClosureRRefCache);
-}
-
-/**
- * Address: 0x0091EE10 (FUN_0091EE10, gpg::RRef_Udata)
- *
- * What it does:
- * Builds a reflection reference for Lua `Udata` object pointers.
- */
-gpg::RRef* RRef_Udata(RRef* const out, Udata* const value)
-{
-  return BuildTypedRefWithCache<Udata>(out, value, typeid(Udata), gUdataRRefType, gUdataRRefCache);
-}
-
-/**
- * Address: 0x0091EAA0 (FUN_0091EAA0, gpg::RRef_UpVal)
- *
- * What it does:
- * Builds a reflection reference for Lua `UpVal` object pointers.
- */
-gpg::RRef* RRef_UpVal(RRef* const out, UpVal* const value)
-{
-  return BuildTypedRefWithCache<UpVal>(out, value, typeid(UpVal), gUpValRRefType, gUpValRRefCache);
-}
-
-/**
- * Address: 0x0091EC40 (FUN_0091EC40, gpg::RRef_Proto)
- *
- * What it does:
- * Builds a reflection reference for Lua `Proto` object pointers.
- */
-gpg::RRef* RRef_Proto(RRef* const out, Proto* const value)
-{
-  return BuildTypedRefWithCache<Proto>(out, value, typeid(Proto), gProtoRRefType, gProtoRRefCache);
-}
-
-/**
- * Address: 0x0090B1E0 (FUN_0090B1E0, gpg::RRef_lua_State)
- *
- * What it does:
- * Builds a reflection reference for `lua_State` object pointers.
- */
-gpg::RRef* RRef_lua_State(RRef* const out, lua_State* const value)
-{
-  return BuildTypedRefWithCache<lua_State>(
-    out,
-    value,
-    typeid(lua_State),
-    gLuaRawStateRRefType,
-    gLuaRawStateRRefCache
-  );
 }
 
 /**
@@ -10256,7 +6297,7 @@ RRef::RRef(TString* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_TString(&staged, value);
+  staged = gpg::MakeRRef<TString>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10273,7 +6314,7 @@ RRef::RRef(Table* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_Table(&staged, value);
+  staged = gpg::MakeRRef<Table>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10290,7 +6331,7 @@ RRef::RRef(LClosure* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_LClosure(&staged, value);
+  staged = gpg::MakeRRef<LClosure>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10307,7 +6348,7 @@ RRef::RRef(UpVal* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_UpVal(&staged, value);
+  staged = gpg::MakeRRef<UpVal>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10324,7 +6365,7 @@ RRef::RRef(Proto* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_Proto(&staged, value);
+  staged = gpg::MakeRRef<Proto>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10341,7 +6382,7 @@ RRef::RRef(lua_State* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_lua_State(&staged, value);
+  staged = gpg::MakeRRef<lua_State>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10358,7 +6399,7 @@ RRef::RRef(Udata* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_Udata(&staged, value);
+  staged = gpg::MakeRRef<Udata>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10391,7 +6432,7 @@ RRef::RRef(moho::RUnitBlueprint* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_RUnitBlueprint(&staged, value);
+  staged = gpg::MakeRRef<moho::RUnitBlueprint>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10408,7 +6449,7 @@ RRef::RRef(char* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_char(&staged, value);
+  staged = gpg::MakeRRef<char>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10425,7 +6466,7 @@ RRef::RRef(short* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_short(&staged, value);
+  staged = gpg::MakeRRef<short>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10442,7 +6483,7 @@ RRef::RRef(long* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_long(&staged, value);
+  staged = gpg::MakeRRef<long>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10459,7 +6500,7 @@ RRef::RRef(signed char* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_schar(&staged, value);
+  staged = gpg::MakeRRef<signed char>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -10476,7 +6517,7 @@ RRef::RRef(unsigned short* const value) noexcept
   , mType(nullptr)
 {
   gpg::RRef staged{};
-  (void)gpg::RRef_ushort(&staged, value);
+  staged = gpg::MakeRRef<unsigned short>(value);
   mObj = staged.mObj;
   mType = staged.mType;
 }
@@ -11528,7 +7569,7 @@ RRef gpg::RPointerType<moho::SimArmy>::SubscriptIndex(void* const obj, const int
 {
     auto* const slot = static_cast<moho::SimArmy**>(obj);
     RRef out{};
-    gpg::RRef_SimArmy(&out, (*slot) + ind);
+    out = gpg::MakeRRef<moho::SimArmy>((*slot) + ind);
     return out;
 }
 
@@ -11654,7 +7695,7 @@ RRef gpg::RVectorType<moho::SimArmy*>::SubscriptIndex(void* const obj, const int
 {
     auto* const vec = static_cast<msvc8::vector<moho::SimArmy*>*>(obj);
     RRef out{};
-    gpg::RRef_SimArmy_P(&out, vec->ptr_at(static_cast<std::size_t>(ind)));
+    out = gpg::MakeRRef<moho::SimArmy*>(vec->ptr_at(static_cast<std::size_t>(ind)));
     return out;
 }
 
@@ -11752,7 +7793,7 @@ void gpg::SerializeSimArmyPtrVector(WriteArchive* const archive, const int vecto
 
     for (std::size_t i = 0; i < count; ++i) {
         RRef elementRef{};
-        gpg::RRef_SimArmy(&elementRef, (*vector)[i]);
+        elementRef = gpg::MakeRRef<moho::SimArmy>((*vector)[i]);
         gpg::WriteRawPointer(archive, elementRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
     }
 }
@@ -11821,7 +7862,7 @@ RRef gpg::RPointerType<moho::Shield>::SubscriptIndex(void* const obj, const int 
 {
     auto* const slot = static_cast<moho::Shield**>(obj);
     RRef out{};
-    gpg::RRef_Shield(&out, (*slot) + ind);
+    out = gpg::MakeRRef<moho::Shield>((*slot) + ind);
     return out;
 }
 
@@ -11943,7 +7984,7 @@ RRef gpg::RPointerType<moho::CDecalHandle>::SubscriptIndex(void* const obj, cons
 {
     auto* const slot = static_cast<moho::CDecalHandle**>(obj);
     RRef out{};
-    gpg::RRef_CDecalHandle(&out, (*slot) + ind);
+    out = gpg::MakeRRef<moho::CDecalHandle>((*slot) + ind);
     return out;
 }
 
@@ -12058,7 +8099,7 @@ RRef gpg::RPointerType<moho::RBlueprint>::SubscriptIndex(void* const obj, const 
 {
     auto* const slot = static_cast<moho::RBlueprint**>(obj);
     RRef out{};
-    gpg::RRef_RBlueprint(&out, (*slot) + ind);
+    out = gpg::MakeRRef<moho::RBlueprint>((*slot) + ind);
     return out;
 }
 
@@ -12166,7 +8207,7 @@ RRef gpg::RPointerType<moho::UnitWeapon>::SubscriptIndex(void* const obj, const 
 {
     auto* const slot = static_cast<moho::UnitWeapon**>(obj);
     RRef out{};
-    gpg::RRef_UnitWeapon(&out, (*slot) + ind);
+    out = gpg::MakeRRef<moho::UnitWeapon>((*slot) + ind);
     return out;
 }
 
@@ -12845,7 +8886,7 @@ RRef gpg::RPointerType<moho::CSndParams>::SubscriptIndex(void* const obj, const 
 {
     auto* const slot = static_cast<moho::CSndParams**>(obj);
     RRef out{};
-    gpg::RRef_CSndParams(&out, (*slot) + ind);
+    out = gpg::MakeRRef<moho::CSndParams>((*slot) + ind);
     return out;
 }
 
@@ -13037,7 +9078,7 @@ RRef gpg::RPointerType<moho::RUnitBlueprint>::SubscriptIndex(void* const obj, co
 {
     auto* const slot = static_cast<moho::RUnitBlueprint**>(obj);
     RRef out{};
-    gpg::RRef_RUnitBlueprint(&out, (*slot) + ind);
+    out = gpg::MakeRRef<moho::RUnitBlueprint>((*slot) + ind);
     return out;
 }
 
@@ -14038,7 +10079,7 @@ void REnumType::AddEnum(char const* name, const int index)
 gpg::RRef* PackRRef_CSndVar(RRef* const out, moho::CSndVar* const value)
 {
   RRef tmp{};
-  (void)RRef_CSndVar(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CSndVar>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14053,7 +10094,7 @@ gpg::RRef* PackRRef_CSndVar(RRef* const out, moho::CSndVar* const value)
 gpg::RRef* PackRRef_CSndParams(RRef* const out, moho::CSndParams* const value)
 {
   RRef tmp{};
-  (void)RRef_CSndParams(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CSndParams>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14068,7 +10109,7 @@ gpg::RRef* PackRRef_CSndParams(RRef* const out, moho::CSndParams* const value)
 gpg::RRef* PackRRef_CSndParamsPointer(RRef* const out, moho::CSndParams** const value)
 {
   RRef tmp{};
-  (void)RRef_CSndParams_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CSndParams*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14083,7 +10124,7 @@ gpg::RRef* PackRRef_CSndParamsPointer(RRef* const out, moho::CSndParams** const 
 gpg::RRef* PackRRef_CSndParamsPointerSecondary(RRef* const out, moho::CSndParams** const value)
 {
   RRef tmp{};
-  (void)RRef_CSndParams_P(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CSndParams*>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14098,7 +10139,7 @@ gpg::RRef* PackRRef_CSndParamsPointerSecondary(RRef* const out, moho::CSndParams
 gpg::RRef* PackRRef_CAniPose(RRef* const out, moho::CAniPose* const value)
 {
   RRef tmp{};
-  (void)RRef_CAniPose(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAniPose>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14113,7 +10154,7 @@ gpg::RRef* PackRRef_CAniPose(RRef* const out, moho::CAniPose* const value)
 gpg::RRef* PackRRef_SOCellPos(RRef* const out, moho::SOCellPos* const value)
 {
   RRef tmp{};
-  (void)RRef_SOCellPos(&tmp, value);
+  tmp = gpg::MakeRRef<moho::SOCellPos>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14131,7 +10172,7 @@ gpg::RRef* PackRRef_CAiFormationInstance(
 )
 {
   RRef tmp{};
-  (void)RRef_CAiFormationInstance(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAiFormationInstance>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14146,7 +10187,7 @@ gpg::RRef* PackRRef_CAiFormationInstance(
 gpg::RRef* PackRRef_CAiPathFinder(RRef* const out, moho::CAiPathFinder* const value)
 {
   RRef tmp{};
-  (void)RRef_CAiPathFinder(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAiPathFinder>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14161,7 +10202,7 @@ gpg::RRef* PackRRef_CAiPathFinder(RRef* const out, moho::CAiPathFinder* const va
 gpg::RRef* PackRRef_LAiAttackerImpl(RRef* const out, moho::LAiAttackerImpl* const value)
 {
   RRef tmp{};
-  (void)RRef_LAiAttackerImpl(&tmp, value);
+  tmp = gpg::MakeRRef<moho::LAiAttackerImpl>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14176,7 +10217,7 @@ gpg::RRef* PackRRef_LAiAttackerImpl(RRef* const out, moho::LAiAttackerImpl* cons
 gpg::RRef* PackRRef_CAcquireTargetTask(RRef* const out, moho::CAcquireTargetTask* const value)
 {
   RRef tmp{};
-  (void)RRef_CAcquireTargetTask(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CAcquireTargetTask>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14191,7 +10232,7 @@ gpg::RRef* PackRRef_CAcquireTargetTask(RRef* const out, moho::CAcquireTargetTask
 gpg::RRef* PackRRef_CUnitCaptureTask(RRef* const out, moho::CUnitCaptureTask* const value)
 {
   RRef tmp{};
-  (void)RRef_CUnitCaptureTask(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CUnitCaptureTask>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14206,7 +10247,7 @@ gpg::RRef* PackRRef_CUnitCaptureTask(RRef* const out, moho::CUnitCaptureTask* co
 gpg::RRef* PackRRef_CUnitGetBuiltTask(RRef* const out, moho::CUnitGetBuiltTask* const value)
 {
   RRef tmp{};
-  (void)RRef_CUnitGetBuiltTask(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CUnitGetBuiltTask>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14221,7 +10262,7 @@ gpg::RRef* PackRRef_CUnitGetBuiltTask(RRef* const out, moho::CUnitGetBuiltTask* 
 gpg::RRef* PackRRef_CUnitGuardTask(RRef* const out, moho::CUnitGuardTask* const value)
 {
   RRef tmp{};
-  (void)RRef_CUnitGuardTask(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CUnitGuardTask>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14236,7 +10277,7 @@ gpg::RRef* PackRRef_CUnitGuardTask(RRef* const out, moho::CUnitGuardTask* const 
 gpg::RRef* PackRRef_CUnitUnloadUnits(RRef* const out, moho::CUnitUnloadUnits* const value)
 {
   RRef tmp{};
-  (void)RRef_CUnitUnloadUnits(&tmp, value);
+  tmp = gpg::MakeRRef<moho::CUnitUnloadUnits>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14254,7 +10295,7 @@ gpg::RRef* PackRRef_SharedPtrCAniPose(
 )
 {
   RRef tmp{};
-  (void)RRef_shared_ptr_CAniPose(&tmp, value);
+  tmp = gpg::MakeRRef<boost::shared_ptr<moho::CAniPose>>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;
@@ -14269,7 +10310,7 @@ gpg::RRef* PackRRef_SharedPtrCAniPose(
 gpg::RRef* PackRRef_Entity(RRef* const out, moho::Entity* const value)
 {
   RRef tmp{};
-  (void)RRef_Entity(&tmp, value);
+  tmp = gpg::MakeRRef<moho::Entity>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;

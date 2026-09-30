@@ -342,7 +342,7 @@ namespace
   void WriteOwnedCPlatoonPointer(gpg::WriteArchive* archive, moho::CPlatoon* platoon, const gpg::RRef& ownerRef)
   {
     gpg::RRef objectRef{};
-    gpg::RRef_CPlatoon(&objectRef, platoon);
+    objectRef = gpg::MakeRRef<moho::CPlatoon>(platoon);
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Owned, ownerRef);
   }
 
@@ -358,7 +358,7 @@ namespace
   void WriteUnownedCPlatoonPointer(gpg::WriteArchive* archive, moho::CPlatoon* platoon, const gpg::RRef& ownerRef)
   {
     gpg::RRef objectRef{};
-    gpg::RRef_CPlatoon(&objectRef, platoon);
+    objectRef = gpg::MakeRRef<moho::CPlatoon>(platoon);
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 

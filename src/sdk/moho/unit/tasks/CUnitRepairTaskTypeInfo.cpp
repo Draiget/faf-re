@@ -228,7 +228,7 @@ namespace moho
     auto* const task = new (std::nothrow) CUnitRepairTaskReflectionView();
 
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitRepairTask(&ref, reinterpret_cast<CUnitRepairTask*>(task));
+    ref = gpg::MakeRRef<moho::CUnitRepairTask>(reinterpret_cast<CUnitRepairTask*>(task));
     return ref;
   }
 
@@ -247,7 +247,7 @@ namespace moho
     }
 
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitRepairTask(&ref, reinterpret_cast<CUnitRepairTask*>(task));
+    ref = gpg::MakeRRef<moho::CUnitRepairTask>(reinterpret_cast<CUnitRepairTask*>(task));
     return ref;
   }
 

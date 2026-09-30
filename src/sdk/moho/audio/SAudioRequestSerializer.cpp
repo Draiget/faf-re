@@ -93,11 +93,11 @@ namespace moho
     archive->WriteInt(static_cast<int>(layer));
 
     gpg::RRef paramsRef{};
-    gpg::RRef_CSndParams(&paramsRef, params);
+    paramsRef = gpg::MakeRRef<moho::CSndParams>(params);
     gpg::WriteRawPointer(archive, paramsRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     gpg::RRef soundRef{};
-    gpg::RRef_HSound(&soundRef, sound);
+    soundRef = gpg::MakeRRef<moho::HSound>(sound);
     gpg::WriteRawPointer(archive, soundRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 

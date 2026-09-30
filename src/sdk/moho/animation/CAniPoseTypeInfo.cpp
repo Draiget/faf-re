@@ -39,7 +39,7 @@ namespace
   [[nodiscard]] gpg::RRef MakePoseRef(CAniPose* const pose)
   {
     gpg::RRef out{};
-    gpg::RRef_CAniPose(&out, pose);
+    out = gpg::MakeRRef<moho::CAniPose>(pose);
     return out;
   }
 

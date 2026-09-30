@@ -315,7 +315,7 @@ namespace moho
     auto* const blueprint = reinterpret_cast<RPropBlueprint*>(static_cast<std::uintptr_t>(ownerToken));
 
     gpg::RRef ownerFieldRef{};
-    (void)gpg::RRef_RRuleGameRules(&ownerFieldRef, blueprint->mOwner);
+    ownerFieldRef = gpg::MakeRRef<moho::RRuleGameRules>(blueprint->mOwner);
     const gpg::RRef nullOwnerRef{};
     gpg::WriteRawPointer(archive, ownerFieldRef, gpg::TrackedPointerState::Unowned, nullOwnerRef);
 
@@ -350,7 +350,7 @@ namespace moho
       : nullptr;
 
     gpg::RRef blueprintRef{};
-    (void)gpg::RRef_RPropBlueprint(&blueprintRef, blueprint);
+    blueprintRef = gpg::MakeRRef<moho::RPropBlueprint>(blueprint);
     result->SetOwned(blueprintRef, 1u);
   }
 
@@ -377,7 +377,7 @@ namespace moho
     gpg::RRef* const outRef
   )
   {
-    (void)gpg::RRef_RPropBlueprint(outRef, blueprint);
+    *outRef = gpg::MakeRRef<moho::RPropBlueprint>(blueprint);
     return outRef;
   }
 

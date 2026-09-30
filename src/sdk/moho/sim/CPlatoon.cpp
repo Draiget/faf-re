@@ -1181,7 +1181,7 @@ namespace moho
   {
     auto* const object = new (std::nothrow) CPlatoon();
     gpg::RRef objectRef{};
-    gpg::RRef_CPlatoon(&objectRef, object);
+    objectRef = gpg::MakeRRef<moho::CPlatoon>(object);
     result->SetUnowned(objectRef, 0u);
   }
 
@@ -1208,7 +1208,7 @@ namespace moho
   {
     CSquad* const squad = new CSquad();
     gpg::RRef objectRef{};
-    gpg::RRef_CSquad(&objectRef, squad);
+    objectRef = gpg::MakeRRef<moho::CSquad>(squad);
     result->SetUnowned(objectRef, 0u);
   }
 
@@ -1370,7 +1370,7 @@ namespace moho
 
     ownerRef = {};
     gpg::RRef armyRef{};
-    gpg::RRef_SimArmy(&armyRef, mArmy);
+    armyRef = gpg::MakeRRef<moho::SimArmy>(mArmy);
     gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     WritePlatoonSquadPointersToArchive(archive, const_cast<CPlatoon*>(this));
@@ -2776,7 +2776,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
-    gpg::RRef_ESquadClass(&enumRef, &squadClass);
+    enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
     const char* squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
@@ -2858,7 +2858,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
-    gpg::RRef_ESquadClass(&enumRef, &squadClass);
+    enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
     const char* squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
@@ -3164,7 +3164,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
-    gpg::RRef_ESquadClass(&enumRef, &squadClass);
+    enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
     const char* squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
@@ -3228,7 +3228,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
-    gpg::RRef_ESquadClass(&enumRef, &squadClass);
+    enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
     const char* squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
@@ -3292,7 +3292,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
-    gpg::RRef_ESquadClass(&enumRef, &squadClass);
+    enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
     const char* squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
@@ -3356,7 +3356,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
-    gpg::RRef_ESquadClass(&enumRef, &squadClass);
+    enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
     const char* squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
@@ -3654,7 +3654,7 @@ namespace moho
 
       ESquadClass squadClass = static_cast<ESquadClass>(0);
       gpg::RRef enumRef{};
-      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+      enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
       const LuaPlus::LuaObject squadClassNameObject = squadSpec[4];
       const char* const squadClassName = squadClassNameObject.GetString();
       SCR_GetEnum(state, squadClassName, enumRef);
@@ -3836,7 +3836,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
-    gpg::RRef_ESquadClass(&enumRef, &squadClass);
+    enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
     const char* const squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
@@ -4054,7 +4054,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef squadClassRef{};
-    gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    squadClassRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
     const char* const squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
       LuaPlus::LuaStackObject typeErrorArg(state, 2);
@@ -4064,7 +4064,7 @@ namespace moho
 
     EAlliance alliance = static_cast<EAlliance>(0);
     gpg::RRef allianceRef{};
-    gpg::RRef_EAlliance(&allianceRef, &alliance);
+    allianceRef = gpg::MakeRRef<moho::EAlliance>(&alliance);
     const char* const allianceName = lua_tostring(state->m_state, 3);
     if (allianceName == nullptr) {
       LuaPlus::LuaStackObject typeErrorArg(state, 3);
@@ -4285,7 +4285,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef squadClassRef{};
-    gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    squadClassRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
     const char* const squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
       LuaPlus::LuaStackObject typeErrorArg(state, 2);
@@ -4295,7 +4295,7 @@ namespace moho
 
     EAlliance alliance = static_cast<EAlliance>(0);
     gpg::RRef allianceRef{};
-    gpg::RRef_EAlliance(&allianceRef, &alliance);
+    allianceRef = gpg::MakeRRef<moho::EAlliance>(&alliance);
     const char* const allianceName = lua_tostring(state->m_state, 3);
     if (allianceName == nullptr) {
       LuaPlus::LuaStackObject typeErrorArg(state, 3);
@@ -4338,7 +4338,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef squadClassRef{};
-    gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    squadClassRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
     const char* const squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
       LuaPlus::LuaStackObject typeErrorArg(state, 2);
@@ -4348,7 +4348,7 @@ namespace moho
 
     EAlliance alliance = static_cast<EAlliance>(0);
     gpg::RRef allianceRef{};
-    gpg::RRef_EAlliance(&allianceRef, &alliance);
+    allianceRef = gpg::MakeRRef<moho::EAlliance>(&alliance);
     const char* const allianceName = lua_tostring(state->m_state, 3);
     if (allianceName == nullptr) {
       LuaPlus::LuaStackObject typeErrorArg(state, 3);
@@ -4391,7 +4391,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef squadClassRef{};
-    gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    squadClassRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
     const char* const squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
       LuaPlus::LuaStackObject typeErrorArg(state, 2);
@@ -4401,7 +4401,7 @@ namespace moho
 
     EAlliance alliance = static_cast<EAlliance>(0);
     gpg::RRef allianceRef{};
-    gpg::RRef_EAlliance(&allianceRef, &alliance);
+    allianceRef = gpg::MakeRRef<moho::EAlliance>(&alliance);
     const char* const allianceName = lua_tostring(state->m_state, 3);
     if (allianceName == nullptr) {
       LuaPlus::LuaStackObject typeErrorArg(state, 3);
@@ -4446,7 +4446,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef squadClassRef{};
-    gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    squadClassRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
     const char* const squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
       LuaPlus::LuaStackObject typeErrorArg(state, 2);
@@ -4456,7 +4456,7 @@ namespace moho
 
     EAlliance alliance = static_cast<EAlliance>(0);
     gpg::RRef allianceRef{};
-    gpg::RRef_EAlliance(&allianceRef, &alliance);
+    allianceRef = gpg::MakeRRef<moho::EAlliance>(&alliance);
     const char* const allianceName = lua_tostring(state->m_state, 3);
     if (allianceName == nullptr) {
       LuaPlus::LuaStackObject typeErrorArg(state, 3);
@@ -4627,7 +4627,7 @@ namespace moho
 
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     gpg::RRef enumRef{};
-    gpg::RRef_ESquadClass(&enumRef, &squadClass);
+    enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
     const char* const squadClassName = lua_tostring(state->m_state, 2);
     if (squadClassName == nullptr) {
@@ -4719,7 +4719,7 @@ namespace moho
     ESquadClass squadClass = kAllSquadsClass;
     if (argumentCount > 1) {
       gpg::RRef enumRef{};
-      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+      enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
       const char* squadClassName = lua_tostring(state->m_state, 2);
       if (squadClassName == nullptr) {
@@ -4875,7 +4875,7 @@ namespace moho
     ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
     if (lua_gettop(state->m_state) > 2) {
       gpg::RRef enumRef{};
-      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+      enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
       const char* const squadClassName = lua_tostring(state->m_state, 3);
       if (squadClassName == nullptr) {
@@ -5106,7 +5106,7 @@ namespace moho
     ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
     if (lua_gettop(state->m_state) > 3) {
       gpg::RRef enumRef{};
-      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+      enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
       const char* const squadClassName = lua_tostring(state->m_state, 4);
       if (squadClassName == nullptr) {
@@ -5348,7 +5348,7 @@ namespace moho
     ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
     if (lua_gettop(state->m_state) > 3) {
       gpg::RRef enumRef{};
-      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+      enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
       const char* const squadClassName = lua_tostring(state->m_state, 4);
       if (squadClassName == nullptr) {
@@ -5530,7 +5530,7 @@ namespace moho
     ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
     if (lua_gettop(state->m_state) > 2) {
       gpg::RRef enumRef{};
-      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+      enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
       const char* const squadClassName = lua_tostring(state->m_state, 3);
       if (squadClassName == nullptr) {
@@ -6213,7 +6213,7 @@ namespace moho
     ESquadClass squadClass = static_cast<ESquadClass>(kAllSquadClassesSentinel);
     if (lua_gettop(state->m_state) > 2) {
       gpg::RRef enumRef{};
-      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+      enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
       const char* const squadClassName = lua_tostring(state->m_state, 3);
       if (squadClassName == nullptr) {
@@ -6348,7 +6348,7 @@ namespace moho
     ESquadClass squadClass = kAllSquadsClass;
     if (lua_gettop(state->m_state) > 2) {
       gpg::RRef enumRef{};
-      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+      enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
       const char* const squadClassName = lua_tostring(state->m_state, 3);
       if (squadClassName == nullptr) {
@@ -6478,7 +6478,7 @@ namespace moho
       ESquadClass squadClass = kAllSquadsClass;
       if (lua_gettop(state->m_state) > 1) {
         gpg::RRef enumRef{};
-        gpg::RRef_ESquadClass(&enumRef, &squadClass);
+        enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
         const char* const squadClassName = lua_tostring(state->m_state, 2);
         if (squadClassName == nullptr) {
@@ -6847,7 +6847,7 @@ namespace moho
     ESquadClass squadClass = kAllSquadsClass;
     if (lua_gettop(state->m_state) > 2) {
       gpg::RRef enumRef{};
-      gpg::RRef_ESquadClass(&enumRef, &squadClass);
+      enumRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
       const char* const squadClassName = lua_tostring(state->m_state, 3);
       if (squadClassName == nullptr) {

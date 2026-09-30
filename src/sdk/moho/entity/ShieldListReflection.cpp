@@ -182,7 +182,7 @@ namespace gpg
     archive->WriteUInt(static_cast<unsigned int>(list->size()));
     for (moho::Shield* const element : *list) {
       gpg::RRef ref{};
-      gpg::RRef_Shield(&ref, element);
+      ref = gpg::MakeRRef<moho::Shield>(element);
       gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Unowned, *ownerRef);
     }
   }

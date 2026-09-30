@@ -261,7 +261,7 @@ namespace gpg
   gpg::RRef RFastVectorType<moho::SAudioRequest>::SubscriptIndex(void* const obj, const int ind) const
   {
     gpg::RRef out{};
-    gpg::RRef_SAudioRequest(&out, nullptr);
+    out = gpg::MakeRRef<moho::SAudioRequest>(nullptr);
     if (!obj || ind < 0) {
       return out;
     }
@@ -271,7 +271,7 @@ namespace gpg
       return out;
     }
 
-    gpg::RRef_SAudioRequest(&out, vec.Data() + ind);
+    out = gpg::MakeRRef<moho::SAudioRequest>(vec.Data() + ind);
     return out;
   }
 

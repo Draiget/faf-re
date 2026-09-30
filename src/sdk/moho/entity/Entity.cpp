@@ -83,7 +83,6 @@ namespace gpg
 {
   // Defined out-of-line in ArchiveSerialization.cpp (0x00683600). Builds a
   // reflected RRef for a texture-scroller pointer; used by Entity::MemberSerialize.
-  RRef* RRef_CTextureScroller(RRef* outRef, moho::CTextureScroller* value);
 
   class SerConstructResult
   {
@@ -826,7 +825,7 @@ namespace
     gpg::RRef blueprintRef{};
     // The RRef builder takes a mutable pointer because an RRef models a mutable
     // reflected reference; nothing here writes through it.
-    (void)gpg::RRef_REntityBlueprint(&blueprintRef, const_cast<moho::REntityBlueprint*>(blueprint));
+    blueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(const_cast<moho::REntityBlueprint*>(blueprint));
 
     // Unit: 0x006773C7-0x006773EC, against RUnitBlueprint's own descriptor
     // cache (0x010C6E0C, i.e. `StaticGetClass`) - not the base's.
@@ -1851,7 +1850,7 @@ namespace moho
 
     // Owning army pointer (UNOWNED). CArmyImpl derives from SimArmy.
     gpg::RRef armyRef{};
-    (void)gpg::RRef_SimArmy(&armyRef, static_cast<SimArmy*>(ArmyRef));
+    armyRef = gpg::MakeRRef<moho::SimArmy>(static_cast<SimArmy*>(ArmyRef));
     gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, owner);
 
     // Pending world transform (+0x150), logically a VTransform payload.
@@ -1859,7 +1858,7 @@ namespace moho
 
     // Position-history pointer (OWNED).
     gpg::RRef positionHistoryRef{};
-    (void)gpg::RRef_PositionHistory(&positionHistoryRef, mPositionHistory);
+    positionHistoryRef = gpg::MakeRRef<moho::PositionHistory>(mPositionHistory);
     gpg::WriteRawPointer(archive, positionHistoryRef, gpg::TrackedPointerState::Owned, owner);
 
     archive->WriteFloat(mPendingVelocityScale);
@@ -1867,7 +1866,7 @@ namespace moho
 
     // Collision-primitive pointer (OWNED).
     gpg::RRef collisionRef{};
-    (void)gpg::RRef_CColPrimitiveBase(&collisionRef, CollisionExtents);
+    collisionRef = gpg::MakeRRef<moho::CColPrimitiveBase>(CollisionExtents);
     gpg::WriteRawPointer(archive, collisionRef, gpg::TrackedPointerState::Owned, owner);
 
     // Attached-entity vector (+0x17C).
@@ -1885,7 +1884,7 @@ namespace moho
 
     // Intel-manager pointer (OWNED).
     gpg::RRef intelRef{};
-    (void)gpg::RRef_CIntel(&intelRef, mIntelManager);
+    intelRef = gpg::MakeRRef<moho::CIntel>(mIntelManager);
     gpg::WriteRawPointer(archive, intelRef, gpg::TrackedPointerState::Owned, owner);
 
     // Four visibility-mode lanes (+0x1DC..+0x1E8).
@@ -1897,12 +1896,12 @@ namespace moho
 
     // Texture-scroller pointer (OWNED).
     gpg::RRef scrollerRef{};
-    (void)gpg::RRef_CTextureScroller(&scrollerRef, mScroller);
+    scrollerRef = gpg::MakeRRef<moho::CTextureScroller>(mScroller);
     gpg::WriteRawPointer(archive, scrollerRef, gpg::TrackedPointerState::Owned, owner);
 
     // Physics-body pointer (OWNED).
     gpg::RRef physBodyRef{};
-    (void)gpg::RRef_SPhysBody(&physBodyRef, mPhysBody);
+    physBodyRef = gpg::MakeRRef<moho::SPhysBody>(mPhysBody);
     gpg::WriteRawPointer(archive, physBodyRef, gpg::TrackedPointerState::Owned, owner);
 
     archive->WriteBool(RealtimeStatsEnabled != 0u);
@@ -1913,7 +1912,7 @@ namespace moho
 
     // Motor pointer (OWNED).
     gpg::RRef motorRef{};
-    (void)gpg::RRef_Motor(&motorRef, mMotor);
+    motorRef = gpg::MakeRRef<moho::Motor>(mMotor);
     gpg::WriteRawPointer(archive, motorRef, gpg::TrackedPointerState::Owned, owner);
 
     // Collision AABB (+0x240): min/max modeled split, first field is min.

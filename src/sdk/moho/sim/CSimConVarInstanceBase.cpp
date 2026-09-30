@@ -629,7 +629,7 @@ gpg::RRef* moho::TSimConVarInstance<int>::GetValueRef(gpg::RRef* const outRef)
   }
 
   gpg::RRef intValueRef{};
-  gpg::RRef_int(&intValueRef, &mValue);
+  intValueRef = gpg::MakeRRef<int>(&mValue);
   outRef->mObj = intValueRef.mObj;
   outRef->mType = intValueRef.mType;
   return outRef;
@@ -650,7 +650,7 @@ gpg::RRef* moho::TSimConVarInstance<bool>::GetValueRef(gpg::RRef* const outRef)
   }
 
   gpg::RRef boolValueRef{};
-  gpg::RRef_bool(&boolValueRef, &mValue);
+  boolValueRef = gpg::MakeRRef<bool>(&mValue);
   outRef->mObj = boolValueRef.mObj;
   outRef->mType = boolValueRef.mType;
   return outRef;
@@ -671,7 +671,7 @@ gpg::RRef* moho::TSimConVarInstance<std::uint8_t>::GetValueRef(gpg::RRef* const 
   }
 
   gpg::RRef uint8ValueRef{};
-  gpg::RRef_uchar(&uint8ValueRef, &mValue);
+  uint8ValueRef = gpg::MakeRRef<unsigned char>(&mValue);
   outRef->mObj = uint8ValueRef.mObj;
   outRef->mType = uint8ValueRef.mType;
   return outRef;
@@ -692,7 +692,7 @@ gpg::RRef* moho::TSimConVarInstance<msvc8::string>::GetValueRef(gpg::RRef* const
   }
 
   gpg::RRef stringValueRef{};
-  gpg::RRef_string(&stringValueRef, &mValue);
+  stringValueRef = gpg::MakeRRef<msvc8::string>(&mValue);
   outRef->mObj = stringValueRef.mObj;
   outRef->mType = stringValueRef.mType;
   return outRef;
@@ -727,7 +727,7 @@ gpg::RRef* moho::TSimConVarInstance<float>::GetValueRef(gpg::RRef* const outRef)
   }
 
   gpg::RRef floatValueRef{};
-  gpg::RRef_float(&floatValueRef, &mValue);
+  floatValueRef = gpg::MakeRRef<float>(&mValue);
   outRef->mObj = floatValueRef.mObj;
   outRef->mType = floatValueRef.mType;
   return outRef;

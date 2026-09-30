@@ -517,7 +517,7 @@ void CTaskThread::MemberSerialize(gpg::WriteArchive* const archive, gpg::RRef* c
 {
   const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
   gpg::RRef stageRef{};
-  (void)gpg::RRef_CTaskStage(&stageRef, mStage);
+  stageRef = gpg::MakeRRef<moho::CTaskStage>(mStage);
   gpg::WriteRawPointer(archive, stageRef, gpg::TrackedPointerState::Unowned, owner);
   archive->WriteInt(mPendingFrames);
   archive->WriteBool(mStaged);

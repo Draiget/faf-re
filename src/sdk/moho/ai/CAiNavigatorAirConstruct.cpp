@@ -38,7 +38,7 @@ namespace
   [[nodiscard]] gpg::RRef* PopulateCAiNavigatorAirRef(gpg::RRef* const out, CAiNavigatorAir* const object)
   {
     gpg::RRef temp{};
-    gpg::RRef_CAiNavigatorAir(&temp, object);
+    temp = gpg::MakeRRef<moho::CAiNavigatorAir>(object);
     *out = temp;
     return out;
   }

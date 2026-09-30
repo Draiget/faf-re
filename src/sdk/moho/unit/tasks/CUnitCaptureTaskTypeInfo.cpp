@@ -127,7 +127,7 @@ namespace moho
   {
     auto* const task = new (std::nothrow) CUnitCaptureTask();
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitCaptureTask(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitCaptureTask>(task);
     return ref;
   }
 
@@ -146,7 +146,7 @@ namespace moho
     }
 
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitCaptureTask(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitCaptureTask>(task);
     return ref;
   }
 

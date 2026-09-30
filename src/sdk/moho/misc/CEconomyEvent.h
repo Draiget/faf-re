@@ -487,12 +487,4 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x005D1C70 (FUN_005D1C70, gpg::RRef_CEconRequest)
-   *
-   * What it does:
-   * Builds a typed reflection reference for `CEconRequest*`, upgrading to the
-   * dynamic derived type and applying base-offset adjustment when needed.
-   */
-  gpg::RRef* RRef_CEconRequest(gpg::RRef* outRef, moho::CEconRequest* value);
 } // namespace gpg

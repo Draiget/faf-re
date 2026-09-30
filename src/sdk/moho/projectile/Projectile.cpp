@@ -120,7 +120,7 @@ namespace
     // performs the polymorphic derived-type normalization the earlier inline
     // stand-in elided.
     gpg::RRef out{};
-    gpg::RRef_Projectile(&out, object);
+    out = gpg::MakeRRef<moho::Projectile>(object);
     return out;
   }
 

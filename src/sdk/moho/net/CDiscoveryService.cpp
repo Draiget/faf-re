@@ -482,7 +482,7 @@ void moho::CDiscoveryService::OnDatagram(
   );
 
   gpg::RRef protocolRef{};
-  gpg::RRef_ENetProtocol(&protocolRef, &protocol);
+  protocolRef = gpg::MakeRRef<moho::ENetProtocolType>(&protocol);
   configObject.SetString("Protocol", protocolRef.GetLexical().c_str());
 
   gpg::Logf(

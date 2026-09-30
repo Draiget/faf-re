@@ -146,7 +146,7 @@ namespace moho
     auto* const task = new (std::nothrow) CUnitSacrificeTask(nullptr, nullptr);
 
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitSacrificeTask(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitSacrificeTask>(task);
     return ref;
   }
 
@@ -165,7 +165,7 @@ namespace moho
     }
 
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitSacrificeTask(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitSacrificeTask>(task);
     return ref;
   }
 

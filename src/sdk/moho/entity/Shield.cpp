@@ -42,7 +42,6 @@ namespace gpg
   // Declared locally: gpg::RRef_Sim (defined + address-cited in
   // src/sdk/gpg/core/containers/ArchiveSerialization.cpp) has external
   // linkage but is not yet exposed from a shared header.
-  RRef* RRef_Sim(RRef* outRef, moho::Sim* value);
 } // namespace gpg
 
 namespace
@@ -223,7 +222,7 @@ namespace moho
     }
 
     gpg::RRef objectRef{};
-    gpg::RRef_Shield(&objectRef, object);
+    objectRef = gpg::MakeRRef<moho::Shield>(object);
     result->SetUnowned(objectRef, 0u);
   }
 
@@ -430,7 +429,7 @@ namespace moho
     }
 
     gpg::RRef ownerRef{};
-    gpg::RRef_Sim(&ownerRef, shield->SimulationRef);
+    ownerRef = gpg::MakeRRef<moho::Sim>(shield->SimulationRef);
     gpg::WriteRawPointer(archive, ownerRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
     if (result != nullptr) {

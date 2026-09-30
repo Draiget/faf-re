@@ -2249,15 +2249,15 @@ void CAiBrain::MemberSerialize(gpg::WriteArchive* const archive) const
   }
 
   gpg::RRef armyRef{};
-  (void)gpg::RRef_SimArmy(&armyRef, mArmy);
+  armyRef = gpg::MakeRRef<moho::SimArmy>(mArmy);
   gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, owner);
 
   gpg::RRef currentEnemyRef{};
-  (void)gpg::RRef_SimArmy(&currentEnemyRef, mCurrentEnemy);
+  currentEnemyRef = gpg::MakeRRef<moho::SimArmy>(mCurrentEnemy);
   gpg::WriteRawPointer(archive, currentEnemyRef, gpg::TrackedPointerState::Unowned, owner);
 
   gpg::RRef personalityRef{};
-  (void)gpg::RRef_CAiPersonality(&personalityRef, mPersonality);
+  personalityRef = gpg::MakeRRef<moho::CAiPersonality>(mPersonality);
   gpg::WriteRawPointer(archive, personalityRef, gpg::TrackedPointerState::Owned, owner);
 
   archive->WriteString(const_cast<msvc8::string*>(&mCurrentPlan));
@@ -4391,7 +4391,7 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
   EAlliance optIgnoreAlliance = ALLIANCE_None;
   if (numArgs >= 7 && lua_type(state->m_state, 7) != 0) {
     gpg::RRef enumRef;
-    (void)gpg::RRef_EAlliance(&enumRef, &optIgnoreAlliance);
+    enumRef = gpg::MakeRRef<moho::EAlliance>(&optIgnoreAlliance);
     LuaPlus::LuaStackObject allianceArg(state, 7);
     const char* const allianceName = lua_tostring(state->m_state, 7);
     if (allianceName == nullptr) {
@@ -5928,7 +5928,7 @@ int moho::cfunc_CAiBrainGetThreatAtPositionL(LuaPlus::LuaState* const state)
 
   if (argumentCount > 4) {
     gpg::RRef threatRef{};
-    gpg::RRef_EThreatType(&threatRef, &threatType);
+    threatRef = gpg::MakeRRef<moho::EThreatType>(&threatType);
     LuaPlus::LuaStackObject threatNameStackObject(state, 5);
     const char* const threatName = lua_tostring(rawState, 5);
     if (threatName == nullptr) {
@@ -6045,7 +6045,7 @@ int moho::cfunc_CAiBrainGetThreatBetweenPositionsL(LuaPlus::LuaState* const stat
 
   if (argumentCount > 4) {
     gpg::RRef threatRef{};
-    gpg::RRef_EThreatType(&threatRef, &threatType);
+    threatRef = gpg::MakeRRef<moho::EThreatType>(&threatType);
     LuaPlus::LuaStackObject threatNameStackObject(state, 5);
     const char* const threatName = lua_tostring(rawState, 5);
     if (threatName == nullptr) {
@@ -6177,7 +6177,7 @@ int moho::cfunc_CAiBrainGetThreatsAroundPositionL(LuaPlus::LuaState* const state
 
   if (argumentCount > 4) {
     gpg::RRef threatRef{};
-    gpg::RRef_EThreatType(&threatRef, &threatType);
+    threatRef = gpg::MakeRRef<moho::EThreatType>(&threatType);
     LuaPlus::LuaStackObject threatNameStackObject(state, 5);
     const char* const threatName = lua_tostring(rawState, 5);
     if (threatName == nullptr) {
@@ -6541,7 +6541,7 @@ int moho::cfunc_CAiBrainPickBestAttackVectorL(LuaPlus::LuaState* const state)
 
   ESquadClass squadClass{};
   gpg::RRef squadClassRef{};
-  (void)gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+  squadClassRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
   LuaPlus::LuaStackObject squadClassArg(state, 3);
   const char* const squadClassName = lua_tostring(rawState, 3);
   if (squadClassName == nullptr) {
@@ -6551,7 +6551,7 @@ int moho::cfunc_CAiBrainPickBestAttackVectorL(LuaPlus::LuaState* const state)
 
   EAlliance alliance{};
   gpg::RRef allianceRef{};
-  (void)gpg::RRef_EAlliance(&allianceRef, &alliance);
+  allianceRef = gpg::MakeRRef<moho::EAlliance>(&alliance);
   LuaPlus::LuaStackObject allianceArg(state, 4);
   const char* const allianceName = lua_tostring(rawState, 4);
   if (allianceName == nullptr) {
@@ -6561,7 +6561,7 @@ int moho::cfunc_CAiBrainPickBestAttackVectorL(LuaPlus::LuaState* const state)
 
   ECompareType compareType{};
   gpg::RRef compareTypeRef{};
-  (void)gpg::RRef_ECompareType(&compareTypeRef, &compareType);
+  compareTypeRef = gpg::MakeRRef<moho::ECompareType>(&compareType);
   LuaPlus::LuaStackObject compareTypeArg(state, 5);
   const char* const compareTypeName = lua_tostring(rawState, 5);
   if (compareTypeName == nullptr) {
@@ -6676,7 +6676,7 @@ int moho::cfunc_CAiBrainAssignThreatAtPositionL(LuaPlus::LuaState* const state)
 
   if (argumentCount > 4) {
     gpg::RRef threatRef{};
-    gpg::RRef_EThreatType(&threatRef, &threatType);
+    threatRef = gpg::MakeRRef<moho::EThreatType>(&threatType);
     LuaPlus::LuaStackObject threatNameStackObject(state, 5);
     const char* const threatName = lua_tostring(rawState, 5);
     if (threatName == nullptr) {
@@ -6766,7 +6766,7 @@ int moho::cfunc_CAiBrainGetHighestThreatPositionL(LuaPlus::LuaState* const state
 
   if (argumentCount > 3) {
     gpg::RRef threatRef{};
-    gpg::RRef_EThreatType(&threatRef, &threatType);
+    threatRef = gpg::MakeRRef<moho::EThreatType>(&threatType);
     LuaPlus::LuaStackObject threatNameStackObject(state, 4);
     const char* const threatName = lua_tostring(rawState, 4);
     if (threatName == nullptr) {
@@ -7813,7 +7813,7 @@ int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* const state)
 
   EAlliance requestedAlliance{};
   gpg::RRef enumRef{};
-  (void)gpg::RRef_EAlliance(&enumRef, &requestedAlliance);
+  enumRef = gpg::MakeRRef<moho::EAlliance>(&requestedAlliance);
 
   const LuaPlus::LuaStackObject allianceArg(state, 2);
   const char* const allianceName = lua_tostring(rawState, 2);
@@ -7926,7 +7926,7 @@ int moho::cfunc_CAiBrainGetUnitsAroundPointL(LuaPlus::LuaState* const state)
   if (lua_gettop(rawState) == 5) {
     EAlliance requestedAlliance{};
     gpg::RRef allianceRef{};
-    (void)gpg::RRef_EAlliance(&allianceRef, &requestedAlliance);
+    allianceRef = gpg::MakeRRef<moho::EAlliance>(&requestedAlliance);
 
     LuaPlus::LuaStackObject allianceArg(state, 5);
     const char* const allianceName = lua_tostring(rawState, 5);
@@ -8062,7 +8062,7 @@ int moho::cfunc_CAiBrainGetNumUnitsAroundPointL(LuaPlus::LuaState* const state)
   EAlliance requestedAlliance = static_cast<EAlliance>(kAiBrainAllianceAnySentinel);
   if (lua_gettop(rawState) == 5) {
     gpg::RRef allianceRef{};
-    (void)gpg::RRef_EAlliance(&allianceRef, &requestedAlliance);
+    allianceRef = gpg::MakeRRef<moho::EAlliance>(&requestedAlliance);
 
     LuaPlus::LuaStackObject allianceArg(state, 5);
     const char* const allianceName = lua_tostring(rawState, 5);
@@ -8387,7 +8387,7 @@ int moho::cfunc_CAiBrainAssignUnitsToPlatoonL(LuaPlus::LuaState* const state)
 
   ESquadClass squadClass{};
   gpg::RRef squadClassRef{};
-  (void)gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+  squadClassRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
 
   const LuaPlus::LuaStackObject squadClassArg(state, 4);
   const char* const squadClassName = lua_tostring(rawState, 4);
@@ -8548,7 +8548,7 @@ int moho::cfunc_CAiBrainMakePlatoonL(LuaPlus::LuaState* const state)
 
     ESquadClass squadClass{};
     gpg::RRef squadClassRef{};
-    (void)gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    squadClassRef = gpg::MakeRRef<moho::ESquadClass>(&squadClass);
     SCR_GetEnum(state, squadClassNameObject.GetString(), squadClassRef);
 
     SEntitySetTemplateUnit pulledUnits{};

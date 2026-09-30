@@ -258,7 +258,7 @@ gpg::RType* moho::CLuaConOutputHandler::GetClass() const
 gpg::RRef moho::CLuaConOutputHandler::GetDerivedObjectRef()
 {
   gpg::RRef out{};
-  gpg::RRef_CLuaConOutputHandler(&out, this);
+  out = gpg::MakeRRef<moho::CLuaConOutputHandler>(this);
   return out;
 }
 

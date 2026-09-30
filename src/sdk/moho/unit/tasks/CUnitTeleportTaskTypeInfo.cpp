@@ -37,7 +37,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeCUnitTeleportTaskRef(moho::CUnitTeleportTask* const object)
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitTeleportTask(&ref, object);
+    ref = gpg::MakeRRef<moho::CUnitTeleportTask>(object);
     return ref;
   }
 } // namespace

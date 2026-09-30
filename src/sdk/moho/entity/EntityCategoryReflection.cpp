@@ -289,7 +289,7 @@ namespace
   {
     LuaPlus::LuaObject metatable = EntityCategoryLuaMetatableFactory::Instance().Get(state);
     gpg::RRef categoryRef{};
-    (void)gpg::RRef_EntityCategory(&categoryRef, value);
+    categoryRef = gpg::MakeRRef<moho::EntityCategorySet>(value);
     out->AssignNewUserData(state, categoryRef);
     out->SetMetaTable(metatable);
     return out;

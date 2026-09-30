@@ -98,7 +98,7 @@ namespace moho
   {
     auto* const task = new (std::nothrow) CUnitCarrierLaunch();
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitCarrierLaunch(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitCarrierLaunch>(task);
     return ref;
   }
 
@@ -117,7 +117,7 @@ namespace moho
     }
 
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitCarrierLaunch(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitCarrierLaunch>(task);
     return ref;
   }
 } // namespace moho

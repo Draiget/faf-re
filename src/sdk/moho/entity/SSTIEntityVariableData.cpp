@@ -822,11 +822,11 @@ namespace moho
     // `RRef_RMeshBlueprint`, and `RRef_CSndParams` for the two sound lanes
     // below), so this does too.
     gpg::RRef scmRef{};
-    (void)gpg::RRef_RScmResource(&scmRef, const_cast<RScmResource*>(mScmResource.get()));
+    scmRef = gpg::MakeRRef<moho::RScmResource>(const_cast<RScmResource*>(mScmResource.get()));
     gpg::WriteRawPointer(archive, scmRef, gpg::TrackedPointerState::Shared, ownerRef);
 
     gpg::RRef meshRef{};
-    (void)gpg::RRef_RMeshBlueprint(&meshRef, const_cast<RMeshBlueprint*>(mMeshBlueprint));
+    meshRef = gpg::MakeRRef<moho::RMeshBlueprint>(const_cast<RMeshBlueprint*>(mMeshBlueprint));
     gpg::WriteRawPointer(archive, meshRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     gpg::RType* const vector3Type = ResolveVector3fType();
@@ -859,11 +859,11 @@ namespace moho
     archive->WriteFloat(mScrollBeatEnd.y);
 
     gpg::RRef ambientRef{};
-    (void)gpg::RRef_CSndParams(&ambientRef, mAmbientSound);
+    ambientRef = gpg::MakeRRef<moho::CSndParams>(mAmbientSound);
     gpg::WriteRawPointer(archive, ambientRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     gpg::RRef rumbleRef{};
-    (void)gpg::RRef_CSndParams(&rumbleRef, mRumbleSound);
+    rumbleRef = gpg::MakeRRef<moho::CSndParams>(mRumbleSound);
     gpg::WriteRawPointer(archive, rumbleRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     archive->WriteBool(mVisibilityHidden != 0u);

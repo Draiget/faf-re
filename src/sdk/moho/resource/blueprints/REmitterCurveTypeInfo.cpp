@@ -790,7 +790,7 @@ namespace moho
     }
 
     gpg::RRef curveRef{};
-    gpg::RRef_REmitterBlueprintCurve(&curveRef, curve);
+    curveRef = gpg::MakeRRef<moho::REmitterBlueprintCurve>(curve);
     return curveRef;
   }
 

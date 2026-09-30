@@ -55,7 +55,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeEntityCategoryRef(moho::EntityCategorySet* const categorySet)
   {
     gpg::RRef out{};
-    (void)gpg::RRef_EntityCategory(&out, categorySet);
+    out = gpg::MakeRRef<moho::EntityCategorySet>(categorySet);
     return out;
   }
 

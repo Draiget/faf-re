@@ -21,7 +21,6 @@ namespace gpg
   // gpg/core/containers/ArchiveSerialization.cpp:649 — MSVC mangles top-level
   // `T* const` parameters distinctly from `T*` parameters, so a mismatched
   // forward declaration would resolve to a different symbol at link time.
-  gpg::RRef* RRef_CEconStorage(gpg::RRef* outRef, moho::CEconStorage* value);
 } // namespace gpg
 
 namespace
@@ -64,7 +63,7 @@ namespace
 
     auto* const storage = new (std::nothrow) moho::CEconStorage{};
     gpg::RRef storageRef{};
-    gpg::RRef_CEconStorage(&storageRef, storage);
+    storageRef = gpg::MakeRRef<moho::CEconStorage>(storage);
     result->SetUnowned(storageRef, 0u);
   }
 

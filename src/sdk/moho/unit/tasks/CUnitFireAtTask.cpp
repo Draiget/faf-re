@@ -458,7 +458,7 @@ namespace moho
     archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);
 
     gpg::RRef weaponRef{};
-    (void)gpg::RRef_UnitWeapon(&weaponRef, mWeapon);
+    weaponRef = gpg::MakeRRef<moho::UnitWeapon>(mWeapon);
     gpg::WriteRawPointer(archive, weaponRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     archive->Write(CachedESiloTypeType(), &mIsNuclear, ownerRef);

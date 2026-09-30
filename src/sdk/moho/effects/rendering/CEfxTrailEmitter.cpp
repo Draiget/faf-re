@@ -336,7 +336,7 @@ namespace moho
     archive->Write(CEffectImpl::StaticGetClass(), static_cast<const CEffectImpl*>(this), nullOwner);
 
     gpg::RRef trailBlueprintRef{};
-    gpg::RRef_RTrailBlueprint(&trailBlueprintRef, mTrailBlueprint);
+    trailBlueprintRef = gpg::MakeRRef<moho::RTrailBlueprint>(mTrailBlueprint);
     gpg::WriteRawPointer(archive, trailBlueprintRef, gpg::TrackedPointerState::Unowned, nullOwner);
 
     archive->WriteInt(mTrailLength);

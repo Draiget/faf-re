@@ -888,7 +888,7 @@ namespace moho
     *outObject = LuaPlus::LuaObject();
 
     gpg::RRef paramsRef{};
-    gpg::RRef_CSndParams_P(&paramsRef, paramsSlot);
+    paramsRef = gpg::MakeRRef<moho::CSndParams*>(paramsSlot);
     outObject->AssignNewUserData(state, paramsRef);
     outObject->SetMetaTable(metatable);
     return outObject;
@@ -1104,7 +1104,7 @@ namespace moho
     CSndParams* const params = FindOrCreateSndParamsByKey(key);
 
     gpg::RRef paramsRef{};
-    gpg::RRef_CSndParams(&paramsRef, params);
+    paramsRef = gpg::MakeRRef<moho::CSndParams>(params);
     result->SetOwned(paramsRef, 1u);
   }
 

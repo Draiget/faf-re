@@ -64,7 +64,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeCUnitCarrierLandRef(moho::CUnitCarrierLand* const object)
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitCarrierLand(&ref, object);
+    ref = gpg::MakeRRef<moho::CUnitCarrierLand>(object);
     return ref;
   }
 } // namespace

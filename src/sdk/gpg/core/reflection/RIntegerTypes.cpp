@@ -10,8 +10,6 @@
 
 namespace
 {
-  template <class TValue>
-  using IntegerMakeRefFunc = gpg::RRef* (*)(gpg::RRef*, TValue*);
 
   // The binary emits one upcast function per reflected integer type
   // (0x008E15B0 char .. 0x008E1AD0 uint) and every Copy/Construct/Move lane
@@ -58,10 +56,7 @@ namespace
   }
 
   template <class TValue>
-  [[nodiscard]] gpg::RRef CopyIntegerValueRef(
-    gpg::RRef* const sourceRef,
-    const IntegerMakeRefFunc<TValue> makeRefFunc
-  )
+  [[nodiscard]] gpg::RRef CopyIntegerValueRef(gpg::RRef* const sourceRef)
   {
     TValue* valueCopy = static_cast<TValue*>(::operator new(sizeof(TValue)));
     try {
@@ -73,46 +68,30 @@ namespace
       throw;
     }
 
-    gpg::RRef outRef{};
-    makeRefFunc(&outRef, valueCopy);
-    return outRef;
+    return gpg::MakeRRef<TValue>(valueCopy);
   }
 
   template <class TValue>
-  [[nodiscard]] gpg::RRef MoveIntegerValueRef(
-    void* const slotObject,
-    gpg::RRef* const sourceRef,
-    const IntegerMakeRefFunc<TValue> makeRefFunc
-  )
+  [[nodiscard]] gpg::RRef MoveIntegerValueRef(void* const slotObject, gpg::RRef* const sourceRef)
   {
     TValue* slot = static_cast<TValue*>(slotObject);
     if (slot != nullptr) {
       *slot = *TryUpcastIntegerValue<TValue>(sourceRef);
     }
 
-    gpg::RRef outRef{};
-    makeRefFunc(&outRef, slot);
-    return outRef;
+    return gpg::MakeRRef<TValue>(slot);
   }
 
   template <class TValue>
-  [[nodiscard]] gpg::RRef ConstructIntegerValueRef(
-    void* const slotObject,
-    const IntegerMakeRefFunc<TValue> makeRefFunc
-  )
+  [[nodiscard]] gpg::RRef ConstructIntegerValueRef(void* const slotObject)
   {
-    gpg::RRef outRef{};
-    makeRefFunc(&outRef, static_cast<TValue*>(slotObject));
-    return outRef;
+    return gpg::MakeRRef<TValue>(static_cast<TValue*>(slotObject));
   }
 
   template <class TValue>
-  [[nodiscard]] gpg::RRef NewIntegerValueRef(const IntegerMakeRefFunc<TValue> makeRefFunc)
+  [[nodiscard]] gpg::RRef NewIntegerValueRef()
   {
-    TValue* const slot = static_cast<TValue*>(::operator new(sizeof(TValue)));
-    gpg::RRef outRef{};
-    makeRefFunc(&outRef, slot);
-    return outRef;
+    return gpg::MakeRRef<TValue>(static_cast<TValue*>(::operator new(sizeof(TValue))));
   }
 
   template <class TValue>
@@ -320,7 +299,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewCharRef()
   {
-    return NewIntegerValueRef<char>(&gpg::RRef_char);
+    return NewIntegerValueRef<char>();
   }
 
   /**
@@ -328,7 +307,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructCharRef(void* const slotObject)
   {
-    return ConstructIntegerValueRef<char>(slotObject, &gpg::RRef_char);
+    return ConstructIntegerValueRef<char>(slotObject);
   }
 
   /**
@@ -336,7 +315,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CopyCharRef(gpg::RRef* const sourceRef)
   {
-    return CopyIntegerValueRef<char>(sourceRef, &gpg::RRef_char);
+    return CopyIntegerValueRef<char>(sourceRef);
   }
 
   /**
@@ -344,7 +323,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MoveCharRef(void* const slotObject, gpg::RRef* const sourceRef)
   {
-    return MoveIntegerValueRef<char>(slotObject, sourceRef, &gpg::RRef_char);
+    return MoveIntegerValueRef<char>(slotObject, sourceRef);
   }
 
   /**
@@ -374,7 +353,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewShortRef()
   {
-    return NewIntegerValueRef<short>(&gpg::RRef_short);
+    return NewIntegerValueRef<short>();
   }
 
   /**
@@ -382,7 +361,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructShortRef(void* const slotObject)
   {
-    return ConstructIntegerValueRef<short>(slotObject, &gpg::RRef_short);
+    return ConstructIntegerValueRef<short>(slotObject);
   }
 
   /**
@@ -390,7 +369,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CopyShortRef(gpg::RRef* const sourceRef)
   {
-    return CopyIntegerValueRef<short>(sourceRef, &gpg::RRef_short);
+    return CopyIntegerValueRef<short>(sourceRef);
   }
 
   /**
@@ -398,7 +377,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MoveShortRef(void* const slotObject, gpg::RRef* const sourceRef)
   {
-    return MoveIntegerValueRef<short>(slotObject, sourceRef, &gpg::RRef_short);
+    return MoveIntegerValueRef<short>(slotObject, sourceRef);
   }
 
   /**
@@ -428,7 +407,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewIntRef()
   {
-    return NewIntegerValueRef<int>(&gpg::RRef_int);
+    return NewIntegerValueRef<int>();
   }
 
   /**
@@ -436,7 +415,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructIntRef(void* const slotObject)
   {
-    return ConstructIntegerValueRef<int>(slotObject, &gpg::RRef_int);
+    return ConstructIntegerValueRef<int>(slotObject);
   }
 
   /**
@@ -444,7 +423,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CopyIntRef(gpg::RRef* const sourceRef)
   {
-    return CopyIntegerValueRef<int>(sourceRef, &gpg::RRef_int);
+    return CopyIntegerValueRef<int>(sourceRef);
   }
 
   /**
@@ -452,7 +431,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MoveIntRef(void* const slotObject, gpg::RRef* const sourceRef)
   {
-    return MoveIntegerValueRef<int>(slotObject, sourceRef, &gpg::RRef_int);
+    return MoveIntegerValueRef<int>(slotObject, sourceRef);
   }
 
   /**
@@ -482,7 +461,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewLongRef()
   {
-    return NewIntegerValueRef<long>(&gpg::RRef_long);
+    return NewIntegerValueRef<long>();
   }
 
   /**
@@ -490,7 +469,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructLongRef(void* const slotObject)
   {
-    return ConstructIntegerValueRef<long>(slotObject, &gpg::RRef_long);
+    return ConstructIntegerValueRef<long>(slotObject);
   }
 
   /**
@@ -498,7 +477,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CopyLongRef(gpg::RRef* const sourceRef)
   {
-    return CopyIntegerValueRef<long>(sourceRef, &gpg::RRef_long);
+    return CopyIntegerValueRef<long>(sourceRef);
   }
 
   /**
@@ -506,7 +485,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MoveLongRef(void* const slotObject, gpg::RRef* const sourceRef)
   {
-    return MoveIntegerValueRef<long>(slotObject, sourceRef, &gpg::RRef_long);
+    return MoveIntegerValueRef<long>(slotObject, sourceRef);
   }
 
   /**
@@ -536,7 +515,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewSignedCharRef()
   {
-    return NewIntegerValueRef<signed char>(&gpg::RRef_schar);
+    return NewIntegerValueRef<signed char>();
   }
 
   /**
@@ -544,7 +523,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructSignedCharRef(void* const slotObject)
   {
-    return ConstructIntegerValueRef<signed char>(slotObject, &gpg::RRef_schar);
+    return ConstructIntegerValueRef<signed char>(slotObject);
   }
 
   /**
@@ -552,7 +531,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CopySignedCharRef(gpg::RRef* const sourceRef)
   {
-    return CopyIntegerValueRef<signed char>(sourceRef, &gpg::RRef_schar);
+    return CopyIntegerValueRef<signed char>(sourceRef);
   }
 
   /**
@@ -560,7 +539,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MoveSignedCharRef(void* const slotObject, gpg::RRef* const sourceRef)
   {
-    return MoveIntegerValueRef<signed char>(slotObject, sourceRef, &gpg::RRef_schar);
+    return MoveIntegerValueRef<signed char>(slotObject, sourceRef);
   }
 
   /**
@@ -590,7 +569,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewUnsignedCharRef()
   {
-    return NewIntegerValueRef<unsigned char>(&gpg::RRef_uchar);
+    return NewIntegerValueRef<unsigned char>();
   }
 
   /**
@@ -598,7 +577,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructUnsignedCharRef(void* const slotObject)
   {
-    return ConstructIntegerValueRef<unsigned char>(slotObject, &gpg::RRef_uchar);
+    return ConstructIntegerValueRef<unsigned char>(slotObject);
   }
 
   /**
@@ -606,7 +585,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CopyUnsignedCharRef(gpg::RRef* const sourceRef)
   {
-    return CopyIntegerValueRef<unsigned char>(sourceRef, &gpg::RRef_uchar);
+    return CopyIntegerValueRef<unsigned char>(sourceRef);
   }
 
   /**
@@ -614,7 +593,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MoveUnsignedCharRef(void* const slotObject, gpg::RRef* const sourceRef)
   {
-    return MoveIntegerValueRef<unsigned char>(slotObject, sourceRef, &gpg::RRef_uchar);
+    return MoveIntegerValueRef<unsigned char>(slotObject, sourceRef);
   }
 
   /**
@@ -644,7 +623,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewUnsignedShortRef()
   {
-    return NewIntegerValueRef<unsigned short>(&gpg::RRef_ushort);
+    return NewIntegerValueRef<unsigned short>();
   }
 
   /**
@@ -652,7 +631,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructUnsignedShortRef(void* const slotObject)
   {
-    return ConstructIntegerValueRef<unsigned short>(slotObject, &gpg::RRef_ushort);
+    return ConstructIntegerValueRef<unsigned short>(slotObject);
   }
 
   /**
@@ -660,7 +639,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CopyUnsignedShortRef(gpg::RRef* const sourceRef)
   {
-    return CopyIntegerValueRef<unsigned short>(sourceRef, &gpg::RRef_ushort);
+    return CopyIntegerValueRef<unsigned short>(sourceRef);
   }
 
   /**
@@ -668,7 +647,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MoveUnsignedShortRef(void* const slotObject, gpg::RRef* const sourceRef)
   {
-    return MoveIntegerValueRef<unsigned short>(slotObject, sourceRef, &gpg::RRef_ushort);
+    return MoveIntegerValueRef<unsigned short>(slotObject, sourceRef);
   }
 
   /**
@@ -698,7 +677,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewUnsignedIntRef()
   {
-    return NewIntegerValueRef<unsigned int>(&gpg::RRef_uint);
+    return NewIntegerValueRef<unsigned int>();
   }
 
   /**
@@ -706,7 +685,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructUnsignedIntRef(void* const slotObject)
   {
-    return ConstructIntegerValueRef<unsigned int>(slotObject, &gpg::RRef_uint);
+    return ConstructIntegerValueRef<unsigned int>(slotObject);
   }
 
   /**
@@ -714,7 +693,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CopyUnsignedIntRef(gpg::RRef* const sourceRef)
   {
-    return CopyIntegerValueRef<unsigned int>(sourceRef, &gpg::RRef_uint);
+    return CopyIntegerValueRef<unsigned int>(sourceRef);
   }
 
   /**
@@ -722,7 +701,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MoveUnsignedIntRef(void* const slotObject, gpg::RRef* const sourceRef)
   {
-    return MoveIntegerValueRef<unsigned int>(slotObject, sourceRef, &gpg::RRef_uint);
+    return MoveIntegerValueRef<unsigned int>(slotObject, sourceRef);
   }
 
   /**
@@ -752,7 +731,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewUnsignedLongRef()
   {
-    return NewIntegerValueRef<unsigned long>(&gpg::RRef_ulong);
+    return NewIntegerValueRef<unsigned long>();
   }
 
   /**
@@ -760,7 +739,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructUnsignedLongRef(void* const slotObject)
   {
-    return ConstructIntegerValueRef<unsigned long>(slotObject, &gpg::RRef_ulong);
+    return ConstructIntegerValueRef<unsigned long>(slotObject);
   }
 
   /**
@@ -768,7 +747,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CopyUnsignedLongRef(gpg::RRef* const sourceRef)
   {
-    return CopyIntegerValueRef<unsigned long>(sourceRef, &gpg::RRef_ulong);
+    return CopyIntegerValueRef<unsigned long>(sourceRef);
   }
 
   /**
@@ -776,7 +755,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MoveUnsignedLongRef(void* const slotObject, gpg::RRef* const sourceRef)
   {
-    return MoveIntegerValueRef<unsigned long>(slotObject, sourceRef, &gpg::RRef_ulong);
+    return MoveIntegerValueRef<unsigned long>(slotObject, sourceRef);
   }
 
   /**

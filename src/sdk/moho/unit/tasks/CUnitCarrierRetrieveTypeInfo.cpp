@@ -38,7 +38,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeCUnitCarrierRetrieveRef(moho::CUnitCarrierRetrieve* const object)
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitCarrierRetrieve(&ref, object);
+    ref = gpg::MakeRRef<moho::CUnitCarrierRetrieve>(object);
     return ref;
   }
 } // namespace

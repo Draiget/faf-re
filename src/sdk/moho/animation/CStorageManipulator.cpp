@@ -289,7 +289,7 @@ namespace moho
 
     moho::EEconResource resourceType{};
     gpg::RRef resourceRef;
-    (void)gpg::RRef_EEconResource(&resourceRef, &resourceType);
+    resourceRef = gpg::MakeRRef<moho::EEconResource>(&resourceType);
     const char* const resourceName = lua_tostring(rawState, 3);
     if (resourceName == nullptr) {
       LuaPlus::LuaStackObject resourceArg(state, 3);
@@ -671,7 +671,7 @@ namespace moho
     archive->Write(IAniManipulator::StaticGetClass(), this, ownerRef);
 
     gpg::RRef unitRef{};
-    (void)gpg::RRef_Unit(&unitRef, mUnit);
+    unitRef = gpg::MakeRRef<moho::Unit>(mUnit);
     gpg::WriteRawPointer(archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     gpg::RType* const vector3Type = CachedVector3fType();

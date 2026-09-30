@@ -196,7 +196,7 @@ gpg::RRef gpg::RFastVectorType<moho::SOCellPos>::SubscriptIndex(void* obj, const
 {
   auto& cells = *static_cast<gpg::core::FastVectorInline<moho::SOCellPos>*>(obj);
   gpg::RRef out{};
-  gpg::RRef_SOCellPos(&out, cells.Data() + static_cast<std::size_t>(ind));
+  out = gpg::MakeRRef<moho::SOCellPos>(cells.Data() + static_cast<std::size_t>(ind));
   return out;
 }
 

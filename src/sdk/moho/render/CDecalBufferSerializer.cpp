@@ -15,7 +15,6 @@ namespace gpg
 {
   // Defined in gpg/core/containers/ArchiveSerialization.cpp; builds one reflected
   // reference for a `moho::Sim*` while preserving derived runtime type.
-  RRef* RRef_Sim(RRef* outRef, moho::Sim* value);
 } // namespace gpg
 
 namespace
@@ -112,12 +111,12 @@ namespace moho
       CDecalHandle* const handle = (node != nullptr) ? CDecalHandle::FromListNode(node) : nullptr;
 
       gpg::RRef handleRef{};
-      gpg::RRef_CDecalHandle(&handleRef, handle);
+      handleRef = gpg::MakeRRef<moho::CDecalHandle>(handle);
       gpg::WriteRawPointer(ar, handleRef, gpg::TrackedPointerState::Owned, gpg::RRef{});
     }
 
     gpg::RRef terminatorRef{};
-    gpg::RRef_CDecalHandle_P(&terminatorRef, nullptr);
+    terminatorRef = gpg::MakeRRef<moho::CDecalHandle*>(nullptr);
     gpg::WriteRawPointer(ar, terminatorRef, gpg::TrackedPointerState::Owned, gpg::RRef{});
   }
 
@@ -135,7 +134,7 @@ namespace moho
   void CDecalBufferSaveCallback(gpg::WriteArchive* const ar, const CDecalBuffer* const buf)
   {
     gpg::RRef simRef{};
-    gpg::RRef_Sim(&simRef, buf->mSim);
+    simRef = gpg::MakeRRef<moho::Sim>(buf->mSim);
     gpg::WriteRawPointer(ar, simRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
     ar->Write(CachedIdPoolType(), &buf->mPool, gpg::RRef{});

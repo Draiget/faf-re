@@ -107,7 +107,7 @@ namespace moho
   {
     auto* const task = new (std::nothrow) CUnitUnloadUnits();
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitUnloadUnits(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitUnloadUnits>(task);
     return ref;
   }
 
@@ -126,7 +126,7 @@ namespace moho
     }
 
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitUnloadUnits(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitUnloadUnits>(task);
     return ref;
   }
 } // namespace moho

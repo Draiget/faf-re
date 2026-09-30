@@ -211,7 +211,7 @@ namespace
   )
   {
     gpg::RRef listenerRef{};
-    (void)gpg::RRef_Listener_EAiNavigatorEvent(&listenerRef, listener);
+    listenerRef = gpg::MakeRRef<moho::Listener<moho::EAiNavigatorEvent>>(listener);
 
     const gpg::RRef nullOwner{};
     gpg::WriteRawPointer(

@@ -575,12 +575,12 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (moho::Listener<const moho::SNavPath&>* const listener : listHead->mListeners.owners()) {
       gpg::RRef ref{};
-      gpg::RRef_Listener_NavPath(&ref, listener);
+      ref = gpg::MakeRRef<moho::Listener<const moho::SNavPath&>>(listener);
       gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Unowned, owner);
     }
 
     gpg::RRef endRef{};
-    gpg::RRef_Listener_NavPath(&endRef, nullptr);
+    endRef = gpg::MakeRRef<moho::Listener<const moho::SNavPath&>>(nullptr);
     gpg::WriteRawPointer(archive, endRef, gpg::TrackedPointerState::Unowned, owner);
   }
 } // namespace

@@ -672,7 +672,8 @@ namespace
     gpg::RRef* const outRef, CScriptObject** const scriptObjectSlot
   )
   {
-    return gpg::RRef_CScriptObject_P(outRef, scriptObjectSlot);
+    *outRef = gpg::MakeRRef<moho::CScriptObject*>(scriptObjectSlot);
+    return outRef;
   }
 
   /**
@@ -684,7 +685,8 @@ namespace
    */
   [[maybe_unused]] gpg::RRef* StoreCScriptEventRef(gpg::RRef* const outRef, CScriptEvent* const event)
   {
-    return gpg::RRef_CScriptEvent(outRef, event);
+    *outRef = gpg::MakeRRef<moho::CScriptEvent>(event);
+    return outRef;
   }
 
   /**
@@ -697,7 +699,7 @@ namespace
     // Binary: `operator new(0x44)`, which is sizeof(CScriptEvent) on x86.
     auto* const event = static_cast<CScriptEvent*>(::operator new(sizeof(CScriptEvent)));
     new (event) CScriptEvent();
-    (void)gpg::RRef_CScriptEvent(&out, event);
+    out = gpg::MakeRRef<moho::CScriptEvent>(event);
     return out;
   }
 
@@ -720,7 +722,7 @@ namespace
       new (event) CScriptEvent();
     }
     gpg::RRef out{};
-    (void)gpg::RRef_CScriptEvent(&out, event);
+    out = gpg::MakeRRef<moho::CScriptEvent>(event);
     return out;
   }
 
@@ -830,7 +832,7 @@ gpg::RType* CScriptEvent::GetClass() const
 gpg::RRef CScriptEvent::GetDerivedObjectRef()
 {
   gpg::RRef out{};
-  (void)gpg::RRef_CScriptEvent(&out, this);
+  out = gpg::MakeRRef<moho::CScriptEvent>(this);
   return out;
 }
 
@@ -2901,7 +2903,7 @@ Prop* moho::SCR_FromLua_Prop(const LuaPlus::LuaObject& object, LuaPlus::LuaState
 gpg::RRef moho::SCR_MakeScriptObjectRef(CScriptObject* object)
 {
   gpg::RRef out{};
-  (void)gpg::RRef_CScriptObject(&out, object);
+  out = gpg::MakeRRef<moho::CScriptObject>(object);
   return out;
 }
 

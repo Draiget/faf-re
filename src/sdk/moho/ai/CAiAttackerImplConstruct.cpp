@@ -33,7 +33,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeCAiAttackerImplRef(CAiAttackerImpl* const object)
   {
     gpg::RRef ref{};
-    gpg::RRef_CAiAttackerImpl(&ref, object);
+    ref = gpg::MakeRRef<moho::CAiAttackerImpl>(object);
     return ref;
   }
 

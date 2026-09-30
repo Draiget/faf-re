@@ -31,7 +31,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeCAiFormationDBImplRef(CAiFormationDBImpl* const object) noexcept
   {
     gpg::RRef out{};
-    (void)gpg::RRef_CAiFormationDBImpl(&out, object);
+    out = gpg::MakeRRef<moho::CAiFormationDBImpl>(object);
     return out;
   }
 

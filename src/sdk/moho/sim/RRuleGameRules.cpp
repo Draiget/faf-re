@@ -1414,7 +1414,7 @@ namespace moho
     }
 
     gpg::RRef footprintsRef{};
-    gpg::RRef_SRuleFootprintsBlueprint(&footprintsRef, &mFootprints);
+    footprintsRef = gpg::MakeRRef<moho::SRuleFootprintsBlueprint>(&mFootprints);
     REF_UpdateMD5(context, footprintsRef, file, 1);
 
     const auto blueprintCount = static_cast<std::uint32_t>(mBlueprintsByOrdinal.size());
@@ -1434,7 +1434,7 @@ namespace moho
       }
 
       gpg::RRef blueprintRef{};
-      gpg::RRef_RBlueprint(&blueprintRef, blueprint);
+      blueprintRef = gpg::MakeRRef<moho::RBlueprint>(blueprint);
       REF_UpdateMD5(context, blueprintRef, file, 1);
     }
 

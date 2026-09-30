@@ -487,7 +487,7 @@ namespace
 
     gpg::RRef out{};
     auto* const reference = reinterpret_cast<std::vector<bool>::reference*>(&gRecoveredRVectorTypeBoolSubscriptCursorScratch);
-    (void)gpg::RRef_VectorBoolReference(&out, reference);
+    out = gpg::MakeRRef<std::vector<bool>::reference>(reference);
     return out;
   }
 

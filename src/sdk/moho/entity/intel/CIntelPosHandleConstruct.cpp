@@ -39,7 +39,7 @@ namespace moho
       }
 
       gpg::RRef ref{};
-      gpg::RRef_CIntelPosHandle(&ref, object);
+      ref = gpg::MakeRRef<moho::CIntelPosHandle>(object);
       result->SetUnowned(ref, 0u);
     }
   } // namespace

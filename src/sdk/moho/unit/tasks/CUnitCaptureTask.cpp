@@ -525,7 +525,7 @@ namespace moho
     archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
 
     gpg::RRef commandRef{};
-    (void)gpg::RRef_CUnitCommand(&commandRef, mCommand);
+    commandRef = gpg::MakeRRef<moho::CUnitCommand>(mCommand);
     gpg::WriteRawPointer(archive, commandRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     archive->Write(CachedWeakPtrEntityType(), &mTargetEntity, ownerRef);
@@ -534,7 +534,7 @@ namespace moho
     archive->WriteInt(mCaptureTime);
 
     gpg::RRef economyRequestRef{};
-    (void)gpg::RRef_CEconRequest(&economyRequestRef, mConsumptionData);
+    economyRequestRef = gpg::MakeRRef<moho::CEconRequest>(mConsumptionData);
     gpg::WriteRawPointer(archive, economyRequestRef, gpg::TrackedPointerState::Owned, ownerRef);
 
     archive->Write(CachedSEconValueType(), &mCaptureRate, ownerRef);

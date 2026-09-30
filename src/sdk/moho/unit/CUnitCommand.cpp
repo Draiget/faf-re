@@ -86,7 +86,7 @@ namespace
   [[nodiscard]] const RUnitBlueprint* AsUnitBlueprint(REntityBlueprint* const blueprint)
   {
     gpg::RRef blueprintRef{};
-    (void)gpg::RRef_REntityBlueprint(&blueprintRef, blueprint);
+    blueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(blueprint);
 
     const gpg::RRef unitRef = gpg::REF_UpcastPtr(blueprintRef, CachedRUnitBlueprintType());
     return static_cast<const RUnitBlueprint*>(unitRef.mObj);

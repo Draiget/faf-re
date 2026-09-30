@@ -283,7 +283,7 @@ namespace gpg
       return out;
     }
 
-    gpg::RRef_CAniPoseBone(&out, &vec[ind]);
+    out = gpg::MakeRRef<moho::CAniPoseBone>(&vec[ind]);
     return out;
   }
 

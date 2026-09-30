@@ -86,7 +86,7 @@ namespace
   {
     CAiPathSpline* const spline = new (std::nothrow) CAiPathSpline();
     gpg::RRef out{};
-    gpg::RRef_CAiPathSpline(&out, spline);
+    out = gpg::MakeRRef<moho::CAiPathSpline>(spline);
     return out;
   }
 

@@ -26,7 +26,7 @@ void DeserializeLuaStatePointerPair(
 	(void)archive->ReadPointer(&rootState, ownerRef);
 
 	gpg::RRef rootStateRef{};
-	(void)gpg::RRef_lua_State(&rootStateRef, rootState->m_state);
+	rootStateRef = gpg::MakeRRef<lua_State>(rootState->m_state);
 
 	lua_State* activeState = nullptr;
 	(void)archive->ReadPointer(&activeState, &rootStateRef);

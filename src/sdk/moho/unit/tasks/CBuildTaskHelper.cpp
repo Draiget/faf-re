@@ -483,7 +483,7 @@ namespace moho
     const gpg::RRef ownerRef{};
 
     gpg::RRef unitRef{};
-    gpg::RRef_Unit(&unitRef, mUnit);
+    unitRef = gpg::MakeRRef<moho::Unit>(mUnit);
     gpg::WriteRawPointer(archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     gpg::RRef simRef{};

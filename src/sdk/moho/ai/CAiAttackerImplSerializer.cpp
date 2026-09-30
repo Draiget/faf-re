@@ -163,7 +163,7 @@ void CAiAttackerImpl::SerializePointerVectors(gpg::WriteArchive* const archive, 
   archive->WriteUInt(weaponCount);
   for (unsigned int i = 0; i < weaponCount; ++i) {
     gpg::RRef pointerRef{};
-    gpg::RRef_UnitWeapon(&pointerRef, object->mWeapons[static_cast<std::size_t>(i)]);
+    pointerRef = gpg::MakeRRef<moho::UnitWeapon>(object->mWeapons[static_cast<std::size_t>(i)]);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Owned, ownerRef);
   }
 
@@ -171,7 +171,7 @@ void CAiAttackerImpl::SerializePointerVectors(gpg::WriteArchive* const archive, 
   archive->WriteUInt(taskCount);
   for (unsigned int i = 0; i < taskCount; ++i) {
     gpg::RRef pointerRef{};
-    gpg::RRef_CAcquireTargetTask(&pointerRef, object->mTasks[static_cast<std::size_t>(i)]);
+    pointerRef = gpg::MakeRRef<moho::CAcquireTargetTask>(object->mTasks[static_cast<std::size_t>(i)]);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Owned, ownerRef);
   }
 }
@@ -264,7 +264,7 @@ void CAiAttackerImpl::MemberSerialize(const CAiAttackerImpl* const object, gpg::
   archive->Write(attackerType, static_cast<const IAiAttacker*>(object), ownerRef);
 
   gpg::RRef unitRef{};
-  gpg::RRef_Unit(&unitRef, object->mUnit);
+  unitRef = gpg::MakeRRef<moho::Unit>(object->mUnit);
   gpg::WriteRawPointer(archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
   SerializePointerVectors(archive, object);

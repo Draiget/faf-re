@@ -4118,7 +4118,7 @@ int moho::cfunc_ToggleFireStateL(LuaPlus::LuaState* const state)
   EFireState nextFireState = static_cast<EFireState>((currentFireState + 1) % 3);
 
   gpg::RRef nextFireStateRef{};
-  gpg::RRef_EFireState(&nextFireStateRef, &nextFireState);
+  nextFireStateRef = gpg::MakeRRef<moho::EFireState>(&nextFireState);
   const msvc8::string nextFireStateLexical = nextFireStateRef.GetLexical();
 
   if (unitsObject.IsTable()) {
@@ -12361,10 +12361,10 @@ void SSTIUnitVariableData::MemberSerialize(gpg::WriteArchive* const archive)
   // each wrapped via gpg::RRef_CAniPose and emitted through WriteRawPointer
   // with TrackedPointerState::Shared (the binary's `push 3; state`).
   gpg::RRef poseRef{};
-  (void)gpg::RRef_CAniPose(&poseRef, mPriorSharedPose.get());
+  poseRef = gpg::MakeRRef<moho::CAniPose>(mPriorSharedPose.get());
   gpg::WriteRawPointer(archive, poseRef, gpg::TrackedPointerState::Shared, ownerRef);
 
-  (void)gpg::RRef_CAniPose(&poseRef, mSharedPose.get());
+  poseRef = gpg::MakeRRef<moho::CAniPose>(mSharedPose.get());
   gpg::WriteRawPointer(archive, poseRef, gpg::TrackedPointerState::Shared, ownerRef);
 
   archive->Write(CachedUnitWeaponInfoVectorType(), &mWeaponInfo, ownerRef);
@@ -13465,7 +13465,7 @@ void Unit::MemberConstruct(
   }
 
   gpg::RRef unitRef{};
-  gpg::RRef_Unit(&unitRef, unit);
+  unitRef = gpg::MakeRRef<moho::Unit>(unit);
 
   // SetUnowned records the constructed object paired with its owning Sim: the
   // binary keeps RRef_Unit's base-adjusted object pointer but stores the Sim in
@@ -15356,13 +15356,13 @@ void Unit::SerEconomyEvents(gpg::WriteArchive& archive, const int) const
   for (auto* node = mEconomyEventListHead.mNext; node != &mEconomyEventListHead; node = node->mNext) {
     gpg::RRef eventOwnerRef{};
     gpg::RRef eventRef{};
-    gpg::RRef_CEconomyEvent(&eventRef, node->Get());
+    eventRef = gpg::MakeRRef<moho::CEconomyEvent>(node->Get());
     gpg::WriteRawPointer(&archive, eventRef, gpg::TrackedPointerState::Owned, eventOwnerRef);
   }
 
   gpg::RRef tailOwnerRef{};
   gpg::RRef nullRef{};
-  gpg::RRef_CEconomyEvent_P(&nullRef, nullptr);
+  nullRef = gpg::MakeRRef<moho::CEconomyEvent*>(nullptr);
   gpg::WriteRawPointer(&archive, nullRef, gpg::TrackedPointerState::Owned, tailOwnerRef);
 }
 
@@ -17326,7 +17326,6 @@ void Unit::SetFireState(const std::int32_t fireState)
 // ===== Recovered Unit reflection serializer bodies (FUN_006B33A0 / FUN_006B2B50) =====
 namespace gpg
 {
-  gpg::RRef* RRef_CEconStorage(gpg::RRef* outRef, moho::CEconStorage* value);
 } // namespace gpg
 
 namespace moho
@@ -17398,17 +17397,17 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
   // Owned AI / motion / command sidecar pointers (tracked OWNED lanes).
   {
     gpg::RRef ref{};
-    gpg::RRef_IAiSteering(&ref, unit->AiSteering);
+    ref = gpg::MakeRRef<moho::IAiSteering>(unit->AiSteering);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
   {
     gpg::RRef ref{};
-    gpg::RRef_CUnitMotion(&ref, unit->UnitMotion);
+    ref = gpg::MakeRRef<moho::CUnitMotion>(unit->UnitMotion);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
   {
     gpg::RRef ref{};
-    gpg::RRef_CUnitCommandQueue(&ref, unit->CommandQueue);
+    ref = gpg::MakeRRef<moho::CUnitCommandQueue>(unit->CommandQueue);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
 
@@ -17437,7 +17436,7 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
   // Owned extra economy storage.
   {
     gpg::RRef ref{};
-    gpg::RRef_CEconStorage(&ref, unit->mExtraStorage);
+    ref = gpg::MakeRRef<moho::CEconStorage>(unit->mExtraStorage);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
 
@@ -17446,7 +17445,7 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
   // Owned consumption (upkeep) request.
   {
     gpg::RRef ref{};
-    gpg::RRef_CEconRequest(&ref, unit->mConsumptionData);
+    ref = gpg::MakeRRef<moho::CEconRequest>(unit->mConsumptionData);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
 
@@ -17457,39 +17456,39 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
   // Owned animation actor.
   {
     gpg::RRef ref{};
-    gpg::RRef_CAniActor(&ref, unit->AniActor);
+    ref = gpg::MakeRRef<moho::CAniActor>(unit->AniActor);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
 
   // Owned AI implementation lanes.
   {
     gpg::RRef ref{};
-    gpg::RRef_IAiAttacker(&ref, unit->AiAttacker);
+    ref = gpg::MakeRRef<moho::IAiAttacker>(unit->AiAttacker);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
   {
     gpg::RRef ref{};
-    gpg::RRef_IAiCommandDispatch(&ref, unit->AiCommandDispatch);
+    ref = gpg::MakeRRef<moho::IAiCommandDispatch>(unit->AiCommandDispatch);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
   {
     gpg::RRef ref{};
-    gpg::RRef_IAiNavigator(&ref, unit->AiNavigator);
+    ref = gpg::MakeRRef<moho::IAiNavigator>(unit->AiNavigator);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
   {
     gpg::RRef ref{};
-    gpg::RRef_IAiBuilder(&ref, unit->AiBuilder);
+    ref = gpg::MakeRRef<moho::IAiBuilder>(unit->AiBuilder);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
   {
     gpg::RRef ref{};
-    gpg::RRef_IAiSiloBuild(&ref, unit->AiSiloBuild);
+    ref = gpg::MakeRRef<moho::IAiSiloBuild>(unit->AiSiloBuild);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
   {
     gpg::RRef ref{};
-    gpg::RRef_IAiTransport(&ref, unit->AiTransport);
+    ref = gpg::MakeRRef<moho::IAiTransport>(unit->AiTransport);
     gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
   }
 

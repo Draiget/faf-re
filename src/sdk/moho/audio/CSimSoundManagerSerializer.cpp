@@ -150,12 +150,12 @@ namespace
         );
 
       gpg::RRef soundRef{};
-      gpg::RRef_HSound(&soundRef, const_cast<moho::HSound*>(sound));
+      soundRef = gpg::MakeRRef<moho::HSound>(const_cast<moho::HSound*>(sound));
       gpg::WriteRawPointer(archive, soundRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
     }
 
     gpg::RRef nullRef{};
-    gpg::RRef_HSound(&nullRef, nullptr);
+    nullRef = gpg::MakeRRef<moho::HSound>(nullptr);
     gpg::WriteRawPointer(archive, nullRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
   }
 

@@ -9,6 +9,8 @@
 #include "String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "lua/LuaObject.h"
+#include "lua/LuaRuntimeTypes.h"
 
 using namespace gpg;
 
@@ -770,7 +772,7 @@ WriteArchive* WriteArchive::WriteValue(const void* const valueLane, const int /*
 WriteArchive* WriteArchive::WriteTThread(lua_State* const threadState, const RRef& ownerRef)
 {
     RRef objectRef{};
-    (void)RRef_lua_State(&objectRef, threadState);
+    objectRef = gpg::MakeRRef<lua_State>(threadState);
     WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
     return this;
 }
@@ -785,7 +787,7 @@ WriteArchive* WriteArchive::WriteTThread(lua_State* const threadState, const RRe
 WriteArchive* WriteArchive::WriteTString(TString* const value, const RRef& ownerRef)
 {
     RRef objectRef{};
-    (void)RRef_TString(&objectRef, value);
+    objectRef = gpg::MakeRRef<TString>(value);
     WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
     return this;
 }
@@ -800,7 +802,7 @@ WriteArchive* WriteArchive::WriteTString(TString* const value, const RRef& owner
 WriteArchive* WriteArchive::WriteTTable(Table* const table, const RRef& ownerRef)
 {
     RRef objectRef{};
-    (void)RRef_Table(&objectRef, table);
+    objectRef = gpg::MakeRRef<Table>(table);
     WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
     return this;
 }
@@ -815,7 +817,7 @@ WriteArchive* WriteArchive::WriteTTable(Table* const table, const RRef& ownerRef
 WriteArchive* WriteArchive::WriteFunction(LClosure* const closure, const RRef& ownerRef)
 {
     RRef objectRef{};
-    (void)RRef_LClosure(&objectRef, closure);
+    objectRef = gpg::MakeRRef<LClosure>(closure);
     WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
     return this;
 }
@@ -830,7 +832,7 @@ WriteArchive* WriteArchive::WriteFunction(LClosure* const closure, const RRef& o
 WriteArchive* WriteArchive::WriteUserdata(Udata* const userdata, const RRef& ownerRef)
 {
     RRef objectRef{};
-    (void)RRef_Udata(&objectRef, userdata);
+    objectRef = gpg::MakeRRef<Udata>(userdata);
     WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
     return this;
 }
@@ -845,7 +847,7 @@ WriteArchive* WriteArchive::WriteUserdata(Udata* const userdata, const RRef& own
 WriteArchive* WriteArchive::WriteCFunction(CClosure* const closure, const RRef& ownerRef)
 {
     RRef objectRef{};
-    (void)RRef_CClosure(&objectRef, closure);
+    objectRef = gpg::MakeRRef<CClosure>(closure);
     WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
     return this;
 }

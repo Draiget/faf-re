@@ -1100,13 +1100,13 @@ namespace moho
     (void)gpg::RRef_CCommandTask(&pointerRef, mDispatchTask);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    (void)gpg::RRef_CUnitCommand(&pointerRef, mCommand);
+    pointerRef = gpg::MakeRRef<moho::CUnitCommand>(mCommand);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     (void)gpg::RRef_IFormationInstance(&pointerRef, static_cast<IFormationInstance*>(mFormation));
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    (void)gpg::RRef_UnitWeapon(&pointerRef, mWeapon);
+    pointerRef = gpg::MakeRRef<moho::UnitWeapon>(mWeapon);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);

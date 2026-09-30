@@ -14,7 +14,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeSSessionSaveDataRef(SSessionSaveData* const object)
   {
     gpg::RRef out{};
-    gpg::RRef_SSessionSaveData(&out, object);
+    out = gpg::MakeRRef<moho::SSessionSaveData>(object);
     return out;
   }
 

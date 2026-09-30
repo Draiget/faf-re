@@ -81,7 +81,7 @@ namespace moho
   {
     auto* const task = new (std::nothrow) CFactoryBuildTask();
     gpg::RRef ref{};
-    (void)gpg::RRef_CFactoryBuildTask(&ref, task);
+    ref = gpg::MakeRRef<moho::CFactoryBuildTask>(task);
     return ref;
   }
 
@@ -100,7 +100,7 @@ namespace moho
     }
 
     gpg::RRef ref{};
-    (void)gpg::RRef_CFactoryBuildTask(&ref, task);
+    ref = gpg::MakeRRef<moho::CFactoryBuildTask>(task);
     return ref;
   }
 } // namespace moho

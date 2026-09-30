@@ -115,7 +115,7 @@ gpg::RRef LAiAttackerImplTypeInfo::NewRef()
 {
   auto* const task = new (std::nothrow) LAiAttackerImpl(nullptr);
   gpg::RRef out{};
-  gpg::RRef_LAiAttackerImpl(&out, task);
+  out = gpg::MakeRRef<moho::LAiAttackerImpl>(task);
   return out;
 }
 
@@ -134,7 +134,7 @@ gpg::RRef LAiAttackerImplTypeInfo::CtrRef(void* const objectStorage)
   }
 
   gpg::RRef out{};
-  gpg::RRef_LAiAttackerImpl(&out, task);
+  out = gpg::MakeRRef<moho::LAiAttackerImpl>(task);
   return out;
 }
 

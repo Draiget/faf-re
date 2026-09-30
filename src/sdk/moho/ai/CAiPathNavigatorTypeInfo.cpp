@@ -54,7 +54,7 @@ namespace
   gpg::RRef* PopulateCAiPathNavigatorRef(gpg::RRef* const out, CAiPathNavigator* const value)
   {
     gpg::RRef temp{};
-    gpg::RRef_CAiPathNavigator(&temp, value);
+    temp = gpg::MakeRRef<moho::CAiPathNavigator>(value);
     *out = temp;
     return out;
   }

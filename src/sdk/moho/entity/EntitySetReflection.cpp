@@ -347,7 +347,7 @@ namespace
   )
   {
     gpg::RRef tmp{};
-    (void)gpg::RRef_EntitySetBase(&tmp, value);
+    tmp = gpg::MakeRRef<moho::EntitySetBase>(value);
     out->mObj = tmp.mObj;
     out->mType = tmp.mType;
     return out;

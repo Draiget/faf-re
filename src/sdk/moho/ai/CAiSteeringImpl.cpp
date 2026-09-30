@@ -1114,11 +1114,11 @@ void CAiSteeringImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->Write(taskType, static_cast<const CTask*>(this), ownerRef);
 
   gpg::RRef pathRef{};
-  gpg::RRef_CAiPathSpline(&pathRef, mPath);
+  pathRef = gpg::MakeRRef<moho::CAiPathSpline>(mPath);
   gpg::WriteRawPointer(archive, pathRef, gpg::TrackedPointerState::Owned, ownerRef);
 
   gpg::RRef unitRef{};
-  gpg::RRef_Unit(&unitRef, mOwnerUnit);
+  unitRef = gpg::MakeRRef<moho::Unit>(mOwnerUnit);
   gpg::WriteRawPointer(archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
   archive->WriteUInt(static_cast<unsigned int>(mWaypointCount));
@@ -1144,7 +1144,7 @@ void CAiSteeringImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->Write(layerType, &mMovementLayer, ownerRef);
 
   gpg::RRef motionRef{};
-  gpg::RRef_CUnitMotion(&motionRef, mUnitMotion);
+  motionRef = gpg::MakeRRef<moho::CUnitMotion>(mUnitMotion);
   gpg::WriteRawPointer(archive, motionRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
   gpg::RType* const collisionInfoType = ResolveSCollisionInfoType();

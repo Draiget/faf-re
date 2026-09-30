@@ -44,7 +44,7 @@ namespace moho
   {
     auto* const grid = reinterpret_cast<COGrid*>(static_cast<std::uintptr_t>(objectPtr));
     gpg::RRef selfRef{};
-    gpg::RRef_COGrid(&selfRef, grid);
+    selfRef = gpg::MakeRRef<moho::COGrid>(grid);
     archive->TrackPointer(selfRef);
   }
 
@@ -55,7 +55,7 @@ namespace moho
   {
     auto* const grid = reinterpret_cast<COGrid*>(static_cast<std::uintptr_t>(objectPtr));
     gpg::RRef selfRef{};
-    gpg::RRef_COGrid(&selfRef, grid);
+    selfRef = gpg::MakeRRef<moho::COGrid>(grid);
     archive->PreCreatedPtr(selfRef);
   }
 

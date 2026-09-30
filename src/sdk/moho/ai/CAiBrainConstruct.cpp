@@ -32,7 +32,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeCAiBrainRef(CAiBrain* const object)
   {
     gpg::RRef ref{};
-    gpg::RRef_CAiBrain(&ref, object);
+    ref = gpg::MakeRRef<moho::CAiBrain>(object);
     return ref;
   }
 

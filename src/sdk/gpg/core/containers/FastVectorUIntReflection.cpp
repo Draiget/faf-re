@@ -1461,7 +1461,7 @@ gpg::RRef gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::SubscriptIndex(void*
 {
   auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(obj);
   gpg::RRef out{};
-  gpg::RRef_SSTIEntityAttachInfo(&out, elements.Data() + (static_cast<std::size_t>(ind)));
+  out = gpg::MakeRRef<moho::SSTIEntityAttachInfo>(elements.Data() + (static_cast<std::size_t>(ind)));
   return out;
 }
 

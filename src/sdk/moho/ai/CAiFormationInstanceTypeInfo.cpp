@@ -48,7 +48,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeFormationInstanceRef(CAiFormationInstance* const object)
   {
     gpg::RRef out{};
-    gpg::RRef_CAiFormationInstance(&out, object);
+    out = gpg::MakeRRef<moho::CAiFormationInstance>(object);
     return out;
   }
 

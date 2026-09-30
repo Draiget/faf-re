@@ -206,7 +206,7 @@ namespace gpg
   {
     gpg::RRef out{};
     auto& vec = *static_cast<gpg::fastvector<moho::SEfxCurve>*>(obj);
-    gpg::RRef_SEfxCurve(&out, vec.Data() + ind);
+    out = gpg::MakeRRef<moho::SEfxCurve>(vec.Data() + ind);
     return out;
   }
 

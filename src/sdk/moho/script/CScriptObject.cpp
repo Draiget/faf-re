@@ -152,7 +152,7 @@ namespace
 
     LuaPlus::LuaObject metatable = GetScriptObjectMetatable(state);
     gpg::RRef objectRef{};
-    gpg::RRef_CScriptObject_P(&objectRef, objectSlot);
+    objectRef = gpg::MakeRRef<moho::CScriptObject*>(objectSlot);
     out.AssignNewUserData(state, objectRef);
     out.SetMetaTable(metatable);
     return out;

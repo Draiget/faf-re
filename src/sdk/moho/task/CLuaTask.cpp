@@ -123,7 +123,7 @@ namespace
     }
 
     gpg::RRef taskRef{};
-    (void)gpg::RRef_CLuaTask(&taskRef, task);
+    taskRef = gpg::MakeRRef<moho::CLuaTask>(task);
     result->SetUnowned(taskRef, 0u);
   }
 
@@ -164,7 +164,8 @@ namespace
    */
   [[maybe_unused]] gpg::RRef* StoreCLuaTaskRef(gpg::RRef* const outRef, CLuaTask* const task)
   {
-    return gpg::RRef_CLuaTask(outRef, task);
+    *outRef = gpg::MakeRRef<moho::CLuaTask>(task);
+    return outRef;
   }
 
   /**
@@ -216,7 +217,7 @@ namespace
   )
   {
     gpg::RRef stateRef{};
-    (void)gpg::RRef_LuaState(&stateRef, state);
+    stateRef = gpg::MakeRRef<LuaPlus::LuaState>(state);
     gpg::WriteRawPointer(archive, stateRef, gpg::TrackedPointerState::Owned, ownerRef);
     return archive;
   }

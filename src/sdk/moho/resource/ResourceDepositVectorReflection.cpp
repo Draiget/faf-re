@@ -237,7 +237,7 @@ gpg::RRef gpg::RVectorType_ResourceDeposit::SubscriptIndex(void* const obj, cons
     return out;
   }
 
-  gpg::RRef_ResourceDeposit(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  out = gpg::MakeRRef<moho::ResourceDeposit>(&(*storage)[static_cast<std::size_t>(ind)]);
   return out;
 }
 

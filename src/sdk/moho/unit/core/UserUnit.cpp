@@ -1420,10 +1420,7 @@ namespace moho
       }
 
       gpg::RRef entityRef{};
-      (void)gpg::RRef_REntityBlueprint(
-        &entityRef,
-        helper->mConstantData.blueprint
-      );
+      entityRef = gpg::MakeRRef<moho::REntityBlueprint>(helper->mConstantData.blueprint);
       // The reference `RRef_REntityBlueprint` builds describes the blueprint
       // *object*, and `upcast.mObj` is used as one below, so the target is the
       // class descriptor. `GetPointerType()` is the descriptor for
@@ -3350,10 +3347,7 @@ bool moho::USERUNIT_CanBeBuiltAt(
     }
 
     gpg::RRef buildBlueprintRef{};
-    (void)gpg::RRef_REntityBlueprint(
-      &buildBlueprintRef,
-      helper->mConstantData.blueprint
-    );
+    buildBlueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(helper->mConstantData.blueprint);
     // Object reference in, object pointer out (it is handed to `GetSkirtRect`
     // below), so the upcast target is the class descriptor - the same one
     // `RefreshQueuedBuildGhosts` uses on this exact blueprint lane, and the
@@ -5662,7 +5656,7 @@ int moho::cfunc_UserUnitGetCommandQueueL(LuaPlus::LuaState* const state)
 
     EUnitCommandType commandTypeValue = ResolveHelperCommandType(*helper);
     gpg::RRef commandTypeRef{};
-    gpg::RRef_EUnitCommandType(&commandTypeRef, &commandTypeValue);
+    commandTypeRef = gpg::MakeRRef<moho::EUnitCommandType>(&commandTypeValue);
     const msvc8::string commandTypeLexical = commandTypeRef.GetLexical();
     row.SetString(kCommandQueueTypeKey, commandTypeLexical.c_str());
 

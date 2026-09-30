@@ -648,7 +648,7 @@ namespace
     auto* const history = new (objectStorage) moho::PositionHistory;
 
     gpg::RRef out{};
-    (void)gpg::RRef_PositionHistory(&out, history);
+    out = gpg::MakeRRef<moho::PositionHistory>(history);
     return out;
   }
 
@@ -674,7 +674,7 @@ namespace
     moho::PositionHistory* const history = new (std::nothrow) moho::PositionHistory;
 
     gpg::RRef out{};
-    (void)gpg::RRef_PositionHistory(&out, history);
+    out = gpg::MakeRRef<moho::PositionHistory>(history);
     return out;
   }
 
@@ -692,7 +692,7 @@ namespace
     GPG_ASSERT(sourceRef != nullptr);
     if (sourceRef == nullptr) {
       gpg::RRef out{};
-      (void)gpg::RRef_PositionHistory(&out, nullptr);
+      out = gpg::MakeRRef<moho::PositionHistory>(nullptr);
       return out;
     }
 
@@ -703,7 +703,7 @@ namespace
     auto* const copiedHistory = new (std::nothrow) moho::PositionHistory(*sourceHistory);
 
     gpg::RRef out{};
-    (void)gpg::RRef_PositionHistory(&out, copiedHistory);
+    out = gpg::MakeRRef<moho::PositionHistory>(copiedHistory);
     return out;
   }
 
@@ -730,7 +730,7 @@ namespace
     }
 
     gpg::RRef out{};
-    (void)gpg::RRef_PositionHistory(&out, history);
+    out = gpg::MakeRRef<moho::PositionHistory>(history);
     return out;
   }
 

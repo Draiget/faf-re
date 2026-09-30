@@ -278,12 +278,12 @@ namespace moho
 
     for (const auto& entry : commands) {
       gpg::RRef commandRef{};
-      (void)gpg::RRef_CUnitCommand(&commandRef, entry.second);
+      commandRef = gpg::MakeRRef<moho::CUnitCommand>(entry.second);
       gpg::WriteRawPointer(archive, commandRef, gpg::TrackedPointerState::Owned, NullOwnerRef());
     }
 
     gpg::RRef nullRef{};
-    (void)gpg::RRef_CUnitCommand_P(&nullRef, nullptr);
+    nullRef = gpg::MakeRRef<moho::CUnitCommand*>(nullptr);
     gpg::WriteRawPointer(archive, nullRef, gpg::TrackedPointerState::Owned, NullOwnerRef());
   }
 

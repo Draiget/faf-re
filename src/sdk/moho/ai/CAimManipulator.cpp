@@ -1951,13 +1951,13 @@ void moho::CAimManipulator::MemberSerialize(const CAimManipulator* const object,
   archive->WriteString(&self->mLabel);
 
   gpg::RRef unitWeaponBlueprintRef{};
-  gpg::RRef_RUnitBlueprintWeapon(&unitWeaponBlueprintRef, object->mUnitWepBlueprint);
+  unitWeaponBlueprintRef = gpg::MakeRRef<moho::RUnitBlueprintWeapon>(object->mUnitWepBlueprint);
   gpg::WriteRawPointer(archive, unitWeaponBlueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
   if (UnitWeapon* const weapon = object->mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* const projectileBlueprint = weapon->mProjectileBlueprint;
     gpg::RRef projectileBlueprintRef{};
-    gpg::RRef_RProjectileBlueprint(&projectileBlueprintRef, projectileBlueprint);
+    projectileBlueprintRef = gpg::MakeRRef<moho::RProjectileBlueprint>(projectileBlueprint);
     gpg::WriteRawPointer(archive, projectileBlueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
     if (projectileBlueprint != nullptr) {
       self->mProjPhysBlueprint = &projectileBlueprint->Physics;

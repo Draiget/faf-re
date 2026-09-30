@@ -12,7 +12,12 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "moho/animation/IAniManipulator.h"
+#include "moho/audio/CSndParams.h"
 #include "moho/entity/PositionHistory.h"
+#include "moho/render/CDecalHandle.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SPhysBody.h"
 #include "moho/sim/SPhysConstants.h"
 #include "gpg/core/utils/BoostWrappers.h"
@@ -196,39 +201,6 @@ namespace
     return sType;
   }
 
-  template <class TObject>
-  [[nodiscard]] gpg::RRef* BuildCompatTypedRef(gpg::RRef* const out, TObject* const object, gpg::RType* const staticType)
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    out->mObj = nullptr;
-    out->mType = staticType;
-    if (object == nullptr) {
-      return out;
-    }
-
-    gpg::RType* runtimeType = staticType;
-    try {
-      runtimeType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      runtimeType = staticType;
-    }
-
-    int baseOffset = 0;
-    if (runtimeType != nullptr && staticType != nullptr && runtimeType->IsDerivedFrom(staticType, &baseOffset)) {
-      out->mObj = reinterpret_cast<void*>(
-        reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset)
-      );
-      out->mType = runtimeType;
-      return out;
-    }
-
-    out->mObj = object;
-    out->mType = runtimeType != nullptr ? runtimeType : staticType;
-    return out;
-  }
 
   template <class T>
   void SaveContiguousArchiveVectorPayload(
@@ -675,32 +647,6 @@ GPG_PREREGISTER_INIT(preregister_SPathNeighborTypeInfo_a41c9e, preregister_SPath
 namespace gpg
 {
   /**
-   * Address: 0x005504C0 (FUN_005504C0, gpg::RRef_CAniSkel)
-   * Mangled: ?RRef_CAniSkel@gpg@@YAPAVRRef@1@PAV01@PAVCAniSkel@Moho@@@Z
-   *
-   * IDA signature:
-   * gpg::RRef *__cdecl gpg::RRef_CAniSkel(gpg::RRef *outRef, Moho::CAniSkel *value);
-   *
-   * What it does:
-   * Builds one reflected reference for `moho::CAniSkel`, preserving derived
-   * runtime type and base-adjusted object lane when needed.
-   */
-  gpg::RRef* RRef_CAniSkel(gpg::RRef* const outRef, moho::CAniSkel* const value)
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CAniSkel>());
-  }
-
-  gpg::RRef* RRef_Stats_StatItem(gpg::RRef* const outRef, moho::Stats_StatItem* const value)
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::Stats_StatItem>());
-  }
-
-  gpg::RRef* RRef_Sim(gpg::RRef* outRef, moho::Sim* value)
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::Sim>());
-  }
-
-  /**
    * Address: 0x00756130 (FUN_00756130, sub_756130)
    *
    * What it does:
@@ -710,87 +656,10 @@ namespace gpg
   gpg::RRef* AssignSimRef(gpg::RRef* const outRef, moho::Sim* const value)
   {
     gpg::RRef tmp{};
-    RRef_Sim(&tmp, value);
+    tmp = gpg::MakeRRef<moho::Sim>(value);
     outRef->mObj = tmp.mObj;
     outRef->mType = tmp.mType;
     return outRef;
-  }
-
-  /**
-   * Address: 0x0040C300 (FUN_0040C300, gpg::RRef_CTaskStage)
-   *
-   * What it does:
-   * Builds one reflected reference for a `moho::CTaskStage` object pointer.
-   *
-   * The parameters are deliberately not `T* const`: MSVC mangles a top-level
-   * const on a pointer parameter as `QA` rather than `PA` when the definition
-   * carries it and no prior declaration does, which produced a symbol no
-   * caller could resolve. The declaration in Reflection.h now fixes the
-   * mangling for every translation unit.
-   */
-  gpg::RRef* RRef_CTaskStage(gpg::RRef* outRef, moho::CTaskStage* value)
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CTaskStage>());
-  }
-
-  /**
-   * Address: 0x006431E0 (FUN_006431E0, gpg::RRef_RScaResource)
-   * Mangled: ?RRef_RScaResource@gpg@@YAPAVRRef@1@PAV01@PAVRScaResource@Moho@@@Z
-   *
-   * IDA signature:
-   * gpg::RRef *__cdecl gpg::RRef_RScaResource(gpg::RRef *outRef, Moho::RScaResource *value);
-   *
-   * What it does:
-   * Builds one reflected reference for `moho::RScaResource`, preserving derived
-   * runtime type and base-adjusted object lane when needed.
-   */
-  gpg::RRef* RRef_RScaResource(gpg::RRef* const outRef, moho::RScaResource* const value)
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::RScaResource>());
-  }
-
-  /**
-   * Address: 0x006B5BC0 (FUN_006B5BC0, gpg::RRef_CEconStorage)
-   * Mangled: ?RRef_CEconStorage@gpg@@YAPAVRRef@1@PAV01@PAVCEconStorage@Moho@@@Z
-   *
-   * IDA signature:
-   * gpg::RRef *__cdecl gpg::RRef_CEconStorage(gpg::RRef *outRef, Moho::CEconStorage *value);
-   *
-   * What it does:
-   * Builds one reflected reference for `moho::CEconStorage`, preserving derived
-   * runtime type and base-adjusted object lane when needed.
-   */
-  gpg::RRef* RRef_CEconStorage(gpg::RRef* outRef, moho::CEconStorage* value)
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CEconStorage>());
-  }
-
-  /**
-   * Address: 0x00707830 (FUN_00707830, gpg::RRef_CEconomy)
-   *
-   * What it does:
-   * Builds one reflected reference for `moho::CEconomy`, preserving derived
-   * runtime type and base-adjusted object lane when needed.
-   */
-  gpg::RRef* RRef_CEconomy(gpg::RRef* const outRef, moho::CEconomy* const value)
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CEconomy>());
-  }
-
-  /**
-   * Address: 0x00683600 (FUN_00683600, gpg::RRef_CTextureScroller)
-   * Mangled: ?RRef_CTextureScroller@gpg@@YAPAVRRef@1@PAV01@PAVCTextureScroller@Moho@@@Z
-   *
-   * IDA signature:
-   * gpg::RRef *__cdecl gpg::RRef_CTextureScroller(gpg::RRef *outRef, Moho::CTextureScroller *value);
-   *
-   * What it does:
-   * Builds one reflected reference for `moho::CTextureScroller`, preserving
-   * derived runtime type and base-adjusted object lane when needed.
-   */
-  gpg::RRef* RRef_CTextureScroller(gpg::RRef* outRef, moho::CTextureScroller* value)
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CTextureScroller>());
   }
 
   /**
@@ -807,7 +676,7 @@ namespace gpg
     }
 
     gpg::RRef temp{};
-    (void)RRef_CEconomy(&temp, value);
+    temp = gpg::MakeRRef<moho::CEconomy>(value);
     outRef->mObj = temp.mObj;
     outRef->mType = temp.mType;
     return outRef;
@@ -827,7 +696,7 @@ namespace gpg
     }
 
     gpg::RRef temp{};
-    (void)RRef_CEconStorage(&temp, value);
+    temp = gpg::MakeRRef<moho::CEconStorage>(value);
     outRef->mObj = temp.mObj;
     outRef->mType = temp.mType;
     return outRef;
@@ -850,48 +719,10 @@ namespace gpg
     }
 
     gpg::RRef temp{};
-    (void)RRef_CTextureScroller(&temp, value);
+    temp = gpg::MakeRRef<moho::CTextureScroller>(value);
     outRef->mObj = temp.mObj;
     outRef->mType = temp.mType;
     return outRef;
-  }
-
-  /**
-   * Address: 0x0072AF00 (FUN_0072AF00, gpg::RRef_CSquad)
-   * Mangled: ?RRef_CSquad@gpg@@YAPAVRRef@1@PAV01@PAVCSquad@Moho@@@Z
-   *
-   * IDA signature:
-   * gpg::RRef *__cdecl gpg::RRef_CSquad(gpg::RRef *outRef, Moho::CSquad *value);
-   *
-   * What it does:
-   * Builds one reflected reference for `moho::CSquad`, preserving derived
-   * runtime type and base-adjusted object lane when needed.
-   */
-  gpg::RRef* RRef_CSquad(gpg::RRef* const outRef, moho::CSquad* const value)
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CSquad>());
-  }
-
-  /**
-   * Address: 0x00676000 (FUN_00676000)
-   * Mangled: ?RRef_ManyToOneListener_ECollisionBeamEvent@gpg@@YAPAVRRef@1@PAV21@PAV?$ManyToOneListener@W4ECollisionBeamEvent@Moho@@@Moho@@@Z
-   *
-   * IDA signature:
-   * gpg::RRef *__cdecl gpg::RRef_ManyToOneListener_ECollisionBeamEvent(
-   *     gpg::RRef *outRef, Moho::ManyToOneListener_ECollisionBeamEvent *value);
-   *
-   * What it does:
-   * Builds one reflected reference for
-   * `moho::ManyToOneListener<moho::ECollisionBeamEvent>`, resolving the dynamic
-   * runtime RType via RTTI and adjusting the object lane by the base offset when
-   * the concrete type derives from the static listener type.
-   */
-  gpg::RRef* RRef_ManyToOneListener_ECollisionBeamEvent(
-    gpg::RRef* const outRef,
-    moho::ManyToOneListener_ECollisionBeamEvent* const value
-  )
-  {
-    return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::ManyToOneListener_ECollisionBeamEvent>());
   }
 
   /**
@@ -2609,6 +2440,20 @@ namespace
     return archive;
   }
 
+  /**
+   * What it does:
+   * Writes `value` as a tracked pointer in `trackedState`, owned by nothing:
+   * `WriteRawPointer` of `MakeRRef<TObject>(value)`.
+   */
+  template <class TObject>
+  [[nodiscard]] gpg::WriteArchive* WriteTrackedPointer(
+    gpg::WriteArchive* const archive, TObject* const value, const gpg::TrackedPointerState trackedState
+  )
+  {
+    gpg::WriteRawPointer(archive, gpg::MakeRRef<TObject>(value), trackedState, gpg::RRef{});
+    return archive;
+  }
+
   template <class TValue>
   /**
    * Address: 0x004E5B00 (FUN_004E5B00 -- `SaveRawPointer` of a `moho::CSndParams` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCSndParamsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
@@ -2724,6 +2569,12 @@ namespace
   )
   {
     (void)WriteTrackedPointerFromRefBuilder(archive, buildRef, value, trackedState);
+  }
+
+  template <class TObject>
+  void SaveTrackedPointer(gpg::WriteArchive* const archive, TObject* const value, const gpg::TrackedPointerState trackedState)
+  {
+    (void)WriteTrackedPointer<TObject>(archive, value, trackedState);
   }
 
   [[nodiscard]] gpg::RType* ResolveCThrustManipulatorArchiveAdapterType()
@@ -3420,7 +3271,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromCSndParamsSlotLane2(moho::CSndParams** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CSndParams, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::CSndParams>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3433,7 +3284,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromCSndParamsValueLane2(moho::CSndParams* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CSndParams, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::CSndParams>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3446,7 +3297,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromRRuleGameRulesSlotLane2(moho::RRuleGameRules** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RRuleGameRules, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::RRuleGameRules>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3459,7 +3310,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromRRuleGameRulesValueLane2(moho::RRuleGameRules* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RRuleGameRules, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::RRuleGameRules>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3472,7 +3323,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromRMeshBlueprintSlotLane1(moho::RMeshBlueprint** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RMeshBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::RMeshBlueprint>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3485,7 +3336,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromRMeshBlueprintValueLane1(moho::RMeshBlueprint* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RMeshBlueprint, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::RMeshBlueprint>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3498,7 +3349,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromRUnitBlueprintSlotLane2(moho::RUnitBlueprint** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RUnitBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::RUnitBlueprint>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3511,7 +3362,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromRUnitBlueprintValueLane2(moho::RUnitBlueprint* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RUnitBlueprint, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::RUnitBlueprint>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3532,7 +3383,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x1C, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiAttackerImpl, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::CAiAttackerImpl>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
   }
 
   /**
@@ -3552,7 +3403,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x1C, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiAttackerImpl, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::CAiAttackerImpl>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
   }
 
   /**
@@ -3572,7 +3423,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x1C, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiAttackerImpl, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::CAiAttackerImpl>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
   }
 
   /**
@@ -3584,7 +3435,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromRUnitBlueprintWeaponSlotLane1(moho::RUnitBlueprintWeapon** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RUnitBlueprintWeapon, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::RUnitBlueprintWeapon>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3597,7 +3448,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromRProjectileBlueprintSlotLane1(moho::RProjectileBlueprint** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RProjectileBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::RProjectileBlueprint>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3610,7 +3461,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromRUnitBlueprintWeaponValueLane1(moho::RUnitBlueprintWeapon* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RUnitBlueprintWeapon, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::RUnitBlueprintWeapon>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3623,7 +3474,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromRProjectileBlueprintValueLane1(moho::RProjectileBlueprint* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RProjectileBlueprint, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::RProjectileBlueprint>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3635,7 +3486,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromIAniManipulator_PNullLane1(gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAniManipulator_P, static_cast<moho::IAniManipulator**>(nullptr), gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::IAniManipulator*>(archive, static_cast<moho::IAniManipulator**>(nullptr), gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -3647,7 +3498,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromIEffect_PNullLane1(gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IEffect_P, static_cast<moho::IEffect**>(nullptr), gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::IEffect*>(archive, static_cast<moho::IEffect**>(nullptr), gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -3660,7 +3511,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromSPhysConstantsSlotLane1(moho::SPhysConstants** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SPhysConstants, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::SPhysConstants>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3673,7 +3524,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromSPhysConstantsValueLane1(moho::SPhysConstants* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SPhysConstants, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::SPhysConstants>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3697,7 +3548,7 @@ namespace
       (broadcaster != nullptr) ? broadcaster->GetListener() : nullptr;
 
     gpg::RRef listenerRef{};
-    (void)gpg::RRef_ManyToOneListener_EProjectileImpactEvent(&listenerRef, listener);
+    listenerRef = gpg::MakeRRef<moho::ManyToOneListener<moho::EProjectileImpactEvent>>(listener);
     gpg::WriteRawPointer(archive, listenerRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
   }
 
@@ -3709,7 +3560,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromManyToOneListener_EProjectileImpactEventValueLane1(moho::ManyToOneListener<moho::EProjectileImpactEvent>* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_ManyToOneListener_EProjectileImpactEvent, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::ManyToOneListener<moho::EProjectileImpactEvent>>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3722,7 +3573,7 @@ namespace
   gpg::WriteArchive* WriteOwnedRawPointerFromCEconomyEventValueLane1(moho::CEconomyEvent* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconomyEvent, value, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconomyEvent>(archive, value, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -3734,7 +3585,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCEconomyEvent_PNullLane1(gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconomyEvent_P, static_cast<moho::CEconomyEvent**>(nullptr), gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconomyEvent*>(archive, static_cast<moho::CEconomyEvent**>(nullptr), gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -3747,7 +3598,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromCPathPointSlotLane1(moho::CPathPoint** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CPathPoint, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::CPathPoint>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3760,7 +3611,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromCPathPointValueLane1(moho::CPathPoint* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CPathPoint, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::CPathPoint>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3772,7 +3623,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCUnitCommand_PNullLane1(gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CUnitCommand_P, static_cast<moho::CUnitCommand**>(nullptr), gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CUnitCommand*>(archive, static_cast<moho::CUnitCommand**>(nullptr), gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -3793,7 +3644,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x8, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Unit, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Unit>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -3805,7 +3656,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromListener_EUnitCommandQueueStatusValueLane1(moho::Listener<moho::EUnitCommandQueueStatus>* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Listener_EUnitCommandQueueStatus, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::Listener<moho::EUnitCommandQueueStatus>>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3826,7 +3677,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x10, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiBrain, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::CAiBrain>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -3848,7 +3699,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x10, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiBrain, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::CAiBrain>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -3869,7 +3720,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x10, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_CAiBrain, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::CAiBrain>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -3882,7 +3733,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromIPathTravelerSlotLane2(moho::IPathTraveler** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IPathTraveler, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::IPathTraveler>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3895,7 +3746,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromIPathTravelerValueLane2(moho::IPathTraveler* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IPathTraveler, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::IPathTraveler>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3929,7 +3780,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCIntelPosHandleSlotLane1(moho::CIntelPosHandle** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CIntelPosHandle, *valueSlot, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CIntelPosHandle>(archive, *valueSlot, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -3941,7 +3792,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCIntelPosHandleValueLane1(moho::CIntelPosHandle* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CIntelPosHandle, value, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CIntelPosHandle>(archive, value, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -3953,7 +3804,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromIAiReconDBSlotLane1(moho::IAiReconDB** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiReconDB, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::IAiReconDB>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3965,7 +3816,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromIAiReconDBValueLane1(moho::IAiReconDB* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IAiReconDB, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::IAiReconDB>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3977,7 +3828,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromIEffectManagerValueLane1(moho::IEffectManager* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IEffectManager, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::IEffectManager>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -3989,7 +3840,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCDecalHandleValueLane1(moho::CDecalHandle* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CDecalHandle, value, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CDecalHandle>(archive, value, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -4001,7 +3852,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCDecalHandle_PNullLane1(gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CDecalHandle_P, static_cast<moho::CDecalHandle**>(nullptr), gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CDecalHandle*>(archive, static_cast<moho::CDecalHandle**>(nullptr), gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -4013,7 +3864,7 @@ namespace
    */
   gpg::WriteArchive* WriteSharedRawPointerFromSSessionSaveDataSlotLane1(moho::SSessionSaveData** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SSessionSaveData, *valueSlot, gpg::TrackedPointerState::Shared);
+    auto* const writeResult = WriteTrackedPointer<moho::SSessionSaveData>(archive, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
   }
 
@@ -4025,7 +3876,7 @@ namespace
    */
   gpg::WriteArchive* WriteSharedRawPointerFromSSessionSaveDataSlotLane2(moho::SSessionSaveData** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_SSessionSaveData, *valueSlot, gpg::TrackedPointerState::Shared);
+    auto* const writeResult = WriteTrackedPointer<moho::SSessionSaveData>(archive, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
   }
 
@@ -4038,7 +3889,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromLuaStateValueLane1(gpg::WriteArchive* archive, LuaPlus::LuaState* value, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_LuaState, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<LuaPlus::LuaState>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4051,7 +3902,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromTableValueLane1(gpg::WriteArchive* archive, Table* value, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Table, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<Table>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4064,7 +3915,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromTStringValueLane1(gpg::WriteArchive* archive, TString* value, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_TString, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<TString>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4077,7 +3928,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromProtoValueLane1(gpg::WriteArchive* archive, Proto* value, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Proto, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<Proto>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4090,7 +3941,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromUpValValueLane1(gpg::WriteArchive* archive, UpVal* value, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_UpVal, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<UpVal>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4103,7 +3954,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromTStringSlotLane1(gpg::WriteArchive* archive, TString** valueSlot, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_TString, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<TString>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4139,7 +3990,7 @@ namespace
   gpg::WriteArchive* WriteSharedRawPointerFromCAniSkelSlotLane1(moho::CAniSkel** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniSkel, *valueSlot, gpg::TrackedPointerState::Shared);
+    auto* const writeResult = WriteTrackedPointer<moho::CAniSkel>(archive, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
   }
 
@@ -4152,7 +4003,7 @@ namespace
   gpg::WriteArchive* WriteSharedRawPointerFromCAniSkelSlotLane2(moho::CAniSkel** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CAniSkel, *valueSlot, gpg::TrackedPointerState::Shared);
+    auto* const writeResult = WriteTrackedPointer<moho::CAniSkel>(archive, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
   }
 
@@ -4191,7 +4042,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromREntityBlueprintSlotLane1(moho::REntityBlueprint** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_REntityBlueprint, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::REntityBlueprint>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4204,7 +4055,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromREntityBlueprintValueLane1(moho::REntityBlueprint* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_REntityBlueprint, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::REntityBlueprint>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4216,7 +4067,7 @@ namespace
    */
   gpg::WriteArchive* WriteSharedRawPointerFromStats_StatItemSlotLane1(moho::Stats_StatItem** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Stats_StatItem, *valueSlot, gpg::TrackedPointerState::Shared);
+    auto* const writeResult = WriteTrackedPointer<moho::Stats_StatItem>(archive, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
   }
 
@@ -4228,7 +4079,7 @@ namespace
    */
   gpg::WriteArchive* WriteSharedRawPointerFromStats_StatItemSlotLane2(moho::Stats_StatItem** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Stats_StatItem, *valueSlot, gpg::TrackedPointerState::Shared);
+    auto* const writeResult = WriteTrackedPointer<moho::Stats_StatItem>(archive, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
   }
 
@@ -4240,7 +4091,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromListener_EFormationdStatusValueLane1(moho::Listener_EFormationdStatus* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Listener_EFormationdStatus, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::Listener<moho::EFormationdStatus>>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4252,7 +4103,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromSimSlotLane1(moho::Sim** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::Sim>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4264,7 +4115,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCTaskStageSlotLane1(moho::CTaskStage** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CTaskStage, *valueSlot, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CTaskStage>(archive, *valueSlot, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -4276,7 +4127,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromSimValueLane1(moho::Sim* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::Sim>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4288,7 +4139,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCTaskStageValueLane1(moho::CTaskStage* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CTaskStage, value, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CTaskStage>(archive, value, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -4348,7 +4199,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCEconRequestSlotLane1(moho::CEconRequest** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconRequest, *valueSlot, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconRequest>(archive, *valueSlot, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -4360,7 +4211,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCEconRequestValueLane1(moho::CEconRequest* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconRequest, value, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconRequest>(archive, value, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -4396,7 +4247,7 @@ namespace
    */
   gpg::WriteArchive* WriteSharedRawPointerFromRScaResourceSlotLane1(moho::RScaResource** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RScaResource, *valueSlot, gpg::TrackedPointerState::Shared);
+    auto* const writeResult = WriteTrackedPointer<moho::RScaResource>(archive, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
   }
 
@@ -4408,7 +4259,7 @@ namespace
    */
   gpg::WriteArchive* WriteSharedRawPointerFromRScaResourceSlotLane2(moho::RScaResource** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_RScaResource, *valueSlot, gpg::TrackedPointerState::Shared);
+    auto* const writeResult = WriteTrackedPointer<moho::RScaResource>(archive, *valueSlot, gpg::TrackedPointerState::Shared);
     return writeResult;
   }
 
@@ -4432,7 +4283,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromIEffectValueLane1(moho::IEffect* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IEffect, value, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::IEffect>(archive, value, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -4452,7 +4303,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x148, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -4476,7 +4327,7 @@ namespace
       (broadcaster != nullptr) ? broadcaster->GetListener() : nullptr;
 
     gpg::RRef listenerRef{};
-    (void)gpg::RRef_ManyToOneListener_ECollisionBeamEvent(&listenerRef, listener);
+    listenerRef = gpg::MakeRRef<moho::ManyToOneListener_ECollisionBeamEvent>(listener);
     gpg::WriteRawPointer(archive, listenerRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
   }
 
@@ -4491,12 +4342,8 @@ namespace
     gpg::WriteArchive* archive
   )
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(
-      archive,
-      gpg::RRef_ManyToOneListener_ECollisionBeamEvent,
-      value,
-      gpg::TrackedPointerState::Unowned
-    );
+    auto* const writeResult =
+      WriteTrackedPointer<moho::ManyToOneListener<moho::ECollisionBeamEvent>>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4508,7 +4355,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromIEffectSlotLane1(moho::IEffect** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IEffect, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::IEffect>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4520,7 +4367,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromIEffectValueLane1(moho::IEffect* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_IEffect, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::IEffect>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -4532,7 +4379,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCTextureScrollerSlotLane1(moho::CTextureScroller** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CTextureScroller, *valueSlot, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CTextureScroller>(archive, *valueSlot, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -4544,7 +4391,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCTextureScrollerValueLane1(moho::CTextureScroller* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CTextureScroller, value, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CTextureScroller>(archive, value, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -4564,7 +4411,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x148, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -4584,7 +4431,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x150, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -4608,7 +4455,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCEconStorageSlotLane1(moho::CEconStorage** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconStorage, *valueSlot, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconStorage>(archive, *valueSlot, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -5101,7 +4948,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCEconStorageValueLane1(moho::CEconStorage* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconStorage, value, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconStorage>(archive, value, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -5113,7 +4960,7 @@ namespace
    */
   void SaveUnownedRawPointerFromSimSlotLane1Variant2(moho::Sim** valueSlot, gpg::WriteArchive* archive)
   {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, *valueSlot, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -5126,7 +4973,7 @@ namespace
   void SaveUnownedRawPointerFromSimSlotLane2(moho::Sim** valueSlot, gpg::WriteArchive* archive, int a3)
   {
     (void)a3;
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, *valueSlot, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -5138,7 +4985,7 @@ namespace
    */
   void SaveUnownedRawPointerFromSimSlotLane3(moho::Sim** valueSlot, gpg::WriteArchive* archive)
   {
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, *valueSlot, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -5170,7 +5017,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x148, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -5295,7 +5142,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCEconomySlotLane1(moho::CEconomy** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconomy, *valueSlot, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconomy>(archive, *valueSlot, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -5390,7 +5237,7 @@ namespace
   void SaveOwnedRawPointerFromPathQueueSlotLane1(moho::PathQueue** valueSlot, gpg::RRef* ownerRef, gpg::WriteArchive* archive)
   {
     gpg::RRef objectRef{};
-    gpg::RRef_PathQueue(&objectRef, *valueSlot);
+    objectRef = gpg::MakeRRef<moho::PathQueue>(*valueSlot);
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Owned, *ownerRef);
   }
 
@@ -5402,7 +5249,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCEconomyValueLane1(moho::CEconomy* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconomy, value, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconomy>(archive, value, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -5503,7 +5350,7 @@ namespace
    */
   gpg::WriteArchive* WriteOwnedRawPointerFromCSquadValueLane1(moho::CSquad* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CSquad, value, gpg::TrackedPointerState::Owned);
+    auto* const writeResult = WriteTrackedPointer<moho::CSquad>(archive, value, gpg::TrackedPointerState::Owned);
     return writeResult;
   }
 
@@ -5515,7 +5362,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromCSquadSlotLane1(moho::CSquad** valueSlot, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CSquad, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::CSquad>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -5527,7 +5374,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromCSquadValueLane1(moho::CSquad* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CSquad, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::CSquad>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -5550,7 +5397,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x4, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     constructResult->SetUnowned(0);
   }
 
@@ -5570,7 +5417,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x4, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -5607,7 +5454,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromCEconRequestSlotLane1(moho::CEconRequest** valueSlot, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconRequest, *valueSlot, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconRequest>(archive, *valueSlot, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -5620,7 +5467,7 @@ namespace
   gpg::WriteArchive* WriteUnownedRawPointerFromCEconRequestValueLane1(moho::CEconRequest* value, gpg::WriteArchive* archive, int a5)
   {
     (void)a5;
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconRequest, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconRequest>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -5632,7 +5479,7 @@ namespace
    */
   gpg::WriteArchive* WriteUnownedRawPointerFromCEconomyValueLane1(moho::CEconomy* value, gpg::WriteArchive* archive)
   {
-    auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_CEconomy, value, gpg::TrackedPointerState::Unowned);
+    auto* const writeResult = WriteTrackedPointer<moho::CEconomy>(archive, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
   }
 
@@ -5655,7 +5502,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x148, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     constructResult->SetUnowned(0);
   }
 
@@ -5675,7 +5522,7 @@ namespace
     static_assert(offsetof(OwnerFieldView, ownerField) == 0x148, "OwnerFieldView::ownerField offset must match evidence");
 
     const auto* const ownerView = reinterpret_cast<const OwnerFieldView*>(static_cast<std::uintptr_t>(ownerToken));
-    SaveTrackedPointerFromRefBuilder(archive, gpg::RRef_Sim, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
+    SaveTrackedPointer<moho::Sim>(archive, ownerView->ownerField, gpg::TrackedPointerState::Unowned);
     reinterpret_cast<gpg::SerSaveConstructArgsResult*>(archive)->SetUnowned(0);
   }
 
@@ -7151,7 +6998,7 @@ int LuaSerializeFromString(lua_State* const L)
     LuaPlus::TObject* const slot = L->top - 1;
 
     gpg::RRef ownerRef{};
-    (void)gpg::RRef_lua_State(&ownerRef, L);
+    ownerRef = gpg::MakeRRef<lua_State>(L);
 
     archive->Read(sObjectType, slot, ownerRef);
     if (slot->tt == 0) {
@@ -7217,7 +7064,7 @@ int LuaSerializeToString(lua_State* const L)
     }
 
     gpg::RRef ownerRef{};
-    (void)gpg::RRef_lua_State(&ownerRef, L);
+    ownerRef = gpg::MakeRRef<lua_State>(L);
 
     archive->Write(sObjectType, slot, ownerRef);
   }

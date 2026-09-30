@@ -49,7 +49,7 @@ namespace
   )
   {
     gpg::RRef managerRef{};
-    gpg::RRef_IEffectManager(&managerRef, managerField ? *managerField : nullptr);
+    managerRef = gpg::MakeRRef<moho::IEffectManager>(managerField ? *managerField : nullptr);
     gpg::WriteRawPointer(archive, managerRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
     return archive;
   }

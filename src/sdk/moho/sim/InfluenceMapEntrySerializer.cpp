@@ -76,13 +76,13 @@ namespace
     archive->WriteUInt(entry->entityId);
 
     gpg::RRef armyRef{};
-    (void)gpg::RRef_SimArmy(&armyRef, static_cast<moho::SimArmy*>(entry->sourceArmy));
+    armyRef = gpg::MakeRRef<moho::SimArmy>(static_cast<moho::SimArmy*>(entry->sourceArmy));
     gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, owner);
 
     archive->Write(CachedType<Wm3::Vec3f>(gVec3fType), const_cast<Wm3::Vec3f*>(&entry->lastPosition), owner);
 
     gpg::RRef blueprintRef{};
-    (void)gpg::RRef_RUnitBlueprint(&blueprintRef, const_cast<moho::RUnitBlueprint*>(entry->sourceBlueprint));
+    blueprintRef = gpg::MakeRRef<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(entry->sourceBlueprint));
     gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, owner);
 
     archive->WriteInt(entry->sourceLayer);

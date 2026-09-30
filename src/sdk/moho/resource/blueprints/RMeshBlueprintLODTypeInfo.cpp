@@ -68,7 +68,7 @@ namespace
     }
 
     gpg::RRef temp{};
-    (void)gpg::RRef_RMeshBlueprintLOD(&temp, object);
+    temp = gpg::MakeRRef<moho::RMeshBlueprintLOD>(object);
     out->mObj = temp.mObj;
     out->mType = temp.mType;
     return out;

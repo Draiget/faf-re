@@ -197,7 +197,7 @@ namespace moho
   void RBlueprint::InitBlueprint(LuaPlus::LuaObject& luaBlueprint)
   {
     gpg::RRef destination{};
-    (void)gpg::RRef_RBlueprint(&destination, this);
+    destination = gpg::MakeRRef<moho::RBlueprint>(this);
 
     LuaPlus::LuaObject valueObject(luaBlueprint);
     (void)SCR_LuaBuildObject(valueObject, destination, true);
@@ -207,7 +207,7 @@ namespace moho
     OnInitBlueprint();
 
     gpg::RRef source{};
-    (void)gpg::RRef_RBlueprint(&source, this);
+    source = gpg::MakeRRef<moho::RBlueprint>(this);
     SCR_RObjectToLuaMerge(source, luaBlueprint);
   }
 

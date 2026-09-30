@@ -270,7 +270,7 @@ namespace moho
     archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
 
     gpg::RRef commandRef{};
-    (void)gpg::RRef_CUnitCommand(&commandRef, mCommand);
+    commandRef = gpg::MakeRRef<moho::CUnitCommand>(mCommand);
     gpg::WriteRawPointer(archive, commandRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     archive->Write(CachedWeakPtrUnitType(), &mTargetUnit, ownerRef);

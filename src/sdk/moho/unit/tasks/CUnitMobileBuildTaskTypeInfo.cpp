@@ -143,7 +143,7 @@ namespace moho
   {
     auto* const task = new (std::nothrow) CUnitMobileBuildTask();
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitMobileBuildTask(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitMobileBuildTask>(task);
     return ref;
   }
 
@@ -161,7 +161,7 @@ namespace moho
       new (task) CUnitMobileBuildTask();
     }
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitMobileBuildTask(&ref, task);
+    ref = gpg::MakeRRef<moho::CUnitMobileBuildTask>(task);
     return ref;
   }
 

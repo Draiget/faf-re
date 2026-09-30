@@ -5435,7 +5435,7 @@ void moho::USER_GetSpecialFiles(
       {
         ESpecialFileType reflectedType = specialFileType;
         gpg::RRef enumRef{};
-        gpg::RRef_ESpecialFileType(&enumRef, &reflectedType);
+        enumRef = gpg::MakeRRef<moho::ESpecialFileType>(&reflectedType);
         const msvc8::string lexical = enumRef.GetLexical();
         throw std::runtime_error(gpg::STR_Printf("Invalid special file type %s", lexical.c_str()).to_std());
       }

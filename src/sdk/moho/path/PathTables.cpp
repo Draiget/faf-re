@@ -694,7 +694,7 @@ namespace moho
     [[nodiscard]] gpg::RRef NewPathQueueRefCallback()
     {
       gpg::RRef objectRef{};
-      (void)gpg::RRef_PathQueue(&objectRef, new PathQueue());
+      objectRef = gpg::MakeRRef<moho::PathQueue>(new PathQueue());
       return objectRef;
     }
 
@@ -708,7 +708,7 @@ namespace moho
     [[nodiscard]] gpg::RRef ConstructPathQueueRefCallback(void* const objectStorage)
     {
       gpg::RRef objectRef{};
-      (void)gpg::RRef_PathQueue(&objectRef, ::new (objectStorage) PathQueue());
+      objectRef = gpg::MakeRRef<moho::PathQueue>(::new (objectStorage) PathQueue());
       return objectRef;
     }
 
@@ -1061,7 +1061,7 @@ namespace moho
   void PathQueue::Impl::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     gpg::RRef pathTablesRef{};
-    (void)gpg::RRef_PathTables(&pathTablesRef, mOwner);
+    pathTablesRef = gpg::MakeRRef<moho::PathTables>(mOwner);
     gpg::RRef ownerRef{};
     gpg::WriteRawPointer(archive, pathTablesRef, gpg::TrackedPointerState::Unowned, ownerRef);
 

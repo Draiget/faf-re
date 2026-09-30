@@ -994,7 +994,7 @@ namespace
     }
 
     gpg::RRef out{};
-    (void)gpg::RRef_EntityDB(&out, entityDb);
+    out = gpg::MakeRRef<moho::CEntityDb>(entityDb);
     return out;
   }
 
@@ -1013,7 +1013,7 @@ namespace
     }
 
     gpg::RRef out{};
-    (void)gpg::RRef_EntityDB(&out, entityDb);
+    out = gpg::MakeRRef<moho::CEntityDb>(entityDb);
     return out;
   }
 
@@ -1370,7 +1370,7 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (moho::Entity* const entity : *list) {
       gpg::RRef entityRef{};
-      (void)gpg::RRef_Entity(&entityRef, entity);
+      entityRef = gpg::MakeRRef<moho::Entity>(entity);
       gpg::WriteRawPointer(archive, entityRef, gpg::TrackedPointerState::Unowned, owner);
     }
   }

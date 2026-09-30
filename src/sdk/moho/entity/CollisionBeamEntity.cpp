@@ -503,7 +503,7 @@ namespace moho
     CollisionBeamEntity* const object = new CollisionBeamEntity(ownerSim);
 
     gpg::RRef objectRef{};
-    gpg::RRef_CollisionBeamEntity(&objectRef, object);
+    objectRef = gpg::MakeRRef<moho::CollisionBeamEntity>(object);
     result.SetUnowned(objectRef, 0u);
   }
 

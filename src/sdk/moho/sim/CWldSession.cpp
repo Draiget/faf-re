@@ -3475,7 +3475,7 @@ namespace moho
       for (LuaPlus::LuaTableIterator iter(genericIcons, 1); iter.IsValid(); iter.Next()) {
         EGenericIconType iconType{};
         gpg::RRef enumRef{};
-        gpg::RRef_EGenericIconType(&enumRef, &iconType);
+        enumRef = gpg::MakeRRef<moho::EGenericIconType>(&iconType);
         SCR_GetEnum(session->mState, iter.GetKey().GetString(), enumRef);
 
         mGenericIcons[static_cast<std::size_t>(iconType)] = CD3DBatchTexture::FromFile(iter.GetValue().GetString(), 0u);
@@ -5166,7 +5166,7 @@ namespace moho
 
       auto commandType = static_cast<EUnitCommandType>(index);
       gpg::RRef commandTypeRef{};
-      (void)gpg::RRef_EUnitCommandType(&commandTypeRef, &commandType);
+      commandTypeRef = gpg::MakeRRef<moho::EUnitCommandType>(&commandType);
 
       // The reflected type is always the EUnitCommandType enum descriptor, so
       // the binary reads `mPrefix` straight off it at 0x00824F3E rather than
@@ -12726,7 +12726,7 @@ namespace moho
 
     ESTITargetType targetType = static_cast<ESTITargetType>(static_cast<std::int32_t>(commandIssueData.mTarget.mType));
     gpg::RRef targetTypeRef{};
-    gpg::RRef_ESTITargetType(&targetTypeRef, &targetType);
+    targetTypeRef = gpg::MakeRRef<moho::ESTITargetType>(&targetType);
     const msvc8::string targetTypeLexical = targetTypeRef.GetLexical();
     targetTable.SetString("Type", targetTypeLexical.c_str());
 
@@ -12757,7 +12757,7 @@ namespace moho
 
     EUnitCommandType commandType = commandIssueData.mCommandType;
     gpg::RRef commandTypeRef{};
-    gpg::RRef_EUnitCommandType(&commandTypeRef, &commandType);
+    commandTypeRef = gpg::MakeRRef<moho::EUnitCommandType>(&commandType);
     const msvc8::string commandTypeLexical = commandTypeRef.GetLexical();
     outCommandObject->SetString("CommandType", commandTypeLexical.c_str());
     outCommandObject->SetBoolean("Clear", doClear);
@@ -13356,7 +13356,7 @@ namespace moho
                 if (const char* const commandCapsName = commandName ? commandName.GetString() : nullptr;
                     commandCapsName != nullptr) {
                   gpg::RRef capsRef{};
-                  (void)gpg::RRef_ERuleBPUnitCommandCaps(&capsRef, &mode.mCommandCaps);
+                  capsRef = gpg::MakeRRef<moho::ERuleBPUnitCommandCaps>(&mode.mCommandCaps);
                   if (capsRef.mType != nullptr) {
                     (void)capsRef.mType->SetLexical(capsRef, commandCapsName);
                   }

@@ -317,7 +317,7 @@ namespace
 
     auto* const request = new (std::nothrow) moho::CEconRequest{};
     gpg::RRef requestRef{};
-    gpg::RRef_CEconRequest(&requestRef, request);
+    requestRef = gpg::MakeRRef<moho::CEconRequest>(request);
     result->SetUnowned(requestRef, 0u);
   }
 
@@ -871,24 +871,6 @@ namespace
 } // namespace
 
 /**
- * Address: 0x005D1C70 (FUN_005D1C70, gpg::RRef_CEconRequest)
- *
- * What it does:
- * Builds a typed reflection reference for `CEconRequest*`, resolving derived
- * runtime type + base adjustment when required.
- */
-gpg::RRef* gpg::RRef_CEconRequest(gpg::RRef* const outRef, moho::CEconRequest* const value)
-{
-  return BuildTypedRefWithCache(
-    outRef,
-    value,
-    typeid(moho::CEconRequest),
-    moho::CEconRequest::sType,
-    gCEconRequestRRefCache
-  );
-}
-
-/**
  * Address: 0x00774420 (FUN_00774420)
  *
  * What it does:
@@ -900,7 +882,7 @@ namespace gpg
   [[maybe_unused]] gpg::RRef* AssignCEconRequestRef(gpg::RRef* const out, moho::CEconRequest* const value)
   {
     gpg::RRef tmp{};
-    gpg::RRef_CEconRequest(&tmp, value);
+    tmp = gpg::MakeRRef<moho::CEconRequest>(value);
     out->mObj = tmp.mObj;
     out->mType = tmp.mType;
     return out;
@@ -1002,7 +984,7 @@ namespace moho
   {
     auto* const request = new (std::nothrow) CEconRequest{};
     gpg::RRef requestRef{};
-    gpg::RRef_CEconRequest(&requestRef, request);
+    requestRef = gpg::MakeRRef<moho::CEconRequest>(request);
     result.SetUnowned(requestRef, 0u);
   }
 
@@ -1152,7 +1134,7 @@ void moho::ConstructCEconomyEventForSerializer(gpg::SerConstructResult* const re
 {
   auto* const object = new (std::nothrow) CEconomyEvent();
   gpg::RRef objectRef{};
-  gpg::RRef_CEconomyEvent(&objectRef, object);
+  objectRef = gpg::MakeRRef<moho::CEconomyEvent>(object);
   result->SetUnowned(objectRef, 0u);
 }
 

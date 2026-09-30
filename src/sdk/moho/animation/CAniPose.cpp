@@ -111,7 +111,7 @@ namespace
     }
 
     gpg::RRef tmp{};
-    (void)gpg::RRef_CAniPoseBone(&tmp, value);
+    tmp = gpg::MakeRRef<moho::CAniPoseBone>(value);
     out->mObj = tmp.mObj;
     out->mType = tmp.mType;
     return out;

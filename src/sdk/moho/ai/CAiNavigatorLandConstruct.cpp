@@ -38,7 +38,7 @@ namespace
   [[nodiscard]] gpg::RRef* PopulateCAiNavigatorLandRef(gpg::RRef* const out, CAiNavigatorLand* const object)
   {
     gpg::RRef temp{};
-    gpg::RRef_CAiNavigatorLand(&temp, object);
+    temp = gpg::MakeRRef<moho::CAiNavigatorLand>(object);
     *out = temp;
     return out;
   }

@@ -321,7 +321,7 @@ namespace
 
     for (unsigned int i = 0; i < count; ++i) {
       gpg::RRef objectRef{};
-      (void)gpg::RRef_Entity(&objectRef, vec[i]);
+      objectRef = gpg::MakeRRef<moho::Entity>(vec[i]);
       gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
     }
   }

@@ -876,7 +876,7 @@ namespace
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
       for (const boost::shared_ptr<moho::STrigger>& value : *list) {
         gpg::RRef pointerRef{};
-        gpg::RRef_STrigger(&pointerRef, value.get());
+        pointerRef = gpg::MakeRRef<moho::STrigger>(value.get());
         gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Shared, owner);
       }
     }
@@ -963,7 +963,7 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (const auto& entry : *source) {
       gpg::RRef pointerRef{};
-      gpg::RRef_RUnitBlueprint(&pointerRef, const_cast<moho::RUnitBlueprint*>(entry.first));
+      pointerRef = gpg::MakeRRef<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(entry.first));
       gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, owner);
       archive->WriteFloat(entry.second);
     }
@@ -1090,7 +1090,7 @@ namespace
     }
 
     gpg::RRef statsRef{};
-    gpg::RRef_Stats_CArmyStatItem(&statsRef, stats);
+    statsRef = gpg::MakeRRef<moho::Stats<moho::CArmyStatItem>>(stats);
     constructResult->SetUnowned(statsRef, 0u);
   }
 

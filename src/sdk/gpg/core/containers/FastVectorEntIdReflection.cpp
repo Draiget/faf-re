@@ -215,7 +215,7 @@ gpg::RRef gpg::RFastVectorType<moho::EntId>::SubscriptIndex(void* obj, const int
 {
   auto& elements = *static_cast<gpg::core::FastVectorInline<unsigned int>*>(obj);
   gpg::RRef out{};
-  gpg::RRef_EntId(&out, reinterpret_cast<std::int32_t*>(elements.Data() + (static_cast<std::size_t>(ind))));
+  out = gpg::MakeRRef<std::int32_t>(reinterpret_cast<std::int32_t*>(elements.Data() + (static_cast<std::size_t>(ind))));
   return out;
 }
 

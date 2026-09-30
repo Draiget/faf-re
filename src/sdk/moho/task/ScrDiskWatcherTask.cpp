@@ -268,7 +268,7 @@ void ScrDiskWatcherTask::SaveConstructArgs(
 
   auto* const task = reinterpret_cast<ScrDiskWatcherTask*>(objectPtr);
   gpg::RRef luaStateRef{};
-  (void)gpg::RRef_LuaState(&luaStateRef, task != nullptr ? task->mLuaState : nullptr);
+  luaStateRef = gpg::MakeRRef<LuaPlus::LuaState>(task != nullptr ? task->mLuaState : nullptr);
   gpg::WriteRawPointer(archive, luaStateRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
   result->SetUnowned(1u);
 }

@@ -8374,7 +8374,7 @@ void moho::CBuildDragPreview::RefreshQueuedBuildGhosts()
       refreshed[orderId] = ghost;
     } else {
       gpg::RRef blueprintRef{};
-      (void)gpg::RRef_REntityBlueprint(&blueprintRef, helper->mConstantData.blueprint);
+      blueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(helper->mConstantData.blueprint);
       const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(blueprintRef, moho::RUnitBlueprint::StaticGetClass());
       if (unitBlueprintRef.mObj == nullptr) {
         continue;
@@ -10225,7 +10225,7 @@ int moho::cfunc_PostDraggerL(
     }
 
     gpg::RRef keyCodeEnumRef{};
-    gpg::RRef_EMauiKeyCode(&keyCodeEnumRef, reinterpret_cast<EMauiKeyCode*>(&keyCode));
+    keyCodeEnumRef = gpg::MakeRRef<moho::EMauiKeyCode>(reinterpret_cast<EMauiKeyCode*>(&keyCode));
     SCR_GetEnum(state, keyCodeName, keyCodeEnumRef);
   }
 
@@ -13053,7 +13053,7 @@ int moho::cfunc_InternalCreateScrollbarL(
 
   EMauiScrollAxis axis = static_cast<EMauiScrollAxis>(0);
   gpg::RRef axisRef{};
-  gpg::RRef_EMauiScrollAxis(&axisRef, &axis);
+  axisRef = gpg::MakeRRef<moho::EMauiScrollAxis>(&axis);
   (void)axisRef.SetLexical(axisLexical);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
@@ -18979,7 +18979,7 @@ int moho::cfunc_CUIWorldViewGetRightMouseButtonOrderL(
 
     if (commandMode.mMode == COMMOD_Order) {
       gpg::RRef commandCapRef{};
-      (void)gpg::RRef_ERuleBPUnitCommandCaps(&commandCapRef, &commandMode.mCommandCaps);
+      commandCapRef = gpg::MakeRRef<moho::ERuleBPUnitCommandCaps>(&commandMode.mCommandCaps);
       const msvc8::string commandLexical = commandCapRef.GetLexical();
       lua_pushstring(state->m_state, commandLexical.c_str());
       (void)lua_gettop(state->m_state);
@@ -22678,7 +22678,7 @@ bool moho::CMauiControl::IsScrollable(
 {
   EMauiScrollAxis axisCopy = axis;
   gpg::RRef axisRef{};
-  gpg::RRef_EMauiScrollAxis(&axisRef, &axisCopy);
+  axisRef = gpg::MakeRRef<moho::EMauiScrollAxis>(&axisCopy);
   const msvc8::string axisLexical = axisRef.GetLexical();
   return GetIsScrollable(axisLexical.c_str());
 }
@@ -22814,7 +22814,7 @@ void moho::CMauiControl::ScrollLines(
 {
   EMauiScrollAxis axisCopy = axis;
   gpg::RRef axisRef{};
-  gpg::RRef_EMauiScrollAxis(&axisRef, &axisCopy);
+  axisRef = gpg::MakeRRef<moho::EMauiScrollAxis>(&axisCopy);
   const msvc8::string axisLexical = axisRef.GetLexical();
   RunScriptStringNum("ScrollLines", axisLexical.c_str(), amount);
 }
@@ -22833,7 +22833,7 @@ void moho::CMauiControl::ScrollPages(
 {
   EMauiScrollAxis axisCopy = axis;
   gpg::RRef axisRef{};
-  gpg::RRef_EMauiScrollAxis(&axisRef, &axisCopy);
+  axisRef = gpg::MakeRRef<moho::EMauiScrollAxis>(&axisCopy);
   const msvc8::string axisLexical = axisRef.GetLexical();
   RunScriptStringNum("ScrollLines", axisLexical.c_str(), amount);
 }
@@ -22851,7 +22851,7 @@ void moho::CMauiControl::ScrollSetTop(
 {
   EMauiScrollAxis axisCopy = axis;
   gpg::RRef axisRef{};
-  gpg::RRef_EMauiScrollAxis(&axisRef, &axisCopy);
+  axisRef = gpg::MakeRRef<moho::EMauiScrollAxis>(&axisCopy);
   const msvc8::string axisLexical = axisRef.GetLexical();
   RunScriptStringNum("ScrollSetTop", axisLexical.c_str(), amount);
 }
@@ -23043,7 +23043,7 @@ moho::SMauiScrollValues moho::CMauiControl::GetScrollValues(
 
   EMauiScrollAxis axisCopy = axis;
   gpg::RRef axisRef{};
-  gpg::RRef_EMauiScrollAxis(&axisRef, &axisCopy);
+  axisRef = gpg::MakeRRef<moho::EMauiScrollAxis>(&axisCopy);
   const auto axisLexical = axisRef.GetLexical();
 
   LuaPlus::LuaObject axisArg{};
@@ -25841,7 +25841,7 @@ LuaPlus::LuaObject* moho::CreateLuaEventObject(
   outEvent->AssignNewTable(state, 0, 8u);
 
   gpg::RRef eventTypeRef{};
-  gpg::RRef_EMauiEventType(&eventTypeRef, &eventData->mEventType);
+  eventTypeRef = gpg::MakeRRef<moho::EMauiEventType>(&eventData->mEventType);
   const auto eventTypeLexical = eventTypeRef.GetLexical();
   outEvent->SetString("Type", eventTypeLexical.c_str());
 
@@ -26099,7 +26099,7 @@ int moho::cfunc_IsKeyDownL(
 
   gpg::RRef enumRef{};
   EMauiKeyCode keyCode = static_cast<EMauiKeyCode>(0);
-  gpg::RRef_EMauiKeyCode(&enumRef, &keyCode);
+  enumRef = gpg::MakeRRef<moho::EMauiKeyCode>(&keyCode);
 
   LuaPlus::LuaStackObject keyCodeArg(state, 1);
   const char* keyCodeName = lua_tostring(state->m_state, 1);
@@ -29333,7 +29333,7 @@ namespace moho
       }
 
       gpg::RRef blueprintRef{};
-      (void)RRef_REntityBlueprint(&blueprintRef, helper->mConstantData.blueprint);
+      blueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(helper->mConstantData.blueprint);
 
       const Wm3::Vector3f position = ResolveCommandIssueHelperAnchorPosition(*helper);
 

@@ -965,7 +965,7 @@ namespace
     archive->Write(entIdType, &entry->entityId, owner);
 
     gpg::RRef armyRef{};
-    (void)gpg::RRef_SimArmy(&armyRef, reinterpret_cast<moho::SimArmy*>(entry->sourceArmy));
+    armyRef = gpg::MakeRRef<moho::SimArmy>(reinterpret_cast<moho::SimArmy*>(entry->sourceArmy));
     gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, owner);
 
     static gpg::RType* vector3fType = nullptr;
@@ -975,7 +975,7 @@ namespace
     archive->Write(vector3fType, &entry->lastPosition, owner);
 
     gpg::RRef blueprintRef{};
-    (void)gpg::RRef_RUnitBlueprint(&blueprintRef, const_cast<moho::RUnitBlueprint*>(entry->sourceBlueprint));
+    blueprintRef = gpg::MakeRRef<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(entry->sourceBlueprint));
     gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, owner);
 
     static gpg::RType* layerType = nullptr;
@@ -1010,7 +1010,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_CInfluenceMap(&ref, object);
+    ref = gpg::MakeRRef<moho::CInfluenceMap>(object);
     outRefPair->object = ref.mObj;
     outRefPair->type = ref.mType;
     return outRefPair;
@@ -1029,7 +1029,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_InfluenceGrid(&ref, object);
+    ref = gpg::MakeRRef<moho::InfluenceGrid>(object);
     outRefPair->object = ref.mObj;
     outRefPair->type = ref.mType;
     return outRefPair;
@@ -1048,7 +1048,7 @@ namespace
   )
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_SThreat(&ref, object);
+    ref = gpg::MakeRRef<moho::SThreat>(object);
     outRefPair->object = ref.mObj;
     outRefPair->type = ref.mType;
     return outRefPair;
@@ -1633,11 +1633,11 @@ gpg::RRef gpg::RVectorType_InfluenceGrid::SubscriptIndex(void* const obj, const 
 
   gpg::RRef out{};
   if (!storage || ind < 0) {
-    (void)gpg::RRef_InfluenceGrid(&out, nullptr);
+    out = gpg::MakeRRef<moho::InfluenceGrid>(nullptr);
     return out;
   }
 
-  (void)gpg::RRef_InfluenceGrid(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  out = gpg::MakeRRef<moho::InfluenceGrid>(&(*storage)[static_cast<std::size_t>(ind)]);
   return out;
 }
 
@@ -1755,11 +1755,11 @@ gpg::RRef gpg::RVectorType_SThreat::SubscriptIndex(void* const obj, const int in
 
   gpg::RRef out{};
   if (!storage || ind < 0) {
-    (void)gpg::RRef_SThreat(&out, nullptr);
+    out = gpg::MakeRRef<moho::SThreat>(nullptr);
     return out;
   }
 
-  (void)gpg::RRef_SThreat(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  out = gpg::MakeRRef<moho::SThreat>(&(*storage)[static_cast<std::size_t>(ind)]);
   return out;
 }
 

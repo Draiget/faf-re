@@ -94,14 +94,6 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x00555040 (FUN_00555040, gpg::RRef_REntityBlueprint)
-   *
-   * What it does:
-   * Builds a typed reflection reference for `REntityBlueprint*`, upgrading to
-   * the dynamic derived type and applying base-offset adjustment when needed.
-   */
-  gpg::RRef* RRef_REntityBlueprint(gpg::RRef* outRef, moho::REntityBlueprint* value);
 
   /**
    * Address: 0x0060C290 (FUN_0060C290, func_RRRefREntityBlueprint)

@@ -212,12 +212,12 @@ gpg::RRef gpg::RVectorType<moho::HPathCell>::SubscriptIndex(void* const obj, con
   GPG_ASSERT(ind >= 0);
 
   gpg::RRef out{};
-  gpg::RRef_HPathCell(&out, nullptr);
+  out = gpg::MakeRRef<moho::HPathCell>(nullptr);
   if (!storage || ind < 0 || static_cast<std::size_t>(ind) >= storage->size()) {
     return out;
   }
 
-  gpg::RRef_HPathCell(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  out = gpg::MakeRRef<moho::HPathCell>(&(*storage)[static_cast<std::size_t>(ind)]);
   return out;
 }
 

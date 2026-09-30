@@ -187,7 +187,7 @@ gpg::RRef gpg::RFastVectorType<moho::IFormationInstance*>::SubscriptIndex(void* 
 {
   auto& vec = *static_cast<gpg::fastvector<moho::IFormationInstance*>*>(obj);
   gpg::RRef out{};
-  gpg::RRef_IFormationInstance_P(&out, &vec[static_cast<std::size_t>(ind)]);
+  out = gpg::MakeRRef<moho::IFormationInstance*>(&vec[static_cast<std::size_t>(ind)]);
   return out;
 }
 

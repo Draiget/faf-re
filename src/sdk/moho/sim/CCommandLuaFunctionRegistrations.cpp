@@ -808,7 +808,7 @@ namespace
     }
 
     gpg::RRef commandTypeRef{};
-    gpg::RRef_EUnitCommandType(&commandTypeRef, &outCommandType);
+    commandTypeRef = gpg::MakeRRef<moho::EUnitCommandType>(&outCommandType);
     return commandTypeRef.SetLexical(lexicalCommandType);
   }
 
@@ -2677,7 +2677,7 @@ namespace moho
       if (((1u << b) & accCommandCaps) != 0u) {
         moho::ERuleBPUnitCommandCaps cap = static_cast<moho::ERuleBPUnitCommandCaps>(1u << b);
         gpg::RRef capRef{};
-        (void)gpg::RRef_ERuleBPUnitCommandCaps(&capRef, &cap);
+        capRef = gpg::MakeRRef<moho::ERuleBPUnitCommandCaps>(&cap);
         const msvc8::string lexical = capRef.GetLexical();
         commandCapsTable.SetString(commandRow, lexical.c_str());
         ++commandRow;
@@ -2692,7 +2692,7 @@ namespace moho
       if (((1u << b) & accToggleCaps) != 0u) {
         moho::ERuleBPUnitToggleCaps cap = static_cast<moho::ERuleBPUnitToggleCaps>(1u << b);
         gpg::RRef capRef{};
-        (void)gpg::RRef_ERuleBPUnitToggleCaps(&capRef, &cap);
+        capRef = gpg::MakeRRef<moho::ERuleBPUnitToggleCaps>(&cap);
         const msvc8::string lexical = capRef.GetLexical();
         toggleCapsTable.SetString(toggleRow, lexical.c_str());
         ++toggleRow;

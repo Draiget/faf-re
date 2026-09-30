@@ -2825,7 +2825,7 @@ void moho::CON_StartCommandMode(const msvc8::vector<msvc8::string>& args)
   // user-unit that advertises that capability.
   ERuleBPUnitCommandCaps requestedCaps = static_cast<ERuleBPUnitCommandCaps>(0);
   gpg::RRef capsRef{};
-  (void)gpg::RRef_ERuleBPUnitCommandCaps(&capsRef, &requestedCaps);
+  capsRef = gpg::MakeRRef<moho::ERuleBPUnitCommandCaps>(&requestedCaps);
   (void)capsRef.mType->SetLexical(capsRef, requested.mPayload["name"].GetString());
 
   if (SelectionHasUnitWithCommandCap(session->mSelection, static_cast<std::uint32_t>(requestedCaps))) {

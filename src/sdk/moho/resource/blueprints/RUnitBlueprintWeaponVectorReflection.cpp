@@ -411,7 +411,7 @@ gpg::RRef gpg::RVectorType_RUnitBlueprintWeapon::SubscriptIndex(void* const obj,
     return out;
   }
 
-  gpg::RRef_RUnitBlueprintWeapon(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  out = gpg::MakeRRef<moho::RUnitBlueprintWeapon>(&(*storage)[static_cast<std::size_t>(ind)]);
   return out;
 }
 

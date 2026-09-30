@@ -717,24 +717,6 @@ namespace moho
 } // namespace moho
 
 /**
- * Address: 0x00555040 (FUN_00555040, gpg::RRef_REntityBlueprint)
- *
- * What it does:
- * Builds a typed reflection reference for `REntityBlueprint*`, resolving
- * derived runtime type + base adjustment when required.
- */
-gpg::RRef* gpg::RRef_REntityBlueprint(gpg::RRef* const outRef, moho::REntityBlueprint* const value)
-{
-  return BuildTypedRefWithCache(
-    outRef,
-    value,
-    typeid(moho::REntityBlueprint),
-    moho::REntityBlueprint::sType,
-    gREntityBlueprintRRefCache
-  );
-}
-
-/**
  * Address: 0x0060C290 (FUN_0060C290, func_RRRefREntityBlueprint)
  *
  * What it does:
@@ -744,7 +726,7 @@ gpg::RRef* gpg::RRef_REntityBlueprint(gpg::RRef* const outRef, moho::REntityBlue
 gpg::RRef* gpg::PackRRef_REntityBlueprint(gpg::RRef* const outRef, moho::REntityBlueprint* const value)
 {
   gpg::RRef temp{};
-  (void)RRef_REntityBlueprint(&temp, value);
+  temp = gpg::MakeRRef<moho::REntityBlueprint>(value);
   outRef->mObj = temp.mObj;
   outRef->mType = temp.mType;
   return outRef;

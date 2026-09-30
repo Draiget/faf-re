@@ -1436,7 +1436,7 @@ namespace moho
     (void)gpg::RRef_CCommandTask(&pointerRef, mDispatchTask);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    (void)gpg::RRef_CUnitCommand(&pointerRef, mCommand);
+    pointerRef = gpg::MakeRRef<moho::CUnitCommand>(mCommand);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     (void)gpg::RRef_IFormationInstance(&pointerRef, static_cast<IFormationInstance*>(mFormation));

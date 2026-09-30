@@ -501,7 +501,7 @@ void gpg::RVectorType<moho::SPointVector>::SerSave(
 gpg::RRef gpg::RVectorType<moho::SPointVector>::SubscriptIndex(void* const obj, const int ind) const
 {
   gpg::RRef out{};
-  gpg::RRef_SPointVector(&out, nullptr);
+  out = gpg::MakeRRef<moho::SPointVector>(nullptr);
 
   auto* const storage = static_cast<SPointVectorVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -511,7 +511,7 @@ gpg::RRef gpg::RVectorType<moho::SPointVector>::SubscriptIndex(void* const obj, 
     return out;
   }
 
-  gpg::RRef_SPointVector(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  out = gpg::MakeRRef<moho::SPointVector>(&(*storage)[static_cast<std::size_t>(ind)]);
   return out;
 }
 
