@@ -252,7 +252,7 @@ void CAiNavigatorAir::SetGoal(const SAiNavigatorGoal& goal)
 
   if (mIgnoreFormation == 0u) {
     mTrackFormationTarget =
-      static_cast<std::uint8_t>(mUnit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>() != nullptr);
+      static_cast<std::uint8_t>(mUnit->mInfoCache.mFormationLeadRef.GetObjectPtr() != nullptr);
   }
 }
 
@@ -354,7 +354,7 @@ bool CAiNavigatorAir::FollowingLeader() const
     return false;
   }
 
-  Unit* const leaderUnit = mUnit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+  Unit* const leaderUnit = mUnit->mInfoCache.mFormationLeadRef.GetObjectPtr();
   if (leaderUnit) {
     return leaderUnit != mUnit;
   }
@@ -491,7 +491,7 @@ int CAiNavigatorAir::Execute()
     // - its chain is a `WeakPtr<Unit>` (Unit.cpp:15770) and 0x005A4DCE
     // dispatches slot 0 on `slot - 4` directly - which is why only this site
     // narrows.
-    Entity* const focusEntity = mUnit->FocusEntityRef.ResolveObjectPtr<Entity>();
+    Entity* const focusEntity = mUnit->FocusEntityRef.GetObjectPtr();
     Unit* const focusUnit = (focusEntity != nullptr) ? focusEntity->IsUnit() : nullptr;
     if (focusUnit && focusUnit->IsMobile() &&
         (focusUnit->IsDead() || focusUnit->DestroyQueued() || !IsUnitIdleState(*focusUnit) ||
@@ -602,7 +602,7 @@ void CAiNavigatorAir::UpdateCurrentTargetFromFormation()
     return;
   }
 
-  Unit* const leaderUnit = mUnit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+  Unit* const leaderUnit = mUnit->mInfoCache.mFormationLeadRef.GetObjectPtr();
   if (leaderUnit && leaderUnit != mUnit && leaderUnit->AiNavigator && leaderUnit->AiNavigator->HasGoodPath()) {
     mCurrentTargetPos = mUnit->mInfoCache.mFormationHeadingHint;
     ApplyCurrentTargetToMotion();

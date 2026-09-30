@@ -894,12 +894,12 @@ bool moho::func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate)
   }
 
   if (owner.IsUnitState(UNITSTATE_WaitingForTransport) && candidate->IsUnitState(UNITSTATE_WaitingForTransport)) {
-    if (owner.FocusEntityRef.ResolveObjectPtr<Entity>() == candidate->FocusEntityRef.ResolveObjectPtr<Entity>()) {
+    if (owner.FocusEntityRef.GetObjectPtr() == candidate->FocusEntityRef.GetObjectPtr()) {
       return true;
     }
   }
 
-  if (owner.IsUnitState(UNITSTATE_Upgrading) && candidate->CreatorRef.ResolveObjectPtr<Unit>() == &owner) {
+  if (owner.IsUnitState(UNITSTATE_Upgrading) && candidate->CreatorRef.GetObjectPtr() == &owner) {
     return true;
   }
 

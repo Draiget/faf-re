@@ -112,7 +112,7 @@ namespace
       return nullptr;
     }
 
-    return unit->AssignedTransportRef.ResolveObjectPtr<moho::Unit>();
+    return unit->AssignedTransportRef.GetObjectPtr();
   }
 
   [[nodiscard]] bool IsZeroVector(const Wm3::Vector3f& value) noexcept
@@ -309,7 +309,7 @@ namespace moho
     // category check it linked the owner unit's assigned-transport weak
     // reference into the transport's owner chain; splice it back out here.
     if (mRequiresTransportCategoryCheck != 0u && mUnit != nullptr) {
-      WeakPtr<Unit>& ferryRef = mUnit->AssignedTransportRef.AsWeakPtr<Unit>();
+      WeakPtr<Unit>& ferryRef = mUnit->AssignedTransportRef;
       ferryRef.UnlinkFromOwnerChain();
     }
 

@@ -913,7 +913,7 @@ bool moho::AI_TestForTerrainBlockage(
  */
 Entity* CAiAttackerImpl::FindBestEnemy(
   UnitWeapon* const weapon,
-  gpg::core::FastVectorN<SWeakRefSlot, 20>* const entities,
+  gpg::core::FastVectorN<WeakPtr<Entity>, 20>* const entities,
   const float range,
   const bool use3DDistance
 )
@@ -944,9 +944,9 @@ Entity* CAiAttackerImpl::FindBestEnemy(
   WeaponTargetRangeStatus bestSolution = WeaponTargetRangeStatus::OutsideMaxRange;
   std::uint32_t bestCategory = 9999u;
 
-  for (const SWeakRefSlot& slot : *entities) {
+  for (const WeakPtr<Entity>& blip : *entities) {
     std::uint32_t closestSeenCategory = 9999u;
-    Entity* const candidate = slot.ResolveObjectPtr<Entity>();
+    Entity* const candidate = blip.GetObjectPtr();
     if (candidate == nullptr || candidate->mVarDat.mIsDead != 0u || candidate->DestroyQueuedFlag != 0u) {
       continue;
     }
@@ -1402,7 +1402,7 @@ bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
       continue;
     }
 
-    if (engineer->FocusEntityRef.ResolveObjectPtr<Entity>() == target) {
+    if (engineer->FocusEntityRef.GetObjectPtr() == target) {
       return true;
     }
   }
@@ -1511,8 +1511,8 @@ void CAiAttackerImpl::ForceEngage(Entity* const target)
     return;
   }
 
-  view->mUnit->FocusEntityRef.ResetObjectPtr<Entity>(target);
-  if (view->mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+  view->mUnit->FocusEntityRef.ResetFromObject(target);
+  if (view->mUnit->FocusEntityRef.GetObjectPtr() != nullptr) {
     (void)view->mUnit->RunScript("OnAssignedFocusEntity");
   }
 

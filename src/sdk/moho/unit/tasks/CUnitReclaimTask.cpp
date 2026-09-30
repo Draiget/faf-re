@@ -392,8 +392,8 @@ namespace moho
     SetReclaimScriptActive(false);
 
     if (mUnit != nullptr) {
-      mUnit->FocusEntityRef.ResetObjectPtr<Entity>(nullptr);
-      if (mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+      mUnit->FocusEntityRef.ResetFromObject(nullptr);
+      if (mUnit->FocusEntityRef.GetObjectPtr() != nullptr) {
         (void)mUnit->RunScript(kOnAssignedFocusEntityScript);
       }
       mUnit->NeedSyncGameData = true;
@@ -426,8 +426,8 @@ namespace moho
     }
 
     if (mUnit != nullptr) {
-      mUnit->FocusEntityRef.ResetObjectPtr<Entity>(commandTargetEntity);
-      if (mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+      mUnit->FocusEntityRef.ResetFromObject(commandTargetEntity);
+      if (mUnit->FocusEntityRef.GetObjectPtr() != nullptr) {
         (void)mUnit->RunScript(kOnAssignedFocusEntityScript);
       }
       mUnit->NeedSyncGameData = true;

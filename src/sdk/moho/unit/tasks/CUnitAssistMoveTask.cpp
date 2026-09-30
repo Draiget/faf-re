@@ -338,7 +338,7 @@ namespace moho
         continue;
       }
 
-      if (candidate->AssignedTransportRef.ResolveObjectPtr<Unit>() != nullptr) {
+      if (candidate->AssignedTransportRef.GetObjectPtr() != nullptr) {
         continue;
       }
 

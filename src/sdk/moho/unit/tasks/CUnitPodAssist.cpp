@@ -261,7 +261,7 @@ namespace moho
       mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_AssistingCommander);
     }
 
-    Unit* const creatorUnit = (mUnit != nullptr) ? mUnit->CreatorRef.ResolveObjectPtr<Unit>() : nullptr;
+    Unit* const creatorUnit = (mUnit != nullptr) ? mUnit->CreatorRef.GetObjectPtr() : nullptr;
     mAssistTarget.ResetFromObject(creatorUnit);
 
     bool detachAssistTarget = true;

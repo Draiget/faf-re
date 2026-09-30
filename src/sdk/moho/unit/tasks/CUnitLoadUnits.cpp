@@ -484,7 +484,7 @@ namespace moho
             continue;
           }
 
-          pickupUnit->AssignedTransportRef.ResetObjectPtr(mUnit);
+          pickupUnit->AssignedTransportRef.ResetFromObject(mUnit);
 
           IAiNavigator* const navigator = pickupUnit->AiNavigator;
           if (navigator == nullptr) {

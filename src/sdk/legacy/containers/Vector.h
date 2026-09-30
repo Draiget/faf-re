@@ -7312,6 +7312,7 @@ namespace msvc8
          * Address: 0x006877E0 (FUN_006877E0 -- a tail-jump into 0x006892E0; zero callers.)
          * Address: 0x00688D00 (FUN_00688D00 -- another tail-jump into 0x006892E0; zero callers.)
          * Address: 0x00628AB0 (FUN_00628AB0 -- `destroy_range` for `msvc8::vector<moho::SPickUpInfo>`: `~WeakPtr<Unit>` per slot; callers 0x006273B0 (`erase`), 0x00624B70 / 0x00624CC0 (`CUnitLoadUnits`'s constructor unwind and destructor), 0x006270E0 (`SerLoad`'s old storage), 0x00626EA0; formerly `UnlinkPickUpInfoWeakUnitRange` in moho/unit/tasks/CUnitLoadUnits.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x007A5FB0 (FUN_007A5FB0 -- `destroy_range` for `msvc8::vector<moho::WeakPtr<moho::CMauiControl>>` (`sInputCapture`): `~WeakPtr` per slot, no write to the node; callers 0x007A58C0 (`erase`), 0x007A5970, 0x007A5A70 (`_Insert_n`), 0x007A5780. Formerly `UnlinkWeakPtrRangeWithoutClearing` in moho/misc/WeakPtr.h, whose two source callers fed it `SWeakRefSlot` fastvectors, removed 2026-09-30.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {

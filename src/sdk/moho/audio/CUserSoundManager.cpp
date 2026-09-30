@@ -1552,9 +1552,8 @@ namespace moho
       return;
     }
 
-    const CameraFrustumUserEntityList& audibleEntities = worldCamera->GetAllSoundEntitiesInFrustum();
-    for (const CameraUserEntityWeakRef* ref = audibleEntities.mStart; ref != audibleEntities.mFinish; ++ref) {
-      UserEntity* const entity = WeakPtr<UserEntity>::DecodeOwnerObject(ref->mOwnerLinkSlot);
+    for (const WeakPtr<UserEntity>& audible : worldCamera->GetAllSoundEntitiesInFrustum()) {
+      UserEntity* const entity = audible.GetObjectPtr();
       if (entity == nullptr) {
         continue;
       }

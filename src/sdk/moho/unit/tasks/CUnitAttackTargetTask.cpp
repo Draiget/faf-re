@@ -644,7 +644,7 @@ namespace moho
       return false;
     }
 
-    Unit* const formationLead = owner->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+    Unit* const formationLead = owner->mInfoCache.mFormationLeadRef.GetObjectPtr();
     if (formationLead == nullptr) {
       return false;
     }
@@ -1250,7 +1250,7 @@ namespace moho
 
       case TASKSTATE_Processing: {
         if (mFormation != nullptr) {
-          Unit* const formationLead = unit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+          Unit* const formationLead = unit->mInfoCache.mFormationLeadRef.GetObjectPtr();
           if (formationLead != unit && mIgnoreFormationUpdates != 0u) {
             if (!HasFormationLeadDesiredTarget()) {
               return 1;

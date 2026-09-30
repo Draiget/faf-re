@@ -6984,7 +6984,7 @@ int moho::cfunc_CAiBrainNumCurrentlyBuildingL(LuaPlus::LuaState* const state)
         continue;
       }
 
-      Entity* const focusedEntity = builder->FocusEntityRef.ResolveObjectPtr<Entity>();
+      Entity* const focusedEntity = builder->FocusEntityRef.GetObjectPtr();
       Unit* const focusedUnit = focusedEntity ? focusedEntity->IsUnit() : nullptr;
       if (focusedUnit == nullptr) {
         continue;

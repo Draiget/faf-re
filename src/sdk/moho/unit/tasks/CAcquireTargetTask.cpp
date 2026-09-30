@@ -571,7 +571,7 @@ namespace moho
     // blip staleness bound: a value of 1 would use the raw cached list, but since
     // v6 is always >= 2, the binary always refreshes through GetBlipsInRange with
     // a max-age of v6 - 1 (== intervalTicks).
-    gpg::core::FastVectorN<SWeakRefSlot, 20>* blipsInRange;
+    gpg::core::FastVectorN<WeakPtr<Entity>, 20>* blipsInRange;
     if (waitStatus == 1) {
       blipsInRange = &mUnit->mBlipsInRange;
     } else {

@@ -369,7 +369,7 @@ namespace moho
           // mUnit->Entity comparison). A unit focused on the carrier and
           // not the carrier itself is still attaching/loading -- skip it
           // and leave it in the tracked set for the next tick.
-          Entity* const focusedEntity = trackedUnit->FocusEntityRef.ResolveObjectPtr<Entity>();
+          Entity* const focusedEntity = trackedUnit->FocusEntityRef.GetObjectPtr();
           const bool focusedOnCarrier = (focusedEntity == ownerEntity);
           if (focusedOnCarrier && trackedUnit != mUnit) {
             continue;

@@ -166,93 +166,20 @@ namespace
   }
 
   /**
-   * `Unit::mBlipsInRange`'s real declared type is `gpg::core::FastVectorN<
-   * SWeakRefSlot,20>` (`Unit.h`), a small-buffer vector with a 20-element
-   * inline array embedded directly in the `Unit` object. This lane operates
-   * on that real type by named field (`start_`/`end_`/`capacity_`/
-   * `originalVec_`, all public) rather than through a type-erased
-   * `{begin,end,capacityEnd}` view, specifically so it can tell an inline
-   * buffer apart from a heap one before freeing anything -- growing past 20
-   * entries while still on the inline buffer must not free memory embedded
-   * in the owning `Unit`. `SWeakRefSlot::AsWeakPtr<T>()` (`Unit.h`,
-   * layout-verified via its own `static_assert`s) provides the WeakPtr
-   * methods needed for the element-lifetime rule below (shrink, and
-   * relocate-on-grow, must each `ResetFromObject`/`ResetFromOwnerLinkSlot`
-   * to keep the intrusive owner-chain pointers correct), which plain
-   * `FastVectorN::GrowToCapacity` does not know how to do -- that is why
-   * this lane cannot simply call the container's own generic growth.
-   */
-  void AdjustBlipsInRangeCount(gpg::core::FastVectorN<moho::SWeakRefSlot, 20>& vec, const std::size_t newCount)
-  {
-    const std::size_t oldCount = static_cast<std::size_t>(vec.end_ - vec.start_);
-    const std::size_t oldCapacity = static_cast<std::size_t>(vec.capacity_ - vec.start_);
-
-    if (newCount < oldCount) {
-      for (std::size_t i = newCount; i < oldCount; ++i) {
-        vec.start_[i].AsWeakPtr<moho::Entity>().ResetFromObject(nullptr);
-      }
-      vec.end_ = vec.start_ + newCount;
-      return;
-    }
-
-    if (newCount > oldCapacity) {
-      std::size_t newCapacity = oldCapacity ? oldCapacity : 4u;
-      while (newCapacity < newCount) {
-        newCapacity *= 2u;
-      }
-
-      auto* const newBegin =
-        static_cast<moho::SWeakRefSlot*>(::operator new(sizeof(moho::SWeakRefSlot) * newCapacity));
-      for (std::size_t i = 0; i < newCapacity; ++i) {
-        newBegin[i].valueWithTag = nullptr;
-        newBegin[i].backlink = nullptr;
-      }
-
-      for (std::size_t i = 0; i < oldCount; ++i) {
-        newBegin[i].AsWeakPtr<moho::Entity>().ResetFromOwnerLinkSlot(
-          vec.start_[i].AsWeakPtr<moho::Entity>().ownerLinkSlot
-        );
-        vec.start_[i].AsWeakPtr<moho::Entity>().ResetFromObject(nullptr);
-      }
-
-      if (vec.start_ != vec.originalVec_) {
-        ::operator delete(vec.start_);
-      }
-      vec.start_ = newBegin;
-      vec.end_ = newBegin + oldCount;
-      vec.capacity_ = newBegin + newCapacity;
-    }
-
-    for (std::size_t i = oldCount; i < newCount; ++i) {
-      vec.start_[i].valueWithTag = nullptr;
-      vec.start_[i].backlink = nullptr;
-    }
-    vec.end_ = vec.start_ + newCount;
-  }
-
-  /**
    * Address: 0x006AF3F0 (FUN_006AF3F0, sub_6AF3F0)
    *
    * What it does:
    * Deserializes `fastvector<WeakPtr<Entity>>` count/lane payloads.
    */
-  void LoadFastVectorWeakPtrEntity(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorWeakPtrEntity(gpg::ReadArchive* const archive, const int objectPtr, int, gpg::RRef* const ownerRef)
   {
-    if (!archive || objectPtr == 0) {
-      return;
-    }
-
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorN<moho::SWeakRefSlot, 20>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::Entity>>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
-
-    AdjustBlipsInRangeCount(vec, static_cast<std::size_t>(count));
-
-    gpg::RType* const weakType = CachedWeakPtrEntityType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    vec.resize(count, moho::WeakPtr<moho::Entity>{});
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(weakType, &vec[i].AsWeakPtr<moho::Entity>(), owner);
+      archive->Read(CachedWeakPtrEntityType(), &vec[i], *ownerRef);
     }
   }
 
@@ -262,21 +189,14 @@ namespace
    * What it does:
    * Serializes `fastvector<WeakPtr<Entity>>` count/lane payloads.
    */
-  void SaveFastVectorWeakPtrEntity(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorWeakPtrEntity(gpg::WriteArchive* const archive, const int objectPtr, int, gpg::RRef* const ownerRef)
   {
-    if (!archive || objectPtr == 0) {
-      return;
-    }
-
     const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::WeakPtr<moho::Entity>>*>(objectPtr);
 
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
-
-    gpg::RType* const weakType = CachedWeakPtrEntityType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(weakType, &vec[i], owner);
+      archive->Write(CachedWeakPtrEntityType(), &vec[i], *ownerRef);
     }
   }
 
@@ -420,16 +340,11 @@ namespace gpg
   /**
    * Address: 0x006AE570 (FUN_006AE570, gpg::RFastVectorType_WeakPtr_Entity::SetCount)
    */
-  void RFastVectorType<moho::WeakPtr<moho::Entity>>::SetCount(void* obj, const int count) const
+  void RFastVectorType<moho::WeakPtr<moho::Entity>>::SetCount(void* const obj, const int count) const
   {
-    GPG_ASSERT(obj != nullptr);
-    GPG_ASSERT(count >= 0);
-    if (!obj || count < 0) {
-      return;
-    }
-
-    auto& vec = *static_cast<gpg::core::FastVectorN<moho::SWeakRefSlot, 20>*>(obj);
-    AdjustBlipsInRangeCount(vec, static_cast<std::size_t>(count));
+    static_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::Entity>>*>(obj)->resize(
+      static_cast<std::size_t>(count), moho::WeakPtr<moho::Entity>{}
+    );
   }
 
   RFastVectorType<moho::ReconBlip*>::~RFastVectorType() = default;

@@ -807,7 +807,7 @@ namespace moho
      * driven by the same push_back/grow family (0x0061C5E0 / 0x0061C750) as
      * `Unit::mBlipsInRange`.
      */
-    gpg::core::FastVectorN<SWeakRefSlot, 10> mRaisedPlatformCandidates; // +0x178
+    gpg::core::FastVectorN<WeakPtr<Entity>, 10> mRaisedPlatformCandidates; // +0x178
   };
 
   static_assert(sizeof(CUnitMotion) == 0x1D8, "CUnitMotion size must be 0x1D8");
@@ -853,7 +853,7 @@ namespace moho
     "CUnitMotion::mRaisedPlatformCandidates offset must be 0x178"
   );
   static_assert(
-    sizeof(gpg::core::FastVectorN<SWeakRefSlot, 10>) == 0x60,
+    sizeof(gpg::core::FastVectorN<WeakPtr<Entity>, 10>) == 0x60,
     "CUnitMotion::mRaisedPlatformCandidates size must be 0x60"
   );
   static_assert(offsetof(CUnitMotion, mLastTrans) == 0x120, "CUnitMotion::mLastTrans offset must be 0x120");

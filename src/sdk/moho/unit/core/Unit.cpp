@@ -2663,7 +2663,7 @@ CScrLuaInitForm* moho::func_UnitSetCreator_LuaFuncDef()
  */
 void moho::AssignCreatorWeakRefAndMarkSyncDirty(Unit* const unit, Unit* const creator)
 {
-  unit->CreatorRef.AsWeakPtr<Unit>().Set(creator);
+  unit->CreatorRef.Set(creator);
   unit->NeedSyncGameData = true;
 }
 
@@ -2939,8 +2939,8 @@ int moho::cfunc_UnitClearFocusEntityL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  unit->FocusEntityRef.ResetObjectPtr<Entity>(nullptr);
-  if (unit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+  unit->FocusEntityRef.ResetFromObject(nullptr);
+  if (unit->FocusEntityRef.GetObjectPtr() != nullptr) {
     unit->RunScript(kUnitOnAssignedFocusEntityScript);
   }
   unit->NeedSyncGameData = true;
@@ -2998,8 +2998,8 @@ int moho::cfunc_UnitSetFocusEntityL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject focusEntityObject(LuaPlus::LuaStackObject(state, 2));
   Entity* const focusEntity = SCR_FromLua_EntityOpt(focusEntityObject);
   if (focusEntity != nullptr) {
-    unit->FocusEntityRef.ResetObjectPtr<Entity>(focusEntity);
-    if (unit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+    unit->FocusEntityRef.ResetFromObject(focusEntity);
+    if (unit->FocusEntityRef.GetObjectPtr() != nullptr) {
       unit->RunScript(kUnitOnAssignedFocusEntityScript);
     }
     unit->NeedSyncGameData = true;
@@ -11579,7 +11579,7 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   }
 
   // 6) Guarded-unit + guard-list transfer.
-  dest->SetGuardedUnit(source->GuardedUnitRef.ResolveObjectPtr<Unit>());
+  dest->SetGuardedUnit(source->GuardedUnitRef.GetObjectPtr());
   dest->GuardedPos = source->GuardedPos;
 
   // Snapshot the guard slots first: SetGuardedUnit mutates source->GuardedByList.
@@ -12692,16 +12692,16 @@ namespace
 
   void ClearUnitWeakReferences(Unit& unit) noexcept
   {
-    unit.CreatorRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
-    unit.TransportedByRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
-    unit.AssignedTransportRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
-    unit.FocusEntityRef.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
-    unit.TargetBlipEntityRef.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
-    unit.GuardedUnitRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
-    unit.mInfoCache.mFormationLeadRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+    unit.CreatorRef.UnlinkFromOwnerChain();
+    unit.TransportedByRef.UnlinkFromOwnerChain();
+    unit.AssignedTransportRef.UnlinkFromOwnerChain();
+    unit.FocusEntityRef.UnlinkFromOwnerChain();
+    unit.TargetBlipEntityRef.UnlinkFromOwnerChain();
+    unit.GuardedUnitRef.UnlinkFromOwnerChain();
+    unit.mInfoCache.mFormationLeadRef.UnlinkFromOwnerChain();
 
-    for (SWeakRefSlot& slot : unit.mBlipsInRange) {
-      slot.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
+    for (WeakPtr<Entity>& blip : unit.mBlipsInRange) {
+      blip.UnlinkFromOwnerChain();
     }
     unit.mBlipsInRange.ResetStorageToInline();
   }
@@ -13138,7 +13138,7 @@ Unit::Unit(Sim* sim) : IUnit(), Entity(sim, ENTITYTYPE_Unit)
   ReservedOgridRectMaxX = 0;
   ReservedOgridRectMaxZ = 0;
 
-  // mBlipsInRange (FastVectorN<SWeakRefSlot,20>) and mReconBlips
+  // mBlipsInRange (FastVectorN<WeakPtr<Entity>,20>) and mReconBlips
   // (FastVectorN<ReconBlip*,2>) bind to their inline buffers as members.
   mBlipLastUpdateTick = 0;
 
@@ -13216,7 +13216,7 @@ Unit::Unit(const SUnitConstructionParams& params)
   UnitMotion = nullptr;
   CommandQueue = nullptr;
   CreatorRef = {};
-  CreatorRef.AsWeakPtr<Unit>().Set(params.mLinkSourceUnit);
+  CreatorRef.Set(params.mLinkSourceUnit);
   TransportedByRef = {};
   AssignedTransportRef = {};
   FocusEntityRef = {};
@@ -14176,9 +14176,9 @@ int Unit::GetMaxFootprintSize() const
  */
 void Unit::SetFocusEntity(Entity* const focusEntity)
 {
-  FocusEntityRef.ResetObjectPtr<Entity>(focusEntity);
+  FocusEntityRef.ResetFromObject(focusEntity);
 
-  const WeakPtr<Entity>& focusLane = FocusEntityRef.AsWeakPtr<Entity>();
+  const WeakPtr<Entity>& focusLane = FocusEntityRef;
   if (focusLane.HasValue()) {
     RunScript(kUnitOnAssignedFocusEntityScript);
   }
@@ -14195,7 +14195,7 @@ void Unit::SetFocusEntity(Entity* const focusEntity)
  */
 void Unit::SetTargetBlipEntity(Entity* const blipEntity)
 {
-  TargetBlipEntityRef.AsWeakPtr<Entity>().Set(blipEntity);
+  TargetBlipEntityRef.Set(blipEntity);
   NeedSyncGameData = true;
 }
 
@@ -14495,7 +14495,7 @@ bool Unit::DetachFrom(Entity* const parent, const bool skipBallistic)
   }
 
   TransportLoadFactor = -1.0f;
-  TransportedByRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+  TransportedByRef.UnlinkFromOwnerChain();
   return true;
 }
 
@@ -14701,7 +14701,7 @@ float Unit::Materialize(const float delta)
   const char* const layerName = (static_cast<unsigned int>(mVarDat.mLayerMask) > LAYER_Orbit)
                                   ? ""
                                   : Entity::LayerToString(mVarDat.mLayerMask);
-  RunScriptOnStopBeingBuilt(CreatorRef.AsWeakPtr<Unit>(), layerName);
+  RunScriptOnStopBeingBuilt(CreatorRef, layerName);
 
   const RUnitBlueprint* const blueprint = GetBlueprint();
   if (blueprint != nullptr && blueprint->General.CapCost > 0.0f) {
@@ -14865,7 +14865,7 @@ Unit* Unit::FindPlatform()
   }
 
   // Skip if this unit is its own formation lead.
-  if (IUnit* const formationLead = mInfoCache.mFormationLeadRef.ResolveObjectPtr<IUnit>();
+  if (IUnit* const formationLead = mInfoCache.mFormationLeadRef.GetObjectPtr();
       formationLead != nullptr && formationLead->IsUnit() == this) {
     return nullptr;
   }
@@ -14996,7 +14996,7 @@ void Unit::UpdateSpeedThroughStatus()
     ) {
       if (IsSpeedThroughBusyCommandType(currentCommand->mVarDat.mCmdType)
           && IsSpeedThroughBusyCommandType(nextCommand->mVarDat.mCmdType) && !IsUnitState(UNITSTATE_AssistMoving)) {
-        const Unit* const formationLead = mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+        const Unit* const formationLead = mInfoCache.mFormationLeadRef.GetObjectPtr();
         if (formationLead == nullptr || formationLead == this) {
           enableSpeedThrough = true;
         }
@@ -15056,7 +15056,7 @@ bool Unit::IsUnitState(const EUnitState state) const
  */
 Unit* Unit::GetGuardedUnit() const
 {
-  return GuardedUnitRef.ResolveObjectPtr<Unit>();
+  return GuardedUnitRef.GetObjectPtr();
 }
 
 /**
@@ -15072,7 +15072,7 @@ Unit* Unit::GetGuardedUnit() const
  * `maxAgeTicks` ticks stale (current sim tick minus the last update tick, as an
  * unsigned compare), then returns a reference to the cached list.
  */
-gpg::core::FastVectorN<SWeakRefSlot, 20>& Unit::GetBlipsInRange(const unsigned int maxAgeTicks)
+gpg::core::FastVectorN<WeakPtr<Entity>, 20>& Unit::GetBlipsInRange(const unsigned int maxAgeTicks)
 {
   const unsigned int ticksSinceUpdate =
     SimulationRef->mCurTick - static_cast<unsigned int>(mBlipLastUpdateTick);
@@ -15146,10 +15146,6 @@ void Unit::UpdateBlipsInRange()
 
   // Reset the blip list: unlink every currently-held weak reference from its
   // owner chain, release escaped heap storage, and rebind to inline storage.
-  UnlinkWeakPtrRangeWithoutClearing(
-    reinterpret_cast<WeakPtr<void>*>(mBlipsInRange.begin()),
-    reinterpret_cast<WeakPtr<void>*>(mBlipsInRange.end())
-  );
   mBlipsInRange.ResetStorageToInline();
 
   for (const CollisionResult& hit : unitsInRange) {
@@ -15189,15 +15185,13 @@ void Unit::UpdateBlipsInRange()
     }
 
     // Record a weak reference to the visible enemy.
-    WeakPtr<Entity> blipRef(candidate);
-    mBlipsInRange.push_back(reinterpret_cast<const SWeakRefSlot&>(blipRef));
+    mBlipsInRange.push_back(WeakPtr<Entity>(candidate));
 
     // When the candidate is actively jamming, also record its shadow blips.
     if (candidateUnit->mIntelManager->HasActiveJamming()) {
       EntitySetTemplate<Entity> jammingBlips = army->GetReconDB()->ReconGetJamingBlips(candidateUnit);
       for (Entity* const jammingEntity : jammingBlips) {
-        WeakPtr<Entity> jammingRef(jammingEntity);
-        mBlipsInRange.push_back(reinterpret_cast<const SWeakRefSlot&>(jammingRef));
+        mBlipsInRange.push_back(WeakPtr<Entity>(jammingEntity));
       }
     }
   }
@@ -15265,15 +15259,15 @@ void Unit::UpdateBlipsInRange()
  */
 void Unit::SetGuardedUnit(Unit* const guarded)
 {
-  Unit* const oldGuardedUnit = GuardedUnitRef.ResolveObjectPtr<Unit>();
+  Unit* const oldGuardedUnit = GuardedUnitRef.GetObjectPtr();
   if (oldGuardedUnit != nullptr) {
     (void)RemoveGuardedByOwner(oldGuardedUnit->GuardedByList, this);
     ClearGuardFormation(oldGuardedUnit);
   }
 
-  GuardedUnitRef.AsWeakPtr<Unit>().Set(guarded);
+  GuardedUnitRef.Set(guarded);
 
-  Unit* const newGuardedUnit = GuardedUnitRef.ResolveObjectPtr<Unit>();
+  Unit* const newGuardedUnit = GuardedUnitRef.GetObjectPtr();
   if (newGuardedUnit != nullptr) {
     AddGuardedByOwner(newGuardedUnit->GuardedByList, this);
     ClearGuardFormation(newGuardedUnit);
@@ -15304,7 +15298,7 @@ void Unit::RemoveGuardedByUnit(Unit* const guardedByUnit)
  */
 Entity* Unit::GetFocusEntity() const
 {
-  return FocusEntityRef.ResolveObjectPtr<Entity>();
+  return FocusEntityRef.GetObjectPtr();
 }
 
 /**
@@ -15312,7 +15306,7 @@ Entity* Unit::GetFocusEntity() const
  */
 Unit* Unit::GetStagingPlatform() const
 {
-  Unit* const transport = TransportedByRef.ResolveObjectPtr<Unit>();
+  Unit* const transport = TransportedByRef.GetObjectPtr();
   if (transport == nullptr) {
     return nullptr;
   }
@@ -15334,7 +15328,7 @@ Unit* Unit::GetStagingPlatform() const
  */
 Unit* Unit::GetTransportedBy() const
 {
-  return TransportedByRef.ResolveObjectPtr<Unit>();
+  return TransportedByRef.GetObjectPtr();
 }
 
 /**
@@ -15350,7 +15344,7 @@ Unit* Unit::GetTransportedBy() const
  */
 Unit* Unit::GetFerryUnit() const
 {
-  return AssignedTransportRef.ResolveObjectPtr<Unit>();
+  return AssignedTransportRef.GetObjectPtr();
 }
 
 /**
@@ -15361,7 +15355,7 @@ Unit* Unit::GetFerryUnit() const
  */
 void Unit::SetAssignedTransport(Unit* const assignedTransport)
 {
-  AssignedTransportRef.AsWeakPtr<Unit>().Set(assignedTransport);
+  AssignedTransportRef.Set(assignedTransport);
 }
 
 /**
@@ -15394,7 +15388,7 @@ Unit* Unit::GetTransportFerryBeacon() const
  */
 Unit* Unit::GetCreator() const
 {
-  return CreatorRef.ResolveObjectPtr<Unit>();
+  return CreatorRef.GetObjectPtr();
 }
 
 /**
@@ -15497,7 +15491,7 @@ Wm3::Vector3f Unit::GetFormationVector() const
   }
 
   if (mIsAir) {
-    const Unit* const formationLead = mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+    const Unit* const formationLead = mInfoCache.mFormationLeadRef.GetObjectPtr();
     if (formationLead != nullptr && !formationLead->mIsAir) {
       return ForwardXZ(*formationLead);
     }
@@ -15520,7 +15514,7 @@ Wm3::Vector3f Unit::GetFormationVector() const
  */
 IFormationInstance* Unit::GetFormation() const
 {
-  Unit* const guardedUnit = GuardedUnitRef.ResolveObjectPtr<Unit>();
+  Unit* const guardedUnit = GuardedUnitRef.GetObjectPtr();
   if (guardedUnit != nullptr && !mIsEngineer) {
     if (IsUnitState(UNITSTATE_GuardBusy)) {
       return nullptr;
@@ -15565,7 +15559,7 @@ void Unit::UpdateInfoCache()
     mInfoCache.mHasFormationSpeedData = formation->IsInFormation(this);
 
     Unit* const formationLead = formation->GetLeader(this, offsetInfo);
-    mInfoCache.mFormationLeadRef.AsWeakPtr<Unit>().Set(formationLead);
+    mInfoCache.mFormationLeadRef.Set(formationLead);
 
     Wm3::Vec3f headingHint{};
     formation->GetTargetPosition(&headingHint, this, offsetInfo);
@@ -15575,7 +15569,7 @@ void Unit::UpdateInfoCache()
   } else {
     mInfoCache.mFormationLayer = nullptr;
     mInfoCache.mHasFormationSpeedData = true;
-    mInfoCache.mFormationLeadRef.AsWeakPtr<Unit>().Set(nullptr);
+    mInfoCache.mFormationLeadRef.Set(nullptr);
     mInfoCache.mFormationHeadingHint = GetPosition();
     mInfoCache.mFormationDistanceMetric = 0.0f;
     mInfoCache.mFormationPriorityOrder = 0;
@@ -15693,7 +15687,7 @@ bool Unit::IsHigherPriorityThan(const Unit* const other) const
   if (mInfoCache.mFormationLayer && mInfoCache.mFormationLayer == other->mInfoCache.mFormationLayer) {
     inSharedFormation = true;
 
-    const Unit* const formationLead = mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+    const Unit* const formationLead = mInfoCache.mFormationLeadRef.GetObjectPtr();
     if (formationLead == this) {
       return true;
     }
@@ -16514,7 +16508,7 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
     if (transportOwner->AiTransport != nullptr && mAttachInfo.GetAttachTargetEntity() != nullptr) {
       (void)transportOwner->AiTransport->TransportDetachUnit(this);
     }
-    TransportedByRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+    TransportedByRef.UnlinkFromOwnerChain();
     excessDamageRatio = 10.0f;
   }
 
@@ -16645,7 +16639,7 @@ void Unit::OnDestroy()
 
     if (Unit* const transportOwner = GetTransportedBy(); transportOwner != nullptr && !transportOwner->IsDead()) {
       (void)transportOwner->AiTransport->TransportDetachUnit(this);
-      TransportedByRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+      TransportedByRef.UnlinkFromOwnerChain();
     }
 
     if (AiTransport != nullptr) {
@@ -16997,9 +16991,9 @@ namespace
    * inlines the same null-tag test and `id_` load at each one.
    */
   template <class TObject>
-  [[nodiscard]] moho::EntId WeakRefEntityId(const moho::SWeakRefSlot& slot) noexcept
+  [[nodiscard]] moho::EntId WeakRefEntityId(const moho::WeakPtr<TObject>& weak) noexcept
   {
-    const TObject* const target = slot.ResolveObjectPtr<TObject>();
+    const TObject* const target = weak.GetObjectPtr();
     return target != nullptr ? target->id_ : kNoCreatorEntityId;
   }
 

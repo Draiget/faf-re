@@ -5,12 +5,14 @@
 #include <string_view>
 
 #include "boost/shared_ptr.h"
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/gal/VertexBuffer.hpp"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/misc/RangeExtractor.h"
+#include "moho/misc/WeakPtr.h"
 #include "moho/render/CRenFrame.h"
 #include "moho/render/RenderGeometryBuffers.h"
 
@@ -214,20 +216,6 @@ namespace moho
   );
 
   /**
-   * Address: 0x007EF0B0 (FUN_007EF0B0, Moho::func_ExtractRanges)
-   *
-   * Opaque candidate-pool view: a contiguous half-open range of
-   * `SSelectionWeakRefUserEntity` records, modeled as `(begin, end)` raw
-   * pointer pair to match the original fastvector view shape used by
-   * `RangeRenderer::Render`.
-   */
-  struct SRangeProfileWeakRefCandidatePoolView
-  {
-    const void* begin;   // start of weak-ref record range (8 bytes per entry)
-    const void* end;     // one-past-last weak-ref record
-  };
-
-  /**
    * Output ring extraction payload vector accepted by `func_ExtractRanges`.
    * The binary appends one entry per successfully extracted candidate using
    * `AppendRangeExtractionPayload` lane behavior.
@@ -247,7 +235,7 @@ namespace moho
    * ring extraction payload vector.
    */
   void func_ExtractRanges(
-    const SRangeProfileWeakRefCandidatePoolView& candidatePool,
+    const gpg::fastvector<WeakPtr<UserEntity>>& candidatePool,
     float interpolationAlpha,
     const SRangeRenderProfile& profile,
     SRangeExtractionPayloadVector& outRingPayloadVector

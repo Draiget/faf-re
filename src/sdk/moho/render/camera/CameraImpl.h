@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/Vector2f.h"
@@ -34,196 +35,6 @@ namespace moho
   class UserEntity;
   enum ECamTimeSource : std::int32_t;
   struct SSelectionSetUserEntity;
-
-  struct CameraUserEntityWeakRef
-  {
-    void* mOwnerLinkSlot;                  // +0x00
-    CameraUserEntityWeakRef* mNextOwnerRef; // +0x04
-  };
-
-  static_assert(sizeof(CameraUserEntityWeakRef) == 0x08, "CameraUserEntityWeakRef size must be 0x08");
-  static_assert(
-    offsetof(CameraUserEntityWeakRef, mOwnerLinkSlot) == 0x00,
-    "CameraUserEntityWeakRef::mOwnerLinkSlot offset must be 0x00"
-  );
-  static_assert(
-    offsetof(CameraUserEntityWeakRef, mNextOwnerRef) == 0x04,
-    "CameraUserEntityWeakRef::mNextOwnerRef offset must be 0x04"
-  );
-
-  struct CameraFrustumUserEntityList
-  {
-    CameraUserEntityWeakRef* mStart;        // +0x00
-    CameraUserEntityWeakRef* mFinish;       // +0x04
-    CameraUserEntityWeakRef* mCapacity;     // +0x08
-    CameraUserEntityWeakRef* mInlineOrigin; // +0x0C
-
-    /**
-     * Address: 0x007AFBB0 (FUN_007AFBB0)
-     *
-     * IDA signature:
-     * void** __thiscall sub_7AFBB0(CameraFrustumUserEntityList *this,
-     *   unsigned requiredCapacity, CameraUserEntityWeakRef *insertionPos,
-     *   CameraUserEntityWeakRef *first, CameraUserEntityWeakRef *last);
-     *
-     * What it does:
-     * Reallocates this lane's storage to `requiredCapacity` slots, splicing
-     * `[first, last)` in at `insertionPos` while relocating the existing
-     * `[mStart, insertionPos)` head and `[insertionPos, mFinish)` tail into
-     * the new buffer (each element's owner-chain link is relinked to the new
-     * address by the copy step). Detaches every element at the OLD storage
-     * addresses from the owner chains they were just relinked away from,
-     * then either releases the old heap buffer or, when the old buffer was
-     * the inline block, stashes its capacity bound at the inline origin so a
-     * later `Teardown` can restore it. Returns the new `mCapacity` (matching
-     * the binary's own return value, which no observed caller actually
-     * uses). Called only from `InsertRange`'s grow branch below.
-     */
-    CameraUserEntityWeakRef* GrowAndInsertRange(
-      std::size_t requiredCapacity,
-      CameraUserEntityWeakRef* insertionPos,
-      CameraUserEntityWeakRef* first,
-      CameraUserEntityWeakRef* last
-    );
-
-    /**
-     * Address: 0x007AF0B0 (FUN_007AF0B0)
-     *
-     * IDA signature:
-     * void __thiscall sub_7AF0B0(CameraFrustumUserEntityList *this,
-     *   CameraUserEntityWeakRef *insertionPos, CameraUserEntityWeakRef *first,
-     *   CameraUserEntityWeakRef *last);
-     *
-     * What it does:
-     * The VC8 `_Insert_n` dispatcher for this lane's element range: when
-     * spare capacity cannot hold `size() + (last-first)`, reallocates via
-     * `GrowAndInsertRange` above; otherwise shifts the existing tail
-     * in-place (constructing into freshly-exposed raw slots past `mFinish`,
-     * assigning over slots that stay live) and places `[first, last)` into
-     * the gap at `insertionPos`. Direct callers: the inlined sound-entities
-     * lane push in `CacheCameraFrustumUnits` (FUN_007A75A0), and `AssignRange`
-     * below (FUN_007F20E0's grow-then-append path).
-     */
-    CameraUserEntityWeakRef* InsertRange(
-      CameraUserEntityWeakRef* insertionPos,
-      CameraUserEntityWeakRef* first,
-      CameraUserEntityWeakRef* last
-    );
-
-    /**
-     * Address: 0x007F20E0 (FUN_007F20E0)
-     *
-     * IDA signature:
-     * CameraFrustumUserEntityList* __thiscall sub_7F20E0(
-     *   CameraFrustumUserEntityList *this, CameraFrustumUserEntityList *other);
-     *
-     * What it does:
-     * The VC8 vector `assign(first, last)` / `operator=` shape for this lane,
-     * taking another lane-shaped object as the source view (matching the
-     * binary's own `CameraFrustumUserEntityList*` second parameter, even
-     * though only its `mStart`/`mFinish` are ever read): self-assignment
-     * no-op guard; when this lane's current size already covers `other`,
-     * assigns the retained prefix forward and detaches/drops the excess
-     * tail; otherwise ensures capacity for `other`'s element count (via
-     * `InsertRange`'s own grow machinery, invoked here with a degenerate
-     * empty range purely for its capacity-ensure side effect), assigns
-     * forward over the currently-live prefix, then places the remaining
-     * source elements past `mFinish` via `InsertRange`. Sole real caller:
-     * `SnapshotCameraFrustumWeakRefs` (FUN_007F03D0, RangeRenderer.cpp),
-     * always with an empty `this` -- the truncate branch is therefore only
-     * exercised when `other` is also empty in every observed call site.
-     */
-    CameraUserEntityWeakRef* AssignRange(const CameraFrustumUserEntityList& other);
-
-    /**
-     * Address: 0x007F2DA0 (FUN_007F2DA0)
-     *
-     * What it does:
-     * The lane's `erase(first, last)`: assigns the surviving tail
-     * `[last, mFinish)` down onto `first` through `WeakPtr`'s relinking
-     * assignment (0x007F3BE0, the `copy_or_move_assign` emission), unlinks
-     * the vacated slots `[newFinish, mFinish)` from their entities' weak
-     * chains (0x007AF240, `UnlinkIntrusiveWeakRefRange`), rebases `mFinish`
-     * and returns `first`; an empty range changes nothing. `this` arrives in
-     * EBX and `last` in EDX. Sole caller: `AssignRange`'s truncate branch
-     * (0x007F2181), as `Erase(newFinish, mFinish)`.
-     */
-    CameraUserEntityWeakRef* Erase(CameraUserEntityWeakRef* first, CameraUserEntityWeakRef* last);
-    /**
-     * Address: inlined - emitted at 0x007EEB13..0x007EEB52 inside
-     * `RangeRenderer::Render` (FUN_007EEA00), and again in the lane teardown
-     * `CameraImpl::~CameraImpl` and `CameraImpl::CacheCameraFrustumUnits` run.
-     *
-     * The destruction half of this lane, and the one operation it was missing.
-     * Every element is spliced into its tracked entity's intrusive weak-link
-     * chain, so the storage cannot simply be released: each node must first
-     * rewire the chain slot pointing back at it (FUN_007AF240), and only then
-     * is heap-grown storage handed to `operator delete[]`. Skipping this
-     * leaves the entity chains pointing into memory the lane no longer owns,
-     * which is fatal for a stack-allocated lane - the next walk of that chain
-     * dereferences a dead frame.
-     *
-     * Leaves `mStart`/`mFinish` as they were: the binary's inlined copy is a
-     * dying object's destructor. Callers that go on to reuse the lane restore
-     * the inline sentinel state themselves.
-     */
-    void DetachAndRelease() noexcept;
-  };
-
-  static_assert(sizeof(CameraFrustumUserEntityList) == 0x10, "CameraFrustumUserEntityList size must be 0x10");
-  static_assert(
-    offsetof(CameraFrustumUserEntityList, mStart) == 0x00, "CameraFrustumUserEntityList::mStart offset must be 0x00"
-  );
-  static_assert(
-    offsetof(CameraFrustumUserEntityList, mFinish) == 0x04, "CameraFrustumUserEntityList::mFinish offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CameraFrustumUserEntityList, mCapacity) == 0x08, "CameraFrustumUserEntityList::mCapacity offset must be 0x08"
-  );
-  static_assert(
-    offsetof(CameraFrustumUserEntityList, mInlineOrigin) == 0x0C,
-    "CameraFrustumUserEntityList::mInlineOrigin offset must be 0x0C"
-  );
-
-  /**
-   * Decodes one `CameraFrustumUserEntityList` lane back to the `UserEntity`
-   * it tracks. `mOwnerLinkSlot` points at the entity's `mIUnitChainHead`
-   * slot (`offsetof(UserEntity, mIUnitChainHead)`, 0x08 on x86), so the
-   * entity itself sits that many bytes before it; an unlinked or self-pointing lane
-   * (`raw <= kUserEntityWeakOwnerOffset`) decodes to null.
-   *
-   * Named distinctly from `CameraImpl.cpp`'s file-private
-   * `DecodeUserEntityWeakRef(const SSelectionWeakRefUserEntity&)` - that one
-   * decodes a selection weak-ref, this one a frustum weak-ref; the two types
-   * are unrelated despite the coincidentally similar source names.
-   *
-   * Shared by every walk of `CameraImpl::GetArmyUnitsInFrustum()` - promoted
-   * here from a file-private duplicate in `CWldSession.cpp` so
-   * `CUIWorldView`'s build-drag adjacency highlighter can use it too.
-   */
-  [[nodiscard]] UserEntity* DecodeCameraFrustumWeakRef(const CameraUserEntityWeakRef& weakRef) noexcept;
-
-  /**
-   * One frustum weak-entity lane: a `gpg::fastvector_n<WeakPtr<UserEntity>, 40>`
-   * -- the four-pointer view followed by its own 40-slot inline buffer, which
-   * the view's `mInlineOrigin` points at until the lane outgrows it. `CameraImpl`
-   * holds three of these back to back at +0x460, +0x5B0 and +0x700.
-   */
-  struct CameraFrustumUserEntityStorage
-  {
-    CameraFrustumUserEntityList mView;             // +0x00
-    CameraUserEntityWeakRef mInlineStorage[40]{};  // +0x10
-  };
-
-  static_assert(sizeof(CameraFrustumUserEntityStorage) == 0x150, "CameraFrustumUserEntityStorage size must be 0x150");
-  static_assert(
-    offsetof(CameraFrustumUserEntityStorage, mView) == 0x00,
-    "CameraFrustumUserEntityStorage::mView offset must be 0x00"
-  );
-  static_assert(
-    offsetof(CameraFrustumUserEntityStorage, mInlineStorage) == 0x10,
-    "CameraFrustumUserEntityStorage::mInlineStorage offset must be 0x10"
-  );
 
   struct SCamShakeParams
   {
@@ -507,13 +318,13 @@ namespace moho
     virtual void CameraShake(const SCamShakeParams& shakeParams) = 0;
 
     /// Slot 39.
-    [[nodiscard]] virtual CameraFrustumUserEntityList& GetAllSoundEntitiesInFrustum() = 0;
+    [[nodiscard]] virtual gpg::core::FastVectorInline<WeakPtr<UserEntity>>& GetAllSoundEntitiesInFrustum() = 0;
 
     /// Slot 40.
-    [[nodiscard]] virtual CameraFrustumUserEntityList* GetAllUnitsInFrustum() = 0;
+    [[nodiscard]] virtual gpg::core::FastVectorInline<WeakPtr<UserEntity>>* GetAllUnitsInFrustum() = 0;
 
     /// Slot 41.
-    [[nodiscard]] virtual CameraFrustumUserEntityList* GetArmyUnitsInFrustum() = 0;
+    [[nodiscard]] virtual gpg::core::FastVectorInline<WeakPtr<UserEntity>>* GetArmyUnitsInFrustum() = 0;
 
     /// Slot 42.
     [[nodiscard]] virtual Wm3::AxisAlignedBox3f GetViewBox() const = 0;
@@ -1083,7 +894,7 @@ namespace moho
      * 41), with `CameraShake` at 0x007A7130 immediately above in slot 38. The
      * `UAE` in the mangled name says the same thing -- public virtual.
      */
-    [[nodiscard]] CameraFrustumUserEntityList& GetAllSoundEntitiesInFrustum() override;
+    [[nodiscard]] gpg::core::FastVectorInline<WeakPtr<UserEntity>>& GetAllSoundEntitiesInFrustum() override;
     /**
      * Address: 0x007A7900 (FUN_007A7900, Moho::CameraImpl::GetAllUnitsInFrustum)
      * Mangled: ?GetAllUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
@@ -1106,7 +917,7 @@ namespace moho
      * it for the strategic-icon pass, matching "every visible unit" rather
      * than "focus army's units only".
      */
-    [[nodiscard]] CameraFrustumUserEntityList* GetAllUnitsInFrustum() override;
+    [[nodiscard]] gpg::core::FastVectorInline<WeakPtr<UserEntity>>* GetAllUnitsInFrustum() override;
     /**
      * Address: 0x007A7910 (FUN_007A7910, Moho::CameraImpl::GetArmyUnitsInFrustum)
      * Mangled: ?GetArmyUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
@@ -1117,7 +928,7 @@ namespace moho
      * Returns one cached weak-vector view of focus-army units currently in
      * camera frustum.
      */
-    [[nodiscard]] CameraFrustumUserEntityList* GetArmyUnitsInFrustum() override;
+    [[nodiscard]] gpg::core::FastVectorInline<WeakPtr<UserEntity>>* GetArmyUnitsInFrustum() override;
     /**
      * Address: 0x007A7410 (FUN_007A7410, Moho::CameraImpl::GetViewBox)
      * Mangled: ?GetViewBox@CameraImpl@Moho@@UBE?AV?$AxisAlignedBox3@M@Wm3@@XZ
@@ -1347,9 +1158,9 @@ namespace moho
     // still-tracked weak entity owner before releasing heap-grown storage.
     // They are plain aggregates, so the compiler emits neither construction
     // nor destruction for them and that explicit wiring is real source.
-    CameraFrustumUserEntityStorage mFrustumLaneA{};        // +0x460
-    CameraFrustumUserEntityStorage mFrustumLaneB{};        // +0x5B0
-    CameraFrustumUserEntityStorage mArmyUnitsInFrustum{};  // +0x700
+    gpg::core::FastVectorN<WeakPtr<UserEntity>, 40> mFrustumLaneA;       // +0x460
+    gpg::core::FastVectorN<WeakPtr<UserEntity>, 40> mFrustumLaneB;       // +0x5B0
+    gpg::core::FastVectorN<WeakPtr<UserEntity>, 40> mArmyUnitsInFrustum; // +0x700
     float mMaxZoomMult = 0.0f;                             // +0x850
     std::uint8_t mPadding0x854_[4]{};                      // +0x854
   };

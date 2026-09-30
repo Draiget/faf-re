@@ -37,184 +37,6 @@ namespace gpg::core
       }
       return reinterpret_cast<std::uint32_t*>(destinationAddress);
     }
-  } // namespace detail
-
-  /**
-   * Element-type trait selecting the intrusive weak-ref relink lane of
-   * `FastVectorN` (see the `FUN_0061C5E0` push_back / `FUN_0061C750` grow family).
-   *
-   * The default is `false`: ordinary trivially-relocatable and deep-copy element
-   * types keep their existing `push_back` / `InsertAt` / `GrowInsert` branches
-   * (byte blit or element-wise construct-assign). Only element types whose value
-   * is an 8-byte intrusive weak-owner slot `{ownerLinkSlot, nextInOwner}` — where
-   * appending / relocating an element must splice the slot into (or out of) the
-   * pointed-at weak object's use-list rather than raw-copy the two words —
-   * specialize this to `true`. `moho::SWeakRefSlot` is the sole specialization,
-   * declared next to that type (see `Unit.h`).
-   *
-   * The trait exists because such a slot IS trivially copyable at the C++ type
-   * level (two `void*`), so `std::is_trivially_copyable_v<T>` alone would route it
-   * through the wrong (memmove) branch and drop the intrusive owner-chain fixups
-   * the binary performs.
-   */
-  template <class T>
-  struct IsIntrusiveWeakRefSlot : std::false_type
-  {};
-
-  // Compile-time gate for the lanes that move elements WITHOUT relinking.
-  //
-  // An intrusive weak-ref slot is not a value: it is a node that the owner's
-  // weak-link chain points *at* by address. Copying or relocating one is only
-  // correct if the node is spliced out of the chain it left and into the chain
-  // at its new address -- which is why the binary emits a dedicated relinking
-  // body for every operation this element type supports, and no memcpy lane at
-  // all: `push_back` (FUN_0061C5E0), `InsertAt` (FUN_0061C750), the reallocate
-  // arm (FUN_0061C940), `_Ucopy` (FUN_0061CA20), `_Copy_backward`
-  // (FUN_0061CE90/FUN_0061CF00) and the range unlink (FUN_0061CA70). Those six
-  // are the only lanes the shipped image has for this element type.
-  //
-  // A raw-copy lane applied to such a slot leaves the destination claiming an
-  // owner whose chain never contained it. Nothing faults at that moment; the
-  // damage surfaces later, in whichever unrelated walk of that owner's chain
-  // runs off the end -- `moho::UnlinkWeakPtrRangeWithoutClearing` being the
-  // usual victim, since its loop is the binary's own unguarded
-  // `mov eax,[eax]; add eax,4; cmp [eax],ecx` (0x007A5FC0) and so cannot defend
-  // itself. Diagnosing that from the crash site is near-impossible, so reject it
-  // here instead: route through the relinking lane, or add the missing lane to
-  // this container if the binary has an emission the template lacks -- never a
-  // per-element-type copy outside the container homes (RULE ONE).
-
-  /**
-   * Typed view over an 8-byte intrusive weak-owner slot. This mirrors the
-   * `moho::WeakPtr<void>` / `moho::SWeakRefSlot` layout exactly:
-   *   +0x00 ownerLinkSlot : pointer to the owner object's weak-link head slot
-   *                         (or null when the slot holds no live target)
-   *   +0x04 nextInOwner   : intrusive next node in that owner's weak-link chain
-   *
-   * Using a named two-field view (rather than raw `void**` arithmetic) keeps the
-   * intrusive relink lane free of offset magic while still matching the binary's
-   * `*slot = target; slot[1] = *target; *target = slot` splice sequence.
-   */
-  struct IntrusiveWeakLinkNode
-  {
-    void* ownerLinkSlot;
-    void* nextInOwner;
-  };
-  static_assert(sizeof(IntrusiveWeakLinkNode) == 0x08, "IntrusiveWeakLinkNode must be 8 bytes");
-
-  namespace detail
-  {
-    /**
-     * Address: 0x0061CA20 (FUN_0061CA20, weak-ref slot copy-construct + relink lane)
-     *
-     * What it does:
-     * Copy-CONSTRUCTS the intrusive weak-ref slot range `[sourceBegin, sourceEnd)`
-     * into raw storage at `destination`, relinking each freshly written slot into
-     * its target's weak-owner chain head. Mirrors the binary's per-slot sequence
-     * `*dst = *src; if (*src) { dst[1] = *(*src); *(*src) = dst; } else dst[1] = 0`
-     * with an 8-byte element stride. Advances without writing when
-     * `destination == nullptr`, matching the binary's null-guarded lane. This is
-     * the `_Ucopy` analogue used by the weak-ref grow path (FUN_0061C940).
-     */
-    inline IntrusiveWeakLinkNode* CopyIntrusiveWeakRefRangeRelink(
-      IntrusiveWeakLinkNode* destination,
-      const IntrusiveWeakLinkNode* sourceBegin,
-      const IntrusiveWeakLinkNode* sourceEnd
-    ) noexcept
-    {
-      for (const IntrusiveWeakLinkNode* source = sourceBegin; source != sourceEnd; ++source, ++destination) {
-        if (destination == nullptr) {
-          continue;
-        }
-
-        void* const ownerLinkSlot = source->ownerLinkSlot;
-        destination->ownerLinkSlot = ownerLinkSlot;
-        if (ownerLinkSlot == nullptr) {
-          destination->nextInOwner = nullptr;
-        } else {
-          auto** const ownerHead = reinterpret_cast<IntrusiveWeakLinkNode**>(ownerLinkSlot);
-          destination->nextInOwner = *ownerHead;
-          *ownerHead = destination;
-        }
-      }
-      return destination;
-    }
-
-    /**
-     * Address: 0x0061CE90 (FUN_0061CE90, weak-ref slot assign-over-live + relink, backward)
-     * Address: 0x0061CF00 (FUN_0061CF00, ICF twin of FUN_0061CE90)
-     *
-     * What it does:
-     * Copy-ASSIGNS the intrusive weak-ref slot range `[sourceBegin, sourceEnd)`
-     * into destination slots that already hold live nodes, walking backward so an
-     * overlapping upward shift stays correct. For each slot whose target changes,
-     * it first splices the destination's old node out of its previous owner chain,
-     * then relinks the new target at that owner's head. Mirrors the binary's
-     * `std::_Copy_backward`-shaped relink loop. (These two addresses are shared
-     * with `moho::AssignWeakPtrRangeBackward`; the body is identical.)
-     */
-    inline IntrusiveWeakLinkNode* AssignIntrusiveWeakRefRangeBackwardRelink(
-      IntrusiveWeakLinkNode* destinationEnd,
-      const IntrusiveWeakLinkNode* sourceBegin,
-      const IntrusiveWeakLinkNode* sourceEnd
-    ) noexcept
-    {
-      while (sourceBegin != sourceEnd) {
-        --sourceEnd;
-        --destinationEnd;
-
-        void* const newOwnerLinkSlot = sourceEnd->ownerLinkSlot;
-        if (destinationEnd->ownerLinkSlot != newOwnerLinkSlot) {
-          if (destinationEnd->ownerLinkSlot != nullptr) {
-            auto** cursor = reinterpret_cast<IntrusiveWeakLinkNode**>(destinationEnd->ownerLinkSlot);
-            while (*cursor != destinationEnd) {
-              cursor = reinterpret_cast<IntrusiveWeakLinkNode**>(&(*cursor)->nextInOwner);
-            }
-            *cursor = static_cast<IntrusiveWeakLinkNode*>(destinationEnd->nextInOwner);
-          }
-
-          destinationEnd->ownerLinkSlot = newOwnerLinkSlot;
-          if (newOwnerLinkSlot == nullptr) {
-            destinationEnd->nextInOwner = nullptr;
-          } else {
-            auto** const ownerHead = reinterpret_cast<IntrusiveWeakLinkNode**>(newOwnerLinkSlot);
-            destinationEnd->nextInOwner = *ownerHead;
-            *ownerHead = destinationEnd;
-          }
-        }
-      }
-      return destinationEnd;
-    }
-
-    /**
-     * Address: 0x0061CA70 (FUN_0061CA70, weak-ref slot range unlink lane)
-     * Address: 0x007AF240 (FUN_007AF240, the same body emitted for
-     *          `moho::CameraUserEntityWeakRef`, used by the camera's three
-     *          frustum lanes)
-     * Address: inlined at 0x007EEB21..0x007EEB40 in `RangeRenderer::Render`
-     *          (FUN_007EEA00), where it is the unlink half of the stack
-     *          snapshot lane's destructor
-     *
-     * What it does:
-     * Unlinks every intrusive weak-ref slot in `[begin, end)` from its owner's
-     * weak-link chain by replacing the owner-chain reference to each node with
-     * that node's `nextInOwner`, WITHOUT clearing the unlinked node's own storage.
-     * Mirrors the binary's `mov [eax], [ecx+4]` splice loop.
-     */
-    inline void UnlinkIntrusiveWeakRefRange(IntrusiveWeakLinkNode* begin, IntrusiveWeakLinkNode* end) noexcept
-    {
-      for (; begin != end; ++begin) {
-        if (begin->ownerLinkSlot == nullptr) {
-          continue;
-        }
-
-        auto** cursor = reinterpret_cast<IntrusiveWeakLinkNode**>(begin->ownerLinkSlot);
-        while (*cursor != begin) {
-          cursor = reinterpret_cast<IntrusiveWeakLinkNode**>(&(*cursor)->nextInOwner);
-        }
-        *cursor = static_cast<IntrusiveWeakLinkNode*>(begin->nextInOwner);
-      }
-    }
 
     /**
      * Address: 0x00562A80 (FUN_00562A80, _Copy_backward for a 152-byte element)
@@ -231,6 +53,8 @@ namespace gpg::core
      * objects. The 0x00562A80 emission is for `T = Moho::UnitWeaponInfo` and
      * calls its operator= (0x0055F210) per element, which is why a byte-wise
      * move is wrong for that T - it owns two msvc8::string members.
+     * Address: 0x0061CE90 (FUN_0061CE90 -- the `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion` emission: `WeakPtr::operator=` per slot, walking backward; formerly `AssignIntrusiveWeakRefRangeBackwardRelink` over a look-alike node struct, removed 2026-09-30.)
+     * Address: 0x0061CF00 (FUN_0061CF00 -- an ICF twin of 0x0061CE90.)
      */
     template <class T>
     T* CopyBackwardAssign(const T* last, T* resultLast, const T* first)
@@ -304,6 +128,9 @@ namespace gpg::core
      * `::operator delete`, and the body is this template.)
      * Address: 0x0055D940 (FUN_0055D940 -- `DestroyRange` for `gpg::fastvector_n<moho::UnitWeaponInfo, 1>` (`SSTIUnitVariableData::mWeaponInfo`, element 0x98): `first` in EAX, `last` in EBX, `~UnitWeaponInfo` (0x0055D170) per slot; callers 0x00561D90 (`AssignFrom`'s shrink tail, `DestroyRange(newEnd, end_)`), 0x0055D260 (`resize`), 0x0055D840, and unboxed code at 0x0055D7FA; formerly `DestroyUnitWeaponInfoRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      * Address: 0x0056E7E0 (FUN_0056E7E0 -- `DestroyRange` for `gpg::fastvector_n<SFormationRunScriptCandidate, 16>` (CAiFormationInstance.cpp, element 0x48): `first` in EAX, `last` in EBX; each inlined `~SFormationRunScriptCandidate` is the reset of `category.mBits.mWords` at `+0x30`; callers 0x00567300 (`CFormationInstance::RunScript`'s three scope exits of the candidate vector), 0x0056C8A0 / 0x0056C900 / 0x0056E7A0 (out-of-line `~FastVectorN` emissions), 0x0056FAB0 (`GrowInsertDeepCopy`'s old-range teardown and catch rollback); formerly `NormalizeFormationLaneRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0061CA70 (FUN_0061CA70 -- `DestroyRange` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`: `~WeakPtr` per slot, the splice-out walk with no write to the node; reached from those vectors' destructors and `ResetStorageToInline` (`Unit::UpdateBlipsInRange` 0x006ACC60, `CUnitMotion::ProcessSurfaceCollisionFromLastMove`), and from the reallocating insert's old-range teardown. Formerly an intrusive-slot range unlink beside this template, removed 2026-09-30.)
+     * Address: 0x007AF240 (FUN_007AF240 -- the same body for the camera's `fastvector_n<WeakPtr<UserEntity>, N>` frustum lists.)
+     * (Inlined at 0x007EEB21..0x007EEB40 in `RangeRenderer::Render`, 0x007EEA00, as the teardown of a stack `WeakPtr` fastvector.)
      */
     template <class T>
     inline void DestroyRange(T* first, T* const last) noexcept
@@ -347,6 +174,7 @@ namespace gpg::core
      * the generic 4-byte emission (FUN_00402C20) performs.
      * Address: 0x0092BE50 (FUN_0092BE50 -- `ConstructRangeForward` (`_Ucopy`, null-guarded byte copy) for the 1-byte `gpg::HaStar::Cluster::Edge` of `gpg::fastvector_n<Cluster::Edge, 50>` (`ClusterBuild`'s triangular edge table), emitted as a `this`-taking member (`ret 0xC`, `(first, last, dest)` order); callers 0x0092CCF0 (the reallocating insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      * Address: 0x00954250 (FUN_00954250 -- `ConstructRangeForward` for the `char` reachability flags of `gpg::fastvector_n<char, 12>` (`EraseUnconnectedNodes` 0x00954650, grown by `resize(n, 0)` 0x009545D0); the same null-guarded byte copy as 0x0092BE50 for a second instantiation, also a `this`-taking member (`ret 0xC`); callers 0x009543F0 (the reallocating insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0061CA20 (FUN_0061CA20 -- `ConstructRangeForward` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`: each non-null slot `WeakPtr`'s copy constructor, pushed onto its target's chain; the `_Ucopy` of the reallocating insert 0x0061C940. Formerly `CopyIntrusiveWeakRefRangeRelink`, removed 2026-09-30.)
      */
     template <class T>
     inline T* ConstructRangeForward(T* dest, const T* first, const T* const last)
@@ -431,14 +259,6 @@ namespace gpg::core
      */
     ~FastVector()
     {
-      // See ~FastVectorInline: an intrusive weak-ref slot has to leave its
-      // target's chain before its storage goes away, and DestroyRange cannot do
-      // it because the slot is trivially destructible.
-      if constexpr (IsIntrusiveWeakRefSlot<T>::value) {
-        detail::UnlinkIntrusiveWeakRefRange(
-          reinterpret_cast<IntrusiveWeakLinkNode*>(start_), reinterpret_cast<IntrusiveWeakLinkNode*>(end_)
-        );
-      }
       detail::DestroyRange(start_, end_);
       detail::FreeElements(start_);
     }
@@ -640,11 +460,6 @@ namespace gpg::core
      */
     void Reserve(size_t n)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVector<T>::Reserve relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       if (Capacity() >= n)
         return;
       const size_t oldSize = Size();
@@ -669,11 +484,6 @@ namespace gpg::core
      */
     void PushBack(const T& v)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVector<T>::PushBack relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       if (end_ == capacity_) {
         const size_t newCap = Capacity() ? Capacity() * 2 : 4;
         Reserve(newCap);
@@ -707,15 +517,6 @@ namespace gpg::core
 
     void resize(const size_t n)
     {
-      // Shrinking drops the truncated tail through DestroyRange, which is a
-      // no-op for an intrusive weak-ref slot -- so the dropped elements stay
-      // linked in their targets' chains while end_ moves out from under them.
-      // Same hole as Clear(); see the note there.
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "resize() would strand intrusive weak-ref slots in their owners' chains; "
-        "unlink the truncated tail first (detail::UnlinkIntrusiveWeakRefRange), as the engine does"
-      );
       const size_t current = Size();
       if (n <= current) {
         T* const newEnd = ptr_at(start_, n);
@@ -741,12 +542,6 @@ namespace gpg::core
      */
     void resize(const size_t n, const value_type& value)
     {
-      // See resize(n) above: the shrink arm strands intrusive weak-ref slots.
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "resize() would strand intrusive weak-ref slots in their owners' chains; "
-        "unlink the truncated tail first (detail::UnlinkIntrusiveWeakRefRange), as the engine does"
-      );
       const size_t current = Size();
       if (n <= current) {
         T* const newEnd = ptr_at(start_, n);
@@ -783,23 +578,10 @@ namespace gpg::core
      * Address: 0x00657DB0 (FUN_00657DB0 -- `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: shift through 0x00658800 (always empty here), release the vacated tail, drop `end_`; the shrink arm of `resize` 0x00657900.)
      * Address: 0x00954510 (FUN_00954510 -- `FastVector<T>::erase(first, last)` for a 12-char inline-backed lane; zero callers, unreachable; formerly `FastVectorN12CharEraseRange` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0092DAD0 (FUN_0092DAD0 -- `erase(first, last)` for `gpg::fastvector_n<gpg::HaStar::Cluster::Edge, 50>` (1-byte element): byte-copy the tail `[last, end_)` down to `first`, rebase `end_` (+0x04), return `first`, nothing when `first == last` -- the `erase(begin() + n, end())` shrink arm of `resize(n, value)` 0x0092E410; callers 0x0092E410; formerly `ShiftByteRangeLeftAndCommitEndRuntime` over a `ByteRangeStorageRuntime` overlay in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x007F2DA0 (FUN_007F2DA0 -- `erase(first, last)` for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`): `WeakPtr::operator=` down over the gap, `~WeakPtr` over the vacated tail (0x007AF240); its one caller is `AssignFrom` 0x007F20E0's shrink arm; formerly `CameraFrustumUserEntityList::Erase`, removed 2026-09-30.)
      */
     iterator erase(iterator first, iterator last)
     {
-      // Worse than the Clear()/resize() hole: the compaction below is a
-      // move-assignment per slot, which for an intrusive weak-ref slot is a
-      // two-word byte copy that RELOCATES the node without re-splicing it, so
-      // the target's chain is left pointing at the vacated address; the tail is
-      // then dropped through DestroyRange, which does not unlink either. The
-      // binary has no erase lane for this element type -- it has
-      // UnlinkIntrusiveWeakRefRange (FUN_0061CA70) and the relinking
-      // copy/copy_backward pair (FUN_0061CA20 / FUN_0061CE90) instead.
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "erase() would relocate intrusive weak-ref slots without relinking them; "
-        "route through the relinking lanes (CopyIntrusiveWeakRefRangeRelink / "
-        "AssignIntrusiveWeakRefRangeBackwardRelink) and unlink the vacated tail"
-      );
       if (!first || !last || first < start_ || first > end_ || last < first || last > end_) {
         return end_;
       }
@@ -820,24 +602,6 @@ namespace gpg::core
     /** Destroys every element; keeps the storage. */
     void Clear() noexcept
     {
-      // An intrusive weak-ref slot cannot be dropped by a destructor pass: it
-      // is trivially destructible, so `DestroyRange` below is a no-op for it
-      // and every element would stay linked in its target's chain while this
-      // rewinds `end_` out from under them -- the same silent stranding the
-      // destructor carried until it was given an explicit unlink.
-      //
-      // The engine does not have a clearing lane for this element type; each
-      // site open-codes the unlink first and then rewinds, which is why
-      // `Unit::GetBlipsInRange` and
-      // `CUnitMotion::ProcessSurfaceCollisionFromLastMove` both call
-      // `UnlinkWeakPtrRangeWithoutClearing` before `ResetStorageToInline`.
-      // Reject the call here rather than corrupt a chain at runtime: unlink the
-      // range explicitly, then clear.
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "Clear() would strand intrusive weak-ref slots in their owners' chains; "
-        "unlink the range first (detail::UnlinkIntrusiveWeakRefRange), as the engine does"
-      );
       detail::DestroyRange(start_, end_);
       end_ = start_;
     }
@@ -891,11 +655,6 @@ namespace gpg::core
      */
     FastVector& operator=(const FastVector& other)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVector<T>::operator= relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       if (this == &other) {
         return *this;
       }
@@ -986,20 +745,6 @@ namespace gpg::core
      */
     ~FastVectorInline()
     {
-      // An intrusive weak-ref slot is a node the target's weak-link chain points
-      // AT, so releasing the storage without splicing each slot out leaves the
-      // target naming memory that is about to be freed -- and for a vector with
-      // live inline storage, that memory is the owning frame. `DestroyRange`
-      // cannot do this: the slot is two raw `void*`, hence trivially
-      // destructible, so its `is_trivially_destructible_v` branch is a no-op.
-      // The binary emits the unlink here for exactly that reason, as
-      // `sub_61CA70` immediately before `operator delete[]`.
-      if constexpr (IsIntrusiveWeakRefSlot<T>::value) {
-        detail::UnlinkIntrusiveWeakRefRange(
-          reinterpret_cast<IntrusiveWeakLinkNode*>(this->start_),
-          reinterpret_cast<IntrusiveWeakLinkNode*>(this->end_)
-        );
-      }
       detail::DestroyRange(this->start_, this->end_);
       if (this->start_ && this->start_ != originalVec_) {
         detail::FreeElements(this->start_);
@@ -1089,31 +834,16 @@ namespace gpg::core
      */
     T* InsertRange(T* const pos, const T* const first, const T* const last)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorInline<T>::InsertRange relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       return InsertRangeImpl_(pos, first, last);
     }
 
     void PushBack(const T& v)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorInline<T>::PushBack relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       (void)InsertRange(this->end_, &v, &v + 1);
     }
 
     void push_back(const T& v)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorInline<T>::push_back relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       (void)InsertRange(this->end_, &v, &v + 1);
     }
 
@@ -1122,11 +852,6 @@ namespace gpg::core
      */
     void Reserve(const size_type n)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorInline<T>::Reserve relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       (void)EnsureCapacity_(n);
     }
 
@@ -1137,11 +862,6 @@ namespace gpg::core
 
     void resize(const size_type n)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorInline<T>::resize relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       const T zeroFill{};
       ResizeFill_(zeroFill, n);
     }
@@ -1150,14 +870,10 @@ namespace gpg::core
      * Address: 0x009545D0 (FUN_009545D0 -- a second emission of `resize(n, value)`, for the reachability flags for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x00954650; formerly `FastVectorN12CharResize` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0092E410 (FUN_0092E410 -- `resize(n, value)` for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x009310E0, 0x00954A40; formerly `ResizeInlineBackedByteVectorWithFill` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0056D1D0 (FUN_0056D1D0 -- `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` (the 0x10 header of `CFormationInstance::mUnits`, element 0x08): shrink through 0x0056EF40, grow through `ReallocateInsert_` 0x0056D2B0, then copy-construct `value` (link at the owner head) into each new slot; callers `RFastVectorType<WeakPtr<IUnit>>::SetCount` 0x0056BF9D and its loader 0x0056DDC7; formerly `ResizeWeakPtrVector` over `WeakPtrVectorStorage` in moho/unit/core/IUnitWeakPtrReflection.cpp (RULE THREE), removed 2026-09-30.)
+     * Address: 0x006AF0A0 (FUN_006AF0A0 -- `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::Entity>>` (the 0x10 header of `Unit::mBlipsInRange`): callers `RFastVectorType<WeakPtr<Entity>>::SetCount` 0x006AE570 and its load callback 0x006AF3F0, each with a default `WeakPtr` temporary as the fill, and the vector's copy constructor 0x006ADE50. It was tagged `external_dependency` as an "all-external-callees thunk".)
      */
     void resize(const size_type n, const T& value)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorInline<T>::resize(n, value) relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       ResizeFill_(value, n);
     }
 
@@ -1333,6 +1049,7 @@ namespace gpg::core
      * element-wise copies, each slot's `EntityCategorySet` rebinding its word
      * lane to its own inline run. Reached only from that type's copy
      * constructor 0x00576C20. It was cited on `ResetFrom`.)
+     * Address: 0x007F20E0 (FUN_007F20E0 -- the `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`) emission, reached from the converting copy 0x007F03D0; formerly `CameraFrustumUserEntityList::AssignRange`, removed 2026-09-30.)
      */
   public:
     void AssignFrom(const FastVectorInline& other)
@@ -1650,6 +1367,25 @@ namespace gpg::core
     }
 
     /**
+     * Address: 0x007F03D0 (FUN_007F03D0 -- the
+     * `fastvector_n<WeakPtr<UserEntity>, 40>` emission: seat the inline block,
+     * then `AssignFrom` 0x007F20E0 the camera's army frustum list. Its one
+     * caller is `RangeRenderer::Render` (0x007EEAA3), which snapshots the list
+     * for the length of its range pass. Formerly
+     * `SnapshotCameraFrustumWeakRefs` in moho/render/RangeRenderer.cpp, removed
+     * 2026-09-30.)
+     *
+     * What it does:
+     * Copies any vector of the same element type into this one's own storage,
+     * the way the copy constructor above does.
+     */
+    explicit FastVectorN(const FastVectorInline<T>& other)
+      : FastVectorN()
+    {
+      this->AssignFrom(other);
+    }
+
+    /**
      * Address: 0x00899790 (FUN_00899790,
      * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::operator= -- reached
      * from `Moho::CWldSession::SetActiveBuildTemplate` (0x00896A70), recovered
@@ -1690,11 +1426,6 @@ namespace gpg::core
     FastVectorN(FastVectorN&& other) noexcept
       : FastVectorN()
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorN<T, N>'s move constructor relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       if (other.start_ != other.originalVec_) {
         this->start_ = other.start_;
         this->end_ = other.end_;
@@ -1718,11 +1449,6 @@ namespace gpg::core
      */
     FastVectorN& operator=(FastVectorN&& other) noexcept
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorN<T, N>'s move assignment relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       if (this != &other) {
         if (other.start_ != other.originalVec_) {
           detail::DestroyRange(this->start_, this->end_);
@@ -1846,8 +1572,10 @@ namespace gpg::core
      * there, whereas msvc8::vector's {proxy, first, last, end} would put the
      * same test at +0x08/+0x0C.)
      * Address: 0x0059C750 (FUN_0059C750, gpg::fastvector_n64_SAssignedLocInfo::push_back)
-     * Address: 0x0061C5E0 (FUN_0061C5E0, gpg::fastvector_n<SWeakRefSlot,20>::push_back —
-     *   the mBlipsInRange intrusive weak-ref lane)
+     * Address: 0x0061C5E0 (FUN_0061C5E0, `push_back` for
+     *   `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`):
+     *   in place, `WeakPtr`'s copy constructor pushes the new slot onto its
+     *   target's chain; when full, `InsertAt` 0x0061C750)
      * Address: 0x0056C940 (FUN_0056C940, gpg::fastvector_n<Moho::SFormationRunScriptCandidate,16>::
      *   push_back — the 72-byte "Cand72" candidate local in
      *   CAiFormationInstance::RunScript's phase 6 (`candidates.push_back(candidate)`).
@@ -1861,13 +1589,6 @@ namespace gpg::core
      * Appends one element into the active lane. If storage is full, routes
      * through insert-grow lane with a one-element source window; otherwise
      * writes directly at `end_` and advances by one element.
-     *
-     * For the intrusive weak-ref slot element (`IsIntrusiveWeakRefSlot<T>`), the
-     * in-place write is not a raw assignment: the binary (FUN_0061C5E0) links the
-     * new slot into its target's weak-owner chain head
-     * (`*slot = target; slot[1] = *target; *target = slot`), leaving `slot[1] = 0`
-     * when the appended value carries no target. The full-storage arm forwards to
-     * the same `InsertAt` grow lane as every other element type.
      *
      * Address: 0x006AD6E0 (FUN_006AD6E0, gpg::fastvector_n<Moho::
      * SExtraUnitDataPair, 1>::push_back for the 8-byte `{key,value}` element --
@@ -1893,24 +1614,6 @@ namespace gpg::core
     {
       if (this->end_ == this->capacity_) {
         InsertAt(this->end_, &value, &value + 1);
-        return;
-      }
-
-      if constexpr (IsIntrusiveWeakRefSlot<T>::value) {
-        if (this->end_ != nullptr) {
-          auto* const destination = reinterpret_cast<IntrusiveWeakLinkNode*>(this->end_);
-          const auto* const source = reinterpret_cast<const IntrusiveWeakLinkNode*>(&value);
-          void* const ownerLinkSlot = source->ownerLinkSlot;
-          destination->ownerLinkSlot = ownerLinkSlot;
-          if (ownerLinkSlot != nullptr) {
-            auto** const ownerHead = reinterpret_cast<IntrusiveWeakLinkNode**>(ownerLinkSlot);
-            destination->nextInOwner = *ownerHead;
-            *ownerHead = destination;
-          } else {
-            destination->nextInOwner = nullptr;
-          }
-        }
-        ++this->end_;
         return;
       }
 
@@ -1945,13 +1648,6 @@ namespace gpg::core
      */
     void Resize(size_t newSize, const T& fill = T{})
     {
-      // See Clear(): the shrink arm below drops the tail through DestroyRange,
-      // which never unlinks an intrusive weak-ref slot.
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "Resize() would strand intrusive weak-ref slots in their owners' chains; "
-        "unlink the truncated tail first (detail::UnlinkIntrusiveWeakRefRange), as the engine does"
-      );
       const size_t sz = this->Size();
       if (newSize < sz) {
         T* const newEnd = this->start_ + newSize;
@@ -2084,6 +1780,8 @@ namespace gpg::core
      * Address: 0x00774000 (FUN_00774000 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
      * Address: 0x006AEAD0 (FUN_006AEAD0 -- `insert_range`/`InsertAt` for a 8-byte element; Inserts one 8-byte source range before `insertPosition`, growing storage when required and preserving overlap-safe lane movement semantics.)
      * Address: 0x00723090 (FUN_00723090 -- `InsertAt` for `gpg::fastvector_n<moho::CollisionResult, 10>` (element 0x18), the full arm of the inlined `push_back` in the COGrid gathers 0x00721C00/0x00721DC0/0x00721FB0/0x00722350/0x007227B0 and CDamage's 0x00722560; its tail shifts are the `_Copy_backward` pair 0x007237E0/0x00723770 and its `_Ucopy` is 0x00723410. Formerly `InsertCollisionResultRange` in moho/entity/EntityCollisionUpdater.cpp (RULE ONE), file removed 2026-09-24.)
+     * Address: 0x007AF0B0 (FUN_007AF0B0 -- `InsertAt` for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`), the full arm of their `push_back`; formerly `CameraFrustumUserEntityList::InsertRange` in moho/render/camera/CameraImpl.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0061C750 (FUN_0061C750 -- `InsertAt` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`, the deep-copy arm: `WeakPtr` copy constructors past the end and `operator=` over live slots; the full arm of `push_back` 0x0061C5E0, growing through 0x0061C940.)
      */
     void InsertAt(T* pos, const T* insStart, const T* insEnd)
     {
@@ -2091,51 +1789,7 @@ namespace gpg::core
       if (!insertCount)
         return;
 
-      if constexpr (IsIntrusiveWeakRefSlot<T>::value) {
-        // Intrusive weak-ref slot grow/insert lane (FUN_0061C750 dispatch +
-        // FUN_0061C940 reallocate). A slot value is an 8-byte weak-owner node, so
-        // relocating it must re-splice the node into its target's use-list rather
-        // than blit two words. All per-element work routes through the relink
-        // helpers (CopyIntrusiveWeakRefRangeRelink = FUN_0061CA20,
-        // AssignIntrusiveWeakRefRangeBackwardRelink = FUN_0061CE90/CF00,
-        // UnlinkIntrusiveWeakRefRange = FUN_0061CA70).
-        T* const start = this->start_;
-        T* const end = this->end_;
-        const std::size_t requiredSize = static_cast<std::size_t>(end - start) + insertCount;
-        const std::size_t currentCapacity = static_cast<std::size_t>(this->capacity_ - start);
-        if (requiredSize > currentCapacity) {
-          std::size_t growTo = requiredSize;
-          const std::size_t doubledCapacity = currentCapacity * 2u;
-          if (growTo < doubledCapacity) {
-            growTo = doubledCapacity;
-          }
-          GrowInsertIntrusiveWeakRef(pos, growTo, insStart, insEnd);
-          return;
-        }
-
-        auto* const posNode = reinterpret_cast<IntrusiveWeakLinkNode*>(pos);
-        auto* const endNode = reinterpret_cast<IntrusiveWeakLinkNode*>(end);
-        const auto* const insStartNode = reinterpret_cast<const IntrusiveWeakLinkNode*>(insStart);
-        const auto* const insEndNode = reinterpret_cast<const IntrusiveWeakLinkNode*>(insEnd);
-
-        if (posNode + insertCount <= endNode) {
-          // Branch A: inserted range fits within the live tail.
-          IntrusiveWeakLinkNode* const tailStart = endNode - insertCount;
-          this->end_ = reinterpret_cast<T*>(detail::CopyIntrusiveWeakRefRangeRelink(endNode, tailStart, endNode));
-          detail::AssignIntrusiveWeakRefRangeBackwardRelink(posNode + insertCount, posNode, tailStart);
-          detail::AssignIntrusiveWeakRefRangeBackwardRelink(posNode + insertCount, insStartNode, insEndNode);
-          return;
-        }
-
-        // Branch B: inserted range spills past the current end.
-        const std::size_t prefixCount = static_cast<std::size_t>(endNode - posNode);
-        IntrusiveWeakLinkNode* write =
-          detail::CopyIntrusiveWeakRefRangeRelink(endNode, insStartNode + prefixCount, insEndNode);
-        write = detail::CopyIntrusiveWeakRefRangeRelink(write, posNode, endNode);
-        this->end_ = reinterpret_cast<T*>(write);
-        detail::AssignIntrusiveWeakRefRangeBackwardRelink(endNode, insStartNode, insStartNode + prefixCount);
-        return;
-      } else if constexpr (!std::is_trivially_copyable_v<T>) {
+      if constexpr (!std::is_trivially_copyable_v<T>) {
         // Deep-copy lane (FUN_0083B6F0 / FUN_004C7EB0 / FUN_0084E570): element-wise
         // construct + assign; never memmove a value type that owns storage.
         T* const start = this->start_;
@@ -2293,11 +1947,6 @@ namespace gpg::core
      */
     void ResetFrom(const FastVector<T>& src)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorN<T, N>::ResetFrom(FastVector) relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       this->ResetInline_();
       CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
     }
@@ -2305,11 +1954,6 @@ namespace gpg::core
     // Reset to inline storage and copy from another FastVectorN
     void ResetFrom(const FastVectorN<T, N>& src)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorN<T, N>::ResetFrom(FastVectorN) relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       this->ResetInline_();
       CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
     }
@@ -2726,56 +2370,6 @@ namespace gpg::core
     }
 
     /**
-     * Address: 0x0061C940 (FUN_0061C940, weak-ref slot reallocate-grow-insert lane)
-     *
-     * What it does:
-     * Reallocate arm of the intrusive weak-ref slot grow path (the target of
-     * FUN_0061C750 when `requiredSize > capacity`). Allocates a `newCapacity`
-     * buffer and copy-CONSTRUCTS-with-relink the three slices
-     * `[start, pos) + [insStart, insEnd) + [pos, end)` into it via
-     * `CopyIntrusiveWeakRefRangeRelink` (FUN_0061CA20) — each moved node is spliced
-     * into its target's owner chain in the new storage. The OLD range is then
-     * unlinked from its owner chains (`UnlinkIntrusiveWeakRefRange` =
-     * FUN_0061CA70) before the old buffer is released (or the inline-capacity
-     * sentinel is restamped when the old storage was the inline window), matching
-     * the binary's `sub_61CA70` + `operator delete[]` / inline-restore tail.
-     */
-    void GrowInsertIntrusiveWeakRef(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
-    {
-      T* const oldStart = this->start_;
-      T* const oldEnd = this->end_;
-
-      T* const newBuffer = detail::AllocateElements<T>(newCapacity);
-
-      auto* const newBegin = reinterpret_cast<IntrusiveWeakLinkNode*>(newBuffer);
-      const auto* const oldStartNode = reinterpret_cast<const IntrusiveWeakLinkNode*>(oldStart);
-      const auto* const posNode = reinterpret_cast<const IntrusiveWeakLinkNode*>(pos);
-      const auto* const oldEndNode = reinterpret_cast<const IntrusiveWeakLinkNode*>(oldEnd);
-      const auto* const insStartNode = reinterpret_cast<const IntrusiveWeakLinkNode*>(insStart);
-      const auto* const insEndNode = reinterpret_cast<const IntrusiveWeakLinkNode*>(insEnd);
-
-      IntrusiveWeakLinkNode* write = detail::CopyIntrusiveWeakRefRangeRelink(newBegin, oldStartNode, posNode);
-      write = detail::CopyIntrusiveWeakRefRangeRelink(write, insStartNode, insEndNode);
-      write = detail::CopyIntrusiveWeakRefRangeRelink(write, posNode, oldEndNode);
-
-      // Unlink every node that lived in the old storage from its owner chains
-      // (their owner-chain entries currently point at the freed-to-be old slots).
-      detail::UnlinkIntrusiveWeakRefRange(
-        reinterpret_cast<IntrusiveWeakLinkNode*>(oldStart), reinterpret_cast<IntrusiveWeakLinkNode*>(oldEnd)
-      );
-
-      if (oldStart == this->originalVec_) {
-        this->SaveInlineCapacity_();
-      } else {
-        detail::FreeElements(oldStart);
-      }
-
-      this->start_ = newBuffer;
-      this->end_ = reinterpret_cast<T*>(write);
-      this->capacity_ = newBuffer + newCapacity;
-    }
-
-    /**
      * Address: 0x00658200 (FUN_00658200, std::vector<std::string>::_Insert_n grow lane)
      * Address: 0x00848F50 (FUN_00848F50,
      * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::GrowInsert lane -- the
@@ -2820,14 +2414,11 @@ namespace gpg::core
      * built in the new block are torn down, the block is freed and the vector
      * is left untouched.
      * Address: 0x0056F100 (FUN_0056F100 -- the reallocating insert for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): three `_Ucopy` passes (0x0056F1F0) into the new block, destroy of the old range (0x0056D620) and the inline-capacity save.)
+     * Address: 0x007AFBB0 (FUN_007AFBB0 -- the reallocating insert for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`), doubling (0x007AF0E0 `add edx, edx`); formerly `CameraFrustumUserEntityList::GrowAndInsertRange`, removed 2026-09-30.)
+     * Address: 0x0061C940 (FUN_0061C940 -- the reallocating insert for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`: the three slices copy-constructed into the new block (0x0061CA20), the old range destroyed (0x0061CA70), then the old block freed or the inline capacity restamped. Formerly `GrowInsertIntrusiveWeakRef`, removed 2026-09-30.)
      */
     void GrowInsertDeepCopy(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorN<T, N>::GrowInsertDeepCopy relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       T* const oldStart = this->start_;
       T* const oldEnd = this->end_;
 
@@ -2939,11 +2530,6 @@ namespace gpg::core
      */
     void GrowInsert(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorN<T, N>::GrowInsert relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       if constexpr (!std::is_trivially_copyable_v<T>) {
         GrowInsertDeepCopy(pos, newCapacity, insStart, insEnd);
         return;
@@ -3018,11 +2604,6 @@ namespace gpg::core
      */
     void CopyFromRaw_(const T* src, size_t count)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorN<T, N>::CopyFromRaw_ relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       if (count == 0 || src == nullptr) {
         return;
       }
@@ -3067,11 +2648,6 @@ namespace gpg::core
     /** Reallocate to exactly newCap elements; preserve contents. */
     void GrowToCapacity(size_t newCap)
     {
-      static_assert(
-        !IsIntrusiveWeakRefSlot<T>::value,
-        "FastVectorN<T, N>::GrowToCapacity relocates elements without relinking their owner chains; an intrusive "
-        "weak-ref slot has to go through the relinking lane instead"
-      );
       const size_t sz = this->Size();
       T* newBuf = detail::AllocateElements<T>(newCap);
 
@@ -3485,24 +3061,6 @@ namespace gpg::core
   );
   static_assert(sizeof(FastVectorN<char, 64>) == 0x50, "FastVectorN<char,64> must be 0x50");
 
-  // Sibling-safety proof for the intrusive weak-ref relink gate: the trait is
-  // opt-in (default std::false_type) and specialized true only for
-  // moho::SWeakRefSlot (see Unit.h). Every other FastVector(N) element type —
-  // the trivially-relocatable char / pointer / POD lanes (FUN_0047C590,
-  // FUN_0057FE30, FUN_005050A0, FUN_0059CC10, FUN_0056B2F0) and the deep-copy
-  // lanes (msvc8::string FUN_0083B6F0, LuaObject FUN_004C7EB0,
-  // boost::shared_ptr FUN_0084E570) — keeps its existing InsertAt / push_back
-  // branch because IsIntrusiveWeakRefSlot<T>::value stays false. Prove it for the
-  // representative element categories nameable here; the moho POD/deep-copy
-  // element proofs live with those types.
-  static_assert(!IsIntrusiveWeakRefSlot<char>::value, "char must not take the intrusive relink lane");
-  static_assert(!IsIntrusiveWeakRefSlot<int>::value, "int must not take the intrusive relink lane");
-  static_assert(!IsIntrusiveWeakRefSlot<std::uint32_t>::value, "uint must not take the intrusive relink lane");
-  static_assert(!IsIntrusiveWeakRefSlot<void*>::value, "raw pointer lanes must not take the intrusive relink lane");
-  static_assert(
-    !IsIntrusiveWeakRefSlot<IntrusiveWeakLinkNode>::value,
-    "the untyped node view itself must not opt into the relink lane"
-  );
 } // namespace gpg::core
 
 namespace gpg

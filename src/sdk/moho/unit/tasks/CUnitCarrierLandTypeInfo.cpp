@@ -246,7 +246,7 @@ namespace moho
     unit->mUnitVarDat.mUnitStates &= ~static_cast<std::uint64_t>(0x100u);
 
     // Release the focus-entity weak link this carrier-land task established.
-    unit->FocusEntityRef.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
+    unit->FocusEntityRef.UnlinkFromOwnerChain();
     unit->NeedSyncGameData = true;
 
     if (!mHasLoadedIntoCarrier) {

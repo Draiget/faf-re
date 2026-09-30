@@ -236,8 +236,8 @@ namespace moho
   CUnitUpgradeTask::~CUnitUpgradeTask()
   {
     if (mUnit != nullptr) {
-      mUnit->FocusEntityRef.ResetObjectPtr<Entity>(nullptr);
-      if (mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+      mUnit->FocusEntityRef.ResetFromObject(nullptr);
+      if (mUnit->FocusEntityRef.GetObjectPtr() != nullptr) {
         mUnit->RunScript("OnAssignedFocusEntity");
       }
       mUnit->NeedSyncGameData = true;
@@ -386,8 +386,8 @@ int CUnitUpgradeTask::TaskTick()
     }
 
     mUnit->mUnitVarDat.mSelectionInheritorId = upgradedUnit->id_;
-    mUnit->FocusEntityRef.ResetObjectPtr<Entity>(upgradedUnit);
-    if (mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+    mUnit->FocusEntityRef.ResetFromObject(upgradedUnit);
+    if (mUnit->FocusEntityRef.GetObjectPtr() != nullptr) {
       mUnit->RunScript("OnAssignedFocusEntity");
     }
     mUnit->NeedSyncGameData = true;

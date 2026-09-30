@@ -71,83 +71,6 @@ namespace
     return effect->GetBaseEffect();
   }
 
-  /**
-   * Address: 0x007F03D0 (FUN_007F03D0, sub_7F03D0)
-   *
-   * `sub_7F03D0`'s only real caller in this binary is `RangeRenderer::Render`
-   * (0x007EEAA3) - byte-verified via the namespace callgraph index, which
-   * lists exactly one code xref to this address. A prior recovery pass
-   * attributed this address to a `fastvector_n<SRangeExtractionPayload,20>`
-   * copy helper, citing no caller evidence; that shape does not match the one
-   * real call site, which snapshots `CameraImpl::GetArmyUnitsInFrustum()`'s
-   * cached `CameraFrustumUserEntityList` (stride
-   * `sizeof(CameraUserEntityWeakRef) == 0x08`) into a `Render`-local buffer
-   * before building `func_ExtractRanges`'s candidate-pool view. Retyped here
-   * per that evidence; the struct's total inline-capacity span (0x140 bytes)
-   * is unchanged from the original recovery, only the element stride/count
-   * (0x08 * 40, not 0x10 * 20).
-   */
-  struct CameraFrustumWeakRefSnapshotBuffer
-  {
-    moho::CameraFrustumUserEntityList mView;           // +0x00
-    moho::CameraUserEntityWeakRef mInlineStorage[40];  // +0x10
-
-    /**
-     * Address: inlined at 0x007EEB13..0x007EEB52 in `RangeRenderer::Render`
-     * (FUN_007EEA00) - the detach walk followed by the guarded
-     * `operator delete[]` at 0x007EEB4D.
-     *
-     * Every snapshotted element is spliced into the intrusive weak-link chain
-     * of the entity it tracks. This buffer lives on `Render`'s stack, so those
-     * chains must be unspliced before the frame unwinds or the camera's next
-     * frustum-cache rebuild walks a chain into a dead stack frame.
-     */
-    ~CameraFrustumWeakRefSnapshotBuffer() noexcept { mView.DetachAndRelease(); }
-  };
-  static_assert(sizeof(CameraFrustumWeakRefSnapshotBuffer) == 0x150, "CameraFrustumWeakRefSnapshotBuffer size must be 0x150");
-
-  /**
-   * Address: 0x007F03D0 (FUN_007F03D0, sub_7F03D0)
-   *
-   * What it does:
-   * Rebinds one `fastvector_n<CameraUserEntityWeakRef,40>` snapshot buffer to
-   * inline storage, then assigns the camera's current frustum weak-ref list
-   * into it via `CameraFrustumUserEntityList::AssignRange` (FUN_007F20E0),
-   * which relinks each copied weak-ref into the new storage's owner chains
-   * and spills to heap when the source list exceeds inline capacity.
-   *
-   * The buffer holds a real `CameraFrustumUserEntityList` header followed by
-   * its inline element block - the same 0x150 shape the camera's own three
-   * frustum lanes use - so the lane's whole machinery applies to it unchanged,
-   * destructor included. A prior version of this
-   * function used a raw `std::memcpy`, which is wrong for this element type:
-   * each `CameraUserEntityWeakRef` is spliced into its tracked entity's
-   * intrusive weak-link chain, and a byte copy leaves that chain still
-   * pointing at the old (about-to-be-discarded) storage instead of the
-   * fresh snapshot.
-   */
-  CameraFrustumWeakRefSnapshotBuffer* SnapshotCameraFrustumWeakRefs(
-    CameraFrustumWeakRefSnapshotBuffer* const destination,
-    const moho::CameraFrustumUserEntityList& source
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    constexpr std::size_t kInlineCount = 40u;
-    moho::CameraUserEntityWeakRef* const inlineStart = &destination->mInlineStorage[0];
-    destination->mView.mStart = inlineStart;
-    destination->mView.mFinish = inlineStart;
-    destination->mView.mCapacity = inlineStart + kInlineCount;
-    destination->mView.mInlineOrigin = inlineStart;
-
-    auto* const assignedEnd = destination->mView.AssignRange(source);
-    (void)assignedEnd;
-
-    return destination;
-  }
-
   struct RangeRingGeometryBuildState
   {
     float innerThicknessOffset;
@@ -1595,13 +1518,10 @@ namespace moho
     }
 
     if (!mVisibleProfiles.empty()) {
-      CameraFrustumUserEntityList* const frustumList = camera->GetArmyUnitsInFrustum();
-      if (frustumList != nullptr) {
-        CameraFrustumWeakRefSnapshotBuffer candidateSnapshot{};
-        (void)SnapshotCameraFrustumWeakRefs(&candidateSnapshot, *frustumList);
-        const SRangeProfileWeakRefCandidatePoolView candidatePool{
-          candidateSnapshot.mView.mStart, candidateSnapshot.mView.mFinish
-        };
+      if (const auto* const frustumList = camera->GetArmyUnitsInFrustum(); frustumList != nullptr) {
+        // A copy for the length of the pass (0x007F03D0), unlinked again at
+        // 0x007EEB13..0x007EEB52 as it goes out of scope.
+        const gpg::core::FastVectorN<WeakPtr<UserEntity>, 40> candidatePool(*frustumList);
 
         for (SRangeRenderProfile& profile : mVisibleProfiles) {
           scratchPayload.clear();
@@ -1716,7 +1636,7 @@ namespace moho
    * payloads to the output ring extraction payload vector.
    */
   void func_ExtractRanges(
-    const SRangeProfileWeakRefCandidatePoolView& candidatePool,
+    const gpg::fastvector<WeakPtr<UserEntity>>& candidatePool,
     const float interpolationAlpha,
     const SRangeRenderProfile& profile,
     SRangeExtractionPayloadVector& outRingPayloadVector
@@ -1732,45 +1652,13 @@ namespace moho
       return;
     }
 
-    // Walk the candidate pool of 8-byte selection-weak-ref records. Each
-    // record's `mOwnerLinkSlot` points into the owning UserEntity at the
-    // `mIUnitChainHead` (+0x08) slot, so `mOwnerLinkSlot - 0x08` recovers the
-    // owning `UserEntity*`. The binary's `(char *)i + 8` step iterates the
-    // pool with 8-byte stride matching `sizeof(SSelectionWeakRefUserEntity)`.
-    static_assert(
-      sizeof(SSelectionWeakRefUserEntity) == 0x08,
-      "func_ExtractRanges weak-ref candidate pool stride must remain 8 bytes"
-    );
-
-    const auto* const begin = static_cast<const SSelectionWeakRefUserEntity*>(candidatePool.begin);
-    const auto* const end = static_cast<const SSelectionWeakRefUserEntity*>(candidatePool.end);
-    if (begin == nullptr || end == nullptr || begin == end) {
-      return;
-    }
-
-    // UserEntity::mIUnitChainHead sits at +0x08 on x86 (pinned by the
-    // `static_assert(offsetof(UserEntity, mIUnitChainHead) == 0x08)` in
-    // UserEntity.h); taking it from the member keeps the step right on x64.
-    constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
-
-    for (const SSelectionWeakRefUserEntity* candidate = begin; candidate != end; ++candidate) {
-      void* const ownerLinkSlot = candidate->mOwnerLinkSlot;
-      if (ownerLinkSlot == nullptr) {
+    // The binary's `Left != (... *)8` test is the null test on the decoded
+    // entity (`slot - 8`).
+    for (const WeakPtr<UserEntity>& candidate : candidatePool) {
+      UserEntity* const userEntity = candidate.GetObjectPtr();
+      if (userEntity == nullptr) {
         continue;
       }
-
-      // Skip the synthetic shape-match sentinel the original binary excludes
-      // explicitly: the IDA-decompiled condition `Left != (... *)8` rejects
-      // weak-ref entries whose link slot lies entirely within the first
-      // selection-owner-link offset of address space (a guard against
-      // null-derived owner pointers).
-      const std::uintptr_t rawLink = reinterpret_cast<std::uintptr_t>(ownerLinkSlot);
-      if (rawLink < kSelectionOwnerLinkOffset) {
-        continue;
-      }
-
-      UserEntity* const userEntity =
-        reinterpret_cast<UserEntity*>(rawLink - kSelectionOwnerLinkOffset);
       if (userEntity->IsBeingBuilt()) {
         continue;
       }

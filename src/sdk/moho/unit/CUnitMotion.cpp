@@ -701,24 +701,6 @@ namespace moho
       request = replacement;
     }
 
-    void DestroyRaisedPlatformCandidateStorage(gpg::core::FastVectorN<moho::SWeakRefSlot, 10>& runtime) noexcept
-    {
-      // Drop each candidate's weak reference, then hand any grown block back
-      // and rebind the lane on its inline window.
-      if (runtime.start_ != nullptr && runtime.end_ != nullptr && runtime.end_ >= runtime.start_) {
-        for (moho::SWeakRefSlot* lane = runtime.start_; lane != runtime.end_; ++lane) {
-          lane->AsWeakPtr<Entity>().ResetFromObject(nullptr);
-        }
-      }
-
-      if (runtime.start_ != nullptr && runtime.start_ != runtime.originalVec_) {
-        ::operator delete[](static_cast<void*>(runtime.start_));
-      }
-
-      runtime.start_ = runtime.originalVec_;
-      runtime.end_ = runtime.start_;
-    }
-
     [[nodiscard]] CEconRequest* CreateEconomyRequest(const SEconValue& requested, CSimArmyEconomyInfo* const economy)
     {
       auto* const request = new CEconRequest{};
@@ -951,7 +933,7 @@ namespace moho
   CUnitMotion::~CUnitMotion()
   {
     DestroyEconomyRequestPointer(mEconomyRequest);
-    DestroyRaisedPlatformCandidateStorage(mRaisedPlatformCandidates);
+    mRaisedPlatformCandidates.ResetStorageToInline();
 
     // The binary lane performs a second economy-request null-check after
     // raised-platform cleanup; keep the same no-op-safe shape.
@@ -2347,7 +2329,7 @@ namespace moho
     const Wm3::Vector3f ownerPosition = mUnit->GetPosition();
     float nearestDistanceSq = gpg::pInf;
 
-    for (moho::SWeakRefSlot* candidate = candidates.start_; candidate != candidates.end_; ++candidate) {
+    for (const WeakPtr<Entity>& candidate : candidates) {
       // The slot holds an Entity. Recover the unit through the virtual
       // downcast the binary uses -- Entity's vtable slot 4 (0x006C2F97
       // `mov edx, [ecx]` / 0x006C2F99 `mov eax, [edx+10h]` / 0x006C2F9C
@@ -2356,7 +2338,7 @@ namespace moho
       // staggered beat, and this null return is what filters them out;
       // casting the slot straight to `Unit*` instead type-confuses every
       // non-unit candidate and reads its blueprint through the wrong vtable.
-      Entity* const candidateEntity = candidate->AsWeakPtr<Entity>().GetObjectPtr();
+      Entity* const candidateEntity = candidate.GetObjectPtr();
       if (candidateEntity == nullptr) {
         continue;
       }
@@ -2409,10 +2391,6 @@ namespace moho
     // from its owner chain, release escaped heap storage, and rebind to inline
     // storage (asm 0x6B9055-0x6B908A; sub_61CA70 + delete[] + reset-to-inline).
     auto& candidates = mRaisedPlatformCandidates;
-    UnlinkWeakPtrRangeWithoutClearing(
-      reinterpret_cast<WeakPtr<void>*>(candidates.begin()),
-      reinterpret_cast<WeakPtr<void>*>(candidates.end())
-    );
     candidates.ResetStorageToInline();
 
     // Only land/water surface units re-snap here: skip air, submerged, dead,
@@ -2462,8 +2440,7 @@ namespace moho
       // `add ecx, 4`); it is NOT narrowed to a unit here -- see
       // FindIntersectingRaisedPlatform, which does the `Entity::IsUnit`
       // dispatch when the list is consumed.
-      WeakPtr<Entity> candidateRef(hit.sourceEntity);
-      candidates.push_back(reinterpret_cast<const SWeakRefSlot&>(candidateRef));
+      candidates.push_back(WeakPtr<Entity>(hit.sourceEntity));
     }
   }
 

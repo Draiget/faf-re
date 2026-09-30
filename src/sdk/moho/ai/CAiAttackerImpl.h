@@ -35,7 +35,8 @@ namespace gpg
 
 namespace moho
 {
-  struct SWeakRefSlot;
+  template <class T>
+  struct WeakPtr;
   struct RUnitBlueprintWeapon;
   class CAcquireTargetTask;
   class CollisionBeamEntity;
@@ -215,7 +216,7 @@ namespace moho
      */
     Entity* FindBestEnemy(
       UnitWeapon* weapon,
-      gpg::core::FastVectorN<SWeakRefSlot, 20>* blipsInRange,
+      gpg::core::FastVectorN<WeakPtr<Entity>, 20>* blipsInRange,
       float maxRange,
       bool use3DDistance
     ) override;

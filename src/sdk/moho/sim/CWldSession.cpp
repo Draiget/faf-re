@@ -7050,9 +7050,6 @@ namespace moho
       return reinterpret_cast<UserEntity*>(raw - kSelectionOwnerLinkOffset);
     }
 
-    // DecodeUserEntityWeakRef(const CameraUserEntityWeakRef&) lives in
-    // CameraImpl.h/.cpp now - it decodes the same GetArmyUnitsInFrustum()
-    // lanes and CUIWorldView's build-drag adjacency pass needs it too.
     /**
      * Address: 0x0081FD2B..0x0081FD4E (inlined into
      * `Moho::SCommandModeData::HandleEvent`, FUN_0081FCD0)
@@ -16574,12 +16571,10 @@ namespace moho
     msvc8::vector<UserUnit*> nextSelection{};
     GetSelectionUnits(nextSelection);
 
-    CameraFrustumUserEntityList* const frustumUnits = camera != nullptr ? camera->GetArmyUnitsInFrustum() : nullptr;
+    auto* const frustumUnits = camera != nullptr ? camera->GetArmyUnitsInFrustum() : nullptr;
     if (frustumUnits != nullptr) {
-      for (CameraUserEntityWeakRef* weakRef = frustumUnits->mStart;
-           weakRef != nullptr && weakRef != frustumUnits->mFinish;
-           ++weakRef) {
-        UserEntity* const entity = DecodeCameraFrustumWeakRef(*weakRef);
+      for (const WeakPtr<UserEntity>& weakRef : *frustumUnits) {
+        UserEntity* const entity = weakRef.GetObjectPtr();
         if (entity == nullptr) {
           continue;
         }
@@ -18039,10 +18034,8 @@ namespace moho
 
     // --- Phase 3: classify every unit in frustum ------------------------
     UserArmy* const focusArmy = GetFocusArmy();
-    CameraFrustumUserEntityList* const allUnits = camera->GetAllUnitsInFrustum();
-
-    for (CameraUserEntityWeakRef* ref = allUnits->mStart; ref != allUnits->mFinish; ++ref) {
-      UserEntity* const entity = DecodeCameraFrustumWeakRef(*ref);
+    for (const WeakPtr<UserEntity>& ref : *camera->GetAllUnitsInFrustum()) {
+      UserEntity* const entity = ref.GetObjectPtr();
       if (entity == nullptr || entity->mVariableData.mIsDead) {
         continue;
       }
@@ -18862,10 +18855,8 @@ namespace moho
     primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(view));
     primBatcher->SetViewMatrix(VMatrix4::Identity()); // 0x00858FE6 (sIdentity)
 
-    CameraFrustumUserEntityList* const frustumUnits = camera->GetArmyUnitsInFrustum();
-    for (CameraUserEntityWeakRef* weakRef = frustumUnits->mStart; weakRef != frustumUnits->mFinish;
-         ++weakRef) {
-      UserEntity* const entity = DecodeCameraFrustumWeakRef(*weakRef);
+    for (const WeakPtr<UserEntity>& weakRef : *camera->GetArmyUnitsInFrustum()) {
+      UserEntity* const entity = weakRef.GetObjectPtr();
       if (entity == nullptr) {
         continue;
       }

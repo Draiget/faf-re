@@ -388,29 +388,6 @@ namespace moho
   static_assert(offsetof(WeakPtr<void>, nextInOwner) == 0x04, "WeakPtr<T>::nextInOwner offset must be 0x04");
 
   /**
-   * Address: 0x007A5FB0 (FUN_007A5FB0)
-   *
-   * What it does:
-   * Unlinks every weak node in `[begin, end)` from its owner chain without
-   * mutating the unlinked nodes' local storage lanes.
-   */
-  inline void UnlinkWeakPtrRangeWithoutClearing(WeakPtr<void>* begin, WeakPtr<void>* end) noexcept
-  {
-    for (; begin != end; ++begin) {
-      if (begin->ownerLinkSlot == nullptr) {
-        continue;
-      }
-
-      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
-      auto** cursor = reinterpret_cast<WeakPtr<void>**>(begin->ownerLinkSlot);
-      while (*cursor != begin) {
-        cursor = &(*cursor)->nextInOwner;
-      }
-      *cursor = begin->nextInOwner;
-    }
-  }
-
-  /**
    * Address: 0x005A6DE0 (FUN_005A6DE0, `WeakPtr<Entity>`'s emission -- the
    * `CDamage` copy-ctor unwind funclets at 0x00BAC2EF / 0x00BAC2FA reach it
    * as `mov ecx,[ebp+4]; add ecx,38h/40h; jmp sub_5A6DE0`, i.e. as the

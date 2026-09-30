@@ -32,7 +32,8 @@ namespace moho
   class Unit;
   class UnitWeapon;
   struct RUnitBlueprintWeapon;
-  struct SWeakRefSlot;
+  template <class T>
+  struct WeakPtr;
 
   /**
    * RTTI: `Broadcaster<EAiAttackerEvent>` at +0x04, the ring the attack and
@@ -77,7 +78,7 @@ namespace moho
     virtual bool PickTarget(Entity* targetEntity) = 0;                                // slot 12
     virtual Entity* FindBestEnemy(
       UnitWeapon* weapon,
-      gpg::core::FastVectorN<SWeakRefSlot, 20>* blipsInRange,
+      gpg::core::FastVectorN<WeakPtr<Entity>, 20>* blipsInRange,
       float maxRange,
       bool use3DDistance
     ) = 0;                                                                            // slot 13

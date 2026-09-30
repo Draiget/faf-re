@@ -2751,7 +2751,7 @@ namespace
 
   [[nodiscard]] Unit* GetTransportedBy(const Unit* const unit) noexcept
   {
-    return (unit != nullptr) ? unit->TransportedByRef.ResolveObjectPtr<Unit>() : nullptr;
+    return (unit != nullptr) ? unit->TransportedByRef.GetObjectPtr() : nullptr;
   }
 
   [[nodiscard]] Unit* GetTransportFerryBeacon(Unit* const unit) noexcept
@@ -3407,7 +3407,7 @@ namespace
         continue;
       }
 
-      if (unit->TransportedByRef.ResolveObjectPtr<Unit>() != nullptr) {
+      if (unit->TransportedByRef.GetObjectPtr() != nullptr) {
         continue;
       }
 
@@ -8292,7 +8292,7 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
   // --- Phase C: detach each captured child and unlink its transport weak-ref ---
   for (Unit* const child : detachedChildren) {
     child->DetachFrom(unit, true);
-    child->TransportedByRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+    child->TransportedByRef.UnlinkFromOwnerChain();
   }
 
   // --- Phase D: recursively transfer the detached children ---

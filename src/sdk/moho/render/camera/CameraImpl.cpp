@@ -169,7 +169,6 @@ namespace
   constexpr const char* kCameraAccTypeFastInSlowOutName = "FastInSlowOut";
   constexpr const char* kCameraAccTypeSlowInOutName = "SlowInOut";
 
-  using moho::CameraFrustumUserEntityStorage;
   using moho::CameraTargetEntityList;
   using moho::CameraTargetEntityNode;
   using moho::CameraTimeSourceRuntime;
@@ -696,113 +695,6 @@ namespace
     return fallbackSet;
   }
 
-  // Seed one runtime camera frustum-weak-vector lane into its empty inline-SBO
-  // state, exactly as `CameraImpl::CameraImpl` does at 0x007A7BC3..0x007A7C4C:
-  // the live cursor pair (`mStart`/`mFinish`) and the inline origin point at
-  // slot 0, and the capacity bound points one past the 40-entry inline block
-  // (`&mInlineStorage[40]`, i.e. the base of the next lane). No inline node is
-  // written, mirroring the binary's pointer-only lane init.
-  void InitCameraFrustumStorageLane(CameraFrustumUserEntityStorage& storage) noexcept
-  {
-    moho::CameraFrustumUserEntityList& view = storage.mView;
-    moho::CameraUserEntityWeakRef* const inlineOrigin = &storage.mInlineStorage[0];
-    view.mStart = inlineOrigin;
-    view.mFinish = inlineOrigin;
-    view.mCapacity =
-      inlineOrigin + (sizeof(storage.mInlineStorage) / sizeof(storage.mInlineStorage[0]));
-    view.mInlineOrigin = inlineOrigin;
-  }
-
-  /**
-   * Walk one runtime camera frustum-weak-vector lane, unlink every tracked
-   * weak entity ref and release any heap-grown storage (the lane's own
-   * `DetachAndRelease`), then restore it to the post-construction inline
-   * sentinel state (`mView.mStart == mView.mInlineOrigin`) so it can be
-   * refilled.
-   */
-  void TeardownCameraFrustumStorageLane(CameraFrustumUserEntityStorage& storage) noexcept
-  {
-    moho::CameraFrustumUserEntityList& view = storage.mView;
-    const bool hadHeapStorage = (view.mStart != view.mInlineOrigin);
-
-    // Same unlink-then-release the lane's own destructor performs; this caller
-    // additionally rearms the lane, because it is about to be refilled.
-    view.DetachAndRelease();
-
-    if (hadHeapStorage) {
-      view.mStart = view.mInlineOrigin;
-      // Restore the SBO "capacity end" cache the binary maintains by reading
-      // the first word stored at the inline origin (the post-construction
-      // capacity bound seeded by `CameraImpl::CameraImpl`).
-      view.mCapacity = *reinterpret_cast<moho::CameraUserEntityWeakRef**>(view.mInlineOrigin);
-    }
-    view.mFinish = view.mStart;
-  }
-
-  // The camera frustum lanes track entities by their `IUnit` intrusive
-  // weak-link chain head, the `mIUnitChainHead` slot (+0x08 on x86). A lane
-  // node's `mOwnerLinkSlot` points at that chain-head slot; `mNextOwnerRef` is
-  // the next node in the owner's chain.
-
-  // Detaches one temporary lane node from the owner chain it was spliced into,
-  // restoring the saved previous head. Mirrors the binary's per-push unsplice
-  // (`*cursor = savedHead`) after a node is copied into the lane storage.
-  void DetachTemporaryCameraFrustumNode(
-    moho::CameraUserEntityWeakRef& tempNode, void* const savedPreviousHead
-  ) noexcept
-  {
-    auto* chainSlot = static_cast<std::uintptr_t*>(tempNode.mOwnerLinkSlot);
-    if (chainSlot == nullptr) {
-      return;
-    }
-    const auto tempMarker = reinterpret_cast<std::uintptr_t>(&tempNode);
-    if (*chainSlot != tempMarker) {
-      // Walk the owner chain to the node that points at the temp node.
-      while (*reinterpret_cast<std::uintptr_t*>(*chainSlot) != tempMarker) {
-        chainSlot = reinterpret_cast<std::uintptr_t*>(*chainSlot + sizeof(void*));
-      }
-      chainSlot = reinterpret_cast<std::uintptr_t*>(*chainSlot);
-    }
-    *chainSlot = reinterpret_cast<std::uintptr_t>(savedPreviousHead);
-  }
-
-  // Appends one weak entity reference to the end of a camera frustum lane.
-  // Splices a fresh lane node into `entity`'s IUnit weak chain head so the lane
-  // is automatically pruned when the entity is destroyed.
-  //
-  // The binary's own `CacheCameraFrustumUnits` inlines this push once (the
-  // sound-entities lane) and factors it out to a shared out-of-line function
-  // for the other two lanes (FUN_007AE710, CrtRuntimeHelpers.cpp) - both
-  // emissions of the same source-level push operation, recovered here as one
-  // function reused at all three call sites. On the capacity-full path both
-  // binary emissions materialize a one-element {ownerLinkSlot, next} value
-  // and tail-call into the shared `_Insert_n`-style range-insert
-  // (`CameraFrustumUserEntityList::InsertRange`, which itself calls
-  // `GrowAndInsertRange` on this path) with that single element as the
-  // range being inserted at `mFinish` - matching this push's own doubling
-  // growth (`GrowAndInsertRange`'s `existingCapacity * 2u`, confirmed at
-  // 0x007AF0E0 `add edx, edx`).
-  void PushUserEntityIntoCameraFrustumLane(
-    moho::CameraFrustumUserEntityList& lane, moho::UserEntity* const entity
-  )
-  {
-    void* const ownerChainHead = &entity->mIUnitChainHead;
-
-    if (lane.mFinish == lane.mCapacity) {
-      moho::CameraUserEntityWeakRef newValue{ownerChainHead, nullptr};
-      lane.InsertRange(lane.mFinish, &newValue, &newValue + 1);
-      return;
-    }
-
-    // In-place append: splice the new node at the owner chain head.
-    moho::CameraUserEntityWeakRef* const slot = lane.mFinish;
-    slot->mOwnerLinkSlot = ownerChainHead;
-    auto* const head = static_cast<std::uintptr_t*>(ownerChainHead);
-    slot->mNextOwnerRef = reinterpret_cast<moho::CameraUserEntityWeakRef*>(*head);
-    *head = reinterpret_cast<std::uintptr_t>(slot);
-    ++lane.mFinish;
-  }
-
   /**
    * Address: 0x007AEFA0 (FUN_007AEFA0, target-list head allocator)
    *
@@ -997,11 +889,6 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
   mFrustumCacheTimer = 0.0f;
   mFrustumCacheZoomMark = 0.0f;
 
-  // Prime the three inline frustum weak-vector lanes to empty inline-SBO state.
-  InitCameraFrustumStorageLane(mFrustumLaneA);
-  InitCameraFrustumStorageLane(mFrustumLaneB);
-  InitCameraFrustumStorageLane(mArmyUnitsInFrustum);
-
   // Max-zoom multiplier (+0x850, byte-verified `dword_E4F98C` = 1.4).
   mMaxZoomMult = 1.4f;
 
@@ -1095,9 +982,9 @@ moho::CameraImpl::~CameraImpl()
   // tears these down in reverse-construction order; each lane unlinks every
   // still-attached weak ref from its owner chain before releasing heap
   // storage.
-  TeardownCameraFrustumStorageLane(mArmyUnitsInFrustum);
-  TeardownCameraFrustumStorageLane(mFrustumLaneB);
-  TeardownCameraFrustumStorageLane(mFrustumLaneA);
+  mArmyUnitsInFrustum.ResetStorageToInline();
+  mFrustumLaneB.ResetStorageToInline();
+  mFrustumLaneA.ResetStorageToInline();
 
   // Release both heap-owned `CameraTimeSourceRuntime` slots via their virtual
   // scalar-deleting destructor (vtable slot 1). Only indices 0 and 1 are
@@ -1692,9 +1579,9 @@ Wm3::Vector3f moho::CameraImpl::GetTargetPosition() const
  * at +0x460 and `mArmyUnitsInFrustum` at +0x700 are separate lanes for
  * different consumers.
  */
-moho::CameraFrustumUserEntityList* moho::CameraImpl::GetAllUnitsInFrustum()
+gpg::core::FastVectorInline<moho::WeakPtr<moho::UserEntity>>* moho::CameraImpl::GetAllUnitsInFrustum()
 {
-  return &mFrustumLaneB.mView;
+  return &mFrustumLaneB;
 }
 
 /**
@@ -1704,266 +1591,9 @@ moho::CameraFrustumUserEntityList* moho::CameraImpl::GetAllUnitsInFrustum()
  * Returns one cached weak-vector view of focus-army units currently in camera
  * frustum.
  */
-moho::CameraFrustumUserEntityList* moho::CameraImpl::GetArmyUnitsInFrustum()
+gpg::core::FastVectorInline<moho::WeakPtr<moho::UserEntity>>* moho::CameraImpl::GetArmyUnitsInFrustum()
 {
-  return &mArmyUnitsInFrustum.mView;
-}
-
-/**
- * What it does: see the header - decodes one `GetArmyUnitsInFrustum()` lane
- * back to the `UserEntity` it tracks.
- */
-moho::UserEntity* moho::DecodeCameraFrustumWeakRef(const moho::CameraUserEntityWeakRef& weakRef) noexcept
-{
-  constexpr std::uintptr_t kUserEntityWeakOwnerOffset = offsetof(UserEntity, mIUnitChainHead);
-
-  const auto raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-  if (raw <= kUserEntityWeakOwnerOffset) {
-    return nullptr;
-  }
-
-  return reinterpret_cast<moho::UserEntity*>(raw - kUserEntityWeakOwnerOffset);
-}
-
-/**
- * What it does: see the header - reallocates this lane's storage to
- * `requiredCapacity` slots and splices `[first, last)` in at `insertionPos`.
- */
-moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::GrowAndInsertRange(
-  const std::size_t requiredCapacity,
-  CameraUserEntityWeakRef* const insertionPos,
-  CameraUserEntityWeakRef* const first,
-  CameraUserEntityWeakRef* const last
-)
-{
-  auto* const newBegin = static_cast<CameraUserEntityWeakRef*>(
-    ::operator new(sizeof(CameraUserEntityWeakRef) * requiredCapacity)
-  );
-
-  auto* relinkCursor = gpg::core::detail::CopyIntrusiveWeakRefRangeRelink(
-    reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(newBegin),
-    reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(mStart),
-    reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(insertionPos)
-  );
-  relinkCursor = gpg::core::detail::CopyIntrusiveWeakRefRangeRelink(
-    relinkCursor,
-    reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(first),
-    reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(last)
-  );
-  relinkCursor = gpg::core::detail::CopyIntrusiveWeakRefRangeRelink(
-    relinkCursor,
-    reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(insertionPos),
-    reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(mFinish)
-  );
-
-  // Every relocated element was just relinked into the NEW addresses above;
-  // the OLD addresses are now stale duplicate links still spliced into the
-  // same owner chains, so detach them before releasing the old storage.
-  gpg::core::detail::UnlinkIntrusiveWeakRefRange(
-    reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mStart),
-    reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mFinish)
-  );
-
-  if (mStart == mInlineOrigin) {
-    // Abandoning the inline block without freeing it - stash its capacity
-    // bound at the inline origin so a later Teardown can restore it.
-    *reinterpret_cast<CameraUserEntityWeakRef**>(mInlineOrigin) = mCapacity;
-  } else {
-    ::operator delete[](mStart);
-  }
-
-  mStart = newBegin;
-  mFinish = reinterpret_cast<CameraUserEntityWeakRef*>(relinkCursor);
-  mCapacity = newBegin + requiredCapacity;
-  return mCapacity;
-}
-
-/**
- * What it does: see the header - the VC8 `_Insert_n` dispatcher for this
- * lane: grows via `GrowAndInsertRange` above when spare capacity can't hold
- * the request, otherwise shifts the existing tail in-place.
- */
-moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::InsertRange(
-  CameraUserEntityWeakRef* const insertionPos,
-  CameraUserEntityWeakRef* const first,
-  CameraUserEntityWeakRef* const last
-)
-{
-  const std::size_t insertCount = static_cast<std::size_t>(last - first);
-  const std::size_t liveSize = static_cast<std::size_t>(mFinish - mStart);
-  const std::size_t existingCapacity = static_cast<std::size_t>(mCapacity - mStart);
-
-  if (liveSize + insertCount > existingCapacity) {
-    // This lane doubles (not msvc8::vector<T>'s usual 1.5x) - confirmed from
-    // the raw `add edx, edx` at 0x007AF0E0, floored at the actual post-insert
-    // size. Matches `PushUserEntityIntoCameraFrustumLane`'s own growth
-    // formula below (`oldCapacity * 2u`), independently recovered from the
-    // same lane's single-element push path.
-    std::size_t newCapacity = existingCapacity * 2u;
-    if (newCapacity < liveSize + insertCount) {
-      newCapacity = liveSize + insertCount;
-    }
-    auto* const grown = GrowAndInsertRange(newCapacity, insertionPos, first, last);
-    return grown;
-  }
-
-  const std::size_t tailCount = static_cast<std::size_t>(mFinish - insertionPos);
-
-  if (tailCount < insertCount) {
-    // Case A: the inserted range overflows past the current end. Construct
-    // the new range's overflow suffix at the current end, relocate (also by
-    // construct) the whole old tail past that, then assign the new range's
-    // prefix into the vacated old-tail slots.
-    CameraUserEntityWeakRef* const midSplit = first + tailCount;
-    auto* relinkCursor = gpg::core::detail::CopyIntrusiveWeakRefRangeRelink(
-      reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mFinish),
-      reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(midSplit),
-      reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(last)
-    );
-    relinkCursor = gpg::core::detail::CopyIntrusiveWeakRefRangeRelink(
-      relinkCursor,
-      reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(insertionPos),
-      reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(mFinish)
-    );
-    msvc8::vector<moho::WeakPtr<void>>::copy_backward_assign(
-      reinterpret_cast<const WeakPtr<void>*>(first),
-      reinterpret_cast<const WeakPtr<void>*>(midSplit),
-      reinterpret_cast<WeakPtr<void>*>(mFinish)
-    );
-    mFinish = reinterpret_cast<CameraUserEntityWeakRef*>(relinkCursor);
-  } else {
-    // Case B: the existing tail fully absorbs the insert. Construct the
-    // last `insertCount` old elements past the current end, assign-shift
-    // the remaining old tail up by `insertCount` (backward - the shift can
-    // overlap), then assign the new range into the vacated gap.
-    CameraUserEntityWeakRef* const splitPoint = mFinish - insertCount;
-    auto* const relinkCursor = gpg::core::detail::CopyIntrusiveWeakRefRangeRelink(
-      reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mFinish),
-      reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(splitPoint),
-      reinterpret_cast<const gpg::core::IntrusiveWeakLinkNode*>(mFinish)
-    );
-    msvc8::vector<moho::WeakPtr<void>>::copy_backward_assign(
-      reinterpret_cast<const WeakPtr<void>*>(insertionPos),
-      reinterpret_cast<const WeakPtr<void>*>(splitPoint),
-      reinterpret_cast<WeakPtr<void>*>(mFinish)
-    );
-    msvc8::vector<moho::WeakPtr<void>>::copy_backward_assign(
-      reinterpret_cast<const WeakPtr<void>*>(first),
-      reinterpret_cast<const WeakPtr<void>*>(last),
-      reinterpret_cast<WeakPtr<void>*>(insertionPos + insertCount)
-    );
-    mFinish = reinterpret_cast<CameraUserEntityWeakRef*>(relinkCursor);
-  }
-
-  return insertionPos;
-}
-
-/**
- * What it does: see the header - the VC8 vector `assign(first, last)` shape
- * for this lane.
- */
-moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::AssignRange(
-  const CameraFrustumUserEntityList& other
-)
-{
-  if (this == &other) {
-    return mStart;
-  }
-
-  const std::size_t destSize = static_cast<std::size_t>(mFinish - mStart);
-  const std::size_t sourceSize = static_cast<std::size_t>(other.mFinish - other.mStart);
-
-  if (destSize >= sourceSize) {
-    // Truncate: assign the retained prefix, detach and drop the excess tail.
-    msvc8::vector<moho::WeakPtr<void>>::copy_or_move_assign(
-      reinterpret_cast<WeakPtr<void>*>(mStart),
-      reinterpret_cast<const WeakPtr<void>*>(other.mStart),
-      sourceSize
-    );
-
-    (void)Erase(mStart + sourceSize, mFinish);
-    return mStart;
-  }
-
-  const std::size_t existingCapacity = static_cast<std::size_t>(mCapacity - mStart);
-  if (sourceSize > existingCapacity) {
-    // Ensure capacity via the shared grow-and-insert machinery, using a
-    // degenerate empty range at `mStart` purely for its capacity-ensure
-    // side effect (matches the binary's own reuse of this mechanism).
-    auto* const reserved = GrowAndInsertRange(sourceSize, mStart, mStart, mStart);
-    (void)reserved;
-  }
-
-  msvc8::vector<moho::WeakPtr<void>>::copy_or_move_assign(
-    reinterpret_cast<WeakPtr<void>*>(mStart),
-    reinterpret_cast<const WeakPtr<void>*>(other.mStart),
-    destSize
-  );
-
-  auto* const insertedEnd = InsertRange(
-    mFinish,
-    const_cast<CameraUserEntityWeakRef*>(other.mStart + destSize),
-    const_cast<CameraUserEntityWeakRef*>(other.mFinish)
-  );
-  (void)insertedEnd;
-
-  return mStart;
-}
-
-/**
- * Address: 0x007F2DA0 (FUN_007F2DA0)
- *
- * What it does:
- * The lane's `erase(first, last)`: shifts `[last, mFinish)` down onto `first`
- * through the relinking `WeakPtr` assignment, unlinks the vacated tail from
- * its entities' weak chains, rebases `mFinish` and returns `first`.
- */
-moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::Erase(
-  CameraUserEntityWeakRef* const first,
-  CameraUserEntityWeakRef* const last
-)
-{
-  if (first != last) {
-    const std::size_t tailCount = static_cast<std::size_t>(mFinish - last);
-    msvc8::vector<moho::WeakPtr<void>>::copy_or_move_assign(
-      reinterpret_cast<WeakPtr<void>*>(first),
-      reinterpret_cast<const WeakPtr<void>*>(last),
-      tailCount
-    );
-
-    CameraUserEntityWeakRef* const newFinish = first + tailCount;
-    gpg::core::detail::UnlinkIntrusiveWeakRefRange(
-      reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(newFinish),
-      reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mFinish)
-    );
-    mFinish = newFinish;
-  }
-  return first;
-}
-
-/**
- * Address: inlined - emitted at 0x007EEB13..0x007EEB52 inside
- * `RangeRenderer::Render` (FUN_007EEA00), where the compiler expanded this
- * lane's destructor for the stack snapshot that function builds.
- *
- * What it does:
- * Unlinks every element from the intrusive weak-link chain of the entity it
- * tracks, then releases the storage if it had outgrown the inline buffer. The
- * unlink walk at 0x007EEB21..0x007EEB40 is the shared container-home body
- * (`UnlinkIntrusiveWeakRefRange`, FUN_0061CA70) instruction for instruction:
- * skip a null owner slot, otherwise follow the owner's chain until the slot
- * pointing back at this node is found and rewire it past us.
- */
-void moho::CameraFrustumUserEntityList::DetachAndRelease() noexcept
-{
-  gpg::core::detail::UnlinkIntrusiveWeakRefRange(
-    reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mStart),
-    reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mFinish)
-  );
-
-  if (mStart != mInlineOrigin) {
-    ::operator delete[](mStart);
-  }
+  return &mArmyUnitsInFrustum;
 }
 
 /**
@@ -2053,9 +1683,9 @@ float moho::CameraImpl::LODMetric(const Wm3::Vec3f& offset) const
  * lane `CacheCameraFrustumUnits` above fills with every live entity inside the
  * current camera view. The binary is a bare `lea eax, [ecx+460h]; retn`.
  */
-moho::CameraFrustumUserEntityList& moho::CameraImpl::GetAllSoundEntitiesInFrustum()
+gpg::core::FastVectorInline<moho::WeakPtr<moho::UserEntity>>& moho::CameraImpl::GetAllSoundEntitiesInFrustum()
 {
-  return mFrustumLaneA.mView;
+  return mFrustumLaneA;
 }
 
 /**
@@ -3015,12 +2645,9 @@ void moho::CameraImpl::CacheCameraFrustumUnits(const float deltaFrame)
 
   // Clear all three cached lanes (detaching any still-tracked weak refs and
   // releasing heap-grown storage) before the rebuild.
-    moho::CameraFrustumUserEntityList& soundEntities = mFrustumLaneA.mView;
-  moho::CameraFrustumUserEntityList& allUnits = mFrustumLaneB.mView;
-  moho::CameraFrustumUserEntityList& armyUnits = mArmyUnitsInFrustum.mView;
-  TeardownCameraFrustumStorageLane(mFrustumLaneA);
-  TeardownCameraFrustumStorageLane(mFrustumLaneB);
-  TeardownCameraFrustumStorageLane(mArmyUnitsInFrustum);
+  mFrustumLaneA.ResetStorageToInline();
+  mFrustumLaneB.ResetStorageToInline();
+  mArmyUnitsInFrustum.ResetStorageToInline();
 
   UserArmy* const focusArmy = session->GetFocusArmy();
 
@@ -3042,16 +2669,16 @@ void moho::CameraImpl::CacheCameraFrustumUnits(const float deltaFrame)
     }
 
     // Every live in-view entity goes into the sound/all-entities lane.
-    PushUserEntityIntoCameraFrustumLane(soundEntities, entity);
+    mFrustumLaneA.push_back(WeakPtr<UserEntity>(entity));
 
     // Units (entities that resolve to a `UserUnit`) also go into the all-units
     // lane (virtual `IsUserUnit`, vtable slot 3).
     if (entity->IsUserUnit() != nullptr) {
-      PushUserEntityIntoCameraFrustumLane(allUnits, entity);
+      mFrustumLaneB.push_back(WeakPtr<UserEntity>(entity));
 
       // Units owned by the current focus army also go into the focus-army lane.
       if (focusArmy == entity->mArmy) {
-        PushUserEntityIntoCameraFrustumLane(armyUnits, entity);
+        mArmyUnitsInFrustum.push_back(WeakPtr<UserEntity>(entity));
       }
     }
   }

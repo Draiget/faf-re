@@ -229,14 +229,14 @@ namespace moho
     if (mUnit != nullptr) {
       CAiTarget updatedTarget{};
       updatedTarget.UpdateTarget(targetEntity);
-      mUnit->FocusEntityRef.ResetObjectPtr<Entity>(updatedTarget.GetEntity());
-      if (mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+      mUnit->FocusEntityRef.ResetFromObject(updatedTarget.GetEntity());
+      if (mUnit->FocusEntityRef.GetObjectPtr() != nullptr) {
         mUnit->RunScript(kOnAssignedFocusEntityScript);
       }
       mUnit->NeedSyncGameData = true;
 
       Entity* const targetBlip = (targetEntity != nullptr) ? targetEntity->IsReconBlip() : nullptr;
-      mUnit->TargetBlipEntityRef.ResetObjectPtr<Entity>(targetBlip);
+      mUnit->TargetBlipEntityRef.ResetFromObject(targetBlip);
       mUnit->NeedSyncGameData = true;
     }
 
@@ -588,13 +588,13 @@ namespace moho
     ListUnlink();
 
     if (mUnit != nullptr) {
-      mUnit->FocusEntityRef.ResetObjectPtr<Entity>(nullptr);
-      if (mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+      mUnit->FocusEntityRef.ResetFromObject(nullptr);
+      if (mUnit->FocusEntityRef.GetObjectPtr() != nullptr) {
         mUnit->RunScript(kOnAssignedFocusEntityScript);
       }
       mUnit->NeedSyncGameData = true;
 
-      mUnit->TargetBlipEntityRef.ResetObjectPtr<Entity>(nullptr);
+      mUnit->TargetBlipEntityRef.ResetFromObject(nullptr);
       mUnit->NeedSyncGameData = true;
 
       mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Capturing);
@@ -678,13 +678,13 @@ namespace moho
     Entity* const commandTargetBlip = (rawTargetEntity != nullptr) ? rawTargetEntity->IsReconBlip() : nullptr;
     mTargetEntity.Set(commandTargetEntity);
 
-    mUnit->FocusEntityRef.ResetObjectPtr<Entity>(commandTargetEntity);
-    if (mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+    mUnit->FocusEntityRef.ResetFromObject(commandTargetEntity);
+    if (mUnit->FocusEntityRef.GetObjectPtr() != nullptr) {
       mUnit->RunScript(kOnAssignedFocusEntityScript);
     }
     mUnit->NeedSyncGameData = true;
 
-    mUnit->TargetBlipEntityRef.ResetObjectPtr<Entity>(commandTargetBlip);
+    mUnit->TargetBlipEntityRef.ResetFromObject(commandTargetBlip);
     mUnit->NeedSyncGameData = true;
     mUnit->mUnitVarDat.mWorkProgress = 0.0f;
 

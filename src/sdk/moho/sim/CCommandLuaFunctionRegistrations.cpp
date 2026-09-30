@@ -427,14 +427,9 @@ namespace
 
   // ---- UISelectionByCategory support (FUN_008662B0 / FUN_00865590) ----
 
-  // Selection weak-set nodes and camera frustum-list entries both link into
-  // the entity's weak chain; their slot decodes like any `WeakPtr<UserEntity>`.
+  // Selection weak-set nodes link into the entity's weak chain; their slot
+  // decodes like any `WeakPtr<UserEntity>`.
   [[nodiscard]] moho::UserEntity* DecodeSelectionEntity(const moho::SSelectionWeakRefUserEntity& weakRef) noexcept
-  {
-    return moho::WeakPtr<moho::UserEntity>::DecodeOwnerObject(weakRef.mOwnerLinkSlot);
-  }
-
-  [[nodiscard]] moho::UserEntity* DecodeFrustumEntity(const moho::CameraUserEntityWeakRef& weakRef) noexcept
   {
     return moho::WeakPtr<moho::UserEntity>::DecodeOwnerObject(weakRef.mOwnerLinkSlot);
   }
@@ -534,9 +529,8 @@ namespace
     // ---- Gather candidate entities ----
     gpg::fastvector<moho::UserEntity*> gathered{};
     if (inViewFrustum && camera != nullptr) {
-      moho::CameraFrustumUserEntityList* const frustumList = camera->GetArmyUnitsInFrustum();
-      for (moho::CameraUserEntityWeakRef* ref = frustumList->mStart; ref != frustumList->mFinish; ++ref) {
-        if (moho::UserEntity* const entity = DecodeFrustumEntity(*ref); entity != nullptr) {
+      for (const moho::WeakPtr<moho::UserEntity>& ref : *camera->GetArmyUnitsInFrustum()) {
+        if (moho::UserEntity* const entity = ref.GetObjectPtr(); entity != nullptr) {
           gathered.push_back(entity);
         }
       }

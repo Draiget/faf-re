@@ -170,76 +170,6 @@ namespace moho
    */
   LuaPlus::LuaObject* func_GetUnitFactory(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
 
-  struct SWeakRefSlot
-  {
-    void* valueWithTag;
-    void* backlink;
-
-    template <class TObject>
-    [[nodiscard]] WeakPtr<TObject>& AsWeakPtr() noexcept
-    {
-      static_assert(sizeof(SWeakRefSlot) == sizeof(WeakPtr<void>), "SWeakRefSlot/WeakPtr layout mismatch");
-      static_assert(
-        offsetof(SWeakRefSlot, valueWithTag) == offsetof(WeakPtr<void>, ownerLinkSlot),
-        "SWeakRefSlot owner slot mismatch"
-      );
-      static_assert(
-        offsetof(SWeakRefSlot, backlink) == offsetof(WeakPtr<void>, nextInOwner), "SWeakRefSlot next slot mismatch"
-      );
-      return reinterpret_cast<WeakPtr<TObject>&>(*this);
-    }
-
-    template <class TObject>
-    [[nodiscard]] const WeakPtr<TObject>& AsWeakPtr() const noexcept
-    {
-      static_assert(sizeof(SWeakRefSlot) == sizeof(WeakPtr<void>), "SWeakRefSlot/WeakPtr layout mismatch");
-      static_assert(
-        offsetof(SWeakRefSlot, valueWithTag) == offsetof(WeakPtr<void>, ownerLinkSlot),
-        "SWeakRefSlot owner slot mismatch"
-      );
-      static_assert(
-        offsetof(SWeakRefSlot, backlink) == offsetof(WeakPtr<void>, nextInOwner), "SWeakRefSlot next slot mismatch"
-      );
-      return reinterpret_cast<const WeakPtr<TObject>&>(*this);
-    }
-
-    template <class TObject>
-    [[nodiscard]] TObject* ResolveObjectPtr() const noexcept
-    {
-      return AsWeakPtr<TObject>().GetObjectPtr();
-    }
-
-    template <class TObject>
-    void ResetObjectPtr(TObject* object) noexcept
-    {
-      AsWeakPtr<TObject>().ResetFromObject(object);
-    }
-  };
-  static_assert(sizeof(SWeakRefSlot) == 0x08, "SWeakRefSlot size must be 0x08");
-  static_assert(offsetof(SWeakRefSlot, valueWithTag) == 0x00, "SWeakRefSlot::valueWithTag offset must be 0x00");
-  static_assert(offsetof(SWeakRefSlot, backlink) == 0x04, "SWeakRefSlot::backlink offset must be 0x04");
-} // namespace moho
-
-namespace gpg::core
-{
-  // `SWeakRefSlot` is the sole element type that routes `FastVectorN::push_back`
-  // and its grow/insert lane through the intrusive weak-ref relink path
-  // (FUN_0061C5E0 / FUN_0061C750 family). Although the slot is two `void*` and is
-  // therefore trivially copyable at the C++ level, appending/relocating one must
-  // splice the node into (or out of) its target's weak-owner chain — so the
-  // trivially-copyable memmove branch would be incorrect. `valueWithTag`/`backlink`
-  // alias `IntrusiveWeakLinkNode::ownerLinkSlot`/`nextInOwner` one-to-one.
-  template <>
-  struct IsIntrusiveWeakRefSlot<::moho::SWeakRefSlot> : std::true_type
-  {};
-  static_assert(
-    sizeof(::moho::SWeakRefSlot) == sizeof(IntrusiveWeakLinkNode),
-    "SWeakRefSlot must alias IntrusiveWeakLinkNode layout for the relink lane"
-  );
-} // namespace gpg::core
-
-namespace moho
-{
 
   /**
    * Encoded weak-owner slot lane used by Unit guarded-by lists.
@@ -352,7 +282,7 @@ namespace moho
     static gpg::RType* sType;
 
     CFormationInstance* mFormationLayer;   // +0x00
-    SWeakRefSlot mFormationLeadRef;        // +0x04
+    WeakPtr<Unit> mFormationLeadRef;       // +0x04
     std::int32_t mFormationPriorityOrder;  // +0x0C
     bool mHasFormationSpeedData;           // +0x10
     std::uint8_t mPad11[0x03];             // +0x11
@@ -718,7 +648,7 @@ namespace moho
    */
   [[nodiscard]] gpg::RType* preregister_SSTIUnitVariableDataTypeInfo();
 
-  static_assert(sizeof(gpg::core::FastVectorN<SWeakRefSlot, 20>) == 0xB0, "FastVectorN<SWeakRefSlot,20> must be 0xB0");
+  static_assert(sizeof(gpg::core::FastVectorN<WeakPtr<Entity>, 20>) == 0xB0, "FastVectorN<WeakPtr<Entity>,20> must be 0xB0");
   static_assert(sizeof(gpg::core::FastVectorN<ReconBlip*, 2>) == 0x18, "FastVectorN<ReconBlip*,2> must be 0x18");
 
   /**
@@ -1814,7 +1744,7 @@ namespace moho
      * (current sim tick minus `mBlipLastUpdateTick`).
      */
     [[nodiscard]]
-    gpg::core::FastVectorN<SWeakRefSlot, 20>& GetBlipsInRange(unsigned int maxAgeTicks);
+    gpg::core::FastVectorN<WeakPtr<Entity>, 20>& GetBlipsInRange(unsigned int maxAgeTicks);
 
     /**
      * Address: 0x006A76A0 (FUN_006A76A0, Moho::Unit::SetGuardedUnit)
@@ -2120,12 +2050,12 @@ namespace moho
     SSTIUnitVariableData mUnitVarDat; // 0x0288
     CUnitMotion* UnitMotion;                             // 0x04B0
     CUnitCommandQueue* CommandQueue;                     // 0x04B4
-    SWeakRefSlot CreatorRef;                             // 0x04B8
-    SWeakRefSlot TransportedByRef;                       // 0x04C0
-    SWeakRefSlot AssignedTransportRef;                   // 0x04C8
-    SWeakRefSlot FocusEntityRef;                         // 0x04D0
-    SWeakRefSlot TargetBlipEntityRef;                    // 0x04D8
-    SWeakRefSlot GuardedUnitRef;                         // 0x04E0
+    WeakPtr<Unit> CreatorRef;                             // 0x04B8
+    WeakPtr<Unit> TransportedByRef;                       // 0x04C0
+    WeakPtr<Unit> AssignedTransportRef;                   // 0x04C8
+    WeakPtr<Entity> FocusEntityRef;                         // 0x04D0
+    WeakPtr<Entity> TargetBlipEntityRef;                    // 0x04D8
+    WeakPtr<Unit> GuardedUnitRef;                         // 0x04E0
     Wm3::Vector3f GuardedPos;                            // 0x04E8
     char pad_04F4[4];                                    // 0x04F4
     SGuardedByRuntimeList GuardedByList;                 // 0x04F8 (spans 0x04F8..0x0520; mInlineSlots own 0x0510..0x0520)
@@ -2193,7 +2123,7 @@ namespace moho
      * Initializes the `mBlipsInRange` small-buffer vector to its inline
      * storage window and leaves the lane empty for range updates.
      */
-    gpg::core::FastVectorN<SWeakRefSlot, 20> mBlipsInRange; // 0x05B8
+    gpg::core::FastVectorN<WeakPtr<Entity>, 20> mBlipsInRange; // 0x05B8
     // External findings name; xrefs in current export set are still limited.
     std::int32_t mBlipLastUpdateTick; // 0x0668
     std::int32_t mUnknown066C;        // 0x066C

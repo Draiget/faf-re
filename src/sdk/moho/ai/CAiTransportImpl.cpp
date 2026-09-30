@@ -872,7 +872,7 @@ void CAiTransportImpl::TransportUnreserveUnattachedSpots()
       continue;
     }
 
-    Unit* const transportedBy = reserved->TransportedByRef.ResolveObjectPtr<Unit>();
+    Unit* const transportedBy = reserved->TransportedByRef.GetObjectPtr();
     if (transportedBy != mUnit) {
       it = EraseReservedTransportBoneAndAdvance(mReservedBones, it);
       continue;
@@ -1559,7 +1559,7 @@ bool CAiTransportImpl::TransportAttachUnit(Unit* const unit)
   }
 
   AttachUnitToBone(unit, reservedBone->transportBoneIndex, reservedBone->attachBoneIndex);
-  unit->TransportedByRef.ResetObjectPtr<Unit>(mUnit);
+  unit->TransportedByRef.ResetFromObject(mUnit);
 
   if (unit->AiNavigator) {
     unit->AiNavigator->AbortMove();
@@ -1611,7 +1611,7 @@ bool CAiTransportImpl::TransportDetachUnit(Unit* const unit)
   const int detachedBoneIndex = unit->mAttachInfo.mParentBoneIndex;
   (void)unit->DetachFrom(expectedParent, false);
   TransportRemovePickupUnit(unit, true);
-  unit->TransportedByRef.ResetObjectPtr<Unit>(nullptr);
+  unit->TransportedByRef.ResetFromObject(nullptr);
 
   const SAniSkelBone* detachedBone = nullptr;
   if (detachedBoneIndex >= 0) {
@@ -1844,7 +1844,7 @@ void CAiTransportImpl::TransportAddToStorage(Unit* const unit)
 
   SEntAttachInfo attachInfo(static_cast<Entity*>(mUnit), -1, -1, VTransform());
   (void)unit->AttachTo(attachInfo);
-  unit->TransportedByRef.ResetObjectPtr<Unit>(mUnit);
+  unit->TransportedByRef.ResetFromObject(mUnit);
   (void)mStoredUnits.AddUnit(unit);
 }
 
@@ -1864,7 +1864,7 @@ void CAiTransportImpl::TransportRemoveFromStorage(Unit* const unit, VTransform& 
   }
 
   unit->RunScript("OnRemoveFromStorage", mUnit);
-  unit->TransportedByRef.ResetObjectPtr<Unit>(nullptr);
+  unit->TransportedByRef.ResetFromObject(nullptr);
   (void)unit->DetachFrom(static_cast<Entity*>(mUnit), false);
   (void)mStoredUnits.RemoveUnit(unit);
 

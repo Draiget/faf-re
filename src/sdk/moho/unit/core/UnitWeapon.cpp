@@ -3655,7 +3655,7 @@ namespace moho
       if (targetEntity != nullptr) {
         if (targetEntity->IsReconBlip() != nullptr) {
           // Target is already a recon blip: bind the blip lane straight to it.
-          unit->TargetBlipEntityRef.ResetObjectPtr<Entity>(targetEntity);
+          unit->TargetBlipEntityRef.ResetFromObject(targetEntity);
           unit->NeedSyncGameData = true;
           return;
         }
@@ -3670,7 +3670,7 @@ namespace moho
       }
 
       // No bindable target: clear the blip lane.
-      unit->TargetBlipEntityRef.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
+      unit->TargetBlipEntityRef.UnlinkFromOwnerChain();
       unit->NeedSyncGameData = true;
     }
 

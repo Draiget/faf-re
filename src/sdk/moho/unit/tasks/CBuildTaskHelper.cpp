@@ -200,8 +200,8 @@ namespace moho
     }
 
     if (ownerUnit != nullptr) {
-      ownerUnit->FocusEntityRef.ResetObjectPtr<Entity>(nullptr);
-      if (ownerUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+      ownerUnit->FocusEntityRef.ResetFromObject(nullptr);
+      if (ownerUnit->FocusEntityRef.GetObjectPtr() != nullptr) {
         ownerUnit->RunScript(kOnAssignedFocusEntity);
       }
       ownerUnit->NeedSyncGameData = true;
@@ -228,8 +228,8 @@ namespace moho
     }
 
     if (mUnit != nullptr) {
-      mUnit->FocusEntityRef.ResetObjectPtr<Entity>(focusUnit);
-      if (mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+      mUnit->FocusEntityRef.ResetFromObject(focusUnit);
+      if (mUnit->FocusEntityRef.GetObjectPtr() != nullptr) {
         mUnit->RunScript(kOnAssignedFocusEntity);
       }
       mUnit->NeedSyncGameData = true;
@@ -244,7 +244,7 @@ namespace moho
     }
 
     if (mDelta > 0.0f) {
-      Unit* const creatorUnit = focusUnit->CreatorRef.ResolveObjectPtr<Unit>();
+      Unit* const creatorUnit = focusUnit->CreatorRef.GetObjectPtr();
       if (creatorUnit == mUnit) {
         focusUnit->Materialize(mDelta);
       }

@@ -165,7 +165,7 @@ namespace moho
   {
     Unit* const ownerUnit = mUnit;
     if (ownerUnit != nullptr) {
-      ownerUnit->AssignedTransportRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+      ownerUnit->AssignedTransportRef.UnlinkFromOwnerChain();
       ownerUnit->SetFocusEntity(nullptr);
       ownerUnit->FreeOgridRect();
       ownerUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskWaitForFerry;

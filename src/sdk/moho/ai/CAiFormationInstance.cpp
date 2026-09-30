@@ -1491,7 +1491,7 @@ namespace
     if (formation.mCommandType != moho::EUnitCommandType::UNITCOMMAND_Guard || leader == nullptr) {
       return leader;
     }
-    return leader->IsUnit()->GuardedUnitRef.ResolveObjectPtr<moho::Unit>();
+    return leader->IsUnit()->GuardedUnitRef.GetObjectPtr();
   }
 
   /**
@@ -3632,7 +3632,7 @@ namespace moho
     if (runtimeUnit == nullptr) {
       return 1;
     }
-    if (runtimeUnit->GuardedUnitRef.AsWeakPtr<Unit>().HasValue()) {
+    if (runtimeUnit->GuardedUnitRef.HasValue()) {
       return 1;
     }
 
@@ -3716,7 +3716,7 @@ namespace moho
   Unit* CAiFormationInstance::GetLeader(Unit* const unit, SOffsetInfo* const info)
   {
     if (mCommandType == EUnitCommandType::UNITCOMMAND_Guard && unit->IsUnit() != nullptr) {
-      return unit->IsUnit()->GuardedUnitRef.ResolveObjectPtr<Unit>();
+      return unit->IsUnit()->GuardedUnitRef.GetObjectPtr();
     }
 
     if (info == nullptr || unit->IsDead()) {

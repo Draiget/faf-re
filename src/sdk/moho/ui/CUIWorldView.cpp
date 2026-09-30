@@ -405,9 +405,8 @@ namespace moho
     CHeightField* const heightField = buildDrag.mSession->mWldMap->mTerrainRes->GetHeightField();
     const std::size_t previewCount = buildDrag.mMeshes.size();
 
-    CameraFrustumUserEntityList* const frustumUnits = camera->GetArmyUnitsInFrustum();
-    for (CameraUserEntityWeakRef* weakRef = frustumUnits->mStart; weakRef != frustumUnits->mFinish; ++weakRef) {
-      UserEntity* const entity = DecodeCameraFrustumWeakRef(*weakRef);
+    for (const WeakPtr<UserEntity>& weakRef : *camera->GetArmyUnitsInFrustum()) {
+      UserEntity* const entity = weakRef.GetObjectPtr();
       if (entity == nullptr) {
         continue;
       }

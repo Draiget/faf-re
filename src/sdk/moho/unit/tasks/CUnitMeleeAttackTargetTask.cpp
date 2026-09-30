@@ -246,8 +246,8 @@ namespace
 
   void SetUnitFocusEntity(moho::Unit& unit, moho::Entity* const focusEntity)
   {
-    unit.FocusEntityRef.ResetObjectPtr<moho::Entity>(focusEntity);
-    if (unit.FocusEntityRef.ResolveObjectPtr<moho::Entity>() != nullptr) {
+    unit.FocusEntityRef.ResetFromObject(focusEntity);
+    if (unit.FocusEntityRef.GetObjectPtr() != nullptr) {
       (void)unit.RunScript(kOnAssignedFocusEntityScript);
     }
     unit.NeedSyncGameData = true;
@@ -466,8 +466,8 @@ namespace moho
     if (unit != nullptr) {
       unit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_Attacking);
 
-      unit->FocusEntityRef.ResetObjectPtr<Entity>(nullptr);
-      if (unit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+      unit->FocusEntityRef.ResetFromObject(nullptr);
+      if (unit->FocusEntityRef.GetObjectPtr() != nullptr) {
         (void)unit->RunScript("OnAssignedFocusEntity");
       }
       unit->NeedSyncGameData = true;
@@ -723,7 +723,7 @@ namespace moho
       return false;
     }
 
-    Unit* const formationLead = static_cast<moho::CCommandTask*>(this)->mUnit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+    Unit* const formationLead = static_cast<moho::CCommandTask*>(this)->mUnit->mInfoCache.mFormationLeadRef.GetObjectPtr();
     if (formationLead == nullptr) {
       return false;
     }
@@ -986,7 +986,7 @@ namespace moho
         break;
 
       case 9: {
-        const WeakPtr<Entity>& focusWeak = unit->FocusEntityRef.AsWeakPtr<Entity>();
+        const WeakPtr<Entity>& focusWeak = unit->FocusEntityRef;
         if (focusWeak.GetObjectPtr() != nullptr) {
           Entity* const focusEntity = unit->GetFocusEntity();
           Unit* const targetUnit = focusEntity != nullptr ? focusEntity->IsUnit() : nullptr;
@@ -1269,7 +1269,7 @@ namespace moho
 
       case TASKSTATE_Processing: {
         if (mFormation != nullptr) {
-          Unit* const formationLead = unit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+          Unit* const formationLead = unit->mInfoCache.mFormationLeadRef.GetObjectPtr();
           if (formationLead != unit && mIgnoreFormationUpdates) {
             if (HasFormationLeadDesiredTarget()) {
               mFormation = nullptr;

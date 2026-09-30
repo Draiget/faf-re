@@ -496,12 +496,12 @@ namespace moho
     // Scratch collector of blips overlapping the patrol search box. Its
     // destructor performs the intrusive weak-ref range-unlink teardown that the
     // binary open-codes (sub_61CA70 + operator delete[]).
-    gpg::core::FastVectorN<SWeakRefSlot, 20> overlappingBlips;
+    gpg::core::FastVectorN<WeakPtr<Entity>, 20> overlappingBlips;
 
-    const gpg::core::FastVectorN<SWeakRefSlot, 20>& blips = unit->mBlipsInRange;
+    const gpg::core::FastVectorN<WeakPtr<Entity>, 20>& blips = unit->mBlipsInRange;
     const std::ptrdiff_t blipCount = blips.end() - blips.begin();
     for (std::ptrdiff_t i = 0; i < blipCount; ++i) {
-      Entity* const blip = unit->mBlipsInRange.begin()[i].ResolveObjectPtr<Entity>();
+      Entity* const blip = unit->mBlipsInRange.begin()[i].GetObjectPtr();
       if (blip == nullptr || blip->mVarDat.mIsDead || blip->DestroyQueuedFlag) {
         continue;
       }
@@ -514,13 +514,9 @@ namespace moho
       CollisionResult collision{};
       if (collisionShape->CollideBox(&mSearchBox, &collision)) {
         collision.sourceEntity = blip;
-        // Stage a weak-ref node on the blip, append it to the collector (whose
-        // intrusive push_back splices a second link into the blip's owner chain),
-        // then unlink the staging node — mirroring sub_61C5E0 + sub_5A6DE0.
-        SWeakRefSlot blipSlot{};
-        blipSlot.ResetObjectPtr<Entity>(blip);
-        overlappingBlips.push_back(blipSlot);
-        blipSlot.AsWeakPtr<Entity>().UnlinkFromOwnerChain();
+        // A temporary weak pointer to the blip, copied into the collector
+        // (sub_61C5E0) and unlinked again as it dies (sub_5A6DE0).
+        overlappingBlips.push_back(WeakPtr<Entity>(blip));
       }
     }
 

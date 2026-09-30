@@ -318,7 +318,7 @@ namespace
       return stagingPlatform;
     }
 
-    moho::Unit* const assignedTransport = unit->AssignedTransportRef.ResolveObjectPtr<moho::Unit>();
+    moho::Unit* const assignedTransport = unit->AssignedTransportRef.GetObjectPtr();
     if (assignedTransport == nullptr || assignedTransport->IsDead() || assignedTransport->DestroyQueued()) {
       return nullptr;
     }

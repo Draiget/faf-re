@@ -353,7 +353,7 @@ namespace moho
     }
 
     if (target->IsInCategory("SHIELD")) {
-      if (Entity* const focus = target->FocusEntityRef.ResolveObjectPtr<Entity>(); focus != nullptr) {
+      if (Entity* const focus = target->FocusEntityRef.GetObjectPtr(); focus != nullptr) {
         if (focus->mVarDat.mMaxHealth > focus->mVarDat.mHealth) {
           return false;
         }
