@@ -573,20 +573,12 @@ namespace moho
    */
   Stats<CArmyStatItem>::Stats()
     : mItem(new CArmyStatItem("Root"))
-    , mLock(new boost::mutex())
-    , pad_000D{0, 0, 0}
   {}
 
   /**
    * Address: 0x006FD850 (FUN_006FD850, Stats<CArmyStatItem> destructor core)
    */
-  Stats<CArmyStatItem>::~Stats()
-  {
-    delete mItem;
-    mItem = nullptr;
-    delete mLock;
-    mLock = nullptr;
-  }
+  Stats<CArmyStatItem>::~Stats() = default;
 
   /**
    * Address: 0x005953A0 (FUN_005953A0, token walk)
@@ -644,13 +636,13 @@ namespace moho
    */
   CArmyStatItem* Stats<CArmyStatItem>::TraverseTables(const gpg::StrArg statPath, const bool allowCreate)
   {
-    boost::mutex::scoped_lock lock(*mLock);
+    boost::mutex::scoped_lock lock(mLock);
 
     msvc8::vector<msvc8::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
-    CArmyStatItem* const item = WalkTokenPath(mItem, tokens, allowCreate, &didCreate);
+    CArmyStatItem* const item = WalkTokenPath(mItem.get(), tokens, allowCreate, &didCreate);
     if (didCreate && item != nullptr) {
       item->SynchronizeAsInt();
     }
@@ -676,13 +668,13 @@ namespace moho
    */
   CArmyStatItem* Stats<CArmyStatItem>::GetStringItem(const gpg::StrArg statPath)
   {
-    boost::mutex::scoped_lock lock(*mLock);
+    boost::mutex::scoped_lock lock(mLock);
 
     msvc8::vector<msvc8::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
-    CArmyStatItem* const item = WalkTokenPath(mItem, tokens, true, &didCreate);
+    CArmyStatItem* const item = WalkTokenPath(mItem.get(), tokens, true, &didCreate);
     if (didCreate && item != nullptr) {
       boost::mutex::scoped_lock itemLock(item->mLock);
       item->mType = EStatType::kString;
@@ -695,9 +687,9 @@ namespace moho
    */
   void Stats<CArmyStatItem>::Delete(const char* statPath)
   {
-    boost::mutex::scoped_lock lock(*mLock);
+    boost::mutex::scoped_lock lock(mLock);
     CArmyStatItem* const item = TraverseTables(statPath, false);
-    if (item == mItem) {
+    if (item == mItem.get()) {
       throw std::runtime_error("Don't be doing that, chief.");
     }
     if (item != nullptr) {

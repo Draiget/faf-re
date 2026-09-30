@@ -2443,10 +2443,8 @@ namespace moho
   extern float ren_BandwidthDisplaySeconds;  // ?ren_BandwidthDisplaySeconds@Moho@@3MA
   extern float ren_BandwidthDisplayKernel;   // ?ren_BandwidthDisplayKernel@Moho@@3MA
 
-  // Editor render hook enable flag (ed_EnableHook @DAT..; the ed_Hook object
-  // pointer itself is the process-global IEdRenderHook* from IEdRenderHook.h).
-  // The RenderUI pass invokes ed_Hook's second vtable slot (Hook1, +0x04) when
-  // both are set (asm 0x007F89FB..0x007F8A13).
+  // ed_EnableHook (0x00F57E55) gates ED_Render at the end of RenderUI
+  // (asm 0x007F89FB..0x007F8A13); RenderPreviewImage clears it while it draws.
 
   // Frame-driver tuning globals read by WRenViewport::D3DWindowOnDeviceRender /
   // WRenViewport::Render. Types byte-verified from the referencing .asm
@@ -2925,9 +2923,10 @@ void moho::WRenViewport::RenderUI(const msvc8::vector<SWorldViewInfo>& worldView
   // 0x007F89C3..0x007F89F8: debug overlays, handed a copy of the batcher.
   REN_DebugStuff(mPrimBatcher, mHead);
 
-  // 0x007F89FB..0x007F8A13: editor render hook, slot +0x04 (IEdRenderHook::Hook1).
-  if (ed_EnableHook && ed_Hook != nullptr) {
-    ed_Hook->Hook1();
+  // 0x007F89FB..0x007F8A13: editor render hook. ED_Render (0x007B6450) is
+  // inlined here by LTCG: `mov ecx,[ed_Hook]; cmp ecx,esi; ...; call [vtbl+4]`.
+  if (ed_EnableHook) {
+    ED_Render();
   }
 }
 

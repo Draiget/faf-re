@@ -5765,7 +5765,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
         if (CArmyImpl* const syncArmy = mArmiesList[static_cast<std::size_t>(mSyncArmy)]; syncArmy != nullptr) {
           if (CArmyStats* const armyStats = syncArmy->GetArmyStats(); armyStats != nullptr) {
             LuaPlus::LuaObject armyStatsTable{};
-            STAT_GetLuaTable(mLuaState, armyStats->mItem, armyStatsTable);
+            STAT_GetLuaTable(mLuaState, armyStats->mItem.get(), armyStatsTable);
             armyStatsTable.SetInteger("Tick", static_cast<std::int32_t>(mCurTick));
             syncTable.SetObject("__ArmyStats", armyStatsTable);
           }

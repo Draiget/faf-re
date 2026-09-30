@@ -278,13 +278,11 @@ namespace
     auto* const stats = reinterpret_cast<moho::Stats<moho::StatItem>*>(objectPtr);
     GPG_ASSERT(stats != nullptr);
 
-    boost::mutex::scoped_lock lock(*stats->mLock);
+    boost::mutex::scoped_lock lock(stats->mLock);
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     moho::StatItem* const loadedRoot = ReadArchiveStatItemPointer(archive, owner);
 
-    moho::StatItem* const previousRoot = stats->mItem;
-    stats->mItem = loadedRoot;
-    delete previousRoot;
+    stats->mItem.reset(loadedRoot);
   }
 
   /**
@@ -295,8 +293,8 @@ namespace
     auto* const stats = reinterpret_cast<moho::Stats<moho::StatItem>*>(objectPtr);
     GPG_ASSERT(stats != nullptr);
 
-    boost::mutex::scoped_lock lock(*stats->mLock);
-    const gpg::RRef rootRef = MakeStatItemRef(stats->mItem);
+    boost::mutex::scoped_lock lock(stats->mLock);
+    const gpg::RRef rootRef = MakeStatItemRef(stats->mItem.get());
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     gpg::WriteRawPointer(archive, rootRef, gpg::TrackedPointerState::Owned, owner);
   }
@@ -1105,29 +1103,21 @@ namespace moho
    */
   Stats<StatItem>::Stats()
     : mItem(new StatItem(kRootStatName))
-    , mLock(new boost::mutex())
-    , pad_000D{0, 0, 0}
   {}
 
   /**
    * Address: 0x00406600 (FUN_00406600, Moho::Stats_StatItem::~Stats_StatItem)
    */
-  Stats<StatItem>::~Stats()
-  {
-    delete mItem;
-    mItem = nullptr;
-    delete mLock;
-    mLock = nullptr;
-  }
+  Stats<StatItem>::~Stats() = default;
 
   /**
    * Address: 0x0040B2E0 (FUN_0040B2E0, Moho::Stats_StatItem::Delete)
    */
   void Stats<StatItem>::Delete(const char* statPath)
   {
-    boost::mutex::scoped_lock lock(*mLock);
+    boost::mutex::scoped_lock lock(mLock);
     StatItem* const item = GetItem(statPath, false);
-    if (item == mItem) {
+    if (item == mItem.get()) {
       throw std::runtime_error("Don't be doing that, chief.");
     }
     if (item) {
@@ -1140,13 +1130,13 @@ namespace moho
    */
   StatItem* Stats<StatItem>::GetItem(const gpg::StrArg statPath, const bool allowCreate)
   {
-    boost::mutex::scoped_lock lock(*mLock);
+    boost::mutex::scoped_lock lock(mLock);
 
     msvc8::vector<msvc8::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
-    StatItem* const item = WalkStatPath(mItem, tokens, allowCreate, &didCreate);
+    StatItem* const item = WalkStatPath(mItem.get(), tokens, allowCreate, &didCreate);
     if (didCreate && item != nullptr) {
       item->SynchronizeAsInt();
     }
@@ -1158,13 +1148,13 @@ namespace moho
    */
   StatItem* Stats<StatItem>::GetFloatItem(const gpg::StrArg statPath)
   {
-    boost::mutex::scoped_lock lock(*mLock);
+    boost::mutex::scoped_lock lock(mLock);
 
     msvc8::vector<msvc8::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
-    StatItem* const item = WalkStatPath(mItem, tokens, true, &didCreate);
+    StatItem* const item = WalkStatPath(mItem.get(), tokens, true, &didCreate);
     if (didCreate && item != nullptr) {
       item->SynchronizeAsFloat();
     }
@@ -1176,13 +1166,13 @@ namespace moho
    */
   StatItem* Stats<StatItem>::GetStringItem(const gpg::StrArg statPath)
   {
-    boost::mutex::scoped_lock lock(*mLock);
+    boost::mutex::scoped_lock lock(mLock);
 
     msvc8::vector<msvc8::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
-    StatItem* const item = WalkStatPath(mItem, tokens, true, &didCreate);
+    StatItem* const item = WalkStatPath(mItem.get(), tokens, true, &didCreate);
     if (didCreate && item != nullptr) {
       boost::mutex::scoped_lock itemLock(item->mLock);
       item->mType = EStatType::kString;
@@ -1346,7 +1336,7 @@ namespace moho
     writer.Printf("SupComMark (composite) : %7.0f\n", compositeScore);
     writer.Printf("(Note: SupComMark scores represent overall system performance.  Higher is better.)\n\n");
 
-    StatItem* const rootItem = GetEngineStats()->mItem;
+    StatItem* const rootItem = GetEngineStats()->mItem.get();
     std::string reportBody;
     std::vector<int> depthNameWidths;
     BuildStatReportRecursive(rootItem, reportBody, 0u, depthNameWidths);
@@ -1611,7 +1601,7 @@ namespace moho
     }
 
     EngineStats* const engineStats = GetEngineStats();
-    DumpStatsTreeRecursive(engineStats ? engineStats->mItem : nullptr, 0);
+    DumpStatsTreeRecursive(engineStats ? engineStats->mItem.get() : nullptr, 0);
   }
 
   /**
@@ -1708,7 +1698,7 @@ namespace moho
       return;
     }
 
-    StatItem* const rootItem = GetEngineStats()->mItem;
+    StatItem* const rootItem = GetEngineStats()->mItem.get();
     if (rootItem) {
       CaptureNonZeroSamplesRecursive(rootItem, engineStats->mLogFrameCount);
     }
@@ -1725,7 +1715,7 @@ namespace moho
   void STAT_Frame()
   {
     EngineStats* const engineStats = GetEngineStats();
-    StatItem* const rootItem = engineStats ? engineStats->mItem : nullptr;
+    StatItem* const rootItem = engineStats ? engineStats->mItem.get() : nullptr;
     if (rootItem) {
       rootItem->ClearChildren(static_cast<std::int32_t>(EPulseMode::kFrame));
     }

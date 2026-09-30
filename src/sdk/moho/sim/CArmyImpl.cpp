@@ -1749,7 +1749,7 @@ namespace moho
    */
   void CArmyImpl::OnTick()
   {
-    if (Stats != nullptr && Stats->mItem != nullptr) {
+    if (Stats != nullptr && Stats->mItem.get() != nullptr) {
       Stats->mItem->ClearChildren(1);
     }
 

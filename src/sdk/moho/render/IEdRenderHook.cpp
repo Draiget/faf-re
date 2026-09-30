@@ -1,38 +1,5 @@
 #include "moho/render/IEdRenderHook.h"
 
-namespace
-{
-  struct IEdRenderHookRuntimeView
-  {
-    void* mVtable = nullptr;
-  };
-  static_assert(sizeof(IEdRenderHookRuntimeView) == sizeof(moho::IEdRenderHook), "IEdRenderHook runtime view size must match");
-
-  class EdRenderHookVTableProbe final : public moho::IEdRenderHook
-  {
-  public:
-    void Hook0() override
-    {
-    }
-
-    void Hook1() override
-    {
-    }
-  };
-
-  [[nodiscard]] void* RecoveredEdRenderHookVTable() noexcept
-  {
-    static EdRenderHookVTableProbe probe;
-    return *reinterpret_cast<void**>(&probe);
-  }
-
-  void WriteEdRenderHookVTable(moho::IEdRenderHook* const hook)
-  {
-    auto& runtimeView = reinterpret_cast<IEdRenderHookRuntimeView&>(*hook);
-    runtimeView.mVtable = RecoveredEdRenderHookVTable();
-  }
-}
-
 namespace moho
 {
 IEdRenderHook* ed_Hook = nullptr;
@@ -44,13 +11,9 @@ IEdRenderHook* ed_Hook = nullptr;
  * _DWORD *__usercall sub_7B6410@<eax>(_DWORD *result@<eax>)
  *
  * What it does:
- * Writes the `IEdRenderHook` vtable lane and returns the same object pointer.
+ * Stores the interface vftable and returns `this`.
  */
-IEdRenderHook* InitializeEdRenderHookVTableEax(IEdRenderHook* const hook)
-{
-  WriteEdRenderHookVTable(hook);
-  return hook;
-}
+IEdRenderHook::IEdRenderHook() = default;
 
 /**
  * Address: 0x007B6420 (FUN_007B6420)
@@ -59,12 +22,23 @@ IEdRenderHook* InitializeEdRenderHookVTableEax(IEdRenderHook* const hook)
  * void __thiscall sub_7B6420(_DWORD *this)
  *
  * What it does:
- * Writes the `IEdRenderHook` vtable lane to one object pointer in the ECX
- * thiscall variant.
+ * Restores the interface vftable; the out-of-line body of the pure virtual
+ * destructor.
  */
-void InitializeEdRenderHookVTableEcx(IEdRenderHook* const hook)
+IEdRenderHook::~IEdRenderHook() = default;
+
+/**
+ * Address: 0x007B6430 (FUN_007B6430)
+ *
+ * IDA signature:
+ * int __usercall sub_7B6430@<eax>(int result@<eax>)
+ *
+ * What it does:
+ * Installs `hook` as the editor render hook.
+ */
+void ED_SetHook(IEdRenderHook* const hook)
 {
-  WriteEdRenderHookVTable(hook);
+  ed_Hook = hook;
 }
 
 /**
@@ -74,10 +48,26 @@ void InitializeEdRenderHookVTableEcx(IEdRenderHook* const hook)
  * int sub_7B6440()
  *
  * What it does:
- * Returns the process-global `Moho::ed_Hook` pointer.
+ * Returns the installed editor render hook.
  */
-IEdRenderHook* GetEditorRenderHook()
+IEdRenderHook* ED_GetHook()
 {
   return ed_Hook;
 }
+
+/**
+ * Address: 0x007B6450 (FUN_007B6450)
+ *
+ * IDA signature:
+ * int sub_7B6450()
+ *
+ * What it does:
+ * Calls `ed_Hook->Render()` when a hook is installed.
+ */
+void ED_Render()
+{
+  if (ed_Hook != nullptr) {
+    ed_Hook->Render();
+  }
 }
+} // namespace moho

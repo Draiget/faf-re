@@ -113,7 +113,7 @@ namespace
     // Built before the globals lookup, as the binary does: the serializer takes
     // the stat tree's lock and can run script-visible allocation.
     LuaPlus::LuaObject engineStatsTable{};
-    moho::STAT_GetLuaTable(state, moho::GetEngineStats()->mItem, engineStatsTable);
+    moho::STAT_GetLuaTable(state, moho::GetEngineStats()->mItem.get(), engineStatsTable);
 
     LuaPlus::LuaObject globals = state->GetGlobals();
     globals.SetObject("__EngineStats", engineStatsTable);

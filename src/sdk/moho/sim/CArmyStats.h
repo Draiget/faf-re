@@ -151,7 +151,7 @@ namespace moho
   static_assert(offsetof(CArmyStatItem, mBlueprintStats) == 0xA0, "CArmyStatItem::mBlueprintStats offset must be 0xA0");
   static_assert(sizeof(CArmyStatItem) == 0xAC, "CArmyStatItem size must be 0xAC");
 
-  class CArmyStats : public Stats<CArmyStatItem>, public boost::noncopyable_::noncopyable
+  class CArmyStats : public Stats<CArmyStatItem>
   {
   public:
     static gpg::RType* sType;

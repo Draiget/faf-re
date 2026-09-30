@@ -38,7 +38,7 @@ namespace moho
   };
 
   template <>
-  class Stats<StatItem>
+  class Stats<StatItem> : boost::noncopyable
   {
   public:
     using item_type = StatItem;
@@ -82,14 +82,15 @@ namespace moho
 
     static gpg::RType* sType;
 
-  private:
-    Stats(const Stats&) = delete;
-    Stats& operator=(const Stats&) = delete;
 
   public:
-    StatItem* mItem;      // +0x04
-    boost::mutex* mLock;  // +0x08 (runtime-owned lock pointer, ABI cell)
-    std::uint8_t pad_000D[3];
+    // The root item, owned: the destructor 0x00406600 tears down `mLock` and then
+    // deletes it through this member, the reverse of their declaration order;
+    // loads swap a new root in before the old one is deleted (0x00419DE0).
+    boost::scoped_ptr<StatItem> mItem; // +0x04
+    // Built in place by the constructor (boost::mutex::mutex 0x00AC1A60 on
+    // `this+8`): the lock handle, then the critical-section flag at +0x0C.
+    boost::mutex mLock; // +0x08
   };
 
   static_assert(offsetof(Stats<StatItem>, mItem) == 0x04, "Stats<StatItem>::mItem offset must be 0x04");
@@ -946,7 +947,7 @@ namespace moho
   [[nodiscard]] CScrLuaInitForm* register_EndLoggingStats_LuaFuncDef();
 
   template <>
-  class Stats<CArmyStatItem>
+  class Stats<CArmyStatItem> : boost::noncopyable
   {
   public:
     using item_type = CArmyStatItem;
@@ -1001,13 +1002,15 @@ namespace moho
     [[nodiscard]] static CArmyStatItem*
     WalkTokenPath(CArmyStatItem* root, const msvc8::vector<msvc8::string>& tokens, bool allowCreate, bool* didCreate);
 
-    Stats(const Stats&) = delete;
-    Stats& operator=(const Stats&) = delete;
 
   public:
-    CArmyStatItem* mItem; // +0x04
-    boost::mutex* mLock;  // +0x08 (runtime-owned lock pointer, ABI cell)
-    std::uint8_t pad_000D[3];
+    // The root item, owned: the destructor 0x006FD850 tears down `mLock` and then
+    // deletes it through this member, the reverse of their declaration order;
+    // loads swap a new root in before the old one is deleted (0x00419DE0).
+    boost::scoped_ptr<CArmyStatItem> mItem; // +0x04
+    // Built in place by the constructor (boost::mutex::mutex 0x00AC1A60 on
+    // `this+8`): the lock handle, then the critical-section flag at +0x0C.
+    boost::mutex mLock; // +0x08
   };
 
   static_assert(offsetof(Stats<CArmyStatItem>, mItem) == 0x04, "Stats<CArmyStatItem>::mItem offset must be 0x04");

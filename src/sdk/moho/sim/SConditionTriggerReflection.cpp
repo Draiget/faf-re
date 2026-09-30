@@ -804,14 +804,12 @@ namespace
       return;
     }
 
-    boost::mutex::scoped_lock lock(*stats->mLock);
+    boost::mutex::scoped_lock lock(stats->mLock);
     moho::CArmyStatItem* loadedRoot = nullptr;
     const gpg::RRef owner{};
     archive->ReadPointerOwned(&loadedRoot, &owner);
 
-    moho::CArmyStatItem* const previousRoot = stats->mItem;
-    stats->mItem = loadedRoot;
-    delete previousRoot;
+    stats->mItem.reset(loadedRoot);
   }
 
   /**
@@ -829,8 +827,8 @@ namespace
     auto* const stats = reinterpret_cast<moho::Stats<moho::CArmyStatItem>*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
     );
-    boost::mutex::scoped_lock lock(*stats->mLock);
-    archive->WritePointer(stats->mItem, gpg::TrackedPointerState::Owned, gpg::RRef{});
+    boost::mutex::scoped_lock lock(stats->mLock);
+    archive->WritePointer(stats->mItem.get(), gpg::TrackedPointerState::Owned, gpg::RRef{});
   }
 
   /**

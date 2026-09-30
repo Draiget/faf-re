@@ -44,18 +44,6 @@
 
 using namespace moho;
 
-namespace moho
-{
-  class IEditorDispatchHook
-  {
-  public:
-    virtual ~IEditorDispatchHook() = default;
-    virtual int Dispatch() = 0;
-  };
-
-  IEditorDispatchHook* ed_Hook = nullptr;
-} // namespace moho
-
 namespace
 {
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
@@ -64,18 +52,6 @@ namespace
   constexpr const char* kGpgNetSendHelpText = "GpgNetSend(cmd,args...)";
 
   boost::shared_ptr<CGpgNetInterface> sGPGNet;
-
-  /**
-   * Address: 0x007B6450 (FUN_007B6450)
-   *
-   * What it does:
-   * Dispatches one optional editor hook lane when present and returns its
-   * integer result; returns `0` when no hook is installed.
-   */
-  [[maybe_unused]] int DispatchEditorHookIfPresent()
-  {
-    return moho::ed_Hook != nullptr ? moho::ed_Hook->Dispatch() : 0;
-  }
 
   /**
    * Address: 0x007BDB70 (FUN_007BDB70, register_WeakPtr_INetNATTraversalProvider_Type_00)
