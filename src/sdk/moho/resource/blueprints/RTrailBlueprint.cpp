@@ -3,6 +3,12 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "moho/resource/RResId.h"
+#include "moho/sim/RRuleGameRules.h"
 
 namespace moho
 {
@@ -87,3 +93,62 @@ namespace moho
     return this;
   }
 } // namespace moho
+
+namespace moho
+{
+  void RTrailBlueprint::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    RRuleGameRules* rules = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&rules, &owner);
+    msvc8::string id;
+    archive.ReadString(&id);
+    RResId resId{};
+    gpg::STR_CopyFilename(&resId.name, &id);
+    result.SetOwned(gpg::MakeRRef(rules->GetTrailBlueprint(resId)), 1u);
+  }
+
+  /**
+   * Address: 0x0050FFE0 (FUN_0050FFE0)
+   */
+  void RTrailBlueprint::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    archive.WritePointer(mOwnerRules, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    archive.WriteString(&BlueprintId.name);
+    result.SetOwned(1u);
+  }
+
+  /**
+   * `gpg::SerSaveConstructHelper<RTrailBlueprint>`, vtable 0x00E0EC3C.
+   *
+   * Address: 0x00BC8140 (FUN_00BC8140 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF2620 (FUN_00BF2620 -- the global's destructor.)
+   * Address: 0x00510680 (FUN_00510680 -- `Init`.)
+   * Address: 0x0050FF60 (FUN_0050FF60 -- `SaveConstructArgs`, a forward to `MemberSaveConstructArgs`.)
+   */
+  struct RTrailBlueprintSaveConstruct : gpg::SerSaveConstructHelper<RTrailBlueprint>
+  {};
+
+  /**
+   * `gpg::SerConstructHelper<RTrailBlueprint>`, vtable 0x00E0EC4C.
+   *
+   * Address: 0x00BC8170 (FUN_00BC8170 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF2650 (FUN_00BF2650 -- the global's destructor.)
+   * Address: 0x00510700 (FUN_00510700 -- `Init`.)
+   * Address: 0x005100C0 (FUN_005100C0 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x00511100 (FUN_00511100 -- `Delete`.)
+   */
+  struct RTrailBlueprintConstruct : gpg::SerConstructHelper<RTrailBlueprint>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AA63C -- process-global `RTrailBlueprintSaveConstruct` singleton.
+  moho::RTrailBlueprintSaveConstruct gRTrailBlueprintSaveConstruct;
+
+  // Address: 0x010AA64C -- process-global `RTrailBlueprintConstruct` singleton.
+  moho::RTrailBlueprintConstruct gRTrailBlueprintConstruct;
+} // namespace

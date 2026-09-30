@@ -24,6 +24,7 @@
 #include "moho/sim/STIMap.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 namespace
 {
@@ -34,8 +35,6 @@ namespace
   constexpr float kTwoPi = 6.2831855f;
   constexpr float kQuatUpdateThreshold = 0.0001f;
 
-  moho::MotorFallDownSerializer gMotorFallDownSerializer{};
-  moho::MotorFallDownConstruct gMotorFallDownConstruct{};
   std::int32_t gRecoveredCScrLuaMetatableFactoryMotorFallDownIndex = 0;
 
   /**
@@ -171,141 +170,6 @@ namespace
     ref.mObj = object;
     ref.mType = CachedMotorFallDownType();
     return ref;
-  }
-
-  /**
-   * Address: 0x00694FF0 (FUN_00694FF0, construct helper body)
-   * Address: 0x00695DA0 (FUN_00695DA0, construct helper thunk)
-   */
-  void ConstructMotorFallDownObject(gpg::SerConstructResult* const result)
-  {
-    moho::MotorFallDown* const object = new (std::nothrow) moho::MotorFallDown();
-    if (!result) {
-      return;
-    }
-
-    const gpg::RRef objectRef = MakeMotorFallDownRef(object);
-    result->SetUnowned(objectRef, 0u);
-  }
-
-  /**
-   * Address: 0x00695DB0 (FUN_00695DB0)
-   *
-   * What it does:
-   * Builds one temporary `RRef_MotorFallDown` and copies its `(mObj,mType)`
-   * pair into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_MotorFallDown(
-    gpg::RRef* const out,
-    moho::MotorFallDown* const value
-  )
-  {
-    const gpg::RRef ref = MakeMotorFallDownRef(value);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00694FE0 (FUN_00694FE0, construct callback thunk)
-   */
-  void ConstructMotorFallDownCallback(
-    gpg::ReadArchive*, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    ConstructMotorFallDownObject(result);
-  }
-
-  /**
-   * Address: 0x00695D80 (FUN_00695D80, delete callback thunk)
-   */
-  void DeleteConstructedMotorFallDown(void* const objectPtr)
-  {
-    delete static_cast<moho::MotorFallDown*>(objectPtr);
-  }
-
-  /**
-   * Address: 0x00696110 (FUN_00696110, serializer load body)
-   */
-  void DeserializeMotorFallDownBody(moho::MotorFallDown* const object, gpg::ReadArchive* const archive)
-  {
-    if (!object || !archive) {
-      return;
-    }
-
-    const gpg::RRef nullOwner{};
-    archive->Read(CachedMotorType(), static_cast<moho::Motor*>(object), nullOwner);
-    archive->Read(CachedCScriptObjectType(), static_cast<moho::CScriptObject*>(object), nullOwner);
-    archive->ReadFloat(&object->mFallDirectionRadians);
-    archive->ReadFloat(&object->mFallAngleRadians);
-    archive->ReadFloat(&object->mFallDepth);
-    archive->ReadBool(&object->mBreakOnWhack);
-  }
-
-  /**
-   * Address: 0x006961D0 (FUN_006961D0, serializer save body)
-   */
-  void SerializeMotorFallDownBody(const moho::MotorFallDown* const object, gpg::WriteArchive* const archive)
-  {
-    if (!object || !archive) {
-      return;
-    }
-
-    const gpg::RRef nullOwner{};
-    archive->Write(CachedMotorType(), static_cast<const moho::Motor*>(object), nullOwner);
-    archive->Write(CachedCScriptObjectType(), static_cast<const moho::CScriptObject*>(object), nullOwner);
-    archive->WriteFloat(object->mFallDirectionRadians);
-    archive->WriteFloat(object->mFallAngleRadians);
-    archive->WriteFloat(object->mFallDepth);
-    archive->WriteBool(object->mBreakOnWhack);
-  }
-
-  /**
-   * Address: 0x00695DE0 (FUN_00695DE0, serializer load thunk alias)
-   *
-   * What it does:
-   * Tail-forwards the MotorFallDown deserialize thunk alias to the recovered
-   * serializer load body.
-   */
-  void DeserializeMotorFallDownThunkVariantA(moho::MotorFallDown* const object, gpg::ReadArchive* const archive)
-  {
-    DeserializeMotorFallDownBody(object, archive);
-  }
-
-  /**
-   * Address: 0x00695DF0 (FUN_00695DF0, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards the MotorFallDown serialize thunk alias to the recovered
-   * serializer save body.
-   */
-  void SerializeMotorFallDownThunkVariantA(const moho::MotorFallDown* const object, gpg::WriteArchive* const archive)
-  {
-    SerializeMotorFallDownBody(object, archive);
-  }
-
-  /**
-   * Address: 0x006960B0 (FUN_006960B0, serializer load thunk alias)
-   *
-   * What it does:
-   * Tail-forwards the second MotorFallDown deserialize thunk alias to the
-   * recovered serializer load body.
-   */
-  void DeserializeMotorFallDownThunkVariantB(moho::MotorFallDown* const object, gpg::ReadArchive* const archive)
-  {
-    DeserializeMotorFallDownBody(object, archive);
-  }
-
-  /**
-   * Address: 0x006960C0 (FUN_006960C0, serializer save thunk alias)
-   *
-   * What it does:
-   * Tail-forwards the second MotorFallDown serialize thunk alias to the
-   * recovered serializer save body.
-   */
-  void SerializeMotorFallDownThunkVariantB(const moho::MotorFallDown* const object, gpg::WriteArchive* const archive)
-  {
-    SerializeMotorFallDownBody(object, archive);
   }
 
   /**
@@ -578,72 +442,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00695080 (FUN_00695080, serializer load thunk)
-   */
-  void MotorFallDownSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    DeserializeMotorFallDownBody(reinterpret_cast<MotorFallDown*>(objectPtr), archive);
-  }
-
-  /**
-   * Address: 0x00695090 (FUN_00695090, serializer save thunk)
-   */
-  void MotorFallDownSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    SerializeMotorFallDownBody(reinterpret_cast<const MotorFallDown*>(objectPtr), archive);
-  }
-
-  /**
-   * Address: 0x00BD5C40 (FUN_00BD5C40, dynamic initializer for the global
-   * `MotorFallDownSerializer` singleton)
-   */
-  MotorFallDownSerializer::MotorFallDownSerializer()
-    : mDeserialize(&MotorFallDownSerializer::Deserialize)
-    , mSerialize(&MotorFallDownSerializer::Serialize)
-  {}
-
-  MotorFallDownSerializer::~MotorFallDownSerializer() = default;
-
-  /**
-   * Address: 0x00695AC0 (FUN_00695AC0, MotorFallDownSerializer::Init)
-   */
-  void MotorFallDownSerializer::Init()
-  {
-    gpg::RType* const type = CachedMotorFallDownType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BD5C00 (FUN_00BD5C00, dynamic initializer for the global
-   * `MotorFallDownConstruct` singleton)
-   */
-  MotorFallDownConstruct::MotorFallDownConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructMotorFallDownCallback))
-    , mDeleteCallback(&DeleteConstructedMotorFallDown)
-  {}
-
-  /**
-   * Address: 0x00BFD190 (FUN_00BFD190, atexit target registered by the real
-   * ctor above)
-   */
-  MotorFallDownConstruct::~MotorFallDownConstruct() = default;
-
-  /**
-   * Address: 0x00695A40 (FUN_00695A40, MotorFallDownConstruct::Init)
-   */
-  void MotorFallDownConstruct::Init()
-  {
-    gpg::RType* const type = CachedMotorFallDownType();
-    GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mConstructCallback);
-    GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == mDeleteCallback);
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
-
-  /**
    * Address: 0x00BD5BE0 (FUN_00BD5BE0, register_MotorFallDownTypeInfo)
    * Address: 0x00BFD130 (FUN_00BFD130, atexit destructor of the MotorFallDownTypeInfo object)
    */
@@ -835,4 +633,81 @@ namespace
   };
 
   const MotorFallDownLuaFuncDefBootstrap gMotorFallDownLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00696110 (FUN_00696110)
+   */
+  void MotorFallDown::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef owner{};
+    archive->Read(CachedMotorType(), static_cast<Motor*>(this), owner);
+    archive->Read(CachedCScriptObjectType(), static_cast<CScriptObject*>(this), owner);
+    archive->ReadFloat(&mFallDirectionRadians);
+    archive->ReadFloat(&mFallAngleRadians);
+    archive->ReadFloat(&mFallDepth);
+    archive->ReadBool(&mBreakOnWhack);
+  }
+
+  /**
+   * Address: 0x006961D0 (FUN_006961D0)
+   */
+  void MotorFallDown::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const gpg::RRef owner{};
+    archive->Write(CachedMotorType(), static_cast<const Motor*>(this), owner);
+    archive->Write(CachedCScriptObjectType(), static_cast<const CScriptObject*>(this), owner);
+    archive->WriteFloat(mFallDirectionRadians);
+    archive->WriteFloat(mFallAngleRadians);
+    archive->WriteFloat(mFallDepth);
+    archive->WriteBool(mBreakOnWhack);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * Address: 0x00694FF0 (FUN_00694FF0)
+   */
+  void MotorFallDown::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new MotorFallDown()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<MotorFallDown>`, vtable 0x00E291E4.
+   *
+   * Address: 0x00BD5C00 (FUN_00BD5C00 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFD190 (FUN_00BFD190 -- the global's destructor.)
+   * Address: 0x00694F50 (FUN_00694F50 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00695A40 (FUN_00695A40 -- `Init`.)
+   * Address: 0x00694FE0 (FUN_00694FE0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x00695D80 (FUN_00695D80 -- `Delete`.)
+   */
+  struct MotorFallDownConstruct : gpg::SerConstructHelper<MotorFallDown>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<MotorFallDown>`, vtable 0x00E291F4.
+   *
+   * Address: 0x00BD5C40 (FUN_00BD5C40 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFD1C0 (FUN_00BFD1C0 -- the global's destructor.)
+   * Address: 0x006950B0 (FUN_006950B0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00695AC0 (FUN_00695AC0 -- `Init`.)
+   * Address: 0x00695080 (FUN_00695080 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00695090 (FUN_00695090 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct MotorFallDownSerializer : gpg::SerSaveLoadHelper<MotorFallDown>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B5080 -- process-global `MotorFallDownConstruct` singleton.
+  moho::MotorFallDownConstruct gMotorFallDownConstruct;
+
+  // Address: 0x010B50A8 -- process-global `MotorFallDownSerializer` singleton.
+  moho::MotorFallDownSerializer gMotorFallDownSerializer;
 } // namespace

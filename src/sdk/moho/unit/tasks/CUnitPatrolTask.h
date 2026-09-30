@@ -17,6 +17,13 @@ namespace gpg
   class RType;
 }
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+} // namespace gpg
+
 namespace moho
 {
   class CCommandTask;
@@ -176,6 +183,17 @@ namespace moho
     void OnEvent(EFormationdStatus event) override;
 
     /**
+     * Address: 0x0061AD10 (FUN_0061AD10)
+     *
+     * What it does:
+     * Builds a new `CUnitPatrolTask` for an archive load and hands it back unowned; its
+     * members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
      * Address: 0x0061CF50 (FUN_0061CF50, Moho::CUnitPatrolTask::MemberDeserialize)
      *
      * IDA signature:
@@ -202,7 +220,7 @@ namespace moho
      * for the tracked pointer lanes, and the virtual `WriteBool`/`WriteInt`
      * archive slots for the scalar lanes.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   private:
     /**
@@ -310,23 +328,3 @@ namespace moho
   static_assert(offsetof(CUnitPatrolTask, mMembership) == 0xC8, "CUnitPatrolTask::mMembership offset must be 0xC8");
 } // namespace moho
 
-namespace gpg
-{
-  /**
-   * Address: 0x0061CCA0 (FUN_0061CCA0, gpg::RRef_CUnitPatrolTask)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CUnitPatrolTask*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitPatrolTask(gpg::RRef* outRef, moho::CUnitPatrolTask* value);
-
-  /**
-   * Address: 0x0061CBF0 (FUN_0061CBF0)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary `RRef_CUnitPatrolTask` and
-   * copies object/type fields into the destination reference record.
-   */
-  gpg::RRef* AssignCUnitPatrolTaskRef(gpg::RRef* outRef, moho::CUnitPatrolTask* value);
-} // namespace gpg

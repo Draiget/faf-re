@@ -78,17 +78,6 @@ namespace
   // Same registration/dispatch mechanism as gSEconValueSerializer above.
   moho::SEconTotalsSerializer gSEconTotalsSerializer;
 
-  // Address: 0x010BB7E0 -- process-global `CEconomySerializer` singleton.
-  // Unlike the two globals above, its real ctor (0x007730A0) registers no
-  // atexit cleanup, so this class declares no destructor.
-  moho::CEconomySerializer gCEconomySerializer;
-
-  // Address: 0x010BB894 -- process-global `CEconomyConstruct` singleton.
-  // Unlike gCEconomySerializer above, this real ctor (FUN_00BDD0D0) DOES
-  // register an atexit cleanup (FUN_00C02250) -- see CEconomyConstruct's
-  // own Doxygen block for the dead-duplicate-ctor evidence.
-  moho::CEconomyConstruct gCEconomyConstruct;
-
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeTypedRef(TObject* const object, gpg::RType* const staticType) noexcept
   {
@@ -381,6 +370,23 @@ namespace moho
    * Initializes one army economy state, creates its max-storage lane, and
    * seeds stored energy/mass from the initial economy convars.
    */
+  CEconomy::CEconomy()
+    : mSim(nullptr)
+    , mIndex(-1)
+    , mResources{}
+    , mPendingResources{}
+    , mTotals{}
+    , mResourceSharing(1u)
+  {}
+
+  /**
+   * Address: 0x00772FC0 (FUN_00772FC0)
+   */
+  void CEconomy::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CEconomy()), 0u);
+  }
+
   CEconomy::CEconomy(Sim* const sim, const std::int32_t armyIndex)
   {
     mSim = sim;
@@ -388,77 +394,16 @@ namespace moho
     mResources = {};
     mPendingResources = {};
     mTotals = {};
-    mExtraStorage = nullptr;
     mResourceSharing = 1u;
-    mConsumptionData.mPrev = &mConsumptionData;
-    mConsumptionData.mNext = &mConsumptionData;
 
     const SEconValue zeroStorage{};
-    mExtraStorage = new CEconStorage(zeroStorage, this);
+    mExtraStorage.reset(new CEconStorage(zeroStorage, this));
 
     const SEconValue initialMaxStorage{ai_InitialEnergyCurrencyMax, ai_InitialMassCurrencyMax};
-    (void)mExtraStorage->ChangeAmt(initialMaxStorage);
+    mExtraStorage->ChangeAmt(initialMaxStorage);
 
     mTotals.mStored.ENERGY = ai_InitialEnergyCurrency;
     mTotals.mStored.MASS = ai_InitialMassCurrency;
-  }
-
-  /**
-   * Address: 0x00772FC0 (FUN_00772FC0)
-   *
-   * What it does:
-   * Allocates one `CEconomy` object, initializes constructor-default lanes,
-   * then returns it through `SerConstructResult` as an unowned reflected ref.
-   */
-  void ConstructCEconomyForSerializer(gpg::SerConstructResult* const result)
-  {
-    CEconomy* economy = static_cast<CEconomy*>(::operator new(sizeof(CEconomy), std::nothrow));
-    if (economy != nullptr) {
-      economy->mSim = nullptr;
-      economy->mIndex = -1;
-      economy->mResources = {};
-      economy->mPendingResources = {};
-      economy->mTotals = {};
-      economy->mExtraStorage = nullptr;
-      economy->mResourceSharing = 1u;
-      economy->mPad55To57[0] = 0u;
-      economy->mPad55To57[1] = 0u;
-      economy->mPad55To57[2] = 0u;
-      economy->mConsumptionData.mPrev = &economy->mConsumptionData;
-      economy->mConsumptionData.mNext = &economy->mConsumptionData;
-    }
-
-    if (result != nullptr) {
-      result->SetUnowned(MakeTypedRef(economy, CachedCEconomyType()), 0u);
-    }
-  }
-
-  /**
-   * Address: 0x00772FB0 (FUN_00772FB0)
-   *
-   * What it does:
-   * Serializer construct-callback thunk that forwards to
-   * `ConstructCEconomyForSerializer`.
-   */
-  void ConstructCEconomySerializerThunk(
-    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    ConstructCEconomyForSerializer(result);
-  }
-
-  /**
-   * Address: 0x007742A0 (FUN_007742A0)
-   *
-   * What it does:
-   * Serializer delete-callback thunk that clears one `CEconomy` object when
-   * the pointer lane is non-null.
-   */
-  void ClearCEconomyIfPresent(CEconomy* const economy)
-  {
-    if (economy != nullptr) {
-      (void)economy->Clear();
-    }
   }
 
   namespace
@@ -825,31 +770,6 @@ namespace moho
     economy.mPendingResources = SEconValue{0.0f, 0.0f};
   }
 
-  /**
-   * Address: 0x007048F0 (FUN_007048F0, Moho::CEconomy::Clear)
-   *
-   * What it does:
-   * Unlinks the consumption-request sentinel node, releases extra-storage
-   * ownership (with max-storage rollback), then frees this economy object.
-   */
-  CEconomy* CEconomy::Clear()
-  {
-    mConsumptionData.mNext->mPrev = mConsumptionData.mPrev;
-    mConsumptionData.mPrev->mNext = mConsumptionData.mNext;
-    mConsumptionData.mPrev = &mConsumptionData;
-    mConsumptionData.mNext = &mConsumptionData;
-
-    CEconStorage* const extraStorage = mExtraStorage;
-    if (extraStorage != nullptr) {
-      if (extraStorage->mEconomy != nullptr) {
-        (void)extraStorage->Chng(-1);
-      }
-      ::operator delete(extraStorage);
-    }
-
-    ::operator delete(this);
-    return this;
-  }
 
   /**
    * Address: 0x007731B0 (FUN_007731B0, Moho::CEconomy::SerializeRequests)
@@ -858,7 +778,7 @@ namespace moho
    * Writes economy-request intrusive-list pointers in reverse link order and
    * appends one null pointer terminator.
    */
-void CEconomy::SerializeRequests(gpg::WriteArchive* const archive)
+void CEconomy::SerializeRequests(gpg::WriteArchive* const archive) const
 {
   if (archive == nullptr) {
     return;
@@ -922,14 +842,7 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
     CEconStorage* loadedExtraStorage = nullptr;
     (void)archive->ReadPointerOwned(&loadedExtraStorage, &nullOwner);
 
-    CEconStorage* const previousExtraStorage = mExtraStorage;
-    mExtraStorage = loadedExtraStorage;
-    if (previousExtraStorage != nullptr) {
-      if (previousExtraStorage->mEconomy != nullptr) {
-        (void)previousExtraStorage->Chng(-1);
-      }
-      ::operator delete(previousExtraStorage);
-    }
+    mExtraStorage.reset(loadedExtraStorage);
 
     bool sharingEnabled = (mResourceSharing != 0u);
     archive->ReadBool(&sharingEnabled);
@@ -938,12 +851,6 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
     DeserializeRequests(archive);
   }
 
-  // Addresses 0x007742F0/0x00774510 (the "ThunkA"/"ThunkB" jump-thunk
-  // duplicates formerly modeled here) are dead: zero data_refs and zero
-  // call_edges in the callgraph index for both, and no source-level caller
-  // anywhere in src/sdk/**. `CEconomySerializer::Deserialize` below already
-  // calls `CEconomy::MemberDeserialize` directly.
-
   /**
    * Address: 0x00774860 (FUN_00774860, Moho::CEconomy::MemberSerialize)
    *
@@ -951,7 +858,7 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
    * Serializes Sim owner, index/value lanes, totals, storage pointer ownership,
    * sharing flag, then emits the intrusive CEconRequest chain terminator.
    */
-  void CEconomy::MemberSerialize(gpg::WriteArchive* const archive)
+  void CEconomy::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     if (archive == nullptr) {
       return;
@@ -973,129 +880,13 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
 
     gpg::WriteRawPointer(
       archive,
-      MakeTypedRef(mExtraStorage, CachedCEconStorageType()),
+      gpg::MakeRRef(mExtraStorage.get()),
       gpg::TrackedPointerState::Owned,
       nullOwner
     );
 
     archive->WriteBool(mResourceSharing != 0u);
     SerializeRequests(archive);
-  }
-
-  /**
-   * Address: 0x007730A0 (FUN_007730A0, dynamic initializer for the global
-   * `CEconomySerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields. No atexit cleanup is registered (confirmed
-   * from raw disassembly: the ctor tail is `mov eax, offset Global; retn`,
-   * with no `push Func; call _atexit` sequence), so this class declares no
-   * destructor -- a user-declared one would make the compiler emit an
-   * implicit registration that the real binary does not have.
-   */
-  CEconomySerializer::CEconomySerializer()
-    : mLoadCallback(&CEconomySerializer::Deserialize)
-    , mSaveCallback(&CEconomySerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00773080 (FUN_00773080, Moho::CEconomySerializer::Deserialize)
-   *
-   * What it does:
-   * Forwards the reflected object pointer to `CEconomy::MemberDeserialize`.
-   */
-  void CEconomySerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const economy = reinterpret_cast<CEconomy*>(objectPtr);
-    if (economy != nullptr) {
-      economy->MemberDeserialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00773090 (FUN_00773090, Moho::CEconomySerializer::Serialize)
-   *
-   * What it does:
-   * Forwards the reflected object pointer to `CEconomy::MemberSerialize`.
-   */
-  void CEconomySerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const economy = reinterpret_cast<CEconomy*>(objectPtr);
-    if (economy != nullptr) {
-      economy->MemberSerialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00773D00 (FUN_00773D00, gpg::SerSaveLoadHelper_CEconomy::Init)
-   *
-   * What it does:
-   * Lazily resolves `CEconomy` RTTI (via `CEconomy::sType`) and installs
-   * load/save callbacks from this helper object into the type descriptor.
-   */
-  void CEconomySerializer::Init()
-  {
-    gpg::RType* const type = CachedCEconomyType();
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kLoadAssertText, kSerializationLoadLine, kSerializationSourcePath);
-    }
-    const bool saveAlreadySet = type->serSaveFunc_ != nullptr;
-    type->serLoadFunc_ = mLoadCallback;
-    if (saveAlreadySet) {
-      gpg::HandleAssertFailure(kSaveAssertText, kSerializationSaveLine, kSerializationSourcePath);
-    }
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  /**
-   * Address: 0x00BDD0D0 (FUN_00BDD0D0, dynamic initializer for the global
-   * `CEconomyConstruct` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * construct/delete callback fields, then registers `atexit(FUN_00C02250)`.
-   * Unlike `CEconomySerializer`, this real ctor DOES register an atexit
-   * cleanup -- see the destructor below and the class-level Doxygen block
-   * in CEconomy.h for the dead-duplicate evidence (`FUN_00772F20`) that
-   * previously led this citation astray.
-   */
-  CEconomyConstruct::CEconomyConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCEconomySerializerThunk))
-    , mDeleteCallback(reinterpret_cast<gpg::RType::delete_func_t>(&ClearCEconomyIfPresent))
-  {}
-
-  /**
-   * Address: 0x00C02250 (FUN_00C02250, atexit target registered by the real
-   * ctor above)
-   */
-  CEconomyConstruct::~CEconomyConstruct() = default;
-
-  /**
-   * Address: 0x00773C80 (FUN_00773C80, Moho::CEconomyConstruct::Init)
-   *
-   * What it does:
-   * Resolves `CEconomy` RTTI and installs startup construct/delete callbacks
-   * from this helper's own fields.
-   */
-  void CEconomyConstruct::Init()
-  {
-    gpg::RType* const type = CachedCEconomyType();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
-    }
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
   }
 
   /**
@@ -1162,3 +953,41 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_SEconValueTypeInfo_e739f5, moho::preregister_SEconValueTypeInfo)
 GPG_PREREGISTER_INIT(preregister_SEconTotalsTypeInfo_e739f5, moho::preregister_SEconTotalsTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<CEconomy>`, vtable 0x00E36DA0.
+   *
+   * Address: 0x00BDD0D0 (FUN_00BDD0D0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C02250 (FUN_00C02250 -- the global's destructor.)
+   * Address: 0x00772F20 (FUN_00772F20 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00773C80 (FUN_00773C80 -- `Init`.)
+   * Address: 0x00772FB0 (FUN_00772FB0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x007742A0 (FUN_007742A0 -- `Delete`.)
+   */
+  struct CEconomyConstruct : gpg::SerConstructHelper<CEconomy>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<CEconomy>`, vtable 0x00E36DB0.
+   *
+   * Address: 0x00BDD110 (FUN_00BDD110 -- constructs the global and registers its destructor.)
+   * Address: 0x00C02280 (FUN_00C02280 -- the global's destructor.)
+   * Address: 0x007730A0 (FUN_007730A0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00773D00 (FUN_00773D00 -- `Init`.)
+   * Address: 0x00773080 (FUN_00773080 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00773090 (FUN_00773090 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CEconomySerializer : gpg::SerSaveLoadHelper<CEconomy>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BB894 -- process-global `CEconomyConstruct` singleton.
+  moho::CEconomyConstruct gCEconomyConstruct;
+
+  // Address: 0x010BB7E0 -- process-global `CEconomySerializer` singleton.
+  moho::CEconomySerializer gCEconomySerializer;
+} // namespace

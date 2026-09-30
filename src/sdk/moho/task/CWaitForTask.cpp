@@ -12,12 +12,12 @@
 #include "moho/misc/Stats.h"
 #include "moho/script/CScriptEvent.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 using namespace moho;
 
 namespace
 {
-  moho::CWaitForTaskConstruct gCWaitForTaskConstruct{};
   moho::CWaitForTaskSerializer gCWaitForTaskSerializer{};
 
   /**
@@ -33,42 +33,6 @@ namespace
     static moho::CWaitForTaskTypeInfo sInstance;
     gpg::PreRegisterRType(typeid(CWaitForTask), &sInstance);
     return &sInstance;
-  }
-
-  /**
-   * Address: 0x004CBA10 (FUN_004CBA10, CWaitForTask reflected ref store helper)
-   *
-   * What it does:
-   * Writes one `gpg::RRef` lane for a CWaitForTask pointer into
-   * caller-provided output storage.
-   */
-  [[maybe_unused]] gpg::RRef* StoreCWaitForTaskRef(gpg::RRef* const outRef, CWaitForTask* const task)
-  {
-    *outRef = gpg::MakeRRef<moho::CWaitForTask>(task);
-    return outRef;
-  }
-
-  /**
-   * Address: 0x004CA750 (FUN_004CA750, allocate + default-construct + SetUnowned body)
-   *
-   * What it does:
-   * Allocates raw `CWaitForTask` storage, default-constructs it via
-   * `CWaitForTask::CWaitForTask()`, builds an unowned reflected reference
-   * for the new object, and reports it through the serializer construct
-   * result. This is the real callback body -- it allocates its own storage
-   * rather than using any caller-provided `objectStorage`.
-   */
-  void ConstructCWaitForTaskForSerializer(gpg::SerConstructResult* const result)
-  {
-    void* const storage = ::operator new(sizeof(moho::CWaitForTask), std::nothrow);
-    moho::CWaitForTask* task = nullptr;
-    if (storage) {
-      task = ::new (storage) moho::CWaitForTask();
-    }
-
-    gpg::RRef taskRef{};
-    taskRef = gpg::MakeRRef<moho::CWaitForTask>(task);
-    result->SetUnowned(taskRef, 0u);
   }
 
   gpg::RType* CachedCWaitForTaskType()
@@ -206,72 +170,6 @@ void CWaitForTask::MemberSerialize(gpg::WriteArchive* const archive)
 }
 
 /**
- * Address: 0x00BC62A0 (FUN_00BC62A0, dynamic initializer for the global
- * `CWaitForTaskConstruct` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the
- * construct/delete callback fields.
- */
-CWaitForTaskConstruct::CWaitForTaskConstruct()
-  : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&CWaitForTaskConstruct::Construct))
-  , mDeleteFunc(&CWaitForTaskConstruct::Deconstruct)
-{}
-
-/**
- * Address: 0x00BF0C10 (FUN_00BF0C10, Moho::CWaitForTaskConstruct::~CWaitForTaskConstruct)
- *
- * What it does:
- * Plain (unmangled) implicit-dtor-style unlink body -- functionally
- * identical to `ResetLinks()`. Two zero-incoming-xref duplicate emissions
- * of this same unlink shape also exist (0x004CA6E0, 0x004CA710); neither is
- * reachable from anywhere in the binary.
- */
-CWaitForTaskConstruct::~CWaitForTaskConstruct() = default;
-
-/**
- * Address: 0x004CA740 (FUN_004CA740, Moho::CWaitForTaskConstruct::Construct)
- *
- * What it does:
- * Thin reflection-dispatcher thunk: ignores the archive/objectStorage/
- * version parameters and forwards only `result` to the allocate +
- * default-construct + `SetUnowned` body.
- */
-void CWaitForTaskConstruct::Construct(
-  gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-)
-{
-  ConstructCWaitForTaskForSerializer(result);
-}
-
-/**
- * Address: 0x004CB9E0 (FUN_004CB9E0, CWaitForTask construct delete callback)
- *
- * What it does:
- * Deletes one construct-path CWaitForTask object through its virtual
- * deleting destructor.
- */
-void CWaitForTaskConstruct::Deconstruct(void* const object)
-{
-  auto* const task = static_cast<CWaitForTask*>(object);
-  if (!task) {
-    return;
-  }
-  delete task;
-}
-
-/**
- * Address: 0x004CB1B0 (FUN_004CB1B0, sub_4CB1B0)
- */
-void CWaitForTaskConstruct::Init()
-{
-  gpg::RType* const type = CachedCWaitForTaskType();
-  GPG_ASSERT(type->serConstructFunc_ == nullptr);
-  type->serConstructFunc_ = mSerConstructFunc;
-  type->deleteFunc_ = mDeleteFunc;
-}
-
-/**
  * Address: 0x00BC62E0 (FUN_00BC62E0, dynamic initializer for the global
  * `CWaitForTaskSerializer` singleton)
  *
@@ -373,3 +271,32 @@ void CWaitForTaskTypeInfo::Init()
 GPG_PREREGISTER_INIT(register_CWaitForTaskTypeInfo_30426d, moho::register_CWaitForTaskTypeInfo)
 
 GPG_PREREGISTER_INIT(PreRegisterCWaitForTaskTypeInfo_30426d, PreRegisterCWaitForTaskTypeInfo)
+
+namespace moho
+{
+  /**
+   * Address: 0x004CA750 (FUN_004CA750)
+   */
+  void CWaitForTask::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CWaitForTask()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CWaitForTask>`, vtable 0x00E09A14.
+   *
+   * Address: 0x00BC62A0 (FUN_00BC62A0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF0C10 (FUN_00BF0C10 -- the global's destructor.)
+   * Address: 0x004CB1B0 (FUN_004CB1B0 -- `Init`.)
+   * Address: 0x004CA740 (FUN_004CA740 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x004CB9E0 (FUN_004CB9E0 -- `Delete`.)
+   */
+  struct CWaitForTaskConstruct : gpg::SerConstructHelper<CWaitForTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A8D2C -- process-global `CWaitForTaskConstruct` singleton.
+  moho::CWaitForTaskConstruct gCWaitForTaskConstruct;
+} // namespace

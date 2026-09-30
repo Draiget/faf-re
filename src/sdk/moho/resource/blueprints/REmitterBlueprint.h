@@ -13,6 +13,15 @@ namespace gpg
   class RType;
 } // namespace gpg
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   /**
@@ -126,6 +135,27 @@ namespace moho
    */
   struct REmitterBlueprint : public REffectBlueprint
   {
+    /**
+     * What it does:
+     * Reads the owning rules and the blueprint id and hands back the rules'
+     * own `REmitterBlueprint` (owned by the rules, so the archive may not delete it).
+     * Inlined into `SerConstructHelper<REmitterBlueprint>::Construct` 0x0050FE40.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x0050FD60 (FUN_0050FD60)
+     *
+     * What it does:
+     * Saves the owning rules (unowned) and the blueprint id for
+     * `MemberConstruct` to look the blueprint up by.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     REmitterBlueprintCurve SizeCurve;             // +0x28
     REmitterBlueprintCurve XDirectionCurve;       // +0x40
     REmitterBlueprintCurve YDirectionCurve;       // +0x58

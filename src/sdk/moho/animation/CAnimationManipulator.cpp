@@ -339,9 +339,6 @@ namespace
 
   using TypeInfo = moho::CAnimationManipulatorTypeInfo;
 
-  // Address: 0x010B2930 -- process-global `CAnimationManipulatorConstruct` singleton.
-  moho::CAnimationManipulatorConstruct gCAnimationManipulatorConstruct;
-
   // Address: 0x010B291C -- process-global `CAnimationManipulatorSerializer` singleton.
   moho::CAnimationManipulatorSerializer gCAnimationManipulatorSerializer;
   gpg::RType* gWeakPtrUnitType = nullptr;
@@ -1768,71 +1765,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0063F230 (FUN_0063F230, Moho::CAnimationManipulator::MemberConstruct)
-   *
-   * What it does:
-   * Allocates one `CAnimationManipulator`, builds one typed `RRef` for that
-   * object, and stores it as unowned in the construct-result lane.
-   */
-  void CAnimationManipulatorMemberConstruct(gpg::SerConstructResult* const result)
-  {
-    auto* const object = new CAnimationManipulator();
-    const gpg::RRef objectRef = MakeTypedRef(object, CachedCAnimationManipulatorType());
-    result->SetUnowned(objectRef, 0u);
-  }
-
-  /**
-   * Address: 0x0063F220 (FUN_0063F220, Moho::CAnimationManipulatorConstruct::Construct)
-   */
-  void CAnimationManipulatorConstruct::Construct(
-    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    if (result == nullptr) {
-      return;
-    }
-
-    CAnimationManipulatorMemberConstruct(result);
-  }
-
-  /**
-   * Address: 0x00642340 (FUN_00642340, Moho::CAnimationManipulatorConstruct::Deconstruct)
-   */
-  void CAnimationManipulatorConstruct::Deconstruct(void* const objectPtr)
-  {
-    auto* const object = static_cast<CAnimationManipulator*>(objectPtr);
-    if (object != nullptr) {
-      delete object;
-    }
-  }
-
-  /**
-   * Address: 0x00BD2DB0 (FUN_00BD2DB0, register_CAnimationManipulatorConstruct,
-   * dynamic initializer for the global `CAnimationManipulatorConstruct`
-   * singleton)
-   */
-  CAnimationManipulatorConstruct::CAnimationManipulatorConstruct()
-    : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&CAnimationManipulatorConstruct::Construct))
-    , mDeleteFunc(&CAnimationManipulatorConstruct::Deconstruct)
-  {}
-
-  /**
-   * Address: 0x00BFAFF0 (FUN_00BFAFF0, Moho::CAnimationManipulatorConstruct::~CAnimationManipulatorConstruct)
-   */
-  CAnimationManipulatorConstruct::~CAnimationManipulatorConstruct() = default;
-
-  /**
-   * Address: 0x00641E70 (FUN_00641E70, Moho::CAnimationManipulatorConstruct::Init)
-   */
-  void CAnimationManipulatorConstruct::Init()
-  {
-    gpg::RType* const type = CachedCAnimationManipulatorType();
-    GPG_ASSERT(type->serConstructFunc_ == nullptr);
-    type->serConstructFunc_ = mSerConstructFunc;
-    type->deleteFunc_ = mDeleteFunc;
-  }
-
-  /**
    * Address: 0x0063F2C0 (FUN_0063F2C0, Moho::CAnimationManipulatorSerializer::Deserialize)
    */
   void CAnimationManipulatorSerializer::Deserialize(
@@ -1981,4 +1913,33 @@ namespace
   };
 
   const CAnimationManipulatorLuaFuncDefBootstrap gCAnimationManipulatorLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x0063F230 (FUN_0063F230)
+   */
+  void CAnimationManipulator::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CAnimationManipulator()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CAnimationManipulator>`, vtable 0x00E2255C.
+   *
+   * Address: 0x00BD2DB0 (FUN_00BD2DB0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFAFF0 (FUN_00BFAFF0 -- the global's destructor.)
+   * Address: 0x00641E70 (FUN_00641E70 -- `Init`.)
+   * Address: 0x0063F220 (FUN_0063F220 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x00642340 (FUN_00642340 -- `Delete`.)
+   */
+  struct CAnimationManipulatorConstruct : gpg::SerConstructHelper<CAnimationManipulator>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B2930 -- process-global `CAnimationManipulatorConstruct` singleton.
+  moho::CAnimationManipulatorConstruct gCAnimationManipulatorConstruct;
 } // namespace

@@ -18,6 +18,13 @@ namespace gpg
   struct SerHelperBase;
 } // namespace gpg
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+} // namespace gpg
+
 namespace moho
 {
   class StatItem;
@@ -71,6 +78,34 @@ namespace moho
     float mFallAngleRadians;     // +0x3C
     float mFallDepth;            // +0x40 (angular velocity lane)
     bool mBreakOnWhack;          // +0x44
+
+    /**
+     * Address: 0x00694FF0 (FUN_00694FF0)
+     *
+     * What it does:
+     * Builds a new `MotorFallDown` for an archive load and hands it back unowned; its
+     * members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x00696110 (FUN_00696110)
+     *
+     * What it does:
+     * Loads the `Motor` and `CScriptObject` bases, then the fall direction,
+     * angle and depth and the break-on-whack flag.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x006961D0 (FUN_006961D0)
+     *
+     * What it does:
+     * Saves what `MemberDeserialize` loads.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   static_assert(
@@ -140,106 +175,6 @@ namespace moho
   };
 
   static_assert(sizeof(MotorFallDownTypeInfo) == 0x64, "MotorFallDownTypeInfo size must be 0x64");
-
-  class MotorFallDownSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD5C40 (FUN_00BD5C40, dynamic initializer for the global
-     * `MotorFallDownSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields. Plain unlink atexit target, modeled as the
-     * compiler's implicit static-destructor registration.
-     */
-    MotorFallDownSerializer();
-
-    /**
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~MotorFallDownSerializer();
-
-    /**
-     * Address: 0x00695080 (FUN_00695080, serializer load thunk)
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00695090 (FUN_00695090, serializer save thunk)
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00695AC0 (FUN_00695AC0, MotorFallDownSerializer::Init)
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mDeserialize; // +0x0C
-    gpg::RType::save_func_t mSerialize;   // +0x10
-  };
-
-  static_assert(
-    offsetof(MotorFallDownSerializer, mDeserialize) == 0x0C,
-    "MotorFallDownSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(MotorFallDownSerializer, mSerialize) == 0x10,
-    "MotorFallDownSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(MotorFallDownSerializer) == 0x14, "MotorFallDownSerializer size must be 0x14");
-
-  class MotorFallDownConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD5C00 (FUN_00BD5C00, dynamic initializer for the global
-     * `MotorFallDownConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields. Plain unlink atexit target, modeled
-     * as the compiler's implicit static-destructor registration.
-     */
-    MotorFallDownConstruct();
-
-    /**
-     * Address: 0x00BFD190 (FUN_00BFD190, atexit target registered by the
-     * real ctor above)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state. `FUN_00694F80`/
-     * `FUN_00694FB0` are dead, zero-xref duplicate-emission twins of this
-     * exact body (function_sha256-confirmed), formerly modeled in
-     * `moho/containers/LegacyContainerFillLanes.cpp` as
-     * `gGlobalIntrusiveSentinelLaneAD` and its two reset thunks; removed in
-     * favor of this citation.
-     */
-    ~MotorFallDownConstruct();
-
-    /**
-     * Address: 0x00695A40 (FUN_00695A40, MotorFallDownConstruct::Init)
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mConstructCallback; // +0x0C
-    gpg::RType::delete_func_t mDeleteCallback;         // +0x10
-  };
-
-  static_assert(
-    offsetof(MotorFallDownConstruct, mConstructCallback) == 0x0C,
-    "MotorFallDownConstruct::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(MotorFallDownConstruct, mDeleteCallback) == 0x10,
-    "MotorFallDownConstruct::mDeleteCallback offset must be 0x10"
-  );
-  static_assert(sizeof(MotorFallDownConstruct) == 0x14, "MotorFallDownConstruct size must be 0x14");
 
   /**
    * Address: 0x00BD5BE0 (FUN_00BD5BE0, register_MotorFallDownTypeInfo)

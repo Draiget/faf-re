@@ -198,9 +198,6 @@
     <ClCompile Include="moho\resource\blueprints\RUnitBlueprint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RUnitBlueprintEnumTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -210,34 +207,16 @@
     <ClCompile Include="moho\resource\blueprints\RMeshBlueprint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RMeshBlueprintConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RMeshBlueprintTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RMeshBlueprintSaveConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RTrailBlueprint.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RTrailBlueprintConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RTrailBlueprintSaveConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RTrailBlueprintTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RBeamBlueprint.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RBeamBlueprintConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RBeamBlueprintSaveConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RBeamBlueprintTypeInfo.cpp">
@@ -252,12 +231,6 @@
     <ClCompile Include="moho\resource\blueprints\REmitterBlueprint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\REmitterBlueprintConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\REmitterBlueprintSaveConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\resource\blueprints\REmitterBlueprintTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -267,13 +240,7 @@
     <ClCompile Include="moho\resource\blueprints\RProjectileBlueprint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintNestedTypeInfo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintSaveConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintTypeInfo.cpp">
@@ -297,16 +264,7 @@
     <ClCompile Include="moho\resource\blueprints\RUnitBlueprintNestedTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintSaveConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RUnitBlueprintTypeInfo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintWeaponConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintWeaponSaveConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RUnitBlueprintWeaponVectorReflection.cpp">
@@ -1392,15 +1350,6 @@
     <ClCompile Include="moho\unit\CUnitMotion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\unit\CUnitMotionSerHelpers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\unit\CUnitMotionConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\unit\CUnitMotionSerializer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\unit\CUnitMotionTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2329,9 +2278,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\CUnitCommandQueueReflection.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\unit\CUnitCommandSerHelpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\CUnitCommandTypeInfo.cpp">
@@ -5199,34 +5145,16 @@
     <ClInclude Include="moho\resource\blueprints\RMeshBlueprint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RMeshBlueprintConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RMeshBlueprintTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RMeshBlueprintSaveConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RTrailBlueprint.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RTrailBlueprintConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RTrailBlueprintSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RTrailBlueprintTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RBeamBlueprint.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RBeamBlueprintConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RBeamBlueprintSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RBeamBlueprintTypeInfo.h">
@@ -5241,12 +5169,6 @@
     <ClInclude Include="moho\resource\blueprints\REmitterBlueprint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\REmitterBlueprintConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\REmitterBlueprintSaveConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\resource\blueprints\REmitterBlueprintTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -5256,13 +5178,7 @@
     <ClInclude Include="moho\resource\blueprints\RProjectileBlueprint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RProjectileBlueprintConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RProjectileBlueprintNestedTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RProjectileBlueprintSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RProjectileBlueprintTypeInfo.h">
@@ -5272,9 +5188,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RUnitBlueprint.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RUnitBlueprintCapabilityEnums.h">
@@ -5293,15 +5206,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RUnitBlueprintTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintSaveConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintWeaponConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintWeaponSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RUnitBlueprintWeaponVectorReflection.h">
@@ -5436,15 +5340,6 @@
     <ClInclude Include="moho\unit\CUnitMotion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\unit\CUnitMotionSerHelpers.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\unit\CUnitMotionConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\unit\CUnitMotionSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\unit\CUnitMotionTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -5461,9 +5356,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\CUnitCommandTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\unit\CUnitCommandSerHelpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\CUnitCommandWeakPtrReflection.h">
@@ -5989,9 +5881,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\SPointVector.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\animation\CAnimationManipulatorConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\animation\CAnimationManipulatorSerializer.h">

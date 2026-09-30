@@ -1155,17 +1155,9 @@ msvc8::vector<WeakPtr<CUnitCommand>> CUnitCommand::GetCoordinatingOrdersSnapshot
  * Allocates one command object, runs default constructor lanes, and publishes
  * the result as an unowned construct payload.
  */
-void CUnitCommand::MemberConstruct(gpg::SerConstructResult* const result)
+void CUnitCommand::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
 {
-  if (!result) {
-    return;
-  }
-
-  CUnitCommand* const command = new (std::nothrow) CUnitCommand();
-  gpg::RRef objectRef{};
-  objectRef.mObj = command;
-  objectRef.mType = CUnitCommand::StaticGetClass();
-  result->SetUnowned(objectRef, 0u);
+  result.SetUnowned(gpg::MakeRRef(new CUnitCommand()), 0u);
 }
 
 /**
@@ -1176,36 +1168,36 @@ void CUnitCommand::MemberConstruct(gpg::SerConstructResult* const result)
  * Loads reflected base/object lanes and command payload fields, then maps the
  * serialized unit-set lane into command-runtime unit entries.
  */
-void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, CUnitCommand* const command, const int version)
+void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
 {
-  if (!archive || !command) {
+  if (!archive) {
     return;
   }
 
   const gpg::RRef ownerRef{};
 
   if (gpg::RType* const scriptType = ResolveCachedType<CScriptObject>()) {
-    archive->Read(scriptType, command, ownerRef);
+    archive->Read(scriptType, this, ownerRef);
   }
 
   if (gpg::RType* const broadcasterType = ResolveBroadcasterCommandEventType()) {
-    archive->Read(broadcasterType, BroadcasterSubobjectPtr(command), ownerRef);
+    archive->Read(broadcasterType, BroadcasterSubobjectPtr(this), ownerRef);
   }
 
-  (void)archive->ReadPointer(&command->mSim, &ownerRef);
+  (void)archive->ReadPointer(&mSim, &ownerRef);
 
   if (gpg::RType* const constDataType = ResolveCachedType<SSTICommandConstantData>()) {
-    archive->Read(constDataType, &command->mConstDat, ownerRef);
+    archive->Read(constDataType, &mConstDat, ownerRef);
   }
 
   if (gpg::RType* const variableDataType = ResolveCachedType<SSTICommandVariableData>()) {
-    archive->Read(variableDataType, &command->mVarDat, ownerRef);
+    archive->Read(variableDataType, &mVarDat, ownerRef);
   }
 
   EntitySetTemplate<Unit> loadedUnitSet{};
   if (gpg::RType* const unitSetType = ResolveEntityUnitSetType()) {
     archive->Read(unitSetType, &loadedUnitSet, ownerRef);
-    CopyUnitSetFromEntitySet(loadedUnitSet, command->mUnitSet);
+    CopyUnitSetFromEntitySet(loadedUnitSet, mUnitSet);
   }
 
   if (gpg::RType* const formationType = ResolveCountedPtrIFormationInstanceType()) {
@@ -1218,34 +1210,34 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, CUnitComma
     // `mFormationInstance`.
     IFormationInstance* formation = nullptr;
     archive->Read(formationType, &formation, ownerRef);
-    command->mFormationInstance = static_cast<CAiFormationInstance*>(formation);
+    mFormationInstance = static_cast<CAiFormationInstance*>(formation);
   }
 
   if (gpg::RType* const targetType = ResolveCachedType<CAiTarget>()) {
-    archive->Read(targetType, &command->mTarget, ownerRef);
+    archive->Read(targetType, &mTarget, ownerRef);
   }
 
   std::uint32_t instanceSerial = 0u;
   archive->ReadUInt(&instanceSerial);
-  command->mInstanceSerial = static_cast<CmdId>(instanceSerial);
+  mInstanceSerial = static_cast<CmdId>(instanceSerial);
 
-  archive->ReadBool(&command->mUnknownFlag142);
+  archive->ReadBool(&mUnknownFlag142);
 
   if (gpg::RType* const coordinatingOrdersType = ResolveWeakPtrCUnitCommandVectorType()) {
-    archive->Read(coordinatingOrdersType, &command->mCoordinatingOrders, ownerRef);
+    archive->Read(coordinatingOrdersType, &mCoordinatingOrders, ownerRef);
   }
 
-  archive->ReadBool(&command->mUnknownFlag154);
+  archive->ReadBool(&mUnknownFlag154);
 
   if (version >= 1) {
     if (gpg::RType* const weakUnitType = ResolveWeakPtrUnitType()) {
-      archive->Read(weakUnitType, &command->mUnit, ownerRef);
+      archive->Read(weakUnitType, &mUnit, ownerRef);
     }
   }
 
   if (version >= 2) {
     if (gpg::RType* const luaObjectType = ResolveLuaObjectType()) {
-      archive->Read(luaObjectType, &command->mArgs, ownerRef);
+      archive->Read(luaObjectType, &mArgs, ownerRef);
     }
   }
 }
@@ -1259,70 +1251,70 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, CUnitComma
  * Saves reflected base/object lanes and command payload fields, serializing
  * the command-unit set through legacy `EntitySetTemplate<Unit>` RTTI lanes.
  */
-void CUnitCommand::MemberSerialize(CUnitCommand* const command, gpg::WriteArchive* const archive, const int version)
+void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int version)
 {
-  if (!archive || !command) {
+  if (!archive) {
     return;
   }
 
   const gpg::RRef ownerRef{};
 
   if (gpg::RType* const scriptType = ResolveCachedType<CScriptObject>()) {
-    archive->Write(scriptType, command, ownerRef);
+    archive->Write(scriptType, this, ownerRef);
   }
 
   if (gpg::RType* const broadcasterType = ResolveBroadcasterCommandEventType()) {
-    archive->Write(broadcasterType, BroadcasterSubobjectPtr(command), ownerRef);
+    archive->Write(broadcasterType, BroadcasterSubobjectPtr(this), ownerRef);
   }
 
   if (gpg::RType* const simType = ResolveCachedType<Sim>()) {
-    const gpg::RRef simRef = MakeDerivedRef(command->mSim, simType);
+    const gpg::RRef simRef = MakeDerivedRef(mSim, simType);
     gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 
   if (gpg::RType* const constDataType = ResolveCachedType<SSTICommandConstantData>()) {
-    archive->Write(constDataType, &command->mConstDat, ownerRef);
+    archive->Write(constDataType, &mConstDat, ownerRef);
   }
 
   if (gpg::RType* const variableDataType = ResolveCachedType<SSTICommandVariableData>()) {
-    archive->Write(variableDataType, &command->mVarDat, ownerRef);
+    archive->Write(variableDataType, &mVarDat, ownerRef);
   }
 
   EntitySetTemplate<Unit> serializedUnitSet{};
-  BuildEntitySetFromCommandUnitSet(command->mUnitSet, serializedUnitSet);
+  BuildEntitySetFromCommandUnitSet(mUnitSet, serializedUnitSet);
   if (gpg::RType* const unitSetType = ResolveEntityUnitSetType()) {
     archive->Write(unitSetType, &serializedUnitSet, ownerRef);
   }
 
   // Bare pointer slot, as on the load side above -- the save path takes no
   // reference either.
-  IFormationInstance* formation = command->mFormationInstance;
+  IFormationInstance* formation = mFormationInstance;
   if (gpg::RType* const formationType = ResolveCountedPtrIFormationInstanceType()) {
     archive->Write(formationType, &formation, ownerRef);
   }
 
   if (gpg::RType* const targetType = ResolveCachedType<CAiTarget>()) {
-    archive->Write(targetType, &command->mTarget, ownerRef);
+    archive->Write(targetType, &mTarget, ownerRef);
   }
 
-  archive->WriteUInt(static_cast<unsigned int>(command->mInstanceSerial));
-  archive->WriteBool(command->mUnknownFlag142);
+  archive->WriteUInt(static_cast<unsigned int>(mInstanceSerial));
+  archive->WriteBool(mUnknownFlag142);
 
   if (gpg::RType* const coordinatingOrdersType = ResolveWeakPtrCUnitCommandVectorType()) {
-    archive->Write(coordinatingOrdersType, &command->mCoordinatingOrders, ownerRef);
+    archive->Write(coordinatingOrdersType, &mCoordinatingOrders, ownerRef);
   }
 
-  archive->WriteBool(command->mUnknownFlag154);
+  archive->WriteBool(mUnknownFlag154);
 
   if (version >= 1) {
     if (gpg::RType* const weakUnitType = ResolveWeakPtrUnitType()) {
-      archive->Write(weakUnitType, &command->mUnit, ownerRef);
+      archive->Write(weakUnitType, &mUnit, ownerRef);
     }
   }
 
   if (version >= 2) {
     if (gpg::RType* const luaObjectType = ResolveLuaObjectType()) {
-      archive->Write(luaObjectType, &command->mArgs, ownerRef);
+      archive->Write(luaObjectType, &mArgs, ownerRef);
     }
   }
 }
@@ -1987,3 +1979,41 @@ void moho::SimGetCommandQueueInsert(LuaPlus::LuaObject& queueArray, const CUnitC
 
   queueArray.SetObject(queueArray.GetN() + 1, row);
 }
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<CUnitCommand>`, vtable 0x00E2EA44.
+   *
+   * Address: 0x00BD8F50 (FUN_00BD8F50 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFEBE0 (FUN_00BFEBE0 -- the global's destructor.)
+   * Address: 0x006E9120 (FUN_006E9120 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x006EA060 (FUN_006EA060 -- `Init`.)
+   * Address: 0x006E91B0 (FUN_006E91B0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x006EB710 (FUN_006EB710 -- `Delete`.)
+   */
+  struct CUnitCommandConstruct : gpg::SerConstructHelper<CUnitCommand>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitCommand>`, vtable 0x00E2EA54.
+   *
+   * Address: 0x00BD8F90 (FUN_00BD8F90 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFEC10 (FUN_00BFEC10 -- the global's destructor.)
+   * Address: 0x006E9290 (FUN_006E9290 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x006EA0E0 (FUN_006EA0E0 -- `Init`.)
+   * Address: 0x006E9250 (FUN_006E9250 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006E9270 (FUN_006E9270 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitCommandSerializer : gpg::SerSaveLoadHelper<CUnitCommand>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B7FA8 -- process-global `CUnitCommandConstruct` singleton.
+  moho::CUnitCommandConstruct gCUnitCommandConstruct;
+
+  // Address: 0x010B7F28 -- process-global `CUnitCommandSerializer` singleton.
+  moho::CUnitCommandSerializer gCUnitCommandSerializer;
+} // namespace

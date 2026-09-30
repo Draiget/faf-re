@@ -7,6 +7,15 @@
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/RResId.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   /**
@@ -58,6 +67,27 @@ namespace moho
    */
   struct RPropBlueprint : public REntityBlueprint
   {
+    /**
+     * What it does:
+     * Reads the owning rules and the blueprint id and hands back the rules'
+     * own `RPropBlueprint` (owned by the rules, so the archive may not delete it).
+     * Inlined into `SerConstructHelper<RPropBlueprint>::Construct` 0x0051DC90.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x0051DBB0 (FUN_0051DBB0)
+     *
+     * What it does:
+     * Saves the owning rules (unowned) and the blueprint id for
+     * `MemberConstruct` to look the blueprint up by.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     RPropBlueprintDisplay Display; // +0x017C
     RPropBlueprintDefense Defense; // +0x019C
     RPropBlueprintEconomy Economy; // +0x01A4

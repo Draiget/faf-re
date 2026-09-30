@@ -13,6 +13,15 @@ namespace gpg
   class RType;
 } // namespace gpg
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   /**
@@ -27,6 +36,27 @@ namespace moho
    */
   struct RBeamBlueprint : public REffectBlueprint
   {
+    /**
+     * What it does:
+     * Reads the owning rules and the blueprint id and hands back the rules'
+     * own `RBeamBlueprint` (owned by the rules, so the archive may not delete it).
+     * Inlined into `SerConstructHelper<RBeamBlueprint>::Construct` 0x00510340.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x00510260 (FUN_00510260)
+     *
+     * What it does:
+     * Saves the owning rules (unowned) and the blueprint id for
+     * `MemberConstruct` to look the blueprint up by.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     /**
      * Address: 0x0050EEF0 (FUN_0050EEF0, ??0RBeamBlueprint@Moho@@QAE@XZ)
      *

@@ -13,41 +13,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/resource/RResId.h"
 #include "moho/sim/RRuleGameRules.h"
-
-namespace moho
-{
-  // Forward declaration: the real definition sits further down in this TU;
-  // RPropBlueprintConstruct's ctor below only needs the signature to bind
-  // the callback pointer.
-  void Construct_RPropBlueprint(
-    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
-  );
-
-  // Forward declaration: the real definition sits further down in this TU;
-  // RPropBlueprintConstruct's ctor below binds it as the delete callback.
-  void Delete_RPropBlueprint(void* objectPtr);
-
-  // Forward declaration: the real definition sits further down in this TU;
-  // RPropBlueprintSaveConstruct's ctor below only needs the signature to
-  // bind the callback pointer. Mirrors Construct_RPropBlueprint's forward
-  // declaration above (this is the save-side counterpart).
-  void SaveConstructArgsThunk_RPropBlueprint(
-    gpg::WriteArchive* archive,
-    int ownerToken,
-    int version,
-    gpg::RRef* ownerRef,
-    gpg::SerSaveConstructArgsResult* constructResult
-  );
-
-  // Forward declaration: the real definition sits further down in this TU;
-  // the thunk above calls this canonical body before its own definition is
-  // reached.
-  void SaveConstructArgs_RPropBlueprint(
-    int ownerToken,
-    gpg::WriteArchive* archive,
-    gpg::SerSaveConstructArgsResult* constructResult
-  );
-} // namespace moho
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 namespace
 {
@@ -61,308 +27,11 @@ namespace
     return type;
   }
 
-  /**
-   * VFTABLE: unknown - not independently observed for this instantiation.
-   *
-   * Demangled: gpg::SerConstructHelper<class Moho::RPropBlueprint>
-   *
-   * What it does:
-   * Binds the construct/delete callbacks used to materialize
-   * `RPropBlueprint` references during load. Base-class construction
-   * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices it
-   * into the pending `sNewHelpers` list; `InitNewHelpers` later dispatches
-   * `Init()` on it.
-   */
-  class RPropBlueprintConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC8860 (FUN_00BC8860, dynamic initializer for `gRPropBlueprintConstructHelper`)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the pending `sNewHelpers` list), binds the
-     * construct/delete callbacks and installs this helper's vtable
-     * (0x00E11088); the compiler registers the destructor with `atexit`.
-     */
-    RPropBlueprintConstruct();
-
-    /**
-     * Address: 0x00BF3180 (FUN_00BF3180, dynamic atexit destructor for `gRPropBlueprintConstructHelper`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_0051DC30` and `FUN_0051DC60` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~RPropBlueprintConstruct() = default;
-
-    /**
-     * Address: 0x0051DE50 (FUN_0051DE50, gpg::SerConstructHelper<Moho::RPropBlueprint>::Init)
-     *
-     * IDA signature:
-     * void(__cdecl *) __thiscall sub_51DE50(SerConstructHelperView *this);
-     *
-     * What it does:
-     * Lazily resolves the `RPropBlueprint` reflection descriptor, asserts the
-     * construct callback slot is empty, and publishes this helper's
-     * construct/delete callbacks to the descriptor.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
-  };
-  static_assert(
-    offsetof(RPropBlueprintConstruct, mConstructCallback) == 0x0C,
-    "RPropBlueprintConstruct::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(RPropBlueprintConstruct, mDeleteCallback) == 0x10,
-    "RPropBlueprintConstruct::mDeleteCallback offset must be 0x10"
-  );
-  static_assert(sizeof(RPropBlueprintConstruct) == 0x14, "RPropBlueprintConstruct size must be 0x14");
-
-  /**
-   * Address: 0x00BC8860 (FUN_00BC8860, dynamic initializer for `gRPropBlueprintConstructHelper`)
-   *
-   * What it does:
-   * Binds this helper's construct/delete callbacks (0x0051DC90, 0x0051E080).
-   */
-  RPropBlueprintConstruct::RPropBlueprintConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&moho::Construct_RPropBlueprint))
-    , mDeleteCallback(&moho::Delete_RPropBlueprint)
-  {}
-
-  void RPropBlueprintConstruct::Init()
-  {
-    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
-    constexpr int kSerializationConstructLine = 231;
-    constexpr const char* kSerializationSourcePath =
-      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-
-    gpg::RType* const type = ResolveRPropBlueprintTypeCached();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
-    }
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
-
-  RPropBlueprintConstruct gRPropBlueprintConstructHelper;
-
-  /**
-   * VFTABLE: 0x00E11078 (`??_7RPropBlueprintSaveConstruct@Moho@@6B@`)
-   *
-   * Demangled: gpg::SerSaveConstructHelper<class Moho::RPropBlueprint>
-   *
-   * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
-   * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
-   * single save-construct-args callback lane@0x0C. Total 0x10 bytes,
-   * matching the single-callback `SaveConstruct` shape (see
-   * `moho::CSimSoundManagerSaveConstruct`), not the two-callback
-   * `SerSaveLoadHelper<T>` shape (see `RPropBlueprintConstruct` above,
-   * which is that OTHER, load-side mechanism for this same type -- Init()
-   * writes `serConstructFunc_`/`deleteFunc_`, not `serSaveConstructArgsFunc_`).
-   *
-   * Investigation note (2026-08-25): this class replaces a prior
-   * `InitRPropBlueprintSaveConstructHelper` free function operating on a
-   * raw `SerSaveConstructHelperView` POD (never a real `gpg::SerHelperBase`,
-   * so construction never spliced it into `sNewHelpers`, so it was never
-   * actually dispatched -- the function was `[[maybe_unused]]` and uncalled).
-   * The real construction site (0x00BC8830, confirmed sole caller: the
-   * `__xc_a` static-init table) was previously mis-cited in
-   * `ArchiveSerialization.cpp` as `gRRuleGameRulesOwnerFieldSaveConstructHelper`
-   * -- a name describing the FIELD TYPE this helper happens to save
-   * (`RRuleGameRules*`), not the TYPE the helper is actually registered for
-   * (`RPropBlueprint`, confirmed by the vtable symbol and by
-   * `Init()`'s own `typeid(RPropBlueprint)` lookup at 0x0051DDD0). That
-   * duplicate citation, including its two ICF-twin unlink functions
-   * (0x0051DB50/0x0051DB80, both twins of the real atexit target
-   * 0x00BF3150) and its save-body thunk (0x0051DB30/0x0051DBB0, moved to
-   * this file as `SaveConstructArgsThunk_RPropBlueprint`/
-   * `SaveConstructArgs_RPropBlueprint` below), has been removed from
-   * `ArchiveSerialization.cpp`.
-   */
-  class RPropBlueprintSaveConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC8830 (FUN_00BC8830, register_RPropBlueprintSaveConstruct,
-     * dynamic initializer for the global `RPropBlueprintSaveConstruct`
-     * singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the save-construct-args callback field; the compiler
-     * registers the destructor with `atexit`.
-     */
-    RPropBlueprintSaveConstruct();
-
-    /**
-     * Address: 0x00BF3150 (FUN_00BF3150, dynamic atexit destructor for `gRPropBlueprintSaveConstructHelper`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_0051DB50` and `FUN_0051DB80` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~RPropBlueprintSaveConstruct() = default;
-
-    /**
-     * Address: 0x0051DDD0 (FUN_0051DDD0, gpg::SerSaveConstructHelper<Moho::RPropBlueprint>::Init)
-     *
-     * What it does:
-     * Resolves `RPropBlueprint` RTTI and installs this helper's
-     * save-construct-args callback into the reflected type descriptor.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
-  };
-  static_assert(
-    offsetof(RPropBlueprintSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
-    "RPropBlueprintSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
-  );
-  static_assert(sizeof(RPropBlueprintSaveConstruct) == 0x10, "RPropBlueprintSaveConstruct size must be 0x10");
-
-  RPropBlueprintSaveConstruct gRPropBlueprintSaveConstructHelper;
-
-  RPropBlueprintSaveConstruct::RPropBlueprintSaveConstruct()
-    : mSaveConstructArgsCallback(
-        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&moho::SaveConstructArgsThunk_RPropBlueprint)
-      )
-  {}
-
-  void RPropBlueprintSaveConstruct::Init()
-  {
-    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
-    constexpr int kSerializationSaveConstructLine = 189;
-    constexpr const char* kSerializationSourcePath =
-      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-
-    gpg::RType* const type = ResolveRPropBlueprintTypeCached();
-    if (type->serSaveConstructArgsFunc_ != nullptr) {
-      gpg::HandleAssertFailure(
-        kSaveConstructAssertText,
-        kSerializationSaveConstructLine,
-        kSerializationSourcePath
-      );
-    }
-    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
-  }
 } // namespace
 
 namespace moho
 {
   gpg::RType* RPropBlueprint::sType = nullptr;
-
-  /**
-   * Address: 0x0051DB30 (FUN_0051DB30, register-shape thunk)
-   *
-   * What it does:
-   * Forwards save-construct serialization for one `RPropBlueprint`'s owner
-   * lane (`RRuleGameRules*` + blueprint id string) to the canonical body
-   * below. This is the thin cdecl-shaped adapter the reflection slot
-   * dispatches to; `SaveConstructArgs_RPropBlueprint` below is what it
-   * subsumes.
-   */
-  void SaveConstructArgsThunk_RPropBlueprint(
-    gpg::WriteArchive* const archive,
-    const int ownerToken,
-    const int,
-    gpg::RRef* const,
-    gpg::SerSaveConstructArgsResult* const constructResult
-  )
-  {
-    SaveConstructArgs_RPropBlueprint(ownerToken, archive, constructResult);
-  }
-
-  /**
-   * Address: 0x0051DBB0 (FUN_0051DBB0)
-   *
-   * What it does:
-   * Writes one `RPropBlueprint`'s owner `RRuleGameRules*` as an unowned
-   * tracked pointer, then serializes its blueprint id string, then marks
-   * the save-construct result as owned. Symmetric with `Construct_RPropBlueprint`
-   * above, which reads the same two values back to look the blueprint up
-   * again via `RRuleGameRules::GetPropBlueprint`.
-   */
-  void SaveConstructArgs_RPropBlueprint(
-    const int ownerToken,
-    gpg::WriteArchive* const archive,
-    gpg::SerSaveConstructArgsResult* const constructResult
-  )
-  {
-    auto* const blueprint = reinterpret_cast<RPropBlueprint*>(static_cast<std::uintptr_t>(ownerToken));
-
-    const gpg::RRef nullOwnerRef{};
-    archive->WritePointer<moho::RRuleGameRules>(blueprint->mOwner, gpg::TrackedPointerState::Unowned, nullOwnerRef);
-
-    archive->WriteString(&blueprint->mBlueprintId);
-    constructResult->SetOwned(1u);
-  }
-
-  /**
-   * Address: 0x0051DC90 (FUN_0051DC90)
-   *
-   * What it does:
-   * Reads save-construct args (`RRuleGameRules*`, prop blueprint id),
-   * resolves the owning prop blueprint from game rules, and stores it as
-   * owned construct-result payload.
-   */
-  void Construct_RPropBlueprint(
-    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    RRuleGameRules* gameRules = nullptr;
-    gpg::RRef ownerRef{};
-    archive->ReadPointer(&gameRules, &ownerRef);
-
-    msvc8::string serializedId{};
-    archive->ReadString(&serializedId);
-
-    msvc8::string lookupId{};
-    gpg::STR_CopyFilename(&lookupId, &serializedId);
-
-    RPropBlueprint* const blueprint = gameRules != nullptr
-      ? gameRules->GetPropBlueprint(lookupId)
-      : nullptr;
-
-    gpg::RRef blueprintRef{};
-    blueprintRef = gpg::MakeRRef<moho::RPropBlueprint>(blueprint);
-    result->SetOwned(blueprintRef, 1u);
-  }
-
-  /**
-   * Address: 0x0051E080 (FUN_0051E080)
-   *
-   * What it does:
-   * Deletes one constructed `RPropBlueprint` through its virtual destructor.
-   */
-  void Delete_RPropBlueprint(void* const objectPtr)
-  {
-    delete static_cast<RPropBlueprint*>(objectPtr);
-  }
-
-  /**
-   * Address: 0x0051E0A0 (FUN_0051E0A0)
-   *
-   * What it does:
-   * Writes one reflected `{object,type}` lane from one `RPropBlueprint*`
-   * into caller-provided `RRef` storage.
-   */
-  [[maybe_unused]] gpg::RRef* BuildRRefFromRPropBlueprint(
-    RPropBlueprint* const blueprint,
-    gpg::RRef* const outRef
-  )
-  {
-    *outRef = gpg::MakeRRef<moho::RPropBlueprint>(blueprint);
-    return outRef;
-  }
 
   /**
    * Address: 0x0051D250 (FUN_0051D250)
@@ -453,3 +122,62 @@ namespace moho
     Display.MeshBlueprint.name.assign_owned(completedMeshPath.view());
   }
 } // namespace moho
+
+namespace moho
+{
+  void RPropBlueprint::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    RRuleGameRules* rules = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&rules, &owner);
+    msvc8::string id;
+    archive.ReadString(&id);
+    RResId resId{};
+    gpg::STR_CopyFilename(&resId.name, &id);
+    result.SetOwned(gpg::MakeRRef(rules->GetPropBlueprint(resId)), 1u);
+  }
+
+  /**
+   * Address: 0x0051DBB0 (FUN_0051DBB0)
+   */
+  void RPropBlueprint::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    archive.WritePointer(mOwner, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    archive.WriteString(&mBlueprintId);
+    result.SetOwned(1u);
+  }
+
+  /**
+   * `gpg::SerSaveConstructHelper<RPropBlueprint>`, vtable 0x00E11078.
+   *
+   * Address: 0x00BC8830 (FUN_00BC8830 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF3150 (FUN_00BF3150 -- the global's destructor.)
+   * Address: 0x0051DDD0 (FUN_0051DDD0 -- `Init`.)
+   * Address: 0x0051DB30 (FUN_0051DB30 -- `SaveConstructArgs`, a forward to `MemberSaveConstructArgs`.)
+   */
+  struct RPropBlueprintSaveConstruct : gpg::SerSaveConstructHelper<RPropBlueprint>
+  {};
+
+  /**
+   * `gpg::SerConstructHelper<RPropBlueprint>`, vtable 0x00E11088.
+   *
+   * Address: 0x00BC8860 (FUN_00BC8860 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF3180 (FUN_00BF3180 -- the global's destructor.)
+   * Address: 0x0051DE50 (FUN_0051DE50 -- `Init`.)
+   * Address: 0x0051DC90 (FUN_0051DC90 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x0051E080 (FUN_0051E080 -- `Delete`.)
+   */
+  struct RPropBlueprintConstruct : gpg::SerConstructHelper<RPropBlueprint>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AAFCC -- process-global `RPropBlueprintSaveConstruct` singleton.
+  moho::RPropBlueprintSaveConstruct gRPropBlueprintSaveConstruct;
+
+  // Address: 0x010AAEEC -- process-global `RPropBlueprintConstruct` singleton.
+  moho::RPropBlueprintConstruct gRPropBlueprintConstruct;
+} // namespace

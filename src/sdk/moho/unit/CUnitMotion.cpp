@@ -902,15 +902,9 @@ namespace moho
    * Allocates one `CUnitMotion`, default-constructs it, and returns it as an
    * unowned reflected construct result.
    */
-  void CUnitMotion::MemberConstruct(
-    gpg::ReadArchive&,
-    const int,
-    const gpg::RRef&,
-    gpg::SerConstructResult& result
-  )
+  void CUnitMotion::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    CUnitMotion* const motion = new (std::nothrow) CUnitMotion();
-    result.SetUnowned(MakeCUnitMotionRef(motion), 0u);
+    result.SetUnowned(gpg::MakeRRef(new CUnitMotion()), 0u);
   }
 
   /**
@@ -934,167 +928,167 @@ namespace moho
   /**
    * Address: 0x006BACE0 (FUN_006BACE0, Moho::CUnitMotion::MemberDeserialize)
    */
-  void CUnitMotion::MemberDeserialize(gpg::ReadArchive* const archive, CUnitMotion* const motion)
+  void CUnitMotion::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    if (archive == nullptr || motion == nullptr) {
+    if (archive == nullptr) {
       return;
     }
 
     const gpg::RRef ownerRef = NullOwnerRef();
-    motion->mUnit = ReadPointerUnowned<Unit>(*archive, ownerRef, "Unit");
-    motion->mNextWaypoint = ReadPointerUnowned<CPathPoint>(*archive, ownerRef, "CPathPoint");
-    motion->mFollowingWaypoint = ReadPointerUnowned<CPathPoint>(*archive, ownerRef, "CPathPoint");
+    mUnit = ReadPointerUnowned<Unit>(*archive, ownerRef, "Unit");
+    mNextWaypoint = ReadPointerUnowned<CPathPoint>(*archive, ownerRef, "CPathPoint");
+    mFollowingWaypoint = ReadPointerUnowned<CPathPoint>(*archive, ownerRef, "CPathPoint");
 
-    archive->ReadFloat(&motion->mFuelUseTime);
-    archive->ReadBool(&motion->mStopRequested);
+    archive->ReadFloat(&mFuelUseTime);
+    archive->ReadBool(&mStopRequested);
 
-    ReadTypedValue(*archive, motion->mTargetPosition, ownerRef);
-    ReadTypedValue(*archive, motion->mFormationVec, ownerRef);
-    ReadTypedValue(*archive, motion->mPos, ownerRef);
-    ReadTypedValue(*archive, motion->mVelocity, ownerRef);
-    ReadTypedValue(*archive, motion->mVector44, ownerRef);
+    ReadTypedValue(*archive, mTargetPosition, ownerRef);
+    ReadTypedValue(*archive, mFormationVec, ownerRef);
+    ReadTypedValue(*archive, mPos, ownerRef);
+    ReadTypedValue(*archive, mVelocity, ownerRef);
+    ReadTypedValue(*archive, mVector44, ownerRef);
 
-    archive->ReadFloat(&motion->mCurElevation);
-    archive->ReadFloat(&motion->mTargetElevation);
-    archive->ReadFloat(&motion->mNewElevation);
-    archive->ReadFloat(&motion->mSubElevation);
-    archive->ReadFloat(&motion->mDivingSpeed);
-    archive->ReadFloat(&motion->mHeight);
+    archive->ReadFloat(&mCurElevation);
+    archive->ReadFloat(&mTargetElevation);
+    archive->ReadFloat(&mNewElevation);
+    archive->ReadFloat(&mSubElevation);
+    archive->ReadFloat(&mDivingSpeed);
+    archive->ReadFloat(&mHeight);
 
-    ReadTypedValue(*archive, motion->mVector68, ownerRef);
-    ReadTypedValue(*archive, motion->mLayer, ownerRef);
-    ReadTypedValue(*archive, motion->mMotionState, ownerRef);
-    ReadTypedValue(*archive, motion->mHorzEvent, ownerRef);
-    ReadTypedValue(*archive, motion->mVertEvent, ownerRef);
-    ReadTypedValue(*archive, motion->mTurnEvent, ownerRef);
-    ReadTypedValue(*archive, motion->mCarrierEvent, ownerRef);
+    ReadTypedValue(*archive, mVector68, ownerRef);
+    ReadTypedValue(*archive, mLayer, ownerRef);
+    ReadTypedValue(*archive, mMotionState, ownerRef);
+    ReadTypedValue(*archive, mHorzEvent, ownerRef);
+    ReadTypedValue(*archive, mVertEvent, ownerRef);
+    ReadTypedValue(*archive, mTurnEvent, ownerRef);
+    ReadTypedValue(*archive, mCarrierEvent, ownerRef);
 
-    archive->ReadBool(&motion->mAlwaysUseTopSpeed);
-    archive->ReadBool(&motion->mIsBeingPushed);
-    archive->ReadBool(&motion->mInStateTransition);
-    archive->ReadBool(&motion->mUnknownBool8F);
-    archive->ReadBool(&motion->mProcessSurfaceCollision);
-    archive->ReadBool(&motion->mUnknownBool91);
+    archive->ReadBool(&mAlwaysUseTopSpeed);
+    archive->ReadBool(&mIsBeingPushed);
+    archive->ReadBool(&mInStateTransition);
+    archive->ReadBool(&mUnknownBool8F);
+    archive->ReadBool(&mProcessSurfaceCollision);
+    archive->ReadBool(&mUnknownBool91);
 
-    archive->ReadFloat(&motion->mUnknownFloat94);
-    archive->ReadFloat(&motion->mUnknownFloat98);
-    archive->ReadFloat(&motion->mRandomElevation);
+    archive->ReadFloat(&mUnknownFloat94);
+    archive->ReadFloat(&mUnknownFloat98);
+    archive->ReadFloat(&mRandomElevation);
 
-    ReadTypedValue(*archive, motion->mCombatState, ownerRef);
+    ReadTypedValue(*archive, mCombatState, ownerRef);
 
-    archive->ReadUInt(&motion->mCombatStateTimeoutTick);
-    archive->ReadInt(&motion->mSustainedTurnTicks);
-    archive->ReadInt(&motion->mPreparationTick);
-    archive->ReadInt(&motion->mStateWordB0);
+    archive->ReadUInt(&mCombatStateTimeoutTick);
+    archive->ReadInt(&mSustainedTurnTicks);
+    archive->ReadInt(&mPreparationTick);
+    archive->ReadInt(&mStateWordB0);
 
-    ReadTypedValue(*archive, motion->mPreviousVelocity, ownerRef);
-    ReadTypedValue(*archive, motion->mBodyTiltOffset, ownerRef);
-    ReadTypedValue(*archive, motion->mRecoilImpulse, ownerRef);
-    ReadTypedValue(*archive, motion->mWobbleOffset, ownerRef);
-    ReadTypedValue(*archive, motion->mWobbleVelocity, ownerRef);
-    ReadTypedValue(*archive, motion->mWobbleTarget, ownerRef);
-    ReadTypedValue(*archive, motion->mForce, ownerRef);
-    ReadTypedValue(*archive, motion->mTorque, ownerRef);
-    ReadTypedValue(*archive, motion->mRaisedPlatformUnit, ownerRef);
+    ReadTypedValue(*archive, mPreviousVelocity, ownerRef);
+    ReadTypedValue(*archive, mBodyTiltOffset, ownerRef);
+    ReadTypedValue(*archive, mRecoilImpulse, ownerRef);
+    ReadTypedValue(*archive, mWobbleOffset, ownerRef);
+    ReadTypedValue(*archive, mWobbleVelocity, ownerRef);
+    ReadTypedValue(*archive, mWobbleTarget, ownerRef);
+    ReadTypedValue(*archive, mForce, ownerRef);
+    ReadTypedValue(*archive, mTorque, ownerRef);
+    ReadTypedValue(*archive, mRaisedPlatformUnit, ownerRef);
 
-    archive->ReadFloat(&motion->mLayerTransitionTicks);
+    archive->ReadFloat(&mLayerTransitionTicks);
 
-    ReadTypedValue(*archive, motion->mLastTrans, ownerRef);
-    ReadTypedValue(*archive, motion->mCurTrans, ownerRef);
-    ReadTypedValue(*archive, motion->mReservation, ownerRef);
+    ReadTypedValue(*archive, mLastTrans, ownerRef);
+    ReadTypedValue(*archive, mCurTrans, ownerRef);
+    ReadTypedValue(*archive, mReservation, ownerRef);
 
-    archive->ReadBool(&motion->mHasDoneCallback);
+    archive->ReadBool(&mHasDoneCallback);
 
     CEconRequest* const loadedRequest = ReadPointerOwned<CEconRequest>(*archive, ownerRef, "CEconRequest");
-    ReplaceEconomyRequestPointer(motion->mEconomyRequest, loadedRequest);
+    ReplaceEconomyRequestPointer(mEconomyRequest, loadedRequest);
 
-    ReadTypedValue(*archive, motion->mRepairConsumption, ownerRef);
+    ReadTypedValue(*archive, mRepairConsumption, ownerRef);
   }
 
   /**
    * Address: 0x006BB460 (FUN_006BB460, Moho::CUnitMotion::MemberSerialize)
    */
-  void CUnitMotion::MemberSerialize(CUnitMotion* const motion, gpg::WriteArchive* const archive)
+  void CUnitMotion::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    if (archive == nullptr || motion == nullptr) {
+    if (archive == nullptr) {
       return;
     }
 
     const gpg::RRef ownerRef = NullOwnerRef();
     gpg::WriteRawPointer(
-      archive, MakeTrackedRef(motion->mUnit), gpg::TrackedPointerState::Unowned, ownerRef
+      archive, MakeTrackedRef(mUnit), gpg::TrackedPointerState::Unowned, ownerRef
     );
     gpg::WriteRawPointer(
-      archive, MakeTrackedRef(motion->mNextWaypoint), gpg::TrackedPointerState::Unowned, ownerRef
+      archive, MakeTrackedRef(mNextWaypoint), gpg::TrackedPointerState::Unowned, ownerRef
     );
     gpg::WriteRawPointer(
-      archive, MakeTrackedRef(motion->mFollowingWaypoint), gpg::TrackedPointerState::Unowned, ownerRef
+      archive, MakeTrackedRef(mFollowingWaypoint), gpg::TrackedPointerState::Unowned, ownerRef
     );
 
-    archive->WriteFloat(motion->mFuelUseTime);
-    archive->WriteBool(motion->mStopRequested);
+    archive->WriteFloat(mFuelUseTime);
+    archive->WriteBool(mStopRequested);
 
-    WriteTypedValue(*archive, motion->mTargetPosition, ownerRef);
-    WriteTypedValue(*archive, motion->mFormationVec, ownerRef);
-    WriteTypedValue(*archive, motion->mPos, ownerRef);
-    WriteTypedValue(*archive, motion->mVelocity, ownerRef);
-    WriteTypedValue(*archive, motion->mVector44, ownerRef);
+    WriteTypedValue(*archive, mTargetPosition, ownerRef);
+    WriteTypedValue(*archive, mFormationVec, ownerRef);
+    WriteTypedValue(*archive, mPos, ownerRef);
+    WriteTypedValue(*archive, mVelocity, ownerRef);
+    WriteTypedValue(*archive, mVector44, ownerRef);
 
-    archive->WriteFloat(motion->mCurElevation);
-    archive->WriteFloat(motion->mTargetElevation);
-    archive->WriteFloat(motion->mNewElevation);
-    archive->WriteFloat(motion->mSubElevation);
-    archive->WriteFloat(motion->mDivingSpeed);
-    archive->WriteFloat(motion->mHeight);
+    archive->WriteFloat(mCurElevation);
+    archive->WriteFloat(mTargetElevation);
+    archive->WriteFloat(mNewElevation);
+    archive->WriteFloat(mSubElevation);
+    archive->WriteFloat(mDivingSpeed);
+    archive->WriteFloat(mHeight);
 
-    WriteTypedValue(*archive, motion->mVector68, ownerRef);
-    WriteTypedValue(*archive, motion->mLayer, ownerRef);
-    WriteTypedValue(*archive, motion->mMotionState, ownerRef);
-    WriteTypedValue(*archive, motion->mHorzEvent, ownerRef);
-    WriteTypedValue(*archive, motion->mVertEvent, ownerRef);
-    WriteTypedValue(*archive, motion->mTurnEvent, ownerRef);
-    WriteTypedValue(*archive, motion->mCarrierEvent, ownerRef);
+    WriteTypedValue(*archive, mVector68, ownerRef);
+    WriteTypedValue(*archive, mLayer, ownerRef);
+    WriteTypedValue(*archive, mMotionState, ownerRef);
+    WriteTypedValue(*archive, mHorzEvent, ownerRef);
+    WriteTypedValue(*archive, mVertEvent, ownerRef);
+    WriteTypedValue(*archive, mTurnEvent, ownerRef);
+    WriteTypedValue(*archive, mCarrierEvent, ownerRef);
 
-    archive->WriteBool(motion->mAlwaysUseTopSpeed);
-    archive->WriteBool(motion->mIsBeingPushed);
-    archive->WriteBool(motion->mInStateTransition);
-    archive->WriteBool(motion->mUnknownBool8F);
-    archive->WriteBool(motion->mProcessSurfaceCollision);
-    archive->WriteBool(motion->mUnknownBool91);
+    archive->WriteBool(mAlwaysUseTopSpeed);
+    archive->WriteBool(mIsBeingPushed);
+    archive->WriteBool(mInStateTransition);
+    archive->WriteBool(mUnknownBool8F);
+    archive->WriteBool(mProcessSurfaceCollision);
+    archive->WriteBool(mUnknownBool91);
 
-    archive->WriteFloat(motion->mUnknownFloat94);
-    archive->WriteFloat(motion->mUnknownFloat98);
-    archive->WriteFloat(motion->mRandomElevation);
+    archive->WriteFloat(mUnknownFloat94);
+    archive->WriteFloat(mUnknownFloat98);
+    archive->WriteFloat(mRandomElevation);
 
-    WriteTypedValue(*archive, motion->mCombatState, ownerRef);
+    WriteTypedValue(*archive, mCombatState, ownerRef);
 
-    archive->WriteUInt(motion->mCombatStateTimeoutTick);
-    archive->WriteInt(motion->mSustainedTurnTicks);
-    archive->WriteInt(motion->mPreparationTick);
-    archive->WriteInt(motion->mStateWordB0);
+    archive->WriteUInt(mCombatStateTimeoutTick);
+    archive->WriteInt(mSustainedTurnTicks);
+    archive->WriteInt(mPreparationTick);
+    archive->WriteInt(mStateWordB0);
 
-    WriteTypedValue(*archive, motion->mPreviousVelocity, ownerRef);
-    WriteTypedValue(*archive, motion->mBodyTiltOffset, ownerRef);
-    WriteTypedValue(*archive, motion->mRecoilImpulse, ownerRef);
-    WriteTypedValue(*archive, motion->mWobbleOffset, ownerRef);
-    WriteTypedValue(*archive, motion->mWobbleVelocity, ownerRef);
-    WriteTypedValue(*archive, motion->mWobbleTarget, ownerRef);
-    WriteTypedValue(*archive, motion->mForce, ownerRef);
-    WriteTypedValue(*archive, motion->mTorque, ownerRef);
-    WriteTypedValue(*archive, motion->mRaisedPlatformUnit, ownerRef);
+    WriteTypedValue(*archive, mPreviousVelocity, ownerRef);
+    WriteTypedValue(*archive, mBodyTiltOffset, ownerRef);
+    WriteTypedValue(*archive, mRecoilImpulse, ownerRef);
+    WriteTypedValue(*archive, mWobbleOffset, ownerRef);
+    WriteTypedValue(*archive, mWobbleVelocity, ownerRef);
+    WriteTypedValue(*archive, mWobbleTarget, ownerRef);
+    WriteTypedValue(*archive, mForce, ownerRef);
+    WriteTypedValue(*archive, mTorque, ownerRef);
+    WriteTypedValue(*archive, mRaisedPlatformUnit, ownerRef);
 
-    archive->WriteFloat(motion->mLayerTransitionTicks);
+    archive->WriteFloat(mLayerTransitionTicks);
 
-    WriteTypedValue(*archive, motion->mLastTrans, ownerRef);
-    WriteTypedValue(*archive, motion->mCurTrans, ownerRef);
-    WriteTypedValue(*archive, motion->mReservation, ownerRef);
+    WriteTypedValue(*archive, mLastTrans, ownerRef);
+    WriteTypedValue(*archive, mCurTrans, ownerRef);
+    WriteTypedValue(*archive, mReservation, ownerRef);
 
-    archive->WriteBool(motion->mHasDoneCallback);
+    archive->WriteBool(mHasDoneCallback);
     gpg::WriteRawPointer(
-      archive, MakeTrackedRef(motion->mEconomyRequest), gpg::TrackedPointerState::Owned, ownerRef
+      archive, MakeTrackedRef(mEconomyRequest), gpg::TrackedPointerState::Owned, ownerRef
     );
 
-    WriteTypedValue(*archive, motion->mRepairConsumption, ownerRef);
+    WriteTypedValue(*archive, mRepairConsumption, ownerRef);
   }
 
   /**
@@ -4790,3 +4784,39 @@ namespace moho
     unit->mUnitVarDat.mFuelRatio = nextFuelRatio;
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<CUnitMotion>`, vtable 0x00E2ACD8.
+   *
+   * Address: 0x00BD7240 (FUN_00BD7240 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFE070 (FUN_00BFE070 -- the global's destructor.)
+   * Address: 0x006BA7F0 (FUN_006BA7F0 -- `Init`.)
+   * Address: 0x006BA270 (FUN_006BA270 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x006BAC40 (FUN_006BAC40 -- `Delete`.)
+   */
+  struct CUnitMotionConstruct : gpg::SerConstructHelper<CUnitMotion>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitMotion>`, vtable 0x00E2ACE8.
+   *
+   * Address: 0x00BD7280 (FUN_00BD7280 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFE0A0 (FUN_00BFE0A0 -- the global's destructor.)
+   * Address: 0x006BA870 (FUN_006BA870 -- `Init`.)
+   * Address: 0x006BA2E0 (FUN_006BA2E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006BA2F0 (FUN_006BA2F0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitMotionSerializer : gpg::SerSaveLoadHelper<CUnitMotion>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B5E70 -- process-global `CUnitMotionConstruct` singleton.
+  moho::CUnitMotionConstruct gCUnitMotionConstruct;
+
+  // Address: 0x010B60C0 -- process-global `CUnitMotionSerializer` singleton.
+  moho::CUnitMotionSerializer gCUnitMotionSerializer;
+} // namespace

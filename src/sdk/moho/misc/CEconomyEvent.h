@@ -14,6 +14,7 @@
 namespace gpg
 {
   class ReadArchive;
+  class RRef;
   class SerConstructResult;
   class WriteArchive;
 } // namespace gpg
@@ -177,6 +178,35 @@ namespace moho
     [[nodiscard]]
     bool IsDone() const noexcept;
 
+    /**
+     * Address: 0x007754E0 (FUN_007754E0)
+     *
+     * What it does:
+     * Builds a default economy event for an archive load and hands it back
+     * unowned; its members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x00776010 (FUN_00776010)
+     *
+     * What it does:
+     * Loads the `CScriptEvent` base, the unit, the per-tick request, the owned
+     * `CEconRequest` (deleting the one it replaces), the progress callback and
+     * the tick counters.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00776140 (FUN_00776140)
+     *
+     * What it does:
+     * Saves what `MemberDeserialize` loads; the request is written owned.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
   public:
     static gpg::RType* sType;
     static gpg::RType* sPointerType;
@@ -221,107 +251,6 @@ namespace moho
 
   private:
     static CScrLuaMetatableFactory sInstance;
-  };
-
-  /**
-   * VFTABLE: 0x00E36FE4
-   * COL:  0x00E90A24
-   *
-   * Demangled: gpg::SerConstructHelper<class Moho::CEconomyEvent>
-   *
-   * Real ctor confirmed via the callgraph index (`incoming_xrefs`/
-   * `reachable`): `FUN_00BDD360` is `__xc_a`-reachable at depth 0 (direct
-   * data xref from the CRT static-initializer table at 0x00C0FA60) and
-   * constructs a real global at 0x010BB9A8, installing the
-   * `Moho::CEconomyEventConstruct::vftable` and registering
-   * `atexit(FUN_00C024B0)`. A prior recovery pass in this file had claimed
-   * "no global singleton instance of this class exists anywhere in the
-   * codebase" -- that claim was never checked against this ctor's own
-   * reachability and is superseded by this citation; see the constructor
-   * and destructor below.
-   */
-  class CEconomyEventConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BDD360 (FUN_00BDD360, dynamic initializer for the global
-     * `CEconomyEventConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields to the already-recovered
-     * `ConstructCEconomyEventSerializerThunk`/`DeleteEconomyEventIfPresent`
-     * (previously `[[maybe_unused]]`/file-local with no source-level
-     * caller; this constructor is that caller).
-     */
-    CEconomyEventConstruct();
-
-    /**
-     * Address: 0x00C024B0 (FUN_00C024B0, atexit target registered by the
-     * real ctor above)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state. `FUN_00775470`/
-     * `FUN_007754A0` are dead, zero-xref duplicate-emission twins of this
-     * exact body (function_sha256-confirmed), formerly modeled in
-     * `moho/containers/LegacyContainerFillLanes.cpp` as
-     * `gGlobalIntrusiveSentinelLaneBL` and its two reset thunks; removed in
-     * favor of this citation.
-     */
-    ~CEconomyEventConstruct();
-
-    /**
-     * Address: 0x00775C40 (FUN_00775C40, sub_775C40)
-     *
-     * What it does:
-     * Registers construct/delete callbacks for CEconomyEvent into RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
-    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
-  };
-
-  static_assert(
-    offsetof(CEconomyEventConstruct, mSerConstructFunc) == 0x0C,
-    "CEconomyEventConstruct::mSerConstructFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CEconomyEventConstruct, mDeleteFunc) == 0x10, "CEconomyEventConstruct::mDeleteFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CEconomyEventConstruct) == 0x14, "CEconomyEventConstruct size must be 0x14");
-
-  /**
-   * VFTABLE: 0x00E36FF4
-   * COL:  0x00E90978
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class Moho::CEconomyEvent>
-   *
-   * NOTE: no global singleton instance of this class exists anywhere in the
-   * codebase (verified across all of src/sdk) - Init() is currently
-   * unreachable at runtime, matching this class's pre-existing (already
-   * unreferenced) state. Two address-cited unlink lanes previously modeled
-   * this class's link pair as a disconnected bare 3-field struct in
-   * CEconomyEvent.cpp (FUN_007755D0/FUN_00775600, "SerSaveLoadHelper
-   * <CEconomyEvent>::unlink lane A/B") - those addresses are this class's own
-   * inherited ResetLinks() emissions and are cited there now instead.
-   */
-  class CEconomyEventSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00775CC0 (FUN_00775CC0, sub_775CC0)
-     *
-     * What it does:
-     * Registers load/save callbacks for CEconomyEvent into RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
   };
 
   /**
@@ -429,26 +358,6 @@ namespace moho
   [[nodiscard]]
   CEconomyEvent* func_GetCEconomyEvent(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
 
-  /**
-   * Address: 0x007754E0 (FUN_007754E0, sub_7754E0)
-   *
-   * What it does:
-   * Allocates one default `CEconomyEvent` and publishes it as an unowned
-   * serializer construct-result reference.
-   */
-  void ConstructCEconomyEventForSerializer(gpg::SerConstructResult* result);
-
-  /**
-   * Address: 0x007754D0 (FUN_007754D0)
-   *
-   * What it does:
-   * Serializer construct-callback thunk that forwards to
-   * `ConstructCEconomyEventForSerializer`.
-   */
-  void ConstructCEconomyEventSerializerThunk(
-    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
-  );
-
 #if defined(MOHO_STRICT_LAYOUT_ASSERTS)
   static_assert(offsetof(CEconomyEvent, mUnit) == 0x50, "CEconomyEvent::mUnit offset must be 0x50");
   static_assert(
@@ -465,23 +374,6 @@ namespace moho
   static_assert(
     sizeof(CScrLuaMetatableFactory<CEconomyEvent>) == 0x08, "CScrLuaMetatableFactory<CEconomyEvent> size must be 0x08"
   );
-  static_assert(
-    offsetof(CEconomyEventConstruct, mSerConstructFunc) == 0x0C,
-    "CEconomyEventConstruct::mSerConstructFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CEconomyEventConstruct, mDeleteFunc) == 0x10, "CEconomyEventConstruct::mDeleteFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CEconomyEventConstruct) == 0x14, "CEconomyEventConstruct size must be 0x14");
-  static_assert(
-    offsetof(CEconomyEventSerializer, mSerLoadFunc) == 0x0C,
-    "CEconomyEventSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CEconomyEventSerializer, mSerSaveFunc) == 0x10,
-    "CEconomyEventSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CEconomyEventSerializer) == 0x14, "CEconomyEventSerializer size must be 0x14");
   static_assert(sizeof(CEconomyEventTypeInfo) == 0x64, "CEconomyEventTypeInfo size must be 0x64");
 } // namespace moho
 

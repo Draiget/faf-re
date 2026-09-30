@@ -45,11 +45,11 @@ namespace moho
     ~CUnitCommandQueue();
 
     /**
-     * Address: 0x006EE8C0 (FUN_006EE8C0,
-     * ?MemberSaveConstructArgs@CUnitCommandQueue@Moho@@AAEXAAVWriteArchive@gpg@@HABVRRef@4@AAVSerSaveConstructArgsResult@4@@Z)
+     * Address: 0x006EE9C0 (FUN_006EE9C0 -- out of line with no callers; inlined into
+     * `SerSaveConstructHelper<CUnitCommandQueue>::SaveConstructArgs` 0x006EE8C0.)
      *
      * What it does:
-     * Saves construct payload (`Unit*` owner) as unowned tracked-pointer data.
+     * Saves the owning unit as an unowned pointer.
      */
     void MemberSaveConstructArgs(
       gpg::WriteArchive& archive,
@@ -59,11 +59,10 @@ namespace moho
     );
 
     /**
-     * Address: 0x006EEAC0 (FUN_006EEAC0,
-     * ?MemberConstruct@CUnitCommandQueue@Moho@@CAXAAVReadArchive@gpg@@HABVRRef@4@AAVSerConstructResult@4@@Z)
+     * Address: 0x006EEAC0 (FUN_006EEAC0)
      *
      * What it does:
-     * Reads construct payload and allocates one `CUnitCommandQueue`.
+     * Reads the owning unit and builds a queue on it for an archive load.
      */
     static void MemberConstruct(
       gpg::ReadArchive& archive,
@@ -78,7 +77,7 @@ namespace moho
      * What it does:
      * Loads queue base/vector/type lanes and marks UI refresh state dirty.
      */
-    void MemberDeserialize(gpg::ReadArchive& archive);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x006F9750 (FUN_006F9750, sub_6F9750)
@@ -86,7 +85,7 @@ namespace moho
      * What it does:
      * Saves queue base/vector/type lanes and queue local counter lane.
      */
-    void MemberSerialize(gpg::WriteArchive& archive) const;
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
       * Alias of FUN_006EDAA0 (non-canonical helper lane).

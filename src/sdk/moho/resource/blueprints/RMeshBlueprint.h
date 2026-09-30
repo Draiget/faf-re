@@ -9,6 +9,15 @@
 #include "moho/resource/blueprints/RBlueprint.h"
 #include "moho/resource/blueprints/RMeshBlueprintLODTypeInfo.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class RScmResource;
@@ -107,6 +116,27 @@ namespace moho
    */
   struct RMeshBlueprint : public RBlueprint
   {
+    /**
+     * What it does:
+     * Reads the owning rules and the blueprint id and hands back the rules'
+     * own `RMeshBlueprint` (owned by the rules, so the archive may not delete it).
+     * Inlined into `SerConstructHelper<RMeshBlueprint>::Construct` 0x005190A0.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x00518FC0 (FUN_00518FC0)
+     *
+     * What it does:
+     * Saves the owning rules (unowned) and the blueprint id for
+     * `MemberConstruct` to look the blueprint up by.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     msvc8::vector<RMeshBlueprintLOD> mLods; // +0x60
     float mIconFadeInZoom{0.0f};            // +0x70
     float mSortOrder{0.0f};                 // +0x74

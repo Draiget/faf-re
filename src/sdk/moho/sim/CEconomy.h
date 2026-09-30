@@ -3,12 +3,14 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/scoped_ptr.h"
 #include "moho/misc/CEconomyEvent.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 
 namespace gpg
 {
   class ReadArchive;
+  class RRef;
   class RType;
   class SerConstructResult;
   class WriteArchive;
@@ -37,10 +39,23 @@ namespace moho
 
   /**
    * Runtime economy state serialized on army save/load lanes.
+   *
+   * The destructor is implicit: `mConsumptionData` unlinks, then
+   * `mExtraStorage` deletes its storage (taking it back out of max storage).
+   *
+   * Address: 0x007048F0 (FUN_007048F0 -- the scalar deleting destructor;
+   * formerly recovered as a `Clear()` member that freed `this`.)
    */
   class CEconomy
   {
   public:
+    /**
+     * What it does:
+     * An empty economy for an archive load (inlined into `MemberConstruct`
+     * 0x00772FC0): no sim, index -1, zeroed resources, sharing on.
+     */
+    CEconomy();
+
     /**
      * Address: 0x00771880 (FUN_00771880, struct_EconomyData::struct_EconomyData)
      * Mangled: ??0struct_EconomyData@@QAE@@Z
@@ -58,13 +73,15 @@ namespace moho
     CEconomy(Sim* sim, std::int32_t armyIndex);
 
     /**
-     * Address: 0x007048F0 (FUN_007048F0, Moho::CEconomy::Clear)
+     * Address: 0x00772FC0 (FUN_00772FC0)
      *
      * What it does:
-     * Unlinks the consumption-request sentinel node, releases extra-storage
-     * ownership (with max-storage rollback), then frees this economy object.
+     * Builds an empty economy for an archive load and hands it back unowned;
+     * its members are loaded over it afterwards.
      */
-    CEconomy* Clear();
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x00774860 (FUN_00774860, Moho::CEconomy::MemberSerialize)
@@ -73,7 +90,7 @@ namespace moho
      * Serializes Sim owner, index/value lanes, totals, storage pointer ownership,
      * sharing flag, then emits the intrusive CEconRequest chain terminator.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x00774730 (FUN_00774730, Moho::CEconomy::MemberDeserialize)
@@ -91,7 +108,7 @@ namespace moho
      * Writes economy-request intrusive-list pointers in reverse link order and
      * appends one null pointer terminator.
      */
-    void SerializeRequests(gpg::WriteArchive* archive);
+    void SerializeRequests(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x00773130 (FUN_00773130, Moho::CEconomy::DeserializeRequests)
@@ -105,15 +122,14 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    Sim* mSim;                         // +0x00
-    std::int32_t mIndex;               // +0x04
-    SEconValue mResources;             // +0x08
-    SEconValue mPendingResources;      // +0x10
-    SEconTotals mTotals;               // +0x18
-    CEconStorage* mExtraStorage;       // +0x50
-    std::uint8_t mResourceSharing;     // +0x54
-    std::uint8_t mPad55To57[0x03];     // +0x55
-    TDatListItem<void, void> mConsumptionData; // +0x58
+    Sim* mSim;                                     // +0x00
+    std::int32_t mIndex;                           // +0x04
+    SEconValue mResources;                         // +0x08
+    SEconValue mPendingResources;                  // +0x10
+    SEconTotals mTotals;                           // +0x18
+    boost::scoped_ptr<CEconStorage> mExtraStorage; // +0x50
+    std::uint8_t mResourceSharing;                 // +0x54
+    TDatListItem<void, void> mConsumptionData;     // +0x58
   };
 
   static_assert(offsetof(CEconomy, mSim) == 0x00, "CEconomy::mSim offset must be 0x00");
@@ -147,15 +163,6 @@ namespace moho
    * Constructs/preregisters RTTI metadata for `SEconTotals`.
    */
   [[nodiscard]] gpg::RType* preregister_SEconTotalsTypeInfo();
-
-  /**
-   * Address: 0x00772FC0 (FUN_00772FC0)
-   *
-   * What it does:
-   * Allocates one `CEconomy` runtime object with constructor-default field
-   * lanes and stores an unowned reflected reference in `result`.
-   */
-  void ConstructCEconomyForSerializer(gpg::SerConstructResult* result);
 
   /**
    * VFTABLE: 0x00E189AC
@@ -304,127 +311,4 @@ namespace moho
   );
   static_assert(sizeof(SEconTotalsSerializer) == 0x14, "SEconTotalsSerializer size must be 0x14");
 
-  /**
-   * VFTABLE: 0x00E36DB0
-   */
-  class CEconomySerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x007730A0 (FUN_007730A0, dynamic initializer for the global
-     * `CEconomySerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields. Confirmed from raw disassembly: unlike
-     * `SEconValueSerializer`/`SEconTotalsSerializer`, this constructor does
-     * NOT register an atexit cleanup -- `CEconomySerializer` is never torn
-     * down at process exit in the real binary (no `push offset Func; call
-     * _atexit` sequence exists here).
-     */
-    CEconomySerializer();
-
-    /**
-     * Address: 0x00773080 (FUN_00773080, Moho::CEconomySerializer::Deserialize)
-     *
-     * What it does:
-     * Forwards the reflected object pointer to `CEconomy::MemberDeserialize`.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00773090 (FUN_00773090, Moho::CEconomySerializer::Serialize)
-     *
-     * What it does:
-     * Forwards the reflected object pointer to `CEconomy::MemberSerialize`.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00773D00 (FUN_00773D00, gpg::SerSaveLoadHelper_CEconomy::Init)
-     *
-     * What it does:
-     * Lazily resolves `CEconomy` RTTI (via `CEconomy::sType`) and installs
-     * load/save callbacks from this helper object into the type descriptor.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mLoadCallback; // +0x0C
-    gpg::RType::save_func_t mSaveCallback; // +0x10
-  };
-
-  static_assert(
-    offsetof(CEconomySerializer, mLoadCallback) == 0x0C, "CEconomySerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CEconomySerializer, mSaveCallback) == 0x10, "CEconomySerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(CEconomySerializer) == 0x14, "CEconomySerializer size must be 0x14");
-
-  /**
-   * VFTABLE: 0x00E36DA0
-   */
-  class CEconomyConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BDD0D0 (FUN_00BDD0D0, dynamic initializer for the global
-     * `CEconomyConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields, then registers `atexit(FUN_00C02250)`.
-     * `FUN_00772F20` decompiles to the identical field-write shape (same
-     * `gpg::SerHelperBase` ctor call, same `mConstructCallback`/
-     * `mDeleteCallback` values, same vtable install) but its tail returns
-     * `&dword_10BB894` directly instead of calling `atexit` -- confirmed via
-     * the callgraph index to have zero incoming xrefs (unlike `FUN_00BDD0D0`,
-     * which is `__xc_a`-reachable via a data xref from the CRT static-
-     * initializer table at 0x00C0FA60). It is a dead, unreachable
-     * duplicate-emission twin of this real ctor, not a competing
-     * initializer; a prior recovery pass had mistakenly cited it as "the"
-     * ctor and concluded (based on that wrong body) that no atexit cleanup
-     * was ever registered.
-     */
-    CEconomyConstruct();
-
-    /**
-     * Address: 0x00C02250 (FUN_00C02250, atexit target registered by the
-     * real ctor above)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state. `FUN_00772F50`/
-     * `FUN_00772F80` are dead, zero-xref duplicate-emission twins of this
-     * exact body (function_sha256-confirmed), formerly modeled in
-     * `moho/containers/LegacyContainerFillLanes.cpp` as
-     * `gGlobalIntrusiveSentinelLaneBK` and its two reset thunks; removed in
-     * favor of this citation.
-     */
-    ~CEconomyConstruct();
-
-    /**
-     * Address: 0x00773C80 (FUN_00773C80, Moho::CEconomyConstruct::Init)
-     *
-     * What it does:
-     * Resolves `CEconomy` RTTI and installs startup construct/delete
-     * callbacks from this helper's own fields (vtable slot 0, dispatched by
-     * `gpg::SerHelperBase::InitNewHelpers`).
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mConstructCallback; // +0x0C
-    gpg::RType::delete_func_t mDeleteCallback;        // +0x10
-  };
-
-  static_assert(
-    offsetof(CEconomyConstruct, mConstructCallback) == 0x0C,
-    "CEconomyConstruct::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CEconomyConstruct, mDeleteCallback) == 0x10, "CEconomyConstruct::mDeleteCallback offset must be 0x10"
-  );
-  static_assert(sizeof(CEconomyConstruct) == 0x14, "CEconomyConstruct size must be 0x14");
 } // namespace moho

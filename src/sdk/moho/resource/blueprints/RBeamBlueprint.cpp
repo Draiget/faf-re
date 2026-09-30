@@ -3,6 +3,12 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "moho/resource/RResId.h"
+#include "moho/sim/RRuleGameRules.h"
 
 namespace moho
 {
@@ -96,3 +102,62 @@ namespace moho
     return this;
   }
 } // namespace moho
+
+namespace moho
+{
+  void RBeamBlueprint::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    RRuleGameRules* rules = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&rules, &owner);
+    msvc8::string id;
+    archive.ReadString(&id);
+    RResId resId{};
+    gpg::STR_CopyFilename(&resId.name, &id);
+    result.SetOwned(gpg::MakeRRef(rules->GetBeamBlueprint(resId)), 1u);
+  }
+
+  /**
+   * Address: 0x00510260 (FUN_00510260)
+   */
+  void RBeamBlueprint::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    archive.WritePointer(mOwnerRules, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    archive.WriteString(&BlueprintId.name);
+    result.SetOwned(1u);
+  }
+
+  /**
+   * `gpg::SerSaveConstructHelper<RBeamBlueprint>`, vtable 0x00E0EC5C.
+   *
+   * Address: 0x00BC81B0 (FUN_00BC81B0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF2680 (FUN_00BF2680 -- the global's destructor.)
+   * Address: 0x00510780 (FUN_00510780 -- `Init`.)
+   * Address: 0x005101E0 (FUN_005101E0 -- `SaveConstructArgs`, a forward to `MemberSaveConstructArgs`.)
+   */
+  struct RBeamBlueprintSaveConstruct : gpg::SerSaveConstructHelper<RBeamBlueprint>
+  {};
+
+  /**
+   * `gpg::SerConstructHelper<RBeamBlueprint>`, vtable 0x00E0EC6C.
+   *
+   * Address: 0x00BC81E0 (FUN_00BC81E0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF26B0 (FUN_00BF26B0 -- the global's destructor.)
+   * Address: 0x00510800 (FUN_00510800 -- `Init`.)
+   * Address: 0x00510340 (FUN_00510340 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x00511150 (FUN_00511150 -- `Delete`.)
+   */
+  struct RBeamBlueprintConstruct : gpg::SerConstructHelper<RBeamBlueprint>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AA81C -- process-global `RBeamBlueprintSaveConstruct` singleton.
+  moho::RBeamBlueprintSaveConstruct gRBeamBlueprintSaveConstruct;
+
+  // Address: 0x010AA73C -- process-global `RBeamBlueprintConstruct` singleton.
+  moho::RBeamBlueprintConstruct gRBeamBlueprintConstruct;
+} // namespace

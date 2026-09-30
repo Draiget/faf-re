@@ -33,13 +33,24 @@ namespace moho
     CEconStorage(const SEconValue& amount, CEconomy* economy);
 
     /**
+     * Address: 0x00773270 (FUN_00773270 -- out of line with no callers.)
+     *
+     * What it does:
+     * Takes this storage's contribution back out of its economy's max
+     * storage. Inlined at every delete (`CEconomy`'s deleting destructor
+     * 0x007048F0, `SerConstructHelper<CEconStorage>::Delete` 0x00774350,
+     * `Unit`'s storage replacement).
+     */
+    ~CEconStorage();
+
+    /**
      * Address: 0x00773280 (FUN_00773280, Moho::CEconStorage::ChangeAmt)
      *
      * What it does:
      * Removes previous amount contribution, copies new amount lanes, then
      * reapplies contribution to economy max-storage totals.
      */
-    std::int64_t ChangeAmt(const SEconValue& amount);
+    void ChangeAmt(const SEconValue& amount);
 
     /**
      * Address: 0x00773500 (FUN_00773500, Moho::CEconStorage::MemberConstruct)
@@ -48,7 +59,9 @@ namespace moho
      * Allocates one `CEconStorage`, zero-initializes owner/value lanes, and
      * publishes the object as an unowned construct result.
      */
-    static void MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x007732C0 (FUN_007732C0, Moho::CEconStorage::Chng)
@@ -57,7 +70,7 @@ namespace moho
      * Applies this storage lane as a signed delta (`direction` is typically
      * `+1` or `-1`) into owning economy max-storage counters.
      */
-    std::int64_t Chng(std::int32_t direction);
+    void Chng(std::int32_t direction);
 
     /**
      * Address: 0x00774990 (FUN_00774990, Moho::CEconStorage::MemberDeserialize)
@@ -75,7 +88,7 @@ namespace moho
      * Serializes referenced economy owner as an unowned pointer, then writes
      * one reflected `SEconValue` payload lane.
      */
-    void MemberSerialize(gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     static gpg::RType* sType;

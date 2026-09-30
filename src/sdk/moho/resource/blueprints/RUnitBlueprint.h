@@ -16,6 +16,15 @@ namespace gpg
   class RType;
 }
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class CRandomStream;
@@ -531,6 +540,26 @@ namespace moho
    */
   struct RUnitBlueprintWeapon
   {
+    /**
+     * What it does:
+     * Reads the owning unit blueprint and the weapon index and hands back that
+     * weapon, owned by the blueprint. Inlined into
+     * `SerConstructHelper<RUnitBlueprintWeapon>::Construct` 0x00522F40.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x00522E60 (FUN_00522E60)
+     *
+     * What it does:
+     * Saves the owning unit blueprint (unowned) and this weapon's index.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     RUnitBlueprint* OwnerBlueprint;                 // +0x00
     std::uint32_t WeaponIndex;                      // +0x04
     msvc8::string Label;                            // +0x08
@@ -733,6 +762,27 @@ namespace moho
    */
   struct RUnitBlueprint : public REntityBlueprint
   {
+    /**
+     * What it does:
+     * Reads the owning rules and the blueprint id and hands back the rules'
+     * own `RUnitBlueprint` (owned by the rules, so the archive may not delete it).
+     * Inlined into `SerConstructHelper<RUnitBlueprint>::Construct` 0x00522CC0.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x00522BE0 (FUN_00522BE0)
+     *
+     * What it does:
+     * Saves the owning rules (unowned) and the blueprint id for
+     * `MemberConstruct` to look the blueprint up by.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     static gpg::RType* sPointerType;
 
     /**

@@ -12,6 +12,15 @@ namespace gpg
   class RType;
 } // namespace gpg
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   /**
@@ -27,6 +36,27 @@ namespace moho
    */
   struct RTrailBlueprint : public REffectBlueprint
   {
+    /**
+     * What it does:
+     * Reads the owning rules and the blueprint id and hands back the rules'
+     * own `RTrailBlueprint` (owned by the rules, so the archive may not delete it).
+     * Inlined into `SerConstructHelper<RTrailBlueprint>::Construct` 0x005100C0.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x0050FFE0 (FUN_0050FFE0)
+     *
+     * What it does:
+     * Saves the owning rules (unowned) and the blueprint id for
+     * `MemberConstruct` to look the blueprint up by.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     float Lifetime;                   // +0x28
     float TrailLength;                // +0x2C
     float StartSize;                  // +0x30

@@ -795,17 +795,6 @@ void CTaskStage::DeserializeThreads(gpg::ReadArchive* const archive)
 }
 
 /**
- * Address: 0x0040A630 (FUN_0040A630, Moho::CTaskThreadConstruct::Init)
- */
-void CTaskThreadConstruct::Init()
-{
-  gpg::RType* const type = CachedCTaskThreadType();
-  GPG_ASSERT(type->serConstructFunc_ == nullptr);
-  type->serConstructFunc_ = mSerConstructFunc;
-  type->deleteFunc_ = mDeleteFunc;
-}
-
-/**
  * Address: 0x0040A6B0 (FUN_0040A6B0, Moho::CTaskThreadSerializer::Init)
  */
 void CTaskThreadSerializer::Init()
@@ -910,3 +899,32 @@ void CTaskStageTypeInfo::Init()
   gpg::RType::Init();
   Finish();
 }
+
+namespace moho
+{
+  /**
+   * Address: 0x004094F0 (FUN_004094F0)
+   */
+  void CTaskThread::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CTaskThread()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CTaskThread>`, vtable 0x00E003DC.
+   *
+   * Address: 0x00BC3040 (FUN_00BC3040 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEE3A0 (FUN_00BEE3A0 -- the global's destructor.)
+   * Address: 0x0040A630 (FUN_0040A630 -- `Init`.)
+   * Address: 0x004094E0 (FUN_004094E0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x0040B420 (FUN_0040B420 -- `Delete`.)
+   */
+  struct CTaskThreadConstruct : gpg::SerConstructHelper<CTaskThread>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A67BC -- process-global `CTaskThreadConstruct` singleton.
+  moho::CTaskThreadConstruct gCTaskThreadConstruct;
+} // namespace

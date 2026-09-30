@@ -9,6 +9,10 @@
 #include "gpg/core/containers/String.h"
 #include "moho/resource/RResId.h"
 #include "moho/sim/CRandomStream.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "moho/sim/RRuleGameRules.h"
 
 namespace moho
 {
@@ -305,3 +309,62 @@ namespace moho
     return SampleSymmetricRange(randomStream, Display.MeshScaleVelocityRange) + Display.MeshScaleVelocity;
   }
 } // namespace moho
+
+namespace moho
+{
+  void RProjectileBlueprint::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    RRuleGameRules* rules = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&rules, &owner);
+    msvc8::string id;
+    archive.ReadString(&id);
+    RResId resId{};
+    gpg::STR_CopyFilename(&resId.name, &id);
+    result.SetOwned(gpg::MakeRRef(rules->GetProjectileBlueprint(resId)), 1u);
+  }
+
+  /**
+   * Address: 0x0051CA40 (FUN_0051CA40)
+   */
+  void RProjectileBlueprint::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    archive.WritePointer(mOwner, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    archive.WriteString(&mBlueprintId);
+    result.SetOwned(1u);
+  }
+
+  /**
+   * `gpg::SerSaveConstructHelper<RProjectileBlueprint>`, vtable 0x00E10DCC.
+   *
+   * Address: 0x00BC86D0 (FUN_00BC86D0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF2F50 (FUN_00BF2F50 -- the global's destructor.)
+   * Address: 0x0051CC90 (FUN_0051CC90 -- `Init`.)
+   * Address: 0x0051C9C0 (FUN_0051C9C0 -- `SaveConstructArgs`, a forward to `MemberSaveConstructArgs`.)
+   */
+  struct RProjectileBlueprintSaveConstruct : gpg::SerSaveConstructHelper<RProjectileBlueprint>
+  {};
+
+  /**
+   * `gpg::SerConstructHelper<RProjectileBlueprint>`, vtable 0x00E10DDC.
+   *
+   * Address: 0x00BC8700 (FUN_00BC8700 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF2F80 (FUN_00BF2F80 -- the global's destructor.)
+   * Address: 0x0051CD10 (FUN_0051CD10 -- `Init`.)
+   * Address: 0x0051CB20 (FUN_0051CB20 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x0051CF40 (FUN_0051CF40 -- `Delete`.)
+   */
+  struct RProjectileBlueprintConstruct : gpg::SerConstructHelper<RProjectileBlueprint>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AAC54 -- process-global `RProjectileBlueprintSaveConstruct` singleton.
+  moho::RProjectileBlueprintSaveConstruct gRProjectileBlueprintSaveConstruct;
+
+  // Address: 0x010AAC64 -- process-global `RProjectileBlueprintConstruct` singleton.
+  moho::RProjectileBlueprintConstruct gRProjectileBlueprintConstruct;
+} // namespace

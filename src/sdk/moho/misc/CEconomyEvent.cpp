@@ -35,178 +35,6 @@ namespace
   constexpr const char* kDestroyedGameObjectError = "Game object has been destroyed";
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
-  constexpr int kSerializationConstructLine = 231;
-
-  // Forward declarations: real definitions sit further down in this
-  // anonymous namespace; CEconRequestConstruct/CEconRequestSerializer's
-  // ctors and Init() bodies below only need the signatures.
-  [[nodiscard]] gpg::RType* CachedCEconRequestType();
-  void ConstructCEconRequestSerializerCallback(
-    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
-  );
-  void DeconstructCEconRequestSerializerCallback(moho::CEconRequest* request);
-  void DeserializeCEconRequestSerializerCallback(gpg::ReadArchive* archive, moho::CEconRequest* request);
-  void SerializeCEconRequestSerializerCallback(gpg::WriteArchive* archive, moho::CEconRequest* request);
-
-  /**
-   * Demangled: gpg::SerConstructHelper<class Moho::CEconRequest>
-   */
-  class CEconRequestConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x007738F0 (FUN_007738F0)
-     *
-     * What it does:
-     * Binds construct/deconstruct callback lanes for `CEconRequest`. Base-class
-     * construction (`gpg::SerHelperBase::SerHelperBase`) self-links this node
-     * and splices it into the pending `sNewHelpers` list.
-     */
-    CEconRequestConstruct();
-
-    /**
-     * Address: 0x00773EC0 (FUN_00773EC0, Moho::CEconRequestConstruct::RegisterConstructFunction)
-     *
-     * What it does:
-     * Resolves `CEconRequest` RTTI and installs this helper's construct/delete
-     * callbacks.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
-  };
-  static_assert(
-    offsetof(CEconRequestConstruct, mConstructCallback) == 0x0C,
-    "CEconRequestConstruct::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CEconRequestConstruct, mDeleteCallback) == 0x10,
-    "CEconRequestConstruct::mDeleteCallback offset must be 0x10"
-  );
-  static_assert(sizeof(CEconRequestConstruct) == 0x14, "CEconRequestConstruct size must be 0x14");
-
-  CEconRequestConstruct::CEconRequestConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCEconRequestSerializerCallback))
-    , mDeleteCallback(reinterpret_cast<gpg::RType::delete_func_t>(&DeconstructCEconRequestSerializerCallback))
-  {}
-
-  void CEconRequestConstruct::Init()
-  {
-    gpg::RType* const type = CachedCEconRequestType();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
-    }
-
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
-
-  CEconRequestConstruct gCEconRequestConstructHelper;
-
-  /**
-   * Demangled: gpg::SerSaveLoadHelper<class Moho::CEconRequest> (Init() body
-   * confirmed at FUN_00773F40, see below; matches the shared
-   * `InstallSerSaveLoadHelperCallbacksByTypeName` template's expansion for
-   * "Moho::CEconRequest" in gpg/core/containers/ArchiveSerialization.cpp).
-   */
-  class CEconRequestSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00773A20 (FUN_00773A20)
-     *
-     * What it does:
-     * Binds deserialize/serialize callback lanes for `CEconRequest`. Base-class
-     * construction (`gpg::SerHelperBase::SerHelperBase`) self-links this node
-     * and splices it into the pending `sNewHelpers` list.
-     */
-    CEconRequestSerializer();
-
-    /**
-     * Address: 0x00773F40 (FUN_00773F40, InstallMohoCEconRequestSerializerCallbacks
-     * instantiation of the shared `InstallSerSaveLoadHelperCallbacksByTypeName`
-     * template in gpg/core/containers/ArchiveSerialization.cpp)
-     *
-     * What it does:
-     * Resolves `CEconRequest` RTTI and installs this helper's load/save
-     * callbacks.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-  static_assert(
-    offsetof(CEconRequestSerializer, mLoadCallback) == 0x0C, "CEconRequestSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CEconRequestSerializer, mSaveCallback) == 0x10, "CEconRequestSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(CEconRequestSerializer) == 0x14, "CEconRequestSerializer size must be 0x14");
-
-  CEconRequestSerializer::CEconRequestSerializer()
-    : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&DeserializeCEconRequestSerializerCallback))
-    , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SerializeCEconRequestSerializerCallback))
-  {}
-
-  void CEconRequestSerializer::Init()
-  {
-    gpg::RType* const type = CachedCEconRequestType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  CEconRequestSerializer gCEconRequestSerializerHelper;
-
-  // Addresses 0x00773920/0x00773950 (CEconRequestConstruct) and
-  // 0x00773A50/0x00773A80 (CEconRequestSerializer) are dead: each pair is a
-  // byte-identical ICF twin (sha256 80d8e9ee.../4a492a2a... respectively) that
-  // fully inlines the SerHelperBase unlink-and-self-link sequence with the
-  // owning global's address baked in as an immediate -- exactly the shape of
-  // a compiler-synthesized "dynamic atexit destructor for 'gCEconRequest
-  // ...Helper'" thunk (atexit() only accepts a zero-argument function
-  // pointer, so MSVC cannot register a generic member call and must
-  // specialize one). All four have zero xrefs of any kind (code, data, or
-  // static-init-table) anywhere in the indexed binary, and so does neither
-  // real ctor (0x007738F0 / 0x00773A20).
-  //
-  // Direct disassembly of both real ctors confirms why: each is exactly
-  // "call SerHelperBase::SerHelperBase(this); write two callback fields;
-  // write vftable; retn" -- no atexit call anywhere in either function's
-  // bounds. Neither CEconRequestConstruct nor CEconRequestSerializer (nor
-  // their common base, gpg::SerHelperBase, nor ITS base TDatListItem<T,U>)
-  // declares a destructor anywhere in this codebase; SerHelperBase's own
-  // vtable slot 0 is `Init()`, not a destructor, confirming SerHelperBase
-  // has no virtual destructor. With no user-declared destructor at any level
-  // and no non-trivial member, both derived classes' implicit destructors
-  // are genuinely trivial, so the compiler correctly elided the one call
-  // site (the atexit registration) that would ever have referenced these
-  // thunk bodies -- reproduced independently by compiling an equivalent
-  // "abstract base with a pure-virtual non-dtor method, no explicit dtor
-  // anywhere in the chain" class shape with MSVC: the global's dynamic
-  // initializer comes out byte-for-byte the same shape (ctor call, field
-  // writes, retn, no atexit) with no destructor thunk referenced.
-  //
-  // This is the "compiler-emitted glue... corresponds to no source line
-  // whatsoever" case from this repo's own recovery rules (member-destructor
-  // chaining that the source body says nothing about): the 2007 source wrote
-  // no destructor for either class, so there is nothing here for recovered
-  // source to call. Modeling these four bodies as free functions (as a
-  // prior pass did) or fabricating an explicit `~CEconRequestConstruct()`/
-  // `~CEconRequestSerializer()` to invoke them would both recover the
-  // compiler's output instead of the programmer's input. See
-  // decomp/recovery/reports/by-source/src/sdk/moho/misc/CEconomyEvent.cpp.reconstruction.md
-  // for the full evidence trail (xrefs.txt + callgraph SQLite cross-checks
-  // across call_edges/data_refs/incoming_xrefs/vtable_writers, plus the
-  // isolated compiler experiment).
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
@@ -266,108 +94,12 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Unit));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedSEconValueType()
   {
     if (!moho::SEconValue::sType) {
       moho::SEconValue::sType = gpg::LookupRType(typeid(moho::SEconValue));
     }
     return moho::SEconValue::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCEconRequestType()
-  {
-    if (!moho::CEconRequest::sType) {
-      moho::CEconRequest::sType = gpg::LookupRType(typeid(moho::CEconRequest));
-    }
-    return moho::CEconRequest::sType;
-  }
-
-  /**
-   * Address: 0x00773980 (FUN_00773980, Moho::CEconRequestConstruct::Construct)
-   *
-   * What it does:
-   * Allocates one `CEconRequest`, clears intrusive/requested/granted lanes, and
-   * publishes the object as an unowned construct result.
-   */
-  [[maybe_unused]] void ConstructCEconRequestSerializerCallback(
-    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    if (result == nullptr) {
-      return;
-    }
-
-    auto* const request = new (std::nothrow) moho::CEconRequest{};
-    gpg::RRef requestRef{};
-    requestRef = gpg::MakeRRef<moho::CEconRequest>(request);
-    result->SetUnowned(requestRef, 0u);
-  }
-
-  /**
-   * Address: 0x007743E0 (FUN_007743E0, Moho::CEconRequestConstruct::Deconstruct)
-   *
-   * What it does:
-   * Unlinks one request node from its intrusive list (when present) and
-   * releases request storage.
-   */
-  [[maybe_unused]] void DeconstructCEconRequestSerializerCallback(moho::CEconRequest* const request)
-  {
-    if (request == nullptr) {
-      return;
-    }
-
-    request->mNode.ListUnlink();
-    ::operator delete(request);
-  }
-
-  /**
-   * Address: 0x00773A00 (FUN_00773A00, Moho::CEconRequestSerializer::Deserialize)
-   *
-   * What it does:
-   * Forwards serializer-load callback lanes into `CEconRequest::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCEconRequestSerializerCallback(
-    gpg::ReadArchive* const archive,
-    moho::CEconRequest* const request
-  )
-  {
-    if (request != nullptr) {
-      request->MemberDeserialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x00773A10 (FUN_00773A10, Moho::CEconRequestSerializer::Serialize)
-   *
-   * What it does:
-   * Forwards serializer-save callback lanes into `CEconRequest::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCEconRequestSerializerCallback(
-    gpg::WriteArchive* const archive,
-    moho::CEconRequest* const request
-  )
-  {
-    if (request != nullptr) {
-      request->MemberSerialize(archive);
-    }
-  }
-
-  [[nodiscard]] gpg::RType* CachedLuaObjectType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(LuaPlus::LuaObject));
-    }
-    return cached;
   }
 
   struct TypeInfoRTypePair
@@ -698,167 +430,6 @@ namespace
     request = nullptr;
   }
 
-  [[nodiscard]] moho::CEconRequest* ReadCEconRequestPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconRequestType());
-    if (upcast.mObj) {
-      return static_cast<moho::CEconRequest*>(upcast.mObj);
-    }
-
-    const char* const expected = CachedCEconRequestType()->GetName();
-    const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-      "instead",
-      expected ? expected : "CEconRequest",
-      actual ? actual : "null"
-    );
-    throw std::runtime_error(msg.c_str());
-  }
-
-  void WriteCEconRequestPointer(gpg::WriteArchive* archive, moho::CEconRequest* request, const gpg::RRef& ownerRef)
-  {
-    const gpg::RRef objectRef = MakeTypedRef(request, CachedCEconRequestType());
-    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Owned, ownerRef);
-  }
-
-  [[nodiscard]] moho::Unit* ReadUnitPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedUnitType());
-    if (upcast.mObj) {
-      return static_cast<moho::Unit*>(upcast.mObj);
-    }
-
-    const char* const expected = CachedUnitType()->GetName();
-    const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-      "instead",
-      expected ? expected : "Unit",
-      actual ? actual : "null"
-    );
-    throw std::runtime_error(msg.c_str());
-  }
-
-  void WriteUnitPointer(gpg::WriteArchive* archive, moho::Unit* unit, const gpg::RRef& ownerRef)
-  {
-    const gpg::RRef objectRef = MakeTypedRef(unit, CachedUnitType());
-    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
-  }
-
-  /**
-   * Address: 0x00775E70 (FUN_00775E70)
-   *
-   * What it does:
-   * Deletes one `CEconomyEvent` instance when the pointer lane is non-null.
-   */
-  void DeleteEconomyEventIfPresent(void* const object)
-  {
-    auto* const event = static_cast<moho::CEconomyEvent*>(object);
-    if (!event) {
-      return;
-    }
-
-    delete event;
-  }
-
-  /**
-   * Address: 0x00776010 (FUN_00776010, sub_776010)
-   */
-  void DeserializeCEconomyEvent(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
-  {
-    auto* const event = reinterpret_cast<moho::CEconomyEvent*>(objectPtr);
-    GPG_ASSERT(event != nullptr);
-
-    gpg::RType* const baseType = CachedCScriptEventType();
-    GPG_ASSERT(baseType && baseType->serLoadFunc_);
-    gpg::RRef owner{};
-    baseType->serLoadFunc_(archive, objectPtr, baseType->version_, &owner);
-
-    event->mUnit = ReadUnitPointer(archive, owner);
-    archive->Read(CachedSEconValueType(), &event->mRequestedPerTick, owner);
-
-    moho::CEconRequest* const loadedRequest = ReadCEconRequestPointer(archive, owner);
-    DestroyEconomyRequestPointer(event->mRequest);
-    event->mRequest = loadedRequest;
-
-    archive->Read(CachedLuaObjectType(), &event->mProgressCallback, owner);
-    archive->ReadInt(&event->mRemainingTicks);
-    archive->ReadInt(&event->mTotalTicks);
-  }
-
-  /**
-   * Address: 0x00776140 (FUN_00776140, sub_776140)
-   */
-  void SerializeCEconomyEvent(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
-  {
-    auto* const event = reinterpret_cast<moho::CEconomyEvent*>(objectPtr);
-    GPG_ASSERT(event != nullptr);
-
-    gpg::RType* const baseType = CachedCScriptEventType();
-    GPG_ASSERT(baseType && baseType->serSaveFunc_);
-    gpg::RRef owner{};
-    baseType->serSaveFunc_(archive, objectPtr, baseType->version_, &owner);
-
-    WriteUnitPointer(archive, event->mUnit, owner);
-    archive->Write(CachedSEconValueType(), &event->mRequestedPerTick, owner);
-    WriteCEconRequestPointer(archive, event->mRequest, owner);
-    archive->Write(CachedLuaObjectType(), &event->mProgressCallback, owner);
-    archive->WriteInt(event->mRemainingTicks);
-    archive->WriteInt(event->mTotalTicks);
-  }
-
-  /**
-   * Address: 0x00775EB0 (FUN_00775EB0)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards economy-event save callback lanes into
-   * `SerializeCEconomyEvent`.
-   */
-  [[maybe_unused]] void SerializeCEconomyEventThunkA(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    SerializeCEconomyEvent(archive, objectPtr, version, ownerRef);
-  }
-
-  /**
-   * Address: 0x00776000 (FUN_00776000)
-   *
-   * What it does:
-   * Secondary tail-thunk alias that forwards economy-event save callback lanes
-   * into `SerializeCEconomyEvent`.
-   */
-  [[maybe_unused]] void SerializeCEconomyEventThunkB(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef
-  )
-  {
-    SerializeCEconomyEvent(archive, objectPtr, version, ownerRef);
-  }
 } // namespace
 
 /**
@@ -973,10 +544,7 @@ namespace moho
     gpg::SerConstructResult& result
   )
   {
-    auto* const request = new (std::nothrow) CEconRequest{};
-    gpg::RRef requestRef{};
-    requestRef = gpg::MakeRRef<moho::CEconRequest>(request);
-    result.SetUnowned(requestRef, 0u);
+    result.SetUnowned(gpg::MakeRRef(new CEconRequest()), 0u);
   }
 
   /**
@@ -998,14 +566,6 @@ namespace moho
     archive->Read(econValueType, &mRequested, nullOwner);
     archive->Read(econValueType, &mGranted, nullOwner);
   }
-
-  // Addresses 0x00774450/0x00774550 (the "ThunkA"/"ThunkB" load-lane
-  // duplicates formerly modeled here) are dead: zero data_refs/call_edges
-  // for both, and no source-level caller anywhere in src/sdk/**.
-  // `DeserializeCEconRequestSerializerCallback` above
-  // (`CEconRequestSerializer::Deserialize`, 0x00773A00) already forwards
-  // into `CEconRequest::MemberDeserialize` and is the real, wired body --
-  // confirmed by 3 real incoming xrefs incl. the CEconRequestSerializer ctor.
 
   /**
    * Address: 0x00774AE0 (FUN_00774AE0, Moho::CEconRequest::MemberSerialize)
@@ -1115,38 +675,6 @@ moho::CEconomyEvent::CEconomyEvent()
 {}
 
 /**
- * Address: 0x007754E0 (FUN_007754E0, sub_7754E0)
- *
- * What it does:
- * Allocates one default `CEconomyEvent` object and returns it as an unowned
- * serializer construct-result reference.
- */
-void moho::ConstructCEconomyEventForSerializer(gpg::SerConstructResult* const result)
-{
-  auto* const object = new (std::nothrow) CEconomyEvent();
-  gpg::RRef objectRef{};
-  objectRef = gpg::MakeRRef<moho::CEconomyEvent>(object);
-  result->SetUnowned(objectRef, 0u);
-}
-
-/**
- * Address: 0x007754D0 (FUN_007754D0)
- *
- * What it does:
- * Serializer construct-callback thunk that forwards to
- * `ConstructCEconomyEventForSerializer`.
- */
-[[maybe_unused]] void moho::ConstructCEconomyEventSerializerThunk(
-  gpg::ReadArchive* const,
-  const int,
-  gpg::RRef* const,
-  gpg::SerConstructResult* const result
-)
-{
-  ConstructCEconomyEventForSerializer(result);
-}
-
-/**
  * Address: 0x00775120 (FUN_00775120, scalar deleting thunk)
  * Address: 0x007751C0 (FUN_007751C0, sub_7751C0)
  */
@@ -1239,54 +767,9 @@ LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CEconomyEvent>::Create(Lu
   return SCR_CreateSimpleMetatable(state);
 }
 
-/**
- * Address: 0x00BDD360 (FUN_00BDD360, dynamic initializer for the global
- * `CEconomyEventConstruct` singleton)
- */
-moho::CEconomyEventConstruct::CEconomyEventConstruct()
-  : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCEconomyEventSerializerThunk))
-  , mDeleteFunc(&DeleteEconomyEventIfPresent)
-{}
-
-/**
- * Address: 0x00C024B0 (FUN_00C024B0, atexit target registered by the real
- * ctor above)
- */
-moho::CEconomyEventConstruct::~CEconomyEventConstruct() = default;
-
-/**
- * Address: 0x00775C40 (FUN_00775C40, sub_775C40)
- */
-void moho::CEconomyEventConstruct::Init()
-{
-  gpg::RType* const type = CachedCEconomyEventType();
-  GPG_ASSERT(type->serConstructFunc_ == nullptr);
-  type->serConstructFunc_ = mSerConstructFunc;
-  type->deleteFunc_ = mDeleteFunc;
-}
-
 namespace
 {
-  // Address: 0x010BB9A8 -- process-global `CEconomyEventConstruct` singleton.
-  // Constructing it runs CEconomyEventConstruct::CEconomyEventConstruct()
-  // (0x00BDD360), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches Init() on it from within the first ReadArchive/
-  // WriteArchive construction.
-  moho::CEconomyEventConstruct gCEconomyEventConstruct;
 } // namespace
-
-/**
- * Address: 0x00775CC0 (FUN_00775CC0, sub_775CC0)
- */
-void moho::CEconomyEventSerializer::Init()
-{
-  gpg::RType* const type = CachedCEconomyEventType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mSerLoadFunc;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSerSaveFunc;
-}
 
 /**
  * Address: 0x00774E40 (FUN_00774E40, scalar deleting destructor thunk)
@@ -1407,7 +890,7 @@ int moho::cfunc_RemoveEconomyEventL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject payload(LuaPlus::LuaStackObject(state, 2));
   CEconomyEvent* const event = func_GetCEconomyEvent(payload, state);
-  DeleteEconomyEventIfPresent(event);
+  delete event;
   return 0;
 }
 
@@ -1496,4 +979,116 @@ namespace
   };
 
   const CEconomyEventLuaFuncDefBootstrap gCEconomyEventLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x007754E0 (FUN_007754E0)
+   */
+  void CEconomyEvent::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CEconomyEvent()), 0u);
+  }
+
+  /**
+   * Address: 0x00776010 (FUN_00776010)
+   */
+  void CEconomyEvent::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef owner{};
+    archive->Read(gpg::RTypeOf<CScriptEvent>(), static_cast<CScriptEvent*>(this), owner);
+    archive->ReadPointer(&mUnit, &owner);
+    archive->Read(gpg::RTypeOf<SEconValue>(), &mRequestedPerTick, owner);
+
+    CEconRequest* request = nullptr;
+    archive->ReadPointerOwned(&request, &owner);
+    CEconRequest* const replaced = mRequest;
+    mRequest = request;
+    delete replaced;
+
+    archive->Read(gpg::RTypeOf<LuaPlus::LuaObject>(), &mProgressCallback, owner);
+    archive->ReadInt(&mRemainingTicks);
+    archive->ReadInt(&mTotalTicks);
+  }
+
+  /**
+   * Address: 0x00776140 (FUN_00776140)
+   */
+  void CEconomyEvent::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const gpg::RRef owner{};
+    archive->Write(gpg::RTypeOf<CScriptEvent>(), static_cast<const CScriptEvent*>(this), owner);
+    archive->WritePointer(mUnit, gpg::TrackedPointerState::Unowned, owner);
+    archive->Write(gpg::RTypeOf<SEconValue>(), &mRequestedPerTick, owner);
+    archive->WritePointer(mRequest, gpg::TrackedPointerState::Owned, owner);
+    archive->Write(gpg::RTypeOf<LuaPlus::LuaObject>(), &mProgressCallback, owner);
+    archive->WriteInt(mRemainingTicks);
+    archive->WriteInt(mTotalTicks);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CEconRequest>`, vtable 0x00E36E40.
+   *
+   * Address: 0x00BDD210 (FUN_00BDD210 -- constructs the global and registers its destructor.)
+   * Address: 0x00C023D0 (FUN_00C023D0 -- the global's destructor.)
+   * Address: 0x007738F0 (FUN_007738F0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00773EC0 (FUN_00773EC0 -- `Init`.)
+   * Address: 0x00773980 (FUN_00773980 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x007743E0 (FUN_007743E0 -- `Delete`.)
+   */
+  struct CEconRequestConstruct : gpg::SerConstructHelper<CEconRequest>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<CEconRequest>`, vtable 0x00E36E50.
+   *
+   * Address: 0x00BDD250 (FUN_00BDD250 -- constructs the global and registers its destructor.)
+   * Address: 0x00C02400 (FUN_00C02400 -- the global's destructor.)
+   * Address: 0x00773A20 (FUN_00773A20 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00773F40 (FUN_00773F40 -- `Init`.)
+   * Address: 0x00773A00 (FUN_00773A00 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00773A10 (FUN_00773A10 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CEconRequestSerializer : gpg::SerSaveLoadHelper<CEconRequest>
+  {};
+
+  /**
+   * `gpg::SerConstructHelper<CEconomyEvent>`, vtable 0x00E36FE4.
+   *
+   * Address: 0x00BDD360 (FUN_00BDD360 -- constructs the global and registers its destructor.)
+   * Address: 0x00C024B0 (FUN_00C024B0 -- the global's destructor.)
+   * Address: 0x00775C40 (FUN_00775C40 -- `Init`.)
+   * Address: 0x007754D0 (FUN_007754D0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x00775E70 (FUN_00775E70 -- `Delete`.)
+   */
+  struct CEconomyEventConstruct : gpg::SerConstructHelper<CEconomyEvent>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<CEconomyEvent>`, vtable 0x00E36FF4.
+   *
+   * Address: 0x00BDD3A0 (FUN_00BDD3A0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C024E0 (FUN_00C024E0 -- the global's destructor.)
+   * Address: 0x00775CC0 (FUN_00775CC0 -- `Init`.)
+   * Address: 0x00775570 (FUN_00775570 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00775580 (FUN_00775580 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CEconomyEventSerializer : gpg::SerSaveLoadHelper<CEconomyEvent>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BB81C -- process-global `CEconRequestConstruct` singleton.
+  moho::CEconRequestConstruct gCEconRequestConstruct;
+
+  // Address: 0x010BB808 -- process-global `CEconRequestSerializer` singleton.
+  moho::CEconRequestSerializer gCEconRequestSerializer;
+
+  // Address: 0x010BB9A8 -- process-global `CEconomyEventConstruct` singleton.
+  moho::CEconomyEventConstruct gCEconomyEventConstruct;
+
+  // Address: 0x010BB994 -- process-global `CEconomyEventSerializer` singleton.
+  moho::CEconomyEventSerializer gCEconomyEventSerializer;
 } // namespace

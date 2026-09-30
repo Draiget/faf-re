@@ -12,6 +12,7 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 namespace
 {
@@ -28,8 +29,6 @@ namespace
   // `ResetLinks()` shape, folded to separate addresses); they have no
   // distinct source-level body of their own.
   moho::MotorSinkAwaySerializer gMotorSinkAwaySerializer;
-  // Address: 0x010B528C -- process-global `MotorSinkAwayConstruct` singleton.
-  moho::MotorSinkAwayConstruct gMotorSinkAwayConstruct;
   std::int32_t gRecoveredCScrLuaMetatableFactoryMotorSinkAwayIndex = 0;
 
   /**
@@ -191,40 +190,6 @@ namespace
     out->mObj = ref.mObj;
     out->mType = ref.mType;
     return out;
-  }
-
-  /**
-   * Address: 0x006967F0 (FUN_006967F0, construct helper body)
-   * Address: 0x00696F70 (FUN_00696F70, construct helper thunk)
-   */
-  void Construct_MotorSinkAway_Object(gpg::SerConstructResult* const result)
-  {
-    moho::MotorSinkAway* const object = new (std::nothrow) moho::MotorSinkAway();
-    if (!result) {
-      return;
-    }
-
-    gpg::RRef ref{};
-    (void)gpg::RRef_MotorSinkAway(&ref, object);
-    result->SetUnowned(ref, 0u);
-  }
-
-  /**
-    * Alias of FUN_006967E0 (non-canonical helper lane).
-   */
-  void Construct_MotorSinkAway_Callback(
-    gpg::ReadArchive*, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    Construct_MotorSinkAway_Object(result);
-  }
-
-  /**
-   * Address: 0x00696F50 (FUN_00696F50, delete callback thunk)
-   */
-  void DeleteConstructedMotorSinkAway(void* const objectPtr)
-  {
-    delete static_cast<moho::MotorSinkAway*>(objectPtr);
   }
 
 } // namespace
@@ -439,38 +404,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5D70 (FUN_00BD5D70, dynamic initializer for the global
-   * `MotorSinkAwayConstruct` singleton)
-   */
-  MotorSinkAwayConstruct::MotorSinkAwayConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_MotorSinkAway_Callback))
-    , mDeleteCallback(&DeleteConstructedMotorSinkAway)
-  {}
-
-  /**
-   * Address: 0x00BFD270 (FUN_00BFD270, Moho::MotorSinkAwayConstruct::~MotorSinkAwayConstruct)
-   *
-   * `FUN_00696780` and `FUN_006967B0` are duplicate-emission twins of this
-   * exact unlink/reset lane (same `ResetLinks()` shape, folded to separate
-   * addresses); they have no distinct source-level body of their own.
-   */
-  MotorSinkAwayConstruct::~MotorSinkAwayConstruct() = default;
-
-  /**
-   * Address: 0x00696C60 (FUN_00696C60, Moho::MotorSinkAwayConstruct::Init)
-   *
-   * What it does:
-   * Binds construct/delete callbacks into reflected RTTI for `MotorSinkAway`.
-   */
-  void MotorSinkAwayConstruct::Init()
-  {
-    gpg::RType* const type = CachedMotorSinkAwayType();
-    GPG_ASSERT(type->serConstructFunc_ == nullptr);
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
-
-  /**
    * Address: 0x00BD5D50 (FUN_00BD5D50, register_MotorSinkAwayTypeInfo)
    * Address: 0x00BFD210 (FUN_00BFD210, atexit destructor of the MotorSinkAwayTypeInfo object)
    */
@@ -552,3 +485,33 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_MotorSinkAwayTypeInfo_905beb, moho::register_MotorSinkAwayTypeInfo)
+
+namespace moho
+{
+  /**
+   * Address: 0x006967F0 (FUN_006967F0)
+   */
+  void MotorSinkAway::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new MotorSinkAway()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<MotorSinkAway>`, vtable 0x00E292B8.
+   *
+   * Address: 0x00BD5D70 (FUN_00BD5D70 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFD270 (FUN_00BFD270 -- the global's destructor.)
+   * Address: 0x00696750 (FUN_00696750 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00696C60 (FUN_00696C60 -- `Init`.)
+   * Address: 0x006967E0 (FUN_006967E0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x00696F50 (FUN_00696F50 -- `Delete`.)
+   */
+  struct MotorSinkAwayConstruct : gpg::SerConstructHelper<MotorSinkAway>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B528C -- process-global `MotorSinkAwayConstruct` singleton.
+  moho::MotorSinkAwayConstruct gMotorSinkAwayConstruct;
+} // namespace

@@ -80,6 +80,17 @@ namespace moho
     void Unstage();
 
     /**
+     * Address: 0x004094F0 (FUN_004094F0)
+     *
+     * What it does:
+     * Builds a new `CTaskThread` for an archive load and hands it back unowned; its
+     * members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
      * Address: 0x0040CF90 (FUN_0040CF90, Moho::CTaskThread::MemberDeserialize)
      *
      * What it does:
@@ -100,65 +111,6 @@ namespace moho
   static_assert(offsetof(CTaskThread, mTaskTop) == 0x10, "CTaskThread::mTaskTop offset must be 0x10");
   static_assert(offsetof(CTaskThread, mPendingFrames) == 0x14, "CTaskThread::mPendingFrames offset must be 0x14");
   static_assert(offsetof(CTaskThread, mStaged) == 0x18, "CTaskThread::mStaged offset must be 0x18");
-
-  class CTaskThreadConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC3040 (FUN_00BC3040, dynamic initializer for the global
-     * `CTaskThreadConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields.
-     */
-    CTaskThreadConstruct();
-
-    /**
-     * Address: 0x00BEE3A0 (FUN_00BEE3A0, Moho::CTaskThreadConstruct::~CTaskThreadConstruct)
-     */
-    ~CTaskThreadConstruct();
-
-    /**
-     * Address: 0x004094E0 (FUN_004094E0, Moho::CTaskThreadConstruct::Construct)
-     * Address: 0x00724910 (FUN_00724910)
-     *
-     * What it does:
-     * Forwards serializer construct callback into CTaskThread allocation/init path.
-     */
-    static void Construct(
-      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
-    );
-
-    /**
-     * Address: 0x0040B420 (FUN_0040B420, Moho::CTaskThreadConstruct::Deconstruct)
-     *
-     * What it does:
-     * Runs `CTaskThread` destructor and releases storage for constructed object.
-     */
-    static void Deconstruct(void* object);
-
-    /**
-     * Address: 0x0040A630 (FUN_0040A630, Moho::CTaskThreadConstruct::Init)
-     *
-     * What it does:
-     * Binds construct/delete callbacks into CTaskThread RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
-    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
-  };
-
-  static_assert(
-    offsetof(CTaskThreadConstruct, mSerConstructFunc) == 0x0C,
-    "CTaskThreadConstruct::mSerConstructFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CTaskThreadConstruct, mDeleteFunc) == 0x10, "CTaskThreadConstruct::mDeleteFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CTaskThreadConstruct) == 0x14, "CTaskThreadConstruct size must be 0x14");
 
   class CTaskThreadSerializer : public gpg::SerHelperBase
   {

@@ -968,7 +968,7 @@ namespace moho
    * search box via reflected `Write`, the tick counter via the virtual
    * `WriteInt` slot, and the membership node via reflected `Write`.
    */
-  void CUnitPatrolTask::MemberSerialize(gpg::WriteArchive* const archive)
+  void CUnitPatrolTask::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     if (archive == nullptr) {
       return;
@@ -976,7 +976,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    archive->Write(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
 
     gpg::RRef pointerRef{};
     (void)gpg::RRef_CCommandTask(&pointerRef, static_cast<CCommandTask*>(mDispatch));
@@ -1055,302 +1055,52 @@ namespace moho
 
 } // namespace moho
 
-namespace gpg
-{
-  /**
-   * Address: 0x0061CCA0 (FUN_0061CCA0, gpg::RRef_CUnitPatrolTask)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CUnitPatrolTask*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitPatrolTask(gpg::RRef* const outRef, moho::CUnitPatrolTask* const value)
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitPatrolTaskType());
-    return outRef;
-  }
-
-  /**
-   * Address: 0x0061CBF0 (FUN_0061CBF0)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary `RRef_CUnitPatrolTask` and
-   * copies object/type fields into the destination reference record.
-   */
-  gpg::RRef* AssignCUnitPatrolTaskRef(gpg::RRef* const outRef, moho::CUnitPatrolTask* const value)
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    gpg::RRef temporaryRef{};
-    (void)RRef_CUnitPatrolTask(&temporaryRef, value);
-    outRef->mObj = temporaryRef.mObj;
-    outRef->mType = temporaryRef.mType;
-    return outRef;
-  }
-} // namespace gpg
 
 namespace
 {
+
+} // namespace
+
+namespace moho
+{
   /**
-   * VFTABLE: 0x00E20794 (`??_7CUnitPatrolTaskSerializer@Moho@@6B@`)
-   * Also installed as: 0x00E2079C (`??_7?$SerSaveLoadHelper@VCUnitPatrolTask@Moho@@@gpg@@6B@`)
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class Moho::CUnitPatrolTask>
-   *
-   * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
-   * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
-   * load/save callback lanes@0x0C-0x13. Total 0x14 bytes.
+   * Address: 0x0061AD10 (FUN_0061AD10)
    */
-  class CUnitPatrolTaskSerializerHelperNode : public gpg::SerHelperBase
+  void CUnitPatrolTask::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-  public:
-    /**
-     * Address: 0x00BD1340 (FUN_00BD1340, dynamic initializer for the global
-     * `CUnitPatrolTaskSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the process-global `sNewHelpers` pending list), then
-     * binds the load/save callback fields.
-     */
-    CUnitPatrolTaskSerializerHelperNode();
-
-    /**
-     * Address: 0x00BFA1B0 (FUN_00BFA1B0, dynamic atexit destructor for `gCUnitPatrolTaskSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). The compiler registers it with
-     * `atexit` from the global's dynamic initializer (0x00BD1340).
-     * `FUN_0061ADF0` and `FUN_0061AE20` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~CUnitPatrolTaskSerializerHelperNode() = default;
-
-    /**
-     * Address: 0x0061C6E0 (FUN_0061C6E0, gpg::SerSaveLoadHelper<Moho::CUnitPatrolTask>::Init)
-     *
-     * What it does:
-     * Resolves `CUnitPatrolTask` RTTI and installs this helper's load/save
-     * callbacks into the reflected type descriptor.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-  static_assert(
-    offsetof(CUnitPatrolTaskSerializerHelperNode, mSerLoadFunc) == 0x0C,
-    "CUnitPatrolTaskSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CUnitPatrolTaskSerializerHelperNode, mSerSaveFunc) == 0x10,
-    "CUnitPatrolTaskSerializerHelperNode::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(
-    sizeof(CUnitPatrolTaskSerializerHelperNode) == 0x14,
-    "CUnitPatrolTaskSerializerHelperNode size must be 0x14"
-  );
-
-  CUnitPatrolTaskSerializerHelperNode gCUnitPatrolTaskSerializer;
-
-  /**
-   * Address: 0x0061ADA0 (FUN_0061ADA0, Moho::CUnitPatrolTaskSerializer::Deserialize)
-   *
-   * IDA signature:
-   * int __cdecl Deserialize(ReadArchive* archive, void* objectPtr, int version, RRef* ownerRef);
-   *
-   * What it does:
-   * Reflection load-callback facade for `CUnitPatrolTask`. Forwards the
-   * reflected object pointer to the class member load body; `version` and the
-   * owner-ref lane are unused by the member (mirrors the binary tail-jump).
-   */
-  void CUnitPatrolTaskSerializerDeserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const task = reinterpret_cast<moho::CUnitPatrolTask*>(objectPtr);
-    if (task == nullptr) {
-      return;
-    }
-    task->MemberDeserialize(archive);
+    result.SetUnowned(gpg::MakeRRef(new CUnitPatrolTask()), 0u);
   }
 
   /**
-   * Address: 0x0061ADB0 (FUN_0061ADB0, Moho::CUnitPatrolTaskSerializer::Serialize)
+   * `gpg::SerConstructHelper<CUnitPatrolTask>`, vtable 0x00E20784.
    *
-   * IDA signature:
-   * int __cdecl Serialize(WriteArchive* archive, void* objectPtr, int version, RRef* ownerRef);
-   *
-   * What it does:
-   * Reflection save-callback facade for `CUnitPatrolTask`. Forwards the
-   * reflected object pointer to the class member save body; `version` and the
-   * owner-ref lane are unused by the member (mirrors the binary tail-jump).
+   * Address: 0x00BD1300 (FUN_00BD1300 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFA180 (FUN_00BFA180 -- the global's destructor.)
+   * Address: 0x0061C660 (FUN_0061C660 -- `Init`.)
+   * Address: 0x0061AD00 (FUN_0061AD00 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x0061CBC0 (FUN_0061CBC0 -- `Delete`.)
    */
-  void CUnitPatrolTaskSerializerSerialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const task = reinterpret_cast<moho::CUnitPatrolTask*>(objectPtr);
-    if (task == nullptr) {
-      return;
-    }
-    task->MemberSerialize(archive);
-  }
-
-  CUnitPatrolTaskSerializerHelperNode::CUnitPatrolTaskSerializerHelperNode()
-    : mSerLoadFunc(&CUnitPatrolTaskSerializerDeserialize)
-    , mSerSaveFunc(&CUnitPatrolTaskSerializerSerialize)
-  {}
-
-  void CUnitPatrolTaskSerializerHelperNode::Init()
-  {
-    gpg::RType* const type = CachedCUnitPatrolTaskType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
+  struct CUnitPatrolTaskConstruct : gpg::SerConstructHelper<CUnitPatrolTask>
+  {};
 
   /**
-   * VFTABLE: 0x00E20784 (`??_7CUnitPatrolTaskConstruct@Moho@@6B@`)
-   * Also installed as: 0x00E2078C (`??_7?$SerConstructHelper@VCUnitPatrolTask@Moho@@@gpg@@6B@`)
+   * `gpg::SerSaveLoadHelper<CUnitPatrolTask>`, vtable 0x00E20794.
    *
-   * Demangled: gpg::SerConstructHelper<class Moho::CUnitPatrolTask>
-   *
-   * Binary layout: vtable@0x00 (`gpg::SerHelperBase`), intrusive link pair
-   * @0x04-0x0B (`moho::TDatListItem`, inherited via `SerHelperBase`),
-   * construct/delete callback lanes@0x0C-0x13. Total 0x14 bytes.
+   * Address: 0x00BD1340 (FUN_00BD1340 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFA1B0 (FUN_00BFA1B0 -- the global's destructor.)
+   * Address: 0x0061C6E0 (FUN_0061C6E0 -- `Init`.)
+   * Address: 0x0061ADA0 (FUN_0061ADA0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0061ADB0 (FUN_0061ADB0 -- `Serialize`, a forward to `MemberSerialize`.)
    */
-  class CUnitPatrolTaskConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD1300 (FUN_00BD1300, dynamic initializer for the global
-     * `CUnitPatrolTaskConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the process-global `sNewHelpers` pending list), then
-     * binds the construct/delete callback fields.
-     */
-    CUnitPatrolTaskConstruct();
+  struct CUnitPatrolTaskSerializer : gpg::SerSaveLoadHelper<CUnitPatrolTask>
+  {};
+} // namespace moho
 
-    /**
-     * Address: 0x00BFA180 (FUN_00BFA180, dynamic atexit destructor for `gCUnitPatrolTaskConstruct`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_0061ACA0` and `FUN_0061ACD0` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~CUnitPatrolTaskConstruct() = default;
+namespace
+{
+  // Address: 0x010B19BC -- process-global `CUnitPatrolTaskConstruct` singleton.
+  moho::CUnitPatrolTaskConstruct gCUnitPatrolTaskConstruct;
 
-    /**
-     * Address: 0x0061C660 (FUN_0061C660, gpg::SerConstructHelper<Moho::CUnitPatrolTask>::Init)
-     *
-     * What it does:
-     * Lazily resolves the `CUnitPatrolTask` reflection descriptor, asserts
-     * the construct callback slot is empty, and publishes this helper's
-     * construct/delete callbacks to the descriptor.
-     *
-     * Notes:
-     * Mirrors the binary's single `!type->mSerConstructFunc` assert (no
-     * separate delete-slot assert); intentionally diverges from the broader
-     * `RegisterConstructCallbacks` helper used in other subsystems.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
-  };
-  static_assert(
-    offsetof(CUnitPatrolTaskConstruct, mConstructCallback) == 0x0C,
-    "CUnitPatrolTaskConstruct::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CUnitPatrolTaskConstruct, mDeleteCallback) == 0x10,
-    "CUnitPatrolTaskConstruct::mDeleteCallback offset must be 0x10"
-  );
-  static_assert(sizeof(CUnitPatrolTaskConstruct) == 0x14, "CUnitPatrolTaskConstruct size must be 0x14");
-
-  CUnitPatrolTaskConstruct gCUnitPatrolTaskConstruct;
-
-  /**
-   * Address: 0x0061AD10 (FUN_0061AD10, Moho::CUnitPatrolTaskConstruct::Construct)
-   *
-   * What it does:
-   * Allocates one `CUnitPatrolTask` instance via `operator new(0xF0u)`,
-   * default-constructs it, wraps the result in a typed `gpg::RRef_CUnitPatrolTask`,
-   * and publishes the payload as an unowned construct result through
-   * `gpg::SerConstructResult::SetUnowned`. Invoked by the reflection
-   * subsystem during archive replay when a patrol-task instance must be
-   * materialized before its fields are streamed in.
-   *
-   * The reflected slot actually holds the thunk at 0x0061AD00, which takes the
-   * dispatcher's four arguments and forwards only `arg_C` (the construct
-   * result) to this body -- MSVC's way of adapting a one-argument source
-   * function to the `mSerConstructFunc` signature. The source is the four
-   * argument form; the thunk is the emission, not a separate function.
-   */
-  void ConstructCUnitPatrolTaskSerializerCallback(
-    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    if (result == nullptr) {
-      return;
-    }
-
-    auto* const task = new (std::nothrow) moho::CUnitPatrolTask{};
-    gpg::RRef taskRef{};
-    (void)gpg::RRef_CUnitPatrolTask(&taskRef, task);
-    result->SetUnowned(taskRef, 0u);
-  }
-
-  /**
-   * Address: 0x0061ADC0 (FUN_0061ADC0, Moho::CUnitPatrolTaskConstruct::Deconstruct)
-   *
-   * What it does:
-   * Releases one heap-owned `CUnitPatrolTask` instance via the standard
-   * scalar `delete` expression; mirrors the binary's reflection-side
-   * destructor lane that fires when the construct result is discarded.
-   */
-  void DestructCUnitPatrolTaskSerializerCallback(void* const taskStorage)
-  {
-    delete static_cast<moho::CUnitPatrolTask*>(taskStorage);
-  }
-
-  CUnitPatrolTaskConstruct::CUnitPatrolTaskConstruct()
-    : mConstructCallback(&ConstructCUnitPatrolTaskSerializerCallback)
-    , mDeleteCallback(&DestructCUnitPatrolTaskSerializerCallback)
-  {}
-
-  void CUnitPatrolTaskConstruct::Init()
-  {
-    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
-    constexpr int kSerializationConstructLine = 231;
-    constexpr const char* kSerializationSourcePath =
-      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-
-    gpg::RType* const type = CachedCUnitPatrolTaskType();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
-    }
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
+  // Address: 0x010B1A64 -- process-global `CUnitPatrolTaskSerializer` singleton.
+  moho::CUnitPatrolTaskSerializer gCUnitPatrolTaskSerializer;
 } // namespace

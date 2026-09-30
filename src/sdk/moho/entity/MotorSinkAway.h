@@ -17,6 +17,13 @@ namespace LuaPlus
   class LuaState;
 } // namespace LuaPlus
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+} // namespace gpg
+
 namespace moho
 {
   /**
@@ -60,6 +67,17 @@ namespace moho
      * Address: 0x00696940 (FUN_00696940, update lane)
      */
     void Update(Entity* entity) override;
+
+    /**
+     * Address: 0x006967F0 (FUN_006967F0)
+     *
+     * What it does:
+     * Builds a new `MotorSinkAway` for an archive load and hands it back unowned; its
+     * members are loaded over it afterwards.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x00697200 (FUN_00697200, Moho::MotorSinkAway::MemberDeserialize)
@@ -172,44 +190,6 @@ namespace moho
    */
   struct MotorSinkAwaySerializer : gpg::SerSaveLoadHelper<MotorSinkAway>
   {};
-
-  class MotorSinkAwayConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD5D70 (FUN_00BD5D70, dynamic initializer for the global
-     * `MotorSinkAwayConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields.
-     */
-    MotorSinkAwayConstruct();
-
-    /**
-     * Address: 0x00BFD270 (FUN_00BFD270, Moho::MotorSinkAwayConstruct::~MotorSinkAwayConstruct)
-     */
-    ~MotorSinkAwayConstruct();
-
-    /**
-     * Address: 0x00696C60 (FUN_00696C60, Moho::MotorSinkAwayConstruct::Init)
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mConstructCallback; // +0x0C
-    gpg::RType::delete_func_t mDeleteCallback;         // +0x10
-  };
-
-  static_assert(
-    offsetof(MotorSinkAwayConstruct, mConstructCallback) == 0x0C,
-    "MotorSinkAwayConstruct::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(MotorSinkAwayConstruct, mDeleteCallback) == 0x10,
-    "MotorSinkAwayConstruct::mDeleteCallback offset must be 0x10"
-  );
-  static_assert(sizeof(MotorSinkAwayConstruct) == 0x14, "MotorSinkAwayConstruct size must be 0x14");
 
   /**
    * Address: 0x00BD5D50 (FUN_00BD5D50, register_MotorSinkAwayTypeInfo)

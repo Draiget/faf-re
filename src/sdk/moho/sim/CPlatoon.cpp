@@ -151,44 +151,6 @@ namespace
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
 
-  // Address: 0x00BDABE0 (FUN_00BDABE0, dynamic initializer for the global
-  // `CSquadConstruct` singleton) -- MSVC's own compiler-generated dynamic
-  // initializer for this global runs the real ctor (self-links into
-  // `sNewHelpers`, binds the construct/delete callback fields, installs
-  // `CSquadConstruct`'s own vtable) and registers the real destructor
-  // (0x00C004D0) via `atexit`. Two dead zero-xref COMDAT duplicate ctors:
-  // 0x00724880 (own vtable) and 0x0072A540 (installs
-  // `gpg::SerConstructHelper<CSquad>`'s vtable onto this same global).
-  moho::CSquadConstruct gCSquadConstructHelper;
-
-  // Address: 0x00BDAC80 (FUN_00BDAC80, dynamic initializer for the global
-  // `CPlatoonConstruct` singleton) -- same shape as gCSquadConstructHelper
-  // above. Real destructor: 0x00C00590. Two dead zero-xref COMDAT
-  // duplicate ctors: 0x0072A030 (own vtable) and 0x0072A660 (installs
-  // `gpg::SerConstructHelper<CPlatoon>`'s vtable onto this same global).
-  moho::CPlatoonConstruct gCPlatoonConstructHelper;
-
-  // Address: 0x00BDAC20 (FUN_00BDAC20, dynamic initializer for the global
-  // `CSquadSerializer` singleton) -- MSVC's own compiler-generated dynamic
-  // initializer for this global runs the real ctor (self-links into
-  // `sNewHelpers`, binds `mLoadCallback`/`mSaveCallback`, installs
-  // `CSquadSerializer`'s own vtable -- NOT the template's; see the
-  // class-level comment in CSquad.h) and registers the real mangled
-  // destructor (`??1CSquadSerializer@Moho@@QAE@@Z`, 0x00C00500) via
-  // `atexit`. Two dead zero-xref COMDAT duplicate ctors: 0x007249D0 (own
-  // vtable) and 0x0072A5C0 (template vtable).
-  moho::CSquadSerializer gCSquadSerializer;
-
-  // Address: 0x00BDACC0 (FUN_00BDACC0, dynamic initializer for the global
-  // `CPlatoonSerializer` singleton) -- same shape as gCSquadSerializer
-  // above, for `CPlatoonSerializer`'s own vtable (NOT
-  // `gpg::SerSaveLoadHelper<CPlatoon>`'s; see the class-level comment in
-  // CPlatoon.h). Real destructor: 0x00C005C0 (no recovered mangled name;
-  // body confirmed via raw asm to just call ResetLinks()). Two dead
-  // zero-xref COMDAT duplicate ctors: 0x0072A180 (own vtable) and
-  // 0x0072A6E0 (template vtable).
-  moho::CPlatoonSerializer gCPlatoonSerializer;
-
   /**
    * Address: 0x0072AA20 (FUN_0072AA20)
    *
@@ -783,110 +745,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x0072A0C0 (FUN_0072A0C0)
-   *
-   * What it does:
-   * Forwards the platoon serializer's construct callback to
-   * `CPlatoon::ConstructForSerializer`. Address-taken into
-   * `CPlatoonConstruct::mConstructCallback`.
-   */
-  void ConstructCPlatoonForSerializerThunk(
-    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    CPlatoon::ConstructForSerializer(result);
-  }
-
-  /**
    * Address: 0x0072A0D0 (FUN_0072A0D0, sub_72A0D0)
    */
-  void CPlatoon::ConstructForSerializer(gpg::SerConstructResult* const result)
+  void CPlatoon::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    auto* const object = new (std::nothrow) CPlatoon();
-    gpg::RRef objectRef{};
-    objectRef = gpg::MakeRRef<moho::CPlatoon>(object);
-    result->SetUnowned(objectRef, 0u);
-  }
-
-  /**
-   * Address: 0x00724920 (FUN_00724920, sub_724920)
-   *
-   * IDA signature:
-   * void __cdecl sub_724920(gpg::SerConstructResult *a1);
-   *
-   * What it does:
-   * Serializer construct callback for CSquad: `new CSquad()` (operator new
-   * 0x00A825B9, then the default constructor 0x00723E00), `RRef_CSquad`
-   * (0x0072AF00) on it, and `SetUnowned` (0x0094F630) into the result.
-   * This recovery used to open-code the constructor's member initialisation
-   * on `nothrow` storage, write the +0x04 word the binary never touches, and
-   * skip the store when `result` was null; none of that is in the binary.
-   */
-  void ConstructCSquadForSerializer(
-    gpg::ReadArchive* const,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
-  )
-  {
-    CSquad* const squad = new CSquad();
-    gpg::RRef objectRef{};
-    objectRef = gpg::MakeRRef<moho::CSquad>(squad);
-    result->SetUnowned(objectRef, 0u);
-  }
-
-  /**
-   * Address: 0x0072AB70 (FUN_0072AB70)
-   *
-   * What it does:
-   * Single-argument serializer-construct adapter that forwards directly to
-   * `ConstructCSquadForSerializer` (FUN_00724920).  Used by the 4-arg
-   * reflection-construct thunk below and by RType construct-callback slots
-   * that supply only the `SerConstructResult` pointer.
-   */
-  int ConstructCSquadForSerializerAlias(gpg::SerConstructResult* const result)
-  {
-    ConstructCSquadForSerializer(nullptr, 0, 0, result);
-    return 0;
-  }
-
-  /**
-   * Address: 0x00724910 (FUN_00724910, sub_724910)
-   *
-   * What it does:
-   * Four-argument reflection-construct adapter: discards the archive and
-   * version operands and forwards the result slot to the CSquad construct
-   * callback.
-   */
-  int ConstructCSquadForSerializerThunk(const int, const int, gpg::RRef* const, gpg::SerConstructResult* const result)
-  {
-    return ConstructCSquadForSerializerAlias(result);
-  }
-
-  /**
-   * Address: 0x0072AB80 (FUN_0072AB80)
-   *
-   * What it does:
-   * Builds one reflected `RRef` for `squad` and copies it into `outRef`.
-   */
-  [[maybe_unused]] gpg::RRef* AssignCSquadRef(gpg::RRef& outRef, CSquad* const squad)
-  {
-    outRef.mObj = squad;
-    outRef.mType = CachedCSquadType();
-    return &outRef;
-  }
-
-  /**
-   * Address: 0x0072AC70 (FUN_0072AC70)
-   *
-   * What it does:
-   * Serializer construct adapter that forwards to
-   * `CPlatoon::ConstructForSerializer`.
-   */
-  [[maybe_unused]] int ConstructCPlatoonForSerializerAlias(gpg::SerConstructResult* const result)
-  {
-    CPlatoon::ConstructForSerializer(result);
-    return 0;
+    result.SetUnowned(gpg::MakeRRef(new CPlatoon()), 0u);
   }
 
   /**
@@ -1005,254 +868,6 @@ namespace moho
     archive->WriteInt(mLosses);
     archive->WriteFloat(mDamageDealt);
     archive->WriteFloat(mDamageReceived);
-  }
-
-  /**
-   * Address: 0x0072AB50 (FUN_0072AB50, sub_72AB50)
-   *
-   * IDA signature:
-   * void __cdecl sub_72AB50(Moho::CSquad* a1);
-   *
-   * What it does:
-   * Serializer delete-callback for CSquad instances: destroys the squad and frees
-   * its storage. Address-taken into `gCSquadConstructHelper.mDeleteCallback`.
-   */
-  void DeleteConstructedCSquadForSerializer(void* const objectPtr)
-  {
-    auto* const squad = static_cast<CSquad*>(objectPtr);
-    if (squad == nullptr) {
-      return;
-    }
-
-    squad->~CSquad();
-    ::operator delete(squad);
-  }
-
-  /**
-   * Address: 0x0072AC50 (FUN_0072AC50, sub_72AC50)
-   *
-   * IDA signature:
-   * int __cdecl sub_72AC50(int a1);
-   *
-   * What it does:
-   * Serializer delete-callback for CPlatoon instances. Raw disassembly is a
-   * virtual dispatch through the object's own vtable slot 2 with a
-   * `shouldDelete=1` flag -- the standard MSVC scalar-deleting-destructor
-   * shape for a polymorphic type, i.e. exactly what `delete
-   * static_cast<CPlatoon*>(objectPtr)` compiles to for a type with a
-   * virtual destructor (`CPlatoon` derives `CScriptObject`). Address-taken
-   * into `CPlatoonConstruct::mDeleteCallback`.
-   */
-  void DeleteConstructedCPlatoonForSerializer(void* const objectPtr)
-  {
-    if (objectPtr == nullptr) {
-      return;
-    }
-
-    delete static_cast<CPlatoon*>(objectPtr);
-  }
-
-  /**
-   * Address: 0x00BDABE0 (FUN_00BDABE0, dynamic initializer for the global
-   * `CSquadConstruct` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * construct/delete callback fields.
-   */
-  CSquadConstruct::CSquadConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCSquadForSerializerThunk))
-    , mDeleteCallback(&DeleteConstructedCSquadForSerializer)
-  {}
-
-  /**
-   * Address: 0x00C004D0 (FUN_00C004D0, Moho::CSquadConstruct::~CSquadConstruct)
-   *
-   * `FUN_007248B0` and `FUN_007248E0` are duplicate-emission twins of this
-   * exact unlink/reset body (same `ResetLinks()` shape, folded to separate
-   * addresses); they have no distinct source-level body of their own.
-   */
-  CSquadConstruct::~CSquadConstruct() = default;
-
-  /**
-   * Address: 0x0072A570 (FUN_0072A570, Moho::CSquadConstruct::Init)
-   *
-   * What it does:
-   * Virtual-method body installed at `CSquadConstruct`'s (and, ICF-shared,
-   * `gpg::SerConstructHelper<CSquad>`'s) vtable slot 0. Lazily resolves the
-   * `CSquad` reflection descriptor, asserts the construct callback slot is
-   * empty, and publishes this helper's construct/delete callbacks to the
-   * descriptor.
-   *
-   * Notes:
-   * Mirrors the binary's single `!type->mSerConstructFunc` assert (no
-   * separate delete-slot assert), confirmed from raw disassembly.
-   */
-  void CSquadConstruct::Init()
-  {
-    constexpr const char* kSquadConstructAssertText = "!type->mSerConstructFunc";
-    constexpr int kSquadSerializationConstructLine = 231;
-    constexpr const char* kSquadSerializationSourcePath =
-      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-
-    gpg::RType* const type = CachedCSquadType();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(
-        kSquadConstructAssertText,
-        kSquadSerializationConstructLine,
-        kSquadSerializationSourcePath
-      );
-    }
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
-
-  /**
-   * Address: 0x00BDAC80 (FUN_00BDAC80, dynamic initializer for the global
-   * `CPlatoonConstruct` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * construct/delete callback fields.
-   */
-  CPlatoonConstruct::CPlatoonConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCPlatoonForSerializerThunk))
-    , mDeleteCallback(&DeleteConstructedCPlatoonForSerializer)
-  {}
-
-  /**
-   * Address: 0x00C00590 (FUN_00C00590, Moho::CPlatoonConstruct::~CPlatoonConstruct)
-   *
-   * `FUN_0072A060` and `FUN_0072A090` are duplicate-emission twins of this
-   * exact unlink/reset body (same `ResetLinks()` shape, folded to separate
-   * addresses); they have no distinct source-level body of their own.
-   */
-  CPlatoonConstruct::~CPlatoonConstruct() = default;
-
-  /**
-   * Address: 0x0072A690 (FUN_0072A690, Moho::CPlatoonConstruct::Init)
-   *
-   * What it does:
-   * Virtual-method body installed at `CPlatoonConstruct`'s (and,
-   * ICF-shared, `gpg::SerConstructHelper<CPlatoon>`'s) vtable slot 0.
-   * Lazily resolves the `CPlatoon` reflection descriptor, asserts the
-   * construct callback slot is empty, and publishes this helper's
-   * construct/delete callbacks to the descriptor.
-   *
-   * Notes:
-   * Mirrors the binary's single `!type->mSerConstructFunc` assert (no
-   * separate delete-slot assert), confirmed from raw disassembly.
-   */
-  void CPlatoonConstruct::Init()
-  {
-    constexpr const char* kPlatoonConstructAssertText = "!type->mSerConstructFunc";
-    constexpr int kPlatoonSerializationConstructLine = 231;
-    constexpr const char* kPlatoonSerializationSourcePath =
-      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-
-    gpg::RType* const type = CachedCPlatoonType();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(
-        kPlatoonConstructAssertText,
-        kPlatoonSerializationConstructLine,
-        kPlatoonSerializationSourcePath
-      );
-    }
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
-
-  /**
-   * Address: 0x007249B0 (FUN_007249B0, Moho::CSquadSerializer::Deserialize)
-   */
-  void CSquadSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    reinterpret_cast<CSquad*>(objectPtr)->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x007249C0 (FUN_007249C0, Moho::CSquadSerializer::Serialize)
-   */
-  void CSquadSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    reinterpret_cast<const CSquad*>(objectPtr)->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00BDAC20 (FUN_00BDAC20, dynamic initializer for the global
-   * `CSquadSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  CSquadSerializer::CSquadSerializer()
-    : mLoadCallback(&CSquadSerializer::Deserialize)
-    , mSaveCallback(&CSquadSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00C00500 (`??1CSquadSerializer@Moho@@QAE@@Z`,
-   * Moho::CSquadSerializer::~CSquadSerializer)
-   */
-  CSquadSerializer::~CSquadSerializer() = default;
-
-  /**
-   * Address: 0x0072A5F0 (FUN_0072A5F0, Moho::CSquadSerializer::Init)
-   */
-  void CSquadSerializer::Init()
-  {
-    gpg::RType* const type = CachedCSquadType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  /**
-   * Address: 0x0072A160 (FUN_0072A160, Moho::CPlatoonSerializer::Deserialize)
-   */
-  void CPlatoonSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    reinterpret_cast<CPlatoon*>(objectPtr)->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0072A170 (FUN_0072A170, Moho::CPlatoonSerializer::Serialize)
-   */
-  void CPlatoonSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    reinterpret_cast<const CPlatoon*>(objectPtr)->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00BDACC0 (FUN_00BDACC0, dynamic initializer for the global
-   * `CPlatoonSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  CPlatoonSerializer::CPlatoonSerializer()
-    : mLoadCallback(&CPlatoonSerializer::Deserialize)
-    , mSaveCallback(&CPlatoonSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00C005C0 (FUN_00C005C0, Moho::CPlatoonSerializer::~CPlatoonSerializer)
-   */
-  CPlatoonSerializer::~CPlatoonSerializer() = default;
-
-  /**
-   * Address: 0x0072A710 (FUN_0072A710, Moho::CPlatoonSerializer::Init)
-   */
-  void CPlatoonSerializer::Init()
-  {
-    gpg::RType* const type = CachedCPlatoonType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
   }
 
   /**
@@ -6803,4 +6418,88 @@ namespace
   };
 
   const CPlatoonLuaFuncDefBootstrap gCPlatoonLuaFuncDefBootstrap{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00724920 (FUN_00724920)
+   */
+  void CSquad::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    result.SetUnowned(gpg::MakeRRef(new CSquad()), 0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CSquad>`, vtable 0x00E31B68.
+   *
+   * Address: 0x00BDABE0 (FUN_00BDABE0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C004D0 (FUN_00C004D0 -- the global's destructor.)
+   * Address: 0x00724880 (FUN_00724880 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0072A570 (FUN_0072A570 -- `Init`.)
+   * Address: 0x00724910 (FUN_00724910 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x0072AB50 (FUN_0072AB50 -- `Delete`.)
+   */
+  struct CSquadConstruct : gpg::SerConstructHelper<CSquad>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<CSquad>`, vtable 0x00E31B78.
+   *
+   * Address: 0x00BDAC20 (FUN_00BDAC20 -- constructs the global and registers its destructor.)
+   * Address: 0x00C00500 (FUN_00C00500 -- the global's destructor.)
+   * Address: 0x007249D0 (FUN_007249D0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0072A5F0 (FUN_0072A5F0 -- `Init`.)
+   * Address: 0x007249B0 (FUN_007249B0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x007249C0 (FUN_007249C0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CSquadSerializer : gpg::SerSaveLoadHelper<CSquad>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B9688 -- process-global `CSquadConstruct` singleton.
+  moho::CSquadConstruct gCSquadConstruct;
+
+  // Address: 0x010B9820 -- process-global `CSquadSerializer` singleton.
+  moho::CSquadSerializer gCSquadSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<CPlatoon>`, vtable 0x00E31B88.
+   *
+   * Address: 0x00BDAC80 (FUN_00BDAC80 -- constructs the global and registers its destructor.)
+   * Address: 0x00C00590 (FUN_00C00590 -- the global's destructor.)
+   * Address: 0x0072A030 (FUN_0072A030 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0072A690 (FUN_0072A690 -- `Init`.)
+   * Address: 0x0072A0C0 (FUN_0072A0C0 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x0072AC50 (FUN_0072AC50 -- `Delete`.)
+   */
+  struct CPlatoonConstruct : gpg::SerConstructHelper<CPlatoon>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<CPlatoon>`, vtable 0x00E31B98.
+   *
+   * Address: 0x00BDACC0 (FUN_00BDACC0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C005C0 (FUN_00C005C0 -- the global's destructor.)
+   * Address: 0x0072A180 (FUN_0072A180 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0072A710 (FUN_0072A710 -- `Init`.)
+   * Address: 0x0072A160 (FUN_0072A160 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0072A170 (FUN_0072A170 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CPlatoonSerializer : gpg::SerSaveLoadHelper<CPlatoon>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B9714 -- process-global `CPlatoonConstruct` singleton.
+  moho::CPlatoonConstruct gCPlatoonConstruct;
+
+  // Address: 0x010B969C -- process-global `CPlatoonSerializer` singleton.
+  moho::CPlatoonSerializer gCPlatoonSerializer;
 } // namespace

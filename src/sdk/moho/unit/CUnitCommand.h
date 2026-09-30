@@ -106,7 +106,9 @@ namespace moho
      * Allocates one `CUnitCommand`, default-constructs it, and returns it as an
      * unowned construct result.
      */
-    static void MemberConstruct(gpg::SerConstructResult* result);
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x006ECB80 (FUN_006ECB80, Moho::CUnitCommand::MemberDeserialize)
@@ -115,7 +117,7 @@ namespace moho
      * What it does:
      * Loads the serialized command payload lanes into this command instance.
      */
-    static void MemberDeserialize(gpg::ReadArchive* archive, CUnitCommand* command, int version);
+    void MemberDeserialize(gpg::ReadArchive* archive, int version);
 
     /**
      * Address: 0x006ECE20 (FUN_006ECE20, Moho::CUnitCommand::MemberSerialize)
@@ -125,7 +127,7 @@ namespace moho
      * What it does:
      * Saves the serialized command payload lanes from this command instance.
      */
-    static void MemberSerialize(CUnitCommand* command, gpg::WriteArchive* archive, int version);
+    void MemberSerialize(gpg::WriteArchive* archive, int version);
 
     /**
      * Address: 0x006E8B40 (FUN_006E8B40)
@@ -305,7 +307,6 @@ namespace moho
      */
     CUnitCommand();
 
-    friend class CUnitCommandConstruct;
     friend class CCommandDb;
 
     /**

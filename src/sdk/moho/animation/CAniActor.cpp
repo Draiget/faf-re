@@ -20,9 +20,6 @@ namespace
 {
   constexpr std::uint32_t kWatchBoneEnabledFlag = 0x8000u;
 
-  // Address: 0x010B284C -- process-global `CAniActorConstruct` singleton.
-  moho::CAniActorConstruct gCAniActorConstruct;
-
   // Address: 0x00BD2B60 (FUN_00BD2B60, register_CAniActorSerializer) -- MSVC's
   // own compiler-generated dynamic initializer for this global runs the real
   // `gpg::SerSaveLoadHelper<CAniActor>` ctor (self-links into `sNewHelpers`,
@@ -374,19 +371,9 @@ namespace moho
   /**
    * Address: 0x0063B030 (FUN_0063B030, Moho::CAniActor::MemberConstruct)
    */
-  void CAniActor::MemberConstruct(gpg::SerConstructResult* const result)
+  void CAniActor::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    CAniActor* actor = nullptr;
-    void* const storage = ::operator new(sizeof(CAniActor), std::nothrow);
-    if (storage) {
-      actor = new (storage) CAniActor();
-    }
-
-    if (!result) {
-      delete actor;
-      return;
-    }
-    result->SetUnowned(MakeDerivedRef(actor, CachedCAniActorType()), 0u);
+    result.SetUnowned(gpg::MakeRRef(new CAniActor()), 0u);
   }
 
   /**
@@ -746,52 +733,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0063B020 (FUN_0063B020, Moho::CAniActorConstruct::Construct)
-   */
-  void CAniActorConstruct::Construct(
-    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    if (!result) {
-      return;
-    }
-    CAniActor::MemberConstruct(result);
-  }
-
-  /**
-   * Address: 0x0063CAB0 (FUN_0063CAB0, Moho::CAniActorConstruct::Deconstruct)
-   */
-  void CAniActorConstruct::Deconstruct(void* const objectPtr)
-  {
-    delete static_cast<CAniActor*>(objectPtr);
-  }
-
-  /**
-   * Address: 0x0063C190 (FUN_0063C190, Moho::CAniActorConstruct::Init)
-   */
-  void CAniActorConstruct::Init()
-  {
-    gpg::RType* const type = CachedCAniActorType();
-    GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mSerConstructFunc);
-    type->serConstructFunc_ = mSerConstructFunc;
-    type->deleteFunc_ = mDeleteFunc;
-  }
-
-  /**
-   * Address: 0x00BD2B20 (FUN_00BD2B20, dynamic initializer for the global
-   * `CAniActorConstruct` singleton)
-   */
-  CAniActorConstruct::CAniActorConstruct()
-    : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&CAniActorConstruct::Construct))
-    , mDeleteFunc(&CAniActorConstruct::Deconstruct)
-  {}
-
-  /**
-   * Address: 0x00BFACD0 (FUN_00BFACD0, Moho::CAniActorConstruct::~CAniActorConstruct)
-   */
-  CAniActorConstruct::~CAniActorConstruct() = default;
-
-  /**
    * Address: 0x0063A770 (FUN_0063A770, ??0CAniActorTypeInfo@Moho@@QAE@@Z)
    */
   CAniActorTypeInfo::CAniActorTypeInfo()
@@ -865,3 +806,24 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_CAniActorTypeInfo_22c0a4, moho::register_CAniActorTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerConstructHelper<CAniActor>`, vtable 0x00E21EC4.
+   *
+   * Address: 0x00BD2B20 (FUN_00BD2B20 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFACD0 (FUN_00BFACD0 -- the global's destructor.)
+   * Address: 0x0063C190 (FUN_0063C190 -- `Init`.)
+   * Address: 0x0063B020 (FUN_0063B020 -- `Construct`, a forward to `MemberConstruct`.)
+   * Address: 0x0063CAB0 (FUN_0063CAB0 -- `Delete`.)
+   */
+  struct CAniActorConstruct : gpg::SerConstructHelper<CAniActor>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B284C -- process-global `CAniActorConstruct` singleton.
+  moho::CAniActorConstruct gCAniActorConstruct;
+} // namespace

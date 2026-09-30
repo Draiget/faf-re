@@ -128,10 +128,7 @@ namespace moho
      * as an unowned construct result.
      */
     static void MemberConstruct(
-      gpg::ReadArchive& archive,
-      int version,
-      const gpg::RRef& ownerRef,
-      gpg::SerConstructResult& result
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
     );
 
     /**
@@ -140,7 +137,7 @@ namespace moho
      * What it does:
      * Loads serialized runtime motion state lanes for one `CUnitMotion`.
      */
-    static void MemberDeserialize(gpg::ReadArchive* archive, CUnitMotion* motion);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x006BB460 (FUN_006BB460, Moho::CUnitMotion::MemberSerialize)
@@ -148,7 +145,7 @@ namespace moho
      * What it does:
      * Saves serialized runtime motion state lanes for one `CUnitMotion`.
      */
-    static void MemberSerialize(CUnitMotion* motion, gpg::WriteArchive* archive);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x006B8460 (FUN_006B8460, ?Stop@CUnitMotion@Moho@@QAEXPBV?$Vector3@M@Wm3@@@Z)

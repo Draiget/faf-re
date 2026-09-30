@@ -6007,6 +6007,8 @@ namespace gpg
    * Address: 0x00584800 (FUN_00584800 -- `WritePointer<moho::Sim>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromSimSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x006E1140 (FUN_006E1140 -- `WritePointer<moho::Sim>` from a slot, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x006E2A40 (FUN_006E2A40 -- `WritePointer<moho::Sim>` from a slot, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimSlotLane3` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00774B80 (FUN_00774B80 -- `WritePointer<moho::CEconomy>` from a slot, state folded to Unowned; no references in the PE; formerly `SerializeUnownedCEconomyPointer` in moho/sim/CEconStorage.cpp, removed 2026-09-30.)
+   * Address: 0x00774BC0 (FUN_00774BC0 -- the same, archive on the stack; no references in the PE; formerly `SerializeUnownedCEconomyPointerBinary` in moho/sim/CEconStorage.cpp, removed 2026-09-30.)
    *
    * What it does:
    * Writes `value` as a tracked pointer in `state`, owned by `ownerRef`:
@@ -6175,6 +6177,7 @@ namespace gpg
    * Address: 0x005EDED0 (FUN_005EDED0 -- `MakeRRef<moho::SAttachPoint>`; formerly `gpg::RRef_SAttachPoint`.)
    * Address: 0x005EE1B0 (FUN_005EE1B0 -- `MakeRRef<moho::Listener<moho::EAiTransportEvent>>`; formerly `gpg::RRef_Listener_EAiTransportEvent`.)
    * Address: 0x005F5280 (FUN_005F5280 -- `MakeRRef<moho::CUnitCommand>`; formerly `gpg::RRef_CUnitCommand`.)
+   * Address: 0x0061CCA0 (FUN_0061CCA0 -- `MakeRRef<moho::CUnitPatrolTask>`; formerly `gpg::RRef_CUnitPatrolTask`.)
    * Address: 0x005FDCD0 (FUN_005FDCD0 -- `MakeRRef<moho::CUnitMobileBuildTask>`; formerly `gpg::RRef_CUnitMobileBuildTask`.)
    * Address: 0x005FDE80 (FUN_005FDE80 -- `MakeRRef<moho::CUnitUpgradeTask>`; formerly `gpg::RRef_CUnitUpgradeTask`.)
    * Address: 0x005FE030 (FUN_005FE030 -- `MakeRRef<moho::CUnitRepairTask>`; formerly `gpg::RRef_CUnitRepairTask`.)
