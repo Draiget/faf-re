@@ -18,6 +18,20 @@ namespace moho
   {
   public:
     /**
+     * What it does:
+     * Loads the `CCommandTask` base. Inlined into
+     * `gpg::SerSaveLoadHelper<CUnitGetBuiltTask>::Deserialize` 0x0060A700.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
+    /**
+     * What it does:
+     * Saves the `CCommandTask` base. Inlined into
+     * `gpg::SerSaveLoadHelper<CUnitGetBuiltTask>::Serialize` 0x0060A740.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
+
+    /**
      * Address: 0x0060A4D0 (FUN_0060A4D0, Moho::CUnitGetBuiltTask::TaskTick)
      *
      * What it does:

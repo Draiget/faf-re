@@ -1,4 +1,5 @@
 #include "ISoundManager.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
@@ -23,3 +24,25 @@ namespace moho
    */
   ISoundManager::~ISoundManager() = default;
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<ISoundManager>`, vtable 0x00E35A40.
+   *
+   * Address: 0x00BDC4C0 (FUN_00BDC4C0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C014D0 (FUN_00C014D0 -- the global's destructor.)
+   * Address: 0x00760BF0 (FUN_00760BF0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00761BE0 (FUN_00761BE0 -- `Init`.)
+   * Address: 0x00760BD0 (FUN_00760BD0 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x00760BE0 (FUN_00760BE0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct ISoundManagerSerializer : gpg::SerSaveLoadHelper<ISoundManager>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BAE8C -- process-global `ISoundManagerSerializer` singleton.
+  moho::ISoundManagerSerializer gISoundManagerSerializer;
+} // namespace

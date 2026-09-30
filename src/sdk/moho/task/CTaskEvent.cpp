@@ -174,26 +174,6 @@ namespace
     throw gpg::SerializationError(msg.c_str());
   }
 
-  // Shared callback body used by FUN_004069A0 and FUN_00407900.
-  void DeserializeSTaskEventLinkageThreadRef(gpg::ReadArchive* archive, int objectPtr)
-  {
-    auto* const linkage = reinterpret_cast<STaskEventLinkage*>(objectPtr);
-    GPG_ASSERT(linkage != nullptr);
-
-    const gpg::RRef owner{};
-    archive->Read(CachedWeakPtrCTaskThreadType(), &linkage->mThreadRef, owner);
-  }
-
-  // Shared callback body used by FUN_004069F0 and FUN_00407950.
-  void SerializeSTaskEventLinkageThreadRef(gpg::WriteArchive* archive, int objectPtr)
-  {
-    auto* const linkage = reinterpret_cast<STaskEventLinkage*>(objectPtr);
-    GPG_ASSERT(linkage != nullptr);
-
-    const gpg::RRef owner{};
-    archive->Write(CachedWeakPtrCTaskThreadType(), &linkage->mThreadRef, owner);
-  }
-
   /**
    * Address: 0x00407710 (FUN_00407710)
    *
@@ -227,9 +207,6 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, owner);
   }
 
-  // Address: 0x010A664C -- process-global `STaskEventLinkageSerializer` singleton.
-  STaskEventLinkageSerializer gSTaskEventLinkageSerializer;
-
   RWeakPtrType<STaskEventLinkage> gRWeakPtrTypeSTaskEventLinkage{};
 
   /**
@@ -247,54 +224,6 @@ namespace
 } // namespace
 
 gpg::RType* WeakPtr_STaskEventLinkage::sType = nullptr;
-
-/**
- * Address: 0x004069A0 (FUN_004069A0, Moho::STaskEventLinkageSerializer::Deserialize)
- * Alias:   0x00407900 (FUN_00407900, duplicate callback body)
- */
-void STaskEventLinkageSerializer::Deserialize(
-  gpg::ReadArchive* const archive, const int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/
-)
-{
-  DeserializeSTaskEventLinkageThreadRef(archive, objectPtr);
-}
-
-/**
- * Address: 0x004069F0 (FUN_004069F0, Moho::STaskEventLinkageSerializer::Serialize)
- * Alias:   0x00407950 (FUN_00407950, duplicate callback body)
- */
-void STaskEventLinkageSerializer::Serialize(
-  gpg::WriteArchive* const archive, const int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/
-)
-{
-  SerializeSTaskEventLinkageThreadRef(archive, objectPtr);
-}
-
-/**
- * Address: 0x00BC2EF0 (FUN_00BC2EF0, dynamic initializer for the global
- * `STaskEventLinkageSerializer` singleton)
- */
-STaskEventLinkageSerializer::STaskEventLinkageSerializer()
-  : mSerLoadFunc(&STaskEventLinkageSerializer::Deserialize)
-  , mSerSaveFunc(&STaskEventLinkageSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BEE140 (FUN_00BEE140, Moho::STaskEventLinkageSerializer::~STaskEventLinkageSerializer)
- */
-STaskEventLinkageSerializer::~STaskEventLinkageSerializer() = default;
-
-/**
- * Address: 0x00407240 (FUN_00407240, Moho::STaskEventLinkageSerializer::Init)
- */
-void STaskEventLinkageSerializer::Init()
-{
-  gpg::RType* const type = CachedSTaskEventLinkageType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mSerLoadFunc;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSerSaveFunc;
-}
 
 /**
  * Address: 0x00406840 (FUN_00406840, Moho::STaskEventLinkageTypeInfo::STaskEventLinkageTypeInfo)
@@ -800,4 +729,50 @@ namespace
 {
   // Address: 0x010A6638 -- process-global `CTaskEventSerializer` singleton.
   moho::CTaskEventSerializer gCTaskEventSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * What it does:
+   * Loads the weak thread reference. Inlined into
+   * `gpg::SerSaveLoadHelper<STaskEventLinkage>::Deserialize` 0x004069A0.
+   */
+  void STaskEventLinkage::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->Read(CachedWeakPtrCTaskThreadType(), &mThreadRef, gpg::RRef{});
+  }
+
+  /**
+   * What it does:
+   * Saves the weak thread reference. Inlined into
+   * `gpg::SerSaveLoadHelper<STaskEventLinkage>::Serialize` 0x004069F0.
+   */
+  void STaskEventLinkage::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->Write(CachedWeakPtrCTaskThreadType(), &mThreadRef, gpg::RRef{});
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<STaskEventLinkage>`, vtable 0x00E00188.
+   *
+   * Address: 0x00BC2EF0 (FUN_00BC2EF0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEE140 (FUN_00BEE140 -- the global's destructor.)
+   * Address: 0x00407900 (FUN_00407900 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x00407950 (FUN_00407950 -- an unreferenced copy of `Serialize`.)
+   * Address: 0x00407240 (FUN_00407240 -- `Init`.)
+   * Address: 0x004069A0 (FUN_004069A0 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004069F0 (FUN_004069F0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct STaskEventLinkageSerializer : gpg::SerSaveLoadHelper<STaskEventLinkage>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A664C -- process-global `STaskEventLinkageSerializer` singleton.
+  moho::STaskEventLinkageSerializer gSTaskEventLinkageSerializer;
 } // namespace

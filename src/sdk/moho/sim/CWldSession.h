@@ -324,6 +324,20 @@ namespace moho
     SSessionSaveNodeMap mNodeMap; // +0x00
 
     /**
+     * What it does:
+     * Loads the save-node map. Inlined into
+     * `gpg::SerSaveLoadHelper<SSessionSaveData>::Deserialize` 0x00897470.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+
+    /**
+     * What it does:
+     * Saves the save-node map. Inlined into
+     * `gpg::SerSaveLoadHelper<SSessionSaveData>::Serialize` 0x008974B0.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
+
+    /**
        * Address: 0x00896F00 (FUN_00896F00)
      *
      * What it does:

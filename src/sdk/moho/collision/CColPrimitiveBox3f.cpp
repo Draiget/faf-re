@@ -282,48 +282,6 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
   }
 
   /**
-   * Address: 0x004FF880 (FUN_004FF880, Moho::DColPrimBoxSerializer::Deserialize)
-   */
-  void DColPrimBoxSerializer::Deserialize(gpg::ReadArchive* const, const int, const int, gpg::RRef*)
-  {}
-
-  /**
-   * Address: 0x004FF890 (FUN_004FF890, Moho::DColPrimBoxSerializer::Serialize)
-   */
-  void DColPrimBoxSerializer::Serialize(gpg::WriteArchive* const, const int, const int, gpg::RRef*)
-  {}
-
-  /**
-   * Address: 0x004FFD70 (FUN_004FFD70, Moho::DColPrimBoxSerializer::RegisterSerializeFunctions)
-   */
-  void DColPrimBoxSerializer::Init()
-  {
-    gpg::RType* const type = CachedDColPrimBoxPrimitiveType();
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerLoadFunc", kSerializationLoadLine, kSerializationSourcePath);
-    }
-    if (type->serSaveFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerSaveFunc", kSerializationSaveLine, kSerializationSourcePath);
-    }
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BC76B0 (FUN_00BC76B0, register_DColPrimBoxSerializer)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  DColPrimBoxSerializer::DColPrimBoxSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&DColPrimBoxSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&DColPrimBoxSerializer::Serialize))
-  {}
-
-  DColPrimBoxSerializer::~DColPrimBoxSerializer() = default;
-
-  /**
    * Address: 0x00BC7620 (FUN_00BC7620, register_DColPrimBoxTypeInfo)
    * Address: 0x00BF1B30 (FUN_00BF1B30, atexit destructor of the DColPrimBoxTypeInfo object)
    *
@@ -348,9 +306,6 @@ namespace
   };
 
   [[maybe_unused]] DColPrimBoxTypeInfoBootstrap gDColPrimBoxTypeInfoBootstrap;
-
-  // Address: 0x010A9C0C -- process-global `DColPrimBoxSerializer` singleton.
-  moho::DColPrimBoxSerializer gDColPrimBoxSerializer;
 
 } // namespace
 
@@ -446,4 +401,25 @@ namespace
 {
   // Address: 0x010A7CBC -- process-global `Box3fSerializer` singleton.
   moho::Box3fSerializer gBox3fSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CColPrimitive<Wm3::Box3f>>`, vtable 0x00E0D588.
+   *
+   * Address: 0x00BC76B0 (FUN_00BC76B0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1BF0 (FUN_00BF1BF0 -- the global's destructor.)
+   * Address: 0x004FFD70 (FUN_004FFD70 -- `Init`.)
+   * Address: 0x004FF880 (FUN_004FF880 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x004FF890 (FUN_004FF890 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct DColPrimBoxSerializer : gpg::SerSaveLoadHelper<CColPrimitive<Wm3::Box3f>>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A9C0C -- process-global `DColPrimBoxSerializer` singleton.
+  moho::DColPrimBoxSerializer gDColPrimBoxSerializer;
 } // namespace

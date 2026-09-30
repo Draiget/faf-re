@@ -10,6 +10,12 @@
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace boost
 {
   template <typename T>
@@ -88,6 +94,14 @@ namespace moho
   class CIntelGrid
   {
   public:
+    /**
+     * What it does:
+     * Nothing: the construct hook rebuilds the grid from its map and size; the cells are not archived. `gpg::SerSaveLoadHelper<CIntelGrid>::Deserialize`
+     * 0x00507490 and `Serialize` 0x005074A0 are a bare `ret`.
+     */
+    void MemberDeserialize(gpg::ReadArchive*) {}
+    void MemberSerialize(gpg::WriteArchive*) const {}
+
     inline static gpg::RType* sType = nullptr;
 
     /**
@@ -234,66 +248,6 @@ namespace moho
     msvc8::vector<SDelayedSubVizInfo> mUpdateList;   // +0x10
     std::uint32_t mGridSize;                     // +0x20
   };
-
-  /**
-   * VFTABLE: 0x00E0D7D4
-   * COL: 0x00E66EB8
-   */
-  class CIntelGridSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC79B0 (FUN_00BC79B0, dynamic initializer for the global
-     * `CIntelGridSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    CIntelGridSerializer();
-
-    /**
-     * Address: 0x00BF1E50 (FUN_00BF1E50, Moho::CIntelGridSerializer::~CIntelGridSerializer)
-     */
-    ~CIntelGridSerializer();
-
-    /**
-     * Address: 0x00507490 (FUN_00507490, Moho::CIntelGridSerializer::Deserialize)
-     *
-     * What it does:
-     * Empty serializer load callback lane (binary `retn` stub).
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x005074A0 (FUN_005074A0, Moho::CIntelGridSerializer::Serialize)
-     *
-     * What it does:
-     * Empty serializer save callback lane (binary `retn` stub).
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00507E60 (FUN_00507E60, Moho::CIntelGridSerializer::Init)
-     *
-     * What it does:
-     * Binds load/save callbacks into CIntelGrid RTTI
-     * (`serLoadFunc_`, `serSaveFunc_`).
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
-  static_assert(
-    offsetof(CIntelGridSerializer, mSerLoadFunc) == 0x0C, "CIntelGridSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CIntelGridSerializer, mSerSaveFunc) == 0x10, "CIntelGridSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CIntelGridSerializer) == 0x14, "CIntelGridSerializer size must be 0x14");
 
   /**
    * VFTABLE: 0x00E0D784

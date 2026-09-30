@@ -17,6 +17,20 @@ namespace moho
   {
     WeakPtr<CTaskThread> mThreadRef; // 0x0C
 
+    /**
+     * What it does:
+     * Loads the weak thread reference. Inlined into
+     * `gpg::SerSaveLoadHelper<STaskEventLinkage>::Deserialize` 0x004069A0.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * What it does:
+     * Saves the weak thread reference. Inlined into
+     * `gpg::SerSaveLoadHelper<STaskEventLinkage>::Serialize` 0x004069F0.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     STaskEventLinkage()
       : WeakObject()
     {}
@@ -86,68 +100,6 @@ namespace moho
      */
     static WeakPtr<STaskEventLinkage>* SetObject(WeakPtr<STaskEventLinkage>* slot, STaskEventLinkage* linkage) noexcept;
   };
-
-  class STaskEventLinkageSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC2EF0 (FUN_00BC2EF0, dynamic initializer for the global
-     * `STaskEventLinkageSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    STaskEventLinkageSerializer();
-
-    /**
-     * Address: 0x00BEE140 (FUN_00BEE140, Moho::STaskEventLinkageSerializer::~STaskEventLinkageSerializer)
-     */
-    ~STaskEventLinkageSerializer();
-
-    /**
-     * Address: 0x004069A0 (FUN_004069A0, Moho::STaskEventLinkageSerializer::Deserialize)
-     * Alias:   0x00407900 (FUN_00407900, duplicate callback body)
-     *
-     * What it does:
-     * Loads `STaskEventLinkage::mThreadRef` through reflected
-     * `WeakPtr<CTaskThread>` serialization.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-
-    /**
-     * Address: 0x004069F0 (FUN_004069F0, Moho::STaskEventLinkageSerializer::Serialize)
-     * Alias:   0x00407950 (FUN_00407950, duplicate callback body)
-     *
-     * What it does:
-     * Saves `STaskEventLinkage::mThreadRef` through reflected
-     * `WeakPtr<CTaskThread>` serialization.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00407240 (FUN_00407240, Moho::STaskEventLinkageSerializer::Init)
-     *
-     * What it does:
-     * Binds linkage serializer callbacks into RTTI for `STaskEventLinkage`.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
-  static_assert(
-    offsetof(STaskEventLinkageSerializer, mSerLoadFunc) == 0x0C,
-    "STaskEventLinkageSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(STaskEventLinkageSerializer, mSerSaveFunc) == 0x10,
-    "STaskEventLinkageSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(STaskEventLinkageSerializer) == 0x14, "STaskEventLinkageSerializer size must be 0x14");
 
   class STaskEventLinkageTypeInfo : public gpg::RType
   {

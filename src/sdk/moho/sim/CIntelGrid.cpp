@@ -15,6 +15,7 @@
 #include "moho/sim/STIMapReflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "moho/misc/DiagnosticBudget.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -26,9 +27,6 @@ namespace
     static moho::CIntelGridTypeInfo sInstance;
     return &sInstance;
   }
-
-  // Address: 0x010A9EB4 -- process-global `CIntelGridSerializer` singleton.
-  moho::CIntelGridSerializer gCIntelGridSerializer;
 
   template <class TTypeInfo>
   void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
@@ -548,48 +546,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00507490 (FUN_00507490, Moho::CIntelGridSerializer::Deserialize)
-   */
-  void CIntelGridSerializer::Deserialize(gpg::ReadArchive*, int, int, gpg::RRef*)
-  {
-    // Binary callback is an explicit no-op (`retn`).
-  }
-
-  /**
-   * Address: 0x005074A0 (FUN_005074A0, Moho::CIntelGridSerializer::Serialize)
-   */
-  void CIntelGridSerializer::Serialize(gpg::WriteArchive*, int, int, gpg::RRef*)
-  {
-    // Binary callback is an explicit no-op (`retn`).
-  }
-
-  /**
-   * Address: 0x00BC79B0 (FUN_00BC79B0, dynamic initializer for the global
-   * `CIntelGridSerializer` singleton)
-   */
-  CIntelGridSerializer::CIntelGridSerializer()
-    : mSerLoadFunc(reinterpret_cast<gpg::RType::load_func_t>(&CIntelGridSerializer::Deserialize))
-    , mSerSaveFunc(reinterpret_cast<gpg::RType::save_func_t>(&CIntelGridSerializer::Serialize))
-  {}
-
-  /**
-   * Address: 0x00BF1E50 (FUN_00BF1E50, Moho::CIntelGridSerializer::~CIntelGridSerializer)
-   */
-  CIntelGridSerializer::~CIntelGridSerializer() = default;
-
-  /**
-   * Address: 0x00507E60 (FUN_00507E60, Moho::CIntelGridSerializer::Init)
-   */
-  void CIntelGridSerializer::Init()
-  {
-    gpg::RType* const type = CachedIntelGridType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mSerLoadFunc);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerSaveFunc);
-    type->serLoadFunc_ = mSerLoadFunc;
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  /**
    * Address: 0x005070D0 (FUN_005070D0, Moho::CIntelGridTypeInfo::CIntelGridTypeInfo)
    */
   CIntelGridTypeInfo::CIntelGridTypeInfo()
@@ -698,4 +654,26 @@ namespace
 
   // Address: 0x010A9EC8 -- process-global `CIntelGridConstruct` singleton.
   moho::CIntelGridConstruct gCIntelGridConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CIntelGrid>`, vtable 0x00E0D7D4.
+   *
+   * Address: 0x00BC79B0 (FUN_00BC79B0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1E50 (FUN_00BF1E50 -- the global's destructor.)
+   * Address: 0x005074B0 (FUN_005074B0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00507E60 (FUN_00507E60 -- `Init`.)
+   * Address: 0x00507490 (FUN_00507490 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x005074A0 (FUN_005074A0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct CIntelGridSerializer : gpg::SerSaveLoadHelper<CIntelGrid>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A9EB4 -- process-global `CIntelGridSerializer` singleton.
+  moho::CIntelGridSerializer gCIntelGridSerializer;
 } // namespace

@@ -1101,7 +1101,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\audio\XAudioError.cpp" />
     <ClCompile Include="moho\audio\CSimSoundManagerTypeInfo.cpp" />
     <ClCompile Include="moho\audio\HSound.cpp" />
-    <ClCompile Include="moho\audio\ISoundManagerSerializer.cpp" />
     <ClCompile Include="moho\audio\SAudioRequestFastVectorReflection.cpp" />
     <ClCompile Include="moho\ai\HPathCellTypeInfo.cpp" />
     <ClCompile Include="moho\ai\HPathCellSerializer.cpp" />
@@ -2427,7 +2426,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\animation\IAniManipulatorSerializer.h" />
     <ClInclude Include="moho\animation\IAniManipulatorTypeInfo.h" />
     <ClInclude Include="moho\audio\CSimSoundManagerTypeInfo.h" />
-    <ClInclude Include="moho\audio\ISoundManagerSerializer.h" />
     <ClInclude Include="moho\audio\ISoundManagerTypeInfo.h" />
     <ClInclude Include="moho\audio\XAudioError.h" />
     <ClInclude Include="moho\console\TConVarString.h" />

@@ -100,9 +100,6 @@ namespace
   ArmyLaunchInfoVectorTypeInfo gArmyLaunchInfoVectorTypeInfo;
   moho::LaunchInfoBaseTypeInfo gLaunchInfoBaseTypeInfo;
 
-  // Address: 0x010ABD74 -- process-global `ArmyLaunchInfoSerializer` singleton.
-  moho::ArmyLaunchInfoSerializer gArmyLaunchInfoSerializer;
-
   // Address: 0x010ABE54 -- process-global `LaunchInfoNewSerializer` singleton.
   moho::LaunchInfoNewSerializer gLaunchInfoNewSerializer;
 
@@ -1070,56 +1067,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC9460 (FUN_00BC9460, dynamic initializer for the global
-   * `ArmyLaunchInfoSerializer` singleton)
-   */
-  ArmyLaunchInfoSerializer::ArmyLaunchInfoSerializer()
-    : mDeserialize(&ArmyLaunchInfoSerializer::Deserialize)
-    , mSerialize(&ArmyLaunchInfoSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BF3F90 (FUN_00BF3F90, Moho::ArmyLaunchInfoSerializer::~ArmyLaunchInfoSerializer)
-   */
-  ArmyLaunchInfoSerializer::~ArmyLaunchInfoSerializer() = default;
-
-  /**
-   * Address: 0x005421C0 (FUN_005421C0, Moho::ArmyLaunchInfoSerializer::Deserialize)
-   */
-  void ArmyLaunchInfoSerializer::Deserialize(gpg::ReadArchive* const, const int, const int, gpg::RRef* const)
-  {
-  }
-
-  /**
-   * Address: 0x005421D0 (FUN_005421D0, Moho::ArmyLaunchInfoSerializer::Serialize)
-   */
-  void ArmyLaunchInfoSerializer::Serialize(gpg::WriteArchive* const, const int, const int, gpg::RRef* const)
-  {
-  }
-
-  /**
-   * Address: 0x00542EF0 (FUN_00542EF0, Moho::ArmyLaunchInfoSerializer::Init)
-   */
-  void ArmyLaunchInfoSerializer::Init()
-  {
-    gpg::RType* type = ArmyLaunchInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(ArmyLaunchInfo));
-      ArmyLaunchInfo::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    if (!type) {
-      return;
-    }
-
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
    * Address: 0x00542610 (FUN_00542610)
    */
   LaunchInfoNewTypeInfo::LaunchInfoNewTypeInfo()
@@ -1606,4 +1553,25 @@ namespace
 {
   // Address: 0x010ABED0 -- process-global `LaunchInfoBaseSerializer` singleton.
   moho::LaunchInfoBaseSerializer gLaunchInfoBaseSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<ArmyLaunchInfo>`, vtable 0x00E16E5C.
+   *
+   * Address: 0x00BC9460 (FUN_00BC9460 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF3F90 (FUN_00BF3F90 -- the global's destructor.)
+   * Address: 0x00542EF0 (FUN_00542EF0 -- `Init`.)
+   * Address: 0x005421C0 (FUN_005421C0 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x005421D0 (FUN_005421D0 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct ArmyLaunchInfoSerializer : gpg::SerSaveLoadHelper<ArmyLaunchInfo>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ABD74 -- process-global `ArmyLaunchInfoSerializer` singleton.
+  moho::ArmyLaunchInfoSerializer gArmyLaunchInfoSerializer;
 } // namespace

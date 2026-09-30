@@ -5318,9 +5318,6 @@
     <ClCompile Include="moho\audio\HSound.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\audio\ISoundManagerSerializer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\audio\ISoundManagerTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5448,9 +5445,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\audio\CSimSoundManagerTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\audio\ISoundManagerSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\audio\ISoundManagerTypeInfo.h">

@@ -258,6 +258,14 @@ namespace moho
   public:
     /**
      * What it does:
+     * Nothing: the construct arguments carry the whole shape. `gpg::SerSaveLoadHelper<CColPrimitive<Wm3::Box3f>>::Deserialize`
+     * 0x004FF880 and `Serialize` 0x004FF890 are a bare `ret`.
+     */
+    void MemberDeserialize(gpg::ReadArchive*) {}
+    void MemberSerialize(gpg::WriteArchive*) const {}
+
+    /**
+     * What it does:
      * Reads the shape and the local centre and builds a primitive from them
      * for an archive load, handed back unowned. Inlined into
      * `SerConstructHelper<CColPrimitive<Wm3::Box3f>>::Construct` 0x004FF750.
@@ -345,6 +353,14 @@ namespace moho
   class CColPrimitive<Wm3::Sphere3f> final : public CColPrimitiveBase
   {
   public:
+    /**
+     * What it does:
+     * Nothing: the construct arguments carry the whole shape. `gpg::SerSaveLoadHelper<CColPrimitive<Wm3::Sphere3f>>::Deserialize`
+     * 0x004FEF40 and `Serialize` 0x004FEF50 are a bare `ret`.
+     */
+    void MemberDeserialize(gpg::ReadArchive*) {}
+    void MemberSerialize(gpg::WriteArchive*) const {}
+
     /**
      * What it does:
      * Reads the shape and the local centre and builds a primitive from them
