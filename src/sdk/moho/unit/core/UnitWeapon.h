@@ -1275,7 +1275,6 @@ namespace moho
   static_assert(offsetof(UnitWeapon, mAimingAt) == 0x178, "UnitWeapon::mAimingAt offset must be 0x178");
   static_assert(offsetof(UnitWeapon, mShotsAtTarget) == 0x184, "UnitWeapon::mShotsAtTarget offset must be 0x184");
   static_assert(sizeof(UnitWeapon) == 0x188, "UnitWeapon size must be 0x188");
-  static_assert(WeakPtr<UnitWeapon>::kOwnerLinkOffset == 0x14, "UnitWeapon weak-owner slot offset must be 0x14");
 
   /**
    * Address: 0x006D5590 (FUN_006D5590, func_PickTargetPoint)

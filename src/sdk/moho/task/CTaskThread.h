@@ -19,23 +19,12 @@ namespace moho
   class CTaskThread;
   class CTaskStage;
 
-#ifndef MOHO_WEAKPTR_OWNER_LINK_OFFSET_CTASKTHREAD_DEFINED
-#define MOHO_WEAKPTR_OWNER_LINK_OFFSET_CTASKTHREAD_DEFINED
-  template <>
-  struct WeakPtrOwnerLinkOffset<CTaskThread>
-  {
-    static constexpr std::uintptr_t value = 2 * sizeof(void*); // after the TDatListItem links (0x08 on x86)
-  };
-#endif
-
-  class CTaskThread : public TDatListItem<CTaskThread, void>, InstanceCounter<CTaskThread>
+  class CTaskThread : public TDatListItem<CTaskThread, void>, public WeakObject, InstanceCounter<CTaskThread>
   {
   public:
     static gpg::RType* sType;
     static gpg::RType* sPointerType;
 
-    // Head of intrusive weak-link chain (owner slot at +0x08 in CTaskThread).
-    WeakPtr<CTaskThread>* mEventLinkHead; // 0x08
     CTaskStage* mStage;                   // 0x0C
     CTask* mTaskTop;                      // 0x10
     int mPendingFrames;                   // 0x14
@@ -107,12 +96,10 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive, gpg::RRef* ownerRef);
   };
   static_assert(sizeof(CTaskThread) == 0x1C, "CTaskThread == 0x1C");
-  static_assert(offsetof(CTaskThread, mEventLinkHead) == 0x08, "CTaskThread::mEventLinkHead offset must be 0x08");
   static_assert(offsetof(CTaskThread, mStage) == 0x0C, "CTaskThread::mStage offset must be 0x0C");
   static_assert(offsetof(CTaskThread, mTaskTop) == 0x10, "CTaskThread::mTaskTop offset must be 0x10");
   static_assert(offsetof(CTaskThread, mPendingFrames) == 0x14, "CTaskThread::mPendingFrames offset must be 0x14");
   static_assert(offsetof(CTaskThread, mStaged) == 0x18, "CTaskThread::mStaged offset must be 0x18");
-  static_assert(WeakPtr<CTaskThread>::kOwnerLinkOffset == 0x08, "CTaskThread weak-owner slot offset must be 0x08");
 
   class CTaskThreadConstruct : public gpg::SerHelperBase
   {

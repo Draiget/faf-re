@@ -740,14 +740,6 @@ namespace moho
   static_assert(sizeof(wxDialog) == 0x170, "wxDialog size must be 0x170");
   static_assert(sizeof(WWinManagedDialog) == 0x174, "moho::WWinManagedDialog size must be 0x174");
 
-  // The WeakObject base sits right after the 0x170-byte wxDialog; every
-  // `managedWindows` probe tests the slot against `null + 0x170`.
-  template <>
-  struct WeakPtrOwnerLinkOffset<WWinManagedDialog>
-  {
-    static constexpr std::uintptr_t value = sizeof(wxDialog); // 0x170 on x86
-  };
-
   /**
    * The "Moho Log" dialog: the console log with its category and filter
    * controls.
@@ -959,12 +951,6 @@ namespace moho
   };
 
   static_assert(sizeof(WWinManagedFrame) == 0x17C, "moho::WWinManagedFrame size must be 0x17C");
-
-  template <>
-  struct WeakPtrOwnerLinkOffset<WWinManagedFrame>
-  {
-    static constexpr std::uintptr_t value = sizeof(wxFrame); // 0x178 on x86
-  };
 
   // Every managed dialog / frame still open (elements at 0x010A9B94 /
   // 0x010A9BD8): filled by the constructors, emptied by WINX_Exit.

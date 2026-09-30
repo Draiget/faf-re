@@ -754,6 +754,16 @@ namespace moho
     return *this;
   }
 
+  UserEntity* MouseInfo::HoveredEntity() const noexcept
+  {
+    return mUnitHover.GetObjectPtr();
+  }
+
+  void MouseInfo::SetHoveredEntity(UserEntity* const entity) noexcept
+  {
+    mUnitHover.ResetFromObject(entity);
+  }
+
   /**
    * Address: 0x0081F6C0 (FUN_0081F6C0, ??0SCommandModeData@Moho@@QAE@@Z)
    *

@@ -64,16 +64,8 @@ namespace moho
      * (0x0068C1E6), each with a default-constructed (identity) transform.
      */
     SEntAttachInfo(
-      Entity* const parent,
-      const std::int32_t childBoneIndex,
-      const std::int32_t parentBoneIndex,
-      const VTransform& relativeTransform
-    ) noexcept
-      : mAttachTargetWeak(parent)
-      , mParentBoneIndex(parentBoneIndex)
-      , mChildBoneIndex(childBoneIndex)
-      , mRelativeTransform(relativeTransform)
-    {}
+      Entity* parent, std::int32_t childBoneIndex, std::int32_t parentBoneIndex, const VTransform& relativeTransform
+    ) noexcept;
 
     [[nodiscard]] WeakPtr<Entity>& TargetWeakLink() noexcept
     {
@@ -100,10 +92,9 @@ namespace moho
       return TargetWeakLink().HasValue();
     }
 
-    [[nodiscard]] Entity* GetAttachTargetEntity() const noexcept
-    {
-      return TargetWeakLink().GetObjectPtr();
-    }
+    // Defined in Entity.h, where `Entity` is complete: decoding the weak link
+    // is the downcast from the entity's `WeakObject`.
+    [[nodiscard]] Entity* GetAttachTargetEntity() const noexcept;
 
     /**
      * Address: 0x0067ED40 (FUN_0067ED40, Moho::SEntAttachInfo::MemberDeserialize)

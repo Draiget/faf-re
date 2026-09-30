@@ -5,6 +5,7 @@
 #include <new>
 
 #include "legacy/containers/Vector.h"
+#include "moho/misc/WeakObject.h"
 #include "moho/sim/SimThreadRole.h"
 
 // Windows GDI headers define `GetObject` as an ANSI/Unicode macro alias.
@@ -26,47 +27,6 @@ namespace moho
   class UserEntity;
   class UserUnit;
 
-  template <class T>
-  struct WeakPtrOwnerLinkOffset
-  {
-    static constexpr std::uintptr_t value = sizeof(void*);
-  };
-
-#ifndef MOHO_WEAKPTR_OWNER_LINK_OFFSET_UNITWEAPON_DEFINED
-#define MOHO_WEAKPTR_OWNER_LINK_OFFSET_UNITWEAPON_DEFINED
-  template <>
-  struct WeakPtrOwnerLinkOffset<UnitWeapon>
-  {
-    // CTaskEvent {vptr, bool (one pointer slot), TDatList {prev, next}}, then
-    // the CScriptObject base's vptr: the link head is the fifth pointer slot
-    // (0x14 on x86).
-    static constexpr std::uintptr_t value = 5 * sizeof(void*);
-  };
-#endif
-
-  /**
-   * `UserEntity`'s weak-link head is its `WeakObject` base's `weakLinkHead_`,
-   * which sits at +0x08 because the class carries a vtable at +0x00 and the
-   * IUnit-chain head at +0x04. Every avatar/creator lane in the binary decodes
-   * these nodes with a literal `lea reg, [slot-8]` (0x008B2340 in the army
-   * avatar scan, 0x008C0870 in `UserUnit::UpdateUnitData`).
-   *
-   * `UserUnit` derives from `UserEntity` at offset zero, so it shares the
-   * offset.
-   */
-  template <>
-  struct WeakPtrOwnerLinkOffset<UserEntity>
-  {
-    // UserEntity::mIUnitChainHead, after the WeakObject base's two words (0x08 on x86).
-    static constexpr std::uintptr_t value = 2 * sizeof(void*);
-  };
-
-  template <>
-  struct WeakPtrOwnerLinkOffset<UserUnit>
-  {
-    // Same slot as UserEntity's (0x08 on x86).
-    static constexpr std::uintptr_t value = 2 * sizeof(void*);
-  };
 
   /**
    * Recovered intrusive weak-pointer node layout used by Moho reflection helpers.
@@ -195,12 +155,7 @@ namespace moho
 
     inline static gpg::RType* sType = nullptr;
 
-    // Owner link points at the owner's intrusive weak-link head slot.
-    // Most owners use +sizeof(void*), but some recovered types have different
-    // owner-link slot offsets (specialized via WeakPtrOwnerLinkOffset<T>).
-    static constexpr std::uintptr_t kOwnerLinkOffset = WeakPtrOwnerLinkOffset<T>::value;
-
-    void* ownerLinkSlot;     // points to owner weak-link slot (owner + kOwnerLinkOffset) or nullptr/sentinel
+    void* ownerLinkSlot;     // the owner's weak-chain head (`EncodeOwnerLinkSlot`), or null
     WeakPtr<T>* nextInOwner; // intrusive next node in owner chain
 
     WeakPtr() noexcept
@@ -268,7 +223,7 @@ namespace moho
       : ownerLinkSlot(other.ownerLinkSlot)
       , nextInOwner(nullptr)
     {
-      if (ownerLinkSlot != nullptr && !IsSentinel()) {
+      if (ownerLinkSlot != nullptr) {
         MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
         auto** const head = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
         nextInOwner = *head;
@@ -299,47 +254,52 @@ namespace moho
 
     ~WeakPtr() noexcept;
 
-    [[nodiscard]] static bool IsSentinelSlot(void* slot) noexcept
+    /**
+     * The weak-chain head `object` is referenced through, null for a null
+     * object.
+     *
+     * An owner keeps that chain in its `WeakObject` base, and this is the cast
+     * to it: the compiler supplies the base offset and the null guard, which is
+     * the `obj ? obj + N : 0` the binary emits at every encode -- `+0x04` for
+     * `CMauiControl` (0x0079DB80), `+0x14` for `UnitWeapon`, whose
+     * `CScriptObject` sits behind its `CTaskEvent` (0x00632CA0), `+0x170` and
+     * `+0x178` for the managed wx dialog and frame. An owner with several
+     * `WeakObject`s, or none, says where its chain is with a static
+     * `WeakLinkHeadOf` of its own.
+     */
+    [[nodiscard]] static void* EncodeOwnerLinkSlot(T* const object) noexcept
     {
-      return reinterpret_cast<std::uintptr_t>(slot) == kOwnerLinkOffset;
-    }
-
-    [[nodiscard]] static void* EncodeOwnerLinkSlot(T* object) noexcept
-    {
-      if (!object) {
-        return nullptr;
+      if constexpr (requires { T::WeakLinkHeadOf(object); }) {
+        return T::WeakLinkHeadOf(object);
+      } else {
+        WeakObject* const weak = object;
+        return weak;
       }
-      return reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) + kOwnerLinkOffset);
     }
 
     /**
      * Address: 0x0057D540 (FUN_0057D540)
      *
      * What it does:
-     * Decodes one weak owner-link slot back to the owning object pointer
-     * (`slot - kOwnerLinkOffset`), returning null for empty/sentinel lanes.
+     * Decodes one weak owner-link slot back to the owning object pointer:
+     * `slot ? slot - N : 0`, the downcast from the owner's `WeakObject`.
      * Address: 0x006860D0 (FUN_006860D0 -- this accessor emitted out of line,
      * node in EAX: `slot ? slot - 4 : 0`; zero callers, no pointer or jump to it
      * anywhere in the image. Formerly `ResolveBackLinkNodeOwner` in
      * moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22.)
      */
-    [[nodiscard]] static T* DecodeOwnerObject(void* slot) noexcept
+    [[nodiscard]] static T* DecodeOwnerObject(void* const slot) noexcept
     {
-      if (!slot || IsSentinelSlot(slot)) {
-        return nullptr;
+      if constexpr (requires { T::FromWeakLinkHead(slot); }) {
+        return T::FromWeakLinkHead(slot);
+      } else {
+        return static_cast<T*>(static_cast<WeakObject*>(slot));
       }
-      const auto raw = reinterpret_cast<std::uintptr_t>(slot);
-      return reinterpret_cast<T*>(raw - kOwnerLinkOffset);
-    }
-
-    [[nodiscard]] bool IsSentinel() const noexcept
-    {
-      return IsSentinelSlot(ownerLinkSlot);
     }
 
     [[nodiscard]] bool HasValue() const noexcept
     {
-      return ownerLinkSlot != nullptr && !IsSentinel();
+      return ownerLinkSlot != nullptr;
     }
 
     /**
@@ -361,7 +321,7 @@ namespace moho
 
     [[nodiscard]] bool IsLinkedInOwnerChain() const noexcept
     {
-      return ownerLinkSlot != nullptr && !IsSentinel();
+      return ownerLinkSlot != nullptr;
     }
 
     /**
@@ -552,7 +512,7 @@ namespace moho
       MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
 
       // Detach from current owner chain.
-      if (ownerLinkSlot && !IsSentinel()) {
+      if (ownerLinkSlot) {
         auto** cursor = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
         while (*cursor && *cursor != this) {
           cursor = reinterpret_cast<WeakPtr<T>**>(
@@ -565,7 +525,7 @@ namespace moho
       }
 
       ownerLinkSlot = newOwnerLinkSlot;
-      if (newOwnerLinkSlot && !IsSentinelSlot(newOwnerLinkSlot)) {
+      if (newOwnerLinkSlot) {
         auto** const head = reinterpret_cast<WeakPtr<T>**>(newOwnerLinkSlot);
         nextInOwner = *head;
         *head = this;
@@ -578,15 +538,14 @@ namespace moho
      * Address: 0x00836BD0 (FUN_00836BD0 -- `WeakPtr<T>::ResetFromObject` (the owner's weak-link head at +0x08); `UserUnit::UpdateUnitData` 0x008C0750; callers 0x008C0750; formerly `RelinkIntrusiveNodeViaOwnerOffset08` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
      * Address: 0x00632CA0 (FUN_00632CA0 -- the `WeakPtr<UnitWeapon>` emission,
      *   identified by its owner-link offset: the body's `add ecx, 0x14` is
-     *   `EncodeOwnerLinkSlot`'s `kOwnerLinkOffset`, and
-     *   `WeakPtrOwnerLinkOffset<UnitWeapon>::value` is the only 0x14
-     *   specialization. The rest matches `ResetFromOwnerLinkSlot` instruction
+     *   the `UnitWeapon` -> `WeakObject` base cast, and `UnitWeapon` is the
+     *   only owner whose `WeakObject` sits at 0x14. The rest matches `ResetFromOwnerLinkSlot` instruction
      *   for instruction, including the null-slot branch that writes
      *   `nextInOwner = nullptr`. Zero callers, unreachable; formerly
      *   `AttachNodeToOwnerHead` over an `IntrusiveOwnerHeadRuntimeView` in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      * Address: 0x0066A2A0 (FUN_0066A2A0 -- the `WeakPtr<WWinManagedFrame>` emission
-     *   (`lea edx, [ecx+178h]` is WeakPtrOwnerLinkOffset<WWinManagedFrame>);
+     *   (`lea edx, [ecx+178h]` is its `WeakObject` base, after the wxFrame);
      *   caller EFX_CreateEmitterWindow 0x0066A007; formerly
      *   `RebindManagedWindowSlotToFrame` in moho/console/CConCommand.cpp, removed
      *   with the wx conversion.)
@@ -622,6 +581,13 @@ namespace moho
       ResetFromOwnerLinkSlot(EncodeOwnerLinkSlot(object));
     }
 
+    /**
+     * Address: 0x0057D4F0 (FUN_0057D4F0, Moho::WeakPtr_Unit::Set -- the
+     *   `WeakPtr<Unit>` emission: `slot = unit ? unit + 4 : 0`, unlink from the
+     *   old chain, link at the new head, with no other test. It used to be a
+     *   separate specialization here because the generic body carried sentinel
+     *   checks the binary does not have.)
+     */
     void Set(T* object) noexcept
     {
       ResetFromObject(object);
@@ -629,7 +595,6 @@ namespace moho
   };
 
   static_assert(sizeof(WeakPtr<void>) == 0x08, "WeakPtr<T> must be 8 bytes");
-  static_assert(WeakPtr<void>::kOwnerLinkOffset == 0x4, "WeakPtr ABI expects owner-link offset 0x4");
   static_assert(offsetof(WeakPtr<void>, ownerLinkSlot) == 0x00, "WeakPtr<T>::ownerLinkSlot offset must be 0x00");
   static_assert(offsetof(WeakPtr<void>, nextInOwner) == 0x04, "WeakPtr<T>::nextInOwner offset must be 0x04");
 
@@ -973,7 +938,7 @@ namespace moho
   template <class T>
   inline WeakPtr<T>::~WeakPtr() noexcept
   {
-    if (ownerLinkSlot == nullptr || IsSentinel()) {
+    if (ownerLinkSlot == nullptr) {
       return;
     }
 
@@ -984,40 +949,6 @@ namespace moho
     }
     if (*cursor == this) {
       *cursor = nextInOwner;
-    }
-  }
-
-  /**
-   * Address: 0x0057D4F0 (FUN_0057D4F0, Moho::WeakPtr_Unit::Set)
-   *
-   * What it does:
-   * Rebinds one weak-unit node by unlinking from its current owner chain and
-   * inserting at the head of the new owner's weak-link list.
-   */
-  template <>
-  inline void WeakPtr<Unit>::Set(Unit* object) noexcept
-  {
-    void* const targetOwnerLinkSlot = EncodeOwnerLinkSlot(object);
-    if (ownerLinkSlot == targetOwnerLinkSlot) {
-      return;
-    }
-
-    MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
-    if (ownerLinkSlot != nullptr) {
-      auto** existing = reinterpret_cast<WeakPtr<Unit>**>(ownerLinkSlot);
-      while (*existing != this) {
-        existing = &(*existing)->nextInOwner;
-      }
-      *existing = nextInOwner;
-    }
-
-    ownerLinkSlot = targetOwnerLinkSlot;
-    if (targetOwnerLinkSlot != nullptr) {
-      auto** const ownerHead = reinterpret_cast<WeakPtr<Unit>**>(targetOwnerLinkSlot);
-      nextInOwner = *ownerHead;
-      *ownerHead = this;
-    } else {
-      nextInOwner = nullptr;
     }
   }
 

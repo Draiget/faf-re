@@ -2597,6 +2597,25 @@ namespace moho
   ENTSCR_GetBonePosition(Entity* entity, LuaPlus::LuaStackObject& boneIdentifier, bool allowNilAndSpecialIndices);
 
   static_assert(sizeof(Entity) == 0x270, "Entity size must be 0x270");
+
+  // `SEntAttachInfo`'s weak link to its parent needs `Entity` complete: linking
+  // and decoding are the casts to and from the entity's `WeakObject`.
+  inline SEntAttachInfo::SEntAttachInfo(
+    Entity* const parent,
+    const std::int32_t childBoneIndex,
+    const std::int32_t parentBoneIndex,
+    const VTransform& relativeTransform
+  ) noexcept
+    : mAttachTargetWeak(parent)
+    , mParentBoneIndex(parentBoneIndex)
+    , mChildBoneIndex(childBoneIndex)
+    , mRelativeTransform(relativeTransform)
+  {}
+
+  inline Entity* SEntAttachInfo::GetAttachTargetEntity() const noexcept
+  {
+    return TargetWeakLink().GetObjectPtr();
+  }
   // id_ sits right behind the 8-byte dirty-list node base, which therefore
   // starts at 0x60.
   static_assert(offsetof(Entity, id_) == 0x68, "Entity::id_ offset must be 0x68");

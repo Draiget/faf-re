@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 
 namespace moho
@@ -135,4 +136,6 @@ namespace moho
   };
 
   static_assert(sizeof(WeakObject) == 4, "WeakObject must be 4 bytes");
+  // `WeakPtr` uses the object's address as its chain-head slot.
+  static_assert(offsetof(WeakObject, weakLinkHead_) == 0, "WeakObject::weakLinkHead_ must lead the object");
 } // namespace moho

@@ -545,13 +545,7 @@ STaskEventLinkage::~STaskEventLinkage()
 {
   mThreadRef.ResetFromObject(nullptr);
 
-  for (WeakPtr<STaskEventLinkage>* node = mOwnerWeakRefHead; node != nullptr;) {
-    WeakPtr<STaskEventLinkage>* const next = node->nextInOwner;
-    node->ownerLinkSlot = nullptr;
-    node->nextInOwner = nullptr;
-    node = next;
-  }
-  mOwnerWeakRefHead = nullptr;
+  DetachAllWeakReferences();
 }
 
 /**

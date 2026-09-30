@@ -816,11 +816,7 @@ namespace
    */
   void RelinkArmyHook(ListenerArmyHook& hook, moho::UserArmy* army)
   {
-    auto* const newOwnerAnchor = army == nullptr
-      ? nullptr
-      : reinterpret_cast<std::uintptr_t*>(
-          reinterpret_cast<std::uintptr_t>(army) + offsetof(moho::UserArmy, mWeakRefs)
-        );
+    auto* const newOwnerAnchor = static_cast<std::uintptr_t*>(moho::UserArmy::WeakLinkHeadOf(army));
 
     if (hook.mOwnerAnchor == newOwnerAnchor) {
       return;
@@ -2262,12 +2258,7 @@ namespace moho
       reconMask = UserArmy::EReconGridMask::Fog;
     }
 
-    UserArmy* listenerArmy = nullptr;
-    if (mListenerArmyHook.mOwnerAnchor != nullptr) {
-      listenerArmy = reinterpret_cast<UserArmy*>(
-        reinterpret_cast<std::uintptr_t>(mListenerArmyHook.mOwnerAnchor) - offsetof(UserArmy, mWeakRefs)
-      );
-    }
+    UserArmy* const listenerArmy = UserArmy::FromWeakLinkHead(mListenerArmyHook.mOwnerAnchor);
 
     if (listenerArmy == nullptr) {
       return EFilterType::Pass;

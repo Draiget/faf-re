@@ -427,28 +427,16 @@ namespace
 
   // ---- UISelectionByCategory support (FUN_008662B0 / FUN_00865590) ----
 
-  // Selection weak-set nodes store `&UserEntity::mIUnitChainHead` (offset 0x08)
-  // in their owner-link slot; a null slot or the tombstone sentinel `(void*)8`
-  // decodes to null. Mirrors the file's existing decodeSelectionSlot lambda.
+  // Selection weak-set nodes and camera frustum-list entries both link into
+  // the entity's weak chain; their slot decodes like any `WeakPtr<UserEntity>`.
   [[nodiscard]] moho::UserEntity* DecodeSelectionEntity(const moho::SSelectionWeakRefUserEntity& weakRef) noexcept
   {
-    constexpr std::uintptr_t kOwnerLinkOffset = offsetof(moho::UserEntity, mIUnitChainHead);
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-    if (raw == 0u || raw == kOwnerLinkOffset) {
-      return nullptr;
-    }
-    return reinterpret_cast<moho::UserEntity*>(raw - kOwnerLinkOffset);
+    return moho::WeakPtr<moho::UserEntity>::DecodeOwnerObject(weakRef.mOwnerLinkSlot);
   }
 
-  // Camera frustum-list entries use the identical owner-link encoding.
   [[nodiscard]] moho::UserEntity* DecodeFrustumEntity(const moho::CameraUserEntityWeakRef& weakRef) noexcept
   {
-    constexpr std::uintptr_t kOwnerLinkOffset = offsetof(moho::UserEntity, mIUnitChainHead);
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-    if (raw == 0u || raw == kOwnerLinkOffset) {
-      return nullptr;
-    }
-    return reinterpret_cast<moho::UserEntity*>(raw - kOwnerLinkOffset);
+    return moho::WeakPtr<moho::UserEntity>::DecodeOwnerObject(weakRef.mOwnerLinkSlot);
   }
 
   // File-static camera-focus cycle state for CycleCameraFocusOnSelection.

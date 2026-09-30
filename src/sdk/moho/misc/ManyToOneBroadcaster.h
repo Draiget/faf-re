@@ -174,8 +174,4 @@ namespace moho
     offsetof(ManyToOneListener<int>, weakLinkHead_) == 0x04,
     "ManyToOneListener<TEvent>::weakLinkHead_ offset must be 0x04"
   );
-  static_assert(
-    WeakPtr<ManyToOneListener<int>>::kOwnerLinkOffset == 0x04,
-    "ManyToOneListener<TEvent> weak-owner slot offset must be 0x04"
-  );
 } // namespace moho

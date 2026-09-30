@@ -26757,7 +26757,7 @@ bool Sim::LocationIsFree(Sim* const sim, Unit* const ignore, gpg::Rect2i* const 
           idle = true;
         } else {
           const WeakPtr<CUnitCommand>& head = commands.data()[0];
-          idle = (head.ownerLinkSlot == nullptr) || head.IsSentinel();
+          idle = head.GetObjectPtr() == nullptr;
         }
       }
       if (!idle) {

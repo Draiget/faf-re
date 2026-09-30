@@ -354,12 +354,7 @@ namespace
 
   void ClearTaskEventLinks(CTaskThread* const thread)
   {
-    while (thread->mEventLinkHead != nullptr) {
-      WeakPtr<CTaskThread>* const link = thread->mEventLinkHead;
-      thread->mEventLinkHead = link->nextInOwner;
-      link->ownerLinkSlot = nullptr;
-      link->nextInOwner = nullptr;
-    }
+    thread->DetachAllWeakReferences();
   }
 
   /**
@@ -572,7 +567,7 @@ gpg::RType* CTaskThread::GetPointerType()
  * Initializes thread state and links it into stage main thread list.
  */
 CTaskThread::CTaskThread(CTaskStage* const stage)
-  : mEventLinkHead(nullptr)
+  : WeakObject()
   , mStage(stage)
   , mTaskTop(nullptr)
   , mPendingFrames(0)
@@ -592,7 +587,7 @@ CTaskThread::CTaskThread(CTaskStage* const stage)
  * `s_count` instead of the stat.
  */
 CTaskThread::CTaskThread()
-  : mEventLinkHead(nullptr)
+  : WeakObject()
   , mStage(nullptr)
   , mTaskTop(nullptr)
   , mPendingFrames(0)

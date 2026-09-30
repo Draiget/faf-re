@@ -31,6 +31,26 @@ namespace moho
   {
   public:
     /**
+     * Weak references to a user entity link into the chain at +0x08, which
+     * RTTI says is the binary's `WeakObject` base. The constructor leaves
+     * +0x04 untouched (0x008B85E0): the binary pads the vfptr to 8, which MSVC
+     * does only for a member with 8-byte alignment, and that member is not
+     * identified yet. Until it is, this recovery's base sits at +0x04 and the
+     * +0x08 chain is `mIUnitChainHead`, so the entity names it here.
+     */
+    [[nodiscard]] static void* WeakLinkHeadOf(UserEntity* const entity) noexcept
+    {
+      return entity != nullptr ? static_cast<void*>(&entity->mIUnitChainHead) : nullptr;
+    }
+
+    [[nodiscard]] static UserEntity* FromWeakLinkHead(void* const head) noexcept
+    {
+      return head != nullptr
+        ? reinterpret_cast<UserEntity*>(static_cast<std::byte*>(head) - offsetof(UserEntity, mIUnitChainHead))
+        : nullptr;
+    }
+
+    /**
      * Address: 0x008B85E0 (FUN_008B85E0, ??0UserEntity@Moho@@QAE@AAVCWldSession@1@ABUSCreateEntityParams@1@@Z)
      *
      * What it does:

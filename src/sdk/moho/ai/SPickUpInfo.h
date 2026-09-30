@@ -50,10 +50,9 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    [[nodiscard]] Unit* GetUnit() const noexcept
-    {
-      return mUnit.GetObjectPtr();
-    }
+    // Out of line: decoding the weak link is the cast from the unit's
+    // `WeakObject`, which needs `Unit` complete.
+    [[nodiscard]] Unit* GetUnit() const noexcept;
 
   private:
     /**

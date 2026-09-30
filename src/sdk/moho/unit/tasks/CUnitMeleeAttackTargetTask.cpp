@@ -659,7 +659,7 @@ namespace moho
       return;
     }
 
-    if (mTarget.targetEntity.ownerLinkSlot == nullptr || mTarget.targetEntity.IsSentinel()) {
+    if (mTarget.targetEntity.GetObjectPtr() == nullptr) {
       return;
     }
 
@@ -988,7 +988,7 @@ namespace moho
 
       case 9: {
         const WeakPtr<Entity>& focusWeak = unit->FocusEntityRef.AsWeakPtr<Entity>();
-        if (focusWeak.ownerLinkSlot != nullptr && !focusWeak.IsSentinel()) {
+        if (focusWeak.GetObjectPtr() != nullptr) {
           Entity* const focusEntity = unit->GetFocusEntity();
           Unit* const targetUnit = focusEntity != nullptr ? focusEntity->IsUnit() : nullptr;
           if (targetUnit != nullptr) {

@@ -729,6 +729,22 @@ namespace moho
   {
   public:
     /**
+     * A unit carries two `WeakObject`s (RTTI: +0x04 through `IUnit`, +0x0C
+     * through `Entity`'s `CScriptObject`); weak references to it use
+     * `IUnit`'s, so `WeakPtr<Unit>` goes through that base.
+     */
+    [[nodiscard]] static void* WeakLinkHeadOf(Unit* const unit) noexcept
+    {
+      WeakObject* const weak = static_cast<IUnit*>(unit);
+      return weak;
+    }
+
+    [[nodiscard]] static Unit* FromWeakLinkHead(void* const head) noexcept
+    {
+      return static_cast<Unit*>(static_cast<IUnit*>(static_cast<WeakObject*>(head)));
+    }
+
+    /**
      * Address: 0x006A4920 (FUN_006A4920, Moho::Unit::StaticGetClass)
      *
      * What it does:

@@ -133,8 +133,8 @@ namespace moho
     std::int32_t mIsDragger;       // +0x18
     Wm3::Vector2f mMouseScreenPos; // +0x1C
 
-    [[nodiscard]] UserEntity* HoveredEntity() const noexcept { return mUnitHover.GetObjectPtr(); }
-    void SetHoveredEntity(UserEntity* const entity) noexcept { mUnitHover.ResetFromObject(entity); }
+    [[nodiscard]] UserEntity* HoveredEntity() const noexcept;
+    void SetHoveredEntity(UserEntity* entity) noexcept;
   };
 
   static_assert(sizeof(MouseInfo) == 0x24, "MouseInfo size must be 0x24");

@@ -13,29 +13,12 @@ namespace moho
 
   struct STaskEventLinkage;
 
-#ifndef MOHO_WEAKPTR_OWNER_LINK_OFFSET_CTASKTHREAD_DEFINED
-#define MOHO_WEAKPTR_OWNER_LINK_OFFSET_CTASKTHREAD_DEFINED
-  template <>
-  struct WeakPtrOwnerLinkOffset<CTaskThread>
+  struct STaskEventLinkage : TDatListItem<STaskEventLinkage, void>, WeakObject
   {
-    static constexpr std::uintptr_t value = 2 * sizeof(void*); // after the TDatListItem links (0x08 on x86)
-  };
-#endif
-
-  template <>
-  struct WeakPtrOwnerLinkOffset<STaskEventLinkage>
-  {
-    // mOwnerWeakRefHead, after the TDatListItem links (0x08 on x86).
-    static constexpr std::uintptr_t value = 2 * sizeof(void*);
-  };
-
-  struct STaskEventLinkage : TDatListItem<STaskEventLinkage, void>
-  {
-    WeakPtr<STaskEventLinkage>* mOwnerWeakRefHead; // 0x08
-    WeakPtr<CTaskThread> mThreadRef;               // 0x0C
+    WeakPtr<CTaskThread> mThreadRef; // 0x0C
 
     STaskEventLinkage()
-      : mOwnerWeakRefHead(nullptr)
+      : WeakObject()
       , mThreadRef{nullptr, nullptr}
     {}
 
@@ -50,14 +33,7 @@ namespace moho
   };
 
   static_assert(sizeof(STaskEventLinkage) == 0x14, "STaskEventLinkage size must be 0x14");
-  static_assert(
-    offsetof(STaskEventLinkage, mOwnerWeakRefHead) == 0x08, "STaskEventLinkage::mOwnerWeakRefHead offset must be 0x08"
-  );
   static_assert(offsetof(STaskEventLinkage, mThreadRef) == 0x0C, "STaskEventLinkage::mThreadRef offset must be 0x0C");
-  static_assert(WeakPtr<CTaskThread>::kOwnerLinkOffset == 0x08, "CTaskThread weak-owner slot offset must be 0x08");
-  static_assert(
-    WeakPtr<STaskEventLinkage>::kOwnerLinkOffset == 0x08, "STaskEventLinkage weak-owner slot offset must be 0x08"
-  );
 
   /**
    * Wrapper namespace for free helpers operating on `WeakPtr<STaskEventLinkage>`

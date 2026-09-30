@@ -1221,8 +1221,6 @@ namespace
   constexpr const char* kUnitOnProductionInactiveScript = "OnProductionInActive";
   constexpr const char* kUnitLuaClassName = "Unit";
   constexpr const char* kGlobalLuaClassName = "<global>";
-  // A weak command link that decodes to its own owner-link offset has no owner (4 on x86).
-  constexpr std::uintptr_t kInvalidWeakCommandSentinel = WeakPtr<CUnitCommand>::kOwnerLinkOffset;
 
   [[nodiscard]] bool BlueprintHasOccupancyCaps(const REntityBlueprint* const blueprint, const std::uint8_t caps) noexcept
   {
@@ -4820,7 +4818,7 @@ int moho::cfunc_UnitPrintCommandQueueL(LuaPlus::LuaState* const state)
 
   for (const WeakPtr<CUnitCommand>& commandWeakPtr : commandSnapshot) {
     CUnitCommand* const command = commandWeakPtr.GetObjectPtr();
-    if (command == nullptr || reinterpret_cast<std::uintptr_t>(command) == kInvalidWeakCommandSentinel) {
+    if (command == nullptr) {
       continue;
     }
 
@@ -4890,7 +4888,7 @@ int moho::cfunc_UnitGetCurrentMoveLocationL(LuaPlus::LuaState* const state)
     command = commandQueue->mCommandVec.front().GetObjectPtr();
   }
 
-  if (command != nullptr && reinterpret_cast<std::uintptr_t>(command) != kInvalidWeakCommandSentinel) {
+  if (command != nullptr) {
     switch (command->mVarDat.mCmdType) {
       case EUnitCommandType::UNITCOMMAND_Move:
       case EUnitCommandType::UNITCOMMAND_FormMove:
@@ -14835,7 +14833,7 @@ bool Unit::IsIdleState() const
   }
 
   const CUnitCommand* const headCommand = commandQueue->mCommandVec.front().GetObjectPtr();
-  return headCommand == nullptr || reinterpret_cast<std::uintptr_t>(headCommand) == kInvalidWeakCommandSentinel;
+  return headCommand == nullptr;
 }
 
 /**
@@ -15381,7 +15379,7 @@ Unit* Unit::GetTransportFerryBeacon() const
   }
 
   const CUnitCommand* const command = commandQueue->mCommandVec.front().GetObjectPtr();
-  if (command == nullptr || reinterpret_cast<std::uintptr_t>(command) == kInvalidWeakCommandSentinel) {
+  if (command == nullptr) {
     return nullptr;
   }
 
@@ -16966,7 +16964,7 @@ void Unit::RenderAIDebugInfo()
     headCommand = CommandQueue->mCommandVec.begin()->GetObjectPtr();
   }
 
-  if (headCommand == nullptr || reinterpret_cast<std::uintptr_t>(headCommand) == kInvalidWeakCommandSentinel) {
+  if (headCommand == nullptr) {
     IncrementAIDebugStateStat(armyStats, unitStatePrefix + "_Idle");
   }
 

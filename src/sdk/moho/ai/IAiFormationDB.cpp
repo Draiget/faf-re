@@ -49,7 +49,7 @@ std::uint32_t* SFormationUnitWeakRef::DecodeOwnerChainHead() const noexcept
   // weak-link head (`+4`).
   auto* const entity = reinterpret_cast<Entity*>(static_cast<std::uintptr_t>(ownerLinkSlotWord));
   IUnit* const unit = static_cast<Unit*>(entity);
-  return reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uintptr_t>(unit) + WeakPtr<IUnit>::kOwnerLinkOffset);
+  return static_cast<std::uint32_t*>(WeakPtr<IUnit>::EncodeOwnerLinkSlot(unit));
 }
 
 /**

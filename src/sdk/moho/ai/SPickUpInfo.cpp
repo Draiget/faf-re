@@ -6,6 +6,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/unit/core/Unit.h"
 
 namespace
 {
@@ -73,6 +74,11 @@ namespace moho
     }
     mDistanceSq = source.mDistanceSq;
     return *this;
+  }
+
+  Unit* SPickUpInfo::GetUnit() const noexcept
+  {
+    return mUnit.GetObjectPtr();
   }
 
   SPickUpInfo::~SPickUpInfo()

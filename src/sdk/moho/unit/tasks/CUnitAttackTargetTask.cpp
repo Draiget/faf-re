@@ -956,7 +956,7 @@ namespace moho
     // order: every command event retired the task, so dragging such an order to
     // a new spot discarded it outright.
     const auto hasLiveEntity = [](const CAiTarget& target) {
-      return target.targetEntity.ownerLinkSlot != nullptr && !target.targetEntity.IsSentinel();
+      return target.targetEntity.GetObjectPtr() != nullptr;
     };
 
     const bool commandHasLiveEntityTarget = hasLiveEntity(mCommand->mTarget);

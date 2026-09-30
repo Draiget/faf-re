@@ -1,4 +1,5 @@
 #include "moho/entity/CollisionBeamEntity.h"
+#include "moho/effects/rendering/IEffect.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"

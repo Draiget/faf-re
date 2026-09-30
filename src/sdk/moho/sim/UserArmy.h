@@ -166,6 +166,22 @@ namespace moho
 
     /// Head of the intrusive chain of `WeakPtr<UserArmy>` nodes referencing us.
     /// `CUserSoundManager`'s listener-army hook links itself here.
+    /**
+     * Weak references to an army link into `mWeakRefs`, a member rather than a
+     * base, so the army names it for `WeakPtr<UserArmy>`.
+     */
+    [[nodiscard]] static void* WeakLinkHeadOf(UserArmy* const army) noexcept
+    {
+      return army != nullptr ? static_cast<void*>(&army->mWeakRefs) : nullptr;
+    }
+
+    [[nodiscard]] static UserArmy* FromWeakLinkHead(void* const head) noexcept
+    {
+      return head != nullptr
+        ? reinterpret_cast<UserArmy*>(static_cast<std::byte*>(head) - offsetof(UserArmy, mWeakRefs))
+        : nullptr;
+    }
+
     WeakObject mWeakRefs; // 0x1E0
 
     CWldSession* mSession; // 0x1E4
