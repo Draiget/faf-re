@@ -714,6 +714,33 @@ void CUnitCommandQueue::SetCommandCount(const unsigned int index, const unsigned
 }
 
 /**
+ * Address: 0x006EE430 (FUN_006EE430)
+ *
+ * IDA signature:
+ * int __usercall sub_6EE430@<eax>(CUnitCommandQueue* this@<ecx>, int* totalBuildCount@<edi>);
+ *
+ * What it does:
+ * Walks `mCommandVec` in order (8-byte `WeakPtr` stride), decodes each
+ * command (`p ? p - 4 : 0`) and, for `mVarDat.mCmdType ==
+ * UNITCOMMAND_BuildFactory` (+0x98 == 7), adds `mVarDat.mCount` (+0xE4) to
+ * `totalBuildCount` and counts the order. The decoded command is read
+ * without a null test. Caller: `CUnitGuardTask::ResolveGuardCommandSourceUnit`
+ * (0x00611D14).
+ */
+int CUnitCommandQueue::CountFactoryBuildCommands(int& totalBuildCount) const
+{
+  int factoryBuildCommands = 0;
+  for (const WeakPtr<CUnitCommand>& entry : mCommandVec) {
+    const CUnitCommand* const command = entry.GetObjectPtr();
+    if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
+      totalBuildCount += command->mVarDat.mCount;
+      ++factoryBuildCommands;
+    }
+  }
+  return factoryBuildCommands;
+}
+
+/**
  * Address: 0x006EE470 (FUN_006EE470)
  *
  * What it does:

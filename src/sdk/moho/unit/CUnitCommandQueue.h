@@ -237,6 +237,18 @@ namespace moho
     void SetCommandCount(unsigned int index, unsigned int count);
 
     /**
+     * Address: 0x006EE430 (FUN_006EE430)
+     *
+     * IDA signature:
+     * int __usercall sub_6EE430@<eax>(CUnitCommandQueue* this@<ecx>, int* totalBuildCount@<edi>);
+     *
+     * What it does:
+     * Counts the queued `UNITCOMMAND_BuildFactory` orders and adds each
+     * one's remaining build count (`mVarDat.mCount`) into `totalBuildCount`.
+     */
+    [[nodiscard]] int CountFactoryBuildCommands(int& totalBuildCount) const;
+
+    /**
      * Address: 0x006EE470 (FUN_006EE470)
      *
      * What it does:

@@ -214,6 +214,12 @@ namespace moho
       return 0;
     }
 
+    /**
+     * Address: 0x007359F0 (FUN_007359F0 -- `TSimConVarInstance<unsigned char>::GetValueStorage`, `lea eax,[ecx+8]; ret`; vtable 0x00E32B48 slot 2, that vtable written by 0x00735400 and 0x00735980; formerly `GetInlineLane08RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     *
+     * What it does:
+     * Returns the address of the typed value (`mValue`, +0x08).
+     */
     void* GetValueStorage() override
     {
       return &mValue;

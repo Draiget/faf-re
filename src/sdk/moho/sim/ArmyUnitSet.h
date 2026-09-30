@@ -125,6 +125,7 @@ namespace moho
      * What it does:
      * Iterates one `Entity*` range, resolves live `Unit*` owners, and inserts
      * them into this sorted unit set.
+     * Address: 0x006F8F10 (FUN_006F8F10 -- a second out-of-line emission of this range add, byte-identical to 0x00704070 (per entry `static_cast<Unit*>` -- `p ? p - 8 : 0` -- into `Add` 0x0057DDD0; set, first, last on the stack, `ret 0xC`); callers 0x006F7AE0 (`cfunc_IssueTransportUnloadSpecificL`, the cargo added to the transports' set at 0x006F7D0E), 0x00725770 (`BuildPlatoonUnitSet`), 0x00726DE0 (`CPlatoon::MoveToLocation`, 0x00727070/0x007270E0), 0x00727740 (`CPlatoon::MoveToTarget`, 0x0072797C/0x007279EC); formerly `AddUnitRangeFromPointerWordsRuntime` in moho/sim/SimRecoveryRuntime.cpp and `AddUnitPointerRangeToSet` in moho/sim/CPlatoon.cpp (RULE ONE), removed 2026-09-30.)
      */
     void AddRange(Entity* const* start, Entity* const* end);
 

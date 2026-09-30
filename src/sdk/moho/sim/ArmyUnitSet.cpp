@@ -261,13 +261,15 @@ namespace moho
    * Address: 0x00704070 (FUN_00704070, Moho::EntitySetTemplate_Entity::AddRange)
    *
    * What it does:
-   * Iterates one `Entity*` range, converts each entry to a `Unit*` owner, and
-   * inserts it into this sorted set.
+   * Iterates one `Entity*` range and adds each entry to this sorted set as the
+   * `Unit` that owns it: a plain `static_cast` (`p ? p - 8 : 0`) straight into
+   * `Add` (0x0057DDD0) -- no `IsUnit()` call and no filtering, in both
+   * emissions (0x00704070 and 0x006F8F10).
    */
   void SEntitySetTemplateUnit::AddRange(Entity* const* const start, Entity* const* const end)
   {
     for (Entity* const* it = start; it != end; ++it) {
-      (void)AddUnit(UnitFromEntry(*it));
+      (void)AddUnit(static_cast<Unit*>(*it));
     }
   }
 

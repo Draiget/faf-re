@@ -1809,6 +1809,7 @@ namespace msvc8
          * Address: 0x00A74430 (FUN_00A74430 -- `vector(count, value)` for a 16-byte element (buy at 0x00A720E0, fill at 0x00A72C70).)
  * Address: 0x008D6480 (FUN_008D6480 -- `vector<list<unsigned>::iterator>(9, end())`, the bucket array
  *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp)'s constructor 0x008D5350 builds: `_Allocate(9)` (0x008D6F60), then the fill 0x008D72F0.)
+ * Address: 0x00642180 (FUN_00642180 -- this constructor's `_Construct_n` body (`_Buy` 0x00443950, `_Ufill` 0x00445430, then `last_ = first_ + count`) for `msvc8::vector<unsigned int>`, the word vector `_Myvec` of VC8 `vector<bool>` (`moho::SBitStorage32`, +0x04); usercall this=ESI, count=EDI, &value on the stack, `ret 4`; callers 0x00641B70 (`vector<bool>(count, true)`: `_Mysize = 0`, `_Myvec(_Nw(count), ~0u)`, `_Trim(count)` 0x00444780; reached from `CAnimationManipulator::CAnimationManipulator` 0x0063F460) and 0x00641F60 (the untokenized `vector<unsigned int>(count, value)` thiscall shell around it, zero references); formerly `TryResolveLookupAndCacheRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          */
         vector(std::size_t count, const T& value) : vector() {
             // VC8: `if (_Buy(count)) { try { _Mylast = _Ufill(_Myfirst, count,

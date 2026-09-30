@@ -83,10 +83,6 @@ namespace moho
   extern CWinLogTarget sLogWindowTarget;
 }
 
-// Defined at global scope in SimRecoveryRuntime.cpp (that file declares no
-// header of its own).
-extern void SimDriverDebugClientManagerRuntime();
-
 namespace moho
 {
   [[nodiscard]] msvc8::string ToString(const Wm3::Vec3f& value);
@@ -7345,7 +7341,7 @@ namespace moho
    * Address: 0x00BE7510 (FUN_00BE7510, dynamic initializer for `gCConFunc_wld_ClientDebugDump`)
    * Address: 0x00C08080 (FUN_00C08080, dynamic atexit destructor for `gCConFunc_wld_ClientDebugDump`)
    */
-  CConFunc gCConFunc_wld_ClientDebugDump("wld_ClientDebugDump", kConsoleStartupWldClientDebugDumpDescription, reinterpret_cast<CConFunc::Callback>(&SimDriverDebugClientManagerRuntime));
+  CConFunc gCConFunc_wld_ClientDebugDump("wld_ClientDebugDump", kConsoleStartupWldClientDebugDumpDescription, &moho::CON_WLD_ClientDebugDump);
 
 } // namespace moho
 

@@ -7076,7 +7076,7 @@ namespace moho
     SEntitySetTemplateUnit orderRecipients{};
     orderRecipients.AddUnits(transportUnits);
 
-    bool hasUnitsToUnload = false;
+    SEntitySetTemplateUnit cargoUnits{};
     for (Unit* const transportUnit : transportUnits) {
       if (transportUnit == nullptr) {
         continue;
@@ -7117,16 +7117,17 @@ namespace moho
           continue;
         }
 
-        (void)orderRecipients.AddUnit(loadedUnit);
-        hasUnitsToUnload = true;
+        (void)cargoUnits.AddUnit(loadedUnit);
       }
     }
 
-    // 0x006F7CFF `cmp eax, ecx` / `je` -- the binary skips the AddAll and the
-    // issue entirely when no cargo matched the category.
-    if (!hasUnitsToUnload) {
+    // 0x006F7CFF `cmp eax, ecx` / `je` -- the binary skips the range add and
+    // the issue entirely when no cargo matched the category; otherwise
+    // 0x006F7D0E adds the collected cargo to the transports (0x006F8F10).
+    if (cargoUnits.Empty()) {
       return 0;
     }
+    orderRecipients.AddRange(cargoUnits.mVec.begin(), cargoUnits.mVec.end());
 
     CAiTarget unloadTarget{};
     // 0x006EEF60 `CAiTarget::SetTarget(state, "IssueTransportUnloadSpecific", arg)` -- the

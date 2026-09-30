@@ -218,17 +218,63 @@ namespace
     return static_cast<int>(std::lround(sample));
   }
 
-  void AddElapsedMicrosecondsToStat(StatItem* const statItem, const std::int64_t elapsedMicroseconds)
+  /**
+   * Scope timer charged to one engine stat: remembers the `StatItem`, starts
+   * a cycle timer, and on scope exit adds the elapsed microseconds to the
+   * stat's integer value. `FinalizeSyncDispatchLocked` (0x0073DAD0) scopes
+   * one around `Sim::Sync` ("Sim_Sync"), the original
+   * `ExecuteDispatchStepLocked` body (0x0073D8C6) one around
+   * `UpdateStates` ("Sim_Dispatch"); both inline the constructor and the
+   * destructor, whose out-of-line copies are below.
+   */
+  class ScopedStatTimer
   {
-    if (statItem == nullptr) {
-      return;
+  public:
+    /**
+     * Address: 0x0073B050 (FUN_0073B050)
+     *
+     * IDA signature:
+     * int __usercall sub_73B050@<eax>(int this@<esi>, int stat@<eax>);
+     *
+     * What it does:
+     * Stores the stat item at +0x00 and starts the timer at +0x08
+     * (0x009556D0). Zero references: both users inline it.
+     */
+    explicit ScopedStatTimer(StatItem* const stat)
+      : mStat(stat)
+      , mTimer()
+    {
     }
 
-    (void)::InterlockedExchangeAdd(
-      reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits),
-      static_cast<long>(elapsedMicroseconds)
-    );
-  }
+    /**
+     * Address: 0x0073B060 (FUN_0073B060)
+     *
+     * IDA signature:
+     * void __usercall sub_73B060(int this@<esi>);
+     *
+     * What it does:
+     * `ElapsedCycles` (0x00955700) -> `CyclesToMicroseconds` (0x00955520),
+     * then `lock xadd` of the low word into `mStat->mPrimaryValueBits`
+     * (+0x24); no null test on the stat. Reached through the EH unwind
+     * funclets 0x00BB49B3 (0x0073DAD0's timer at ebp-0x38) and 0x00BB49DB
+     * (0x0073D8C6's timer at ebp-0x48).
+     */
+    ~ScopedStatTimer()
+    {
+      (void)::InterlockedExchangeAdd(
+        reinterpret_cast<volatile long*>(&mStat->mPrimaryValueBits),
+        static_cast<long>(gpg::time::CyclesToMicroseconds(mTimer.ElapsedCycles()))
+      );
+    }
+
+    ScopedStatTimer(const ScopedStatTimer&) = delete;
+    ScopedStatTimer& operator=(const ScopedStatTimer&) = delete;
+
+  private:
+    StatItem* mStat;         // +0x00
+    gpg::time::Timer mTimer; // +0x08
+  };
+  static_assert(sizeof(ScopedStatTimer) == 0x10, "ScopedStatTimer size must be 0x10");
 
   bool IsZeroDigest(const gpg::MD5Digest& digest)
   {
@@ -836,22 +882,22 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
 
   lock.unlock();
 
-  CTimeBarSection timebar("Sim - Sync");
-  if (gEngineStatSimSync == nullptr) {
-    gEngineStatSimSync = GetEngineStats()->GetItem3("Sim_Sync");
-    if (gEngineStatSimSync != nullptr) {
-      (void)gEngineStatSimSync->Release(1);
-    }
-  }
-
-  gpg::time::Timer syncTimer;
+  // 0x0073DB2A..0x0073DBFC: the time-bar section and the stat timer live in
+  // one scope around `Sim::Sync`; both are torn down (timer first) before the
+  // driver lock is re-taken.
   SSyncData* syncData = nullptr;
-  mSim->Sync(mActiveSyncFilter, syncData);
+  {
+    CTimeBarSection timebar("Sim - Sync");
+    if (gEngineStatSimSync == nullptr) {
+      gEngineStatSimSync = GetEngineStats()->GetItem3("Sim_Sync");
+      if (gEngineStatSimSync != nullptr) {
+        (void)gEngineStatSimSync->Release(1);
+      }
+    }
 
-  AddElapsedMicrosecondsToStat(
-    gEngineStatSimSync,
-    static_cast<std::int64_t>(gpg::time::CyclesToMicroseconds(syncTimer.ElapsedCycles()))
-  );
+    ScopedStatTimer syncTimer(gEngineStatSimSync);
+    mSim->Sync(mActiveSyncFilter, syncData);
+  }
 
   lock.lock();
 

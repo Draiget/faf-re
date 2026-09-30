@@ -1998,34 +1998,6 @@ namespace
   }
 }
 
-/**
- * Address: 0x00642180 (FUN_00642180)
- *
- * What it does:
- * Verifies one key in a lookup cache and refreshes the cached resolved lane
- * when the key is currently present.
- */
-bool TryResolveLookupAndCacheRuntime(
-  const std::uint32_t key,
-  LookupCacheRuntime* const cache,
-  const std::uint32_t argument
-)
-{
-  if (cache == nullptr || cache->containsFn == nullptr) {
-    return false;
-  }
-
-  if (!cache->containsFn(cache->containsState, key)) {
-    return false;
-  }
-
-  if (cache->resolveFn != nullptr) {
-    cache->cachedValue = cache->resolveFn(cache->context, key, argument);
-  }
-
-  return true;
-}
-
 namespace
 {
   struct PriorityQueueNode24Runtime
@@ -2123,29 +2095,6 @@ namespace
   static_assert(sizeof(Element20Runtime) == 0x14, "Element20Runtime size must be 0x14");
 }
 
-/**
- * Address: 0x00687AF0 (FUN_00687AF0)
- *
- * What it does:
- * Rebuilds one 100-slot IdPool history ring from another ring by replaying
- * each active snapshot lane in order.
- */
-moho::SimSubRes2* CopyIdPoolHistoryRingRuntime(
-  moho::SimSubRes2* const destination,
-  const moho::SimSubRes2* const source
-)
-{
-  if (destination == nullptr || source == nullptr || destination == source) {
-    return destination;
-  }
-
-  destination->Reset();
-  for (int index = source->mStart; index != source->mEnd; index = (index + 1) % static_cast<int>(kIdPoolHistoryCapacity)) {
-    destination->PushSnapshot(AsIdPoolSnapshot(source->mData[index]));
-  }
-  return destination;
-}
-
 struct DwordTimerLaneRuntime
 {
   std::uint32_t lane00 = 0; // +0x00
@@ -2153,27 +2102,6 @@ struct DwordTimerLaneRuntime
   gpg::time::Timer timer{}; // +0x08
 };
 static_assert(offsetof(DwordTimerLaneRuntime, timer) == 0x08, "DwordTimerLaneRuntime::timer offset must be 0x08");
-
-/**
- * Address: 0x0073B050 (FUN_0073B050)
- *
- * What it does:
- * Writes one input dword to the destination head lane and default-constructs
- * the embedded timer lane at `+0x08`.
- */
-DwordTimerLaneRuntime* InitializeDwordTimerLane(
-  DwordTimerLaneRuntime* const destination,
-  const std::uint32_t lane00
-)
-{
-  if (destination == nullptr) {
-    return nullptr;
-  }
-
-  destination->lane00 = lane00;
-  new (&destination->timer) gpg::time::Timer();
-  return destination;
-}
 
 struct DwordAndFastVectorLaneRuntime
 {
@@ -2192,31 +2120,6 @@ static_assert(
   "DwordAndFastVectorLaneRuntime::words offset must be 0x10"
 );
 
-/**
- * Address: 0x0073B550 (FUN_0073B550)
- *
- * What it does:
- * Copies the dword lane at `+0x08` and deep-copies the embedded
- * `gpg::fastvector_uint` lane at `+0x10`.
- */
-DwordAndFastVectorLaneRuntime* CopyDwordAndFastVectorLane(
-  const DwordAndFastVectorLaneRuntime* const source,
-  DwordAndFastVectorLaneRuntime* const destination
-)
-{
-  if (destination == nullptr || source == nullptr) {
-    return destination;
-  }
-
-  destination->copiedLane08 = source->copiedLane08;
-  destination->words.clear();
-  destination->words.reserve(source->words.size());
-  for (const std::uint32_t word : source->words) {
-    destination->words.push_back(word);
-  }
-  return destination;
-}
-
 struct ByteAndStringLaneRuntime
 {
   std::uint8_t flag = 0; // +0x00
@@ -2224,48 +2127,6 @@ struct ByteAndStringLaneRuntime
   msvc8::string text{}; // +0x04
 };
 static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLaneRuntime::text offset must be 0x04");
-
-/**
- * Address: 0x0073C3E0 (FUN_0073C3E0)
- *
- * What it does:
- * Copies one leading byte lane, then assigns the embedded legacy string lane.
- */
-ByteAndStringLaneRuntime* CopyByteAndStringLane(
-  const ByteAndStringLaneRuntime* const source,
-  ByteAndStringLaneRuntime* const destination
-)
-{
-  if (destination == nullptr || source == nullptr) {
-    return destination;
-  }
-
-  destination->flag = source->flag;
-  destination->text.assign(source->text, 0u, msvc8::string::npos);
-  return destination;
-}
-
-/**
- * Address: 0x0073B060 (FUN_0073B060)
- *
- * What it does:
- * Converts elapsed cycles from the embedded timer lane into microseconds and
- * atomically accumulates them into the owner counter at `+0x24`.
- */
-std::int32_t AccumulateTimerElapsedMicrosecondsRuntime(
-  TimerAccumulatorRuntime* const runtime
-)
-{
-  if (runtime == nullptr || runtime->counterOwner == 0u) {
-    return 0;
-  }
-
-  const LONGLONG elapsedCycles = runtime->elapsedTimer.ElapsedCycles();
-  const std::int32_t elapsedMicros = static_cast<std::int32_t>(gpg::time::CyclesToMicroseconds(elapsedCycles));
-  auto* const ownerBase = reinterpret_cast<std::uint8_t*>(runtime->counterOwner);
-  auto* const target = reinterpret_cast<volatile LONG*>(ownerBase + 36u);
-  return static_cast<std::int32_t>(::InterlockedExchangeAdd(const_cast<LONG*>(target), elapsedMicros));
-}
 
 /**
  * Address: unresolved -- DB-integrity fix: this body was previously cited
@@ -2326,33 +2187,6 @@ int* MapErrnoForMathInputRuntime(
     *_errno() = ERANGE;
   }
   return result;
-}
-
-/**
- * Address: 0x006F8F10 (FUN_006F8F10)
- *
- * What it does:
- * Iterates one pointer-word range and adds each resolved `Unit*` lane into one
- * unit-set container.
- */
-void AddUnitRangeFromPointerWordsRuntime(
-  moho::SEntitySetTemplateUnit* const unitSet,
-  const std::uint32_t* pointerBegin,
-  const std::uint32_t* const pointerEnd
-)
-{
-  if (unitSet == nullptr) {
-    return;
-  }
-
-  while (pointerBegin != pointerEnd) {
-    moho::Unit* unit = nullptr;
-    if (*pointerBegin != 0u) {
-      unit = reinterpret_cast<moho::Unit*>(static_cast<std::uintptr_t>(*pointerBegin) - 8u);
-    }
-    (void)unitSet->AddUnit(unit);
-    ++pointerBegin;
-  }
 }
 
 /**
@@ -3692,26 +3526,6 @@ std::int16_t ScalePackedDoubleWordsRuntimeAdapter(
 }
 
 /**
- * Address: 0x0088E6D0 (FUN_0088E6D0)
- *
- * What it does:
- * When one sim-driver instance is active, requests its client-manager lane
- * and runs the manager debug dump callback.
- */
-void SimDriverDebugClientManagerRuntime()
-{
-  moho::ISTIDriver* const driver = moho::WLD_GetDriver();
-  if (driver == nullptr) {
-    return;
-  }
-
-  moho::CClientManagerImpl* const clientManager = driver->GetClientManager();
-  if (clientManager != nullptr) {
-    clientManager->Debug();
-  }
-}
-
-/**
  * Address: 0x009A4AA0 (FUN_009A4AA0)
  *
  * What it does:
@@ -4351,38 +4165,6 @@ static_assert(
 );
 static_assert(offsetof(GuardThreatSlotRangeRuntime, end) == 0x14, "GuardThreatSlotRangeRuntime::end offset must be 0x14");
 
-/**
- * Address: 0x006EE430 (FUN_006EE430)
- *
- * What it does:
- * Sums threat values from kind-7 candidates in one guarded slot range and
- * returns the number of contributing entries.
- */
-std::int32_t AccumulateGuardKind7ThreatRuntime(
-  const GuardThreatSlotRangeRuntime* const range,
-  std::int32_t* const outSum
-) noexcept
-{
-  if (range == nullptr || outSum == nullptr) {
-    return 0;
-  }
-
-  std::int32_t count = 0;
-  for (GuardThreatSlotRuntime* slot = range->begin; slot != range->end; ++slot) {
-    auto* candidate = static_cast<GuardThreatCandidateRuntime*>(slot->weakOwner);
-    if (candidate != nullptr) {
-      candidate = reinterpret_cast<GuardThreatCandidateRuntime*>(reinterpret_cast<std::byte*>(candidate) - 4);
-    }
-
-    if (candidate != nullptr && candidate->kind == 7) {
-      *outSum += candidate->value;
-      ++count;
-    }
-  }
-
-  return count;
-}
-
 struct WordVectorTailRuntime
 {
   std::uint32_t lane00;
@@ -4433,45 +4215,6 @@ struct ThreatLaneBuildRuntime
 #pragma pack(pop)
 
 static_assert(sizeof(ThreatLaneBuildRuntime) == 0x3E, "ThreatLaneBuildRuntime size must be 0x3E");
-
-/**
- * Address: 0x0071C8B0 (FUN_0071C8B0)
- *
- * What it does:
- * Builds one packed threat-lane record from header words and one source lane.
- */
-ThreatLaneBuildRuntime* BuildThreatLaneRecordRuntime(
-  ThreatLaneBuildRuntime* const outRecord,
-  const std::uint32_t lane00,
-  const ThreatLaneSourceRuntime& source,
-  const std::uint32_t lane04,
-  const std::uint32_t lane08,
-  const std::uint8_t state
-) noexcept
-{
-  if (outRecord == nullptr) {
-    return nullptr;
-  }
-
-  outRecord->lane00 = lane00;
-  outRecord->lane04 = lane04;
-  outRecord->lane08 = lane08;
-  outRecord->lane0C = source.lane00;
-  outRecord->lane10 = source.lane04;
-  outRecord->lane14 = source.lane08;
-  outRecord->lane18 = source.lane0C;
-  outRecord->lane1C = source.lane10;
-  outRecord->lane20 = source.lane14;
-  outRecord->lane24 = source.lane18;
-  outRecord->lane28 = source.lane1C;
-  outRecord->lane2C = source.lane20;
-  outRecord->lane30 = source.lane24;
-  outRecord->lane34 = source.lane28;
-  outRecord->lane38 = source.lane2C;
-  outRecord->lane3C = state;
-  outRecord->lane3D = 0u;
-  return outRecord;
-}
 
 namespace
 {
@@ -6451,17 +6194,6 @@ namespace
     owner->destroy50 = destroy50;
   }
 
-}
-
-/**
- * Address: 0x007359F0 (FUN_007359F0)
- *
- * What it does:
- * Returns `this + 0x08`.
- */
-char* GetInlineLane08RuntimeA(char* const self) noexcept
-{
-  return self + 8;
 }
 
 // NOTE: FUN_0074FEE0, FUN_00750090, FUN_007500A0 and FUN_007500B0 were

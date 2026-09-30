@@ -68,24 +68,6 @@ namespace
     return MakeBVIntSetIndex(&set, value);
   }
 
-  // Alias of FUN_00687AF0 ring-copy behavior for local IdPool map-lane cloning.
-  [[nodiscard]] moho::SimSubRes2* CopyIdPoolHistoryRingForMapLanes(
-    moho::SimSubRes2* const destination,
-    const moho::SimSubRes2* const source
-  )
-  {
-    if (destination == source) {
-      return destination;
-    }
-
-    destination->Reset();
-    for (int index = source->mStart; index != source->mEnd; index = (index + 1) % kHistoryCapacity) {
-      destination->PushSnapshot(AsBitSet(source->mData[index]));
-    }
-
-    return destination;
-  }
-
   /**
    * Address: 0x00686DF0 (FUN_00686DF0, copy_IdPool_payload_for_map_lanes)
    *
@@ -112,7 +94,7 @@ namespace
 
     destination->mSubRes2.mStart = 0;
     destination->mSubRes2.mEnd = 0;
-    (void)CopyIdPoolHistoryRingForMapLanes(&destination->mSubRes2, &source->mSubRes2);
+    destination->mSubRes2 = source->mSubRes2;
 
     return destination;
   }
@@ -176,7 +158,7 @@ namespace
   {
     destination->mStart = 0;
     destination->mEnd = 0;
-    (void)CopyIdPoolHistoryRingForMapLanes(destination, source);
+    *destination = *source;
     return destination;
   }
 } // namespace
@@ -221,6 +203,31 @@ void SimSubRes2::Reset()
 
   mStart = 0;
   mEnd = 0;
+}
+
+/**
+ * Address: 0x00687AF0 (FUN_00687AF0)
+ *
+ * IDA signature:
+ * int __stdcall sub_687AF0(int source); // this in EAX, `ret 4`
+ *
+ * What it does:
+ * Copy assignment of the 100-slot history ring: `cmp esi, ebp` skips a
+ * self-assignment; otherwise `Reset` (0x00403E70) drains this ring and each
+ * of `other`'s live snapshots, `mStart` up to `mEnd` modulo 100, is pushed
+ * back through `PushSnapshot` (0x00403CB0). The binary copy sits in
+ * EntityDb's address range because `IdPool`'s implicit copy (0x00686DF0,
+ * the `map<uint, IdPool>` node build) is its first user.
+ */
+SimSubRes2& SimSubRes2::operator=(const SimSubRes2& other)
+{
+  if (this != &other) {
+    Reset();
+    for (int index = other.mStart; index != other.mEnd; index = (index + 1) % kHistoryCapacity) {
+      PushSnapshot(AsBitSet(other.mData[index]));
+    }
+  }
+  return *this;
 }
 
 /**

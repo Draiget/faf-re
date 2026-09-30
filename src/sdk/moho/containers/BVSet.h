@@ -112,6 +112,9 @@ namespace moho
 
     BVSet(const BVSet& other) : mUniverse(other.mUniverse), mReserved04(other.mReserved04), mBits(other.mBits) {}
 
+    /**
+     * Address: 0x0073B550 (FUN_0073B550 -- copy assignment for `BVSet<EntId, EntIdUniverse>` out of line: the empty universe emits nothing and +0x04 is not written, then `mBits = other.mBits` inline -- `mFirstWordIndex` (+0x08) and the word vector's `AssignFrom` 0x004028E0 (+0x10); no self-test; usercall this=ESI, source=EAX; emitted beside CSimDriver's ICommandSink members, zero callers, unreachable; formerly `CopyDwordAndFastVectorLane` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     */
     BVSet& operator=(const BVSet& other)
     {
       if (this != &other) {

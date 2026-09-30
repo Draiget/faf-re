@@ -55,6 +55,22 @@ namespace moho
      * Drains all active history slots and resets the ring indices to empty state.
      */
     void Reset();
+
+    /**
+     * Address: 0x00687AF0 (FUN_00687AF0)
+     *
+     * IDA signature:
+     * int __stdcall sub_687AF0(int source); // this in EAX, `ret 4`
+     *
+     * What it does:
+     * Copy assignment of the 100-slot history ring: unless `other` is this
+     * ring, drains every live slot (`Reset`, 0x00403E70), then pushes a
+     * copy of each of `other`'s live snapshots from `mStart` to `mEnd` in
+     * ring order (`PushSnapshot`, 0x00403CB0). Called by the ring's copy
+     * constructor (0x00686E60: `mStart = mEnd = 0`, then this) and by
+     * `IdPool`'s implicit copy constructor (0x00686DF0), which inlines it.
+     */
+    SimSubRes2& operator=(const SimSubRes2& other);
   };
   static_assert(offsetof(SimSubRes2, mData) == 0x0000, "SimSubRes2::mData offset must be 0x0000");
   static_assert(offsetof(SimSubRes2, mStart) == 0x0C80, "SimSubRes2::mStart offset must be 0x0C80");

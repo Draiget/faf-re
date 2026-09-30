@@ -4938,26 +4938,6 @@ namespace moho
 
   /**
    * What it does:
-   * Adds each pointer-word in `[begin, end)` to `dest` as a `Unit*` (the stored
-   * entity word maps to its owning unit by the -8 Entity-subobject adjustment;
-   * a null word adds a null lane). Mirrors the compiler-emitted range-add the
-   * transport-move branch uses (FUN_006F8F10) -- an unconditional add, unlike
-   * SEntitySetTemplateUnit::AddRange which filters to live units.
-   */
-  static void AddUnitPointerRangeToSet(
-    SEntitySetTemplateUnit& dest,
-    Entity* const* const begin,
-    Entity* const* const end
-  )
-  {
-    for (Entity* const* cursor = begin; cursor != end; ++cursor) {
-      Unit* const unit = (*cursor != nullptr) ? static_cast<Unit*>(*cursor) : nullptr;
-      (void)dest.AddUnit(unit);
-    }
-  }
-
-  /**
-   * What it does:
    * Issues one move order over `units` toward the entity `target`. When a
    * formation script resolved and the set holds more than one unit, issues
    * UNITCOMMAND_FormMove carrying the formation script index + identity
@@ -5054,7 +5034,7 @@ namespace moho
           // Only the requested classes' units join the move set.
           if (static_cast<std::int32_t>(squadClass) == kAllSquadClassesSentinel ||
               static_cast<std::int32_t>(squadClass) == squadClassIndex) {
-            AddUnitPointerRangeToSet(moveSet, squadUnits.mVec.begin(), squadUnits.mVec.end());
+            moveSet.AddRange(squadUnits.mVec.begin(), squadUnits.mVec.end());
           }
           break;
         }
@@ -5062,7 +5042,7 @@ namespace moho
 
       if (!moveSet.Empty()) {
         if (!transports.Empty()) {
-          AddUnitPointerRangeToSet(moveSet, transports.mVec.begin(), transports.mVec.end());
+          moveSet.AddRange(transports.mVec.begin(), transports.mVec.end());
         }
         IssuePlatoonMoveCommand(mSim, moveSet, target, -1, issuedCommands);
       }
@@ -5290,7 +5270,7 @@ namespace moho
 
           if (static_cast<std::int32_t>(squadClass) == kAllSquadClassesSentinel ||
               static_cast<std::int32_t>(squadClass) == squadClassIndex) {
-            AddUnitPointerRangeToSet(moveSet, squadUnits.mVec.begin(), squadUnits.mVec.end());
+            moveSet.AddRange(squadUnits.mVec.begin(), squadUnits.mVec.end());
           }
           break;
         }
@@ -5298,7 +5278,7 @@ namespace moho
 
       if (!moveSet.Empty()) {
         if (!transports.Empty()) {
-          AddUnitPointerRangeToSet(moveSet, transports.mVec.begin(), transports.mVec.end());
+          moveSet.AddRange(transports.mVec.begin(), transports.mVec.end());
         }
         IssuePlatoonMoveToLocationCommand(mSim, moveSet, pos, -1, issuedCommands);
       }

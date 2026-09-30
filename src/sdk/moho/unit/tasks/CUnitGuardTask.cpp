@@ -823,11 +823,16 @@ namespace moho
         break;
       }
 
-      const std::size_t commandCount = commandQueue->mCommandVec.size();
+      // 0x00611D08..0x00611D3D: the queue is judged by its factory-build
+      // orders (`CountFactoryBuildCommands`, 0x006EE430) -- their number and
+      // their summed remaining build counts -- not by its total length.
+      int queuedBuildCount = 0;
+      const int factoryBuildCommands = commandQueue->CountFactoryBuildCommands(queuedBuildCount);
       const bool useCandidate =
-        (candidate == mUnit && commandCount > 0u)
-        || (commandCount > 1u)
-        || (commandCount > 0u && candidate->mUnitVarDat.mRepeatQueue);
+        (candidate == mUnit && factoryBuildCommands > 0)
+        || (factoryBuildCommands > 1)
+        || (factoryBuildCommands > 0 && candidate->mUnitVarDat.mRepeatQueue)
+        || (queuedBuildCount > 1);
       if (useCandidate) {
         return candidate;
       }

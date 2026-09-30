@@ -2167,6 +2167,18 @@ namespace moho
   void WLD_RequestEndSession();
 
   /**
+   * Address: 0x0088E6D0 (FUN_0088E6D0)
+   *
+   * What it does:
+   * Console-command callback for `wld_ClientDebugDump`: when a sim driver is
+   * active (`sSimDriver`, 0x010C4F50), asks it for its client manager
+   * (`ISTIDriver` slot 3) and runs that manager's `Debug` dump (slot 25,
+   * tail call, no null test). Registered by the `gCConFunc_wld_ClientDebugDump`
+   * initializer 0x00BE7510 (the address is pushed at 0x00BE7536).
+   */
+  void CON_WLD_ClientDebugDump(const msvc8::vector<msvc8::string>& args);
+
+  /**
    * Address: 0x0088E6F0 (FUN_0088E6F0)
    *
    * What it does:
