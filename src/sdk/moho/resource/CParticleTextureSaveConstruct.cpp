@@ -5,15 +5,6 @@
 #include "moho/resource/CParticleTexture.h"
 #include "moho/resource/ResourceReflectionHelpers.h"
 
-namespace gpg
-{
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetUnowned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   // Address: 0x010A7F88 -- process-global `CParticleTextureSaveConstruct`

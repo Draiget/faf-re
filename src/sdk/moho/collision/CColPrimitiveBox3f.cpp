@@ -218,21 +218,6 @@ namespace moho
   }
 } // namespace moho
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetUnowned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   [[nodiscard]] gpg::RType* CachedDColPrimBoxPrimitiveType()
@@ -548,7 +533,6 @@ namespace
   // Address: 0x010A9C84 -- process-global `DColPrimBoxSaveConstruct` singleton.
   moho::DColPrimBoxSaveConstruct gDColPrimBoxSaveConstruct;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

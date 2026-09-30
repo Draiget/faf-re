@@ -26,16 +26,6 @@ extern "C" void luaC_link(lua_State* L, GCObject* object, int typeTag);
 // to the same `_luaO_nilobject` symbol.
 extern "C" const LuaPlus::TObject luaO_nilobject;
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetOwned(const RRef& ref, unsigned int flags);
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace LuaPlus
 {
   namespace

@@ -23,15 +23,6 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   constexpr const char* kCreateEconomyEventHelp = "CreateEconomyEvent";

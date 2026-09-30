@@ -21,15 +21,6 @@ extern "C" {
 int lua_traceback(lua_State* L, const char* message, int level);
 }
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 using namespace moho;
 
 namespace
@@ -386,7 +377,6 @@ int moho::cfunc_WaitForL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kWaitForForkOnlyError);
   }
 
-
   CLuaTask* const luaTask = state->m_luaTask;
   CWaitForTask* const waitTask = new (std::nothrow) CWaitForTask(eventObject);
   if (waitTask != nullptr) {
@@ -484,7 +474,6 @@ int moho::cfunc_ForkThreadL(LuaPlus::LuaState* const curState)
     const LuaPlus::LuaObject argumentObject(LuaPlus::LuaStackObject(curState, stackIndex));
     PushForkThreadArgumentAndIncrementResumeCount(task, argumentObject);
   }
-
 
   const LuaPlus::LuaObject threadObject(threadState->m_threadObj);
   threadObject.PushStack(curState);
@@ -861,7 +850,6 @@ namespace
   const LuaTaskLuaFunctionBootstrap gLuaTaskLuaFunctionBootstrap{};
 } // namespace
 
-
 /**
  * Address: 0x004CC2B0 (FUN_004CC2B0, Moho::CLuaTask::MemberDeserialize)
  */
@@ -1072,7 +1060,6 @@ void CLuaTaskTypeInfo::Init()
   AddBase_CTask(this);
   Finish();
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

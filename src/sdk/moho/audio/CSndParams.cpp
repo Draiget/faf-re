@@ -28,21 +28,6 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetOwned(const RRef& ref, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetOwned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   constexpr std::uint32_t kResolvePolicyUnresolved = 0u;

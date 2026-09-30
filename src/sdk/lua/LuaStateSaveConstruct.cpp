@@ -12,16 +12,6 @@
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
 
-namespace gpg
-{
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetOwned(unsigned int flags);
-    void SetUnowned(unsigned int flags);
-  };
-} // namespace gpg
-
 namespace LuaPlus
 {
   extern "C"

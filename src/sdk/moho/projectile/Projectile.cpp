@@ -53,15 +53,6 @@ namespace moho
   extern bool dbg_Projectile;
 } // namespace moho
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   constexpr std::uint32_t kProjectileCollisionBucketFlags = 0x400u;

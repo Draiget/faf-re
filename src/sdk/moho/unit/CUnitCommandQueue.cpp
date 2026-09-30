@@ -19,21 +19,6 @@
 
 using namespace moho;
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetUnowned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   gpg::RType* gQueueBaseType = nullptr;

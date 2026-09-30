@@ -6,15 +6,6 @@
 
 #include "gpg/core/utils/Global.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   /**

@@ -22,15 +22,6 @@
 
 using namespace moho;
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   gpg::RType* gUnitType = nullptr;

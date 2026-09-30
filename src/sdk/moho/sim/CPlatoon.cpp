@@ -59,15 +59,6 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/CUnitCommand.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace moho
 {
   template <>
@@ -361,7 +352,6 @@ namespace
 
     return static_cast<moho::Unit*>(entry);
   }
-
 
   [[nodiscard]] moho::CSquad* FindSquadByClass(
     moho::CPlatoon& platoonRuntime,

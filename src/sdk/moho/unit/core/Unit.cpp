@@ -106,11 +106,6 @@ namespace gpg
   // Minimal local view of gpg::SerConstructResult sufficient to invoke the
   // recovered Unit::MemberConstruct publish path (mirrors the local declaration
   // used by the other recovered *Construct translation units).
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
 } // namespace gpg
 
 namespace moho
@@ -7219,7 +7214,6 @@ int moho::cfunc_UnitSetBlockCommandQueueL(LuaPlus::LuaState* const state)
   } else {
     unit->mUnitVarDat.mUnitStates &= ~kBlockCommandQueueMask;
   }
-
 
   return 0;
 }
@@ -14576,7 +14570,6 @@ float Unit::GetArmorMult(const msvc8::string& damageType) const
   return 1.0f;
 }
 
-
 /**
  * Address: 0x006A9F40 (FUN_006A9F40, Moho::Unit::Materialize)
  * Slot: 29 of ??_7Unit@Moho@@6BEntity@Moho@@@ (0x00E2A5EC)
@@ -17324,9 +17317,6 @@ void Unit::SetFireState(const std::int32_t fireState)
 }
 
 // ===== Recovered Unit reflection serializer bodies (FUN_006B33A0 / FUN_006B2B50) =====
-namespace gpg
-{
-} // namespace gpg
 
 namespace moho
 {

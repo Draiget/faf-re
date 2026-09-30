@@ -20,21 +20,6 @@ namespace moho
   Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
 }
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetUnowned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   /**
@@ -1007,7 +992,6 @@ namespace
 
   [[maybe_unused]] SPhysBodyBootstrap gSPhysBodyBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

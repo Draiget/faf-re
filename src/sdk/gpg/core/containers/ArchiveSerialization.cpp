@@ -217,14 +217,7 @@ namespace
     }
   }
 
-  struct PathNeighborCellWeightPairRuntime
-  {
-    moho::HPathCell mCell;
-    float mWeight;
-  };
-  static_assert(sizeof(PathNeighborCellWeightPairRuntime) == 0x08, "PathNeighborCellWeightPairRuntime size must be 0x08");
-  static_assert(offsetof(PathNeighborCellWeightPairRuntime, mWeight) == 0x04,
-    "PathNeighborCellWeightPairRuntime::mWeight offset must be 0x04");
+  static_assert(sizeof(moho::SPathNeighbor) == 0x08, "SPathNeighbor size must be 0x08");
 
   /**
    * Address: 0x0076D3C0 (FUN_0076D3C0, Moho::SPathNeighborTypeInfo::Init)
@@ -233,9 +226,8 @@ namespace
    *
    * What it does:
    * Reflected leaf `RType` descriptor for `std::pair<Moho::HPathCell,float>`
-   * (the `{cell, weight}` neighbor-distance pair the A* pathfinder reflects
-   * for save/load, modeled at runtime by `PathNeighborCellWeightPairRuntime`
-   * above). Matches the same scalar-`RType`-leaf shape as
+   * (`moho::SPathNeighbor`, the `{cell, weight}` neighbour the A* pathfinder
+   * reflects for save/load). Matches the same scalar-`RType`-leaf shape as
    * `moho::SCollisionInfoTypeInfo` (CAiPathSpline.h/.cpp) and
    * `SUnitOffsetInfoTypeInfo` (CAiFormationInstance.cpp): only `GetName`/
    * `Init` are overridden - the dtor is the compiler-generated `~RType()`,
@@ -257,7 +249,7 @@ namespace
 
     void Init() override
     {
-      size_ = sizeof(PathNeighborCellWeightPairRuntime);
+      size_ = sizeof(moho::SPathNeighbor);
       gpg::RType::Init();
       Finish();
     }
@@ -478,7 +470,7 @@ namespace
    * head first and then one trailing float.
    */
   void DeserializePathNeighborCellWeightPair(
-    PathNeighborCellWeightPairRuntime* const value,
+    moho::SPathNeighbor* const value,
     gpg::ReadArchive* const archive
   )
   {
@@ -488,8 +480,8 @@ namespace
 
     gpg::RType* const hPathCellType = ResolveHPathCellSerializerType();
     gpg::RRef ownerRef{};
-    archive->Read(hPathCellType, &value->mCell, ownerRef);
-    archive->ReadFloat(&value->mWeight);
+    archive->Read(hPathCellType, &value->first, ownerRef);
+    archive->ReadFloat(&value->second);
   }
 
   /**
@@ -500,7 +492,7 @@ namespace
    * head first and then one trailing float.
    */
   void SerializePathNeighborCellWeightPair(
-    const PathNeighborCellWeightPairRuntime* const value,
+    const moho::SPathNeighbor* const value,
     gpg::WriteArchive* const archive
   )
   {
@@ -510,8 +502,8 @@ namespace
 
     gpg::RType* const hPathCellType = ResolveHPathCellSerializerType();
     const gpg::RRef ownerRef{};
-    archive->Write(hPathCellType, &value->mCell, ownerRef);
-    archive->WriteFloat(value->mWeight);
+    archive->Write(hPathCellType, &value->first, ownerRef);
+    archive->WriteFloat(value->second);
   }
 
   /**
@@ -528,7 +520,7 @@ namespace
     gpg::RRef*
   )
   {
-    auto* const value = reinterpret_cast<PathNeighborCellWeightPairRuntime*>(static_cast<std::uintptr_t>(objectStorage));
+    auto* const value = reinterpret_cast<moho::SPathNeighbor*>(static_cast<std::uintptr_t>(objectStorage));
     DeserializePathNeighborCellWeightPair(value, archive);
   }
 
@@ -547,7 +539,7 @@ namespace
   )
   {
     const auto* const value =
-      reinterpret_cast<const PathNeighborCellWeightPairRuntime*>(static_cast<std::uintptr_t>(objectStorage));
+      reinterpret_cast<const moho::SPathNeighbor*>(static_cast<std::uintptr_t>(objectStorage));
     SerializePathNeighborCellWeightPair(value, archive);
   }
 
@@ -921,110 +913,10 @@ namespace gpg
       CachedCompatRType<moho::EntitySetTemplate<moho::Unit>>(), ownerRef ? *ownerRef : gpg::RRef{}
     );
   }
-
-  class SerConstructResult
-  {
-  public:
-    /**
-     * Address: 0x0094F5E0 (FUN_0094F5E0, gpg::SerConstructResult::SetOwned)
-     *
-     * What it does:
-     * Marks load-construct result ownership as `OWNED` and stores the
-     * constructed reflected reference.
-     */
-    void SetOwned(const RRef& ref, unsigned int flags);
-
-    /**
-     * Address: 0x0094F630 (FUN_0094F630, gpg::SerConstructResult::SetUnowned)
-     *
-     * What it does:
-     * Marks load-construct result ownership as `UNOWNED` and stores the
-     * constructed reflected reference.
-     */
-    void SetUnowned(const RRef& ref, unsigned int flags);
-
-    /**
-     * Address: 0x0094F680 (FUN_0094F680, gpg::SerConstructResult::SetShared)
-     * Mangled: ?SetShared@SerConstructResult@gpg@@QAEXABVRRef@2@I@Z_0
-     *
-     * What it does:
-     * Marks load-construct result ownership as `SHARED` and stores one
-     * reflected reference lane directly.
-     */
-    void SetShared(const RRef& ref, unsigned int flags);
-
-    /**
-     * Address: 0x0094F6D0 (FUN_0094F6D0, gpg::SerConstructResult::SetShared)
-     *
-     * What it does:
-     * Marks load-construct result ownership as `SHARED`, retains one
-     * `boost::shared_ptr<void>` lane, and stores the reflected reference.
-     */
-    void SetShared(const boost::shared_ptr<void>& object, RType* type, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    /**
-     * Address: 0x0094F750 (FUN_0094F750, gpg::SerSaveConstructArgsResult::SetOwned)
-     *
-     * What it does:
-     * Marks save-construct ownership lane as `OWNED` from the reserved state.
-     */
-    void SetOwned(unsigned int flags);
-
-    /**
-     * Address: 0x0094F7D0 (FUN_0094F7D0, gpg::SerSaveConstructArgsResult::SetShared)
-     *
-     * What it does:
-     * Marks save-construct ownership lane as `SHARED` from the reserved state.
-     */
-    void SetShared(unsigned int flags);
-
-    /**
-     * Address: 0x0094F790 (FUN_0094F790, gpg::SerSaveConstructArgsResult::SetUnowned)
-     *
-     * What it does:
-     * Marks save-construct ownership lane as `UNOWNED` from the reserved state.
-     */
-    void SetUnowned(unsigned int flags);
-  };
 } // namespace gpg
 
 namespace
 {
-  struct SerConstructResultView
-  {
-    gpg::RRef mRef;                   // +0x00
-    boost::SharedPtrRaw<void> mSharedPtr; // +0x08
-    TrackedPointerState mState;       // +0x10
-    std::uint8_t mLoadMembers;         // +0x14
-  };
-  static_assert(offsetof(SerConstructResultView, mRef) == 0x0, "SerConstructResultView::mRef offset must be 0x0");
-  static_assert(
-    offsetof(SerConstructResultView, mSharedPtr) == 0x8, "SerConstructResultView::mSharedPtr offset must be 0x8"
-  );
-  static_assert(offsetof(SerConstructResultView, mState) == 0x10, "SerConstructResultView::mState offset must be 0x10");
-  static_assert(
-    offsetof(SerConstructResultView, mLoadMembers) == 0x14, "SerConstructResultView::mLoadMembers offset must be 0x14"
-  );
-  static_assert(sizeof(SerConstructResultView) == 0x18, "SerConstructResultView size must be 0x18");
-
-  struct SerSaveConstructArgsResultView
-  {
-    TrackedPointerState mOwnership;
-    std::uint8_t mWriteMembers;
-  };
-  static_assert(
-    offsetof(SerSaveConstructArgsResultView, mOwnership) == 0x0,
-    "SerSaveConstructArgsResultView::mOwnership offset must be 0x0"
-  );
-  static_assert(
-    offsetof(SerSaveConstructArgsResultView, mWriteMembers) == 0x4,
-    "SerSaveConstructArgsResultView::mWriteMembers offset must be 0x4"
-  );
-
   constexpr const char* kSerializationCppPath = "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.cpp";
 
   [[noreturn]] void ThrowSerializationError(const char* const message)
@@ -1409,15 +1301,15 @@ namespace
  */
 void gpg::SerConstructResult::SetOwned(const RRef& ref, const unsigned int flags)
 {
-  auto* const view = reinterpret_cast<SerConstructResultView*>(this);
-  if (view->mState != TrackedPointerState::Reserved) {
+  if (mInfo.state != TrackedPointerState::Reserved) {
     gpg::HandleAssertFailure("mInfo.mState == RESERVED", 196, kSerializationCppPath);
   }
 
-  view->mRef = ref;
-  view->mState = TrackedPointerState::Owned;
+  mInfo.object = ref.mObj;
+  mInfo.type = ref.mType;
+  mInfo.state = TrackedPointerState::Owned;
   if ((flags & 1u) != 0u) {
-    view->mLoadMembers = 0;
+    mLoadMembers = false;
   }
 }
 
@@ -1431,15 +1323,15 @@ void gpg::SerConstructResult::SetOwned(const RRef& ref, const unsigned int flags
  */
 void gpg::SerConstructResult::SetUnowned(const RRef& ref, const unsigned int flags)
 {
-  auto* const view = reinterpret_cast<SerConstructResultView*>(this);
-  if (view->mState != TrackedPointerState::Reserved) {
+  if (mInfo.state != TrackedPointerState::Reserved) {
     gpg::HandleAssertFailure("mInfo.mState == RESERVED", 204, kSerializationCppPath);
   }
 
-  view->mRef = ref;
-  view->mState = TrackedPointerState::Unowned;
+  mInfo.object = ref.mObj;
+  mInfo.type = ref.mType;
+  mInfo.state = TrackedPointerState::Unowned;
   if ((flags & 1u) != 0u) {
-    view->mLoadMembers = 0;
+    mLoadMembers = false;
   }
 }
 
@@ -1454,15 +1346,15 @@ void gpg::SerConstructResult::SetUnowned(const RRef& ref, const unsigned int fla
  */
 void gpg::SerConstructResult::SetShared(const RRef& ref, const unsigned int flags)
 {
-  auto* const view = reinterpret_cast<SerConstructResultView*>(this);
-  if (view->mState != TrackedPointerState::Reserved) {
+  if (mInfo.state != TrackedPointerState::Reserved) {
     gpg::HandleAssertFailure("mInfo.mState == RESERVED", 212, kSerializationCppPath);
   }
 
-  view->mRef = ref;
-  view->mState = TrackedPointerState::Shared;
+  mInfo.object = ref.mObj;
+  mInfo.type = ref.mType;
+  mInfo.state = TrackedPointerState::Shared;
   if ((flags & 1u) != 0u) {
-    view->mLoadMembers = 0;
+    mLoadMembers = false;
   }
 }
 
@@ -1480,18 +1372,21 @@ void gpg::SerConstructResult::SetShared(
   const unsigned int flags
 )
 {
-  auto* const view = reinterpret_cast<SerConstructResultView*>(this);
-  if (view->mState != TrackedPointerState::Reserved) {
+  if (mInfo.state != TrackedPointerState::Reserved) {
     gpg::HandleAssertFailure("mInfo.mState == RESERVED", 220, kSerializationCppPath);
   }
 
-  const boost::SharedPtrRaw<void> sourceShared = boost::SharedPtrRawFromSharedBorrow(object);
-  view->mSharedPtr.assign_retain(sourceShared);
-  view->mRef.mObj = sourceShared.px;
-  view->mRef.mType = type;
-  view->mState = TrackedPointerState::Shared;
+  boost::SharedPtrRaw<void> held{};
+  held.px = mInfo.sharedObject;
+  held.pi = mInfo.sharedControl;
+  held.assign_retain(boost::SharedPtrRawFromSharedBorrow(object));
+  mInfo.sharedObject = held.px;
+  mInfo.sharedControl = held.pi;
+  mInfo.object = held.px;
+  mInfo.type = type;
+  mInfo.state = TrackedPointerState::Shared;
   if ((flags & 1u) != 0u) {
-    view->mLoadMembers = 0;
+    mLoadMembers = false;
   }
 }
 
@@ -1505,14 +1400,13 @@ void gpg::SerConstructResult::SetShared(
  */
 void gpg::SerSaveConstructArgsResult::SetOwned(const unsigned int flags)
 {
-  auto* const view = reinterpret_cast<SerSaveConstructArgsResultView*>(this);
-  if (view->mOwnership != TrackedPointerState::Reserved) {
+  if (mOwnership != TrackedPointerState::Reserved) {
     gpg::HandleAssertFailure("mOwnership == RESERVED", 402, kSerializationCppPath);
   }
 
-  view->mOwnership = TrackedPointerState::Owned;
+  mOwnership = TrackedPointerState::Owned;
   if ((flags & 1u) != 0u) {
-    view->mWriteMembers = 0;
+    mWriteMembers = false;
   }
 }
 
@@ -1525,14 +1419,13 @@ void gpg::SerSaveConstructArgsResult::SetOwned(const unsigned int flags)
  */
 void gpg::SerSaveConstructArgsResult::SetUnowned(const unsigned int flags)
 {
-  auto* const view = reinterpret_cast<SerSaveConstructArgsResultView*>(this);
-  if (view->mOwnership != TrackedPointerState::Reserved) {
+  if (mOwnership != TrackedPointerState::Reserved) {
     gpg::HandleAssertFailure("mOwnership == RESERVED", 409, kSerializationCppPath);
   }
 
-  view->mOwnership = TrackedPointerState::Unowned;
+  mOwnership = TrackedPointerState::Unowned;
   if ((flags & 1u) != 0u) {
-    view->mWriteMembers = 0;
+    mWriteMembers = false;
   }
 }
 
@@ -1545,14 +1438,13 @@ void gpg::SerSaveConstructArgsResult::SetUnowned(const unsigned int flags)
  */
 void gpg::SerSaveConstructArgsResult::SetShared(const unsigned int flags)
 {
-  auto* const view = reinterpret_cast<SerSaveConstructArgsResultView*>(this);
-  if (view->mOwnership != TrackedPointerState::Reserved) {
+  if (mOwnership != TrackedPointerState::Reserved) {
     gpg::HandleAssertFailure("mOwnership == RESERVED", 416, kSerializationCppPath);
   }
 
-  view->mOwnership = TrackedPointerState::Shared;
+  mOwnership = TrackedPointerState::Shared;
   if ((flags & 1u) != 0u) {
-    view->mWriteMembers = 0;
+    mWriteMembers = false;
   }
 }
 
@@ -1606,9 +1498,7 @@ void gpg::WriteRawPointer(
     // does exactly that (`SaveConstructArgs` at 0x004E0CD0 writes one
     // `SParamKey` and calls `SetOwned(1)`), which is why the reader can hand
     // back the one shared descriptor for that key instead of a fresh object.
-    SerSaveConstructArgsResultView saveResult{};
-    saveResult.mOwnership = TrackedPointerState::Reserved;
-    saveResult.mWriteMembers = 1u;
+    SerSaveConstructArgsResult saveResult{};
 
     if (objectType->serSaveConstructArgsFunc_) {
       objectType->serSaveConstructArgsFunc_(
@@ -1616,7 +1506,7 @@ void gpg::WriteRawPointer(
         objectRef.mObj,
         objectType->version_,
         const_cast<RRef*>(&ownerRef),
-        reinterpret_cast<SerSaveConstructArgsResult*>(&saveResult)
+        &saveResult
       );
       if (saveResult.mOwnership == TrackedPointerState::Reserved) {
         gpg::HandleAssertFailure("saveConstructArgsResult.mOwnership != RESERVED", 319, kSerializationCppPath);
@@ -1732,18 +1622,16 @@ TrackedPointerInfo& gpg::ReadRawPointer(ReadArchive* const archive, const RRef& 
     ThrowSerializationError("Error detected in archive: null type handle.");
   }
 
-  SerConstructResultView constructResult{};
-  constructResult.mState = TrackedPointerState::Reserved;
-  constructResult.mLoadMembers = 1u;
+  SerConstructResult constructResult{};
 
   if (handle.type->serConstructFunc_) {
     handle.type->serConstructFunc_(
       archive,
       handle.version,
       const_cast<RRef*>(&ownerRef),
-      reinterpret_cast<SerConstructResult*>(&constructResult)
+      &constructResult
     );
-    if (constructResult.mState == TrackedPointerState::Reserved) {
+    if (constructResult.mInfo.state == TrackedPointerState::Reserved) {
       gpg::HandleAssertFailure("constructResult.mInfo.mState != RESERVED", 156, kSerializationCppPath);
     }
   } else {
@@ -1756,28 +1644,24 @@ TrackedPointerInfo& gpg::ReadRawPointer(ReadArchive* const archive, const RRef& 
     }
 
     const RRef objectRef = handle.type->newRefFunc_();
-    constructResult.mRef.mObj = objectRef.mObj;
-    constructResult.mRef.mType = objectRef.mType ? objectRef.mType : handle.type;
-    constructResult.mState = TrackedPointerState::Unowned;
+    constructResult.mInfo.object = objectRef.mObj;
+    constructResult.mInfo.type = objectRef.mType ? objectRef.mType : handle.type;
+    constructResult.mInfo.state = TrackedPointerState::Unowned;
   }
 
   {
-    TrackedPointerInfo& slot = archive->mTrackedPtrs[trackedIndex];
-    slot.object = constructResult.mRef.mObj;
-    slot.type = constructResult.mRef.mType;
-    slot.state = constructResult.mState;
-    // Ownership of the construct result's shared lane moves into the table
-    // rather than being copied, so nothing releases it twice.
-    slot.sharedObject = constructResult.mSharedPtr.px;
-    slot.sharedControl = constructResult.mSharedPtr.pi;
-    constructResult.mSharedPtr.px = nullptr;
-    constructResult.mSharedPtr.pi = nullptr;
+    // The construct result's tracked pointer moves into the table: its shared
+    // reference changes hands rather than being copied, so nothing releases
+    // it twice.
+    archive->mTrackedPtrs[trackedIndex] = constructResult.mInfo;
+    constructResult.mInfo.sharedObject = nullptr;
+    constructResult.mInfo.sharedControl = nullptr;
   }
 
   // A construct hook that rebuilt the object from its own arguments clears this
   // flag, and the member payload it skipped on the way out is not in the stream
   // to be read back.
-  if (constructResult.mLoadMembers != 0u) {
+  if (constructResult.mLoadMembers) {
     if (!handle.type->serLoadFunc_) {
       ThrowSerializationError(STR_Printf(
         "Error detected in archive: found an object of type \"%s\", but we don't have a loader for it.",
@@ -1787,7 +1671,7 @@ TrackedPointerInfo& gpg::ReadRawPointer(ReadArchive* const archive, const RRef& 
 
     handle.type->serLoadFunc_(
       archive,
-      reinterpret_cast<int>(constructResult.mRef.mObj),
+      reinterpret_cast<int>(constructResult.mInfo.object),
       handle.version,
       const_cast<RRef*>(&ownerRef)
     );

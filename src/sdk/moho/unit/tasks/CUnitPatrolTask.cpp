@@ -48,15 +48,6 @@
 #include "moho/unit/tasks/CUnitRepairTask.h"
 #include "moho/unit/tasks/CUnitReclaimTask.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   [[nodiscard]] gpg::RType* CachedCUnitPatrolTaskType()

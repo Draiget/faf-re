@@ -29,15 +29,6 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
@@ -2027,7 +2018,6 @@ namespace
 
   [[maybe_unused]] CAnimationManipulatorStartupBootstrap gCAnimationManipulatorStartupBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

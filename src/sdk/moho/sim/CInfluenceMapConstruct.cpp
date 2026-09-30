@@ -5,15 +5,6 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/sim/CInfluenceMap.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   /**

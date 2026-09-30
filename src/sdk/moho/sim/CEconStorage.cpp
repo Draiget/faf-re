@@ -11,11 +11,6 @@
 
 namespace gpg
 {
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
 
   // Note: parameter cv-qualifiers must match the definition in
   // gpg/core/containers/ArchiveSerialization.cpp:649 — MSVC mangles top-level

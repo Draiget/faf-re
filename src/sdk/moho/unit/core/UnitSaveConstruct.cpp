@@ -8,15 +8,6 @@
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 
-namespace gpg
-{
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetUnowned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   gpg::RType* gSimType = nullptr;

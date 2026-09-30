@@ -8,15 +8,6 @@
 #include "moho/resource/blueprints/BlueprintConstructSerializationHelpers.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 
-namespace gpg
-{
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetOwned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   // See the matching comment in RUnitBlueprintWeaponConstruct.cpp:

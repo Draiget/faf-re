@@ -7,15 +7,6 @@
 #include "moho/resource/CAniResourceSkel.h"
 #include "moho/resource/ResourceReflectionHelpers.h"
 
-namespace gpg
-{
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetShared(unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   // Address: 0x010ABBC8 -- process-global `CAniResourceSkelSaveConstruct`

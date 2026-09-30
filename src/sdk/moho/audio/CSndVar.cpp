@@ -18,21 +18,6 @@
 #include "legacy/containers/Vector.h"
 #include "moho/audio/AudioEngine.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetOwned(const RRef& ref, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetOwned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   constexpr std::uint32_t kSndVarHashSalt = 0x7BEF2693u;
@@ -233,8 +218,6 @@ namespace moho
     if (CSndVar* const cached = FindCachedSndVarByNameLocked(variableName, nameHash); cached != nullptr) {
       return cached;
     }
-
-
 
     CSndVar* const created = new CSndVar(variableName.c_str());
     (void)gSndVarNameCache.insert({nameHash, created});

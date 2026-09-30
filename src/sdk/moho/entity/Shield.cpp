@@ -27,17 +27,6 @@
 
 namespace gpg
 {
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetUnowned(unsigned int value);
-  };
 
   // Declared locally: gpg::RRef_Sim (defined + address-cited in
   // src/sdk/gpg/core/containers/ArchiveSerialization.cpp) has external

@@ -10,15 +10,6 @@
 #include "moho/resource/blueprints/REmitterBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
 
-namespace gpg
-{
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetOwned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   gpg::RType* gRuleGameRulesType = nullptr;

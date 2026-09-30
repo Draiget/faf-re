@@ -26,15 +26,6 @@
 #include "moho/unit/tasks/CAcquireTargetTask.h"
 #include "Wm3Box3.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   constexpr std::uint32_t kCollisionBeamCollisionBucketFlags = 0x800u;

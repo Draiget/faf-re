@@ -33,15 +33,6 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   struct StatIntrusiveNode
@@ -2621,7 +2612,6 @@ namespace
 
   const StatItemLuaFuncDefBootstrap gStatItemLuaFuncDefBootstrap{};
 } // namespace
-
 
 // EStatType/EPulseMode's primitive-serializer registration used to be
 // phase-1 pre-registered here via register_PrimitiveSerHelper_EStatType()/

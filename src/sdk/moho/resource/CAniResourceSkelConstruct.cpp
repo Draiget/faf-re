@@ -7,15 +7,6 @@
 #include "moho/resource/ResourceManager.h"
 #include "moho/resource/ResourceReflectionHelpers.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetShared(const boost::shared_ptr<void>& object, gpg::RType* type, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   struct ScalarDeleteVTable

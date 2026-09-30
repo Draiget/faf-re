@@ -8,15 +8,6 @@
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/sim/Sim.h"
 
-namespace gpg
-{
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetUnowned(unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   gpg::RType* gSimType = nullptr;

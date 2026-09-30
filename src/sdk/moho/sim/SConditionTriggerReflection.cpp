@@ -21,16 +21,6 @@
 #include "moho/sim/CArmyStats.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-
-} // namespace gpg
-
 namespace
 {
   constexpr const char kReflectSharedPtrHeaderPath[] =
@@ -1464,7 +1454,6 @@ namespace
 
   SConditionTriggerBootstrap gSConditionTriggerBootstrap;
 } // namespace
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

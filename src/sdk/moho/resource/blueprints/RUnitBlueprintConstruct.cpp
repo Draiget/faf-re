@@ -11,15 +11,6 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetOwned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   // RUnitBlueprint (unlike RBeamBlueprint/REmitterBlueprint/RMeshBlueprint/

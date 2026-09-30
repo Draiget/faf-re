@@ -16,21 +16,6 @@
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/utils/Logging.h" // TEMPORARY PROBE (do not commit)
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetShared(const boost::shared_ptr<void>& object, gpg::RType* type, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetShared(unsigned int flags);
-  };
-} // namespace gpg
-
 namespace moho
 {
 
@@ -408,7 +393,6 @@ void SaveConstructArgs_RScaResourceThunk(
 {
   SaveConstructArgs_RScaResource(archive, objectPtr, version, ownerRef, result);
 }
-
 
 /**
  * Address: 0x0053AD00 (FUN_0053AD00, Moho::ResourceFactory_RScaResource::Init)

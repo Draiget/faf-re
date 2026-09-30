@@ -7,15 +7,6 @@
 #include "moho/ai/CAiBrain.h"
 #include "moho/sim/CArmyStats.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   template <class TObject>

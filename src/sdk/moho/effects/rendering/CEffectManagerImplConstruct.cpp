@@ -6,15 +6,6 @@
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/sim/Sim.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   [[nodiscard]] moho::Sim* ReadOwnerSim(gpg::ReadArchive* const archive)

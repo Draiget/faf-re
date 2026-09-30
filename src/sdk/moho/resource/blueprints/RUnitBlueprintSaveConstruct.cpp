@@ -9,15 +9,6 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
 
-namespace gpg
-{
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetOwned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   // See the matching comment in RUnitBlueprintConstruct.cpp: RUnitBlueprint

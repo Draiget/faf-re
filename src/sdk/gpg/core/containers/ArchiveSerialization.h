@@ -7,6 +7,9 @@ namespace boost
   template <class T>
   struct SharedPtrRaw;
 
+  template <class T>
+  class shared_ptr;
+
   namespace detail
   {
     class sp_counted_base;
@@ -135,6 +138,105 @@ namespace gpg
   );
   static_assert(offsetof(TrackedPointerInfo, state) == 0x10, "TrackedPointerInfo::state offset must be 0x10");
   static_assert(sizeof(TrackedPointerInfo) == 0x14, "TrackedPointerInfo size must be 0x14");
+
+  /**
+   * What a type's construct hook (`RType::serConstructFunc_`) hands back to
+   * `ReadArchive` when it builds an object from the stream: the tracked
+   * pointer the object becomes, and whether its members are still to be read.
+   * `ReadArchive` makes one per pointer on the stack, reserved and with member
+   * loading on (0x00953720), asserts the hook left it reserved no longer
+   * (`"constructResult.mInfo.mState != RESERVED"`, serialization.cpp line
+   * 156), moves `mInfo` into its tracked-pointer table and reads the members
+   * only when `mLoadMembers` is still set.
+   */
+  class SerConstructResult
+  {
+  public:
+    /**
+     * Address: 0x0094F5E0 (FUN_0094F5E0, gpg::SerConstructResult::SetOwned)
+     *
+     * What it does:
+     * Marks load-construct result ownership as `OWNED` and stores the
+     * constructed reflected reference.
+     */
+    void SetOwned(const RRef& ref, unsigned int flags);
+
+    /**
+     * Address: 0x0094F630 (FUN_0094F630, gpg::SerConstructResult::SetUnowned)
+     *
+     * What it does:
+     * Marks load-construct result ownership as `UNOWNED` and stores the
+     * constructed reflected reference.
+     */
+    void SetUnowned(const RRef& ref, unsigned int flags);
+
+    /**
+     * Address: 0x0094F680 (FUN_0094F680, gpg::SerConstructResult::SetShared)
+     * Mangled: ?SetShared@SerConstructResult@gpg@@QAEXABVRRef@2@I@Z_0
+     *
+     * What it does:
+     * Marks load-construct result ownership as `SHARED` and stores one
+     * reflected reference directly.
+     */
+    void SetShared(const RRef& ref, unsigned int flags);
+
+    /**
+     * Address: 0x0094F6D0 (FUN_0094F6D0, gpg::SerConstructResult::SetShared)
+     *
+     * What it does:
+     * Marks load-construct result ownership as `SHARED`, retains the shared
+     * control block, and stores the reflected reference.
+     */
+    void SetShared(const boost::shared_ptr<void>& object, RType* type, unsigned int flags);
+
+    TrackedPointerInfo mInfo{};  // +0x00
+    bool mLoadMembers = true;    // +0x14
+  };
+  static_assert(offsetof(SerConstructResult, mLoadMembers) == 0x14, "SerConstructResult::mLoadMembers offset must be 0x14");
+  static_assert(sizeof(SerConstructResult) == 0x18, "SerConstructResult size must be 0x18");
+
+  /**
+   * What a type's save-construct hook (`RType::serSaveConstructArgsFunc_`)
+   * reports to `WriteArchive` after writing the arguments its construct hook
+   * will need: how the pointer is owned, and whether the members still follow.
+   * `WriteRawPointer` 0x00953320 starts it reserved with member writing on and
+   * asserts the hook set an ownership (`"saveConstructArgsResult.mOwnership !=
+   * RESERVED"`, serialization.cpp line 319).
+   */
+  class SerSaveConstructArgsResult
+  {
+  public:
+    /**
+     * Address: 0x0094F750 (FUN_0094F750, gpg::SerSaveConstructArgsResult::SetOwned)
+     *
+     * What it does:
+     * Marks save-construct ownership as `OWNED` from the reserved state.
+     */
+    void SetOwned(unsigned int flags);
+
+    /**
+     * Address: 0x0094F790 (FUN_0094F790, gpg::SerSaveConstructArgsResult::SetUnowned)
+     *
+     * What it does:
+     * Marks save-construct ownership as `UNOWNED` from the reserved state.
+     */
+    void SetUnowned(unsigned int flags);
+
+    /**
+     * Address: 0x0094F7D0 (FUN_0094F7D0, gpg::SerSaveConstructArgsResult::SetShared)
+     *
+     * What it does:
+     * Marks save-construct ownership as `SHARED` from the reserved state.
+     */
+    void SetShared(unsigned int flags);
+
+    TrackedPointerState mOwnership = TrackedPointerState::Reserved;  // +0x00
+    bool mWriteMembers = true;                                      // +0x04
+  };
+  static_assert(
+    offsetof(SerSaveConstructArgsResult, mWriteMembers) == 0x04, "SerSaveConstructArgsResult::mWriteMembers offset must be 0x04"
+  );
+  static_assert(sizeof(SerSaveConstructArgsResult) == 0x08, "SerSaveConstructArgsResult size must be 0x08");
 
   struct TypeHandle
   {

@@ -20,15 +20,6 @@
 #include "moho/sim/Sim.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   class SEconValueTypeInfo final : public gpg::RType

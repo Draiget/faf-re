@@ -6,15 +6,6 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/animation/CAniDefaultSkel.h"
 
-namespace gpg
-{
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetOwned(unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   gpg::RType* CachedDefaultSkelType()

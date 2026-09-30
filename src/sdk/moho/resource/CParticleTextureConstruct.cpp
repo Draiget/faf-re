@@ -7,15 +7,6 @@
 #include "moho/resource/CParticleTextureReflection.h"
 #include "moho/resource/ResourceReflectionHelpers.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   [[nodiscard]] gpg::RRef MakeCParticleTextureRef(moho::CParticleTexture* const object)

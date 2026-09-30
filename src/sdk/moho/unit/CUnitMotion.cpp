@@ -40,15 +40,6 @@
 #include "Wm3Box3.h"
 #include "moho/misc/DiagnosticBudget.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace moho
 {
   namespace

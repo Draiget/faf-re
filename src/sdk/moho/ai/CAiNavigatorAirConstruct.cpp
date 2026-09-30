@@ -8,15 +8,6 @@
 
 using namespace moho;
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-} // namespace gpg
-
 namespace
 {
   [[nodiscard]] gpg::RType* CachedCAiNavigatorAirType()

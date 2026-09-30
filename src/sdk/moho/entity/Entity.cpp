@@ -84,17 +84,6 @@ namespace gpg
   // Defined out-of-line in ArchiveSerialization.cpp (0x00683600). Builds a
   // reflected RRef for a texture-scroller pointer; used by Entity::MemberSerialize.
 
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetUnowned(unsigned int value);
-  };
 } // namespace gpg
 
 namespace
@@ -236,7 +225,6 @@ namespace
   {
     return (range != 0u) ? (range | kEntityAttributeEnabledMask) : 0u;
   }
-
 
   /**
    * Address: 0x0067B6F0 (FUN_0067B6F0)
@@ -639,7 +627,6 @@ namespace
     target.targetIsMobile = false;
     return target;
   }
-
 
   /**
    * Address: 0x00692700 (FUN_00692700, func_ShakeCamera)
@@ -1259,7 +1246,6 @@ namespace
     const auto* const baseBlueprint = reinterpret_cast<const moho::RBlueprint*>(blueprint);
     return baseBlueprint->GetLuaBlueprint(state);
   }
-
 
   [[nodiscard]] const char* ResolveEntityBlueprintName(const moho::Entity* entity) noexcept
   {
@@ -2221,7 +2207,6 @@ namespace moho
     mLastTickProcessed = 0u;
     CollisionExtents = nullptr;
 
-
     mQueueRelinkBlocked = 0u;
     DestroyQueuedFlag = 0u;
     mOnDestroyDispatched = 0u;
@@ -2282,7 +2267,6 @@ namespace moho
     mLastTickProcessed = 0u;
     CollisionExtents = nullptr;
 
-
     mQueueRelinkBlocked = 0u;
     DestroyQueuedFlag = 0u;
     mOnDestroyDispatched = 0u;
@@ -2342,7 +2326,6 @@ namespace moho
     mPendingVelocityScale = 1.0f;
     mLastTickProcessed = 0u;
     CollisionExtents = nullptr;
-
 
     mQueueRelinkBlocked = 0u;
     DestroyQueuedFlag = 0u;
@@ -3948,7 +3931,6 @@ namespace moho
     mVarDat.mRequestRefreshUI = 1;
   }
 
-
   /**
    * Address: 0x00689F60 (FUN_00689F60)
    *
@@ -5548,7 +5530,6 @@ namespace moho
       didDetach = entity->DetachFrom(parent, skipBallistic);
     }
 
-
     lua_pushboolean(rawState, didDetach ? 1 : 0);
     return 1;
   }
@@ -6370,7 +6351,6 @@ namespace moho
   {
     const EntityDetachAllArgs args = DecodeEntityDetachAllArgs(state);
     const msvc8::vector<Entity*> attachedSnapshot(args.entity->GetAttachedEntities());
-
 
     for (Entity* const attached : attachedSnapshot) {
       if (attached == nullptr || attached->mAttachInfo.mParentBoneIndex != args.parentBoneIndex) {
@@ -8331,7 +8311,6 @@ namespace moho
     }
   }
 } // namespace moho
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

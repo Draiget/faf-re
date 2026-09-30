@@ -14,21 +14,6 @@
 #include "moho/resource/RResId.h"
 #include "moho/sim/RRuleGameRules.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetOwned(const RRef& ref, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetOwned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace moho
 {
   // Forward declaration: the real definition sits further down in this TU;

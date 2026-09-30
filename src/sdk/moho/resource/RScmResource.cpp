@@ -18,21 +18,6 @@
 #include "moho/resource/SScmFile.h"
 #include "moho/serialization/PrefetchHandleBase.h"
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetShared(const boost::shared_ptr<void>& object, gpg::RType* type, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetShared(unsigned int flags);
-  };
-} // namespace gpg
-
 namespace moho
 {
   // Forward declarations: real definitions sit further down in this TU;

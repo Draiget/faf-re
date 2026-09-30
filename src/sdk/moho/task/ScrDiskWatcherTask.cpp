@@ -17,21 +17,6 @@
 
 using namespace moho;
 
-namespace gpg
-{
-  class SerConstructResult
-  {
-  public:
-    void SetUnowned(const RRef& ref, unsigned int flags);
-  };
-
-  class SerSaveConstructArgsResult
-  {
-  public:
-    void SetUnowned(unsigned int value);
-  };
-} // namespace gpg
-
 namespace
 {
   gpg::RType* CachedScrDiskWatcherTaskType()
@@ -393,7 +378,6 @@ void ScrDiskWatcherTaskTypeInfo::Init()
   AddBase_CTask(this);
   Finish();
 }
-
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

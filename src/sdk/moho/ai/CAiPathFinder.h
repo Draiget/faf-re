@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -44,6 +45,15 @@ namespace moho
      */
     static gpg::RType* sType;
   };
+
+  /**
+   * One A* neighbour: a cell and the cost of stepping to it. Reflected as
+   * `SPathNeighbor` -- `SPathNeighborTypeInfo` preregisters it for
+   * `typeid(std::pair<HPathCell, float>)` (0x0076D360), and RTTI has
+   * `SPathNeighborSerializer` deriving
+   * `SerSaveLoadHelper<std::pair<Moho::HPathCell, float>>`.
+   */
+  using SPathNeighbor = std::pair<HPathCell, float>;
 
   /**
    * Recovered request mode latch used by CAiPathFinder.
