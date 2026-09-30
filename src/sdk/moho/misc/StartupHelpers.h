@@ -1452,9 +1452,9 @@ namespace moho
    *
    * What it does:
    * Validates and records launch-directory/data-script bootstrap paths for
-   * early startup services.
+   * early startup services. `/init <file>` replaces the default script name.
    */
-  bool DISK_SetupDataAndSearchPaths(const msvc8::string& dataPathScriptName, const std::filesystem::path& launchDir);
+  bool DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const std::filesystem::path& launchDir);
 
   /**
    * Address: 0x00459DA0 (FUN_00459DA0, ?DISK_GetAllowedProtocols@Moho@@YA?AV?$vector@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@V?$allocator@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@@2@@std@@XZ)

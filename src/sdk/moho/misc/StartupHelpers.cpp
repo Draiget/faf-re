@@ -5691,10 +5691,19 @@ void moho::DISK_Recycle(const gpg::StrArg sourcePath)
  *
  * What it does:
  * Validates and records launch-directory/data-script bootstrap paths for
- * early startup services.
+ * early startup services. `/init <file>` replaces the caller's default
+ * script name (SupComDataPath.lua); the FAF client launches with
+ * `/init init_faf.lua`, `/init init_coop.lua` and so on.
  */
-bool moho::DISK_SetupDataAndSearchPaths(const msvc8::string& dataPathScriptName, const std::filesystem::path& launchDir)
+bool moho::DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const std::filesystem::path& launchDir)
 {
+  // 0x00459E14..0x00459E4E: the script name is taken by value and overwritten
+  // with the `/init` argument when one is given.
+  msvc8::vector<msvc8::string> initArgs;
+  if (CFG_GetArgOption("/init", 1, &initArgs)) {
+    dataPathScriptName = initArgs[0];
+  }
+
   const std::filesystem::path absoluteLaunchDirectory =
     MakeAbsolutePath(launchDir.empty() ? std::filesystem::current_path() : launchDir);
   if (absoluteLaunchDirectory.empty()) {
