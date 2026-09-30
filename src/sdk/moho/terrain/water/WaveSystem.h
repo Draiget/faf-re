@@ -37,6 +37,7 @@ namespace moho
    * (a single virtual-destructor vtable slot) so `msvc8::vector<WaveParameters>`
    * tears its elements down through the class's own vtable rather than a
    * statically-bound call -- see `WavePattern::~WavePattern` below.
+   * Address: 0x0088B2A0 (FUN_0088B2A0 -- the compiler-generated copy assignment (`operator= = default` below), emitted out of line for `msvc8::vector<WaveParameters>` (136-byte polymorphic element, `WavePattern::mWaves` at +0x3C): `mTexturePath`/`mRampPath` through `basic_string::assign(rhs, 0, npos)` (0x004056B0), then +0x3C..+0x84 member-wise, vptr untouched; `this` in ESI, `rhs` in EDI; callers 0x0088AD60 (`std::copy`, stride 0x88), 0x0088AE30 (`std::fill`), 0x0088AE60 (`std::copy_backward`) and the untokenized adapter sites 0x0088B070, 0x0088B1C0, 0x0088B20C, 0x0088B48C; formerly `CopyWaveParametersPayloadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
    */
   class WaveParameters
   {

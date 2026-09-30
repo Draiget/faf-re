@@ -3692,43 +3692,6 @@ std::int16_t ScalePackedDoubleWordsRuntimeAdapter(
 }
 
 /**
- * Address: 0x0088B2A0 (FUN_0088B2A0)
- *
- * What it does:
- * Copies both wave-parameter string lanes and all scalar parameter lanes
- * (`+0x3C..+0x84`) from source to destination.
- */
-[[nodiscard]] WaveParametersRuntime* CopyWaveParametersPayloadRuntime(
-  const WaveParametersRuntime* const source,
-  WaveParametersRuntime* const destination
-)
-{
-  destination->lane04Text.assign(source->lane04Text, 0u, msvc8::string::npos);
-  destination->lane20Text.assign(source->lane20Text, 0u, msvc8::string::npos);
-
-  destination->lane3C = source->lane3C;
-  destination->lane40 = source->lane40;
-  destination->lane44 = source->lane44;
-  destination->lane48 = source->lane48;
-  destination->lane4C = source->lane4C;
-  destination->lane50 = source->lane50;
-  destination->lane54 = source->lane54;
-  destination->lane58 = source->lane58;
-  destination->lane5C = source->lane5C;
-  destination->lane60 = source->lane60;
-  destination->lane64 = source->lane64;
-  destination->lane68 = source->lane68;
-  destination->lane6C = source->lane6C;
-  destination->lane70 = source->lane70;
-  destination->lane74 = source->lane74;
-  destination->lane78 = source->lane78;
-  destination->lane7C = source->lane7C;
-  destination->lane80 = source->lane80;
-  destination->lane84 = source->lane84;
-  return destination;
-}
-
-/**
  * Address: 0x0088E6D0 (FUN_0088E6D0)
  *
  * What it does:
@@ -4324,187 +4287,6 @@ void DestroyWideIstreamIosBaseLaneRuntime(
 // rethrowing. None has, or needs, a source-level call site of its own; full
 // citations live on `rb_tree::~rb_tree()` and `rb_tree(const rb_tree&)` in
 // RbTree.h. No standalone recovery of these three belongs here per RULE ONE.
-
-/**
- * Address: 0x007D4320 (FUN_007D4320)
- *
- * What it does:
- * Clears one cartographic-decal owner lane via its list clear routine, frees
- * list storage, and resets the storage pointer.
- */
-void ClearAndReleaseCartographicDecalOwnerRuntime(
-  TreeStorageOwnerRuntime* const owner,
-  const OwnerTreeClearFn clearOwnerFn
-)
-{
-  if (owner == nullptr) {
-    return;
-  }
-
-  if (clearOwnerFn != nullptr) {
-    clearOwnerFn(owner);
-  }
-
-  ::operator delete(owner->treeStorage);
-  owner->treeStorage = nullptr;
-}
-
-/**
- * Address: 0x007EB4F0 (FUN_007EB4F0)
- *
- * What it does:
- * Replaces one destination intrusive-list lane with source contents when the
- * lists differ, then clears the source list.
- */
-std::size_t TransferListContentAndClearSourceRuntime(
-  IntrusiveListRuntime* const destination,
-  std::byte* const sourceOwnerBytes,
-  const ListClearFn clearFn,
-  const ListSpliceFn spliceFn
-)
-{
-  if (destination == nullptr || sourceOwnerBytes == nullptr || clearFn == nullptr) {
-    return 0u;
-  }
-
-  auto* const source = reinterpret_cast<IntrusiveListRuntime*>(sourceOwnerBytes + 0x30);
-  if (destination != source && source->head != nullptr && spliceFn != nullptr) {
-    IntrusiveListNodeRuntime* const sourceHead = source->head;
-    IntrusiveListNodeRuntime* const first = sourceHead->next;
-    clearFn(destination);
-    if (destination->head != nullptr) {
-      spliceFn(destination, destination->head->next, first, sourceHead, first);
-    }
-  }
-
-  clearFn(source);
-  return static_cast<std::size_t>(destination->size);
-}
-
-/**
- * Address: 0x007EB5B0 (FUN_007EB5B0)
- *
- * What it does:
- * Copies one camera-snapshot lane and updates the weak-counted pointer lane
- * with retain/release semantics.
- */
-void* CopyCameraSnapshotAndWeakCounterRuntime(
-  const void* const source,
-  void* const destination,
-  const CameraCopyFn copyCameraFn,
-  const WeakReleaseFn weakReleaseFn
-)
-{
-  if (source == nullptr || destination == nullptr) {
-    return destination;
-  }
-
-  const CameraSnapshotViewRuntime srcView(source);
-  const CameraSnapshotViewRuntime dstView(destination);
-  dstView.lane08() = srcView.lane08();
-  if (copyCameraFn != nullptr) {
-    copyCameraFn(dstView.cameraStorage(), srcView.cameraStorage());
-  }
-
-  dstView.lane2D8() = srcView.lane2D8();
-  dstView.lane2DC() = srcView.lane2DC();
-  dstView.lane2E0() = srcView.lane2E0();
-  dstView.lane2E4() = srcView.lane2E4();
-  dstView.lane2E8() = srcView.lane2E8();
-  dstView.lane2EC() = srcView.lane2EC();
-  dstView.lane2F0() = srcView.lane2F0();
-  dstView.lane2F4() = srcView.lane2F4();
-  dstView.lane2F8() = srcView.lane2F8();
-  dstView.lane2FC() = srcView.lane2FC();
-  dstView.lane300() = srcView.lane300();
-
-  void* const incomingCounter = srcView.weakCounter304();
-  if (incomingCounter != dstView.weakCounter304()) {
-    if (incomingCounter != nullptr) {
-      auto* const strong = reinterpret_cast<volatile LONG*>(static_cast<std::byte*>(incomingCounter) + 4u);
-      (void)::InterlockedExchangeAdd(strong, 1);
-    }
-
-    void* const previousCounter = dstView.weakCounter304();
-    if (previousCounter != nullptr && weakReleaseFn != nullptr) {
-      weakReleaseFn(previousCounter);
-    }
-    dstView.weakCounter304() = incomingCounter;
-  }
-
-  return destination;
-}
-
-/**
- * Address: 0x007EF1C0 (FUN_007EF1C0)
- *
- * What it does:
- * Builds one current-selection range lane and, when valid, submits an
- * axis-aligned quad derived from selected entry bounds.
- *
- * Wiring status (intentionally not yet called):
- * The real, single binary caller is `Moho::RangeRenderer::Render`
- * (`FUN_007EEA00`, 0x007EEBD3), whose recovered body in
- * `moho/render/RangeRenderer.cpp` documents this exact gap in its own
- * address-block comment: the final selection-bounds ring pass is left
- * unwired because this function reads `UserArmy`-relative fields at
- * `+0x1BC..+0x1D0` that have no named accessor yet, and `UserArmy.h` is
- * owned by a different, concurrently active recovery pass. Wiring the
- * call here would require adding raw offset reads into a class this
- * file does not own, which the reconstruction fidelity contract
- * forbids. See `decomp/recovery/recovered_progress.json`
- * (`fa_full_2026_03_26`, `FUN_007EF1C0`, `blocker_type=needs_layout`)
- * for the exact field list gathered from the binary. Unblocks once
- * `UserArmy` grows named selection-bounds accessors at those offsets.
- */
-int UpdateSelectedEntryBoundsRuntime(
-  void* const owner,
-  const void* const selectionState,
-  const BuildSelectionRangeFn buildRangeFn,
-  const SubmitSelectionQuadFn submitQuadFn
-)
-{
-  if (owner == nullptr || selectionState == nullptr) {
-    return 0;
-  }
-
-  auto* const ownerBytes = static_cast<std::byte*>(owner);
-  void* const begin = *reinterpret_cast<void**>(ownerBytes + 4u);
-  void* const end = *reinterpret_cast<void**>(ownerBytes + 8u);
-  std::uint32_t rangeState[2]{};
-  if (buildRangeFn != nullptr) {
-    buildRangeFn(rangeState, owner, begin, end);
-  }
-
-  const UnitSelectionStateViewRuntime stateView(selectionState);
-  int result = stateView.selectedIndex();
-  if (result < 0) {
-    return result;
-  }
-
-  void* const* const entries = stateView.entries();
-  if (entries == nullptr) {
-    return result;
-  }
-
-  const auto entryWord = reinterpret_cast<std::uintptr_t>(entries[result]);
-  result = static_cast<int>(entryWord);
-  if (entryWord == 0u) {
-    return result;
-  }
-
-  const UnitSelectionEntryViewRuntime entryView(reinterpret_cast<const void*>(entryWord));
-  if (entryView.sampleCount() <= 0) {
-    return result;
-  }
-
-  float quad[4]{};
-  quad[0] = entryView.minX() + entryView.extX();
-  quad[1] = entryView.minY() + entryView.extY();
-  quad[2] = 0.0f;
-  quad[3] = entryView.minZ();
-  return submitQuadFn != nullptr ? submitQuadFn(quad, owner) : result;
-}
 
 using DeferredSimDriverBindRuntime = boost::_bi::bind_t<
   void,
@@ -6444,65 +6226,6 @@ std::uint8_t* SwapByteRangesRuntime(
 }
 
 /**
- * Address: 0x007EED00 (FUN_007EED00)
- *
- * What it does:
- * Emits one triangle index strip over a [start,end) lane, selecting winding
- * order from the `flipWinding` flag and returning the advanced cursor.
- */
-int EmitTriangleStripIndicesRuntime(
-  int writeCursor,
-  std::uint16_t* const outIndices,
-  const int start,
-  const int end,
-  const int laneOffset,
-  const bool flipWinding
-) noexcept
-{
-  std::int16_t pivot = static_cast<std::int16_t>(start);
-  int current = start;
-  if (start < end) {
-    const std::int16_t lane = static_cast<std::int16_t>(laneOffset);
-    int secondary = 1 - laneOffset;
-    int edge = start + laneOffset;
-    while (true) {
-      const int candidatePivot = edge + secondary;
-      if (candidatePivot != end) {
-        pivot = static_cast<std::int16_t>(candidatePivot);
-      }
-
-      const std::int16_t pivotPlusLane = static_cast<std::int16_t>(pivot + lane);
-      if (flipWinding) {
-        outIndices[writeCursor + 0] = static_cast<std::uint16_t>(current);
-        outIndices[writeCursor + 1] = static_cast<std::uint16_t>(edge);
-        outIndices[writeCursor + 2] = static_cast<std::uint16_t>(pivot);
-        outIndices[writeCursor + 3] = static_cast<std::uint16_t>(pivotPlusLane);
-        outIndices[writeCursor + 4] = static_cast<std::uint16_t>(pivot);
-        outIndices[writeCursor + 5] = static_cast<std::uint16_t>(edge);
-      } else {
-        outIndices[writeCursor + 0] = static_cast<std::uint16_t>(pivot);
-        outIndices[writeCursor + 1] = static_cast<std::uint16_t>(edge);
-        outIndices[writeCursor + 2] = static_cast<std::uint16_t>(current);
-        outIndices[writeCursor + 3] = static_cast<std::uint16_t>(edge);
-        outIndices[writeCursor + 4] = static_cast<std::uint16_t>(pivot);
-        outIndices[writeCursor + 5] = static_cast<std::uint16_t>(pivotPlusLane);
-      }
-
-      ++current;
-      writeCursor += 6;
-      ++edge;
-      if (current >= end) {
-        break;
-      }
-
-      secondary = 1 - laneOffset;
-      pivot = static_cast<std::int16_t>(start);
-    }
-  }
-  return writeCursor;
-}
-
-/**
  * Address: 0x00A2EEB0 (FUN_00A2EEB0)
  *
  * What it does:
@@ -7269,23 +6992,6 @@ char ReadTailByteOrZeroRuntime(const TailByteBufferOwnerRuntime* const owner) no
 }
 
 /**
- * Address: 0x007BEEB0 (FUN_007BEEB0)
- *
- * What it does:
- * Dispatches one payload pointer to the destination writer, selecting inline
- * or heap storage based on payload length `< 16`.
- */
-int DispatchSsoPayloadToDestinationRuntime(
-  const SsoPayloadDispatchHandleRuntime* const handle
-)
-{
-  const SsoPayloadDispatchRuntime* const object = handle->object;
-  const void* const payload = ResolveSsoPayloadPointer(object->storage.heapPayload, object->storage.inlinePayload, object->payloadLength);
-  const std::uintptr_t destination = static_cast<std::uintptr_t>(object->lane04 + object->lane08);
-  return object->writeFn(destination, payload);
-}
-
-/**
  * Address: 0x00964A10 (FUN_00964A10)
  *
  * What it does:
@@ -7767,20 +7473,6 @@ namespace
   {
     Slot0CVTableRuntime* vtable;
   };
-}
-
-/**
- * Address: 0x00886B00 (FUN_00886B00)
- *
- * What it does:
- * Invokes one context-bound callback thunk with a forwarded integer argument.
- */
-int InvokeContextUnaryThunkRuntime(
-  const ThiscallContextUnaryThunkRuntime* const thunk,
-  const int arg0
-)
-{
-  return thunk->invoke(thunk->context, arg0);
 }
 
 /**

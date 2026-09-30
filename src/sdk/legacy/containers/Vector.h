@@ -11899,6 +11899,7 @@ namespace msvc8
         /**
          * Address: 0x007020B0 (FUN_007020B0 -- `~list()` -- `_Tidy` then free the header sentinel for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); zero callers, unreachable; formerly `ReleaseArmyTriggerListStorage` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x007015C0 (FUN_007015C0 -- a second emission of `~list()`; this is `mTriggers`' member destructor, reached from `~CArmyStats` 0x00704A40 for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); callers 0x0070BEA0; formerly `CArmyStats::DestroyAuxList` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007D4320 (FUN_007D4320 -- VC8 `list::_Tidy()`, i.e. this destructor's body: `clear()` (0x007D4380), free the header sentinel, null `_Myhead`, for `msvc8::list<moho::CartographicDecal>` (`CartographicDecalBatch::mDecals` at +0x68; head `{proxy, head, size}` 0x0C, node `{next, prev, CartographicDecal}` 0x30); callers 0x007D4230 (the list copy constructor's `catch (...)` rollback at 0x007D4296, reached from `CartographicDecalBatch(const CartographicDecalBatch&)` 0x007D40E0); the untokenized twin at 0x007D42B0 has no references; formerly `ClearAndReleaseCartographicDecalOwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          */
         ~list()
         {

@@ -39,6 +39,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/SFootprint.h"
+#include "moho/sim/UserArmy.h"
 #include "moho/sim/VisibilityRect.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
@@ -515,6 +516,21 @@ namespace
     vertexData[base + 4u] = lane1;
   }
 
+  /**
+   * Address: 0x007EED00 (FUN_007EED00)
+   *
+   * What it does:
+   * Emits two triangles (six 16-bit indices) per ring segment in
+   * `[start, end)`, joining vertex `i` and its wrap-around successor
+   * (`i + 1`, or `start` when that reaches `end`) to the matching vertices
+   * `ringOffset` further on; `usePrimaryWinding` picks the winding. Returns
+   * the advanced write cursor. LTCG register convention: cursor in EAX
+   * (returned in EAX), index buffer in ECX, the rest on the stack (`retn 10h`).
+   * Called four times by `RangeRenderer::Init` (0x007EE3DF, 0x007EE3F1,
+   * 0x007EE400, 0x007EE40F) with (0,45,45,1), (90,135,45,1), (0,45,90,0),
+   * (45,90,90,1). The binary has no null test on the buffer; `Init` only
+   * calls it after a successful `Lock`.
+   */
   std::uint32_t AppendRingStripIndices(
     std::uint32_t writeIndex,
     std::int16_t* const indexData,
@@ -1339,6 +1355,45 @@ namespace
       );
     }
   }
+
+  /**
+   * Address: 0x007EF1C0 (FUN_007EF1C0)
+   *
+   * Register convention (LTCG): `outPayloads` in EAX, `session` in EDI, no
+   * stack arguments.
+   *
+   * What it does:
+   * Clears `outPayloads`, then, when the session has a focus army whose
+   * no-rush timer is still running, appends that army's no-rush zone as one
+   * ring: centre `mArmyStart + mNoRushOffset`, inner radius 0, outer radius
+   * `mNoRushRadius` (`UserArmy` +0x1BC/+0x1C0 start, +0x1C4 timer, +0x1C8
+   * radius, +0x1CC/+0x1D0 offset = `mVarDat` at +0x80). Sole caller
+   * `RangeRenderer::Render` (0x007EEBD7), which draws it as a fixed thin ring.
+   */
+  void ExtractFocusArmyNoRushRange(
+    const moho::CWldSession& session, RangeExtractionPayloadVector& outPayloads
+  )
+  {
+    outPayloads.clear();
+
+    const moho::UserArmy* const focusArmy = session.GetFocusArmy();
+    if (focusArmy == nullptr) {
+      return;
+    }
+
+    const moho::SSTIArmyVariableData& armyData = focusArmy->mVarDat;
+    if (armyData.mNoRushTimer <= 0) {
+      return;
+    }
+
+    const moho::SRangeExtractionPayload noRushZone{
+      armyData.mArmyStart.x + armyData.mNoRushOffset.x,
+      armyData.mArmyStart.y + armyData.mNoRushOffset.y,
+      0.0f,
+      armyData.mNoRushRadius,
+    };
+    outPayloads.push_back(noRushZone);
+  }
 } // namespace
 
 namespace moho
@@ -1488,19 +1543,11 @@ namespace moho
    *   subset), runs the selected-units pass (`RenderSelectedUnitsRange`) and
    *   draws the batch with `profile.mSelectedRingColor`
    * - runs the highlighted/hovered-unit pass (`RenderHighlightedUnitRange`)
-   *
-   * Not yet wired: the binary's final pass (0x007EEBD3-EC48) submits the
-   * current selection's axis-aligned bounds as one more ring
-   * (`sub_7EF1C0`, called with a fixed thin-ring color/radius) before the
-   * device-clear at the end. `sub_7EF1C0` reads `UserArmy`-relative fields at
-   * +0x1BC..+0x1D0 that have no named accessor in `moho/sim/UserArmy.h` yet
-   * (that header is owned by a concurrently active recovery pass, not this
-   * file); recovering `sub_7EF1C0` here would require adding raw offset
-   * reads to a class this file does not own, which the reconstruction
-   * fidelity contract forbids. Left `blocked` with
-   * `blocker_type=needs_layout` pending named `UserArmy` selection-bounds
-   * fields - see the recovery report for exact field offsets/sizes gathered
-   * from the binary.
+   * - finally draws the focus army's no-rush zone
+   *   (`ExtractFocusArmyNoRushRange`, 0x007EEBD7) as one fixed thin ring:
+   *   outer params `{1.0, 2.0}`, inner `{0.1, 1.0}`, colour 0.2 on every
+   *   channel (the `movss` constants stored at 0x007EEBDC-0x007EEC3D ahead
+   *   of the `RenderRingBatch` call at 0x007EEC43)
    */
   void RangeRenderer::Render(
     CWldSession* const worldSession, CameraImpl* const camera, const unsigned int viewportHeadIndex,
@@ -1576,6 +1623,14 @@ namespace moho
     }
 
     RenderHighlightedUnitRange(*worldSession, scratchPayload, *this, *camera, alpha, viewportHeadIndex);
+
+    ExtractFocusArmyNoRushRange(*worldSession, scratchPayload);
+    constexpr RangeRingRadiusParams kNoRushOuterRing{1.0f, 2.0f};
+    constexpr RangeRingRadiusParams kNoRushInnerRing{0.1f, 1.0f};
+    constexpr RangeRingColor kNoRushRingColor{0.2f, 0.2f, 0.2f, 0.2f};
+    RenderRingBatch(
+      kNoRushOuterRing, *camera, *this, viewportHeadIndex, kNoRushRingColor, kNoRushInnerRing, scratchPayload
+    );
   }
 
   /**

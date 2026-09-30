@@ -204,6 +204,7 @@ namespace moho
    *
    * What it does:
    * Stores loader worker entry callback and bound scenario owner.
+   * Address: 0x00886B00 (FUN_00886B00 -- `boost::detail::function::void_function_obj_invoker1<F, void, CBackgroundTaskControl*>::invoke` for this callback's in-buffer functor `F = bind_t<void, mf1<void, SWldScenarioInfo, CBackgroundTaskControl*>, list2<value<SWldScenarioInfo*>, arg<1>>>`: pushes the argument and calls the stored member pointer (+0x08, `WorldSessionUserLoad` 0x00885DE0) with the bound scenario (+0x0C) in ECX; no direct callers -- stored as the invoker slot (+4) of the static vtable at 0x010C79BC (manager 0x00886B20) by 0x00886986 (FUN_00886970, `assign_to` from the functor constructor 0x008868A0 that `CWldSessionLoaderImpl::Update` calls at 0x00885C95) and by the three register-shape installs at 0x008869F0, 0x00886A60 and 0x00886AB0; formerly `InvokeContextUnaryThunkRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
    */
   struct SWldScenarioLoadCallbackStorage
   {

@@ -1100,6 +1100,7 @@ namespace
    * construction half, see the Address list above) belongs to this same
    * chain -- an earlier DB-integrity pass mis-attributed it to
    * `CrtRuntimeHelpers.cpp` with no real citation there; corrected here.
+   * Address: 0x007BEEB0 (FUN_007BEEB0 -- `boost::detail::function::void_function_obj_invoker0<F, void>::invoke` for this heap-stored `F = bind_t<void, mf1<void, CGpgNetInterface, gpg::StrArg>, list2<value<CGpgNetInterface*>, value<std::string>>>` (the 40-byte clone: pmf `{fn +0x00, this-adjust +0x04}`, bound `this` +0x08, bound `std::string` +0x0C whose `_Myres` at +0x24 picks the inline or heap buffer handed over as the `StrArg`, then `(self->*pmf)(StrArg)`); no direct callers -- stored as the invoker slot (+4) of the static vtable at 0x01104140 (manager 0x007BEEE0) by 0x007BEA4B (FUN_007BE9F0) and by the second install at 0x007BECA5; formerly `DispatchSsoPayloadToDestinationRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
    */
   [[nodiscard]] boost::function0<void> MakeConnectThreadLaunchCallback(
     CGpgNetInterface* const self,

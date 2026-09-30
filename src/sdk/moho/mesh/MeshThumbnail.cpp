@@ -51,14 +51,23 @@ namespace moho
     , outputSheet(rhs.outputSheet)
   {}
 
+  /**
+   * Address: 0x007EB5B0 (FUN_007EB5B0)
+   *
+   * What it does:
+   * Member-wise copy assignment in declaration order. No self-assignment
+   * test (the binary has none; every member assignment is self-safe), and
+   * the vptr and the +0x04/+0x0C gaps are left alone.
+   */
   MeshThumbnail& MeshThumbnail::operator=(const MeshThumbnail& rhs)
   {
-    if (this == &rhs) {
-      return *this;
-    }
-
-    this->~MeshThumbnail();
-    new (this) MeshThumbnail(rhs);
+    requestId = rhs.requestId;
+    camera = rhs.camera;
+    meshInstance = rhs.meshInstance;
+    orientation = rhs.orientation;
+    color = rhs.color;
+    outputRect = rhs.outputRect;
+    outputSheet = rhs.outputSheet;
     return *this;
   }
 

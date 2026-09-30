@@ -37,6 +37,19 @@ namespace moho
      */
     MeshThumbnail(const MeshThumbnail& rhs);
 
+    /**
+     * Address: 0x007EB5B0 (FUN_007EB5B0)
+     *
+     * What it does:
+     * Member-wise copy assignment, the implicit operator's shape: `requestId`,
+     * `camera` through `GeomCamera3::operator=` (0x007421C0), `meshInstance`,
+     * `orientation`, `color`, `outputRect`, then `outputSheet`'s shared_ptr
+     * assignment (add-ref the incoming count, release the old one). The vptr
+     * and the +0x04/+0x0C gaps are not touched. `this` arrives in ESI and
+     * `rhs` in EAX. Sole caller 0x007EB540 (take one completed request out of
+     * `mCompletedRequests` by id), itself reached only from 0x007FA700, which
+     * nothing in the image references.
+     */
     MeshThumbnail& operator=(const MeshThumbnail& rhs);
 
     /**
