@@ -1950,15 +1950,11 @@ void moho::CAimManipulator::MemberSerialize(const CAimManipulator* const object,
   archive->Write(CachedWeakPtrUnitWeaponType(), &object->mWeapon, ownerRef);
   archive->WriteString(&self->mLabel);
 
-  gpg::RRef unitWeaponBlueprintRef{};
-  unitWeaponBlueprintRef = gpg::MakeRRef<moho::RUnitBlueprintWeapon>(object->mUnitWepBlueprint);
-  gpg::WriteRawPointer(archive, unitWeaponBlueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
+  archive->WritePointer<moho::RUnitBlueprintWeapon>(object->mUnitWepBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
 
   if (UnitWeapon* const weapon = object->mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* const projectileBlueprint = weapon->mProjectileBlueprint;
-    gpg::RRef projectileBlueprintRef{};
-    projectileBlueprintRef = gpg::MakeRRef<moho::RProjectileBlueprint>(projectileBlueprint);
-    gpg::WriteRawPointer(archive, projectileBlueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::RProjectileBlueprint>(projectileBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
     if (projectileBlueprint != nullptr) {
       self->mProjPhysBlueprint = &projectileBlueprint->Physics;
     }

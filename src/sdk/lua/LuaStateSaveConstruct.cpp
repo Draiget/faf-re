@@ -67,9 +67,7 @@ namespace LuaPlus
         if (resolvedName->tt == LUA_TSTRING) {
           archive->WriteBool(true);
 
-          gpg::RRef nameRef{};
-          nameRef = gpg::MakeRRef<TString>(static_cast<TString*>(resolvedName->value.p));
-          gpg::WriteRawPointer(archive, nameRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+          archive->WritePointer<TString>(static_cast<TString*>(resolvedName->value.p), gpg::TrackedPointerState::Unowned, gpg::RRef{});
           result->SetOwned(1u);
           return;
         }

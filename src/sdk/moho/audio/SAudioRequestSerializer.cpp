@@ -92,13 +92,9 @@ namespace moho
     archive->Write(ResolveVector3fType(), &position, ownerRef);
     archive->WriteInt(static_cast<int>(layer));
 
-    gpg::RRef paramsRef{};
-    paramsRef = gpg::MakeRRef<moho::CSndParams>(params);
-    gpg::WriteRawPointer(archive, paramsRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::CSndParams>(params, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    gpg::RRef soundRef{};
-    soundRef = gpg::MakeRRef<moho::HSound>(sound);
-    gpg::WriteRawPointer(archive, soundRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::HSound>(sound, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 
   /**

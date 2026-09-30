@@ -7792,9 +7792,7 @@ void gpg::SerializeSimArmyPtrVector(WriteArchive* const archive, const int vecto
     archive->WriteUInt(static_cast<unsigned int>(count));
 
     for (std::size_t i = 0; i < count; ++i) {
-        RRef elementRef{};
-        elementRef = gpg::MakeRRef<moho::SimArmy>((*vector)[i]);
-        gpg::WriteRawPointer(archive, elementRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+        archive->WritePointer<moho::SimArmy>((*vector)[i], gpg::TrackedPointerState::Unowned, gpg::RRef{});
     }
 }
 

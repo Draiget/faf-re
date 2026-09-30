@@ -2248,17 +2248,11 @@ void CAiBrain::MemberSerialize(gpg::WriteArchive* const archive) const
     archive->Write(scriptObjectType, static_cast<const CScriptObject*>(this), owner);
   }
 
-  gpg::RRef armyRef{};
-  armyRef = gpg::MakeRRef<moho::SimArmy>(mArmy);
-  gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, owner);
+  archive->WritePointer<moho::SimArmy>(mArmy, gpg::TrackedPointerState::Unowned, owner);
 
-  gpg::RRef currentEnemyRef{};
-  currentEnemyRef = gpg::MakeRRef<moho::SimArmy>(mCurrentEnemy);
-  gpg::WriteRawPointer(archive, currentEnemyRef, gpg::TrackedPointerState::Unowned, owner);
+  archive->WritePointer<moho::SimArmy>(mCurrentEnemy, gpg::TrackedPointerState::Unowned, owner);
 
-  gpg::RRef personalityRef{};
-  personalityRef = gpg::MakeRRef<moho::CAiPersonality>(mPersonality);
-  gpg::WriteRawPointer(archive, personalityRef, gpg::TrackedPointerState::Owned, owner);
+  archive->WritePointer<moho::CAiPersonality>(mPersonality, gpg::TrackedPointerState::Owned, owner);
 
   archive->WriteString(const_cast<msvc8::string*>(&mCurrentPlan));
 

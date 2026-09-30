@@ -341,9 +341,7 @@ namespace
    */
   void WriteOwnedCPlatoonPointer(gpg::WriteArchive* archive, moho::CPlatoon* platoon, const gpg::RRef& ownerRef)
   {
-    gpg::RRef objectRef{};
-    objectRef = gpg::MakeRRef<moho::CPlatoon>(platoon);
-    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Owned, ownerRef);
+    archive->WritePointer<moho::CPlatoon>(platoon, gpg::TrackedPointerState::Owned, ownerRef);
   }
 
   /**
@@ -357,9 +355,7 @@ namespace
    */
   void WriteUnownedCPlatoonPointer(gpg::WriteArchive* archive, moho::CPlatoon* platoon, const gpg::RRef& ownerRef)
   {
-    gpg::RRef objectRef{};
-    objectRef = gpg::MakeRRef<moho::CPlatoon>(platoon);
-    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::CPlatoon>(platoon, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 
   [[nodiscard]] gpg::RType* ResolveEntitySetTemplateUnitVectorType()

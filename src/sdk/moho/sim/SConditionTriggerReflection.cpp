@@ -772,9 +772,7 @@ namespace
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (const auto& entry : *source) {
-      gpg::RRef pointerRef{};
-      pointerRef = gpg::MakeRRef<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(entry.first));
-      gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, owner);
+      archive->WritePointer<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(entry.first), gpg::TrackedPointerState::Unowned, owner);
       archive->WriteFloat(entry.second);
     }
   }

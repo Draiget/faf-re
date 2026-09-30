@@ -964,9 +964,7 @@ namespace
     }
     archive->Write(entIdType, &entry->entityId, owner);
 
-    gpg::RRef armyRef{};
-    armyRef = gpg::MakeRRef<moho::SimArmy>(reinterpret_cast<moho::SimArmy*>(entry->sourceArmy));
-    gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, owner);
+    archive->WritePointer<moho::SimArmy>(reinterpret_cast<moho::SimArmy*>(entry->sourceArmy), gpg::TrackedPointerState::Unowned, owner);
 
     static gpg::RType* vector3fType = nullptr;
     if (vector3fType == nullptr) {
@@ -974,9 +972,7 @@ namespace
     }
     archive->Write(vector3fType, &entry->lastPosition, owner);
 
-    gpg::RRef blueprintRef{};
-    blueprintRef = gpg::MakeRRef<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(entry->sourceBlueprint));
-    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, owner);
+    archive->WritePointer<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(entry->sourceBlueprint), gpg::TrackedPointerState::Unowned, owner);
 
     static gpg::RType* layerType = nullptr;
     if (layerType == nullptr) {

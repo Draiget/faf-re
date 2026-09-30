@@ -15329,15 +15329,11 @@ void Unit::SerEconomyEvents(gpg::WriteArchive& archive, const int) const
 {
   for (auto* node = mEconomyEventListHead.mNext; node != &mEconomyEventListHead; node = node->mNext) {
     gpg::RRef eventOwnerRef{};
-    gpg::RRef eventRef{};
-    eventRef = gpg::MakeRRef<moho::CEconomyEvent>(node->Get());
-    gpg::WriteRawPointer(&archive, eventRef, gpg::TrackedPointerState::Owned, eventOwnerRef);
+    archive.WritePointer<moho::CEconomyEvent>(node->Get(), gpg::TrackedPointerState::Owned, eventOwnerRef);
   }
 
   gpg::RRef tailOwnerRef{};
-  gpg::RRef nullRef{};
-  nullRef = gpg::MakeRRef<moho::CEconomyEvent*>(nullptr);
-  gpg::WriteRawPointer(&archive, nullRef, gpg::TrackedPointerState::Owned, tailOwnerRef);
+  archive.WritePointer<moho::CEconomyEvent*>(nullptr, gpg::TrackedPointerState::Owned, tailOwnerRef);
 }
 
 /**
@@ -17367,19 +17363,13 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
 
   // Owned AI / motion / command sidecar pointers (tracked OWNED lanes).
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::IAiSteering>(unit->AiSteering);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiSteering>(unit->AiSteering, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::CUnitMotion>(unit->UnitMotion);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::CUnitMotion>(unit->UnitMotion, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::CUnitCommandQueue>(unit->CommandQueue);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::CUnitCommandQueue>(unit->CommandQueue, gpg::TrackedPointerState::Owned, unowned);
   }
 
   // Weak-reference lanes.
@@ -17406,18 +17396,14 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
 
   // Owned extra economy storage.
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::CEconStorage>(unit->mExtraStorage);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::CEconStorage>(unit->mExtraStorage, gpg::TrackedPointerState::Owned, unowned);
   }
 
   archive->WriteInt(unit->PriorityBoost);
 
   // Owned consumption (upkeep) request.
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::CEconRequest>(unit->mConsumptionData);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::CEconRequest>(unit->mConsumptionData, gpg::TrackedPointerState::Owned, unowned);
   }
 
   archive->WriteBool(unit->ConsumptionActive);
@@ -17426,41 +17412,27 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, Unit* const unit, c
 
   // Owned animation actor.
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::CAniActor>(unit->AniActor);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::CAniActor>(unit->AniActor, gpg::TrackedPointerState::Owned, unowned);
   }
 
   // Owned AI implementation lanes.
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::IAiAttacker>(unit->AiAttacker);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiAttacker>(unit->AiAttacker, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::IAiCommandDispatch>(unit->AiCommandDispatch);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiCommandDispatch>(unit->AiCommandDispatch, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::IAiNavigator>(unit->AiNavigator);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiNavigator>(unit->AiNavigator, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::IAiBuilder>(unit->AiBuilder);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiBuilder>(unit->AiBuilder, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::IAiSiloBuild>(unit->AiSiloBuild);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiSiloBuild>(unit->AiSiloBuild, gpg::TrackedPointerState::Owned, unowned);
   }
   {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::IAiTransport>(unit->AiTransport);
-    gpg::WriteRawPointer(archive, ref, gpg::TrackedPointerState::Owned, unowned);
+    archive->WritePointer<moho::IAiTransport>(unit->AiTransport, gpg::TrackedPointerState::Owned, unowned);
   }
 
   archive->WriteBool(unit->FootprintDown);

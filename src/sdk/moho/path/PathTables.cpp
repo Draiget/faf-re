@@ -1060,10 +1060,8 @@ namespace moho
    */
   void PathQueue::Impl::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    gpg::RRef pathTablesRef{};
-    pathTablesRef = gpg::MakeRRef<moho::PathTables>(mOwner);
     gpg::RRef ownerRef{};
-    gpg::WriteRawPointer(archive, pathTablesRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::PathTables>(mOwner, gpg::TrackedPointerState::Unowned, ownerRef);
 
     static gpg::RType* dlistType = nullptr;
     if (dlistType == nullptr) {

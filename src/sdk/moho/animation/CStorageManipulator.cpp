@@ -670,9 +670,7 @@ namespace moho
 
     archive->Write(IAniManipulator::StaticGetClass(), this, ownerRef);
 
-    gpg::RRef unitRef{};
-    unitRef = gpg::MakeRRef<moho::Unit>(mUnit);
-    gpg::WriteRawPointer(archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::Unit>(mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
 
     gpg::RType* const vector3Type = CachedVector3fType();
     archive->Write(vector3Type, &mMax, ownerRef);

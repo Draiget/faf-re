@@ -34,9 +34,7 @@ namespace
       return;
     }
 
-    gpg::RRef ownerRef{};
-    ownerRef = gpg::MakeRRef<moho::Sim>(object->GetSim());
-    gpg::WriteRawPointer(archive, ownerRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    archive->WritePointer<moho::Sim>(object->GetSim(), gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
     if (result) {
       result->SetUnowned(0u);

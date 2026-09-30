@@ -132,15 +132,12 @@ namespace
     }
 
     const gpg::RRef nullOwner{};
-    gpg::RRef pointerRef{};
 
     for (moho::Listener<moho::EFormationdStatus>* const listener : broadcaster->mListeners.owners()) {
-      pointerRef = gpg::MakeRRef<moho::Listener<moho::EFormationdStatus>>(listener);
-      gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+      archive->WritePointer<moho::Listener<moho::EFormationdStatus>>(listener, gpg::TrackedPointerState::Unowned, nullOwner);
     }
 
-    pointerRef = gpg::MakeRRef<moho::Listener<moho::EFormationdStatus>>(nullptr);
-    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::Listener<moho::EFormationdStatus>>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 
   /**

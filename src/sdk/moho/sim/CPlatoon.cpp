@@ -1359,9 +1359,7 @@ namespace moho
     gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     ownerRef = {};
-    gpg::RRef armyRef{};
-    armyRef = gpg::MakeRRef<moho::SimArmy>(mArmy);
-    gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::SimArmy>(mArmy, gpg::TrackedPointerState::Unowned, ownerRef);
 
     WritePlatoonSquadPointersToArchive(archive, const_cast<CPlatoon*>(this));
 

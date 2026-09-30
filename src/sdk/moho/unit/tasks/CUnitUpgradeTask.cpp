@@ -186,9 +186,7 @@ namespace moho
       archive->Write(commandTaskType, this, ownerRef);
     }
 
-    gpg::RRef blueprintRef{};
-    blueprintRef = gpg::MakeRRef<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(mToBlueprint));
-    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(mToBlueprint), gpg::TrackedPointerState::Unowned, ownerRef);
 
     if (gpg::RType* const buildHelperType = ResolveCachedType<CBuildTaskHelper>()) {
       archive->Write(buildHelperType, &mBuildHelper, ownerRef);

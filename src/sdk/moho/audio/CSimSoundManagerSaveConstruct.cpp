@@ -74,9 +74,7 @@ namespace moho
       return;
     }
 
-    gpg::RRef ownerRef{};
-    ownerRef = gpg::MakeRRef<moho::Sim>(soundManager->mOwnerSim);
-    gpg::WriteRawPointer(archive, ownerRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    archive->WritePointer<moho::Sim>(soundManager->mOwnerSim, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
     if (result != nullptr) {
       result->SetUnowned(0u);

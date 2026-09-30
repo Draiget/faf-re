@@ -95,9 +95,7 @@ namespace moho
 
     archive->WriteFloat(unk1);
 
-    gpg::RRef blueprintRef{};
-    blueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(blueprint);
-    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::REntityBlueprint>(blueprint, gpg::TrackedPointerState::Unowned, ownerRef);
 
     archive->WriteString(const_cast<msvc8::string*>(&unk2));
   }

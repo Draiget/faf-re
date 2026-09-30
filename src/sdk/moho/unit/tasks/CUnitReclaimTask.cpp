@@ -799,18 +799,14 @@ namespace moho
     const gpg::RRef nullOwner{};
     archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), nullOwner);
 
-    gpg::RRef commandRef{};
-    commandRef = gpg::MakeRRef<moho::CUnitCommand>(mCommand);
-    gpg::WriteRawPointer(archive, commandRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::CUnitCommand>(mCommand, gpg::TrackedPointerState::Unowned, nullOwner);
 
     archive->Write(CachedWeakPtrEntityType(), &mTargetEntity, nullOwner);
     archive->WriteBool(mTargetHasNoMotor);
     archive->Write(CachedVector3fType(), &mTargetPosition, nullOwner);
     archive->WriteBool(mHasStarted);
 
-    gpg::RRef requestRef{};
-    requestRef = gpg::MakeRRef<moho::CEconRequest>(mConsumptionData);
-    gpg::WriteRawPointer(archive, requestRef, gpg::TrackedPointerState::Owned, nullOwner);
+    archive->WritePointer<moho::CEconRequest>(mConsumptionData, gpg::TrackedPointerState::Owned, nullOwner);
 
     archive->WriteFloat(mReclaimRate);
     archive->Write(CachedSEconValueType(), &mReclaimPerSecond, nullOwner);

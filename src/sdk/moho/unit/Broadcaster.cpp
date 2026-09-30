@@ -346,15 +346,12 @@ namespace
     }
 
     const gpg::RRef nullOwner{};
-    gpg::RRef pointerRef{};
 
     for (moho::Listener<moho::ECommandEvent>* const listener : broadcaster->mListeners.owners()) {
-      pointerRef = gpg::MakeRRef<moho::Listener<moho::ECommandEvent>>(listener);
-      gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+      archive->WritePointer<moho::Listener<moho::ECommandEvent>>(listener, gpg::TrackedPointerState::Unowned, nullOwner);
     }
 
-    pointerRef = gpg::MakeRRef<moho::Listener<moho::ECommandEvent>>(nullptr);
-    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::Listener<moho::ECommandEvent>>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 
   /**
@@ -526,15 +523,12 @@ namespace gpg
     }
 
     const gpg::RRef nullOwner{};
-    gpg::RRef pointerRef{};
 
     for (moho::Listener<moho::EUnitCommandQueueStatus>* const listener : broadcaster->mListeners.owners()) {
-      pointerRef = gpg::MakeRRef<moho::Listener<moho::EUnitCommandQueueStatus>>(listener);
-      gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+      archive->WritePointer<moho::Listener<moho::EUnitCommandQueueStatus>>(listener, gpg::TrackedPointerState::Unowned, nullOwner);
     }
 
-    pointerRef = gpg::MakeRRef<moho::Listener<moho::EUnitCommandQueueStatus>>(nullptr);
-    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::Listener<moho::EUnitCommandQueueStatus>>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 } // namespace gpg
 

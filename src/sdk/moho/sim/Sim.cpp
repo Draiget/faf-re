@@ -4993,9 +4993,7 @@ void Sim::SerArmies(gpg::WriteArchive* const archive)
 
   gpg::RRef ownerRef{};
   for (CArmyImpl* const army : mArmiesList) {
-    gpg::RRef armyRef{};
-    armyRef = gpg::MakeRRef<moho::SimArmy>(army);
-    gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Owned, ownerRef);
+    archive->WritePointer<moho::SimArmy>(army, gpg::TrackedPointerState::Owned, ownerRef);
   }
 }
 
@@ -5040,14 +5038,10 @@ void Sim::SerDirtyEnts(gpg::WriteArchive* const archive)
 
   const gpg::RRef nullOwner{};
   for (Entity* const entity : mCoordEntities.owners()) {
-    gpg::RRef entityRef{};
-    entityRef = gpg::MakeRRef<moho::Entity>(entity);
-    gpg::WriteRawPointer(archive, entityRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::Entity>(entity, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 
-  gpg::RRef tailRef{};
-  tailRef = gpg::MakeRRef<moho::Entity>(nullptr);
-  gpg::WriteRawPointer(archive, tailRef, gpg::TrackedPointerState::Unowned, nullOwner);
+  archive->WritePointer<moho::Entity>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
 }
 
 /**

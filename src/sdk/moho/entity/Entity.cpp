@@ -1835,25 +1835,19 @@ namespace moho
     archive->Write(CachedVariableDataType(), &mVarDat.mScmResource, owner);
 
     // Owning army pointer (UNOWNED). CArmyImpl derives from SimArmy.
-    gpg::RRef armyRef{};
-    armyRef = gpg::MakeRRef<moho::SimArmy>(static_cast<SimArmy*>(ArmyRef));
-    gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, owner);
+    archive->WritePointer<moho::SimArmy>(static_cast<SimArmy*>(ArmyRef), gpg::TrackedPointerState::Unowned, owner);
 
     // Pending world transform (+0x150), logically a VTransform payload.
     archive->Write(CachedVTransformType(), &mPendingTransform, owner);
 
     // Position-history pointer (OWNED).
-    gpg::RRef positionHistoryRef{};
-    positionHistoryRef = gpg::MakeRRef<moho::PositionHistory>(mPositionHistory);
-    gpg::WriteRawPointer(archive, positionHistoryRef, gpg::TrackedPointerState::Owned, owner);
+    archive->WritePointer<moho::PositionHistory>(mPositionHistory, gpg::TrackedPointerState::Owned, owner);
 
     archive->WriteFloat(mPendingVelocityScale);
     archive->WriteInt(static_cast<int>(mLastTickProcessed));
 
     // Collision-primitive pointer (OWNED).
-    gpg::RRef collisionRef{};
-    collisionRef = gpg::MakeRRef<moho::CColPrimitiveBase>(CollisionExtents);
-    gpg::WriteRawPointer(archive, collisionRef, gpg::TrackedPointerState::Owned, owner);
+    archive->WritePointer<moho::CColPrimitiveBase>(CollisionExtents, gpg::TrackedPointerState::Owned, owner);
 
     // Attached-entity vector (+0x17C).
     archive->Write(CachedAttachedEntitiesType(), &mAttachedEntities, owner);
@@ -1869,9 +1863,7 @@ namespace moho
     archive->Write(CachedResIdType(), &mResId, owner);
 
     // Intel-manager pointer (OWNED).
-    gpg::RRef intelRef{};
-    intelRef = gpg::MakeRRef<moho::CIntel>(mIntelManager);
-    gpg::WriteRawPointer(archive, intelRef, gpg::TrackedPointerState::Owned, owner);
+    archive->WritePointer<moho::CIntel>(mIntelManager, gpg::TrackedPointerState::Owned, owner);
 
     // Four visibility-mode lanes (+0x1DC..+0x1E8).
     gpg::RType* const visibilityType = CachedVisibilityModeTypeForSerialize();
@@ -1881,14 +1873,10 @@ namespace moho
     archive->Write(visibilityType, &mVizToNeutrals, owner);
 
     // Texture-scroller pointer (OWNED).
-    gpg::RRef scrollerRef{};
-    scrollerRef = gpg::MakeRRef<moho::CTextureScroller>(mScroller);
-    gpg::WriteRawPointer(archive, scrollerRef, gpg::TrackedPointerState::Owned, owner);
+    archive->WritePointer<moho::CTextureScroller>(mScroller, gpg::TrackedPointerState::Owned, owner);
 
     // Physics-body pointer (OWNED).
-    gpg::RRef physBodyRef{};
-    physBodyRef = gpg::MakeRRef<moho::SPhysBody>(mPhysBody);
-    gpg::WriteRawPointer(archive, physBodyRef, gpg::TrackedPointerState::Owned, owner);
+    archive->WritePointer<moho::SPhysBody>(mPhysBody, gpg::TrackedPointerState::Owned, owner);
 
     archive->WriteBool(RealtimeStatsEnabled != 0u);
     archive->WriteString(const_cast<msvc8::string*>(&mUniqueName));
@@ -1897,9 +1885,7 @@ namespace moho
     archive->Write(CachedShooterSetType(), &mShooters, owner);
 
     // Motor pointer (OWNED).
-    gpg::RRef motorRef{};
-    motorRef = gpg::MakeRRef<moho::Motor>(mMotor);
-    gpg::WriteRawPointer(archive, motorRef, gpg::TrackedPointerState::Owned, owner);
+    archive->WritePointer<moho::Motor>(mMotor, gpg::TrackedPointerState::Owned, owner);
 
     // Collision AABB (+0x240): min/max modeled split, first field is min.
     archive->Write(CachedCollisionBoxType(), &mAABox, owner);

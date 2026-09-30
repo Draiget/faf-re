@@ -201,14 +201,10 @@ void gpg::RDListType_IPathTraveler::SerSave(
   const gpg::RRef owner = ownerRef != nullptr ? *ownerRef : gpg::RRef{};
 
   for (moho::IPathTraveler* const traveler : listHead->owners()) {
-    gpg::RRef travelerRef{};
-    travelerRef = gpg::MakeRRef<moho::IPathTraveler>(traveler);
-    gpg::WriteRawPointer(archive, travelerRef, gpg::TrackedPointerState::Unowned, owner);
+    archive->WritePointer<moho::IPathTraveler>(traveler, gpg::TrackedPointerState::Unowned, owner);
   }
 
-  gpg::RRef nullTravelerRef{};
-  nullTravelerRef = gpg::MakeRRef<moho::IPathTraveler>(nullptr);
-  gpg::WriteRawPointer(archive, nullTravelerRef, gpg::TrackedPointerState::Unowned, owner);
+  archive->WritePointer<moho::IPathTraveler>(nullptr, gpg::TrackedPointerState::Unowned, owner);
 }
 
 /**

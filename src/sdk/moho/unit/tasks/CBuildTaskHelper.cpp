@@ -482,9 +482,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    gpg::RRef unitRef{};
-    unitRef = gpg::MakeRRef<moho::Unit>(mUnit);
-    gpg::WriteRawPointer(archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::Unit>(mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
 
     gpg::RRef simRef{};
     simRef.mObj = mSim;

@@ -18844,16 +18844,12 @@ void LClosure::MemberSerialize(
 	const gpg::RRef nullOwner{};
 	const gpg::RRef& owner = ownerRef != nullptr ? *ownerRef : nullOwner;
 
-	gpg::RRef protoRef{};
-	protoRef = gpg::MakeRRef<Proto>(object->p);
-	gpg::WriteRawPointer(archive, protoRef, gpg::TrackedPointerState::Unowned, owner);
+	archive->WritePointer<Proto>(object->p, gpg::TrackedPointerState::Unowned, owner);
 
 	archive->Write(CachedType<TObject>(gLuaTObjectType), &object->g, owner);
 
 	for (std::uint8_t upvalueIndex = 0; upvalueIndex < object->nupvalues; ++upvalueIndex) {
-		gpg::RRef upvalueRef{};
-		upvalueRef = gpg::MakeRRef<UpVal>(object->upvals[upvalueIndex]);
-		gpg::WriteRawPointer(archive, upvalueRef, gpg::TrackedPointerState::Unowned, owner);
+		archive->WritePointer<UpVal>(object->upvals[upvalueIndex], gpg::TrackedPointerState::Unowned, owner);
 	}
 }
 
@@ -18896,9 +18892,7 @@ void Proto::MemberSerialize(
 	archive->WriteBytes(reinterpret_cast<char*>(object->code), sizeof(Instruction) * static_cast<std::size_t>(object->sizecode));
 
 	for (int index = 0; index < object->sizep; ++index) {
-		gpg::RRef protoRef{};
-		protoRef = gpg::MakeRRef<Proto>(object->p[index]);
-		gpg::WriteRawPointer(archive, protoRef, gpg::TrackedPointerState::Unowned, owner);
+		archive->WritePointer<Proto>(object->p[index], gpg::TrackedPointerState::Unowned, owner);
 	}
 
 	for (int index = 0; index < object->sizelineinfo; ++index) {
@@ -18906,22 +18900,16 @@ void Proto::MemberSerialize(
 	}
 
 	for (int index = 0; index < object->sizelocvars; ++index) {
-		gpg::RRef localNameRef{};
-		localNameRef = gpg::MakeRRef<TString>(object->locvars[index].varname);
-		gpg::WriteRawPointer(archive, localNameRef, gpg::TrackedPointerState::Unowned, owner);
+		archive->WritePointer<TString>(object->locvars[index].varname, gpg::TrackedPointerState::Unowned, owner);
 		archive->WriteInt(object->locvars[index].startpc);
 		archive->WriteInt(object->locvars[index].endpc);
 	}
 
 	for (int index = 0; index < object->nups; ++index) {
-		gpg::RRef upvalueNameRef{};
-		upvalueNameRef = gpg::MakeRRef<TString>(object->upvalues[index]);
-		gpg::WriteRawPointer(archive, upvalueNameRef, gpg::TrackedPointerState::Unowned, owner);
+		archive->WritePointer<TString>(object->upvalues[index], gpg::TrackedPointerState::Unowned, owner);
 	}
 
-	gpg::RRef sourceRef{};
-	sourceRef = gpg::MakeRRef<TString>(object->source);
-	gpg::WriteRawPointer(archive, sourceRef, gpg::TrackedPointerState::Unowned, owner);
+	archive->WritePointer<TString>(object->source, gpg::TrackedPointerState::Unowned, owner);
 }
 
 /**
@@ -19047,9 +19035,7 @@ void Table::MemberSerialize(
 	Ensure(object != nullptr, "object");
 	Ensure(ownerRef != nullptr, "ownerRef");
 
-	gpg::RRef metatableRef{};
-	metatableRef = gpg::MakeRRef<Table>(object->metatable);
-	gpg::WriteRawPointer(archive, metatableRef, gpg::TrackedPointerState::Unowned, *ownerRef);
+	archive->WritePointer<Table>(object->metatable, gpg::TrackedPointerState::Unowned, *ownerRef);
 
 	const int hashNodeCount = 1 << object->lsizenode;
 	int nonEmptyHashCount = 0;
@@ -19165,9 +19151,7 @@ void Udata::MemberSerialize(
 		}
 	} lockGuard(ownerState->l_G);
 
-	gpg::RRef metatableRef{};
-	metatableRef = gpg::MakeRRef<Table>(object->metatable);
-	gpg::WriteRawPointer(archive, metatableRef, gpg::TrackedPointerState::Unowned, *ownerRef);
+	archive->WritePointer<Table>(object->metatable, gpg::TrackedPointerState::Unowned, *ownerRef);
 
 	gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(object->len);
 	const void* const payload = reinterpret_cast<const std::uint8_t*>(object) + sizeof(Udata);
@@ -19430,9 +19414,7 @@ void lua_State::MemberSerialize(
 		UpVal* const upvalue = &openUpval->uv;
 		archive->WriteInt(static_cast<int>(upvalue->v - stackBase));
 
-		gpg::RRef upvalueRef{};
-		upvalueRef = gpg::MakeRRef<UpVal>(upvalue);
-		gpg::WriteRawPointer(archive, upvalueRef, gpg::TrackedPointerState::Unowned, owner);
+		archive->WritePointer<UpVal>(upvalue, gpg::TrackedPointerState::Unowned, owner);
 	}
 
 	archive->WriteInt(-1);
@@ -19451,13 +19433,9 @@ void LuaState::MemberSerialize(gpg::WriteArchive* const archive, LuaState* const
 	Ensure(state != nullptr, "state");
 	Ensure(state->m_rootState != nullptr, "state->m_rootState");
 
-	gpg::RRef rootStateRef{};
-	rootStateRef = gpg::MakeRRef<LuaPlus::LuaState>(state->m_rootState);
-	gpg::WriteRawPointer(archive, rootStateRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+	archive->WritePointer<LuaPlus::LuaState>(state->m_rootState, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
-	gpg::RRef currentStateRef{};
-	currentStateRef = gpg::MakeRRef<lua_State>(state->m_state);
-	gpg::WriteRawPointer(archive, currentStateRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+	archive->WritePointer<lua_State>(state->m_state, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 }
 
 LuaState* LuaState::GetActiveState()
@@ -19919,9 +19897,7 @@ void LuaObject::MemberSerialize(gpg::WriteArchive* const archive, LuaObject* con
 	Ensure(archive != nullptr, "archive");
 	Ensure(object != nullptr, "object");
 
-	gpg::RRef stateRef{};
-	stateRef = gpg::MakeRRef<LuaPlus::LuaState>(object->m_state);
-	gpg::WriteRawPointer(archive, stateRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+	archive->WritePointer<LuaPlus::LuaState>(object->m_state, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
 	if (object->m_state != nullptr) {
 		gpg::RRef ownerRef{};

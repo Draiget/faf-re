@@ -867,14 +867,10 @@ void CEconomy::SerializeRequests(gpg::WriteArchive* const archive)
     const gpg::RRef nullOwner{};
 
     for (TDatListItem<void, void>* node = mConsumptionData.mPrev; node != &mConsumptionData; node = node->mPrev) {
-      gpg::RRef requestRef{};
-      requestRef = gpg::MakeRRef<moho::CEconRequest>(RequestFromNode(node));
-      gpg::WriteRawPointer(archive, requestRef, gpg::TrackedPointerState::Unowned, nullOwner);
+      archive->WritePointer<moho::CEconRequest>(RequestFromNode(node), gpg::TrackedPointerState::Unowned, nullOwner);
     }
 
-  gpg::RRef endRef{};
-  endRef = gpg::MakeRRef<moho::CEconRequest>(nullptr);
-  gpg::WriteRawPointer(archive, endRef, gpg::TrackedPointerState::Unowned, nullOwner);
+  archive->WritePointer<moho::CEconRequest>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
 }
 
 /**

@@ -368,15 +368,12 @@ void moho::RBroadcasterRType_EAiAttackerEvent::SerSave(
   }
 
   const gpg::RRef nullOwner{};
-  gpg::RRef pointerRef{};
 
   for (moho::Listener<moho::EAiAttackerEvent>* const listener : broadcaster->mListeners.owners()) {
-    pointerRef = gpg::MakeRRef<moho::Listener<moho::EAiAttackerEvent>>(listener);
-    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::Listener<moho::EAiAttackerEvent>>(listener, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 
-  pointerRef = gpg::MakeRRef<moho::Listener<moho::EAiAttackerEvent>>(nullptr);
-  gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+  archive->WritePointer<moho::Listener<moho::EAiAttackerEvent>>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
 }
 
 /**
@@ -486,10 +483,8 @@ void gpg::RVectorType_UnitWeaponPtr::SerSave(
   archive->WriteUInt(count);
 
   const gpg::RRef ownerRef{};
-  gpg::RRef pointerRef{};
   for (unsigned int i = 0; i < count; ++i) {
-    pointerRef = gpg::MakeRRef<moho::UnitWeapon>((*storage)[i]);
-    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::UnitWeapon>((*storage)[i], gpg::TrackedPointerState::Unowned, ownerRef);
   }
 }
 
@@ -625,10 +620,8 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SerSave(
   archive->WriteUInt(count);
 
   const gpg::RRef nullOwner{};
-  gpg::RRef pointerRef{};
   for (unsigned int i = 0; i < count; ++i) {
-    pointerRef = gpg::MakeRRef<moho::CAcquireTargetTask>((*storage)[static_cast<std::size_t>(i)]);
-    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::CAcquireTargetTask>((*storage)[static_cast<std::size_t>(i)], gpg::TrackedPointerState::Unowned, nullOwner);
   }
 }
 

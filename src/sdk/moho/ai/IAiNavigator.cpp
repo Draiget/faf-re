@@ -210,16 +210,9 @@ namespace
     const gpg::RRef* const ownerRef
   )
   {
-    gpg::RRef listenerRef{};
-    listenerRef = gpg::MakeRRef<moho::Listener<moho::EAiNavigatorEvent>>(listener);
 
     const gpg::RRef nullOwner{};
-    gpg::WriteRawPointer(
-      archive,
-      listenerRef,
-      gpg::TrackedPointerState::Unowned,
-      ownerRef ? *ownerRef : nullOwner
-    );
+    archive->WritePointer<moho::Listener<moho::EAiNavigatorEvent>>(listener, gpg::TrackedPointerState::Unowned, ownerRef ? *ownerRef : nullOwner);
     return archive;
   }
 

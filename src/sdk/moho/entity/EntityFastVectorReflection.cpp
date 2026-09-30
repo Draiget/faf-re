@@ -320,9 +320,7 @@ namespace
     archive->WriteUInt(count);
 
     for (unsigned int i = 0; i < count; ++i) {
-      gpg::RRef objectRef{};
-      objectRef = gpg::MakeRRef<moho::Entity>(vec[i]);
-      gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+      archive->WritePointer<moho::Entity>(vec[i], gpg::TrackedPointerState::Unowned, gpg::RRef{});
     }
   }
 

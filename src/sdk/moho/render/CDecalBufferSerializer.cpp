@@ -110,14 +110,10 @@ namespace moho
       // though loop nodes are always non-null before the sentinel.
       CDecalHandle* const handle = (node != nullptr) ? CDecalHandle::FromListNode(node) : nullptr;
 
-      gpg::RRef handleRef{};
-      handleRef = gpg::MakeRRef<moho::CDecalHandle>(handle);
-      gpg::WriteRawPointer(ar, handleRef, gpg::TrackedPointerState::Owned, gpg::RRef{});
+      ar->WritePointer<moho::CDecalHandle>(handle, gpg::TrackedPointerState::Owned, gpg::RRef{});
     }
 
-    gpg::RRef terminatorRef{};
-    terminatorRef = gpg::MakeRRef<moho::CDecalHandle*>(nullptr);
-    gpg::WriteRawPointer(ar, terminatorRef, gpg::TrackedPointerState::Owned, gpg::RRef{});
+    ar->WritePointer<moho::CDecalHandle*>(nullptr, gpg::TrackedPointerState::Owned, gpg::RRef{});
   }
 
   /**
@@ -133,9 +129,7 @@ namespace moho
    */
   void CDecalBufferSaveCallback(gpg::WriteArchive* const ar, const CDecalBuffer* const buf)
   {
-    gpg::RRef simRef{};
-    simRef = gpg::MakeRRef<moho::Sim>(buf->mSim);
-    gpg::WriteRawPointer(ar, simRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    ar->WritePointer<moho::Sim>(buf->mSim, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
     ar->Write(CachedIdPoolType(), &buf->mPool, gpg::RRef{});
 

@@ -288,9 +288,7 @@ namespace moho
 
     SerializeEntIdField(&mEntityId, archive);
 
-    gpg::RRef blueprintRef{};
-    blueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(mBlueprint);
-    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::REntityBlueprint>(mBlueprint, gpg::TrackedPointerState::Unowned, nullOwner);
 
     archive->WriteUInt(mTickCreated);
   }

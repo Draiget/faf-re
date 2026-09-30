@@ -149,14 +149,10 @@ namespace
           const_cast<LoopNode*>(node)
         );
 
-      gpg::RRef soundRef{};
-      soundRef = gpg::MakeRRef<moho::HSound>(const_cast<moho::HSound*>(sound));
-      gpg::WriteRawPointer(archive, soundRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+      archive->WritePointer<moho::HSound>(const_cast<moho::HSound*>(sound), gpg::TrackedPointerState::Unowned, gpg::RRef{});
     }
 
-    gpg::RRef nullRef{};
-    nullRef = gpg::MakeRRef<moho::HSound>(nullptr);
-    gpg::WriteRawPointer(archive, nullRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    archive->WritePointer<moho::HSound>(nullptr, gpg::TrackedPointerState::Unowned, gpg::RRef{});
   }
 
   /**

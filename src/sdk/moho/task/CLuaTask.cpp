@@ -207,9 +207,7 @@ namespace
     gpg::WriteArchive* const archive, LuaPlus::LuaState* const state, const gpg::RRef& ownerRef
   )
   {
-    gpg::RRef stateRef{};
-    stateRef = gpg::MakeRRef<LuaPlus::LuaState>(state);
-    gpg::WriteRawPointer(archive, stateRef, gpg::TrackedPointerState::Owned, ownerRef);
+    archive->WritePointer<LuaPlus::LuaState>(state, gpg::TrackedPointerState::Owned, ownerRef);
     return archive;
   }
 

@@ -417,9 +417,7 @@ namespace moho
       return;
     }
 
-    gpg::RRef ownerRef{};
-    ownerRef = gpg::MakeRRef<moho::Sim>(shield->SimulationRef);
-    gpg::WriteRawPointer(archive, ownerRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    archive->WritePointer<moho::Sim>(shield->SimulationRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
     if (result != nullptr) {
       result->SetUnowned(0u);

@@ -251,9 +251,7 @@ namespace moho
   {
     const gpg::RRef ownerRef{};
 
-    gpg::RRef blueprintRef{};
-    blueprintRef = gpg::MakeRRef<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(attributes->blueprint));
-    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(attributes->blueprint), gpg::TrackedPointerState::Unowned, ownerRef);
 
     archive->Write(CachedEntityCategorySetType(), &attributes->restrictionCategory, ownerRef);
     archive->WriteFloat(attributes->spawnElevationOffset);

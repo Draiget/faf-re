@@ -763,9 +763,7 @@ namespace moho
     archive->Write(ResolveEmitterTypeRuntimeType(), &mEmitterType, nullOwner);
     archive->Write(ResolveFastVectorSEfxCurveType(), &mCurves, nullOwner);
 
-    gpg::RRef blueprintRef{};
-    blueprintRef = gpg::MakeRRef<moho::REmitterBlueprint>(mBlueprint);
-    gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::REmitterBlueprint>(mBlueprint, gpg::TrackedPointerState::Unowned, nullOwner);
 
     archive->WriteFloat(mTotalEmissions);
     archive->WriteInt(static_cast<int>(mLife));
