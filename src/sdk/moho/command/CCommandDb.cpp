@@ -16,6 +16,7 @@
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/sim/Sim.h"
 
 namespace
 {
@@ -120,7 +121,7 @@ namespace moho
    * `_Myfirst`/`_Mylast`/`_Myend`, matching the binary's explicit
    * zero-stores.
    */
-  CCommandDb::CCommandDb(Sim* const sim)
+  CCommandDB::CCommandDB(Sim* const sim)
     : sim(sim)
     , commands()
     , pool()
@@ -143,7 +144,7 @@ namespace moho
    * `msvc8::detail::rb_tree::~rb_tree`, RbTree.h); there is no separate
    * hand-written call for it in this function's own body.
    */
-  CCommandDb::~CCommandDb()
+  CCommandDB::~CCommandDB()
   {
     ValidateCommandMapEmptyOrDie(commands);
 
@@ -159,7 +160,7 @@ namespace moho
    * one command from issue-data lanes, inserts it into the command map, and
    * returns the command pointer.
    */
-  CUnitCommand* CCommandDb::AddIssueData(SSTICommandIssueData issueData)
+  CUnitCommand* CCommandDB::AddIssueData(SSTICommandIssueData issueData)
   {
     CmdId commandId = issueData.nextCommandId;
 
@@ -184,7 +185,7 @@ namespace moho
 
     /**
      * Address: 0x006E15B0 (FUN_006E15B0, `msvc8::map<Moho::CmdId,
-     * Moho::CUnitCommand*>::insert_unique` -- `Moho::CCommandDb::commands` in
+     * Moho::CUnitCommand*>::insert_unique` -- `Moho::CCommandDB::commands` in
      * CCommandDb.h. Matches `rb_tree::insert_unique` field for field: descend
      * recording the last branch taken, `where == leftmost()` fast path
      * straight to `insert_at`, otherwise the predecessor check via
@@ -203,7 +204,7 @@ namespace moho
    * swaps pending released command-id vectors with packet storage, and updates
    * id-pool recycle state.
    */
-  void CCommandDb::PublishSyncData(SSyncData* const syncData, const bool forceRefresh)
+  void CCommandDB::PublishSyncData(SSyncData* const syncData, const bool forceRefresh)
   {
     // The iterator is advanced *before* the call, exactly as 0x006E0F67 does:
     // it loads the mapped command into `ecx` first, then runs the successor
@@ -236,7 +237,7 @@ namespace moho
    * at 0x006E0EF6 is `IdPool::QueueReleasedLowId` (0x004039F0) inlined, and the
    * tail call is the `msvc8::vector<CmdId>::push_back` emission FUN_006E1A10.
    */
-  void CCommandDb::RemoveCmd(const CmdId cmdId)
+  void CCommandDB::RemoveCmd(const CmdId cmdId)
   {
     if (const auto it = commands.find(cmdId); it != commands.end()) {
       commands.erase(it);
@@ -253,12 +254,12 @@ namespace moho
    * Address: 0x006E2E10 (FUN_006E2E10)
    *
    * What it does:
-   * Runs one `CCommandDb` destructor lane and then releases the object storage
+   * Runs one `CCommandDB` destructor lane and then releases the object storage
    * with scalar `operator delete`, returning the same pointer.
    */
-  [[maybe_unused]] CCommandDb* ReleaseCommandDbInstance(CCommandDb* const db)
+  [[maybe_unused]] CCommandDB* ReleaseCommandDbInstance(CCommandDB* const db)
   {
-    db->~CCommandDb();
+    db->~CCommandDB();
     ::operator delete(db);
     return db;
   }
@@ -270,7 +271,7 @@ namespace moho
    * Serializes each stored command pointer as `OWNED`, then writes the
    * terminating null command-pointer lane.
    */
-  void CCommandDb::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CCommandDB::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     if (!archive) {
       return;
@@ -295,7 +296,7 @@ namespace moho
    * never calls) -- deserialization only ever runs against a freshly
    * constructed, still-empty command database.
    */
-  void CCommandDb::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CCommandDB::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     if (!archive) {
       return;
@@ -339,11 +340,11 @@ namespace moho
    *
    * What it does:
    * Register-shape adapter that forwards one command-db save lane to
-   * `CCommandDb::MemberSerialize`.
+   * `CCommandDB::MemberSerialize`.
    */
   [[maybe_unused]] void SerializeCommandDbMemberLanePrimary(
     gpg::WriteArchive* const archive,
-    CCommandDb* const commandDb
+    CCommandDB* const commandDb
   )
   {
     commandDb->MemberSerialize(archive);
@@ -354,10 +355,10 @@ namespace moho
    *
    * What it does:
    * Register-shape adapter that forwards one command-db load lane to
-   * `CCommandDb::MemberDeserialize`.
+   * `CCommandDB::MemberDeserialize`.
    */
   [[maybe_unused]] void DeserializeCommandDbMemberLane(
-    CCommandDb* const commandDb,
+    CCommandDB* const commandDb,
     gpg::ReadArchive* const archive
   )
   {
@@ -369,13 +370,82 @@ namespace moho
    *
    * What it does:
    * Secondary register-shape adapter that forwards one command-db save lane to
-   * `CCommandDb::MemberSerialize`.
+   * `CCommandDB::MemberSerialize`.
    */
   [[maybe_unused]] void SerializeCommandDbMemberLaneSecondary(
     gpg::WriteArchive* const archive,
-    CCommandDb* const commandDb
+    CCommandDB* const commandDb
   )
   {
     commandDb->MemberSerialize(archive);
   }
 } // namespace moho
+
+namespace moho
+{
+  void CCommandDB::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    Sim* sim = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&sim, &owner);
+    result.SetUnowned(gpg::MakeRRef(new CCommandDB(sim)), 0u);
+  }
+
+  void CCommandDB::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    archive.WritePointer(sim, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    result.SetUnowned(0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CCommandDB>`, vtable 0x00E2E508.
+   *
+   * Address: 0x00BD8C90 (FUN_00BD8C90 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFE9D0 (FUN_00BFE9D0 -- the global's destructor.)
+   * Address: 0x006E1190 (FUN_006E1190 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x006E1BA0 (FUN_006E1BA0 -- `Init`.)
+   * Address: 0x006E1220 (FUN_006E1220 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x006E2A90 (FUN_006E2A90 -- `Delete`.)
+   */
+  struct CCommandDBConstruct : gpg::SerConstructHelper<CCommandDB>
+  {};
+
+  /**
+   * `gpg::SerSaveConstructHelper<CCommandDB>`, vtable 0x00E2E4F8.
+   *
+   * Address: 0x00BD8C60 (FUN_00BD8C60 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFE9A0 (FUN_00BFE9A0 -- the global's destructor.)
+   * Address: 0x006E1010 (FUN_006E1010 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x006E1B20 (FUN_006E1B20 -- `Init`.)
+   * Address: 0x006E1040 (FUN_006E1040 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
+   */
+  struct CCommandDBSaveConstruct : gpg::SerSaveConstructHelper<CCommandDB>
+  {};
+
+  /**
+   * `gpg::SerSaveLoadHelper<CCommandDB>`, vtable 0x00E2E518.
+   *
+   * Address: 0x00BD8CD0 (FUN_00BD8CD0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFEA00 (FUN_00BFEA00 -- the global's destructor.)
+   * Address: 0x006E1310 (FUN_006E1310 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x006E1C20 (FUN_006E1C20 -- `Init`.)
+   * Address: 0x006E12E0 (FUN_006E12E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006E12F0 (FUN_006E12F0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CCommandDBSerializer : gpg::SerSaveLoadHelper<CCommandDB>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B7E4C -- process-global `CCommandDBConstruct` singleton.
+  moho::CCommandDBConstruct gCCommandDBConstruct;
+
+  // Address: 0x010B7E68 -- process-global `CCommandDBSaveConstruct` singleton.
+  moho::CCommandDBSaveConstruct gCCommandDBSaveConstruct;
+
+  // Address: 0x010B7DD4 -- process-global `CCommandDBSerializer` singleton.
+  moho::CCommandDBSerializer gCCommandDBSerializer;
+} // namespace

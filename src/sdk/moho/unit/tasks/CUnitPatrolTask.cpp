@@ -1088,6 +1088,7 @@ namespace moho
    *
    * Address: 0x00BD1340 (FUN_00BD1340 -- constructs the global and registers its destructor.)
    * Address: 0x00BFA1B0 (FUN_00BFA1B0 -- the global's destructor.)
+   * Address: 0x0061ADC0 (FUN_0061ADC0 -- an unreferenced out-of-line copy of the constructor.)
    * Address: 0x0061C6E0 (FUN_0061C6E0 -- `Init`.)
    * Address: 0x0061ADA0 (FUN_0061ADA0 -- `Deserialize`, a forward to `MemberDeserialize`.)
    * Address: 0x0061ADB0 (FUN_0061ADB0 -- `Serialize`, a forward to `MemberSerialize`.)

@@ -8,6 +8,15 @@
 #include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class VTransform;
@@ -62,6 +71,26 @@ namespace moho
     static gpg::RType* sType;
 
     SPhysBody() = default;
+
+    /**
+     * What it does:
+     * Reads the owning constants and builds a default body on them for an
+     * archive load, handed back unowned. Inlined into
+     * `SerConstructHelper<SPhysBody>::Construct` 0x006981B0.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x006980D0 (FUN_006980D0)
+     *
+     * What it does:
+     * Saves the owning constants unowned.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
 
     /**
      * Address: 0x006831B0 (FUN_006831B0)
@@ -273,120 +302,6 @@ namespace moho
   );
   static_assert(offsetof(SPhysBodySerializer, mSerialize) == 0x10, "SPhysBodySerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(SPhysBodySerializer) == 0x14, "SPhysBodySerializer size must be 0x14");
-
-  /**
-   * VFTABLE: 0x00E29324 (`??_7SPhysBodySaveConstruct@Moho@@6B@`)
-   *
-   * Same ICF-shared-`Init()`-with-a-dead-template-twin shape as
-   * `SPhysBodySerializer` above: `Init()` (FUN_00698660) is shared with
-   * `gpg::SerSaveConstructHelper<Moho::SPhysBody>::Init()`, and that
-   * template's own separately-emitted ctor (FUN_00698630) plus a second
-   * dead out-of-line copy of this class's own ctor (FUN_00698010) both have
-   * zero incoming xrefs and are `skip`.
-   */
-  class SPhysBodySaveConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD5EA0 (FUN_00BD5EA0, dynamic initializer for the global
-     * `SPhysBodySaveConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * save-construct-args callback field. Confirmed from raw disassembly:
-     * the installed callback is `FUN_00698040` (a thin signature-adapting
-     * forward into the real save-construct-args body at `FUN_006980D0`),
-     * not the real body directly.
-     */
-    SPhysBodySaveConstruct();
-
-    /**
-     * Address: 0x00BFD330 (FUN_00BFD330, Moho::SPhysBodySaveConstruct::~SPhysBodySaveConstruct)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~SPhysBodySaveConstruct();
-
-    /**
-     * Address: 0x00698660 (FUN_00698660, Moho::SPhysBodySaveConstruct::Init)
-     *
-     * What it does:
-     * Binds the save-construct-args callback into `SPhysBody`'s reflected
-     * RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback; // +0x0C
-  };
-
-  static_assert(
-    offsetof(SPhysBodySaveConstruct, mSaveConstructArgsCallback) == 0x0C,
-    "SPhysBodySaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
-  );
-  static_assert(sizeof(SPhysBodySaveConstruct) == 0x10, "SPhysBodySaveConstruct size must be 0x10");
-
-  /**
-   * VFTABLE: 0x00E29334 (`??_7SPhysBodyConstruct@Moho@@6B@`)
-   *
-   * Same ICF-shared-`Init()`-with-a-dead-template-twin shape again:
-   * `Init()` (FUN_006986E0) is shared with `gpg::SerConstructHelper<
-   * Moho::SPhysBody>::Init()`, and that template's own separately-emitted
-   * ctor (FUN_006986B0) plus a second dead out-of-line copy of this class's
-   * own ctor (FUN_00698120) both have zero incoming xrefs and are `skip`.
-   */
-  class SPhysBodyConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD5ED0 (FUN_00BD5ED0, dynamic initializer for the global
-     * `SPhysBodyConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields. Confirmed from raw disassembly:
-     * `mDeleteCallback` is a direct `jmp` thunk (`j_j_func_tent_Destroy_15`
-     * at 0x00698830) straight to the global scalar `operator delete(void*)`,
-     * not a typed per-instance delete -- `SPhysBody` has a trivial
-     * destructor so the two are behaviorally identical, but this matches
-     * what the binary actually installs.
-     */
-    SPhysBodyConstruct();
-
-    /**
-     * Address: 0x00BFD360 (FUN_00BFD360, Moho::SPhysBodyConstruct::~SPhysBodyConstruct)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~SPhysBodyConstruct();
-
-    /**
-     * Address: 0x006986E0 (FUN_006986E0, Moho::SPhysBodyConstruct::Init)
-     *
-     * What it does:
-     * Binds the construct/delete callbacks into `SPhysBody`'s reflected
-     * RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mConstructCallback; // +0x0C
-    gpg::RType::delete_func_t mDeleteCallback;         // +0x10
-  };
-
-  static_assert(
-    offsetof(SPhysBodyConstruct, mConstructCallback) == 0x0C,
-    "SPhysBodyConstruct::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SPhysBodyConstruct, mDeleteCallback) == 0x10,
-    "SPhysBodyConstruct::mDeleteCallback offset must be 0x10"
-  );
-  static_assert(sizeof(SPhysBodyConstruct) == 0x14, "SPhysBodyConstruct size must be 0x14");
 
   /**
    * Address: 0x00BD5E80 (FUN_00BD5E80, register_SPhysBodyTypeInfo)

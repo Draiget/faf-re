@@ -155,7 +155,7 @@ namespace msvc8
         /**
          * Address: 0x006E1F90 (FUN_006E1F90, the command-id map's leftmost
          * descent -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
-         * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15.
+         * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15.
          * Walks `_Left` (offset 0) while `!_Isnil`, matching this member
          * exactly. Reached from `erase_node`'s emission FUN_006E1670 (cited
          * below) to re-seat `head->left` when the erased node was the
@@ -393,7 +393,7 @@ namespace msvc8
         /**
          * Address: 0x006E1F70 (FUN_006E1F70, the command-id map's rightmost
          * descent -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
-         * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15.
+         * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15.
          * Walks `_Right` (offset +8) while `!_Isnil`, matching this member
          * exactly. Reached from `erase_node`'s emission FUN_006E1670 (cited
          * below) to re-seat `head->right` when the erased node was the
@@ -594,7 +594,7 @@ namespace msvc8
         /**
          * Address: 0x006E2220 (FUN_006E2220, `std::map_uint_CUnitCommand::
          * Iterator::inc`) -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
-         * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15.
+         * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15.
          * Matches this member exactly.
          * Address: 0x006E1A90 (FUN_006E1A90, first of the two thin adapters described below)
          * Address: 0x006E1AB0 (FUN_006E1AB0, second of the two thin adapters described below)
@@ -989,7 +989,7 @@ namespace msvc8
          * emission `FUN_006864E0`, both cited below.)
          * Address: 0x006E28D0 (FUN_006E28D0, the command-id map's
          * predecessor lookup -- `msvc8::map<Moho::CmdId,
-         * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+         * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
          * `CCommandDb.h`, isNil@+0x15. This body has three callers total
          * (`incoming_xrefs` in `_callgraph_index.sqlite`); only one,
          * `insert_unique`'s emission for this map (FUN_006E15B0, cited
@@ -1476,7 +1476,7 @@ namespace msvc8
              */
             /**
              * Address: 0x006E28C0 (FUN_006E28C0) -- `msvc8::map<Moho::CmdId,
-             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
              * `CCommandDb.h`. Same copy-then-advance shape as FUN_006886A0
              * above (a separate instantiation): copies `*sourceSlot` into
              * `*outSlot`, advances `*sourceSlot` via `FUN_006E2220`
@@ -1525,7 +1525,7 @@ namespace msvc8
             /**
              * Address: 0x006E2200 (FUN_006E2200) Address: 0x006E27D0
              * (FUN_006E27D0, duplicate emission) -- `msvc8::map<Moho::CmdId,
-             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
              * `CCommandDb.h`. Both are thin `_Node**` slot-pointer wrapper
              * adapters around `FUN_006E28D0` (`rb_decrement`, cited above),
              * matching this member's `node_ = rb_decrement(node_)` shape one
@@ -1713,16 +1713,16 @@ namespace msvc8
              * Address: 0x006E1520 (FUN_006E1520) Address: 0x006E1CF0
              * (FUN_006E1CF0, duplicate emission) Address: 0x006E2390
              * (FUN_006E2390, duplicate emission) -- `msvc8::map<Moho::CmdId,
-             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
              * `CCommandDb.h`, isNil@+0x15. All three call `FUN_006E2840`
-             * (the raw head-node allocator already cited on `CCommandDb`'s
+             * (the raw head-node allocator already cited on `CCommandDB`'s
              * own constructor in `CCommandDb.h` as the `buy_head()` split
              * half), patch `isNil=1`, self-link `parent`/`left`/`right`, and
              * zero `size_` -- exactly this constructor's shape -- without
              * touching `proxy_` at offset 0, matching the "storage already
              * zero-initialised" pattern documented above. Three compiler
              * emissions of the same ctor body for different inlining
-             * contexts inside `CCommandDb`'s own methods; zero incoming
+             * contexts inside `CCommandDB`'s own methods; zero incoming
              * xrefs in this sweep for any of the three. Re-homed here from
              * bespoke `InitializeCommandDbMapHead`/`InitializeCommandDbMapStorageLaneA`/
              * `...LaneB`/`...LaneC` free functions in Sim.cpp that hand-
@@ -2087,14 +2087,14 @@ namespace msvc8
              * this address does not touch `mEntityList` at all.
              * Address: 0x006E0A70 (FUN_006E0A70, `Moho::CommandDatabase::
              * ~CommandDatabase` -- `msvc8::map<Moho::CmdId,
-             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
              * `CCommandDb.h`. The tail of that function is exactly this
              * member: `sub_6E22D0(&mCommands, iter, mCommands._Myhead->
              * _Left, mCommands._Myhead)` -- `erase_range(leftmost(),
              * header())`'s emission for this instantiation, cited on that
              * member below -- then `operator delete(mCommands._Myhead)` and
-             * the `_Myhead=0`/`_Mysize=0` zeroing. `CCommandDb::
-             * ~CCommandDb()`'s own hand-written body is only the
+             * the `_Myhead=0`/`_Mysize=0` zeroing. `CCommandDB::
+             * ~CCommandDB()`'s own hand-written body is only the
              * empty-or-die diagnostic dump; this teardown is reached
              * automatically via member destruction.)
              */
@@ -2428,7 +2428,7 @@ namespace msvc8
              * matching the "compiler emits the same body more than once for
              * different inlining contexts, only one of which is ever
              * actually reached from a live caller" shape already documented
-             * elsewhere in this file (e.g. `CCommandDb`'s three `rb_tree()`
+             * elsewhere in this file (e.g. `CCommandDB`'s three `rb_tree()`
              * ctor emissions above).
              *
              * `~AudioEngineImpl`'s real instruction stream tears down
@@ -2536,7 +2536,7 @@ namespace msvc8
              * Address: 0x007358C0 (FUN_007358C0 -- a third emission of that teardown for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `DestroySimConRegistryStorageLaneC` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x00501760 (FUN_00501760 -- `~_Tree` -- `erase(begin(), end())` through 0x00505200, free the head, zero head and size, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h; node 0x38, isNil@+0x35); callers 0x00500F60 (the shard-data constructor's unwind), 0x005017E0, 0x00501E50; formerly `DestroySpatialMapTree` in moho/mesh/Mesh.cpp (RULE ONE), removed 2026-09-29.)
              * Address: 0x00504350 (FUN_00504350 -- a second emission of that same `~_Tree` for `moho::SpatialMap<T>`; zero callers, no references, a linker-retained copy nothing runs.)
-             * Address: 0x006E0A40 (FUN_006E0A40 -- `~rb_tree()` for `msvc8::map<moho::CmdId, moho::CUnitCommand*>` (`CCommandDb::commands` at +0x04, node 0x18), `this` in EAX: `erase_range(leftmost(), header())` through 0x006E22D0, free the header, zero `head_`/`size_`; reached only from the EH unwind funclets 0x00B9F0E0 / 0x00BAC860 of `CCommandDb::CCommandDb` (0x006E09C0) and `~CCommandDb` (0x006E0A70); formerly `ReleaseCommandDatabaseNodeBufferRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+             * Address: 0x006E0A40 (FUN_006E0A40 -- `~rb_tree()` for `msvc8::map<moho::CmdId, moho::CUnitCommand*>` (`CCommandDB::commands` at +0x04, node 0x18), `this` in EAX: `erase_range(leftmost(), header())` through 0x006E22D0, free the header, zero `head_`/`size_`; reached only from the EH unwind funclets 0x00B9F0E0 / 0x00BAC860 of `CCommandDB::CCommandDB` (0x006E09C0) and `~CCommandDB` (0x006E0A70); formerly `ReleaseCommandDatabaseNodeBufferRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
              * Address: 0x00715440 (FUN_00715440 -- `~rb_tree()` for `msvc8::set<moho::InfluenceMapEntry, moho::InfluenceMapEntryLess>` (`InfluenceGrid::entries` at +0x00), `this` in EAX: `erase_range(leftmost(), header())` through 0x0071AA60, free the header, zero `head_`/`size_`; reached only from the EH unwind funclets 0x00B9ED80 / 0x00BA4570 of `InfluenceGrid::InfluenceGrid()` (0x00715030) and its copy constructor (0x0071C150); formerly `ResetInfluenceGridEntryStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
              */
             ~rb_tree()
@@ -2732,13 +2732,13 @@ namespace msvc8
              * Address: 0x006E23C0 (FUN_006E23C0, the command-id map's raw
              * lower-bound descent) Address: 0x006E1D30 (FUN_006E1D30, its
              * store-into-hidden-return-pointer adapter) -- `msvc8::map<
-             * Moho::CmdId, Moho::CUnitCommand*>`, `Moho::CCommandDb::commands`
+             * Moho::CmdId, Moho::CUnitCommand*>`, `Moho::CCommandDB::commands`
              * in `CCommandDb.h`. Re-homed here from two bespoke free
              * functions in `CCommandDb.cpp` (`LowerBoundCommandMapNode`,
              * `StoreLowerBoundCommandMapNode`) during the
              * `CommandDbMapNodeRuntime` hand-rolled-tree migration; no
              * direct caller confirmed in this pass (`incoming_xrefs` empty
-             * in this sweep for both) -- none of `CCommandDb`'s recovered
+             * in this sweep for both) -- none of `CCommandDB`'s recovered
              * methods call `lower_bound`/`operator[]` directly, so this
              * emission's real call site remains unidentified.)
              */
@@ -2941,7 +2941,7 @@ namespace msvc8
              * compiles to and what this template's `erase(const key_type&)`
              * below already relies on -- genuinely useful, cited engine
              * infrastructure for this project's own `msvc8::set`/`msvc8::map`
-             * (used e.g. by `CCommandDb`/`EntityDb`), independent of the
+             * (used e.g. by `CCommandDB`/`EntityDb`), independent of the
              * external addresses that happen to confirm its shape above.
              *
              * Address: 0x0087A1A0 (FUN_0087A1A0, sub_87A1A0) -- `msvc8::map<
@@ -3060,7 +3060,7 @@ namespace msvc8
              * `Moho::CCommandDB::RemoveCmd`'s (FUN_006E0EC0, cited below on
              * `erase_node`) and `Moho::Sim::ValidateNewCommandId`'s
              * (FUN_007491C0) find call) -- `msvc8::map<Moho::CmdId,
-             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
              * `CCommandDb.h`, isNil@+0x15. Same shape as `find_node`'s
              * generic body with `lower_bound_node`'s descent inlined rather
              * than called out to a separate emission -- opens with the same
@@ -3378,7 +3378,7 @@ namespace msvc8
             /**
              * Address: 0x006E15B0 (FUN_006E15B0, the command-id map's unique
              * insert -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
-             * `Moho::CCommandDb::commands` in `CCommandDb.h`. Matches this
+             * `Moho::CCommandDB::commands` in `CCommandDb.h`. Matches this
              * member field for field: descends recording the last branch
              * (`Parent`/`v7`=`addLeft`), the `where == leftmost()` fast path
              * tail-calls `insert_at` (FUN_006E1D60, cited below) directly,
@@ -4435,7 +4435,7 @@ namespace msvc8
             /**
              * Address: 0x006E1670 (FUN_006E1670, sub_6E1670) --
              * `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
-             * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15.
+             * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15.
              * Matches this member exactly: `_Isnil` guard throwing
              * `out_of_range("invalid map/set<T> iterator")`, captures the
              * successor via the map's `Iterator::inc` (`rb_increment`) before
@@ -5131,14 +5131,14 @@ namespace msvc8
             /**
              * Address: 0x006E22D0 (FUN_006E22D0, the command-id map's range
              * erase -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
-             * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15,
+             * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15,
              * node 0x18. Same two-shape split as the emissions above:
              * `first == begin() && last == end()` takes the whole-tree fast
              * path, calling `sub_6E2990` (`destroy_subtree`, cited below);
              * otherwise walks `erase(_First++)`. Reached from
              * `~CommandDatabase` (FUN_006E0A70, cited on `~rb_tree` above)
              * with `[leftmost(), header())` -- always the whole-tree fast
-             * path from that caller. `CCommandDb::MemberDeserialize`
+             * path from that caller. `CCommandDB::MemberDeserialize`
              * (FUN_006E1430) does *not* call this member -- a prior recovery
              * pass wired an `erase(begin(), end())` call into that function
              * that the binary's own disassembly does not contain;
@@ -5829,7 +5829,7 @@ namespace msvc8
              */
             /**
              * Address: 0x006E2810 (FUN_006E2810) -- `msvc8::map<Moho::CmdId,
-             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
              * `CCommandDb.h`. Destroys the subtree from the root via
              * `FUN_006E2990` (`destroy_subtree`, cited above) then rewires
              * `head->parent`/`head->left`/`head->right` back to self-linked
@@ -5995,7 +5995,7 @@ namespace msvc8
              */
             /**
              * Address: 0x006E28A0 (FUN_006E28A0) -- `msvc8::map<Moho::CmdId,
-             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
              * `CCommandDb.h`. Thin wrapper over `FUN_006E2D90` (the
              * `operator new(sizeof(node_type))` call proper, matching
              * `buy_node`'s own `sub_6E23F0` allocation path's inner shape),
@@ -6253,7 +6253,7 @@ namespace msvc8
             /**
              * Address: 0x006E2080 (FUN_006E2080) Address: 0x006E2470
              * (FUN_006E2470, duplicate emission) -- `msvc8::map<Moho::CmdId,
-             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
              * `CCommandDb.h`. Both are plain `::operator delete(n)`
              * one-liners with no value_type-specific behaviour, matching
              * this member exactly. Zero incoming xrefs in this sweep.
@@ -6834,7 +6834,7 @@ namespace msvc8
             /**
              * Address: 0x006E23F0 (FUN_006E23F0, the command-id map's node
              * buy -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
-             * `Moho::CCommandDb::commands` in `CCommandDb.h`. Allocates one
+             * `Moho::CCommandDB::commands` in `CCommandDb.h`. Allocates one
              * 0x18-byte node via `sub_6E2D90(1)`, writes `left`/`parent`/
              * `right` from its first three arguments, the 8-byte value
              * (`CmdId` + `CUnitCommand*`) copied from the fourth argument's
@@ -7330,7 +7330,7 @@ namespace msvc8
             /**
              * Address: 0x006E2990 (FUN_006E2990, the command-id map's
              * subtree destroy -- `msvc8::map<Moho::CmdId,
-             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
              * `CCommandDb.h`, isNil@+0x15. Self-recursive on the right
              * child (`sub_6E2990(v2[2])`) then loops down the left chain
              * (`v2 = *v2`) deleting each node as it goes -- exactly this
@@ -7345,7 +7345,7 @@ namespace msvc8
              * Address: 0x00947120 (FUN_00947120, isNil@+0x15 -- the same
              * 8-byte value_type node shape as 0x006E2990 above, but reached
              * from a different subsystem (`CScApp`'s vtable neighbourhood,
-             * not `CCommandDb`), so this is a distinct `map`/`set`
+             * not `CCommandDB`), so this is a distinct `map`/`set`
              * instantiation with a matching layout rather than the same
              * field. Same recurse-right/iterate-left/`free_node` shape
              * (`call sub_947120` on `[node+8]`, `node=[node]`, delete the
@@ -7935,7 +7935,7 @@ namespace msvc8
             /**
              * Address: 0x006E1F20 (FUN_006E1F20, the command-id map's left
              * rotate -- `msvc8::map<Moho::CmdId, Moho::CUnitCommand*>`,
-             * `Moho::CCommandDb::commands` in `CCommandDb.h`, isNil@+0x15,
+             * `Moho::CCommandDB::commands` in `CCommandDb.h`, isNil@+0x15,
              * standard field order. Reached from `insert_at`'s fixup loop
              * (FUN_006E1D60, cited below) via a direct `call` within that
              * same function. Byte-identical to `FUN_004AD3F0`
@@ -8548,7 +8548,7 @@ namespace msvc8
             /**
              * Address: 0x006E1D60 (FUN_006E1D60, the command-id map's
              * link-and-rebalance -- `msvc8::map<Moho::CmdId,
-             * Moho::CUnitCommand*>`, `Moho::CCommandDb::commands` in
+             * Moho::CUnitCommand*>`, `Moho::CCommandDB::commands` in
              * `CCommandDb.h`. The `_Mysize >= 0x1FFFFFFE` guard is this
              * member's `max_size() - 1u <= size_` for the 8-byte
              * `pair<const CmdId, CUnitCommand*>` value_type

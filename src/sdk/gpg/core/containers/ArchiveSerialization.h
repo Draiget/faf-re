@@ -182,6 +182,14 @@ namespace gpg
      */
     void SetShared(const boost::shared_ptr<void>& object, RType* type, unsigned int flags);
 
+    /**
+     * What it does:
+     * `SetShared` for a typed pointer: shares `object` untyped with `T`'s
+     * reflected type. Defined in Reflection.h, after `RTypeOf`.
+     */
+    template <class T>
+    void SetShared(const boost::shared_ptr<T>& object, unsigned int flags);
+
     TrackedPointerInfo mInfo{};  // +0x00
     bool mLoadMembers = true;    // +0x14
   };

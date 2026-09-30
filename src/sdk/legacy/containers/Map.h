@@ -91,7 +91,7 @@ namespace msvc8
         [[nodiscard]] size_type size() const noexcept { return tree_.size(); }
         /**
          * Address: 0x006E15A0 (FUN_006E15A0, `msvc8::map<Moho::CmdId,
-         * Moho::CUnitCommand*>::empty` -- `Moho::CCommandDb::commands` in
+         * Moho::CUnitCommand*>::empty` -- `Moho::CCommandDB::commands` in
          * `CCommandDb.h`. `return map->size == 0u;`, matching `tree_.empty()`
          * exactly. Re-homed here from a bespoke free function in
          * `CCommandDb.cpp` (`IsCommandMapEmptyBySize`) during the
@@ -131,7 +131,7 @@ namespace msvc8
          */
         /**
          * Address: 0x006E1580 (FUN_006E1580, `msvc8::map<Moho::CmdId,
-         * Moho::CUnitCommand*>::begin` -- `Moho::CCommandDb::commands` in
+         * Moho::CUnitCommand*>::begin` -- `Moho::CCommandDB::commands` in
          * `CCommandDb.h`. `*outNode = map->head->left; return outNode;` --
          * the store-into-hidden-return-pointer form MSVC8 uses for a
          * non-trivial-return-type accessor, matching `iterator(tree_.

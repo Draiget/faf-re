@@ -1778,7 +1778,7 @@ void CUnitCommand::DestroyInternal()
   }
 
   // 0x006E8574..0x006E85B4. The retire call is the one that matters outside
-  // this object: it drops the command from `CCommandDb::commands` and queues
+  // this object: it drops the command from `CCommandDB::commands` and queues
   // its id into `pendingReleasedCmdIds`, which the next `PublishSyncData` hands
   // to the UI as `SSyncData::mPendingReleasedCommandIds`. `CWldSession::DoBeat`
   // turns that list into `DeleteCommandIssueHelpers`, which is the *only* thing
@@ -1851,7 +1851,7 @@ void CUnitCommand::RefreshPublishedCommandEvent(const bool forceRefresh, SSyncDa
     // destructor with the delete flag set, i.e. `delete this`. This used to
     // call `DestroyInternal` alone, which tears the members down but neither
     // frees the object nor runs `~CUnitCommand`, so the command was left as a
-    // gutted zombie inside `CCommandDb::commands` for every later beat to walk.
+    // gutted zombie inside `CCommandDB::commands` for every later beat to walk.
     delete this;
     return;
   }

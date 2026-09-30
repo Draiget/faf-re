@@ -268,83 +268,7 @@ namespace
     return ref;
   }
 
-  /**
-   * Address: 0x004FF750 (FUN_004FF750)
-   *
-   * What it does:
-   * Reconstructs one box collision primitive from archived box/vector payloads
-   * and returns it as an unowned construct result.
-   */
-  void ConstructDColPrimBox(
-    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    Wm3::Box3f shape{};
-    Wm3::Vec3f localCenter{};
-    const gpg::RRef ownerRef{};
-
-    archive->Read(CachedDColPrimBoxShapeType(), &shape, ownerRef);
-    archive->Read(CachedDColPrimBoxVector3fType(), &localCenter, ownerRef);
-
-    auto* object = new (std::nothrow) moho::CColPrimitive<Wm3::Box3f>(shape);
-    if (object != nullptr) {
-      object->mLocalCenter = localCenter;
-    }
-
-    result->SetUnowned(MakeDColPrimBoxRef(object), 0u);
-  }
-
-  /**
-   * Address: 0x004FF620 (FUN_004FF620)
-   *
-   * What it does:
-   * Serializes one box primitive's shape payload and local-center payload
-   * through the primitive virtual accessors used by save-construct lanes.
-   */
-  void SaveBoxPrimitiveConstructArgs(
-    moho::CColPrimitive<Wm3::Box3f>* const primitive,
-    gpg::WriteArchive* const archive,
-    gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    Wm3::Vec3f center{};
-    gpg::RRef shapeOwnerRef{};
-    archive->Write(CachedDColPrimBoxShapeType(), primitive->GetBox(), shapeOwnerRef);
-
-    gpg::RRef centerOwnerRef{};
-    archive->Write(CachedDColPrimBoxVector3fType(), primitive->GetCenter(&center), centerOwnerRef);
-    result->SetUnowned(0u);
-  }
-
-  /**
-   * Address: 0x004FF570 (FUN_004FF570)
-   *
-   * What it does:
-   * Tail-forwards save-construct-args dispatch into the shared box primitive
-   * serialization helper.
-   */
-  void SaveConstructArgsDColPrimBox(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    auto* const primitive = reinterpret_cast<moho::CColPrimitive<Wm3::Box3f>*>(objectPtr);
-    SaveBoxPrimitiveConstructArgs(primitive, archive, result);
-  }
-
-  /**
-   * Address: 0x00500570 (FUN_00500570, j_j_func_tent_Destroy_4 -> ??3@YAXPAX@Z)
-   *
-   * What it does:
-   * Frees one constructed box collision primitive's raw storage. Confirmed
-   * from raw disassembly: the real delete-callback field is a direct jump
-   * thunk to the global `operator delete(void*)`, NOT a per-type wrapper
-   * that runs `~CColPrimitive<Wm3::Box3f>()` first -- `CColPrimitive<Wm3::Box3f>`
-   * is deleted through this path with no destructor call.
-   */
-  void DeleteDColPrimBox(void* const objectPtr)
-  {
-    ::operator delete(objectPtr);
-  }} // namespace
+} // namespace
 
 namespace moho
 {
@@ -445,60 +369,6 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
   DColPrimBoxSerializer::~DColPrimBoxSerializer() = default;
 
   /**
-   * Address: 0x004FFCF0 (FUN_004FFCF0, Moho::DColPrimBoxConstruct::RegisterConstructFunction)
-   */
-  void DColPrimBoxConstruct::Init()
-  {
-    gpg::RType* const type = CachedDColPrimBoxPrimitiveType();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerConstructFunc", kConstructLine, kSerializationSourcePath);
-    }
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
-
-  /**
-   * Address: 0x00BC7670 (FUN_00BC7670, register_DColPrimBoxConstruct)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * construct/delete callback fields.
-   */
-  DColPrimBoxConstruct::DColPrimBoxConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructDColPrimBox))
-    , mDeleteCallback(&DeleteDColPrimBox)
-  {}
-
-  DColPrimBoxConstruct::~DColPrimBoxConstruct() = default;
-
-  /**
-   * Address: 0x004FFC70 (FUN_004FFC70, Moho::DColPrimBoxSaveConstruct::RegisterSaveConstructArgsFunction)
-   */
-  void DColPrimBoxSaveConstruct::Init()
-  {
-    gpg::RType* const type = CachedDColPrimBoxPrimitiveType();
-    if (type->serSaveConstructArgsFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerSaveConstructArgsFunc", kSaveConstructArgsLine, kSerializationSourcePath);
-    }
-    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
-  }
-
-  /**
-   * Address: 0x00BC7640 (FUN_00BC7640, register_DColPrimBoxSaveConstruct)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * save-construct-args callback field.
-   */
-  DColPrimBoxSaveConstruct::DColPrimBoxSaveConstruct()
-    : mSaveConstructArgsCallback(
-        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgsDColPrimBox)
-      )
-  {}
-
-  DColPrimBoxSaveConstruct::~DColPrimBoxSaveConstruct() = default;
-
-  /**
    * Address: 0x00BC7620 (FUN_00BC7620, register_DColPrimBoxTypeInfo)
    * Address: 0x00BF1B30 (FUN_00BF1B30, atexit destructor of the DColPrimBoxTypeInfo object)
    *
@@ -527,14 +397,77 @@ namespace
   // Address: 0x010A9C0C -- process-global `DColPrimBoxSerializer` singleton.
   moho::DColPrimBoxSerializer gDColPrimBoxSerializer;
 
-  // Address: 0x010A9E14 -- process-global `DColPrimBoxConstruct` singleton.
-  moho::DColPrimBoxConstruct gDColPrimBoxConstruct;
-
-  // Address: 0x010A9C84 -- process-global `DColPrimBoxSaveConstruct` singleton.
-  moho::DColPrimBoxSaveConstruct gDColPrimBoxSaveConstruct;
 } // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_Box3fTypeInfo_88284f, moho::register_Box3fTypeInfo)
 GPG_PREREGISTER_INIT(register_DColPrimBoxTypeInfo_88284f, moho::register_DColPrimBoxTypeInfo)
+
+namespace moho
+{
+  void CColPrimitive<Wm3::Box3f>::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    Wm3::Box3f shape{};
+    Wm3::Vec3f localCenter{};
+    const gpg::RRef ownerRef{};
+
+    archive.Read(CachedDColPrimBoxShapeType(), &shape, ownerRef);
+    archive.Read(CachedDColPrimBoxVector3fType(), &localCenter, ownerRef);
+
+    auto* object = new CColPrimitive<Wm3::Box3f>(shape);
+    if (object != nullptr) {
+      object->mLocalCenter = localCenter;
+    }
+
+    result.SetUnowned(MakeDColPrimBoxRef(object), 0u);
+  }
+
+  /**
+   * Address: 0x004FF620 (FUN_004FF620)
+   */
+  void CColPrimitive<Wm3::Box3f>::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    Wm3::Vec3f center{};
+    gpg::RRef shapeOwnerRef{};
+    archive.Write(CachedDColPrimBoxShapeType(), GetBox(), shapeOwnerRef);
+
+    gpg::RRef centerOwnerRef{};
+    archive.Write(CachedDColPrimBoxVector3fType(), GetCenter(&center), centerOwnerRef);
+    result.SetUnowned(0u);
+  }
+
+  /**
+   * `gpg::SerSaveConstructHelper<CColPrimitive<Wm3::Box3f>>`, vtable 0x00E0D568.
+   *
+   * Address: 0x00BC7640 (FUN_00BC7640 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1B90 (FUN_00BF1B90 -- the global's destructor.)
+   * Address: 0x004FFC70 (FUN_004FFC70 -- `Init`.)
+   * Address: 0x004FF570 (FUN_004FF570 -- `SaveConstructArgs`, a forward to `MemberSaveConstructArgs`.)
+   */
+  struct DColPrimBoxSaveConstruct : gpg::SerSaveConstructHelper<CColPrimitive<Wm3::Box3f>>
+  {};
+
+  /**
+   * `gpg::SerConstructHelper<CColPrimitive<Wm3::Box3f>>`, vtable 0x00E0D578.
+   *
+   * Address: 0x00BC7670 (FUN_00BC7670 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1BC0 (FUN_00BF1BC0 -- the global's destructor.)
+   * Address: 0x004FFCF0 (FUN_004FFCF0 -- `Init`.)
+   * Address: 0x004FF750 (FUN_004FF750 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x00500570 (FUN_00500570 -- `Delete`.)
+   */
+  struct DColPrimBoxConstruct : gpg::SerConstructHelper<CColPrimitive<Wm3::Box3f>>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A9C84 -- process-global `DColPrimBoxSaveConstruct` singleton.
+  moho::DColPrimBoxSaveConstruct gDColPrimBoxSaveConstruct;
+
+  // Address: 0x010A9E14 -- process-global `DColPrimBoxConstruct` singleton.
+  moho::DColPrimBoxConstruct gDColPrimBoxConstruct;
+} // namespace

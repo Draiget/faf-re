@@ -1446,14 +1446,14 @@ namespace msvc8
          * Address: 0x0077DB80 (FUN_0077DB80 -- `_Allocate` for a 20-byte `std::_Tree` node (`set<int>::_Buynode` and its siblings in RbTree.h).)
          * Address: 0x007B4E50 (FUN_007B4E50 -- `_Allocate` for a 20-byte `std::_Tree` node (`set<int>::_Buynode` and its siblings in RbTree.h).)
          * Address: 0x007CC1C0 (FUN_007CC1C0 -- `_Allocate` for a 20-byte `std::_Tree` node (`set<int>::_Buynode` and its siblings in RbTree.h).)
-         * Address: 0x004E50A0 (FUN_004E50A0 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
-         * Address: 0x004E5160 (FUN_004E5160 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
-         * Address: 0x004E51F0 (FUN_004E51F0 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
-         * Address: 0x004E9B70 (FUN_004E9B70 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
-         * Address: 0x00594230 (FUN_00594230 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
-         * Address: 0x00688D70 (FUN_00688D70 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
-         * Address: 0x006E2D90 (FUN_006E2D90 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
-         * Address: 0x0083C6E0 (FUN_0083C6E0 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDb and RbTree.h buyers).)
+         * Address: 0x004E50A0 (FUN_004E50A0 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDB and RbTree.h buyers).)
+         * Address: 0x004E5160 (FUN_004E5160 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDB and RbTree.h buyers).)
+         * Address: 0x004E51F0 (FUN_004E51F0 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDB and RbTree.h buyers).)
+         * Address: 0x004E9B70 (FUN_004E9B70 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDB and RbTree.h buyers).)
+         * Address: 0x00594230 (FUN_00594230 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDB and RbTree.h buyers).)
+         * Address: 0x00688D70 (FUN_00688D70 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDB and RbTree.h buyers).)
+         * Address: 0x006E2D90 (FUN_006E2D90 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDB and RbTree.h buyers).)
+         * Address: 0x0083C6E0 (FUN_0083C6E0 -- `_Allocate` for a 24-byte `std::_Tree` node (CSndVar, TimeBar, EntityDb, CCommandDB and RbTree.h buyers).)
          * Address: 0x00571800 (FUN_00571800 -- `_Allocate` for a 28-byte `std::_Tree` node: `map<EntId, SCoordsVec2>`'s head buy (0x00570300, RbTree.h) and `WeakEntitySetUserEntity::BuyNode` (CWldSession.cpp).)
          * Address: 0x007B1420 (FUN_007B1420 -- `_Allocate` for a 28-byte `std::_Tree` node: `map<EntId, SCoordsVec2>`'s head buy (0x00570300, RbTree.h) and `WeakEntitySetUserEntity::BuyNode` (CWldSession.cpp).)
          * Address: 0x007B4FA0 (FUN_007B4FA0 -- `_Allocate` for a 28-byte `std::_Tree` node: `map<EntId, SCoordsVec2>`'s head buy (0x00570300, RbTree.h) and `WeakEntitySetUserEntity::BuyNode` (CWldSession.cpp).)
@@ -3586,7 +3586,7 @@ namespace msvc8
          * for the 4-byte command-id element — fast path stores the id in place;
          * capacity-full path tail-calls the insert(end(),1,value) grow body
          * (FUN_006E24D0). Emitted via pendingReleasedCmdIds.push_back(cmdId) in
-         * Moho::CCommandDb::RemoveCmd (CCommandDb.cpp), the retire path that
+         * Moho::CCommandDB::RemoveCmd (CCommandDb.cpp), the retire path that
          * hands a dead command's id to the UI through
          * SSyncData::mPendingReleasedCommandIds)
          * Address: 0x008522A0 (FUN_008522A0, msvc8::vector<Wm3::Vector3f>::push_back

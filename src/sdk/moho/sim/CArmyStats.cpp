@@ -38,6 +38,7 @@
 #include "moho/sim/SConditionTriggerTypes.h"
 #include "moho/sim/Sim.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 namespace
 {
@@ -1407,3 +1408,54 @@ namespace moho
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(PreregisterCArmyStatItemPointerType_5a41c5, moho::PreregisterCArmyStatItemPointerType)
+
+namespace moho
+{
+  void CArmyStats::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    CAiBrain* brain = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&brain, &owner);
+    result.SetUnowned(gpg::MakeRRef(new CArmyStats(brain)), 0u);
+  }
+
+  void CArmyStats::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    archive.WritePointer(mOwnerArmy, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    result.SetUnowned(0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CArmyStats>`, vtable 0x00E31288.
+   *
+   * Address: 0x00BDA1D0 (FUN_00BDA1D0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF820 (FUN_00BFF820 -- the global's destructor.)
+   * Address: 0x0070F560 (FUN_0070F560 -- `Init`.)
+   * Address: 0x0070E140 (FUN_0070E140 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x00712680 (FUN_00712680 -- `Delete`.)
+   */
+  struct CArmyStatsConstruct : gpg::SerConstructHelper<CArmyStats>
+  {};
+
+  /**
+   * `gpg::SerSaveConstructHelper<CArmyStats>`, vtable 0x00E31278.
+   *
+   * Address: 0x00BDA1A0 (FUN_00BDA1A0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF7F0 (FUN_00BFF7F0 -- the global's destructor.)
+   * Address: 0x0070F4E0 (FUN_0070F4E0 -- `Init`.)
+   * Address: 0x0070DF60 (FUN_0070DF60 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
+   */
+  struct CArmyStatsSaveConstruct : gpg::SerSaveConstructHelper<CArmyStats>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B8FA0 -- process-global `CArmyStatsConstruct` singleton.
+  moho::CArmyStatsConstruct gCArmyStatsConstruct;
+
+  // Address: 0x010B902C -- process-global `CArmyStatsSaveConstruct` singleton.
+  moho::CArmyStatsSaveConstruct gCArmyStatsSaveConstruct;
+} // namespace

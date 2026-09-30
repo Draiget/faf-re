@@ -15,6 +15,15 @@ namespace gpg
   class RType;
 }
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   // ============================================================================
@@ -91,6 +100,26 @@ namespace moho
   class RScaResource
   {
   public:
+    /**
+     * What it does:
+     * Reads the animation path and hands back the shared resource for it
+     * (`GetScaResource`). Inlined into `SerConstructHelper<RScaResource>::Construct`
+     * 0x0053A8C0.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x0053A770 (FUN_0053A770)
+     *
+     * What it does:
+     * Saves the resource's file name as a mounted path.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     static gpg::RType* sType;
 
     /**

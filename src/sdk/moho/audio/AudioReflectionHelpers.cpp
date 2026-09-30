@@ -67,18 +67,6 @@ namespace moho::audio_reflection
     ownerType->AddBase(baseField);
   }
 
-  void RegisterConstructCallbacks(
-    gpg::RType* const typeInfo,
-    const gpg::RType::construct_func_t constructCallback,
-    const gpg::RType::delete_func_t deleteCallback
-  )
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(typeInfo->serConstructFunc_ == nullptr);
-    typeInfo->serConstructFunc_ = constructCallback;
-    typeInfo->deleteFunc_ = deleteCallback;
-  }
-
   void RegisterSerializeCallbacks(
     gpg::RType* const typeInfo, const gpg::RType::load_func_t loadCallback, const gpg::RType::save_func_t saveCallback
   )
@@ -90,13 +78,5 @@ namespace moho::audio_reflection
     typeInfo->serSaveFunc_ = saveCallback;
   }
 
-  void RegisterSaveConstructArgsCallback(
-    gpg::RType* const typeInfo, const gpg::RType::save_construct_args_func_t saveConstructArgsCallback
-  )
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(typeInfo->serSaveConstructArgsFunc_ == nullptr);
-    typeInfo->serSaveConstructArgsFunc_ = saveConstructArgsCallback;
-  }
 } // namespace moho::audio_reflection
 

@@ -140,11 +140,6 @@ namespace
 
   ScrDiskWatcherTaskReflectionBootstrap gScrDiskWatcherTaskReflectionBootstrap{};
 
-  // Address: 0x010A8A9C -- process-global `ScrDiskWatcherTaskSaveConstruct` singleton.
-  moho::ScrDiskWatcherTaskSaveConstruct gScrDiskWatcherTaskSaveConstruct;
-
-  // Address: 0x010A8A88 -- process-global `ScrDiskWatcherTaskConstruct` singleton.
-  moho::ScrDiskWatcherTaskConstruct gScrDiskWatcherTaskConstruct;
 } // namespace
 
 /**
@@ -235,102 +230,26 @@ int ScrDiskWatcherTask::Execute()
   return 1;
 }
 
-/**
- * Address: 0x004C0940 (FUN_004C0940, ScrDiskWatcherTask save-construct callback)
- */
-void ScrDiskWatcherTask::SaveConstructArgs(
-  gpg::WriteArchive* const archive,
-  const int objectPtr,
-  const int version,
-  gpg::RRef* const,
-  gpg::SerSaveConstructArgsResult* const result
+void ScrDiskWatcherTask::MemberSaveConstructArgs(
+  gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
 )
 {
-  (void)version;
-  if (archive == nullptr || result == nullptr) {
-    return;
-  }
-
-  auto* const task = reinterpret_cast<ScrDiskWatcherTask*>(objectPtr);
-  archive->WritePointer<LuaPlus::LuaState>(task != nullptr ? task->mLuaState : nullptr, gpg::TrackedPointerState::Unowned, gpg::RRef{});
-  result->SetUnowned(1u);
+  archive.WritePointer(mLuaState, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+  result.SetUnowned(1u);
 }
 
-/**
- * Address: 0x004C0AB0 (FUN_004C0AB0, ScrDiskWatcherTask construct callback)
- */
-void ScrDiskWatcherTask::Construct(
-  gpg::ReadArchive* const archive,
-  const int version, gpg::RRef* const, gpg::SerConstructResult* const result
+void ScrDiskWatcherTask::MemberConstruct(
+  gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result
 )
 {
-  (void)version;
-  if (archive == nullptr || result == nullptr) {
-    return;
-  }
-
   // 0x004C0ACE: the owner is an empty reference on the stack.
   LuaPlus::LuaState* luaState = nullptr;
-  const gpg::RRef nullOwner{};
-  (void)archive->ReadPointer(&luaState, &nullOwner);
-  ScrDiskWatcherTask* const task = new ScrDiskWatcherTask(luaState);
+  const gpg::RRef owner{};
+  archive.ReadPointer(&luaState, &owner);
 
   gpg::RRef taskRef{};
-  (void)StoreScrDiskWatcherTaskRef(task, &taskRef);
-  result->SetUnowned(taskRef, 1u);
-}
-
-/**
- * Address: 0x004C11F0 (FUN_004C11F0, ScrDiskWatcherTask delete callback)
- */
-void ScrDiskWatcherTask::Delete(void* const objectPtr)
-{
-  delete static_cast<ScrDiskWatcherTask*>(objectPtr);
-}
-
-/**
- * Address: 0x00BC5F80 (FUN_00BC5F80, dynamic initializer for the global
- * `ScrDiskWatcherTaskSaveConstruct` singleton)
- */
-ScrDiskWatcherTaskSaveConstruct::ScrDiskWatcherTaskSaveConstruct()
-  : mSerSaveConstructArgsFunc(
-      reinterpret_cast<gpg::RType::save_construct_args_func_t>(&ScrDiskWatcherTask::SaveConstructArgs)
-    )
-{}
-
-ScrDiskWatcherTaskSaveConstruct::~ScrDiskWatcherTaskSaveConstruct() = default;
-
-/**
- * Address: 0x004C0F90 (FUN_004C0F90, sub_4C0F90)
- */
-void ScrDiskWatcherTaskSaveConstruct::Init()
-{
-  gpg::RType* const type = CachedScrDiskWatcherTaskType();
-  GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr || type->serSaveConstructArgsFunc_ == mSerSaveConstructArgsFunc);
-  type->serSaveConstructArgsFunc_ = mSerSaveConstructArgsFunc;
-}
-
-/**
- * Address: 0x00BC5FB0 (FUN_00BC5FB0, dynamic initializer for the global
- * `ScrDiskWatcherTaskConstruct` singleton)
- */
-ScrDiskWatcherTaskConstruct::ScrDiskWatcherTaskConstruct()
-  : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&ScrDiskWatcherTask::Construct))
-  , mDeleteFunc(&ScrDiskWatcherTask::Delete)
-{}
-
-ScrDiskWatcherTaskConstruct::~ScrDiskWatcherTaskConstruct() = default;
-
-/**
- * Address: 0x004C1010 (FUN_004C1010, sub_4C1010)
- */
-void ScrDiskWatcherTaskConstruct::Init()
-{
-  gpg::RType* const type = CachedScrDiskWatcherTaskType();
-  GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mSerConstructFunc);
-  GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == mDeleteFunc);
-  type->serConstructFunc_ = mSerConstructFunc;
-  type->deleteFunc_ = mDeleteFunc;
+  (void)StoreScrDiskWatcherTaskRef(new ScrDiskWatcherTask(luaState), &taskRef);
+  result.SetUnowned(taskRef, 1u);
 }
 
 /**
@@ -382,3 +301,38 @@ void ScrDiskWatcherTaskTypeInfo::Init()
 GPG_PREREGISTER_INIT(register_ScrDiskWatcherTaskTypeInfo_1d07fe, moho::register_ScrDiskWatcherTaskTypeInfo)
 
 GPG_PREREGISTER_INIT(RegisterScrDiskWatcherTaskTypeInfo_1d07fe, RegisterScrDiskWatcherTaskTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveConstructHelper<ScrDiskWatcherTask>`, vtable 0x00E08B94.
+   *
+   * Address: 0x00BC5F80 (FUN_00BC5F80 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF0860 (FUN_00BF0860 -- the global's destructor.)
+   * Address: 0x004C0F90 (FUN_004C0F90 -- `Init`.)
+   * Address: 0x004C0940 (FUN_004C0940 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
+   */
+  struct ScrDiskWatcherTaskSaveConstruct : gpg::SerSaveConstructHelper<ScrDiskWatcherTask>
+  {};
+
+  /**
+   * `gpg::SerConstructHelper<ScrDiskWatcherTask>`, vtable 0x00E08BA4.
+   *
+   * Address: 0x00BC5FB0 (FUN_00BC5FB0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF0890 (FUN_00BF0890 -- the global's destructor.)
+   * Address: 0x004C1010 (FUN_004C1010 -- `Init`.)
+   * Address: 0x004C0AB0 (FUN_004C0AB0 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x004C11F0 (FUN_004C11F0 -- `Delete`.)
+   */
+  struct ScrDiskWatcherTaskConstruct : gpg::SerConstructHelper<ScrDiskWatcherTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A8A9C -- process-global `ScrDiskWatcherTaskSaveConstruct` singleton.
+  moho::ScrDiskWatcherTaskSaveConstruct gScrDiskWatcherTaskSaveConstruct;
+
+  // Address: 0x010A8A88 -- process-global `ScrDiskWatcherTaskConstruct` singleton.
+  moho::ScrDiskWatcherTaskConstruct gScrDiskWatcherTaskConstruct;
+} // namespace

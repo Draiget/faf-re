@@ -2321,7 +2321,7 @@ namespace
     (void)events.back().mUnits.Add(unit);
   }
 
-  CUnitCommand* FindCommandById(CCommandDb* commandDb, const CmdId cmdId)
+  CUnitCommand* FindCommandById(CCommandDB* commandDb, const CmdId cmdId)
   {
     if (!commandDb || !commandDb->commands.header_ptr()) {
       return nullptr;
@@ -2521,10 +2521,10 @@ namespace
   }
 
   /**
-   * The guarded shape of `CCommandDb::RemoveCmd` (0x006E0EC0, CCommandDb.cpp)
+   * The guarded shape of `CCommandDB::RemoveCmd` (0x006E0EC0, CCommandDb.cpp)
    * that this file's issue paths need.
    *
-   * The retire body itself belongs to `CCommandDb` and lives there now -- it is
+   * The retire body itself belongs to `CCommandDB` and lives there now -- it is
    * called unconditionally from `~CUnitCommand` (0x006E8500), which is how a
    * completed or cancelled order actually leaves the sim's command map. What
    * stays here is the pair of call-site guards the binary applies around it:
@@ -2532,7 +2532,7 @@ namespace
    * still the unresolved `0xFF......` sentinel, and one Sim.cpp path
    * deliberately passes a possibly-null `mCommandDB`.
    */
-  void ReleaseCommandIdIfUnconsumed(CCommandDb* commandDb, const CmdId cmdId)
+  void ReleaseCommandIdIfUnconsumed(CCommandDB* commandDb, const CmdId cmdId)
   {
     if (!commandDb) {
       return;
@@ -2695,7 +2695,7 @@ namespace moho
 namespace
 {
   [[nodiscard]] CUnitCommand* AddIssueDataToCommandDb(
-    CCommandDb* const commandDb,
+    CCommandDB* const commandDb,
     const SSTICommandIssueData& issueData
   )
   {
@@ -5200,7 +5200,7 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
   mGameOver = bitFlag;
 
   mCommandDB =
-    static_cast<CCommandDb*>(LoadPointerByRType(archive, {"CCommandDB", "CCommandDb", "Moho::CCommandDB"}, ownerRef));
+    static_cast<CCommandDB*>(LoadPointerByRType(archive, {"CCommandDB", "CCommandDB", "Moho::CCommandDB"}, ownerRef));
 
   // Restore the sim's Lua globals table: read (key, value) pairs into the globals
   // until a nil-key sentinel (binary tail: mLuaState->GetGlobals() + FUN_00744E50).
@@ -5361,7 +5361,7 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
   archive->WriteBool(mCheatsEnabled);
   archive->WriteBool(mGameOver);
   SavePointerByRType(
-    archive, mCommandDB, {"CCommandDB", "CCommandDb", "Moho::CCommandDB"}, gpg::TrackedPointerState::Owned, ownerRef
+    archive, mCommandDB, {"CCommandDB", "CCommandDB", "Moho::CCommandDB"}, gpg::TrackedPointerState::Owned, ownerRef
   );
 
   // Persist the sim's Lua globals table as (key, value) entries + nil terminator
@@ -5713,7 +5713,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   //     mov  ecx, [edi]        ; syncData
   //     mov  edx, [ebp+a3]     ; forceRefresh
   //     mov  eax, [ebx+988h]   ; mCommandDb  (NOT +0x984 - adjacent to it)
-  //     call CCommandDb::PublishSyncData
+  //     call CCommandDB::PublishSyncData
   //
   // `EntityDB::Purge` (0x00684560) has exactly one caller in the binary and
   // this is it, so nothing destroyed the queued entities before this; and
@@ -7167,8 +7167,8 @@ void Sim::Setup(LaunchInfoNew* const info)
 
   // Command database.
   {
-    auto* const newCommandDB = new CCommandDb(this);
-    CCommandDb* const previousCommandDB = mCommandDB;
+    auto* const newCommandDB = new CCommandDB(this);
+    CCommandDB* const previousCommandDB = mCommandDB;
     mCommandDB = newCommandDB;
     if (previousCommandDB) {
       delete previousCommandDB;
@@ -8072,7 +8072,7 @@ void Sim::SingleStep()
  * its value is non-null (`a1 == head || !a1->_Myval.cmd` -> allow). It does
  * not null-check `mCommandDB` or the map head first -- both guards were a
  * `CCommandDbRuntimeView` reach-in artifact; `mCommandDB->commands` is
- * `CCommandDb`'s own real typed member (`CCommandDb.h`) and is always valid
+ * `CCommandDB`'s own real typed member (`CCommandDb.h`) and is always valid
  * once `Sim` is constructed.
  */
 bool Sim::ValidateNewCommandId(const CmdId cmdId, const char* callsiteName) const

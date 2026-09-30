@@ -35,7 +35,7 @@ namespace moho
   struct SUnitConstructionParams;
   struct ArmyLaunchInfo;
   class CDecalBuffer;
-  class CCommandDb;
+  class CCommandDB;
   class CUnitCommand;
   class CEntityDb;
   class CAiFormationDBImpl;
@@ -1496,7 +1496,7 @@ namespace moho
     PathTables* mPathTables;
     CAiFormationDBImpl* mFormationDB; // 0x0980
     CEntityDb* mEntityDB;             // 0x0984
-    CCommandDb* mCommandDB;           // 0x0988
+    CCommandDB* mCommandDB;           // 0x0988
     uint32_t mReserved98C;
     uint32_t mReserved990;
     boost::shared_ptr<SParticleBuffer> mParticleBuffer;

@@ -30,7 +30,7 @@ namespace
   {
     gpg::RType* type = gLegacyCCommandDbType;
     if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandDb));
+      type = gpg::LookupRType(typeid(moho::CCommandDB));
       gLegacyCCommandDbType = type;
     }
     return type;
@@ -45,7 +45,7 @@ namespace moho
   CCommandDBTypeInfo::CCommandDBTypeInfo()
     : gpg::RType()
   {
-    gpg::PreRegisterRType(typeid(CCommandDb), this);
+    gpg::PreRegisterRType(typeid(CCommandDB), this);
   }
 
   /**
@@ -86,7 +86,7 @@ namespace moho
    */
   void CCommandDBTypeInfo::Init()
   {
-    size_ = sizeof(CCommandDb);
+    size_ = sizeof(CCommandDB);
     gpg::RType::Init();
     Finish();
   }

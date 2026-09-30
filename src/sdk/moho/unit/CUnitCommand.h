@@ -28,7 +28,7 @@ namespace moho
 {
   class Entity;
   class Unit;
-  class CCommandDb;
+  class CCommandDB;
   class CAiFormationInstance;
   class Sim;
   struct SOCellPos;
@@ -307,7 +307,7 @@ namespace moho
      */
     CUnitCommand();
 
-    friend class CCommandDb;
+    friend class CCommandDB;
 
     /**
      * Address: 0x006E8500 (FUN_006E8500)

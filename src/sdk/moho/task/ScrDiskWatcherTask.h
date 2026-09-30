@@ -15,6 +15,7 @@ namespace LuaPlus
 namespace gpg
 {
   class SerConstructResult;
+  class RRef;
   class SerSaveConstructArgsResult;
 } // namespace gpg
 
@@ -43,39 +44,29 @@ namespace moho
     explicit ScrDiskWatcherTask(LuaPlus::LuaState* luaState);
 
     /**
-     * Address: 0x004C0AB0 (FUN_004C0AB0, ScrDiskWatcherTask construct callback)
-     *
-     * What it does:
-     * Constructs one `ScrDiskWatcherTask` from archived LuaState pointer lane
-     * and returns it through unowned construct-result storage.
-     */
-    static void Construct(
-      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
-    );
-
-    /**
-     * Address: 0x004C11F0 (FUN_004C11F0, ScrDiskWatcherTask delete callback)
-     *
-     * What it does:
-     * Deletes one constructed `ScrDiskWatcherTask` object through virtual dtor.
-     */
-    static void Delete(void* objectPtr);
-
-    /**
-     * Address: 0x004C0940 (FUN_004C0940, ScrDiskWatcherTask save-construct callback)
-     *
-     * What it does:
-     * Saves LuaState constructor-args lane as unowned tracked pointer.
-     */
-    static void SaveConstructArgs(
-      gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult* result
-    );
-
-    /**
      * Address: 0x004C0C20 (FUN_004C0C20, scalar deleting thunk)
      * Address: 0x004C0C40 (FUN_004C0C40, non-deleting body)
      */
     ~ScrDiskWatcherTask() override;
+
+    /**
+     * What it does:
+     * Reads the Lua state and builds a watcher task on it for an archive load,
+     * handed back unowned. Inlined into
+     * `SerConstructHelper<ScrDiskWatcherTask>::Construct` 0x004C0AB0.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * What it does:
+     * Saves the Lua state unowned. Inlined into
+     * `SerSaveConstructHelper<ScrDiskWatcherTask>::SaveConstructArgs` 0x004C0940.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
 
     /**
      * Address: 0x004C0CB0 (FUN_004C0CB0, ?Execute@ScrDiskWatcherTask@Moho@@UAEHXZ)
@@ -93,77 +84,6 @@ namespace moho
     std::uint32_t mReserved18;    // +0x18
     LuaPlus::LuaState* mLuaState; // +0x1C
     CDiskWatchListener mListener; // +0x20
-  };
-
-  class ScrDiskWatcherTaskSaveConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC5F80 (FUN_00BC5F80, dynamic initializer for the global
-     * `ScrDiskWatcherTaskSaveConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * save-construct-args callback field. The ctor's atexit target is a
-     * plain unlink thunk, not a mangled destructor, so it is modeled as
-     * the compiler's implicit static-destructor registration rather than
-     * an explicit call.
-     */
-    ScrDiskWatcherTaskSaveConstruct();
-
-    /**
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~ScrDiskWatcherTaskSaveConstruct();
-
-    /**
-     * Address: 0x004C0F90 (FUN_004C0F90, sub_4C0F90)
-     * Slot: 0
-     *
-     * What it does:
-     * Binds save-construct-args callback into ScrDiskWatcherTask RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc; // +0x0C
-  };
-
-  class ScrDiskWatcherTaskConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC5FB0 (FUN_00BC5FB0, dynamic initializer for the global
-     * `ScrDiskWatcherTaskConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields. Same implicit-registration atexit
-     * shape as `ScrDiskWatcherTaskSaveConstruct`.
-     */
-    ScrDiskWatcherTaskConstruct();
-
-    /**
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~ScrDiskWatcherTaskConstruct();
-
-    /**
-     * Address: 0x004C1010 (FUN_004C1010, sub_4C1010)
-     * Slot: 0
-     *
-     * What it does:
-     * Binds construct/delete callbacks into ScrDiskWatcherTask RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
-    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
   };
 
   class ScrDiskWatcherTaskTypeInfo : public gpg::RType
@@ -204,19 +124,5 @@ namespace moho
   );
   static_assert(offsetof(ScrDiskWatcherTask, mLuaState) == 0x1C, "ScrDiskWatcherTask::mLuaState offset must be 0x1C");
   static_assert(offsetof(ScrDiskWatcherTask, mListener) == 0x20, "ScrDiskWatcherTask::mListener offset must be 0x20");
-  static_assert(
-    offsetof(ScrDiskWatcherTaskSaveConstruct, mSerSaveConstructArgsFunc) == 0x0C,
-    "ScrDiskWatcherTaskSaveConstruct::mSerSaveConstructArgsFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ScrDiskWatcherTaskConstruct, mSerConstructFunc) == 0x0C,
-    "ScrDiskWatcherTaskConstruct::mSerConstructFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ScrDiskWatcherTaskConstruct, mDeleteFunc) == 0x10,
-    "ScrDiskWatcherTaskConstruct::mDeleteFunc offset must be 0x10"
-  );
-  static_assert(sizeof(ScrDiskWatcherTaskSaveConstruct) == 0x10, "ScrDiskWatcherTaskSaveConstruct size must be 0x10");
-  static_assert(sizeof(ScrDiskWatcherTaskConstruct) == 0x14, "ScrDiskWatcherTaskConstruct size must be 0x14");
   static_assert(sizeof(ScrDiskWatcherTaskTypeInfo) == 0x64, "ScrDiskWatcherTaskTypeInfo size must be 0x64");
 } // namespace moho

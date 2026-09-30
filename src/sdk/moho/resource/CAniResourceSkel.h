@@ -11,6 +11,15 @@ namespace gpg
   class RType;
 }
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   struct SScmFile;
@@ -18,6 +27,25 @@ namespace moho
   class CAniResourceSkel : public CAniSkel
   {
   public:
+    /**
+     * What it does:
+     * Reads the model path and hands back the skeleton of that model, shared.
+     * Inlined into `SerConstructHelper<CAniResourceSkel>::Construct` 0x005388C0.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x00538770 (FUN_00538770)
+     *
+     * What it does:
+     * Saves the model name as a mounted path.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     static gpg::RType* sType;
 
     /**

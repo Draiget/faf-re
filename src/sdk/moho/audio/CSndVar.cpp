@@ -169,31 +169,6 @@ namespace
   constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
   constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
 
-  // Address: 0x00BC6960 (dynamic initializer for the global `CSndVarConstruct`
-  // singleton, __xc_a-reachable) -- MSVC's own compiler-generated dynamic
-  // initializer for this global runs the real `Moho::CSndVarConstruct` ctor
-  // (calls `gpg::SerHelperBase::SerHelperBase`, binds `mConstructCallback`/
-  // `mDeleteCallback`, installs the vtable) and registers the real mangled
-  // destructor (`??1CSndVarConstruct@Moho@@QAE@@Z`, 0x00BF0F30) via `atexit`.
-  // Dead zero-xref duplicate ctor that installs a distinct byte-identical
-  // copy of the `gpg::SerConstructHelper<CSndVar>` template's own vtable
-  // instead of the real class vtable: 0x004E1D00 (prior recovery
-  // misidentified this as a "BuildCSndVarConstructHelper" view builder).
-  moho::CSndVarConstruct gCSndVarConstruct;
-
-  // Address: 0x00BC6930 (dynamic initializer for the global
-  // `CSndVarSaveConstruct` singleton, __xc_a-reachable) -- same shape as
-  // `gCSndVarConstruct` above; registers the real mangled destructor
-  // (`??1CSndVarSaveConstruct@Moho@@QAE@@Z`, 0x00BF0F00) via `atexit`.
-  // Prior recovery modeled both of these globals' wiring via
-  // `SerConstructHelperView`/`SerSaveConstructHelperView` raw structs
-  // (`void* mVftable` field, no real base) passed by value into
-  // `InitCSndVarConstructHelper`/`InitCSndVarSaveConstructHelper` from a
-  // `RegisterCSndVarSerializationCallbacks()` bootstrap function with no
-  // address citation of its own -- i.e. the reflection callbacks were never
-  // actually installed by any code path the binary itself runs. These
-  // globals' own static initialization fixes that.
-  moho::CSndVarSaveConstruct gCSndVarSaveConstruct;
 } // namespace
 
 namespace moho
@@ -257,101 +232,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004E0560 (FUN_004E0560, Moho::CSndVarConstruct::Construct)
-   */
-  void CSndVarConstruct::Construct(
-    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    msvc8::string variableName{};
-    archive->ReadString(&variableName);
-
-    CSndVar* const sndVar = SND_FindOrCreateVariable(variableName);
-    gpg::RRef ref{};
-    ref.mObj = sndVar;
-    ref.mType = sndVar != nullptr ? ResolveCSndVarType() : nullptr;
-    result->SetOwned(ref, 1u);
-  }
-
-  /**
-   * Address: 0x004E4BD0 (FUN_004E4BD0, Moho::CSndVarConstruct::Deconstruct)
-   */
-  void CSndVarConstruct::Deconstruct(void* const objectPtr)
-  {
-    auto* const sndVar = static_cast<CSndVar*>(objectPtr);
-    if (sndVar == nullptr) {
-      return;
-    }
-
-    sndVar->~CSndVar();
-    ::operator delete(sndVar);
-  }
-
-  /**
-   * Address: 0x00BC6960 (FUN_00BC6960, dynamic initializer for the global
-   * `CSndVarConstruct` singleton)
-   */
-  CSndVarConstruct::CSndVarConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CSndVarConstruct::Construct))
-    , mDeleteCallback(&CSndVarConstruct::Deconstruct)
-  {}
-
-  CSndVarConstruct::~CSndVarConstruct() = default;
-
-  /**
-   * Address: 0x004E1D30 (FUN_004E1D30, gpg::SerConstructHelper<Moho::CSndVar>::Init)
-   */
-  void CSndVarConstruct::Init()
-  {
-    gpg::RType* const type = ResolveCSndVarType();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
-    }
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
-
-  /**
-   * Address: 0x004E0430 (FUN_004E0430, Moho::CSndVarSaveConstruct::SaveConstructArgs)
-   */
-  void CSndVarSaveConstruct::SaveConstructArgs(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const,
-    gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    auto* const sndVar = reinterpret_cast<CSndVar*>(objectPtr);
-    archive->WriteString(&sndVar->mName);
-    result->SetOwned(1u);
-  }
-
-  /**
-   * Address: 0x00BC6930 (FUN_00BC6930, dynamic initializer for the global
-   * `CSndVarSaveConstruct` singleton)
-   */
-  CSndVarSaveConstruct::CSndVarSaveConstruct()
-    : mSaveConstructArgsCallback(
-        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CSndVarSaveConstruct::SaveConstructArgs)
-      )
-  {}
-
-  CSndVarSaveConstruct::~CSndVarSaveConstruct() = default;
-
-  /**
-   * Address: 0x004E1CB0 (FUN_004E1CB0, gpg::SerSaveConstructHelper<Moho::CSndVar>::Init)
-   */
-  void CSndVarSaveConstruct::Init()
-  {
-    gpg::RType* const type = ResolveCSndVarType();
-    if (type->serSaveConstructArgsFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kSaveConstructAssertText, kSerializationSaveConstructLine, kSerializationSourcePath);
-    }
-    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
-  }
-
-  /**
    * Address: 0x004E0390 (FUN_004E0390)
    *
    * What it does:
@@ -386,3 +266,53 @@ namespace moho
     return LookupSndVarNameById(static_cast<std::uint16_t>(variableId));
   }
 } // namespace moho
+
+namespace moho
+{
+  void CSndVar::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    msvc8::string name;
+    archive.ReadString(&name);
+    result.SetOwned(gpg::MakeRRef(SND_FindOrCreateVariable(name)), 1u);
+  }
+
+  void CSndVar::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    archive.WriteString(&mName);
+    result.SetOwned(1u);
+  }
+
+  /**
+   * `gpg::SerSaveConstructHelper<CSndVar>`, vtable 0x00E0BA38.
+   *
+   * Address: 0x00BC6930 (FUN_00BC6930 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF0F00 (FUN_00BF0F00 -- the global's destructor.)
+   * Address: 0x004E1CB0 (FUN_004E1CB0 -- `Init`.)
+   * Address: 0x004E0430 (FUN_004E0430 -- `SaveConstructArgs`, a forward to `MemberSaveConstructArgs`.)
+   */
+  struct CSndVarSaveConstruct : gpg::SerSaveConstructHelper<CSndVar>
+  {};
+
+  /**
+   * `gpg::SerConstructHelper<CSndVar>`, vtable 0x00E0BA48.
+   *
+   * Address: 0x00BC6960 (FUN_00BC6960 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF0F30 (FUN_00BF0F30 -- the global's destructor.)
+   * Address: 0x004E1D30 (FUN_004E1D30 -- `Init`.)
+   * Address: 0x004E0560 (FUN_004E0560 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x004E4BD0 (FUN_004E4BD0 -- `Delete`.)
+   */
+  struct CSndVarConstruct : gpg::SerConstructHelper<CSndVar>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A9378 -- process-global `CSndVarSaveConstruct` singleton.
+  moho::CSndVarSaveConstruct gCSndVarSaveConstruct;
+
+  // Address: 0x010A94CC -- process-global `CSndVarConstruct` singleton.
+  moho::CSndVarConstruct gCSndVarConstruct;
+} // namespace

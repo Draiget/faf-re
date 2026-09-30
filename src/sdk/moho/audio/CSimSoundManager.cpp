@@ -4,6 +4,8 @@
 #include <cstddef>
 
 #include "moho/entity/Entity.h"
+#include "moho/sim/Sim.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 namespace
 {
@@ -254,3 +256,54 @@ namespace moho
    */
   CSimSoundManager::~CSimSoundManager() = default;
 } // namespace moho
+
+namespace moho
+{
+  void CSimSoundManager::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    Sim* sim = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&sim, &owner);
+    result.SetUnowned(gpg::MakeRRef(static_cast<ISoundManager*>(new CSimSoundManager(sim))), 0u);
+  }
+
+  void CSimSoundManager::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    archive.WritePointer(mOwnerSim, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    result.SetUnowned(0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CSimSoundManager>`, vtable 0x00E35AAC.
+   *
+   * Address: 0x00BDC550 (FUN_00BDC550 -- constructs the global and registers its destructor.)
+   * Address: 0x00C01590 (FUN_00C01590 -- the global's destructor.)
+   * Address: 0x00761E10 (FUN_00761E10 -- `Init`.)
+   * Address: 0x00761240 (FUN_00761240 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x007623F0 (FUN_007623F0 -- `Delete`.)
+   */
+  struct CSimSoundManagerConstruct : gpg::SerConstructHelper<CSimSoundManager>
+  {};
+
+  /**
+   * `gpg::SerSaveConstructHelper<CSimSoundManager>`, vtable 0x00E35A9C.
+   *
+   * Address: 0x00BDC520 (FUN_00BDC520 -- constructs the global and registers its destructor.)
+   * Address: 0x00C01560 (FUN_00C01560 -- the global's destructor.)
+   * Address: 0x00761D90 (FUN_00761D90 -- `Init`.)
+   * Address: 0x007610B0 (FUN_007610B0 -- `SaveConstructArgs`, `MemberSaveConstructArgs` inlined.)
+   */
+  struct CSimSoundManagerSaveConstruct : gpg::SerSaveConstructHelper<CSimSoundManager>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BAF40 -- process-global `CSimSoundManagerConstruct` singleton.
+  moho::CSimSoundManagerConstruct gCSimSoundManagerConstruct;
+
+  // Address: 0x010BAF7C -- process-global `CSimSoundManagerSaveConstruct` singleton.
+  moho::CSimSoundManagerSaveConstruct gCSimSoundManagerSaveConstruct;
+} // namespace

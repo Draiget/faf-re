@@ -2064,7 +2064,7 @@ namespace moho
      *   and container layout (12-byte `{proxy,_Myhead,_Mysize}` triplet)
      *   match `msvc8::map<msvc8::string,float>` exactly -- see
      *   `legacy/containers/Map.h`'s class doc comment for the shared layout
-     *   derivation (confirmed independently via `Moho::CCommandDb::commands`).
+     *   derivation (confirmed independently via `Moho::CCommandDB::commands`).
      */
     msvc8::map<msvc8::string, float> ArmorMultipliers; // 0x0568
     gpg::DList<CEconomyEvent> mEconomyEventListHead; // 0x0574

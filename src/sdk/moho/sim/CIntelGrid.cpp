@@ -27,12 +27,6 @@ namespace
     return &sInstance;
   }
 
-  // Address: 0x010A9F44 -- process-global `CIntelGridSaveConstruct` singleton.
-  moho::CIntelGridSaveConstruct gCIntelGridSaveConstruct;
-
-  // Address: 0x010A9EC8 -- process-global `CIntelGridConstruct` singleton.
-  moho::CIntelGridConstruct gCIntelGridConstruct;
-
   // Address: 0x010A9EB4 -- process-global `CIntelGridSerializer` singleton.
   moho::CIntelGridSerializer gCIntelGridSerializer;
 
@@ -216,22 +210,6 @@ namespace
   }
 
   /**
-   * Address: 0x00508D40 (FUN_00508D40, CIntelGrid destroy-and-delete helper)
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CIntelGrid* DestroyCIntelGridAndDeleteSelf(
-    moho::CIntelGrid* const intelGrid
-  )
-  {
-    if (!intelGrid) {
-      return nullptr;
-    }
-
-    intelGrid->~CIntelGrid();
-    ::operator delete(intelGrid);
-    return intelGrid;
-  }
-
-  /**
    * Address: 0x00508E50 (FUN_00508E50, STIMap unowned pointer read helper duplicate)
    */
   [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadUnownedSTIMapPointerVariant2(
@@ -278,8 +256,8 @@ namespace moho
     mHeight = static_cast<std::uint32_t>(height);
 
     const std::size_t cellCount = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
-    mGrid = static_cast<std::int8_t*>(::operator new(cellCount));
-    std::memset(mGrid, 0, cellCount);
+    mGrid.reset(new std::int8_t[cellCount]);
+    std::memset(mGrid.get(), 0, cellCount);
 
     mGridSize = size;
   }
@@ -287,11 +265,23 @@ namespace moho
   /**
    * Address: 0x00508D80 (FUN_00508D80, CIntelGrid storage-release lane)
    */
-  CIntelGrid::~CIntelGrid()
+  CIntelGrid::~CIntelGrid() = default;
+
+  /**
+   * Inlined into `SerConstructHelper<CIntelGrid>::Construct` 0x005073C0.
+   */
+  void CIntelGrid::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    // `mUpdateList`'s destructor (`_Tidy`, 0x00508050 cited on Vector.h) is
-    // compiler-emitted after this body.
-    ::operator delete[](mGrid);
+    const gpg::RRef owner{};
+    STIMap* map = nullptr;
+    (void)ReadUnownedSTIMapPointerVariant1(owner, &archive, &map);
+
+    unsigned int gridSize = 0u;
+    archive.ReadUInt(&gridSize);
+
+    gpg::RRef gridRef{};
+    (void)FillCIntelGridRef(new CIntelGrid(map, gridSize), &gridRef);
+    result.SetUnowned(gridRef, 0u);
   }
 
   /**
@@ -558,68 +548,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00507240 (FUN_00507240, CIntelGridSaveConstruct::SaveConstruct)
-   */
-  void CIntelGridSaveConstruct::SaveConstruct(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef,
-    gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    auto* const intelGrid = reinterpret_cast<CIntelGrid*>(objectPtr);
-    if (archive == nullptr || intelGrid == nullptr || result == nullptr) {
-      return;
-    }
-
-    const gpg::RRef fallbackOwner{};
-    ForwardCIntelGridMemberSaveConstructArgs(
-      result, intelGrid, archive, version, ownerRef != nullptr ? *ownerRef : fallbackOwner
-    );
-  }
-
-  /**
-   * Address: 0x005073C0 (FUN_005073C0, Moho::CIntelGridConstruct::Construct)
-   */
-  void CIntelGridConstruct::Construct(
-    gpg::ReadArchive* const archive,
-    const int version, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    if (archive == nullptr || result == nullptr) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-    STIMap* map = nullptr;
-    (void)ReadUnownedSTIMapPointerVariant1(ownerRef, archive, &map);
-
-    unsigned int gridSize = 0u;
-    archive->ReadUInt(&gridSize);
-
-    CIntelGrid* const intelGrid = new CIntelGrid(map, gridSize);
-    gpg::RRef outRef{};
-    (void)FillCIntelGridRef(intelGrid, &outRef);
-    result->SetUnowned(outRef, 0u);
-
-    (void)version;
-  }
-
-  /**
-   * Address: 0x005089F0 (FUN_005089F0, Moho::CIntelGridConstruct::Deconstruct)
-   */
-  void CIntelGridConstruct::Deconstruct(void* const objectPtr)
-  {
-    auto* const intelGrid = static_cast<CIntelGrid*>(objectPtr);
-    if (intelGrid == nullptr) {
-      return;
-    }
-
-    (void)DestroyCIntelGridAndDeleteSelf(intelGrid);
-  }
-
-  /**
    * Address: 0x00507490 (FUN_00507490, Moho::CIntelGridSerializer::Deserialize)
    */
   void CIntelGridSerializer::Deserialize(gpg::ReadArchive*, int, int, gpg::RRef*)
@@ -633,57 +561,6 @@ namespace moho
   void CIntelGridSerializer::Serialize(gpg::WriteArchive*, int, int, gpg::RRef*)
   {
     // Binary callback is an explicit no-op (`retn`).
-  }
-
-  /**
-   * Address: 0x00BC7940 (FUN_00BC7940, dynamic initializer for the global
-   * `CIntelGridSaveConstruct` singleton)
-   */
-  CIntelGridSaveConstruct::CIntelGridSaveConstruct()
-    : mSerSaveConstructArgsFunc(
-        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CIntelGridSaveConstruct::SaveConstruct)
-      )
-  {}
-
-  /**
-   * Address: 0x00BF1DF0 (FUN_00BF1DF0, Moho::CIntelGridSaveConstruct::~CIntelGridSaveConstruct)
-   */
-  CIntelGridSaveConstruct::~CIntelGridSaveConstruct() = default;
-
-  /**
-   * Address: 0x00507D60 (FUN_00507D60, Moho::CIntelGridSaveConstruct::Init)
-   */
-  void CIntelGridSaveConstruct::Init()
-  {
-    gpg::RType* const type = CachedIntelGridType();
-    GPG_ASSERT(type->serSaveConstructArgsFunc_ == nullptr || type->serSaveConstructArgsFunc_ == mSerSaveConstructArgsFunc);
-    type->serSaveConstructArgsFunc_ = mSerSaveConstructArgsFunc;
-  }
-
-  /**
-   * Address: 0x00BC7970 (FUN_00BC7970, dynamic initializer for the global
-   * `CIntelGridConstruct` singleton)
-   */
-  CIntelGridConstruct::CIntelGridConstruct()
-    : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&CIntelGridConstruct::Construct))
-    , mDeleteFunc(&CIntelGridConstruct::Deconstruct)
-  {}
-
-  /**
-   * Address: 0x00BF1E20 (FUN_00BF1E20, Moho::CIntelGridConstruct::~CIntelGridConstruct)
-   */
-  CIntelGridConstruct::~CIntelGridConstruct() = default;
-
-  /**
-   * Address: 0x00507DE0 (FUN_00507DE0, Moho::CIntelGridConstruct::Init)
-   */
-  void CIntelGridConstruct::Init()
-  {
-    gpg::RType* const type = CachedIntelGridType();
-    GPG_ASSERT(type->serConstructFunc_ == nullptr || type->serConstructFunc_ == mSerConstructFunc);
-    GPG_ASSERT(type->deleteFunc_ == nullptr || type->deleteFunc_ == mDeleteFunc);
-    type->serConstructFunc_ = mSerConstructFunc;
-    type->deleteFunc_ = mDeleteFunc;
   }
 
   /**
@@ -785,3 +662,40 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_CIntelGridTypeInfo_d0037a, moho::register_CIntelGridTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveConstructHelper<CIntelGrid>`, vtable 0x00E0D7B4.
+   *
+   * Address: 0x00BC7940 (FUN_00BC7940 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1DF0 (FUN_00BF1DF0 -- the global's destructor.)
+   * Address: 0x00507210 (FUN_00507210 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00507D60 (FUN_00507D60 -- `Init`.)
+   * Address: 0x00507240 (FUN_00507240 -- `SaveConstructArgs`, a forward to `MemberSaveConstructArgs`.)
+   */
+  struct CIntelGridSaveConstruct : gpg::SerSaveConstructHelper<CIntelGrid>
+  {};
+
+  /**
+   * `gpg::SerConstructHelper<CIntelGrid>`, vtable 0x00E0D7C4.
+   *
+   * Address: 0x00BC7970 (FUN_00BC7970 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1E20 (FUN_00BF1E20 -- the global's destructor.)
+   * Address: 0x00507330 (FUN_00507330 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x00507DE0 (FUN_00507DE0 -- `Init`.)
+   * Address: 0x005073C0 (FUN_005073C0 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x005089F0 (FUN_005089F0 -- `Delete`.)
+   */
+  struct CIntelGridConstruct : gpg::SerConstructHelper<CIntelGrid>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A9F44 -- process-global `CIntelGridSaveConstruct` singleton.
+  moho::CIntelGridSaveConstruct gCIntelGridSaveConstruct;
+
+  // Address: 0x010A9EC8 -- process-global `CIntelGridConstruct` singleton.
+  moho::CIntelGridConstruct gCIntelGridConstruct;
+} // namespace

@@ -73,7 +73,7 @@ namespace moho
   class StatItem;
   class CEconomy;
   class CEconomyEvent;
-  class CCommandDb;
+  class CCommandDB;
   class CUnitCommand;
   class CDecalBuffer;
   class CDecalHandle;

@@ -8,6 +8,15 @@
 #include "moho/sim/IdPool.h"
 #include "moho/unit/CUnitCommand.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class Sim;
@@ -22,7 +31,7 @@ namespace gpg
 namespace moho
 {
 
-  class CCommandDb
+  class CCommandDB
   {
   public:
     /**
@@ -50,7 +59,7 @@ namespace moho
      * `_Myfirst`/`_Mylast`/`_Myend`, matching the binary's explicit
      * zero-stores.
      */
-    explicit CCommandDb(Sim* sim);
+    explicit CCommandDB(Sim* sim);
 
     /**
      * Address: 0x006E0A70 (FUN_006E0A70, ??1CommandDatabase@Moho@@QAE@@Z)
@@ -60,7 +69,7 @@ namespace moho
      * diagnostic dump when commands remain, and releases command-db runtime
      * map/id-pool storage lanes.
      */
-    ~CCommandDb();
+    ~CCommandDB();
 
     Sim* sim;                                     // +0x0000
     /**
@@ -81,6 +90,25 @@ namespace moho
     msvc8::map<CmdId, CUnitCommand*> commands;    // +0x0004
     IdPool pool;                                  // +0x0010
     msvc8::vector<CmdId> pendingReleasedCmdIds;   // +0x0CC0
+
+    /**
+     * What it does:
+     * Reads the owning `Sim` and builds a new `CCommandDB` for an archive load and hands it back unowned;
+     * its members are loaded over it afterwards.
+     * Inlined into `SerConstructHelper<CCommandDB>::Construct` 0x006E1220.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * What it does:
+     * Saves `sim` unowned for `MemberConstruct` to read back.
+     * Inlined into `SerSaveConstructHelper<CCommandDB>::SaveConstructArgs` 0x006E1040.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
 
     /**
      * Address: 0x006E1430 (FUN_006E1430, Moho::CCommandDB::MemberDeserialize)
@@ -139,12 +167,12 @@ namespace moho
     void RemoveCmd(CmdId cmdId);
   };
 
-  static_assert(offsetof(CCommandDb, sim) == 0x0000, "CCommandDb::sim offset must be 0x0000");
-  static_assert(offsetof(CCommandDb, commands) == 0x0004, "CCommandDb::commands offset must be 0x0004");
-  static_assert(offsetof(CCommandDb, pool) == 0x0010, "CCommandDb::pool offset must be 0x0010");
+  static_assert(offsetof(CCommandDB, sim) == 0x0000, "CCommandDB::sim offset must be 0x0000");
+  static_assert(offsetof(CCommandDB, commands) == 0x0004, "CCommandDB::commands offset must be 0x0004");
+  static_assert(offsetof(CCommandDB, pool) == 0x0010, "CCommandDB::pool offset must be 0x0010");
   static_assert(
-    offsetof(CCommandDb, pendingReleasedCmdIds) == 0x0CC0,
-    "CCommandDb::pendingReleasedCmdIds offset must be 0x0CC0"
+    offsetof(CCommandDB, pendingReleasedCmdIds) == 0x0CC0,
+    "CCommandDB::pendingReleasedCmdIds offset must be 0x0CC0"
   );
-  static_assert(sizeof(CCommandDb) == 0xCD0, "CCommandDb size must be 0xCD0");
+  static_assert(sizeof(CCommandDB) == 0xCD0, "CCommandDB size must be 0xCD0");
 } // namespace moho

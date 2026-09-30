@@ -417,8 +417,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="gpg\core\reflection\BadRefCast.cpp" />
     <ClCompile Include="gpg\core\time\Timer.cpp" />
     <ClCompile Include="gpg\core\utils\BoostWrappers.cpp" />
-    <ClCompile Include="moho\audio\CSimSoundManagerConstruct.cpp" />
-    <ClCompile Include="moho\audio\CSimSoundManagerSaveConstruct.cpp" />
     <ClCompile Include="moho\audio\CSimSoundManagerSerializer.cpp" />
     <ClCompile Include="moho\misc\ScrPauseEvent.cpp" />
     <ClCompile Include="moho\misc\PausedThread.cpp" />
@@ -525,8 +523,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\net\SNetPacket.cpp" />
     <ClCompile Include="moho\resource\CSimResources.cpp" />
     <ClCompile Include="moho\resource\CParticleTextureTypeInfo.cpp" />
-    <ClCompile Include="moho\resource\CParticleTextureSaveConstruct.cpp" />
-    <ClCompile Include="moho\resource\CParticleTextureConstruct.cpp" />
     <ClCompile Include="moho\serialization\typeinfo\SWorldBeamTypeInfo.cpp" />
     <ClCompile Include="moho\serialization\serializers\SWorldBeamSerializer.cpp" />
     <ClCompile Include="moho\serialization\typeinfo\SWorldParticleTypeInfo.cpp" />
@@ -688,7 +684,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\RRuleGameRulesImplTypeInfo.cpp" />
     <ClCompile Include="moho\entity\EntityCategoryReflection.cpp" />
     <ClCompile Include="moho\resource\CAniResourceSkelTypeInfo.cpp" />
-    <ClCompile Include="moho\resource\CAniResourceSkelSaveConstruct.cpp" />
     <ClCompile Include="moho\resource\RScmResourceTypeInfo.cpp" />
     <ClCompile Include="moho\resource\CParticleTexture.cpp" />
     <ClCompile Include="moho\resource\CParticleTextureReflection.cpp" />
@@ -701,7 +696,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\resource\ResourceDeposit.cpp" />
     <ClCompile Include="moho\resource\CSimResourcesTypeInfo.cpp" />
     <ClCompile Include="moho\resource\CAniResourceSkel.cpp" />
-    <ClCompile Include="moho\resource\CAniResourceSkelConstruct.cpp" />
     <ClCompile Include="moho\resource\CSimResourcesSerializer.cpp" />
     <ClCompile Include="moho\resource\IResourcesTypeInfo.cpp" />
     <ClCompile Include="moho\resource\EResourceTypeTypeInfo.cpp" />
@@ -810,8 +804,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\ai\EPathTypeTypeInfo.cpp" />
     <ClCompile Include="moho\ai\SContinueInfoTypeInfo.cpp" />
     <ClCompile Include="moho\animation\CAniDefaultSkel.cpp" />
-    <ClCompile Include="moho\animation\CAniDefaultSkelConstruct.cpp" />
-    <ClCompile Include="moho\animation\CAniDefaultSkelSaveConstruct.cpp" />
     <ClCompile Include="moho\ai\SContinueInfoSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiPathSplineTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiPathSplineSerializer.cpp" />
@@ -1022,8 +1014,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\render\CDecalGroup.cpp" />
     <ClCompile Include="moho\render\SParticleBuffer.cpp" />
     <ClCompile Include="moho\render\CDecalBufferSerializer.cpp" />
-    <ClCompile Include="moho\effects\rendering\CEffectManagerImplSaveConstruct.cpp" />
-    <ClCompile Include="moho\effects\rendering\CEffectManagerImplConstruct.cpp" />
     <ClCompile Include="moho\effects\rendering\CEffectManagerImplSerializer.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamStartupRegistrations.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamEntity.cpp" />
@@ -1103,7 +1093,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\net\INetNATTraversalProviderWeakPtrReflection.cpp" />
     <ClCompile Include="moho\command\CCommandDbTypeInfo.cpp" />
     <ClCompile Include="moho\command\CCommandDb.cpp" />
-    <ClCompile Include="moho\command\CCommandDbSerHelpers.cpp" />
     <ClCompile Include="moho\unit\ECommandEventTypeInfo.cpp" />
     <ClCompile Include="moho\unit\CUnitCommandTypeInfo.cpp" />
     <ClCompile Include="moho\unit\CUnitCommandWeakPtrReflection.cpp" />
@@ -1133,8 +1122,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\CArmyStats.cpp" />
     <ClCompile Include="moho\sim\CArmyStatItemSerializer.cpp" />
     <ClCompile Include="moho\sim\CArmyStatsTypeInfo.cpp" />
-    <ClCompile Include="moho\sim\CArmyStatsSaveConstruct.cpp" />
-    <ClCompile Include="moho\sim\CArmyStatsConstruct.cpp" />
     <ClCompile Include="moho\sim\CArmyStatsSerializer.cpp" />
     <ClCompile Include="moho\sim\CInfluenceMapTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CInfluenceMap.cpp" />
@@ -1635,8 +1622,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\CAiTarget.h" />
     <ClInclude Include="moho\ai\EAiTargetType.h" />
     <ClInclude Include="moho\animation\CAniDefaultSkel.h" />
-    <ClInclude Include="moho\animation\CAniDefaultSkelConstruct.h" />
-    <ClInclude Include="moho\animation\CAniDefaultSkelSaveConstruct.h" />
     <ClInclude Include="moho\animation\CAniDefaultSkelTypeInfo.h" />
     <ClInclude Include="moho\animation\CAnimTexture.h" />
     <ClInclude Include="moho\animation\CAniActor.h" />
@@ -1683,7 +1668,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\client\Localization.h" />
     <ClInclude Include="moho\collision\ECollisionShape.h" />
     <ClInclude Include="moho\command\CCommandDb.h" />
-    <ClInclude Include="moho\command\CCommandDbSerHelpers.h" />
     <ClInclude Include="moho\command\CCommandDbTypeInfo.h" />
     <ClInclude Include="moho\command\CmdDefs.h" />
     <ClInclude Include="moho\command\CommandIssueHelper.h" />
@@ -1769,8 +1753,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\effects\rendering\CEfxTrailEmitter.h" />
     <ClInclude Include="moho\effects\rendering\CEfxEmitterTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEffectManagerImpl.h" />
-    <ClInclude Include="moho\effects\rendering\CEffectManagerImplConstruct.h" />
-    <ClInclude Include="moho\effects\rendering\CEffectManagerImplSaveConstruct.h" />
     <ClInclude Include="moho\effects\rendering\CEffectManagerImplSerializer.h" />
     <ClInclude Include="moho\effects\rendering\CEffectManagerImplTypeInfo.h" />
     <ClInclude Include="moho\render\CDecalBuffer.h" />
@@ -2224,13 +2206,9 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\resource\CSimResourcesSerializer.h" />
     <ClInclude Include="moho\resource\CSimResourcesTypeInfo.h" />
     <ClInclude Include="moho\resource\CAniResourceSkel.h" />
-    <ClInclude Include="moho\resource\CAniResourceSkelConstruct.h" />
-    <ClInclude Include="moho\resource\CAniResourceSkelSaveConstruct.h" />
     <ClInclude Include="moho\resource\CAniResourceSkelTypeInfo.h" />
     <ClInclude Include="moho\resource\CParticleTexture.h" />
     <ClInclude Include="moho\resource\CParticleTextureReflection.h" />
-    <ClInclude Include="moho\resource\CParticleTextureConstruct.h" />
-    <ClInclude Include="moho\resource\CParticleTextureSaveConstruct.h" />
     <ClInclude Include="moho\resource\CParticleTextureTypeInfo.h" />
     <ClInclude Include="moho\render\d3d\CD3DTextureResourceFactory.h" />
     <ClInclude Include="moho\resource\ResourceFactory.h" />
@@ -2290,8 +2268,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\CArmyStatItemSerializer.h" />
     <ClInclude Include="moho\sim\CArmyStatItemTypeInfo.h" />
     <ClInclude Include="moho\sim\CArmyStats.h" />
-    <ClInclude Include="moho\sim\CArmyStatsConstruct.h" />
-    <ClInclude Include="moho\sim\CArmyStatsSaveConstruct.h" />
     <ClInclude Include="moho\sim\CArmyStatsSerializer.h" />
     <ClInclude Include="moho\sim\CArmyStatsTypeInfo.h" />
     <ClInclude Include="moho\sim\CInfluenceMap.h" />
@@ -2578,8 +2554,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\animation\CAnimationManipulatorTypeInfo.h" />
     <ClInclude Include="moho\animation\IAniManipulatorSerializer.h" />
     <ClInclude Include="moho\animation\IAniManipulatorTypeInfo.h" />
-    <ClInclude Include="moho\audio\CSimSoundManagerConstruct.h" />
-    <ClInclude Include="moho\audio\CSimSoundManagerSaveConstruct.h" />
     <ClInclude Include="moho\audio\CSimSoundManagerSerializer.h" />
     <ClInclude Include="moho\audio\CSimSoundManagerTypeInfo.h" />
     <ClInclude Include="moho\audio\ISoundManagerSerializer.h" />

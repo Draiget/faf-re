@@ -6,6 +6,15 @@
 #include "gpg/core/containers/FastVector.h"
 #include "moho/audio/ISoundManager.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class Sim;
@@ -109,6 +118,25 @@ namespace moho
      * Iterates active loop list and dispatches virtual slot 3 for each entry.
      */
     void Shutdown() override;
+
+    /**
+     * What it does:
+     * Reads the owning `Sim` and builds a new `CSimSoundManager` for an archive load and hands it back unowned;
+     * its members are loaded over it afterwards.
+     * Inlined into `SerConstructHelper<CSimSoundManager>::Construct` 0x00761240.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * What it does:
+     * Saves `mOwnerSim` unowned for `MemberConstruct` to read back.
+     * Inlined into `SerSaveConstructHelper<CSimSoundManager>::SaveConstructArgs` 0x007610B0.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
 
     /**
      * Address: 0x00761520 (FUN_00761520)

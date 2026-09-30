@@ -11,6 +11,15 @@ namespace gpg
   class RType;
 }
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class RD3DTextureResource;
@@ -18,6 +27,25 @@ namespace moho
   class CParticleTexture : public CountedObject
   {
   public:
+    /**
+     * What it does:
+     * Reads the texture path and builds a texture on it for an archive load,
+     * handed back unowned. Inlined into
+     * `SerConstructHelper<CParticleTexture>::Construct` 0x0048F140.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * What it does:
+     * Saves the texture path. Inlined into
+     * `SerSaveConstructHelper<CParticleTexture>::SaveConstructArgs` 0x0048F010.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     using TextureResourceHandle = boost::shared_ptr<RD3DTextureResource>;
 
     static gpg::RType* sType;

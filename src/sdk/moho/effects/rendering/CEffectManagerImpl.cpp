@@ -27,6 +27,7 @@
 #include "moho/resource/RResId.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 
 
 namespace
@@ -638,3 +639,57 @@ namespace moho
     return effect;
   }
 } // namespace moho
+
+namespace moho
+{
+  void CEffectManagerImpl::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    Sim* sim = nullptr;
+    const gpg::RRef owner{};
+    archive.ReadPointer(&sim, &owner);
+    result.SetUnowned(gpg::MakeRRef(new CEffectManagerImpl(sim)), 0u);
+  }
+
+  /**
+   * Address: 0x0066BA60 (FUN_0066BA60)
+   */
+  void CEffectManagerImpl::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    archive.WritePointer(GetSim(), gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    result.SetUnowned(0u);
+  }
+
+  /**
+   * `gpg::SerConstructHelper<CEffectManagerImpl>`, vtable 0x00E25E70.
+   *
+   * Address: 0x00BD45C0 (FUN_00BD45C0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFC030 (FUN_00BFC030 -- the global's destructor.)
+   * Address: 0x0066C0E0 (FUN_0066C0E0 -- `Init`.)
+   * Address: 0x0066BB40 (FUN_0066BB40 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x0066C280 (FUN_0066C280 -- `Delete`.)
+   */
+  struct CEffectManagerImplConstruct : gpg::SerConstructHelper<CEffectManagerImpl>
+  {};
+
+  /**
+   * `gpg::SerSaveConstructHelper<CEffectManagerImpl>`, vtable 0x00E25E60.
+   *
+   * Address: 0x00BD4590 (FUN_00BD4590 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFC000 (FUN_00BFC000 -- the global's destructor.)
+   * Address: 0x0066C060 (FUN_0066C060 -- `Init`.)
+   * Address: 0x0066B9E0 (FUN_0066B9E0 -- `SaveConstructArgs`, a forward to `MemberSaveConstructArgs`.)
+   */
+  struct CEffectManagerImplSaveConstruct : gpg::SerSaveConstructHelper<CEffectManagerImpl>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B3CB4 -- process-global `CEffectManagerImplConstruct` singleton.
+  moho::CEffectManagerImplConstruct gCEffectManagerImplConstruct;
+
+  // Address: 0x010B3CA4 -- process-global `CEffectManagerImplSaveConstruct` singleton.
+  moho::CEffectManagerImplSaveConstruct gCEffectManagerImplSaveConstruct;
+} // namespace

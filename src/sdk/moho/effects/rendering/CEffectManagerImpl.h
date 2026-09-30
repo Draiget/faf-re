@@ -5,6 +5,15 @@
 #include "moho/containers/TDatList.h"
 #include "moho/effects/rendering/IEffectManager.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class CEffectManagerImpl : public IEffectManager
@@ -24,6 +33,26 @@ namespace moho
      * owning `Sim` lane and self-linking both intrusive effect lists.
      */
     explicit CEffectManagerImpl(Sim* sim);
+
+    /**
+     * What it does:
+     * Reads the owning `Sim` and builds a new `CEffectManagerImpl` for an archive load and hands it back unowned;
+     * its members are loaded over it afterwards.
+     * Inlined into `SerConstructHelper<CEffectManagerImpl>::Construct` 0x0066BB40.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x0066BA60 (FUN_0066BA60)
+     *
+     * What it does:
+     * Saves `GetSim()` unowned for `MemberConstruct` to read back.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
 
     /**
      * Address: 0x0066B400 (FUN_0066B400, Moho::CEffectManagerImpl::dtr thunk)

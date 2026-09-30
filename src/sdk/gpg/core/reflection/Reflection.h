@@ -173,7 +173,7 @@ namespace moho
   class CParticleTexture;
   class CUnitCommand;
   class CUnitCommandQueue;
-  class CCommandDb;
+  class CCommandDB;
   class CUnitMotion;
   class IEffect;
   class IEffectManager;
@@ -700,7 +700,7 @@ namespace gpg
      * Address: 0x00758230 (FUN_00758230 -- `Upcast<moho::CRandomStream>`; formerly `UpcastToCRandomStream` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x00758270 (FUN_00758270 -- `Upcast<moho::SPhysConstants>`; formerly `UpcastToSPhysConstants` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x007582B0 (FUN_007582B0 -- `Upcast<moho::IAiFormationDB>`; formerly `UpcastToIAiFormationDB` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x007586B0 (FUN_007586B0 -- `Upcast<moho::CCommandDb>`; formerly `UpcastToCCommandDb` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x007586B0 (FUN_007586B0 -- `Upcast<moho::CCommandDB>`; formerly `UpcastToCCommandDb` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x007586F0 (FUN_007586F0 -- `Upcast<moho::CDecalBuffer>`; formerly `UpcastToCDecalBuffer` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x007588D0 (FUN_007588D0 -- `Upcast<moho::IEffectManager>`; formerly `UpcastToIEffectManager` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x00758AC0 (FUN_00758AC0 -- `Upcast<moho::ISoundManager>`; formerly `UpcastToISoundManager` in gpg/core/containers/ReadArchive.cpp.)
@@ -1089,6 +1089,8 @@ namespace gpg
    * first -- the binary does not; removed 2026-09-30.)
    * Address: 0x0073AAE0 (FUN_0073AAE0 -- `RTypeOf<moho::SMinMax<float>>`; formerly `CachedSMinMaxFloatType`
    * in moho/sim/CDamage.cpp, removed 2026-09-30.)
+   * Address: 0x0054CFC0 (FUN_0054CFC0 -- `RTypeOf<moho::CAniDefaultSkel>`; formerly `CachedDefaultSkelType` in
+   * moho/animation/CAniDefaultSkelConstruct.cpp, removed 2026-09-30.)
    *
    * A pointer type is the exception: its descriptor is the pointee's
    * `RPointerType` object, which `U::GetPointerType()` constructs before it
@@ -1108,6 +1110,22 @@ namespace gpg
       }
       return sType;
     }
+  }
+
+  /**
+   * Address: 0x0053B1E0 (FUN_0053B1E0 -- `SetShared<moho::RScaResource>`; formerly `SetConstructResultSharedScaResource` in moho/resource/RScaResource.cpp.)
+   * Address: 0x00539D80 (FUN_00539D80 -- `SetShared<moho::RScmResource>`; formerly `SetConstructResultSharedModelResource` in moho/resource/RScmResource.cpp.)
+   * Address: 0x00539C80 (FUN_00539C80 -- `SetShared<const moho::CAniSkel>`; formerly `SetConstructResultSharedAniSkel` in moho/resource/CAniResourceSkelConstruct.cpp.)
+   *
+   * What it does:
+   * Copies the pointer into a `shared_ptr<void>`, looks up `T`'s type through
+   * its cache slot, and hands both to the untyped `SetShared`.
+   */
+  template <class T>
+  void SerConstructResult::SetShared(const boost::shared_ptr<T>& object, const unsigned int flags)
+  {
+    using Object = std::remove_const_t<T>;
+    SetShared(boost::shared_ptr<void>(boost::const_pointer_cast<Object>(object)), RTypeOf<Object>(), flags);
   }
 
   RRef REF_UpcastPtr(const RRef& source, const RType* targetType);
@@ -5460,7 +5478,7 @@ namespace gpg
    * Address: 0x00757540 (FUN_00757540 -- `ReadPointerOwned<moho::CRandomStream>`; formerly `ReadPointerOwned_CRandomStream`.)
    * Address: 0x00757680 (FUN_00757680 -- `ReadPointerOwned<moho::SPhysConstants>`; formerly `ReadPointerOwned_SPhysConstants`.)
    * Address: 0x007577C0 (FUN_007577C0 -- `ReadPointerOwned<moho::IAiFormationDB>`; formerly `ReadPointerOwned_IAiFormationDB`.)
-   * Address: 0x00757B10 (FUN_00757B10 -- `ReadPointerOwned<moho::CCommandDb>`; formerly `ReadPointerOwned_CCommandDB`.)
+   * Address: 0x00757B10 (FUN_00757B10 -- `ReadPointerOwned<moho::CCommandDB>`; formerly `ReadPointerOwned_CCommandDB`.)
    * Address: 0x00757C50 (FUN_00757C50 -- `ReadPointerOwned<moho::CDecalBuffer>`; formerly `ReadPointerOwned_CDecalBuffer`.)
    * Address: 0x00757D90 (FUN_00757D90 -- `ReadPointerOwned<moho::IEffectManager>`; formerly `ReadPointerOwned_IEffectManager`.)
    * Address: 0x00757ED0 (FUN_00757ED0 -- `ReadPointerOwned<moho::ISoundManager>`; formerly `ReadPointerOwned_ISoundManager`.)
@@ -5503,8 +5521,8 @@ namespace gpg
    * Address: 0x00682020 (FUN_00682020 -- `ReadPointerOwned<moho::Motor>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromMotorSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x00706540 (FUN_00706540 -- `ReadPointerOwned<moho::CArmyStats>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x00706B60 (FUN_00706B60 -- `ReadPointerOwned<moho::CArmyStats>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756330 (FUN_00756330 -- `ReadPointerOwned<moho::CCommandDb>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCCommandDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756F90 (FUN_00756F90 -- `ReadPointerOwned<moho::CCommandDb>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCCommandDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00756330 (FUN_00756330 -- `ReadPointerOwned<moho::CCommandDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCCommandDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00756F90 (FUN_00756F90 -- `ReadPointerOwned<moho::CCommandDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCCommandDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x00756430 (FUN_00756430 -- `ReadPointerOwned<moho::CEntityDb>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCEntityDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x006B4600 (FUN_006B4600 -- `ReadPointerOwned<moho::CAniActor>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x00757160 (FUN_00757160 -- `ReadPointerOwned<moho::CEntityDb>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCEntityDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
@@ -6245,7 +6263,7 @@ namespace gpg
    * Address: 0x006D22F0 (FUN_006D22F0 -- `MakeRRef<moho::ERuleBPUnitCommandCaps>`; formerly `gpg::RRef_ERuleBPUnitCommandCaps`.)
    * Address: 0x006DD790 (FUN_006DD790 -- `MakeRRef<moho::ELayer>`; formerly `gpg::RRef_ELayer`.)
    * Address: 0x006DED40 (FUN_006DED40 -- `MakeRRef<moho::CFireWeaponTask>`; formerly `gpg::RRef_CFireWeaponTask`.)
-   * Address: 0x006E3150 (FUN_006E3150 -- `MakeRRef<moho::CCommandDb>`; formerly `gpg::RRef_CCommandDB`.)
+   * Address: 0x006E3150 (FUN_006E3150 -- `MakeRRef<moho::CCommandDB>`; formerly `gpg::RRef_CCommandDB`.)
    * Address: 0x006E3310 (FUN_006E3310 -- `MakeRRef<moho::CUnitCommand*>`; formerly `gpg::RRef_CUnitCommand_P`.)
    * Address: 0x006EC1D0 (FUN_006EC1D0 -- `MakeRRef<moho::WeakPtr<moho::CUnitCommand>>`; formerly `gpg::RRef_WeakPtr_CUnitCommand`.)
    * Address: 0x006EC620 (FUN_006EC620 -- `MakeRRef<moho::Listener<moho::ECommandEvent>>`; formerly `gpg::RRef_Listener_ECommandEvent`.)

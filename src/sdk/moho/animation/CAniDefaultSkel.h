@@ -2,11 +2,38 @@
 
 #include "moho/animation/CAniSkel.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class CAniDefaultSkel : public CAniSkel
   {
   public:
+    /**
+     * What it does:
+     * Hands back the one default skeleton, shared. Inlined into
+     * `SerConstructHelper<CAniDefaultSkel>::Construct` 0x0054ABB0.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * What it does:
+     * Saves nothing but the ownership (owned). Inlined into
+     * `SerSaveConstructHelper<CAniDefaultSkel>::SaveConstructArgs` 0x0054AAA0.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     static gpg::RType* sType;
 
     /**

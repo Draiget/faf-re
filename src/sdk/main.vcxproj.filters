@@ -21,9 +21,6 @@
     <ClCompile Include="moho\command\CCommandDbTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\command\CCommandDbSerHelpers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\command\EUnitCommandTypeTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -315,12 +312,6 @@
     <ClCompile Include="moho\resource\CAniResourceSkel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\resource\CAniResourceSkelConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\CAniResourceSkelSaveConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\resource\CAniResourceSkelTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -337,12 +328,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\CParticleTextureReflection.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\CParticleTextureConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\resource\CParticleTextureSaveConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\CParticleTextureTypeInfo.cpp">
@@ -553,12 +538,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\sim\CArmyStats.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\sim\CArmyStatsConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\sim\CArmyStatsSaveConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\sim\CArmyStatsSerializer.cpp">
@@ -1914,12 +1893,6 @@
     <ClCompile Include="moho\effects\rendering\CEffectManagerImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\effects\rendering\CEffectManagerImplConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\effects\rendering\CEffectManagerImplSaveConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\effects\rendering\CEffectManagerImplSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2448,12 +2421,6 @@
     <ClCompile Include="moho\animation\CAniDefaultSkel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\animation\CAniDefaultSkelConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\animation\CAniDefaultSkelSaveConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\animation\CAniDefaultSkelTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2643,12 +2610,6 @@
     <ClInclude Include="moho\resource\CAniResourceSkel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\CAniResourceSkelConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\CAniResourceSkelSaveConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\resource\CAniResourceSkelTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2656,12 +2617,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\CParticleTextureReflection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\CParticleTextureConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\resource\CParticleTextureSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\CParticleTextureTypeInfo.h">
@@ -2866,12 +2821,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\CArmyStats.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\sim\CArmyStatsConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\sim\CArmyStatsSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\CArmyStatsSerializer.h">
@@ -4710,9 +4659,6 @@
     <ClInclude Include="moho\command\CCommandDbTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\command\CCommandDbSerHelpers.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\command\EUnitCommandTypeTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -4729,12 +4675,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\effects\rendering\CEffectManagerImpl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\effects\rendering\CEffectManagerImplConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\effects\rendering\CEffectManagerImplSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\effects\rendering\CEffectManagerImplSerializer.h">
@@ -5224,12 +5164,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\animation\CAniDefaultSkel.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\animation\CAniDefaultSkelConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\animation\CAniDefaultSkelSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\animation\CAniDefaultSkelTypeInfo.h">
@@ -5748,12 +5682,6 @@
     <ClCompile Include="moho\ai\CAiPathSpline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\audio\CSimSoundManagerConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\audio\CSimSoundManagerSaveConstruct.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\audio\CSimSoundManagerSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5893,12 +5821,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\animation\IAniManipulatorTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\audio\CSimSoundManagerConstruct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\audio\CSimSoundManagerSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\audio\CSimSoundManagerSerializer.h">

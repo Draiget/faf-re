@@ -8,6 +8,15 @@
 #include "Wm3Sphere3.h"
 #include "Wm3Vector3.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class Entity;
@@ -248,6 +257,26 @@ namespace moho
   {
   public:
     /**
+     * What it does:
+     * Reads the shape and the local centre and builds a primitive from them
+     * for an archive load, handed back unowned. Inlined into
+     * `SerConstructHelper<CColPrimitive<Wm3::Box3f>>::Construct` 0x004FF750.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x004FF620 (FUN_004FF620)
+     *
+     * What it does:
+     * Saves the shape and the local centre through the primitive accessors.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
+    /**
      * Address: 0x0067AC40 (FUN_0067AC40, inlined construction payload)
      */
     explicit CColPrimitive(const Wm3::Box3f& localBox);
@@ -316,6 +345,26 @@ namespace moho
   class CColPrimitive<Wm3::Sphere3f> final : public CColPrimitiveBase
   {
   public:
+    /**
+     * What it does:
+     * Reads the shape and the local centre and builds a primitive from them
+     * for an archive load, handed back unowned. Inlined into
+     * `SerConstructHelper<CColPrimitive<Wm3::Sphere3f>>::Construct` 0x004FEE20.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x004FECF0 (FUN_004FECF0)
+     *
+     * What it does:
+     * Saves the shape and the local centre through the primitive accessors.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
+
     /**
      * Address: 0x0067AD30 (FUN_0067AD30, inlined construction payload)
      */

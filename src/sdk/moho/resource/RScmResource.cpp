@@ -17,23 +17,10 @@
 #include "moho/resource/ResourceManager.h"
 #include "moho/resource/SScmFile.h"
 #include "moho/serialization/PrefetchHandleBase.h"
+#include "moho/resource/ResourceManager.h"
 
 namespace moho
 {
-  // Forward declarations: real definitions sit further down in this TU;
-  // RScmResourceConstruct/RScmResourceSaveConstruct's ctors below only need
-  // the signatures to bind their callback pointers.
-  void Construct_RScmResource(
-    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
-  );
-  void DeleteRScmResource(void* self);
-  void SaveConstructArgs_RScmResourceThunk(
-    gpg::WriteArchive* archive,
-    int objectPtr,
-    int version,
-    gpg::RRef* ownerRef,
-    gpg::SerSaveConstructArgsResult* result
-  );
 } // namespace moho
 
 namespace
@@ -46,189 +33,6 @@ namespace
       moho::RScmResource::sType = resourceType;
     }
     return resourceType;
-  }
-
-  /**
-   * Demangled: gpg::SerSaveConstructHelper<class Moho::RScmResource>
-   *
-   * What it does:
-   * Binds the save-construct-args callback used to serialize `RScmResource`
-   * pointer lanes by mounted-path string. Base-class construction
-   * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices it
-   * into the pending `sNewHelpers` list; `InitNewHelpers` later dispatches
-   * `Init()` on it.
-   */
-  class RScmResourceSaveConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC9110 (FUN_00BC9110, dynamic initializer for `gRScmResourceSaveConstructHelper`)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the pending `sNewHelpers` list), binds the
-     * save-construct-args callback and installs this helper's vtable
-     * (0x00E16390); the compiler registers the destructor with `atexit`.
-     */
-    RScmResourceSaveConstruct();
-
-    /**
-     * Address: 0x00BF3C40 (FUN_00BF3C40, dynamic atexit destructor for `gRScmResourceSaveConstructHelper`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_00538F10` and `FUN_00538F40` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~RScmResourceSaveConstruct() = default;
-
-    /**
-     * Address: 0x00539620 (FUN_00539620, gpg::SerSaveConstructHelper<Moho::RScmResource>::Init)
-     *
-     * IDA signature:
-     * gpg::RType *__thiscall sub_539620(SerSaveConstructHelperView *this);
-     *
-     * What it does:
-     * Lazily resolves the `RScmResource` reflection descriptor, asserts the
-     * save-construct-args callback slot is empty, and publishes this helper's
-     * save-construct-args callback to the descriptor.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::save_construct_args_func_t mSaveConstructArgsCallback;
-  };
-  static_assert(
-    offsetof(RScmResourceSaveConstruct, mSaveConstructArgsCallback) == 0x0C,
-    "RScmResourceSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
-  );
-  static_assert(sizeof(RScmResourceSaveConstruct) == 0x10, "RScmResourceSaveConstruct size must be 0x10");
-
-  /**
-   * Address: 0x00BC9110 (FUN_00BC9110, dynamic initializer for `gRScmResourceSaveConstructHelper`)
-   *
-   * What it does:
-   * Binds this helper's save-construct-args callback.
-   */
-  RScmResourceSaveConstruct::RScmResourceSaveConstruct()
-    : mSaveConstructArgsCallback(
-        reinterpret_cast<gpg::RType::save_construct_args_func_t>(&moho::SaveConstructArgs_RScmResourceThunk)
-      )
-  {}
-
-  void RScmResourceSaveConstruct::Init()
-  {
-    constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
-    constexpr int kSerializationSaveConstructLine = 189;
-    constexpr const char* kSerializationSourcePath =
-      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-
-    gpg::RType* const type = ResolveRScmResourceTypeCached();
-    if (type->serSaveConstructArgsFunc_ != nullptr) {
-      gpg::HandleAssertFailure(
-        kSaveConstructAssertText,
-        kSerializationSaveConstructLine,
-        kSerializationSourcePath
-      );
-    }
-    type->serSaveConstructArgsFunc_ = mSaveConstructArgsCallback;
-  }
-
-  RScmResourceSaveConstruct gRScmResourceSaveConstructHelper;
-
-  /**
-   * Demangled: gpg::SerConstructHelper<class Moho::RScmResource>
-   *
-   * What it does:
-   * Binds the construct/delete callbacks used to materialize `RScmResource`
-   * references during load. Base-class construction
-   * (`gpg::SerHelperBase::SerHelperBase`) self-links this node and splices it
-   * into the pending `sNewHelpers` list; `InitNewHelpers` later dispatches
-   * `Init()` on it.
-   */
-  class RScmResourceConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC9140 (FUN_00BC9140, register_RScmResourceConstructHelper)
-     *
-     * What it does:
-     * Binds `Construct_RScmResource` / `DeleteRScmResource` as this helper's
-     * construct/delete callbacks (type-erased through
-     * `gpg::RType::construct_func_t` / `delete_func_t`); the compiler
-     * registers the destructor with `atexit`. The published callbacks are
-     * later copied onto `RScmResource`'s reflected `RType` by `Init()`
-     * (0x005396A0) when the pending helper list is drained.
-     */
-    RScmResourceConstruct();
-
-    /**
-     * Address: 0x00BF3C70 (FUN_00BF3C70, dynamic atexit destructor for `gRScmResourceConstructHelper`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_00539060` and `FUN_00539090` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~RScmResourceConstruct() = default;
-
-    /**
-     * Address: 0x005396A0 (FUN_005396A0, gpg::SerConstructHelper<Moho::RScmResource>::Init)
-     *
-     * IDA signature:
-     * void(__cdecl *) __thiscall sub_5396A0(SerConstructHelperView *this);
-     *
-     * What it does:
-     * Lazily resolves the `RScmResource` reflection descriptor, asserts the
-     * construct callback slot is empty, and publishes this helper's
-     * construct/delete callbacks to the descriptor.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mConstructCallback;
-    gpg::RType::delete_func_t mDeleteCallback;
-  };
-  static_assert(
-    offsetof(RScmResourceConstruct, mConstructCallback) == 0x0C,
-    "RScmResourceConstruct::mConstructCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(RScmResourceConstruct, mDeleteCallback) == 0x10,
-    "RScmResourceConstruct::mDeleteCallback offset must be 0x10"
-  );
-  static_assert(sizeof(RScmResourceConstruct) == 0x14, "RScmResourceConstruct size must be 0x14");
-
-  RScmResourceConstruct::RScmResourceConstruct()
-    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&moho::Construct_RScmResource))
-    , mDeleteCallback(&moho::DeleteRScmResource)
-  {}
-
-  void RScmResourceConstruct::Init()
-  {
-    constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
-    constexpr int kSerializationConstructLine = 231;
-    constexpr const char* kSerializationSourcePath =
-      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-
-    gpg::RType* const type = ResolveRScmResourceTypeCached();
-    if (type->serConstructFunc_ != nullptr) {
-      gpg::HandleAssertFailure(kConstructAssertText, kSerializationConstructLine, kSerializationSourcePath);
-    }
-    type->serConstructFunc_ = mConstructCallback;
-    type->deleteFunc_ = mDeleteCallback;
-  }
-
-  RScmResourceConstruct gRScmResourceConstructHelper;
-
-  void SetConstructResultSharedRScmResource(
-    gpg::SerConstructResult* const result,
-    const boost::shared_ptr<moho::RScmResource>& resource
-  )
-  {
-    const boost::shared_ptr<void>& sharedAny =
-      reinterpret_cast<const boost::shared_ptr<void>&>(resource);
-    result->SetShared(sharedAny, ResolveRScmResourceTypeCached(), 1u);
   }
 
   struct RScmResourcePrefetchBootstrap
@@ -311,29 +115,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00539D40 (FUN_00539D40, gpg::RType::delete_func_t callback for
-   * Moho::RScmResourceConstruct)
-   *
-   * IDA signature:
-   * void __cdecl sub_539D40(void *a1);
-   *
-   * What it does:
-   * `gpg::RType::delete_func_t`-shaped callback installed alongside
-   * `Construct_RScmResource` by `register_RScmResourceConstructHelper`
-   * (0x00BC9140). Destroys one heap-allocated `RScmResource` in place
-   * (destructor, then `operator delete`) when non-null -- the same shape as
-   * `RType::deleteFunc_` uses to release constructed objects everywhere else
-   * in the reflection system.
-   */
-  void DeleteRScmResource(void* const self)
-  {
-    if (self != nullptr) {
-      static_cast<RScmResource*>(self)->~RScmResource();
-      operator delete(self);
-    }
-  }
-
-  /**
    * Address: 0x00538DB0 (FUN_00538DB0, ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
    *
    * What it does:
@@ -390,82 +171,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00539D80 (FUN_00539D80)
-   *
-   * What it does:
-   * Packages one shared `RScmResource` lane into construct-result shared
-   * payload with resolved `RScmResource` runtime type metadata.
-   */
-  void SetConstructResultSharedModelResource(
-    gpg::SerConstructResult* const result,
-    const boost::shared_ptr<RScmResource>& resource
-  )
-  {
-    SetConstructResultSharedRScmResource(result, resource);
-  }
-
-  /**
-   * Address: 0x005390C0 (FUN_005390C0)
-   *
-   * What it does:
-   * Reads one model path from archive, resolves/loads the referenced SCM
-   * resource, and forwards it into construct-result shared ownership.
-   */
-  void Construct_RScmResource(
-    gpg::ReadArchive* const archive, const int version, gpg::RRef* const, gpg::SerConstructResult* const result
-  )
-  {
-    msvc8::string modelPath{};
-    archive->ReadString(&modelPath);
-
-    // 0x00539123: the same shared `GetModel` lane every other model consumer
-    // goes through, not a second copy of the lookup.
-    const boost::shared_ptr<RScmResource> modelResource = GetModel(modelPath.c_str(), nullptr);
-    SetConstructResultSharedModelResource(result, modelResource);
-  }
-
-  /**
-   * Address: 0x00538F70 (FUN_00538F70)
-   *
-   * What it does:
-   * Writes one mounted-path string save-construct arg for one `RScmResource`
-   * and marks the construct-result ownership lane as shared.
-   */
-  void SaveConstructArgs_RScmResource(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const,
-    gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    const auto* const resource = reinterpret_cast<const RScmResource*>(static_cast<std::uintptr_t>(objectPtr));
-
-    msvc8::string mountedPath{};
-    (void)FILE_ToMountedPath(&mountedPath, resource->mName.c_str());
-    archive->WriteString(&mountedPath);
-    result->SetShared(1u);
-  }
-
-  /**
-   * Address: 0x00538EF0 (FUN_00538EF0)
-   *
-   * What it does:
-   * Thin callback thunk forwarding save-construct arg serialization for one
-   * `RScmResource`.
-   */
-  void SaveConstructArgs_RScmResourceThunk(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::RRef* const ownerRef,
-    gpg::SerSaveConstructArgsResult* const result
-  )
-  {
-    SaveConstructArgs_RScmResource(archive, objectPtr, version, ownerRef, result);
-  }
-
-  /**
    * Address: 0x00BC91A0 (FUN_00BC91A0)
    *
    * What it does:
@@ -480,5 +185,90 @@ namespace moho
     }
 
     RES_RegisterPrefetchType("models", resourceType);
+  }
+} // namespace moho
+
+namespace moho
+{
+  void RScmResource::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    msvc8::string path;
+    archive.ReadString(&path);
+    result.SetShared(GetModel(path.c_str(), nullptr), 1u);
+  }
+
+  /**
+   * Address: 0x00538F70 (FUN_00538F70)
+   */
+  void RScmResource::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    msvc8::string mountedPath;
+    (void)FILE_ToMountedPath(&mountedPath, mName.c_str());
+    archive.WriteString(&mountedPath);
+    result.SetShared(1u);
+  }
+
+  /**
+   * `gpg::SerSaveConstructHelper<RScmResource>`, vtable 0x00E16390.
+   *
+   * Address: 0x00BC9110 (FUN_00BC9110 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF3C40 (FUN_00BF3C40 -- the global's destructor.)
+   * Address: 0x00539620 (FUN_00539620 -- `Init`.)
+   * Address: 0x00538EF0 (FUN_00538EF0 -- `SaveConstructArgs`, a forward to `MemberSaveConstructArgs`.)
+   */
+  struct RScmResourceSaveConstruct : gpg::SerSaveConstructHelper<RScmResource>
+  {};
+
+  /**
+   * `gpg::SerConstructHelper<RScmResource>`, vtable 0x00E163A0.
+   *
+   * Address: 0x00BC9140 (FUN_00BC9140 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF3C70 (FUN_00BF3C70 -- the global's destructor.)
+   * Address: 0x005396A0 (FUN_005396A0 -- `Init`.)
+   * Address: 0x005390C0 (FUN_005390C0 -- `Construct`, `MemberConstruct` inlined.)
+   * Address: 0x00539D40 (FUN_00539D40 -- `Delete`.)
+   */
+  struct RScmResourceConstruct : gpg::SerConstructHelper<RScmResource>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ABB28 -- process-global `RScmResourceSaveConstruct` singleton.
+  moho::RScmResourceSaveConstruct gRScmResourceSaveConstruct;
+
+  // Address: 0x010ABB38 -- process-global `RScmResourceConstruct` singleton.
+  moho::RScmResourceConstruct gRScmResourceConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00539BA0 (FUN_00539BA0, func_GetModel)
+   *
+   * IDA signature:
+   * boost::shared_ptr<RScmResource> *__cdecl func_GetModel(
+   *     boost::shared_ptr<RScmResource> *out, const char *path, int resWatcher);
+   *
+   * What it does:
+   * Lazily resolves the `RScmResource` reflection descriptor (0x00539BC6
+   * caches it in `RScmResource::sType`), dispatches one model path through
+   * `RES_GetResource` (0x00539BF0), and retains the resolved object into the
+   * caller's handle (0x00539BFC) before releasing the manager's temporary.
+   * Yields an empty pointer when the lookup produced no live object -- the
+   * empty-path case lands there too, via the manager's own
+   * `GetResource: Invalid name` rejection.
+   */
+  boost::shared_ptr<RScmResource> GetModel(const gpg::StrArg path, CResourceWatcher* const resourceWatcher)
+  {
+    gpg::RType* resourceType = RScmResource::sType;
+    if (resourceType == nullptr) {
+      resourceType = gpg::LookupRType(typeid(RScmResource));
+      RScmResource::sType = resourceType;
+    }
+
+    return boost::static_pointer_cast<RScmResource>(RES_GetResource(path, resourceWatcher, resourceType));
   }
 } // namespace moho

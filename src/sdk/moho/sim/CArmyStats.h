@@ -10,6 +10,15 @@
 #include "../misc/Stats.h"
 #include "legacy/containers/Map.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class RRef;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class CArmyStatItem;
@@ -173,6 +182,25 @@ namespace moho
      * VFTable SLOT: 0
      */
     void Delete(const char* statPath) override;
+
+    /**
+     * What it does:
+     * Reads the owning `CAiBrain` and builds a new `CArmyStats` for an archive load and hands it back unowned;
+     * its members are loaded over it afterwards.
+     * Inlined into `SerConstructHelper<CArmyStats>::Construct` 0x0070E140.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
+
+    /**
+     * What it does:
+     * Saves `mOwnerArmy` unowned for `MemberConstruct` to read back.
+     * Inlined into `SerSaveConstructHelper<CArmyStats>::SaveConstructArgs` 0x0070DF60.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    );
 
     /**
      * Address: 0x00714870 (FUN_00714870, Moho::CArmyStats::MemberDeserialize)

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/scoped_array.hpp"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
@@ -99,12 +100,24 @@ namespace moho
     CIntelGrid(const STIMap* map, std::uint32_t size);
 
     /**
-       * Address: 0x00508D80 (FUN_00508D80)
+     * Address: 0x00508D80 (FUN_00508D80)
+     * Address: 0x00508D40 (FUN_00508D40 -- the scalar deleting destructor; no callers.)
      *
      * What it does:
-     * Releases delayed-sub-viz storage and backing visibility grid memory.
+     * Implicit in effect: `mUpdateList` frees its storage, then `mGrid` its
+     * cells (members in reverse order), which is the order 0x00508D80 frees
+     * them in.
      */
     ~CIntelGrid();
+
+    /**
+     * What it does:
+     * Reads the map and the cell size and builds a grid on them for an archive
+     * load. Inlined into `SerConstructHelper<CIntelGrid>::Construct` 0x005073C0.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x005BE150 (FUN_005BE150, ?IsVisible@CIntelGrid@Moho@@QBE_NHH@Z)
@@ -215,132 +228,12 @@ namespace moho
 
   public:
     STIMap* mMapData;                            // +0x00
-    std::int8_t* mGrid;                          // +0x04
+    boost::scoped_array<std::int8_t> mGrid;      // +0x04
     std::uint32_t mWidth;                        // +0x08
     std::uint32_t mHeight;                       // +0x0C
     msvc8::vector<SDelayedSubVizInfo> mUpdateList;   // +0x10
     std::uint32_t mGridSize;                     // +0x20
   };
-
-  /**
-   * VFTABLE: 0x00E0D7B4
-   * COL: 0x00E67010
-   */
-  class CIntelGridSaveConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC7940 (FUN_00BC7940, dynamic initializer for the global
-     * `CIntelGridSaveConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * save-construct-args callback field.
-     */
-    CIntelGridSaveConstruct();
-
-    /**
-     * Address: 0x00BF1DF0 (FUN_00BF1DF0, Moho::CIntelGridSaveConstruct::~CIntelGridSaveConstruct)
-     */
-    ~CIntelGridSaveConstruct();
-
-    /**
-     * Address: 0x00507240 (FUN_00507240, CIntelGridSaveConstruct::SaveConstruct)
-     *
-     * What it does:
-     * Forwards save-construct-args callback flow into
-     * `CIntelGrid::MemberSaveConstructArgs`.
-     */
-    static void SaveConstruct(
-      gpg::WriteArchive* archive,
-      int objectPtr,
-      int version,
-      gpg::RRef* ownerRef,
-      gpg::SerSaveConstructArgsResult* result
-    );
-
-    /**
-     * Address: 0x00507D60 (FUN_00507D60, Moho::CIntelGridSaveConstruct::Init)
-     *
-     * What it does:
-     * Binds save-construct callback into CIntelGrid RTTI
-     * (`serSaveConstructArgsFunc_`).
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc; // +0x0C
-  };
-
-  static_assert(
-    offsetof(CIntelGridSaveConstruct, mSerSaveConstructArgsFunc) == 0x0C,
-    "CIntelGridSaveConstruct::mSerSaveConstructArgsFunc offset must be 0x0C"
-  );
-  static_assert(sizeof(CIntelGridSaveConstruct) == 0x10, "CIntelGridSaveConstruct size must be 0x10");
-
-  /**
-   * VFTABLE: 0x00E0D7C4
-   * COL: 0x00E66F64
-   */
-  class CIntelGridConstruct : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC7970 (FUN_00BC7970, dynamic initializer for the global
-     * `CIntelGridConstruct` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * construct/delete callback fields.
-     */
-    CIntelGridConstruct();
-
-    /**
-     * Address: 0x00BF1E20 (FUN_00BF1E20, Moho::CIntelGridConstruct::~CIntelGridConstruct)
-     */
-    ~CIntelGridConstruct();
-
-    /**
-     * Address: 0x005073C0 (FUN_005073C0, Moho::CIntelGridConstruct::Construct)
-     *
-     * What it does:
-     * Reads construct arguments (`STIMap*`, `mGridSize`) and returns a new
-     * `CIntelGrid` as an unowned construct result.
-     */
-    static void Construct(
-      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
-    );
-
-    /**
-     * Address: 0x005089F0 (FUN_005089F0, Moho::CIntelGridConstruct::Deconstruct)
-     *
-     * What it does:
-     * Destroys and frees one `CIntelGrid` object allocated via construct helper.
-     */
-    static void Deconstruct(void* objectPtr);
-
-    /**
-     * Address: 0x00507DE0 (FUN_00507DE0, Moho::CIntelGridConstruct::Init)
-     *
-     * What it does:
-     * Binds construct/delete callbacks into CIntelGrid RTTI
-     * (`serConstructFunc_`, `deleteFunc_`).
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::construct_func_t mSerConstructFunc; // +0x0C
-    gpg::RType::delete_func_t mDeleteFunc;           // +0x10
-  };
-
-  static_assert(
-    offsetof(CIntelGridConstruct, mSerConstructFunc) == 0x0C,
-    "CIntelGridConstruct::mSerConstructFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CIntelGridConstruct, mDeleteFunc) == 0x10, "CIntelGridConstruct::mDeleteFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CIntelGridConstruct) == 0x14, "CIntelGridConstruct size must be 0x14");
 
   /**
    * VFTABLE: 0x00E0D7D4
