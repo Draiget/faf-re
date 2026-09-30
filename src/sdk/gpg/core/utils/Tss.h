@@ -111,6 +111,8 @@ namespace gpg::core
      * cleanup callback they registered is superseded by `ThreadStateTssDeleter`
      * (`Logging.h`), already cited against the matching runtime addresses
      * there (0x00936CC0/0x00936FD0).
+     * Address: 0x00935DB0 (FUN_00935DB0 -- `boost::detail::function::void_function_invoker1<void (*)(void*), void, void*>::invoke` for that `boost::function1` cleanup wrapper: loads the stored function pointer and calls it with the one argument; reached through the wrapper's vtable, no direct callers. Formerly `InvokeUnaryCdeclThunkRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00936180 (FUN_00936180 -- the same `boost::function1` wrapper's functor manager (clone / destroy / type query of the stored function pointer); caller 0x00936B30 (`tss_adapter` constructor). Was tagged external_dependency; it is an engine-instantiated boost template like its siblings above.)
      */
     template<class T, class Deleter = std::default_delete<T>>
     class TssPtr

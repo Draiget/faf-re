@@ -1393,25 +1393,6 @@ namespace moho
   static_assert(sizeof(MeshRenderer) == 0x13C, "MeshRenderer size must be 0x13C");
 
   /**
-   * Address: 0x007E6650 (FUN_007E6650, boost::shared_ptr<Moho::RMeshBlueprintLOD>::shared_ptr(RMeshBlueprintLOD*))
-   *
-   * What it does:
-   * Per-T named helper binding the engine-instantiated
-   * `boost::shared_ptr<Moho::RMeshBlueprintLOD>::shared_ptr(RMeshBlueprintLOD*)`
-   * ctor body. Allocates the `sp_counted_impl_p<RMeshBlueprintLOD>`
-   * reference-count block (size 0x10) with use_count=1 / weak_count=1, sets
-   * the `sp_counted_impl_p<RMeshBlueprintLOD>` vtable, and binds the owned
-   * raw pointer.
-   *
-   * Wired into `MeshLOD::Load` (line ~4915, the
-   * `lodBlueprintCopy.reset(new RMeshBlueprintLOD(blueprintLod));` site) to
-   * preserve the MSVC8 per-T template emission symbol shape.
-   */
-  void ConstructSharedMeshBlueprintLODFromRaw(
-    boost::shared_ptr<RMeshBlueprintLOD>& out,
-    RMeshBlueprintLOD* raw);
-
-  /**
    * Address: 0x007E6820 (FUN_007E6820, boost::detail::shared_count::
    * shared_count(Mesh*, Deleter) -- the outer control-block allocator:
    * `operator new(0x18)` then inline-constructs the `sp_counted_impl_pd`

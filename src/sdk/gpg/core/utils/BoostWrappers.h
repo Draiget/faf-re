@@ -390,6 +390,7 @@ namespace boost
          * `ReleaseOwnerSharedCountControlLane` over a
          * `SharedCountOwnerRuntimeView` stand-in in
          * gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-18.)
+         * Address: 0x0064DFE0 (FUN_0064DFE0 -- another branch-for-branch copy of this release, object in EAX: the `shared_ptr<moho::CIntelGrid>` handle inside RDebugRadar's `ReconCoverageDecalPass` stack block, dropped after every coverage pass by `TraverseRadarCellsRecursive` (eight calls 0x0064DBBA .. 0x0064DEF0) and by its unwind funclets 0x00B9F81B .. 0x00B9F88B; the accessor's own temporary goes through 0x005BE250 right after; formerly `ReleaseSharedCounterOwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          */
         void release() noexcept {
             detail::sp_counted_base* const control = pi;
@@ -776,6 +777,7 @@ namespace boost
      * What it does:
      * Rebinds one initialized `boost::shared_ptr<T>` to a raw pointee by
      * constructing one new control block and releasing one previous owner.
+     * Address: 0x007E5170 (FUN_007E5170, shared_ptr<RMeshBlueprintLOD>::reset(RMeshBlueprintLOD*) - p in EAX, `this` in EDI: the temporary's `shared_count(p)` 0x007E6650, the no-op `sp_enable_shared_from_this` overload 0x0042AC30, the swap, then the old count released inline; `MeshLOD::Load`'s `lodBlueprintCopy.reset(new RMeshBlueprintLOD(blueprintLod))` at 0x007DCF32; formerly `AssignSharedRefWithEnableRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      */
     template <class T>
     [[nodiscard]] inline boost::shared_ptr<T>* ResetSharedFromRaw(
@@ -987,6 +989,11 @@ namespace boost
      * `dispose()`/`destroy()` dispatch through such a block would have jumped
      * into unrelated data; they also had no caller at all, in the binary or in
      * source.
+     * Address: 0x007FC250 (FUN_007FC250, checked_delete<Moho::CD3DTextureBatcher> - the non-virtual `~CD3DTextureBatcher` 0x00448B60 then `operator delete`, pointer in ESI, skipped for null; from the catch of `shared_count(CD3DTextureBatcher*)` 0x007FBEB0 (0x007FBF21), which `WRenViewport::D3DWindowOnDeviceInit`'s `mTexBatcher.reset(new CD3DTextureBatcher())` reaches through `shared_ptr::reset` 0x007FB6C0; formerly `DestroyTextureBatcherObjectRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x007FC270 (FUN_007FC270, checked_delete<Moho::CD3DPrimBatcher> - the non-virtual `~CD3DPrimBatcher` 0x00438460 then `operator delete`, pointer in ESI, skipped for null; from the catch of `shared_count(CD3DPrimBatcher*)` 0x007FBF30 (0x007FBFA1), reached from `D3DWindowOnDeviceInit`'s `mPrimBatcher.reset(new CD3DPrimBatcher(...))` through `shared_ptr::reset` 0x007FB730; formerly `DestroyPrimBatcherObjectRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00755FC0 (FUN_00755FC0, sp_counted_impl_p<Moho::ISimResources>::dispose, vtable 0x00E348EC slot 1 - `delete px_` (+0x0C) through ISimResources' virtual deleting destructor, `push 1; call [vtbl]`, skipped for null; the vtable is installed by `shared_count(ISimResources*)` 0x00754BD0; formerly `ReleaseOptionalOwnedObjectRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x007E6AD0 (FUN_007E6AD0, checked_delete<Moho::RMeshBlueprintLOD> - the non-virtual `~RMeshBlueprintLOD` 0x00519800 then `operator delete`, pointer in EAX, skipped for null; from the catch of `shared_count(RMeshBlueprintLOD*)` 0x007E6650 (0x007E66C1); formerly `RunCleanupThenDeleteObjectRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x007E6650 (FUN_007E6650, shared_count(RMeshBlueprintLOD*) - `pi_ = new sp_counted_impl_p<RMeshBlueprintLOD>(p)` (vtable 0x00E3F4E4) in a try whose catch runs checked_delete 0x007E6AD0 and rethrows, `this` in ECX, `ret 4`; from `shared_ptr<RMeshBlueprintLOD>::reset` 0x007E5170 (0x007E517F); formerly `ConstructSharedMeshBlueprintLODFromRaw` in moho/mesh/Mesh.h/.cpp, labelled as the shared_ptr constructor (RULE ONE), removed 2026-09-30.)
      */
     template <class T>
     [[nodiscard]] inline detail::shared_count* ConstructSharedCountFromRaw(

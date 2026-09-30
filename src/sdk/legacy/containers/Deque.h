@@ -147,6 +147,7 @@ namespace msvc8
          * Address: 0x0074C940 (FUN_0074C940 -- a one-instruction `jmp` thunk to
          * 0x0074DF10, reached from `Sim::Sim`'s unwind path 0x007434D0 and from
          * `Sim::~Sim`.)
+         * Address: 0x00740860 (FUN_00740860 -- `~deque` for `msvc8::deque<Moho::SSyncData*>` (`SSyncDataQueue::mSyncdat`), a one-instruction `jmp` to its teardown body 0x007411A0 (cited on `clear()`), the same shape as 0x0074C940; reached only from unwind funclets: 0x00BAC240 (0x0073FA70), 0x00BAC260 (0x0073BA10), 0x00BAC280 (`SSyncDataQueue::~SSyncDataQueue` 0x0073B940) and 0x00BBB9A7 (`CSimDriver::~CSimDriver` 0x0073BA50); formerly `ForwardOwnerCleanupThunkRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          */
         ~deque()
         {

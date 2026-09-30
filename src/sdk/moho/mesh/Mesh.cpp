@@ -2440,10 +2440,7 @@ namespace moho
   {
     Clear();
 
-    // Route per-T raw-pointer ctor through the canonical helper
-    // (FUN_007E6650) so the MSVC8 `shared_ptr<RMeshBlueprintLOD>(RMeshBlueprintLOD*)`
-    // template emission symbol is preserved.
-    ConstructSharedMeshBlueprintLODFromRaw(lodBlueprintCopy, new RMeshBlueprintLOD(blueprintLod));
+    lodBlueprintCopy.reset(new RMeshBlueprintLOD(blueprintLod));
     // 0x007DCF58: the LOD's model path goes straight through the shared
     // `GetModel` resource lane; there is no local caching or empty-path guard.
     res = GetModel(blueprintLod.mMeshName.c_str(), ownerWatcher);
@@ -5323,25 +5320,6 @@ namespace moho
       static_cast<float>(fogColor & 0xFFu) * kChannelScale,
     };
     SetShaderVarMem(vars.color, 3u, color);
-  }
-
-  /**
-   * Address: 0x007E6650 (FUN_007E6650, boost::shared_ptr<Moho::RMeshBlueprintLOD>::shared_ptr(RMeshBlueprintLOD*))
-   *
-   * What it does:
-   * Per-T canonical-template-helper binding for the engine-instantiated
-   * `boost::shared_ptr<Moho::RMeshBlueprintLOD>` raw-pointer constructor.
-   * `out.reset(raw)` constructs a fresh `shared_ptr<RMeshBlueprintLOD>`
-   * from the raw pointer (allocating the `sp_counted_impl_p` reference-count
-   * block with use_count=1 / weak_count=1, setting the vtable, binding the
-   * owned pointer) then swaps it into `out` — equivalent runtime behavior
-   * to the binary's out-of-line ctor body.
-   */
-  void ConstructSharedMeshBlueprintLODFromRaw(
-    boost::shared_ptr<RMeshBlueprintLOD>& out,
-    RMeshBlueprintLOD* const raw)
-  {
-    out.reset(raw);
   }
 
   namespace

@@ -2514,22 +2514,6 @@ std::uint32_t ResetSwapBackedArrayRuntimeB(
 }
 
 /**
- * Address: 0x00740860 (FUN_00740860)
- *
- * What it does:
- * Pure forwarding thunk to one owner cleanup callback.
- */
-void ForwardOwnerCleanupThunkRuntime(
-  void* const owner,
-  const ForwardCleanupFn cleanupFn
-)
-{
-  if (cleanupFn != nullptr) {
-    cleanupFn(owner);
-  }
-}
-
-/**
  * Address: 0x00767C70 (FUN_00767C70)
  *
  * What it does:
@@ -4734,59 +4718,6 @@ void ClearAndReleaseCartographicDecalOwnerRuntime(
 }
 
 /**
- * Address: 0x007E5170 (FUN_007E5170)
- *
- * What it does:
- * Initializes a shared-ref pair from one object lane, enables
- * shared-from-this, then releases the previous counter lane.
- */
-void AssignSharedRefWithEnableRuntime(
-  void* const object,
-  SharedRefRuntime* const destination,
-  const InitSharedRefFn initFn,
-  const EnableSharedFromThisFn enableFn
-)
-{
-  if (destination == nullptr) {
-    return;
-  }
-
-  SharedRefInitRuntime temporary{object, nullptr};
-  if (initFn != nullptr) {
-    initFn(&temporary, object);
-  }
-  if (enableFn != nullptr) {
-    enableFn(&temporary, object, object);
-  }
-
-  void* const previousCounter = destination->counter;
-  destination->object = object;
-  destination->counter = temporary.counter;
-  ReleaseSharedCounterRuntime(previousCounter);
-}
-
-/**
- * Address: 0x007E6AD0 (FUN_007E6AD0)
- *
- * What it does:
- * Runs one pre-delete hook for an object lane, then frees the object storage.
- */
-void RunCleanupThenDeleteObjectRuntime(
-  void* const object,
-  const ObjectPreDeleteFn preDeleteFn
-)
-{
-  if (object == nullptr) {
-    return;
-  }
-
-  if (preDeleteFn != nullptr) {
-    preDeleteFn(object);
-  }
-  ::operator delete(object);
-}
-
-/**
  * Address: 0x007EB4F0 (FUN_007EB4F0)
  *
  * What it does:
@@ -4975,48 +4906,6 @@ void* CloneTreeStorageIntoOwnerRuntime(
   return sourceRoot;
 }
 
-/**
- * Address: 0x007FC250 (FUN_007FC250)
- *
- * What it does:
- * Destroys one D3D texture-batcher lane and frees its storage.
- */
-void DestroyTextureBatcherObjectRuntime(
-  void* const batcher,
-  const SimpleDtorFn destructorFn
-)
-{
-  if (batcher == nullptr) {
-    return;
-  }
-
-  if (destructorFn != nullptr) {
-    destructorFn(batcher);
-  }
-  ::operator delete(batcher);
-}
-
-/**
- * Address: 0x007FC270 (FUN_007FC270)
- *
- * What it does:
- * Destroys one D3D prim-batcher lane and frees its storage.
- */
-void DestroyPrimBatcherObjectRuntime(
-  void* const batcher,
-  const SimpleDtorFn destructorFn
-)
-{
-  if (batcher == nullptr) {
-    return;
-  }
-
-  if (destructorFn != nullptr) {
-    destructorFn(batcher);
-  }
-  ::operator delete(batcher);
-}
-
 using DeferredSimDriverBindRuntime = boost::_bi::bind_t<
   void,
   boost::_mfi::mf0<void, moho::CSimDriver>,
@@ -5041,98 +4930,6 @@ static_assert(
 );
 
 RuntimeDeferredSimDriverCallableVtable gDeferredSimDriverCallableVtable{};
-
-/**
- * Address: 0x00742E20 (FUN_00742E20)
- *
- * What it does:
- * Invokes one deferred thiscall callback lane using the bound object lane at
- * offset `+0x04`; the forwarded `CSimDriver*` argument is not consumed by this
- * invoker shape.
- */
-void InvokeDeferredSimDriverCallback(
-  boost::detail::function::function_buffer* const invoker,
-  moho::CSimDriver* const /*driver*/
-)
-{
-  using InvokeFn = void(__thiscall*)(void* boundObject);
-  reinterpret_cast<InvokeFn>(invoker->obj_ptr)(invoker[1].obj_ptr);
-}
-
-/**
- * Address: 0x00742E30 (FUN_00742E30)
- *
- * What it does:
- * Manages one deferred sim-driver callback payload for clone/destroy/type-check
- * and type-query operations.
- */
-void ManageDeferredSimDriverCallbackPayload(
-  const boost::detail::function::function_buffer* const sourcePayload,
-  boost::detail::function::function_buffer* const targetPayload,
-  const boost::detail::function::functor_manager_operation_type operation
-)
-{
-  using Operation = boost::detail::function::functor_manager_operation_type;
-
-  if (targetPayload == nullptr) {
-    return;
-  }
-
-  if (operation == Operation::get_functor_type_tag) {
-    targetPayload->obj_ptr = const_cast<std::type_info*>(&typeid(DeferredSimDriverBindRuntime));
-    return;
-  }
-
-  if (operation == Operation::clone_functor_tag) {
-    if (sourcePayload != nullptr) {
-      targetPayload->obj_ptr = sourcePayload->obj_ptr;
-      targetPayload[1].obj_ptr = sourcePayload[1].obj_ptr;
-    }
-    return;
-  }
-
-  if (operation == Operation::destroy_functor_tag) {
-    return;
-  }
-
-  const auto* const checkType = static_cast<const std::type_info*>(targetPayload->obj_ptr);
-  targetPayload->obj_ptr =
-    (checkType != nullptr && (*checkType == typeid(DeferredSimDriverBindRuntime)))
-      ? const_cast<boost::detail::function::function_buffer*>(sourcePayload)
-      : nullptr;
-}
-
-/**
- * Address: 0x00742B00 (FUN_00742B00)
- * Address: 0x00742DB0 (FUN_00742DB0)
- *
- * What it does:
- * Binds the global deferred sim-driver callable vtable lanes to the canonical
- * invoker/manager handlers.
- */
-void __stdcall BindDeferredSimDriverCallableHandlers(
-  const std::uint32_t /*lane0*/,
-  const std::uint32_t /*lane1*/
-) noexcept
-{
-  gDeferredSimDriverCallableVtable.invoker = &InvokeDeferredSimDriverCallback;
-  gDeferredSimDriverCallableVtable.manager = &ManageDeferredSimDriverCallbackPayload;
-}
-
-/**
- * Address: 0x00742540 (FUN_00742540)
- *
- * What it does:
- * Initializes and returns the deferred sim-driver callable vtable singleton.
- */
-RuntimeDeferredSimDriverCallableVtable* InitializeDeferredSimDriverCallableVtable(
-  const std::uint32_t /*lane0*/,
-  const std::uint32_t /*lane1*/
-) noexcept
-{
-  BindDeferredSimDriverCallableHandlers(0u, 0u);
-  return &gDeferredSimDriverCallableVtable;
-}
 
 struct StrideVectorRuntime
 {
@@ -7267,33 +7064,6 @@ char ValidateTokenAndResetStateRuntime(
   return 1;
 }
 
-/**
- * Address: 0x0064DFE0 (FUN_0064DFE0)
- *
- * What it does:
- * Releases one shared-counter owner lane by decrementing strong and weak bias
- * counters and invoking vtable release slots when they transition from zero.
- */
-int ReleaseSharedCounterOwnerRuntime(
-  SharedCounterOwnerRuntime* const owner
-)
-{
-  int result = static_cast<int>(reinterpret_cast<std::uintptr_t>(owner));
-  SharedCounterRuntime* const counter = (owner != nullptr) ? owner->counter : nullptr;
-  if (counter == nullptr) {
-    return result;
-  }
-
-  if (InterlockedExchangeAdd(&counter->strongRefBias, -1) == 0) {
-    counter->vtable->releaseStrong(counter);
-    result = static_cast<int>(reinterpret_cast<std::uintptr_t>(&counter->weakRefBias));
-    if (InterlockedExchangeAdd(&counter->weakRefBias, -1) == 0) {
-      return counter->vtable->releaseWeakAndDelete(counter);
-    }
-  }
-  return result;
-}
-
 namespace
 {
   using OpaqueCallbackRuntime = void (*)();
@@ -7388,20 +7158,6 @@ char* GetInlineLane08RuntimeA(char* const self) noexcept
 // gpg::RPointerType<moho::Shield> and are now recovered as methods of that
 // specialization in gpg/core/reflection/Reflection.cpp
 // (one-address-one-function).
-
-/**
- * Address: 0x00755FC0 (FUN_00755FC0)
- *
- * What it does:
- * Calls one optional owned-object release slot with lane argument `1`.
- */
-int ReleaseOptionalOwnedObjectRuntime(OptionalReleaseOwnerRuntime* const owner)
-{
-  if (owner->target == nullptr || owner->target->vtable == nullptr || owner->target->vtable->release == nullptr) {
-    return 0;
-  }
-  return owner->target->vtable->release(owner->target, 1);
-}
 
 // NOTE: FUN_0077EC10, FUN_0077EDC0 and FUN_0077EDD0 were previously transcribed
 // here as generic [[maybe_unused]] runtime helpers
@@ -8425,20 +8181,6 @@ int InvokeContextUnaryThunkRuntime(
 )
 {
   return thunk->invoke(thunk->context, arg0);
-}
-
-/**
- * Address: 0x00935DB0 (FUN_00935DB0)
- *
- * What it does:
- * Invokes one unary cdecl thunk with a forwarded integer argument.
- */
-int InvokeUnaryCdeclThunkRuntime(
-  const CdeclUnaryThunkRuntime* const thunk,
-  const int arg0
-)
-{
-  return thunk->invoke(arg0);
 }
 
 /**

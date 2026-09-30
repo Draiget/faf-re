@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "boost/function.hpp"
+#include <boost/bind.hpp>
 #include <boost/ptr_container/exception.hpp>
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/render/camera/CameraImpl.h"
@@ -232,47 +233,6 @@ namespace
   bool IsZeroDigest(const gpg::MD5Digest& digest)
   {
     return digest.vals[0] == 0 && digest.vals[1] == 0 && digest.vals[2] == 0 && digest.vals[3] == 0;
-  }
-
-  [[nodiscard]] boost::function<void()> BuildCallLaterCallback(
-    void (*fn)(CSimDriver*),
-    CSimDriver* driver
-  );
-
-  /**
-   * Address: 0x00741810 (FUN_00741810, func_call_later)
-   *
-   * What it does:
-   * Builds one deferred driver callback object and seeds it by forwarding to
-   * `BuildCallLaterCallback`.
-   */
-  [[nodiscard]] boost::function<void()> BuildDeferredDriverCallback(
-    void (*fn)(CSimDriver*),
-    CSimDriver* const driver
-  )
-  {
-    boost::function<void()> callback{};
-    callback = BuildCallLaterCallback(fn, driver);
-    return callback;
-  }
-
-  /**
-   * Address: 0x00741D70 (FUN_00741D70, func_call_later_0)
-   *
-   * What it does:
-   * Builds one deferred callback lane that will invoke `fn(driver)` when the
-   * created `boost::thread` runs.
-   */
-  [[nodiscard]] boost::function<void()> BuildCallLaterCallback(
-    void (*fn)(CSimDriver*),
-    CSimDriver* const driver
-  )
-  {
-    if (fn == nullptr || driver == nullptr) {
-      return {};
-    }
-
-    return [fn, driver]() { fn(driver); };
   }
 } // namespace
 
@@ -683,6 +643,14 @@ SSyncData* moho::PopFrontSSyncDataPtrDeque(SSyncDataQueue& queue)
  * connection and sync events, builds the marshaller that turns this driver's
  * `ISTIDriver` calls into command-stream messages, and starts the
  * create-sim bootstrap thread.
+ * `boost::function0<void>` as `new boost::thread(boost::bind(&CSimDriver::ThreadCreateSim, this))` below and `new boost::thread(boost::bind(&CSimDriver::ThreadRun, this))` in `ThreadCreateSim` instantiate it: one F = `bind_t<void, _mfi::mf0<void, CSimDriver>, _bi::list1<_bi::value<CSimDriver*>>>` (RTTI 0x00F802D8) serves both sites, the member pointer being data (0x0073B85A pushes 0x0073D260, 0x0073D638 pushes 0x0073BDF0); its static vtable is {manager 0x010C79E4, invoker 0x010C79E8}, guard bit 0x010C79EC:
+ * Address: 0x00741810 (FUN_00741810 -- `function0<void>::function0<F>(F)`: `vtable = 0`, then `assign_to(f)`; EAX = the temporary, F by value, `ret 8`; callers 0x0073B865 (this constructor), 0x0073D642 (`ThreadCreateSim`); formerly the hand-written `BuildDeferredDriverCallback` in this file (RULE ONE), removed 2026-09-30.)
+ * Address: 0x00741D70 (FUN_00741D70 -- `function0<void>::assign_to<F>(F)`: the magic-static `stored_vtable(f)` with `basic_vtable0(F)`/`init` inlined, `has_empty_target` 0x00412B30, the 8-byte bind_t placement-copied into `functor` (+0x08), `vtable = &stored_vtable`; caller 0x00741810; formerly `BuildCallLaterCallback` in this file, a lambda that instantiated a different F (RULE ONE), removed 2026-09-30.)
+ * Address: 0x00742540 (FUN_00742540 -- `basic_vtable0<void>::basic_vtable0<F>(F)` out of line, `this` folded to the static 0x010C79E4: stores invoker 0x00742E20 / manager 0x00742E30 and returns `this`, `ret 8`; zero callers, unreachable (0x00741D70 inlines it); formerly `InitializeDeferredSimDriverCallableVtable` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+ * Address: 0x00742B00 (FUN_00742B00 -- `basic_vtable0<void>::init<F>(F)` out of line: the same two stores, `ret 8`; zero callers, unreachable; formerly `BindDeferredSimDriverCallableHandlers` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+ * Address: 0x00742DB0 (FUN_00742DB0 -- `basic_vtable0<void>::init<F>(F, function_obj_tag)` out of line: the same two stores, `ret 0xC` for F plus the tag; zero callers, unreachable; formerly the second address of `BindDeferredSimDriverCallableHandlers` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+ * Address: 0x00742E20 (FUN_00742E20 -- `void_function_obj_invoker0<F, void>::invoke(function_buffer&)`: `ecx = buf[+4]` (the bound CSimDriver*), `jmp buf[+0]` (the member pointer); reached through the invoker slot 0x010C79E8 stored at 0x00741D86, i.e. by `boost::thread`'s thread proc; formerly `InvokeDeferredSimDriverCallback` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+ * Address: 0x00742E30 (FUN_00742E30 -- `functor_manager<F, std::allocator<function_base>>::manage` with the in-buffer `manager(..., mpl::true_)` inlined: op 3 returns `&typeid(F)` 0x00F802D8, 0 copies the two words, 1 does nothing, 2 compares through `type_info::operator==` 0x00A8247D; reached through the manager slot 0x010C79E4 stored at 0x00741D90, called by the temporaries' `~function0` at 0x0073B8B1 and 0x0073D683; formerly `ManageDeferredSimDriverCallbackPayload` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
  */
 CSimDriver::CSimDriver(
   msvc8::auto_ptr<gpg::Stream> stream,
@@ -734,8 +702,7 @@ CSimDriver::CSimDriver(
   mMarshaller.reset(new CMarshaller(mClientManager.get()));
   mMarshaller->SetCommandSource(mCommandSourceId);
 
-  const auto createSimBootstrapProc = [](CSimDriver* const driver) { driver->ThreadCreateSim(); };
-  mCreateSimThread = new boost::thread(BuildDeferredDriverCallback(createSimBootstrapProc, this));
+  mCreateSimThread = new boost::thread(boost::bind(&CSimDriver::ThreadCreateSim, this));
 }
 
 /**
@@ -1168,9 +1135,7 @@ void CSimDriver::ThreadCreateSim()
 
   boost::mutex::scoped_lock lock(mLock);
 
-  mSimThread = new boost::thread(
-    BuildDeferredDriverCallback([](CSimDriver* const driver) { driver->ThreadRun(); }, this)
-  );
+  mSimThread = new boost::thread(boost::bind(&CSimDriver::ThreadRun, this));
 
   // The opening sync: the frame machine waits on it before it will leave
   // Initialize.
