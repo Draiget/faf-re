@@ -37,7 +37,7 @@ namespace moho
   class CDecalBuffer;
   class CCommandDB;
   class CUnitCommand;
-  class CEntityDb;
+  class EntityDB;
   class CAiFormationDBImpl;
   class CSimConVarBase;
   class Unit;
@@ -1495,7 +1495,7 @@ namespace moho
     boost::shared_ptr<CDebugCanvas> mDebugCanvas2;  // 0x0974
     PathTables* mPathTables;
     CAiFormationDBImpl* mFormationDB; // 0x0980
-    CEntityDb* mEntityDB;             // 0x0984
+    EntityDB* mEntityDB;             // 0x0984
     CCommandDB* mCommandDB;           // 0x0988
     uint32_t mReserved98C;
     uint32_t mReserved990;

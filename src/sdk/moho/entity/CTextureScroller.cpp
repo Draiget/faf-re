@@ -25,90 +25,6 @@ namespace
   // SScrollerSerializer::Init() below.
   [[nodiscard]] gpg::RType* CachedScrollerType();
 
-  /**
-   * Demangled: gpg::SerSaveLoadHelper<class Moho::SScroller> (Init() body
-   * confirmed at FUN_00777EC0, see below; matches the shared
-   * `InstallSerSaveLoadHelperCallbacksByTypeName` template's expansion for
-   * "Moho::SScroller" in gpg/core/containers/ArchiveSerialization.cpp).
-   *
-   * `CTextureScroller::MemberDeserialize` / `MemberSerialize` call the
-   * payload functions directly; this helper serves every other reflected
-   * read or write of an `SScroller`.
-   */
-  class SScrollerSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BDD6F0 (FUN_00BDD6F0, dynamic initializer for `gSScrollerSerializerHelper`)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the pending `sNewHelpers` list), binds the load/save
-     * callbacks and installs this helper's vtable (0x00E37270); the compiler
-     * registers the destructor with `atexit`.
-     */
-    SScrollerSerializer();
-
-    /**
-     * Address: 0x00C026E0 (FUN_00C026E0, dynamic atexit destructor for `gSScrollerSerializerHelper`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_007774D0` and `FUN_00777500` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~SScrollerSerializer() = default;
-
-    /**
-     * Address: 0x00777470 (FUN_00777470, Moho::SScrollerSerializer::Deserialize)
-     *
-     * What it does:
-     * Reflection load callback: reads one `SScroller` payload.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00777480 (FUN_00777480, Moho::SScrollerSerializer::Serialize)
-     *
-     * What it does:
-     * Reflection save callback: writes one `SScroller` payload.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00777EC0 (FUN_00777EC0, InstallMohoSScrollerSerializerCallbacks
-     * instantiation of the shared `InstallSerSaveLoadHelperCallbacksByTypeName`
-     * template in gpg/core/containers/ArchiveSerialization.cpp)
-     *
-     * What it does:
-     * Resolves `SScroller` reflected type metadata and publishes this
-     * helper's load/save callbacks to it.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mLoadCallback;
-    gpg::RType::save_func_t mSaveCallback;
-  };
-  static_assert(
-    offsetof(SScrollerSerializer, mLoadCallback) == 0x0C, "SScrollerSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SScrollerSerializer, mSaveCallback) == 0x10, "SScrollerSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(SScrollerSerializer) == 0x14, "SScrollerSerializer size must be 0x14");
-
-  void SScrollerSerializer::Init()
-  {
-    gpg::RType* const type = CachedScrollerType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  SScrollerSerializer gSScrollerSerializerHelper;
-
   [[nodiscard]] gpg::RType* CachedScrollerType()
   {
     if (moho::SScroller::sType == nullptr) {
@@ -336,92 +252,6 @@ namespace
   {
     (void)WriteReflectedPayload(archive, CachedScrollerType(), payload, ownerRef);
   }
-
-  /**
-   * Address: 0x00778170 (FUN_00778170)
-   *
-   * What it does:
-   * Deserializes one `SScroller` payload by loading its reflected
-   * `EScrollType` lane followed by all ten float lanes in binary order.
-   */
-  [[nodiscard]] gpg::ReadArchive* DeserializeSScrollerConfigPayload(
-    moho::SScroller* const payload,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (archive == nullptr || payload == nullptr) {
-      return archive;
-    }
-
-    const gpg::RRef ownerRef{};
-    archive->Read(CachedEScrollType(), &payload->mType, ownerRef);
-    archive->ReadFloat(&payload->mFloat04);
-    archive->ReadFloat(&payload->mFloat08);
-    archive->ReadFloat(&payload->mFloat0C);
-    archive->ReadFloat(&payload->mFloat10);
-    archive->ReadFloat(&payload->mScroll1.x);
-    archive->ReadFloat(&payload->mScroll1.y);
-    archive->ReadFloat(&payload->mScroll2.x);
-    archive->ReadFloat(&payload->mScroll2.y);
-    archive->ReadFloat(&payload->mFloat24);
-    archive->ReadFloat(&payload->mFloat28);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00778240 (FUN_00778240)
-   *
-   * What it does:
-   * Serializes one `SScroller` payload by writing its reflected
-   * `EScrollType` lane followed by all ten float lanes in binary order.
-   */
-  void SerializeSScrollerConfigPayload(
-    const moho::SScroller& payload,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (archive == nullptr) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-    archive->Write(CachedEScrollType(), &payload.mType, ownerRef);
-    archive->WriteFloat(payload.mFloat04);
-    archive->WriteFloat(payload.mFloat08);
-    archive->WriteFloat(payload.mFloat0C);
-    archive->WriteFloat(payload.mFloat10);
-    archive->WriteFloat(payload.mScroll1.x);
-    archive->WriteFloat(payload.mScroll1.y);
-    archive->WriteFloat(payload.mScroll2.x);
-    archive->WriteFloat(payload.mScroll2.y);
-    archive->WriteFloat(payload.mFloat24);
-    archive->WriteFloat(payload.mFloat28);
-  }
-
-  void SScrollerSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    (void)DeserializeSScrollerConfigPayload(reinterpret_cast<moho::SScroller*>(objectPtr), archive);
-  }
-
-  void SScrollerSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-  )
-  {
-    SerializeSScrollerConfigPayload(*reinterpret_cast<const moho::SScroller*>(objectPtr), archive);
-  }
-
-  /**
-   * Address: 0x00BDD6F0 (FUN_00BDD6F0, dynamic initializer for `gSScrollerSerializerHelper`)
-   *
-   * What it does:
-   * Binds this helper's load/save callbacks.
-   */
-  SScrollerSerializer::SScrollerSerializer()
-    : mLoadCallback(&SScrollerSerializer::Deserialize)
-    , mSaveCallback(&SScrollerSerializer::Serialize)
-  {}
 
   /**
    * Address: 0x007785B0 (FUN_007785B0)
@@ -796,7 +626,7 @@ namespace moho
 
     (void)archive->ReadPointer(&mEntity, &nullOwner);
 
-    (void)DeserializeSScrollerConfigPayload(&mScroller, archive);
+    mScroller.MemberDeserialize(archive);
 
     bool dir0 = false;
     bool dir1 = false;
@@ -834,7 +664,7 @@ namespace moho
 
     archive->WritePointer<moho::Entity>(mEntity, gpg::TrackedPointerState::Unowned, nullOwner);
 
-    SerializeSScrollerConfigPayload(mScroller, archive);
+    mScroller.MemberSerialize(archive);
 
     archive->WriteBool(mDir[0] != 0u);
     archive->WriteBool(mDir[1] != 0u);
@@ -933,4 +763,74 @@ namespace
 {
   // Address: 0x010BBB80 -- process-global `CTextureScrollerSerializer` singleton.
   moho::CTextureScrollerSerializer gCTextureScrollerSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00778170 (FUN_00778170)
+   *
+   * What it does:
+   * Deserializes one `SScroller` payload by loading its reflected
+   * `EScrollType` lane followed by all ten float lanes in binary order.
+   */
+  void SScroller::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef ownerRef{};
+    archive->Read(CachedEScrollType(), &mType, ownerRef);
+    archive->ReadFloat(&mFloat04);
+    archive->ReadFloat(&mFloat08);
+    archive->ReadFloat(&mFloat0C);
+    archive->ReadFloat(&mFloat10);
+    archive->ReadFloat(&mScroll1.x);
+    archive->ReadFloat(&mScroll1.y);
+    archive->ReadFloat(&mScroll2.x);
+    archive->ReadFloat(&mScroll2.y);
+    archive->ReadFloat(&mFloat24);
+    archive->ReadFloat(&mFloat28);
+  }
+
+  /**
+   * Address: 0x00778240 (FUN_00778240)
+   *
+   * What it does:
+   * Serializes one `SScroller` payload by writing its reflected
+   * `EScrollType` lane followed by all ten float lanes in binary order.
+   */
+  void SScroller::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedEScrollType(), &mType, ownerRef);
+    archive->WriteFloat(mFloat04);
+    archive->WriteFloat(mFloat08);
+    archive->WriteFloat(mFloat0C);
+    archive->WriteFloat(mFloat10);
+    archive->WriteFloat(mScroll1.x);
+    archive->WriteFloat(mScroll1.y);
+    archive->WriteFloat(mScroll2.x);
+    archive->WriteFloat(mScroll2.y);
+    archive->WriteFloat(mFloat24);
+    archive->WriteFloat(mFloat28);
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SScroller>`, vtable 0x00E37270.
+   *
+   * Address: 0x00BDD6F0 (FUN_00BDD6F0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C026E0 (FUN_00C026E0 -- the global's destructor.)
+   * Address: 0x00777EC0 (FUN_00777EC0 -- `Init`.)
+   * Address: 0x00777470 (FUN_00777470 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00777480 (FUN_00777480 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SScrollerSerializer : gpg::SerSaveLoadHelper<SScroller>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BBBFC -- process-global `SScrollerSerializer` singleton.
+  moho::SScrollerSerializer gSScrollerSerializer;
 } // namespace

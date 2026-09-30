@@ -984,7 +984,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\unit\core\UnitWeapon.cpp" />
     <ClCompile Include="moho\entity\EntityAttachPositionReflection.cpp" />
     <ClCompile Include="moho\entity\intel\CIntel.cpp" />
-    <ClCompile Include="moho\entity\intel\CIntelSerializer.cpp" />
     <ClCompile Include="moho\entity\EntityFastVectorReflection.cpp" />
     <ClCompile Include="moho\projectile\ProjectileStartupRegistrations.cpp" />
     <ClCompile Include="moho\entity\Prop.cpp" />
@@ -1640,7 +1639,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\entity\EntityPositionWatchEntry.h" />
     <ClInclude Include="moho\entity\PositionHistory.h" />
     <ClInclude Include="moho\entity\intel\CIntel.h" />
-    <ClInclude Include="moho\entity\intel\CIntelSerializer.h" />
     <ClInclude Include="moho\entity\intel\CIntelTypeInfo.h" />
     <ClInclude Include="moho\entity\intel\CIntelCounterHandle.h" />
     <ClInclude Include="moho\entity\intel\CIntelCounterHandleTypeInfo.h" />
@@ -1920,7 +1918,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\IAiSteering.h" />
     <ClInclude Include="moho\ai\IAiSteeringTypeInfo.h" />
     <ClInclude Include="moho\ai\IAiTransport.h" />
-    <ClInclude Include="moho\ai\IAiTransportSerializer.h" />
     <ClInclude Include="moho\ai\IAiTransportTypeInfo.h" />
     <ClInclude Include="moho\ai\SPickUpInfo.h" />
     <ClInclude Include="moho\ai\SPickUpInfoVectorReflection.h" />
@@ -1968,7 +1965,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\EAiTransportEventTypeInfo.h" />
     <ClInclude Include="moho\ai\EAirCombatStateTypeInfo.h" />
     <ClInclude Include="moho\ai\SAiReservedTransportBoneTypeInfo.h" />
-    <ClInclude Include="moho\ai\SAttachPointSerializer.h" />
     <ClInclude Include="moho\ai\SAttachPointTypeInfo.h" />
     <ClInclude Include="moho\ai\STransportPickUpInfoTypeInfo.h" />
     <ClInclude Include="moho\ai\SContinueInfoTypeInfo.h" />

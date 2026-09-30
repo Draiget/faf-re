@@ -43,6 +43,22 @@ namespace moho
    */
   struct SAttachPoint
   {
+    /**
+     * Address: 0x005EB9E0 (FUN_005EB9E0)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x005EB980 (FUN_005EB980)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     std::uint32_t index; // +0x00
     Wm3::Vec3f localPos; // +0x04
     float distSq;        // +0x10

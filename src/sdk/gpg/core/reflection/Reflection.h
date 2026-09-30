@@ -196,7 +196,7 @@ namespace moho
   class Motor;
   class Entity;
   class CollisionBeamEntity;
-  class CEntityDb;
+  class EntityDB;
   class EntitySetBase;
   template <class T>
   class EntitySetTemplate;
@@ -704,7 +704,7 @@ namespace gpg
      * Address: 0x007586F0 (FUN_007586F0 -- `Upcast<moho::CDecalBuffer>`; formerly `UpcastToCDecalBuffer` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x007588D0 (FUN_007588D0 -- `Upcast<moho::IEffectManager>`; formerly `UpcastToIEffectManager` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x00758AC0 (FUN_00758AC0 -- `Upcast<moho::ISoundManager>`; formerly `UpcastToISoundManager` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00758CB0 (FUN_00758CB0 -- `Upcast<moho::CEntityDb>`; formerly `UpcastToCEntityDb` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00758CB0 (FUN_00758CB0 -- `Upcast<moho::EntityDB>`; formerly `UpcastToCEntityDb` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x0076B6E0 (FUN_0076B6E0 -- `Upcast<moho::PathQueue::Impl>`; formerly `UpcastToPathQueueImpl` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x0076ED90 (FUN_0076ED90 -- `Upcast<moho::CIntelPosHandle>`; formerly `UpcastToCIntelPosHandle` in gpg/core/containers/ReadArchive.cpp.)
      * Address: 0x0054EBC0 (FUN_0054EBC0 -- `Upcast<moho::CAniPose>`, the type check of `ReadPointerShared<moho::CAniPose>`; formerly `gpg::RRef::Upcast_CAniPose` in gpg/core/containers/ArchiveSerialization.cpp.)
@@ -1583,7 +1583,7 @@ namespace gpg
    * Wrapper that materializes one temporary `RRef_EntityDB` and copies its
    * object/type lanes into the destination ref.
    */
-  RRef* AssignEntityDBRef(RRef* out, moho::CEntityDb* value);
+  RRef* AssignEntityDBRef(RRef* out, moho::EntityDB* value);
 
   /**
    * Address: 0x00698D60 (FUN_00698D60, gpg::RRef_SPhysConstants pack lane A)
@@ -5493,7 +5493,7 @@ namespace gpg
    * Address: 0x00757C50 (FUN_00757C50 -- `ReadPointerOwned<moho::CDecalBuffer>`; formerly `ReadPointerOwned_CDecalBuffer`.)
    * Address: 0x00757D90 (FUN_00757D90 -- `ReadPointerOwned<moho::IEffectManager>`; formerly `ReadPointerOwned_IEffectManager`.)
    * Address: 0x00757ED0 (FUN_00757ED0 -- `ReadPointerOwned<moho::ISoundManager>`; formerly `ReadPointerOwned_ISoundManager`.)
-   * Address: 0x00758010 (FUN_00758010 -- `ReadPointerOwned<moho::CEntityDb>`; formerly `ReadPointerOwned_EntityDB`.)
+   * Address: 0x00758010 (FUN_00758010 -- `ReadPointerOwned<moho::EntityDB>`; formerly `ReadPointerOwned_EntityDB`.)
    * Address: 0x0076B570 (FUN_0076B570 -- `ReadPointerOwned<moho::PathQueue::Impl>`; formerly `ReadPointerOwned_PathQueue_Impl`.)
    * Address: 0x0076EC30 (FUN_0076EC30 -- `ReadPointerOwned<moho::CIntelPosHandle>`; formerly `ReadPointerOwned_CIntelPosHandle`.)
    * Address: 0x0077D7A0 (FUN_0077D7A0 -- `ReadPointerOwned<moho::CDecalHandle>`; formerly `ReadPointerOwned_CDecalHandle`.)
@@ -5534,9 +5534,9 @@ namespace gpg
    * Address: 0x00706B60 (FUN_00706B60 -- `ReadPointerOwned<moho::CArmyStats>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x00756330 (FUN_00756330 -- `ReadPointerOwned<moho::CCommandDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCCommandDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x00756F90 (FUN_00756F90 -- `ReadPointerOwned<moho::CCommandDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCCommandDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756430 (FUN_00756430 -- `ReadPointerOwned<moho::CEntityDb>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCEntityDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00756430 (FUN_00756430 -- `ReadPointerOwned<moho::EntityDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCEntityDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x006B4600 (FUN_006B4600 -- `ReadPointerOwned<moho::CAniActor>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00757160 (FUN_00757160 -- `ReadPointerOwned<moho::CEntityDb>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCEntityDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00757160 (FUN_00757160 -- `ReadPointerOwned<moho::EntityDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCEntityDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x00706C20 (FUN_00706C20 -- `ReadPointerOwned<moho::PathQueue>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x00706510 (FUN_00706510 -- `ReadPointerOwned<moho::CEconomy>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCEconomySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
    * Address: 0x00706B00 (FUN_00706B00 -- `ReadPointerOwned<moho::CEconomy>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCEconomySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
@@ -6250,7 +6250,7 @@ namespace gpg
    * Address: 0x00683600 (FUN_00683600 -- `MakeRRef<moho::CTextureScroller>`; formerly `gpg::RRef_CTextureScroller`.)
    * Address: 0x006837E0 (FUN_006837E0 -- `MakeRRef<moho::SPhysBody>`; formerly `gpg::RRef_SPhysBody`.)
    * Address: 0x006839C0 (FUN_006839C0 -- `MakeRRef<moho::Motor>`; formerly `gpg::RRef_Motor`.)
-   * Address: 0x00689360 (FUN_00689360 -- `MakeRRef<moho::CEntityDb>`; formerly `gpg::RRef_EntityDB`.)
+   * Address: 0x00689360 (FUN_00689360 -- `MakeRRef<moho::EntityDB>`; formerly `gpg::RRef_EntityDB`.)
    * Address: 0x00689920 (FUN_00689920 -- `MakeRRef<moho::EntitySetBase>`; formerly `gpg::RRef_EntitySetBase`.)
    * Address: 0x00692DB0 (FUN_00692DB0 -- `MakeRRef<moho::EVisibilityMode>`; formerly `gpg::RRef_EVisibilityMode`.)
    * Address: 0x00692F50 (FUN_00692F50 -- `MakeRRef<moho::EIntel>`; formerly `gpg::RRef_EIntel`.)

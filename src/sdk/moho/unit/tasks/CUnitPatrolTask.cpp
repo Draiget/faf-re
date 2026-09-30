@@ -280,7 +280,7 @@ namespace moho
 
     // Link the per-army membership node into the sim entity DB's registered-set
     // list (binary `mUnit->mSim->mEntityDB + 0x18`).
-    CEntityDb* const entityDb = unit->SimulationRef->mEntityDB;
+    EntityDB* const entityDb = unit->SimulationRef->mEntityDB;
     mMembership.ListLinkBefore(&entityDb->mRegisteredEntitySets);
 
     // When a formation instance is bound, splice the formation-status listener

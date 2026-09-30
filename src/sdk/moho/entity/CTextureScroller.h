@@ -22,6 +22,22 @@ namespace moho
    */
   struct SScroller
   {
+    /**
+     * Address: 0x00778240 (FUN_00778240)
+     *
+     * What it does:
+     * Saves this object's members.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00778170 (FUN_00778170)
+     *
+     * What it does:
+     * Loads this object's members.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     static gpg::RType* sType;
 
     /**

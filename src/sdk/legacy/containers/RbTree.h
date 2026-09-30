@@ -203,7 +203,7 @@ namespace msvc8
          */
         /**
          * Address: 0x006880F0 (FUN_006880F0, `_Min` for `msvc8::map<
-         * std::uint32_t, moho::IdPool>` -- `CEntityDb::mIdPoolTree` in
+         * std::uint32_t, moho::IdPool>` -- `EntityDB::mIdPoolTree` in
          * `EntityDb.h`. Node layout confirmed against `FUN_006881C0`
          * (`buy_node`, cited above): `IdPool`'s `alignas(8)` (see that
          * type's own citation in `IdPool.h`) forces a 4-byte pad between
@@ -445,7 +445,7 @@ namespace msvc8
          */
         /**
          * Address: 0x00688830 (FUN_00688830, `_Max` for `msvc8::map<
-         * std::uint32_t, moho::IdPool>` -- `CEntityDb::mIdPoolTree` in
+         * std::uint32_t, moho::IdPool>` -- `EntityDB::mIdPoolTree` in
          * `EntityDb.h`, sibling of `rb_min`'s 0x006880F0 citation above
          * (same node layout: colour/isNil at node+0xCC8/node+0xCC9). Walks
          * `_Right` (node+0x08) while `!_Isnil` (node+0xCC9), matching this
@@ -583,7 +583,7 @@ namespace msvc8
          */
         /**
          * Address: 0x006878C0 (FUN_006878C0, `_Inc` for `msvc8::map<
-         * std::uint32_t, moho::IdPool>` -- `CEntityDb::mIdPoolTree` in
+         * std::uint32_t, moho::IdPool>` -- `EntityDB::mIdPoolTree` in
          * `EntityDb.h`. Reached from `EntityDbIdPoolMapTypeInfo::SerSave`'s
          * (binary: `std::map_IdPool::Serialize`, `FUN_00686B10`) range-for
          * walk over the map. Its register-shape adapters `FUN_00685FA0`/
@@ -984,7 +984,7 @@ namespace msvc8
         /**
          * Address: 0x006888E0 (FUN_006888E0, the predecessor-lookup half of
          * `insert_unique` for `msvc8::map<std::uint32_t, moho::IdPool>` --
-         * `CEntityDb::mIdPoolTree` in `EntityDb.h`. Reached from
+         * `EntityDB::mIdPoolTree` in `EntityDb.h`. Reached from
          * `insert_unique`'s emission `FUN_006870D0` and `insert_hint`'s
          * emission `FUN_006864E0`, both cited below.)
          * Address: 0x006E28D0 (FUN_006E28D0, the command-id map's
@@ -1465,7 +1465,7 @@ namespace msvc8
             }
             /**
              * Address: 0x006886A0 (FUN_006886A0, postfix `_Inc` for
-             * `msvc8::map<std::uint32_t, moho::IdPool>` -- `CEntityDb::
+             * `msvc8::map<std::uint32_t, moho::IdPool>` -- `EntityDB::
              * mIdPoolTree` in `EntityDb.h`. Copies the pre-increment cursor
              * out, advances via prefix `operator++` (`FUN_006878C0`, cited
              * on `rb_increment` above), returns the copy -- exactly this
@@ -2056,20 +2056,20 @@ namespace msvc8
              */
             /**
              * Address: 0x006843B0 (FUN_006843B0, `Moho::EntityDB::~EntityDB` --
-             * `msvc8::map<std::uint32_t, moho::IdPool>`, `CEntityDb::
+             * `msvc8::map<std::uint32_t, moho::IdPool>`, `EntityDB::
              * mIdPoolTree` in `EntityDb.h`. Recurses `FUN_00688030`
              * (`destroy_subtree`, cited below) from the tree's actual root
              * (`head->parent`) then releases the sentinel head -- exactly
              * this member's `erase_range(leftmost(), header())` whole-tree
              * fast path followed by `free_raw(head_)`. A prior hand-rolled
-             * version of `CEntityDb`'s destructor recursed from
+             * version of `EntityDB`'s destructor recursed from
              * `head->left` (leftmost()) instead of the root, which would
              * have destroyed at most one node and leaked the rest; this
              * member does not have that bug. Reached automatically via
              * member destruction, `EntityDb.h`.)
              * Address: 0x00684310 (FUN_00684310, sub_684310) -- the same
              * `mIdPoolTree` instantiation's `~rb_tree()` emission for a
-             * *different* caller: `CEntityDb::CEntityDb`'s (0x00684230,
+             * *different* caller: `EntityDB::EntityDB`'s (0x00684230,
              * `EntityDb.cpp`) SEH unwind funclet, torn down if a
              * later-constructed member (`mRegisteredEntitySets`/
              * `mEntityList`/`mAllUnits`, all declared after `mIdPoolTree` in
@@ -3361,7 +3361,7 @@ namespace msvc8
              */
             /**
              * Address: 0x006870D0 (FUN_006870D0, `msvc8::map<std::uint32_t,
-             * moho::IdPool>::insert_unique` -- `CEntityDb::mIdPoolTree` in
+             * moho::IdPool>::insert_unique` -- `EntityDB::mIdPoolTree` in
              * `EntityDb.h`. Matches this member field for field: descends
              * recording the last branch (`addLeft`), fast-paths when the
              * descent bottomed out at `leftmost()`, otherwise confirms
@@ -3838,7 +3838,7 @@ namespace msvc8
             /**
              * Address: 0x006864E0 (FUN_006864E0, `std::map_uint_IdPool::insert`
              * -- `msvc8::map<std::uint32_t, moho::IdPool>`'s hinted insert,
-             * `CEntityDb::mIdPoolTree` in `EntityDb.h`. Matches this member's
+             * `EntityDB::mIdPoolTree` in `EntityDb.h`. Matches this member's
              * branch structure directly: empty-tree fast path, `hint ==
              * leftmost()` check, `hint == end()` check against `rightmost()`,
              * then the decrement/increment straddle checks (via
@@ -3846,7 +3846,7 @@ namespace msvc8
              * through to `insert_at` (`FUN_00687280`, cited above) with the
              * decided `addLeft`, and a fallback to `insert_unique`
              * (`FUN_006870D0`, cited above) taking its `.first`. Reached
-             * from `CEntityDb::MemberSerialize`'s
+             * from `EntityDB::MemberSerialize`'s
              * `mIdPoolTree[familySourceBits]` (binary: `Moho::EntityDB::
              * DoReserveId`/`ReleaseId`'s `std::map_uint_IdPool::find2`,
              * `FUN_00685750`, cited on `msvc8::map::operator[]` in Map.h --
@@ -4632,7 +4632,7 @@ namespace msvc8
              */
             /**
              * Address: 0x00687CC0 (FUN_00687CC0, `erase(const_iterator)` for
-             * `msvc8::map<std::uint32_t, moho::IdPool>` -- `CEntityDb::
+             * `msvc8::map<std::uint32_t, moho::IdPool>` -- `EntityDB::
              * mIdPoolTree` in `EntityDb.h`. 251-instruction body, unmistakably
              * this member: checked-iterator guard throwing `std::out_of_range(
              * "invalid map/set<T> iterator")` on a nil node (isNil@node+0xCC9,
@@ -5411,7 +5411,7 @@ namespace msvc8
              */
             /**
              * Address: 0x00687190 (FUN_00687190, `erase(iterator, iterator)`
-             * for `msvc8::map<std::uint32_t, moho::IdPool>` -- `CEntityDb::
+             * for `msvc8::map<std::uint32_t, moho::IdPool>` -- `EntityDB::
              * mIdPoolTree` in `EntityDb.h`. Matches this member's two-shape
              * split exactly: `cmp [first],[head->left] / cmp [last],[head]`
              * gates the whole-tree fast path (`sub_688030` = `destroy_
@@ -5428,7 +5428,7 @@ namespace msvc8
              *     destruction, inlining `~rb_tree()`'s body but keeping this
              *     call out-of-line.
              *   - `0x00684310` (`sub_684310`, cited separately below, right
-             *     after `~rb_tree()`) -- `CEntityDb::CEntityDb`'s (0x00684230)
+             *     after `~rb_tree()`) -- `EntityDB::EntityDB`'s (0x00684230)
              *     SEH unwind funclet for the already-constructed
              *     `mIdPoolTree` member, should a later member's construction
              *     throw. Sole caller confirmed via this pass's xref sweep
@@ -5450,7 +5450,7 @@ namespace msvc8
              *     an unchecked gap.
              *
              * Reached in practice via `mIdPoolTree`'s membership in
-             * `CEntityDb` (`EntityDb.h`) -- `~CEntityDb()`'s implicit member
+             * `EntityDB` (`EntityDb.h`) -- `~EntityDB()`'s implicit member
              * destruction (`EntityDb.cpp`) is what triggers `~rb_tree()`,
              * which is what calls this member.
              *
@@ -5822,7 +5822,7 @@ namespace msvc8
              * Address: 0x00687B90 (FUN_00687B90, mirror emission)
              *
              * `msvc8::map<std::uint32_t, moho::IdPool>::clear` --
-             * `CEntityDb::mIdPoolTree` in `EntityDb.h`. Destroys the subtree
+             * `EntityDB::mIdPoolTree` in `EntityDb.h`. Destroys the subtree
              * from the root (`FUN_00688030`, cited on `destroy_subtree`
              * above) then rewires the sentinel head back to self-linked
              * empty form with zero size -- exactly this member's shape.
@@ -5981,7 +5981,7 @@ namespace msvc8
             /**
              * Address: 0x00688180 (FUN_00688180, `Mangled: std::map_uint_IdPool
              * ::_Node allocator` -- `msvc8::map<std::uint32_t, moho::IdPool>`,
-             * `CEntityDb::mIdPoolTree` in `EntityDb.h`. Pure raw allocation:
+             * `EntityDB::mIdPoolTree` in `EntityDb.h`. Pure raw allocation:
              * `operator new(sizeof(node_type))` with no field writes of its
              * own -- the caller (`FUN_006881C0`, `buy_node` below) writes
              * every link/value/colour field afterward. Node size 0xCD0 =
@@ -6247,7 +6247,7 @@ namespace msvc8
              * Address: 0x00687830 (FUN_00687830, mirror emission)
              *
              * `msvc8::map<std::uint32_t, moho::IdPool>`'s bare node-storage
-             * release -- `CEntityDb::mIdPoolTree` in `EntityDb.h`. Plain
+             * release -- `EntityDB::mIdPoolTree` in `EntityDb.h`. Plain
              * `operator delete(n)`, matching this member exactly.
              */
             /**
@@ -6367,7 +6367,7 @@ namespace msvc8
              */
             /**
              * Address: 0x00684230 (FUN_00684230, `Moho::EntityDB::EntityDB` --
-             * `msvc8::map<std::uint32_t, moho::IdPool>`, `CEntityDb::
+             * `msvc8::map<std::uint32_t, moho::IdPool>`, `EntityDB::
              * mIdPoolTree` in `EntityDb.h`. The binary inlines buy_head's
              * allocate-then-self-link-then-isNil=1/color=black sequence
              * directly into the owning class's constructor rather than
@@ -6383,7 +6383,7 @@ namespace msvc8
              * Address: 0x00687250 (FUN_00687250, sibling emission)
              *
              * Further `msvc8::map<std::uint32_t, moho::IdPool>` sentinel-head
-             * allocate/self-link/isNil=1 emissions -- `CEntityDb::mIdPoolTree`,
+             * allocate/self-link/isNil=1 emissions -- `EntityDB::mIdPoolTree`,
              * `EntityDb.h`. Same fused shape as `FUN_00684230` above, emitted
              * at other construction call sites (e.g. placement-new via
              * `EntityDbTypeInfo::CtrRef`/`NewEntityDbTypeLaneRef`, EntityDb.cpp).
@@ -6814,7 +6814,7 @@ namespace msvc8
              */
             /**
              * Address: 0x006881C0 (FUN_006881C0, `msvc8::map<std::uint32_t,
-             * moho::IdPool>::_Buynode` -- `CEntityDb::mIdPoolTree` in
+             * moho::IdPool>::_Buynode` -- `EntityDB::mIdPoolTree` in
              * `EntityDb.h`. Allocates via `FUN_00688180` (`alloc_raw`, cited
              * above), writes `left`/`right`=head and `parent`=the caller's
              * `where` (all three from its own arguments rather than a fixed
@@ -6953,7 +6953,7 @@ namespace msvc8
              * (insert descent) and a 7-call-site cluster inside
              * `FUN_009496E0`, a much higher call volume than the EntId map
              * above, suggesting a hot per-entity or per-frame map. Not
-             * `CEntityDb::mIdPoolTree` (that instantiation's insert
+             * `EntityDB::mIdPoolTree` (that instantiation's insert
              * machinery is already separately cited on `erase_node`/
              * `buy_node` elsewhere in this file, `EntityDb.h:428-437`).
              * Owning class not yet pinned down.
@@ -7317,12 +7317,12 @@ namespace msvc8
              */
             /**
              * Address: 0x00688030 (FUN_00688030, `msvc8::map<std::uint32_t,
-             * moho::IdPool>::_Erase` -- `CEntityDb::mIdPoolTree` in
+             * moho::IdPool>::_Erase` -- `EntityDB::mIdPoolTree` in
              * `EntityDb.h`. Reached two ways: from this member's own `clear()`
              * (cited above) during `EntityDbIdPoolMapTypeInfo::SerLoad`'s
              * clear-before-repopulate step (binary:
              * `std::map_IdPool::Deserialize`, FUN_00686990), and from
-             * `~rb_tree()` (cited above) during `CEntityDb`'s destructor.
+             * `~rb_tree()` (cited above) during `EntityDB`'s destructor.
              * Confirmed the true argument is `head->parent` (root), not
              * `head->left` (leftmost) -- see the `~rb_tree()` citation's note
              * on the bug that distinction fixes.)
@@ -7925,7 +7925,7 @@ namespace msvc8
              */
             /**
              * Address: 0x006880A0 (FUN_006880A0, `msvc8::map<std::uint32_t,
-             * moho::IdPool>::_Lrotate` -- `CEntityDb::mIdPoolTree` in
+             * moho::IdPool>::_Lrotate` -- `EntityDB::mIdPoolTree` in
              * `EntityDb.h`. Byte-for-byte this member's shape (pivot =
              * `n->right`; `pivot->left`'s `isNil` probed at its
              * instantiation-specific offset `+0xCC9`, matching `IdPool`'s
@@ -8214,7 +8214,7 @@ namespace msvc8
              */
             /**
              * Address: 0x00688120 (FUN_00688120, `msvc8::map<std::uint32_t,
-             * moho::IdPool>::_Rrotate` -- `CEntityDb::mIdPoolTree` in
+             * moho::IdPool>::_Rrotate` -- `EntityDB::mIdPoolTree` in
              * `EntityDb.h`. Mirror of `rotate_left`'s FUN_006880A0 above,
              * same instantiation. Reached from `insert_at`'s emission
              * FUN_00687280's fixup loop, cited above.)
@@ -8525,7 +8525,7 @@ namespace msvc8
              */
             /**
              * Address: 0x00687280 (FUN_00687280, `msvc8::map<std::uint32_t,
-             * moho::IdPool>::_Insert` -- `CEntityDb::mIdPoolTree` in
+             * moho::IdPool>::_Insert` -- `EntityDB::mIdPoolTree` in
              * `EntityDb.h`. The `_Mysize >= 0x1420B4` guard is this member's
              * `max_size() - 1u <= size_` for the 0xCB8-byte `pair<const
              * uint32_t, IdPool>` value_type (`0xFFFFFFFF / 0xCB8 - 1 ==
@@ -8542,7 +8542,7 @@ namespace msvc8
              * and from `insert_hint`'s emission `FUN_006864E0` (cited
              * below) -- both real paths in this codebase: the former via
              * `EntityDbIdPoolMapTypeInfo::SerLoad`'s per-element
-             * `map->insert(...)`, the latter via `CEntityDb::
+             * `map->insert(...)`, the latter via `EntityDB::
              * MemberDeserialize`'s `mIdPoolTree[familySourceBits]`.)
              */
             /**

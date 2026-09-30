@@ -145,7 +145,7 @@ namespace moho
     CEntityDbAllUnitsNode* node = sim->mEntityDB->AllUnitsEnd(0u);
     CEntityDbAllUnitsNode* const endNode = sim->mEntityDB->AllUnitsEnd();
     while (node != endNode) {
-      Unit* const unit = CEntityDb::UnitFromAllUnitsNode(node);
+      Unit* const unit = EntityDB::UnitFromAllUnitsNode(node);
       if (unit == nullptr) {
         break;
       }
@@ -155,7 +155,7 @@ namespace moho
         DrawNavigatorPathOverlay(sim, unit->GetFootprint(), navigator->GetNavPath());
       }
 
-      node = CEntityDb::NextAllUnitsNode(node);
+      node = EntityDB::NextAllUnitsNode(node);
     }
   }
 } // namespace moho

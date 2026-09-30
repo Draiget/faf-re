@@ -23,8 +23,6 @@
 
 namespace
 {
-  // Address: 0x010A96D4 -- process-global `AxisAlignedBox3fSerializer` singleton.
-  moho::AxisAlignedBox3fSerializer gAxisAlignedBox3fSerializer;
   // Address: 0x010A9634 -- process-global `Vector2iSerializer` singleton.
   moho::Vector2iSerializer gVector2iSerializer;
   // Address: 0x010A9648 -- process-global `Vector3iSerializer` singleton.
@@ -490,50 +488,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EDB60 (FUN_004EDB60, Moho::AxisAlignedBox3f::MemberDeserialize)
-   *
-   * What it does:
-   * Loads `Min` and `Max` vector lanes in archive order.
-   */
-  void AxisAlignedBox3fMemberDeserialize(Wm3::AxisAlignedBox3f* const box, gpg::ReadArchive* const archive)
-  {
-    GPG_ASSERT(box != nullptr);
-    GPG_ASSERT(archive != nullptr);
-    if (box == nullptr || archive == nullptr) {
-      return;
-    }
-
-    archive->ReadFloat(&box->Min.x);
-    archive->ReadFloat(&box->Min.y);
-    archive->ReadFloat(&box->Min.z);
-    archive->ReadFloat(&box->Max.x);
-    archive->ReadFloat(&box->Max.y);
-    archive->ReadFloat(&box->Max.z);
-  }
-
-  /**
-   * Address: 0x004EDBB0 (FUN_004EDBB0, Moho::AxisAlignedBox3f::MemberSerialize)
-   *
-   * What it does:
-   * Stores `Min` and `Max` vector lanes in archive order.
-   */
-  void AxisAlignedBox3fMemberSerialize(const Wm3::AxisAlignedBox3f* const box, gpg::WriteArchive* const archive)
-  {
-    GPG_ASSERT(box != nullptr);
-    GPG_ASSERT(archive != nullptr);
-    if (box == nullptr || archive == nullptr) {
-      return;
-    }
-
-    archive->WriteFloat(box->Min.x);
-    archive->WriteFloat(box->Min.y);
-    archive->WriteFloat(box->Min.z);
-    archive->WriteFloat(box->Max.x);
-    archive->WriteFloat(box->Max.y);
-    archive->WriteFloat(box->Max.z);
-  }
-
-  /**
    * Address: 0x004E9FA0 (FUN_004E9FA0)
    *
    * What it does:
@@ -582,22 +536,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004EA140 (FUN_004EA140, Moho::AxisAlignedBox3fSerializer::Deserialize)
-   */
-  void AxisAlignedBox3fSerializer::Deserialize(gpg::ReadArchive* const archive, Wm3::AxisAlignedBox3f* const box)
-  {
-    AxisAlignedBox3fMemberDeserialize(box, archive);
-  }
-
-  /**
-   * Address: 0x004EA150 (FUN_004EA150, Moho::AxisAlignedBox3fSerializer::Serialize)
-   */
-  void AxisAlignedBox3fSerializer::Serialize(gpg::WriteArchive* const archive, Wm3::AxisAlignedBox3f* const box)
-  {
-    AxisAlignedBox3fMemberSerialize(box, archive);
-  }
-
-  /**
    * `FUN_004EA1A0`/`FUN_004EA1D0` (cleanup_AxisAlignedBox3fSerializerVariant1/2)
    * removed here: both are zero-xref dead duplicate unlink-helper fragments
    * (confirmed via `FUN_004EA1A0.xrefs.txt`/`FUN_004EA1D0.xrefs.txt`,
@@ -605,33 +543,6 @@ namespace moho
    * across every other file in this campaign (e.g. `CColPrimitiveBox3f.cpp`'s
    * `FUN_004FF8D0`/`FUN_004FF900`). Marked `skip` in the progress DB.
    */
-
-  /**
-   * Address: 0x00BC6C60 (FUN_00BC6C60, dynamic initializer for the global
-   * `AxisAlignedBox3fSerializer` singleton)
-   */
-  AxisAlignedBox3fSerializer::AxisAlignedBox3fSerializer()
-    : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&AxisAlignedBox3fSerializer::Deserialize))
-    , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&AxisAlignedBox3fSerializer::Serialize))
-  {
-  }
-
-  /**
-   * Address: 0x00BF1230 (FUN_00BF1230, Moho::AxisAlignedBox3fSerializer::~AxisAlignedBox3fSerializer)
-   */
-  AxisAlignedBox3fSerializer::~AxisAlignedBox3fSerializer() = default;
-
-  /**
-   * Address: 0x004ED140 (FUN_004ED140, Moho::AxisAlignedBox3fSerializer::Init)
-   */
-  void AxisAlignedBox3fSerializer::Init()
-  {
-    gpg::RType* const type = ResolveAxisAlignedBox3fType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mDeserialize;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerialize;
-  }
 
   /**
    * Address: 0x004EA200 (FUN_004EA200, Moho::Vector2iTypeInfo::Vector2iTypeInfo)
@@ -2271,4 +2182,62 @@ namespace
 {
   // Address: 0x010A992C -- process-global `VAxes3Serializer` singleton.
   moho::VAxes3Serializer gVAxes3Serializer;
+} // namespace
+
+namespace Wm3
+{
+  /**
+   * Address: 0x004EDB60 (FUN_004EDB60, Wm3::AxisAlignedBox3f::MemberDeserialize)
+   *
+   * What it does:
+   * Loads `Min` and `Max` vector lanes in archive order.
+   */
+  template <>
+  void AxisAlignedBox3<float>::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->ReadFloat(&Min.x);
+    archive->ReadFloat(&Min.y);
+    archive->ReadFloat(&Min.z);
+    archive->ReadFloat(&Max.x);
+    archive->ReadFloat(&Max.y);
+    archive->ReadFloat(&Max.z);
+  }
+
+  /**
+   * Address: 0x004EDBB0 (FUN_004EDBB0, Wm3::AxisAlignedBox3f::MemberSerialize)
+   *
+   * What it does:
+   * Stores `Min` and `Max` vector lanes in archive order.
+   */
+  template <>
+  void AxisAlignedBox3<float>::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteFloat(Min.x);
+    archive->WriteFloat(Min.y);
+    archive->WriteFloat(Min.z);
+    archive->WriteFloat(Max.x);
+    archive->WriteFloat(Max.y);
+    archive->WriteFloat(Max.z);
+  }
+} // namespace Wm3
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Wm3::AxisAlignedBox3f>`, vtable 0x00E0BCF0.
+   *
+   * Address: 0x00BC6C60 (FUN_00BC6C60 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF1230 (FUN_00BF1230 -- the global's destructor.)
+   * Address: 0x004ED140 (FUN_004ED140 -- `Init`.)
+   * Address: 0x004EA140 (FUN_004EA140 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x004EA150 (FUN_004EA150 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct AxisAlignedBox3fSerializer : gpg::SerSaveLoadHelper<Wm3::AxisAlignedBox3f>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A96D4 -- process-global `AxisAlignedBox3fSerializer` singleton.
+  moho::AxisAlignedBox3fSerializer gAxisAlignedBox3fSerializer;
 } // namespace

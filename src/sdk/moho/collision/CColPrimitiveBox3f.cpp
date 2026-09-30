@@ -9,6 +9,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -51,8 +52,6 @@ namespace
 
   Box3fTypeInfoBootstrap gBox3fTypeInfoBootstrap;
 
-  // Address: 0x010A7CBC -- process-global `Box3fSerializer` singleton.
-  moho::Box3fSerializer gBox3fSerializer;
 } // namespace
 
 namespace Wm3
@@ -141,50 +140,6 @@ namespace moho
     gpg::RType::Init();
     Finish();
   }
-
-  /**
-   * Address: 0x00474770 (FUN_00474770, Moho::Box3fSerializer::Deserialize)
-   */
-  void Box3fSerializer::Deserialize(gpg::ReadArchive* archive, int objectStorage, int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<Wm3::Box3f*>(objectStorage);
-    object->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00474780 (FUN_00474780, Moho::Box3fSerializer::Serialize)
-   */
-  void Box3fSerializer::Serialize(gpg::WriteArchive* archive, int objectStorage, int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<const Wm3::Box3f*>(objectStorage);
-    object->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x004756D0 (FUN_004756D0, gpg::SerSaveLoadHelper<Wm3::Box3<float>>::Init lane)
-   */
-  void Box3fSerializer::Init()
-  {
-    gpg::RType* const type = CachedBox3fType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  /**
-   * Address: 0x00BC4A40 (FUN_00BC4A40, register_Box3fSerializer)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  Box3fSerializer::Box3fSerializer()
-    : mLoadCallback(&Box3fSerializer::Deserialize)
-    , mSaveCallback(&Box3fSerializer::Serialize)
-  {}
-
-  Box3fSerializer::~Box3fSerializer() = default;
 
   /**
    * Address: 0x00BC4A20 (FUN_00BC4A20, register_Box3fTypeInfo)
@@ -470,4 +425,25 @@ namespace
 
   // Address: 0x010A9E14 -- process-global `DColPrimBoxConstruct` singleton.
   moho::DColPrimBoxConstruct gDColPrimBoxConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Wm3::Box3f>`, vtable 0x00E03944.
+   *
+   * Address: 0x00BC4A40 (FUN_00BC4A40 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEF830 (FUN_00BEF830 -- the global's destructor.)
+   * Address: 0x004756D0 (FUN_004756D0 -- `Init`.)
+   * Address: 0x00474770 (FUN_00474770 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00474780 (FUN_00474780 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct Box3fSerializer : gpg::SerSaveLoadHelper<Wm3::Box3f>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A7CBC -- process-global `Box3fSerializer` singleton.
+  moho::Box3fSerializer gBox3fSerializer;
 } // namespace

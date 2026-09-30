@@ -1,4 +1,3 @@
-#include "moho/ai/IAiTransportSerializer.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -6,18 +5,12 @@
 #include <typeinfo>
 
 #include "moho/ai/IAiTransport.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
 namespace
 {
-  // Address: 0x010B06D4 -- process-global `IAiTransportSerializer`
-  // singleton. Constructing it runs
-  // IAiTransportSerializer::IAiTransportSerializer() (0x00BCEEB0), which
-  // splices this helper into gpg::SerHelperBase::sNewHelpers;
-  // gpg::SerHelperBase::InitNewHelpers() later dispatches Init() on it from
-  // within the first ReadArchive/WriteArchive construction.
-  moho::IAiTransportSerializer gIAiTransportSerializer;
 
   [[nodiscard]] gpg::RType* CachedIAiTransportType()
   {
@@ -38,129 +31,50 @@ namespace
     return cached;
   }
 
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x005EBC80 (FUN_005EBC80)
    *
    * What it does:
-   * Deserializes one `Broadcaster<EAiTransportEvent>` base lane from the
-   * archive into `broadcasterLane`.
+   * Loads the `Broadcaster<EAiTransportEvent>` base.
    */
-  void ReadEAiTransportBroadcasterLane(void* const broadcasterLane, gpg::ReadArchive* const archive)
+  void IAiTransport::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    if (archive == nullptr) {
-      return;
-    }
-
-    gpg::RType* const broadcasterType = CachedTransportBroadcasterType();
-    GPG_ASSERT(broadcasterType != nullptr);
-    const gpg::RRef ownerRef{};
-    archive->Read(broadcasterType, broadcasterLane, ownerRef);
+    archive->Read(CachedTransportBroadcasterType(), static_cast<Broadcaster<EAiTransportEvent>*>(this), gpg::RRef{});
   }
 
   /**
    * Address: 0x005EBCD0 (FUN_005EBCD0)
    *
    * What it does:
-   * Serializes one `Broadcaster<EAiTransportEvent>` base lane from
-   * `broadcasterLane` into the archive.
+   * Saves the `Broadcaster<EAiTransportEvent>` base.
    */
-  void WriteEAiTransportBroadcasterLane(const void* const broadcasterLane, gpg::WriteArchive* const archive)
+  void IAiTransport::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    if (archive == nullptr) {
-      return;
-    }
-
-    gpg::RType* const broadcasterType = CachedTransportBroadcasterType();
-    GPG_ASSERT(broadcasterType != nullptr);
-    const gpg::RRef ownerRef{};
-    archive->Write(broadcasterType, broadcasterLane, ownerRef);
+    archive->Write(CachedTransportBroadcasterType(), static_cast<const Broadcaster<EAiTransportEvent>*>(this), gpg::RRef{});
   }
+} // namespace moho
 
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<IAiTransport>`, vtable 0x00E1F3B8.
+   *
+   * Address: 0x00BCEEB0 (FUN_00BCEEB0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF8BB0 (FUN_00BF8BB0 -- the global's destructor.)
+   * Address: 0x005E9530 (FUN_005E9530 -- `Init`.)
+   * Address: 0x005E4880 (FUN_005E4880 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005E4890 (FUN_005E4890 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct IAiTransportSerializer : gpg::SerSaveLoadHelper<IAiTransport>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B06D4 -- process-global `IAiTransportSerializer` singleton.
+  moho::IAiTransportSerializer gIAiTransportSerializer;
 } // namespace
-
-/**
- * Address: 0x005E4880 (FUN_005E4880, IAiTransportSerializer::Deserialize)
- */
-void IAiTransportSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  auto* const transport = reinterpret_cast<IAiTransport*>(static_cast<std::uintptr_t>(objectPtr));
-  auto* const broadcasterLane = static_cast<void*>(static_cast<Broadcaster<EAiTransportEvent>*>(transport));
-  ReadEAiTransportBroadcasterLane(broadcasterLane, archive);
-}
-
-/**
- * Address: 0x005E4890 (FUN_005E4890, IAiTransportSerializer::Serialize)
- */
-void IAiTransportSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  auto* const transport = reinterpret_cast<const IAiTransport*>(static_cast<std::uintptr_t>(objectPtr));
-  auto* const broadcasterLane = static_cast<const void*>(static_cast<const Broadcaster<EAiTransportEvent>*>(transport));
-  WriteEAiTransportBroadcasterLane(broadcasterLane, archive);
-}
-
-/**
- * Address: 0x00BCEEB0 (FUN_00BCEEB0, dynamic initializer for the global
- * `IAiTransportSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`), binds the load/save callback fields, and registers
- * process-exit cleanup.
- */
-IAiTransportSerializer::IAiTransportSerializer()
-  : mLoadCallback(&IAiTransportSerializer::Deserialize)
-  , mSaveCallback(&IAiTransportSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BF8BB0 (FUN_00BF8BB0, dynamic atexit destructor for `gIAiTransportSerializer`)
- *
- * What it does:
- * Unlinks this helper node from the serializer-helper list (the
- * `TDatListItem` base destructor). The compiler registers it with
- * `atexit` from the global's dynamic initializer (0x00BCEEB0).
- * `FUN_005E48D0` and `FUN_005E4900` are
- * unreferenced out-of-line copies of the same body.
- */
-IAiTransportSerializer::~IAiTransportSerializer() = default;
-
-/**
- * Address: 0x005E9530 (FUN_005E9530, gpg::SerSaveLoadHelper_IAiTransport::Init)
- *
- * What it does:
- * Lazily resolves IAiTransport RTTI and installs load/save callbacks from
- * this helper object into the type descriptor.
- */
-void IAiTransportSerializer::Init()
-{
-  gpg::RType* const type = CachedIAiTransportType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
-  type->serLoadFunc_ = mLoadCallback;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
- * Address: 0x010B06D4 caller lane (`IAiTransport.cpp`'s reflection
- * bootstrap sequence)
- *
- * What it does:
- * Historically forced construction of the (then lazily-constructed)
- * `IAiTransportSerializer` singleton from an explicit registration
- * sequence. `gIAiTransportSerializer` is now a genuine namespace-scope
- * global, so its constructor already runs unconditionally at static-init
- * time; this call is kept only so `IAiTransport.cpp`'s existing bootstrap
- * sequence does not need editing.
- */
-int moho::register_IAiTransportSerializer()
-{
-  return 0;
-}

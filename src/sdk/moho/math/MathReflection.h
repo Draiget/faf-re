@@ -155,21 +155,7 @@ namespace moho
    */
   [[nodiscard]] msvc8::string ToString(const VAxes3& value);
 
-  /**
-   * Address: 0x004EDB60 (FUN_004EDB60, Moho::AxisAlignedBox3f::MemberDeserialize)
-   *
-   * What it does:
-   * Loads `Min`/`Max` vector lanes in binary archive order.
-   */
-  void AxisAlignedBox3fMemberDeserialize(Wm3::AxisAlignedBox3f* box, gpg::ReadArchive* archive);
 
-  /**
-   * Address: 0x004EDBB0 (FUN_004EDBB0, Moho::AxisAlignedBox3f::MemberSerialize)
-   *
-   * What it does:
-   * Stores `Min`/`Max` vector lanes in binary archive order.
-   */
-  void AxisAlignedBox3fMemberSerialize(const Wm3::AxisAlignedBox3f* box, gpg::WriteArchive* archive);
 
   class AxisAlignedBox3fTypeInfo final : public gpg::RType
   {
@@ -193,54 +179,6 @@ namespace moho
      * Address: 0x004EA010 (FUN_004EA010, Moho::AxisAlignedBox3fTypeInfo::Init)
      */
     void Init() override;
-  };
-
-  class AxisAlignedBox3fSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC6C60 (FUN_00BC6C60, dynamic initializer for the global
-     * `AxisAlignedBox3fSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    AxisAlignedBox3fSerializer();
-
-    /**
-     * Address: 0x00BF1230 (FUN_00BF1230, Moho::AxisAlignedBox3fSerializer::~AxisAlignedBox3fSerializer)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~AxisAlignedBox3fSerializer();
-
-    /**
-     * Address: 0x004EA140 (FUN_004EA140, Moho::AxisAlignedBox3fSerializer::Deserialize)
-     */
-    static void Deserialize(gpg::ReadArchive* archive, Wm3::AxisAlignedBox3f* box);
-
-    /**
-     * Address: 0x004EA150 (FUN_004EA150, Moho::AxisAlignedBox3fSerializer::Serialize)
-     */
-    static void Serialize(gpg::WriteArchive* archive, Wm3::AxisAlignedBox3f* box);
-
-    /**
-     * Address: 0x004ED140 (FUN_004ED140, Moho::AxisAlignedBox3fSerializer::Init)
-     *
-     * What it does:
-     * Resolves `Wm3::AxisAlignedBox3f` RTTI and installs the load/save
-     * callbacks for this helper. Also the vtable slot-0 target shared with
-     * the RTTI-inferred `gpg::SerSaveLoadHelper<Wm3::AxisAlignedBox3f>`
-     * vtable head (0x00E0BCF8) -- one function, two vtable-head symbols.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mDeserialize; // +0x0C
-    gpg::RType::save_func_t mSerialize;   // +0x10
   };
 
   class Vector2iTypeInfo final : public gpg::RType
@@ -903,10 +841,6 @@ namespace moho
   static_assert(sizeof(VEulers3TypeInfo) == 0x64, "VEulers3TypeInfo size must be 0x64");
   static_assert(sizeof(VAxes3TypeInfo) == 0x64, "VAxes3TypeInfo size must be 0x64");
   static_assert(sizeof(VMatrix4TypeInfo) == 0x64, "VMatrix4TypeInfo size must be 0x64");
-
-  static_assert(offsetof(AxisAlignedBox3fSerializer, mDeserialize) == 0x0C, "AxisAlignedBox3fSerializer::mDeserialize offset must be 0x0C");
-  static_assert(offsetof(AxisAlignedBox3fSerializer, mSerialize) == 0x10, "AxisAlignedBox3fSerializer::mSerialize offset must be 0x10");
-  static_assert(sizeof(AxisAlignedBox3fSerializer) == 0x14, "AxisAlignedBox3fSerializer size must be 0x14");
 
   static_assert(offsetof(Vector2iSerializer, mDeserialize) == 0x0C, "Vector2iSerializer::mDeserialize offset must be 0x0C");
   static_assert(offsetof(Vector2iSerializer, mSerialize) == 0x10, "Vector2iSerializer::mSerialize offset must be 0x10");

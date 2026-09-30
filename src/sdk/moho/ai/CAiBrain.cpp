@@ -933,7 +933,7 @@ namespace
     moho::CEntityDbAllUnitsNode* node = sim->mEntityDB->AllUnitsEnd(armyIndex);
     moho::CEntityDbAllUnitsNode* const endNode = sim->mEntityDB->AllUnitsEnd(armyIndex + 1u);
     while (node != endNode) {
-      moho::Unit* const unit = moho::CEntityDb::UnitFromAllUnitsNode(node);
+      moho::Unit* const unit = moho::EntityDB::UnitFromAllUnitsNode(node);
       if (unit == nullptr) {
         break;
       }
@@ -948,7 +948,7 @@ namespace
         }
       }
 
-      node = moho::CEntityDb::NextAllUnitsNode(node);
+      node = moho::EntityDB::NextAllUnitsNode(node);
     }
 
     return nullptr;

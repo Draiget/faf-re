@@ -9,6 +9,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -69,54 +70,6 @@ namespace Wm3
 
 namespace moho
 {
-  /**
-   * Address: 0x004730E0 (FUN_004730E0, Moho::Sphere3fSerializer::Deserialize)
-   */
-  void Sphere3fSerializer::Deserialize(gpg::ReadArchive* archive, int objectStorage, int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<Wm3::Sphere3f*>(objectStorage);
-    object->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x004730F0 (FUN_004730F0, Moho::Sphere3fSerializer::Serialize)
-   */
-  void Sphere3fSerializer::Serialize(gpg::WriteArchive* archive, int objectStorage, int, gpg::RRef*)
-  {
-    auto* const object = reinterpret_cast<const Wm3::Sphere3f*>(objectStorage);
-    object->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00473FF0 (FUN_00473FF0, gpg::SerSaveLoadHelper<Wm3::Sphere3<float>>::Init)
-   */
-  void Sphere3fSerializer::Init()
-  {
-    gpg::RType* const type = CachedSphere3fType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoadCallback;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  /**
-   * Address: 0x00BC4970 (FUN_00BC4970, dynamic initializer for the global
-   * `Sphere3fSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields.
-   */
-  Sphere3fSerializer::Sphere3fSerializer()
-    : mLoadCallback(&Sphere3fSerializer::Deserialize)
-    , mSaveCallback(&Sphere3fSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BEF780 (FUN_00BEF780, Moho::Sphere3fSerializer::~Sphere3fSerializer)
-   */
-  Sphere3fSerializer::~Sphere3fSerializer() = default;
-
   /**
    * Address: 0x00473050 (FUN_00473050, Moho::Invalid<Wm3::Sphere3<float>>)
    */
@@ -318,9 +271,6 @@ namespace
 
   [[maybe_unused]] DColPrimSphereTypeInfoBootstrap gDColPrimSphereTypeInfoBootstrap;
 
-  // Address: 0x010A7C34 -- process-global `Sphere3fSerializer` singleton.
-  moho::Sphere3fSerializer gSphere3fSerializer;
-
   // Address: 0x010A9D84 -- process-global `DColPrimSphereSerializer` singleton.
   moho::DColPrimSphereSerializer gDColPrimSphereSerializer;
 
@@ -399,4 +349,25 @@ namespace
 
   // Address: 0x010A9CA4 -- process-global `DColPrimSphereConstruct` singleton.
   moho::DColPrimSphereConstruct gDColPrimSphereConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<Wm3::Sphere3f>`, vtable 0x00E038FC.
+   *
+   * Address: 0x00BC4970 (FUN_00BC4970 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEF780 (FUN_00BEF780 -- the global's destructor.)
+   * Address: 0x00473FF0 (FUN_00473FF0 -- `Init`.)
+   * Address: 0x004730E0 (FUN_004730E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x004730F0 (FUN_004730F0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct Sphere3fSerializer : gpg::SerSaveLoadHelper<Wm3::Sphere3f>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A7C34 -- process-global `Sphere3fSerializer` singleton.
+  moho::Sphere3fSerializer gSphere3fSerializer;
 } // namespace

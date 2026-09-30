@@ -81,7 +81,7 @@ namespace moho
    * `IdPool` is 8-byte aligned in the shipped binary, through `mReleasedLows`'
    * words (an 8-aligned `gpg::fastvector_n`). Evidence, converging from four
    * independent sites:
-   *   - `CEntityDb::mIdPoolTree`'s node (`msvc8::map<std::uint32_t, IdPool>`,
+   *   - `EntityDB::mIdPoolTree`'s node (`msvc8::map<std::uint32_t, IdPool>`,
    *     `EntityDb.h`) places `IdPool` at node+0x18, one 4-byte word after the
    *     node's `key`+0x10..0x14 -- i.e. a forced pad word between key and
    *     payload that only 8-byte alignment on the payload explains

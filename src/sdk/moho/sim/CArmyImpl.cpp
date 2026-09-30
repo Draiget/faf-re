@@ -494,13 +494,13 @@ namespace
     moho::CEntityDbAllUnitsNode* node = army.Simulation->mEntityDB->AllUnitsEnd(armyIndex);
     const moho::CEntityDbAllUnitsNode* const endNode = army.Simulation->mEntityDB->AllUnitsEnd(armyIndex + 1u);
     while (node != endNode) {
-      moho::Unit* const unit = moho::CEntityDb::UnitFromAllUnitsNode(node);
+      moho::Unit* const unit = moho::EntityDB::UnitFromAllUnitsNode(node);
       if (unit == nullptr) {
         break;
       }
 
       unit->MarkNeedsSyncGameData();
-      node = moho::CEntityDb::NextAllUnitsNode(node);
+      node = moho::EntityDB::NextAllUnitsNode(node);
     }
   }
 
@@ -1622,19 +1622,19 @@ namespace moho
     // The alliance change can flip what every unit of this army is visible to,
     // so re-queue each owned unit into the Sim coord-dirty list to have its
     // visibility recomputed next tick. The binary (0x006FDF6C-0x006FDFF0) walks
-    // CEntityDb::mAllUnits and relinks every unit whose ArmyRef == this at the
+    // EntityDB::mAllUnits and relinks every unit whose ArmyRef == this at the
     // front of Sim::mCoordEntities; the army-keyed range yields exactly those
     // units in the same order.
     const std::uint32_t armyIndex = static_cast<std::uint32_t>(mConstDat.mArmyIndex);
     CEntityDbAllUnitsNode* node = Simulation->mEntityDB->AllUnitsEnd(armyIndex);
     const CEntityDbAllUnitsNode* const endNode = Simulation->mEntityDB->AllUnitsEnd(armyIndex + 1u);
     while (node != endNode) {
-      Unit* const unit = CEntityDb::UnitFromAllUnitsNode(node);
+      Unit* const unit = EntityDB::UnitFromAllUnitsNode(node);
       if (unit == nullptr) {
         break;
       }
       unit->ListLinkBefore(&Simulation->mCoordEntities);
-      node = CEntityDb::NextAllUnitsNode(node);
+      node = EntityDB::NextAllUnitsNode(node);
     }
   }
 
@@ -2054,7 +2054,7 @@ namespace moho
     CEntityDbAllUnitsNode* node = Simulation->mEntityDB->AllUnitsEnd(armyIndex);
     CEntityDbAllUnitsNode* const endNode = Simulation->mEntityDB->AllUnitsEnd(armyIndex + 1u);
     while (node != endNode) {
-      Unit* const unit = CEntityDb::UnitFromAllUnitsNode(node);
+      Unit* const unit = EntityDB::UnitFromAllUnitsNode(node);
       if (unit == nullptr) {
         break;
       }
@@ -2063,7 +2063,7 @@ namespace moho
         currentCap += GetUnitCapCost(unit);
       }
 
-      node = CEntityDb::NextAllUnitsNode(node);
+      node = EntityDB::NextAllUnitsNode(node);
     }
 
     return currentCap;

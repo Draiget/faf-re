@@ -108,32 +108,16 @@ namespace moho
      * Reads all 9 intel-handle pointers and 5 toggle-state pairs from archive,
      * replacing any existing handle instances.
      */
-    void ReadArchive(gpg::ReadArchive& archive, const gpg::RRef& ownerRef);
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
-     * Address: 0x0076EAE0 (FUN_0076EAE0, Moho::CIntel::WriteArchive)
+     * Address: 0x0076EAE0 (FUN_0076EAE0, Moho::CIntel::MemberSerialize)
      *
      * What it does:
      * Writes all 9 intel-handle pointers as owned tracked pointers and then
      * serializes 5 toggle-state `{present,enabled}` pairs.
      */
-    void WriteArchive(gpg::WriteArchive& archive, const gpg::RRef& ownerRef) const;
-
-    /**
-     * Address: 0x0076E9E0 (FUN_0076E9E0, thunk to 0x0076EA60)
-     *
-     * What it does:
-     * Reflection serializer load callback wrapper for `ReadArchive`.
-     */
-    static void SerializeLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x0076E6C0 (FUN_0076E6C0, Moho::CIntelSerializer::Serialize)
-     *
-     * What it does:
-     * Reflection serializer save callback wrapper for `WriteArchive`.
-     */
-    static void SerializeSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x0076E010 (FUN_0076E010, Moho::CIntel::InitIntel)

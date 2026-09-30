@@ -4818,10 +4818,10 @@ gpg::RRef* PackRRef_WeakPtr_Entity(RRef* const out, moho::WeakPtr<moho::Entity>*
  * Thin wrapper that materializes a temporary `RRef_EntityDB` and copies lanes
  * out.
  */
-gpg::RRef* AssignEntityDBRef(RRef* const out, moho::CEntityDb* const value)
+gpg::RRef* AssignEntityDBRef(RRef* const out, moho::EntityDB* const value)
 {
   RRef tmp{};
-  tmp = gpg::MakeRRef<moho::CEntityDb>(value);
+  tmp = gpg::MakeRRef<moho::EntityDB>(value);
   out->mObj = tmp.mObj;
   out->mType = tmp.mType;
   return out;

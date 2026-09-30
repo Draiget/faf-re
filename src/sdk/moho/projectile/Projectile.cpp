@@ -146,7 +146,7 @@ namespace
   // the test inverted the projectile deleted itself inside its constructor while
   // Destroy() had already queued it, the allocator handed the same block to the
   // next projectile, and the deletion queue then held one address twice -
-  // OnDestroy ran twice on it and CEntityDb::Purge deleted it twice.
+  // OnDestroy ran twice on it and EntityDB::Purge deleted it twice.
   void PopOwnedTaskThreadTop(moho::Entity* const entity) noexcept
   {
     moho::CTaskThread* const thread = static_cast<moho::CTask*>(entity)->mOwnerThread;

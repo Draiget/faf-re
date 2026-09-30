@@ -78,7 +78,7 @@ namespace moho
   class CDecalBuffer;
   class CDecalHandle;
   class CParticleTexture;
-  class CEntityDb;
+  class EntityDB;
   class Entity;
   class COGrid;
   class CInfluenceMap;

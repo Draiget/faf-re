@@ -9,69 +9,6 @@
 namespace moho
 {
   /**
-   * VFTABLE: 0x00E038FC
-   * COL: 0x00E60048
-   */
-  class Sphere3fSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC4970 (FUN_00BC4970, dynamic initializer for the global
-     * `Sphere3fSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    Sphere3fSerializer();
-
-    /**
-     * Address: 0x00BEF780 (FUN_00BEF780, Moho::Sphere3fSerializer::~Sphere3fSerializer)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~Sphere3fSerializer();
-
-    /**
-     * Address: 0x004730E0 (FUN_004730E0, Moho::Sphere3fSerializer::Deserialize)
-     *
-     * What it does:
-     * Forwards archive load flow into `Wm3::Sphere3f::MemberDeserialize`.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectStorage, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x004730F0 (FUN_004730F0, Moho::Sphere3fSerializer::Serialize)
-     *
-     * What it does:
-     * Forwards archive save flow into `Wm3::Sphere3f::MemberSerialize`.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectStorage, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00473FF0 (FUN_00473FF0, gpg::SerSaveLoadHelper<Wm3::Sphere3<float>>::Init lane)
-     *
-     * What it does:
-     * Resolves Sphere3f RTTI and installs load/save callbacks for this helper.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mLoadCallback; // +0x0C
-    gpg::RType::save_func_t mSaveCallback; // +0x10
-  };
-
-  static_assert(
-    offsetof(Sphere3fSerializer, mLoadCallback) == 0x0C, "Sphere3fSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(Sphere3fSerializer, mSaveCallback) == 0x10, "Sphere3fSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(Sphere3fSerializer) == 0x14, "Sphere3fSerializer size must be 0x14");
-
-  /**
    * Owns reflected metadata for `CColPrimitive<Wm3::Sphere3<float>>`.
    */
   class DColPrimSphereTypeInfo final : public gpg::RType

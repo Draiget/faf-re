@@ -273,10 +273,10 @@ namespace moho
    * Reads all 9 intel-handle pointers and 5 toggle-state pairs from archive,
    * replacing any existing handle instances.
    */
-  void CIntel::ReadArchive(gpg::ReadArchive& archive, const gpg::RRef& ownerRef)
+  void CIntel::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     for (std::size_t i = 0; i < kHandleCount; ++i) {
-      CIntelPosHandle* const loaded = ReadPosHandlePointer(archive, ownerRef);
+      CIntelPosHandle* const loaded = ReadPosHandlePointer(*archive, gpg::RRef{});
       CIntelPosHandle* const previous = mIntelHandles[i];
       mIntelHandles[i] = loaded;
       if (previous) {
@@ -287,82 +287,30 @@ namespace moho
     for (CIntelToggleState& toggle : mToggleStates) {
       bool present = false;
       bool enabled = false;
-      archive.ReadBool(&present);
-      archive.ReadBool(&enabled);
+      archive->ReadBool(&present);
+      archive->ReadBool(&enabled);
       toggle.present = static_cast<std::uint8_t>(present ? 1u : 0u);
       toggle.enabled = static_cast<std::uint8_t>(enabled ? 1u : 0u);
     }
   }
 
   /**
-   * Address: 0x0076EAE0 (FUN_0076EAE0, Moho::CIntel::WriteArchive)
+   * Address: 0x0076EAE0 (FUN_0076EAE0, Moho::CIntel::MemberSerialize)
    *
    * What it does:
    * Writes all 9 intel-handle pointers as owned tracked pointers and then
    * serializes 5 toggle-state `{present,enabled}` pairs.
    */
-  void CIntel::WriteArchive(gpg::WriteArchive& archive, const gpg::RRef& ownerRef) const
+  void CIntel::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     for (std::size_t i = 0; i < kHandleCount; ++i) {
-      const gpg::RRef handleRef = MakePosHandleRef(mIntelHandles[i]);
-      gpg::WriteRawPointer(&archive, handleRef, gpg::TrackedPointerState::Owned, ownerRef);
+      gpg::WriteRawPointer(archive, MakePosHandleRef(mIntelHandles[i]), gpg::TrackedPointerState::Owned, gpg::RRef{});
     }
 
     for (const CIntelToggleState& toggle : mToggleStates) {
-      archive.WriteBool(toggle.present != 0u);
-      archive.WriteBool(toggle.enabled != 0u);
+      archive->WriteBool(toggle.present != 0u);
+      archive->WriteBool(toggle.enabled != 0u);
     }
-  }
-
-  /**
-   * Address: 0x0076E6B0 (FUN_0076E6B0)
-   *
-   * What it does:
-   * Serializer-load thunk lane that forwards directly into
-   * `CIntel::ReadArchive` using a null-owner reflection reference.
-   */
-  [[maybe_unused]] void DeserializeCIntelFromArchiveThunk(gpg::ReadArchive* const archive, CIntel* const intel)
-  {
-    if (archive == nullptr || intel == nullptr) {
-      return;
-    }
-
-    const gpg::RRef nullOwner{};
-    intel->ReadArchive(*archive, nullOwner);
-  }
-
-  /**
-   * Address: 0x0076E9E0 (FUN_0076E9E0, thunk to 0x0076EA60)
-   *
-   * What it does:
-   * Reflection serializer load callback wrapper for `ReadArchive`.
-   */
-  void CIntel::SerializeLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
-  {
-    if (!archive || !ownerRef || objectPtr == 0) {
-      return;
-    }
-
-    auto* const intel = reinterpret_cast<CIntel*>(static_cast<std::uintptr_t>(objectPtr));
-    intel->ReadArchive(*archive, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0076E6C0 (FUN_0076E6C0, Moho::CIntelSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection serializer save callback wrapper for `WriteArchive`.
-   */
-  void CIntel::SerializeSave(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
-  )
-  {
-    if (!archive || !ownerRef || objectPtr == 0) {
-      return;
-    }
-
-    auto* const intel = reinterpret_cast<CIntel*>(static_cast<std::uintptr_t>(objectPtr));
-    intel->WriteArchive(*archive, *ownerRef);
   }
 
   /**
@@ -465,3 +413,26 @@ namespace moho
     return mJamming.present != 0u && mJamming.enabled != 0u;
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CIntel>`, vtable 0x00E36214.
+   *
+   * Address: 0x00BDCBE0 (FUN_00BDCBE0 -- constructs the global and registers its destructor.)
+   * Address: 0x00C01DF0 (FUN_00C01DF0 -- the global's destructor.)
+   * Address: 0x0076E6D0 (FUN_0076E6D0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0076E9E0 (FUN_0076E9E0 -- an unreferenced copy of `Deserialize`.)
+   * Address: 0x0076E810 (FUN_0076E810 -- `Init`.)
+   * Address: 0x0076E6B0 (FUN_0076E6B0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0076E6C0 (FUN_0076E6C0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CIntelSerializer : gpg::SerSaveLoadHelper<CIntel>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BB3D0 -- process-global `CIntelSerializer` singleton.
+  moho::CIntelSerializer gCIntelSerializer;
+} // namespace

@@ -1,24 +1,15 @@
-#include "moho/ai/SAttachPointSerializer.h"
 
 #include <cstdint>
 #include <cstdlib>
 #include <typeinfo>
 
 #include "moho/ai/CAiTransportImpl.h"
+#include "gpg/core/reflection/Reflection.h"
 
 using namespace moho;
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedSAttachPointType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(SAttachPoint));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedVector3fType()
   {
     static gpg::RType* cached = nullptr;
@@ -28,6 +19,10 @@ namespace
     return cached;
   }
 
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x005EB980 (FUN_005EB980)
    *
@@ -35,21 +30,16 @@ namespace
    * Deserializes one `SAttachPoint` payload lane (`index`, `localPos`,
    * `distSq`) from the archive.
    */
-  int ReadSAttachPointPayload(SAttachPoint* const point, gpg::ReadArchive* const archive)
+  void SAttachPoint::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    if (point == nullptr || archive == nullptr) {
-      return 0;
-    }
-
-    archive->ReadUInt(&point->index);
+    archive->ReadUInt(&index);
 
     const gpg::RRef ownerRef{};
     gpg::RType* const vectorType = CachedVector3fType();
     GPG_ASSERT(vectorType != nullptr);
-    archive->Read(vectorType, &point->localPos, ownerRef);
+    archive->Read(vectorType, &localPos, ownerRef);
 
-    archive->ReadFloat(&point->distSq);
-    return 1;
+    archive->ReadFloat(&distSq);
   }
 
   /**
@@ -59,107 +49,36 @@ namespace
    * Serializes one `SAttachPoint` payload lane (`index`, `localPos`,
    * `distSq`) into the archive.
    */
-  int WriteSAttachPointPayload(const SAttachPoint* const point, gpg::WriteArchive* const archive)
+  void SAttachPoint::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    if (point == nullptr || archive == nullptr) {
-      return 0;
-    }
-
-    archive->WriteUInt(point->index);
+    archive->WriteUInt(index);
 
     const gpg::RRef ownerRef{};
     gpg::RType* const vectorType = CachedVector3fType();
     GPG_ASSERT(vectorType != nullptr);
-    archive->Write(vectorType, &point->localPos, ownerRef);
+    archive->Write(vectorType, &localPos, ownerRef);
 
-    archive->WriteFloat(point->distSq);
-    return 1;
+    archive->WriteFloat(distSq);
   }
+} // namespace moho
 
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SAttachPoint>`, vtable 0x00E1F2F4.
+   *
+   * Address: 0x00BCEDF0 (FUN_00BCEDF0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF8A90 (FUN_00BF8A90 -- the global's destructor.)
+   * Address: 0x005E91E0 (FUN_005E91E0 -- `Init`.)
+   * Address: 0x005E42E0 (FUN_005E42E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005E42F0 (FUN_005E42F0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SAttachPointSerializer : gpg::SerSaveLoadHelper<SAttachPoint>
+  {};
+} // namespace moho
+
+namespace
+{
   // Address: 0x010B07C4 -- process-global `SAttachPointSerializer` singleton.
-  // Constructing it runs SAttachPointSerializer::SAttachPointSerializer()
-  // (0x00BCEDF0), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; the compiler registers its destructor with
-  // `atexit`.
-  SAttachPointSerializer gSAttachPointSerializer;
-
+  moho::SAttachPointSerializer gSAttachPointSerializer;
 } // namespace
-
-/**
- * Address: 0x005E42E0 (FUN_005E42E0, SAttachPointSerializer::Deserialize)
- */
-void SAttachPointSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  auto* const point = reinterpret_cast<SAttachPoint*>(static_cast<std::uintptr_t>(objectPtr));
-  (void)ReadSAttachPointPayload(point, archive);
-}
-
-/**
- * Address: 0x005E42F0 (FUN_005E42F0, SAttachPointSerializer::Serialize)
- */
-void SAttachPointSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
-{
-  if (!archive || objectPtr == 0) {
-    return;
-  }
-
-  auto* const point = reinterpret_cast<const SAttachPoint*>(static_cast<std::uintptr_t>(objectPtr));
-  (void)WriteSAttachPointPayload(point, archive);
-}
-
-/**
- * Address: 0x00BCEDF0 (FUN_00BCEDF0, dynamic initializer for the global
- * `SAttachPointSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices into
- * `sNewHelpers`) and binds the load/save callback fields; the compiler
- * registers the destructor with `atexit`.
- */
-SAttachPointSerializer::SAttachPointSerializer()
-  : mLoadCallback(&SAttachPointSerializer::Deserialize)
-  , mSaveCallback(&SAttachPointSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BF8A90 (FUN_00BF8A90, dynamic atexit destructor for `gSAttachPointSerializer`)
- *
- * What it does:
- * Unlinks this helper node from the serializer-helper list (the
- * `TDatListItem` base destructor). The compiler registers it with
- * `atexit` from the global's dynamic initializer (0x00BCEDF0).
- * `FUN_005E4340` and `FUN_005E4370` are
- * unreferenced out-of-line copies of the same body.
- */
-SAttachPointSerializer::~SAttachPointSerializer() = default;
-
-void SAttachPointSerializer::Init()
-{
-  gpg::RType* const type = CachedSAttachPointType();
-  GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mLoadCallback);
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSaveCallback);
-  type->serLoadFunc_ = mLoadCallback;
-  type->serSaveFunc_ = mSaveCallback;
-}
-
-/**
- * Address: 0x00BCEDF0 caller lane (`IAiTransport.cpp`'s reflection bootstrap
- * sequence)
- *
- * What it does:
- * Historically forced construction of the (then lazily-constructed)
- * `SAttachPointSerializer` singleton from an explicit registration
- * sequence. `gSAttachPointSerializer` is now a genuine namespace-scope
- * global, so its constructor already runs unconditionally at static-init
- * time; this call is kept only so `IAiTransport.cpp`'s existing bootstrap
- * sequence does not need editing.
- */
-int moho::register_SAttachPointSerializer()
-{
-  return 0;
-}

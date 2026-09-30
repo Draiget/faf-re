@@ -2347,7 +2347,7 @@ namespace
    * consumer in the sim (IssueCommand, DestroyEntity, WarpEntity, AdvanceBeat,
    * ProcessInfoPair, ...) open-codes around that one map lookup.
    */
-  Entity* FindEntityById(CEntityDb* entityDb, const EntId id)
+  Entity* FindEntityById(EntityDB* entityDb, const EntId id)
   {
     if (!entityDb) {
       return nullptr;
@@ -5179,7 +5179,7 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
   mFormationDB =
     static_cast<CAiFormationDBImpl*>(LoadPointerByRType(archive, {"IAiFormationDB", "Moho::IAiFormationDB"}, ownerRef));
   mEntityDB =
-    static_cast<CEntityDb*>(LoadPointerByRType(archive, {"EntityDB", "CEntityDB", "Moho::EntityDB"}, ownerRef));
+    static_cast<EntityDB*>(LoadPointerByRType(archive, {"EntityDB", "CEntityDB", "Moho::EntityDB"}, ownerRef));
   archive->ReadUInt(&mReserved98C);
   mDecalBuffer =
     static_cast<CDecalBuffer*>(LoadPointerByRType(archive, {"CDecalBuffer", "Moho::CDecalBuffer"}, ownerRef));
@@ -7157,8 +7157,8 @@ void Sim::Setup(LaunchInfoNew* const info)
 
   // Entity database.
   {
-    auto* const newEntityDB = new CEntityDb();
-    CEntityDb* const previousEntityDB = mEntityDB;
+    auto* const newEntityDB = new EntityDB();
+    EntityDB* const previousEntityDB = mEntityDB;
     mEntityDB = newEntityDB;
     if (previousEntityDB) {
       delete previousEntityDB;
@@ -9424,12 +9424,12 @@ int Sim::DumpUnits(
   // vector<DumpUnitsCountEntry>::_Insert_n (FUN_0075F810) on the capacity-full
   // path, matching the original binary; std::vector would inline its own grow.
   msvc8::vector<DumpUnitsCountEntry> counts;
-  CEntityDb* const entityDb = sim->mEntityDB;
+  EntityDB* const entityDb = sim->mEntityDB;
   CEntityDbAllUnitsNode* node = entityDb->AllUnitsEnd(0u);
   CEntityDbAllUnitsNode* const end = entityDb->AllUnitsEnd();
   while (node != end) {
-    Unit* const unit = CEntityDb::UnitFromAllUnitsNode(node);
-    node = CEntityDb::NextAllUnitsNode(node);
+    Unit* const unit = EntityDB::UnitFromAllUnitsNode(node);
+    node = EntityDB::NextAllUnitsNode(node);
     if (unit == nullptr) {
       continue;
     }
@@ -10811,7 +10811,7 @@ void Sim::Shutdown()
   //   0x0074581C  call 0x5C87A0         ; ++it
   //   0x00745825  cmp eax, edi / jne    ; until end()
   //
-  // This used to walk `CEntityDb::Entities()`, a hand-kept side table of
+  // This used to walk `EntityDB::Entities()`, a hand-kept side table of
   // entity pointers that could outlive its entries; it was removed
   // 2026-09-22. `mAllUnits` cannot: `~Entity` -> `ReleaseId` erases the node.
   //

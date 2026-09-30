@@ -14,6 +14,12 @@ namespace gpg
   class RType;
 }
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   struct RUnitBlueprint;
@@ -44,6 +50,22 @@ namespace moho
   class IAiTransport : public Broadcaster<EAiTransportEvent>
   {
   public:
+    /**
+     * Address: 0x005EBC80 (FUN_005EBC80)
+     *
+     * What it does:
+     * Loads the `Broadcaster<EAiTransportEvent>` base.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005EBCD0 (FUN_005EBCD0)
+     *
+     * What it does:
+     * Saves the `Broadcaster<EAiTransportEvent>` base.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     /**
      * Address: 0x005E3C50 (FUN_005E3C50)
      * Address: 0x005E82A0 (FUN_005E82A0)

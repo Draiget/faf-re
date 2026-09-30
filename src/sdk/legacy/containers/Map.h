@@ -366,7 +366,7 @@ namespace msvc8
          * AddUiKeyMapEntries, UiRuntimeTypes.cpp)
          * Address: 0x00685750 (FUN_00685750, `std::map_uint_IdPool::find2` --
          * `msvc8::map<std::uint32_t, moho::IdPool>::operator[]`,
-         * `CEntityDb::mIdPoolTree` in `EntityDb.h`. Matches this member
+         * `EntityDB::mIdPoolTree` in `EntityDb.h`. Matches this member
          * exactly: calls `find` (this instantiation's `lower_bound_node`
          * emission), and on a miss (`result == head || key < result->key`)
          * default-constructs a fresh `IdPool` and inserts it via
@@ -375,7 +375,7 @@ namespace msvc8
          * insert shape this member performs. Reached from `Moho::EntityDB::
          * DoReserveId`/`ReleaseId` (`FUN_00684480`/`FUN_00684690`) in the
          * binary; the current recovery reaches the same instantiation from
-         * `CEntityDb::MemberSerialize`'s `mIdPoolTree[familySourceBits]`
+         * `EntityDB::MemberSerialize`'s `mIdPoolTree[familySourceBits]`
          * -- `DoReserveId`/`ReleaseId` themselves still route id allocation
          * through a separate `gRuntimePools` runtime cache rather than this
          * member directly, a known follow-up documented in the EntityDb.cpp
@@ -537,7 +537,7 @@ namespace msvc8
          * Address: 0x00495AE0 (FUN_00495AE0 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindOrInsertBeamBucketEntryByKey` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007F00A0 (FUN_007F00A0 -- `operator[]` -- the find half for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007ED4B0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
          * Address: 0x007F0960 (FUN_007F0960 -- `operator[]`'s insert-on-miss half for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F00A0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
-         * Address: 0x00684510 (FUN_00684510 -- the mapped-value store `operator[]` performs -- `Entity::StandardInit` writing the entity into the reserved id's slot for `msvc8::map<std::uint32_t, moho::Entity*>` (`CEntityDb::mAllUnits` at +0x00); zero callers, unreachable; formerly `AssignEntityPayloadAtIdNode` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00684510 (FUN_00684510 -- the mapped-value store `operator[]` performs -- `Entity::StandardInit` writing the entity into the reserved id's slot for `msvc8::map<std::uint32_t, moho::Entity*>` (`EntityDB::mAllUnits` at +0x00); zero callers, unreachable; formerly `AssignEntityPayloadAtIdNode` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0045AFE0 (FUN_0045AFE0 -- `operator[]` -- lower bound, then insert a default-constructed record on a miss for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x00458D30; formerly `FileInfoMapGetOrCreate` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x007EFD00 (FUN_007EFD00 -- `operator[]` -- lower bound, then insert a default-constructed profile on a miss for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007EE5A0; formerly `FindOrInsertRangeProfileByExtractorName` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00431910 (FUN_00431910 -- `operator[]` -- lower bound, then insert a default-constructed mapped string on a miss; `AssignRemap` assigns into what it returns for `msvc8::map<msvc8::string, msvc8::string>` (`ShaderDictionary::mRemaps` at +0x10; pair 0x38, node 0x48, key at node+0x0C, mapped name at node+0x28, colour/nil at +0x44/+0x45); callers 0x0042BDA4, 0x0042D840, 0x007DBE90; formerly `ShaderDictionary::AssignRemap`'s hand-written body in moho/mesh/ShaderDictionary.cpp (RULE ONE), rewritten 2026-09-11.)
@@ -571,7 +571,7 @@ namespace msvc8
          * it just never trips, since `position` is always a live, valid
          * cursor from the enclosing walk.
          * Address: 0x004AC520 (FUN_004AC520 -- `erase(const_iterator)` with the invalid-iterator throw for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`, node 0x18); callers 0x004A9FC0, 0x004AE0D0; formerly `EraseFactoryRegistrationAtIterator` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x00685410 (FUN_00685410 -- `erase(const_iterator)` for `msvc8::map<std::uint32_t, moho::Entity*>` (`CEntityDb::mAllUnits` at +0x00); callers 0x00684690, 0x00686EF0; formerly `EraseAllUnitsTreeNode` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00685410 (FUN_00685410 -- `erase(const_iterator)` for `msvc8::map<std::uint32_t, moho::Entity*>` (`EntityDB::mAllUnits` at +0x00); callers 0x00684690, 0x00686EF0; formerly `EraseAllUnitsTreeNode` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
 
