@@ -16,6 +16,7 @@
 #include "moho/script/CScriptEvent.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 extern "C" {
 int lua_traceback(lua_State* L, const char* message, int level);
@@ -43,7 +44,6 @@ namespace
   constexpr const char* kResumeThreadKilledTraceback = "Attempted to resume a thread that was already killed";
   constexpr const char* kResumeThreadTypeError = "thread";
   constexpr const char* kResumeThreadForkOnlyError = "Can't resume a thread that wasn't created with ForkThread.";
-  moho::CLuaTaskSerializer gCLuaTaskSerializer{};
 
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
   {
@@ -850,66 +850,6 @@ void CLuaTask::MemberSerialize(gpg::WriteArchive* const archive)
 }
 
 /**
- * Address: 0x00BC61C0 (FUN_00BC61C0, dynamic initializer for the global
- * `CLuaTaskSerializer` singleton)
- *
- * What it does:
- * Default-constructs the `gpg::SerHelperBase` base and binds the load/save
- * callback fields.
- */
-CLuaTaskSerializer::CLuaTaskSerializer()
-  : mSerLoadFunc(&CLuaTaskSerializer::Deserialize)
-  , mSerSaveFunc(&CLuaTaskSerializer::Serialize)
-{}
-
-/**
- * Address: 0x00BF0AF0 (FUN_00BF0AF0, Moho::CLuaTaskSerializer::~CLuaTaskSerializer)
- *
- * What it does:
- * Mangled `??1CLuaTaskSerializer@Moho@@QAE@@Z` dtor calling the shared
- * unlink body. Two zero-incoming-xref duplicate emissions of this same
- * unlink shape also exist (0x004C9CA0, 0x004C9CD0); neither is reachable
- * from anywhere in the binary.
- */
-CLuaTaskSerializer::~CLuaTaskSerializer() = default;
-
-/**
- * Address: 0x004C9C40 (FUN_004C9C40, CLuaTaskSerializer::Deserialize callback)
- * Chain:   0x004CC2B0 (FUN_004CC2B0)
- */
-void CLuaTaskSerializer::Deserialize(
-  gpg::ReadArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
-)
-{
-  auto* const task = reinterpret_cast<CLuaTask*>(objectPtr);
-  DeserializeCLuaTaskThunk(archive, task);
-}
-
-/**
- * Address: 0x004C9C50 (FUN_004C9C50, CLuaTaskSerializer::Serialize callback)
- * Chain:   0x004CC320 (FUN_004CC320)
- */
-void CLuaTaskSerializer::Serialize(
-  gpg::WriteArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
-)
-{
-  auto* const task = reinterpret_cast<CLuaTask*>(objectPtr);
-  SerializeCLuaTaskThunk(archive, task);
-}
-
-/**
- * Address: 0x004CAFE0 (FUN_004CAFE0, sub_4CAFE0)
- */
-void CLuaTaskSerializer::Init()
-{
-  gpg::RType* const type = CachedCLuaTaskType();
-  GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = mSerLoadFunc;
-  GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = mSerSaveFunc;
-}
-
-/**
  * Address: 0x00BC6160 (FUN_00BC6160, CLuaTask startup type-info registration)
  *
  * What it does:
@@ -997,4 +937,25 @@ namespace
 {
   // Address: 0x010A8D18 -- process-global `CLuaTaskConstruct` singleton.
   moho::CLuaTaskConstruct gCLuaTaskConstruct;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CLuaTask>`, vtable 0x00E099A8.
+   *
+   * Address: 0x00BC61C0 (FUN_00BC61C0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF0AF0 (FUN_00BF0AF0 -- the global's destructor.)
+   * Address: 0x004CAFE0 (FUN_004CAFE0 -- `Init`.)
+   * Address: 0x004C9C40 (FUN_004C9C40 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x004C9C50 (FUN_004C9C50 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CLuaTaskSerializer : gpg::SerSaveLoadHelper<CLuaTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A8D58 -- process-global `CLuaTaskSerializer` singleton.
+  moho::CLuaTaskSerializer gCLuaTaskSerializer;
 } // namespace

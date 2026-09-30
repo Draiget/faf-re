@@ -11086,75 +11086,6 @@ namespace
     return cached;
   }
 
-  /**
-   * VFTABLE: 0x00E1879C (`??_7UnitWeaponInfoSerializer@Moho@@6B@`)
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class moho::UnitWeaponInfo> (IDA
-   * infers `Moho::UnitWeaponInfoSerializer`). The binary global is 0x14
-   * bytes (vtable + inherited link pair + load/save callback lanes),
-   * matching every other `SerHelperBase`-derived serializer in this
-   * codebase.
-   */
-  struct UnitWeaponInfoSerializer : public gpg::SerHelperBase
-  {
-    /**
-     * Address: 0x00BCA580 (FUN_00BCA580, dynamic initializer for `gUnitWeaponInfoSerializer`)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the pending `sNewHelpers` list), binds the load/save
-     * callbacks and installs this helper's vtable (0x00E1879C); the compiler
-     * registers the destructor with `atexit`.
-     */
-    UnitWeaponInfoSerializer();
-
-    /**
-     * Address: 0x00BF5300 (FUN_00BF5300, dynamic atexit destructor for `gUnitWeaponInfoSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_0055C1B0` and `FUN_0055C1E0` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~UnitWeaponInfoSerializer() = default;
-
-    /**
-     * Address: 0x0055CA40 (FUN_0055CA40, Moho::UnitWeaponInfoSerializer::Init,
-     * vtable slot 0)
-     *
-     * What it does:
-     * Lazily resolves `UnitWeaponInfo` RTTI and installs this helper's
-     * load/save callback pair onto the reflected type descriptor.
-     */
-    void Init() override;
-
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-  static_assert(
-    offsetof(UnitWeaponInfoSerializer, mSerLoadFunc) == 0x0C,
-    "UnitWeaponInfoSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(UnitWeaponInfoSerializer, mSerSaveFunc) == 0x10,
-    "UnitWeaponInfoSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(
-    sizeof(UnitWeaponInfoSerializer) == 0x14,
-    "UnitWeaponInfoSerializer size must be 0x14"
-  );
-
-  void UnitWeaponInfoSerializer::Init()
-  {
-    gpg::RType* const type = CachedUnitWeaponInfoType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  UnitWeaponInfoSerializer gUnitWeaponInfoSerializer;
-
   [[nodiscard]] gpg::RType* CachedSSTIUnitVariableDataType()
   {
     static gpg::RType* cached = nullptr;
@@ -11163,77 +11094,6 @@ namespace
     }
     return cached;
   }
-
-  /**
-   * VFTABLE: 0x00E188E4 (`??_7SSTIUnitVariableDataSerializer@Moho@@6B@`)
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class moho::SSTIUnitVariableData>
-   * (IDA infers `Moho::SSTIUnitVariableDataSerializer`). The binary global
-   * is 0x14 bytes (vtable + inherited link pair + load/save callback
-   * lanes), matching every other `SerHelperBase`-derived serializer in this
-   * codebase. The engine install path copies mSerLoadFunc / mSerSaveFunc
-   * into the reflection descriptor's serLoadFunc_ / serSaveFunc_ slots via
-   * `Init()`.
-   */
-  struct SSTIUnitVariableDataSerializer : public gpg::SerHelperBase
-  {
-    /**
-     * Address: 0x00BCA6A0 (FUN_00BCA6A0, dynamic initializer for `gSSTIUnitVariableDataSerializer`)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the pending `sNewHelpers` list), binds the load/save
-     * callbacks and installs this helper's vtable (0x00E188E4); the compiler
-     * registers the destructor with `atexit`.
-     */
-    SSTIUnitVariableDataSerializer();
-
-    /**
-     * Address: 0x00BF54B0 (FUN_00BF54B0, dynamic atexit destructor for `gSSTIUnitVariableDataSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_0055C7C0` and `FUN_0055C7F0` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~SSTIUnitVariableDataSerializer() = default;
-
-    /**
-     * Address: 0x0055D100 (FUN_0055D100, Moho::SSTIUnitVariableDataSerializer::Init,
-     * vtable slot 0)
-     *
-     * What it does:
-     * Lazily resolves `SSTIUnitVariableData` RTTI and installs this
-     * helper's load/save callback pair onto the reflected type descriptor.
-     */
-    void Init() override;
-
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-  static_assert(
-    offsetof(SSTIUnitVariableDataSerializer, mSerLoadFunc) == 0x0C,
-    "SSTIUnitVariableDataSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SSTIUnitVariableDataSerializer, mSerSaveFunc) == 0x10,
-    "SSTIUnitVariableDataSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(
-    sizeof(SSTIUnitVariableDataSerializer) == 0x14,
-    "SSTIUnitVariableDataSerializer size must be 0x14"
-  );
-
-  void SSTIUnitVariableDataSerializer::Init()
-  {
-    gpg::RType* const type = CachedSSTIUnitVariableDataType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  SSTIUnitVariableDataSerializer gSSTIUnitVariableDataSerializer;
 
   /**
    * Address: 0x0055C160 (FUN_0055C160, Moho::UnitWeaponInfoSerializer::Deserialize)
@@ -11280,17 +11140,6 @@ namespace
     }
     info->MemberSerialize(archive);
   }
-
-  /**
-   * Address: 0x00BCA580 (FUN_00BCA580, dynamic initializer for `gUnitWeaponInfoSerializer`)
-   *
-   * What it does:
-   * Binds this helper's load/save callbacks.
-   */
-  UnitWeaponInfoSerializer::UnitWeaponInfoSerializer()
-    : mSerLoadFunc(&DeserializeUnitWeaponInfoSerializerCallback)
-    , mSerSaveFunc(&SerializeUnitWeaponInfoSerializerCallback)
-  {}
 
   /**
    * Address: 0x0055C760 (FUN_0055C760, Moho::SSTIUnitVariableDataSerializer::Deserialize)
@@ -11344,16 +11193,6 @@ namespace
     data->MemberSerialize(archive);
   }
 
-  /**
-   * Address: 0x00BCA6A0 (FUN_00BCA6A0, dynamic initializer for `gSSTIUnitVariableDataSerializer`)
-   *
-   * What it does:
-   * Binds this helper's load/save callbacks.
-   */
-  SSTIUnitVariableDataSerializer::SSTIUnitVariableDataSerializer()
-    : mSerLoadFunc(&SSTIUnitVariableDataSerializerDeserialize)
-    , mSerSaveFunc(&SSTIUnitVariableDataSerializerSerialize)
-  {}
 } // namespace
 
 // Wrapped in `namespace moho` so the linker mangles these as
@@ -17892,4 +17731,46 @@ namespace
 
   // Address: 0x010B5B80 -- process-global `UnitSerializer` singleton.
   moho::UnitSerializer gUnitSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SSTIUnitVariableData>`, vtable 0x00E188E4.
+   *
+   * Address: 0x00BCA6A0 (FUN_00BCA6A0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF54B0 (FUN_00BF54B0 -- the global's destructor.)
+   * Address: 0x0055D100 (FUN_0055D100 -- `Init`.)
+   * Address: 0x0055C760 (FUN_0055C760 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0055C770 (FUN_0055C770 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SSTIUnitVariableDataSerializer : gpg::SerSaveLoadHelper<SSTIUnitVariableData>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ACB54 -- process-global `SSTIUnitVariableDataSerializer` singleton.
+  moho::SSTIUnitVariableDataSerializer gSSTIUnitVariableDataSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<UnitWeaponInfo>`, vtable 0x00E1879C.
+   *
+   * Address: 0x00BCA580 (FUN_00BCA580 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF5300 (FUN_00BF5300 -- the global's destructor.)
+   * Address: 0x0055CA40 (FUN_0055CA40 -- `Init`.)
+   * Address: 0x0055C160 (FUN_0055C160 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0055C170 (FUN_0055C170 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct UnitWeaponInfoSerializer : gpg::SerSaveLoadHelper<UnitWeaponInfo>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ACD0C -- process-global `UnitWeaponInfoSerializer` singleton.
+  moho::UnitWeaponInfoSerializer gUnitWeaponInfoSerializer;
 } // namespace

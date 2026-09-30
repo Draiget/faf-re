@@ -837,104 +837,10 @@ namespace moho
 
 namespace moho
 {
-  /**
-   * RTTI Class Hierarchy Descriptor shows this class's base chain running
-   * through `.?AU?$SerSaveLoadHelper@VCUnitReclaimTask@Moho@@@gpg@@` before
-   * `gpg::SerHelperBase`. `CUnitReclaimTask::MemberDeserialize`/
-   * `MemberSerialize` are non-static instance methods, so this class needs
-   * its own static forwarding methods to bind into the `__cdecl`-shaped
-   * callback fields (same situation as the sibling `CUnitPodAssistSerializer`
-   * fixed earlier this session). Kept as a concrete `SerHelperBase`-derived
-   * class rather than a naked `gpg::SerSaveLoadHelper<CUnitReclaimTask>`
-   * alias, matching the `Rect2iSerializer`-style precedent.
-   */
-  class CUnitReclaimTaskSerializer final : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BD17E0 (FUN_00BD17E0, register_CUnitReclaimTaskSerializer)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    CUnitReclaimTaskSerializer()
-      : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&CUnitReclaimTaskSerializer::Deserialize))
-      , mSerialize(reinterpret_cast<gpg::RType::save_func_t>(&CUnitReclaimTaskSerializer::Serialize))
-    {}
-
-    /**
-     * Address: 0x00BFA310 (FUN_00BFA310, Moho::CUnitReclaimTaskSerializer::~CUnitReclaimTaskSerializer)
-     *
-     * What it does:
-     * Unlinks the serializer helper from the intrusive helper list.
-     */
-    ~CUnitReclaimTaskSerializer() = default;
-
-    /**
-     * What it does:
-     * Forwards one archive load callback into
-     * `CUnitReclaimTask::MemberDeserialize` on the supplied object pointer.
-     */
-    static void Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-    {
-      reinterpret_cast<CUnitReclaimTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
-    }
-
-    /**
-     * What it does:
-     * Forwards one archive save callback into
-     * `CUnitReclaimTask::MemberSerialize` on the supplied object pointer.
-     */
-    static void Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-    {
-      reinterpret_cast<const CUnitReclaimTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
-    }
-
-    /**
-     * Address: 0x006204B0 (FUN_006204B0, gpg::SerSaveLoadHelper<Moho::CUnitReclaimTask>::Init)
-     *
-     * What it does:
-     * Lazily resolves `CUnitReclaimTask` RTTI and installs load/save
-     * callbacks from this helper object into the type descriptor.
-     */
-    void Init() override
-    {
-      gpg::RType* const type = CachedCUnitReclaimTaskType();
-      GPG_ASSERT(type->serLoadFunc_ == nullptr);
-      type->serLoadFunc_ = mDeserialize;
-      GPG_ASSERT(type->serSaveFunc_ == nullptr);
-      type->serSaveFunc_ = mSerialize;
-    }
-
-  public:
-    gpg::RType::load_func_t mDeserialize; // +0x0C
-    gpg::RType::save_func_t mSerialize;   // +0x10
-  };
-
-  static_assert(
-    offsetof(CUnitReclaimTaskSerializer, mDeserialize) == 0x0C,
-    "CUnitReclaimTaskSerializer::mDeserialize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CUnitReclaimTaskSerializer, mSerialize) == 0x10,
-    "CUnitReclaimTaskSerializer::mSerialize offset must be 0x10"
-  );
-  static_assert(sizeof(CUnitReclaimTaskSerializer) == 0x14, "CUnitReclaimTaskSerializer size must be 0x14");
 } // namespace moho
 
 namespace
 {
-  /**
-   * Address: 0x00BD17E0 (FUN_00BD17E0, dynamic initializer for the global
-   * `CUnitReclaimTaskSerializer` singleton)
-   *
-   * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields (vtable slot 0 `Init()` dispatched later by
-   * `gpg::SerHelperBase::InitNewHelpers`).
-   */
-  moho::CUnitReclaimTaskSerializer gCUnitReclaimTaskSerializer;
 } // namespace
 
 namespace moho
@@ -983,3 +889,24 @@ namespace gpg
     return outRef;
   }
 } // namespace gpg
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitReclaimTask>`, vtable 0x00E2097C.
+   *
+   * Address: 0x00BD17E0 (FUN_00BD17E0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFA310 (FUN_00BFA310 -- the global's destructor.)
+   * Address: 0x006204B0 (FUN_006204B0 -- `Init`.)
+   * Address: 0x0061EEB0 (FUN_0061EEB0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0061EEC0 (FUN_0061EEC0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitReclaimTaskSerializer : gpg::SerSaveLoadHelper<CUnitReclaimTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B1BFC -- process-global `CUnitReclaimTaskSerializer` singleton.
+  moho::CUnitReclaimTaskSerializer gCUnitReclaimTaskSerializer;
+} // namespace

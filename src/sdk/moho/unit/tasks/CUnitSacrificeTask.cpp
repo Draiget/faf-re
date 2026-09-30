@@ -480,75 +480,6 @@ namespace
   }
 
   /**
-   * VFTABLE: 0x00E1FB6C (`??_7CUnitSacrificeTaskSerializer@Moho@@6B@`)
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class moho::CUnitSacrificeTask> (IDA
-   * infers `Moho::CUnitSacrificeTaskSerializer`). The binary global is 0x14
-   * bytes (vtable + inherited link pair + load/save callback lanes),
-   * matching every other `SerHelperBase`-derived serializer in this
-   * codebase.
-   */
-  struct CUnitSacrificeTaskSerializer : public gpg::SerHelperBase
-  {
-    /**
-     * Address: 0x00BCFA10 (FUN_00BCFA10, dynamic initializer for `gCUnitSacrificeTaskSerializer`)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the pending `sNewHelpers` list), binds the load/save
-     * callbacks and installs this helper's vtable (0x00E1FB6C); the compiler
-     * registers the destructor with `atexit`.
-     */
-    CUnitSacrificeTaskSerializer();
-
-    /**
-     * Address: 0x00BF9570 (FUN_00BF9570, dynamic atexit destructor for `gCUnitSacrificeTaskSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_005FB120` and `FUN_005FB150` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~CUnitSacrificeTaskSerializer() = default;
-
-    /**
-     * Address: 0x005FBED0 (FUN_005FBED0, Moho::CUnitSacrificeTaskSerializer::Init,
-     * vtable slot 0)
-     *
-     * What it does:
-     * Lazily resolves `CUnitSacrificeTask` RTTI and installs this helper's
-     * load/save callback pair onto the reflected type descriptor.
-     */
-    void Init() override;
-
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-  static_assert(
-    offsetof(CUnitSacrificeTaskSerializer, mSerLoadFunc) == 0x0C,
-    "CUnitSacrificeTaskSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CUnitSacrificeTaskSerializer, mSerSaveFunc) == 0x10,
-    "CUnitSacrificeTaskSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(
-    sizeof(CUnitSacrificeTaskSerializer) == 0x14,
-    "CUnitSacrificeTaskSerializer size must be 0x14"
-  );
-
-  void CUnitSacrificeTaskSerializer::Init()
-  {
-    gpg::RType* const type = CachedCUnitSacrificeTaskType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  CUnitSacrificeTaskSerializer gCUnitSacrificeTaskSerializer;
-
-  /**
    * Address: 0x005FB0D0 (FUN_005FB0D0, Moho::CUnitSacrificeTaskSerializer::Deserialize)
    *
    * What it does:
@@ -594,15 +525,25 @@ namespace
     task->MemberSerialize(archive);
   }
 
-  /**
-   * Address: 0x00BCFA10 (FUN_00BCFA10, dynamic initializer for `gCUnitSacrificeTaskSerializer`)
-   *
-   * What it does:
-   * Binds this helper's load/save callbacks.
-   */
-  CUnitSacrificeTaskSerializer::CUnitSacrificeTaskSerializer()
-    : mSerLoadFunc(&DeserializeCUnitSacrificeTaskSerializerCallback)
-    , mSerSaveFunc(&SerializeCUnitSacrificeTaskSerializerCallback)
-  {}
+} // namespace
 
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitSacrificeTask>`, vtable 0x00E1FB6C.
+   *
+   * Address: 0x00BCFA10 (FUN_00BCFA10 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF9570 (FUN_00BF9570 -- the global's destructor.)
+   * Address: 0x005FBED0 (FUN_005FBED0 -- `Init`.)
+   * Address: 0x005FB0D0 (FUN_005FB0D0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005FB0E0 (FUN_005FB0E0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitSacrificeTaskSerializer : gpg::SerSaveLoadHelper<CUnitSacrificeTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B0D18 -- process-global `CUnitSacrificeTaskSerializer` singleton.
+  moho::CUnitSacrificeTaskSerializer gCUnitSacrificeTaskSerializer;
 } // namespace

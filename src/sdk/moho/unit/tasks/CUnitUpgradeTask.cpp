@@ -48,64 +48,6 @@ namespace
     return sType;
   }
 
-  /**
-   * VFTABLE: 0x00E1FA78 (`??_7CUnitUpgradeTaskSerializer@Moho@@6B@`)
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class moho::CUnitUpgradeTask> (IDA
-   * infers `Moho::CUnitUpgradeTaskSerializer`). The binary global is 0x14
-   * bytes (vtable + inherited link pair + load/save callback lanes),
-   * matching every other `SerHelperBase`-derived serializer in this
-   * codebase.
-   */
-  struct CUnitUpgradeTaskSerializer : public gpg::SerHelperBase
-  {
-    /**
-     * Address: 0x00BCF8F0 (FUN_00BCF8F0, dynamic initializer for `gCUnitUpgradeTaskSerializer`)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the pending `sNewHelpers` list), binds the load/save
-     * callbacks and installs this helper's vtable (0x00E1FA78); the compiler
-     * registers the destructor with `atexit`.
-     */
-    CUnitUpgradeTaskSerializer();
-
-    /**
-     * Address: 0x00BF93C0 (FUN_00BF93C0, dynamic atexit destructor for `gCUnitUpgradeTaskSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_005F8830` and `FUN_005F8860` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~CUnitUpgradeTaskSerializer() = default;
-
-    /**
-     * Address: 0x005FBC90 (FUN_005FBC90, Moho::CUnitUpgradeTaskSerializer::Init,
-     * vtable slot 0)
-     *
-     * What it does:
-     * Lazily resolves `CUnitUpgradeTask` RTTI and installs this helper's
-     * load/save callback pair onto the reflected type descriptor.
-     */
-    void Init() override;
-
-    gpg::RType::load_func_t mLoad;
-    gpg::RType::save_func_t mSave;
-  };
-  static_assert(sizeof(CUnitUpgradeTaskSerializer) == 0x14, "CUnitUpgradeTaskSerializer size must be 0x14");
-
-  void CUnitUpgradeTaskSerializer::Init()
-  {
-    gpg::RType* const type = ResolveCachedType<moho::CUnitUpgradeTask>();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mLoad;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSave;
-  }
-
-  CUnitUpgradeTaskSerializer gCUnitUpgradeTaskSerializer;
-
   void DeserializeCUnitUpgradeTaskSerializerCallback(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
   {
     auto* const task = reinterpret_cast<moho::CUnitUpgradeTask*>(static_cast<std::uintptr_t>(objectPtr));
@@ -117,17 +59,6 @@ namespace
     const auto* const task = reinterpret_cast<const moho::CUnitUpgradeTask*>(static_cast<std::uintptr_t>(objectPtr));
     task->MemberSerialize(archive);
   }
-
-  /**
-   * Address: 0x00BCF8F0 (FUN_00BCF8F0, dynamic initializer for `gCUnitUpgradeTaskSerializer`)
-   *
-   * What it does:
-   * Binds this helper's load/save callbacks.
-   */
-  CUnitUpgradeTaskSerializer::CUnitUpgradeTaskSerializer()
-    : mLoad(&DeserializeCUnitUpgradeTaskSerializerCallback)
-    , mSave(&SerializeCUnitUpgradeTaskSerializerCallback)
-  {}
 
 } // namespace
 
@@ -443,3 +374,24 @@ int CUnitUpgradeTask::TaskTick()
     task->MemberSerialize(archive);
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitUpgradeTask>`, vtable 0x00E1FA78.
+   *
+   * Address: 0x00BCF8F0 (FUN_00BCF8F0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF93C0 (FUN_00BF93C0 -- the global's destructor.)
+   * Address: 0x005FBC90 (FUN_005FBC90 -- `Init`.)
+   * Address: 0x005F87E0 (FUN_005F87E0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005F87F0 (FUN_005F87F0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitUpgradeTaskSerializer : gpg::SerSaveLoadHelper<CUnitUpgradeTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B0CEC -- process-global `CUnitUpgradeTaskSerializer` singleton.
+  moho::CUnitUpgradeTaskSerializer gCUnitUpgradeTaskSerializer;
+} // namespace

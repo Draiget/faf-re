@@ -1107,9 +1107,6 @@
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\unit\tasks\CUnitCaptureTaskSerializer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTaskTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1638,9 +1635,6 @@
     <ClCompile Include="moho\serialization\PrefetchHandleBase.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\serialization\PrefetchHandleBaseSerializer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\serialization\PrefetchHandleBaseTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1845,9 +1839,6 @@
     <ClCompile Include="moho\effects\rendering\CEfxBeam.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\effects\rendering\CEfxBeamSerializer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\effects\rendering\CEfxBeamTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1936,9 +1927,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\effects\rendering\SEfxCurve.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\effects\rendering\SEfxCurveSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\effects\rendering\SEfxCurveTypeInfo.cpp">
@@ -2338,9 +2326,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ai\SPointVectorTypeInfo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\ai\STransportPickUpInfoSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ai\STransportPickUpInfoTypeInfo.cpp">
@@ -2872,9 +2857,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\serialization\PrefetchHandleBase.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\serialization\PrefetchHandleBaseSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\serialization\PrefetchHandleBaseTypeInfo.h">
@@ -3996,9 +3978,6 @@
     <ClInclude Include="moho\unit\tasks\CUnitCaptureTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\unit\tasks\CUnitCaptureTaskSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitCaptureTaskTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -4437,9 +4416,6 @@
     <ClInclude Include="moho\sim\CMersenneTwisterTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\CMersenneTwisterSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\sim\CRandomStreamTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -4551,9 +4527,6 @@
     <ClInclude Include="moho\effects\rendering\CEfxBeam.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\effects\rendering\CEfxBeamSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\effects\rendering\CEfxBeamTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -4630,9 +4603,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\effects\rendering\SEfxCurve.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\effects\rendering\SEfxCurveSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\effects\rendering\SEfxCurveTypeInfo.h">
@@ -5326,9 +5296,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\SAttachPointTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\ai\STransportPickUpInfoSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\STransportPickUpInfoTypeInfo.h">

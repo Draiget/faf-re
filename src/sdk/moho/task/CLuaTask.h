@@ -101,59 +101,6 @@ namespace moho
     bool* mExecuteDestroyedFlag;  // 0x24
   };
 
-  class CLuaTaskSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BC61C0 (FUN_00BC61C0, dynamic initializer for the global
-     * `CLuaTaskSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    CLuaTaskSerializer();
-
-    /**
-     * Address: 0x00BF0AF0 (FUN_00BF0AF0, Moho::CLuaTaskSerializer::~CLuaTaskSerializer)
-     */
-    ~CLuaTaskSerializer();
-
-    /**
-     * Address: 0x004C9C40 (FUN_004C9C40, CLuaTaskSerializer::Deserialize callback)
-     * Chain:   0x004CC2B0 (FUN_004CC2B0)
-     *
-     * What it does:
-     * Forwards archive-load flow into `CLuaTask::MemberDeserialize`.
-     */
-    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x004C9C50 (FUN_004C9C50, CLuaTaskSerializer::Serialize callback)
-     * Chain:   0x004CC320 (FUN_004CC320)
-     *
-     * What it does:
-     * Forwards archive-save flow into `CLuaTask::MemberSerialize`.
-     */
-    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x004CAFE0 (FUN_004CAFE0, sub_4CAFE0)
-     *
-     * What it does:
-     * Binds load/save serializer callbacks into CLuaTask RTTI.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc; // +0x0C
-    gpg::RType::save_func_t mSerSaveFunc; // +0x10
-  };
-
-  static_assert(offsetof(CLuaTaskSerializer, mSerLoadFunc) == 0x0C, "CLuaTaskSerializer::mSerLoadFunc offset must be 0x0C");
-  static_assert(offsetof(CLuaTaskSerializer, mSerSaveFunc) == 0x10, "CLuaTaskSerializer::mSerSaveFunc offset must be 0x10");
-  static_assert(sizeof(CLuaTaskSerializer) == 0x14, "CLuaTaskSerializer size must be 0x14");
-
   class CLuaTaskTypeInfo : public gpg::RType
   {
   public:

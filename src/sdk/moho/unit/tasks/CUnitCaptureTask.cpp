@@ -691,3 +691,24 @@ namespace moho
     WakeTaskThreadForImmediateTick(mOwnerThread);
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitCaptureTask>`, vtable 0x00E1FF54.
+   *
+   * Address: 0x00BCFFD0 (FUN_00BCFFD0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF9880 (FUN_00BF9880 -- the global's destructor.)
+   * Address: 0x00605320 (FUN_00605320 -- `Init`.)
+   * Address: 0x006042B0 (FUN_006042B0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x006042C0 (FUN_006042C0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitCaptureTaskSerializer : gpg::SerSaveLoadHelper<CUnitCaptureTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B106C -- process-global `CUnitCaptureTaskSerializer` singleton.
+  moho::CUnitCaptureTaskSerializer gCUnitCaptureTaskSerializer;
+} // namespace

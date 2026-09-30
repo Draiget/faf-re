@@ -3006,6 +3006,8 @@ namespace gpg
         object.MemberDeserialize(archive, version, *ownerRef);
       } else if constexpr (requires { object.MemberDeserialize(archive, version); }) {
         object.MemberDeserialize(archive, version);
+      } else if constexpr (requires { object.MemberDeserialize(archive); }) {
+        object.MemberDeserialize(archive);
       } else {
         SerLoadMembers(archive, object);
       }
@@ -3024,6 +3026,8 @@ namespace gpg
         object.MemberSerialize(archive, version, *ownerRef);
       } else if constexpr (requires { object.MemberSerialize(archive, version); }) {
         object.MemberSerialize(archive, version);
+      } else if constexpr (requires { object.MemberSerialize(archive); }) {
+        object.MemberSerialize(archive);
       } else {
         SerSaveMembers(archive, static_cast<const T&>(object));
       }

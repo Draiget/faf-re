@@ -208,158 +208,10 @@ namespace
   };
   static_assert(sizeof(STriggerTypeInfo) == 0x64, "STriggerTypeInfo size must be 0x64");
 
-  class SConditionSerializer final : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BDA060 (FUN_00BDA060, dynamic initializer for the global
-     * `SConditionSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    SConditionSerializer()
-      : mLoadCallback(&SConditionSerializer::Deserialize)
-      , mSaveCallback(&SConditionSerializer::Serialize)
-    {}
-
-    /**
-     * Address: 0x00BFF610 (FUN_00BFF610, ??1SConditionSerializer@Moho@@QAE@@Z)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~SConditionSerializer() = default;
-
-    /**
-     * Address: 0x0070B120 (FUN_0070B120, Moho::SConditionSerializer::Deserialize)
-     */
-    static void Deserialize(
-      gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-    )
-    {
-      auto* const object = reinterpret_cast<moho::SCondition*>(objectPtr);
-      if (archive && object) {
-        object->MemberDeserialize(archive);
-      }
-    }
-
-    /**
-     * Address: 0x0070B130 (FUN_0070B130, Moho::SConditionSerializer::Serialize)
-     */
-    static void Serialize(
-      gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-    )
-    {
-      auto* const object = reinterpret_cast<const moho::SCondition*>(objectPtr);
-      if (archive && object) {
-        object->MemberSerialize(archive);
-      }
-    }
-
-    /**
-     * Address: 0x0070E5B0 (FUN_0070E5B0, shared Init() body -- also serves
-     * the dead SerSaveLoadHelper<SCondition> duplicate's vtable slot 0)
-     */
-    void Init() override
-    {
-      gpg::RType* const type = moho::SCondition::StaticGetClass();
-      GPG_ASSERT(type != nullptr);
-      if (!type) {
-        return;
-      }
-
-      GPG_ASSERT(type->serLoadFunc_ == nullptr);
-      GPG_ASSERT(type->serSaveFunc_ == nullptr);
-      type->serLoadFunc_ = mLoadCallback;
-      type->serSaveFunc_ = mSaveCallback;
-    }
-
-  public:
-    gpg::RType::load_func_t mLoadCallback; // +0x0C
-    gpg::RType::save_func_t mSaveCallback; // +0x10
-  };
 #if defined(MOHO_ABI_MSVC8_COMPAT)
-  static_assert(sizeof(SConditionSerializer) == 0x14, "SConditionSerializer size must be 0x14");
 #endif
 
-  class STriggerSerializer final : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BDA0C0 (FUN_00BDA0C0, dynamic initializer for the global
-     * `STriggerSerializer` singleton)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base and binds the
-     * load/save callback fields.
-     */
-    STriggerSerializer()
-      : mLoadCallback(&STriggerSerializer::Deserialize)
-      , mSaveCallback(&STriggerSerializer::Serialize)
-    {}
-
-    /**
-     * Address: 0x00BFF6A0 (FUN_00BFF6A0, ??1STriggerSerializer@Moho@@QAE@@Z)
-     *
-     * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently
-     * sits in and restores a self-linked sentinel state.
-     */
-    ~STriggerSerializer() = default;
-
-    /**
-     * Address: 0x0070B380 (FUN_0070B380, Moho::STriggerSerializer::Deserialize)
-     */
-    static void Deserialize(
-      gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-    )
-    {
-      auto* const object = reinterpret_cast<moho::STrigger*>(objectPtr);
-      if (archive && object) {
-        object->MemberDeserialize(archive);
-      }
-    }
-
-    /**
-     * Address: 0x0070B390 (FUN_0070B390, Moho::STriggerSerializer::Serialize)
-     */
-    static void Serialize(
-      gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
-    )
-    {
-      auto* const object = reinterpret_cast<const moho::STrigger*>(objectPtr);
-      if (archive && object) {
-        object->MemberSerialize(archive);
-      }
-    }
-
-    /**
-     * Address: 0x0070E9F0 (FUN_0070E9F0, shared Init() body -- also serves
-     * the dead SerSaveLoadHelper<STrigger> duplicate's vtable slot 0)
-     */
-    void Init() override
-    {
-      gpg::RType* const type = moho::STrigger::StaticGetClass();
-      GPG_ASSERT(type != nullptr);
-      if (!type) {
-        return;
-      }
-
-      GPG_ASSERT(type->serLoadFunc_ == nullptr);
-      GPG_ASSERT(type->serSaveFunc_ == nullptr);
-      type->serLoadFunc_ = mLoadCallback;
-      type->serSaveFunc_ = mSaveCallback;
-    }
-
-  public:
-    gpg::RType::load_func_t mLoadCallback; // +0x0C
-    gpg::RType::save_func_t mSaveCallback; // +0x10
-  };
 #if defined(MOHO_ABI_MSVC8_COMPAT)
-  static_assert(sizeof(STriggerSerializer) == 0x14, "STriggerSerializer size must be 0x14");
 #endif
 
   [[nodiscard]] gpg::RType* CachedSConditionType()
@@ -990,9 +842,7 @@ namespace
   gpg::PrimitiveSerHelper<moho::ETriggerOperator, int> gETriggerOperatorPrimitiveSerializer;
 
   SConditionTypeInfo gSConditionTypeInfo;
-  SConditionSerializer gSConditionSerializer;
   STriggerTypeInfo gSTriggerTypeInfo;
-  STriggerSerializer gSTriggerSerializer;
 
   RFastVectorSConditionTypeInfo gFastVectorSConditionTypeInfo;
   gpg::RSharedPointerType<moho::STrigger> gSharedPointerSTriggerTypeInfo;

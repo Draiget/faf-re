@@ -1,3 +1,4 @@
+#include <cstddef>
 #include "moho/serialization/PrefetchHandleBase.h"
 
 #include <cstdlib>
@@ -12,9 +13,9 @@
 #include "legacy/containers/Vector.h"
 #include "moho/resource/ResourceManager.h"
 #include "moho/serialization/CPrefetchSet.h"
-#include "moho/serialization/PrefetchHandleBaseSerializer.h"
 #include "moho/serialization/PrefetchHandleBaseTypeInfo.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -234,9 +235,6 @@ namespace
     return &sInstance;
   }
 
-  // Address: 0x010A8938 -- process-global `PrefetchHandleBaseSerializer` singleton.
-  moho::PrefetchHandleBaseSerializer gPrefetchHandleBaseSerializer;
-
   void EnsurePrefetchHandleBaseRegistered()
   {
     static const bool kRegistered = []() {
@@ -347,6 +345,12 @@ namespace moho
     *this = RES_PrefetchResource(resourcePath.c_str(), typeHandle.type);
   }
 
+  void PrefetchHandleBase::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteString(&mPtr->mRecord->mId.name);
+    archive->WriteRefCounts(mPtr->mRecord->mType);
+  }
+
   /**
    * Address: 0x004ABE00 (FUN_004ABE00, Moho::PrefetchHandleBase::GetName)
    */
@@ -372,3 +376,24 @@ namespace moho
 GPG_PREREGISTER_INIT(register_PrefetchHandleBaseTypeInfo_dee002, moho::register_PrefetchHandleBaseTypeInfo)
 
 GPG_PREREGISTER_INIT(EnsurePrefetchSetTypeRegistered_dee002, EnsurePrefetchSetTypeRegistered)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<PrefetchHandleBase>`, vtable 0x00E07658.
+   *
+   * Address: 0x00BC5BE0 (FUN_00BC5BE0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF0620 (FUN_00BF0620 -- the global's destructor.)
+   * Address: 0x004ACCF0 (FUN_004ACCF0 -- `Init`.)
+   * Address: 0x004ABD30 (FUN_004ABD30 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x004ABD40 (FUN_004ABD40 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct PrefetchHandleBaseSerializer : gpg::SerSaveLoadHelper<PrefetchHandleBase>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A8938 -- process-global `PrefetchHandleBaseSerializer` singleton.
+  moho::PrefetchHandleBaseSerializer gPrefetchHandleBaseSerializer;
+} // namespace

@@ -61,72 +61,6 @@ namespace
   }
 
   /**
-   * Demangled (by analogy to the established `gpg::Rect2iSerializer` /
-   * `gpg::Rect2fSerializer` sibling shape in Reflection.h):
-   * `gpg::SerSaveLoadHelper<class Moho::SSTITarget>`.
-   */
-  class SSTITargetSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BCA310 (FUN_00BCA310, register_SSTITargetSerializer)
-     *
-     * What it does:
-     * Binds this helper's load/save callback lanes and registers process-exit
-     * cleanup. Base-class construction (`gpg::SerHelperBase::SerHelperBase`)
-     * self-links this node and splices it into the pending `sNewHelpers`
-     * list.
-     */
-    SSTITargetSerializer();
-
-    /**
-     * Address: 0x00BF5170 (FUN_00BF5170, dynamic atexit destructor for `gSSTITargetSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). The compiler registers it with
-     * `atexit` from the global's dynamic initializer (0x00BCA310).
-     * `FUN_0055B170` and `FUN_0055B1A0` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~SSTITargetSerializer() = default;
-
-    /**
-     * What it does:
-     * Resolves `SSTITarget` reflected type metadata and publishes this
-     * helper's load/save callback lanes to it.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-  static_assert(
-    offsetof(SSTITargetSerializer, mSerLoadFunc) == 0x0C, "SSTITargetSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SSTITargetSerializer, mSerSaveFunc) == 0x10, "SSTITargetSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(SSTITargetSerializer) == 0x14, "SSTITargetSerializer size must be 0x14");
-
-  SSTITargetSerializer::SSTITargetSerializer()
-    : mSerLoadFunc(&DeserializeSSTITargetSerializerCallback)
-    , mSerSaveFunc(&SerializeSSTITargetSerializerCallback)
-  {}
-
-  void SSTITargetSerializer::Init()
-  {
-    gpg::RType* const type = CachedSSTITargetType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  SSTITargetSerializer gSSTITargetSerializer;
-
-  /**
    * Address: 0x0055B120 (FUN_0055B120, Moho::SSTITargetSerializer::Deserialize)
    *
    * What it does:
@@ -344,3 +278,24 @@ namespace
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_EntIdTypeInfo_dd3051, moho::preregister_EntIdTypeInfo)
 GPG_PREREGISTER_INIT(preregister_SSTITargetTypeInfo_dd3051, moho::preregister_SSTITargetTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SSTITarget>`, vtable 0x00E18080.
+   *
+   * Address: 0x00BCA310 (FUN_00BCA310 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF5170 (FUN_00BF5170 -- the global's destructor.)
+   * Address: 0x0055B2A0 (FUN_0055B2A0 -- `Init`.)
+   * Address: 0x0055B120 (FUN_0055B120 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0055B130 (FUN_0055B130 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SSTITargetSerializer : gpg::SerSaveLoadHelper<SSTITarget>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010ACA0C -- process-global `SSTITargetSerializer` singleton.
+  moho::SSTITargetSerializer gSSTITargetSerializer;
+} // namespace

@@ -833,7 +833,8 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
    * u64 max-storage energy/mass fields through the archive's WriteUInt64
    * virtual slot. Mirrors the binary's lazy LookupRType caching sequence.
    */
-  void SEconTotals::MemberSerialize(gpg::WriteArchive* const archive) const{
+  void SEconTotals::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
     const gpg::RRef nullOwner{};
 
     gpg::RType* const econValueType = CachedSEconValueType();

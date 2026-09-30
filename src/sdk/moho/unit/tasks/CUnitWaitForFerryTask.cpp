@@ -378,74 +378,6 @@ namespace moho
 
 namespace
 {
-  /**
-   * VFTABLE: 0x00E20468 (`??_7CUnitWaitForFerryTaskSerializer@Moho@@6B@`)
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class moho::CUnitWaitForFerryTask> (IDA
-   * infers `Moho::CUnitWaitForFerryTaskSerializer`). The binary global is
-   * 0x14 bytes (vtable + inherited link pair + load/save callback lanes),
-   * matching every other `SerHelperBase`-derived serializer in this
-   * codebase.
-   */
-  struct CUnitWaitForFerryTaskSerializer : public gpg::SerHelperBase
-  {
-    /**
-     * Address: 0x00BD0960 (FUN_00BD0960, dynamic initializer for `gCUnitWaitForFerryTaskSerializer`)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the pending `sNewHelpers` list), binds the load/save
-     * callbacks and installs this helper's vtable (0x00E20468); the compiler
-     * registers the destructor with `atexit`.
-     */
-    CUnitWaitForFerryTaskSerializer();
-
-    /**
-     * Address: 0x00BF9E30 (FUN_00BF9E30, dynamic atexit destructor for `gCUnitWaitForFerryTaskSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_0060F9E0` and `FUN_0060FA10` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~CUnitWaitForFerryTaskSerializer() = default;
-
-    /**
-     * Address: 0x006100C0 (FUN_006100C0, Moho::CUnitWaitForFerryTaskSerializer::Init,
-     * vtable slot 0)
-     *
-     * What it does:
-     * Lazily resolves `CUnitWaitForFerryTask` RTTI and installs this
-     * helper's load/save callback pair onto the reflected type descriptor.
-     */
-    void Init() override;
-
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-  static_assert(
-    offsetof(CUnitWaitForFerryTaskSerializer, mSerLoadFunc) == 0x0C,
-    "CUnitWaitForFerryTaskSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CUnitWaitForFerryTaskSerializer, mSerSaveFunc) == 0x10,
-    "CUnitWaitForFerryTaskSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(
-    sizeof(CUnitWaitForFerryTaskSerializer) == 0x14,
-    "CUnitWaitForFerryTaskSerializer size must be 0x14"
-  );
-
-  void CUnitWaitForFerryTaskSerializer::Init()
-  {
-    gpg::RType* const type = CachedCUnitWaitForFerryTaskType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  CUnitWaitForFerryTaskSerializer gCUnitWaitForFerryTaskSerializer;
 
   /**
    * Address: 0x0060F990 (FUN_0060F990, Moho::CUnitWaitForFerryTaskSerializer::Deserialize)
@@ -499,17 +431,6 @@ namespace
     task->MemberSerialize(archive);
   }
 
-  /**
-   * Address: 0x00BD0960 (FUN_00BD0960, dynamic initializer for `gCUnitWaitForFerryTaskSerializer`)
-   *
-   * What it does:
-   * Binds this helper's load/save callbacks.
-   */
-  CUnitWaitForFerryTaskSerializer::CUnitWaitForFerryTaskSerializer()
-    : mSerLoadFunc(&DeserializeCUnitWaitForFerryTaskSerializerCallback)
-    , mSerSaveFunc(&SerializeCUnitWaitForFerryTaskSerializerCallback)
-  {}
-
 } // namespace
 
 namespace gpg
@@ -552,3 +473,24 @@ namespace gpg
     return outRef;
   }
 } // namespace gpg
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitWaitForFerryTask>`, vtable 0x00E20468.
+   *
+   * Address: 0x00BD0960 (FUN_00BD0960 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF9E30 (FUN_00BF9E30 -- the global's destructor.)
+   * Address: 0x006100C0 (FUN_006100C0 -- `Init`.)
+   * Address: 0x0060F990 (FUN_0060F990 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0060F9A0 (FUN_0060F9A0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitWaitForFerryTaskSerializer : gpg::SerSaveLoadHelper<CUnitWaitForFerryTask>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B16AC -- process-global `CUnitWaitForFerryTaskSerializer` singleton.
+  moho::CUnitWaitForFerryTaskSerializer gCUnitWaitForFerryTaskSerializer;
+} // namespace

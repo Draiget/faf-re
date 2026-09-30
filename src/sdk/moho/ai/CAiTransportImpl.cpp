@@ -2046,3 +2046,24 @@ namespace
   // Address: 0x010B07D8 -- process-global `CAiTransportImplSerializer` singleton.
   moho::CAiTransportImplSerializer gCAiTransportImplSerializer;
 } // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<STransportPickUpInfo>`, vtable 0x00E1F378.
+   *
+   * Address: 0x00BCEE50 (FUN_00BCEE50 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF8B20 (FUN_00BF8B20 -- the global's destructor.)
+   * Address: 0x005E9490 (FUN_005E9490 -- `Init`.)
+   * Address: 0x005E4660 (FUN_005E4660 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x005E4670 (FUN_005E4670 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct STransportPickUpInfoSerializer : gpg::SerSaveLoadHelper<STransportPickUpInfo>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B07EC -- process-global `STransportPickUpInfoSerializer` singleton.
+  moho::STransportPickUpInfoSerializer gSTransportPickUpInfoSerializer;
+} // namespace

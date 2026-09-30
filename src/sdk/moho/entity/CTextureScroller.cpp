@@ -858,84 +858,6 @@ namespace
   void DeserializeCTextureScrollerSerializerCallback(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
   void SerializeCTextureScrollerSerializerCallback(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
 
-  /**
-   * Demangled: gpg::SerSaveLoadHelper<class Moho::CTextureScroller>
-   */
-  class CTextureScrollerSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BDD750 (FUN_00BDD750, register_CTextureScrollerSerializer)
-     *
-     * What it does:
-     * Binds this helper's load/save callback lanes and registers process-exit
-     * cleanup. Base-class construction (`gpg::SerHelperBase::SerHelperBase`)
-     * self-links this node and splices it into the pending `sNewHelpers`
-     * list.
-     */
-    CTextureScrollerSerializer();
-
-    /**
-     * Address: 0x00C02770 (FUN_00C02770, dynamic atexit destructor for `gCTextureScrollerSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). The compiler registers it with
-     * `atexit` from the global's dynamic initializer (0x00BDD750).
-     * `FUN_00777D90` and `FUN_00777DC0` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~CTextureScrollerSerializer() = default;
-
-    /**
-     * Address: 0x00777F80 (FUN_00777F80, gpg::SerSaveLoadHelper_CTextureScroller::Init)
-     *
-     * What it does:
-     * Resolves reflected type metadata for `CTextureScroller` and installs
-     * this helper's load/save callback lanes.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mLoadCallback = nullptr;
-    gpg::RType::save_func_t mSaveCallback = nullptr;
-  };
-  static_assert(
-    offsetof(CTextureScrollerSerializer, mLoadCallback) == 0x0C,
-    "CTextureScrollerSerializer::mLoadCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CTextureScrollerSerializer, mSaveCallback) == 0x10,
-    "CTextureScrollerSerializer::mSaveCallback offset must be 0x10"
-  );
-  static_assert(sizeof(CTextureScrollerSerializer) == 0x14, "CTextureScrollerSerializer size must be 0x14");
-
-  CTextureScrollerSerializer::CTextureScrollerSerializer()
-    : mLoadCallback(&DeserializeCTextureScrollerSerializerCallback)
-    , mSaveCallback(&SerializeCTextureScrollerSerializerCallback)
-  {}
-
-  void CTextureScrollerSerializer::Init()
-  {
-    gpg::RType* type = moho::CTextureScroller::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CTextureScroller));
-      moho::CTextureScroller::sType = type;
-    }
-
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerLoadFunc", 84, kSerializationHeaderPath);
-    }
-    type->serLoadFunc_ = mLoadCallback;
-
-    if (type->serSaveFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerSaveFunc", 87, kSerializationHeaderPath);
-    }
-    type->serSaveFunc_ = mSaveCallback;
-  }
-
-  CTextureScrollerSerializer gCTextureScrollerSerializer;
-
   void DeserializeCTextureScrollerSerializerCallback(
     gpg::ReadArchive* const archive,
     const int objectPtr,
@@ -991,3 +913,24 @@ namespace moho
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_CTextureScrollerTypeInfo_6b8f21, moho::register_CTextureScrollerTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CTextureScroller>`, vtable 0x00E372B0.
+   *
+   * Address: 0x00BDD750 (FUN_00BDD750 -- constructs the global and registers its destructor.)
+   * Address: 0x00C02770 (FUN_00C02770 -- the global's destructor.)
+   * Address: 0x00777F80 (FUN_00777F80 -- `Init`.)
+   * Address: 0x00777D30 (FUN_00777D30 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00777D40 (FUN_00777D40 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CTextureScrollerSerializer : gpg::SerSaveLoadHelper<CTextureScroller>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010BBB80 -- process-global `CTextureScrollerSerializer` singleton.
+  moho::CTextureScrollerSerializer gCTextureScrollerSerializer;
+} // namespace

@@ -302,72 +302,6 @@ namespace
   }
 
   /**
-   * VFTABLE: 0x00E200CC (`??_7CUnitCarrierLandSerializer@Moho@@6B@`)
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class moho::CUnitCarrierLand> (IDA
-   * infers `Moho::CUnitCarrierLandSerializer`). The binary global is 0x14
-   * bytes (vtable + inherited link pair + load/save callback lanes),
-   * matching every other `SerHelperBase`-derived serializer in this
-   * codebase.
-   */
-  struct CUnitCarrierLandSerializer : public gpg::SerHelperBase
-  {
-    /**
-     * Address: 0x00BD0280 (FUN_00BD0280, dynamic initializer for `gCUnitCarrierLandSerializer`)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the pending `sNewHelpers` list), binds the load/save
-     * callbacks and installs this helper's vtable (0x00E200CC); the compiler
-     * registers the destructor with `atexit`.
-     */
-    CUnitCarrierLandSerializer();
-
-    /**
-     * Address: 0x00BF99C0 (FUN_00BF99C0, dynamic atexit destructor for `gCUnitCarrierLandSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_00606D20` and `FUN_00606D50` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~CUnitCarrierLandSerializer() = default;
-
-    /**
-     * Address: 0x006077F0 (FUN_006077F0, Moho::CUnitCarrierLandSerializer::Init,
-     * vtable slot 0)
-     *
-     * What it does:
-     * Lazily resolves `CUnitCarrierLand` RTTI and installs this helper's
-     * load/save callback pair onto the reflected type descriptor.
-     */
-    void Init() override;
-
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-  static_assert(
-    offsetof(CUnitCarrierLandSerializer, mSerLoadFunc) == 0x0C,
-    "CUnitCarrierLandSerializer::mSerLoadFunc offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CUnitCarrierLandSerializer, mSerSaveFunc) == 0x10,
-    "CUnitCarrierLandSerializer::mSerSaveFunc offset must be 0x10"
-  );
-  static_assert(sizeof(CUnitCarrierLandSerializer) == 0x14, "CUnitCarrierLandSerializer size must be 0x14");
-
-  void CUnitCarrierLandSerializer::Init()
-  {
-    gpg::RType* const type = CachedCUnitCarrierLandType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  CUnitCarrierLandSerializer gCUnitCarrierLandSerializer;
-
-  /**
    * Address: 0x00606CD0 (FUN_00606CD0, Moho::CUnitCarrierLandSerializer::Deserialize)
    *
    * What it does:
@@ -413,20 +347,30 @@ namespace
     task->MemberSerialize(archive);
   }
 
-  /**
-   * Address: 0x00BD0280 (FUN_00BD0280, dynamic initializer for `gCUnitCarrierLandSerializer`)
-   *
-   * What it does:
-   * Binds this helper's load/save callbacks.
-   */
-  CUnitCarrierLandSerializer::CUnitCarrierLandSerializer()
-    : mSerLoadFunc(&DeserializeCUnitCarrierLandSerializerCallback)
-    , mSerSaveFunc(&SerializeCUnitCarrierLandSerializerCallback)
-  {}
-
 } // namespace
 
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_CUnitCarrierLandTypeInfo_f5d39f, moho::register_CUnitCarrierLandTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CUnitCarrierLand>`, vtable 0x00E200CC.
+   *
+   * Address: 0x00BD0280 (FUN_00BD0280 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF99C0 (FUN_00BF99C0 -- the global's destructor.)
+   * Address: 0x006077F0 (FUN_006077F0 -- `Init`.)
+   * Address: 0x00606CD0 (FUN_00606CD0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00606CE0 (FUN_00606CE0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CUnitCarrierLandSerializer : gpg::SerSaveLoadHelper<CUnitCarrierLand>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B1134 -- process-global `CUnitCarrierLandSerializer` singleton.
+  moho::CUnitCarrierLandSerializer gCUnitCarrierLandSerializer;
+} // namespace

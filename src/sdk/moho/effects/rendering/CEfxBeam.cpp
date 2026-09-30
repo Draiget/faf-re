@@ -26,6 +26,7 @@
 #include "moho/particles/SParticleBuffer.h"
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/ui/SDebugLine.h"
+#include "gpg/core/reflection/Reflection.h"
 
 
 namespace
@@ -866,3 +867,24 @@ namespace moho
     debugCanvas->DebugDrawLine(endLine);
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CEfxBeam>`, vtable 0x00E23C4C.
+   *
+   * Address: 0x00BD3F50 (FUN_00BD3F50 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFB910 (FUN_00BFB910 -- the global's destructor.)
+   * Address: 0x00657B80 (FUN_00657B80 -- `Init`.)
+   * Address: 0x00655F60 (FUN_00655F60 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00655F70 (FUN_00655F70 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CEfxBeamSerializer : gpg::SerSaveLoadHelper<CEfxBeam>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B3A44 -- process-global `CEfxBeamSerializer` singleton.
+  moho::CEfxBeamSerializer gCEfxBeamSerializer;
+} // namespace

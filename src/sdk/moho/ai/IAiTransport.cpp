@@ -1,3 +1,4 @@
+#include <cstddef>
 #include "moho/ai/IAiTransport.h"
 
 #include <cstdint>
@@ -20,7 +21,6 @@
 #include "moho/ai/SAiReservedTransportBoneTypeInfo.h"
 #include "moho/ai/SAttachPointSerializer.h"
 #include "moho/ai/SAttachPointTypeInfo.h"
-#include "moho/ai/STransportPickUpInfoSerializer.h"
 #include "moho/ai/STransportPickUpInfoTypeInfo.h"
 #include "moho/misc/Listener.h"
 
@@ -1111,7 +1111,6 @@ namespace
       (void)moho::register_SAttachPointTypeInfo();
       (void)moho::register_SAttachPointSerializer();
       (void)moho::register_STransportPickUpInfoTypeInfo();
-      (void)moho::register_STransportPickUpInfoSerializer();
       (void)moho::register_IAiTransportTypeInfo();
       (void)moho::register_IAiTransportSerializer();
       (void)moho::register_CAiTransportImplTypeInfo();

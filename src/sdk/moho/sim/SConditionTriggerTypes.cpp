@@ -9,6 +9,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/resource/blueprints/RBlueprint.h"
 #include "moho/sim/CArmyStats.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -174,3 +175,45 @@ namespace moho
     archive->Write(CachedType<gpg::fastvector<SCondition>>(gFastVectorSConditionType), &mConditions, gpg::RRef{});
   }
 } // namespace moho
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SCondition>`, vtable 0x00E310A0.
+   *
+   * Address: 0x00BDA060 (FUN_00BDA060 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF610 (FUN_00BFF610 -- the global's destructor.)
+   * Address: 0x0070E5B0 (FUN_0070E5B0 -- `Init`.)
+   * Address: 0x0070B120 (FUN_0070B120 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0070B130 (FUN_0070B130 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SConditionSerializer : gpg::SerSaveLoadHelper<SCondition>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B8F64 -- process-global `SConditionSerializer` singleton.
+  moho::SConditionSerializer gSConditionSerializer;
+} // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<STrigger>`, vtable 0x00E31124.
+   *
+   * Address: 0x00BDA0C0 (FUN_00BDA0C0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFF6A0 (FUN_00BFF6A0 -- the global's destructor.)
+   * Address: 0x0070E9F0 (FUN_0070E9F0 -- `Init`.)
+   * Address: 0x0070B380 (FUN_0070B380 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0070B390 (FUN_0070B390 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct STriggerSerializer : gpg::SerSaveLoadHelper<STrigger>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B903C -- process-global `STriggerSerializer` singleton.
+  moho::STriggerSerializer gSTriggerSerializer;
+} // namespace

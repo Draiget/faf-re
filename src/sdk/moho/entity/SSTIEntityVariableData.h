@@ -227,53 +227,6 @@ namespace moho
   };
 
   /**
-   * VFTABLE: 0x00E17FA0
-   * COL:  0x00E6C8FC
-   *
-   * Demangled: gpg::SerSaveLoadHelper<class Moho::SSTIEntityVariableData>
-   */
-  class SSTIEntityVariableDataSerializer : public gpg::SerHelperBase
-  {
-  public:
-    /**
-     * Address: 0x00BCA100 (FUN_00BCA100, dynamic initializer for `gSSTIEntityVariableDataSerializer`)
-     * Address: 0x005588D0 (FUN_005588D0, out-of-line copy of this constructor, unreferenced)
-     *
-     * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the pending `sNewHelpers` list), binds the load/save
-     * callbacks and installs this helper's vtable (0x00E17FA0); the compiler
-     * registers the destructor with `atexit`.
-     */
-    SSTIEntityVariableDataSerializer();
-
-    /**
-     * Address: 0x00BF4FF0 (FUN_00BF4FF0, dynamic atexit destructor for `gSSTIEntityVariableDataSerializer`)
-     *
-     * What it does:
-     * Unlinks this helper node from the serializer-helper list (the
-     * `TDatListItem` base destructor). `FUN_00558900` and `FUN_00558930` are
-     * unreferenced out-of-line copies of the same body.
-     */
-    ~SSTIEntityVariableDataSerializer();
-
-    /**
-     * Address: 0x00558E40 (FUN_00558E40, sub_558E40)
-     * Slot: 0
-     *
-     * What it does:
-     * Binds prebuilt load/save callbacks into `SSTIEntityVariableData` RTTI.
-     * Dispatched by `gpg::SerHelperBase::InitNewHelpers` when this helper is
-     * drained from the pending list.
-     */
-    void Init() override;
-
-  public:
-    gpg::RType::load_func_t mSerLoadFunc;
-    gpg::RType::save_func_t mSerSaveFunc;
-  };
-
-  /**
    * VFTABLE: 0x00E17F70
    * COL:  0x00E6C994
    *
@@ -433,6 +386,5 @@ namespace moho
     "SSTIEntityVariableData::mIntelAttributes offset must be 0xB0"
   );
   static_assert(sizeof(SSTIEntityVariableData) == 0xD0, "SSTIEntityVariableData size must be 0xD0");
-  static_assert(sizeof(SSTIEntityVariableDataSerializer) == 0x14, "SSTIEntityVariableDataSerializer size must be 0x14");
   static_assert(sizeof(SSTIEntityVariableDataTypeInfo) == 0x64, "SSTIEntityVariableDataTypeInfo size must be 0x64");
 } // namespace moho

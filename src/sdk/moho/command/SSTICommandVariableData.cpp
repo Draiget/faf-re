@@ -9,6 +9,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
@@ -661,66 +662,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC9D00 (FUN_00BC9D00, dynamic initializer for the global
-   * `SSTICommandVariableDataSerializer` singleton)
-   */
-  SSTICommandVariableDataSerializer::SSTICommandVariableDataSerializer()
-    : mSerLoadFunc(&SSTICommandVariableDataSerializer::Serialize)
-    , mSerSaveFunc(&SSTICommandVariableDataSerializer::Deserialize)
-  {}
-
-  /**
-   * Address: 0x00BF4A80 (FUN_00BF4A80)
-   */
-  SSTICommandVariableDataSerializer::~SSTICommandVariableDataSerializer() = default;
-
-  /**
-   * Address: 0x00552B20 (FUN_00552B20, Moho::SSTICommandVariableDataSerializer::Serialize)
-   */
-  void SSTICommandVariableDataSerializer::Serialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    auto* const data = reinterpret_cast<SSTICommandVariableData*>(objectPtr);
-    if (!archive || !data) {
-      return;
-    }
-
-    data->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00552B30 (FUN_00552B30, Moho::SSTICommandVariableDataSerializer::Deserialize)
-   */
-  void SSTICommandVariableDataSerializer::Deserialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*
-  )
-  {
-    const auto* const data = reinterpret_cast<const SSTICommandVariableData*>(objectPtr);
-    if (!archive || !data) {
-      return;
-    }
-
-    data->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00553260 (FUN_00553260, Moho::SSTICommandVariableDataSerializer::Init)
-   */
-  void SSTICommandVariableDataSerializer::Init()
-  {
-    gpg::RType* type = SSTICommandVariableData::sType;
-    if (type == nullptr) {
-      type = preregister_SSTICommandVariableDataTypeInfo();
-      SSTICommandVariableData::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
-    type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
-    type->serSaveFunc_ = mSerSaveFunc;
-  }
-
-  /**
    * Address: 0x00552C10 (FUN_00552C10, func_UnitStateIsBusy)
    *
    * What it does:
@@ -749,10 +690,29 @@ namespace moho
 
 namespace
 {
-  // Address: 0x010AC554 -- process-global `SSTICommandVariableDataSerializer` singleton.
-  moho::SSTICommandVariableDataSerializer gSSTICommandVariableDataSerializer;
 } // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_SSTICommandVariableDataTypeInfo_2a172c, moho::preregister_SSTICommandVariableDataTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SSTICommandVariableData>`, vtable 0x00E17B3C.
+   *
+   * Address: 0x00BC9D00 (FUN_00BC9D00 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF4A80 (FUN_00BF4A80 -- the global's destructor.)
+   * Address: 0x00553260 (FUN_00553260 -- `Init`.)
+   * Address: 0x00552B20 (FUN_00552B20 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00552B30 (FUN_00552B30 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SSTICommandVariableDataSerializer : gpg::SerSaveLoadHelper<SSTICommandVariableData>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AC554 -- process-global `SSTICommandVariableDataSerializer` singleton.
+  moho::SSTICommandVariableDataSerializer gSSTICommandVariableDataSerializer;
+} // namespace

@@ -1422,7 +1422,8 @@ namespace moho
    * Serializes base command-task state, melee-task pointer lanes, target
    * payload, navigation flags, destination cell, and planted-state lane.
    */
-  void CUnitMeleeAttackTargetTask::MemberSerialize(gpg::WriteArchive* const archive) const{
+  void CUnitMeleeAttackTargetTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
     if (archive == nullptr) {
       return;
     }

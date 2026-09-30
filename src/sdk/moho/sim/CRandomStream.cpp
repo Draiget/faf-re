@@ -343,3 +343,25 @@ namespace
   // Address: 0x010A6A14 -- process-global `CRandomStreamSerializer` singleton.
   moho::CRandomStreamSerializer gCRandomStreamSerializer;
 } // namespace
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<CMersenneTwister>`, vtable 0x00E00584.
+   *
+   * Address: 0x00BC3320 (FUN_00BC3320 -- constructs the global and registers its destructor.)
+   * Address: 0x00BEE6F0 (FUN_00BEE6F0 -- the global's destructor.)
+   * Address: 0x0040EDF0 (FUN_0040EDF0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x0040F2C0 (FUN_0040F2C0 -- `Init`.)
+   * Address: 0x0040EDB0 (FUN_0040EDB0 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0040EDD0 (FUN_0040EDD0 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct CMersenneTwisterSerializer : gpg::SerSaveLoadHelper<CMersenneTwister>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A699C -- process-global `CMersenneTwisterSerializer` singleton.
+  moho::CMersenneTwisterSerializer gCMersenneTwisterSerializer;
+} // namespace

@@ -945,7 +945,8 @@ namespace moho
    * unowned raw pointer; the placement-retry counter is written through the
    * virtual `WriteInt` slot.
    */
-  void CUnitMobileBuildTask::MemberSerialize(gpg::WriteArchive* const archive) const{
+  void CUnitMobileBuildTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
     if (archive == nullptr) {
       return;
     }

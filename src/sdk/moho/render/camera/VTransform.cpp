@@ -51,10 +51,6 @@ namespace
     return gCachedQuaternionfType;
   }
 
-  // Address: 0x010A9B40 -- process-global `VTransformSerializer` singleton
-  // (constructed by FUN_00BC7170, self-registering via `__xc_a`; see
-  // VTransform.h for the real-ctor/atexit-target/dead-duplicate evidence).
-  moho::VTransformSerializer gVTransformSerializer;
 } // namespace
 
 namespace moho
@@ -428,57 +424,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004F0740 (FUN_004F0740, Moho::VTransformSerializer::Deserialize)
-   */
-  void VTransformSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(objectPtr != 0);
-    reinterpret_cast<VTransform*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x004F0760 (FUN_004F0760, Moho::VTransformSerializer::Serialize)
-   */
-  void VTransformSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(objectPtr != 0);
-    reinterpret_cast<const VTransform*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x004F0840 (FUN_004F0840, gpg::SerSaveLoadHelper_VTransform::Init)
-   */
-  void VTransformSerializer::Init()
-  {
-    if (VTransform::sType == nullptr) {
-      VTransform::sType = gpg::LookupRType(typeid(VTransform));
-    }
-
-    gpg::RType* const type = VTransform::sType;
-    if (type->serLoadFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerLoadFunc", kSerializationLoadLine, kSerializationSourcePath);
-    }
-    if (type->serSaveFunc_ != nullptr) {
-      gpg::HandleAssertFailure("!type->mSerSaveFunc", kSerializationSaveLine, kSerializationSourcePath);
-    }
-    type->serLoadFunc_ = mDeserialize;
-    type->serSaveFunc_ = mSerialize;
-  }
-
-  /**
-   * Address: 0x00BC7170 (FUN_00BC7170, dynamic initializer for the global
-   * `VTransformSerializer` singleton)
-   */
-  VTransformSerializer::VTransformSerializer()
-    : mDeserialize(&VTransformSerializer::Deserialize)
-    , mSerialize(&VTransformSerializer::Serialize)
-  {}
-
-  VTransformSerializer::~VTransformSerializer() = default;
-
-  /**
    * Address: 0x00BC7150 (FUN_00BC7150, register_VTransformTypeInfo)
    */
   void register_VTransformTypeInfo()
@@ -506,3 +451,24 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_VTransformTypeInfo_2fd396, moho::register_VTransformTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<VTransform>`, vtable 0x00E0BF9C.
+   *
+   * Address: 0x00BC7170 (FUN_00BC7170 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF17D0 (FUN_00BF17D0 -- the global's destructor.)
+   * Address: 0x004F0840 (FUN_004F0840 -- `Init`.)
+   * Address: 0x004F0740 (FUN_004F0740 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x004F0760 (FUN_004F0760 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct VTransformSerializer : gpg::SerSaveLoadHelper<VTransform>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010A9B40 -- process-global `VTransformSerializer` singleton.
+  moho::VTransformSerializer gVTransformSerializer;
+} // namespace

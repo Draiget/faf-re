@@ -117,6 +117,13 @@ namespace moho
     void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
+     * What it does:
+     * Saves the resource path and type of the prefetched record. Inlined
+     * into `SerSaveLoadHelper<PrefetchHandleBase>::Serialize` 0x004ABD40.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
      * Address: 0x004ABE00 (FUN_004ABE00, Moho::PrefetchHandleBase::GetName)
      *
      * What it does:

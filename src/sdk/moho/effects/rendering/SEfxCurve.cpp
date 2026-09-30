@@ -589,3 +589,24 @@ namespace
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_FastVectorSEfxCurveType_a4fe50, moho::preregister_FastVectorSEfxCurveType)
 GPG_PREREGISTER_INIT(register_FastVectorSEfxCurveType_a4fe50, moho::register_FastVectorSEfxCurveType)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<SEfxCurve>`, vtable 0x00E0F988.
+   *
+   * Address: 0x00BC8440 (FUN_00BC8440 -- constructs the global and registers its destructor.)
+   * Address: 0x00BF29D0 (FUN_00BF29D0 -- the global's destructor.)
+   * Address: 0x00515B30 (FUN_00515B30 -- `Init`.)
+   * Address: 0x00514D40 (FUN_00514D40 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x00514D50 (FUN_00514D50 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct SEfxCurveSerializer : gpg::SerSaveLoadHelper<SEfxCurve>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010AAA14 -- process-global `SEfxCurveSerializer` singleton.
+  moho::SEfxCurveSerializer gSEfxCurveSerializer;
+} // namespace

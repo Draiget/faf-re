@@ -67,9 +67,6 @@ namespace
     return &sInstance;
   }
 
-  // Address: 0x010A672C -- process-global `CTaskThreadSerializer` singleton.
-  moho::CTaskThreadSerializer gCTaskThreadSerializerHelper;
-
   // Address: 0x010A6834 -- process-global `CTaskStageSerializer` singleton.
   moho::CTaskStageSerializer gCTaskStageSerializerHelper;
 
@@ -108,20 +105,6 @@ namespace moho
   {
     (void)InitializeCTaskStageTypeInfoStorage();
   }
-
-  /**
-   * Address: 0x00BC3080 (FUN_00BC3080, dynamic initializer for the global
-   * `CTaskThreadSerializer` singleton)
-   */
-  CTaskThreadSerializer::CTaskThreadSerializer()
-    : mSerLoadFunc(&CTaskThreadSerializer::Deserialize)
-    , mSerSaveFunc(&CTaskThreadSerializer::Serialize)
-  {}
-
-  /**
-   * Address: 0x00BEE3D0 (FUN_00BEE3D0, Moho::CTaskThreadSerializer::~CTaskThreadSerializer)
-   */
-  CTaskThreadSerializer::~CTaskThreadSerializer() = default;
 
   /**
    * Address: 0x00BC30E0 (FUN_00BC30E0, dynamic initializer for the global
