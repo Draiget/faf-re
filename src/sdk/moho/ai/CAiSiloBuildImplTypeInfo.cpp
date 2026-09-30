@@ -9,6 +9,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/RListType.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/CAiSiloBuildImplConstruct.h"
 #include "moho/ai/CAiSiloBuildImplSerializer.h"
@@ -26,24 +27,7 @@ namespace
     void Init() override;
   };
 
-  class ESiloTypeListTypeInfo final : public gpg::RType
-  {
-  public:
-    /**
-     * Address: 0x005D0C40 (FUN_005D0C40, gpg::RListType_ESiloType::dtr)
-     */
-    ~ESiloTypeListTypeInfo() override = default;
-
-    [[nodiscard]] const char* GetName() const override;
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
-    void Init() override;
-
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
-  };
-
   static_assert(sizeof(SSiloBuildInfoTypeInfo) == 0x64, "SSiloBuildInfoTypeInfo size must be 0x64");
-  static_assert(sizeof(ESiloTypeListTypeInfo) == 0x64, "ESiloTypeListTypeInfo size must be 0x64");
 
   /**
    * Address: 0x00BF7E40 (FUN_00BF7E40, atexit destructor of the SSiloBuildInfoTypeInfo object)
@@ -61,30 +45,6 @@ namespace
   {
     static CAiSiloBuildImplTypeInfo sInstance;
     return &sInstance;
-  }
-
-  /**
-   * Address: 0x00BF7FC0 (FUN_00BF7FC0, atexit destructor of the ESiloTypeListTypeInfo object)
-   */
-  [[nodiscard]] ESiloTypeListTypeInfo* AcquireESiloTypeListTypeInfo()
-  {
-    static ESiloTypeListTypeInfo sInstance;
-    return &sInstance;
-  }
-
-  [[nodiscard]] gpg::RType* CachedESiloTypeType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(ESiloType));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] const gpg::RRef& NullOwnerRef() noexcept
-  {
-    static const gpg::RRef kNullOwner{nullptr, nullptr};
-    return kNullOwner;
   }
 
   /**
@@ -114,16 +74,28 @@ namespace
   }
 
   /**
-   * Address: 0x005D0B00 (FUN_005D0B00, sub_5D0B00)
+   * Address: 0x005D0B00 (FUN_005D0B00, preregister_ESiloTypeListTypeInfo)
+   * Address: 0x00BF7FC0 (FUN_00BF7FC0, atexit destructor of the list type object)
    *
    * What it does:
-   * Constructs and preregisters reflected `msvc8::list<ESiloType>` type-info.
+   * Constructs the `gpg::RListType<ESiloType>` static, which preregisters it
+   * for `typeid(msvc8::list<ESiloType>)`, and returns it.
+   *
+   * `RListType<ESiloType>`, vtable 0x00E1DDA4:
+   *
+   * Address: 0x005D0C40 (FUN_005D0C40 -- the implicit scalar deleting destructor.)
+   * Address: 0x005CFBD0 (FUN_005CFBD0 -- `GetName`.)
+   * Address: 0x00BF7F90 (FUN_00BF7F90 -- the atexit destructor of `GetName`'s name string.)
+   * Address: 0x005CFC90 (FUN_005CFC90 -- `GetLexical`.)
+   * Address: 0x005CFC70 (FUN_005CFC70 -- `Init`.)
+   * Address: 0x005D0020 (FUN_005D0020 -- `SerLoad`; the enum element is read uninitialised, the
+   * `T value;` the template writes.)
+   * Address: 0x005D00C0 (FUN_005D00C0 -- `SerSave`.)
    */
   [[nodiscard]] gpg::RType* preregister_ESiloTypeListTypeInfo()
   {
-    ESiloTypeListTypeInfo* const typeInfo = AcquireESiloTypeListTypeInfo();
-    gpg::PreRegisterRType(typeid(msvc8::list<ESiloType>), typeInfo);
-    return typeInfo;
+    static gpg::RListType<ESiloType> sInstance;
+    return &sInstance;
   }
 
   [[nodiscard]] gpg::RType* CachedIAiSiloBuildType()
@@ -206,127 +178,6 @@ void CAiSiloBuildImplTypeInfo::Init()
 }
 
 /**
- * Address: 0x005CFBD0 (FUN_005CFBD0, gpg::RListType_ESiloType::GetName)
- * Address: 0x00BF7F90 (FUN_00BF7F90, atexit destructor of GetName's cached name)
- *
- * What it does:
- * Formats the reflected type label for `list<ESiloType>` once from the
- * registered enum RTTI name and returns it.
- */
-const char* ESiloTypeListTypeInfo::GetName() const
-{
-  static const msvc8::string sName = gpg::STR_Printf("list<%s>", CachedESiloTypeType()->GetName());
-  return sName.c_str();
-}
-
-/**
- * Address: 0x005CFC90 (FUN_005CFC90, gpg::RListType_ESiloType::GetLexical)
- *
- * What it does:
- * Formats default RTTI lexical text and appends current list element count.
- */
-msvc8::string ESiloTypeListTypeInfo::GetLexical(const gpg::RRef& ref) const
-{
-  const msvc8::string lexical = gpg::RType::GetLexical(ref);
-  const auto* const list = static_cast<const msvc8::list<ESiloType>*>(ref.mObj);
-  const int size = list ? static_cast<int>(list->size()) : 0;
-  return gpg::STR_Printf("%s, size=%d", lexical.c_str(), size);
-}
-
-/**
- * Address: 0x005CFC70 (FUN_005CFC70, gpg::RListType_ESiloType::Init)
- *
- * What it does:
- * Configures reflected `list<ESiloType>` layout/version lanes and installs
- * list serializer callbacks.
- */
-void ESiloTypeListTypeInfo::Init()
-{
-  size_ = sizeof(msvc8::list<ESiloType>);
-  version_ = 1;
-  serLoadFunc_ = &ESiloTypeListTypeInfo::SerLoad;
-  serSaveFunc_ = &ESiloTypeListTypeInfo::SerSave;
-}
-
-/**
- * Address: 0x005D0020 (FUN_005D0020, gpg::RListType_ESiloType::SerLoad)
- *
- * What it does:
- * Clears one reflected `list<ESiloType>`, reads element count, then loads and
- * appends each enum value in archive stream order.
- */
-void ESiloTypeListTypeInfo::SerLoad(
-  gpg::ReadArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const ownerRef
-)
-{
-  auto* const list = reinterpret_cast<msvc8::list<ESiloType>*>(static_cast<std::uintptr_t>(objectPtr));
-  GPG_ASSERT(archive != nullptr);
-  GPG_ASSERT(list != nullptr);
-  if (!archive || !list) {
-    return;
-  }
-
-  unsigned int count = 0;
-  archive->ReadUInt(&count);
-  list->clear();
-
-  gpg::RType* const valueType = CachedESiloTypeType();
-  GPG_ASSERT(valueType != nullptr);
-  if (!valueType) {
-    return;
-  }
-
-  const gpg::RRef& owner = ownerRef ? *ownerRef : NullOwnerRef();
-  for (unsigned int index = 0; index < count; ++index) {
-    ESiloType value = SILOTYPE_Tactical;
-    archive->Read(valueType, &value, owner);
-    list->push_back(value);
-  }
-}
-
-/**
- * Address: 0x005D00C0 (FUN_005D00C0, gpg::RListType_ESiloType::SerSave)
- *
- * What it does:
- * Writes reflected `list<ESiloType>` element count, then serializes each enum
- * element in list traversal order.
- */
-void ESiloTypeListTypeInfo::SerSave(
-  gpg::WriteArchive* const archive,
-  const int objectPtr,
-  const int,
-  gpg::RRef* const ownerRef
-)
-{
-  const auto* const list = reinterpret_cast<const msvc8::list<ESiloType>*>(static_cast<std::uintptr_t>(objectPtr));
-  GPG_ASSERT(archive != nullptr);
-  if (!archive) {
-    return;
-  }
-
-  const unsigned int count = list ? static_cast<unsigned int>(list->size()) : 0u;
-  archive->WriteUInt(count);
-
-  if (!list) {
-    return;
-  }
-
-  gpg::RType* const valueType = CachedESiloTypeType();
-  GPG_ASSERT(valueType != nullptr);
-  if (!valueType) {
-    return;
-  }
-
-  const gpg::RRef& owner = ownerRef ? *ownerRef : NullOwnerRef();
-  for (const ESiloType value : *list) {
-    archive->Write(valueType, &value, owner);
-  }
-}
-
-/**
  * Address: 0x00BCE090 (FUN_00BCE090, register_SSiloBuildInfoTypeInfo)
  *
  * What it does:
@@ -386,4 +237,3 @@ GPG_PREREGISTER_INIT(register_ESiloTypeListTypeInfo_cefa38, moho::register_ESilo
 
 GPG_PREREGISTER_INIT(AcquireSSiloBuildInfoTypeInfo_cefa38, AcquireSSiloBuildInfoTypeInfo)
 GPG_PREREGISTER_INIT(AcquireCAiSiloBuildImplTypeInfo_cefa38, AcquireCAiSiloBuildImplTypeInfo)
-GPG_PREREGISTER_INIT(AcquireESiloTypeListTypeInfo_cefa38, AcquireESiloTypeListTypeInfo)

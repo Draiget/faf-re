@@ -10,6 +10,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/RListType.h"
 #include "moho/ai/CAiPathFinder.h"
 #include "moho/misc/Stats.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -18,23 +19,6 @@ using namespace moho;
 
 namespace
 {
-  class Rect2iListTypeInfo final : public gpg::RType
-  {
-  public:
-    /**
-     * Address: 0x005ABCA0 (FUN_005ABCA0, gpg::RListType_Rect2i::dtr)
-     */
-    ~Rect2iListTypeInfo() override = default;
-
-    [[nodiscard]] const char* GetName() const override;
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
-    void Init() override;
-    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
-    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
-  };
-
-  static_assert(sizeof(Rect2iListTypeInfo) == 0x64, "Rect2iListTypeInfo size must be 0x64");
-
   /**
    * Address: 0x00BF71E0 (FUN_00BF71E0, atexit destructor of the CAiPathFinderTypeInfo object)
    */
@@ -42,139 +26,6 @@ namespace
   {
     static CAiPathFinderTypeInfo sInstance;
     return &sInstance;
-  }
-
-  /**
-   * Address: 0x00BF72A0 (FUN_00BF72A0, atexit destructor of the Rect2iListTypeInfo object)
-   */
-  [[nodiscard]] Rect2iListTypeInfo* AcquireRect2iListTypeInfo()
-  {
-    static Rect2iListTypeInfo sInstance;
-    return &sInstance;
-  }
-
-  [[nodiscard]] gpg::RType* CachedRect2iType()
-  {
-    gpg::RType* type = gpg::Rect2i::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(gpg::Rect2i));
-      gpg::Rect2i::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x005AAFA0 (FUN_005AAFA0, gpg::RListType_Rect2i::GetName)
-   * Address: 0x00BF7270 (FUN_00BF7270, atexit destructor of GetName's cached name)
-   *
-   * What it does:
-   * Builds the reflected `list<Rect2i>` type name once and returns it.
-   */
-  const char* Rect2iListTypeInfo::GetName() const
-  {
-    static const msvc8::string sName = gpg::STR_Printf("list<%s>", CachedRect2iType()->GetName());
-    return sName.c_str();
-  }
-
-  /**
-   * Address: 0x005AB060 (FUN_005AB060, gpg::RListType_Rect2i::GetLexical)
-   *
-   * What it does:
-   * Formats the default RTTI lexical text and appends current list length.
-   */
-  msvc8::string Rect2iListTypeInfo::GetLexical(const gpg::RRef& ref) const
-  {
-    const msvc8::string lexical = gpg::RType::GetLexical(ref);
-    const auto* const list = static_cast<const msvc8::list<gpg::Rect2i>*>(ref.mObj);
-    const int size = list ? static_cast<int>(list->size()) : 0;
-    return gpg::STR_Printf("%s, size=%d", lexical.c_str(), size);
-  }
-
-  /**
-   * Address: 0x005AB040 (FUN_005AB040, gpg::RListType_Rect2i::Init)
-   *
-   * What it does:
-   * Configures reflected `list<Rect2i>` layout/version lanes and installs
-   * list serializer callbacks.
-   */
-  void Rect2iListTypeInfo::Init()
-  {
-    size_ = sizeof(msvc8::list<gpg::Rect2i>);
-    version_ = 1;
-    serLoadFunc_ = &Rect2iListTypeInfo::SerLoad;
-    serSaveFunc_ = &Rect2iListTypeInfo::SerSave;
-  }
-
-  /**
-   * Address: 0x005AB410 (FUN_005AB410, gpg::RListType_Rect2i::SerLoad)
-   *
-   * What it does:
-   * Clears one reflected `list<Rect2i>`, reads element count, then deserializes
-   * each `Rect2i` element in archive order.
-   */
-  void Rect2iListTypeInfo::SerLoad(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    auto* const list = reinterpret_cast<msvc8::list<gpg::Rect2i>*>(static_cast<std::uintptr_t>(objectPtr));
-    if (archive == nullptr || list == nullptr) {
-      return;
-    }
-
-    unsigned int count = 0;
-    archive->ReadUInt(&count);
-    list->clear();
-
-    gpg::RType* const elementType = CachedRect2iType();
-    if (elementType == nullptr) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (unsigned int index = 0; index < count; ++index) {
-      gpg::Rect2i value{};
-      archive->Read(elementType, &value, owner);
-      list->push_back(value);
-    }
-  }
-
-  /**
-   * Address: 0x005AB4C0 (FUN_005AB4C0, gpg::RListType_Rect2i::SerSave)
-   *
-   * What it does:
-   * Writes reflected `list<Rect2i>` element count, then serializes each
-   * element in list traversal order.
-   */
-  void Rect2iListTypeInfo::SerSave(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    const auto* const list = reinterpret_cast<const msvc8::list<gpg::Rect2i>*>(static_cast<std::uintptr_t>(objectPtr));
-    if (archive == nullptr) {
-      return;
-    }
-
-    const unsigned int count = list ? static_cast<unsigned int>(list->size()) : 0u;
-    archive->WriteUInt(count);
-    if (!list) {
-      return;
-    }
-
-    gpg::RType* const elementType = CachedRect2iType();
-    if (elementType == nullptr) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (const gpg::Rect2i& value : *list) {
-      archive->Write(elementType, &value, owner);
-    }
   }
 
   void AddBaseByTypeInfo(gpg::RType* typeInfo, const std::type_info& baseTypeInfo, const std::int32_t baseOffset)
@@ -267,16 +118,28 @@ namespace
 
   /**
    * Address: 0x005ABC00 (FUN_005ABC00, preregister_Rect2iListTypeInfo)
+   * Address: 0x00BF72A0 (FUN_00BF72A0, atexit destructor of the list type object)
    *
    * What it does:
-   * Constructs and preregisters reflected `std::list<gpg::Rect2<int>>`
-   * startup RTTI descriptor.
+   * Constructs the `gpg::RListType<gpg::Rect2i>` static, which preregisters
+   * it for `typeid(msvc8::list<gpg::Rect2i>)`, and returns it.
+   *
+   * `RListType<Rect2<int>>`, vtable 0x00E1C36C:
+   *
+   * Address: 0x005ABCA0 (FUN_005ABCA0 -- the implicit scalar deleting destructor.)
+   * Address: 0x005AAFA0 (FUN_005AAFA0 -- `GetName`.)
+   * Address: 0x00BF7270 (FUN_00BF7270 -- the atexit destructor of `GetName`'s name string.)
+   * Address: 0x005AB060 (FUN_005AB060 -- `GetLexical`.)
+   * Address: 0x005AB040 (FUN_005AB040 -- `Init`.)
+   * Address: 0x005AB410 (FUN_005AB410 -- `SerLoad`. The binary zeroes the stack element first
+   * (0x005AB44D..0x005AB459); `Rect2` stays a plain aggregate here, because `CUnitMotion` holds one in
+   * an anonymous union, so its four words are uninitialised until `Read` writes all of them.)
+   * Address: 0x005AB4C0 (FUN_005AB4C0 -- `SerSave`.)
    */
   [[nodiscard]] gpg::RType* preregister_Rect2iListTypeInfo()
   {
-    Rect2iListTypeInfo* const typeInfo = AcquireRect2iListTypeInfo();
-    gpg::PreRegisterRType(typeid(msvc8::list<gpg::Rect2i>), typeInfo);
-    return typeInfo;
+    static gpg::RListType<gpg::Rect2i> sInstance;
+    return &sInstance;
   }
 
 } // namespace
@@ -439,4 +302,3 @@ GPG_PREREGISTER_INIT(register_CAiPathFinderTypeInfo_ef9477, moho::register_CAiPa
 GPG_PREREGISTER_INIT(register_Rect2iListTypeInfo_ef9477, moho::register_Rect2iListTypeInfo)
 
 GPG_PREREGISTER_INIT(AcquireCAiPathFinderTypeInfo_ef9477, AcquireCAiPathFinderTypeInfo)
-GPG_PREREGISTER_INIT(AcquireRect2iListTypeInfo_ef9477, AcquireRect2iListTypeInfo)
