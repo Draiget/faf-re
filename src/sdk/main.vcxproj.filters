@@ -522,9 +522,6 @@
     <ClCompile Include="moho\sim\SimDebugCommandRegistrations.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\sim\SimRecoveryRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\sim\ManipulatorStartupRegistrations.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
