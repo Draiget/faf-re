@@ -52,9 +52,9 @@ namespace moho
       const RMeshBlueprint* mMeshTypeClassId;   // +0x08
       RMeshBlueprint* mStiMesh;                 // +0x08
     };
-    boost::SharedPtrRaw<RScmResource> mMesh;    // +0x0C
-    boost::SharedPtrRaw<CAniPose> mPriorPose;   // +0x14
-    boost::SharedPtrRaw<CAniPose> mPose;        // +0x1C
+    boost::shared_ptr<RScmResource> mMesh;      // +0x0C
+    boost::shared_ptr<CAniPose> mPriorPose;     // +0x14
+    boost::shared_ptr<CAniPose> mPose;          // +0x1C
     float mHealth;                              // +0x24
     float mMaxHealth;                           // +0x28
     float mFractionComplete;                    // +0x2C
@@ -65,10 +65,9 @@ namespace moho
      * Address: 0x005C4F50 (FUN_005C4F50, Moho::SPerArmyReconInfo::~SPerArmyReconInfo)
      *
      * What it does:
-     * Releases shared recon snapshot lanes (`mPose`, `mPriorPose`, `mMesh`)
-     * in binary destructor order.
+     * The implicit destructor: `mPose`, `mPriorPose`, then `mMesh` released.
      */
-    ~SPerArmyReconInfo();
+    ~SPerArmyReconInfo() = default;
 
     SPerArmyReconInfo() = default;
 
@@ -76,22 +75,18 @@ namespace moho
      * Address: 0x005C84D0 (FUN_005C84D0, Moho::SPerArmyReconInfo::SPerArmyReconInfo)
      *
      * What it does:
-     * Copy-constructs one per-army recon snapshot lane field-by-field,
-     * bumping the shared-control-block refcount for `mMesh`/`mPriorPose`/
-     * `mPose` directly (`_InterlockedExchangeAdd`) rather than going through
-     * `boost::SharedPtrRaw`'s own copy constructor.
+     * The implicit memberwise copy.
      */
-    SPerArmyReconInfo(const SPerArmyReconInfo& other) noexcept;
+    SPerArmyReconInfo(const SPerArmyReconInfo& other) = default;
 
     /**
      * Address: 0x005CC5E0 (FUN_005CC5E0, Moho::SPerArmyReconInfo::operator=)
      * Mangled: ??4SPerArmyReconInfo@Moho@@QAEAAV01@ABV01@@Z
      *
      * What it does:
-     * Copies one per-army recon snapshot lane, retaining/releasing shared
-     * ownership control blocks for mesh/pause payload pointers in binary order.
+     * The implicit memberwise assignment.
      */
-    SPerArmyReconInfo& operator=(const SPerArmyReconInfo& other);
+    SPerArmyReconInfo& operator=(const SPerArmyReconInfo& other) = default;
 
     /**
      * Address: 0x005C8DE0 (FUN_005C8DE0, Moho::SPerArmyReconInfo::MemberDeserialize)

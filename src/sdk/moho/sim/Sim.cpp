@@ -12613,8 +12613,8 @@ int moho::cfunc_TryCopyPoseL(LuaPlus::LuaState* const state)
   Entity* const entityTo = SCR_FromLua_Entity(entityToObject, state);
 
   const bool sameMeshAndSkeleton =
-    unitFrom->GetMesh().px == entityTo->GetMesh().px &&
-    entityTo->GetMesh().px->GetSkeleton() == unitFrom->GetMesh().px->GetSkeleton();
+    unitFrom->GetMesh() == entityTo->GetMesh() &&
+    entityTo->GetMesh()->GetSkeleton() == unitFrom->GetMesh()->GetSkeleton();
 
   if (!sameMeshAndSkeleton) {
     lua_pushboolean(state->m_state, 0);

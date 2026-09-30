@@ -34,10 +34,10 @@ namespace moho
      * Address: 0x0063A8F0 (FUN_0063A8F0, ??0CAniActor@Moho@@QAE@ABV?$shared_ptr@VCAniPose@Moho@@@boost@@0@Z)
      *
      * What it does:
-     * Initializes actor pose handles from `{priorPose, pose}` and self-links
-     * the manipulator intrusive list head.
+     * Copies both pose handles (current pose first: the binary takes it in ECX
+     * and stores it at +0x00) and self-links the manipulator list head.
      */
-    CAniActor(const boost::SharedPtrRaw<CAniPose>& priorPose, const boost::SharedPtrRaw<CAniPose>& pose);
+    CAniActor(const boost::shared_ptr<CAniPose>& pose, const boost::shared_ptr<CAniPose>& priorPose);
 
     /**
      * Address: 0x0063A930 (FUN_0063A930, ??1CAniActor@Moho@@QAE@XZ)
@@ -104,16 +104,9 @@ namespace moho
      * Address: 0x0063AA20 (FUN_0063AA20)
      *
      * What it does:
-     * Replaces both `mPose` and `mPriorPose` raw shared-ptr lanes in one call,
-     * retaining new control blocks and releasing prior ones. Out-of-line
-     * helper emitted for callers (e.g. `Unit::SetPoses`) that assign both
-     * pose lanes together; preserves VC8 ordering (use_count_++ before
-     * release() on the swapped-out partner).
+     * Replaces both pose handles; `Unit::SetPoses` calls it.
      */
-    void AssignPoses(
-      const boost::SharedPtrRaw<CAniPose>& pose,
-      const boost::SharedPtrRaw<CAniPose>& priorPose
-    ) noexcept;
+    void AssignPoses(const boost::shared_ptr<CAniPose>& pose, const boost::shared_ptr<CAniPose>& priorPose) noexcept;
 
     /**
      * Address: 0x0063AA80 (FUN_0063AA80, ?UpdateManipulators@CAniActor@Moho@@QAEXABVVTransform@2@@Z)
@@ -185,8 +178,8 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    boost::SharedPtrRaw<CAniPose> mPose;                       // +0x00
-    boost::SharedPtrRaw<CAniPose> mPriorPose;                  // +0x08
+    boost::shared_ptr<CAniPose> mPose;                         // +0x00
+    boost::shared_ptr<CAniPose> mPriorPose;                    // +0x08
     TDatList<IAniManipulator, void> mManipulatorsByPrecedence; // +0x10
   };
 

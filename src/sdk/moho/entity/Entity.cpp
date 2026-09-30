@@ -2549,19 +2549,11 @@ namespace moho
    * Address: 0x005BDB90 (FUN_005BDB90, Moho::Entity::GetMesh)
    *
    * What it does:
-   * Copies this entity's mesh shared-handle lanes and retains one shared
-   * owner on the control block when present.
+   * Returns this entity's mesh resource.
    */
-  boost::SharedPtrRaw<RScmResource> Entity::GetMesh() const
+  boost::shared_ptr<RScmResource> Entity::GetMesh() const
   {
-    const auto* const source = reinterpret_cast<const boost::SharedPtrRaw<RScmResource>*>(&mVarDat.mScmResource);
-    boost::SharedPtrRaw<RScmResource> result{};
-    result.px = source->px;
-    result.pi = source->pi;
-    if (result.pi != nullptr) {
-      result.pi->add_ref_copy();
-    }
-    return result;
+    return mVarDat.mScmResource;
   }
 
   /**

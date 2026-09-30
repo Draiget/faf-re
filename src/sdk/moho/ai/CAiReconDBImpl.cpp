@@ -1037,24 +1037,22 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
     // control block (0x005C1BF2..0x005C1C1B) and the temporary is released at
     // 0x005C1C2A.
     //
-    // This capture was missing. `ReconBlip::SyncInterface` ships
-    // `mMesh.px`/`mMesh.pi` to the client through `PatchEntityUpdateReconMesh`,
-    // and `UserEntity::UpdateEntityData` only builds a mesh instance when the
+    // This capture was missing. `ReconBlip::SyncInterface` ships `mMesh` to the
+    // client in the entity-update record, and
+    // `UserEntity::UpdateEntityData` only builds a mesh instance when the
     // incoming `mScmResource` is non-null -- so every recon blip arrived with no
     // scm resource and the client drew the unit's footprint and attached
     // effects but never its mesh.
-    boost::SharedPtrRaw<RScmResource> unitMesh = sourceUnit->Entity::GetMesh();
-    perArmy->mMesh.reset_from(unitMesh);
-    unitMesh.release();
+    perArmy->mMesh = sourceUnit->Entity::GetMesh();
 
     // 0x005C1C2F: an animated source unit reseats both pose lanes from its
     // actor; one without an actor drops them instead (0x005C1C95/0x005C1CA0).
     if (CAniActor* const actor = sourceUnit->AniActor; actor != nullptr) {
-      perArmy->mPriorPose.reset_from_owner(actor->GetPriorPoseShared());
-      perArmy->mPose.reset_from_owner(actor->GetPoseShared());
+      perArmy->mPriorPose = actor->GetPriorPoseShared();
+      perArmy->mPose = actor->GetPoseShared();
     } else {
-      perArmy->mPriorPose.release();
-      perArmy->mPose.release();
+      perArmy->mPriorPose.reset();
+      perArmy->mPose.reset();
     }
 
     perArmy->mHealth = sourceUnit->mVarDat.mHealth;

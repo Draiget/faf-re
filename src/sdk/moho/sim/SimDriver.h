@@ -503,46 +503,6 @@ namespace moho
   void SetUnitUpdateReconFlags(SUnitVariableUpdateEntry* entry, std::int32_t reconFlags) noexcept;
 
   /**
-   * Overwrites the prior/current shared-pose lanes and the stun-ticks lane of a
-   * queued unit-update record's embedded `SSTIUnitVariableData` from a recon
-   * snapshot, replicating `ReconBlip::SyncInterface` (FUN_005BEFB0
-   * 0x005BF092..0x005BF15A). Each pose slot performs the binary's
-   * add_ref_copy(new) / weak_release(old) swap in place; `px` is written first,
-   * then `pi` is conditionally swapped. `applyStunTicks` gates the stun write
-   * (only performed when the creator unit is alive in the binary).
-   *
-   * The pose control-block pointers are passed as raw `boost::detail::sp_counted_base*`
-   * so this helper stays free of the recon/pose engine types; the entry type
-   * (which embeds the full `SSTIUnitVariableData`) is defined in SimDriver.cpp.
-   */
-  void PatchUnitUpdateReconPose(
-    SUnitVariableUpdateEntry* entry,
-    void* priorPosePx,
-    boost::detail::sp_counted_base* priorPosePi,
-    void* posePx,
-    boost::detail::sp_counted_base* posePi,
-    bool applyStunTicks,
-    std::int32_t stunTicks) noexcept;
-
-  /**
-   * Overwrites the mesh / scm-resource / health lanes of the most recently
-   * queued entity-update record (`SSyncData::mEntityUpdates.back()`) from a
-   * recon snapshot, replicating the post-base-call tail of
-   * `ReconBlip::SyncInterface` (FUN_005BEFB0 0x005BF168..0x005BF1C4). The
-   * scm-resource control block is swapped with the binary's add_ref_copy(new) /
-   * weak_release(old) sequence.
-   */
-  void PatchEntityUpdateReconMesh(
-    SSyncData* syncData,
-    const RMeshBlueprint* meshBlueprint,
-    void* scmResourcePx,
-    boost::detail::sp_counted_base* scmResourcePi,
-    float health,
-    float maxHealth,
-    float fractionComplete,
-    std::uint8_t isDead) noexcept;
-
-  /**
    * 8-byte lock cell used by CSimDriver (matches +0x30..+0x37 layout).
    */
   /**

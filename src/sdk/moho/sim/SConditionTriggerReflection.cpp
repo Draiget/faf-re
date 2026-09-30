@@ -20,13 +20,11 @@
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyStats.h"
+#include "gpg/core/reflection/RSharedPointerType.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  constexpr const char kReflectSharedPtrHeaderPath[] =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/reflect_shared_ptr.h";
-
   class ETriggerOperatorTypeInfo final : public gpg::REnumType
   {
   public:
@@ -533,116 +531,6 @@ namespace
   };
   static_assert(sizeof(RFastVectorSConditionTypeInfo) == 0x68, "RFastVectorSConditionTypeInfo size must be 0x68");
 
-  class RSharedPointerSTriggerTypeInfo final : public gpg::RType, public gpg::RIndexed
-  {
-  public:
-    RSharedPointerSTriggerTypeInfo()
-      : gpg::RType()
-      , gpg::RIndexed()
-    {
-      gpg::PreRegisterRType(typeid(boost::shared_ptr<moho::STrigger>), this);
-    }
-
-    /**
-     * Address: 0x00713190 (FUN_00713190, gpg::RSharedPointerType_STrigger::dtr)
-     */
-    ~RSharedPointerSTriggerTypeInfo() override = default;
-
-    /**
-     * Address: 0x0070EA60 (FUN_0070EA60, gpg::RSharedPointerType_STrigger::GetName)
-     * Address: 0x00BFF940 (FUN_00BFF940, atexit destructor of GetName's cached name)
-     *
-     * What it does:
-     * Builds `boost::shared_ptr<STrigger>` once and returns it.
-     */
-    [[nodiscard]] const char* GetName() const override
-    {
-      static const msvc8::string sName =
-        gpg::STR_Printf("boost::shared_ptr<%s>", moho::STrigger::StaticGetClass()->GetName());
-      return sName.c_str();
-    }
-
-    /**
-     * Address: 0x0070EB10 (FUN_0070EB10, gpg::RSharedPointerType_STrigger::GetLexical)
-     */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
-    {
-      auto* const ptr = static_cast<boost::shared_ptr<moho::STrigger>*>(ref.mObj);
-      if (!ptr || !ptr->get()) {
-        return msvc8::string("NULL");
-      }
-
-      gpg::RRef objectRef{};
-      objectRef.mObj = ptr->get();
-      objectRef.mType = moho::STrigger::StaticGetClass();
-      return gpg::STR_Printf("[%s]", objectRef.GetLexical().c_str());
-    }
-
-    /**
-     * Address: 0x0070EC90 (FUN_0070EC90, gpg::RSharedPointerType_STrigger::IsIndexed)
-     */
-    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override
-    {
-      return this;
-    }
-
-    /**
-     * Address: 0x0070ECA0 (FUN_0070ECA0, gpg::RSharedPointerType_STrigger::IsPointer)
-     */
-    [[nodiscard]] const gpg::RIndexed* IsPointer() const override
-    {
-      return this;
-    }
-
-    static void Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
-    {
-      archive->ReadPointerShared(reinterpret_cast<boost::shared_ptr<moho::STrigger>*>(objectPtr), ownerRef);
-    }
-
-    static void Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
-    {
-      const auto* const pointer = reinterpret_cast<const boost::shared_ptr<moho::STrigger>*>(objectPtr);
-      archive->WritePointer(pointer->get(), gpg::TrackedPointerState::Shared, *ownerRef);
-    }
-
-    /**
-     * Address: 0x0070EB00 (FUN_0070EB00, gpg::RSharedPointerType_STrigger::Init)
-     */
-    void Init() override
-    {
-      size_ = sizeof(boost::shared_ptr<moho::STrigger>);
-      version_ = 1;
-      serLoadFunc_ = &RSharedPointerSTriggerTypeInfo::Deserialize;
-      serSaveFunc_ = &RSharedPointerSTriggerTypeInfo::Serialize;
-    }
-
-    /**
-     * Address: 0x0070ECC0 (FUN_0070ECC0, gpg::RSharedPointerType_STrigger::SubscriptIndex)
-     *
-     * What it does:
-     * Asserts `index == 0` and returns the pointee of `boost::shared_ptr<STrigger>` as an `RRef`.
-     */
-    gpg::RRef SubscriptIndex(void* const obj, const int ind) const override
-    {
-      if (ind != 0) {
-        gpg::HandleAssertFailure("index == 0", 65, kReflectSharedPtrHeaderPath);
-      }
-
-      auto* const ptr = static_cast<boost::shared_ptr<moho::STrigger>*>(obj);
-      return MakeSTriggerRef(ptr->get());
-    }
-
-    size_t GetCount(void* const obj) const override
-    {
-      if (!obj) {
-        return 0u;
-      }
-      auto* const ptr = static_cast<boost::shared_ptr<moho::STrigger>*>(obj);
-      return (ptr && ptr->get()) ? 1u : 0u;
-    }
-  };
-  static_assert(sizeof(RSharedPointerSTriggerTypeInfo) == 0x68, "RSharedPointerSTriggerTypeInfo size must be 0x68");
-
   using UnitBlueprintWeightMap = std::map<const moho::RUnitBlueprint*, float>;
   using StringToArmyStatItemMap = std::map<std::string, moho::CArmyStatItem*>;
 
@@ -1107,7 +995,7 @@ namespace
   STriggerSerializer gSTriggerSerializer;
 
   RFastVectorSConditionTypeInfo gFastVectorSConditionTypeInfo;
-  RSharedPointerSTriggerTypeInfo gSharedPointerSTriggerTypeInfo;
+  gpg::RSharedPointerType<moho::STrigger> gSharedPointerSTriggerTypeInfo;
   /**
    * `gpg::RListType<boost::shared_ptr<moho::STrigger>>` (the trigger lists):
    *

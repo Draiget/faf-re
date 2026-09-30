@@ -70,11 +70,11 @@ namespace
 
   [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const ownerActor, const std::int32_t boneIndex) noexcept
   {
-    if (ownerActor == nullptr || ownerActor->mPose.px == nullptr || boneIndex < 0) {
+    if (ownerActor == nullptr || ownerActor->mPose.get() == nullptr || boneIndex < 0) {
       return nullptr;
     }
 
-    moho::CAniPose* const pose = ownerActor->mPose.px;
+    moho::CAniPose* const pose = ownerActor->mPose.get();
     moho::CAniPoseBone* const bonesBegin = pose->mBones.begin();
     moho::CAniPoseBone* const bonesEnd = pose->mBones.end();
     if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin >= bonesEnd) {

@@ -124,11 +124,11 @@ namespace
 
   [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const actor, const int boneIndex) noexcept
   {
-    if (actor == nullptr || actor->mPose.px == nullptr || boneIndex < 0) {
+    if (actor == nullptr || actor->mPose.get() == nullptr || boneIndex < 0) {
       return nullptr;
     }
 
-    moho::CAniPose* const pose = actor->mPose.px;
+    moho::CAniPose* const pose = actor->mPose.get();
     moho::CAniPoseBone* const bonesBegin = pose->mBones.begin();
     moho::CAniPoseBone* const bonesEnd = pose->mBones.end();
     if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin >= bonesEnd) {
@@ -336,8 +336,8 @@ namespace
   {
     manipulator->mGoal = goal;
 
-    if (manipulator->mWorldUnits == 0u && manipulator->mOwnerActor && manipulator->mOwnerActor->mPose.px) {
-      const float scale = manipulator->mOwnerActor->mPose.px->mScale;
+    if (manipulator->mWorldUnits == 0u && manipulator->mOwnerActor && manipulator->mOwnerActor->mPose.get()) {
+      const float scale = manipulator->mOwnerActor->mPose.get()->mScale;
       manipulator->mGoal.x *= scale;
       manipulator->mGoal.y *= scale;
       manipulator->mGoal.z *= scale;
@@ -368,8 +368,8 @@ namespace
 
     const float scaledSpeed = requestedSpeed * kSlideRateScale;
     manipulator->mSpeed = scaledSpeed;
-    if (manipulator->mWorldUnits == 0u && manipulator->mOwnerActor != nullptr && manipulator->mOwnerActor->mPose.px != nullptr) {
-      manipulator->mSpeed = manipulator->mOwnerActor->mPose.px->mScale * scaledSpeed;
+    if (manipulator->mWorldUnits == 0u && manipulator->mOwnerActor != nullptr && manipulator->mOwnerActor->mPose.get() != nullptr) {
+      manipulator->mSpeed = manipulator->mOwnerActor->mPose.get()->mScale * scaledSpeed;
     }
 
     return manipulator;

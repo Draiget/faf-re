@@ -119,16 +119,6 @@ namespace
     ThrowPointerTypeMismatch(source, expectedType, fallback);
   }
 
-  void WriteSharedCAniPosePointer(
-    const boost::SharedPtrRaw<moho::CAniPose>& pointer,
-    gpg::WriteArchive* const archive,
-    const gpg::RRef& ownerRef
-  )
-  {
-    const gpg::RRef objectRef = MakeDerivedRef(pointer.px, CachedCAniPoseType());
-    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Shared, ownerRef);
-  }
-
   [[nodiscard]] moho::IAniManipulator* ReadOwnedManipulatorPointer(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
   {
     gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
@@ -245,7 +235,7 @@ namespace
       return false;
     }
 
-    const moho::CAniPose* const pose = ownerActor->mPose.px;
+    const moho::CAniPose* const pose = ownerActor->mPose.get();
     if (pose == nullptr) {
       return false;
     }
@@ -359,12 +349,10 @@ namespace moho
   /**
    * Address: 0x0063A8F0 (FUN_0063A8F0, ??0CAniActor@Moho@@QAE@ABV?$shared_ptr@VCAniPose@Moho@@@boost@@0@Z)
    */
-  CAniActor::CAniActor(const boost::SharedPtrRaw<CAniPose>& priorPose, const boost::SharedPtrRaw<CAniPose>& pose)
-  {
-    mPose.assign_retain(pose);
-    mPriorPose.assign_retain(priorPose);
-    mManipulatorsByPrecedence.ListResetLinks();
-  }
+  CAniActor::CAniActor(const boost::shared_ptr<CAniPose>& pose, const boost::shared_ptr<CAniPose>& priorPose)
+    : mPose(pose)
+    , mPriorPose(priorPose)
+  {}
 
   /**
    * Address: 0x0063A930 (FUN_0063A930, ??1CAniActor@Moho@@QAE@XZ)
@@ -381,8 +369,6 @@ namespace moho
     }
 
     ResetActorListHeadLinks(this);
-    mPriorPose.release();
-    mPose.release();
   }
 
   /**
@@ -412,8 +398,8 @@ namespace moho
       return;
     }
 
-    archive->TrackPointer(MakeDerivedRef(mPose.px, CachedCAniPoseType()));
-    archive->TrackPointer(MakeDerivedRef(mPriorPose.px, CachedCAniPoseType()));
+    archive->TrackPointer(gpg::MakeRRef(&mPose));
+    archive->TrackPointer(gpg::MakeRRef(&mPriorPose));
 
     const gpg::RRef nullOwner{};
     archive->ReadPointerShared(&mPose, &nullOwner);
@@ -462,11 +448,11 @@ namespace moho
       return;
     }
 
-    archive->PreCreatedPtr(MakeDerivedRef(mPose.px, CachedCAniPoseType()));
-    archive->PreCreatedPtr(MakeDerivedRef(mPriorPose.px, CachedCAniPoseType()));
+    archive->PreCreatedPtr(gpg::MakeRRef(const_cast<boost::shared_ptr<CAniPose>*>(&mPose)));
+    archive->PreCreatedPtr(gpg::MakeRRef(const_cast<boost::shared_ptr<CAniPose>*>(&mPriorPose)));
 
-    WriteSharedCAniPosePointer(mPose, archive, gpg::RRef{});
-    WriteSharedCAniPosePointer(mPriorPose, archive, gpg::RRef{});
+    archive->WritePointer(mPose.get(), gpg::TrackedPointerState::Shared, gpg::RRef{});
+    archive->WritePointer(mPriorPose.get(), gpg::TrackedPointerState::Shared, gpg::RRef{});
     SerializeManipulatorList(this, archive);
   }
 
@@ -507,7 +493,7 @@ namespace moho
    */
   boost::shared_ptr<const CAniSkel> CAniActor::GetSkeleton() const
   {
-    return mPose.px->GetSkeleton();
+    return mPose->GetSkeleton();
   }
 
   /**
@@ -518,7 +504,7 @@ namespace moho
    */
   boost::shared_ptr<CAniPose> CAniActor::GetPoseShared() const
   {
-    return boost::SharedPtrFromRawRetained(mPose);
+    return mPose;
   }
 
   /**
@@ -529,7 +515,7 @@ namespace moho
    */
   boost::shared_ptr<CAniPose> CAniActor::GetPriorPoseShared() const
   {
-    return boost::SharedPtrFromRawRetained(mPriorPose);
+    return mPriorPose;
   }
 
   /**
@@ -539,22 +525,13 @@ namespace moho
    * _DWORD *__usercall sub_63AA20@<eax>(_DWORD *result@<eax>, _DWORD *a2@<ebx>, _DWORD *a3@<esi>);
    *
    * What it does:
-   * Out-of-line pair-assign emitted for `Unit::SetPoses` and similar callers.
-   * Re-binds both `mPose` and `mPriorPose` raw shared-ptr lanes against new
-   * borrowed sources while preserving VC8-era assign ordering: copy `px`,
-   * compare control blocks, retain the incoming `pi` before releasing the
-   * outgoing one. The binary mismatch where IDA reports `weak_release` is
-   * the unified VC8 `sp_counted_base::release()` body at 0x004229B0 —
-   * `--use_count_; dispose; --weak_count_; destroy` — i.e. ordinary shared
-   * release semantics, not weak-only.
+   * Two `shared_ptr` assignments, current pose first; `Unit::SetPoses`
+   * (0x006ABB90) calls it.
    */
-  void CAniActor::AssignPoses(
-    const boost::SharedPtrRaw<CAniPose>& pose,
-    const boost::SharedPtrRaw<CAniPose>& priorPose
-  ) noexcept
+  void CAniActor::AssignPoses(const boost::shared_ptr<CAniPose>& pose, const boost::shared_ptr<CAniPose>& priorPose) noexcept
   {
-    mPose.assign_retain(pose);
-    mPriorPose.assign_retain(priorPose);
+    mPose = pose;
+    mPriorPose = priorPose;
   }
 
   /**
@@ -574,15 +551,15 @@ namespace moho
     // 0x0063AA9C-0x0063AAB5 exchanges both `(px,pi)` pairs with no refcount
     // traffic: last frame's pose becomes the prior pose, and the lane it
     // vacates is about to be overwritten anyway.
-    std::swap(mPose, mPriorPose);
+    mPose.swap(mPriorPose);
 
     // 0x0063AAB0-0x0063AAE7: `mPose.reset(new CAniPose(*mPriorPose.px))`. The
     // new frame starts as a copy of the pose just retired, under a fresh
     // control block; the referent this lane held before the swap is released.
-    boost::ResetSharedPtrRawOwning(mPose, new CAniPose(*mPriorPose.px));
+    mPose.reset(new CAniPose(*mPriorPose));
 
-    mPose.px->UpdateBones();                     // 0x0063AAEE
-    mPose.px->SetWorldTransform(worldTransform); // 0x0063AAFA
+    mPose->UpdateBones();                     // 0x0063AAEE
+    mPose->SetWorldTransform(worldTransform); // 0x0063AAFA
 
     auto* const listHead = static_cast<TDatListItem<IAniManipulator, void>*>(&mManipulatorsByPrecedence);
     for (auto* node = mManipulatorsByPrecedence.mNext; node != listHead;) {

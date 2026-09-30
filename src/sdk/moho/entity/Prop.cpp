@@ -605,9 +605,8 @@ namespace moho
   {
     constexpr float kQ = 0.70710677f; // sqrt(2)/2; fixed 90-degree rotation lane.
 
-    boost::SharedPtrRaw<RScmResource> meshResource = original->GetMesh();
-    if (meshResource.px == nullptr) {
-      meshResource.release();
+    const boost::shared_ptr<RScmResource> meshResource = original->GetMesh();
+    if (!meshResource) {
       return;
     }
 
@@ -615,11 +614,10 @@ namespace moho
     {
       // Binary grabs the raw skeleton pointer then drops the shared owner; the
       // mesh resource keeps the skeleton alive for the loop.
-      const boost::shared_ptr<const CAniSkel> handle = meshResource.px->GetSkeleton();
+      const boost::shared_ptr<const CAniSkel> handle = meshResource->GetSkeleton();
       sourceSkeleton = handle.get();
     }
     if (sourceSkeleton == nullptr) {
-      meshResource.release();
       return;
     }
 
@@ -661,9 +659,8 @@ namespace moho
       const VTransform composed = VTransform::Compose(invTransform, original->GetTransformWm3());
       Prop* const child = Prop::CreateFromBlueprintResolved(original->SimulationRef, childBlueprint, composed);
 
-      boost::SharedPtrRaw<RScmResource> childMeshResource = child->GetMesh();
-      if (childMeshResource.px != nullptr) {
-        const RScmResource* const childMesh = childMeshResource.px;
+      if (const boost::shared_ptr<RScmResource> childMeshResource = child->GetMesh()) {
+        const RScmResource* const childMesh = childMeshResource.get();
 
         // Per-axis child scale = source-bone-bounds extent / child-mesh-box extent.
         Wm3::Vector3f childScale{};
@@ -675,7 +672,7 @@ namespace moho
           (childMesh->mBounds.Max.z - childMesh->mBounds.Min.z);
 
         {
-          const boost::shared_ptr<const CAniSkel> childHandle = childMeshResource.px->GetSkeleton();
+          const boost::shared_ptr<const CAniSkel> childHandle = childMeshResource->GetSkeleton();
           const CAniSkel* const childSkeleton = childHandle.get();
           if (childSkeleton != nullptr && childSkeleton->mBones.begin() != childSkeleton->mBones.end()) {
             const SAniSkelBone* const rootBone = childSkeleton->GetBone(0);
@@ -705,13 +702,11 @@ namespace moho
         child->mVarDat.mScale.z = childScale.z;
         child->ListLinkBefore(&child->SimulationRef->mCoordEntities);
       }
-      childMeshResource.release();
 
       out->push_back(child);
     }
 
     original->Destroy();
-    meshResource.release();
   }
 
   /**

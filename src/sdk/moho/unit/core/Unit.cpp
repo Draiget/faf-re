@@ -1370,11 +1370,11 @@ namespace
 
   [[nodiscard]] CAniPoseBone* ResolveUnitPoseBone(Unit& unit, const int boneIndex) noexcept
   {
-    if (unit.AniActor == nullptr || unit.AniActor->mPose.px == nullptr || boneIndex < 0) {
+    if (unit.AniActor == nullptr || unit.AniActor->mPose.get() == nullptr || boneIndex < 0) {
       return nullptr;
     }
 
-    CAniPose* const pose = unit.AniActor->mPose.px;
+    CAniPose* const pose = unit.AniActor->mPose.get();
     CAniPoseBone* const bonesBegin = pose->mBones.begin();
     CAniPoseBone* const bonesEnd = pose->mBones.end();
     if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin > bonesEnd) {
@@ -10019,8 +10019,8 @@ int moho::cfunc_UnitShowBoneL(LuaPlus::LuaState* const state)
     int visibleCount = 0;
     int totalCount = 0;
     const void* posePtr = nullptr;
-    if (unit != nullptr && unit->AniActor != nullptr && unit->AniActor->mPose.px != nullptr) {
-      CAniPose* const pose = unit->AniActor->mPose.px;
+    if (unit != nullptr && unit->AniActor != nullptr && unit->AniActor->mPose.get() != nullptr) {
+      CAniPose* const pose = unit->AniActor->mPose.get();
       posePtr = pose;
       for (const CAniPoseBone& bone : pose->mBones) {
         ++totalCount;
@@ -10092,8 +10092,8 @@ int moho::cfunc_UnitHideBoneL(LuaPlus::LuaState* const state)
   {
     const char* requested = lua_isstring(rawState, 2) != 0 ? lua_tostring(rawState, 2) : "<index>";
     const char* resolved = "<none>";
-    if (unit != nullptr && unit->AniActor != nullptr && unit->AniActor->mPose.px != nullptr && boneIndex >= 0) {
-      const boost::shared_ptr<const CAniSkel> skeleton = unit->AniActor->mPose.px->GetSkeleton();
+    if (unit != nullptr && unit->AniActor != nullptr && unit->AniActor->mPose.get() != nullptr && boneIndex >= 0) {
+      const boost::shared_ptr<const CAniSkel> skeleton = unit->AniActor->mPose.get()->GetSkeleton();
       if (const SAniSkelBone* const bone = skeleton ? skeleton->GetBone(static_cast<std::uint32_t>(boneIndex)) : nullptr) {
         resolved = bone->mBoneName != nullptr ? bone->mBoneName : "<null>";
       }
@@ -13784,8 +13784,8 @@ Wm3::Vec3f Unit::GetTargetPoint(std::int32_t targetPoint) const
  */
 VTransform Unit::GetBoneWorldTransform(const int boneIndex) const
 {
-  if (AniActor != nullptr && AniActor->mPose.px != nullptr && boneIndex >= 0) {
-    const CAniPose* const pose = AniActor->mPose.px;
+  if (AniActor != nullptr && AniActor->mPose.get() != nullptr && boneIndex >= 0) {
+    const CAniPose* const pose = AniActor->mPose.get();
     const CAniPoseBone* const bonesBegin = pose->mBones.begin();
     const CAniPoseBone* const bonesEnd = pose->mBones.end();
     if (bonesBegin != nullptr && bonesEnd != nullptr && bonesEnd >= bonesBegin) {
@@ -13832,8 +13832,8 @@ VTransform Unit::GetBoneLocalTransform(const int boneIndex) const
   localTransform.pos_.y = 0.0f;
   localTransform.pos_.z = 0.0f;
 
-  if (AniActor != nullptr && AniActor->mPose.px != nullptr) {
-    const CAniPose* const pose = AniActor->mPose.px;
+  if (AniActor != nullptr && AniActor->mPose.get() != nullptr) {
+    const CAniPose* const pose = AniActor->mPose.get();
     const CAniPoseBone* const bonesBegin = pose->mBones.begin();
     const CAniPoseBone* const bonesEnd = pose->mBones.end();
     if (bonesBegin != nullptr && bonesEnd != nullptr && bonesEnd >= bonesBegin) {
@@ -13890,12 +13890,7 @@ void Unit::SetMesh(const RResId& meshResId, RMeshBlueprint* const meshBlueprint,
   varDat.mSharedPose->SetWorldTransform(GetTransformWm3());
   varDat.mPriorSharedPose = varDat.mSharedPose;
 
-  CAniActor* newActor = nullptr;
-  if (void* const actorStorage = ::operator new(sizeof(CAniActor)); actorStorage != nullptr) {
-    const boost::SharedPtrRaw<CAniPose> priorRaw = boost::SharedPtrRawFromSharedBorrow(varDat.mPriorSharedPose);
-    const boost::SharedPtrRaw<CAniPose> currentRaw = boost::SharedPtrRawFromSharedBorrow(varDat.mSharedPose);
-    newActor = ::new (actorStorage) CAniActor(priorRaw, currentRaw);
-  }
+  CAniActor* const newActor = new CAniActor(varDat.mSharedPose, varDat.mPriorSharedPose);
 
   CAniActor* const oldActor = AniActor;
   AniActor = newActor;
@@ -13921,11 +13916,7 @@ void Unit::SetPoses(
   varDat.mSharedPose = sharedPose;
   varDat.mPriorSharedPose = priorSharedPose;
 
-  const boost::SharedPtrRaw<CAniPose> sharedPoseRaw = boost::SharedPtrRawFromSharedBorrow(sharedPose);
-  const boost::SharedPtrRaw<CAniPose> priorSharedPoseRaw = boost::SharedPtrRawFromSharedBorrow(priorSharedPose);
-  // Routes through the out-of-line pair-assign helper emitted at 0x0063AA20
-  // so the linker preserves that body's symbol against this caller.
-  AniActor->AssignPoses(sharedPoseRaw, priorSharedPoseRaw);
+  AniActor->AssignPoses(sharedPose, priorSharedPose);
 }
 
 /**

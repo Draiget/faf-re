@@ -293,11 +293,11 @@ namespace
 
   [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const actor, const int boneIndex) noexcept
   {
-    if (actor == nullptr || actor->mPose.px == nullptr || boneIndex < 0) {
+    if (actor == nullptr || actor->mPose.get() == nullptr || boneIndex < 0) {
       return nullptr;
     }
 
-    moho::CAniPose* const pose = actor->mPose.px;
+    moho::CAniPose* const pose = actor->mPose.get();
     moho::CAniPoseBone* const bonesBegin = pose->mBones.begin();
     moho::CAniPoseBone* const bonesEnd = pose->mBones.end();
     if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin >= bonesEnd) {
@@ -975,8 +975,8 @@ Wm3::Vector3f* moho::CAimManipulator::Aim(Wm3::Vector3f* const outDirection, CAi
   Wm3::Vector3f aimDirection = InvalidAimVector();
 
   CAniPoseBone* muzzleBone = nullptr;
-  if (this->mOwnerActor != nullptr && this->mOwnerActor->mPriorPose.px != nullptr) {
-    CAniPose* const priorPose = this->mOwnerActor->mPriorPose.px;
+  if (this->mOwnerActor != nullptr && this->mOwnerActor->mPriorPose.get() != nullptr) {
+    CAniPose* const priorPose = this->mOwnerActor->mPriorPose.get();
     CAniPoseBone* const boneBegin = priorPose->mBones.begin();
     CAniPoseBone* const boneEnd = priorPose->mBones.end();
     if (boneBegin != nullptr && boneEnd != nullptr && boneBegin < boneEnd && this->mMuzzleBone >= 0) {

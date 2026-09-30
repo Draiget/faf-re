@@ -671,67 +671,6 @@ ReconBlip::ReconBlip(Sim* const sim) :
 }
 
 /**
- * Address: 0x005C4F50 (FUN_005C4F50, Moho::SPerArmyReconInfo::~SPerArmyReconInfo)
- *
- * What it does:
- * Releases per-army recon shared ownership lanes in binary destruction order.
- */
-SPerArmyReconInfo::~SPerArmyReconInfo()
-{
-  mPose.release();
-  mPriorPose.release();
-  mMesh.release();
-}
-
-/**
- * Address: 0x005C84D0 (FUN_005C84D0, Moho::SPerArmyReconInfo::SPerArmyReconInfo)
- *
- * What it does:
- * Copy-constructs one per-army recon snapshot lane field-by-field.
- * `boost::SharedPtrRaw<T>`'s own copy constructor retains the shared
- * control block for `mMesh`/`mPriorPose`/`mPose`, matching the binary's
- * direct `_InterlockedExchangeAdd` refcount bump for each.
- */
-SPerArmyReconInfo::SPerArmyReconInfo(const SPerArmyReconInfo& other) noexcept
-  : mNeedsFlush(other.mNeedsFlush)
-  , mReconFlags(other.mReconFlags)
-  , mStiMesh(other.mStiMesh)
-  , mMesh(other.mMesh)
-  , mPriorPose(other.mPriorPose)
-  , mPose(other.mPose)
-  , mHealth(other.mHealth)
-  , mMaxHealth(other.mMaxHealth)
-  , mFractionComplete(other.mFractionComplete)
-  , mMaybeDead(other.mMaybeDead)
-{
-}
-
-/**
- * Address: 0x005CC5E0 (FUN_005CC5E0, Moho::SPerArmyReconInfo::operator=)
- * Mangled: ??4SPerArmyReconInfo@Moho@@QAEAAV01@ABV01@@Z
- *
- * What it does:
- * Assigns scalar recon flags/health lanes and rebinds mesh/pose shared
- * control blocks with retain/release semantics in binary field order.
- */
-SPerArmyReconInfo& SPerArmyReconInfo::operator=(const SPerArmyReconInfo& other)
-{
-  mNeedsFlush = other.mNeedsFlush;
-  mReconFlags = other.mReconFlags;
-  mStiMesh = other.mStiMesh;
-
-  mMesh.assign_retain(other.mMesh);
-  mPriorPose.assign_retain(other.mPriorPose);
-  mPose.assign_retain(other.mPose);
-
-  mHealth = other.mHealth;
-  mMaxHealth = other.mMaxHealth;
-  mFractionComplete = other.mFractionComplete;
-  mMaybeDead = other.mMaybeDead;
-  return *this;
-}
-
-/**
  * Address: 0x005C8DE0 (FUN_005C8DE0, Moho::SPerArmyReconInfo::MemberDeserialize)
  */
 void SPerArmyReconInfo::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
@@ -774,9 +713,9 @@ void SPerArmyReconInfo::MemberSerialize(gpg::WriteArchive* const archive, const 
 
   const gpg::RRef ownerRef{};
   archive->WritePointer(mStiMesh, gpg::TrackedPointerState::Unowned, ownerRef);
-  archive->WritePointer(mMesh.px, gpg::TrackedPointerState::Shared, ownerRef);
-  archive->WritePointer(mPriorPose.px, gpg::TrackedPointerState::Shared, ownerRef);
-  archive->WritePointer(mPose.px, gpg::TrackedPointerState::Shared, ownerRef);
+  archive->WritePointer(mMesh.get(), gpg::TrackedPointerState::Shared, ownerRef);
+  archive->WritePointer(mPriorPose.get(), gpg::TrackedPointerState::Shared, ownerRef);
+  archive->WritePointer(mPose.get(), gpg::TrackedPointerState::Shared, ownerRef);
   archive->WriteFloat(mHealth);
   archive->WriteFloat(mHealth);
   archive->WriteFloat(mFractionComplete);
@@ -1370,29 +1309,23 @@ void ReconBlip::SyncInterface(SSyncData* const syncData)
   const bool creatorAlive = creator != nullptr;
   const std::int32_t creatorStunTicks =
     creatorAlive ? static_cast<std::int32_t>(creator->mUnitVarDat.mStunTicks != 0) : 0;
-  PatchUnitUpdateReconPose(
-    entry,
-    reconInfo.mPriorPose.px,
-    reconInfo.mPriorPose.pi,
-    reconInfo.mPose.px,
-    reconInfo.mPose.pi,
-    creatorAlive,
-    creatorStunTicks
-  );
+  entry->mVariableData.mSharedPose = reconInfo.mPose;
+  entry->mVariableData.mPriorSharedPose = reconInfo.mPriorPose;
+  if (creatorAlive) {
+    entry->mVariableData.mStunTicks = creatorStunTicks;
+  }
   SetUnitUpdateReconFlags(entry, static_cast<std::int32_t>(reconInfo.mReconFlags));
 
   Entity::SyncInterface(syncData);
 
-  PatchEntityUpdateReconMesh(
-    syncData,
-    reconInfo.mStiMesh,
-    reconInfo.mMesh.px,
-    reconInfo.mMesh.pi,
-    reconInfo.mHealth,
-    reconInfo.mMaxHealth,
-    reconInfo.mFractionComplete,
-    reconInfo.mMaybeDead
-  );
+  // 0x005BF168..0x005BF1C4: the record `Entity::SyncInterface` just queued.
+  SSTIEntityVariableData& entityData = syncData->mEntityUpdates.back().mVariableData;
+  entityData.mMeshBlueprint = reconInfo.mStiMesh;
+  entityData.mScmResource = reconInfo.mMesh;
+  entityData.mHealth = reconInfo.mHealth;
+  entityData.mMaxHealth = reconInfo.mMaxHealth;
+  entityData.mFractionComplete = reconInfo.mFractionComplete;
+  entityData.mIsDead = reconInfo.mMaybeDead;
 }
 
 /**

@@ -80,11 +80,11 @@ namespace
 
   [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const actor, const int boneIndex) noexcept
   {
-    if (actor == nullptr || actor->mPose.px == nullptr || boneIndex < 0) {
+    if (actor == nullptr || actor->mPose.get() == nullptr || boneIndex < 0) {
       return nullptr;
     }
 
-    moho::CAniPose* const pose = actor->mPose.px;
+    moho::CAniPose* const pose = actor->mPose.get();
     moho::CAniPoseBone* const bonesBegin = pose->mBones.begin();
     moho::CAniPoseBone* const bonesEnd = pose->mBones.end();
     if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin >= bonesEnd) {
@@ -467,7 +467,7 @@ moho::CRotateManipulator::CRotateManipulator(
  */
 bool moho::CRotateManipulator::SetCurrentAngle(const float angleRadians)
 {
-  if (mOwnerActor == nullptr || mOwnerActor->mPose.px == nullptr || mWatchBones.begin() == nullptr) {
+  if (mOwnerActor == nullptr || mOwnerActor->mPose.get() == nullptr || mWatchBones.begin() == nullptr) {
     return false;
   }
 

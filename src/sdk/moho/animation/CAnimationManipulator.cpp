@@ -1497,7 +1497,7 @@ namespace moho
     const SScaAnimKey* const keys0 = AnimationFrameKeys(*resource, boneTrackCount, frameIndex);
     const SScaAnimKey* const keys1 = AnimationFrameKeys(*resource, boneTrackCount, nextFrameIndex);
 
-    CAniPose* const pose = mOwnerActor->mPose.px;
+    CAniPose* const pose = mOwnerActor->mPose.get();
     const float poseScale = pose->mScale;
     CAniPoseBone* const poseBones = pose->mBones.begin();
     const std::uint32_t poseBoneCount = static_cast<std::uint32_t>(pose->mBones.end() - poseBones);

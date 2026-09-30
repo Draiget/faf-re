@@ -84,7 +84,7 @@ namespace
       return nullptr;
     }
 
-    moho::CAniPose* const pose = manipulator->mOwnerActor->mPose.px;
+    moho::CAniPose* const pose = manipulator->mOwnerActor->mPose.get();
     if (pose == nullptr || pose->mBones.begin() == nullptr || pose->mBones.end() == nullptr) {
       return nullptr;
     }

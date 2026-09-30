@@ -750,7 +750,7 @@ namespace moho
      * Copies this entity's mesh shared-handle lanes and retains one shared
      * owner on the control block when present.
      */
-    [[nodiscard]] boost::SharedPtrRaw<RScmResource> GetMesh() const;
+    [[nodiscard]] boost::shared_ptr<RScmResource> GetMesh() const;
 
     /**
      * Address: 0x005BDB60 (FUN_005BDB60)

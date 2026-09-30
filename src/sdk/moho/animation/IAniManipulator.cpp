@@ -927,8 +927,8 @@ namespace moho
     // (start[0] = foot, start[2] = hip), and then looks up the corresponding
     // pose bones via the owner actor's CAniPose::mBones array, returning a
     // null pointer when the bone index is past the array end.
-    if (CAniActor* const actor = mOwnerActor; actor != nullptr && actor->mPose.px != nullptr) {
-      CAniPose* const pose = actor->mPose.px;
+    if (CAniActor* const actor = mOwnerActor; actor != nullptr && actor->mPose.get() != nullptr) {
+      CAniPose* const pose = actor->mPose.get();
       const std::size_t boneCount = pose->mBones.end() - pose->mBones.begin();
       const SAniManipBinding* const watchBegin = mWatchBones.begin();
       const std::uint32_t footIndex = watchBegin != nullptr
@@ -1069,7 +1069,7 @@ namespace moho
 
     if (markSkipInterp) {
       if (CAniPoseBone* const watchedBone =
-            ResolvePoseBoneByIndex(mOwnerActor->mPose.px, mWatchBones.begin()->mBoneIndex);
+            ResolvePoseBoneByIndex(mOwnerActor->mPose.get(), mWatchBones.begin()->mBoneIndex);
           watchedBone != nullptr) {
         watchedBone->mSkipNextInterp = 1;
       }
@@ -1125,7 +1125,7 @@ namespace moho
       return false;
     }
 
-    CAniPose* const pose = mOwnerActor->mPose.px;
+    CAniPose* const pose = mOwnerActor->mPose.get();
     const SAniManipBinding* const watchBones = mWatchBones.begin();
     CAniPoseBone* const footBone = ResolvePoseBoneByIndex(pose, watchBones[0].mBoneIndex);
     CAniPoseBone* const kneeBone = ResolvePoseBoneByIndex(pose, watchBones[1].mBoneIndex);
@@ -1257,7 +1257,7 @@ namespace moho
    */
   bool CBoneEntityManipulator::ManipulatorUpdate()
   {
-    CAniPose* const pose = mOwnerActor->mPose.px;
+    CAniPose* const pose = mOwnerActor->mPose.get();
     Entity* const targetEntity = mTargetEntity.GetObjectPtr();
 
     if (targetEntity != nullptr) {
