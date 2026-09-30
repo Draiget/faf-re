@@ -1326,7 +1326,13 @@ namespace gpg::core
      * Copy `other`'s payload over this one. Public copy assignment stays deleted
      * because an inline-backed vector must not be assigned through a base
      * reference; the rebind helpers call this explicitly instead.
-     * Address: 0x0056EFA0 (FUN_0056EFA0 -- the `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` emission: assign over the live prefix (relink), grow through `ReallocateInsert_` 0x0056D2B0, copy-construct the rest, unlink a longer destination's tail (0x0056EF40). The binary's `fastvector_n<WeakPtr<IUnit>, 4>` copy constructor 0x0056B200 seats its inline block and calls this at 0x0056B236; this tree's `FastVectorN` copy constructor reaches the same end state through `ResetFrom`. Formerly `AssignWeakPtrIUnitVectorStorage` in moho/unit/core/IUnitWeakPtrReflection.cpp (orphan), removed 2026-09-30.)
+     * Address: 0x0056EFA0 (FUN_0056EFA0 -- the `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` emission: assign over the live prefix (relink), grow through `ReallocateInsert_` 0x0056D2B0, copy-construct the rest, unlink a longer destination's tail (0x0056EF40). The binary's `fastvector_n<WeakPtr<IUnit>, 4>` copy constructor 0x0056B200 seats its inline block and calls this at 0x0056B236, as `FastVectorN`'s copy constructor does. Formerly `AssignWeakPtrIUnitVectorStorage` in moho/unit/core/IUnitWeakPtrReflection.cpp (orphan), removed 2026-09-30.)
+     * Address: 0x00576F10 (FUN_00576F10 -- the `Moho::SFormationScriptSlot`
+     * (0x38) emission: the size compare at 0x00576F5A, growth through
+     * 0x00576D60 when the source outruns the twenty inline slots, then
+     * element-wise copies, each slot's `EntityCategorySet` rebinding its word
+     * lane to its own inline run. Reached only from that type's copy
+     * constructor 0x00576C20. It was cited on `ResetFrom`.)
      */
   public:
     void AssignFrom(const FastVectorInline& other)
@@ -1606,12 +1612,11 @@ namespace gpg::core
      * rebinds lanes back to inline storage metadata.
      */
     /**
-     * Copies another vector's elements into this one's own storage.
-     *
-     * The implicitly-generated copy would duplicate the raw pointer lanes and
-     * leave the copy aliasing the source's inline buffer, which dangles as
-     * soon as the source dies or is relocated. Every inline-storage vector in
-     * the binary rebinds to its own buffer instead (`ResetFrom`).
+     * Copies another vector's elements into this one's own storage: seat the
+     * lanes on this object's inline block, then `AssignFrom` the source
+     * (0x0056B200 does exactly that, calling 0x0056EFA0 at 0x0056B236). An
+     * implicitly-generated copy would duplicate the raw pointer lanes and leave
+     * the copy aliasing the source's inline buffer.
      */
     /**
      * Address: 0x00576C20 (FUN_00576C20,
@@ -1620,8 +1625,8 @@ namespace gpg::core
      * returns `SFormationScriptResult` by value. It opens exactly as the
      * `: FastVectorN()` delegation below does, seating the three lanes on
      * `this + 0x10` and the capacity on `this + 0x10 + 0x460` -- 0x460 being
-     * twenty slots of 0x38 -- and then rebinds through the uninitialised copy
-     * at 0x00576F10, which is `ResetFrom`.)
+     * twenty slots of 0x38 -- and then calls that type's `AssignFrom`,
+     * 0x00576F10.)
      * Address: 0x00898E50 (FUN_00898E50,
      * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>'s copy constructor --
      * `Moho::CWldSession::GetActiveBuildTemplate` (0x00896A40) copy-constructs
@@ -1641,7 +1646,7 @@ namespace gpg::core
     FastVectorN(const FastVectorN& other)
       : FastVectorN()
     {
-      this->ResetFrom(other);
+      this->AssignFrom(other);
     }
 
     /**
@@ -2282,14 +2287,6 @@ namespace gpg::core
       return this;
     }
 
-    /**
-     * Address: 0x00576F10 (FUN_00576F10, the rebind-and-copy lane for the
-     * 0x38-byte `Moho::SFormationScriptSlot`. Reached only from that type's
-     * fastvector copy constructor at 0x00576C20, and grows through 0x00576D60
-     * when the source outruns the twenty inline slots. Copies element-wise
-     * rather than by block because each slot carries an `EntityCategorySet`
-     * whose word lane has to be rebound to its own inline run.)
-     */
     // Reset to inline storage and copy from a plain FastVector view
     /**
      * Address: 0x0065FED0 (FUN_0065FED0 -- the per-element assignment a range copy runs for `gpg::core::FastVector<moho::SEfxCurve>` (the reflected curve vector; the 0x38 element's assignment copies both bound vectors then hands its key vector to `ResetFrom`, which is the emission at 0x0065F240); callers 0x0065F330, 0x0065FA80; formerly `CopyAssignSEfxCurveRangeRuntime` in moho/effects/rendering/SEfxCurve.cpp (RULE ONE), removed 2026-09-11.)
