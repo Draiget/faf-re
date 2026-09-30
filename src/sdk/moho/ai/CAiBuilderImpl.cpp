@@ -201,19 +201,6 @@ namespace
     return (mask & static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED)) != 0u;
   }
 
-  // `CAiTarget::DecodeFromSSTITarget` (0x005E2620) resolves an id with
-  // `std::map<EntId, Entity*>::find` over `EntityDB::mAllUnits`, collapsing a
-  // miss onto the head node -- which is exactly `CEntityDb::FindEntityById`
-  // (0x006856C0, over `FindEntityPayloadByIdNode` 0x00684530). A hand-rolled
-  // linear walk of the recovery's own side list used to stand here; it is a
-  // second, unevidenced spelling of a lookup the engine already has, and the
-  // two containers are maintained by different code paths, so they can
-  // disagree about an id the tree still holds.
-  [[nodiscard]] Entity* FindEntityById(CEntityDb* entityDb, const EntId id)
-  {
-    return entityDb != nullptr ? entityDb->FindEntityById(static_cast<std::uint32_t>(id)) : nullptr;
-  }
-
   [[nodiscard]] bool IsTransportTargetEntityAllowed(const Entity* entity)
   {
     if (!entity) {
@@ -408,6 +395,19 @@ void CAiBuilderImpl::BuilderSetUpInitialRally()
 
 /**
  * Address: 0x0059F220 (FUN_0059F220)
+ *
+ * What it does:
+ * Drops queued transport-load orders whose target is no longer something a
+ * factory can ferry to (a ferry beacon, a transport or an air staging
+ * platform), then re-rallies when the queue is left empty.
+ *
+ * The target is the order's own weak target (`mTarget.targetEntity`,
+ * command +0x120, 0x0059F282), not an entity-id lookup. Each dropped order
+ * releases the owner (0x0059F3D4) and is erased in place (0x0059F3E6). An
+ * order slot that has gone empty is re-tested without advancing
+ * (0x0059F264/0x0059F26F jump back to the loop test at 0x0059F402), exactly
+ * as the binary does. The empty-queue test is inline (0x0059F411..0x0059F420)
+ * before the rally virtual (slot 3, `+0x0C`).
  */
 void CAiBuilderImpl::BuilderValidateFactoryCommandQueue()
 {
@@ -415,38 +415,24 @@ void CAiBuilderImpl::BuilderValidateFactoryCommandQueue()
     return;
   }
 
-  std::size_t index = 0;
-  while (index < mFactoryCommands.size()) {
-    CUnitCommand* const command = mFactoryCommands[index].GetObjectPtr();
-    if (!command) {
-      EraseWeakVectorEntry(mFactoryCommands, index);
+  for (WeakPtr<CUnitCommand>* it = mFactoryCommands.begin(); it != mFactoryCommands.end();) {
+    CUnitCommand* const command = it->GetObjectPtr();
+    if (command == nullptr) {
+      continue;
+    }
+
+    if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits &&
+        !IsTransportTargetEntityAllowed(command->mTarget.targetEntity.GetObjectPtr())) {
+      command->RemoveUnit(mOwnerUnit);
+      it = mFactoryCommands.erase(it);
       mFactoryQueueDirty = 1;
       continue;
     }
 
-    if (command->mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_TransportLoadUnits) {
-      ++index;
-      continue;
-    }
-
-    bool shouldRemove = true;
-    if (mOwnerUnit && mOwnerUnit->SimulationRef && command->mVarDat.mTarget1.mType == EAiTargetType::AITARGET_Entity) {
-      const EntId targetId = static_cast<EntId>(command->mVarDat.mTarget1.mEntityId);
-      Entity* const entity = FindEntityById(mOwnerUnit->SimulationRef->mEntityDB, targetId);
-      shouldRemove = !IsTransportTargetEntityAllowed(entity);
-    }
-
-    if (!shouldRemove) {
-      ++index;
-      continue;
-    }
-
-    command->RemoveUnit(mOwnerUnit);
-    EraseWeakVectorEntry(mFactoryCommands, index);
-    mFactoryQueueDirty = 1;
+    ++it;
   }
 
-  if (BuilderIsFactoryQueueEmpty()) {
+  if (mFactoryCommands.empty()) {
     BuilderSetUpInitialRally();
   }
 }

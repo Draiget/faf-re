@@ -1,4 +1,5 @@
 #include "CUnitCommand.h"
+#include <algorithm>
 #include <cmath>
 
 #include <cstdio>
@@ -1476,15 +1477,15 @@ void CUnitCommand::MemberSerialize(CUnitCommand* const command, gpg::WriteArchiv
 
 /**
  * Address: 0x006E8B40 (FUN_006E8B40)
- * Address: 0x006E96F0 (FUN_006E96F0, msvc8::vector<Moho::WeakPtr<CUnitCommand>>
- *   ::insert emission for the `queue` insert below, reached via
- *   InsertWeakPtrVectorObjectAt / EnsureWeakPtrVectorCapacity in WeakPtr.h; the
- *   T=UserUnit sibling of this same template emission is cited there as
- *   FUN_008B2B70)
+ * Address: 0x006E96F0 (FUN_006E96F0, `msvc8::vector<WeakPtr<CUnitCommand>>::insert(pos, value)`
+ *   for the `queue` insert below: offset, `_Insert_n` 0x006EA440, `begin() + offset`)
  *
  * What it does:
  * Adds `unit` into this command's unit-set and inserts this command weak-ref
  * into `queue` at `index` (negative index inserts relative to queue end).
+ *
+ * A negative index is `index + size() + 1` (0x006E8BAD..0x006E8BBA); nothing
+ * clamps it into range.
  */
 void CUnitCommand::AddUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue, const int index)
 {
@@ -1497,7 +1498,11 @@ void CUnitCommand::AddUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitCommand>
   }
 
   mNeedsUpdate = true;
-  InsertWeakPtrVectorObjectAt(queue, this, NormalizeWeakPtrVectorInsertIndex(queue, index));
+  int insertIndex = index;
+  if (insertIndex < 0) {
+    insertIndex += static_cast<int>(queue.size()) + 1;
+  }
+  queue.insert(queue.begin() + insertIndex, WeakPtr<CUnitCommand>(this));
 
   if (mFormationInstance) {
     mFormationInstance->AddUnit(unit);
@@ -1534,6 +1539,10 @@ void CUnitCommand::AddUnit(Unit* const unit)
  * What it does:
  * Removes `unit` from this command's unit-set and removes this command weak-ref
  * from the provided queue.
+ *
+ * The queue entry is `erase(std::find(begin, end, this))`, with no test for
+ * a miss (0x006E8C9A, 0x006E8CAA):
+ * Address: 0x006EC170 (FUN_006EC170, `std::find` over `WeakPtr<CUnitCommand>` for a `CUnitCommand*`)
  */
 void CUnitCommand::RemoveUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue)
 {
@@ -1552,7 +1561,7 @@ void CUnitCommand::RemoveUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitComma
     }
   }
 
-  (void)RemoveWeakPtrVectorObject(queue, this);
+  queue.erase(std::find(queue.begin(), queue.end(), this));
 }
 
 /**

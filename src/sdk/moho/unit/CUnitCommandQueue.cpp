@@ -1,4 +1,5 @@
 #include "CUnitCommandQueue.h"
+#include <algorithm>
 
 #include <cstddef>
 #include <cstdint>
@@ -531,15 +532,15 @@ bool CUnitCommandQueue::RemoveCommandFromQueue(const CUnitCommand* command)
  *
  * What it does:
  * Removes a queued command by index and marks queue refresh state.
+ *
+ * Removing the head raises the refresh event before the index is checked
+ * (0x006EDEF1..0x006EDF1C), so an out-of-range 0 still refreshes. The
+ * command then takes itself out of the queue through `RemoveUnit`; the
+ * binary has no separate path for an empty slot (0x006EDF3D..0x006EDF4E).
  */
 bool CUnitCommandQueue::RemoveCommandFromQueue(const unsigned int index)
 {
-  if (static_cast<std::size_t>(index) >= mCommandVec.size()) {
-    return false;
-  }
-
-  const std::size_t queueIndex = static_cast<std::size_t>(index);
-  if (queueIndex == 0u) {
+  if (index == 0u) {
     if (NeedsUIRefresh()) {
       MarkOwningUnitSyncDirty(mUnit);
     }
@@ -547,12 +548,11 @@ bool CUnitCommandQueue::RemoveCommandFromQueue(const unsigned int index)
     EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_NeedsRefresh);
   }
 
-  CUnitCommand* const command = mCommandVec[queueIndex].GetObjectPtr();
-  if (command) {
-    command->RemoveUnit(mUnit, mCommandVec);
-  } else {
-    EraseWeakVectorEntry(mCommandVec, queueIndex);
+  if (static_cast<std::size_t>(index) >= mCommandVec.size()) {
+    return false;
   }
+
+  mCommandVec[index].GetObjectPtr()->RemoveUnit(mUnit, mCommandVec);
 
   mNeedsRefresh = true;
   EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_Changed);
@@ -572,8 +572,8 @@ void CUnitCommandQueue::MoveFirstCommandToBackOfQueue()
   }
 
   CUnitCommand* const command = mCommandVec.front().GetObjectPtr();
-  EraseWeakVectorEntry(mCommandVec, 0u);
-  InsertWeakPtrVectorObjectAt(mCommandVec, command, mCommandVec.size());
+  mCommandVec.erase(mCommandVec.begin());
+  mCommandVec.push_back(WeakPtr<CUnitCommand>(command));
 
   mNeedsRefresh = true;
   EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_Reordered);
@@ -596,20 +596,13 @@ bool CUnitCommandQueue::MoveCommandToBackOfQueue(const unsigned int index)
 
   CUnitCommand* const targetCommand = mCommandVec[requestedIndex].GetObjectPtr();
 
-  std::size_t matchedIndex = queueSize;
-  for (std::size_t i = 0; i < queueSize; ++i) {
-    if (mCommandVec[i].GetObjectPtr() == targetCommand) {
-      matchedIndex = i;
-      break;
-    }
-  }
-
-  if (matchedIndex == queueSize) {
+  WeakPtr<CUnitCommand>* const match = std::find(mCommandVec.begin(), mCommandVec.end(), targetCommand);
+  if (match == mCommandVec.end()) {
     return false;
   }
 
-  EraseWeakVectorEntry(mCommandVec, matchedIndex);
-  InsertWeakPtrVectorObjectAt(mCommandVec, targetCommand, mCommandVec.size());
+  mCommandVec.erase(match);
+  mCommandVec.push_back(WeakPtr<CUnitCommand>(targetCommand));
 
   mNeedsRefresh = true;
   EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_Reordered);
@@ -648,14 +641,13 @@ void CUnitCommandQueue::ClearCommandQueue()
 
   EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_Cleared);
 
-  while (!mCommandVec.empty()) {
-    CUnitCommand* const command = mCommandVec.back().GetObjectPtr();
-    if (command) {
-      command->RemoveUnit(mUnit, mCommandVec);
-    } else {
-      EraseWeakVectorEntry(mCommandVec, mCommandVec.size() - 1u);
-    }
+  // Each command takes itself out of the queue; the count is taken once and
+  // the walk runs from the back (0x006EE2F9..0x006EE335), then whatever is
+  // left is cleared (0x006EE346).
+  for (int index = static_cast<int>(mCommandVec.size()) - 1; index >= 0; --index) {
+    mCommandVec[index].GetObjectPtr()->RemoveUnit(mUnit, mCommandVec);
   }
+  mCommandVec.clear();
 
   mCommandType = EUnitCommandType::UNITCOMMAND_None;
   mNeedsRefresh = true;

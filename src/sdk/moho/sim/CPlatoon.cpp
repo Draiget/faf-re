@@ -2029,7 +2029,7 @@ namespace moho
 
       CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, commandUnits, commandIssueData, false);
       if (issuedCommand != nullptr) {
-        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+        issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
       }
     }
 
@@ -4789,7 +4789,7 @@ namespace moho
 
     CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
     if (issuedCommand != nullptr) {
-      InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
     }
   }
 
@@ -4971,7 +4971,7 @@ namespace moho
 
     CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
     if (issuedCommand != nullptr) {
-      InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
     }
   }
 
@@ -5200,7 +5200,7 @@ namespace moho
 
     CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
     if (issuedCommand != nullptr) {
-      InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
     }
   }
 
@@ -5438,7 +5438,7 @@ namespace moho
 
     CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
     if (issuedCommand != nullptr) {
-      InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+      issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
     }
   }
 
@@ -5643,7 +5643,7 @@ namespace moho
 
       CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, transports, commandIssueData, false);
       if (issuedCommand != nullptr) {
-        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+        issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
       }
     }
 
@@ -5877,7 +5877,7 @@ namespace moho
 
       CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, unitsToUnload, commandIssueData, false);
       if (issuedCommand != nullptr) {
-        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+        issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
       }
     }
 
@@ -6006,7 +6006,7 @@ namespace moho
 
       CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, carriers, commandIssueData, false);
       if (issuedCommand != nullptr) {
-        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+        issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
       }
     }
 
@@ -6285,7 +6285,7 @@ namespace moho
 
       CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(platoon->mSim, units, commandIssueData, false);
       if (issuedCommand != nullptr) {
-        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+        issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
       }
     };
 
@@ -6680,7 +6680,7 @@ namespace moho
 
       CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, loadableUnits, commandIssueData, false);
       if (issuedCommand != nullptr) {
-        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+        issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
       }
     }
 
@@ -6809,7 +6809,7 @@ namespace moho
 
       CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(mSim, selectedUnits, commandIssueData, false);
       if (issuedCommand != nullptr) {
-        InsertWeakPtrVectorObjectAt(issuedCommands, issuedCommand, issuedCommands.size());
+        issuedCommands.push_back(WeakPtr<CUnitCommand>(issuedCommand));
       }
     }
 

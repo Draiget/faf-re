@@ -199,8 +199,7 @@ namespace gpg::core
      * Unlinks every intrusive weak-ref slot in `[begin, end)` from its owner's
      * weak-link chain by replacing the owner-chain reference to each node with
      * that node's `nextInOwner`, WITHOUT clearing the unlinked node's own storage.
-     * Mirrors the binary's `mov [eax], [ecx+4]` splice loop. (Shared with
-     * `moho::UnlinkWeakPtrUnitRange`.)
+     * Mirrors the binary's `mov [eax], [ecx+4]` splice loop.
      */
     inline void UnlinkIntrusiveWeakRefRange(IntrusiveWeakLinkNode* begin, IntrusiveWeakLinkNode* end) noexcept
     {

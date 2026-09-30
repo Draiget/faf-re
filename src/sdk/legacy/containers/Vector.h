@@ -2675,6 +2675,7 @@ namespace msvc8
          * Address: 0x007A56A0 (FUN_007A56A0 -- `size()` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp) (`sar 3`).
          *   Formerly `InputCaptureCount`.)
          * Address: 0x0076C400 (FUN_0076C400 -- `size()` for `msvc8::vector<moho::OccupySourceBinding>` (`PathTables::Impl::mSources`): `(last - first) / 12` through the 0x2AAAAAAB reciprocal, 0 when unallocated; caller 0x0076C490 (`_Insert_n`).)
+         * Address: 0x00599530 (FUN_00599530 -- `size` for `msvc8::vector<WeakPtr<CUnitCommand>>` (`(last - first) >> 3`); caller `CUnitCommand::AddUnit` 0x006E8BB1; formerly cited on `NormalizeWeakPtrVectorInsertIndex` in moho/misc/WeakPtr.h, removed 2026-09-30.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -4056,6 +4057,7 @@ namespace msvc8
          * Address: 0x008EFDD0 (FUN_008EFDD0 -- `push_back`: `_Ufill(last, 1, v)` over 0x008EA090 when there is room, else `insert(end, v)` 0x008EFA50, for `msvc8::vector<gpg::gal::HeadAdapterMode>` (`Head::adapterModes` at +0x50 and gal::Device slot 5's out-vector; the 0x0C `{width, height, refresh}` element); callers 0x008F020C (`DeviceD3D9::GetModesForAdapter`), 0x008F2218 (`DeviceD3D9::BuildDeviceCapabilities`), 0x008FF752 (`DeviceD3D10::CheckAvailableFormats`); formerly `AppendHeadAdapterMode` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x007A5710 (FUN_007A5710 -- `push_back` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp); caller
          *   `AddInputCaptureControl` 0x007A4540. Formerly `AppendInputCaptureWeakReference`.)
+         * Address: 0x008B2770 (FUN_008B2770 -- `push_back` for `msvc8::vector<WeakPtr<UserUnit>>` (8-byte element, `UserArmy::mAvatars` +0x1E8); caller `AddArmyAvatar` 0x008B2429; formerly `InsertWeakPtrVectorObjectAt` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -4274,6 +4276,7 @@ namespace msvc8
          * Address: 0x00507A50 (FUN_00507A50 -- `erase(pos)` for `moho::SDelayedSubVizInfo`: tail shift 0x005093E0, `--last_`, iterator through the hidden slot; the source call is `CIntelGrid::Tick` 0x005077B0's `update = mUpdateList.erase(update)`. Formerly `EraseDelayedSubVizElementAndShiftTail` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x008B3870 (FUN_008B3870 -- the `std::copy` tail shift of `erase(pos)` over `WeakPtr<UserUnit>` (the army's priority-selection avatars); caller 0x008B2470, reached from `UnregisterUserArmyPrioritySelectionSlot` in UserUnit.cpp.)
          * Address: 0x005E9CF0 (FUN_005E9CF0 -- `erase(pos)` for `msvc8::vector<std::int32_t>` (the transport's index vector); zero callers, unreachable; formerly `EraseIntVectorElementAndReturnCursor` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0059FFC0 (FUN_0059FFC0 -- `erase(where)` for `msvc8::vector<WeakPtr<CUnitCommand>>` (assign tail down 0x005A2220, destroy last 0x005A2270, `_Mylast -= 8`); callers `CUnitCommand::RemoveUnit` 0x006E8CAA, `CAiBuilderImpl::BuilderValidateFactoryCommandQueue` 0x0059F3E6; formerly `RemoveWeakPtrVectorObject`/`EraseWeakVectorEntry` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
          */
         iterator erase(iterator pos) {
             assert(pos >= first_ && pos < last_);
@@ -4477,6 +4480,7 @@ namespace msvc8
  * Address: 0x0076C430 (FUN_0076C430 -- `erase(first, last)` for `msvc8::vector<moho::OccupySourceBinding>`: the tail is assigned down through the implicit `operator=`, which copies `mGrid`/`mFootprint` and leaves every vptr alone; caller 0x0076C130. Formerly `CopyOccupySourceBindingTailRangeAndCommitRuntime` in moho/path/PathTables.cpp (RULE ONE), removed 2026-09-29.)
  * Address: 0x00753630 (FUN_00753630 -- `erase(first, last)` for `msvc8::vector<moho::SEntityPoseUpdateEntry>` (`SSyncData::mPoseUpdates`, the 0x0C `{EntId, shared_ptr<CAniPose>}` element), `this` in EDI, result through the hidden slot: the tail assigned down by `copy_or_move_assign` 0x00755C50, the vacated tail destroyed by 0x007420F0, `last_` rebased; callers 0x00752C50 (`operator=`'s empty-source `clear()`) and 0x00753480 (`clear()`), neither referenced anywhere in the image, so it is unreachable; formerly `AssignRebuiltOpaqueLaneRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
  * Address: 0x00767D00 (FUN_00767D00 -- `erase(first, last)` for `msvc8::vector<gpg::AStarOpenHeap<TCell>::Entry>` (the open heap's `mEntries`, 0x0C `{mPriority, mNode, mHandle}` POD element), `this` in EBX, result through the hidden slot in EAX: the tail copied down three dwords per slot, `last_` rebased; callers 0x007672E0 (`AStarOpenHeap::clear`'s `mEntries.clear()`, VC8's `erase(begin(), end())`) and 0x00767750 (an unreferenced out-of-line `clear()`); formerly `CompactWordVectorTailFromCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+ * Address: 0x005FBF60 (FUN_005FBF60 -- `erase(first, last)` for `msvc8::vector<WeakPtr<CUnitCommand>>`; VC8's `clear()` is `erase(begin(), end())`, called so by `CUnitCommandQueue::ClearCommandQueue` 0x006EE346.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -6711,6 +6715,7 @@ namespace msvc8
  * Address: 0x0076C490 (FUN_0076C490 -- `_Insert_n` for `msvc8::vector<moho::OccupySourceBinding>` (12-byte element, `max_size` 0x15555555): `size` 0x0076C400, `_Xlen` 0x0076C730, `_Uninit_fill_n` 0x0076CBA0 / `_Ufill` 0x0076D150, `_Umove` 0x0076CD00 over `_Ucopy` 0x0076D300, the gap `fill` 0x0076CD30, `copy_backward` 0x0076CD60, `_Allocate` 0x0076CD90; caller 0x0076C130. Formerly `InsertOccupySourceBindingRange` in moho/path/PathTables.cpp (RULE ONE), removed 2026-09-29.)
  * Address: 0x0076CD30 (FUN_0076CD30 -- the gap `fill` of that `_Insert_n`: the binding's implicit `operator=` over `[first, last)`, `mGrid`/`mFootprint` only; caller 0x0076C490. Formerly `FillOccupySourceBindingPayloadRangeRuntime` in moho/path/PathTables.cpp (RULE ONE), removed 2026-09-29.)
  * Address: 0x0076C850 (FUN_0076C850 -- `_Insert_n` for `msvc8::vector<gpg::HaStar::ClusterMap*>` (`PathTables::Impl::mMaps`, 4-byte element): `_Xlen` 0x0076CA70, `_Copy_opt` 0x0076CE20, `_Copy_backward_opt` 0x0076CE60, `_Allocate` 0x0076CE90; caller 0x0076C270.)
+ * Address: 0x008B2B70 (FUN_008B2B70 -- `_Insert_n` for `msvc8::vector<WeakPtr<UserUnit>>` (8-byte element, max_size 0x1FFFFFFF); `insert(pos, value)` inlined into `AddArmyAvatar` calls it at 0x008B23D2; formerly `EnsureWeakPtrVectorCapacity` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-30.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -10610,12 +10615,11 @@ namespace msvc8
          * `0x005C705C` in `msvc8::vector<Moho::SPerArmyReconInfo>::_Insert_n`
          * (FUN_005C6F90), preceded by the `sub_5C3C70` max_size clamp.
          *
-         * Exposed publicly (was private) so per-element-type helpers that
-         * can't route through `reallocate_to` directly -- because their `T`
-         * needs relocation semantics this template doesn't model, e.g.
-         * `moho::EnsureWeakPtrVectorCapacity` for `WeakPtr<T>`'s intrusive
-         * owner-chain relink -- can still reuse the real growth formula
-         * instead of re-deriving it.
+         * Public so the few element types that manage their own storage can
+         * reuse the real growth formula instead of re-deriving it.
+         * (`WeakPtr<T>` no longer needs to: its copy constructor, assignment
+         * and destructor carry the owner-chain relink, so `insert` and
+         * `reallocate_to` handle it as they are.)
          */
         [[nodiscard]] std::size_t recommended_capacity(const std::size_t need) const noexcept {
             const std::size_t cur = capacity();

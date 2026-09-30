@@ -97,11 +97,9 @@ namespace moho
      * `moho/containers/LegacyContainerFillLanes.cpp`, a RULE ONE reach-in
      * duplicate over an `IntrusiveLinkRuntimeView***` triple pointer that
      * modeled this exact same shape without naming `moho::WeakPtr<T>`.
-     * Reached from `msvc8::vector<WeakPtr<UserUnit>>::insert`'s in-place
-     * tail-shift branch -- `InsertWeakPtrVectorObjectAt` (`FUN_008B2770`)
-     * and `EnsureWeakPtrVectorCapacity` (`FUN_008B2B70`) above both already
-     * cite this address in their own evidence chains -- via the
-     * source-first adapter below.)
+     * Reached from `msvc8::vector<WeakPtr<UserUnit>>`'s `push_back`
+     * (`FUN_008B2770`) and `_Insert_n` (`FUN_008B2B70`), both cited on
+     * Vector.h, via the source-first adapter below.)
      *
      * IDA signature:
      * void *__fastcall sub_7A5FE0(WeakPtr<T> *destination@<eax>,
@@ -364,6 +362,16 @@ namespace moho
     [[nodiscard]] bool IsLinkedInOwnerChain() const noexcept
     {
       return ownerLinkSlot != nullptr && !IsSentinel();
+    }
+
+    /**
+     * True when this node refers to `object`. This is the comparison
+     * `std::find` makes when a `vector<WeakPtr<T>>` is searched for a raw
+     * `T*`: `CUnitCommand::RemoveUnit` finds its own queue entry that way.
+     */
+    [[nodiscard]] friend bool operator==(const WeakPtr<T>& weak, const T* const object) noexcept
+    {
+      return weak.GetObjectPtr() == object;
     }
 
     // There used to be a `GetObject()` alias for `GetObjectPtr()` here, behind
@@ -1022,287 +1030,4 @@ namespace moho
   };
   static_assert(sizeof(WeakPtrVectorStorage<void>) == 0x0C, "WeakPtrVectorStorage<T> must be 12 bytes");
 
-  template <class T>
-  struct WeakPtrVectorRuntimeView
-  {
-    void* proxy;
-    WeakPtr<T>* begin;
-    WeakPtr<T>* end;
-    WeakPtr<T>* capacityEnd;
-  };
-  static_assert(sizeof(WeakPtrVectorRuntimeView<void>) == 0x10, "WeakPtrVectorRuntimeView<T> must be 16 bytes");
-  static_assert(
-    offsetof(WeakPtrVectorRuntimeView<void>, begin) == 0x04,
-    "WeakPtrVectorRuntimeView<T>::begin offset must be 0x04"
-  );
-  static_assert(
-    offsetof(WeakPtrVectorRuntimeView<void>, end) == 0x08,
-    "WeakPtrVectorRuntimeView<T>::end offset must be 0x08"
-  );
-  static_assert(
-    offsetof(WeakPtrVectorRuntimeView<void>, capacityEnd) == 0x0C,
-    "WeakPtrVectorRuntimeView<T>::capacityEnd offset must be 0x0C"
-  );
-
-  /**
-   * Address: 0x0056D3C0 (FUN_0056D3C0, sub_56D3C0)
-   * Address: 0x0061CA70 (FUN_0061CA70)
-   *
-   * What it does:
-   * Unlinks each `WeakPtr<Unit>` in [`begin`, `end`) from its owner chain by
-   * replacing owner-chain references to each node with that node's `nextInOwner`.
-   */
-  inline void UnlinkWeakPtrUnitRange(WeakPtr<Unit>* begin, WeakPtr<Unit>* end) noexcept
-  {
-    while (begin != end) {
-      begin->UnlinkFromOwnerChain();
-      ++begin;
-    }
-  }
-
-  template <class T>
-  [[nodiscard]] WeakPtrVectorRuntimeView<T>& AsWeakPtrVectorRuntimeView(msvc8::vector<WeakPtr<T>>& weakVector) noexcept
-  {
-    return *reinterpret_cast<WeakPtrVectorRuntimeView<T>*>(&weakVector);
-  }
-
-  template <class T>
-  [[nodiscard]] const WeakPtrVectorRuntimeView<T>&
-  AsWeakPtrVectorRuntimeView(const msvc8::vector<WeakPtr<T>>& weakVector) noexcept
-  {
-    return *reinterpret_cast<const WeakPtrVectorRuntimeView<T>*>(&weakVector);
-  }
-
-  /**
-   * Address: 0x008B2B70 (FUN_008B2B70, msvc8::vector<Moho::WeakPtr<UserUnit>>
-   * ::insert(pos, 1, value) for the 8-byte `WeakPtr<T>` element -- the real
-   * `_Insert_n` shape: max_size guard (`0x1FFFFFFF`), in-place tail-shift
-   * when capacity allows (`sub_8B39A0`), else VC8's real 1.5x growth
-   * (`(cap>>1)+cap`, floored to `size+1` when that's not enough --
-   * `msvc8::vector<T>::recommended_capacity()`'s own formula, reused below
-   * rather than re-derived, since this element's move-with-relink semantics
-   * don't go through `Vector.h`'s generic `reallocate_to`) followed by an
-   * allocate (`sub_8B3700`), head/gap/tail relocate
-   * (`sub_8B39A0`/`sub_8B3D30`), and old-block release. The capacity-growth
-   * divergence this citation caught (this function was doubling from a
-   * capacity-4 floor; the binary grows 1.5x from an exact-fit-at-1 floor,
-   * matching every other `_Insert_n` in this codebase) is fixed below by
-   * calling `recommended_capacity()` directly instead of re-deriving the
-   * formula. Reached from `Moho::AddArmyAvatar` (FUN_008B2300,
-   * UserUnit.cpp) via `InsertWeakPtrVectorObjectAt`.
-   */
-  template <class T>
-  void EnsureWeakPtrVectorCapacity(msvc8::vector<WeakPtr<T>>& weakVector, const std::size_t requiredCount)
-  {
-    auto& view = AsWeakPtrVectorRuntimeView(weakVector);
-
-    const std::size_t size = view.begin ? static_cast<std::size_t>(view.end - view.begin) : 0u;
-    const std::size_t capacity = view.begin ? static_cast<std::size_t>(view.capacityEnd - view.begin) : 0u;
-    if (requiredCount <= capacity) {
-      return;
-    }
-
-    const std::size_t newCapacity = weakVector.recommended_capacity(requiredCount);
-
-    auto* const newBegin = static_cast<WeakPtr<T>*>(::operator new(sizeof(WeakPtr<T>) * newCapacity));
-    for (std::size_t i = 0; i < newCapacity; ++i) {
-      newBegin[i].ownerLinkSlot = nullptr;
-      newBegin[i].nextInOwner = nullptr;
-    }
-
-    for (std::size_t i = 0; i < size; ++i) {
-      newBegin[i].ResetFromOwnerLinkSlot(view.begin[i].ownerLinkSlot);
-      view.begin[i].ResetFromObject(nullptr);
-    }
-
-    ::operator delete(view.begin);
-    view.begin = newBegin;
-    view.end = newBegin + size;
-    view.capacityEnd = newBegin + newCapacity;
-  }
-
-  /**
-   * Address: 0x00599530 (FUN_00599530, msvc8::vector<WeakPtr<CUnitCommand>>::size)
-   *
-   * What it does:
-   * `(view.end - view.begin) / sizeof(WeakPtr<T>)` - the binary emits this
-   * out of line for `WeakPtr<CUnitCommand>` and calls it from
-   * `CUnitCommand::AddUnit` by way of this helper; the same
-   * `view.end - view.begin` computation is inlined at each of this file's
-   * other `WeakPtrVectorRuntimeView` accessors (`EnsureWeakPtrVectorCapacity`,
-   * `InsertWeakPtrVectorObjectAt`, `RemoveWeakPtrVectorObject`) rather than
-   * calling a shared helper.
-   */
-  template <class T>
-  [[nodiscard]] std::size_t
-  NormalizeWeakPtrVectorInsertIndex(const msvc8::vector<WeakPtr<T>>& weakVector, int index) noexcept
-  {
-    const auto& view = AsWeakPtrVectorRuntimeView(weakVector);
-    const std::size_t size = view.begin ? static_cast<std::size_t>(view.end - view.begin) : 0u;
-
-    int normalized = index;
-    if (normalized < 0) {
-      normalized += static_cast<int>(size) + 1;
-    }
-    if (normalized < 0) {
-      normalized = 0;
-    }
-
-    std::size_t result = static_cast<std::size_t>(normalized);
-    if (result > size) {
-      result = size;
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x008B2770 (FUN_008B2770, msvc8::vector<Moho::WeakPtr<UserUnit>>
-   * ::push_back's fast-path append -- the sibling emission of the grow lane
-   * described above (FUN_008B2B70); AddArmyAvatar's InsertWeakPtrVectorObjectAt
-   * call below covers this address's index==size() behavior byte-for-byte.
-   *
-   * Re-verified directly from FUN_008B2770.asm and FUN_008B2B70.asm (its
-   * general insert(pos,1,value), in-place/capacity-sufficient branch at
-   * loc_8B2D40) to resolve a divergence a prior pass flagged but did not fix:
-   *   - append (pos==end): both FUN_008B2770's fast path and FUN_008B2B70's
-   *     own tailCount==0 fallback construct the slot via FUN_008B39A0 -- an
-   *     unconditional 2-word write, no read of the slot's prior contents.
-   *   - mid-insert (pos!=end, tailCount>=1): FUN_008B3630 -> FUN_008B3D30
-   *     fill-*constructs* the freshly-grown tail slot begin[size] from
-   *     begin[size-1] (same no-read-before-write shape as FUN_008B39A0;
-   *     confirmed from FUN_008B3D30.asm -- `mov ecx,[edx]; mov [eax],ecx`
-   *     writes the destination unconditionally and never reads
-   *     [eax]/[eax+4] first). FUN_008B3660 -> FUN_008B3B90 then
-   *     back-shift-*assigns* [pos,size-1) into [pos+1,size) --
-   *     FUN_008B3B90.asm DOES read [eax-8] before decrementing/overwriting,
-   *     matching `AssignWeakPtrRangeBackward`'s detach-before-relink shape,
-   *     correctly, since those destinations are live elements, not raw
-   *     storage. FUN_008B3910 finally assigns the new value into the
-   *     vacated gap at pos, matching `AssignFillRange`'s single-element
-   *     read-before-write shape.
-   *
-   * The manual shift loop below used to run the read-before-write
-   * `ResetFromOwnerLinkSlot` on the newly-grown tail slot too (loop
-   * iteration i==size), and the final assign-into-clampedIndex line ran
-   * unconditionally even for the append case, where clampedIndex names that
-   * same uninitialized tail slot. Both are now split out as
-   * `FillConstructRange` calls to match FUN_008B39A0/FUN_008B3D30; the
-   * middle-shift loop and the mid-insert gap-assign already matched
-   * FUN_008B3B90/FUN_008B3910's read-before-write shape and are unchanged.
-   */
-  template <class T>
-  void InsertWeakPtrVectorObjectAt(
-    msvc8::vector<WeakPtr<T>>& weakVector, T* object, const std::size_t index
-  )
-  {
-    auto& view = AsWeakPtrVectorRuntimeView(weakVector);
-    const std::size_t size = view.begin ? static_cast<std::size_t>(view.end - view.begin) : 0u;
-    const std::size_t clampedIndex = index <= size ? index : size;
-
-    EnsureWeakPtrVectorCapacity(weakVector, size + 1u);
-
-    if (clampedIndex < size) {
-      // begin[size] is freshly-grown capacity, not a live element yet:
-      // fill-construct it from the current last element first (FUN_008B3D30
-      // shape), then back-shift-assign the rest into place (FUN_008B3B90
-      // shape, unchanged).
-      (void)WeakPtr<T>::FillConstructRange(view.begin + size, 1, view.begin[size - 1]);
-
-      for (std::size_t i = size - 1; i > clampedIndex; --i) {
-        view.begin[i].ResetFromOwnerLinkSlot(view.begin[i - 1].ownerLinkSlot);
-        view.begin[i - 1].ResetFromObject(nullptr);
-      }
-
-      // The vacated gap at clampedIndex is still a live (if logically
-      // superseded) element, so the new value is assigned into it,
-      // detaching whatever it was previously holding (FUN_008B3910 shape).
-      view.begin[clampedIndex].ResetFromObject(object);
-    } else {
-      // Appending at the end: begin[clampedIndex] (== begin[size]) is
-      // uninitialized capacity, so the new value is constructed directly,
-      // matching FUN_008B2770's fast path and FUN_008B2B70's own
-      // tailCount==0 fallback (both call FUN_008B39A0).
-      // Constructed in place rather than staged through a local node: a local
-      // would name `object`'s chain without ever being linked into it, and
-      // `~WeakPtr` (which unlinks) would then walk that chain for a node that
-      // is not there. The one-arg constructor is the same bind-then-link-at-head
-      // sequence `FillConstructRange` performs for a single lane.
-      ::new (static_cast<void*>(view.begin + clampedIndex)) WeakPtr<T>(object);
-    }
-
-    view.end = view.begin + size + 1u;
-  }
-
-  template <class T>
-  /**
-   * Address: 0x006EC170 (FUN_006EC170)
-   *
-   * What it does:
-   * Finds one weak-pointer lane in `[begin, end)` whose bound object pointer
-   * equals `object`, returning `end` when no match is present.
-   */
-  [[nodiscard]] WeakPtr<T>* FindWeakPtrObjectRange(
-    WeakPtr<T>* begin,
-    WeakPtr<T>* end,
-    const T* object
-  ) noexcept
-  {
-    for (WeakPtr<T>* cursor = begin; cursor != end; ++cursor) {
-      if (cursor->GetObjectPtr() == object) {
-        return cursor;
-      }
-    }
-    return end;
-  }
-
-  template <class T>
-  [[nodiscard]] bool RemoveWeakPtrVectorObject(msvc8::vector<WeakPtr<T>>& weakVector, const T* object)
-  {
-    if (!object) {
-      return false;
-    }
-
-    auto& view = AsWeakPtrVectorRuntimeView(weakVector);
-    const std::size_t size = view.begin ? static_cast<std::size_t>(view.end - view.begin) : 0u;
-    if (!view.begin || size == 0u) {
-      return false;
-    }
-
-    WeakPtr<T>* const match = FindWeakPtrObjectRange(view.begin, view.begin + size, object);
-    if (match == view.begin + size) {
-      return false;
-    }
-
-    const std::size_t index = static_cast<std::size_t>(match - view.begin);
-    view.begin[index].ResetFromObject(nullptr);
-    for (std::size_t j = index + 1; j < size; ++j) {
-        view.begin[j - 1].ResetFromOwnerLinkSlot(view.begin[j].ownerLinkSlot);
-        view.begin[j].ResetFromObject(nullptr);
-    }
-
-    view.end = view.begin + size - 1u;
-    return true;
-  }
-
-  /**
-   * Removes one intrusive weak-pointer entry from a contiguous weak-pointer container.
-   *
-   * The container is expected to expose `size()`, `operator[]`, and `pop_back()`
-   * with elements matching `WeakPtr<T>` semantics.
-   */
-  template <class TWeakVector>
-  void EraseWeakVectorEntry(TWeakVector& weakVector, const std::size_t index) noexcept
-  {
-    const std::size_t count = weakVector.size();
-    if (index >= count) {
-      return;
-    }
-
-    weakVector[index].ResetFromObject(nullptr);
-    for (std::size_t i = index + 1; i < count; ++i) {
-      weakVector[i - 1].ResetFromOwnerLinkSlot(weakVector[i].ownerLinkSlot);
-      weakVector[i].ResetFromObject(nullptr);
-    }
-    weakVector.pop_back();
-  }
 } // namespace moho

@@ -1035,37 +1035,35 @@ namespace
    * lanes whose weak reference has already gone stale and inserts before the
    * first surviving avatar that outranks the new unit, appending when none
    * does.
+   *
+   * Only `unit` is null-tested (0x008B231E). Each surviving avatar is compared
+   * with the unit's priority read afresh (0x008B2347..0x008B2375, signed `jg`);
+   * the hit is `insert(it, WeakPtr(unit))` (0x008B23D2), the fall-through
+   * `push_back(WeakPtr(unit))` (0x008B2429).
    */
   void AddArmyAvatar(UserArmy* const army, UserUnit* const unit)
   {
-    if (unit == nullptr || army == nullptr) {
+    if (unit == nullptr) {
       return;
     }
 
     const IUnit* const unitBridge = unit;
-    const RUnitBlueprint* const unitBlueprint = unitBridge->GetBlueprint();
-    if (unitBlueprint == nullptr) {
-      return;
-    }
-    const std::int32_t unitPriority = unitBlueprint->General.QuickSelectPriority;
-
     msvc8::vector<WeakPtr<UserUnit>>& avatars = army->mAvatars;
-    std::size_t insertIndex = avatars.size();
-    for (std::size_t index = 0; index < avatars.size(); ++index) {
-      UserUnit* const avatar = avatars[index].GetObjectPtr();
+    for (WeakPtr<UserUnit>* it = avatars.begin(); it != avatars.end(); ++it) {
+      const UserUnit* const avatar = it->GetObjectPtr();
       if (avatar == nullptr) {
         continue;
       }
 
+      const std::int32_t unitPriority = unitBridge->GetBlueprint()->General.QuickSelectPriority;
       const IUnit* const avatarBridge = avatar;
-      const RUnitBlueprint* const avatarBlueprint = avatarBridge->GetBlueprint();
-      if (avatarBlueprint != nullptr && avatarBlueprint->General.QuickSelectPriority > unitPriority) {
-        insertIndex = index;
-        break;
+      if (avatarBridge->GetBlueprint()->General.QuickSelectPriority > unitPriority) {
+        avatars.insert(it, WeakPtr<UserUnit>(unit));
+        return;
       }
     }
 
-    InsertWeakPtrVectorObjectAt(avatars, unit, insertIndex);
+    avatars.push_back(WeakPtr<UserUnit>(unit));
   }
 
   /**
