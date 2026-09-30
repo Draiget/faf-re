@@ -507,7 +507,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\net\INetConnection.cpp" />
     <ClCompile Include="moho\net\INetConnector.cpp" />
     <ClCompile Include="moho\net\INetDatagramSocket.cpp" />
-    <ClCompile Include="moho\net\INetNATTraversalHandler.cpp" />
     <ClCompile Include="moho\net\INetNATTraversalProvider.cpp" />
     <ClCompile Include="moho\render\RCamManager.cpp" />
     <ClCompile Include="moho\render\RangeRenderer.cpp" />

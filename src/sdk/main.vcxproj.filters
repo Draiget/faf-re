@@ -1482,9 +1482,6 @@
     <ClCompile Include="moho\net\ENetProtocolTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\net\INetNATTraversalHandler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\net\CNetUDPConnection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

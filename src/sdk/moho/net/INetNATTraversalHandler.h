@@ -45,9 +45,17 @@ namespace moho
      * Address: 0x00485A10 (FUN_00485A10)
      *
      * What it does:
-     * Initializes NAT traversal handler interface vtable lane.
+     * Restores the interface vftable (0x00E060C8). Non-virtual: the vftable
+     * holds only the two pure slots above. User-provided rather than
+     * `= default` because the binary keeps the vptr reset: `~CNetUDPConnector`
+     * inlines it on the base subobject at +0x04 (0x00489CBA), and the
+     * out-of-line copy is reached only from CNetUDPConnector's ctor/dtor EH
+     * unwind funclets (`mov eax,[ebp+4]; add eax,4; jmp 0x00485A10` at
+     * 0x00BB33D8, and 0x00B8999A). Unwind funclets only ever run destructors,
+     * so this is not the constructor; the constructor is implicit and
+     * inlined at every construction site.
      */
-    INetNATTraversalHandler();
+    ~INetNATTraversalHandler() {}
   };
 
   static_assert(sizeof(INetNATTraversalHandler) == 0x4, "INetNATTraversalHandler size must be 0x4");
