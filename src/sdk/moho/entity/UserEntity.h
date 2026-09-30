@@ -329,7 +329,7 @@ namespace moho
      * (`mRuntimeLinkHead` / `mRuntimeSelectionToken` / `mCachedAmbientSound`),
      * which is why the ambient loop had no way to be started: nothing could
      * form the `HSndEntityLoop*` the sound manager needs. They line up exactly:
-     * `~UserEntity` drains `mListLinkHead` at +0x30 as the tracking chain, the
+     * `~UserEntity` drains the handle's weak chain at +0x30, the
      * constructor seeds `mLoopIndex` at +0x34 with -1, and `UpdateEntityData`
      * refreshes `mParams` at +0x38 from the replicated ambient sound.
      */

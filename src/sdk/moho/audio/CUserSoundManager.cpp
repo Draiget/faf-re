@@ -51,7 +51,6 @@ namespace
 {
   using LoopNode = moho::TDatListItem<moho::HSound, void>;
   using LoopList = moho::TDatList<moho::HSound, void>;
-  using ListenerArmyHook = moho::ListenerArmyHook;
 
   constexpr int kXactErrCuePreparedOnly = static_cast<int>(0x8AC70008u);
   constexpr int kCueStatePlaying = 16;
@@ -299,64 +298,6 @@ namespace
     return node;
   }
 
-  [[nodiscard]] moho::SoundHandleRecord*& OwnerLoopHeadRef(moho::HSndEntityLoop& ownerHandle) noexcept
-  {
-    return *reinterpret_cast<moho::SoundHandleRecord**>(&ownerHandle.mListLinkHead);
-  }
-
-  void UnlinkRecordFromOwnerChain(moho::SoundHandleRecord* const record)
-  {
-    if (record == nullptr || record->mOwnerHandle == nullptr) {
-      if (record != nullptr) {
-        record->mOwnerNextInChain = nullptr;
-      }
-      return;
-    }
-
-    moho::HSndEntityLoop& ownerHandle = *record->mOwnerHandle;
-    moho::SoundHandleRecord** ownerSlot = &OwnerLoopHeadRef(ownerHandle);
-    while (*ownerSlot != record) {
-      if (*ownerSlot == nullptr) {
-        break;
-      }
-      ownerSlot = &(*ownerSlot)->mOwnerNextInChain;
-    }
-    if (*ownerSlot == record) {
-      *ownerSlot = record->mOwnerNextInChain;
-    }
-    record->mOwnerHandle = nullptr;
-    record->mOwnerNextInChain = nullptr;
-  }
-
-  /**
-   * Address: 0x008AA340 (FUN_008AA340)
-   *
-   * What it does:
-   * Initializes one loop-handle record and creates an empty tracked-entity
-   * set sentinel for that slot.
-   */
-  void InitializeSoundHandleRecordRuntime(moho::SoundHandleRecord* const record)
-  {
-    if (record == nullptr) {
-      return;
-    }
-
-    record->mOwnerHandle = nullptr;
-    record->mOwnerNextInChain = nullptr;
-    record->mCue = nullptr;
-    record->mParams = nullptr;
-    record->mAngleVariableIndex = 0xFFFFu;
-    record->mReserved12 = 0u;
-    record->mLoopIndex = -1;
-
-    // The record lives in raw pooled storage, so its set is constructed here
-    // rather than by a member initialiser -- the shipped body buys the header
-    // sentinel at exactly this point.
-    new (&record->mTrackedEntities) moho::TrackedEntitySet();
-
-    record->mPlayingSeconds = 0.0f;
-  }
-
   /**
    * Address: 0x008AE5D0 (FUN_008AE5D0)
    *
@@ -390,17 +331,7 @@ namespace
     record->mCue = cue;
     record->mAngleVariableIndex = cue != nullptr ? cue->GetVariableIndex(kAngleVariableName) : 0xFFFFu;
 
-    if (record->mOwnerHandle != ownerHandle) {
-      UnlinkRecordFromOwnerChain(record);
-      record->mOwnerHandle = ownerHandle;
-      if (ownerHandle != nullptr) {
-        moho::SoundHandleRecord*& ownerHead = OwnerLoopHeadRef(*ownerHandle);
-        record->mOwnerNextInChain = ownerHead;
-        ownerHead = record;
-      } else {
-        record->mOwnerNextInChain = nullptr;
-      }
-    }
+    record->mLoop.Set(ownerHandle);
 
     if (ownerHandle != nullptr) {
       record->mParams = ownerHandle->mParams;
@@ -416,98 +347,6 @@ namespace
         1L
       );
     }
-  }
-
-  /**
-   * Address: 0x008AECF0 (FUN_008AECF0, per-element SoundHandleRecord
-   * copy-with-splice from the mSoundHandles growth path)
-   *
-   * What it does:
-   * The binary spliced each copied record into its owner's chain head
-   * inline while deep-copying SoundHandleRecord during storage growth
-   * (called from FUN_008AEA40 / EnsureSoundHandleStorage). This helper
-   * reproduces the same final chain state in one aggregate pass after
-   * Resize(): clear every owner's chain head, then re-thread every
-   * record whose mOwnerHandle is non-null onto that head.
-   */
-  void RebuildSoundHandleOwnerChains(moho::CUserSoundManager* const manager)
-  {
-    if (manager == nullptr) {
-      return;
-    }
-
-    const std::size_t handleCount = manager->mSoundHandles.Size();
-
-    for (std::size_t handleIndex = 0; handleIndex < handleCount; ++handleIndex) {
-      moho::SoundHandleRecord& record = manager->mSoundHandles.start_[handleIndex];
-      if (record.mOwnerHandle != nullptr) {
-        OwnerLoopHeadRef(*record.mOwnerHandle) = nullptr;
-      }
-    }
-
-    for (std::size_t handleIndex = 0; handleIndex < handleCount; ++handleIndex) {
-      moho::SoundHandleRecord& record = manager->mSoundHandles.start_[handleIndex];
-      record.mOwnerNextInChain = nullptr;
-      if (record.mOwnerHandle != nullptr) {
-        moho::SoundHandleRecord*& ownerHead = OwnerLoopHeadRef(*record.mOwnerHandle);
-        record.mOwnerNextInChain = ownerHead;
-        ownerHead = &record;
-      }
-    }
-  }
-
-  // Forward declaration: `RefreshTrackedEntitySetAfterRelocation` is defined
-  // further below (next to `ReleaseSoundHandleRecordRuntime`, its sibling
-  // tree-lifecycle helper), but `EnsureSoundHandleStorage` calls it inside
-  // its grow-relocation loop, so the compiler needs to see the declaration
-  // first. Both live in the same anonymous namespace.
-  void RefreshTrackedEntitySetAfterRelocation(moho::SoundHandleRecord* record);
-
-  /**
-   * Address: 0x008AEA40 (FUN_008AEA40)
-   *
-   * What it does:
-   * Ensures sound-handle storage has at least `requiredCount` slots, creating
-   * new runtime-initialized records and rebuilding owner chains after moves.
-   *
-   * The real function is shaped like `gpg::fastvector_n<SoundHandleRecord,
-   * 256>::resize(requiredCount, prototype)` inlined into its one call site
-   * (grow-if-needed via `FUN_008AF760`, then construct every newly appended
-   * slot) -- see the Address: 0x008AF760 citation on
-   * `gpg::core::FastVectorN<T,N>::GrowInsert` (FastVector.h) for the grow
-   * lane this delegates to via `.Resize()`. When that grow lane actually
-   * reallocates, every pre-existing record needs
-   * `RefreshTrackedEntitySetAfterRelocation` (below) to match the binary's
-   * FUN_008AB160/FUN_008AEE40 per-relocated-record tree release-and-refresh;
-   * when growth stays within existing capacity (the common case), the binary
-   * never touches those records' trees at all, so the loop below is
-   * skipped entirely.
-   */
-  void EnsureSoundHandleStorage(moho::CUserSoundManager* const manager, const std::uint32_t requiredCount)
-  {
-    if (manager == nullptr) {
-      return;
-    }
-
-    const std::uint32_t currentCount = static_cast<std::uint32_t>(manager->mSoundHandles.Size());
-    if (requiredCount <= currentCount) {
-      return;
-    }
-
-    const bool willReallocate = requiredCount > static_cast<std::uint32_t>(manager->mSoundHandles.Capacity());
-
-    manager->mSoundHandles.Resize(requiredCount, moho::SoundHandleRecord{});
-
-    if (willReallocate) {
-      for (std::uint32_t index = 0; index < currentCount; ++index) {
-        RefreshTrackedEntitySetAfterRelocation(&manager->mSoundHandles.start_[index]);
-      }
-    }
-
-    for (std::uint32_t index = currentCount; index < requiredCount; ++index) {
-      InitializeSoundHandleRecordRuntime(&manager->mSoundHandles.start_[index]);
-    }
-    RebuildSoundHandleOwnerChains(manager);
   }
 
   /**
@@ -532,98 +371,6 @@ namespace
     const std::uint32_t next = idPool->mFreeIds.GetNext(0xFFFFFFFFu);
     (void)idPool->mFreeIds.Remove(next);
     return next;
-  }
-
-  // Forward declaration: `ReleaseSoundHandleRecordRuntime` is defined just
-  // below `ClearSoundHandleVector` for source ordering / readability, but
-  // `ClearSoundHandleVector` calls it inside its loop, so the compiler needs
-  // to see the declaration first. Both functions live in the same anonymous
-  // namespace and call no external code.
-  void ReleaseSoundHandleRecordRuntime(moho::SoundHandleRecord* record);
-
-  /**
-   * Address: 0x008AF710 (FUN_008AF710)
-   *
-   * What it does:
-   * Destroys every live `SoundHandleRecord` in one
-   * `gpg::fastvector_n<SoundHandleRecord, 256>` storage lane via
-   * `ReleaseSoundHandleRecordRuntime` (0x008AB160) and then returns the
-   * vector to its inline-buffer state: when the current `begin` does not
-   * match the inline-buffer anchor the heap storage is released via
-   * `operator delete[]` and `begin/end/capacity` rebind back to the
-   * inline buffer; when it already points at the inline buffer only the
-   * `end` lane is clamped to `begin`. Binary stride between records is
-   * `sizeof(SoundHandleRecord)=0x28`.
-   */
-  void ClearSoundHandleVector(gpg::fastvector_n<moho::SoundHandleRecord, 256>& soundHandles) noexcept
-  {
-    const std::size_t liveCount = soundHandles.Size();
-    for (std::size_t recordIndex = 0u; recordIndex < liveCount; ++recordIndex) {
-      ReleaseSoundHandleRecordRuntime(&soundHandles.start_[recordIndex]);
-    }
-    soundHandles.ResetStorageToInline();
-  }
-
-  /**
-   * Address: 0x008AB160 (FUN_008AB160)
-   *
-   * What it does:
-   * Releases one loop-handle record runtime tree storage and unlinks the
-   * record from its owner-chain slot.
-   */
-  void ReleaseSoundHandleRecordRuntime(moho::SoundHandleRecord* const record)
-  {
-    if (record == nullptr) {
-      return;
-    }
-
-    record->mTrackedEntities.~set();
-
-    UnlinkRecordFromOwnerChain(record);
-  }
-
-  /**
-   * Address: 0x008AB160 (FUN_008AB160, the per-relocated-record release call
-   * `FUN_008AF760` makes on each pre-existing record immediately after
-   * copying it into freshly grown `mSoundHandles` storage -- see the
-   * Address: 0x008AF760 citation on `gpg::core::FastVectorN<T,N>::GrowInsert`,
-   * FastVector.h)
-   * Address: 0x008AEE40 (FUN_008AEE40, reached through FUN_008AECF0's
-   * per-element copy for that same relocated record -- installs a fresh
-   * empty sentinel rather than carrying the old copy's tree forward; same
-   * self-referencing sentinel shape `InitializeSoundHandleRecordRuntime`
-   * already builds for brand-new slots)
-   *
-   * What it does:
-   * `GrowInsert`'s plain field copy leaves a relocated record's
-   * `mTrackedEntitySetHead` pointing at the SAME tree its old-storage origin
-   * owned (the pointer value is copied verbatim, not the tree). The binary
-   * does not carry that tree forward across a relocation: it frees the
-   * (now-shared) tree exactly once and gives the relocated copy a brand-new
-   * empty one. This reproduces that combined effect for one already-relocated
-   * record. Deliberately narrower than `ReleaseSoundHandleRecordRuntime` --
-   * it must NOT touch `mOwnerHandle`/`mOwnerNextInChain`, which the plain
-   * field copy already carried over correctly and which
-   * `RebuildSoundHandleOwnerChains` re-threads right after.
-   *
-   * Known gap: FUN_008AEE40's real body also ends with an unconditional call
-   * to `FUN_008AF580`, whose own two register-passed arguments are never
-   * loaded by FUN_008AEE40 immediately before that call (they are apparently
-   * already live from earlier context), so its effect could not be pinned
-   * down with confidence from this call site alone and is not reproduced
-   * here. It runs after every field this helper cares about is already
-   * correct, so it is not required for the fresh-sentinel/owner-chain
-   * behavior this helper restores; it is left as a documented gap rather than
-   * a guessed citation.
-   */
-  void RefreshTrackedEntitySetAfterRelocation(moho::SoundHandleRecord* const record)
-  {
-    if (record == nullptr) {
-      return;
-    }
-
-    record->mTrackedEntities.~set();
-    new (&record->mTrackedEntities) moho::TrackedEntitySet();
   }
 
   moho::HSound* LoopOwnerFromNode(LoopNode* node)
@@ -786,50 +533,6 @@ namespace
 
     const char* const xactMessage = moho::func_SoundErrorCodeToMsg(xactResult);
     gpg::Warnf("SND: Error playing cue %i on bank %i [%s]\nXACT: %s", cueId, bankId, bankName.c_str(), xactMessage);
-  }
-
-  void UnlinkArmyHook(ListenerArmyHook& hook)
-  {
-    if (hook.mOwnerAnchor == nullptr) {
-      hook.mNext = nullptr;
-      return;
-    }
-
-    auto** link = reinterpret_cast<ListenerArmyHook**>(hook.mOwnerAnchor);
-    ListenerArmyHook* node = *link;
-    while (node != &hook) {
-      link =
-        reinterpret_cast<ListenerArmyHook**>(reinterpret_cast<std::uint8_t*>(node) + offsetof(ListenerArmyHook, mNext));
-      node = *link;
-    }
-
-    *link = hook.mNext;
-    hook.mNext = nullptr;
-  }
-
-  /**
-   * Address: 0x008AEC20 (FUN_008AEC20, sub_8AEC20)
-   *
-   * What it does:
-   * Rebinds one listener-army intrusive hook to a new owner anchor and keeps
-   * the single-linked owner chain consistent across unlink/relink transitions.
-   */
-  void RelinkArmyHook(ListenerArmyHook& hook, moho::UserArmy* army)
-  {
-    auto* const newOwnerAnchor = static_cast<std::uintptr_t*>(moho::UserArmy::WeakLinkHeadOf(army));
-
-    if (hook.mOwnerAnchor == newOwnerAnchor) {
-      return;
-    }
-
-    UnlinkArmyHook(hook);
-    hook.mOwnerAnchor = newOwnerAnchor;
-
-    if (newOwnerAnchor != nullptr) {
-      auto** const head = reinterpret_cast<ListenerArmyHook**>(newOwnerAnchor);
-      hook.mNext = *head;
-      *head = &hook;
-    }
   }
 
   void EnsureSoundCounterStat(moho::StatItem*& slot, const char* const statPath)
@@ -1052,6 +755,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x008AA340 (FUN_008AA340)
+   *
+   * What it does:
+   * An idle slot; the angle index at +0x10 is left unwritten, as the binary
+   * leaves it.
+   */
+  SoundHandleRecord::SoundHandleRecord()
+    : mLoop()
+    , mCue(nullptr)
+    , mParams(nullptr)
+    , mLoopIndex(-1)
+    , mTrackedEntities()
+    , mPlayingSeconds(0.0f)
+  {}
+
+  /**
    * Address: 0x008AA800 (FUN_008AA800, ??0CUserSoundManager@Moho@@QAE@XZ)
    *
    * What it does:
@@ -1065,7 +784,6 @@ namespace moho
     , mReserved13C(0u)
     , mSoundHandles()
     , mPendingDestroyCues()
-    , mListenerArmyHook{nullptr, nullptr}
     , mActiveLoops()
     , mAmbientEngine()
     , mTutorialEngine()
@@ -1083,11 +801,7 @@ namespace moho
     , mActiveDuckingSounds(0)
     , mReserved2A34(0u)
   {
-    mSoundHandles.Resize(0x100u, SoundHandleRecord{});
-    const std::size_t handleCount = mSoundHandles.Size();
-    for (std::size_t handleIndex = 0; handleIndex < handleCount; ++handleIndex) {
-      InitializeSoundHandleRecordRuntime(&mSoundHandles.start_[handleIndex]);
-    }
+    mSoundHandles.resize(0x100u, SoundHandleRecord());
     snd_SpewSound = CFG_GetArgOption("/spewsound", 0, nullptr);
   }
 
@@ -1095,15 +809,13 @@ namespace moho
    * Address: 0x008AAA10 (FUN_008AAA10, ??1CUserSoundManager@Moho@@QAE@XZ)
    *
    * What it does:
-   * Detaches intrusive list/hook links before member-owned container teardown.
+   * Nothing of its own: the members go in reverse order, the duck and camera
+   * `CSndVar`s, the language tag, the three engines, `mActiveLoops`,
+   * `mListenerArmy` (the unguarded splice-out walk at 0x008AAB7F),
+   * `mPendingDestroyCues`, then `mSoundHandles` through its out-of-line
+   * destructor 0x008AF710 and the two id-pool vectors.
    */
-  CUserSoundManager::~CUserSoundManager()
-  {
-    UnlinkArmyHook(mListenerArmyHook);
-
-    mPendingDestroyCues.clear();
-    ClearSoundHandleVector(mSoundHandles);
-  }
+  CUserSoundManager::~CUserSoundManager() = default;
 
   /**
    * Address: 0x008AB220 (FUN_008AB220, ?USER_GetSound@Moho@@YAPAVIUserSoundManager@1@XZ)
@@ -1218,10 +930,10 @@ namespace moho
       record->mCue = nullptr;
     }
 
-    if (record->mOwnerHandle != nullptr) {
-      record->mOwnerHandle->mLoopIndex = -1;
-      UnlinkRecordFromOwnerChain(record);
+    if (HSndEntityLoop* const loop = record->mLoop.GetObjectPtr(); loop != nullptr) {
+      loop->mLoopIndex = -1;
     }
+    record->mLoop.UnlinkFromOwnerChain();
 
     if (gUserSoundManager != nullptr && record->mLoopIndex >= 0) {
       (void)gUserSoundManager->mLoopHandleIdPool.mFreeIds.Add(static_cast<std::uint32_t>(record->mLoopIndex));
@@ -1231,8 +943,6 @@ namespace moho
 
     record->mTrackedEntities.clear();
 
-    record->mAngleVariableIndex = 0xFFFFu;
-    record->mReserved12 = 0u;
     record->mPlayingSeconds = 0.0f;
 
     if (gEngineStatSoundActiveEntityLoops == nullptr) {
@@ -1675,7 +1385,7 @@ namespace moho
       if (expandedCount <= handleIndex) {
         expandedCount = handleIndex + 1u;
       }
-      EnsureSoundHandleStorage(this, expandedCount);
+      mSoundHandles.resize(expandedCount, SoundHandleRecord());
     }
 
     SoundHandleRecord& record = mSoundHandles.start_[handleIndex];
@@ -1724,7 +1434,7 @@ namespace moho
         if (expandedCount <= handleIndex) {
           expandedCount = handleIndex + 1u;
         }
-        EnsureSoundHandleStorage(this, expandedCount);
+        mSoundHandles.resize(expandedCount, SoundHandleRecord());
       }
 
       SoundHandleRecord& record = mSoundHandles.start_[handleIndex];
@@ -1916,7 +1626,7 @@ namespace moho
    */
   void CUserSoundManager::SetListenerArmy(UserArmy* listenerArmy)
   {
-    RelinkArmyHook(mListenerArmyHook, listenerArmy);
+    mListenerArmy.Set(listenerArmy);
   }
 
   /**
@@ -2257,7 +1967,7 @@ namespace moho
       reconMask = UserArmy::EReconGridMask::Fog;
     }
 
-    UserArmy* const listenerArmy = UserArmy::FromWeakLinkHead(mListenerArmyHook.mOwnerAnchor);
+    UserArmy* const listenerArmy = mListenerArmy.GetObjectPtr();
 
     if (listenerArmy == nullptr) {
       return EFilterType::Pass;

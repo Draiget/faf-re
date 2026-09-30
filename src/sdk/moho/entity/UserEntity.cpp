@@ -90,26 +90,6 @@ namespace
     out.reset(pose);
   }
 
-  // The same drain over the `void*` head lane an inline `HSndEntityLoop` keeps
-  // at +0x30. These nodes are the sound manager's tracking records, *not*
-  // selection weak-references: they only share the two-pointer shape
-  // (0x008B88A0's loop reads `[eax+4]` and clears both words). The record type
-  // has not been named yet, so the node stays the shape-only
-  // `TDatListItem<void, void>` the intrusive-link contract prescribes while an
-  // owner is still unidentified.
-  void ResetLinkChain(void*& head) noexcept
-  {
-    using SoundTrackingNode = moho::TDatListItem<void, void>;
-    auto* node = static_cast<SoundTrackingNode*>(head);
-    while (node) {
-      SoundTrackingNode* const next = node->mNext;
-      node->mPrev = nullptr;
-      node->mNext = nullptr;
-      node = next;
-    }
-    head = nullptr;
-  }
-
   /**
    * Drains one intrusive chain of selection weak-references, nulling both
    * words of every node. `~UserEntity` runs this over `mIUnitChainHead` at
@@ -243,7 +223,7 @@ namespace moho
     , mMeshInstance(nullptr)
     // The -1 seeds `HSndEntityLoop::mLoopIndex`: no ambient loop playing yet,
     // which is the condition CUserSoundManager tests before starting one.
-    , mAmbientLoop{nullptr, -1, nullptr}
+    , mAmbientLoop(nullptr)
     , mRumbleLoopHandle(nullptr)
     , mLastFocusDamageGameTick(-1000)
     , mParams(createParams)
@@ -296,7 +276,7 @@ namespace moho
     // (0x00560310) during standard C++ member destruction.
 
     // Matches the two intrusive-list teardown loops at +0x30 and +0x08.
-    ResetLinkChain(mAmbientLoop.mListLinkHead);
+    mAmbientLoop.DetachAllWeakReferences();
 
     if (mVisionHandle) {
       delete mVisionHandle;

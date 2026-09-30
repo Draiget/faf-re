@@ -160,7 +160,7 @@ namespace
    *   allocation. Read by `GetOrCreateSharedAmbientLoop` (0x004DF2B0) and
    *   0x008B85E0.
    */
-  moho::HSndEntityLoop gDefaultSharedAmbientLoop{nullptr, -1, nullptr};
+  moho::HSndEntityLoop gDefaultSharedAmbientLoop;
 
   struct CSndParamsTemp
   {
@@ -324,28 +324,6 @@ namespace
     temp.mLodCutoff.tidy(true, 0U);
     temp.mBank.tidy(true, 0U);
     temp.mCue1.tidy(true, 0U);
-  }
-
-  /**
-   * Address: 0x004DEB60 (FUN_004DEB60)
-   *
-   * What it does:
-   * Initializes one `HSndEntityLoop` lane as `{head=nullptr, index=-1,
-   * params=<input>}`.
-   */
-  [[nodiscard]] moho::HSndEntityLoop* InitializeSndEntityLoopHandle(
-    moho::HSndEntityLoop* const outHandle,
-    moho::CSndParams* const params
-  ) noexcept
-  {
-    if (outHandle == nullptr) {
-      return outHandle;
-    }
-
-    outHandle->mListLinkHead = nullptr;
-    outHandle->mLoopIndex = -1;
-    outHandle->mParams = params;
-    return outHandle;
   }
 
   [[nodiscard]] moho::CSndParams* FindCachedSndParamsByHashLocked(const moho::SParamKey& key, const std::uint32_t hash)
@@ -677,10 +655,7 @@ namespace
 
     // 0x0C bytes from `operator new`, then the three fields in order: no list
     // head, index -1, and the descriptor that keyed the entry.
-    auto* const loop = new moho::HSndEntityLoop();
-    loop->mListLinkHead = nullptr;
-    loop->mLoopIndex = -1;
-    loop->mParams = params;
+    auto* const loop = new moho::HSndEntityLoop(params);
     (void)gSharedAmbientLoopsByParams.insert({params, loop});
     return loop;
   }

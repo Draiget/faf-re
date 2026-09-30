@@ -175,6 +175,7 @@ namespace gpg::core
      * Address: 0x0092BE50 (FUN_0092BE50 -- `ConstructRangeForward` (`_Ucopy`, null-guarded byte copy) for the 1-byte `gpg::HaStar::Cluster::Edge` of `gpg::fastvector_n<Cluster::Edge, 50>` (`ClusterBuild`'s triangular edge table), emitted as a `this`-taking member (`ret 0xC`, `(first, last, dest)` order); callers 0x0092CCF0 (the reallocating insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      * Address: 0x00954250 (FUN_00954250 -- `ConstructRangeForward` for the `char` reachability flags of `gpg::fastvector_n<char, 12>` (`EraseUnconnectedNodes` 0x00954650, grown by `resize(n, 0)` 0x009545D0); the same null-guarded byte copy as 0x0092BE50 for a second instantiation, also a `this`-taking member (`ret 0xC`); callers 0x009543F0 (the reallocating insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      * Address: 0x0061CA20 (FUN_0061CA20 -- `ConstructRangeForward` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`: each non-null slot `WeakPtr`'s copy constructor, pushed onto its target's chain; the `_Ucopy` of the reallocating insert 0x0061C940. Formerly `CopyIntrusiveWeakRefRangeRelink`, removed 2026-09-30.)
+     * Address: 0x008AFB90 (FUN_008AFB90 -- `ConstructRangeForward` for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28): `if (dest) new (dest) SoundHandleRecord(*src)` per slot, the copy constructor 0x008AECF0 that pushes the new slot onto its loop handle's chain and copies the tracked-entity set; the three slices of the reallocating insert 0x008AF760. It was cited on the assignment lane, with the chain relink and the set copy modelled as passes after the grow (`RebuildSoundHandleOwnerChains`, `RefreshTrackedEntitySetAfterRelocation`, removed 2026-09-30); the second one emptied every relocated slot's set instead of copying it.)
      */
     template <class T>
     inline T* ConstructRangeForward(T* dest, const T* first, const T* const last)
@@ -579,6 +580,7 @@ namespace gpg::core
      * Address: 0x00954510 (FUN_00954510 -- `FastVector<T>::erase(first, last)` for a 12-char inline-backed lane; zero callers, unreachable; formerly `FastVectorN12CharEraseRange` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0092DAD0 (FUN_0092DAD0 -- `erase(first, last)` for `gpg::fastvector_n<gpg::HaStar::Cluster::Edge, 50>` (1-byte element): byte-copy the tail `[last, end_)` down to `first`, rebase `end_` (+0x04), return `first`, nothing when `first == last` -- the `erase(begin() + n, end())` shrink arm of `resize(n, value)` 0x0092E410; callers 0x0092E410; formerly `ShiftByteRangeLeftAndCommitEndRuntime` over a `ByteRangeStorageRuntime` overlay in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      * Address: 0x007F2DA0 (FUN_007F2DA0 -- `erase(first, last)` for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`): `WeakPtr::operator=` down over the gap, `~WeakPtr` over the vacated tail (0x007AF240); its one caller is `AssignFrom` 0x007F20E0's shrink arm; formerly `CameraFrustumUserEntityList::Erase`, removed 2026-09-30.)
+     * Address: 0x008AF2C0 (FUN_008AF2C0 -- `erase(first, last)` for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28), the shrink arm of `resize(n, value)` 0x008AEA40: assignment down over the gap, `~SoundHandleRecord` over the vacated tail.)
      */
     iterator erase(iterator first, iterator last)
     {
@@ -742,6 +744,7 @@ namespace gpg::core
      * Address: 0x0057E9D0 (FUN_0057E9D0 -- the destructor of `gpg::fastvector_n<Moho::CollisionResult, 10>`, the stack buffer every COGrid collision query fills; its 12 callers are the scope exits of those locals (`Sim::LocationIsFree`, `Projectile::CheckCollision`, `CUnitMotion::ProcessSurfaceCollisionFromLastMove`, ...). The FUN_00401DE0 body with `this` in ESI instead of ECX and the vector at +0x00; no element loop, `CollisionResult` being trivially destructible.)
      * Address: 0x00545280 (FUN_00545280 -- the FUN_00401DE0 body with `this` in ESI: the destructor of the `gpg::fastvector_n<unsigned int, 2>` at `+0x08` of `moho::BVIntSet` (`mWords`), i.e. the implicit `~ArmyLaunchInfo` / `~BVIntSet` of the 0x20-byte element of `msvc8::vector<moho::ArmyLaunchInfo>`; callers 0x00545130 (`uninit_fill_n`), 0x005454A0 / 0x005457A0 / 0x00545880 (the `uninit_copy_n` bodies' catch rollback loops, stride 0x20); formerly `ResetSwapBackedArrayRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      * Address: 0x006DF040 (FUN_006DF040 -- the same destructor body for the `gpg::fastvector_n<unsigned int, 2>` at `+0x10` of `moho::EntityCategorySet` (`mBits.mWords`), i.e. the implicit `~BVSet` of the 0x28-byte element of `msvc8::vector<moho::EntityCategorySet>`, `this` in ESI; callers 0x006DEA30 (`uninit_fill_n`), 0x006DFFF0 / 0x006E0400 (`uninit_copy_n`), 0x006E00A0 -- each a catch rollback loop, stride 0x28; formerly `ResetSwapBackedArrayRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x008AF710 (FUN_008AF710 -- the destructor of `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28): `~SoundHandleRecord` (0x008AB160) per slot, then the heap block freed and the lanes rebound to the inline window; callers `~CUserSoundManager` (0x008AABC7) and the constructor's unwind (0x008AA800). Formerly `ClearSoundHandleVector`, removed 2026-09-30.)
      */
     ~FastVectorInline()
     {
@@ -1645,6 +1648,7 @@ namespace gpg::core
      * Address: 0x00693140 (FUN_00693140 -- resize/fill for a 28-byte element (calling-convention bridge); Tail-thunk alias that forwards 28-byte repeated-fill lanes into the shared fill body.)
      * Address: 0x0064F7C0 (FUN_0064F7C0 -- resize/fill for a 52-byte element (calling-convention bridge); Tail-thunk alias that forwards 52-byte repeated-fill lanes into the shared fill body.)
      * Address: 0x0064FB10 (FUN_0064FB10 -- resize/fill for a 52-byte element; Writes one repeated 52-byte source lane into destination slots in `[destinationBegin, destinationEnd)`.)
+     * Address: 0x008AEA40 (FUN_008AEA40 -- `resize(n, value)` for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28): shrinking through `erase(begin() + n, end())` (0x008AF2C0), growing through the reallocating insert 0x008AF760 when full, then the copy constructor 0x008AECF0 per new slot. Callers `CUserSoundManager::CUserSoundManager` (0x008AA800, 256 slots), `StartRPCEntityLoop` (0x008ABCD0) and `StartEntityLoop` (0x008ABE90), each passing a default-constructed record. Formerly `EnsureSoundHandleStorage`, removed 2026-09-30.)
      */
     void Resize(size_t newSize, const T& fill = T{})
     {
@@ -2042,20 +2046,6 @@ namespace gpg::core
      * Address: 0x005774B0 (FUN_005774B0, the same body emitted a second time --
      * 36 instructions and 92 bytes each, identical mnemonics and the same call
      * target. This build did not fold identical COMDATs, so both survive.)
-     * Address: 0x008AFB90 (FUN_008AFB90, gpg::fastvector_n<moho::SoundHandleRecord,
-     * 256>'s per-element forward copy, called three times from `GrowInsert`'s
-     * FUN_008AF760 instantiation (see the citation there) for the
-     * `[start,pos)+[insStart,insEnd)+[pos,end)` slices. Per element the binary
-     * calls `FUN_008AECF0` (`if (dest) sub_8AECF0(source++, dest); ++dest;`) --
-     * a splice-into-owner-chain-head-and-reset-tracked-entity-tree copy, not a
-     * plain field copy. `RebuildSoundHandleOwnerChains` and
-     * `RefreshTrackedEntitySetAfterRelocation` (CUserSoundManager.cpp) already
-     * reproduce those two per-element effects as aggregate caller-side passes
-     * run once after the whole `.Resize()` completes, which is what makes this
-     * method's plain `*dest = *cur` shape the correct substrate here: it
-     * carries every other field (owner handle, cue, params, angle/loop index,
-     * playing-seconds) verbatim, exactly as the binary's per-element copy also
-     * does for those same fields.)
      * Address: 0x00762530 (FUN_00762530 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
      * Address: 0x0080ABE0 (FUN_0080ABE0 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
      * Address: 0x00693430 (FUN_00693430 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
@@ -2416,6 +2406,7 @@ namespace gpg::core
      * Address: 0x0056F100 (FUN_0056F100 -- the reallocating insert for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): three `_Ucopy` passes (0x0056F1F0) into the new block, destroy of the old range (0x0056D620) and the inline-capacity save.)
      * Address: 0x007AFBB0 (FUN_007AFBB0 -- the reallocating insert for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`), doubling (0x007AF0E0 `add edx, edx`); formerly `CameraFrustumUserEntityList::GrowAndInsertRange`, removed 2026-09-30.)
      * Address: 0x0061C940 (FUN_0061C940 -- the reallocating insert for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`: the three slices copy-constructed into the new block (0x0061CA20), the old range destroyed (0x0061CA70), then the old block freed or the inline capacity restamped. Formerly `GrowInsertIntrusiveWeakRef`, removed 2026-09-30.)
+     * Address: 0x008AF760 (FUN_008AF760 -- the reallocating insert for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28): `operator new(0x28 * capacity)`, the three slices copy-constructed through 0x008AFB90, `~SoundHandleRecord` (0x008AB160) over the old range (0x008AF7E2, stride 0x28), then the old block freed or the inline capacity restamped. Reached from `resize(n, value)` 0x008AEA40 with an empty insert at `start`.)
      */
     void GrowInsertDeepCopy(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
     {
@@ -2460,35 +2451,6 @@ namespace gpg::core
      * modern `GrowInsert` consolidates every per-type growth helper (see the
      * other addresses on this block) into one template, same as the other
      * lanes)
-     * Address: 0x008AF760 (FUN_008AF760, gpg::fastvector_n<moho::SoundHandleRecord,
-     * 256>::GrowInsert -- the 40-byte (0x28) `SoundHandleRecord` element lane
-     * reached from `FastVectorN::Resize`'s "Binary char lane grows through
-     * GrowInsert(start, size, start, start)" call, itself reached from
-     * `moho::EnsureSoundHandleStorage`'s `mSoundHandles.Resize(...)`
-     * (CUserSoundManager.cpp). Asm-verified against FUN_008AF760.asm: `operator
-     * new(40 * newCapacity)`, three `sub_8AFB90` (CopyRangeForward) calls for
-     * the `[start,pos)+[insStart,insEnd)+[pos,end)` slices -- always the
-     * degenerate zero-length-insert form at this call site, since `pos ==
-     * insStart == insEnd == start` -- then the inline-vs-heap old-buffer
-     * release (`+0x0C` origin compare, matching `originalVec_`/
-     * `SaveInlineCapacity_`) and the `start_`/`end_`/`capacity_` field swap.
-     * One divergence this template does not itself model: right after the
-     * copy, for every element carried over from the OLD range specifically
-     * (not the empty insert range), FUN_008AF760 also calls `FUN_008AB160`
-     * per relocated element (0x008AF7E2 loop, stride 0x28) before releasing
-     * the old buffer -- releasing the tracked-entity RB-tree each relocated
-     * `SoundHandleRecord` still shares (by raw pointer value) with its
-     * about-to-be-freed old-storage origin, and FUN_008AECF0/FUN_008AEE40
-     * (reached the same way for brand-new slots) install a fresh empty
-     * sentinel rather than carry the old tree forward. That is
-     * `SoundHandleRecord`-specific business logic, not generic vector
-     * mechanics, so it is NOT folded into this shared template (see RULE ONE,
-     * CLAUDE.md) -- it is modeled as the caller-side
-     * `RefreshTrackedEntitySetAfterRelocation` step `EnsureSoundHandleStorage`
-     * runs over `[0, currentCount)` whenever this grow lane actually fires
-     * (CUserSoundManager.cpp), the same "manager-level step wrapping the
-     * generic Resize() call" idiom that file already uses for
-     * `InitializeSoundHandleRecordRuntime` and `RebuildSoundHandleOwnerChains`.)
      *
      * What it does:
      * Allocates `newCapacity` elements and materializes

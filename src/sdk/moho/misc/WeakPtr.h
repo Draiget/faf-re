@@ -312,6 +312,11 @@ namespace moho
      *   0x00870E35 (`CUIWorldView::mSelectionDragger`, right after
      *   `NewSelectionDragger`). Formerly `BindWorldViewOverlayDragger` in
      *   moho/ui/UiRuntimeTypes.cpp, removed 2026-09-25.)
+     * Address: 0x008AEC20 (FUN_008AEC20 -- the `WeakPtr<UserArmy>` emission
+     *   (the army's chain head at +0x1E0); caller
+     *   `CUserSoundManager::SetListenerArmy` (`mListenerArmy`). Formerly
+     *   `RelinkArmyHook` over a `ListenerArmyHook` look-alike in
+     *   moho/audio/CUserSoundManager.cpp, removed 2026-09-30.)
      *
      * All three share `function_sha256` 5c93862d...: one 70-byte body,
      * emitted once per owner type.

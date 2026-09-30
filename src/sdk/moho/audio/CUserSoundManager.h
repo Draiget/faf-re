@@ -11,6 +11,7 @@
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "moho/audio/CSndParams.h"
+#include "moho/misc/WeakPtr.h"
 #include "moho/audio/CSndVar.h"
 #include "moho/audio/HSound.h"
 #include "moho/audio/IUserSoundManager.h"
@@ -49,23 +50,45 @@ namespace moho
 
   static_assert(sizeof(TrackedEntitySet) == 0x0C, "TrackedEntitySet size must be 0x0C");
 
+  /**
+   * One looping-sound slot of `CUserSoundManager::mSoundHandles`.
+   *
+   * The copy constructor and destructor are the implicit ones:
+   *
+   * Address: 0x008AECF0 (FUN_008AECF0 -- the copy constructor: `mLoop`'s
+   *   `WeakPtr` copy pushes the new slot onto the handle's chain, the cue,
+   *   params, the 16-bit angle index and the loop index are copied (the two
+   *   bytes at +0x12 are padding and are not), `mTrackedEntities` is
+   *   copy-constructed (0x008AEE40: a fresh head, then `_Copy` 0x008AF580) and
+   *   the float follows. Reached per element from `ConstructRangeForward`
+   *   0x008AFB90 and from `resize(n, value)` 0x008AEA40.)
+   * Address: 0x008AB160 (FUN_008AB160 -- the destructor: `mTrackedEntities`
+   *   (erase 0x008AF4C0, free the head) and then `mLoop` (the unguarded
+   *   splice-out walk), in reverse declaration order. Reached from the
+   *   vector's range teardown and from every temporary record.)
+   */
   struct SoundHandleRecord
   {
-    HSndEntityLoop* mOwnerHandle = nullptr;         // +0x00 (shared-ambient owner lane)
-    SoundHandleRecord* mOwnerNextInChain = nullptr; // +0x04
-    IXACTCue* mCue = nullptr;                       // +0x08
-    CSndParams* mParams = nullptr;                  // +0x0C
-    std::uint16_t mAngleVariableIndex = 0xFFFFu;    // +0x10 (0xFFFF => no angle variable)
-    std::uint16_t mReserved12 = 0u;                 // +0x12
-    std::int32_t mLoopIndex = -1;                   // +0x14 (-1 when inactive)
-    TrackedEntitySet mTrackedEntities;              // +0x18
-    float mPlayingSeconds = 0.0f;                   // +0x24
-  };
+    /**
+     * Address: 0x008AA340 (FUN_008AA340)
+     *
+     * What it does:
+     * An idle slot: no loop, no cue, no params, loop index -1, an empty
+     * tracked-entity set and zero playing time. The angle index at +0x10 is
+     * not written; `BindSoundHandleRecordRuntime` sets it when the slot starts
+     * playing. Callers build the prototype `resize` copies into new slots:
+     * `CUserSoundManager::CUserSoundManager` (0x008AA800), `StartRPCEntityLoop`
+     * (0x008ABCD0) and `StartEntityLoop` (0x008ABE90).
+     */
+    SoundHandleRecord();
 
-  struct ListenerArmyHook
-  {
-    std::uintptr_t* mOwnerAnchor; // +0x00 (points to UserArmy + 0x1E0 slot)
-    ListenerArmyHook* mNext;      // +0x04
+    WeakPtr<HSndEntityLoop> mLoop;     // +0x00 (the handle this slot plays for)
+    IXACTCue* mCue;                    // +0x08
+    CSndParams* mParams;               // +0x0C
+    std::uint16_t mAngleVariableIndex; // +0x10 (0xFFFF => no angle variable)
+    std::int32_t mLoopIndex;           // +0x14 (-1 when inactive)
+    TrackedEntitySet mTrackedEntities; // +0x18
+    float mPlayingSeconds;             // +0x24
   };
 
   static_assert(sizeof(SoundHandleIdPool) == 0x24, "SoundHandleIdPool size must be 0x24");
@@ -73,13 +96,7 @@ namespace moho
   static_assert(offsetof(SoundHandleIdPool, mNextId) == 0x20, "SoundHandleIdPool::mNextId offset must be 0x20");
 
   static_assert(sizeof(SoundHandleRecord) == 0x28, "SoundHandleRecord size must be 0x28");
-  static_assert(
-    offsetof(SoundHandleRecord, mOwnerHandle) == 0x00, "SoundHandleRecord::mOwnerHandle offset must be 0x00"
-  );
-  static_assert(
-    offsetof(SoundHandleRecord, mOwnerNextInChain) == 0x04,
-    "SoundHandleRecord::mOwnerNextInChain offset must be 0x04"
-  );
+  static_assert(offsetof(SoundHandleRecord, mLoop) == 0x00, "SoundHandleRecord::mLoop offset must be 0x00");
   static_assert(offsetof(SoundHandleRecord, mCue) == 0x08, "SoundHandleRecord::mCue offset must be 0x08");
   static_assert(offsetof(SoundHandleRecord, mParams) == 0x0C, "SoundHandleRecord::mParams offset must be 0x0C");
   static_assert(
@@ -95,7 +112,6 @@ namespace moho
     offsetof(SoundHandleRecord, mPlayingSeconds) == 0x24, "SoundHandleRecord::mPlayingSeconds offset must be 0x24"
   );
 
-  static_assert(sizeof(ListenerArmyHook) == 0x08, "ListenerArmyHook size must be 0x08");
   static_assert(sizeof(msvc8::set<IXACTCue*>) == 0x0C, "msvc8::set<IXACTCue*> size must be 0x0C");
 
   /**
@@ -403,7 +419,7 @@ namespace moho
     gpg::fastvector_n<SoundHandleRecord, 256> mSoundHandles; // +0x140
 
     msvc8::set<IXACTCue*> mPendingDestroyCues; // +0x2950
-    ListenerArmyHook mListenerArmyHook;        // +0x295C
+    WeakPtr<UserArmy> mListenerArmy;           // +0x295C (the army whose recon filters positional sounds)
     TDatList<HSound, void> mActiveLoops;       // +0x2964
 
     boost::shared_ptr<AudioEngine> mAmbientEngine;  // +0x296C
@@ -439,8 +455,8 @@ namespace moho
     "CUserSoundManager::mPendingDestroyCues offset must be 0x2950"
   );
   static_assert(
-    offsetof(CUserSoundManager, mListenerArmyHook) == 0x295C,
-    "CUserSoundManager::mListenerArmyHook offset must be 0x295C"
+    offsetof(CUserSoundManager, mListenerArmy) == 0x295C,
+    "CUserSoundManager::mListenerArmy offset must be 0x295C"
   );
   static_assert(
     offsetof(CUserSoundManager, mActiveLoops) == 0x2964, "CUserSoundManager::mActiveLoops offset must be 0x2964"

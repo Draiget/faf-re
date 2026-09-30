@@ -7,6 +7,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
 #include "moho/audio/CSndVar.h"
+#include "moho/misc/WeakObject.h"
 
 struct lua_State;
 
@@ -32,20 +33,41 @@ namespace moho
   class CSndParams;
 
   /**
-   * Shared ambient-loop handle lane used to bind one `CSndParams` descriptor to
-   * one loop-tracking record.
+   * The handle an entity (or the shared ambient cache) holds for one looping
+   * sound: which `CSndParams` it plays and which `CUserSoundManager` slot is
+   * playing it.
+   *
+   * The slot's `SoundHandleRecord::mLoop` is a `WeakPtr` to this handle, so the
+   * handle is a `WeakObject`: its chain head is the word at +0x00, which
+   * `~UserEntity` drains for the handle it embeds at +0x30 (0x008B88A0) and
+   * `SND_DestroyEntityLoop` walks to unlink the record (0x008AA6C4).
    *
    * Layout recovered from FUN_004DF2B0 (`func_GetSndLoop`) and
    * FUN_004E0140 (`SND_GetSharedAmbientHandle`) allocation and field stores.
    */
-  struct HSndEntityLoop
+  struct HSndEntityLoop : WeakObject
   {
-    void* mListLinkHead;     // +0x00
-    std::int32_t mLoopIndex; // +0x04
+    /**
+     * Address: 0x004DEB60 (FUN_004DEB60)
+     *
+     * What it does:
+     * `{chain head = 0, loop index = -1, params}`: this in EAX, `params` in
+     * ECX. Every construction inlines it -- `func_GetSndLoop`'s `new`
+     * (0x004DF2B0), the default shared handle the audio constructor group
+     * builds (0x004DFD54..0x004DFD64) and `UserEntity`'s ambient loop
+     * (0x008B85E0) -- so this out-of-line copy has no caller.
+     */
+    explicit HSndEntityLoop(CSndParams* const params = nullptr) noexcept
+      : WeakObject()
+      , mLoopIndex(-1)
+      , mParams(params)
+    {}
+
+    std::int32_t mLoopIndex; // +0x04 (the playing `SoundHandleRecord` slot, -1 when none)
     CSndParams* mParams;     // +0x08
   };
 
-  static_assert(offsetof(HSndEntityLoop, mListLinkHead) == 0x00, "HSndEntityLoop::mListLinkHead offset must be 0x00");
+  static_assert(offsetof(HSndEntityLoop, weakLinkHead_) == 0x00, "HSndEntityLoop's weak chain head must be at 0x00");
   static_assert(offsetof(HSndEntityLoop, mLoopIndex) == 0x04, "HSndEntityLoop::mLoopIndex offset must be 0x04");
   static_assert(offsetof(HSndEntityLoop, mParams) == 0x08, "HSndEntityLoop::mParams offset must be 0x08");
   static_assert(sizeof(HSndEntityLoop) == 0x0C, "HSndEntityLoop size must be 0x0C");

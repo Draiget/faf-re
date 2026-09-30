@@ -1894,6 +1894,7 @@ namespace msvc8
              * source path -- both wrong: it is the copy constructor, not the
              * default constructor, and its real citation is this one.
              * Address: 0x0056CC50 (FUN_0056CC50 -- the copy constructor for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `SOffsetInfo`'s implicit copy constructor (0x0056CAA0), i.e. `mOffsetInfo[layer].push_back(group)` in `CFormationInstance::RunScript`.)
+             * Address: 0x008AEE40 (FUN_008AEE40 -- the copy constructor for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, colour/nil at +0x10/+0x11): `buy_head` (0x008AFAC0), isNil=1, three self-links, size zero, then `_Copy` 0x008AF580; the catch `_Erase`s what was built (0x008AF1C0) and rethrows. Reached from `SoundHandleRecord`'s implicit copy constructor 0x008AECF0. It was cited on `RefreshTrackedEntitySetAfterRelocation`, which built the empty head and never copied, removed 2026-09-30.)
              */
             rb_tree(const rb_tree& other)
                 : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
@@ -7769,6 +7770,8 @@ namespace msvc8
              * at; flagged for whoever picks up `FUN_00530EE0`/`FUN_007CC3B0`/
              * `FUN_007B4980` next.
              * Address: 0x0056EC00 (FUN_0056EC00 -- the tail of `_Copy` (root/size copied, leftmost/rightmost recomputed; nil byte at node+0x41); callers 0x0056CC50, 0x00573270, 0x00573390; formerly `CopyMapHeaderAndExtremaFlag65Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008AF580 (FUN_008AF580 -- `_Copy(right)` for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, colour/nil at +0x10/+0x11): the root cloned by the recursive node copy 0x008AFA10, the size taken over, then the leftmost and rightmost walks; caller the copy constructor 0x008AEE40. It was tagged `external_dependency`.)
+             * Address: 0x008AFA10 (FUN_008AFA10 -- the recursive node clone `_Copy(node, parent)` for the same set; caller 0x008AF580. It was tagged `external_dependency`.)
              */
             void copy_from(const rb_tree& other)
             {
