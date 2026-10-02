@@ -29,7 +29,12 @@ namespace
   }
 
   /**
-   * Address: 0x00BF23C0 (FUN_00BF23C0, atexit destructor of the RBlueprintTypeInfo object)
+   * Address: 0x00BF23C0 (FUN_00BF23C0, atexit destructor of the
+   *   RBlueprintTypeInfo object)
+   *
+   * What it does:
+   * Destroys the function-local `RBlueprintTypeInfo` static this accessor
+   * owns, at process exit.
    */
   [[nodiscard]] TypeInfo& AcquireRBlueprintTypeInfo()
   {
