@@ -1826,7 +1826,7 @@ namespace moho
     mBoundedProps.PopAt(heapIndex);
   }
 
-  void EntityDB::RegisterEntitySet(SEntitySetTemplateUnit& set) noexcept
+  void EntityDB::RegisterEntitySet(EntitySetTemplate<Unit>& set) noexcept
   {
     set.ListLinkBefore(&mRegisteredEntitySets);
   }

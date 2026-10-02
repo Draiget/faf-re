@@ -7,6 +7,7 @@
 #include "moho/entity/Entity.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -132,3 +133,25 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_UnitSetTypeInfo_a8678e, moho::register_UnitSetTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<EntitySetTemplate<Unit>>`, vtable 0x00E2D7EC.
+   *
+   * Address: 0x00BD8480 (FUN_00BD8480 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFE450 (FUN_00BFE450 -- the global's destructor.)
+   * Address: 0x006D2A80 (FUN_006D2A80 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x006D2D90 (FUN_006D2D90 -- `Init`.)
+   * Address: 0x006D2A00 (FUN_006D2A00 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x006D2A40 (FUN_006D2A40 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct UnitSetSerializer : gpg::SerSaveLoadHelper<EntitySetTemplate<Unit>>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B75D4 -- process-global `UnitSetSerializer` singleton.
+  moho::UnitSetSerializer gUnitSetSerializer;
+} // namespace

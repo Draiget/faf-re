@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "moho/path/SNavGoal.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/task/CCommandTask.h"
 
 namespace gpg
@@ -15,7 +15,8 @@ namespace gpg
 
 namespace moho
 {
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
 
   /**
    * Task lane used for carrier unit launch command flow.
@@ -42,7 +43,7 @@ namespace moho
      * launch-goal state, collects candidate carried units, and links the set
      * into the simulation registered-set lane.
      */
-    CUnitCarrierLaunch(CCommandTask* parentTask, const SNavGoal& launchGoal, const SEntitySetTemplateUnit& commandUnits);
+    CUnitCarrierLaunch(CCommandTask* parentTask, const SNavGoal& launchGoal, const EntitySetTemplate<Unit>& commandUnits);
 
     /**
      * Address: 0x00606F90 (FUN_00606F90, Moho::CUnitCarrierLaunch::~CUnitCarrierLaunch)
@@ -63,7 +64,7 @@ namespace moho
     static CUnitCarrierLaunch* Create(
       CCommandTask* parentTask,
       const SNavGoal* launchGoal,
-      const SEntitySetTemplateUnit* commandUnits
+      const EntitySetTemplate<Unit>* commandUnits
     );
 
     /**
@@ -96,7 +97,7 @@ namespace moho
     SNavGoal mLaunchGoal;                 // 0x30
     bool mHasCarrierTransportedUnit;      // 0x54
     std::uint8_t mPad55[0x03];            // 0x55
-    SEntitySetTemplateUnit mCarriedUnits; // 0x58
+    EntitySetTemplate<Unit> mCarriedUnits; // 0x58
   };
 
   static_assert(sizeof(CUnitCarrierLaunch) == 0x80, "CUnitCarrierLaunch size must be 0x80");

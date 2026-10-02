@@ -19,7 +19,8 @@ namespace moho
 {
   class Entity;
   class EntitySetBase;
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
   struct BVIntSetAddResult;
   class Prop;
   class CArmyImpl;
@@ -358,7 +359,7 @@ namespace moho
      * What it does:
      * Registers one intrusive entity-set node in the DB-owned set registry.
      */
-    void RegisterEntitySet(SEntitySetTemplateUnit& set) noexcept;
+    void RegisterEntitySet(EntitySetTemplate<Unit>& set) noexcept;
 
     /**
      * What it does:

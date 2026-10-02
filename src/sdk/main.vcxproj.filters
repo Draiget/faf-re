@@ -375,9 +375,6 @@
     <ClCompile Include="moho\sim\IArmyTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\sim\ArmyUnitSet.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\sim\ArmyUnitSetVectorReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -706,9 +703,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\serialization\CWeaponAttributesTypeInfo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\serialization\WeakUnitSetSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\serialization\WeakUnitSetTypeInfo.cpp">
@@ -1192,9 +1186,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\core\Unit.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\unit\core\UnitSetSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\core\UnitSetTypeInfo.cpp">
@@ -2790,9 +2781,6 @@
     <ClInclude Include="moho\serialization\CWeaponAttributesTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\serialization\WeakUnitSetSerializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\serialization\WeakUnitSetTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3934,9 +3922,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\core\Unit.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\unit\core\UnitSetSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\core\UnitSetTypeInfo.h">
@@ -5586,9 +5571,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\serialization\typeinfo\SBuildReserveInfoTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\sim\ArmyUnitSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\BlueprintLoaderContext.h">

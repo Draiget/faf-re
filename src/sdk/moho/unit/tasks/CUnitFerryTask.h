@@ -19,7 +19,8 @@ namespace moho
 {
   class CUnitCommand;
   class IAiCommandDispatchImpl;
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
   class Unit;
 
   /**
@@ -93,7 +94,7 @@ namespace moho
      * that this ferry can carry and has space for, and whose focus entity
      * matches this task's beacon (or ferry factory when no beacon is bound).
      */
-    void FilterTransportableUnits(SEntitySetTemplateUnit& outUnits);
+    void FilterTransportableUnits(EntitySetTemplate<Unit>& outUnits);
 
     /**
      * Address: 0x0060E7E0 (FUN_0060E7E0, Moho::CUnitFerryTask::HasNewUnit)

@@ -1033,9 +1033,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\unit\CUnitCommandQueue.cpp" />
     <ClCompile Include="moho\unit\CUnitMotionTypeInfo.cpp" />
     <ClCompile Include="moho\unit\core\UnitSetTypeInfo.cpp" />
-    <ClCompile Include="moho\unit\core\UnitSetSerializer.cpp" />
     <ClCompile Include="moho\serialization\WeakUnitSetTypeInfo.cpp" />
-    <ClCompile Include="moho\serialization\WeakUnitSetSerializer.cpp" />
     <ClCompile Include="moho\serialization\CWeaponAttributesTypeInfo.cpp" />
     <ClCompile Include="moho\serialization\CWeaponAttributesSerializer.cpp" />
     <ClCompile Include="moho\serialization\SBlackListInfoTypeInfo.cpp" />
@@ -1269,7 +1267,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     </ClCompile>
     <ClCompile Include="moho\misc\CSaveGameRequestImpl.cpp" />
     <ClCompile Include="moho\script\ScriptedDecalTypeInfo.cpp" />
-    <ClCompile Include="moho\sim\ArmyUnitSet.cpp" />
     <ClCompile Include="moho\script\ScriptedDecal.cpp" />
     <ClCompile Include="moho\serialization\SSavedGameArmyInfo.cpp" />
     <ClCompile Include="moho\serialization\SSavedGameHeader.cpp" />
@@ -1446,7 +1443,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\serialization\CPrefetchSet.h" />
     <ClInclude Include="moho\serialization\CFireWeaponTaskTypeInfo.h" />
     <ClInclude Include="moho\serialization\CWeaponAttributesTypeInfo.h" />
-    <ClInclude Include="moho\serialization\WeakUnitSetSerializer.h" />
     <ClInclude Include="moho\serialization\WeakUnitSetTypeInfo.h" />
     <ClInclude Include="moho\serialization\SBlackListInfo.h" />
     <ClInclude Include="moho\serialization\SBlackListInfoTypeInfo.h" />
@@ -2334,7 +2330,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\unit\core\RDebugWeapons.h" />
     <ClInclude Include="moho\unit\core\RDebugWeaponsTypeInfo.h" />
     <ClInclude Include="moho\unit\core\Unit.h" />
-    <ClInclude Include="moho\unit\core\UnitSetSerializer.h" />
     <ClInclude Include="moho\unit\core\UnitSetTypeInfo.h" />
     <ClInclude Include="moho\unit\core\UnitTypeInfo.h" />
     <ClInclude Include="moho\unit\core\UnitWeakPtrReflection.h" />
@@ -2483,7 +2478,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\serialization\SavedGameFileHeader.h" />
     <ClInclude Include="moho\serialization\typeinfo\ECompareTypeTypeInfo.h" />
     <ClInclude Include="moho\serialization\typeinfo\SBuildReserveInfoTypeInfo.h" />
-    <ClInclude Include="moho\sim\ArmyUnitSet.h" />
     <ClInclude Include="moho\sim\BlueprintLoaderContext.h" />
     <ClInclude Include="moho\sim\CBackgroundTaskControl.h" />
     <ClInclude Include="moho\sim\CSimArmyEconomyInfo.h" />

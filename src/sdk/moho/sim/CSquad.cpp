@@ -107,7 +107,7 @@ namespace moho
    * The fastvector and string members destruct in declaration order; this
    * destructor only needs to clear the category vector and unlink the
    * intrusive unit-set node. The compiler-generated member dtors handle
-   * `mUnits.mVec`, `mName`, and `mCats` heap teardown via `~SEntitySetTemplateUnit`,
+   * `mUnits.mVec`, `mName`, and `mCats` heap teardown via `~EntitySetTemplate<Unit>`,
    * `~msvc8::string`, and `~msvc8::vector` respectively.
    */
   CSquad::~CSquad() = default;
@@ -192,7 +192,7 @@ namespace moho
    * What it does:
    * Removes each unit of `units` from this squad.
    */
-  void CSquad::RemoveUnits(const SEntitySetTemplateUnit& units)
+  void CSquad::RemoveUnits(const EntitySetTemplate<Unit>& units)
   {
     for (Entity* const entity : units.mVec) {
       RemoveUnit(static_cast<Unit*>(entity));
@@ -210,7 +210,7 @@ namespace moho
   {
     int count = 0;
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      Unit* const unit = static_cast<Unit*>(*slot);
       if (unit == nullptr || unit->IsDead() || unit->DestroyQueued() || unit->IsBeingBuilt()) {
         continue;
       }
@@ -235,7 +235,7 @@ namespace moho
   {
     int count = 0;
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      Unit* const unit = static_cast<Unit*>(*slot);
       if (unit == nullptr || unit->IsDead() || unit->DestroyQueued() || unit->IsBeingBuilt()) {
         continue;
       }
@@ -264,7 +264,7 @@ namespace moho
     Entity* const targetEntity = target != nullptr ? static_cast<Entity*>(target) : nullptr;
 
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      Unit* const unit = static_cast<Unit*>(*slot);
       if (unit == nullptr || unit->IsDead()) {
         continue;
       }
@@ -287,7 +287,7 @@ namespace moho
   bool CSquad::HasUnitWithState(const EUnitState state) const
   {
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      Unit* const unit = static_cast<Unit*>(*slot);
       if (unit == nullptr || unit->IsDead()) {
         continue;
       }
@@ -372,11 +372,11 @@ namespace moho
    * against `blueprintId` and adds them to `outUnits` until `maxCount`
    * matches have been collected.
    */
-  void CSquad::AppendUnitsWithBP(const char* const blueprintId, const int maxCount, SEntitySetTemplateUnit& outUnits)
+  void CSquad::AppendUnitsWithBP(const char* const blueprintId, const int maxCount, EntitySetTemplate<Unit>& outUnits)
   {
     int matchCount = 0;
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      Unit* const unit = static_cast<Unit*>(*slot);
       if (unit == nullptr || unit->IsDead() || unit->DestroyQueued() || unit->IsBeingBuilt()) {
         continue;
       }
@@ -387,7 +387,7 @@ namespace moho
         continue;
       }
 
-      (void)outUnits.AddUnit(unit);
+      (void)outUnits.Add(unit);
       if (++matchCount >= maxCount) {
         break;
       }
@@ -410,12 +410,12 @@ namespace moho
    * `categorySet` until `maxCount` accepted units have been added.
    */
   void CSquad::AppendUnitsInCategory(
-    const EntityCategorySet* const categorySet, const int maxCount, SEntitySetTemplateUnit& outUnits
+    const EntityCategorySet* const categorySet, const int maxCount, EntitySetTemplate<Unit>& outUnits
   )
   {
     int matchCount = 0;
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      Unit* const unit = static_cast<Unit*>(*slot);
       if (unit == nullptr || unit->IsDead() || unit->DestroyQueued() || unit->IsBeingBuilt()) {
         continue;
       }
@@ -425,7 +425,7 @@ namespace moho
         continue;
       }
 
-      (void)outUnits.AddUnit(unit);
+      (void)outUnits.Add(unit);
       if (++matchCount >= maxCount) {
         return;
       }
@@ -448,7 +448,7 @@ namespace moho
     COGrid* const occupancyGrid = mSim->mOGrid;
 
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      Unit* const unit = static_cast<Unit*>(*slot);
       if (unit == nullptr || unit->IsDead()) {
         continue;
       }
@@ -534,7 +534,7 @@ namespace moho
     }
 
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      Unit* const unit = static_cast<Unit*>(*slot);
       const Wm3::Vec3f& unitPosition = unit->GetPosition();
       outPos->x += unitPosition.x;
       outPos->y += unitPosition.y;

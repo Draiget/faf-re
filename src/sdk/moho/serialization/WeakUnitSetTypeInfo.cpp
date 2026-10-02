@@ -7,6 +7,7 @@
 #include "moho/entity/Entity.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace
 {
@@ -132,3 +133,25 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_WeakUnitSetTypeInfo_72e330, moho::register_WeakUnitSetTypeInfo)
+
+namespace moho
+{
+  /**
+   * `gpg::SerSaveLoadHelper<WeakEntitySetTemplate<Unit>>`, vtable 0x00E2D82C.
+   *
+   * Address: 0x00BD84E0 (FUN_00BD84E0 -- constructs the global and registers its destructor.)
+   * Address: 0x00BFE4E0 (FUN_00BFE4E0 -- the global's destructor.)
+   * Address: 0x006D2CD0 (FUN_006D2CD0 -- an unreferenced out-of-line copy of the constructor.)
+   * Address: 0x006D2E30 (FUN_006D2E30 -- `Init`.)
+   * Address: 0x006D2C50 (FUN_006D2C50 -- `Deserialize`, `MemberDeserialize` inlined.)
+   * Address: 0x006D2C90 (FUN_006D2C90 -- `Serialize`, `MemberSerialize` inlined.)
+   */
+  struct WeakUnitSetSerializer : gpg::SerSaveLoadHelper<WeakEntitySetTemplate<Unit>>
+  {};
+} // namespace moho
+
+namespace
+{
+  // Address: 0x010B76B8 -- process-global `WeakUnitSetSerializer` singleton.
+  moho::WeakUnitSetSerializer gWeakUnitSetSerializer;
+} // namespace

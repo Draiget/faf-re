@@ -2366,7 +2366,7 @@ namespace msvc8
          * Address: 0x0051A900 (FUN_0051A900 -- `vector<RMeshBlueprintLOD>::operator=` (buy 0x00519570, copy-construct 0x0051B3D0); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00526A90 (FUN_00526A90 -- `vector<RUnitBlueprintWeapon>::operator=` (buy 0x00523A00, copy-construct 0x00527DD0); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00582890 (FUN_00582890 -- `vector<SPointVector>::operator=` (24-byte, buy 0x0057EE70); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00704D80 (FUN_00704D80 -- `vector<SEntitySetTemplateUnit>::operator=` (buy 0x00702590, element assign 0x007056A0, copy-construct 0x00706900); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00704D80 (FUN_00704D80 -- `vector<EntitySetTemplate<Unit>>::operator=` (buy 0x00702590, element assign 0x007056A0, copy-construct 0x00706900); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00752C50 (FUN_00752C50 -- `operator=` for the 12-byte shared-count element of `SSyncData` (buy 0x0074D8C0, release 0x007420F0); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00752EA0 (FUN_00752EA0 -- `operator=` for a 40-byte element (buy 0x0074DA70, copy 0x00755D30); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007525C0 (FUN_007525C0 -- `operator=` for a 28-byte seven-float element (copy 0x00755B30); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
@@ -3151,13 +3151,13 @@ namespace msvc8
          * describes. Reached from the one-argument overload above, itself
          * reached from `DragRelease`'s bucket-vector growth.)
          * Address: 0x00702450 (FUN_00702450,
-         * msvc8::vector<SEntitySetTemplateUnit>::resize for the 0x28-byte
+         * msvc8::vector<EntitySetTemplate<Unit>>::resize for the 0x28-byte
          * element -- `size()` via `(mLast-mFirst)/40`, growth tail-calling
          * the `_Insert_n` body FUN_007030C0 at `end()`, shrink tail-calling
          * the erase body FUN_00703040. Reached from
          * `InitializeArmyUnitCategorySets` (CArmyImpl.cpp), the one-argument
          * overload above inlined into `CArmyImpl::CArmyImpl` at 0x006FF2E1,
-         * which builds the default `SEntitySetTemplateUnit()` value on the
+         * which builds the default `EntitySetTemplate<Unit>()` value on the
          * stack before the call -- VC8's `resize(_Newsize, _Ty())` shape.)
          *
          * What it does:
@@ -3349,7 +3349,7 @@ namespace msvc8
          * Address: 0x005E01D0 (FUN_005E01D0 -- `clear()` for a 4-byte element (`_Insert_n`/`resize` callers, 0x005ED190).)
          * Address: 0x005ED4C0 (FUN_005ED4C0 -- `clear()` for a 4-byte element (`_Insert_n`/`resize` callers, 0x005ED190).)
          * Address: 0x0078A070 (FUN_0078A070 -- `clear()` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x00703040 (FUN_00703040 -- `clear()` for `SEntitySetTemplateUnit` (destroy the range at 0x007056D0, then `last_ = first_`), the empty-source arm of `operator=` (0x00704D80) and `resize` (0x00702450).)
+         * Address: 0x00703040 (FUN_00703040 -- `clear()` for `EntitySetTemplate<Unit>` (destroy the range at 0x007056D0, then `last_ = first_`), the empty-source arm of `operator=` (0x00704D80) and `resize` (0x00702450).)
          * Address: 0x00583C30 (FUN_00583C30 -- `clear()` for `msvc8::vector<int>`, the empty-source arm of `operator=` 0x00583A20. Formerly the orphan `ClearLegacyIntVectorLogicalRange` in CAiBrain.cpp, removed 2026-09-10.)
          * Address: 0x0057D8B0 (FUN_0057D8B0 -- `clear()` for `msvc8::vector<moho::SPointVector>` (24-byte element), the empty-source arm of that vector's `operator=` 0x00582890. Formerly the orphan `ResetSPointVectorVectorEndToBegin` in CAiBrain.cpp, removed 2026-09-10.)
          * Address: 0x005091D0 (FUN_005091D0 -- `clear()` (`erase(begin(), end())`: a zero-length self copy then `last_ = first_`) for `moho::SDelayedSubVizInfo`, the empty-source arm of `operator=` 0x00509010. Formerly `NormalizeDelayedSubVizFinish` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
@@ -5683,7 +5683,7 @@ namespace msvc8
          * exactly. Reached from the two-argument `resize` overload above
          * (FUN_00867B90) when growing.)
          * Address: 0x007030C0 (FUN_007030C0,
-         * msvc8::vector<SEntitySetTemplateUnit>::insert(end(), count, value)
+         * msvc8::vector<EntitySetTemplate<Unit>>::insert(end(), count, value)
          * core for the 0x28-byte element -- copies `value` into a local
          * first (VC8's aliasing-safe idiom; the copy itself is the
          * `uninit_fill_n`-shaped emission FUN_007046F0, called twice from
@@ -5694,7 +5694,7 @@ namespace msvc8
          * buffer through the `uninit_move_n` emissions FUN_00706900 /
          * FUN_00705980 (reached via the thin trampolines FUN_007046C0 /
          * FUN_00703B90), whose own EH-unwind cleanup destroys the
-         * already-constructed prefix through the `~SEntitySetTemplateUnit`
+         * already-constructed prefix through the `~EntitySetTemplate<Unit>`
          * emission FUN_00705B30 (cited on the destructor, ArmyUnitSet.h).
          * Reached from `resize`'s two-argument overload above (FUN_00702450)
          * when growing `CArmyImpl::UnitCategorySets`.)
@@ -8063,7 +8063,7 @@ namespace msvc8
          * Address: 0x005EFF70 (FUN_005EFF70 -- `_Uninit_copy` for `SAiReservedTransportBone` (element copy constructor 0x005EAC50), the copy-construct step of that vector's `resize` (0x005EA590).)
          * Address: 0x005EC830 (FUN_005EC830 -- EH-shaped bridges into the `SAiReservedTransportBone` `_Uninit_copy` at 0x005EFF70.)
          * Address: 0x005EE710 (FUN_005EE710 -- EH-shaped bridges into the `SAiReservedTransportBone` `_Uninit_copy` at 0x005EFF70.)
-         * Address: 0x00706210 (FUN_00706210 -- EH-shaped bridge into the `SEntitySetTemplateUnit` `_Uninit_copy` at 0x00706900; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00706210 (FUN_00706210 -- EH-shaped bridge into the `EntitySetTemplate<Unit>` `_Uninit_copy` at 0x00706900; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007548E0 (FUN_007548E0 -- register bridge into the `_Uninit_copy` of `SSyncData`'s 12-byte shared-count element (retains each control block; `operator=` 0x00752C50).)
          * Address: 0x0051B3D0 (FUN_0051B3D0 -- `_Uninit_copy` for the 204-byte `RMeshBlueprintLOD` (`RMeshBlueprintLODTypeInfo` 0x00519D90, `operator=` 0x0051A900).)
          * Address: 0x0051A5B0 (FUN_0051A5B0 -- EH-shaped bridges into the `RMeshBlueprintLOD` `_Uninit_copy` at 0x0051B3D0.)
@@ -8266,7 +8266,7 @@ namespace msvc8
          * Address: 0x00518220 (FUN_00518220 -- a third `__cdecl` bridge into it; zero callers for `msvc8::vector<moho::REmitterCurveKey>` (`REmitterBlueprintCurve::Keys`; the element is a polymorphic 0x10 `{vptr, X, Y, Z}`, so every element step routes through its virtual destructor or its copy constructor); zero callers, unreachable; formerly `CopyEmitterCurveKeyRangeCdeclAdapterLaneC` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00518290 (FUN_00518290 -- a fourth `__cdecl` bridge into it; zero callers for `msvc8::vector<moho::REmitterCurveKey>` (`REmitterBlueprintCurve::Keys`; the element is a polymorphic 0x10 `{vptr, X, Y, Z}`, so every element step routes through its virtual destructor or its copy constructor); zero callers, unreachable; formerly `CopyEmitterCurveKeyRangeCdeclAdapterLaneD` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x004250E0 (FUN_004250E0 -- `uninit_copy_n` -- placement-copy the range, retaining each control block for `msvc8::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px, pi}` element retains and releases its control block on every copy); callers 0x00423EB0, 0x00424BD0, 0x00424E10; formerly `CopyConstructAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x00706D70 (FUN_00706D70 -- `uninit_copy_n` -- placement-copy the range, destroying the built prefix and rethrowing on a throw; five callers in the reflection TU that owns `msvc8::vector<moho::SEntitySetTemplateUnit>` for `moho::SEntitySetTemplateUnit` (the 0x28 record: two list words then the inline entity vector); callers 0x00702E60, 0x00704640, 0x00705650; formerly `CopyConstructEntitySetTemplateUnitRangeWithRollback` in moho/sim/ArmyUnitSet.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00706D70 (FUN_00706D70 -- `uninit_copy_n` -- placement-copy the range, destroying the built prefix and rethrowing on a throw; five callers in the reflection TU that owns `msvc8::vector<moho::EntitySetTemplate<moho::Unit>>` for `moho::EntitySetTemplate<moho::Unit>` (the 0x28 record: two list words then the inline entity vector); callers 0x00702E60, 0x00704640, 0x00705650; formerly `CopyConstructEntitySetTemplateUnitRangeWithRollback` in moho/sim/ArmyUnitSet.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x008FF520 (FUN_008FF520 -- `uninit_copy_n` -- placement-copy the range, destroying the built prefix and rethrowing on a throw; the caller hands it raw storage from `_Allocate` 0x008F8E70 for `msvc8::vector<gpg::gal::AdapterD3D10>` (`DeviceD3D10::mAdapters` at +0x94; the 0x13C element owns a DXGI descriptor and an inner mode vector, so every element step routes through its copy constructor 0x008FF450 or its destructor); callers 0x00900180, 0x00900430, 0x009005B0; formerly `CopyConstructAdapterD3D10ArrayOrUnwind` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00900180 (FUN_00900180 -- a forwarding bridge into that copy for `msvc8::vector<gpg::gal::AdapterD3D10>` (`DeviceD3D10::mAdapters` at +0x94; the 0x13C element owns a DXGI descriptor and an inner mode vector, so every element step routes through its copy constructor 0x008FF450 or its destructor); zero callers, unreachable; formerly `UninitializedCopyAdapterRangeDispatchA` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00900430 (FUN_00900430 -- a second forwarding bridge into it for `msvc8::vector<gpg::gal::AdapterD3D10>` (`DeviceD3D10::mAdapters` at +0x94; the 0x13C element owns a DXGI descriptor and an inner mode vector, so every element step routes through its copy constructor 0x008FF450 or its destructor); zero callers, unreachable; formerly `UninitializedCopyAdapterRangeDispatchB` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-11.)
@@ -8469,7 +8469,7 @@ namespace msvc8
          * fast path FUN_008DF290 (cited on `AppendEnumOptionValue`,
          * Reflection.cpp) when the vector still has spare capacity)
          * Address: 0x007046F0 (FUN_007046F0,
-         * msvc8::vector<SEntitySetTemplateUnit>::uninit_fill_n for the
+         * msvc8::vector<EntitySetTemplate<Unit>>::uninit_fill_n for the
          * 0x28-byte element -- a count-driven loop over `[dst, dstEnd)`
          * that, per slot, calls `gpg::fastvector_Entity::AddAll(slot.mVec,
          * value.mVec)` against the SAME fixed `value` source every
@@ -9733,7 +9733,7 @@ namespace msvc8
          * in-place tail-shift branch described above.)
          *
          * Address: 0x00706900 (FUN_00706900,
-         * msvc8::vector<SEntitySetTemplateUnit>::uninit_move_n for the
+         * msvc8::vector<EntitySetTemplate<Unit>>::uninit_move_n for the
          * 0x28-byte element, forward-direction shape -- per slot,
          * default-constructs the destination node in place (self-referential
          * list-link pointers, inline-storage fastvector header) then calls
@@ -10307,7 +10307,7 @@ namespace msvc8
          * Address: 0x00653A10 (FUN_00653A10 -- register bridge into the `SDebugWorldText` copy at 0x00653BC0; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x0064FA40 (FUN_0064FA40 -- `_Copy_opt` for `SDebugScreenText`, the assign step of that vector's `_Insert_n` (0x0064E490).)
          * Address: 0x0064F750 (FUN_0064F750 -- register bridge into the `SDebugScreenText` copy at 0x0064FA40; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x007056A0 (FUN_007056A0 -- `_Copy_opt` for `SEntitySetTemplateUnit` (each element `operator=` reduces to `mVec.AddAll`), reached from `operator=` 0x00704D80 and `clear` 0x00703040 through the 0x00704670 bridge.)
+         * Address: 0x007056A0 (FUN_007056A0 -- `_Copy_opt` for `EntitySetTemplate<Unit>` (each element `operator=` reduces to `mVec.AddAll`), reached from `operator=` 0x00704D80 and `clear` 0x00703040 through the 0x00704670 bridge.)
          * Address: 0x00755D30 (FUN_00755D30 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of a per-type free function' 0x00753680.)
          * Address: 0x00754940 (FUN_00754940 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of a per-type free function' 0x00753680.)
          * Address: 0x00754970 (FUN_00754970 -- `_Copy_opt` for a 40-byte element (the loop and its two register bridges), the copy step of `operator=` 0x00752EA0 and of a per-type free function' 0x00753680.)
@@ -10946,10 +10946,10 @@ namespace msvc8
          * yet)
          *
          * sizeof(T) == 0x28 (40, `Moho::EntitySetTemplate<Moho::Unit>` a.k.a.
-         * `SEntitySetTemplateUnit` -- checks `0xFFFFFFFF/40 < count` before
+         * `EntitySetTemplate<Unit>` -- checks `0xFFFFFFFF/40 < count` before
          * `operator new(40*count)`):
          * Address: 0x00704750 (FUN_00704750, msvc8::vector<
-         * SEntitySetTemplateUnit>::allocate_slots_checked -- reached from the
+         * EntitySetTemplate<Unit>>::allocate_slots_checked -- reached from the
          * `_Insert_n` reallocation path FUN_007030C0, which grows
          * `CArmyImpl::UnitCategorySets`)
          *
@@ -11273,7 +11273,7 @@ namespace msvc8
          * `msvc8::vector<gpg::TypeHandle>`, reached from the `_Insert_n`
          * grow body FUN_00951F30, already cited above)
          * Address: 0x00703410 (FUN_00703410, the 40-byte-stride throw helper for
-         * `msvc8::vector<SEntitySetTemplateUnit>`, reached from the
+         * `msvc8::vector<EntitySetTemplate<Unit>>`, reached from the
          * `_Insert_n` grow body FUN_007030C0 for `CArmyImpl::UnitCategorySets`)
          * Address: 0x0064EEE0 (FUN_0064EEE0, the 52-byte-stride throw helper for
          * `msvc8::vector<moho::SDebugDecal>`, reached from the `_Insert_n`

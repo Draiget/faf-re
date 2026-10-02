@@ -7,7 +7,7 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/EntityCategoryReflection.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/sim/ESquadClass.h"
 #include "Wm3Vector3.h"
 
@@ -48,7 +48,7 @@ namespace moho
    * - 0x00723F70 (FUN_00723F70, Moho::CSquad::~CSquad) — releases dynamic
    *   unit storage, destroys category list, unlinks from the entity-DB list.
    *
-   * Each squad owns one `SEntitySetTemplateUnit` (0x28 bytes including its
+   * Each squad owns one `EntitySetTemplate<Unit>` (0x28 bytes including its
    * intrusive ring-list head and the inline 4-entity buffer) and a category
    * vector. Squads belong to a `CPlatoon` and are stored in the platoon's
    * `mSquadList` fastvector.
@@ -103,8 +103,8 @@ namespace moho
      * Address: 0x00723A50 (FUN_00723A50, copy_CSquadUnits_into_EntitySet)
      *
      * IDA signature:
-     * Moho::SEntitySetTemplateUnit *__usercall sub_723A50@<eax>(
-     *   Moho::SEntitySetTemplateUnit *result@<esi>, Moho::CSquad *this@<edx>);
+     * Moho::EntitySetTemplate<Unit> *__usercall sub_723A50@<eax>(
+     *   Moho::EntitySetTemplate<Unit> *result@<esi>, Moho::CSquad *this@<edx>);
      *
      * What it does:
      * Returns a copy of `mUnits` (copy constructor 0x00579500) in the
@@ -113,7 +113,7 @@ namespace moho
      * Emitted first in the translation unit, ahead of `CPlatoon::GetClass`,
      * as an inline from this header is.
      */
-    [[nodiscard]] SEntitySetTemplateUnit GetUnitSet() const
+    [[nodiscard]] EntitySetTemplate<Unit> GetUnitSet() const
     {
       return mUnits;
     }
@@ -143,14 +143,14 @@ namespace moho
      * Address: 0x007241C0 (FUN_007241C0)
      *
      * IDA signature:
-     * void __usercall sub_7241C0(Moho::CSquad *this@<eax>, Moho::SEntitySetTemplateUnit *units@<edi>);
+     * void __usercall sub_7241C0(Moho::CSquad *this@<eax>, Moho::EntitySetTemplate<Unit> *units@<edi>);
      *
      * What it does:
      * `RemoveUnit` for every unit in `units`. The out-of-line copy has no
      * caller; it is inlined into `CPlatoon::ReturnUnitsTo` (0x00725410) and
      * `CPlatoon::DestroySquads` (0x00726210).
      */
-    void RemoveUnits(const SEntitySetTemplateUnit& units);
+    void RemoveUnits(const EntitySetTemplate<Unit>& units);
 
     /**
      * Address: 0x00724220 (FUN_00724220, Moho::CSquad::CountUnitsWithBP)
@@ -224,7 +224,7 @@ namespace moho
      * `blueprintId` (case-insensitive) into `outUnits`, stopping after
      * `maxCount` matches have been added.
      */
-    void AppendUnitsWithBP(const char* blueprintId, int maxCount, SEntitySetTemplateUnit& outUnits);
+    void AppendUnitsWithBP(const char* blueprintId, int maxCount, EntitySetTemplate<Unit>& outUnits);
 
     /**
      * Address: 0x00724400 (FUN_00724400, Moho::CSquad::AppendUnitsInCategory)
@@ -234,7 +234,7 @@ namespace moho
      * destroying, not under-construction) unit whose blueprint category bit is
      * present in `categorySet`, stopping once `maxCount` matches are added.
      */
-    void AppendUnitsInCategory(const EntityCategorySet* categorySet, int maxCount, SEntitySetTemplateUnit& outUnits);
+    void AppendUnitsInCategory(const EntityCategorySet* categorySet, int maxCount, EntitySetTemplate<Unit>& outUnits);
 
     /**
      * Address: 0x00724550 (FUN_00724550, Moho::CSquad::FitsAt)
@@ -301,7 +301,7 @@ namespace moho
   public:
     Sim* mSim;                                                // +0x00
     std::uint32_t mPad_0x04;                                  // +0x04 (binary leaves this uninitialised; reserved/unused slot)
-    SEntitySetTemplateUnit mUnits;                            // +0x08 (size 0x28)
+    EntitySetTemplate<Unit> mUnits;                            // +0x08 (size 0x28)
     ESquadClass mSquadClass;                                  // +0x30
     msvc8::string mName;                                      // +0x34 (size 0x1C)
     msvc8::vector<EntityCategorySet> mCats;                   // +0x50 (size 0x10)

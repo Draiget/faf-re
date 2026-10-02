@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
+#include <utility>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/utils/BoostWrappers.h"
@@ -233,65 +235,57 @@ namespace moho
   class EntitySetBase;
 
   /**
-   * Every entity set, whatever `T`, is a node of one ring: `EntityDB`'s
-   * registered sets (+0x18), which `EntityDB::Purge` (0x00684560) walks as
-   * `EntitySetBase`s. The binary's reflection agrees that the set types share
-   * that base: `EntitySet` registers `EntitySetBase` at offset 0 (0x00694180)
-   * and both are 0x28 bytes (0x006935D0, 0x006937C0).
+   * Every entity set, whatever its `T`, stores `Entity*` in one sorted inline
+   * vector and is a node of one ring: `EntityDB`'s registered sets (+0x18),
+   * which `EntityDB::Purge` (0x00684560) walks as `EntitySetBase`s. The
+   * reflection agrees: `EntitySetTemplate<Entity>` registers `EntitySetBase`
+   * at offset 0 (0x00694180), `WeakEntitySetTemplate<Entity>` registers
+   * `EntitySetTemplate<Entity>` (0x00694260), all are 0x28 bytes
+   * (0x006935D0, 0x006937C0), and each set type saves itself as that base
+   * (0x006938A0, 0x006D2A00, 0x00693AF0, 0x006D2C50).
    */
-  template <class T>
-  class EntitySetTemplate
-    : public TDatList<EntitySetBase, void>
+  class EntitySetBase : public TDatList<EntitySetBase, void>
   {
   public:
     inline static gpg::RType* sType = nullptr;
 
-    using iterator = T**;
-    using const_iterator = T* const*;
+    EntitySetBase() noexcept = default;
 
-    struct InsertResult
+    /**
+     * Address: 0x00579500 (FUN_00579500 -- emitted for `EntitySetTemplate<Unit>`: self-links the node, then hands `this + 8` to the inline vector's copy constructor 0x0057D3F0.)
+     * Address: 0x00705AE0 (FUN_00705AE0 -- a second emission, guarded on a null source; zero callers, unreachable; formerly `CopyConstructEntitySetTemplateUnitIfPresentPrimary`, removed 2026-09-11.)
+     * Address: 0x00706230 (FUN_00706230 -- a third emission; zero callers, unreachable; formerly `CopyConstructEntitySetTemplateUnitIfPresentSecondary`, removed 2026-09-11.)
+     *
+     * What it does:
+     * Copies `other`'s entities into a new set that is on no ring.
+     */
+    EntitySetBase(const EntitySetBase& other)
+      : TDatList<EntitySetBase, void>()
+      , mVec(other.mVec)
+    {}
+
+    /**
+     * What it does:
+     * Replaces this set's entities with `other`'s and keeps this set's own
+     * place in its ring. Inlined into the element loop of the unit-set
+     * vector's `_Copy_opt` (0x007056A0).
+     */
+    EntitySetBase& operator=(const EntitySetBase& other)
     {
-      iterator position;
-      bool inserted;
-    };
-
-    EntitySetTemplate() noexcept = default;
-
-    EntitySetTemplate(const EntitySetTemplate&) = delete;
-    EntitySetTemplate& operator=(const EntitySetTemplate&) = delete;
-
-    EntitySetTemplate(EntitySetTemplate&& other) noexcept
-      : TDatList<EntitySetBase, void>{}
-      , mVec()
-    {
-      mVec.ResetFrom(other.mVec);
-      other.Clear();
-    }
-
-    EntitySetTemplate& operator=(EntitySetTemplate&& other) noexcept
-    {
-      if (this == &other) {
-        return *this;
-      }
-
-      Clear();
-      this->ListUnlink();
-      mVec.ResetFrom(other.mVec);
-      other.Clear();
+      (void)mVec.AddAll(&other.mVec);
       return *this;
     }
 
     /**
+     * Address: 0x005796A0 (FUN_005796A0, Moho::EntitySetTemplate_Entity::~EntitySetTemplate_Entity)
+     * Address: 0x00705B30 (FUN_00705B30 -- a second emission, for the unit-set vector's reallocation unwind loop (`CArmyImpl::UnitCategorySets`, `uninit_move_n` 0x00706900/0x00705980).)
      * Address: 0x005C23A0 (FUN_005C23A0)
      *
      * What it does:
-     * Resets fastvector_n storage back to inline capacity and unlinks this
-     * intrusive list node from its owner chain.
+     * Nothing of its own: `mVec`'s destructor frees heap storage, then the
+     * node's unlinks it from its ring.
      */
-    ~EntitySetTemplate()
-    {
-      Clear();
-    }
+    ~EntitySetBase() = default;
 
     [[nodiscard]] bool Empty() const noexcept
     {
@@ -303,159 +297,11 @@ namespace moho
       return static_cast<std::size_t>(mVec.end() - mVec.begin());
     }
 
-    [[nodiscard]] iterator begin() noexcept
-    {
-      return mVec.begin();
-    }
-
-    [[nodiscard]] iterator end() noexcept
-    {
-      return mVec.end();
-    }
-
-    [[nodiscard]] const_iterator begin() const noexcept
-    {
-      return mVec.begin();
-    }
-
-    [[nodiscard]] const_iterator end() const noexcept
-    {
-      return mVec.end();
-    }
-
-    [[nodiscard]] bool Contains(const T* const entity) const noexcept
-    {
-      if (!entity) {
-        return false;
-      }
-
-      const std::uint32_t key = static_cast<std::uint32_t>(entity->id_);
-      const const_iterator it = LowerBoundByEntityId(begin(), end(), key);
-      return it != end() && *it == entity;
-    }
-
-    [[nodiscard]] bool Add(T* const entity)
-    {
-      if (!entity) {
-        return false;
-      }
-
-      return InsertUniqueByEntityId(mVec, entity).inserted;
-    }
-
-    /**
-     * Address: 0x0067BCE0 (FUN_0067BCE0, Moho::EntitySetTemplate_Entity::Remove)
-     *
-     * What it does:
-     * Removes one exact entity pointer from sorted storage when present and
-     * compacts trailing elements.
-     */
-    [[nodiscard]] bool Remove(T* const entity) noexcept
-    {
-      if (!entity) {
-        return false;
-      }
-
-      iterator first = mVec.begin();
-      iterator last = mVec.end();
-      const std::uint32_t key = static_cast<std::uint32_t>(entity->id_);
-      iterator it = LowerBoundByEntityId(first, last, key);
-      if (it == last || *it != entity) {
-        return false;
-      }
-
-      mVec.erase(it, it + 1);
-      return true;
-    }
-
     void Clear() noexcept
     {
       mVec.ResetStorageToInline();
     }
 
-  public:
-    gpg::fastvector_n<T*, 4> mVec;
-
-  private:
-    template <typename Iter>
-    [[nodiscard]] static Iter LowerBoundByEntityIdImpl(Iter first, Iter last, const std::uint32_t targetId) noexcept
-    {
-      std::ptrdiff_t count = last - first;
-      while (count > 0) {
-        const std::ptrdiff_t step = count / 2;
-        Iter mid = first + step;
-        const T* const candidate = *mid;
-        const std::uint32_t candidateId = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
-        if (candidateId < targetId) {
-          first = mid + 1;
-          count -= step + 1;
-        } else {
-          count = step;
-        }
-      }
-      return first;
-    }
-
-    /**
-     * Address: 0x005CB710 (FUN_005CB710)
-     *
-     * What it does:
-     * Binary-search lower-bound over a sorted `Entity*` span by `Entity::id_`.
-     */
-    [[nodiscard]] static iterator LowerBoundByEntityId(
-      iterator first, iterator last, const std::uint32_t targetId
-    ) noexcept
-    {
-      return LowerBoundByEntityIdImpl(first, last, targetId);
-    }
-
-    /**
-     * Address: 0x005CB710 (FUN_005CB710)
-     *
-     * What it does:
-     * Const overload of lower-bound search over sorted `Entity*` span.
-     */
-    [[nodiscard]] static const_iterator LowerBoundByEntityId(
-      const_iterator first, const_iterator last, const std::uint32_t targetId
-    ) noexcept
-    {
-      return LowerBoundByEntityIdImpl(first, last, targetId);
-    }
-
-    /**
-     * Address: 0x005C3A90 (FUN_005C3A90)
-     *
-     * What it does:
-     * Inserts one entity pointer into sorted storage when missing and returns
-     * `{position, inserted}` semantics.
-     */
-    [[nodiscard]] static InsertResult InsertUniqueByEntityId(gpg::fastvector_n<T*, 4>& vec, T* const entity) noexcept
-    {
-      iterator first = vec.begin();
-      iterator last = vec.end();
-      const std::uint32_t key = static_cast<std::uint32_t>(entity->id_);
-      iterator it = LowerBoundByEntityId(first, last, key);
-      if (it != last && *it == entity) {
-        return InsertResult{it, false};
-      }
-
-      const std::ptrdiff_t insertionIndex = it - first;
-      vec.InsertAt(it, &entity, &entity + 1);
-      return InsertResult{vec.begin() + insertionIndex, true};
-    }
-  };
-
-  static_assert(
-    offsetof(EntitySetTemplate<Entity>, mVec) == 0x08, "EntitySetTemplate<Entity>::mVec offset must be 0x08"
-  );
-  static_assert(sizeof(EntitySetTemplate<Entity>) == 0x28, "EntitySetTemplate<Entity> size must be 0x28");
-
-  /**
-   * Binary-facing alias wrapper for `EntitySetTemplate<Entity>` with independent RTTI slot.
-   */
-  class EntitySetBase : public EntitySetTemplate<Entity>
-  {
-  public:
     /**
      * Address: 0x00694640 (FUN_00694640)
      *
@@ -472,24 +318,296 @@ namespace moho
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
 
-    inline static gpg::RType* sType = nullptr;
+  public:
+    gpg::fastvector_n<Entity*, 4> mVec; // +0x08, sorted by `Entity::id_`
   };
 
+  static_assert(offsetof(EntitySetBase, mVec) == 0x08, "EntitySetBase::mVec offset must be 0x08");
+  static_assert(sizeof(EntitySetBase) == 0x28, "EntitySetBase size must be 0x28");
+
   /**
-   * Binary-facing weak set wrapper that preserves legacy RTTI identity while reusing
-   * `EntitySetTemplate<T>` storage/layout lanes.
+   * The set as `T*`s. Entries go in and come out through `static_cast`:
+   * `Unit`'s `Entity` base is at +0x08, so `Remove` stores `lea ecx,[edi+8]`
+   * behind a null test (0x005E8960) and `AddRange` reads `p ? p - 8 : 0`
+   * (0x00704070).
+   */
+  template <class T>
+  class EntitySetTemplate : public EntitySetBase
+  {
+  public:
+    inline static gpg::RType* sType = nullptr;
+
+    class iterator
+    {
+    public:
+      using iterator_category = std::random_access_iterator_tag;
+      using value_type = T*;
+      using difference_type = std::ptrdiff_t;
+      using pointer = void;
+      using reference = T*;
+
+      iterator() noexcept = default;
+      explicit iterator(Entity* const* const slot) noexcept
+        : mSlot(slot)
+      {}
+
+      [[nodiscard]] T* operator*() const noexcept
+      {
+        return static_cast<T*>(*mSlot);
+      }
+
+      [[nodiscard]] T* operator[](const difference_type offset) const noexcept
+      {
+        return static_cast<T*>(mSlot[offset]);
+      }
+
+      iterator& operator++() noexcept
+      {
+        ++mSlot;
+        return *this;
+      }
+
+      iterator operator++(int) noexcept
+      {
+        iterator previous = *this;
+        ++mSlot;
+        return previous;
+      }
+
+      iterator& operator--() noexcept
+      {
+        --mSlot;
+        return *this;
+      }
+
+      iterator& operator+=(const difference_type offset) noexcept
+      {
+        mSlot += offset;
+        return *this;
+      }
+
+      [[nodiscard]] iterator operator+(const difference_type offset) const noexcept
+      {
+        return iterator(mSlot + offset);
+      }
+
+      [[nodiscard]] difference_type operator-(const iterator& other) const noexcept
+      {
+        return mSlot - other.mSlot;
+      }
+
+      [[nodiscard]] bool operator==(const iterator& other) const noexcept = default;
+
+      /** The `Entity*` slot this iterator is on. */
+      [[nodiscard]] Entity* const* slot() const noexcept
+      {
+        return mSlot;
+      }
+
+    private:
+      Entity* const* mSlot = nullptr;
+    };
+
+    using const_iterator = iterator;
+
+    EntitySetTemplate() noexcept = default;
+    EntitySetTemplate(const EntitySetTemplate&) = default;
+    EntitySetTemplate& operator=(const EntitySetTemplate&) = default;
+
+    [[nodiscard]] iterator begin() const noexcept
+    {
+      return iterator(mVec.begin());
+    }
+
+    [[nodiscard]] iterator end() const noexcept
+    {
+      return iterator(mVec.end());
+    }
+
+    /**
+     * Address: 0x0057DDD0 (FUN_0057DDD0, Moho::EntitySetTemplate_Unit::Add)
+     * Address: 0x005C3A90 (FUN_005C3A90 -- the `Entity` instantiation.)
+     *
+     * What it does:
+     * Inserts `entity` at its id's sorted position unless it is already
+     * there. A null entity is stored like any other (its key is 0).
+     */
+    std::pair<iterator, bool> Add(T* const entity)
+    {
+      Entity* const value = entity;
+      Entity** const it = LowerBound(entity, mVec.begin(), mVec.end());
+      if (it != mVec.end() && *it == value) {
+        return {iterator(it), false};
+      }
+
+      const std::ptrdiff_t index = it - mVec.begin();
+      mVec.InsertAt(it, &value, &value + 1);
+      return {iterator(mVec.begin() + index), true};
+    }
+
+    /**
+     * Address: 0x005E8960 (FUN_005E8960, Moho::EntitySetTemplate_Unit::Remove)
+     * Address: 0x0067BCE0 (FUN_0067BCE0, Moho::EntitySetTemplate_Entity::Remove)
+     *
+     * What it does:
+     * Removes `entity` when present, compacting the tail.
+     */
+    bool Remove(T* const entity) noexcept
+    {
+      Entity* const value = entity;
+      Entity** const it = LowerBound(entity, mVec.begin(), mVec.end());
+      if (it == mVec.end() || *it != value) {
+        return false;
+      }
+
+      (void)mVec.erase(it, it + 1);
+      return true;
+    }
+
+    /**
+     * Address: 0x005E89E0 (FUN_005E89E0 -- the `Unit` instantiation.)
+     *
+     * What it does:
+     * Returns the position of `entity`, or `end()`.
+     */
+    [[nodiscard]] iterator Find(const T* const entity) const noexcept
+    {
+      const Entity* const value = entity;
+      Entity* const* const it = LowerBound(entity, mVec.begin(), mVec.end());
+      if (it != mVec.end() && *it == value) {
+        return iterator(it);
+      }
+      return end();
+    }
+
+    [[nodiscard]] bool Contains(const T* const entity) const noexcept
+    {
+      return Find(entity) != end();
+    }
+
+    /**
+     * Address: 0x006D2F20 (FUN_006D2F20 -- an unreferenced out-of-line copy, `Unit`.)
+     *
+     * What it does:
+     * Loads the set as its `EntitySetBase`, with a fresh owner. Inlined into
+     * `gpg::SerSaveLoadHelper<EntitySetTemplate<T>>::Deserialize` (0x006938A0
+     * for `Entity`, 0x006D2A00 for `Unit`).
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x006D2F60 (FUN_006D2F60 -- an unreferenced out-of-line copy, `Unit`.)
+     *
+     * What it does:
+     * Saves the set as its `EntitySetBase`, with a fresh owner. Inlined into
+     * `Serialize` (0x006938E0, 0x006D2A40).
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x006EEC40 (FUN_006EEC40 -- the `Unit` instantiation.)
+     *
+     * What it does:
+     * True when both sets hold the same entities: equal sizes, and every
+     * entity of this set found in `other`.
+     */
+    [[nodiscard]] bool Same(const EntitySetTemplate& other) const noexcept
+    {
+      if (Size() != other.Size()) {
+        return false;
+      }
+
+      for (T* const entity : *this) {
+        if (other.Find(entity) == other.end()) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    /**
+     * Address: 0x00704070 (FUN_00704070, Moho::EntitySetTemplate_Entity::AddRange)
+     * Address: 0x006F8F10 (FUN_006F8F10 -- a second emission, byte-identical (set, first, last on the stack, `ret 0xC`); callers 0x006F7AE0 (`cfunc_IssueTransportUnloadSpecificL`), 0x00725770 (`BuildPlatoonUnitSet`), 0x00726DE0 (`CPlatoon::MoveToLocation`), 0x00727740 (`CPlatoon::MoveToTarget`); formerly `AddUnitRangeFromPointerWordsRuntime` in moho/sim/SimRecoveryRuntime.cpp and `AddUnitPointerRangeToSet` in moho/sim/CPlatoon.cpp (RULE ONE), removed 2026-09-30.)
+     *
+     * What it does:
+     * `Add`s each entity of `[first, last)` as a `T`, with a plain
+     * `static_cast` and no filtering.
+     */
+    void AddRange(Entity* const* first, Entity* const* const last)
+    {
+      for (; first != last; ++first) {
+        (void)Add(static_cast<T*>(*first));
+      }
+    }
+
+  private:
+    /**
+     * Address: 0x00582EB0 (FUN_00582EB0, func_GetUnitIdPosInVec_BinarySearch -- the `Unit` instantiation.)
+     * Address: 0x005EDCE0 (FUN_005EDCE0 -- a byte-identical copy of it, the one `Find` calls.)
+     * Address: 0x005CB710 (FUN_005CB710 -- the `Entity` instantiation.)
+     *
+     * What it does:
+     * Lower bound of `needle`'s id over `[first, last)`; a null entry or
+     * needle sorts as id 0.
+     */
+    template <class Slot>
+    [[nodiscard]] static Slot* LowerBound(const T* const needle, Slot* first, Slot* const last) noexcept
+    {
+      const Entity* const needleEntity = needle;
+      const std::uint32_t key = needleEntity ? static_cast<std::uint32_t>(needleEntity->id_) : 0u;
+      std::ptrdiff_t count = last - first;
+      while (count > 0) {
+        const std::ptrdiff_t step = count / 2;
+        const Entity* const candidate = first[step];
+        const std::uint32_t candidateKey = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
+        if (candidateKey < key) {
+          first += step + 1;
+          count -= step + 1;
+        } else {
+          count = step;
+        }
+      }
+      return first;
+    }
+  };
+
+  static_assert(sizeof(EntitySetTemplate<Entity>) == 0x28, "EntitySetTemplate<Entity> size must be 0x28");
+
+  /**
+   * An entity set the reflection keeps apart from `EntitySetTemplate<T>` and
+   * saves as it (0x00693AF0, 0x006D2C50).
    */
   template <class T>
   class WeakEntitySetTemplate : public EntitySetTemplate<T>
   {
   public:
     inline static gpg::RType* sType = nullptr;
+
+    /**
+     * Address: 0x006942C0 (FUN_006942C0 -- an unreferenced out-of-line copy, `Entity`.)
+     * Address: 0x006D3000 (FUN_006D3000 -- an unreferenced out-of-line copy, `Unit`.)
+     *
+     * What it does:
+     * Loads the set as its `EntitySetTemplate<T>`, with a fresh owner.
+     * Inlined into `gpg::SerSaveLoadHelper<WeakEntitySetTemplate<T>>::Deserialize`
+     * (0x00693AF0, 0x006D2C50).
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00694300 (FUN_00694300 -- an unreferenced out-of-line copy, `Entity`.)
+     * Address: 0x006D3040 (FUN_006D3040 -- an unreferenced out-of-line copy, `Unit`.)
+     *
+     * What it does:
+     * Saves the set as its `EntitySetTemplate<T>`, with a fresh owner.
+     * Inlined into `Serialize` (0x00693B30, 0x006D2C90).
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   using UnitSet = EntitySetTemplate<Unit>;
   using WeakUnitSet = WeakEntitySetTemplate<Unit>;
 
-  static_assert(sizeof(EntitySetBase) == 0x28, "EntitySetBase size must be 0x28");
   static_assert(sizeof(WeakEntitySetTemplate<Unit>) == 0x28, "WeakEntitySetTemplate<Unit> size must be 0x28");
 
   /**
@@ -1417,7 +1535,7 @@ namespace moho
     std::uint8_t RealtimeStatsEnabled;     // 0x01F8 (per-entity realtime-stats accounting gate; FUN_00689F50)
     char pad_01F9_01FB[0x03];              // 0x01F9
     msvc8::string mUniqueName;             // 0x01FC (FUN_00689F20)
-    EntitySetBase mShooters;               // 0x0218 (Entity:AddShooter/RemoveShooter ownership set)
+    EntitySetTemplate<Entity> mShooters;   // 0x0218 (Entity:AddShooter/RemoveShooter ownership set)
     // World-space bounds of `CollisionExtents`, refreshed by `UpdateAABox`
     // (0x00679180, `?UpdateAABox@Entity@Moho@@QAEXXZ`); serialized through the
     // `Wm3::AxisAlignedBox3<float>` RType.

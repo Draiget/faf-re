@@ -542,18 +542,6 @@ namespace
     return static_cast<const Broadcaster<ECommandEvent>*>(command);
   }
 
-  void CopyUnitSetFromEntitySet(const EntitySetTemplate<Unit>& source, SEntitySetTemplateUnit& destination)
-  {
-    destination.Clear();
-    destination.AddUnits(source);
-  }
-
-  void BuildEntitySetFromCommandUnitSet(const SEntitySetTemplateUnit& source, EntitySetTemplate<Unit>& destination)
-  {
-    destination.Clear();
-    source.CopyTo(destination);
-  }
-
   struct CUnitCommandByteAt110RuntimeView
   {
     std::byte pad0000_010F[0x110];
@@ -1194,10 +1182,8 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, const int 
     archive->Read(variableDataType, &mVarDat, ownerRef);
   }
 
-  EntitySetTemplate<Unit> loadedUnitSet{};
   if (gpg::RType* const unitSetType = ResolveEntityUnitSetType()) {
-    archive->Read(unitSetType, &loadedUnitSet, ownerRef);
-    CopyUnitSetFromEntitySet(loadedUnitSet, mUnitSet);
+    archive->Read(unitSetType, &mUnitSet, ownerRef);
   }
 
   if (gpg::RType* const formationType = ResolveCountedPtrIFormationInstanceType()) {
@@ -1280,10 +1266,8 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
     archive->Write(variableDataType, &mVarDat, ownerRef);
   }
 
-  EntitySetTemplate<Unit> serializedUnitSet{};
-  BuildEntitySetFromCommandUnitSet(mUnitSet, serializedUnitSet);
   if (gpg::RType* const unitSetType = ResolveEntityUnitSetType()) {
-    archive->Write(unitSetType, &serializedUnitSet, ownerRef);
+    archive->Write(unitSetType, &mUnitSet, ownerRef);
   }
 
   // Bare pointer slot, as on the load side above -- the save path takes no
@@ -1337,7 +1321,7 @@ void CUnitCommand::AddUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitCommand>
     return;
   }
 
-  if (!mUnitSet.AddUnit(unit)) {
+  if (!mUnitSet.Add(unit).second) {
     return;
   }
 
@@ -1366,7 +1350,7 @@ void CUnitCommand::AddUnit(Unit* const unit)
     return;
   }
 
-  if (!mUnitSet.AddUnit(unit)) {
+  if (!mUnitSet.Add(unit).second) {
     return;
   }
 
@@ -1390,7 +1374,7 @@ void CUnitCommand::AddUnit(Unit* const unit)
  */
 void CUnitCommand::RemoveUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue)
 {
-  if (!mUnitSet.RemoveUnit(unit)) {
+  if (!mUnitSet.Remove(unit)) {
     return;
   }
 
@@ -1416,7 +1400,7 @@ void CUnitCommand::RemoveUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitComma
  */
 void CUnitCommand::RemoveUnit(Unit* const unit)
 {
-  if (!mUnitSet.RemoveUnit(unit)) {
+  if (!mUnitSet.Remove(unit)) {
     return;
   }
 

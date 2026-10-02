@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/task/CCommandTask.h"
 
 namespace gpg
@@ -50,7 +50,7 @@ namespace moho
      * tracked-unit set into the simulation entity DB, and flips the unit's
      * "carrier-retrieve in progress" state bit (0x100).
      */
-    CUnitCarrierRetrieve(CCommandTask* parentTask, const SEntitySetTemplateUnit& trackedUnits);
+    CUnitCarrierRetrieve(CCommandTask* parentTask, const EntitySetTemplate<Unit>& trackedUnits);
 
     /**
      * Address: 0x00605DD0 (FUN_00605DD0, ??1CUnitCarrierRetrieve@Moho@@QAE@@Z)
@@ -87,7 +87,7 @@ namespace moho
      */
     static CUnitCarrierRetrieve* Create(
       CCommandTask* parentTask,
-      const SEntitySetTemplateUnit& trackedUnits
+      const EntitySetTemplate<Unit>& trackedUnits
     );
 
     /**
@@ -132,7 +132,7 @@ namespace moho
   public:
     bool mRetrievalComplete;             // 0x30
     std::uint8_t mPad31_37[0x07];        // 0x31
-    SEntitySetTemplateUnit mTrackedUnits; // 0x38
+    EntitySetTemplate<Unit> mTrackedUnits; // 0x38
   };
 
   static_assert(sizeof(CUnitCarrierRetrieve) == 0x60, "CUnitCarrierRetrieve size must be 0x60");

@@ -40,7 +40,7 @@ namespace moho
     // whole struct -- what was previously modeled as a trailing `unknown30`
     // scalar at ArmyPool+0x30 is not part of ArmyPool at all: it is the
     // `myProxy_` (debug-iterator) lane of the adjacent, separate
-    // `CArmyImpl::UnitCategorySets` real `msvc8::vector<SEntitySetTemplateUnit>`
+    // `CArmyImpl::UnitCategorySets` real `msvc8::vector<EntitySetTemplate<Unit>>`
     // member that starts immediately after this struct (CArmyImpl+0x258).
     // Evidence: `CArmyImpl::CArmyImpl` (0x006FE690) builds the category-set
     // count/value arguments and calls `sub_702450` (`resize`) at 0x006FF2E1
@@ -50,9 +50,9 @@ namespace moho
     // read/write `*(obj+4)`/`*(obj+8)`/`*(obj+0xC)` (first_/last_/end_),
     // never `*(obj+0)` -- exactly the `msvc8::vector<T>` shape (leading
     // unused proxy slot). Independently confirmed by
-    // `gpg::RVectorType<SEntitySetTemplateUnit>::Init()`
+    // `gpg::RVectorType<EntitySetTemplate<Unit>>::Init()`
     // (ArmyUnitSetVectorReflection.cpp), which sets
-    // `size_ = sizeof(msvc8::vector<SEntitySetTemplateUnit>)` == 0x10 (16
+    // `size_ = sizeof(msvc8::vector<EntitySetTemplate<Unit>>)` == 0x10 (16
     // bytes) for the exact same reflected field.
     gpg::fastvector_n<CPlatoon*, 8> platoons;
   };
@@ -216,18 +216,18 @@ namespace moho
      * Removes all provided units from their current platoons, then appends
      * that unit set into the unassigned squad of the named platoon.
      */
-    void AssignUnitsToPlatoon(const SEntitySetTemplateUnit* units, const char* platoonName) override;
+    void AssignUnitsToPlatoon(const EntitySetTemplate<Unit>* units, const char* platoonName) override;
     /** Address: 0x00700700 (FUN_00700700, Moho::CArmyImpl::RemoveFromPlatoon) */
     void RemoveFromPlatoon(Unit* unit) override;
     /** Address: 0x00700730 (FUN_00700730, Moho::CArmyImpl::RemoveUnitsFromPlatoons) */
-    void RemoveUnitsFromPlatoons(const SEntitySetTemplateUnit* units) override;
+    void RemoveUnitsFromPlatoons(const EntitySetTemplate<Unit>* units) override;
     /** Address: 0x00700770 (FUN_00700770, Moho::CArmyImpl::GetNumPlatoonsTemplateNamed) */
     int GetNumPlatoonsTemplateNamed(const char* templateName) override;
     /** Address: 0x007007C0 (FUN_007007C0, Moho::CArmyImpl::GetNumPlatoonWithPlan) */
     int GetNumPlatoonWithPlan(const char* planName) override;
     /** Address: 0x00700A00 (FUN_00700A00, Moho::CArmyImpl::CountUnitsInBoundsXZ) */
     int CountUnitsInBoundsXZ(
-      const Wm3::Vector3f& minBounds, const Wm3::Vector3f& maxBounds, const SEntitySetTemplateUnit& unitSet
+      const Wm3::Vector3f& minBounds, const Wm3::Vector3f& maxBounds, const EntitySetTemplate<Unit>& unitSet
     ) override;
     /** Address: 0x00700A70 (FUN_00700A70, Moho::CArmyImpl::UpdateAIDebugPlatoonStats) */
     void UpdateAIDebugPlatoonStats(Unit* unit) override;
@@ -317,7 +317,7 @@ namespace moho
     boost::SharedPtrRaw<void> UnknownShared220;          // 0x0220
     ArmyPool PlatoonPool;                                // 0x0228
     /**
-     * Real `msvc8::vector<SEntitySetTemplateUnit>` (0x258: myProxy_,
+     * Real `msvc8::vector<EntitySetTemplate<Unit>>` (0x258: myProxy_,
      * 0x25C: first_/begin, 0x260: last_/end, 0x264: end_/capacityEnd),
      * one per-category-bit-index cached unit set. Built by
      * `InitializeArmyUnitCategorySets` (FUN_006FE690 tail via
@@ -325,7 +325,7 @@ namespace moho
      * `ResolveCategorySetForUnit`, `~CArmyImpl` (via `TeardownEntitySetRange`),
      * and the `MemberSerialize`/`MemberDeserialize` reflection lanes.
      */
-    msvc8::vector<SEntitySetTemplateUnit> UnitCategorySets; // 0x0258
+    msvc8::vector<EntitySetTemplate<Unit>> UnitCategorySets; // 0x0258
     std::uint32_t UnitCategoryBaseIndex;                 // 0x0268
     std::uint32_t UnitCategoryMaxIndex;                  // 0x026C
     float UnitCapacity;                                  // 0x0270

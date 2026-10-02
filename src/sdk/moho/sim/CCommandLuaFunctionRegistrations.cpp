@@ -45,7 +45,7 @@
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/ISTIDriver.h"
@@ -71,7 +71,8 @@ namespace moho
 {
   class CUnitCommand;
   struct SSTICommandIssueData;
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
   class Sim;
 
   // Recovered child wrappers call these deeper callback lanes.
@@ -81,7 +82,7 @@ namespace moho
 
   [[nodiscard]] CUnitCommand* IssueCommandToSelectedUnits(
     Sim* sim,
-    SEntitySetTemplateUnit& selectedUnits,
+    EntitySetTemplate<Unit>& selectedUnits,
     const SSTICommandIssueData& commandIssueData,
     bool clearQueue
   );
@@ -830,7 +831,7 @@ namespace
    */
   [[nodiscard]] bool FilterFactoryUnitsByCommandCap(
     const moho::UnitSet& sourceUnits,
-    moho::SEntitySetTemplateUnit& outFactoryUnits,
+    moho::EntitySetTemplate<moho::Unit>& outFactoryUnits,
     const std::uint32_t requiredCaps
   )
   {
@@ -848,7 +849,7 @@ namespace
         continue;
       }
 
-      (void)outFactoryUnits.AddUnit(unit);
+      (void)outFactoryUnits.Add(unit);
     }
 
     return !outFactoryUnits.Empty();
@@ -922,7 +923,7 @@ namespace
   [[nodiscard]] int ResolveFormationScriptIndex(
     moho::CAiFormationDBImpl* const formationDb,
     const char* const formationName,
-    const moho::SEntitySetTemplateUnit& selectedUnits
+    const moho::EntitySetTemplate<moho::Unit>& selectedUnits
   )
   {
     if (formationDb == nullptr || formationName == nullptr) {
@@ -994,8 +995,7 @@ namespace
       return 0;
     }
 
-    moho::SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    moho::EntitySetTemplate<moho::Unit> selectedUnits(filteredUnits);
 
     const LuaPlus::LuaStackObject formationNameArg(state, 3);
     const char* const formationName = lua_tostring(rawState, 3);
@@ -1080,8 +1080,7 @@ namespace
       return 0;
     }
 
-    moho::SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    moho::EntitySetTemplate<moho::Unit> selectedUnits(filteredUnits);
 
     const LuaPlus::LuaStackObject formationNameArg(state, 3);
     const char* const formationName = lua_tostring(rawState, 3);
@@ -1305,7 +1304,7 @@ namespace moho
   // Shared Sim.cpp helper recovered as UNIT_IssueCommand (FUN_006F12C0).
   [[nodiscard]] CUnitCommand* IssueCommandToSelectedUnits(
     Sim* sim,
-    SEntitySetTemplateUnit& selectedUnits,
+    EntitySetTemplate<Unit>& selectedUnits,
     const SSTICommandIssueData& commandIssueData,
     bool clearQueue
   );
@@ -4770,8 +4769,7 @@ namespace moho
       return 1;
     }
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Move);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -5010,8 +5008,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Tactical);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -5063,8 +5060,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Nuke);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -5116,8 +5112,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Teleport);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -5175,8 +5170,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Move);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -5233,8 +5227,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(units);
+    EntitySetTemplate<Unit> selectedUnits(units);
 
     CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
     if (issuedCommand != nullptr) {
@@ -5281,7 +5274,7 @@ namespace moho
     LuaPlus::LuaStackObject unitListArg(state, 1);
     CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueFactoryAssistHelpText);
 
-    SEntitySetTemplateUnit selectedFactories{};
+    EntitySetTemplate<Unit> selectedFactories{};
     if (!FilterFactoryUnitsByCommandCap(
           sourceUnits, selectedFactories, static_cast<std::uint32_t>(RULEUCC_Guard))) {
       return 0;
@@ -5346,8 +5339,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportUnloadUnits);
     commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
@@ -5402,8 +5394,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportUnloadUnits);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -5446,7 +5437,7 @@ namespace moho
     LuaPlus::LuaStackObject unitListArg(state, 1);
     CollectLiveUnitsFromLuaTable(sourceUnits, state, unitListArg, kIssueFactoryRallyPointHelpText);
 
-    SEntitySetTemplateUnit selectedFactories{};
+    EntitySetTemplate<Unit> selectedFactories{};
     if (!FilterFactoryUnitsByCommandCap(
           sourceUnits, selectedFactories, static_cast<std::uint32_t>(RULEUCC_Move))) {
       return 0;
@@ -5531,8 +5522,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Guard);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -5593,8 +5583,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Attack);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -5695,8 +5684,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Patrol);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -5789,8 +5777,7 @@ namespace moho
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Ferry);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -5924,8 +5911,8 @@ namespace moho
     }
 
     if (closestUnit != nullptr) {
-      SEntitySetTemplateUnit selectedUnits{};
-      (void)selectedUnits.AddUnit(closestUnit);
+      EntitySetTemplate<Unit> selectedUnits{};
+      (void)selectedUnits.Add(closestUnit);
 
       Sim* const sim = lua_getglobaluserdata(rawState);
 
@@ -5939,8 +5926,7 @@ namespace moho
       }
 
       if (lua_toboolean(rawState, 5) != 0) {
-        SEntitySetTemplateUnit allUnits{};
-        allUnits.AddUnits(candidateUnits);
+        EntitySetTemplate<Unit> allUnits(candidateUnits);
         (void)IssueCommandToSelectedUnits(sim, allUnits, commandIssueData, false);
       } else {
         (void)IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
@@ -6021,8 +6007,7 @@ namespace moho
     CAiTarget target{};
     target.UpdateTarget(targetEntity);
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
@@ -6082,13 +6067,12 @@ namespace moho
     const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
     Entity* const targetEntity = SCR_FromLua_Entity(targetObject, state);
 
-    SEntitySetTemplateUnit workerSelection{};
-    workerSelection.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> workerSelection(filteredUnits);
 
     // Drop the repair target itself out of the worker selection so a unit
     // does not get tasked to repair itself when the script passed the same
     // unit as both worker and target.
-    (void)workerSelection.RemoveUnit(static_cast<Unit*>(targetEntity));
+    (void)workerSelection.Remove(static_cast<Unit*>(targetEntity));
     if (workerSelection.Empty()) {
       return 0;
     }
@@ -6152,8 +6136,7 @@ namespace moho
       return 0;
     }
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(units);
+    EntitySetTemplate<Unit> selectedUnits(units);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Script);
     commandIssueData.mObject = LuaPlus::LuaStackObject(state, 2);
@@ -6224,15 +6207,14 @@ namespace moho
     const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
     Entity* const targetEntity = SCR_FromLua_Entity(targetObject, state);
 
-    SEntitySetTemplateUnit workerSelection{};
-    workerSelection.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> workerSelection(filteredUnits);
 
     // Drop the reclaim target itself out of the worker selection so a unit
     // does not get tasked to reclaim itself when the script passed the same
     // unit as both worker and target. Unlike Repair, the binary keeps issuing
     // even when the resulting worker set is empty (the per-unit dispatcher
     // discards impossible commands at the unit level).
-    (void)workerSelection.RemoveUnit(static_cast<Unit*>(targetEntity));
+    (void)workerSelection.Remove(static_cast<Unit*>(targetEntity));
 
     CAiTarget target{};
     target.UpdateTarget(targetEntity);
@@ -6307,15 +6289,14 @@ namespace moho
     const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
     Entity* const targetEntity = SCR_FromLua_Entity(targetObject, state);
 
-    SEntitySetTemplateUnit workerSelection{};
-    workerSelection.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> workerSelection(filteredUnits);
 
     // Drop the capture target itself out of the worker selection so a unit
     // does not get tasked to capture itself when the script passed the same
     // unit as both worker and target. Like Reclaim (and unlike Repair), the
     // binary keeps issuing even when the resulting worker set is empty (the
     // per-unit dispatcher discards impossible commands at the unit level).
-    (void)workerSelection.RemoveUnit(static_cast<Unit*>(targetEntity));
+    (void)workerSelection.Remove(static_cast<Unit*>(targetEntity));
 
     CAiTarget target{};
     target.UpdateTarget(targetEntity);
@@ -6387,14 +6368,13 @@ namespace moho
     const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
     Entity* const targetEntity = SCR_FromLua_Entity(targetObject, state);
 
-    SEntitySetTemplateUnit workerSelection{};
-    workerSelection.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> workerSelection(filteredUnits);
 
     // Drop the sacrifice target itself out of the worker selection so a unit is
     // not tasked to sacrifice into itself when the script passed the same unit
     // as both worker and target. Unlike the sibling Capture/Reclaim callbacks,
     // Sacrifice only issues when a worker unit remains after the removal.
-    (void)workerSelection.RemoveUnit(static_cast<Unit*>(targetEntity));
+    (void)workerSelection.Remove(static_cast<Unit*>(targetEntity));
 
     if (!workerSelection.Empty()) {
       CAiTarget target{};
@@ -6556,8 +6536,7 @@ namespace moho
       return 0;
     }
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(units);
+    EntitySetTemplate<Unit> selectedUnits(units);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Upgrade);
     commandIssueData.mBlueprint = upgradeBlueprint;
@@ -6630,8 +6609,7 @@ namespace moho
       return 0;
     }
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(units);
+    EntitySetTemplate<Unit> selectedUnits(units);
 
     Sim* const sim = lua_getglobaluserdata(rawState);
     for (int issueIndex = 0; issueIndex < repeatCount; ++issueIndex) {
@@ -6704,8 +6682,7 @@ namespace moho
       return 1;
     }
 
-    SEntitySetTemplateUnit selectedUnits{};
-    selectedUnits.AddUnits(filteredUnits);
+    EntitySetTemplate<Unit> selectedUnits(filteredUnits);
 
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_AggressiveMove);
     target.EncodeToSSTITarget(commandIssueData.mTarget);
@@ -6794,7 +6771,7 @@ namespace moho
       return 0;
     }
 
-    SEntitySetTemplateUnit commandUnits{};
+    EntitySetTemplate<Unit> commandUnits{};
     for (Unit* const unit : transportUnits) {
       if (unit == nullptr) {
         continue;
@@ -6804,14 +6781,14 @@ namespace moho
         LuaPlus::LuaState::Error(state, kIssueTransportLoadAttachedError);
       }
 
-      (void)commandUnits.AddUnit(unit);
+      (void)commandUnits.Add(unit);
     }
 
     if (commandUnits.Empty()) {
       LuaPlus::LuaState::Error(state, kIssueTransportLoadNoUnitsError);
     }
 
-    (void)commandUnits.AddUnit(unitToLoad);
+    (void)commandUnits.Add(unitToLoad);
 
     CAiTarget target{};
     target.UpdateTarget(unitToLoad != nullptr ? static_cast<Entity*>(unitToLoad) : nullptr);
@@ -6889,10 +6866,9 @@ namespace moho
     // no transport ever saw the order and `mUnitSet` never carried the subset,
     // so a queued "unload these units here" did nothing and the transport was
     // left to unload everything on whatever generic unload order ran next.
-    SEntitySetTemplateUnit orderRecipients{};
-    orderRecipients.AddUnits(transportUnits);
+    EntitySetTemplate<Unit> orderRecipients(transportUnits);
 
-    SEntitySetTemplateUnit cargoUnits{};
+    EntitySetTemplate<Unit> cargoUnits{};
     for (Unit* const transportUnit : transportUnits) {
       if (transportUnit == nullptr) {
         continue;
@@ -6933,7 +6909,7 @@ namespace moho
           continue;
         }
 
-        (void)cargoUnits.AddUnit(loadedUnit);
+        (void)cargoUnits.Add(loadedUnit);
       }
     }
 

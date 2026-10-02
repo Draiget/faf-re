@@ -10,7 +10,7 @@
 #include "lua/LuaObject.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/script/CScriptObject.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 
 namespace LuaPlus
 {
@@ -143,7 +143,7 @@ namespace moho
      * Address: 0x007241F0 (FUN_007241F0)
      *
      * IDA signature:
-     * void __userpurge sub_7241F0(Moho::SEntitySetTemplateUnit *units@<eax>,
+     * void __userpurge sub_7241F0(Moho::EntitySetTemplate<Unit> *units@<eax>,
      *   Moho::CSquad *squad, Moho::CPlatoon *this);
      *
      * What it does:
@@ -153,7 +153,7 @@ namespace moho
      * (0x00725410), `FormPlatoon` (0x0072E0A7) and the two brain bindings that
      * build platoons.
      */
-    void AppendUnitsToSquad(CSquad* squad, const SEntitySetTemplateUnit& units);
+    void AppendUnitsToSquad(CSquad* squad, const EntitySetTemplate<Unit>& units);
 
     /**
      * Address: 0x00725280 (FUN_00725280, sub_725280)
@@ -162,7 +162,7 @@ namespace moho
      * Adds `units` to the squad of class `squadClass`, if there is one, and
      * drops the cached Lua unit list either way.
      */
-    void AppendUnitsToSquad(ESquadClass squadClass, const SEntitySetTemplateUnit& units);
+    void AppendUnitsToSquad(ESquadClass squadClass, const EntitySetTemplate<Unit>& units);
 
     /**
      * Address: 0x007252D0 (FUN_007252D0, sub_7252D0)
@@ -192,7 +192,7 @@ namespace moho
      * caller's return slot, `ret 4`). Empty squads are skipped; each other
      * squad's units are copied out (0x00723A50) and range-added (0x006F8F10).
      */
-    [[nodiscard]] SEntitySetTemplateUnit GetPlatoonUnits() const;
+    [[nodiscard]] EntitySetTemplate<Unit> GetPlatoonUnits() const;
 
     /**
      * Address: 0x00725CF0 (FUN_00725CF0, Moho::CPlatoon::FindClosestUnitToPos)
@@ -293,7 +293,7 @@ namespace moho
      * Adds up to `maxCount` live units of blueprint `blueprintId` from the
      * unassigned squad to `outUnits`. No-op when there is no unassigned squad.
      */
-    void GetUnassignedUnitsWithBP(const char* blueprintId, int maxCount, SEntitySetTemplateUnit& outUnits);
+    void GetUnassignedUnitsWithBP(const char* blueprintId, int maxCount, EntitySetTemplate<Unit>& outUnits);
 
     /**
      * Address: 0x007256E0 (FUN_007256E0, Moho::CPlatoon::GetUnassignedUnitsInCategory)
@@ -302,7 +302,7 @@ namespace moho
      * Adds up to `maxCount` live units in `categorySet` from the unassigned
      * squad to `outUnits`. No-op when there is no unassigned squad.
      */
-    void GetUnassignedUnitsInCategory(const EntityCategorySet* categorySet, int maxCount, SEntitySetTemplateUnit& outUnits);
+    void GetUnassignedUnitsInCategory(const EntityCategorySet* categorySet, int maxCount, EntitySetTemplate<Unit>& outUnits);
 
     /**
      * Address: 0x007261B0 (FUN_007261B0, Moho::CPlatoon::Stop)
@@ -425,7 +425,7 @@ namespace moho
      * Collects into `outBeacons` the ferry-beacon units referenced by the head
      * command of every platoon unit currently in the Ferrying state.
      */
-    void GetFerryBeacons(SEntitySetTemplateUnit& outBeacons);
+    void GetFerryBeacons(EntitySetTemplate<Unit>& outBeacons);
 
     /**
      * Address: 0x007268E0 (FUN_007268E0, Moho::CPlatoon::AggressiveMoveToLocation)

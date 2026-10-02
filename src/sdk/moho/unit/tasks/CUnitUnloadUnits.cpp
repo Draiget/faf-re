@@ -203,7 +203,7 @@ namespace moho
     CUnitCommand* const ownerCommand,
     CCommandTask* const dispatchTask,
     const SNavGoal& unloadGoal,
-    const SEntitySetTemplateUnit& commandUnits
+    const EntitySetTemplate<Unit>& commandUnits
   )
     : CCommandTask(dispatchTask)
     , mUnloadGoal(unloadGoal)
@@ -229,7 +229,7 @@ namespace moho
 
       mHasEligibleLoadedUnits = true;
       if (transportOwner == mUnit) {
-        (void)mLoadedUnits.AddUnit(candidate);
+        (void)mLoadedUnits.Add(candidate);
       }
     }
 
@@ -315,7 +315,7 @@ namespace moho
           // cached end then steps past the live range into the slot the removal
           // vacated.
           for (Entity* const* entry = mLoadedUnits.mVec.begin(); entry != mLoadedUnits.mVec.end(); ++entry) {
-            Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+            Unit* const candidate = static_cast<Unit*>(*entry);
             if (!IsUsableDetachedUnit(candidate)) {
               continue;
             }
@@ -445,7 +445,7 @@ namespace moho
   CUnitUnloadUnits* CUnitUnloadUnits::Create(
     CCommandTask* const dispatchTask,
     const SNavGoal* const unloadGoal,
-    const SEntitySetTemplateUnit* const commandUnits,
+    const EntitySetTemplate<Unit>* const commandUnits,
     CUnitCommand* const ownerCommand
   )
   {

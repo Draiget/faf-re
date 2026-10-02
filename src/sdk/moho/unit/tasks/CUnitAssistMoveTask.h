@@ -17,7 +17,8 @@ namespace gpg
 
 namespace moho
 {
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
   class Unit;
 
   class CUnitAssistMoveTask final : public CCommandTask
@@ -117,7 +118,7 @@ namespace moho
      * Builds one candidate set of loadable allied mobile land units near
      * this assist task's context and writes filtered results into `outUnits`.
      */
-    SEntitySetTemplateUnit* GetEntitiesAlreadyAtLoc(SEntitySetTemplateUnit* outUnits);
+    EntitySetTemplate<Unit>* GetEntitiesAlreadyAtLoc(EntitySetTemplate<Unit>* outUnits);
 
   public:
     static gpg::RType* sType;

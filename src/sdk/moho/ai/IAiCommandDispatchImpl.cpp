@@ -34,7 +34,7 @@
 
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/resource/blueprints/RBlueprint.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/ReconBlip.h"
@@ -520,13 +520,13 @@ namespace
         }
 
         if (CUnitCommand::GetTarget(command) == unit) {
-          SEntitySetTemplateUnit workingSet;
+          EntitySetTemplate<Unit> workingSet;
           for (Entity* const entry : command->mUnitSet.mVec) {
             if (Unit* const setUnit = static_cast<Unit*>(entry)) {
-              (void)workingSet.AddUnit(setUnit);
+              (void)workingSet.Add(setUnit);
             }
           }
-          (void)workingSet.RemoveUnit(unit);
+          (void)workingSet.Remove(unit);
 
           if (unit->IsInCategory("CARRIER")) {
             if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits) {
@@ -539,7 +539,7 @@ namespace
               Entity* const entity = *it;
               Unit* const setUnit = entity ? entity->IsUnit() : nullptr;
               if (setUnit != nullptr && setUnit->GetTransportedBy() != nullptr) {
-                (void)workingSet.RemoveUnit(setUnit);
+                (void)workingSet.Remove(setUnit);
                 it = workingSet.mVec.begin(); // RemoveUnit compacts mVec; re-seek from head
               } else {
                 ++it;
@@ -577,8 +577,8 @@ namespace
           if (!unit->AiTransport || !CUnitCommand::GetTarget(command)) {
             return;
           }
-          SEntitySetTemplateUnit loadSet;
-          (void)loadSet.AddUnit(CUnitCommand::GetTarget(command));
+          EntitySetTemplate<Unit> loadSet;
+          (void)loadSet.Add(CUnitCommand::GetTarget(command));
           if (unit->IsInCategory("CARRIER")) {
             CUnitCarrierRetrieve::Create(dispatch, loadSet);
             return;
@@ -748,17 +748,17 @@ namespace
         // both are non-empty, dispatch an assist-move (transport) or a move variant.
         CUnitCommand::Move(unit, command);
 
-        SEntitySetTemplateUnit transportSet;
-        SEntitySetTemplateUnit mobileLandSet;
+        EntitySetTemplate<Unit> transportSet;
+        EntitySetTemplate<Unit> mobileLandSet;
         for (Entity* const entry : command->mUnitSet.mVec) {
           Unit* const setUnit = static_cast<Unit*>(entry);
           if (setUnit == nullptr) {
             continue;
           }
           if (setUnit->IsInCategory("TRANSPORTATION")) {
-            (void)transportSet.AddUnit(setUnit);
+            (void)transportSet.Add(setUnit);
           } else if (setUnit->IsInCategory("MOBILE") && setUnit->IsInCategory("LAND")) {
-            (void)mobileLandSet.AddUnit(setUnit);
+            (void)mobileLandSet.Add(setUnit);
           }
         }
 

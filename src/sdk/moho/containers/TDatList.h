@@ -64,7 +64,7 @@ namespace moho
      * took over `mPrev`/`mNext` would claim a place in a ring that never
      * linked it. The only two link holders the binary copies both rebuild
      * their own links instead: `ResourceRecord`'s copy (0x004A9AA0)
-     * self-links its waiter head, and `SEntitySetTemplateUnit`'s assignment
+     * self-links its waiter head, and `EntitySetTemplate<Unit>`'s assignment
      * (inlined in 0x007056A0) leaves its links alone. Owners that are copied
      * spell out what they copy.
      */

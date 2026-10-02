@@ -22,7 +22,7 @@ namespace moho
     ParsedCommandArgs* const commandArgs,
     Wm3::Vector3f* const worldPos,
     CArmyImpl* const focusArmy,
-    SEntitySetTemplateUnit* const selectedUnits
+    EntitySetTemplate<Unit>* const selectedUnits
   )
   {
     if (!mHandler) {

@@ -16,7 +16,6 @@
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
@@ -232,7 +231,7 @@ namespace moho
    * Builds one candidate set of loadable allied mobile land units near
    * this assist task's context and writes filtered results into `outUnits`.
    */
-  SEntitySetTemplateUnit* CUnitAssistMoveTask::GetEntitiesAlreadyAtLoc(SEntitySetTemplateUnit* const outUnits)
+  EntitySetTemplate<Unit>* CUnitAssistMoveTask::GetEntitiesAlreadyAtLoc(EntitySetTemplate<Unit>* const outUnits)
   {
     if (outUnits == nullptr) {
       return nullptr;
@@ -266,16 +265,16 @@ namespace moho
     EntityCategorySet mobileLandCategory{};
     (void)EntityCategory::Mul(&mobileLandCategory, mobileCategory, landCategory);
 
-    SEntitySetTemplateUnit allMobileLandUnits{};
+    EntitySetTemplate<Unit> allMobileLandUnits{};
     (void)mUnit->ArmyRef->GetUnits(&allMobileLandUnits, &mobileLandCategory);
 
-    SEntitySetTemplateUnit pickupCandidates{};
+    EntitySetTemplate<Unit> pickupCandidates{};
     Wm3::Vector3f maxDistancePosition{0.0f, 0.0f, 0.0f};
     float maxDistanceScore = 0.0f;
 
     CUnitCommand* const ownerCommand = ResolveCurrentCommand(mUnit);
     for (Entity* const unitEntry : allMobileLandUnits.mVec) {
-      Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(unitEntry);
+      Unit* const candidate = static_cast<Unit*>(unitEntry);
       if (candidate == nullptr) {
         continue;
       }
@@ -323,7 +322,7 @@ namespace moho
         continue;
       }
 
-      (void)pickupCandidates.AddUnit(candidate);
+      (void)pickupCandidates.Add(candidate);
 
       const Wm3::Vector3f& candidatePosition = candidate->GetPosition();
       const Wm3::Vector3f candidateGoalPosition = candidateNavigator->GetGoalPos();
@@ -346,7 +345,7 @@ namespace moho
 
     if (!IsZeroVector(maxDistancePosition)) {
       for (Entity* const unitEntry : pickupCandidates.mVec) {
-        Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(unitEntry);
+        Unit* const candidate = static_cast<Unit*>(unitEntry);
         if (candidate == nullptr) {
           continue;
         }
@@ -356,7 +355,7 @@ namespace moho
         const float dz = maxDistancePosition.z - candidatePosition.z;
         const float distance = static_cast<float>(std::sqrt((dx * dx) + (dz * dz)));
         if (guardScanRadius > distance) {
-          (void)outUnits->AddUnit(candidate);
+          (void)outUnits->Add(candidate);
         }
       }
     }
@@ -378,7 +377,7 @@ namespace moho
       return;
     }
 
-    SEntitySetTemplateUnit candidateUnits{};
+    EntitySetTemplate<Unit> candidateUnits{};
     (void)GetEntitiesAlreadyAtLoc(&candidateUnits);
 
     if (!candidateUnits.Empty()) {
@@ -456,7 +455,7 @@ namespace moho
     unloadGoal.aux3 = 0;
     unloadGoal.aux4 = 0;
 
-    SEntitySetTemplateUnit commandUnits{};
+    EntitySetTemplate<Unit> commandUnits{};
     (void)CUnitUnloadUnits::Create(mDispatchTask, &unloadGoal, &commandUnits, nullptr);
 
     mTaskState = TASKSTATE_Preparing;

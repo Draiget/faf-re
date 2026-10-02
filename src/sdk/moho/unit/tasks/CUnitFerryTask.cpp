@@ -18,7 +18,6 @@
 #include "moho/path/SNavGoal.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SFootprint.h"
@@ -198,7 +197,7 @@ namespace
   void CollectArmyUnitsInCategory(
     moho::Unit& ownerUnit,
     const char* const categoryName,
-    moho::SEntitySetTemplateUnit& outUnits
+    moho::EntitySetTemplate<moho::Unit>& outUnits
   )
   {
     const moho::EntityCategorySet* const category =
@@ -408,15 +407,15 @@ namespace moho
    *   unit's own IsUnitState(+0x3C) with 2 = UNITSTATE_Moving
    *   (0x0060E724-0x0060E75D).
    */
-  void CUnitFerryTask::FilterTransportableUnits(SEntitySetTemplateUnit& outUnits)
+  void CUnitFerryTask::FilterTransportableUnits(EntitySetTemplate<Unit>& outUnits)
   {
     Unit* const ownerUnit = mUnit;
 
-    SEntitySetTemplateUnit landUnits{};
+    EntitySetTemplate<Unit> landUnits{};
     CollectArmyUnitsInCategory(*ownerUnit, "LAND", landUnits);
 
     for (Entity* const entry : landUnits.mVec) {
-      Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(entry);
+      Unit* const candidate = static_cast<Unit*>(entry);
       if (candidate == nullptr) {
         continue;
       }
@@ -489,7 +488,7 @@ namespace moho
         }
       }
 
-      (void)outUnits.AddUnit(candidate);
+      (void)outUnits.Add(candidate);
     }
   }
 
@@ -544,11 +543,11 @@ namespace moho
       }
     }
 
-    SEntitySetTemplateUnit landUnits{};
+    EntitySetTemplate<Unit> landUnits{};
     CollectArmyUnitsInCategory(*mUnit, "LAND", landUnits);
 
     for (Entity* const entry : landUnits.mVec) {
-      Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(entry);
+      Unit* const candidate = static_cast<Unit*>(entry);
       if (candidate == nullptr) {
         continue;
       }
@@ -598,7 +597,7 @@ namespace moho
    */
   bool CUnitFerryTask::HasNextUnitToLoad()
   {
-    SEntitySetTemplateUnit transportables{};
+    EntitySetTemplate<Unit> transportables{};
     FilterTransportableUnits(transportables);
 
     if (!transportables.Empty()) {
@@ -675,11 +674,11 @@ namespace moho
 
     // The route source IS the beacon: adopt the queue of whichever army
     // transport is currently ferrying to that beacon.
-    SEntitySetTemplateUnit transports{};
+    EntitySetTemplate<Unit> transports{};
     CollectArmyUnitsInCategory(*mUnit, "TRANSPORTATION", transports);
 
     for (Entity* const entry : transports.mVec) {
-      Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(entry);
+      Unit* const candidate = static_cast<Unit*>(entry);
       if (candidate == nullptr) {
         continue;
       }
@@ -809,7 +808,7 @@ namespace moho
       const Wm3::Vec3f targetPos = routeCommand->mTarget.GetTargetPosGun(false);
       const SNavGoal unloadGoal(mUnit->GetFootprint().ToCellPos(targetPos));
 
-      SEntitySetTemplateUnit commandUnits{};
+      EntitySetTemplate<Unit> commandUnits{};
       (void)CUnitUnloadUnits::Create(mDispatch, &unloadGoal, &commandUnits, routeCommand);
     }
 
@@ -914,7 +913,7 @@ namespace moho
 
     SNavGoal goal(mUnit->GetFootprint().ToCellPos(mPos));
 
-    SEntitySetTemplateUnit transportables{};
+    EntitySetTemplate<Unit> transportables{};
     FilterTransportableUnits(transportables);
 
     // Binary stores the set-empty flag straight into the goal's layer lane

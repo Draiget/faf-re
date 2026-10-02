@@ -25,7 +25,8 @@ namespace moho
   class Entity;
   class IAiCommandDispatchImpl;
   struct RUnitBlueprint;
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
   struct SOCellPos;
   class Unit;
 
@@ -160,7 +161,7 @@ namespace moho
      * Walks the guarded-unit chain and chooses the unit that should source
      * guard-follow-up commands while avoiding previously visited units.
      */
-    [[nodiscard]] Unit* ResolveGuardCommandSourceUnit(Unit* guardedUnit, SEntitySetTemplateUnit& visitedUnits) const;
+    [[nodiscard]] Unit* ResolveGuardCommandSourceUnit(Unit* guardedUnit, EntitySetTemplate<Unit>& visitedUnits) const;
 
     /**
      * Address: 0x00611DA0 (FUN_00611DA0)

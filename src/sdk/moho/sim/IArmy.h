@@ -6,7 +6,6 @@
 #include "../../gpg/core/utils/BoostWrappers.h"
 #include "../../legacy/containers/String.h"
 #include "../../legacy/containers/Vector.h"
-#include "ArmyUnitSet.h"
 #include "ESquadClass.h"
 #include "SSTIArmyConstantData.h"
 #include "SSTIArmyVariableData.h"

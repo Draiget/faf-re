@@ -41,7 +41,7 @@
 #include "moho/ai/ECompareType.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/sim/CSquad.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimConVarBase.h"
@@ -84,7 +84,6 @@ namespace
   using moho::ESquadClass;
   using moho::EUnitState;
   using moho::CSquad;
-  using moho::SEntitySetTemplateUnit;
   using moho::EntityCategorySet;
   using moho::Unit;
 
@@ -191,7 +190,7 @@ namespace
   {
     static gpg::RType* sUnitSetType = nullptr;
     if (sUnitSetType == nullptr) {
-      sUnitSetType = gpg::LookupRType(typeid(moho::SEntitySetTemplateUnit));
+      sUnitSetType = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
     }
     return sUnitSetType;
   }
@@ -788,7 +787,7 @@ namespace moho
     gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     ownerRef = {};
-    archive->Write(CachedUnitSetTypeForCSquadSerializer(), const_cast<SEntitySetTemplateUnit*>(&mUnits), ownerRef);
+    archive->Write(CachedUnitSetTypeForCSquadSerializer(), const_cast<EntitySetTemplate<Unit>*>(&mUnits), ownerRef);
 
     ownerRef = {};
     archive->Write(CachedESquadClassTypeForCSquadSerializer(), const_cast<ESquadClass*>(&mSquadClass), ownerRef);
@@ -902,12 +901,12 @@ namespace moho
   /**
    * Address: 0x00725770 (FUN_00725770, sub_725770)
    */
-  SEntitySetTemplateUnit CPlatoon::GetPlatoonUnits() const
+  EntitySetTemplate<Unit> CPlatoon::GetPlatoonUnits() const
   {
-    SEntitySetTemplateUnit units;
+    EntitySetTemplate<Unit> units;
     for (const CSquad* const squad : mSquadList) {
       if (squad != nullptr && !squad->mUnits.Empty()) {
-        const SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+        const EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
         units.AddRange(squadUnits.mVec.begin(), squadUnits.mVec.end());
       }
     }
@@ -936,7 +935,7 @@ namespace moho
    * Address: 0x007256E0 (FUN_007256E0, Moho::CPlatoon::GetUnassignedUnitsInCategory)
    */
   void CPlatoon::GetUnassignedUnitsInCategory(
-    const EntityCategorySet* const categorySet, const int maxCount, SEntitySetTemplateUnit& outUnits
+    const EntityCategorySet* const categorySet, const int maxCount, EntitySetTemplate<Unit>& outUnits
   )
   {
     if (CSquad* const squad = GetSquad(ESquadClass::Unassigned)) {
@@ -948,7 +947,7 @@ namespace moho
    * Address: 0x00725730 (FUN_00725730, Moho::CPlatoon::GetUnassignedUnitsWithBP)
    */
   void CPlatoon::GetUnassignedUnitsWithBP(
-    const char* const blueprintId, const int maxCount, SEntitySetTemplateUnit& outUnits
+    const char* const blueprintId, const int maxCount, EntitySetTemplate<Unit>& outUnits
   )
   {
     if (CSquad* const squad = GetSquad(ESquadClass::Unassigned)) {
@@ -1011,7 +1010,7 @@ namespace moho
   /**
    * Address: 0x007241F0 (FUN_007241F0)
    */
-  void CPlatoon::AppendUnitsToSquad(CSquad* const squad, const SEntitySetTemplateUnit& units)
+  void CPlatoon::AppendUnitsToSquad(CSquad* const squad, const EntitySetTemplate<Unit>& units)
   {
     squad->mUnits.AddRange(units.mVec.begin(), units.mVec.end());
     mHasLuaList = false;
@@ -1020,7 +1019,7 @@ namespace moho
   /**
    * Address: 0x00725280 (FUN_00725280, sub_725280)
    */
-  void CPlatoon::AppendUnitsToSquad(const ESquadClass squadClass, const SEntitySetTemplateUnit& units)
+  void CPlatoon::AppendUnitsToSquad(const ESquadClass squadClass, const EntitySetTemplate<Unit>& units)
   {
     if (CSquad* const squad = GetSquad(squadClass)) {
       AppendUnitsToSquad(squad, units);
@@ -1033,8 +1032,8 @@ namespace moho
    */
   void CPlatoon::AppendUnitToSquad(const ESquadClass squadClass, Unit* const unit)
   {
-    SEntitySetTemplateUnit singleUnitSet{};
-    (void)singleUnitSet.AddUnit(unit);
+    EntitySetTemplate<Unit> singleUnitSet{};
+    (void)singleUnitSet.Add(unit);
     AppendUnitsToSquad(squadClass, singleUnitSet);
   }
 
@@ -1102,8 +1101,8 @@ namespace moho
     constexpr const char* kTransportationCategoryName = "TRANSPORTATION";
 
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
-    SEntitySetTemplateUnit transportUnits{};
-    SEntitySetTemplateUnit unitsToLoad{};
+    EntitySetTemplate<Unit> transportUnits{};
+    EntitySetTemplate<Unit> unitsToLoad{};
 
     for (int squadClassValue = 1; squadClassValue < static_cast<int>(kAllSquadClasses); ++squadClassValue) {
       CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassValue));
@@ -1111,28 +1110,28 @@ namespace moho
         continue;
       }
 
-      const SEntitySetTemplateUnit squadUnits(squad->mUnits);
+      const EntitySetTemplate<Unit> squadUnits(squad->mUnits);
 
       for (Entity* const* unitEntry = squadUnits.mVec.begin(); unitEntry != squadUnits.mVec.end(); ++unitEntry) {
-        Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*unitEntry);
+        Unit* const unit = static_cast<Unit*>(*unitEntry);
         if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt()) {
           continue;
         }
 
         if (!unit->IsInCategory(kTransportationCategoryName)
             && EntityCategory::HasBlueprint(unit->GetBlueprint(), categorySet)) {
-          (void)unitsToLoad.AddUnit(unit);
+          (void)unitsToLoad.Add(unit);
         }
       }
 
       for (Entity* const* unitEntry = squadUnits.mVec.begin(); unitEntry != squadUnits.mVec.end(); ++unitEntry) {
-        Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*unitEntry);
+        Unit* const unit = static_cast<Unit*>(*unitEntry);
         if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt()) {
           continue;
         }
 
         if (unit->IsInCategory(kTransportationCategoryName)) {
-          (void)transportUnits.AddUnit(unit);
+          (void)transportUnits.Add(unit);
         }
       }
     }
@@ -1146,10 +1145,10 @@ namespace moho
       return issuedCommands;
     }
 
-    SEntitySetTemplateUnit assignedUnits{};
+    EntitySetTemplate<Unit> assignedUnits{};
     for (Entity* const* transportEntry = transportUnits.mVec.begin(); transportEntry != transportUnits.mVec.end();
          ++transportEntry) {
-      Unit* const transportUnit = SEntitySetTemplateUnit::UnitFromEntry(*transportEntry);
+      Unit* const transportUnit = static_cast<Unit*>(*transportEntry);
       if (transportUnit == nullptr) {
         continue;
       }
@@ -1159,25 +1158,25 @@ namespace moho
         continue;
       }
 
-      SEntitySetTemplateUnit commandUnits{};
+      EntitySetTemplate<Unit> commandUnits{};
       for (Entity* const* unitEntry = unitsToLoad.mVec.begin(); unitEntry != unitsToLoad.mVec.end(); ++unitEntry) {
-        Unit* const loadUnit = SEntitySetTemplateUnit::UnitFromEntry(*unitEntry);
-        if (loadUnit == nullptr || assignedUnits.ContainsUnit(loadUnit)) {
+        Unit* const loadUnit = static_cast<Unit*>(*unitEntry);
+        if (loadUnit == nullptr || assignedUnits.Contains(loadUnit)) {
           continue;
         }
 
         if (aiTransport->TransportAssignSlot(loadUnit, -1)) {
-          (void)commandUnits.AddUnit(loadUnit);
-          (void)assignedUnits.AddUnit(loadUnit);
+          (void)commandUnits.Add(loadUnit);
+          (void)assignedUnits.Add(loadUnit);
         }
       }
 
       for (Entity* const* unitEntry = commandUnits.mVec.begin(); unitEntry != commandUnits.mVec.end(); ++unitEntry) {
-        Unit* const reservedUnit = SEntitySetTemplateUnit::UnitFromEntry(*unitEntry);
+        Unit* const reservedUnit = static_cast<Unit*>(*unitEntry);
         aiTransport->TransportRemoveUnitReservation(reservedUnit);
       }
 
-      (void)commandUnits.AddUnit(transportUnit);
+      (void)commandUnits.Add(transportUnit);
 
       SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportLoadUnits);
       commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Entity;
@@ -1342,7 +1341,7 @@ namespace moho
     armyPool->mHasLuaList = false;
 
     for (CSquad* const squad : mSquadList) {
-      const SEntitySetTemplateUnit units = squad->GetUnitSet();
+      const EntitySetTemplate<Unit> units = squad->GetUnitSet();
       squad->RemoveUnits(units);
       delete squad;
       AppendUnitsToSquad(poolSquad, units);
@@ -1803,7 +1802,7 @@ namespace moho
     LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
 
-    const SEntitySetTemplateUnit units = platoon->GetPlatoonUnits();
+    const EntitySetTemplate<Unit> units = platoon->GetPlatoonUnits();
     if (units.Size() == 0u) {
       lua_pushnil(state->m_state);
       (void)lua_gettop(state->m_state);
@@ -2511,12 +2510,12 @@ namespace moho
     }
 
     if (!platoon->mHasLuaList) {
-      const SEntitySetTemplateUnit platoonUnits = platoon->GetPlatoonUnits();
+      const EntitySetTemplate<Unit> platoonUnits = platoon->GetPlatoonUnits();
 
       platoon->mLuaUnitList.AssignNewTable(state, static_cast<int>(platoonUnits.Size()), 0);
       std::int32_t luaIndex = 1;
       for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {
-        Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entityIt);
+        Unit* const unit = static_cast<Unit*>(*entityIt);
         if (!unit) {
           continue;
         }
@@ -2634,7 +2633,7 @@ namespace moho
           return 1;
         }
       } else {
-        SEntitySetTemplateUnit candidates{};
+        EntitySetTemplate<Unit> candidates{};
         if (unitFilter.IsString()) {
           platoon->GetUnassignedUnitsWithBP(unitFilter.GetString(), 1000, candidates);
         } else {
@@ -2743,7 +2742,7 @@ namespace moho
       const char* const squadClassName = squadClassNameObject.GetString();
       SCR_GetEnum(state, squadClassName, enumRef);
 
-      SEntitySetTemplateUnit ref{};
+      EntitySetTemplate<Unit> ref{};
       if (argumentCount <= 4) {
         if (unitFilter.IsString()) {
           newPlatoon->GetUnassignedUnitsWithBP(unitFilter.GetString(), requiredSize, ref);
@@ -2752,7 +2751,7 @@ namespace moho
           newPlatoon->GetUnassignedUnitsInCategory(category, requiredSize, ref);
         }
       } else {
-        SEntitySetTemplateUnit candidates{};
+        EntitySetTemplate<Unit> candidates{};
         if (unitFilter.IsString()) {
           newPlatoon->GetUnassignedUnitsWithBP(unitFilter.GetString(), 1000, candidates);
         } else {
@@ -2806,7 +2805,7 @@ namespace moho
 
         int added = 0;
         for (const PlatoonUnitSearchEntry& candidate : nearbyUnits) {
-          (void)ref.AddUnit(candidate.unit);
+          (void)ref.Add(candidate.unit);
           if (++added == requiredSize) {
             break;
           }
@@ -3046,7 +3045,7 @@ namespace moho
     const msvc8::vector<EntityCategorySet> priorityList = squad->mCats;
 
     // Gather every unit within `radius` of `center` ("ALLUNITS", alliance-filtered).
-    SEntitySetTemplateUnit gatheredUnits{};
+    EntitySetTemplate<Unit> gatheredUnits{};
     (void)CollectUnitsAroundPointFiltered(
       mArmy->GetArmyBrain(),
       &gatheredUnits,
@@ -3261,7 +3260,7 @@ namespace moho
           }
           const float gatherRadius = static_cast<float>(maxDimension) * kLeastDefendedRadiusScale;
 
-          SEntitySetTemplateUnit nearbyDefenders{};
+          EntitySetTemplate<Unit> nearbyDefenders{};
           (void)CollectUnitsAroundPointFiltered(
             unitEntity->ArmyRef->GetArmyBrain(),
             &nearbyDefenders,
@@ -3274,7 +3273,7 @@ namespace moho
           for (Entity* const* defenderSlot = nearbyDefenders.mVec.begin();
                defenderSlot != nearbyDefenders.mVec.end();
                ++defenderSlot) {
-            const Unit* const defender = SEntitySetTemplateUnit::UnitFromEntry(*defenderSlot);
+            const Unit* const defender = static_cast<Unit*>(*defenderSlot);
             if (defender == nullptr) {
               continue;
             }
@@ -3838,7 +3837,7 @@ namespace moho
    */
   static void IssuePlatoonAttackCommand(
     Sim* const sim,
-    SEntitySetTemplateUnit& units,
+    EntitySetTemplate<Unit>& units,
     Entity* const target,
     const int formationScriptIndex,
     msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
@@ -3897,14 +3896,14 @@ namespace moho
         }
 
         if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+          EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
           const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
           IssuePlatoonAttackCommand(mSim, squadUnits, target, formationScriptIndex, issuedCommands);
         }
       }
     } else {
       // Platoon-wide formation attack.
-      SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
+      EntitySetTemplate<Unit> platoonUnits = GetPlatoonUnits();
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonAttackCommand(mSim, platoonUnits, target, formationScriptIndex, issuedCommands);
     }
@@ -4010,7 +4009,7 @@ namespace moho
    */
   static void IssuePlatoonMoveCommand(
     Sim* const sim,
-    SEntitySetTemplateUnit& units,
+    EntitySetTemplate<Unit>& units,
     Entity* const target,
     const int formationScriptIndex,
     msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
@@ -4066,12 +4065,12 @@ namespace moho
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
 
     if (useTransports) {
-      SEntitySetTemplateUnit transports{};
-      SEntitySetTemplateUnit moveSet{};
+      EntitySetTemplate<Unit> transports{};
+      EntitySetTemplate<Unit> moveSet{};
 
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
         if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+          EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
 
           // Collect alive transports from every class.
           for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
@@ -4084,7 +4083,7 @@ namespace moho
               continue;
             }
             if (unit->IsInCategory("TRANSPORTATION")) {
-              (void)transports.AddUnit(unit);
+              (void)transports.Add(unit);
             }
           }
 
@@ -4102,7 +4101,7 @@ namespace moho
         IssuePlatoonMoveCommand(mSim, moveSet, target, -1, issuedCommands);
       }
     } else if (!mFormation.empty()) {
-      SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
+      EntitySetTemplate<Unit> platoonUnits = GetPlatoonUnits();
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonMoveCommand(mSim, platoonUnits, target, formationScriptIndex, issuedCommands);
     } else {
@@ -4112,7 +4111,7 @@ namespace moho
         }
 
         if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+          EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
           const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
           IssuePlatoonMoveCommand(mSim, squadUnits, target, formationScriptIndex, issuedCommands);
         }
@@ -4223,7 +4222,7 @@ namespace moho
    */
   static void IssuePlatoonMoveToLocationCommand(
     Sim* const sim,
-    SEntitySetTemplateUnit& units,
+    EntitySetTemplate<Unit>& units,
     const Wm3::Vector3f& target,
     const int formationScriptIndex,
     msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
@@ -4286,12 +4285,12 @@ namespace moho
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
 
     if (useTransports) {
-      SEntitySetTemplateUnit transports{};
-      SEntitySetTemplateUnit moveSet{};
+      EntitySetTemplate<Unit> transports{};
+      EntitySetTemplate<Unit> moveSet{};
 
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
         if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+          EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
 
           for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
             Entity* const entity = *entry;
@@ -4303,7 +4302,7 @@ namespace moho
               continue;
             }
             if (unit->IsInCategory("TRANSPORTATION")) {
-              (void)transports.AddUnit(unit);
+              (void)transports.Add(unit);
             }
           }
 
@@ -4320,7 +4319,7 @@ namespace moho
         IssuePlatoonMoveToLocationCommand(mSim, moveSet, pos, -1, issuedCommands);
       }
     } else if (!mFormation.empty()) {
-      SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
+      EntitySetTemplate<Unit> platoonUnits = GetPlatoonUnits();
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonMoveToLocationCommand(mSim, platoonUnits, pos, formationScriptIndex, issuedCommands);
     } else {
@@ -4330,7 +4329,7 @@ namespace moho
         }
 
         if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+          EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
           const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
           IssuePlatoonMoveToLocationCommand(mSim, squadUnits, pos, formationScriptIndex, issuedCommands);
         }
@@ -4447,7 +4446,7 @@ namespace moho
    */
   static void IssuePlatoonAggressiveMoveCommand(
     Sim* const sim,
-    SEntitySetTemplateUnit& units,
+    EntitySetTemplate<Unit>& units,
     const Wm3::Vector3f& pos,
     const int formationScriptIndex,
     msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
@@ -4507,13 +4506,13 @@ namespace moho
         }
 
         if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+          EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
           const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
           IssuePlatoonAggressiveMoveCommand(mSim, squadUnits, pos, formationScriptIndex, issuedCommands);
         }
       }
     } else {
-      SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
+      EntitySetTemplate<Unit> platoonUnits = GetPlatoonUnits();
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonAggressiveMoveCommand(mSim, platoonUnits, pos, formationScriptIndex, issuedCommands);
     }
@@ -4629,17 +4628,17 @@ namespace moho
     }
     targetPos.y = surfaceElevation;
 
-    SEntitySetTemplateUnit transports{};
+    EntitySetTemplate<Unit> transports{};
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
       if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+        EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
-          Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+          Unit* const unit = static_cast<Unit*>(*entry);
           if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt()) {
             continue;
           }
           if (unit->IsInCategory("TRANSPORTATION")) {
-            (void)transports.AddUnit(unit);
+            (void)transports.Add(unit);
           }
         }
       }
@@ -4839,12 +4838,12 @@ namespace moho
     }
     pos.y = surfaceElevation;
 
-    SEntitySetTemplateUnit unitsToUnload{};
+    EntitySetTemplate<Unit> unitsToUnload{};
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
       if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+        EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
-          Unit* const carrier = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+          Unit* const carrier = static_cast<Unit*>(*entry);
           if (carrier == nullptr || carrier->IsDead() || carrier->IsBeingBuilt()) {
             continue;
           }
@@ -4860,12 +4859,12 @@ namespace moho
             }
             const std::uint32_t ordinal = heldUnit->GetBlueprint()->mCategoryBitIndex;
             if (category->mBits.Contains(ordinal)) {
-              (void)unitsToUnload.AddUnit(heldUnit);
+              (void)unitsToUnload.Add(heldUnit);
               carrierGaveUpAUnit = true;
             }
           }
           if (carrierGaveUpAUnit) {
-            (void)unitsToUnload.AddUnit(carrier);
+            (void)unitsToUnload.Add(carrier);
           }
         }
       }
@@ -4976,17 +4975,17 @@ namespace moho
   {
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
-    SEntitySetTemplateUnit carriers{};
+    EntitySetTemplate<Unit> carriers{};
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
       if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+        EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
-          Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+          Unit* const unit = static_cast<Unit*>(*entry);
           if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt()) {
             continue;
           }
           if (unit->IsInCategory("TRANSPORTATION") || unit->IsInCategory("CARRIER")) {
-            (void)carriers.AddUnit(unit);
+            (void)carriers.Add(unit);
           }
         }
       }
@@ -5094,7 +5093,7 @@ namespace moho
    */
   static void IssuePlatoonPatrolCommand(
     Sim* const sim,
-    SEntitySetTemplateUnit& units,
+    EntitySetTemplate<Unit>& units,
     const Wm3::Vector3f& target,
     const int formationScriptIndex
   )
@@ -5147,7 +5146,7 @@ namespace moho
 
     // Platoon-wide formation patrol.
     if (!mFormation.empty()) {
-      SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
+      EntitySetTemplate<Unit> platoonUnits = GetPlatoonUnits();
       const int formationScriptIndex = formationDb->GetScriptIndex(mFormation.c_str(), &platoonUnits);
       IssuePlatoonPatrolCommand(mSim, platoonUnits, target, formationScriptIndex);
       return;
@@ -5160,7 +5159,7 @@ namespace moho
       }
 
       if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+        EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
         const int formationScriptIndex = formationDb->GetScriptIndex(squad->mName.c_str(), &squadUnits);
         IssuePlatoonPatrolCommand(mSim, squadUnits, target, formationScriptIndex);
       }
@@ -5248,7 +5247,7 @@ namespace moho
   {
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
-    const auto issueGuardOnUnits = [&](SEntitySetTemplateUnit& units) {
+    const auto issueGuardOnUnits = [&](EntitySetTemplate<Unit>& units) {
       SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Guard);
       commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Entity;
       commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(guardTarget->GetEntityId());
@@ -5269,12 +5268,12 @@ namespace moho
         }
 
         if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-          SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+          EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
           issueGuardOnUnits(squadUnits);
         }
       }
     } else {
-      SEntitySetTemplateUnit formationUnits = GetPlatoonUnits();
+      EntitySetTemplate<Unit> formationUnits = GetPlatoonUnits();
       issueGuardOnUnits(formationUnits);
     }
 
@@ -5381,18 +5380,18 @@ namespace moho
   {
     mHasLuaList = false;
 
-    SEntitySetTemplateUnit doomedUnits{};
+    EntitySetTemplate<Unit> doomedUnits{};
     for (std::int32_t squadClassIndex = 1; squadClassIndex < static_cast<std::int32_t>(kAllSquadClasses); ++squadClassIndex) {
       if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
         continue;
       }
 
       if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-        const SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+        const EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
         for (Entity* const entity : squadUnits.mVec) {
           Unit* const unit = static_cast<Unit*>(entity);
           if (unit != nullptr && !unit->IsDead()) {
-            (void)doomedUnits.AddUnit(unit);
+            (void)doomedUnits.Add(unit);
           }
         }
         squad->RemoveUnits(squadUnits);
@@ -5476,8 +5475,8 @@ namespace moho
    * Address: 0x00725870 (FUN_00725870, Moho::CPlatoon::GetFerryBeacons)
    *
    * IDA signature:
-   * SEntitySetTemplateUnit* __stdcall CPlatoon::GetFerryBeacons(CPlatoon* this,
-   *                                                             SEntitySetTemplateUnit* out);
+   * EntitySetTemplate<Unit>* __stdcall CPlatoon::GetFerryBeacons(CPlatoon* this,
+   *                                                             EntitySetTemplate<Unit>* out);
    *
    * What it does:
    * Collects the ferry-beacon units the platoon is currently ferrying to: for every
@@ -5486,17 +5485,17 @@ namespace moho
    * the entity set). The decompiler mislabels the result as `std::map_uint_Entity`;
    * it is the intrusive unit set the callback then exposes to Lua.
    */
-  void CPlatoon::GetFerryBeacons(SEntitySetTemplateUnit& outBeacons)
+  void CPlatoon::GetFerryBeacons(EntitySetTemplate<Unit>& outBeacons)
   {
-    SEntitySetTemplateUnit platoonUnits = GetPlatoonUnits();
+    EntitySetTemplate<Unit> platoonUnits = GetPlatoonUnits();
 
     for (Entity* const* entry = platoonUnits.mVec.begin(); entry != platoonUnits.mVec.end(); ++entry) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+      Unit* const unit = static_cast<Unit*>(*entry);
       if (unit == nullptr || !unit->IsUnitState(EUnitState::UNITSTATE_Ferrying)) {
         continue;
       }
       if (Unit* const beacon = unit->GetTransportFerryBeacon()) {
-        (void)outBeacons.AddUnit(beacon);
+        (void)outBeacons.Add(beacon);
       }
     }
   }
@@ -5518,7 +5517,7 @@ namespace moho
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
 
-    SEntitySetTemplateUnit ferryBeacons{};
+    EntitySetTemplate<Unit> ferryBeacons{};
     platoon->GetFerryBeacons(ferryBeacons);
 
     LuaPlus::LuaObject beaconTable{};
@@ -5526,7 +5525,7 @@ namespace moho
 
     int beaconIndex = 1;
     for (Entity* const* entry = ferryBeacons.mVec.begin(); entry != ferryBeacons.mVec.end(); ++entry) {
-      Unit* const beacon = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+      Unit* const beacon = static_cast<Unit*>(*entry);
       if (beacon == nullptr) {
         continue;
       }
@@ -5587,12 +5586,12 @@ namespace moho
   {
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
-    SEntitySetTemplateUnit loadableUnits{};
+    EntitySetTemplate<Unit> loadableUnits{};
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
       if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+        EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
-          Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entry);
+          Unit* const unit = static_cast<Unit*>(*entry);
           if (unit == nullptr || unit->IsDead() || unit->IsBeingBuilt() || !unit->IsMobile()) {
             continue;
           }
@@ -5601,7 +5600,7 @@ namespace moho
           // "mBlueprintOrdinal" on the RUnitBlueprint returned by GetBlueprint).
           const std::uint32_t ordinal = unit->GetBlueprint()->mCategoryBitIndex;
           if (category->mBits.Contains(ordinal)) {
-            (void)loadableUnits.AddUnit(unit);
+            (void)loadableUnits.Add(unit);
           }
         }
       }
@@ -5712,22 +5711,22 @@ namespace moho
   {
     msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
-    SEntitySetTemplateUnit selectedUnits{};
+    EntitySetTemplate<Unit> selectedUnits{};
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
       if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
         continue;
       }
 
       if (CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClassIndex))) {
-        SEntitySetTemplateUnit squadUnits = squad->GetUnitSet();
+        EntitySetTemplate<Unit> squadUnits = squad->GetUnitSet();
         for (Entity* const* entry = squadUnits.mVec.begin(); entry != squadUnits.mVec.end(); ++entry) {
-          (void)selectedUnits.AddUnit(SEntitySetTemplateUnit::UnitFromEntry(*entry));
+          (void)selectedUnits.Add(static_cast<Unit*>(*entry));
         }
       }
     }
 
     if (!selectedUnits.Empty() && teleporter != nullptr) {
-      (void)selectedUnits.AddUnit(teleporter);
+      (void)selectedUnits.Add(teleporter);
 
       SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_TransportLoadUnits);
       commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Entity;
@@ -6012,11 +6011,11 @@ namespace moho
     const EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
     const PlatoonThreatType threatType = ParsePlatoonThreatType(threatTypeName);
 
-    SEntitySetTemplateUnit platoonUnits = platoon->GetPlatoonUnits();
+    EntitySetTemplate<Unit> platoonUnits = platoon->GetPlatoonUnits();
 
     float totalThreat = 0.0f;
     for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {
-      const Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entityIt);
+      const Unit* const unit = static_cast<Unit*>(*entityIt);
       if (!IsThreatCandidateUnit(unit)) {
         continue;
       }
@@ -6105,11 +6104,11 @@ namespace moho
     const float radiusSq = ReadSquaredRadiusArg(state, 5);
     const PlatoonThreatType threatType = ParsePlatoonThreatType(threatTypeName);
 
-    SEntitySetTemplateUnit platoonUnits = platoon->GetPlatoonUnits();
+    EntitySetTemplate<Unit> platoonUnits = platoon->GetPlatoonUnits();
 
     float totalThreat = 0.0f;
     for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {
-      const Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entityIt);
+      const Unit* const unit = static_cast<Unit*>(*entityIt);
       if (!IsThreatCandidateUnit(unit)) {
         continue;
       }
@@ -6197,11 +6196,11 @@ namespace moho
     const Wm3::Vector3f position = SCR_FromLuaCopy<Wm3::Vector3<float>>(positionObject);
     const float radiusSq = ReadSquaredRadiusArg(state, 4);
 
-    SEntitySetTemplateUnit platoonUnits = platoon->GetPlatoonUnits();
+    EntitySetTemplate<Unit> platoonUnits = platoon->GetPlatoonUnits();
 
     int matchingCount = 0;
     for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {
-      const Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entityIt);
+      const Unit* const unit = static_cast<Unit*>(*entityIt);
       if (!IsThreatCandidateUnit(unit)) {
         continue;
       }
@@ -6277,11 +6276,11 @@ namespace moho
     LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
     const EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
-    SEntitySetTemplateUnit platoonUnits = platoon->GetPlatoonUnits();
+    EntitySetTemplate<Unit> platoonUnits = platoon->GetPlatoonUnits();
 
     int matchingCount = 0;
     for (moho::Entity* const* entityIt = platoonUnits.mVec.begin(); entityIt != platoonUnits.mVec.end(); ++entityIt) {
-      const Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*entityIt);
+      const Unit* const unit = static_cast<Unit*>(*entityIt);
       if (!IsThreatCandidateUnit(unit)) {
         continue;
       }

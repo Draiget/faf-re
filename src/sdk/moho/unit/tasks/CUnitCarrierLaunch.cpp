@@ -59,7 +59,7 @@ namespace
   {
     static gpg::RType* type = nullptr;
     if (!type) {
-      type = gpg::LookupRType(typeid(moho::SEntitySetTemplateUnit));
+      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
     }
     return type;
   }
@@ -95,7 +95,7 @@ namespace moho
   CUnitCarrierLaunch::CUnitCarrierLaunch(
     CCommandTask* const parentTask,
     const SNavGoal& launchGoal,
-    const SEntitySetTemplateUnit& commandUnits
+    const EntitySetTemplate<Unit>& commandUnits
   )
     : CCommandTask(parentTask)
     , mLaunchGoal(launchGoal)
@@ -116,7 +116,7 @@ namespace moho
 
       mHasCarrierTransportedUnit = true;
       if (transportOwner == mUnit) {
-        (void)mCarriedUnits.AddUnit(candidate);
+        (void)mCarriedUnits.Add(candidate);
       }
     }
 
@@ -153,7 +153,7 @@ namespace moho
   CUnitCarrierLaunch* CUnitCarrierLaunch::Create(
     CCommandTask* const parentTask,
     const SNavGoal* const launchGoal,
-    const SEntitySetTemplateUnit* const commandUnits
+    const EntitySetTemplate<Unit>* const commandUnits
   )
   {
     void* const storage = ::operator new(sizeof(CUnitCarrierLaunch));
@@ -222,14 +222,14 @@ namespace moho
           // preserves element ordering and type safety is the
           // typed `AddUnits(const EntitySetTemplate<Unit>&)` helper.
           const EntitySetTemplate<Unit> stored = mUnit->AiTransport->TransportGetStoredUnits();
-          mCarriedUnits.AddUnits(stored);
+          mCarriedUnits.AddRange(stored.mVec.begin(), stored.mVec.end());
         }
 
         // Spawn the sibling retrieve task that drives the unload-and-
         // wait flow on the receiving side. The retrieve task is created
         // with an empty tracked-unit set; the Starting case populates
         // the binary's tracked set lazily as units are released.
-        SEntitySetTemplateUnit emptyTracked{};
+        EntitySetTemplate<Unit> emptyTracked{};
         (void)CUnitCarrierRetrieve::Create(this, emptyTracked);
 
         mTaskState = TASKSTATE_Waiting;
@@ -277,12 +277,12 @@ namespace moho
           return 3;
         }
 
-        Unit* const next = (*start != nullptr) ? SEntitySetTemplateUnit::UnitFromEntry(*start) : nullptr;
+        Unit* const next = (*start != nullptr) ? static_cast<Unit*>(*start) : nullptr;
 
         // Pop the first unit into a one-element tracked set (matches the
         // binary's transient v25/searchSlot pair).
-        SEntitySetTemplateUnit firstUnit{};
-        (void)firstUnit.AddUnit(next);
+        EntitySetTemplate<Unit> firstUnit{};
+        (void)firstUnit.Add(next);
 
         // Capture the transform produced by removing the unit from the
         // transport so we can re-settle the unit at that pose. The binary
@@ -299,7 +299,7 @@ namespace moho
         next->SetPendingTransform(unloadTransform, 1.0f);
         next->AdvanceCoords();
         next->AdvanceCoords();
-        (void)mCarriedUnits.ContainsUnit(next); // matches the binary's containment probe
+        (void)mCarriedUnits.Contains(next); // matches the binary's containment probe
 
         // Compute initial velocity: (1 - 2*(qx*qx + qz*qz)) * blueprint.maxSpeed
         // along (qx, qy, qz). The quaternion encodes the spawn-facing

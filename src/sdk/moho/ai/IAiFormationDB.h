@@ -20,7 +20,8 @@ namespace moho
   class CAiFormationInstance;
   class RRuleGameRules;
   class Unit;
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
 
   /**
    * Formation script bucket type used by `/lua/formations.lua`.
@@ -255,7 +256,7 @@ namespace moho
      * its `{begin, end}` at +0x08/+0x0C: it is the unit set, not a caller-chosen
      * formation-type enum.
      */
-    virtual const char* GetScriptName(int scriptIndex, const SEntitySetTemplateUnit* unitSet) = 0;
+    virtual const char* GetScriptName(int scriptIndex, const EntitySetTemplate<Unit>* unitSet) = 0;
 
     /**
      * Address: 0x0059C0F0 (FUN_0059C0F0)
@@ -266,7 +267,7 @@ namespace moho
      * bucket derived from the passed unit set. As with GetScriptName, the second
      * parameter is the unit set, which the PDB mislabels as `EFormationType`.
      */
-    virtual int GetScriptIndex(gpg::StrArg scriptName, const SEntitySetTemplateUnit* unitSet) = 0;
+    virtual int GetScriptIndex(gpg::StrArg scriptName, const EntitySetTemplate<Unit>* unitSet) = 0;
 
     /**
      * Address: 0x0059C060 (FUN_0059C060)
@@ -294,7 +295,7 @@ namespace moho
      * constructs a new formation instance, then appends it to this DB.
      */
     virtual CAiFormationInstance* NewFormation(
-      const SEntitySetTemplateUnit* unitSet,
+      const EntitySetTemplate<Unit>* unitSet,
       const char* scriptName,
       const SCoordsVec2* formationCenter,
       float orientX,

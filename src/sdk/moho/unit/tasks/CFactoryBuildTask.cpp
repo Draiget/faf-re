@@ -16,7 +16,6 @@
 #include "moho/command/SSTITarget.h"
 #include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/CSimConVarInstanceBase.h"
 #include "moho/sim/Sim.h"
@@ -481,8 +480,8 @@ namespace moho
         }
 
         if (selectedTransport != nullptr) {
-          SEntitySetTemplateUnit dispatchSet{};
-          (void)dispatchSet.AddUnit(selectedTransport);
+          EntitySetTemplate<Unit> dispatchSet{};
+          (void)dispatchSet.Add(selectedTransport);
 
           CAiTarget aiTarget{};
           aiTarget.UpdateTarget(selectedTransport);

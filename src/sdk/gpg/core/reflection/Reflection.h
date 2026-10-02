@@ -1093,6 +1093,8 @@ namespace gpg
    * moho/animation/CAniDefaultSkelConstruct.cpp, removed 2026-09-30.)
    * Address: 0x0050D390 (FUN_0050D390 -- `RTypeOf<gpg::Rect2i>`, slot 0x010C6D98; formerly `CachedRect2iType`
    * in gpg/core/reflection/Reflection.cpp, removed 2026-10-01.)
+   * Address: 0x006D2EA0 (FUN_006D2EA0 -- `RTypeOf<moho::WeakEntitySetTemplate<moho::Unit>>`; formerly
+   * `ResolveWeakUnitSetType` in moho/serialization/WeakUnitSetSerializer.cpp, removed 2026-10-01.)
    *
    * A pointer type is the exception: its descriptor is the pointee's
    * `RPointerType` object, which `U::GetPointerType()` constructs before it

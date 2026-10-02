@@ -46,7 +46,7 @@ namespace moho
     CSimConCommand::ParsedCommandArgs* commandArgs,
     Wm3::Vector3f* worldPos,
     CArmyImpl* focusArmy,
-    SEntitySetTemplateUnit* selectedUnits
+    EntitySetTemplate<Unit>* selectedUnits
   );
 }
 
@@ -2707,7 +2707,7 @@ namespace moho
     CSimConCommand::ParsedCommandArgs* const commandArgs,
     Wm3::Vector3f* const worldPos,
     CArmyImpl* const focusArmy,
-    SEntitySetTemplateUnit* const selectedUnits
+    EntitySetTemplate<Unit>* const selectedUnits
   )
   {
     (void)focusArmy;

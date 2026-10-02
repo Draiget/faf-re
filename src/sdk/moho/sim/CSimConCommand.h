@@ -11,7 +11,9 @@ namespace moho
 {
   class Sim;
   class CArmyImpl;
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
+  class Unit;
 
   /**
    * VFTABLE: 0x00E32B1C
@@ -58,7 +60,7 @@ namespace moho
      *   std::vector<std::string>* commandArgs,
      *   Wm3::Vector3<float>* worldPos,
      *   Moho::CArmyImpl* focusArmy,
-     *   Moho::SEntitySetTemplateUnit* selectedUnits);
+     *   Moho::EntitySetTemplate<Unit>* selectedUnits);
      *
      * What it does:
      * Executes one parsed sim-console command payload.
@@ -68,7 +70,7 @@ namespace moho
       ParsedCommandArgs* commandArgs,
       Wm3::Vector3f* worldPos,
       CArmyImpl* focusArmy,
-      SEntitySetTemplateUnit* selectedUnits
+      EntitySetTemplate<Unit>* selectedUnits
     ) = 0;
 
     /**

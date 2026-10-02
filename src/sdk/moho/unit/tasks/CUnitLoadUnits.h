@@ -5,7 +5,7 @@
 
 #include "legacy/containers/Vector.h"
 #include "moho/ai/SPickUpInfo.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/task/CCommandTask.h"
 #include "Wm3Vector3.h"
 
@@ -41,7 +41,7 @@ namespace moho
      * binds transport mode flags, links unit-set ownership in EntityDB, and
      * starts transport-loading script/state.
      */
-    CUnitLoadUnits(CCommandTask* parentTask, const SEntitySetTemplateUnit& requestedUnits);
+    CUnitLoadUnits(CCommandTask* parentTask, const EntitySetTemplate<Unit>& requestedUnits);
 
     /**
      * Address: 0x00624CC0 (FUN_00624CC0, Moho::CUnitLoadUnits::~CUnitLoadUnits)
@@ -60,7 +60,7 @@ namespace moho
      * Allocates one load-units task and forwards constructor arguments into
      * in-place construction.
      */
-    [[nodiscard]] static CUnitLoadUnits* Create(CCommandTask* parentTask, const SEntitySetTemplateUnit* requestedUnits);
+    [[nodiscard]] static CUnitLoadUnits* Create(CCommandTask* parentTask, const EntitySetTemplate<Unit>* requestedUnits);
 
     /**
      * Address: 0x00625110 (FUN_00625110, Moho::CUnitLoadUnits::DoTask)
@@ -102,7 +102,7 @@ namespace moho
 
   public:
     msvc8::vector<SPickUpInfo> mPickupQueue;  // 0x30
-    SEntitySetTemplateUnit mRequestedUnits;   // 0x40
+    EntitySetTemplate<Unit> mRequestedUnits;   // 0x40
     Wm3::Vector3f mPickupCenter;              // 0x68
     std::int32_t mReadyUnitCount;             // 0x74
     std::int32_t mLoadedUnitCount;            // 0x78

@@ -1106,8 +1106,7 @@ namespace moho
     float bestReachableScore = gpg::pInf;
     float bestFallbackScore = gpg::pInf;
 
-    for (Entity* const* it = candidateSet.begin(); it != candidateSet.end(); ++it) {
-      Entity* const candidateEntity = *it;
+    for (Entity* const candidateEntity : candidateSet) {
       Unit* const candidateUnit = candidateEntity ? candidateEntity->IsUnit() : nullptr;
       if (candidateUnit == nullptr) {
         continue;

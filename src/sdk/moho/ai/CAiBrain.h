@@ -40,7 +40,8 @@ namespace moho
   class CScrLuaInitForm;
   class CTaskStage;
   class Entity;
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
   class Sim;
   class Unit;
   enum EAlliance : std::int32_t;
@@ -213,8 +214,8 @@ namespace moho
      * Scans this brain's non-mobile factory units and appends currently
      * available entries to `outSet`, optionally filtering by XZ range.
      */
-    SEntitySetTemplateUnit* GetAvailableFactories(
-      SEntitySetTemplateUnit* outSet,
+    EntitySetTemplate<Unit>* GetAvailableFactories(
+      EntitySetTemplate<Unit>* outSet,
       const Wm3::Vector3f* referencePosition,
       float maxDistance
     );
@@ -323,9 +324,9 @@ namespace moho
    * appends those passing liveness / destroy-queue / alliance / recon-visibility
    * / category filters. Returns `outUnits`.
    */
-  SEntitySetTemplateUnit* CollectUnitsAroundPointFiltered(
+  EntitySetTemplate<Unit>* CollectUnitsAroundPointFiltered(
     CAiBrain* brain,
-    SEntitySetTemplateUnit* outUnits,
+    EntitySetTemplate<Unit>* outUnits,
     const EntityCategorySet* categorySet,
     const Wm3::Vector3f& position,
     float dist,
@@ -340,7 +341,7 @@ namespace moho
    * `CAiBrain:GetAvailableFactories()` and `CSquad::GetUnits`.
    */
   LuaPlus::LuaObject* FillLuaTableWithEntities(
-    const SEntitySetTemplateUnit& entities,
+    const EntitySetTemplate<Unit>& entities,
     LuaPlus::LuaObject* outTable,
     LuaPlus::LuaState* state);
 

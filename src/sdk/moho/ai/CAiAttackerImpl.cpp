@@ -18,7 +18,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/script/CScriptEvent.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -1416,10 +1416,10 @@ bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
     return false;
   }
 
-  SEntitySetTemplateUnit engineerUnits{};
+  EntitySetTemplate<Unit> engineerUnits{};
   ownerUnit->ArmyRef->GetUnits(&engineerUnits, const_cast<void*>(static_cast<const void*>(engineerCategory)));
   for (Entity* const* it = engineerUnits.mVec.begin(); it != engineerUnits.mVec.end(); ++it) {
-    Unit* const engineer = SEntitySetTemplateUnit::UnitFromEntry(*it);
+    Unit* const engineer = static_cast<Unit*>(*it);
     if (engineer == nullptr || engineer->IsDead() || engineer->DestroyQueued()) {
       continue;
     }

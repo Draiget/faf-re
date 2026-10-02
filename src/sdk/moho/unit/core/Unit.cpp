@@ -65,7 +65,7 @@
 #include "moho/task/ETaskStatus.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/path/PathTables.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/CArmyStats.h"
@@ -2650,10 +2650,10 @@ int moho::cfunc_UnitGetCargoL(LuaPlus::LuaState* const state)
   resultTable.AssignNewTable(state, 0, 0);
 
   int resultIndex = 1;
-  for (Unit* const* it = loadedUnits.begin(); it != loadedUnits.end(); ++it, ++resultIndex) {
-    Unit* const cargoUnit = *it;
+  for (Unit* const cargoUnit : loadedUnits) {
     LuaPlus::LuaObject cargoObject = cargoUnit->GetLuaObject();
     resultTable.Insert(resultIndex, cargoObject);
+    ++resultIndex;
   }
 
   resultTable.PushStack(state);
@@ -12794,8 +12794,8 @@ int Unit::MotionTick()
   HandleResourceManagement();
 
   if (mIsNotPod && (CommandQueue == nullptr || CommandQueue->mCommandVec.empty())) {
-    SEntitySetTemplateUnit selectedUnits{};
-    (void)selectedUnits.AddUnit(this);
+    EntitySetTemplate<Unit> selectedUnits{};
+    (void)selectedUnits.Add(this);
     SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_AssistCommander);
     (void)IssueCommandToSelectedUnits(SimulationRef, selectedUnits, commandData, false);
   }
@@ -13189,8 +13189,8 @@ Unit::Unit(const SUnitConstructionParams& params)
 
   // --- publish into the army pool ----------------------------------------
   {
-    SEntitySetTemplateUnit spawnedSet{};
-    (void)spawnedSet.AddUnit(this);
+    EntitySetTemplate<Unit> spawnedSet{};
+    (void)spawnedSet.Add(this);
     ArmyRef->AssignUnitsToPlatoon(&spawnedSet, "ArmyPool");
   }
 
@@ -13216,10 +13216,10 @@ Unit::Unit(const SUnitConstructionParams& params)
     RunScript("OnStartBeingBuilt", creatorObject, layerName);
   } else {
     if (UnitMotion == nullptr) {
-      SEntitySetTemplateUnit overlapping{};
+      EntitySetTemplate<Unit> overlapping{};
       (void)CollectAllOverlapping(&overlapping, this);
       for (Entity* const entry : overlapping.mVec) {
-        Unit* const neighbour = SEntitySetTemplateUnit::UnitFromEntry(entry);
+        Unit* const neighbour = static_cast<Unit*>(entry);
         if (neighbour == nullptr) {
           continue;
         }
@@ -14444,10 +14444,10 @@ float Unit::Materialize(const float delta)
 
   // Adjacency is a structure concept; mobile units never bond to neighbours.
   if (!IsMobile()) {
-    SEntitySetTemplateUnit overlapping{};
+    EntitySetTemplate<Unit> overlapping{};
     (void)CollectAllOverlapping(&overlapping, this);
     for (Entity* const entry : overlapping.mVec) {
-      Unit* const neighbour = SEntitySetTemplateUnit::UnitFromEntry(entry);
+      Unit* const neighbour = static_cast<Unit*>(entry);
       if (neighbour == nullptr) {
         continue;
       }
@@ -14980,7 +14980,7 @@ void Unit::SetGuardedUnit(Unit* const guarded)
 {
   Unit* const oldGuardedUnit = GuardedUnitRef.GetObjectPtr();
   if (oldGuardedUnit != nullptr) {
-    (void)oldGuardedUnit->GuardedByList.RemoveUnit(this); // 0x005E8960
+    (void)oldGuardedUnit->GuardedByList.Remove(this); // 0x005E8960
     ClearGuardFormation(oldGuardedUnit);
   }
 
@@ -14988,7 +14988,7 @@ void Unit::SetGuardedUnit(Unit* const guarded)
 
   Unit* const newGuardedUnit = GuardedUnitRef.GetObjectPtr();
   if (newGuardedUnit != nullptr) {
-    (void)newGuardedUnit->GuardedByList.AddUnit(this); // 0x0057DDD0
+    (void)newGuardedUnit->GuardedByList.Add(this); // 0x0057DDD0
     ClearGuardFormation(newGuardedUnit);
   }
 
@@ -15006,7 +15006,7 @@ void Unit::SetGuardedUnit(Unit* const guarded)
 void Unit::RemoveGuardedByUnit(Unit* const guardedByUnit)
 {
   if (guardedByUnit != nullptr) {
-    (void)GuardedByList.AddUnit(guardedByUnit); // 0x0057DDD0
+    (void)GuardedByList.Add(guardedByUnit); // 0x0057DDD0
   }
 
   ClearGuardFormation(this);
@@ -16058,7 +16058,7 @@ std::string Unit::GetCustomName() const
  * Gathers nearby non-mobile same-army same-layer structures and appends
  * those whose skirt rectangles overlap `unit`.
  */
-SEntitySetTemplateUnit* Unit::CollectAllOverlapping(SEntitySetTemplateUnit* const outSet, Unit* const unit)
+EntitySetTemplate<Unit>* Unit::CollectAllOverlapping(EntitySetTemplate<Unit>* const outSet, Unit* const unit)
 {
   if (outSet == nullptr) {
     return nullptr;
@@ -16117,7 +16117,7 @@ SEntitySetTemplateUnit* Unit::CollectAllOverlapping(SEntitySetTemplateUnit* cons
       continue;
     }
 
-    (void)outSet->AddUnit(other);
+    (void)outSet->Add(other);
   }
 
   return outSet;
@@ -16147,11 +16147,11 @@ void Unit::LookForStructureRebuilder()
     return;
   }
 
-  SEntitySetTemplateUnit rebuilderUnits{};
+  EntitySetTemplate<Unit> rebuilderUnits{};
   (void)ArmyRef->GetUnits(&rebuilderUnits, const_cast<EntityCategorySet*>(rebuilderCategory));
 
   for (Entity* const entry : rebuilderUnits.mVec) {
-    Unit* const rebuilder = SEntitySetTemplateUnit::UnitFromEntry(entry);
+    Unit* const rebuilder = static_cast<Unit*>(entry);
     if (rebuilder == nullptr) {
       continue;
     }
@@ -16213,7 +16213,7 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
   // UNITSTATE_TransportUnloading, which every corpse then carried.
   mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_NoCost));
 
-  SEntitySetTemplateUnit overlappingStructures{};
+  EntitySetTemplate<Unit> overlappingStructures{};
   if (!IsMobile()) {
     CollectAllOverlapping(&overlappingStructures, this);
     LookForStructureRebuilder();
@@ -16237,7 +16237,7 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
 
   if (!IsMobile() && !IsBeingBuilt()) {
     for (Entity* const entry : overlappingStructures.mVec) {
-      Unit* const adjacent = SEntitySetTemplateUnit::UnitFromEntry(entry);
+      Unit* const adjacent = static_cast<Unit*>(entry);
       if (adjacent == nullptr) {
         continue;
       }
@@ -16339,10 +16339,10 @@ void Unit::OnDestroy()
 
   if (!IsDead()) {
     if (!IsMobile() && !IsBeingBuilt()) {
-      SEntitySetTemplateUnit adjacentUnits{};
+      EntitySetTemplate<Unit> adjacentUnits{};
       CollectAllOverlapping(&adjacentUnits, this);
       for (Entity* const entry : adjacentUnits.mVec) {
-        Unit* const adjacent = SEntitySetTemplateUnit::UnitFromEntry(entry);
+        Unit* const adjacent = static_cast<Unit*>(entry);
         RunScriptUnit("OnNotAdjacentTo", adjacent);
         adjacent->RunScriptUnit("OnNotAdjacentTo", this);
         adjacent->ReserveOgridRect(GetReservedOgridRect(*adjacent));

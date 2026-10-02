@@ -62,7 +62,7 @@ int CSimConVarBase::Run(
   ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f*,
   CArmyImpl*,
-  SEntitySetTemplateUnit*
+  EntitySetTemplate<Unit>*
 )
 {
   CSimConVarInstanceBase* const simVar = sim->GetSimVar(this);

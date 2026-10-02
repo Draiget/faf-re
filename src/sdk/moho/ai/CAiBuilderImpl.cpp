@@ -23,7 +23,6 @@
 #include "moho/math/QuaternionMath.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
@@ -381,8 +380,8 @@ void CAiBuilderImpl::BuilderSetUpInitialRally()
   // point was rejected every time with "ignoring issue of cmd id 0xffffffff
   // ... the id's source (255) is wrong (should be 0)", so a new factory came
   // up with no rally point at all.
-  SEntitySetTemplateUnit factorySet{};
-  (void)factorySet.AddUnit(mOwnerUnit);
+  EntitySetTemplate<Unit> factorySet{};
+  (void)factorySet.Add(mOwnerUnit);
 
   SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_Move);
   issueData.mTarget.mType = EAiTargetType::AITARGET_Ground;

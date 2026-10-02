@@ -46,6 +46,9 @@ gamedata/
 # Session memory is machine-local; never pushed.
 .memory/
 
+# Working plans for agent sessions (Markdown + rendered HTML + their tools); machine-local.
+.plans/
+
 # Container build tooling stays local. It names private infrastructure (the
 # OCI registry it pushes to and pulls from) and pins a DirectX SDK subset we
 # are not redistributing, so the whole directory is kept off the repository.

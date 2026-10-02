@@ -18,7 +18,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/core/Unit.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/sim/Sim.h"
 
 using namespace moho;
@@ -189,7 +189,7 @@ namespace
    * `GetBlueprint` on it without a null test; a null entry is counted as
    * non-air here rather than faulting.
    */
-  [[nodiscard]] int ResolveFormationBucketTypeFromUnitSet(const moho::SEntitySetTemplateUnit* const unitSet)
+  [[nodiscard]] int ResolveFormationBucketTypeFromUnitSet(const moho::EntitySetTemplate<moho::Unit>* const unitSet)
   {
     if (unitSet == nullptr) {
       return 0;
@@ -694,7 +694,7 @@ void CAiFormationDBImpl::RemoveFormation(CAiFormationInstance* const formation)
 /**
  * Address: 0x0059C0C0 (FUN_0059C0C0)
  */
-const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const SEntitySetTemplateUnit* const unitSet)
+const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const EntitySetTemplate<Unit>* const unitSet)
 {
   if (!mSim) {
     return nullptr;
@@ -711,7 +711,7 @@ const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const SEnti
 /**
  * Address: 0x0059C0F0 (FUN_0059C0F0)
  */
-int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const SEntitySetTemplateUnit* const unitSet)
+int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const EntitySetTemplate<Unit>* const unitSet)
 {
   if (!mSim) {
     return 0;
@@ -746,7 +746,7 @@ int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const SEnti
  * free at 0x0059C2FB-0x0059C32E.
  */
 CAiFormationInstance* CAiFormationDBImpl::NewFormation(
-  const SEntitySetTemplateUnit* const unitSet,
+  const EntitySetTemplate<Unit>* const unitSet,
   const char* const scriptName,
   const SCoordsVec2* const formationCenter,
   const float orientX,

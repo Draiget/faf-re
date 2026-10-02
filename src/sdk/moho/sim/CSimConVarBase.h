@@ -37,7 +37,7 @@ namespace moho
      * What it does:
      * Resolves the per-Sim convar instance and forwards command args to instance handler slot.
      */
-    int Run(Sim* sim, ParsedCommandArgs* commandArgs, Wm3::Vector3f*, CArmyImpl*, SEntitySetTemplateUnit*) override;
+    int Run(Sim* sim, ParsedCommandArgs* commandArgs, Wm3::Vector3f*, CArmyImpl*, EntitySetTemplate<Unit>*) override;
 
     /**
      * Address: 0x00579790 (FUN_00579790, sub_579790)

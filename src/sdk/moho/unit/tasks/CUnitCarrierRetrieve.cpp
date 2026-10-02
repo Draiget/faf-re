@@ -14,7 +14,6 @@
 #include "moho/entity/EntityDb.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/Sim.h"
@@ -44,7 +43,7 @@ namespace
   {
     static gpg::RType* type = nullptr;
     if (!type) {
-      type = gpg::LookupRType(typeid(moho::SEntitySetTemplateUnit));
+      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
     }
     return type;
   }
@@ -88,7 +87,7 @@ namespace moho
    */
   CUnitCarrierRetrieve::CUnitCarrierRetrieve(
     CCommandTask* const parentTask,
-    const SEntitySetTemplateUnit& trackedUnits
+    const EntitySetTemplate<Unit>& trackedUnits
   )
     : CCommandTask(parentTask)
     , mRetrievalComplete(false)
@@ -157,7 +156,7 @@ namespace moho
           continue;
         }
 
-        Unit* const trackedUnit = SEntitySetTemplateUnit::UnitFromEntry(tracked);
+        Unit* const trackedUnit = static_cast<Unit*>(tracked);
         if (trackedUnit == nullptr || trackedUnit->IsDead()) {
           continue;
         }
@@ -187,7 +186,7 @@ namespace moho
    */
   CUnitCarrierRetrieve* CUnitCarrierRetrieve::Create(
     CCommandTask* const parentTask,
-    const SEntitySetTemplateUnit& trackedUnits
+    const EntitySetTemplate<Unit>& trackedUnits
   )
   {
     void* const storage = ::operator new(sizeof(CUnitCarrierRetrieve));
@@ -276,7 +275,7 @@ namespace moho
             continue;
           }
 
-          Unit* const trackedUnit = SEntitySetTemplateUnit::UnitFromEntry(tracked);
+          Unit* const trackedUnit = static_cast<Unit*>(tracked);
           if (trackedUnit == nullptr) {
             continue;
           }
@@ -341,7 +340,7 @@ namespace moho
         // remove each from the tracked set so it stops counting toward
         // the retrieve quorum. When the tracked set drains to empty, mark
         // the retrieve as complete and tell the dispatcher we're done.
-        SEntitySetTemplateUnit completedSet{};
+        EntitySetTemplate<Unit> completedSet{};
 
         Entity* const ownerEntity = (mUnit != nullptr) ? static_cast<Entity*>(mUnit) : nullptr;
 
@@ -350,18 +349,18 @@ namespace moho
           if (tracked == nullptr) {
             // Null sentinel slots feed through the binary's Add path to
             // keep slot accounting consistent with the original.
-            (void)completedSet.AddUnit(nullptr);
+            (void)completedSet.Add(nullptr);
             continue;
           }
 
-          Unit* const trackedUnit = SEntitySetTemplateUnit::UnitFromEntry(tracked);
+          Unit* const trackedUnit = static_cast<Unit*>(tracked);
           if (trackedUnit == nullptr) {
-            (void)completedSet.AddUnit(nullptr);
+            (void)completedSet.Add(nullptr);
             continue;
           }
 
           if (trackedUnit->IsDead() || !trackedUnit->IsUnitState(UNITSTATE_TransportLoading)) {
-            (void)completedSet.AddUnit(trackedUnit);
+            (void)completedSet.Add(trackedUnit);
             continue;
           }
 
@@ -375,7 +374,7 @@ namespace moho
             continue;
           }
 
-          (void)completedSet.AddUnit(trackedUnit);
+          (void)completedSet.Add(trackedUnit);
         }
 
         // Drain the completed set out of mTrackedUnits. The Remove call
@@ -383,8 +382,8 @@ namespace moho
         // dispatch (the IDA listing labels the address "Contains", but
         // the body is the erase lane recovered as RemoveUnit).
         for (Entity** it = completedSet.mVec.start_; it != completedSet.mVec.end_; ++it) {
-          Unit* const completedUnit = (*it != nullptr) ? SEntitySetTemplateUnit::UnitFromEntry(*it) : nullptr;
-          (void)mTrackedUnits.RemoveUnit(completedUnit);
+          Unit* const completedUnit = (*it != nullptr) ? static_cast<Unit*>(*it) : nullptr;
+          (void)mTrackedUnits.Remove(completedUnit);
         }
 
         if (mTrackedUnits.Empty()) {

@@ -132,7 +132,6 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/net/CClientManagerImpl.h"
-#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/BlueprintLoaderContext.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
@@ -1773,14 +1772,14 @@ namespace
   }
 
   template <class THandler>
-  void ForEachSelectedUnit(SEntitySetTemplateUnit* const selectedUnits, THandler&& handler)
+  void ForEachSelectedUnit(EntitySetTemplate<Unit>* const selectedUnits, THandler&& handler)
   {
     if (selectedUnits == nullptr) {
       return;
     }
 
     for (Entity* const* it = selectedUnits->mVec.begin(); it != selectedUnits->mVec.end(); ++it) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+      Unit* const unit = static_cast<Unit*>(*it);
       if (unit != nullptr) {
         handler(*unit);
       }
@@ -2361,19 +2360,19 @@ namespace
     return it->second;
   }
 
-  static_assert(sizeof(SEntitySetTemplateUnit) == 0x28, "SEntitySetTemplateUnit size must be 0x28");
+  static_assert(sizeof(EntitySetTemplate<Unit>) == 0x28, "EntitySetTemplate<Unit> size must be 0x28");
   static_assert(
-    sizeof(TDatList<EntitySetBase, void>) == 0x08, "SEntitySetTemplateUnit link-node size must be 0x08"
+    sizeof(TDatList<EntitySetBase, void>) == 0x08, "EntitySetTemplate<Unit> link-node size must be 0x08"
   );
 
-  void InitSimDebugEntitySet(SEntitySetTemplateUnit& outSet)
+  void InitSimDebugEntitySet(EntitySetTemplate<Unit>& outSet)
   {
     outSet.mNext = &outSet;
     outSet.mPrev = &outSet;
     outSet.mVec.RebindInlineNoFree();
   }
 
-  void DestroySimDebugEntitySet(SEntitySetTemplateUnit& set)
+  void DestroySimDebugEntitySet(EntitySetTemplate<Unit>& set)
   {
     set.mVec.ResetStorageToInline();
 
@@ -2785,8 +2784,8 @@ namespace
   }
 
   [[nodiscard]] bool CommandUnitSetMatchesSelection(
-    const SEntitySetTemplateUnit& commandUnits,
-    const SEntitySetTemplateUnit& selectedUnits
+    const EntitySetTemplate<Unit>& commandUnits,
+    const EntitySetTemplate<Unit>& selectedUnits
   ) noexcept
   {
     std::size_t commandUnitCount = 0;
@@ -2801,7 +2800,7 @@ namespace
     }
 
     for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
-      const Unit* const selectedUnit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+      const Unit* const selectedUnit = static_cast<Unit*>(*it);
       if (selectedUnit == nullptr) {
         return false;
       }
@@ -2893,14 +2892,14 @@ namespace
   void RetargetReverseLoadUnits(
     const SSTICommandIssueData& issueData,
     Sim* const sim,
-    SEntitySetTemplateUnit& selectedUnits
+    EntitySetTemplate<Unit>& selectedUnits
   )
   {
     if (sim == nullptr || issueData.mCommandType != EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits) {
       return;
     }
 
-    SEntitySetTemplateUnit originalSelection{};
+    EntitySetTemplate<Unit> originalSelection{};
     for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
       originalSelection.mVec.PushBack(*it);
     }
@@ -2917,7 +2916,7 @@ namespace
     float bestScore = gpg::pInf;
 
     for (Entity* const* it = originalSelection.mVec.begin(); it != originalSelection.mVec.end(); ++it) {
-      Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(*it);
+      Unit* const candidate = static_cast<Unit*>(*it);
       if (candidate == nullptr || candidate->IsDead() || candidate->IsBeingBuilt()) {
         continue;
       }
@@ -2948,8 +2947,8 @@ namespace
     }
 
     if (bestTransport != nullptr) {
-      (void)selectedUnits.AddUnit(bestTransport);
-      (void)selectedUnits.AddUnit(targetUnit);
+      (void)selectedUnits.Add(bestTransport);
+      (void)selectedUnits.Add(targetUnit);
     }
   }
 
@@ -2976,7 +2975,7 @@ namespace
     const SSTICommandIssueData& commandIssueData,
     Unit* const unit,
     const bool clearQueue,
-    const SEntitySetTemplateUnit& selectedUnits
+    const EntitySetTemplate<Unit>& selectedUnits
   )
   {
     if (sim == nullptr || unit == nullptr) {
@@ -3233,7 +3232,7 @@ namespace
 
         Unit* candidateTransport = nullptr;
         for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
-          Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(*it);
+          Unit* const candidate = static_cast<Unit*>(*it);
           if (candidate == nullptr || candidate->IsDead() || candidate->IsBeingBuilt() || candidate->AiTransport == nullptr) {
             continue;
           }
@@ -3340,7 +3339,7 @@ namespace
    */
   [[nodiscard]] CUnitCommand* IssueFactoryCommandToSelectedUnitsImpl(
     Sim* const sim,
-    const SEntitySetTemplateUnit& selectedUnits,
+    const EntitySetTemplate<Unit>& selectedUnits,
     const SSTICommandIssueData& commandIssueData,
     const bool clearQueue
   )
@@ -3354,7 +3353,7 @@ namespace
 
     CUnitCommand* issuedCommand = nullptr;
     for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+      Unit* const unit = static_cast<Unit*>(*it);
       if (!unit || unit->IsDead()) {
         continue;
       }
@@ -3403,7 +3402,7 @@ namespace
    */
   [[nodiscard]] CUnitCommand* IssueCommandToSelectedUnitsImpl(
     Sim* const sim,
-    SEntitySetTemplateUnit& selectedUnits,
+    EntitySetTemplate<Unit>& selectedUnits,
     const SSTICommandIssueData& commandIssueData,
     const bool clearQueue
   )
@@ -3426,7 +3425,7 @@ namespace
     const bool appendByDefault = insertBeforeTopByte == 0xFF000000u;
 
     for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
-      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+      Unit* const unit = static_cast<Unit*>(*it);
       CUnitCommandQueue* const queue = (unit != nullptr) ? unit->CommandQueue : nullptr;
       if (queue == nullptr) {
         continue;
@@ -4256,7 +4255,7 @@ namespace
    * Chooses one live unit from the candidate unit-set lane that has a resolved
    * footprint and the largest blueprint size-Z lane.
    */
-  Unit* PathPreviewSelectLargestUnit(const SEntitySetTemplateUnit* const unitSet)
+  Unit* PathPreviewSelectLargestUnit(const EntitySetTemplate<Unit>* const unitSet)
   {
     if (!unitSet) {
       return nullptr;
@@ -4366,7 +4365,7 @@ namespace moho
    * IDA signature:
    * void __cdecl Moho::Sim::path_GeneratePreview(
    *   Moho::Sim* sim, std::vector<std::string>* commandArgs, Wm3::Vector3f* worldPos,
-   *   Moho::CArmyImpl* focusArmy, Moho::SEntitySetTemplateUnit* selectedUnits);
+   *   Moho::CArmyImpl* focusArmy, Moho::EntitySetTemplate<Unit>* selectedUnits);
    *
    * What it does:
    * `path_GeneratePreview` SimCon command. Picks the largest selected unit with
@@ -4385,7 +4384,7 @@ namespace moho
     CSimConCommand::ParsedCommandArgs* const commandArgs,
     Wm3::Vector3f* const worldPos,
     CArmyImpl* const focusArmy,
-    SEntitySetTemplateUnit* const selectedUnits
+    EntitySetTemplate<Unit>* const selectedUnits
   )
   {
     if (focusArmy == nullptr) {
@@ -4830,7 +4829,7 @@ namespace moho
 {
   [[nodiscard]] CUnitCommand* IssueFactoryCommandToSelectedUnits(
     Sim* const sim,
-    const SEntitySetTemplateUnit& selectedUnits,
+    const EntitySetTemplate<Unit>& selectedUnits,
     const SSTICommandIssueData& commandIssueData,
     const bool clearQueue
   )
@@ -4840,7 +4839,7 @@ namespace moho
 
   [[nodiscard]] CUnitCommand* IssueCommandToSelectedUnits(
     Sim* const sim,
-    SEntitySetTemplateUnit& selectedUnits,
+    EntitySetTemplate<Unit>& selectedUnits,
     const SSTICommandIssueData& commandIssueData,
     const bool clearQueue
   )
@@ -8587,7 +8586,7 @@ void Sim::IssueCommand(
     return;
   }
 
-  SEntitySetTemplateUnit selectedUnits{};
+  EntitySetTemplate<Unit> selectedUnits{};
 
   auto collectUnit = [this, &selectedUnits](const EntId entId) {
     Entity* entity = FindEntityById(mEntityDB, entId);
@@ -8610,7 +8609,7 @@ void Sim::IssueCommand(
       return;
     }
 
-    (void)selectedUnits.AddUnit(unit);
+    (void)selectedUnits.Add(unit);
   };
 
   entities.ForEachValue([&collectUnit](const unsigned int value) {
@@ -8652,7 +8651,7 @@ void Sim::IssueFactoryCommand(
     return;
   }
 
-  SEntitySetTemplateUnit selectedFactories{};
+  EntitySetTemplate<Unit> selectedFactories{};
   auto collectFactory = [this, &selectedFactories](const EntId entId) {
     Entity* entity = FindEntityById(mEntityDB, entId);
     if (!entity || !OkayToMessWith(entity)) {
@@ -8664,7 +8663,7 @@ void Sim::IssueFactoryCommand(
       return;
     }
 
-    (void)selectedFactories.AddUnit(unit);
+    (void)selectedFactories.Add(unit);
   };
 
   entities.ForEachValue([&collectFactory](const unsigned int value) {
@@ -8955,7 +8954,7 @@ void Sim::LuaSimCallback(
  *   std::vector<std::string>* commandArgs,
  *   Wm3::Vector3<float>* worldPos,
  *   Moho::CArmyImpl* focusArmy,
- *   Moho::SEntitySetTemplateUnit* selectedUnits);
+ *   Moho::EntitySetTemplate<Unit>* selectedUnits);
  *
  * What it does:
  * Parses and applies the `SetArmyColor` sim-console command.
@@ -8965,7 +8964,7 @@ int Sim::SetArmyColor(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -9020,7 +9019,7 @@ int Sim::DamageUnit(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -9068,7 +9067,7 @@ int Sim::dbg(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -9150,7 +9149,7 @@ int Sim::DebugSetConsumptionActive(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -9175,7 +9174,7 @@ int Sim::DebugSetConsumptionInActive(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -9201,7 +9200,7 @@ int Sim::DebugSetProductionActive(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -9228,7 +9227,7 @@ int Sim::DebugSetProductionInActive(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -9254,7 +9253,7 @@ int Sim::DebugAIStatesOn(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -9280,7 +9279,7 @@ int Sim::DebugAIStatesOff(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -9307,7 +9306,7 @@ int Sim::TrackStats(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -9408,7 +9407,7 @@ int Sim::DumpUnits(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)commandArgs;
@@ -9489,7 +9488,7 @@ int Sim::DebugDumpArmyStats(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -9524,7 +9523,7 @@ int Sim::SallyShears(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)commandArgs;
@@ -9597,7 +9596,7 @@ int Sim::BlingBling(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)commandArgs;
@@ -9644,7 +9643,7 @@ int Sim::ZeroExtraStorage(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)commandArgs;
@@ -9682,7 +9681,7 @@ int Sim::AddImpulse(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -9723,7 +9722,7 @@ int Sim::ReconFlush(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)commandArgs;
@@ -9760,7 +9759,7 @@ int Sim::Purge(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -9825,7 +9824,7 @@ int Sim::KillAll(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -9850,7 +9849,7 @@ int Sim::DestroyAll(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -9886,7 +9885,7 @@ int Sim::efx_NewEmitter(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)focusArmy;
@@ -9923,7 +9922,7 @@ int Sim::efx_AttachEmitter(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -9975,7 +9974,7 @@ int Sim::AddLightParticle(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)focusArmy;
@@ -10029,7 +10028,7 @@ int Sim::Log(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -10061,7 +10060,7 @@ int Sim::SimWarn(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -10098,7 +10097,7 @@ int Sim::SimError(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -10133,7 +10132,7 @@ int Sim::sim_Gravity(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -10186,7 +10185,7 @@ int Sim::SimAssert(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -10208,7 +10207,7 @@ int Sim::SimCrash(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -10232,7 +10231,7 @@ int Sim::sim_DebugCrash(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)sim;
@@ -10257,7 +10256,7 @@ int Sim::sim_TestFunc(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)commandArgs;
@@ -10281,7 +10280,7 @@ int Sim::ScenarioMethod(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -10326,7 +10325,7 @@ int Sim::SimLua(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -10349,7 +10348,7 @@ int Sim::SimLua(
   LuaPlus::LuaObject globals = sim->mLuaState->GetGlobals();
   Unit* selectedUnit = nullptr;
   if (selectedUnits != nullptr && selectedUnits->mVec.begin() != selectedUnits->mVec.end()) {
-    selectedUnit = SEntitySetTemplateUnit::UnitFromEntry(*selectedUnits->mVec.begin());
+    selectedUnit = static_cast<Unit*>(*selectedUnits->mVec.begin());
   }
 
   if (selectedUnit != nullptr) {
@@ -10392,7 +10391,7 @@ int Sim::DebugSetPlayableRect(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -10439,7 +10438,7 @@ int Sim::DebugMoveCamera(
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,
   CArmyImpl* const focusArmy,
-  SEntitySetTemplateUnit* const selectedUnits
+  EntitySetTemplate<Unit>* const selectedUnits
 )
 {
   (void)worldPos;
@@ -10475,7 +10474,7 @@ int Sim::DebugMoveCamera(
  *   char *commandText,
  *   Wm3::Vector3<float> *worldPos,
  *   Moho::CArmyImpl *focusArmy,
- *   Moho::SEntitySetTemplateUnit *selectedUnits);
+ *   Moho::EntitySetTemplate<Unit> *selectedUnits);
  *
  * What it does:
  * Parses one or more sim debug command segments, resolves each segment through
@@ -10486,7 +10485,7 @@ void Sim::TryParseSimCommand(
   const char* command,
   const Wm3::Vector3<float>& worldPos,
   CArmyImpl* focusArmy,
-  SEntitySetTemplateUnit& selectedUnits
+  EntitySetTemplate<Unit>& selectedUnits
 )
 {
   const char* const rawCommandText = command ? command : "";
@@ -10544,7 +10543,7 @@ void Sim::ExecuteDebugCommand(
   const BVSet<EntId, EntIdUniverse>& entities
 )
 {
-  SEntitySetTemplateUnit selectedUnits{};
+  EntitySetTemplate<Unit> selectedUnits{};
   InitSimDebugEntitySet(selectedUnits);
 
   auto appendSelectedUnit = [this, &selectedUnits](const EntId entId) {
@@ -10558,7 +10557,7 @@ void Sim::ExecuteDebugCommand(
       return;
     }
 
-    selectedUnits.AppendUniqueEntity(static_cast<Entity*>(unit));
+    (void)selectedUnits.Add(unit);
   };
 
   entities.ForEachValue([&appendSelectedUnit](const unsigned int value) {

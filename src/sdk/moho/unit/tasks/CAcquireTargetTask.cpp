@@ -20,7 +20,6 @@
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/Sim.h"
-#include "moho/sim/ArmyUnitSet.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/command/SSTITarget.h"
 #include "moho/task/ETaskStatus.h"
@@ -373,8 +372,8 @@ namespace moho
     const int waitStatus = intervalTicks + 1;
 
     // Selected-unit set used by the auto-issue attack command below.
-    SEntitySetTemplateUnit selectedUnits{};
-    (void)selectedUnits.AddUnit(mUnit);
+    EntitySetTemplate<Unit> selectedUnits{};
+    (void)selectedUnits.Add(mUnit);
 
     // Mid-unpack move short-circuit: units that must unpack before firing simply
     // wait while moving / (un)loading transport.

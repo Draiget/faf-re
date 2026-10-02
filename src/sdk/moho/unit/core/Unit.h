@@ -25,7 +25,6 @@
 #include "moho/ai/IAiFormationDB.h"
 #include "moho/containers/TDatList.h"
 #include "moho/entity/Entity.h"
-#include "moho/sim/ArmyUnitSet.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/misc/WeakPtr.h"
 #include "Wm3Vector3.h"
@@ -57,7 +56,8 @@ namespace moho
   class CFormationInstance;
   class IFormationInstance;
   class Unit;
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
   class IAiBuilder;
   class IAiNavigator;
   class IAiSteering;
@@ -1034,7 +1034,7 @@ namespace moho
      * Gathers nearby non-mobile same-army same-layer structures and appends
      * those whose skirt rectangles overlap `unit`.
      */
-    static SEntitySetTemplateUnit* CollectAllOverlapping(SEntitySetTemplateUnit* outSet, Unit* unit);
+    static EntitySetTemplate<Unit>* CollectAllOverlapping(EntitySetTemplate<Unit>* outSet, Unit* unit);
 
     /**
      * Address: 0x006A7E00 (FUN_006A7E00, ?LookForStructureRebuilder@Unit@Moho@@QAEXXZ)
@@ -2034,7 +2034,7 @@ namespace moho
     char pad_04F4[4];                                    // 0x04F4
     /// The units guarding this one: an `EntitySetTemplate<Unit>` (the serializer's type), kept in
     /// entity-id order by the set's `Add` 0x0057DDD0 / `Remove` 0x005E8960.
-    SEntitySetTemplateUnit GuardedByList; // 0x04F8
+    EntitySetTemplate<Unit> GuardedByList; // 0x04F8
     IFormationInstance* GuardFormation;                  // 0x0520
     bool mNeedsKillCleanup;            // 0x0524: tested in Sim::AdvanceBeat, cleared by Unit::KillCleanup (0x006A8790)
     char pad_0525[0x03];               // 0x0525

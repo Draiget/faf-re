@@ -28,7 +28,6 @@
 #include "moho/math/MathReflection.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CSimConVarBase.h"
@@ -676,16 +675,16 @@ namespace moho
         Unit* const builtUnit = mBuildUnit.GetObjectPtr();
         const Wm3::Vector3f zeroDir{0.0f, 0.0f, 0.0f};
         if (builtUnit != nullptr && !mBlueprint->General.SeedUnit.name.empty()) {
-          SEntitySetTemplateUnit dispatchSet{};
-          (void)dispatchSet.AddUnit(builtUnit);
+          EntitySetTemplate<Unit> dispatchSet{};
+          (void)dispatchSet.Add(builtUnit);
           SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_Upgrade);
           issueData.mBlueprint = const_cast<RUnitBlueprint*>(mBlueprint);
           (void)IssueCommandToSelectedUnits(mSim, dispatchSet, issueData, true);
         } else if (builtUnit != nullptr && builtUnit->AiBuilder != nullptr &&
                    builtUnit->AiBuilder->BuilderIsFactory() &&
                    mBuildDirection != zeroDir) {
-          SEntitySetTemplateUnit dispatchSet{};
-          (void)dispatchSet.AddUnit(builtUnit);
+          EntitySetTemplate<Unit> dispatchSet{};
+          (void)dispatchSet.Add(builtUnit);
           const Wm3::Vec3f& unitPos = builtUnit->GetPosition();
           const Wm3::Vector3f rallyPos{unitPos.x + mBuildDirection.x, unitPos.y + mBuildDirection.y,
                                        unitPos.z + mBuildDirection.z};

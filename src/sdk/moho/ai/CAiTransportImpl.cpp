@@ -65,14 +65,14 @@ STransportPickUpInfo::STransportPickUpInfo()
  * What it does:
  * Linear-scans the pickup set's contiguous storage, converting each entry to
  * its owning unit, and reports whether `unit` is among them. This is a plain
- * pointer scan, not `SEntitySetTemplateUnit::ContainsUnit`'s id-keyed binary
+ * pointer scan, not `EntitySetTemplate<Unit>::ContainsUnit`'s id-keyed binary
  * search — the binary emits a separate body here and calls it from both
  * `TransportIsUnitAssignedForPickup` and `TransportIsReadyForUnit`.
  */
 bool STransportPickUpInfo::HasUnit(const Unit* const unit) const noexcept
 {
-  for (const Entity* const entry : mUnits.mVec) {
-    if (SEntitySetTemplateUnit::UnitFromEntry(entry) == unit) {
+  for (const Unit* const entry : mUnits) {
+    if (entry == unit) {
       return true;
     }
   }
@@ -92,7 +92,7 @@ void STransportPickUpInfo::RemoveUnit(Unit* const unit) noexcept
   Entity** const begin = mUnits.mVec.begin();
   Entity** const end = mUnits.mVec.end();
   for (Entity** it = begin; it != end; ++it) {
-    if (SEntitySetTemplateUnit::UnitFromEntry(*it) == unit) {
+    if (static_cast<Unit*>(*it) == unit) {
       (void)mUnits.mVec.erase(it);
       break;
     }
@@ -568,7 +568,7 @@ CAiTransportImpl::~CAiTransportImpl()
   Entity* const* it = mStoredUnits.mVec.begin();
   Entity* const* const end = mStoredUnits.mVec.end();
   for (; it != end; ++it) {
-    Unit* const storedUnit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+    Unit* const storedUnit = static_cast<Unit*>(*it);
     if (!storedUnit || storedUnit->IsDead()) {
       continue;
     }
@@ -744,7 +744,7 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportGetLoadedUnits(const bool inc
 
   const msvc8::vector<Entity*>& attached = mUnit->GetAttachedEntities();
   for (Entity* const* it = attached.begin(); it != attached.end(); ++it) {
-    Unit* const attachedUnit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+    Unit* const attachedUnit = static_cast<Unit*>(*it);
     if (!attachedUnit) {
       continue;
     }
@@ -770,8 +770,7 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportGetLoadedUnits(const bool inc
  */
 void CAiTransportImpl::TransportAddPickupUnits(const EntitySetTemplate<Unit>& units, const SCoordsVec2 fallbackPos)
 {
-  for (Unit* const* it = units.begin(); it != units.end(); ++it) {
-    Unit* const unit = *it;
+  for (Unit* const unit : units) {
     if (unit) {
       TransportRemovePickupUnit(unit, false);
     }
@@ -783,7 +782,7 @@ void CAiTransportImpl::TransportAddPickupUnits(const EntitySetTemplate<Unit>& un
 
   Wm3::Vec3f pickupFacing{};
   if (mAttachpoints == 1 && units.Size() == 1u) {
-    Unit* const onlyUnit = SEntitySetTemplateUnit::UnitFromEntry(*units.begin());
+    Unit* const onlyUnit = *units.begin();
     if (onlyUnit) {
       pickupFacing = ForwardFromOrientation(onlyUnit->GetTransform().orient_);
     }
@@ -796,7 +795,7 @@ void CAiTransportImpl::TransportAddPickupUnits(const EntitySetTemplate<Unit>& un
   mPickupInfo.mFallbackPos = fallbackPos;
   mPickupInfo.mPos = Wm3::Vec3f(fallbackPos.x, mUnit->GetPosition().y, fallbackPos.z);
   mPickupInfo.mOri = OrientationFromForward(pickupFacing);
-  mPickupInfo.mUnits.AddUnits(units);
+  mPickupInfo.mUnits = units;
   mPickupInfo.mHasSpace = 0;
 }
 
@@ -871,7 +870,13 @@ void CAiTransportImpl::TransportUnreserveUnattachedSpots()
  */
 unsigned int CAiTransportImpl::TransportGetPickupUnitCount() const
 {
-  return mPickupInfo.mUnits.CountLiveUnits();
+  unsigned int count = 0;
+  for (Unit* const unit : mPickupInfo.mUnits) {
+    if (unit && !unit->IsDead()) {
+      ++count;
+    }
+  }
+  return count;
 }
 
 /**
@@ -879,13 +884,14 @@ unsigned int CAiTransportImpl::TransportGetPickupUnitCount() const
  */
 EntitySetTemplate<Unit> CAiTransportImpl::TransportGetPickupUnits()
 {
-  EntitySetTemplate<Unit> out{};
-  mPickupInfo.mUnits.CopyTo(out);
-
+  EntitySetTemplate<Unit> out(mPickupInfo.mUnits);
   if (mWaitingFormation) {
-    mUnitSet30.CopyLiveUnitsTo(out);
+    for (Unit* const unit : mUnitSet30) {
+      if (unit && !unit->IsDead()) {
+        (void)out.Add(unit);
+      }
+    }
   }
-
   return out;
 }
 
@@ -983,7 +989,7 @@ bool CAiTransportImpl::TransportCanCarryUnit(Unit* const unit) const
  */
 void CAiTransportImpl::TransportRemoveFromWaitingList(Unit* const unit)
 {
-  (void)mUnitSet30.RemoveUnit(unit);
+  (void)mUnitSet30.Remove(unit);
 }
 
 /**
@@ -991,9 +997,7 @@ void CAiTransportImpl::TransportRemoveFromWaitingList(Unit* const unit)
  */
 EntitySetTemplate<Unit> CAiTransportImpl::TransportGetUnitsWaitingForPickup() const
 {
-  EntitySetTemplate<Unit> out{};
-  mUnitSet30.CopyTo(out);
-  return out;
+  return mUnitSet30;
 }
 
 /**
@@ -1011,8 +1015,7 @@ void CAiTransportImpl::TransportGenerateWaitingFormationForUnits(const EntitySet
 {
   // 0x005E5F57: the set's vector takes `units`' contents (`AddAll`, a
   // replace, not a merge).
-  mUnitSet30.Clear();
-  mUnitSet30.AddUnits(units);
+  mUnitSet30 = units;
   if (!mUnit || !mUnit->SimulationRef || !mUnit->SimulationRef->mFormationDB) {
     return;
   }
@@ -1623,7 +1626,7 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(const bool cle
 
   const msvc8::vector<Entity*>& attachedCopy = mUnit->GetAttachedEntities();
   for (Entity* const* it = attachedCopy.begin(); it != attachedCopy.end(); ++it) {
-    Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+    Unit* const unit = static_cast<Unit*>(*it);
     if (!unit || unit->IsDead()) {
       continue;
     }
@@ -1649,8 +1652,7 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(const bool cle
   }
 
   CRandomStream* const random = sim ? sim->mRngState : nullptr;
-  for (Unit* const* it = detached.mVec.begin(); it != detached.mVec.end(); ++it) {
-    Unit* const unit = *it;
+  for (Unit* const unit : detached) {
     if (!unit) {
       continue;
     }
@@ -1673,8 +1675,7 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(const bool cle
     (void)TransportDetachUnit(unit);
   }
 
-  for (Unit* const* it = storedToDestroy.mVec.begin(); it != storedToDestroy.mVec.end(); ++it) {
-    Unit* const unit = *it;
+  for (Unit* const unit : storedToDestroy) {
     if (!unit) {
       continue;
     }
@@ -1822,7 +1823,7 @@ void CAiTransportImpl::TransportAddToStorage(Unit* const unit)
   SEntAttachInfo attachInfo(static_cast<Entity*>(mUnit), -1, -1, VTransform());
   (void)unit->AttachTo(attachInfo);
   unit->TransportedByRef.ResetFromObject(mUnit);
-  (void)mStoredUnits.AddUnit(unit);
+  (void)mStoredUnits.Add(unit);
 }
 
 /**
@@ -1843,7 +1844,7 @@ void CAiTransportImpl::TransportRemoveFromStorage(Unit* const unit, VTransform& 
   unit->RunScript("OnRemoveFromStorage", mUnit);
   unit->TransportedByRef.ResetFromObject(nullptr);
   (void)unit->DetachFrom(static_cast<Entity*>(mUnit), false);
-  (void)mStoredUnits.RemoveUnit(unit);
+  (void)mStoredUnits.Remove(unit);
 
   const msvc8::vector<SAttachPoint>* launchPoints = &mLaunchAttachPoints;
   if (launchPoints->empty()) {
@@ -1868,9 +1869,7 @@ void CAiTransportImpl::TransportRemoveFromStorage(Unit* const unit, VTransform& 
  */
 EntitySetTemplate<Unit> CAiTransportImpl::TransportGetStoredUnits() const
 {
-  EntitySetTemplate<Unit> out{};
-  mStoredUnits.CopyTo(out);
-  return out;
+  return mStoredUnits;
 }
 
 /**
@@ -1878,7 +1877,7 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportGetStoredUnits() const
  */
 bool CAiTransportImpl::TransportIsStoredUnit(Unit* const unit) const
 {
-  return mStoredUnits.ContainsUnit(unit);
+  return mStoredUnits.Contains(unit);
 }
 
 /**
@@ -1913,7 +1912,7 @@ int CAiTransportImpl::TransportReserveStorage(
     return previousOverflow;
   }
 
-  (void)mUnitSet80.AddUnit(unit);
+  (void)mUnitSet80.Add(unit);
   const std::size_t index = static_cast<std::size_t>(mNextGeneric) % mGenericAttachPoints.size();
   const SAttachPoint& point = mGenericAttachPoints[index];
   const VTransform world = mUnit->GetBoneWorldTransform(static_cast<int>(point.index));
@@ -1937,7 +1936,7 @@ int CAiTransportImpl::TransportReserveStorage(
  */
 void CAiTransportImpl::TransportClearReservation(Unit* const unit)
 {
-  (void)mUnitSet80.RemoveUnit(unit);
+  (void)mUnitSet80.Remove(unit);
 }
 
 /**

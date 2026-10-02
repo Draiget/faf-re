@@ -5,7 +5,7 @@
 
 #include "moho/misc/WeakPtr.h"
 #include "moho/path/SNavGoal.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "moho/task/CCommandTask.h"
 
 namespace gpg
@@ -17,7 +17,8 @@ namespace gpg
 namespace moho
 {
   class CUnitCommand;
-  struct SEntitySetTemplateUnit;
+  template <class T>
+  class EntitySetTemplate;
 
   /**
    * Task lane used by transport unload command flow.
@@ -55,7 +56,7 @@ namespace moho
       CUnitCommand* ownerCommand,
       CCommandTask* dispatchTask,
       const SNavGoal& unloadGoal,
-      const SEntitySetTemplateUnit& commandUnits
+      const EntitySetTemplate<Unit>& commandUnits
     );
 
     /**
@@ -68,7 +69,7 @@ namespace moho
     static CUnitUnloadUnits* Create(
       CCommandTask* dispatchTask,
       const SNavGoal* unloadGoal,
-      const SEntitySetTemplateUnit* commandUnits,
+      const EntitySetTemplate<Unit>* commandUnits,
       CUnitCommand* ownerCommand
     );
 
@@ -105,7 +106,7 @@ namespace moho
     bool mIsStagingPlatform;                  // 0x54
     bool mHasEligibleLoadedUnits;             // 0x55
     std::uint8_t mPad56_57[2];                // 0x56
-    SEntitySetTemplateUnit mLoadedUnits;      // 0x58
+    EntitySetTemplate<Unit> mLoadedUnits;      // 0x58
     WeakPtr<CUnitCommand> mOwnerCommandLinkLane; // 0x80
   };
 

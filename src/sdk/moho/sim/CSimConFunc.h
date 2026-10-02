@@ -18,7 +18,7 @@ namespace moho
       ParsedCommandArgs* commandArgs,
       Wm3::Vector3f* worldPos,
       CArmyImpl* focusArmy,
-      SEntitySetTemplateUnit* selectedUnits
+      EntitySetTemplate<Unit>* selectedUnits
     );
 
     /**
@@ -40,7 +40,7 @@ namespace moho
       ParsedCommandArgs* commandArgs,
       Wm3::Vector3f* worldPos,
       CArmyImpl* focusArmy,
-      SEntitySetTemplateUnit* selectedUnits
+      EntitySetTemplate<Unit>* selectedUnits
     ) override;
 
   public:

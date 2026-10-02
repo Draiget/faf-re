@@ -13,11 +13,11 @@
 
 namespace
 {
-  using EntitySetVector = msvc8::vector<moho::SEntitySetTemplateUnit>;
-  using EntitySetVectorType = gpg::RVectorType<moho::SEntitySetTemplateUnit>;
+  using EntitySetVector = msvc8::vector<moho::EntitySetTemplate<moho::Unit>>;
+  using EntitySetVectorType = gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>;
 
   /**
-   * Address: 0x00BFF470 (FUN_00BFF470, atexit destructor of the RVectorType<SEntitySetTemplateUnit> object)
+   * Address: 0x00BFF470 (FUN_00BFF470, atexit destructor of the RVectorType<EntitySetTemplate<Unit>> object)
    */
   [[nodiscard]] EntitySetVectorType* AcquireEntitySetVectorType()
   {
@@ -30,7 +30,7 @@ namespace
     // UnitSetTypeInfo pre-registers this descriptor under
     // typeid(EntitySetTemplate<Unit>), and the binary resolves it the same way
     // (FUN_005EBA40 looks up `Moho::EntitySetTemplate<Moho::Unit>`).
-    // SEntitySetTemplateUnit is this recovery's own name for that type, so
+    // EntitySetTemplate<Unit> is this recovery's own name for that type, so
     // nothing ever registers it - and since LookupRType throws on a miss, the
     // name-based candidate search that used to follow was unreachable.
     return gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
@@ -100,9 +100,9 @@ namespace
  * Address: 0x00704B40 (FUN_00704B40, gpg::RRef_EntitySetTemplateUnit)
  *
  * What it does:
- * Builds one reflected reference lane for `SEntitySetTemplateUnit`.
+ * Builds one reflected reference lane for `EntitySetTemplate<Unit>`.
  */
-gpg::RRef* gpg::RRef_SEntitySetTemplateUnit(gpg::RRef* const outRef, moho::SEntitySetTemplateUnit* const value)
+gpg::RRef* gpg::RRef_UnitSetBase(gpg::RRef* const outRef, moho::EntitySetTemplate<moho::Unit>* const value)
 {
   if (outRef == nullptr) {
     return nullptr;
@@ -114,19 +114,19 @@ gpg::RRef* gpg::RRef_SEntitySetTemplateUnit(gpg::RRef* const outRef, moho::SEnti
 }
 
 /**
- * Address: 0x00705320 (FUN_00705320, gpg::RRef_EntitySetTemplate_Unit)
+ * Address: 0x00705320 (FUN_00705320, gpg::MakeUnitSetDerivedRef)
  *
  * What it does:
  * Builds one reflected reference for `EntitySetTemplate<Unit>`, resolving
  * the value's dynamic type and adjusting the object pointer to the base
  * offset `IsDerivedFrom` reports (the general derived-ref pattern used
  * throughout this codebase's reflection glue, `MakeDerivedRef`). This is
- * the version `RVectorType<SEntitySetTemplateUnit>::SubscriptIndex`
+ * the version `RVectorType<EntitySetTemplate<Unit>>::SubscriptIndex`
  * (0x00701850) actually calls per-element on every vector subscript;
- * `RRef_SEntitySetTemplateUnit` above is a separate, simpler binary
+ * `RRef_UnitSetBase` above is a separate, simpler binary
  * function used by other callers.
  */
-gpg::RRef* gpg::RRef_EntitySetTemplate_Unit(gpg::RRef* const outRef, moho::SEntitySetTemplateUnit* const value)
+gpg::RRef* gpg::MakeUnitSetDerivedRef(gpg::RRef* const outRef, moho::EntitySetTemplate<moho::Unit>* const value)
 {
   if (outRef == nullptr) {
     return nullptr;
@@ -142,53 +142,53 @@ gpg::RType* gpg::ResolveEntitySetTemplateUnitVectorType()
 }
 
 /**
- * Address: 0x00704C60 (FUN_00704C60, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::dtr)
+ * Address: 0x00704C60 (FUN_00704C60, gpg::RVectorType<Moho::EntitySetTemplate<Unit>>::dtr)
  *
  * What it does:
- * Tears down one `RVectorType<SEntitySetTemplateUnit>` descriptor and
+ * Tears down one `RVectorType<EntitySetTemplate<Unit>>` descriptor and
  * releases inherited `gpg::RType` reflection storage lanes.
  */
-gpg::RVectorType<moho::SEntitySetTemplateUnit>::~RVectorType() = default;
+gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::~RVectorType() = default;
 
 /**
- * Address: 0x00701680 (FUN_00701680, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::GetName)
+ * Address: 0x00701680 (FUN_00701680, gpg::RVectorType<Moho::EntitySetTemplate<Unit>>::GetName)
  * Address: 0x00BFF440 (FUN_00BFF440, atexit destructor of GetName's cached name)
  *
  * What it does:
  * Builds `vector<EntitySetTemplate<Unit>>` once, through the shared
  * `EntitySetTemplate<Unit>::sType` cache, and returns it.
  */
-const char* gpg::RVectorType<moho::SEntitySetTemplateUnit>::GetName() const
+const char* gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetName() const
 {
   static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedEntitySetTemplateUnitReflType()->GetName());
   return sName.c_str();
 }
 
 /**
- * Address: 0x00701740 (FUN_00701740, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::GetLexical)
+ * Address: 0x00701740 (FUN_00701740, gpg::RVectorType<Moho::EntitySetTemplate<Unit>>::GetLexical)
  *
  * What it does:
  * Appends the element count to the base `RType::GetLexical` text, matching
  * the binary's `"%s, size=%d"` formatting of the inherited lexical form.
  */
-msvc8::string gpg::RVectorType<moho::SEntitySetTemplateUnit>::GetLexical(const gpg::RRef& ref) const
+msvc8::string gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetLexical(const gpg::RRef& ref) const
 {
   const msvc8::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
-const gpg::RIndexed* gpg::RVectorType<moho::SEntitySetTemplateUnit>::IsIndexed() const
+const gpg::RIndexed* gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::IsIndexed() const
 {
   return this;
 }
 
-void gpg::RVectorType<moho::SEntitySetTemplateUnit>::Init()
+void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::Init()
 {
   size_ = sizeof(EntitySetVector);
   version_ = 1;
 }
 
-gpg::RRef gpg::RVectorType<moho::SEntitySetTemplateUnit>::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SubscriptIndex(void* const obj, const int ind) const
 {
   auto* const storage = static_cast<EntitySetVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -196,22 +196,22 @@ gpg::RRef gpg::RVectorType<moho::SEntitySetTemplateUnit>::SubscriptIndex(void* c
   GPG_ASSERT(static_cast<std::size_t>(ind) < storage->size());
 
   gpg::RRef out{};
-  gpg::RRef_EntitySetTemplate_Unit(&out, nullptr);
+  gpg::MakeUnitSetDerivedRef(&out, nullptr);
   if (storage == nullptr || ind < 0 || static_cast<std::size_t>(ind) >= storage->size()) {
     return out;
   }
 
-  gpg::RRef_EntitySetTemplate_Unit(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  gpg::MakeUnitSetDerivedRef(&out, &(*storage)[static_cast<std::size_t>(ind)]);
   return out;
 }
 
-size_t gpg::RVectorType<moho::SEntitySetTemplateUnit>::GetCount(void* const obj) const
+size_t gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetCount(void* const obj) const
 {
   const auto* const storage = static_cast<const EntitySetVector*>(obj);
   return storage ? storage->size() : 0u;
 }
 
-void gpg::RVectorType<moho::SEntitySetTemplateUnit>::SetCount(void* const obj, const int count) const
+void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SetCount(void* const obj, const int count) const
 {
   auto* const storage = static_cast<EntitySetVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -232,7 +232,7 @@ void gpg::RVectorType<moho::SEntitySetTemplateUnit>::SetCount(void* const obj, c
 gpg::RType* moho::register_EntitySetTemplateUnitVectorType()
 {
   EntitySetVectorType* const type = AcquireEntitySetVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SEntitySetTemplateUnit>), type);
+  gpg::PreRegisterRType(typeid(msvc8::vector<moho::EntitySetTemplate<moho::Unit>>), type);
   return type;
 }
 

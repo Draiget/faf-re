@@ -122,18 +122,18 @@ namespace moho
      * Clears the incoming unit set out of any current platoons, then assigns
      * those units into the named platoon's unassigned squad lane.
      */
-    virtual void AssignUnitsToPlatoon(const SEntitySetTemplateUnit* units, const char* platoonName) = 0;
+    virtual void AssignUnitsToPlatoon(const EntitySetTemplate<Unit>* units, const char* platoonName) = 0;
     // Address: 0x00700700 (FUN_00700700)
     virtual void RemoveFromPlatoon(Unit* unit) = 0;
     // Address: 0x00700730 (FUN_00700730)
-    virtual void RemoveUnitsFromPlatoons(const SEntitySetTemplateUnit* units) = 0;
+    virtual void RemoveUnitsFromPlatoons(const EntitySetTemplate<Unit>* units) = 0;
     // Address: 0x00700770 (FUN_00700770)
     virtual int GetNumPlatoonsTemplateNamed(const char* templateName) = 0;
     // Address: 0x007007C0 (FUN_007007C0)
     virtual int GetNumPlatoonWithPlan(const char* planName) = 0;
     // Address: 0x00700A00 (FUN_00700A00)
     virtual int CountUnitsInBoundsXZ(
-      const Wm3::Vector3f& minBounds, const Wm3::Vector3f& maxBounds, const SEntitySetTemplateUnit& unitSet
+      const Wm3::Vector3f& minBounds, const Wm3::Vector3f& maxBounds, const EntitySetTemplate<Unit>& unitSet
     ) = 0;
     // Address: 0x00700A70 (FUN_00700A70)
     virtual void UpdateAIDebugPlatoonStats(Unit* unit) = 0;

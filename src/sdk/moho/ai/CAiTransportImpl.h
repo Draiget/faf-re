@@ -9,7 +9,7 @@
 #include "moho/ai/SAiReservedTransportBone.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/misc/WeakPtr.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 #include "Wm3Quaternion.h"
 
 namespace gpg
@@ -121,7 +121,7 @@ namespace moho
     Wm3::Quatf mOri;                 // +0x08
     Wm3::Vec3f mPos;                 // +0x18
     std::uint32_t mReserved24;       // +0x24
-    SEntitySetTemplateUnit mUnits;   // +0x28
+    EntitySetTemplate<Unit> mUnits;   // +0x28
     std::uint8_t mHasSpace;          // +0x50
     std::uint8_t mUnknown51[0x07];   // +0x51
   };
@@ -578,9 +578,9 @@ namespace moho
     std::int32_t mLaunchAttachIndex; // +0x24
     std::int32_t mGenericOverflow; // +0x28
     std::uint8_t mUnknown2C[0x04]; // +0x2C
-    SEntitySetTemplateUnit mUnitSet30; // +0x30
-    SEntitySetTemplateUnit mStoredUnits; // +0x58
-    SEntitySetTemplateUnit mUnitSet80; // +0x80
+    EntitySetTemplate<Unit> mUnitSet30; // +0x30
+    EntitySetTemplate<Unit> mStoredUnits; // +0x58
+    EntitySetTemplate<Unit> mUnitSet80; // +0x80
     msvc8::vector<SAiReservedTransportBone> mReservedBones; // +0xA8
     STransportPickUpInfo mPickupInfo; // +0xB8
     IFormationInstance* mWaitingFormation; // +0x110

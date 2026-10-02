@@ -13,7 +13,7 @@
 #include "moho/command/SSTICommandVariableData.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptObject.h"
-#include "moho/sim/ArmyUnitSet.h"
+#include "moho/entity/Entity.h"
 
 namespace gpg
 {
@@ -336,7 +336,7 @@ namespace moho
     SSTICommandVariableData mVarDat; // +0x80 (+0xEC is its tail padding)
     /// The units the command applies to: an `EntitySetTemplate<Unit>` (entries are each unit's `Entity`),
     /// kept in entity-id order by the set's `Add` 0x0057DDD0 / `Remove` 0x005E8960.
-    SEntitySetTemplateUnit mUnitSet;
+    EntitySetTemplate<Unit> mUnitSet;
     CAiFormationInstance* mFormationInstance;
     CAiTarget mTarget;
     // Monotonic per-command serial assigned from Sim counter (not mConstDat.cmd).

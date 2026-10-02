@@ -259,7 +259,7 @@ namespace moho
    * binds transport mode flags, links unit-set ownership in EntityDB, and
    * starts transport-loading script/state.
    */
-  CUnitLoadUnits::CUnitLoadUnits(CCommandTask* const parentTask, const SEntitySetTemplateUnit& requestedUnits)
+  CUnitLoadUnits::CUnitLoadUnits(CCommandTask* const parentTask, const EntitySetTemplate<Unit>& requestedUnits)
     : CCommandTask(parentTask)
     , mPickupQueue()
     , mRequestedUnits(requestedUnits)
@@ -348,7 +348,7 @@ namespace moho
    * Allocates one load-units task and forwards constructor arguments into
    * in-place construction.
    */
-  CUnitLoadUnits* CUnitLoadUnits::Create(CCommandTask* const parentTask, const SEntitySetTemplateUnit* const requestedUnits)
+  CUnitLoadUnits* CUnitLoadUnits::Create(CCommandTask* const parentTask, const EntitySetTemplate<Unit>* const requestedUnits)
   {
     if (requestedUnits == nullptr) {
       return nullptr;
@@ -392,7 +392,7 @@ namespace moho
     mLoadedUnitCount = static_cast<std::int32_t>(loadedUnits.Size());
 
     for (Entity* const unitSlot : mRequestedUnits.mVec) {
-      Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(unitSlot);
+      Unit* const candidate = static_cast<Unit*>(unitSlot);
       if (!IsEligiblePickupCandidate(candidate)) {
         continue;
       }
@@ -432,7 +432,7 @@ namespace moho
         mPickupCenter.z += pos.z;
 
         (void)unitsToPickup.Add(candidate);
-        (void)mRequestedUnits.ContainsUnit(candidate);
+        (void)mRequestedUnits.Contains(candidate);
         ++mReadyUnitCount;
 
         if (transport->TransportGetWaitingFormation() != nullptr) {
@@ -509,9 +509,7 @@ namespace moho
     }
 
     if (!mRequestedUnits.Empty() && transport->TransportGetWaitingFormation() == nullptr && (mIsStagingPlatform || mIsTeleporter)) {
-      EntitySetTemplate<Unit> waitingUnits{};
-      mRequestedUnits.CopyTo(waitingUnits);
-      transport->TransportGenerateWaitingFormationForUnits(waitingUnits);
+      transport->TransportGenerateWaitingFormationForUnits(mRequestedUnits);
     }
   }
 
@@ -550,7 +548,7 @@ namespace moho
 
           CUnitCommand* const ownerHeadCommand = mUnit->CommandQueue != nullptr ? mUnit->CommandQueue->GetCurrentCommand() : nullptr;
           for (Entity* const unitSlot : mRequestedUnits.mVec) {
-            Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(unitSlot);
+            Unit* const candidate = static_cast<Unit*>(unitSlot);
             if (!IsUsableUnitSlot(candidate)) {
               continue;
             }
@@ -691,7 +689,7 @@ namespace moho
         }
 
         const EntitySetTemplate<Unit> waitingForPickup = transport->TransportGetUnitsWaitingForPickup();
-        mRequestedUnits.AddUnits(waitingForPickup);
+        mRequestedUnits.AddRange(waitingForPickup.mVec.begin(), waitingForPickup.mVec.end());
 
         if (!mRequestedUnits.Empty() && mIsTeleporter) {
           mTaskState = TASKSTATE_Preparing;
@@ -714,7 +712,7 @@ namespace moho
         }
 
         const EntitySetTemplate<Unit> waitingForPickup = transport->TransportGetUnitsWaitingForPickup();
-        mRequestedUnits.AddUnits(waitingForPickup);
+        mRequestedUnits.AddRange(waitingForPickup.mVec.begin(), waitingForPickup.mVec.end());
 
         if (!mRequestedUnits.Empty()) {
           mTaskState = TASKSTATE_Preparing;

@@ -22,7 +22,6 @@
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/EAllianceTypeInfo.h"
@@ -804,7 +803,7 @@ namespace moho
    */
   Unit* CUnitGuardTask::ResolveGuardCommandSourceUnit(
     Unit* guardedUnit,
-    SEntitySetTemplateUnit& visitedUnits
+    EntitySetTemplate<Unit>& visitedUnits
   ) const
   {
     Unit* candidate = guardedUnit;
@@ -813,7 +812,7 @@ namespace moho
     }
 
     while (true) {
-      if (visitedUnits.ContainsUnit(candidate)) {
+      if (visitedUnits.Contains(candidate)) {
         return mUnit;
       }
 
@@ -836,7 +835,7 @@ namespace moho
         return candidate;
       }
 
-      (void)visitedUnits.AddUnit(candidate);
+      (void)visitedUnits.Add(candidate);
       candidate = candidate->GetGuardedUnit();
       if (candidate == nullptr) {
         return mUnit;
@@ -1314,16 +1313,16 @@ namespace moho
       return blueprint;
     }
 
-    SEntitySetTemplateUnit visitedUnits{};
+    EntitySetTemplate<Unit> visitedUnits{};
     Unit* guardedUnit = mSecondaryUnit.GetObjectPtr();
     while (guardedUnit != nullptr) {
-      if (visitedUnits.ContainsUnit(guardedUnit)) {
+      if (visitedUnits.Contains(guardedUnit)) {
         break;
       }
 
       Unit* const nextGuardedUnit = guardedUnit->GetGuardedUnit();
       if (nextGuardedUnit != nullptr) {
-        (void)visitedUnits.AddUnit(guardedUnit);
+        (void)visitedUnits.Add(guardedUnit);
         guardedUnit = nextGuardedUnit;
         continue;
       }
@@ -1779,7 +1778,7 @@ namespace moho
     }
 
     if (mRefreshGuardedUnitFromNearby) {
-      SEntitySetTemplateUnit visitedUnits{};
+      EntitySetTemplate<Unit> visitedUnits{};
       mSecondaryUnit.Set(ResolveGuardCommandSourceUnit(mSecondaryUnit.GetObjectPtr(), visitedUnits));
     }
 
