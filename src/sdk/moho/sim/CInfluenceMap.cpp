@@ -236,12 +236,15 @@ namespace
   using InfluenceEntryIterator = InfluenceEntrySet::iterator;
   using InfluenceMapCellIterator = InfluenceMapCellSet::iterator;
 
-  struct LegacyMapRuntimeView
+  template <class TMap>
+  [[nodiscard]] std::size_t CountLegacyMapElements(const void* const object) noexcept
   {
-    void* allocProxy;
-    void* head;
-    std::uint32_t size;
-  };
+    if (object == nullptr) {
+      return 0u;
+    }
+
+    return static_cast<const TMap*>(object)->size();
+  }
 
   template <class TValue>
   [[nodiscard]] std::size_t CountLegacyVectorElements(const void* const object) noexcept
@@ -252,16 +255,6 @@ namespace
 
     const auto* const vector = static_cast<const msvc8::vector<TValue>*>(object);
     return vector->size();
-  }
-
-  [[nodiscard]] std::size_t CountLegacyMapElements(const void* const object) noexcept
-  {
-    if (object == nullptr) {
-      return 0u;
-    }
-
-    const auto* const mapView = static_cast<const LegacyMapRuntimeView*>(object);
-    return mapView->size;
   }
 
   template <class TObject>
@@ -756,70 +749,6 @@ namespace
     }
   }
 
-  struct RRefPairRuntime
-  {
-    void* object;      // +0x00
-    gpg::RType* type;  // +0x04
-  };
-  static_assert(sizeof(RRefPairRuntime) == 0x08, "RRefPairRuntime size must be 0x08");
-
-  /**
-   * Address: 0x0071CAD0 (FUN_0071CAD0)
-   *
-   * What it does:
-   * Builds one reflected `RRef` pair for `CInfluenceMap` and writes
-   * `{mObj,mType}` lanes into caller-owned output storage.
-   */
-  RRefPairRuntime* BuildCInfluenceMapRRefPair(
-    moho::CInfluenceMap* const object,
-    RRefPairRuntime* const outRefPair
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::CInfluenceMap>(object);
-    outRefPair->object = ref.mObj;
-    outRefPair->type = ref.mType;
-    return outRefPair;
-  }
-
-  /**
-   * Address: 0x0071D100 (FUN_0071D100)
-   *
-   * What it does:
-   * Builds one reflected `RRef` pair for `InfluenceGrid` and writes
-   * `{mObj,mType}` lanes into caller-owned output storage.
-   */
-  RRefPairRuntime* BuildInfluenceGridRRefPair(
-    moho::InfluenceGrid* const object,
-    RRefPairRuntime* const outRefPair
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::InfluenceGrid>(object);
-    outRefPair->object = ref.mObj;
-    outRefPair->type = ref.mType;
-    return outRefPair;
-  }
-
-  /**
-   * Address: 0x0071D140 (FUN_0071D140)
-   *
-   * What it does:
-   * Builds one reflected `RRef` pair for `SThreat` and writes
-   * `{mObj,mType}` lanes into caller-owned output storage.
-   */
-  RRefPairRuntime* BuildSThreatRRefPair(
-    moho::SThreat* const object,
-    RRefPairRuntime* const outRefPair
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::SThreat>(object);
-    outRefPair->object = ref.mObj;
-    outRefPair->type = ref.mType;
-    return outRefPair;
-  }
-
   // Addresses 0x007189D0/0x0071A0C0 (the "ThunkA"/"ThunkB" iterator-advance
   // duplicates formerly modeled here) are dead: zero data_refs/call_edges
   // for both, and no source-level caller anywhere in src/sdk/**.
@@ -832,14 +761,6 @@ namespace
   // caller anywhere in src/sdk/**. AdvanceBlipCellIterator above is the
   // real body, used directly by EraseBlipCellRange below (confirmed real
   // via multiple binary callers).
-
-  /**
-   * Address: 0x0071C750 (FUN_0071C750)
-   *
-   * What it does:
-   * Allocates one fixed `0x40`-byte runtime node lane.
-   */
-  void* AllocateSingle64ByteNode() { return ::operator new(0x40u); }
 
   // The tree walks formerly transcribed here over two private node overlays
   // (an isNil@+0x3D node for `InfluenceGrid::entries`, an isNil@+0x15 node for
@@ -1114,28 +1035,6 @@ namespace
     return influenceMap->GetThreatRect(x, z, radius, onMap, threatType, armyIndex);
   }
 
-  /**
-   * Address: 0x007197D0 (FUN_007197D0)
-   *
-   * What it does:
-   * Releases one influence-map runtime storage lane through global
-   * `operator delete`.
-   */
-  void DeleteInfluenceMapRuntimeStoragePrimary(void* const storage) noexcept
-  {
-    ::operator delete(storage);
-  }
-
-  /**
-   * Address: 0x00719D90 (FUN_00719D90)
-   *
-   * What it does:
-   * Secondary delete-thunk lane for influence-map runtime storage.
-   */
-  void DeleteInfluenceMapRuntimeStorageSecondary(void* const storage) noexcept
-  {
-    ::operator delete(storage);
-  }
 } // namespace
 
 /**
@@ -1161,7 +1060,7 @@ const char* gpg::RMapType_uint_int::GetName() const
 msvc8::string gpg::RMapType_uint_int::GetLexical(const gpg::RRef& ref) const
 {
   const msvc8::string base = gpg::RType::GetLexical(ref);
-  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements(ref.mObj)));
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements<msvc8::map<unsigned int, int>>(ref.mObj)));
 }
 
 /**
@@ -1202,7 +1101,7 @@ const char* gpg::RMapType_uint_InfluenceMapEntry::GetName() const
 msvc8::string gpg::RMapType_uint_InfluenceMapEntry::GetLexical(const gpg::RRef& ref) const
 {
   const msvc8::string base = gpg::RType::GetLexical(ref);
-  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements(ref.mObj)));
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements<msvc8::map<unsigned int, moho::InfluenceMapEntry>>(ref.mObj)));
 }
 
 /**
@@ -1716,14 +1615,6 @@ namespace moho
         return unknownInfluence;
     }
   }
-
-  struct SThreatMoveOwnerRuntime
-  {
-    SThreat* activeEnd;            // +0x00
-    SThreat* moveDestinationBegin; // +0x04
-    SThreat* moveSourceBegin;      // +0x08
-  };
-  static_assert(sizeof(SThreatMoveOwnerRuntime) == 0x0C, "SThreatMoveOwnerRuntime size must be 0x0C");
 
   /**
    * Address: 0x0071CD70 (FUN_0071CD70)
