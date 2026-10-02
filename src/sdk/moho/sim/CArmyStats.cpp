@@ -333,31 +333,6 @@ namespace
 
 
 
-  struct ArmyTriggerSentinelRuntimeNode
-  {
-    ArmyTriggerSentinelRuntimeNode* next;
-    ArmyTriggerSentinelRuntimeNode* prev;
-    std::uint32_t payload0;
-    std::uint32_t payload1;
-  };
-  static_assert(sizeof(ArmyTriggerSentinelRuntimeNode) == 0x10, "ArmyTriggerSentinelRuntimeNode size must be 0x10");
-
-  /**
-   * Address: 0x00702090 (FUN_00702090, CArmyStats trigger-list sentinel allocator)
-   *
-   * What it does:
-   * Allocates one 16-byte trigger-list sentinel lane and self-links its
-   * `{next,prev}` pointers.
-   */
-  [[maybe_unused]] [[nodiscard]] ArmyTriggerSentinelRuntimeNode* AllocateSelfLinkedArmyTriggerSentinel()
-  {
-    auto* const node =
-      msvc8::detail::allocate_checked<ArmyTriggerSentinelRuntimeNode>(1u);
-    node->next = node;
-    node->prev = node;
-    return node;
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
   {
@@ -366,28 +341,6 @@ namespace
     }
     return slot;
   }
-
-  struct ArmyNameIndexMapRuntime
-  {
-    std::uint32_t meta0;
-    moho::ArmyNameIndexNode* head;
-    std::uint32_t size;
-  };
-  static_assert(sizeof(ArmyNameIndexMapRuntime) == 0x0C, "ArmyNameIndexMapRuntime size must be 0x0C");
-
-
-
-  [[nodiscard]] ArmyNameIndexMapRuntime* NameIndexMapRuntimeView(moho::CArmyStats* const object)
-  {
-    return reinterpret_cast<ArmyNameIndexMapRuntime*>(&object->mNameIndex);
-  }
-
-  [[nodiscard]] const ArmyNameIndexMapRuntime* NameIndexMapRuntimeView(const moho::CArmyStats* const object)
-  {
-    return reinterpret_cast<const ArmyNameIndexMapRuntime*>(&object->mNameIndex);
-  }
-
-
 
   gpg::RType* gArmyStatsBaseType = nullptr;
   gpg::RType* gArmyNameIndexType = nullptr;
@@ -754,8 +707,8 @@ namespace moho
    * gpg::ReadArchive*
    *
    * What it does:
-   * Loads base stats storage, name-index map runtime lane, and trigger-list
-   * runtime lane from archive using cached reflection RTTI.
+   * Loads base stats storage, by-name item index and the trigger list
+   * from archive using cached reflection RTTI.
    */
   void CArmyStats::MemberDeserialize(gpg::ReadArchive* const archive)
   {
@@ -766,7 +719,7 @@ namespace moho
 
     const gpg::RRef owner{};
     archive->Read(CachedType<Stats<CArmyStatItem>>(gArmyStatsBaseType), static_cast<Stats<CArmyStatItem>*>(this), owner);
-    archive->Read(CachedType<ArmyNameIndexMapRuntime>(gArmyNameIndexType), NameIndexMapRuntimeView(this), owner);
+    archive->Read(CachedType<ArmyNameIndexTree>(gArmyNameIndexType), &mNameIndex, owner);
     archive->Read(CachedType<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
   }
 
@@ -776,8 +729,8 @@ namespace moho
    * gpg::WriteArchive*
    *
    * What it does:
-   * Writes base stats storage, name-index map runtime lane, and trigger-list
-   * runtime lane to archive using cached reflection RTTI.
+   * Writes base stats storage, by-name item index and the trigger list
+   * to archive using cached reflection RTTI.
    */
   void CArmyStats::MemberSerialize(gpg::WriteArchive* const archive) const
   {
@@ -792,7 +745,7 @@ namespace moho
       static_cast<const Stats<CArmyStatItem>*>(this),
       owner
     );
-    archive->Write(CachedType<ArmyNameIndexMapRuntime>(gArmyNameIndexType), NameIndexMapRuntimeView(this), owner);
+    archive->Write(CachedType<ArmyNameIndexTree>(gArmyNameIndexType), &mNameIndex, owner);
     archive->Write(CachedType<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
   }
 
