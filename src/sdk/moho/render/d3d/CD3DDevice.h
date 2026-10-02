@@ -1,8 +1,11 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
+#include "gpg/gal/CursorContext.hpp"
+#include "moho/render/d3d/CD3DDeviceResources.h"
 #include "moho/unit/Broadcaster.h"
 #include "Wm3IVector2.h"
 
@@ -77,25 +80,35 @@ namespace moho
    *
    * The binary splits the device across two types:
    *
-   *   Moho::ID3DDevice   vftable 0x00E0..  53 slots, every one `_purecall`
+   *   Moho::ID3DDevice   vftable 0x00E01F04, 53 slots, every one `_purecall`
    *   Moho::CD3DDevice : public Moho::ID3DDevice,
    *                      public Broadcaster<SD3DDeviceEvent const&>
    *                      vftable 0x00E02214, 53 real slots
    *
-   * This tree keeps both levels but collapses the names by one step: there is
-   * no `ID3DDevice` class here, so `CD3DDevice` plays the interface role -- 
-   * hence the handful of `= 0` members below -- and
-   * `CD3DDeviceSingleton final : public moho::CD3DDevice` in CD3DDevice.cpp
-   * is the implementation.
+   * The constructor `??0CD3DDevice@Moho@@QAE@XZ` (0x00430C20) builds the
+   * whole flat object -- broadcaster ring at +0x04, the state bytes, the
+   * embedded `CD3DDeviceResources` at +0x1C (`lea eax,[ecx+0x1C]` is the
+   * whole of `GetResources`, 0x0042EE70), the per-head lock arrays and the
+   * cursor context -- so there is no separate implementation class: this is
+   * one concrete object, and `D3D_GetDevice` (0x00430590) constructs it as
+   * a function-local static at 0x010C7C18.
    *
-   * So the pure members here are deliberate, not a stray `= 0`, and the
-   * missing `ID3DDevice` base is not an omission to be "fixed" -- that class
-   * does not exist in this tree. Only 3 of the interface's 53 pure slots are
-   * modelled; the rest are simply not recovered yet.
+   * Most of the 53 slots are not recovered yet; the vtable keeps its
+   * original span through the pure-reserved slots declared further down.
    */
   class CD3DDevice : public Broadcaster<const SD3DDeviceEvent&>
   {
   public:
+    /**
+     * Address: 0x00430C20 (FUN_00430C20, ??0CD3DDevice@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes the device's state bytes and embedded resource owner:
+     * cursor shown and viewport background drawn by default, software-VP and
+     * direct-debug copied from the command-line overrides, then the embedded
+     * resource owner is handed its owning device pointer.
+     */
+    CD3DDevice();
     /**
      * Address: 0x0042DBE0 (FUN_0042DBE0)
      *
@@ -197,7 +210,6 @@ namespace moho
      */
     virtual double GetAspectRatio(int headIndex);
 
-#define CD3DDEVICE_RESERVED_VFUNC(slot) virtual void VFunc##slot() = 0
     /**
      * Address: 0x0042EB40 (FUN_0042EB40)
      * Slot: 9
@@ -222,7 +234,6 @@ namespace moho
      * Shows or hides cursor through backend dispatch and updates local cursor state.
      */
     virtual int ShowCursor(bool show);
-#undef CD3DDEVICE_RESERVED_VFUNC
 
     /**
      * Address: 0x0042ED50 (FUN_0042ED50)
@@ -252,8 +263,12 @@ namespace moho
      * Address: 0x0042EE70
      * Slot: 13
      * Demangled: Moho::CD3DDevice::GetResources
+     *
+     * What it does:
+     * Returns the device's embedded resource owner - the whole body is
+     * `lea eax, [ecx+0x1C]`.
      */
-    virtual ID3DDeviceResources* GetResources() = 0;
+    virtual ID3DDeviceResources* GetResources();
 
     /**
      * Address: 0x004310D0 (FUN_004310D0)
@@ -621,7 +636,7 @@ namespace moho
      * A `gpg::gal::Error` during the rebind (e.g. a failed device reset) is
      * logged and reported as false.
      */
-    virtual bool InitContext(gpg::gal::DeviceContext* context) = 0;
+    virtual bool InitContext(gpg::gal::DeviceContext* context);
 
     /**
      * Address: 0x0042E750 (FUN_0042E750)
@@ -631,7 +646,7 @@ namespace moho
      * What it does:
      * Tears down current device-bound resources and cursor/output state.
      */
-    virtual void Destroy() = 0;
+    virtual void Destroy();
 
     /**
      * Address: 0x0042FD90 (FUN_0042FD90)
@@ -736,12 +751,14 @@ namespace moho
     virtual void SetViewRenderTarget(
       ID3DRenderTarget* sourceRenderTarget, ID3DTextureSheet* destinationTextureSheet
     );
-#undef CD3DDEVICE_RESERVED_VFUNC
 
     /**
      * Address: 0x004300D0
      * Slot: 51
      * Demangled: Moho::CD3DDevice::Clear2
+     *
+     * What it does:
+     * Stores one clear-enable state byte on the device object.
      */
     virtual bool Clear2(bool clear);
 
@@ -749,6 +766,10 @@ namespace moho
      * Address: 0x004300E0
      * Slot: 52
      * Demangled: Moho::CD3DDevice::Clear
+     *
+     * What it does:
+     * Clears the active render target with opaque black between an
+     * explicit backend scene begin/end.
      */
     virtual void Clear();
 
@@ -768,6 +789,18 @@ namespace moho
     [[nodiscard]] bool ShouldDrawViewportBackground() const;
 
     /**
+     * Inlined block from FUN_0042E1E0 (0x0042E278..0x0042E30D) and the matching
+     * lane in FUN_0042E750: the per-head release loop the compiler inlined at
+     * each call site, kept out of line here as one named helper.
+     *
+     * What it does:
+     * Drops one head's retained render-target and depth-stencil writer-lock
+     * wrappers, resetting their retained surfaces first (surface px nulled at
+     * 0x0042E28D, then the handle released).
+     */
+    void ReleaseHeadWriterLocks(std::size_t headIndex);
+
+    /**
      * FAF instrumentation - not a recovered function; non-virtual, so the
      * vtable and layout are unchanged.
      *
@@ -780,7 +813,63 @@ namespace moho
      */
     void PublishDrawStatistics();
 
+  public:
+    /// Whether `Paint` should clear instead of rendering the viewport. +0x0C
+    std::uint8_t mClearEnabled;                 // +0x0C
+    /// Set once a context bind (`SetRenViewport`/`InitContext`) succeeded. +0x0D
+    std::uint8_t mInitialized;                  // +0x0D
+    /// Padding reserved by the binary (ctor/dtor never touch it). +0x0E
+    std::uint8_t mReserved0E[0x02];             // +0x0E
+    /// The viewport bound by `SetRenViewport`; `Paint` renders through it. +0x10
+    WRenViewport* mViewport;                    // +0x10
+    /// Last state handed to `ShowCursor`. +0x14
+    std::uint8_t mShowingCursor;                // +0x14
+    /// Cleared by `SetRenViewport` once a real viewport owns the background. +0x15
+    std::uint8_t mDrawViewportBackground;       // +0x15
+    /// Copy of `d3d_ForceSoftwareVP || d3d_ForceDirect3DDebugEnabled`. +0x16
+    std::uint8_t mSoftwareVP;                   // +0x16
+    /// Copy of `d3d_ForceDirect3DDebugEnabled`. +0x17
+    std::uint8_t mDirectDebug;                  // +0x17
+    /// Guard so `BeginScene`/`EndScene` run at most once per scene. +0x18
+    std::uint8_t mSceneStarted;                 // +0x18
+    /// Padding reserved by the binary (ctor/dtor never touch it). +0x19
+    std::uint8_t mReserved19[0x03];             // +0x19
+    /// Embedded resource owner; `GetResources` is `lea eax,[ecx+0x1C]`. +0x1C
+    CD3DDeviceResources mResources;             // +0x1C
+    /// Render-target writer locks, one per head (`GetWriterLock1`). +0x214
+    boost::shared_ptr<ID3DRenderTarget> mRenderTargetLocks[2];  // +0x214
+    /// Depth-stencil writer locks, one per head (`GetWriterLock2`). +0x224
+    boost::shared_ptr<ID3DDepthStencil> mDepthStencilLocks[2];  // +0x224
+    /// Retained generic handle lanes mirrored by `Func16`/`Func17`. +0x234
+    boost::shared_ptr<void> mWriterLockContext1;                // +0x234
+    boost::shared_ptr<void> mWriterLockContext2;                // +0x23C
+    /// The device's own default render target/depth stencil (`SetRenViewport`). +0x244
+    boost::shared_ptr<CD3DRenderTarget> mRenderTarget;          // +0x244
+    boost::shared_ptr<CD3DDepthStencil> mDepthStencil;          // +0x24C
+    /// Effect selected by `SetCurEffect`; null-checks gate technique passes. +0x254
+    CD3DEffect* mCurEffect;                                     // +0x254
+    /// Hotspot + texture of the hardware cursor (`SetCursor`/`InitContext`). +0x258
+    gpg::gal::CursorContext mCursorContext;                     // +0x258
+
   };
+    static_assert(offsetof(CD3DDevice, mClearEnabled) == 0x0C, "CD3DDevice::mClearEnabled offset must be 0x0C");
+    static_assert(offsetof(CD3DDevice, mInitialized) == 0x0D, "CD3DDevice::mInitialized offset must be 0x0D");
+    static_assert(offsetof(CD3DDevice, mViewport) == 0x10, "CD3DDevice::mViewport offset must be 0x10");
+    static_assert(offsetof(CD3DDevice, mShowingCursor) == 0x14, "CD3DDevice::mShowingCursor offset must be 0x14");
+    static_assert(offsetof(CD3DDevice, mDrawViewportBackground) == 0x15, "CD3DDevice::mDrawViewportBackground offset must be 0x15");
+    static_assert(offsetof(CD3DDevice, mSoftwareVP) == 0x16, "CD3DDevice::mSoftwareVP offset must be 0x16");
+    static_assert(offsetof(CD3DDevice, mDirectDebug) == 0x17, "CD3DDevice::mDirectDebug offset must be 0x17");
+    static_assert(offsetof(CD3DDevice, mSceneStarted) == 0x18, "CD3DDevice::mSceneStarted offset must be 0x18");
+    static_assert(offsetof(CD3DDevice, mResources) == 0x1C, "CD3DDevice::mResources offset must be 0x1C");
+    static_assert(offsetof(CD3DDevice, mRenderTargetLocks) == 0x214, "CD3DDevice::mRenderTargetLocks offset must be 0x214");
+    static_assert(offsetof(CD3DDevice, mDepthStencilLocks) == 0x224, "CD3DDevice::mDepthStencilLocks offset must be 0x224");
+    static_assert(offsetof(CD3DDevice, mWriterLockContext1) == 0x234, "CD3DDevice::mWriterLockContext1 offset must be 0x234");
+    static_assert(offsetof(CD3DDevice, mWriterLockContext2) == 0x23C, "CD3DDevice::mWriterLockContext2 offset must be 0x23C");
+    static_assert(offsetof(CD3DDevice, mRenderTarget) == 0x244, "CD3DDevice::mRenderTarget offset must be 0x244");
+    static_assert(offsetof(CD3DDevice, mDepthStencil) == 0x24C, "CD3DDevice::mDepthStencil offset must be 0x24C");
+    static_assert(offsetof(CD3DDevice, mCurEffect) == 0x254, "CD3DDevice::mCurEffect offset must be 0x254");
+    static_assert(offsetof(CD3DDevice, mCursorContext) == 0x258, "CD3DDevice::mCursorContext offset must be 0x258");
+    static_assert(sizeof(CD3DDevice) == 0x26C, "CD3DDevice size must be 0x26C");
 
   /**
    * Address: 0x00430900 (FUN_00430900, ?D3D_Init@Moho@@YA_NXZ)

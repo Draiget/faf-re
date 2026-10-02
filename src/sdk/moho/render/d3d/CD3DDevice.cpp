@@ -9,8 +9,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <iterator>
-#include <memory>
-#include <unordered_map>
 
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
@@ -234,345 +232,6 @@ namespace
     }
   }
 
-  struct CD3DDeviceRuntimeView
-  {
-    void* mVTable = nullptr;                                     // +0x00
-    std::uint8_t mUnknown004To00B[0x08]{};                       // +0x04
-    std::uint8_t mClearEnabled = 0;                              // +0x0C
-    std::uint8_t mInitialized = 0;                               // +0x0D
-    std::uint8_t mUnknown00ETo00F[0x02]{};                       // +0x0E
-    moho::WRenViewport* mViewport = nullptr;                     // +0x10
-    std::uint8_t mShowingCursor = 0;                             // +0x14
-    std::uint8_t mDrawViewportBackground = 0;                    // +0x15
-    std::uint8_t mSoftwareVP = 0;                                // +0x16
-    std::uint8_t mDirectDebug = 0;                               // +0x17
-    std::uint8_t mSceneStarted = 0;                              // +0x18
-    std::uint8_t mUnknown019To213[0x1FB]{};                      // +0x19
-    boost::shared_ptr<moho::ID3DRenderTarget> mReaderWriterLocks1[2]; // +0x214
-    boost::shared_ptr<moho::ID3DDepthStencil> mReaderWriterLocks2[2]; // +0x224
-    boost::shared_ptr<void> mWriterLockContext1;                 // +0x234
-    boost::shared_ptr<void> mWriterLockContext2;                 // +0x23C
-    boost::shared_ptr<moho::CD3DRenderTarget> mRenderTarget;     // +0x244
-    boost::shared_ptr<moho::CD3DDepthStencil> mDepthStencil;     // +0x24C
-    moho::CD3DEffect* mCurEffect = nullptr;                      // +0x254
-    gpg::gal::CursorContext mCursorContext;                      // +0x258
-
-    [[nodiscard]] static CD3DDeviceRuntimeView* FromDevice(moho::CD3DDevice* const device) noexcept
-    {
-      using DeviceRuntimeMap = std::unordered_map<const moho::CD3DDevice*, std::unique_ptr<CD3DDeviceRuntimeView>>;
-      static DeviceRuntimeMap* const runtimeByDevice = new DeviceRuntimeMap();
-
-      auto it = runtimeByDevice->find(device);
-      if (it == runtimeByDevice->end()) {
-        auto runtime = std::make_unique<CD3DDeviceRuntimeView>();
-        runtime->mClearEnabled = 0;
-        runtime->mInitialized = 0;
-        runtime->mShowingCursor = 1;
-        runtime->mDrawViewportBackground = 1;
-        runtime->mSceneStarted = 0;
-        const auto inserted = runtimeByDevice->emplace(device, std::move(runtime));
-        it = inserted.first;
-      }
-
-      return it->second.get();
-    }
-
-    [[nodiscard]] static const CD3DDeviceRuntimeView* FromDevice(const moho::CD3DDevice* const device) noexcept
-    {
-      return FromDevice(const_cast<moho::CD3DDevice*>(device));
-    }
-  };
-
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mClearEnabled) == 0x0C,
-    "CD3DDeviceRuntimeView::mClearEnabled offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mInitialized) == 0x0D,
-    "CD3DDeviceRuntimeView::mInitialized offset must be 0x0D"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mViewport) == 0x10,
-    "CD3DDeviceRuntimeView::mViewport offset must be 0x10"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mShowingCursor) == 0x14,
-    "CD3DDeviceRuntimeView::mShowingCursor offset must be 0x14"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mSoftwareVP) == 0x16,
-    "CD3DDeviceRuntimeView::mSoftwareVP offset must be 0x16"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mDirectDebug) == 0x17,
-    "CD3DDeviceRuntimeView::mDirectDebug offset must be 0x17"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mSceneStarted) == 0x18,
-    "CD3DDeviceRuntimeView::mSceneStarted offset must be 0x18"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mReaderWriterLocks1) == 0x214,
-    "CD3DDeviceRuntimeView::mReaderWriterLocks1 offset must be 0x214"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mReaderWriterLocks2) == 0x224,
-    "CD3DDeviceRuntimeView::mReaderWriterLocks2 offset must be 0x224"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mWriterLockContext1) == 0x234,
-    "CD3DDeviceRuntimeView::mWriterLockContext1 offset must be 0x234"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mWriterLockContext2) == 0x23C,
-    "CD3DDeviceRuntimeView::mWriterLockContext2 offset must be 0x23C"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mRenderTarget) == 0x244,
-    "CD3DDeviceRuntimeView::mRenderTarget offset must be 0x244"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mDepthStencil) == 0x24C,
-    "CD3DDeviceRuntimeView::mDepthStencil offset must be 0x24C"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mCurEffect) == 0x254,
-    "CD3DDeviceRuntimeView::mCurEffect offset must be 0x254"
-  );
-  static_assert(
-    offsetof(CD3DDeviceRuntimeView, mCursorContext) == 0x258,
-    "CD3DDeviceRuntimeView::mCursorContext offset must be 0x258"
-  );
-
-  void ReleaseHeadWriterLocks(CD3DDeviceRuntimeView& runtime, const std::size_t headIndex)
-  {
-    if (auto* const renderTarget =
-          static_cast<moho::CD3DRenderTarget*>(runtime.mReaderWriterLocks1[headIndex].get());
-        renderTarget != nullptr) {
-      renderTarget->mSurface.reset();
-    }
-    runtime.mReaderWriterLocks1[headIndex].reset();
-
-    if (auto* const depthStencil =
-          static_cast<moho::CD3DDepthStencil*>(runtime.mReaderWriterLocks2[headIndex].get());
-        depthStencil != nullptr) {
-      depthStencil->mSurface.reset();
-    }
-    runtime.mReaderWriterLocks2[headIndex].reset();
-  }
-
-  class CD3DDeviceSingleton final : public moho::CD3DDevice
-  {
-  public:
-    /**
-     * Address: 0x00430C20 (FUN_00430C20, ??0CD3DDevice@Moho@@QAE@XZ)
-     * Address: 0x00430D50 (FUN_00430D50, the interface-level constructor on
-     *   the global device at 0x010C7C18: `ID3DDevice`'s vtable 0x00E01F04
-     *   and its `Broadcaster` ring at +0x04 self-linked; zero callers, the
-     *   base-constructor step of this one)
-     *
-     * What it does:
-     * Initializes singleton device runtime lanes, broadcaster links, and
-     * resource ownership used by the global D3D device object.
-     */
-    CD3DDeviceSingleton()
-    {
-      CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
-      runtime->mShowingCursor = 1;
-      runtime->mDrawViewportBackground = 1;
-      runtime->mClearEnabled = 0;
-      runtime->mInitialized = 0;
-      runtime->mSceneStarted = 0;
-      runtime->mSoftwareVP = (moho::d3d_ForceSoftwareVP || moho::d3d_ForceDirect3DDebugEnabled) ? 1u : 0u;
-      runtime->mDirectDebug = moho::d3d_ForceDirect3DDebugEnabled ? 1u : 0u;
-      runtime->mViewport = nullptr;
-      runtime->mCurEffect = nullptr;
-      mResources.SetDevice(this);
-    }
-
-    /**
-     * Address: 0x00430DF0 (FUN_00430DF0, ??1CD3DDevice@Moho@@UAE@XZ)
-     * Address: 0x00430D70 (FUN_00430D70, the global device's `Broadcaster`
-     *   ring at 0x010C7C1C unlinked and self-linked -- the base's destructor,
-     *   called from here and from the constructor's unwind path; formerly
-     *   `UnlinkAndResetDeviceBroadcaster`)
-     *
-     * What it does:
-     * Tears down singleton-owned runtime lanes and unlinks device broadcaster
-     * list ownership before global-device destruction completes.
-     */
-    ~CD3DDeviceSingleton() override
-    {
-      CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
-      runtime->mWriterLockContext1.reset();
-      runtime->mWriterLockContext2.reset();
-      runtime->mRenderTarget.reset();
-      runtime->mDepthStencil.reset();
-      runtime->mReaderWriterLocks1[0].reset();
-      runtime->mReaderWriterLocks1[1].reset();
-      runtime->mReaderWriterLocks2[0].reset();
-      runtime->mReaderWriterLocks2[1].reset();
-      runtime->mViewport = nullptr;
-      runtime->mSceneStarted = 0;
-      runtime->mInitialized = 0;
-      runtime->mDrawViewportBackground = 1;
-      runtime->mSoftwareVP = 0;
-      runtime->mDirectDebug = 0;
-      runtime->mCurEffect = nullptr;
-    }
-
-    [[nodiscard]] moho::ID3DDeviceResources* GetResources() override
-    {
-      return &mResources;
-    }
-
-    /**
-     * Address: 0x0042E1E0 (FUN_0042E1E0)
-     *
-     * What it does:
-     * Rebinds one GAL device-context payload, rebuilds per-head writer locks,
-     * recreates tracked device resources, and re-emits init callbacks/events.
-     *
-     * The body from `mInitialized = 0` on runs under
-     * `catch (const gpg::gal::Error&)` (FuncInfo 0x00F24DEC: one try block over
-     * states 0..5, adjectives 9, catch object at ebp-0x28, handler 0x0042E6CB).
-     * The handler warns "%s(%d) %s" (0x00E0196C) and falls through to
-     * `return mInitialized`, so a rebind whose `Reset` throws - the device was
-     * lost again before `IDirect3DDevice9::Reset` - answers false instead of
-     * propagating.
-     */
-    bool InitContext(gpg::gal::DeviceContext* const context) override
-    {
-      { static int sInitCount = 0; ++sInitCount; gpg::Warnf("[DEVRESET] CD3DDevice::InitContext #%d context=%p", sInitCount, static_cast<const void*>(context)); } // TEMPORARY PROBE (do not commit)
-      if (context == nullptr) {
-        return false;
-      }
-
-      CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
-      try {
-        runtime->mInitialized = 0;
-
-        gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-        const int headCount = context->GetHeadCount();
-        const std::size_t lockHeadCount =
-          std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
-
-        // false = rebind, not shutdown: keep the batchers, only Reset the mesh
-        // renderer. Everything else the viewport holds is released either way,
-        // which is what lets `Reset`'s `IDirect3DDevice9::Reset` succeed.
-        if (runtime->mViewport != nullptr) {
-          runtime->mViewport->D3DWindowOnDeviceExit(false);
-        }
-
-        const moho::SD3DDeviceEvent deviceExitEvent{1u, false, {0u, 0u, 0u}};
-        BroadcastEvent(deviceExitEvent);
-        ResetResourcesForContextTransition(mResources, false);
-        ResetWorldParticleBuffers();
-
-        for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
-          ReleaseHeadWriterLocks(*runtime, headIndex);
-        }
-
-        if (device != nullptr) {
-          device->Reset(context);
-        }
-
-        for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
-          if (device == nullptr) {
-            break;
-          }
-
-          // 0x0042E3BE: slot 7, then a copy of the head's output context.
-          const gpg::gal::OutputContext outputContext =
-            *device->GetHeadOutputContext(static_cast<unsigned int>(headIndex));
-
-          runtime->mReaderWriterLocks1[headIndex].reset(new moho::CD3DRenderTarget(this, outputContext.surface));
-          runtime->mReaderWriterLocks2[headIndex].reset(new moho::CD3DDepthStencil(this, outputContext.depthStencil));
-        }
-
-        mResources.InitResources(false);
-
-        if (runtime->mViewport != nullptr) {
-          runtime->mViewport->D3DWindowOnDeviceInit(false);
-        }
-
-        const moho::SD3DDeviceEvent deviceInitEvent{0u, false, {0u, 0u, 0u}};
-        BroadcastEvent(deviceInitEvent);
-
-        for (int headIndex = 1; headIndex < headCount; ++headIndex) {
-          const gpg::gal::Head& head = context->GetHead(static_cast<unsigned int>(headIndex));
-          ::ShowWindow(static_cast<HWND>(head.mWindow), SW_SHOWNORMAL);
-        }
-
-        if (runtime->mCursorContext.texture_.get() != nullptr && device != nullptr) {
-          device->SetCursor(&runtime->mCursorContext);
-        }
-
-        runtime->mInitialized = 1;
-        gpg::Warnf("[DEVRESET] CD3DDevice::InitContext done"); // TEMPORARY PROBE (do not commit)
-      } catch (const gpg::gal::Error& error) {
-        gpg::Warnf("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
-      }
-      return runtime->mInitialized != 0;
-    }
-
-    /**
-     * Address: 0x0042E750 (FUN_0042E750)
-     *
-     * What it does:
-     * Emits device-exit callbacks/events, tears down tracked resources and
-     * per-head writer locks, resets cursor context lanes, and dispatches backend
-     * destroy. The whole body runs under `catch (const gpg::gal::Error&)`
-     * (FuncInfo 0x00F1DD54, try over states 0..1): the handler at 0x0042E9A3
-     * hands the error's file, line and text to `gpg::Die`.
-     */
-    void Destroy() override
-    {
-      CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
-      try {
-        runtime->mInitialized = 0;
-        // true = app shutdown (the binary pushes 1 at 0x0042E786): the batchers
-        // and the map-imager border go too, and the mesh renderer is fully shut
-        // down rather than reset.
-        if (runtime->mViewport != nullptr) {
-          runtime->mViewport->D3DWindowOnDeviceExit(true);
-        }
-
-        const moho::SD3DDeviceEvent deviceExitEvent{1u, true, {0u, 0u, 0u}};
-        BroadcastEvent(deviceExitEvent);
-        ResetResourcesForContextTransition(mResources, true);
-        mResources.ClearCachedVertexFormats();
-
-        gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-        int headCount = 0;
-        if (device != nullptr) {
-          if (gpg::gal::DeviceContext* const context = device->GetDeviceContext(); context != nullptr) {
-            headCount = context->GetHeadCount();
-          }
-        }
-
-        const std::size_t lockHeadCount =
-          std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
-        for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
-          ReleaseHeadWriterLocks(*runtime, headIndex);
-        }
-
-        // 0x0042E902: back to a default cursor - a temporary context,
-        // copy-assigned over the device's.
-        runtime->mCursorContext = gpg::gal::CursorContext();
-
-        if (device != nullptr) {
-          gpg::gal::Device::DestroyInstance();
-        }
-      } catch (const gpg::gal::Error& error) {
-        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
-      }
-    }
-
-  private:
-    moho::CD3DDeviceResources mResources{};
-  };
-
   /**
    * FAF instrumentation, not in the shipped binary.
    *
@@ -665,12 +324,221 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x0042DBE0 (FUN_0042DBE0)
+   * Address: 0x0042DBE0 (FUN_0042DBE0, the scalar deleting destructor)
+   * Address: 0x00430DF0 (FUN_00430DF0, the non-deleting body this definition
+   *   emits: `~CursorContext`, the four shared handles, both lock arrays,
+   *   `~CD3DDeviceResources` (0x00440660) and the broadcaster ring unlink)
+   * Address: 0x00430D70 (FUN_00430D70, the interface-level destructor step:
+   *   ring unlinked and vptr reset to 0x00E01F04)
    *
    * What it does:
-   * Owns the deleting-destructor entrypoint for the D3D device wrapper.
+   * Destroys the device's members in reverse order. The field resets the old
+   * hand-written body performed do not exist in the binary (0x00430DF0
+   * releases members only) and were removed.
    */
   CD3DDevice::~CD3DDevice() = default;
+
+  /**
+   * Address: 0x00430C20 (FUN_00430C20, ??0CD3DDevice@Moho@@QAE@XZ)
+   * Address: 0x00430D50 (FUN_00430D50, the interface-level constructor step:
+   *   vptr 0x00E01F04 and the broadcaster ring at +0x04 self-linked before
+   *   this body runs; zero callers, the base-construction step of this one)
+   *
+   * What it does:
+   * Initializes the device's state bytes and embedded resource owner:
+   * clear/initialized/scene-open cleared, cursor shown and viewport
+   * background drawn by default, software-VP/direct-debug copied from the
+   * command-line overrides, then `mResources` handed its owner pointer.
+   */
+  CD3DDevice::CD3DDevice()
+    : mClearEnabled(0)
+    , mInitialized(0)
+    , mViewport(nullptr)
+    , mShowingCursor(1)
+    , mDrawViewportBackground(1)
+    , mSoftwareVP((d3d_ForceSoftwareVP || d3d_ForceDirect3DDebugEnabled) ? 1u : 0u)
+    , mDirectDebug(d3d_ForceDirect3DDebugEnabled ? 1u : 0u)
+    , mSceneStarted(0)
+  {
+    mCurEffect = nullptr;
+    mResources.SetDevice(this);
+  }
+
+  /**
+   * Address: 0x0042EE70 (FUN_0042EE70)
+   *
+   * What it does:
+   * Returns the device's embedded resource owner; the whole binary body is
+   * `lea eax, [ecx+0x1C]`.
+   */
+  ID3DDeviceResources* CD3DDevice::GetResources()
+  {
+    return &mResources;
+  }
+
+  /**
+   * Address: 0x0042E1E0 (FUN_0042E1E0, Moho::CD3DDevice::InitContext)
+   *
+   * What it does:
+   * Rebinds one GAL device-context payload, rebuilds per-head writer locks,
+   * recreates tracked device resources, and re-emits init callbacks/events.
+   *
+   * The body from `mInitialized = 0` on runs under
+   * `catch (const gpg::gal::Error&)` (FuncInfo 0x00F24DEC: one try block over
+   * states 0..5, adjectives 9, catch object at ebp-0x28, handler 0x0042E6CB).
+   * The handler warns "%s(%d) %s" (0x00E0196C) and falls through to
+   * `return mInitialized`, so a rebind whose `Reset` throws - the device was
+   * lost again before `IDirect3DDevice9::Reset` - answers false instead of
+   * propagating.
+   */
+  bool CD3DDevice::InitContext(gpg::gal::DeviceContext* const context)
+  {
+    if (context == nullptr) {
+      return false;
+    }
+
+    try {
+      mInitialized = 0;
+
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+      const int headCount = context->GetHeadCount();
+      const std::size_t lockHeadCount =
+        std::min(static_cast<std::size_t>(headCount), std::size(mRenderTargetLocks));
+
+      // false = rebind, not shutdown: keep the batchers, only Reset the mesh
+      // renderer. Everything else the viewport holds is released either way,
+      // which is what lets `Reset`'s `IDirect3DDevice9::Reset` succeed.
+      if (mViewport != nullptr) {
+        mViewport->D3DWindowOnDeviceExit(false);
+      }
+
+      const moho::SD3DDeviceEvent deviceExitEvent{1u, false, {0u, 0u, 0u}};
+      BroadcastEvent(deviceExitEvent);
+      ResetResourcesForContextTransition(mResources, false);
+      ResetWorldParticleBuffers();
+
+      for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
+        ReleaseHeadWriterLocks(headIndex);
+      }
+
+      if (device != nullptr) {
+        device->Reset(context);
+      }
+
+      for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
+        if (device == nullptr) {
+          break;
+        }
+
+        // 0x0042E3BE: slot 7, then a copy of the head's output context.
+        const gpg::gal::OutputContext outputContext =
+          *device->GetHeadOutputContext(static_cast<unsigned int>(headIndex));
+
+        mRenderTargetLocks[headIndex].reset(new moho::CD3DRenderTarget(this, outputContext.surface));
+        mDepthStencilLocks[headIndex].reset(new moho::CD3DDepthStencil(this, outputContext.depthStencil));
+      }
+
+      mResources.InitResources(false);
+
+      if (mViewport != nullptr) {
+        mViewport->D3DWindowOnDeviceInit(false);
+      }
+
+      const moho::SD3DDeviceEvent deviceInitEvent{0u, false, {0u, 0u, 0u}};
+      BroadcastEvent(deviceInitEvent);
+
+      for (int headIndex = 1; headIndex < headCount; ++headIndex) {
+        const gpg::gal::Head& head = context->GetHead(static_cast<unsigned int>(headIndex));
+        ::ShowWindow(static_cast<HWND>(head.mWindow), SW_SHOWNORMAL);
+      }
+
+      if (mCursorContext.texture_.get() != nullptr && device != nullptr) {
+        device->SetCursor(&mCursorContext);
+      }
+
+      mInitialized = 1;
+    } catch (const gpg::gal::Error& error) {
+      gpg::Warnf("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+    }
+    return mInitialized != 0;
+  }
+
+  /**
+   * Address: 0x0042E750 (FUN_0042E750, Moho::CD3DDevice::Destroy)
+   *
+   * What it does:
+   * Emits device-exit callbacks/events, tears down tracked resources and
+   * per-head writer locks, resets cursor context lanes, and dispatches backend
+   * destroy. The whole body runs under `catch (const gpg::gal::Error&)`
+   * (FuncInfo 0x00F1DD54, try over states 0..1): the handler at 0x0042E9A3
+   * hands the error's file, line and text to `gpg::Die`.
+   */
+  void CD3DDevice::Destroy()
+  {
+    try {
+      mInitialized = 0;
+      // true = app shutdown (the binary pushes 1 at 0x0042E786): the batchers
+      // and the map-imager border go too, and the mesh renderer is fully shut
+      // down rather than reset.
+      if (mViewport != nullptr) {
+        mViewport->D3DWindowOnDeviceExit(true);
+      }
+
+      const moho::SD3DDeviceEvent deviceExitEvent{1u, true, {0u, 0u, 0u}};
+      BroadcastEvent(deviceExitEvent);
+      ResetResourcesForContextTransition(mResources, true);
+      mResources.ClearCachedVertexFormats();
+
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+      int headCount = 0;
+      if (device != nullptr) {
+        if (gpg::gal::DeviceContext* const context = device->GetDeviceContext(); context != nullptr) {
+          headCount = context->GetHeadCount();
+        }
+      }
+
+      const std::size_t lockHeadCount =
+        std::min(static_cast<std::size_t>(headCount), std::size(mRenderTargetLocks));
+      for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
+        ReleaseHeadWriterLocks(headIndex);
+      }
+
+      // 0x0042E902: back to a default cursor - a temporary context,
+      // copy-assigned over the device's.
+      mCursorContext = gpg::gal::CursorContext();
+
+      if (device != nullptr) {
+        gpg::gal::Device::DestroyInstance();
+      }
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+    }
+  }
+
+  /**
+   * Inlined block from FUN_0042E1E0 (0x0042E278..0x0042E30D) and the matching
+   * lane in FUN_0042E750: the per-head release loop the compiler inlined at
+   * each call site, kept out of line here as one named helper.
+   *
+   * What it does:
+   * Drops one head's retained render-target and depth-stencil writer-lock
+   * wrappers, resetting their retained surfaces first (surface px nulled at
+   * 0x0042E28D, then the handle released).
+   */
+  void CD3DDevice::ReleaseHeadWriterLocks(const std::size_t headIndex)
+  {
+    if (auto* const renderTarget = static_cast<CD3DRenderTarget*>(mRenderTargetLocks[headIndex].get());
+        renderTarget != nullptr) {
+      renderTarget->mSurface.reset();
+    }
+    mRenderTargetLocks[headIndex].reset();
+
+    if (auto* const depthStencil = static_cast<CD3DDepthStencil*>(mDepthStencilLocks[headIndex].get());
+        depthStencil != nullptr) {
+      depthStencil->mSurface.reset();
+    }
+    mDepthStencilLocks[headIndex].reset();
+  }
 
   /**
    * Address: 0x0042DBF0 (FUN_0042DBF0)
@@ -696,8 +564,7 @@ namespace moho
    */
   void CD3DDevice::SetRenViewport(WRenViewport* const viewport)
   {
-    CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
-    runtime->mViewport = viewport;
+    mViewport = viewport;
 
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     if (device == nullptr) {
@@ -739,35 +606,33 @@ namespace moho
     }
 
     const std::size_t lockHeadCount =
-      std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
+      std::min(static_cast<std::size_t>(headCount), std::size(mRenderTargetLocks));
     for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
-      ReleaseHeadWriterLocks(*runtime, headIndex);
+      ReleaseHeadWriterLocks(headIndex);
 
       const gpg::gal::OutputContext outputContext =
         *device->GetHeadOutputContext(static_cast<unsigned int>(headIndex));
 
-      runtime->mReaderWriterLocks1[headIndex].reset(new moho::CD3DRenderTarget(this, outputContext.surface));
-      runtime->mReaderWriterLocks2[headIndex].reset(new moho::CD3DDepthStencil(this, outputContext.depthStencil));
+      mRenderTargetLocks[headIndex].reset(new moho::CD3DRenderTarget(this, outputContext.surface));
+      mDepthStencilLocks[headIndex].reset(new moho::CD3DDepthStencil(this, outputContext.depthStencil));
     }
 
     // 0x0042DFC8: `push 0x28; call operator new; call 0x0043EBC0` - a fresh
     // default `CD3DRenderTarget` (0x28 bytes), then the same for the depth
     // stencil.
-    runtime->mRenderTarget.reset(new moho::CD3DRenderTarget());
-    runtime->mDepthStencil.reset(new moho::CD3DDepthStencil());
+    mRenderTarget.reset(new moho::CD3DRenderTarget());
+    mDepthStencil.reset(new moho::CD3DDepthStencil());
 
-    if (auto* const resources = static_cast<moho::CD3DDeviceResources*>(GetResources()); resources != nullptr) {
-      resources->InitResources(true);
-    }
+    mResources.InitResources(true);
 
-    runtime->mDrawViewportBackground = 0u;
+    mDrawViewportBackground = 0u;
     const moho::SD3DDeviceEvent deviceInitEvent{0u, true, {0u, 0u, 0u}};
     BroadcastEvent(deviceInitEvent);
 
-    if (runtime->mViewport != nullptr) {
-      runtime->mViewport->D3DWindowOnDeviceInit(true);
+    if (mViewport != nullptr) {
+      mViewport->D3DWindowOnDeviceInit(true);
     }
-    runtime->mInitialized = 1u;
+    mInitialized = 1u;
   }
 
   /**
@@ -778,7 +643,7 @@ namespace moho
    */
   WRenViewport* CD3DDevice::GetViewport()
   {
-    return CD3DDeviceRuntimeView::FromDevice(this)->mViewport;
+    return mViewport;
   }
 
   /**
@@ -1027,12 +892,11 @@ namespace moho
       }
 
       gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-      auto* const view = CD3DDeviceRuntimeView::FromDevice(this);
-      view->mCursorContext.hotspotX_ = hotspotX;
-      view->mCursorContext.hotspotY_ = hotspotY;
+      mCursorContext.hotspotX_ = hotspotX;
+      mCursorContext.hotspotY_ = hotspotY;
       ID3DTextureSheet::TextureHandle cursorPixels{};
-      view->mCursorContext.texture_ = cursorTexture->GetTexture(cursorPixels);
-      device->SetCursor(&view->mCursorContext);
+      mCursorContext.texture_ = cursorTexture->GetTexture(cursorPixels);
+      device->SetCursor(&mCursorContext);
       isSet = true;
     } catch (const gpg::gal::Error&) {
     }
@@ -1054,24 +918,24 @@ namespace moho
     if (result != 0) {
       gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
       result = device->ShowCursor(show);
-      CD3DDeviceRuntimeView::FromDevice(this)->mShowingCursor = show ? 1u : 0u;
+      mShowingCursor = show ? 1u : 0u;
     }
     return result;
   }
 
   [[nodiscard]] bool CD3DDevice::IsCursorPixelSourceReady() const
   {
-    return CD3DDeviceRuntimeView::FromDevice(this)->mCursorContext.texture_.get() != nullptr;
+    return mCursorContext.texture_.get() != nullptr;
   }
 
   [[nodiscard]] bool CD3DDevice::IsCursorShowing() const
   {
-    return CD3DDeviceRuntimeView::FromDevice(this)->mShowingCursor != 0;
+    return mShowingCursor != 0;
   }
 
   [[nodiscard]] bool CD3DDevice::ShouldDrawViewportBackground() const
   {
-    return CD3DDeviceRuntimeView::FromDevice(this)->mDrawViewportBackground != 0;
+    return mDrawViewportBackground != 0;
   }
 
   /**
@@ -1085,7 +949,7 @@ namespace moho
   boost::shared_ptr<ID3DRenderTarget>&
   CD3DDevice::GetWriterLock1(boost::shared_ptr<ID3DRenderTarget>& outLock, const int index)
   {
-    const auto& source = CD3DDeviceRuntimeView::FromDevice(this)->mReaderWriterLocks1[static_cast<std::size_t>(index)];
+    const auto& source = mRenderTargetLocks[static_cast<std::size_t>(index)];
     return CopyRetainedHandle(source, outLock);
   }
 
@@ -1100,7 +964,7 @@ namespace moho
   boost::shared_ptr<ID3DDepthStencil>&
   CD3DDevice::GetWriterLock2(boost::shared_ptr<ID3DDepthStencil>& outLock, const int index)
   {
-    const auto& source = CD3DDeviceRuntimeView::FromDevice(this)->mReaderWriterLocks2[static_cast<std::size_t>(index)];
+    const auto& source = mDepthStencilLocks[static_cast<std::size_t>(index)];
     return CopyRetainedHandle(source, outLock);
   }
 
@@ -1114,7 +978,7 @@ namespace moho
    */
   boost::shared_ptr<void>& CD3DDevice::Func16(boost::shared_ptr<void>& outHandle)
   {
-    return CopyRetainedHandle(CD3DDeviceRuntimeView::FromDevice(this)->mWriterLockContext1, outHandle);
+    return CopyRetainedHandle(mWriterLockContext1, outHandle);
   }
 
   /**
@@ -1127,7 +991,7 @@ namespace moho
    */
   boost::shared_ptr<void>& CD3DDevice::Func17(boost::shared_ptr<void>& outHandle)
   {
-    return CopyRetainedHandle(CD3DDeviceRuntimeView::FromDevice(this)->mWriterLockContext2, outHandle);
+    return CopyRetainedHandle(mWriterLockContext2, outHandle);
   }
 
   /**
@@ -1138,7 +1002,7 @@ namespace moho
    */
   boost::shared_ptr<CD3DRenderTarget>& CD3DDevice::GetRenderTarget(boost::shared_ptr<CD3DRenderTarget>& outTarget)
   {
-    return CopyRetainedHandle(CD3DDeviceRuntimeView::FromDevice(this)->mRenderTarget, outTarget);
+    return CopyRetainedHandle(mRenderTarget, outTarget);
   }
 
   /**
@@ -1152,7 +1016,7 @@ namespace moho
   boost::shared_ptr<CD3DDepthStencil>&
   CD3DDevice::GetDepthStencil(boost::shared_ptr<CD3DDepthStencil>& outDepthStencil)
   {
-    return CopyRetainedHandle(CD3DDeviceRuntimeView::FromDevice(this)->mDepthStencil, outDepthStencil);
+    return CopyRetainedHandle(mDepthStencil, outDepthStencil);
   }
 
   /**
@@ -1192,8 +1056,7 @@ namespace moho
     const int stencil
   )
   {
-    CD3DDeviceRuntimeView* const view = CD3DDeviceRuntimeView::FromDevice(this);
-    if (view->mSceneStarted != 0) {
+    if (mSceneStarted != 0) {
       return;
     }
 
@@ -1208,7 +1071,7 @@ namespace moho
     device->ClearTarget(&outputContext);
     (void)device->BeginScene();
     device->Clear(clear, clear, clear, static_cast<std::uint32_t>(color), zValue, stencil);
-    view->mSceneStarted = 1;
+    mSceneStarted = 1;
   }
 
   /**
@@ -1219,14 +1082,13 @@ namespace moho
    */
   void CD3DDevice::BeginScene()
   {
-    CD3DDeviceRuntimeView* const view = CD3DDeviceRuntimeView::FromDevice(this);
-    if (view->mSceneStarted != 0) {
+    if (mSceneStarted != 0) {
       return;
     }
 
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     (void)device->BeginScene();
-    view->mSceneStarted = 1;
+    mSceneStarted = 1;
   }
 
   /**
@@ -1237,14 +1099,13 @@ namespace moho
    */
   void CD3DDevice::EndScene()
   {
-    CD3DDeviceRuntimeView* const view = CD3DDeviceRuntimeView::FromDevice(this);
-    if (view->mSceneStarted == 0) {
+    if (mSceneStarted == 0) {
       return;
     }
 
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     device->EndScene();
-    view->mSceneStarted = 0;
+    mSceneStarted = 0;
   }
 
   /**
@@ -1618,7 +1479,7 @@ namespace moho
    */
   bool CD3DDevice::SetCurEffect(CD3DEffect* const effect)
   {
-    CD3DDeviceRuntimeView::FromDevice(this)->mCurEffect = effect;
+    mCurEffect = effect;
     return effect != nullptr;
   }
 
@@ -1664,7 +1525,7 @@ namespace moho
    */
   CD3DEffect* CD3DDevice::GetCurEffect()
   {
-    return CD3DDeviceRuntimeView::FromDevice(this)->mCurEffect;
+    return mCurEffect;
   }
 
   /**
@@ -1847,7 +1708,7 @@ namespace moho
    */
   bool CD3DDevice::Clear2(const bool clear)
   {
-    CD3DDeviceRuntimeView::FromDevice(this)->mClearEnabled = clear ? 1u : 0u;
+    mClearEnabled = clear ? 1u : 0u;
     return clear;
   }
 
@@ -1870,8 +1731,7 @@ namespace moho
    */
   void CD3DDevice::Paint()
   {
-    CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
-    if (runtime->mInitialized == 0 || !gpg::gal::Device::IsReady() || runtime->mViewport == nullptr) {
+    if (mInitialized == 0 || !gpg::gal::Device::IsReady() || mViewport == nullptr) {
       return;
     }
 
@@ -1889,14 +1749,14 @@ namespace moho
       device->Present();
       (void)AddToStatCounter(EnsureEngineIntStat(sEngineStatRenderPresentCount, "Render_PresentCount"), 1);
 
-      if (runtime->mClearEnabled != 0) {
+      if (mClearEnabled != 0) {
         Clear();
       } else {
-        runtime->mViewport->D3DWindowOnDeviceRender();
+        mViewport->D3DWindowOnDeviceRender();
       }
     } catch (const gpg::gal::Error& error) {
       gpg::Warnf("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
-      runtime->mSceneStarted = 0;
+      mSceneStarted = 0;
     }
   }
 
@@ -1908,7 +1768,7 @@ namespace moho
    */
   CD3DDevice* D3D_GetDevice()
   {
-    static CD3DDeviceSingleton sDevice{};
+    static CD3DDevice sDevice;
     return &sDevice;
   }
 

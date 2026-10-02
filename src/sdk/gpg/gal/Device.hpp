@@ -171,7 +171,7 @@ namespace gpg::gal
      * in reverse declaration order, so the non-const overload, declared first,
      * lands in slot 7; `DeviceD3D9` defines it first too (its throw is
      * `DeviceD3D9.cpp` line 295, the const one's line 303). Moho calls slot 7
-     * on a non-const `Device*` (0x0042E3BE in `CD3DDeviceSingleton::InitContext`,
+     * on a non-const `Device*` (0x0042E3BE in `CD3DDevice::InitContext`,
      * 0x0042DD28 in `CD3DDevice::SetRenViewport`).
      */
     virtual OutputContext* GetHeadOutputContext(unsigned int headIndex) = 0;
