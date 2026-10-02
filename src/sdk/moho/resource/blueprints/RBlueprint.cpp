@@ -37,66 +37,6 @@ namespace
     return sInstance;
   }
 
-  struct SerializerCallbackRuntimeView
-  {
-    void* vtableLane;            // +0x00
-    void* helperNextLane;        // +0x04
-    void* helperPrevLane;        // +0x08
-    void* deserializeCallback;   // +0x0C
-    void* serializeCallback;     // +0x10
-  };
-
-  static_assert(
-    offsetof(SerializerCallbackRuntimeView, deserializeCallback) == 0x0C,
-    "SerializerCallbackRuntimeView::deserializeCallback offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SerializerCallbackRuntimeView, serializeCallback) == 0x10,
-    "SerializerCallbackRuntimeView::serializeCallback offset must be 0x10"
-  );
-  static_assert(sizeof(SerializerCallbackRuntimeView) == 0x14, "SerializerCallbackRuntimeView size must be 0x14");
-
-  /**
-   * Address: 0x0050DB70 (FUN_0050DB70)
-   *
-   * What it does:
-   * Stores one serializer deserialize callback lane at offset `+0x0C`.
-   */
-  [[maybe_unused]] [[nodiscard]] SerializerCallbackRuntimeView* SetSerializerDeserializeCallbackLane(
-    SerializerCallbackRuntimeView* const result,
-    void* const callback
-  ) noexcept
-  {
-    result->deserializeCallback = callback;
-    return result;
-  }
-
-  /**
-   * Address: 0x0050DB80 (FUN_0050DB80)
-   *
-   * What it does:
-   * Stores one serializer serialize callback lane at offset `+0x10`.
-   */
-  [[maybe_unused]] [[nodiscard]] SerializerCallbackRuntimeView* SetSerializerSerializeCallbackLane(
-    SerializerCallbackRuntimeView* const result,
-    void* const callback
-  ) noexcept
-  {
-    result->serializeCallback = callback;
-    return result;
-  }
-
-  /**
-   * Address: 0x0050DB90 (FUN_0050DB90)
-   *
-   * What it does:
-   * Returns mutable string data pointer using legacy MSVC8 SSO policy
-   * (`myRes < 16` uses inline buffer, otherwise heap pointer).
-   */
-  [[maybe_unused]] [[nodiscard]] char* ResolveLegacyStringDataPointer(msvc8::string* const text) noexcept
-  {
-    return text->myRes < 16u ? text->bx.buf : text->bx.ptr;
-  }
 } // namespace
 
 namespace moho
@@ -166,25 +106,6 @@ namespace moho
     // first word. That is the inlined base destructor, and the compiler emits it
     // now that RObject is a declared base rather than a hand-modelled word -- so
     // there is nothing to write here.
-  }
-
-  /**
-   * Address: 0x0050DE40 (FUN_0050DE40, deleting-destructor thunk)
-   *
-   * What it does:
-   * Runs one `RBlueprint` destructor lane and conditionally frees this object
-   * storage when the low delete flag bit is set.
-   */
-  [[maybe_unused]] RBlueprint* DestroyRBlueprintAndMaybeDelete(
-    RBlueprint* const object,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    object->~RBlueprint();
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(object));
-    }
-    return object;
   }
 
   /**
@@ -374,7 +295,9 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
    * Address: 0x00BC7FC0 (FUN_00BC7FC0, register_RBlueprintTypeInfo)
    *
    * What it does:
-   * Startup thunk that materializes `RBlueprintTypeInfo`.
+   * Startup thunk that materializes `RBlueprintTypeInfo`; its phase entry is
+   * the `GPG_PREREGISTER_INIT(register_RBlueprintTypeInfo_c294bc, ...)` line
+   * below (the old bootstrap object that called this a second time is gone).
    */
   void register_RBlueprintTypeInfo()
   {
@@ -382,18 +305,6 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
   }
 } // namespace moho
 
-namespace
-{
-  struct RBlueprintTypeInfoBootstrap
-  {
-    RBlueprintTypeInfoBootstrap()
-    {
-      moho::register_RBlueprintTypeInfo();
-    }
-  };
-
-  RBlueprintTypeInfoBootstrap gRBlueprintTypeInfoBootstrap;
-} // namespace
 
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
