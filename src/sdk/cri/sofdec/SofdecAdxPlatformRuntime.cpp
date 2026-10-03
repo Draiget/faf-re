@@ -2189,8 +2189,7 @@
   );
   // `SFD_SetM2tsPara` is declared against the SFD runtime's own view of this
   // static, which is defined later in the aggregate; the call site casts.
-  struct Sfm2tsParameterSnapshot;
-  extern "C" void SFD_SetM2tsPara(const Sfm2tsParameterSnapshot* parameterSnapshot);
+  extern "C" void SFD_SetM2tsPara(const moho::Sfm2tsParameterSnapshot* parameterSnapshot);
 
   void mwsfcre_AttachPicUsrBuf(moho::MwsfdPlaybackStateSubobj* ply);
   void* LSC_Create(void* sourceJoinObject);
@@ -3291,7 +3290,7 @@
       mwsfd_m2tspara.bufferBytes = m2tsBufferBytes;
       mwsfd_m2tspara.input = m2tsInput;
       mwsfd_m2tspara.inputBytes = m2tsInputBytes;
-      SFD_SetM2tsPara(reinterpret_cast<const Sfm2tsParameterSnapshot*>(&mwsfd_m2tspara));
+      SFD_SetM2tsPara(reinterpret_cast<const moho::Sfm2tsParameterSnapshot*>(&mwsfd_m2tspara));
       SFD_SetAdxtPara(&mwsfd_adxtpara);
     }
 

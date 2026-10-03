@@ -503,41 +503,31 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SfplyCreateParams) == 0x44, "SfplyCreateParams size must be 0x44");
 
   /**
-   * SFPLY flow-counter lane used by playback-info snapshots.
+   * One SFPLY flow-counter lane: three signed 64-bit accumulators.
+   * `sfply_InitFlowCnt` (0x00AD7CF0) zeroes all six words, and the decode
+   * loops fold ring snapshots into them as lo/hi pairs via
+   * `SFBUF_UpdateFlowCnt` (`sfmps_UpdateFlowCnt` 0x00AD6900 pairs +0x00/+0x04,
+   * +0x08/+0x0C, +0x10/+0x14), so the words are 64-bit counters, not six
+   * independent 32-bit tallies.
    */
   struct SfplyFlowCount
   {
-    std::int32_t producedBytes = 0;   // +0x00
-    std::int32_t consumedBytes = 0;   // +0x04
-    std::int32_t producedPackets = 0; // +0x08
-    std::int32_t consumedPackets = 0; // +0x0C
-    std::int32_t producedFrames = 0;  // +0x10
-    std::int32_t consumedFrames = 0;  // +0x14
+    std::int64_t sourceFlowBytes = 0; // +0x00 ring bytes pulled from the supply
+    std::int64_t consumedBytes = 0;   // +0x08 bytes handed to the decoder
+    std::int64_t decodedUnits = 0;    // +0x10 packs/units decoded
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SfplyFlowCount, producedBytes) == 0x00,
-    "SfplyFlowCount::producedBytes offset must be 0x00"
+    offsetof(SfplyFlowCount, sourceFlowBytes) == 0x00,
+    "SfplyFlowCount::sourceFlowBytes offset must be 0x00"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SfplyFlowCount, consumedBytes) == 0x04,
-    "SfplyFlowCount::consumedBytes offset must be 0x04"
+    offsetof(SfplyFlowCount, consumedBytes) == 0x08,
+    "SfplyFlowCount::consumedBytes offset must be 0x08"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SfplyFlowCount, producedPackets) == 0x08,
-    "SfplyFlowCount::producedPackets offset must be 0x08"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SfplyFlowCount, consumedPackets) == 0x0C,
-    "SfplyFlowCount::consumedPackets offset must be 0x0C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SfplyFlowCount, producedFrames) == 0x10,
-    "SfplyFlowCount::producedFrames offset must be 0x10"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SfplyFlowCount, consumedFrames) == 0x14,
-    "SfplyFlowCount::consumedFrames offset must be 0x14"
+    offsetof(SfplyFlowCount, decodedUnits) == 0x10,
+    "SfplyFlowCount::decodedUnits offset must be 0x10"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SfplyFlowCount) == 0x18, "SfplyFlowCount size must be 0x18");
 
@@ -673,6 +663,220 @@ namespace moho
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SfplyTimerInfo) == 0xE0, "SfplyTimerInfo size must be 0xE0");
 
+  struct SfseeHandle;
+  struct SofdecSjRingBufferHandle;
+
+  /// One SFBUF ring-lane descriptor in the buffer-manager's lane table
+  /// (`workctrl+0x1320`, stride 0x74 - `getSupSj` 0x00ACF630). Lane 0 is the
+  /// input supply (its join address is the SFMEM in-SJ), lanes 1/2 the video
+  /// and audio destinations the PTS callback dispatches on.
+  struct SfbufSupplyLane
+  {
+    std::int32_t mUnknown00 = 0;
+    std::int32_t supplyJoinAddress = 0; // +0x04 SJ join address of the lane
+    std::int32_t mUnknown08 = 0;
+    std::int32_t supplyWindowBytes = 0; // +0x0C prep-end threshold window
+    std::int32_t mUnknown10 = 0;         // +0x10
+    std::int32_t mUnknown14 = 0;         // +0x14
+    std::uint8_t mUnknown18[0x5C]{};     // +0x18
+  };
+  static_assert(sizeof(SfbufSupplyLane) == 0x74, "SfbufSupplyLane size must be 0x74");
+
+  /// SFBUF buffer-manager sub-object at `workctrl+0x1310` (0xC20 bytes),
+  /// initialized by `SFBUF_InitHn`.
+  struct SfbufBufferState
+  {
+    std::uint8_t mUnknown00[0x10]{};
+    std::array<SfbufSupplyLane, 8> supplyLanes{}; // +0x10 (workctrl +0x1320)
+    std::uint8_t mUnknown3B0[0x870]{};            // +0x3B0
+  };
+  static_assert(offsetof(SfbufBufferState, supplyLanes) == 0x10, "SfbufBufferState::supplyLanes offset must be 0x10");
+  static_assert(sizeof(SfbufBufferState) == 0xC20, "SfbufBufferState size must be 0xC20");
+
+  /// Per-source-lane input descriptor `SFM2TS_Create` reads when opening one
+  /// SJRBF ring buffer per configured M2TS transfer lane.
+  struct Sfm2tsSourceLane
+  {
+    std::int32_t sourceAddress = 0;   // +0x00
+    std::int32_t sourceSizeBytes = 0; // +0x04
+  };
+  static_assert(sizeof(Sfm2tsSourceLane) == 0x08, "Sfm2tsSourceLane size must be 0x08");
+
+  /// Per-lane M2TSD out-SJ override record; `SFM2TS_Create` seeds
+  /// `streamIdFilter=-1` / `outStreamJoinAddress=0` and opens `relayRingBuffer`.
+  struct Sfm2tsTransferLaneOverride
+  {
+    std::int32_t streamIdFilter = -1;      // +0x00 (-1 = keep M2TSD's current filter)
+    std::int32_t outStreamJoinAddress = 0; // +0x04 (0 = unset; falls back to a supply lane)
+    SofdecSjRingBufferHandle* relayRingBuffer = nullptr; // +0x08
+  };
+  static_assert(sizeof(Sfm2tsTransferLaneOverride) == 0x0C, "Sfm2tsTransferLaneOverride size must be 0x0C");
+
+  /// Teardown callback node interface stored in the M2TS init block's lane
+  /// table during destroy (vtable slot +0x0C is `Destroy`).
+  struct Sfm2tsDestroyNode
+  {
+    virtual void Reserved00() = 0;
+    virtual void Reserved04() = 0;
+    virtual void Reserved08() = 0;
+    virtual void Destroy() = 0; // +0x0C
+  };
+
+  struct Sfm2tsDestroyCallbackLane
+  {
+    Sfm2tsDestroyNode* node = nullptr; // +0x00
+    std::int32_t mUnknown04 = 0;       // +0x04
+    std::int32_t mUnknown08 = 0;       // +0x08
+  };
+  static_assert(sizeof(Sfm2tsDestroyCallbackLane) == 0x0C, "Sfm2tsDestroyCallbackLane size must be 0x0C");
+
+  /// M2TS transfer parameter template copied into every M2TS init block by
+  /// `initInf` (0x00ACF8F0) and mirrored back to the global `sfdm2ts_para` by
+  /// `SFM2TS_Destroy`.
+  struct Sfm2tsParameterSnapshot
+  {
+    std::int32_t workAddress = 0;   // +0x00 M2TSD work buffer address
+    std::int32_t workSizeBytes = 0; // +0x04
+    std::int32_t laneCount = 0;     // +0x08 source-lane count (destroy walk count)
+    union
+    {
+      std::array<std::int32_t, 16> tailWords;      // +0x0C raw template words
+      std::array<Sfm2tsSourceLane, 8> sourceLanes; // +0x0C per-lane descriptors
+    } sources;                                     // +0x0C
+  };
+  static_assert(sizeof(Sfm2tsParameterSnapshot) == 0x4C, "Sfm2tsParameterSnapshot size must be 0x4C");
+
+  /// MPS program-stream parser init block (`sfmps_InitInf` 0x00AD6A00 seeds
+  /// it; `SFMPS_Create` 0x00AD6990 stores the `MPS_Create` handle at +0x00).
+  struct SfmpsParserState
+  {
+    std::int32_t parserHandleAddress = 0;    // +0x00
+    std::int32_t cachedSystemField3Max = 0;  // +0x04
+    std::int32_t cachedSystemField2Max = 0;  // +0x08
+    std::int32_t mUnknown0C = 0;             // +0x0C
+    std::int32_t parserField4Default = -1;   // +0x10
+    std::int32_t parserField5Ceiling = static_cast<std::int32_t>(0x7FFFFFFFu); // +0x14
+    std::int32_t parserField6Low = -1;       // +0x18
+    std::int32_t parserField7High = static_cast<std::int32_t>(0x7FFFFFFFu);    // +0x1C
+    std::int32_t concatCount = 0;            // +0x20
+    std::int32_t parserField9Ceiling = static_cast<std::int32_t>(0x7FFFFFFFu); // +0x24
+    std::int32_t parserField10Ceiling = static_cast<std::int32_t>(0x7FFFFFFFu); // +0x28
+    std::int32_t reprocessField11 = -1;      // +0x2C
+    std::int32_t reprocessField12 = -1;      // +0x30
+    std::int32_t videoChannel = -1;          // +0x34
+    std::int32_t audioChannel = -1;          // +0x38
+    std::int32_t effectiveEndcodeMode = 0;   // +0x3C
+    std::array<std::int32_t, 68> elementOutSjByElementType{}; // +0x40 element types 188..255
+    std::int32_t copyElemOutCallbackAddress = 0; // +0x150
+    std::int32_t copyElemOutCallbackContext = 0; // +0x154
+    std::int32_t selectedElementaryLane = -1;    // +0x158
+  };
+  static_assert(offsetof(SfmpsParserState, elementOutSjByElementType) == 0x40, "SfmpsParserState::elementOutSjByElementType offset must be 0x40");
+  static_assert(sizeof(SfmpsParserState) == 0x15C, "SfmpsParserState size must be 0x15C");
+
+  /// M2TS transport init block (`initInf` seeds it from the global
+  /// `sfdm2ts_para` template). The lane table at +0x50 holds the per-lane
+  /// out-SJ overrides while the stream runs and the destroy-callback nodes
+  /// from +0x58 during teardown - one storage, two lifecycle phases.
+  struct Sfm2tsInitInfo
+  {
+    std::int32_t m2tsdRuntimeAddress = 0; // +0x00 M2TSD demux handle
+    Sfm2tsParameterSnapshot parameters{}; // +0x04 create template / destroy snapshot
+    union
+    {
+      std::array<Sfm2tsTransferLaneOverride, 8> laneOverrides; // +0x00 (block +0x50)
+      struct
+      {
+        std::uint8_t mUnknown00[0x08]{};                       // +0x00 (block +0x50)
+        std::array<Sfm2tsDestroyCallbackLane, 8> destroyLanes; // +0x08 (block +0x58)
+      } teardown;
+    } lanes;                                                              // +0x50
+  };
+  static_assert(offsetof(Sfm2tsInitInfo, parameters) == 0x04, "Sfm2tsInitInfo::parameters offset must be 0x04");
+  static_assert(offsetof(Sfm2tsInitInfo, lanes) == 0x50, "Sfm2tsInitInfo::lanes offset must be 0x50");
+  static_assert(sizeof(Sfm2tsInitInfo) == 0xB8, "Sfm2tsInitInfo size must be 0xB8");
+
+  /// The demux init block the transfer state publishes: the MPS parser state
+  /// or the M2TS init block - the two create paths are mutually exclusive.
+  union SfdDemuxInitBlock
+  {
+    SfmpsParserState mps; // 0x15C
+    Sfm2tsInitInfo m2ts;  // 0xB8
+  };
+  static_assert(sizeof(SfdDemuxInitBlock) == 0x15C, "SfdDemuxInitBlock size must be 0x15C");
+
+  /// One SFSET transfer-lane slot (`SFSET_GetTrHn` indexes them 0x44 apart).
+  struct SfsetTransferLane
+  {
+    std::int32_t transferHandleAddress = 0; // +0x00 demux/parser handle on demux lanes
+    std::uint8_t mUnknown04[0x40]{};        // +0x04
+  };
+  static_assert(sizeof(SfsetTransferLane) == 0x44, "SfsetTransferLane size must be 0x44");
+
+  /**
+   * Named demux-lane model of the transfer state's bytes: SFMEM ring lane word,
+   * the system lane's active-demux pointer and destination bookkeeping, and
+   * the two mutually-exclusive demux init blocks.
+   */
+  struct SftrnDemuxState
+  {
+    std::uint8_t mUnknown00[0x0C]{};          // +0x00 lane 0 head
+    std::int32_t memoryPrepLaneIndex = 0;     // +0x0C SFMEM ring lane (workctrl +0x1F44)
+    std::uint8_t mUnknown10[0x34]{};          // +0x10 lane 0 tail / lane 1 head
+    SfdDemuxInitBlock* demuxInit = nullptr;   // +0x44 active demux block (workctrl +0x1F7C)
+    std::int32_t mUnknown48 = 0;              // +0x48
+    std::int32_t activeSupplyLaneIndex = 0;   // +0x4C (workctrl +0x1F84)
+    std::int32_t termDestinationLane[3]{};    // +0x50 video/audio/user destinations
+    std::int32_t effectiveEndcodeBoundaryBytes = -1; // +0x5C
+    std::uint8_t mUnknown60[0x200]{};         // +0x60 lanes 2..4
+    SfdDemuxInitBlock mpsInit{};              // +0x260 (workctrl +0x2198)
+    std::uint8_t mUnknown3BC[0x04]{};         // +0x3BC
+    SfdDemuxInitBlock m2tsInit{};             // +0x3C0 (workctrl +0x22F8)
+  };
+  static_assert(offsetof(SftrnDemuxState, memoryPrepLaneIndex) == 0x0C, "SftrnDemuxState::memoryPrepLaneIndex offset must be 0x0C");
+  static_assert(offsetof(SftrnDemuxState, demuxInit) == 0x44, "SftrnDemuxState::demuxInit offset must be 0x44");
+  static_assert(offsetof(SftrnDemuxState, activeSupplyLaneIndex) == 0x4C, "SftrnDemuxState::activeSupplyLaneIndex offset must be 0x4C");
+  static_assert(offsetof(SftrnDemuxState, termDestinationLane) == 0x50, "SftrnDemuxState::termDestinationLane offset must be 0x50");
+  static_assert(offsetof(SftrnDemuxState, effectiveEndcodeBoundaryBytes) == 0x5C, "SftrnDemuxState::effectiveEndcodeBoundaryBytes offset must be 0x5C");
+  static_assert(offsetof(SftrnDemuxState, mpsInit) == 0x260, "SftrnDemuxState::mpsInit offset must be 0x260");
+  static_assert(offsetof(SftrnDemuxState, m2tsInit) == 0x3C0, "SftrnDemuxState::m2tsInit offset must be 0x3C0");
+
+  /**
+   * SFTRN transfer sub-object at `workctrl+0x1F30` (0x1620 bytes). The SFSET
+   * handle table starts at +0x08 (workctrl +0x1F38, nine 0x44 lanes); the
+   * same bytes carry the demux state: lane 0's +0x0C word is the SFMEM ring
+   * lane, lane 1 holds the active demux pointer and destination bookkeeping,
+   * and the MPS / M2TS init blocks sit at +0x268 / +0x3C8. One storage, the
+   * generic lane table and the named demux model.
+   */
+  struct SftrnTransferState
+  {
+    std::uint8_t mUnknown00[0x08]{};
+    union
+    {
+      /// SFSET's flat transfer-handle table.
+      std::array<SfsetTransferLane, 9> lanes; // +0x08 (workctrl +0x1F38)
+      SftrnDemuxState demux;                  // +0x08
+    } transfer;                               // +0x08
+    std::uint8_t mUnknownTail[0x1620 - 0x524]{};   // +0x524
+  };
+  static_assert(offsetof(SftrnTransferState, transfer) == 0x08, "SftrnTransferState::transfer offset must be 0x08");
+  static_assert(sizeof(SftrnTransferState) == 0x1620, "SftrnTransferState size must be 0x1620");
+
+  /**
+   * Seek sub-object at `workctrl+0x3550` (0x10 bytes): the SFSEE handle
+   * pointer lane plus three request words. `SFSEE_InitHn` seeds it with
+   * {0, 0, -3, 1}; `SFD_EntrySeek` binds the SFSEE handle; `sfmps_GetHd`
+   * reads the same pointer as the SFMPS header-bank base (+0x8A0 into the
+   * SFSEE work).
+   */
+  struct SfseeOwnerState
+  {
+    SfseeHandle* handle = nullptr; // +0x00 SFSEE seek handle / SFMPS header bank
+    std::int32_t requestWords[3]{}; // +0x04 seek request lane
+  };
+  static_assert(sizeof(SfseeOwnerState) == 0x10, "SfseeOwnerState size must be 0x10");
+
   /**
    * The SFPLY playback handle. `sfply_InitHn` (0x00AD7AE0) builds one of these
    * at the 32-byte-aligned base of the caller's work-control buffer, and every
@@ -682,9 +886,9 @@ namespace moho
    * `sfply_ChkCrePara` rejects any work-control buffer smaller than 0x3660 -
    * exactly 0x3640 plus the 32 bytes the alignment step can consume.
    *
-   * The four handle lanes below (timer / buffer / transfer / seek) stay sized
-   * storage because their layouts are file-local to `SofdecSfdRuntime.cpp`;
-   * that translation unit re-types them by name, never by offset.
+   * The timer lane stays sized storage because its layout is file-local to
+   * `SofdecSfdRuntime.cpp`; the buffer, transfer and seek lanes are typed
+   * sub-objects (`SfbufBufferState`, `SftrnTransferState`, `SfseeOwnerState`).
    */
   struct SofdecSfdWorkctrlSubobj
   {
@@ -706,13 +910,23 @@ namespace moho
     SfplyPlaybackInfo playbackInfo{};         // +0x950
     std::uint8_t errorInfo[0x14]{};           // +0x9F8
     /// Playback conditions, seeded from the SFLIB library defaults.
-    std::uint8_t conditions[0x190]{};         // +0xA0C
-    std::uint8_t defaultConditions[0x190]{};  // +0xB9C
+    /// `SFSET_GetCond`/`SFSET_SetCond` (0x00AD8940/0x00AD8840) index the live
+    /// block by condition id; `SFD_SetCond` (0x00AD8790) writes the default
+    /// block at +0xB9C.
+    std::array<std::int32_t, 0x64> conditions{};        // +0xA0C
+    std::array<std::int32_t, 0x64> defaultConditions{}; // +0xB9C
     std::uint8_t mUnknownD2C[0x04]{};
-    std::uint8_t timerHandle[0x5E0]{};        // +0xD30
-    std::uint8_t bufferHandle[0xC20]{};       // +0x1310
-    std::uint8_t transferHandle[0x1620]{};    // +0x1F30
-    std::uint8_t seekHandle[0x10]{};          // +0x3550
+    /// SFTIM timer sub-object (`SFTIM_InitHn`), split around the four SFMPS
+    /// seek/delta words it hosts at +0x150 (workctrl +0xE80..+0xE8F).
+    std::uint8_t timerHandle[0x150]{};        // +0xD30
+    std::int32_t seekStampLow = 0;            // +0xE80 SFMPS seek stamp (lo/hi)
+    std::int32_t seekStampHigh = 0;           // +0xE84
+    std::int32_t headerStampDeltaLow = 0;     // +0xE88 parser-to-header stamp delta
+    std::int32_t headerStampDeltaHigh = 0;    // +0xE8C
+    std::uint8_t timerHandleTail[0x480]{};    // +0xE90
+    SfbufBufferState bufferState{};           // +0x1310
+    SftrnTransferState transferState{};       // +0x1F30
+    SfseeOwnerState seekState{};              // +0x3550
     SfplyTimerInfo timerInfo{};               // +0x3560
   };
 
@@ -728,15 +942,62 @@ namespace moho
     "workctrl defaultConditions @0xB9C"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, timerHandle) == 0xD30, "workctrl timerHandle @0xD30");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, bufferHandle) == 0x1310, "workctrl bufferHandle @0x1310");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, transferHandle) == 0x1F30, "workctrl transferHandle @0x1F30");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, seekHandle) == 0x3550, "workctrl seekHandle @0x3550");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, seekStampLow) == 0xE80, "workctrl seek stamp @0xE80");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, seekStampHigh) == 0xE84, "workctrl seek stamp high @0xE84");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, headerStampDeltaLow) == 0xE88, "workctrl header stamp delta @0xE88");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, headerStampDeltaHigh) == 0xE8C, "workctrl header stamp delta high @0xE8C");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, timerHandleTail) == 0xE90, "workctrl timer tail @0xE90");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, bufferState) == 0x1310, "workctrl bufferState @0x1310");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, transferState) == 0x1F30, "workctrl transferState @0x1F30");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, seekState) == 0x3550, "workctrl seekState @0x3550");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSfdWorkctrlSubobj, bufferState) + offsetof(SfbufBufferState, supplyLanes) == 0x1320,
+    "workctrl supply-lane table @0x1320"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + 0x0C == 0x1F3C,
+    "workctrl SFMEM ring lane word @0x1F3C region"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer) == 0x1F38,
+    "workctrl SFSET lane table @0x1F38"
+  );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, timerInfo) == 0x3560, "workctrl timerInfo @0x3560");
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SofdecSfdWorkctrlSubobj) == 0x3640, "workctrl size must be 0x3640");
 
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SofdecSfdWorkctrlSubobj, handleState) == 0x48,
     "SofdecSfdWorkctrlSubobj::handleState offset must be 0x48"
+  );
+  static_assert(
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer)
+      + offsetof(SftrnDemuxState, memoryPrepLaneIndex)
+      == 0x1F44,
+    "workctrl SFMEM ring lane index @0x1F44"
+  );
+  static_assert(
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer)
+      + offsetof(SftrnDemuxState, demuxInit)
+      == 0x1F7C,
+    "workctrl active demux pointer @0x1F7C"
+  );
+  static_assert(
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer)
+      + offsetof(SftrnDemuxState, activeSupplyLaneIndex)
+      == 0x1F84,
+    "workctrl active supply lane index @0x1F84"
+  );
+  static_assert(
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer)
+      + offsetof(SftrnDemuxState, mpsInit)
+      == 0x2198,
+    "workctrl MPS parser init @0x2198"
+  );
+  static_assert(
+    offsetof(SofdecSfdWorkctrlSubobj, transferState) + offsetof(SftrnTransferState, transfer)
+      + offsetof(SftrnDemuxState, m2tsInit)
+      == 0x22F8,
+    "workctrl M2TS init @0x22F8"
   );
 
   struct MwsstPauseGate;
