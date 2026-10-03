@@ -7,8 +7,10 @@ namespace moho::movie
 {
   struct MPVDecoderContextPrefix;
   struct MPVDecoderScanContext;
+  struct MPVSjStreamVTable;
   struct MPVSjStream;
   struct MPVPredictionKernelState;
+
 
   using MPVDecodeMacroblockFn = void(__cdecl*)(MPVDecoderContextPrefix*);
   using MPVInterpolationKernelFn = int(__cdecl*)(MPVPredictionKernelState*);
@@ -32,6 +34,24 @@ namespace moho::movie
   };
 
   static_assert(sizeof(MPVSjChunk) == 0x08, "MPVSjChunk size must be 0x08");
+
+  /// SJ stream virtual interface (`requestChunk`/`submitChunk`/`releaseChunk`
+  /// at +0x18/+0x1C/+0x20).
+  struct MPVSjStreamVTable
+  {
+    std::uint8_t reserved_00[0x18];
+    void(__cdecl* requestChunk)(MPVSjStream* stream, int lane, int maxSize, MPVSjChunk* outChunk); // +0x18
+    void(__cdecl* submitChunk)(MPVSjStream* stream, int lane, MPVSjChunk* chunk);                  // +0x1C
+    void(__cdecl* releaseChunk)(MPVSjStream* stream, int lane, MPVSjChunk* chunk);                 // +0x20
+  };
+
+  /// The MPV SJ stream object: one vtable pointer.
+  struct MPVSjStream
+  {
+    MPVSjStreamVTable* vtable; // +0x00
+  };
+  static_assert(sizeof(MPVSjStream) == 0x04, "MPVSjStream size must be 0x04");
+
 
   struct MPVFrameDecodeSession
   {
@@ -204,13 +224,13 @@ namespace moho::movie
   static_assert(offsetof(MPVDecoderContextPrefix, intraCopyAddressLut) == 0x3A0, "MPVDecoderContextPrefix::intraCopyAddressLut offset must be 0x3A0");
   static_assert(sizeof(MPVDecoderContextPrefix) == 0x6A0, "MPVDecoderContextPrefix size must be 0x6A0");
 
-  struct MPVDecoderRuntimeStats
+  struct MPVDecoderStats
   {
     std::uint8_t reserved_0000[0x13AC];
     int motionClampCounter; // +0x13AC
   };
 
-  static_assert(offsetof(MPVDecoderRuntimeStats, motionClampCounter) == 0x13AC, "MPVDecoderRuntimeStats::motionClampCounter offset must be 0x13AC");
+  static_assert(offsetof(MPVDecoderStats, motionClampCounter) == 0x13AC, "MPVDecoderStats::motionClampCounter offset must be 0x13AC");
 
   using MPVDecodeReadKernelFn = std::uint8_t(__cdecl*)(MPVDecoderScanContext* decoderContext, void* decodeState);
   using MPVDecodeFinalizeFlagsFn = void(__cdecl*)(std::uint8_t* flags);

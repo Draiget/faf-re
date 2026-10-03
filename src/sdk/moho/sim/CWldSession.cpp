@@ -163,7 +163,7 @@ namespace
    */
   msvc8::vector<SFormationPreviewGhost> gFormationPreviews;
 
-  // `StrategicIconAuxView` (the real type) and `gStrategicIconAuxiliary`
+  // `StrategicIconAux` (the real type) and `gStrategicIconAuxiliary`
   // live in the `moho`-scoped anonymous namespace alongside the type's
   // definition (see `CWldSession::RenderStrategicIcons`'s callee cluster) -
   // a plain forward declaration here would name an unrelated, permanently
@@ -761,7 +761,7 @@ namespace moho
   bool ui_DrawPathPreview = false;          // 0x010A6443
   bool ui_PathPreview = false;              // 0x010A6448
 
-  // Per-army team-color palette, distinct from `StrategicIconAuxView`'s own
+  // Per-army team-color palette, distinct from `StrategicIconAux`'s own
   // Self/Ally/Enemy/Neutral relation colors: `RenderUnitIcon` (0x0085D9A0)
   // indexes this one directly by the icon's owning army's `mArmyIndex`
   // (`mov eax, offset teamcolors` / `mov ecx, [eax+ecx*4]`, the cold
@@ -2459,12 +2459,12 @@ namespace moho
     }
 
     // Forward-declared here (rather than defined) because the process-global
-    // singleton lane below only ever holds a pointer; `StrategicIconAuxView`
+    // singleton lane below only ever holds a pointer; `StrategicIconAux`
     // itself is defined later in this same `moho`-scoped anonymous
     // namespace, next to `CWldSession::RenderStrategicIcons`'s callee
     // cluster (0x0085B6E0's lazy-init target, address 0x010C4300).
-    struct StrategicIconAuxView;
-    StrategicIconAuxView* gStrategicIconAuxiliary = nullptr;
+    struct StrategicIconAux;
+    StrategicIconAux* gStrategicIconAuxiliary = nullptr;
 
     /**
      * Address: 0x0085EFE0 (FUN_0085EFE0)
@@ -2472,7 +2472,7 @@ namespace moho
      * What it does:
      * Returns the global strategic-icon auxiliary object lane.
      */
-    [[nodiscard]] StrategicIconAuxView* GetStrategicIconAuxiliaryLaneA() noexcept
+    [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneA() noexcept
     {
       return gStrategicIconAuxiliary;
     }
@@ -2483,7 +2483,7 @@ namespace moho
      * What it does:
      * Secondary entrypoint returning the strategic-icon auxiliary object lane.
      */
-    [[nodiscard]] StrategicIconAuxView* GetStrategicIconAuxiliaryLaneB() noexcept
+    [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneB() noexcept
     {
       return gStrategicIconAuxiliary;
     }
@@ -2494,7 +2494,7 @@ namespace moho
      * What it does:
      * Third entrypoint returning the strategic-icon auxiliary object lane.
      */
-    [[nodiscard]] StrategicIconAuxView* GetStrategicIconAuxiliaryLaneC() noexcept
+    [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneC() noexcept
     {
       return gStrategicIconAuxiliary;
     }
@@ -2764,7 +2764,7 @@ namespace moho
      * One classified entity in the strategic-icon pass - `struct_UnitIconData`
      * in the IDB. `CWldSession::RenderStrategicIcons` fills one of these per
      * visible entity, files it into one of the five runs on
-     * `StrategicIconAuxView` below, and the emitters read it back.
+     * `StrategicIconAux` below, and the emitters read it back.
      *
      * Layout evidence, all from the binary:
      *  - the copy-assignment at 0x0085CB00 walks every lane in order: two
@@ -2894,7 +2894,7 @@ namespace moho
      * carries its own texture, then the selected units, and finally the
      * lifebars under their own `TLifeBar` technique.
      */
-    struct StrategicIconAuxView
+    struct StrategicIconAux
     {
       float mViewportX = 0.0f;              // +0x00
       float mViewportY = 0.0f;              // +0x04
@@ -2934,7 +2934,7 @@ namespace moho
        * (`LoadGenericIcons`/`LoadPauseAndStunnedRestTextures`) right after
        * construction, not from this constructor.
        */
-      StrategicIconAuxView();
+      StrategicIconAux();
 
       /**
        * Address: 0x0085E7F0 (FUN_0085E7F0, struct_IconAux::GetGenericIcons)
@@ -2962,56 +2962,56 @@ namespace moho
       void LoadPauseAndStunnedRestTextures(CWldSession* session);
     };
 
-    static_assert(sizeof(StrategicIconAuxView) == 0xAC, "StrategicIconAuxView size must be 0xAC");
+    static_assert(sizeof(StrategicIconAux) == 0xAC, "StrategicIconAux size must be 0xAC");
     static_assert(
-      offsetof(StrategicIconAuxView, mViewportWidth) == 0x08, "StrategicIconAuxView::mViewportWidth offset must be 0x08"
+      offsetof(StrategicIconAux, mViewportWidth) == 0x08, "StrategicIconAux::mViewportWidth offset must be 0x08"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mSession) == 0x10, "StrategicIconAuxView::mSession offset must be 0x10"
+      offsetof(StrategicIconAux, mSession) == 0x10, "StrategicIconAux::mSession offset must be 0x10"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mBatcher) == 0x14, "StrategicIconAuxView::mBatcher offset must be 0x14"
+      offsetof(StrategicIconAux, mBatcher) == 0x14, "StrategicIconAux::mBatcher offset must be 0x14"
     );
-    static_assert(offsetof(StrategicIconAuxView, mCamera) == 0x18, "StrategicIconAuxView::mCamera offset must be 0x18");
+    static_assert(offsetof(StrategicIconAux, mCamera) == 0x18, "StrategicIconAux::mCamera offset must be 0x18");
     static_assert(
-      offsetof(StrategicIconAuxView, mTickFraction) == 0x1C, "StrategicIconAuxView::mTickFraction offset must be 0x1C"
-    );
-    static_assert(
-      offsetof(StrategicIconAuxView, mWhiteTexture) == 0x20, "StrategicIconAuxView::mWhiteTexture offset must be 0x20"
+      offsetof(StrategicIconAux, mTickFraction) == 0x1C, "StrategicIconAux::mTickFraction offset must be 0x1C"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mGenericIcons) == 0x28, "StrategicIconAuxView::mGenericIcons offset must be 0x28"
+      offsetof(StrategicIconAux, mWhiteTexture) == 0x20, "StrategicIconAux::mWhiteTexture offset must be 0x20"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mPauseRestTexture) == 0x38,
-      "StrategicIconAuxView::mPauseRestTexture offset must be 0x38"
+      offsetof(StrategicIconAux, mGenericIcons) == 0x28, "StrategicIconAux::mGenericIcons offset must be 0x28"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mStunnedRestTexture) == 0x40,
-      "StrategicIconAuxView::mStunnedRestTexture offset must be 0x40"
+      offsetof(StrategicIconAux, mPauseRestTexture) == 0x38,
+      "StrategicIconAux::mPauseRestTexture offset must be 0x38"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mGroundIcons) == 0x48, "StrategicIconAuxView::mGroundIcons offset must be 0x48"
+      offsetof(StrategicIconAux, mStunnedRestTexture) == 0x40,
+      "StrategicIconAux::mStunnedRestTexture offset must be 0x40"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mAirIcons) == 0x58, "StrategicIconAuxView::mAirIcons offset must be 0x58"
+      offsetof(StrategicIconAux, mGroundIcons) == 0x48, "StrategicIconAux::mGroundIcons offset must be 0x48"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mHighPriorityIcons) == 0x68,
-      "StrategicIconAuxView::mHighPriorityIcons offset must be 0x68"
+      offsetof(StrategicIconAux, mAirIcons) == 0x58, "StrategicIconAux::mAirIcons offset must be 0x58"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mSelectedIcons) == 0x78, "StrategicIconAuxView::mSelectedIcons offset must be 0x78"
+      offsetof(StrategicIconAux, mHighPriorityIcons) == 0x68,
+      "StrategicIconAux::mHighPriorityIcons offset must be 0x68"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mLifebarIcons) == 0x88, "StrategicIconAuxView::mLifebarIcons offset must be 0x88"
+      offsetof(StrategicIconAux, mSelectedIcons) == 0x78, "StrategicIconAux::mSelectedIcons offset must be 0x78"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mSelfColor) == 0x98, "StrategicIconAuxView::mSelfColor offset must be 0x98"
+      offsetof(StrategicIconAux, mLifebarIcons) == 0x88, "StrategicIconAux::mLifebarIcons offset must be 0x88"
     );
     static_assert(
-      offsetof(StrategicIconAuxView, mUnidentifiedColor) == 0xA8,
-      "StrategicIconAuxView::mUnidentifiedColor offset must be 0xA8"
+      offsetof(StrategicIconAux, mSelfColor) == 0x98, "StrategicIconAux::mSelfColor offset must be 0x98"
+    );
+    static_assert(
+      offsetof(StrategicIconAux, mUnidentifiedColor) == 0xA8,
+      "StrategicIconAux::mUnidentifiedColor offset must be 0xA8"
     );
 
     /**
@@ -3022,7 +3022,7 @@ namespace moho
      * their binary-observed capacities, and decodes the team-color palette.
      * See the class comment above for the full field-by-field evidence.
      */
-    StrategicIconAuxView::StrategicIconAuxView()
+    StrategicIconAux::StrategicIconAux()
     {
       mWhiteTexture = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
 
@@ -3057,7 +3057,7 @@ namespace moho
      * fills one `mGenericIcons` slot per `EGenericIconType` key with the
      * named batch texture.
      */
-    void StrategicIconAuxView::LoadGenericIcons(CWldSession* const session)
+    void StrategicIconAux::LoadGenericIcons(CWldSession* const session)
     {
       mGenericIcons.resize(8);
 
@@ -3081,7 +3081,7 @@ namespace moho
      * Imports strategic icon Lua tables and refreshes pause/stunned overlay
      * rest textures for one icon-aux runtime object.
      */
-    void StrategicIconAuxView::LoadPauseAndStunnedRestTextures(CWldSession* const session)
+    void StrategicIconAux::LoadPauseAndStunnedRestTextures(CWldSession* const session)
     {
       LuaPlus::LuaObject iconTable = SCR_Import(session->mState, "/lua/ui/game/strategicIcons.lua");
       LuaPlus::LuaObject pauseIcons = iconTable.GetByName("PauseIcons");
@@ -3126,7 +3126,7 @@ namespace moho
      * or `aux->mWhiteTexture` - never a weak-to-shared promotion.
      */
     [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> PickGenericStrategicIconTexture(
-      const StrategicIconAuxView& aux, const UnitIconData& iconData, const bool wantHighlightVariant
+      const StrategicIconAux& aux, const UnitIconData& iconData, const bool wantHighlightVariant
     )
     {
       if (!iconData.mBlueprint->IsMobile()) {
@@ -3180,7 +3180,7 @@ namespace moho
      *    retype note on those fields in `REntityBlueprint.h`).
      */
     [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> PickUnitStrategicIconTexture(
-      const StrategicIconAuxView& aux,
+      const StrategicIconAux& aux,
       const UnitIconData& iconData,
       const bool isSelected,
       const bool selectedVariantEligible,
@@ -13039,7 +13039,7 @@ namespace moho
      * on screen blinks in step: the whole-tick counter plus this frame's
      * sub-tick interpolant, scaled by the console rate and wrapped.
      */
-    [[nodiscard]] float FuelWarningBlinkPhase(const StrategicIconAuxView& aux)
+    [[nodiscard]] float FuelWarningBlinkPhase(const StrategicIconAux& aux)
     {
       const double simTime = static_cast<double>(aux.mSession->mGameTick) + static_cast<double>(aux.mTickFraction);
       return static_cast<float>(std::fmod(simTime * static_cast<double>(ui_FuelEmptyBlinkRate), 1.0));
@@ -13071,7 +13071,7 @@ namespace moho
      * bottom edge of the last row actually drawn, which is what
      * `DrawUnitCustomNameLabel` hangs its text off.
      */
-    void DrawUnitLifebars(const UnitIconData& icon, Wm3::Vector2f& labelCursor, const StrategicIconAuxView& aux)
+    void DrawUnitLifebars(const UnitIconData& icon, Wm3::Vector2f& labelCursor, const StrategicIconAux& aux)
     {
       CD3DPrimBatcher& primBatcher = *aux.mBatcher;
       primBatcher.SetTexture(aux.mWhiteTexture);
@@ -13295,7 +13295,7 @@ namespace moho
      */
     [[nodiscard]] Wm3::Vector2f DrawUnitCustomNameLabel(
       const UnitIconData& icon,
-      const StrategicIconAuxView& aux,
+      const StrategicIconAux& aux,
       const Wm3::Vector2f& labelCursor,
       const bool isMiniMap
     )
@@ -13410,7 +13410,7 @@ namespace moho
      */
     [[nodiscard]] Wm3::Vector2f DrawUnitSelectionSetNameLabel(
       const UnitIconData& icon,
-      const StrategicIconAuxView& aux,
+      const StrategicIconAux& aux,
       const Wm3::Vector2f& labelCursor,
       const bool isMiniMap
     )
@@ -13541,7 +13541,7 @@ namespace moho
      *
      * What it does:
      * Draws one classified unit's strategic-icon quads. Called once per icon
-     * collected into `StrategicIconAuxView`'s ground/air/high-priority/
+     * collected into `StrategicIconAux`'s ground/air/high-priority/
      * selected runs by `RenderStrategicIcons`.
      *
      * Projects the icon's world position through the camera to a floored
@@ -13576,7 +13576,7 @@ namespace moho
      * resolved/darkened color; the underlay and both overlays draw at their
      * own native texture color.
      */
-    void RenderUnitIcon(const UnitIconData& icon, const StrategicIconAuxView& aux)
+    void RenderUnitIcon(const UnitIconData& icon, const StrategicIconAux& aux)
     {
       constexpr std::uint32_t kOverlayNoTintColor = 0xFFFFFFFFu;
 
@@ -13680,7 +13680,7 @@ namespace moho
    *  - `CWldSession`'s `EntId -> UserEntity*` map was already modelled
    *    (`SessionEntityMap` / `LookupEntityId`) by a prior pass - no new work
    *    needed there.
-   *  - `StrategicIconAuxView`'s constructor and `LoadGenericIcons` recovered
+   *  - `StrategicIconAux`'s constructor and `LoadGenericIcons` recovered
    *    (0x0085B2A0 / 0x0085E7F0); `gStrategicIconAuxiliary` retyped from a
    *    never-defined `StrategicIconAuxRuntimeView` forward declaration to
    *    the real, complete type.
@@ -13722,11 +13722,11 @@ namespace moho
 
     // --- Phase 1: lazy singleton build --------------------------------
     if (gStrategicIconAuxiliary == nullptr) {
-      gStrategicIconAuxiliary = new StrategicIconAuxView();
+      gStrategicIconAuxiliary = new StrategicIconAux();
       gStrategicIconAuxiliary->LoadGenericIcons(this);
       gStrategicIconAuxiliary->LoadPauseAndStunnedRestTextures(this);
     }
-    StrategicIconAuxView& aux = *gStrategicIconAuxiliary;
+    StrategicIconAux& aux = *gStrategicIconAuxiliary;
 
     // --- Phase 2: re-seat per-frame camera/batcher state, clear the four
     // implemented runs, push the pixel-exact screen projection ----------
