@@ -2,7 +2,6 @@
 
 #include "moho/render/MapImager.h"
 
-#include <cstdlib>   // TEMPORARY PROBE (do not commit)
 
 #include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
@@ -59,7 +58,6 @@ namespace
 
 namespace moho
 {
-bool ren_ShowSkeletons = (getenv("FAF_SHOW_SKELETONS") != nullptr);   // TEMPORARY PROBE (do not commit)
 
 /**
  * Address: 0x007D9BB0 (FUN_007D9BB0, Moho::MapImager::~MapImager)

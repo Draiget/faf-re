@@ -1667,9 +1667,6 @@ namespace moho
   }
 
   // ---------------------------------------------------------------------
-  // TEMPORARY PROBE -- delete with the call site in DirtyClusters below.
-  // Not part of the recovery: the binary dereferences the lane unguarded.
-  // ---------------------------------------------------------------------
 
   /// True when `cluster` points at committed, writable private heap memory,
   /// which every live `ClusterMap` does (`::operator new(sizeof(ClusterMap))`
@@ -1765,20 +1762,6 @@ namespace moho
         continue;
       }
 
-      // TEMPORARY PROBE (remove once the ClusterMap* corruption is root-caused).
-      // The reported fault is inside DirtyRect's very first statement, reading
-      // `mArea` at +0x90 -- i.e. this array held a readable-but-wrong pointer.
-      // Classify it before dereferencing so one run says whether the *array*
-      // was smashed or a single entry, and what the garbage actually is (a
-      // freed block, an image/.rdata address like the documented small-block
-      // allocator defect, or an unmapped page).
-      //
-      // Each slot is queried once per pointer value: the array is filled in the
-      // PathTables constructor and never reassigned, so the corruption this
-      // hunts shows up as a slot whose value changed. A VirtualQuery on every
-      // call cost one syscall per cluster per dirtied rect, and every prop
-      // creation dirties one - that stalled the sim for ~40s while the
-      // commander's warp-in knocked trees down, and slowed it after.
       static const ClusterMap* sVerifiedLanes[32]{};
       const std::ptrdiff_t lane = it - mImpl->mMaps.begin();
       const bool cached = lane < std::ssize(sVerifiedLanes) && sVerifiedLanes[lane] == cluster;

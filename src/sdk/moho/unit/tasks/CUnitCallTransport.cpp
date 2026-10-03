@@ -245,12 +245,6 @@ namespace moho
           return 3;
         }
 
-        // TEMPORARY PROBE -- transport-load triage, delete when resolved.
-        // `loading` is the transport's kUnitStateMaskTransportLoading, set by
-        // the CUnitLoadUnits ctor; `holding` is the holding-pattern bit that
-        // CUnitLoadUnits' TASKSTATE_Preparing leaves set whenever it bails on a
-        // head-command mismatch. These four flags say exactly which half of the
-        // handshake is refusing to advance.
         static DiagnosticBudget sCallTransportWaitProbe;
         if ((sCallTransportWaitProbe.Next() % 60) == 0) {
           gpg::Warnf(

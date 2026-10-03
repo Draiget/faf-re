@@ -1558,7 +1558,6 @@ namespace moho
     , mLocalQueue{}
     , mCursorEntitySet()
   {
-    { static int c = 0; if (c++ < 200) gpg::Warnf("[HELPER] ctor cmd=0x%08X delWhenDue=%u dueSeq=%d this=%p", static_cast<unsigned>(constantData.cmd), static_cast<unsigned>(deleteWhenDue), dueSeqNo, static_cast<void*>(this)); } // TEMPORARY PROBE (do not commit)
   }
 
   /**
@@ -1573,7 +1572,6 @@ namespace moho
     const auto dueDelta = static_cast<std::int32_t>(
       static_cast<std::uint32_t>(mDueSeqNo) - static_cast<std::uint32_t>(beat)
     );
-    { static int c = 0; if (mDeleteWhenDue != 0u && c++ < 200) gpg::Warnf("[HELPER] due cmd=0x%08X dueSeq=%d beat=%d delta=%d cursor=%u", static_cast<unsigned>(mConstantData.cmd), mDueSeqNo, beat, dueDelta, static_cast<unsigned>(mCursorEntitySet.Size())); } // TEMPORARY PROBE (do not commit)
     if (mDeleteWhenDue != 0u && dueDelta <= 0) {
       this->~UserCommandIssueHelper();
       ::operator delete(this);
@@ -2100,34 +2098,6 @@ void UserUnit::UpdateUnitData(const SSTIUnitVariableData& payload, const std::ui
 
   mPosePrimary = mUnitVarDat.mPriorSharedPose;
   mPoseSecondary = mUnitVarDat.mSharedPose;
-  // TEMPORARY PROBE -- invisible-commander triage, delete when resolved.
-  {
-    static int sUpdCount = 0;
-    if ((sUpdCount++ % 20) == 0) {
-      auto countVisible = [](const CAniPose* pose) {
-        int n = 0;
-        if (pose != nullptr) {
-          for (const CAniPoseBone& b : pose->mBones) {
-            n += b.mVisible != 0u ? 1 : 0;
-          }
-        }
-        return n;
-      };
-      char flags[40] = {};
-      if (mPoseSecondary) {
-        int w = 0;
-        for (const CAniPoseBone& b : mPoseSecondary->mBones) {
-          if (w < 30) {
-            flags[w++] = b.mVisible != 0u ? '1' : '0';
-          }
-        }
-      }
-      gpg::Warnf("[POSEDIAG] UserUnit::UpdateUnitData this=%p secondary=%p visible=%d primary=%p visible=%d bones=%s mesh=%p n=%d",
-                 static_cast<void*>(this), static_cast<const void*>(mPoseSecondary.get()), countVisible(mPoseSecondary.get()),
-                 static_cast<const void*>(mPosePrimary.get()), countVisible(mPosePrimary.get()), flags,
-                 static_cast<const void*>(mMeshInstance), sUpdCount);
-    }
-  }
 
   const EntId replicatedCreator = mUnitVarDat.mCreator;
   if ((replicatedCreator & 0xF0000000u) == 0xF0000000u) {

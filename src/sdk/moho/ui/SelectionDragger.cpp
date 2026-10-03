@@ -333,9 +333,6 @@ namespace moho
   {
     DragMove(eventData);
 
-    // TEMPORARY PROBE (do not commit): click-select triage.
-    gpg::Warnf("[CLICKDIAG] DragRelease at=(%.0f,%.0f) start=(%.0f,%.0f) active=%d",
-               eventData->mMousePos.x, eventData->mMousePos.y, mX0, mY0, HasActiveSelectionDrag() ? 1 : 0);
 
     if (!HasActiveSelectionDrag()) {
       mSess->ReleaseDrag(eventData->mModifiers);
@@ -345,8 +342,6 @@ namespace moho
     WeakSet<UserEntity> draggedSelection;
     CollectSelectionDraggerEntities(draggedSelection, *this);
 
-    // TEMPORARY PROBE -- band-box triage, delete when resolved.
-    gpg::Warnf("[BOXDIAG] release drag=(%.0f,%.0f) dragged=%d", mX0, mY0, static_cast<int>(draggedSelection.Size()));
 
     if ((eventData->mModifiers & MEM_Shift) != 0u) {
       WeakSet<UserEntity> currentSelection(mSess->GetSelection());

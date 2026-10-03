@@ -5,8 +5,6 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
-#include <cstdio>   // TEMPORARY PROBE (do not commit)
-#include <windows.h> // TEMPORARY PROBE (do not commit)
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -77,7 +75,6 @@
 #include "moho/unit/core/Unit.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "moho/misc/DiagnosticBudget.h"
 #include "gpg/core/reflection/Reflection.h"
 
 namespace gpg
@@ -3506,14 +3503,6 @@ namespace moho
     if (next < 0.0f) {
       next = 0.0f;
     }
-    {
-      static DiagnosticBudget sAdjProbe;
-      if (delta < 0.0f && sAdjProbe.Take(40)) {
-        gpg::Warnf("[DMGDIAG] AdjustHealth this=%p isUnit=%d health=%.2f maxHealth=%.2f delta=%.2f next=%.2f willSet=%d",
-                   static_cast<void*>(this), (IsUnit() != nullptr) ? 1 : 0,
-                   mVarDat.mHealth, mVarDat.mMaxHealth, delta, next, (next != mVarDat.mHealth) ? 1 : 0);
-      }
-    }
     if (next != mVarDat.mHealth) {
       SetHealth(next);
     }
@@ -4080,44 +4069,6 @@ namespace moho
    */
   void Entity::AdvanceCoords()
   {
-    // TEMPORARY PROBE (do not commit). A flying transport's Entity::Position
-    // reads NaN -- its four engine emitters all report
-    // `[EFXATTACH] nan-transform ent=... bone=28..31 dead=0`. This is the commit
-    // that publishes it, so report the first ticks on which a non-finite
-    // pending transform arrives, and say whether the orientation went bad with
-    // the position (orientation math) or the position alone (the integrator).
-    {
-      const VTransform& previous = mVarDat.mCurTransform;
-      const VTransform& current = mPendingTransform;
-      const bool posBad =
-        !(std::isfinite(current.pos_.x) && std::isfinite(current.pos_.y) && std::isfinite(current.pos_.z));
-      const bool orientBad =
-        !(std::isfinite(current.orient_.w) && std::isfinite(current.orient_.x) &&
-          std::isfinite(current.orient_.y) && std::isfinite(current.orient_.z));
-      if (posBad || orientBad) {
-        static DiagnosticBudget sAdvanceProbeBudget;
-        if (sAdvanceProbeBudget.Take(16)) {
-          char probe[352];
-          const char* className = "?";
-          try {
-            className = typeid(*this).name();
-          } catch (...) {
-            className = "<rtti-failed>";
-          }
-          sprintf_s(probe, sizeof(probe),
-                    "[COORDNAN] ent=%08X cls=%.60s pos=%d orient=%d prevpos=(%.2f,%.2f,%.2f) "
-                    "newpos=(%.2f,%.2f,%.2f) newquat=(%.3f,%.3f,%.3f,%.3f) velScale=%.3f\n",
-                    static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(this)),
-                    className,
-                    posBad ? 1 : 0, orientBad ? 1 : 0,
-                    previous.pos_.x, previous.pos_.y, previous.pos_.z,
-                    current.pos_.x, current.pos_.y, current.pos_.z,
-                    current.orient_.w, current.orient_.x, current.orient_.y, current.orient_.z,
-                    mPendingVelocityScale);
-          ::OutputDebugStringA(probe);
-        }
-      }
-    }
 
     mVarDat.mLastTransform = mVarDat.mCurTransform;
     mVarDat.mCurTransform = mPendingTransform;
@@ -5757,13 +5708,6 @@ namespace moho
     }
     const float delta = static_cast<float>(lua_tonumber(rawState, 3));
 
-    {
-      static DiagnosticBudget sBindProbe;
-      if (delta < 0.0f && sBindProbe.Take(30)) {
-        gpg::Warnf("[DMGDIAG] Lua AdjustHealth binding entity=%p isUnit=%d delta=%.1f",
-                   static_cast<void*>(entity), (entity->IsUnit() != nullptr) ? 1 : 0, delta);
-      }
-    }
     entity->SimulationRef->Logf("Entity[0x%08x]:AdjustHealth(%.5f)\n", static_cast<std::uint32_t>(entity->id_), delta);
     entity->AdjustHealth(instigator, delta);
     return 0;

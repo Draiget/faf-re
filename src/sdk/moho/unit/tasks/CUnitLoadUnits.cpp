@@ -38,10 +38,6 @@ namespace moho
 
 namespace
 {
-  // TEMPORARY PROBE SINK -- transport/effects triage, delete when resolved.
-  // gpg::Warnf reaches nothing until `/log <name>` installs a target
-  // (gpg::InitLogSingleton creates the context but registers no target), so the
-  // probes below append here instead. The file lands beside the executable.
   void DiagLine(const char* const fmt, ...)
   {
     std::FILE* const sink = std::fopen("faf_diag.log", "a");
@@ -561,11 +557,6 @@ namespace moho
             CUnitCommand* const candidateHeadCommand =
               candidate->CommandQueue != nullptr ? candidate->CommandQueue->GetCurrentCommand() : nullptr;
             if (candidateHeadCommand != ownerHeadCommand) {
-              // TEMPORARY PROBE -- transport-load triage, delete when resolved.
-              // This early return leaves kUnitStateMaskHoldingPattern set, and
-              // CUnitCallTransport's own TASKSTATE_Preparing refuses to advance
-              // while the transport is in a holding pattern, so a head-command
-              // mismatch deadlocks both halves with the order still queued.
               static moho::DiagnosticBudget sHeadMismatchProbe;
               if ((sHeadMismatchProbe.Next() % 60) == 0) {
                 DiagLine(
@@ -582,10 +573,6 @@ namespace moho
         }
 
         DoTask();
-        // TEMPORARY PROBE -- transport-load triage, delete when resolved.
-        // ready==0 here means no candidate survived IsEligiblePickupCandidate
-        // or TransportAssignSlot, which is what leaves the transport with
-        // nothing to fly to.
         DiagLine(
           "[XPORTDIAG] LoadUnits DoTask: transport=%p requested=%u ready=%d loaded=%d",
           static_cast<void*>(mUnit), static_cast<unsigned int>(mRequestedUnits.Size()),

@@ -2758,18 +2758,6 @@ namespace moho
 
     mNormalMap.resize(tileCount, boost::shared_ptr<CD3DDynamicTextureSheet>{});
 
-    // TEMPORARY PROBE -- terrain overexposure triage, delete with the others.
-    {
-      char probe[192];
-      (void)std::snprintf(
-        probe, sizeof(probe),
-        "[TERRDIAG] InitNormalMap field=%dx%d tile=%dx%d tiles=%ux%u=%u\n",
-        field->width, field->height, tileWidth, tileHeight,
-        static_cast<unsigned>(tileCountX), static_cast<unsigned>(tileCountY),
-        static_cast<unsigned>(tileCount)
-      );
-      ::OutputDebugStringA(probe);
-    }
 
     moho::CD3DDevice* const device = moho::D3D_GetDevice();
     moho::ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;

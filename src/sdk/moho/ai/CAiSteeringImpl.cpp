@@ -16,7 +16,6 @@
 #include "moho/console/CVarAccess.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector2f.h"
-#include "moho/misc/DiagnosticBudget.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -1003,7 +1002,6 @@ CAiSteeringImpl::CAiSteeringImpl(Unit* const unit, CUnitMotion* const motion, co
  */
 CAiSteeringImpl::~CAiSteeringImpl()
 {
-  gpg::Warnf("[STEERDIAG] Stop() from %s", "site1018"); // TEMPORARY PROBE
   Stop();
   if (mPath) {
     delete mPath;
@@ -1171,10 +1169,6 @@ CUnitMotion* CAiSteeringImpl::SetWaypoints(const Wm3::Vector3f* const waypoints,
     mWaypoints[i] = waypoints[i];
   }
 
-  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-  gpg::Warnf("[STEERDIAG] SetWaypoints count=%d w0=(%.1f,%.1f,%.1f) unit=%p", clampedCount,
-             clampedCount > 0 ? mWaypoints[0].x : 0.0f, clampedCount > 0 ? mWaypoints[0].y : 0.0f,
-             clampedCount > 0 ? mWaypoints[0].z : 0.0f, static_cast<void*>(mOwnerUnit));
   if (clampedCount > 0) {
     mNeedsWaypointRefresh = 1;
     return mUnitMotion;
@@ -1361,14 +1355,6 @@ void CAiSteeringImpl::Stop()
  */
 void CAiSteeringImpl::UpdatePath(const int pathMode, const Wm3::Vector3f& destination, const bool allowContinuation)
 {
-  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-  {
-    static DiagnosticBudget sCount;
-    if (const int seen = sCount.Next(); seen < 200) {
-      gpg::Warnf("[STEERDIAG] UpdatePath mode=%d dest=(%.1f,%.1f) cont=%d n=%d", pathMode, destination.x, destination.z,
-                 allowContinuation ? 1 : 0, seen + 1);
-    }
-  }
   ResetCollisionInfo(mCollisionInfo);
 
   if (!mPath) {
@@ -1448,7 +1434,6 @@ bool CAiSteeringImpl::ProcessSplineMovement()
 
   if (motion && motion->mIsBeingPushed != 0) {
     if (mPath) {
-      gpg::Warnf("[STEERDIAG] Stop() from %s", "site1463-pushed"); // TEMPORARY PROBE
       Stop();
     }
 
@@ -1471,11 +1456,6 @@ bool CAiSteeringImpl::ProcessSplineMovement()
   } else {
     if (mPath && (mPath->mCurrentNodeIndex + 1U) >= mPath->mNodeCount) {
       if (Wm3::Vector3f::IsInvalid(mDestination) || mOwnerUnit->IsAtPosition(mDestination)) {
-        // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-        gpg::Warnf("[STEERDIAG] Spline end -> Stop (destInvalid=%d) nodes=%d/%d dest=(%.1f,%.1f)",
-                   Wm3::Vector3f::IsInvalid(mDestination) ? 1 : 0, static_cast<int>(mPath->mCurrentNodeIndex),
-                   static_cast<int>(mPath->mNodeCount), mDestination.x, mDestination.z);
-        gpg::Warnf("[STEERDIAG] Stop() from %s", "site1489-splineEnd"); // TEMPORARY PROBE
         Stop();
         return true;
       }
@@ -1493,7 +1473,6 @@ bool CAiSteeringImpl::ProcessSplineMovement()
   if (mPausedForStateTransition == 0) {
     if (IsUnitState(mOwnerUnit, UNITSTATE_Immobile) || mOwnerUnit->mUnitVarDat.mStunTicks != 0) {
       mPausedForStateTransition = 1;
-      gpg::Warnf("[STEERDIAG] Stop() from %s", "site1506-immobile"); // TEMPORARY PROBE
       Stop();
       return false;
     }
@@ -1540,18 +1519,6 @@ bool CAiSteeringImpl::ProcessSplineMovement()
       }
     }
 
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    {
-      static DiagnosticBudget sCount;
-      if (const int seen = sCount.Next(); (seen % 10) == 0) {
-        gpg::Warnf("[STEERDIAG] Spline tick col=%d gate=%d tick=%d paused=%d refresh=%d nodes=%d/%d pushed=%d immobile=%d stun=%d n=%d",
-                   static_cast<int>(mCollisionInfo.mCollisionType), mCollisionInfo.mTickGate,
-                   sim ? static_cast<int>(sim->mCurTick) : -1, static_cast<int>(mPausedForStateTransition), doPathRefresh ? 1 : 0,
-                   mPath ? static_cast<int>(mPath->mCurrentNodeIndex) : -1, mPath ? static_cast<int>(mPath->mNodeCount) : -1,
-                   motion ? static_cast<int>(motion->mIsBeingPushed) : -1,
-                   IsUnitState(mOwnerUnit, UNITSTATE_Immobile) ? 1 : 0, static_cast<int>(mOwnerUnit->mUnitVarDat.mStunTicks), seen + 1);
-      }
-    }
     UpdateMotionPathPointers(*this);
   }
 
@@ -1565,20 +1532,6 @@ bool CAiSteeringImpl::DriveToNextWaypoint()
 {
   const bool processResult = ProcessSplineMovement();
   const bool refreshPending = mNeedsWaypointRefresh != 0;
-  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-  {
-    static DiagnosticBudget sCount;
-    // A refresh beat logs without counting, as the `||` short-circuit had it;
-    // `n` is the count after this beat.
-    const int n = refreshPending ? sCount.Count() : sCount.Next() + 1;
-    if (refreshPending || ((n - 1) % 25) == 0) {
-      const Wm3::Vector3f p = mOwnerUnit ? mOwnerUnit->GetPosition() : Wm3::Vector3f::Zero();
-      gpg::Warnf("[STEERDIAG] Drive idx=%d count=%d spline=%d refresh=%d pathNodes=%d/%d dest=(%.1f,%.1f) pos=(%.1f,%.1f) n=%d",
-                 mCurrentWaypointIndex, mWaypointCount, processResult ? 1 : 0, refreshPending ? 1 : 0,
-                 mPath ? static_cast<int>(mPath->mCurrentNodeIndex) : -1, mPath ? static_cast<int>(mPath->mNodeCount) : -1,
-                 mDestination.x, mDestination.z, p.x, p.z, n);
-    }
-  }
 
   if (!refreshPending) {
     if (processResult) {

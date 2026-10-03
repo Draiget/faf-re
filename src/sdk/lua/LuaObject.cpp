@@ -7461,13 +7461,6 @@ namespace
 			}
 		}
 
-		// TEMPORARY PROBE (do not commit). This loop is where the engine dies
-		// (LuaObject.cpp:8216, reading ~0x0005C05F). Validate `varname` instead
-		// of dereferencing it -- an earlier probe used a 0x10000 floor, which
-		// 0x0005C05A passes, so it faulted instead of reporting. Report the
-		// Proto, its locvars block and the bad index so it can be cross-checked
-		// against the close_func shrink frees logged below, then skip the entry
-		// so the run survives and we see every occurrence rather than the first.
 		for (int index = 0; index < f->sizelocvars; ++index) {
 			TString* const varname = f->locvars[index].varname;
 			const auto nameBits = reinterpret_cast<std::uintptr_t>(varname);
@@ -15223,8 +15216,6 @@ extern "C"
 			}
 
 			case kOpGetUpval: {
-				// TEMPORARY PROBE (do not commit) -- the read side of the same
-				// null-upvalue fault the SETUPVAL case below reports.
 				const int upIndex = LuaGetArgB(i);
 				if (upIndex >= static_cast<int>(cl->nupvalues) || cl->upvals[upIndex] == nullptr) {
 					static int sGetUpvalBudget = 0;
@@ -15284,11 +15275,6 @@ extern "C"
 				break;
 
 			case kOpSetUpval: {
-				// TEMPORARY PROBE (do not commit). The sim thread dies here --
-				// luaV_execute+0x570, reading address 8, i.e. `cl->upvals[B]` is
-				// null and `->v` sits at +8. Name the closure and the Lua line
-				// instead of faulting, and keep running so every occurrence is
-				// reported rather than only the first.
 				const int upIndex = LuaGetArgB(i);
 				if (upIndex >= static_cast<int>(cl->nupvalues) || cl->upvals[upIndex] == nullptr) {
 					static int sSetUpvalBudget = 0;

@@ -4,7 +4,6 @@
 #include "lua/LuaParser.h"
 #include "lua/LuaUndump.h"
 
-#include <Windows.h>   // TEMPORARY PROBE (do not commit): OutputDebugStringA
 
 #include <array>
 #include <cctype>
@@ -3461,10 +3460,6 @@ namespace
     );
     f->sizep = fs->np;
 
-    // TEMPORARY PROBE (do not commit). close_func shrink is the one place a
-    // LIVE Proto's locvars array is released (luaM_realloc to a smaller size
-    // takes realloc_0's shrink path: new block, copy, free old). Log old/new
-    // so a later [LOCVARBAD] pointer can be matched to a block freed here.
     LocVar* const probeOldLocvars = f->locvars;
 
     f->locvars = static_cast<LocVar*>(
@@ -3477,7 +3472,6 @@ namespace
     );
     f->sizelocvars = fs->nlocvars;
 
-    // TEMPORARY PROBE (do not commit)
     if (probeOldLocvars != f->locvars) {
       static int sShrinkBudget = 0;
       if (sShrinkBudget < 100000) {

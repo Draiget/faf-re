@@ -39,11 +39,6 @@ namespace moho
   void SND_DestroyEntityLoop(SoundHandleRecord* record);
   const char* func_SoundErrorCodeToMsg(int errorCode);
 
-  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- defined in CSndParams.cpp,
-  // which owns the registry of every live descriptor. Declared here rather than
-  // in the header because the probes come back out again. It has to sit at
-  // `moho` scope, not in the anonymous namespace below, or it would name a
-  // distinct internal-linkage symbol that nothing ever defines.
   bool SndDiagIsRegisteredParams(const void* candidate);
 } // namespace moho
 
@@ -386,10 +381,6 @@ namespace
     return value.DoResolve();
   }
 
-  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- reports which memory region a
-  // pointer lands in, without dereferencing it. `MEM_COMMIT` means the bytes
-  // are really there (so a bad value was written into them); anything else
-  // means the memory was handed back, which is a lifetime defect instead.
   const char* SndDiagRegionState(const void* const address)
   {
     if (address == nullptr) {
@@ -412,38 +403,6 @@ namespace
     }
   }
 
-  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- decides WHICH defect we are
-  // looking at, before the read that faults.
-  //
-  // The crash presents two ways: the assert "Reached the supposably
-  // unreachable" (SndParams.cpp:387 -- `mResolvePolicy` at params+0x40 outside
-  // the 0..4 the switch at 0x004E0892 covers), and an access violation inside
-  // `weak_ptr<AudioEngine>::lock()` reading the control block stored at
-  // params+0x4C. From the call stack those are one bug, but they have three
-  // possible causes and each wants a completely different search:
-  //
-  //   reg=0                   the pointer is not a live descriptor at all, so
-  //                           the defect is upstream of the audio code: either
-  //                           a dangling `UserEntity` decoded out of the camera
-  //                           frustum lane, or a garbage
-  //                           `HSndEntityLoop::mParams`.
-  //   reg=1 pi!=commit        the descriptor is real, but the AudioEngine
-  //                           control block has been returned to the OS. The
-  //                           weak count was therefore never held -- i.e. a
-  //                           `weak_ptr` got byte-copied somewhere instead of
-  //                           copy-constructed.
-  //   reg=1 pi==commit        the descriptor is real and its control block is
-  //                           still mapped, so the bytes at +0x40/+0x4C were
-  //                           overwritten in place: a stray write.
-  //
-  // The verdict is delivered through `HandleAssertFailure` rather than
-  // `gpg::Warnf` for a practical reason: the engine's assert dialog shows only
-  // the last 100 log lines, and the navigation/steering/motion probes emit
-  // several hundred lines per second, so a warning logged here is guaranteed to
-  // have scrolled away before anyone can read it. Putting the verdict in the
-  // dialog headline is the one channel that cannot be lost.
-  //
-  // Returns true when the descriptor is safe to dereference.
   bool SndDiagParamsLooksLive(
     const char* const arm, const moho::UserEntity* const entity, const moho::CSndParams* const params
   )
@@ -1008,17 +967,10 @@ namespace moho
    * entities through `EraseEntityLoopTreeNode` (and release the whole set once
    * the last one goes), ambient loops stop or destroy outright.
    */
-  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- defined in CSndParams.cpp,
-  // which owns the registry of every live descriptor. Declared here rather
-  // than in the header because the probes come back out again.
   void SndDiagScanParamsRegistry();
 
   void CUserSoundManager::UpdateSoundRequests(const gpg::fastvector<SAudioRequest>& requests)
   {
-    // TEMPORARY PROBE [SNDDIAG] (do not commit) -- sweep every live descriptor
-    // once a beat so a corrupted one is reported on the beat it goes bad,
-    // rather than later when whichever entity happens to own it enters the
-    // sound frustum.
     SndDiagScanParamsRegistry();
 
     EnsureSoundCounterStat(gEngineStatSoundLimitedLoop, "Sound_LimitedLoop");

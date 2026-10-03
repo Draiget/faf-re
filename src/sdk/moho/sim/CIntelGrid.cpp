@@ -14,7 +14,6 @@
 #include "moho/sim/STIMap.h"
 #include "moho/sim/STIMapReflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "moho/misc/DiagnosticBudget.h"
 #include "gpg/core/reflection/Reflection.h"
 
 namespace
@@ -392,26 +391,6 @@ namespace moho
    */
   void CIntelGrid::AddCircle(const Wm3::Vec3f& position, const std::uint32_t radius)
   {
-    // TEMPORARY PROBE -- delete once resolved. GetReconFlags returns None for
-    // ~99.9% of probes (gridNone=7990 / gridHit=10), so the grids are
-    // effectively empty. This reports whether anything stamps vision into them
-    // at all, and what cell radius survives the integer divide by mGridSize --
-    // a world radius smaller than the cell size truncates to 0 and writes
-    // nothing.
-    {
-      static DiagnosticBudget sCalls;
-      static DiagnosticBudget sZeroCell;
-      const unsigned calls = static_cast<unsigned>(sCalls.Next()) + 1u;
-      if ((radius / mGridSize) == 0u) {
-        (void)sZeroCell.Next();
-      }
-      if ((calls % 100u) == 0u) {
-        gpg::Warnf(
-          "[INTELSTAMP] calls=%u zeroCellRadius=%u radius=%u gridSize=%u cells=%u pos=(%.1f,%.1f)",
-          calls, static_cast<unsigned>(sZeroCell.Count()), radius, mGridSize, radius / mGridSize, position.x, position.z
-        );
-      }
-    }
 
     Raster(position, radius / mGridSize, true);
   }

@@ -14,7 +14,6 @@
 #include <new>
 #include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
-#include "gpg/core/utils/Logging.h" // TEMPORARY PROBE (do not commit)
 
 namespace moho
 {
@@ -201,7 +200,6 @@ boost::shared_ptr<RScaResource> GetScaResource(const gpg::StrArg path)
 
   const boost::shared_ptr<RScaResource> resource =
     boost::static_pointer_cast<RScaResource>(RES_GetResource(path, nullptr, resourceType));
-  { static int sScaBudget = 12; if (sScaBudget > 0) { --sScaBudget; gpg::Warnf("[SCADIAG] path='%s' useCount=%ld obj=%p", path != nullptr ? path : "", resource.use_count(), resource.get()); } } // TEMPORARY PROBE (do not commit)
   return resource;
 }
 

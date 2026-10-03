@@ -868,30 +868,6 @@ namespace moho
    * What it does:
    * Releases one `CSndParams` descriptor's owned string and weak-engine lanes.
    */
-  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- catches the corruption at the
-  // moment it happens instead of at the read that faults.
-  //
-  // Every CSndParams ever built is registered here and none are ever freed, so
-  // the whole population can be walked cheaply once a beat. Shadowing each
-  // descriptor's tail (mResolvePolicy at +0x40 and the weak_ptr lanes at +0x48)
-  // and reporting the first scan where one goes bad turns "something wrote over
-  // this at some point" into "it changed between beat N and N+1, from X to Y" --
-  // and the value it changed TO usually identifies the writer.
-  //
-  // The bank name is captured on first sight, while the object is known good,
-  // so that reporting a corrupted one cannot fault a second time on a trashed
-  // string.
-  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- the single most decisive fact
-  // available at the crash site, and one the crash itself cannot tell us.
-  //
-  // Every CSndParams ever constructed registers here and none are ever
-  // destroyed (`func_GetCSndParams` at 0x004DF790 is an insert-only cache, and
-  // the shared-ambient-loop map at 0x004DF2B0 is keyed on the descriptor
-  // pointer and never erased). So membership is an exact liveness oracle: if
-  // the pointer an entity handed us is NOT in here, it was never a CSndParams
-  // at all and the defect is upstream -- a dangling `UserEntity`, or a garbage
-  // `HSndEntityLoop::mParams`. If it IS in here, the object is real and
-  // something wrote over it, which is a completely different search.
   bool SndDiagIsRegisteredParams(const void* candidate)
   {
     if (candidate == nullptr) {
@@ -995,15 +971,6 @@ namespace moho
     }
   }
 
-  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- was `= default`.
-  //
-  // Entities and the shared-ambient-loop map both hold raw CSndParams* for the
-  // life of the session, and the loop map is keyed by that pointer and never
-  // erased, so a single destruction poisons it permanently. Nothing should
-  // reach this for a descriptor that came out of FindOrCreateSndParamsByKey's
-  // cache; if the log shows a pointer here that later shows up in a
-  // "[SNDDIAG] DEAD PARAMS" line, that is the use-after-free, and the route
-  // that destroyed it is whatever called this.
   CSndParams::~CSndParams()
   {
     gpg::Warnf(
@@ -1130,22 +1097,6 @@ namespace moho
       resolvedEngine = SND_FindEngine(mBank.c_str());
       mEngine = resolvedEngine;
 
-      // TEMPORARY PROBE [SNDDIAG] (do not commit) -- record the control block
-      // this weak_ptr just took a weak reference to. If the crash-site probe
-      // later reports a different pi for the same params, the lane was
-      // overwritten; if it reports the same pi, the control block was freed
-      // despite our weak count, and the fault is in whoever released it.
-      {
-        std::uint32_t storedLane[2] = {0u, 0u};
-        std::memcpy(storedLane, &mEngine, sizeof(storedLane));
-        gpg::Warnf(
-          "[SNDDIAG] resolve params=%p bank='%s' px=%08X pi=%08X",
-          static_cast<const void*>(this),
-          mBank.c_str(),
-          storedLane[0],
-          storedLane[1]
-        );
-      }
 
       if (resolvedEngine.get() == nullptr) {
         gpg::Warnf("Error resolving bank '%s' to audio engine", mBank.c_str());

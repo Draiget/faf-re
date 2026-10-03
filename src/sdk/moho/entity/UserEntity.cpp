@@ -1,5 +1,4 @@
 #include "moho/entity/UserEntity.h"
-#include "gpg/core/utils/Logging.h"   // TEMPORARY PROBE (do not commit)
 
 #include <algorithm>
 #include <cmath>
@@ -463,7 +462,6 @@ namespace moho
         spatialBounds.Max = variableData.mCurTransform.pos_;
       }
       mSpatialDbEntry.UpdateBounds(spatialBounds);
-      { static int sB = 0; if (sB < 14) { ++sB; gpg::Warnf("[BOUNDSDIAG] ent=%p mesh=%p box=(%.1f,%.1f,%.1f)-(%.1f,%.1f,%.1f)", static_cast<void*>(this), static_cast<void*>(mMeshInstance), spatialBounds.Min.x, spatialBounds.Min.y, spatialBounds.Min.z, spatialBounds.Max.x, spatialBounds.Max.y, spatialBounds.Max.z); } } // TEMPORARY PROBE (do not commit)
     }
 
     if (mMeshInstance != nullptr) {

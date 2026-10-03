@@ -499,27 +499,6 @@ CAiReconDBImpl::CAiReconDBImpl(SimArmy* const army, const bool fogOfWar) :
       mVisibleToReconCategory = *category;
     }
 
-    // TEMPORARY PROBE -- delete once resolved.
-    //
-    // ReconTick gates EVERY candidate on this set
-    // (`mVisibleToReconCategory.ContainsBit(bp->mCategoryBitIndex)`), and the
-    // set is captured here, once, at army construction. If "VISIBLETORECON" is
-    // not registered yet at this point -- categories come from Lua -- the set
-    // stays empty for the army's whole life, no blip is ever created, and every
-    // downstream symptom follows at once: nothing is ever seen (fog), nothing
-    // auto-acquires, attack-ground finds no target, and clicking an enemy
-    // issues nothing. ContainsBit itself is verified against the binary's
-    // `(ord>>5) - ordinalStart` / `ord & 0x1F` test, so an empty set is the
-    // only way this gate can reject everything.
-    gpg::Warnf(
-      "[RECONCAT] army=%d sim=%p rules=%p resolved=%d words=%u fog=%u",
-      static_cast<int>(mArmy->mConstDat.mArmyIndex),
-      static_cast<void*>(mSim),
-      static_cast<void*>(mSim ? mSim->mRules : nullptr),
-      (category != nullptr) ? 1 : 0,
-      static_cast<unsigned>(mVisibleToReconCategory.WordCount()),
-      static_cast<unsigned>(mFogOfWar)
-    );
   }
 
   boost::ResetSharedPtrRawOwning(mRadarGrid, MakeGrid(mMapData, 4));
@@ -702,42 +681,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     }
   }
 
-  // TEMPORARY PROBE -- delete once resolved.
-  //
-  // Direct measurement of the gate every blip candidate must pass. The
-  // constructor probe never fires, which says this army's recon DB was built
-  // through the reflection default ctor + deserialize path rather than
-  // CAiReconDBImpl::Create, so the "VISIBLETORECON" set may never have been
-  // populated from the rules at all. words=0 here means ContainsBit rejects
-  // every unit, no blip is ever created, and the fog/auto-attack/attack-ground/
-  // enemy-click symptoms all follow from this one line.
-  {
-    // Periodic, not first-N: at game start the armies have not met yet, so an
-    // early blipMap=0 proves nothing. Sample every 300 ticks instead.
-    if ((mSim->mCurTick % 301u) == 0u) {
-      std::size_t entities = 0;
-      if (mSim->mEntityDB) {
-        for (const auto& [entityId, e] : mSim->mEntityDB->mAllUnits) {
-          if (e) {
-            ++entities;
-          }
-        }
-      }
-      gpg::Warnf(
-        "[RECONGATE] army=%d words=%u fog=%u entities=%u blipMap=%u bblips=%u",
-        static_cast<int>(mArmy ? mArmy->mConstDat.mArmyIndex : -1),
-        static_cast<unsigned>(mVisibleToReconCategory.WordCount()),
-        static_cast<unsigned>(mFogOfWar),
-        static_cast<unsigned>(entities),
-        static_cast<unsigned>(mBlipMap.size()),
-        static_cast<unsigned>(mBblips.end() - mBblips.begin())
-      );
-    }
-  }
 
-  // TEMPORARY PROBE counters -- delete once resolved. The cumulative ones are
-  // what matter: sampling one tick in 301 cannot tell "never detects" from
-  // "the sampled tick happened to miss it".
   std::size_t gTotal = 0, gUnit = 0, gBp = 0, gNotOwn = 0, gCat = 0, gDetect = 0;
   static unsigned sEverDetect = 0, sEverPending = 0, sEverCreated = 0, sTicks = 0;
   ++sTicks;
@@ -825,9 +769,6 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
 
   TickAllReconGrids(this, dTicks);
 
-  // TEMPORARY PROBE -- delete once resolved. Per-gate survivor counts for the
-  // publish loop above, sampled periodically so it reports after the armies
-  // have actually met rather than only on the opening ticks.
   if ((mSim->mCurTick % 301u) == 0u) {
     gpg::Warnf(
       "[RECONFUNNEL] army=%d db=%p visionGrid=%p fog=%u ticks=%u unit=%u cat=%u detect=%u | EVER detect=%u pending=%u maxBlipMap=%u",
@@ -1615,10 +1556,6 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(
     return GetReconFlags(nullptr, pos, oldFlags, belowWater);
   }
 
-  // TEMPORARY PROBE -- delete once resolved. RECONFUNNEL proved every enemy
-  // candidate dies here (cat=14 -> detect=0), so this splits the two ways that
-  // happens: the playable-radius gate, or GetReconFlags finding nothing in the
-  // vision/radar/sonar/omni grids.
   static unsigned sCalls = 0, sOutside = 0, sAllied = 0, sGridNone = 0, sGridHit = 0;
   ++sCalls;
 
