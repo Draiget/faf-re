@@ -31,9 +31,6 @@
 
 namespace
 {
-  // TEMPORARY PROBE SINK -- effects triage, delete when resolved.
-  // gpg::Warnf reaches nothing until `/log <name>` installs a target, so the
-  // probes below append here instead. The file lands beside the executable.
   void DiagLine(const char* const fmt, ...)
   {
     std::FILE* const sink = std::fopen("faf_diag.log", "a");
@@ -524,11 +521,6 @@ namespace moho
     const bool startVisible = reconDb->ReconCanDetect(mBeam.mCurStart.pos_, static_cast<int>(RECON_LOSNow)) != RECON_None;
     mVisible = startVisible || reconDb->BeamIsVisible(mBeam);
 
-    // TEMPORARY PROBE -- enemy build-beam triage, delete when resolved.
-    // The probe position is the beam's own start, so comparing a culled line
-    // here against where the map is actually unfogged says whether the focus
-    // army's vision grid really lacks coverage at that point, or whether the
-    // beam is being tested at a stale/wrong position.
     static int sBeamVisProbe = 0;
     if (!mVisible && (sBeamVisProbe++ % 60) == 0) {
       // Probe every sense as well: RECON_AnySense == 0 at the same point means
