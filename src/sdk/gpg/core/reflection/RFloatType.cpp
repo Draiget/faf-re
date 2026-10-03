@@ -16,7 +16,7 @@
  * Parses the incoming null-terminated string using the recovered CRT `atof`
  * lane and returns the parsed value.
  */
-extern "C" double __cdecl RuntimeAtofForward(const char* text)
+extern "C" double __cdecl EngineAtofForward(const char* text)
 {
   return std::atof(text != nullptr ? text : "0");
 }
@@ -57,7 +57,7 @@ msvc8::string RFloatType::GetLexical(const gpg::RRef& ref) const
  */
 bool RFloatType::SetLexical(const gpg::RRef& ref, const char* const str) const
 {
-  *static_cast<float*>(ref.mObj) = static_cast<float>(RuntimeAtofForward(str));
+  *static_cast<float*>(ref.mObj) = static_cast<float>(EngineAtofForward(str));
   return true;
 }
 

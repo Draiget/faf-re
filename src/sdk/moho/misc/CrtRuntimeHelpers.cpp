@@ -141,7 +141,7 @@ extern "C" wchar_t __cdecl putwch_nolock(wchar_t wideCharacter);
 extern "C" int __cdecl _getdrive();
 extern "C" void __cdecl _dosmaperr(unsigned long osErrorCode);
 extern "C" int __cdecl _get_winmajor(unsigned int* majorVersion);
-extern "C" lconv* __cdecl RuntimeGetlconv();
+extern "C" lconv* __cdecl EngineGetlconv();
 extern "C" int __cdecl _tsopen_helper(
   const char* fileName,
   int openFlags,
@@ -167,7 +167,7 @@ extern "C" BOOL __cdecl _lock_fhandle(int fileDescriptor);
 // to this project's __pioinfo; a same-name redeclaration with a different
 // return type is a hard compile error, and even a compatible-signature
 // redeclaration would silently resolve to the wrong (host-toolchain) table.
-extern "C" HANDLE __cdecl RuntimeGetOsfHandle(int fileDescriptor);
+extern "C" HANDLE __cdecl EngineGetOsfHandle(int fileDescriptor);
 extern "C" long __cdecl _lseek_nolock(int fileDescriptor, long offset, int moveMethod);
 extern "C" __int64 __cdecl _lseeki64_nolock(int fileDescriptor, __int64 offset, int moveMethod);
 extern "C" int __cdecl _close_nolock(int fileDescriptor);
@@ -185,8 +185,8 @@ extern "C" int __cdecl _wsopen_nolock(
 );
 constexpr int kOsfhndLock = 11;  // _OSFHND_LOCK, confirmed via `push 0Bh` at 0x00AAF529
 constexpr int kLocktabLock = 10; // _LOCKTAB_LOCK, confirmed via `push 0Ah` at 0x00A96C26
-extern "C" int __cdecl RuntimeInitCrtLockNumber(int lockId);
-extern "C" void __cdecl RuntimeLockCrtLock(int lockId);
+extern "C" int __cdecl EngineInitCrtLockNumber(int lockId);
+extern "C" void __cdecl EngineLockCrtLock(int lockId);
 extern "C" int __cdecl _isatty(int fileDescriptor);
 extern "C" int __cdecl isleadbyte(int character);
 extern "C" errno_t __cdecl _chsize_nolock(int fileDescriptor, __int64 size);
@@ -315,7 +315,8 @@ extern "C" int __cdecl _SFUO_Destroy()
 // declarations all use the plain form; this must match or every one of
 // them is a permanently-unresolved external.
 // MOVED to moho/misc/CrtRuntimeExportedHelpers.cpp: this TU is excluded from
-// the build, and RuntimeThrowContainerTooLong has live callers.
+// the build, and EngineThrowContainerTooLong has live callers.
+[[noreturn]] void EngineThrowContainerTooLong(const char* message);
 
 namespace
 {
@@ -324,18 +325,18 @@ namespace
 
   constexpr std::intptr_t kRuntimeUninitializedConsoleHandleValue = -2;
 
-  [[nodiscard]] inline HANDLE RuntimeUninitializedConsoleHandle() noexcept
+  [[nodiscard]] inline HANDLE EngineUninitializedConsoleHandle() noexcept
   {
     return reinterpret_cast<HANDLE>(kRuntimeUninitializedConsoleHandleValue);
   }
 
-  [[nodiscard]] inline bool RuntimeConsoleHandleIsClosable(const HANDLE handle) noexcept
+  [[nodiscard]] inline bool EngineConsoleHandleIsClosable(const HANDLE handle) noexcept
   {
-    return handle != INVALID_HANDLE_VALUE && handle != RuntimeUninitializedConsoleHandle();
+    return handle != INVALID_HANDLE_VALUE && handle != EngineUninitializedConsoleHandle();
   }
 
-  HANDLE gConsoleOutputHandle = RuntimeUninitializedConsoleHandle();
-  HANDLE gConsoleInputHandle = RuntimeUninitializedConsoleHandle();
+  HANDLE gConsoleOutputHandle = EngineUninitializedConsoleHandle();
+  HANDLE gConsoleInputHandle = EngineUninitializedConsoleHandle();
 }
 
 /**
@@ -345,7 +346,7 @@ namespace
  * Applies one masked update to the CRT abort-behavior lane and returns the
  * previous behavior value.
  */
-extern "C" int __cdecl RuntimeSetAbortBehaviorMasked(
+extern "C" int __cdecl EngineSetAbortBehaviorMasked(
   const int value,
   const int mask
 )
@@ -482,7 +483,7 @@ static_assert(
  * Provides strict lexical ordering for runtime string-map lanes used by CRT
  * type-info map insertion.
  */
-extern "C" bool __stdcall RuntimeTypeInfoStringLess(const char* const lhsText, const char* const rhsText)
+extern "C" bool __stdcall EngineTypeInfoStringLess(const char* const lhsText, const char* const rhsText)
 {
   return std::strcmp(lhsText, rhsText) < 0;
 }
@@ -665,7 +666,7 @@ struct RuntimeLocaleCodePageView
   std::int32_t codepage;
   std::int32_t lcCollateCp;    // +0x08
   LCID lcHandle[6];            // +0x0C, per-category locale handles (matches
-                                // RuntimeLocaleUpdateScope::CollateView)
+                                // LocaleUpdateScope::CollateView)
 };
 static_assert(offsetof(RuntimeLocaleCodePageView, codepage) == 0x4, "RuntimeLocaleCodePageView::codepage offset must be 0x4");
 static_assert(offsetof(RuntimeLocaleCodePageView, lcCollateCp) == 0x8, "RuntimeLocaleCodePageView::lcCollateCp offset must be 0x8");
@@ -855,10 +856,10 @@ extern "C" int __cdecl _isleadbyte_l(int character, _locale_t localeInfo);
  *    already own a per-thread locale, and then claims the per-thread locale
  *    bit -- recording that claim so the destructor releases it.
  */
-class RuntimeLocaleUpdateScope
+class LocaleUpdateScope
 {
 public:
-  explicit RuntimeLocaleUpdateScope(_locale_t const explicitLocale) noexcept
+  explicit LocaleUpdateScope(_locale_t const explicitLocale) noexcept
   {
     if (explicitLocale != nullptr) {
       const auto* const handle = reinterpret_cast<const RuntimeLocaleHandle*>(explicitLocale);
@@ -884,15 +885,15 @@ public:
     }
   }
 
-  ~RuntimeLocaleUpdateScope()
+  ~LocaleUpdateScope()
   {
     if (updated_ && thread_ != nullptr) {
       thread_->ownlocale &= ~kPerThreadLocaleBit;
     }
   }
 
-  RuntimeLocaleUpdateScope(const RuntimeLocaleUpdateScope&) = delete;
-  RuntimeLocaleUpdateScope& operator=(const RuntimeLocaleUpdateScope&) = delete;
+  LocaleUpdateScope(const LocaleUpdateScope&) = delete;
+  LocaleUpdateScope& operator=(const LocaleUpdateScope&) = delete;
 
   /**
    * Narrow-locale payload lane as read by the collation helpers:
@@ -927,7 +928,7 @@ public:
   /** Raw `_locale_t` view of this scope, for forwarding to nested `*_l` lanes. */
   [[nodiscard]] _locale_t asLocale() const noexcept
   {
-    return reinterpret_cast<_locale_t>(const_cast<RuntimeLocaleUpdateScope*>(this));
+    return reinterpret_cast<_locale_t>(const_cast<LocaleUpdateScope*>(this));
   }
 
   /** Multibyte code-page payload for the effective locale. */
@@ -1273,7 +1274,7 @@ using RuntimeInitFunctionWithStatus = int(__cdecl*)();
  * Parses a null-terminated C string through the CRT `atof` lane and returns
  * the floating-point result.
  */
-extern "C" double __cdecl RuntimeAtofForward(const char* text);
+extern "C" double __cdecl EngineAtofForward(const char* text);
 
 /**
  * Address: 0x00A83523 (FUN_00A83523, atof)
@@ -1282,7 +1283,7 @@ extern "C" double __cdecl RuntimeAtofForward(const char* text);
  * Parses a null-terminated C string through the CRT `atof` lane and returns
  * the floating-point result.
  */
-extern "C" double __cdecl RuntimeAtofForward(const char* text)
+extern "C" double __cdecl EngineAtofForward(const char* text)
 {
   return std::atof(text);
 }
@@ -1300,7 +1301,7 @@ extern "C" double __cdecl RuntimeAtofForward(const char* text)
  * global `strtod` defined here does not forward to the real CRT
  * implementation, it calls itself, unconditionally, on every invocation.
  * That is a guaranteed stack overflow the instant anything - this file's
- * own `RuntimeStrtodScaledByPowerOfTen` below, or any of Lua's numeric
+ * own `EngineStrtodScaledByPowerOfTen` below, or any of Lua's numeric
  * parsing, or PNG chunk parsing - calls `strtod`/`std::strtod` anywhere in
  * the program. Keeping the disassembled wrapper under a non-colliding name
  * preserves the recovery; not colliding lets `std::strtod` resolve to the
@@ -1345,7 +1346,7 @@ namespace
    * `std::strtod` and does not yet invoke this lane; flagged as technical
    * debt for a dedicated `strtod` fidelity pass rather than reworked here.
    */
-  [[maybe_unused]] int RuntimeParseSpecialFloatToken(const char** const inOutCursor, const char** const outConsumedEnd)
+  [[maybe_unused]] int EngineParseSpecialFloatToken(const char** const inOutCursor, const char** const outConsumedEnd)
   {
     const char* cursor = *inOutCursor;
     while (std::isspace(static_cast<unsigned char>(*cursor))) {
@@ -1417,7 +1418,7 @@ namespace
  * `outParseErrno`, restores caller errno state, then scales the parsed value
  * by `10^decimalScale`.
  */
-double RuntimeStrtodScaledByPowerOfTen(
+double EngineStrtodScaledByPowerOfTen(
   const char* const text,
   char** const endPtr,
   const int decimalScale,
@@ -1454,33 +1455,33 @@ double RuntimeStrtodScaledByPowerOfTen(
  * Address: 0x00AC0398 (FUN_00AC0398)
  *
  * What it does:
- * Wraps `RuntimeStrtodScaledByPowerOfTen`, then narrows the parsed result to
+ * Wraps `EngineStrtodScaledByPowerOfTen`, then narrows the parsed result to
  * `float` while preserving the double-return ABI lane.
  */
-extern "C" double __cdecl RuntimeStrtodScaledAsFloat(
+extern "C" double __cdecl EngineStrtodScaledAsFloat(
   char* const text,
   char** const endPtr,
   const int decimalScale,
   int* const outParseErrno
 )
 {
-  return static_cast<float>(RuntimeStrtodScaledByPowerOfTen(text, endPtr, decimalScale, outParseErrno));
+  return static_cast<float>(EngineStrtodScaledByPowerOfTen(text, endPtr, decimalScale, outParseErrno));
 }
 
 /**
  * Address: 0x00AC068F (FUN_00AC068F)
  *
  * What it does:
- * Thunk lane that forwards directly to `RuntimeStrtodScaledByPowerOfTen`.
+ * Thunk lane that forwards directly to `EngineStrtodScaledByPowerOfTen`.
  */
-extern "C" double __cdecl RuntimeStrtodScaledAlias(
+extern "C" double __cdecl EngineStrtodScaledAlias(
   char* const text,
   char** const endPtr,
   const int decimalScale,
   int* const outParseErrno
 )
 {
-  return RuntimeStrtodScaledByPowerOfTen(text, endPtr, decimalScale, outParseErrno);
+  return EngineStrtodScaledByPowerOfTen(text, endPtr, decimalScale, outParseErrno);
 }
 
 /**
@@ -1568,7 +1569,7 @@ namespace
    * the requested radix, with optional sign handling for the signed caller
    * lane and CRT invalid-parameter / overflow semantics.
    */
-  errno_t RuntimeIntegerToText(
+  errno_t EngineIntegerToText(
     unsigned int value,
     char* const buffer,
     const std::size_t bufferSize,
@@ -1644,7 +1645,7 @@ namespace
    * Formats one 64-bit integer into a caller-provided narrow buffer using the
    * requested radix and optional signed-minus handling.
    */
-  errno_t RuntimeInteger64ToText(
+  errno_t EngineInteger64ToText(
     const std::uint64_t rawValue,
     char* const buffer,
     const std::size_t bufferSize,
@@ -1715,14 +1716,14 @@ namespace
  * Forwards the unsigned integer formatting lane into the shared radix helper
  * with sign handling disabled.
  */
-extern "C" errno_t __cdecl RuntimeUnsignedLongToString(
+extern "C" errno_t __cdecl EngineUnsignedLongToString(
   const unsigned long value,
   char* const buffer,
   const std::size_t bufferSize,
   const int radix
 )
 {
-  return RuntimeIntegerToText(static_cast<unsigned int>(value), buffer, bufferSize, static_cast<unsigned int>(radix), false);
+  return EngineIntegerToText(static_cast<unsigned int>(value), buffer, bufferSize, static_cast<unsigned int>(radix), false);
 }
 
 /**
@@ -1740,7 +1741,7 @@ extern "C" errno_t __cdecl _itoa_s(
 )
 {
   const bool decimalNegative = (radix == 10) && (value < 0);
-  return RuntimeIntegerToText(
+  return EngineIntegerToText(
     static_cast<unsigned int>(value),
     buffer,
     bufferSize,
@@ -1762,7 +1763,7 @@ extern "C" errno_t __cdecl _i64toa_s(
   const int radix
 )
 {
-  return RuntimeInteger64ToText(
+  return EngineInteger64ToText(
     static_cast<std::uint64_t>(value),
     buffer,
     bufferSize,
@@ -1784,7 +1785,7 @@ extern "C" errno_t __cdecl _ui64toa_s(
   const int radix
 )
 {
-  return RuntimeInteger64ToText(value, buffer, bufferSize, static_cast<unsigned int>(radix), false);
+  return EngineInteger64ToText(value, buffer, bufferSize, static_cast<unsigned int>(radix), false);
 }
 
 extern "C" tagHeader* _sbh_pHeaderList = nullptr;
@@ -1799,7 +1800,7 @@ namespace
 {
   using CorExitProcessFn = void(__stdcall*)(unsigned int exitCode);
 
-  void RuntimeTryCorExitProcess(const unsigned int exitCode)
+  void EngineTryCorExitProcess(const unsigned int exitCode)
   {
     const HMODULE mscoreeModule = ::GetModuleHandleA("mscoree.dll");
     if (mscoreeModule == nullptr) {
@@ -1817,13 +1818,13 @@ namespace
 {
   struct RuntimeThreadLocInfoView;
 
-  [[nodiscard]] RuntimeThreadLocInfoView* RuntimeResolveLocaleLocInfo(
+  [[nodiscard]] RuntimeThreadLocInfoView* EngineResolveLocaleLocInfo(
     _locale_t localeInfo,
     RuntimeTidDataLocaleView** outThreadData,
     bool* outUpdated
   );
 
-  void RuntimeReleaseLocaleUpdate(RuntimeTidDataLocaleView* threadData, bool updated);
+  void EngineReleaseLocaleUpdate(RuntimeTidDataLocaleView* threadData, bool updated);
 }
 
 /**
@@ -1835,7 +1836,7 @@ namespace
  */
 extern "C" [[noreturn]] void __cdecl crtExitProcess(const unsigned int exitCode)
 {
-  RuntimeTryCorExitProcess(exitCode);
+  EngineTryCorExitProcess(exitCode);
   ::ExitProcess(exitCode);
 }
 
@@ -1980,7 +1981,7 @@ namespace
  * checks for the C++ exception code (0xE06D7363) before calling
  * `terminate`.
  */
-extern "C" void __stdcall RuntimeEhVectorDestructorIterator(
+extern "C" void __stdcall EngineEhVectorDestructorIterator(
   char* currentElement,
   const unsigned int elementSize,
   int elementCount,
@@ -2005,10 +2006,10 @@ extern "C" void __stdcall RuntimeEhVectorDestructorIterator(
  * once per element and returning the number of constructed elements. If a
  * constructor throws partway through, the unwind funclet at 0x00A84012
  * destroys the already-constructed prefix in reverse order via the shared
- * teardown loop (RuntimeEhVectorDestructorIterator, 0x00A83A4E) before the
+ * teardown loop (EngineEhVectorDestructorIterator, 0x00A83A4E) before the
  * original exception continues propagating.
  */
-extern "C" int __stdcall RuntimeEhVectorConstructorIterator(
+extern "C" int __stdcall EngineEhVectorConstructorIterator(
   char* currentElement,
   const unsigned int elementSize,
   const int elementCount,
@@ -2024,7 +2025,7 @@ extern "C" int __stdcall RuntimeEhVectorConstructorIterator(
       ++constructedCount;
     }
   } catch (...) {
-    RuntimeEhVectorDestructorIterator(currentElement, elementSize, constructedCount, destructorFn);
+    EngineEhVectorDestructorIterator(currentElement, elementSize, constructedCount, destructorFn);
     throw;
   }
 
@@ -2038,7 +2039,7 @@ extern "C" int __stdcall RuntimeEhVectorConstructorIterator(
  * Invokes one `__thiscall int(int)` callback under CRT EH bridge semantics
  * and terminates on C++ exception propagation.
  */
-extern "C" int __cdecl RuntimeInvokeThiscallIntCallbackNoexcept(
+extern "C" int __cdecl EngineInvokeThiscallIntCallbackNoexcept(
   int(__thiscall* const callback)(int),
   const int argument
 )
@@ -2057,7 +2058,7 @@ extern "C" int __cdecl RuntimeInvokeThiscallIntCallbackNoexcept(
  * Invokes one `__cdecl int(int)` callback under CRT EH bridge semantics and
  * terminates on C++ exception propagation.
  */
-extern "C" int __cdecl RuntimeInvokeCdeclIntCallbackNoexcept(
+extern "C" int __cdecl EngineInvokeCdeclIntCallbackNoexcept(
   int(__cdecl* const callback)(int),
   const int argument
 )
@@ -2076,7 +2077,7 @@ extern "C" int __cdecl RuntimeInvokeCdeclIntCallbackNoexcept(
  * Invokes one `__stdcall int(int)` callback under CRT EH bridge semantics and
  * terminates on C++ exception propagation.
  */
-extern "C" int __cdecl RuntimeInvokeStdcallIntCallbackNoexcept(
+extern "C" int __cdecl EngineInvokeStdcallIntCallbackNoexcept(
   int(__stdcall* const callback)(int),
   const int argument
 )
@@ -2095,7 +2096,7 @@ extern "C" int __cdecl RuntimeInvokeStdcallIntCallbackNoexcept(
  * Invokes one `__stdcall int(int,int,int,int)` callback under CRT EH bridge
  * semantics and terminates on C++ exception propagation.
  */
-extern "C" int __cdecl RuntimeInvokeStdcallInt4CallbackNoexcept(
+extern "C" int __cdecl EngineInvokeStdcallInt4CallbackNoexcept(
   int(__stdcall* const callback)(int, int, int, int),
   const int argument0,
   const int argument1,
@@ -2117,7 +2118,7 @@ namespace
 
   using RuntimeLocaleClassifierFn = int(__cdecl*)(int character, _locale_t localeInfo);
 
-  [[nodiscard]] int RuntimeClassifyLocaleCharacter(
+  [[nodiscard]] int EngineClassifyLocaleCharacter(
     const int character,
     _locale_t const localeInfo,
     const unsigned int fastMask,
@@ -2127,7 +2128,7 @@ namespace
     RuntimeTidDataLocaleView* threadData = nullptr;
     bool updated = false;
     const auto* const localeView = reinterpret_cast<const RuntimeLocaleClassificationView*>(
-      RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated)
+      EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated)
     );
 
     int result = 0;
@@ -2139,7 +2140,7 @@ namespace
       }
     }
 
-    RuntimeReleaseLocaleUpdate(threadData, updated);
+    EngineReleaseLocaleUpdate(threadData, updated);
     return result;
   }
 
@@ -2149,16 +2150,16 @@ namespace
    *
    * What it does:
    * Locale-aware CRT `_isctype` classifier. Updates the effective locale via
-   * `RuntimeResolveLocaleLocInfo` (the `_LocaleUpdate` construction lane),
+   * `EngineResolveLocaleLocInfo` (the `_LocaleUpdate` construction lane),
    * then classifies `character` against `mask`:
    *   * single-byte fast path `(character + 1) <= 0x100`: returns
    *     `locale.pctype[character] & mask`
    *   * DBCS path: tests leadbyte state of `character >> 8` via
    *     `_isleadbyte_l` and combines with `pctype[character & 0xFF]`
-   * Always pairs with `RuntimeReleaseLocaleUpdate` to release any
+   * Always pairs with `EngineReleaseLocaleUpdate` to release any
    * thread-local locale ref acquired by the resolve lane.
    */
-  [[nodiscard]] int RuntimeIsCtypeLocale(
+  [[nodiscard]] int EngineIsCtypeLocale(
     const int character,
     const int mask,
     _locale_t const localeInfo
@@ -2167,7 +2168,7 @@ namespace
     RuntimeTidDataLocaleView* threadData = nullptr;
     bool updated = false;
     const auto* const localeView = reinterpret_cast<const RuntimeLocaleClassificationView*>(
-      RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated)
+      EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated)
     );
 
     int result = 0;
@@ -2186,11 +2187,11 @@ namespace
       }
     }
 
-    RuntimeReleaseLocaleUpdate(threadData, updated);
+    EngineReleaseLocaleUpdate(threadData, updated);
     return result;
   }
 
-  [[nodiscard]] int RuntimeClassifyInitialOrLocaleChanged(
+  [[nodiscard]] int EngineClassifyInitialOrLocaleChanged(
     const int character,
     const unsigned int initialMask,
     const RuntimeLocaleClassifierFn changedLocaleClassifier
@@ -2232,12 +2233,12 @@ namespace
    * locale resolution, supports DBCS lead-byte mapping through
    * `__crtLCMapStringA(LCMAP_UPPERCASE)`, and preserves `EILSEQ` fallback lanes.
    */
-  int RuntimeToupperLocaleHelper(const int character, _locale_t const localeInfo)
+  int EngineToupperLocaleHelper(const int character, _locale_t const localeInfo)
   {
     RuntimeTidDataLocaleView* threadData = nullptr;
     bool updated = false;
     const auto* const localeView = reinterpret_cast<const RuntimeToupperLocaleView*>(
-      RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated)
+      EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated)
     );
 
     int result = character;
@@ -2288,7 +2289,7 @@ namespace
       }
     }
 
-    RuntimeReleaseLocaleUpdate(threadData, updated);
+    EngineReleaseLocaleUpdate(threadData, updated);
     return result;
   }
 
@@ -2300,7 +2301,7 @@ namespace
    * lane (`_LocaleUpdate` equivalent), falling back to ASCII-only uppercase
    * conversion when no locale handle is active.
    */
-  int RuntimeTowupperLocaleHelperWide(
+  int EngineTowupperLocaleHelperWide(
     const std::uint16_t sourceCharacter,
     _locale_t const localeInfo
   )
@@ -2313,7 +2314,7 @@ namespace
     RuntimeTidDataLocaleView* threadData = nullptr;
     bool updated = false;
     const auto* const localeView = reinterpret_cast<const RuntimeToupperLocaleView*>(
-      RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated)
+      EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated)
     );
 
     if (localeView != nullptr) {
@@ -2348,7 +2349,7 @@ namespace
       }
     }
 
-    RuntimeReleaseLocaleUpdate(threadData, updated);
+    EngineReleaseLocaleUpdate(threadData, updated);
     return result;
   }
 }
@@ -2356,14 +2357,14 @@ namespace
 /**
  * Address: 0x00A984BB (FUN_00A984BB, _isctype_l)
  *
- * See the anonymous namespace implementation `RuntimeIsCtypeLocale` for the
+ * See the anonymous namespace implementation `EngineIsCtypeLocale` for the
  * full behavior description. This `extern "C"` entry point is the stable
  * CRT-facing symbol that other recovered ctype helpers (`_isalpha_l`,
  * `_isdigit_l`, etc.) dispatch into for the DBCS slow path.
  */
 extern "C" int __cdecl _isctype_l(const int character, const int mask, _locale_t const localeInfo)
 {
-  return RuntimeIsCtypeLocale(character, mask, localeInfo);
+  return EngineIsCtypeLocale(character, mask, localeInfo);
 }
 
 /**
@@ -2375,7 +2376,7 @@ extern "C" int __cdecl _isctype_l(const int character, const int mask, _locale_t
  */
 extern "C" int __cdecl _isalpha_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x103u, 0x103);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x103u, 0x103);
 }
 
 /**
@@ -2387,7 +2388,7 @@ extern "C" int __cdecl _isalpha_l(const int character, _locale_t const localeInf
  */
 extern "C" int __cdecl isalpha(const int character)
 {
-  return RuntimeClassifyInitialOrLocaleChanged(character, 0x103u, &_isalpha_l);
+  return EngineClassifyInitialOrLocaleChanged(character, 0x103u, &_isalpha_l);
 }
 
 /**
@@ -2398,7 +2399,7 @@ extern "C" int __cdecl isalpha(const int character)
  */
 extern "C" int __cdecl _isupper_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x001u, 0x001);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x001u, 0x001);
 }
 
 /**
@@ -2410,7 +2411,7 @@ extern "C" int __cdecl _isupper_l(const int character, _locale_t const localeInf
  */
 extern "C" int __cdecl isupper(const int character)
 {
-  return RuntimeClassifyInitialOrLocaleChanged(character, 0x001u, &_isupper_l);
+  return EngineClassifyInitialOrLocaleChanged(character, 0x001u, &_isupper_l);
 }
 
 /**
@@ -2421,7 +2422,7 @@ extern "C" int __cdecl isupper(const int character)
  */
 extern "C" int __cdecl _islower_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x002u, 0x002);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x002u, 0x002);
 }
 
 /**
@@ -2433,7 +2434,7 @@ extern "C" int __cdecl _islower_l(const int character, _locale_t const localeInf
  */
 extern "C" int __cdecl islower(const int character)
 {
-  return RuntimeClassifyInitialOrLocaleChanged(character, 0x002u, &_islower_l);
+  return EngineClassifyInitialOrLocaleChanged(character, 0x002u, &_islower_l);
 }
 
 /**
@@ -2444,7 +2445,7 @@ extern "C" int __cdecl islower(const int character)
  */
 extern "C" int __cdecl _isdigit_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x004u, 0x004);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x004u, 0x004);
 }
 
 /**
@@ -2456,7 +2457,7 @@ extern "C" int __cdecl _isdigit_l(const int character, _locale_t const localeInf
  */
 extern "C" int __cdecl isdigit(const int character)
 {
-  return RuntimeClassifyInitialOrLocaleChanged(character, 0x004u, &_isdigit_l);
+  return EngineClassifyInitialOrLocaleChanged(character, 0x004u, &_isdigit_l);
 }
 
 /**
@@ -2467,7 +2468,7 @@ extern "C" int __cdecl isdigit(const int character)
  */
 extern "C" int __cdecl _isxdigit_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x080u, 0x080);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x080u, 0x080);
 }
 
 /**
@@ -2479,7 +2480,7 @@ extern "C" int __cdecl _isxdigit_l(const int character, _locale_t const localeIn
  */
 extern "C" int __cdecl isxdigit(const int character)
 {
-  return RuntimeClassifyInitialOrLocaleChanged(character, 0x080u, &_isxdigit_l);
+  return EngineClassifyInitialOrLocaleChanged(character, 0x080u, &_isxdigit_l);
 }
 
 /**
@@ -2490,7 +2491,7 @@ extern "C" int __cdecl isxdigit(const int character)
  */
 extern "C" int __cdecl _isspace_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x008u, 0x008);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x008u, 0x008);
 }
 
 /**
@@ -2502,7 +2503,7 @@ extern "C" int __cdecl _isspace_l(const int character, _locale_t const localeInf
  */
 extern "C" int __cdecl isspace(const int character)
 {
-  return RuntimeClassifyInitialOrLocaleChanged(character, 0x008u, &_isspace_l);
+  return EngineClassifyInitialOrLocaleChanged(character, 0x008u, &_isspace_l);
 }
 
 /**
@@ -2513,7 +2514,7 @@ extern "C" int __cdecl isspace(const int character)
  */
 extern "C" int __cdecl _ispunct_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x010u, 0x010);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x010u, 0x010);
 }
 
 /**
@@ -2525,7 +2526,7 @@ extern "C" int __cdecl _ispunct_l(const int character, _locale_t const localeInf
  */
 extern "C" int __cdecl ispunct(const int character)
 {
-  return RuntimeClassifyInitialOrLocaleChanged(character, 0x010u, &_ispunct_l);
+  return EngineClassifyInitialOrLocaleChanged(character, 0x010u, &_ispunct_l);
 }
 
 /**
@@ -2537,7 +2538,7 @@ extern "C" int __cdecl ispunct(const int character)
  */
 extern "C" int __cdecl _isalnum_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x107u, 0x107);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x107u, 0x107);
 }
 
 /**
@@ -2549,7 +2550,7 @@ extern "C" int __cdecl _isalnum_l(const int character, _locale_t const localeInf
  */
 extern "C" int __cdecl isalnum(const int character)
 {
-  return RuntimeClassifyInitialOrLocaleChanged(character, 0x107u, &_isalnum_l);
+  return EngineClassifyInitialOrLocaleChanged(character, 0x107u, &_isalnum_l);
 }
 
 /**
@@ -2560,7 +2561,7 @@ extern "C" int __cdecl isalnum(const int character)
  */
 extern "C" int __cdecl _isprint_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x157u, 0x157);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x157u, 0x157);
 }
 
 /**
@@ -2572,7 +2573,7 @@ extern "C" int __cdecl _isprint_l(const int character, _locale_t const localeInf
  */
 extern "C" int __cdecl isprint(const int character)
 {
-  return RuntimeClassifyInitialOrLocaleChanged(character, 0x157u, &_isprint_l);
+  return EngineClassifyInitialOrLocaleChanged(character, 0x157u, &_isprint_l);
 }
 
 /**
@@ -2583,7 +2584,7 @@ extern "C" int __cdecl isprint(const int character)
  */
 extern "C" int __cdecl _isgraph_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x117u, 0x117);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x117u, 0x117);
 }
 
 /**
@@ -2594,7 +2595,7 @@ extern "C" int __cdecl _isgraph_l(const int character, _locale_t const localeInf
  */
 extern "C" int __cdecl _iscntrl_l(const int character, _locale_t const localeInfo)
 {
-  return RuntimeClassifyLocaleCharacter(character, localeInfo, 0x020u, 0x020);
+  return EngineClassifyLocaleCharacter(character, localeInfo, 0x020u, 0x020);
 }
 
 /**
@@ -2606,7 +2607,7 @@ extern "C" int __cdecl _iscntrl_l(const int character, _locale_t const localeInf
  */
 extern "C" int __cdecl iscntrl(const int character)
 {
-  return RuntimeClassifyInitialOrLocaleChanged(character, 0x020u, &_iscntrl_l);
+  return EngineClassifyInitialOrLocaleChanged(character, 0x020u, &_iscntrl_l);
 }
 
 /**
@@ -2619,7 +2620,7 @@ extern "C" int __cdecl iscntrl(const int character)
 extern "C" int __cdecl toupper(const int character)
 {
   if (__locale_changed != 0) {
-    return RuntimeToupperLocaleHelper(character, nullptr);
+    return EngineToupperLocaleHelper(character, nullptr);
   }
 
   if (static_cast<unsigned int>(character - static_cast<int>('a'))
@@ -2639,7 +2640,7 @@ extern "C" int __cdecl toupper(const int character)
  */
 extern "C" wint_t __cdecl towupper(const wint_t character)
 {
-  return static_cast<wint_t>(RuntimeTowupperLocaleHelperWide(
+  return static_cast<wint_t>(EngineTowupperLocaleHelperWide(
     static_cast<std::uint16_t>(character),
     nullptr
   ));
@@ -2688,7 +2689,7 @@ extern "C" long __cdecl strtol(
  * Byte-string variant of the signed `strtol` lane used by parser callsites
  * that carry `unsigned char*` text/end pointers.
  */
-long RuntimeStrtolByteString(
+long EngineStrtolByteString(
   const unsigned char* const text,
   unsigned char** const endPointer,
   const int radix
@@ -2714,7 +2715,7 @@ long RuntimeStrtolByteString(
  */
 extern "C" int __cdecl atoi(const char* const text)
 {
-  return static_cast<int>(RuntimeStrtolByteString(
+  return static_cast<int>(EngineStrtolByteString(
     reinterpret_cast<const unsigned char*>(text),
     nullptr,
     10
@@ -2728,7 +2729,7 @@ extern "C" int __cdecl atoi(const char* const text)
  * Forwards locale-explicit signed narrow integer parsing into `strtoxl` with
  * signed-mode semantics.
  */
-extern "C" long __cdecl RuntimeStrtolLocaleForward(
+extern "C" long __cdecl EngineStrtolLocaleForward(
   const char* const text,
   char** const endPointer,
   const int radix,
@@ -2751,7 +2752,7 @@ extern "C" long __cdecl RuntimeStrtolLocaleForward(
  * Forwards wide-string 64-bit integer parsing to `wcstoxq`, selecting either
  * the active thread locale or `__initiallocalestructinfo`.
  */
-static unsigned __int64 RuntimeWcstoi64(
+static unsigned __int64 EngineWcstoi64(
   const wchar_t* const text,
   wchar_t** const endPointer,
   const int radix
@@ -2769,7 +2770,7 @@ static unsigned __int64 RuntimeWcstoi64(
  * Locale-explicit wide-string signed 64-bit parse wrapper forwarding into
  * `wcstoxq(..., flags=0)`.
  */
-__int64 __cdecl Runtime_wcstoi64_l(
+__int64 __cdecl EngineWcstoi64Locale(
   const wchar_t* const text,
   wchar_t** const endPointer,
   const int radix,
@@ -2785,7 +2786,7 @@ __int64 __cdecl Runtime_wcstoi64_l(
  * What it does:
  * Forwards locale-explicit signed wide integer parsing into `_wcstol_l`.
  */
-extern "C" long __cdecl RuntimeWcstolLocaleForward(
+extern "C" long __cdecl EngineWcstolLocaleForward(
   const wchar_t* const text,
   wchar_t** const endPointer,
   const int radix,
@@ -2808,7 +2809,7 @@ extern "C" long __cdecl RuntimeWcstolLocaleForward(
  * IDA signature:
  * unsigned int __cdecl wcstol(unsigned __int16 *nptr, unsigned __int16 **endptr, unsigned int ibase);
  */
-extern "C" long __cdecl RuntimeWcstolFromLocale(
+extern "C" long __cdecl EngineWcstolFromLocale(
   const wchar_t* const text,
   wchar_t** const endPointer,
   const int radix
@@ -2831,7 +2832,7 @@ extern "C" long __cdecl RuntimeWcstolFromLocale(
  * IDA signature:
  * int __cdecl sub_A8F5B3(int a1, int a2);
  */
-extern "C" double __cdecl RuntimeWcstodFromLocale(
+extern "C" double __cdecl EngineWcstodFromLocale(
   const wchar_t* const text,
   wchar_t** const endPointer
 )
@@ -2858,7 +2859,7 @@ extern "C" double __cdecl RuntimeWcstodFromLocale(
  * IDA signature:
  * int __cdecl sub_A8F63A(_WORD *a1, _WORD *a2);
  */
-extern "C" std::size_t __cdecl RuntimeWcsSpanOfIncludedChars(
+extern "C" std::size_t __cdecl EngineWcsSpanOfIncludedChars(
   const wchar_t* const text,
   const wchar_t* const characterSet
 )
@@ -2880,7 +2881,7 @@ extern "C" std::size_t __cdecl RuntimeWcsSpanOfIncludedChars(
  * Address: 0x00A8FC71 (FUN_00A8FC71, _wtoi thunk lane)
  *
  * What it does:
- * Tail-forwards one `_wtoi` thunk lane into `RuntimeWtoiFromWide`.
+ * Tail-forwards one `_wtoi` thunk lane into `EngineWtoiFromWide`.
  */
 // MOVED to moho/misc/CrtRuntimeExportedHelpers.cpp (this TU is excluded from
 // the build; the helper has live callers).
@@ -2892,9 +2893,9 @@ extern "C" std::size_t __cdecl RuntimeWcsSpanOfIncludedChars(
  * What it does:
  * Parses one base-10 signed wide integer with explicit locale forwarding.
  */
-extern "C" int __cdecl RuntimeWtoiFromWideLocale(const wchar_t* const text, _locale_t const localeInfo)
+extern "C" int __cdecl EngineWtoiFromWideLocale(const wchar_t* const text, _locale_t const localeInfo)
 {
-  return static_cast<int>(RuntimeWcstolLocaleForward(text, nullptr, 10, localeInfo));
+  return static_cast<int>(EngineWcstolLocaleForward(text, nullptr, 10, localeInfo));
 }
 
 /**
@@ -2904,9 +2905,9 @@ extern "C" int __cdecl RuntimeWtoiFromWideLocale(const wchar_t* const text, _loc
  * Tail-forwards one `_wtoi_l` thunk lane into the canonical locale-aware
  * wide integer parser helper.
  */
-extern "C" int __cdecl RuntimeWtoiFromWideLocaleThunk(const wchar_t* const text, _locale_t const localeInfo)
+extern "C" int __cdecl EngineWtoiFromWideLocaleThunk(const wchar_t* const text, _locale_t const localeInfo)
 {
-  return RuntimeWtoiFromWideLocale(text, localeInfo);
+  return EngineWtoiFromWideLocale(text, localeInfo);
 }
 
 /**
@@ -2918,7 +2919,7 @@ extern "C" int __cdecl RuntimeWtoiFromWideLocaleThunk(const wchar_t* const text,
  */
 extern "C" __int64 __cdecl _wtoi64(const wchar_t* const text)
 {
-  return static_cast<__int64>(RuntimeWcstoi64(text, nullptr, 10));
+  return static_cast<__int64>(EngineWcstoi64(text, nullptr, 10));
 }
 
 /**
@@ -2930,7 +2931,7 @@ extern "C" __int64 __cdecl _wtoi64(const wchar_t* const text)
  */
 extern "C" __int64 __cdecl _wtoi64_l(const wchar_t* const text, _locale_t localeInfo)
 {
-  return Runtime_wcstoi64_l(text, nullptr, 10, reinterpret_cast<RuntimeLocaleInfoStruct*>(localeInfo));
+  return EngineWcstoi64Locale(text, nullptr, 10, reinterpret_cast<RuntimeLocaleInfoStruct*>(localeInfo));
 }
 
 /**
@@ -3021,7 +3022,7 @@ extern "C" errno_t __cdecl _mbstowcs_s_l(
   RuntimeTidDataLocaleView* threadData = nullptr;
   bool updated = false;
   RuntimeThreadLocInfoView* const resolvedLocaleInfo =
-    RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
+    EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
   const std::size_t conversionCount = (maxCount > destinationCount) ? destinationCount : maxCount;
   const std::size_t convertedWideChars = ::_mbstowcs_l(
@@ -3036,7 +3037,7 @@ extern "C" errno_t __cdecl _mbstowcs_s_l(
     }
 
     const errno_t result = *_errno();
-    RuntimeReleaseLocaleUpdate(threadData, updated);
+    EngineReleaseLocaleUpdate(threadData, updated);
     return result;
   }
 
@@ -3048,7 +3049,7 @@ extern "C" errno_t __cdecl _mbstowcs_s_l(
         destination[0] = L'\0';
         *_errno() = ERANGE;
         _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
-        RuntimeReleaseLocaleUpdate(threadData, updated);
+        EngineReleaseLocaleUpdate(threadData, updated);
         return ERANGE;
       }
 
@@ -3063,7 +3064,7 @@ extern "C" errno_t __cdecl _mbstowcs_s_l(
     *outConvertedCount = requiredWideChars;
   }
 
-  RuntimeReleaseLocaleUpdate(threadData, updated);
+  EngineReleaseLocaleUpdate(threadData, updated);
   return result;
 }
 
@@ -3074,7 +3075,7 @@ extern "C" errno_t __cdecl _mbstowcs_s_l(
  * Forwards secure multibyte-to-wide conversion into `_mbstowcs_s_l` with
  * null locale so the active thread locale lane is used.
  */
-extern "C" errno_t __cdecl RuntimeMbstowcsSecureNoLocale(
+extern "C" errno_t __cdecl EngineMbstowcsSecureNoLocale(
   std::size_t* const outConvertedCount,
   wchar_t* const destination,
   const std::size_t destinationCount,
@@ -3646,13 +3647,13 @@ namespace
   constexpr std::size_t kSbhLastPageOffset = 0x7000;
   constexpr std::int32_t kSbhFreePayloadBytes = 0x0FF0;
 
-  [[nodiscard]] tagEntry* RuntimeSbhGroupSentinel(tagGroup* const group, const int bucketIndex) noexcept
+  [[nodiscard]] tagEntry* EngineSbhGroupSentinel(tagGroup* const group, const int bucketIndex) noexcept
   {
     auto* const groupBytes = reinterpret_cast<std::uint8_t*>(group);
     return reinterpret_cast<tagEntry*>(groupBytes + (static_cast<std::size_t>(bucketIndex) * sizeof(tagListHead)));
   }
 
-  [[nodiscard]] std::uint32_t RuntimeSbhBucketFromSize(const std::uint32_t sizeBytes) noexcept
+  [[nodiscard]] std::uint32_t EngineSbhBucketFromSize(const std::uint32_t sizeBytes) noexcept
   {
     std::uint32_t bucket = (sizeBytes >> 4u) - 1u;
     if (bucket > 0x3Fu) {
@@ -3661,13 +3662,13 @@ namespace
     return bucket;
   }
 
-  void RuntimeSbhUnlinkEntry(tagEntry* const entry) noexcept
+  void EngineSbhUnlinkEntry(tagEntry* const entry) noexcept
   {
     entry->pEntryNext->pEntryPrev = entry->pEntryPrev;
     entry->pEntryPrev->pEntryNext = entry->pEntryNext;
   }
 
-  void RuntimeSbhClearBucketState(
+  void EngineSbhClearBucketState(
     tagHeader* const header,
     tagRegion* const region,
     const unsigned int groupIndex,
@@ -3690,7 +3691,7 @@ namespace
     }
   }
 
-  void RuntimeSbhSetBucketState(
+  void EngineSbhSetBucketState(
     tagHeader* const header,
     tagRegion* const region,
     const unsigned int groupIndex,
@@ -3736,7 +3737,7 @@ extern "C" int __cdecl _sbh_alloc_new_group(tagHeader* const header)
 
   tagGroup* const group = &region->grpHeadList[groupIndex];
   for (int bucket = 0; bucket < (kSbhBinsPerGroup - 1); ++bucket) {
-    tagEntry* const sentinel = RuntimeSbhGroupSentinel(group, bucket);
+    tagEntry* const sentinel = EngineSbhGroupSentinel(group, bucket);
     sentinel->pEntryPrev = sentinel;
     sentinel->pEntryNext = sentinel;
   }
@@ -3763,7 +3764,7 @@ extern "C" int __cdecl _sbh_alloc_new_group(tagHeader* const header)
   }
 
   auto* const lastPageEntry = reinterpret_cast<tagEntry*>(groupMemory + kSbhLastPageOffset);
-  tagEntry* const size63Sentinel = RuntimeSbhGroupSentinel(group, 63);
+  tagEntry* const size63Sentinel = EngineSbhGroupSentinel(group, 63);
   size63Sentinel->pEntryPrev = firstEntry + 1;
   (firstEntry + 1)->pEntryNext = size63Sentinel;
   size63Sentinel->pEntryNext = lastPageEntry + 1;
@@ -3852,38 +3853,38 @@ extern "C" void __cdecl _sbh_free_block(tagHeader* const header, void* const all
   const std::int32_t leftSizeOrFlags = *reinterpret_cast<std::int32_t*>(static_cast<std::uint8_t*>(allocation) - 8u);
 
   if ((rightSize & 1) == 0) {
-    const unsigned int rightBucket = RuntimeSbhBucketFromSize(static_cast<std::uint32_t>(rightSize));
+    const unsigned int rightBucket = EngineSbhBucketFromSize(static_cast<std::uint32_t>(rightSize));
     if (rightEntry->pEntryPrev == rightEntry->pEntryNext) {
-      RuntimeSbhClearBucketState(ownerHeader, region, groupIndex, rightBucket);
+      EngineSbhClearBucketState(ownerHeader, region, groupIndex, rightBucket);
     }
 
-    RuntimeSbhUnlinkEntry(rightEntry);
+    EngineSbhUnlinkEntry(rightEntry);
     mergedSize += rightSize;
   }
 
-  unsigned int mergedBucket = RuntimeSbhBucketFromSize(static_cast<std::uint32_t>(mergedSize));
+  unsigned int mergedBucket = EngineSbhBucketFromSize(static_cast<std::uint32_t>(mergedSize));
   unsigned int leftBucket = 0u;
   const bool previousAllocated = (leftSizeOrFlags & 1) != 0;
 
   if (!previousAllocated) {
     auto* const leftEntry = reinterpret_cast<tagEntry*>(reinterpret_cast<std::uint8_t*>(entry) - leftSizeOrFlags);
-    leftBucket = RuntimeSbhBucketFromSize(static_cast<std::uint32_t>(leftSizeOrFlags));
+    leftBucket = EngineSbhBucketFromSize(static_cast<std::uint32_t>(leftSizeOrFlags));
     mergedSize += leftSizeOrFlags;
-    mergedBucket = RuntimeSbhBucketFromSize(static_cast<std::uint32_t>(mergedSize));
+    mergedBucket = EngineSbhBucketFromSize(static_cast<std::uint32_t>(mergedSize));
 
     if (leftBucket != mergedBucket) {
       if (leftEntry->pEntryPrev == leftEntry->pEntryNext) {
-        RuntimeSbhClearBucketState(ownerHeader, region, groupIndex, leftBucket);
+        EngineSbhClearBucketState(ownerHeader, region, groupIndex, leftBucket);
       }
 
-      RuntimeSbhUnlinkEntry(leftEntry);
+      EngineSbhUnlinkEntry(leftEntry);
     }
 
     entry = leftEntry;
   }
 
   if (previousAllocated || leftBucket != mergedBucket) {
-    tagEntry* const bucketSentinel = RuntimeSbhGroupSentinel(group, static_cast<int>(mergedBucket));
+    tagEntry* const bucketSentinel = EngineSbhGroupSentinel(group, static_cast<int>(mergedBucket));
     tagEntry* const previousTail = bucketSentinel->pEntryPrev;
     entry->pEntryNext = bucketSentinel;
     entry->pEntryPrev = previousTail;
@@ -3891,7 +3892,7 @@ extern "C" void __cdecl _sbh_free_block(tagHeader* const header, void* const all
     entry->pEntryPrev->pEntryNext = entry;
 
     if (entry->pEntryPrev == entry->pEntryNext) {
-      RuntimeSbhSetBucketState(ownerHeader, region, groupIndex, mergedBucket);
+      EngineSbhSetBucketState(ownerHeader, region, groupIndex, mergedBucket);
     }
   }
 
@@ -4047,7 +4048,7 @@ namespace
  * Returns the upper-bound count lane used by the legacy system-error message
  * lookup helper.
  */
-extern "C" int* __cdecl RuntimeSystemErrorMessageLimit()
+extern "C" int* __cdecl EngineSystemErrorMessageLimit()
 {
   return &kLegacySystemErrorMessageCount;
 }
@@ -4059,7 +4060,7 @@ extern "C" int* __cdecl RuntimeSystemErrorMessageLimit()
  * Returns the base pointer for the legacy system-error message table whose
  * first entry is "No error".
  */
-extern "C" const char* const* __cdecl RuntimeSystemErrorMessageTableBase()
+extern "C" const char* const* __cdecl EngineSystemErrorMessageTableBase()
 {
   return kLegacySystemErrorMessages;
 }
@@ -4074,12 +4075,12 @@ extern "C" const char* const* __cdecl RuntimeSystemErrorMessageTableBase()
 extern "C" const char* __cdecl _get_sys_err_msg(const int errorCode)
 {
   int index = errorCode;
-  int* const count = RuntimeSystemErrorMessageLimit();
+  int* const count = EngineSystemErrorMessageLimit();
   if (index < 0 || index >= *count) {
     index = *count;
   }
 
-  return RuntimeSystemErrorMessageTableBase()[index];
+  return EngineSystemErrorMessageTableBase()[index];
 }
 
 /**
@@ -4398,7 +4399,7 @@ namespace
  * Builds one stack-file scratch lane for CRT output callbacks; null stream
  * pointer follows `_invalid_parameter` failure semantics and returns `-1`.
  */
-[[maybe_unused]] static int __cdecl RuntimeDispatchValidatedOutputCall(
+[[maybe_unused]] static int __cdecl EngineDispatchValidatedOutputCall(
   RuntimeValidatedOutputFn outputFn,
   const int stream,
   const int localeInfo,
@@ -4424,12 +4425,12 @@ namespace
  * What it does:
  * Dispatches one validated narrow output callback with default locale (`0`).
  */
-extern "C" int __cdecl RuntimeDispatchValidatedOutputLegacyNoLocale(
+extern "C" int __cdecl EngineDispatchValidatedOutputLegacyNoLocale(
   const int stream,
   const int arguments
 )
 {
-  return RuntimeDispatchValidatedOutputCall(
+  return EngineDispatchValidatedOutputCall(
     reinterpret_cast<RuntimeValidatedOutputFn>(_output_l),
     stream,
     0,
@@ -4443,13 +4444,13 @@ extern "C" int __cdecl RuntimeDispatchValidatedOutputLegacyNoLocale(
  * What it does:
  * Dispatches one validated narrow output callback with caller-provided locale.
  */
-extern "C" int __cdecl RuntimeDispatchValidatedOutputLegacyWithLocale(
+extern "C" int __cdecl EngineDispatchValidatedOutputLegacyWithLocale(
   const int stream,
   const int localeInfo,
   const int arguments
 )
 {
-  return RuntimeDispatchValidatedOutputCall(
+  return EngineDispatchValidatedOutputCall(
     reinterpret_cast<RuntimeValidatedOutputFn>(_output_l),
     stream,
     localeInfo,
@@ -4462,14 +4463,14 @@ extern "C" int __cdecl RuntimeDispatchValidatedOutputLegacyWithLocale(
  *
  * What it does:
  * Dispatches one validated narrow output callback lane using the default
- * locale (`0`) through `RuntimeDispatchValidatedOutputCall`.
+ * locale (`0`) through `EngineDispatchValidatedOutputCall`.
  */
-extern "C" int __cdecl RuntimeDispatchValidatedOutputNoLocale(
+extern "C" int __cdecl EngineDispatchValidatedOutputNoLocale(
   const int stream,
   const int arguments
 )
 {
-  return RuntimeDispatchValidatedOutputCall(
+  return EngineDispatchValidatedOutputCall(
     reinterpret_cast<RuntimeValidatedOutputFn>(_output_l),
     stream,
     0,
@@ -4482,15 +4483,15 @@ extern "C" int __cdecl RuntimeDispatchValidatedOutputNoLocale(
  *
  * What it does:
  * Dispatches one validated narrow output callback lane with an explicit
- * locale pointer lane through `RuntimeDispatchValidatedOutputCall`.
+ * locale pointer lane through `EngineDispatchValidatedOutputCall`.
  */
-extern "C" int __cdecl RuntimeDispatchValidatedOutputWithLocale(
+extern "C" int __cdecl EngineDispatchValidatedOutputWithLocale(
   const int stream,
   const int localeInfo,
   const int arguments
 )
 {
-  return RuntimeDispatchValidatedOutputCall(
+  return EngineDispatchValidatedOutputCall(
     reinterpret_cast<RuntimeValidatedOutputFn>(_output_l),
     stream,
     localeInfo,
@@ -4504,7 +4505,7 @@ extern "C" int __cdecl RuntimeDispatchValidatedOutputWithLocale(
  * What it does:
  * Retained CRT set-locale helper hook; returns success (`0`) in this build.
  */
-extern "C" int __cdecl RuntimeSetLocaleCategoryInitHook()
+extern "C" int __cdecl EngineSetLocaleCategoryInitHook()
 {
   return 0;
 }
@@ -4515,7 +4516,7 @@ extern "C" int __cdecl RuntimeSetLocaleCategoryInitHook()
  * What it does:
  * Maps select East-Asian codepages to their LCID defaults for MBCS setup.
  */
-extern "C" int __cdecl RuntimeCodePageToLcid(const int codePage)
+extern "C" int __cdecl EngineCodePageToLcid(const int codePage)
 {
   switch (codePage) {
     case 932:
@@ -4596,7 +4597,7 @@ extern "C" __time64_t __cdecl __time64_t_from_ft(FILETIME* const fileTime)
  * Unlike `__time64_t_from_ft` above this stays in UTC - no local-time
  * conversion is involved.
  */
-extern "C" __time64_t __cdecl RuntimeCurrentTime64(__time64_t* const outTime)
+extern "C" __time64_t __cdecl EngineCurrentTime64(__time64_t* const outTime)
 {
   // 116444736000000000 = 100ns ticks between 1601-01-01 and 1970-01-01.
   constexpr std::int64_t kFileTimeToUnixEpochTicks = 0x19DB1DED53E8000LL;
@@ -4759,7 +4760,7 @@ extern "C" __time64_t __cdecl __loctotime64_t(
  * Reads the locale's default ANSI codepage string and converts it to an
  * integer codepage value.
  */
-extern "C" int __cdecl RuntimeAnsiCodePageFromLocale(const LCID locale)
+extern "C" int __cdecl EngineAnsiCodePageFromLocale(const LCID locale)
 {
   constexpr int kAnsiCodePageBufferLength = 6;
   char localeCodePage[8]{};
@@ -4779,7 +4780,7 @@ extern "C" int __cdecl RuntimeAnsiCodePageFromLocale(const LCID locale)
  * Opens a narrow stream through the CRT `_fsopen` lane with the shared
  * read/write mode used by the binary thunk.
  */
-extern "C" std::FILE* __cdecl RuntimeFopen(const char* const filePath, const char* const mode)
+extern "C" std::FILE* __cdecl EngineFopen(const char* const filePath, const char* const mode)
 {
   return ::_fsopen(filePath, mode, 64);
 }
@@ -4792,7 +4793,7 @@ extern "C" std::FILE* __cdecl RuntimeFopen(const char* const filePath, const cha
  * returns CRT-style status (`0` or `errno`), with invalid-parameter semantics
  * when `outFile` is null.
  */
-extern "C" int __cdecl RuntimeFopenS(std::FILE** const outFile, char* const filePath, char* const mode)
+extern "C" int __cdecl EngineFopenS(std::FILE** const outFile, char* const filePath, char* const mode)
 {
   if (outFile != nullptr) {
     std::FILE* const file = ::_fsopen(filePath, mode, 128);
@@ -4809,7 +4810,7 @@ extern "C" int __cdecl RuntimeFopenS(std::FILE** const outFile, char* const file
  * Address: 0x00A48EC0 (FUN_00A48EC0)
  *
  * What it does:
- * Opens `filePath` with `mode` via `RuntimeFopenS` (fopen_0) and returns
+ * Opens `filePath` with `mode` via `EngineFopenS` (fopen_0) and returns
  * the resulting `FILE*` only when it reports success (return value `0`),
  * masking the result to `nullptr` on any failure -- the classic
  * `neg/sbb/not/and` all-ones-or-all-zeros boolean mask idiom compiled down
@@ -4821,7 +4822,7 @@ extern "C" int __cdecl RuntimeFopenS(std::FILE** const outFile, char* const file
 [[maybe_unused]] std::FILE* OpenFileOrNull(char* const filePath, char* const mode)
 {
   std::FILE* file = nullptr;
-  const int status = RuntimeFopenS(&file, filePath, mode);
+  const int status = EngineFopenS(&file, filePath, mode);
   return (status == 0) ? file : nullptr;
 }
 
@@ -4848,7 +4849,7 @@ extern "C" wint_t __cdecl _putwch(wchar_t wideCharacter)
  * Refreshes the active thread locale lane when needed, then returns the CRT
  * locale conversion table pointer.
  */
-extern "C" lconv* __cdecl RuntimeGetlconv()
+extern "C" lconv* __cdecl EngineGetlconv()
 {
   RuntimeTidDataLocaleView* const threadData = __getptd();
   if (threadData->ptlocinfo != __ptlocinfo && (__globallocalestatus & threadData->ownlocale) == 0) {
@@ -4857,7 +4858,7 @@ extern "C" lconv* __cdecl RuntimeGetlconv()
   return std::localeconv();
 }
 
-[[nodiscard]] int RuntimeReadBufferedByteNoLockLegacy(std::FILE* const stream)
+[[nodiscard]] int EngineReadBufferedByteNoLockLegacy(std::FILE* const stream)
 {
   int& counter = legacy_file(stream)._cnt;
   if (--counter < 0) {
@@ -4877,12 +4878,12 @@ extern "C" lconv* __cdecl RuntimeGetlconv()
  * Reads one buffered byte from a legacy CRT stream using `_cnt/_ptr` fast-path
  * semantics and falls back to `_filbuf` when the local buffer is exhausted.
  */
-extern "C" int __fastcall RuntimeReadBufferedByteNoLockLaneA(
+extern "C" int __fastcall EngineReadBufferedByteNoLockLaneA(
   const int /*unused*/,
   std::FILE* const stream
 )
 {
-  return RuntimeReadBufferedByteNoLockLegacy(stream);
+  return EngineReadBufferedByteNoLockLegacy(stream);
 }
 
 /**
@@ -4892,12 +4893,12 @@ extern "C" int __fastcall RuntimeReadBufferedByteNoLockLaneA(
  * Duplicate no-lock buffered-byte read lane used by a sibling CRT parser path;
  * preserves `_cnt/_ptr` fast-path with `_filbuf` fallback semantics.
  */
-extern "C" int __fastcall RuntimeReadBufferedByteNoLockLaneB(
+extern "C" int __fastcall EngineReadBufferedByteNoLockLaneB(
   const int /*unused*/,
   std::FILE* const stream
 )
 {
-  return RuntimeReadBufferedByteNoLockLegacy(stream);
+  return EngineReadBufferedByteNoLockLegacy(stream);
 }
 
 using RuntimeOutputFn = int(__cdecl*)(std::FILE* stream, const char* format, _locale_t localeInfo, va_list arguments);
@@ -4911,13 +4912,13 @@ using RuntimeWideOutputFn = int(__cdecl*)(std::FILE* stream, const wchar_t* form
  *
  * What it does:
  * The register-convention entry point for the same buffered-char-write logic
- * implemented below (`RuntimeWriteBufferedCharImpl`) -- field-for-field
+ * implemented below (`EngineWriteBufferedCharImpl`) -- field-for-field
  * identical: tests `_flag & 0x40` / `_base != nullptr`, decrements `_cnt`,
  * either writes through `_ptr` or falls back to `_flsbuf`, then updates
  * `*pnumwritten`. Called from `_output_l`'s (external) hot loop with the
  * stream/count-pointer already resident in ecx/esi.
  */
-static void RuntimeWriteBufferedCharImpl(std::FILE* const f, int ch, int* const pnumwritten)
+static void EngineWriteBufferedCharImpl(std::FILE* const f, int ch, int* const pnumwritten)
 {
   if ((legacy_file(f)._flag & 0x40) == 0 || legacy_file(f)._base != nullptr) {
     int& counter = legacy_file(f)._cnt;
@@ -4946,9 +4947,9 @@ static void RuntimeWriteBufferedCharImpl(std::FILE* const f, int ch, int* const 
  * Writes one buffered character into a legacy CRT stream and updates the
  * written-count lane with buffered-output fallback semantics.
  */
-static void RuntimeWriteBufferedCharLegacy(std::FILE* const f, int ch, int* const pnumwritten)
+static void EngineWriteBufferedCharLegacy(std::FILE* const f, int ch, int* const pnumwritten)
 {
-  RuntimeWriteBufferedCharImpl(f, ch, pnumwritten);
+  EngineWriteBufferedCharImpl(f, ch, pnumwritten);
 }
 
 /**
@@ -4968,7 +4969,7 @@ static void write_multi_char(
 {
   while (num > 0) {
     --num;
-    RuntimeWriteBufferedCharLegacy(f, static_cast<unsigned char>(ch), pnumwritten);
+    EngineWriteBufferedCharLegacy(f, static_cast<unsigned char>(ch), pnumwritten);
     if (*pnumwritten == -1) {
       break;
     }
@@ -4998,7 +4999,7 @@ static void write_string(int* const pnumwritten, char* string, std::FILE* const 
     while (len > 0) {
       const int ch = static_cast<unsigned char>(*string);
       --len;
-      RuntimeWriteBufferedCharImpl(f, ch, written);
+      EngineWriteBufferedCharImpl(f, ch, written);
       ++string;
 
       if (*written == -1) {
@@ -5007,7 +5008,7 @@ static void write_string(int* const pnumwritten, char* string, std::FILE* const 
           return;
         }
 
-        RuntimeWriteBufferedCharImpl(f, '?', written);
+        EngineWriteBufferedCharImpl(f, '?', written);
       }
     }
   } else {
@@ -5023,7 +5024,7 @@ static void write_string(int* const pnumwritten, char* string, std::FILE* const 
  * dispatches to `_output_l`, then commits the trailing null through direct
  * store or `_flsbuf` when the sink counter underflows.
  */
-int RuntimeVsprintfOutputCore(
+int EngineVsprintfOutputCore(
   char* const buffer,
   const char* const format,
   _locale_t const localeInfo,
@@ -5061,7 +5062,7 @@ int RuntimeVsprintfOutputCore(
  */
 extern "C" int __cdecl _vsprintf(char* const buffer, const char* const format, va_list arguments)
 {
-  return RuntimeVsprintfOutputCore(buffer, format, nullptr, arguments);
+  return EngineVsprintfOutputCore(buffer, format, nullptr, arguments);
 }
 
 /**
@@ -5147,7 +5148,7 @@ namespace
  * Forwards narrow secure vararg formatting to `_vsprintf_s_l` with a null
  * locale lane.
  */
-extern "C" int __cdecl RuntimeVsprintfSecureNoLocale(
+extern "C" int __cdecl EngineVsprintfSecureNoLocale(
   char* const buffer,
   const std::size_t sizeInBytes,
   const char* const format,
@@ -5264,7 +5265,7 @@ vwprintf_helper(const RuntimeWideOutputFn woutfn, const wchar_t* const format, _
  * Dispatches wide varargs print through `vwprintf_helper` using the default
  * locale lane.
  */
-int __cdecl Runtime_vwprintf(const wchar_t* const format, va_list arguments)
+int __cdecl EngineVwprintf(const wchar_t* const format, va_list arguments)
 {
   return vwprintf_helper(woutput_l, format, nullptr, arguments);
 }
@@ -5281,7 +5282,7 @@ extern "C" int __cdecl _wprintf_l(const wchar_t* const format, _locale_t const l
   (void)localeInfo;
   va_list arguments;
   va_start(arguments, localeInfo);
-  const int result = Runtime_vwprintf(format, arguments);
+  const int result = EngineVwprintf(format, arguments);
   va_end(arguments);
   return result;
 }
@@ -5307,13 +5308,13 @@ extern "C" int __cdecl is_wctype(const wint_t character, const wctype_t characte
  * Forward declaration here keeps the helper visible to other
  * anonymous-namespace bodies in this file; the real file-scope
  * definition lives after the anonymous namespace closes (see
- * `RuntimeToLowerWideWithCurrentLocale` near `_mbschr` further
+ * `EngineToLowerWideWithCurrentLocale` near `_mbschr` further
  * down) so the global mangled name is exported and the file-scope
  * caller `WxRuntimeTypes.cpp:49627` links against the real body
  * (previously fell back to the no-op stub in
  * `EngineUnrecoveredStubs.cpp`).
  */
-int RuntimeToLowerWideWithCurrentLocale(wchar_t character);
+int EngineToLowerWideWithCurrentLocale(wchar_t character);
 
 /**
  * Address: 0x00AAE493 (FUN_00AAE493, _vwprintf_p_l)
@@ -5322,7 +5323,7 @@ int RuntimeToLowerWideWithCurrentLocale(wchar_t character);
  * Dispatches wide varargs print through `vwprintf_helper` with the caller's
  * explicit locale lane.
  */
-int __cdecl Runtime_vwprintf_p_l(const wchar_t* const format, _locale_t const localeInfo, va_list arguments)
+int __cdecl EngineVwprintfPositional(const wchar_t* const format, _locale_t const localeInfo, va_list arguments)
 {
   return vwprintf_helper(woutput_l, format, localeInfo, arguments);
 }
@@ -5338,7 +5339,7 @@ extern "C" int __cdecl _wprintf_p_l(const wchar_t* const format, _locale_t const
 {
   va_list arguments;
   va_start(arguments, localeInfo);
-  const int result = Runtime_vwprintf_p_l(format, localeInfo, arguments);
+  const int result = EngineVwprintfPositional(format, localeInfo, arguments);
   va_end(arguments);
   return result;
 }
@@ -5580,7 +5581,7 @@ namespace
  * Sleeps for `waitMillis`, then returns the next retry delay (`+1000`) or `-1`
  * when the value would exceed `_maxwait`.
  */
-[[maybe_unused]] int RuntimeSleepAndAdvanceAllocationRetryDelay(const DWORD waitMillis) noexcept
+[[maybe_unused]] int EngineSleepAndAdvanceAllocationRetryDelay(const DWORD waitMillis) noexcept
 {
   ::Sleep(waitMillis);
   const DWORD nextWait = waitMillis + 1000u;
@@ -5623,7 +5624,7 @@ extern "C" void* __cdecl __recalloc_crt(void* const ptr, const std::size_t count
       break;
     }
 
-    nextSeconds = static_cast<DWORD>(RuntimeSleepAndAdvanceAllocationRetryDelay(seconds));
+    nextSeconds = static_cast<DWORD>(EngineSleepAndAdvanceAllocationRetryDelay(seconds));
     seconds = nextSeconds;
   } while (nextSeconds != static_cast<DWORD>(-1));
 
@@ -5632,7 +5633,7 @@ extern "C" void* __cdecl __recalloc_crt(void* const ptr, const std::size_t count
 
 namespace
 {
-  [[nodiscard]] void* RuntimeRetryMallocWithMaxwait(const std::size_t size)
+  [[nodiscard]] void* EngineRetryMallocWithMaxwait(const std::size_t size)
   {
     DWORD seconds = 0;
     void* result = nullptr;
@@ -5644,14 +5645,14 @@ namespace
         break;
       }
 
-      nextSeconds = static_cast<DWORD>(RuntimeSleepAndAdvanceAllocationRetryDelay(seconds));
+      nextSeconds = static_cast<DWORD>(EngineSleepAndAdvanceAllocationRetryDelay(seconds));
       seconds = nextSeconds;
     } while (nextSeconds != static_cast<DWORD>(-1));
 
     return result;
   }
 
-  [[nodiscard]] void* RuntimeRetryReallocWithMaxwait(void* const ptr, const std::size_t size)
+  [[nodiscard]] void* EngineRetryReallocWithMaxwait(void* const ptr, const std::size_t size)
   {
     DWORD seconds = 0;
     void* result = nullptr;
@@ -5663,7 +5664,7 @@ namespace
         break;
       }
 
-      nextSeconds = static_cast<DWORD>(RuntimeSleepAndAdvanceAllocationRetryDelay(seconds));
+      nextSeconds = static_cast<DWORD>(EngineSleepAndAdvanceAllocationRetryDelay(seconds));
       seconds = nextSeconds;
     } while (nextSeconds != static_cast<DWORD>(-1));
 
@@ -5677,9 +5678,9 @@ namespace
  * What it does:
  * Forwards one allocation request through the CRT max-wait retry lane.
  */
-extern "C" void* __cdecl RuntimeMallocRetryLane(const std::size_t size)
+extern "C" void* __cdecl EngineMallocRetryLane(const std::size_t size)
 {
-  return RuntimeRetryMallocWithMaxwait(size);
+  return EngineRetryMallocWithMaxwait(size);
 }
 
 /**
@@ -5688,7 +5689,7 @@ extern "C" void* __cdecl RuntimeMallocRetryLane(const std::size_t size)
  * What it does:
  * Forwards one zeroed-allocation request through `_calloc_crt`.
  */
-extern "C" void* __cdecl RuntimeCallocRetryLane(const std::size_t count, const std::size_t size)
+extern "C" void* __cdecl EngineCallocRetryLane(const std::size_t count, const std::size_t size)
 {
   return _calloc_crt(count, size);
 }
@@ -5699,9 +5700,9 @@ extern "C" void* __cdecl RuntimeCallocRetryLane(const std::size_t count, const s
  * What it does:
  * Forwards one reallocation request through the CRT max-wait retry lane.
  */
-extern "C" void* __cdecl RuntimeReallocRetryLane(void* const ptr, const std::size_t size)
+extern "C" void* __cdecl EngineReallocRetryLane(void* const ptr, const std::size_t size)
 {
-  return RuntimeRetryReallocWithMaxwait(ptr, size);
+  return EngineRetryReallocWithMaxwait(ptr, size);
 }
 
 /**
@@ -5839,7 +5840,7 @@ namespace
   };
   static_assert(sizeof(RuntimeCodePageLocaleHashEntry) == 0xC, "RuntimeCodePageLocaleHashEntry size must be 0xC");
 
-  [[nodiscard]] int RuntimeGetFileFlags(std::FILE* const stream) noexcept
+  [[nodiscard]] int EngineGetFileFlags(std::FILE* const stream) noexcept
   {
     if (stream == nullptr) {
       return 0;
@@ -5864,7 +5865,7 @@ namespace
    * What it does:
    * Initializes one CRT mutex critical-section lane.
    */
-  void RuntimeMtxInit(CRITICAL_SECTION* const lock) noexcept
+  void EngineMtxInit(CRITICAL_SECTION* const lock) noexcept
   {
     ::InitializeCriticalSection(lock);
   }
@@ -5875,7 +5876,7 @@ namespace
    * What it does:
    * Tears down one CRT mutex critical-section lane.
    */
-  void RuntimeMtxDestroy(CRITICAL_SECTION* const lock) noexcept
+  void EngineMtxDestroy(CRITICAL_SECTION* const lock) noexcept
   {
     ::DeleteCriticalSection(lock);
   }
@@ -5905,14 +5906,14 @@ namespace
    * -1) runs the loop, so concurrent constructions are safe and later ones are
    * no-ops.
    */
-  void RuntimeInitIostreamsLocks() noexcept
+  void EngineInitIostreamsLocks() noexcept
   {
     if (::InterlockedIncrement(&gIostreamsLockInit) != 0) {
       return;
     }
 
     for (CRITICAL_SECTION& lock : gIostreamsLocks) {
-      RuntimeMtxInit(&lock);
+      EngineMtxInit(&lock);
     }
   }
 
@@ -5941,7 +5942,7 @@ namespace
    * rather than failing softly, which is why the count is checked before the
    * decrement.
    */
-  void RuntimeAtexit(const RuntimeAtexitFn handler)
+  void EngineAtexit(const RuntimeAtexitFn handler)
   {
     if (gAtexitRemaining == 0) {
       std::abort();
@@ -5958,7 +5959,7 @@ namespace
    * What it does:
    * Enters one CRT mutex critical-section lane and returns zero on completion.
    */
-  int RuntimeMtxLock(CRITICAL_SECTION* const lock) noexcept
+  int EngineMtxLock(CRITICAL_SECTION* const lock) noexcept
   {
     ::EnterCriticalSection(lock);
     return 0;
@@ -5970,7 +5971,7 @@ namespace
    * What it does:
    * Leaves one CRT mutex critical-section lane and returns zero.
    */
-  int RuntimeMtxUnlock(CRITICAL_SECTION* const lock) noexcept
+  int EngineMtxUnlock(CRITICAL_SECTION* const lock) noexcept
   {
     ::LeaveCriticalSection(lock);
     return 0;
@@ -5986,22 +5987,22 @@ namespace
    * size derived from the xlock::mtx address range, and means an out-of-range
    * request silently aliases onto an existing lock instead of faulting.
    */
-  class RuntimeLockitGuard
+  class LockitGuard
   {
   public:
-    explicit RuntimeLockitGuard(const int selector) noexcept
+    explicit LockitGuard(const int selector) noexcept
       : mSlot(selector & 3)
     {
-      (void)RuntimeMtxLock(&gIostreamsLocks[static_cast<std::size_t>(mSlot)]);
+      (void)EngineMtxLock(&gIostreamsLocks[static_cast<std::size_t>(mSlot)]);
     }
 
-    ~RuntimeLockitGuard()
+    ~LockitGuard()
     {
-      (void)RuntimeMtxUnlock(&gIostreamsLocks[static_cast<std::size_t>(mSlot)]);
+      (void)EngineMtxUnlock(&gIostreamsLocks[static_cast<std::size_t>(mSlot)]);
     }
 
-    RuntimeLockitGuard(const RuntimeLockitGuard&) = delete;
-    RuntimeLockitGuard& operator=(const RuntimeLockitGuard&) = delete;
+    LockitGuard(const LockitGuard&) = delete;
+    LockitGuard& operator=(const LockitGuard&) = delete;
 
   private:
     int mSlot;
@@ -6030,9 +6031,9 @@ namespace
    * allocated facets: 0x00479C57 skips the decrement for it, so such a facet
    * never reports itself as collectable.
    */
-  RuntimeLocaleFacetView* RuntimeFacetDecref(RuntimeLocaleFacetView* const facet) noexcept
+  RuntimeLocaleFacetView* EngineFacetDecref(RuntimeLocaleFacetView* const facet) noexcept
   {
-    const RuntimeLockitGuard guard(0);
+    const LockitGuard guard(0);
 
     const std::size_t refs = facet->refs;
     if (refs != 0u && refs != static_cast<std::size_t>(-1)) {
@@ -6049,10 +6050,10 @@ namespace
    * destructor (vftable slot 0, flag 1) only if the reference drop made this
    * the last owner.
    */
-  void RuntimeReleaseFacetNode(RuntimeFacetNode* const node) noexcept
+  void EngineReleaseFacetNode(RuntimeFacetNode* const node) noexcept
   {
     RuntimeLocaleFacetView* const owned =
-      RuntimeFacetDecref(reinterpret_cast<RuntimeLocaleFacetView*>(node->facet));
+      EngineFacetDecref(reinterpret_cast<RuntimeLocaleFacetView*>(node->facet));
     if (owned == nullptr) {
       return;
     }
@@ -6069,14 +6070,14 @@ namespace
    * Shutdown hook: drains the registered-facet list under the locale lock,
    * releasing each facet and freeing its node.
    */
-  void RuntimeFacetTidy()
+  void EngineFacetTidy()
   {
-    const RuntimeLockitGuard guard(0);
+    const LockitGuard guard(0);
 
     while (gRuntimeFacetHead != nullptr) {
       RuntimeFacetNode* const node = gRuntimeFacetHead;
       gRuntimeFacetHead = node->next;
-      RuntimeReleaseFacetNode(node);
+      EngineReleaseFacetNode(node);
       ::operator delete(static_cast<void*>(node));
     }
   }
@@ -6085,17 +6086,17 @@ namespace
    * Address: 0x00ABF483 (FUN_00ABF483, std::locale::facet::_Register)
    *
    * What it does:
-   * Adds one facet to the list that `RuntimeFacetTidy` drains at shutdown,
+   * Adds one facet to the list that `EngineFacetTidy` drains at shutdown,
    * arming that hook on first registration.
    *
    * Note the allocation-failure path: the binary stores the null straight into
    * the head (0x00ABF4B4/0x00ABF4B6), discarding every previously registered
    * node rather than leaving the list intact. Reproduced as-is.
    */
-  void RuntimeRegisterFacet(std::locale::facet* const facet)
+  void EngineRegisterFacet(std::locale::facet* const facet)
   {
     if (gRuntimeFacetHead == nullptr) {
-      RuntimeAtexit(&RuntimeFacetTidy);
+      EngineAtexit(&EngineFacetTidy);
     }
 
     auto* const node = static_cast<RuntimeFacetNode*>(::operator new(sizeof(RuntimeFacetNode), std::nothrow));
@@ -6114,7 +6115,7 @@ namespace
    * positive infinity (`1`), negative infinity (`2`), canonical NaN (`3`),
    * or payload NaN (`4`), and returns `0` for finite values.
    */
-  [[maybe_unused]] int RuntimeClassifyDoubleWords(const std::uint32_t lowDword, const std::uint32_t highDword)
+  [[maybe_unused]] int EngineClassifyDoubleWords(const std::uint32_t lowDword, const std::uint32_t highDword)
   {
     if (highDword == 0x7FF00000u) {
       if (lowDword == 0u) {
@@ -6136,7 +6137,7 @@ namespace
     return 0;
   }
 
-  [[nodiscard]] CRITICAL_SECTION* RuntimeStdLockSlot(const int slot) noexcept
+  [[nodiscard]] CRITICAL_SECTION* EngineStdLockSlot(const int slot) noexcept
   {
     return &gRuntimeStdLockSlots[slot & 3];
   }
@@ -6246,7 +6247,7 @@ namespace
   static_assert(offsetof(RuntimeThreadLocInfoView, lcTimeCurrent) == 0xD4, "RuntimeThreadLocInfoView::lcTimeCurrent offset must be 0xD4");
   static_assert(sizeof(RuntimeThreadLocInfoView) == 0xD8, "RuntimeThreadLocInfoView size must be 0xD8");
 
-  [[nodiscard]] RuntimeThreadLocInfoView* RuntimeResolveLocaleLocInfo(
+  [[nodiscard]] RuntimeThreadLocInfoView* EngineResolveLocaleLocInfo(
     _locale_t const localeInfo,
     RuntimeTidDataLocaleView** const outThreadData,
     bool* const outUpdated
@@ -6282,7 +6283,7 @@ namespace
     return reinterpret_cast<RuntimeThreadLocInfoView*>(localeView);
   }
 
-  void RuntimeReleaseLocaleUpdate(RuntimeTidDataLocaleView* const threadData, const bool updated)
+  void EngineReleaseLocaleUpdate(RuntimeTidDataLocaleView* const threadData, const bool updated)
   {
     if (updated && threadData != nullptr) {
       threadData->ownlocale &= ~2;
@@ -6310,7 +6311,7 @@ namespace
    * Preserves CRT `EINVAL`/`EILSEQ` errno lanes, invalid-parameter dispatch,
    * and always releases any thread-local locale reference acquired.
    */
-  std::size_t RuntimeMbstowcsLocaleCore(
+  std::size_t EngineMbstowcsLocaleCore(
     wchar_t* const destination,
     const char* const source,
     const std::size_t maxCount,
@@ -6333,7 +6334,7 @@ namespace
     RuntimeTidDataLocaleView* threadData = nullptr;
     bool updated = false;
     RuntimeThreadLocInfoView* const localeView =
-      RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
+      EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
     const bool hasCodepageHandle = localeView->lcHandle[2] != 0;
 
@@ -6341,7 +6342,7 @@ namespace
     if (destination == nullptr) {
       if (!hasCodepageHandle) {
         const std::size_t asciiLength = std::strlen(source);
-        RuntimeReleaseLocaleUpdate(threadData, updated);
+        EngineReleaseLocaleUpdate(threadData, updated);
         return asciiLength;
       }
 
@@ -6355,12 +6356,12 @@ namespace
       );
       if (wideCount == 0) {
         *_errno() = EILSEQ;
-        RuntimeReleaseLocaleUpdate(threadData, updated);
+        EngineReleaseLocaleUpdate(threadData, updated);
         return static_cast<std::size_t>(-1);
       }
 
       const std::size_t result = static_cast<std::size_t>(wideCount) - 1u;
-      RuntimeReleaseLocaleUpdate(threadData, updated);
+      EngineReleaseLocaleUpdate(threadData, updated);
       return result;
     }
 
@@ -6376,7 +6377,7 @@ namespace
       );
       if (wideCount != 0) {
         const std::size_t result = static_cast<std::size_t>(wideCount) - 1u;
-        RuntimeReleaseLocaleUpdate(threadData, updated);
+        EngineReleaseLocaleUpdate(threadData, updated);
         return result;
       }
 
@@ -6413,7 +6414,7 @@ namespace
           );
           if (partialWideCount != 0) {
             const std::size_t result = static_cast<std::size_t>(partialWideCount);
-            RuntimeReleaseLocaleUpdate(threadData, updated);
+            EngineReleaseLocaleUpdate(threadData, updated);
             return result;
           }
         }
@@ -6421,7 +6422,7 @@ namespace
 
       *_errno() = EILSEQ;
       destination[0] = L'\0';
-      RuntimeReleaseLocaleUpdate(threadData, updated);
+      EngineReleaseLocaleUpdate(threadData, updated);
       return static_cast<std::size_t>(-1);
     }
 
@@ -6433,7 +6434,7 @@ namespace
         const std::size_t current = index;
         *out = static_cast<wchar_t>(static_cast<unsigned char>(source[index]));
         if (source[current] == '\0') {
-          RuntimeReleaseLocaleUpdate(threadData, updated);
+          EngineReleaseLocaleUpdate(threadData, updated);
           return current;
         }
         ++out;
@@ -6444,14 +6445,14 @@ namespace
       }
     }
 
-    RuntimeReleaseLocaleUpdate(threadData, updated);
+    EngineReleaseLocaleUpdate(threadData, updated);
     return maxCount;
   }
 
   /**
    * Address: 0x00A88511 (FUN_00A88511, _mbstowcs_l)
    *
-   * See the anonymous namespace implementation `RuntimeMbstowcsLocaleCore` for
+   * See the anonymous namespace implementation `EngineMbstowcsLocaleCore` for
    * the full behavior description. This `extern "C"` entry point is the stable
    * CRT-facing symbol that `mbstowcs` (0x00A8869E) and `_mbstowcs_s_l`
    * (0x00A886C6) dispatch into by name.
@@ -6463,7 +6464,7 @@ namespace
     _locale_t const localeInfo
   )
   {
-    return RuntimeMbstowcsLocaleCore(destination, source, maxCount, localeInfo);
+    return EngineMbstowcsLocaleCore(destination, source, maxCount, localeInfo);
   }
 
   [[nodiscard]] RuntimeIoInfo* ResolveIoInfoFromStream(std::FILE* const stream) noexcept
@@ -6479,7 +6480,7 @@ namespace
     );
   }
 
-  [[nodiscard]] constexpr unsigned char RuntimeAsciiToLower(const unsigned char value) noexcept
+  [[nodiscard]] constexpr unsigned char EngineAsciiToLower(const unsigned char value) noexcept
   {
     if (value >= 'A' && value <= 'Z') {
       return static_cast<unsigned char>(value + ('a' - 'A'));
@@ -6492,18 +6493,18 @@ namespace
     return (static_cast<std::uint64_t>(highPart) << 32u) | static_cast<std::uint64_t>(lowPart);
   }
 
-  class RuntimeFileLock2Guard
+  class FileLock2Guard
   {
   public:
-    RuntimeFileLock2Guard(const int streamIndex, std::FILE* const stream) : mStreamIndex(streamIndex), mStream(stream)
+    FileLock2Guard(const int streamIndex, std::FILE* const stream) : mStreamIndex(streamIndex), mStream(stream)
     {
       __lock_file2(mStreamIndex, mStream);
     }
 
-    RuntimeFileLock2Guard(const RuntimeFileLock2Guard&) = delete;
-    RuntimeFileLock2Guard& operator=(const RuntimeFileLock2Guard&) = delete;
+    FileLock2Guard(const FileLock2Guard&) = delete;
+    FileLock2Guard& operator=(const FileLock2Guard&) = delete;
 
-    ~RuntimeFileLock2Guard()
+    ~FileLock2Guard()
     {
       __unlock_file2(mStreamIndex, mStream);
     }
@@ -6513,18 +6514,18 @@ namespace
     std::FILE* mStream = nullptr;
   };
 
-  class RuntimeLockGuard
+  class CrtLockGuard
   {
   public:
-    explicit RuntimeLockGuard(const int lockNumber) : mLockNumber(lockNumber)
+    explicit CrtLockGuard(const int lockNumber) : mLockNumber(lockNumber)
     {
       _lock(mLockNumber);
     }
 
-    RuntimeLockGuard(const RuntimeLockGuard&) = delete;
-    RuntimeLockGuard& operator=(const RuntimeLockGuard&) = delete;
+    CrtLockGuard(const CrtLockGuard&) = delete;
+    CrtLockGuard& operator=(const CrtLockGuard&) = delete;
 
-    ~RuntimeLockGuard()
+    ~CrtLockGuard()
     {
       _unlock(mLockNumber);
     }
@@ -6545,7 +6546,7 @@ namespace
 }
 
 /**
- * Address: 0x00A882CC (FUN_00A882CC, RuntimeDispatchLockedFormattedOutput)
+ * Address: 0x00A882CC (FUN_00A882CC, EngineDispatchLockedFormattedOutput)
  *
  * IDA signature:
  * FILE *callcnv_F3 sub_A882CC@<eax>(FILE *(__cdecl *a1)(FILE *, const char *, int, va_list), FILE *f, const char *a3, int a4, va_list args);
@@ -6560,7 +6561,7 @@ namespace
  * via `_ftbuf`, then unlocks. Returns the callback's byte count, or `-1`
  * with `errno = EINVAL` on a validation failure.
  */
-extern "C" int __cdecl RuntimeDispatchLockedFormattedOutput(
+extern "C" int __cdecl EngineDispatchLockedFormattedOutput(
   const RuntimeLockedOutputFn outputCallback,
   std::FILE* const stream,
   const char* const format,
@@ -6576,7 +6577,7 @@ extern "C" int __cdecl RuntimeDispatchLockedFormattedOutput(
   _lock_file(stream);
 
   int result = 0;
-  if ((RuntimeGetFileFlags(stream) & 0x40) == 0) {
+  if ((EngineGetFileFlags(stream) & 0x40) == 0) {
     const RuntimeIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
     if ((ioInfo->textmodeUnicode & 0x7F) != 0 || ioInfo->textmodeUnicode < 0) {
       *_errno() = EINVAL;
@@ -6603,12 +6604,12 @@ extern "C" int __cdecl RuntimeDispatchLockedFormattedOutput(
  *
  * What it does:
  * CRT narrow-character formatted output to a stream from an existing
- * `va_list`. Thin forward into `RuntimeDispatchLockedFormattedOutput` with
+ * `va_list`. Thin forward into `EngineDispatchLockedFormattedOutput` with
  * the `_output_l` callback and the default (null) locale.
  */
 extern "C" int __cdecl vfprintf(std::FILE* const stream, const char* const format, va_list arguments)
 {
-  return RuntimeDispatchLockedFormattedOutput(_output_l, stream, format, nullptr, arguments);
+  return EngineDispatchLockedFormattedOutput(_output_l, stream, format, nullptr, arguments);
 }
 
 /**
@@ -6619,7 +6620,7 @@ extern "C" int __cdecl vfprintf(std::FILE* const stream, const char* const forma
  *
  * What it does:
  * Locale-explicit CRT narrow-character formatted output to a stream from an
- * existing `va_list`. Thin forward into `RuntimeDispatchLockedFormattedOutput`
+ * existing `va_list`. Thin forward into `EngineDispatchLockedFormattedOutput`
  * with the `_output_l` callback and the caller-supplied locale (matches
  * `vfprintf`'s shape exactly, differing only in passing `locale` through
  * instead of a hardcoded `nullptr`).
@@ -6628,7 +6629,7 @@ extern "C" int __cdecl _vfprintf_l(
   std::FILE* const stream, const char* const format, const _locale_t locale, va_list arguments
 )
 {
-  return RuntimeDispatchLockedFormattedOutput(_output_l, stream, format, locale, arguments);
+  return EngineDispatchLockedFormattedOutput(_output_l, stream, format, locale, arguments);
 }
 
 /**
@@ -6669,7 +6670,7 @@ extern "C" int __cdecl _vfprintf_s_l(
   std::FILE* const stream, const char* const format, const _locale_t locale, va_list arguments
 )
 {
-  return RuntimeDispatchLockedFormattedOutput(_output_s_l, stream, format, locale, arguments);
+  return EngineDispatchLockedFormattedOutput(_output_s_l, stream, format, locale, arguments);
 }
 
 /**
@@ -6732,7 +6733,7 @@ extern "C" int __cdecl _vfprintf_p_l(
   std::FILE* const stream, const char* const format, const _locale_t locale, va_list arguments
 )
 {
-  return RuntimeDispatchLockedFormattedOutput(outfn, stream, format, locale, arguments);
+  return EngineDispatchLockedFormattedOutput(outfn, stream, format, locale, arguments);
 }
 
 /**
@@ -6786,13 +6787,13 @@ extern "C" int __cdecl _fprintf_p(std::FILE* const stream, const char* const for
  * What it does:
  * Secure CRT narrow-character formatted output to a stream from an
  * existing `va_list`, current-locale only (no locale parameter at all).
- * Thin forward into `RuntimeDispatchLockedFormattedOutput` with the
+ * Thin forward into `EngineDispatchLockedFormattedOutput` with the
  * `_output_s_l` callback and a null locale, mirroring `vfprintf`'s
  * null-locale shape but through the secure callback.
  */
 extern "C" int __cdecl _vfprintf_s(std::FILE* const stream, const char* const format, va_list arguments)
 {
-  return RuntimeDispatchLockedFormattedOutput(_output_s_l, stream, format, nullptr, arguments);
+  return EngineDispatchLockedFormattedOutput(_output_s_l, stream, format, nullptr, arguments);
 }
 
 /**
@@ -6854,7 +6855,7 @@ extern "C" int __cdecl fprintf(std::FILE* const stream, const char* const format
   _lock_file(stream);
 
   int result = 0;
-  if ((RuntimeGetFileFlags(stream) & 0x40) == 0) {
+  if ((EngineGetFileFlags(stream) & 0x40) == 0) {
     const RuntimeIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
     if ((ioInfo->textmodeUnicode & 0x7F) != 0 || ioInfo->textmodeUnicode < 0) {
       *_errno() = EINVAL;
@@ -6887,7 +6888,7 @@ extern "C" unsigned char* __cdecl _mbschr(const unsigned char* const text, const
 }
 
 /**
- * Address: 0x00A8FB50 (FUN_00A8FB50, RuntimeToLowerWideWithCurrentLocale)
+ * Address: 0x00A8FB50 (FUN_00A8FB50, EngineToLowerWideWithCurrentLocale)
  *
  * What it does:
  * Lowercases one wide character under the current CRT locale lane.
@@ -6948,7 +6949,7 @@ namespace
    * and returns eax unchanged. Both real call sites in `_CallSettingFrame`
    * (0x00AA39A0) dispatch through this entry.
    */
-  [[nodiscard]] std::uint32_t RuntimePublishNonLocalGotoState(
+  [[nodiscard]] std::uint32_t EnginePublishNonLocalGotoState(
     const std::uint32_t eaxValue,
     const std::uint32_t ebpValue,
     const std::uint32_t notifyCode
@@ -7169,7 +7170,7 @@ extern "C" void __stdcall TlsCallback_0(void* /*module*/, const DWORD reason, vo
  * Executes the legacy floating-point precision probe formula used when
  * `IsProcessorFeaturePresent` is unavailable.
  */
-extern "C" int __cdecl RuntimeTestFloatingPointPrecisionErrataKludge()
+extern "C" int __cdecl EngineTestFloatingPointPrecisionErrataKludge()
 {
   constexpr double kProbeValue = 4195835.0;
   constexpr double kProbeDivisor = 3145727.0;
@@ -7186,7 +7187,7 @@ extern "C" int __cdecl RuntimeTestFloatingPointPrecisionErrataKludge()
  * `PF_FLOATING_POINT_PRECISION_ERRATA`; when unavailable, falls back to the
  * legacy floating-point precision probe helper.
  */
-extern "C" int __cdecl RuntimeTestFloatingPointPrecisionErrata()
+extern "C" int __cdecl EngineTestFloatingPointPrecisionErrata()
 {
   const HMODULE kernel32Module = ::GetModuleHandleA("KERNEL32");
   if (kernel32Module != nullptr) {
@@ -7199,7 +7200,7 @@ extern "C" int __cdecl RuntimeTestFloatingPointPrecisionErrata()
     }
   }
 
-  return RuntimeTestFloatingPointPrecisionErrataKludge();
+  return EngineTestFloatingPointPrecisionErrataKludge();
 }
 
 /**
@@ -7209,7 +7210,7 @@ extern "C" int __cdecl RuntimeTestFloatingPointPrecisionErrata()
  * Clears one aligned memory range in 128-byte chunks (8 contiguous 16-byte
  * lanes per iteration).
  */
-void RuntimeClearAligned128ByteChunks(void* const alignedStart, const unsigned int byteCount)
+void EngineClearAligned128ByteChunks(void* const alignedStart, const unsigned int byteCount)
 {
   auto* writeCursor = static_cast<unsigned char*>(alignedStart);
   unsigned int chunkCount = byteCount >> 7;
@@ -7228,20 +7229,20 @@ void RuntimeClearAligned128ByteChunks(void* const alignedStart, const unsigned i
  * start to 16 bytes, clears aligned 128-byte blocks, and zeroes trailing
  * bytes.
  */
-void* RuntimeClearRange(void* const start, const int /*fillValue*/, const int byteCount)
+void* EngineClearRange(void* const start, const int /*fillValue*/, const int byteCount)
 {
   auto* const startBytes = static_cast<unsigned char*>(start);
   const std::uintptr_t unalignedBytes = reinterpret_cast<std::uintptr_t>(startBytes) & 0x0Fu;
   if (unalignedBytes != 0u) {
     const int headBytes = static_cast<int>(0x10u - unalignedBytes);
     std::memset(startBytes, 0, static_cast<std::size_t>(headBytes));
-    (void)RuntimeClearRange(startBytes + headBytes, 0, byteCount - headBytes);
+    (void)EngineClearRange(startBytes + headBytes, 0, byteCount - headBytes);
     return start;
   }
 
   const int trailingBytes = (byteCount & 0x7F);
   if (byteCount != trailingBytes) {
-    RuntimeClearAligned128ByteChunks(start, static_cast<unsigned int>(byteCount - trailingBytes));
+    EngineClearAligned128ByteChunks(start, static_cast<unsigned int>(byteCount - trailingBytes));
   }
 
   if (trailingBytes != 0) {
@@ -7431,10 +7432,10 @@ extern "C" void __cdecl _lock_file(std::FILE* const stream)
 }
 
 // Defined below alongside the other CRT lock-table lanes.
-extern "C" void __cdecl RuntimeUnlockCrtLock(int lockId);
+extern "C" void __cdecl EngineUnlockCrtLock(int lockId);
 
 // Defined below with the other stream lanes.
-extern "C" int __cdecl RuntimeFlushAllStreams(int mode);
+extern "C" int __cdecl EngineFlushAllStreams(int mode);
 
 /**
  * Address: 0x00A86537 (FUN_00A86537, fflush)
@@ -7452,7 +7453,7 @@ extern "C" int __cdecl RuntimeFlushAllStreams(int mode);
 extern "C" int __cdecl fflush(std::FILE* const stream)
 {
   if (stream == nullptr) {
-    return RuntimeFlushAllStreams(0);
+    return EngineFlushAllStreams(0);
   }
 
   _lock_file(stream);
@@ -7474,7 +7475,7 @@ extern "C" int __cdecl fflush(std::FILE* const stream)
  * what `ownsTable` records, so teardown knows whether the buffer is his to
  * free.
  */
-extern "C" RuntimeCtypeVec* __cdecl RuntimeGetCtypeVec(RuntimeCtypeVec* const out)
+extern "C" RuntimeCtypeVec* __cdecl EngineGetCtypeVec(RuntimeCtypeVec* const out)
 {
   out->handle = __lc_handle_func()[1];
   out->codePage = __lc_codepage_func();
@@ -7509,7 +7510,7 @@ extern "C" double __cdecl __CIpow_pentium4(double exponent, double base);
  * engine does around some render and sim paths - it falls back to x87 so the
  * caller keeps the rounding and exception behaviour it set up.
  */
-extern "C" double __cdecl RuntimePowDispatch(const double base, const double exponent)
+extern "C" double __cdecl EnginePowDispatch(const double base, const double exponent)
 {
   if (global_mode_sse2 != 0) {
     const bool mxcsrIsDefault = (_mm_getcsr() & 0x1F80u) == 0x1F80u;
@@ -7631,7 +7632,7 @@ int(__cdecl* const gRegisterCompatFlagInit)() = &register_compatFlag;
  * Note it does NOT scrub the destination on failure, unlike the later UCRT
  * behaviour - the buffer is left exactly as the caller had it.
  */
-extern "C" errno_t __cdecl RuntimeMemMoveChecked(
+extern "C" errno_t __cdecl EngineMemMoveChecked(
   void* const destination,
   const std::size_t destinationSize,
   const void* const source,
@@ -7673,7 +7674,7 @@ extern "C" errno_t __cdecl RuntimeMemMoveChecked(
  * The allocation is calloc, not malloc, so the buffer is already zeroed if the
  * copy writes short.
  */
-extern "C" wchar_t* __cdecl RuntimeWideStringDuplicate(const wchar_t* const text)
+extern "C" wchar_t* __cdecl EngineWideStringDuplicate(const wchar_t* const text)
 {
   if (text == nullptr) {
     return nullptr;
@@ -7728,7 +7729,7 @@ extern "C" void __cdecl _unlock_file(std::FILE* const stream)
   }
 
   legacy_file(stream)._flag &= ~0x8000;
-  RuntimeUnlockCrtLock(static_cast<int>(stream - table) + 16);
+  EngineUnlockCrtLock(static_cast<int>(stream - table) + 16);
 }
 
 /**
@@ -7742,7 +7743,7 @@ extern "C" void __cdecl _unlock_file(std::FILE* const stream)
  * side effect of refreshing thread locale state; its result is discarded, and
  * the handle is read before it so the pre-refresh value is what comes back.
  */
-extern "C" LCID __cdecl RuntimeGetConversionLocale()
+extern "C" LCID __cdecl EngineGetConversionLocale()
 {
   const LCID numericHandle = __lc_handle_func()[2];
   (void)__lc_codepage_func();
@@ -8094,7 +8095,7 @@ extern "C" void __cdecl __free_lc_time(void* const lcTimeData)
  */
 extern "C" char* __cdecl __Getdays_l(_locale_t const localeInfo)
 {
-  const RuntimeLocaleUpdateScope locale(localeInfo);
+  const LocaleUpdateScope locale(localeInfo);
   const RuntimeLcTimeData* const lcTime = locale.timeView()->lcTimeCurrent;
 
   std::size_t totalLength = 0u;
@@ -8482,7 +8483,7 @@ extern "C" std::int64_t __cdecl __ftol2(const double value)
  * Sofdec lanes. Distinct from `__ftol2` above, which carries the extra
  * rounding-correction shuffle.
  */
-extern "C" std::int64_t __cdecl RuntimeDoubleToInt64(const double value)
+extern "C" std::int64_t __cdecl EngineDoubleToInt64(const double value)
 {
   return static_cast<std::int64_t>(value);
 }
@@ -8498,7 +8499,7 @@ extern "C" std::int64_t __cdecl RuntimeDoubleToInt64(const double value)
  * or more yields zero rather than being taken modulo the width, which is what
  * a bare x86 shift would do.
  */
-extern "C" std::int64_t __cdecl RuntimeShiftLeft64(const std::int64_t value, const unsigned char count)
+extern "C" std::int64_t __cdecl EngineShiftLeft64(const std::int64_t value, const unsigned char count)
 {
   if (count >= 64u) {
     return 0;
@@ -8514,7 +8515,7 @@ extern "C" std::int64_t __cdecl RuntimeShiftLeft64(const std::int64_t value, con
  * (`(current & ~mask) | (control & mask)`), writes the new control word,
  * and returns the previous control word sign-extended to `int`.
  */
-extern "C" int __cdecl RuntimeSetFpuControlMasked(
+extern "C" int __cdecl EngineSetFpuControlMasked(
   const unsigned int controlWord,
   const unsigned int mask
 )
@@ -8679,8 +8680,8 @@ extern "C" int __cdecl __initstdio()
 
 namespace moho::runtime
 {
-  int RuntimeMemicmp(const void* lhsBuffer, const void* rhsBuffer, std::size_t byteCount);
-  [[nodiscard]] unsigned long* RuntimeDosErrno();
+  int EngineMemicmp(const void* lhsBuffer, const void* rhsBuffer, std::size_t byteCount);
+  [[nodiscard]] unsigned long* EngineDosErrno();
   extern "C" unsigned int __cdecl div64_0(unsigned __int64 dividend, __int64 divisor);
 
   /**
@@ -8839,7 +8840,7 @@ namespace moho::runtime
     }
 
     auto invalidArgument = [&]() -> int {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *outFileHandle = -1;
       *_errno() = EINVAL;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
@@ -8920,7 +8921,7 @@ namespace moho::runtime
     const int newDescriptor = _alloc_osfhnd();
     *outFileHandle = newDescriptor;
     if (newDescriptor == -1) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *outFileHandle = -1;
       *_errno() = EMFILE;
       return *_errno();
@@ -8977,7 +8978,7 @@ namespace moho::runtime
       // trailing byte and truncate a lone Ctrl-Z.
       const long tailPos = _lseek_nolock(newDescriptor, -1, FILE_END);
       if (tailPos == -1) {
-        if (*RuntimeDosErrno() != 131 /* ERROR_NEGATIVE_SEEK: empty file, nothing to truncate */) {
+        if (*EngineDosErrno() != 131 /* ERROR_NEGATIVE_SEEK: empty file, nothing to truncate */) {
           _close_nolock(newDescriptor);
           return *_errno();
         }
@@ -9161,7 +9162,7 @@ namespace moho::runtime
    * then dispatches to `_tsopen_nolock`; on failure it clears the "in use"
    * bit in `_pioinfo` for the freshly-allocated slot and releases the
    * per-handle lock, then resets `*outFileHandle` to `-1`. Narrow-path
-   * counterpart of `RuntimeWideSopenHelper` (0x00AAFFC4).
+   * counterpart of `EngineWideSopenHelper` (0x00AAFFC4).
    */
   extern "C" int __cdecl _tsopen_helper(
     const char* const lpFileName,
@@ -9239,11 +9240,11 @@ namespace moho::runtime
    */
   extern "C" int __cdecl _alloc_osfhnd()
   {
-    if (!RuntimeInitCrtLockNumber(kOsfhndLock)) {
+    if (!EngineInitCrtLockNumber(kOsfhndLock)) {
       return -1;
     }
 
-    RuntimeLockCrtLock(kOsfhndLock);
+    EngineLockCrtLock(kOsfhndLock);
 
     int newDescriptor = -1;
     bool lockFailed = false;
@@ -9277,7 +9278,7 @@ namespace moho::runtime
         }
 
         if (candidate->lockinitflag == 0) {
-          RuntimeLockCrtLock(kLocktabLock);
+          EngineLockCrtLock(kLocktabLock);
           if (candidate->lockinitflag == 0) {
             if (__crtInitCritSecAndSpinCount(&candidate->lock, 4000u)) {
               ++candidate->lockinitflag;
@@ -9285,7 +9286,7 @@ namespace moho::runtime
               lockFailed = true;
             }
           }
-          RuntimeUnlockCrtLock(kLocktabLock);
+          EngineUnlockCrtLock(kLocktabLock);
         }
 
         if (!lockFailed) {
@@ -9305,7 +9306,7 @@ namespace moho::runtime
       }
     }
 
-    RuntimeUnlockCrtLock(kOsfhndLock);
+    EngineUnlockCrtLock(kOsfhndLock);
     return newDescriptor;
   }
 
@@ -9321,14 +9322,14 @@ namespace moho::runtime
   {
     if (fileDescriptor < 0 || fileDescriptor >= _nhandle) {
       *_errno() = EBADF;
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       return -1;
     }
 
     RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
     if ((slot->osfile & 1) == 0 || slot->osfhnd == -1) {
       *_errno() = EBADF;
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       return -1;
     }
 
@@ -9360,12 +9361,12 @@ namespace moho::runtime
 
     BOOL status = TRUE;
     if (slot->lockinitflag == 0) {
-      RuntimeLockCrtLock(kLocktabLock);
+      EngineLockCrtLock(kLocktabLock);
       if (slot->lockinitflag == 0) {
         status = __crtInitCritSecAndSpinCount(&slot->lock, 4000u);
         ++slot->lockinitflag;
       }
-      RuntimeUnlockCrtLock(kLocktabLock);
+      EngineUnlockCrtLock(kLocktabLock);
     }
 
     if (status) {
@@ -9393,10 +9394,10 @@ namespace moho::runtime
    * with `errno=EBADF` if the descriptor is the sentinel `-2` value, out of
    * range, or not currently open.
    */
-  extern "C" HANDLE __cdecl RuntimeGetOsfHandle(const int fileDescriptor)
+  extern "C" HANDLE __cdecl EngineGetOsfHandle(const int fileDescriptor)
   {
     if (fileDescriptor == -2) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EBADF;
       return reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
     }
@@ -9408,7 +9409,7 @@ namespace moho::runtime
       }
     }
 
-    *RuntimeDosErrno() = 0;
+    *EngineDosErrno() = 0;
     *_errno() = EBADF;
     _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
     return reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
@@ -9423,7 +9424,7 @@ namespace moho::runtime
    */
   extern "C" long __cdecl _lseek_nolock(const int fileDescriptor, const long offset, const int moveMethod)
   {
-    const HANDLE osHandle = RuntimeGetOsfHandle(fileDescriptor);
+    const HANDLE osHandle = EngineGetOsfHandle(fileDescriptor);
     if (osHandle == reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1))) {
       *_errno() = EBADF;
       return -1;
@@ -9449,7 +9450,7 @@ namespace moho::runtime
    */
   extern "C" __int64 __cdecl _lseeki64_nolock(const int fileDescriptor, const __int64 offset, const int moveMethod)
   {
-    const HANDLE osHandle = RuntimeGetOsfHandle(fileDescriptor);
+    const HANDLE osHandle = EngineGetOsfHandle(fileDescriptor);
     if (osHandle == reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1))) {
       *_errno() = EBADF;
       return -1;
@@ -9487,12 +9488,12 @@ namespace moho::runtime
     // preserved verbatim from the decompiled shape; the exact intended flag
     // semantics for the second case are not independently confirmed.
     const bool skipClose =
-      (RuntimeGetOsfHandle(fileDescriptor) == reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1))) ||
+      (EngineGetOsfHandle(fileDescriptor) == reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1))) ||
       (((fileDescriptor == 1 && (__pioinfo[0][2].textmodeUnicode & 1) != 0) ||
         (fileDescriptor == 2 && (reinterpret_cast<int*>(&__pioinfo[0][1].lock)[2] & 1) != 0)) &&
-       RuntimeGetOsfHandle(2) == RuntimeGetOsfHandle(1));
+       EngineGetOsfHandle(2) == EngineGetOsfHandle(1));
 
-    const bool closedOk = skipClose || ::CloseHandle(RuntimeGetOsfHandle(fileDescriptor)) != 0;
+    const bool closedOk = skipClose || ::CloseHandle(EngineGetOsfHandle(fileDescriptor)) != 0;
     const DWORD lastError = closedOk ? 0u : ::GetLastError();
 
     _free_osfhnd(fileDescriptor);
@@ -9575,7 +9576,7 @@ namespace moho::runtime
         }
         *_errno() = ENOSPC;
       }
-      *RuntimeDosErrno() = mappedDosError;
+      *EngineDosErrno() = mappedDosError;
       return -1;
     }
   } // namespace detail
@@ -9599,7 +9600,7 @@ namespace moho::runtime
       return 0;
     }
     if (buffer == nullptr) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EINVAL;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
       return -1;
@@ -9609,7 +9610,7 @@ namespace moho::runtime
     const int submode = static_cast<int>(static_cast<std::int8_t>(slot->textmodeUnicode << 1) >> 1);
 
     if ((submode == 1 || submode == 2) && (count & 1u) != 0) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EINVAL;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
       return -1;
@@ -9866,7 +9867,7 @@ namespace moho::runtime
   extern "C" int __cdecl _write(const int fileDescriptor, const void* const buffer, const unsigned int count)
   {
     if (fileDescriptor == -2) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EBADF;
       return -1;
     }
@@ -9874,7 +9875,7 @@ namespace moho::runtime
     if (fileDescriptor < 0 || fileDescriptor >= _nhandle ||
         ((__pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F))->osfile & 1) == 0)
     {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EBADF;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
       return -1;
@@ -9887,7 +9888,7 @@ namespace moho::runtime
       result = _write_nolock(fileDescriptor, static_cast<const char*>(buffer), count);
     } else {
       *_errno() = EBADF;
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       result = -1;
     }
 
@@ -9919,12 +9920,12 @@ namespace moho::runtime
   extern "C" unsigned int __cdecl _read_nolock(const int fileDescriptor, char* const lpBuffer, const unsigned int requestedSize)
   {
     if (fileDescriptor == -2) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EBADF;
       return static_cast<unsigned int>(-1);
     }
     if (fileDescriptor < 0 || fileDescriptor >= _nhandle) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EBADF;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
       return static_cast<unsigned int>(-1);
@@ -9932,14 +9933,14 @@ namespace moho::runtime
 
     RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
     if ((slot->osfile & 1) == 0) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EBADF;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
       return static_cast<unsigned int>(-1);
     }
 
     if (requestedSize > 0x7FFFFFFFu) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EINVAL;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
       return static_cast<unsigned int>(-1);
@@ -9948,7 +9949,7 @@ namespace moho::runtime
       return 0;
     }
     if (lpBuffer == nullptr) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EINVAL;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
       return static_cast<unsigned int>(-1);
@@ -9962,7 +9963,7 @@ namespace moho::runtime
 
     if (submode == 2 /* _O_U16TEXT */) {
       if ((requestedSize & 1u) != 0) {
-        *RuntimeDosErrno() = 0;
+        *EngineDosErrno() = 0;
         *_errno() = EINVAL;
         _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
         return static_cast<unsigned int>(-1);
@@ -9970,7 +9971,7 @@ namespace moho::runtime
       readCapacity &= ~1u;
     } else if (submode == 1 /* _O_U8TEXT */) {
       if ((requestedSize & 1u) != 0) {
-        *RuntimeDosErrno() = 0;
+        *EngineDosErrno() = 0;
         *_errno() = EINVAL;
         _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
         return static_cast<unsigned int>(-1);
@@ -9979,7 +9980,7 @@ namespace moho::runtime
       scratch = static_cast<char*>(std::malloc(readCapacity));
       if (scratch == nullptr) {
         *_errno() = ENOMEM;
-        *RuntimeDosErrno() = 8;
+        *EngineDosErrno() = 8;
         return static_cast<unsigned int>(-1);
       }
       scratchOwned = true;
@@ -10030,7 +10031,7 @@ namespace moho::runtime
       };
       if (lastError == ERROR_ACCESS_DENIED) {
         *_errno() = EBADF;
-        *RuntimeDosErrno() = ERROR_ACCESS_DENIED;
+        *EngineDosErrno() = ERROR_ACCESS_DENIED;
         cleanup();
         return static_cast<unsigned int>(-1);
       }
@@ -10300,7 +10301,7 @@ namespace moho::runtime
       ::HeapFree(processHeap, 0, zeroBuffer);
 
       if (failed) {
-        if (*RuntimeDosErrno() == ERROR_ACCESS_DENIED) {
+        if (*EngineDosErrno() == ERROR_ACCESS_DENIED) {
           *_errno() = EACCES;
         }
         result = *_errno();
@@ -10309,9 +10310,9 @@ namespace moho::runtime
       if (_lseeki64_nolock(fileDescriptor, size, FILE_BEGIN) == -1) {
         return *_errno();
       }
-      if (!::SetEndOfFile(RuntimeGetOsfHandle(fileDescriptor))) {
+      if (!::SetEndOfFile(EngineGetOsfHandle(fileDescriptor))) {
         *_errno() = EACCES;
-        *RuntimeDosErrno() = ::GetLastError();
+        *EngineDosErrno() = ::GetLastError();
         result = *_errno();
       }
     }
@@ -10372,7 +10373,7 @@ namespace moho::runtime
     }
 
     auto invalidArgument = [&]() -> int {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *outFileHandle = -1;
       *_errno() = EINVAL;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
@@ -10453,7 +10454,7 @@ namespace moho::runtime
     const int newDescriptor = _alloc_osfhnd();
     *outFileHandle = newDescriptor;
     if (newDescriptor == -1) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *outFileHandle = -1;
       *_errno() = EMFILE;
       return *_errno();
@@ -10511,7 +10512,7 @@ namespace moho::runtime
       // behavior for text-mode read+write opens).
       const long tailPos = _lseek_nolock(newDescriptor, -1, FILE_END);
       if (tailPos == -1) {
-        if (*RuntimeDosErrno() != 131 /* ERROR_NEGATIVE_SEEK: empty file, nothing to truncate */) {
+        if (*EngineDosErrno() != 131 /* ERROR_NEGATIVE_SEEK: empty file, nothing to truncate */) {
           _close_nolock(newDescriptor);
           return *_errno();
         }
@@ -10708,7 +10709,7 @@ namespace moho::runtime
    * IDA signature:
    * int __cdecl sub_AAFFC4(LPCWSTR lpFileName, int a2, int a3, int a4, int *a5, int a6);
    */
-  extern "C" int __cdecl RuntimeWideSopenHelper(
+  extern "C" int __cdecl EngineWideSopenHelper(
     const wchar_t* const lpFileName,
     const int openFlags,
     const int shareFlags,
@@ -10812,10 +10813,10 @@ namespace moho::runtime
    * Validates wide file path/mode arguments, then forwards to CRT `_wfsopen`
    * for stream allocation/open semantics.
    */
-  std::FILE* RuntimeWfsopen(const wchar_t* const filePath, const wchar_t* const mode, const int shareFlag)
+  std::FILE* EngineWfsopen(const wchar_t* const filePath, const wchar_t* const mode, const int shareFlag)
   {
     if (filePath == nullptr || mode == nullptr || mode[0] == L'\0') {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EINVAL;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
       return nullptr;
@@ -10844,7 +10845,7 @@ namespace moho::runtime
       return EINVAL;
     }
 
-    std::FILE* const stream = RuntimeWfsopen(filePath, mode, 0x80);
+    std::FILE* const stream = EngineWfsopen(filePath, mode, 0x80);
     *outStream = stream;
     if (stream != nullptr) {
       return 0;
@@ -10862,10 +10863,10 @@ namespace moho::runtime
    */
   extern "C" std::FILE* __cdecl wfopen(const wchar_t* const filePath, const wchar_t* const mode)
   {
-    return RuntimeWfsopen(filePath, mode, 0x40);
+    return EngineWfsopen(filePath, mode, 0x40);
   }
 
-  [[noreturn]] void RuntimeTerminate();
+  [[noreturn]] void EngineTerminate();
 
   /**
    * Address: 0x00A99357 (FUN_00A99357, _imp___CrtSetCheckCount)
@@ -10914,7 +10915,7 @@ namespace moho::runtime
    */
   extern "C" void* __cdecl _initp_eh_hooks()
   {
-    gRuntimeTerminateActionEncoded = ::EncodePointer(reinterpret_cast<void*>(static_cast<void (*)()>(&RuntimeTerminate)));
+    gRuntimeTerminateActionEncoded = ::EncodePointer(reinterpret_cast<void*>(static_cast<void (*)()>(&EngineTerminate)));
     return gRuntimeTerminateActionEncoded;
   }
 
@@ -11165,9 +11166,9 @@ namespace moho::runtime
    * Clears the active CRT heap-failure handler lane and returns the previously
    * installed handler.
    */
-  extern "C" RuntimeHeapFailureHandler __cdecl RuntimeClearNewHandler()
+  extern "C" RuntimeHeapFailureHandler __cdecl EngineClearNewHandler()
   {
-    RuntimeLockGuard heapLock(kRuntimeHeapLock);
+    CrtLockGuard heapLock(kRuntimeHeapLock);
     const RuntimeHeapFailureHandler previousHandler = _query_new_handler();
     _initp_heap_handler(nullptr);
     return previousHandler;
@@ -11252,11 +11253,11 @@ namespace moho::runtime
   // Mirrors `` `std::basic_filebuf<char>::_Init'::`2'::_Stinit`` (.data, 0x010C6BB4).
   // Confirmed via data_refs: FUN_004C5430 (`_Init`) reads this exact address into a
   // freshly bound filebuf's stateWord (+0x44), and FUN_004C55A0 (`close`, see
-  // RuntimeFilebufClose below) writes this exact address back into stateWord when
+  // EngineFilebufClose below) writes this exact address back into stateWord when
   // releasing the file - same global, read on init, restored on close.
   std::int32_t gRuntimeFilebufInitialStateWord = 0;
 
-  void RuntimeFilebufResetIoLanes(RuntimeFilebufCharView* const filebuf)
+  void EngineFilebufResetIoLanes(RuntimeFilebufCharView* const filebuf)
   {
     filebuf->inputBase = nullptr;
     filebuf->outputBase = nullptr;
@@ -11281,11 +11282,11 @@ namespace moho::runtime
    * A null FILE leaves the lanes as `_Init` on the streambuf base left them
    * (all null) and only the scalar state is written.
    */
-  void RuntimeFilebufInit(RuntimeFilebufCharView* const filebuf, std::FILE* const file)
+  void EngineFilebufInit(RuntimeFilebufCharView* const filebuf, std::FILE* const file)
   {
     filebuf->closeOnClose = 0;
     filebuf->wroteSome = 0;
-    RuntimeFilebufResetIoLanes(filebuf);
+    EngineFilebufResetIoLanes(filebuf);
 
     if (file != nullptr) {
       LegacyFileView& legacy = legacy_file(file);
@@ -11302,16 +11303,16 @@ namespace moho::runtime
     filebuf->codecvtFacet = nullptr;
   }
 
-  std::intptr_t RuntimeFilebufApplyCodecvtFacet(
+  std::intptr_t EngineFilebufApplyCodecvtFacet(
     RuntimeFilebufCharView* filebuf,
     const std::codecvt<char, char, std::mbstate_t>* codecvtFacet
   );
 
-  RuntimeLockitState* RuntimeLockitConstruct(RuntimeLockitState* object, int requestedSlot);
-  void RuntimeLockitDestroy(RuntimeLockitState* object);
-  RuntimeMutexHandle* RuntimeMutexConstruct(RuntimeMutexHandle* object);
-  RuntimeLocaleLocimpView* RuntimeGetGlobalLocale();
-  RuntimeLocaleLocimpView* RuntimeLocaleInit();
+  RuntimeLockitState* EngineLockitConstruct(RuntimeLockitState* object, int requestedSlot);
+  void EngineLockitDestroy(RuntimeLockitState* object);
+  RuntimeMutexHandle* EngineMutexConstruct(RuntimeMutexHandle* object);
+  RuntimeLocaleLocimpView* EngineGetGlobalLocale();
+  RuntimeLocaleLocimpView* EngineLocaleInit();
 
   /**
    * Address: 0x004C57B0 (FUN_004C57B0, sub_4C57B0)
@@ -11320,7 +11321,7 @@ namespace moho::runtime
    * Applies one codecvt facet lane to filebuf state, clearing `_Pcvt` when the
    * facet reports `always_noconv()`.
    */
-  [[maybe_unused]] std::intptr_t RuntimeFilebufApplyCodecvtFacet(
+  [[maybe_unused]] std::intptr_t EngineFilebufApplyCodecvtFacet(
     RuntimeFilebufCharView* const filebuf,
     const std::codecvt<char, char, std::mbstate_t>* const codecvtFacet
   )
@@ -11331,7 +11332,7 @@ namespace moho::runtime
     }
 
     filebuf->codecvtFacet = codecvtFacet;
-    RuntimeFilebufResetIoLanes(filebuf);
+    EngineFilebufResetIoLanes(filebuf);
     return reinterpret_cast<std::intptr_t>(filebuf);
   }
 
@@ -11344,7 +11345,7 @@ namespace moho::runtime
    * What it does:
    * Flushes a pending codecvt shift-state reset before the filebuf goes
    * idle. In the original binary this is called from `close()` (see
-   * RuntimeFilebufClose below), `seekoff()`, and `seekpos()` - anywhere a
+   * EngineFilebufClose below), `seekoff()`, and `seekpos()` - anywhere a
    * write sequence through a stateful encoding needs to leave the output
    * in the "initial shift state" before repositioning or closing.
    *
@@ -11386,7 +11387,7 @@ namespace moho::runtime
    * longer fits the original 4-byte slot, so this recovery cannot alias it
    * without corrupting the adjacent `closeOnClose`/`myFile` fields.
    */
-  bool RuntimeFilebufEndwrite(RuntimeFilebufCharView* const filebuf)
+  bool EngineFilebufEndwrite(RuntimeFilebufCharView* const filebuf)
   {
     if (filebuf->codecvtFacet == nullptr || !filebuf->wroteSome) {
       return true;
@@ -11448,17 +11449,17 @@ namespace moho::runtime
    * What it does:
    * No-ops to failure when `myFile` (+0x4C) is already null - a filebuf
    * that isn't open has nothing to close. Otherwise it calls
-   * RuntimeFilebufEndwrite() to flush any pending codecvt shift-state reset
+   * EngineFilebufEndwrite() to flush any pending codecvt shift-state reset
    * (result false demotes the return value to null) and unconditionally
    * `fclose`s `myFile` afterward regardless of whether the unshift flush
    * succeeded (a failed `fclose` also demotes the return value to null).
    * Either way, the filebuf is then reset to a fresh, unopened state:
    * `closeOnClose` (+0x48) and `wroteSome` (+0x41) cleared, the streambuf
-   * I/O lanes reset (RuntimeFilebufResetIoLanes - matches the binary's
+   * I/O lanes reset (EngineFilebufResetIoLanes - matches the binary's
    * `std::wstreambuf::_Init` call, ICF-merged from the shared streambuf
    * base `_Init`), `myFile` nulled, `codecvtFacet` (+0x3C) cleared, and
    * `stateWord` (+0x44) restored to `gRuntimeFilebufInitialStateWord`
-   * (confirmed to be the same `_Stinit` global RuntimeFilebufInit reads -
+   * (confirmed to be the same `_Stinit` global EngineFilebufInit reads -
    * see the comment on that global above).
    *
    * Source-level trigger: `moho::USER_SavePreferences()`
@@ -11469,18 +11470,18 @@ namespace moho::runtime
    *     if (fileBuffer->close() == nullptr) { outputStream.setstate(std::ios::failbit); }
    *   }
    * That real call is serviced by the toolchain's own `std::filebuf::close()`,
-   * not by this recovered mirror - the same relationship RuntimeFopen has
-   * with the real `::_fsopen` it documents. RuntimeFilebufClose exists as
+   * not by this recovered mirror - the same relationship EngineFopen has
+   * with the real `::_fsopen` it documents. EngineFilebufClose exists as
    * the address-traceable, 1:1 recovery of what FUN_004C55A0 does in the
-   * shipped binary, and it invokes RuntimeFilebufEndwrite by name below,
+   * shipped binary, and it invokes EngineFilebufEndwrite by name below,
    * which is what satisfies that function's own invocation requirement.
    */
-  RuntimeFilebufCharView* RuntimeFilebufClose(RuntimeFilebufCharView* const filebuf)
+  RuntimeFilebufCharView* EngineFilebufClose(RuntimeFilebufCharView* const filebuf)
   {
     RuntimeFilebufCharView* result = filebuf;
 
     if (filebuf->myFile != nullptr) {
-      if (!RuntimeFilebufEndwrite(filebuf)) {
+      if (!EngineFilebufEndwrite(filebuf)) {
         result = nullptr;
       }
       if (std::fclose(filebuf->myFile) != 0) {
@@ -11492,7 +11493,7 @@ namespace moho::runtime
 
     filebuf->closeOnClose = 0;
     filebuf->wroteSome = 0;
-    RuntimeFilebufResetIoLanes(filebuf);
+    EngineFilebufResetIoLanes(filebuf);
     filebuf->myFile = nullptr;
     filebuf->codecvtFacet = nullptr;
     filebuf->stateWord = gRuntimeFilebufInitialStateWord;
@@ -11506,11 +11507,11 @@ namespace moho::runtime
    * What it does:
    * Captures one lock-slot id (`arg & 3`) and enters that CRT lock slot.
    */
-  RuntimeLockitState* RuntimeLockitConstruct(RuntimeLockitState* const object, const int requestedSlot)
+  RuntimeLockitState* EngineLockitConstruct(RuntimeLockitState* const object, const int requestedSlot)
   {
     const int slot = requestedSlot & 3;
     object->slot = slot;
-    (void)RuntimeMtxLock(RuntimeStdLockSlot(slot));
+    (void)EngineMtxLock(EngineStdLockSlot(slot));
     return object;
   }
 
@@ -11520,9 +11521,9 @@ namespace moho::runtime
    * What it does:
    * Leaves the CRT lock slot captured by this `_Lockit` guard.
    */
-  void RuntimeLockitDestroy(RuntimeLockitState* const object)
+  void EngineLockitDestroy(RuntimeLockitState* const object)
   {
-    (void)RuntimeMtxUnlock(RuntimeStdLockSlot(object->slot));
+    (void)EngineMtxUnlock(EngineStdLockSlot(object->slot));
   }
 
   /**
@@ -11531,11 +11532,11 @@ namespace moho::runtime
    * What it does:
    * Allocates one `CRITICAL_SECTION` object and initializes it.
    */
-  RuntimeMutexHandle* RuntimeMutexConstruct(RuntimeMutexHandle* const object)
+  RuntimeMutexHandle* EngineMutexConstruct(RuntimeMutexHandle* const object)
   {
     auto* const lock = static_cast<CRITICAL_SECTION*>(::operator new(sizeof(CRITICAL_SECTION)));
     object->criticalSection = lock;
-    RuntimeMtxInit(lock);
+    EngineMtxInit(lock);
     return object;
   }
 
@@ -11544,12 +11545,12 @@ namespace moho::runtime
    *
    * What it does:
    * Destroys the critical section this mutex owns and releases its storage -
-   * the counterpart to RuntimeMutexConstruct above.
+   * the counterpart to EngineMutexConstruct above.
    */
-  void RuntimeMutexDestruct(RuntimeMutexHandle* const object)
+  void EngineMutexDestruct(RuntimeMutexHandle* const object)
   {
     CRITICAL_SECTION* const lock = object->criticalSection;
-    RuntimeMtxDestroy(lock);
+    EngineMtxDestroy(lock);
     ::operator delete(static_cast<void*>(lock));
   }
 
@@ -11564,9 +11565,9 @@ namespace moho::runtime
    * so the section is reached through one indirection rather than being
    * embedded.
    */
-  int RuntimeMutexLock(RuntimeMutexHandle* const object) noexcept
+  int EngineMutexLock(RuntimeMutexHandle* const object) noexcept
   {
-    return RuntimeMtxLock(object->criticalSection);
+    return EngineMtxLock(object->criticalSection);
   }
 
   /**
@@ -11577,11 +11578,11 @@ namespace moho::runtime
    *
    * What it does:
    * Leaves the critical section this mutex owns; the counterpart to
-   * RuntimeMutexLock.
+   * EngineMutexLock.
    */
-  int RuntimeMutexUnlock(RuntimeMutexHandle* const object) noexcept
+  int EngineMutexUnlock(RuntimeMutexHandle* const object) noexcept
   {
-    return RuntimeMtxUnlock(object->criticalSection);
+    return EngineMtxUnlock(object->criticalSection);
   }
 
   /**
@@ -11592,7 +11593,7 @@ namespace moho::runtime
    * not a crash: errno is set to EINVAL, the invalid-parameter handler runs,
    * and zero is returned.
    */
-  extern "C" int __cdecl RuntimeStreamAtEof(std::FILE* const stream)
+  extern "C" int __cdecl EngineStreamAtEof(std::FILE* const stream)
   {
     if (stream == nullptr) {
       errno = EINVAL;
@@ -11607,9 +11608,9 @@ namespace moho::runtime
    *
    * What it does:
    * Reports the stream error flag, with the same null-stream handling as
-   * RuntimeStreamAtEof. Differs from it only in the flag bit tested.
+   * EngineStreamAtEof. Differs from it only in the flag bit tested.
    */
-  extern "C" int __cdecl RuntimeStreamHasError(std::FILE* const stream)
+  extern "C" int __cdecl EngineStreamHasError(std::FILE* const stream)
   {
     if (stream == nullptr) {
       errno = EINVAL;
@@ -11626,7 +11627,7 @@ namespace moho::runtime
    * Leaves the CRT lock-table entry for `lockId`. The paired acquire lives in
    * the same table; entries are initialized lazily by the lock-table setup lane.
    */
-  extern "C" void __cdecl RuntimeUnlockCrtLock(const int lockId)
+  extern "C" void __cdecl EngineUnlockCrtLock(const int lockId)
   {
     // The table is pairs of {lock, kind}; _locktable is typed as a flat
     // LPCRITICAL_SECTION array, so the lock lives at index 2*lockId.
@@ -11644,7 +11645,7 @@ namespace moho::runtime
    * lock-table's own lock (`_LOCKTAB_LOCK`). Fatal-exits via the CRT
    * not-initialized banner if the process heap isn't up yet.
    */
-  extern "C" int __cdecl RuntimeInitCrtLockNumber(const int lockId)
+  extern "C" int __cdecl EngineInitCrtLockNumber(const int lockId)
   {
     if (_crtheap == nullptr) {
       __FF_MSGBANNER();
@@ -11663,7 +11664,7 @@ namespace moho::runtime
     }
 
     int status = 1;
-    RuntimeLockCrtLock(kLocktabLock);
+    EngineLockCrtLock(kLocktabLock);
     if (_locktable[2 * static_cast<std::size_t>(lockId)] != nullptr) {
       _free_crt(newLock);
     } else if (__crtInitCritSecAndSpinCount(newLock, 4000u)) {
@@ -11673,7 +11674,7 @@ namespace moho::runtime
       *_errno() = ENOMEM;
       status = 0;
     }
-    RuntimeUnlockCrtLock(kLocktabLock);
+    EngineUnlockCrtLock(kLocktabLock);
     return status;
   }
 
@@ -11682,12 +11683,12 @@ namespace moho::runtime
    *
    * What it does:
    * Enters the CRT lock-table entry for `lockId`, initializing it on first
-   * use via `RuntimeInitCrtLockNumber`. Fatal-exits (`__amsg_exit`) if
+   * use via `EngineInitCrtLockNumber`. Fatal-exits (`__amsg_exit`) if
    * initialization fails.
    */
-  extern "C" void __cdecl RuntimeLockCrtLock(const int lockId)
+  extern "C" void __cdecl EngineLockCrtLock(const int lockId)
   {
-    if (_locktable[2 * static_cast<std::size_t>(lockId)] == nullptr && !RuntimeInitCrtLockNumber(lockId)) {
+    if (_locktable[2 * static_cast<std::size_t>(lockId)] == nullptr && !EngineInitCrtLockNumber(lockId)) {
       __amsg_exit(17);
     }
     ::EnterCriticalSection(_locktable[2 * static_cast<std::size_t>(lockId)]);
@@ -11860,7 +11861,7 @@ namespace moho::runtime
    * for instruction against the x87 body, including the `fmul dbl_F3F3D2`
    * multiply by the same 0.5 constant as `gRuntimeHalfScaleDouble` below.
    */
-  extern "C" std::uint8_t __cdecl RuntimeClassifyPowExponentParity(const double exponent)
+  extern "C" std::uint8_t __cdecl EngineClassifyPowExponentParity(const double exponent)
   {
     const double roundedExponent = std::nearbyint(exponent);
     if (roundedExponent != exponent) {
@@ -11920,7 +11921,7 @@ namespace moho::runtime
    * Compares up to `byteCount` ASCII bytes case-insensitively using legacy
    * null-terminated early-stop semantics and returns -1/0/+1 ordering.
    */
-  int RuntimeAsciiMemicmp(
+  int EngineAsciiMemicmp(
     const unsigned char* lhsBytes,
     const unsigned char* rhsBytes,
     int byteCount
@@ -11942,8 +11943,8 @@ namespace moho::runtime
 
       ++lhsBytes;
       ++rhsBytes;
-      lhsValue = RuntimeAsciiToLower(lhsValue);
-      rhsValue = RuntimeAsciiToLower(rhsValue);
+      lhsValue = EngineAsciiToLower(lhsValue);
+      rhsValue = EngineAsciiToLower(rhsValue);
       if (lhsValue != rhsValue) {
         return (lhsValue < rhsValue) ? -1 : 1;
       }
@@ -11965,7 +11966,7 @@ namespace moho::runtime
    * compare, with ASCII fold fallback when the locale collate-handle lane is
    * disabled.
    */
-  int RuntimeWcsnicollLocale(
+  int EngineWcsnicollLocale(
     const wchar_t* const lhsText,
     const wchar_t* const rhsText,
     const std::size_t maxCount,
@@ -11984,7 +11985,7 @@ namespace moho::runtime
 
     RuntimeTidDataLocaleView* threadData = nullptr;
     bool updated = false;
-    RuntimeThreadLocInfoView* const localeView = RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
+    RuntimeThreadLocInfoView* const localeView = EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
     int result = 0x7FFFFFFF;
     const LCID collateHandle = (localeView != nullptr) ? localeView->lcHandle[1] : 0;
@@ -12026,7 +12027,7 @@ namespace moho::runtime
       result = static_cast<int>(lhsValue) - static_cast<int>(rhsValue);
     }
 
-    RuntimeReleaseLocaleUpdate(threadData, updated);
+    EngineReleaseLocaleUpdate(threadData, updated);
     return result;
   }
 
@@ -12045,7 +12046,7 @@ namespace moho::runtime
   )
   {
     if (__locale_changed != 0) {
-      return RuntimeWcsnicollLocale(lhsText, rhsText, maxCount, nullptr);
+      return EngineWcsnicollLocale(lhsText, rhsText, maxCount, nullptr);
     }
 
     if (lhsText == nullptr || rhsText == nullptr || maxCount > 0x7FFFFFFFu) {
@@ -12085,7 +12086,7 @@ namespace moho::runtime
    * case-insensitively under one locale, returning CRT ordering and
    * invalid-parameter sentinel behavior.
    */
-  int RuntimeMbsnbicmpLocale(
+  int EngineMbsnbicmpLocale(
     const void* const lhsBuffer,
     const unsigned char* const rhsBuffer,
     const std::size_t byteCount,
@@ -12098,7 +12099,7 @@ namespace moho::runtime
 
     RuntimeTidDataLocaleView* threadData = nullptr;
     bool updated = false;
-    (void)RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
+    (void)EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
     int result = 0x7FFFFFFF;
     if (lhsBuffer == nullptr || rhsBuffer == nullptr || byteCount > 0x7FFFFFFFu) {
@@ -12113,7 +12114,7 @@ namespace moho::runtime
       );
     }
 
-    RuntimeReleaseLocaleUpdate(threadData, updated);
+    EngineReleaseLocaleUpdate(threadData, updated);
     return result;
   }
 
@@ -12122,15 +12123,15 @@ namespace moho::runtime
    *
    * What it does:
    * Forwards one default-locale `_mbsnbicmp_l` lane into
-   * `RuntimeMbsnbicmpLocale`.
+   * `EngineMbsnbicmpLocale`.
    */
-  extern "C" int __cdecl RuntimeMbsnbicmpDefaultLocale(
+  extern "C" int __cdecl EngineMbsnbicmpDefaultLocale(
     const void* const lhsBuffer,
     const void* const rhsBuffer,
     const std::size_t byteCount
   )
   {
-    return RuntimeMbsnbicmpLocale(lhsBuffer, reinterpret_cast<const unsigned char*>(rhsBuffer), byteCount, nullptr);
+    return EngineMbsnbicmpLocale(lhsBuffer, reinterpret_cast<const unsigned char*>(rhsBuffer), byteCount, nullptr);
   }
 
   /**
@@ -12209,11 +12210,11 @@ namespace moho::runtime
    * active collate LCID/codepage lane, falls back to `strcmp` when collation
    * is disabled, and preserves CRT invalid-parameter/`EINVAL` semantics.
    */
-  int RuntimeStrcollLocale(const char* const lhsText, const char* const rhsText, _locale_t const localeInfo)
+  int EngineStrcollLocale(const char* const lhsText, const char* const rhsText, _locale_t const localeInfo)
   {
     RuntimeTidDataLocaleView* threadData = nullptr;
     bool updated = false;
-    RuntimeThreadLocInfoView* const localeView = RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
+    RuntimeThreadLocInfoView* const localeView = EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
     int result = 0x7FFFFFFF;
     if (lhsText != nullptr && rhsText != nullptr) {
@@ -12240,7 +12241,7 @@ namespace moho::runtime
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
     }
 
-    RuntimeReleaseLocaleUpdate(threadData, updated);
+    EngineReleaseLocaleUpdate(threadData, updated);
     return result;
   }
 
@@ -12249,11 +12250,11 @@ namespace moho::runtime
    *
    * What it does:
    * Default-locale narrow collation wrapper forwarding to
-   * `RuntimeStrcollLocale(..., nullptr)`.
+   * `EngineStrcollLocale(..., nullptr)`.
    */
   extern "C" int __cdecl strcoll(const char* const lhsText, const char* const rhsText)
   {
-    return RuntimeStrcollLocale(lhsText, rhsText, nullptr);
+    return EngineStrcollLocale(lhsText, rhsText, nullptr);
   }
 
   /**
@@ -12423,7 +12424,7 @@ namespace moho::runtime
    * ASCII case-insensitive memory compare lane with CRT-style invalid-argument
    * reporting on null or oversized requests.
    */
-  int RuntimeMemicmp(const void* const lhsBuffer, const void* const rhsBuffer, const std::size_t byteCount)
+  int EngineMemicmp(const void* const lhsBuffer, const void* const rhsBuffer, const std::size_t byteCount)
   {
     // The binary tests __locale_changed first and only takes the ASCII fast
     // path when the process is still on the initial locale; the locale-aware
@@ -12437,7 +12438,7 @@ namespace moho::runtime
     if (lhsBuffer != nullptr && rhsBuffer != nullptr && byteCount <= 0x7FFFFFFFu) {
       const auto* const lhsBytes = static_cast<const unsigned char*>(lhsBuffer);
       const auto* const rhsBytes = static_cast<const unsigned char*>(rhsBuffer);
-      return RuntimeAsciiMemicmp(lhsBytes, rhsBytes, static_cast<int>(byteCount));
+      return EngineAsciiMemicmp(lhsBytes, rhsBytes, static_cast<int>(byteCount));
     }
 
     *_errno() = EINVAL;
@@ -12476,7 +12477,7 @@ namespace moho::runtime
    * IDA signature:
    * int __cdecl strstr(const char *str, const char *substr);
    */
-  extern "C" const char* __cdecl RuntimeStrstr(
+  extern "C" const char* __cdecl EngineStrstr(
     const char* const haystack,
     const char* const needle
   ) noexcept
@@ -12504,7 +12505,7 @@ namespace moho::runtime
    * IDA signature:
    * int sub_A900FC(int a1, int a2, ...);  // (source, format, ...)
    */
-  extern "C" int __cdecl RuntimeSscanfWide(
+  extern "C" int __cdecl EngineSscanfWide(
     const wchar_t* const source,
     const wchar_t* const format,
     ...
@@ -12538,7 +12539,7 @@ namespace moho::runtime
    * Duplicates one C string into CRT heap storage; null input yields null and
    * copy failure routes through Watson.
    */
-  char* RuntimeStrdup(const char* const text)
+  char* EngineStrdup(const char* const text)
   {
     if (text == nullptr) {
       return nullptr;
@@ -12564,7 +12565,7 @@ namespace moho::runtime
    * Resolves one locale-update lane and forwards wide time formatting into the
    * locale-aware CRT formatter.
    */
-  std::size_t RuntimeWcsftimeLocaleLane(
+  std::size_t EngineWcsftimeLocaleLane(
     wchar_t* const destination,
     const std::size_t maxSize,
     const wchar_t* const format,
@@ -12574,9 +12575,9 @@ namespace moho::runtime
   {
     RuntimeTidDataLocaleView* threadData = nullptr;
     bool updated = false;
-    (void)RuntimeResolveLocaleLocInfo(localeInfo, &threadData, &updated);
+    (void)EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
     const std::size_t result = ::_wcsftime_l(destination, maxSize, format, timeData, localeInfo);
-    RuntimeReleaseLocaleUpdate(threadData, updated);
+    EngineReleaseLocaleUpdate(threadData, updated);
     return result;
   }
 
@@ -12594,7 +12595,7 @@ namespace moho::runtime
     const std::tm* const timeData
   )
   {
-    return RuntimeWcsftimeLocaleLane(lpWideCharStr, maxSize, format, timeData, nullptr);
+    return EngineWcsftimeLocaleLane(lpWideCharStr, maxSize, format, timeData, nullptr);
   }
 
   /**
@@ -12604,7 +12605,7 @@ namespace moho::runtime
    * Maps one CRT floating-category bitmask lane into the legacy small integer
    * category code used by higher-level classification helpers.
    */
-  extern "C" int __cdecl RuntimeMapFloatClassMaskToLegacyCode(const char classMask)
+  extern "C" int __cdecl EngineMapFloatClassMaskToLegacyCode(const char classMask)
   {
     if ((classMask & 0x20) != 0) {
       return 5;
@@ -12628,7 +12629,7 @@ namespace moho::runtime
    * Reads the current x87 status word, clears pending floating-point exception
    * flags, and returns the captured status lane.
    */
-extern "C" int __cdecl RuntimeClearFloatExceptionFlags()
+extern "C" int __cdecl EngineClearFloatExceptionFlags()
 {
 #if defined(_M_IX86)
   short statusWord = 0;
@@ -12648,7 +12649,7 @@ extern "C" int __cdecl RuntimeClearFloatExceptionFlags()
  * What it does:
  * Clears the MXCSR exception flags lane when compatibility mode is enabled.
  */
-extern "C" void __cdecl RuntimeClearMxcsrExceptionFlagsIfCompatEnabled()
+extern "C" void __cdecl EngineClearMxcsrExceptionFlagsIfCompatEnabled()
 {
   if (global_compat_flag != 0) {
     _mm_setcsr(_mm_getcsr() & 0xFFFFFFC0u);
@@ -12662,7 +12663,7 @@ extern "C" void __cdecl RuntimeClearMxcsrExceptionFlagsIfCompatEnabled()
  * Returns pending MXCSR exception flags (`bits 0..5`) when compatibility mode
  * is enabled; returns `0` when compatibility mode is disabled.
  */
-extern "C" int __cdecl RuntimeQueryMxcsrExceptionFlagsIfCompatEnabled()
+extern "C" int __cdecl EngineQueryMxcsrExceptionFlagsIfCompatEnabled()
 {
   const int mxcsr = (global_compat_flag != 0) ? static_cast<int>(_mm_getcsr()) : 0;
   return mxcsr & 0x3F;
@@ -12675,7 +12676,7 @@ extern "C" int __cdecl RuntimeQueryMxcsrExceptionFlagsIfCompatEnabled()
  * Returns currently pending MXCSR exception flags (`bits 0..5`) and clears the
  * pending flags when compatibility mode is enabled.
  */
-extern "C" int __cdecl RuntimeConsumeMxcsrExceptionFlagsIfCompatEnabled()
+extern "C" int __cdecl EngineConsumeMxcsrExceptionFlagsIfCompatEnabled()
 {
   if (global_compat_flag == 0) {
     return 0;
@@ -12694,7 +12695,7 @@ extern "C" int __cdecl RuntimeConsumeMxcsrExceptionFlagsIfCompatEnabled()
  * control bits while preserving reserved/exception lanes required by VC8 CRT
  * compatibility behavior.
  */
-extern "C" int __cdecl RuntimeSetMxcsrMaskedIfCompatEnabled(
+extern "C" int __cdecl EngineSetMxcsrMaskedIfCompatEnabled(
   const int value,
   const int mask
 )
@@ -12715,11 +12716,11 @@ extern "C" int __cdecl RuntimeSetMxcsrMaskedIfCompatEnabled(
  * Raises MXCSR exception-flag bits (`0..5`) by OR-ing caller flags into the
  * current MXCSR lane when compatibility mode is enabled.
  */
-extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
+extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
 {
   const int currentMxcsr = (global_compat_flag != 0) ? static_cast<int>(_mm_getcsr()) : 0;
   const int merged = currentMxcsr | (static_cast<int>(flags) & 0x3F);
-  (void)RuntimeSetMxcsrMaskedIfCompatEnabled(merged, 0x3F);
+  (void)EngineSetMxcsrMaskedIfCompatEnabled(merged, 0x3F);
   return 0;
 }
 
@@ -12730,7 +12731,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
  * Maps MXCSR exception flags into CRT `_statusfp`-style status bits when
    * compatibility mode enables MXCSR probing.
    */
-  extern "C" int __cdecl RuntimeStatusfpFromMxcsr()
+  extern "C" int __cdecl EngineStatusfpFromMxcsr()
   {
     const unsigned int mxcsr = (global_compat_flag != 0) ? static_cast<unsigned int>(_mm_getcsr()) : 0u;
     unsigned int status = 0u;
@@ -12877,7 +12878,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * What it does:
    * Invokes the active terminate handler and hard-aborts when control returns.
    */
-  [[noreturn]] void RuntimeTerminate()
+  [[noreturn]] void EngineTerminate()
   {
     const std::terminate_handler terminateHandler = std::get_terminate();
     if (terminateHandler != nullptr) {
@@ -12927,13 +12928,13 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     using RuntimeSettingFrameTarget = int(__cdecl*)();
 
     const std::uint32_t frameEbpValue = static_cast<std::uint32_t>(establisherFrame + 0x0C);
-    const auto actionTarget = reinterpret_cast<RuntimeSettingFrameTarget>(RuntimePublishNonLocalGotoState(
+    const auto actionTarget = reinterpret_cast<RuntimeSettingFrameTarget>(EnginePublishNonLocalGotoState(
       static_cast<std::uint32_t>(targetAction), frameEbpValue, static_cast<std::uint32_t>(notifyCode)
     ));
 
     const int actionResult = actionTarget();
     const int postNotifyCode = (notifyCode == 0x100) ? 2 : notifyCode;
-    return static_cast<int>(RuntimePublishNonLocalGotoState(
+    return static_cast<int>(EnginePublishNonLocalGotoState(
       static_cast<std::uint32_t>(actionResult), frameEbpValue, static_cast<std::uint32_t>(postNotifyCode)
     ));
   }
@@ -12981,7 +12982,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Scans up to `maxCount` bytes for one target byte value and returns pointer
    * to the first match (or null when not found).
    */
-  extern "C" void* __cdecl RuntimeMemchr(const void* const buffer, const int value, const std::size_t maxCount)
+  extern "C" void* __cdecl EngineMemchr(const void* const buffer, const int value, const std::size_t maxCount)
   {
     const auto* const bytes = static_cast<const std::uint8_t*>(buffer);
     const std::uint8_t needle = static_cast<std::uint8_t>(value);
@@ -13000,7 +13001,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Detects IEEE-754 NaN payload lanes from raw double bits and returns
    * non-zero when the input is NaN.
    */
-  extern "C" int __cdecl RuntimeIsnan(const double value)
+  extern "C" int __cdecl EngineIsnan(const double value)
   {
     std::uint64_t bits = 0;
     std::memcpy(&bits, &value, sizeof(bits));
@@ -13022,14 +13023,14 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Classifies one double into CRT `_FPCLASS_*` categories using recovered
    * special-value and sign/magnitude tests.
    */
-  extern "C" int __cdecl RuntimeFpclass(const double value)
+  extern "C" int __cdecl EngineFpclass(const double value)
   {
     std::uint64_t bits = 0;
     std::memcpy(&bits, &value, sizeof(bits));
     const std::uint32_t lowDword = static_cast<std::uint32_t>(bits);
     const std::uint32_t highDword = static_cast<std::uint32_t>(bits >> 32u);
 
-    switch (RuntimeClassifyDoubleWords(lowDword, highDword)) {
+    switch (EngineClassifyDoubleWords(lowDword, highDword)) {
       case 1:
         return _FPCLASS_PINF;
       case 2:
@@ -13145,7 +13146,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * it coordinates the "in-flight throw" flag with the configured
    * terminate action.
    */
-  extern "C" void __cdecl RuntimeUpdateProcessingThrowForExceptionRecord(
+  extern "C" void __cdecl EngineUpdateProcessingThrowForExceptionRecord(
     EXCEPTION_RECORD** const exceptionRecordSlot
   )
   {
@@ -13179,7 +13180,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Returns the current thread-data slot that stores the active
    * exception-pointer lane (`_tpxcptinfoptrs`).
    */
-  extern "C" void** __cdecl RuntimeGetThreadExceptionPointersSlot()
+  extern "C" void** __cdecl EngineGetThreadExceptionPointersSlot()
   {
     auto* const threadData = reinterpret_cast<RuntimeTidDataXcptView*>(__getptd());
     return (threadData != nullptr) ? &threadData->mThreadExceptionPointers : nullptr;
@@ -13192,7 +13193,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Validates one classic VC C++ EH record (`0xE06D7363` + `0x1993052x`
    * signature, rethrow lane) and marks current `_tiddata` as rethrowing.
    */
-  extern "C" int __cdecl RuntimeMarkCxxRethrowIfClassicException(EXCEPTION_RECORD** const exceptionRecordSlot)
+  extern "C" int __cdecl EngineMarkCxxRethrowIfClassicException(EXCEPTION_RECORD** const exceptionRecordSlot)
   {
     if (exceptionRecordSlot == nullptr || *exceptionRecordSlot == nullptr) {
       return 0;
@@ -13257,7 +13258,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Maps a structured float exception code to its `_FPE_*` sub-code for the
    * SIGFPE handler dispatch, falling back to `fallbackCode` for unknown codes.
    */
-  [[nodiscard]] std::int32_t RuntimeMapXcptCodeToFpe(
+  [[nodiscard]] std::int32_t EngineMapXcptCodeToFpe(
     const std::uint32_t exceptionCode,
     const std::int32_t fallbackCode
   ) noexcept
@@ -13335,7 +13336,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * initializing one record on first access without raising allocation
    * exceptions.
    */
-  [[nodiscard]] RuntimeTidDataDosErrnoView* RuntimeGetPtdNoExit()
+  [[nodiscard]] RuntimeTidDataDosErrnoView* EngineGetPtdNoExit()
   {
     const unsigned long lastError = ::GetLastError();
 
@@ -13386,7 +13387,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * (`sec/min/hour/mday/mon/year/wday/yday/isdst`) and reports `EINVAL` for
    * null or negative inputs.
    */
-  int RuntimeConvertEpochSecondsToTm32(
+  int EngineConvertEpochSecondsToTm32(
     int* const outTimeFields,
     const int* const epochSeconds
   )
@@ -13476,7 +13477,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * What it does:
    * Seeds the per-thread CRT linear-congruential random state lane.
    */
-  void __cdecl Runtime_srand(const int seed)
+  void __cdecl EngineSrand(const int seed)
   {
     auto* const threadData = reinterpret_cast<RuntimeTidDataRandomView*>(__getptd());
     threadData->mHoldRand = static_cast<std::uint32_t>(seed);
@@ -13492,7 +13493,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    */
   extern "C" int __cdecl _XcptFilter(const int exceptionCode, _EXCEPTION_POINTERS* const exceptionPointers)
   {
-    auto* const threadData = reinterpret_cast<RuntimeTidDataXcptView*>(RuntimeGetPtdNoExit());
+    auto* const threadData = reinterpret_cast<RuntimeTidDataXcptView*>(EngineGetPtdNoExit());
     if (threadData == nullptr) {
       return 0;
     }
@@ -13536,7 +13537,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
 
       const int previousFpeCode = threadData->mThreadFpeCode;
       threadData->mThreadFpeCode =
-        RuntimeMapXcptCodeToFpe(matchedAction->mExceptionCode, threadData->mThreadFpeCode);
+        EngineMapXcptCodeToFpe(matchedAction->mExceptionCode, threadData->mThreadFpeCode);
       reinterpret_cast<RuntimeFpeSignalHandler>(rawHandler)(kSignalFpe, threadData->mThreadFpeCode);
       threadData->mThreadFpeCode = previousFpeCode;
     } else {
@@ -13603,21 +13604,21 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Returns one pointer to the current thread's DOS errno lane (`_doserrno`),
    * or a process fallback lane when thread-local storage is unavailable.
    */
-  [[nodiscard]] unsigned long* RuntimeDosErrno()
+  [[nodiscard]] unsigned long* EngineDosErrno()
   {
-    if (RuntimeTidDataDosErrnoView* const threadData = RuntimeGetPtdNoExit(); threadData != nullptr) {
+    if (RuntimeTidDataDosErrnoView* const threadData = EngineGetPtdNoExit(); threadData != nullptr) {
       return &threadData->mDosErrno;
     }
 
     return &gRuntimeDosErrnoFallback;
   }
 
-  [[nodiscard]] bool RuntimeIsPathSeparator(const char value) noexcept
+  [[nodiscard]] bool EngineIsPathSeparator(const char value) noexcept
   {
     return value == '\\' || value == '/';
   }
 
-  [[nodiscard]] bool RuntimeIsPathSeparator(const wchar_t value) noexcept
+  [[nodiscard]] bool EngineIsPathSeparator(const wchar_t value) noexcept
   {
     return value == L'\\' || value == L'/';
   }
@@ -13628,7 +13629,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * What it does:
    * Thunk lane that forwards one stream clear-error request to `clearerr_s`.
    */
-  extern "C" int __cdecl RuntimeClearerrSafeThunk(std::FILE* const stream)
+  extern "C" int __cdecl EngineClearerrSafeThunk(std::FILE* const stream)
   {
     return ::clearerr_s(stream);
   }
@@ -13640,7 +13641,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Returns `0` on access success and `-1` on failure by forwarding to
    * `_waccess_s`.
    */
-  extern "C" int __cdecl RuntimeWaccess(const wchar_t* const path, const int mode)
+  extern "C" int __cdecl EngineWaccess(const wchar_t* const path, const int mode)
   {
     return (::_waccess_s(path, mode) == 0) ? 0 : -1;
   }
@@ -13651,15 +13652,15 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * What it does:
    * Returns the current file position by forwarding to `_lseek(fd, 0, SEEK_CUR)`.
    */
-  extern "C" long __cdecl RuntimeLseek32(
+  extern "C" long __cdecl EngineLseek32(
     const int fileHandle,
     const long distance,
     const int moveMethod
   );
 
-  extern "C" long __cdecl RuntimeTell(const int fileHandle)
+  extern "C" long __cdecl EngineTell(const int fileHandle)
   {
-    return RuntimeLseek32(fileHandle, 0L, SEEK_CUR);
+    return EngineLseek32(fileHandle, 0L, SEEK_CUR);
   }
 
   /**
@@ -13681,7 +13682,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * number of wide characters emitted (the terminator itself is excluded
    * from the returned count).
    */
-  extern "C" int __cdecl RuntimeSnwprintf(
+  extern "C" int __cdecl EngineSnwprintf(
     wchar_t* const buffer,
     const std::size_t count,
     const wchar_t* const format,
@@ -13720,16 +13721,16 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    *   if (curPos != endPos) _lseek_nolock(fd, curPos, SEEK_SET)
    *   return endPos
    */
-  extern "C" long __cdecl RuntimeFileLength(const int fileHandle)
+  extern "C" long __cdecl EngineFileLength(const int fileHandle)
   {
     if (fileHandle == -2) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EBADF;
       return -1L;
     }
 
     if (fileHandle < 0 || fileHandle >= _nhandle) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EBADF;
       ::_invalid_parameter_noinfo();
       return -1L;
@@ -13737,7 +13738,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
 
     RuntimeIoInfo* const ioInfo = __pioinfo[fileHandle >> 5] + (fileHandle & 0x1F);
     if ((ioInfo->osfile & 0x01u) == 0u) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EBADF;
       ::_invalid_parameter_noinfo();
       return -1L;
@@ -13764,14 +13765,14 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * IDA signature:
    * DWORD __cdecl sub_A9CB58(int a1, LONG lDistanceToMove, DWORD dwMoveMethod);
    */
-  extern "C" long __cdecl RuntimeLseek32(
+  extern "C" long __cdecl EngineLseek32(
     const int fileHandle,
     const long distance,
     const int moveMethod
   )
   {
     if (fileHandle == -2) {
-      *RuntimeDosErrno() = 0;
+      *EngineDosErrno() = 0;
       *_errno() = EBADF;
       return -1L;
     }
@@ -13789,7 +13790,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Returns the low dword of one arithmetic right shift over a signed 64-bit
    * lane, including saturated sign-fill behavior for shifts >= 64.
    */
-  extern "C" int __cdecl RuntimeArithmeticShiftRightI64ToLowDword(
+  extern "C" int __cdecl EngineArithmeticShiftRightI64ToLowDword(
     const std::int64_t value,
     const std::uint8_t shift
   ) noexcept
@@ -13813,7 +13814,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Validates whether one wide path names a UNC root/share lane:
    * `\\server\\share` (optionally with one trailing slash).
    */
-  extern "C" BOOL __cdecl RuntimeIsUncPathRootedWide(const wchar_t* const path)
+  extern "C" BOOL __cdecl EngineIsUncPathRootedWide(const wchar_t* const path)
   {
     if (path == nullptr || std::wcslen(path) < 5u) {
       return FALSE;
@@ -13858,7 +13859,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Validates whether one narrow path names a UNC root/share lane:
    * `\\server\\share` (optionally with one trailing slash).
    */
-  extern "C" BOOL __cdecl RuntimeIsUncPathRootedNarrow(const char* const path)
+  extern "C" BOOL __cdecl EngineIsUncPathRootedNarrow(const char* const path)
   {
     if (path == nullptr || std::strlen(path) < 5u) {
       return FALSE;
@@ -13924,7 +13925,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Counts non-NUL UTF-16 code units in one wide-string lane, capped by
    * `maxCount`.
    */
-  [[maybe_unused]] unsigned int RuntimeBoundedWideLength(
+  [[maybe_unused]] unsigned int EngineBoundedWideLength(
     const wchar_t* text,
     const unsigned int maxCount
   ) noexcept
@@ -13953,7 +13954,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Copies one aligned `0x80`-byte lane block per iteration from `source` to
    * `destination`, with iteration count derived from `byteCount >> 7`.
    */
-  [[maybe_unused]] void RuntimeCopyAligned128ByteBlocksSse(
+  [[maybe_unused]] void EngineCopyAligned128ByteBlocksSse(
     __m128i* destination,
     const __m128i* source,
     const unsigned int byteCount
@@ -14006,11 +14007,11 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    *   * otherwise the entire range is copied byte-wise via `std::memmove`.
    * When both lanes are 16-byte aligned, the bulk
    * `[byteCount - tailBytes)` portion is copied through
-   * `RuntimeCopyAligned128ByteBlocksSse` (FUN_00A9B1CA) in `0x80`-byte SSE
+   * `EngineCopyAligned128ByteBlocksSse` (FUN_00A9B1CA) in `0x80`-byte SSE
    * blocks; the residual `tailBytes = byteCount & 0x7F` bytes are finished
    * with `std::memmove`. Returns `destination` in all paths.
    */
-  [[maybe_unused]] void* RuntimeAlignedMemmoveDispatch(
+  [[maybe_unused]] void* EngineAlignedMemmoveDispatch(
     void* const destination,
     const void* const source,
     const std::size_t byteCount
@@ -14025,7 +14026,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
       if (destAlign == srcAlign) {
         const std::size_t leadingBytes = 16u - srcAlign;
         std::memmove(destination, source, leadingBytes);
-        (void)RuntimeAlignedMemmoveDispatch(
+        (void)EngineAlignedMemmoveDispatch(
           static_cast<char*>(destination) + leadingBytes,
           static_cast<const char*>(source) + leadingBytes,
           byteCount - leadingBytes
@@ -14038,7 +14039,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
 
     const std::size_t tailBytes = byteCount & 0x7Fu;
     if (byteCount != tailBytes) {
-      RuntimeCopyAligned128ByteBlocksSse(
+      EngineCopyAligned128ByteBlocksSse(
         static_cast<__m128i*>(destination),
         static_cast<const __m128i*>(source),
         static_cast<unsigned int>(byteCount - tailBytes)
@@ -14070,7 +14071,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     const char* const variableName
   )
   {
-    RuntimeLockGuard lockGuard(kRuntimeEnvironmentLock);
+    CrtLockGuard lockGuard(kRuntimeEnvironmentLock);
 
     if (requiredCountOut == nullptr || variableName == nullptr ||
         (destination == nullptr && destinationSize != 0u) ||
@@ -14124,8 +14125,8 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
   }
 
   // Staging pointer for the raw wide (UTF-16) environment block returned by
-  // RuntimeBuildWideEnvironmentBlock, consumed and freed by
-  // RuntimePublishWideEnvironFromBlock. Real symbol at 0x00FB8970 (`ptr` in
+  // EngineBuildWideEnvironmentBlock, consumed and freed by
+  // EnginePublishWideEnvironFromBlock. Real symbol at 0x00FB8970 (`ptr` in
   // IDA's decompile); also written by the not-yet-recovered `_wputenv`
   // internal (FUN_00ABDD6F).
   extern "C" wchar_t* gCrtRawWideEnvironmentBlock = nullptr;
@@ -14163,7 +14164,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * failure path in this function does release it). This matches the
    * shipped binary exactly, not a mistake introduced here.
    */
-  extern "C" wchar_t* __cdecl RuntimeBuildWideEnvironmentBlock()
+  extern "C" wchar_t* __cdecl EngineBuildWideEnvironmentBlock()
   {
     LPWCH nativeBlock = nullptr;
     int support = gCrtEnvironmentStringsWSupport;
@@ -14266,13 +14267,13 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    *
    * What it does:
    * Parses `gCrtRawWideEnvironmentBlock` (built by
-   * `RuntimeBuildWideEnvironmentBlock`) into `gCrtWideEnvironPointerArray`,
+   * `EngineBuildWideEnvironmentBlock`) into `gCrtWideEnvironPointerArray`,
    * one heap-owned copy per entry, skipping entries that start with `=`
    * (Windows' hidden per-drive current-directory pseudo-variables). Frees
    * the raw block and marks `__env_initialized` on success. Returns `-1`
    * if the raw block is null or any allocation fails, `0` on success.
    */
-  extern "C" int __cdecl RuntimePublishWideEnvironFromBlock()
+  extern "C" int __cdecl EnginePublishWideEnvironFromBlock()
   {
     if (gCrtRawWideEnvironmentBlock == nullptr) {
       return -1;
@@ -14327,7 +14328,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
   // The CRT's pristine, process-startup-captured wide environment array
   // pointer (real symbol at 0x00FB7D7C) -- compared against
   // gCrtWideEnvironPointerArray (0x00FB7D78) by
-  // RuntimePublishWideEnvironmentVariable to detect whether the working
+  // EnginePublishWideEnvironmentVariable to detect whether the working
   // array still just aliases the untouched startup snapshot (in which case
   // it must be privately duplicated before any in-place mutation, matching
   // the real MSVCRT `__winitenv` convention). No writer to this symbol
@@ -14361,7 +14362,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * callees thunk") -- wrong: its only real callee, `_wcsnicoll`, is
    * engine-recovered in this same file, not third-party runtime.
    */
-  [[nodiscard]] int RuntimeFindWideEnvironmentEntryIndex(
+  [[nodiscard]] int EngineFindWideEnvironmentEntryIndex(
     const std::uint32_t nameLength,
     const wchar_t* const needleName
   )
@@ -14387,14 +14388,14 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * What it does:
    * Duplicates one null-terminated `wchar_t**` environment pointer vector
    * into CRT heap storage and deep-copies each entry -- the wide sibling of
-   * `_copy_environ` above, `wcsdup` (`RuntimeWideStringDuplicate`) in place
+   * `_copy_environ` above, `wcsdup` (`EngineWideStringDuplicate`) in place
    * of `_strdup`.
    *
    * DB-integrity fix: was tagged `external_dependency` ("MSVC CRT internal
    * ... duplicator") -- wrong: its per-entry callee, `wcsdup`
-   * (`RuntimeWideStringDuplicate`), is engine-recovered in this same file.
+   * (`EngineWideStringDuplicate`), is engine-recovered in this same file.
    */
-  [[nodiscard]] wchar_t** RuntimeDuplicateWideEnvironmentArray(
+  [[nodiscard]] wchar_t** EngineDuplicateWideEnvironmentArray(
     wchar_t** const sourceArray
   )
   {
@@ -14414,18 +14415,18 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     }
 
     for (std::size_t entryIndex = 0u; entryIndex < entryCount; ++entryIndex) {
-      duplicateArray[entryIndex] = RuntimeWideStringDuplicate(sourceArray[entryIndex]);
+      duplicateArray[entryIndex] = EngineWideStringDuplicate(sourceArray[entryIndex]);
     }
     duplicateArray[entryCount] = nullptr;
     return duplicateArray;
   }
 
-  // Forward declaration: RuntimePublishWideEnvironmentVariable's own
-  // bootstrap path can call RuntimeSyncWideEnvironFromAnsiFallback (real
+  // Forward declaration: EnginePublishWideEnvironmentVariable's own
+  // bootstrap path can call EngineSyncWideEnvironFromAnsiFallback (real
   // definition below, at 0x00AAEA1D), which is itself defined in terms of
-  // RuntimePublishWideEnvironmentVariable -- a genuine mutual recursion in
+  // EnginePublishWideEnvironmentVariable -- a genuine mutual recursion in
   // the shipped binary, not a layering mistake here.
-  extern "C" int __cdecl RuntimeSyncWideEnvironFromAnsiFallback();
+  extern "C" int __cdecl EngineSyncWideEnvironFromAnsiFallback();
 
   /**
    * Address: 0x00ABDD6F (FUN_00ABDD6F, sub_ABDD6F)
@@ -14443,16 +14444,16 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * If the working array (`gCrtWideEnvironPointerArray`) still just
    * aliases the pristine startup snapshot (`gCrtWideEnvironStartupSnapshot`
    * -- this also covers "not yet built at all", since both start null), it
-   * is first privately duplicated via `RuntimeDuplicateWideEnvironmentArray`.
+   * is first privately duplicated via `EngineDuplicateWideEnvironmentArray`.
    * If no array is available even after that: when `synchronizeNativeEnvironment`
    * is set and `_wenviron` exists, attempts the native rebuild chain
-   * (`RuntimeBuildWideEnvironmentBlock` + `RuntimePublishWideEnvironFromBlock`,
-   * falling back to `RuntimeSyncWideEnvironFromAnsiFallback` -- the mutual-
+   * (`EngineBuildWideEnvironmentBlock` + `EnginePublishWideEnvironFromBlock`,
+   * falling back to `EngineSyncWideEnvironFromAnsiFallback` -- the mutual-
    * recursion partner that reaches this function itself, always with
    * `synchronizeNativeEnvironment=false`); otherwise bootstraps both
    * `_wenviron` and the working array as fresh single-null-entry arrays.
    *
-   * Looks up an existing entry by name (`RuntimeFindWideEnvironmentEntryIndex`).
+   * Looks up an existing entry by name (`EngineFindWideEnvironmentEntryIndex`).
    * If found: on a delete request, shifts every later entry down by one slot
    * and shrinks the array (`__recalloc_crt`); otherwise replaces the
    * existing entry's string in place. If not found: on a delete request
@@ -14470,16 +14471,16 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * OS publish -- matches the shipped binary exactly, not a mistake
    * introduced here.
    *
-   * Real caller: `RuntimeSyncWideEnvironFromAnsiFallback` (0x00AAEA1D,
+   * Real caller: `EngineSyncWideEnvironFromAnsiFallback` (0x00AAEA1D,
    * cited below), always with `synchronizeNativeEnvironment=false` -- the
    * only reachable call path for this function in this binary, matching
-   * `RuntimeSyncWideEnvironFromAnsiFallback`'s own status as a dead-in-
+   * `EngineSyncWideEnvironFromAnsiFallback`'s own status as a dead-in-
    * practice pre-NT fallback. The `synchronizeNativeEnvironment=true`
    * branches are preserved faithfully (this is the shared general-purpose
    * CRT internal) even though nothing in this binary's reachable call
    * graph currently exercises them.
    */
-  int RuntimePublishWideEnvironmentVariable(
+  int EnginePublishWideEnvironmentVariable(
     wchar_t** const assignmentSlot,
     const bool synchronizeNativeEnvironment
   )
@@ -14507,14 +14508,14 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
 
     wchar_t** workingArray = gCrtWideEnvironPointerArray;
     if (gCrtWideEnvironPointerArray == gCrtWideEnvironStartupSnapshot) {
-      workingArray = RuntimeDuplicateWideEnvironmentArray(gCrtWideEnvironPointerArray);
+      workingArray = EngineDuplicateWideEnvironmentArray(gCrtWideEnvironPointerArray);
       gCrtWideEnvironPointerArray = workingArray;
     }
 
     if (workingArray == nullptr) {
       if (synchronizeNativeEnvironment && _wenviron != nullptr) {
-        gCrtRawWideEnvironmentBlock = RuntimeBuildWideEnvironmentBlock();
-        if (RuntimePublishWideEnvironFromBlock() < 0 && RuntimeSyncWideEnvironFromAnsiFallback() != 0) {
+        gCrtRawWideEnvironmentBlock = EngineBuildWideEnvironmentBlock();
+        if (EnginePublishWideEnvironFromBlock() < 0 && EngineSyncWideEnvironFromAnsiFallback() != 0) {
           *_errno() = EINVAL;
           return -1;
         }
@@ -14546,7 +14547,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     }
 
     int publishResult = 0;
-    const int matchIndex = RuntimeFindWideEnvironmentEntryIndex(nameLength, newAssignment);
+    const int matchIndex = EngineFindWideEnvironmentEntryIndex(nameLength, newAssignment);
     if (matchIndex < 0 || gCrtWideEnvironPointerArray[0] == nullptr) {
       if (!isDeleteRequest) {
         const std::size_t existingCount = (matchIndex < 0) ? static_cast<std::size_t>(-matchIndex) : 0u;
@@ -14677,8 +14678,8 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    *
    * What it does:
    * ANSI-to-wide environment sync fallback, reached from
-   * `RuntimeGetWideEnvironmentValue` only when `_wenviron` is already
-   * non-null but `RuntimePublishWideEnvironFromBlock` fails on the pre-NT
+   * `EngineGetWideEnvironmentValue` only when `_wenviron` is already
+   * non-null but `EnginePublishWideEnvironFromBlock` fails on the pre-NT
    * `GetEnvironmentStringsW`-unsupported path (dead in practice on every
    * Windows version this game targets).
    *
@@ -14695,13 +14696,13 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    *
    * For each `_wenviron` entry: probes the required wide buffer length via
    * `MultiByteToWideChar`, allocates it, converts, and publishes the result
-   * through `RuntimePublishWideEnvironmentVariable` (with
+   * through `EnginePublishWideEnvironmentVariable` (with
    * `synchronizeNativeEnvironment=false` -- this function is the mutual-
    * recursion fallback partner that function's own bootstrap path can
    * reach). Returns 0 once every entry has been processed, or -1 on the
    * first conversion, allocation, or publish failure.
    */
-  extern "C" int __cdecl RuntimeSyncWideEnvironFromAnsiFallback()
+  extern "C" int __cdecl EngineSyncWideEnvironFromAnsiFallback()
   {
     wchar_t** environEntry = _wenviron;
     if (*environEntry == nullptr) {
@@ -14727,7 +14728,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
         return -1;
       }
 
-      if (RuntimePublishWideEnvironmentVariable(&convertedEntry, false) < 0) {
+      if (EnginePublishWideEnvironmentVariable(&convertedEntry, false) < 0) {
         if (convertedEntry != nullptr) {
           _free_crt(convertedEntry);
         }
@@ -14751,9 +14752,9 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * What it does:
    * The real VC8 `_wgetenv` implementation. Bails if `__env_initialized`
    * is false. If `gCrtWideEnvironPointerArray` is not yet built, and
-   * `_wenviron` is set, lazily builds it -- `RuntimeBuildWideEnvironmentBlock`
-   * then `RuntimePublishWideEnvironFromBlock`, falling back to
-   * `RuntimeSyncWideEnvironFromAnsiFallback` only if that fails. Once the
+   * `_wenviron` is set, lazily builds it -- `EngineBuildWideEnvironmentBlock`
+   * then `EnginePublishWideEnvironFromBlock`, falling back to
+   * `EngineSyncWideEnvironFromAnsiFallback` only if that fails. Once the
    * array is available, linear-scans it for a `NAME=value` entry whose
    * name matches `variableName` case-insensitively (`_wcsnicoll`), and
    * returns a pointer just past the `=`.
@@ -14765,7 +14766,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * does not touch this VC8-shaped `gCrtWideEnvironPointerArray` state at
    * all and was a placeholder pending this recovery.
    */
-  extern "C" const wchar_t* __cdecl RuntimeGetWideEnvironmentValue(const wchar_t* const variableName)
+  extern "C" const wchar_t* __cdecl EngineGetWideEnvironmentValue(const wchar_t* const variableName)
   {
     const wchar_t* const* environArray = gCrtWideEnvironPointerArray;
 
@@ -14775,8 +14776,8 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
 
     const bool ready = (gCrtWideEnvironPointerArray != nullptr) || (
       _wenviron != nullptr &&
-      ((gCrtRawWideEnvironmentBlock = RuntimeBuildWideEnvironmentBlock(), RuntimePublishWideEnvironFromBlock() >= 0) ||
-       !RuntimeSyncWideEnvironFromAnsiFallback()) &&
+      ((gCrtRawWideEnvironmentBlock = EngineBuildWideEnvironmentBlock(), EnginePublishWideEnvironFromBlock() >= 0) ||
+       !EngineSyncWideEnvironFromAnsiFallback()) &&
       (environArray = gCrtWideEnvironPointerArray) != nullptr
     );
 
@@ -14802,7 +14803,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
    * Duplicates one wide environment variable value into caller-owned heap
    * storage and reports the required UTF-16 element count.
    *
-   * Real callsite evidence for `RuntimeGetWideEnvironmentValue`: this
+   * Real callsite evidence for `EngineGetWideEnvironmentValue`: this
    * function's raw decompile (`FUN_00A90B12.c`) shows
    * `v3 = sub_A907EB(a3);` -- a direct call to the VC8 `_wgetenv` internal,
    * not to some generic CRT entry point. Previously called the modern
@@ -14816,7 +14817,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     const wchar_t* const variableName
   )
   {
-    RuntimeLockGuard lockGuard(kRuntimeEnvironmentLock);
+    CrtLockGuard lockGuard(kRuntimeEnvironmentLock);
 
     if (duplicatedValueOut == nullptr || variableName == nullptr) {
       if (requiredCountOut != nullptr) {
@@ -14831,7 +14832,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
       *requiredCountOut = 0u;
     }
 
-    const wchar_t* const source = RuntimeGetWideEnvironmentValue(variableName);
+    const wchar_t* const source = EngineGetWideEnvironmentValue(variableName);
     if (source == nullptr) {
       return 0;
     }
@@ -14877,7 +14878,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     const int maxLength
   )
   {
-    RuntimeLockGuard lockGuard(kRuntimeEnvironmentLock);
+    CrtLockGuard lockGuard(kRuntimeEnvironmentLock);
     // `::_wgetdcwd_nolock` is the same no-lock drive-relative worker the
     // binary's `sub_A9113F` (called here as `sub_A9113F(0, lpBuffer, a2)`)
     // implements: drive 0 means "the current drive".
@@ -14948,7 +14949,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     );
   }
 
-  [[noreturn]] void RuntimeRaiseEhFrameConsistencyFailure()
+  [[noreturn]] void EngineRaiseEhFrameConsistencyFailure()
   {
     _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
     std::abort();
@@ -14977,7 +14978,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
       const unsigned int previousRangeEnd = scanIndex;
       while (true) {
         if (scanIndex == static_cast<unsigned int>(-1)) {
-          RuntimeRaiseEhFrameConsistencyFailure();
+          EngineRaiseEhFrameConsistencyFailure();
         }
 
         const RuntimeTryBlockMapEntry* const entry = &tryBlocks[--scanIndex];
@@ -14994,7 +14995,7 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     *outRangeStart = rangeStart;
     *outRangeEnd = rangeEnd;
     if (rangeEnd > funcInfo->tryBlockCount || rangeStart > rangeEnd) {
-      RuntimeRaiseEhFrameConsistencyFailure();
+      EngineRaiseEhFrameConsistencyFailure();
     }
 
     return &tryBlocks[rangeStart];
@@ -15094,13 +15095,13 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Publishes non-local-goto notification state (`notifyCode = 1`) for an EH4
    * filter callback, then invokes that filter with zeroed argument lanes.
    */
-  extern "C" int __fastcall RuntimeCallEh4FilterWithNlgNotify(
+  extern "C" int __fastcall EngineCallEh4FilterWithNlgNotify(
     int (__fastcall* const filterCallback)(std::uint32_t, std::uint32_t),
     const std::uint32_t frameBase
   )
   {
     const std::uint32_t callbackLane = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(filterCallback));
-    (void)RuntimePublishNonLocalGotoState(callbackLane, frameBase, 1u);
+    (void)EnginePublishNonLocalGotoState(callbackLane, frameBase, 1u);
     return filterCallback(0u, 0u);
   }
 
@@ -15111,7 +15112,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Performs the EH4 global unwind lane by issuing `RtlUnwind` toward one
    * local resume label.
    */
-  extern "C" void __cdecl RuntimeEh4GlobalUnwind2(PVOID targetFrame)
+  extern "C" void __cdecl EngineEh4GlobalUnwind2(PVOID targetFrame)
   {
     void* targetInstructionPointer = nullptr;
     __asm
@@ -15131,7 +15132,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Performs the EH3 global unwind lane by issuing `RtlUnwind` toward one
    * local resume label.
    */
-  extern "C" void __cdecl RuntimeEh3GlobalUnwind2(PVOID targetFrame)
+  extern "C" void __cdecl EngineEh3GlobalUnwind2(PVOID targetFrame)
   {
     void* targetInstructionPointer = nullptr;
     __asm
@@ -15227,7 +15228,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Appends one C-string into a caller buffer with CRT invalid-parameter and
    * errno semantics for invalid arguments and overflow.
    */
-  errno_t RuntimeStrcatS(char* const destination, const std::size_t sizeInBytes, const char* const source)
+  errno_t EngineStrcatS(char* const destination, const std::size_t sizeInBytes, const char* const source)
   {
     if (destination == nullptr || sizeInBytes == 0u) {
       *_errno() = EINVAL;
@@ -15324,7 +15325,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     va_start(sourceList, sourceCount);
     while (sourceCount > 0) {
       const char* const source = va_arg(sourceList, const char*);
-      if (RuntimeStrcatS(destination, destinationSize, source) != 0) {
+      if (EngineStrcatS(destination, destinationSize, source) != 0) {
         va_end(sourceList);
         _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
         return;
@@ -15360,7 +15361,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Releases one CRT locale bundle by decrementing mbc/locinfo refcounts,
    * freeing non-initial blocks, and poisoning/freeing the locale handle.
    */
-  void RuntimeFreeLocale(RuntimeLocaleHandle* const locale)
+  void EngineFreeLocale(RuntimeLocaleHandle* const locale)
   {
     if (locale == nullptr) {
       return;
@@ -15375,7 +15376,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
     RuntimeThreadLocInfo* const locInfo = locale->locinfo;
     if (locInfo != nullptr) {
-      RuntimeLockGuard setLocaleLock(kRuntimeSetLocaleLock);
+      CrtLockGuard setLocaleLock(kRuntimeSetLocaleLock);
       ::__removelocaleref(locInfo);
       if (locInfo->refcount == 0 && locInfo != &__initiallocinfo) {
         ::__freetlocinfo(locInfo);
@@ -15396,7 +15397,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Initializes one locale implementation lane with default facet/category
    * state and seeds the locale name to `"*"`.
    */
-  RuntimeLocaleLocimpView* RuntimeLocaleLocimpConstruct(RuntimeLocaleLocimpView* const localeImpl, const bool isParent)
+  RuntimeLocaleLocimpView* EngineLocaleLocimpConstruct(RuntimeLocaleLocimpView* const localeImpl, const bool isParent)
   {
     localeImpl->refs = 1;
     localeImpl->facetVector = nullptr;
@@ -15407,7 +15408,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return localeImpl;
   }
 
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocCommon(const unsigned int count, const unsigned int elementSize)
+  [[nodiscard]] void* EngineAllocateArrayWithBadAllocCommon(const unsigned int count, const unsigned int elementSize)
   {
     if (count != 0u && (std::numeric_limits<unsigned int>::max() / count) < elementSize) {
       throw std::bad_alloc();
@@ -15416,7 +15417,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return ::operator new(static_cast<std::size_t>(elementSize) * count);
   }
 
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane021(const unsigned int count);
+  [[nodiscard]] void* EngineAllocateArrayWithBadAllocLane021(const unsigned int count);
 
   /**
    * Address: 0x00533620 (FUN_00533620)
@@ -15425,9 +15426,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Allocates one `20`-byte element array lane and throws `std::bad_alloc`
    * when the 32-bit count multiplication overflows.
    */
-  [[nodiscard]] void* RuntimeAllocateArrayWithBadAllocLane009(const unsigned int count)
+  [[nodiscard]] void* EngineAllocateArrayWithBadAllocLane009(const unsigned int count)
   {
-    return RuntimeAllocateArrayWithBadAllocCommon(count, 20u);
+    return EngineAllocateArrayWithBadAllocCommon(count, 20u);
   }
 
   std::uint8_t gRuntimeByte54741F = 0;
@@ -15503,7 +15504,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeDispatchSlot24VTable* vtable = nullptr; // +0x00
   };
 
-  void RuntimeReleaseSharedControlBlock(RuntimeSharedControlBlockView* const sharedControl)
+  void EngineReleaseSharedControlBlock(RuntimeSharedControlBlockView* const sharedControl)
   {
     if (sharedControl == nullptr) {
       return;
@@ -15523,9 +15524,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * What it does:
    * Throws the legacy VC8 map/set growth overflow length-error diagnostic.
    */
-  [[noreturn]] void RuntimeThrowMapSetTooLongQ()
+  [[noreturn]] void EngineThrowMapSetTooLongQ()
   {
-    RuntimeThrowContainerTooLong("map/set<T> too long");
+    EngineThrowContainerTooLong("map/set<T> too long");
   }
 
   /**
@@ -15534,12 +15535,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * What it does:
    * Throws the legacy VC8 vector growth overflow length-error diagnostic.
    */
-  [[noreturn]] void RuntimeThrowVectorTooLongBW()
+  [[noreturn]] void EngineThrowVectorTooLongBW()
   {
-    RuntimeThrowContainerTooLong("vector<T> too long");
+    EngineThrowContainerTooLong("vector<T> too long");
   }
 
-  [[noreturn]] void RuntimeThrowListTooLongS();
+  [[noreturn]] void EngineThrowListTooLongS();
 
   /**
    * Address: 0x0082F5D0 (FUN_0082F5D0)
@@ -15547,9 +15548,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * What it does:
    * Throws the legacy VC8 list growth overflow length-error diagnostic.
    */
-  [[noreturn]] void RuntimeThrowListTooLongS()
+  [[noreturn]] void EngineThrowListTooLongS()
   {
-    RuntimeThrowContainerTooLong("list<T> too long");
+    EngineThrowContainerTooLong("list<T> too long");
   }
 
   struct RuntimeSharedControlPairEntry
@@ -15660,13 +15661,13 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     virtual ~RuntimeFacetDeleteDispatchBase() = default;
   };
 
-  void RuntimeDestroyFacetPolymorphic(std::locale::facet* const facet)
+  void EngineDestroyFacetPolymorphic(std::locale::facet* const facet)
   {
     auto* const dispatchBase = reinterpret_cast<RuntimeFacetDeleteDispatchBase*>(facet);
     delete dispatchBase;
   }
 
-  [[nodiscard]] std::locale::facet* RuntimeLocaleFacetDecref(std::locale::facet* const facet)
+  [[nodiscard]] std::locale::facet* EngineLocaleFacetDecref(std::locale::facet* const facet)
   {
     auto* const view = reinterpret_cast<RuntimeFacetRefView*>(facet);
     --view->refs;
@@ -15683,7 +15684,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Decrements one facet pointer lane and deletes the facet when the reference
    * count reaches zero.
    */
-  std::locale::facet* RuntimeReleaseFacetSlot(std::locale::facet** const facetSlot)
+  std::locale::facet* EngineReleaseFacetSlot(std::locale::facet** const facetSlot)
   {
     if (facetSlot == nullptr) {
       return nullptr;
@@ -15694,9 +15695,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       return reinterpret_cast<std::locale::facet*>(facetSlot);
     }
 
-    std::locale::facet* const releasedFacet = RuntimeLocaleFacetDecref(facet);
+    std::locale::facet* const releasedFacet = EngineLocaleFacetDecref(facet);
     if (releasedFacet != nullptr) {
-      RuntimeDestroyFacetPolymorphic(releasedFacet);
+      EngineDestroyFacetPolymorphic(releasedFacet);
       return releasedFacet;
     }
     return nullptr;
@@ -15709,13 +15710,13 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Under `_Lockit(0)`, releases one global locale facet lane and clears the
    * process-global locale pointer.
    */
-  void RuntimeTidyGlobalLocale()
+  void EngineTidyGlobalLocale()
   {
     RuntimeLockitState lockit{};
-    RuntimeLockitConstruct(&lockit, 0);
-    RuntimeReleaseFacetSlot(reinterpret_cast<std::locale::facet**>(&gRuntimeGlobalLocale));
+    EngineLockitConstruct(&lockit, 0);
+    EngineReleaseFacetSlot(reinterpret_cast<std::locale::facet**>(&gRuntimeGlobalLocale));
     gRuntimeGlobalLocale = nullptr;
-    RuntimeLockitDestroy(&lockit);
+    EngineLockitDestroy(&lockit);
   }
 
   /**
@@ -15724,7 +15725,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * What it does:
    * Returns the process-global locale implementation pointer.
    */
-  RuntimeLocaleLocimpView* RuntimeGetGlobalLocale()
+  RuntimeLocaleLocimpView* EngineGetGlobalLocale()
   {
     return gRuntimeGlobalLocale;
   }
@@ -15736,11 +15737,11 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * One-time registers global locale tidy callback and updates the process
    * global locale implementation pointer.
    */
-  RuntimeLocaleLocimpView* RuntimeSetGlobalLocale(RuntimeLocaleLocimpView* const localeImpl)
+  RuntimeLocaleLocimpView* EngineSetGlobalLocale(RuntimeLocaleLocimpView* const localeImpl)
   {
     if (gRuntimeGlobalLocaleAtexitRegistered == 0) {
       gRuntimeGlobalLocaleAtexitRegistered = 1;
-      std::atexit(RuntimeTidyGlobalLocale);
+      std::atexit(EngineTidyGlobalLocale);
     }
 
     gRuntimeGlobalLocale = localeImpl;
@@ -15754,7 +15755,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Lazily initializes the process-global `"C"` locale implementation under
    * `_Lockit(0)`, seeds classic-locale pointers, and bumps facet refs.
    */
-  RuntimeLocaleLocimpView* RuntimeLocaleInit()
+  RuntimeLocaleLocimpView* EngineLocaleInit()
   {
     RuntimeLocaleLocimpView* localeImpl = gRuntimeGlobalLocale;
     if (localeImpl != nullptr) {
@@ -15762,20 +15763,20 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
 
     RuntimeLockitState lockit{};
-    RuntimeLockitConstruct(&lockit, 0);
+    EngineLockitConstruct(&lockit, 0);
 
     localeImpl = gRuntimeGlobalLocale;
     if (localeImpl == nullptr) {
       auto* const storage = static_cast<RuntimeLocaleLocimpView*>(::operator new(sizeof(RuntimeLocaleLocimpView)));
       try {
-        localeImpl = RuntimeLocaleLocimpConstruct(storage, false);
+        localeImpl = EngineLocaleLocimpConstruct(storage, false);
       } catch (...) {
         ::operator delete(storage);
-        RuntimeLockitDestroy(&lockit);
+        EngineLockitDestroy(&lockit);
         throw;
       }
 
-      RuntimeSetGlobalLocale(localeImpl);
+      EngineSetGlobalLocale(localeImpl);
       localeImpl->categoryMask = 0x3F;
       localeImpl->name.assign("C");
       gRuntimeClassicLocale = localeImpl;
@@ -15783,16 +15784,16 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       gRuntimeClassicLocaleObject.ptr = gRuntimeClassicLocale;
     }
 
-    RuntimeLockitDestroy(&lockit);
+    EngineLockitDestroy(&lockit);
     return localeImpl;
   }
 
-  [[nodiscard]] std::size_t RuntimeCodePageHashBucket(const std::uint32_t codePage) noexcept
+  [[nodiscard]] std::size_t EngineCodePageHashBucket(const std::uint32_t codePage) noexcept
   {
     return static_cast<std::size_t>(codePage % static_cast<std::uint32_t>(kRuntimeCodePageLocaleHashBucketCount));
   }
 
-  [[nodiscard]] int RuntimeGetCodePageMaxCharBytes(const RuntimeLocaleHandle* const locale, const UINT fallbackCodePage)
+  [[nodiscard]] int EngineGetCodePageMaxCharBytes(const RuntimeLocaleHandle* const locale, const UINT fallbackCodePage)
   {
     // `RuntimeLocaleHandle` is layout-identical to the real `_locale_tstruct`
     // (`{locinfo, mbcinfo}`, both single pointers) -- FUN_00AA64B2's real body
@@ -15822,7 +15823,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Builds one `".<codepage>"` locale descriptor and creates a CRT locale
    * bundle for that codepage lane.
    */
-  RuntimeLocaleHandle* RuntimeCreateCodePageLocale(const std::uint32_t codePage)
+  RuntimeLocaleHandle* EngineCreateCodePageLocale(const std::uint32_t codePage)
   {
     char codePageText[31] = {};
     if (_ultoa_s(static_cast<unsigned long>(codePage), codePageText, _countof(codePageText), 10) != 0) {
@@ -15830,7 +15831,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
 
     char localeName[32] = ".";
-    if (RuntimeStrcatS(localeName, _countof(localeName), codePageText) != 0) {
+    if (EngineStrcatS(localeName, _countof(localeName), codePageText) != 0) {
       return nullptr;
     }
 
@@ -15844,9 +15845,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Returns one cached CRT locale handle for a codepage lane, creating and
    * atomically publishing a new cache node when no match exists.
    */
-  RuntimeLocaleHandle* RuntimeGetCachedCodePageLocale(const std::uint32_t codePage)
+  RuntimeLocaleHandle* EngineGetCachedCodePageLocale(const std::uint32_t codePage)
   {
-    const std::size_t bucketIndex = RuntimeCodePageHashBucket(codePage);
+    const std::size_t bucketIndex = EngineCodePageHashBucket(codePage);
     auto* const bucket = reinterpret_cast<PVOID volatile*>(&gRuntimeCodePageLocaleHash[bucketIndex]);
 
     RuntimeCodePageLocaleHashEntry* pendingEntry = nullptr;
@@ -15856,7 +15857,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       while (probe != nullptr) {
         if (probe->codePage == codePage) {
           if (pendingEntry != nullptr) {
-            RuntimeFreeLocale(pendingEntry->locale);
+            EngineFreeLocale(pendingEntry->locale);
             _free_crt(pendingEntry);
           }
           return probe->locale;
@@ -15870,7 +15871,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
           return nullptr;
         }
 
-        RuntimeLocaleHandle* const locale = RuntimeCreateCodePageLocale(codePage);
+        RuntimeLocaleHandle* const locale = EngineCreateCodePageLocale(codePage);
         pendingEntry->locale = locale;
         if (locale == nullptr) {
           _free_crt(pendingEntry);
@@ -15887,7 +15888,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
   }
 
-  int RuntimeMultiByteToWideStep(
+  int EngineMultiByteToWideStep(
     wchar_t* destinationWideChar,
     const char* sourceBytes,
     const unsigned int sourceByteCount,
@@ -15902,7 +15903,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Converts one multibyte step to wide-char under `_Cvtvec` locale lanes,
    * including pending-lead-byte state handling and `EILSEQ` error semantics.
    */
-  int RuntimeMultiByteToWideStep(
+  int EngineMultiByteToWideStep(
     wchar_t* const destinationWideChar,
     const char* const sourceBytes,
     const unsigned int sourceByteCount,
@@ -15941,11 +15942,11 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       return 1;
     }
 
-    RuntimeLocaleHandle* const codePageLocale = RuntimeGetCachedCodePageLocale(codePage);
+    RuntimeLocaleHandle* const codePageLocale = EngineGetCachedCodePageLocale(codePage);
     auto* const pendingState = reinterpret_cast<std::uint32_t*>(pendingStateBytes);
     if (*pendingState != 0u) {
       pendingStateBytes[1] = sourceBytes[0];
-      const int maxCharBytes = RuntimeGetCodePageMaxCharBytes(codePageLocale, codePage);
+      const int maxCharBytes = EngineGetCodePageMaxCharBytes(codePageLocale, codePage);
       if (maxCharBytes > 1
           && ::MultiByteToWideChar(
             codePage,
@@ -15994,7 +15995,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       return -1;
     }
 
-    const int maxCharBytes = RuntimeGetCodePageMaxCharBytes(codePageLocale, codePage);
+    const int maxCharBytes = EngineGetCodePageMaxCharBytes(codePageLocale, codePage);
     if (sourceByteCount < static_cast<unsigned int>(maxCharBytes)) {
       pendingStateBytes[0] = sourceBytes[0];
       return -2;
@@ -16043,18 +16044,18 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * `_IOB_SCAN_LOCK`, then tears down/free-caches dynamic stream slots
    * (`index >= 20`) and returns successful close count.
    */
-  int RuntimeFcloseall()
+  int EngineFcloseall()
   {
     int closedStreamCount = 0;
 
-    RuntimeLockGuard scanLock(kRuntimeIobScanLock);
+    CrtLockGuard scanLock(kRuntimeIobScanLock);
     for (int streamIndex = 3; streamIndex < static_cast<int>(_nstream); ++streamIndex) {
       std::FILE* const stream = __piob[streamIndex];
       if (stream == nullptr) {
         continue;
       }
 
-      if ((RuntimeGetFileFlags(stream) & kRuntimeFileFlagFlushMask) != 0 && std::fclose(stream) != -1) {
+      if ((EngineGetFileFlags(stream) & kRuntimeFileFlagFlushMask) != 0 && std::fclose(stream) != -1) {
         ++closedStreamCount;
       }
 
@@ -16079,7 +16080,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    */
   extern "C" int __cdecl _flush(std::FILE* const stream)
   {
-    const int streamFlags = RuntimeGetFileFlags(stream);
+    const int streamFlags = EngineGetFileFlags(stream);
     int flushStatus = 0;
     if ((streamFlags & 0x3) == 0x2 && (streamFlags & 0x108) != 0) {
       char* const base = legacy_file(stream)._base;
@@ -16109,24 +16110,24 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Walks CRT stream slots under `_IOB_SCAN_LOCK`, locks each active FILE lane
    * with `__lock_file2`, and performs mode-gated `_fflush_nolock` dispatch.
    */
-  int RuntimeFlushAllStreams(const int mode)
+  int EngineFlushAllStreams(const int mode)
   {
     int flushCount = 0;
     int flushFailure = 0;
 
-    RuntimeLockGuard scanLock(kRuntimeIobScanLock);
+    CrtLockGuard scanLock(kRuntimeIobScanLock);
     for (int streamIndex = 0; streamIndex < static_cast<int>(_nstream); ++streamIndex) {
       std::FILE* const stream = __piob[streamIndex];
       if (stream == nullptr) {
         continue;
       }
 
-      if ((RuntimeGetFileFlags(stream) & kRuntimeFileFlagFlushMask) == 0) {
+      if ((EngineGetFileFlags(stream) & kRuntimeFileFlagFlushMask) == 0) {
         continue;
       }
 
-      RuntimeFileLock2Guard streamLock(streamIndex, stream);
-      const int streamFlags = RuntimeGetFileFlags(stream);
+      FileLock2Guard streamLock(streamIndex, stream);
+      const int streamFlags = EngineGetFileFlags(stream);
       if ((streamFlags & kRuntimeFileFlagFlushMask) == 0) {
         continue;
       }
@@ -16157,7 +16158,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    */
   extern "C" int __cdecl _flushall()
   {
-    return RuntimeFlushAllStreams(1);
+    return EngineFlushAllStreams(1);
   }
 
   /**
@@ -16169,9 +16170,9 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    */
   extern "C" void __cdecl __endstdio()
   {
-    (void)RuntimeFlushAllStreams(1);
+    (void)EngineFlushAllStreams(1);
     if (_exitflag != 0u) {
-      (void)RuntimeFcloseall();
+      (void)EngineFcloseall();
     }
     _free_crt(__piob);
   }
@@ -16199,7 +16200,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   extern "C" int __cdecl _fflush_nolock(std::FILE* const stream)
   {
     if (stream == nullptr) {
-      return RuntimeFlushAllStreams(0);
+      return EngineFlushAllStreams(0);
     }
 
     if (_flush(stream) != 0) {
@@ -16278,7 +16279,7 @@ extern "C" std::size_t __cdecl __Strftime(
  * What it does:
  * Returns one process-global runtime storage scalar lane.
  */
-extern "C" int __cdecl RuntimeGetStaticStorageIntLane()
+extern "C" int __cdecl EngineGetStaticStorageIntLane()
 {
   return gRuntimeStaticStorageSlotB;
 }
@@ -16289,7 +16290,7 @@ extern "C" int __cdecl RuntimeGetStaticStorageIntLane()
  * What it does:
  * Returns the address of one process-global runtime storage lane.
  */
-extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
+extern "C" void* __cdecl EngineGetStaticStoragePointerLane()
 {
   return &gRuntimeStaticStorageSlotC;
 }
@@ -16530,11 +16531,11 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
    */
   extern "C" void __cdecl _termcon()
   {
-    if (RuntimeConsoleHandleIsClosable(gConsoleOutputHandle)) {
+    if (EngineConsoleHandleIsClosable(gConsoleOutputHandle)) {
       ::CloseHandle(gConsoleOutputHandle);
     }
 
-    if (RuntimeConsoleHandleIsClosable(gConsoleInputHandle)) {
+    if (EngineConsoleHandleIsClosable(gConsoleInputHandle)) {
       ::CloseHandle(gConsoleInputHandle);
     }
   }
@@ -16576,7 +16577,7 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
     }
 
     for (std::size_t entryIndex = 0u; entryIndex < entryCount; ++entryIndex) {
-      copiedEnvironment[entryIndex] = RuntimeStrdup(sourceEnvironment[entryIndex]);
+      copiedEnvironment[entryIndex] = EngineStrdup(sourceEnvironment[entryIndex]);
     }
     copiedEnvironment[entryCount] = nullptr;
     return copiedEnvironment;
@@ -16589,7 +16590,7 @@ extern "C" void* __cdecl RuntimeGetStaticStoragePointerLane()
    * Returns the number of UTF-16 code units before NUL, bounded by
    * `maxCharacters`.
    */
-  [[maybe_unused]] int RuntimeBoundedWideLength(
+  [[maybe_unused]] int EngineBoundedWideLength(
     const std::uint16_t* text,
     const int maxCharacters
   ) noexcept
@@ -16705,7 +16706,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
    * CRT internal used by the printf/scanf float formatting family, distinct
    * from `floor`/`ceil`'s fixed-direction rounding.
    */
-  extern "C" double __cdecl RuntimeRoundDoubleToNearestFpuMode(const double value)
+  extern "C" double __cdecl EngineRoundDoubleToNearestFpuMode(const double value)
   {
     return std::nearbyint(value);
   }
@@ -16724,7 +16725,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
    * - when source is empty, writes a single terminator and returns zero,
    * - otherwise forwards to the locale-aware converter with no locale.
    */
-  extern "C" std::size_t __cdecl RuntimeWcsToMbs(
+  extern "C" std::size_t __cdecl EngineWcsToMbs(
     char* destination,
     const wchar_t* const wideSource,
     std::size_t maxNarrowBytes
@@ -16928,7 +16929,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
       return 0;
     }
 
-    const RuntimeLocaleUpdateScope locale(localeInfo);
+    const LocaleUpdateScope locale(localeInfo);
 
     if (!locale.isMultibyteCodePage()) {
       return std::strncmp(
@@ -17030,7 +17031,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     _locale_t const localeInfo
   )
   {
-    const RuntimeLocaleUpdateScope locale(localeInfo);
+    const LocaleUpdateScope locale(localeInfo);
 
     if (text == nullptr) {
       *_errno() = EINVAL;
@@ -17088,7 +17089,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     _locale_t const localeInfo
   )
   {
-    const RuntimeLocaleUpdateScope locale(localeInfo);
+    const LocaleUpdateScope locale(localeInfo);
 
     if (!locale.isMultibyteCodePage()) {
       return reinterpret_cast<unsigned char*>(
@@ -17161,7 +17162,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
       return 0;
     }
 
-    const RuntimeLocaleUpdateScope locale(localeInfo);
+    const LocaleUpdateScope locale(localeInfo);
 
     if (lhsBuffer == nullptr || rhsBuffer == nullptr || byteCount > 0x7FFFFFFFu) {
       *_errno() = EINVAL;
@@ -17173,7 +17174,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     const auto* rhsBytes = static_cast<const unsigned char*>(rhsBuffer);
 
     if (locale.loc()->lcHandle[2] == 0) {
-      return RuntimeAsciiMemicmp(lhsBytes, rhsBytes, static_cast<int>(byteCount));
+      return EngineAsciiMemicmp(lhsBytes, rhsBytes, static_cast<int>(byteCount));
     }
 
     std::size_t remaining = byteCount;
@@ -17210,7 +17211,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     _locale_t const localeInfo
   )
   {
-    const RuntimeLocaleUpdateScope locale(localeInfo);
+    const LocaleUpdateScope locale(localeInfo);
 
     if (maxCount == 0u) {
       return 0;
@@ -17274,7 +17275,7 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     _locale_t const localeInfo
   )
   {
-    const RuntimeLocaleUpdateScope locale(localeInfo);
+    const LocaleUpdateScope locale(localeInfo);
 
     if (maxCount == 0u) {
       return 0;

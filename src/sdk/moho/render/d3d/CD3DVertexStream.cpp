@@ -104,7 +104,7 @@ namespace moho
         static_cast<gpg::gal::MohoD3DLockFlags>(lockFlags)
       );
     } catch (const gpg::gal::Error& error) {
-      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
     }
   }
 
@@ -162,7 +162,7 @@ namespace moho
       try {
         mBuffer = gpg::gal::VertexBuffer::Create(mContext);
       } catch (const gpg::gal::Error& error) {
-        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+        gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
       }
     }
 

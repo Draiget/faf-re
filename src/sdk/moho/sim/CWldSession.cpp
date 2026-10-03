@@ -201,7 +201,7 @@ namespace
 // reuse the identical message/exception construction instead of re-emitting it
 // inline a second time. The bucket vector's own overflow lane (FUN_00830620)
 // is msvc8::vector<void*>::throw_too_long and is cited there.
-[[noreturn]] void RuntimeThrowContainerTooLong(const char* message);
+[[noreturn]] void EngineThrowContainerTooLong(const char* message);
 
 namespace
 {
@@ -3741,7 +3741,7 @@ namespace moho
   std::uint32_t UICommandGraph::CheckedIncrementListSize(const std::uint32_t count, std::uint32_t& sizeField)
   {
     if ((0x1FFFFFFu - sizeField) < count) {
-      RuntimeThrowContainerTooLong("list<T> too long");
+      EngineThrowContainerTooLong("list<T> too long");
     }
     sizeField += count;
     return sizeField;
@@ -4259,7 +4259,7 @@ namespace moho
   std::uint32_t UICommandGraph::CheckedIncrementListSize2C(const std::uint32_t count, std::uint32_t& sizeField)
   {
     if ((119304647u - sizeField) < count) {
-      RuntimeThrowContainerTooLong("list<T> too long");
+      EngineThrowContainerTooLong("list<T> too long");
     }
     sizeField += count;
     return sizeField;
@@ -4271,7 +4271,7 @@ namespace moho
   std::uint32_t UICommandGraph::CheckedIncrementListSize10(const std::uint32_t count, std::uint32_t& sizeField)
   {
     if ((0x1FFFFFFFu - sizeField) < count) {
-      RuntimeThrowContainerTooLong("list<T> too long");
+      EngineThrowContainerTooLong("list<T> too long");
     }
     sizeField += count;
     return sizeField;
@@ -4538,7 +4538,7 @@ namespace moho
   )
   {
     if (0xAAAAAA9u <= tree.mSize) {
-      RuntimeThrowContainerTooLong("map/set<T> too long");
+      EngineThrowContainerTooLong("map/set<T> too long");
     }
 
     auto* const fresh = static_cast<CommandGraphTreeNode*>(::operator new(sizeof(CommandGraphTreeNode)));

@@ -1459,7 +1459,7 @@ bool CScApp::CreateAppFrame(
     return true;
   } catch (const gpg::gal::Error& error) {
     std::ostringstream formatted;
-    formatted << "file : " << error.GetRuntimeMessage() << "(" << error.GetRuntimeLine() << ")\n";
+    formatted << "file : " << error.GetFile() << "(" << error.GetLine() << ")\n";
     formatted << "error: " << error.what();
     const std::string text = formatted.str();
     return handleFailure(text.c_str());

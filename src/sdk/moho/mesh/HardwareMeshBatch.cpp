@@ -1126,7 +1126,7 @@ namespace moho
       try {
         device->DrawIndexedPrimitive(&drawContext);
       } catch (const gpg::gal::Error& error) {
-        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+        gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
       }
       return;
     }
@@ -1137,7 +1137,7 @@ namespace moho
       try {
         device->DrawIndexedPrimitive(&drawContext);
       } catch (const gpg::gal::Error& error) {
-        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+        gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
       }
       sOpenPassTechnique = technique;
       return;
@@ -1151,7 +1151,7 @@ namespace moho
       try {
         device->DrawIndexedPrimitive(&drawContext);
       } catch (const gpg::gal::Error& error) {
-        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+        gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
       }
       technique->EndPass();
     }

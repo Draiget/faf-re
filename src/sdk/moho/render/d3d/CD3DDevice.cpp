@@ -458,7 +458,7 @@ namespace moho
 
       mInitialized = 1;
     } catch (const gpg::gal::Error& error) {
-      gpg::Warnf("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      gpg::Warnf("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
     }
     return mInitialized != 0;
   }
@@ -511,7 +511,7 @@ namespace moho
         gpg::gal::Device::DestroyInstance();
       }
     } catch (const gpg::gal::Error& error) {
-      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
     }
   }
 
@@ -1333,14 +1333,14 @@ namespace moho
           );
           (void)device->DrawIndexedPrimitive(&drawContext);
         } catch (const gpg::gal::Error& error) {
-          gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+          gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
         }
 
         technique->EndPass();
       }
       technique->EndTechnique();
     } catch (const gpg::gal::Error& error) {
-      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
     }
     return true;
   }
@@ -1381,14 +1381,14 @@ namespace moho
           );
           (void)device->DrawPrimitive(&drawContext);
         } catch (const gpg::gal::Error& error) {
-          gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+          gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
         }
 
         technique->EndPass();
       }
       technique->EndTechnique();
     } catch (const gpg::gal::Error& error) {
-      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
     }
     return true;
   }
@@ -1439,14 +1439,14 @@ namespace moho
           );
           (void)device->DrawIndexedPrimitive(&drawContext);
         } catch (const gpg::gal::Error& error) {
-          gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+          gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
         }
 
         technique->EndPass();
       }
       technique->EndTechnique();
     } catch (const gpg::gal::Error& error) {
-      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
     }
     return true;
   }
@@ -1755,7 +1755,7 @@ namespace moho
         mViewport->D3DWindowOnDeviceRender();
       }
     } catch (const gpg::gal::Error& error) {
-      gpg::Warnf("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      gpg::Warnf("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
       mSceneStarted = 0;
     }
   }

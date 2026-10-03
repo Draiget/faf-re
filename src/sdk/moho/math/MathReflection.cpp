@@ -1394,12 +1394,12 @@ extern "C" double __cdecl ceil(double value)
  * is unset or the FPU is not in the default environment). Per the .asm at
  * 0x00A9AC84-0x00A9AD55: masks the FPU control word to round-toward-+inf
  * (`sub_A9A813(dword_F3EE8C, 0xFFFF)`, saving the previous word), classifies
- * the argument via `sub_A99EAA` (recovered as `RuntimeClassifyDoubleWords`
+ * the argument via `sub_A99EAA` (recovered as `EngineClassifyDoubleWords`
  * above), and for +/-Inf or NaN inputs dispatches to `sub_A9A676`/
  * `sub_A9A5C4` (both `external_dependency` -- CRT `_except`-style FP
  * exception entry points) before returning the input unchanged. For
  * ordinary finite inputs it calls `sub_AB7F03` (recovered as
- * `RuntimeRoundDoubleToNearestFpuMode` -- its own doc calls it "distinct
+ * `EngineRoundDoubleToNearestFpuMode` -- its own doc calls it "distinct
  * from floor/ceil's fixed-direction rounding", which is true in isolation:
  * the direction comes entirely from the round-toward-+inf control word this
  * function installs first, not from `sub_AB7F03` itself), then compares the
@@ -1420,7 +1420,7 @@ extern "C" double __cdecl ceil(double value)
  * via `std::trunc` (including NaN/Inf pass-through and the negative-subunit
  * `-0.0` lane) without needing the FPU-control-word dance. `sub_A9A813` and
  * `sub_AB7F03` are already recovered in `CrtRuntimeHelpers.cpp`
- * (`RuntimeSetFpuControlMasked`/`RuntimeRoundDoubleToNearestFpuMode`) but
+ * (`EngineSetFpuControlMasked`/`EngineRoundDoubleToNearestFpuMode`) but
  * are not wired to a call here, since doing so would only reproduce the
  * unmasked-precision-exception signaling path, which depends on two
  * `external_dependency` CRT entry points (`sub_A9A676`/`sub_A9A5C4`) that

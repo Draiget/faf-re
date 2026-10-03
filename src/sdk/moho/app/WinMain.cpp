@@ -715,7 +715,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     gpg::Logf("Run time: %dh%02dm%02ds", totalSeconds / 3600, (totalSeconds % 3600) / 60, totalSeconds % 60);
   } catch (const gpg::gal::Error& galError) {
     std::ostringstream formatted;
-    formatted << "file : " << galError.GetRuntimeMessage() << "(" << galError.GetRuntimeLine() << ")\n";
+    formatted << "file : " << galError.GetFile() << "(" << galError.GetLine() << ")\n";
     formatted << "error: " << galError.what();
     gpg::Die("GAL Exception: %s", formatted.str().c_str());
   } catch (const std::exception& ex) {

@@ -5375,7 +5375,7 @@ namespace gpg::gal
     void DestroyErrorBody(Error* const error) noexcept
     {
       error->message_.tidy(true, 0U);
-      error->runtimeMessage_.tidy(true, 0U);
+      error->file_.tidy(true, 0U);
     }
 
 
@@ -5523,7 +5523,7 @@ namespace gpg::gal
    */
   Error::Error()
     : std::exception()
-    , runtimeMessage_("<unknown>")
+    , file_("<unknown>")
     , line_(0)
     , message_("<undefined>")
   {
@@ -5539,7 +5539,7 @@ namespace gpg::gal
   Error::Error(const msvc8::string& file, const int line, const msvc8::string& message)
     : std::exception()
   {
-    runtimeMessage_.assign(file, 0U, msvc8::string::npos);
+    file_.assign(file, 0U, msvc8::string::npos);
     line_ = line;
     message_.assign(message, 0U, msvc8::string::npos);
   }
@@ -5572,7 +5572,7 @@ namespace gpg::gal
    * What it does:
    * Returns the stored source line captured by the constructor payload.
    */
-  int Error::GetRuntimeLine() const noexcept
+  int Error::GetLine() const noexcept
   {
     return line_;
   }
@@ -5581,11 +5581,11 @@ namespace gpg::gal
    * Address: 0x00940450 (FUN_00940450)
    *
    * What it does:
-   * Returns the throw-site runtime text pointer from `runtimeMessage_`.
+   * Returns the raw source-file string pointer stored in `file_`.
    */
-  const char* Error::GetRuntimeMessage() const noexcept
+  const char* Error::GetFile() const noexcept
   {
-    return runtimeMessage_.raw_data_unsafe();
+    return file_.raw_data_unsafe();
   }
 
   /**

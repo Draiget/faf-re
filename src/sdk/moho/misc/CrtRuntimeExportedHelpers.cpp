@@ -40,19 +40,19 @@
  * symbols even though they are the same C++ overload. Unit.cpp,
  * CWldSession.cpp and PathTables.cpp all forward-declare the plain form.
  */
-[[noreturn]] void RuntimeThrowContainerTooLong(const char* message)
+[[noreturn]] void EngineThrowContainerTooLong(const char* message)
 {
   throw std::length_error(message);
 }
 
 /**
- * Address: 0x00A8FB50 (FUN_00A8FB50, RuntimeToLowerWideWithCurrentLocale)
+ * Address: 0x00A8FB50 (FUN_00A8FB50, EngineToLowerWideWithCurrentLocale)
  *
  * What it does:
  * Lowercases one wide character under the current CRT locale lane. Called per
  * character by the typed wxString lowercase loop in `WxRuntimeTypes.cpp`.
  */
-int RuntimeToLowerWideWithCurrentLocale(const wchar_t character)
+int EngineToLowerWideWithCurrentLocale(const wchar_t character)
 {
   return static_cast<int>(_towlower_l(static_cast<wint_t>(character), nullptr));
 }
@@ -63,7 +63,7 @@ int RuntimeToLowerWideWithCurrentLocale(const wchar_t character)
  * What it does:
  * Parses one base-10 signed wide integer by forwarding to `wcstol`.
  */
-extern "C" int __cdecl RuntimeWtoiFromWide(const wchar_t* const text)
+extern "C" int __cdecl EngineWtoiFromWide(const wchar_t* const text)
 {
   return static_cast<int>(::wcstol(text, nullptr, 10));
 }
@@ -72,11 +72,11 @@ extern "C" int __cdecl RuntimeWtoiFromWide(const wchar_t* const text)
  * Address: 0x00A8FC71 (FUN_00A8FC71, `_wtoi` thunk lane)
  *
  * What it does:
- * Tail-forwards one `_wtoi` thunk lane into `RuntimeWtoiFromWide`.
+ * Tail-forwards one `_wtoi` thunk lane into `EngineWtoiFromWide`.
  */
-extern "C" int __cdecl RuntimeWtoiFromWideThunk(const wchar_t* const text)
+extern "C" int __cdecl EngineWtoiFromWideThunk(const wchar_t* const text)
 {
-  return RuntimeWtoiFromWide(text);
+  return EngineWtoiFromWide(text);
 }
 
 /**
@@ -90,7 +90,7 @@ extern "C" int __cdecl RuntimeWtoiFromWideThunk(const wchar_t* const text)
  * that position, or null when absent. Searching for the terminator itself
  * finds it, because the backward scan starts there.
  */
-extern "C" wchar_t* __cdecl RuntimeWideStringFindLast(wchar_t* const text, const wchar_t needle)
+extern "C" wchar_t* __cdecl EngineWideStringFindLast(wchar_t* const text, const wchar_t needle)
 {
   wchar_t* cursor = text;
   while (*cursor++ != L'\0') {

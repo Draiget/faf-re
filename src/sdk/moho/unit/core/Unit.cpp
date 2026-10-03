@@ -11800,7 +11800,7 @@ CScrLuaInitForm* moho::func_CreateUnitHPR_LuaFuncDef()
 
 } // namespace moho
 
-[[noreturn]] void RuntimeThrowContainerTooLong(const char* message);
+[[noreturn]] void EngineThrowContainerTooLong(const char* message);
 
 namespace
 {

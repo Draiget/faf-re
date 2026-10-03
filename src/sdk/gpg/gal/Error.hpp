@@ -82,23 +82,24 @@ namespace gpg::gal
          * What it does:
          * Returns the stored source line captured for this error payload.
          */
-        int GetRuntimeLine() const noexcept;
+        int GetLine() const noexcept;
 
         /**
          * Address: 0x00940450 (FUN_00940450)
          *
          * What it does:
-         * Returns the raw throw-site runtime text pointer (SSO/heap aware).
+         * Returns the raw source-file string pointer captured at the throw
+         * site (SSO/heap aware).
          */
-        const char* GetRuntimeMessage() const noexcept;
+        const char* GetFile() const noexcept;
 
     public:
-        msvc8::string runtimeMessage_; // +0x0C
+        msvc8::string file_; // +0x0C
         int line_ = 0;                // +0x28
         msvc8::string message_;        // +0x2C
     };
 
-    static_assert(offsetof(Error, runtimeMessage_) == 0x0C, "Error::runtimeMessage_ offset must be 0x0C");
+    static_assert(offsetof(Error, file_) == 0x0C, "Error::file_ offset must be 0x0C");
     static_assert(offsetof(Error, line_) == 0x28, "Error::line_ offset must be 0x28");
     static_assert(offsetof(Error, message_) == 0x2C, "Error::message_ offset must be 0x2C");
     static_assert(sizeof(Error) == 0x48, "Error size must be 0x48");

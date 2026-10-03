@@ -205,7 +205,7 @@ namespace moho
     try {
       mTexture->Unlock(0);
     } catch (const gpg::gal::Error& error) {
-      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
     }
     return true;
   }
@@ -261,7 +261,7 @@ namespace moho
     try {
       mTexture->SaveToBuffer(&textureBytes);
     } catch (const gpg::gal::Error& error) {
-      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
     }
 
     const std::uint32_t byteCount = static_cast<std::uint32_t>(textureBytes.Size());
@@ -291,7 +291,7 @@ namespace moho
     try {
       mTexture = gpg::gal::Texture::Create(mContext);
     } catch (const gpg::gal::Error& error) {
-      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      gpg::Die("%s(%d) %s", error.GetFile(), error.GetLine(), error.what());
     }
     return true;
   }
