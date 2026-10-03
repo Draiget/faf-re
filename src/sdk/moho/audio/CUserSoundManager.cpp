@@ -314,7 +314,7 @@ namespace
    * Binds cue/owner lanes for one active sound-handle slot, inserts the
    * tracked entity id into that slot tree, and increments active-loop stats.
    */
-  void BindSoundHandleRecordRuntime(
+  void BindSoundHandleRecord(
     moho::SoundHandleRecord* const record,
     moho::IXACTCue* const cue,
     const std::int32_t loopIndex,
@@ -1387,7 +1387,7 @@ namespace moho
     }
 
     SoundHandleRecord& record = mSoundHandles.start_[handleIndex];
-    BindSoundHandleRecordRuntime(&record, cue, static_cast<std::int32_t>(handleIndex), loopHandle, entityId);
+    BindSoundHandleRecord(&record, cue, static_cast<std::int32_t>(handleIndex), loopHandle, entityId);
     UpdateEntityLoopSpatialization(&record, voiceEngine, 0.0f);
   }
 
@@ -1436,7 +1436,7 @@ namespace moho
       }
 
       SoundHandleRecord& record = mSoundHandles.start_[handleIndex];
-      BindSoundHandleRecordRuntime(&record, cue, static_cast<std::int32_t>(handleIndex), loopHandle, entityId);
+      BindSoundHandleRecord(&record, cue, static_cast<std::int32_t>(handleIndex), loopHandle, entityId);
       SND_SetGlobalFloat(rpcLoopVariable, static_cast<float>(record.mTrackedEntities.size()));
       return;
     }

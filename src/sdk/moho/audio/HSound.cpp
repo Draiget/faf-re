@@ -85,7 +85,7 @@ namespace moho
    * Forwards one deleting-lane call from the `CScriptObject`-view vtable of
    * `HSound` into the canonical `HSound::Destroy` implementation.
    */
-  [[maybe_unused]] HSound* HSoundDestroyScriptObjectViewRuntime(HSound* const self, const std::uint8_t flags)
+  [[maybe_unused]] HSound* HSoundDestroyScriptObjectSlot(HSound* const self, const std::uint8_t flags)
   {
     return self != nullptr ? self->Destroy(flags) : nullptr;
   }

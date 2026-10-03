@@ -115,7 +115,7 @@ namespace
    * Clears and reassigns one destination string from projectile
    * `mDamageTypeName`.
    */
-  [[maybe_unused]] msvc8::string* CopyProjectileDamageTypeNameRuntime(
+  [[maybe_unused]] msvc8::string* CopyProjectileDamageTypeName(
     const moho::Projectile* const projectile,
     msvc8::string* const outName
   )
@@ -2296,7 +2296,7 @@ namespace moho
     }
 
     msvc8::string copiedDamageTypeName{};
-    (void)CopyProjectileDamageTypeNameRuntime(sourceProjectile, &copiedDamageTypeName);
+    (void)CopyProjectileDamageTypeName(sourceProjectile, &copiedDamageTypeName);
 
     Projectile* const childProjectile = PROJ_Create(
       sim,

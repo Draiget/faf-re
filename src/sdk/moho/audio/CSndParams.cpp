@@ -338,7 +338,7 @@ namespace
    * What it does:
    * Clears one two-word runtime state pair to zero.
    */
-  [[nodiscard]] TwoWordRuntimeState* ClearTwoWordRuntimeState(TwoWordRuntimeState* const state) noexcept
+  [[nodiscard]] TwoWordRuntimeState* ClearTwoWordState(TwoWordRuntimeState* const state) noexcept
   {
     if (state == nullptr) {
       return state;

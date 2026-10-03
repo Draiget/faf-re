@@ -109,7 +109,7 @@ namespace
     return moho::CEffectImpl::sType;
   }
 
-  [[nodiscard]] gpg::RType* ResolveEmitterTypeRuntimeType()
+  [[nodiscard]] gpg::RType* ResolveEmitterRType()
   {
     static gpg::RType* sEmitterType = nullptr;
     if (!sEmitterType) {
@@ -731,7 +731,7 @@ namespace moho
     const gpg::RRef nullOwner{};
 
     archive->Read(ResolveCEffectImplType(), static_cast<CEffectImpl*>(this), nullOwner);
-    archive->Read(ResolveEmitterTypeRuntimeType(), &mEmitterType, nullOwner);
+    archive->Read(ResolveEmitterRType(), &mEmitterType, nullOwner);
     archive->Read(ResolveFastVectorSEfxCurveType(), &mCurves, nullOwner);
 
     const gpg::RRef blueprintOwner{};
@@ -760,7 +760,7 @@ namespace moho
     gpg::RRef nullOwner{};
 
     archive->Write(ResolveCEffectImplType(), static_cast<const CEffectImpl*>(this), nullOwner);
-    archive->Write(ResolveEmitterTypeRuntimeType(), &mEmitterType, nullOwner);
+    archive->Write(ResolveEmitterRType(), &mEmitterType, nullOwner);
     archive->Write(ResolveFastVectorSEfxCurveType(), &mCurves, nullOwner);
 
     archive->WritePointer<moho::REmitterBlueprint>(mBlueprint, gpg::TrackedPointerState::Unowned, nullOwner);

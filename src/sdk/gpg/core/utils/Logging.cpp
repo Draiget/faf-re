@@ -445,7 +445,7 @@ void gpg::InitLogContextSingleton()
  * Initializes the global log-context singleton on first use and returns the
  * process-global context pointer lane.
  */
-[[maybe_unused]] gpg::LogContext* gpg::GetLogContextSingletonRuntime()
+[[maybe_unused]] gpg::LogContext* gpg::GetLogContextSingleton()
 {
     std::call_once(g_LogOnce, &InitLogContextSingleton);
     return g_LogCtx;

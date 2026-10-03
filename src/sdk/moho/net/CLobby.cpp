@@ -155,7 +155,7 @@ namespace
    * What it does:
    * Returns the lazily cached reflection descriptor for `CLobby`.
    */
-  [[nodiscard]] gpg::RType* CachedCLobbyRuntimeTypeBridge()
+  [[nodiscard]] gpg::RType* CachedCLobbyTypeBridge()
   {
     static gpg::RType* cached = nullptr;
     if (cached == nullptr) {
@@ -503,7 +503,7 @@ namespace
  */
 gpg::RType* CLobby::GetClass() const
 {
-  return CachedCLobbyRuntimeTypeBridge();
+  return CachedCLobbyTypeBridge();
 }
 
 /**

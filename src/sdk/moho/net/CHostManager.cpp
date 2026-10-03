@@ -100,7 +100,7 @@ CHostManager::~CHostManager()
  * Thunk lane that forwards one host-manager teardown request into
  * `FUN_0047FA40`.
  */
-[[maybe_unused]] void DestroyHostManagerRuntimeAdapter(CHostManager* const manager) noexcept
+[[maybe_unused]] void DestroyHostManagerAdapter(CHostManager* const manager) noexcept
 {
   if (manager != nullptr) {
     manager->~CHostManager();

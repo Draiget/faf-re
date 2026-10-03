@@ -21,7 +21,7 @@ namespace
     return sInstance;
   }
 
-  void InitializeTeleportRuntimeState(moho::CUnitCallTeleport* const task)
+  void InitializeTeleportState(moho::CUnitCallTeleport* const task)
   {
     task->mTargetTransportUnit.ownerLinkSlot = nullptr;
     task->mTargetTransportUnit.nextInOwner = nullptr;
@@ -100,7 +100,7 @@ namespace moho
   {
     auto* const task = new (std::nothrow) CUnitCallTeleport();
     if (task) {
-      InitializeTeleportRuntimeState(task);
+      InitializeTeleportState(task);
     }
     return gpg::RRef{task, gpg::LookupRType(typeid(CUnitCallTeleport))};
   }
@@ -113,7 +113,7 @@ namespace moho
     auto* const task = static_cast<CUnitCallTeleport*>(objectStorage);
     if (task) {
       new (task) CUnitCallTeleport();
-      InitializeTeleportRuntimeState(task);
+      InitializeTeleportState(task);
     }
     return gpg::RRef{task, gpg::LookupRType(typeid(CUnitCallTeleport))};
   }

@@ -13,7 +13,7 @@ namespace
    * Builds one `std::runtime_error` payload from
    * `prefix_or_default("type error: ") + detail`.
    */
-  [[maybe_unused]] std::runtime_error* BuildRuntimeTypeErrorWithPrefix(
+  [[maybe_unused]] std::runtime_error* BuildTypeErrorWithPrefix(
     std::runtime_error* const outError,
     const char* const prefix,
     const char* const detail

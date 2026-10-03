@@ -141,7 +141,7 @@ namespace moho
     , mHandicapExtra(0.0f)
   {
     std::memset(&mEconomyTotals, 0, sizeof(mEconomyTotals));
-    mRuntimeWordVectorWithMeta.mMetaWord = 0u;
+    mWordVectorWithMeta.mMetaWord = 0u;
     mCategoryFilterSet.ResetToEmpty(0u);
     mArmyStart = Wm3::Vector2f(0.0f, 0.0f);
     mNoRushOffset = Wm3::Vector2f(0.0f, 0.0f);
@@ -167,7 +167,7 @@ namespace moho
     , mArmyType(other.mArmyType)
     , mFaction(other.mFaction)
     , mUseWholeMap(other.mUseWholeMap)
-    , mRuntimeWordVectorWithMeta(other.mRuntimeWordVectorWithMeta)
+    , mWordVectorWithMeta(other.mWordVectorWithMeta)
     , mShowScore(other.mShowScore)
     , mCategoryFilterSet(other.mCategoryFilterSet)
     , mIsOutOfGame(other.mIsOutOfGame)

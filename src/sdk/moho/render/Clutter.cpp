@@ -66,16 +66,16 @@ namespace
 
 
 
-  RegionRuntimeVtableResetTag gRegionRuntimeVtableResetTag{};
   DestroyInstanceVtableTag gDestroyInstanceVtableTag{};
   UpdateInstanceVtableTag gUpdateInstanceVtableTag{};
   SurfaceVtableResetTag gSurfaceVtableResetTag{};
   SeedVtableResetTag gSeedVtableResetTag{};
 
-  [[nodiscard]] void* RegionRuntimeVtableResetToken()
-  {
-    return *reinterpret_cast<void**>(&gRegionRuntimeVtableResetTag);
-  }
+  // FUN_007D5EE0 (Region ctor, store at 0x7D5EE6) and FUN_007D5F20 (dtor,
+  // store at 0x7D5F3D) write this fixed .data address into the region's
+  // vtable slot; no code in the binary ever reads through it - it is a
+  // reset/poison sentinel, so it is recovered as the plain constant it is.
+  void* const kRegionVtableResetSentinel = reinterpret_cast<void*>(0x00E3F04C);
 
   [[nodiscard]] void* DestroyInstanceVtableToken()
   {
@@ -519,7 +519,7 @@ namespace moho
    */
   ClutterRegion::ClutterRegion()
   {
-    vtable = RegionRuntimeVtableResetToken();
+    vtable = kRegionVtableResetSentinel;
     mNext = nullptr;
     mPrev = nullptr;
     mX = -1;
@@ -535,8 +535,8 @@ namespace moho
    */
   ClutterRegion::~ClutterRegion()
   {
-    vtable = RegionRuntimeVtableResetToken();
-    (void)ResetRegionRuntimeState(this);
+    vtable = kRegionVtableResetSentinel;
+    (void)ResetState();
   }
 
   /**
@@ -833,21 +833,21 @@ namespace moho
   /**
    * Address: 0x007D5F80 (FUN_007D5F80)
    */
-  ClutterPayloadList* ResetRegionRuntimeState(ClutterRegion* const region)
+  ClutterPayloadList* ClutterRegion::ResetState()
   {
-    region->mPrev = nullptr;
-    region->mNext = nullptr;
-    region->mZ = -1;
-    region->mX = -1;
+    mPrev = nullptr;
+    mNext = nullptr;
+    mZ = -1;
+    mX = -1;
 
     DestroyInstanceRuntimeLane destroyLane{};
     ResetDestroyInstanceLaneVtable(&destroyLane);
     destroyLane.instance = nullptr;
 
     MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
-    ApplyDestroyInstanceToRegionPayloads(region->mMap, destroyLane, meshRenderer);
-    region->mMap.clear();
-    return &region->mMap;
+    ApplyDestroyInstanceToRegionPayloads(mMap, destroyLane, meshRenderer);
+    mMap.clear();
+    return &mMap;
   }
 
   /**
@@ -1046,7 +1046,7 @@ namespace moho
 
     UnlinkRegion(region);
 
-    (void)ResetRegionRuntimeState(region);
+    (void)region->ResetState();
 
     mList2.push_back(region);
   }

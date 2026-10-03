@@ -171,10 +171,10 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::SArmyVectorWithMeta* GetRuntimeWordVectorWithMeta(moho::CArmyImpl* army)
+  [[nodiscard]] moho::SArmyVectorWithMeta* GetWordVectorWithMeta(moho::CArmyImpl* army)
   {
-    // Evidence: FUN_006FDE70 targets (this + 0x17C), modeled as CArmyImpl::RuntimeWordVectorWithMeta.
-    return &army->mVarDat.mRuntimeWordVectorWithMeta;
+    // Evidence: FUN_006FDE70 targets (this + 0x17C): CArmyImpl::mVarDat.mWordVectorWithMeta.
+    return &army->mVarDat.mWordVectorWithMeta;
   }
 
   constexpr const char* kCAiBrainTypeNames[] = {"Moho::CAiBrain", "CAiBrain"};
@@ -2114,7 +2114,7 @@ namespace moho
       return 0;
     }
 
-    SArmyVectorWithMeta* const target = GetRuntimeWordVectorWithMeta(this);
+    SArmyVectorWithMeta* const target = GetWordVectorWithMeta(this);
     target->CopyWordPayloadFrom(*value);
     target->mMetaWord = value->mMetaWord;
     return target->mMetaWord;

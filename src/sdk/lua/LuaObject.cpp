@@ -7556,7 +7556,7 @@ namespace
 	 * Shrinks call-info and stack allocations when the live usage window is
 	 * sparse enough to satisfy the legacy Lua GC compaction thresholds.
 	 */
-	void ShrinkThreadRuntimeStacksIfSparse(
+	void ShrinkThreadStacksIfSparse(
 		TObject* const liveStackLimit,
 		lua_State* const state
 	)
@@ -7611,7 +7611,7 @@ namespace
 			object->value.p = nullptr;
 		}
 
-		ShrinkThreadRuntimeStacksIfSparse(lim, L1);
+		ShrinkThreadStacksIfSparse(lim, L1);
 	}
 
 	/**

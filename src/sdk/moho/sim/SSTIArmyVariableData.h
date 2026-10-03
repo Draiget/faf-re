@@ -94,7 +94,7 @@ namespace moho
     std::int32_t mFaction;          // 0x0EC
     std::uint8_t mUseWholeMap;      // 0x0F0
     std::uint8_t mPad_00F1_00F4[0x03]{};
-    SArmyVectorWithMeta mRuntimeWordVectorWithMeta; // 0x0F4
+    SArmyVectorWithMeta mWordVectorWithMeta; // 0x0F4
     std::uint8_t mShowScore;                        // 0x108
     std::uint8_t mRuntimePad_0109_0110[0x07]{};
     EntityCategorySet mCategoryFilterSet; // 0x110
@@ -172,8 +172,8 @@ namespace moho
     offsetof(SSTIArmyVariableData, mUseWholeMap) == 0x0F0, "SSTIArmyVariableData::mUseWholeMap offset must be 0x0F0"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mRuntimeWordVectorWithMeta) == 0x0F4,
-    "SSTIArmyVariableData::mRuntimeWordVectorWithMeta offset must be 0x0F4"
+    offsetof(SSTIArmyVariableData, mWordVectorWithMeta) == 0x0F4,
+    "SSTIArmyVariableData::mWordVectorWithMeta offset must be 0x0F4"
   );
   static_assert(
     offsetof(SSTIArmyVariableData, mShowScore) == 0x108, "SSTIArmyVariableData::mShowScore offset must be 0x108"

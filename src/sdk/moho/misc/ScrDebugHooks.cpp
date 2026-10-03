@@ -54,7 +54,7 @@ namespace
     bool hasEnabledBreakpoints = false;
   };
 
-  [[nodiscard]] ScrDebugRuntime& GetScrDebugRuntime()
+  [[nodiscard]] ScrDebugRuntime& GetScrDebugState()
   {
     static ScrDebugRuntime runtime{};
     return runtime;
@@ -295,7 +295,7 @@ namespace
     lua_Debug* const debugFrame
   )
   {
-    ScrDebugRuntime& runtime = GetScrDebugRuntime();
+    ScrDebugRuntime& runtime = GetScrDebugState();
     moho::PausedThread* pausedThread = nullptr;
 
     {
@@ -343,7 +343,7 @@ void moho::SCR_HookState(LuaPlus::LuaState* const state)
     return;
   }
 
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   {
     boost::mutex::scoped_lock lock(runtime.hookBindingMutex);
     BindLuaStateForHook(runtime, state);
@@ -369,7 +369,7 @@ void moho::SCR_UnhookState(LuaPlus::LuaState* const state)
     return;
   }
 
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   {
     boost::mutex::scoped_lock lock(runtime.hookBindingMutex);
     UnbindLuaStateForHook(runtime, state);
@@ -389,7 +389,7 @@ void moho::SCR_UnhookState(LuaPlus::LuaState* const state)
  */
 void moho::SCR_AddBreakpoint(const ScrBreakpoint& breakpoint)
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.breakpointMutex);
 
   if (InsertBreakpointSortedUnique(runtime, breakpoint)) {
@@ -408,7 +408,7 @@ void moho::SCR_AddBreakpoint(const ScrBreakpoint& breakpoint)
  */
 void moho::SCR_EnableBreakpoint(const ScrBreakpoint& breakpoint, const bool enabled)
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.breakpointMutex);
 
   const auto it = FindBreakpointExact(runtime, breakpoint);
@@ -430,7 +430,7 @@ void moho::SCR_EnableBreakpoint(const ScrBreakpoint& breakpoint, const bool enab
  */
 void moho::SCR_EnableAllBreakpoints(const bool enabled)
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.breakpointMutex);
 
   for (ScrBreakpoint& breakpoint : runtime.breakpoints) {
@@ -450,7 +450,7 @@ void moho::SCR_EnableAllBreakpoints(const bool enabled)
  */
 void moho::SCR_RemoveBreakpoint(const ScrBreakpoint& breakpoint)
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.breakpointMutex);
 
   const auto it = FindBreakpointExact(runtime, breakpoint);
@@ -470,7 +470,7 @@ void moho::SCR_RemoveBreakpoint(const ScrBreakpoint& breakpoint)
  */
 void moho::SCR_RemoveAllBreakpoints()
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.breakpointMutex);
 
   runtime.breakpoints.clear();
@@ -493,7 +493,7 @@ void moho::SCR_EnumerateBreakpoints(
 {
   outBreakpoints.clear();
 
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.breakpointMutex);
   if (!runtime.hasEnabledBreakpoints) {
     return;
@@ -519,7 +519,7 @@ void moho::SCR_EnumerateCallStack(msvc8::vector<ScrActivation>& outActivations)
 {
   outActivations.clear();
 
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.pausedQueueMutex);
 
   LuaPlus::LuaState* const pausedLuaState = GetFrontPausedLuaStateUnlocked(runtime);
@@ -554,7 +554,7 @@ void moho::SCR_EnumerateLocals(const int level, msvc8::vector<ScrWatch>& outWatc
 {
   outWatches.clear();
 
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.pausedQueueMutex);
 
   LuaPlus::LuaState* const pausedLuaState = GetFrontPausedLuaStateUnlocked(runtime);
@@ -608,7 +608,7 @@ void moho::SCR_EnumerateGlobals(msvc8::vector<ScrWatch>& outWatches)
 {
   outWatches.clear();
 
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.pausedQueueMutex);
 
   LuaPlus::LuaState* const pausedLuaState = GetFrontPausedLuaStateUnlocked(runtime);
@@ -639,7 +639,7 @@ void moho::SCR_EnumerateGlobals(msvc8::vector<ScrWatch>& outWatches)
  */
 void moho::SCR_DebugStep()
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock queueLock(runtime.pausedQueueMutex);
 
   PausedThread* const pausedThread = PopPausedThreadUnlocked(runtime);
@@ -663,7 +663,7 @@ void moho::SCR_DebugStep()
  */
 void moho::SCR_DebugResume()
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock queueLock(runtime.pausedQueueMutex);
 
   PausedThread* const pausedThread = PopPausedThreadUnlocked(runtime);
@@ -683,7 +683,7 @@ void moho::SCR_DebugResume()
  */
 void moho::SCR_LoadBreakpoints()
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.breakpointMutex);
 
   runtime.breakpoints.clear();
@@ -718,7 +718,7 @@ void moho::SCR_LoadBreakpoints()
  */
 void moho::SCR_SaveBreakpoints()
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   boost::mutex::scoped_lock lock(runtime.breakpointMutex);
   SaveBreakpointsUnlocked(runtime);
 }
@@ -734,7 +734,7 @@ void moho::SCR_SaveBreakpoints()
  */
 void moho::DebugLuaHook(lua_State* const state, lua_Debug* const debugFrame)
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
 
   LuaPlus::LuaState* luaState = nullptr;
   {
@@ -806,7 +806,7 @@ void moho::DebugLuaHook(lua_State* const state, lua_Debug* const debugFrame)
  */
 void moho::SCR_CreateDebugWindow()
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   if (runtime.debugWindow != nullptr) {
     return;
   }
@@ -834,7 +834,7 @@ void moho::SCR_CreateDebugWindow()
  */
 void moho::SCR_DestroyDebugWindow()
 {
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  ScrDebugRuntime& runtime = GetScrDebugState();
   if (runtime.debugWindow == nullptr) {
     return;
   }
@@ -858,5 +858,5 @@ void moho::SCR_DestroyDebugWindow()
 
 bool moho::SCR_IsDebugWindowActive()
 {
-  return GetScrDebugRuntime().debugWindow != nullptr;
+  return GetScrDebugState().debugWindow != nullptr;
 }

@@ -325,7 +325,7 @@ namespace moho
     std::uint8_t mNoSound;             // +0x28
     std::uint8_t mReserved29[0x03];    // +0x29
     std::uint32_t mSpeakerConfiguration; // +0x2C
-    void* mAudioRuntimeModule;         // +0x30 (`HMODULE`)
+    void* mAudioModule;         // +0x30 (`HMODULE`)
     std::uint32_t mLookAheadTimeMs;    // +0x34
     const void* mGlobalSettingsStart;  // +0x38
     std::uint32_t mGlobalSettingsLength; // +0x3C
@@ -432,8 +432,8 @@ namespace moho
     "SoundConfiguration::mSpeakerConfiguration offset must be 0x2C"
   );
   static_assert(
-    offsetof(SoundConfiguration, mAudioRuntimeModule) == 0x30,
-    "SoundConfiguration::mAudioRuntimeModule offset must be 0x30"
+    offsetof(SoundConfiguration, mAudioModule) == 0x30,
+    "SoundConfiguration::mAudioModule offset must be 0x30"
   );
   static_assert(
     offsetof(SoundConfiguration, mLookAheadTimeMs) == 0x34,

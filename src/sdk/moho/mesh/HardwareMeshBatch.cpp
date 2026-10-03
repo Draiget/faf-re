@@ -46,7 +46,7 @@ namespace
 {
   // TEMPORARY -- runtime toggle files for the exploded-mesh triage. A toggle is
   // on while "<FAF_TOGGLE_DIR>/<name>" exists; delete when resolved.
-  bool RuntimeToggleFileExists(const char* const name)
+  bool ToggleFileExists(const char* const name)
   {
     static char sDir[512] = {};
     static bool sDirResolved = false;
@@ -140,7 +140,7 @@ namespace moho
         static int sIgnoreHiddenBones = 0;
         static unsigned sToggleCalls = 0;
         if ((sToggleCalls++ % 500u) == 0u) {
-          sIgnoreHiddenBones = RuntimeToggleFileExists("nohide.on") ? 1 : 0;
+          sIgnoreHiddenBones = ToggleFileExists("nohide.on") ? 1 : 0;
         }
 
         if (poseBone == nullptr || (poseBone->mVisible == 0 && sIgnoreHiddenBones == 0)) {
@@ -1012,7 +1012,7 @@ namespace moho
       static int sSkipStatic = 0;
       static unsigned sStaticToggleCalls = 0;
       if ((sStaticToggleCalls++ % 100u) == 0u) {
-        sSkipStatic = RuntimeToggleFileExists("nostatic.on") ? 1 : 0;
+        sSkipStatic = ToggleFileExists("nostatic.on") ? 1 : 0;
       }
       if (sSkipStatic != 0 && mUseBoneRemap == 0) {
         return;
@@ -1026,7 +1026,7 @@ namespace moho
       static int sSkinnedDrawMode = 0;
       static unsigned sDrawToggleCalls = 0;
       if ((sDrawToggleCalls++ % 100u) == 0u) {
-        sSkinnedDrawMode = RuntimeToggleFileExists("noskin.on") ? 1 : 0;
+        sSkinnedDrawMode = ToggleFileExists("noskin.on") ? 1 : 0;
       }
       if (mUseBoneRemap != 0) {
         static int sDrawBudget = 0;
@@ -1061,9 +1061,9 @@ namespace moho
         static int sSkipDest = 0;
         static int sSkipNonUnit = 0;
         if ((sFamilyToggleCalls++ % 100u) == 0u) {
-          sSkipAcu = RuntimeToggleFileExists("noacu.on") ? 1 : 0;
-          sSkipDest = RuntimeToggleFileExists("nodest.on") ? 1 : 0;
-          sSkipNonUnit = RuntimeToggleFileExists("notrees.on") ? 1 : 0;
+          sSkipAcu = ToggleFileExists("noacu.on") ? 1 : 0;
+          sSkipDest = ToggleFileExists("nodest.on") ? 1 : 0;
+          sSkipNonUnit = ToggleFileExists("notrees.on") ? 1 : 0;
         }
         if (sSkipAcu != 0 || sSkipDest != 0 || sSkipNonUnit != 0) {
           boost::shared_ptr<const CAniSkel> skeleton;

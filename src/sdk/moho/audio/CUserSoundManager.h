@@ -75,7 +75,7 @@ namespace moho
      * What it does:
      * An idle slot: no loop, no cue, no params, loop index -1, an empty
      * tracked-entity set and zero playing time. The angle index at +0x10 is
-     * not written; `BindSoundHandleRecordRuntime` sets it when the slot starts
+     * not written; `BindSoundHandleRecord` sets it when the slot starts
      * playing. Callers build the prototype `resize` copies into new slots:
      * `CUserSoundManager::CUserSoundManager` (0x008AA800), `StartRPCEntityLoop`
      * (0x008ABCD0) and `StartEntityLoop` (0x008ABE90).

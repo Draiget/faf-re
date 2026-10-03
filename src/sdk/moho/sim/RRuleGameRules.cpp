@@ -400,7 +400,7 @@ namespace moho
      * What it does:
      * Releases one raw runtime storage lane through global `operator delete`.
      */
-    void DeleteRuntimeStorageLane(void* const storage)
+    void DeleteStorageLane(void* const storage)
     {
       ::operator delete(storage);
     }

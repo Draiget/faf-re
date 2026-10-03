@@ -524,4 +524,4 @@ namespace moho
  * `CFG_GetArgOption("/sse2")`, so the default launch - no `/sse2` on the
  * command line - deliberately turns the SSE2 lane off.
  */
-extern "C" int __cdecl RuntimeSetSse2Mode(int enableSse2);
+extern "C" int __cdecl SetSse2Mode(int enableSse2);

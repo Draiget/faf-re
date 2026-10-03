@@ -6069,7 +6069,7 @@ namespace moho
       return;
     }
 
-    SArmyVectorWithMeta& scratch = army->mVarDat.mRuntimeWordVectorWithMeta;
+    SArmyVectorWithMeta& scratch = army->mVarDat.mWordVectorWithMeta;
     const std::size_t cellCount = scratch.mWords.size();
     // The meta dword is only ever a real descriptor pointer once the army's
     // scratch buffer has been populated for STI/path-preview display; a

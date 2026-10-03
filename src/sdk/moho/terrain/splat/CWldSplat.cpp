@@ -485,7 +485,7 @@ namespace moho
         }
       }
 
-      decal->mRuntimeHandle = static_cast<std::int32_t>(record->mObj);
+      decal->mDecalHandle = static_cast<std::int32_t>(record->mObj);
       decal->mRemoveTick = static_cast<std::int32_t>(record->mStartTick);
       decal->mArmy = static_cast<std::int32_t>(record->mArmy);
       decal->mFidelity = static_cast<std::int32_t>(record->mFidelity);
@@ -509,7 +509,7 @@ namespace moho
   {
     for (const std::uint32_t handle : decalHandles) {
       for (CWldTerrainDecal* const decal : mDecals) {
-        if (static_cast<std::uint32_t>(decal->mRuntimeHandle) == handle) {
+        if (static_cast<std::uint32_t>(decal->mDecalHandle) == handle) {
           decal->mRemoveTick = 1;
           break;
         }

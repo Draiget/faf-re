@@ -401,9 +401,9 @@ void UdataTypeInfo::Init()
 
 namespace
 {
-  struct LuaRuntimeTypeInfoBootstrap
+  struct LuaTypeInfoBootstrap
   {
-    LuaRuntimeTypeInfoBootstrap()
+    LuaTypeInfoBootstrap()
     {
       register_TStringTypeInfoStartup();
       register_TableTypeInfoStartup();
@@ -415,7 +415,7 @@ namespace
     }
   };
 
-  LuaRuntimeTypeInfoBootstrap gLuaRuntimeTypeInfoBootstrap;
+  LuaTypeInfoBootstrap gLuaRuntimeTypeInfoBootstrap;
 }
 
 /**

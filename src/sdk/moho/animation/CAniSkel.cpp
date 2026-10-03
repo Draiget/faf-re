@@ -299,28 +299,6 @@ namespace
   }
 
   /**
-   * Address: 0x0054D3B0 (FUN_0054D3B0)
-   *
-   * What it does:
-   * Deletes one heap-allocated runtime object lane.
-   */
-  void DeleteRuntimeObjectLaneA(void* const objectStorage) noexcept
-  {
-    ::operator delete(objectStorage);
-  }
-
-  /**
-   * Address: 0x0054D710 (FUN_0054D710)
-   *
-   * What it does:
-   * Secondary deleting lane for the same heap-runtime object contract.
-   */
-  void DeleteRuntimeObjectLaneB(void* const objectStorage) noexcept
-  {
-    ::operator delete(objectStorage);
-  }
-
-  /**
    * Address: 0x0054DB30 (FUN_0054DB30)
    *
    * What it does:

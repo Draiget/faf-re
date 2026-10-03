@@ -271,6 +271,16 @@ namespace moho
      * releases the map sentinel allocation.
      */
     ~ClutterRegion();
+
+    /**
+     * Address: 0x007D5F80 (FUN_007D5F80)
+     *
+     * What it does:
+     * Unlinks one region from the active chain, clears X/Z tags, and releases
+     * map payload instances through the mesh-renderer destroy-instance lane.
+     * Returns the region's payload list.
+     */
+    ClutterPayloadList* ResetState();
   };
   static_assert(sizeof(ClutterRegion) == 0x38, "ClutterRegion size must be 0x38");
   static_assert(offsetof(ClutterRegion, mNext) == 0x04, "ClutterRegion::mNext offset must be 0x04");
@@ -478,14 +488,4 @@ namespace moho
    * Walks one intrusive list lane and releases node payload storage.
    */
   std::uint8_t ReleaseRegionListPayloads(ClutterRegionList& poolBlocks, std::uint8_t passthrough);
-
-  /**
-   * Address: 0x007D5F80 (FUN_007D5F80)
-   *
-   * What it does:
-   * Unlinks one region from the active chain, clears X/Z tags, and releases
-   * map payload instances through the mesh-renderer destroy-instance lane.
-   */
-  ClutterPayloadList* ResetRegionRuntimeState(ClutterRegion* region);
-
 } // namespace moho

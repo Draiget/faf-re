@@ -1072,7 +1072,7 @@ namespace gpg::gal
     using RuntimeProxyVectorThrowFn = void (*)();
     using RuntimeProxyVectorAllocateFn = void* (*)(std::uint32_t);
 
-    bool TryInitializeRuntimeProxyVectorLane(
+    bool TryInitializeProxyVectorLane(
       RuntimeProxyVectorLane* const lane,
       const std::uint32_t elementCount,
       const std::uint32_t maxElementCount,
@@ -1112,7 +1112,7 @@ namespace gpg::gal
       const std::uint32_t elementCount
     )
     {
-      return TryInitializeRuntimeProxyVectorLane(
+      return TryInitializeProxyVectorLane(
         lane,
         elementCount,
         0x3FFFFFFFU,

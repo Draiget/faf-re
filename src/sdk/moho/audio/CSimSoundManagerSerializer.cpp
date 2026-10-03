@@ -15,7 +15,7 @@ namespace
 {
   using LoopNode = moho::TDatListItem<moho::HSound, void>;
 
-  void SerializeAudioRequestFastVectorRuntime(
+  void SerializeAudioRequestFastVector(
     gpg::WriteArchive* archive,
     int objectPtr,
     int version,
@@ -38,7 +38,7 @@ namespace
       type = gpg::LookupRType(typeid(gpg::fastvector<moho::SAudioRequest>));
       if (type != nullptr && type->serSaveFunc_ == nullptr) {
         type->serSaveFunc_ =
-          reinterpret_cast<gpg::RType::save_func_t>(&SerializeAudioRequestFastVectorRuntime);
+          reinterpret_cast<gpg::RType::save_func_t>(&SerializeAudioRequestFastVector);
       }
     }
     return type;
@@ -51,7 +51,7 @@ namespace
    * Serializes one `fastvector<SAudioRequest>` payload by writing count and
    * each request element through reflected write callbacks.
    */
-  void SerializeAudioRequestFastVectorRuntime(
+  void SerializeAudioRequestFastVector(
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,

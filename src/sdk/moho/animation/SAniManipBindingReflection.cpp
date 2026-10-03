@@ -138,7 +138,7 @@ namespace
    * the inline storage base and capacity spans two `SAniManipBinding` lanes.
    */
   [[maybe_unused]] SAniManipBindingRuntimeInlineView*
-  InitializeSAniManipBindingRuntimeInlineView(
+  InitializeSAniManipBindingInlineView(
     SAniManipBindingRuntimeInlineView* const outView,
     moho::SAniManipBinding* const inlineStorageBase
   ) noexcept

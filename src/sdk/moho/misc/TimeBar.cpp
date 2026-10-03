@@ -133,14 +133,14 @@ namespace moho
       gTimeBarState = &sState;
     }
 
-    void EnsureTimeBarRuntimeInitialized()
+    void EnsureTimeBarInitialized()
     {
       std::call_once(gTimeBarStateInitOnce, &InitializeTimeBarState);
     }
 
     [[nodiscard]] TimeBarState& GetTimeBarState()
     {
-      EnsureTimeBarRuntimeInitialized();
+      EnsureTimeBarInitialized();
       return *gTimeBarState;
     }
 

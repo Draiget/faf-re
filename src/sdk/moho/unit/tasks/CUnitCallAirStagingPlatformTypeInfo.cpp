@@ -21,7 +21,7 @@ namespace
     return sInstance;
   }
 
-  void InitializeAirStagingRuntimeState(moho::CUnitCallAirStagingPlatform* const task)
+  void InitializeAirStagingState(moho::CUnitCallAirStagingPlatform* const task)
   {
     task->mPlatform.ownerLinkSlot = nullptr;
     task->mPlatform.nextInOwner = nullptr;
@@ -99,7 +99,7 @@ namespace moho
   {
     auto* const task = new (std::nothrow) CUnitCallAirStagingPlatform();
     if (task) {
-      InitializeAirStagingRuntimeState(task);
+      InitializeAirStagingState(task);
     }
     return gpg::RRef{task, gpg::LookupRType(typeid(CUnitCallAirStagingPlatform))};
   }
@@ -112,7 +112,7 @@ namespace moho
     auto* const task = static_cast<CUnitCallAirStagingPlatform*>(objectStorage);
     if (task) {
       new (task) CUnitCallAirStagingPlatform();
-      InitializeAirStagingRuntimeState(task);
+      InitializeAirStagingState(task);
     }
     return gpg::RRef{task, gpg::LookupRType(typeid(CUnitCallAirStagingPlatform))};
   }

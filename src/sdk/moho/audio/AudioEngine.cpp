@@ -1735,7 +1735,7 @@ namespace moho
     , mNoSound(0u)
     , mReserved29{}
     , mSpeakerConfiguration(3u)
-    , mAudioRuntimeModule(nullptr)
+    , mAudioModule(nullptr)
     , mLookAheadTimeMs(0u)
     , mGlobalSettingsStart(nullptr)
     , mGlobalSettingsLength(0u)
@@ -1774,9 +1774,9 @@ namespace moho
       }
     }
 
-    if (mAudioRuntimeModule != nullptr) {
-      (void)::FreeLibrary(static_cast<HMODULE>(mAudioRuntimeModule));
-      mAudioRuntimeModule = nullptr;
+    if (mAudioModule != nullptr) {
+      (void)::FreeLibrary(static_cast<HMODULE>(mAudioModule));
+      mAudioModule = nullptr;
     }
 
     if (mEngines.mStart != nullptr) {
@@ -2223,7 +2223,7 @@ namespace moho
     // pointer and length, [+0x40] the flags, [+0x50] func_HandleSoundEvent.
     //
     // This passed &mSpeakerConfiguration (+0x2C) instead, i.e. the block eight
-    // bytes early, so XACT read lookAheadTime = 3 and took mAudioRuntimeModule
+    // bytes early, so XACT read lookAheadTime = 3 and took mAudioModule
     // as the global-settings pointer and rejected the lot with "Invalid arg".
     const int initializeResult = mImpl->mInstance->Initialize(&configuration->mLookAheadTimeMs);
     if (initializeResult < 0) {

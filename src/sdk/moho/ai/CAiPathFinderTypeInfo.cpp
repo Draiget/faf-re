@@ -73,37 +73,6 @@ namespace
   }
 
   /**
-   * Address: 0x005AB980 (FUN_005AB980)
-   *
-   * What it does:
-   * Stores one runtime `RType*` lane through an output pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType** StoreRuntimeTypePointer(
-    gpg::RType** const outType,
-    gpg::RType* const value
-  ) noexcept
-  {
-    if (outType) {
-      *outType = value;
-    }
-    return outType;
-  }
-
-  /**
-   * Address: 0x005AB9B0 (FUN_005AB9B0)
-   *
-   * What it does:
-   * Alias lane for storing one runtime `RType*` pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType** StoreRuntimeTypePointerAlias(
-    gpg::RType** const outType,
-    gpg::RType* const value
-  ) noexcept
-  {
-    return StoreRuntimeTypePointer(outType, value);
-  }
-
-  /**
    * Address: 0x005AAAA0 (FUN_005AAAA0, preregister_CAiPathFinderTypeInfo)
    *
    * What it does:

@@ -195,7 +195,7 @@ namespace moho
    * The per-thread error-string slot (the binary's
    * `boost::thread_specific_ptr<std::string>`).
    */
-  struct FWHSThreadStateRuntime
+  struct FWHSThreadState
   {
     /**
      * Address: 0x0045B210 (FUN_0045B210, Moho::CDiskThreadState::Create)
@@ -203,7 +203,7 @@ namespace moho
      * What it does:
      * Creates the thread-specific slot `FWaitHandleSet::ErrorString` reads.
      */
-    FWHSThreadStateRuntime();
+    FWHSThreadState();
 
     /**
      * Address: 0x0045B290 (FUN_0045B290, boost::thread_specific_ptr::release)
@@ -211,12 +211,12 @@ namespace moho
      * What it does:
      * Releases the calling thread's error string and the slot.
      */
-    ~FWHSThreadStateRuntime();
+    ~FWHSThreadState();
 
     void* mTss = nullptr; // +0x00 (boost tss key runtime lane)
   };
 
-  static_assert(sizeof(FWHSThreadStateRuntime) == 0x04, "FWHSThreadStateRuntime size must be 0x04");
+  static_assert(sizeof(FWHSThreadState) == 0x04, "FWHSThreadState size must be 0x04");
 
   /**
    * The process's file layer: the mounted archives, their entry index, the
@@ -247,7 +247,7 @@ namespace moho
     FWHSZipEntryMap mZipEntries{};                    // +0x34
     FWHSFileInfoMap mFileInfo{};                      // +0x40
     CVirtualFileSystem* mHandle = nullptr;            // +0x4C
-    FWHSThreadStateRuntime mThreadStateInd{};         // +0x50
+    FWHSThreadState mThreadStateInd{};         // +0x50
 
     /**
      * Address: 0x00458BC0 (FUN_00458BC0, Moho::FWaitHandleSet::RemoveEntry)

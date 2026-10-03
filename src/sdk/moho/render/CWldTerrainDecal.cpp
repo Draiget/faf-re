@@ -267,7 +267,7 @@ namespace moho
     , mCurrentAlpha(1.0f)
     , mFadeDistance(5.0f)
     , mUnknown94(0.0f)
-    , mRuntimeHandle(0)
+    , mDecalHandle(0)
     , mArmy(-1)
     , mUnknownA0(0)
     , mPadA1_A3{0, 0, 0}
@@ -478,7 +478,7 @@ namespace moho
    */
   void CWldTerrainDecal::SetHandle(const int handle)
   {
-    mRuntimeHandle = handle;
+    mDecalHandle = handle;
   }
 
   /**

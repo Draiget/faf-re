@@ -34,7 +34,7 @@ namespace
   constexpr std::uint8_t kDiscoveryLobbyProtocolVersion = 0x01;
   constexpr std::uint8_t kDiscoverySupComGameTypeFlag = 0x00;
 
-  [[nodiscard]] gpg::RType* CachedCDiscoveryServiceRuntimeType()
+  [[nodiscard]] gpg::RType* CachedCDiscoveryServiceTypeBridge()
   {
     static gpg::RType* cached = nullptr;
     if (cached == nullptr) {
@@ -351,7 +351,7 @@ moho::CDiscoveryService::~CDiscoveryService()
  */
 gpg::RType* moho::CDiscoveryService::GetClass() const
 {
-  return CachedCDiscoveryServiceRuntimeType();
+  return CachedCDiscoveryServiceTypeBridge();
 }
 
 /**

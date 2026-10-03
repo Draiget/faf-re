@@ -537,7 +537,7 @@ namespace gpg
      * Initializes the global log-context singleton on first use and returns the
      * process-global context pointer lane.
      */
-    LogContext* GetLogContextSingletonRuntime();
+    LogContext* GetLogContextSingleton();
 
     /**
      * One-time initializer for logging singleton.

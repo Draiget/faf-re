@@ -288,7 +288,7 @@ namespace
    * Invokes slot-0 delete-with-flag semantics with flag `1` when the runtime
    * object pointer is non-null.
    */
-  void DeleteSlot0RuntimeWithFlagOne(void* const object)
+  void DeleteAiReconDbObject(void* const object)
   {
     auto* const runtime = static_cast<DeleteWithFlagSlot0Runtime*>(object);
     if (!runtime) {
@@ -305,7 +305,7 @@ namespace
    * Invokes slot-0 delete-with-flag semantics with flag `0` (non-deleting
    * destructor path).
    */
-  void DestroySlot0RuntimeWithFlagZero(void* const object)
+  void DestroyAiReconDbObject(void* const object)
   {
     (void)static_cast<DeleteWithFlagSlot0Runtime*>(object)->DeleteWithFlag(0);
   }
@@ -657,8 +657,8 @@ void CAiReconDBImplTypeInfo::BindFactoryCallbacks() noexcept
 {
   newRefFunc_ = &CreateAiReconDbRefOwned;
   ctorRefFunc_ = &ConstructAiReconDbRefInPlace;
-  deleteFunc_ = &DeleteSlot0RuntimeWithFlagOne;
-  dtrFunc_ = &DestroySlot0RuntimeWithFlagZero;
+  deleteFunc_ = &DeleteAiReconDbObject;
+  dtrFunc_ = &DestroyAiReconDbObject;
 }
 
 /**

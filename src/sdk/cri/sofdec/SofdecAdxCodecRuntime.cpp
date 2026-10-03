@@ -5048,7 +5048,7 @@
    * Applies Dolby matrix parameters to one ADXT-owned ADXB decode lane and
    * latches the caller-provided matrix parameters in decoder runtime state.
    */
-  [[maybe_unused]] void ADXT_UpdateDolbyMatrixFromRuntime(
+  [[maybe_unused]] void ADXT_UpdateDolbyMatrix(
     void* const adxtRuntime,
     const std::int32_t matrixParamA,
     const std::int32_t matrixParamB

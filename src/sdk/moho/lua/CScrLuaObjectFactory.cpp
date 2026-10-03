@@ -442,7 +442,7 @@ namespace moho
    * Initializes the `CScriptObject*` metatable-factory singleton index lane
    * and returns that singleton address.
    */
-  [[maybe_unused]] CScrLuaMetatableFactory<CScriptObject*>* InitializeCScriptObjectMetatableFactoryRuntimeSingleton()
+  [[maybe_unused]] CScrLuaMetatableFactory<CScriptObject*>* InitializeCScriptObjectMetatableFactorySingleton()
   {
     (void)register_CScrLuaMetatableFactory_CScriptObject_Index();
     return &CScrLuaMetatableFactory<CScriptObject*>::Instance();

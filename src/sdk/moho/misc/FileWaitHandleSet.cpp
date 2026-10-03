@@ -27,11 +27,11 @@ namespace moho
 namespace
 {
   moho::FWaitHandleSet* sPFWaitHandleSet = nullptr;
-  using DiskThreadStateStringMap = std::unordered_map<const moho::FWHSThreadStateRuntime*, msvc8::string*>;
+  using DiskThreadStateStringMap = std::unordered_map<const moho::FWHSThreadState*, msvc8::string*>;
 
   /**
    * Per-thread error-string storage, standing in for the
-   * `boost::thread_specific_ptr` the binary keeps in `FWHSThreadStateRuntime`.
+   * `boost::thread_specific_ptr` the binary keeps in `FWHSThreadState`.
    *
    * The map is allocated once per thread and deliberately never destroyed.
    * The wait-handle set is a function-local static whose destructor runs from
@@ -99,7 +99,7 @@ namespace
   }
 
   void CleanupDiskThreadStateValue(
-    const moho::FWHSThreadStateRuntime& runtime
+    const moho::FWHSThreadState& runtime
   )
   {
     const auto it = DiskThreadStateStrings().find(&runtime);
@@ -111,7 +111,7 @@ namespace
 
   [[nodiscard]]
   msvc8::string* GetOrCreateDiskThreadStateValue(
-    moho::FWHSThreadStateRuntime& runtime
+    moho::FWHSThreadState& runtime
   )
   {
     if (msvc8::string*& slot = DiskThreadStateStrings()[&runtime]; slot == nullptr) {
@@ -637,7 +637,7 @@ namespace
  * What it does:
  * Creates the thread-specific slot `FWaitHandleSet::ErrorString` reads.
  */
-moho::FWHSThreadStateRuntime::FWHSThreadStateRuntime()
+moho::FWHSThreadState::FWHSThreadState()
   : mTss(this)
 {}
 
@@ -647,7 +647,7 @@ moho::FWHSThreadStateRuntime::FWHSThreadStateRuntime()
  * What it does:
  * Releases the calling thread's error string and the slot.
  */
-moho::FWHSThreadStateRuntime::~FWHSThreadStateRuntime()
+moho::FWHSThreadState::~FWHSThreadState()
 {
   CleanupDiskThreadStateValue(*this);
   mTss = nullptr;

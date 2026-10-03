@@ -325,7 +325,7 @@ namespace moho
     float mCurrentAlpha;                       // +0x8C
     float mFadeDistance;                       // +0x90
     float mUnknown94;                          // +0x94
-    std::int32_t mRuntimeHandle;               // +0x98
+    std::int32_t mDecalHandle;               // +0x98
     /// Owning army, or -1 for a decal that came off the map rather than out of
     /// the sim. `CDecalManager::AddDecals` copies `SDecalInfo::mArmy` here
     /// (0x0087899B), and the constructor seeds -1 (0x0089CB5D).
@@ -364,7 +364,7 @@ namespace moho
   );
   static_assert(offsetof(CWldTerrainDecal, mFadeDistance) == 0x90, "CWldTerrainDecal::mFadeDistance offset must be 0x90");
   static_assert(offsetof(CWldTerrainDecal, mUnknown94) == 0x94, "CWldTerrainDecal::mUnknown94 offset must be 0x94");
-  static_assert(offsetof(CWldTerrainDecal, mRuntimeHandle) == 0x98, "CWldTerrainDecal::mRuntimeHandle offset must be 0x98");
+  static_assert(offsetof(CWldTerrainDecal, mDecalHandle) == 0x98, "CWldTerrainDecal::mDecalHandle offset must be 0x98");
   static_assert(offsetof(CWldTerrainDecal, mArmy) == 0x9C, "CWldTerrainDecal::mArmy offset must be 0x9C");
   static_assert(offsetof(CWldTerrainDecal, mUnknownA0) == 0xA0, "CWldTerrainDecal::mUnknownA0 offset must be 0xA0");
   static_assert(offsetof(CWldTerrainDecal, mResourceRefs) == 0xA4, "CWldTerrainDecal::mResourceRefs offset must be 0xA4");

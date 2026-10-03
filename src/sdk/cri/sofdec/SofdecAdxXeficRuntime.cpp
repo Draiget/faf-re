@@ -10289,7 +10289,7 @@
    * What it does:
    * Initializes ADXPC video-sync runtime lanes and timing callbacks.
    */
-  std::int32_t ADXPC_InitializeVideoSyncRuntime()
+  std::int32_t ADXPC_InitializeVideoSync()
   {
     if (gAdxpcVideoObject == nullptr || gAdxpcVideoMode <= 0) {
       return 0;
@@ -10368,7 +10368,7 @@
       gAdxpcVideoObject = videoObject;
       SofdecSignalReleaseLegacyNoOp(gAdxpcVideoProcessingSignal);
 
-      initResult = ADXPC_InitializeVideoSyncRuntime();
+      initResult = ADXPC_InitializeVideoSync();
       if (initResult == 0) {
         (void)ADXPC_EndVideoSyncSession();
       }

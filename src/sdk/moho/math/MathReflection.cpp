@@ -1300,7 +1300,7 @@ extern "C" int global_compat_flag = 1;
  * Enables/disables the SSE2 runtime lane by masking with the startup
  * compatibility flag, then publishes and returns the resulting mode value.
  */
-extern "C" int __cdecl RuntimeSetSse2Mode(const int enableSse2)
+extern "C" int __cdecl SetSse2Mode(const int enableSse2)
 {
   const int mode = (enableSse2 != 0) ? global_compat_flag : 0;
   global_mode_sse2 = mode;
