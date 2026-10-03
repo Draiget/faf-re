@@ -559,13 +559,13 @@ namespace
     };
 
     auto growWords = [&throwTooLong, &allocateWords](
-                       msvc8::detail::vector_bool_storage* const view,
+                       msvc8::detail::vector_bool_storage* const storage,
                        std::uint32_t* const insertAt,
                        const std::size_t count,
                        const std::uint32_t value
                      ) {
       (void)msvc8::detail::InsertFillWords(
-        view,
+        storage,
         insertAt,
         count,
         value,
@@ -575,7 +575,7 @@ namespace
     };
 
     auto eraseWords = [](
-                        msvc8::detail::vector_bool_storage* const view,
+                        msvc8::detail::vector_bool_storage* const storage,
                         std::uint32_t* const first,
                         std::uint32_t* const last
                       ) {
@@ -583,12 +583,12 @@ namespace
         return;
       }
 
-      if (last != view->end) {
-        const std::size_t tailWordCount = static_cast<std::size_t>(view->end - last);
+      if (last != storage->end) {
+        const std::size_t tailWordCount = static_cast<std::size_t>(storage->end - last);
         std::memmove(first, last, tailWordCount * sizeof(std::uint32_t));
       }
 
-      view->end -= static_cast<std::ptrdiff_t>(last - first);
+      storage->end -= static_cast<std::ptrdiff_t>(last - first);
     };
 
     (void)msvc8::detail::ResizeWordStorage(
@@ -654,9 +654,7 @@ namespace
   void RebuildWaterMapRect(moho::CWldTerrainRes& terrainRes, const gpg::Rect2i& updateRect)
   {
     constexpr float kNoWaterElevation = -10000.0f;
-    auto* const terrainView = (&terrainRes);
-    auto* const visualView = (&terrainRes);
-    moho::STIMap* const map = terrainView->mMap;
+    moho::STIMap* const map = terrainRes.mMap;
     moho::CHeightField* const field = map->mHeightField.get();
 
     const std::int32_t maxZ = field->height - 1;
@@ -709,8 +707,8 @@ namespace
           const float h11 = SampleTerrainHeightWordScaled(*field, worldX + 2, worldZ + 2);
 
           std::uint32_t packedSample = 0;
-          packedSample |= static_cast<std::uint32_t>(visualView->mWaterFoam[pixelIndex]) << 24u;
-          packedSample |= static_cast<std::uint32_t>(visualView->mWaterFlatness[pixelIndex]) << 16u;
+          packedSample |= static_cast<std::uint32_t>(terrainRes.mWaterFoam[pixelIndex]) << 24u;
+          packedSample |= static_cast<std::uint32_t>(terrainRes.mWaterFlatness[pixelIndex]) << 16u;
 
           float depthByte = ((waterElevation - h00) / depthDenominator) * 255.0f;
           if (depthByte >= 255.0f) {
@@ -728,14 +726,14 @@ namespace
             packedSample |= 0xFFu;
           }
 
-          visualView->mEditWordBuffer.begin[pixelIndex] = packedSample;
+          terrainRes.mEditWordBuffer.begin[pixelIndex] = packedSample;
           ++pixelIndex;
           worldX += 2;
         }
       }
     }
 
-    terrainRes.UpdateTexture(visualView->mWaterMapTexture, visualView->mEditWordBuffer.begin);
+    terrainRes.UpdateTexture(terrainRes.mWaterMapTexture, terrainRes.mEditWordBuffer.begin);
   }
 
   /**
@@ -1603,8 +1601,7 @@ namespace moho
    */
   void CWldTerrainRes::SetBackground(const msvc8::string& texturePath)
   {
-    auto* const view = this;
-    view->mBackgroundFile = texturePath;
+    mBackgroundFile = texturePath;
 
     ID3DDeviceResources::TextureResourceHandle texture{};
     if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
@@ -1613,7 +1610,7 @@ namespace moho
       }
     }
 
-    view->mBackgroundTexture = texture;
+    mBackgroundTexture = texture;
   }
 
   /**
@@ -1625,8 +1622,7 @@ namespace moho
    */
   void CWldTerrainRes::SetSkycube(const msvc8::string& texturePath)
   {
-    auto* const view = this;
-    view->mSkycubeFile = texturePath;
+    mSkycubeFile = texturePath;
 
     ID3DDeviceResources::TextureResourceHandle texture{};
     if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
@@ -1635,7 +1631,7 @@ namespace moho
       }
     }
 
-    view->mSkycubeTexture = texture;
+    mSkycubeTexture = texture;
   }
 
   /**
@@ -1979,8 +1975,7 @@ namespace moho
    */
   Wm3::Vector2f CWldTerrainRes::GetWaterMapSize() const
   {
-    const auto* const view = this;
-    const CHeightField* const field = view->mMap->mHeightField.get();
+    const CHeightField* const field = mMap->mHeightField.get();
     const std::int32_t waterMapWidth = (field->width - 1) >> 1;
     const std::int32_t waterMapHeight = (field->height - 1) >> 1;
     return {static_cast<float>(waterMapWidth), static_cast<float>(waterMapHeight)};
@@ -2027,11 +2022,10 @@ namespace moho
    */
   std::int32_t CWldTerrainRes::GetNormalMapCount()
   {
-    const auto* const view = this;
-    if (view->mNormalMap.begin() == nullptr) {
+    if (mNormalMap.begin() == nullptr) {
       return 0;
     }
-    return static_cast<std::int32_t>(view->mNormalMap.size());
+    return static_cast<std::int32_t>(mNormalMap.size());
   }
 
   /**
@@ -2043,8 +2037,7 @@ namespace moho
    */
   float IWldTerrainRes::GetHeightAt(const std::int32_t x, const std::int32_t z) const
   {
-    const auto* const view = this;
-    const CHeightField* const field = view->mMap->mHeightField.get();
+    const CHeightField* const field = mMap->mHeightField.get();
     return static_cast<float>(field->GetHeightAt(x, z)) * 0.0078125f;
   }
 
@@ -2072,9 +2065,6 @@ namespace moho
    */
   bool CWldTerrainRes::Reset(const SChartSize chartSize, LuaPlus::LuaState* const state)
   {
-    auto* const view = this;
-    auto* const normalView = this;
-    auto* const visualView = this;
 
     // 0x008A625F: the single stack-resident progress handle is zeroed at entry
     // and reused for both `InitNormalMap` (0x008A658E) and `EnterEditMode`
@@ -2093,12 +2083,12 @@ namespace moho
       static_cast<std::uint32_t>(chartSize.mWidth),
       static_cast<std::uint32_t>(chartSize.mHeight)
     );
-    STIMap* const previousMap = view->mMap;
-    view->mMap = newMap;
+    STIMap* const previousMap = mMap;
+    mMap = newMap;
     delete previousMap;
 
     // 0x008A62AF-0x008A62BA
-    view->mMap->LoadTerrainTypes(state);
+    mMap->LoadTerrainTypes(state);
 
     // 0x008A62BB-0x008A630E: refresh the full bound/error hierarchy. Both calls
     // re-chase `mMap->mHeightField` and pass an unbounded rectangle.
@@ -2107,8 +2097,8 @@ namespace moho
     wholeField.z0 = 0;
     wholeField.x1 = 0x7FFFFFFF;
     wholeField.z1 = 0x7FFFFFFF;
-    view->mMap->mHeightField.get()->UpdateBounds(wholeField);
-    view->mMap->mHeightField.get()->UpdateError(wholeField);
+    mMap->mHeightField.get()->UpdateBounds(wholeField);
+    mMap->mHeightField.get()->UpdateError(wholeField);
 
     // 0x008A630F-0x008A6372: half-resolution debug dirty mask, swapped then freed.
     const std::int32_t halfWidth = chartSize.mWidth / 2;
@@ -2117,8 +2107,8 @@ namespace moho
       static_cast<unsigned int>(halfWidth),
       static_cast<unsigned int>(halfHeight)
     );
-    gpg::BitArray2D* const previousDirtyTerrain = visualView->mDebugDirtyTerrain;
-    visualView->mDebugDirtyTerrain = newDirtyTerrain;
+    gpg::BitArray2D* const previousDirtyTerrain = mDebugDirtyTerrain;
+    mDebugDirtyTerrain = newDirtyTerrain;
     delete previousDirtyTerrain;
 
     // 0x008A6373-0x008A6421: default sky/background art, each built as a
@@ -2147,7 +2137,7 @@ namespace moho
       );
 
       const TerrainEnvironmentLookupEntry defaultEnvironment(defaultEnvironmentName, defaultEnvironmentTexture);
-      view->mEnvLookup[defaultEnvironmentKey] = defaultEnvironment;
+      mEnvLookup[defaultEnvironmentKey] = defaultEnvironment;
     }
 
     // 0x008A6589-0x008A6598
@@ -2156,71 +2146,71 @@ namespace moho
 
     // 0x008A659A-0x008A65BF: stratum masks live at half chart resolution; both
     // lanes are recomputed from the arguments rather than reused.
-    normalView->mStrata.mStratumMaskWidth = static_cast<std::uint32_t>(halfWidth);
-    normalView->mStrata.mStratumMaskHeight = static_cast<std::uint32_t>(halfHeight);
+    mStrata.mStratumMaskWidth = static_cast<std::uint32_t>(halfWidth);
+    mStrata.mStratumMaskHeight = static_cast<std::uint32_t>(halfHeight);
 
     // 0x008A65BF-0x008A667E: stratum mask 0 - the returned handle is assigned into
     // the member, the temporary released, and only then is the member cleared.
     {
       ID3DDeviceResources::DynamicTextureSheetHandle sheet;
       AdoptDynamicSheetAsStratumMask(
-        normalView->mStrata.mStratumMask0,
+        mStrata.mStratumMask0,
         resources->NewDynamicTextureSheet(sheet, halfWidth, halfHeight, 2)
       );
     }
-    ClearTexture(ShareAsDynamicSheet(normalView->mStrata.mStratumMask0));
+    ClearTexture(ShareAsDynamicSheet(mStrata.mStratumMask0));
 
     // 0x008A667F-0x008A6748: stratum mask 1 - sized from the lanes just written.
     {
       ID3DDeviceResources::DynamicTextureSheetHandle sheet;
       AdoptDynamicSheetAsStratumMask(
-        normalView->mStrata.mStratumMask1,
+        mStrata.mStratumMask1,
         resources->NewDynamicTextureSheet(
           sheet,
-          static_cast<int>(normalView->mStrata.mStratumMaskWidth),
-          static_cast<int>(normalView->mStrata.mStratumMaskHeight),
+          static_cast<int>(mStrata.mStratumMaskWidth),
+          static_cast<int>(mStrata.mStratumMaskHeight),
           2
         )
       );
     }
-    ClearTexture(ShareAsDynamicSheet(normalView->mStrata.mStratumMask1));
+    ClearTexture(ShareAsDynamicSheet(mStrata.mStratumMask1));
 
     // 0x008A674E-0x008A6814: water map, same half resolution.
     {
       ID3DDeviceResources::DynamicTextureSheetHandle sheet;
-      visualView->mWaterMapTexture = resources->NewDynamicTextureSheet(sheet, halfWidth, halfHeight, 2);
+      mWaterMapTexture = resources->NewDynamicTextureSheet(sheet, halfWidth, halfHeight, 2);
     }
-    ClearTexture(visualView->mWaterMapTexture);
+    ClearTexture(mWaterMapTexture);
 
     // 0x008A6815-0x008A6825: the water masks are sized from the sheet the driver
     // actually handed back, not from the requested extent.
     Wm3::Vector3f waterMapDimensions{};
-    visualView->mWaterMapTexture->GetDimensions(&waterMapDimensions);
+    mWaterMapTexture->GetDimensions(&waterMapDimensions);
 
     // 0x008A6827-0x008A691F: fixed lighting / sun / shadow / fog defaults.
-    view->mLightingMultiplier = 1.5f;
-    view->mSunDirection.x = 0.70700002f;
-    view->mSunDirection.y = 0.70700002f;
-    view->mSunDirection.z = 0.0f;
-    view->mSunAmbience.x = 0.2f;
-    view->mSunAmbience.y = 0.2f;
-    view->mSunAmbience.z = 0.2f;
-    view->mSunColor.x = 1.0f;
-    view->mSunColor.y = 1.0f;
-    view->mSunColor.z = 1.0f;
-    view->mShadowFillColor.x = 0.69999999f;
-    view->mShadowFillColor.y = 0.69999999f;
-    view->mShadowFillColor.z = 0.75f;
-    view->mSpecularColor.x = 0.0f;
-    view->mSpecularColor.y = 0.0f;
-    view->mSpecularColor.z = 0.0f;
-    view->mSpecularColor.w = 0.0f;
-    view->mBloom = 0.079999998f;
-    view->mFogInfo.mStartDistance = 1.0f;
-    view->mFogInfo.mCutoffDistance = 1.0f;
-    view->mFogInfo.mMinClamp = 1.0f;
-    view->mFogInfo.mMaxClamp = 0.0f;
-    view->mFogInfo.mCurveExponent = 1000.0f;
+    mLightingMultiplier = 1.5f;
+    mSunDirection.x = 0.70700002f;
+    mSunDirection.y = 0.70700002f;
+    mSunDirection.z = 0.0f;
+    mSunAmbience.x = 0.2f;
+    mSunAmbience.y = 0.2f;
+    mSunAmbience.z = 0.2f;
+    mSunColor.x = 1.0f;
+    mSunColor.y = 1.0f;
+    mSunColor.z = 1.0f;
+    mShadowFillColor.x = 0.69999999f;
+    mShadowFillColor.y = 0.69999999f;
+    mShadowFillColor.z = 0.75f;
+    mSpecularColor.x = 0.0f;
+    mSpecularColor.y = 0.0f;
+    mSpecularColor.z = 0.0f;
+    mSpecularColor.w = 0.0f;
+    mBloom = 0.079999998f;
+    mFogInfo.mStartDistance = 1.0f;
+    mFogInfo.mCutoffDistance = 1.0f;
+    mFogInfo.mMinClamp = 1.0f;
+    mFogInfo.mMaxClamp = 0.0f;
+    mFogInfo.mCurveExponent = 1000.0f;
 
     // 0x008A691A-0x008A693B
     SetWaterDefaults();
@@ -2237,8 +2227,8 @@ namespace moho
     // 0x008A6959-0x008A6979: swap in a decal manager bound to this terrain, then
     // destroy the previous one through its virtual destructor.
     CDecalManager* const newDecalManager = CDecalManager::Create(this);
-    CDecalManager* const previousDecalManager = visualView->mDecalManager;
-    visualView->mDecalManager = newDecalManager;
+    CDecalManager* const previousDecalManager = mDecalManager;
+    mDecalManager = newDecalManager;
     delete previousDecalManager;
 
     // 0x008A697A-0x008A6A3C: the sky dome is centred on the XZ midpoint of the
@@ -2257,11 +2247,11 @@ namespace moho
       std::sqrt(halfExtentZSquared + halfExtentXSquared) / msvc8::cos(1.25663697719574)
     );
 
-    const STIMap* const map = view->mMap;
+    const STIMap* const map = mMap;
     const float domeElevation = map->mWaterEnabled != 0 ? map->mWaterElevation : bounds.Min.y;
 
     const Wm3::Vector3f domeOrigin{centerX, 0.0f, centerZ};
-    view->mSkyDome.SetupHorizonAndCirrus(domeOrigin, domeElevation, domeRadius);
+    mSkyDome.SetupHorizonAndCirrus(domeOrigin, domeElevation, domeRadius);
 
     return true;
   }
@@ -2274,8 +2264,7 @@ namespace moho
    */
   Wm3::AxisAlignedBox3f CWldTerrainRes::GetWorldBounds() const
   {
-    const auto* const view = this;
-    const CHeightField* const field = view->mMap->mHeightField.get();
+    const CHeightField* const field = mMap->mHeightField.get();
     if (field == nullptr) {
       return Wm3::AxisAlignedBox3f{};
     }
@@ -2416,12 +2405,11 @@ namespace moho
    */
   void CWldTerrainRes::SetFogInfo(const SFogInfo& fogInfo)
   {
-    auto* const view = this;
-    view->mFogInfo.mStartDistance = fogInfo.mStartDistance;
-    view->mFogInfo.mCutoffDistance = fogInfo.mCutoffDistance;
-    view->mFogInfo.mMinClamp = fogInfo.mMinClamp;
-    view->mFogInfo.mMaxClamp = fogInfo.mMaxClamp;
-    view->mFogInfo.mCurveExponent = fogInfo.mCurveExponent;
+    mFogInfo.mStartDistance = fogInfo.mStartDistance;
+    mFogInfo.mCutoffDistance = fogInfo.mCutoffDistance;
+    mFogInfo.mMinClamp = fogInfo.mMinClamp;
+    mFogInfo.mMaxClamp = fogInfo.mMaxClamp;
+    mFogInfo.mCurveExponent = fogInfo.mCurveExponent;
   }
 
   /**
@@ -2520,10 +2508,9 @@ namespace moho
    */
   void CWldTerrainRes::SetWaterShaderProperties(const CWaterShaderProperties& properties)
   {
-    auto* const view = this;
-    if (&properties != &view->mWaterShaderProperties) {
-      view->mWaterShaderProperties.~CWaterShaderProperties();
-      new (&view->mWaterShaderProperties) CWaterShaderProperties(properties);
+    if (&properties != &mWaterShaderProperties) {
+      mWaterShaderProperties.~CWaterShaderProperties();
+      new (&mWaterShaderProperties) CWaterShaderProperties(properties);
     }
   }
 
@@ -2593,20 +2580,17 @@ namespace moho
   {
     (void)loadControl;
 
-    auto* const runtimeView = this;
-    auto* const normalView = this;
-    auto* const visualView = this;
 
-    runtimeView->mEditMode = 1;
+    mEditMode = 1;
 
-    const CHeightField* const field = normalView->mMap->mHeightField.get();
+    const CHeightField* const field = mMap->mHeightField.get();
     const std::int64_t cellCount = static_cast<std::int64_t>(field->width - 1) * static_cast<std::int64_t>(field->height - 1);
     const std::size_t wordCount = cellCount > 0 ? static_cast<std::size_t>(cellCount >> 2) : 0u;
-    EnsureTerrainEditWordCount(visualView->mEditWordBuffer, wordCount, 0u);
+    EnsureTerrainEditWordCount(mEditWordBuffer, wordCount, 0u);
 
-    CloneStratumMaskForEdit(normalView->mStrata.mStratumMask0, false);
-    CloneStratumMaskForEdit(normalView->mStrata.mStratumMask1, false);
-    CloneTerrainDynamicTextureForEdit(visualView->mWaterMapTexture, false);
+    CloneStratumMaskForEdit(mStrata.mStratumMask0, false);
+    CloneStratumMaskForEdit(mStrata.mStratumMask1, false);
+    CloneTerrainDynamicTextureForEdit(mWaterMapTexture, false);
 
     gpg::Rect2i fullRect{
       static_cast<std::int32_t>(0x80000000u),
@@ -2626,20 +2610,17 @@ namespace moho
    */
   void CWldTerrainRes::ExitEditMode()
   {
-    auto* const runtimeView = this;
-    auto* const normalView = this;
-    auto* const visualView = this;
 
-    UpdateTexture(visualView->mWaterMapTexture, visualView->mEditWordBuffer.begin);
+    UpdateTexture(mWaterMapTexture, mEditWordBuffer.begin);
 
-    runtimeView->mEditMode = 0;
-    if (visualView->mEditWordBuffer.begin != visualView->mEditWordBuffer.end) {
-      visualView->mEditWordBuffer.end = visualView->mEditWordBuffer.begin;
+    mEditMode = 0;
+    if (mEditWordBuffer.begin != mEditWordBuffer.end) {
+      mEditWordBuffer.end = mEditWordBuffer.begin;
     }
 
-    CloneStratumMaskForEdit(normalView->mStrata.mStratumMask0, true);
-    CloneStratumMaskForEdit(normalView->mStrata.mStratumMask1, true);
-    CloneTerrainDynamicTextureForEdit(visualView->mWaterMapTexture, true);
+    CloneStratumMaskForEdit(mStrata.mStratumMask0, true);
+    CloneStratumMaskForEdit(mStrata.mStratumMask1, true);
+    CloneTerrainDynamicTextureForEdit(mWaterMapTexture, true);
   }
 
   /**
@@ -2685,25 +2666,24 @@ namespace moho
   void CWldTerrainRes::CreateWaterMasks(const std::int32_t width, const std::int32_t height)
   {
     const std::uint32_t maskSizeBytes = static_cast<std::uint32_t>(width * height);
-    auto* const view = this;
 
     auto* const newWaterFoam = static_cast<std::uint8_t*>(::operator new(maskSizeBytes));
-    std::uint8_t* const oldWaterFoam = view->mWaterFoam;
-    view->mWaterFoam = newWaterFoam;
+    std::uint8_t* const oldWaterFoam = mWaterFoam;
+    mWaterFoam = newWaterFoam;
     ::operator delete[](oldWaterFoam);
-    std::memset(view->mWaterFoam, 0, maskSizeBytes);
+    std::memset(mWaterFoam, 0, maskSizeBytes);
 
     auto* const newWaterFlatness = static_cast<std::uint8_t*>(::operator new(maskSizeBytes));
-    std::uint8_t* const oldWaterFlatness = view->mWaterFlatness;
-    view->mWaterFlatness = newWaterFlatness;
+    std::uint8_t* const oldWaterFlatness = mWaterFlatness;
+    mWaterFlatness = newWaterFlatness;
     ::operator delete[](oldWaterFlatness);
-    std::memset(view->mWaterFlatness, 0xFF, maskSizeBytes);
+    std::memset(mWaterFlatness, 0xFF, maskSizeBytes);
 
     auto* const newWaterDepthBias = static_cast<std::uint8_t*>(::operator new(maskSizeBytes));
-    std::uint8_t* const oldWaterDepthBias = view->mWaterDepthBias;
-    view->mWaterDepthBias = newWaterDepthBias;
+    std::uint8_t* const oldWaterDepthBias = mWaterDepthBias;
+    mWaterDepthBias = newWaterDepthBias;
     ::operator delete[](oldWaterDepthBias);
-    std::memset(view->mWaterDepthBias, 0x7F, maskSizeBytes);
+    std::memset(mWaterDepthBias, 0x7F, maskSizeBytes);
   }
 
   /**
@@ -2756,8 +2736,7 @@ namespace moho
    */
   void CWldTerrainRes::InitNormalMap(CBackgroundTaskControl& loadControl)
   {
-    auto* const normalView = this;
-    CHeightField* const field = normalView->mMap->mHeightField.get();
+    CHeightField* const field = mMap->mHeightField.get();
 
     const std::int32_t widthMinusOne = field->width - 1;
     const std::int32_t heightMinusOne = field->height - 1;
@@ -2765,11 +2744,11 @@ namespace moho
     const std::int32_t tileWidth = (widthMinusOne <= 2048) ? widthMinusOne : 2048;
     const std::int32_t tileHeight = (heightMinusOne <= 2048) ? heightMinusOne : 2048;
 
-    normalView->mNormalMapWidth = tileWidth;
-    normalView->mNormalMapHeight = tileHeight;
+    mNormalMapWidth = tileWidth;
+    mNormalMapHeight = tileHeight;
 
     if (tileWidth <= 0 || tileHeight <= 0 || widthMinusOne <= 0 || heightMinusOne <= 0) {
-      normalView->mNormalMap.resize(0u, boost::shared_ptr<CD3DDynamicTextureSheet>{});
+      mNormalMap.resize(0u, boost::shared_ptr<CD3DDynamicTextureSheet>{});
       return;
     }
 
@@ -2777,7 +2756,7 @@ namespace moho
     const std::size_t tileCountY = static_cast<std::size_t>((tileHeight + heightMinusOne - 1) / tileHeight);
     const std::size_t tileCount = tileCountX * tileCountY;
 
-    normalView->mNormalMap.resize(tileCount, boost::shared_ptr<CD3DDynamicTextureSheet>{});
+    mNormalMap.resize(tileCount, boost::shared_ptr<CD3DDynamicTextureSheet>{});
 
     // TEMPORARY PROBE -- terrain overexposure triage, delete with the others.
     {
@@ -2801,8 +2780,8 @@ namespace moho
         (void)resources->NewDynamicTextureSheet(texture, tileWidth, tileHeight, 12);
       }
 
-      normalView->mNormalMap[i] = texture;
-      if (normalView->mNormalMap[i].get() == nullptr) {
+      mNormalMap[i] = texture;
+      if (mNormalMap[i].get() == nullptr) {
         // Original binary at 0x008A5715 constructs one default-shaped
         // gpg::gal::Error via the 0x00940560 ctor then `_CxxThrowException`s it.
         throw gpg::gal::Error{};
@@ -2832,8 +2811,7 @@ namespace moho
       return;
     }
 
-    auto* const runtimeView = this;
-    CHeightField* const field = runtimeView->mMap->mHeightField.get();
+    CHeightField* const field = mMap->mHeightField.get();
     const Wm3::AxisAlignedBox3f cameraAabb = field->ConvexIntersection(camera->CameraGetView().solid2);
 
     gpg::Rect2i cameraRect{};
@@ -2844,8 +2822,7 @@ namespace moho
 
     UserArmy* const focusArmy = WLD_GetActiveSession()->GetFocusArmy();
 
-    auto* const visualView = this;
-    moho::TerrainDirtyRectList& dirtyList = visualView->mDebugDirtyRects;
+    moho::TerrainDirtyRectList& dirtyList = mDebugDirtyRects;
     auto current = dirtyList.begin();
 
     bool syncedAnyRect = false;
@@ -2861,7 +2838,7 @@ namespace moho
         const std::int32_t sourceOffset = dirtyRect.x0 + dirtyRect.z0 * field->width;
         field->SetElevationRectRaw(dirtyRect, source->data + sourceOffset, field->width);
 
-        visualView->mDebugDirtyTerrain->FillRect(
+        mDebugDirtyTerrain->FillRect(
           dirtyRect.x0 / 2,
           dirtyRect.z0 / 2,
           (dirtyRect.x1 / 2) - (dirtyRect.x0 / 2),
@@ -2923,19 +2900,18 @@ namespace moho
    */
   void CWldTerrainRes::UpdateNormalMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect)
   {
-    auto* const normalView = this;
-    const std::int32_t tileWidth = normalView->mNormalMapWidth;
-    const std::int32_t tileHeight = normalView->mNormalMapHeight;
+    const std::int32_t tileWidth = mNormalMapWidth;
+    const std::int32_t tileHeight = mNormalMapHeight;
     if (tileWidth <= 0 || tileHeight <= 0) {
       return;
     }
 
-    CHeightField* const field = normalView->mMap->mHeightField.get();
+    CHeightField* const field = mMap->mHeightField.get();
     if (field == nullptr || field->width <= 1 || field->height <= 1) {
       return;
     }
 
-    const std::size_t tileCount = normalView->mNormalMap.size();
+    const std::size_t tileCount = mNormalMap.size();
     std::size_t tileIndex = 0u;
 
     for (std::int32_t tileZBase = 0; tileZBase < field->height - 1; tileZBase += tileHeight) {
@@ -2969,7 +2945,7 @@ namespace moho
           continue;
         }
 
-        boost::shared_ptr<CD3DDynamicTextureSheet> texture = normalView->mNormalMap[tileIndex];
+        boost::shared_ptr<CD3DDynamicTextureSheet> texture = mNormalMap[tileIndex];
         CD3DDynamicTextureSheet* const sheet = texture.get();
         if (sheet == nullptr) {
           continue;
@@ -3262,11 +3238,10 @@ namespace moho
     static constexpr std::uint32_t kChannelShift[4] = {16u, 8u, 0u, 24u};
 
     const std::int32_t channel = static_cast<std::int32_t>(static_cast<std::uint32_t>(stratumIndex) & 3u);
-    const auto* const view = this;
 
     const boost::shared_ptr<CD3DDynamicTextureSheet> targetTexture =
-      ((stratumIndex / 4) != 0) ? ShareAsDynamicSheet(view->mStrata.mStratumMask1)
-                                : ShareAsDynamicSheet(view->mStrata.mStratumMask0);
+      ((stratumIndex / 4) != 0) ? ShareAsDynamicSheet(mStrata.mStratumMask1)
+                                : ShareAsDynamicSheet(mStrata.mStratumMask0);
 
     UpdateTextureChannel(
       rowStart,
@@ -3287,8 +3262,7 @@ namespace moho
    */
   void CWldTerrainRes::UpdateStratumMask(const std::int32_t stratumIndex, const std::uint8_t* const sourceMask)
   {
-    const auto* const view = this;
-    UpdateStratumMask(stratumIndex, sourceMask, 0, 0, view->mStrata.mStratumMaskWidth, view->mStrata.mStratumMaskHeight);
+    UpdateStratumMask(stratumIndex, sourceMask, 0, 0, mStrata.mStratumMaskWidth, mStrata.mStratumMaskHeight);
   }
 
   /**
@@ -3309,10 +3283,9 @@ namespace moho
     static constexpr std::uint32_t kChannelShift[4] = {16u, 8u, 0u, 24u};
 
     const std::int32_t channel = static_cast<std::int32_t>(static_cast<std::uint32_t>(stratumIndex) & 3u);
-    const auto* const view = this;
     const boost::shared_ptr<CD3DDynamicTextureSheet> sourceTexture =
-      ((stratumIndex / 4) != 0) ? ShareAsDynamicSheet(view->mStrata.mStratumMask1)
-                                : ShareAsDynamicSheet(view->mStrata.mStratumMask0);
+      ((stratumIndex / 4) != 0) ? ShareAsDynamicSheet(mStrata.mStratumMask1)
+                                : ShareAsDynamicSheet(mStrata.mStratumMask0);
 
     GetTextureChannel(sourceTexture, kChannelMask[channel], kChannelShift[channel], outMask);
   }
@@ -3328,34 +3301,33 @@ namespace moho
   {
     SNormalMapInfo outInfo{};
 
-    const auto* const view = this;
-    const std::int32_t mapWidthMinusOne = view->mMap->mHeightField->width - 1;
-    const std::int32_t mapHeightMinusOne = view->mMap->mHeightField->height - 1;
+    const std::int32_t mapWidthMinusOne = mMap->mHeightField->width - 1;
+    const std::int32_t mapHeightMinusOne = mMap->mHeightField->height - 1;
 
     const std::int32_t normalMapTilesPerRow = static_cast<std::int32_t>(
-      static_cast<std::uint32_t>(mapWidthMinusOne) / static_cast<std::uint32_t>(view->mNormalMapWidth)
+      static_cast<std::uint32_t>(mapWidthMinusOne) / static_cast<std::uint32_t>(mNormalMapWidth)
     );
 
     const std::int32_t tileIndexX = index % normalMapTilesPerRow;
     const std::int32_t tileIndexY = index / normalMapTilesPerRow;
 
-    outInfo.mTileOriginX = static_cast<float>(view->mNormalMapWidth) * static_cast<float>(tileIndexX);
-    outInfo.mTileOriginY = static_cast<float>(view->mNormalMapHeight) * static_cast<float>(tileIndexY);
-    outInfo.mTexture = view->mNormalMap[index];
+    outInfo.mTileOriginX = static_cast<float>(mNormalMapWidth) * static_cast<float>(tileIndexX);
+    outInfo.mTileOriginY = static_cast<float>(mNormalMapHeight) * static_cast<float>(tileIndexY);
+    outInfo.mTexture = mNormalMap[index];
 
     outInfo.mXResolution =
-      static_cast<float>(static_cast<double>(static_cast<std::uint32_t>(mapWidthMinusOne)) / view->mNormalMapWidth);
+      static_cast<float>(static_cast<double>(static_cast<std::uint32_t>(mapWidthMinusOne)) / mNormalMapWidth);
     outInfo.mYResolution =
-      static_cast<float>(static_cast<double>(static_cast<std::uint32_t>(mapHeightMinusOne)) / view->mNormalMapHeight);
+      static_cast<float>(static_cast<double>(static_cast<std::uint32_t>(mapHeightMinusOne)) / mNormalMapHeight);
 
     outInfo.mScaleBiasX = 0.0f;
     outInfo.mScaleBiasY = 1.0f;
-    outInfo.mOffsetScaleX = (-0.0f - outInfo.mTileOriginX) / static_cast<float>(view->mNormalMapWidth);
-    outInfo.mOffsetScaleY = (-0.0f - outInfo.mTileOriginY) / static_cast<float>(view->mNormalMapHeight);
+    outInfo.mOffsetScaleX = (-0.0f - outInfo.mTileOriginX) / static_cast<float>(mNormalMapWidth);
+    outInfo.mOffsetScaleY = (-0.0f - outInfo.mTileOriginY) / static_cast<float>(mNormalMapHeight);
     outInfo.mOffsetScaleZ = 0.0f;
     outInfo.mOffsetScaleW = 0.0f;
-    outInfo.mWidth = static_cast<float>(view->mNormalMapWidth);
-    outInfo.mHeight = static_cast<float>(view->mNormalMapHeight);
+    outInfo.mWidth = static_cast<float>(mNormalMapWidth);
+    outInfo.mHeight = static_cast<float>(mNormalMapHeight);
     return outInfo;
   }
 
@@ -3393,9 +3365,8 @@ namespace moho
    */
   void CWldTerrainRes::SetStratumDefaults()
   {
-    auto* const normalView = this;
-    normalView->mStrata = StratumMaterial{};
-    normalView->mStrata.SetSizeTo(this);
+    mStrata = StratumMaterial{};
+    mStrata.SetSizeTo(this);
   }
 
   /**
@@ -4095,23 +4066,20 @@ namespace moho
    */
   bool CWldTerrainRes::Finalize()
   {
-    auto* const runtimeView = this;
-    auto* const normalView = this;
-    auto* const visualView = this;
 
-    runtimeView->mBool = 0;
+    mBool = 0;
 
     CBackgroundTaskControl loadControl{};
 
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
 
-    const CHeightField* const field = runtimeView->mMap->mHeightField.get();
+    const CHeightField* const field = mMap->mHeightField.get();
     const std::int32_t maskTileX = (field->width - 1) >> 1;
     const std::int32_t maskTileY = (field->height - 1) >> 1;
 
-    runtimeView->mStrata.mStratumMaskWidth = static_cast<std::uint32_t>(maskTileX);
-    runtimeView->mStrata.mStratumMaskHeight = static_cast<std::uint32_t>(maskTileY);
+    mStrata.mStratumMaskWidth = static_cast<std::uint32_t>(maskTileX);
+    mStrata.mStratumMaskHeight = static_cast<std::uint32_t>(maskTileY);
 
     // Stratum mask 0: create a half-res dynamic sheet, blit the current mask
     // surface into it, then adopt it as the live mask.
@@ -4120,8 +4088,8 @@ namespace moho
     if (newSheet.get() == nullptr) {
       throw gpg::gal::Error{};
     }
-    D3D_GetDevice()->UpdateSurface(AsDynamicSheet(normalView->mStrata.mStratumMask0), newSheet.get(), nullptr, nullptr);
-    AdoptDynamicSheetAsStratumMask(normalView->mStrata.mStratumMask0, newSheet);
+    D3D_GetDevice()->UpdateSurface(AsDynamicSheet(mStrata.mStratumMask0), newSheet.get(), nullptr, nullptr);
+    AdoptDynamicSheetAsStratumMask(mStrata.mStratumMask0, newSheet);
 
     // Stratum mask 1: same pattern, reusing the temporary sheet slot.
     boost::shared_ptr<CD3DDynamicTextureSheet> spareSheet;
@@ -4131,8 +4099,8 @@ namespace moho
     if (newSheet.get() == nullptr) {
       throw gpg::gal::Error{};
     }
-    D3D_GetDevice()->UpdateSurface(AsDynamicSheet(normalView->mStrata.mStratumMask1), newSheet.get(), nullptr, nullptr);
-    AdoptDynamicSheetAsStratumMask(normalView->mStrata.mStratumMask1, newSheet);
+    D3D_GetDevice()->UpdateSurface(AsDynamicSheet(mStrata.mStratumMask1), newSheet.get(), nullptr, nullptr);
+    AdoptDynamicSheetAsStratumMask(mStrata.mStratumMask1, newSheet);
     newSheet.reset();
 
     // Water map: create a full-res (format 12) dynamic sheet, blit the current
@@ -4141,16 +4109,16 @@ namespace moho
     if (spareSheet.get() == nullptr) {
       throw gpg::gal::Error{};
     }
-    D3D_GetDevice()->UpdateSurface(visualView->mWaterMapTexture.get(), spareSheet.get(), nullptr, nullptr);
-    visualView->mWaterMapTexture = spareSheet;
+    D3D_GetDevice()->UpdateSurface(mWaterMapTexture.get(), spareSheet.get(), nullptr, nullptr);
+    mWaterMapTexture = spareSheet;
     spareSheet.reset();
 
     InitNormalMap(loadControl);
     EnterEditMode(loadControl);
     ExitEditMode();
 
-    runtimeView->mBool = 1;
-    return runtimeView->mBool != 0;
+    mBool = 1;
+    return mBool != 0;
   }
 
   /**
