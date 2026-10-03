@@ -10,22 +10,16 @@
 #include <cstring>
 #include <limits>
 
-struct SfmpvPictureAttributeRuntimeView;
-struct SfmpvPictureDecodeLaneRuntimeView;
-struct SfmpvComplementPts;
-struct SfmpvMvInfoRuntimeView;
-struct SfmpvInfoRuntimeView;
-struct SfmpvfInfoRuntimeView;
-struct SfmpvfFrameObjectRuntimeView;
-struct SfmpvfFrameInfoRuntimeView;
-struct SfmpvHandleRuntimeView;
-struct SfmpvPackedTimecodeRuntimeView;
-struct SfmpvDecodeFrameParamRuntimeView;
-struct SfbufRingChunkRuntimeView;
-struct MpvcmcRuntimeView;
-struct SfptsQueueEntryRuntimeView;
-struct SfptsPtsQueueRuntimeView;
-struct SfptsSourceLaneRuntimeView;
+#include "moho/audio/SofdecRuntime.h"
+
+using moho::SfmpvPara;
+using moho::SfmpvComplementPts;
+using moho::SfmpvPicUsr;
+
+struct SfmpvPictureAttribute;
+struct SfmpvDecodeFrameParam;
+struct SfbufRingChunk;
+struct Mpvcmc;
 
 // ---------------------------------------------------------------------------
 // Forward declarations for CRI library functions used by this module
@@ -33,8 +27,6 @@ struct SfptsSourceLaneRuntimeView;
 
 extern "C" {
   std::int32_t SFLIB_SetErr(std::int32_t errorObjectAddress, std::int32_t errorCode);
-  void SFLIB_LockCs();
-  void SFLIB_UnlockCs();
   std::int32_t sfmpv_ChkFatal();
   std::int32_t MPVLIB_CheckHn(std::int32_t decoderHandle);
   std::int32_t MPV_GoNextDelimSj(std::int32_t streamBufferAddress);
@@ -47,14 +39,13 @@ extern "C" {
   std::int32_t MPV_Create();
   std::int32_t MPV_SetErrFunc(std::int32_t handleAddress, std::int32_t errorCallbackAddress, std::int32_t errorCallbackContext);
   std::int32_t MPV_SetCond(std::int32_t handleAddress, std::int32_t conditionId, std::int32_t (*conditionCallback)());
-  std::int32_t SFPLY_GetResetFlg();
   std::int32_t M2V_Init(std::int32_t framePoolCount, void* workAddress, std::int32_t workBytes);
   std::int32_t UTY_MemsetDword(void* destination, std::uint32_t value, unsigned int dwordCount);
   std::int32_t UTY_MulDiv(std::int32_t lhs, std::int32_t rhs, std::int32_t divisor);
   std::int32_t SFTIM_InitTtu(std::uint32_t* timerState, std::int32_t initialValue);
   void SFTIM_UpdateItime(void* timerState, std::int32_t interpolationTime);
   std::int32_t SFTIM_GetNextItime(void* timerState, std::int32_t interpolationTime);
-  std::int32_t SFTIM_IsGetFrmTime(std::int32_t workctrlAddress, const SfmpvfFrameInfoRuntimeView* frameInfo);
+  std::int32_t SFTIM_IsGetFrmTime(std::int32_t workctrlAddress, const SfmpvfFrameInfo* frameInfo);
   /**
    * Address: 0x00AE5C40 (FUN_00AE5C40, _SFPTS_ReadPtsQue)
    *
@@ -76,14 +67,14 @@ extern "C" {
    * cursor/count lanes, and copies 16-byte entry words to caller output.
    */
   std::int32_t* sfpts_ReadPtsQueSub(
-    SfptsPtsQueueRuntimeView* ptsQueue,
+    moho::SfptsPtsQueue* ptsQueue,
     std::int32_t normalizedDelimiterAddress,
     std::int32_t* outPtsWords,
     std::int32_t sourceLaneStartAddress,
     std::int32_t sourceLaneSpanBytes
   );
   std::int32_t sfpts_SearchPtsQue(
-    const SfptsPtsQueueRuntimeView* ptsQueue,
+    const moho::SfptsPtsQueue* ptsQueue,
     std::uint32_t delimiterAddress,
     std::uint32_t sourceLaneStartAddress,
     std::int32_t sourceLaneSpanBytes
@@ -99,15 +90,10 @@ extern "C" {
   std::int32_t SFSET_SetCond(std::int32_t workctrlAddress, std::int32_t conditionId, std::int32_t value);
   std::int32_t SFSET_GetCond(std::int32_t workctrlAddress, std::int32_t conditionId);
   std::int32_t SFHDS_GetColType(std::int32_t workctrlAddress);
-  std::int32_t SFD_SetMpvCond(
-    std::int32_t workctrlAddress,
-    std::int32_t conditionId,
-    std::int32_t (*conditionCallback)()
-  );
-  std::int32_t sfmpv_DetectTcErr(std::int32_t workctrlAddress, const SfmpvPictureAttributeRuntimeView* pictureAttribute);
+  std::int32_t sfmpv_DetectTcErr(std::int32_t workctrlAddress, const SfmpvPictureAttribute* pictureAttribute);
   std::int32_t sfmpv_DoReformTc(
     std::int32_t workctrlAddress,
-    SfmpvPictureAttributeRuntimeView* pictureAttribute,
+    SfmpvPictureAttribute* pictureAttribute,
     std::int64_t presentationPts,
     std::int32_t detectErrorMode
   );
@@ -116,11 +102,11 @@ extern "C" {
     std::int32_t frameRateIndex,
     std::int32_t dropFrameMode,
     std::int32_t decodeOrderMetric,
-    SfmpvPackedTimecodeRuntimeView* outTimecode
+    moho::SfmpvPackedTimecode* outTimecode
   );
   std::int32_t sfmpv_NextTc(
-    const SfmpvPackedTimecodeRuntimeView* sourceTimecode,
-    SfmpvPackedTimecodeRuntimeView* outTimecode
+    const moho::SfmpvPackedTimecode* sourceTimecode,
+    moho::SfmpvPackedTimecode* outTimecode
   );
   std::int32_t sfmpv_CalcAudioTotTime(std::int32_t workctrlAddress);
   std::int32_t sfmpv_CalcVideoTotTime(std::int32_t workctrlAddress);
@@ -163,12 +149,10 @@ extern "C" {
   std::int32_t sfmpv_IsDefect(std::int32_t workctrlAddress, std::int32_t pictureType);
   std::int32_t sfmpv_IsPtypeSkip(std::int32_t workctrlAddress, std::int32_t pictureType);
   std::uint8_t*
-  sfmpv_IsEmptyBpic(std::int32_t workctrlAddress, std::int32_t pictureType, const SfbufRingChunkRuntimeView* chunkWords);
+  sfmpv_IsEmptyBpic(std::int32_t workctrlAddress, std::int32_t pictureType, const SfbufRingChunk* chunkWords);
   std::int32_t sfmpv_CopyPicUsrInf(std::int32_t destinationInfoAddress, std::int32_t sourceInfoAddress);
   std::int32_t sfmpv_SetMpvHd(std::int32_t workctrlAddress, std::int32_t frameRateBase, std::int32_t pictureHeaderChunkAddress);
-  std::int32_t SFMPV_Seek(std::int32_t workctrlAddress);
   std::int32_t sfmpv_SetStartTtu(std::int32_t workctrlAddress);
-  std::int32_t SJRBF_GetFlowCnt(std::int32_t streamBufferAddress, std::int32_t lane0, std::int32_t lane1);
   std::int32_t sfmpv_ChkMpvErr(
     std::int32_t workctrlAddress,
     std::int32_t decodeResult,
@@ -190,27 +174,12 @@ extern "C" {
     std::int32_t* outStreamScale
   );
   std::int32_t sfmpv_DestroySub(std::int32_t decoderHandle);
-  std::int32_t SFBUF_SetPrepFlg(std::int32_t workctrlAddress, std::int32_t laneIndex, std::int32_t prepFlag);
-  std::int32_t SFBUF_GetPrepFlg(std::int32_t workctrlAddress, std::int32_t laneIndex);
-  std::int32_t SFBUF_SetTermFlg(std::int32_t workctrlAddress, std::int32_t laneIndex, std::int32_t termFlag);
-  std::int32_t SFBUF_GetTermFlg(std::int32_t workctrlAddress, std::int32_t laneIndex);
-  std::int32_t SFBUF_GetRTot(std::int32_t sfbufHandleAddress, std::int32_t ringIndex);
   std::int32_t*
   SFBUF_AddRtotSj(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t addBytes);
-  std::int32_t SFBUF_GetWTot(std::int32_t workctrlAddress, std::int32_t laneIndex);
-  std::int32_t SFTRN_IsSetup(std::int32_t workctrlAddress, std::int32_t laneIndex);
-  std::int32_t SFBUF_RingGetDataSiz(std::int32_t workctrlAddress, std::int32_t laneIndex);
-  std::int32_t SFBUF_GetRingBufSiz(std::int32_t workctrlAddress, std::int32_t laneIndex);
   std::int32_t sfmpv_AddRtotSj(std::int32_t workctrlAddress, std::int32_t consumedBytes);
-  std::int32_t SFPLY_AddSkipPic(
-    std::int32_t workctrlAddress,
-    std::int32_t skippedPictureDelta,
-    std::int32_t callbackContext
-  );
-  std::int32_t SFPLY_AddDecPic(std::int32_t workctrlAddress, std::int32_t decodedPictureDelta, std::int32_t pictureType);
   std::int32_t SFMPVF_HoldFrm(std::int32_t workctrlAddress);
   std::int32_t
-  sfmpvf_IsChkFirst(const SfmpvfFrameObjectRuntimeView* selectedFrameObject, const SfmpvfFrameObjectRuntimeView* candidateFrameObject);
+  sfmpvf_IsChkFirst(const moho::SfmpvfFrameObject* selectedFrameObject, const moho::SfmpvfFrameObject* candidateFrameObject);
   /**
    * Address: 0x00ADC6C0 (FUN_00ADC6C0, _SFMPVF_IssueFrmId)
    *
@@ -254,7 +223,7 @@ extern "C" {
   void sfmpvf_SearchFrmInf(
     std::int32_t workctrlAddress,
     std::int32_t frameObjectAddress,
-    SfmpvfFrameInfoRuntimeView** outFrameInfo
+    SfmpvfFrameInfo** outFrameInfo
   );
   std::int32_t sfmpvf_GetVfrmDataFromFrmInf(std::int32_t workctrlAddress, std::int32_t frameInfoIndex);
   std::int32_t sfmpvf_AddReadSub(
@@ -287,25 +256,6 @@ extern "C" {
    * non-reference draw state back to the appropriate idle lane.
    */
   std::int32_t SFMPVF_EndDrawFrm(std::int32_t frameObjectAddress);
-  std::int32_t SFBUF_RingGetRead(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outCursorWords);
-  std::int32_t SFBUF_RingAddRead(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t advanceCount);
-  void SFBUF_RingGetDlm(
-    std::int32_t sfbufHandleAddress,
-    std::int32_t ringIndex,
-    std::int32_t* outPrimaryDelimiterAddress,
-    std::int32_t* outSecondaryDelimiterAddress
-  );
-  void SFBUF_RingSetDlm(
-    std::int32_t sfbufHandleAddress,
-    std::int32_t ringIndex,
-    std::int32_t primaryDelimiterAddress,
-    std::int32_t secondaryDelimiterAddress
-  );
-  std::int32_t
-  SFBUF_RingGetSj(std::int32_t sfbufHandleAddress, std::int32_t ringIndex, std::int32_t* outRingHandleAddress);
-  std::int32_t
-  SFBUF_GetFlowCnt(std::int32_t sjHandleAddress, std::int32_t* outLane1FlowCount, std::int32_t* outLane0FlowCount);
-  std::int64_t SFBUF_UpdateFlowCnt(std::int32_t previousFlowLow, std::int32_t previousFlowHigh, std::int32_t nextFlowLow);
   std::uint8_t*
   sfmpv_SearchDelim(const std::int32_t ringCursorSnapshotAddress, std::int32_t delimiterMask, std::int32_t* outDelimiterState);
   std::int32_t sfmpv_CalcDistance(const std::int32_t* ringCursorSnapshotWords, const std::uint8_t* targetAddress);
@@ -334,7 +284,7 @@ extern "C" {
   std::int32_t MPV_DecodePicAtr(std::int32_t handleAddress, const std::int32_t* pictureDataRange, std::int32_t* outConsumedBytes);
   void MPV_SetPicUsrBuf(std::int32_t decoderHandle, std::int32_t userBufferAddress, std::int32_t userBufferSize);
   std::int32_t MPV_DecodePicAtrSj(std::int32_t decoderHandle, std::int32_t streamBufferAddress);
-  std::int32_t MPV_GetPicAtr(std::int32_t decoderHandle, SfmpvPictureDecodeLaneRuntimeView* outPictureDecodeLane);
+  std::int32_t MPV_GetPicAtr(std::int32_t decoderHandle, moho::SfmpvPictureDecodeLane* outPictureDecodeLane);
   void MPV_GetPicUsr(std::int32_t decoderHandle, std::int32_t laneIndex, std::int32_t* outPictureUserFlags);
   char* MPV_SearchDelim(const char* chunkAddress, std::int32_t chunkBytes, std::int32_t delimiterMask);
   std::uint8_t* MPV_BsearchDelim(
@@ -345,7 +295,7 @@ extern "C" {
   std::int32_t MPV_DecodeFrmSj(
     std::int32_t decoderHandle,
     std::int32_t streamBufferAddress,
-    const SfmpvDecodeFrameParamRuntimeView* decodeFrameParam
+    const SfmpvDecodeFrameParam* decodeFrameParam
   );
   /**
    * Address: 0x00AF5F50 (FUN_00AF5F50, _mpvcmc_InitMcOiTa)
@@ -354,7 +304,7 @@ extern "C" {
    * Seeds MPV CMC interpolation-pointer lanes to the internal table storage
    * block and resets per-lane span words.
    */
-  MpvcmcRuntimeView* mpvcmc_InitMcOiTa(MpvcmcRuntimeView* runtimeView);
+  Mpvcmc* mpvcmc_InitMcOiTa(Mpvcmc* runtimeView);
   /**
    * Address: 0x00AF5FC0 (FUN_00AF5FC0, _MPVCMC_InitMcOiRt)
    *
@@ -362,14 +312,14 @@ extern "C" {
    * Initializes MPV CMC interpolation runtime words from fixed seed lanes in
    * the CMC object.
    */
-  MpvcmcRuntimeView* MPVCMC_InitMcOiRt(MpvcmcRuntimeView* runtimeView);
+  Mpvcmc* MPVCMC_InitMcOiRt(Mpvcmc* runtimeView);
   /**
    * Address: 0x00AF6010 (FUN_00AF6010, _MPVCMC_SetCcnt)
    *
    * What it does:
    * Recomputes CMC count/state lanes from the runtime mode gate.
    */
-  std::int32_t MPVCMC_SetCcnt(MpvcmcRuntimeView* runtimeView);
+  std::int32_t MPVCMC_SetCcnt(Mpvcmc* runtimeView);
   /**
    * Address: 0x00AF60F0 (FUN_00AF60F0, _MPVUMC_Finish)
    *
@@ -384,7 +334,7 @@ extern "C" {
    * Computes Y/C output frame-buffer lane addresses and aligned strides for the
    * current decode-frame geometry.
    */
-  std::int32_t MPVUMC_InitOutRfb(MpvcmcRuntimeView* runtimeView);
+  std::int32_t MPVUMC_InitOutRfb(Mpvcmc* runtimeView);
   /**
    * Address: 0x00AF61D0 (FUN_00AF61D0, _MPVUMC_EndOfFrame)
    *
@@ -436,16 +386,16 @@ extern "C" {
   );
   std::int64_t sfmpv_ReadPtsQue(
     std::int32_t workctrlAddress,
-    SfmpvPictureDecodeLaneRuntimeView* pictureDecodeLane,
+    moho::SfmpvPictureDecodeLane* pictureDecodeLane,
     char* delimiterCursor,
     std::int32_t* outPresentationPtsWords,
     std::int32_t* outReferenceErrorSeedWords,
     std::int32_t pictureChangedFlag
   );
   std::int64_t sfmpv_ComplementPts(
-    std::int32_t timingLaneAddress,
+    moho::SofdecSfdWorkctrlSubobj* workctrl,
     SfmpvComplementPts* complementState,
-    const SfmpvPictureDecodeLaneRuntimeView* pictureDecodeLane,
+    const moho::SfmpvPictureDecodeLane* pictureDecodeLane,
     const std::int32_t* ptsWords,
     std::int32_t pictureChangedFlag,
     std::int32_t* outReferenceSeedWords
@@ -468,7 +418,7 @@ extern "C" {
     std::int32_t* outHasActiveUnit
   );
   std::int32_t sfmpv_DecodeOneUnit(
-    SfmpvHandleRuntimeView* workctrl,
+    moho::SofdecSfdWorkctrlSubobj* workctrl,
     std::int32_t activeSize,
     std::int32_t delimiterState,
     std::int32_t hasActiveUnit,
@@ -482,20 +432,20 @@ extern "C" {
     std::int32_t pictureHeaderChunkAddress
   );
   std::int32_t sfmpv_SetMvInf(
-    SfmpvMvInfoRuntimeView* destinationInfo,
+    moho::SfplyMovieInfo* destinationInfo,
     std::int32_t frameRateBase,
     const std::int32_t* frameInfoWords,
     std::int32_t vbvBufferBytes
   );
   std::int32_t sfmpv_SetFrmPara(
     std::int32_t workctrlAddress,
-    const SfmpvPictureDecodeLaneRuntimeView* pictureDecodeLane,
-    SfmpvDecodeFrameParamRuntimeView* decodeFrameParam,
+    const moho::SfmpvPictureDecodeLane* pictureDecodeLane,
+    SfmpvDecodeFrameParam* decodeFrameParam,
     std::int32_t* outFrameObjectAddress
   );
   std::int32_t sfmpv_ReadRefErrCnt(
     std::int32_t workctrlAddress,
-    const SfmpvInfoRuntimeView* mpvInfo,
+    const moho::SfmpvInfo* mpvInfo,
     std::int32_t* outErrorMajor,
     std::int32_t* outErrorMinor
   );
@@ -503,14 +453,14 @@ extern "C" {
   std::int32_t sfmpv_CalcRepeatField(std::int32_t workctrlAddress, std::int32_t frameObjectAddress, std::int32_t resetHistory);
   std::int32_t sfmpv_ChkBufSiz(std::int32_t workctrlAddress, const std::int32_t* frameDimensions);
   std::int32_t sfmpv_CalcFrmTtu(std::int32_t workctrlAddress, std::int32_t frameObjectAddress);
-  std::int32_t sfmpv_ReadTcode(std::int32_t frameObjectAddress, SfmpvPackedTimecodeRuntimeView* outTimecodeLane);
+  std::int32_t sfmpv_ReadTcode(std::int32_t frameObjectAddress, moho::SfmpvPackedTimecode* outTimecodeLane);
   std::int32_t sfmpv_CalcFrmTime(std::int32_t workctrlAddress, std::int32_t frameObjectAddress);
   std::int32_t sfmpv_UpdateFlowCnt(std::int32_t workctrlAddress);
   std::int32_t sfmpv_RingAddRead(std::int32_t workctrlAddress, std::int32_t advanceCount);
   std::int32_t
   sfmpv_ReprocessShc(std::int32_t workctrlAddress, const std::int32_t* decoderHandleLane, std::int32_t* outReprocessed);
   std::int32_t sfmpv_GetHd(std::int32_t workctrlAddress);
-  SfmpvfFrameObjectRuntimeView* SFMPVF_AllocFrm(std::int32_t workctrlAddress);
+  moho::SfmpvfFrameObject* SFMPVF_AllocFrm(std::int32_t workctrlAddress);
 }
 
 namespace
@@ -563,230 +513,45 @@ namespace
   }
 } // namespace
 
-// ---------------------------------------------------------------------------
-// MPV parameter block -- CRI-internal global state
-// ---------------------------------------------------------------------------
-
-/**
- * CRI Sofdec MPV parameter structure, stored at a fixed BSS address.
- * 0x24 bytes (9 DWORDs) are bulk-copied into each MPV info block by
- * `sfmpv_InitInf`.
- */
-struct SfmpvPara
-{
-  std::int32_t field_0x00;         // +0x00
-  std::int32_t field_0x04;         // +0x04
-  std::int32_t field_0x08;         // +0x08
-  std::int32_t field_0x0C;         // +0x0C
-  std::int32_t val4;               // +0x10  -- checked by sfmpvf_CheckMpvPara
-  std::int32_t field_0x14;         // +0x14
-  std::int32_t field_0x18;         // +0x18
-  std::int32_t nfrm_pool_wk;      // +0x1C  -- max 16 frame pool entries
-  std::int32_t val8;               // +0x20  -- checked by sfmpvf_CheckMpvPara
-};
-
-static_assert(sizeof(SfmpvPara) == 0x24, "SfmpvPara size must be 0x24");
-
-// ---------------------------------------------------------------------------
-// MPV complement-points sub-structure
-// ---------------------------------------------------------------------------
-
-/**
- * Complement (interpolation/prediction) point state, initialised by
- * `sfmpv_InitComplementPts`.  8 DWORDs = 0x20 bytes at known offsets.
- */
-struct SfmpvComplementPts
-{
-  std::int32_t field_0x00; // +0x00
-  std::int32_t field_0x04; // +0x04
-  std::int32_t field_0x08; // +0x08
-  std::int32_t reserved_0C; // +0x0C  (gap -- not written by init)
-  std::int32_t field_0x10; // +0x10
-  std::int32_t field_0x14; // +0x14
-  std::int32_t field_0x18; // +0x18
-  std::int32_t field_0x1C; // +0x1C
-};
-
-static_assert(sizeof(SfmpvComplementPts) == 0x20, "SfmpvComplementPts size must be 0x20");
-
-// ---------------------------------------------------------------------------
-// MPV picture-user sub-structure
-// ---------------------------------------------------------------------------
-
-/**
- * Picture-user state block.  `SFMPVF_InitPicUsr` zeroes 5 header DWORDs
- * followed by 16 pairs of DWORDs (32 entries), totalling 37 DWORDs.
- */
-struct SfmpvPicUsr
-{
-  std::int32_t header[5]; // +0x00  -- zeroed by init
-  struct PicUsrEntry
-  {
-    std::int32_t value0; // +0x00
-    std::int32_t value1; // +0x04
-  };
-  PicUsrEntry entries[16]; // +0x14  -- zeroed by init
-};
-
-struct SfbufRingChunkRuntimeView
+struct SfbufRingChunk
 {
   std::uint8_t* bufferAddress = nullptr; // +0x00
   std::int32_t byteCount = 0; // +0x04
 };
 
 static_assert(
-  offsetof(SfbufRingChunkRuntimeView, bufferAddress) == 0x00,
-  "SfbufRingChunkRuntimeView::bufferAddress offset must be 0x00"
+  offsetof(SfbufRingChunk, bufferAddress) == 0x00,
+  "SfbufRingChunk::bufferAddress offset must be 0x00"
 );
-static_assert(offsetof(SfbufRingChunkRuntimeView, byteCount) == 0x04, "SfbufRingChunkRuntimeView::byteCount offset must be 0x04");
-static_assert(sizeof(SfbufRingChunkRuntimeView) == 0x08, "SfbufRingChunkRuntimeView size must be 0x08");
+static_assert(offsetof(SfbufRingChunk, byteCount) == 0x04, "SfbufRingChunk::byteCount offset must be 0x04");
+static_assert(sizeof(SfbufRingChunk) == 0x08, "SfbufRingChunk size must be 0x08");
 
-struct SfbufRingCursorSnapshotRuntimeView
+struct SfbufRingCursorSnapshot
 {
-  SfbufRingChunkRuntimeView firstChunk{}; // +0x00
-  SfbufRingChunkRuntimeView secondChunk{}; // +0x08
+  SfbufRingChunk firstChunk{}; // +0x00
+  SfbufRingChunk secondChunk{}; // +0x08
   std::int32_t reservedWords[3]{}; // +0x10
 };
 
 static_assert(
-  offsetof(SfbufRingCursorSnapshotRuntimeView, firstChunk) == 0x00,
-  "SfbufRingCursorSnapshotRuntimeView::firstChunk offset must be 0x00"
+  offsetof(SfbufRingCursorSnapshot, firstChunk) == 0x00,
+  "SfbufRingCursorSnapshot::firstChunk offset must be 0x00"
 );
 static_assert(
-  offsetof(SfbufRingCursorSnapshotRuntimeView, secondChunk) == 0x08,
-  "SfbufRingCursorSnapshotRuntimeView::secondChunk offset must be 0x08"
+  offsetof(SfbufRingCursorSnapshot, secondChunk) == 0x08,
+  "SfbufRingCursorSnapshot::secondChunk offset must be 0x08"
 );
 static_assert(
-  offsetof(SfbufRingCursorSnapshotRuntimeView, reservedWords) == 0x10,
-  "SfbufRingCursorSnapshotRuntimeView::reservedWords offset must be 0x10"
+  offsetof(SfbufRingCursorSnapshot, reservedWords) == 0x10,
+  "SfbufRingCursorSnapshot::reservedWords offset must be 0x10"
 );
-static_assert(sizeof(SfbufRingCursorSnapshotRuntimeView) == 0x1C, "SfbufRingCursorSnapshotRuntimeView size must be 0x1C");
+static_assert(sizeof(SfbufRingCursorSnapshot) == 0x1C, "SfbufRingCursorSnapshot size must be 0x1C");
 
-/**
- * One 16-byte PTS queue entry consumed by SFPTS lanes.
- */
-struct SfptsQueueEntryRuntimeView
-{
-  std::int32_t ptsLow = -1; // +0x00
-  std::int32_t ptsHigh = -1; // +0x04
-  std::int32_t referenceLow = -1; // +0x08
-  std::int32_t referenceHigh = -1; // +0x0C
-};
 
-static_assert(offsetof(SfptsQueueEntryRuntimeView, ptsLow) == 0x00, "SfptsQueueEntryRuntimeView::ptsLow offset must be 0x00");
-static_assert(offsetof(SfptsQueueEntryRuntimeView, ptsHigh) == 0x04, "SfptsQueueEntryRuntimeView::ptsHigh offset must be 0x04");
-static_assert(
-  offsetof(SfptsQueueEntryRuntimeView, referenceLow) == 0x08,
-  "SfptsQueueEntryRuntimeView::referenceLow offset must be 0x08"
-);
-static_assert(
-  offsetof(SfptsQueueEntryRuntimeView, referenceHigh) == 0x0C,
-  "SfptsQueueEntryRuntimeView::referenceHigh offset must be 0x0C"
-);
-static_assert(sizeof(SfptsQueueEntryRuntimeView) == 0x10, "SfptsQueueEntryRuntimeView size must be 0x10");
-
-/**
- * PTS queue control lane used by `_sfpts_SearchPtsQue` and `_sfpts_ReadPtsQueSub`.
- */
-struct SfptsPtsQueueRuntimeView
-{
-  std::int32_t entriesBaseAddress = 0; // +0x00
-  std::int32_t entryCapacity = 0; // +0x04
-  std::int32_t queuedEntryCount = 0; // +0x08
-  std::int32_t reserved0C = 0; // +0x0C
-  std::int32_t readCursor = 0; // +0x10
-};
-
-static_assert(
-  offsetof(SfptsPtsQueueRuntimeView, entriesBaseAddress) == 0x00,
-  "SfptsPtsQueueRuntimeView::entriesBaseAddress offset must be 0x00"
-);
-static_assert(
-  offsetof(SfptsPtsQueueRuntimeView, entryCapacity) == 0x04,
-  "SfptsPtsQueueRuntimeView::entryCapacity offset must be 0x04"
-);
-static_assert(
-  offsetof(SfptsPtsQueueRuntimeView, queuedEntryCount) == 0x08,
-  "SfptsPtsQueueRuntimeView::queuedEntryCount offset must be 0x08"
-);
-static_assert(offsetof(SfptsPtsQueueRuntimeView, reserved0C) == 0x0C, "SfptsPtsQueueRuntimeView::reserved0C offset must be 0x0C");
-static_assert(offsetof(SfptsPtsQueueRuntimeView, readCursor) == 0x10, "SfptsPtsQueueRuntimeView::readCursor offset must be 0x10");
-static_assert(sizeof(SfptsPtsQueueRuntimeView) == 0x14, "SfptsPtsQueueRuntimeView size must be 0x14");
-
-/**
- * One source lane subobject containing stream-window bounds and embedded PTS queue.
- *
- * Evidence:
- * - `FUN_00AE5C40` indexes this array at `workctrl + 0x1320 + lane * 0x74`.
- */
-struct SfptsSourceLaneRuntimeView
-{
-  std::uint8_t mUnknown00To07[0x08]{}; // +0x00
-  std::int32_t ringWindowStartAddress = 0; // +0x08
-  std::int32_t ringWindowSpanBytes = 0; // +0x0C
-  std::uint8_t mUnknown10To27[0x18]{}; // +0x10
-  SfptsPtsQueueRuntimeView ptsQueue{}; // +0x28
-  std::uint8_t mUnknown3CTo73[0x38]{}; // +0x3C
-};
-
-static_assert(
-  offsetof(SfptsSourceLaneRuntimeView, ringWindowStartAddress) == 0x08,
-  "SfptsSourceLaneRuntimeView::ringWindowStartAddress offset must be 0x08"
-);
-static_assert(
-  offsetof(SfptsSourceLaneRuntimeView, ringWindowSpanBytes) == 0x0C,
-  "SfptsSourceLaneRuntimeView::ringWindowSpanBytes offset must be 0x0C"
-);
-static_assert(
-  offsetof(SfptsSourceLaneRuntimeView, ptsQueue) == 0x28,
-  "SfptsSourceLaneRuntimeView::ptsQueue offset must be 0x28"
-);
-static_assert(sizeof(SfptsSourceLaneRuntimeView) == 0x74, "SfptsSourceLaneRuntimeView size must be 0x74");
-
-struct SfmpvPackedTimecodeRuntimeView
-{
-  std::int32_t frameRateIndex = 0; // +0x00
-  std::int32_t dropFrameMode = 0; // +0x04
-  std::int32_t hours = 0; // +0x08
-  std::int32_t minutes = 0; // +0x0C
-  std::int32_t seconds = 0; // +0x10
-  std::int32_t frameNumber = 0; // +0x14
-  std::int32_t halfFrameCarry = 0; // +0x18
-  std::int16_t repeatFieldCount = 0; // +0x1C
-  std::int16_t repeatFieldAccumulated = 0; // +0x1E
-};
-
-static_assert(
-  offsetof(SfmpvPackedTimecodeRuntimeView, repeatFieldCount) == 0x1C,
-  "SfmpvPackedTimecodeRuntimeView::repeatFieldCount offset must be 0x1C"
-);
-static_assert(
-  offsetof(SfmpvPackedTimecodeRuntimeView, repeatFieldAccumulated) == 0x1E,
-  "SfmpvPackedTimecodeRuntimeView::repeatFieldAccumulated offset must be 0x1E"
-);
-static_assert(sizeof(SfmpvPackedTimecodeRuntimeView) == 0x20, "SfmpvPackedTimecodeRuntimeView size must be 0x20");
-
-struct SfmpvTtuRuntimeView
-{
-  std::int32_t state = 0; // +0x00
-  std::int32_t packedTimecodeWords[8]{}; // +0x04
-  std::int32_t timeMajor = 0; // +0x24
-  std::int32_t timeMinor = 0; // +0x28
-};
-
-static_assert(offsetof(SfmpvTtuRuntimeView, state) == 0x00, "SfmpvTtuRuntimeView::state offset must be 0x00");
-static_assert(
-  offsetof(SfmpvTtuRuntimeView, packedTimecodeWords) == 0x04,
-  "SfmpvTtuRuntimeView::packedTimecodeWords offset must be 0x04"
-);
-static_assert(offsetof(SfmpvTtuRuntimeView, timeMajor) == 0x24, "SfmpvTtuRuntimeView::timeMajor offset must be 0x24");
-static_assert(offsetof(SfmpvTtuRuntimeView, timeMinor) == 0x28, "SfmpvTtuRuntimeView::timeMinor offset must be 0x28");
-static_assert(sizeof(SfmpvTtuRuntimeView) == 0x2C, "SfmpvTtuRuntimeView size must be 0x2C");
-
-struct SfmpvfFrameTimingRuntimeView
+struct SfmpvfFrameTiming
 {
   std::uint8_t mUnknown00To0B[0x0C]{}; // +0x00
-  SfmpvTtuRuntimeView frameTtu{}; // +0x0C
+  moho::SfmpvTtu frameTtu{}; // +0x0C
   std::int32_t resolvedTimeMajor = 0; // +0x38
   std::int32_t resolvedTimeMinor = 0; // +0x3C
   std::uint8_t mUnknown40To4B[0x0C]{}; // +0x40
@@ -795,27 +560,27 @@ struct SfmpvfFrameTimingRuntimeView
 };
 
 static_assert(
-  offsetof(SfmpvfFrameTimingRuntimeView, frameTtu) == 0x0C,
-  "SfmpvfFrameTimingRuntimeView::frameTtu offset must be 0x0C"
+  offsetof(SfmpvfFrameTiming, frameTtu) == 0x0C,
+  "SfmpvfFrameTiming::frameTtu offset must be 0x0C"
 );
 static_assert(
-  offsetof(SfmpvfFrameTimingRuntimeView, resolvedTimeMajor) == 0x38,
-  "SfmpvfFrameTimingRuntimeView::resolvedTimeMajor offset must be 0x38"
+  offsetof(SfmpvfFrameTiming, resolvedTimeMajor) == 0x38,
+  "SfmpvfFrameTiming::resolvedTimeMajor offset must be 0x38"
 );
 static_assert(
-  offsetof(SfmpvfFrameTimingRuntimeView, resolvedTimeMinor) == 0x3C,
-  "SfmpvfFrameTimingRuntimeView::resolvedTimeMinor offset must be 0x3C"
+  offsetof(SfmpvfFrameTiming, resolvedTimeMinor) == 0x3C,
+  "SfmpvfFrameTiming::resolvedTimeMinor offset must be 0x3C"
 );
 static_assert(
-  offsetof(SfmpvfFrameTimingRuntimeView, frameStartTimeMajor) == 0x4C,
-  "SfmpvfFrameTimingRuntimeView::frameStartTimeMajor offset must be 0x4C"
+  offsetof(SfmpvfFrameTiming, frameStartTimeMajor) == 0x4C,
+  "SfmpvfFrameTiming::frameStartTimeMajor offset must be 0x4C"
 );
 static_assert(
-  offsetof(SfmpvfFrameTimingRuntimeView, frameEndTimeMajor) == 0x50,
-  "SfmpvfFrameTimingRuntimeView::frameEndTimeMajor offset must be 0x50"
+  offsetof(SfmpvfFrameTiming, frameEndTimeMajor) == 0x50,
+  "SfmpvfFrameTiming::frameEndTimeMajor offset must be 0x50"
 );
 
-struct SfmpvfFrameRepeatRuntimeView
+struct SfmpvfFrameRepeat
 {
   std::uint8_t mUnknown00To13[0x14]{}; // +0x00
   std::int32_t historyOrdinal = 0; // +0x14
@@ -827,23 +592,23 @@ struct SfmpvfFrameRepeatRuntimeView
 };
 
 static_assert(
-  offsetof(SfmpvfFrameRepeatRuntimeView, historyOrdinal) == 0x14,
-  "SfmpvfFrameRepeatRuntimeView::historyOrdinal offset must be 0x14"
+  offsetof(SfmpvfFrameRepeat, historyOrdinal) == 0x14,
+  "SfmpvfFrameRepeat::historyOrdinal offset must be 0x14"
 );
 static_assert(
-  offsetof(SfmpvfFrameRepeatRuntimeView, pictureType) == 0x18,
-  "SfmpvfFrameRepeatRuntimeView::pictureType offset must be 0x18"
+  offsetof(SfmpvfFrameRepeat, pictureType) == 0x18,
+  "SfmpvfFrameRepeat::pictureType offset must be 0x18"
 );
 static_assert(
-  offsetof(SfmpvfFrameRepeatRuntimeView, repeatAccumulatorWord) == 0x2E,
-  "SfmpvfFrameRepeatRuntimeView::repeatAccumulatorWord offset must be 0x2E"
+  offsetof(SfmpvfFrameRepeat, repeatAccumulatorWord) == 0x2E,
+  "SfmpvfFrameRepeat::repeatAccumulatorWord offset must be 0x2E"
 );
 static_assert(
-  offsetof(SfmpvfFrameRepeatRuntimeView, decodeOrderIndex) == 0x70,
-  "SfmpvfFrameRepeatRuntimeView::decodeOrderIndex offset must be 0x70"
+  offsetof(SfmpvfFrameRepeat, decodeOrderIndex) == 0x70,
+  "SfmpvfFrameRepeat::decodeOrderIndex offset must be 0x70"
 );
 
-struct SfmpvfTimecodeSourceRuntimeView
+struct SfmpvfTimecodeSource
 {
   std::uint8_t mUnknown00To0F[0x10]{}; // +0x00
   std::int32_t word00 = 0; // +0x10
@@ -859,50 +624,28 @@ struct SfmpvfTimecodeSourceRuntimeView
 };
 
 static_assert(
-  offsetof(SfmpvfTimecodeSourceRuntimeView, word00) == 0x10,
-  "SfmpvfTimecodeSourceRuntimeView::word00 offset must be 0x10"
+  offsetof(SfmpvfTimecodeSource, word00) == 0x10,
+  "SfmpvfTimecodeSource::word00 offset must be 0x10"
 );
 static_assert(
-  offsetof(SfmpvfTimecodeSourceRuntimeView, word18) == 0x28,
-  "SfmpvfTimecodeSourceRuntimeView::word18 offset must be 0x28"
+  offsetof(SfmpvfTimecodeSource, word18) == 0x28,
+  "SfmpvfTimecodeSource::word18 offset must be 0x28"
 );
 static_assert(
-  offsetof(SfmpvfTimecodeSourceRuntimeView, word1C) == 0x2C,
-  "SfmpvfTimecodeSourceRuntimeView::word1C offset must be 0x2C"
+  offsetof(SfmpvfTimecodeSource, word1C) == 0x2C,
+  "SfmpvfTimecodeSource::word1C offset must be 0x2C"
 );
 static_assert(
-  offsetof(SfmpvfTimecodeSourceRuntimeView, repeatFieldCount) == 0x54,
-  "SfmpvfTimecodeSourceRuntimeView::repeatFieldCount offset must be 0x54"
+  offsetof(SfmpvfTimecodeSource, repeatFieldCount) == 0x54,
+  "SfmpvfTimecodeSource::repeatFieldCount offset must be 0x54"
 );
 
-struct SfmpvRepeatFieldSampleRuntimeView
-{
-  std::int16_t repeatFieldCount = -1; // +0x00
-  std::int16_t accumulatedRepeatCount = -1; // +0x02
-};
-
-static_assert(
-  offsetof(SfmpvRepeatFieldSampleRuntimeView, repeatFieldCount) == 0x00,
-  "SfmpvRepeatFieldSampleRuntimeView::repeatFieldCount offset must be 0x00"
-);
-static_assert(
-  offsetof(SfmpvRepeatFieldSampleRuntimeView, accumulatedRepeatCount) == 0x02,
-  "SfmpvRepeatFieldSampleRuntimeView::accumulatedRepeatCount offset must be 0x02"
-);
-static_assert(sizeof(SfmpvRepeatFieldSampleRuntimeView) == 0x04, "SfmpvRepeatFieldSampleRuntimeView size must be 0x04");
-
-struct SfmpvRepeatFieldHistoryRuntimeView
-{
-  SfmpvRepeatFieldSampleRuntimeView samples[64]{}; // +0x00
-};
-
-static_assert(sizeof(SfmpvRepeatFieldHistoryRuntimeView) == 0x100, "SfmpvRepeatFieldHistoryRuntimeView size must be 0x100");
 
 /**
  * MPV picture-attribute lane filled by `MPV_GetPicAtr` and consumed by
  * timecode reform helpers.
  */
-struct SfmpvPictureAttributeRuntimeView
+struct SfmpvPictureAttribute
 {
   std::uint8_t mUnknown00To0F[0x10]{}; // +0x00
   std::int32_t timecodeFrameRateIndex = 0; // +0x10
@@ -916,132 +659,31 @@ struct SfmpvPictureAttributeRuntimeView
 };
 
 static_assert(
-  offsetof(SfmpvPictureAttributeRuntimeView, timecodeFrameRateIndex) == 0x10,
-  "SfmpvPictureAttributeRuntimeView::timecodeFrameRateIndex offset must be 0x10"
+  offsetof(SfmpvPictureAttribute, timecodeFrameRateIndex) == 0x10,
+  "SfmpvPictureAttribute::timecodeFrameRateIndex offset must be 0x10"
 );
 static_assert(
-  offsetof(SfmpvPictureAttributeRuntimeView, timecodeFrameOrdinal) == 0x14,
-  "SfmpvPictureAttributeRuntimeView::timecodeFrameOrdinal offset must be 0x14"
+  offsetof(SfmpvPictureAttribute, timecodeFrameOrdinal) == 0x14,
+  "SfmpvPictureAttribute::timecodeFrameOrdinal offset must be 0x14"
 );
 static_assert(
-  offsetof(SfmpvPictureAttributeRuntimeView, timecodeDropFrameMode) == 0x1C,
-  "SfmpvPictureAttributeRuntimeView::timecodeDropFrameMode offset must be 0x1C"
+  offsetof(SfmpvPictureAttribute, timecodeDropFrameMode) == 0x1C,
+  "SfmpvPictureAttribute::timecodeDropFrameMode offset must be 0x1C"
 );
 static_assert(
-  offsetof(SfmpvPictureAttributeRuntimeView, pictureTimecodeBase) == 0x30,
-  "SfmpvPictureAttributeRuntimeView::pictureTimecodeBase offset must be 0x30"
+  offsetof(SfmpvPictureAttribute, pictureTimecodeBase) == 0x30,
+  "SfmpvPictureAttribute::pictureTimecodeBase offset must be 0x30"
 );
 static_assert(
-  offsetof(SfmpvPictureAttributeRuntimeView, pictureTimecodeDisableLatch) == 0x57,
-  "SfmpvPictureAttributeRuntimeView::pictureTimecodeDisableLatch offset must be 0x57"
+  offsetof(SfmpvPictureAttribute, pictureTimecodeDisableLatch) == 0x57,
+  "SfmpvPictureAttribute::pictureTimecodeDisableLatch offset must be 0x57"
 );
 
-/**
- * Picture decode lane produced by MPV picture-attribute decoding.
- *
- * Evidence:
- * - `FUN_00AD4590` copies 0x80 bytes from `mpvInfo + 0x8C` into frame object `+0x5C`.
- * - `FUN_00AD47E0` and `FUN_00AD4330` read `pictureType` at lane `+0x18`.
- */
-struct SfmpvPictureDecodeLaneRuntimeView
-{
-  std::int32_t pictureWidthPixels = 0; // +0x00
-  std::int32_t pictureHeightPixels = 0; // +0x04
-  std::int32_t pictureDetailWord08 = 0; // +0x08
-  std::int32_t pictureDetailWord0C = 0; // +0x0C
-  std::int32_t frameRateIndex = 0; // +0x10
-  std::int32_t decodeOrderMetric = 0; // +0x14
-  std::int32_t pictureType = 0; // +0x18
-  std::uint8_t mUnknown1CTo2F[0x14]{}; // +0x1C
-  std::int32_t sequenceStamp = 0; // +0x30
-  std::int32_t progressiveSequence = 0; // +0x34
-  std::int32_t referenceUpdateMode = 0; // +0x38
-  std::int32_t chromaFormat = 0; // +0x3C
-  std::int32_t chromaPositionLow = 0; // +0x40
-  std::int32_t chromaPositionHigh = 0; // +0x44
-  std::int32_t pictureDetailWord48 = 0; // +0x48
-  std::int32_t pictureDetailWord4C = 0; // +0x4C
-  std::uint16_t pictureDetailWord50 = 0; // +0x50
-  std::uint16_t pictureDetailWord52 = 0; // +0x52
-  std::uint8_t mUnknown54 = 0; // +0x54
-  std::uint8_t pictureDecodeFlagA = 0; // +0x55
-  std::uint8_t pictureDecodeFlagB = 0; // +0x56
-  std::uint8_t pictureDecodeFlagC = 0; // +0x57
-  std::uint8_t skipDecisionLatch = 0; // +0x58
-  std::uint8_t pictureDecodeFlagD = 0; // +0x59
-  std::uint8_t pictureDecodeFlagE = 0; // +0x5A
-  std::uint8_t pictureDecodeFlagF = 0; // +0x5B
-  std::uint8_t pictureDecodeFlagG = 0; // +0x5C
-  std::uint8_t pictureDecodeFlagH = 0; // +0x5D
-  std::uint8_t pictureDecodeFlagI = 0; // +0x5E
-  std::uint8_t pictureDecodeFlagJ = 0; // +0x5F
-  std::uint8_t pictureDecodeFlagK = 0; // +0x60
-  std::uint8_t pictureDecodeFlagL = 0; // +0x61
-  std::uint8_t pictureDecodeFlagM = 0; // +0x62
-  std::uint8_t pictureDecodeFlagN = 0; // +0x63
-  std::uint8_t pictureDecodeFlagO = 0; // +0x64
-  std::uint8_t mUnknown65To67[0x03]{}; // +0x65
-  std::int32_t decodeOrderTiebreak = 0; // +0x68
-  std::uint8_t mUnknown6CTo7F[0x14]{}; // +0x6C
-};
-
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, frameRateIndex) == 0x10,
-  "SfmpvPictureDecodeLaneRuntimeView::frameRateIndex offset must be 0x10"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, decodeOrderMetric) == 0x14,
-  "SfmpvPictureDecodeLaneRuntimeView::decodeOrderMetric offset must be 0x14"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, pictureType) == 0x18,
-  "SfmpvPictureDecodeLaneRuntimeView::pictureType offset must be 0x18"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, sequenceStamp) == 0x30,
-  "SfmpvPictureDecodeLaneRuntimeView::sequenceStamp offset must be 0x30"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, referenceUpdateMode) == 0x38,
-  "SfmpvPictureDecodeLaneRuntimeView::referenceUpdateMode offset must be 0x38"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, chromaPositionLow) == 0x40,
-  "SfmpvPictureDecodeLaneRuntimeView::chromaPositionLow offset must be 0x40"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, chromaPositionHigh) == 0x44,
-  "SfmpvPictureDecodeLaneRuntimeView::chromaPositionHigh offset must be 0x44"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, pictureDetailWord48) == 0x48,
-  "SfmpvPictureDecodeLaneRuntimeView::pictureDetailWord48 offset must be 0x48"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, pictureDetailWord50) == 0x50,
-  "SfmpvPictureDecodeLaneRuntimeView::pictureDetailWord50 offset must be 0x50"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, skipDecisionLatch) == 0x58,
-  "SfmpvPictureDecodeLaneRuntimeView::skipDecisionLatch offset must be 0x58"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, pictureDecodeFlagO) == 0x64,
-  "SfmpvPictureDecodeLaneRuntimeView::pictureDecodeFlagO offset must be 0x64"
-);
-static_assert(
-  offsetof(SfmpvPictureDecodeLaneRuntimeView, decodeOrderTiebreak) == 0x68,
-  "SfmpvPictureDecodeLaneRuntimeView::decodeOrderTiebreak offset must be 0x68"
-);
-static_assert(
-  sizeof(SfmpvPictureDecodeLaneRuntimeView) == 0x80,
-  "SfmpvPictureDecodeLaneRuntimeView size must be 0x80"
-);
 
 /**
  * Decode-frame parameter block consumed by `MPV_DecodeFrmSj`.
  */
-struct SfmpvDecodeFrameParamRuntimeView
+struct SfmpvDecodeFrameParam
 {
   std::int32_t primaryLumaPlaneAddress = 0; // +0x00
   std::int32_t primaryChromaPlaneAddress = 0; // +0x04
@@ -1058,775 +700,25 @@ struct SfmpvDecodeFrameParamRuntimeView
 };
 
 static_assert(
-  offsetof(SfmpvDecodeFrameParamRuntimeView, decodedFrameBaseAddress) == 0x20,
-  "SfmpvDecodeFrameParamRuntimeView::decodedFrameBaseAddress offset must be 0x20"
+  offsetof(SfmpvDecodeFrameParam, decodedFrameBaseAddress) == 0x20,
+  "SfmpvDecodeFrameParam::decodedFrameBaseAddress offset must be 0x20"
 );
 static_assert(
-  offsetof(SfmpvDecodeFrameParamRuntimeView, pictureDecodeLaneAddress) == 0x24,
-  "SfmpvDecodeFrameParamRuntimeView::pictureDecodeLaneAddress offset must be 0x24"
+  offsetof(SfmpvDecodeFrameParam, pictureDecodeLaneAddress) == 0x24,
+  "SfmpvDecodeFrameParam::pictureDecodeLaneAddress offset must be 0x24"
 );
 static_assert(
-  sizeof(SfmpvDecodeFrameParamRuntimeView) == 0x30,
-  "SfmpvDecodeFrameParamRuntimeView size must be 0x30"
-);
-
-/**
- * MV information lane seeded by first-picture attribute path.
- */
-struct SfmpvMvInfoRuntimeView
-{
-  std::int32_t pictureWidthPixels = 0; // +0x00
-  std::int32_t pictureHeightPixels = 0; // +0x04
-  std::int32_t frameAreaWidthPixels = 0; // +0x08
-  std::int32_t frameAreaHeightPixels = 0; // +0x0C
-  std::int32_t frameRateBase = 0; // +0x10
-  std::int32_t vbvBufferBytes = 0; // +0x14
-  std::int32_t field_0x18 = 0; // +0x18
-  std::int32_t field_0x1C = 0; // +0x1C
-  std::int32_t vbvWindowBytes = 0; // +0x20
-};
-
-static_assert(offsetof(SfmpvMvInfoRuntimeView, frameRateBase) == 0x10, "SfmpvMvInfoRuntimeView::frameRateBase offset must be 0x10");
-static_assert(
-  offsetof(SfmpvMvInfoRuntimeView, vbvWindowBytes) == 0x20,
-  "SfmpvMvInfoRuntimeView::vbvWindowBytes offset must be 0x20"
-);
-static_assert(sizeof(SfmpvMvInfoRuntimeView) == 0x24, "SfmpvMvInfoRuntimeView size must be 0x24");
-
-struct SftmrTimeSumRuntimeView
-{
-  std::uint8_t words[0x20]{}; // +0x00
-};
-
-static_assert(sizeof(SftmrTimeSumRuntimeView) == 0x20, "SftmrTimeSumRuntimeView size must be 0x20");
-
-/**
- * Per-handle timing lane consumed by MPV late/skip decision helpers.
- *
- * Evidence:
- * - `FUN_00AD4100` accesses this subobject at workctrl offset `+0x0D30`.
- */
-struct SfmpvTimingLane
-{
-  using IsLateCallback =
-    std::int32_t(__cdecl*)(std::int32_t workctrlAddress, std::int32_t mode, std::int32_t interpolationTime, std::int32_t baseFraction);
-
-  std::uint8_t mUnknown00To17[0x18]{}; // +0x00
-  IsLateCallback isLateCallback = nullptr; // +0x18
-  SfmpvPackedTimecodeRuntimeView repeatFieldTimecode{}; // +0x1C
-  std::uint32_t concatVideoTimeUnit[11]{}; // +0x3C
-  std::uint32_t concatAudioTimeUnit[11]{}; // +0x68
-  SfmpvTtuRuntimeView seekFixedBaselineTtu{}; // +0x94
-  SfmpvTtuRuntimeView pendingStartTtu{}; // +0xC0
-  SfmpvTtuRuntimeView skipSeedTtu{}; // +0xEC
-  std::int32_t interpolationEnabled = 0; // +0x118
-  std::uint32_t activeStartTimecodeWords[8]{}; // +0x11C
-  std::int32_t frameInterpolationTime = 0; // +0x13C
-  std::int32_t frameInterpolationMinor = 0; // +0x140
-  std::uint8_t mUnknown144To14F[0x0C]{}; // +0x144
-  std::int32_t ptsBiasLow = -1; // +0x150
-  std::int32_t ptsBiasHigh = -1; // +0x154
-  std::uint8_t mUnknown158To163[0x0C]{}; // +0x158
-  std::int32_t decodeProgressTime = 0; // +0x164
-  std::int32_t concatTimeHistoryWriteOrdinal = 0; // +0x168
-  std::int32_t concatTimeHistory[32]{}; // +0x16C
-  std::int32_t queuedAudioSampleRate = 0; // +0x1EC
-  std::int32_t audioTotalSampleCount = 0; // +0x1F0
-  std::int32_t totalSampleQueueWriteOrdinal = 0; // +0x1F4
-  std::int32_t totalSampleQueueReadOrdinal = 0; // +0x1F8
-  std::int32_t totalSampleQueueTotals[32]{}; // +0x1FC
-  std::int32_t readFrameTimeMajor = 0; // +0x27C
-  std::int32_t readFrameTimeMinor = 0; // +0x280
-  std::int32_t maxFrameTimeMajor = 0; // +0x284
-  std::int32_t maxFrameTimeMinor = 0; // +0x288
-  std::uint8_t mUnknown28CTo293[0x08]{}; // +0x28C
-  std::int32_t interpolationWindowTimeBase = 0; // +0x294
-  std::int32_t interpolationWindowAdaptiveStep = 0; // +0x298
-  std::int32_t interpolationWindowMaxStep = 0; // +0x29C
-  std::int32_t interpolationWindowMinStep = 0; // +0x2A0
-};
-
-static_assert(sizeof(SfmpvTimingLane) == 0x2A4, "SfmpvTimingLane size must be 0x2A4");
-static_assert(
-  offsetof(SfmpvTimingLane, concatTimeHistoryWriteOrdinal) == 0x168,
-  "SfmpvTimingLane::concatTimeHistoryWriteOrdinal offset must be 0x168"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, totalSampleQueueTotals) == 0x1FC,
-  "SfmpvTimingLane::totalSampleQueueTotals offset must be 0x1FC"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, readFrameTimeMajor) == 0x27C,
-  "SfmpvTimingLane::readFrameTimeMajor offset must be 0x27C"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, interpolationWindowTimeBase) == 0x294,
-  "SfmpvTimingLane::interpolationWindowTimeBase offset must be 0x294"
+  sizeof(SfmpvDecodeFrameParam) == 0x30,
+  "SfmpvDecodeFrameParam size must be 0x30"
 );
 
-static_assert(offsetof(SfmpvTimingLane, isLateCallback) == 0x18, "SfmpvTimingLane::isLateCallback offset must be 0x18");
-static_assert(
-  offsetof(SfmpvTimingLane, repeatFieldTimecode) == 0x1C,
-  "SfmpvTimingLane::repeatFieldTimecode offset must be 0x1C"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, concatVideoTimeUnit) == 0x3C,
-  "SfmpvTimingLane::concatVideoTimeUnit offset must be 0x3C"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, concatAudioTimeUnit) == 0x68,
-  "SfmpvTimingLane::concatAudioTimeUnit offset must be 0x68"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, seekFixedBaselineTtu) == 0x94,
-  "SfmpvTimingLane::seekFixedBaselineTtu offset must be 0x94"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, seekFixedBaselineTtu) + offsetof(SfmpvTtuRuntimeView, timeMajor) == 0xB8,
-  "SfmpvTimingLane::seekFixedBaselineTtu.timeMajor offset must be 0xB8"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, pendingStartTtu) == 0xC0,
-  "SfmpvTimingLane::pendingStartTtu offset must be 0xC0"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, pendingStartTtu) + offsetof(SfmpvTtuRuntimeView, packedTimecodeWords) == 0xC4,
-  "SfmpvTimingLane::pendingStartTtu.packedTimecodeWords offset must be 0xC4"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, pendingStartTtu) + offsetof(SfmpvTtuRuntimeView, timeMajor) == 0xE4,
-  "SfmpvTimingLane::pendingStartTtu.timeMajor offset must be 0xE4"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, pendingStartTtu) + offsetof(SfmpvTtuRuntimeView, timeMinor) == 0xE8,
-  "SfmpvTimingLane::pendingStartTtu.timeMinor offset must be 0xE8"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, skipSeedTtu) == 0xEC,
-  "SfmpvTimingLane::skipSeedTtu offset must be 0xEC"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, interpolationEnabled) == 0x118,
-  "SfmpvTimingLane::interpolationEnabled offset must be 0x118"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, activeStartTimecodeWords) == 0x11C,
-  "SfmpvTimingLane::activeStartTimecodeWords offset must be 0x11C"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, frameInterpolationTime) == 0x13C,
-  "SfmpvTimingLane::frameInterpolationTime offset must be 0x13C"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, frameInterpolationMinor) == 0x140,
-  "SfmpvTimingLane::frameInterpolationMinor offset must be 0x140"
-);
-static_assert(offsetof(SfmpvTimingLane, ptsBiasLow) == 0x150, "SfmpvTimingLane::ptsBiasLow offset must be 0x150");
-static_assert(offsetof(SfmpvTimingLane, ptsBiasHigh) == 0x154, "SfmpvTimingLane::ptsBiasHigh offset must be 0x154");
-static_assert(
-  offsetof(SfmpvTimingLane, decodeProgressTime) == 0x164,
-  "SfmpvTimingLane::decodeProgressTime offset must be 0x164"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, interpolationWindowTimeBase) == 0x294,
-  "SfmpvTimingLane::interpolationWindowTimeBase offset must be 0x294"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, interpolationWindowAdaptiveStep) == 0x298,
-  "SfmpvTimingLane::interpolationWindowAdaptiveStep offset must be 0x298"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, interpolationWindowMaxStep) == 0x29C,
-  "SfmpvTimingLane::interpolationWindowMaxStep offset must be 0x29C"
-);
-static_assert(
-  offsetof(SfmpvTimingLane, interpolationWindowMinStep) == 0x2A0,
-  "SfmpvTimingLane::interpolationWindowMinStep offset must be 0x2A0"
-);
 
-/**
- * MPV info lane addressed from one workctrl via pointer at offset `+0x1FC0`.
- */
-struct SfmpvInfoRuntimeView
-{
-  std::int32_t decoderHandle = 0; // +0x00
-  SfmpvPara persistedPara = {}; // +0x04
-  std::int32_t persistedRfbAddressTable[2]{}; // +0x28
-  std::int32_t persistedSofDecTabs[16]{}; // +0x30
-  std::int32_t activeFrameObjectAddress = 0; // +0x70
-  std::int32_t defectPictureTypeState = 0; // +0x74
-  std::int32_t concatControlFlags = 0; // +0x78
-  std::uint8_t mUnknown7CTo83[0x08]{}; // +0x7C
-  std::int32_t lateFrameCounter = 0; // +0x84
-  std::int32_t concatAdvanceCount = 0; // +0x88
-  SfmpvPictureDecodeLaneRuntimeView pictureDecodeLane{}; // +0x8C
-  std::int32_t lastPictureSequenceStamp = 0; // +0x10C
-  std::int32_t linkDefectCheckEnabled = 0; // +0x110
-  std::int32_t vbvWriteThreshold = 0; // +0x114
-  SfmpvComplementPts complementPts = {}; // +0x118
-  std::int32_t primaryFrameToggleIndex = 0; // +0x138
-  std::int32_t secondaryFrameToggleIndex = 0; // +0x13C
-  std::int32_t primaryLumaPlaneBaseAddress = 0; // +0x140
-  std::int32_t primaryChromaUPlaneBaseAddress = 0; // +0x144
-  std::int32_t primaryFrameBaseAddress = 0; // +0x148
-  std::uint16_t primaryChromaStride = 0; // +0x14C
-  std::uint16_t primaryLumaStride = 0; // +0x14E
-  std::int32_t secondaryLumaPlaneBaseAddress = 0; // +0x150
-  std::int32_t secondaryChromaUPlaneBaseAddress = 0; // +0x154
-  std::int32_t secondaryFrameBaseAddress = 0; // +0x158
-  std::uint16_t secondaryChromaStride = 0; // +0x15C
-  std::uint16_t secondaryLumaStride = 0; // +0x15E
-  std::int32_t primaryReferenceFrameObjectAddress = 0; // +0x160
-  std::int32_t secondaryReferenceFrameObjectAddress = 0; // +0x164
-  std::int32_t pendingFrameObjectAddress = 0; // +0x168
-  std::int32_t skipIssuedFlag = 0; // +0x16C
-  std::int32_t picAtrPrimedLatch = 0; // +0x170
-  std::int32_t referenceErrorCarryFlag = 0; // +0x174
-  std::uint8_t mUnknown178ToFFF[0xE88]{}; // +0x178
-  std::int32_t pictureUserBufferAddress = 0; // +0x1000
-  std::int32_t pictureUserBufferCount = 0; // +0x1004
-  std::int32_t pictureUserBufferSize = 0; // +0x1008
-  std::int32_t pictureUserBufferMirrorAddress = 0; // +0x100C
-  std::int32_t pictureUserFlags = 0; // +0x1010
-  SfmpvPicUsr::PicUsrEntry pictureUserEntries[16]{}; // +0x1014
-  std::uint8_t mUnknown1094To1097[0x04]{}; // +0x1094
-  std::int32_t referenceErrorSeedMajor = 0; // +0x1098
-  std::int32_t referenceErrorSeedMinor = 0; // +0x109C
-};
 
-static_assert(offsetof(SfmpvInfoRuntimeView, decoderHandle) == 0x00, "SfmpvInfoRuntimeView::decoderHandle offset must be 0x00");
-static_assert(offsetof(SfmpvInfoRuntimeView, persistedPara) == 0x04, "SfmpvInfoRuntimeView::persistedPara offset must be 0x04");
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, persistedRfbAddressTable) == 0x28,
-  "SfmpvInfoRuntimeView::persistedRfbAddressTable offset must be 0x28"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, persistedSofDecTabs) == 0x30,
-  "SfmpvInfoRuntimeView::persistedSofDecTabs offset must be 0x30"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, activeFrameObjectAddress) == 0x70,
-  "SfmpvInfoRuntimeView::activeFrameObjectAddress offset must be 0x70"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, defectPictureTypeState) == 0x74,
-  "SfmpvInfoRuntimeView::defectPictureTypeState offset must be 0x74"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, concatControlFlags) == 0x78,
-  "SfmpvInfoRuntimeView::concatControlFlags offset must be 0x78"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, lateFrameCounter) == 0x84,
-  "SfmpvInfoRuntimeView::lateFrameCounter offset must be 0x84"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, concatAdvanceCount) == 0x88,
-  "SfmpvInfoRuntimeView::concatAdvanceCount offset must be 0x88"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, pictureDecodeLane) == 0x8C,
-  "SfmpvInfoRuntimeView::pictureDecodeLane offset must be 0x8C"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, pictureDecodeLane) + offsetof(SfmpvPictureDecodeLaneRuntimeView, pictureType) == 0xA4,
-  "SfmpvInfoRuntimeView::pictureDecodeLane.pictureType offset must be 0xA4"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, pictureDecodeLane) + offsetof(SfmpvPictureDecodeLaneRuntimeView, skipDecisionLatch) == 0xE4,
-  "SfmpvInfoRuntimeView::pictureDecodeLane.skipDecisionLatch offset must be 0xE4"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, lastPictureSequenceStamp) == 0x10C,
-  "SfmpvInfoRuntimeView::lastPictureSequenceStamp offset must be 0x10C"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, linkDefectCheckEnabled) == 0x110,
-  "SfmpvInfoRuntimeView::linkDefectCheckEnabled offset must be 0x110"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, vbvWriteThreshold) == 0x114,
-  "SfmpvInfoRuntimeView::vbvWriteThreshold offset must be 0x114"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, complementPts) == 0x118,
-  "SfmpvInfoRuntimeView::complementPts offset must be 0x118"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, primaryFrameToggleIndex) == 0x138,
-  "SfmpvInfoRuntimeView::primaryFrameToggleIndex offset must be 0x138"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, secondaryFrameToggleIndex) == 0x13C,
-  "SfmpvInfoRuntimeView::secondaryFrameToggleIndex offset must be 0x13C"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, primaryLumaPlaneBaseAddress) == 0x140,
-  "SfmpvInfoRuntimeView::primaryLumaPlaneBaseAddress offset must be 0x140"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, primaryChromaUPlaneBaseAddress) == 0x144,
-  "SfmpvInfoRuntimeView::primaryChromaUPlaneBaseAddress offset must be 0x144"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, primaryFrameBaseAddress) == 0x148,
-  "SfmpvInfoRuntimeView::primaryFrameBaseAddress offset must be 0x148"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, primaryChromaStride) == 0x14C,
-  "SfmpvInfoRuntimeView::primaryChromaStride offset must be 0x14C"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, primaryLumaStride) == 0x14E,
-  "SfmpvInfoRuntimeView::primaryLumaStride offset must be 0x14E"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, secondaryLumaPlaneBaseAddress) == 0x150,
-  "SfmpvInfoRuntimeView::secondaryLumaPlaneBaseAddress offset must be 0x150"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, secondaryChromaUPlaneBaseAddress) == 0x154,
-  "SfmpvInfoRuntimeView::secondaryChromaUPlaneBaseAddress offset must be 0x154"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, secondaryFrameBaseAddress) == 0x158,
-  "SfmpvInfoRuntimeView::secondaryFrameBaseAddress offset must be 0x158"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, secondaryChromaStride) == 0x15C,
-  "SfmpvInfoRuntimeView::secondaryChromaStride offset must be 0x15C"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, secondaryLumaStride) == 0x15E,
-  "SfmpvInfoRuntimeView::secondaryLumaStride offset must be 0x15E"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, primaryReferenceFrameObjectAddress) == 0x160,
-  "SfmpvInfoRuntimeView::primaryReferenceFrameObjectAddress offset must be 0x160"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, secondaryReferenceFrameObjectAddress) == 0x164,
-  "SfmpvInfoRuntimeView::secondaryReferenceFrameObjectAddress offset must be 0x164"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, pendingFrameObjectAddress) == 0x168,
-  "SfmpvInfoRuntimeView::pendingFrameObjectAddress offset must be 0x168"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, skipIssuedFlag) == 0x16C,
-  "SfmpvInfoRuntimeView::skipIssuedFlag offset must be 0x16C"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, picAtrPrimedLatch) == 0x170,
-  "SfmpvInfoRuntimeView::picAtrPrimedLatch offset must be 0x170"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, referenceErrorCarryFlag) == 0x174,
-  "SfmpvInfoRuntimeView::referenceErrorCarryFlag offset must be 0x174"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, pictureUserBufferAddress) == 0x1000,
-  "SfmpvInfoRuntimeView::pictureUserBufferAddress offset must be 0x1000"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, pictureUserBufferCount) == 0x1004,
-  "SfmpvInfoRuntimeView::pictureUserBufferCount offset must be 0x1004"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, pictureUserBufferSize) == 0x1008,
-  "SfmpvInfoRuntimeView::pictureUserBufferSize offset must be 0x1008"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, pictureUserBufferMirrorAddress) == 0x100C,
-  "SfmpvInfoRuntimeView::pictureUserBufferMirrorAddress offset must be 0x100C"
-);
-static_assert(offsetof(SfmpvInfoRuntimeView, pictureUserFlags) == 0x1010, "SfmpvInfoRuntimeView::pictureUserFlags offset must be 0x1010");
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, pictureUserEntries) == 0x1014,
-  "SfmpvInfoRuntimeView::pictureUserEntries offset must be 0x1014"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, referenceErrorSeedMajor) == 0x1098,
-  "SfmpvInfoRuntimeView::referenceErrorSeedMajor offset must be 0x1098"
-);
-static_assert(
-  offsetof(SfmpvInfoRuntimeView, referenceErrorSeedMinor) == 0x109C,
-  "SfmpvInfoRuntimeView::referenceErrorSeedMinor offset must be 0x109C"
-);
-
-/**
- * Workctrl runtime view used by recovered MPV helper lanes.
- */
-struct SfmpvHandleRuntimeView
-{
-  std::uint8_t mUnknown00To27[0x28]{}; // +0x00
-  std::int32_t minimumVideoBufferBytes = 0; // +0x28
-  std::int32_t prepFrameTargetCount = 0; // +0x2C
-  std::uint8_t mUnknown30To37[0x08]{}; // +0x30
-  std::int32_t mpvCond6Value = 0; // +0x38
-  std::uint8_t mUnknown3CTo47[0x0C]{}; // +0x3C
-  /**
-   * Shared SFPLY execution-stage lane. Every transfer strategy reads it off the
-   * same workctrl base, so this is the same word `SfmpsExecRuntimeView` calls
-   * `executionStage` - `2` is the PREP stage.
-   */
-  std::int32_t executionStage = 0; // +0x48
-  std::uint8_t mUnknown4CTo57[0x0C]{}; // +0x4C
-  std::int32_t decodePathMode = 0; // +0x58
-  std::int32_t frameIdCounter = 0; // +0x5C
-  std::uint8_t mUnknown60To77[0x18]{}; // +0x60
-  std::int32_t frameHeaderHandle = 0; // +0x78
-  std::uint8_t mUnknown7CToF3[0x78]{}; // +0x7C
-  std::int32_t vbvBypassFlag = 0; // +0xF4
-  std::uint8_t mUnknownF8To90B[0x814]{}; // +0xF8
-  SfmpvMvInfoRuntimeView mvInfo{}; // +0x90C
-  std::uint8_t mUnknown930To94F[0x20]{}; // +0x930
-  std::int32_t playbackInfoAddress = 0; // +0x950
-  std::uint8_t mUnknown954To957[0x04]{}; // +0x954
-  std::int32_t decoderDctCountPrimary = 0; // +0x958
-  std::int32_t decoderDctCountSecondary = 0; // +0x95C
-  std::int32_t emptyBpicCount = 0; // +0x960
-  std::int32_t emptyPpicCount = 0; // +0x964
-  std::int32_t preparedFrameCount = 0; // +0x968
-  std::int32_t consumedFrameCount = 0; // +0x96C
-  std::uint8_t mUnknown970To977[0x08]{}; // +0x970
-  std::int32_t decodeStarvedLatch = 0; // +0x978
-  std::int32_t frameAllocationFailed = 0; // +0x97C
-  std::uint8_t mUnknown980To99F[0x20]{}; // +0x980
-  std::int32_t streamFlowCountLow = 0; // +0x9A0
-  std::int32_t streamFlowCountHigh = 0; // +0x9A4
-  std::int32_t ringReadTotalLow = 0; // +0x9A8
-  std::int32_t ringReadTotalHigh = 0; // +0x9AC
-  std::int32_t delimiterReadTotalLow = 0; // +0x9B0
-  std::int32_t delimiterReadTotalHigh = 0; // +0x9B4
-  std::uint8_t mUnknown9B8ToA03[0x4C]{}; // +0x9B8
-  std::int32_t decodeReferenceErrorMajor = 0; // +0xA04
-  std::int32_t decodeReferenceErrorMinor = 0; // +0xA08
-  std::uint8_t mUnknownA0CToA13[0x08]{}; // +0xA0C
-  std::int32_t ptype1DecodeEnable = 0; // +0xA14
-  std::int32_t ptype2DecodeEnable = 0; // +0xA18
-  std::int32_t ptype3DecodeEnable = 0; // +0xA1C
-  std::uint8_t mUnknownA20ToA67[0x48]{}; // +0xA20
-  std::int32_t prepFrameRequiredCount = 0; // +0xA68
-  std::uint8_t mUnknownA6CToAA3[0x38]{}; // +0xA6C
-  std::int32_t lateFrameGateThreshold = 0; // +0xAA4
-  std::uint8_t mUnknownAA8ToAB3[0x0C]{}; // +0xAA8
-  std::int32_t frameDeltaMajor = 0; // +0xAB4
-  std::int32_t frameDeltaMinor = 0; // +0xAB8
-  std::uint8_t mUnknownABCToD2F[0x274]{}; // +0xABC
-  // The timing lane runs the full 0x2A4 bytes to +0xFD4. Everything the SFTIM
-  // helpers touch lives inside it: `SFTIM_UpdateItime` (0x00ADAC60) reads
-  // `[esi+294h]` off the pointer `sfmpv_IsLate` hands it, and that pointer is
-  // `lea edi, [ebx+0D30h]` — this lane's own base. The concat-time and
-  // total-sample queues that used to be declared out here as siblings are
-  // interior lane fields at +0x168..+0x288; they are reached as
-  // `workctrl->timingLane.xxx`.
-  SfmpvTimingLane timingLane{}; // +0xD30
-  std::uint8_t mUnknownFD4To11DF[0x20C]{}; // +0xFD4
-  SfmpvRepeatFieldHistoryRuntimeView repeatFieldHistory{}; // +0x11E0
-  std::uint8_t mUnknown12E0To1FBF[0xCE0]{}; // +0x12E0
-  SfmpvInfoRuntimeView* mpvInfo = nullptr; // +0x1FC0
-  std::uint8_t mUnknown1FC4To1FC7[0x04]{}; // +0x1FC4
-  std::int32_t prepSourceLaneIndex = 0; // +0x1FC8
-  std::int32_t prepDestinationLaneIndex = 0; // +0x1FCC
-  std::uint8_t mUnknown1FD0To1FD7[0x08]{}; // +0x1FD0
-  std::int32_t seekFixedReadTotal = -1; // +0x1FD8
-  std::uint8_t mUnknown1FDCTo23A7[0x3CC]{}; // +0x1FDC
-  /**
-   * The MPV info block lives inside the workctrl. `SFMPV_Create` publishes its
-   * address into `mpvInfo` above (`lea ebx, [esi+23A8h]` / `mov [esi+1FC0h],
-   * ebx` at 0x00AD4BBA), so the pointer and the storage it points at are the
-   * same object.
-   */
-  SfmpvInfoRuntimeView embeddedMpvInfo{}; // +0x23A8
-  std::uint8_t mUnknownInfoTailTo354F[0x3550 - 0x23A8 - sizeof(SfmpvInfoRuntimeView)]{};
-  std::int32_t headerWorkspaceBaseAddress = 0; // +0x3550
-  std::uint8_t mUnknown3554To3557[0x04]{}; // +0x3554
-  std::int32_t seekSkipTimeMajor = -1; // +0x3558
-  std::int32_t seekSkipTimeMinor = 0; // +0x355C
-  SftmrTimeSumRuntimeView decodeTimeSumsByPictureType[4]{}; // +0x3560
-};
-
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, minimumVideoBufferBytes) == 0x28,
-  "SfmpvHandleRuntimeView::minimumVideoBufferBytes offset must be 0x28"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, prepFrameTargetCount) == 0x2C,
-  "SfmpvHandleRuntimeView::prepFrameTargetCount offset must be 0x2C"
-);
-static_assert(offsetof(SfmpvHandleRuntimeView, mpvCond6Value) == 0x38, "SfmpvHandleRuntimeView::mpvCond6Value offset must be 0x38");
-static_assert(offsetof(SfmpvHandleRuntimeView, executionStage) == 0x48, "SfmpvHandleRuntimeView::executionStage offset must be 0x48");
-static_assert(offsetof(SfmpvHandleRuntimeView, decodePathMode) == 0x58, "SfmpvHandleRuntimeView::decodePathMode offset must be 0x58");
-static_assert(offsetof(SfmpvHandleRuntimeView, frameIdCounter) == 0x5C, "SfmpvHandleRuntimeView::frameIdCounter offset must be 0x5C");
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, frameHeaderHandle) == 0x78,
-  "SfmpvHandleRuntimeView::frameHeaderHandle offset must be 0x78"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, vbvBypassFlag) == 0xF4,
-  "SfmpvHandleRuntimeView::vbvBypassFlag offset must be 0xF4"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, playbackInfoAddress) == 0x950,
-  "SfmpvHandleRuntimeView::playbackInfoAddress offset must be 0x950"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, mvInfo) == 0x90C,
-  "SfmpvHandleRuntimeView::mvInfo offset must be 0x90C"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, mvInfo) + offsetof(SfmpvMvInfoRuntimeView, frameAreaWidthPixels) == 0x914,
-  "SfmpvHandleRuntimeView::mvInfo.frameAreaWidthPixels offset must be 0x914"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, mvInfo) + offsetof(SfmpvMvInfoRuntimeView, frameAreaHeightPixels) == 0x918,
-  "SfmpvHandleRuntimeView::mvInfo.frameAreaHeightPixels offset must be 0x918"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, mvInfo) + offsetof(SfmpvMvInfoRuntimeView, frameRateBase) == 0x91C,
-  "SfmpvHandleRuntimeView::mvInfo.frameRateBase offset must be 0x91C"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, decoderDctCountPrimary) == 0x958,
-  "SfmpvHandleRuntimeView::decoderDctCountPrimary offset must be 0x958"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, decoderDctCountSecondary) == 0x95C,
-  "SfmpvHandleRuntimeView::decoderDctCountSecondary offset must be 0x95C"
-);
-static_assert(offsetof(SfmpvHandleRuntimeView, emptyBpicCount) == 0x960, "SfmpvHandleRuntimeView::emptyBpicCount offset must be 0x960");
-static_assert(offsetof(SfmpvHandleRuntimeView, emptyPpicCount) == 0x964, "SfmpvHandleRuntimeView::emptyPpicCount offset must be 0x964");
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, preparedFrameCount) == 0x968,
-  "SfmpvHandleRuntimeView::preparedFrameCount offset must be 0x968"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, consumedFrameCount) == 0x96C,
-  "SfmpvHandleRuntimeView::consumedFrameCount offset must be 0x96C"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, decodeStarvedLatch) == 0x978,
-  "SfmpvHandleRuntimeView::decodeStarvedLatch offset must be 0x978"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, frameAllocationFailed) == 0x97C,
-  "SfmpvHandleRuntimeView::frameAllocationFailed offset must be 0x97C"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, streamFlowCountLow) == 0x9A0,
-  "SfmpvHandleRuntimeView::streamFlowCountLow offset must be 0x9A0"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, streamFlowCountHigh) == 0x9A4,
-  "SfmpvHandleRuntimeView::streamFlowCountHigh offset must be 0x9A4"
-);
-static_assert(offsetof(SfmpvHandleRuntimeView, ringReadTotalLow) == 0x9A8, "SfmpvHandleRuntimeView::ringReadTotalLow offset must be 0x9A8");
-static_assert(offsetof(SfmpvHandleRuntimeView, ringReadTotalHigh) == 0x9AC, "SfmpvHandleRuntimeView::ringReadTotalHigh offset must be 0x9AC");
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, delimiterReadTotalLow) == 0x9B0,
-  "SfmpvHandleRuntimeView::delimiterReadTotalLow offset must be 0x9B0"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, delimiterReadTotalHigh) == 0x9B4,
-  "SfmpvHandleRuntimeView::delimiterReadTotalHigh offset must be 0x9B4"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, decodeReferenceErrorMajor) == 0xA04,
-  "SfmpvHandleRuntimeView::decodeReferenceErrorMajor offset must be 0xA04"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, decodeReferenceErrorMinor) == 0xA08,
-  "SfmpvHandleRuntimeView::decodeReferenceErrorMinor offset must be 0xA08"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, ptype1DecodeEnable) == 0xA14,
-  "SfmpvHandleRuntimeView::ptype1DecodeEnable offset must be 0xA14"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, ptype2DecodeEnable) == 0xA18,
-  "SfmpvHandleRuntimeView::ptype2DecodeEnable offset must be 0xA18"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, ptype3DecodeEnable) == 0xA1C,
-  "SfmpvHandleRuntimeView::ptype3DecodeEnable offset must be 0xA1C"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, prepFrameRequiredCount) == 0xA68,
-  "SfmpvHandleRuntimeView::prepFrameRequiredCount offset must be 0xA68"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, lateFrameGateThreshold) == 0xAA4,
-  "SfmpvHandleRuntimeView::lateFrameGateThreshold offset must be 0xAA4"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, frameDeltaMajor) == 0xAB4,
-  "SfmpvHandleRuntimeView::frameDeltaMajor offset must be 0xAB4"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, frameDeltaMinor) == 0xAB8,
-  "SfmpvHandleRuntimeView::frameDeltaMinor offset must be 0xAB8"
-);
-static_assert(offsetof(SfmpvHandleRuntimeView, timingLane) == 0xD30, "SfmpvHandleRuntimeView::timingLane offset must be 0xD30");
 // The timing-lane extent is settled (see the note on the member), so every
 // offset past it is checkable again.
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, repeatFieldHistory) == 0x11E0,
-  "SfmpvHandleRuntimeView::repeatFieldHistory offset must be 0x11E0"
-);
-static_assert(offsetof(SfmpvHandleRuntimeView, mpvInfo) == 0x1FC0, "SfmpvHandleRuntimeView::mpvInfo offset must be 0x1FC0");
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, prepSourceLaneIndex) == 0x1FC8,
-  "SfmpvHandleRuntimeView::prepSourceLaneIndex offset must be 0x1FC8"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, prepDestinationLaneIndex) == 0x1FCC,
-  "SfmpvHandleRuntimeView::prepDestinationLaneIndex offset must be 0x1FCC"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, seekFixedReadTotal) == 0x1FD8,
-  "SfmpvHandleRuntimeView::seekFixedReadTotal offset must be 0x1FD8"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, headerWorkspaceBaseAddress) == 0x3550,
-  "SfmpvHandleRuntimeView::headerWorkspaceBaseAddress offset must be 0x3550"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, seekSkipTimeMajor) == 0x3558,
-  "SfmpvHandleRuntimeView::seekSkipTimeMajor offset must be 0x3558"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, seekSkipTimeMinor) == 0x355C,
-  "SfmpvHandleRuntimeView::seekSkipTimeMinor offset must be 0x355C"
-);
-static_assert(
-  offsetof(SfmpvHandleRuntimeView, decodeTimeSumsByPictureType) == 0x3560,
-  "SfmpvHandleRuntimeView::decodeTimeSumsByPictureType offset must be 0x3560"
-);
-static_assert(sizeof(SfmpvHandleRuntimeView) == 0x35E0, "SfmpvHandleRuntimeView size must be 0x35E0");
 
-struct SfmpvfVfrmDataRuntime
-{
-  std::int32_t drawState = 0; // +0x00
-  std::int32_t ownerFrameObjectAddress = 0; // +0x04
-};
 
-static_assert(offsetof(SfmpvfVfrmDataRuntime, drawState) == 0x00, "SfmpvfVfrmDataRuntime::drawState offset must be 0x00");
-static_assert(
-  offsetof(SfmpvfVfrmDataRuntime, ownerFrameObjectAddress) == 0x04,
-  "SfmpvfVfrmDataRuntime::ownerFrameObjectAddress offset must be 0x04"
-);
-static_assert(sizeof(SfmpvfVfrmDataRuntime) == 0x08, "SfmpvfVfrmDataRuntime size must be 0x08");
-
-struct SfmpvfVfrmDataLaneRuntimeView
-{
-  SfmpvfVfrmDataRuntime vfrmData{}; // +0x00
-  std::uint8_t mUnknown08To87[0x80]{}; // +0x08
-};
-
-static_assert(
-  offsetof(SfmpvfVfrmDataLaneRuntimeView, vfrmData) == 0x00,
-  "SfmpvfVfrmDataLaneRuntimeView::vfrmData offset must be 0x00"
-);
-static_assert(
-  sizeof(SfmpvfVfrmDataLaneRuntimeView) == 0x88,
-  "SfmpvfVfrmDataLaneRuntimeView size must be 0x88"
-);
-
-struct SfmpvfSearchWorkctrlRuntimeView
-{
-  std::uint8_t mUnknown00To16AF[0x16B0]{}; // +0x00
-  SfmpvfVfrmDataLaneRuntimeView vfrmDataLanes[16]{}; // +0x16B0
-  std::uint8_t mUnknown1F30To1FBF[0x90]{}; // +0x1F30
-  SfmpvfInfoRuntimeView* mpvInfo = nullptr; // +0x1FC0
-};
-
-static_assert(
-  offsetof(SfmpvfSearchWorkctrlRuntimeView, vfrmDataLanes) == 0x16B0,
-  "SfmpvfSearchWorkctrlRuntimeView::vfrmDataLanes offset must be 0x16B0"
-);
-static_assert(
-  offsetof(SfmpvfSearchWorkctrlRuntimeView, mpvInfo) == 0x1FC0,
-  "SfmpvfSearchWorkctrlRuntimeView::mpvInfo offset must be 0x1FC0"
-);
-static_assert(sizeof(SfmpvfSearchWorkctrlRuntimeView) == 0x1FC4, "SfmpvfSearchWorkctrlRuntimeView size must be 0x1FC4");
-
-struct SfmpvfFrameObjectRuntimeView
-{
-  std::int32_t decodeState = 0; // +0x00
-  std::int32_t allocationState = 0; // +0x04
-  std::int32_t frameSurfaceBaseAddress = 0; // +0x08
-  std::uint8_t mUnknown0CTo37[0x2C]{}; // +0x0C
-  std::int32_t presentationTimeMajor = 0; // +0x38
-  std::int32_t presentationTimeMinor = 0; // +0x3C
-  std::int32_t referenceErrorMajor = 0; // +0x40
-  std::int32_t referenceErrorMinor = 0; // +0x44
-  std::int32_t decodeConcatOrdinal = 0; // +0x48
-  std::int32_t frameDetailWord4C = 0; // +0x4C
-  std::int32_t frameDetailWord50 = 0; // +0x50
-  std::int32_t pictureUserInfoAddress = 0; // +0x54
-  std::int32_t frameId = 0; // +0x58
-  SfmpvPictureDecodeLaneRuntimeView pictureDecodeLane{}; // +0x5C
-  std::uint8_t mUnknownDCToDF[0x04]{}; // +0xDC
-  std::int32_t referenceErrorSeedMajor = 0; // +0xE0
-  std::int32_t referenceErrorSeedMinor = 0; // +0xE4
-};
-
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, decodeState) == 0x00,
-  "SfmpvfFrameObjectRuntimeView::decodeState offset must be 0x00"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, allocationState) == 0x04,
-  "SfmpvfFrameObjectRuntimeView::allocationState offset must be 0x04"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, frameSurfaceBaseAddress) == 0x08,
-  "SfmpvfFrameObjectRuntimeView::frameSurfaceBaseAddress offset must be 0x08"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, presentationTimeMajor) == 0x38,
-  "SfmpvfFrameObjectRuntimeView::presentationTimeMajor offset must be 0x38"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, presentationTimeMinor) == 0x3C,
-  "SfmpvfFrameObjectRuntimeView::presentationTimeMinor offset must be 0x3C"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, referenceErrorMajor) == 0x40,
-  "SfmpvfFrameObjectRuntimeView::referenceErrorMajor offset must be 0x40"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, referenceErrorMinor) == 0x44,
-  "SfmpvfFrameObjectRuntimeView::referenceErrorMinor offset must be 0x44"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, decodeConcatOrdinal) == 0x48,
-  "SfmpvfFrameObjectRuntimeView::decodeConcatOrdinal offset must be 0x48"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, pictureUserInfoAddress) == 0x54,
-  "SfmpvfFrameObjectRuntimeView::pictureUserInfoAddress offset must be 0x54"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, frameId) == 0x58,
-  "SfmpvfFrameObjectRuntimeView::frameId offset must be 0x58"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, pictureDecodeLane) == 0x5C,
-  "SfmpvfFrameObjectRuntimeView::pictureDecodeLane offset must be 0x5C"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, referenceErrorSeedMajor) == 0xE0,
-  "SfmpvfFrameObjectRuntimeView::referenceErrorSeedMajor offset must be 0xE0"
-);
-static_assert(
-  offsetof(SfmpvfFrameObjectRuntimeView, referenceErrorSeedMinor) == 0xE4,
-  "SfmpvfFrameObjectRuntimeView::referenceErrorSeedMinor offset must be 0xE4"
-);
-static_assert(sizeof(SfmpvfFrameObjectRuntimeView) == 0xE8, "SfmpvfFrameObjectRuntimeView size must be 0xE8");
-
-struct SfmpvfFrameInfoRuntimeView
+struct SfmpvfFrameInfo
 {
   std::int32_t pictureWidthPixels = 0; // +0x00
   std::int32_t pictureHeightPixels = 0; // +0x04
@@ -1874,83 +766,56 @@ struct SfmpvfFrameInfoRuntimeView
 };
 
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, pictureWidthPixels) == 0x00,
-  "SfmpvfFrameInfoRuntimeView::pictureWidthPixels offset must be 0x00"
+  offsetof(SfmpvfFrameInfo, pictureWidthPixels) == 0x00,
+  "SfmpvfFrameInfo::pictureWidthPixels offset must be 0x00"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, pictureType) == 0x10,
-  "SfmpvfFrameInfoRuntimeView::pictureType offset must be 0x10"
+  offsetof(SfmpvfFrameInfo, pictureType) == 0x10,
+  "SfmpvfFrameInfo::pictureType offset must be 0x10"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, presentationTimeMajor) == 0x14,
-  "SfmpvfFrameInfoRuntimeView::presentationTimeMajor offset must be 0x14"
+  offsetof(SfmpvfFrameInfo, presentationTimeMajor) == 0x14,
+  "SfmpvfFrameInfo::presentationTimeMajor offset must be 0x14"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, presentationTimeMinor) == 0x18,
-  "SfmpvfFrameInfoRuntimeView::presentationTimeMinor offset must be 0x18"
+  offsetof(SfmpvfFrameInfo, presentationTimeMinor) == 0x18,
+  "SfmpvfFrameInfo::presentationTimeMinor offset must be 0x18"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, decodeConditionMode) == 0x1C,
-  "SfmpvfFrameInfoRuntimeView::decodeConditionMode offset must be 0x1C"
+  offsetof(SfmpvfFrameInfo, decodeConditionMode) == 0x1C,
+  "SfmpvfFrameInfo::decodeConditionMode offset must be 0x1C"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, pictureUserInfoAddress) == 0x38,
-  "SfmpvfFrameInfoRuntimeView::pictureUserInfoAddress offset must be 0x38"
+  offsetof(SfmpvfFrameInfo, pictureUserInfoAddress) == 0x38,
+  "SfmpvfFrameInfo::pictureUserInfoAddress offset must be 0x38"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, chromaLayoutClass) == 0x48,
-  "SfmpvfFrameInfoRuntimeView::chromaLayoutClass offset must be 0x48"
+  offsetof(SfmpvfFrameInfo, chromaLayoutClass) == 0x48,
+  "SfmpvfFrameInfo::chromaLayoutClass offset must be 0x48"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, referenceErrorSeedMajor) == 0x50,
-  "SfmpvfFrameInfoRuntimeView::referenceErrorSeedMajor offset must be 0x50"
+  offsetof(SfmpvfFrameInfo, referenceErrorSeedMajor) == 0x50,
+  "SfmpvfFrameInfo::referenceErrorSeedMajor offset must be 0x50"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, referenceUpdateMode) == 0x58,
-  "SfmpvfFrameInfoRuntimeView::referenceUpdateMode offset must be 0x58"
+  offsetof(SfmpvfFrameInfo, referenceUpdateMode) == 0x58,
+  "SfmpvfFrameInfo::referenceUpdateMode offset must be 0x58"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, pictureDetailWord68) == 0x68,
-  "SfmpvfFrameInfoRuntimeView::pictureDetailWord68 offset must be 0x68"
+  offsetof(SfmpvfFrameInfo, pictureDetailWord68) == 0x68,
+  "SfmpvfFrameInfo::pictureDetailWord68 offset must be 0x68"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, pictureDecodeFlagA) == 0x6C,
-  "SfmpvfFrameInfoRuntimeView::pictureDecodeFlagA offset must be 0x6C"
+  offsetof(SfmpvfFrameInfo, pictureDecodeFlagA) == 0x6C,
+  "SfmpvfFrameInfo::pictureDecodeFlagA offset must be 0x6C"
 );
 static_assert(
-  offsetof(SfmpvfFrameInfoRuntimeView, pictureDecodeFlagO) == 0x7A,
-  "SfmpvfFrameInfoRuntimeView::pictureDecodeFlagO offset must be 0x7A"
+  offsetof(SfmpvfFrameInfo, pictureDecodeFlagO) == 0x7A,
+  "SfmpvfFrameInfo::pictureDecodeFlagO offset must be 0x7A"
 );
 
-struct SfmpvfInfoRuntimeView
-{
-  std::uint8_t mUnknown00To7B[0x7C]{}; // +0x00
-  std::int32_t termDecodeState = 0; // +0x7C
-  std::int32_t allowSingleFrameOutput = 0; // +0x80
-  std::uint8_t mUnknown84To177[0xF4]{}; // +0x84
-  std::int32_t frameObjectCount = 0; // +0x178
-  std::uint8_t mUnknown17CTo17F[0x04]{}; // +0x17C
-  SfmpvfFrameObjectRuntimeView frameObjects[16]{}; // +0x180
-};
 
-static_assert(
-  offsetof(SfmpvfInfoRuntimeView, termDecodeState) == 0x7C,
-  "SfmpvfInfoRuntimeView::termDecodeState offset must be 0x7C"
-);
-static_assert(
-  offsetof(SfmpvfInfoRuntimeView, allowSingleFrameOutput) == 0x80,
-  "SfmpvfInfoRuntimeView::allowSingleFrameOutput offset must be 0x80"
-);
-static_assert(
-  offsetof(SfmpvfInfoRuntimeView, frameObjectCount) == 0x178,
-  "SfmpvfInfoRuntimeView::frameObjectCount offset must be 0x178"
-);
-static_assert(
-  offsetof(SfmpvfInfoRuntimeView, frameObjects) == 0x180,
-  "SfmpvfInfoRuntimeView::frameObjects offset must be 0x180"
-);
-
-struct SfmpvHeaderRuntimeView
+struct SfmpvHeader
 {
   std::int32_t hasHeader = 0; // +0x00
   std::int32_t frameRateTicks = 0; // +0x04
@@ -1961,30 +826,30 @@ struct SfmpvHeaderRuntimeView
 };
 
 static_assert(
-  offsetof(SfmpvHeaderRuntimeView, concatTimeSeedWords) == 0x0C,
-  "SfmpvHeaderRuntimeView::concatTimeSeedWords offset must be 0x0C"
+  offsetof(SfmpvHeader, concatTimeSeedWords) == 0x0C,
+  "SfmpvHeader::concatTimeSeedWords offset must be 0x0C"
 );
 static_assert(
-  offsetof(SfmpvHeaderRuntimeView, pictureAttributeBytes) == 0x38,
-  "SfmpvHeaderRuntimeView::pictureAttributeBytes offset must be 0x38"
+  offsetof(SfmpvHeader, pictureAttributeBytes) == 0x38,
+  "SfmpvHeader::pictureAttributeBytes offset must be 0x38"
 );
 static_assert(
-  offsetof(SfmpvHeaderRuntimeView, pictureAttributeByteCount) == 0x238,
-  "SfmpvHeaderRuntimeView::pictureAttributeByteCount offset must be 0x238"
+  offsetof(SfmpvHeader, pictureAttributeByteCount) == 0x238,
+  "SfmpvHeader::pictureAttributeByteCount offset must be 0x238"
 );
 
-struct SfmpvDefectLaneRuntimeView
+struct SfmpvDefectLane
 {
   std::uint8_t mUnknown00To17[0x18]{}; // +0x00
   std::int32_t pictureType = 0; // +0x18
 };
 
 static_assert(
-  offsetof(SfmpvDefectLaneRuntimeView, pictureType) == 0x18,
-  "SfmpvDefectLaneRuntimeView::pictureType offset must be 0x18"
+  offsetof(SfmpvDefectLane, pictureType) == 0x18,
+  "SfmpvDefectLane::pictureType offset must be 0x18"
 );
 
-struct SfmpvAudioTransportVtableRuntimeView
+struct SfmpvAudioTransportVtable
 {
   void(__cdecl* reserved00)() = nullptr; // +0x00
   void(__cdecl* reserved04)() = nullptr; // +0x04
@@ -1992,45 +857,45 @@ struct SfmpvAudioTransportVtableRuntimeView
   void(__cdecl* readTotalSamplesProc)() = nullptr; // +0x0C
 };
 
-struct SfmpvAudioTransportRuntimeView
+struct SfmpvAudioTransport
 {
-  SfmpvAudioTransportVtableRuntimeView* vtable = nullptr; // +0x00
+  SfmpvAudioTransportVtable* vtable = nullptr; // +0x00
 };
 
 static_assert(
-  offsetof(SfmpvAudioTransportRuntimeView, vtable) == 0x00,
-  "SfmpvAudioTransportRuntimeView::vtable offset must be 0x00"
+  offsetof(SfmpvAudioTransport, vtable) == 0x00,
+  "SfmpvAudioTransport::vtable offset must be 0x00"
 );
 
-struct SfmpvStreamWindowCursorRuntimeView
+struct SfmpvStreamWindowCursor
 {
   std::uint8_t* cursor = nullptr; // +0x00
   std::int32_t byteCount = 0; // +0x04
 };
 
 static_assert(
-  sizeof(SfmpvStreamWindowCursorRuntimeView) == 0x08,
-  "SfmpvStreamWindowCursorRuntimeView size must be 0x08"
+  sizeof(SfmpvStreamWindowCursor) == 0x08,
+  "SfmpvStreamWindowCursor size must be 0x08"
 );
 
 using SfmpvStreamBufferReadWindowProc = void(__cdecl*)(
   std::int32_t streamBufferAddress,
   std::int32_t laneIndex,
   std::int32_t byteCount,
-  SfmpvStreamWindowCursorRuntimeView* cursorWindow
+  SfmpvStreamWindowCursor* cursorWindow
 );
 using SfmpvStreamBufferCommitWindowProc = std::int32_t(__cdecl*)(
   std::int32_t streamBufferAddress,
   std::int32_t laneIndex,
-  SfmpvStreamWindowCursorRuntimeView* cursorWindow
+  SfmpvStreamWindowCursor* cursorWindow
 );
 using SfmpvStreamBufferAdvanceWindowProc = void(__cdecl*)(
   std::int32_t streamBufferAddress,
   std::int32_t discardMode,
-  SfmpvStreamWindowCursorRuntimeView* cursorWindow
+  SfmpvStreamWindowCursor* cursorWindow
 );
 
-struct SfmpvStreamBufferVtableRuntimeView
+struct SfmpvStreamBufferVtable
 {
   void(__cdecl* reserved00)() = nullptr; // +0x00
   void(__cdecl* reserved04)() = nullptr; // +0x04
@@ -2043,20 +908,20 @@ struct SfmpvStreamBufferVtableRuntimeView
   SfmpvStreamBufferAdvanceWindowProc advanceWindow = nullptr; // +0x20
 };
 
-struct SfmpvStreamBufferRuntimeView
+struct SfmpvStreamBuffer
 {
-  SfmpvStreamBufferVtableRuntimeView* vtable = nullptr; // +0x00
+  SfmpvStreamBufferVtable* vtable = nullptr; // +0x00
 };
 
 static_assert(
-  offsetof(SfmpvStreamBufferRuntimeView, vtable) == 0x00,
-  "SfmpvStreamBufferRuntimeView::vtable offset must be 0x00"
+  offsetof(SfmpvStreamBuffer, vtable) == 0x00,
+  "SfmpvStreamBuffer::vtable offset must be 0x00"
 );
 
 /**
  * Runtime lane used by MPV CMC motion-compensation init helpers.
  */
-struct MpvcmcRuntimeView
+struct Mpvcmc
 {
   std::uint8_t reserved0000_011F[0x120]{};
   std::int32_t initWord120 = 0; // +0x120
@@ -2106,63 +971,63 @@ struct MpvcmcRuntimeView
   std::uint32_t initWord0D20 = 0; // +0xD20
 };
 
-static_assert(offsetof(MpvcmcRuntimeView, initWord120) == 0x120, "MpvcmcRuntimeView::initWord120 offset must be 0x120");
-static_assert(offsetof(MpvcmcRuntimeView, initWord128) == 0x128, "MpvcmcRuntimeView::initWord128 offset must be 0x128");
-static_assert(offsetof(MpvcmcRuntimeView, initWord130) == 0x130, "MpvcmcRuntimeView::initWord130 offset must be 0x130");
-static_assert(offsetof(MpvcmcRuntimeView, initWord138) == 0x138, "MpvcmcRuntimeView::initWord138 offset must be 0x138");
-static_assert(offsetof(MpvcmcRuntimeView, initWord140) == 0x140, "MpvcmcRuntimeView::initWord140 offset must be 0x140");
-static_assert(offsetof(MpvcmcRuntimeView, initWord148) == 0x148, "MpvcmcRuntimeView::initWord148 offset must be 0x148");
-static_assert(offsetof(MpvcmcRuntimeView, initWord150) == 0x150, "MpvcmcRuntimeView::initWord150 offset must be 0x150");
-static_assert(offsetof(MpvcmcRuntimeView, initWord154) == 0x154, "MpvcmcRuntimeView::initWord154 offset must be 0x154");
-static_assert(offsetof(MpvcmcRuntimeView, initWord158) == 0x158, "MpvcmcRuntimeView::initWord158 offset must be 0x158");
-static_assert(offsetof(MpvcmcRuntimeView, initWord15C) == 0x15C, "MpvcmcRuntimeView::initWord15C offset must be 0x15C");
-static_assert(offsetof(MpvcmcRuntimeView, initWord160) == 0x160, "MpvcmcRuntimeView::initWord160 offset must be 0x160");
-static_assert(offsetof(MpvcmcRuntimeView, initWord164) == 0x164, "MpvcmcRuntimeView::initWord164 offset must be 0x164");
-static_assert(offsetof(MpvcmcRuntimeView, initWord168) == 0x168, "MpvcmcRuntimeView::initWord168 offset must be 0x168");
-static_assert(offsetof(MpvcmcRuntimeView, initWord16C) == 0x16C, "MpvcmcRuntimeView::initWord16C offset must be 0x16C");
-static_assert(offsetof(MpvcmcRuntimeView, initWord170) == 0x170, "MpvcmcRuntimeView::initWord170 offset must be 0x170");
-static_assert(offsetof(MpvcmcRuntimeView, initWord174) == 0x174, "MpvcmcRuntimeView::initWord174 offset must be 0x174");
-static_assert(offsetof(MpvcmcRuntimeView, initWord178) == 0x178, "MpvcmcRuntimeView::initWord178 offset must be 0x178");
-static_assert(offsetof(MpvcmcRuntimeView, initWord17C) == 0x17C, "MpvcmcRuntimeView::initWord17C offset must be 0x17C");
-static_assert(offsetof(MpvcmcRuntimeView, initWord180) == 0x180, "MpvcmcRuntimeView::initWord180 offset must be 0x180");
-static_assert(offsetof(MpvcmcRuntimeView, initWord184) == 0x184, "MpvcmcRuntimeView::initWord184 offset must be 0x184");
-static_assert(offsetof(MpvcmcRuntimeView, initWord1A4) == 0x1A4, "MpvcmcRuntimeView::initWord1A4 offset must be 0x1A4");
-static_assert(offsetof(MpvcmcRuntimeView, umcHalfResMode) == 0x1B8, "MpvcmcRuntimeView::umcHalfResMode offset must be 0x1B8");
+static_assert(offsetof(Mpvcmc, initWord120) == 0x120, "Mpvcmc::initWord120 offset must be 0x120");
+static_assert(offsetof(Mpvcmc, initWord128) == 0x128, "Mpvcmc::initWord128 offset must be 0x128");
+static_assert(offsetof(Mpvcmc, initWord130) == 0x130, "Mpvcmc::initWord130 offset must be 0x130");
+static_assert(offsetof(Mpvcmc, initWord138) == 0x138, "Mpvcmc::initWord138 offset must be 0x138");
+static_assert(offsetof(Mpvcmc, initWord140) == 0x140, "Mpvcmc::initWord140 offset must be 0x140");
+static_assert(offsetof(Mpvcmc, initWord148) == 0x148, "Mpvcmc::initWord148 offset must be 0x148");
+static_assert(offsetof(Mpvcmc, initWord150) == 0x150, "Mpvcmc::initWord150 offset must be 0x150");
+static_assert(offsetof(Mpvcmc, initWord154) == 0x154, "Mpvcmc::initWord154 offset must be 0x154");
+static_assert(offsetof(Mpvcmc, initWord158) == 0x158, "Mpvcmc::initWord158 offset must be 0x158");
+static_assert(offsetof(Mpvcmc, initWord15C) == 0x15C, "Mpvcmc::initWord15C offset must be 0x15C");
+static_assert(offsetof(Mpvcmc, initWord160) == 0x160, "Mpvcmc::initWord160 offset must be 0x160");
+static_assert(offsetof(Mpvcmc, initWord164) == 0x164, "Mpvcmc::initWord164 offset must be 0x164");
+static_assert(offsetof(Mpvcmc, initWord168) == 0x168, "Mpvcmc::initWord168 offset must be 0x168");
+static_assert(offsetof(Mpvcmc, initWord16C) == 0x16C, "Mpvcmc::initWord16C offset must be 0x16C");
+static_assert(offsetof(Mpvcmc, initWord170) == 0x170, "Mpvcmc::initWord170 offset must be 0x170");
+static_assert(offsetof(Mpvcmc, initWord174) == 0x174, "Mpvcmc::initWord174 offset must be 0x174");
+static_assert(offsetof(Mpvcmc, initWord178) == 0x178, "Mpvcmc::initWord178 offset must be 0x178");
+static_assert(offsetof(Mpvcmc, initWord17C) == 0x17C, "Mpvcmc::initWord17C offset must be 0x17C");
+static_assert(offsetof(Mpvcmc, initWord180) == 0x180, "Mpvcmc::initWord180 offset must be 0x180");
+static_assert(offsetof(Mpvcmc, initWord184) == 0x184, "Mpvcmc::initWord184 offset must be 0x184");
+static_assert(offsetof(Mpvcmc, initWord1A4) == 0x1A4, "Mpvcmc::initWord1A4 offset must be 0x1A4");
+static_assert(offsetof(Mpvcmc, umcHalfResMode) == 0x1B8, "Mpvcmc::umcHalfResMode offset must be 0x1B8");
 static_assert(
-  offsetof(MpvcmcRuntimeView, outputWidthPixels) == 0x1D0,
-  "MpvcmcRuntimeView::outputWidthPixels offset must be 0x1D0"
+  offsetof(Mpvcmc, outputWidthPixels) == 0x1D0,
+  "Mpvcmc::outputWidthPixels offset must be 0x1D0"
 );
 static_assert(
-  offsetof(MpvcmcRuntimeView, outputHeightPixels) == 0x1D4,
-  "MpvcmcRuntimeView::outputHeightPixels offset must be 0x1D4"
+  offsetof(Mpvcmc, outputHeightPixels) == 0x1D4,
+  "Mpvcmc::outputHeightPixels offset must be 0x1D4"
 );
-static_assert(offsetof(MpvcmcRuntimeView, initWord280) == 0x280, "MpvcmcRuntimeView::initWord280 offset must be 0x280");
-static_assert(offsetof(MpvcmcRuntimeView, initWord282) == 0x282, "MpvcmcRuntimeView::initWord282 offset must be 0x282");
+static_assert(offsetof(Mpvcmc, initWord280) == 0x280, "Mpvcmc::initWord280 offset must be 0x280");
+static_assert(offsetof(Mpvcmc, initWord282) == 0x282, "Mpvcmc::initWord282 offset must be 0x282");
 static_assert(
-  offsetof(MpvcmcRuntimeView, outputRfbBaseAddress) == 0x284,
-  "MpvcmcRuntimeView::outputRfbBaseAddress offset must be 0x284"
-);
-static_assert(
-  offsetof(MpvcmcRuntimeView, outputYPlaneAddress) == 0x294,
-  "MpvcmcRuntimeView::outputYPlaneAddress offset must be 0x294"
+  offsetof(Mpvcmc, outputRfbBaseAddress) == 0x284,
+  "Mpvcmc::outputRfbBaseAddress offset must be 0x284"
 );
 static_assert(
-  offsetof(MpvcmcRuntimeView, outputCPlaneAddress) == 0x298,
-  "MpvcmcRuntimeView::outputCPlaneAddress offset must be 0x298"
+  offsetof(Mpvcmc, outputYPlaneAddress) == 0x294,
+  "Mpvcmc::outputYPlaneAddress offset must be 0x294"
 );
 static_assert(
-  offsetof(MpvcmcRuntimeView, outputYPlaneBaseAddress) == 0x29C,
-  "MpvcmcRuntimeView::outputYPlaneBaseAddress offset must be 0x29C"
+  offsetof(Mpvcmc, outputCPlaneAddress) == 0x298,
+  "Mpvcmc::outputCPlaneAddress offset must be 0x298"
 );
 static_assert(
-  offsetof(MpvcmcRuntimeView, outputChromaStrideBytes) == 0x2A0,
-  "MpvcmcRuntimeView::outputChromaStrideBytes offset must be 0x2A0"
+  offsetof(Mpvcmc, outputYPlaneBaseAddress) == 0x29C,
+  "Mpvcmc::outputYPlaneBaseAddress offset must be 0x29C"
 );
 static_assert(
-  offsetof(MpvcmcRuntimeView, outputLumaStrideBytes) == 0x2A2,
-  "MpvcmcRuntimeView::outputLumaStrideBytes offset must be 0x2A2"
+  offsetof(Mpvcmc, outputChromaStrideBytes) == 0x2A0,
+  "Mpvcmc::outputChromaStrideBytes offset must be 0x2A0"
 );
-static_assert(offsetof(MpvcmcRuntimeView, initWord0D20) == 0xD20, "MpvcmcRuntimeView::initWord0D20 offset must be 0xD20");
+static_assert(
+  offsetof(Mpvcmc, outputLumaStrideBytes) == 0x2A2,
+  "Mpvcmc::outputLumaStrideBytes offset must be 0x2A2"
+);
+static_assert(offsetof(Mpvcmc, initWord0D20) == 0xD20, "Mpvcmc::initWord0D20 offset must be 0xD20");
 
 // ---------------------------------------------------------------------------
 // Global CRI MPV state variables (BSS)
@@ -2287,26 +1152,25 @@ namespace
     return (modulo < 0) ? (modulo + 32) : modulo;
   }
 
-  constexpr std::int32_t kSfptsSourceLaneArrayOffset = 0x1320;
-
-  [[nodiscard]] SfptsSourceLaneRuntimeView*
-  GetSfptsSourceLane(SfmpvHandleRuntimeView* const workctrl, const std::int32_t sourceLaneIndex) noexcept
+  [[nodiscard]] moho::SfbufSupplyLane*
+  GetSfptsSourceLane(moho::SofdecSfdWorkctrlSubobj* const workctrl, const std::int32_t sourceLaneIndex) noexcept
   {
-    auto* const laneTableBase = reinterpret_cast<std::uint8_t*>(workctrl) + kSfptsSourceLaneArrayOffset;
-    const std::ptrdiff_t laneOffset =
-      static_cast<std::ptrdiff_t>(sourceLaneIndex) * static_cast<std::ptrdiff_t>(sizeof(SfptsSourceLaneRuntimeView));
-    return reinterpret_cast<SfptsSourceLaneRuntimeView*>(
-      laneTableBase + laneOffset
-    );
+    return &workctrl->bufferState.supplyLanes[sourceLaneIndex];
   }
 
-  void AddSigned32ToLane(std::int32_t* const lowWord, std::int32_t* const highWord, const std::int32_t delta) noexcept
+  void AddSigned32ToLane(std::int64_t* const counter, const std::int32_t delta) noexcept
   {
-    const std::int64_t current =
-      (static_cast<std::int64_t>(*highWord) << 32) | static_cast<std::uint32_t>(*lowWord);
-    const std::int64_t updated = current + static_cast<std::int64_t>(delta);
-    *lowWord = static_cast<std::int32_t>(updated);
-    *highWord = static_cast<std::int32_t>(updated >> 32);
+    *counter += static_cast<std::int64_t>(delta);
+  }
+
+  [[nodiscard]] std::int32_t FlowWordLow(const std::int64_t counter) noexcept
+  {
+    return static_cast<std::int32_t>(counter);
+  }
+
+  [[nodiscard]] std::int32_t FlowWordHigh(const std::int64_t counter) noexcept
+  {
+    return static_cast<std::int32_t>(counter >> 32);
   }
 }
 
@@ -2357,7 +1221,7 @@ std::int32_t SFTIM_InitTtu(std::uint32_t* timerState, std::int32_t initialValue)
  */
 void SFTIM_UpdateItime(void* const timerState, const std::int32_t interpolationTime)
 {
-  auto* const timingLane = static_cast<SfmpvTimingLane*>(timerState);
+  auto* const timingLane = static_cast<moho::SfmpvTimingLaneTail*>(timerState);
   const std::int32_t previousInterpolationTime = timingLane->interpolationWindowTimeBase;
   if (previousInterpolationTime == -5) {
     timingLane->interpolationWindowTimeBase = interpolationTime;
@@ -2402,7 +1266,7 @@ void SFTIM_UpdateItime(void* const timerState, const std::int32_t interpolationT
  */
 std::int32_t SFTIM_GetNextItime(void* const timerState, const std::int32_t interpolationTime)
 {
-  const auto* const timingLane = static_cast<const SfmpvTimingLane*>(timerState);
+  const auto* const timingLane = static_cast<const moho::SfmpvTimingLaneTail*>(timerState);
   const std::int32_t previousInterpolationTime = timingLane->interpolationWindowTimeBase;
   std::int32_t nextInterpolationTime = previousInterpolationTime + timingLane->interpolationWindowAdaptiveStep;
   if (interpolationTime >= nextInterpolationTime) {
@@ -2540,7 +1404,7 @@ void SFMPVF_InitPicUsr(std::uint32_t* picUsrState)
  * What it does:
  * Copies one MPV parameter table, clears validator lanes (`val4/val8`), aligns
  * ring-frame-buffer and SofDec tab addresses to 0x800, and writes up to
- * `nfrm_pool_wk` tab entries.
+ * `nfrmPoolWork` tab entries.
  */
 std::int32_t SFD_SetMpvParaTbl(
   const SfmpvPara* const parameterTable,
@@ -2557,7 +1421,7 @@ std::int32_t SFD_SetMpvParaTbl(
   }
 
   for (std::int32_t tabIndex = 0; tabIndex < kSfmpvMaxFramePoolCount; ++tabIndex) {
-    if (tabIndex >= parameterTable->nfrm_pool_wk) {
+    if (tabIndex >= parameterTable->nfrmPoolWork) {
       sSofDec_tabs[tabIndex] = 0;
     } else {
       const auto tabAddress =
@@ -2584,12 +1448,12 @@ std::int32_t sfmpvf_SetPicUsrBuf(
   const std::int32_t bytesPerFrame
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   auto* const picUsrState = reinterpret_cast<std::uint32_t*>(&mpvInfo->pictureUserBufferAddress);
 
   if (userBufferAddress != 0 && frameSlotCount != 0 && bytesPerFrame != 0) {
-    if (frameSlotCount < (workctrl->prepFrameTargetCount + 3)) {
+    if (frameSlotCount < (workctrl->createTemplate.framePoolWork + 3)) {
       return SFLIB_SetErr(workctrlAddress, kSfmpvErrPicUsrBufferTooShort);
     }
 
@@ -2635,7 +1499,7 @@ std::int32_t sfmpv_SetCondY16(const std::int32_t workctrlAddress)
   if (result != -1) {
     const auto cond5Arg =
       reinterpret_cast<std::int32_t(*)()>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(result == 0)));
-    return SFD_SetMpvCond(workctrlAddress, 5, cond5Arg);
+    return SFD_SetMpvCond(AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress), 5, cond5Arg);
   }
 
   return result;
@@ -2651,10 +1515,10 @@ std::int32_t sfmpv_SetCondY16(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_ProcessAuxShc(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
-  SfbufRingChunkRuntimeView pictureRange{};
+  SfbufRingChunk pictureRange{};
   pictureRange.bufferAddress = reinterpret_cast<std::uint8_t*>(
       static_cast<std::uintptr_t>(SFSET_GetCond(workctrlAddress, 93)));
   std::int32_t result = SFSET_GetCond(workctrlAddress, 94);
@@ -2693,7 +1557,7 @@ std::int32_t MPVM2V_Init()
  * Seeds MPV CMC interpolation-pointer lanes to the internal table storage
  * block and resets per-lane span words.
  */
-MpvcmcRuntimeView* mpvcmc_InitMcOiTa(MpvcmcRuntimeView* const runtimeView)
+Mpvcmc* mpvcmc_InitMcOiTa(Mpvcmc* const runtimeView)
 {
   runtimeView->initWord154 = (runtimeView->initWord1A4 != 0) ? 4 : -1;
 
@@ -2721,7 +1585,7 @@ MpvcmcRuntimeView* mpvcmc_InitMcOiTa(MpvcmcRuntimeView* const runtimeView)
  * Initializes MPV CMC interpolation runtime words from fixed seed lanes in
  * the CMC object.
  */
-MpvcmcRuntimeView* MPVCMC_InitMcOiRt(MpvcmcRuntimeView* const runtimeView)
+Mpvcmc* MPVCMC_InitMcOiRt(Mpvcmc* const runtimeView)
 {
   runtimeView->initWord120 = (runtimeView->initWord1A4 != 0) ? 4 : -1;
 
@@ -2743,7 +1607,7 @@ MpvcmcRuntimeView* MPVCMC_InitMcOiRt(MpvcmcRuntimeView* const runtimeView)
  * What it does:
  * Recomputes CMC count/state lanes from the runtime mode gate.
  */
-extern "C" std::int32_t MPVCMC_SetCcnt(MpvcmcRuntimeView* const runtimeView)
+extern "C" std::int32_t MPVCMC_SetCcnt(Mpvcmc* const runtimeView)
 {
   const std::int32_t nextCount = (runtimeView->initWord1A4 != 0) ? 4 : -1;
   runtimeView->initWord154 = nextCount;
@@ -2768,7 +1632,7 @@ extern "C" void MPVUMC_Finish()
  * Computes Y/C output frame-buffer lane addresses and aligned strides for the
  * current decode-frame geometry.
  */
-extern "C" std::int32_t MPVUMC_InitOutRfb(MpvcmcRuntimeView* const runtimeView)
+extern "C" std::int32_t MPVUMC_InitOutRfb(Mpvcmc* const runtimeView)
 {
   std::int32_t widthPixels = runtimeView->outputWidthPixels;
   std::int32_t heightPixels = runtimeView->outputHeightPixels;
@@ -2925,8 +1789,8 @@ std::int32_t sfmpv_ExecServerSub(const std::int32_t workctrlAddress)
 
   (void)sfmpv_SetCondY16(workctrlAddress);
 
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  if (workctrl->executionStage == kSfplyExecutionStagePrep) {
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  if (workctrl->handleState == kSfplyExecutionStagePrep) {
     (void)sfmpv_ProcessAuxShc(workctrlAddress);
   }
 
@@ -2946,7 +1810,7 @@ std::int32_t sfmpv_ExecServerSub(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpvf_CheckMpvPara()
 {
-  if (sfmpv_para.nfrm_pool_wk <= 0 || sfmpv_para.nfrm_pool_wk > kSfmpvMaxFramePoolCount) {
+  if (sfmpv_para.nfrmPoolWork <= 0 || sfmpv_para.nfrmPoolWork > kSfmpvMaxFramePoolCount) {
     return -1;
   }
 
@@ -2966,7 +1830,7 @@ std::int32_t sfmpvf_CheckMpvPara()
     }
   }
 
-  for (std::int32_t index = 0; index < sfmpv_para.nfrm_pool_wk; ++index) {
+  for (std::int32_t index = 0; index < sfmpv_para.nfrmPoolWork; ++index) {
     if (sSofDec_tabs[index] == 0) {
       return -1;
     }
@@ -3060,8 +1924,8 @@ std::int32_t sfmpv_InitInf(std::int32_t /*unused*/, std::uint32_t* infoBlock)
  */
 std::int32_t sfmpv_IsVbvEnough(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   const std::int32_t decoderHandle = mpvInfo->decoderHandle;
 
   const std::int32_t termSourceState = sfmpv_GetTermSrc(workctrlAddress);
@@ -3083,7 +1947,7 @@ std::int32_t sfmpv_IsVbvEnough(const std::int32_t workctrlAddress)
     return 1;
   }
 
-  const std::int32_t streamLane = (SFTRN_IsSetup(workctrlAddress, 1) == 0) ? 1 : 0;
+  const std::int32_t streamLane = (SFTRN_IsSetup(AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress), 1) == 0) ? 1 : 0;
   const std::int32_t totalWritableBytes = SFBUF_GetWTot(workctrlAddress, streamLane);
   const std::int32_t bufferedBytes = SFBUF_RingGetDataSiz(workctrlAddress, streamLane);
   return (totalWritableBytes >= bufferedBytes) ? 1 : 0;
@@ -3098,11 +1962,11 @@ std::int32_t sfmpv_IsVbvEnough(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_CheckViBufSiz(const std::int32_t workctrlAddress)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  const std::int32_t ringIndex = workctrl->prepSourceLaneIndex;
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  const std::int32_t ringIndex = workctrl->transferState.transfer.demux.prepSourceLaneIndex;
   const std::int32_t ringBufferBytes = SFBUF_GetRingBufSiz(workctrlAddress, ringIndex);
   const std::int32_t readableBytes = SFBUF_RingGetDataSiz(workctrlAddress, ringIndex);
-  if ((readableBytes - ringBufferBytes) >= workctrl->minimumVideoBufferBytes) {
+  if ((readableBytes - ringBufferBytes) >= workctrl->createTemplate.packBytes) {
     return 0;
   }
   return SFLIB_SetErr(workctrlAddress, kSfmpvErrVideoBufferTooSmall);
@@ -3116,8 +1980,8 @@ std::int32_t sfmpv_CheckViBufSiz(const std::int32_t workctrlAddress)
  */
 std::int32_t SFMPVF_IsTermDec(const std::int32_t workctrlAddress)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  const auto* const mpvInfo = reinterpret_cast<const SfmpvfInfoRuntimeView*>(workctrl->mpvInfo);
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  const auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   return mpvInfo->termDecodeState;
 }
 
@@ -3134,10 +1998,10 @@ std::int32_t SFMPVF_GetNumFrm(const std::int32_t workctrlAddress)
   SFLIB_LockCs();
 
   std::int32_t decodableFrameCount = 0;
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  const auto* const mpvInfo = reinterpret_cast<const SfmpvfInfoRuntimeView*>(workctrl->mpvInfo);
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  const auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   for (std::int32_t frameIndex = 0; frameIndex < mpvInfo->frameObjectCount; ++frameIndex) {
-    const SfmpvfFrameObjectRuntimeView& frameObject = mpvInfo->frameObjects[frameIndex];
+    const moho::SfmpvfFrameObject& frameObject = mpvInfo->frameObjects[frameIndex];
     if ((frameObject.decodeState == 2 || frameObject.decodeState == 4) && frameObject.frameId == -1) {
       ++decodableFrameCount;
     }
@@ -3159,8 +2023,8 @@ std::int32_t SFMPVF_GetNumFrm(const std::int32_t workctrlAddress)
  * concat/decode ordering lanes and a final per-picture tie-break metric.
  */
 std::int32_t sfmpvf_IsChkFirst(
-  const SfmpvfFrameObjectRuntimeView* const selectedFrameObject,
-  const SfmpvfFrameObjectRuntimeView* const candidateFrameObject
+  const moho::SfmpvfFrameObject* const selectedFrameObject,
+  const moho::SfmpvfFrameObject* const candidateFrameObject
 )
 {
   if (selectedFrameObject == nullptr) {
@@ -3203,11 +2067,11 @@ std::int32_t SFMPVF_HoldFrm(const std::int32_t workctrlAddress)
 {
   SFLIB_LockCs();
 
-  SfmpvfFrameObjectRuntimeView* selectedFrameObject = nullptr;
+  moho::SfmpvfFrameObject* selectedFrameObject = nullptr;
   std::int32_t selectableFrameCount = 0;
 
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  auto* const mpvInfo = reinterpret_cast<SfmpvfInfoRuntimeView*>(workctrl->mpvInfo);
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   if (mpvInfo->frameObjectCount > 0) {
     for (std::int32_t frameIndex = 0; frameIndex < mpvInfo->frameObjectCount; ++frameIndex) {
       auto* const candidateFrameObject = &mpvInfo->frameObjects[frameIndex];
@@ -3237,16 +2101,16 @@ std::int32_t SFMPVF_HoldFrm(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_IsPrepFrmEnough(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
-  std::int32_t requiredFrameCount = workctrl->prepFrameRequiredCount;
-  if (requiredFrameCount == -1 || workctrl->prepFrameTargetCount < requiredFrameCount) {
-    requiredFrameCount = workctrl->prepFrameTargetCount;
+  std::int32_t requiredFrameCount = workctrl->conditions[moho::SofdecSfdWorkctrlSubobj::kSfdConditionPrepFrameRequiredCount];
+  if (requiredFrameCount == -1 || workctrl->createTemplate.framePoolWork < requiredFrameCount) {
+    requiredFrameCount = workctrl->createTemplate.framePoolWork;
   }
 
   std::int32_t preparedFrameCount = SFMPVF_GetNumFrm(workctrlAddress);
   if (workctrl->decodePathMode == 2) {
-    preparedFrameCount += workctrl->preparedFrameCount;
+    preparedFrameCount += workctrl->playbackInfo.preparedFrameCount;
   }
 
   return (preparedFrameCount >= requiredFrameCount) ? 1 : 0;
@@ -3276,7 +2140,7 @@ std::int32_t sfmpv_IsPrepEnd(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_FixedStartTtu(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   if (workctrl->timingLane.frameInterpolationTime != 0x7FFFFFFF) {
     workctrl->timingLane.interpolationEnabled = 1;
   }
@@ -3292,9 +2156,9 @@ std::int32_t sfmpv_FixedStartTtu(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_ChkPrepFlg(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  const std::int32_t prepDestinationLaneIndex = workctrl->prepDestinationLaneIndex;
-  const std::int32_t prepSourceLaneIndex = workctrl->prepSourceLaneIndex;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  const std::int32_t prepDestinationLaneIndex = workctrl->transferState.transfer.demux.prepDestinationLaneIndex;
+  const std::int32_t prepSourceLaneIndex = workctrl->transferState.transfer.demux.prepSourceLaneIndex;
 
   std::int32_t result = SFBUF_GetPrepFlg(workctrlAddress, prepDestinationLaneIndex);
   if (result == 1) {
@@ -3324,7 +2188,7 @@ std::int32_t sfmpv_ChkPrepFlg(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_IsFinalFrmGotten(const std::int32_t workctrlAddress, const std::int32_t frameCount)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   if (SFMPVF_IsTermDec(workctrlAddress) == 0) {
     return 0;
   }
@@ -3334,7 +2198,7 @@ std::int32_t sfmpv_IsFinalFrmGotten(const std::int32_t workctrlAddress, const st
 
   if (
     workctrl->decodePathMode == 1 && frameCount == 1
-    && workctrl->preparedFrameCount > workctrl->consumedFrameCount
+    && workctrl->playbackInfo.preparedFrameCount > workctrl->playbackInfo.consumedFrameCount
   ) {
     return 1;
   }
@@ -3349,8 +2213,8 @@ std::int32_t sfmpv_IsFinalFrmGotten(const std::int32_t workctrlAddress, const st
  */
 std::int32_t sfmpv_SetTermDst(const std::int32_t workctrlAddress, const std::int32_t termFlag)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  return SFBUF_SetTermFlg(workctrlAddress, workctrl->prepDestinationLaneIndex, termFlag);
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  return SFBUF_SetTermFlg(workctrlAddress, workctrl->transferState.transfer.demux.prepDestinationLaneIndex, termFlag);
 }
 
 /**
@@ -3362,15 +2226,15 @@ std::int32_t sfmpv_SetTermDst(const std::int32_t workctrlAddress, const std::int
  */
 std::int32_t sfmpv_ChkTermFlg(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const std::int32_t frameCount = SFMPVF_GetNumFrm(workctrlAddress);
 
   if (frameCount == -1 || sfmpv_IsFinalFrmGotten(workctrlAddress, frameCount) != 0) {
     (void)sfmpv_SetTermDst(workctrlAddress, 1);
-    if (workctrl->playbackInfoAddress == 0) {
+    if (workctrl->playbackInfo.publishedAddress == 0) {
       return SFSET_SetCond(workctrlAddress, 5, 0);
     }
-    return workctrl->playbackInfoAddress;
+    return workctrl->playbackInfo.publishedAddress;
   }
   return 0;
 }
@@ -3389,9 +2253,9 @@ std::int32_t sfmpv_GetActiveSize(
   std::int32_t* const outHasActiveUnit
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfbufRingCursorSnapshotRuntimeView ringCursor{};
-  const std::int32_t sourceLaneIndex = workctrl->prepSourceLaneIndex;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  SfbufRingCursorSnapshot ringCursor{};
+  const std::int32_t sourceLaneIndex = workctrl->transferState.transfer.demux.prepSourceLaneIndex;
 
   *outActiveSize = 0;
   *outDelimiterFlags = 0;
@@ -3507,7 +2371,7 @@ std::int32_t sfmpv_NeedSafeDlmRefresh(
     return 1;
   }
 
-  const auto* const ringCursor = reinterpret_cast<const SfbufRingCursorSnapshotRuntimeView*>(ringCursorSnapshotWords);
+  const auto* const ringCursor = reinterpret_cast<const SfbufRingCursorSnapshot*>(ringCursorSnapshotWords);
   const std::uint8_t* const firstBase = ringCursor->firstChunk.bufferAddress;
   const std::int32_t firstLength = ringCursor->firstChunk.byteCount;
   const std::uint8_t* const secondBase = ringCursor->secondChunk.bufferAddress;
@@ -3598,7 +2462,7 @@ std::int32_t sfmpv_CalcDistance(
   const std::uint8_t* const targetAddress
 )
 {
-  const auto* const ringCursor = reinterpret_cast<const SfbufRingCursorSnapshotRuntimeView*>(ringCursorSnapshotWords);
+  const auto* const ringCursor = reinterpret_cast<const SfbufRingCursorSnapshot*>(ringCursorSnapshotWords);
   const std::uintptr_t target = reinterpret_cast<std::uintptr_t>(targetAddress);
   const std::uintptr_t firstBase = reinterpret_cast<std::uintptr_t>(ringCursor->firstChunk.bufferAddress);
   const std::uintptr_t secondBase = reinterpret_cast<std::uintptr_t>(ringCursor->secondChunk.bufferAddress);
@@ -3627,7 +2491,7 @@ std::uint8_t* sfmpv_SearchDelim(
   std::int32_t* const outDelimiterType
 )
 {
-  const auto* const ringCursor = AddressToPointer<const SfbufRingCursorSnapshotRuntimeView>(ringCursorSnapshotAddress);
+  const auto* const ringCursor = AddressToPointer<const SfbufRingCursorSnapshot>(ringCursorSnapshotAddress);
   *outDelimiterType = 0;
 
   std::uint8_t* delimiter =
@@ -3694,7 +2558,7 @@ std::uint8_t* sfmpv_BsearchDelim(
   std::int32_t* const outDelimiterType
 )
 {
-  const auto* const ringCursor = reinterpret_cast<const SfbufRingCursorSnapshotRuntimeView*>(ringCursorSnapshotWords);
+  const auto* const ringCursor = reinterpret_cast<const SfbufRingCursorSnapshot*>(ringCursorSnapshotWords);
   *outDelimiterType = 0;
 
   if (ringCursor->secondChunk.byteCount != 0) {
@@ -3749,10 +2613,10 @@ std::uint8_t* sfmpv_BsearchDelim(
 // callers below reference them before their definitions.
 std::int32_t sfmpv_SkipFrm(std::int32_t workctrlAddress, std::int32_t streamBufferAddress);
 std::int32_t sfmpv_ConcatSub(std::int32_t workctrlAddress);
-struct SfmpvPictureAttributeRuntimeView;
+struct SfmpvPictureAttribute;
 std::int32_t sfmpv_ReformTc(
     std::int32_t workctrlAddress,
-    SfmpvPictureAttributeRuntimeView* pictureAttribute,
+    SfmpvPictureAttribute* pictureAttribute,
     std::int64_t presentationPts,
     std::int32_t detectErrorMode);
 std::int32_t sfmpv_IsLate(std::int32_t workctrlAddress, std::int32_t updateMode);
@@ -3766,7 +2630,7 @@ std::int32_t sfmpv_ErrFn(std::int32_t workctrlAddress, std::int32_t statusCode);
  * picture-attribute decode lane, and frame decode-or-skip dispatch.
  */
 std::int32_t sfmpv_DecodeOneUnit(
-  SfmpvHandleRuntimeView* const workctrl,
+  moho::SofdecSfdWorkctrlSubobj* const workctrl,
   const std::int32_t activeSize,
   const std::int32_t delimiterState,
   const std::int32_t hasActiveUnit,
@@ -3774,10 +2638,10 @@ std::int32_t sfmpv_DecodeOneUnit(
 )
 {
   const std::int32_t workctrlAddress = PointerToAddress(workctrl);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   *outUnitProcessed = 0;
-  workctrl->decodeStarvedLatch = 0;
+  workctrl->playbackInfo.decodeStarvedLatch = 0;
 
   std::int32_t activeDelimiterMask = delimiterState;
   if (mpvInfo->concatControlFlags != 0xCC || mpvInfo->picAtrPrimedLatch == 0) {
@@ -3785,7 +2649,7 @@ std::int32_t sfmpv_DecodeOneUnit(
   }
 
   std::int32_t streamBufferAddress = 0;
-  std::int32_t decodeResult = SFBUF_RingGetSj(workctrlAddress, workctrl->prepSourceLaneIndex, &streamBufferAddress);
+  std::int32_t decodeResult = SFBUF_RingGetSj(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, &streamBufferAddress);
   if (decodeResult != 0 || streamBufferAddress == 0) {
     return 0;
   }
@@ -3817,7 +2681,7 @@ std::int32_t sfmpv_DecodeOneUnit(
       return 0;
     }
     if (activeSize <= 4) {
-      workctrl->decodeStarvedLatch = 1;
+      workctrl->playbackInfo.decodeStarvedLatch = 1;
       return 0;
     }
   }
@@ -3878,7 +2742,7 @@ std::int32_t sfmpv_DecodeOneUnit(
  */
 std::int32_t sfmpv_DecodeSomePic(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
   std::int32_t activeSize = 0;
   std::int32_t delimiterFlags = 0;
@@ -3911,17 +2775,17 @@ std::int32_t sfmpv_DecodeSomePic(const std::int32_t workctrlAddress)
  */
 void sfmpv_FixedForSeek(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
-  if (workctrl->seekFixedReadTotal < 0) {
-    workctrl->seekFixedReadTotal = SFBUF_GetRTot(workctrlAddress, workctrl->prepSourceLaneIndex) + 4;
+  if (workctrl->transferState.transfer.demux.seekFixedReadTotal < 0) {
+    workctrl->transferState.transfer.demux.seekFixedReadTotal = SFBUF_GetRTot(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex) + 4;
   }
 
   if (workctrl->timingLane.seekFixedBaselineTtu.timeMajor < 0) {
     std::memcpy(
       &workctrl->timingLane.seekFixedBaselineTtu,
       &workctrl->timingLane.concatAudioTimeUnit[0],
-      sizeof(SfmpvTtuRuntimeView)
+      sizeof(moho::SfmpvTtu)
     );
   }
 }
@@ -3954,8 +2818,8 @@ std::int32_t sfmpv_Concat(const std::int32_t workctrlAddress, const std::int32_t
  */
 std::int32_t sfmpv_ConcatSub(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   std::int32_t concatTotalTime = 0;
   if (SFSET_GetCond(workctrlAddress, 6) != 0) {
@@ -3987,16 +2851,16 @@ std::int32_t sfmpv_ConcatSub(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_CalcVideoTotTime(const std::int32_t workctrlAddress)
 {
-  const auto* const workctrl = AddressToPointer<const SfmpvHandleRuntimeView>(workctrlAddress);
+  const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const auto* const concatAudioTtu =
-    reinterpret_cast<const SfmpvTtuRuntimeView*>(workctrl->timingLane.concatAudioTimeUnit);
+    reinterpret_cast<const moho::SfmpvTtu*>(workctrl->timingLane.concatAudioTimeUnit);
   if (concatAudioTtu->state == 0) {
     return 0;
   }
 
-  SfmpvPackedTimecodeRuntimeView nextTimecode{};
+  moho::SfmpvPackedTimecode nextTimecode{};
   (void)sfmpv_NextTc(
-    reinterpret_cast<const SfmpvPackedTimecodeRuntimeView*>(concatAudioTtu->packedTimecodeWords),
+    reinterpret_cast<const moho::SfmpvPackedTimecode*>(concatAudioTtu->packedTimecodeWords),
     &nextTimecode
   );
   nextTimecode.halfFrameCarry = 0;
@@ -4016,23 +2880,23 @@ std::int32_t sfmpv_CalcVideoTotTime(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_CalcAudioTotTime(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
   std::int32_t totalSamples = 0;
   std::int32_t sampleRate = 44100;
-  const auto* const transportView = AddressToPointer<const SfmpvAudioTransportRuntimeView>(workctrlAddress);
+  const auto* const transportView = AddressToPointer<const SfmpvAudioTransport>(workctrlAddress);
   if (transportView->vtable->readTotalSamplesProc == &SFD_tr_ad_adxt) {
     if (SFCON_ReadTotSmplQue(workctrlAddress, &totalSamples, &sampleRate) == 0) {
       return -1;
     }
   }
 
-  totalSamples += workctrl->timingLane.audioTotalSampleCount;
-  workctrl->timingLane.audioTotalSampleCount = totalSamples;
+  totalSamples += workctrl->timerTail.audioTotalSampleCount;
+  workctrl->timerTail.audioTotalSampleCount = totalSamples;
 
   const std::int32_t concatAudioTime =
     UTY_MulDiv(totalSamples, static_cast<std::int32_t>(workctrl->timingLane.concatVideoTimeUnit[10]), sampleRate)
-    - workctrl->timingLane.decodeProgressTime;
+    - workctrl->timerTail.decodeProgressTime;
   if (concatAudioTime < 0) {
     return 0;
   }
@@ -4048,7 +2912,7 @@ std::int32_t sfmpv_CalcAudioTotTime(const std::int32_t workctrlAddress)
  * returns `-1` when no entry matches.
  */
 std::int32_t sfpts_SearchPtsQue(
-  const SfptsPtsQueueRuntimeView* const ptsQueue,
+  const moho::SfptsPtsQueue* const ptsQueue,
   const std::uint32_t normalizedDelimiterAddress,
   const std::uint32_t sourceLaneStartAddress,
   const std::int32_t sourceLaneSpanBytes
@@ -4064,12 +2928,12 @@ std::int32_t sfpts_SearchPtsQue(
     return -1;
   }
 
-  const auto* const entries = AddressToPointer<const SfptsQueueEntryRuntimeView>(ptsQueue->entriesBaseAddress);
-  std::int32_t byteOffset = entryIndex * static_cast<std::int32_t>(sizeof(SfptsQueueEntryRuntimeView));
-  const std::int32_t ringByteSpan = entryCapacity * static_cast<std::int32_t>(sizeof(SfptsQueueEntryRuntimeView));
+  const auto* const entries = AddressToPointer<const moho::SfptsQueueEntry>(ptsQueue->entriesBaseAddress);
+  std::int32_t byteOffset = entryIndex * static_cast<std::int32_t>(sizeof(moho::SfptsQueueEntry));
+  const std::int32_t ringByteSpan = entryCapacity * static_cast<std::int32_t>(sizeof(moho::SfptsQueueEntry));
 
   while (true) {
-    const auto* const entry = reinterpret_cast<const SfptsQueueEntryRuntimeView*>(
+    const auto* const entry = reinterpret_cast<const moho::SfptsQueueEntry*>(
       reinterpret_cast<const std::uint8_t*>(entries) + byteOffset
     );
     const std::uint32_t referenceStart = static_cast<std::uint32_t>(entry->referenceLow);
@@ -4100,7 +2964,7 @@ std::int32_t sfpts_SearchPtsQue(
     } else {
       ++entryIndex;
     }
-    byteOffset += static_cast<std::int32_t>(sizeof(SfptsQueueEntryRuntimeView));
+    byteOffset += static_cast<std::int32_t>(sizeof(moho::SfptsQueueEntry));
 
     ++queueOffset;
     if (queueOffset >= queuedEntryCount) {
@@ -4112,14 +2976,14 @@ std::int32_t sfpts_SearchPtsQue(
 /**
  * Address: 0x00AE5CA0 (FUN_00AE5CA0, _sfpts_ReadPtsQueSub)
  *
- * SfptsPtsQueueRuntimeView *,int,int *,int,int
+ * moho::SfptsPtsQueue *,int,int *,int,int
  *
  * What it does:
  * Searches one source-lane PTS queue for the delimiter-relative entry, updates
  * queue cursor/count state, and copies one 16-byte entry payload.
  */
 std::int32_t* sfpts_ReadPtsQueSub(
-  SfptsPtsQueueRuntimeView* const ptsQueue,
+  moho::SfptsPtsQueue* const ptsQueue,
   const std::int32_t normalizedDelimiterAddress,
   std::int32_t* const outPtsWords,
   const std::int32_t sourceLaneStartAddress,
@@ -4153,7 +3017,7 @@ std::int32_t* sfpts_ReadPtsQueSub(
       ptsQueue->readCursor = nextCursor;
       ptsQueue->queuedEntryCount = queuedEntryCount - queueOffset;
 
-      const auto* const entries = AddressToPointer<const SfptsQueueEntryRuntimeView>(ptsQueue->entriesBaseAddress);
+      const auto* const entries = AddressToPointer<const moho::SfptsQueueEntry>(ptsQueue->entriesBaseAddress);
       const auto* const selectedEntry = &entries[nextCursor];
       outPtsWords[0] = selectedEntry->ptsLow;
       outPtsWords[1] = selectedEntry->ptsHigh;
@@ -4182,7 +3046,7 @@ std::int32_t SFPTS_ReadPtsQue(
   std::int32_t* const outPtsWords
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const sourceLane = GetSfptsSourceLane(workctrl, sourceLaneIndex);
 
   outPtsWords[0] = -1;
@@ -4241,15 +3105,15 @@ std::int32_t SFCON_IsVideoEndcodeSkip(const std::int32_t workctrlAddress)
  */
 void SFCON_UpdateConcatTime(const std::int32_t workctrlAddress, const std::int32_t totalTime)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
   SFLIB_LockCs();
-  const std::int32_t updatedConcatTime = workctrl->timingLane.decodeProgressTime + totalTime;
-  workctrl->timingLane.decodeProgressTime = updatedConcatTime;
+  const std::int32_t updatedConcatTime = workctrl->timerTail.decodeProgressTime + totalTime;
+  workctrl->timerTail.decodeProgressTime = updatedConcatTime;
 
-  const std::int32_t nextWriteOrdinal = workctrl->timingLane.concatTimeHistoryWriteOrdinal + 1;
-  workctrl->timingLane.concatTimeHistory[Modulo32Index(nextWriteOrdinal)] = updatedConcatTime;
-  workctrl->timingLane.concatTimeHistoryWriteOrdinal = nextWriteOrdinal;
+  const std::int32_t nextWriteOrdinal = workctrl->timerTail.concatTimeHistoryWriteOrdinal + 1;
+  workctrl->timerTail.concatTimeHistory[Modulo32Index(nextWriteOrdinal)] = updatedConcatTime;
+  workctrl->timerTail.concatTimeHistoryWriteOrdinal = nextWriteOrdinal;
   SFLIB_UnlockCs();
 }
 
@@ -4266,18 +3130,18 @@ std::int32_t SFCON_WriteTotSmplQue(
   const std::int32_t sampleRate
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
   SFLIB_LockCs();
-  const std::int32_t queuedCount = workctrl->timingLane.totalSampleQueueWriteOrdinal - workctrl->timingLane.totalSampleQueueReadOrdinal;
+  const std::int32_t queuedCount = workctrl->timerTail.totalSampleQueueWriteOrdinal - workctrl->timerTail.totalSampleQueueReadOrdinal;
   if (queuedCount >= 32) {
     SFLIB_UnlockCs();
     return 0;
   }
 
-  workctrl->timingLane.queuedAudioSampleRate = sampleRate;
-  workctrl->timingLane.totalSampleQueueTotals[Modulo32Index(workctrl->timingLane.totalSampleQueueWriteOrdinal)] = totalSamples;
-  ++workctrl->timingLane.totalSampleQueueWriteOrdinal;
+  workctrl->timerTail.queuedAudioSampleRate = sampleRate;
+  workctrl->timerTail.totalSampleQueueTotals[Modulo32Index(workctrl->timerTail.totalSampleQueueWriteOrdinal)] = totalSamples;
+  ++workctrl->timerTail.totalSampleQueueWriteOrdinal;
   SFLIB_UnlockCs();
   return 1;
 }
@@ -4295,19 +3159,19 @@ std::int32_t SFCON_ReadTotSmplQue(
   std::int32_t* const outSampleRate
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
   SFLIB_LockCs();
-  const std::int32_t queuedCount = workctrl->timingLane.totalSampleQueueWriteOrdinal - workctrl->timingLane.totalSampleQueueReadOrdinal;
+  const std::int32_t queuedCount = workctrl->timerTail.totalSampleQueueWriteOrdinal - workctrl->timerTail.totalSampleQueueReadOrdinal;
   if (queuedCount <= 0) {
     *outTotalSamples = -1;
     SFLIB_UnlockCs();
     return 0;
   }
 
-  *outSampleRate = workctrl->timingLane.queuedAudioSampleRate;
-  *outTotalSamples = workctrl->timingLane.totalSampleQueueTotals[Modulo32Index(workctrl->timingLane.totalSampleQueueReadOrdinal)];
-  ++workctrl->timingLane.totalSampleQueueReadOrdinal;
+  *outSampleRate = workctrl->timerTail.queuedAudioSampleRate;
+  *outTotalSamples = workctrl->timerTail.totalSampleQueueTotals[Modulo32Index(workctrl->timerTail.totalSampleQueueReadOrdinal)];
+  ++workctrl->timerTail.totalSampleQueueReadOrdinal;
   SFLIB_UnlockCs();
   return 1;
 }
@@ -4321,8 +3185,8 @@ std::int32_t SFCON_ReadTotSmplQue(
  */
 void sfmpv_DiscardSec(const std::int32_t workctrlAddress, const std::int32_t streamBufferAddress)
 {
-  const auto* const streamBuffer = AddressToPointer<const SfmpvStreamBufferRuntimeView>(streamBufferAddress);
-  SfmpvStreamWindowCursorRuntimeView cursorWindow{};
+  const auto* const streamBuffer = AddressToPointer<const SfmpvStreamBuffer>(streamBufferAddress);
+  SfmpvStreamWindowCursor cursorWindow{};
 
   streamBuffer->vtable->readWindow(streamBufferAddress, 1, 4, &cursorWindow);
   while (cursorWindow.byteCount == 4) {
@@ -4347,10 +3211,10 @@ void sfmpv_DiscardSec(const std::int32_t workctrlAddress, const std::int32_t str
  */
 std::int32_t sfmpv_AddRtotSj(const std::int32_t workctrlAddress, const std::int32_t consumedBytes)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  (void)SFBUF_AddRtotSj(workctrlAddress, workctrl->prepSourceLaneIndex, consumedBytes);
-  AddSigned32ToLane(&workctrl->ringReadTotalLow, &workctrl->ringReadTotalHigh, consumedBytes);
-  return workctrl->ringReadTotalHigh;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  (void)SFBUF_AddRtotSj(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, consumedBytes);
+  AddSigned32ToLane(&workctrl->playbackInfo.flowCounter1.consumedBytes, consumedBytes);
+  return FlowWordHigh(workctrl->playbackInfo.flowCounter1.consumedBytes);
 }
 
 /**
@@ -4362,12 +3226,12 @@ std::int32_t sfmpv_AddRtotSj(const std::int32_t workctrlAddress, const std::int3
  */
 void sfmpv_PeekChnk(const std::int32_t workctrlAddress, std::int32_t* const outChunkWords)
 {
-  const auto* const workctrl = AddressToPointer<const SfmpvHandleRuntimeView>(workctrlAddress);
-  SfbufRingCursorSnapshotRuntimeView ringCursor{};
+  const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  SfbufRingCursorSnapshot ringCursor{};
   if (
     SFBUF_RingGetRead(
       workctrlAddress,
-      workctrl->prepSourceLaneIndex,
+      workctrl->transferState.transfer.demux.prepSourceLaneIndex,
       reinterpret_cast<std::int32_t*>(&ringCursor)
     )
     == 0
@@ -4389,8 +3253,8 @@ void sfmpv_PeekChnk(const std::int32_t workctrlAddress, std::int32_t* const outC
  */
 std::int32_t sfmpv_GetTermDst(const std::int32_t workctrlAddress)
 {
-  const auto* const workctrl = AddressToPointer<const SfmpvHandleRuntimeView>(workctrlAddress);
-  return SFBUF_GetTermFlg(workctrlAddress, workctrl->prepDestinationLaneIndex);
+  const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  return SFBUF_GetTermFlg(workctrlAddress, workctrl->transferState.transfer.demux.prepDestinationLaneIndex);
 }
 
 /**
@@ -4401,8 +3265,8 @@ std::int32_t sfmpv_GetTermDst(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_GetTermSrc(const std::int32_t workctrlAddress)
 {
-  const auto* const workctrl = AddressToPointer<const SfmpvHandleRuntimeView>(workctrlAddress);
-  return SFBUF_GetTermFlg(workctrlAddress, workctrl->prepSourceLaneIndex);
+  const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  return SFBUF_GetTermFlg(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex);
 }
 
 /**
@@ -4481,10 +3345,10 @@ std::int32_t sfmpv_DecodePicAtr(
   using DelimiterObserverCallback =
     void(__cdecl*)(std::int32_t callbackContext, std::int32_t chunkBaseAddress, std::int32_t payloadOffsetBytes);
 
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   auto* const pictureDecodeLane = &mpvInfo->pictureDecodeLane;
-  const auto* const chunk = reinterpret_cast<const SfbufRingChunkRuntimeView*>(chunkWords);
+  const auto* const chunk = reinterpret_cast<const SfbufRingChunk*>(chunkWords);
 
   mpvInfo->pictureUserFlags = 0;
   MPV_SetPicUsrBuf(
@@ -4493,9 +3357,9 @@ std::int32_t sfmpv_DecodePicAtr(
     mpvInfo->pictureUserBufferSize
   );
 
-  const std::int32_t flowCountBefore = SJRBF_GetFlowCnt(streamBufferAddress, 0, 1);
+  const std::int32_t flowCountBefore = SJRBF_GetFlowCnt(AddressToPointer<moho::SofdecSjRingBufferHandle>(streamBufferAddress), 0, 1);
   *outDecodeState = MPV_DecodePicAtrSj(mpvInfo->decoderHandle, streamBufferAddress);
-  const std::int32_t consumedBytes = SJRBF_GetFlowCnt(streamBufferAddress, 0, 1) - flowCountBefore;
+  const std::int32_t consumedBytes = SJRBF_GetFlowCnt(AddressToPointer<moho::SofdecSjRingBufferHandle>(streamBufferAddress), 0, 1) - flowCountBefore;
 
   const std::int32_t checkedResult =
     sfmpv_ChkMpvErr(workctrlAddress, *outDecodeState, consumedBytes, -16773372);
@@ -4514,9 +3378,9 @@ std::int32_t sfmpv_DecodePicAtr(
 
   if ((delimiterState & 0x40) != 0) {
     if (
-      workctrl->mvInfo.pictureWidthPixels > 0
-      && (workctrl->mvInfo.pictureWidthPixels != pictureDecodeLane->pictureWidthPixels
-          || workctrl->mvInfo.pictureHeightPixels != pictureDecodeLane->pictureHeightPixels)
+      workctrl->movieInfo.pictureWidthPixels > 0
+      && (workctrl->movieInfo.pictureWidthPixels != pictureDecodeLane->pictureWidthPixels
+          || workctrl->movieInfo.pictureHeightPixels != pictureDecodeLane->pictureHeightPixels)
     ) {
       *outDecodeState = -2;
       return 0;
@@ -4543,9 +3407,9 @@ std::int32_t sfmpv_DecodePicAtr(
   const std::int32_t pictureType = pictureDecodeLane->pictureType;
   if (pictureType == 1) {
     mpvInfo->referenceErrorCarryFlag = 0;
-  } else if (workctrl->mpvCond6Value == 3 && mpvInfo->secondaryReferenceFrameObjectAddress != 0) {
+  } else if (workctrl->createTemplate.bufferFormat == 3 && mpvInfo->secondaryReferenceFrameObjectAddress != 0) {
     const auto* const secondaryReferenceFrame =
-      AddressToPointer<const SfmpvfFrameObjectRuntimeView>(mpvInfo->secondaryReferenceFrameObjectAddress);
+      AddressToPointer<const moho::SfmpvfFrameObject>(mpvInfo->secondaryReferenceFrameObjectAddress);
     const std::int32_t secondaryOrderMetric = secondaryReferenceFrame->pictureDecodeLane.decodeOrderMetric;
     if (
       (pictureType == 2 && pictureDecodeLane->decodeOrderMetric < secondaryOrderMetric && secondaryOrderMetric < 512)
@@ -4612,7 +3476,7 @@ std::int32_t sfmpv_DecodePicAtr(
     | static_cast<std::uint32_t>(presentationPtsWords[0]);
   (void)sfmpv_ReformTc(
     workctrlAddress,
-    reinterpret_cast<SfmpvPictureAttributeRuntimeView*>(pictureDecodeLane),
+    reinterpret_cast<SfmpvPictureAttribute*>(pictureDecodeLane),
     presentationPts,
     mpvInfo->linkDefectCheckEnabled
   );
@@ -4647,20 +3511,18 @@ std::int64_t sfmpv_Nfrm2Pts(const std::int32_t frameCount, const std::int32_t fr
  * bias/history state, while outputting current reference-seed words.
  */
 std::int64_t sfmpv_ComplementPts(
-  const std::int32_t timingLaneAddress,
+  moho::SofdecSfdWorkctrlSubobj* const workctrl,
   SfmpvComplementPts* const complementState,
-  const SfmpvPictureDecodeLaneRuntimeView* const pictureDecodeLane,
+  const moho::SfmpvPictureDecodeLane* const pictureDecodeLane,
   const std::int32_t* const ptsWords,
   const std::int32_t pictureChangedFlag,
   std::int32_t* const outReferenceSeedWords
 )
 {
-  auto* const timingLane = AddressToPointer<SfmpvTimingLane>(timingLaneAddress);
-
   const std::int32_t frameCount = pictureDecodeLane->decodeOrderMetric;
   const std::int32_t frameRateScale = SFTIM_prate[pictureDecodeLane->frameRateIndex];
 
-  if (timingLane->ptsBiasHigh < 0) {
+  if (workctrl->seekStampHigh < 0) {
     const std::int64_t framePts = sfmpv_Nfrm2Pts(frameCount, frameRateScale);
     std::int64_t ptsBias = (static_cast<std::int64_t>(static_cast<std::uint32_t>(ptsWords[1])) << 32)
       | static_cast<std::uint32_t>(ptsWords[0]);
@@ -4668,14 +3530,14 @@ std::int64_t sfmpv_ComplementPts(
     if (ptsBias < 0) {
       ptsBias = 0;
     }
-    timingLane->ptsBiasLow = static_cast<std::int32_t>(ptsBias);
-    timingLane->ptsBiasHigh = static_cast<std::int32_t>(ptsBias >> 32);
+    workctrl->seekStampLow = static_cast<std::int32_t>(ptsBias);
+    workctrl->seekStampHigh = static_cast<std::int32_t>(ptsBias >> 32);
   }
 
   std::int64_t ptsDelta = (static_cast<std::int64_t>(static_cast<std::uint32_t>(ptsWords[1])) << 32)
     | static_cast<std::uint32_t>(ptsWords[0]);
-  ptsDelta -= (static_cast<std::int64_t>(static_cast<std::uint32_t>(timingLane->ptsBiasHigh)) << 32)
-    | static_cast<std::uint32_t>(timingLane->ptsBiasLow);
+  ptsDelta -= (static_cast<std::int64_t>(static_cast<std::uint32_t>(workctrl->seekStampHigh)) << 32)
+    | static_cast<std::uint32_t>(workctrl->seekStampLow);
   if (ptsDelta < 0) {
     ptsDelta = 0;
   }
@@ -4721,15 +3583,15 @@ std::int64_t sfmpv_ComplementPts(
  */
 std::int64_t sfmpv_ReadPtsQue(
   const std::int32_t workctrlAddress,
-  SfmpvPictureDecodeLaneRuntimeView* const pictureDecodeLane,
+  moho::SfmpvPictureDecodeLane* const pictureDecodeLane,
   char* const delimiterCursor,
   std::int32_t* const outPresentationPtsWords,
   std::int32_t* const outReferenceSeedWords,
   const std::int32_t pictureChangedFlag
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   outPresentationPtsWords[0] = -1;
   outPresentationPtsWords[1] = -1;
@@ -4743,7 +3605,7 @@ std::int64_t sfmpv_ReadPtsQue(
   std::int32_t queuedPtsWords[4]{};
   SFPTS_ReadPtsQue(
     workctrlAddress,
-    workctrl->prepSourceLaneIndex,
+    workctrl->transferState.transfer.demux.prepSourceLaneIndex,
     PointerToAddress(delimiterCursor),
     queuedPtsWords
   );
@@ -4756,7 +3618,7 @@ std::int64_t sfmpv_ReadPtsQue(
   }
 
   const std::int64_t complementedPts = sfmpv_ComplementPts(
-    PointerToAddress(&workctrl->timingLane),
+    workctrl,
     &mpvInfo->complementPts,
     pictureDecodeLane,
     queuedPtsWords,
@@ -4777,12 +3639,12 @@ std::int64_t sfmpv_ReadPtsQue(
  */
 std::int32_t sfmpv_SetHeadTtu(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvTimingLane* const timingLane = &workctrl->timingLane;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const timingLane = &workctrl->timingLane;
 
   std::int32_t result = static_cast<std::int32_t>(timingLane->concatVideoTimeUnit[0]);
   if (result == 0) {
-    SfmpvPackedTimecodeRuntimeView headTimecode{};
+    moho::SfmpvPackedTimecode headTimecode{};
     std::memcpy(&headTimecode, &timingLane->repeatFieldTimecode, sizeof(headTimecode));
     headTimecode.halfFrameCarry = 0;
 
@@ -4809,23 +3671,23 @@ std::int32_t sfmpv_SetHeadTtu(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_SetDecTtu(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvTimingLane* const timingLane = &workctrl->timingLane;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const timingLane = &workctrl->timingLane;
 
-  SfmpvPackedTimecodeRuntimeView decodeTimecode{};
+  moho::SfmpvPackedTimecode decodeTimecode{};
   std::memcpy(&decodeTimecode, &timingLane->repeatFieldTimecode, sizeof(decodeTimecode));
 
   std::int32_t decodeTimeMajor = 0;
   std::int32_t decodeTimeMinor = 0;
   (void)SFTIM_Tc2Time(&decodeTimecode, &decodeTimeMajor, &decodeTimeMinor);
 
-  auto* const pendingStartTtu = AddressToPointer<SfmpvTtuRuntimeView>(PointerToAddress(&timingLane->pendingStartTtu));
+  auto* const pendingStartTtu = AddressToPointer<moho::SfmpvTtu>(PointerToAddress(&timingLane->pendingStartTtu));
   std::memcpy(pendingStartTtu->packedTimecodeWords, &decodeTimecode, sizeof(decodeTimecode));
   pendingStartTtu->timeMajor = decodeTimeMajor - static_cast<std::int32_t>(timingLane->concatVideoTimeUnit[9]);
   pendingStartTtu->timeMinor = decodeTimeMinor;
   pendingStartTtu->state = 1;
 
-  auto* const decodeTtu = AddressToPointer<SfmpvTtuRuntimeView>(PointerToAddress(&timingLane->concatAudioTimeUnit[0]));
+  auto* const decodeTtu = AddressToPointer<moho::SfmpvTtu>(PointerToAddress(&timingLane->concatAudioTimeUnit[0]));
   const std::int32_t result = decodeTtu->timeMajor;
   if (result <= pendingStartTtu->timeMajor) {
     *decodeTtu = *pendingStartTtu;
@@ -4843,10 +3705,10 @@ std::int32_t sfmpv_SetDecTtu(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_ReadTcode(
   const std::int32_t frameObjectAddress,
-  SfmpvPackedTimecodeRuntimeView* const outTimecodeLane
+  moho::SfmpvPackedTimecode* const outTimecodeLane
 )
 {
-  const auto* const frameObject = AddressToPointer<SfmpvfTimecodeSourceRuntimeView>(frameObjectAddress);
+  const auto* const frameObject = AddressToPointer<SfmpvfTimecodeSource>(frameObjectAddress);
   outTimecodeLane->frameRateIndex = frameObject->word00;
   outTimecodeLane->dropFrameMode = frameObject->word0C;
   outTimecodeLane->hours = frameObject->word10;
@@ -4868,8 +3730,8 @@ std::int32_t sfmpv_ReadTcode(
  */
 std::int32_t sfmpv_CalcFrmTtu(const std::int32_t workctrlAddress, const std::int32_t frameObjectAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  auto* const frameTiming = AddressToPointer<SfmpvfFrameTimingRuntimeView>(frameObjectAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const frameTiming = AddressToPointer<SfmpvfFrameTiming>(frameObjectAddress);
 
   std::int32_t frameTimeMajor = 0;
   std::int32_t frameTimeMinor = 0;
@@ -4883,7 +3745,7 @@ std::int32_t sfmpv_CalcFrmTtu(const std::int32_t workctrlAddress, const std::int
     std::memcpy(
       &workctrl->timingLane.concatAudioTimeUnit[0],
       &frameTiming->frameTtu,
-      sizeof(SfmpvTtuRuntimeView)
+      sizeof(moho::SfmpvTtu)
     );
   }
 
@@ -4899,17 +3761,17 @@ std::int32_t sfmpv_CalcFrmTtu(const std::int32_t workctrlAddress, const std::int
  */
 std::int32_t sfmpv_DecodeFrm(const std::int32_t workctrlAddress, const std::int32_t streamBufferAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   const std::int32_t decoderHandle = mpvInfo->decoderHandle;
 
-  SfmpvDecodeFrameParamRuntimeView decodeFrameParam{};
+  SfmpvDecodeFrameParam decodeFrameParam{};
   std::int32_t frameObjectAddress = 0;
   if (sfmpv_SetFrmPara(workctrlAddress, &mpvInfo->pictureDecodeLane, &decodeFrameParam, &frameObjectAddress) != 0) {
     return 0;
   }
 
-  auto* const frameObject = AddressToPointer<SfmpvfFrameObjectRuntimeView>(frameObjectAddress);
+  auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   std::int32_t referenceErrorMajor = 0;
   std::int32_t referenceErrorMinor = 0;
   (void)sfmpv_ReadRefErrCnt(workctrlAddress, mpvInfo, &referenceErrorMajor, &referenceErrorMinor);
@@ -4921,19 +3783,19 @@ std::int32_t sfmpv_DecodeFrm(const std::int32_t workctrlAddress, const std::int3
   (void)sfmpv_SetStartTtu(workctrlAddress);
 
   const std::int64_t decodeStart = SFTMR_GetTmr();
-  const std::int32_t flowCountBefore = SJRBF_GetFlowCnt(streamBufferAddress, 0, 1);
+  const std::int32_t flowCountBefore = SJRBF_GetFlowCnt(AddressToPointer<moho::SofdecSjRingBufferHandle>(streamBufferAddress), 0, 1);
   const std::int32_t decodeResult = MPV_DecodeFrmSj(decoderHandle, streamBufferAddress, &decodeFrameParam);
-  const std::int32_t consumedBytes = SJRBF_GetFlowCnt(streamBufferAddress, 0, 1) - flowCountBefore;
+  const std::int32_t consumedBytes = SJRBF_GetFlowCnt(AddressToPointer<moho::SofdecSjRingBufferHandle>(streamBufferAddress), 0, 1) - flowCountBefore;
 
   const std::int64_t decodeElapsed = SFTMR_GetTmr() - decodeStart;
   SFTMR_AddTsum(
-    &workctrl->decodeTimeSumsByPictureType[mpvInfo->pictureDecodeLane.pictureType],
+    &workctrl->timerInfo.summaries[mpvInfo->pictureDecodeLane.pictureType],
     static_cast<std::int32_t>(decodeElapsed),
     static_cast<std::int32_t>(decodeElapsed >> 32)
   );
 
-  workctrl->decodeReferenceErrorMajor += decodeFrameParam.reserved28;
-  workctrl->decodeReferenceErrorMinor += decodeFrameParam.reserved2C;
+  workctrl->errorInfo.decodeReferenceErrorMajor += decodeFrameParam.reserved28;
+  workctrl->errorInfo.decodeReferenceErrorMinor += decodeFrameParam.reserved2C;
 
   const std::int32_t checkedResult =
     sfmpv_ChkMpvErr(workctrlAddress, decodeResult, consumedBytes, -16773370);
@@ -4969,17 +3831,17 @@ std::int32_t sfmpv_DecodeFrm(const std::int32_t workctrlAddress, const std::int3
   mpvInfo->picAtrPrimedLatch = 0;
   if (pendingFrameObjectAddress == 0) {
     const std::int32_t pictureType = mpvInfo->pictureDecodeLane.pictureType;
-    if (workctrl->mpvCond6Value == 3 && (pictureType == 1 || pictureType == 2)) {
+    if (workctrl->createTemplate.bufferFormat == 3 && (pictureType == 1 || pictureType == 2)) {
       SFMPVF_RefStbyFrm(frameObjectAddress);
     } else {
       SFMPVF_StbyFrm(frameObjectAddress);
     }
 
-    MPV_GetDctCnt(decoderHandle, &workctrl->decoderDctCountPrimary, &workctrl->decoderDctCountSecondary);
+    MPV_GetDctCnt(decoderHandle, &workctrl->playbackInfo.decoderDctCountPrimary, &workctrl->playbackInfo.decoderDctCountSecondary);
     mpvInfo->lateFrameCounter = 0;
   }
 
-  SFPLY_AddDecPic(workctrlAddress, 1, mpvInfo->pictureDecodeLane.pictureType);
+  SFPLY_AddDecPic(workctrl, 1, mpvInfo->pictureDecodeLane.pictureType);
   return 0;
 }
 
@@ -4992,13 +3854,13 @@ std::int32_t sfmpv_DecodeFrm(const std::int32_t workctrlAddress, const std::int3
  */
 std::int32_t sfmpv_SetFrmPara(
   const std::int32_t workctrlAddress,
-  const SfmpvPictureDecodeLaneRuntimeView* const pictureDecodeLane,
-  SfmpvDecodeFrameParamRuntimeView* const decodeFrameParam,
+  const moho::SfmpvPictureDecodeLane* const pictureDecodeLane,
+  SfmpvDecodeFrameParam* const decodeFrameParam,
   std::int32_t* const outFrameObjectAddress
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   const std::int32_t pendingFrameObjectAddress = mpvInfo->pendingFrameObjectAddress;
   std::int32_t frameObjectAddress = pendingFrameObjectAddress;
@@ -5007,19 +3869,19 @@ std::int32_t sfmpv_SetFrmPara(
     frameObjectAddress = PointerToAddress(allocatedFrame);
     *outFrameObjectAddress = frameObjectAddress;
     if (frameObjectAddress == 0) {
-      workctrl->frameAllocationFailed = 1;
+      workctrl->playbackInfo.frameAllocationFailed = 1;
       return -1;
     }
   } else {
     *outFrameObjectAddress = frameObjectAddress;
   }
 
-  auto* const frameObject = AddressToPointer<SfmpvfFrameObjectRuntimeView>(frameObjectAddress);
-  std::memcpy(&frameObject->pictureDecodeLane, pictureDecodeLane, sizeof(SfmpvPictureDecodeLaneRuntimeView));
+  auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
+  std::memcpy(&frameObject->pictureDecodeLane, pictureDecodeLane, sizeof(moho::SfmpvPictureDecodeLane));
   frameObject->referenceErrorSeedMajor = mpvInfo->referenceErrorSeedMajor;
   frameObject->referenceErrorSeedMinor = mpvInfo->referenceErrorSeedMinor;
 
-  if (workctrl->mpvCond6Value == 3) {
+  if (workctrl->createTemplate.bufferFormat == 3) {
     const std::int32_t pictureType = pictureDecodeLane->pictureType;
     if ((pictureType == 1 || pictureType == 2) && pendingFrameObjectAddress == 0) {
       SFMPVF_EndRefFrm(mpvInfo->primaryReferenceFrameObjectAddress);
@@ -5038,7 +3900,7 @@ std::int32_t sfmpv_SetFrmPara(
     decodeFrameParam->secondaryStridePacked = decodeFrameParam->primaryStridePacked;
 
     const auto* const primaryReferenceFrame =
-      AddressToPointer<const SfmpvfFrameObjectRuntimeView>(mpvInfo->primaryReferenceFrameObjectAddress);
+      AddressToPointer<const moho::SfmpvfFrameObject>(mpvInfo->primaryReferenceFrameObjectAddress);
     decodeFrameParam->primaryFrameBaseAddress = primaryReferenceFrame->frameSurfaceBaseAddress;
 
     const std::int32_t heightBlocks32 = (pictureDecodeLane->pictureHeightPixels + 31) / 32;
@@ -5050,7 +3912,7 @@ std::int32_t sfmpv_SetFrmPara(
     decodeFrameParam->primaryChromaPlaneAddress = primaryLumaAddress + chromaPlaneBytes;
 
     const auto* const secondaryReferenceFrame =
-      AddressToPointer<const SfmpvfFrameObjectRuntimeView>(mpvInfo->secondaryReferenceFrameObjectAddress);
+      AddressToPointer<const moho::SfmpvfFrameObject>(mpvInfo->secondaryReferenceFrameObjectAddress);
     decodeFrameParam->secondaryFrameBaseAddress = secondaryReferenceFrame->frameSurfaceBaseAddress;
 
     const std::int32_t secondaryLumaAddress = decodeFrameParam->secondaryFrameBaseAddress + lumaPlaneOffsetBytes;
@@ -5083,7 +3945,7 @@ std::int32_t sfmpv_SetFrmPara(
   decodeFrameParam->pictureDecodeLaneAddress = PointerToAddress(&frameObject->pictureDecodeLane);
   decodeFrameParam->reserved28 = 0;
   decodeFrameParam->reserved2C = 0;
-  workctrl->frameAllocationFailed = 0;
+  workctrl->playbackInfo.frameAllocationFailed = 0;
   return 0;
 }
 
@@ -5096,13 +3958,13 @@ std::int32_t sfmpv_SetFrmPara(
  */
 std::int32_t sfmpv_ReadRefErrCnt(
   const std::int32_t workctrlAddress,
-  const SfmpvInfoRuntimeView* const mpvInfo,
+  const moho::SfmpvInfo* const mpvInfo,
   std::int32_t* const outErrorMajor,
   std::int32_t* const outErrorMinor
 )
 {
-  const auto* const workctrl = AddressToPointer<const SfmpvHandleRuntimeView>(workctrlAddress);
-  if (workctrl->mpvCond6Value != 3) {
+  const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  if (workctrl->createTemplate.bufferFormat != 3) {
     *outErrorMajor = 0;
     *outErrorMinor = 0;
     return PointerToAddress(outErrorMajor);
@@ -5111,7 +3973,7 @@ std::int32_t sfmpv_ReadRefErrCnt(
   const std::int32_t pictureType = mpvInfo->pictureDecodeLane.pictureType;
   if (pictureType == 2) {
     const auto* const primaryReferenceFrame =
-      AddressToPointer<const SfmpvfFrameObjectRuntimeView>(mpvInfo->primaryReferenceFrameObjectAddress);
+      AddressToPointer<const moho::SfmpvfFrameObject>(mpvInfo->primaryReferenceFrameObjectAddress);
     *outErrorMajor = primaryReferenceFrame->referenceErrorMajor;
     *outErrorMinor = primaryReferenceFrame->referenceErrorMinor;
     return mpvInfo->primaryReferenceFrameObjectAddress;
@@ -5119,9 +3981,9 @@ std::int32_t sfmpv_ReadRefErrCnt(
 
   if (pictureType == 3) {
     const auto* const primaryReferenceFrame =
-      AddressToPointer<const SfmpvfFrameObjectRuntimeView>(mpvInfo->primaryReferenceFrameObjectAddress);
+      AddressToPointer<const moho::SfmpvfFrameObject>(mpvInfo->primaryReferenceFrameObjectAddress);
     const auto* const secondaryReferenceFrame =
-      AddressToPointer<const SfmpvfFrameObjectRuntimeView>(mpvInfo->secondaryReferenceFrameObjectAddress);
+      AddressToPointer<const moho::SfmpvfFrameObject>(mpvInfo->secondaryReferenceFrameObjectAddress);
 
     *outErrorMajor = primaryReferenceFrame->referenceErrorMajor + secondaryReferenceFrame->referenceErrorMajor;
     const std::int32_t summedMinor =
@@ -5144,15 +4006,15 @@ std::int32_t sfmpv_ReadRefErrCnt(
  */
 std::int32_t sfmpv_SetStartTtu(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvTimingLane* const timingLane = &workctrl->timingLane;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const timingLane = &workctrl->timingLane;
 
   std::int32_t result = timingLane->interpolationEnabled;
   if (result != 0) {
     return result;
   }
 
-  SfmpvPackedTimecodeRuntimeView startTimecode{};
+  moho::SfmpvPackedTimecode startTimecode{};
   std::memcpy(&startTimecode, timingLane->pendingStartTtu.packedTimecodeWords, sizeof(startTimecode));
 
   if (sfmpv_IsDefect(workctrlAddress, 3) == 0 && sfmpv_IsPtypeSkip(workctrlAddress, 3) == 0) {
@@ -5181,9 +4043,9 @@ std::int32_t sfmpv_SetStartTtu(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_SetFrmTime(const std::int32_t workctrlAddress, const std::int32_t frameObjectAddress)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  auto* const frameTiming = AddressToPointer<SfmpvfFrameTimingRuntimeView>(frameObjectAddress);
-  std::memcpy(&frameTiming->frameTtu, &workctrl->timingLane.pendingStartTtu, sizeof(SfmpvTtuRuntimeView));
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const frameTiming = AddressToPointer<SfmpvfFrameTiming>(frameObjectAddress);
+  std::memcpy(&frameTiming->frameTtu, &workctrl->timingLane.pendingStartTtu, sizeof(moho::SfmpvTtu));
   return sfmpv_CalcFrmTime(workctrlAddress, frameObjectAddress);
 }
 
@@ -5196,21 +4058,21 @@ std::int32_t sfmpv_SetFrmTime(const std::int32_t workctrlAddress, const std::int
  */
 std::int32_t sfmpv_CalcFrmTime(const std::int32_t workctrlAddress, const std::int32_t frameObjectAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  auto* const frameTiming = AddressToPointer<SfmpvfFrameTimingRuntimeView>(frameObjectAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const frameTiming = AddressToPointer<SfmpvfFrameTiming>(frameObjectAddress);
 
   std::int32_t result = frameObjectAddress;
 
   frameTiming->resolvedTimeMinor = frameTiming->frameTtu.timeMinor;
   frameTiming->resolvedTimeMajor =
-    frameTiming->frameTtu.timeMajor + workctrl->timingLane.decodeProgressTime - workctrl->timingLane.frameInterpolationTime;
+    frameTiming->frameTtu.timeMajor + workctrl->timerTail.decodeProgressTime - workctrl->timingLane.frameInterpolationTime;
   frameTiming->frameStartTimeMajor = frameTiming->frameTtu.timeMajor;
-  frameTiming->frameEndTimeMajor = frameTiming->frameTtu.timeMajor + workctrl->timingLane.decodeProgressTime;
+  frameTiming->frameEndTimeMajor = frameTiming->frameTtu.timeMajor + workctrl->timerTail.decodeProgressTime;
 
-  if (workctrl->timingLane.maxFrameTimeMajor < frameTiming->resolvedTimeMajor) {
-    workctrl->timingLane.maxFrameTimeMajor = frameTiming->resolvedTimeMajor;
+  if (workctrl->timerTail.maxFrameTimeMajor < frameTiming->resolvedTimeMajor) {
+    workctrl->timerTail.maxFrameTimeMajor = frameTiming->resolvedTimeMajor;
     result = frameTiming->resolvedTimeMinor;
-    workctrl->timingLane.maxFrameTimeMinor = result;
+    workctrl->timerTail.maxFrameTimeMinor = result;
   }
 
   return result;
@@ -5229,20 +4091,20 @@ std::int32_t sfmpv_CalcRepeatField(
   const std::int32_t resetHistory
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  auto* const frameRepeat = AddressToPointer<SfmpvfFrameRepeatRuntimeView>(frameObjectAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const frameRepeat = AddressToPointer<SfmpvfFrameRepeat>(frameObjectAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   sfmpv_ReadTcode(frameObjectAddress, &workctrl->timingLane.repeatFieldTimecode);
 
   if (resetHistory != 0) {
     for (std::int32_t index = 0; index < 64; ++index) {
-      workctrl->repeatFieldHistory.samples[index].repeatFieldCount = -1;
+      workctrl->timerTail.repeatFieldHistory.samples[index].repeatFieldCount = -1;
     }
-    workctrl->repeatFieldHistory.samples[0].accumulatedRepeatCount = -1;
+    workctrl->timerTail.repeatFieldHistory.samples[0].accumulatedRepeatCount = -1;
   } else if (frameRepeat->pictureType == 1 || frameRepeat->pictureType == 2) {
     const std::int32_t referenceFrameAddress = mpvInfo->secondaryReferenceFrameObjectAddress;
-    const auto* const referenceFrame = AddressToPointer<SfmpvfFrameRepeatRuntimeView>(referenceFrameAddress);
+    const auto* const referenceFrame = AddressToPointer<SfmpvfFrameRepeat>(referenceFrameAddress);
 
     std::int32_t scanOrdinal = referenceFrame->decodeOrderIndex;
     std::int32_t targetOrdinal = frameRepeat->historyOrdinal;
@@ -5251,23 +4113,23 @@ std::int32_t sfmpv_CalcRepeatField(
     }
 
     for (std::int32_t ordinal = scanOrdinal + 1; ordinal < targetOrdinal; ++ordinal) {
-      workctrl->repeatFieldHistory.samples[Modulo64Index(ordinal)].repeatFieldCount = -1;
+      workctrl->timerTail.repeatFieldHistory.samples[Modulo64Index(ordinal)].repeatFieldCount = -1;
     }
   }
 
   const std::int32_t currentIndex = Modulo64Index(frameRepeat->historyOrdinal);
-  SfmpvRepeatFieldSampleRuntimeView& currentSample = workctrl->repeatFieldHistory.samples[currentIndex];
+  moho::SfmpvRepeatFieldSample& currentSample = workctrl->timerTail.repeatFieldHistory.samples[currentIndex];
   currentSample.repeatFieldCount = workctrl->timingLane.repeatFieldTimecode.repeatFieldCount;
 
   if (resetHistory != 0) {
     currentSample.accumulatedRepeatCount = 0;
   } else if (
     frameRepeat->historyOrdinal != 0
-    || workctrl->repeatFieldHistory.samples[0].accumulatedRepeatCount != static_cast<std::int16_t>(-1)
+    || workctrl->timerTail.repeatFieldHistory.samples[0].accumulatedRepeatCount != static_cast<std::int16_t>(-1)
   ) {
     std::int32_t misses = 0;
     std::int32_t searchOrdinal = currentIndex + 63;
-    while (workctrl->repeatFieldHistory.samples[Modulo64Index(searchOrdinal)].repeatFieldCount == static_cast<std::int16_t>(-1)) {
+    while (workctrl->timerTail.repeatFieldHistory.samples[Modulo64Index(searchOrdinal)].repeatFieldCount == static_cast<std::int16_t>(-1)) {
       ++misses;
       --searchOrdinal;
       if (misses >= 64) {
@@ -5276,25 +4138,25 @@ std::int32_t sfmpv_CalcRepeatField(
     }
 
     if (misses < 64) {
-      const SfmpvRepeatFieldSampleRuntimeView& previousSample =
-        workctrl->repeatFieldHistory.samples[Modulo64Index(searchOrdinal)];
+      const moho::SfmpvRepeatFieldSample& previousSample =
+        workctrl->timerTail.repeatFieldHistory.samples[Modulo64Index(searchOrdinal)];
       currentSample.accumulatedRepeatCount =
         static_cast<std::int16_t>(previousSample.repeatFieldCount + previousSample.accumulatedRepeatCount);
     }
   } else {
-    workctrl->repeatFieldHistory.samples[0].accumulatedRepeatCount = 0;
+    workctrl->timerTail.repeatFieldHistory.samples[0].accumulatedRepeatCount = 0;
   }
 
   workctrl->timingLane.repeatFieldTimecode.repeatFieldAccumulated = currentSample.accumulatedRepeatCount;
 
   if (frameRepeat->pictureType == 3 && currentSample.repeatFieldCount != 0) {
     const std::int32_t referenceFrameAddress = mpvInfo->secondaryReferenceFrameObjectAddress;
-    auto* const referenceFrame = AddressToPointer<SfmpvfFrameRepeatRuntimeView>(referenceFrameAddress);
+    auto* const referenceFrame = AddressToPointer<SfmpvfFrameRepeat>(referenceFrameAddress);
 
     const std::int32_t referenceIndex = Modulo64Index(referenceFrame->decodeOrderIndex);
     const std::int16_t propagatedRepeat =
       static_cast<std::int16_t>(currentSample.repeatFieldCount + currentSample.accumulatedRepeatCount);
-    workctrl->repeatFieldHistory.samples[referenceIndex].accumulatedRepeatCount = propagatedRepeat;
+    workctrl->timerTail.repeatFieldHistory.samples[referenceIndex].accumulatedRepeatCount = propagatedRepeat;
     referenceFrame->repeatAccumulatorWord = static_cast<std::uint16_t>(propagatedRepeat);
 
     (void)sfmpv_CalcFrmTtu(workctrlAddress, referenceFrameAddress);
@@ -5311,17 +4173,17 @@ std::int32_t sfmpv_CalcRepeatField(
  * Finds the first frame object whose owner-state pair is clear, marks it
  * allocated, and returns its frame-object address under SFLIB lock.
  */
-SfmpvfFrameObjectRuntimeView* SFMPVF_AllocFrm(const std::int32_t workctrlAddress)
+moho::SfmpvfFrameObject* SFMPVF_AllocFrm(const std::int32_t workctrlAddress)
 {
   SFLIB_LockCs();
 
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  auto* const mpvInfo = reinterpret_cast<SfmpvfInfoRuntimeView*>(workctrl->mpvInfo);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   const std::int32_t frameObjectCount = mpvInfo->frameObjectCount;
 
-  SfmpvfFrameObjectRuntimeView* allocatedFrameObject = nullptr;
+  moho::SfmpvfFrameObject* allocatedFrameObject = nullptr;
   for (std::int32_t frameIndex = 0; frameIndex < frameObjectCount; ++frameIndex) {
-    SfmpvfFrameObjectRuntimeView& frameObject = mpvInfo->frameObjects[frameIndex];
+    moho::SfmpvfFrameObject& frameObject = mpvInfo->frameObjects[frameIndex];
     if (frameObject.decodeState == 0 && frameObject.allocationState == 0) {
       frameObject.decodeState = 1;
       allocatedFrameObject = &frameObject;
@@ -5342,8 +4204,8 @@ SfmpvfFrameObjectRuntimeView* SFMPVF_AllocFrm(const std::int32_t workctrlAddress
  */
 std::int32_t sfmpv_ChkBufSiz(const std::int32_t workctrlAddress, const std::int32_t* const frameDimensions)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   const std::int32_t requestedWidth = frameDimensions[0];
   const std::int32_t requestedHeight = frameDimensions[1];
@@ -5372,7 +4234,7 @@ std::int32_t sfmpv_ChkBufSiz(const std::int32_t workctrlAddress, const std::int3
   if (mpvInfo->persistedPara.val8 != 0) {
     availableFrameSlots = 1;
     const std::int32_t configuredCapacityBytes =
-      (mpvInfo->persistedPara.nfrm_pool_wk * configuredFrameUnitBytes) << 6;
+      (mpvInfo->persistedPara.nfrmPoolWork * configuredFrameUnitBytes) << 6;
     const std::int32_t requestedSlotBytes = requestedFrameUnitBytes << 6;
     std::int32_t runningBytes = requestedSlotBytes;
     while (runningBytes <= configuredCapacityBytes) {
@@ -5384,7 +4246,7 @@ std::int32_t sfmpv_ChkBufSiz(const std::int32_t workctrlAddress, const std::int3
     }
     --availableFrameSlots;
 
-    if (availableFrameSlots < mpvInfo->persistedPara.nfrm_pool_wk) {
+    if (availableFrameSlots < mpvInfo->persistedPara.nfrmPoolWork) {
       return SFLIB_SetErr(workctrlAddress, kSfmpvErrFrameBufferTooSmall);
     }
 
@@ -5394,7 +4256,7 @@ std::int32_t sfmpv_ChkBufSiz(const std::int32_t workctrlAddress, const std::int3
       mpvInfo->persistedSofDecTabs[slotIndex] = mpvInfo->persistedPara.val8 + (slotIndex * requestedSlotBytes);
     }
   } else {
-    availableFrameSlots = mpvInfo->persistedPara.nfrm_pool_wk;
+    availableFrameSlots = mpvInfo->persistedPara.nfrmPoolWork;
   }
 
   mpvInfo->secondaryLumaStride = static_cast<std::uint16_t>(32 * requestedLumaBlocks32);
@@ -5413,13 +4275,13 @@ std::int32_t sfmpv_ChkBufSiz(const std::int32_t workctrlAddress, const std::int3
   mpvInfo->secondaryChromaUPlaneBaseAddress = mpvInfo->secondaryLumaPlaneBaseAddress + chromaPlaneOffset;
   mpvInfo->secondaryFrameBaseAddress = mpvInfo->persistedRfbAddressTable[1];
 
-  if (workctrl->mpvCond6Value == 3) {
+  if (workctrl->createTemplate.bufferFormat == 3) {
     std::int32_t movableFrameCount = availableFrameSlots;
     if (movableFrameCount >= 14) {
       movableFrameCount = 14;
     }
 
-    auto* const mpvFrameInfo = reinterpret_cast<SfmpvfInfoRuntimeView*>(mpvInfo);
+    auto* const mpvFrameInfo = mpvInfo;
     mpvFrameInfo->frameObjectCount = movableFrameCount + 2;
     sfmpv_InitFrmObj(
       reinterpret_cast<std::uint32_t*>(&mpvFrameInfo->frameObjects[0]),
@@ -5440,7 +4302,7 @@ std::int32_t sfmpv_ChkBufSiz(const std::int32_t workctrlAddress, const std::int3
       frameObjectCount = 16;
     }
 
-    auto* const mpvFrameInfo = reinterpret_cast<SfmpvfInfoRuntimeView*>(mpvInfo);
+    auto* const mpvFrameInfo = mpvInfo;
     mpvFrameInfo->frameObjectCount = frameObjectCount;
     sfmpv_InitFrmObj(
       reinterpret_cast<std::uint32_t*>(&mpvFrameInfo->frameObjects[0]),
@@ -5465,10 +4327,10 @@ std::int32_t sfmpv_GoDdelim(
   const std::int32_t delimiterMask
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
-  SfbufRingCursorSnapshotRuntimeView ringCursor{};
-  if (SFBUF_RingGetRead(workctrlAddress, workctrl->prepSourceLaneIndex, reinterpret_cast<std::int32_t*>(&ringCursor)) != 0) {
+  SfbufRingCursorSnapshot ringCursor{};
+  if (SFBUF_RingGetRead(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, reinterpret_cast<std::int32_t*>(&ringCursor)) != 0) {
     return 0;
   }
 
@@ -5509,12 +4371,12 @@ std::int32_t sfmpv_GoDdelim(
     }
 
     if (*probeByte != 0) {
-      AddSigned32ToLane(&workctrl->delimiterReadTotalLow, &workctrl->delimiterReadTotalHigh, advanceBytes);
+      AddSigned32ToLane(&workctrl->playbackInfo.flowCounter1.decodedUnits, advanceBytes);
       break;
     }
   }
 
-  AddSigned32ToLane(&workctrl->ringReadTotalLow, &workctrl->ringReadTotalHigh, advanceBytes);
+  AddSigned32ToLane(&workctrl->playbackInfo.flowCounter1.consumedBytes, advanceBytes);
   return advanceBytes;
 }
 
@@ -5526,8 +4388,8 @@ std::int32_t sfmpv_GoDdelim(
  */
 std::int32_t sfmpv_RingAddRead(const std::int32_t workctrlAddress, const std::int32_t advanceCount)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  return SFBUF_RingAddRead(workctrlAddress, workctrl->prepSourceLaneIndex, advanceCount);
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  return SFBUF_RingAddRead(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, advanceCount);
 }
 
 /**
@@ -5538,10 +4400,10 @@ std::int32_t sfmpv_RingAddRead(const std::int32_t workctrlAddress, const std::in
  */
 std::int32_t sfmpv_UpdateFlowCnt(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
   std::int32_t streamHandleAddress = 0;
-  (void)SFBUF_RingGetSj(workctrlAddress, workctrl->prepSourceLaneIndex, &streamHandleAddress);
+  (void)SFBUF_RingGetSj(workctrlAddress, workctrl->transferState.transfer.demux.prepSourceLaneIndex, &streamHandleAddress);
   std::int32_t result = streamHandleAddress;
   if (streamHandleAddress != 0) {
     std::int32_t nextFlowLow = 0;
@@ -5549,11 +4411,14 @@ std::int32_t sfmpv_UpdateFlowCnt(const std::int32_t workctrlAddress)
     (void)SFBUF_GetFlowCnt(streamHandleAddress, &nextFlowLow, &nextFlowHigh);
 
     const std::uint64_t mergedFlow = static_cast<std::uint64_t>(
-      SFBUF_UpdateFlowCnt(workctrl->streamFlowCountLow, workctrl->streamFlowCountHigh, nextFlowLow)
+      SFBUF_UpdateFlowCnt(
+        FlowWordLow(workctrl->playbackInfo.flowCounter1.sourceFlowBytes),
+        FlowWordHigh(workctrl->playbackInfo.flowCounter1.sourceFlowBytes),
+        nextFlowLow
+      )
     );
-    workctrl->streamFlowCountLow = static_cast<std::int32_t>(mergedFlow & 0xFFFFFFFFu);
-    workctrl->streamFlowCountHigh = static_cast<std::int32_t>(mergedFlow >> 32);
-    result = workctrl->streamFlowCountLow;
+    workctrl->playbackInfo.flowCounter1.sourceFlowBytes = mergedFlow;
+    result = FlowWordLow(mergedFlow);
   }
   return result;
 }
@@ -5567,18 +4432,18 @@ std::int32_t sfmpv_UpdateFlowCnt(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_DetectTcErr(
   const std::int32_t workctrlAddress,
-  const SfmpvPictureAttributeRuntimeView* const /*pictureAttribute*/
+  const SfmpvPictureAttribute* const /*pictureAttribute*/
 )
 {
-  const auto* const workctrl = AddressToPointer<const SfmpvHandleRuntimeView>(workctrlAddress);
-  const SfmpvTimingLane* const timingLane = &workctrl->timingLane;
+  const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  const auto* const timingLane = &workctrl->timingLane;
   const auto* const concatAudioTtu =
-    reinterpret_cast<const SfmpvTtuRuntimeView*>(timingLane->concatAudioTimeUnit);
+    reinterpret_cast<const moho::SfmpvTtu*>(timingLane->concatAudioTimeUnit);
   if (concatAudioTtu->state == 0) {
     return 0;
   }
 
-  SfmpvPackedTimecodeRuntimeView currentTimecode{};
+  moho::SfmpvPackedTimecode currentTimecode{};
   std::memcpy(&currentTimecode, &timingLane->repeatFieldTimecode, sizeof(currentTimecode));
 
   std::int32_t currentMajor = 0;
@@ -5608,7 +4473,7 @@ std::int32_t sfmpv_Pts2Tc(
   const std::int32_t frameRateIndex,
   const std::int32_t dropFrameMode,
   const std::int32_t decodeOrderMetric,
-  SfmpvPackedTimecodeRuntimeView* const outTimecode
+  moho::SfmpvPackedTimecode* const outTimecode
 )
 {
   struct SfmpvDropFrameConversionTable
@@ -5707,8 +4572,8 @@ std::int32_t sfmpv_Pts2Tc(
  * applies drop-frame 00/01 -> 02 skip rules on minute boundaries.
  */
 std::int32_t sfmpv_NextTc(
-  const SfmpvPackedTimecodeRuntimeView* const sourceTimecode,
-  SfmpvPackedTimecodeRuntimeView* const outTimecode
+  const moho::SfmpvPackedTimecode* const sourceTimecode,
+  moho::SfmpvPackedTimecode* const outTimecode
 )
 {
   const std::int32_t frameRateIndex = sourceTimecode->frameRateIndex;
@@ -5757,18 +4622,18 @@ std::int32_t sfmpv_NextTc(
  */
 std::int32_t sfmpv_DoReformTc(
   const std::int32_t workctrlAddress,
-  SfmpvPictureAttributeRuntimeView* const pictureAttribute,
+  SfmpvPictureAttribute* const pictureAttribute,
   const std::int64_t presentationPts,
   const std::int32_t detectErrorMode
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvTimingLane* const timingLane = &workctrl->timingLane;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const timingLane = &workctrl->timingLane;
   auto* const reformTimecode = &timingLane->repeatFieldTimecode;
   const auto* const concatAudioTtu =
-    reinterpret_cast<const SfmpvTtuRuntimeView*>(timingLane->concatAudioTimeUnit);
+    reinterpret_cast<const moho::SfmpvTtu*>(timingLane->concatAudioTimeUnit);
   const auto* const concatAudioTimecode =
-    reinterpret_cast<const SfmpvPackedTimecodeRuntimeView*>(concatAudioTtu->packedTimecodeWords);
+    reinterpret_cast<const moho::SfmpvPackedTimecode*>(concatAudioTtu->packedTimecodeWords);
 
   if (detectErrorMode != 0 && presentationPts >= 0) {
     return sfmpv_Pts2Tc(
@@ -5784,8 +4649,8 @@ std::int32_t sfmpv_DoReformTc(
     if (detectErrorMode != 0) {
       (void)sfmpv_NextTc(concatAudioTimecode, reformTimecode);
       const std::int16_t repeatAccumulator = reformTimecode->repeatFieldAccumulated;
-      workctrl->repeatFieldHistory.samples[0].accumulatedRepeatCount = repeatAccumulator;
-      workctrl->repeatFieldHistory.samples[pictureAttribute->timecodeFrameOrdinal].accumulatedRepeatCount = repeatAccumulator;
+      workctrl->timerTail.repeatFieldHistory.samples[0].accumulatedRepeatCount = repeatAccumulator;
+      workctrl->timerTail.repeatFieldHistory.samples[pictureAttribute->timecodeFrameOrdinal].accumulatedRepeatCount = repeatAccumulator;
       return static_cast<std::int32_t>(repeatAccumulator);
     }
 
@@ -5798,7 +4663,7 @@ std::int32_t sfmpv_DoReformTc(
     return concatAudioTimecode->minutes;
   }
 
-  if (workctrl->headerWorkspaceBaseAddress == 0) {
+  if (PointerToAddress(workctrl->seekState.handle) == 0) {
     reformTimecode->frameRateIndex = pictureAttribute->timecodeFrameRateIndex;
     reformTimecode->dropFrameMode = 0;
     reformTimecode->hours = 0;
@@ -5819,7 +4684,7 @@ std::int32_t sfmpv_DoReformTc(
  */
 std::int32_t sfmpv_ReformTc(
   const std::int32_t workctrlAddress,
-  SfmpvPictureAttributeRuntimeView* const pictureAttribute,
+  SfmpvPictureAttribute* const pictureAttribute,
   const std::int64_t presentationPts,
   const std::int32_t detectErrorMode
 )
@@ -5865,9 +4730,9 @@ std::int32_t sfmpv_FirstPicAtr(
   const std::int32_t pictureHeaderChunkAddress
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
-  if (workctrl->mvInfo.frameRateBase != 0) {
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  if (workctrl->movieInfo.frameRateBase != 0) {
     return 0;
   }
 
@@ -5897,12 +4762,12 @@ std::int32_t sfmpv_FirstPicAtr(
 
   (void)sfmpv_SetMpvHd(workctrlAddress, bitRate, pictureHeaderChunkAddress);
   (void)sfmpv_SetMvInf(
-    &workctrl->mvInfo,
+    &workctrl->movieInfo,
     bitRate,
     AddressToPointer<const std::int32_t>(frameInfoAddress),
     vbvBufferBytes
   );
-  return sfmpv_ChkBufSiz(workctrlAddress, reinterpret_cast<const std::int32_t*>(&workctrl->mvInfo));
+  return sfmpv_ChkBufSiz(workctrlAddress, reinterpret_cast<const std::int32_t*>(&workctrl->movieInfo));
 }
 
 /**
@@ -5913,7 +4778,7 @@ std::int32_t sfmpv_FirstPicAtr(
  * latches bitrate/VBV sizing words used by buffer sizing checks.
  */
 std::int32_t sfmpv_SetMvInf(
-  SfmpvMvInfoRuntimeView* const destinationInfo,
+  moho::SfplyMovieInfo* const destinationInfo,
   const std::int32_t frameRateBase,
   const std::int32_t* const frameInfoWords,
   const std::int32_t vbvBufferBytes
@@ -5943,9 +4808,9 @@ std::int32_t sfmpv_SetMpvHd(
 )
 {
   std::int32_t result = sfmpv_GetHd(workctrlAddress);
-  auto* const header = AddressToPointer<SfmpvHeaderRuntimeView>(result);
+  auto* const header = AddressToPointer<SfmpvHeader>(result);
   if (header != nullptr && header->hasHeader == 0) {
-    const auto* const headerChunk = AddressToPointer<SfbufRingChunkRuntimeView>(pictureHeaderChunkAddress);
+    const auto* const headerChunk = AddressToPointer<SfbufRingChunk>(pictureHeaderChunkAddress);
 
     std::int32_t pictureHeaderBytes = headerChunk->byteCount;
     if (pictureHeaderBytes >= 0x200) {
@@ -5964,7 +4829,7 @@ std::int32_t sfmpv_SetMpvHd(
       header->frameRateTicks = 50 * frameRateBase;
     }
 
-    const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+    const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
     std::memcpy(header->concatTimeSeedWords, workctrl->timingLane.concatVideoTimeUnit, sizeof(header->concatTimeSeedWords));
     header->hasHeader = 1;
   }
@@ -5981,10 +4846,10 @@ std::int32_t sfmpv_SetMpvHd(
  */
 std::int32_t sfmpv_IsSkip(const std::int32_t workctrlAddress, const std::int32_t* const chunkWords)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   const std::int32_t defectLaneAddress = PointerToAddress(&mpvInfo->pictureDecodeLane);
-  const auto* const defectLane = AddressToPointer<SfmpvPictureDecodeLaneRuntimeView>(defectLaneAddress);
+  const auto* const defectLane = AddressToPointer<moho::SfmpvPictureDecodeLane>(defectLaneAddress);
 
   if (SFSET_GetCond(workctrlAddress, 47) == 1) {
     return 1;
@@ -5999,7 +4864,7 @@ std::int32_t sfmpv_IsSkip(const std::int32_t workctrlAddress, const std::int32_t
   }
 
   const std::int32_t pictureType = defectLane->pictureType;
-  const auto* const chunk = reinterpret_cast<const SfbufRingChunkRuntimeView*>(chunkWords);
+  const auto* const chunk = reinterpret_cast<const SfbufRingChunk*>(chunkWords);
 
   if (
     sfmpv_IsSeekSkip(workctrlAddress) != 0
@@ -6029,9 +4894,9 @@ std::int32_t sfmpv_UpdateDefect(
   const std::int32_t defectDetected
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
-  const auto* const defectLane = AddressToPointer<SfmpvDefectLaneRuntimeView>(defectLaneAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
+  const auto* const defectLane = AddressToPointer<SfmpvDefectLane>(defectLaneAddress);
 
   std::int32_t result = mpvInfo->linkDefectCheckEnabled;
   std::int32_t defectState = mpvInfo->defectPictureTypeState;
@@ -6080,8 +4945,8 @@ std::int32_t sfmpv_UpdateDefect(
  */
 std::int32_t sfmpv_IsSeekSkip(const std::int32_t workctrlAddress)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  const std::int32_t seekTimeMajor = workctrl->seekSkipTimeMajor;
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  const std::int32_t seekTimeMajor = workctrl->seekState.requestWords[1];
   if (seekTimeMajor < 0) {
     return 0;
   }
@@ -6093,7 +4958,7 @@ std::int32_t sfmpv_IsSeekSkip(const std::int32_t workctrlAddress)
   return (
            UTY_CmpTime(
              seekTimeMajor,
-             workctrl->seekSkipTimeMinor,
+             workctrl->seekState.requestWords[2],
              workctrl->timingLane.pendingStartTtu.timeMajor,
              workctrl->timingLane.pendingStartTtu.timeMinor
            )
@@ -6112,7 +4977,7 @@ std::int32_t sfmpv_IsSeekSkip(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_SetSkipTtu(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   if (workctrl->timingLane.pendingStartTtu.timeMajor < workctrl->timingLane.frameInterpolationTime) {
     workctrl->timingLane.skipSeedTtu = workctrl->timingLane.pendingStartTtu;
   }
@@ -6128,8 +4993,8 @@ std::int32_t sfmpv_SetSkipTtu(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpv_CopyPicUsrInf(const std::int32_t destinationInfoAddress, const std::int32_t sourceInfoAddress)
 {
-  auto* const destinationInfo = AddressToPointer<SfbufRingChunkRuntimeView>(destinationInfoAddress);
-  const auto* const sourceInfo = AddressToPointer<SfbufRingChunkRuntimeView>(sourceInfoAddress);
+  auto* const destinationInfo = AddressToPointer<SfbufRingChunk>(destinationInfoAddress);
+  const auto* const sourceInfo = AddressToPointer<SfbufRingChunk>(sourceInfoAddress);
 
   std::memcpy(
     destinationInfo->bufferAddress,
@@ -6149,8 +5014,8 @@ std::int32_t sfmpv_CopyPicUsrInf(const std::int32_t destinationInfoAddress, cons
  */
 std::int32_t sfmpv_IsDefect(const std::int32_t workctrlAddress, const std::int32_t pictureType)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  const SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  const moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   if (mpvInfo->defectPictureTypeState == 2) {
     return (pictureType == 2 || pictureType == 3) ? 1 : 0;
@@ -6172,15 +5037,15 @@ std::int32_t sfmpv_IsDefect(const std::int32_t workctrlAddress, const std::int32
  */
 std::int32_t sfmpv_IsPtypeSkip(const std::int32_t workctrlAddress, const std::int32_t pictureType)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
   switch (pictureType) {
     case 1:
-      return (workctrl->ptype1DecodeEnable == 0) ? 1 : 0;
+      return (workctrl->conditions[moho::SofdecSfdWorkctrlSubobj::kSfdConditionPtype1DecodeEnable] == 0) ? 1 : 0;
     case 2:
-      return (workctrl->ptype2DecodeEnable == 0) ? 1 : 0;
+      return (workctrl->conditions[moho::SofdecSfdWorkctrlSubobj::kSfdConditionPtype2DecodeEnable] == 0) ? 1 : 0;
     case 3:
-      return (workctrl->ptype3DecodeEnable == 0) ? 1 : 0;
+      return (workctrl->conditions[moho::SofdecSfdWorkctrlSubobj::kSfdConditionPtype3DecodeEnable] == 0) ? 1 : 0;
     default:
       return 1;
   }
@@ -6196,22 +5061,22 @@ std::int32_t sfmpv_IsPtypeSkip(const std::int32_t workctrlAddress, const std::in
 std::uint8_t* sfmpv_IsEmptyBpic(
   const std::int32_t workctrlAddress,
   const std::int32_t pictureType,
-  const SfbufRingChunkRuntimeView* const chunkWords
+  const SfbufRingChunk* const chunkWords
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
 
   if (SFSET_GetCond(workctrlAddress, 7) != 0) {
     return nullptr;
   }
 
-  const std::int32_t frameAreaProduct = workctrl->mvInfo.frameAreaWidthPixels * workctrl->mvInfo.frameAreaHeightPixels;
+  const std::int32_t frameAreaProduct = workctrl->movieInfo.frameAreaWidthPixels * workctrl->movieInfo.frameAreaHeightPixels;
   if (pictureType == 3) {
     auto* const emptyPicture = static_cast<std::uint8_t*>(
       MPV_IsEmptyBpic(reinterpret_cast<const char*>(chunkWords->bufferAddress), chunkWords->byteCount, frameAreaProduct)
     );
     if (emptyPicture != nullptr) {
-      ++workctrl->emptyBpicCount;
+      ++workctrl->playbackInfo.emptyBpicCount;
     }
     return emptyPicture;
   }
@@ -6224,7 +5089,7 @@ std::uint8_t* sfmpv_IsEmptyBpic(
     MPV_IsEmptyPpic(reinterpret_cast<const char*>(chunkWords->bufferAddress), chunkWords->byteCount, frameAreaProduct)
   );
   if (emptyPicture != nullptr) {
-    ++workctrl->emptyPpicCount;
+    ++workctrl->playbackInfo.emptyPpicCount;
   }
   return emptyPicture;
 }
@@ -6238,13 +5103,13 @@ std::uint8_t* sfmpv_IsEmptyBpic(
  */
 std::int32_t sfmpv_IsLate(const std::int32_t workctrlAddress, const std::int32_t updateMode)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvTimingLane* const timingLane = &workctrl->timingLane;
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const timingLane = &workctrl->timingLane;
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   std::int32_t interpolationTime = 0;
   if (timingLane->interpolationEnabled != 0) {
-    interpolationTime = timingLane->pendingStartTtu.timeMajor + timingLane->decodeProgressTime - timingLane->frameInterpolationTime;
+    interpolationTime = timingLane->pendingStartTtu.timeMajor + workctrl->timerTail.decodeProgressTime - timingLane->frameInterpolationTime;
   }
 
   const auto lateCallback = timingLane->isLateCallback;
@@ -6260,7 +5125,7 @@ std::int32_t sfmpv_IsLate(const std::int32_t workctrlAddress, const std::int32_t
     interpolationTime = SFTIM_GetNextItime(timingLane, interpolationTime);
   }
 
-  if (SFTIM_GetSpeed(workctrlAddress) <= 1000 && mpvInfo->lateFrameCounter >= workctrl->lateFrameGateThreshold) {
+  if (SFTIM_GetSpeed(workctrlAddress) <= 1000 && mpvInfo->lateFrameCounter >= workctrl->conditions[moho::SofdecSfdWorkctrlSubobj::kSfdConditionLateFrameGateThreshold]) {
     return 0;
   }
 
@@ -6302,9 +5167,9 @@ std::int32_t sfmpv_GetDtime(
   std::int32_t* const outDeltaMinor
 )
 {
-  const auto* const workctrl = AddressToPointer<const SfmpvHandleRuntimeView>(workctrlAddress);
-  *outDeltaMinor = workctrl->frameDeltaMinor;
-  const std::int32_t result = workctrl->frameDeltaMajor;
+  const auto* const workctrl = AddressToPointer<const moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  *outDeltaMinor = workctrl->conditions[moho::SofdecSfdWorkctrlSubobj::kSfdConditionFrameDeltaMinor];
+  const std::int32_t result = workctrl->conditions[moho::SofdecSfdWorkctrlSubobj::kSfdConditionFrameDeltaMajor];
   *outDeltaMajor = result;
   return result;
 }
@@ -6353,13 +5218,13 @@ std::int32_t m2v_SkipFrm(const std::int32_t decoderHandle, const std::int32_t st
  */
 std::int32_t sfmpv_SkipFrm(const std::int32_t workctrlAddress, const std::int32_t streamBufferAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   sfmpv_SetSkipTtu(workctrlAddress);
-  const std::int32_t flowCountBefore = SJRBF_GetFlowCnt(streamBufferAddress, 0, 1);
+  const std::int32_t flowCountBefore = SJRBF_GetFlowCnt(AddressToPointer<moho::SofdecSjRingBufferHandle>(streamBufferAddress), 0, 1);
   const std::int32_t skipDecodeResult = m2v_SkipFrm(mpvInfo->decoderHandle, streamBufferAddress);
-  const std::int32_t consumedBytes = SJRBF_GetFlowCnt(streamBufferAddress, 0, 1) - flowCountBefore;
+  const std::int32_t consumedBytes = SJRBF_GetFlowCnt(AddressToPointer<moho::SofdecSjRingBufferHandle>(streamBufferAddress), 0, 1) - flowCountBefore;
 
   const std::int32_t checkedResult =
     sfmpv_ChkMpvErr(workctrlAddress, skipDecodeResult, consumedBytes, kSfmpvErrSkipFrameFailed);
@@ -6372,7 +5237,7 @@ std::int32_t sfmpv_SkipFrm(const std::int32_t workctrlAddress, const std::int32_
     mpvInfo->skipIssuedFlag = 1;
   }
 
-  SFPLY_AddSkipPic(workctrlAddress, 1, mpvInfo->pictureDecodeLane.pictureType);
+  SFPLY_AddSkipPic(workctrl, 1, mpvInfo->pictureDecodeLane.pictureType);
   return 0;
 }
 
@@ -6398,9 +5263,9 @@ std::int32_t SFMPV_Create(const std::int32_t workctrlAddress)
     return 0;
   }
 
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = &workctrl->embeddedMpvInfo;
-  workctrl->mpvInfo = mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = &workctrl->transferState.transfer.demux.m2tsMpvInfo.embeddedMpvInfo;
+  workctrl->transferState.transfer.demux.mpvInfoHandle = mpvInfo;
 
   const std::int32_t initInfoResult = sfmpv_InitInf(workctrlAddress, reinterpret_cast<std::uint32_t*>(mpvInfo));
   if (initInfoResult != 0) {
@@ -6419,7 +5284,7 @@ std::int32_t SFMPV_Create(const std::int32_t workctrlAddress)
 
   MPV_SetCond(decoderHandle, 1, AsMpvConditionCallback(SFSET_GetCond(workctrlAddress, 0)));
   MPV_SetCond(decoderHandle, 2, AsMpvConditionCallback(SFSET_GetCond(workctrlAddress, 1)));
-  MPV_SetCond(decoderHandle, 6, AsMpvConditionCallback(workctrl->mpvCond6Value));
+  MPV_SetCond(decoderHandle, 6, AsMpvConditionCallback(workctrl->createTemplate.bufferFormat));
 
   mpvInfo->decoderHandle = decoderHandle;
 
@@ -6438,8 +5303,8 @@ std::int32_t SFMPV_Create(const std::int32_t workctrlAddress)
  */
 std::int32_t SFMPV_Destroy(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   const std::int32_t decoderHandle = mpvInfo->decoderHandle;
   if (decoderHandle == 0) {
     return 0;
@@ -6553,11 +5418,11 @@ std::int32_t SFMPV_AddWrite(const std::int32_t workctrlAddress)
  */
 std::int32_t SFMPVF_GetRead(
   const std::int32_t workctrlAddress,
-  SfmpvfFrameInfoRuntimeView** const outFrameInfo,
+  SfmpvfFrameInfo** const outFrameInfo,
   std::int32_t* const outFrameId
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const std::int32_t frameObjectAddress = SFMPVF_HoldFrm(workctrlAddress);
   if (frameObjectAddress == 0) {
     *outFrameInfo = nullptr;
@@ -6565,10 +5430,10 @@ std::int32_t SFMPVF_GetRead(
   }
 
   sfmpvf_SearchFrmInf(workctrlAddress, frameObjectAddress, outFrameInfo);
-  SfmpvfFrameInfoRuntimeView* const frameInfo = *outFrameInfo;
+  SfmpvfFrameInfo* const frameInfo = *outFrameInfo;
 
-  workctrl->timingLane.readFrameTimeMajor = frameInfo->presentationTimeMajor;
-  workctrl->timingLane.readFrameTimeMinor = frameInfo->presentationTimeMinor;
+  workctrl->timerTail.readFrameTimeMajor = frameInfo->presentationTimeMajor;
+  workctrl->timerTail.readFrameTimeMinor = frameInfo->presentationTimeMinor;
 
   if (SFTIM_IsGetFrmTime(workctrlAddress, frameInfo) == 0) {
     *outFrameInfo = nullptr;
@@ -6577,7 +5442,7 @@ std::int32_t SFMPVF_GetRead(
 
   if (workctrl->decodePathMode == 2) {
     const std::int32_t frameId = SFMPVF_IssueFrmId(workctrlAddress);
-    auto* const frameObject = AddressToPointer<SfmpvfFrameObjectRuntimeView>(frameObjectAddress);
+    auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
     frameObject->frameId = frameId;
     *outFrameId = frameId;
   }
@@ -6595,18 +5460,18 @@ std::int32_t SFMPVF_GetRead(
 void sfmpvf_SearchFrmInf(
   const std::int32_t workctrlAddress,
   const std::int32_t frameObjectAddress,
-  SfmpvfFrameInfoRuntimeView** const outFrameInfo
+  SfmpvfFrameInfo** const outFrameInfo
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  auto* const frameObject = AddressToPointer<SfmpvfFrameObjectRuntimeView>(frameObjectAddress);
-  auto* const vfrmData = AddressToPointer<SfmpvfVfrmDataRuntime>(SFMPVF_SearchVfrmData(workctrlAddress, frameObjectAddress));
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
+  auto* const vfrmData = AddressToPointer<moho::SfmpvfVfrmData>(SFMPVF_SearchVfrmData(workctrlAddress, frameObjectAddress));
   auto* const frameInfo =
-    AddressToPointer<SfmpvfFrameInfoRuntimeView>(PointerToAddress(vfrmData) + static_cast<std::int32_t>(sizeof(SfmpvfVfrmDataRuntime)));
+    AddressToPointer<SfmpvfFrameInfo>(PointerToAddress(vfrmData) + static_cast<std::int32_t>(sizeof(moho::SfmpvfVfrmData)));
 
   *outFrameInfo = frameInfo;
   vfrmData->drawState = 1;
-  workctrl->mpvInfo->activeFrameObjectAddress = frameObjectAddress;
+  workctrl->transferState.transfer.demux.mpvInfoHandle->activeFrameObjectAddress = frameObjectAddress;
 
   frameInfo->pictureWidthPixels = frameObject->pictureDecodeLane.pictureWidthPixels;
   frameInfo->pictureHeightPixels = frameObject->pictureDecodeLane.pictureHeightPixels;
@@ -6615,7 +5480,7 @@ void sfmpvf_SearchFrmInf(
   frameInfo->pictureType = frameObject->pictureDecodeLane.pictureType;
   frameInfo->presentationTimeMajor = frameObject->presentationTimeMajor;
   frameInfo->presentationTimeMinor = frameObject->presentationTimeMinor;
-  frameInfo->decodeConditionMode = workctrl->mpvCond6Value;
+  frameInfo->decodeConditionMode = workctrl->createTemplate.bufferFormat;
   frameInfo->frameSurfaceBaseAddress = frameObject->frameSurfaceBaseAddress;
   frameInfo->referenceErrorMajor = frameObject->referenceErrorMajor;
   frameInfo->referenceErrorMinor = frameObject->referenceErrorMinor;
@@ -6682,11 +5547,11 @@ std::int32_t sfmpvf_AddReadSub(
   const std::int32_t frameObjectId
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  const SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  const moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   std::int32_t frameObjectAddress = 0;
-  SfmpvfVfrmDataRuntime* vfrmData = nullptr;
+  moho::SfmpvfVfrmData* vfrmData = nullptr;
 
   if (workctrl->decodePathMode == 2) {
     frameObjectAddress = SFMPVF_SearchFrmObjFromId(workctrlAddress, frameObjectId);
@@ -6694,9 +5559,9 @@ std::int32_t sfmpvf_AddReadSub(
       return SFLIB_SetErr(workctrlAddress, kSfmpvErrFrameObjectMissingById);
     }
 
-    vfrmData = AddressToPointer<SfmpvfVfrmDataRuntime>(SFMPVF_SearchVfrmData(workctrlAddress, frameObjectAddress));
+    vfrmData = AddressToPointer<moho::SfmpvfVfrmData>(SFMPVF_SearchVfrmData(workctrlAddress, frameObjectAddress));
   } else {
-    vfrmData = AddressToPointer<SfmpvfVfrmDataRuntime>(sfmpvf_GetVfrmDataFromFrmInf(workctrlAddress, frameInfoIndex));
+    vfrmData = AddressToPointer<moho::SfmpvfVfrmData>(sfmpvf_GetVfrmDataFromFrmInf(workctrlAddress, frameInfoIndex));
     if (vfrmData->drawState != 1) {
       return SFLIB_SetErr(workctrlAddress, kSfmpvErrInvalidVfrmDrawState);
     }
@@ -6721,7 +5586,7 @@ std::int32_t sfmpvf_AddReadSub(
 std::int32_t sfmpvf_GetVfrmDataFromFrmInf(const std::int32_t workctrlAddress, const std::int32_t frameInfoIndex)
 {
   (void)workctrlAddress;
-  return frameInfoIndex - static_cast<std::int32_t>(sizeof(SfmpvfVfrmDataRuntime));
+  return frameInfoIndex - static_cast<std::int32_t>(sizeof(moho::SfmpvfVfrmData));
 }
 
 /**
@@ -6733,16 +5598,16 @@ std::int32_t sfmpvf_GetVfrmDataFromFrmInf(const std::int32_t workctrlAddress, co
  */
 std::int32_t SFMPVF_SearchVfrmData(const std::int32_t workctrlAddress, const std::int32_t frameObjectAddress)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvfSearchWorkctrlRuntimeView>(workctrlAddress);
-  const std::int32_t frameObjectCount = workctrl->mpvInfo->frameObjectCount;
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  const std::int32_t frameObjectCount = workctrl->transferState.transfer.demux.mpvInfoHandle->frameObjectCount;
   if (frameObjectCount <= 0) {
     return 0;
   }
 
   for (std::int32_t frameIndex = 0; frameIndex < frameObjectCount; ++frameIndex) {
-    const auto* const frameObject = &workctrl->mpvInfo->frameObjects[frameIndex];
+    const auto* const frameObject = &workctrl->transferState.transfer.demux.mpvInfoHandle->frameObjects[frameIndex];
     if (PointerToAddress(frameObject) == frameObjectAddress) {
-      return PointerToAddress(&workctrl->vfrmDataLanes[frameIndex]);
+      return PointerToAddress(&workctrl->bufferState.vfrmDataLanes[frameIndex]);
     }
   }
 
@@ -6758,8 +5623,8 @@ std::int32_t SFMPVF_SearchVfrmData(const std::int32_t workctrlAddress, const std
  */
 std::int32_t SFMPVF_SearchFrmObjFromId(const std::int32_t workctrlAddress, const std::int32_t frameObjectId)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  const auto* const mpvInfo = reinterpret_cast<const SfmpvfInfoRuntimeView*>(workctrl->mpvInfo);
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  const auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   for (std::int32_t frameIndex = 0; frameIndex < 16; ++frameIndex) {
     const auto* const frameObject = &mpvInfo->frameObjects[frameIndex];
@@ -6779,8 +5644,8 @@ std::int32_t SFMPVF_SearchFrmObjFromId(const std::int32_t workctrlAddress, const
  */
 std::int32_t SFMPVF_TermDec(const std::int32_t workctrlAddress)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  auto* const mpvInfo = reinterpret_cast<SfmpvfInfoRuntimeView*>(workctrl->mpvInfo);
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
   mpvInfo->termDecodeState = 1;
   return workctrlAddress;
 }
@@ -6794,7 +5659,7 @@ std::int32_t SFMPVF_TermDec(const std::int32_t workctrlAddress)
  */
 void SFMPVF_FreeFrm(const std::int32_t frameObjectAddress)
 {
-  auto* const frameObject = AddressToPointer<SfmpvfFrameObjectRuntimeView>(frameObjectAddress);
+  auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   if (frameObject != nullptr) {
     frameObject->decodeState = 0;
   }
@@ -6809,7 +5674,7 @@ void SFMPVF_FreeFrm(const std::int32_t frameObjectAddress)
  */
 std::int32_t SFMPVF_StbyFrm(const std::int32_t frameObjectAddress)
 {
-  auto* const frameObject = AddressToPointer<SfmpvfFrameObjectRuntimeView>(frameObjectAddress);
+  auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   if (frameObject != nullptr) {
     frameObject->decodeState = 2;
   }
@@ -6825,7 +5690,7 @@ std::int32_t SFMPVF_StbyFrm(const std::int32_t frameObjectAddress)
  */
 std::int32_t SFMPVF_RefStbyFrm(const std::int32_t frameObjectAddress)
 {
-  auto* const frameObject = AddressToPointer<SfmpvfFrameObjectRuntimeView>(frameObjectAddress);
+  auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   if (frameObject != nullptr) {
     frameObject->decodeState = 4;
   }
@@ -6841,7 +5706,7 @@ std::int32_t SFMPVF_RefStbyFrm(const std::int32_t frameObjectAddress)
  */
 std::int32_t SFMPVF_EndDrawFrm(const std::int32_t frameObjectAddress)
 {
-  auto* const frameObject = AddressToPointer<SfmpvfFrameObjectRuntimeView>(frameObjectAddress);
+  auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   if (frameObject != nullptr) {
     const bool wasReferenceStandby = (frameObject->decodeState == 4);
     frameObject->frameId = -1;
@@ -6859,7 +5724,7 @@ std::int32_t SFMPVF_EndDrawFrm(const std::int32_t frameObjectAddress)
  */
 std::int32_t SFMPVF_EndRefFrm(const std::int32_t frameObjectAddress)
 {
-  auto* const frameObject = AddressToPointer<SfmpvfFrameObjectRuntimeView>(frameObjectAddress);
+  auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
   if (frameObject != nullptr) {
     frameObject->decodeState = (frameObject->decodeState != 4) ? 0 : 2;
   }
@@ -6875,7 +5740,7 @@ std::int32_t SFMPVF_EndRefFrm(const std::int32_t frameObjectAddress)
  */
 std::int32_t SFMPVF_IssueFrmId(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   const std::int32_t frameId = workctrl->frameIdCounter;
   std::int32_t nextFrameId = frameId + 1;
   if (nextFrameId < 0) {
@@ -6894,8 +5759,8 @@ std::int32_t SFMPVF_IssueFrmId(const std::int32_t workctrlAddress)
  */
 void SFMPVF_FixDispOrder(const std::int32_t workctrlAddress, const std::int32_t shouldSort)
 {
-  auto* const workctrl = AddressToPointer<SfmpvfSearchWorkctrlRuntimeView>(workctrlAddress);
-  workctrl->mpvInfo->allowSingleFrameOutput = shouldSort;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  workctrl->transferState.transfer.demux.mpvInfoHandle->allowSingleFrameOutput = shouldSort;
 }
 
 /**
@@ -6907,8 +5772,8 @@ void SFMPVF_FixDispOrder(const std::int32_t workctrlAddress, const std::int32_t 
  */
 std::int32_t SFMPV_Seek(const std::int32_t workctrlAddress)
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  moho::SfmpvInfo* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
   std::int32_t reprocessed = 0;
   const std::int32_t result =
@@ -6940,15 +5805,15 @@ std::int32_t sfmpv_ReprocessShc(
   std::int32_t* const outReprocessed
 )
 {
-  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   *outReprocessed = 0;
 
   const std::int32_t headerAddress = sfmpv_GetHd(workctrlAddress);
-  auto* const header = AddressToPointer<SfmpvHeaderRuntimeView>(headerAddress);
+  auto* const header = AddressToPointer<SfmpvHeader>(headerAddress);
   if (header != nullptr && header->hasHeader != 0) {
     std::memcpy(workctrl->timingLane.concatVideoTimeUnit, header->concatTimeSeedWords, sizeof(header->concatTimeSeedWords));
 
-    SfbufRingChunkRuntimeView pictureRange{};
+    SfbufRingChunk pictureRange{};
     pictureRange.bufferAddress = header->pictureAttributeBytes;
     pictureRange.byteCount = header->pictureAttributeByteCount;
 
@@ -6972,13 +5837,13 @@ std::int32_t sfmpv_ReprocessShc(
  */
 std::int32_t sfmpv_GetHd(const std::int32_t workctrlAddress)
 {
-  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
-  std::int32_t headerWorkspaceAddress = workctrl->headerWorkspaceBaseAddress;
+  const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+  std::int32_t headerWorkspaceAddress = PointerToAddress(workctrl->seekState.handle);
   if (headerWorkspaceAddress == 0) {
     return 0;
   }
 
-  if (workctrl->mpvInfo->concatAdvanceCount > 0) {
+  if (workctrl->transferState.transfer.demux.mpvInfoHandle->concatAdvanceCount > 0) {
     return 0;
   }
 

@@ -3085,9 +3085,8 @@
   std::int32_t __cdecl ADXB_ExecOneAhx(moho::AdxBitstreamDecoderState* decoder);
   std::int32_t __cdecl ADXB_ExecOneMpa(moho::AdxBitstreamDecoderState* decoder);
   std::int32_t __cdecl ADXB_ExecOneM2a(moho::AdxBitstreamDecoderState* decoder);
-  struct SflibErrorInfo;
+  using moho::SflibErrorInfo;
   struct SflibLibWorkRuntime;
-  using SflibErrorCallback = std::int32_t(__cdecl*)(std::int32_t callbackObject, std::int32_t errorCode);
   // 0x00AE7150: void, not int - it just forwards 32 static slots to SFH_Init.
   void SFHDS_Init();
   std::int32_t SFHDS_Finish();
@@ -3303,9 +3302,9 @@
   void sflib_InitBaseLib();
   void sflib_InitSub();
   void sflib_InitCs();
-  SflibErrorInfo* sflib_InitErr(SflibErrorInfo* errInfo);
-  SflibErrorInfo*
-  sflib_SetErrFnSub(SflibErrorInfo* errInfo, SflibErrorCallback callback, std::int32_t callbackObject);
+  moho::SflibErrorInfo* sflib_InitErr(moho::SflibErrorInfo* errInfo);
+  moho::SflibErrorInfo*
+  sflib_SetErrFnSub(moho::SflibErrorInfo* errInfo, moho::SflibErrorCallback callback, std::int32_t callbackObject);
   SflibLibWorkRuntime* sflib_InitResetPara(SflibLibWorkRuntime* libWork);
   /**
    * Address: 0x00ADA9C0 (FUN_00ADA9C0, _SFTIM_Init)
@@ -3537,23 +3536,6 @@
   std::int32_t gSofdecSoundPortVtable2Tag = 0;
   moho::MwsfdLibWork gMwsfdLibWork{};
 
-  struct SflibErrorInfo
-  {
-    SflibErrorCallback callback = nullptr; // +0x00
-    std::int32_t callbackObject = 0; // +0x04
-    std::int32_t firstErrorCode = 0; // +0x08
-    std::int32_t reserved0 = 0; // +0x0C
-    std::int32_t reserved1 = 0; // +0x10
-  };
-
-  static_assert(offsetof(SflibErrorInfo, callback) == 0x00, "SflibErrorInfo::callback offset must be 0x00");
-  static_assert(
-    offsetof(SflibErrorInfo, callbackObject) == 0x04, "SflibErrorInfo::callbackObject offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SflibErrorInfo, firstErrorCode) == 0x08, "SflibErrorInfo::firstErrorCode offset must be 0x08"
-  );
-  static_assert(sizeof(SflibErrorInfo) == 0x14, "SflibErrorInfo size must be 0x14");
 
   struct SflibTransferInitRuntimeView
   {
@@ -3577,7 +3559,7 @@
     std::array<std::uint32_t, 0x64> defaultConditions{}; // +0x000
     moho::MwsfdInitSfdParams initParams{}; // +0x190
     std::int32_t initState = 0; // +0x198
-    SflibErrorInfo errInfo{}; // +0x19C
+    moho::SflibErrorInfo errInfo{}; // +0x19C
     std::uint8_t timeState[0x0C]{}; // +0x1B0
     std::uint8_t sfbufState[0x04]{}; // +0x1BC
     SflibTransferInitRuntimeView transferInitState{}; // +0x1C0
@@ -3630,7 +3612,7 @@
     std::uint8_t mUnknown00[0x48]{};
     std::int32_t handleState = 0; // +0x48
     std::uint8_t mUnknown4C[0x9AC]{};
-    SflibErrorInfo errInfo{}; // +0x9F8
+    moho::SflibErrorInfo errInfo{}; // +0x9F8
   };
 
   static_assert(

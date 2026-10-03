@@ -3871,7 +3871,7 @@
     const auto* const workctrlSubobj =
       reinterpret_cast<const moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
     const auto* const header =
-      reinterpret_cast<const SfcreHeaderRuntimeView*>(workctrlSubobj->fileHeader);
+      reinterpret_cast<const SfcreHeaderRuntimeView*>(&workctrlSubobj->frameHeaderHandle);
 
     if (header->headerValid == 0) {
       return 0;
@@ -9056,13 +9056,13 @@
    * What it does:
    * Clears one SFLIB error-info lane.
    */
-  SflibErrorInfo* SFLIB_InitErrInf(SflibErrorInfo* const errInfo)
+  moho::SflibErrorInfo* SFLIB_InitErrInf(SflibErrorInfo* const errInfo)
   {
     errInfo->callback = nullptr;
     errInfo->callbackObject = 0;
     errInfo->firstErrorCode = 0;
-    errInfo->reserved0 = 0;
-    errInfo->reserved1 = 0;
+    errInfo->decodeReferenceErrorMajor = 0;
+    errInfo->decodeReferenceErrorMinor = 0;
     return errInfo;
   }
 
@@ -9072,7 +9072,7 @@
    * What it does:
    * Thunk to `SFLIB_InitErrInf`.
    */
-  SflibErrorInfo* sflib_InitErr(SflibErrorInfo* const errInfo)
+  moho::SflibErrorInfo* sflib_InitErr(SflibErrorInfo* const errInfo)
   {
     return SFLIB_InitErrInf(errInfo);
   }
@@ -11305,7 +11305,7 @@
     std::int32_t candidateThreshold = workctrlSubobj->createTemplate.streamInputBytes;
     std::int32_t thresholdBytes = workctrlSubobj->conditions[22];
     if (candidateThreshold <= 0) {
-      candidateThreshold = getSupSj(workctrlSubobj)->supplyWindowBytes;
+      candidateThreshold = getSupSj(workctrlSubobj)->ringWindowSpanBytes;
     }
 
     if (candidateThreshold > 0 && candidateThreshold < thresholdBytes) {
@@ -11854,7 +11854,7 @@
       return 0;
     }
 
-    const std::int32_t ringEndAddress = supplyLane->mUnknown08 + supplyLane->supplyWindowBytes;
+    const std::int32_t ringEndAddress = supplyLane->ringWindowStartAddress + supplyLane->ringWindowSpanBytes;
     return (cursorAddress == ringEndAddress) ? 1 : 0;
   }
 
@@ -12853,7 +12853,7 @@
     std::int32_t candidateThreshold = workctrlSubobj->createTemplate.streamInputBytes;
     std::int32_t thresholdBytes = workctrlSubobj->conditions[22];
     if (candidateThreshold <= 0) {
-      candidateThreshold = sfmps_GetSupSj(workctrlSubobj)->supplyWindowBytes;
+      candidateThreshold = sfmps_GetSupSj(workctrlSubobj)->ringWindowSpanBytes;
     }
 
     if (candidateThreshold > 0 && candidateThreshold < thresholdBytes) {
@@ -12911,7 +12911,7 @@
     const std::int32_t workctrlAddress = SjPointerToAddress(workctrlSubobj);
     std::int32_t result = 0;
     if (
-      sourceBufferedBytes >= (supplyLane->supplyWindowBytes / 2) ||
+      sourceBufferedBytes >= (supplyLane->ringWindowSpanBytes / 2) ||
       (result = SFBUF_GetTermFlg(workctrlAddress, workctrlSubobj->transferState.transfer.demux.activeSupplyLaneIndex)) != 0
     ) {
       const auto* const m2tsdRuntime =
@@ -13225,7 +13225,7 @@
     MpsPackHeaderRuntimeView packHeader{};
     (void)MPS_GetPackHd(parserHandle, &packHeader);
     if (packHeader.muxRateUnits50BytesPerSecond > 0) {
-      workctrlSubobj->movieInfo.mUnknown00[6] = packHeader.muxRateUnits50BytesPerSecond;
+      workctrlSubobj->movieInfo.muxRateUnits50BytesPerSecond = packHeader.muxRateUnits50BytesPerSecond;
     }
 
     MpsSystemHeaderRuntimeView systemHeader{};
@@ -13273,7 +13273,7 @@
         workctrlSubobj->headerStampDeltaHigh = static_cast<std::int32_t>((stampDelta >> 32u) & 0xFFFFFFFFu);
 
         if (headerRuntime->activeFlag == 0) {
-          headerRuntime->muxRateBytesPerSecond = 50 * workctrlSubobj->movieInfo.mUnknown00[6];
+          headerRuntime->muxRateBytesPerSecond = 50 * workctrlSubobj->movieInfo.muxRateUnits50BytesPerSecond;
           headerRuntime->systemHeaderMetric = workctrlSubobj->movieInfo.decodeDirection;
           headerRuntime->parserCachedField3Max = parserRuntime->cachedSystemField3Max;
           headerRuntime->parserCachedField2Max = parserRuntime->cachedSystemField2Max;
@@ -13769,7 +13769,7 @@
     const std::int32_t callbackObject
   )
   {
-    const auto callback = reinterpret_cast<SflibErrorCallback>(
+    const auto callback = reinterpret_cast<moho::SflibErrorCallback>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(callbackAddress))
     );
 
@@ -13824,8 +13824,8 @@
    * What it does:
    * Stores one SFLIB error callback and callback-object lanes.
    */
-  SflibErrorInfo*
-  sflib_SetErrFnSub(SflibErrorInfo* const errInfo, SflibErrorCallback const callback, const std::int32_t callbackObject)
+  moho::SflibErrorInfo*
+  sflib_SetErrFnSub(SflibErrorInfo* const errInfo, moho::SflibErrorCallback const callback, const std::int32_t callbackObject)
   {
     errInfo->callback = callback;
     errInfo->callbackObject = callbackObject;
@@ -17162,19 +17162,15 @@
   [[nodiscard]] SfcreHeaderRuntimeView* SfplyFileHeaderOf(moho::SofdecSfdWorkctrlSubobj* const handle) noexcept
   {
     static_assert(
-      sizeof(SfcreHeaderRuntimeView) == sizeof(moho::SofdecSfdWorkctrlSubobj::fileHeader),
+      sizeof(SfcreHeaderRuntimeView) == 0x894,
       "SFPLY file-header lane must hold one SfcreHeaderRuntimeView"
     );
-    return reinterpret_cast<SfcreHeaderRuntimeView*>(handle->fileHeader);
+    return reinterpret_cast<SfcreHeaderRuntimeView*>(&handle->frameHeaderHandle);
   }
 
-  [[nodiscard]] SflibErrorInfo* SfplyErrorInfoOf(moho::SofdecSfdWorkctrlSubobj* const handle) noexcept
+  [[nodiscard]] moho::SflibErrorInfo* SfplyErrorInfoOf(moho::SofdecSfdWorkctrlSubobj* const handle) noexcept
   {
-    static_assert(
-      sizeof(SflibErrorInfo) == sizeof(moho::SofdecSfdWorkctrlSubobj::errorInfo),
-      "SFPLY error-info lane must hold one SflibErrorInfo"
-    );
-    return reinterpret_cast<SflibErrorInfo*>(handle->errorInfo);
+    return &handle->errorInfo;
   }
 
   [[nodiscard]] moho::SfseeOwnerState* SfplySeekHandleOf(moho::SofdecSfdWorkctrlSubobj* const handle) noexcept
@@ -17241,8 +17237,8 @@
     handle->initialized = 1;
     handle->reserved50 = 0;
     handle->reserved54 = 0;
-    handle->reserved58 = 0;
-    handle->reserved5C = 0;
+    handle->decodePathMode = 0;
+    handle->frameIdCounter = 0;
 
     (void)SFHDS_InitFhd(SfplyFileHeaderOf(handle));
     (void)sfply_InitMvInf(&handle->movieInfo);
@@ -17258,7 +17254,7 @@
       sizeof(handle->defaultConditions)
     );
 
-    (void)SFTIM_InitHn(reinterpret_cast<std::int32_t>(handle), handle->timerHandle);
+    (void)SFTIM_InitHn(reinterpret_cast<std::int32_t>(handle), &handle->timingLane);
     if (SFBUF_InitHn(
           reinterpret_cast<std::int32_t>(handle),
           reinterpret_cast<std::int32_t>(&handle->bufferState),
@@ -19848,7 +19844,7 @@
     (void)SFHDS_FinishFhd(SfplyFileHeaderOf(workctrlSubobj));
     SFBUF_DestroySj(workctrlSubobj);
 
-    const SflibErrorInfo* const errorInfo = SfplyErrorInfoOf(workctrlSubobj);
+    const moho::SflibErrorInfo* const errorInfo = SfplyErrorInfoOf(workctrlSubobj);
     const std::int32_t savedErrorCallback = reinterpret_cast<std::int32_t>(errorInfo->callback);
     const std::int32_t savedErrorCallbackObject = errorInfo->callbackObject;
 
