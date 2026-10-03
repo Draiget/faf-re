@@ -489,7 +489,7 @@ namespace moho
      * Slot: 23
      * Demangled: Moho::CClientManagerImpl::Func3
      */
-    virtual SSendStampView GetBetween(int since);
+    virtual SSendStampWindow GetBetween(int since);
 
     /**
      * Address: 0x0053F5A0

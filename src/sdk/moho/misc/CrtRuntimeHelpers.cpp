@@ -237,8 +237,8 @@ extern "C" void __cdecl __amsg_exit(int runtimeMessageId);
 extern "C" void* __cdecl _decode_pointer(void* encodedPointer);
 extern "C" unsigned long __flsindex;
 extern "C" void* gpFlsSetValue;
-using RuntimeFlsGetValueFn = void* (__stdcall*)(unsigned long flsIndex);
-extern "C" RuntimeFlsGetValueFn __cdecl __set_flsgetvalue();
+using CrtFlsGetValueFn = void* (__stdcall*)(unsigned long flsIndex);
+extern "C" CrtFlsGetValueFn __cdecl __set_flsgetvalue();
 extern "C" void __cdecl __initptd(void* ptd, void* initData);
 extern "C" void __cdecl _free_crt(void* ptr);
 extern "C" void __cdecl _tzset_nolock();
@@ -978,15 +978,15 @@ extern "C" void __cdecl _invoke_watson(
   unsigned int lineNumber,
   std::uintptr_t reserved
 );
-using RuntimeInvalidArgHandler = void(__cdecl*)(
+using CrtInvalidArgHandler = void(__cdecl*)(
   const wchar_t* expression,
   const wchar_t* functionName,
   const wchar_t* fileName,
   unsigned int lineNumber,
   std::uintptr_t reserved
 );
-using RuntimePurecallHandler = void(__cdecl*)();
-using RuntimeHeapFailureHandler = int(__cdecl*)(std::size_t);
+using CrtPurecallHandler = void(__cdecl*)();
+using CrtHeapFailureHandler = int(__cdecl*)(std::size_t);
 extern "C" int __cdecl _memicmp_l(
   const void* lhsBuffer,
   const void* rhsBuffer,
@@ -1265,7 +1265,7 @@ extern "C" unsigned __int64 __cdecl wcstoxq(
   int flags
 );
 
-using RuntimeInitFunctionWithStatus = int(__cdecl*)();
+using CrtInitFunctionWithStatus = int(__cdecl*)();
 
 /**
  * Address: 0x00A83523 (FUN_00A83523, atof)
@@ -1962,7 +1962,7 @@ extern "C" unsigned int __cdecl _set_winminor(const unsigned int minorVersion)
 
 namespace
 {
-  using RuntimeEhVectorStepFn = void(__thiscall*)(void* element);
+  using CrtEhVectorStepFn = void(__thiscall*)(void* element);
 
 }
 
@@ -1985,7 +1985,7 @@ extern "C" void __stdcall EngineEhVectorDestructorIterator(
   char* currentElement,
   const unsigned int elementSize,
   int elementCount,
-  const RuntimeEhVectorStepFn destructorFn
+  const CrtEhVectorStepFn destructorFn
 )
 {
   while (--elementCount >= 0) {
@@ -2013,8 +2013,8 @@ extern "C" int __stdcall EngineEhVectorConstructorIterator(
   char* currentElement,
   const unsigned int elementSize,
   const int elementCount,
-  const RuntimeEhVectorStepFn constructorFn,
-  const RuntimeEhVectorStepFn destructorFn
+  const CrtEhVectorStepFn constructorFn,
+  const CrtEhVectorStepFn destructorFn
 )
 {
   int constructedCount = 0;
@@ -2116,7 +2116,7 @@ namespace
 {
   struct CrtCtypeVec;
 
-  using RuntimeLocaleClassifierFn = int(__cdecl*)(int character, _locale_t localeInfo);
+  using CrtLocaleClassifierFn = int(__cdecl*)(int character, _locale_t localeInfo);
 
   [[nodiscard]] int EngineClassifyLocaleCharacter(
     const int character,
@@ -2194,7 +2194,7 @@ namespace
   [[nodiscard]] int EngineClassifyInitialOrLocaleChanged(
     const int character,
     const unsigned int initialMask,
-    const RuntimeLocaleClassifierFn changedLocaleClassifier
+    const CrtLocaleClassifierFn changedLocaleClassifier
   )
   {
     if (__locale_changed != 0) {
@@ -3274,12 +3274,12 @@ extern "C" int __cdecl _wrename(const wchar_t* const existingPath, const wchar_t
  * non-zero return status and returns that status.
  */
 extern "C" int __cdecl _initterm_e(
-  RuntimeInitFunctionWithStatus* const first,
-  RuntimeInitFunctionWithStatus* const last
+  CrtInitFunctionWithStatus* const first,
+  CrtInitFunctionWithStatus* const last
 )
 {
   int result = 0;
-  for (RuntimeInitFunctionWithStatus* current = first; current < last && result == 0; ++current) {
+  for (CrtInitFunctionWithStatus* current = first; current < last && result == 0; ++current) {
     if (*current != nullptr) {
       result = (*current)();
     }
@@ -4389,7 +4389,7 @@ extern "C" int __cdecl getSystemCP(const int codePage)
 
 namespace
 {
-  using RuntimeValidatedOutputFn = int(__cdecl*)(void* stream, int format, int localeInfo, int arguments);
+  using CrtValidatedOutputFn = int(__cdecl*)(void* stream, int format, int localeInfo, int arguments);
 }
 
 /**
@@ -4400,7 +4400,7 @@ namespace
  * pointer follows `_invalid_parameter` failure semantics and returns `-1`.
  */
 [[maybe_unused]] static int __cdecl EngineDispatchValidatedOutputCall(
-  RuntimeValidatedOutputFn outputFn,
+  CrtValidatedOutputFn outputFn,
   const int stream,
   const int localeInfo,
   const int arguments
@@ -4431,7 +4431,7 @@ extern "C" int __cdecl EngineDispatchValidatedOutputLegacyNoLocale(
 )
 {
   return EngineDispatchValidatedOutputCall(
-    reinterpret_cast<RuntimeValidatedOutputFn>(_output_l),
+    reinterpret_cast<CrtValidatedOutputFn>(_output_l),
     stream,
     0,
     arguments
@@ -4451,7 +4451,7 @@ extern "C" int __cdecl EngineDispatchValidatedOutputLegacyWithLocale(
 )
 {
   return EngineDispatchValidatedOutputCall(
-    reinterpret_cast<RuntimeValidatedOutputFn>(_output_l),
+    reinterpret_cast<CrtValidatedOutputFn>(_output_l),
     stream,
     localeInfo,
     arguments
@@ -4471,7 +4471,7 @@ extern "C" int __cdecl EngineDispatchValidatedOutputNoLocale(
 )
 {
   return EngineDispatchValidatedOutputCall(
-    reinterpret_cast<RuntimeValidatedOutputFn>(_output_l),
+    reinterpret_cast<CrtValidatedOutputFn>(_output_l),
     stream,
     0,
     arguments
@@ -4492,7 +4492,7 @@ extern "C" int __cdecl EngineDispatchValidatedOutputWithLocale(
 )
 {
   return EngineDispatchValidatedOutputCall(
-    reinterpret_cast<RuntimeValidatedOutputFn>(_output_l),
+    reinterpret_cast<CrtValidatedOutputFn>(_output_l),
     stream,
     localeInfo,
     arguments
@@ -4901,8 +4901,8 @@ extern "C" int __fastcall EngineReadBufferedByteNoLockLaneB(
   return EngineReadBufferedByteNoLockLegacy(stream);
 }
 
-using RuntimeOutputFn = int(__cdecl*)(std::FILE* stream, const char* format, _locale_t localeInfo, va_list arguments);
-using RuntimeWideOutputFn = int(__cdecl*)(std::FILE* stream, const wchar_t* format, _locale_t localeInfo, va_list arguments);
+using CrtOutputFn = int(__cdecl*)(std::FILE* stream, const char* format, _locale_t localeInfo, va_list arguments);
+using CrtWideOutputFn = int(__cdecl*)(std::FILE* stream, const wchar_t* format, _locale_t localeInfo, va_list arguments);
 
 /**
  * Address: 0x00A96E17 (FUN_00A96E17, write_char_0)
@@ -5073,7 +5073,7 @@ extern "C" int __cdecl _vsprintf(char* const buffer, const char* const format, v
  * `_vsnprintf`-style truncation/terminator semantics.
  */
 extern "C" int __cdecl _vsnprintf_helper(
-  const RuntimeOutputFn outfn,
+  const CrtOutputFn outfn,
   char* const string,
   const std::size_t count,
   const char* const format,
@@ -5242,7 +5242,7 @@ extern "C" int __cdecl _findenv(const std::size_t nameLength, const unsigned cha
  * uses CRT invalid-parameter failure semantics.
  */
 extern "C" int __cdecl
-vwprintf_helper(const RuntimeWideOutputFn woutfn, const wchar_t* const format, _locale_t const plocinfo, va_list ap)
+vwprintf_helper(const CrtWideOutputFn woutfn, const wchar_t* const format, _locale_t const plocinfo, va_list ap)
 {
   if (format == nullptr) {
     *_errno() = EINVAL;
@@ -5389,8 +5389,8 @@ extern "C" int __cdecl _set_osfhnd(const int fileDescriptor, const std::intptr_t
  */
 extern "C" int __stdcall _fls_setvalue(const unsigned long flsIndex, void* const value)
 {
-  using RuntimeFlsSetValueFn = int(__stdcall*)(unsigned long flsIndexValue, void* slotValue);
-  auto* const flsSetValue = reinterpret_cast<RuntimeFlsSetValueFn>(_decode_pointer(gpFlsSetValue));
+  using CrtFlsSetValueFn = int(__stdcall*)(unsigned long flsIndexValue, void* slotValue);
+  auto* const flsSetValue = reinterpret_cast<CrtFlsSetValueFn>(_decode_pointer(gpFlsSetValue));
   return flsSetValue(flsIndex, value);
 }
 
@@ -5406,13 +5406,13 @@ extern "C" DWORD __cdecl _freeptd(void* threadData)
   if (__flsindex != 0xFFFFFFFFu) {
     void* dataToFree = threadData;
     if (dataToFree == nullptr && ::TlsGetValue(_getvalueindex) != nullptr) {
-      using RuntimeFlsGetValueThunk = void* (__stdcall*)(unsigned long index);
-      auto* const flsGetValueThunk = reinterpret_cast<RuntimeFlsGetValueThunk>(::TlsGetValue(_getvalueindex));
+      using CrtFlsGetValueThunk = void* (__stdcall*)(unsigned long index);
+      auto* const flsGetValueThunk = reinterpret_cast<CrtFlsGetValueThunk>(::TlsGetValue(_getvalueindex));
       dataToFree = flsGetValueThunk(__flsindex);
     }
 
-    using RuntimeFlsSetValueThunk = void(__stdcall*)(unsigned long index, void* value);
-    auto* const flsSetValueThunk = reinterpret_cast<RuntimeFlsSetValueThunk>(_decode_pointer(gpFlsSetValue));
+    using CrtFlsSetValueThunk = void(__stdcall*)(unsigned long index, void* value);
+    auto* const flsSetValueThunk = reinterpret_cast<CrtFlsSetValueThunk>(_decode_pointer(gpFlsSetValue));
     flsSetValueThunk(__flsindex, nullptr);
     _freefls(dataToFree);
   }
@@ -5731,8 +5731,8 @@ extern "C" unsigned long __cdecl __get_flsindex()
 
 namespace
 {
-  using RuntimeSignalHandler = void(__cdecl*)(int);
-  using RuntimeMathErrorHandler = int(__cdecl*)(int*);
+  using CrtSignalHandler = void(__cdecl*)(int);
+  using CrtMathErrorHandler = int(__cdecl*)(int*);
 
   constexpr int kRuntimeEnvironmentLock = 7;
   constexpr int kRuntimeSetLocaleLock = 12;
@@ -5749,7 +5749,7 @@ namespace
   constexpr std::uint64_t kFiletimeToUnixEpochOffset = 116444736000000000ull;
   constexpr std::size_t kRuntimeCodePageLocaleHashBucketCount = 0x3Eu;
   constexpr int kRuntimeOnExitFailureCode = 0x18;
-  using RuntimeInitCritSecAndSpinCountFn = int(__cdecl*)(LPCRITICAL_SECTION, DWORD);
+  using CrtInitCritSecAndSpinCountFn = int(__cdecl*)(LPCRITICAL_SECTION, DWORD);
 
   std::uint64_t gRuntimeClockStartFiletime = 0;
   std::int64_t gRuntimeElapsedMinutesCache = 0;
@@ -5763,13 +5763,13 @@ namespace
   void* gRuntimeMathErrorActionEncoded = nullptr;
   std::int32_t gRuntimeMathErrorActionEnabled = 0;
   void* gRuntimeTerminateActionEncoded = nullptr;
-  RuntimeInvalidArgHandler gRuntimeInvalidArgHandler = nullptr;
+  CrtInvalidArgHandler gRuntimeInvalidArgHandler = nullptr;
   void* gRuntimePurecallHandlerEncoded = nullptr;
-  RuntimePurecallHandler gRuntimePurecallHandler = nullptr;
-  static_assert(sizeof(RuntimeHeapFailureHandler) == sizeof(void*), "RuntimeHeapFailureHandler pointer size must match void*");
+  CrtPurecallHandler gRuntimePurecallHandler = nullptr;
+  static_assert(sizeof(CrtHeapFailureHandler) == sizeof(void*), "CrtHeapFailureHandler pointer size must match void*");
   void* gRuntimeHeapFailureHandlerEncoded = nullptr;
   std::int32_t gRuntimeRandomSImportAddress = 0;
-  RuntimeInitCritSecAndSpinCountFn gRuntimeInitCritSecAndSpinCount = nullptr;
+  CrtInitCritSecAndSpinCountFn gRuntimeInitCritSecAndSpinCount = nullptr;
   void* gRuntimeCfltCvtTable[10]{};
   struct CrtTypeInfoFrameListNode
   {
@@ -5926,8 +5926,8 @@ namespace
    * `atfuns_cdecl` is zero-initialised BSS.
    */
   constexpr std::size_t kAtexitSlotCount = 10;
-  using RuntimeAtexitFn = void(__cdecl*)();
-  RuntimeAtexitFn gAtexitFuncs[kAtexitSlotCount]{};
+  using CrtAtexitFn = void(__cdecl*)();
+  CrtAtexitFn gAtexitFuncs[kAtexitSlotCount]{};
   int gAtexitRemaining = static_cast<int>(kAtexitSlotCount);
 
   /**
@@ -5942,7 +5942,7 @@ namespace
    * rather than failing softly, which is why the count is checked before the
    * decrement.
    */
-  void EngineAtexit(const RuntimeAtexitFn handler)
+  void EngineAtexit(const CrtAtexitFn handler)
   {
     if (gAtexitRemaining == 0) {
       std::abort();
@@ -6058,8 +6058,8 @@ namespace
       return;
     }
 
-    using RuntimeFacetDeletingDtorFn = void*(__thiscall*)(CrtLocaleFacetRef*, int);
-    auto* const deletingDtor = reinterpret_cast<RuntimeFacetDeletingDtorFn>(owned->vftable[0]);
+    using CrtFacetDeletingDtorFn = void*(__thiscall*)(CrtLocaleFacetRef*, int);
+    auto* const deletingDtor = reinterpret_cast<CrtFacetDeletingDtorFn>(owned->vftable[0]);
     (void)deletingDtor(owned, 1);
   }
 
@@ -6537,7 +6537,7 @@ namespace
 
 namespace
 {
-  using RuntimeLockedOutputFn = int(__cdecl*)(
+  using CrtLockedOutputFn = int(__cdecl*)(
     std::FILE* stream,
     const char* format,
     _locale_t localeInfo,
@@ -6562,7 +6562,7 @@ namespace
  * with `errno = EINVAL` on a validation failure.
  */
 extern "C" int __cdecl EngineDispatchLockedFormattedOutput(
-  const RuntimeLockedOutputFn outputCallback,
+  const CrtLockedOutputFn outputCallback,
   std::FILE* const stream,
   const char* const format,
   const _locale_t localeInfo,
@@ -8713,7 +8713,7 @@ namespace moho::runtime
       }
 
       entry.lock = nextPreallocLock++;
-      RuntimeInitCritSecAndSpinCountFn initFn = gRuntimeInitCritSecAndSpinCount;
+      CrtInitCritSecAndSpinCountFn initFn = gRuntimeInitCritSecAndSpinCount;
       if (initFn == nullptr) {
         initFn = &__crtInitCritSecAndSpinCount;
       }
@@ -10925,9 +10925,9 @@ namespace moho::runtime
    * What it does:
    * Decodes and returns the active SIGABRT action handler lane.
    */
-  extern "C" RuntimeSignalHandler __cdecl __get_sigabrt()
+  extern "C" CrtSignalHandler __cdecl __get_sigabrt()
   {
-    return reinterpret_cast<RuntimeSignalHandler>(_decode_pointer(gRuntimeAbortActionEncoded));
+    return reinterpret_cast<CrtSignalHandler>(_decode_pointer(gRuntimeAbortActionEncoded));
   }
 
   /**
@@ -11002,7 +11002,7 @@ namespace moho::runtime
    */
   extern "C" int __cdecl rand_s(unsigned int* const randomValueOut)
   {
-    using RuntimeRtlGenRandomFn = BOOLEAN(WINAPI*)(PVOID, ULONG);
+    using CrtRtlGenRandomFn = BOOLEAN(WINAPI*)(PVOID, ULONG);
 
     if (randomValueOut == nullptr) {
       *_errno() = EINVAL;
@@ -11012,7 +11012,7 @@ namespace moho::runtime
 
     *randomValueOut = 0u;
 
-    RuntimeRtlGenRandomFn randomFn = reinterpret_cast<RuntimeRtlGenRandomFn>(
+    CrtRtlGenRandomFn randomFn = reinterpret_cast<CrtRtlGenRandomFn>(
       _decode_pointer(reinterpret_cast<void*>(static_cast<std::uintptr_t>(gRuntimeRandomSImportAddress)))
     );
 
@@ -11031,7 +11031,7 @@ namespace moho::runtime
         return mappedErrno;
       }
 
-      randomFn = reinterpret_cast<RuntimeRtlGenRandomFn>(proc);
+      randomFn = reinterpret_cast<CrtRtlGenRandomFn>(proc);
       gRuntimeRandomSImportAddress =
         static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(::EncodePointer(reinterpret_cast<void*>(randomFn))));
     }
@@ -11055,7 +11055,7 @@ namespace moho::runtime
   extern "C" void __cdecl _initp_misc_initcrit(void* const initCritSecAndSpinCountLane)
   {
     gRuntimeInitCritSecAndSpinCount =
-      reinterpret_cast<RuntimeInitCritSecAndSpinCountFn>(initCritSecAndSpinCountLane);
+      reinterpret_cast<CrtInitCritSecAndSpinCountFn>(initCritSecAndSpinCountLane);
   }
 
   /**
@@ -11082,8 +11082,8 @@ namespace moho::runtime
    * Publishes the CRT invalid-parameter handler pointer lane and returns the
    * installed handler.
    */
-  extern "C" RuntimeInvalidArgHandler __cdecl _initp_misc_invarg(
-    RuntimeInvalidArgHandler const handler
+  extern "C" CrtInvalidArgHandler __cdecl _initp_misc_invarg(
+    CrtInvalidArgHandler const handler
   )
   {
     gRuntimeInvalidArgHandler = handler;
@@ -11096,8 +11096,8 @@ namespace moho::runtime
    * What it does:
    * Publishes the CRT pure-virtual-call handler lane and returns the handler.
    */
-  extern "C" RuntimePurecallHandler __cdecl _initp_misc_purevirt(
-    RuntimePurecallHandler const handler
+  extern "C" CrtPurecallHandler __cdecl _initp_misc_purevirt(
+    CrtPurecallHandler const handler
   )
   {
     gRuntimePurecallHandler = handler;
@@ -11111,11 +11111,11 @@ namespace moho::runtime
    * Atomically swaps the encoded CRT purecall-handler lane and returns the
    * previously installed decoded handler pointer.
    */
-  extern "C" RuntimePurecallHandler __cdecl _set_purecall_handler(
-    RuntimePurecallHandler const handler
+  extern "C" CrtPurecallHandler __cdecl _set_purecall_handler(
+    CrtPurecallHandler const handler
   )
   {
-    const auto previousHandler = reinterpret_cast<RuntimePurecallHandler>(
+    const auto previousHandler = reinterpret_cast<CrtPurecallHandler>(
       _decode_pointer(gRuntimePurecallHandlerEncoded)
     );
     gRuntimePurecallHandlerEncoded = ::EncodePointer(reinterpret_cast<void*>(handler));
@@ -11130,9 +11130,9 @@ namespace moho::runtime
    * Returns the decoded CRT purecall-handler lane currently stored in the
    * encoded purecall handler slot.
    */
-  extern "C" RuntimePurecallHandler __cdecl _get_purecall_handler()
+  extern "C" CrtPurecallHandler __cdecl _get_purecall_handler()
   {
-    return reinterpret_cast<RuntimePurecallHandler>(
+    return reinterpret_cast<CrtPurecallHandler>(
       _decode_pointer(gRuntimePurecallHandlerEncoded)
     );
   }
@@ -11143,7 +11143,7 @@ namespace moho::runtime
    * What it does:
    * Publishes the CRT heap-allocation failure handler pointer lane.
    */
-  extern "C" void __cdecl _initp_heap_handler(RuntimeHeapFailureHandler const handler)
+  extern "C" void __cdecl _initp_heap_handler(CrtHeapFailureHandler const handler)
   {
     gRuntimeHeapFailureHandlerEncoded = std::bit_cast<void*>(handler);
   }
@@ -11154,9 +11154,9 @@ namespace moho::runtime
    * What it does:
    * Returns the decoded CRT heap-allocation failure handler lane.
    */
-  extern "C" RuntimeHeapFailureHandler __cdecl _query_new_handler()
+  extern "C" CrtHeapFailureHandler __cdecl _query_new_handler()
   {
-    return std::bit_cast<RuntimeHeapFailureHandler>(_decode_pointer(gRuntimeHeapFailureHandlerEncoded));
+    return std::bit_cast<CrtHeapFailureHandler>(_decode_pointer(gRuntimeHeapFailureHandlerEncoded));
   }
 
   /**
@@ -11166,10 +11166,10 @@ namespace moho::runtime
    * Clears the active CRT heap-failure handler lane and returns the previously
    * installed handler.
    */
-  extern "C" RuntimeHeapFailureHandler __cdecl EngineClearNewHandler()
+  extern "C" CrtHeapFailureHandler __cdecl EngineClearNewHandler()
   {
     CrtLockGuard heapLock(kRuntimeHeapLock);
-    const RuntimeHeapFailureHandler previousHandler = _query_new_handler();
+    const CrtHeapFailureHandler previousHandler = _query_new_handler();
     _initp_heap_handler(nullptr);
     return previousHandler;
   }
@@ -12530,7 +12530,7 @@ namespace moho::runtime
   };
   static_assert(sizeof(CrtScanStringStream) == 0x10, "CrtScanStringStream size must be 0x10");
 
-  using RuntimeStringScanWorker = int(__cdecl*)(CrtScanStringStream*, int, int, int);
+  using CrtStringScanWorker = int(__cdecl*)(CrtScanStringStream*, int, int, int);
 
   /**
    * Address: 0x00AA4A1D (FUN_00AA4A1D, _strdup)
@@ -12925,10 +12925,10 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   extern "C" int __stdcall _CallSettingFrame(const int targetAction, const int establisherFrame, const int notifyCode)
   {
-    using RuntimeSettingFrameTarget = int(__cdecl*)();
+    using CrtSettingFrameTarget = int(__cdecl*)();
 
     const std::uint32_t frameEbpValue = static_cast<std::uint32_t>(establisherFrame + 0x0C);
-    const auto actionTarget = reinterpret_cast<RuntimeSettingFrameTarget>(EnginePublishNonLocalGotoState(
+    const auto actionTarget = reinterpret_cast<CrtSettingFrameTarget>(EnginePublishNonLocalGotoState(
       static_cast<std::uint32_t>(targetAction), frameEbpValue, static_cast<std::uint32_t>(notifyCode)
     ));
 
@@ -13231,8 +13231,8 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
     return 1;
   }
 
-  using RuntimeSignalHandler = void(__cdecl*)(int);
-  using RuntimeFpeSignalHandler = void(__cdecl*)(int, int);
+  using CrtSignalHandler = void(__cdecl*)(int);
+  using CrtFpeSignalHandler = void(__cdecl*)(int, int);
 
   extern "C" int _XcptActTabCount;
   extern "C" int _First_FPE_Indx;
@@ -13292,8 +13292,8 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   extern "C" int __stdcall __fls_getvalue(const int flsIndex)
   {
-    using RuntimeTlsGetValueThunk = int(__stdcall*)(int);
-    auto* const flsGetValueThunk = reinterpret_cast<RuntimeTlsGetValueThunk>(::TlsGetValue(_getvalueindex));
+    using CrtTlsGetValueThunk = int(__stdcall*)(int);
+    auto* const flsGetValueThunk = reinterpret_cast<CrtTlsGetValueThunk>(::TlsGetValue(_getvalueindex));
     return flsGetValueThunk(flsIndex);
   }
 
@@ -13341,16 +13341,16 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
     const unsigned long lastError = ::GetLastError();
 
     CrtTidDataDosErrno* threadData = nullptr;
-    if (RuntimeFlsGetValueFn const flsGetValue = __set_flsgetvalue(); flsGetValue != nullptr) {
+    if (CrtFlsGetValueFn const flsGetValue = __set_flsgetvalue(); flsGetValue != nullptr) {
       threadData = static_cast<CrtTidDataDosErrno*>(flsGetValue(__flsindex));
     }
 
     if (threadData == nullptr) {
       threadData = static_cast<CrtTidDataDosErrno*>(_calloc_crt(1u, 0x214u));
       if (threadData != nullptr) {
-        using RuntimeFlsSetValueFn = int(__stdcall*)(unsigned long flsIndex, void* value);
+        using CrtFlsSetValueFn = int(__stdcall*)(unsigned long flsIndex, void* value);
         auto* const flsSetValueRaw = _decode_pointer(gpFlsSetValue);
-        auto* const flsSetValue = reinterpret_cast<RuntimeFlsSetValueFn>(flsSetValueRaw);
+        auto* const flsSetValue = reinterpret_cast<CrtFlsSetValueFn>(flsSetValueRaw);
         if (flsSetValue != nullptr && flsSetValue(__flsindex, threadData) != 0) {
           __initptd(threadData, nullptr);
           threadData->mThreadHandle = -1;
@@ -13538,11 +13538,11 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
       const int previousFpeCode = threadData->mThreadFpeCode;
       threadData->mThreadFpeCode =
         EngineMapXcptCodeToFpe(matchedAction->mExceptionCode, threadData->mThreadFpeCode);
-      reinterpret_cast<RuntimeFpeSignalHandler>(rawHandler)(kSignalFpe, threadData->mThreadFpeCode);
+      reinterpret_cast<CrtFpeSignalHandler>(rawHandler)(kSignalFpe, threadData->mThreadFpeCode);
       threadData->mThreadFpeCode = previousFpeCode;
     } else {
       matchedAction->mSignalHandler = nullptr;
-      reinterpret_cast<RuntimeSignalHandler>(rawHandler)(signalNumber);
+      reinterpret_cast<CrtSignalHandler>(rawHandler)(signalNumber);
     }
 
     threadData->mThreadExceptionPointers = previousExceptionPointers;
@@ -15434,26 +15434,26 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   std::uint8_t gRuntimeByte54741F = 0;
 
   struct CrtSharedControlBlock;
-  using RuntimeSharedControlReleaseFn = void(__thiscall*)(CrtSharedControlBlock*);
+  using CrtSharedControlReleaseFn = void(__thiscall*)(CrtSharedControlBlock*);
 
   struct CrtSharedControlBlock
   {
-    RuntimeSharedControlReleaseFn* vtable = nullptr; // +0x00
+    CrtSharedControlReleaseFn* vtable = nullptr; // +0x00
     volatile long sharedRefs = 0;                    // +0x04
     volatile long weakRefs = 0;                      // +0x08
   };
   static_assert(sizeof(CrtSharedControlBlock) == 0x0C, "CrtSharedControlBlock size must be 0x0C");
 
-  using RuntimeOffsetDispatchThreeLaneFn = int(__thiscall*)(std::uint32_t, std::uint32_t, std::uint32_t);
-  using RuntimeOffsetDispatchPointerLaneFn = int(__thiscall*)(std::uint32_t, const void*);
-  using RuntimeOffsetDispatchTwoLaneFn = int(__thiscall*)(std::uint32_t, std::uint32_t);
+  using CrtOffsetDispatchThreeLaneFn = int(__thiscall*)(std::uint32_t, std::uint32_t, std::uint32_t);
+  using CrtOffsetDispatchPointerLaneFn = int(__thiscall*)(std::uint32_t, const void*);
+  using CrtOffsetDispatchTwoLaneFn = int(__thiscall*)(std::uint32_t, std::uint32_t);
 
   struct CrtReleasableObject;
-  using RuntimeReleaseWithCountFn = std::intptr_t(__thiscall*)(CrtReleasableObject*, int);
+  using CrtReleaseWithCountFn = std::intptr_t(__thiscall*)(CrtReleasableObject*, int);
 
   struct CrtReleasableObjectVTable
   {
-    RuntimeReleaseWithCountFn release = nullptr; // +0x00
+    CrtReleaseWithCountFn release = nullptr; // +0x00
   };
 
   struct CrtReleasableObject
@@ -15462,13 +15462,13 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
 
   struct CrtStdcallReleaseObject;
-  using RuntimeStdcallReleaseSlot2Fn = int(__stdcall*)(CrtStdcallReleaseObject*);
+  using CrtStdcallReleaseSlot2Fn = int(__stdcall*)(CrtStdcallReleaseObject*);
 
   struct CrtStdcallReleaseVTable
   {
     void* reserved00 = nullptr;                     // +0x00
     void* reserved04 = nullptr;                     // +0x04
-    RuntimeStdcallReleaseSlot2Fn releaseSlot2 = nullptr; // +0x08
+    CrtStdcallReleaseSlot2Fn releaseSlot2 = nullptr; // +0x08
   };
 
   struct CrtStdcallReleaseObject
@@ -15477,7 +15477,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
 
   struct CrtDispatchSlot24Object;
-  using RuntimeDispatchSlot24Fn = void(__thiscall*)(
+  using CrtDispatchSlot24Fn = void(__thiscall*)(
     CrtDispatchSlot24Object*,
     int,
     int,
@@ -15496,7 +15496,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     void* slot0C = nullptr;            // +0x0C
     void* slot10 = nullptr;            // +0x10
     void* slot14 = nullptr;            // +0x14
-    RuntimeDispatchSlot24Fn slot24 = nullptr; // +0x18
+    CrtDispatchSlot24Fn slot24 = nullptr; // +0x18
   };
 
   struct CrtDispatchSlot24Object
@@ -15566,10 +15566,10 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   CrtSharedControlPairEntry* gRuntimeSharedControlPairEnd = nullptr;
   CrtSharedControlPairEntry* gRuntimeSharedControlPairCapacity = nullptr;
 
-  using RuntimeDestroyCallbackFn = int(__thiscall*)(void*, int);
+  using CrtDestroyCallbackFn = int(__thiscall*)(void*, int);
 
-  using RuntimeLegacyProxyVectorThrowFn = void (*)();
-  using RuntimeLegacyProxyVectorAllocateFn = void* (*)(unsigned int);
+  using CrtLegacyProxyVectorThrowFn = void (*)();
+  using CrtLegacyProxyVectorAllocateFn = void* (*)(unsigned int);
 
   using DequeMapThrowTooLongFn = void (*)();
 
@@ -15592,7 +15592,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     "CrtPointerGrid::rowPointers offset must be 0x10"
   );
 
-  using RuntimePointerGridAllocator = int (*)(CrtPointerGrid&, std::uint8_t);
+  using CrtPointerGridAllocator = int (*)(CrtPointerGrid&, std::uint8_t);
 
   struct CrtLocaleNameTableEntry
   {
@@ -15643,7 +15643,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
   };
   static_assert(sizeof(CrtUndecoratorHeapFrameNode) == 0x04, "CrtUndecoratorHeapFrameNode size must be 0x04");
 
-  using RuntimeUndecoratorFrameFreeFn = void(__cdecl*)(CrtUndecoratorHeapFrameNode* frame);
+  using CrtUndecoratorFrameFreeFn = void(__cdecl*)(CrtUndecoratorHeapFrameNode* frame);
 
   const char* gRuntimeUndecoratorCurrentDecoratedName = nullptr;
 
@@ -16471,10 +16471,10 @@ extern "C" void* __cdecl EngineGetStaticStoragePointerLane()
   namespace
   {
     struct RuntimeTssSlotVector;
-    using RuntimeTryEnterCriticalSectionFn = BOOL(WINAPI*)(LPCRITICAL_SECTION);
+    using CrtTryEnterCriticalSectionFn = BOOL(WINAPI*)(LPCRITICAL_SECTION);
 
-    RuntimeTryEnterCriticalSectionFn gRuntimeTryEnterCriticalSectionLegacyA = nullptr;
-    RuntimeTryEnterCriticalSectionFn gRuntimeTryEnterCriticalSectionLegacyB = nullptr;
+    CrtTryEnterCriticalSectionFn gRuntimeTryEnterCriticalSectionLegacyA = nullptr;
+    CrtTryEnterCriticalSectionFn gRuntimeTryEnterCriticalSectionLegacyB = nullptr;
 
     extern "C" RuntimeTssSlotVector* __cdecl get_slots(bool alloc);
     extern "C" void __cdecl cleanup_slots(RuntimeTssSlotVector* slots);
@@ -17365,15 +17365,15 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     (void)::_ftime64_s(timeBuffer);
   }
 
-  using RuntimeVirtualDestroyWithFlagFn = int(__thiscall*)(void* owner, int destroyFlag);
+  using CrtVirtualDestroyWithFlagFn = int(__thiscall*)(void* owner, int destroyFlag);
 
-  using RuntimeComSlotDispatchFn = int(__stdcall*)(void*);
+  using CrtComSlotDispatchFn = int(__stdcall*)(void*);
 
-  using RuntimeVirtualForwardSlot16Fn = void(
+  using CrtVirtualForwardSlot16Fn = void(
     __thiscall*
   )(void*, int, int, int, int, int, int, int, int, int, int);
 
-  using RuntimeSortCompareUnsignedAddressFn = int(__cdecl*)(unsigned int, unsigned int);
+  using CrtSortCompareUnsignedAddressFn = int(__cdecl*)(unsigned int, unsigned int);
 
   /**
    * Address: 0x00A48A40 (FUN_00A48A40)

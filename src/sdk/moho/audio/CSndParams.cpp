@@ -324,13 +324,13 @@ namespace
     (void)gSndParamsHashCache.insert({hash, params});
   }
 
-  struct TwoWordRuntimeState
+  struct TwoWordState
   {
     std::uint32_t mFirst;  // +0x00
     std::uint32_t mSecond; // +0x04
   };
 
-  static_assert(sizeof(TwoWordRuntimeState) == 0x8, "TwoWordRuntimeState size must be 0x8");
+  static_assert(sizeof(TwoWordState) == 0x8, "TwoWordState size must be 0x8");
 
   /**
    * Address: 0x004E14B0 (FUN_004E14B0)
@@ -338,7 +338,7 @@ namespace
    * What it does:
    * Clears one two-word runtime state pair to zero.
    */
-  [[nodiscard]] TwoWordRuntimeState* ClearTwoWordState(TwoWordRuntimeState* const state) noexcept
+  [[nodiscard]] TwoWordState* ClearTwoWordState(TwoWordState* const state) noexcept
   {
     if (state == nullptr) {
       return state;
@@ -371,16 +371,16 @@ namespace
     return cursorSlot;
   }
 
-  struct PairHeadTailView
+  struct PairHeadTail
   {
     std::uint32_t mHeadValue; // +0x00
     std::uint32_t mTailValue; // +0x04
   };
 
-  static_assert(sizeof(PairHeadTailView) == 0x8, "PairHeadTailView size must be 0x8");
+  static_assert(sizeof(PairHeadTail) == 0x8, "PairHeadTail size must be 0x8");
 
-  [[nodiscard]] PairHeadTailView* CopyPairHeadTail(
-    PairHeadTailView* const outPair,
+  [[nodiscard]] PairHeadTail* CopyPairHeadTail(
+    PairHeadTail* const outPair,
     const std::uint32_t* const headValueSlot,
     const std::uint32_t* const tailValueSlot
   ) noexcept
@@ -400,8 +400,8 @@ namespace
    * What it does:
    * Writes one `(head,tail)` pair from two source value slots.
    */
-  [[nodiscard]] PairHeadTailView* CopyPairHeadTail_A(
-    PairHeadTailView* const outPair,
+  [[nodiscard]] PairHeadTail* CopyPairHeadTail_A(
+    PairHeadTail* const outPair,
     const std::uint32_t* const headValueSlot,
     const std::uint32_t* const tailValueSlot
   ) noexcept
@@ -415,8 +415,8 @@ namespace
    * What it does:
    * Writes one `(head,tail)` pair from two source value slots.
    */
-  [[nodiscard]] PairHeadTailView* CopyPairHeadTail_B(
-    PairHeadTailView* const outPair,
+  [[nodiscard]] PairHeadTail* CopyPairHeadTail_B(
+    PairHeadTail* const outPair,
     const std::uint32_t* const headValueSlot,
     const std::uint32_t* const tailValueSlot
   ) noexcept
@@ -430,8 +430,8 @@ namespace
    * What it does:
    * Writes one `(head,tail)` pair from two source value slots.
    */
-  [[nodiscard]] PairHeadTailView* CopyPairHeadTail_C(
-    PairHeadTailView* const outPair,
+  [[nodiscard]] PairHeadTail* CopyPairHeadTail_C(
+    PairHeadTail* const outPair,
     const std::uint32_t* const headValueSlot,
     const std::uint32_t* const tailValueSlot
   ) noexcept
@@ -439,17 +439,17 @@ namespace
     return CopyPairHeadTail(outPair, headValueSlot, tailValueSlot);
   }
 
-  struct HeaderPointerOwnerView
+  struct HeaderPointerOwner
   {
     std::uint32_t mReserved00;   // +0x00
     std::uint32_t* mHeaderSlot;  // +0x04
   };
 
-  static_assert(sizeof(HeaderPointerOwnerView) == 0x8, "HeaderPointerOwnerView size must be 0x8");
+  static_assert(sizeof(HeaderPointerOwner) == 0x8, "HeaderPointerOwner size must be 0x8");
 
   [[nodiscard]] std::uint32_t* ReadHeaderRootWord(
     std::uint32_t* const outWord,
-    const HeaderPointerOwnerView* const owner
+    const HeaderPointerOwner* const owner
   ) noexcept
   {
     if (outWord == nullptr || owner == nullptr || owner->mHeaderSlot == nullptr) {
@@ -462,7 +462,7 @@ namespace
 
   [[nodiscard]] std::uint32_t* ReadHeaderPointerWord(
     std::uint32_t* const outWord,
-    const HeaderPointerOwnerView* const owner
+    const HeaderPointerOwner* const owner
   ) noexcept
   {
     if (outWord == nullptr || owner == nullptr) {
@@ -481,7 +481,7 @@ namespace
    */
   [[nodiscard]] std::uint32_t* ReadHeaderRootWord_A(
     std::uint32_t* const outWord,
-    const HeaderPointerOwnerView* const owner
+    const HeaderPointerOwner* const owner
   ) noexcept
   {
     return ReadHeaderRootWord(outWord, owner);
@@ -495,7 +495,7 @@ namespace
    */
   [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_A(
     std::uint32_t* const outWord,
-    const HeaderPointerOwnerView* const owner
+    const HeaderPointerOwner* const owner
   ) noexcept
   {
     return ReadHeaderPointerWord(outWord, owner);
@@ -509,7 +509,7 @@ namespace
    */
   [[nodiscard]] std::uint32_t* ReadHeaderRootWord_B(
     std::uint32_t* const outWord,
-    const HeaderPointerOwnerView* const owner
+    const HeaderPointerOwner* const owner
   ) noexcept
   {
     return ReadHeaderRootWord(outWord, owner);
@@ -523,7 +523,7 @@ namespace
    */
   [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_B(
     std::uint32_t* const outWord,
-    const HeaderPointerOwnerView* const owner
+    const HeaderPointerOwner* const owner
   ) noexcept
   {
     return ReadHeaderPointerWord(outWord, owner);
@@ -537,7 +537,7 @@ namespace
    */
   [[nodiscard]] std::uint32_t* ReadHeaderRootWord_C(
     std::uint32_t* const outWord,
-    const HeaderPointerOwnerView* const owner
+    const HeaderPointerOwner* const owner
   ) noexcept
   {
     return ReadHeaderRootWord(outWord, owner);
@@ -551,7 +551,7 @@ namespace
    */
   [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_C(
     std::uint32_t* const outWord,
-    const HeaderPointerOwnerView* const owner
+    const HeaderPointerOwner* const owner
   ) noexcept
   {
     return ReadHeaderPointerWord(outWord, owner);

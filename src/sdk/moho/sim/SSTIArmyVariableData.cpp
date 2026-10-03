@@ -102,14 +102,14 @@ namespace
     return destination;
   }
 
-  struct SSTIArmyVariableDataOwnerSlotRuntime
+  struct SSTIArmyVariableDataOwnerSlot
   {
     std::uint8_t reserved00_7F[0x80]{};
     moho::SSTIArmyVariableData variableData;
   };
   static_assert(
-    offsetof(SSTIArmyVariableDataOwnerSlotRuntime, variableData) == 0x80,
-    "SSTIArmyVariableDataOwnerSlotRuntime::variableData offset must be 0x80"
+    offsetof(SSTIArmyVariableDataOwnerSlot, variableData) == 0x80,
+    "SSTIArmyVariableDataOwnerSlot::variableData offset must be 0x80"
   );
 
 } // namespace

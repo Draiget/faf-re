@@ -106,14 +106,14 @@ namespace
     return MakeIUnitRefFromRawObject(weak.GetObjectPtr());
   }
 
-  struct RuntimeBoundThiscallInvoker
+  struct BoundThiscallInvoker
   {
     using InvokeFn = int(__thiscall*)(void* boundObject);
 
     InvokeFn invoke;     // +0x00
     void* boundObject;   // +0x04
   };
-  static_assert(sizeof(RuntimeBoundThiscallInvoker) == 0x08, "RuntimeBoundThiscallInvoker size must be 0x08");
+  static_assert(sizeof(BoundThiscallInvoker) == 0x08, "BoundThiscallInvoker size must be 0x08");
 
   /**
    * Address: 0x00541290 (FUN_00541290)
@@ -123,7 +123,7 @@ namespace
    * offset `+0x04`.
    */
   [[maybe_unused]] int InvokeBoundThiscallCallback(
-    RuntimeBoundThiscallInvoker* const invoker
+    BoundThiscallInvoker* const invoker
   )
   {
     return invoker->invoke(invoker->boundObject);

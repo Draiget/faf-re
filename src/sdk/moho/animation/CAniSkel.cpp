@@ -546,7 +546,7 @@ namespace
    * updated after `SAniSkelBone`'s on-disk layout changed, or some other
    * historical mismatch, is not resolved by this pass.
    */
-  struct AniSkeletonBoneDumpFieldsView
+  struct AniSkeletonBoneDumpFields
   {
     const char* mName;        // +0x00
     std::uint32_t field_0x04; // +0x04 (never read by the dump)
@@ -559,15 +559,15 @@ namespace
     float mPosZ;                    // +0x20
   };
   static_assert(
-    offsetof(AniSkeletonBoneDumpFieldsView, mQuatW) == 0x08,
-    "AniSkeletonBoneDumpFieldsView::mQuatW offset must be 0x08"
+    offsetof(AniSkeletonBoneDumpFields, mQuatW) == 0x08,
+    "AniSkeletonBoneDumpFields::mQuatW offset must be 0x08"
   );
   static_assert(
-    offsetof(AniSkeletonBoneDumpFieldsView, mPosX) == 0x18,
-    "AniSkeletonBoneDumpFieldsView::mPosX offset must be 0x18"
+    offsetof(AniSkeletonBoneDumpFields, mPosX) == 0x18,
+    "AniSkeletonBoneDumpFields::mPosX offset must be 0x18"
   );
   static_assert(
-    sizeof(AniSkeletonBoneDumpFieldsView) == 0x24, "AniSkeletonBoneDumpFieldsView size must be 0x24"
+    sizeof(AniSkeletonBoneDumpFields) == 0x24, "AniSkeletonBoneDumpFields size must be 0x24"
   );
 
   /**
@@ -602,7 +602,7 @@ namespace
   {
     for (const std::uint32_t boneKey : children) {
       const auto* const fields =
-        reinterpret_cast<const AniSkeletonBoneDumpFieldsView*>(static_cast<std::uintptr_t>(boneKey));
+        reinterpret_cast<const AniSkeletonBoneDumpFields*>(static_cast<std::uintptr_t>(boneKey));
 
       const std::size_t nameLength = std::strlen(fields->mName);
       const int rawPadWidth = 50 - static_cast<int>(nameLength) - static_cast<int>(indent);

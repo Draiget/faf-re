@@ -126,7 +126,7 @@ void CNetNullConnector::SelectEvent(HANDLE ev)
  * What it does:
  * Returns an empty send-stamp snapshot (`items` empty, duration/end = 0).
  */
-SSendStampView CNetNullConnector::SnapshotSendStamps(const int32_t since)
+SSendStampWindow CNetNullConnector::SnapshotSendStamps(const int32_t since)
 {
   (void)since;
   return {0u, 0u};

@@ -401,9 +401,9 @@ HANDLE CNetTCPConnector::GetSelectedEventHandle() const noexcept
  * What it does:
  * Returns empty stamp snapshot for legacy TCP path.
  */
-SSendStampView CNetTCPConnector::SnapshotSendStamps(const int32_t /*since*/)
+SSendStampWindow CNetTCPConnector::SnapshotSendStamps(const int32_t /*since*/)
 {
-  return SSendStampView{0, 0};
+  return SSendStampWindow{0, 0};
 }
 
 /**

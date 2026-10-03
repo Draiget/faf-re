@@ -7607,18 +7607,18 @@
       "SjLegacyIoDispatchTable::queryStatus offset must be 0x0C"
     );
 
-    struct SjLegacyIoOwnerView
+    struct SjLegacyIoOwner
     {
       SjLegacyIoDispatchTable* dispatchTable = nullptr; // +0x00
     };
 
-    struct SjLegacyIoClientView
+    struct SjLegacyIoClient
     {
       std::uint8_t mUnknown00_07[0x08]{}; // +0x00
-      SjLegacyIoOwnerView* ioOwner = nullptr; // +0x08
+      SjLegacyIoOwner* ioOwner = nullptr; // +0x08
     };
 
-    static_assert(offsetof(SjLegacyIoClientView, ioOwner) == 0x08, "SjLegacyIoClientView::ioOwner offset must be 0x08");
+    static_assert(offsetof(SjLegacyIoClient, ioOwner) == 0x08, "SjLegacyIoClient::ioOwner offset must be 0x08");
   } // namespace
 
   /**
@@ -7630,7 +7630,7 @@
    */
   [[maybe_unused]] std::int32_t sj_QueryLegacyIoStatus(const std::int32_t ioClientAddress)
   {
-    auto* const client = reinterpret_cast<SjLegacyIoClientView*>(
+    auto* const client = reinterpret_cast<SjLegacyIoClient*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(ioClientAddress))
     );
 

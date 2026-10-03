@@ -151,7 +151,7 @@ namespace moho
      * What it does:
      * Returns empty stamp snapshot for legacy TCP path.
      */
-    SSendStampView SnapshotSendStamps(int32_t since) override;
+    SSendStampWindow SnapshotSendStamps(int32_t since) override;
 
     /**
      * Address: 0x00484AB0 (FUN_00484AB0)

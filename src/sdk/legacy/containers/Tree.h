@@ -204,7 +204,7 @@ namespace msvc8
   };
 
   template <class Node, auto ParentMember, auto LeftMember, auto RightMember, auto SentinelMember>
-  using MemberSentinelTreeView =
+  using MemberSentinelTree =
     SentinelTreeView<Node, MemberSentinelTreeTraits<Node, ParentMember, LeftMember, RightMember, SentinelMember>>;
 
   template <
@@ -217,7 +217,7 @@ namespace msvc8
     class NodeLessThanKey>
   [[nodiscard]] Node* lower_bound_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
   {
-    return MemberSentinelTreeView<Node, ParentMember, LeftMember, RightMember, SentinelMember>{head}.lower_bound(
+    return MemberSentinelTree<Node, ParentMember, LeftMember, RightMember, SentinelMember>{head}.lower_bound(
       key, nodeLessThanKey
     );
   }
@@ -232,14 +232,14 @@ namespace msvc8
     class NodeLessThanKey>
   [[nodiscard]] Node* find_equal_or_head_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
   {
-    return MemberSentinelTreeView<Node, ParentMember, LeftMember, RightMember, SentinelMember>{head}
+    return MemberSentinelTree<Node, ParentMember, LeftMember, RightMember, SentinelMember>{head}
       .find_equal_or_head(key, nodeLessThanKey);
   }
 
   template <class Node, auto Node::* SentinelMember, class Key, class NodeLessThanKey>
   [[nodiscard]] Node* lower_bound_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
   {
-    return MemberSentinelTreeView<Node, &Node::parent, &Node::left, &Node::right, SentinelMember>{head}.lower_bound(
+    return MemberSentinelTree<Node, &Node::parent, &Node::left, &Node::right, SentinelMember>{head}.lower_bound(
       key,
       nodeLessThanKey
     );
@@ -248,7 +248,7 @@ namespace msvc8
   template <class Node, auto Node::* SentinelMember, class Key, class NodeLessThanKey>
   [[nodiscard]] Node* find_equal_or_head_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
   {
-    return MemberSentinelTreeView<Node, &Node::parent, &Node::left, &Node::right, SentinelMember>{head}.find_equal_or_head(
+    return MemberSentinelTree<Node, &Node::parent, &Node::left, &Node::right, SentinelMember>{head}.find_equal_or_head(
       key,
       nodeLessThanKey
     );

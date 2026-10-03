@@ -449,7 +449,7 @@ namespace boost
     };
 
     template <class T>
-    struct SharedPtrLayoutView
+    struct SharedPtrLayout
     {
         T* px;
         detail::sp_counted_base* pi;
@@ -457,7 +457,7 @@ namespace boost
 
     /**
      * Same `(px, pi)` layout as `boost::shared_ptr<T>` and
-     * `SharedPtrLayoutView<T>` above, but types `pi` as a real,
+     * `SharedPtrLayout<T>` above, but types `pi` as a real,
      * placement-newable `detail::shared_count` instead of the bare
      * control-block pointer it wraps.
      *
@@ -474,13 +474,13 @@ namespace boost
      * its private members. See `ConstructSharedFromRawViaCountCtor` below.
      */
     template <class T>
-    struct SharedPtrConstructionView
+    struct SharedPtrConstruction
     {
         T* px;
         detail::shared_count pi;
     };
 
-    static_assert(sizeof(SharedPtrConstructionView<void>) == 0x08, "SharedPtrConstructionView size must be 0x08");
+    static_assert(sizeof(SharedPtrConstruction<void>) == 0x08, "SharedPtrConstruction size must be 0x08");
 
     struct SharedCountPair
     {
@@ -833,12 +833,12 @@ namespace boost
     inline void ResetSharedPtrRawOwning(SharedPtrRaw<T>& target, T* const rawPointer)
     {
         static_assert(
-            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayoutView<T>),
+            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayout<T>),
             "boost::shared_ptr<T> layout must match (px,pi) pair on this target"
         );
 
         boost::shared_ptr<T> owner(rawPointer);
-        auto* const ownerLanes = reinterpret_cast<SharedPtrLayoutView<T>*>(&owner);
+        auto* const ownerLanes = reinterpret_cast<SharedPtrLayout<T>*>(&owner);
 
         detail::sp_counted_base* const previous = target.pi;
         target.px = ownerLanes->px;
@@ -1055,7 +1055,7 @@ namespace boost
      * `px` first, then construct the control block through the caller-
      * supplied per-T `shared_count(T*)` helper (`constructCount`, typically
      * one of the `ConstructSharedCount<Type>FromRaw` free functions next to
-     * each type's outer wrapper). This is `SharedPtrConstructionView<T>`'s
+     * each type's outer wrapper). This is `SharedPtrConstruction<T>`'s
      * one intended use: reinterpret the raw output slot through the typed
      * view, write both lanes explicitly, and hand back the original
      * pointer - matching boost's real `shared_ptr(Y* p): px(p), pi_(p) {}`
@@ -1077,11 +1077,11 @@ namespace boost
     )
     {
         static_assert(
-            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrConstructionView<T>),
-            "boost::shared_ptr<T> layout must match the (px,pi) SharedPtrConstructionView pair"
+            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrConstruction<T>),
+            "boost::shared_ptr<T> layout must match the (px,pi) SharedPtrConstruction pair"
         );
 
-        auto* const view = reinterpret_cast<SharedPtrConstructionView<T>*>(outShared);
+        auto* const view = reinterpret_cast<SharedPtrConstruction<T>*>(outShared);
         view->px = rawPointer;
         constructCount(&view->pi, rawPointer);
         return outShared;
@@ -2316,11 +2316,11 @@ namespace boost
     [[nodiscard]] SharedPtrRaw<T> SharedPtrRawFromSharedBorrow(const boost::shared_ptr<T>& source) noexcept
     {
         static_assert(
-            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayoutView<T>),
+            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayout<T>),
             "boost::shared_ptr<T> layout must match (px,pi) pair on this target"
         );
 
-        const auto* const layout = reinterpret_cast<const SharedPtrLayoutView<T>*>(&source);
+        const auto* const layout = reinterpret_cast<const SharedPtrLayout<T>*>(&source);
         SharedPtrRaw<T> out{};
         out.px = layout->px;
         out.pi = layout->pi;
@@ -2349,12 +2349,12 @@ namespace boost
     [[nodiscard]] boost::shared_ptr<T> SharedPtrFromRawAdopt(const SharedPtrRaw<T>& source) noexcept
     {
         static_assert(
-            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayoutView<T>),
+            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayout<T>),
             "boost::shared_ptr<T> layout must match (px,pi) pair on this target"
         );
 
         boost::shared_ptr<T> out{};
-        auto* const layout = reinterpret_cast<SharedPtrLayoutView<T>*>(&out);
+        auto* const layout = reinterpret_cast<SharedPtrLayout<T>*>(&out);
         layout->px = source.px;
         layout->pi = source.pi;
         return out;
@@ -2364,12 +2364,12 @@ namespace boost
     [[nodiscard]] boost::shared_ptr<T> SharedPtrFromRawRetained(const SharedPtrRaw<T>& source) noexcept
     {
         static_assert(
-            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayoutView<T>),
+            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayout<T>),
             "boost::shared_ptr<T> layout must match (px,pi) pair on this target"
         );
 
         boost::shared_ptr<T> out{};
-        auto* const layout = reinterpret_cast<SharedPtrLayoutView<T>*>(&out);
+        auto* const layout = reinterpret_cast<SharedPtrLayout<T>*>(&out);
         layout->px = source.px;
         layout->pi = source.pi;
         if (layout->pi != nullptr) {

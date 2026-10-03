@@ -18,7 +18,7 @@ constexpr std::array<std::uint8_t, 8> kPngFileSignature = {
 // View into the CRC / flags / chunk_name triad inside png_struct, accessed via
 // typed offsets to avoid exposing the full (large) libpng layout here.
 // Field offsets verified from FUN_009E0526.asm.
-struct PngStructCrcChunkView
+struct PngStructCrcChunk
 {
   std::uint32_t flags;       // +0x6C in full png_struct
   std::uint32_t crc;         // +0x110

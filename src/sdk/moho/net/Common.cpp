@@ -127,7 +127,7 @@ float NetSpeeds::Jitter(const float center) const noexcept
  * What it does:
  * Initializes a send-stamp view for the requested [start, end] time window.
  */
-SSendStampView::SSendStampView(const uint64_t durationUs, const uint64_t endTimeUs)
+SSendStampWindow::SSendStampWindow(const uint64_t durationUs, const uint64_t endTimeUs)
   : items{}
   , windowDurationUs(durationUs)
   , windowEndTimeUs(endTimeUs)
@@ -136,7 +136,7 @@ SSendStampView::SSendStampView(const uint64_t durationUs, const uint64_t endTime
 /**
  * Address: 0x0047D4D0 (FUN_0047D4D0, GetStampCount)
  */
-uint32_t SSendStampView::StampCount() const noexcept
+uint32_t SSendStampWindow::StampCount() const noexcept
 {
   return static_cast<uint32_t>(items.size());
 }
@@ -144,7 +144,7 @@ uint32_t SSendStampView::StampCount() const noexcept
 /**
  * Address: 0x0047D3C0 (FUN_0047D3C0, ReserveStampCapacity)
  */
-void SSendStampView::ReserveStamps(const uint32_t count)
+void SSendStampWindow::ReserveStamps(const uint32_t count)
 {
   if (count <= static_cast<uint32_t>(items.capacity())) {
     return;
@@ -155,7 +155,7 @@ void SSendStampView::ReserveStamps(const uint32_t count)
 /**
  * Address: 0x0047D500 (FUN_0047D500, AppendStamp)
  */
-void SSendStampView::AppendStamp(const SSendStamp& stamp)
+void SSendStampWindow::AppendStamp(const SSendStamp& stamp)
 {
   items.push_back(stamp);
 }
@@ -247,7 +247,7 @@ const char* moho::NetConnectionStateToStr(const ENetConnectionState state)
   }
 }
 
-SSendStampView SSendStampBuffer::GetBetween(const uint64_t endTimeUs, const uint64_t startTimeUs)
+SSendStampWindow SSendStampBuffer::GetBetween(const uint64_t endTimeUs, const uint64_t startTimeUs)
 {
   // Binary computes and stores duration as (end - start).
   const uint64_t durationUs = endTimeUs - startTimeUs;
@@ -268,7 +268,7 @@ SSendStampView SSendStampBuffer::GetBetween(const uint64_t endTimeUs, const uint
     }
   }
 
-  SSendStampView out{durationUs, endTimeUs};
+  SSendStampWindow out{durationUs, endTimeUs};
 
   // Reserve exactly the number of items we will push (len - lo)
   out.ReserveStamps(len - lo);
@@ -569,7 +569,7 @@ namespace
     return ExtractArgumentHighByte(value);
   }
 
-  [[nodiscard]] uint32_t FindFirstStampAtOrAfter(const SSendStampView& stamps, const uint64_t thresholdUs)
+  [[nodiscard]] uint32_t FindFirstStampAtOrAfter(const SSendStampWindow& stamps, const uint64_t thresholdUs)
   {
     uint32_t index = 0;
     const uint32_t count = stamps.StampCount();
@@ -601,7 +601,7 @@ namespace
  */
 void moho::NET_BuildBandwidthUsageSeries(
   SBandwidthUsageSeries& outSeries,
-  const SSendStampView& stamps,
+  const SSendStampWindow& stamps,
   const int sampleCount,
   const uint64_t rangeStartUs,
   const uint64_t rangeEndUs,

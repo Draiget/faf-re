@@ -999,7 +999,7 @@ namespace
    * Returns the inline-buffer subobject pointer (`this + 4`) for one recovered
    * legacy wide-string layout view.
    */
-  struct LegacyWideStringObjectView
+  struct LegacyWideStringObject
   {
     std::uint32_t allocatorState = 0;
     union
@@ -1012,10 +1012,10 @@ namespace
   };
 
 #if defined(_M_IX86)
-  static_assert(sizeof(LegacyWideStringObjectView) == 0x1C, "LegacyWideStringObjectView size must be 0x1C");
+  static_assert(sizeof(LegacyWideStringObject) == 0x1C, "LegacyWideStringObject size must be 0x1C");
 #endif
 
-  [[maybe_unused]] wchar_t* GetLegacyWideStringInlineBufferSubobject(LegacyWideStringObjectView* const value) noexcept
+  [[maybe_unused]] wchar_t* GetLegacyWideStringInlineBufferSubobject(LegacyWideStringObject* const value) noexcept
   {
     return reinterpret_cast<wchar_t*>(&(value->storage));
   }
@@ -1251,7 +1251,7 @@ namespace
    * object view (SSO-aware).
    */
   [[maybe_unused]] wchar_t* GetLegacyWideStringCharacterPointer(
-    LegacyWideStringObjectView* const value,
+    LegacyWideStringObject* const value,
     const std::uint32_t index
   ) noexcept
   {
@@ -1264,10 +1264,10 @@ namespace
     return value->storage.heap + index;
   }
 
-  struct LegacyWideStringVectorAccessorView
+  struct LegacyWideStringVectorAccessor
   {
     std::uint32_t reserved = 0;
-    LegacyWideStringObjectView* first = nullptr;
+    LegacyWideStringObject* first = nullptr;
   };
 
   /**
@@ -1277,9 +1277,9 @@ namespace
    * Returns one legacy wide-string element pointer by index from a recovered
    * vector-storage accessor view.
    */
-  [[maybe_unused]] LegacyWideStringObjectView* GetLegacyWideStringElementPointerByIndex(
+  [[maybe_unused]] LegacyWideStringObject* GetLegacyWideStringElementPointerByIndex(
     const std::uint32_t index,
-    const LegacyWideStringVectorAccessorView* const accessor
+    const LegacyWideStringVectorAccessor* const accessor
   ) noexcept
   {
     if (accessor == nullptr || accessor->first == nullptr) {
@@ -1294,8 +1294,8 @@ namespace
    * What it does:
    * Resets one legacy wide-string pointer-slot to null.
    */
-  [[maybe_unused]] LegacyWideStringObjectView** ResetLegacyWideStringPointerSlotA(
-    LegacyWideStringObjectView** const pointerSlot
+  [[maybe_unused]] LegacyWideStringObject** ResetLegacyWideStringPointerSlotA(
+    LegacyWideStringObject** const pointerSlot
   ) noexcept
   {
     if (pointerSlot != nullptr) {
@@ -1310,8 +1310,8 @@ namespace
    * What it does:
    * Loads one legacy wide-string pointer-slot value.
    */
-  [[maybe_unused]] LegacyWideStringObjectView* LoadLegacyWideStringPointerSlotA(
-    LegacyWideStringObjectView* const* const pointerSlot
+  [[maybe_unused]] LegacyWideStringObject* LoadLegacyWideStringPointerSlotA(
+    LegacyWideStringObject* const* const pointerSlot
   ) noexcept
   {
     return (pointerSlot != nullptr) ? *pointerSlot : nullptr;
@@ -1323,13 +1323,13 @@ namespace
    * What it does:
    * Advances one legacy wide-string pointer-slot by one element stride.
    */
-  [[maybe_unused]] LegacyWideStringObjectView** AdvanceLegacyWideStringPointerSlotByOneElement(
-    LegacyWideStringObjectView** const pointerSlot
+  [[maybe_unused]] LegacyWideStringObject** AdvanceLegacyWideStringPointerSlotByOneElement(
+    LegacyWideStringObject** const pointerSlot
   ) noexcept
   {
     if (pointerSlot != nullptr && *pointerSlot != nullptr) {
-      *pointerSlot = reinterpret_cast<LegacyWideStringObjectView*>(
-        reinterpret_cast<std::byte*>(*pointerSlot) + sizeof(LegacyWideStringObjectView)
+      *pointerSlot = reinterpret_cast<LegacyWideStringObject*>(
+        reinterpret_cast<std::byte*>(*pointerSlot) + sizeof(LegacyWideStringObject)
       );
     }
     return pointerSlot;
@@ -1341,8 +1341,8 @@ namespace
    * What it does:
    * Duplicate legacy wide-string pointer-slot load helper.
    */
-  [[maybe_unused]] LegacyWideStringObjectView* LoadLegacyWideStringPointerSlotB(
-    LegacyWideStringObjectView* const* const pointerSlot
+  [[maybe_unused]] LegacyWideStringObject* LoadLegacyWideStringPointerSlotB(
+    LegacyWideStringObject* const* const pointerSlot
   ) noexcept
   {
     return LoadLegacyWideStringPointerSlotA(pointerSlot);
@@ -1354,8 +1354,8 @@ namespace
    * What it does:
    * Duplicate legacy wide-string pointer-slot reset helper.
    */
-  [[maybe_unused]] LegacyWideStringObjectView** ResetLegacyWideStringPointerSlotB(
-    LegacyWideStringObjectView** const pointerSlot
+  [[maybe_unused]] LegacyWideStringObject** ResetLegacyWideStringPointerSlotB(
+    LegacyWideStringObject** const pointerSlot
   ) noexcept
   {
     return ResetLegacyWideStringPointerSlotA(pointerSlot);
@@ -1430,22 +1430,22 @@ namespace
     return static_cast<std::uint8_t>((value >> 8) & 0xFFu);
   }
 
-  struct LegacyUint32PairEmitterView
+  struct LegacyUint32PairEmitter
   {
     std::uint32_t reserved0 = 0;
     std::uint32_t secondValue = 0;
     std::uint32_t firstBase = 0;
   };
 
-  struct LegacyUint32PairView
+  struct LegacyUint32Pair
   {
     std::uint32_t first = 0;
     std::uint32_t second = 0;
   };
 
 #if defined(_M_IX86)
-  static_assert(sizeof(LegacyUint32PairEmitterView) == 0x0C, "LegacyUint32PairEmitterView size must be 0x0C");
-  static_assert(sizeof(LegacyUint32PairView) == 0x08, "LegacyUint32PairView size must be 0x08");
+  static_assert(sizeof(LegacyUint32PairEmitter) == 0x0C, "LegacyUint32PairEmitter size must be 0x0C");
+  static_assert(sizeof(LegacyUint32Pair) == 0x08, "LegacyUint32Pair size must be 0x08");
 #endif
 
   /**
@@ -1455,9 +1455,9 @@ namespace
    * Writes one 32-bit pair where `first = firstBase + delta` and
    * `second = secondValue`.
    */
-  [[maybe_unused]] LegacyUint32PairView* WriteAdjustedUint32PairFromEmitter(
-    const LegacyUint32PairEmitterView* const emitter,
-    LegacyUint32PairView* const outPair,
+  [[maybe_unused]] LegacyUint32Pair* WriteAdjustedUint32PairFromEmitter(
+    const LegacyUint32PairEmitter* const emitter,
+    LegacyUint32Pair* const outPair,
     const std::uint32_t delta
   ) noexcept
   {
@@ -1476,7 +1476,7 @@ namespace
     return outPair;
   }
 
-  struct ParsedRegistryPathView
+  struct ParsedRegistryPath
   {
     HKEY rootKey = HKEY_CURRENT_USER;
     char* subKey = nullptr;
@@ -1512,9 +1512,9 @@ namespace
     return HKEY_CURRENT_USER;
   }
 
-  [[nodiscard]] ParsedRegistryPathView ParseRegistryPathInPlace(char* const mutablePath) noexcept
+  [[nodiscard]] ParsedRegistryPath ParseRegistryPathInPlace(char* const mutablePath) noexcept
   {
-    ParsedRegistryPathView parsed{};
+    ParsedRegistryPath parsed{};
     if (mutablePath == nullptr) {
       return parsed;
     }
@@ -1555,14 +1555,14 @@ namespace
    * Process-global opaque `MiniDmpSender` object storage used by BugSplat
    * methods. IDA data-item sizing marks this global at 8 bytes.
    */
-  struct BugSplatMiniDmpSenderRuntime
+  struct BugSplatMiniDmpSender
   {
     std::byte mOpaqueStorage[0x8]{};
   };
 
   static_assert(
-    sizeof(BugSplatMiniDmpSenderRuntime) == 0x8,
-    "BugSplatMiniDmpSenderRuntime size must be 0x8"
+    sizeof(BugSplatMiniDmpSender) == 0x8,
+    "BugSplatMiniDmpSender size must be 0x8"
   );
 
   class BugSplatApi
@@ -1607,7 +1607,7 @@ namespace
      * Typed import-thunk model for `MiniDmpSender` constructor export.
      */
     void Construct(
-      BugSplatMiniDmpSenderRuntime* const senderStorage,
+      BugSplatMiniDmpSender* const senderStorage,
       const char* const database,
       const char* const appName,
       const char* const versionText,
@@ -1624,7 +1624,7 @@ namespace
      * What it does:
      * Typed import-thunk model for `MiniDmpSender` destructor export.
      */
-    void Destroy(BugSplatMiniDmpSenderRuntime* const senderStorage) const
+    void Destroy(BugSplatMiniDmpSender* const senderStorage) const
     {
       dtor_(static_cast<void*>(senderStorage));
     }
@@ -1635,7 +1635,7 @@ namespace
      * What it does:
      * Typed import-thunk model for `MiniDmpSender::setCallback` export.
      */
-    void SetCallback(BugSplatMiniDmpSenderRuntime* const senderStorage, const BugSplatAttachmentCallbackFn callback)
+    void SetCallback(BugSplatMiniDmpSender* const senderStorage, const BugSplatAttachmentCallbackFn callback)
       const
     {
       setCallback_(static_cast<void*>(senderStorage), callback);
@@ -1647,7 +1647,7 @@ namespace
      * What it does:
      * Typed import-thunk model for `MiniDmpSender::createReport` export.
      */
-    void CreateReport(BugSplatMiniDmpSenderRuntime* const senderStorage, _EXCEPTION_POINTERS* const exceptionInfo)
+    void CreateReport(BugSplatMiniDmpSender* const senderStorage, _EXCEPTION_POINTERS* const exceptionInfo)
       const
     {
       createReport_(static_cast<void*>(senderStorage), exceptionInfo);
@@ -1720,7 +1720,7 @@ namespace
 
     std::mutex mutex_;
     BugSplatApi api_{};
-    BugSplatMiniDmpSenderRuntime sender_{};
+    BugSplatMiniDmpSender sender_{};
     bool isRegistered_ = false;
   };
 
@@ -3275,7 +3275,7 @@ bool moho::PLAT_SetRegistryValue(
 
   char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.begin());
   std::strcpy(mutableKeyPath, keyPath);
-  const ParsedRegistryPathView parsedPath = ParseRegistryPathInPlace(mutableKeyPath);
+  const ParsedRegistryPath parsedPath = ParseRegistryPathInPlace(mutableKeyPath);
 
   HKEY openedKey = nullptr;
   if (::RegCreateKeyExA(
@@ -3369,7 +3369,7 @@ std::uint32_t moho::PLAT_GetRegistryValue(
 
   char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.begin());
   std::strcpy(mutableKeyPath, keyPath);
-  const ParsedRegistryPathView parsedPath = ParseRegistryPathInPlace(mutableKeyPath);
+  const ParsedRegistryPath parsedPath = ParseRegistryPathInPlace(mutableKeyPath);
 
   HKEY openedKey = nullptr;
   if (::RegOpenKeyExA(parsedPath.rootKey, parsedPath.subKey, 0, 0x20019u, &openedKey) != ERROR_SUCCESS) {

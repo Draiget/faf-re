@@ -123,23 +123,23 @@ namespace
     return cached;
   }
 
-  struct NavigatorGlueTailWordView
+  struct NavigatorGlueTailWord
   {
     std::uint8_t pad00[0xA8];
     std::uint32_t tailWord0;
     std::uint32_t tailWord1;
     std::uint32_t tailWord2;
   };
-  static_assert(offsetof(NavigatorGlueTailWordView, tailWord0) == 0xA8, "tailWord0 offset must be 0xA8");
-  static_assert(offsetof(NavigatorGlueTailWordView, tailWord1) == 0xAC, "tailWord1 offset must be 0xAC");
-  static_assert(offsetof(NavigatorGlueTailWordView, tailWord2) == 0xB0, "tailWord2 offset must be 0xB0");
+  static_assert(offsetof(NavigatorGlueTailWord, tailWord0) == 0xA8, "tailWord0 offset must be 0xA8");
+  static_assert(offsetof(NavigatorGlueTailWord, tailWord1) == 0xAC, "tailWord1 offset must be 0xAC");
+  static_assert(offsetof(NavigatorGlueTailWord, tailWord2) == 0xB0, "tailWord2 offset must be 0xB0");
 
-  struct NavigatorGlueLateWordView
+  struct NavigatorGlueLateWord
   {
     std::uint8_t pad00[0x118];
     std::uint32_t lateWord;
   };
-  static_assert(offsetof(NavigatorGlueLateWordView, lateWord) == 0x118, "lateWord offset must be 0x118");
+  static_assert(offsetof(NavigatorGlueLateWord, lateWord) == 0x118, "lateWord offset must be 0x118");
 
   /**
    * Address: 0x005A2BF0 (FUN_005A2BF0)
@@ -149,7 +149,7 @@ namespace
    * glue view object.
    */
   [[maybe_unused]] [[nodiscard]] std::uint32_t ReadNavigatorGlueTailWord0(
-    const NavigatorGlueTailWordView* const view
+    const NavigatorGlueTailWord* const view
   ) noexcept
   {
     return view->tailWord0;
@@ -163,7 +163,7 @@ namespace
    * glue view object.
    */
   [[maybe_unused]] [[nodiscard]] std::uint32_t ReadNavigatorGlueTailWord1(
-    const NavigatorGlueTailWordView* const view
+    const NavigatorGlueTailWord* const view
   ) noexcept
   {
     return view->tailWord1;
@@ -177,7 +177,7 @@ namespace
    * glue view object.
    */
   [[maybe_unused]] [[nodiscard]] std::uint32_t ReadNavigatorGlueTailWord2(
-    const NavigatorGlueTailWordView* const view
+    const NavigatorGlueTailWord* const view
   ) noexcept
   {
     return view->tailWord2;
@@ -191,7 +191,7 @@ namespace
    * object.
    */
   [[maybe_unused]] [[nodiscard]] std::uint32_t ReadNavigatorGlueLateWord(
-    const NavigatorGlueLateWordView* const view
+    const NavigatorGlueLateWord* const view
   ) noexcept
   {
     return view->lateWord;

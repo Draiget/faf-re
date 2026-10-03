@@ -37,7 +37,7 @@ namespace moho
     constexpr float kMinWindowSeconds = 0.000001f;
     constexpr float kLabelPadding = 2.0f;
 
-    struct TimeBarEventView
+    struct TimeBarEvent
     {
       const STimeBarEventRecord* mRecord;
       std::int64_t mStartCycles;
@@ -306,13 +306,13 @@ namespace moho
       primBatcher.DrawLine(start, end);
     }
 
-    void BuildEventViews(const msvc8::vector<STimeBarEventRecord>& events, std::vector<TimeBarEventView>& outEventViews)
+    void BuildEventViews(const msvc8::vector<STimeBarEventRecord>& events, std::vector<TimeBarEvent>& outEventViews)
     {
       outEventViews.clear();
       outEventViews.reserve(events.size());
 
       for (const STimeBarEventRecord& eventRecord : events) {
-        TimeBarEventView view{};
+        TimeBarEvent view{};
         view.mRecord = &eventRecord;
         view.mStartCycles = CombineCycles(eventRecord.mStartCycleLo, eventRecord.mStartCycleHi);
         view.mEndCycles = CombineCycles(eventRecord.mEndCycleLo, eventRecord.mEndCycleHi);
@@ -322,7 +322,7 @@ namespace moho
 
     void BuildTrackLayout(
       CD3DFont& font,
-      const std::vector<TimeBarEventView>& eventViews,
+      const std::vector<TimeBarEvent>& eventViews,
       const float top,
       TimeBarTrackMap& outTracks,
       float& outMaxLabelWidth
@@ -331,7 +331,7 @@ namespace moho
       outTracks.clear();
       outMaxLabelWidth = 0.0f;
 
-      for (const TimeBarEventView& eventView : eventViews) {
+      for (const TimeBarEvent& eventView : eventViews) {
         if (!eventView.mRecord->mName) {
           continue;
         }
@@ -583,7 +583,7 @@ namespace moho
     msvc8::vector<STimeBarEventRecord> events;
     TIME_CollectTimeBarEvents(events, ren_FrameTimeSeconds);
 
-    std::vector<TimeBarEventView> eventViews;
+    std::vector<TimeBarEvent> eventViews;
     BuildEventViews(events, eventViews);
 
     TimeBarTrackMap tracks;
@@ -614,7 +614,7 @@ namespace moho
     const double cyclesToPixels = static_cast<double>(timelineWidth) / static_cast<double>(windowCycles);
     const double xBase = static_cast<double>(timelineRight) - (cyclesToPixels * static_cast<double>(nowCycles));
 
-    for (const TimeBarEventView& eventView : eventViews) {
+    for (const TimeBarEvent& eventView : eventViews) {
       const char* const eventName = eventView.mRecord->mName;
       if (!eventName) {
         continue;

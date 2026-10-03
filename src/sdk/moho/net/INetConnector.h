@@ -122,7 +122,7 @@ namespace moho
      * Slot: 12
      * Demangled: _purecall
      */
-    virtual SSendStampView SnapshotSendStamps(int32_t since) = 0;
+    virtual SSendStampWindow SnapshotSendStamps(int32_t since) = 0;
   };
 
   static_assert(sizeof(INetConnector) == 0x4, "INetConnector size must be 0x4");

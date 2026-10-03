@@ -99,15 +99,15 @@ namespace
     return destination;
   }
 
-  struct IdPoolMapLaneCopyView
+  struct IdPoolMapLaneCopy
   {
     std::uint32_t mKey; // +0x00
     std::uint32_t mReserved04;
     moho::IdPool mPayload; // +0x08
   };
-  static_assert(offsetof(IdPoolMapLaneCopyView, mKey) == 0x00, "IdPoolMapLaneCopyView::mKey offset must be 0x00");
+  static_assert(offsetof(IdPoolMapLaneCopy, mKey) == 0x00, "IdPoolMapLaneCopy::mKey offset must be 0x00");
   static_assert(
-    offsetof(IdPoolMapLaneCopyView, mPayload) == 0x08, "IdPoolMapLaneCopyView::mPayload offset must be 0x08"
+    offsetof(IdPoolMapLaneCopy, mPayload) == 0x08, "IdPoolMapLaneCopy::mPayload offset must be 0x08"
   );
 
   /**
@@ -117,9 +117,9 @@ namespace
    * Copies one map-lane key dword and then clones the associated IdPool payload
    * into destination storage.
    */
-  [[maybe_unused]] IdPoolMapLaneCopyView* CopyIdPoolMapLaneEntryForMapLanes(
+  [[maybe_unused]] IdPoolMapLaneCopy* CopyIdPoolMapLaneEntryForMapLanes(
     const std::uint32_t* const sourceKey,
-    IdPoolMapLaneCopyView* const destination,
+    IdPoolMapLaneCopy* const destination,
     const moho::IdPool* const sourcePayload
   )
   {
@@ -134,9 +134,9 @@ namespace
    * What it does:
    * Copies one packed map-lane key/payload entry into destination storage.
    */
-  [[maybe_unused]] IdPoolMapLaneCopyView* CopyPackedIdPoolMapLaneEntryForMapLanes(
-    const IdPoolMapLaneCopyView* const source,
-    IdPoolMapLaneCopyView* const destination
+  [[maybe_unused]] IdPoolMapLaneCopy* CopyPackedIdPoolMapLaneEntryForMapLanes(
+    const IdPoolMapLaneCopy* const source,
+    IdPoolMapLaneCopy* const destination
   )
   {
     destination->mKey = source->mKey;

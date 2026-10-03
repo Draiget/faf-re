@@ -51,12 +51,12 @@ void tss_cleanup_implemented()
 
 namespace
 {
-  struct WinMutexHandleRuntime
+  struct WinMutexHandle
   {
     HANDLE handle = nullptr;
   };
 
-  struct WinMutexHandlePairRuntime
+  struct WinMutexHandlePair
   {
     HANDLE handle = nullptr;
     std::uint32_t lane04 = 0;
@@ -108,8 +108,8 @@ namespace boost
    * Initializes one single-lane Win32 mutex owner and throws
    * `boost::thread_resource_error` when mutex creation fails.
    */
-  WinMutexHandleRuntime* InitializeUnnamedMutexHandleOrThrow(
-    WinMutexHandleRuntime* const outHandle
+  WinMutexHandle* InitializeUnnamedMutexHandleOrThrow(
+    WinMutexHandle* const outHandle
   )
   {
     if (outHandle == nullptr) {
@@ -133,8 +133,8 @@ namespace boost
    * Initializes one two-lane Win32 mutex owner (`handle`, `lane04`) and throws
    * `boost::thread_resource_error` when mutex creation fails.
    */
-  WinMutexHandlePairRuntime* InitializeUnnamedMutexHandlePairOrThrow(
-    WinMutexHandlePairRuntime* const outHandlePair
+  WinMutexHandlePair* InitializeUnnamedMutexHandlePairOrThrow(
+    WinMutexHandlePair* const outHandlePair
   )
   {
     if (outHandlePair == nullptr) {
@@ -1513,7 +1513,7 @@ namespace boost
     }
 
     template <class TPointee>
-    struct SpCountedImplPdRuntimeView
+    struct SpCountedImplPd
     {
       void* vftable;
       std::int32_t useCount;
@@ -1523,8 +1523,8 @@ namespace boost
     };
 
     static_assert(
-      offsetof(SpCountedImplPdRuntimeView<void>, deleterStorage) == 0x10,
-      "SpCountedImplPdRuntimeView::deleterStorage offset must be 0x10"
+      offsetof(SpCountedImplPd<void>, deleterStorage) == 0x10,
+      "SpCountedImplPd::deleterStorage offset must be 0x10"
     );
 
     [[nodiscard]] bool SpTypeInfoMatchesRawName(
@@ -1552,7 +1552,7 @@ namespace boost
         return nullptr;
       }
 
-      auto* const runtime = reinterpret_cast<SpCountedImplPdRuntimeView<TPointee>*>(countedImpl);
+      auto* const runtime = reinterpret_cast<SpCountedImplPd<TPointee>*>(countedImpl);
       return static_cast<void*>(runtime->deleterStorage);
     }
 
@@ -1747,7 +1747,7 @@ namespace boost
     }
   }
 
-  struct SpCountedImplPdFunctionDeleterRuntimeView
+  struct SpCountedImplPdFunctionDeleter
   {
     void* vftable;
     std::int32_t useCount;
@@ -1756,8 +1756,8 @@ namespace boost
     void(__cdecl* deleter)(void*);
   };
   static_assert(
-    offsetof(SpCountedImplPdFunctionDeleterRuntimeView, deleter) == 0x10,
-    "SpCountedImplPdFunctionDeleterRuntimeView::deleter offset must be 0x10"
+    offsetof(SpCountedImplPdFunctionDeleter, deleter) == 0x10,
+    "SpCountedImplPdFunctionDeleter::deleter offset must be 0x10"
   );
 
   /**
@@ -1775,7 +1775,7 @@ namespace boost
       return;
     }
 
-    auto* const runtime = reinterpret_cast<SpCountedImplPdFunctionDeleterRuntimeView*>(countedImpl);
+    auto* const runtime = reinterpret_cast<SpCountedImplPdFunctionDeleter*>(countedImpl);
     runtime->deleter(runtime->px);
   }
 

@@ -20304,19 +20304,19 @@ namespace
 		return link;
 	}
 
-	struct OwnerWordLaneAt68Runtime
+	struct OwnerWordLaneAt68
 	{
 		std::byte pad00[68];
 		std::uint32_t lane44;
 	};
-	static_assert(offsetof(OwnerWordLaneAt68Runtime, lane44) == 68, "OwnerWordLaneAt68Runtime::lane44 offset must be 68");
+	static_assert(offsetof(OwnerWordLaneAt68, lane44) == 68, "OwnerWordLaneAt68::lane44 offset must be 68");
 
-	struct OwnerWordWritePairRuntime
+	struct OwnerWordWritePair
 	{
-		OwnerWordLaneAt68Runtime* owner;
+		OwnerWordLaneAt68* owner;
 		std::uint32_t value;
 	};
-	static_assert(sizeof(OwnerWordWritePairRuntime) == 0x08, "OwnerWordWritePairRuntime size must be 0x08");
+	static_assert(sizeof(OwnerWordWritePair) == 0x08, "OwnerWordWritePair size must be 0x08");
 
 	/**
 	 * Address: 0x00929BE0 (FUN_00929BE0)
@@ -20325,8 +20325,8 @@ namespace
 	 * Stores one 32-bit value into owner field `+0x44` (`+0x68` bytes) and
 	 * returns the owner pointer lane.
 	 */
-	OwnerWordLaneAt68Runtime* StoreOwnerWordLaneAt68(
-		OwnerWordWritePairRuntime* const writePair
+	OwnerWordLaneAt68* StoreOwnerWordLaneAt68(
+		OwnerWordWritePair* const writePair
 	)
 	{
 		if (writePair == nullptr || writePair->owner == nullptr) {

@@ -268,7 +268,7 @@ namespace
 
   static_assert(sizeof(RectHistoryNode) == 0x18, "RectHistoryNode size must be 0x18");
 
-  [[nodiscard]] RectHistoryNode* RectHistoryHead(const SRectListRuntime& history) noexcept
+  [[nodiscard]] RectHistoryNode* RectHistoryHead(const SRectList& history) noexcept
   {
     return static_cast<RectHistoryNode*>(history.mHead);
   }

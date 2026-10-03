@@ -5835,7 +5835,7 @@ namespace gpg
      * (`RRef_Entity` 0x006805E0 reaches it through the TLS slot at
      * `fs:[0x2C]`, guard bit 1 of `+0x898`).
      */
-    struct RecentRuntimeTypes
+    struct RecentRegisteredTypes
     {
       struct Entry
       {
@@ -6118,7 +6118,7 @@ namespace gpg
    * What it does:
    * A reference to `*value` as the object it really is. For a polymorphic
    * `T` whose dynamic type is not `T` itself, the dynamic type is looked up
-   * (`detail::RecentRuntimeTypes`), asserted to derive from `T` (`"isDer"`,
+   * (`detail::RecentRegisteredTypes`), asserted to derive from `T` (`"isDer"`,
    * reflection.h line 458) and the pointer moved back to the start of the
    * whole object; otherwise the reference is `{value, RTypeOf<T>()}` -- for a
    * pointer `T` that is the pointee's `RPointerType`, the reference to a
@@ -6132,7 +6132,7 @@ namespace gpg
     auto* const object = const_cast<Object*>(value);
     if constexpr (std::is_polymorphic_v<Object>) {
       if (object != nullptr && typeid(*object) != typeid(Object)) {
-        thread_local detail::RecentRuntimeTypes sRecent{};
+        thread_local detail::RecentRegisteredTypes sRecent{};
         RType* const runtime = sRecent.Find(typeid(*object));
 
         std::int32_t baseOffset = 0;

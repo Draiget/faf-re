@@ -107,7 +107,7 @@ namespace moho
    * implementations live in `CameraImpl.cpp` and are heap-allocated into the
    * two slots: system time at index 0, game time at index 1.
    */
-  class CameraTimeSourceRuntime
+  class CameraTimeSource
   {
   public:
     /// VTable slot 0, queried as `mTimeSources[mTimeSource]->Time()`.
@@ -116,7 +116,7 @@ namespace moho
     /// VTable slot 1: the scalar-deleting destructor the `eh vector destructor
     /// iterator` lane in `CameraImpl::~CameraImpl` dispatches through
     /// (FUN_007AE630).
-    virtual ~CameraTimeSourceRuntime() = default;
+    virtual ~CameraTimeSource() = default;
   };
 
   /**
@@ -353,7 +353,7 @@ namespace moho
      * of the three frustum/spotter inline weak-vector lanes from their tracked
      * `UserEntity` owners and releases any heap-grown storage. Clears the
      * intrusive target-entity weak list (`mTargetEntities`) and frees its head
-     * sentinel. Destroys both heap-allocated `CameraTimeSourceRuntime` slots
+     * sentinel. Destroys both heap-allocated `CameraTimeSource` slots
      * via the EH vector-destructor iterator, whose per-element delete
      * callback is `FUN_007AE630` (`ReleaseOwnedRuntimePointerSlotWithDeleteFlag`,
      * WinApiImportThunks.cpp) -- see the .cpp definition's doc comment for
@@ -1090,7 +1090,7 @@ namespace moho
     std::uint8_t mTargetTime = 0;                              // +0x3B8
     std::uint8_t mPadding0x3B9_[3]{};                          // +0x3B9
     std::int32_t mTimeSource = 0;                              // +0x3BC
-    CameraTimeSourceRuntime* mTimeSources[2]{};                // +0x3C0 (System=0, Game=1)
+    CameraTimeSource* mTimeSources[2]{};                // +0x3C0 (System=0, Game=1)
     float mLastFrameTime = 0.0f;                               // +0x3C8
     std::uint8_t mEnableEaseInOut = 0;                         // +0x3CC
     std::uint8_t mPadding0x3CD_[3]{};                          // +0x3CD

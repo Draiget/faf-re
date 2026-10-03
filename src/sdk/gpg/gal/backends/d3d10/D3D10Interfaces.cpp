@@ -1060,25 +1060,25 @@ namespace gpg::gal
       return GetLegacyWideZeroStorageLane();
     }
 
-    struct RuntimeProxyVectorLane final
+    struct ProxyVectorLane final
     {
       void* proxy = nullptr;          // +0x00
       std::uint8_t* first = nullptr;  // +0x04
       std::uint8_t* last = nullptr;   // +0x08
       std::uint8_t* end = nullptr;    // +0x0C
     };
-    static_assert(sizeof(RuntimeProxyVectorLane) == 0x10, "RuntimeProxyVectorLane size must be 0x10");
+    static_assert(sizeof(ProxyVectorLane) == 0x10, "ProxyVectorLane size must be 0x10");
 
-    using RuntimeProxyVectorThrowFn = void (*)();
-    using RuntimeProxyVectorAllocateFn = void* (*)(std::uint32_t);
+    using ProxyVectorThrowFn = void (*)();
+    using ProxyVectorAllocateFn = void* (*)(std::uint32_t);
 
     bool TryInitializeProxyVectorLane(
-      RuntimeProxyVectorLane* const lane,
+      ProxyVectorLane* const lane,
       const std::uint32_t elementCount,
       const std::uint32_t maxElementCount,
       const std::uint32_t elementStrideBytes,
-      RuntimeProxyVectorThrowFn throwTooLong,
-      RuntimeProxyVectorAllocateFn allocateStorage
+      ProxyVectorThrowFn throwTooLong,
+      ProxyVectorAllocateFn allocateStorage
     )
     {
       lane->first = nullptr;
@@ -1108,7 +1108,7 @@ namespace gpg::gal
      * legacy VC8 vector-length overflow semantics.
      */
     bool TryInitializeDwordProxyVectorLane(
-      RuntimeProxyVectorLane* const lane,
+      ProxyVectorLane* const lane,
       const std::uint32_t elementCount
     )
     {

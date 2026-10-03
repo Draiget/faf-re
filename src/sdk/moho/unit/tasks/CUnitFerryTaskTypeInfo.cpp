@@ -5,14 +5,15 @@
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitFerryTask.h"
+#include "moho/unit/tasks/CUnitFerryTask.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   using TypeInfo = moho::CUnitFerryTaskTypeInfo;
 
-  class CUnitFerryTaskReflectionView final : public moho::CCommandTask
+  class CUnitFerryTaskReflection final : public moho::CCommandTask
   {
   public:
     moho::IAiCommandDispatchImpl* mDispatch; // +0x30
@@ -24,7 +25,7 @@ namespace
     moho::WeakPtr<moho::Unit> mFerryUnit;    // +0x50
     moho::WeakPtr<moho::Unit> mBeacon;       // +0x58
 
-    CUnitFerryTaskReflectionView()
+    CUnitFerryTaskReflection()
       : CCommandTask()
     {
       mDispatch = nullptr;
@@ -44,7 +45,7 @@ namespace
       mBeacon.nextInOwner = nullptr;
     }
 
-    ~CUnitFerryTaskReflectionView() override
+    ~CUnitFerryTaskReflection() override
     {
       mBeacon.UnlinkFromOwnerChain();
       mFerryUnit.UnlinkFromOwnerChain();
@@ -58,36 +59,36 @@ namespace
   };
 
   static_assert(
-    sizeof(CUnitFerryTaskReflectionView) == sizeof(moho::CUnitFerryTask),
-    "CUnitFerryTaskReflectionView size must match CUnitFerryTask"
+    sizeof(CUnitFerryTaskReflection) == sizeof(moho::CUnitFerryTask),
+    "CUnitFerryTaskReflection size must match CUnitFerryTask"
   );
   static_assert(
-    offsetof(CUnitFerryTaskReflectionView, mDispatch) == 0x30,
-    "CUnitFerryTaskReflectionView::mDispatch offset must be 0x30"
+    offsetof(CUnitFerryTaskReflection, mDispatch) == 0x30,
+    "CUnitFerryTaskReflection::mDispatch offset must be 0x30"
   );
   static_assert(
-    offsetof(CUnitFerryTaskReflectionView, mCommandIndex) == 0x34,
-    "CUnitFerryTaskReflectionView::mCommandIndex offset must be 0x34"
+    offsetof(CUnitFerryTaskReflection, mCommandIndex) == 0x34,
+    "CUnitFerryTaskReflection::mCommandIndex offset must be 0x34"
   );
   static_assert(
-    offsetof(CUnitFerryTaskReflectionView, mHasResolvedFerryTarget) == 0x38,
-    "CUnitFerryTaskReflectionView::mHasResolvedFerryTarget offset must be 0x38"
+    offsetof(CUnitFerryTaskReflection, mHasResolvedFerryTarget) == 0x38,
+    "CUnitFerryTaskReflection::mHasResolvedFerryTarget offset must be 0x38"
   );
   static_assert(
-    offsetof(CUnitFerryTaskReflectionView, mPos) == 0x3C,
-    "CUnitFerryTaskReflectionView::mPos offset must be 0x3C"
+    offsetof(CUnitFerryTaskReflection, mPos) == 0x3C,
+    "CUnitFerryTaskReflection::mPos offset must be 0x3C"
   );
   static_assert(
-    offsetof(CUnitFerryTaskReflectionView, mCommandUnit) == 0x48,
-    "CUnitFerryTaskReflectionView::mCommandUnit offset must be 0x48"
+    offsetof(CUnitFerryTaskReflection, mCommandUnit) == 0x48,
+    "CUnitFerryTaskReflection::mCommandUnit offset must be 0x48"
   );
   static_assert(
-    offsetof(CUnitFerryTaskReflectionView, mFerryUnit) == 0x50,
-    "CUnitFerryTaskReflectionView::mFerryUnit offset must be 0x50"
+    offsetof(CUnitFerryTaskReflection, mFerryUnit) == 0x50,
+    "CUnitFerryTaskReflection::mFerryUnit offset must be 0x50"
   );
   static_assert(
-    offsetof(CUnitFerryTaskReflectionView, mBeacon) == 0x58,
-    "CUnitFerryTaskReflectionView::mBeacon offset must be 0x58"
+    offsetof(CUnitFerryTaskReflection, mBeacon) == 0x58,
+    "CUnitFerryTaskReflection::mBeacon offset must be 0x58"
   );
 
   /**
@@ -118,7 +119,7 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitFerryTaskRef(CUnitFerryTaskReflectionView* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitFerryTaskRef(CUnitFerryTaskReflection* const object)
   {
     return gpg::RRef{reinterpret_cast<moho::CUnitFerryTask*>(object), CachedCUnitFerryTaskType()};
   }
@@ -197,7 +198,7 @@ namespace moho
    */
   gpg::RRef CUnitFerryTaskTypeInfo::NewRef()
   {
-    auto* const object = new (std::nothrow) CUnitFerryTaskReflectionView();
+    auto* const object = new (std::nothrow) CUnitFerryTaskReflection();
     return MakeCUnitFerryTaskRef(object);
   }
 
@@ -206,9 +207,9 @@ namespace moho
    */
   gpg::RRef CUnitFerryTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitFerryTaskReflectionView*>(objectStorage);
+    auto* const object = static_cast<CUnitFerryTaskReflection*>(objectStorage);
     if (object) {
-      new (object) CUnitFerryTaskReflectionView();
+      new (object) CUnitFerryTaskReflection();
     }
     return MakeCUnitFerryTaskRef(object);
   }
@@ -218,7 +219,7 @@ namespace moho
    */
   void CUnitFerryTaskTypeInfo::Delete(void* const objectStorage)
   {
-    delete static_cast<CUnitFerryTaskReflectionView*>(objectStorage);
+    delete static_cast<CUnitFerryTaskReflection*>(objectStorage);
   }
 
   /**
@@ -226,12 +227,12 @@ namespace moho
    */
   void CUnitFerryTaskTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitFerryTaskReflectionView*>(objectStorage);
+    auto* const object = static_cast<CUnitFerryTaskReflection*>(objectStorage);
     if (!object) {
       return;
     }
 
-    object->~CUnitFerryTaskReflectionView();
+    object->~CUnitFerryTaskReflection();
   }
 
   /**

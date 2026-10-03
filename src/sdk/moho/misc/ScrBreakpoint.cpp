@@ -43,7 +43,7 @@ namespace
     return "true";
   }
 
-  struct DwordLaneRuntime
+  struct DwordLane
   {
     std::uint32_t lane0;
     std::uint32_t lane1;
@@ -54,7 +54,7 @@ namespace
     std::uint32_t lane6;
   };
 
-  static_assert(sizeof(DwordLaneRuntime) == 0x1C, "DwordLaneRuntime size must be 0x1C");
+  static_assert(sizeof(DwordLane) == 0x1C, "DwordLane size must be 0x1C");
 
   /**
    * Address: 0x004B00A0 (FUN_004B00A0)
@@ -62,8 +62,8 @@ namespace
    * What it does:
    * Stores one caller-provided dword into lane0 of output storage.
    */
-  [[maybe_unused]] DwordLaneRuntime* StoreDwordLane0(
-    DwordLaneRuntime* const outLanes,
+  [[maybe_unused]] DwordLane* StoreDwordLane0(
+    DwordLane* const outLanes,
     const std::uint32_t lane0
   ) noexcept
   {
@@ -78,7 +78,7 @@ namespace
    * Returns dword lane4 from caller-provided lane storage.
    */
   [[maybe_unused]] std::uint32_t ReadDwordLane4(
-    const DwordLaneRuntime* const lanes
+    const DwordLane* const lanes
   ) noexcept
   {
     return lanes->lane4;
@@ -91,7 +91,7 @@ namespace
    * Returns dword lane5 from caller-provided lane storage.
    */
   [[maybe_unused]] std::uint32_t ReadDwordLane5(
-    const DwordLaneRuntime* const lanes
+    const DwordLane* const lanes
   ) noexcept
   {
     return lanes->lane5;
@@ -104,7 +104,7 @@ namespace
    * Returns dword lane6 from caller-provided lane storage.
    */
   [[maybe_unused]] std::uint32_t ReadDwordLane6(
-    const DwordLaneRuntime* const lanes
+    const DwordLane* const lanes
   ) noexcept
   {
     return lanes->lane6;
@@ -117,7 +117,7 @@ namespace
    * Exchanges dword lane6 and returns the previously stored lane value.
    */
   [[maybe_unused]] std::uint32_t ExchangeDwordLane6(
-    DwordLaneRuntime* const lanes,
+    DwordLane* const lanes,
     const std::uint32_t replacementLane6
   ) noexcept
   {

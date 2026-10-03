@@ -52,7 +52,7 @@ namespace
     const boost::shared_ptr<TType>& lhs, const boost::shared_ptr<TType>& rhs
   ) noexcept
   {
-    using SharedHandleRaw = boost::SharedPtrLayoutView<TType>;
+    using SharedHandleRaw = boost::SharedPtrLayout<TType>;
     const auto* const lhsRaw = reinterpret_cast<const SharedHandleRaw*>(&lhs);
     const auto* const rhsRaw = reinterpret_cast<const SharedHandleRaw*>(&rhs);
     if (lhsRaw->px == rhsRaw->px) {

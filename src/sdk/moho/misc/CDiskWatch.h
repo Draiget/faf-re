@@ -23,7 +23,7 @@ namespace moho
     std::uint32_t mTimestampHigh; // +0x24
   };
 
-  struct SDiskWatchOverlappedRuntime
+  struct SDiskWatchOverlapped
   {
     std::uintptr_t mInternal;      // +0x00
     std::uintptr_t mInternalHigh;  // +0x04
@@ -79,7 +79,7 @@ namespace moho
     msvc8::string mDirectoryPath;      // +0x14
     void* mDirectoryHandle;            // +0x30
     msvc8::vector<std::uint8_t> mReadBuffer;       // +0x34
-    SDiskWatchOverlappedRuntime mReadOverlapped;   // +0x44
+    SDiskWatchOverlapped mReadOverlapped;   // +0x44
   };
 
   /**
@@ -294,7 +294,7 @@ namespace moho
 
   static_assert(sizeof(SDiskWatchEvent) == 0x28, "SDiskWatchEvent size must be 0x28");
   static_assert(offsetof(SDiskWatchEvent, mActionCode) == 0x1C, "SDiskWatchEvent::mActionCode offset must be 0x1C");
-  static_assert(sizeof(SDiskWatchOverlappedRuntime) == 0x14, "SDiskWatchOverlappedRuntime size must be 0x14");
+  static_assert(sizeof(SDiskWatchOverlapped) == 0x14, "SDiskWatchOverlapped size must be 0x14");
   static_assert(sizeof(CDiskDirWatch) == 0x58, "CDiskDirWatch size must be 0x58");
   static_assert(offsetof(CDiskDirWatch, mPendingEvents) == 0x04, "CDiskDirWatch::mPendingEvents offset must be 0x04");
   static_assert(offsetof(CDiskDirWatch, mDirectoryPath) == 0x14, "CDiskDirWatch::mDirectoryPath offset must be 0x14");

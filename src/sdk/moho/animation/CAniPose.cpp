@@ -246,7 +246,7 @@ namespace
     return transform;
   }
 
-  struct PoseDualTransformTailLaneView
+  struct PoseDualTransformTailLane
   {
     float lane00;
     float lane04;
@@ -265,7 +265,7 @@ namespace
     float lane38;
     float lane3C;
   };
-  static_assert(sizeof(PoseDualTransformTailLaneView) == 0x40, "PoseDualTransformTailLaneView size must be 0x40");
+  static_assert(sizeof(PoseDualTransformTailLane) == 0x40, "PoseDualTransformTailLane size must be 0x40");
 
   /**
    * Address: 0x0054C960 (FUN_0054C960)
@@ -275,8 +275,8 @@ namespace
    * pose payload: sets both scale-diagonal lanes to `1.0f` and clears the
    * remaining tail lanes.
    */
-  [[maybe_unused]] PoseDualTransformTailLaneView* InitializePoseDualTransformTailLanes(
-    PoseDualTransformTailLaneView* const laneView
+  [[maybe_unused]] PoseDualTransformTailLane* InitializePoseDualTransformTailLanes(
+    PoseDualTransformTailLane* const laneView
   ) noexcept
   {
     if (laneView == nullptr) {

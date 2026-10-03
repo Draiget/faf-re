@@ -29,11 +29,11 @@ namespace gpg::core
         static_assert(std::is_trivial<OwnerT>::value || std::is_standard_layout<OwnerT>::value,
             "OwnerT must be trivially addressable");
 
-        struct NodeView {
+        struct TreeCursor {
             std::uint8_t* p;
-            NodeView left()  const { return NodeView{ *reinterpret_cast<std::uint8_t**>(p + kLeftOff) }; }
-            NodeView right() const { return NodeView{ *reinterpret_cast<std::uint8_t**>(p + kRightOff) }; }
-            NodeView parent()const { return NodeView{ *reinterpret_cast<std::uint8_t**>(p + kParentOff) }; }
+            TreeCursor left()  const { return TreeCursor{ *reinterpret_cast<std::uint8_t**>(p + kLeftOff) }; }
+            TreeCursor right() const { return TreeCursor{ *reinterpret_cast<std::uint8_t**>(p + kRightOff) }; }
+            TreeCursor parent()const { return TreeCursor{ *reinterpret_cast<std::uint8_t**>(p + kParentOff) }; }
             [[nodiscard]] bool      null()  const { return p == nullptr; }
         };
 
@@ -51,7 +51,7 @@ namespace gpg::core
             using reference = OwnerT&;
 
             iterator() : cur_{ nullptr }, head_{ nullptr } {}
-            iterator(NodeView cur, NodeView head) : cur_{ cur }, head_{ head } {}
+            iterator(TreeCursor cur, TreeCursor head) : cur_{ cur }, head_{ head } {}
 
             reference operator*()  const { return *owner_from_node(cur_); }
             pointer operator->() const { return  owner_from_node(cur_); }
@@ -62,7 +62,7 @@ namespace gpg::core
             /** ++it: in-order successor */
             iterator& operator++() {
                 // If right subtree exists, go to its leftmost
-                NodeView n = cur_;
+                TreeCursor n = cur_;
                 if (n.right().p != head_.p && !n.right().null()) {
                     n = n.right();
                     while (n.left().p != head_.p && !n.left().null())
@@ -71,7 +71,7 @@ namespace gpg::core
                     return *this;
                 }
                 // Else climb up until we come from a left child
-                NodeView parent = n.parent();
+                TreeCursor parent = n.parent();
                 while (parent.p != nullptr && parent.p != head_.p && n.p == parent.right().p) {
                     n = parent;
                     parent = parent.parent();
@@ -84,11 +84,11 @@ namespace gpg::core
             iterator operator++(int) { iterator tmp = *this; ++(*this); return tmp; }
 
         private:
-            static pointer owner_from_node(NodeView n) {
+            static pointer owner_from_node(TreeCursor n) {
                 return reinterpret_cast<pointer>(n.p - kNodeEmbedOff);
             }
-            NodeView cur_{};
-            NodeView head_{};
+            TreeCursor cur_{};
+            TreeCursor head_{};
         };
 
         IntrusiveRbTree() = default;
@@ -105,7 +105,7 @@ namespace gpg::core
 
         /** Begin (leftmost) and end (sentinel head) iterators. */
         iterator begin() const {
-            NodeView left = head_left();
+            TreeCursor left = head_left();
             return iterator(left.p ? left : head_, head_);
         }
         iterator end() const {
@@ -117,11 +117,11 @@ namespace gpg::core
         [[nodiscard]] void* root_node() const { return head_parent().p; }
 
     private:
-        NodeView head_left()   const { return NodeView{ *reinterpret_cast<std::uint8_t**>(head_.p + kLeftOff) }; }
-        NodeView head_right()  const { return NodeView{ *reinterpret_cast<std::uint8_t**>(head_.p + kRightOff) }; }
-        NodeView head_parent() const { return NodeView{ *reinterpret_cast<std::uint8_t**>(head_.p + kParentOff) }; }
+        TreeCursor head_left()   const { return TreeCursor{ *reinterpret_cast<std::uint8_t**>(head_.p + kLeftOff) }; }
+        TreeCursor head_right()  const { return TreeCursor{ *reinterpret_cast<std::uint8_t**>(head_.p + kRightOff) }; }
+        TreeCursor head_parent() const { return TreeCursor{ *reinterpret_cast<std::uint8_t**>(head_.p + kParentOff) }; }
 
         std::uint8_t* base_{ nullptr };
-        NodeView     head_{ nullptr };
+        TreeCursor     head_{ nullptr };
     };
 }

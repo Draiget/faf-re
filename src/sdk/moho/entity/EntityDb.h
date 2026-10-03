@@ -52,7 +52,7 @@ namespace moho
    * `Handle` returned by `Insert` keep resolving to the right node across
    * heap reorders.
    */
-  struct CEntityDbBoundedPropQueueRuntime
+  struct CEntityDbBoundedPropQueue
   {
     msvc8::vector<CEntityDbBoundedPropQueueNode> heap; // +0x00 (proxy +0x00, first +0x04, last +0x08, end +0x0C)
     msvc8::vector<std::int32_t> handleSlots;           // +0x10 (proxy +0x10, first +0x14, last +0x18, end +0x1C)
@@ -67,7 +67,7 @@ namespace moho
      * `handleSlots` members already start empty, so only `lastHandle`'s
      * default member initializer above is needed to reproduce it.
      */
-    CEntityDbBoundedPropQueueRuntime() noexcept = default;
+    CEntityDbBoundedPropQueue() noexcept = default;
 
     /**
      * Address: 0x00684360 (FUN_00684360 -- the implicit destructor, emitted
@@ -78,7 +78,7 @@ namespace moho
      * itself, and its storage freed. Formerly `Reset()`, which `~EntityDB`
      * called by hand and which tore `heap` down first, removed 2026-09-30.)
      */
-    ~CEntityDbBoundedPropQueueRuntime() = default;
+    ~CEntityDbBoundedPropQueue() = default;
 
     /**
      * Address: 0x006859F0 (FUN_006859F0)
@@ -154,11 +154,11 @@ namespace moho
     void Swap(std::int32_t lhs, std::int32_t rhs) noexcept;
   };
   static_assert(
-    sizeof(CEntityDbBoundedPropQueueRuntime) == 0x24, "CEntityDbBoundedPropQueueRuntime size must be 0x24"
+    sizeof(CEntityDbBoundedPropQueue) == 0x24, "CEntityDbBoundedPropQueue size must be 0x24"
   );
-  static_assert(offsetof(CEntityDbBoundedPropQueueRuntime, heap) == 0x00, "CEntityDbBoundedPropQueueRuntime::heap offset must be 0x00");
-  static_assert(offsetof(CEntityDbBoundedPropQueueRuntime, handleSlots) == 0x10, "CEntityDbBoundedPropQueueRuntime::handleSlots offset must be 0x10");
-  static_assert(offsetof(CEntityDbBoundedPropQueueRuntime, lastHandle) == 0x20, "CEntityDbBoundedPropQueueRuntime::lastHandle offset must be 0x20");
+  static_assert(offsetof(CEntityDbBoundedPropQueue, heap) == 0x00, "CEntityDbBoundedPropQueue::heap offset must be 0x00");
+  static_assert(offsetof(CEntityDbBoundedPropQueue, handleSlots) == 0x10, "CEntityDbBoundedPropQueue::handleSlots offset must be 0x10");
+  static_assert(offsetof(CEntityDbBoundedPropQueue, lastHandle) == 0x20, "CEntityDbBoundedPropQueue::lastHandle offset must be 0x20");
 
   /**
    * Iterator payload used by all-army unit scans against `EntityDB::mAllUnits`.
@@ -446,7 +446,7 @@ namespace moho
     // `MemberSerialize` (0x006897F0) writes it whole at `this + 0x20`. Every
     // live entity is in `mAllUnits`, not here.
     msvc8::list<Entity*> mEntList;                  // +0x20
-    CEntityDbBoundedPropQueueRuntime mBoundedProps; // +0x2C
+    CEntityDbBoundedPropQueue mBoundedProps; // +0x2C
   };
 
   static_assert(offsetof(EntityDB, mAllUnits) == 0x00, "EntityDB::mAllUnits offset must be 0x00");

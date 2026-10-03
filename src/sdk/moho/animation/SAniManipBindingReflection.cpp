@@ -118,7 +118,7 @@ namespace
     return moho::SAniManipBinding::sType;
   }
 
-  struct SAniManipBindingRuntimeInlineView
+  struct SAniManipBindingInline
   {
     moho::SAniManipBinding* begin = nullptr;
     moho::SAniManipBinding* end = nullptr;
@@ -126,8 +126,8 @@ namespace
     moho::SAniManipBinding* inlineStorage = nullptr;
   };
   static_assert(
-    sizeof(SAniManipBindingRuntimeInlineView) == 0x10,
-    "SAniManipBindingRuntimeInlineView size must be 0x10"
+    sizeof(SAniManipBindingInline) == 0x10,
+    "SAniManipBindingInline size must be 0x10"
   );
 
   /**
@@ -137,9 +137,9 @@ namespace
    * Initializes one inline fastvector-style runtime view where `begin=end` at
    * the inline storage base and capacity spans two `SAniManipBinding` lanes.
    */
-  [[maybe_unused]] SAniManipBindingRuntimeInlineView*
+  [[maybe_unused]] SAniManipBindingInline*
   InitializeSAniManipBindingInlineView(
-    SAniManipBindingRuntimeInlineView* const outView,
+    SAniManipBindingInline* const outView,
     moho::SAniManipBinding* const inlineStorageBase
   ) noexcept
   {

@@ -437,7 +437,7 @@ void CNetUDPConnector::Debug()
  * What it does:
  * Returns a snapshot view of send/recv stamps from `since` milliseconds up to current connector time.
  */
-SSendStampView CNetUDPConnector::SnapshotSendStamps(const int32_t since)
+SSendStampWindow CNetUDPConnector::SnapshotSendStamps(const int32_t since)
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
   const uint64_t endTimeUs = static_cast<uint64_t>(GetTime());

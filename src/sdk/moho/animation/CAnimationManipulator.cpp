@@ -84,7 +84,7 @@ namespace
   // `moho::SScaHeader` (RScaResource.h) describes the same record, but its
   // +0x08/+0x10 names (boneCount/keysPerBone) are really the frame count and
   // the bone-track count, as the frame stride at 0x0063FDD0 shows.
-  struct AnimationClipHeaderView
+  struct AnimationClipHeader
   {
     std::uint8_t mReserved00[0x08];
     std::uint32_t mFrameCount;          // +0x08
@@ -97,9 +97,9 @@ namespace
   // `RScaResource::mEnd` (+0x30) the animation section (a 28-byte root
   // transform, then the frames). Both point into the resource's own file
   // buffer, so the header record is read straight out of those bytes.
-  [[nodiscard]] const AnimationClipHeaderView* ScaClipHeader(const moho::RScaResource& resource) noexcept
+  [[nodiscard]] const AnimationClipHeader* ScaClipHeader(const moho::RScaResource& resource) noexcept
   {
-    return reinterpret_cast<const AnimationClipHeaderView*>(resource.mStart);
+    return reinterpret_cast<const AnimationClipHeader*>(resource.mStart);
   }
 
   // Frame `index` of a clip: the animation section starts with a 28-byte root
@@ -129,7 +129,7 @@ namespace
     return skeleton->GetBone(static_cast<std::uint32_t>(bone.mIdx));
   }
 
-  [[nodiscard]] const AnimationClipHeaderView*
+  [[nodiscard]] const AnimationClipHeader*
   GetAnimationClipHeader(const boost::shared_ptr<moho::RScaResource>& ref)
   {
     if (!ref) {
@@ -1300,7 +1300,7 @@ namespace moho
     if (resource == nullptr) {
       return false;
     }
-    const AnimationClipHeaderView* const clip = ScaClipHeader(*resource);
+    const AnimationClipHeader* const clip = ScaClipHeader(*resource);
     if (clip->mFrameCount == 0u) {
       return false;
     }
@@ -1449,7 +1449,7 @@ namespace moho
    */
   void CAnimationManipulator::SetAnimationFraction(const float fraction)
   {
-    const AnimationClipHeaderView* const clip = GetAnimationClipHeader(mAnimationRef);
+    const AnimationClipHeader* const clip = GetAnimationClipHeader(mAnimationRef);
     if (!clip) {
       return;
     }
@@ -1470,7 +1470,7 @@ namespace moho
    */
   void CAnimationManipulator::SetAnimationTime(const float timeSeconds)
   {
-    const AnimationClipHeaderView* const clip = GetAnimationClipHeader(mAnimationRef);
+    const AnimationClipHeader* const clip = GetAnimationClipHeader(mAnimationRef);
     if (!clip) {
       return;
     }
@@ -1517,7 +1517,7 @@ namespace moho
       // 0x0063FBC1..0x0063FC5A: rebuild the watch-bone bindings from the clip's
       // bone-name table, resolving each name against the owner's skeleton.
       const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
-      const AnimationClipHeaderView* const clip = ScaClipHeader(*resource);
+      const AnimationClipHeader* const clip = ScaClipHeader(*resource);
       const std::uint32_t boneTrackCount = clip->mBoneTrackCount;
       const char* boneName = reinterpret_cast<const char*>(clip) + clip->mBoneNameTableOffset;
       ResetWatchBoneStorage();
@@ -1603,7 +1603,7 @@ namespace moho
 
   float CAnimationManipulator::GetAnimationDuration() const
   {
-    const AnimationClipHeaderView* const clip = GetAnimationClipHeader(mAnimationRef);
+    const AnimationClipHeader* const clip = GetAnimationClipHeader(mAnimationRef);
     if (!clip) {
       return 0.0f;
     }

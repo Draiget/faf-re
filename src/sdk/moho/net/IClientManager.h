@@ -193,7 +193,7 @@ namespace moho
      * Slot: 23
      * Demangled: _purecall
      */
-    virtual SSendStampView GetBetween(int since) = 0;
+    virtual SSendStampWindow GetBetween(int since) = 0;
 
     /**
      * Address: 0x00A82547

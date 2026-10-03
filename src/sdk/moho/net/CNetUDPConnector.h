@@ -201,7 +201,7 @@ namespace moho
      * What it does:
      * Returns a snapshot view of send/recv stamps from `since` milliseconds up to current connector time.
      */
-    SSendStampView SnapshotSendStamps(int32_t since) override;
+    SSendStampWindow SnapshotSendStamps(int32_t since) override;
 
     /**
      * Address: 0x00489F30

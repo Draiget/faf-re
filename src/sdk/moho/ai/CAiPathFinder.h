@@ -17,14 +17,14 @@ namespace moho
   class Sim;
   class Unit;
 
-  struct SRectListRuntime
+  struct SRectList
   {
     void* mAllocatorOrProxy; // +0x00
     void* mHead;             // +0x04 (intrusive sentinel node)
     std::int32_t mSize;      // +0x08
   };
 
-  static_assert(sizeof(SRectListRuntime) == 0x0C, "SRectListRuntime size must be 0x0C");
+  static_assert(sizeof(SRectList) == 0x0C, "SRectList size must be 0x0C");
 
   /**
    * Runtime path-grid cell payload used by land path callbacks.
@@ -320,7 +320,7 @@ namespace moho
     std::uint8_t mHasPathResult;         // +0x65
     std::uint8_t mPad66;                 // +0x66
     std::uint8_t mPad67;                 // +0x67
-    SRectListRuntime mRecentSearchRects; // +0x68
+    SRectList mRecentSearchRects; // +0x68
     std::uint8_t mUseWholeMap;           // +0x74
     std::uint8_t mInsidePlayableRect;    // +0x75
     std::uint8_t mPad76;                 // +0x76

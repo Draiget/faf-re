@@ -199,18 +199,18 @@ namespace
     return ResolveCachedType<moho::VTransform>(gVTransformType);
   }
 
-  struct ScaledDirectionLaneView
+  struct ScaledDirectionLane
   {
     Wm3::Vector3f base;      // +0x00
     Wm3::Vector3f direction; // +0x0C
     float scale;             // +0x18
   };
 
-  static_assert(sizeof(ScaledDirectionLaneView) == 0x1C, "ScaledDirectionLaneView size must be 0x1C");
+  static_assert(sizeof(ScaledDirectionLane) == 0x1C, "ScaledDirectionLane size must be 0x1C");
   static_assert(
-    offsetof(ScaledDirectionLaneView, direction) == 0x0C, "ScaledDirectionLaneView::direction offset must be 0x0C"
+    offsetof(ScaledDirectionLane, direction) == 0x0C, "ScaledDirectionLane::direction offset must be 0x0C"
   );
-  static_assert(offsetof(ScaledDirectionLaneView, scale) == 0x18, "ScaledDirectionLaneView::scale offset must be 0x18");
+  static_assert(offsetof(ScaledDirectionLane, scale) == 0x18, "ScaledDirectionLane::scale offset must be 0x18");
 
   /**
    * Address: 0x00675300 (FUN_00675300)
@@ -220,7 +220,7 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] Wm3::Vector3f* ComposeScaledDirectionOffsetAdd(
     Wm3::Vector3f* const out,
-    const ScaledDirectionLaneView* const lane
+    const ScaledDirectionLane* const lane
   ) noexcept
   {
     GPG_ASSERT(out != nullptr);
@@ -244,7 +244,7 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] Wm3::Vector3f* ComposeScaledDirectionOffsetSub(
     Wm3::Vector3f* const out,
-    const ScaledDirectionLaneView* const lane
+    const ScaledDirectionLane* const lane
   ) noexcept
   {
     GPG_ASSERT(out != nullptr);
@@ -260,13 +260,13 @@ namespace
     return out;
   }
 
-  struct ByteLaneFlagAt18View
+  struct ByteLaneFlagAt18
   {
     std::uint8_t pad_00_18[0x18];
     std::uint8_t flagValue; // +0x18
   };
 
-  static_assert(offsetof(ByteLaneFlagAt18View, flagValue) == 0x18, "ByteLaneFlagAt18View::flagValue offset must be 0x18");
+  static_assert(offsetof(ByteLaneFlagAt18, flagValue) == 0x18, "ByteLaneFlagAt18::flagValue offset must be 0x18");
 
   /**
    * Address: 0x006767F0 (FUN_006767F0)
@@ -274,7 +274,7 @@ namespace
    * What it does:
    * Returns one raw flag byte from lane `+0x18`.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t ReadFlagByteAtOffset18(const ByteLaneFlagAt18View* const view) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint8_t ReadFlagByteAtOffset18(const ByteLaneFlagAt18* const view) noexcept
   {
     GPG_ASSERT(view != nullptr);
     if (!view) {
@@ -284,14 +284,14 @@ namespace
     return view->flagValue;
   }
 
-  struct PackedHistoryIndexWordView
+  struct PackedHistoryIndexWord
   {
     std::uint32_t packedWord;
   };
 
   static_assert(
-    offsetof(PackedHistoryIndexWordView, packedWord) == 0x00,
-    "PackedHistoryIndexWordView::packedWord offset must be 0x00"
+    offsetof(PackedHistoryIndexWord, packedWord) == 0x00,
+    "PackedHistoryIndexWord::packedWord offset must be 0x00"
   );
 
   inline constexpr std::uint32_t kPackedHistoryIndexShift = 20u;
@@ -304,7 +304,7 @@ namespace
    * What it does:
    * Decodes packed table index bits (`[27:20]`) from one 32-bit lane.
    */
-  [[nodiscard]] std::uint32_t DecodePackedHistoryIndexByte(const PackedHistoryIndexWordView* const packedWord
+  [[nodiscard]] std::uint32_t DecodePackedHistoryIndexByte(const PackedHistoryIndexWord* const packedWord
   ) noexcept
   {
     GPG_ASSERT(packedWord != nullptr);
@@ -339,7 +339,7 @@ namespace
       return nullptr;
     }
 
-    const PackedHistoryIndexWordView packedWord{entityId};
+    const PackedHistoryIndexWord packedWord{entityId};
     const std::uint32_t armyIndex = DecodePackedHistoryIndexByte(&packedWord);
     if (armyIndex == kPackedHistoryIndexInvalid) {
       return nullptr;

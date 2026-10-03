@@ -109,7 +109,7 @@ namespace moho
      * What it does:
      * Returns an empty send-stamp snapshot (`items` empty, duration/end = 0).
      */
-    SSendStampView SnapshotSendStamps(int32_t since) override;
+    SSendStampWindow SnapshotSendStamps(int32_t since) override;
   };
 
   static_assert(sizeof(CNetNullConnector) == 0x4, "CNetNullConnector size must be 0x4");

@@ -12,7 +12,7 @@
 
 namespace {
 
-struct PngInfoRowLayoutRuntimeView
+struct PngInfoRowLayout
 {
   std::uint8_t pad00_5F[0x60]{};
   std::uint32_t rowbytes = 0;  // +0x60
@@ -20,12 +20,12 @@ struct PngInfoRowLayoutRuntimeView
   std::uint8_t pixelDepth = 0; // +0x65
 };
 
-static_assert(offsetof(PngInfoRowLayoutRuntimeView, rowbytes) == 0x60,
-              "PngInfoRowLayoutRuntimeView::rowbytes offset must be 0x60");
-static_assert(offsetof(PngInfoRowLayoutRuntimeView, channels) == 0x64,
-              "PngInfoRowLayoutRuntimeView::channels offset must be 0x64");
-static_assert(offsetof(PngInfoRowLayoutRuntimeView, pixelDepth) == 0x65,
-              "PngInfoRowLayoutRuntimeView::pixelDepth offset must be 0x65");
+static_assert(offsetof(PngInfoRowLayout, rowbytes) == 0x60,
+              "PngInfoRowLayout::rowbytes offset must be 0x60");
+static_assert(offsetof(PngInfoRowLayout, channels) == 0x64,
+              "PngInfoRowLayout::channels offset must be 0x64");
+static_assert(offsetof(PngInfoRowLayout, pixelDepth) == 0x65,
+              "PngInfoRowLayout::pixelDepth offset must be 0x65");
 
 } // namespace
 
@@ -321,7 +321,7 @@ extern "C" void png_info_set_row_layout_runtime(
   const std::uint8_t channels,
   const std::uint8_t pixel_depth)
 {
-  auto* const info = reinterpret_cast<PngInfoRowLayoutRuntimeView*>(info_ptr);
+  auto* const info = reinterpret_cast<PngInfoRowLayout*>(info_ptr);
   info->rowbytes = rowbytes;
   info->channels = channels;
   info->pixelDepth = pixel_depth;
@@ -338,6 +338,6 @@ extern "C" void png_info_set_row_layout_runtime(
  */
 extern "C" std::uint32_t png_info_get_rowbytes_runtime(png_infop info_ptr)
 {
-  const auto* const info = reinterpret_cast<const PngInfoRowLayoutRuntimeView*>(info_ptr);
+  const auto* const info = reinterpret_cast<const PngInfoRowLayout*>(info_ptr);
   return info->rowbytes;
 }

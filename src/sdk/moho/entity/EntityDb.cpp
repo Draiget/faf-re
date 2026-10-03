@@ -809,20 +809,20 @@ namespace
     return *outPosition;
   }
 
-  struct BackRefListNodeRuntime
+  struct BackRefListNode
   {
-    BackRefListNodeRuntime* next;
-    BackRefListNodeRuntime** backRef;
+    BackRefListNode* next;
+    BackRefListNode** backRef;
   };
-  static_assert(sizeof(BackRefListNodeRuntime) == 0x08, "BackRefListNodeRuntime size must be 0x08");
+  static_assert(sizeof(BackRefListNode) == 0x08, "BackRefListNode size must be 0x08");
 
-  struct BackRefListOwnerRuntime
+  struct BackRefListOwner
   {
     std::uint32_t iteratorProxy;
-    BackRefListNodeRuntime* head;
+    BackRefListNode* head;
     std::uint32_t size;
   };
-  static_assert(sizeof(BackRefListOwnerRuntime) == 0x0C, "BackRefListOwnerRuntime size must be 0x0C");
+  static_assert(sizeof(BackRefListOwner) == 0x0C, "BackRefListOwner size must be 0x0C");
 
   /**
    * Address: 0x00685BA0 (FUN_00685BA0)
@@ -875,14 +875,6 @@ namespace
 
         it = entities.erase(it, it + 1);
       }
-    }
-  }
-
-  void AdvanceRuntimeIdPools(moho::EntityDB& entityDb)
-  {
-    for (auto& [familySourceBits, pool] : entityDb.mIdPoolTree) {
-      (void)familySourceBits;
-      pool.Update();
     }
   }
 
@@ -1268,7 +1260,7 @@ namespace moho
   {
     // mBoundedProps (Address: 0x00685980, FUN_00685980) starts empty via its
     // own default member initialization -- see the constructor citation on
-    // `CEntityDbBoundedPropQueueRuntime` in EntityDb.h.
+    // `CEntityDbBoundedPropQueue` in EntityDb.h.
   }
 
   /**
@@ -1349,7 +1341,11 @@ namespace moho
       delete queuedEntity;
     }
 
-    AdvanceRuntimeIdPools(*this);
+    // Advance every id pool: the tail of ?Purge@EntityDB@@QAEXXZ.
+    for (auto& [familySourceBits, pool] : mIdPoolTree) {
+      (void)familySourceBits;
+      pool.Update();
+    }
   }
 
   /**
@@ -1594,7 +1590,7 @@ namespace moho
    * unreachable from here) -- collapsed onto this method, the real
    * source-level invocation `SiftUp`/`SiftDown` already call by name.
    */
-  void CEntityDbBoundedPropQueueRuntime::Swap(const std::int32_t lhs, const std::int32_t rhs) noexcept
+  void CEntityDbBoundedPropQueue::Swap(const std::int32_t lhs, const std::int32_t rhs) noexcept
   {
     if (lhs == rhs) {
       return;
@@ -1627,7 +1623,7 @@ namespace moho
    * unreachable from here) -- collapsed onto this method, the real
    * source-level invocation `Insert` already calls by name.
    */
-  std::int32_t CEntityDbBoundedPropQueueRuntime::AcquireHandle(const std::int32_t payload) noexcept
+  std::int32_t CEntityDbBoundedPropQueue::AcquireHandle(const std::int32_t payload) noexcept
   {
     if (lastHandle == -1) {
       const std::int32_t index = static_cast<std::int32_t>(handleSlots.size());
@@ -1657,7 +1653,7 @@ namespace moho
    * `moho/sim/SimRecoveryRuntime.cpp`, unreachable from here) -- collapsed
    * onto this method, reached by name from `Insert`.
    */
-  std::int32_t CEntityDbBoundedPropQueueRuntime::SiftUp(std::int32_t index) noexcept
+  std::int32_t CEntityDbBoundedPropQueue::SiftUp(std::int32_t index) noexcept
   {
     CEntityDbBoundedPropQueueNode* const nodes = heap.begin();
     while (index != 0) {
@@ -1688,7 +1684,7 @@ namespace moho
    * anywhere in `src/sdk/**`; removed rather than left as a citation
    * duplicate.
    */
-  void CEntityDbBoundedPropQueueRuntime::SiftDown(std::int32_t index, const std::int32_t count) noexcept
+  void CEntityDbBoundedPropQueue::SiftDown(std::int32_t index, const std::int32_t count) noexcept
   {
     CEntityDbBoundedPropQueueNode* const nodes = heap.begin();
     for (;;) {
@@ -1738,7 +1734,7 @@ namespace moho
    * Sole caller: `Moho::EntityDB::AddBoundedProp` (0x00684C30), which calls
    * this at 0x00684CCF.
    */
-  std::int32_t CEntityDbBoundedPropQueueRuntime::Insert(
+  std::int32_t CEntityDbBoundedPropQueue::Insert(
     const std::int32_t priority, const std::int32_t boundedTick, Prop* const prop
   ) noexcept
   {
@@ -1773,7 +1769,7 @@ namespace moho
    * `RemoveBoundedProp` (explicit removal by handle), and `Prop::~Prop`
    * (auto-unregister on prop destruction).
    */
-  void CEntityDbBoundedPropQueueRuntime::PopAt(const std::int32_t index) noexcept
+  void CEntityDbBoundedPropQueue::PopAt(const std::int32_t index) noexcept
   {
     const std::int32_t lastIndex = static_cast<std::int32_t>(heap.size()) - 1;
     if (index != lastIndex) {

@@ -2532,7 +2532,7 @@ namespace
     using moho::CD3DBatchTexture;
     using moho::CD3DPrimBatcher;
     using moho::SBandwidthUsageSeries;
-    using moho::SSendStampView;
+    using moho::SSendStampWindow;
     using moho::CClientManagerImpl;
     using moho::INetConnector;
     using moho::Vector3f;
@@ -2592,12 +2592,12 @@ namespace
     const int kernelMs = RenFloorTowardZero(moho::ren_BandwidthDisplayKernel * 1000.0f);        // v28-derived
 
     // 0x007F443E..0x007F4451: local send-stamp window (vtable GetBetween, slot 23).
-    SSendStampView localStamps = clientMgr->GetBetween(rangeSpanMs + kernelMs);
+    SSendStampWindow localStamps = clientMgr->GetBetween(rangeSpanMs + kernelMs);
 
     // 0x007F4453..0x007F44A1: connector send-stamp window (SnapshotSendStamps, slot 12).
     INetConnector* const connector = clientMgr->GetConnector();
     const int connectorSinceMs = rangeSpanMs + RenFloorTowardZero(moho::ren_BandwidthDisplayKernel * 1000.0f);
-    SSendStampView connectorStamps = connector->SnapshotSendStamps(connectorSinceMs);
+    SSendStampWindow connectorStamps = connector->SnapshotSendStamps(connectorSinceMs);
 
     // ---- Build the two smoothed byte-rate series, asm 0x007F44A3..0x007F4547.
     const int sampleCount = rangeSpanMs;                                     // v63

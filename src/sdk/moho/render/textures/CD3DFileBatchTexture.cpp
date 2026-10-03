@@ -301,7 +301,7 @@ namespace moho
       std::uint32_t word3 = 0;
     };
 
-    struct LegacyBlockLaneVectorView
+    struct LegacyBlockLaneVector
     {
       void* proxy = nullptr;
       LegacyBlockLane16* first = nullptr;
@@ -309,11 +309,11 @@ namespace moho
       LegacyBlockLane16* end = nullptr;
     };
 
-    static_assert(offsetof(LegacyBlockLaneVectorView, first) == 0x04, "LegacyBlockLaneVectorView::first offset must be 0x04");
-    static_assert(offsetof(LegacyBlockLaneVectorView, last) == 0x08, "LegacyBlockLaneVectorView::last offset must be 0x08");
-    static_assert(offsetof(LegacyBlockLaneVectorView, end) == 0x0C, "LegacyBlockLaneVectorView::end offset must be 0x0C");
+    static_assert(offsetof(LegacyBlockLaneVector, first) == 0x04, "LegacyBlockLaneVector::first offset must be 0x04");
+    static_assert(offsetof(LegacyBlockLaneVector, last) == 0x08, "LegacyBlockLaneVector::last offset must be 0x08");
+    static_assert(offsetof(LegacyBlockLaneVector, end) == 0x0C, "LegacyBlockLaneVector::end offset must be 0x0C");
     static_assert(sizeof(LegacyBlockLane16) == 0x10, "LegacyBlockLane16 size must be 0x10");
-    static_assert(sizeof(LegacyBlockLaneVectorView) == 0x10, "LegacyBlockLaneVectorView size must be 0x10");
+    static_assert(sizeof(LegacyBlockLaneVector) == 0x10, "LegacyBlockLaneVector size must be 0x10");
 
     /**
      * Address: 0x0044EAB0 (FUN_0044EAB0)
@@ -323,7 +323,7 @@ namespace moho
      */
     [[maybe_unused]] LegacyBlockLane16** CopyLegacyBlockLaneBeginCursor(
       LegacyBlockLane16** const outCursor,
-      const LegacyBlockLaneVectorView& view
+      const LegacyBlockLaneVector& view
     )
     {
       *outCursor = view.first;
@@ -338,7 +338,7 @@ namespace moho
      */
     [[maybe_unused]] LegacyBlockLane16** CopyLegacyBlockLaneEndCursor(
       LegacyBlockLane16** const outCursor,
-      const LegacyBlockLaneVectorView& view
+      const LegacyBlockLaneVector& view
     )
     {
       *outCursor = view.last;

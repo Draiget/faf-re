@@ -121,10 +121,10 @@ namespace moho
   };
   static_assert(sizeof(SSendStamp) == 0x18, "SSendStamp size must be 0x18");
 
-  struct SSendStampView
+  struct SSendStampWindow
   {
     /**
-     * Address: 0x0047D290 (FUN_0047D290 -- `SSendStampView::operator=` -- the vector assignment plus the two window lanes; zero callers, unreachable; formerly `CopyStampViewWithWindowMetadata` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0047D290 (FUN_0047D290 -- `SSendStamp::operator=` -- the vector assignment plus the two window lanes; zero callers, unreachable; formerly `CopyStampViewWithWindowMetadata` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
      */
     msvc8::vector<SSendStamp> items; // contiguous vector of copied stamps
     uint64_t windowDurationUs{0};    // (endTimeUs - startTimeUs)
@@ -137,7 +137,7 @@ namespace moho
      * @param durationUs
      * @param endTimeUs
      */
-    SSendStampView(uint64_t durationUs, uint64_t endTimeUs);
+    SSendStampWindow(uint64_t durationUs, uint64_t endTimeUs);
 
     /**
      * Address: 0x0047D4D0 (FUN_0047D4D0, GetStampCount)
@@ -177,7 +177,7 @@ namespace moho
      *
      * lower-bound in circular buffer, copy window into out
      */
-    SSendStampView GetBetween(uint64_t endTimeUs, uint64_t startTimeUs);
+    SSendStampWindow GetBetween(uint64_t endTimeUs, uint64_t startTimeUs);
 
     /**
      * Address: 0x0047D990
@@ -271,7 +271,7 @@ namespace moho
    */
   void NET_BuildBandwidthUsageSeries(
     SBandwidthUsageSeries& outSeries,
-    const SSendStampView& stamps,
+    const SSendStampWindow& stamps,
     int sampleCount,
     uint64_t rangeStartUs,
     uint64_t rangeEndUs,

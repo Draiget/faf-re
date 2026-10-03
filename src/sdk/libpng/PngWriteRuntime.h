@@ -18,7 +18,7 @@
 //   +0x208: filter_costs       (png_uint_16p = uint16_t*)
 //   +0x20C: inv_filter_costs   (png_uint_16p = uint16_t*)
 
-struct PngStructWeightedFilterView
+struct PngStructWeightedFilter
 {
   std::uint8_t  heuristic_method    = 0;   // +0x00
   std::uint8_t  num_prev_filters    = 0;   // +0x01
@@ -29,14 +29,14 @@ struct PngStructWeightedFilterView
   std::uint16_t* filter_costs       = nullptr; // +0x10
   std::uint16_t* inv_filter_costs   = nullptr; // +0x14
 };
-static_assert(sizeof(PngStructWeightedFilterView) == 0x18, "PngStructWeightedFilterView size must be 0x18");
-static_assert(offsetof(PngStructWeightedFilterView, heuristic_method)    == 0x00);
-static_assert(offsetof(PngStructWeightedFilterView, num_prev_filters)    == 0x01);
-static_assert(offsetof(PngStructWeightedFilterView, prev_filters)        == 0x04);
-static_assert(offsetof(PngStructWeightedFilterView, filter_weights)      == 0x08);
-static_assert(offsetof(PngStructWeightedFilterView, inv_filter_weights)  == 0x0C);
-static_assert(offsetof(PngStructWeightedFilterView, filter_costs)        == 0x10);
-static_assert(offsetof(PngStructWeightedFilterView, inv_filter_costs)    == 0x14);
+static_assert(sizeof(PngStructWeightedFilter) == 0x18, "PngStructWeightedFilter size must be 0x18");
+static_assert(offsetof(PngStructWeightedFilter, heuristic_method)    == 0x00);
+static_assert(offsetof(PngStructWeightedFilter, num_prev_filters)    == 0x01);
+static_assert(offsetof(PngStructWeightedFilter, prev_filters)        == 0x04);
+static_assert(offsetof(PngStructWeightedFilter, filter_weights)      == 0x08);
+static_assert(offsetof(PngStructWeightedFilter, inv_filter_weights)  == 0x0C);
+static_assert(offsetof(PngStructWeightedFilter, filter_costs)        == 0x10);
+static_assert(offsetof(PngStructWeightedFilter, inv_filter_costs)    == 0x14);
 
 // Opaque png_struct forward declaration — layout not exposed here.
 struct png_struct_def;
@@ -210,7 +210,7 @@ constexpr int kPngFilterHeuristicLast       = 3;
 // Filter type count: None, Sub, Up, Average, Paeth.
 constexpr int kPngFilterValueLast = 5;
 
-// Byte offset of the PngStructWeightedFilterView within a full png_struct.
+// Byte offset of the PngStructWeightedFilter within a full png_struct.
 // Evidence: ASM `mov [esi+1F8h], al` for heuristic_method from png_set_filter_heuristics.
 constexpr std::size_t kPngStructWeightedFilterOffset = 0x1F8;
 

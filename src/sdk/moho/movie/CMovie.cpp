@@ -94,7 +94,7 @@ namespace moho
   {
     constexpr std::int32_t kSofdecInterlacedCompoMode = 33;
 
-    struct MoviePlaybackInfoDebugView
+    struct MoviePlaybackInfoDebug
     {
       std::int32_t mReserved00 = 0; // +0x00
       std::int32_t skipDec = 0;     // +0x04
@@ -103,7 +103,7 @@ namespace moho
       std::int32_t noSupply = 0;    // +0x10
     };
 
-    static_assert(sizeof(MoviePlaybackInfoDebugView) == 0x14, "MoviePlaybackInfoDebugView size must be 0x14");
+    static_assert(sizeof(MoviePlaybackInfoDebug) == 0x14, "MoviePlaybackInfoDebug size must be 0x14");
 
     // _mwsfcre_MallocTab create-params; the binary memsets 0x30 bytes then fills.
     // The create-parameter layout is shared with the recovered mwsfcre create
@@ -522,7 +522,7 @@ namespace moho
     }
 
     if (debug_movie) {
-      MoviePlaybackInfoDebugView playbackInfo{};
+      MoviePlaybackInfoDebug playbackInfo{};
       (void)::mwPlyGetPlyInf(mPly, reinterpret_cast<std::int32_t*>(&playbackInfo));
       gpg::Debugf(
         "skip_disp %i, no_supply %i, skip_dec %i",

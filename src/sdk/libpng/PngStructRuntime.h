@@ -67,16 +67,16 @@ constexpr std::size_t kPngStructChunkListOffset    = 0x224;
 constexpr std::size_t kPngChunkListRecordSize      = 5;
 constexpr std::size_t kPngChunkListNameSize        = 4;
 
-struct PngChunkListView
+struct PngChunkList
 {
   std::uint32_t&  num;
   std::uint8_t*&  entries;
 };
 
-[[nodiscard]] inline PngChunkListView GetChunkList(png_structp png_ptr) noexcept
+[[nodiscard]] inline PngChunkList GetChunkList(png_structp png_ptr) noexcept
 {
   auto* base = reinterpret_cast<std::uint8_t*>(png_ptr);
-  return PngChunkListView{
+  return PngChunkList{
     *reinterpret_cast<std::uint32_t*>(base + kPngStructNumChunkListOffset),
     *reinterpret_cast<std::uint8_t**>(base + kPngStructChunkListOffset),
   };

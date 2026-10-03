@@ -77,7 +77,7 @@ namespace
   constexpr std::array<std::uint8_t, 512> kDistanceCode = BuildDistanceCodeTable();
 
   void SendBits(
-    DeflateStateRuntime* const state,
+    DeflateState* const state,
     const unsigned int value,
     const int bitCount
   )
@@ -96,16 +96,16 @@ namespace
   }
 
   void SendCode(
-    DeflateStateRuntime* const state,
+    DeflateState* const state,
     const int symbol,
-    const DeflateCtDataRuntime* const tree
+    const DeflateCtData* const tree
   )
   {
     SendBits(state, static_cast<unsigned int>(tree[symbol].fc.freq), static_cast<int>(tree[symbol].dl.dad));
   }
 
   [[nodiscard]] bool IsNodeSmaller(
-    const DeflateCtDataRuntime* const tree,
+    const DeflateCtData* const tree,
     const int leftNode,
     const int rightNode,
     const std::uint8_t* const depth
@@ -468,8 +468,8 @@ namespace
  * Flushes any pending bit-accumulator bytes into `pending_buf`, then clears
  * the bit-buffer validity lanes.
  */
-extern "C" DeflateStateRuntime* __cdecl bi_windup(
-  DeflateStateRuntime* const state
+extern "C" DeflateState* __cdecl bi_windup(
+  DeflateState* const state
 )
 {
   if (state->bi_valid <= 8) {
@@ -497,7 +497,7 @@ extern "C" DeflateStateRuntime* __cdecl bi_windup(
  * header, then appends `len` payload bytes into the pending output buffer.
  */
 extern "C" void __cdecl copy_block(
-  DeflateStateRuntime* state,
+  DeflateState* state,
   int len,
   const std::uint8_t* buffer,
   const int header
@@ -528,8 +528,8 @@ extern "C" void __cdecl copy_block(
  * What it does:
  * Emits one 16-bit short to the pending output lane in big-endian order.
  */
-extern "C" DeflateStateRuntime* __cdecl putShortMSB(
-  DeflateStateRuntime* const state,
+extern "C" DeflateState* __cdecl putShortMSB(
+  DeflateState* const state,
   const std::int16_t value
 )
 {
@@ -613,7 +613,7 @@ extern "C" DeflateStateRuntime* __cdecl putShortMSB(
  */
 extern "C" unsigned int __cdecl longest_match(
   unsigned int cur_match,
-  DeflateStateRuntime* const state
+  DeflateState* const state
 )
 {
   std::uint32_t maxChainLength = state->max_chain_length;
@@ -709,7 +709,7 @@ extern "C" unsigned int __cdecl longest_match(
  * match length or `2` when no usable 3+ byte match is present.
  */
 extern "C" int __cdecl longest_match_fast(
-  DeflateStateRuntime* const state,
+  DeflateState* const state,
   const int cur_match
 )
 {
@@ -838,12 +838,12 @@ extern "C" unsigned long compressBound(unsigned long sourceLength)
  */
 extern "C" void __cdecl init_block(
   const int dead,
-  DeflateStateRuntime* const state
+  DeflateState* const state
 )
 {
   (void)dead;
 
-  DeflateCtDataRuntime* dynLiteralTree = state->dyn_ltree;
+  DeflateCtData* dynLiteralTree = state->dyn_ltree;
   int literalCount = 286;
   do {
     dynLiteralTree->fc.freq = 0;
@@ -851,7 +851,7 @@ extern "C" void __cdecl init_block(
     --literalCount;
   } while (literalCount != 0);
 
-  DeflateCtDataRuntime* dynDistanceTree = state->dyn_dtree;
+  DeflateCtData* dynDistanceTree = state->dyn_dtree;
   int distanceCount = 30;
   do {
     dynDistanceTree->fc.freq = 0;
@@ -859,7 +859,7 @@ extern "C" void __cdecl init_block(
     --distanceCount;
   } while (distanceCount != 0);
 
-  DeflateCtDataRuntime* bitLengthTree = state->bl_tree;
+  DeflateCtData* bitLengthTree = state->bl_tree;
   int bitLengthCount = 19;
   do {
     bitLengthTree->fc.freq = 0;
@@ -881,15 +881,15 @@ extern "C" void __cdecl init_block(
  * Builds code lengths for one dynamic Huffman tree from parent-depth lanes,
  * updates bit-length histograms, and accumulates opt/static encoded lengths.
  */
-extern "C" DeflateStateRuntime* __cdecl gen_bitlen(
-  DeflateStateRuntime* const state,
-  DeflateTreeDescriptorRuntime* const descriptor
+extern "C" DeflateState* __cdecl gen_bitlen(
+  DeflateState* const state,
+  DeflateTreeDescriptor* const descriptor
 )
 {
-  DeflateCtDataRuntime* const tree = descriptor->dynTree;
+  DeflateCtData* const tree = descriptor->dynTree;
   const int maxCode = descriptor->maxCode;
-  const DeflateStaticTreeDescriptorRuntime* const staticDescriptor = descriptor->statDesc;
-  const DeflateCtDataRuntime* const staticTree = staticDescriptor->staticTree;
+  const DeflateStaticTreeDescriptor* const staticDescriptor = descriptor->statDesc;
+  const DeflateCtData* const staticTree = staticDescriptor->staticTree;
   const std::int32_t* const extraBits = staticDescriptor->extraBits;
   const int extraBase = staticDescriptor->extraBase;
   const int maxLength = staticDescriptor->maxLength;
@@ -969,13 +969,13 @@ extern "C" DeflateStateRuntime* __cdecl gen_bitlen(
  * Restores the Huffman min-heap ordering from `heapIndex` using the dynamic
  * tree frequency lane and `depth` tie-break ordering.
  */
-extern "C" DeflateStateRuntime* __cdecl pqdownheap(
-  DeflateStateRuntime* const state,
-  DeflateTreeDescriptorRuntime* const descriptor,
+extern "C" DeflateState* __cdecl pqdownheap(
+  DeflateState* const state,
+  DeflateTreeDescriptor* const descriptor,
   int heapIndex
 )
 {
-  const DeflateCtDataRuntime* const dynamicTree = descriptor->dynTree;
+  const DeflateCtData* const dynamicTree = descriptor->dynTree;
   const int heapLength = state->heap_len;
   const int node = state->heap[heapIndex];
   int childIndex = heapIndex << 1;
@@ -1009,9 +1009,9 @@ extern "C" DeflateStateRuntime* __cdecl pqdownheap(
  * `bl_tree` (`REP_3_6`, `REPZ_3_10`, `REPZ_11_138`).
  */
 extern "C" void __cdecl scan_tree(
-  DeflateCtDataRuntime* const tree,
+  DeflateCtData* const tree,
   const int maxCode,
-  DeflateStateRuntime* const state
+  DeflateState* const state
 )
 {
   int nextLength = static_cast<int>(tree->dl.len);
@@ -1081,8 +1081,8 @@ extern "C" void __cdecl scan_tree(
  * writes the resulting bits into the pending deflate bitstream.
  */
 extern "C" void __cdecl send_tree(
-  DeflateStateRuntime* const state,
-  DeflateCtDataRuntime* const tree,
+  DeflateState* const state,
+  DeflateCtData* const tree,
   const int maxCode
 )
 {
@@ -1150,7 +1150,7 @@ extern "C" void __cdecl send_tree(
  * its last writable slot.
  */
 extern "C" int __cdecl _tr_tally(
-  DeflateStateRuntime* const state,
+  DeflateState* const state,
   const int distance,
   const int literalOrLengthCode
 )
@@ -1186,13 +1186,13 @@ extern "C" int __cdecl _tr_tally(
  */
 extern "C" void __cdecl set_data_type(
   const int dead,
-  DeflateStateRuntime* const state
+  DeflateState* const state
 )
 {
   (void)dead;
 
   int n = 0;
-  DeflateCtDataRuntime* dynLiteralTree = state->dyn_ltree;
+  DeflateCtData* dynLiteralTree = state->dyn_ltree;
   do {
     if (dynLiteralTree->fc.freq != 0u) {
       break;
@@ -1203,7 +1203,7 @@ extern "C" void __cdecl set_data_type(
 
   if (n == 9) {
     n = 14;
-    for (DeflateCtDataRuntime* literalCursor = &state->dyn_ltree[15]; literalCursor[-1].fc.freq == 0u;
+    for (DeflateCtData* literalCursor = &state->dyn_ltree[15]; literalCursor[-1].fc.freq == 0u;
          literalCursor += 6) {
       if (literalCursor[0].fc.freq != 0u) {
         state->strm->data_type = (n == 31) ? 1 : 0;

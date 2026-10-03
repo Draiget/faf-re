@@ -40,7 +40,7 @@ namespace
     return cached;
   }
 
-  class CUnitRepairTaskReflectionView final
+  class CUnitRepairTaskReflection final
     : public moho::CCommandTask
     , public moho::Listener<moho::ECommandEvent>
   {
@@ -61,7 +61,7 @@ namespace
      * Initializes the reflection-construction `CUnitRepairTask` storage lane:
      * listener self-links, build-helper defaults, and weak-target slots.
      */
-    CUnitRepairTaskReflectionView()
+    CUnitRepairTaskReflection()
       : CCommandTask()
       , Listener<moho::ECommandEvent>()
       , mBuildHelper()
@@ -74,7 +74,7 @@ namespace
       , mInheritingWork(false)
     {}
 
-    ~CUnitRepairTaskReflectionView() override
+    ~CUnitRepairTaskReflection() override
     {
       mTargetUnit.UnlinkFromOwnerChain();
       mBuildTargetUnit.UnlinkFromOwnerChain();
@@ -88,42 +88,42 @@ namespace
     void OnEvent(moho::ECommandEvent) override {}
   };
 
-  static_assert(sizeof(CUnitRepairTaskReflectionView) == 0x9C, "CUnitRepairTaskReflectionView size must be 0x9C");
+  static_assert(sizeof(CUnitRepairTaskReflection) == 0x9C, "CUnitRepairTaskReflection size must be 0x9C");
   static_assert(
-    offsetof(CUnitRepairTaskReflectionView, mBuildHelper) == 0x40,
-    "CUnitRepairTaskReflectionView::mBuildHelper offset must be 0x40"
+    offsetof(CUnitRepairTaskReflection, mBuildHelper) == 0x40,
+    "CUnitRepairTaskReflection::mBuildHelper offset must be 0x40"
   );
   static_assert(
-    offsetof(CUnitRepairTaskReflectionView, mCommand) == 0x84,
-    "CUnitRepairTaskReflectionView::mCommand offset must be 0x84"
+    offsetof(CUnitRepairTaskReflection, mCommand) == 0x84,
+    "CUnitRepairTaskReflection::mCommand offset must be 0x84"
   );
   static_assert(
-    offsetof(CUnitRepairTaskReflectionView, mTargetUnit) == 0x88,
-    "CUnitRepairTaskReflectionView::mTargetUnit offset must be 0x88"
+    offsetof(CUnitRepairTaskReflection, mTargetUnit) == 0x88,
+    "CUnitRepairTaskReflection::mTargetUnit offset must be 0x88"
   );
   static_assert(
-    offsetof(CUnitRepairTaskReflectionView, mBuildTargetUnit) == 0x90,
-    "CUnitRepairTaskReflectionView::mBuildTargetUnit offset must be 0x90"
+    offsetof(CUnitRepairTaskReflection, mBuildTargetUnit) == 0x90,
+    "CUnitRepairTaskReflection::mBuildTargetUnit offset must be 0x90"
   );
   static_assert(
-    offsetof(CUnitRepairTaskReflectionView, mInPosition) == 0x98,
-    "CUnitRepairTaskReflectionView::mInPosition offset must be 0x98"
+    offsetof(CUnitRepairTaskReflection, mInPosition) == 0x98,
+    "CUnitRepairTaskReflection::mInPosition offset must be 0x98"
   );
   static_assert(
-    offsetof(CUnitRepairTaskReflectionView, mIsSilo) == 0x99, "CUnitRepairTaskReflectionView::mIsSilo offset must be 0x99"
+    offsetof(CUnitRepairTaskReflection, mIsSilo) == 0x99, "CUnitRepairTaskReflection::mIsSilo offset must be 0x99"
   );
   static_assert(
-    offsetof(CUnitRepairTaskReflectionView, mGuardAssistMode) == 0x9A,
-    "CUnitRepairTaskReflectionView::mGuardAssistMode offset must be 0x9A"
+    offsetof(CUnitRepairTaskReflection, mGuardAssistMode) == 0x9A,
+    "CUnitRepairTaskReflection::mGuardAssistMode offset must be 0x9A"
   );
   static_assert(
-    offsetof(CUnitRepairTaskReflectionView, mInheritingWork) == 0x9B,
-    "CUnitRepairTaskReflectionView::mInheritingWork offset must be 0x9B"
+    offsetof(CUnitRepairTaskReflection, mInheritingWork) == 0x9B,
+    "CUnitRepairTaskReflection::mInheritingWork offset must be 0x9B"
   );
 
-  [[nodiscard]] CUnitRepairTaskReflectionView* ToReflectionView(moho::CUnitRepairTask* const task) noexcept
+  [[nodiscard]] CUnitRepairTaskReflection* ToReflectionView(moho::CUnitRepairTask* const task) noexcept
   {
-    return reinterpret_cast<CUnitRepairTaskReflectionView*>(task);
+    return reinterpret_cast<CUnitRepairTaskReflection*>(task);
   }
 } // namespace
 
@@ -225,7 +225,7 @@ namespace moho
    */
   gpg::RRef CUnitRepairTaskTypeInfo::NewRef()
   {
-    auto* const task = new (std::nothrow) CUnitRepairTaskReflectionView();
+    auto* const task = new (std::nothrow) CUnitRepairTaskReflection();
 
     gpg::RRef ref{};
     ref = gpg::MakeRRef<moho::CUnitRepairTask>(reinterpret_cast<CUnitRepairTask*>(task));
@@ -243,7 +243,7 @@ namespace moho
   {
     auto* const task = ToReflectionView(static_cast<CUnitRepairTask*>(objectStorage));
     if (task) {
-      new (task) CUnitRepairTaskReflectionView();
+      new (task) CUnitRepairTaskReflection();
     }
 
     gpg::RRef ref{};
@@ -277,7 +277,7 @@ namespace moho
       return;
     }
 
-    task->~CUnitRepairTaskReflectionView();
+    task->~CUnitRepairTaskReflection();
   }
 
   /**

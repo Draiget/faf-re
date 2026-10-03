@@ -6,7 +6,7 @@ using namespace moho;
 
 namespace
 {
-  struct ISTIDriverRuntimeView
+  struct ISTIDriverHandle
   {
     void* vtable;
   };
@@ -17,8 +17,8 @@ namespace
    * What it does:
    * Rebinds one runtime payload to the base `ISTIDriver` vtable lane.
    */
-  [[maybe_unused]] [[nodiscard]] ISTIDriverRuntimeView* ResetISTIDriverBaseVtableLane(
-    ISTIDriverRuntimeView* const runtime
+  [[maybe_unused]] [[nodiscard]] ISTIDriverHandle* ResetISTIDriverBaseVtableLane(
+    ISTIDriverHandle* const runtime
   ) noexcept
   {
     static std::uint8_t sISTIDriverRuntimeVTableTag = 0;

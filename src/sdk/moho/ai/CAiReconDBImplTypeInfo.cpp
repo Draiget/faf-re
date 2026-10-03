@@ -37,13 +37,13 @@ namespace
    */
   void SerializeReconBlipMapStorage(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef);
 
-  class ReconBlipPointerVectorTypeRuntime final : public gpg::RType, public gpg::RIndexed
+  class ReconBlipPointerVectorType final : public gpg::RType, public gpg::RIndexed
   {
   public:
     /**
      * Address: 0x005CA810 (FUN_005CA810, gpg::RVectorType_ReconBlipP::dtr)
      */
-    ~ReconBlipPointerVectorTypeRuntime() override = default;
+    ~ReconBlipPointerVectorType() override = default;
 
     /**
      * Address: 0x005C40D0 (FUN_005C40D0, gpg::RVectorType_ReconBlipP::GetName)
@@ -82,16 +82,16 @@ namespace
     void SetCount(void* obj, int count) const override;
   };
   static_assert(
-    sizeof(ReconBlipPointerVectorTypeRuntime) == 0x68, "ReconBlipPointerVectorTypeRuntime size must be 0x68"
+    sizeof(ReconBlipPointerVectorType) == 0x68, "ReconBlipPointerVectorType size must be 0x68"
   );
 
-  class ReconBlipMapTypeRuntime final : public gpg::RType
+  class ReconBlipMapType final : public gpg::RType
   {
   public:
     /**
      * Address: 0x005CA870 (FUN_005CA870, gpg::RMultiMapType_SReconKey_ReconBlipP::dtr)
      */
-    ~ReconBlipMapTypeRuntime() override = default;
+    ~ReconBlipMapType() override = default;
 
     /**
      * Address: 0x005C4D50 (FUN_005C4D50, gpg::RMultiMapType_SReconKey_ReconBlipP::GetName)
@@ -109,7 +109,7 @@ namespace
      */
     void Init() override;
   };
-  static_assert(sizeof(ReconBlipMapTypeRuntime) == 0x64, "ReconBlipMapTypeRuntime size must be 0x64");
+  static_assert(sizeof(ReconBlipMapType) == 0x64, "ReconBlipMapType size must be 0x64");
 
   gpg::RType* gReconBlipType = nullptr;
   gpg::RType* gReconBlipPtrType = nullptr;
@@ -125,20 +125,20 @@ namespace
   }
 
   /**
-   * Address: 0x00BF7CC0 (FUN_00BF7CC0, atexit destructor of the ReconBlipPointerVectorTypeRuntime object)
+   * Address: 0x00BF7CC0 (FUN_00BF7CC0, atexit destructor of the ReconBlipPointerVectorType object)
    */
-  [[nodiscard]] ReconBlipPointerVectorTypeRuntime* AcquireReconBlipPtrVectorType()
+  [[nodiscard]] ReconBlipPointerVectorType* AcquireReconBlipPtrVectorType()
   {
-    static ReconBlipPointerVectorTypeRuntime sInstance;
+    static ReconBlipPointerVectorType sInstance;
     return &sInstance;
   }
 
   /**
-   * Address: 0x00BF7C60 (FUN_00BF7C60, atexit destructor of the ReconBlipMapTypeRuntime object)
+   * Address: 0x00BF7C60 (FUN_00BF7C60, atexit destructor of the ReconBlipMapType object)
    */
-  [[nodiscard]] ReconBlipMapTypeRuntime* AcquireReconBlipMapType()
+  [[nodiscard]] ReconBlipMapType* AcquireReconBlipMapType()
   {
-    static ReconBlipMapTypeRuntime sInstance;
+    static ReconBlipMapType sInstance;
     return &sInstance;
   }
 
@@ -272,13 +272,13 @@ namespace
     return static_cast<ReconBlip*>(upcast.mObj);
   }
 
-  class DeleteWithFlagSlot0Runtime
+  class DeleteWithFlagSlot0
   {
   public:
     virtual void* DeleteWithFlag(int deleteFlag) = 0;
 
   protected:
-    ~DeleteWithFlagSlot0Runtime() = default;
+    ~DeleteWithFlagSlot0() = default;
   };
 
   /**
@@ -290,7 +290,7 @@ namespace
    */
   void DeleteAiReconDbObject(void* const object)
   {
-    auto* const runtime = static_cast<DeleteWithFlagSlot0Runtime*>(object);
+    auto* const runtime = static_cast<DeleteWithFlagSlot0*>(object);
     if (!runtime) {
       return;
     }
@@ -307,7 +307,7 @@ namespace
    */
   void DestroyAiReconDbObject(void* const object)
   {
-    (void)static_cast<DeleteWithFlagSlot0Runtime*>(object)->DeleteWithFlag(0);
+    (void)static_cast<DeleteWithFlagSlot0*>(object)->DeleteWithFlag(0);
   }
 
   /**
@@ -374,24 +374,24 @@ namespace
     typeInfo->AddBase(field);
   }
 
-  const char* ReconBlipPointerVectorTypeRuntime::GetName() const
+  const char* ReconBlipPointerVectorType::GetName() const
   {
     static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ReconBlip::GetPointerType()->GetName());
     return sName.c_str();
   }
 
-  msvc8::string ReconBlipPointerVectorTypeRuntime::GetLexical(const gpg::RRef& ref) const
+  msvc8::string ReconBlipPointerVectorType::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
-  const gpg::RIndexed* ReconBlipPointerVectorTypeRuntime::IsIndexed() const
+  const gpg::RIndexed* ReconBlipPointerVectorType::IsIndexed() const
   {
     return this;
   }
 
-  void ReconBlipPointerVectorTypeRuntime::Init()
+  void ReconBlipPointerVectorType::Init()
   {
     size_ = sizeof(msvc8::vector<ReconBlip*>);
     version_ = 1;
@@ -399,7 +399,7 @@ namespace
     serSaveFunc_ = &SerializeReconBlipPointerVector;
   }
 
-  gpg::RRef ReconBlipPointerVectorTypeRuntime::SubscriptIndex(void* const obj, const int ind) const
+  gpg::RRef ReconBlipPointerVectorType::SubscriptIndex(void* const obj, const int ind) const
   {
     auto* const storage = static_cast<msvc8::vector<ReconBlip*>*>(obj);
     if (!storage || ind < 0 || static_cast<size_t>(ind) >= storage->size()) {
@@ -409,13 +409,13 @@ namespace
     return MakeReconBlipPointerSlotRef(storage->data() + ind);
   }
 
-  size_t ReconBlipPointerVectorTypeRuntime::GetCount(void* const obj) const
+  size_t ReconBlipPointerVectorType::GetCount(void* const obj) const
   {
     const auto* const storage = static_cast<const msvc8::vector<ReconBlip*>*>(obj);
     return storage ? storage->size() : 0u;
   }
 
-  void ReconBlipPointerVectorTypeRuntime::SetCount(void* const obj, const int count) const
+  void ReconBlipPointerVectorType::SetCount(void* const obj, const int count) const
   {
     auto* const storage = static_cast<msvc8::vector<ReconBlip*>*>(obj);
     GPG_ASSERT(storage != nullptr);
@@ -427,14 +427,14 @@ namespace
     storage->resize(static_cast<size_t>(count), nullptr);
   }
 
-  const char* ReconBlipMapTypeRuntime::GetName() const
+  const char* ReconBlipMapType::GetName() const
   {
     static const msvc8::string sName =
       gpg::STR_Printf("multimap<%s,%s>", CachedSReconKeyType()->GetName(), ReconBlip::GetPointerType()->GetName());
     return sName.c_str();
   }
 
-  msvc8::string ReconBlipMapTypeRuntime::GetLexical(const gpg::RRef& ref) const
+  msvc8::string ReconBlipMapType::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
     const auto* const storage = static_cast<const ReconBlipMap*>(ref.mObj);
@@ -442,7 +442,7 @@ namespace
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(count));
   }
 
-  void ReconBlipMapTypeRuntime::Init()
+  void ReconBlipMapType::Init()
   {
     size_ = sizeof(ReconBlipMap);
     version_ = 1;

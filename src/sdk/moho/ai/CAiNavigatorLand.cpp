@@ -15,7 +15,7 @@ using namespace moho;
 
 namespace
 {
-  struct SRect2iView
+  struct SRect2i
   {
     std::int32_t x0;
     std::int32_t z0;
@@ -23,12 +23,12 @@ namespace
     std::int32_t z1;
   };
 
-  [[nodiscard]] bool IsRegularRect(const SRect2iView& rect) noexcept
+  [[nodiscard]] bool IsRegularRect(const SRect2i& rect) noexcept
   {
     return rect.x0 >= rect.x1 || rect.z0 >= rect.z1;
   }
 
-  [[nodiscard]] bool RectsOverlapStrict(const SRect2iView& lhs, const SRect2iView& rhs) noexcept
+  [[nodiscard]] bool RectsOverlapStrict(const SRect2i& lhs, const SRect2i& rhs) noexcept
   {
     return lhs.x0 < rhs.x1 && rhs.x0 < lhs.x1 && lhs.z0 < rhs.z1 && rhs.z0 < lhs.z1;
   }
@@ -440,14 +440,14 @@ bool CAiNavigatorLand::AtGoal() const
   const std::int32_t spanX = static_cast<std::int32_t>(footprint.mSizeX);
   const std::int32_t spanZ = static_cast<std::int32_t>(footprint.mSizeZ);
 
-  const SRect2iView unitRect{
+  const SRect2i unitRect{
     baseX - spanX,
     baseZ - spanZ,
     baseX + spanX,
     baseZ + spanZ,
   };
 
-  const SRect2iView goalRect{
+  const SRect2i goalRect{
     mGoal.minX,
     mGoal.minZ,
     mGoal.maxX,

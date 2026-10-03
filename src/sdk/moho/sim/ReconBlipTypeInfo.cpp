@@ -12,7 +12,7 @@
 
 namespace
 {
-  class SPerArmyReconInfoTypeInfoRuntime final : public gpg::RType
+  class SPerArmyReconInfoTypeInfo final : public gpg::RType
   {
   public:
     [[nodiscard]] const char* GetName() const override
@@ -28,7 +28,7 @@ namespace
     }
   };
   static_assert(
-    sizeof(SPerArmyReconInfoTypeInfoRuntime) == 0x64, "SPerArmyReconInfoTypeInfoRuntime size must be 0x64"
+    sizeof(SPerArmyReconInfoTypeInfo) == 0x64, "SPerArmyReconInfoTypeInfo size must be 0x64"
   );
 
   [[nodiscard]] gpg::RType* ResolveSPerArmyReconInfoType()
@@ -43,13 +43,13 @@ namespace
     return cached;
   }
 
-  class SPerArmyReconInfoVectorTypeRuntime final : public gpg::RType, public gpg::RIndexed
+  class SPerArmyReconInfoVectorType final : public gpg::RType, public gpg::RIndexed
   {
   public:
     /**
      * Address: 0x005CA7B0 (FUN_005CA7B0, gpg::RVectorType_SPerArmyReconInfo::dtr)
      */
-    ~SPerArmyReconInfoVectorTypeRuntime() override = default;
+    ~SPerArmyReconInfoVectorType() override = default;
 
     [[nodiscard]] const char* GetName() const override;
 
@@ -123,7 +123,7 @@ namespace
     }
   };
   static_assert(
-    sizeof(SPerArmyReconInfoVectorTypeRuntime) == 0x68, "SPerArmyReconInfoVectorTypeRuntime size must be 0x68"
+    sizeof(SPerArmyReconInfoVectorType) == 0x68, "SPerArmyReconInfoVectorType size must be 0x68"
   );
 
   using moho::ReconBlipTypeInfo;
@@ -138,20 +138,20 @@ namespace
   }
 
   /**
-   * Address: 0x00BF77E0 (FUN_00BF77E0, atexit destructor of the SPerArmyReconInfoTypeInfoRuntime object)
+   * Address: 0x00BF77E0 (FUN_00BF77E0, atexit destructor of the SPerArmyReconInfoTypeInfo object)
    */
-  [[nodiscard]] SPerArmyReconInfoTypeInfoRuntime* AcquireSPerArmyReconInfoTypeInfo()
+  [[nodiscard]] SPerArmyReconInfoTypeInfo* AcquireSPerArmyReconInfoTypeInfo()
   {
-    static SPerArmyReconInfoTypeInfoRuntime sInstance;
+    static SPerArmyReconInfoTypeInfo sInstance;
     return &sInstance;
   }
 
   /**
-   * Address: 0x00BF7D20 (FUN_00BF7D20, atexit destructor of the SPerArmyReconInfoVectorTypeRuntime object)
+   * Address: 0x00BF7D20 (FUN_00BF7D20, atexit destructor of the SPerArmyReconInfoVectorType object)
    */
-  [[nodiscard]] SPerArmyReconInfoVectorTypeRuntime* AcquireSPerArmyReconInfoVectorType()
+  [[nodiscard]] SPerArmyReconInfoVectorType* AcquireSPerArmyReconInfoVectorType()
   {
-    static SPerArmyReconInfoVectorTypeRuntime sInstance;
+    static SPerArmyReconInfoVectorType sInstance;
     return &sInstance;
   }
 
@@ -162,7 +162,7 @@ namespace
    * What it does:
    * Builds `vector<SPerArmyReconInfo>` once and returns it.
    */
-  const char* SPerArmyReconInfoVectorTypeRuntime::GetName() const
+  const char* SPerArmyReconInfoVectorType::GetName() const
   {
     static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveSPerArmyReconInfoType()->GetName());
     return sName.c_str();

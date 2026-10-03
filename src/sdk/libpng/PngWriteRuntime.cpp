@@ -680,7 +680,7 @@ extern "C" void png_set_filter_heuristics(
 
   // Reinterpret the png_struct as a typed view of the weighted-filter fields.
   // Evidence: heuristic_method stored at offset 0x1F8, other fields follow.
-  auto* const pngFilter = reinterpret_cast<PngStructWeightedFilterView*>(
+  auto* const pngFilter = reinterpret_cast<PngStructWeightedFilter*>(
     reinterpret_cast<std::uint8_t*>(png_ptr) + kPngStructWeightedFilterOffset
   );
 
@@ -2238,7 +2238,7 @@ namespace {
 // into this candidate's early-exit threshold) -- matching upstream's two
 // call shapes exactly.
 [[nodiscard]] std::uint32_t ApplyWeightedFilterHeuristic(
-  const PngStructWeightedFilterView& filter, std::uint32_t sum,
+  const PngStructWeightedFilter& filter, std::uint32_t sum,
   std::uint8_t filterValue, bool useInverse) noexcept
 {
   constexpr std::uint32_t kHiShift = 10;           // PNG_HISHIFT
@@ -2317,7 +2317,7 @@ extern "C" void png_write_find_filter(png_structp png_ptr, png_row_infop row_inf
   const std::uint8_t filterToDo = DoFilter(png_ptr);
   std::uint32_t mins = 0x7FFFFFFFu;  // PNG_MAXSUM
 
-  auto* const filter = reinterpret_cast<PngStructWeightedFilterView*>(
+  auto* const filter = reinterpret_cast<PngStructWeightedFilter*>(
     RawBase(png_ptr) + kPngStructWeightedFilterOffset);
   const bool weighted = filter->heuristic_method == kPngFilterHeuristicWeighted;
 

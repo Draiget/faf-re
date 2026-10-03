@@ -73,7 +73,7 @@ namespace
     }
   }
 
-  struct LowFidelityTriangleBatchRuntime
+  struct LowFidelityTriangleBatch
   {
     std::uint32_t pad00[5];         // +0x00
     moho::CD3DVertexSheet* vtx;     // +0x14
@@ -82,15 +82,15 @@ namespace
     std::int32_t indexCount;        // +0x20
     std::int32_t endVertexInclusive; // +0x24
   };
-  static_assert(offsetof(LowFidelityTriangleBatchRuntime, vtx) == 0x14, "LowFidelityTriangleBatchRuntime::vtx");
-  static_assert(offsetof(LowFidelityTriangleBatchRuntime, idx) == 0x18, "LowFidelityTriangleBatchRuntime::idx");
+  static_assert(offsetof(LowFidelityTriangleBatch, vtx) == 0x14, "LowFidelityTriangleBatch::vtx");
+  static_assert(offsetof(LowFidelityTriangleBatch, idx) == 0x18, "LowFidelityTriangleBatch::idx");
   static_assert(
-    offsetof(LowFidelityTriangleBatchRuntime, indexCount) == 0x20,
-    "LowFidelityTriangleBatchRuntime::indexCount"
+    offsetof(LowFidelityTriangleBatch, indexCount) == 0x20,
+    "LowFidelityTriangleBatch::indexCount"
   );
   static_assert(
-    offsetof(LowFidelityTriangleBatchRuntime, endVertexInclusive) == 0x24,
-    "LowFidelityTriangleBatchRuntime::endVertexInclusive"
+    offsetof(LowFidelityTriangleBatch, endVertexInclusive) == 0x24,
+    "LowFidelityTriangleBatch::endVertexInclusive"
   );
 
   /**
@@ -100,7 +100,7 @@ namespace
    * Issues one triangle-list draw for one prebuilt low-fidelity terrain batch
    * when the batch has a non-zero index count.
    */
-  void DrawLowFidelityTerrainBatch(const LowFidelityTriangleBatchRuntime& batch)
+  void DrawLowFidelityTerrainBatch(const LowFidelityTriangleBatch& batch)
   {
     if (batch.indexCount == 0 || batch.vtx == nullptr || batch.idx == nullptr) {
       return;
@@ -450,7 +450,7 @@ namespace moho
       shaderVars.heightScale.SetFloat(mTesselator->GetHeightScale());
     }
 
-    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatchRuntime&>(*this));
+    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatch&>(*this));
   }
 
   /**
@@ -501,7 +501,7 @@ namespace moho
       shaderVars.heightScale.SetFloat(heightScale);
     }
 
-    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatchRuntime&>(*this));
+    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatch&>(*this));
   }
 
   /**
@@ -892,7 +892,7 @@ namespace moho
     CD3DDevice* const device = D3D_GetDevice();
 
     LoadShaderVars();
-    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatchRuntime&>(*this));
+    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatch&>(*this));
     LoadTerrainLighting(shadowContext);
 
     auto* const terrainRes = mTerrainResource;

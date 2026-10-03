@@ -1023,7 +1023,7 @@ void CClientManagerImpl::UpdateStates(const int beat)
 /**
  * Address: 0x0053F4C0 (FUN_0053F4C0)
  */
-SSendStampView CClientManagerImpl::GetBetween(const int since)
+SSendStampWindow CClientManagerImpl::GetBetween(const int since)
 {
   std::scoped_lock lock(mLock);
   const auto nowUs = static_cast<uint64_t>(mTimer3.ElapsedMicroseconds());

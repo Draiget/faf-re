@@ -46,7 +46,7 @@ constexpr std::uint8_t kPngColorTypeGrayAlpha   = 4;  // alpha
 constexpr std::uint8_t kPngColorTypeRgbAlpha    = 6;  // color | alpha
 
 // Typed view onto a png_row_info* without pulling in the full libpng header.
-struct PngRowInfoView
+struct PngRowInfo
 {
   std::uint32_t& width;
   std::uint32_t& rowbytes;
@@ -56,10 +56,10 @@ struct PngRowInfoView
   std::uint8_t&  pixel_depth;
 };
 
-[[nodiscard]] inline PngRowInfoView GetRowInfo(void* row_info) noexcept
+[[nodiscard]] inline PngRowInfo GetRowInfo(void* row_info) noexcept
 {
   auto* base = reinterpret_cast<std::uint8_t*>(row_info);
-  return PngRowInfoView{
+  return PngRowInfo{
     *reinterpret_cast<std::uint32_t*>(base + kRowInfoWidthOffset),
     *reinterpret_cast<std::uint32_t*>(base + kRowInfoRowbytesOffset),
     *(base + kRowInfoColorTypeOffset),
@@ -79,7 +79,7 @@ extern "C" const std::uint8_t fourbppswaptable[256];
 } // namespace libpng_detail
 
 // Forward declaration; full layout lives in libpng's bundled png.h, and the
-// recovered helpers only ever access fields through libpng_detail::PngRowInfoView.
+// recovered helpers only ever access fields through libpng_detail::PngRowInfo.
 struct png_row_info;
 #ifndef FA_LIBPNG_PNG_ROW_INFOP_DEFINED
 #define FA_LIBPNG_PNG_ROW_INFOP_DEFINED

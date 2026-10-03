@@ -724,10 +724,10 @@ namespace
     engines.mCapacity = newStorage + targetCapacity;
   }
 
-  [[nodiscard]] const boost::SharedPtrLayoutView<moho::AudioEngine>&
+  [[nodiscard]] const boost::SharedPtrLayout<moho::AudioEngine>&
   AsSharedLayout(const boost::shared_ptr<moho::AudioEngine>& value)
   {
-    return *reinterpret_cast<const boost::SharedPtrLayoutView<moho::AudioEngine>*>(&value);
+    return *reinterpret_cast<const boost::SharedPtrLayout<moho::AudioEngine>*>(&value);
   }
 
   static_assert(sizeof(moho::AudioEngineRef) == sizeof(boost::SharedCountPair), "AudioEngineRef size must match SharedCountPair");
@@ -752,7 +752,7 @@ namespace
   [[nodiscard]] boost::shared_ptr<moho::AudioEngine> CopyEngineRefShared(const moho::AudioEngineRef& ref)
   {
     boost::shared_ptr<moho::AudioEngine> result;
-    auto& view = *reinterpret_cast<boost::SharedPtrLayoutView<moho::AudioEngine>*>(&result);
+    auto& view = *reinterpret_cast<boost::SharedPtrLayout<moho::AudioEngine>*>(&result);
     view.px = ref.mEngine;
     view.pi = ref.mControl;
     if (view.pi != nullptr) {
@@ -1021,7 +1021,7 @@ namespace
     loader->mName.mySize = 0u;
     loader->mName.bx.buf[0] = '\0';
 
-    auto& bufferOwner = reinterpret_cast<boost::SharedPtrLayoutView<char>&>(loader->mBuffer.mData);
+    auto& bufferOwner = reinterpret_cast<boost::SharedPtrLayout<char>&>(loader->mBuffer.mData);
     if (bufferOwner.pi != nullptr) {
       bufferOwner.pi->release();
     }
