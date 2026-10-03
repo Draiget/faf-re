@@ -186,17 +186,17 @@ namespace moho
   struct RUnitBlueprintRaisedPlatform
   {
     float Vertex0X; // +0x00
-    float Vertex0Y; // +0x04
-    float Vertex0Z; // +0x08
+    float Vertex0Z; // +0x04
+    float Vertex0Y; // +0x08
     float Vertex1X; // +0x0C
-    float Vertex1Y; // +0x10
-    float Vertex1Z; // +0x14
+    float Vertex1Z; // +0x10
+    float Vertex1Y; // +0x14
     float Vertex2X; // +0x18
-    float Vertex2Y; // +0x1C
-    float Vertex2Z; // +0x20
+    float Vertex2Z; // +0x1C
+    float Vertex2Y; // +0x20
     float Vertex3X; // +0x24
-    float Vertex3Y; // +0x28
-    float Vertex3Z; // +0x2C
+    float Vertex3Z; // +0x28
+    float Vertex3Y; // +0x2C
   };
 
   /**
@@ -1020,6 +1020,14 @@ namespace moho
   static_assert(
     offsetof(RUnitBlueprintRaisedPlatform, Vertex0X) == 0x00,
     "RUnitBlueprintRaisedPlatform::Vertex0X offset must be 0x00"
+  );
+  static_assert(
+    offsetof(RUnitBlueprintRaisedPlatform, Vertex0Z) == 0x04,
+    "RUnitBlueprintRaisedPlatform::Vertex0Z offset must be 0x04"
+  );
+  static_assert(
+    offsetof(RUnitBlueprintRaisedPlatform, Vertex0Y) == 0x08,
+    "RUnitBlueprintRaisedPlatform::Vertex0Y offset must be 0x08"
   );
   static_assert(
     offsetof(RUnitBlueprintRaisedPlatform, Vertex1X) == 0x0C,

@@ -2245,27 +2245,6 @@ namespace
     canvas.DebugDrawLine(line);
   }
 
-  struct RaisedPlatformVertexRuntimeLane
-  {
-    float x;
-    float z;
-    float y;
-  };
-  static_assert(sizeof(RaisedPlatformVertexRuntimeLane) == 0x0C, "RaisedPlatformVertexRuntimeLane size must be 0x0C");
-
-  struct RaisedPlatformRuntimeView
-  {
-    RaisedPlatformVertexRuntimeLane vertex0;
-    RaisedPlatformVertexRuntimeLane vertex1;
-    RaisedPlatformVertexRuntimeLane vertex2;
-    RaisedPlatformVertexRuntimeLane vertex3;
-  };
-  static_assert(sizeof(RaisedPlatformRuntimeView) == 0x30, "RaisedPlatformRuntimeView size must be 0x30");
-  static_assert(
-    sizeof(RaisedPlatformRuntimeView) == sizeof(RUnitBlueprintRaisedPlatform),
-    "RaisedPlatformRuntimeView must mirror RUnitBlueprintRaisedPlatform storage"
-  );
-
   /**
    * Address: 0x0062EAC0 (FUN_0062EAC0, func_UnitMoreInLineToOther)
    */
@@ -16979,20 +16958,19 @@ float Unit::DistanceToOccupiedRect(const Wm3::Vector3f* const samplePoint)
   const float sampleX = samplePoint->x;
   const float sampleZ = samplePoint->z;
 
-  for (const RUnitBlueprintRaisedPlatform& raisedPlatform : blueprint->Physics.RaisedPlatforms) {
-    const auto& platform = reinterpret_cast<const RaisedPlatformRuntimeView&>(raisedPlatform);
-    const float x0 = platform.vertex0.x + unitPosition.x;
-    const float x1 = platform.vertex1.x + unitPosition.x;
-    const float x3 = platform.vertex3.x + unitPosition.x;
+  for (const RUnitBlueprintRaisedPlatform& platform : blueprint->Physics.RaisedPlatforms) {
+    const float x0 = platform.Vertex0X + unitPosition.x;
+    const float x1 = platform.Vertex1X + unitPosition.x;
+    const float x3 = platform.Vertex3X + unitPosition.x;
 
-    const float z0 = platform.vertex0.z + unitPosition.z;
-    const float z2 = platform.vertex2.z + unitPosition.z;
-    const float z3 = platform.vertex3.z + unitPosition.z;
+    const float z0 = platform.Vertex0Z + unitPosition.z;
+    const float z2 = platform.Vertex2Z + unitPosition.z;
+    const float z3 = platform.Vertex3Z + unitPosition.z;
 
     if (sampleX <= x3 && x0 <= sampleX && sampleZ <= z3 && z0 <= sampleZ) {
       const float zBlend = (sampleZ - z0) / (z2 - z0);
-      const float yOnLeftEdge = ((platform.vertex2.y - platform.vertex0.y) * zBlend) + platform.vertex0.y;
-      const float yOnRightEdge = ((platform.vertex3.y - platform.vertex1.y) * zBlend) + platform.vertex1.y;
+      const float yOnLeftEdge = ((platform.Vertex2Y - platform.Vertex0Y) * zBlend) + platform.Vertex0Y;
+      const float yOnRightEdge = ((platform.Vertex3Y - platform.Vertex1Y) * zBlend) + platform.Vertex1Y;
       const float xBlend = (sampleX - x0) / (x1 - x0);
       return ((yOnRightEdge - yOnLeftEdge) * xBlend) + yOnLeftEdge;
     }
