@@ -3761,6 +3761,45 @@
   );
   static_assert(sizeof(CftPixelSurfaceLanes) == 0x14, "CftPixelSurfaceLanes size must be 0x14");
 
+  struct CftYcc420PlanarPackedWords
+  {
+    std::int32_t reserved00 = 0; // +0x00
+    std::uint32_t* yPlaneWords = nullptr; // +0x04
+    std::int32_t reserved08 = 0; // +0x08
+    std::int32_t reserved0C = 0; // +0x0C
+    std::int32_t yStrideBytes = 0; // +0x10
+    std::uint32_t* cbPlaneWords = nullptr; // +0x14
+    std::int32_t reserved18 = 0; // +0x18
+    std::int32_t reserved1C = 0; // +0x1C
+    std::int32_t cbStrideBytes = 0; // +0x20
+    std::uint32_t* crPlaneWords = nullptr; // +0x24
+    std::int32_t reserved28 = 0; // +0x28
+    std::int32_t reserved2C = 0; // +0x2C
+    std::int32_t crStrideBytes = 0; // +0x30
+  };
+  static_assert(offsetof(CftYcc420PlanarPackedWords, yPlaneWords) == 0x04, "CftYcc420PlanarPackedWords::yPlaneWords offset must be 0x04");
+  static_assert(offsetof(CftYcc420PlanarPackedWords, yStrideBytes) == 0x10, "CftYcc420PlanarPackedWords::yStrideBytes offset must be 0x10");
+  static_assert(offsetof(CftYcc420PlanarPackedWords, cbPlaneWords) == 0x14, "CftYcc420PlanarPackedWords::cbPlaneWords offset must be 0x14");
+  static_assert(offsetof(CftYcc420PlanarPackedWords, cbStrideBytes) == 0x20, "CftYcc420PlanarPackedWords::cbStrideBytes offset must be 0x20");
+  static_assert(offsetof(CftYcc420PlanarPackedWords, crPlaneWords) == 0x24, "CftYcc420PlanarPackedWords::crPlaneWords offset must be 0x24");
+  static_assert(offsetof(CftYcc420PlanarPackedWords, crStrideBytes) == 0x30, "CftYcc420PlanarPackedWords::crStrideBytes offset must be 0x30");
+  static_assert(sizeof(CftYcc420PlanarPackedWords) == 0x34, "CftYcc420PlanarPackedWords size must be 0x34");
+
+  struct CftRgb16OutputPackedWords
+  {
+    std::int32_t reserved00 = 0; // +0x00
+    std::uint8_t* pixelBase = nullptr; // +0x04
+    std::int32_t widthPixels = 0; // +0x08
+    std::int32_t heightPixels = 0; // +0x0C
+    std::int32_t strideBytes = 0; // +0x10
+  };
+  static_assert(offsetof(CftRgb16OutputPackedWords, pixelBase) == 0x04, "CftRgb16OutputPackedWords::pixelBase offset must be 0x04");
+  static_assert(offsetof(CftRgb16OutputPackedWords, widthPixels) == 0x08, "CftRgb16OutputPackedWords::widthPixels offset must be 0x08");
+  static_assert(offsetof(CftRgb16OutputPackedWords, heightPixels) == 0x0C, "CftRgb16OutputPackedWords::heightPixels offset must be 0x0C");
+  static_assert(offsetof(CftRgb16OutputPackedWords, strideBytes) == 0x10, "CftRgb16OutputPackedWords::strideBytes offset must be 0x10");
+  static_assert(sizeof(CftRgb16OutputPackedWords) == 0x14, "CftRgb16OutputPackedWords size must be 0x14");
+
+
   std::array<std::int16_t, 0x10000> yuv_to_tmp{};
   std::array<std::uint32_t, 0x10000> yuv_to_r{};
   std::array<std::uint8_t, 0x10000> yuv_to_b{};

@@ -1603,143 +1603,11 @@
     );
   }
 
-  struct CftYcc420PlanarPackedWords;
-  struct CftRgb16OutputPackedWords;
-
   namespace
   {
-    struct CftYcc420PlanarPackedWordsView
-    {
-      std::int32_t reserved00 = 0; // +0x00
-      std::uint32_t* yPlaneWords = nullptr; // +0x04
-      std::int32_t reserved08 = 0; // +0x08
-      std::int32_t reserved0C = 0; // +0x0C
-      std::int32_t yStrideBytes = 0; // +0x10
-      std::uint32_t* cbPlaneWords = nullptr; // +0x14
-      std::int32_t reserved18 = 0; // +0x18
-      std::int32_t reserved1C = 0; // +0x1C
-      std::int32_t cbStrideBytes = 0; // +0x20
-      std::uint32_t* crPlaneWords = nullptr; // +0x24
-      std::int32_t reserved28 = 0; // +0x28
-      std::int32_t reserved2C = 0; // +0x2C
-      std::int32_t crStrideBytes = 0; // +0x30
-    };
-    static_assert(
-      offsetof(CftYcc420PlanarPackedWordsView, yPlaneWords) == 0x04,
-      "CftYcc420PlanarPackedWordsView::yPlaneWords offset must be 0x04"
-    );
-    static_assert(
-      offsetof(CftYcc420PlanarPackedWordsView, yStrideBytes) == 0x10,
-      "CftYcc420PlanarPackedWordsView::yStrideBytes offset must be 0x10"
-    );
-    static_assert(
-      offsetof(CftYcc420PlanarPackedWordsView, cbPlaneWords) == 0x14,
-      "CftYcc420PlanarPackedWordsView::cbPlaneWords offset must be 0x14"
-    );
-    static_assert(
-      offsetof(CftYcc420PlanarPackedWordsView, cbStrideBytes) == 0x20,
-      "CftYcc420PlanarPackedWordsView::cbStrideBytes offset must be 0x20"
-    );
-    static_assert(
-      offsetof(CftYcc420PlanarPackedWordsView, crPlaneWords) == 0x24,
-      "CftYcc420PlanarPackedWordsView::crPlaneWords offset must be 0x24"
-    );
-    static_assert(
-      offsetof(CftYcc420PlanarPackedWordsView, crStrideBytes) == 0x30,
-      "CftYcc420PlanarPackedWordsView::crStrideBytes offset must be 0x30"
-    );
-    static_assert(sizeof(CftYcc420PlanarPackedWordsView) == 0x34, "CftYcc420PlanarPackedWordsView size must be 0x34");
 
-    struct CftRgb16OutputPackedWordsView
-    {
-      std::int32_t reserved00 = 0; // +0x00
-      std::uint8_t* pixelBase = nullptr; // +0x04
-      std::int32_t widthPixels = 0; // +0x08
-      std::int32_t heightPixels = 0; // +0x0C
-      std::int32_t strideBytes = 0; // +0x10
-    };
-    static_assert(
-      offsetof(CftRgb16OutputPackedWordsView, pixelBase) == 0x04,
-      "CftRgb16OutputPackedWordsView::pixelBase offset must be 0x04"
-    );
-    static_assert(
-      offsetof(CftRgb16OutputPackedWordsView, widthPixels) == 0x08,
-      "CftRgb16OutputPackedWordsView::widthPixels offset must be 0x08"
-    );
-    static_assert(
-      offsetof(CftRgb16OutputPackedWordsView, heightPixels) == 0x0C,
-      "CftRgb16OutputPackedWordsView::heightPixels offset must be 0x0C"
-    );
-    static_assert(
-      offsetof(CftRgb16OutputPackedWordsView, strideBytes) == 0x10,
-      "CftRgb16OutputPackedWordsView::strideBytes offset must be 0x10"
-    );
-    static_assert(sizeof(CftRgb16OutputPackedWordsView) == 0x14, "CftRgb16OutputPackedWordsView size must be 0x14");
 
-    struct CftYcc420PlanarInputLanesView
-    {
-      std::uint8_t* yPlane = nullptr; // +0x00
-      std::uint8_t* cbPlane = nullptr; // +0x04
-      std::uint8_t* crPlane = nullptr; // +0x08
-      std::int32_t yStrideBytes = 0; // +0x0C
-      std::int32_t cbStrideBytes = 0; // +0x10
-      std::int32_t crStrideBytes = 0; // +0x14
-    };
-    static_assert(
-      offsetof(CftYcc420PlanarInputLanesView, yPlane) == 0x00,
-      "CftYcc420PlanarInputLanesView::yPlane offset must be 0x00"
-    );
-    static_assert(
-      offsetof(CftYcc420PlanarInputLanesView, cbPlane) == 0x04,
-      "CftYcc420PlanarInputLanesView::cbPlane offset must be 0x04"
-    );
-    static_assert(
-      offsetof(CftYcc420PlanarInputLanesView, crPlane) == 0x08,
-      "CftYcc420PlanarInputLanesView::crPlane offset must be 0x08"
-    );
-    static_assert(
-      offsetof(CftYcc420PlanarInputLanesView, yStrideBytes) == 0x0C,
-      "CftYcc420PlanarInputLanesView::yStrideBytes offset must be 0x0C"
-    );
-    static_assert(
-      offsetof(CftYcc420PlanarInputLanesView, cbStrideBytes) == 0x10,
-      "CftYcc420PlanarInputLanesView::cbStrideBytes offset must be 0x10"
-    );
-    static_assert(
-      offsetof(CftYcc420PlanarInputLanesView, crStrideBytes) == 0x14,
-      "CftYcc420PlanarInputLanesView::crStrideBytes offset must be 0x14"
-    );
-    static_assert(sizeof(CftYcc420PlanarInputLanesView) == 0x18, "CftYcc420PlanarInputLanesView size must be 0x18");
 
-    struct CftPixelSurfaceLanesView
-    {
-      std::uint8_t* pixelBase = nullptr; // +0x00
-      std::int32_t widthPixels = 0; // +0x04
-      std::int32_t heightPixels = 0; // +0x08
-      std::int32_t strideBytes = 0; // +0x0C
-      std::int32_t reserved = 0; // +0x10
-    };
-    static_assert(
-      offsetof(CftPixelSurfaceLanesView, pixelBase) == 0x00,
-      "CftPixelSurfaceLanesView::pixelBase offset must be 0x00"
-    );
-    static_assert(
-      offsetof(CftPixelSurfaceLanesView, widthPixels) == 0x04,
-      "CftPixelSurfaceLanesView::widthPixels offset must be 0x04"
-    );
-    static_assert(
-      offsetof(CftPixelSurfaceLanesView, heightPixels) == 0x08,
-      "CftPixelSurfaceLanesView::heightPixels offset must be 0x08"
-    );
-    static_assert(
-      offsetof(CftPixelSurfaceLanesView, strideBytes) == 0x0C,
-      "CftPixelSurfaceLanesView::strideBytes offset must be 0x0C"
-    );
-    static_assert(
-      offsetof(CftPixelSurfaceLanesView, reserved) == 0x10,
-      "CftPixelSurfaceLanesView::reserved offset must be 0x10"
-    );
-    static_assert(sizeof(CftPixelSurfaceLanesView) == 0x14, "CftPixelSurfaceLanesView size must be 0x14");
 
     /**
      * Default BGRA conversion table, `_cftbgra256x3` at 0x00F420E0 (`.data`).
@@ -2824,22 +2692,20 @@
     const std::int32_t* const scratchBufferWords
   )
   {
-    const auto* const inputView = reinterpret_cast<const CftYcc420PlanarPackedWordsView*>(inputWords);
-    const auto* const outputView = reinterpret_cast<const CftRgb16OutputPackedWordsView*>(outputWords);
 
-    CftYcc420PlanarInputLanesView inputLanes{};
-    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputView->yPlaneWords);
-    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputView->cbPlaneWords);
-    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputView->crPlaneWords);
-    inputLanes.yStrideBytes = inputView->yStrideBytes;
-    inputLanes.cbStrideBytes = inputView->cbStrideBytes;
-    inputLanes.crStrideBytes = inputView->crStrideBytes;
+    CftYcc420PlanarInputLanes inputLanes{};
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputWords->yPlaneWords);
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputWords->cbPlaneWords);
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputWords->crPlaneWords);
+    inputLanes.yStrideBytes = inputWords->yStrideBytes;
+    inputLanes.cbStrideBytes = inputWords->cbStrideBytes;
+    inputLanes.crStrideBytes = inputWords->crStrideBytes;
 
-    CftPixelSurfaceLanesView outputSurface{};
-    outputSurface.pixelBase = outputView->pixelBase;
-    outputSurface.widthPixels = outputView->widthPixels;
-    outputSurface.heightPixels = outputView->heightPixels;
-    outputSurface.strideBytes = outputView->strideBytes;
+    CftPixelSurfaceLanes outputSurface{};
+    outputSurface.pixelBase = outputWords->pixelBase;
+    outputSurface.widthPixels = outputWords->widthPixels;
+    outputSurface.heightPixels = outputWords->heightPixels;
+    outputSurface.strideBytes = outputWords->strideBytes;
 
     const auto* const inputLanesPtr = reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes);
     const auto* const outputSurfacePtr = reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface);
@@ -2880,25 +2746,23 @@
     const std::int32_t* const scratchBufferWords
   )
   {
-    const auto* const inputView = reinterpret_cast<const CftYcc420PlanarPackedWordsView*>(inputWords);
-    const auto* const outputView = reinterpret_cast<const CftRgb16OutputPackedWordsView*>(outputWords);
 
-    CftYcc420PlanarInputLanesView inputLanes{};
-    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputView->yPlaneWords);
-    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputView->cbPlaneWords);
-    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputView->crPlaneWords);
-    inputLanes.yStrideBytes = inputView->yStrideBytes;
-    inputLanes.cbStrideBytes = inputView->cbStrideBytes;
-    inputLanes.crStrideBytes = inputView->crStrideBytes;
+    CftYcc420PlanarInputLanes inputLanes{};
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputWords->yPlaneWords);
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputWords->cbPlaneWords);
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputWords->crPlaneWords);
+    inputLanes.yStrideBytes = inputWords->yStrideBytes;
+    inputLanes.cbStrideBytes = inputWords->cbStrideBytes;
+    inputLanes.crStrideBytes = inputWords->crStrideBytes;
 
     // The four words 0x00AEEB74-0x00AEEB8B copy across. `reserved` is left
     // alone here, unlike the interlaced siblings that zero it: nothing below
     // reads it.
-    CftPixelSurfaceLanesView outputSurface{};
-    outputSurface.pixelBase = outputView->pixelBase;
-    outputSurface.widthPixels = outputView->widthPixels;
-    outputSurface.heightPixels = outputView->heightPixels;
-    outputSurface.strideBytes = outputView->strideBytes;
+    CftPixelSurfaceLanes outputSurface{};
+    outputSurface.pixelBase = outputWords->pixelBase;
+    outputSurface.widthPixels = outputWords->widthPixels;
+    outputSurface.heightPixels = outputWords->heightPixels;
+    outputSurface.strideBytes = outputWords->strideBytes;
 
     const auto* const inputLanesPtr = reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes);
     const auto* const outputSurfacePtr = reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface);
@@ -2947,22 +2811,20 @@
     const std::int32_t* const userTableAddress
   )
   {
-    const auto* const inputView = reinterpret_cast<const CftYcc420PlanarPackedWordsView*>(inputWords);
-    const auto* const outputView = reinterpret_cast<const CftRgb16OutputPackedWordsView*>(outputWords);
 
-    CftYcc420PlanarInputLanesView inputLanes{};
-    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputView->yPlaneWords);
-    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputView->cbPlaneWords);
-    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputView->crPlaneWords);
-    inputLanes.yStrideBytes = inputView->yStrideBytes;
-    inputLanes.cbStrideBytes = inputView->cbStrideBytes;
-    inputLanes.crStrideBytes = inputView->crStrideBytes;
+    CftYcc420PlanarInputLanes inputLanes{};
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputWords->yPlaneWords);
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputWords->cbPlaneWords);
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputWords->crPlaneWords);
+    inputLanes.yStrideBytes = inputWords->yStrideBytes;
+    inputLanes.cbStrideBytes = inputWords->cbStrideBytes;
+    inputLanes.crStrideBytes = inputWords->crStrideBytes;
 
-    CftPixelSurfaceLanesView outputSurface{};
-    outputSurface.pixelBase = outputView->pixelBase;
-    outputSurface.widthPixels = outputView->widthPixels;
-    outputSurface.heightPixels = outputView->heightPixels;
-    outputSurface.strideBytes = outputView->strideBytes;
+    CftPixelSurfaceLanes outputSurface{};
+    outputSurface.pixelBase = outputWords->pixelBase;
+    outputSurface.widthPixels = outputWords->widthPixels;
+    outputSurface.heightPixels = outputWords->heightPixels;
+    outputSurface.strideBytes = outputWords->strideBytes;
     outputSurface.reserved = 0;
 
     return cft_Ycc420plnToArgb8888UserTable(
@@ -2986,22 +2848,20 @@
     const std::int32_t* const userTableAddress
   )
   {
-    const auto* const inputView = reinterpret_cast<const CftYcc420PlanarPackedWordsView*>(inputWords);
-    const auto* const outputView = reinterpret_cast<const CftRgb16OutputPackedWordsView*>(outputWords);
 
-    CftYcc420PlanarInputLanesView inputLanes{};
-    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputView->yPlaneWords);
-    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputView->cbPlaneWords);
-    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputView->crPlaneWords);
-    inputLanes.yStrideBytes = inputView->yStrideBytes;
-    inputLanes.cbStrideBytes = inputView->cbStrideBytes;
-    inputLanes.crStrideBytes = inputView->crStrideBytes;
+    CftYcc420PlanarInputLanes inputLanes{};
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputWords->yPlaneWords);
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputWords->cbPlaneWords);
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputWords->crPlaneWords);
+    inputLanes.yStrideBytes = inputWords->yStrideBytes;
+    inputLanes.cbStrideBytes = inputWords->cbStrideBytes;
+    inputLanes.crStrideBytes = inputWords->crStrideBytes;
 
-    CftPixelSurfaceLanesView outputSurface{};
-    outputSurface.pixelBase = outputView->pixelBase;
-    outputSurface.widthPixels = outputView->widthPixels;
-    outputSurface.heightPixels = outputView->heightPixels;
-    outputSurface.strideBytes = outputView->strideBytes;
+    CftPixelSurfaceLanes outputSurface{};
+    outputSurface.pixelBase = outputWords->pixelBase;
+    outputSurface.widthPixels = outputWords->widthPixels;
+    outputSurface.heightPixels = outputWords->heightPixels;
+    outputSurface.strideBytes = outputWords->strideBytes;
     outputSurface.reserved = 0;
 
     return cft_Ycc420plnToArgb8888SplitUserTable(
@@ -3345,22 +3205,20 @@
     const std::int32_t* const scratchBufferWords
   )
   {
-    const auto* const inputView = reinterpret_cast<const CftYcc420PlanarPackedWordsView*>(inputWords);
-    const auto* const outputView = reinterpret_cast<const CftRgb16OutputPackedWordsView*>(outputWords);
 
-    CftYcc420PlanarInputLanesView inputLanes{};
-    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputView->yPlaneWords);
-    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputView->cbPlaneWords);
-    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputView->crPlaneWords);
-    inputLanes.yStrideBytes = inputView->yStrideBytes;
-    inputLanes.cbStrideBytes = inputView->cbStrideBytes;
-    inputLanes.crStrideBytes = inputView->crStrideBytes;
+    CftYcc420PlanarInputLanes inputLanes{};
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputWords->yPlaneWords);
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputWords->cbPlaneWords);
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputWords->crPlaneWords);
+    inputLanes.yStrideBytes = inputWords->yStrideBytes;
+    inputLanes.cbStrideBytes = inputWords->cbStrideBytes;
+    inputLanes.crStrideBytes = inputWords->crStrideBytes;
 
-    CftPixelSurfaceLanesView outputSurface{};
-    outputSurface.pixelBase = outputView->pixelBase;
-    outputSurface.widthPixels = outputView->widthPixels;
-    outputSurface.heightPixels = outputView->heightPixels;
-    outputSurface.strideBytes = outputView->strideBytes;
+    CftPixelSurfaceLanes outputSurface{};
+    outputSurface.pixelBase = outputWords->pixelBase;
+    outputSurface.widthPixels = outputWords->widthPixels;
+    outputSurface.heightPixels = outputWords->heightPixels;
+    outputSurface.strideBytes = outputWords->strideBytes;
     outputSurface.reserved = 0;
 
     if (CFTCOM_GetOptimizeSpeed() != 0) {
@@ -3610,33 +3468,31 @@
   {
     CFTCOM_SetCftFunctionName("cft_c_Ycc420plnToArgb8888Prg");
 
-    const auto* const input = reinterpret_cast<const CftYcc420PlanarInputLanesView*>(inputLanes);
-    const auto* const output = reinterpret_cast<const CftPixelSurfaceLanesView*>(outputSurface);
 
-    const std::uint8_t* lumaRow0 = input->yPlane;
-    const std::uint8_t* lumaRow1 = input->yPlane + input->yStrideBytes;
-    const std::uint8_t* chromaBlueRow = input->cbPlane;
-    const std::uint8_t* chromaRedRow = input->crPlane;
+    const std::uint8_t* lumaRow0 = inputLanes->yPlane;
+    const std::uint8_t* lumaRow1 = inputLanes->yPlane + inputLanes->yStrideBytes;
+    const std::uint8_t* chromaBlueRow = inputLanes->cbPlane;
+    const std::uint8_t* chromaRedRow = inputLanes->crPlane;
 
-    auto* pixelRow0 = reinterpret_cast<std::uint32_t*>(output->pixelBase);
-    auto* pixelRow1 = reinterpret_cast<std::uint32_t*>(output->pixelBase) + (output->strideBytes / 4);
+    auto* pixelRow0 = reinterpret_cast<std::uint32_t*>(outputSurface->pixelBase);
+    auto* pixelRow1 = reinterpret_cast<std::uint32_t*>(outputSurface->pixelBase) + (outputSurface->strideBytes / 4);
 
-    const std::int32_t widthPixels = output->widthPixels;
-    const std::int32_t heightPixels = output->heightPixels;
+    const std::int32_t widthPixels = outputSurface->widthPixels;
+    const std::int32_t heightPixels = outputSurface->heightPixels;
 
     // An odd width means the final pair carries only its even pixel.
     const std::int32_t oddWidth = widthPixels & 1;
     const std::uint32_t pixelPairsPerRow =
       static_cast<std::uint32_t>(widthPixels + oddWidth) >> 1;
 
-    const std::int32_t lumaRowPairAdvance = 2 * input->yStrideBytes - widthPixels;
+    const std::int32_t lumaRowPairAdvance = 2 * inputLanes->yStrideBytes - widthPixels;
 
     if (heightPixels > 1) {
       const std::int32_t chromaRowAdvance =
-        input->cbStrideBytes - static_cast<std::int32_t>(pixelPairsPerRow) + 1;
+        inputLanes->cbStrideBytes - static_cast<std::int32_t>(pixelPairsPerRow) + 1;
       const std::int32_t pixelRowPairAdvance =
         static_cast<std::int32_t>(
-          static_cast<std::uint32_t>(2 * (output->strideBytes - 2 * widthPixels)) >> 2
+          static_cast<std::uint32_t>(2 * (outputSurface->strideBytes - 2 * widthPixels)) >> 2
         );
 
       std::int32_t rowPair = 1;
@@ -3766,31 +3622,29 @@
   {
     CFTCOM_SetCftFunctionName("cft_c_Ycc420plnToArgb8888Prg1smp");
 
-    const auto* const input = reinterpret_cast<const CftYcc420PlanarInputLanesView*>(inputLanes);
-    const auto* const output = reinterpret_cast<const CftPixelSurfaceLanesView*>(outputSurface);
 
-    const std::uint8_t* lumaRow0 = input->yPlane;
-    const std::uint8_t* lumaRow1 = input->yPlane + input->yStrideBytes;
-    const std::uint8_t* chromaBlueRow = input->cbPlane;
-    const std::uint8_t* chromaRedRow = input->crPlane;
+    const std::uint8_t* lumaRow0 = inputLanes->yPlane;
+    const std::uint8_t* lumaRow1 = inputLanes->yPlane + inputLanes->yStrideBytes;
+    const std::uint8_t* chromaBlueRow = inputLanes->cbPlane;
+    const std::uint8_t* chromaRedRow = inputLanes->crPlane;
 
-    auto* pixelRow0 = reinterpret_cast<std::uint32_t*>(output->pixelBase);
-    auto* pixelRow1 = reinterpret_cast<std::uint32_t*>(output->pixelBase) + (output->strideBytes / 4);
+    auto* pixelRow0 = reinterpret_cast<std::uint32_t*>(outputSurface->pixelBase);
+    auto* pixelRow1 = reinterpret_cast<std::uint32_t*>(outputSurface->pixelBase) + (outputSurface->strideBytes / 4);
 
-    const std::int32_t widthPixels = output->widthPixels;
-    const std::int32_t heightPixels = output->heightPixels;
+    const std::int32_t widthPixels = outputSurface->widthPixels;
+    const std::int32_t heightPixels = outputSurface->heightPixels;
     const std::int32_t oddWidth = widthPixels & 1;
     const std::uint32_t pixelPairsPerRow =
       static_cast<std::uint32_t>(widthPixels + oddWidth) >> 1;
 
-    const std::int32_t lumaRowPairAdvance = 2 * input->yStrideBytes - widthPixels;
+    const std::int32_t lumaRowPairAdvance = 2 * inputLanes->yStrideBytes - widthPixels;
 
     if (heightPixels > 1) {
       const std::int32_t chromaRowAdvance =
-        input->cbStrideBytes - static_cast<std::int32_t>(pixelPairsPerRow) + 1;
+        inputLanes->cbStrideBytes - static_cast<std::int32_t>(pixelPairsPerRow) + 1;
       const std::int32_t pixelRowPairAdvance =
         static_cast<std::int32_t>(
-          static_cast<std::uint32_t>(2 * (output->strideBytes - 2 * widthPixels)) >> 2
+          static_cast<std::uint32_t>(2 * (outputSurface->strideBytes - 2 * widthPixels)) >> 2
         );
 
       std::int32_t rowPair = 1;
@@ -3907,15 +3761,13 @@
   {
     CFTCOM_SetCftFunctionName("cft_c_Ycc420plnToArgb8888Int1smp");
 
-    const auto* const input = reinterpret_cast<const CftYcc420PlanarInputLanesView*>(inputLanes);
-    const auto* const output = reinterpret_cast<const CftPixelSurfaceLanesView*>(outputSurface);
 
-    const std::int32_t widthPixels = output->widthPixels;
-    const std::int32_t heightPixels = output->heightPixels;
-    const std::int32_t strideBytes = output->strideBytes;
-    const std::int32_t yStrideBytes = input->yStrideBytes;
-    const std::int32_t cbStrideBytes = input->cbStrideBytes;
-    const std::int32_t crStrideBytes = input->crStrideBytes;
+    const std::int32_t widthPixels = outputSurface->widthPixels;
+    const std::int32_t heightPixels = outputSurface->heightPixels;
+    const std::int32_t strideBytes = outputSurface->strideBytes;
+    const std::int32_t yStrideBytes = inputLanes->yStrideBytes;
+    const std::int32_t cbStrideBytes = inputLanes->cbStrideBytes;
+    const std::int32_t crStrideBytes = inputLanes->crStrideBytes;
 
     const std::int32_t oddWidth = widthPixels & 1;
     const std::uint32_t pixelPairsPerRow =
@@ -3930,10 +3782,10 @@
       2 * cbStrideBytes - static_cast<std::int32_t>(pixelPairsPerRow) + 1;
     const std::int32_t pixelGroupAdvance = strideBytes - widthPixels;
 
-    const std::uint8_t* lumaRow = input->yPlane;
-    const std::uint8_t* chromaBlueRow = input->cbPlane;
-    const std::uint8_t* chromaRedRow = input->crPlane;
-    auto* pixelRow = reinterpret_cast<std::uint32_t*>(output->pixelBase);
+    const std::uint8_t* lumaRow = inputLanes->yPlane;
+    const std::uint8_t* chromaBlueRow = inputLanes->cbPlane;
+    const std::uint8_t* chromaRedRow = inputLanes->crPlane;
+    auto* pixelRow = reinterpret_cast<std::uint32_t*>(outputSurface->pixelBase);
 
     // One row of the leading/trailing phases.
     const auto convertPlainRow = [&]() {
@@ -4098,15 +3950,13 @@
   {
     CFTCOM_SetCftFunctionName("cft_c_Ycc420plnToArgb8888Int2smp");
 
-    const auto* const input = reinterpret_cast<const CftYcc420PlanarInputLanesView*>(inputLanes);
-    const auto* const output = reinterpret_cast<const CftPixelSurfaceLanesView*>(outputSurface);
 
-    const std::int32_t widthPixels = output->widthPixels;
-    const std::int32_t heightPixels = output->heightPixels;
-    const std::int32_t strideBytes = output->strideBytes;
-    const std::int32_t yStrideBytes = input->yStrideBytes;
-    const std::int32_t cbStrideBytes = input->cbStrideBytes;
-    const std::int32_t crStrideBytes = input->crStrideBytes;
+    const std::int32_t widthPixels = outputSurface->widthPixels;
+    const std::int32_t heightPixels = outputSurface->heightPixels;
+    const std::int32_t strideBytes = outputSurface->strideBytes;
+    const std::int32_t yStrideBytes = inputLanes->yStrideBytes;
+    const std::int32_t cbStrideBytes = inputLanes->cbStrideBytes;
+    const std::int32_t crStrideBytes = inputLanes->crStrideBytes;
 
     const std::int32_t oddWidth = widthPixels & 1;
     const std::uint32_t pixelPairsPerRow =
@@ -4122,10 +3972,10 @@
       2 * cbStrideBytes - static_cast<std::int32_t>(pixelPairsPerRow) + 1;
     const std::int32_t pixelGroupAdvance = strideBytes - widthPixels;
 
-    const std::uint8_t* lumaRow = input->yPlane;
-    const std::uint8_t* chromaBlueRow = input->cbPlane;
-    const std::uint8_t* chromaRedRow = input->crPlane;
-    auto* pixelRow = reinterpret_cast<std::uint32_t*>(output->pixelBase);
+    const std::uint8_t* lumaRow = inputLanes->yPlane;
+    const std::uint8_t* chromaBlueRow = inputLanes->cbPlane;
+    const std::uint8_t* chromaRedRow = inputLanes->crPlane;
+    auto* pixelRow = reinterpret_cast<std::uint32_t*>(outputSurface->pixelBase);
 
     // One row of the leading/trailing phases: chroma read straight off the row.
     const auto convertPlainRow = [&]() {
@@ -5176,43 +5026,6 @@
     }
   }
 
-  struct CftYcc420PlanarPackedWords
-  {
-    std::int32_t reserved00 = 0; // +0x00
-    std::uint32_t* yPlaneWords = nullptr; // +0x04
-    std::int32_t reserved08 = 0; // +0x08
-    std::int32_t reserved0C = 0; // +0x0C
-    std::int32_t yStrideBytes = 0; // +0x10
-    std::uint32_t* cbPlaneWords = nullptr; // +0x14
-    std::int32_t reserved18 = 0; // +0x18
-    std::int32_t reserved1C = 0; // +0x1C
-    std::int32_t cbStrideBytes = 0; // +0x20
-    std::uint32_t* crPlaneWords = nullptr; // +0x24
-    std::int32_t reserved28 = 0; // +0x28
-    std::int32_t reserved2C = 0; // +0x2C
-    std::int32_t crStrideBytes = 0; // +0x30
-  };
-  static_assert(offsetof(CftYcc420PlanarPackedWords, yPlaneWords) == 0x04, "CftYcc420PlanarPackedWords::yPlaneWords offset must be 0x04");
-  static_assert(offsetof(CftYcc420PlanarPackedWords, yStrideBytes) == 0x10, "CftYcc420PlanarPackedWords::yStrideBytes offset must be 0x10");
-  static_assert(offsetof(CftYcc420PlanarPackedWords, cbPlaneWords) == 0x14, "CftYcc420PlanarPackedWords::cbPlaneWords offset must be 0x14");
-  static_assert(offsetof(CftYcc420PlanarPackedWords, cbStrideBytes) == 0x20, "CftYcc420PlanarPackedWords::cbStrideBytes offset must be 0x20");
-  static_assert(offsetof(CftYcc420PlanarPackedWords, crPlaneWords) == 0x24, "CftYcc420PlanarPackedWords::crPlaneWords offset must be 0x24");
-  static_assert(offsetof(CftYcc420PlanarPackedWords, crStrideBytes) == 0x30, "CftYcc420PlanarPackedWords::crStrideBytes offset must be 0x30");
-  static_assert(sizeof(CftYcc420PlanarPackedWords) == 0x34, "CftYcc420PlanarPackedWords size must be 0x34");
-
-  struct CftRgb16OutputPackedWords
-  {
-    std::int32_t reserved00 = 0; // +0x00
-    std::uint8_t* pixelBase = nullptr; // +0x04
-    std::int32_t widthPixels = 0; // +0x08
-    std::int32_t heightPixels = 0; // +0x0C
-    std::int32_t strideBytes = 0; // +0x10
-  };
-  static_assert(offsetof(CftRgb16OutputPackedWords, pixelBase) == 0x04, "CftRgb16OutputPackedWords::pixelBase offset must be 0x04");
-  static_assert(offsetof(CftRgb16OutputPackedWords, widthPixels) == 0x08, "CftRgb16OutputPackedWords::widthPixels offset must be 0x08");
-  static_assert(offsetof(CftRgb16OutputPackedWords, heightPixels) == 0x0C, "CftRgb16OutputPackedWords::heightPixels offset must be 0x0C");
-  static_assert(offsetof(CftRgb16OutputPackedWords, strideBytes) == 0x10, "CftRgb16OutputPackedWords::strideBytes offset must be 0x10");
-  static_assert(sizeof(CftRgb16OutputPackedWords) == 0x14, "CftRgb16OutputPackedWords size must be 0x14");
 
   [[nodiscard]] inline std::uint8_t PackedByte(const std::uint32_t word, const std::uint32_t byteIndex) noexcept
   {
