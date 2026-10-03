@@ -1917,11 +1917,6 @@ namespace
     return range.mBits;
   }
 
-  void ResetCategoryWordRange(EntityCategorySet& range) noexcept
-  {
-    range.mBits = BVIntSet{};
-  }
-
   [[nodiscard]] std::int32_t PickUniformIndexFromU32(const std::uint32_t randomValue, const std::uint32_t count) noexcept
   {
     const std::uint64_t product = static_cast<std::uint64_t>(randomValue) * static_cast<std::uint64_t>(count);
@@ -8456,7 +8451,7 @@ int moho::cfunc_UnitRestoreBuildRestrictionsL(LuaPlus::LuaState* const state)
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
   EntityCategorySet& restrictionWords = unit->GetAttributes().restrictionCategory;
-  ResetCategoryWordRange(restrictionWords);
+  restrictionWords.mBits = BVIntSet{};
   unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
 }

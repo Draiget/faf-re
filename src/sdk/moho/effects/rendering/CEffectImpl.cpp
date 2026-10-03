@@ -40,14 +40,6 @@ namespace
     slot = newTexture;
   }
 
-  void ClearStringRange(msvc8::string* it, const msvc8::string* const end) noexcept
-  {
-    while (it != end) {
-      it->tidy(true, 0u);
-      ++it;
-    }
-  }
-
   /**
    * Address: 0x00658170 (FUN_00658170)
    *
@@ -119,7 +111,7 @@ namespace moho
   {
     mEntityInfo.mAttachTargetWeak.UnlinkFromOwnerChain();
 
-    ClearStringRange(mStrings.start_, mStrings.end_);
+    mStrings.clear();
     mStrings.ResetStorageToInline();
 
     ReleaseCountedTexturePointerRangeAndClear(mParticleTextures.start_, mParticleTextures.end_);

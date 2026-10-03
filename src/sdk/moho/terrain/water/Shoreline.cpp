@@ -637,70 +637,6 @@ namespace
     AppendShoreCellRef(shoreline.mCells, cell);
   }
 
-  /**
-   * Address: 0x00814040 (FUN_00814040, sub_814040)
-   *
-   * What it does:
-   * Assign-copies one half-open shoreline-cell shared-pointer range into
-   * destination storage and returns the new destination end.
-   */
-  [[nodiscard]] ShoreCellRef* CopyShoreCellRefRange(
-    ShoreCellRef* const destination,
-    ShoreCellRef* sourceBegin,
-    ShoreCellRef* const sourceEnd
-  )
-  {
-    ShoreCellRef* write = destination;
-    while (sourceBegin != sourceEnd) {
-      *write = *sourceBegin;
-      ++sourceBegin;
-      ++write;
-    }
-    return write;
-  }
-
-  /**
-   * Address: 0x008140F0 (FUN_008140F0, sub_8140F0)
-   *
-   * What it does:
-   * Releases one half-open shoreline-cell shared-pointer range by resetting each
-   * shared owner lane.
-   */
-  void ReleaseShoreCellRefRange(ShoreCellRef* rangeBegin, ShoreCellRef* const rangeEnd)
-  {
-    while (rangeBegin != rangeEnd) {
-      rangeBegin->reset();
-      ++rangeBegin;
-    }
-  }
-
-  /**
-   * Address: 0x00813750 (FUN_00813750, sub_813750)
-   *
-   * What it does:
-   * Erases one half-open shoreline-cell range from the runtime vector by moving
-   * tail lanes over the erased range and releasing the trailing stale lanes.
-   */
-  [[nodiscard]] ShoreCellRef* EraseShoreCellRefRange(
-    msvc8::vector<ShoreCellRef>& shorelineCells,
-    ShoreCellRef* const eraseBegin,
-    ShoreCellRef* const eraseEnd
-  )
-  {
-    if (eraseBegin == eraseEnd) {
-      return eraseBegin;
-    }
-
-    // Shift the survivors down, release the vacated tail's shared refs -- the
-    // element destructor does not -- then drop mLast: erase(first, last).
-    ShoreCellRef* const previousEnd = shorelineCells.end();
-    ShoreCellRef* const newEnd = CopyShoreCellRefRange(eraseBegin, eraseEnd, previousEnd);
-    ReleaseShoreCellRefRange(newEnd, previousEnd);
-    while (shorelineCells.end() != newEnd) {
-      shorelineCells.pop_back_no_destroy();
-    }
-    return eraseBegin;
-  }
 } // namespace
 
 namespace moho
@@ -755,6 +691,11 @@ namespace moho
 
   /**
    * Address: 0x00812E00 (FUN_00812E00, Moho::Shoreline::Destroy)
+   * Address: 0x00813750 (FUN_00813750, sub_813750) with its inline steps
+   * FUN_00814040 (tail copy-assign) and FUN_008140F0 (vacated-tail release):
+   * the `vector<ShoreCellRef>::erase(begin, end)` family — this full-range
+   * erase is `clear()`, which releases every cell's shared reference exactly
+   * once through element destruction.
    *
    * What it does:
    * Releases vertex-sheet ownership, erases shoreline-cell shared-pointer lanes,
@@ -764,7 +705,7 @@ namespace moho
   {
     mVertexSheet.reset();
 
-    (void)EraseShoreCellRefRange(mCells, mCells.begin(), mCells.end());
+    mCells.clear();
 
     mShorelineTris = 0;
   }

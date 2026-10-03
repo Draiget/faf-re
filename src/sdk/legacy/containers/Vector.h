@@ -2423,6 +2423,18 @@ namespace msvc8
          * out-of-line emit (FUN_00560430) of `SSTICommandVariableData`'s copy
          * constructor (primary FUN_006ECAD0, recovered on the class). Orphan island
          * removed from moho/command/SSTICommandVariableData.cpp 2026-10-03 (RULE ONE).)
+         * Address: 0x00813750/0x00814040/0x008140F0 (FUN_00813750, FUN_00814040,
+         * FUN_008140F0 -- the `erase(begin, end)` family for
+         * `msvc8::vector<boost::shared_ptr<moho::ShoreCell>>` (`Shoreline::mCells`):
+         * the move-down copy-assign, the vacated-tail release, and the range-erase
+         * body itself. The only live caller was `Shoreline::Destroy`'s full-range
+         * erase, now `mCells.clear()` (releases each shared ref exactly once);
+         * three-helper lane removed from moho/terrain/water/Shoreline.cpp 2026-10-03 (RULE ONE).)
+         * Address: 0x008E70B0 (FUN_008E70B0 -- the `std::fill`-lane for
+         * `msvc8::vector<gpg::gal::Head>` resize-with-fill on the `AddHead`
+         * insertion path (0x80-byte element); its only binary caller FUN_008E71D0 is
+         * that insert emission itself; zero source callers -- orphan removed from
+         * gpg/gal/GalInterfaces.cpp 2026-10-03 (RULE ONE).)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;
