@@ -2431,11 +2431,11 @@
    * What it does:
    * Detaches one MPASJD lane from ADXT runtime and tears down MPA callback lane.
    */
-  std::int32_t __cdecl MPALINK_DetachMpa(AdxtRuntimeState* const adxtRuntime)
+  std::int32_t __cdecl MPALINK_DetachMpa(AdxtState* const adxtRuntime)
   {
     std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(adxtRuntime));
 
-    auto* const decoder = AsAdxsjdRuntimeView(adxtRuntime->sjdHandle)->Decoder();
+    auto* const decoder = AdxsjdStateOf(adxtRuntime->sjdHandle)->Decoder();
     auto* const mpaDecoder = static_cast<MpasjdDecoderState*>(decoder->mpegAudioDecoder);
     if (mpaDecoder != nullptr) {
       ADXT_Stop(adxtRuntime);
@@ -2455,10 +2455,10 @@
    * What it does:
    * Stops one attached MPASJD decoder lane when ADXT runtime has MPA enabled.
    */
-  std::int32_t __cdecl MPALINK_StopMpa(AdxtRuntimeState* const adxtRuntime)
+  std::int32_t __cdecl MPALINK_StopMpa(AdxtState* const adxtRuntime)
   {
     auto* const mpaDecoder =
-      static_cast<MpasjdDecoderState*>(AsAdxsjdRuntimeView(adxtRuntime->sjdHandle)->Decoder()->mpegAudioDecoder);
+      static_cast<MpasjdDecoderState*>(AdxsjdStateOf(adxtRuntime->sjdHandle)->Decoder()->mpegAudioDecoder);
     if (mpaDecoder != nullptr) {
       return MPASJD_Stop(mpaDecoder);
     }
@@ -3933,11 +3933,11 @@
    * What it does:
    * Detaches one M2ASJD lane from ADXT runtime and tears down M2A callback lane.
    */
-  std::int32_t __cdecl M2ALINK_DetachM2a(AdxtRuntimeState* const adxtRuntime)
+  std::int32_t __cdecl M2ALINK_DetachM2a(AdxtState* const adxtRuntime)
   {
     std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(adxtRuntime));
 
-    auto* const decoder = AsAdxsjdRuntimeView(adxtRuntime->sjdHandle)->Decoder();
+    auto* const decoder = AdxsjdStateOf(adxtRuntime->sjdHandle)->Decoder();
     auto* const m2aDecoder = static_cast<M2asjdDecoderState*>(decoder->mpeg2AacDecoder);
     if (m2aDecoder != nullptr) {
       ADXT_Stop(adxtRuntime);
@@ -3957,10 +3957,10 @@
    * What it does:
    * Stops one attached M2ASJD decoder lane when ADXT runtime has M2A enabled.
    */
-  std::int32_t __cdecl M2ALINK_StopM2a(AdxtRuntimeState* const adxtRuntime)
+  std::int32_t __cdecl M2ALINK_StopM2a(AdxtState* const adxtRuntime)
   {
     auto* const m2aDecoder =
-      static_cast<M2asjdDecoderState*>(AsAdxsjdRuntimeView(adxtRuntime->sjdHandle)->Decoder()->mpeg2AacDecoder);
+      static_cast<M2asjdDecoderState*>(AdxsjdStateOf(adxtRuntime->sjdHandle)->Decoder()->mpeg2AacDecoder);
     if (m2aDecoder != nullptr) {
       return M2ASJD_Stop(m2aDecoder);
     }
@@ -6695,7 +6695,7 @@
       return -1;
     }
 
-    return static_cast<std::int32_t>(AsAdxrnaTransportRuntimeView(rnaHandle)->stateFlags & 0x01u);
+    return static_cast<std::int32_t>(AdxrnaTransportOf(rnaHandle)->stateFlags & 0x01u);
   }
 
   /**
@@ -6706,7 +6706,7 @@
    */
   void ADXRNA_Stop(const std::int32_t rnaHandle)
   {
-    auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaTransportOf(rnaHandle);
     (void)runtime->outputRuntime->dispatchTable->stopPlayback(runtime->outputRuntime, 0);
   }
 
@@ -6718,7 +6718,7 @@
    */
   std::int32_t adxrna_PollTransferStopState(const std::int32_t rnaHandle)
   {
-    auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaTransportOf(rnaHandle);
     if (runtime->transferStopPending == 0) {
       return 0;
     }
@@ -6775,7 +6775,7 @@
    */
   std::int32_t adxrna_AdvanceTransferCursors(const std::int32_t rnaHandle)
   {
-    auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaTransportOf(rnaHandle);
     const std::int32_t transferCarryUnits = runtime->transferCarryUnits;
     const std::int32_t combinedWritePosition = transferCarryUnits + runtime->transferFreezePosition;
     runtime->transferCarryUnits = 0;
@@ -6792,7 +6792,7 @@
    * What it does:
    * Applies pending transfer units to ADXRNA write/queue/time cursors.
    */
-  void __cdecl mwlRnaAddWrPos(AdxrnaTransportRuntimeView* const runtime)
+  void __cdecl mwlRnaAddWrPos(AdxrnaTransport* const runtime)
   {
     CRICRS_Enter();
 
@@ -6829,7 +6829,7 @@
       return;
     }
 
-    auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaTransportOf(rnaHandle);
     const std::uint8_t pendingTransferAck = runtime->pendingTransferAck;
     runtime->transitionGuardFlag = 1;
     if (pendingTransferAck == 1u) {
@@ -6878,7 +6878,7 @@
    * Drains and tears down one ADXRNA runtime object, including output runtime
    * destruction and full object reset.
    */
-  std::int32_t adxrna_DestroyCore(AdxrnaTransportRuntimeView* const runtime)
+  std::int32_t adxrna_DestroyCore(AdxrnaTransport* const runtime)
   {
     if (runtime == nullptr) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6915,7 +6915,7 @@
     }
 
     runtime->outputRuntime->dispatchTable->destroyOutput(runtime->outputRuntime);
-    std::memset(runtime, 0, sizeof(AdxrnaTransportRuntimeView));
+    std::memset(runtime, 0, sizeof(AdxrnaTransport));
     gAdxrnaDestroyGuard = 0;
     return 0;
   }
@@ -6933,7 +6933,7 @@
       return;
     }
 
-    auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaTransportOf(rnaHandle);
     CRICRS_Enter();
     if (runtime->stateFlags != 0) {
       ADXRNA_Stop(rnaHandle);
@@ -6981,7 +6981,7 @@
   void ADXRNA_Destroy(const std::int32_t rnaHandle)
   {
     ADXRNA_Stop(rnaHandle);
-    (void)adxrna_DestroyCore(AsAdxrnaTransportRuntimeView(rnaHandle));
+    (void)adxrna_DestroyCore(AdxrnaTransportOf(rnaHandle));
   }
 
   /**
@@ -7045,9 +7045,9 @@
       return 0;
     }
 
-    const auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    const auto* const runtime = AdxrnaTransportOf(rnaHandle);
     *outQueuedDeltaUnits = runtime->decodedDataUnits - runtime->queuedDataUnits;
-    const std::int32_t timeScaleBase = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle)->timeScaleBase;
+    const std::int32_t timeScaleBase = AdxrnaLegacyMetricsOf(rnaHandle)->timeScaleBase;
     *outTimeScaleBase = timeScaleBase;
     return timeScaleBase;
   }
@@ -7080,7 +7080,7 @@
       return -1;
     }
 
-    return AsAdxrnaTransportRuntimeView(rnaHandle)->queuedDataUnits;
+    return AdxrnaTransportOf(rnaHandle)->queuedDataUnits;
   }
 
   /**
@@ -7107,7 +7107,7 @@
       return -1;
     }
 
-    const auto* const runtime = AsAdxrnaPlaySwitchRuntimeView(rnaHandle);
+    const auto* const runtime = AdxrnaPlaySwitchOf(rnaHandle);
     return static_cast<std::int32_t>((runtime->stateFlags >> 1) & 1u);
   }
 
@@ -7124,7 +7124,7 @@
       return -1;
     }
 
-    return static_cast<std::int32_t>((AsAdxrnaTransportRuntimeView(rnaHandle)->stateFlags >> 2) & 1u);
+    return static_cast<std::int32_t>((AdxrnaTransportOf(rnaHandle)->stateFlags >> 2) & 1u);
   }
 
   /**
@@ -7140,7 +7140,7 @@
       return -1;
     }
 
-    const auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    const auto* const runtime = AdxrnaTransportOf(rnaHandle);
     return runtime->transferRingSize - runtime->queuedDataUnits;
   }
 
@@ -7157,7 +7157,7 @@
       return;
     }
 
-    auto* const runtime = AsAdxrnaPlaySwitchRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaPlaySwitchOf(rnaHandle);
     CRICRS_Enter();
     runtime->playSwitch = enabled;
 

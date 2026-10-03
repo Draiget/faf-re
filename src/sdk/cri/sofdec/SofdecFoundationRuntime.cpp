@@ -529,7 +529,7 @@ using XeficObjectCleanupCallback = void(__cdecl*)(XeficObject* object);
 
 using XeficQueueVisitor = int(__cdecl*)(XeficQueuedFileEntry* queueEntry, std::int32_t contextValue);
 
-struct M2aBitstreamRuntimeView
+struct M2aBitstreamState
 {
   std::uint8_t mUnknown00[0x0C]{};
   std::uint32_t bitEndPosition = 0; // +0x0C
@@ -537,9 +537,9 @@ struct M2aBitstreamRuntimeView
   std::uint32_t overrunCount = 0; // +0x14
 };
 
-static_assert(offsetof(M2aBitstreamRuntimeView, bitEndPosition) == 0x0C, "M2aBitstreamRuntimeView::bitEndPosition offset must be 0x0C");
-static_assert(offsetof(M2aBitstreamRuntimeView, bitPosition) == 0x10, "M2aBitstreamRuntimeView::bitPosition offset must be 0x10");
-static_assert(offsetof(M2aBitstreamRuntimeView, overrunCount) == 0x14, "M2aBitstreamRuntimeView::overrunCount offset must be 0x14");
+static_assert(offsetof(M2aBitstreamState, bitEndPosition) == 0x0C, "M2aBitstreamState::bitEndPosition offset must be 0x0C");
+static_assert(offsetof(M2aBitstreamState, bitPosition) == 0x10, "M2aBitstreamState::bitPosition offset must be 0x10");
+static_assert(offsetof(M2aBitstreamState, overrunCount) == 0x14, "M2aBitstreamState::overrunCount offset must be 0x14");
 
 struct MparbdDecoderState
 {
@@ -569,7 +569,7 @@ static_assert(
 );
 static_assert(sizeof(MparbdDecoderState) == 0x353C, "MparbdDecoderState size must be 0x353C");
 
-struct MparbfRuntimeBuffer
+struct MparbfBuffer
 {
   std::uint8_t* data = nullptr; // +0x00
   std::uint32_t capacityBytes = 0; // +0x04
@@ -579,28 +579,28 @@ struct MparbfRuntimeBuffer
   std::uint32_t freeBytes = 0; // +0x14
 };
 
-static_assert(offsetof(MparbfRuntimeBuffer, data) == 0x00, "MparbfRuntimeBuffer::data offset must be 0x00");
+static_assert(offsetof(MparbfBuffer, data) == 0x00, "MparbfBuffer::data offset must be 0x00");
 static_assert(
-  offsetof(MparbfRuntimeBuffer, capacityBytes) == 0x04,
-  "MparbfRuntimeBuffer::capacityBytes offset must be 0x04"
+  offsetof(MparbfBuffer, capacityBytes) == 0x04,
+  "MparbfBuffer::capacityBytes offset must be 0x04"
 );
 static_assert(
-  offsetof(MparbfRuntimeBuffer, readOffsetBytes) == 0x08,
-  "MparbfRuntimeBuffer::readOffsetBytes offset must be 0x08"
+  offsetof(MparbfBuffer, readOffsetBytes) == 0x08,
+  "MparbfBuffer::readOffsetBytes offset must be 0x08"
 );
 static_assert(
-  offsetof(MparbfRuntimeBuffer, dataBytes) == 0x0C,
-  "MparbfRuntimeBuffer::dataBytes offset must be 0x0C"
+  offsetof(MparbfBuffer, dataBytes) == 0x0C,
+  "MparbfBuffer::dataBytes offset must be 0x0C"
 );
 static_assert(
-  offsetof(MparbfRuntimeBuffer, writeOffsetBytes) == 0x10,
-  "MparbfRuntimeBuffer::writeOffsetBytes offset must be 0x10"
+  offsetof(MparbfBuffer, writeOffsetBytes) == 0x10,
+  "MparbfBuffer::writeOffsetBytes offset must be 0x10"
 );
 static_assert(
-  offsetof(MparbfRuntimeBuffer, freeBytes) == 0x14,
-  "MparbfRuntimeBuffer::freeBytes offset must be 0x14"
+  offsetof(MparbfBuffer, freeBytes) == 0x14,
+  "MparbfBuffer::freeBytes offset must be 0x14"
 );
-static_assert(sizeof(MparbfRuntimeBuffer) == 0x18, "MparbfRuntimeBuffer size must be 0x18");
+static_assert(sizeof(MparbfBuffer) == 0x18, "MparbfBuffer size must be 0x18");
 
 struct SfxaRuntimeHandleView
 {

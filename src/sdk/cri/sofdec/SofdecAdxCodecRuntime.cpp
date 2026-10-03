@@ -4360,7 +4360,7 @@
    */
   std::int32_t adxt_SetOutPan(void* const adxtRuntime, const std::int32_t laneIndex, const std::int32_t panLevel)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return ADXERR_CallErrFunc1_(kAdxtSetOutPanNullRuntimeMessage);
     }
@@ -4404,7 +4404,7 @@
    */
   std::int32_t adxt_GetOutPan(void* const adxtRuntime, const std::int32_t laneIndex)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtGetOutPanParameterErrorMessage);
       return 0;
@@ -4436,7 +4436,7 @@
    */
   void adxt_SetOutBalance(void* const adxtRuntime, const std::int32_t balanceLevel)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtSetOutBalanceParameterErrorMessage);
       return;
@@ -4521,7 +4521,7 @@
    * sub-lanes, destroying owned handles, clearing the runtime block, and
    * reporting null-parameter usage through ADXERR callback lane.
    */
-  void adxt_Destroy(AdxtRuntimeState* const runtime)
+  void adxt_Destroy(AdxtState* const runtime)
   {
     if (runtime == nullptr) {
       ADXERR_CallErrFunc1_(kAdxtDestroyParameterErrorMessage);
@@ -4583,7 +4583,7 @@
       ADXAMP_Destroy(channelExpandHandle);
     }
 
-    std::memset(runtime, 0, sizeof(AdxtRuntimeState));
+    std::memset(runtime, 0, sizeof(AdxtState));
     runtime->used = 0;
 
     ADXCRS_Unlock();
@@ -4598,7 +4598,7 @@
   void ADXT_Destroy(void* const adxtRuntime)
   {
     ADXCRS_Enter();
-    adxt_Destroy(static_cast<AdxtRuntimeState*>(adxtRuntime));
+    adxt_Destroy(static_cast<AdxtState*>(adxtRuntime));
     ADXCRS_Leave();
   }
 
@@ -4655,7 +4655,7 @@
   }
 
   std::int32_t ADXT_ReportMessage(const char* message);
-  std::int32_t ADXT_ResetHistoryState(AdxtDolbyRuntimeState* state);
+  std::int32_t ADXT_ResetHistoryState(AdxtDolbyState* state);
 
   /**
    * Address: 0x00B21F50 (sub_B21F50)
@@ -4664,7 +4664,7 @@
    * Initializes one Dolby runtime work-state object inside caller-provided work
    * memory with alignment and bounds checks.
    */
-  AdxtDolbyRuntimeState* ADXT_AttachDolbyState(AdxtDolbyRuntimeState* workMemory, const std::int32_t workBytes)
+  AdxtDolbyState* ADXT_AttachDolbyState(AdxtDolbyState* workMemory, const std::int32_t workBytes)
   {
     if (workMemory == nullptr) {
       ADXT_ReportMessage(kAdxtNullWorkPointerMessage);
@@ -4677,13 +4677,13 @@
     }
 
     auto* const alignedState =
-      reinterpret_cast<AdxtDolbyRuntimeState*>(AlignPointerTo4Bytes(reinterpret_cast<std::uint8_t*>(workMemory)));
-    std::memset(alignedState, 0, sizeof(AdxtDolbyRuntimeState));
+      reinterpret_cast<AdxtDolbyState*>(AlignPointerTo4Bytes(reinterpret_cast<std::uint8_t*>(workMemory)));
+    std::memset(alignedState, 0, sizeof(AdxtDolbyState));
 
     alignedState->workBufferBase = workMemory;
     alignedState->workBufferBytes = workBytes;
 
-    auto* historyBase = AlignPointerTo4Bytes(reinterpret_cast<std::uint8_t*>(alignedState) + sizeof(AdxtDolbyRuntimeState));
+    auto* historyBase = AlignPointerTo4Bytes(reinterpret_cast<std::uint8_t*>(alignedState) + sizeof(AdxtDolbyState));
     alignedState->historyLaneA = reinterpret_cast<std::int32_t*>(historyBase);
     alignedState->historyLaneB = alignedState->historyLaneA + 96;
 
@@ -4704,7 +4704,7 @@
    * What it does:
    * Lock-guarded wrapper for Dolby work-state attachment/initialization.
    */
-  AdxtDolbyRuntimeState* ADXT_AttachDolbyStateLocked(AdxtDolbyRuntimeState* workMemory, const std::int32_t workBytes)
+  AdxtDolbyState* ADXT_AttachDolbyStateLocked(AdxtDolbyState* workMemory, const std::int32_t workBytes)
   {
     sofdec_EnterLock_7();
     auto* const result = ADXT_AttachDolbyState(workMemory, workBytes);
@@ -4732,9 +4732,9 @@
    * What it does:
    * Clears one Dolby work-state control block.
    */
-  std::int32_t ADXT_ClearControlState(AdxtDolbyRuntimeState* state)
+  std::int32_t ADXT_ClearControlState(AdxtDolbyState* state)
   {
-    std::memset(state, 0, sizeof(AdxtDolbyRuntimeState));
+    std::memset(state, 0, sizeof(AdxtDolbyState));
     return 0;
   }
 
@@ -4744,7 +4744,7 @@
    * What it does:
    * Lock-guarded wrapper for clearing one Dolby control state block.
    */
-  void ADXT_ClearControlStateLocked(AdxtDolbyRuntimeState* state)
+  void ADXT_ClearControlStateLocked(AdxtDolbyState* state)
   {
     sofdec_EnterLock_7();
     ADXT_ClearControlState(state);
@@ -4757,7 +4757,7 @@
    * What it does:
    * Resets fixed history lanes and ring-buffer cursor for Dolby runtime state.
    */
-  std::int32_t ADXT_ResetHistoryState(AdxtDolbyRuntimeState* state)
+  std::int32_t ADXT_ResetHistoryState(AdxtDolbyState* state)
   {
     for (std::int32_t lane = 0; lane < 96; ++lane) {
       state->historyLaneA[lane] = 0;
@@ -4774,7 +4774,7 @@
    * What it does:
    * Lock-guarded wrapper for history-lane reset.
    */
-  void ADXT_ResetHistoryStateLocked(AdxtDolbyRuntimeState* state)
+  void ADXT_ResetHistoryStateLocked(AdxtDolbyState* state)
   {
     sofdec_EnterLock_7();
     ADXT_ResetHistoryState(state);
@@ -4788,8 +4788,8 @@
    * Processes one Dolby matrix sample through Q12 coefficient lanes and updates
    * circular history buffers.
    */
-  AdxtDolbyRuntimeState* ADXT_ProcessSample(
-    AdxtDolbyRuntimeState* state,
+  AdxtDolbyState* ADXT_ProcessSample(
+    AdxtDolbyState* state,
     const std::int16_t inputSample,
     std::int16_t* const outSampleA,
     std::int16_t* const outSampleB
@@ -4845,7 +4845,7 @@
    * Lock-guarded wrapper for single-sample Dolby matrix processing.
    */
   void ADXT_ProcessSampleLocked(
-    AdxtDolbyRuntimeState* state,
+    AdxtDolbyState* state,
     const std::int16_t inputSample,
     std::int16_t* outSampleA,
     std::int16_t* outSampleB
@@ -4864,7 +4864,7 @@
    * first history window segment.
    */
   std::int32_t ADXT_ProcessSampleBlock(
-    AdxtDolbyRuntimeState* state,
+    AdxtDolbyState* state,
     const std::int16_t* inputSamples,
     std::int16_t* outputSamplesA,
     std::int16_t* outputSamplesB
@@ -4919,7 +4919,7 @@
    * Lock-guarded wrapper for 32-sample Dolby block processing.
    */
   void ADXT_ProcessSampleBlockLocked(
-    AdxtDolbyRuntimeState* state,
+    AdxtDolbyState* state,
     const std::int16_t* inputSamples,
     std::int16_t* outputSamplesA,
     std::int16_t* outputSamplesB
@@ -4937,7 +4937,7 @@
    * Updates Dolby matrix lookup-table index lanes from signed user parameters.
    */
   std::int32_t ADXT_SetMixTableIndices(
-    AdxtDolbyRuntimeState* state,
+    AdxtDolbyState* state,
     const std::int32_t matrixParamA,
     const std::int32_t matrixParamB
   )
@@ -4976,7 +4976,7 @@
    * Lock-guarded wrapper for Dolby mix-table index updates.
    */
   void ADXT_SetMixTableIndicesLocked(
-    AdxtDolbyRuntimeState* state,
+    AdxtDolbyState* state,
     const std::int32_t matrixParamA,
     const std::int32_t matrixParamB
   )
@@ -4992,7 +4992,7 @@
    * What it does:
    * Sets Dolby sample-rate lane and derives clamped history window length.
    */
-  std::uint32_t ADXT_SetSampleRate(AdxtDolbyRuntimeState* state, const std::int32_t sampleRate)
+  std::uint32_t ADXT_SetSampleRate(AdxtDolbyState* state, const std::int32_t sampleRate)
   {
     if (state == nullptr) {
       return static_cast<std::uint32_t>(ADXT_ReportMessage(kAdxtNullRateStateMessage));
@@ -5027,16 +5027,16 @@
    * What it does:
    * Lock-guarded wrapper for Dolby sample-rate configuration.
    */
-  void ADXT_SetSampleRateLocked(AdxtDolbyRuntimeState* state, const std::int32_t sampleRate)
+  void ADXT_SetSampleRateLocked(AdxtDolbyState* state, const std::int32_t sampleRate)
   {
     sofdec_EnterLock_7();
     ADXT_SetSampleRate(state, sampleRate);
     sofdec_LeaveLock_7();
   }
 
-  [[nodiscard]] static AdxtDolbyRuntimeState* ADXB_GetDolbyState(moho::AdxBitstreamDecoderState* const decoder)
+  [[nodiscard]] static AdxtDolbyState* ADXB_GetDolbyState(moho::AdxBitstreamDecoderState* const decoder)
   {
-    return reinterpret_cast<AdxtDolbyRuntimeState*>(
+    return reinterpret_cast<AdxtDolbyState*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(decoder->channelExpandHandle))
     );
   }
@@ -5059,8 +5059,8 @@
       return;
     }
 
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
-    auto* const decoder = AsAdxsjdRuntimeView(runtime->sjdHandle)->Decoder();
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
+    auto* const decoder = AdxsjdStateOf(runtime->sjdHandle)->Decoder();
     auto* const dolbyState = ADXB_GetDolbyState(decoder);
     if (runtime->maxChannelCount >= 2 && dolbyState != nullptr) {
       ADXT_SetMixTableIndicesLocked(dolbyState, matrixParamA, matrixParamB);
@@ -5081,8 +5081,8 @@
    */
   [[maybe_unused]] void ADXT_DetachDolbyState(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
-    auto* const decoder = AsAdxsjdRuntimeView(runtime->sjdHandle)->Decoder();
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
+    auto* const decoder = AdxsjdStateOf(runtime->sjdHandle)->Decoder();
     auto* const dolbyState = ADXB_GetDolbyState(decoder);
     if (dolbyState == nullptr) {
       return;

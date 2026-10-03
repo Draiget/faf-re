@@ -3086,7 +3086,7 @@
   std::int32_t __cdecl ADXB_ExecOneMpa(moho::AdxBitstreamDecoderState* decoder);
   std::int32_t __cdecl ADXB_ExecOneM2a(moho::AdxBitstreamDecoderState* decoder);
   using moho::SflibErrorInfo;
-  struct SflibLibWorkRuntime;
+  struct SflibLibWork;
   // 0x00AE7150: void, not int - it just forwards 32 static slots to SFH_Init.
   void SFHDS_Init();
   std::int32_t SFHDS_Finish();
@@ -3305,7 +3305,7 @@
   moho::SflibErrorInfo* sflib_InitErr(moho::SflibErrorInfo* errInfo);
   moho::SflibErrorInfo*
   sflib_SetErrFnSub(moho::SflibErrorInfo* errInfo, moho::SflibErrorCallback callback, std::int32_t callbackObject);
-  SflibLibWorkRuntime* sflib_InitResetPara(SflibLibWorkRuntime* libWork);
+  SflibLibWork* sflib_InitResetPara(SflibLibWork* libWork);
   /**
    * Address: 0x00ADA9C0 (FUN_00ADA9C0, _SFTIM_Init)
    *
@@ -3537,7 +3537,7 @@
   moho::MwsfdLibWork gMwsfdLibWork{};
 
 
-  struct SflibTransferInitRuntimeView
+  struct SflibTransferInit
   {
     std::uint8_t mUnknown00[0x3C]{};
     std::int32_t resetParameter = 0; // +0x3C
@@ -3545,16 +3545,16 @@
   };
 
   static_assert(
-    offsetof(SflibTransferInitRuntimeView, resetParameter) == 0x3C,
-    "SflibTransferInitRuntimeView::resetParameter offset must be 0x3C"
+    offsetof(SflibTransferInit, resetParameter) == 0x3C,
+    "SflibTransferInit::resetParameter offset must be 0x3C"
   );
   static_assert(
-    offsetof(SflibTransferInitRuntimeView, adxtHandle) == 0x40,
-    "SflibTransferInitRuntimeView::adxtHandle offset must be 0x40"
+    offsetof(SflibTransferInit, adxtHandle) == 0x40,
+    "SflibTransferInit::adxtHandle offset must be 0x40"
   );
-  static_assert(sizeof(SflibTransferInitRuntimeView) == 0x44, "SflibTransferInitRuntimeView size must be 0x44");
+  static_assert(sizeof(SflibTransferInit) == 0x44, "SflibTransferInit size must be 0x44");
 
-  struct SflibLibWorkRuntime
+  struct SflibLibWork
   {
     std::array<std::uint32_t, 0x64> defaultConditions{}; // +0x000
     moho::MwsfdInitSfdParams initParams{}; // +0x190
@@ -3562,52 +3562,52 @@
     moho::SflibErrorInfo errInfo{}; // +0x19C
     std::uint8_t timeState[0x0C]{}; // +0x1B0
     std::uint8_t sfbufState[0x04]{}; // +0x1BC
-    SflibTransferInitRuntimeView transferInitState{}; // +0x1C0
+    SflibTransferInit transferInitState{}; // +0x1C0
     std::array<void*, 32> objectHandles{}; // +0x204
     std::int32_t versionTag = 0; // +0x284
   };
 
   static_assert(
-    offsetof(SflibLibWorkRuntime, defaultConditions) == 0x000,
-    "SflibLibWorkRuntime::defaultConditions offset must be 0x000"
+    offsetof(SflibLibWork, defaultConditions) == 0x000,
+    "SflibLibWork::defaultConditions offset must be 0x000"
   );
   static_assert(
-    offsetof(SflibLibWorkRuntime, initParams) == 0x190,
-    "SflibLibWorkRuntime::initParams offset must be 0x190"
+    offsetof(SflibLibWork, initParams) == 0x190,
+    "SflibLibWork::initParams offset must be 0x190"
   );
-  static_assert(offsetof(SflibLibWorkRuntime, initState) == 0x198, "SflibLibWorkRuntime::initState offset must be 0x198");
-  static_assert(offsetof(SflibLibWorkRuntime, errInfo) == 0x19C, "SflibLibWorkRuntime::errInfo offset must be 0x19C");
+  static_assert(offsetof(SflibLibWork, initState) == 0x198, "SflibLibWork::initState offset must be 0x198");
+  static_assert(offsetof(SflibLibWork, errInfo) == 0x19C, "SflibLibWork::errInfo offset must be 0x19C");
   static_assert(
-    offsetof(SflibLibWorkRuntime, timeState) == 0x1B0,
-    "SflibLibWorkRuntime::timeState offset must be 0x1B0"
-  );
-  static_assert(
-    offsetof(SflibLibWorkRuntime, sfbufState) == 0x1BC,
-    "SflibLibWorkRuntime::sfbufState offset must be 0x1BC"
+    offsetof(SflibLibWork, timeState) == 0x1B0,
+    "SflibLibWork::timeState offset must be 0x1B0"
   );
   static_assert(
-    offsetof(SflibLibWorkRuntime, transferInitState) == 0x1C0,
-    "SflibLibWorkRuntime::transferInitState offset must be 0x1C0"
+    offsetof(SflibLibWork, sfbufState) == 0x1BC,
+    "SflibLibWork::sfbufState offset must be 0x1BC"
   );
   static_assert(
-    offsetof(SflibLibWorkRuntime, transferInitState) + offsetof(SflibTransferInitRuntimeView, resetParameter) == 0x1FC,
-    "SflibLibWorkRuntime::resetParameter offset must be 0x1FC"
+    offsetof(SflibLibWork, transferInitState) == 0x1C0,
+    "SflibLibWork::transferInitState offset must be 0x1C0"
   );
   static_assert(
-    offsetof(SflibLibWorkRuntime, transferInitState) + offsetof(SflibTransferInitRuntimeView, adxtHandle) == 0x200,
-    "SflibLibWorkRuntime::adxtHandle offset must be 0x200"
+    offsetof(SflibLibWork, transferInitState) + offsetof(SflibTransferInit, resetParameter) == 0x1FC,
+    "SflibLibWork::resetParameter offset must be 0x1FC"
   );
   static_assert(
-    offsetof(SflibLibWorkRuntime, objectHandles) == 0x204,
-    "SflibLibWorkRuntime::objectHandles offset must be 0x204"
+    offsetof(SflibLibWork, transferInitState) + offsetof(SflibTransferInit, adxtHandle) == 0x200,
+    "SflibLibWork::adxtHandle offset must be 0x200"
   );
   static_assert(
-    offsetof(SflibLibWorkRuntime, versionTag) == 0x284,
-    "SflibLibWorkRuntime::versionTag offset must be 0x284"
+    offsetof(SflibLibWork, objectHandles) == 0x204,
+    "SflibLibWork::objectHandles offset must be 0x204"
   );
-  static_assert(sizeof(SflibLibWorkRuntime) == 0x288, "SflibLibWorkRuntime size must be 0x288");
+  static_assert(
+    offsetof(SflibLibWork, versionTag) == 0x284,
+    "SflibLibWork::versionTag offset must be 0x284"
+  );
+  static_assert(sizeof(SflibLibWork) == 0x288, "SflibLibWork size must be 0x288");
 
-  struct SflibErrorOwnerRuntimeView
+  struct SflibErrorOwner
   {
     std::uint8_t mUnknown00[0x48]{};
     std::int32_t handleState = 0; // +0x48
@@ -3616,15 +3616,15 @@
   };
 
   static_assert(
-    offsetof(SflibErrorOwnerRuntimeView, handleState) == 0x48,
-    "SflibErrorOwnerRuntimeView::handleState offset must be 0x48"
+    offsetof(SflibErrorOwner, handleState) == 0x48,
+    "SflibErrorOwner::handleState offset must be 0x48"
   );
   static_assert(
-    offsetof(SflibErrorOwnerRuntimeView, errInfo) == 0x9F8,
-    "SflibErrorOwnerRuntimeView::errInfo offset must be 0x9F8"
+    offsetof(SflibErrorOwner, errInfo) == 0x9F8,
+    "SflibErrorOwner::errInfo offset must be 0x9F8"
   );
 
-  SflibLibWorkRuntime gSflibLibWork{};
+  SflibLibWork gSflibLibWork{};
 
   /**
    * Address: 0x00D7F40C (`_mwsfd_initsfdpara`)
@@ -4583,7 +4583,7 @@ namespace
   constexpr std::uint32_t kM2aDownmixBufferBytes =
     static_cast<std::uint32_t>(kM2aPcmWindowSampleCount * sizeof(float));
 
-  struct AdxtDolbyRuntimeState
+  struct AdxtDolbyState
   {
     void* workBufferBase = nullptr; // +0x00
     std::int32_t workBufferBytes = 0; // +0x04
@@ -4599,49 +4599,49 @@ namespace
   };
 
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, workBufferBase) == 0x00,
-    "AdxtDolbyRuntimeState::workBufferBase offset must be 0x00"
+    offsetof(AdxtDolbyState, workBufferBase) == 0x00,
+    "AdxtDolbyState::workBufferBase offset must be 0x00"
   );
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, workBufferBytes) == 0x04,
-    "AdxtDolbyRuntimeState::workBufferBytes offset must be 0x04"
+    offsetof(AdxtDolbyState, workBufferBytes) == 0x04,
+    "AdxtDolbyState::workBufferBytes offset must be 0x04"
   );
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, historyLaneA) == 0x08,
-    "AdxtDolbyRuntimeState::historyLaneA offset must be 0x08"
+    offsetof(AdxtDolbyState, historyLaneA) == 0x08,
+    "AdxtDolbyState::historyLaneA offset must be 0x08"
   );
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, historyLaneB) == 0x0C,
-    "AdxtDolbyRuntimeState::historyLaneB offset must be 0x0C"
+    offsetof(AdxtDolbyState, historyLaneB) == 0x0C,
+    "AdxtDolbyState::historyLaneB offset must be 0x0C"
   );
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, sampleRate) == 0x10, "AdxtDolbyRuntimeState::sampleRate offset must be 0x10"
+    offsetof(AdxtDolbyState, sampleRate) == 0x10, "AdxtDolbyState::sampleRate offset must be 0x10"
   );
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, historyWriteIndex) == 0x14,
-    "AdxtDolbyRuntimeState::historyWriteIndex offset must be 0x14"
+    offsetof(AdxtDolbyState, historyWriteIndex) == 0x14,
+    "AdxtDolbyState::historyWriteIndex offset must be 0x14"
   );
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, historyWindowLength) == 0x18,
-    "AdxtDolbyRuntimeState::historyWindowLength offset must be 0x18"
+    offsetof(AdxtDolbyState, historyWindowLength) == 0x18,
+    "AdxtDolbyState::historyWindowLength offset must be 0x18"
   );
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, mixTableIndexA) == 0x1C,
-    "AdxtDolbyRuntimeState::mixTableIndexA offset must be 0x1C"
+    offsetof(AdxtDolbyState, mixTableIndexA) == 0x1C,
+    "AdxtDolbyState::mixTableIndexA offset must be 0x1C"
   );
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, mixTableIndexB) == 0x20,
-    "AdxtDolbyRuntimeState::mixTableIndexB offset must be 0x20"
+    offsetof(AdxtDolbyState, mixTableIndexB) == 0x20,
+    "AdxtDolbyState::mixTableIndexB offset must be 0x20"
   );
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, mixTableIndexC) == 0x24,
-    "AdxtDolbyRuntimeState::mixTableIndexC offset must be 0x24"
+    offsetof(AdxtDolbyState, mixTableIndexC) == 0x24,
+    "AdxtDolbyState::mixTableIndexC offset must be 0x24"
   );
   static_assert(
-    offsetof(AdxtDolbyRuntimeState, mixTableIndexD) == 0x28,
-    "AdxtDolbyRuntimeState::mixTableIndexD offset must be 0x28"
+    offsetof(AdxtDolbyState, mixTableIndexD) == 0x28,
+    "AdxtDolbyState::mixTableIndexD offset must be 0x28"
   );
-  static_assert(sizeof(AdxtDolbyRuntimeState) == 0x2C, "AdxtDolbyRuntimeState size must be 0x2C");
+  static_assert(sizeof(AdxtDolbyState) == 0x2C, "AdxtDolbyState size must be 0x2C");
 
   struct AdxtDestroyableHandle
   {
@@ -4686,7 +4686,7 @@ namespace
     virtual std::int32_t QueryDecodeBacklog(std::int32_t lane) = 0; // +0x24
   };
 
-  struct AdxtRuntimeState
+  struct AdxtState
   {
     std::uint8_t used = 0; // +0x00
     std::uint8_t mUnknown01 = 0; // +0x01
@@ -4972,89 +4972,89 @@ namespace
     }
   };
 
-  static_assert(offsetof(AdxtRuntimeState, used) == 0x00, "AdxtRuntimeState::used offset must be 0x00");
+  static_assert(offsetof(AdxtState, used) == 0x00, "AdxtState::used offset must be 0x00");
   static_assert(
-    offsetof(AdxtRuntimeState, maxChannelCount) == 0x03, "AdxtRuntimeState::maxChannelCount offset must be 0x03"
+    offsetof(AdxtState, maxChannelCount) == 0x03, "AdxtState::maxChannelCount offset must be 0x03"
   );
-  static_assert(offsetof(AdxtRuntimeState, sjdHandle) == 0x04, "AdxtRuntimeState::sjdHandle offset must be 0x04");
-  static_assert(offsetof(AdxtRuntimeState, streamHandle) == 0x08, "AdxtRuntimeState::streamHandle offset must be 0x08");
-  static_assert(offsetof(AdxtRuntimeState, rnaHandle) == 0x0C, "AdxtRuntimeState::rnaHandle offset must be 0x0C");
+  static_assert(offsetof(AdxtState, sjdHandle) == 0x04, "AdxtState::sjdHandle offset must be 0x04");
+  static_assert(offsetof(AdxtState, streamHandle) == 0x08, "AdxtState::streamHandle offset must be 0x08");
+  static_assert(offsetof(AdxtState, rnaHandle) == 0x0C, "AdxtState::rnaHandle offset must be 0x0C");
   static_assert(
-    offsetof(AdxtRuntimeState, sourceRingHandle) == 0x10, "AdxtRuntimeState::sourceRingHandle offset must be 0x10"
-  );
-  static_assert(
-    offsetof(AdxtRuntimeState, streamJoinInputHandle) == 0x14,
-    "AdxtRuntimeState::streamJoinInputHandle offset must be 0x14"
+    offsetof(AdxtState, sourceRingHandle) == 0x10, "AdxtState::sourceRingHandle offset must be 0x10"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, mUnknown18) == 0x18, "AdxtRuntimeState::mUnknown18 offset must be 0x18"
+    offsetof(AdxtState, streamJoinInputHandle) == 0x14,
+    "AdxtState::streamJoinInputHandle offset must be 0x14"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, streamBufferSectorLimitHint) == 0x3C,
-    "AdxtRuntimeState::streamBufferSectorLimitHint offset must be 0x3C"
+    offsetof(AdxtState, mUnknown18) == 0x18, "AdxtState::mUnknown18 offset must be 0x18"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, seamlessFlowSectorHint) == 0x3E,
-    "AdxtRuntimeState::seamlessFlowSectorHint offset must be 0x3E"
+    offsetof(AdxtState, streamBufferSectorLimitHint) == 0x3C,
+    "AdxtState::streamBufferSectorLimitHint offset must be 0x3C"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, streamStartScratchWord) == 0x4C,
-    "AdxtRuntimeState::streamStartScratchWord offset must be 0x4C"
+    offsetof(AdxtState, seamlessFlowSectorHint) == 0x3E,
+    "AdxtState::seamlessFlowSectorHint offset must be 0x3E"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, streamStartLatchByte) == 0x71,
-    "AdxtRuntimeState::streamStartLatchByte offset must be 0x71"
+    offsetof(AdxtState, streamStartScratchWord) == 0x4C,
+    "AdxtState::streamStartScratchWord offset must be 0x4C"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, channelExpandHandle) == 0x74,
-    "AdxtRuntimeState::channelExpandHandle offset must be 0x74"
+    offsetof(AdxtState, streamStartLatchByte) == 0x71,
+    "AdxtState::streamStartLatchByte offset must be 0x71"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, linkReadCursor) == 0x88, "AdxtRuntimeState::linkReadCursor offset must be 0x88"
+    offsetof(AdxtState, channelExpandHandle) == 0x74,
+    "AdxtState::channelExpandHandle offset must be 0x74"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, streamEndSector) == 0x8C, "AdxtRuntimeState::streamEndSector offset must be 0x8C"
+    offsetof(AdxtState, linkReadCursor) == 0x88, "AdxtState::linkReadCursor offset must be 0x88"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, streamLoopStartSample) == 0x90,
-    "AdxtRuntimeState::streamLoopStartSample offset must be 0x90"
+    offsetof(AdxtState, streamEndSector) == 0x8C, "AdxtState::streamEndSector offset must be 0x8C"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, linkControlHandle) == 0x94,
-    "AdxtRuntimeState::linkControlHandle offset must be 0x94"
+    offsetof(AdxtState, streamLoopStartSample) == 0x90,
+    "AdxtState::streamLoopStartSample offset must be 0x90"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, linkSwitchRequested) == 0x98,
-    "AdxtRuntimeState::linkSwitchRequested offset must be 0x98"
+    offsetof(AdxtState, linkControlHandle) == 0x94,
+    "AdxtState::linkControlHandle offset must be 0x94"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, playbackTimeBaseFrames) == 0x9C,
-    "AdxtRuntimeState::playbackTimeBaseFrames offset must be 0x9C"
+    offsetof(AdxtState, linkSwitchRequested) == 0x98,
+    "AdxtState::linkSwitchRequested offset must be 0x98"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, playbackTimeVsyncAnchor) == 0xA0,
-    "AdxtRuntimeState::playbackTimeVsyncAnchor offset must be 0xA0"
+    offsetof(AdxtState, playbackTimeBaseFrames) == 0x9C,
+    "AdxtState::playbackTimeBaseFrames offset must be 0x9C"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, playbackTimeDeltaFrames) == 0xA4,
-    "AdxtRuntimeState::playbackTimeDeltaFrames offset must be 0xA4"
+    offsetof(AdxtState, playbackTimeVsyncAnchor) == 0xA0,
+    "AdxtState::playbackTimeVsyncAnchor offset must be 0xA0"
   );
   static_assert(
-    offsetof(AdxtRuntimeState, linkSwitchActive) == 0xA8,
-    "AdxtRuntimeState::linkSwitchActive offset must be 0xA8"
+    offsetof(AdxtState, playbackTimeDeltaFrames) == 0xA4,
+    "AdxtState::playbackTimeDeltaFrames offset must be 0xA4"
   );
-  static_assert(offsetof(AdxtRuntimeState, mUnknownA9) == 0xA9, "AdxtRuntimeState::mUnknownA9 offset must be 0xA9");
   static_assert(
-    offsetof(AdxtRuntimeState, streamDecodeWindowState) == 0xC0,
-    "AdxtRuntimeState::streamDecodeWindowState offset must be 0xC0"
+    offsetof(AdxtState, linkSwitchActive) == 0xA8,
+    "AdxtState::linkSwitchActive offset must be 0xA8"
   );
-  static_assert(sizeof(AdxtRuntimeState) == 0xC4, "AdxtRuntimeState size must be 0xC4");
+  static_assert(offsetof(AdxtState, mUnknownA9) == 0xA9, "AdxtState::mUnknownA9 offset must be 0xA9");
+  static_assert(
+    offsetof(AdxtState, streamDecodeWindowState) == 0xC0,
+    "AdxtState::streamDecodeWindowState offset must be 0xC0"
+  );
+  static_assert(sizeof(AdxtState) == 0xC4, "AdxtState size must be 0xC4");
   constexpr std::size_t kAdxtRuntimeSlotCount = 0x20;
   static_assert(
-    (sizeof(AdxtRuntimeState) * kAdxtRuntimeSlotCount) == 0x1880,
+    (sizeof(AdxtState) * kAdxtRuntimeSlotCount) == 0x1880,
     "ADXT runtime slot pool size must be 0x1880 bytes"
   );
-  std::array<AdxtRuntimeState, kAdxtRuntimeSlotCount> gAdxtRuntimePool{};
+  std::array<AdxtState, kAdxtRuntimeSlotCount> gAdxtRuntimePool{};
 
   struct MwsfdPicUserBufferDescriptor
   {
@@ -5077,18 +5077,18 @@ namespace
   );
   static_assert(sizeof(MwsfdPicUserBufferDescriptor) == 0x0C, "MwsfdPicUserBufferDescriptor size must be 0x0C");
 
-  struct MwsfdPlaybackPicUserView
+  struct MwsfdPlaybackPicUser
   {
     std::uint8_t mUnknown00[0x178]{};
     MwsfdPicUserBufferDescriptor* picUserBuffer = nullptr; // +0x178
   };
 
   static_assert(
-    offsetof(MwsfdPlaybackPicUserView, picUserBuffer) == 0x178,
-    "MwsfdPlaybackPicUserView::picUserBuffer offset must be 0x178"
+    offsetof(MwsfdPlaybackPicUser, picUserBuffer) == 0x178,
+    "MwsfdPlaybackPicUser::picUserBuffer offset must be 0x178"
   );
 
-  struct AdxfRuntimeHandleView
+  struct AdxfHandle
   {
     std::uint8_t used = 0; // +0x00
     std::uint8_t status = 0; // +0x01
@@ -5112,86 +5112,86 @@ namespace
     std::int32_t boundRangeSectorCount = 0; // +0x40
   };
 
-  static_assert(offsetof(AdxfRuntimeHandleView, used) == 0x00, "AdxfRuntimeHandleView::used offset must be 0x00");
+  static_assert(offsetof(AdxfHandle, used) == 0x00, "AdxfHandle::used offset must be 0x00");
   static_assert(
-    offsetof(AdxfRuntimeHandleView, status) == 0x01,
-    "AdxfRuntimeHandleView::status offset must be 0x01"
+    offsetof(AdxfHandle, status) == 0x01,
+    "AdxfHandle::status offset must be 0x01"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, sjFlag) == 0x02,
-    "AdxfRuntimeHandleView::sjFlag offset must be 0x02"
+    offsetof(AdxfHandle, sjFlag) == 0x02,
+    "AdxfHandle::sjFlag offset must be 0x02"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, stopWithoutNetworkFlag) == 0x03,
-    "AdxfRuntimeHandleView::stopWithoutNetworkFlag offset must be 0x03"
+    offsetof(AdxfHandle, stopWithoutNetworkFlag) == 0x03,
+    "AdxfHandle::stopWithoutNetworkFlag offset must be 0x03"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, streamHandle) == 0x04,
-    "AdxfRuntimeHandleView::streamHandle offset must be 0x04"
+    offsetof(AdxfHandle, streamHandle) == 0x04,
+    "AdxfHandle::streamHandle offset must be 0x04"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, sourceJoinObject) == 0x08,
-    "AdxfRuntimeHandleView::sourceJoinObject offset must be 0x08"
+    offsetof(AdxfHandle, sourceJoinObject) == 0x08,
+    "AdxfHandle::sourceJoinObject offset must be 0x08"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, fileSizeSectors) == 0x0C,
-    "AdxfRuntimeHandleView::fileSizeSectors offset must be 0x0C"
+    offsetof(AdxfHandle, fileSizeSectors) == 0x0C,
+    "AdxfHandle::fileSizeSectors offset must be 0x0C"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, fileSizeBytes) == 0x10,
-    "AdxfRuntimeHandleView::fileSizeBytes offset must be 0x10"
+    offsetof(AdxfHandle, fileSizeBytes) == 0x10,
+    "AdxfHandle::fileSizeBytes offset must be 0x10"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, readStartSector) == 0x14,
-    "AdxfRuntimeHandleView::readStartSector offset must be 0x14"
+    offsetof(AdxfHandle, readStartSector) == 0x14,
+    "AdxfHandle::readStartSector offset must be 0x14"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, requestSectorStart) == 0x18,
-    "AdxfRuntimeHandleView::requestSectorStart offset must be 0x18"
+    offsetof(AdxfHandle, requestSectorStart) == 0x18,
+    "AdxfHandle::requestSectorStart offset must be 0x18"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, requestSectorCount) == 0x1C,
-    "AdxfRuntimeHandleView::requestSectorCount offset must be 0x1C"
+    offsetof(AdxfHandle, requestSectorCount) == 0x1C,
+    "AdxfHandle::requestSectorCount offset must be 0x1C"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, readProgressSectors) == 0x20,
-    "AdxfRuntimeHandleView::readProgressSectors offset must be 0x20"
+    offsetof(AdxfHandle, readProgressSectors) == 0x20,
+    "AdxfHandle::readProgressSectors offset must be 0x20"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, ocbiCallbackArg0) == 0x24,
-    "AdxfRuntimeHandleView::ocbiCallbackArg0 offset must be 0x24"
+    offsetof(AdxfHandle, ocbiCallbackArg0) == 0x24,
+    "AdxfHandle::ocbiCallbackArg0 offset must be 0x24"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, ocbiCallbackArg1) == 0x28,
-    "AdxfRuntimeHandleView::ocbiCallbackArg1 offset must be 0x28"
+    offsetof(AdxfHandle, ocbiCallbackArg1) == 0x28,
+    "AdxfHandle::ocbiCallbackArg1 offset must be 0x28"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, requestedReadSizeSectors) == 0x2C,
-    "AdxfRuntimeHandleView::requestedReadSizeSectors offset must be 0x2C"
+    offsetof(AdxfHandle, requestedReadSizeSectors) == 0x2C,
+    "AdxfHandle::requestedReadSizeSectors offset must be 0x2C"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, fileStartSector) == 0x30,
-    "AdxfRuntimeHandleView::fileStartSector offset must be 0x30"
+    offsetof(AdxfHandle, fileStartSector) == 0x30,
+    "AdxfHandle::fileStartSector offset must be 0x30"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, fileStartOffset) == 0x34,
-    "AdxfRuntimeHandleView::fileStartOffset offset must be 0x34"
+    offsetof(AdxfHandle, fileStartOffset) == 0x34,
+    "AdxfHandle::fileStartOffset offset must be 0x34"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, boundFileName) == 0x38,
-    "AdxfRuntimeHandleView::boundFileName offset must be 0x38"
+    offsetof(AdxfHandle, boundFileName) == 0x38,
+    "AdxfHandle::boundFileName offset must be 0x38"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, boundRangeStartSector) == 0x3C,
-    "AdxfRuntimeHandleView::boundRangeStartSector offset must be 0x3C"
+    offsetof(AdxfHandle, boundRangeStartSector) == 0x3C,
+    "AdxfHandle::boundRangeStartSector offset must be 0x3C"
   );
   static_assert(
-    offsetof(AdxfRuntimeHandleView, boundRangeSectorCount) == 0x40,
-    "AdxfRuntimeHandleView::boundRangeSectorCount offset must be 0x40"
+    offsetof(AdxfHandle, boundRangeSectorCount) == 0x40,
+    "AdxfHandle::boundRangeSectorCount offset must be 0x40"
   );
-  static_assert(sizeof(AdxfRuntimeHandleView) == 0x44, "AdxfRuntimeHandleView size must be 0x44");
+  static_assert(sizeof(AdxfHandle) == 0x44, "AdxfHandle size must be 0x44");
 
-  struct AdxfPointInfoRuntimeView
+  struct AdxfPointInfo
   {
     std::int32_t mUnknown00 = 0; // +0x00
     std::int32_t pointInfoSizeBytes = 0; // +0x04
@@ -5231,28 +5231,28 @@ namespace
   };
 
   static_assert(
-    offsetof(AdxfPointInfoRuntimeView, pointInfoSizeBytes) == 0x04,
-    "AdxfPointInfoRuntimeView::pointInfoSizeBytes offset must be 0x04"
+    offsetof(AdxfPointInfo, pointInfoSizeBytes) == 0x04,
+    "AdxfPointInfo::pointInfoSizeBytes offset must be 0x04"
   );
   static_assert(
-    offsetof(AdxfPointInfoRuntimeView, fileCount) == 0x08,
-    "AdxfPointInfoRuntimeView::fileCount offset must be 0x08"
+    offsetof(AdxfPointInfo, fileCount) == 0x08,
+    "AdxfPointInfo::fileCount offset must be 0x08"
   );
   static_assert(
-    offsetof(AdxfPointInfoRuntimeView, archiveFileName) == 0x10,
-    "AdxfPointInfoRuntimeView::archiveFileName offset must be 0x10"
+    offsetof(AdxfPointInfo, archiveFileName) == 0x10,
+    "AdxfPointInfo::archiveFileName offset must be 0x10"
   );
   static_assert(
-    offsetof(AdxfPointInfoRuntimeView, fileStartOffsetBytes) == 0x110,
-    "AdxfPointInfoRuntimeView::fileStartOffsetBytes offset must be 0x110"
+    offsetof(AdxfPointInfo, fileStartOffsetBytes) == 0x110,
+    "AdxfPointInfo::fileStartOffsetBytes offset must be 0x110"
   );
   static_assert(
-    offsetof(AdxfPointInfoRuntimeView, rangeBase) == 0x114,
-    "AdxfPointInfoRuntimeView::rangeBase offset must be 0x114"
+    offsetof(AdxfPointInfo, rangeBase) == 0x114,
+    "AdxfPointInfo::rangeBase offset must be 0x114"
   );
   static_assert(
-    offsetof(AdxfPointInfoRuntimeView, rangeTableHeader) == 0x118,
-    "AdxfPointInfoRuntimeView::rangeTableHeader offset must be 0x118"
+    offsetof(AdxfPointInfo, rangeTableHeader) == 0x118,
+    "AdxfPointInfo::rangeTableHeader offset must be 0x118"
   );
 
   constexpr std::size_t kAdxfHandleCount = 16;
@@ -5283,8 +5283,8 @@ namespace
 
   std::int32_t gAdxfInitCount = 0;
   const char* gCriVersionStringAdxf = nullptr;
-  std::array<AdxfRuntimeHandleView, kAdxfHandleCount> gAdxfHandlePool{};
-  std::array<AdxfPointInfoRuntimeView*, kAdxfPointInfoCount> gAdxfPointInfoById{};
+  std::array<AdxfHandle, kAdxfHandleCount> gAdxfHandlePool{};
+  std::array<AdxfPointInfo*, kAdxfPointInfoCount> gAdxfPointInfoById{};
   std::array<AdxfCommandHistoryEntry, kAdxfCommandHistoryCount> gAdxfCommandHistory{};
   std::array<std::uint16_t, 16> gAdxfCommandCallCountById{};
   std::int32_t gAdxfHistoryWriteIndex = 0;
@@ -5296,7 +5296,7 @@ namespace
   std::int32_t gAdxfLoadedPointReadSectors = 0;
   std::int32_t gAdxfLoadedPointLastStatus = 1;
 
-  struct AdxsjdRuntimeView
+  struct AdxsjdState
   {
     std::uint8_t used = 0; // +0x00
     std::int8_t streamFormatClass = 0; // +0x01
@@ -5339,95 +5339,95 @@ namespace
     }
   };
 
-  static_assert(offsetof(AdxsjdRuntimeView, used) == 0x00, "AdxsjdRuntimeView::used offset must be 0x00");
+  static_assert(offsetof(AdxsjdState, used) == 0x00, "AdxsjdState::used offset must be 0x00");
   static_assert(
-    offsetof(AdxsjdRuntimeView, streamFormatClass) == 0x01,
-    "AdxsjdRuntimeView::streamFormatClass offset must be 0x01"
+    offsetof(AdxsjdState, streamFormatClass) == 0x01,
+    "AdxsjdState::streamFormatClass offset must be 0x01"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, outputHandleCount) == 0x02,
-    "AdxsjdRuntimeView::outputHandleCount offset must be 0x02"
+    offsetof(AdxsjdState, outputHandleCount) == 0x02,
+    "AdxsjdState::outputHandleCount offset must be 0x02"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, decodeExecState) == 0x03,
-    "AdxsjdRuntimeView::decodeExecState offset must be 0x03"
+    offsetof(AdxsjdState, decodeExecState) == 0x03,
+    "AdxsjdState::decodeExecState offset must be 0x03"
   );
-  static_assert(offsetof(AdxsjdRuntimeView, adxbHandle) == 0x04, "AdxsjdRuntimeView::adxbHandle offset must be 0x04");
+  static_assert(offsetof(AdxsjdState, adxbHandle) == 0x04, "AdxsjdState::adxbHandle offset must be 0x04");
   static_assert(
-    offsetof(AdxsjdRuntimeView, inputSourceHandle) == 0x08,
-    "AdxsjdRuntimeView::inputSourceHandle offset must be 0x08"
-  );
-  static_assert(
-    offsetof(AdxsjdRuntimeView, outputHandles) == 0x0C,
-    "AdxsjdRuntimeView::outputHandles offset must be 0x0C"
+    offsetof(AdxsjdState, inputSourceHandle) == 0x08,
+    "AdxsjdState::inputSourceHandle offset must be 0x08"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, outputWriteChunks) == 0x1C,
-    "AdxsjdRuntimeView::outputWriteChunks offset must be 0x1C"
+    offsetof(AdxsjdState, outputHandles) == 0x0C,
+    "AdxsjdState::outputHandles offset must be 0x0C"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, decodedSampleCount) == 0x2C,
-    "AdxsjdRuntimeView::decodedSampleCount offset must be 0x2C"
+    offsetof(AdxsjdState, outputWriteChunks) == 0x1C,
+    "AdxsjdState::outputWriteChunks offset must be 0x1C"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, decodedDataLengthBytes) == 0x30,
-    "AdxsjdRuntimeView::decodedDataLengthBytes offset must be 0x30"
+    offsetof(AdxsjdState, decodedSampleCount) == 0x2C,
+    "AdxsjdState::decodedSampleCount offset must be 0x2C"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, decodePositionSamples) == 0x34,
-    "AdxsjdRuntimeView::decodePositionSamples offset must be 0x34"
+    offsetof(AdxsjdState, decodedDataLengthBytes) == 0x30,
+    "AdxsjdState::decodedDataLengthBytes offset must be 0x30"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, maxDecodeSamples) == 0x38,
-    "AdxsjdRuntimeView::maxDecodeSamples offset must be 0x38"
+    offsetof(AdxsjdState, decodePositionSamples) == 0x34,
+    "AdxsjdState::decodePositionSamples offset must be 0x34"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, trapSampleCount) == 0x3C,
-    "AdxsjdRuntimeView::trapSampleCount offset must be 0x3C"
+    offsetof(AdxsjdState, maxDecodeSamples) == 0x38,
+    "AdxsjdState::maxDecodeSamples offset must be 0x38"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, trapCount) == 0x40,
-    "AdxsjdRuntimeView::trapCount offset must be 0x40"
+    offsetof(AdxsjdState, trapSampleCount) == 0x3C,
+    "AdxsjdState::trapSampleCount offset must be 0x3C"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, trapDataLengthBytes) == 0x44,
-    "AdxsjdRuntimeView::trapDataLengthBytes offset must be 0x44"
+    offsetof(AdxsjdState, trapCount) == 0x40,
+    "AdxsjdState::trapCount offset must be 0x40"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, trapCallback) == 0x48,
-    "AdxsjdRuntimeView::trapCallback offset must be 0x48"
+    offsetof(AdxsjdState, trapDataLengthBytes) == 0x44,
+    "AdxsjdState::trapDataLengthBytes offset must be 0x44"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, trapCallbackContext) == 0x4C,
-    "AdxsjdRuntimeView::trapCallbackContext offset must be 0x4C"
+    offsetof(AdxsjdState, trapCallback) == 0x48,
+    "AdxsjdState::trapCallback offset must be 0x48"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, filterCallback) == 0x50,
-    "AdxsjdRuntimeView::filterCallback offset must be 0x50"
+    offsetof(AdxsjdState, trapCallbackContext) == 0x4C,
+    "AdxsjdState::trapCallbackContext offset must be 0x4C"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, filterCallbackContext) == 0x54,
-    "AdxsjdRuntimeView::filterCallbackContext offset must be 0x54"
+    offsetof(AdxsjdState, filterCallback) == 0x50,
+    "AdxsjdState::filterCallback offset must be 0x50"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, headerLengthBytes) == 0x98,
-    "AdxsjdRuntimeView::headerLengthBytes offset must be 0x98"
+    offsetof(AdxsjdState, filterCallbackContext) == 0x54,
+    "AdxsjdState::filterCallbackContext offset must be 0x54"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, linkSwitchEnabled) == 0x9C,
-    "AdxsjdRuntimeView::linkSwitchEnabled offset must be 0x9C"
+    offsetof(AdxsjdState, headerLengthBytes) == 0x98,
+    "AdxsjdState::headerLengthBytes offset must be 0x98"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, positiveSampleAdjust) == 0xA0,
-    "AdxsjdRuntimeView::positiveSampleAdjust offset must be 0xA0"
+    offsetof(AdxsjdState, linkSwitchEnabled) == 0x9C,
+    "AdxsjdState::linkSwitchEnabled offset must be 0x9C"
   );
   static_assert(
-    offsetof(AdxsjdRuntimeView, negativeSampleAdjust) == 0xA4,
-    "AdxsjdRuntimeView::negativeSampleAdjust offset must be 0xA4"
+    offsetof(AdxsjdState, positiveSampleAdjust) == 0xA0,
+    "AdxsjdState::positiveSampleAdjust offset must be 0xA0"
   );
-  static_assert(sizeof(AdxsjdRuntimeView) == 0xA8, "AdxsjdRuntimeView size must be 0xA8");
+  static_assert(
+    offsetof(AdxsjdState, negativeSampleAdjust) == 0xA4,
+    "AdxsjdState::negativeSampleAdjust offset must be 0xA4"
+  );
+  static_assert(sizeof(AdxsjdState) == 0xA8, "AdxsjdState size must be 0xA8");
 
-  AdxsjdRuntimeView gAdxsjdObjectPool[kAdxsjdObjectCount]{};
+  AdxsjdState gAdxsjdObjectPool[kAdxsjdObjectCount]{};
   std::int32_t gAdxsjdInitCount = 0;
 
   struct AdxrnaPanDispatchTable
@@ -5538,35 +5538,35 @@ namespace
     "AdxrnaPanDispatchTable::consumeTransferUnits offset must be 0x60"
   );
 
-  struct AdxrnaOutputRuntimeView
+  struct AdxrnaOutput
   {
     AdxrnaPanDispatchTable* dispatchTable = nullptr; // +0x00
   };
 
-  struct AdxrnaRuntimeView
+  struct AdxrnaState
   {
     std::uint8_t inUse = 0; // +0x00
     std::uint8_t mUnknown01 = 0; // +0x01
     std::uint8_t maxChannelCount = 0; // +0x02
     std::uint8_t channelCount = 0; // +0x03
     std::uint8_t mUnknown04[0x34]{}; // +0x04
-    AdxrnaOutputRuntimeView* outputRuntime = nullptr; // +0x38
+    AdxrnaOutput* outputRuntime = nullptr; // +0x38
     std::uint8_t mUnknown3C[0x28]{}; // +0x3C
     std::int32_t outputPanByChannel[16]{}; // +0x64
   };
 
-  static_assert(offsetof(AdxrnaRuntimeView, maxChannelCount) == 0x02, "AdxrnaRuntimeView::maxChannelCount offset must be 0x02");
-  static_assert(offsetof(AdxrnaRuntimeView, channelCount) == 0x03, "AdxrnaRuntimeView::channelCount offset must be 0x03");
+  static_assert(offsetof(AdxrnaState, maxChannelCount) == 0x02, "AdxrnaState::maxChannelCount offset must be 0x02");
+  static_assert(offsetof(AdxrnaState, channelCount) == 0x03, "AdxrnaState::channelCount offset must be 0x03");
   static_assert(
-    offsetof(AdxrnaRuntimeView, outputRuntime) == 0x38,
-    "AdxrnaRuntimeView::outputRuntime offset must be 0x38"
+    offsetof(AdxrnaState, outputRuntime) == 0x38,
+    "AdxrnaState::outputRuntime offset must be 0x38"
   );
   static_assert(
-    offsetof(AdxrnaRuntimeView, outputPanByChannel) == 0x64,
-    "AdxrnaRuntimeView::outputPanByChannel offset must be 0x64"
+    offsetof(AdxrnaState, outputPanByChannel) == 0x64,
+    "AdxrnaState::outputPanByChannel offset must be 0x64"
   );
 
-  struct AdxrnaTransportRuntimeView
+  struct AdxrnaTransport
   {
     std::uint8_t inUse = 0; // +0x00
     std::uint8_t stateFlags = 0; // +0x01
@@ -5583,7 +5583,7 @@ namespace
     std::int32_t transferWritePosition = 0; // +0x2C
     std::int32_t transferReadPosition = 0; // +0x30
     std::int32_t queuedDataUnits = 0; // +0x34
-    AdxrnaOutputRuntimeView* outputRuntime = nullptr; // +0x38
+    AdxrnaOutput* outputRuntime = nullptr; // +0x38
     std::int32_t pendingTransferUnits = 0; // +0x3C
     std::int32_t restoreWritePosition = 0; // +0x40
     std::int32_t restoreReadPosition = 0; // +0x44
@@ -5602,94 +5602,94 @@ namespace
   };
 
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, stateFlags) == 0x01,
-    "AdxrnaTransportRuntimeView::stateFlags offset must be 0x01"
+    offsetof(AdxrnaTransport, stateFlags) == 0x01,
+    "AdxrnaTransport::stateFlags offset must be 0x01"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, transportResetState) == 0x04,
-    "AdxrnaTransportRuntimeView::transportResetState offset must be 0x04"
+    offsetof(AdxrnaTransport, transportResetState) == 0x04,
+    "AdxrnaTransport::transportResetState offset must be 0x04"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, pendingTransferAck) == 0x05,
-    "AdxrnaTransportRuntimeView::pendingTransferAck offset must be 0x05"
+    offsetof(AdxrnaTransport, pendingTransferAck) == 0x05,
+    "AdxrnaTransport::pendingTransferAck offset must be 0x05"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, decodeControlFlags) == 0x06,
-    "AdxrnaTransportRuntimeView::decodeControlFlags offset must be 0x06"
+    offsetof(AdxrnaTransport, decodeControlFlags) == 0x06,
+    "AdxrnaTransport::decodeControlFlags offset must be 0x06"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, outputSyncPending) == 0x07,
-    "AdxrnaTransportRuntimeView::outputSyncPending offset must be 0x07"
+    offsetof(AdxrnaTransport, outputSyncPending) == 0x07,
+    "AdxrnaTransport::outputSyncPending offset must be 0x07"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, channelCount) == 0x03,
-    "AdxrnaTransportRuntimeView::channelCount offset must be 0x03"
+    offsetof(AdxrnaTransport, channelCount) == 0x03,
+    "AdxrnaTransport::channelCount offset must be 0x03"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, transferWritePosition) == 0x2C,
-    "AdxrnaTransportRuntimeView::transferWritePosition offset must be 0x2C"
+    offsetof(AdxrnaTransport, transferWritePosition) == 0x2C,
+    "AdxrnaTransport::transferWritePosition offset must be 0x2C"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, transferReadPosition) == 0x30,
-    "AdxrnaTransportRuntimeView::transferReadPosition offset must be 0x30"
+    offsetof(AdxrnaTransport, transferReadPosition) == 0x30,
+    "AdxrnaTransport::transferReadPosition offset must be 0x30"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, queuedDataUnits) == 0x34,
-    "AdxrnaTransportRuntimeView::queuedDataUnits offset must be 0x34"
+    offsetof(AdxrnaTransport, queuedDataUnits) == 0x34,
+    "AdxrnaTransport::queuedDataUnits offset must be 0x34"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, outputRuntime) == 0x38,
-    "AdxrnaTransportRuntimeView::outputRuntime offset must be 0x38"
+    offsetof(AdxrnaTransport, outputRuntime) == 0x38,
+    "AdxrnaTransport::outputRuntime offset must be 0x38"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, pendingTransferUnits) == 0x3C,
-    "AdxrnaTransportRuntimeView::pendingTransferUnits offset must be 0x3C"
+    offsetof(AdxrnaTransport, pendingTransferUnits) == 0x3C,
+    "AdxrnaTransport::pendingTransferUnits offset must be 0x3C"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, restoreWritePosition) == 0x40,
-    "AdxrnaTransportRuntimeView::restoreWritePosition offset must be 0x40"
+    offsetof(AdxrnaTransport, restoreWritePosition) == 0x40,
+    "AdxrnaTransport::restoreWritePosition offset must be 0x40"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, restoreReadPosition) == 0x44,
-    "AdxrnaTransportRuntimeView::restoreReadPosition offset must be 0x44"
+    offsetof(AdxrnaTransport, restoreReadPosition) == 0x44,
+    "AdxrnaTransport::restoreReadPosition offset must be 0x44"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, decodeCursorUnits) == 0x48,
-    "AdxrnaTransportRuntimeView::decodeCursorUnits offset must be 0x48"
+    offsetof(AdxrnaTransport, decodeCursorUnits) == 0x48,
+    "AdxrnaTransport::decodeCursorUnits offset must be 0x48"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, decodedDataUnits) == 0x4C,
-    "AdxrnaTransportRuntimeView::decodedDataUnits offset must be 0x4C"
+    offsetof(AdxrnaTransport, decodedDataUnits) == 0x4C,
+    "AdxrnaTransport::decodedDataUnits offset must be 0x4C"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, transferFreezePosition) == 0x50,
-    "AdxrnaTransportRuntimeView::transferFreezePosition offset must be 0x50"
+    offsetof(AdxrnaTransport, transferFreezePosition) == 0x50,
+    "AdxrnaTransport::transferFreezePosition offset must be 0x50"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, transferAccumulatedUnits) == 0x54,
-    "AdxrnaTransportRuntimeView::transferAccumulatedUnits offset must be 0x54"
+    offsetof(AdxrnaTransport, transferAccumulatedUnits) == 0x54,
+    "AdxrnaTransport::transferAccumulatedUnits offset must be 0x54"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, transferCarryUnits) == 0x58,
-    "AdxrnaTransportRuntimeView::transferCarryUnits offset must be 0x58"
+    offsetof(AdxrnaTransport, transferCarryUnits) == 0x58,
+    "AdxrnaTransport::transferCarryUnits offset must be 0x58"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, transferStopPending) == 0x5C,
-    "AdxrnaTransportRuntimeView::transferStopPending offset must be 0x5C"
+    offsetof(AdxrnaTransport, transferStopPending) == 0x5C,
+    "AdxrnaTransport::transferStopPending offset must be 0x5C"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, outputSyncStateWord) == 0x8C,
-    "AdxrnaTransportRuntimeView::outputSyncStateWord offset must be 0x8C"
+    offsetof(AdxrnaTransport, outputSyncStateWord) == 0x8C,
+    "AdxrnaTransport::outputSyncStateWord offset must be 0x8C"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, transitionGuardFlag) == 0x90,
-    "AdxrnaTransportRuntimeView::transitionGuardFlag offset must be 0x90"
+    offsetof(AdxrnaTransport, transitionGuardFlag) == 0x90,
+    "AdxrnaTransport::transitionGuardFlag offset must be 0x90"
   );
   static_assert(
-    offsetof(AdxrnaTransportRuntimeView, serverPendingCount) == 0x98,
-    "AdxrnaTransportRuntimeView::serverPendingCount offset must be 0x98"
+    offsetof(AdxrnaTransport, serverPendingCount) == 0x98,
+    "AdxrnaTransport::serverPendingCount offset must be 0x98"
   );
-  static_assert(sizeof(AdxrnaTransportRuntimeView) == 0xB0, "AdxrnaTransportRuntimeView size must be 0xB0");
+  static_assert(sizeof(AdxrnaTransport) == 0xB0, "AdxrnaTransport size must be 0xB0");
 
   struct AdxrnaDsoundHandlerDispatch
   {
@@ -5698,7 +5698,7 @@ namespace
     std::uintptr_t mUnknown08 = 0; // +0x08
     void(__cdecl* initialize)(IDirectSound8* directSound) = nullptr; // +0x0C
     void(__cdecl* shutdown)() = nullptr; // +0x10
-    AdxrnaOutputRuntimeView*(__cdecl* createOutputRuntime)(std::int32_t channelCount) = nullptr; // +0x14
+    AdxrnaOutput*(__cdecl* createOutputRuntime)(std::int32_t channelCount) = nullptr; // +0x14
   };
 
   static_assert(
@@ -5714,7 +5714,7 @@ namespace
     "AdxrnaDsoundHandlerDispatch::createOutputRuntime offset must be 0x14"
   );
 
-  struct AdxrnaPlaySwitchRuntimeView
+  struct AdxrnaPlaySwitch
   {
     std::uint8_t mUnknown00 = 0; // +0x00
     std::uint8_t stateFlags = 0; // +0x01
@@ -5725,23 +5725,23 @@ namespace
   };
 
   static_assert(
-    offsetof(AdxrnaPlaySwitchRuntimeView, stateFlags) == 0x01,
-    "AdxrnaPlaySwitchRuntimeView::stateFlags offset must be 0x01"
+    offsetof(AdxrnaPlaySwitch, stateFlags) == 0x01,
+    "AdxrnaPlaySwitch::stateFlags offset must be 0x01"
   );
   static_assert(
-    offsetof(AdxrnaPlaySwitchRuntimeView, playSwitch) == 0x94,
-    "AdxrnaPlaySwitchRuntimeView::playSwitch offset must be 0x94"
+    offsetof(AdxrnaPlaySwitch, playSwitch) == 0x94,
+    "AdxrnaPlaySwitch::playSwitch offset must be 0x94"
   );
   static_assert(
-    offsetof(AdxrnaPlaySwitchRuntimeView, appliedPlaySwitch) == 0x98,
-    "AdxrnaPlaySwitchRuntimeView::appliedPlaySwitch offset must be 0x98"
+    offsetof(AdxrnaPlaySwitch, appliedPlaySwitch) == 0x98,
+    "AdxrnaPlaySwitch::appliedPlaySwitch offset must be 0x98"
   );
   static_assert(
-    offsetof(AdxrnaPlaySwitchRuntimeView, stopTransitionPending) == 0x9C,
-    "AdxrnaPlaySwitchRuntimeView::stopTransitionPending offset must be 0x9C"
+    offsetof(AdxrnaPlaySwitch, stopTransitionPending) == 0x9C,
+    "AdxrnaPlaySwitch::stopTransitionPending offset must be 0x9C"
   );
 
-  struct AdxrnaLegacyMetricsRuntimeView
+  struct AdxrnaLegacyMetrics
   {
     std::uint8_t mUnknown00_07[0x08]{}; // +0x00
     std::int32_t queuedDataCount = 0; // +0x08
@@ -5765,71 +5765,71 @@ namespace
   };
 
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, queuedDataCount) == 0x08,
-    "AdxrnaLegacyMetricsRuntimeView::queuedDataCount offset must be 0x08"
+    offsetof(AdxrnaLegacyMetrics, queuedDataCount) == 0x08,
+    "AdxrnaLegacyMetrics::queuedDataCount offset must be 0x08"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, timeScaleBase) == 0x0C,
-    "AdxrnaLegacyMetricsRuntimeView::timeScaleBase offset must be 0x0C"
+    offsetof(AdxrnaLegacyMetrics, timeScaleBase) == 0x0C,
+    "AdxrnaLegacyMetrics::timeScaleBase offset must be 0x0C"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, streamInfoWord60) == 0x60,
-    "AdxrnaLegacyMetricsRuntimeView::streamInfoWord60 offset must be 0x60"
+    offsetof(AdxrnaLegacyMetrics, streamInfoWord60) == 0x60,
+    "AdxrnaLegacyMetrics::streamInfoWord60 offset must be 0x60"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, streamInfoWords64) == 0x64,
-    "AdxrnaLegacyMetricsRuntimeView::streamInfoWords64 offset must be 0x64"
+    offsetof(AdxrnaLegacyMetrics, streamInfoWords64) == 0x64,
+    "AdxrnaLegacyMetrics::streamInfoWords64 offset must be 0x64"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, streamInfoWord6C) == 0x6C,
-    "AdxrnaLegacyMetricsRuntimeView::streamInfoWord6C offset must be 0x6C"
+    offsetof(AdxrnaLegacyMetrics, streamInfoWord6C) == 0x6C,
+    "AdxrnaLegacyMetrics::streamInfoWord6C offset must be 0x6C"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, streamInfoWord70) == 0x70,
-    "AdxrnaLegacyMetricsRuntimeView::streamInfoWord70 offset must be 0x70"
+    offsetof(AdxrnaLegacyMetrics, streamInfoWord70) == 0x70,
+    "AdxrnaLegacyMetrics::streamInfoWord70 offset must be 0x70"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, streamInfoWord74) == 0x74,
-    "AdxrnaLegacyMetricsRuntimeView::streamInfoWord74 offset must be 0x74"
+    offsetof(AdxrnaLegacyMetrics, streamInfoWord74) == 0x74,
+    "AdxrnaLegacyMetrics::streamInfoWord74 offset must be 0x74"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, transposeOctaves) == 0x78,
-    "AdxrnaLegacyMetricsRuntimeView::transposeOctaves offset must be 0x78"
+    offsetof(AdxrnaLegacyMetrics, transposeOctaves) == 0x78,
+    "AdxrnaLegacyMetrics::transposeOctaves offset must be 0x78"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, transposeCents) == 0x7C,
-    "AdxrnaLegacyMetricsRuntimeView::transposeCents offset must be 0x7C"
+    offsetof(AdxrnaLegacyMetrics, transposeCents) == 0x7C,
+    "AdxrnaLegacyMetrics::transposeCents offset must be 0x7C"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, streamHeaderLane3Word0) == 0x80,
-    "AdxrnaLegacyMetricsRuntimeView::streamHeaderLane3Word0 offset must be 0x80"
+    offsetof(AdxrnaLegacyMetrics, streamHeaderLane3Word0) == 0x80,
+    "AdxrnaLegacyMetrics::streamHeaderLane3Word0 offset must be 0x80"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, streamHeaderLane3Word1) == 0x84,
-    "AdxrnaLegacyMetricsRuntimeView::streamHeaderLane3Word1 offset must be 0x84"
+    offsetof(AdxrnaLegacyMetrics, streamHeaderLane3Word1) == 0x84,
+    "AdxrnaLegacyMetrics::streamHeaderLane3Word1 offset must be 0x84"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, streamInfoWord88) == 0x88,
-    "AdxrnaLegacyMetricsRuntimeView::streamInfoWord88 offset must be 0x88"
+    offsetof(AdxrnaLegacyMetrics, streamInfoWord88) == 0x88,
+    "AdxrnaLegacyMetrics::streamInfoWord88 offset must be 0x88"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, streamInfoWordA0) == 0xA0,
-    "AdxrnaLegacyMetricsRuntimeView::streamInfoWordA0 offset must be 0xA0"
+    offsetof(AdxrnaLegacyMetrics, streamInfoWordA0) == 0xA0,
+    "AdxrnaLegacyMetrics::streamInfoWordA0 offset must be 0xA0"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, appliedOutputVolume) == 0xA4,
-    "AdxrnaLegacyMetricsRuntimeView::appliedOutputVolume offset must be 0xA4"
+    offsetof(AdxrnaLegacyMetrics, appliedOutputVolume) == 0xA4,
+    "AdxrnaLegacyMetrics::appliedOutputVolume offset must be 0xA4"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, calculatedSampleRate) == 0xA8,
-    "AdxrnaLegacyMetricsRuntimeView::calculatedSampleRate offset must be 0xA8"
+    offsetof(AdxrnaLegacyMetrics, calculatedSampleRate) == 0xA8,
+    "AdxrnaLegacyMetrics::calculatedSampleRate offset must be 0xA8"
   );
   static_assert(
-    offsetof(AdxrnaLegacyMetricsRuntimeView, appliedSampleRate) == 0xAC,
-    "AdxrnaLegacyMetricsRuntimeView::appliedSampleRate offset must be 0xAC"
+    offsetof(AdxrnaLegacyMetrics, appliedSampleRate) == 0xAC,
+    "AdxrnaLegacyMetrics::appliedSampleRate offset must be 0xAC"
   );
 
-  struct AdxrnaStateControlRuntimeView
+  struct AdxrnaStateControl
   {
     std::uint8_t mUnknown00 = 0; // +0x00
     std::uint8_t stateByte = 0; // +0x01
@@ -5838,23 +5838,23 @@ namespace
   };
 
   static_assert(
-    offsetof(AdxrnaStateControlRuntimeView, stateByte) == 0x01,
-    "AdxrnaStateControlRuntimeView::stateByte offset must be 0x01"
+    offsetof(AdxrnaStateControl, stateByte) == 0x01,
+    "AdxrnaStateControl::stateByte offset must be 0x01"
   );
   static_assert(
-    offsetof(AdxrnaStateControlRuntimeView, flowLimitWord) == 0x44,
-    "AdxrnaStateControlRuntimeView::flowLimitWord offset must be 0x44"
+    offsetof(AdxrnaStateControl, flowLimitWord) == 0x44,
+    "AdxrnaStateControl::flowLimitWord offset must be 0x44"
   );
 
-  struct AdxtPanCacheRuntimeView
+  struct AdxtPanCache
   {
     std::uint8_t mUnknown00[0x42]{}; // +0x00
     std::int16_t requestedPanByChannel[16]{}; // +0x42
   };
 
   static_assert(
-    offsetof(AdxtPanCacheRuntimeView, requestedPanByChannel) == 0x42,
-    "AdxtPanCacheRuntimeView::requestedPanByChannel offset must be 0x42"
+    offsetof(AdxtPanCache, requestedPanByChannel) == 0x42,
+    "AdxtPanCache::requestedPanByChannel offset must be 0x42"
   );
 
   using SofdecReportCallback = std::int32_t(__cdecl*)(std::int32_t callbackContext, const char* message);
@@ -5883,7 +5883,7 @@ namespace
   std::int32_t gAdxrnaInitCount = 0;
   IDirectSound8* gAdxrnaDirectSound8 = nullptr;
   constexpr std::size_t kAdxrnaRuntimeObjectCount = 32;
-  std::array<AdxrnaTransportRuntimeView, kAdxrnaRuntimeObjectCount> gAdxrnaRuntimePool{};
+  std::array<AdxrnaTransport, kAdxrnaRuntimeObjectCount> gAdxrnaRuntimePool{};
   std::array<std::uint8_t, 0x820> gAdxrnaScratchStateA{};
   std::array<std::uint8_t, 0x800> gAdxrnaScratchStateB{};
   AdxrnaDsoundHandlerDispatch* gAdxrnaDsoundHandler = nullptr;
@@ -5900,40 +5900,40 @@ namespace
     return pointer + (4u - misalignment);
   }
 
-  [[nodiscard]] AdxsjdRuntimeView* AsAdxsjdRuntimeView(const std::int32_t sjdHandle)
+  [[nodiscard]] AdxsjdState* AdxsjdStateOf(const std::int32_t sjdHandle)
   {
-    return reinterpret_cast<AdxsjdRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sjdHandle)));
+    return reinterpret_cast<AdxsjdState*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sjdHandle)));
   }
 
-  [[nodiscard]] AdxrnaRuntimeView* AsAdxrnaRuntimeView(const std::int32_t rnaHandle)
+  [[nodiscard]] AdxrnaState* AdxrnaStateOf(const std::int32_t rnaHandle)
   {
-    return reinterpret_cast<AdxrnaRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle)));
+    return reinterpret_cast<AdxrnaState*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle)));
   }
 
-  [[nodiscard]] AdxrnaTransportRuntimeView* AsAdxrnaTransportRuntimeView(const std::int32_t rnaHandle)
+  [[nodiscard]] AdxrnaTransport* AdxrnaTransportOf(const std::int32_t rnaHandle)
   {
-    return reinterpret_cast<AdxrnaTransportRuntimeView*>(
+    return reinterpret_cast<AdxrnaTransport*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle))
     );
   }
 
-  [[nodiscard]] AdxrnaPlaySwitchRuntimeView* AsAdxrnaPlaySwitchRuntimeView(const std::int32_t rnaHandle)
+  [[nodiscard]] AdxrnaPlaySwitch* AdxrnaPlaySwitchOf(const std::int32_t rnaHandle)
   {
-    return reinterpret_cast<AdxrnaPlaySwitchRuntimeView*>(
+    return reinterpret_cast<AdxrnaPlaySwitch*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle))
     );
   }
 
-  [[nodiscard]] AdxrnaLegacyMetricsRuntimeView* AsAdxrnaLegacyMetricsRuntimeView(const std::int32_t rnaHandle)
+  [[nodiscard]] AdxrnaLegacyMetrics* AdxrnaLegacyMetricsOf(const std::int32_t rnaHandle)
   {
-    return reinterpret_cast<AdxrnaLegacyMetricsRuntimeView*>(
+    return reinterpret_cast<AdxrnaLegacyMetrics*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle))
     );
   }
 
-  [[nodiscard]] AdxrnaStateControlRuntimeView* AsAdxrnaStateControlRuntimeView(const std::int32_t rnaHandle)
+  [[nodiscard]] AdxrnaStateControl* AdxrnaStateControlOf(const std::int32_t rnaHandle)
   {
-    return reinterpret_cast<AdxrnaStateControlRuntimeView*>(
+    return reinterpret_cast<AdxrnaStateControl*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(rnaHandle))
     );
   }
@@ -5948,7 +5948,7 @@ namespace
     {
     }
 
-    AdxrnaOutputRuntimeView* __cdecl AdxrnaDsoundNoOpCreateOutputRuntime(std::int32_t)
+    AdxrnaOutput* __cdecl AdxrnaDsoundNoOpCreateOutput(std::int32_t)
     {
       return nullptr;
     }
@@ -5959,7 +5959,7 @@ namespace
       0,
       &AdxrnaDsoundNoOpInitialize,
       &AdxrnaDsoundNoOpShutdown,
-      &AdxrnaDsoundNoOpCreateOutputRuntime
+      &AdxrnaDsoundNoOpCreateOutput
     };
   } // namespace
 
@@ -6011,7 +6011,7 @@ namespace
     const std::int32_t channelIndex
   )
   {
-    auto* const sjdRuntime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const sjdRuntime = AdxsjdStateOf(sjdHandle);
     if (
       ADXB_GetAinfLen(sjdRuntime->adxbHandle) > 0
       && (sjdRuntime->streamFormatClass == 2u || sjdRuntime->streamFormatClass == 3u)
@@ -6023,7 +6023,7 @@ namespace
 
   [[nodiscard]] std::int32_t ResolveAdxsjdChannelCount(const std::int32_t sjdHandle)
   {
-    return ADXB_GetNumChan(AsAdxsjdRuntimeView(sjdHandle)->adxbHandle);
+    return ADXB_GetNumChan(AdxsjdStateOf(sjdHandle)->adxbHandle);
   }
 
   // `SetAdxrnaOutputPan` used to live here as an unaddressed duplicate of
@@ -6069,7 +6069,7 @@ namespace
     "MwlRnaTransferSink::dispatchTable offset must be 0x00"
   );
 
-  struct MwlRnaRuntimeView
+  struct MwlRna
   {
     std::uint8_t inUse = 0; // +0x00
     std::uint8_t stateFlags = 0; // +0x01
@@ -6096,66 +6096,66 @@ namespace
     std::int32_t transferIssuedFlag = 0; // +0x5C
   };
 
-  static_assert(offsetof(MwlRnaRuntimeView, channelCount) == 0x03, "MwlRnaRuntimeView::channelCount offset must be 0x03");
+  static_assert(offsetof(MwlRna, channelCount) == 0x03, "MwlRna::channelCount offset must be 0x03");
   static_assert(
-    offsetof(MwlRnaRuntimeView, pendingTransferAck) == 0x05,
-    "MwlRnaRuntimeView::pendingTransferAck offset must be 0x05"
+    offsetof(MwlRna, pendingTransferAck) == 0x05,
+    "MwlRna::pendingTransferAck offset must be 0x05"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, outputSyncPending) == 0x07,
-    "MwlRnaRuntimeView::outputSyncPending offset must be 0x07"
+    offsetof(MwlRna, outputSyncPending) == 0x07,
+    "MwlRna::outputSyncPending offset must be 0x07"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, bitsPerSample) == 0x08,
-    "MwlRnaRuntimeView::bitsPerSample offset must be 0x08"
+    offsetof(MwlRna, bitsPerSample) == 0x08,
+    "MwlRna::bitsPerSample offset must be 0x08"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, channelSjHandle0) == 0x20,
-    "MwlRnaRuntimeView::channelSjHandle0 offset must be 0x20"
+    offsetof(MwlRna, channelSjHandle0) == 0x20,
+    "MwlRna::channelSjHandle0 offset must be 0x20"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, channelSjHandle1) == 0x24,
-    "MwlRnaRuntimeView::channelSjHandle1 offset must be 0x24"
+    offsetof(MwlRna, channelSjHandle1) == 0x24,
+    "MwlRna::channelSjHandle1 offset must be 0x24"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, transferCapacityBytes) == 0x28,
-    "MwlRnaRuntimeView::transferCapacityBytes offset must be 0x28"
+    offsetof(MwlRna, transferCapacityBytes) == 0x28,
+    "MwlRna::transferCapacityBytes offset must be 0x28"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, transferWriteCursor) == 0x2C,
-    "MwlRnaRuntimeView::transferWriteCursor offset must be 0x2C"
+    offsetof(MwlRna, transferWriteCursor) == 0x2C,
+    "MwlRna::transferWriteCursor offset must be 0x2C"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, transferReadCursor) == 0x30,
-    "MwlRnaRuntimeView::transferReadCursor offset must be 0x30"
+    offsetof(MwlRna, transferReadCursor) == 0x30,
+    "MwlRna::transferReadCursor offset must be 0x30"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, transferConsumedBytes) == 0x34,
-    "MwlRnaRuntimeView::transferConsumedBytes offset must be 0x34"
+    offsetof(MwlRna, transferConsumedBytes) == 0x34,
+    "MwlRna::transferConsumedBytes offset must be 0x34"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, transferCallbackOwner) == 0x38,
-    "MwlRnaRuntimeView::transferCallbackOwner offset must be 0x38"
+    offsetof(MwlRna, transferCallbackOwner) == 0x38,
+    "MwlRna::transferCallbackOwner offset must be 0x38"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, lastTransferUnits) == 0x3C,
-    "MwlRnaRuntimeView::lastTransferUnits offset must be 0x3C"
+    offsetof(MwlRna, lastTransferUnits) == 0x3C,
+    "MwlRna::lastTransferUnits offset must be 0x3C"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, transferFreezePosition) == 0x50,
-    "MwlRnaRuntimeView::transferFreezePosition offset must be 0x50"
+    offsetof(MwlRna, transferFreezePosition) == 0x50,
+    "MwlRna::transferFreezePosition offset must be 0x50"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, transferAccumulatedUnits) == 0x54,
-    "MwlRnaRuntimeView::transferAccumulatedUnits offset must be 0x54"
+    offsetof(MwlRna, transferAccumulatedUnits) == 0x54,
+    "MwlRna::transferAccumulatedUnits offset must be 0x54"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, transferCarryUnits) == 0x58,
-    "MwlRnaRuntimeView::transferCarryUnits offset must be 0x58"
+    offsetof(MwlRna, transferCarryUnits) == 0x58,
+    "MwlRna::transferCarryUnits offset must be 0x58"
   );
   static_assert(
-    offsetof(MwlRnaRuntimeView, transferIssuedFlag) == 0x5C,
-    "MwlRnaRuntimeView::transferIssuedFlag offset must be 0x5C"
+    offsetof(MwlRna, transferIssuedFlag) == 0x5C,
+    "MwlRna::transferIssuedFlag offset must be 0x5C"
   );
 
   std::int32_t gMwlRnaChunkScratch0 = 0;
@@ -6168,7 +6168,7 @@ namespace
    * Dispatches one RNA transfer callback chunk and marks transfer-issued lane.
    */
   std::int32_t mwlRnaDispatchTransferChunk(
-    MwlRnaRuntimeView* const runtime,
+    MwlRna* const runtime,
     const std::int32_t channelIndex,
     const std::int32_t startUnit,
     const std::int32_t sourceAddress,
@@ -6192,7 +6192,7 @@ namespace
    * Pulls per-channel source chunks, computes aligned transferable unit count,
    * dispatches transfer callback lanes, then returns split chunks to SJ lanes.
    */
-  std::int32_t mwlRnaStartTrans(MwlRnaRuntimeView* const runtime)
+  std::int32_t mwlRnaStartTrans(MwlRna* const runtime)
   {
     if (runtime == nullptr || runtime->bitsPerSample <= 0) {
       return 0;
@@ -6302,8 +6302,8 @@ namespace
    */
   [[maybe_unused]] void adxrna_UpdateTransferReadState(const std::int32_t rnaHandle)
   {
-    auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
-    auto* const mwlRuntime = reinterpret_cast<MwlRnaRuntimeView*>(runtime);
+    auto* const runtime = AdxrnaTransportOf(rnaHandle);
+    auto* const mwlRuntime = reinterpret_cast<MwlRna*>(runtime);
 
     const std::int32_t previousReadCursor = runtime->transferReadPosition;
     const std::int32_t outputReadCursor = runtime->outputRuntime->dispatchTable->queryTransferReadCursor(runtime->outputRuntime, 0);
@@ -6362,14 +6362,14 @@ namespace
    * What it does:
    * Sets decode-control pending byte lane (`+0x06`) on one RNA runtime.
    */
-  [[maybe_unused]] AdxrnaTransportRuntimeView* adxrna_SetDecodeControlPending(const std::int32_t rnaHandle)
+  [[maybe_unused]] AdxrnaTransport* adxrna_SetDecodeControlPending(const std::int32_t rnaHandle)
   {
     if (rnaHandle == 0) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
       return nullptr;
     }
 
-    auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaTransportOf(rnaHandle);
     if (runtime->decodeControlFlags != 1u) {
       runtime->decodeControlFlags = 1u;
     }
@@ -6382,7 +6382,7 @@ namespace
    * What it does:
    * Returns the first free ADXRNA runtime object from the global pool.
    */
-  [[maybe_unused]] AdxrnaTransportRuntimeView* adxrna_GetNextFreeRuntimeObject()
+  [[maybe_unused]] AdxrnaTransport* adxrna_GetNextFreeInstance()
   {
     for (auto& runtime : gAdxrnaRuntimePool) {
       if (runtime.inUse == 0u) {
@@ -6399,7 +6399,7 @@ namespace
    * Resets one ADXRNA runtime object's transport/metrics control lanes to the
    * legacy create-time defaults.
    */
-  [[maybe_unused]] AdxrnaTransportRuntimeView* adxrna_ResetRuntimeDefaults(AdxrnaTransportRuntimeView* const runtime)
+  [[maybe_unused]] AdxrnaTransport* adxrna_ResetDefaults(AdxrnaTransport* const runtime)
   {
     runtime->stateFlags = 0;
     runtime->transportResetState = 0;
@@ -6412,7 +6412,7 @@ namespace
     runtime->restoreReadPosition = 0x2000;
     runtime->decodeCursorUnits = 0;
 
-    auto* const metricsRuntime = reinterpret_cast<AdxrnaLegacyMetricsRuntimeView*>(runtime);
+    auto* const metricsRuntime = reinterpret_cast<AdxrnaLegacyMetrics*>(runtime);
     metricsRuntime->streamInfoWord60 = 0;
     metricsRuntime->streamInfoWord6C = 0;
     metricsRuntime->streamInfoWord70 = 0;
@@ -6449,7 +6449,7 @@ namespace
    * Dispatches one aligned silent transfer chunk from ADXRNA scratch lanes and
    * stores returned carry units for later cursor reconciliation.
    */
-  [[maybe_unused]] std::int32_t mwlRnaDispatchScratchTransfer(MwlRnaRuntimeView* const runtime)
+  [[maybe_unused]] std::int32_t mwlRnaDispatchScratchTransfer(MwlRna* const runtime)
   {
     const std::int32_t bitsPerSample = runtime->bitsPerSample;
     const std::int32_t transferCapacityBytes = runtime->transferCapacityBytes;
@@ -6505,10 +6505,10 @@ namespace
    * Reconciles desired play/volume/sample-rate control lanes with output runtime
    * dispatch state and updates applied-value mirrors.
    */
-  [[maybe_unused]] std::int32_t adxrna_SyncOutputControlLanes(AdxrnaTransportRuntimeView* const runtime)
+  [[maybe_unused]] std::int32_t adxrna_SyncOutputControlLanes(AdxrnaTransport* const runtime)
   {
-    auto* const playSwitchRuntime = reinterpret_cast<AdxrnaPlaySwitchRuntimeView*>(runtime);
-    auto* const metricsRuntime = reinterpret_cast<AdxrnaLegacyMetricsRuntimeView*>(runtime);
+    auto* const playSwitchRuntime = reinterpret_cast<AdxrnaPlaySwitch*>(runtime);
+    auto* const metricsRuntime = reinterpret_cast<AdxrnaLegacyMetrics*>(runtime);
     const std::int32_t requestedPlaySwitch = playSwitchRuntime->playSwitch;
     const std::int32_t appliedPlaySwitch = playSwitchRuntime->appliedPlaySwitch;
 
@@ -6609,7 +6609,7 @@ namespace
       return;
     }
 
-    auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaTransportOf(rnaHandle);
     CRICRS_Enter();
     if (runtime->outputSyncPending == 0u) {
       const std::int32_t playEnabled = static_cast<std::int32_t>((runtime->stateFlags >> 1) & 1u);
@@ -6665,11 +6665,11 @@ namespace
       return;
     }
 
-    auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaTransportOf(rnaHandle);
     CRICRS_Enter();
     if (runtime->outputSyncPending == 1u) {
       if (runtime->outputSyncStateWord >= 2) {
-        auto* const playSwitchRuntime = AsAdxrnaPlaySwitchRuntimeView(rnaHandle);
+        auto* const playSwitchRuntime = AdxrnaPlaySwitchOf(rnaHandle);
         playSwitchRuntime->playSwitch = 1;
         if (((playSwitchRuntime->stateFlags >> 1) & 1u) != 1u) {
           playSwitchRuntime->stateFlags = static_cast<std::uint8_t>(playSwitchRuntime->stateFlags | 0x02u);
@@ -6689,7 +6689,7 @@ namespace
   [[maybe_unused]] std::int32_t adxrna_IsOutputSyncPending(const std::int32_t rnaHandle)
   {
     if (rnaHandle != 0) {
-      return static_cast<std::int32_t>(AsAdxrnaTransportRuntimeView(rnaHandle)->outputSyncPending);
+      return static_cast<std::int32_t>(AdxrnaTransportOf(rnaHandle)->outputSyncPending);
     }
 
     CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -6710,7 +6710,7 @@ namespace
       return;
     }
 
-    auto* const runtime = AsAdxrnaTransportRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaTransportOf(rnaHandle);
     CRICRS_Enter();
     if (runtime->pendingTransferAck == 1u) {
       if ((runtime->stateFlags & 0x01u) != 0u) {
@@ -6764,7 +6764,7 @@ namespace
    * Validates requested RNA channel count against runtime max-channel lane,
    * stores active count, and forwards the update to the output runtime bridge.
    */
-  void __cdecl mwRnaSetNumChan(AdxrnaRuntimeView* const runtime, const std::int32_t channelCount)
+  void __cdecl mwRnaSetNumChan(AdxrnaState* const runtime, const std::int32_t channelCount)
   {
     if (runtime == nullptr) {
       CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -7255,9 +7255,9 @@ namespace
     return static_cast<std::int32_t>(static_cast<double>(static_cast<std::uint32_t>(micros)) * scale);
   }
 
-  [[nodiscard]] MparbfRuntimeBuffer* AsMparbfRuntimeBuffer(const std::int32_t handleAddress)
+  [[nodiscard]] MparbfBuffer* AsMparbfBuffer(const std::int32_t handleAddress)
   {
-    return reinterpret_cast<MparbfRuntimeBuffer*>(
+    return reinterpret_cast<MparbfBuffer*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handleAddress))
     );
   }

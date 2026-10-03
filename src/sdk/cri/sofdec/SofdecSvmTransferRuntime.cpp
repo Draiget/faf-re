@@ -235,7 +235,7 @@
    * sector transfer.
    */
   std::int32_t adxf_read_sj32(
-    AdxfRuntimeHandleView* const adxfHandle,
+    AdxfHandle* const adxfHandle,
     const std::int32_t requestedSectors,
     void* const sourceJoinObject
   )
@@ -282,7 +282,7 @@
    */
   [[maybe_unused]] void* adxf_CreateAdxFs()
   {
-    auto* const handle = static_cast<AdxfRuntimeHandleView*>(adxf_AllocAdxFs());
+    auto* const handle = static_cast<AdxfHandle*>(adxf_AllocAdxFs());
     if (handle == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxfErrCreateNoHandles);
       return nullptr;

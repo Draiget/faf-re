@@ -911,16 +911,16 @@
    */
   std::int32_t __cdecl MPARBF_Create(const std::int32_t bufferBytes, std::int32_t* outHandle)
   {
-    MparbfRuntimeBuffer* ringBuffer = nullptr;
+    MparbfBuffer* ringBuffer = nullptr;
     auto status = mparbf_malloc_func(
-      static_cast<std::int32_t>(sizeof(MparbfRuntimeBuffer)),
+      static_cast<std::int32_t>(sizeof(MparbfBuffer)),
       reinterpret_cast<void**>(&ringBuffer)
     );
     if (status < 0) {
       return status;
     }
 
-    std::memset(ringBuffer, 0, sizeof(MparbfRuntimeBuffer));
+    std::memset(ringBuffer, 0, sizeof(MparbfBuffer));
 
     std::uint8_t* storage = nullptr;
     status = mparbf_malloc_func(bufferBytes, reinterpret_cast<void**>(&storage));
@@ -949,12 +949,12 @@
    */
   std::int32_t __cdecl MPARBF_Destroy(std::int32_t* handleAddress)
   {
-    auto* ringBuffer = AsMparbfRuntimeBuffer(*handleAddress);
+    auto* ringBuffer = AsMparbfBuffer(*handleAddress);
     void* storageAddress = ringBuffer->data;
     std::memset(storageAddress, 0, ringBuffer->capacityBytes);
     mparbf_free_func(&storageAddress);
 
-    std::memset(ringBuffer, 0, sizeof(MparbfRuntimeBuffer));
+    std::memset(ringBuffer, 0, sizeof(MparbfBuffer));
     void* ringBufferAddress = ringBuffer;
     mparbf_free_func(&ringBufferAddress);
     *handleAddress = 0;
@@ -969,7 +969,7 @@
    */
   std::int32_t __cdecl MPARBF_Reset(const std::int32_t handleAddress)
   {
-    auto* const ringBuffer = AsMparbfRuntimeBuffer(handleAddress);
+    auto* const ringBuffer = AsMparbfBuffer(handleAddress);
     std::memset(ringBuffer->data, 0, ringBuffer->capacityBytes);
     ringBuffer->readOffsetBytes = 0;
     ringBuffer->dataBytes = 0;
@@ -986,7 +986,7 @@
    */
   std::int32_t __cdecl MPARBF_GetDataSize(const std::int32_t handleAddress, std::uint32_t* outDataBytes)
   {
-    *outDataBytes = AsMparbfRuntimeBuffer(handleAddress)->dataBytes;
+    *outDataBytes = AsMparbfBuffer(handleAddress)->dataBytes;
     return 0;
   }
 
@@ -998,7 +998,7 @@
    */
   std::int32_t __cdecl MPARBF_GetFreeSize(const std::int32_t handleAddress, std::uint32_t* outFreeBytes)
   {
-    *outFreeBytes = AsMparbfRuntimeBuffer(handleAddress)->freeBytes;
+    *outFreeBytes = AsMparbfBuffer(handleAddress)->freeBytes;
     return 0;
   }
 
@@ -1015,7 +1015,7 @@
     std::uint32_t* outReadBytes
   )
   {
-    auto* const ringBuffer = AsMparbfRuntimeBuffer(handleAddress);
+    auto* const ringBuffer = AsMparbfBuffer(handleAddress);
 
     std::uint32_t availableBytes = 0;
     MPARBF_GetDataSize(handleAddress, &availableBytes);
@@ -1058,7 +1058,7 @@
     std::uint32_t* outWrittenBytes
   )
   {
-    auto* const ringBuffer = AsMparbfRuntimeBuffer(handleAddress);
+    auto* const ringBuffer = AsMparbfBuffer(handleAddress);
     const auto* const sourceBytes = reinterpret_cast<const std::uint8_t*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sourceAddress))
     );
@@ -1102,7 +1102,7 @@
     std::uint32_t* outReturnedBytes
   )
   {
-    auto* const ringBuffer = AsMparbfRuntimeBuffer(handleAddress);
+    auto* const ringBuffer = AsMparbfBuffer(handleAddress);
 
     std::uint32_t freeBytes = 0;
     MPARBF_GetFreeSize(handleAddress, &freeBytes);

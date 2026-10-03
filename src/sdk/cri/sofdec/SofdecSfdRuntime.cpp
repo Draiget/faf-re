@@ -9020,7 +9020,7 @@
    */
   std::int32_t sflib_InitLibWork(const moho::MwsfdInitSfdParams* const initParams)
   {
-    std::memset(&gSflibLibWork, 0, offsetof(SflibLibWorkRuntime, versionTag));
+    std::memset(&gSflibLibWork, 0, offsetof(SflibLibWork, versionTag));
     gSflibLibWork.defaultConditions = kSfplyDefaultConditions;
     gSflibLibWork.initParams = *initParams;
     gSflibLibWork.initState = 0;
@@ -9043,7 +9043,7 @@
    * What it does:
    * Clears two reset/runtime lanes in one SFLIB work object.
    */
-  SflibLibWorkRuntime* sflib_InitResetPara(SflibLibWorkRuntime* const libWork)
+  SflibLibWork* sflib_InitResetPara(SflibLibWork* const libWork)
   {
     libWork->transferInitState.resetParameter = 0;
     libWork->transferInitState.adxtHandle = 0;
@@ -9115,7 +9115,7 @@
     }
 
     auto* const errorOwner =
-      reinterpret_cast<SflibErrorOwnerRuntimeView*>(SjAddressToPointer(errorObjectAddress));
+      reinterpret_cast<SflibErrorOwner*>(SjAddressToPointer(errorObjectAddress));
     (void)sflib_SetErrSub(&errorOwner->errInfo, errorCode);
 
     if (errorOwner->handleState > 0) {
@@ -13785,7 +13785,7 @@
     }
 
     auto* const errorOwner =
-      reinterpret_cast<SflibErrorOwnerRuntimeView*>(SjAddressToPointer(errorObjectAddress));
+      reinterpret_cast<SflibErrorOwner*>(SjAddressToPointer(errorObjectAddress));
     (void)sflib_SetErrFnSub(&errorOwner->errInfo, callback, callbackObject);
     return 0;
   }
@@ -13813,7 +13813,7 @@
     }
 
     auto* const errorOwner =
-      reinterpret_cast<SflibErrorOwnerRuntimeView*>(SjAddressToPointer(errorObjectAddress));
+      reinterpret_cast<SflibErrorOwner*>(SjAddressToPointer(errorObjectAddress));
     std::memcpy(outErrorInfo, &errorOwner->errInfo, sizeof(SflibErrorInfo));
     return 0;
   }

@@ -8279,7 +8279,7 @@
     const std::int32_t rangeEnd
   )
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const std::int32_t result = lsc_EntryFileRange(runtime->SeamlessLscHandle(), fileName, 0, rangeStart, rangeEnd);
     if (result < 0) {
       return ADXERR_CallErrFunc2_(kAdxtErrCannotEntryFilePrefix, fileName);
@@ -8311,7 +8311,7 @@
     const std::int32_t fileIndex
   )
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     std::int32_t startOffset = 0;
     std::int32_t rangeStart = 0;
     std::int32_t rangeEnd = 0;
@@ -8341,7 +8341,7 @@
    */
   std::int32_t adxt_StartSeamless(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     void* const lscHandle = runtime->SeamlessLscHandle();
 
     ADXT_StopWithoutLsc(runtime);
@@ -8382,7 +8382,7 @@
    */
   std::int32_t adxt_GetStm(void* const adxtRuntime)
   {
-    return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(static_cast<AdxtRuntimeState*>(adxtRuntime)->streamHandle));
+    return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(static_cast<AdxtState*>(adxtRuntime)->streamHandle));
   }
 
   /**
@@ -8406,7 +8406,7 @@
    */
   std::int32_t adxt_TermSupply(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     return ADXSJD_TermSupply(runtime->sjdHandle);
   }
 
@@ -8480,7 +8480,7 @@
    */
   std::int32_t adxt_SetLnkSwInternal(void* const adxtRuntime, const std::int32_t enabled)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     runtime->linkSwitchRequested = static_cast<std::uint8_t>(enabled);
     if (runtime->sjdHandle != 0) {
       return ADXSJD_SetLnkSw(runtime->sjdHandle, enabled);
@@ -8534,7 +8534,7 @@
    */
   std::int32_t adxt_start_sj(void* const adxtRuntime, void* const sourceJoinHandle)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const std::int32_t maxChannels = static_cast<std::int32_t>(runtime->maxChannelCount);
     for (std::int32_t lane = 0; lane < maxChannels; ++lane) {
       runtime->SourceChannelRingLane(lane)->Destroy();
@@ -8576,7 +8576,7 @@
     const std::int32_t rangeEnd
   )
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     ADXSTM_SetBufSize(
       runtime->streamHandle,
       static_cast<std::int32_t>(runtime->SeamlessFlowSectorHint()) << 11,
@@ -8618,7 +8618,7 @@
    */
   void adxt_StartSj(void* const adxtRuntime, void* const sourceJoinHandle)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr || sourceJoinHandle == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtErrStartSjParameter);
       return;
@@ -8654,7 +8654,7 @@
    */
   void adxt_StopWithoutLsc(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     ADXCRS_Lock();
     j__ADXRNA_Stop(runtime->rnaHandle);
     j__ADXRNA_SetTransSw(runtime->rnaHandle, 0);
@@ -8699,7 +8699,7 @@
    */
   void adxt_Stop(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtStopParameterErrorMessage);
       return;
@@ -8744,7 +8744,7 @@
       return -1;
     }
 
-    return static_cast<std::int32_t>(AsAdxrnaStateControlRuntimeView(rnaHandle)->stateByte);
+    return static_cast<std::int32_t>(AdxrnaStateControlOf(rnaHandle)->stateByte);
   }
 
   /**
@@ -8761,7 +8761,7 @@
       return 0;
     }
 
-    AsAdxrnaStateControlRuntimeView(rnaHandle)->flowLimitWord = controlWord;
+    AdxrnaStateControlOf(rnaHandle)->flowLimitWord = controlWord;
     return rnaHandle;
   }
 
@@ -8779,7 +8779,7 @@
       return 0;
     }
 
-    const auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+    const auto* const runtime = AdxrnaLegacyMetricsOf(rnaHandle);
     const double semitoneCents = static_cast<double>(runtime->transposeCents + (100 * runtime->transposeOctaves));
     const double ratio = std::pow(2.0, semitoneCents / 1200.0);
     const double scaledSfreq = ratio * static_cast<double>(runtime->timeScaleBase);
@@ -8806,12 +8806,12 @@
       return 0;
     }
 
-    auto* const runtime = reinterpret_cast<MwlRnaRuntimeView*>(AsAdxrnaRuntimeView(rnaHandle));
+    auto* const runtime = reinterpret_cast<MwlRna*>(AdxrnaStateOf(rnaHandle));
     const std::int32_t scaledBits = runtime->transferCapacityBytes * runtime->bitsPerSample;
     const std::int32_t alignedBits = ((scaledBits >> 31) & 7) + scaledBits;
     runtime->transferCapacityBytes = ((alignedBits >> 3) / bitsPerSample) << 3;
 
-    auto* const outputRuntime = AsAdxrnaRuntimeView(rnaHandle)->outputRuntime;
+    auto* const outputRuntime = AdxrnaStateOf(rnaHandle)->outputRuntime;
     const std::int32_t dispatchResult = outputRuntime->dispatchTable->setBitsPerSample(outputRuntime, bitsPerSample);
     runtime->bitsPerSample = bitsPerSample;
     return dispatchResult;
@@ -8832,7 +8832,7 @@
       return 0;
     }
 
-    auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaLegacyMetricsOf(rnaHandle);
     runtime->timeScaleBase = sampleRate;
     runtime->calculatedSampleRate = mwRnaCalcSfreq(rnaHandle);
     return runtime->calculatedSampleRate;
@@ -8856,7 +8856,7 @@
       return 0;
     }
 
-    auto* const outputRuntime = AsAdxrnaTransportRuntimeView(rnaHandle)->outputRuntime;
+    auto* const outputRuntime = AdxrnaTransportOf(rnaHandle)->outputRuntime;
     return outputRuntime->dispatchTable->setLaneWordPair(outputRuntime, 6, word0, word1);
   }
 
@@ -8875,7 +8875,7 @@
       return 0;
     }
 
-    auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaLegacyMetricsOf(rnaHandle);
     if (volumeLevel < 0) {
       const std::int32_t clampedVolume = (volumeLevel <= -999) ? -999 : volumeLevel;
       runtime->streamInfoWordA0 = clampedVolume;
@@ -8913,7 +8913,7 @@
       return 0;
     }
 
-    auto* const runtime = AsAdxrnaRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaStateOf(rnaHandle);
     if (channelIndex < 0) {
       return 0;
     }
@@ -8949,8 +8949,8 @@
       return 0;
     }
 
-    auto* const runtime = AsAdxrnaRuntimeView(rnaHandle);
-    auto* const metrics = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaStateOf(rnaHandle);
+    auto* const metrics = AdxrnaLegacyMetricsOf(rnaHandle);
     const std::int32_t clampedBalance = ClampAdxrnaPanLevel(balanceLevel);
     const std::int32_t dispatchResult = runtime->outputRuntime->dispatchTable->setOutputBalance(runtime->outputRuntime, clampedBalance);
     metrics->streamInfoWord6C = clampedBalance;
@@ -8980,7 +8980,7 @@
     }
 
     const std::int32_t clampedFxLevel = ClampAdxrnaFxLevel(fxLevel);
-    auto* const outputRuntime = AsAdxrnaTransportRuntimeView(rnaHandle)->outputRuntime;
+    auto* const outputRuntime = AdxrnaTransportOf(rnaHandle)->outputRuntime;
     const std::int32_t dispatchResult = outputRuntime->dispatchTable->setLaneWordPair(
       outputRuntime,
       0,
@@ -8988,7 +8988,7 @@
       clampedFxLevel
     );
 
-    auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaLegacyMetricsOf(rnaHandle);
     runtime->streamInfoWord70 = fxLane;
     runtime->streamInfoWord74 = clampedFxLevel;
     return dispatchResult;
@@ -9012,7 +9012,7 @@
       return 0;
     }
 
-    auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaLegacyMetricsOf(rnaHandle);
     runtime->transposeOctaves = transposeOctaves;
     runtime->transposeCents = transposeCents;
     const std::int32_t calculatedSampleRate = mwRnaCalcSfreq(rnaHandle);
@@ -9038,9 +9038,9 @@
     }
 
     const std::int32_t clampedWord = ClampAdxrnaFxLevel(streamInfoWord88);
-    auto* const outputRuntime = AsAdxrnaTransportRuntimeView(rnaHandle)->outputRuntime;
+    auto* const outputRuntime = AdxrnaTransportOf(rnaHandle)->outputRuntime;
     const std::int32_t dispatchResult = outputRuntime->dispatchTable->setLaneWordPair(outputRuntime, 2, clampedWord, 0);
-    AsAdxrnaLegacyMetricsRuntimeView(rnaHandle)->streamInfoWord88 = clampedWord;
+    AdxrnaLegacyMetricsOf(rnaHandle)->streamInfoWord88 = clampedWord;
     return dispatchResult;
   }
 
@@ -9058,7 +9058,7 @@
   )
   {
     if (rnaHandle != 0) {
-      const auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+      const auto* const runtime = AdxrnaLegacyMetricsOf(rnaHandle);
       *outFxLane = runtime->streamInfoWord70;
       *outFxLevel = runtime->streamInfoWord74;
       return outFxLevel;
@@ -9083,7 +9083,7 @@
   )
   {
     if (rnaHandle != 0) {
-      const auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+      const auto* const runtime = AdxrnaLegacyMetricsOf(rnaHandle);
       *outOctaveWord = runtime->transposeOctaves;
       *outCentWord = runtime->transposeCents;
       return outCentWord;
@@ -9104,7 +9104,7 @@
   [[maybe_unused]] std::int32_t ADXRNA_GetStreamInfoWord88(const std::int32_t rnaHandle)
   {
     if (rnaHandle != 0) {
-      return AsAdxrnaLegacyMetricsRuntimeView(rnaHandle)->streamInfoWord88;
+      return AdxrnaLegacyMetricsOf(rnaHandle)->streamInfoWord88;
     }
 
     CRIERR_CallErr(kAdxrnaIllegalParameterMessage);
@@ -9119,7 +9119,7 @@
    */
   [[maybe_unused]] std::int32_t ADXRNA_GetTransportResetState(const std::int32_t rnaHandle)
   {
-    return static_cast<std::int32_t>(AsAdxrnaTransportRuntimeView(rnaHandle)->transportResetState);
+    return static_cast<std::int32_t>(AdxrnaTransportOf(rnaHandle)->transportResetState);
   }
 
   /**
@@ -9130,7 +9130,7 @@
    */
   [[maybe_unused]] std::int32_t ADXRNA_ClearTransportResetState(const std::int32_t rnaHandle)
   {
-    AsAdxrnaTransportRuntimeView(rnaHandle)->transportResetState = 0;
+    AdxrnaTransportOf(rnaHandle)->transportResetState = 0;
     return rnaHandle;
   }
 
@@ -9151,11 +9151,11 @@
       return 0;
     }
 
-    auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+    auto* const runtime = AdxrnaLegacyMetricsOf(rnaHandle);
     runtime->streamHeaderLane3Word0 = word0;
     runtime->streamHeaderLane3Word1 = word1;
 
-    auto* const outputRuntime = AsAdxrnaTransportRuntimeView(rnaHandle)->outputRuntime;
+    auto* const outputRuntime = AdxrnaTransportOf(rnaHandle)->outputRuntime;
     return outputRuntime->dispatchTable->setLaneWordPair(outputRuntime, 3, word0, word1);
   }
 
@@ -9176,7 +9176,7 @@
       return 0;
     }
 
-    const auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+    const auto* const runtime = AdxrnaLegacyMetricsOf(rnaHandle);
     *outWord0 = runtime->streamHeaderLane3Word0;
     *outWord1 = runtime->streamHeaderLane3Word1;
     return runtime->streamHeaderLane3Word1;
@@ -9200,7 +9200,7 @@
       return 0;
     }
 
-    auto* const outputRuntime = AsAdxrnaTransportRuntimeView(rnaHandle)->outputRuntime;
+    auto* const outputRuntime = AdxrnaTransportOf(rnaHandle)->outputRuntime;
     auto* const dispatch = outputRuntime->dispatchTable;
     dispatch->setLaneWordPair(outputRuntime, 4, lane4Word, 0);
     std::int32_t lane4AuxWord = 0;
@@ -9225,7 +9225,7 @@
       (void)adxrna_SetBitPerSmplCore(rnaHandle, bitsPerSample);
       (void)adxrna_SetSfreqCore(rnaHandle, sampleRate);
 
-      auto* const runtime = AsAdxrnaLegacyMetricsRuntimeView(rnaHandle);
+      auto* const runtime = AdxrnaLegacyMetricsOf(rnaHandle);
       runtime->streamInfoWords64[0] = streamInfoWord64;
       runtime->streamInfoWords64[1] = streamInfoWord68;
       runtime->streamInfoWord60 = streamInfoWord60;
@@ -9282,7 +9282,7 @@
    */
   void ADXRNA_SetNumChan(const std::int32_t rnaHandle, const std::int32_t channelCount)
   {
-    mwRnaSetNumChan(AsAdxrnaRuntimeView(rnaHandle), channelCount);
+    mwRnaSetNumChan(AdxrnaStateOf(rnaHandle), channelCount);
   }
 
   /**
@@ -9298,7 +9298,7 @@
       return -1;
     }
 
-    return AsAdxrnaLegacyMetricsRuntimeView(rnaHandle)->queuedDataCount;
+    return AdxrnaLegacyMetricsOf(rnaHandle)->queuedDataCount;
   }
 
   /**
@@ -9314,7 +9314,7 @@
       return -1;
     }
 
-    return AsAdxrnaLegacyMetricsRuntimeView(rnaHandle)->timeScaleBase;
+    return AdxrnaLegacyMetricsOf(rnaHandle)->timeScaleBase;
   }
 
   /**
@@ -9330,7 +9330,7 @@
       return -1;
     }
 
-    return AsAdxrnaLegacyMetricsRuntimeView(rnaHandle)->streamInfoWord60;
+    return AdxrnaLegacyMetricsOf(rnaHandle)->streamInfoWord60;
   }
 
   /**
@@ -9346,7 +9346,7 @@
       return -1;
     }
 
-    return AsAdxrnaLegacyMetricsRuntimeView(rnaHandle)->streamInfoWords64[wordIndex];
+    return AdxrnaLegacyMetricsOf(rnaHandle)->streamInfoWords64[wordIndex];
   }
 
   /**
@@ -9362,7 +9362,7 @@
       return -1;
     }
 
-    return AsAdxrnaLegacyMetricsRuntimeView(rnaHandle)->streamInfoWord6C;
+    return AdxrnaLegacyMetricsOf(rnaHandle)->streamInfoWord6C;
   }
 
   /**
@@ -9612,7 +9612,7 @@
    */
   std::int32_t adxt_GetOutBalance(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     if (runtime != nullptr) {
       return static_cast<std::int32_t>(runtime->OutputBalanceLevel());
     }
@@ -9642,7 +9642,7 @@
    */
   void adxt_SetOutVol(void* const adxtRuntime, const std::int16_t volumeLevel)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtSetOutVolParameterErrorMessage);
       return;
@@ -9679,7 +9679,7 @@
    */
   std::int32_t adxt_GetOutVol(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     if (runtime != nullptr) {
       return static_cast<std::int32_t>(runtime->OutputVolumeLevel());
     }
@@ -9709,7 +9709,7 @@
    */
   std::int32_t adxt_GetDefOutVol(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     return static_cast<std::int32_t>(ADXSJD_GetDefOutVol(runtime->sjdHandle));
   }
 
@@ -9735,7 +9735,7 @@
    */
   std::int32_t adxt_GetDefOutPan(void* const adxtRuntime, const std::int32_t laneIndex)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     return static_cast<std::int32_t>(ADXSJD_GetDefPan(runtime->sjdHandle, laneIndex));
   }
 
@@ -9761,7 +9761,7 @@
    */
   std::uint8_t* adxt_GetDataId(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     return ADXSJD_GetDataId(runtime->sjdHandle);
   }
 
@@ -9838,7 +9838,7 @@
    */
   std::int8_t adxt_SetAinfSw(void* const adxtRuntime, const std::int8_t enabled)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     runtime->AinfSwitchFlag() = static_cast<std::uint8_t>(enabled);
     return enabled;
   }
@@ -9851,7 +9851,7 @@
    */
   std::int32_t adxt_GetAinfSw(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     return static_cast<std::int32_t>(static_cast<std::int8_t>(runtime->AinfSwitchFlag()));
   }
 
@@ -9902,7 +9902,7 @@
    */
   void adxt_SetSvrFreq(void* const adxtRuntime, const std::int32_t serverFrequency)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtSetSvrFreqParameterErrorMessage);
       return;
@@ -9943,7 +9943,7 @@
     const std::int32_t sampleRate
   )
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtSetReloadTimeParameterErrorMessage);
       return;
@@ -9989,7 +9989,7 @@
    */
   void adxt_ResetReloadTime(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtResetReloadTimeParameterErrorMessage);
       return;
@@ -10033,7 +10033,7 @@
    */
   void adxt_SetReloadSct(void* const adxtRuntime, const std::int16_t reloadSectorCount)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtSetReloadSctParameterErrorMessage);
       return;
@@ -10056,7 +10056,7 @@
    */
   std::int32_t ADXT_GetReloadSct(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     return static_cast<std::int32_t>(runtime->SeamlessFlowSectorHint());
   }
 
@@ -10083,7 +10083,7 @@
    */
   std::int32_t adxt_GetNumSctIbuf(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtGetNumSctIbufParameterErrorMessage);
       return -1;
@@ -10119,7 +10119,7 @@
    */
   std::int32_t adxt_GetNumSmplObuf(void* const adxtRuntime, const std::int32_t lane)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr || lane < 0) {
       (void)ADXERR_CallErrFunc1_(kAdxtGetNumSmplObufParameterErrorMessage);
       return -1;
@@ -10155,7 +10155,7 @@
    */
   double adxt_GetIbufRemainTime(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtGetIbufRemainTimeParameterErrorMessage);
       return -1.0;
@@ -10194,7 +10194,7 @@
    */
   std::int32_t adxt_IsIbufSafety(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtIsIbufSafetyParameterErrorMessage);
       return -1;
@@ -10222,7 +10222,7 @@
    */
   std::int32_t adxt_GetErrCode(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return ADXERR_CallErrFunc1_(kAdxtGetErrCodeParameterErrorMessage);
     }
@@ -10238,7 +10238,7 @@
    */
   void adxt_ClearErrCode(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtClearErrCodeParameterErrorMessage);
       return;
@@ -10272,7 +10272,7 @@
    */
   std::int32_t adxt_GetLpCnt(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtGetLpCntParameterErrorMessage);
       return -1;
@@ -10302,7 +10302,7 @@
    */
   void adxt_SetLpFlg(void* const adxtRuntime, const std::int32_t enabled)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtSetLpFlgParameterErrorMessage);
       return;
@@ -10424,7 +10424,7 @@
    */
   std::int32_t adxt_SetAutoRcvr(void* const adxtRuntime, const std::int32_t autoRecoverEnabled)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     runtime->ErrorRecoveryMode() = static_cast<std::uint8_t>(autoRecoverEnabled);
     return static_cast<std::int32_t>(runtime->ErrorRecoveryMode());
   }
@@ -10452,7 +10452,7 @@
    */
   std::int32_t adxt_IsCompleted(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtIsCompletedParameterErrorMessage);
       return -1;
@@ -10484,7 +10484,7 @@
    */
   std::int32_t adxt_GetInputSj(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return ADXERR_CallErrFunc1_(kAdxtGetInputSjParameterErrorMessage);
     }
@@ -10513,7 +10513,7 @@
    */
   void adxt_SetWaitPlayStart(void* const adxtRuntime, const std::int32_t waitEnabled)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtSetWaitPlayStartParameterErrorMessage);
       return;
@@ -10543,7 +10543,7 @@
    */
   std::int32_t adxt_IsReadyPlayStart(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtIsReadyPlayStartParameterErrorMessage);
       return -1;
@@ -10587,7 +10587,7 @@
    */
   std::int32_t adxt_GetStatPause(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtGetStatPauseParameterErrorMessage);
       return 0;
@@ -10617,7 +10617,7 @@
    */
   std::int32_t adxt_SetTranspose(void* const adxtRuntime, const std::int32_t transposeOctaves, const std::int32_t transposeCents)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const std::int32_t sjdHandle = runtime->sjdHandle;
     (void)ADXRNA_SetTransposeWords(runtime->rnaHandle, transposeOctaves, transposeCents);
     const std::int32_t calculatedSampleRate = mwRnaCalcSfreq(runtime->rnaHandle);
@@ -10671,7 +10671,7 @@
     std::int32_t* const outTransposeCents
   )
   {
-    const auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(
       ADXRNA_GetTransposeWords(runtime->rnaHandle, outTransposeOctaves, outTransposeCents)
     ));
@@ -10882,7 +10882,7 @@
    * What it does:
    * Clears one ADXSJD decode-lane runtime state back to default trap/decode values.
    */
-  AdxsjdRuntimeView* adxsjd_clear(AdxsjdRuntimeView* const sjdRuntime)
+  AdxsjdState* adxsjd_clear(AdxsjdState* const sjdRuntime)
   {
     sjdRuntime->linkSwitchEnabled = 0;
     sjdRuntime->decodedSampleCount = 0;
@@ -10976,7 +10976,7 @@
    */
   void ADXSJD_Destroy(const std::int32_t sjdHandle)
   {
-    auto* const sjdRuntime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const sjdRuntime = AdxsjdStateOf(sjdHandle);
     if (sjdRuntime == nullptr) {
       return;
     }
@@ -10988,7 +10988,7 @@
     }
 
     ADXCRS_Lock();
-    std::memset(sjdRuntime, 0, sizeof(AdxsjdRuntimeView));
+    std::memset(sjdRuntime, 0, sizeof(AdxsjdState));
     ADXCRS_Unlock();
   }
 
@@ -11000,7 +11000,7 @@
    */
   std::int32_t ADXSJD_GetStat(const std::int32_t sjdHandle)
   {
-    return static_cast<std::int32_t>(AsAdxsjdRuntimeView(sjdHandle)->streamFormatClass);
+    return static_cast<std::int32_t>(AdxsjdStateOf(sjdHandle)->streamFormatClass);
   }
 
   /**
@@ -11011,7 +11011,7 @@
    */
   std::int32_t ADXSJD_SetInSj(const std::int32_t sjdHandle, void* const sourceJoinHandle)
   {
-    auto* const sjdRuntime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const sjdRuntime = AdxsjdStateOf(sjdHandle);
     sjdRuntime->inputSourceHandle = sourceJoinHandle;
 
     ADXB_SetAhxInSj(sjdRuntime->Decoder());
@@ -11027,7 +11027,7 @@
    */
   std::int32_t ADXSJD_SetOutSj(const std::int32_t sjdHandle, const std::int32_t outputLane, void* const outputHandle)
   {
-    auto* const sjdRuntime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const sjdRuntime = AdxsjdStateOf(sjdHandle);
     sjdRuntime->OutputHandle(outputLane) = reinterpret_cast<AdxsjdOutputHandle*>(outputHandle);
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(outputHandle));
   }
@@ -11040,7 +11040,7 @@
    */
   std::uint32_t ADXSJD_SetMaxDecSmpl(const std::int32_t sjdHandle, const std::int32_t maxDecodeSamples)
   {
-    auto* const sjdRuntime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const sjdRuntime = AdxsjdStateOf(sjdHandle);
     sjdRuntime->maxDecodeSamples = maxDecodeSamples;
     ADXB_SetAhxDecSmpl(sjdRuntime->Decoder(), maxDecodeSamples);
     return ADXB_SetMpaDecSmpl(sjdRuntime->Decoder(), maxDecodeSamples);
@@ -11054,7 +11054,7 @@
    */
   std::int32_t ADXSJD_TermSupply(const std::int32_t sjdHandle)
   {
-    auto* const decoder = AsAdxsjdRuntimeView(sjdHandle)->Decoder();
+    auto* const decoder = AdxsjdStateOf(sjdHandle)->Decoder();
     ADXB_AhxTermSupply(decoder);
     ADXB_MpaTermSupply(decoder);
     return ADXB_M2aTermSupply(decoder);
@@ -11068,7 +11068,7 @@
    */
   std::int32_t ADXSJD_Start(const std::int32_t sjdHandle)
   {
-    auto* const sjdRuntime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const sjdRuntime = AdxsjdStateOf(sjdHandle);
     auto* const result = adxsjd_clear(sjdRuntime);
     sjdRuntime->streamFormatClass = 1;
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(result));
@@ -11082,7 +11082,7 @@
    */
   std::int32_t ADXSJD_Stop(const std::int32_t sjdHandle)
   {
-    auto* const sjdRuntime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const sjdRuntime = AdxsjdStateOf(sjdHandle);
     const std::int32_t stopResult = ADXB_Stop(sjdRuntime->Decoder());
     sjdRuntime->streamFormatClass = 0;
     return stopResult;
@@ -11102,7 +11102,7 @@
     std::int32_t* const outUntilTrapSamples
   )
   {
-    auto* const runtime = static_cast<AdxsjdRuntimeView*>(callbackContext);
+    auto* const runtime = static_cast<AdxsjdState*>(callbackContext);
 
     const std::int32_t channelCount = ADXB_GetNumChan(runtime->Decoder());
     for (std::int32_t lane = 0; lane < channelCount; ++lane) {
@@ -11184,7 +11184,7 @@
    * Prepares one ADXSJD decode step by aligning source stream data, decoding
    * codec headers, and transitioning runtime state into decode phase.
    */
-  void adxsjd_decode_prep(AdxsjdRuntimeView* const runtime)
+  void adxsjd_decode_prep(AdxsjdState* const runtime)
   {
     auto* const decoder = runtime->Decoder();
     auto* const sourceHandle = AsSofdecSjSupplyHandle(runtime->inputSourceHandle);
@@ -11286,7 +11286,7 @@
    * ADX footer/endcode paths, and dispatching ADXB input entry for active
    * decode formats.
    */
-  std::int32_t adxsjd_decexec_start(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_decexec_start(AdxsjdState* const runtime)
   {
     auto* const decoder = runtime->Decoder();
     auto* const sourceHandle = AsSofdecSjSupplyHandle(runtime->inputSourceHandle);
@@ -11403,7 +11403,7 @@
    * running optional per-channel filter callback lanes, updating counters, and
    * resetting ADXB state.
    */
-  std::int32_t adxsjd_decexec_end(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_decexec_end(AdxsjdState* const runtime)
   {
     auto* const decoder = runtime->Decoder();
     auto* const sourceHandle = AsSofdecSjSupplyHandle(runtime->inputSourceHandle);
@@ -11465,7 +11465,7 @@
    * Updates ADXSJD decode counters for codec lanes that bypass regular output
    * chunk split/submit completion handling.
    */
-  std::int32_t adxsjd_decexec_extra(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_decexec_extra(AdxsjdState* const runtime)
   {
     auto* const decoder = runtime->Decoder();
     const std::int32_t totalSamples = ADXB_GetTotalNumSmpl(decoder);
@@ -11490,7 +11490,7 @@
    * Runs one ADXSJD decode step (`start/exec/end`) and dispatches codec-specific
    * extra accounting for streamed compressed formats.
    */
-  std::int32_t adxsjd_decode_exec(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_decode_exec(AdxsjdState* const runtime)
   {
     auto* const decoder = runtime->Decoder();
     if (ADXB_GetStat(decoder) == 0) {
@@ -11516,7 +11516,7 @@
    * Inserts silence samples into every ADXSJD output lane by zero-filling
    * writable lane-0 chunks and submitting them to lane 1.
    */
-  std::int32_t adxsjd_insert_proc(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_insert_proc(AdxsjdState* const runtime)
   {
     std::int32_t insertBytes = 2 * runtime->positiveSampleAdjust;
     const std::int32_t outputHandleCount = runtime->OutputChannelCount();
@@ -11554,7 +11554,7 @@
    * Discards queued ADXSJD lane-1 samples across all output lanes by consuming
    * chunks and returning them into lane 0.
    */
-  std::int32_t adxsjd_discard_proc(AdxsjdRuntimeView* const runtime)
+  std::int32_t adxsjd_discard_proc(AdxsjdState* const runtime)
   {
     std::int32_t discardBytes = 2 * runtime->negativeSampleAdjust;
     const std::int32_t outputHandleCount = runtime->OutputChannelCount();
@@ -11591,7 +11591,7 @@
    * Runs one ADXSJD runtime tick: applies pending sample insert/discard lanes
    * under lock, then executes decode-prep/decode phases by state byte.
    */
-  void ADXSJD_ExecHndl(AdxsjdRuntimeView* const runtime)
+  void ADXSJD_ExecHndl(AdxsjdState* const runtime)
   {
     if (runtime->positiveSampleAdjust > 0) {
       ADXCRS_Lock();
@@ -11635,7 +11635,7 @@
    */
   std::int32_t ADXSJD_GetDecDtLen(const std::int32_t sjdHandle)
   {
-    return AsAdxsjdRuntimeView(sjdHandle)->decodedDataLengthBytes;
+    return AdxsjdStateOf(sjdHandle)->decodedDataLengthBytes;
   }
 
   /**
@@ -11646,7 +11646,7 @@
    */
   std::int32_t ADXSJD_GetDecNumSmpl(const std::int32_t sjdHandle)
   {
-    return AsAdxsjdRuntimeView(sjdHandle)->decodedSampleCount;
+    return AdxsjdStateOf(sjdHandle)->decodedSampleCount;
   }
 
   /**
@@ -11661,7 +11661,7 @@
     const std::int32_t callbackContext
   )
   {
-    auto* const decoder = AsAdxsjdRuntimeView(sjdHandle)->Decoder();
+    auto* const decoder = AdxsjdStateOf(sjdHandle)->Decoder();
     return static_cast<std::int32_t>(
       reinterpret_cast<std::intptr_t>(
         ADXB_SetCbDec(
@@ -11681,7 +11681,7 @@
    */
   std::int32_t ADXSJD_SetDecPos(const std::int32_t sjdHandle, const std::int32_t decodePosition)
   {
-    AsAdxsjdRuntimeView(sjdHandle)->decodePositionSamples = decodePosition;
+    AdxsjdStateOf(sjdHandle)->decodePositionSamples = decodePosition;
     return decodePosition;
   }
 
@@ -11693,7 +11693,7 @@
    */
   std::int32_t ADXSJD_GetDecPos(const std::int32_t sjdHandle)
   {
-    return AsAdxsjdRuntimeView(sjdHandle)->decodePositionSamples;
+    return AdxsjdStateOf(sjdHandle)->decodePositionSamples;
   }
 
   /**
@@ -11704,7 +11704,7 @@
    */
   std::int32_t ADXSJD_SetLnkSw(const std::int32_t sjdHandle, const std::int32_t enabled)
   {
-    AsAdxsjdRuntimeView(sjdHandle)->linkSwitchEnabled = enabled;
+    AdxsjdStateOf(sjdHandle)->linkSwitchEnabled = enabled;
     return enabled;
   }
 
@@ -11716,7 +11716,7 @@
    */
   std::int32_t ADXSJD_GetLnkSw(const std::int32_t sjdHandle)
   {
-    return AsAdxsjdRuntimeView(sjdHandle)->linkSwitchEnabled;
+    return AdxsjdStateOf(sjdHandle)->linkSwitchEnabled;
   }
 
   /**
@@ -11727,7 +11727,7 @@
    */
   moho::AdxBitstreamDecoderState* ADXSJD_SetExtString(const std::int32_t sjdHandle, const char* const extString)
   {
-    return ADXSJE_SetExtString(AsAdxsjdRuntimeView(sjdHandle)->Decoder(), extString);
+    return ADXSJE_SetExtString(AdxsjdStateOf(sjdHandle)->Decoder(), extString);
   }
 
   /**
@@ -11754,7 +11754,7 @@
     std::int16_t* const outKAdder
   )
   {
-    return ADXB_GetExtParams(AsAdxsjdRuntimeView(sjdHandle)->Decoder(), outK0, outKMultiplier, outKAdder);
+    return ADXB_GetExtParams(AdxsjdStateOf(sjdHandle)->Decoder(), outK0, outKMultiplier, outKAdder);
   }
 
   /**
@@ -11770,7 +11770,7 @@
     const std::int16_t kAdder
   )
   {
-    return ADXB_SetExtParams(AsAdxsjdRuntimeView(sjdHandle)->Decoder(), k0, kMultiplier, kAdder);
+    return ADXB_SetExtParams(AdxsjdStateOf(sjdHandle)->Decoder(), k0, kMultiplier, kAdder);
   }
 
   /**
@@ -11781,7 +11781,7 @@
    */
   std::int32_t ADXSJD_SetDefFmt(const std::int32_t sjdHandle, const std::int32_t requestedFormat)
   {
-    auto* const decoder = AsAdxsjdRuntimeView(sjdHandle)->Decoder();
+    auto* const decoder = AdxsjdStateOf(sjdHandle)->Decoder();
     ADXB_SetDefFmt(decoder, requestedFormat);
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(decoder));
   }
@@ -11794,7 +11794,7 @@
    */
   std::int32_t ADXSJD_AdjustSmpl(const std::int32_t sjdHandle, const std::int32_t sampleDelta)
   {
-    auto* const sjdRuntime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const sjdRuntime = AdxsjdStateOf(sjdHandle);
     ADXCRS_Lock();
     if (sampleDelta <= 0) {
       sjdRuntime->negativeSampleAdjust -= sampleDelta;
@@ -11817,7 +11817,7 @@
     const std::int32_t callbackContext
   )
   {
-    auto* const sjdRuntime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const sjdRuntime = AdxsjdStateOf(sjdHandle);
     sjdRuntime->filterCallback = callbackAddress;
     sjdRuntime->filterCallbackContext = callbackContext;
     return sjdHandle;
@@ -11835,7 +11835,7 @@
     const std::int32_t callbackContext
   )
   {
-    auto* const sjdRuntime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const sjdRuntime = AdxsjdStateOf(sjdHandle);
     sjdRuntime->trapCallback = callbackAddress;
     sjdRuntime->trapCallbackContext = callbackContext;
     return sjdHandle;
@@ -11849,7 +11849,7 @@
    */
   std::int32_t ADXSJD_SetTrapNumSmpl(const std::int32_t sjdHandle, const std::int32_t trapSampleCount)
   {
-    AsAdxsjdRuntimeView(sjdHandle)->trapSampleCount = trapSampleCount;
+    AdxsjdStateOf(sjdHandle)->trapSampleCount = trapSampleCount;
     return trapSampleCount;
   }
 
@@ -11861,7 +11861,7 @@
    */
   std::int32_t ADXSJD_GetTrapNumSmpl(const std::int32_t sjdHandle)
   {
-    return AsAdxsjdRuntimeView(sjdHandle)->trapSampleCount;
+    return AdxsjdStateOf(sjdHandle)->trapSampleCount;
   }
 
   /**
@@ -11872,7 +11872,7 @@
    */
   std::int32_t ADXSJD_SetTrapCnt(const std::int32_t sjdHandle, const std::int32_t trapCount)
   {
-    AsAdxsjdRuntimeView(sjdHandle)->trapCount = trapCount;
+    AdxsjdStateOf(sjdHandle)->trapCount = trapCount;
     return trapCount;
   }
 
@@ -11884,7 +11884,7 @@
    */
   std::int32_t ADXSJD_GetTrapCnt(const std::int32_t sjdHandle)
   {
-    return AsAdxsjdRuntimeView(sjdHandle)->trapCount;
+    return AdxsjdStateOf(sjdHandle)->trapCount;
   }
 
   /**
@@ -11895,7 +11895,7 @@
    */
   std::int32_t ADXSJD_SetTrapDtLen(const std::int32_t sjdHandle, const std::int32_t trapDataLengthBytes)
   {
-    AsAdxsjdRuntimeView(sjdHandle)->trapDataLengthBytes = trapDataLengthBytes;
+    AdxsjdStateOf(sjdHandle)->trapDataLengthBytes = trapDataLengthBytes;
     return trapDataLengthBytes;
   }
 
@@ -11907,7 +11907,7 @@
    */
   std::int32_t ADXSJD_GetTrapDtLen(const std::int32_t sjdHandle)
   {
-    return AsAdxsjdRuntimeView(sjdHandle)->trapDataLengthBytes;
+    return AdxsjdStateOf(sjdHandle)->trapDataLengthBytes;
   }
 
   /**
@@ -11918,7 +11918,7 @@
    */
   std::int32_t ADXSJD_GetFormat(const std::int32_t sjdHandle)
   {
-    return ADXB_GetFormat(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetFormat(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -11929,7 +11929,7 @@
    */
   std::int32_t ADXSJD_GetSfreq(const std::int32_t sjdHandle)
   {
-    return ADXB_GetSfreq(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetSfreq(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -11945,7 +11945,7 @@
    */
   std::int32_t ADXSJD_GetOutBps(const std::int32_t sjdHandle)
   {
-    return ADXB_GetOutBps(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetOutBps(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -11953,7 +11953,7 @@
    */
   std::int32_t ADXSJD_GetBlkSmpl(const std::int32_t sjdHandle)
   {
-    return ADXB_GetBlkSmpl(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetBlkSmpl(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -11961,7 +11961,7 @@
    */
   std::int32_t ADXSJD_GetBlkLen(const std::int32_t sjdHandle)
   {
-    return ADXB_GetBlkLen(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetBlkLen(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -11969,7 +11969,7 @@
    */
   std::int32_t ADXSJD_GetTotalNumSmpl(const std::int32_t sjdHandle)
   {
-    return ADXB_GetTotalNumSmpl(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetTotalNumSmpl(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -11977,7 +11977,7 @@
    */
   std::int32_t ADXSJD_GetCof(const std::int32_t sjdHandle)
   {
-    return ADXB_GetCof(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetCof(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -11985,7 +11985,7 @@
    */
   std::int32_t ADXSJD_GetNumLoop(const std::int32_t sjdHandle)
   {
-    return ADXB_GetNumLoop(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetNumLoop(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -11993,7 +11993,7 @@
    */
   std::int32_t ADXSJD_GetLpInsNsmpl(const std::int32_t sjdHandle)
   {
-    return ADXB_GetLpInsNsmpl(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetLpInsNsmpl(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -12001,7 +12001,7 @@
    */
   std::int32_t ADXSJD_GetLpStartPos(const std::int32_t sjdHandle)
   {
-    return ADXB_GetLpStartPos(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetLpStartPos(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -12010,7 +12010,7 @@
   std::int32_t ADXSJD_GetLpStartOfst(const std::int32_t sjdHandle)
   {
     if (sjdHandle != 0) {
-      return ADXB_GetLpStartOfst(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+      return ADXB_GetLpStartOfst(AdxsjdStateOf(sjdHandle)->Decoder());
     }
     return sjdHandle;
   }
@@ -12020,7 +12020,7 @@
    */
   std::int32_t ADXSJD_GetLpEndPos(const std::int32_t sjdHandle)
   {
-    return ADXB_GetLpEndPos(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetLpEndPos(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -12028,7 +12028,7 @@
    */
   std::int32_t ADXSJD_GetLpEndOfst(const std::int32_t sjdHandle)
   {
-    return ADXB_GetLpEndOfst(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetLpEndOfst(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -12036,7 +12036,7 @@
    */
   std::int32_t ADXSJD_GetAinfLen(const std::int32_t sjdHandle)
   {
-    return ADXB_GetAinfLen(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetAinfLen(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -12044,7 +12044,7 @@
    */
   std::int16_t ADXSJD_GetDefOutVol(const std::int32_t sjdHandle)
   {
-    auto* const runtime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const runtime = AdxsjdStateOf(sjdHandle);
     if (
       ADXB_GetAinfLen(runtime->Decoder()) > 0
       && (runtime->streamFormatClass == 2 || runtime->streamFormatClass == 3)
@@ -12067,7 +12067,7 @@
    */
   std::uint8_t* ADXSJD_GetDataId(const std::int32_t sjdHandle)
   {
-    auto* const runtime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const runtime = AdxsjdStateOf(sjdHandle);
     if (
       ADXB_GetAinfLen(runtime->Decoder()) > 0
       && (runtime->streamFormatClass == 2 || runtime->streamFormatClass == 3)
@@ -12082,7 +12082,7 @@
    */
   std::int32_t ADXSJD_GetHdrLen(const std::int32_t sjdHandle)
   {
-    return AsAdxsjdRuntimeView(sjdHandle)->headerLengthBytes;
+    return AdxsjdStateOf(sjdHandle)->headerLengthBytes;
   }
 
   /**
@@ -12090,7 +12090,7 @@
    */
   std::int32_t ADXSJD_GetFmtBps(const std::int32_t sjdHandle)
   {
-    return ADXB_GetFmtBps(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_GetFmtBps(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -12098,7 +12098,7 @@
    */
   std::int32_t ADXSJD_GetSpsdInfo(const std::int32_t sjdHandle)
   {
-    auto* const runtime = AsAdxsjdRuntimeView(sjdHandle);
+    auto* const runtime = AdxsjdStateOf(sjdHandle);
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(&runtime->spsdInfoState[0]));
   }
 
@@ -12107,7 +12107,7 @@
    */
   std::int32_t ADXSJD_TakeSnapshot(const std::int32_t sjdHandle)
   {
-    return ADXB_TakeSnapshot(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_TakeSnapshot(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -12115,7 +12115,7 @@
    */
   std::int32_t ADXSJD_RestoreSnapshot(const std::int32_t sjdHandle)
   {
-    return ADXB_RestoreSnapshot(AsAdxsjdRuntimeView(sjdHandle)->Decoder());
+    return ADXB_RestoreSnapshot(AdxsjdStateOf(sjdHandle)->Decoder());
   }
 
   /**
@@ -12140,7 +12140,7 @@
    */
   std::int32_t adxt_GetStat(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return ADXERR_CallErrFunc1_(kAdxtGetStatParameterErrorMessage);
     }
@@ -12212,7 +12212,7 @@
     std::int32_t* const outTimeScale
   )
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const auto status = static_cast<std::uint8_t>(runtime->mUnknown01);
     if (status == 3u || status == 4u) {
       ADXRNA_GetTime(runtime->rnaHandle, outTimeUnits, outTimeScale);
@@ -12265,7 +12265,7 @@
     std::int32_t* const outTimeScale
   )
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const auto status = static_cast<std::uint8_t>(runtime->mUnknown01);
     if (status == 3u || status == 4u) {
       *outTimeScale = ADXSJD_GetSfreq(runtime->sjdHandle);
@@ -12334,7 +12334,7 @@
    */
   std::int32_t adxt_GetNumChan(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return ADXERR_CallErrFunc1_(kAdxtGetNumChanParameterErrorMessage);
     }
@@ -12394,7 +12394,7 @@
    */
   std::int32_t adxt_GetNumSmpl(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return ADXERR_CallErrFunc1_(kAdxtGetNumSmplParameterErrorMessage);
     }
@@ -12426,7 +12426,7 @@
    */
   std::int32_t adxt_GetSfreq(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return ADXERR_CallErrFunc1_(kAdxtGetSfreqParameterErrorMessage);
     }
@@ -12458,7 +12458,7 @@
    */
   std::int32_t adxt_GetHdrLen(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return ADXERR_CallErrFunc1_(kAdxtGetHdrLenParameterErrorMessage);
     }
@@ -12490,7 +12490,7 @@
    */
   std::int32_t adxt_GetFmtBps(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return ADXERR_CallErrFunc1_(kAdxtGetFmtBpsParameterErrorMessage);
     }
@@ -12533,7 +12533,7 @@
    */
   std::int32_t adxt_DiscardSmpl(void* const adxtRuntime, const std::int32_t sampleCount)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime->ErrorCheckSuppressedFlag() == 0u) {
       return 0;
     }
@@ -12579,7 +12579,7 @@
    */
   std::int32_t adxt_GetTimeOfst(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     return runtime->linkReadCursor;
   }
 
@@ -12604,7 +12604,7 @@
    */
   std::int32_t adxt_SetTimeOfst(void* const adxtRuntime, const std::int32_t timeOffset)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     runtime->linkReadCursor = timeOffset;
     return timeOffset;
   }
@@ -12631,7 +12631,7 @@
    */
   std::int32_t adxt_AdjustSmpl(void* const adxtRuntime, const std::int32_t sampleDelta)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     return ADXSJD_AdjustSmpl(runtime->sjdHandle, sampleDelta);
   }
 
@@ -12661,7 +12661,7 @@
    */
   std::int32_t adxt_EntryFltFunc(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     return static_cast<std::int32_t>(static_cast<std::int8_t>(runtime->linkSwitchRequested));
   }
 
@@ -12694,7 +12694,7 @@
     const std::int32_t filterCallbackContext
   )
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     return ADXSJD_EntryFltFunc(runtime->sjdHandle, filterCallbackAddress, filterCallbackContext);
   }
 
@@ -12720,7 +12720,7 @@
    */
   std::int32_t adxt_GetDecNumSmpl(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtGetDecNumSmplParameterErrorMessage);
       return -1;
@@ -12750,7 +12750,7 @@
    */
   std::int32_t adxt_GetDecDtLen(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtGetDecDtLenParameterErrorMessage);
       return -1;
@@ -12787,7 +12787,7 @@
     const std::int32_t decodeCallbackContext
   )
   {
-    const auto* const runtime = static_cast<const AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<const AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return ADXERR_CallErrFunc1_(kAdxtSetCbDecParameterErrorMessage);
     }
@@ -12871,7 +12871,7 @@
    */
   void adxt_SetKeyString(void* const adxtRuntime, const char* const extString)
   {
-    const auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtSetKeyStringParameterErrorMessage);
       return;
@@ -12926,7 +12926,7 @@
    */
   std::int32_t adxt_GetRna(void* const adxtRuntime)
   {
-    return static_cast<AdxtRuntimeState*>(adxtRuntime)->rnaHandle;
+    return static_cast<AdxtState*>(adxtRuntime)->rnaHandle;
   }
 
   /**
@@ -12950,7 +12950,7 @@
    */
   std::int32_t adxt_SetDefFmt(void* const adxtRuntime, const std::int32_t requestedFormat)
   {
-    const auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     return ADXSJD_SetDefFmt(runtime->sjdHandle, requestedFormat);
   }
 
@@ -13001,7 +13001,7 @@
    */
   std::int32_t adxt_InsertSilence(void* const adxtRuntime, const std::int32_t channelCount, const std::int32_t sampleCount)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     auto* const streamJoinHandle = runtime->streamJoinInputHandle;
     if (streamJoinHandle == nullptr) {
       return 0;
@@ -13085,7 +13085,7 @@
    */
   std::int32_t adxt_trap_entry_lps(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const std::int32_t sjdHandle = runtime->sjdHandle;
 
     const std::int32_t loopStartPos = ADXSJD_GetLpStartPos(sjdHandle);
@@ -13116,7 +13116,7 @@
    */
   std::int32_t adxt_trap_entry(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const std::int32_t sjdHandle = runtime->sjdHandle;
     AdxtStreamJoinHandle* const streamJoinHandle = runtime->streamJoinInputHandle;
 
@@ -13162,7 +13162,7 @@
    */
   std::int32_t adxt_eos_entry(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const std::int32_t sjdHandle = runtime->sjdHandle;
 
     if (runtime->streamHandle != nullptr && sjdHandle != 0) {
@@ -13188,7 +13188,7 @@
    */
   std::int32_t adxt_set_outpan(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const std::int32_t lane0Pan = static_cast<std::int32_t>(runtime->RequestedPanLane(0));
     if (ADXSJD_GetNumChan(runtime->sjdHandle) == 1) {
       ADXT_SetOutPan(runtime, 0, lane0Pan);
@@ -13214,7 +13214,7 @@
    */
   std::int32_t adxt_nlp_trap_entry(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime->linkSwitchRequested == 0u) {
       return 0;
     }
@@ -13282,7 +13282,7 @@
     runtime->PlaybackTimeDeltaFrames() += ADXSJD_GetDecNumSmpl(sjdHandle);
     ADXSJD_Stop(sjdHandle);
     ADXSJD_Start(sjdHandle);
-    ADXSJD_ExecHndl(AsAdxsjdRuntimeView(sjdHandle));
+    ADXSJD_ExecHndl(AdxsjdStateOf(sjdHandle));
 
     if (ADXSJD_GetStat(sjdHandle) != 2) {
       return ADXT_SetLnkSw(runtime, 0);
@@ -13322,7 +13322,7 @@
    */
   std::int32_t adxt_stat_decinfo(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const std::int32_t sjdHandle = runtime->sjdHandle;
 
     if (static_cast<std::uint8_t>(runtime->mUnknown02) <= 1u && runtime->linkSwitchActive == 1u) {
@@ -13464,7 +13464,7 @@
    */
   std::int32_t adxt_stat_prep(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const std::int32_t rnaHandle = runtime->rnaHandle;
     const std::int32_t sjdHandle = runtime->sjdHandle;
 
@@ -13517,7 +13517,7 @@
    */
   std::int32_t adxt_stat_playing(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime->StreamLoopSeekOnEosFlag() == 0u && ADXSJD_GetDecDtLen(runtime->sjdHandle) >= runtime->StreamDecodeWindowState()) {
       ADXSJD_SetTrapNumSmpl(runtime->sjdHandle, -1);
     }
@@ -13555,7 +13555,7 @@
    */
   std::int32_t adxt_stat_decend(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     adxt_dbg_rna_ndata = ADXRNA_GetNumData(runtime->rnaHandle);
 
     const std::int32_t remainingData = ADXRNA_GetNumData(runtime->rnaHandle);
@@ -13586,7 +13586,7 @@
    */
   void adxt_RcvrReplay(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
 
     ADXCRS_Lock();
     j__ADXRNA_SetTransSw(runtime->rnaHandle, 0);
@@ -13625,7 +13625,7 @@
    */
   void ADXT_ExecErrChk(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     const auto playbackState = static_cast<std::int32_t>(runtime->mUnknown01);
 
     const auto dispatchRecoveryAction = [&]() {
@@ -13714,7 +13714,7 @@
    */
   void ADXT_ExecRdErrChk(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime->streamHandle != nullptr && ADXSTM_GetStat(runtime->streamHandle) == kAdxstmStatusFilesystemError) {
       runtime->ErrorStateCode() = -1;
       runtime->mUnknown01 = 6;
@@ -13736,7 +13736,7 @@
    */
   std::int32_t ADXT_ExecRdCompChk(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     std::int32_t status = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtime->streamHandle));
     if (status == 0) {
       return status;
@@ -13793,7 +13793,7 @@
    */
   void adxt_ExecHndl(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxtExecHndlParameterErrorMessage);
       return;
@@ -13836,7 +13836,7 @@
    */
   std::int32_t adxt_GetStatRead(void* const adxtRuntime)
   {
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime == nullptr) {
       return 0;
     }
@@ -13867,7 +13867,7 @@
   void adxt_SetSeamlessLp(void* const adxtRuntime, const std::int32_t enabled)
   {
     if (adxtRuntime != nullptr) {
-      auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+      auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
       LSC_SetLpFlg(runtime->SeamlessLscHandle(), enabled);
       return;
     }
@@ -13908,7 +13908,7 @@
   )
   {
     if (adxtRuntime != nullptr && fileName != nullptr) {
-      auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+      auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
       void* const lscHandle = runtime->SeamlessLscHandle();
       lsc_Stop(lscHandle);
       (void)adxt_EntryFnameRange(runtime, fileName, rangeStart, rangeEnd);
@@ -13933,7 +13933,7 @@
   )
   {
     if (adxtRuntime != nullptr && afsHandle <= 0 && afsHandle < 0x100 && fileIndex >= 0 && fileIndex <= 0x10000) {
-      auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+      auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
       void* const lscHandle = runtime->SeamlessLscHandle();
       lsc_Stop(lscHandle);
       (void)adxt_EntryAfs(runtime, afsHandle, fileIndex);
@@ -13957,7 +13957,7 @@
       return -1;
     }
 
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     return LSC_GetNumStm(runtime->SeamlessLscHandle());
   }
 
@@ -14124,7 +14124,7 @@
       return;
     }
 
-    auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     if (runtime->mUnknown01 == 0) {
       LSC_ResetEntry(runtime->SeamlessLscHandle());
     }
@@ -14225,7 +14225,7 @@
    */
   void mwsfcre_AttachPicUsrBuf(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    const auto* const playbackView = reinterpret_cast<const MwsfdPlaybackPicUserView*>(ply);
+    const auto* const playbackView = reinterpret_cast<const MwsfdPlaybackPicUser*>(ply);
     const MwsfdPicUserBufferDescriptor* const userBuffer = playbackView->picUserBuffer;
     if (userBuffer == nullptr) {
       (void)MWSFSVM_Error(kMwsfcreErrAttachPicUsrBufInternal);
@@ -15018,7 +15018,7 @@
       return -1;
     }
 
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     adxfHandle->boundFileName = fileName;
     adxfHandle->fileStartOffset = startOffset;
     adxfHandle->readStartSector = 0;
@@ -15087,7 +15087,7 @@
     const std::int32_t fileIndex
   )
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     const std::int32_t afsHandle = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(afsPointHandle));
 
     std::int32_t rangeSectorCount = 0;
@@ -15146,7 +15146,7 @@
     const std::int32_t rangeEnd
   )
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     adxfHandle->fileStartSector = rangeStart;
     adxfHandle->boundRangeStartSector = rangeStart;
     adxfHandle->fileStartOffset = startOffset;
@@ -15259,7 +15259,7 @@
    */
   void adxf_CloseSjStm(void* const adxfHandleAddress)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     if (adxfHandle->sourceJoinObject != nullptr && adxfHandle->sjFlag == 0u) {
       if (gAdxfOcbiEnabled == 1) {
         ADXF_Ocbi(adxfHandle->ocbiCallbackArg0, adxfHandle->ocbiCallbackArg1);
@@ -15293,7 +15293,7 @@
    */
   void adxf_Close(void* const adxfHandleAddress)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     (void)adxf_SetCmdHstry(3, 0, adxfHandleAddress, -1, -1);
     if (adxfHandle == nullptr) {
       return;
@@ -15384,7 +15384,7 @@
 
   // Defined in SofdecSvmTransferRuntime.cpp, which this translation unit
   // assembles after SofdecAdxRuntime.cpp.
-  std::int32_t adxf_read_sj32(AdxfRuntimeHandleView* adxfHandle, std::int32_t requestedSectors, void* sourceJoinObject);
+  std::int32_t adxf_read_sj32(AdxfHandle* adxfHandle, std::int32_t requestedSectors, void* sourceJoinObject);
 
   /**
    * Address: 0x00B0B770 (FUN_00B0B770, _adxf_ReadSj32)
@@ -15404,7 +15404,7 @@
   std::int32_t
   adxf_ReadSj32(void* const adxfHandleAddress, const std::int32_t requestedSectors, void* const sourceJoinObject)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
 
     if (adxfHandle == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxfErrReadSj32NullHandle);
@@ -15456,7 +15456,7 @@
   std::int32_t
   adxf_ReadNw32(void* const adxfHandleAddress, const std::int32_t requestedSectors, const std::int32_t bufferAddress)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     (void)adxf_SetCmdHstry(4, 0, adxfHandleAddress, requestedSectors, bufferAddress);
 
     if (adxfHandle == nullptr) {
@@ -15586,7 +15586,7 @@
    */
   std::int32_t adxf_Stop(void* const adxfHandleAddress)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     (void)adxf_SetCmdHstry(5, 0, adxfHandleAddress, -1, -1);
 
     if (adxfHandle == nullptr) {
@@ -15628,7 +15628,7 @@
    */
   void adxf_ExecOne(void* const adxfHandleAddress)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     if (adxfHandle->status == 2u) {
       const auto streamStatus = static_cast<std::uint8_t>(ADXSTM_GetStat(adxfHandle->streamHandle));
       const std::int32_t readStartSector = adxfHandle->readStartSector;
@@ -15713,7 +15713,7 @@
    */
   std::int32_t adxf_Seek(void* const adxfHandleAddress, const std::int32_t seekOffset, const std::int32_t seekOrigin)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     (void)adxf_SetCmdHstry(6, 0, adxfHandleAddress, seekOffset, seekOrigin);
 
     if (adxfHandle == nullptr) {
@@ -15758,7 +15758,7 @@
    */
   std::int32_t adxf_Tell(void* const adxfHandleAddress)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     if (adxfHandle == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxfTellNullHandleMessage);
       return -3;
@@ -15788,7 +15788,7 @@
    */
   std::int32_t adxf_RefreshFsizeSct(void* const adxfHandleAddress)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     const std::int32_t sizeSectors = (adxf_GetFsizeSct(adxfHandleAddress) + 0x7FF) / 0x800;
     adxfHandle->fileSizeSectors = sizeSectors;
     return sizeSectors;
@@ -15816,7 +15816,7 @@
    */
   std::int32_t adxf_GetFsizeSct(void* const adxfHandleAddress)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     if (adxfHandle == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxfGetFsizeSctNullHandleMessage);
       return -3;
@@ -15856,7 +15856,7 @@
    */
   std::int32_t adxf_GetNumReqSct(void* const adxfHandleAddress, std::int32_t* const outRequestedSectorStart)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     if (adxfHandle == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxfGetNumReqSctNullHandleMessage);
       *outRequestedSectorStart = 0;
@@ -15889,7 +15889,7 @@
    */
   std::int32_t adxf_GetNumReadSct(void* const adxfHandleAddress)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     if (adxfHandle == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxfGetNumReadSctNullHandleMessage);
       return -3;
@@ -15919,7 +15919,7 @@
    */
   std::int32_t adxf_GetStat(void* const adxfHandleAddress)
   {
-    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    auto* const adxfHandle = static_cast<AdxfHandle*>(adxfHandleAddress);
     if (adxfHandle == nullptr) {
       (void)ADXERR_CallErrFunc1_(kAdxfGetStatNullHandleMessage);
       return -3;
@@ -16129,7 +16129,7 @@
    * What it does:
    * Updates one ADXF handle requested-read-sector lane unless the handle is in reading state.
    */
-  void adxf_SetReqRdSct(AdxfRuntimeHandleView* const adxfHandle, const std::int32_t requestedSectors)
+  void adxf_SetReqRdSct(AdxfHandle* const adxfHandle, const std::int32_t requestedSectors)
   {
     if (adxfHandle->status == 2u) {
       (void)ADXERR_CallErrFunc1_(kAdxfSetReqRdSctStateReadingMessage);
@@ -16147,7 +16147,7 @@
   void ADXF_SetReqRdSct(void* const adxfHandle, const std::int32_t requestedSectors)
   {
     adxf_enter();
-    adxf_SetReqRdSct(static_cast<AdxfRuntimeHandleView*>(adxfHandle), requestedSectors);
+    adxf_SetReqRdSct(static_cast<AdxfHandle*>(adxfHandle), requestedSectors);
     adxf_leave();
   }
 
@@ -16157,7 +16157,7 @@
    * What it does:
    * Returns ADXF handle read-flag lane, or zero when handle/stream is null.
    */
-  std::int32_t adxf_GetStatRead(AdxfRuntimeHandleView* const adxfHandle)
+  std::int32_t adxf_GetStatRead(AdxfHandle* const adxfHandle)
   {
     if (adxfHandle != nullptr && adxfHandle->streamHandle != nullptr) {
       return ADXSTM_GetReadFlg(adxfHandle->streamHandle);
@@ -16174,7 +16174,7 @@
   std::int32_t ADXF_GetStatRead(void* const adxfHandle)
   {
     adxf_enter();
-    const std::int32_t readFlag = adxf_GetStatRead(static_cast<AdxfRuntimeHandleView*>(adxfHandle));
+    const std::int32_t readFlag = adxf_GetStatRead(static_cast<AdxfHandle*>(adxfHandle));
     adxf_leave();
     return readFlag;
   }
@@ -17099,7 +17099,7 @@
    */
   std::int32_t adxt_GetNumErr(void* const adxtRuntime)
   {
-    const auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
+    const auto* const runtime = static_cast<AdxtState*>(adxtRuntime);
     return AdxstmServerSlotOf(runtime->streamHandle)->streamErrorCount;
   }
 
