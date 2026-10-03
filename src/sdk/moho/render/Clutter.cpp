@@ -26,11 +26,6 @@ namespace
 {
 
 
-  struct RegionRuntimeVtableResetTag
-  {
-    virtual ~RegionRuntimeVtableResetTag() = default;
-  };
-
   struct DestroyInstanceVtableTag
   {
     virtual ~DestroyInstanceVtableTag() = default;
