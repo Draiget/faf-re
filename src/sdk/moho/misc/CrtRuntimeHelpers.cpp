@@ -361,7 +361,7 @@ extern "C" int __cdecl EngineSetAbortBehaviorMasked(
 // classic 32-byte VC8 layout below. This view lets us reach the legacy
 // fields through reinterpret_cast without depending on the corecrt header
 // shape.
-struct LegacyFileView
+struct CrtLegacyFile
 {
   char* _ptr;
   int   _cnt;
@@ -372,16 +372,16 @@ struct LegacyFileView
   int   _bufsiz;
   char* _tmpfname;
 };
-static_assert(sizeof(LegacyFileView) == 0x20, "LegacyFileView size must be 0x20");
+static_assert(sizeof(CrtLegacyFile) == 0x20, "CrtLegacyFile size must be 0x20");
 
-[[nodiscard]] inline LegacyFileView& legacy_file(std::FILE* const stream) noexcept
+[[nodiscard]] inline CrtLegacyFile& legacy_file(std::FILE* const stream) noexcept
 {
-  return *reinterpret_cast<LegacyFileView*>(stream);
+  return *reinterpret_cast<CrtLegacyFile*>(stream);
 }
 
-[[nodiscard]] inline LegacyFileView& legacy_file(std::FILE& stream) noexcept
+[[nodiscard]] inline CrtLegacyFile& legacy_file(std::FILE& stream) noexcept
 {
-  return *reinterpret_cast<LegacyFileView*>(&stream);
+  return *reinterpret_cast<CrtLegacyFile*>(&stream);
 }
 
 namespace
@@ -400,9 +400,9 @@ namespace
     return sResolved;
   }
 
-  [[nodiscard]] LegacyFileView* LegacyIobFallbackBase() noexcept
+  [[nodiscard]] CrtLegacyFile* LegacyIobFallbackBase() noexcept
   {
-    static LegacyFileView sLegacyIob[20]{};
+    static CrtLegacyFile sLegacyIob[20]{};
     return sLegacyIob;
   }
 }
@@ -422,58 +422,58 @@ extern "C" std::FILE* __cdecl __iob_func(void)
   return reinterpret_cast<std::FILE*>(LegacyIobFallbackBase());
 }
 
-struct RuntimePmd
+struct CrtPmd
 {
   int mdisp;
   int pdisp;
   int vdisp;
 };
-static_assert(sizeof(RuntimePmd) == 0x0C, "RuntimePmd size must be 0x0C");
+static_assert(sizeof(CrtPmd) == 0x0C, "CrtPmd size must be 0x0C");
 
-struct RuntimeRttiClassHierarchyDescriptor;
+struct CrtRttiClassHierarchyDescriptor;
 
-struct RuntimeRttiBaseClassDescriptor
+struct CrtRttiBaseClassDescriptor
 {
   const std::type_info* typeDescriptor;
   std::uint32_t numContainedBases;
-  RuntimePmd pmd;
+  CrtPmd pmd;
   std::uint32_t attributes;
-  RuntimeRttiClassHierarchyDescriptor* classHierarchyDescriptor;
+  CrtRttiClassHierarchyDescriptor* classHierarchyDescriptor;
 };
-static_assert(sizeof(RuntimeRttiBaseClassDescriptor) == 0x1C, "RuntimeRttiBaseClassDescriptor size must be 0x1C");
+static_assert(sizeof(CrtRttiBaseClassDescriptor) == 0x1C, "CrtRttiBaseClassDescriptor size must be 0x1C");
 static_assert(
-  offsetof(RuntimeRttiBaseClassDescriptor, typeDescriptor) == 0x00,
-  "RuntimeRttiBaseClassDescriptor::typeDescriptor offset must be 0x00"
+  offsetof(CrtRttiBaseClassDescriptor, typeDescriptor) == 0x00,
+  "CrtRttiBaseClassDescriptor::typeDescriptor offset must be 0x00"
 );
 static_assert(
-  offsetof(RuntimeRttiBaseClassDescriptor, numContainedBases) == 0x04,
-  "RuntimeRttiBaseClassDescriptor::numContainedBases offset must be 0x04"
+  offsetof(CrtRttiBaseClassDescriptor, numContainedBases) == 0x04,
+  "CrtRttiBaseClassDescriptor::numContainedBases offset must be 0x04"
 );
-static_assert(offsetof(RuntimeRttiBaseClassDescriptor, pmd) == 0x08, "RuntimeRttiBaseClassDescriptor::pmd offset must be 0x08");
+static_assert(offsetof(CrtRttiBaseClassDescriptor, pmd) == 0x08, "CrtRttiBaseClassDescriptor::pmd offset must be 0x08");
 static_assert(
-  offsetof(RuntimeRttiBaseClassDescriptor, attributes) == 0x14,
-  "RuntimeRttiBaseClassDescriptor::attributes offset must be 0x14"
+  offsetof(CrtRttiBaseClassDescriptor, attributes) == 0x14,
+  "CrtRttiBaseClassDescriptor::attributes offset must be 0x14"
 );
 static_assert(
-  offsetof(RuntimeRttiBaseClassDescriptor, classHierarchyDescriptor) == 0x18,
-  "RuntimeRttiBaseClassDescriptor::classHierarchyDescriptor offset must be 0x18"
+  offsetof(CrtRttiBaseClassDescriptor, classHierarchyDescriptor) == 0x18,
+  "CrtRttiBaseClassDescriptor::classHierarchyDescriptor offset must be 0x18"
 );
 
-struct RuntimeRttiClassHierarchyDescriptor
+struct CrtRttiClassHierarchyDescriptor
 {
   std::uint32_t signature;
   std::uint32_t attributes;
   std::uint32_t numBaseClasses;
-  RuntimeRttiBaseClassDescriptor** baseClassArray;
+  CrtRttiBaseClassDescriptor** baseClassArray;
 };
-static_assert(sizeof(RuntimeRttiClassHierarchyDescriptor) == 0x10, "RuntimeRttiClassHierarchyDescriptor size must be 0x10");
+static_assert(sizeof(CrtRttiClassHierarchyDescriptor) == 0x10, "CrtRttiClassHierarchyDescriptor size must be 0x10");
 static_assert(
-  offsetof(RuntimeRttiClassHierarchyDescriptor, numBaseClasses) == 0x08,
-  "RuntimeRttiClassHierarchyDescriptor::numBaseClasses offset must be 0x08"
+  offsetof(CrtRttiClassHierarchyDescriptor, numBaseClasses) == 0x08,
+  "CrtRttiClassHierarchyDescriptor::numBaseClasses offset must be 0x08"
 );
 static_assert(
-  offsetof(RuntimeRttiClassHierarchyDescriptor, baseClassArray) == 0x0C,
-  "RuntimeRttiClassHierarchyDescriptor::baseClassArray offset must be 0x0C"
+  offsetof(CrtRttiClassHierarchyDescriptor, baseClassArray) == 0x0C,
+  "CrtRttiClassHierarchyDescriptor::baseClassArray offset must be 0x0C"
 );
 
 /**
@@ -488,7 +488,7 @@ extern "C" bool __stdcall EngineTypeInfoStringLess(const char* const lhsText, co
   return std::strcmp(lhsText, rhsText) < 0;
 }
 
-struct RuntimeIoInfo
+struct CrtIoInfo
 {
   std::intptr_t osfhnd;        // +0x00
   std::uint8_t osfile;         // +0x04
@@ -499,23 +499,23 @@ struct RuntimeIoInfo
   std::int8_t textmodeUnicode; // +0x24
   std::uint8_t reserved25[0x13];
 };
-static_assert(offsetof(RuntimeIoInfo, osfhnd) == 0x00, "RuntimeIoInfo::osfhnd offset must be 0x00");
-static_assert(offsetof(RuntimeIoInfo, osfile) == 0x04, "RuntimeIoInfo::osfile offset must be 0x04");
-static_assert(offsetof(RuntimeIoInfo, pipech) == 0x05, "RuntimeIoInfo::pipech offset must be 0x05");
-static_assert(offsetof(RuntimeIoInfo, pipech2) == 0x06, "RuntimeIoInfo::pipech2 offset must be 0x06");
-static_assert(offsetof(RuntimeIoInfo, lockinitflag) == 0x08, "RuntimeIoInfo::lockinitflag offset must be 0x08");
-static_assert(offsetof(RuntimeIoInfo, lock) == 0x0C, "RuntimeIoInfo::lock offset must be 0x0C");
-static_assert(offsetof(RuntimeIoInfo, textmodeUnicode) == 0x24, "RuntimeIoInfo::textmodeUnicode offset must be 0x24");
-static_assert(sizeof(RuntimeIoInfo) == 0x38, "RuntimeIoInfo size must be 0x38");
-extern "C" RuntimeIoInfo __badioinfo;
-extern "C" RuntimeIoInfo* __pioinfo[];
+static_assert(offsetof(CrtIoInfo, osfhnd) == 0x00, "CrtIoInfo::osfhnd offset must be 0x00");
+static_assert(offsetof(CrtIoInfo, osfile) == 0x04, "CrtIoInfo::osfile offset must be 0x04");
+static_assert(offsetof(CrtIoInfo, pipech) == 0x05, "CrtIoInfo::pipech offset must be 0x05");
+static_assert(offsetof(CrtIoInfo, pipech2) == 0x06, "CrtIoInfo::pipech2 offset must be 0x06");
+static_assert(offsetof(CrtIoInfo, lockinitflag) == 0x08, "CrtIoInfo::lockinitflag offset must be 0x08");
+static_assert(offsetof(CrtIoInfo, lock) == 0x0C, "CrtIoInfo::lock offset must be 0x0C");
+static_assert(offsetof(CrtIoInfo, textmodeUnicode) == 0x24, "CrtIoInfo::textmodeUnicode offset must be 0x24");
+static_assert(sizeof(CrtIoInfo) == 0x38, "CrtIoInfo size must be 0x38");
+extern "C" CrtIoInfo __badioinfo;
+extern "C" CrtIoInfo* __pioinfo[];
 extern "C" unsigned int umaskval;
-struct RuntimeThreadLocInfo
+struct CrtThreadLocInfo
 {
   volatile long refcount;
 };
 
-struct RuntimeLcTimeData
+struct CrtLcTimeData
 {
   const char* wday_abbr[7]; // +0x00
   const char* wday[7];      // +0x1C
@@ -529,38 +529,38 @@ struct RuntimeLcTimeData
   LCID ww_lcid;               // +0xB0
   std::int32_t refcount;      // +0xB4
 };
-static_assert(offsetof(RuntimeLcTimeData, wday_abbr) == 0x00, "RuntimeLcTimeData::wday_abbr offset must be 0x00");
-static_assert(offsetof(RuntimeLcTimeData, wday) == 0x1C, "RuntimeLcTimeData::wday offset must be 0x1C");
-static_assert(offsetof(RuntimeLcTimeData, month_abbr) == 0x38, "RuntimeLcTimeData::month_abbr offset must be 0x38");
-static_assert(offsetof(RuntimeLcTimeData, month) == 0x68, "RuntimeLcTimeData::month offset must be 0x68");
-static_assert(offsetof(RuntimeLcTimeData, ampm) == 0x98, "RuntimeLcTimeData::ampm offset must be 0x98");
-static_assert(offsetof(RuntimeLcTimeData, ww_sdatefmt) == 0xA0, "RuntimeLcTimeData::ww_sdatefmt offset must be 0xA0");
-static_assert(offsetof(RuntimeLcTimeData, ww_ldatefmt) == 0xA4, "RuntimeLcTimeData::ww_ldatefmt offset must be 0xA4");
-static_assert(offsetof(RuntimeLcTimeData, ww_timefmt) == 0xA8, "RuntimeLcTimeData::ww_timefmt offset must be 0xA8");
-static_assert(offsetof(RuntimeLcTimeData, ww_caltype) == 0xAC, "RuntimeLcTimeData::ww_caltype offset must be 0xAC");
-static_assert(offsetof(RuntimeLcTimeData, ww_lcid) == 0xB0, "RuntimeLcTimeData::ww_lcid offset must be 0xB0");
-static_assert(offsetof(RuntimeLcTimeData, refcount) == 0xB4, "RuntimeLcTimeData::refcount offset must be 0xB4");
-static_assert(sizeof(RuntimeLcTimeData) == 0xB8, "RuntimeLcTimeData size must be 0xB8");
+static_assert(offsetof(CrtLcTimeData, wday_abbr) == 0x00, "CrtLcTimeData::wday_abbr offset must be 0x00");
+static_assert(offsetof(CrtLcTimeData, wday) == 0x1C, "CrtLcTimeData::wday offset must be 0x1C");
+static_assert(offsetof(CrtLcTimeData, month_abbr) == 0x38, "CrtLcTimeData::month_abbr offset must be 0x38");
+static_assert(offsetof(CrtLcTimeData, month) == 0x68, "CrtLcTimeData::month offset must be 0x68");
+static_assert(offsetof(CrtLcTimeData, ampm) == 0x98, "CrtLcTimeData::ampm offset must be 0x98");
+static_assert(offsetof(CrtLcTimeData, ww_sdatefmt) == 0xA0, "CrtLcTimeData::ww_sdatefmt offset must be 0xA0");
+static_assert(offsetof(CrtLcTimeData, ww_ldatefmt) == 0xA4, "CrtLcTimeData::ww_ldatefmt offset must be 0xA4");
+static_assert(offsetof(CrtLcTimeData, ww_timefmt) == 0xA8, "CrtLcTimeData::ww_timefmt offset must be 0xA8");
+static_assert(offsetof(CrtLcTimeData, ww_caltype) == 0xAC, "CrtLcTimeData::ww_caltype offset must be 0xAC");
+static_assert(offsetof(CrtLcTimeData, ww_lcid) == 0xB0, "CrtLcTimeData::ww_lcid offset must be 0xB0");
+static_assert(offsetof(CrtLcTimeData, refcount) == 0xB4, "CrtLcTimeData::refcount offset must be 0xB4");
+static_assert(sizeof(CrtLcTimeData) == 0xB8, "CrtLcTimeData size must be 0xB8");
 
-struct RuntimeThreadMbcInfo
+struct CrtThreadMbcInfo
 {
   volatile long refcount;
 };
 
-struct RuntimeLocaleHandle
+struct CrtLocaleHandle
 {
-  RuntimeThreadLocInfo* locinfo;
-  RuntimeThreadMbcInfo* mbcinfo;
+  CrtThreadLocInfo* locinfo;
+  CrtThreadMbcInfo* mbcinfo;
 };
 
-extern "C" void __cdecl __removelocaleref(RuntimeThreadLocInfo* locinfo);
+extern "C" void __cdecl __removelocaleref(CrtThreadLocInfo* locinfo);
 /**
  * Address: 0x00A8C397 (FUN_00A8C397, ___addlocaleref)
  *
  * What it does:
  * Increments one thread-locale payload refcount lane.
  */
-extern "C" void __cdecl __addlocaleref(RuntimeThreadLocInfo* locinfo);
+extern "C" void __cdecl __addlocaleref(CrtThreadLocInfo* locinfo);
 /**
  * Address: 0x00A8C257 (FUN_00A8C257, ___freetlocinfo)
  *
@@ -568,10 +568,10 @@ extern "C" void __cdecl __addlocaleref(RuntimeThreadLocInfo* locinfo);
  * Releases one CRT thread-locale payload by checking lane-level refcounts and
  * freeing owned locale/category buffers that are no longer shared.
  */
-extern "C" void __cdecl __freetlocinfo(RuntimeThreadLocInfo* locinfo);
-extern "C" RuntimeThreadLocInfo __initiallocinfo;
-extern "C" RuntimeThreadMbcInfo __initialmbcinfo;
-extern "C" RuntimeLcTimeData __lc_time_c;
+extern "C" void __cdecl __freetlocinfo(CrtThreadLocInfo* locinfo);
+extern "C" CrtThreadLocInfo __initiallocinfo;
+extern "C" CrtThreadMbcInfo __initialmbcinfo;
+extern "C" CrtLcTimeData __lc_time_c;
 extern "C" lconv __lconv_c;
 extern "C" char* __clocalestr;
 /**
@@ -582,12 +582,12 @@ extern "C" char* __clocalestr;
  * providers for weekday/month names, AM/PM strings, date/time formats, and
  * calendar type.
  */
-extern "C" int __cdecl _get_lc_time(RuntimeThreadLocInfo* locinfo, RuntimeLcTimeData* lcTimeData);
+extern "C" int __cdecl _get_lc_time(CrtThreadLocInfo* locinfo, CrtLcTimeData* lcTimeData);
 extern "C" void __cdecl __free_lc_time(void* lcTimeData);
 extern "C" void __cdecl __free_lconv_num(lconv* localeConv);
 extern "C" void __cdecl __free_lconv_mon(lconv* localeConv);
 extern "C" int __cdecl __getlocaleinfo(
-  RuntimeLocaleHandle* localeHandle,
+  CrtLocaleHandle* localeHandle,
   int localeType,
   LCID localeId,
   int localeField,
@@ -660,29 +660,29 @@ extern "C" int __cdecl __crtGetStringTypeA(
   LCID locale,
   int errorControl
 );
-struct RuntimeLocaleCodePageView
+struct CrtLocaleCodePage
 {
   std::int32_t reserved00;
   std::int32_t codepage;
   std::int32_t lcCollateCp;    // +0x08
   LCID lcHandle[6];            // +0x0C, per-category locale handles (matches
-                                // LocaleUpdateScope::CollateView)
+                                // LocaleUpdateScope::CrtCollate)
 };
-static_assert(offsetof(RuntimeLocaleCodePageView, codepage) == 0x4, "RuntimeLocaleCodePageView::codepage offset must be 0x4");
-static_assert(offsetof(RuntimeLocaleCodePageView, lcCollateCp) == 0x8, "RuntimeLocaleCodePageView::lcCollateCp offset must be 0x8");
-static_assert(offsetof(RuntimeLocaleCodePageView, lcHandle) == 0xC, "RuntimeLocaleCodePageView::lcHandle offset must be 0xC");
+static_assert(offsetof(CrtLocaleCodePage, codepage) == 0x4, "CrtLocaleCodePage::codepage offset must be 0x4");
+static_assert(offsetof(CrtLocaleCodePage, lcCollateCp) == 0x8, "CrtLocaleCodePage::lcCollateCp offset must be 0x8");
+static_assert(offsetof(CrtLocaleCodePage, lcHandle) == 0xC, "CrtLocaleCodePage::lcHandle offset must be 0xC");
 
-struct RuntimeLocaleCTypeTableView
+struct CrtLocaleCTypeTable
 {
   std::uint8_t reserved00_C7[0xC8];
   const std::uint16_t* pctype;
 };
 static_assert(
-  offsetof(RuntimeLocaleCTypeTableView, pctype) == 0xC8,
-  "RuntimeLocaleCTypeTableView::pctype offset must be 0xC8"
+  offsetof(CrtLocaleCTypeTable, pctype) == 0xC8,
+  "CrtLocaleCTypeTable::pctype offset must be 0xC8"
 );
 
-struct RuntimeLocaleClassificationView
+struct CrtLocaleClassification
 {
   std::uint8_t reserved00_AB[0xAC];
   std::int32_t mbCurMax;
@@ -690,15 +690,15 @@ struct RuntimeLocaleClassificationView
   const std::uint16_t* pctype;
 };
 static_assert(
-  offsetof(RuntimeLocaleClassificationView, mbCurMax) == 0xAC,
-  "RuntimeLocaleClassificationView::mbCurMax offset must be 0xAC"
+  offsetof(CrtLocaleClassification, mbCurMax) == 0xAC,
+  "CrtLocaleClassification::mbCurMax offset must be 0xAC"
 );
 static_assert(
-  offsetof(RuntimeLocaleClassificationView, pctype) == 0xC8,
-  "RuntimeLocaleClassificationView::pctype offset must be 0xC8"
+  offsetof(CrtLocaleClassification, pctype) == 0xC8,
+  "CrtLocaleClassification::pctype offset must be 0xC8"
 );
 
-struct RuntimeLocaleLegacySyncView
+struct CrtLocaleLegacySync
 {
   std::int32_t reserved00;
   std::int32_t lcCodepage;
@@ -711,48 +711,48 @@ struct RuntimeLocaleLegacySyncView
   std::uint8_t reservedC0_C7[0x8];
   const std::uint16_t* pctype;
   std::uint8_t reservedCC_D3[0x8];
-  RuntimeLcTimeData* lcTimeCurrent;
+  CrtLcTimeData* lcTimeCurrent;
 };
 static_assert(
-  offsetof(RuntimeLocaleLegacySyncView, lcCodepage) == 0x04,
-  "RuntimeLocaleLegacySyncView::lcCodepage offset must be 0x04"
+  offsetof(CrtLocaleLegacySync, lcCodepage) == 0x04,
+  "CrtLocaleLegacySync::lcCodepage offset must be 0x04"
 );
 static_assert(
-  offsetof(RuntimeLocaleLegacySyncView, lcCollateCodepage) == 0x08,
-  "RuntimeLocaleLegacySyncView::lcCollateCodepage offset must be 0x08"
+  offsetof(CrtLocaleLegacySync, lcCollateCodepage) == 0x08,
+  "CrtLocaleLegacySync::lcCollateCodepage offset must be 0x08"
 );
 static_assert(
-  offsetof(RuntimeLocaleLegacySyncView, lcClike) == 0xA8,
-  "RuntimeLocaleLegacySyncView::lcClike offset must be 0xA8"
+  offsetof(CrtLocaleLegacySync, lcClike) == 0xA8,
+  "CrtLocaleLegacySync::lcClike offset must be 0xA8"
 );
 static_assert(
-  offsetof(RuntimeLocaleLegacySyncView, mbCurMax) == 0xAC,
-  "RuntimeLocaleLegacySyncView::mbCurMax offset must be 0xAC"
+  offsetof(CrtLocaleLegacySync, mbCurMax) == 0xAC,
+  "CrtLocaleLegacySync::mbCurMax offset must be 0xAC"
 );
 static_assert(
-  offsetof(RuntimeLocaleLegacySyncView, localeConventions) == 0xBC,
-  "RuntimeLocaleLegacySyncView::localeConventions offset must be 0xBC"
+  offsetof(CrtLocaleLegacySync, localeConventions) == 0xBC,
+  "CrtLocaleLegacySync::localeConventions offset must be 0xBC"
 );
 static_assert(
-  offsetof(RuntimeLocaleLegacySyncView, pctype) == 0xC8,
-  "RuntimeLocaleLegacySyncView::pctype offset must be 0xC8"
+  offsetof(CrtLocaleLegacySync, pctype) == 0xC8,
+  "CrtLocaleLegacySync::pctype offset must be 0xC8"
 );
 static_assert(
-  offsetof(RuntimeLocaleLegacySyncView, lcTimeCurrent) == 0xD4,
-  "RuntimeLocaleLegacySyncView::lcTimeCurrent offset must be 0xD4"
+  offsetof(CrtLocaleLegacySync, lcTimeCurrent) == 0xD4,
+  "CrtLocaleLegacySync::lcTimeCurrent offset must be 0xD4"
 );
 
-struct RuntimeLocaleHandleView
+struct CrtLocaleHandleRef
 {
   std::uint8_t reserved00_0B[0x0C];
   LCID lcHandle[6];
 };
 static_assert(
-  offsetof(RuntimeLocaleHandleView, lcHandle) == 0x0C,
-  "RuntimeLocaleHandleView::lcHandle offset must be 0x0C"
+  offsetof(CrtLocaleHandleRef, lcHandle) == 0x0C,
+  "CrtLocaleHandleRef::lcHandle offset must be 0x0C"
 );
 
-struct RuntimeSetLocLocaleView
+struct CrtSetLocLocale
 {
   char* pchLanguage;            // +0x00
   char* pchCountry;             // +0x04
@@ -763,44 +763,44 @@ struct RuntimeSetLocLocaleView
   LCID lcidLanguage;            // +0x18
   LCID lcidCountry;             // +0x1C
 };
-static_assert(offsetof(RuntimeSetLocLocaleView, pchLanguage) == 0x0, "RuntimeSetLocLocaleView::pchLanguage offset must be 0x0");
-static_assert(offsetof(RuntimeSetLocLocaleView, pchCountry) == 0x4, "RuntimeSetLocLocaleView::pchCountry offset must be 0x4");
-static_assert(offsetof(RuntimeSetLocLocaleView, iLcidState) == 0x8, "RuntimeSetLocLocaleView::iLcidState offset must be 0x8");
-static_assert(offsetof(RuntimeSetLocLocaleView, iPrimaryLen) == 0xC, "RuntimeSetLocLocaleView::iPrimaryLen offset must be 0xC");
-static_assert(offsetof(RuntimeSetLocLocaleView, bAbbrevLanguage) == 0x10, "RuntimeSetLocLocaleView::bAbbrevLanguage offset must be 0x10");
-static_assert(offsetof(RuntimeSetLocLocaleView, bAbbrevCountry) == 0x14, "RuntimeSetLocLocaleView::bAbbrevCountry offset must be 0x14");
-static_assert(offsetof(RuntimeSetLocLocaleView, lcidLanguage) == 0x18, "RuntimeSetLocLocaleView::lcidLanguage offset must be 0x18");
-static_assert(offsetof(RuntimeSetLocLocaleView, lcidCountry) == 0x1C, "RuntimeSetLocLocaleView::lcidCountry offset must be 0x1C");
-static_assert(sizeof(RuntimeSetLocLocaleView) == 0x20, "RuntimeSetLocLocaleView size must be 0x20");
+static_assert(offsetof(CrtSetLocLocale, pchLanguage) == 0x0, "CrtSetLocLocale::pchLanguage offset must be 0x0");
+static_assert(offsetof(CrtSetLocLocale, pchCountry) == 0x4, "CrtSetLocLocale::pchCountry offset must be 0x4");
+static_assert(offsetof(CrtSetLocLocale, iLcidState) == 0x8, "CrtSetLocLocale::iLcidState offset must be 0x8");
+static_assert(offsetof(CrtSetLocLocale, iPrimaryLen) == 0xC, "CrtSetLocLocale::iPrimaryLen offset must be 0xC");
+static_assert(offsetof(CrtSetLocLocale, bAbbrevLanguage) == 0x10, "CrtSetLocLocale::bAbbrevLanguage offset must be 0x10");
+static_assert(offsetof(CrtSetLocLocale, bAbbrevCountry) == 0x14, "CrtSetLocLocale::bAbbrevCountry offset must be 0x14");
+static_assert(offsetof(CrtSetLocLocale, lcidLanguage) == 0x18, "CrtSetLocLocale::lcidLanguage offset must be 0x18");
+static_assert(offsetof(CrtSetLocLocale, lcidCountry) == 0x1C, "CrtSetLocLocale::lcidCountry offset must be 0x1C");
+static_assert(sizeof(CrtSetLocLocale) == 0x20, "CrtSetLocLocale size must be 0x20");
 
-struct RuntimeFrameInfoNode
+struct CrtFrameInfoNode
 {
   std::int32_t objectState;            // +0x00
-  RuntimeFrameInfoNode* next = nullptr; // +0x04
+  CrtFrameInfoNode* next = nullptr; // +0x04
 };
-static_assert(sizeof(RuntimeFrameInfoNode) == 0x8, "RuntimeFrameInfoNode size must be 0x8");
-static_assert(offsetof(RuntimeFrameInfoNode, objectState) == 0x0, "RuntimeFrameInfoNode::objectState offset must be 0x0");
-static_assert(offsetof(RuntimeFrameInfoNode, next) == 0x4, "RuntimeFrameInfoNode::next offset must be 0x4");
+static_assert(sizeof(CrtFrameInfoNode) == 0x8, "CrtFrameInfoNode size must be 0x8");
+static_assert(offsetof(CrtFrameInfoNode, objectState) == 0x0, "CrtFrameInfoNode::objectState offset must be 0x0");
+static_assert(offsetof(CrtFrameInfoNode, next) == 0x4, "CrtFrameInfoNode::next offset must be 0x4");
 
-struct RuntimeTidDataLocaleView
+struct CrtTidDataLocale
 {
   std::uint8_t reserved00[0x68];
   // +0x68/+0x6C read back-to-back by _LocaleUpdate::_LocaleUpdate (0x00A83031)
   // as `mov ecx,[eax+6Ch]` / `mov ecx,[eax+68h]`.
-  RuntimeThreadMbcInfo* ptmbcinfo;
-  RuntimeLocaleCodePageView* ptlocinfo;
+  CrtThreadMbcInfo* ptmbcinfo;
+  CrtLocaleCodePage* ptlocinfo;
   std::int32_t ownlocale;
   std::uint8_t reserved74[0x24];
-  RuntimeFrameInfoNode* frameInfoChain;
-  RuntimeSetLocLocaleView setlocData;
+  CrtFrameInfoNode* frameInfoChain;
+  CrtSetLocLocale setlocData;
 };
-static_assert(offsetof(RuntimeTidDataLocaleView, ptmbcinfo) == 0x68, "RuntimeTidDataLocaleView::ptmbcinfo offset must be 0x68");
-static_assert(offsetof(RuntimeTidDataLocaleView, ptlocinfo) == 0x6C, "RuntimeTidDataLocaleView::ptlocinfo offset must be 0x6C");
-static_assert(offsetof(RuntimeTidDataLocaleView, ownlocale) == 0x70, "RuntimeTidDataLocaleView::ownlocale offset must be 0x70");
-static_assert(offsetof(RuntimeTidDataLocaleView, frameInfoChain) == 0x98, "RuntimeTidDataLocaleView::frameInfoChain offset must be 0x98");
-static_assert(offsetof(RuntimeTidDataLocaleView, setlocData) == 0x9C, "RuntimeTidDataLocaleView::setlocData offset must be 0x9C");
+static_assert(offsetof(CrtTidDataLocale, ptmbcinfo) == 0x68, "CrtTidDataLocale::ptmbcinfo offset must be 0x68");
+static_assert(offsetof(CrtTidDataLocale, ptlocinfo) == 0x6C, "CrtTidDataLocale::ptlocinfo offset must be 0x6C");
+static_assert(offsetof(CrtTidDataLocale, ownlocale) == 0x70, "CrtTidDataLocale::ownlocale offset must be 0x70");
+static_assert(offsetof(CrtTidDataLocale, frameInfoChain) == 0x98, "CrtTidDataLocale::frameInfoChain offset must be 0x98");
+static_assert(offsetof(CrtTidDataLocale, setlocData) == 0x9C, "CrtTidDataLocale::setlocData offset must be 0x9C");
 
-struct RuntimeThreadMbcInfoCaseView
+struct CrtThreadMbcInfoCase
 {
   std::uint8_t reserved00_03[0x4];
   std::uint32_t mbcodepage;
@@ -810,26 +810,26 @@ struct RuntimeThreadMbcInfoCaseView
   std::uint8_t mbctype[0x101];
   std::uint8_t mbcasemap[0x100];
 };
-static_assert(offsetof(RuntimeThreadMbcInfoCaseView, mbcodepage) == 0x4, "RuntimeThreadMbcInfoCaseView::mbcodepage offset must be 0x4");
-static_assert(offsetof(RuntimeThreadMbcInfoCaseView, ismbcodepage) == 0x8, "RuntimeThreadMbcInfoCaseView::ismbcodepage offset must be 0x8");
-static_assert(offsetof(RuntimeThreadMbcInfoCaseView, mblcid) == 0xC, "RuntimeThreadMbcInfoCaseView::mblcid offset must be 0xC");
-static_assert(offsetof(RuntimeThreadMbcInfoCaseView, mbulinfo) == 0x10, "RuntimeThreadMbcInfoCaseView::mbulinfo offset must be 0x10");
-static_assert(offsetof(RuntimeThreadMbcInfoCaseView, mbctype) == 0x1C, "RuntimeThreadMbcInfoCaseView::mbctype offset must be 0x1C");
-static_assert(offsetof(RuntimeThreadMbcInfoCaseView, mbcasemap) == 0x11D, "RuntimeThreadMbcInfoCaseView::mbcasemap offset must be 0x11D");
+static_assert(offsetof(CrtThreadMbcInfoCase, mbcodepage) == 0x4, "CrtThreadMbcInfoCase::mbcodepage offset must be 0x4");
+static_assert(offsetof(CrtThreadMbcInfoCase, ismbcodepage) == 0x8, "CrtThreadMbcInfoCase::ismbcodepage offset must be 0x8");
+static_assert(offsetof(CrtThreadMbcInfoCase, mblcid) == 0xC, "CrtThreadMbcInfoCase::mblcid offset must be 0xC");
+static_assert(offsetof(CrtThreadMbcInfoCase, mbulinfo) == 0x10, "CrtThreadMbcInfoCase::mbulinfo offset must be 0x10");
+static_assert(offsetof(CrtThreadMbcInfoCase, mbctype) == 0x1C, "CrtThreadMbcInfoCase::mbctype offset must be 0x1C");
+static_assert(offsetof(CrtThreadMbcInfoCase, mbcasemap) == 0x11D, "CrtThreadMbcInfoCase::mbcasemap offset must be 0x11D");
 
-extern "C" RuntimeLocaleCodePageView* __ptlocinfo;
+extern "C" CrtLocaleCodePage* __ptlocinfo;
 extern "C" std::int32_t __lc_codepage;
 extern "C" std::int32_t __lc_collate_cp;
 extern "C" std::int32_t __lc_clike;
-extern "C" RuntimeLcTimeData* __lc_time_curr;
+extern "C" CrtLcTimeData* __lc_time_curr;
 extern "C" lconv* __lconv;
 extern "C" const std::uint16_t* _pctype;
 extern "C" std::int32_t __mb_cur_max;
 extern "C" std::int32_t __globallocalestatus;
-extern "C" RuntimeTidDataLocaleView* __cdecl __getptd();
-extern "C" RuntimeLocaleCodePageView* __cdecl __updatetlocinfo();
-extern "C" RuntimeThreadMbcInfo* __ptmbcinfo;
-extern "C" RuntimeThreadMbcInfo* __cdecl __updatetmbcinfo();
+extern "C" CrtTidDataLocale* __cdecl __getptd();
+extern "C" CrtLocaleCodePage* __cdecl __updatetlocinfo();
+extern "C" CrtThreadMbcInfo* __ptmbcinfo;
+extern "C" CrtThreadMbcInfo* __cdecl __updatetmbcinfo();
 extern "C" int _getvalueindex;
 extern "C" void __cdecl _freefls(void* ptd);
 extern "C" int __cdecl _flsbuf(int character, std::FILE* stream);
@@ -862,8 +862,8 @@ public:
   explicit LocaleUpdateScope(_locale_t const explicitLocale) noexcept
   {
     if (explicitLocale != nullptr) {
-      const auto* const handle = reinterpret_cast<const RuntimeLocaleHandle*>(explicitLocale);
-      locinfo_ = reinterpret_cast<RuntimeLocaleCodePageView*>(handle->locinfo);
+      const auto* const handle = reinterpret_cast<const CrtLocaleHandle*>(explicitLocale);
+      locinfo_ = reinterpret_cast<CrtLocaleCodePage*>(handle->locinfo);
       mbcinfo_ = handle->mbcinfo;
       return;
     }
@@ -899,20 +899,20 @@ public:
    * Narrow-locale payload lane as read by the collation helpers:
    * `lc_codepage` +0x04, `lc_collate_cp` +0x08, `lc_handle[]` +0x0C.
    */
-  struct CollateView
+  struct CrtCollate
   {
     std::int32_t refcount;        // +0x00
     std::int32_t lcCodepage;      // +0x04
     std::int32_t lcCollateCp;     // +0x08
     LCID lcHandle[6];             // +0x0C
   };
-  static_assert(offsetof(CollateView, lcCollateCp) == 0x08, "CollateView::lcCollateCp offset must be 0x08");
-  static_assert(offsetof(CollateView, lcHandle) == 0x0C, "CollateView::lcHandle offset must be 0x0C");
+  static_assert(offsetof(CrtCollate, lcCollateCp) == 0x08, "CrtCollate::lcCollateCp offset must be 0x08");
+  static_assert(offsetof(CrtCollate, lcHandle) == 0x0C, "CrtCollate::lcHandle offset must be 0x0C");
 
   /** Narrow-locale payload for the effective locale. */
-  [[nodiscard]] const CollateView* loc() const noexcept
+  [[nodiscard]] const CrtCollate* loc() const noexcept
   {
-    return reinterpret_cast<const CollateView*>(locinfo_);
+    return reinterpret_cast<const CrtCollate*>(locinfo_);
   }
 
   /**
@@ -920,9 +920,9 @@ public:
    * `lc_time_curr` (+0xD4) weekday/month/format table pointer (e.g.
    * `__Getdays_l`/`__Getmonths_l`).
    */
-  [[nodiscard]] const RuntimeLocaleLegacySyncView* timeView() const noexcept
+  [[nodiscard]] const CrtLocaleLegacySync* timeView() const noexcept
   {
-    return reinterpret_cast<const RuntimeLocaleLegacySyncView*>(locinfo_);
+    return reinterpret_cast<const CrtLocaleLegacySync*>(locinfo_);
   }
 
   /** Raw `_locale_t` view of this scope, for forwarding to nested `*_l` lanes. */
@@ -932,15 +932,15 @@ public:
   }
 
   /** Multibyte code-page payload for the effective locale. */
-  [[nodiscard]] const RuntimeThreadMbcInfoCaseView* mbc() const noexcept
+  [[nodiscard]] const CrtThreadMbcInfoCase* mbc() const noexcept
   {
-    return reinterpret_cast<const RuntimeThreadMbcInfoCaseView*>(mbcinfo_);
+    return reinterpret_cast<const CrtThreadMbcInfoCase*>(mbcinfo_);
   }
 
   /** True when the effective locale uses a multibyte code page. */
   [[nodiscard]] bool isMultibyteCodePage() const noexcept
   {
-    const RuntimeThreadMbcInfoCaseView* const info = mbc();
+    const CrtThreadMbcInfoCase* const info = mbc();
     return info != nullptr && info->ismbcodepage != 0u;
   }
 
@@ -953,14 +953,14 @@ public:
 private:
   static constexpr std::int32_t kPerThreadLocaleBit = 2;
 
-  RuntimeLocaleCodePageView* locinfo_ = nullptr;  // +0x00
-  RuntimeThreadMbcInfo* mbcinfo_ = nullptr;       // +0x04
-  RuntimeTidDataLocaleView* thread_ = nullptr;    // +0x08
+  CrtLocaleCodePage* locinfo_ = nullptr;  // +0x00
+  CrtThreadMbcInfo* mbcinfo_ = nullptr;       // +0x04
+  CrtTidDataLocale* thread_ = nullptr;    // +0x08
   bool updated_ = false;                          // +0x0C
 };
-extern "C" RuntimeLocaleCodePageView* __cdecl _updatetlocinfoEx_nolock(
-  RuntimeLocaleCodePageView** threadLocale,
-  RuntimeLocaleCodePageView* processLocale);
+extern "C" CrtLocaleCodePage* __cdecl _updatetlocinfoEx_nolock(
+  CrtLocaleCodePage** threadLocale,
+  CrtLocaleCodePage* processLocale);
 extern "C" int __cdecl _stbuf(std::FILE* stream);
 extern "C" void __cdecl _ftbuf(int scratchAllocated, std::FILE* stream);
 extern "C" int __cdecl _setmbcp(int codePageMode);
@@ -1239,8 +1239,8 @@ extern "C" __time64_t __cdecl __loctotime64_t(
   int dstflag
 );
 
-struct RuntimeLocaleInfoStruct;
-extern "C" RuntimeLocaleInfoStruct __initiallocalestructinfo;
+struct CrtLocaleInfoStruct;
+extern "C" CrtLocaleInfoStruct __initiallocalestructinfo;
 extern "C" std::size_t __cdecl __Strftime_l(
   char* destination,
   std::size_t maxCount,
@@ -1250,7 +1250,7 @@ extern "C" std::size_t __cdecl __Strftime_l(
   _locale_t localeInfo
 );
 unsigned long __cdecl strtoxl(
-  RuntimeLocaleInfoStruct* localeInfo,
+  CrtLocaleInfoStruct* localeInfo,
   const char* text,
   char** endPointer,
   int radix,
@@ -1258,7 +1258,7 @@ unsigned long __cdecl strtoxl(
 );
 extern "C" void __cdecl doexit(unsigned int exitCode, int quick, int returnToCaller);
 extern "C" unsigned __int64 __cdecl wcstoxq(
-  RuntimeLocaleInfoStruct* localeInfo,
+  CrtLocaleInfoStruct* localeInfo,
   const wchar_t* text,
   wchar_t** endPointer,
   int radix,
@@ -1816,15 +1816,15 @@ namespace
 
 namespace
 {
-  struct RuntimeThreadLocInfoView;
+  struct CrtThreadLocInfoData;
 
-  [[nodiscard]] RuntimeThreadLocInfoView* EngineResolveLocaleLocInfo(
+  [[nodiscard]] CrtThreadLocInfoData* EngineResolveLocaleLocInfo(
     _locale_t localeInfo,
-    RuntimeTidDataLocaleView** outThreadData,
+    CrtTidDataLocale** outThreadData,
     bool* outUpdated
   );
 
-  void EngineReleaseLocaleUpdate(RuntimeTidDataLocaleView* threadData, bool updated);
+  void EngineReleaseLocaleUpdate(CrtTidDataLocale* threadData, bool updated);
 }
 
 /**
@@ -2114,7 +2114,7 @@ extern "C" int __cdecl EngineInvokeStdcallInt4CallbackNoexcept(
 // Shared helpers for the CRT ctype family (`_is*[_l]`) recovered below.
 namespace
 {
-  struct RuntimeCtypeVec;
+  struct CrtCtypeVec;
 
   using RuntimeLocaleClassifierFn = int(__cdecl*)(int character, _locale_t localeInfo);
 
@@ -2125,9 +2125,9 @@ namespace
     const int ctypeMask
   )
   {
-    RuntimeTidDataLocaleView* threadData = nullptr;
+    CrtTidDataLocale* threadData = nullptr;
     bool updated = false;
-    const auto* const localeView = reinterpret_cast<const RuntimeLocaleClassificationView*>(
+    const auto* const localeView = reinterpret_cast<const CrtLocaleClassification*>(
       EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated)
     );
 
@@ -2165,9 +2165,9 @@ namespace
     _locale_t const localeInfo
   )
   {
-    RuntimeTidDataLocaleView* threadData = nullptr;
+    CrtTidDataLocale* threadData = nullptr;
     bool updated = false;
-    const auto* const localeView = reinterpret_cast<const RuntimeLocaleClassificationView*>(
+    const auto* const localeView = reinterpret_cast<const CrtLocaleClassification*>(
       EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated)
     );
 
@@ -2201,11 +2201,11 @@ namespace
       return changedLocaleClassifier(character, nullptr);
     }
 
-    const auto* const initialLocale = reinterpret_cast<const RuntimeLocaleCTypeTableView*>(&__initiallocinfo);
+    const auto* const initialLocale = reinterpret_cast<const CrtLocaleCTypeTable*>(&__initiallocinfo);
     return static_cast<int>(initialLocale->pctype[character] & initialMask);
   }
 
-  struct RuntimeToupperLocaleView
+  struct CrtToupperLocale
   {
     std::uint8_t reserved00_03[0x4]{};
     std::int32_t lcCodepage = 0;               // +0x04
@@ -2218,12 +2218,12 @@ namespace
     std::uint8_t reservedCC_CF[0x4]{};
     const unsigned char* pcumap = nullptr;     // +0xD0
   };
-  static_assert(offsetof(RuntimeToupperLocaleView, lcCodepage) == 0x4, "RuntimeToupperLocaleView::lcCodepage offset must be 0x4");
-  static_assert(offsetof(RuntimeToupperLocaleView, lcHandle) == 0xC, "RuntimeToupperLocaleView::lcHandle offset must be 0xC");
-  static_assert((offsetof(RuntimeToupperLocaleView, lcHandle) + sizeof(LCID) * 2u) == 0x14, "RuntimeToupperLocaleView::lcHandle[2] offset must be 0x14");
-  static_assert(offsetof(RuntimeToupperLocaleView, mbCurMax) == 0xAC, "RuntimeToupperLocaleView::mbCurMax offset must be 0xAC");
-  static_assert(offsetof(RuntimeToupperLocaleView, pctype) == 0xC8, "RuntimeToupperLocaleView::pctype offset must be 0xC8");
-  static_assert(offsetof(RuntimeToupperLocaleView, pcumap) == 0xD0, "RuntimeToupperLocaleView::pcumap offset must be 0xD0");
+  static_assert(offsetof(CrtToupperLocale, lcCodepage) == 0x4, "CrtToupperLocale::lcCodepage offset must be 0x4");
+  static_assert(offsetof(CrtToupperLocale, lcHandle) == 0xC, "CrtToupperLocale::lcHandle offset must be 0xC");
+  static_assert((offsetof(CrtToupperLocale, lcHandle) + sizeof(LCID) * 2u) == 0x14, "CrtToupperLocale::lcHandle[2] offset must be 0x14");
+  static_assert(offsetof(CrtToupperLocale, mbCurMax) == 0xAC, "CrtToupperLocale::mbCurMax offset must be 0xAC");
+  static_assert(offsetof(CrtToupperLocale, pctype) == 0xC8, "CrtToupperLocale::pctype offset must be 0xC8");
+  static_assert(offsetof(CrtToupperLocale, pcumap) == 0xD0, "CrtToupperLocale::pcumap offset must be 0xD0");
 
   /**
    * Address: 0x00A8E5CD (FUN_00A8E5CD)
@@ -2235,9 +2235,9 @@ namespace
    */
   int EngineToupperLocaleHelper(const int character, _locale_t const localeInfo)
   {
-    RuntimeTidDataLocaleView* threadData = nullptr;
+    CrtTidDataLocale* threadData = nullptr;
     bool updated = false;
-    const auto* const localeView = reinterpret_cast<const RuntimeToupperLocaleView*>(
+    const auto* const localeView = reinterpret_cast<const CrtToupperLocale*>(
       EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated)
     );
 
@@ -2311,9 +2311,9 @@ namespace
       return result;
     }
 
-    RuntimeTidDataLocaleView* threadData = nullptr;
+    CrtTidDataLocale* threadData = nullptr;
     bool updated = false;
-    const auto* const localeView = reinterpret_cast<const RuntimeToupperLocaleView*>(
+    const auto* const localeView = reinterpret_cast<const CrtToupperLocale*>(
       EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated)
     );
 
@@ -2659,7 +2659,7 @@ extern "C" unsigned long __cdecl strtoul(
   const int radix
 )
 {
-  RuntimeLocaleInfoStruct* localeInfo =
+  CrtLocaleInfoStruct* localeInfo =
     (__locale_changed != 0) ? nullptr : &__initiallocalestructinfo;
   return strtoxl(localeInfo, text, endPointer, radix, 1);
 }
@@ -2677,7 +2677,7 @@ extern "C" long __cdecl strtol(
   const int radix
 )
 {
-  RuntimeLocaleInfoStruct* localeInfo =
+  CrtLocaleInfoStruct* localeInfo =
     (__locale_changed != 0) ? nullptr : &__initiallocalestructinfo;
   return static_cast<long>(strtoxl(localeInfo, text, endPointer, radix, 0));
 }
@@ -2695,7 +2695,7 @@ long EngineStrtolByteString(
   const int radix
 )
 {
-  RuntimeLocaleInfoStruct* localeInfo =
+  CrtLocaleInfoStruct* localeInfo =
     (__locale_changed != 0) ? nullptr : &__initiallocalestructinfo;
   return static_cast<long>(strtoxl(
     localeInfo,
@@ -2737,7 +2737,7 @@ extern "C" long __cdecl EngineStrtolLocaleForward(
 )
 {
   return static_cast<long>(strtoxl(
-    reinterpret_cast<RuntimeLocaleInfoStruct*>(localeInfo),
+    reinterpret_cast<CrtLocaleInfoStruct*>(localeInfo),
     text,
     endPointer,
     radix,
@@ -2758,7 +2758,7 @@ static unsigned __int64 EngineWcstoi64(
   const int radix
 )
 {
-  RuntimeLocaleInfoStruct* const localeInfo =
+  CrtLocaleInfoStruct* const localeInfo =
     (__locale_changed != 0) ? nullptr : &__initiallocalestructinfo;
   return wcstoxq(localeInfo, text, endPointer, radix, 0);
 }
@@ -2774,7 +2774,7 @@ __int64 __cdecl EngineWcstoi64Locale(
   const wchar_t* const text,
   wchar_t** const endPointer,
   const int radix,
-  RuntimeLocaleInfoStruct* const localeInfo
+  CrtLocaleInfoStruct* const localeInfo
 )
 {
   return static_cast<__int64>(wcstoxq(localeInfo, text, endPointer, radix, 0));
@@ -2931,7 +2931,7 @@ extern "C" __int64 __cdecl _wtoi64(const wchar_t* const text)
  */
 extern "C" __int64 __cdecl _wtoi64_l(const wchar_t* const text, _locale_t localeInfo)
 {
-  return EngineWcstoi64Locale(text, nullptr, 10, reinterpret_cast<RuntimeLocaleInfoStruct*>(localeInfo));
+  return EngineWcstoi64Locale(text, nullptr, 10, reinterpret_cast<CrtLocaleInfoStruct*>(localeInfo));
 }
 
 /**
@@ -2947,7 +2947,7 @@ extern "C" unsigned __int64 __cdecl _wcstoui64(
   const int radix
 )
 {
-  RuntimeLocaleInfoStruct* const localeInfo =
+  CrtLocaleInfoStruct* const localeInfo =
     (__locale_changed != 0) ? nullptr : &__initiallocalestructinfo;
   constexpr int kUnsignedParseFlags = 1;
   return wcstoxq(localeInfo, text, endPointer, radix, kUnsignedParseFlags);
@@ -2968,7 +2968,7 @@ extern "C" unsigned __int64 __cdecl _wcstoui64_l(
 )
 {
   constexpr int kUnsignedParseFlags = 1;
-  return wcstoxq(reinterpret_cast<RuntimeLocaleInfoStruct*>(localeInfo), text, endPointer, radix, kUnsignedParseFlags);
+  return wcstoxq(reinterpret_cast<CrtLocaleInfoStruct*>(localeInfo), text, endPointer, radix, kUnsignedParseFlags);
 }
 
 /**
@@ -2981,7 +2981,7 @@ extern "C" unsigned __int64 __cdecl _wcstoui64_l(
 extern "C" std::size_t __cdecl
 mbstowcs(wchar_t* const destination, const char* const source, const std::size_t maxCount)
 {
-  RuntimeLocaleInfoStruct* localeInfo = (__locale_changed != 0) ? nullptr : &__initiallocalestructinfo;
+  CrtLocaleInfoStruct* localeInfo = (__locale_changed != 0) ? nullptr : &__initiallocalestructinfo;
   return ::_mbstowcs_l(destination, source, maxCount, reinterpret_cast<_locale_t>(localeInfo));
 }
 
@@ -3019,9 +3019,9 @@ extern "C" errno_t __cdecl _mbstowcs_s_l(
     *outConvertedCount = 0u;
   }
 
-  RuntimeTidDataLocaleView* threadData = nullptr;
+  CrtTidDataLocale* threadData = nullptr;
   bool updated = false;
-  RuntimeThreadLocInfoView* const resolvedLocaleInfo =
+  CrtThreadLocInfoData* const resolvedLocaleInfo =
     EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
   const std::size_t conversionCount = (maxCount > destinationCount) ? destinationCount : maxCount;
@@ -4230,14 +4230,14 @@ extern "C" int __cdecl _get_timezone(long* const outTimezone)
  *   * If the result is null, call `_amsg_exit(32)` (CRT runtime failure
  *     abort code for "locale init failure") and never return.
  */
-extern "C" RuntimeLocaleCodePageView* __cdecl __updatetlocinfo()
+extern "C" CrtLocaleCodePage* __cdecl __updatetlocinfo()
 {
   constexpr int kSetLocaleLock = 19;             // _SETLOCALE_LOCK in MSVC8 CRT
   constexpr int kCrtLocaleInitFailureCode = 32;  // _amsg_exit code R6032 equivalent
 
-  RuntimeTidDataLocaleView* const threadData = __getptd();
+  CrtTidDataLocale* const threadData = __getptd();
 
-  RuntimeLocaleCodePageView* locale = nullptr;
+  CrtLocaleCodePage* locale = nullptr;
   if ((__globallocalestatus & threadData->ownlocale) != 0 && threadData->ptlocinfo != nullptr) {
     locale = __getptd()->ptlocinfo;
   } else {
@@ -4261,13 +4261,13 @@ extern "C" RuntimeLocaleCodePageView* __cdecl __updatetlocinfo()
  */
 extern "C" int __cdecl ___mb_cur_max_func()
 {
-  RuntimeTidDataLocaleView* const threadData = __getptd();
-  RuntimeLocaleCodePageView* locale = threadData->ptlocinfo;
+  CrtTidDataLocale* const threadData = __getptd();
+  CrtLocaleCodePage* locale = threadData->ptlocinfo;
   if (locale != __ptlocinfo && (__globallocalestatus & threadData->ownlocale) == 0) {
     locale = __updatetlocinfo();
   }
 
-  return reinterpret_cast<const RuntimeLocaleLegacySyncView*>(locale)->mbCurMax;
+  return reinterpret_cast<const CrtLocaleLegacySync*>(locale)->mbCurMax;
 }
 
 
@@ -4280,8 +4280,8 @@ extern "C" int __cdecl ___mb_cur_max_func()
  */
 extern "C" int __cdecl __lc_codepage_func()
 {
-  RuntimeTidDataLocaleView* const threadData = __getptd();
-  RuntimeLocaleCodePageView* locale = threadData->ptlocinfo;
+  CrtTidDataLocale* const threadData = __getptd();
+  CrtLocaleCodePage* locale = threadData->ptlocinfo;
   if (locale != __ptlocinfo && (__globallocalestatus & threadData->ownlocale) == 0) {
     locale = __updatetlocinfo();
   }
@@ -4297,13 +4297,13 @@ extern "C" int __cdecl __lc_codepage_func()
  */
 extern "C" unsigned int __cdecl __lc_collate_cp_func()
 {
-  RuntimeTidDataLocaleView* const threadData = __getptd();
-  RuntimeLocaleCodePageView* locale = threadData->ptlocinfo;
+  CrtTidDataLocale* const threadData = __getptd();
+  CrtLocaleCodePage* locale = threadData->ptlocinfo;
   if (locale != __ptlocinfo && (__globallocalestatus & threadData->ownlocale) == 0) {
     locale = __updatetlocinfo();
   }
 
-  const auto* const legacyLocale = reinterpret_cast<const RuntimeLocaleLegacySyncView*>(locale);
+  const auto* const legacyLocale = reinterpret_cast<const CrtLocaleLegacySync*>(locale);
   return static_cast<unsigned int>(legacyLocale->lcCollateCodepage);
 }
 
@@ -4316,13 +4316,13 @@ extern "C" unsigned int __cdecl __lc_collate_cp_func()
  */
 extern "C" LCID* __cdecl __lc_handle_func()
 {
-  RuntimeTidDataLocaleView* const threadData = __getptd();
-  RuntimeLocaleCodePageView* locale = threadData->ptlocinfo;
+  CrtTidDataLocale* const threadData = __getptd();
+  CrtLocaleCodePage* locale = threadData->ptlocinfo;
   if (locale != __ptlocinfo && (__globallocalestatus & threadData->ownlocale) == 0) {
     locale = __updatetlocinfo();
   }
 
-  return reinterpret_cast<RuntimeLocaleHandleView*>(locale)->lcHandle;
+  return reinterpret_cast<CrtLocaleHandleRef*>(locale)->lcHandle;
 }
 
 /**
@@ -4345,13 +4345,13 @@ extern "C" const wctype_t* __cdecl __pwctype_func()
  */
 extern "C" const std::uint16_t* __cdecl __pctype_func()
 {
-  RuntimeTidDataLocaleView* const threadData = __getptd();
-  RuntimeLocaleCodePageView* locale = threadData->ptlocinfo;
+  CrtTidDataLocale* const threadData = __getptd();
+  CrtLocaleCodePage* locale = threadData->ptlocinfo;
   if (locale != __ptlocinfo && (__globallocalestatus & threadData->ownlocale) == 0) {
     locale = __updatetlocinfo();
   }
 
-  return reinterpret_cast<const RuntimeLocaleCTypeTableView*>(locale)->pctype;
+  return reinterpret_cast<const CrtLocaleCTypeTable*>(locale)->pctype;
 }
 
 namespace
@@ -4851,7 +4851,7 @@ extern "C" wint_t __cdecl _putwch(wchar_t wideCharacter)
  */
 extern "C" lconv* __cdecl EngineGetlconv()
 {
-  RuntimeTidDataLocaleView* const threadData = __getptd();
+  CrtTidDataLocale* const threadData = __getptd();
   if (threadData->ptlocinfo != __ptlocinfo && (__globallocalestatus & threadData->ownlocale) == 0) {
     (void)__updatetlocinfo();
   }
@@ -5354,8 +5354,8 @@ extern "C" int __cdecl _wprintf_p_l(const wchar_t* const format, _locale_t const
 extern "C" int __cdecl _set_osfhnd(const int fileDescriptor, const std::intptr_t osHandle)
 {
   if (fileDescriptor >= 0 && fileDescriptor < _nhandle) {
-    RuntimeIoInfo* const ioBlock = __pioinfo[fileDescriptor >> 5];
-    RuntimeIoInfo* const ioInfo = ioBlock + (fileDescriptor & 0x1F);
+    CrtIoInfo* const ioBlock = __pioinfo[fileDescriptor >> 5];
+    CrtIoInfo* const ioInfo = ioBlock + (fileDescriptor & 0x1F);
     if (ioInfo->osfhnd == static_cast<std::intptr_t>(-1)) {
       constexpr int kConsoleAppType = 1;
       const HANDLE handle = reinterpret_cast<HANDLE>(osHandle);
@@ -5430,7 +5430,7 @@ extern "C" DWORD __cdecl _freeptd(void* threadData)
  * Resets one thread multibyte-info lane to SBCS defaults and copies canonical
  * `mbctype`/`mbcasemap` tables from CRT `__initialmbcinfo`.
  */
-extern "C" void __cdecl setSBCS(RuntimeThreadMbcInfoCaseView* const threadMbcInfo)
+extern "C" void __cdecl setSBCS(CrtThreadMbcInfoCase* const threadMbcInfo)
 {
   std::memset(threadMbcInfo->mbctype, 0, sizeof(threadMbcInfo->mbctype));
   threadMbcInfo->mbcodepage = 0;
@@ -5438,7 +5438,7 @@ extern "C" void __cdecl setSBCS(RuntimeThreadMbcInfoCaseView* const threadMbcInf
   threadMbcInfo->mblcid = 0;
   std::memset(threadMbcInfo->mbulinfo, 0, sizeof(threadMbcInfo->mbulinfo));
 
-  const auto* const initialInfo = reinterpret_cast<const RuntimeThreadMbcInfoCaseView*>(&__initialmbcinfo);
+  const auto* const initialInfo = reinterpret_cast<const CrtThreadMbcInfoCase*>(&__initialmbcinfo);
   std::memcpy(threadMbcInfo->mbctype, initialInfo->mbctype, sizeof(threadMbcInfo->mbctype));
   std::memcpy(threadMbcInfo->mbcasemap, initialInfo->mbcasemap, sizeof(threadMbcInfo->mbcasemap));
 }
@@ -5450,7 +5450,7 @@ extern "C" void __cdecl setSBCS(RuntimeThreadMbcInfoCaseView* const threadMbcInf
  * Builds single-byte uppercase/lowercase case-map lanes for one CRT multibyte
  * codepage descriptor, with ASCII fallback when codepage metadata is absent.
  */
-extern "C" void __cdecl setSBUpLow(RuntimeThreadMbcInfoCaseView* const threadMbcInfo)
+extern "C" void __cdecl setSBUpLow(CrtThreadMbcInfoCase* const threadMbcInfo)
 {
   if (threadMbcInfo == nullptr) {
     return;
@@ -5771,30 +5771,30 @@ namespace
   std::int32_t gRuntimeRandomSImportAddress = 0;
   RuntimeInitCritSecAndSpinCountFn gRuntimeInitCritSecAndSpinCount = nullptr;
   void* gRuntimeCfltCvtTable[10]{};
-  struct RuntimeTypeInfoFrameListNode
+  struct CrtTypeInfoFrameListNode
   {
     void* frameState = nullptr;                  // +0x00
-    RuntimeTypeInfoFrameListNode* next = nullptr; // +0x04
+    CrtTypeInfoFrameListNode* next = nullptr; // +0x04
   };
-  static_assert(sizeof(RuntimeTypeInfoFrameListNode) == 0x8, "RuntimeTypeInfoFrameListNode size must be 0x8");
+  static_assert(sizeof(CrtTypeInfoFrameListNode) == 0x8, "CrtTypeInfoFrameListNode size must be 0x8");
   static_assert(
-    offsetof(RuntimeTypeInfoFrameListNode, frameState) == 0x0,
-    "RuntimeTypeInfoFrameListNode::frameState offset must be 0x0"
+    offsetof(CrtTypeInfoFrameListNode, frameState) == 0x0,
+    "CrtTypeInfoFrameListNode::frameState offset must be 0x0"
   );
   static_assert(
-    offsetof(RuntimeTypeInfoFrameListNode, next) == 0x4,
-    "RuntimeTypeInfoFrameListNode::next offset must be 0x4"
+    offsetof(CrtTypeInfoFrameListNode, next) == 0x4,
+    "CrtTypeInfoFrameListNode::next offset must be 0x4"
   );
-  RuntimeTypeInfoFrameListNode gRuntimeTypeInfoFrameRoot{};
+  CrtTypeInfoFrameListNode gRuntimeTypeInfoFrameRoot{};
   volatile long gRuntimeStdLockInit = -1;
   CRITICAL_SECTION gRuntimeStdLockSlots[4]{};
   void* gRuntimeIosStdStreams[9]{};
   std::int8_t gRuntimeIosStdOpenCounts[9]{};
-  struct RuntimeCodePageLocaleHashEntry;
-  struct RuntimeLocaleLocimpView;
-  RuntimeCodePageLocaleHashEntry* gRuntimeCodePageLocaleHash[kRuntimeCodePageLocaleHashBucketCount]{};
-  RuntimeLocaleLocimpView* gRuntimeGlobalLocale = nullptr;
-  RuntimeLocaleLocimpView* gRuntimeClassicLocale = nullptr;
+  struct CrtCodePageLocaleHashEntry;
+  struct CrtLocaleLocimp;
+  CrtCodePageLocaleHashEntry* gRuntimeCodePageLocaleHash[kRuntimeCodePageLocaleHashBucketCount]{};
+  CrtLocaleLocimp* gRuntimeGlobalLocale = nullptr;
+  CrtLocaleLocimp* gRuntimeClassicLocale = nullptr;
   std::uint8_t gRuntimeGlobalLocaleAtexitRegistered = 0;
   std::int32_t gRuntimeLocaleIdCounter = 0;
   std::int32_t gRuntimeLocaleIdCtypeChar = 0;
@@ -5806,39 +5806,39 @@ namespace
   std::int32_t gRuntimeStaticStorageSlotB = 0;
   std::uintptr_t gRuntimeStaticStorageSlotC = 0;
   std::uintptr_t gRuntimeStaticStorageSlotD = 0;
-  struct RuntimeStdLocaleObject
+  struct CrtStdLocaleObject
   {
-    RuntimeLocaleLocimpView* ptr = nullptr;
+    CrtLocaleLocimp* ptr = nullptr;
   };
-  static_assert(sizeof(RuntimeStdLocaleObject) == 0x4, "RuntimeStdLocaleObject size must be 0x4");
-  RuntimeStdLocaleObject gRuntimeClassicLocaleObject{};
-  struct RuntimeFacetNode
+  static_assert(sizeof(CrtStdLocaleObject) == 0x4, "CrtStdLocaleObject size must be 0x4");
+  CrtStdLocaleObject gRuntimeClassicLocaleObject{};
+  struct CrtFacetNode
   {
-    RuntimeFacetNode* next = nullptr;
+    CrtFacetNode* next = nullptr;
     std::locale::facet* facet = nullptr;
   };
-  static_assert(sizeof(RuntimeFacetNode) == 0x8, "RuntimeFacetNode size must be 0x8");
-  RuntimeFacetNode* gRuntimeFacetHead = nullptr;
+  static_assert(sizeof(CrtFacetNode) == 0x8, "CrtFacetNode size must be 0x8");
+  CrtFacetNode* gRuntimeFacetHead = nullptr;
 
-  struct RuntimeLockitState
+  struct CrtLockitState
   {
     std::int32_t slot = 0;
   };
-  static_assert(sizeof(RuntimeLockitState) == 0x4, "RuntimeLockitState size must be 0x4");
+  static_assert(sizeof(CrtLockitState) == 0x4, "CrtLockitState size must be 0x4");
 
-  struct RuntimeMutexHandle
+  struct CrtMutexHandle
   {
     CRITICAL_SECTION* criticalSection = nullptr;
   };
-  static_assert(sizeof(RuntimeMutexHandle) == 0x4, "RuntimeMutexHandle size must be 0x4");
+  static_assert(sizeof(CrtMutexHandle) == 0x4, "CrtMutexHandle size must be 0x4");
 
-  struct RuntimeCodePageLocaleHashEntry
+  struct CrtCodePageLocaleHashEntry
   {
-    RuntimeCodePageLocaleHashEntry* next = nullptr; // +0x00
+    CrtCodePageLocaleHashEntry* next = nullptr; // +0x00
     std::uint32_t codePage = 0;                     // +0x04
-    RuntimeLocaleHandle* locale = nullptr;          // +0x08
+    CrtLocaleHandle* locale = nullptr;          // +0x08
   };
-  static_assert(sizeof(RuntimeCodePageLocaleHashEntry) == 0xC, "RuntimeCodePageLocaleHashEntry size must be 0xC");
+  static_assert(sizeof(CrtCodePageLocaleHashEntry) == 0xC, "CrtCodePageLocaleHashEntry size must be 0xC");
 
   [[nodiscard]] int EngineGetFileFlags(std::FILE* const stream) noexcept
   {
@@ -6013,12 +6013,12 @@ namespace
    * count at +0x04 (0x00479C50 reads [edi+4]); slot 0 of the vftable is the
    * scalar deleting destructor.
    */
-  struct RuntimeLocaleFacetView
+  struct CrtLocaleFacetRef
   {
     void** vftable;
     std::size_t refs;
   };
-  static_assert(offsetof(RuntimeLocaleFacetView, refs) == 0x04, "facet::_Refs offset must be 0x04");
+  static_assert(offsetof(CrtLocaleFacetRef, refs) == 0x04, "facet::_Refs offset must be 0x04");
 
   /**
    * Address: 0x00479C40 (std::locale::facet::_Decref)
@@ -6031,7 +6031,7 @@ namespace
    * allocated facets: 0x00479C57 skips the decrement for it, so such a facet
    * never reports itself as collectable.
    */
-  RuntimeLocaleFacetView* EngineFacetDecref(RuntimeLocaleFacetView* const facet) noexcept
+  CrtLocaleFacetRef* EngineFacetDecref(CrtLocaleFacetRef* const facet) noexcept
   {
     const LockitGuard guard(0);
 
@@ -6050,15 +6050,15 @@ namespace
    * destructor (vftable slot 0, flag 1) only if the reference drop made this
    * the last owner.
    */
-  void EngineReleaseFacetNode(RuntimeFacetNode* const node) noexcept
+  void EngineReleaseFacetNode(CrtFacetNode* const node) noexcept
   {
-    RuntimeLocaleFacetView* const owned =
-      EngineFacetDecref(reinterpret_cast<RuntimeLocaleFacetView*>(node->facet));
+    CrtLocaleFacetRef* const owned =
+      EngineFacetDecref(reinterpret_cast<CrtLocaleFacetRef*>(node->facet));
     if (owned == nullptr) {
       return;
     }
 
-    using RuntimeFacetDeletingDtorFn = void*(__thiscall*)(RuntimeLocaleFacetView*, int);
+    using RuntimeFacetDeletingDtorFn = void*(__thiscall*)(CrtLocaleFacetRef*, int);
     auto* const deletingDtor = reinterpret_cast<RuntimeFacetDeletingDtorFn>(owned->vftable[0]);
     (void)deletingDtor(owned, 1);
   }
@@ -6075,7 +6075,7 @@ namespace
     const LockitGuard guard(0);
 
     while (gRuntimeFacetHead != nullptr) {
-      RuntimeFacetNode* const node = gRuntimeFacetHead;
+      CrtFacetNode* const node = gRuntimeFacetHead;
       gRuntimeFacetHead = node->next;
       EngineReleaseFacetNode(node);
       ::operator delete(static_cast<void*>(node));
@@ -6099,7 +6099,7 @@ namespace
       EngineAtexit(&EngineFacetTidy);
     }
 
-    auto* const node = static_cast<RuntimeFacetNode*>(::operator new(sizeof(RuntimeFacetNode), std::nothrow));
+    auto* const node = static_cast<CrtFacetNode*>(::operator new(sizeof(CrtFacetNode), std::nothrow));
     if (node != nullptr) {
       node->next = gRuntimeFacetHead;
       node->facet = facet;
@@ -6142,14 +6142,14 @@ namespace
     return &gRuntimeStdLockSlots[slot & 3];
   }
 
-  struct RuntimeFileLockView
+  struct CrtFileLock
   {
     std::uint8_t reserved00[0x20];
     CRITICAL_SECTION lock;
   };
-  static_assert(offsetof(RuntimeFileLockView, lock) == 0x20, "RuntimeFileLockView::lock offset must be 0x20");
+  static_assert(offsetof(CrtFileLock, lock) == 0x20, "CrtFileLock::lock offset must be 0x20");
 
-  struct RuntimeLocaleLocimpView
+  struct CrtLocaleLocimp
   {
     void* vtable = nullptr;         // +0x00
     std::int32_t refs = 0;          // +0x04
@@ -6161,54 +6161,54 @@ namespace
     std::string name;               // +0x18
   };
 
-  struct RuntimeLocaleCategoryView
+  struct CrtLocaleCategory
   {
     const char* localeName = nullptr; // +0x00
     void* localeWideName = nullptr;   // +0x04
     int* localeRefcount = nullptr;    // +0x08
     int* wideRefcount = nullptr;      // +0x0C
   };
-  static_assert(sizeof(RuntimeLocaleCategoryView) == 0x10, "RuntimeLocaleCategoryView size must be 0x10");
+  static_assert(sizeof(CrtLocaleCategory) == 0x10, "CrtLocaleCategory size must be 0x10");
 
-  struct RuntimeLocaleIdEntryView
+  struct CrtLocaleIdEntry
   {
     std::uint16_t codePage = 0; // +0x00
     std::uint16_t wLanguage = 0; // +0x02
     std::uint16_t wCountry = 0; // +0x04
   };
-  static_assert(sizeof(RuntimeLocaleIdEntryView) == 0x06, "RuntimeLocaleIdEntryView size must be 0x06");
+  static_assert(sizeof(CrtLocaleIdEntry) == 0x06, "CrtLocaleIdEntry size must be 0x06");
 
-  struct RuntimeThreadLocInfoTimeInitView
+  struct CrtThreadLocInfoTimeInit
   {
     std::uint8_t reserved00[0x40]{};
-    RuntimeLocaleIdEntryView timeCategory; // +0x40
+    CrtLocaleIdEntry timeCategory; // +0x40
   };
   static_assert(
-    offsetof(RuntimeThreadLocInfoTimeInitView, timeCategory) == 0x40,
-    "RuntimeThreadLocInfoTimeInitView::timeCategory offset must be 0x40"
+    offsetof(CrtThreadLocInfoTimeInit, timeCategory) == 0x40,
+    "CrtThreadLocInfoTimeInit::timeCategory offset must be 0x40"
   );
 
-  struct RuntimeCtypeVec
+  struct CrtCtypeVec
   {
     LCID handle = 0;                        // +0x00
     std::int32_t codePage = 0;              // +0x04
     const std::uint16_t* table = nullptr;   // +0x08
     std::int32_t ownsCopiedTable = 0;       // +0x0C
   };
-  static_assert(offsetof(RuntimeCtypeVec, handle) == 0x0, "RuntimeCtypeVec::handle offset must be 0x0");
-  static_assert(offsetof(RuntimeCtypeVec, codePage) == 0x4, "RuntimeCtypeVec::codePage offset must be 0x4");
-  static_assert(offsetof(RuntimeCtypeVec, table) == 0x8, "RuntimeCtypeVec::table offset must be 0x8");
-  static_assert(offsetof(RuntimeCtypeVec, ownsCopiedTable) == 0xC, "RuntimeCtypeVec::ownsCopiedTable offset must be 0xC");
-  static_assert(sizeof(RuntimeCtypeVec) == 0x10, "RuntimeCtypeVec size must be 0x10");
+  static_assert(offsetof(CrtCtypeVec, handle) == 0x0, "CrtCtypeVec::handle offset must be 0x0");
+  static_assert(offsetof(CrtCtypeVec, codePage) == 0x4, "CrtCtypeVec::codePage offset must be 0x4");
+  static_assert(offsetof(CrtCtypeVec, table) == 0x8, "CrtCtypeVec::table offset must be 0x8");
+  static_assert(offsetof(CrtCtypeVec, ownsCopiedTable) == 0xC, "CrtCtypeVec::ownsCopiedTable offset must be 0xC");
+  static_assert(sizeof(CrtCtypeVec) == 0x10, "CrtCtypeVec size must be 0x10");
 
-  struct RuntimeCvtVec
+  struct CrtCvtVec
   {
     LCID handle = 0;           // +0x00
     std::int32_t codePage = 0; // +0x04
   };
-  static_assert(sizeof(RuntimeCvtVec) == 0x8, "RuntimeCvtVec size must be 0x8");
+  static_assert(sizeof(CrtCvtVec) == 0x8, "CrtCvtVec size must be 0x8");
 
-  struct RuntimeThreadLocInfoView
+  struct CrtThreadLocInfoData
   {
     volatile long refcount = 0;              // +0x00
     std::int32_t lcCodepage = 0;             // +0x04
@@ -6217,7 +6217,7 @@ namespace
     std::uint8_t reserved24[0x08]{};          // +0x24
     LCID lcId[6]{};                           // +0x2C
     std::uint8_t reserved44[0x0C]{};          // +0x44
-    RuntimeLocaleCategoryView categories[6];  // +0x50
+    CrtLocaleCategory categories[6];  // +0x50
     int* lconvIntlRefcount = nullptr;         // +0xB0
     int* lconvNumRefcount = nullptr;          // +0xB4
     int* lconvMonRefcount = nullptr;          // +0xB8
@@ -6227,29 +6227,29 @@ namespace
     std::uint8_t reservedC8[0x04]{};          // +0xC8
     unsigned char* pclmap = nullptr;          // +0xCC
     unsigned char* pcumap = nullptr;          // +0xD0
-    RuntimeLcTimeData* lcTimeCurrent = nullptr; // +0xD4
+    CrtLcTimeData* lcTimeCurrent = nullptr; // +0xD4
   };
-  static_assert(offsetof(RuntimeThreadLocInfoView, lcCodepage) == 0x04, "RuntimeThreadLocInfoView::lcCodepage offset must be 0x04");
-  static_assert(offsetof(RuntimeThreadLocInfoView, lcHandle) == 0x0C, "RuntimeThreadLocInfoView::lcHandle offset must be 0x0C");
-  static_assert(offsetof(RuntimeThreadLocInfoView, lcId) == 0x2C, "RuntimeThreadLocInfoView::lcId offset must be 0x2C");
-  static_assert((offsetof(RuntimeThreadLocInfoView, lcHandle) + sizeof(LCID) * 3u) == 0x18, "RuntimeThreadLocInfoView::lcHandle[3] offset must be 0x18");
-  static_assert((offsetof(RuntimeThreadLocInfoView, lcHandle) + sizeof(LCID) * 4u) == 0x1C, "RuntimeThreadLocInfoView::lcHandle[4] offset must be 0x1C");
-  static_assert((offsetof(RuntimeThreadLocInfoView, lcId) + sizeof(LCID) * 3u) == 0x38, "RuntimeThreadLocInfoView::lcId[3] offset must be 0x38");
-  static_assert(offsetof(RuntimeThreadLocInfoView, categories) == 0x50, "RuntimeThreadLocInfoView::categories offset must be 0x50");
-  static_assert(offsetof(RuntimeThreadLocInfoView, lconvIntlRefcount) == 0xB0, "RuntimeThreadLocInfoView::lconvIntlRefcount offset must be 0xB0");
-  static_assert(offsetof(RuntimeThreadLocInfoView, lconvNumRefcount) == 0xB4, "RuntimeThreadLocInfoView::lconvNumRefcount offset must be 0xB4");
-  static_assert(offsetof(RuntimeThreadLocInfoView, lconvMonRefcount) == 0xB8, "RuntimeThreadLocInfoView::lconvMonRefcount offset must be 0xB8");
-  static_assert(offsetof(RuntimeThreadLocInfoView, localeConv) == 0xBC, "RuntimeThreadLocInfoView::localeConv offset must be 0xBC");
-  static_assert(offsetof(RuntimeThreadLocInfoView, ctype1Refcount) == 0xC0, "RuntimeThreadLocInfoView::ctype1Refcount offset must be 0xC0");
-  static_assert(offsetof(RuntimeThreadLocInfoView, ctype1) == 0xC4, "RuntimeThreadLocInfoView::ctype1 offset must be 0xC4");
-  static_assert(offsetof(RuntimeThreadLocInfoView, pclmap) == 0xCC, "RuntimeThreadLocInfoView::pclmap offset must be 0xCC");
-  static_assert(offsetof(RuntimeThreadLocInfoView, pcumap) == 0xD0, "RuntimeThreadLocInfoView::pcumap offset must be 0xD0");
-  static_assert(offsetof(RuntimeThreadLocInfoView, lcTimeCurrent) == 0xD4, "RuntimeThreadLocInfoView::lcTimeCurrent offset must be 0xD4");
-  static_assert(sizeof(RuntimeThreadLocInfoView) == 0xD8, "RuntimeThreadLocInfoView size must be 0xD8");
+  static_assert(offsetof(CrtThreadLocInfoData, lcCodepage) == 0x04, "CrtThreadLocInfoData::lcCodepage offset must be 0x04");
+  static_assert(offsetof(CrtThreadLocInfoData, lcHandle) == 0x0C, "CrtThreadLocInfoData::lcHandle offset must be 0x0C");
+  static_assert(offsetof(CrtThreadLocInfoData, lcId) == 0x2C, "CrtThreadLocInfoData::lcId offset must be 0x2C");
+  static_assert((offsetof(CrtThreadLocInfoData, lcHandle) + sizeof(LCID) * 3u) == 0x18, "CrtThreadLocInfoData::lcHandle[3] offset must be 0x18");
+  static_assert((offsetof(CrtThreadLocInfoData, lcHandle) + sizeof(LCID) * 4u) == 0x1C, "CrtThreadLocInfoData::lcHandle[4] offset must be 0x1C");
+  static_assert((offsetof(CrtThreadLocInfoData, lcId) + sizeof(LCID) * 3u) == 0x38, "CrtThreadLocInfoData::lcId[3] offset must be 0x38");
+  static_assert(offsetof(CrtThreadLocInfoData, categories) == 0x50, "CrtThreadLocInfoData::categories offset must be 0x50");
+  static_assert(offsetof(CrtThreadLocInfoData, lconvIntlRefcount) == 0xB0, "CrtThreadLocInfoData::lconvIntlRefcount offset must be 0xB0");
+  static_assert(offsetof(CrtThreadLocInfoData, lconvNumRefcount) == 0xB4, "CrtThreadLocInfoData::lconvNumRefcount offset must be 0xB4");
+  static_assert(offsetof(CrtThreadLocInfoData, lconvMonRefcount) == 0xB8, "CrtThreadLocInfoData::lconvMonRefcount offset must be 0xB8");
+  static_assert(offsetof(CrtThreadLocInfoData, localeConv) == 0xBC, "CrtThreadLocInfoData::localeConv offset must be 0xBC");
+  static_assert(offsetof(CrtThreadLocInfoData, ctype1Refcount) == 0xC0, "CrtThreadLocInfoData::ctype1Refcount offset must be 0xC0");
+  static_assert(offsetof(CrtThreadLocInfoData, ctype1) == 0xC4, "CrtThreadLocInfoData::ctype1 offset must be 0xC4");
+  static_assert(offsetof(CrtThreadLocInfoData, pclmap) == 0xCC, "CrtThreadLocInfoData::pclmap offset must be 0xCC");
+  static_assert(offsetof(CrtThreadLocInfoData, pcumap) == 0xD0, "CrtThreadLocInfoData::pcumap offset must be 0xD0");
+  static_assert(offsetof(CrtThreadLocInfoData, lcTimeCurrent) == 0xD4, "CrtThreadLocInfoData::lcTimeCurrent offset must be 0xD4");
+  static_assert(sizeof(CrtThreadLocInfoData) == 0xD8, "CrtThreadLocInfoData size must be 0xD8");
 
-  [[nodiscard]] RuntimeThreadLocInfoView* EngineResolveLocaleLocInfo(
+  [[nodiscard]] CrtThreadLocInfoData* EngineResolveLocaleLocInfo(
     _locale_t const localeInfo,
-    RuntimeTidDataLocaleView** const outThreadData,
+    CrtTidDataLocale** const outThreadData,
     bool* const outUpdated
   )
   {
@@ -6261,12 +6261,12 @@ namespace
     }
 
     if (localeInfo != nullptr) {
-      const auto* const localeHandle = reinterpret_cast<const RuntimeLocaleHandle*>(localeInfo);
-      return reinterpret_cast<RuntimeThreadLocInfoView*>(localeHandle->locinfo);
+      const auto* const localeHandle = reinterpret_cast<const CrtLocaleHandle*>(localeInfo);
+      return reinterpret_cast<CrtThreadLocInfoData*>(localeHandle->locinfo);
     }
 
-    RuntimeTidDataLocaleView* const threadData = __getptd();
-    RuntimeLocaleCodePageView* localeView = threadData->ptlocinfo;
+    CrtTidDataLocale* const threadData = __getptd();
+    CrtLocaleCodePage* localeView = threadData->ptlocinfo;
     bool updated = false;
     if (localeView != __ptlocinfo && (__globallocalestatus & threadData->ownlocale) == 0) {
       localeView = __updatetlocinfo();
@@ -6280,10 +6280,10 @@ namespace
       *outUpdated = updated;
     }
 
-    return reinterpret_cast<RuntimeThreadLocInfoView*>(localeView);
+    return reinterpret_cast<CrtThreadLocInfoData*>(localeView);
   }
 
-  void EngineReleaseLocaleUpdate(RuntimeTidDataLocaleView* const threadData, const bool updated)
+  void EngineReleaseLocaleUpdate(CrtTidDataLocale* const threadData, const bool updated)
   {
     if (updated && threadData != nullptr) {
       threadData->ownlocale &= ~2;
@@ -6331,9 +6331,9 @@ namespace
       return static_cast<std::size_t>(-1);
     }
 
-    RuntimeTidDataLocaleView* threadData = nullptr;
+    CrtTidDataLocale* threadData = nullptr;
     bool updated = false;
-    RuntimeThreadLocInfoView* const localeView =
+    CrtThreadLocInfoData* const localeView =
       EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
     const bool hasCodepageHandle = localeView->lcHandle[2] != 0;
@@ -6467,16 +6467,16 @@ namespace
     return EngineMbstowcsLocaleCore(destination, source, maxCount, localeInfo);
   }
 
-  [[nodiscard]] RuntimeIoInfo* ResolveIoInfoFromStream(std::FILE* const stream) noexcept
+  [[nodiscard]] CrtIoInfo* ResolveIoInfoFromStream(std::FILE* const stream) noexcept
   {
     const int fileDescriptor = ::_fileno(stream);
     if (fileDescriptor == -1 || fileDescriptor == -2) {
       return &__badioinfo;
     }
 
-    RuntimeIoInfo* const block = __pioinfo[fileDescriptor >> 5];
-    return reinterpret_cast<RuntimeIoInfo*>(
-      reinterpret_cast<std::uint8_t*>(block) + ((fileDescriptor & 0x1F) * sizeof(RuntimeIoInfo))
+    CrtIoInfo* const block = __pioinfo[fileDescriptor >> 5];
+    return reinterpret_cast<CrtIoInfo*>(
+      reinterpret_cast<std::uint8_t*>(block) + ((fileDescriptor & 0x1F) * sizeof(CrtIoInfo))
     );
   }
 
@@ -6578,7 +6578,7 @@ extern "C" int __cdecl EngineDispatchLockedFormattedOutput(
 
   int result = 0;
   if ((EngineGetFileFlags(stream) & 0x40) == 0) {
-    const RuntimeIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
+    const CrtIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
     if ((ioInfo->textmodeUnicode & 0x7F) != 0 || ioInfo->textmodeUnicode < 0) {
       *_errno() = EINVAL;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
@@ -6856,7 +6856,7 @@ extern "C" int __cdecl fprintf(std::FILE* const stream, const char* const format
 
   int result = 0;
   if ((EngineGetFileFlags(stream) & 0x40) == 0) {
-    const RuntimeIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
+    const CrtIoInfo* const ioInfo = ResolveIoInfoFromStream(stream);
     if ((ioInfo->textmodeUnicode & 0x7F) != 0 || ioInfo->textmodeUnicode < 0) {
       *_errno() = EINVAL;
       _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
@@ -6912,28 +6912,28 @@ namespace
   DWORD gThreadMonTlsKey = TLS_OUT_OF_INDEXES;
   std::int32_t gAttachedThreadCount = 0;
 
-  struct RuntimeNonLocalGotoContext
+  struct CrtNonLocalGotoContext
   {
     std::uint32_t reserved00;
     std::uint32_t eaxValue;
     std::uint32_t notifyCode;
     std::uint32_t ebpValue;
   };
-  static_assert(sizeof(RuntimeNonLocalGotoContext) == 0x10, "RuntimeNonLocalGotoContext size must be 0x10");
+  static_assert(sizeof(CrtNonLocalGotoContext) == 0x10, "CrtNonLocalGotoContext size must be 0x10");
   static_assert(
-    offsetof(RuntimeNonLocalGotoContext, eaxValue) == 0x04,
-    "RuntimeNonLocalGotoContext::eaxValue offset must be 0x04"
+    offsetof(CrtNonLocalGotoContext, eaxValue) == 0x04,
+    "CrtNonLocalGotoContext::eaxValue offset must be 0x04"
   );
   static_assert(
-    offsetof(RuntimeNonLocalGotoContext, notifyCode) == 0x08,
-    "RuntimeNonLocalGotoContext::notifyCode offset must be 0x08"
+    offsetof(CrtNonLocalGotoContext, notifyCode) == 0x08,
+    "CrtNonLocalGotoContext::notifyCode offset must be 0x08"
   );
   static_assert(
-    offsetof(RuntimeNonLocalGotoContext, ebpValue) == 0x0C,
-    "RuntimeNonLocalGotoContext::ebpValue offset must be 0x0C"
+    offsetof(CrtNonLocalGotoContext, ebpValue) == 0x0C,
+    "CrtNonLocalGotoContext::ebpValue offset must be 0x0C"
   );
 
-  RuntimeNonLocalGotoContext gRuntimeNonLocalGotoContext{};
+  CrtNonLocalGotoContext gCrtNonLocalGotoContext{};
 
   /**
    * Address: 0x00AA3B2C (FUN_00AA3B2C)
@@ -6955,9 +6955,9 @@ namespace
     const std::uint32_t notifyCode
   ) noexcept
   {
-    gRuntimeNonLocalGotoContext.notifyCode = notifyCode;
-    gRuntimeNonLocalGotoContext.eaxValue = eaxValue;
-    gRuntimeNonLocalGotoContext.ebpValue = ebpValue;
+    gCrtNonLocalGotoContext.notifyCode = notifyCode;
+    gCrtNonLocalGotoContext.eaxValue = eaxValue;
+    gCrtNonLocalGotoContext.ebpValue = ebpValue;
     return eaxValue;
   }
 
@@ -7372,17 +7372,17 @@ extern "C" void __cdecl __FF_MSGBANNER()
 extern "C" void __cdecl __lock_file2(const int streamIndex, std::FILE* const stream)
 {
   if (streamIndex >= 20) {
-    struct RuntimeFileLockOwnerView
+    struct CrtFileLockOwner
     {
       std::uint8_t reserved00[0x20];
       CRITICAL_SECTION lock;
     };
     static_assert(
-      offsetof(RuntimeFileLockOwnerView, lock) == 0x20,
-      "RuntimeFileLockOwnerView::lock offset must be 0x20"
+      offsetof(CrtFileLockOwner, lock) == 0x20,
+      "CrtFileLockOwner::lock offset must be 0x20"
     );
 
-    auto* const lockOwner = reinterpret_cast<RuntimeFileLockOwnerView*>(stream);
+    auto* const lockOwner = reinterpret_cast<CrtFileLockOwner*>(stream);
     ::EnterCriticalSection(&lockOwner->lock);
     return;
   }
@@ -7412,17 +7412,17 @@ extern "C" void __cdecl _lock_file(std::FILE* const stream)
   constexpr std::ptrdiff_t kIobLastEntry = 19;
 
   if (stream < table || stream > (table + kIobLastEntry)) {
-    struct RuntimeFileLockOwnerView
+    struct CrtFileLockOwner
     {
       std::uint8_t reserved00[0x20];
       CRITICAL_SECTION lock;
     };
     static_assert(
-      offsetof(RuntimeFileLockOwnerView, lock) == 0x20,
-      "RuntimeFileLockOwnerView::lock offset must be 0x20"
+      offsetof(CrtFileLockOwner, lock) == 0x20,
+      "CrtFileLockOwner::lock offset must be 0x20"
     );
 
-    auto* const lockOwner = reinterpret_cast<RuntimeFileLockOwnerView*>(stream);
+    auto* const lockOwner = reinterpret_cast<CrtFileLockOwner*>(stream);
     ::EnterCriticalSection(&lockOwner->lock);
     return;
   }
@@ -7475,7 +7475,7 @@ extern "C" int __cdecl fflush(std::FILE* const stream)
  * what `ownsTable` records, so teardown knows whether the buffer is his to
  * free.
  */
-extern "C" RuntimeCtypeVec* __cdecl EngineGetCtypeVec(RuntimeCtypeVec* const out)
+extern "C" CrtCtypeVec* __cdecl EngineGetCtypeVec(CrtCtypeVec* const out)
 {
   out->handle = __lc_handle_func()[1];
   out->codePage = __lc_codepage_func();
@@ -7713,17 +7713,17 @@ extern "C" void __cdecl _unlock_file(std::FILE* const stream)
   constexpr std::ptrdiff_t kIobLastEntry = 19;
 
   if (stream < table || stream > (table + kIobLastEntry)) {
-    struct RuntimeFileLockOwnerView
+    struct CrtFileLockOwner
     {
       std::uint8_t reserved00[0x20];
       CRITICAL_SECTION lock;
     };
     static_assert(
-      offsetof(RuntimeFileLockOwnerView, lock) == 0x20,
-      "RuntimeFileLockOwnerView::lock offset must be 0x20"
+      offsetof(CrtFileLockOwner, lock) == 0x20,
+      "CrtFileLockOwner::lock offset must be 0x20"
     );
 
-    auto* const lockOwner = reinterpret_cast<RuntimeFileLockOwnerView*>(stream);
+    auto* const lockOwner = reinterpret_cast<CrtFileLockOwner*>(stream);
     ::LeaveCriticalSection(&lockOwner->lock);
     return;
   }
@@ -7761,17 +7761,17 @@ extern "C" LCID __cdecl EngineGetConversionLocale()
 extern "C" void __cdecl __unlock_file2(const int streamIndex, std::FILE* const stream)
 {
   if (streamIndex >= 20) {
-    struct RuntimeFileLockOwnerView
+    struct CrtFileLockOwner
     {
       std::uint8_t reserved00[0x20];
       CRITICAL_SECTION lock;
     };
     static_assert(
-      offsetof(RuntimeFileLockOwnerView, lock) == 0x20,
-      "RuntimeFileLockOwnerView::lock offset must be 0x20"
+      offsetof(CrtFileLockOwner, lock) == 0x20,
+      "CrtFileLockOwner::lock offset must be 0x20"
     );
 
-    auto* const lockOwner = reinterpret_cast<RuntimeFileLockOwnerView*>(stream);
+    auto* const lockOwner = reinterpret_cast<CrtFileLockOwner*>(stream);
     ::LeaveCriticalSection(&lockOwner->lock);
     return;
   }
@@ -7787,9 +7787,9 @@ extern "C" void __cdecl __unlock_file2(const int streamIndex, std::FILE* const s
  * Releases one CRT thread-locale payload by checking lane-level refcounts and
  * freeing owned locale/category buffers that are no longer shared.
  */
-extern "C" void __cdecl __freetlocinfo(RuntimeThreadLocInfo* const locinfo)
+extern "C" void __cdecl __freetlocinfo(CrtThreadLocInfo* const locinfo)
 {
-  auto* const localeInfo = reinterpret_cast<RuntimeThreadLocInfoView*>(locinfo);
+  auto* const localeInfo = reinterpret_cast<CrtThreadLocInfoData*>(locinfo);
   if (localeInfo == nullptr) {
     return;
   }
@@ -7826,14 +7826,14 @@ extern "C" void __cdecl __freetlocinfo(RuntimeThreadLocInfo* const locinfo)
     _free_crt(ctypeRefcount);
   }
 
-  RuntimeLcTimeData* const lcTime = localeInfo->lcTimeCurrent;
+  CrtLcTimeData* const lcTime = localeInfo->lcTimeCurrent;
   if (lcTime != nullptr && lcTime != &__lc_time_c && lcTime->refcount == 0) {
     __free_lc_time(lcTime);
     _free_crt(lcTime);
   }
 
   for (int categoryIndex = 0; categoryIndex < 6; ++categoryIndex) {
-    RuntimeLocaleCategoryView& category = localeInfo->categories[categoryIndex];
+    CrtLocaleCategory& category = localeInfo->categories[categoryIndex];
     if (category.localeName != __clocalestr && category.localeRefcount != nullptr && *category.localeRefcount == 0) {
       _free_crt(category.localeRefcount);
     }
@@ -7854,15 +7854,15 @@ extern "C" void __cdecl __freetlocinfo(RuntimeThreadLocInfo* const locinfo)
  * through `__addlocaleref`.
  */
 extern "C" void __cdecl __copytlocinfo_nolock(
-  RuntimeThreadLocInfo* const destination,
-  const RuntimeThreadLocInfo* const source
+  CrtThreadLocInfo* const destination,
+  const CrtThreadLocInfo* const source
 )
 {
   if (source == nullptr || destination == nullptr || destination == source) {
     return;
   }
 
-  std::memcpy(destination, source, sizeof(RuntimeThreadLocInfoView));
+  std::memcpy(destination, source, sizeof(CrtThreadLocInfoData));
   destination->refcount = 0;
   __addlocaleref(destination);
 }
@@ -7875,7 +7875,7 @@ extern "C" void __cdecl __copytlocinfo_nolock(
  * (`LC_STR_TYPE`) or as a parsed numeric byte lane (`LC_INT_TYPE`).
  */
 extern "C" int __cdecl __getlocaleinfo(
-  RuntimeLocaleHandle* const localeHandle,
+  CrtLocaleHandle* const localeHandle,
   const int localeType,
   const LCID localeId,
   const int localeField,
@@ -7969,7 +7969,7 @@ extern "C" int __cdecl __getlocaleinfo(
  * Loads one locale-time data table from locale-info providers, including day
  * and month names, AM/PM strings, date/time formats, and calendar metadata.
  */
-extern "C" int __cdecl _get_lc_time(RuntimeThreadLocInfo* const locinfo, RuntimeLcTimeData* const lcTimeData)
+extern "C" int __cdecl _get_lc_time(CrtThreadLocInfo* const locinfo, CrtLcTimeData* const lcTimeData)
 {
   constexpr int kLocaleIntegerField = 0;
   constexpr int kLocaleStringField = 1;
@@ -7978,11 +7978,11 @@ extern "C" int __cdecl _get_lc_time(RuntimeThreadLocInfo* const locinfo, Runtime
     return -1;
   }
 
-  const auto* const timeLocInfo = reinterpret_cast<const RuntimeThreadLocInfoTimeInitView*>(locinfo);
+  const auto* const timeLocInfo = reinterpret_cast<const CrtThreadLocInfoTimeInit*>(locinfo);
   const LCID localeLanguage = static_cast<LCID>(timeLocInfo->timeCategory.wLanguage);
   const LCID localeCountry = static_cast<LCID>(timeLocInfo->timeCategory.wCountry);
 
-  RuntimeLocaleHandle localeHandle{};
+  CrtLocaleHandle localeHandle{};
   localeHandle.locinfo = locinfo;
   localeHandle.mbcinfo = nullptr;
 
@@ -8049,7 +8049,7 @@ extern "C" int __cdecl _get_lc_time(RuntimeThreadLocInfo* const locinfo, Runtime
  */
 extern "C" void __cdecl __free_lc_time(void* const lcTimeData)
 {
-  auto* const lcTime = static_cast<RuntimeLcTimeData*>(lcTimeData);
+  auto* const lcTime = static_cast<CrtLcTimeData*>(lcTimeData);
   if (lcTime == nullptr) {
     return;
   }
@@ -8096,7 +8096,7 @@ extern "C" void __cdecl __free_lc_time(void* const lcTimeData)
 extern "C" char* __cdecl __Getdays_l(_locale_t const localeInfo)
 {
   const LocaleUpdateScope locale(localeInfo);
-  const RuntimeLcTimeData* const lcTime = locale.timeView()->lcTimeCurrent;
+  const CrtLcTimeData* const lcTime = locale.timeView()->lcTimeCurrent;
 
   std::size_t totalLength = 0u;
   for (int dayIndex = 0; dayIndex < 7; ++dayIndex) {
@@ -8149,13 +8149,13 @@ extern "C" char* __cdecl _Getdays()
  * atomically swaps `lc_time_curr` with refcount-aware release of the previous
  * non-default lane.
  */
-extern "C" int __cdecl _init_time(RuntimeThreadLocInfo* const locinfo)
+extern "C" int __cdecl _init_time(CrtThreadLocInfo* const locinfo)
 {
-  auto* const localeInfo = reinterpret_cast<RuntimeThreadLocInfoView*>(locinfo);
+  auto* const localeInfo = reinterpret_cast<CrtThreadLocInfoData*>(locinfo);
 
-  RuntimeLcTimeData* lcTime = nullptr;
+  CrtLcTimeData* lcTime = nullptr;
   if (localeInfo->lcHandle[5] != 0) {
-    lcTime = static_cast<RuntimeLcTimeData*>(_calloc_crt(1u, 0xB8u));
+    lcTime = static_cast<CrtLcTimeData*>(_calloc_crt(1u, 0xB8u));
     if (lcTime == nullptr) {
       return 1;
     }
@@ -8171,7 +8171,7 @@ extern "C" int __cdecl _init_time(RuntimeThreadLocInfo* const locinfo)
     lcTime = &__lc_time_c;
   }
 
-  RuntimeLcTimeData* const current = localeInfo->lcTimeCurrent;
+  CrtLcTimeData* const current = localeInfo->lcTimeCurrent;
   if (current != &__lc_time_c) {
     (void)InterlockedDecrement(reinterpret_cast<volatile long*>(&current->refcount));
   }
@@ -8188,15 +8188,15 @@ extern "C" int __cdecl _init_time(RuntimeThreadLocInfo* const locinfo)
  * `grouping`) for one thread locale, normalizes grouping bytes, and swaps
  * refcount-owned locale-conversion storage.
  */
-extern "C" int __cdecl _init_numeric(RuntimeThreadLocInfo* const locinfo)
+extern "C" int __cdecl _init_numeric(CrtThreadLocInfo* const locinfo)
 {
   constexpr int kLocaleMonetaryCategory = 3;
   constexpr int kLocaleNumericCategory = 4;
   constexpr int kLocaleIntegerField = 0;
   constexpr int kLocaleStringField = 1;
 
-  auto* const localeInfo = reinterpret_cast<RuntimeThreadLocInfoView*>(locinfo);
-  RuntimeLocaleHandle localeHandle{};
+  auto* const localeInfo = reinterpret_cast<CrtThreadLocInfoData*>(locinfo);
+  CrtLocaleHandle localeHandle{};
   localeHandle.locinfo = locinfo;
   localeHandle.mbcinfo = nullptr;
 
@@ -8300,15 +8300,15 @@ extern "C" int __cdecl _init_numeric(RuntimeThreadLocInfo* const locinfo)
  * Rebuilds monetary `lconv` lanes for one thread locale from CRT locale-info
  * providers, normalizes grouping bytes, and swaps in updated refcount owners.
  */
-extern "C" int __cdecl __init_monetary(RuntimeThreadLocInfo* const locinfo)
+extern "C" int __cdecl __init_monetary(CrtThreadLocInfo* const locinfo)
 {
   constexpr int kLocaleMonetaryCategory = 3;
   constexpr int kLocaleNumericCategory = 4;
   constexpr int kLocaleIntegerField = 0;
   constexpr int kLocaleStringField = 1;
 
-  auto* const localeInfo = reinterpret_cast<RuntimeThreadLocInfoView*>(locinfo);
-  RuntimeLocaleHandle localeHandle{};
+  auto* const localeInfo = reinterpret_cast<CrtThreadLocInfoData*>(locinfo);
+  CrtLocaleHandle localeHandle{};
   localeHandle.locinfo = locinfo;
   localeHandle.mbcinfo = nullptr;
 
@@ -8668,7 +8668,7 @@ extern "C" int __cdecl __initstdio()
   }
 
   for (int streamIndex = 0; streamIndex < kLegacyIobCount; ++streamIndex) {
-    RuntimeIoInfo* const ioInfo = __pioinfo[streamIndex >> 5] + (streamIndex & 0x1F);
+    CrtIoInfo* const ioInfo = __pioinfo[streamIndex >> 5] + (streamIndex & 0x1F);
     const int osHandle = static_cast<int>(ioInfo->osfhnd);
     if (osHandle == -1 || osHandle == -2 || osHandle == 0) {
       legacy_file(ioBase[streamIndex])._file = -2;
@@ -8693,21 +8693,21 @@ namespace moho::runtime
    */
   extern "C" int __cdecl _mtinitlocks()
   {
-    struct RuntimeLockTableEntryView
+    struct CrtLockTableEntry
     {
       LPCRITICAL_SECTION lock;
       LPCRITICAL_SECTION kind;
     };
-    static_assert(sizeof(RuntimeLockTableEntryView) == 0x8, "RuntimeLockTableEntryView size must be 0x8");
+    static_assert(sizeof(CrtLockTableEntry) == 0x8, "CrtLockTableEntry size must be 0x8");
 
     const LPCRITICAL_SECTION preallocKind = reinterpret_cast<LPCRITICAL_SECTION>(1);
     constexpr DWORD kSpinCount = 0xFA0;
     constexpr std::size_t kLockEntryCount = 36u;
 
-    auto* const lockTable = reinterpret_cast<RuntimeLockTableEntryView*>(_locktable);
+    auto* const lockTable = reinterpret_cast<CrtLockTableEntry*>(_locktable);
     CRITICAL_SECTION* nextPreallocLock = lclcritsects;
     for (std::size_t index = 0; index < kLockEntryCount; ++index) {
-      RuntimeLockTableEntryView& entry = lockTable[index];
+      CrtLockTableEntry& entry = lockTable[index];
       if (entry.kind != preallocKind) {
         continue;
       }
@@ -8928,7 +8928,7 @@ namespace moho::runtime
     }
 
     *unlockFlag = 1;
-    RuntimeIoInfo* const slot = __pioinfo[newDescriptor >> 5] + (newDescriptor & 0x1F);
+    CrtIoInfo* const slot = __pioinfo[newDescriptor >> 5] + (newDescriptor & 0x1F);
 
     HANDLE hFile = ::CreateFileA(
       lpFileName, dwDesiredAccess, dwShareMode, &securityAttributes, dwCreationDisposition, dwFlagsAndAttributes, nullptr
@@ -9196,7 +9196,7 @@ namespace moho::runtime
 
     if (unlockNeeded != 0) {
       if (openStatus != 0) {
-        RuntimeIoInfo* const slot = __pioinfo[*outFileHandle >> 5] + (*outFileHandle & 0x1F);
+        CrtIoInfo* const slot = __pioinfo[*outFileHandle >> 5] + (*outFileHandle & 0x1F);
         slot->osfile &= static_cast<std::uint8_t>(~0x01u);
       }
       _unlock_fhandle(*outFileHandle);
@@ -9249,14 +9249,14 @@ namespace moho::runtime
     int newDescriptor = -1;
     bool lockFailed = false;
     for (int page = 0; page < 64; ++page) {
-      RuntimeIoInfo* const slot = __pioinfo[page];
+      CrtIoInfo* const slot = __pioinfo[page];
 
       if (slot == nullptr) {
-        auto* const newPage = static_cast<RuntimeIoInfo*>(_calloc_crt(32u, sizeof(RuntimeIoInfo)));
+        auto* const newPage = static_cast<CrtIoInfo*>(_calloc_crt(32u, sizeof(CrtIoInfo)));
         if (newPage != nullptr) {
           __pioinfo[page] = newPage;
           _nhandle += 32;
-          for (RuntimeIoInfo* init = newPage; init < newPage + 32; ++init) {
+          for (CrtIoInfo* init = newPage; init < newPage + 32; ++init) {
             init->osfile = 0;
             init->osfhnd = -1;
             init->pipech = 10;
@@ -9272,7 +9272,7 @@ namespace moho::runtime
         break;
       }
 
-      for (RuntimeIoInfo* candidate = slot; candidate < slot + 32; ++candidate) {
+      for (CrtIoInfo* candidate = slot; candidate < slot + 32; ++candidate) {
         if ((candidate->osfile & 1) != 0) {
           continue;
         }
@@ -9326,7 +9326,7 @@ namespace moho::runtime
       return -1;
     }
 
-    RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+    CrtIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
     if ((slot->osfile & 1) == 0 || slot->osfhnd == -1) {
       *_errno() = EBADF;
       *EngineDosErrno() = 0;
@@ -9357,7 +9357,7 @@ namespace moho::runtime
    */
   extern "C" BOOL __cdecl _lock_fhandle(const int fileDescriptor)
   {
-    RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+    CrtIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
 
     BOOL status = TRUE;
     if (slot->lockinitflag == 0) {
@@ -9403,7 +9403,7 @@ namespace moho::runtime
     }
 
     if (fileDescriptor >= 0 && fileDescriptor < _nhandle) {
-      RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+      CrtIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
       if ((slot->osfile & 1) != 0) {
         return reinterpret_cast<HANDLE>(slot->osfhnd);
       }
@@ -9521,7 +9521,7 @@ namespace moho::runtime
    */
   extern "C" int __cdecl _setmode_nolock(const int fileDescriptor, const int mode)
   {
-    RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+    CrtIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
     const bool wasTextMode = (slot->osfile & 0x80) != 0;
     const int previousUnicodeSubmode = static_cast<int>(static_cast<std::int8_t>(slot->textmodeUnicode << 1) >> 1);
 
@@ -9570,7 +9570,7 @@ namespace moho::runtime
         }
         *_errno() = EBADF;
       } else {
-        RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+        CrtIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
         if ((slot->osfile & 0x40) != 0 && firstByte == 0x1A) {
           return 0;
         }
@@ -9606,7 +9606,7 @@ namespace moho::runtime
       return -1;
     }
 
-    RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+    CrtIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
     const int submode = static_cast<int>(static_cast<std::int8_t>(slot->textmodeUnicode << 1) >> 1);
 
     if ((submode == 1 || submode == 2) && (count & 1u) != 0) {
@@ -9626,7 +9626,7 @@ namespace moho::runtime
       const HANDLE consoleHandle = reinterpret_cast<HANDLE>(slot->osfhnd);
       DWORD consoleMode = 0;
       if (::GetConsoleMode(consoleHandle, &consoleMode) != 0) {
-        RuntimeTidDataLocaleView* const threadData = __getptd();
+        CrtTidDataLocale* const threadData = __getptd();
         const bool usesDefaultLocale = (threadData->ptlocinfo->lcHandle[2] == 0);
 
         if (!usesDefaultLocale || submode != 0) {
@@ -9931,7 +9931,7 @@ namespace moho::runtime
       return static_cast<unsigned int>(-1);
     }
 
-    RuntimeIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+    CrtIoInfo* const slot = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
     if ((slot->osfile & 1) == 0) {
       *EngineDosErrno() = 0;
       *_errno() = EBADF;
@@ -9987,7 +9987,7 @@ namespace moho::runtime
 
       // Real body: `v9 = lseeki64_nolock(...); *(&_pioinfo[fd>>5][1].osfhnd + v5) = v9;`
       // -- stores the pre-read position into the *next* slot's osfhnd field
-      // (page base + one RuntimeIoInfo further + this slot's own byte
+      // (page base + one CrtIoInfo further + this slot's own byte
       // offset). Preserved verbatim; the intended field/purpose is not
       // independently confirmed (not exercised by any recovered caller --
       // UTF-8-mode reads never occur on a freshly _wsopen_nolock'd file).
@@ -10461,7 +10461,7 @@ namespace moho::runtime
     }
 
     *unlockFlag = 1;
-    RuntimeIoInfo* const slot = __pioinfo[newDescriptor >> 5] + (newDescriptor & 0x1F);
+    CrtIoInfo* const slot = __pioinfo[newDescriptor >> 5] + (newDescriptor & 0x1F);
 
     HANDLE hFile = ::CreateFileW(
       lpFileName, dwDesiredAccess, dwShareMode, &securityAttributes, dwCreationDisposition, dwFlagsAndAttributes, nullptr
@@ -10745,7 +10745,7 @@ namespace moho::runtime
 
     if (unlockNeeded != 0) {
       if (openStatus != 0) {
-        RuntimeIoInfo* const slot = __pioinfo[*outFileHandle >> 5] + (*outFileHandle & 0x1F);
+        CrtIoInfo* const slot = __pioinfo[*outFileHandle >> 5] + (*outFileHandle & 0x1F);
         slot->osfile &= static_cast<std::uint8_t>(~0x01u);
       }
       _unlock_fhandle(*outFileHandle);
@@ -10792,7 +10792,7 @@ namespace moho::runtime
 
     if (shouldUnlockHandle != 0) {
       if (openResult != 0) {
-        RuntimeIoInfo* const ioInfo = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
+        CrtIoInfo* const ioInfo = __pioinfo[fileDescriptor >> 5] + (fileDescriptor & 0x1F);
         ioInfo->osfile &= static_cast<std::uint8_t>(~0x01u);
       }
       _unlock_fhandle(fileDescriptor);
@@ -11208,16 +11208,16 @@ namespace moho::runtime
     }
   }
 
-  struct RuntimeFilebufCharDispatch
+  struct CrtFilebufCharDispatch
   {
     std::uintptr_t unknown00 = 0;                            // +0x00
     std::int32_t(__thiscall* overflow)(void* self, int ch) = nullptr; // +0x04
   };
-  static_assert(offsetof(RuntimeFilebufCharDispatch, overflow) == 0x04, "RuntimeFilebufCharDispatch::overflow offset must be 0x04");
+  static_assert(offsetof(CrtFilebufCharDispatch, overflow) == 0x04, "CrtFilebufCharDispatch::overflow offset must be 0x04");
 
-  struct RuntimeFilebufCharView
+  struct CrtFilebufChar
   {
-    RuntimeFilebufCharDispatch* dispatch = nullptr; // +0x00
+    CrtFilebufCharDispatch* dispatch = nullptr; // +0x00
     std::uint8_t reserved04_0F[0x0C]{};             // +0x04
     char** inputBase = nullptr;                     // +0x10
     char** outputBase = nullptr;                    // +0x14
@@ -11237,18 +11237,18 @@ namespace moho::runtime
     std::uint8_t reserved49_4B[0x03]{};             // +0x49
     std::FILE* myFile = nullptr;                    // +0x4C
   };
-  static_assert(offsetof(RuntimeFilebufCharView, inputBase) == 0x10, "RuntimeFilebufCharView::inputBase offset must be 0x10");
-  static_assert(offsetof(RuntimeFilebufCharView, outputBase) == 0x14, "RuntimeFilebufCharView::outputBase offset must be 0x14");
-  static_assert(offsetof(RuntimeFilebufCharView, inputPtr) == 0x20, "RuntimeFilebufCharView::inputPtr offset must be 0x20");
-  static_assert(offsetof(RuntimeFilebufCharView, outputPtr) == 0x24, "RuntimeFilebufCharView::outputPtr offset must be 0x24");
-  static_assert(offsetof(RuntimeFilebufCharView, inputCount) == 0x30, "RuntimeFilebufCharView::inputCount offset must be 0x30");
-  static_assert(offsetof(RuntimeFilebufCharView, outputCount) == 0x34, "RuntimeFilebufCharView::outputCount offset must be 0x34");
-  static_assert(offsetof(RuntimeFilebufCharView, codecvtFacet) == 0x3C, "RuntimeFilebufCharView::codecvtFacet offset must be 0x3C");
-  static_assert(offsetof(RuntimeFilebufCharView, wroteSome) == 0x41, "RuntimeFilebufCharView::wroteSome offset must be 0x41");
-  static_assert(offsetof(RuntimeFilebufCharView, stateWord) == 0x44, "RuntimeFilebufCharView::stateWord offset must be 0x44");
-  static_assert(offsetof(RuntimeFilebufCharView, closeOnClose) == 0x48, "RuntimeFilebufCharView::closeOnClose offset must be 0x48");
-  static_assert(offsetof(RuntimeFilebufCharView, myFile) == 0x4C, "RuntimeFilebufCharView::myFile offset must be 0x4C");
-  static_assert(sizeof(RuntimeFilebufCharView) == 0x50, "RuntimeFilebufCharView size must be 0x50");
+  static_assert(offsetof(CrtFilebufChar, inputBase) == 0x10, "CrtFilebufChar::inputBase offset must be 0x10");
+  static_assert(offsetof(CrtFilebufChar, outputBase) == 0x14, "CrtFilebufChar::outputBase offset must be 0x14");
+  static_assert(offsetof(CrtFilebufChar, inputPtr) == 0x20, "CrtFilebufChar::inputPtr offset must be 0x20");
+  static_assert(offsetof(CrtFilebufChar, outputPtr) == 0x24, "CrtFilebufChar::outputPtr offset must be 0x24");
+  static_assert(offsetof(CrtFilebufChar, inputCount) == 0x30, "CrtFilebufChar::inputCount offset must be 0x30");
+  static_assert(offsetof(CrtFilebufChar, outputCount) == 0x34, "CrtFilebufChar::outputCount offset must be 0x34");
+  static_assert(offsetof(CrtFilebufChar, codecvtFacet) == 0x3C, "CrtFilebufChar::codecvtFacet offset must be 0x3C");
+  static_assert(offsetof(CrtFilebufChar, wroteSome) == 0x41, "CrtFilebufChar::wroteSome offset must be 0x41");
+  static_assert(offsetof(CrtFilebufChar, stateWord) == 0x44, "CrtFilebufChar::stateWord offset must be 0x44");
+  static_assert(offsetof(CrtFilebufChar, closeOnClose) == 0x48, "CrtFilebufChar::closeOnClose offset must be 0x48");
+  static_assert(offsetof(CrtFilebufChar, myFile) == 0x4C, "CrtFilebufChar::myFile offset must be 0x4C");
+  static_assert(sizeof(CrtFilebufChar) == 0x50, "CrtFilebufChar size must be 0x50");
 
   // Mirrors `` `std::basic_filebuf<char>::_Init'::`2'::_Stinit`` (.data, 0x010C6BB4).
   // Confirmed via data_refs: FUN_004C5430 (`_Init`) reads this exact address into a
@@ -11257,7 +11257,7 @@ namespace moho::runtime
   // releasing the file - same global, read on init, restored on close.
   std::int32_t gRuntimeFilebufInitialStateWord = 0;
 
-  void EngineFilebufResetIoLanes(RuntimeFilebufCharView* const filebuf)
+  void EngineFilebufResetIoLanes(CrtFilebufChar* const filebuf)
   {
     filebuf->inputBase = nullptr;
     filebuf->outputBase = nullptr;
@@ -11282,14 +11282,14 @@ namespace moho::runtime
    * A null FILE leaves the lanes as `_Init` on the streambuf base left them
    * (all null) and only the scalar state is written.
    */
-  void EngineFilebufInit(RuntimeFilebufCharView* const filebuf, std::FILE* const file)
+  void EngineFilebufInit(CrtFilebufChar* const filebuf, std::FILE* const file)
   {
     filebuf->closeOnClose = 0;
     filebuf->wroteSome = 0;
     EngineFilebufResetIoLanes(filebuf);
 
     if (file != nullptr) {
-      LegacyFileView& legacy = legacy_file(file);
+      CrtLegacyFile& legacy = legacy_file(file);
       filebuf->inputBase = &legacy._base;
       filebuf->outputBase = &legacy._base;
       filebuf->inputPtr = &legacy._ptr;
@@ -11304,15 +11304,15 @@ namespace moho::runtime
   }
 
   std::intptr_t EngineFilebufApplyCodecvtFacet(
-    RuntimeFilebufCharView* filebuf,
+    CrtFilebufChar* filebuf,
     const std::codecvt<char, char, std::mbstate_t>* codecvtFacet
   );
 
-  RuntimeLockitState* EngineLockitConstruct(RuntimeLockitState* object, int requestedSlot);
-  void EngineLockitDestroy(RuntimeLockitState* object);
-  RuntimeMutexHandle* EngineMutexConstruct(RuntimeMutexHandle* object);
-  RuntimeLocaleLocimpView* EngineGetGlobalLocale();
-  RuntimeLocaleLocimpView* EngineLocaleInit();
+  CrtLockitState* EngineLockitConstruct(CrtLockitState* object, int requestedSlot);
+  void EngineLockitDestroy(CrtLockitState* object);
+  CrtMutexHandle* EngineMutexConstruct(CrtMutexHandle* object);
+  CrtLocaleLocimp* EngineGetGlobalLocale();
+  CrtLocaleLocimp* EngineLocaleInit();
 
   /**
    * Address: 0x004C57B0 (FUN_004C57B0, sub_4C57B0)
@@ -11322,7 +11322,7 @@ namespace moho::runtime
    * facet reports `always_noconv()`.
    */
   [[maybe_unused]] std::intptr_t EngineFilebufApplyCodecvtFacet(
-    RuntimeFilebufCharView* const filebuf,
+    CrtFilebufChar* const filebuf,
     const std::codecvt<char, char, std::mbstate_t>* const codecvtFacet
   )
   {
@@ -11387,7 +11387,7 @@ namespace moho::runtime
    * longer fits the original 4-byte slot, so this recovery cannot alias it
    * without corrupting the adjacent `closeOnClose`/`myFile` fields.
    */
-  bool EngineFilebufEndwrite(RuntimeFilebufCharView* const filebuf)
+  bool EngineFilebufEndwrite(CrtFilebufChar* const filebuf)
   {
     if (filebuf->codecvtFacet == nullptr || !filebuf->wroteSome) {
       return true;
@@ -11476,9 +11476,9 @@ namespace moho::runtime
    * shipped binary, and it invokes EngineFilebufEndwrite by name below,
    * which is what satisfies that function's own invocation requirement.
    */
-  RuntimeFilebufCharView* EngineFilebufClose(RuntimeFilebufCharView* const filebuf)
+  CrtFilebufChar* EngineFilebufClose(CrtFilebufChar* const filebuf)
   {
-    RuntimeFilebufCharView* result = filebuf;
+    CrtFilebufChar* result = filebuf;
 
     if (filebuf->myFile != nullptr) {
       if (!EngineFilebufEndwrite(filebuf)) {
@@ -11507,7 +11507,7 @@ namespace moho::runtime
    * What it does:
    * Captures one lock-slot id (`arg & 3`) and enters that CRT lock slot.
    */
-  RuntimeLockitState* EngineLockitConstruct(RuntimeLockitState* const object, const int requestedSlot)
+  CrtLockitState* EngineLockitConstruct(CrtLockitState* const object, const int requestedSlot)
   {
     const int slot = requestedSlot & 3;
     object->slot = slot;
@@ -11521,7 +11521,7 @@ namespace moho::runtime
    * What it does:
    * Leaves the CRT lock slot captured by this `_Lockit` guard.
    */
-  void EngineLockitDestroy(RuntimeLockitState* const object)
+  void EngineLockitDestroy(CrtLockitState* const object)
   {
     (void)EngineMtxUnlock(EngineStdLockSlot(object->slot));
   }
@@ -11532,7 +11532,7 @@ namespace moho::runtime
    * What it does:
    * Allocates one `CRITICAL_SECTION` object and initializes it.
    */
-  RuntimeMutexHandle* EngineMutexConstruct(RuntimeMutexHandle* const object)
+  CrtMutexHandle* EngineMutexConstruct(CrtMutexHandle* const object)
   {
     auto* const lock = static_cast<CRITICAL_SECTION*>(::operator new(sizeof(CRITICAL_SECTION)));
     object->criticalSection = lock;
@@ -11547,7 +11547,7 @@ namespace moho::runtime
    * Destroys the critical section this mutex owns and releases its storage -
    * the counterpart to EngineMutexConstruct above.
    */
-  void EngineMutexDestruct(RuntimeMutexHandle* const object)
+  void EngineMutexDestruct(CrtMutexHandle* const object)
   {
     CRITICAL_SECTION* const lock = object->criticalSection;
     EngineMtxDestroy(lock);
@@ -11565,7 +11565,7 @@ namespace moho::runtime
    * so the section is reached through one indirection rather than being
    * embedded.
    */
-  int EngineMutexLock(RuntimeMutexHandle* const object) noexcept
+  int EngineMutexLock(CrtMutexHandle* const object) noexcept
   {
     return EngineMtxLock(object->criticalSection);
   }
@@ -11580,7 +11580,7 @@ namespace moho::runtime
    * Leaves the critical section this mutex owns; the counterpart to
    * EngineMutexLock.
    */
-  int EngineMutexUnlock(RuntimeMutexHandle* const object) noexcept
+  int EngineMutexUnlock(CrtMutexHandle* const object) noexcept
   {
     return EngineMtxUnlock(object->criticalSection);
   }
@@ -11983,9 +11983,9 @@ namespace moho::runtime
       return 0x7FFFFFFF;
     }
 
-    RuntimeTidDataLocaleView* threadData = nullptr;
+    CrtTidDataLocale* threadData = nullptr;
     bool updated = false;
-    RuntimeThreadLocInfoView* const localeView = EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
+    CrtThreadLocInfoData* const localeView = EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
     int result = 0x7FFFFFFF;
     const LCID collateHandle = (localeView != nullptr) ? localeView->lcHandle[1] : 0;
@@ -12097,7 +12097,7 @@ namespace moho::runtime
       return 0;
     }
 
-    RuntimeTidDataLocaleView* threadData = nullptr;
+    CrtTidDataLocale* threadData = nullptr;
     bool updated = false;
     (void)EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
@@ -12212,9 +12212,9 @@ namespace moho::runtime
    */
   int EngineStrcollLocale(const char* const lhsText, const char* const rhsText, _locale_t const localeInfo)
   {
-    RuntimeTidDataLocaleView* threadData = nullptr;
+    CrtTidDataLocale* threadData = nullptr;
     bool updated = false;
-    RuntimeThreadLocInfoView* const localeView = EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
+    CrtThreadLocInfoData* const localeView = EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
 
     int result = 0x7FFFFFFF;
     if (lhsText != nullptr && rhsText != nullptr) {
@@ -12521,16 +12521,16 @@ namespace moho::runtime
     return result;
   }
 
-  struct RuntimeScanStringStreamView
+  struct CrtScanStringStream
   {
     const void* current = nullptr;      // +0x00
     std::int32_t remainingBytes = 0;    // +0x04
     const void* sourceStart = nullptr;  // +0x08
     std::int32_t flags = 0;             // +0x0C
   };
-  static_assert(sizeof(RuntimeScanStringStreamView) == 0x10, "RuntimeScanStringStreamView size must be 0x10");
+  static_assert(sizeof(CrtScanStringStream) == 0x10, "CrtScanStringStream size must be 0x10");
 
-  using RuntimeStringScanWorker = int(__cdecl*)(RuntimeScanStringStreamView*, int, int, int);
+  using RuntimeStringScanWorker = int(__cdecl*)(CrtScanStringStream*, int, int, int);
 
   /**
    * Address: 0x00AA4A1D (FUN_00AA4A1D, _strdup)
@@ -12573,7 +12573,7 @@ namespace moho::runtime
     _locale_t const localeInfo
   )
   {
-    RuntimeTidDataLocaleView* threadData = nullptr;
+    CrtTidDataLocale* threadData = nullptr;
     bool updated = false;
     (void)EngineResolveLocaleLocInfo(localeInfo, &threadData, &updated);
     const std::size_t result = ::_wcsftime_l(destination, maxSize, format, timeData, localeInfo);
@@ -13055,7 +13055,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
     return negative ? _FPCLASS_NN : _FPCLASS_PN;
   }
 
-  struct RuntimeTidDataDosErrnoView
+  struct CrtTidDataDosErrno
   {
     unsigned long mThreadId;         // +0x00
     std::intptr_t mThreadHandle;     // +0x04
@@ -13063,66 +13063,66 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
     unsigned long mDosErrno;         // +0x0C
   };
   static_assert(
-    offsetof(RuntimeTidDataDosErrnoView, mDosErrno) == 0x0C,
-    "RuntimeTidDataDosErrnoView::mDosErrno offset must be 0x0C"
+    offsetof(CrtTidDataDosErrno, mDosErrno) == 0x0C,
+    "CrtTidDataDosErrno::mDosErrno offset must be 0x0C"
   );
 
-  struct RuntimeTidDataRandomView
+  struct CrtTidDataRandom
   {
     std::uint8_t mReserved00_13[0x14];
     std::uint32_t mHoldRand;
   };
   static_assert(
-    offsetof(RuntimeTidDataRandomView, mHoldRand) == 0x14,
-    "RuntimeTidDataRandomView::mHoldRand offset must be 0x14"
+    offsetof(CrtTidDataRandom, mHoldRand) == 0x14,
+    "CrtTidDataRandom::mHoldRand offset must be 0x14"
   );
 
-  struct RuntimeXcptActionEntry
+  struct CrtXcptActionEntry
   {
     std::uint32_t mExceptionCode; // +0x00
     std::int32_t mSignalNumber;   // +0x04
     void* mSignalHandler;         // +0x08
   };
-  static_assert(sizeof(RuntimeXcptActionEntry) == 0x0C, "RuntimeXcptActionEntry size must be 0x0C");
+  static_assert(sizeof(CrtXcptActionEntry) == 0x0C, "CrtXcptActionEntry size must be 0x0C");
 
-  struct RuntimeTidDataXcptView
+  struct CrtTidDataXcpt
   {
     std::uint8_t mReserved00_5B[0x5C];
-    RuntimeXcptActionEntry* mXcptActionTable; // +0x5C
+    CrtXcptActionEntry* mXcptActionTable; // +0x5C
     void* mThreadExceptionPointers;           // +0x60
     std::int32_t mThreadFpeCode;              // +0x64
   };
   static_assert(
-    offsetof(RuntimeTidDataXcptView, mXcptActionTable) == 0x5C,
-    "RuntimeTidDataXcptView::mXcptActionTable offset must be 0x5C"
+    offsetof(CrtTidDataXcpt, mXcptActionTable) == 0x5C,
+    "CrtTidDataXcpt::mXcptActionTable offset must be 0x5C"
   );
   static_assert(
-    offsetof(RuntimeTidDataXcptView, mThreadExceptionPointers) == 0x60,
-    "RuntimeTidDataXcptView::mThreadExceptionPointers offset must be 0x60"
+    offsetof(CrtTidDataXcpt, mThreadExceptionPointers) == 0x60,
+    "CrtTidDataXcpt::mThreadExceptionPointers offset must be 0x60"
   );
   static_assert(
-    offsetof(RuntimeTidDataXcptView, mThreadFpeCode) == 0x64,
-    "RuntimeTidDataXcptView::mThreadFpeCode offset must be 0x64"
+    offsetof(CrtTidDataXcpt, mThreadFpeCode) == 0x64,
+    "CrtTidDataXcpt::mThreadFpeCode offset must be 0x64"
   );
 
-  struct RuntimeTidDataProcessingThrowView
+  struct CrtTidDataProcessingThrow
   {
     std::uint8_t mReserved00_8F[0x90];
     std::int32_t mProcessingThrow; // +0x90
   };
   static_assert(
-    offsetof(RuntimeTidDataProcessingThrowView, mProcessingThrow) == 0x90,
-    "RuntimeTidDataProcessingThrowView::mProcessingThrow offset must be 0x90"
+    offsetof(CrtTidDataProcessingThrow, mProcessingThrow) == 0x90,
+    "CrtTidDataProcessingThrow::mProcessingThrow offset must be 0x90"
   );
 
-  struct RuntimeTidDataCxxRethrowView
+  struct CrtTidDataCxxRethrow
   {
     std::uint8_t mReserved00_20B[0x20C];
     std::int32_t mCxxRethrow; // +0x20C
   };
   static_assert(
-    offsetof(RuntimeTidDataCxxRethrowView, mCxxRethrow) == 0x20C,
-    "RuntimeTidDataCxxRethrowView::mCxxRethrow offset must be 0x20C"
+    offsetof(CrtTidDataCxxRethrow, mCxxRethrow) == 0x20C,
+    "CrtTidDataCxxRethrow::mCxxRethrow offset must be 0x20C"
   );
 
   /**
@@ -13158,7 +13158,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
     constexpr DWORD kMsvcClassicCppEh = 0xE06D7363u;     // "csm"
 
     const DWORD exceptionCode = (*exceptionRecordSlot)->ExceptionCode;
-    auto* const threadData = reinterpret_cast<RuntimeTidDataProcessingThrowView*>(__getptd());
+    auto* const threadData = reinterpret_cast<CrtTidDataProcessingThrow*>(__getptd());
     if (threadData == nullptr) {
       return;
     }
@@ -13182,7 +13182,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   extern "C" void** __cdecl EngineGetThreadExceptionPointersSlot()
   {
-    auto* const threadData = reinterpret_cast<RuntimeTidDataXcptView*>(__getptd());
+    auto* const threadData = reinterpret_cast<CrtTidDataXcpt*>(__getptd());
     return (threadData != nullptr) ? &threadData->mThreadExceptionPointers : nullptr;
   }
 
@@ -13224,7 +13224,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
       return 0;
     }
 
-    auto* const threadData = reinterpret_cast<RuntimeTidDataCxxRethrowView*>(__getptd());
+    auto* const threadData = reinterpret_cast<CrtTidDataCxxRethrow*>(__getptd());
     if (threadData != nullptr) {
       threadData->mCxxRethrow = 1;
     }
@@ -13336,17 +13336,17 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    * initializing one record on first access without raising allocation
    * exceptions.
    */
-  [[nodiscard]] RuntimeTidDataDosErrnoView* EngineGetPtdNoExit()
+  [[nodiscard]] CrtTidDataDosErrno* EngineGetPtdNoExit()
   {
     const unsigned long lastError = ::GetLastError();
 
-    RuntimeTidDataDosErrnoView* threadData = nullptr;
+    CrtTidDataDosErrno* threadData = nullptr;
     if (RuntimeFlsGetValueFn const flsGetValue = __set_flsgetvalue(); flsGetValue != nullptr) {
-      threadData = static_cast<RuntimeTidDataDosErrnoView*>(flsGetValue(__flsindex));
+      threadData = static_cast<CrtTidDataDosErrno*>(flsGetValue(__flsindex));
     }
 
     if (threadData == nullptr) {
-      threadData = static_cast<RuntimeTidDataDosErrnoView*>(_calloc_crt(1u, 0x214u));
+      threadData = static_cast<CrtTidDataDosErrno*>(_calloc_crt(1u, 0x214u));
       if (threadData != nullptr) {
         using RuntimeFlsSetValueFn = int(__stdcall*)(unsigned long flsIndex, void* value);
         auto* const flsSetValueRaw = _decode_pointer(gpFlsSetValue);
@@ -13465,7 +13465,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   extern "C" int __cdecl rand()
   {
-    auto* const threadData = reinterpret_cast<RuntimeTidDataRandomView*>(__getptd());
+    auto* const threadData = reinterpret_cast<CrtTidDataRandom*>(__getptd());
     const std::uint32_t nextState = threadData->mHoldRand * 0x343FDu + 0x269EC3u;
     threadData->mHoldRand = nextState;
     return static_cast<int>((nextState >> 16u) & 0x7FFFu);
@@ -13479,7 +13479,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   void __cdecl EngineSrand(const int seed)
   {
-    auto* const threadData = reinterpret_cast<RuntimeTidDataRandomView*>(__getptd());
+    auto* const threadData = reinterpret_cast<CrtTidDataRandom*>(__getptd());
     threadData->mHoldRand = static_cast<std::uint32_t>(seed);
   }
 
@@ -13493,17 +13493,17 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   extern "C" int __cdecl _XcptFilter(const int exceptionCode, _EXCEPTION_POINTERS* const exceptionPointers)
   {
-    auto* const threadData = reinterpret_cast<RuntimeTidDataXcptView*>(EngineGetPtdNoExit());
+    auto* const threadData = reinterpret_cast<CrtTidDataXcpt*>(EngineGetPtdNoExit());
     if (threadData == nullptr) {
       return 0;
     }
 
-    RuntimeXcptActionEntry* const actionTable = threadData->mXcptActionTable;
+    CrtXcptActionEntry* const actionTable = threadData->mXcptActionTable;
     const int actionCount = _XcptActTabCount;
 
-    RuntimeXcptActionEntry* matchedAction = nullptr;
+    CrtXcptActionEntry* matchedAction = nullptr;
     for (int index = 0; index < actionCount; ++index) {
-      RuntimeXcptActionEntry* const action = &actionTable[index];
+      CrtXcptActionEntry* const action = &actionTable[index];
       if (action->mExceptionCode == static_cast<std::uint32_t>(exceptionCode)) {
         matchedAction = action;
         break;
@@ -13549,22 +13549,22 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
     return -1;
   }
 
-  struct RuntimeOsErrorErrnoMapEntry
+  struct CrtOsErrorErrnoMapEntry
   {
     unsigned long osErrorCode = 0; // +0x00
     int crtErrnoValue = 0;         // +0x04
   };
   static_assert(
-    offsetof(RuntimeOsErrorErrnoMapEntry, osErrorCode) == 0x00,
-    "RuntimeOsErrorErrnoMapEntry::osErrorCode offset must be 0x00"
+    offsetof(CrtOsErrorErrnoMapEntry, osErrorCode) == 0x00,
+    "CrtOsErrorErrnoMapEntry::osErrorCode offset must be 0x00"
   );
   static_assert(
-    offsetof(RuntimeOsErrorErrnoMapEntry, crtErrnoValue) == 0x04,
-    "RuntimeOsErrorErrnoMapEntry::crtErrnoValue offset must be 0x04"
+    offsetof(CrtOsErrorErrnoMapEntry, crtErrnoValue) == 0x04,
+    "CrtOsErrorErrnoMapEntry::crtErrnoValue offset must be 0x04"
   );
-  static_assert(sizeof(RuntimeOsErrorErrnoMapEntry) == 0x08, "RuntimeOsErrorErrnoMapEntry size must be 0x08");
+  static_assert(sizeof(CrtOsErrorErrnoMapEntry) == 0x08, "CrtOsErrorErrnoMapEntry size must be 0x08");
 
-  static constexpr RuntimeOsErrorErrnoMapEntry kRuntimeOsErrorErrnoMap[0x2D] = {
+  static constexpr CrtOsErrorErrnoMapEntry kRuntimeOsErrorErrnoMap[0x2D] = {
     {1u, 22},    {2u, 2},     {3u, 2},    {4u, 24},    {5u, 13},    {6u, 9},    {7u, 12},    {8u, 12},
     {9u, 12},    {10u, 7},    {11u, 8},   {12u, 22},   {13u, 22},   {15u, 2},   {16u, 13},   {17u, 18},
     {18u, 2},    {33u, 13},   {53u, 2},   {65u, 13},   {67u, 2},    {80u, 17},  {82u, 13},   {83u, 13},
@@ -13582,7 +13582,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   extern "C" int __cdecl get_errno_from_oserr(const unsigned long osErrorCode)
   {
-    for (const RuntimeOsErrorErrnoMapEntry& entry : kRuntimeOsErrorErrnoMap) {
+    for (const CrtOsErrorErrnoMapEntry& entry : kRuntimeOsErrorErrnoMap) {
       if (entry.osErrorCode == osErrorCode) {
         return entry.crtErrnoValue;
       }
@@ -13606,7 +13606,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   [[nodiscard]] unsigned long* EngineDosErrno()
   {
-    if (RuntimeTidDataDosErrnoView* const threadData = EngineGetPtdNoExit(); threadData != nullptr) {
+    if (CrtTidDataDosErrno* const threadData = EngineGetPtdNoExit(); threadData != nullptr) {
       return &threadData->mDosErrno;
     }
 
@@ -13736,7 +13736,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
       return -1L;
     }
 
-    RuntimeIoInfo* const ioInfo = __pioinfo[fileHandle >> 5] + (fileHandle & 0x1F);
+    CrtIoInfo* const ioInfo = __pioinfo[fileHandle >> 5] + (fileHandle & 0x1F);
     if ((ioInfo->osfile & 0x01u) == 0u) {
       *EngineDosErrno() = 0;
       *_errno() = EBADF;
@@ -14885,7 +14885,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
     return ::_wgetdcwd_nolock(0, buffer, maxLength);
   }
 
-  struct RuntimeTryBlockMapEntry
+  struct CrtTryBlockMapEntry
   {
     std::int32_t tryLow;            // +0x00
     std::int32_t tryHigh;           // +0x04
@@ -14893,23 +14893,23 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
     std::int32_t catchHandlerCount; // +0x0C
     void* catchHandlerArray;        // +0x10
   };
-  static_assert(sizeof(RuntimeTryBlockMapEntry) == 0x14, "RuntimeTryBlockMapEntry size must be 0x14");
-  static_assert(offsetof(RuntimeTryBlockMapEntry, tryHigh) == 0x04, "RuntimeTryBlockMapEntry::tryHigh offset must be 0x04");
-  static_assert(offsetof(RuntimeTryBlockMapEntry, catchHigh) == 0x08, "RuntimeTryBlockMapEntry::catchHigh offset must be 0x08");
+  static_assert(sizeof(CrtTryBlockMapEntry) == 0x14, "CrtTryBlockMapEntry size must be 0x14");
+  static_assert(offsetof(CrtTryBlockMapEntry, tryHigh) == 0x04, "CrtTryBlockMapEntry::tryHigh offset must be 0x04");
+  static_assert(offsetof(CrtTryBlockMapEntry, catchHigh) == 0x08, "CrtTryBlockMapEntry::catchHigh offset must be 0x08");
 
-  struct RuntimeCxxFuncInfoView
+  struct CrtCxxFuncInfo
   {
     std::uint8_t reserved00_0B[0x0C];
-    const RuntimeTryBlockMapEntry* tryBlockMap; // +0x0C
+    const CrtTryBlockMapEntry* tryBlockMap; // +0x0C
     std::uint32_t tryBlockCount;                // +0x10
   };
-  static_assert(offsetof(RuntimeCxxFuncInfoView, tryBlockMap) == 0x0C, "RuntimeCxxFuncInfoView::tryBlockMap offset must be 0x0C");
+  static_assert(offsetof(CrtCxxFuncInfo, tryBlockMap) == 0x0C, "CrtCxxFuncInfo::tryBlockMap offset must be 0x0C");
   static_assert(
-    offsetof(RuntimeCxxFuncInfoView, tryBlockCount) == 0x10,
-    "RuntimeCxxFuncInfoView::tryBlockCount offset must be 0x10"
+    offsetof(CrtCxxFuncInfo, tryBlockCount) == 0x10,
+    "CrtCxxFuncInfo::tryBlockCount offset must be 0x10"
   );
 
-  struct RuntimeLongjmpUnwindContextView
+  struct CrtLongjmpUnwindContext
   {
     void* savedFramePointer;           // +0x00
     std::uint8_t reserved04_17[0x14];  // +0x04
@@ -14919,18 +14919,18 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
     const void* functionInfo;          // +0x28
   };
   static_assert(
-    offsetof(RuntimeLongjmpUnwindContextView, registrationNode) == 0x18,
-    "RuntimeLongjmpUnwindContextView::registrationNode offset must be 0x18"
+    offsetof(CrtLongjmpUnwindContext, registrationNode) == 0x18,
+    "CrtLongjmpUnwindContext::registrationNode offset must be 0x18"
   );
   static_assert(
-    offsetof(RuntimeLongjmpUnwindContextView, targetState) == 0x1C,
-    "RuntimeLongjmpUnwindContextView::targetState offset must be 0x1C"
+    offsetof(CrtLongjmpUnwindContext, targetState) == 0x1C,
+    "CrtLongjmpUnwindContext::targetState offset must be 0x1C"
   );
   static_assert(
-    offsetof(RuntimeLongjmpUnwindContextView, functionInfo) == 0x28,
-    "RuntimeLongjmpUnwindContextView::functionInfo offset must be 0x28"
+    offsetof(CrtLongjmpUnwindContext, functionInfo) == 0x28,
+    "CrtLongjmpUnwindContext::functionInfo offset must be 0x28"
   );
-  static_assert(sizeof(RuntimeLongjmpUnwindContextView) == 0x2C, "RuntimeLongjmpUnwindContextView size must be 0x2C");
+  static_assert(sizeof(CrtLongjmpUnwindContext) == 0x2C, "CrtLongjmpUnwindContext size must be 0x2C");
 
   /**
    * Address: 0x00A8962E (FUN_00A8962E, __CxxLongjmpUnwind)
@@ -14939,7 +14939,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    * Unwinds C++ EH state for one longjmp context by forwarding registration,
    * function-info, and target-state lanes to `__FrameUnwindToState`.
    */
-  extern "C" void __stdcall __CxxLongjmpUnwind(const RuntimeLongjmpUnwindContextView* const unwindContext)
+  extern "C" void __stdcall __CxxLongjmpUnwind(const CrtLongjmpUnwindContext* const unwindContext)
   {
     __FrameUnwindToState(
       unwindContext->registrationNode,
@@ -14962,8 +14962,8 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    * Walks C++ EH try-block descriptors backward from the current state to
    * derive one contiguous range of candidates for handler probing.
    */
-  extern "C" const RuntimeTryBlockMapEntry* __cdecl _GetRangeOfTrysToCheck(
-    const RuntimeCxxFuncInfoView* const funcInfo,
+  extern "C" const CrtTryBlockMapEntry* __cdecl _GetRangeOfTrysToCheck(
+    const CrtCxxFuncInfo* const funcInfo,
     int nestedTryDepth,
     const int currentState,
     unsigned int* const outRangeStart,
@@ -14971,7 +14971,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
   )
   {
     unsigned int scanIndex = funcInfo->tryBlockCount;
-    const RuntimeTryBlockMapEntry* const tryBlocks = funcInfo->tryBlockMap;
+    const CrtTryBlockMapEntry* const tryBlocks = funcInfo->tryBlockMap;
     unsigned int rangeEnd = scanIndex;
 
     while (nestedTryDepth >= 0) {
@@ -14981,7 +14981,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
           EngineRaiseEhFrameConsistencyFailure();
         }
 
-        const RuntimeTryBlockMapEntry* const entry = &tryBlocks[--scanIndex];
+        const CrtTryBlockMapEntry* const entry = &tryBlocks[--scanIndex];
         if (((entry->tryHigh < currentState) && (currentState <= entry->catchHigh))
             || scanIndex == static_cast<unsigned int>(-1)) {
           --nestedTryDepth;
@@ -15008,13 +15008,13 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    * Pushes one exception-object frame marker onto the per-thread frame-info
    * chain tracked in `_tiddata`.
    */
-  extern "C" RuntimeFrameInfoNode* __cdecl __CreateFrameInfo(
-    RuntimeFrameInfoNode* const frameInfo,
+  extern "C" CrtFrameInfoNode* __cdecl __CreateFrameInfo(
+    CrtFrameInfoNode* const frameInfo,
     const int objectState
   )
   {
     frameInfo->objectState = objectState;
-    RuntimeTidDataLocaleView* const threadData = __getptd();
+    CrtTidDataLocale* const threadData = __getptd();
     frameInfo->next = threadData->frameInfoChain;
     threadData->frameInfoChain = frameInfo;
     return frameInfo;
@@ -15029,7 +15029,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   extern "C" int __cdecl __IsExceptionObjectToBeDestroyed(const int objectState)
   {
-    for (RuntimeFrameInfoNode* frame = __getptd()->frameInfoChain; frame != nullptr; frame = frame->next) {
+    for (CrtFrameInfoNode* frame = __getptd()->frameInfoChain; frame != nullptr; frame = frame->next) {
       if (frame->objectState == objectState) {
         return 0;
       }
@@ -15344,7 +15344,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    */
   extern "C" void __cdecl _sync_legacy_variables_lk()
   {
-    const auto* const localeView = reinterpret_cast<const RuntimeLocaleLegacySyncView*>(__ptlocinfo);
+    const auto* const localeView = reinterpret_cast<const CrtLocaleLegacySync*>(__ptlocinfo);
     __lc_codepage = localeView->lcCodepage;
     __lc_collate_cp = localeView->lcCollateCodepage;
     __lc_clike = localeView->lcClike;
@@ -15361,20 +15361,20 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Releases one CRT locale bundle by decrementing mbc/locinfo refcounts,
    * freeing non-initial blocks, and poisoning/freeing the locale handle.
    */
-  void EngineFreeLocale(RuntimeLocaleHandle* const locale)
+  void EngineFreeLocale(CrtLocaleHandle* const locale)
   {
     if (locale == nullptr) {
       return;
     }
 
-    RuntimeThreadMbcInfo* const mbcInfo = locale->mbcinfo;
+    CrtThreadMbcInfo* const mbcInfo = locale->mbcinfo;
     if (mbcInfo != nullptr) {
       if (::InterlockedDecrement(&mbcInfo->refcount) == 0 && mbcInfo != &__initialmbcinfo) {
         ::_free_crt(mbcInfo);
       }
     }
 
-    RuntimeThreadLocInfo* const locInfo = locale->locinfo;
+    CrtThreadLocInfo* const locInfo = locale->locinfo;
     if (locInfo != nullptr) {
       CrtLockGuard setLocaleLock(kRuntimeSetLocaleLock);
       ::__removelocaleref(locInfo);
@@ -15384,8 +15384,8 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     }
 
     constexpr std::uintptr_t kFreedPointerPoison = 0xBAADF00Du;
-    locale->locinfo = reinterpret_cast<RuntimeThreadLocInfo*>(kFreedPointerPoison);
-    locale->mbcinfo = reinterpret_cast<RuntimeThreadMbcInfo*>(kFreedPointerPoison);
+    locale->locinfo = reinterpret_cast<CrtThreadLocInfo*>(kFreedPointerPoison);
+    locale->mbcinfo = reinterpret_cast<CrtThreadMbcInfo*>(kFreedPointerPoison);
     ::_free_crt(locale);
   }
 
@@ -15397,7 +15397,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Initializes one locale implementation lane with default facet/category
    * state and seeds the locale name to `"*"`.
    */
-  RuntimeLocaleLocimpView* EngineLocaleLocimpConstruct(RuntimeLocaleLocimpView* const localeImpl, const bool isParent)
+  CrtLocaleLocimp* EngineLocaleLocimpConstruct(CrtLocaleLocimp* const localeImpl, const bool isParent)
   {
     localeImpl->refs = 1;
     localeImpl->facetVector = nullptr;
@@ -15433,52 +15433,52 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   std::uint8_t gRuntimeByte54741F = 0;
 
-  struct RuntimeSharedControlBlockView;
-  using RuntimeSharedControlReleaseFn = void(__thiscall*)(RuntimeSharedControlBlockView*);
+  struct CrtSharedControlBlock;
+  using RuntimeSharedControlReleaseFn = void(__thiscall*)(CrtSharedControlBlock*);
 
-  struct RuntimeSharedControlBlockView
+  struct CrtSharedControlBlock
   {
     RuntimeSharedControlReleaseFn* vtable = nullptr; // +0x00
     volatile long sharedRefs = 0;                    // +0x04
     volatile long weakRefs = 0;                      // +0x08
   };
-  static_assert(sizeof(RuntimeSharedControlBlockView) == 0x0C, "RuntimeSharedControlBlockView size must be 0x0C");
+  static_assert(sizeof(CrtSharedControlBlock) == 0x0C, "CrtSharedControlBlock size must be 0x0C");
 
   using RuntimeOffsetDispatchThreeLaneFn = int(__thiscall*)(std::uint32_t, std::uint32_t, std::uint32_t);
   using RuntimeOffsetDispatchPointerLaneFn = int(__thiscall*)(std::uint32_t, const void*);
   using RuntimeOffsetDispatchTwoLaneFn = int(__thiscall*)(std::uint32_t, std::uint32_t);
 
-  struct RuntimeReleasableObject;
-  using RuntimeReleaseWithCountFn = std::intptr_t(__thiscall*)(RuntimeReleasableObject*, int);
+  struct CrtReleasableObject;
+  using RuntimeReleaseWithCountFn = std::intptr_t(__thiscall*)(CrtReleasableObject*, int);
 
-  struct RuntimeReleasableObjectVTable
+  struct CrtReleasableObjectVTable
   {
     RuntimeReleaseWithCountFn release = nullptr; // +0x00
   };
 
-  struct RuntimeReleasableObject
+  struct CrtReleasableObject
   {
-    RuntimeReleasableObjectVTable* vtable = nullptr; // +0x00
+    CrtReleasableObjectVTable* vtable = nullptr; // +0x00
   };
 
-  struct RuntimeStdcallReleaseObject;
-  using RuntimeStdcallReleaseSlot2Fn = int(__stdcall*)(RuntimeStdcallReleaseObject*);
+  struct CrtStdcallReleaseObject;
+  using RuntimeStdcallReleaseSlot2Fn = int(__stdcall*)(CrtStdcallReleaseObject*);
 
-  struct RuntimeStdcallReleaseVTable
+  struct CrtStdcallReleaseVTable
   {
     void* reserved00 = nullptr;                     // +0x00
     void* reserved04 = nullptr;                     // +0x04
     RuntimeStdcallReleaseSlot2Fn releaseSlot2 = nullptr; // +0x08
   };
 
-  struct RuntimeStdcallReleaseObject
+  struct CrtStdcallReleaseObject
   {
-    RuntimeStdcallReleaseVTable* vtable = nullptr; // +0x00
+    CrtStdcallReleaseVTable* vtable = nullptr; // +0x00
   };
 
-  struct RuntimeDispatchSlot24Object;
+  struct CrtDispatchSlot24Object;
   using RuntimeDispatchSlot24Fn = void(__thiscall*)(
-    RuntimeDispatchSlot24Object*,
+    CrtDispatchSlot24Object*,
     int,
     int,
     int,
@@ -15488,7 +15488,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     int
   );
 
-  struct RuntimeDispatchSlot24VTable
+  struct CrtDispatchSlot24VTable
   {
     void* slot00 = nullptr;            // +0x00
     void* slot04 = nullptr;            // +0x04
@@ -15499,12 +15499,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     RuntimeDispatchSlot24Fn slot24 = nullptr; // +0x18
   };
 
-  struct RuntimeDispatchSlot24Object
+  struct CrtDispatchSlot24Object
   {
-    RuntimeDispatchSlot24VTable* vtable = nullptr; // +0x00
+    CrtDispatchSlot24VTable* vtable = nullptr; // +0x00
   };
 
-  void EngineReleaseSharedControlBlock(RuntimeSharedControlBlockView* const sharedControl)
+  void EngineReleaseSharedControlBlock(CrtSharedControlBlock* const sharedControl)
   {
     if (sharedControl == nullptr) {
       return;
@@ -15553,18 +15553,18 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     EngineThrowContainerTooLong("list<T> too long");
   }
 
-  struct RuntimeSharedControlPairEntry
+  struct CrtSharedControlPairEntry
   {
     void* reserved00 = nullptr;                     // +0x00
     volatile long* firstControl = nullptr;          // +0x04
     void* reserved08 = nullptr;                     // +0x08
     volatile long* secondControl = nullptr;         // +0x0C
   };
-  static_assert(sizeof(RuntimeSharedControlPairEntry) == 0x10, "RuntimeSharedControlPairEntry size must be 0x10");
+  static_assert(sizeof(CrtSharedControlPairEntry) == 0x10, "CrtSharedControlPairEntry size must be 0x10");
 
-  RuntimeSharedControlPairEntry* gRuntimeSharedControlPairBegin = nullptr;
-  RuntimeSharedControlPairEntry* gRuntimeSharedControlPairEnd = nullptr;
-  RuntimeSharedControlPairEntry* gRuntimeSharedControlPairCapacity = nullptr;
+  CrtSharedControlPairEntry* gRuntimeSharedControlPairBegin = nullptr;
+  CrtSharedControlPairEntry* gRuntimeSharedControlPairEnd = nullptr;
+  CrtSharedControlPairEntry* gRuntimeSharedControlPairCapacity = nullptr;
 
   using RuntimeDestroyCallbackFn = int(__thiscall*)(void*, int);
 
@@ -15573,7 +15573,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
   using DequeMapThrowTooLongFn = void (*)();
 
-  struct RuntimePointerGridView
+  struct CrtPointerGrid
   {
     std::int32_t rowCount = 0;       // +0x00
     std::int32_t columnCount = 0;    // +0x04
@@ -15581,25 +15581,25 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     void* elementStorage = nullptr;  // +0x0C
     void** rowPointers = nullptr;    // +0x10
   };
-  static_assert(sizeof(RuntimePointerGridView) == 0x14, "RuntimePointerGridView size must be 0x14");
-  static_assert(offsetof(RuntimePointerGridView, rowCount) == 0x00, "RuntimePointerGridView::rowCount offset must be 0x00");
+  static_assert(sizeof(CrtPointerGrid) == 0x14, "CrtPointerGrid size must be 0x14");
+  static_assert(offsetof(CrtPointerGrid, rowCount) == 0x00, "CrtPointerGrid::rowCount offset must be 0x00");
   static_assert(
-    offsetof(RuntimePointerGridView, elementStorage) == 0x0C,
-    "RuntimePointerGridView::elementStorage offset must be 0x0C"
+    offsetof(CrtPointerGrid, elementStorage) == 0x0C,
+    "CrtPointerGrid::elementStorage offset must be 0x0C"
   );
   static_assert(
-    offsetof(RuntimePointerGridView, rowPointers) == 0x10,
-    "RuntimePointerGridView::rowPointers offset must be 0x10"
+    offsetof(CrtPointerGrid, rowPointers) == 0x10,
+    "CrtPointerGrid::rowPointers offset must be 0x10"
   );
 
-  using RuntimePointerGridAllocator = int (*)(RuntimePointerGridView&, std::uint8_t);
+  using RuntimePointerGridAllocator = int (*)(CrtPointerGrid&, std::uint8_t);
 
-  struct RuntimeLocaleNameTableEntry
+  struct CrtLocaleNameTableEntry
   {
     const char* fullName = nullptr; // +0x00
     char* abbreviation = nullptr;   // +0x04
   };
-  static_assert(sizeof(RuntimeLocaleNameTableEntry) == 0x8, "RuntimeLocaleNameTableEntry size must be 0x8");
+  static_assert(sizeof(CrtLocaleNameTableEntry) == 0x8, "CrtLocaleNameTableEntry size must be 0x8");
 
   /**
    * Address: 0x00AA653D (FUN_00AA653D, TranslateName)
@@ -15609,7 +15609,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * on match, replaces `*inOutName` with the matched abbreviation lane.
    */
   extern "C" BOOL __cdecl TranslateName(
-    const RuntimeLocaleNameTableEntry* const table,
+    const CrtLocaleNameTableEntry* const table,
     int maxIndex,
     char** const inOutName
   )
@@ -15623,7 +15623,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       }
 
       const int middleIndex = (lowIndex + maxIndex) / 2;
-      const RuntimeLocaleNameTableEntry& entry = table[middleIndex];
+      const CrtLocaleNameTableEntry& entry = table[middleIndex];
       compareResult = _stricmp(*inOutName, entry.fullName);
       if (compareResult == 0) {
         *inOutName = entry.abbreviation;
@@ -15637,39 +15637,39 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return (compareResult == 0) ? TRUE : FALSE;
   }
 
-  struct RuntimeUndecoratorHeapFrameNode
+  struct CrtUndecoratorHeapFrameNode
   {
-    RuntimeUndecoratorHeapFrameNode* next = nullptr; // +0x00
+    CrtUndecoratorHeapFrameNode* next = nullptr; // +0x00
   };
-  static_assert(sizeof(RuntimeUndecoratorHeapFrameNode) == 0x04, "RuntimeUndecoratorHeapFrameNode size must be 0x04");
+  static_assert(sizeof(CrtUndecoratorHeapFrameNode) == 0x04, "CrtUndecoratorHeapFrameNode size must be 0x04");
 
-  using RuntimeUndecoratorFrameFreeFn = void(__cdecl*)(RuntimeUndecoratorHeapFrameNode* frame);
+  using RuntimeUndecoratorFrameFreeFn = void(__cdecl*)(CrtUndecoratorHeapFrameNode* frame);
 
   const char* gRuntimeUndecoratorCurrentDecoratedName = nullptr;
 
   extern "C" const std::uint16_t __rglangidNotDefault[10];
 
-  struct RuntimeFacetRefView
+  struct CrtFacetRef
   {
     void* vtable = nullptr;     // +0x00
     std::int32_t refs = 0;      // +0x04
   };
-  static_assert(sizeof(RuntimeFacetRefView) == 0x8, "RuntimeFacetRefView size must be 0x8");
+  static_assert(sizeof(CrtFacetRef) == 0x8, "CrtFacetRef size must be 0x8");
 
-  struct RuntimeFacetDeleteDispatchBase
+  struct CrtFacetDeleteDispatchBase
   {
-    virtual ~RuntimeFacetDeleteDispatchBase() = default;
+    virtual ~CrtFacetDeleteDispatchBase() = default;
   };
 
   void EngineDestroyFacetPolymorphic(std::locale::facet* const facet)
   {
-    auto* const dispatchBase = reinterpret_cast<RuntimeFacetDeleteDispatchBase*>(facet);
+    auto* const dispatchBase = reinterpret_cast<CrtFacetDeleteDispatchBase*>(facet);
     delete dispatchBase;
   }
 
   [[nodiscard]] std::locale::facet* EngineLocaleFacetDecref(std::locale::facet* const facet)
   {
-    auto* const view = reinterpret_cast<RuntimeFacetRefView*>(facet);
+    auto* const view = reinterpret_cast<CrtFacetRef*>(facet);
     --view->refs;
     if (view->refs == 0) {
       return facet;
@@ -15712,7 +15712,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    */
   void EngineTidyGlobalLocale()
   {
-    RuntimeLockitState lockit{};
+    CrtLockitState lockit{};
     EngineLockitConstruct(&lockit, 0);
     EngineReleaseFacetSlot(reinterpret_cast<std::locale::facet**>(&gRuntimeGlobalLocale));
     gRuntimeGlobalLocale = nullptr;
@@ -15725,7 +15725,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * What it does:
    * Returns the process-global locale implementation pointer.
    */
-  RuntimeLocaleLocimpView* EngineGetGlobalLocale()
+  CrtLocaleLocimp* EngineGetGlobalLocale()
   {
     return gRuntimeGlobalLocale;
   }
@@ -15737,7 +15737,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * One-time registers global locale tidy callback and updates the process
    * global locale implementation pointer.
    */
-  RuntimeLocaleLocimpView* EngineSetGlobalLocale(RuntimeLocaleLocimpView* const localeImpl)
+  CrtLocaleLocimp* EngineSetGlobalLocale(CrtLocaleLocimp* const localeImpl)
   {
     if (gRuntimeGlobalLocaleAtexitRegistered == 0) {
       gRuntimeGlobalLocaleAtexitRegistered = 1;
@@ -15755,19 +15755,19 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Lazily initializes the process-global `"C"` locale implementation under
    * `_Lockit(0)`, seeds classic-locale pointers, and bumps facet refs.
    */
-  RuntimeLocaleLocimpView* EngineLocaleInit()
+  CrtLocaleLocimp* EngineLocaleInit()
   {
-    RuntimeLocaleLocimpView* localeImpl = gRuntimeGlobalLocale;
+    CrtLocaleLocimp* localeImpl = gRuntimeGlobalLocale;
     if (localeImpl != nullptr) {
       return localeImpl;
     }
 
-    RuntimeLockitState lockit{};
+    CrtLockitState lockit{};
     EngineLockitConstruct(&lockit, 0);
 
     localeImpl = gRuntimeGlobalLocale;
     if (localeImpl == nullptr) {
-      auto* const storage = static_cast<RuntimeLocaleLocimpView*>(::operator new(sizeof(RuntimeLocaleLocimpView)));
+      auto* const storage = static_cast<CrtLocaleLocimp*>(::operator new(sizeof(CrtLocaleLocimp)));
       try {
         localeImpl = EngineLocaleLocimpConstruct(storage, false);
       } catch (...) {
@@ -15793,17 +15793,17 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     return static_cast<std::size_t>(codePage % static_cast<std::uint32_t>(kRuntimeCodePageLocaleHashBucketCount));
   }
 
-  [[nodiscard]] int EngineGetCodePageMaxCharBytes(const RuntimeLocaleHandle* const locale, const UINT fallbackCodePage)
+  [[nodiscard]] int EngineGetCodePageMaxCharBytes(const CrtLocaleHandle* const locale, const UINT fallbackCodePage)
   {
-    // `RuntimeLocaleHandle` is layout-identical to the real `_locale_tstruct`
+    // `CrtLocaleHandle` is layout-identical to the real `_locale_tstruct`
     // (`{locinfo, mbcinfo}`, both single pointers) -- FUN_00AA64B2's real body
     // (`___mb_cur_max_l_func`) is a documented, exported UCRT symbol
     // (declared in <ctype.h>), so it is called directly here instead of being
     // reimplemented as engine source (matching this project's `_findfirst64`/
     // `_ftime64_s` precedent for CRT functions the modern UCRT still exports).
-    static_assert(sizeof(RuntimeLocaleHandle) == sizeof(__crt_locale_pointers), "RuntimeLocaleHandle must match _locale_tstruct layout");
+    static_assert(sizeof(CrtLocaleHandle) == sizeof(__crt_locale_pointers), "CrtLocaleHandle must match _locale_tstruct layout");
     if (locale != nullptr && locale->locinfo != nullptr) {
-      const int mbCurMax = ___mb_cur_max_l_func(reinterpret_cast<_locale_t>(const_cast<RuntimeLocaleHandle*>(locale)));
+      const int mbCurMax = ___mb_cur_max_l_func(reinterpret_cast<_locale_t>(const_cast<CrtLocaleHandle*>(locale)));
       if (mbCurMax > 0) {
         return mbCurMax;
       }
@@ -15823,7 +15823,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Builds one `".<codepage>"` locale descriptor and creates a CRT locale
    * bundle for that codepage lane.
    */
-  RuntimeLocaleHandle* EngineCreateCodePageLocale(const std::uint32_t codePage)
+  CrtLocaleHandle* EngineCreateCodePageLocale(const std::uint32_t codePage)
   {
     char codePageText[31] = {};
     if (_ultoa_s(static_cast<unsigned long>(codePage), codePageText, _countof(codePageText), 10) != 0) {
@@ -15835,7 +15835,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       return nullptr;
     }
 
-    return reinterpret_cast<RuntimeLocaleHandle*>(_create_locale(LC_ALL, localeName));
+    return reinterpret_cast<CrtLocaleHandle*>(_create_locale(LC_ALL, localeName));
   }
 
   /**
@@ -15845,15 +15845,15 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    * Returns one cached CRT locale handle for a codepage lane, creating and
    * atomically publishing a new cache node when no match exists.
    */
-  RuntimeLocaleHandle* EngineGetCachedCodePageLocale(const std::uint32_t codePage)
+  CrtLocaleHandle* EngineGetCachedCodePageLocale(const std::uint32_t codePage)
   {
     const std::size_t bucketIndex = EngineCodePageHashBucket(codePage);
     auto* const bucket = reinterpret_cast<PVOID volatile*>(&gRuntimeCodePageLocaleHash[bucketIndex]);
 
-    RuntimeCodePageLocaleHashEntry* pendingEntry = nullptr;
+    CrtCodePageLocaleHashEntry* pendingEntry = nullptr;
     while (true) {
-      auto* const bucketHead = static_cast<RuntimeCodePageLocaleHashEntry*>(*bucket);
-      RuntimeCodePageLocaleHashEntry* probe = bucketHead;
+      auto* const bucketHead = static_cast<CrtCodePageLocaleHashEntry*>(*bucket);
+      CrtCodePageLocaleHashEntry* probe = bucketHead;
       while (probe != nullptr) {
         if (probe->codePage == codePage) {
           if (pendingEntry != nullptr) {
@@ -15866,12 +15866,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       }
 
       if (pendingEntry == nullptr) {
-        pendingEntry = static_cast<RuntimeCodePageLocaleHashEntry*>(std::malloc(sizeof(RuntimeCodePageLocaleHashEntry)));
+        pendingEntry = static_cast<CrtCodePageLocaleHashEntry*>(std::malloc(sizeof(CrtCodePageLocaleHashEntry)));
         if (pendingEntry == nullptr) {
           return nullptr;
         }
 
-        RuntimeLocaleHandle* const locale = EngineCreateCodePageLocale(codePage);
+        CrtLocaleHandle* const locale = EngineCreateCodePageLocale(codePage);
         pendingEntry->locale = locale;
         if (locale == nullptr) {
           _free_crt(pendingEntry);
@@ -15893,7 +15893,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     const char* sourceBytes,
     const unsigned int sourceByteCount,
     char* pendingStateBytes,
-    const RuntimeCvtVec* localeVector
+    const CrtCvtVec* localeVector
   );
 
   /**
@@ -15908,7 +15908,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
     const char* const sourceBytes,
     const unsigned int sourceByteCount,
     char* const pendingStateBytes,
-    const RuntimeCvtVec* const localeVector
+    const CrtCvtVec* const localeVector
   )
   {
     constexpr std::size_t kRuntimeCtypeIndexMultiByteConvert = 2u;
@@ -15942,7 +15942,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
       return 1;
     }
 
-    RuntimeLocaleHandle* const codePageLocale = EngineGetCachedCodePageLocale(codePage);
+    CrtLocaleHandle* const codePageLocale = EngineGetCachedCodePageLocale(codePage);
     auto* const pendingState = reinterpret_cast<std::uint32_t*>(pendingStateBytes);
     if (*pendingState != 0u) {
       pendingStateBytes[1] = sourceBytes[0];
@@ -15967,12 +15967,12 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
     bool isLeadByte = false;
     if (codePageLocale != nullptr && codePageLocale->mbcinfo != nullptr) {
-      struct RuntimeThreadMbcInfoLeadByteView
+      struct CrtThreadMbcInfoLeadByte
       {
         std::uint8_t reserved00[0x1D];
         std::uint8_t leadByteFlags[256];
       };
-      const auto* const mbcView = reinterpret_cast<const RuntimeThreadMbcInfoLeadByteView*>(codePageLocale->mbcinfo);
+      const auto* const mbcView = reinterpret_cast<const CrtThreadMbcInfoLeadByte*>(codePageLocale->mbcinfo);
       isLeadByte = (mbcView->leadByteFlags[static_cast<unsigned char>(sourceBytes[0])] & 0x4u) != 0u;
     } else {
       isLeadByte = (__pctype_func()[static_cast<unsigned char>(sourceBytes[0])] & 0x8000u) != 0u;
@@ -16032,7 +16032,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
    */
   extern "C" bool __cdecl __uncaught_exception()
   {
-    const auto* const threadData = reinterpret_cast<const RuntimeTidDataProcessingThrowView*>(__getptd());
+    const auto* const threadData = reinterpret_cast<const CrtTidDataProcessingThrow*>(__getptd());
     return threadData->mProcessingThrow != 0;
   }
 
@@ -16061,7 +16061,7 @@ extern "C" void __cdecl _UnwindNestedFrames(PVOID targetFrame, PEXCEPTION_RECORD
 
       if (streamIndex >= 20) {
         std::FILE* const cachedStream = __piob[streamIndex];
-        auto* const fileView = reinterpret_cast<RuntimeFileLockView*>(cachedStream);
+        auto* const fileView = reinterpret_cast<CrtFileLock*>(cachedStream);
         ::DeleteCriticalSection(&fileView->lock);
         _free_crt(cachedStream);
         __piob[streamIndex] = nullptr;
