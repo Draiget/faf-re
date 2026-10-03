@@ -602,7 +602,7 @@ static_assert(
 );
 static_assert(sizeof(MparbfBuffer) == 0x18, "MparbfBuffer size must be 0x18");
 
-struct SfxaRuntimeHandleView
+struct SfxaHandle
 {
   using LuminanceTableBuilderCallback = std::int32_t(__cdecl*)(std::int32_t laneA, std::int32_t laneB, std::int32_t laneC, std::int32_t laneD);
   using AlphaTableBuilderCallback = std::int32_t(__cdecl*)(std::int32_t destinationAddress, std::int32_t alpha0, std::int32_t alpha1, std::int32_t alpha2);
@@ -621,44 +621,44 @@ struct SfxaRuntimeHandleView
   AlphaTableBuilderCallback alpha3211Builder = nullptr; // +0x20
 };
 
-static_assert(offsetof(SfxaRuntimeHandleView, used) == 0x00, "SfxaRuntimeHandleView::used offset must be 0x00");
+static_assert(offsetof(SfxaHandle, used) == 0x00, "SfxaHandle::used offset must be 0x00");
 static_assert(
-  offsetof(SfxaRuntimeHandleView, needsLumiTableUpdate) == 0x04,
-  "SfxaRuntimeHandleView::needsLumiTableUpdate offset must be 0x04"
+  offsetof(SfxaHandle, needsLumiTableUpdate) == 0x04,
+  "SfxaHandle::needsLumiTableUpdate offset must be 0x04"
 );
-static_assert(offsetof(SfxaRuntimeHandleView, luminancePivot) == 0x08, "SfxaRuntimeHandleView::luminancePivot offset must be 0x08");
-static_assert(offsetof(SfxaRuntimeHandleView, luminanceMin) == 0x0C, "SfxaRuntimeHandleView::luminanceMin offset must be 0x0C");
-static_assert(offsetof(SfxaRuntimeHandleView, luminanceMax) == 0x10, "SfxaRuntimeHandleView::luminanceMax offset must be 0x10");
-static_assert(offsetof(SfxaRuntimeHandleView, alpha0) == 0x14, "SfxaRuntimeHandleView::alpha0 offset must be 0x14");
-static_assert(offsetof(SfxaRuntimeHandleView, alpha1) == 0x15, "SfxaRuntimeHandleView::alpha1 offset must be 0x15");
-static_assert(offsetof(SfxaRuntimeHandleView, alpha2) == 0x16, "SfxaRuntimeHandleView::alpha2 offset must be 0x16");
+static_assert(offsetof(SfxaHandle, luminancePivot) == 0x08, "SfxaHandle::luminancePivot offset must be 0x08");
+static_assert(offsetof(SfxaHandle, luminanceMin) == 0x0C, "SfxaHandle::luminanceMin offset must be 0x0C");
+static_assert(offsetof(SfxaHandle, luminanceMax) == 0x10, "SfxaHandle::luminanceMax offset must be 0x10");
+static_assert(offsetof(SfxaHandle, alpha0) == 0x14, "SfxaHandle::alpha0 offset must be 0x14");
+static_assert(offsetof(SfxaHandle, alpha1) == 0x15, "SfxaHandle::alpha1 offset must be 0x15");
+static_assert(offsetof(SfxaHandle, alpha2) == 0x16, "SfxaHandle::alpha2 offset must be 0x16");
 static_assert(
-  offsetof(SfxaRuntimeHandleView, luminanceBuilder) == 0x18,
-  "SfxaRuntimeHandleView::luminanceBuilder offset must be 0x18"
-);
-static_assert(
-  offsetof(SfxaRuntimeHandleView, alpha3110Builder) == 0x1C,
-  "SfxaRuntimeHandleView::alpha3110Builder offset must be 0x1C"
+  offsetof(SfxaHandle, luminanceBuilder) == 0x18,
+  "SfxaHandle::luminanceBuilder offset must be 0x18"
 );
 static_assert(
-  offsetof(SfxaRuntimeHandleView, alpha3211Builder) == 0x20,
-  "SfxaRuntimeHandleView::alpha3211Builder offset must be 0x20"
+  offsetof(SfxaHandle, alpha3110Builder) == 0x1C,
+  "SfxaHandle::alpha3110Builder offset must be 0x1C"
 );
-static_assert(sizeof(SfxaRuntimeHandleView) == 0x24, "SfxaRuntimeHandleView size must be 0x24");
+static_assert(
+  offsetof(SfxaHandle, alpha3211Builder) == 0x20,
+  "SfxaHandle::alpha3211Builder offset must be 0x20"
+);
+static_assert(sizeof(SfxaHandle) == 0x24, "SfxaHandle size must be 0x24");
 
-struct SfxaLibWorkView
+struct SfxaLibWork
 {
   std::int32_t cur = 0; // +0x00
   std::int32_t last = 0; // +0x04
-  std::array<SfxaRuntimeHandleView, 32> objects{}; // +0x08
+  std::array<SfxaHandle, 32> objects{}; // +0x08
 };
 
-static_assert(offsetof(SfxaLibWorkView, cur) == 0x00, "SfxaLibWorkView::cur offset must be 0x00");
-static_assert(offsetof(SfxaLibWorkView, last) == 0x04, "SfxaLibWorkView::last offset must be 0x04");
-static_assert(offsetof(SfxaLibWorkView, objects) == 0x08, "SfxaLibWorkView::objects offset must be 0x08");
-static_assert(sizeof(SfxaLibWorkView) == 0x488, "SfxaLibWorkView size must be 0x488");
+static_assert(offsetof(SfxaLibWork, cur) == 0x00, "SfxaLibWork::cur offset must be 0x00");
+static_assert(offsetof(SfxaLibWork, last) == 0x04, "SfxaLibWork::last offset must be 0x04");
+static_assert(offsetof(SfxaLibWork, objects) == 0x08, "SfxaLibWork::objects offset must be 0x08");
+static_assert(sizeof(SfxaLibWork) == 0x488, "SfxaLibWork size must be 0x488");
 
-struct SfbufInitLayoutConfigView
+struct SfbufInitLayoutConfig
 {
   std::int32_t mUnknown00 = 0; // +0x00
   std::int32_t baseBufferAddress = 0; // +0x04
@@ -667,20 +667,20 @@ struct SfbufInitLayoutConfigView
 };
 
 static_assert(
-  offsetof(SfbufInitLayoutConfigView, baseBufferAddress) == 0x04,
-  "SfbufInitLayoutConfigView::baseBufferAddress offset must be 0x04"
+  offsetof(SfbufInitLayoutConfig, baseBufferAddress) == 0x04,
+  "SfbufInitLayoutConfig::baseBufferAddress offset must be 0x04"
 );
 static_assert(
-  offsetof(SfbufInitLayoutConfigView, laneBufferSizes) == 0x08,
-  "SfbufInitLayoutConfigView::laneBufferSizes offset must be 0x08"
+  offsetof(SfbufInitLayoutConfig, laneBufferSizes) == 0x08,
+  "SfbufInitLayoutConfig::laneBufferSizes offset must be 0x08"
 );
 static_assert(
-  offsetof(SfbufInitLayoutConfigView, lane0ExtraModuloDivisor) == 0x28,
-  "SfbufInitLayoutConfigView::lane0ExtraModuloDivisor offset must be 0x28"
+  offsetof(SfbufInitLayoutConfig, lane0ExtraModuloDivisor) == 0x28,
+  "SfbufInitLayoutConfig::lane0ExtraModuloDivisor offset must be 0x28"
 );
-static_assert(sizeof(SfbufInitLayoutConfigView) == 0x2C, "SfbufInitLayoutConfigView size must be 0x2C");
+static_assert(sizeof(SfbufInitLayoutConfig) == 0x2C, "SfbufInitLayoutConfig size must be 0x2C");
 
-struct SfbufSjCreateStateView
+struct SfbufSjCreateState
 {
   std::int32_t ownerTag = 0; // +0x00
   moho::SofdecSjRingBufferHandle* sjHandle = nullptr; // +0x04
@@ -690,22 +690,22 @@ struct SfbufSjCreateStateView
   std::int32_t mUnknown14 = 0; // +0x14
 };
 
-static_assert(offsetof(SfbufSjCreateStateView, sjHandle) == 0x04, "SfbufSjCreateStateView::sjHandle offset must be 0x04");
+static_assert(offsetof(SfbufSjCreateState, sjHandle) == 0x04, "SfbufSjCreateState::sjHandle offset must be 0x04");
 static_assert(
-  offsetof(SfbufSjCreateStateView, sourceBufferAddress) == 0x08,
-  "SfbufSjCreateStateView::sourceBufferAddress offset must be 0x08"
+  offsetof(SfbufSjCreateState, sourceBufferAddress) == 0x08,
+  "SfbufSjCreateState::sourceBufferAddress offset must be 0x08"
 );
 static_assert(
-  offsetof(SfbufSjCreateStateView, sourceBufferBytes) == 0x0C,
-  "SfbufSjCreateStateView::sourceBufferBytes offset must be 0x0C"
+  offsetof(SfbufSjCreateState, sourceBufferBytes) == 0x0C,
+  "SfbufSjCreateState::sourceBufferBytes offset must be 0x0C"
 );
 static_assert(
-  offsetof(SfbufSjCreateStateView, extraBufferBytes) == 0x10,
-  "SfbufSjCreateStateView::extraBufferBytes offset must be 0x10"
+  offsetof(SfbufSjCreateState, extraBufferBytes) == 0x10,
+  "SfbufSjCreateState::extraBufferBytes offset must be 0x10"
 );
-static_assert(sizeof(SfbufSjCreateStateView) == 0x18, "SfbufSjCreateStateView size must be 0x18");
+static_assert(sizeof(SfbufSjCreateState) == 0x18, "SfbufSjCreateState size must be 0x18");
 
-struct SfbufSupplyLaneView
+struct SfbufRingLane
 {
   std::int32_t laneType = 0; // +0x00
   std::int32_t isSetup = 0; // +0x04
@@ -729,49 +729,49 @@ struct SfbufSupplyLaneView
   std::uint8_t mUnknown54[0x20]{}; // +0x54
 };
 
-static_assert(offsetof(SfbufSupplyLaneView, laneType) == 0x00, "SfbufSupplyLaneView::laneType offset must be 0x00");
-static_assert(offsetof(SfbufSupplyLaneView, isSetup) == 0x04, "SfbufSupplyLaneView::isSetup offset must be 0x04");
-static_assert(offsetof(SfbufSupplyLaneView, prepFlag) == 0x08, "SfbufSupplyLaneView::prepFlag offset must be 0x08");
-static_assert(offsetof(SfbufSupplyLaneView, termFlag) == 0x0C, "SfbufSupplyLaneView::termFlag offset must be 0x0C");
+static_assert(offsetof(SfbufRingLane, laneType) == 0x00, "SfbufRingLane::laneType offset must be 0x00");
+static_assert(offsetof(SfbufRingLane, isSetup) == 0x04, "SfbufRingLane::isSetup offset must be 0x04");
+static_assert(offsetof(SfbufRingLane, prepFlag) == 0x08, "SfbufRingLane::prepFlag offset must be 0x08");
+static_assert(offsetof(SfbufRingLane, termFlag) == 0x0C, "SfbufRingLane::termFlag offset must be 0x0C");
 static_assert(
-  offsetof(SfbufSupplyLaneView, sourceBufferAddress) == 0x10,
-  "SfbufSupplyLaneView::sourceBufferAddress offset must be 0x10"
+  offsetof(SfbufRingLane, sourceBufferAddress) == 0x10,
+  "SfbufRingLane::sourceBufferAddress offset must be 0x10"
 );
 static_assert(
-  offsetof(SfbufSupplyLaneView, sourceBufferBytes) == 0x14,
-  "SfbufSupplyLaneView::sourceBufferBytes offset must be 0x14"
+  offsetof(SfbufRingLane, sourceBufferBytes) == 0x14,
+  "SfbufRingLane::sourceBufferBytes offset must be 0x14"
 );
 static_assert(
-  offsetof(SfbufSupplyLaneView, queuedDataBytes) == 0x1C,
-  "SfbufSupplyLaneView::queuedDataBytes offset must be 0x1C"
+  offsetof(SfbufRingLane, queuedDataBytes) == 0x1C,
+  "SfbufRingLane::queuedDataBytes offset must be 0x1C"
 );
 static_assert(
-  offsetof(SfbufSupplyLaneView, delimiterPrimaryAddress) == 0x28,
-  "SfbufSupplyLaneView::delimiterPrimaryAddress offset must be 0x28"
+  offsetof(SfbufRingLane, delimiterPrimaryAddress) == 0x28,
+  "SfbufRingLane::delimiterPrimaryAddress offset must be 0x28"
 );
 static_assert(
-  offsetof(SfbufSupplyLaneView, delimiterSecondaryAddress) == 0x2C,
-  "SfbufSupplyLaneView::delimiterSecondaryAddress offset must be 0x2C"
+  offsetof(SfbufRingLane, delimiterSecondaryAddress) == 0x2C,
+  "SfbufRingLane::delimiterSecondaryAddress offset must be 0x2C"
 );
 static_assert(
-  offsetof(SfbufSupplyLaneView, writeTotalBytes) == 0x30,
-  "SfbufSupplyLaneView::writeTotalBytes offset must be 0x30"
+  offsetof(SfbufRingLane, writeTotalBytes) == 0x30,
+  "SfbufRingLane::writeTotalBytes offset must be 0x30"
 );
 static_assert(
-  offsetof(SfbufSupplyLaneView, readTotalBytes) == 0x34,
-  "SfbufSupplyLaneView::readTotalBytes offset must be 0x34"
+  offsetof(SfbufRingLane, readTotalBytes) == 0x34,
+  "SfbufRingLane::readTotalBytes offset must be 0x34"
 );
 static_assert(
-  offsetof(SfbufSupplyLaneView, runtimeState0) == 0x4C,
-  "SfbufSupplyLaneView::runtimeState0 offset must be 0x4C"
+  offsetof(SfbufRingLane, runtimeState0) == 0x4C,
+  "SfbufRingLane::runtimeState0 offset must be 0x4C"
 );
 static_assert(
-  offsetof(SfbufSupplyLaneView, runtimeState1) == 0x50,
-  "SfbufSupplyLaneView::runtimeState1 offset must be 0x50"
+  offsetof(SfbufRingLane, runtimeState1) == 0x50,
+  "SfbufRingLane::runtimeState1 offset must be 0x50"
 );
-static_assert(sizeof(SfbufSupplyLaneView) == 0x74, "SfbufSupplyLaneView size must be 0x74");
+static_assert(sizeof(SfbufRingLane) == 0x74, "SfbufRingLane size must be 0x74");
 
-struct SfbufUochDescriptorView
+struct SfbufUochDescriptor
 {
   std::int32_t word0 = 0; // +0x00
   std::int32_t word1 = 0; // +0x04
@@ -779,13 +779,13 @@ struct SfbufUochDescriptorView
   std::int32_t word3 = 0; // +0x0C
 };
 
-static_assert(offsetof(SfbufUochDescriptorView, word0) == 0x00, "SfbufUochDescriptorView::word0 offset must be 0x00");
-static_assert(offsetof(SfbufUochDescriptorView, word1) == 0x04, "SfbufUochDescriptorView::word1 offset must be 0x04");
-static_assert(offsetof(SfbufUochDescriptorView, word2) == 0x08, "SfbufUochDescriptorView::word2 offset must be 0x08");
-static_assert(offsetof(SfbufUochDescriptorView, word3) == 0x0C, "SfbufUochDescriptorView::word3 offset must be 0x0C");
-static_assert(sizeof(SfbufUochDescriptorView) == 0x10, "SfbufUochDescriptorView size must be 0x10");
+static_assert(offsetof(SfbufUochDescriptor, word0) == 0x00, "SfbufUochDescriptor::word0 offset must be 0x00");
+static_assert(offsetof(SfbufUochDescriptor, word1) == 0x04, "SfbufUochDescriptor::word1 offset must be 0x04");
+static_assert(offsetof(SfbufUochDescriptor, word2) == 0x08, "SfbufUochDescriptor::word2 offset must be 0x08");
+static_assert(offsetof(SfbufUochDescriptor, word3) == 0x0C, "SfbufUochDescriptor::word3 offset must be 0x0C");
+static_assert(sizeof(SfbufUochDescriptor) == 0x10, "SfbufUochDescriptor size must be 0x10");
 
-struct SfbufRingCursorSnapshotView
+struct SfbufRingCursorSnapshot
 {
   moho::SjChunkRange firstChunk{}; // +0x00
   moho::SjChunkRange secondChunk{}; // +0x08
@@ -793,20 +793,20 @@ struct SfbufRingCursorSnapshotView
 };
 
 static_assert(
-  offsetof(SfbufRingCursorSnapshotView, firstChunk) == 0x00,
-  "SfbufRingCursorSnapshotView::firstChunk offset must be 0x00"
+  offsetof(SfbufRingCursorSnapshot, firstChunk) == 0x00,
+  "SfbufRingCursorSnapshot::firstChunk offset must be 0x00"
 );
 static_assert(
-  offsetof(SfbufRingCursorSnapshotView, secondChunk) == 0x08,
-  "SfbufRingCursorSnapshotView::secondChunk offset must be 0x08"
+  offsetof(SfbufRingCursorSnapshot, secondChunk) == 0x08,
+  "SfbufRingCursorSnapshot::secondChunk offset must be 0x08"
 );
 static_assert(
-  offsetof(SfbufRingCursorSnapshotView, reservedWords) == 0x10,
-  "SfbufRingCursorSnapshotView::reservedWords offset must be 0x10"
+  offsetof(SfbufRingCursorSnapshot, reservedWords) == 0x10,
+  "SfbufRingCursorSnapshot::reservedWords offset must be 0x10"
 );
-static_assert(sizeof(SfbufRingCursorSnapshotView) == 0x1C, "SfbufRingCursorSnapshotView size must be 0x1C");
+static_assert(sizeof(SfbufRingCursorSnapshot) == 0x1C, "SfbufRingCursorSnapshot size must be 0x1C");
 
-struct SfbufSupplyStateWindowView
+struct SfbufSupplyStateWindow
 {
   std::int32_t sourceBufferAddress = 0; // +0x00
   std::int32_t ringHandleAddress = 0; // +0x04
@@ -819,28 +819,28 @@ struct SfbufSupplyStateWindowView
 };
 
 static_assert(
-  offsetof(SfbufSupplyStateWindowView, ringHandleAddress) == 0x04,
-  "SfbufSupplyStateWindowView::ringHandleAddress offset must be 0x04"
+  offsetof(SfbufSupplyStateWindow, ringHandleAddress) == 0x04,
+  "SfbufSupplyStateWindow::ringHandleAddress offset must be 0x04"
 );
 static_assert(
-  offsetof(SfbufSupplyStateWindowView, delimiterPrimaryAddress) == 0x18,
-  "SfbufSupplyStateWindowView::delimiterPrimaryAddress offset must be 0x18"
+  offsetof(SfbufSupplyStateWindow, delimiterPrimaryAddress) == 0x18,
+  "SfbufSupplyStateWindow::delimiterPrimaryAddress offset must be 0x18"
 );
 static_assert(
-  offsetof(SfbufSupplyStateWindowView, delimiterSecondaryAddress) == 0x1C,
-  "SfbufSupplyStateWindowView::delimiterSecondaryAddress offset must be 0x1C"
+  offsetof(SfbufSupplyStateWindow, delimiterSecondaryAddress) == 0x1C,
+  "SfbufSupplyStateWindow::delimiterSecondaryAddress offset must be 0x1C"
 );
-static_assert(sizeof(SfbufSupplyStateWindowView) == 0x20, "SfbufSupplyStateWindowView size must be 0x20");
+static_assert(sizeof(SfbufSupplyStateWindow) == 0x20, "SfbufSupplyStateWindow size must be 0x20");
 
-struct SfbufRuntimeStatusView
+struct SfbufStatus
 {
   std::uint8_t mUnknown00[0x44]{};
   std::int32_t dirtyFlag = 0; // +0x44
 };
 
-static_assert(offsetof(SfbufRuntimeStatusView, dirtyFlag) == 0x44, "SfbufRuntimeStatusView::dirtyFlag offset must be 0x44");
+static_assert(offsetof(SfbufStatus, dirtyFlag) == 0x44, "SfbufStatus::dirtyFlag offset must be 0x44");
 
-struct SfbufAringLaneStateView
+struct SfbufAringLaneState
 {
   std::int32_t transferParam0 = 0; // +0x00
   std::int32_t sampleMode = 0; // +0x04
@@ -859,52 +859,52 @@ struct SfbufAringLaneStateView
 };
 
 static_assert(
-  offsetof(SfbufAringLaneStateView, transferParam0) == 0x00,
-  "SfbufAringLaneStateView::transferParam0 offset must be 0x00"
+  offsetof(SfbufAringLaneState, transferParam0) == 0x00,
+  "SfbufAringLaneState::transferParam0 offset must be 0x00"
 );
 static_assert(
-  offsetof(SfbufAringLaneStateView, sampleMode) == 0x04,
-  "SfbufAringLaneStateView::sampleMode offset must be 0x04"
+  offsetof(SfbufAringLaneState, sampleMode) == 0x04,
+  "SfbufAringLaneState::sampleMode offset must be 0x04"
 );
 static_assert(
-  offsetof(SfbufAringLaneStateView, transferParam2) == 0x08,
-  "SfbufAringLaneStateView::transferParam2 offset must be 0x08"
+  offsetof(SfbufAringLaneState, transferParam2) == 0x08,
+  "SfbufAringLaneState::transferParam2 offset must be 0x08"
 );
 static_assert(
-  offsetof(SfbufAringLaneStateView, primarySampleBaseAddress) == 0x0C,
-  "SfbufAringLaneStateView::primarySampleBaseAddress offset must be 0x0C"
+  offsetof(SfbufAringLaneState, primarySampleBaseAddress) == 0x0C,
+  "SfbufAringLaneState::primarySampleBaseAddress offset must be 0x0C"
 );
 static_assert(
-  offsetof(SfbufAringLaneStateView, secondarySampleBaseAddress) == 0x10,
-  "SfbufAringLaneStateView::secondarySampleBaseAddress offset must be 0x10"
+  offsetof(SfbufAringLaneState, secondarySampleBaseAddress) == 0x10,
+  "SfbufAringLaneState::secondarySampleBaseAddress offset must be 0x10"
 );
 static_assert(
-  offsetof(SfbufAringLaneStateView, ringCapacitySamples) == 0x14,
-  "SfbufAringLaneStateView::ringCapacitySamples offset must be 0x14"
+  offsetof(SfbufAringLaneState, ringCapacitySamples) == 0x14,
+  "SfbufAringLaneState::ringCapacitySamples offset must be 0x14"
 );
 static_assert(
-  offsetof(SfbufAringLaneStateView, writeCursorSamples) == 0x18,
-  "SfbufAringLaneStateView::writeCursorSamples offset must be 0x18"
+  offsetof(SfbufAringLaneState, writeCursorSamples) == 0x18,
+  "SfbufAringLaneState::writeCursorSamples offset must be 0x18"
 );
 static_assert(
-  offsetof(SfbufAringLaneStateView, readCursorSamples) == 0x1C,
-  "SfbufAringLaneStateView::readCursorSamples offset must be 0x1C"
+  offsetof(SfbufAringLaneState, readCursorSamples) == 0x1C,
+  "SfbufAringLaneState::readCursorSamples offset must be 0x1C"
 );
 static_assert(
-  offsetof(SfbufAringLaneStateView, writeTotalSamples) == 0x20,
-  "SfbufAringLaneStateView::writeTotalSamples offset must be 0x20"
+  offsetof(SfbufAringLaneState, writeTotalSamples) == 0x20,
+  "SfbufAringLaneState::writeTotalSamples offset must be 0x20"
 );
 static_assert(
-  offsetof(SfbufAringLaneStateView, readTotalSamples) == 0x24,
-  "SfbufAringLaneStateView::readTotalSamples offset must be 0x24"
+  offsetof(SfbufAringLaneState, readTotalSamples) == 0x24,
+  "SfbufAringLaneState::readTotalSamples offset must be 0x24"
 );
 static_assert(
-  offsetof(SfbufAringLaneStateView, transferHandleAddress) == 0x34,
-  "SfbufAringLaneStateView::transferHandleAddress offset must be 0x34"
+  offsetof(SfbufAringLaneState, transferHandleAddress) == 0x34,
+  "SfbufAringLaneState::transferHandleAddress offset must be 0x34"
 );
-static_assert(sizeof(SfbufAringLaneStateView) == 0x38, "SfbufAringLaneStateView size must be 0x38");
+static_assert(sizeof(SfbufAringLaneState) == 0x38, "SfbufAringLaneState size must be 0x38");
 
-struct SfbufAringTransferSnapshotView
+struct SfbufAringTransferSnapshot
 {
   std::int32_t transferParam0 = 0; // +0x00
   std::int32_t sampleMode = 0; // +0x04
@@ -920,52 +920,52 @@ struct SfbufAringTransferSnapshotView
 };
 
 static_assert(
-  offsetof(SfbufAringTransferSnapshotView, transferParam0) == 0x00,
-  "SfbufAringTransferSnapshotView::transferParam0 offset must be 0x00"
+  offsetof(SfbufAringTransferSnapshot, transferParam0) == 0x00,
+  "SfbufAringTransferSnapshot::transferParam0 offset must be 0x00"
 );
 static_assert(
-  offsetof(SfbufAringTransferSnapshotView, sampleMode) == 0x04,
-  "SfbufAringTransferSnapshotView::sampleMode offset must be 0x04"
+  offsetof(SfbufAringTransferSnapshot, sampleMode) == 0x04,
+  "SfbufAringTransferSnapshot::sampleMode offset must be 0x04"
 );
 static_assert(
-  offsetof(SfbufAringTransferSnapshotView, transferParam2) == 0x08,
-  "SfbufAringTransferSnapshotView::transferParam2 offset must be 0x08"
+  offsetof(SfbufAringTransferSnapshot, transferParam2) == 0x08,
+  "SfbufAringTransferSnapshot::transferParam2 offset must be 0x08"
 );
 static_assert(
-  offsetof(SfbufAringTransferSnapshotView, chunkSampleCount) == 0x0C,
-  "SfbufAringTransferSnapshotView::chunkSampleCount offset must be 0x0C"
+  offsetof(SfbufAringTransferSnapshot, chunkSampleCount) == 0x0C,
+  "SfbufAringTransferSnapshot::chunkSampleCount offset must be 0x0C"
 );
 static_assert(
-  offsetof(SfbufAringTransferSnapshotView, primaryChunkAddress) == 0x14,
-  "SfbufAringTransferSnapshotView::primaryChunkAddress offset must be 0x14"
+  offsetof(SfbufAringTransferSnapshot, primaryChunkAddress) == 0x14,
+  "SfbufAringTransferSnapshot::primaryChunkAddress offset must be 0x14"
 );
 static_assert(
-  offsetof(SfbufAringTransferSnapshotView, secondaryChunkAddress) == 0x18,
-  "SfbufAringTransferSnapshotView::secondaryChunkAddress offset must be 0x18"
+  offsetof(SfbufAringTransferSnapshot, secondaryChunkAddress) == 0x18,
+  "SfbufAringTransferSnapshot::secondaryChunkAddress offset must be 0x18"
 );
 static_assert(
-  offsetof(SfbufAringTransferSnapshotView, writeTotalSamples) == 0x24,
-  "SfbufAringTransferSnapshotView::writeTotalSamples offset must be 0x24"
+  offsetof(SfbufAringTransferSnapshot, writeTotalSamples) == 0x24,
+  "SfbufAringTransferSnapshot::writeTotalSamples offset must be 0x24"
 );
 static_assert(
-  offsetof(SfbufAringTransferSnapshotView, readTotalSamples) == 0x28,
-  "SfbufAringTransferSnapshotView::readTotalSamples offset must be 0x28"
+  offsetof(SfbufAringTransferSnapshot, readTotalSamples) == 0x28,
+  "SfbufAringTransferSnapshot::readTotalSamples offset must be 0x28"
 );
-static_assert(sizeof(SfbufAringTransferSnapshotView) == 0x2C, "SfbufAringTransferSnapshotView size must be 0x2C");
+static_assert(sizeof(SfbufAringTransferSnapshot) == 0x2C, "SfbufAringTransferSnapshot size must be 0x2C");
 
-struct SfbufRuntimeHandleView
+struct SfbufHandle
 {
   std::uint8_t mUnknown00[0x1310]{}; // +0x00
   /// Nine lanes, not eight. `SFBUF_InitHn` only builds 0..7, which is what the
   /// eight-entry guess was based on, but lane 8 is live: `sfmps_GetTermDst`
   /// reads its termination flag, and `SFTRN_CallTrSetup` walks nine transfer
-  /// lanes (the matching `SftrnTransferRuntimeView::transferLanes` is 9 too).
+  /// lanes (the matching `SftrnTransferLanes::transferLanes` is 9 too).
   /// Sized at eight, the lane-8 read tripped the debug bounds check inside
   /// `std::array` and wedged the process partway through the SFD prepare pass.
-  std::array<SfbufSupplyLaneView, 9> lanes{}; // +0x1310
+  std::array<SfbufRingLane, 9> lanes{}; // +0x1310
 };
 
-static_assert(offsetof(SfbufRuntimeHandleView, lanes) == 0x1310, "SfbufRuntimeHandleView::lanes offset must be 0x1310");
+static_assert(offsetof(SfbufHandle, lanes) == 0x1310, "SfbufHandle::lanes offset must be 0x1310");
 
 /**
  * Per-stream entry point of a transfer strategy.
@@ -1022,14 +1022,14 @@ static_assert(sizeof(SofdecTransferStrategy) == 0x38, "SofdecTransferStrategy si
  * next static, `mwsfd_initsfdpara`, begins at 0x00D7F40C and its `callbacks`
  * field points back at 0x00D7F3D0.
  */
-struct SftrnEntryListView
+struct SftrnEntryList
 {
   std::array<SofdecTransferStrategy*, 15> entries{};
 };
 
-static_assert(sizeof(SftrnEntryListView) == 0x3C, "SftrnEntryListView size must be 0x3C");
+static_assert(sizeof(SftrnEntryList) == 0x3C, "SftrnEntryList size must be 0x3C");
 
-struct SftrnTransferDataLaneView
+struct SftrnTransferDataLane
 {
   std::int32_t prepFlag = 0; // +0x00
   std::int32_t termFlag = 0; // +0x04
@@ -1044,55 +1044,55 @@ struct SftrnTransferDataLaneView
 };
 
 static_assert(
-  offsetof(SftrnTransferDataLaneView, prepFlag) == 0x00,
-  "SftrnTransferDataLaneView::prepFlag offset must be 0x00"
+  offsetof(SftrnTransferDataLane, prepFlag) == 0x00,
+  "SftrnTransferDataLane::prepFlag offset must be 0x00"
 );
 static_assert(
-  offsetof(SftrnTransferDataLaneView, termFlag) == 0x04,
-  "SftrnTransferDataLaneView::termFlag offset must be 0x04"
+  offsetof(SftrnTransferDataLane, termFlag) == 0x04,
+  "SftrnTransferDataLane::termFlag offset must be 0x04"
 );
 static_assert(
-  offsetof(SftrnTransferDataLaneView, setupState) == 0x08,
-  "SftrnTransferDataLaneView::setupState offset must be 0x08"
+  offsetof(SftrnTransferDataLane, setupState) == 0x08,
+  "SftrnTransferDataLane::setupState offset must be 0x08"
 );
 static_assert(
-  offsetof(SftrnTransferDataLaneView, transferDescriptorAddress) == 0x0C,
-  "SftrnTransferDataLaneView::transferDescriptorAddress offset must be 0x0C"
+  offsetof(SftrnTransferDataLane, transferDescriptorAddress) == 0x0C,
+  "SftrnTransferDataLane::transferDescriptorAddress offset must be 0x0C"
 );
 static_assert(
-  offsetof(SftrnTransferDataLaneView, sourceLaneIndex) == 0x10,
-  "SftrnTransferDataLaneView::sourceLaneIndex offset must be 0x10"
+  offsetof(SftrnTransferDataLane, sourceLaneIndex) == 0x10,
+  "SftrnTransferDataLane::sourceLaneIndex offset must be 0x10"
 );
 static_assert(
-  offsetof(SftrnTransferDataLaneView, targetLaneIndex0) == 0x14,
-  "SftrnTransferDataLaneView::targetLaneIndex0 offset must be 0x14"
+  offsetof(SftrnTransferDataLane, targetLaneIndex0) == 0x14,
+  "SftrnTransferDataLane::targetLaneIndex0 offset must be 0x14"
 );
 static_assert(
-  offsetof(SftrnTransferDataLaneView, targetLaneIndex1) == 0x18,
-  "SftrnTransferDataLaneView::targetLaneIndex1 offset must be 0x18"
+  offsetof(SftrnTransferDataLane, targetLaneIndex1) == 0x18,
+  "SftrnTransferDataLane::targetLaneIndex1 offset must be 0x18"
 );
 static_assert(
-  offsetof(SftrnTransferDataLaneView, targetLaneIndex2) == 0x1C,
-  "SftrnTransferDataLaneView::targetLaneIndex2 offset must be 0x1C"
+  offsetof(SftrnTransferDataLane, targetLaneIndex2) == 0x1C,
+  "SftrnTransferDataLane::targetLaneIndex2 offset must be 0x1C"
 );
 static_assert(
-  offsetof(SftrnTransferDataLaneView, transferEndState) == 0x20,
-  "SftrnTransferDataLaneView::transferEndState offset must be 0x20"
+  offsetof(SftrnTransferDataLane, transferEndState) == 0x20,
+  "SftrnTransferDataLane::transferEndState offset must be 0x20"
 );
-static_assert(sizeof(SftrnTransferDataLaneView) == 0x44, "SftrnTransferDataLaneView size must be 0x44");
+static_assert(sizeof(SftrnTransferDataLane) == 0x44, "SftrnTransferDataLane size must be 0x44");
 
-struct SftrnTransferRuntimeView
+struct SftrnTransferLanes
 {
   std::uint8_t mUnknown00[0x1F30]{}; // +0x00
-  std::array<SftrnTransferDataLaneView, 9> transferLanes{}; // +0x1F30
+  std::array<SftrnTransferDataLane, 9> transferLanes{}; // +0x1F30
 };
 
 static_assert(
-  offsetof(SftrnTransferRuntimeView, transferLanes) == 0x1F30,
-  "SftrnTransferRuntimeView::transferLanes offset must be 0x1F30"
+  offsetof(SftrnTransferLanes, transferLanes) == 0x1F30,
+  "SftrnTransferLanes::transferLanes offset must be 0x1F30"
 );
 
-struct SftrnBuildConfigView
+struct SftrnBuildConfig
 {
   std::int32_t mUnknown00 = 0; // +0x00
   std::int32_t hasSystemLane = 0; // +0x04
@@ -1104,20 +1104,20 @@ struct SftrnBuildConfigView
   std::int32_t hasUserLane = 0; // +0x20
 };
 
-static_assert(offsetof(SftrnBuildConfigView, hasSystemLane) == 0x04, "SftrnBuildConfigView::hasSystemLane offset must be 0x04");
-static_assert(offsetof(SftrnBuildConfigView, hasAudioLane) == 0x08, "SftrnBuildConfigView::hasAudioLane offset must be 0x08");
-static_assert(offsetof(SftrnBuildConfigView, hasVideoLane) == 0x0C, "SftrnBuildConfigView::hasVideoLane offset must be 0x0C");
+static_assert(offsetof(SftrnBuildConfig, hasSystemLane) == 0x04, "SftrnBuildConfig::hasSystemLane offset must be 0x04");
+static_assert(offsetof(SftrnBuildConfig, hasAudioLane) == 0x08, "SftrnBuildConfig::hasAudioLane offset must be 0x08");
+static_assert(offsetof(SftrnBuildConfig, hasVideoLane) == 0x0C, "SftrnBuildConfig::hasVideoLane offset must be 0x0C");
 static_assert(
-  offsetof(SftrnBuildConfigView, hasAudioExtendedLane) == 0x10,
-  "SftrnBuildConfigView::hasAudioExtendedLane offset must be 0x10"
+  offsetof(SftrnBuildConfig, hasAudioExtendedLane) == 0x10,
+  "SftrnBuildConfig::hasAudioExtendedLane offset must be 0x10"
 );
 static_assert(
-  offsetof(SftrnBuildConfigView, hasVideoExtendedLane) == 0x14,
-  "SftrnBuildConfigView::hasVideoExtendedLane offset must be 0x14"
+  offsetof(SftrnBuildConfig, hasVideoExtendedLane) == 0x14,
+  "SftrnBuildConfig::hasVideoExtendedLane offset must be 0x14"
 );
-static_assert(offsetof(SftrnBuildConfigView, hasUserLane) == 0x20, "SftrnBuildConfigView::hasUserLane offset must be 0x20");
+static_assert(offsetof(SftrnBuildConfig, hasUserLane) == 0x20, "SftrnBuildConfig::hasUserLane offset must be 0x20");
 
-struct SftrnWorkctrlStateView
+struct SftrnWorkctrlState
 {
   std::uint8_t mUnknown00[0xBB0]{}; // +0x00
   std::int32_t audioConditionState = 0; // +0xBB0
@@ -1125,56 +1125,56 @@ struct SftrnWorkctrlStateView
 };
 
 static_assert(
-  offsetof(SftrnWorkctrlStateView, audioConditionState) == 0xBB0,
-  "SftrnWorkctrlStateView::audioConditionState offset must be 0xBB0"
+  offsetof(SftrnWorkctrlState, audioConditionState) == 0xBB0,
+  "SftrnWorkctrlState::audioConditionState offset must be 0xBB0"
 );
 static_assert(
-  offsetof(SftrnWorkctrlStateView, videoConditionState) == 0xBB4,
-  "SftrnWorkctrlStateView::videoConditionState offset must be 0xBB4"
+  offsetof(SftrnWorkctrlState, videoConditionState) == 0xBB4,
+  "SftrnWorkctrlState::videoConditionState offset must be 0xBB4"
 );
 
-struct SfsetConditionStateView
+struct SfsetConditionState
 {
   std::uint8_t mUnknown00[0xA0C]{}; // +0x00
   std::array<std::int32_t, 256> setConditions{}; // +0xA0C (at least condition IDs up to 0x48 are observed)
 };
 
 static_assert(
-  offsetof(SfsetConditionStateView, setConditions) == 0xA0C,
-  "SfsetConditionStateView::setConditions offset must be 0xA0C"
+  offsetof(SfsetConditionState, setConditions) == 0xA0C,
+  "SfsetConditionState::setConditions offset must be 0xA0C"
 );
 
-struct SfplyPictureCountView
+struct SfplyPictureCount
 {
   std::int32_t decodedPictureCount = 0; // +0x00
   std::int32_t skippedPictureCount = 0; // +0x04
 };
 
 static_assert(
-  offsetof(SfplyPictureCountView, decodedPictureCount) == 0x00,
-  "SfplyPictureCountView::decodedPictureCount offset must be 0x00"
+  offsetof(SfplyPictureCount, decodedPictureCount) == 0x00,
+  "SfplyPictureCount::decodedPictureCount offset must be 0x00"
 );
 static_assert(
-  offsetof(SfplyPictureCountView, skippedPictureCount) == 0x04,
-  "SfplyPictureCountView::skippedPictureCount offset must be 0x04"
+  offsetof(SfplyPictureCount, skippedPictureCount) == 0x04,
+  "SfplyPictureCount::skippedPictureCount offset must be 0x04"
 );
-static_assert(sizeof(SfplyPictureCountView) == 0x08, "SfplyPictureCountView size must be 0x08");
+static_assert(sizeof(SfplyPictureCount) == 0x08, "SfplyPictureCount size must be 0x08");
 
 using SfplyPictureCountCallback =
-  std::int32_t(__cdecl*)(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t callbackContext, SfplyPictureCountView* pictureCounts);
+  std::int32_t(__cdecl*)(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t callbackContext, SfplyPictureCount* pictureCounts);
 
-struct SfplyFileHeaderLaneView
+struct SfplyFileHeaderLane
 {
   std::uint8_t mUnknown00[0x78]{}; // +0x00
   std::uint8_t fileHeaderState[1]{}; // +0x78
 };
 
 static_assert(
-  offsetof(SfplyFileHeaderLaneView, fileHeaderState) == 0x78,
-  "SfplyFileHeaderLaneView::fileHeaderState offset must be 0x78"
+  offsetof(SfplyFileHeaderLane, fileHeaderState) == 0x78,
+  "SfplyFileHeaderLane::fileHeaderState offset must be 0x78"
 );
 
-struct SfplyRuntimeStateView
+struct SfplyState
 {
   std::uint8_t mUnknown00[0x44]{}; // +0x00
   std::int32_t serverWaitFlag = 0; // +0x44
@@ -1182,7 +1182,7 @@ struct SfplyRuntimeStateView
   std::int32_t phaseLane = 0; // +0x4C
   std::int32_t startupGateFlag = 0; // +0x50
   std::uint8_t mUnknown54[0x8FC]{}; // +0x54
-  SfplyPictureCountView pictureCounts{}; // +0x950
+  SfplyPictureCount pictureCounts{}; // +0x950
   std::uint8_t mUnknown958[0x18]{}; // +0x958
   std::int32_t bpaActiveFlag = 0; // +0x970
   std::int32_t bpaToggleCount = 0; // +0x974
@@ -1199,42 +1199,42 @@ struct SfplyRuntimeStateView
 };
 
 static_assert(
-  offsetof(SfplyRuntimeStateView, serverWaitFlag) == 0x44, "SfplyRuntimeStateView::serverWaitFlag offset must be 0x44"
+  offsetof(SfplyState, serverWaitFlag) == 0x44, "SfplyState::serverWaitFlag offset must be 0x44"
 );
-static_assert(offsetof(SfplyRuntimeStateView, statusLane) == 0x48, "SfplyRuntimeStateView::statusLane offset must be 0x48");
-static_assert(offsetof(SfplyRuntimeStateView, phaseLane) == 0x4C, "SfplyRuntimeStateView::phaseLane offset must be 0x4C");
+static_assert(offsetof(SfplyState, statusLane) == 0x48, "SfplyState::statusLane offset must be 0x48");
+static_assert(offsetof(SfplyState, phaseLane) == 0x4C, "SfplyState::phaseLane offset must be 0x4C");
 static_assert(
-  offsetof(SfplyRuntimeStateView, startupGateFlag) == 0x50, "SfplyRuntimeStateView::startupGateFlag offset must be 0x50"
-);
-static_assert(
-  offsetof(SfplyRuntimeStateView, pictureCounts) == 0x950, "SfplyRuntimeStateView::pictureCounts offset must be 0x950"
+  offsetof(SfplyState, startupGateFlag) == 0x50, "SfplyState::startupGateFlag offset must be 0x50"
 );
 static_assert(
-  offsetof(SfplyRuntimeStateView, bpaActiveFlag) == 0x970, "SfplyRuntimeStateView::bpaActiveFlag offset must be 0x970"
+  offsetof(SfplyState, pictureCounts) == 0x950, "SfplyState::pictureCounts offset must be 0x950"
 );
 static_assert(
-  offsetof(SfplyRuntimeStateView, bpaToggleCount) == 0x974, "SfplyRuntimeStateView::bpaToggleCount offset must be 0x974"
+  offsetof(SfplyState, bpaActiveFlag) == 0x970, "SfplyState::bpaActiveFlag offset must be 0x970"
 );
 static_assert(
-  offsetof(SfplyRuntimeStateView, videoLaneReadyFlag) == 0x978,
-  "SfplyRuntimeStateView::videoLaneReadyFlag offset must be 0x978"
+  offsetof(SfplyState, bpaToggleCount) == 0x974, "SfplyState::bpaToggleCount offset must be 0x974"
 );
 static_assert(
-  offsetof(SfplyRuntimeStateView, setConditions) == 0xA0C, "SfplyRuntimeStateView::setConditions offset must be 0xA0C"
+  offsetof(SfplyState, videoLaneReadyFlag) == 0x978,
+  "SfplyState::videoLaneReadyFlag offset must be 0x978"
 );
 static_assert(
-  offsetof(SfplyRuntimeStateView, bpaWindowTicks) == 0xFB4, "SfplyRuntimeStateView::bpaWindowTicks offset must be 0xFB4"
+  offsetof(SfplyState, setConditions) == 0xA0C, "SfplyState::setConditions offset must be 0xA0C"
 );
 static_assert(
-  offsetof(SfplyRuntimeStateView, bpaTickRate) == 0xFB8, "SfplyRuntimeStateView::bpaTickRate offset must be 0xFB8"
+  offsetof(SfplyState, bpaWindowTicks) == 0xFB4, "SfplyState::bpaWindowTicks offset must be 0xFB4"
 );
 static_assert(
-  offsetof(SfplyRuntimeStateView, startSyncBypassFlag) == 0xFE0,
-  "SfplyRuntimeStateView::startSyncBypassFlag offset must be 0xFE0"
+  offsetof(SfplyState, bpaTickRate) == 0xFB8, "SfplyState::bpaTickRate offset must be 0xFB8"
 );
 static_assert(
-  offsetof(SfplyRuntimeStateView, startSyncCurrentTicks) == 0xFFC,
-  "SfplyRuntimeStateView::startSyncCurrentTicks offset must be 0xFFC"
+  offsetof(SfplyState, startSyncBypassFlag) == 0xFE0,
+  "SfplyState::startSyncBypassFlag offset must be 0xFE0"
+);
+static_assert(
+  offsetof(SfplyState, startSyncCurrentTicks) == 0xFFC,
+  "SfplyState::startSyncCurrentTicks offset must be 0xFFC"
 );
 
 struct SfplyDataLaneReaderVtable
@@ -1271,7 +1271,7 @@ static_assert(
 );
 static_assert(sizeof(SfplyDataLaneDescriptor) == 0x74, "SfplyDataLaneDescriptor size must be 0x74");
 
-struct SfplyDataReadinessIndexView
+struct SfplyDataReadinessIndex
 {
   std::uint8_t mUnknown00[0x1FC8]{};
   std::int32_t activeVideoLaneIndex = 0; // +0x1FC8
@@ -1280,23 +1280,23 @@ struct SfplyDataReadinessIndexView
 };
 
 static_assert(
-  offsetof(SfplyDataReadinessIndexView, activeVideoLaneIndex) == 0x1FC8,
-  "SfplyDataReadinessIndexView::activeVideoLaneIndex offset must be 0x1FC8"
+  offsetof(SfplyDataReadinessIndex, activeVideoLaneIndex) == 0x1FC8,
+  "SfplyDataReadinessIndex::activeVideoLaneIndex offset must be 0x1FC8"
 );
 static_assert(
-  offsetof(SfplyDataReadinessIndexView, activeAudioLaneIndex) == 0x200C,
-  "SfplyDataReadinessIndexView::activeAudioLaneIndex offset must be 0x200C"
+  offsetof(SfplyDataReadinessIndex, activeAudioLaneIndex) == 0x200C,
+  "SfplyDataReadinessIndex::activeAudioLaneIndex offset must be 0x200C"
 );
 
-struct SfplyEndTimeView
+struct SfplyEndTime
 {
   std::uint8_t mUnknown00[0xA5C]{};
   std::int32_t endTimeMajor = 0; // +0xA5C
   std::int32_t endTimeMinor = 0; // +0xA60
 };
 
-static_assert(offsetof(SfplyEndTimeView, endTimeMajor) == 0xA5C, "SfplyEndTimeView::endTimeMajor offset must be 0xA5C");
-static_assert(offsetof(SfplyEndTimeView, endTimeMinor) == 0xA60, "SfplyEndTimeView::endTimeMinor offset must be 0xA60");
+static_assert(offsetof(SfplyEndTime, endTimeMajor) == 0xA5C, "SfplyEndTime::endTimeMajor offset must be 0xA5C");
+static_assert(offsetof(SfplyEndTime, endTimeMinor) == 0xA60, "SfplyEndTime::endTimeMinor offset must be 0xA60");
 
 [[nodiscard]] static SfplyDataLaneDescriptor*
 SfplyGetDataLaneDescriptor(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, const std::int32_t laneIndex)
@@ -1366,7 +1366,7 @@ struct M2asjdIoStream
   virtual std::int32_t QueryAvailableBytes(std::int32_t lane) = 0;
 };
 
-struct AdxampRuntimeState
+struct AdxampState
 {
   std::uint8_t used = 0; // +0x00
   std::uint8_t executionState = 0; // +0x01
@@ -1382,41 +1382,41 @@ struct AdxampRuntimeState
   std::int32_t extractIterationCount = 0; // +0x2C
 };
 
-static_assert(offsetof(AdxampRuntimeState, used) == 0x00, "AdxampRuntimeState::used offset must be 0x00");
+static_assert(offsetof(AdxampState, used) == 0x00, "AdxampState::used offset must be 0x00");
 static_assert(
-  offsetof(AdxampRuntimeState, executionState) == 0x01, "AdxampRuntimeState::executionState offset must be 0x01"
+  offsetof(AdxampState, executionState) == 0x01, "AdxampState::executionState offset must be 0x01"
 );
 static_assert(
-  offsetof(AdxampRuntimeState, outputChannelCount) == 0x02,
-  "AdxampRuntimeState::outputChannelCount offset must be 0x02"
+  offsetof(AdxampState, outputChannelCount) == 0x02,
+  "AdxampState::outputChannelCount offset must be 0x02"
 );
 static_assert(
-  offsetof(AdxampRuntimeState, inputStreams) == 0x04, "AdxampRuntimeState::inputStreams offset must be 0x04"
+  offsetof(AdxampState, inputStreams) == 0x04, "AdxampState::inputStreams offset must be 0x04"
 );
 static_assert(
-  offsetof(AdxampRuntimeState, outputStreams) == 0x0C, "AdxampRuntimeState::outputStreams offset must be 0x0C"
+  offsetof(AdxampState, outputStreams) == 0x0C, "AdxampState::outputStreams offset must be 0x0C"
 );
 static_assert(
-  offsetof(AdxampRuntimeState, extractedSamplesByLane) == 0x14,
-  "AdxampRuntimeState::extractedSamplesByLane offset must be 0x14"
+  offsetof(AdxampState, extractedSamplesByLane) == 0x14,
+  "AdxampState::extractedSamplesByLane offset must be 0x14"
 );
 static_assert(
-  offsetof(AdxampRuntimeState, activeLaneCount) == 0x1C, "AdxampRuntimeState::activeLaneCount offset must be 0x1C"
+  offsetof(AdxampState, activeLaneCount) == 0x1C, "AdxampState::activeLaneCount offset must be 0x1C"
 );
 static_assert(
-  offsetof(AdxampRuntimeState, sampleRate) == 0x20, "AdxampRuntimeState::sampleRate offset must be 0x20"
+  offsetof(AdxampState, sampleRate) == 0x20, "AdxampState::sampleRate offset must be 0x20"
 );
 static_assert(
-  offsetof(AdxampRuntimeState, frameLength) == 0x24, "AdxampRuntimeState::frameLength offset must be 0x24"
+  offsetof(AdxampState, frameLength) == 0x24, "AdxampState::frameLength offset must be 0x24"
 );
 static_assert(
-  offsetof(AdxampRuntimeState, framePeriod) == 0x28, "AdxampRuntimeState::framePeriod offset must be 0x28"
+  offsetof(AdxampState, framePeriod) == 0x28, "AdxampState::framePeriod offset must be 0x28"
 );
 static_assert(
-  offsetof(AdxampRuntimeState, extractIterationCount) == 0x2C,
-  "AdxampRuntimeState::extractIterationCount offset must be 0x2C"
+  offsetof(AdxampState, extractIterationCount) == 0x2C,
+  "AdxampState::extractIterationCount offset must be 0x2C"
 );
-static_assert(sizeof(AdxampRuntimeState) == 0x30, "AdxampRuntimeState size must be 0x30");
+static_assert(sizeof(AdxampState) == 0x30, "AdxampState size must be 0x30");
 
 struct M2asjdDecoderState
 {
@@ -1602,7 +1602,7 @@ using CvFsDeviceOptionFn = std::int32_t(
   __cdecl*
 )(void* optionBuffer, std::int32_t optionCode, std::int32_t optionArg0, std::int32_t optionArg1);
 
-struct CvFsDeviceInterfaceView
+struct CvFsDeviceInterface
 {
   CvFsNoArgOperationFn execServer = nullptr; // +0x00
   CvFsRegisterUserErrorFn registerUserErrorBridge = nullptr; // +0x04
@@ -1633,63 +1633,63 @@ struct CvFsDeviceInterfaceView
 };
 
 static_assert(
-  offsetof(CvFsDeviceInterfaceView, execServer) == 0x00,
-  "CvFsDeviceInterfaceView::execServer offset must be 0x00"
+  offsetof(CvFsDeviceInterface, execServer) == 0x00,
+  "CvFsDeviceInterface::execServer offset must be 0x00"
 );
 static_assert(
-  offsetof(CvFsDeviceInterfaceView, registerUserErrorBridge) == 0x04,
-  "CvFsDeviceInterfaceView::registerUserErrorBridge offset must be 0x04"
+  offsetof(CvFsDeviceInterface, registerUserErrorBridge) == 0x04,
+  "CvFsDeviceInterface::registerUserErrorBridge offset must be 0x04"
 );
-static_assert(offsetof(CvFsDeviceInterfaceView, getFileSize) == 0x08, "CvFsDeviceInterfaceView::getFileSize offset must be 0x08");
-static_assert(offsetof(CvFsDeviceInterfaceView, getFreeSize) == 0x0C, "CvFsDeviceInterfaceView::getFreeSize offset must be 0x0C");
-static_assert(offsetof(CvFsDeviceInterfaceView, openFile) == 0x10, "CvFsDeviceInterfaceView::openFile offset must be 0x10");
+static_assert(offsetof(CvFsDeviceInterface, getFileSize) == 0x08, "CvFsDeviceInterface::getFileSize offset must be 0x08");
+static_assert(offsetof(CvFsDeviceInterface, getFreeSize) == 0x0C, "CvFsDeviceInterface::getFreeSize offset must be 0x0C");
+static_assert(offsetof(CvFsDeviceInterface, openFile) == 0x10, "CvFsDeviceInterface::openFile offset must be 0x10");
 static_assert(
-  offsetof(CvFsDeviceInterfaceView, closeFile) == 0x14, "CvFsDeviceInterfaceView::closeFile offset must be 0x14"
+  offsetof(CvFsDeviceInterface, closeFile) == 0x14, "CvFsDeviceInterface::closeFile offset must be 0x14"
 );
-static_assert(offsetof(CvFsDeviceInterfaceView, seekFile) == 0x18, "CvFsDeviceInterfaceView::seekFile offset must be 0x18");
-static_assert(offsetof(CvFsDeviceInterfaceView, tellPosition) == 0x1C, "CvFsDeviceInterfaceView::tellPosition offset must be 0x1C");
-static_assert(offsetof(CvFsDeviceInterfaceView, requestRead) == 0x20, "CvFsDeviceInterfaceView::requestRead offset must be 0x20");
-static_assert(offsetof(CvFsDeviceInterfaceView, requestWrite) == 0x24, "CvFsDeviceInterfaceView::requestWrite offset must be 0x24");
-static_assert(offsetof(CvFsDeviceInterfaceView, stopTransfer) == 0x28, "CvFsDeviceInterfaceView::stopTransfer offset must be 0x28");
-static_assert(offsetof(CvFsDeviceInterfaceView, getStat) == 0x2C, "CvFsDeviceInterfaceView::getStat offset must be 0x2C");
-static_assert(offsetof(CvFsDeviceInterfaceView, getSectorLength) == 0x30, "CvFsDeviceInterfaceView::getSectorLength offset must be 0x30");
-static_assert(offsetof(CvFsDeviceInterfaceView, setSectorLength) == 0x34, "CvFsDeviceInterfaceView::setSectorLength offset must be 0x34");
-static_assert(offsetof(CvFsDeviceInterfaceView, getTransferCount) == 0x38, "CvFsDeviceInterfaceView::getTransferCount offset must be 0x38");
-static_assert(offsetof(CvFsDeviceInterfaceView, changeDir) == 0x3C, "CvFsDeviceInterfaceView::changeDir offset must be 0x3C");
-static_assert(offsetof(CvFsDeviceInterfaceView, isFileExists) == 0x40, "CvFsDeviceInterfaceView::isFileExists offset must be 0x40");
-static_assert(offsetof(CvFsDeviceInterfaceView, getNumFiles) == 0x44, "CvFsDeviceInterfaceView::getNumFiles offset must be 0x44");
-static_assert(offsetof(CvFsDeviceInterfaceView, loadDirInfo) == 0x48, "CvFsDeviceInterfaceView::loadDirInfo offset must be 0x48");
+static_assert(offsetof(CvFsDeviceInterface, seekFile) == 0x18, "CvFsDeviceInterface::seekFile offset must be 0x18");
+static_assert(offsetof(CvFsDeviceInterface, tellPosition) == 0x1C, "CvFsDeviceInterface::tellPosition offset must be 0x1C");
+static_assert(offsetof(CvFsDeviceInterface, requestRead) == 0x20, "CvFsDeviceInterface::requestRead offset must be 0x20");
+static_assert(offsetof(CvFsDeviceInterface, requestWrite) == 0x24, "CvFsDeviceInterface::requestWrite offset must be 0x24");
+static_assert(offsetof(CvFsDeviceInterface, stopTransfer) == 0x28, "CvFsDeviceInterface::stopTransfer offset must be 0x28");
+static_assert(offsetof(CvFsDeviceInterface, getStat) == 0x2C, "CvFsDeviceInterface::getStat offset must be 0x2C");
+static_assert(offsetof(CvFsDeviceInterface, getSectorLength) == 0x30, "CvFsDeviceInterface::getSectorLength offset must be 0x30");
+static_assert(offsetof(CvFsDeviceInterface, setSectorLength) == 0x34, "CvFsDeviceInterface::setSectorLength offset must be 0x34");
+static_assert(offsetof(CvFsDeviceInterface, getTransferCount) == 0x38, "CvFsDeviceInterface::getTransferCount offset must be 0x38");
+static_assert(offsetof(CvFsDeviceInterface, changeDir) == 0x3C, "CvFsDeviceInterface::changeDir offset must be 0x3C");
+static_assert(offsetof(CvFsDeviceInterface, isFileExists) == 0x40, "CvFsDeviceInterface::isFileExists offset must be 0x40");
+static_assert(offsetof(CvFsDeviceInterface, getNumFiles) == 0x44, "CvFsDeviceInterface::getNumFiles offset must be 0x44");
+static_assert(offsetof(CvFsDeviceInterface, loadDirInfo) == 0x48, "CvFsDeviceInterface::loadDirInfo offset must be 0x48");
 static_assert(
-  offsetof(CvFsDeviceInterfaceView, getMaxByteRate) == 0x4C,
-  "CvFsDeviceInterfaceView::getMaxByteRate offset must be 0x4C"
+  offsetof(CvFsDeviceInterface, getMaxByteRate) == 0x4C,
+  "CvFsDeviceInterface::getMaxByteRate offset must be 0x4C"
 );
-static_assert(offsetof(CvFsDeviceInterfaceView, makeDir) == 0x50, "CvFsDeviceInterfaceView::makeDir offset must be 0x50");
+static_assert(offsetof(CvFsDeviceInterface, makeDir) == 0x50, "CvFsDeviceInterface::makeDir offset must be 0x50");
 static_assert(
-  offsetof(CvFsDeviceInterfaceView, removeDir) == 0x54,
-  "CvFsDeviceInterfaceView::removeDir offset must be 0x54"
+  offsetof(CvFsDeviceInterface, removeDir) == 0x54,
+  "CvFsDeviceInterface::removeDir offset must be 0x54"
 );
 static_assert(
-  offsetof(CvFsDeviceInterfaceView, deleteFile) == 0x58,
-  "CvFsDeviceInterfaceView::deleteFile offset must be 0x58"
+  offsetof(CvFsDeviceInterface, deleteFile) == 0x58,
+  "CvFsDeviceInterface::deleteFile offset must be 0x58"
 );
-static_assert(offsetof(CvFsDeviceInterfaceView, getFileSizeEx) == 0x5C, "CvFsDeviceInterfaceView::getFileSizeEx offset must be 0x5C");
-static_assert(offsetof(CvFsDeviceInterfaceView, option) == 0x60, "CvFsDeviceInterfaceView::option offset must be 0x60");
-static_assert(offsetof(CvFsDeviceInterfaceView, option2) == 0x64, "CvFsDeviceInterfaceView::option2 offset must be 0x64");
-static_assert(sizeof(CvFsDeviceInterfaceView) == 0x68, "CvFsDeviceInterfaceView size must be 0x68");
+static_assert(offsetof(CvFsDeviceInterface, getFileSizeEx) == 0x5C, "CvFsDeviceInterface::getFileSizeEx offset must be 0x5C");
+static_assert(offsetof(CvFsDeviceInterface, option) == 0x60, "CvFsDeviceInterface::option offset must be 0x60");
+static_assert(offsetof(CvFsDeviceInterface, option2) == 0x64, "CvFsDeviceInterface::option2 offset must be 0x64");
+static_assert(sizeof(CvFsDeviceInterface) == 0x68, "CvFsDeviceInterface size must be 0x68");
 
-struct CvFsHandleView
+struct CvFsHandle
 {
-  CvFsDeviceInterfaceView* interfaceView = nullptr; // +0x00
+  CvFsDeviceInterface* interfaceView = nullptr; // +0x00
   std::int32_t handleAddress = 0; // +0x04
 };
 
-static_assert(offsetof(CvFsHandleView, interfaceView) == 0x00, "CvFsHandleView::interfaceView offset must be 0x00");
-static_assert(offsetof(CvFsHandleView, handleAddress) == 0x04, "CvFsHandleView::handleAddress offset must be 0x04");
-static_assert(sizeof(CvFsHandleView) == 0x08, "CvFsHandleView size must be 0x08");
+static_assert(offsetof(CvFsHandle, interfaceView) == 0x00, "CvFsHandle::interfaceView offset must be 0x00");
+static_assert(offsetof(CvFsHandle, handleAddress) == 0x04, "CvFsHandle::handleAddress offset must be 0x04");
+static_assert(sizeof(CvFsHandle) == 0x08, "CvFsHandle size must be 0x08");
 
 struct CvFsDeviceSlot
 {
-  CvFsDeviceInterfaceView* interfaceView = nullptr; // +0x00
+  CvFsDeviceInterface* interfaceView = nullptr; // +0x00
   std::array<char, 12> deviceName{}; // +0x04
 };
 

@@ -91,7 +91,7 @@
     }
 
     ADXCRS_Lock();
-    std::memset(channelExpandHandle, 0, sizeof(AdxampRuntimeState));
+    std::memset(channelExpandHandle, 0, sizeof(AdxampState));
     ADXCRS_Unlock();
   }
 
@@ -103,7 +103,7 @@
    */
   [[maybe_unused]] std::int32_t ADXAMP_GetStat(const void* const channelExpandHandle)
   {
-    return static_cast<std::int32_t>(static_cast<std::int8_t>(AsAdxampRuntimeStateConst(channelExpandHandle)->executionState));
+    return static_cast<std::int32_t>(static_cast<std::int8_t>(AsAdxampStateConst(channelExpandHandle)->executionState));
   }
 
   /**
@@ -115,7 +115,7 @@
    */
   std::int32_t ADXAMP_Start(void* const channelExpandHandle)
   {
-    auto* const runtime = AsAdxampRuntimeState(channelExpandHandle);
+    auto* const runtime = AsAdxampState(channelExpandHandle);
     const std::int32_t outputChannelCount = static_cast<std::int32_t>(runtime->outputChannelCount);
 
     for (std::int32_t lane = 0; lane < outputChannelCount; ++lane) {
@@ -144,7 +144,7 @@
    */
   void ADXAMP_Stop(void* const channelExpandHandle)
   {
-    AsAdxampRuntimeState(channelExpandHandle)->executionState = 0;
+    AsAdxampState(channelExpandHandle)->executionState = 0;
   }
 
   /**
@@ -154,7 +154,7 @@
    * Builds per-frame peak envelopes from source lanes and commits metadata
    * blocks to output lanes.
    */
-  std::int32_t __cdecl adxamp_extract(AdxampRuntimeState* const runtime)
+  std::int32_t __cdecl adxamp_extract(AdxampState* const runtime)
   {
     const auto frameSampleCount =
       static_cast<std::int32_t>(static_cast<double>(runtime->sampleRate) * static_cast<double>(runtime->framePeriod));
@@ -232,7 +232,7 @@
    */
   std::int32_t ADXAMP_ExecHndl(void* const channelExpandHandle)
   {
-    auto* const runtime = AsAdxampRuntimeState(channelExpandHandle);
+    auto* const runtime = AsAdxampState(channelExpandHandle);
     if (runtime->executionState == 2) {
       return adxamp_extract(runtime);
     }
@@ -264,7 +264,7 @@
    */
   std::int32_t ADXAMP_GetExtractNumSmpl(const void* const channelExpandHandle)
   {
-    return AsAdxampRuntimeStateConst(channelExpandHandle)->extractedSamplesByLane[0];
+    return AsAdxampStateConst(channelExpandHandle)->extractedSamplesByLane[0];
   }
 
   /**
@@ -275,7 +275,7 @@
    */
   std::int32_t ADXAMP_SetSfreq(void* const channelExpandHandle, const std::int32_t sampleRate)
   {
-    AsAdxampRuntimeState(channelExpandHandle)->sampleRate = sampleRate;
+    AsAdxampState(channelExpandHandle)->sampleRate = sampleRate;
     return sampleRate;
   }
 
@@ -287,7 +287,7 @@
    */
   std::int32_t ADXAMP_GetSfreq(const void* const channelExpandHandle)
   {
-    return AsAdxampRuntimeStateConst(channelExpandHandle)->sampleRate;
+    return AsAdxampStateConst(channelExpandHandle)->sampleRate;
   }
 
   /**
@@ -298,7 +298,7 @@
    */
   void* ADXAMP_SetFrmLen(void* const channelExpandHandle, const float frameLength)
   {
-    AsAdxampRuntimeState(channelExpandHandle)->frameLength = frameLength;
+    AsAdxampState(channelExpandHandle)->frameLength = frameLength;
     return channelExpandHandle;
   }
 
@@ -310,7 +310,7 @@
    */
   double ADXAMP_GetFrmLen(const void* const channelExpandHandle)
   {
-    return static_cast<double>(AsAdxampRuntimeStateConst(channelExpandHandle)->frameLength);
+    return static_cast<double>(AsAdxampStateConst(channelExpandHandle)->frameLength);
   }
 
   /**
@@ -321,7 +321,7 @@
    */
   void* ADXAMP_SetFrmPrd(void* const channelExpandHandle, const float framePeriod)
   {
-    AsAdxampRuntimeState(channelExpandHandle)->framePeriod = framePeriod;
+    AsAdxampState(channelExpandHandle)->framePeriod = framePeriod;
     return channelExpandHandle;
   }
 
@@ -333,7 +333,7 @@
    */
   double ADXAMP_GetFrmPrd(const void* const channelExpandHandle)
   {
-    return static_cast<double>(AsAdxampRuntimeStateConst(channelExpandHandle)->framePeriod);
+    return static_cast<double>(AsAdxampStateConst(channelExpandHandle)->framePeriod);
   }
 
   /**

@@ -10476,7 +10476,7 @@
   constexpr std::size_t kCvFsDeviceNameBytes = 12;
   constexpr std::size_t kCvFsPathScratchBytes = 300;
   std::array<CvFsDeviceSlot, kCvFsDeviceSlotCount> gCvFsDeviceSlots{};
-  std::array<CvFsHandleView, kCvFsHandlePoolCount> gCvFsHandlePool{};
+  std::array<CvFsHandle, kCvFsHandlePoolCount> gCvFsHandlePool{};
   std::array<char, kCvFsDeviceNameBytes> gCvFsDefaultDeviceName{};
   std::array<char, kCvFsPathScratchBytes> gCvFsAddDevicePathScratch{};
   std::int32_t gCvFsErrorObject = 0;

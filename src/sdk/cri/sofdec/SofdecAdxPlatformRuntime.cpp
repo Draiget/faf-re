@@ -2331,7 +2331,7 @@
 
     // Same six-word shape `sfbuf_CreateSj` builds for the lanes it owns:
     // {kind, sj, buffer address, buffer bytes, extra bytes, 0}.
-    SfbufSjCreateStateView supplyDescriptor{};
+    SfbufSjCreateState supplyDescriptor{};
     supplyDescriptor.sjHandle = reinterpret_cast<moho::SofdecSjRingBufferHandle*>(supplyHandle);
     if (supplyHandle == reinterpret_cast<moho::SofdecSjSupplyHandle*>(ply->sjMemoryHandle)) {
       supplyDescriptor.ownerTag = 1;
@@ -16339,7 +16339,7 @@
     std::int8_t readFlag = 0; // +0x02
     std::uint8_t mUnknown03 = 0; // +0x03
     moho::SofdecSjSupplyHandle* sourceJoinHandle = nullptr; // +0x04
-    CvFsHandleView* cvfsHandle = nullptr; // +0x08
+    CvFsHandle* cvfsHandle = nullptr; // +0x08
     std::int32_t baseOffset = 0; // +0x0C
     std::int32_t fileLengthBytes = 0; // +0x10
     std::int32_t fileLengthSectors = 0; // +0x14
@@ -16662,7 +16662,7 @@
    * Allocates one free ADXSTM slot from realtime partition and initializes it.
    */
   void* ADXSTMF_CreateCvfsRt(
-    CvFsHandleView* const cvfsHandle,
+    CvFsHandle* const cvfsHandle,
     const std::int32_t baseOffset,
     const std::int32_t fileLengthBytes,
     moho::SofdecSjSupplyHandle* const sourceJoinObject
@@ -16687,7 +16687,7 @@
    */
   void ADXSTMF_SetupHandleMember(
     AdxstmServerSlot* const streamHandle,
-    CvFsHandleView* const cvfsHandle,
+    CvFsHandle* const cvfsHandle,
     const std::int32_t baseOffset,
     const std::int32_t fileLengthBytes,
     moho::SofdecSjSupplyHandle* const sourceJoinObject
@@ -16729,7 +16729,7 @@
    * Allocates one free ADXSTM slot from normal partition and initializes it.
    */
   void* ADXSTMF_CreateCvfs(
-    CvFsHandleView* const cvfsHandle,
+    CvFsHandle* const cvfsHandle,
     const std::int32_t baseOffset,
     const std::int32_t fileLengthBytes,
     moho::SofdecSjSupplyHandle* const sourceJoinObject
@@ -17768,7 +17768,7 @@
 
       if (runtime->releaseFilePending == 1) {
         if (runtime->cvfsHandle != nullptr) {
-          CvFsHandleView* const closingHandle = runtime->cvfsHandle;
+          CvFsHandle* const closingHandle = runtime->cvfsHandle;
           runtime->cvfsHandle = nullptr;
           cvFsClose(closingHandle);
         }

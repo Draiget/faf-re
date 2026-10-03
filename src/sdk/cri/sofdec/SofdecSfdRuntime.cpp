@@ -5675,7 +5675,7 @@
   {
     const std::int32_t valid = sfset_IsCondValid(workctrlSubobj, conditionId, value);
     if (valid != 0) {
-      auto* const conditionState = reinterpret_cast<SfsetConditionStateView*>(workctrlSubobj);
+      auto* const conditionState = reinterpret_cast<SfsetConditionState*>(workctrlSubobj);
       conditionState->setConditions[conditionId] = value;
     }
     return valid;
@@ -5862,7 +5862,7 @@
    */
   std::int32_t SFSET_GetCond(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, const std::int32_t conditionId)
   {
-    const auto* const conditionState = reinterpret_cast<const SfsetConditionStateView*>(workctrlSubobj);
+    const auto* const conditionState = reinterpret_cast<const SfsetConditionState*>(workctrlSubobj);
     return conditionState->setConditions[conditionId];
   }
 
@@ -8272,10 +8272,10 @@
     const std::int32_t targetLane
   )
   {
-    auto* const transferRuntime = reinterpret_cast<SftrnTransferRuntimeView*>(workctrlSubobj);
-    auto* const sfbufRuntime = reinterpret_cast<SfbufRuntimeHandleView*>(workctrlSubobj);
+    auto* const transferRuntime = reinterpret_cast<SftrnTransferLanes*>(workctrlSubobj);
+    auto* const sfbufRuntime = reinterpret_cast<SfbufHandle*>(workctrlSubobj);
 
-    SftrnTransferDataLaneView* const sourceTransferLane = &transferRuntime->transferLanes[sourceLane];
+    SftrnTransferDataLane* const sourceTransferLane = &transferRuntime->transferLanes[sourceLane];
     (&sourceTransferLane->targetLaneIndex0)[transferSlot] = targetLane;
     sfbufRuntime->lanes[targetLane].runtimeState0 = sourceLane;
     return 29 * targetLane;
@@ -8290,8 +8290,8 @@
     const std::int32_t targetLane
   )
   {
-    auto* const sfbufRuntime = reinterpret_cast<SfbufRuntimeHandleView*>(workctrlSubobj);
-    auto* const transferRuntime = reinterpret_cast<SftrnTransferRuntimeView*>(workctrlSubobj);
+    auto* const sfbufRuntime = reinterpret_cast<SfbufHandle*>(workctrlSubobj);
+    auto* const transferRuntime = reinterpret_cast<SftrnTransferLanes*>(workctrlSubobj);
 
     sfbufRuntime->lanes[sourceLane].runtimeState1 = targetLane;
     transferRuntime->transferLanes[targetLane].sourceLaneIndex = sourceLane;
@@ -8306,7 +8306,7 @@
     using SftrnTransferCallback =
       std::int32_t(__cdecl*)(std::int32_t workctrlArg, std::int32_t arg0, std::int32_t arg1, std::int32_t arg2);
 
-    auto* const transferRuntime = reinterpret_cast<SftrnTransferRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    auto* const transferRuntime = reinterpret_cast<SftrnTransferLanes*>(SjAddressToPointer(workctrlAddress));
     std::int32_t result = 0;
     for (std::int32_t laneIndex = 0; laneIndex < static_cast<std::int32_t>(transferRuntime->transferLanes.size()); ++laneIndex) {
       const std::int32_t descriptorAddress = transferRuntime->transferLanes[laneIndex].transferDescriptorAddress;
@@ -8335,7 +8335,7 @@
     using SftrnTransferCallback =
       std::int32_t(__cdecl*)(std::int32_t workctrlArg, std::int32_t arg0, std::int32_t arg1, std::int32_t arg2);
 
-    auto* const transferRuntime = reinterpret_cast<SftrnTransferRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    auto* const transferRuntime = reinterpret_cast<SftrnTransferLanes*>(SjAddressToPointer(workctrlAddress));
     const std::int32_t descriptorAddress = transferRuntime->transferLanes[transferLaneIndex].transferDescriptorAddress;
     if (descriptorAddress == 0) {
       return 0;
@@ -8354,7 +8354,7 @@
     const std::int32_t prepFlag
   )
   {
-    auto* const transferRuntime = reinterpret_cast<SftrnTransferRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    auto* const transferRuntime = reinterpret_cast<SftrnTransferLanes*>(SjAddressToPointer(workctrlAddress));
     transferRuntime->transferLanes[transferLaneIndex].prepFlag = prepFlag;
     return workctrlAddress;
   }
@@ -8364,7 +8364,7 @@
    */
   std::int32_t SFTRN_GetPrepFlg(const std::int32_t workctrlAddress, const std::int32_t transferLaneIndex)
   {
-    const auto* const transferRuntime = reinterpret_cast<SftrnTransferRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    const auto* const transferRuntime = reinterpret_cast<SftrnTransferLanes*>(SjAddressToPointer(workctrlAddress));
     return transferRuntime->transferLanes[transferLaneIndex].prepFlag;
   }
 
@@ -8377,7 +8377,7 @@
     const std::int32_t termFlag
   )
   {
-    auto* const transferRuntime = reinterpret_cast<SftrnTransferRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    auto* const transferRuntime = reinterpret_cast<SftrnTransferLanes*>(SjAddressToPointer(workctrlAddress));
     transferRuntime->transferLanes[transferLaneIndex].termFlag = termFlag;
     return workctrlAddress;
   }
@@ -8387,7 +8387,7 @@
    */
   std::int32_t SFTRN_GetTermFlg(const std::int32_t workctrlAddress, const std::int32_t transferLaneIndex)
   {
-    const auto* const transferRuntime = reinterpret_cast<SftrnTransferRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    const auto* const transferRuntime = reinterpret_cast<SftrnTransferLanes*>(SjAddressToPointer(workctrlAddress));
     return transferRuntime->transferLanes[transferLaneIndex].termFlag;
   }
 
@@ -8406,7 +8406,7 @@
    */
   std::int32_t SFTRN_IsSetup(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, const std::int32_t transferLaneType)
   {
-    const auto* const transferRuntime = reinterpret_cast<const SftrnTransferRuntimeView*>(workctrlSubobj);
+    const auto* const transferRuntime = reinterpret_cast<const SftrnTransferLanes*>(workctrlSubobj);
     return (transferRuntime->transferLanes[transferLaneType].transferDescriptorAddress != 0) ? 1 : 0;
   }
 
@@ -8415,7 +8415,7 @@
    */
   std::int32_t SFBUF_RingGetDataSiz(const std::int32_t sfbufHandleAddress, const std::int32_t ringIndex)
   {
-    const auto* const runtimeView = reinterpret_cast<SfbufRuntimeHandleView*>(SjAddressToPointer(sfbufHandleAddress));
+    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
     return runtimeView->lanes[ringIndex].queuedDataBytes;
   }
 
@@ -8424,7 +8424,7 @@
    */
   std::int32_t SFBUF_GetRTot(const std::int32_t sfbufHandleAddress, const std::int32_t ringIndex)
   {
-    const auto* const runtimeView = reinterpret_cast<SfbufRuntimeHandleView*>(SjAddressToPointer(sfbufHandleAddress));
+    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
     return runtimeView->lanes[ringIndex].readTotalBytes;
   }
 
@@ -12405,7 +12405,7 @@
     // written eight bytes past its end and destroys the frame this function
     // returns through - the same defect already fixed on the read side in
     // `sfmps_RingGetRead`.
-    SfbufRingCursorSnapshotView writeSnapshot{};
+    SfbufRingCursorSnapshot writeSnapshot{};
     std::int32_t result = SFBUF_RingGetWrite(
       workctrlAddress,
       destinationLaneIndex,
@@ -12586,7 +12586,7 @@
     // two chunk ranges, so a smaller local is written twelve bytes past its end
     // and the frame this function returns through is destroyed. The binary
     // reserves the matching 0x1C of stack (`ebp-1Ch` .. `ebp-10h`).
-    SfbufRingCursorSnapshotView ringSnapshot{};
+    SfbufRingCursorSnapshot ringSnapshot{};
     const std::int32_t workctrlAddress = SjPointerToAddress(workctrlSubobj);
     const std::int32_t result = SFBUF_RingGetRead(
       workctrlAddress,
@@ -16305,7 +16305,7 @@
    */
   std::int32_t sfply_StatStop(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    const auto* const stateView = reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj);
+    const auto* const stateView = reinterpret_cast<const SfplyState*>(workctrlSubobj);
     const std::int32_t phaseLane = stateView->phaseLane;
     if (phaseLane >= 2 && (phaseLane <= 4 || phaseLane == 6)) {
       return 2;
@@ -16321,7 +16321,7 @@
    */
   std::int32_t sfply_StatPrep(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    const auto* const stateView = reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj);
+    const auto* const stateView = reinterpret_cast<const SfplyState*>(workctrlSubobj);
     std::int32_t nextState = stateView->statusLane;
     const std::int32_t phaseLane = stateView->phaseLane;
 
@@ -16402,7 +16402,7 @@
     constexpr std::int32_t kSfsetCond5 = 5;
     constexpr std::int32_t kSfsetCond6 = 6;
     const std::int32_t workctrlAddress = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj));
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
 
     if (
       stateView->setConditions[kSfsetCond5] == 1 && SFBUF_GetWTot(workctrlAddress, 1) == 0 &&
@@ -16432,7 +16432,7 @@
     constexpr std::int32_t kSfsetCond5 = 5;
     constexpr std::int32_t kSfsetCond6 = 6;
     constexpr std::int32_t kSfsetCondSyncMode = 15;
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
 
     if (stateView->setConditions[kSfsetCond6] == 0 && stateView->setConditions[kSfsetCondSyncMode] == 2) {
       SFSET_SetCond(workctrlSubobj, kSfsetCondSyncMode, 1);
@@ -16457,7 +16457,7 @@
     constexpr std::int32_t kSfsetCond6 = 6;
     constexpr std::int32_t kSfsetCondEtrg = 25;
     constexpr std::int32_t kSfsetCondTimerPolicy = 72;
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
 
     std::int32_t etrgConditionValue = 1;
     std::int32_t avMask = (stateView->setConditions[kSfsetCond6] == 1) ? 1 : 0;
@@ -16496,7 +16496,7 @@
    */
   std::int32_t sfply_StatStby(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    const auto* const stateView = reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj);
+    const auto* const stateView = reinterpret_cast<const SfplyState*>(workctrlSubobj);
     std::int32_t nextState = stateView->statusLane;
 
     switch (stateView->phaseLane) {
@@ -16526,7 +16526,7 @@
    */
   std::int32_t sfply_StatPlay(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    const auto* const stateView = reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj);
+    const auto* const stateView = reinterpret_cast<const SfplyState*>(workctrlSubobj);
     if (sfply_ChkFin(workctrlSubobj) != 0) {
       return stateView->statusLane;
     }
@@ -16545,7 +16545,7 @@
    */
   std::int32_t sfply_StatFin(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    return reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj)->statusLane;
+    return reinterpret_cast<const SfplyState*>(workctrlSubobj)->statusLane;
   }
 
   /**
@@ -16559,7 +16559,7 @@
     constexpr std::int32_t kSfsetCond5 = 5;
     constexpr std::int32_t kSfsetCond14 = 14;
     constexpr std::int32_t kSfsetCond45 = 45;
-    const auto* const stateView = reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj);
+    const auto* const stateView = reinterpret_cast<const SfplyState*>(workctrlSubobj);
 
     if (stateView->setConditions[kSfsetCond14] == 0) {
       return 1;
@@ -16584,7 +16584,7 @@
    */
   std::int32_t sfply_ChkBpa(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
 
     SFLIB_LockCs();
     std::int32_t result = 0;
@@ -16617,7 +16617,7 @@
     constexpr std::int32_t kSfsetCond67 = 67;
     constexpr std::int32_t kSfsetCond68 = 68;
     const std::int32_t workctrlAddress = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj));
-    const auto* const stateView = reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj);
+    const auto* const stateView = reinterpret_cast<const SfplyState*>(workctrlSubobj);
 
     if (
       SFSET_GetCond(workctrlSubobj, kSfsetCond67) == 0 || SFSET_GetCond(workctrlSubobj, kSfsetCond15) == 0 ||
@@ -16661,7 +16661,7 @@
     constexpr std::int32_t kSfsetCond6 = 6;
     constexpr std::int32_t kSfsetCond69 = 69;
     const std::int32_t workctrlAddress = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj));
-    const auto* const stateView = reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj);
+    const auto* const stateView = reinterpret_cast<const SfplyState*>(workctrlSubobj);
 
     if (sfply_IsAnyoneTerm(workctrlSubobj) != 0) {
       return 1;
@@ -16715,7 +16715,7 @@
   std::int32_t sfply_EnoughViData(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
     constexpr std::int32_t kSfsetVideoReadyThreshold = 70;
-    const auto* const readinessView = reinterpret_cast<const SfplyDataReadinessIndexView*>(workctrlSubobj);
+    const auto* const readinessView = reinterpret_cast<const SfplyDataReadinessIndex*>(workctrlSubobj);
     const auto* const videoLane = SfplyGetDataLaneDescriptor(workctrlSubobj, readinessView->activeVideoLaneIndex);
     const std::int32_t availableBytes = SfplyQueryLaneReadyBytes(videoLane);
     const std::int32_t laneThreshold = (videoLane->readyThresholdBytes * 80) / 100;
@@ -16733,7 +16733,7 @@
    */
   std::int32_t sfply_EnoughAiData(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    const auto* const readinessView = reinterpret_cast<const SfplyDataReadinessIndexView*>(workctrlSubobj);
+    const auto* const readinessView = reinterpret_cast<const SfplyDataReadinessIndex*>(workctrlSubobj);
     const auto* const audioLane = SfplyGetDataLaneDescriptor(workctrlSubobj, readinessView->activeAudioLaneIndex);
     const std::int32_t availableBytes = SfplyQueryLaneReadyBytes(audioLane);
     const std::int32_t laneThreshold = (audioLane->readyThresholdBytes * 80) / 100;
@@ -16772,7 +16772,7 @@
   std::int32_t sfply_IsEtime(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
     constexpr std::int32_t kNoEndTimeSentinel = -4;
-    const auto* const endTimeView = reinterpret_cast<const SfplyEndTimeView*>(workctrlSubobj);
+    const auto* const endTimeView = reinterpret_cast<const SfplyEndTime*>(workctrlSubobj);
     if (endTimeView->endTimeMajor == kNoEndTimeSentinel) {
       return 0;
     }
@@ -16799,7 +16799,7 @@
     constexpr std::int32_t kSfsetCond5 = 5;
     constexpr std::int32_t kSfsetCond6 = 6;
     constexpr std::int32_t kSfsetCondEtrg = 25;
-    const auto* const stateView = reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj);
+    const auto* const stateView = reinterpret_cast<const SfplyState*>(workctrlSubobj);
     if (stateView->setConditions[kSfsetCond6] == 0 && stateView->setConditions[kSfsetCond5] == 0) {
       return 1;
     }
@@ -16884,7 +16884,7 @@
    */
   std::int32_t sfply_IsStagnant(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    const auto* const stateView = reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj);
+    const auto* const stateView = reinterpret_cast<const SfplyState*>(workctrlSubobj);
     if (stateView->statusLane != 4) {
       return 0;
     }
@@ -16906,7 +16906,7 @@
   std::int32_t sfply_IsPlayTimeAutoStop(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
     constexpr std::int32_t kSfsetCondAutoStopTime = 54;
-    const auto* const stateView = reinterpret_cast<const SfplyRuntimeStateView*>(workctrlSubobj);
+    const auto* const stateView = reinterpret_cast<const SfplyState*>(workctrlSubobj);
     if (stateView->statusLane != 4) {
       return 0;
     }
@@ -17043,7 +17043,7 @@
       return stopResult;
     }
 
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
     stateView->phaseLane = 6;
     SFPLY_MeasureFps(workctrlSubobj);
     return 0;
@@ -17471,7 +17471,7 @@
   )
   {
     constexpr std::int32_t kSfsetCondDecodedPicture = 36;
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
     stateView->pictureCounts.decodedPictureCount += decodedPictureDelta;
 
     const std::int32_t callbackAddress = SFSET_GetCond(workctrlSubobj, kSfsetCondDecodedPicture);
@@ -17498,7 +17498,7 @@
   )
   {
     constexpr std::int32_t kSfsetCondSkippedPicture = 37;
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
     stateView->pictureCounts.skippedPictureCount += skippedPictureDelta;
 
     const std::int32_t callbackAddress = SFSET_GetCond(workctrlSubobj, kSfsetCondSkippedPicture);
@@ -17560,7 +17560,7 @@
    */
   std::int32_t sfply_TrDestroy(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
     stateView->statusLane = 0;
     stateView->phaseLane = 0;
 
@@ -17618,7 +17618,7 @@
       result = sfply_Start(workctrlSubobj);
     }
 
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
     stateView->serverWaitFlag = 1;
     return result;
   }
@@ -17631,7 +17631,7 @@
    */
   std::int32_t sfply_Start(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
     stateView->phaseLane = 4;
     return 0;
   }
@@ -17662,7 +17662,7 @@
     }
 
     const std::int32_t result = SFPLY_Stop(workctrlSubobj);
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
     stateView->serverWaitFlag = 1;
     return result;
   }
@@ -17856,7 +17856,7 @@
    */
   std::int32_t SFPLY_Stop(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
     if (stateView->statusLane == 1) {
       return 0;
     }
@@ -17882,7 +17882,7 @@
    */
   std::int32_t sfply_TrStop(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const stateView = reinterpret_cast<SfplyRuntimeStateView*>(workctrlSubobj);
+    auto* const stateView = reinterpret_cast<SfplyState*>(workctrlSubobj);
     std::int32_t result = 0;
     if (stateView->statusLane == 4) {
       const std::int32_t workctrlAddress = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj));
@@ -19834,7 +19834,7 @@
     // overwrites the work-control buffer with a fresh one.
     const moho::SfplyCreateParams savedCreateParams = workctrlSubobj->createTemplate;
 
-    SfbufRingCursorSnapshotView writeCursor{};
+    SfbufRingCursorSnapshot writeCursor{};
     std::int32_t savedWriteCommit = 0;
     if (userWriteSupply != 0) {
       (void)SFD_GetWritePtr(SfdWorkctrlToAddress(workctrlSubobj), reinterpret_cast<SfdTransferWriteCursor*>(&writeCursor));
@@ -20066,7 +20066,7 @@
   // -------------------------------------------------------------------------
   // SFD transfer strategy table
   //
-  // Address: 0x00D7F3D0 (`SftrnEntryListView`, 15 slots, null-terminated after
+  // Address: 0x00D7F3D0 (`SftrnEntryList`, 15 slots, null-terminated after
   //          eight entries) and 0x00D7F49C / 0x00D7F4D4 / 0x00D7F50C /
   //          0x00D7F544 / 0x00D7F57C / 0x00D7F5D4 / 0x00D7F670 / 0x00D7F6B8
   //          (the eight `SofdecTransferStrategy` descriptors, 0x38 apart).
@@ -20214,7 +20214,7 @@
    *
    * Strategy walk order taken verbatim from the binary's pointer list.
    */
-  SftrnEntryListView gSofdecTransferStrategyList = {{
+  SftrnEntryList gSofdecTransferStrategyList = {{
     &gSfmemTransferStrategy,   // [0] 0x00D7F6B8
     &SFD_tr_sd_mps,   // [1] 0x00D7F670
     &SFD_tr_vd_mpv,   // [2] 0x00D7F5D4

@@ -1392,29 +1392,29 @@
   std::int32_t cvFsSetDefDev(const char* deviceName);
   std::int32_t cvFsError_(const char* message);
   void cvFsCallUsrErrFn(std::int32_t errorObjectAddress, const char* message);
-  const char* cvFsGetDevName(const CvFsHandleView* handle);
-  std::int32_t cvFsOptFn1(CvFsHandleView* handle, std::int32_t optionCode, std::int32_t optionArg0, std::int32_t optionArg1);
-  std::int32_t cvFsOptFn2(CvFsHandleView* handle, std::int32_t optionCode, std::int32_t optionArg0, std::int32_t optionArg1);
-  std::int32_t cvFsGetMaxByteRate(CvFsHandleView* handle);
+  const char* cvFsGetDevName(const CvFsHandle* handle);
+  std::int32_t cvFsOptFn1(CvFsHandle* handle, std::int32_t optionCode, std::int32_t optionArg0, std::int32_t optionArg1);
+  std::int32_t cvFsOptFn2(CvFsHandle* handle, std::int32_t optionCode, std::int32_t optionArg0, std::int32_t optionArg1);
+  std::int32_t cvFsGetMaxByteRate(CvFsHandle* handle);
   std::int32_t cvFsMakeDir(char* fileName);
   std::int32_t cvFsRemoveDir(char* fileName);
   std::int32_t cvFsDeleteFile(char* fileName);
   std::int32_t cvFsGetFreeSize(const char* deviceName);
-  std::int32_t cvFsGetSctLen(CvFsHandleView* handle);
-  std::int32_t cvFsSetSctLen(CvFsHandleView* handle);
-  std::int32_t cvFsGetNumTr(CvFsHandleView* handle);
+  std::int32_t cvFsGetSctLen(CvFsHandle* handle);
+  std::int32_t cvFsSetSctLen(CvFsHandle* handle);
+  std::int32_t cvFsGetNumTr(CvFsHandle* handle);
   std::int32_t cvFsChangeDir(char* directoryName);
   std::int32_t cvFsIsExistFile(char* fileName);
   std::int32_t cvFsGetNumFiles(char* deviceName);
   std::int32_t cvFsLoadDirInfo(char* fileName, std::int32_t optionArg0, std::int32_t optionArg1);
   char* cvFsGetDefDev();
-  std::int32_t cvFsTell(CvFsHandleView* handle);
-  std::int32_t cvFsReqRd(CvFsHandleView* handle, std::int32_t bufferAddress, std::int32_t byteCount);
-  std::int32_t cvFsReqWr(CvFsHandleView* handle, std::int32_t bufferAddress, std::int32_t byteCount);
-  std::int32_t cvFsStopTr(CvFsHandleView* handle);
+  std::int32_t cvFsTell(CvFsHandle* handle);
+  std::int32_t cvFsReqRd(CvFsHandle* handle, std::int32_t bufferAddress, std::int32_t byteCount);
+  std::int32_t cvFsReqWr(CvFsHandle* handle, std::int32_t bufferAddress, std::int32_t byteCount);
+  std::int32_t cvFsStopTr(CvFsHandle* handle);
   void cvFsExecServer();
   std::int32_t cvFsGetFileSizeEx(char* fileName, std::int32_t optionArg);
-  std::int32_t cvFsGetFileSizeByHndl(CvFsHandleView* handle);
+  std::int32_t cvFsGetFileSizeByHndl(CvFsHandle* handle);
 
   /**
    * Address: 0x00B11F40 (FUN_00B11F40, _addDevice)
@@ -1422,7 +1422,7 @@
    * What it does:
    * Registers one CVFS device interface in the fixed device table.
    */
-  CvFsDeviceInterfaceView* addDevice(const char* deviceName, void* (__cdecl* deviceFactory)());
+  CvFsDeviceInterface* addDevice(const char* deviceName, void* (__cdecl* deviceFactory)());
 
   /**
    * Address: 0x00B11FB0 (FUN_00B11FB0, _getDevice)
@@ -1430,7 +1430,7 @@
    * What it does:
    * Resolves one CVFS device name prefix to its registered interface.
    */
-  CvFsDeviceInterfaceView* getDevice(const char* deviceName);
+  CvFsDeviceInterface* getDevice(const char* deviceName);
 
   /**
    * Address: 0x00B12040 (FUN_00B12040, _cvFsDelDev)
@@ -1446,7 +1446,7 @@
    * What it does:
    * Opens one CVFS handle through the selected device interface.
    */
-  extern "C" CvFsHandleView* cvFsOpen(char* fileName, std::int32_t openMode, std::int32_t openFlags);
+  extern "C" CvFsHandle* cvFsOpen(char* fileName, std::int32_t openMode, std::int32_t openFlags);
 
   /**
    * Address: 0x00B12290 (FUN_00B12290, _variousProc)
@@ -1454,7 +1454,7 @@
    * What it does:
    * Resolves effective device + rewritten path for CVFS open operations.
    */
-  CvFsDeviceInterfaceView* variousProc(char* deviceName, char* filePath, const char* originalPath);
+  CvFsDeviceInterface* variousProc(char* deviceName, char* filePath, const char* originalPath);
 
   /**
    * Address: 0x00B12300 (FUN_00B12300, _allocCvFsHn)
@@ -1462,7 +1462,7 @@
    * What it does:
    * Returns one free entry from the fixed CVFS handle pool.
    */
-  CvFsHandleView* allocCvFsHn();
+  CvFsHandle* allocCvFsHn();
 
   /**
    * Address: 0x00B12350 (FUN_00B12350, _getDevName)
@@ -1490,7 +1490,7 @@
   std::int32_t cvFsDelVolume(char* deviceName, std::int32_t volumeName);
   std::int32_t cvFsGetVolumeInfo(char* deviceName, std::int32_t volumeName, std::int32_t infoCode);
   BOOL cvFsIsExistDevice(char* deviceName);
-  std::uint64_t cvFsGetNumTr64(CvFsHandleView* handle);
+  std::uint64_t cvFsGetNumTr64(CvFsHandle* handle);
   std::uint64_t cvFsGetFileSize64(char* fileName);
   std::uint64_t cvFsGetFileSizeEx64(char* fileName, std::int32_t optionArg);
 
@@ -1518,7 +1518,7 @@
    */
   std::int32_t addDevName(char* deviceName, char* filePath);
 
-  extern "C" std::int32_t cvFsGetFsys64Info(CvFsHandleView* handle);
+  extern "C" std::int32_t cvFsGetFsys64Info(CvFsHandle* handle);
 
   void* mfCiGetInterface();
   CvFsUserErrorBridgeFn __cdecl mfCiEntryErrFunc(CvFsUserErrorBridgeFn callbackFunction, std::int32_t callbackObject);
@@ -1776,7 +1776,7 @@
    * lanes.
    */
   void* ADXSTMF_CreateCvfsRt(
-    CvFsHandleView* cvfsHandle,
+    CvFsHandle* cvfsHandle,
     std::int32_t baseOffset,
     std::int32_t fileLengthBytes,
     moho::SofdecSjSupplyHandle* sourceJoinObject
@@ -1790,7 +1790,7 @@
    */
   void ADXSTMF_SetupHandleMember(
     AdxstmServerSlot* streamHandle,
-    CvFsHandleView* cvfsHandle,
+    CvFsHandle* cvfsHandle,
     std::int32_t baseOffset,
     std::int32_t fileLengthBytes,
     moho::SofdecSjSupplyHandle* sourceJoinObject
@@ -1803,7 +1803,7 @@
    * lanes.
    */
   void* ADXSTMF_CreateCvfs(
-    CvFsHandleView* cvfsHandle,
+    CvFsHandle* cvfsHandle,
     std::int32_t baseOffset,
     std::int32_t fileLengthBytes,
     moho::SofdecSjSupplyHandle* sourceJoinObject
@@ -3387,8 +3387,8 @@
   extern CvFsUserErrorBridgeFn mfci_err_func;
   extern std::int32_t mfci_err_obj;
   extern char mfci_err_str[0x100];
-  extern CvFsDeviceInterfaceView mfci_vtbl;
-  extern CvFsDeviceInterfaceView xeci_vtbl;
+  extern CvFsDeviceInterface mfci_vtbl;
+  extern CvFsDeviceInterface xeci_vtbl;
   extern std::int32_t cvfs_init_cnt;
   extern std::array<char, MAX_PATH> gXeDirRootDirectory;
   extern moho::AdxmErrorCallback crierr_callback_func;
@@ -3418,7 +3418,7 @@
   std::int32_t adxt_dbg_sj_backlog = 0;
   std::int32_t adxt_dbg_sj_channels = 0;
   moho::AdxBitstreamDecoderState adxb_obj[32]{};
-  AdxampRuntimeState adxamp_obj[kAdxsjdObjectCount]{};
+  AdxampState adxamp_obj[kAdxsjdObjectCount]{};
   moho::AdxrnaTimingState adxrna_timing_pool[32]{};
   std::int32_t(__cdecl* adxrna_GetTime)() = nullptr;
   using AdxtCodecDetachCallback = std::int32_t(__cdecl*)(void* adxtRuntime);
@@ -3500,8 +3500,8 @@
   CvFsUserErrorBridgeFn mfci_err_func = nullptr;
   std::int32_t mfci_err_obj = 0;
   char mfci_err_str[0x100]{};
-  CvFsDeviceInterfaceView mfci_vtbl{};
-  CvFsDeviceInterfaceView xeci_vtbl{};
+  CvFsDeviceInterface mfci_vtbl{};
+  CvFsDeviceInterface xeci_vtbl{};
   std::int32_t cvfs_init_cnt = 0;
   float m2asjd_downmix_table[4] = {0.5f, 0.35355338f, 0.25f, 0.0f};
   float m2asjd_downmix_buffer[1024]{};
@@ -3636,7 +3636,7 @@
    * it hands to `SFD_Init`; a null here stops `SFTRN_Init` from reaching
    * `sflib_InitSub`, so the SFH analyzer pool never gets built.
    */
-  extern SftrnEntryListView gSofdecTransferStrategyList;
+  extern SftrnEntryList gSofdecTransferStrategyList;
   moho::MwsfdInitSfdParams gMwsfdInitSfdParams{
     reinterpret_cast<std::uintptr_t>(&gSofdecTransferStrategyList),
     0
@@ -3653,7 +3653,7 @@
   const char* gCriVerstrPtrCfg = "";
   const char* gCriVerstrPtrSfd = "";
   const char* gCriVerstrPtrCft = "";
-  SfxaLibWorkView gSfxaLibWork{};
+  SfxaLibWork gSfxaLibWork{};
   const char* gCftcomFunctionName = nullptr;
   std::int32_t gCftcomOptimizeSpeed = 0;
   std::int32_t gUtySseSupportState = -1;
