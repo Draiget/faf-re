@@ -56,7 +56,7 @@ namespace
    */
   gpg::PrimitiveSerHelper<moho::EAiTransportEvent, int> gEAiTransportEventPrimitiveSerializer;
 
-  // NOTE: FUN_005E3E80 ("the deleted overlay" in the prior
+  // NOTE: FUN_005E3E80 ("a deleted overlay" in the prior
   // recovery) was removed from this file. It is a real, distinct 117-byte
   // SEH-wrapped function, but has zero callers/xrefs anywhere in the binary
   // (confirmed via incoming_xrefs, data_refs both directions, and .xrefs.txt)

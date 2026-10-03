@@ -353,7 +353,7 @@ public:
   /**
    * Address: 0x00AB17E9 (FUN_00AB17E9, `pcharNode::copyTo`) is this class's
    * copy-out member below; it was recovered separately over a
-   * the deleted overlay stand-in of this very layout (vtable, next
+   * a deleted overlay stand-in of this very layout (vtable, next
    * node, text, length) with no caller (RULE ONE), removed 2026-09-18.
    *
    * Address: 0x00AB1772 (FUN_00AB1772, pcharNode::pcharNode)

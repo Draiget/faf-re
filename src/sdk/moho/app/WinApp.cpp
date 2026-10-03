@@ -363,7 +363,7 @@ namespace
   //                  member of the internal chain diagram below (it is the
   //                  payload the chain carries, not a link in it). Formerly
   //                  mis-recovered as a hand-rolled `IntrusiveListNode
-  //                  the deleted overlay/deleted overlay pair in
+  //                  a deleted overlay/deleted overlay pair in
   //                  `gpg/core/containers/FastVectorInsertLanes.cpp` (wrong
   //                  subsystem, wrong field order, zero real xrefs there) --
   //                  removed; this is the corrected home.

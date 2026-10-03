@@ -2814,7 +2814,7 @@ namespace msvc8
              * `FindTerrainEnvironmentLowerBound` free function in
              * `moho/sim/CWldMap.cpp` that walked a duplicate
              * `TerrainEnvironmentLookupMap`/
-             * the deleted overlay struct pair over the
+             * a deleted overlay struct pair over the
              * same node shape instead of calling this member (deleted along
              * with the whole hand-rolled tree it anchored).
              *
@@ -3145,7 +3145,7 @@ namespace msvc8
              * to the first, matching `FUN_008A80F0`/`FUN_008A8150`'s own
              * wrapper relationship) that walked a duplicate
              * `TerrainEnvironmentLookupMap`/
-             * the deleted overlay struct pair instead
+             * a deleted overlay struct pair instead
              * of calling this member (deleted along with the whole
              * hand-rolled tree it anchored). `IWldTerrainRes::GetEnvLookup`
              * now reaches this member directly as `mEnvLookup.find(key)`.
@@ -5918,7 +5918,7 @@ namespace msvc8
              * virtual dispatch. Re-homed here from a hand-rolled
              * `ClearEnvLookup` body that open-coded this exact sequence
              * against the deleted `TerrainEnvironmentLookupMap`/
-             * the deleted overlay struct pair instead
+             * a deleted overlay struct pair instead
              * of calling this member.
              * Address: 0x0077C520 (FUN_0077C520 -- `clear()` for a compact tree (`_Erase(root)`, head relinked, size zeroed); zero callers, unreachable; formerly `ResetCompactTreeStorageHeadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007F2AC0 (FUN_007F2AC0 -- `clear()` -- teardown, then the header relinked to itself and the size zeroed for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F1990; formerly `ResetBlueprintExtractorTreeStorage` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
@@ -8608,8 +8608,8 @@ namespace msvc8
              * enumeration order rather than producing the binary's sorted
              * order -- same resulting SET of unique modes, different
              * observable ORDER in the startup options UI. An orphaned,
-             * already-evidenced `*deleted overlay reimplementation of this
-             * same tree already exists (the deleted overlay
+             * already-evidenced a deleted-overlay reimplementation of this
+             * same tree already exists (a deleted overlay
              * family, `StartupHelpers.cpp:~1234-1330`, several
              * `[[maybe_unused]]`) -- per RULE ONE this should be migrated
              * to a real `T=Resolution` instantiation of this template

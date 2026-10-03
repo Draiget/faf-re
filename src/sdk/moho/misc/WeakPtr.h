@@ -282,7 +282,7 @@ namespace moho
      *   only owner whose `WeakObject` sits at 0x14. The rest matches `ResetFromOwnerLinkSlot` instruction
      *   for instruction, including the null-slot branch that writes
      *   `nextInOwner = nullptr`. Zero callers, unreachable; formerly
-     *   `AttachNodeToOwnerHead` over an the deleted overlay in
+     *   `AttachNodeToOwnerHead` over an a deleted overlay in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      * Address: 0x0066A2A0 (FUN_0066A2A0 -- the `WeakPtr<WWinManagedFrame>` emission
      *   (`lea edx, [ecx+178h]` is its `WeakObject` base, after the wxFrame);

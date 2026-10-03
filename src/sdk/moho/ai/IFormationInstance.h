@@ -52,7 +52,7 @@ namespace moho
    * unlink to this class rather than to its owner.
    *
    * Both of those lanes used to be reached through a two-field
-   * the deleted overlay laid over the object with a
+   * a deleted overlay laid over the object with a
    * stand-in vtable word, because this class was modelled as a bare 4-byte
    * vtable carrier that declared the reference count as its own
    * `mSharedCount` member and left the broadcaster on `CFormationInstance` as

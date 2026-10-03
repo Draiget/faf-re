@@ -119,7 +119,7 @@ namespace
    * Address: 0x007EC5A0  Moho::WeaponExtractor, which also stores its
    *                      range category at +0x04
    *
-   * The the deleted overlay / the deleted overlay
+   * The a deleted overlay / a deleted overlay
    * stand-ins these were written over are gone with them (RULE ONE):
    * a vptr fixup has no source line to model an object for.
    */

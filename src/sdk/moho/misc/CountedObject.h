@@ -53,7 +53,7 @@ namespace moho
      * emitted out of line, `mov eax,ecx; mov [eax],0; ret`, as the element
      * constructor `CWldTerrainDecal::CWldTerrainDecal` (0x0089CB11) hands to the
      * array-construct iterator 0x00A83FC5 for `mResourceRefs[2]`. Formerly
-     * the deleted overlay in
+     * a deleted overlay in
      * moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
      */
     CountedPtr() noexcept = default;

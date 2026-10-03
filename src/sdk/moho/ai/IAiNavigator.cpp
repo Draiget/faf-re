@@ -259,7 +259,7 @@ namespace
   // `gpg::RType::~RType()` (Reflection.h/.cpp), which already cites the
   // sibling `RListenerRType_EAiNavigatorEvent` clone (FUN_005A84D0) from this
   // same file. Cited FUN_005A8470 there too instead of keeping a second,
-  // the deleted overlay-shaped raw-offset reach-in copy of
+  // a deleted overlay-shaped raw-offset reach-in copy of
   // the same logic around (RULE ONE / no-orphan-helper rule): no
   // registration or dispatch site anywhere in `src/sdk/**` needs a dedicated
   // named function here, since `RBroadcasterRType_EAiNavigatorEvent`'s

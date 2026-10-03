@@ -50,7 +50,7 @@ namespace moho
    *
    * This class previously existed only as reach-in views over an empty stub of
    * the same name -- `CThrustManipulatorSerializer` in this
-   * subsystem's .cpp and the deleted overlay in
+   * subsystem's .cpp and a deleted overlay in
    * `moho/sim/ManipulatorLuaFunctionThunks.cpp` -- with every use going
    * through a `reinterpret_cast`. The stub inherited `IAniManipulator::sType`,
    * so `gpg::SerSaveLoadHelper<CThrustManipulator>::Init` (0x0064B150) bound

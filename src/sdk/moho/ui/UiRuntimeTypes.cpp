@@ -119,7 +119,7 @@ namespace
 {
   /**
    * The UI classes here are thin: their real layout lives in the matching
-   * `*deleted overlay, so placement-new runs only the vptr-carrying constructors
+   * a deleted-overlay, so placement-new runs only the vptr-carrying constructors
    * and none of the member constructors the binary's real classes have.
    * `operator new` hands back uninitialised bytes, so lanes such as
    * `CScriptObject::cObject` (+0x0C) and `mLuaObj` (+0x20) start as garbage.
@@ -1799,7 +1799,7 @@ namespace
    * exactly the `operator new(0x24)` the sole allocation site issues
    * (0x00870D8C in `CUIWorldView::HandleEvent`).
    *
-   * The previous the deleted overlay modelling put a spare dword at
+   * The previous a deleted overlay modelling put a spare dword at
    * +0x08 and the string at +0x0C, which made the object 0x28 bytes; that
    * offset is corrected here against the constructor disassembly.
    */

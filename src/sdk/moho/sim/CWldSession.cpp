@@ -314,7 +314,7 @@ namespace moho
    * Unlinks this cursor info from the hovered-unit weak-owner chain.
    *
    * All four twin addresses above were formerly duplicated in
-   * `LegacyContainerFillLanes.cpp` as a standalone the deleted overlay
+   * `LegacyContainerFillLanes.cpp` as a standalone a deleted overlay
    * offset struct (`{pad[0x10], IntrusiveLink link}`) plus four
    * near-identical wrapper functions reaching into "an unidentified owning
    * class at +0x10" -- that file's own `IntrusiveLink` citation

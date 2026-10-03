@@ -361,7 +361,7 @@ namespace
    * Address: 0x006E30C0 (FUN_006E30C0, ICF twin -- identical function_sha256.
    *          Formerly duplicated in moho/containers/LegacyContainerFillLanes.cpp
    *          as `AlignLane08ToLane04IfDifferent` over an anonymous
-   *          the deleted overlay offset struct; that duplicate has been
+   *          a deleted overlay offset struct; that duplicate has been
    *          deleted.)
    *
    * What it does:
