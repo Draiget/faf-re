@@ -1699,7 +1699,7 @@
   void* mwRnaCreate(std::int32_t sourceJoinHandleTableAddress, std::int32_t channelCount);
   void ADXSJD_Destroy(std::int32_t sjdHandle);
   void* adxf_AllocAdxFs();
-  struct AdxstmServerSlotView;
+  struct AdxstmServerSlot;
   /**
    * Address: 0x00B0F4A0 (FUN_00B0F4A0)
    *
@@ -1789,7 +1789,7 @@
    * default stream state.
    */
   void ADXSTMF_SetupHandleMember(
-    AdxstmServerSlotView* streamHandle,
+    AdxstmServerSlot* streamHandle,
     CvFsHandleView* cvfsHandle,
     std::int32_t baseOffset,
     std::int32_t fileLengthBytes,

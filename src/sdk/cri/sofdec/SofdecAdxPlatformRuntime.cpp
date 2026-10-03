@@ -158,7 +158,7 @@
    * What it does:
    * Captures DirectSound runtime lane and clears sound-port slot activity.
    */
-  IDirectSoundBuffer** SofdecInitSoundPortRuntime(IDirectSound* const directSound)
+  IDirectSoundBuffer** SofdecVirtInitSoundPort(IDirectSound* const directSound)
   {
     IDirectSound8* directSound8 = nullptr;
     if (directSound->lpVtbl->QueryInterface(directSound, IID_IDirectSound8, reinterpret_cast<void**>(&directSound8)) >= 0
@@ -187,7 +187,7 @@
    * What it does:
    * Stops sound-port runtime and clears global mode/slot lanes.
    */
-  std::uint32_t* SofdecShutdownSoundPortRuntime()
+  std::uint32_t* SofdecVirtShutdownSoundPort()
   {
     SofdecShutdownRestoreProbeBuffer();
     gSofdecOpenPortCount = 0;
@@ -478,7 +478,7 @@
     constexpr char kSofdecTagIntime[] = "INTIME";
     constexpr char kSofdecTagDurtime[] = "DURTIME";
 
-    struct MwsfdTagInfoRuntimeView
+    struct MwsfdTagInfo
     {
       std::uint8_t mUnknown00_A7[0xA8]{};
       void* sfxHandle = nullptr; // +0xA8
@@ -495,34 +495,34 @@
     };
 
     static_assert(
-      offsetof(MwsfdTagInfoRuntimeView, sfxHandle) == 0xA8, "MwsfdTagInfoRuntimeView::sfxHandle offset must be 0xA8"
+      offsetof(MwsfdTagInfo, sfxHandle) == 0xA8, "MwsfdTagInfo::sfxHandle offset must be 0xA8"
     );
     static_assert(
-      offsetof(MwsfdTagInfoRuntimeView, sjTagRingHandle) == 0x17C,
-      "MwsfdTagInfoRuntimeView::sjTagRingHandle offset must be 0x17C"
+      offsetof(MwsfdTagInfo, sjTagRingHandle) == 0x17C,
+      "MwsfdTagInfo::sjTagRingHandle offset must be 0x17C"
     );
     static_assert(
-      offsetof(MwsfdTagInfoRuntimeView, ainfSearchBuffer) == 0x180,
-      "MwsfdTagInfoRuntimeView::ainfSearchBuffer offset must be 0x180"
+      offsetof(MwsfdTagInfo, ainfSearchBuffer) == 0x180,
+      "MwsfdTagInfo::ainfSearchBuffer offset must be 0x180"
     );
     static_assert(
-      offsetof(MwsfdTagInfoRuntimeView, ainfUserBuffer) == 0x188,
-      "MwsfdTagInfoRuntimeView::ainfUserBuffer offset must be 0x188"
+      offsetof(MwsfdTagInfo, ainfUserBuffer) == 0x188,
+      "MwsfdTagInfo::ainfUserBuffer offset must be 0x188"
     );
     static_assert(
-      offsetof(MwsfdTagInfoRuntimeView, ainfTagInfoReady) == 0x194,
-      "MwsfdTagInfoRuntimeView::ainfTagInfoReady offset must be 0x194"
+      offsetof(MwsfdTagInfo, ainfTagInfoReady) == 0x194,
+      "MwsfdTagInfo::ainfTagInfoReady offset must be 0x194"
     );
     static_assert(
-      offsetof(MwsfdTagInfoRuntimeView, ainfTagInfoDataAddress) == 0x198,
-      "MwsfdTagInfoRuntimeView::ainfTagInfoDataAddress offset must be 0x198"
+      offsetof(MwsfdTagInfo, ainfTagInfoDataAddress) == 0x198,
+      "MwsfdTagInfo::ainfTagInfoDataAddress offset must be 0x198"
     );
     static_assert(
-      offsetof(MwsfdTagInfoRuntimeView, ainfTagInfoLength) == 0x19C,
-      "MwsfdTagInfoRuntimeView::ainfTagInfoLength offset must be 0x19C"
+      offsetof(MwsfdTagInfo, ainfTagInfoLength) == 0x19C,
+      "MwsfdTagInfo::ainfTagInfoLength offset must be 0x19C"
     );
 
-    struct SfxzTagGroupRuntimeView
+    struct SfxzTagGroup
     {
       std::uint8_t mUnknown00_07[0x8]{};
       std::int32_t hasTagPayload = 0; // +0x08
@@ -539,67 +539,67 @@
     };
 
     static_assert(
-      offsetof(SfxzTagGroupRuntimeView, hasTagPayload) == 0x08,
-      "SfxzTagGroupRuntimeView::hasTagPayload offset must be 0x08"
+      offsetof(SfxzTagGroup, hasTagPayload) == 0x08,
+      "SfxzTagGroup::hasTagPayload offset must be 0x08"
     );
     static_assert(
-      offsetof(SfxzTagGroupRuntimeView, tagPayloadAddress) == 0x0C,
-      "SfxzTagGroupRuntimeView::tagPayloadAddress offset must be 0x0C"
+      offsetof(SfxzTagGroup, tagPayloadAddress) == 0x0C,
+      "SfxzTagGroup::tagPayloadAddress offset must be 0x0C"
     );
     static_assert(
-      offsetof(SfxzTagGroupRuntimeView, tagPayloadLength) == 0x10,
-      "SfxzTagGroupRuntimeView::tagPayloadLength offset must be 0x10"
+      offsetof(SfxzTagGroup, tagPayloadLength) == 0x10,
+      "SfxzTagGroup::tagPayloadLength offset must be 0x10"
     );
     static_assert(
-      offsetof(SfxzTagGroupRuntimeView, zmhdrReady) == 0x18,
-      "SfxzTagGroupRuntimeView::zmhdrReady offset must be 0x18"
+      offsetof(SfxzTagGroup, zmhdrReady) == 0x18,
+      "SfxzTagGroup::zmhdrReady offset must be 0x18"
     );
     static_assert(
-      offsetof(SfxzTagGroupRuntimeView, zmhdrPayloadAddress) == 0x1C,
-      "SfxzTagGroupRuntimeView::zmhdrPayloadAddress offset must be 0x1C"
+      offsetof(SfxzTagGroup, zmhdrPayloadAddress) == 0x1C,
+      "SfxzTagGroup::zmhdrPayloadAddress offset must be 0x1C"
     );
     static_assert(
-      offsetof(SfxzTagGroupRuntimeView, zmhdrPayloadLength) == 0x20,
-      "SfxzTagGroupRuntimeView::zmhdrPayloadLength offset must be 0x20"
+      offsetof(SfxzTagGroup, zmhdrPayloadLength) == 0x20,
+      "SfxzTagGroup::zmhdrPayloadLength offset must be 0x20"
     );
     static_assert(
-      offsetof(SfxzTagGroupRuntimeView, zmvfrmReady) == 0x28,
-      "SfxzTagGroupRuntimeView::zmvfrmReady offset must be 0x28"
+      offsetof(SfxzTagGroup, zmvfrmReady) == 0x28,
+      "SfxzTagGroup::zmvfrmReady offset must be 0x28"
     );
     static_assert(
-      offsetof(SfxzTagGroupRuntimeView, zmvfrmPayloadAddress) == 0x2C,
-      "SfxzTagGroupRuntimeView::zmvfrmPayloadAddress offset must be 0x2C"
+      offsetof(SfxzTagGroup, zmvfrmPayloadAddress) == 0x2C,
+      "SfxzTagGroup::zmvfrmPayloadAddress offset must be 0x2C"
     );
     static_assert(
-      offsetof(SfxzTagGroupRuntimeView, zmvfrmPayloadLength) == 0x30,
-      "SfxzTagGroupRuntimeView::zmvfrmPayloadLength offset must be 0x30"
+      offsetof(SfxzTagGroup, zmvfrmPayloadLength) == 0x30,
+      "SfxzTagGroup::zmvfrmPayloadLength offset must be 0x30"
     );
 
-    struct SfxTagInfoRuntimeView
+    struct SfxTagInfo
     {
       std::uint8_t mUnknown00_13[0x14]{};
       std::int32_t tagInfoReady = 0; // +0x14
       std::int32_t tagDataAddress = 0; // +0x18
       std::int32_t tagDataLength = 0; // +0x1C
       std::uint8_t mUnknown20_23[0x4]{};
-      SfxzTagGroupRuntimeView* sfxzTagGroup = nullptr; // +0x24
+      SfxzTagGroup* sfxzTagGroup = nullptr; // +0x24
     };
 
     static_assert(
-      offsetof(SfxTagInfoRuntimeView, tagInfoReady) == 0x14,
-      "SfxTagInfoRuntimeView::tagInfoReady offset must be 0x14"
+      offsetof(SfxTagInfo, tagInfoReady) == 0x14,
+      "SfxTagInfo::tagInfoReady offset must be 0x14"
     );
     static_assert(
-      offsetof(SfxTagInfoRuntimeView, tagDataAddress) == 0x18,
-      "SfxTagInfoRuntimeView::tagDataAddress offset must be 0x18"
+      offsetof(SfxTagInfo, tagDataAddress) == 0x18,
+      "SfxTagInfo::tagDataAddress offset must be 0x18"
     );
     static_assert(
-      offsetof(SfxTagInfoRuntimeView, tagDataLength) == 0x1C,
-      "SfxTagInfoRuntimeView::tagDataLength offset must be 0x1C"
+      offsetof(SfxTagInfo, tagDataLength) == 0x1C,
+      "SfxTagInfo::tagDataLength offset must be 0x1C"
     );
     static_assert(
-      offsetof(SfxTagInfoRuntimeView, sfxzTagGroup) == 0x24,
-      "SfxTagInfoRuntimeView::sfxzTagGroup offset must be 0x24"
+      offsetof(SfxTagInfo, sfxzTagGroup) == 0x24,
+      "SfxTagInfo::sfxzTagGroup offset must be 0x24"
     );
 
     [[nodiscard]] constexpr std::int32_t SofdecDecodeHexNibble(const char digit) noexcept
@@ -880,7 +880,7 @@
       return nullptr;
     }
 
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
     moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
     const std::int32_t availableAinfBytes = (sjRingHandle != nullptr) ? SJRBF_GetNumData(sjRingHandle, 1) : 0;
     const char* result = reinterpret_cast<const char*>(static_cast<std::intptr_t>(availableAinfBytes));
@@ -931,7 +931,7 @@
    * Parses one SFXZ payload block and caches ZMHDR/ZMVFRM child-tag windows in
    * the SFXZ tag-group runtime lane.
    */
-  const char* sfxzmv_SetTagGrp(SfxzTagGroupRuntimeView* const tagGroup)
+  const char* sfxzmv_SetTagGrp(SfxzTagGroup* const tagGroup)
   {
     if (tagGroup == nullptr) {
       return nullptr;
@@ -973,7 +973,7 @@
    * refreshes derived ZMHDR/ZMVFRM child-tag windows.
    */
   const char* SFXZ_SetTagInf(
-    SfxzTagGroupRuntimeView* const tagGroup,
+    SfxzTagGroup* const tagGroup,
     const std::int32_t tagPayloadAddress,
     const std::int32_t tagPayloadLength
   )
@@ -997,7 +997,7 @@
    */
   std::int32_t SFX_SetTagInf(void* const sfxHandle, const std::int32_t tagDataAddress, const std::int32_t tagDataLength)
   {
-    auto* const runtimeView = reinterpret_cast<SfxTagInfoRuntimeView*>(sfxHandle);
+    auto* const runtimeView = reinterpret_cast<SfxTagInfo*>(sfxHandle);
     runtimeView->tagDataAddress = tagDataAddress;
     runtimeView->tagDataLength = tagDataLength;
 
@@ -1032,7 +1032,7 @@
    */
   std::int32_t mwsftag_GetSFXinfFromAinf(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
     if (runtimeView->ainfTagInfoDataAddress == 0) {
       return SFX_SetTagInf(runtimeView->sfxHandle, 0, 0);
     }
@@ -1065,7 +1065,7 @@
       return 0;
     }
 
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
     const std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtimeView->sjTagRingHandle));
     if (result != 0 && runtimeView->ainfTagInfoReady != 1) {
       (void)mwsftag_GetAinfFromSj(ply);
@@ -1086,7 +1086,7 @@
       return 0;
     }
 
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
     const std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtimeView->sjTagRingHandle));
     if (result != 0) {
       (void)mwsftag_GetAinfFromSj(ply);
@@ -1108,7 +1108,7 @@
       return 0;
     }
 
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
     if (runtimeView->sjTagRingHandle != nullptr) {
       return -(SFD_SetUsrSj(static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(ply->handle)), 2, 0, 0) != 0);
     }
@@ -1204,15 +1204,15 @@
   // Typed view of one MWSFCRE malloc-table entry as referenced by
   // mwsfcre_MallocCompoWork / MWSFTAG_CreateAinfSj. Only the buffer-format
   // lane (+0x20) is named here; everything else is opaque pending evidence.
-  struct MwsfcreMallocTabBufFmtView
+  struct MwsfcreMallocTabBufFmt
   {
     std::uint8_t mUnknown00_1F[0x20]{};
     std::int32_t buffmt = 0; // +0x20
   };
 
   static_assert(
-    offsetof(MwsfcreMallocTabBufFmtView, buffmt) == 0x20,
-    "MwsfcreMallocTabBufFmtView::buffmt offset must be 0x20"
+    offsetof(MwsfcreMallocTabBufFmt, buffmt) == 0x20,
+    "MwsfcreMallocTabBufFmt::buffmt offset must be 0x20"
   );
 
   // MWSFD buffer-format enum values sampled by MWSFTAG_IsUseAinfSj.
@@ -1263,7 +1263,7 @@
    */
   BOOL MWSFTAG_IsUseAinfSj(const void* const mallocTableEntry)
   {
-    const auto* const view = static_cast<const MwsfcreMallocTabBufFmtView*>(mallocTableEntry);
+    const auto* const view = static_cast<const MwsfcreMallocTabBufFmt*>(mallocTableEntry);
     const std::int32_t buffmt = view->buffmt;
     return (buffmt == kMwsfdBufFmtDefault) || (buffmt == kMwsfdBufFmtAinfSjOverride);
   }
@@ -1280,7 +1280,7 @@
    */
   void MWSFTAG_DestroyAinfSj(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
     moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
     if (sjRingHandle != nullptr) {
       sjrbf_Destroy(sjRingHandle);
@@ -1304,7 +1304,7 @@
       return 0;
     }
 
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
     moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
     if (sjRingHandle == nullptr) {
       return 0;
@@ -1331,7 +1331,7 @@
    */
   void MWSFTAG_InitTagInf(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
     runtimeView->ainfTagInfoReady = 0;
     runtimeView->ainfTagInfoDataAddress = 0;
     runtimeView->ainfTagInfoLength = 0;
@@ -1350,7 +1350,7 @@
    */
   std::int32_t MWSFTAG_ResetAinfSj(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
     moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
     if (sjRingHandle == nullptr) {
       return 0;
@@ -1374,7 +1374,7 @@
     std::int32_t* const outTagDataLength
   )
   {
-    const auto* const runtimeView = reinterpret_cast<const MwsfdTagInfoRuntimeView*>(ply);
+    const auto* const runtimeView = reinterpret_cast<const MwsfdTagInfo*>(ply);
     *outTagDataAddress = runtimeView->ainfTagInfoDataAddress;
     *outTagDataLength = runtimeView->ainfTagInfoLength;
     return runtimeView->ainfTagInfoLength;
@@ -5137,7 +5137,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleTermSupply);
     }
 
-    struct SfplyTermSupplyRuntimeView
+    struct SfplyTermSupply
     {
       std::uint8_t mUnknown00[0x44]{};
       std::int32_t termRequestedFlag = 0; // +0x44
@@ -5145,15 +5145,15 @@
       std::int32_t sfbufLaneIndex = 0; // +0x1F44
     };
     static_assert(
-      offsetof(SfplyTermSupplyRuntimeView, termRequestedFlag) == 0x44,
-      "SfplyTermSupplyRuntimeView::termRequestedFlag offset must be 0x44"
+      offsetof(SfplyTermSupply, termRequestedFlag) == 0x44,
+      "SfplyTermSupply::termRequestedFlag offset must be 0x44"
     );
     static_assert(
-      offsetof(SfplyTermSupplyRuntimeView, sfbufLaneIndex) == 0x1F44,
-      "SfplyTermSupplyRuntimeView::sfbufLaneIndex offset must be 0x1F44"
+      offsetof(SfplyTermSupply, sfbufLaneIndex) == 0x1F44,
+      "SfplyTermSupply::sfbufLaneIndex offset must be 0x1F44"
     );
 
-    auto* const runtime = reinterpret_cast<SfplyTermSupplyRuntimeView*>(workctrlSubobj);
+    auto* const runtime = reinterpret_cast<SfplyTermSupply*>(workctrlSubobj);
     const std::int32_t laneIndex = runtime->sfbufLaneIndex;
     if (SFBUF_GetTermFlg(sfdHandleAddress, laneIndex) != 1) {
       (void)SFBUF_SetTermFlg(sfdHandleAddress, laneIndex, 1);
@@ -6038,7 +6038,7 @@
   // (0x00ADCF00) tests it with `cmp dword ptr [edi+0Ch], 6Eh`. The lane at
   // +0x08 is the remaining byte count, so the version check here was reading
   // a length and comparing it against 107/110.
-  struct SofdecFeatureHeaderRuntimeView
+  struct SofdecFeatureHeader
   {
     std::int32_t state = 0; // +0x00
     std::uint8_t* elementInfoBuffer = nullptr; // +0x04
@@ -6047,16 +6047,16 @@
   };
 
   static_assert(
-    offsetof(SofdecFeatureHeaderRuntimeView, state) == 0x00,
-    "SofdecFeatureHeaderRuntimeView::state offset must be 0x00"
+    offsetof(SofdecFeatureHeader, state) == 0x00,
+    "SofdecFeatureHeader::state offset must be 0x00"
   );
   static_assert(
-    offsetof(SofdecFeatureHeaderRuntimeView, elementInfoBuffer) == 0x04,
-    "SofdecFeatureHeaderRuntimeView::elementInfoBuffer offset must be 0x04"
+    offsetof(SofdecFeatureHeader, elementInfoBuffer) == 0x04,
+    "SofdecFeatureHeader::elementInfoBuffer offset must be 0x04"
   );
   static_assert(
-    offsetof(SofdecFeatureHeaderRuntimeView, version) == 0x0C,
-    "SofdecFeatureHeaderRuntimeView::version offset must be 0x0C"
+    offsetof(SofdecFeatureHeader, version) == 0x0C,
+    "SofdecFeatureHeader::version offset must be 0x0C"
   );
 
   constexpr std::int32_t kSfhElementTableOffset = 0x180;
@@ -6070,7 +6070,7 @@
    * What it does:
    * Validates the feature-header state lane against the accepted range.
    */
-  [[nodiscard]] bool SfhIsObjectStateEffective(const SofdecFeatureHeaderRuntimeView* const featureHeader) noexcept
+  [[nodiscard]] bool SfhIsObjectStateEffective(const SofdecFeatureHeader* const featureHeader) noexcept
   {
     return featureHeader->state < -1 || featureHeader->state > 1;
   }
@@ -6082,7 +6082,7 @@
    * Applies object-state validation and accepts parser versions `107` and
    * `>=110`.
    */
-  [[nodiscard]] bool SfhIsVersionEffective(const SofdecFeatureHeaderRuntimeView* const featureHeader) noexcept
+  [[nodiscard]] bool SfhIsVersionEffective(const SofdecFeatureHeader* const featureHeader) noexcept
   {
     if (!SfhIsObjectStateEffective(featureHeader)) {
       return false;
@@ -6119,7 +6119,7 @@
    * accepted; otherwise returns null.
    */
   [[nodiscard]]
-  std::uint8_t* SfhGetElementInfoPtr(SofdecFeatureHeaderRuntimeView* const featureHeader, const std::int32_t streamId)
+  std::uint8_t* SfhGetElementInfoPtr(SofdecFeatureHeader* const featureHeader, const std::int32_t streamId)
   {
     if (!SfhIsVersionEffective(featureHeader)) {
       return nullptr;
@@ -6128,7 +6128,7 @@
     return SfhSearchStreamId(featureHeader->elementInfoBuffer, streamId);
   }
 
-  struct LscStreamEntryRuntimeView
+  struct LscStreamEntry
   {
     std::int32_t streamId = 0; // +0x00
     const char* fileName = nullptr; // +0x04
@@ -6141,34 +6141,34 @@
   };
 
   static_assert(
-    offsetof(LscStreamEntryRuntimeView, streamId) == 0x00, "LscStreamEntryRuntimeView::streamId offset must be 0x00"
+    offsetof(LscStreamEntry, streamId) == 0x00, "LscStreamEntry::streamId offset must be 0x00"
   );
   static_assert(
-    offsetof(LscStreamEntryRuntimeView, fileName) == 0x04, "LscStreamEntryRuntimeView::fileName offset must be 0x04"
+    offsetof(LscStreamEntry, fileName) == 0x04, "LscStreamEntry::fileName offset must be 0x04"
   );
   static_assert(
-    offsetof(LscStreamEntryRuntimeView, fileNameChecksum) == 0x08,
-    "LscStreamEntryRuntimeView::fileNameChecksum offset must be 0x08"
+    offsetof(LscStreamEntry, fileNameChecksum) == 0x08,
+    "LscStreamEntry::fileNameChecksum offset must be 0x08"
   );
   static_assert(
-    offsetof(LscStreamEntryRuntimeView, startOffset) == 0x0C, "LscStreamEntryRuntimeView::startOffset offset must be 0x0C"
+    offsetof(LscStreamEntry, startOffset) == 0x0C, "LscStreamEntry::startOffset offset must be 0x0C"
   );
   static_assert(
-    offsetof(LscStreamEntryRuntimeView, rangeStart) == 0x10, "LscStreamEntryRuntimeView::rangeStart offset must be 0x10"
+    offsetof(LscStreamEntry, rangeStart) == 0x10, "LscStreamEntry::rangeStart offset must be 0x10"
   );
   static_assert(
-    offsetof(LscStreamEntryRuntimeView, rangeEnd) == 0x14, "LscStreamEntryRuntimeView::rangeEnd offset must be 0x14"
+    offsetof(LscStreamEntry, rangeEnd) == 0x14, "LscStreamEntry::rangeEnd offset must be 0x14"
   );
   static_assert(
-    offsetof(LscStreamEntryRuntimeView, streamStatus) == 0x18,
-    "LscStreamEntryRuntimeView::streamStatus offset must be 0x18"
+    offsetof(LscStreamEntry, streamStatus) == 0x18,
+    "LscStreamEntry::streamStatus offset must be 0x18"
   );
   static_assert(
-    offsetof(LscStreamEntryRuntimeView, readSector) == 0x1C, "LscStreamEntryRuntimeView::readSector offset must be 0x1C"
+    offsetof(LscStreamEntry, readSector) == 0x1C, "LscStreamEntry::readSector offset must be 0x1C"
   );
-  static_assert(sizeof(LscStreamEntryRuntimeView) == 0x20, "LscStreamEntryRuntimeView size must be 0x20");
+  static_assert(sizeof(LscStreamEntry) == 0x20, "LscStreamEntry size must be 0x20");
 
-  struct LscRuntimeView
+  struct LscInstance
   {
     std::uint8_t used = 0; // +0x00
     std::int8_t status = 0; // +0x01
@@ -6187,39 +6187,39 @@
     std::int32_t activeStreamId = 0; // +0x2C
     std::int32_t mUnknown30 = 0; // +0x30
     std::int32_t activeReadSector = 0; // +0x34
-    LscStreamEntryRuntimeView streamEntries[16]{}; // +0x38
+    LscStreamEntry streamEntries[16]{}; // +0x38
   };
 
-  static_assert(offsetof(LscRuntimeView, used) == 0x00, "LscRuntimeView::used offset must be 0x00");
-  static_assert(offsetof(LscRuntimeView, status) == 0x01, "LscRuntimeView::status offset must be 0x01");
+  static_assert(offsetof(LscInstance, used) == 0x00, "LscInstance::used offset must be 0x00");
+  static_assert(offsetof(LscInstance, status) == 0x01, "LscInstance::status offset must be 0x01");
   static_assert(
-    offsetof(LscRuntimeView, streamHandleActive) == 0x02, "LscRuntimeView::streamHandleActive offset must be 0x02"
+    offsetof(LscInstance, streamHandleActive) == 0x02, "LscInstance::streamHandleActive offset must be 0x02"
   );
-  static_assert(offsetof(LscRuntimeView, loopEnabled) == 0x03, "LscRuntimeView::loopEnabled offset must be 0x03");
-  static_assert(offsetof(LscRuntimeView, paused) == 0x04, "LscRuntimeView::paused offset must be 0x04");
-  static_assert(offsetof(LscRuntimeView, sjHandle) == 0x08, "LscRuntimeView::sjHandle offset must be 0x08");
-  static_assert(offsetof(LscRuntimeView, flowLimit) == 0x14, "LscRuntimeView::flowLimit offset must be 0x14");
-  static_assert(offsetof(LscRuntimeView, flowLimitMax) == 0x18, "LscRuntimeView::flowLimitMax offset must be 0x18");
+  static_assert(offsetof(LscInstance, loopEnabled) == 0x03, "LscInstance::loopEnabled offset must be 0x03");
+  static_assert(offsetof(LscInstance, paused) == 0x04, "LscInstance::paused offset must be 0x04");
+  static_assert(offsetof(LscInstance, sjHandle) == 0x08, "LscInstance::sjHandle offset must be 0x08");
+  static_assert(offsetof(LscInstance, flowLimit) == 0x14, "LscInstance::flowLimit offset must be 0x14");
+  static_assert(offsetof(LscInstance, flowLimitMax) == 0x18, "LscInstance::flowLimitMax offset must be 0x18");
   static_assert(
-    offsetof(LscRuntimeView, streamWriteCursor) == 0x1C, "LscRuntimeView::streamWriteCursor offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(LscRuntimeView, streamReadCursor) == 0x20, "LscRuntimeView::streamReadCursor offset must be 0x20"
-  );
-  static_assert(offsetof(LscRuntimeView, streamCount) == 0x24, "LscRuntimeView::streamCount offset must be 0x24");
-  static_assert(
-    offsetof(LscRuntimeView, streamHandle) == 0x28, "LscRuntimeView::streamHandle offset must be 0x28"
+    offsetof(LscInstance, streamWriteCursor) == 0x1C, "LscInstance::streamWriteCursor offset must be 0x1C"
   );
   static_assert(
-    offsetof(LscRuntimeView, activeStreamId) == 0x2C, "LscRuntimeView::activeStreamId offset must be 0x2C"
+    offsetof(LscInstance, streamReadCursor) == 0x20, "LscInstance::streamReadCursor offset must be 0x20"
+  );
+  static_assert(offsetof(LscInstance, streamCount) == 0x24, "LscInstance::streamCount offset must be 0x24");
+  static_assert(
+    offsetof(LscInstance, streamHandle) == 0x28, "LscInstance::streamHandle offset must be 0x28"
   );
   static_assert(
-    offsetof(LscRuntimeView, activeReadSector) == 0x34, "LscRuntimeView::activeReadSector offset must be 0x34"
+    offsetof(LscInstance, activeStreamId) == 0x2C, "LscInstance::activeStreamId offset must be 0x2C"
   );
   static_assert(
-    offsetof(LscRuntimeView, streamEntries) == 0x38, "LscRuntimeView::streamEntries offset must be 0x38"
+    offsetof(LscInstance, activeReadSector) == 0x34, "LscInstance::activeReadSector offset must be 0x34"
   );
-  static_assert(sizeof(LscRuntimeView) == 0x238, "LscRuntimeView size must be 0x238");
+  static_assert(
+    offsetof(LscInstance, streamEntries) == 0x38, "LscInstance::streamEntries offset must be 0x38"
+  );
+  static_assert(sizeof(LscInstance) == 0x238, "LscInstance size must be 0x238");
 
   constexpr std::int32_t kLscRingCapacity = 16;
   constexpr std::int32_t kLscObjectPoolCapacity = 64;
@@ -6262,38 +6262,38 @@
   constexpr char kAdxtErrResetEntryParameter[] = "E02080849 adxt_ResetEntry: parameter error";
 
   using LscErrorCallback = std::int32_t(__cdecl*)(std::int32_t callbackObject, const char* message);
-  std::array<LscRuntimeView, kLscObjectPoolCapacity> gLscObjectPool{};
+  std::array<LscInstance, kLscObjectPoolCapacity> gLscObjectPool{};
   std::array<char, kLscErrorMessageCapacity> gLscErrorMessage{};
   LscErrorCallback gLscErrorCallback = nullptr;
   std::int32_t gLscErrorObject = 0;
   std::int32_t gLscInitCount = 0;
 
-  struct LscSjRuntimeInterfaceVtable
+  struct LscSjInterfaceVtable
   {
     std::uint8_t mUnknown00_23[0x24]{};
     std::int32_t(__cdecl* getNumData)(void* sjHandle, std::int32_t lane) = nullptr; // +0x24
   };
 
-  struct LscSjRuntimeHandleView
+  struct LscSjHandle
   {
     std::int32_t runtimeSlot = 0; // +0x00
   };
 
   static_assert(sizeof(gLscObjectPool) == 0x8E00, "LSC object pool size must be 0x8E00");
   static_assert(
-    offsetof(LscSjRuntimeInterfaceVtable, getNumData) == 0x24,
-    "LscSjRuntimeInterfaceVtable::getNumData offset must be 0x24"
+    offsetof(LscSjInterfaceVtable, getNumData) == 0x24,
+    "LscSjInterfaceVtable::getNumData offset must be 0x24"
   );
-  static_assert(sizeof(LscSjRuntimeHandleView) == 0x04, "LscSjRuntimeHandleView size must be 0x04");
+  static_assert(sizeof(LscSjHandle) == 0x04, "LscSjHandle size must be 0x04");
 
   using LscStatusChangeCallback = std::int32_t(__cdecl*)(std::int32_t callbackObjectPrimary, std::int32_t callbackObjectSecondary);
   LscStatusChangeCallback gLscStatusChangeCallback = nullptr;
   std::int32_t gLscStatusChangeObjectPrimary = 0;
   std::int32_t gLscStatusChangeObjectSecondary = 0;
 
-  [[nodiscard]] LscRuntimeView* AsLscRuntimeView(void* const lscHandle) noexcept
+  [[nodiscard]] LscInstance* LscInstanceOf(void* const lscHandle) noexcept
   {
-    return reinterpret_cast<LscRuntimeView*>(lscHandle);
+    return reinterpret_cast<LscInstance*>(lscHandle);
   }
 
   [[nodiscard]] constexpr std::int32_t LscWrapRingIndex(std::int32_t value) noexcept
@@ -6305,7 +6305,7 @@
     return value;
   }
 
-  [[nodiscard]] std::int32_t LscFindStreamEntryIndex(const LscRuntimeView* const lsc, const std::int32_t streamId) noexcept
+  [[nodiscard]] std::int32_t LscFindStreamEntryIndex(const LscInstance* const lsc, const std::int32_t streamId) noexcept
   {
     for (std::int32_t i = 0; i < kLscRingCapacity; ++i) {
       if (lsc->streamEntries[i].streamId == streamId) {
@@ -6326,13 +6326,13 @@
 
   [[nodiscard]] std::int32_t LscGetSjNumData(void* const sjHandle, const std::int32_t lane)
   {
-    const auto* const sjRuntime = reinterpret_cast<const LscSjRuntimeHandleView*>(sjHandle);
+    const auto* const sjRuntime = reinterpret_cast<const LscSjHandle*>(sjHandle);
     const auto* const runtimeInterface =
-      reinterpret_cast<const LscSjRuntimeInterfaceVtable*>(SjAddressToPointer(sjRuntime->runtimeSlot));
+      reinterpret_cast<const LscSjInterfaceVtable*>(SjAddressToPointer(sjRuntime->runtimeSlot));
     return runtimeInterface->getNumData(sjHandle, lane);
   }
 
-  [[nodiscard]] LscStreamEntryRuntimeView& LscCurrentStreamEntry(LscRuntimeView* const lsc) noexcept
+  [[nodiscard]] LscStreamEntry& LscCurrentStreamEntry(LscInstance* const lsc) noexcept
   {
     return lsc->streamEntries[LscWrapRingIndex(lsc->streamReadCursor)];
   }
@@ -6343,9 +6343,9 @@
    * What it does:
    * Returns first free LSC object lane from the global fixed pool.
    */
-  [[nodiscard]] LscRuntimeView* lsc_Alloc() noexcept
+  [[nodiscard]] LscInstance* lsc_Alloc() noexcept
   {
-    for (LscRuntimeView& lscObject : gLscObjectPool) {
+    for (LscInstance& lscObject : gLscObjectPool) {
       if (lscObject.used == 0) {
         return &lscObject;
       }
@@ -6372,7 +6372,7 @@
     }
 
     LSC_LockCrs();
-    LscRuntimeView* const lsc = lsc_Alloc();
+    LscInstance* const lsc = lsc_Alloc();
     if (lsc == nullptr) {
       (void)LSC_CallErrFunc_(kLscErrNoFreeLscInstance);
       LSC_UnlockCrs();
@@ -6384,7 +6384,7 @@
     lsc->flowLimitMax = LscGetSjNumData(sjHandle, 1) + LscGetSjNumData(sjHandle, 0);
     lsc->flowLimit = (lsc->flowLimitMax * 8) / 10;
 
-    for (LscStreamEntryRuntimeView& entry : lsc->streamEntries) {
+    for (LscStreamEntry& entry : lsc->streamEntries) {
       entry.streamStatus = 0;
     }
 
@@ -6485,7 +6485,7 @@
       return result;
     }
 
-    for (LscRuntimeView& lscObject : gLscObjectPool) {
+    for (LscInstance& lscObject : gLscObjectPool) {
       if (lscObject.used == 1) {
         LSC_Destroy(&lscObject);
       }
@@ -6503,7 +6503,7 @@
    */
   void* LSC_SetStmHndl(void* const lscHandle, void* const streamHandle)
   {
-    AsLscRuntimeView(lscHandle)->streamHandle = streamHandle;
+    LscInstanceOf(lscHandle)->streamHandle = streamHandle;
     return streamHandle;
   }
 
@@ -6537,7 +6537,7 @@
       return -1;
     }
 
-    LscRuntimeView* const lsc = AsLscRuntimeView(lscHandle);
+    LscInstance* const lsc = LscInstanceOf(lscHandle);
     if (lsc->streamCount >= kLscRingCapacity) {
       return -1;
     }
@@ -6551,7 +6551,7 @@
     const std::int32_t previousStreamId = lsc->streamEntries[previousSlot].streamId;
     const std::int32_t streamId = (previousStreamId == kLscMaxStreamId) ? 0 : previousStreamId + 1;
 
-    LscStreamEntryRuntimeView& entry = lsc->streamEntries[LscWrapRingIndex(lsc->streamWriteCursor)];
+    LscStreamEntry& entry = lsc->streamEntries[LscWrapRingIndex(lsc->streamWriteCursor)];
     entry.streamId = streamId;
     entry.fileName = fileName;
     entry.fileNameChecksum = LscComputeFileNameChecksum(fileName);
@@ -6582,7 +6582,7 @@
       return;
     }
 
-    LscRuntimeView* const lsc = AsLscRuntimeView(lscHandle);
+    LscInstance* const lsc = LscInstanceOf(lscHandle);
     if (lsc->status == 0) {
       lsc->streamWriteCursor = 0;
       lsc->streamReadCursor = 0;
@@ -6603,7 +6603,7 @@
       return;
     }
 
-    LscRuntimeView* const lsc = AsLscRuntimeView(lscHandle);
+    LscInstance* const lsc = LscInstanceOf(lscHandle);
     if (lsc->status != 0) {
       lsc_Stop(lscHandle);
     }
@@ -6625,7 +6625,7 @@
       return;
     }
 
-    LscRuntimeView* const lsc = AsLscRuntimeView(lscHandle);
+    LscInstance* const lsc = LscInstanceOf(lscHandle);
     if (lsc->status == 0) {
       return;
     }
@@ -6654,7 +6654,7 @@
       return LSC_CallErrFunc_(kLscErrLscNullPause);
     }
 
-    AsLscRuntimeView(lscHandle)->paused = static_cast<std::uint8_t>(paused == 1);
+    LscInstanceOf(lscHandle)->paused = static_cast<std::uint8_t>(paused == 1);
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(lscHandle));
   }
 
@@ -6671,7 +6671,7 @@
     }
 
     lsc_Stop(lscHandle);
-    std::memset(lscHandle, 0, sizeof(LscRuntimeView));
+    std::memset(lscHandle, 0, sizeof(LscInstance));
   }
 
   /**
@@ -6687,7 +6687,7 @@
       return -1;
     }
 
-    return static_cast<std::int32_t>(AsLscRuntimeView(lscHandle)->status);
+    return static_cast<std::int32_t>(LscInstanceOf(lscHandle)->status);
   }
 
   /**
@@ -6703,7 +6703,7 @@
       return -1;
     }
 
-    return AsLscRuntimeView(lscHandle)->streamCount;
+    return LscInstanceOf(lscHandle)->streamCount;
   }
 
   /**
@@ -6719,7 +6719,7 @@
       return -1;
     }
 
-    const LscRuntimeView* const lsc = AsLscRuntimeView(lscHandle);
+    const LscInstance* const lsc = LscInstanceOf(lscHandle);
     if (streamIndex < 0 || streamIndex >= lsc->streamCount) {
       (void)LSC_CallErrFunc_(kLscErrInvalidStmIndexFmt, streamIndex);
       return -1;
@@ -6742,7 +6742,7 @@
       return nullptr;
     }
 
-    const LscRuntimeView* const lsc = AsLscRuntimeView(lscHandle);
+    const LscInstance* const lsc = LscInstanceOf(lscHandle);
     const std::int32_t index = LscFindStreamEntryIndex(lsc, streamId);
     if (index < 0) {
       (void)LSC_CallErrFunc_(kLscErrStreamNotFoundFnameFmt, streamId);
@@ -6765,7 +6765,7 @@
       return -1;
     }
 
-    const LscRuntimeView* const lsc = AsLscRuntimeView(lscHandle);
+    const LscInstance* const lsc = LscInstanceOf(lscHandle);
     const std::int32_t index = LscFindStreamEntryIndex(lsc, streamId);
     if (index < 0) {
       (void)LSC_CallErrFunc_(kLscErrStreamNotFoundStatFmt, streamId);
@@ -6788,7 +6788,7 @@
       return 0;
     }
 
-    const LscRuntimeView* const lsc = AsLscRuntimeView(lscHandle);
+    const LscInstance* const lsc = LscInstanceOf(lscHandle);
     const std::int32_t index = LscFindStreamEntryIndex(lsc, streamId);
     if (index < 0) {
       (void)LSC_CallErrFunc_(kLscErrStreamNotFoundRdSctFmt, streamId);
@@ -6810,7 +6810,7 @@
       return LSC_CallErrFunc_(kLscErrLscNullSetFlowLimit);
     }
 
-    LscRuntimeView* const lsc = AsLscRuntimeView(lscHandle);
+    LscInstance* const lsc = LscInstanceOf(lscHandle);
     if (flowLimit < 0 || flowLimit > lsc->flowLimitMax) {
       return LSC_CallErrFunc_(kLscErrInvalidFlowLimitFmt, flowLimit);
     }
@@ -6832,7 +6832,7 @@
       return -1;
     }
 
-    return AsLscRuntimeView(lscHandle)->flowLimit;
+    return LscInstanceOf(lscHandle)->flowLimit;
   }
 
   /**
@@ -6848,7 +6848,7 @@
       return;
     }
 
-    AsLscRuntimeView(lscHandle)->loopEnabled = static_cast<std::uint8_t>(enabled);
+    LscInstanceOf(lscHandle)->loopEnabled = static_cast<std::uint8_t>(enabled);
   }
 
   /**
@@ -6922,8 +6922,8 @@
    */
   std::int32_t lsc_StatWait(void* const lscHandle)
   {
-    auto* const lsc = AsLscRuntimeView(lscHandle);
-    LscStreamEntryRuntimeView& entry = LscCurrentStreamEntry(lsc);
+    auto* const lsc = LscInstanceOf(lscHandle);
+    LscStreamEntry& entry = LscCurrentStreamEntry(lsc);
 
     if (lsc->streamCount <= 0) {
       return lsc->streamCount;
@@ -6961,12 +6961,12 @@
    */
   std::int32_t lsc_StatRead(void* const lscHandle)
   {
-    auto* const lsc = AsLscRuntimeView(lscHandle);
+    auto* const lsc = LscInstanceOf(lscHandle);
     if (lsc->streamHandle == nullptr) {
       return LSC_CallErrFunc_(kLscErrLscFilePointerNull);
     }
 
-    LscStreamEntryRuntimeView& entry = LscCurrentStreamEntry(lsc);
+    LscStreamEntry& entry = LscCurrentStreamEntry(lsc);
     const std::int32_t statClass = ADXSTM_GetStat(lsc->streamHandle) - 2;
     if (statClass == 0) {
       entry.readSector = ADXSTM_Tell(lsc->streamHandle);
@@ -6996,13 +6996,13 @@
    */
   std::int32_t lsc_StatEnd(void* const lscHandle)
   {
-    auto* const lsc = AsLscRuntimeView(lscHandle);
+    auto* const lsc = LscInstanceOf(lscHandle);
     if (lsc->streamHandle == nullptr) {
       return 0;
     }
 
     const bool loopEnabled = (lsc->loopEnabled == 1);
-    const LscStreamEntryRuntimeView entrySnapshot = loopEnabled ? LscCurrentStreamEntry(lsc) : LscStreamEntryRuntimeView{};
+    const LscStreamEntry entrySnapshot = loopEnabled ? LscCurrentStreamEntry(lsc) : LscStreamEntry{};
 
     --lsc->streamCount;
     std::int32_t result = lsc->streamCount;
@@ -7034,14 +7034,14 @@
    */
   std::int32_t lsc_ExecHndl(void* const lscHandle)
   {
-    auto* const lsc = AsLscRuntimeView(lscHandle);
+    auto* const lsc = LscInstanceOf(lscHandle);
     std::int32_t result = 1;
 
     if (lsc->paused == 1 || lsc->status != 2 || lsc->streamCount <= 0) {
       return result;
     }
 
-    LscStreamEntryRuntimeView& entry = LscCurrentStreamEntry(lsc);
+    LscStreamEntry& entry = LscCurrentStreamEntry(lsc);
     if (entry.streamStatus == 1) {
       (void)lsc_StatRead(lscHandle);
     }
@@ -7067,7 +7067,7 @@
   std::int32_t lsc_ExecServer()
   {
     std::int32_t result = 0;
-    for (LscRuntimeView& lsc : gLscObjectPool) {
+    for (LscInstance& lsc : gLscObjectPool) {
       if (lsc.used == 1) {
         result = lsc_ExecHndl(&lsc);
       }
@@ -7114,7 +7114,7 @@
   /**
    * Runtime view for M2V concealment paths (`_concealOn*` lane family).
    */
-  struct M2vConcealRuntimeView
+  struct M2vConcealState
   {
     std::uint8_t mUnknown0000_01B7[0x1B8]{};
     std::int32_t concealDisableFlag = 0; // +0x1B8
@@ -7144,27 +7144,27 @@
     std::int32_t concealStartMacroblock = 0; // +0x139C
     std::int32_t concealDeferredFlag = 0; // +0x13A0
   };
-  static_assert(offsetof(M2vConcealRuntimeView, concealDisableFlag) == 0x1B8);
-  static_assert(offsetof(M2vConcealRuntimeView, macroblocksPerRow) == 0x1D8);
-  static_assert(offsetof(M2vConcealRuntimeView, decodeStage) == 0x1E8);
-  static_assert(offsetof(M2vConcealRuntimeView, chromaPlaneUBase) == 0x294);
-  static_assert(offsetof(M2vConcealRuntimeView, chromaPlaneVBase) == 0x298);
-  static_assert(offsetof(M2vConcealRuntimeView, lumaPlaneBase) == 0x29C);
-  static_assert(offsetof(M2vConcealRuntimeView, chromaRowStride) == 0x2A0);
-  static_assert(offsetof(M2vConcealRuntimeView, lumaRowStride) == 0x2A2);
-  static_assert(offsetof(M2vConcealRuntimeView, concealDispatchFn) == 0x2C4);
-  static_assert(offsetof(M2vConcealRuntimeView, concealStateWord308) == 0x308);
-  static_assert(offsetof(M2vConcealRuntimeView, concealStateWord30C) == 0x30C);
-  static_assert(offsetof(M2vConcealRuntimeView, concealStateWord32C) == 0x32C);
-  static_assert(offsetof(M2vConcealRuntimeView, concealStateWord330) == 0x330);
-  static_assert(offsetof(M2vConcealRuntimeView, macroblockCount) == 0x338);
-  static_assert(offsetof(M2vConcealRuntimeView, concealFlags) == 0x348);
-  static_assert(offsetof(M2vConcealRuntimeView, concealStartMacroblock) == 0x139C);
-  static_assert(offsetof(M2vConcealRuntimeView, concealDeferredFlag) == 0x13A0);
+  static_assert(offsetof(M2vConcealState, concealDisableFlag) == 0x1B8);
+  static_assert(offsetof(M2vConcealState, macroblocksPerRow) == 0x1D8);
+  static_assert(offsetof(M2vConcealState, decodeStage) == 0x1E8);
+  static_assert(offsetof(M2vConcealState, chromaPlaneUBase) == 0x294);
+  static_assert(offsetof(M2vConcealState, chromaPlaneVBase) == 0x298);
+  static_assert(offsetof(M2vConcealState, lumaPlaneBase) == 0x29C);
+  static_assert(offsetof(M2vConcealState, chromaRowStride) == 0x2A0);
+  static_assert(offsetof(M2vConcealState, lumaRowStride) == 0x2A2);
+  static_assert(offsetof(M2vConcealState, concealDispatchFn) == 0x2C4);
+  static_assert(offsetof(M2vConcealState, concealStateWord308) == 0x308);
+  static_assert(offsetof(M2vConcealState, concealStateWord30C) == 0x30C);
+  static_assert(offsetof(M2vConcealState, concealStateWord32C) == 0x32C);
+  static_assert(offsetof(M2vConcealState, concealStateWord330) == 0x330);
+  static_assert(offsetof(M2vConcealState, macroblockCount) == 0x338);
+  static_assert(offsetof(M2vConcealState, concealFlags) == 0x348);
+  static_assert(offsetof(M2vConcealState, concealStartMacroblock) == 0x139C);
+  static_assert(offsetof(M2vConcealState, concealDeferredFlag) == 0x13A0);
 
-  [[nodiscard]] inline M2vConcealRuntimeView* AsM2vConcealRuntime(const std::int32_t decoderAddress) noexcept
+  [[nodiscard]] inline M2vConcealState* M2vConcealOf(const std::int32_t decoderAddress) noexcept
   {
-    return reinterpret_cast<M2vConcealRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(decoderAddress)));
+    return reinterpret_cast<M2vConcealState*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(decoderAddress)));
   }
 
   /**
@@ -7176,7 +7176,7 @@
    */
   extern "C" unsigned int __cdecl concealOnExec(const std::int32_t decoderAddress, const unsigned int startMacroblock)
   {
-    auto* const runtime = AsM2vConcealRuntime(decoderAddress);
+    auto* const runtime = M2vConcealOf(decoderAddress);
     unsigned int result = static_cast<unsigned int>(runtime->concealDisableFlag);
     if (result != 0u) {
       return result;
@@ -7300,7 +7300,7 @@
    */
   extern "C" std::int32_t __cdecl concealOn(const std::int32_t decoderAddress)
   {
-    auto* const runtime = AsM2vConcealRuntime(decoderAddress);
+    auto* const runtime = M2vConcealOf(decoderAddress);
     const std::int32_t concealStartMacroblock = (runtime->concealStartMacroblock < 0) ? 0 : runtime->concealStartMacroblock;
 
     const std::int32_t decodeStage = runtime->decodeStage;
@@ -13850,7 +13850,7 @@
       return 0;
     }
 
-    void* const seamlessStreamHandle = AsLscRuntimeView(lscHandle)->streamHandle;
+    void* const seamlessStreamHandle = LscInstanceOf(lscHandle)->streamHandle;
     if (seamlessStreamHandle == nullptr) {
       return 0;
     }
@@ -16332,7 +16332,7 @@
 
   using AdxstmEndOfStreamCallback = void(__cdecl*)(std::int32_t callbackContext);
 
-  struct AdxstmServerSlotView
+  struct AdxstmServerSlot
   {
     std::uint8_t slotState = 0; // +0x00
     std::int8_t streamStatus = 0; // +0x01
@@ -16367,89 +16367,89 @@
     std::int32_t streamSectorLimit = 0; // +0x5C
   };
 
-  static_assert(sizeof(AdxstmServerSlotView) == 0x60, "AdxstmServerSlotView size must be 0x60");
-  static_assert(offsetof(AdxstmServerSlotView, streamStatus) == 0x01, "AdxstmServerSlotView::streamStatus offset must be 0x01");
-  static_assert(offsetof(AdxstmServerSlotView, readFlag) == 0x02, "AdxstmServerSlotView::readFlag offset must be 0x02");
+  static_assert(sizeof(AdxstmServerSlot) == 0x60, "AdxstmServerSlot size must be 0x60");
+  static_assert(offsetof(AdxstmServerSlot, streamStatus) == 0x01, "AdxstmServerSlot::streamStatus offset must be 0x01");
+  static_assert(offsetof(AdxstmServerSlot, readFlag) == 0x02, "AdxstmServerSlot::readFlag offset must be 0x02");
   static_assert(
-    offsetof(AdxstmServerSlotView, sourceJoinHandle) == 0x04,
-    "AdxstmServerSlotView::sourceJoinHandle offset must be 0x04"
+    offsetof(AdxstmServerSlot, sourceJoinHandle) == 0x04,
+    "AdxstmServerSlot::sourceJoinHandle offset must be 0x04"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, cvfsHandle) == 0x08,
-    "AdxstmServerSlotView::cvfsHandle offset must be 0x08"
+    offsetof(AdxstmServerSlot, cvfsHandle) == 0x08,
+    "AdxstmServerSlot::cvfsHandle offset must be 0x08"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, baseOffset) == 0x0C,
-    "AdxstmServerSlotView::baseOffset offset must be 0x0C"
+    offsetof(AdxstmServerSlot, baseOffset) == 0x0C,
+    "AdxstmServerSlot::baseOffset offset must be 0x0C"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, fileLengthSectors) == 0x14,
-    "AdxstmServerSlotView::fileLengthSectors offset must be 0x14"
+    offsetof(AdxstmServerSlot, fileLengthSectors) == 0x14,
+    "AdxstmServerSlot::fileLengthSectors offset must be 0x14"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, sourceReadableBytes) == 0x18,
-    "AdxstmServerSlotView::sourceReadableBytes offset must be 0x18"
+    offsetof(AdxstmServerSlot, sourceReadableBytes) == 0x18,
+    "AdxstmServerSlot::sourceReadableBytes offset must be 0x18"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, sourceWritableBytes) == 0x1C,
-    "AdxstmServerSlotView::sourceWritableBytes offset must be 0x1C"
+    offsetof(AdxstmServerSlot, sourceWritableBytes) == 0x1C,
+    "AdxstmServerSlot::sourceWritableBytes offset must be 0x1C"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, pendingReadSectors) == 0x20,
-    "AdxstmServerSlotView::pendingReadSectors offset must be 0x20"
+    offsetof(AdxstmServerSlot, pendingReadSectors) == 0x20,
+    "AdxstmServerSlot::pendingReadSectors offset must be 0x20"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, pendingChunk) == 0x24,
-    "AdxstmServerSlotView::pendingChunk offset must be 0x24"
+    offsetof(AdxstmServerSlot, pendingChunk) == 0x24,
+    "AdxstmServerSlot::pendingChunk offset must be 0x24"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, requestedReadSectors) == 0x2C,
-    "AdxstmServerSlotView::requestedReadSectors offset must be 0x2C"
+    offsetof(AdxstmServerSlot, requestedReadSectors) == 0x2C,
+    "AdxstmServerSlot::requestedReadSectors offset must be 0x2C"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, eosSector) == 0x30,
-    "AdxstmServerSlotView::eosSector offset must be 0x30"
+    offsetof(AdxstmServerSlot, eosSector) == 0x30,
+    "AdxstmServerSlot::eosSector offset must be 0x30"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, sourceStreamedBytes) == 0x34,
-    "AdxstmServerSlotView::sourceStreamedBytes offset must be 0x34"
+    offsetof(AdxstmServerSlot, sourceStreamedBytes) == 0x34,
+    "AdxstmServerSlot::sourceStreamedBytes offset must be 0x34"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, sourceTotalBytes) == 0x40,
-    "AdxstmServerSlotView::sourceTotalBytes offset must be 0x40"
+    offsetof(AdxstmServerSlot, sourceTotalBytes) == 0x40,
+    "AdxstmServerSlot::sourceTotalBytes offset must be 0x40"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, pauseState) == 0x44,
-    "AdxstmServerSlotView::pauseState offset must be 0x44"
+    offsetof(AdxstmServerSlot, pauseState) == 0x44,
+    "AdxstmServerSlot::pauseState offset must be 0x44"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, waitForFileOpen) == 0x45,
-    "AdxstmServerSlotView::waitForFileOpen offset must be 0x45"
+    offsetof(AdxstmServerSlot, waitForFileOpen) == 0x45,
+    "AdxstmServerSlot::waitForFileOpen offset must be 0x45"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, streamErrorCount) == 0x4C,
-    "AdxstmServerSlotView::streamErrorCount offset must be 0x4C"
+    offsetof(AdxstmServerSlot, streamErrorCount) == 0x4C,
+    "AdxstmServerSlot::streamErrorCount offset must be 0x4C"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, fileName) == 0x50,
-    "AdxstmServerSlotView::fileName offset must be 0x50"
+    offsetof(AdxstmServerSlot, fileName) == 0x50,
+    "AdxstmServerSlot::fileName offset must be 0x50"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, fileOpenMode) == 0x54,
-    "AdxstmServerSlotView::fileOpenMode offset must be 0x54"
+    offsetof(AdxstmServerSlot, fileOpenMode) == 0x54,
+    "AdxstmServerSlot::fileOpenMode offset must be 0x54"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, currentSectorOffset) == 0x58,
-    "AdxstmServerSlotView::currentSectorOffset offset must be 0x58"
+    offsetof(AdxstmServerSlot, currentSectorOffset) == 0x58,
+    "AdxstmServerSlot::currentSectorOffset offset must be 0x58"
   );
   static_assert(
-    offsetof(AdxstmServerSlotView, streamSectorLimit) == 0x5C,
-    "AdxstmServerSlotView::streamSectorLimit offset must be 0x5C"
+    offsetof(AdxstmServerSlot, streamSectorLimit) == 0x5C,
+    "AdxstmServerSlot::streamSectorLimit offset must be 0x5C"
   );
 
   constexpr std::size_t kAdxstmServerSlotCount = 0x50;
   static_assert(
-    (sizeof(AdxstmServerSlotView) * kAdxstmServerSlotCount) == 0x1E00,
+    (sizeof(AdxstmServerSlot) * kAdxstmServerSlotCount) == 0x1E00,
     "ADXSTM server slot pool size must be 0x1E00 bytes"
   );
   std::int32_t gSfadxtAttachCount = 0;
@@ -16476,7 +16476,7 @@
     kAdxstmServerSlotCount == 48 + 32,
     "ADXSTM realtime and normal partitions must tile the whole slot pool"
   );
-  std::array<AdxstmServerSlotView, kAdxstmServerSlotCount> gAdxstmObjectPool{};
+  std::array<AdxstmServerSlot, kAdxstmServerSlotCount> gAdxstmObjectPool{};
 
   /**
    * Address: 0x00B0F4A0 (FUN_00B0F4A0)
@@ -16616,14 +16616,14 @@
     return ((byteCount + signMask) >> 11) + roundCarry;
   }
 
-  [[nodiscard]] static AdxstmServerSlotView*
+  [[nodiscard]] static AdxstmServerSlot*
   ADXSTMF_FindFreeSlotInPartition(const std::int32_t slotOffset, const std::int32_t slotCount)
   {
-    AdxstmServerSlotView* selectedSlot = nullptr;
+    AdxstmServerSlot* selectedSlot = nullptr;
     std::int32_t slotIndex = 0;
 
     if (slotCount > 0) {
-      AdxstmServerSlotView* scanSlot = gAdxstmObjectPool.data() + slotOffset;
+      AdxstmServerSlot* scanSlot = gAdxstmObjectPool.data() + slotOffset;
       do {
         selectedSlot = scanSlot;
         if (scanSlot->slotState == 0) {
@@ -16668,7 +16668,7 @@
     moho::SofdecSjSupplyHandle* const sourceJoinObject
   )
   {
-    AdxstmServerSlotView* const streamHandle = ADXSTMF_FindFreeSlotInPartition(adxstmf_rtim_ofst, adxstmf_rtim_num);
+    AdxstmServerSlot* const streamHandle = ADXSTMF_FindFreeSlotInPartition(adxstmf_rtim_ofst, adxstmf_rtim_num);
     if (streamHandle == nullptr) {
       return nullptr;
     }
@@ -16686,7 +16686,7 @@
    * default stream state under ADXCRS lock.
    */
   void ADXSTMF_SetupHandleMember(
-    AdxstmServerSlotView* const streamHandle,
+    AdxstmServerSlot* const streamHandle,
     CvFsHandleView* const cvfsHandle,
     const std::int32_t baseOffset,
     const std::int32_t fileLengthBytes,
@@ -16735,7 +16735,7 @@
     moho::SofdecSjSupplyHandle* const sourceJoinObject
   )
   {
-    AdxstmServerSlotView* const streamHandle = ADXSTMF_FindFreeSlotInPartition(adxstmf_nrml_ofst, adxstmf_nrml_num);
+    AdxstmServerSlot* const streamHandle = ADXSTMF_FindFreeSlotInPartition(adxstmf_nrml_ofst, adxstmf_nrml_num);
     if (streamHandle == nullptr) {
       return nullptr;
     }
@@ -16767,9 +16767,9 @@
     SVM_Unlock();
   }
 
-  [[nodiscard]] AdxstmServerSlotView* AsAdxstmRuntimeView(void* const streamHandle)
+  [[nodiscard]] AdxstmServerSlot* AdxstmServerSlotOf(void* const streamHandle)
   {
-    return reinterpret_cast<AdxstmServerSlotView*>(streamHandle);
+    return reinterpret_cast<AdxstmServerSlot*>(streamHandle);
   }
 
   /**
@@ -16807,7 +16807,7 @@
     std::int32_t* const outReadableBytes
   )
   {
-    const AdxstmServerSlotView* const runtime = AsAdxstmRuntimeView(streamHandle);
+    const AdxstmServerSlot* const runtime = AdxstmServerSlotOf(streamHandle);
     *outWritableBytes = runtime->sourceWritableBytes;
     *outReadableBytes = runtime->sourceReadableBytes;
     return 1;
@@ -16837,7 +16837,7 @@
   std::int8_t adxstm_SetPause(void* const streamHandle, const std::int32_t paused)
   {
     const std::int8_t pauseByte = static_cast<std::int8_t>(paused);
-    AsAdxstmRuntimeView(streamHandle)->pauseState = pauseByte;
+    AdxstmServerSlotOf(streamHandle)->pauseState = pauseByte;
     return pauseByte;
   }
 
@@ -16860,7 +16860,7 @@
    */
   std::int32_t adxstm_GetPause(void* const streamHandle)
   {
-    return static_cast<std::int32_t>(AsAdxstmRuntimeView(streamHandle)->pauseState);
+    return static_cast<std::int32_t>(AdxstmServerSlotOf(streamHandle)->pauseState);
   }
 
   /**
@@ -16882,7 +16882,7 @@
    */
   std::int32_t ADXSTM_GetCvdfsStat(void* const streamHandle, std::int32_t* const outStatus)
   {
-    const std::int32_t status = cvFsGetStat(AsAdxstmRuntimeView(streamHandle)->cvfsHandle);
+    const std::int32_t status = cvFsGetStat(AdxstmServerSlotOf(streamHandle)->cvfsHandle);
     *outStatus = status;
     return status;
   }
@@ -16962,7 +16962,7 @@
    */
   std::int32_t adxstm_SetSj(void* const streamHandle, moho::SofdecSjSupplyHandle* const sourceJoinObject)
   {
-    AdxstmServerSlotView* const runtime = AsAdxstmRuntimeView(streamHandle);
+    AdxstmServerSlot* const runtime = AdxstmServerSlotOf(streamHandle);
     runtime->sourceJoinHandle = sourceJoinObject;
 
     ADXCRS_Lock();
@@ -16995,7 +16995,7 @@
    */
   std::int32_t adxstm_SetRdSct(void* const streamHandle, const std::int32_t readSectors)
   {
-    AdxstmServerSlotView* const runtime = AsAdxstmRuntimeView(streamHandle);
+    AdxstmServerSlot* const runtime = AdxstmServerSlotOf(streamHandle);
     runtime->fileLengthBytes = (readSectors << 11);
     runtime->fileLengthSectors = readSectors;
     return readSectors;
@@ -17020,7 +17020,7 @@
    */
   std::int32_t adxstm_SetOfst(void* const streamHandle, const std::int32_t baseOffset)
   {
-    AsAdxstmRuntimeView(streamHandle)->baseOffset = baseOffset;
+    AdxstmServerSlotOf(streamHandle)->baseOffset = baseOffset;
     return ADXSTM_Seek(streamHandle, 0);
   }
 
@@ -17044,7 +17044,7 @@
    */
   void adxf_wait_until_file_open_internal(void* const streamHandle)
   {
-    AdxstmServerSlotView* const runtime = AsAdxstmRuntimeView(streamHandle);
+    AdxstmServerSlot* const runtime = AdxstmServerSlotOf(streamHandle);
     if (runtime->fileName == nullptr || runtime->cvfsHandle != nullptr) {
       return;
     }
@@ -17077,7 +17077,7 @@
    */
   std::int32_t adxstm_GetReadFlg(void* const streamHandle)
   {
-    return static_cast<std::int32_t>(AsAdxstmRuntimeView(streamHandle)->readFlag);
+    return static_cast<std::int32_t>(AdxstmServerSlotOf(streamHandle)->readFlag);
   }
 
   /**
@@ -17100,7 +17100,7 @@
   std::int32_t adxt_GetNumErr(void* const adxtRuntime)
   {
     const auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
-    return AsAdxstmRuntimeView(runtime->streamHandle)->streamErrorCount;
+    return AdxstmServerSlotOf(runtime->streamHandle)->streamErrorCount;
   }
 
   /**
@@ -17175,7 +17175,7 @@
    */
   std::int32_t adxstm_GetSj(void* const streamHandle)
   {
-    return SjPointerToAddress(AsAdxstmRuntimeView(streamHandle)->sourceJoinHandle);
+    return SjPointerToAddress(AdxstmServerSlotOf(streamHandle)->sourceJoinHandle);
   }
 
   /**
@@ -17201,7 +17201,7 @@
     const std::int32_t maxBufferSectors
   )
   {
-    AdxstmServerSlotView* const runtime = AsAdxstmRuntimeView(streamHandle);
+    AdxstmServerSlot* const runtime = AdxstmServerSlotOf(streamHandle);
     runtime->sourceWritableBytes = minBufferSectors;
     runtime->sourceReadableBytes = maxBufferSectors;
     return 1;
@@ -17230,7 +17230,7 @@
    */
   std::int32_t adxstm_SetReqRdSize(void* const streamHandle, const std::int32_t requestedSectors)
   {
-    AsAdxstmRuntimeView(streamHandle)->requestedReadSectors = requestedSectors;
+    AdxstmServerSlotOf(streamHandle)->requestedReadSectors = requestedSectors;
     return 1;
   }
 
@@ -17254,7 +17254,7 @@
    */
   std::int32_t adxstm_GetFileLen(void* const streamHandle)
   {
-    return AsAdxstmRuntimeView(streamHandle)->fileLengthBytes;
+    return AdxstmServerSlotOf(streamHandle)->fileLengthBytes;
   }
 
   /**
@@ -17276,7 +17276,7 @@
    */
   std::int32_t adxstm_GetFileLen64(void* const streamHandle)
   {
-    return AsAdxstmRuntimeView(streamHandle)->fileLengthSectors;
+    return AdxstmServerSlotOf(streamHandle)->fileLengthSectors;
   }
 
   /**
@@ -17321,7 +17321,7 @@
    */
   [[maybe_unused]] std::int32_t adxstm_GetFilesystemServiceActive(void* const streamHandle)
   {
-    return static_cast<std::int32_t>(AsAdxstmRuntimeView(streamHandle)->filesystemServiceActive);
+    return static_cast<std::int32_t>(AdxstmServerSlotOf(streamHandle)->filesystemServiceActive);
   }
 
   /**
@@ -17332,7 +17332,7 @@
    */
   std::int32_t adxstm_GetStat(void* const streamHandle)
   {
-    return static_cast<std::int32_t>(AsAdxstmRuntimeView(streamHandle)->streamStatus);
+    return static_cast<std::int32_t>(AdxstmServerSlotOf(streamHandle)->streamStatus);
   }
 
   /**
@@ -17354,7 +17354,7 @@
    */
   std::int32_t adxstm_Seek(void* const streamHandle, const std::int32_t sectorOffset)
   {
-    auto* const runtime = AsAdxstmRuntimeView(streamHandle);
+    auto* const runtime = AdxstmServerSlotOf(streamHandle);
     runtime->currentSectorOffset = sectorOffset;
     if (sectorOffset > runtime->fileLengthSectors) {
       runtime->currentSectorOffset = runtime->fileLengthSectors;
@@ -17381,7 +17381,7 @@
    */
   std::int32_t adxstm_Tell(void* const streamHandle)
   {
-    const auto* const runtime = AsAdxstmRuntimeView(streamHandle);
+    const auto* const runtime = AdxstmServerSlotOf(streamHandle);
     return (runtime->cvfsHandle != nullptr) ? runtime->currentSectorOffset : 0;
   }
 
@@ -17402,9 +17402,9 @@
    * What it does:
    * Resets read-transfer lanes and transitions ADXSTM state for stream start.
    */
-  AdxstmServerSlotView* adxstm_start_sub(void* const streamHandle)
+  AdxstmServerSlot* adxstm_start_sub(void* const streamHandle)
   {
-    auto* const runtime = AsAdxstmRuntimeView(streamHandle);
+    auto* const runtime = AdxstmServerSlotOf(streamHandle);
     runtime->sourceStreamedBytes = 0;
     runtime->streamErrorCount = 0;
     // `cmp [eax+14h], 0` at 0x00B0FA7C - the bound file length, not the pending
@@ -17431,7 +17431,7 @@
   {
     ADXCRS_Lock();
     adxstm_start_sub(streamHandle);
-    AsAdxstmRuntimeView(streamHandle)->streamSectorLimit = 0x000FFFFF;
+    AdxstmServerSlotOf(streamHandle)->streamSectorLimit = 0x000FFFFF;
     ADXCRS_Unlock();
     return 1;
   }
@@ -17457,7 +17457,7 @@
   {
     ADXCRS_Lock();
     adxstm_start_sub(streamHandle);
-    AsAdxstmRuntimeView(streamHandle)->streamSectorLimit = sectorCount;
+    AdxstmServerSlotOf(streamHandle)->streamSectorLimit = sectorCount;
     ADXCRS_Unlock();
     return 1;
   }
@@ -17481,7 +17481,7 @@
    */
   void adxstm_StopNw(void* const streamHandle)
   {
-    auto* const runtime = AsAdxstmRuntimeView(streamHandle);
+    auto* const runtime = AdxstmServerSlotOf(streamHandle);
     adxstm_lock();
     if (runtime->streamStatus == 2 && runtime->readFlag == 1) {
       const std::uint8_t clearStopRequested = runtime->clearStopRequested;
@@ -17514,7 +17514,7 @@
    */
   void adxstm_Stop(void* const streamHandle)
   {
-    auto* const runtime = AsAdxstmRuntimeView(streamHandle);
+    auto* const runtime = AdxstmServerSlotOf(streamHandle);
     ADXSTM_StopNw(streamHandle);
     do {
       do {
@@ -17546,7 +17546,7 @@
     const std::int32_t callbackContext
   )
   {
-    auto* const runtime = AsAdxstmRuntimeView(streamHandle);
+    auto* const runtime = AdxstmServerSlotOf(streamHandle);
     runtime->endOfStreamCallback =
       reinterpret_cast<AdxstmEndOfStreamCallback>(static_cast<std::uintptr_t>(callbackAddress));
     runtime->endOfStreamCallbackContext = callbackContext;
@@ -17573,7 +17573,7 @@
    */
   std::int32_t adxstm_SetEos(void* const streamHandle, const std::int32_t eosSector)
   {
-    auto* const runtime = AsAdxstmRuntimeView(streamHandle);
+    auto* const runtime = AdxstmServerSlotOf(streamHandle);
     if (eosSector < 0) {
       runtime->eosSector = runtime->pendingReadSectors;
       return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(streamHandle));
@@ -17598,12 +17598,12 @@
   constexpr std::int32_t kAdxstmStreamSectorLimitUnbounded = 0x000FFFFF;
   constexpr char kAdxstmStatExecOpenErrorPrefix[] = "E02110501 adxstmf_stat_exec: can't open ";
 
-  [[nodiscard]] AdxstmServerSlotView* AsAdxstmServerSlot(void* const streamHandle)
+  [[nodiscard]] AdxstmServerSlot* AsAdxstmServerSlot(void* const streamHandle)
   {
-    return static_cast<AdxstmServerSlotView*>(streamHandle);
+    return static_cast<AdxstmServerSlot*>(streamHandle);
   }
 
-  void adxstmf_stat_exec(AdxstmServerSlotView* runtime)
+  void adxstmf_stat_exec(AdxstmServerSlot* runtime)
   {
     moho::SofdecSjSupplyHandle* const sourceHandle = runtime->sourceJoinHandle;
     const std::int32_t cvfsStatus = cvFsGetStat(runtime->cvfsHandle);
@@ -17755,7 +17755,7 @@
    */
   std::int32_t ADXSTMF_ExecHndl(void* const streamHandle)
   {
-    AdxstmServerSlotView* const runtime = AsAdxstmServerSlot(streamHandle);
+    AdxstmServerSlot* const runtime = AsAdxstmServerSlot(streamHandle);
 
     if (runtime->readFlag == 0) {
       if (runtime->stopAfterRead == 1) {
@@ -17846,7 +17846,7 @@
     const std::int32_t rangeEnd
   )
   {
-    auto* const runtime = AsAdxstmRuntimeView(streamHandle);
+    auto* const runtime = AdxstmServerSlotOf(streamHandle);
     adxstm_lock();
     runtime->baseOffset = rangeStart;
     runtime->fileLengthSectors = rangeEnd;
@@ -17882,7 +17882,7 @@
    */
   std::int32_t adxstm_Destroy(void* const streamHandle)
   {
-    auto* const runtime = AsAdxstmRuntimeView(streamHandle);
+    auto* const runtime = AdxstmServerSlotOf(streamHandle);
     if (runtime == nullptr) {
       return 0;
     }
@@ -17890,7 +17890,7 @@
     ADXSTM_Stop(streamHandle);
     ADXSTM_ReleaseFile(streamHandle);
     runtime->slotState = 0;
-    std::memset(runtime, 0, sizeof(AdxstmServerSlotView));
+    std::memset(runtime, 0, sizeof(AdxstmServerSlot));
     return 0;
   }
 
@@ -17922,7 +17922,7 @@
   {
     ADXSTM_BindFileNw(streamHandle, fileName, startOffset, rangeStart, rangeEnd);
 
-    AdxstmServerSlotView* const runtime = AsAdxstmServerSlot(streamHandle);
+    AdxstmServerSlot* const runtime = AsAdxstmServerSlot(streamHandle);
     do {
       ADXT_ExecFsSvr();
     } while (runtime->waitForFileOpen != 0);
@@ -17958,7 +17958,7 @@
   {
     ADXSTM_StopNw(streamHandle);
 
-    AdxstmServerSlotView* const runtime = AsAdxstmServerSlot(streamHandle);
+    AdxstmServerSlot* const runtime = AsAdxstmServerSlot(streamHandle);
     adxstm_lock();
     if (runtime->filesystemServiceActive == 1) {
       runtime->releaseFilePending = 1;
@@ -18026,7 +18026,7 @@
   std::int32_t adxstm_ExecServer()
   {
     std::int32_t result = static_cast<std::int32_t>(adxstm_test_and_set(&adxstmf_execsvr_flg));
-    for (AdxstmServerSlotView& slot : gAdxstmObjectPool) {
+    for (AdxstmServerSlot& slot : gAdxstmObjectPool) {
       if (slot.slotState == 1) {
         result = ADXSTMF_ExecHndl(&slot);
       }
@@ -19985,7 +19985,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * `mov esi, [eax+30h]` for the SFXA child, `mov dword ptr [eax], 0` for the
    * lifecycle flag and `mov eax, [eax+24h]` for the SFXZ child.
    */
-  struct SfxHandleTeardownView
+  struct SfxHandleTeardown
   {
     std::int32_t used;                          ///< +0x00 lifecycle flag (cleared on Destroy)
     std::int32_t compositionMode;               ///< +0x04 written by SFX_SetCompoMode
@@ -19994,13 +19994,13 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     std::array<std::uint8_t, 0x08> mUnknown28;  ///< +0x28
     std::int32_t sfxa;                          ///< +0x30 SFXA child handle (integer address ABI)
   };
-  static_assert(offsetof(SfxHandleTeardownView, used) == 0x00, "SfxHandleTeardownView::used offset");
+  static_assert(offsetof(SfxHandleTeardown, used) == 0x00, "SfxHandleTeardown::used offset");
   static_assert(
-    offsetof(SfxHandleTeardownView, compositionMode) == 0x04,
-    "SfxHandleTeardownView::compositionMode offset"
+    offsetof(SfxHandleTeardown, compositionMode) == 0x04,
+    "SfxHandleTeardown::compositionMode offset"
   );
-  static_assert(offsetof(SfxHandleTeardownView, sfxz) == 0x24, "SfxHandleTeardownView::sfxz offset");
-  static_assert(offsetof(SfxHandleTeardownView, sfxa) == 0x30, "SfxHandleTeardownView::sfxa offset");
+  static_assert(offsetof(SfxHandleTeardown, sfxz) == 0x24, "SfxHandleTeardown::sfxz offset");
+  static_assert(offsetof(SfxHandleTeardown, sfxa) == 0x30, "SfxHandleTeardown::sfxa offset");
 
   // ---------------------------------------------------------------------------
   // Constants & error strings
@@ -20075,7 +20075,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     if (sfxHandle == nullptr) {
       return;
     }
-    auto* const view = static_cast<SfxHandleTeardownView*>(sfxHandle);
+    auto* const view = static_cast<SfxHandleTeardown*>(sfxHandle);
     void* const sfxzChild = view->sfxz;
     const std::int32_t sfxaChild = view->sfxa;
     view->used = 0;
@@ -20415,7 +20415,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * `mwl_convFrmInfFromSFD` (0x00ACA210) and `mwsffrm_SaveFrmDetail`
    * (0x00ACA4E0).
    */
-  struct SofdecSfdFrameRuntimeView
+  struct SofdecSfdFrame
   {
     std::int32_t widthPixels = 0;          // +0x00
     std::int32_t heightPixels = 0;         // +0x04
@@ -20455,33 +20455,33 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     }
   };
   static_assert(
-    offsetof(SofdecSfdFrameRuntimeView, frameBufferAddress) == 0x20,
-    "SofdecSfdFrameRuntimeView::frameBufferAddress offset must be 0x20"
+    offsetof(SofdecSfdFrame, frameBufferAddress) == 0x20,
+    "SofdecSfdFrame::frameBufferAddress offset must be 0x20"
   );
   static_assert(
-    offsetof(SofdecSfdFrameRuntimeView, pictureUserPayload) == 0x38,
-    "SofdecSfdFrameRuntimeView::pictureUserPayload offset must be 0x38"
+    offsetof(SofdecSfdFrame, pictureUserPayload) == 0x38,
+    "SofdecSfdFrame::pictureUserPayload offset must be 0x38"
   );
   static_assert(
-    offsetof(SofdecSfdFrameRuntimeView, chromaPositionLow) == 0x3C,
-    "SofdecSfdFrameRuntimeView::chromaPositionLow offset must be 0x3C"
+    offsetof(SofdecSfdFrame, chromaPositionLow) == 0x3C,
+    "SofdecSfdFrame::chromaPositionLow offset must be 0x3C"
   );
   static_assert(
-    offsetof(SofdecSfdFrameRuntimeView, pictureStructure) == 0x58,
-    "SofdecSfdFrameRuntimeView::pictureStructure offset must be 0x58"
+    offsetof(SofdecSfdFrame, pictureStructure) == 0x58,
+    "SofdecSfdFrame::pictureStructure offset must be 0x58"
   );
   static_assert(
-    offsetof(SofdecSfdFrameRuntimeView, chromaFormat) == 0x5C,
-    "SofdecSfdFrameRuntimeView::chromaFormat offset must be 0x5C"
+    offsetof(SofdecSfdFrame, chromaFormat) == 0x5C,
+    "SofdecSfdFrame::chromaFormat offset must be 0x5C"
   );
   static_assert(
-    offsetof(SofdecSfdFrameRuntimeView, pictureDetail) == 0x6C,
-    "SofdecSfdFrameRuntimeView::pictureDetail offset must be 0x6C"
+    offsetof(SofdecSfdFrame, pictureDetail) == 0x6C,
+    "SofdecSfdFrame::pictureDetail offset must be 0x6C"
   );
-  static_assert(sizeof(SofdecSfdFrameRuntimeView) == 0x80, "SofdecSfdFrameRuntimeView size must be 0x80");
+  static_assert(sizeof(SofdecSfdFrame) == 0x80, "SofdecSfdFrame size must be 0x80");
 
   /** Lanes of `MwsfdFrameInfo` the conversion fills that the struct leaves unnamed. */
-  struct MwsfdFrameInfoFillRuntimeView
+  struct MwsfdFrameInfoFill
   {
     std::int32_t frameBufferAddress = 0;  // +0x00
     std::int32_t frameId = 0;             // +0x04
@@ -20508,14 +20508,14 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     std::int32_t subtitleDataBytes = 0;   // +0x8C
   };
   static_assert(
-    offsetof(MwsfdFrameInfoFillRuntimeView, frameFieldType) == 0x4C,
-    "MwsfdFrameInfoFillRuntimeView::frameFieldType offset must be 0x4C"
+    offsetof(MwsfdFrameInfoFill, frameFieldType) == 0x4C,
+    "MwsfdFrameInfoFill::frameFieldType offset must be 0x4C"
   );
   static_assert(
-    offsetof(MwsfdFrameInfoFillRuntimeView, subtitleDataAddress) == 0x88,
-    "MwsfdFrameInfoFillRuntimeView::subtitleDataAddress offset must be 0x88"
+    offsetof(MwsfdFrameInfoFill, subtitleDataAddress) == 0x88,
+    "MwsfdFrameInfoFill::subtitleDataAddress offset must be 0x88"
   );
-  static_assert(sizeof(MwsfdFrameInfoFillRuntimeView) == 0x90, "MwsfdFrameInfoFillRuntimeView size must be 0x90");
+  static_assert(sizeof(MwsfdFrameInfoFill) == 0x90, "MwsfdFrameInfoFill size must be 0x90");
 
   /**
    * Address: 0x00ACD590 (FUN_00ACD590, _SUD_GetSudDatSize)
@@ -20607,8 +20607,8 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t mwsffrm_SetPicUsrInf(
     moho::MwsfdPlaybackStateSubobj* const ply,
-    const SofdecSfdFrameRuntimeView* const sfdFrame,
-    MwsfdFrameInfoFillRuntimeView* const outFrameInfo
+    const SofdecSfdFrame* const sfdFrame,
+    MwsfdFrameInfoFill* const outFrameInfo
   )
   {
     constexpr std::int32_t kPictureUserHeaderBytes = 4;
@@ -20643,8 +20643,8 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t mwsffrm_SetSudDatInf(
     moho::MwsfdPlaybackStateSubobj* const /*ply*/,
-    const SofdecSfdFrameRuntimeView* const sfdFrame,
-    MwsfdFrameInfoFillRuntimeView* const outFrameInfo
+    const SofdecSfdFrame* const sfdFrame,
+    MwsfdFrameInfoFill* const outFrameInfo
   )
   {
     constexpr std::int32_t kPictureUserHeaderBytes = 4;
@@ -20686,7 +20686,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t mwsffrm_DecideFrmType(
     moho::MwsfdPlaybackStateSubobj* const /*ply*/,
-    const SofdecSfdFrameRuntimeView* const sfdFrame,
+    const SofdecSfdFrame* const sfdFrame,
     const std::int32_t subtitleRecordAddress,
     const std::int32_t subtitleRecordBytes
   )
@@ -20724,7 +20724,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   {
     auto* const ply = reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(SjAddressToPointer(plyAddress));
     const auto* const sfdFrame =
-      reinterpret_cast<const SofdecSfdFrameRuntimeView*>(SjAddressToPointer(sfdFrameAddress));
+      reinterpret_cast<const SofdecSfdFrame*>(SjAddressToPointer(sfdFrameAddress));
 
     ply->framePictureStructure = sfdFrame->pictureStructure;
     ply->frameChromaFormat = sfdFrame->chromaFormat;
@@ -20758,9 +20758,9 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   {
     auto* const ply = reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(SjAddressToPointer(plyAddress));
     const auto* const sfdFrame =
-      reinterpret_cast<const SofdecSfdFrameRuntimeView*>(SjAddressToPointer(sfdFrameAddress));
+      reinterpret_cast<const SofdecSfdFrame*>(SjAddressToPointer(sfdFrameAddress));
     auto* const outFrameInfo =
-      reinterpret_cast<MwsfdFrameInfoFillRuntimeView*>(SjAddressToPointer(outFrameInfoAddress));
+      reinterpret_cast<MwsfdFrameInfoFill*>(SjAddressToPointer(outFrameInfoAddress));
 
     std::int32_t frameRateTimes1000 = 0;
     if (SFD_GetFps(static_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle), &frameRateTimes1000) != 0) {
@@ -20813,7 +20813,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     return 3;
   }
 
-  struct MwsfdFrameInfoToSfdInputView
+  struct MwsfdFrameInfoToSfdInput
   {
     std::int32_t lane00;        // +0x00
     std::int32_t lane04;        // +0x04
@@ -20834,7 +20834,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     std::int32_t lane40;        // +0x40
   };
 
-  struct MwsfdFrameInfoToSfdOutputView
+  struct MwsfdFrameInfoToSfdOutput
   {
     std::int32_t lane00;  // +0x00
     std::int32_t lane04;  // +0x04
@@ -20850,9 +20850,9 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     std::int32_t lane2C;  // +0x2C
   };
 
-  static_assert(sizeof(MwsfdFrameInfoToSfdInputView) == 0x44, "MwsfdFrameInfoToSfdInputView size must be 0x44");
-  static_assert(offsetof(MwsfdFrameInfoToSfdInputView, pictureType) == 0x1C, "MwsfdFrameInfoToSfdInputView::pictureType offset must be 0x1C");
-  static_assert(sizeof(MwsfdFrameInfoToSfdOutputView) == 0x30, "MwsfdFrameInfoToSfdOutputView size must be 0x30");
+  static_assert(sizeof(MwsfdFrameInfoToSfdInput) == 0x44, "MwsfdFrameInfoToSfdInput size must be 0x44");
+  static_assert(offsetof(MwsfdFrameInfoToSfdInput, pictureType) == 0x1C, "MwsfdFrameInfoToSfdInput::pictureType offset must be 0x1C");
+  static_assert(sizeof(MwsfdFrameInfoToSfdOutput) == 0x30, "MwsfdFrameInfoToSfdOutput size must be 0x30");
 
   /**
    * Address: 0x00ACA5E0 (FUN_00ACA5E0, _mwl_convFrmInfToSFD)
@@ -20863,8 +20863,8 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * `mwl_conv*ToSFD` helpers.
    */
   std::int32_t mwl_convFrmInfToSFD(
-    const MwsfdFrameInfoToSfdInputView* const source,
-    MwsfdFrameInfoToSfdOutputView* const destination
+    const MwsfdFrameInfoToSfdInput* const source,
+    MwsfdFrameInfoToSfdOutput* const destination
   )
   {
     const std::int32_t sfdBufferFormat = mwl_convBufFmtToSFD(source->bufferFormat);
@@ -21217,7 +21217,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFX_SetCompoMode(void* const sfxHandle, const std::int32_t compositionMode)
   {
-    auto* const view = static_cast<SfxHandleTeardownView*>(sfxHandle);
+    auto* const view = static_cast<SfxHandleTeardown*>(sfxHandle);
     view->compositionMode = compositionMode;
     return compositionMode;
   }
@@ -21239,7 +21239,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFX_GetCompoMode(void* const sfxHandle)
   {
-    return static_cast<const SfxHandleTeardownView*>(sfxHandle)->compositionMode;
+    return static_cast<const SfxHandleTeardown*>(sfxHandle)->compositionMode;
   }
 
   /**
@@ -21334,7 +21334,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   /// the SFX leaf accessors below are named; the rest is opaque pending
   /// further evidence. Field comments cite the offsets observed in the
   /// FUN_00ACCD60..FUN_00ACE8F0 disassembly.
-  struct SfxHandleSettingsView
+  struct SfxHandleSettings
   {
     std::uint8_t mUnknown00_03[0x04]{};       ///< +0x00..+0x03 (used flag etc.)
     std::int32_t compositionMode = 0;          ///< +0x04 SFX_SetCompoMode lane
@@ -21349,28 +21349,28 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     std::int32_t progOut = 0;                  ///< +0x5C SFX_SetProgOut lane
   };
   static_assert(
-    offsetof(SfxHandleSettingsView, compositionMode) == 0x04,
-    "SfxHandleSettingsView::compositionMode offset must be 0x04"
+    offsetof(SfxHandleSettings, compositionMode) == 0x04,
+    "SfxHandleSettings::compositionMode offset must be 0x04"
   );
   static_assert(
-    offsetof(SfxHandleSettingsView, sfxzHandleSlot) == 0x24,
-    "SfxHandleSettingsView::sfxzHandleSlot offset must be 0x24"
+    offsetof(SfxHandleSettings, sfxzHandleSlot) == 0x24,
+    "SfxHandleSettings::sfxzHandleSlot offset must be 0x24"
   );
   static_assert(
-    offsetof(SfxHandleSettingsView, tblPattern) == 0x34,
-    "SfxHandleSettingsView::tblPattern offset must be 0x34"
+    offsetof(SfxHandleSettings, tblPattern) == 0x34,
+    "SfxHandleSettings::tblPattern offset must be 0x34"
   );
   static_assert(
-    offsetof(SfxHandleSettingsView, cnvTable) == 0x38,
-    "SfxHandleSettingsView::cnvTable offset must be 0x38"
+    offsetof(SfxHandleSettings, cnvTable) == 0x38,
+    "SfxHandleSettings::cnvTable offset must be 0x38"
   );
   static_assert(
-    offsetof(SfxHandleSettingsView, splitField) == 0x58,
-    "SfxHandleSettingsView::splitField offset must be 0x58"
+    offsetof(SfxHandleSettings, splitField) == 0x58,
+    "SfxHandleSettings::splitField offset must be 0x58"
   );
   static_assert(
-    offsetof(SfxHandleSettingsView, progOut) == 0x5C,
-    "SfxHandleSettingsView::progOut offset must be 0x5C"
+    offsetof(SfxHandleSettings, progOut) == 0x5C,
+    "SfxHandleSettings::progOut offset must be 0x5C"
   );
 
   // Forward declarations for deeper SFX library helpers (recovered in their
@@ -21390,18 +21390,18 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   /// 0x00E4F6E0). This TU cannot reach `moho_cri_sfx_internal::SfxzHandle`
   /// (defined in the separate SofdecRuntime.cpp fragment chain), so this is a
   /// thin cross-TU view over the same binary layout, matching
-  /// `SfxHandleSettingsView`'s established convention in this file.
-  struct SfxzHandleZclipView
+  /// `SfxHandleSettings`'s established convention in this file.
+  struct SfxzHandleZclip
   {
     std::uint8_t mUnknown00_3B[0x3C]{}; ///< +0x00..+0x3B
     float zClipNear = 0.0f;             ///< +0x3C
     float zClipFar = 0.0f;              ///< +0x40
   };
   static_assert(
-    offsetof(SfxzHandleZclipView, zClipNear) == 0x3C, "SfxzHandleZclipView::zClipNear offset must be 0x3C"
+    offsetof(SfxzHandleZclip, zClipNear) == 0x3C, "SfxzHandleZclip::zClipNear offset must be 0x3C"
   );
   static_assert(
-    offsetof(SfxzHandleZclipView, zClipFar) == 0x40, "SfxzHandleZclipView::zClipFar offset must be 0x40"
+    offsetof(SfxzHandleZclip, zClipFar) == 0x40, "SfxzHandleZclip::zClipFar offset must be 0x40"
   );
 
   /**
@@ -21416,20 +21416,20 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFXZ_IsSetZclip(const std::int32_t sfxzHandleAddress)
   {
-    const auto* const view = reinterpret_cast<const SfxzHandleZclipView*>(sfxzHandleAddress);
+    const auto* const view = reinterpret_cast<const SfxzHandleZclip*>(sfxzHandleAddress);
     return (view->zClipNear != 0.0f || view->zClipFar != 0.0f) ? 1 : 0;
   }
 
   /// Local view over the SFXZ handle's Z-bit-depth lane, as read/written by
   /// `SFX_SetZbit` (0x00ACDFF0). Same cross-TU rationale as
-  /// `SfxzHandleZclipView` above.
-  struct SfxzHandleZbitView
+  /// `SfxzHandleZclip` above.
+  struct SfxzHandleZbit
   {
     std::int32_t used = 0;      ///< +0x00
     std::int32_t zBitDepth = 0; ///< +0x04
   };
   static_assert(
-    offsetof(SfxzHandleZbitView, zBitDepth) == 0x04, "SfxzHandleZbitView::zBitDepth offset must be 0x04"
+    offsetof(SfxzHandleZbit, zBitDepth) == 0x04, "SfxzHandleZbit::zBitDepth offset must be 0x04"
   );
 
   /**
@@ -21443,8 +21443,8 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFX_SetZbit(void* const sfxHandle, const std::int32_t zBitDepth)
   {
-    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
-    reinterpret_cast<SfxzHandleZbitView*>(view->sfxzHandleSlot)->zBitDepth = zBitDepth;
+    auto* const view = static_cast<SfxHandleSettings*>(sfxHandle);
+    reinterpret_cast<SfxzHandleZbit*>(view->sfxzHandleSlot)->zBitDepth = zBitDepth;
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(sfxHandle));
   }
 
@@ -21489,7 +21489,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFXSET_SetTblPtn(void* const sfxHandle, const std::int32_t tablePattern)
   {
-    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    auto* const view = static_cast<SfxHandleSettings*>(sfxHandle);
     view->tblPattern = tablePattern;
     return tablePattern;
   }
@@ -21507,7 +21507,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   std::int32_t SFX_SetCnvTable(void* const sfxHandle, const std::int32_t tableId, const std::int32_t tableValue)
   {
     (void)SFXSET_SetTblPtn(sfxHandle, 100);
-    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    auto* const view = static_cast<SfxHandleSettings*>(sfxHandle);
     view->cnvTable[tableId] = tableValue;
     return tableValue;
   }
@@ -21524,7 +21524,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFX_GetCnvTable(void* const sfxHandle, const std::int32_t tableId)
   {
-    const auto* const view = static_cast<const SfxHandleSettingsView*>(sfxHandle);
+    const auto* const view = static_cast<const SfxHandleSettings*>(sfxHandle);
     return view->cnvTable[tableId];
   }
 
@@ -21540,7 +21540,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFX_SetSplitField(void* const sfxHandle, const std::int32_t enableSplitField)
   {
-    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    auto* const view = static_cast<SfxHandleSettings*>(sfxHandle);
     view->splitField = enableSplitField;
     return enableSplitField;
   }
@@ -21556,7 +21556,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFX_GetSplitField(void* const sfxHandle)
   {
-    const auto* const view = static_cast<const SfxHandleSettingsView*>(sfxHandle);
+    const auto* const view = static_cast<const SfxHandleSettings*>(sfxHandle);
     return view->splitField;
   }
 
@@ -21572,7 +21572,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFX_SetProgOut(void* const sfxHandle, const std::int32_t enableProgressiveOutput)
   {
-    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    auto* const view = static_cast<SfxHandleSettings*>(sfxHandle);
     view->progOut = enableProgressiveOutput;
     return enableProgressiveOutput;
   }
@@ -21589,7 +21589,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFX_GetProgOut(void* const sfxHandle)
   {
-    const auto* const view = static_cast<const SfxHandleSettingsView*>(sfxHandle);
+    const auto* const view = static_cast<const SfxHandleSettings*>(sfxHandle);
     return view->progOut;
   }
 
@@ -21605,7 +21605,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   std::int32_t SFX_GetZfrmRange(void* const sfxHandle, MwsfdSfxFrameInfo* const sfxFrameInfo)
   {
-    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    auto* const view = static_cast<SfxHandleSettings*>(sfxHandle);
     char* startBuffer = nullptr;
     std::int32_t endValue = 0;
     (void)SFXZ_GetZfrmRange(
@@ -21631,7 +21631,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   void SFX_MakeTblZ16(void* const sfxHandle, MwsfdSfxFrameInfo* const sfxFrameInfo)
   {
-    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    auto* const view = static_cast<SfxHandleSettings*>(sfxHandle);
     if (SFXZ_IsSetZclip(view->sfxzHandleSlot) == 1) {
       (void)SFX_SetZbit(sfxHandle, 16);
       (void)sfxcnv_MakeZTbl(sfxHandle, sfxFrameInfo);
@@ -21654,7 +21654,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    */
   void SFX_MakeTblZ32(void* const sfxHandle, MwsfdSfxFrameInfo* const sfxFrameInfo)
   {
-    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    auto* const view = static_cast<SfxHandleSettings*>(sfxHandle);
     if (SFXZ_IsSetZclip(view->sfxzHandleSlot) == 1) {
       (void)SFX_SetZbit(sfxHandle, 32);
       (void)sfxcnv_MakeZTbl(sfxHandle, sfxFrameInfo);
