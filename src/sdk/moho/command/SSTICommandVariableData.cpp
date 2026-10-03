@@ -11,16 +11,6 @@
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/reflection/Reflection.h"
 
-namespace moho
-{
-  // Forward declaration for the TU-local lane helper defined later in this
-  // file (FUN_00560430). Anonymous-namespace helpers above need to reach it.
-  SSTICommandVariableData* CopyConstructSSTICommandVariableDataSecondaryLane(
-    SSTICommandVariableData* destination,
-    const SSTICommandVariableData* source
-  );
-} // namespace moho
-
 namespace
 {
   class SSTICommandVariableDataTypeInfo final : public gpg::RType
@@ -60,74 +50,6 @@ namespace
     "SSTICommandVariableDataSlot must include 8-byte slot header plus variable payload"
   );
 
-  struct RebindableInlineBufferLane
-  {
-    std::uint32_t ownedStorage;  // +0x00
-    std::uint32_t beginStorage;  // +0x04
-    std::uint32_t endStorage;    // +0x08
-    std::uint32_t inlineStorage; // +0x0C
-  };
-
-  static_assert(
-    sizeof(RebindableInlineBufferLane) == 0x10, "RebindableInlineBufferLane size must be 0x10"
-  );
-
-  struct SSTICommandVariableDataRelocationSlot
-  {
-    std::uint32_t mHeaderWord0;                       // +0x00
-    std::uint32_t mHeaderWord1;                       // +0x04
-    RebindableInlineBufferLane mEntIdsLane;    // +0x08
-    std::byte mMidLane[0x38];                         // +0x18
-    RebindableInlineBufferLane mCellsLane;     // +0x50
-    std::byte mTailLane[0x18];                        // +0x60
-  };
-
-  static_assert(
-    offsetof(SSTICommandVariableDataRelocationSlot, mEntIdsLane) == 0x08,
-    "SSTICommandVariableDataRelocationSlot::mEntIdsLane offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SSTICommandVariableDataRelocationSlot, mCellsLane) == 0x50,
-    "SSTICommandVariableDataRelocationSlot::mCellsLane offset must be 0x50"
-  );
-  static_assert(
-    sizeof(SSTICommandVariableDataRelocationSlot) == 0x78,
-    "SSTICommandVariableDataRelocationSlot size must be 0x78"
-  );
-
-  void ResetRebindableInlineBufferLane(RebindableInlineBufferLane& lane)
-  {
-    if (lane.ownedStorage != lane.inlineStorage) {
-      ::operator delete[](reinterpret_cast<void*>(static_cast<std::uintptr_t>(lane.ownedStorage)));
-      lane.ownedStorage = lane.inlineStorage;
-      lane.endStorage = *reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(lane.ownedStorage));
-    }
-
-    lane.beginStorage = lane.ownedStorage;
-  }
-
-  /**
-   * Address: 0x00562C70 (FUN_00562C70, sub_562C70)
-   *
-   * What it does:
-   * Rebinds every `SSTICommandVariableData` relocation slot in `[first,last)`
-   * back to inline ent-id/cell storage lanes, releasing spilled heap blocks
-   * for both lanes in each 0x78-byte slot.
-   */
-  [[maybe_unused]] std::uint32_t RebindSSTICommandVariableDataSlotsToInlineStorage(
-    SSTICommandVariableDataRelocationSlot* first,
-    SSTICommandVariableDataRelocationSlot* const last
-  )
-  {
-    std::uint32_t resultLane = 0u;
-    while (first != last) {
-      ResetRebindableInlineBufferLane(first->mCellsLane);
-      ResetRebindableInlineBufferLane(first->mEntIdsLane);
-      resultLane = first->mEntIdsLane.ownedStorage;
-      ++first;
-    }
-    return resultLane;
-  }
 
   [[nodiscard]] gpg::RType* ResolveEntIdVectorType()
   {
@@ -161,193 +83,7 @@ namespace
     return gCellVectorType;
   }
 
-  /**
-   * Address: 0x006ED220 (FUN_006ED220)
-   * Address: 0x006EC920 (FUN_006EC920)
-   *
-   * What it does:
-   * Backward-copy constructs one slot range into uninitialized destination
-   * storage and returns the new destination begin iterator.
-   */
-  [[maybe_unused]] SSTICommandVariableDataSlot* CopyBackwardSSTICommandVariableDataSlots(
-    SSTICommandVariableDataSlot* sourceCurrent,
-    const SSTICommandVariableDataSlot* const sourceBegin,
-    SSTICommandVariableDataSlot* destinationCurrent
-  )
-  {
-    while (sourceCurrent != sourceBegin) {
-      --sourceCurrent;
-      --destinationCurrent;
-      destinationCurrent->mHeaderWord0 = sourceCurrent->mHeaderWord0;
-      ::new (&destinationCurrent->mVariableData) moho::SSTICommandVariableData(sourceCurrent->mVariableData);
-    }
 
-    return destinationCurrent;
-  }
-
-  [[nodiscard]] SSTICommandVariableDataSlot* CopySSTICommandVariableDataSlotRangeWithRollback(
-    const SSTICommandVariableDataSlot* sourceBegin,
-    const SSTICommandVariableDataSlot* sourceEnd,
-    SSTICommandVariableDataSlot* destinationBegin
-  )
-  {
-    SSTICommandVariableDataSlot* destinationCursor = destinationBegin;
-    try {
-      for (const SSTICommandVariableDataSlot* sourceCursor = sourceBegin;
-           sourceCursor != sourceEnd;
-           ++sourceCursor, ++destinationCursor) {
-        if (destinationCursor != nullptr) {
-          destinationCursor->mHeaderWord0 = sourceCursor->mHeaderWord0;
-          ::new (&destinationCursor->mVariableData) moho::SSTICommandVariableData(sourceCursor->mVariableData);
-        }
-      }
-      return destinationCursor;
-    } catch (...) {
-      for (SSTICommandVariableDataSlot* destroyCursor = destinationBegin;
-           destroyCursor != destinationCursor;
-           ++destroyCursor) {
-        destroyCursor->mVariableData.~SSTICommandVariableData();
-      }
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x005634F0 (FUN_005634F0, copy_SSTICommandVariableData_slot_range_with_rollback)
-   *
-   * What it does:
-   * Copy-constructs one contiguous slot range (`header + SSTICommandVariableData`)
-   * into destination storage and destroys already-constructed payload lanes
-   * before rethrowing if a construction step throws.
-   */
-  [[maybe_unused]] SSTICommandVariableDataSlot* CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(
-    const SSTICommandVariableDataSlot* sourceBegin,
-    const SSTICommandVariableDataSlot* sourceEnd,
-    SSTICommandVariableDataSlot* destinationBegin
-  )
-  {
-    return CopySSTICommandVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x006EC460 (FUN_006EC460, copy_SSTICommandVariableData_slot_range_with_rollback_counted)
-   * Address: 0x006EB7D0 (FUN_006EB7D0)
-   *
-   * What it does:
-   * Copy-constructs one counted slot range (`header + SSTICommandVariableData`)
-   * into destination storage and destroys already-constructed payload lanes
-   * before rethrowing if a copy step throws.
-   */
-  [[maybe_unused]] SSTICommandVariableDataSlot* CopySSTICommandVariableDataSlotRangeWithRollbackCounted(
-    const std::uint32_t count,
-    SSTICommandVariableDataSlot* const destinationBegin,
-    const SSTICommandVariableDataSlot* const sourceBegin
-  )
-  {
-    if (count == 0u) {
-      return destinationBegin;
-    }
-
-    if (destinationBegin == nullptr || sourceBegin == nullptr) {
-      return destinationBegin;
-    }
-
-    SSTICommandVariableDataSlot* destinationCursor = destinationBegin;
-    try {
-      for (std::uint32_t i = 0; i < count; ++i, ++destinationCursor) {
-        const SSTICommandVariableDataSlot* const sourceCursor = sourceBegin + i;
-        destinationCursor->mHeaderWord0 = sourceCursor->mHeaderWord0;
-        ::new (&destinationCursor->mVariableData) moho::SSTICommandVariableData(sourceCursor->mVariableData);
-      }
-      return destinationCursor;
-    } catch (...) {
-      for (SSTICommandVariableDataSlot* destroyCursor = destinationBegin;
-           destroyCursor != destinationCursor;
-           ++destroyCursor) {
-        destroyCursor->mVariableData.~SSTICommandVariableData();
-      }
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x006EA2D0 (FUN_006EA2D0)
-   *
-   * What it does:
-   * Adapts one counted slot-copy lane into
-   * `CopySSTICommandVariableDataSlotRangeWithRollbackCounted` and returns the
-   * destination end pointer.
-   */
-  [[maybe_unused]] SSTICommandVariableDataSlot* CopySSTICommandVariableDataSlotRangeCountedAdapter(
-    const SSTICommandVariableDataSlot* const sourceBegin,
-    SSTICommandVariableDataSlot* const destinationBegin,
-    const std::uint32_t count
-  )
-  {
-    return CopySSTICommandVariableDataSlotRangeWithRollbackCounted(count, destinationBegin, sourceBegin);
-  }
-
-  /**
-   * Address: 0x006ECA60 (FUN_006ECA60)
-   *
-   * What it does:
-   * Copies one slot header lane and copy-constructs one embedded
-   * `SSTICommandVariableData` payload into destination storage.
-   */
-  [[maybe_unused]] SSTICommandVariableDataSlot* CopySSTICommandVariableDataSlotLane(
-    SSTICommandVariableDataSlot* const destination,
-    const SSTICommandVariableDataSlot* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    destination->mHeaderWord0 = source->mHeaderWord0;
-    ::new (&destination->mVariableData) moho::SSTICommandVariableData(source->mVariableData);
-    return destination;
-  }
-
-  /**
-   * Address: 0x00563890 (FUN_00563890, sub_563890)
-   *
-   * IDA signature:
-   * _DWORD *__cdecl sub_563890(_DWORD *a1);   // ECX = source slot, a1 = destination slot
-   *
-   * What it does:
-   * Single-emit lane that copy-constructs one
-   * `SSTICommandVariableDataSlot` from `*source` (received via ECX)
-   * into `*destination` (stack arg). Returns null when destination is null;
-   * otherwise copies `mHeaderWord0` and delegates the embedded
-   * `SSTICommandVariableData` copy-construction to
-   * `moho::CopyConstructSSTICommandVariableDataSecondaryLane` (FUN_00560430).
-   *
-   * The wrapper returns the address of the embedded payload
-   * (`&destination->mVariableData`) on success — this matches the binary,
-   * where the inner helper's `eax = a3 = dest+8` propagates straight through
-   * the wrapper's epilogue. `mHeaderWord1` is left untouched, mirroring the
-   * binary which only writes the first slot header word.
-   */
-  [[maybe_unused]] moho::SSTICommandVariableData* CopySSTICommandVariableDataSlotLaneDelegating(
-    SSTICommandVariableDataSlot* const destination,
-    const SSTICommandVariableDataSlot* const source
-  ) noexcept
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    destination->mHeaderWord0 = source->mHeaderWord0;
-    return moho::CopyConstructSSTICommandVariableDataSecondaryLane(
-      &destination->mVariableData, &source->mVariableData
-    );
-  }
-
-} // namespace
-
-namespace moho
-{
-  gpg::RType* SSTICommandVariableData::sType = nullptr;
 
   /**
    * Address: 0x005528C0 (FUN_005528C0, preregister_SSTICommandVariableDataTypeInfo)
@@ -358,9 +94,15 @@ namespace moho
   gpg::RType* preregister_SSTICommandVariableDataTypeInfo()
   {
     static SSTICommandVariableDataTypeInfo typeInfo;
-    gpg::PreRegisterRType(typeid(SSTICommandVariableData), &typeInfo);
+    gpg::PreRegisterRType(typeid(moho::SSTICommandVariableData), &typeInfo);
     return &typeInfo;
   }
+
+} // namespace
+
+namespace moho
+{
+  gpg::RType* SSTICommandVariableData::sType = nullptr;
 
   /**
    * Address: 0x00552A00 (FUN_00552A00, Moho::SSTICommandVariableData::SSTICommandVariableData)
@@ -389,33 +131,6 @@ namespace moho
     mTarget2.mPos = Wm3::Vec3f::Zero();
   }
 
-  /**
-   * Address: 0x00560430 (FUN_00560430, Moho::SSTICommandVariableData copy-construct TU-local lane)
-   *
-   * IDA signature:
-   * int __userpurge sub_560430@<eax>(int a1@<ecx>, int a2@<edi>, int a3);
-   *
-   * What it does:
-   * Secondary emit of the `SSTICommandVariableData` copy-constructor body, as
-   * materialized out-of-line in a different caller TU. Initializes
-   * `destination.mEntIds` via the vector copy-construct helper (`FUN_00560BE0`)
-   * and then field-copies every POD/typed lane from `source`, finishing with
-   * `mCells` via the `gpg::fastvector<SOCellPos>::cpy` helper lane.
-   *
-   * Semantically identical to the primary copy-ctor at 0x006ECAD0 — the two
-   * emits share source-level behavior but live at distinct code addresses. The
-   * binary preserves the implementation detail where `mEntIds` and `mCells`
-   * vectors are copy-constructed via typed helpers while the embedded target
-   * / integral lanes are copied field-by-field.
-   */
-  SSTICommandVariableData* CopyConstructSSTICommandVariableDataSecondaryLane(
-    SSTICommandVariableData* const destination,
-    const SSTICommandVariableData* const source
-  )
-  {
-    ::new (destination) SSTICommandVariableData(*source);
-    return destination;
-  }
 
   /**
    * Address: 0x006ECAD0 (FUN_006ECAD0, Moho::SSTICommandVariableData::SSTICommandVariableData)

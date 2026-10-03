@@ -946,36 +946,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x0071C6C0 (FUN_0071C6C0, sub_71C6C0)
-   * Address: 0x0071C9A0 (FUN_0071C9A0, msvc8::_Tree<InfluenceMapEntry>::_Copy)
-   *
-   * What it does:
-   * Clones one `InfluenceGrid::entries` ordered-set tree into destination
-   * storage, preserving ordered contents and node count.
-   *
-   * The binary used the MSVC8 `_Tree::_Copy` recursive clone helper
-   * (FUN_0071C9A0) to walk the source tree depth-first and rebuild
-   * matching links in the destination. The recovered version expresses
-   * the same role via the legacy set's iterator + per-entry
-   * `destination.insert(*it)` path, which the modern compiler emits
-   * as its own per-entry insert chain. The recursive `_Tree::_Copy`
-   * template emission is therefore absorbed by the iterator-based
-   * clone — observable behavior is identical (destination ends up with
-   * the same ordered contents and node count), and the per-T template
-   * emission symbol shape is preserved through the named outer helper.
-   */
-  void CopyInfluenceEntryTreeStorage(InfluenceEntrySet& destination, const InfluenceEntrySet& source)
-  {
-    if (&destination == &source) {
-      return;
-    }
-
-    destination.clear();
-    for (InfluenceEntrySet::const_iterator it = source.begin(); it != source.end(); ++it) {
-      destination.insert(*it);
-    }
-  }
 
   /**
    * Address: 0x007181A0 (FUN_007181A0, sub_7181A0)
@@ -1713,14 +1683,17 @@ namespace moho
    * Address: 0x0071F770 (FUN_0071F770 -- `InfluenceGrid::InfluenceGrid(const InfluenceGrid&)` (second copy); zero callers, unreachable; formerly `CopyConstructInfluenceGridIfPresentSecondary` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
    * Address: 0x0071AA60 (FUN_0071AA60 -- the entry-set half of `InfluenceGrid`'s copy constructor; callers 0x00715440, 0x00716140, 0x00716350; formerly `CopyInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
    * Address: 0x0071C1F0 (FUN_0071C1F0 -- the entry-set half of `InfluenceGrid`'s copy constructor (the placement-new form); callers 0x0071C150, 0x0071C1E0; formerly `CopyConstructInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071C6C0/0x0071C9A0 (FUN_0071C6C0, FUN_0071C9A0 -- the outer clone and
+   * `msvc8::_Tree<InfluenceMapEntry>::_Copy` it wraps, now absorbed by the
+   * `entries(other.entries)` member-init and `entries = source.entries` in
+   * AssignInfluenceGridValue; formerly `CopyInfluenceEntryTreeStorage` (RULE ONE), removed 2026-10-03.)
    */
   InfluenceGrid::InfluenceGrid(const InfluenceGrid& other)
-    : entries()
+    : entries(other.entries)
     , threats(other.threats)
     , threat(other.threat)
     , decay(other.decay)
   {
-    CopyInfluenceEntryTreeStorage(entries, other.entries);
   }
 
   /**
@@ -1747,12 +1720,8 @@ namespace moho
   InfluenceGrid& AssignInfluenceGridValue(InfluenceGrid& destination, const InfluenceGrid& source)
   {
     if (&destination != &source) {
-      CopyInfluenceEntryTreeStorage(destination.entries, source.entries);
-
-      destination.threats.clear();
-      for (const SThreat* it = source.threats.begin(); it != source.threats.end(); ++it) {
-        destination.threats.push_back(*it);
-      }
+      destination.entries = source.entries;
+      destination.threats = source.threats;
     }
 
     destination.threat = source.threat;

@@ -83,24 +83,6 @@ namespace
     node.ListResetLinks();
   }
 
-  struct PointerTriplet
-  {
-    void* start;
-    void* finish;
-    void* capacity;
-  };
-
-  static_assert(sizeof(PointerTriplet) == 0x0C, "PointerTriplet size must be 0x0C");
-
-  void ResetPointerTripletStorage(PointerTriplet& triplet)
-  {
-    if (triplet.start != nullptr) {
-      operator delete(triplet.start);
-    }
-    triplet.start = nullptr;
-    triplet.finish = nullptr;
-    triplet.capacity = nullptr;
-  }
 
 
   /**

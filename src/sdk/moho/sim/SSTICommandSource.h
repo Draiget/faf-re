@@ -54,35 +54,6 @@ namespace moho
   static_assert(sizeof(SSTICommandSource) == 0x24, "SSTICommandSource size must be 0x24");
 
   /**
-   * Address: 0x007CCE20 (FUN_007CCE20, ??1vec_SSTICommandSource@@QAE@@Z)
-   * Mangled: ??1vec_SSTICommandSource@@QAE@@Z
-   *
-   * What it does:
-   * Writes `count` copies of one prototype command source into contiguous
-   * destination lanes, and if a copy throws, destroys already-assigned lanes
-   * before rethrowing.
-   */
-  void CopyAssignSSTICommandSourceRange(
-    const SSTICommandSource& prototype,
-    std::uint32_t count,
-    SSTICommandSource* destination
-  );
-
-  /**
-   * Address: 0x007CECC0 (FUN_007CECC0)
-   *
-   * What it does:
-   * Copy-assigns one half-open `SSTICommandSource` source range into
-   * destination lanes and, if assignment throws, destroys already-written
-   * destination entries before rethrowing.
-   */
-  SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRange(
-    const SSTICommandSource* sourceBegin,
-    const SSTICommandSource* sourceEnd,
-    SSTICommandSource* destinationBegin
-  );
-
-  /**
    * Address: 0x007C84D0 (FUN_007C84D0, func_vec_SSTICommandSource_Append)
    *
    * What it does:

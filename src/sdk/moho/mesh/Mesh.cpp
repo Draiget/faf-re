@@ -2514,35 +2514,16 @@ namespace moho
   }
 
   /**
-   * Address: 0x007E5250 (FUN_007E5250)
-   * Address: 0x0087CFF0 (FUN_0087CFF0)
-   * Address: 0x0087D020 (FUN_0087D020)
-   * Address: 0x0087D050 (FUN_0087D050)
-   *
-   * What it does:
-   * Destroys one half-open `MeshLOD*` range and returns the caller-supplied
-   * completion flag unchanged.
-   */
-  [[maybe_unused]] std::uint8_t DestroyMeshLodPointerRange(
-    MeshLOD** begin,
-    MeshLOD** const end,
-    const std::uint8_t completionFlag
-  ) noexcept
-  {
-    for (MeshLOD** it = begin; it != end; ++it) {
-      if (*it != nullptr) {
-        delete *it;
-      }
-    }
-    return completionFlag;
-  }
-
-  /**
    * Address: 0x007DDAC0 (FUN_007DDAC0)
+   * Address: 0x007E5250/0x0087CFF0/0x0087D020/0x0087D050 (FUN_007E5250,
+   * FUN_0087CFF0, FUN_0087D020, FUN_0087D050 -- the out-of-line bodies emitted
+   * for this owned-LOD delete loop at its Clear/dtor/clone sites)
    */
   void Mesh::Clear()
   {
-    (void)DestroyMeshLodPointerRange(lods.begin(), lods.end(), 0u);
+    for (MeshLOD* lod : lods) {
+      delete lod;
+    }
     lods.clear();
     material.reset();
     bp = nullptr;

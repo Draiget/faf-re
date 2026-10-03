@@ -262,17 +262,6 @@ namespace moho
       return 0;
     }
 
-    /**
-     * Address: 0x004471C0 (FUN_004471C0)
-     * Address: 0x0044D3C0 (FUN_0044D3C0, clear/reset helper lane)
-     *
-     * What it does:
-     * Clears the global solid-color texture cache map.
-     */
-    [[maybe_unused]] [[nodiscard]] int DestroySolidTextureMapStorage()
-    {
-      return ReleaseSolidTextureMapStorage();
-    }
   } // namespace
 
   /**

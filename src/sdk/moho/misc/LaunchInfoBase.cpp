@@ -688,118 +688,6 @@ namespace
     ReleaseSharedOwnerControlBlockOnly(shared);
   }
 
-  /**
-   * Address: 0x00545230 (FUN_00545230)
-   * Address: 0x00545250 (FUN_00545250)
-   *
-   * What it does:
-   * Copies one `ArmyLaunchInfo::mUnitSources` payload lane from `source` into
-   * `destination`, preserving the destination reserved meta-word lane.
-   */
-  [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoUnitSourcesLane(
-    const moho::ArmyLaunchInfo* const source,
-    moho::ArmyLaunchInfo* const destination
-  )
-  {
-    destination->mUnitSources.mFirstWordIndex = source->mUnitSources.mFirstWordIndex;
-    (void)gpg::core::legacy::CopyFrom(
-      destination->mUnitSources.mWords,
-      source->mUnitSources.mWords,
-      destination->mUnitSources.mWords.originalVec_
-    );
-    return destination;
-  }
-
-  /**
-   * Address: 0x005450C0 (FUN_005450C0)
-   *
-   * What it does:
-   * Copies one `ArmyLaunchInfo::mUnitSources` payload lane from `source` into
-   * every destination object in `[destinationBegin, destinationEnd)`.
-   */
-  [[maybe_unused]] void CopyArmyLaunchInfoUnitSourcesRangeAssign(
-    moho::ArmyLaunchInfo* const destinationBegin,
-    moho::ArmyLaunchInfo* const destinationEnd,
-    const moho::ArmyLaunchInfo* const source
-  )
-  {
-    for (moho::ArmyLaunchInfo* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
-      (void)CopyArmyLaunchInfoUnitSourcesLane(source, cursor);
-    }
-  }
-
-  /**
-   * Address: 0x00544C20 (FUN_00544C20)
-   *
-   * IDA signature:
-   * int __usercall sub_544C20@<eax>(int result@<eax>, int a2@<ecx>, int a3);
-   *
-   * What it does:
-   * Copy-assigns the half-open range `[sourceBegin, sourceEnd)` onto the
-   * already-constructed destination elements starting at `destinationBegin`,
-   * one `mUnitSources` lane per step, returning the destination cursor one past
-   * the last element written.
-   *
-   * This is the `T = moho::ArmyLaunchInfo` emission of the MSVC8 `std::copy`
-   * element loop. Assignment, not construction: the destination `mWords` lanes
-   * stay bound to the storage they already own.
-   */
-  [[nodiscard]] moho::ArmyLaunchInfo* CopyAssignArmyLaunchInfoRange(
-    const moho::ArmyLaunchInfo* const sourceBegin,
-    const moho::ArmyLaunchInfo* const sourceEnd,
-    moho::ArmyLaunchInfo* const destinationBegin
-  )
-  {
-    moho::ArmyLaunchInfo* destinationCursor = destinationBegin;
-    for (const moho::ArmyLaunchInfo* sourceCursor = sourceBegin; sourceCursor != sourceEnd; ++sourceCursor) {
-      (void)CopyArmyLaunchInfoUnitSourcesLane(sourceCursor, destinationCursor);
-      ++destinationCursor;
-    }
-    return destinationCursor;
-  }
-
-  // Defined below, next to the other per-type ArmyLaunchInfo range lanes.
-  /**
-   * Address: 0x00542CD0 (FUN_00542CD0)
-   *
-   * What it does:
-   * Performs copy-style assignment of ArmyLaunchInfo vectors while preserving
-   * destination self-assignment behavior.
-   */
-  [[nodiscard]] ArmyLaunchInfoVector& CopyAssignArmyLaunchInfoVector(
-    ArmyLaunchInfoVector& destination, const ArmyLaunchInfoVector& source
-  )
-  {
-    if (&destination == &source) {
-      return destination;
-    }
-
-    const std::size_t sourceSize = source.size();
-    if (sourceSize == 0u) {
-      // 0x00542CF3: an empty source clears the destination outright.
-      (void)destination.erase(destination.begin(), destination.end());
-      return destination;
-    }
-
-    if (sourceSize <= destination.size()) {
-      // 0x00542D25: assign onto the live elements, then drop the surplus tail.
-      moho::ArmyLaunchInfo* const assignedEnd =
-        CopyAssignArmyLaunchInfoRange(source.begin(), source.end(), destination.begin());
-      (void)destination.erase(assignedEnd, destination.end());
-      return destination;
-    }
-
-    // 0x00542D75 / 0x00542DC9: both grow lanes finish through the per-type
-    // uninitialized-copy emission (FUN_005444B0 and its calling-convention
-    // siblings) -- now cited on `msvc8::vector<moho::ArmyLaunchInfo>::
-    // uninit_copy_n` (legacy/containers/Vector.h). This assignment is that
-    // citation's real source-level instantiation site: growing `destination`
-    // to `source`'s size placement-constructs the new tail via
-    // `ArmyLaunchInfo`'s compiler-synthesized copy constructor, matching the
-    // binary's per-element `BVIntSet` rebuild exactly.
-    destination = source;
-    return destination;
-  }
 
   /**
    * Address: 0x005439E0 (FUN_005439E0)
@@ -853,30 +741,9 @@ namespace
   // `msvc8::vector<moho::ArmyLaunchInfo>::uninit_copy_n` /
   // `copy_or_move_assign` (legacy/containers/Vector.h) per RULE ONE; see the
   // Address: citations on those members for the full evidence chain. The
-  // real source-level instantiation site is this file's own
-  // `CopyAssignArmyLaunchInfoVector` grow lane (`destination = source;`,
-  // below).
+  // real source-level instantiation site is `LaunchInfoNew`'s clone path
+  // (`createdInfo->mArmyLaunchInfo = mArmyLaunchInfo;`).
 
-  [[nodiscard]] moho::ArmyLaunchInfo* CopyArmyLaunchInfoRangeBackwardCore(
-    moho::ArmyLaunchInfo* destinationEnd,
-    const moho::ArmyLaunchInfo* sourceEnd,
-    const moho::ArmyLaunchInfo* const sourceBegin
-  )
-  {
-    const moho::ArmyLaunchInfo* read = sourceEnd;
-    moho::ArmyLaunchInfo* write = destinationEnd;
-    while (read != sourceBegin) {
-      --read;
-      --write;
-      write->mUnitSources.mFirstWordIndex = read->mUnitSources.mFirstWordIndex;
-      (void)gpg::core::legacy::CopyFrom(
-        write->mUnitSources.mWords,
-        read->mUnitSources.mWords,
-        write->mUnitSources.mWords.originalVec_
-      );
-    }
-    return write;
-  }
 
   /**
    * Address: 0x00542270 (FUN_00542270)
@@ -1179,7 +1046,8 @@ namespace moho
     LaunchInfoNew* const createdInfo = new LaunchInfoNew();
     createdInfo->mGameMods = mGameMods;
     createdInfo->mScenarioInfo = mScenarioInfo;
-    (void)CopyAssignArmyLaunchInfoVector(createdInfo->mArmyLaunchInfo, mArmyLaunchInfo);
+    // FUN_00542CD0 is the operator= emission this assignment instantiates.
+    createdInfo->mArmyLaunchInfo = mArmyLaunchInfo;
     createdInfo->mCommandSources.v4 = mCommandSources.v4;
     createdInfo->mCommandSources.mOriginalSource = mCommandSources.mOriginalSource;
     createdInfo->mLanguage = mLanguage;

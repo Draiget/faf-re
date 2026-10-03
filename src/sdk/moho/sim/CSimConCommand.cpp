@@ -141,12 +141,6 @@ namespace
     (void)GetSimConCommandRegistry();
   }
 
-  int DestroySimConRegistryStorage(void* const /*ownerContext*/)
-  {
-    auto& registry = GetSimConCommandRegistry();
-    registry.clear();
-    return 0;
-  }
 
 } // namespace
 

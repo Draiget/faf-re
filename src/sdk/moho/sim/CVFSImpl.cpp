@@ -70,20 +70,6 @@ namespace
   }
 
   /**
-   * Address: 0x004697E0 (FUN_004697E0, sub_4697E0)
-   *
-   * What it does:
-   * Destroys one contiguous search-candidate range by resetting each string
-   * payload lane.
-   */
-  [[maybe_unused]] void DestroySearchPathCandidateRange(SearchPathCandidate* begin, SearchPathCandidate* end)
-  {
-    for (SearchPathCandidate* current = begin; current != end; ++current) {
-      DestroySearchPathCandidate(*current);
-    }
-  }
-
-  /**
    * What it does:
    * Wildcard-expansion core of `AddMountPoint` (0x00466370). The binary
    * walks matches through the CRT find-first/find-next/find-close triad

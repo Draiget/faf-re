@@ -35,18 +35,6 @@ namespace moho
       return destination;
     }
 
-    /**
-     * Address: 0x00448B30 (FUN_00448B30)
-     *
-     * What it does:
-     * Clears one atlas tree storage lane before destructor teardown.
-     */
-    void DestroyTextureAtlasStorage(CD3DTextureBatcher::TextureAtlasSet* const atlasStorage)
-    {
-      if (atlasStorage != nullptr) {
-        atlasStorage->clear();
-      }
-    }
 
     /**
      * Address: 0x00448E10 (FUN_00448E10)
@@ -151,7 +139,8 @@ namespace moho
    */
   CD3DTextureBatcher::~CD3DTextureBatcher()
   {
-    DestroyTextureAtlasStorage(&mMap);
+    // FUN_00448B30: the explicit atlas-tree clear ahead of member teardown.
+    mMap.clear();
   }
 
   /**

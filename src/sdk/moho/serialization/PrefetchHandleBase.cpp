@@ -51,19 +51,6 @@ namespace
     return moho::CPrefetchSet::sType;
   }
 
-  /**
-   * Address: 0x004A89A0 (FUN_004A89A0)
-   *
-   * What it does:
-   * Destroys one half-open `PrefetchHandleBase` range `[begin, end)`.
-   */
-  void DestroyPrefetchHandleRange(moho::PrefetchHandleBase* begin, moho::PrefetchHandleBase* end)
-  {
-    while (begin != end) {
-      begin->~PrefetchHandleBase();
-      ++begin;
-    }
-  }
 
   /**
    * Address: 0x004A71B0 (FUN_004A71B0, Moho::CPrefetchset::NewRef)
@@ -102,7 +89,9 @@ namespace
    *
    * What it does:
    * Destroys all `PrefetchHandleBase` elements, frees backing storage, and
-   * deletes the owning CPrefetchSet object.
+   * deletes the owning CPrefetchSet object. The empty-vector assignment is
+   * VC8 `_Tidy()`: one element sweep, one deallocate, empty triple
+   * (FUN_004A89A0 is that sweep's out-of-line body).
    */
   void DeletePrefetchSet(void* const objectStorage)
   {
@@ -111,8 +100,6 @@ namespace
       return;
     }
 
-    // Element destructor sweep, free, null all three lanes: VC8 _Tidy().
-    DestroyPrefetchHandleRange(object->mHandles.begin(), object->mHandles.end());
     object->mHandles = msvc8::vector<moho::PrefetchHandleBase>{};
 
     ::operator delete(object);
@@ -123,7 +110,8 @@ namespace
    *
    * What it does:
    * Destroys all `PrefetchHandleBase` elements and frees vector backing storage
-   * without deleting the owning CPrefetchSet storage.
+   * without deleting the owning CPrefetchSet storage. As above, the
+   * empty-vector assignment is the single `_Tidy()` the binary performed.
    */
   void DestructPrefetchSet(void* const objectStorage)
   {
@@ -132,8 +120,6 @@ namespace
       return;
     }
 
-    // Element destructor sweep, free, null all three lanes: VC8 _Tidy().
-    DestroyPrefetchHandleRange(object->mHandles.begin(), object->mHandles.end());
     object->mHandles = msvc8::vector<moho::PrefetchHandleBase>{};
   }
 

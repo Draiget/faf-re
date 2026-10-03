@@ -2386,6 +2386,43 @@ namespace msvc8
          * Address: 0x005EA480 (FUN_005EA480 -- `operator=` -- assign the common prefix, then copy-construct or destroy the tail and rebind `_Mylast`. Reached from `RVectorType_SAiReservedTransportBone::SerLoad`'s `*storage = loaded` for `msvc8::vector<moho::SAiReservedTransportBone>` (the reflected reserved-bone vector; the 0x1C element owns an inner `msvc8::vector<int>` and a self-unlinking `WeakPtr<Unit>`); callers 0x005E5300, 0x005E5670, 0x005E96DF; formerly `AssignReservedTransportBoneVector` in moho/ai/IAiTransport.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00942B60 (FUN_00942B60 -- `operator=`: self-check, then clear, copy-and-destroy, copy-and-`_Ucopy`, or free-`_Buy`-`_Ucopy` by size and capacity, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); `EffectContext::operator=` 0x00942CF0 reaches it through `mMacros = other.mMacros` (0x00942D49); formerly `AssignEffectContextLane54` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x006DE1C0 (FUN_006DE1C0 -- `operator=` for `msvc8::vector<moho::EntityCategorySet>` (`CSquad::mCats`, 0x28-byte element; `this` in EAX): self-check, clear on an empty source, assign-over plus destroy when shrinking, assign-over plus `_Ucopy` into slack, else free and rebuy; callers 0x00724810 (`CSquad::SetPrioritizedTargetList`), 0x00725990, 0x0072E940; formerly filed as `CSquad::SetPrioritizedTargetList` itself in moho/sim/CSquad.cpp, corrected 2026-09-30.)
+         * Address: 0x00542CD0 (FUN_00542CD0 -- `operator=` for `msvc8::vector<moho::ArmyLaunchInfo>`
+         * (the 0x20 BVIntSet-owning element), hand-recovered with all four arms in
+         * `CopyAssignArmyLaunchInfoVector` (moho/misc/LaunchInfoBase.cpp) whose
+         * per-element assign lane (FUN_00544C20, the `std::copy` emission; fill form
+         * FUN_005450C0; per-slot assign FUN_00545230/FUN_00545250) is
+         * `ArmyLaunchInfo`'s compiler-synthesized memberwise copy-assign over
+         * `BVIntSet::operator=`; emitted from `createdInfo->mArmyLaunchInfo =
+         * mArmyLaunchInfo` in `LaunchInfoNew`'s clone path; wrapper removed 2026-10-03 (RULE ONE).)
+         * Address: 0x0051A580/0x0051A5E0/0x0051A610/0x0051AF70/0x0051B130/0x0051B270/
+         * 0x0051B2F0/0x0051B330/0x0051B4A0 (FUN_0051A580..FUN_0051B4A0 -- the contiguous
+         * copy/assign/fill/backward-copy-with-rollback family for `msvc8::vector<moho::RMeshBlueprintLOD>`
+         * (the 0xCC element owning a mesh handle plus four texture strings): copy-assign
+         * range, fill-assign range, copy_backward, counted `_Uninit_copy`-with-rollback,
+         * range form, and the null-tested single-slot copy plus its two adapters and
+         * register-order bridge -- the emissions of this template's `copy_or_move_assign`,
+         * `uninit_fill_n`, `uninit_copy_n` and `_Construct` lanes for that element.
+         * Zero real callers once the register-order anchors went; the orphan island that
+         * stood in for them in moho/resource/blueprints/RMeshBlueprint.cpp was removed
+         * 2026-10-03 (RULE ONE).)
+         * Address: 0x007CCE20/0x007CECC0/0x007CBEB0/0x007C9220/0x007CBF20
+         * (FUN_007CCE20..FUN_007CBF20 -- the prototype-fill, half-open copy-assign and
+         * register-order bridge emissions for `msvc8::vector<moho::SSTICommandSource>`
+         * (`{uint32_t mIndex; msvc8::string mName; int32_t mTimeouts}`); zero real
+         * callers once the anchors went, orphan family removed from
+         * moho/sim/SSTICommandSource.cpp 2026-10-03 (RULE ONE). The shape-identical
+         * fill lane that DOES have a live caller is FUN_00755810
+         * (`CopyAssignCommandSourceRangeForVectorFill`, kept there).)
+         * Address: 0x00560430/0x00562C70/0x005634F0/0x00563890/0x006EA2D0/0x006EB7D0/
+         * 0x006EC460/0x006EC920/0x006ECA60/0x006ED220 (FUN_00560430..FUN_006ED220 --
+         * the copy/backward-copy/counted-copy-with-rollback slot family and the SBO
+         * rebind-to-inline lane for the 0x78-byte `SSTICommandVariableData` relocation
+         * slot (`{header, msvc8::vector<EntId> mEntIds, payload, gpg fastvector<SOCellPos>
+         * mCells}`): all placements of this template's `uninit_copy_n` /
+         * `copy_backward` / `_Construct` lanes over that element, plus the secondary
+         * out-of-line emit (FUN_00560430) of `SSTICommandVariableData`'s copy
+         * constructor (primary FUN_006ECAD0, recovered on the class). Orphan island
+         * removed from moho/command/SSTICommandVariableData.cpp 2026-10-03 (RULE ONE).)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;

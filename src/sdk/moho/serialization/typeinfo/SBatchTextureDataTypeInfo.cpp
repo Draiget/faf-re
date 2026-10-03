@@ -7,19 +7,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x00447CB0 (FUN_00447CB0)
-   *
-   * What it does:
-   * Releases dynamic base/field storage lanes in one `RType` payload and
-   * resets the vectors to empty.
-   */
-  void ResetSBatchTextureDataTypeStorage(gpg::RType& type)
-  {
-    type.fields_ = {};
-    type.bases_ = {};
-  }
-
   moho::SBatchTextureDataTypeInfo gSBatchTextureDataTypeInfo;
 } // namespace
 
@@ -37,10 +24,13 @@ namespace moho
   /**
    * Address: 0x00447C50 (FUN_00447C50, Moho::SBatchTextureDataTypeInfo::dtr)
    * Address: 0x00BEF480 (FUN_00BEF480, global dtor lane)
+   * Address: 0x00447CB0 (FUN_00447CB0, the base/field vector reset this
+   * teardown emits)
    */
   SBatchTextureDataTypeInfo::~SBatchTextureDataTypeInfo()
   {
-    ResetSBatchTextureDataTypeStorage(*this);
+    fields_ = {};
+    bases_ = {};
   }
 
   /**
