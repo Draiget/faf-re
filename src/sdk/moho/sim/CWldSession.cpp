@@ -137,12 +137,12 @@ namespace
    * last-declared member first (`mMaterial`, then `mMesh`), which is exactly
    * what MSVC emits for this member order. No source line spells it out.
    */
-  struct FormationPreviewSharedPair
+  struct SFormationPreviewGhost
   {
     boost::shared_ptr<moho::MeshInstance> mMesh;     // +0x00
     boost::shared_ptr<moho::MeshMaterial> mMaterial; // +0x08
   };
-  static_assert(sizeof(FormationPreviewSharedPair) == 0x10, "FormationPreviewSharedPair size must be 0x10");
+  static_assert(sizeof(SFormationPreviewGhost) == 0x10, "SFormationPreviewGhost size must be 0x10");
 
   /**
    * Session-global ghost list for the formation-placement preview.
@@ -161,287 +161,13 @@ namespace
    * `CWldSession::RenderMeshPreviews` (0x008599D0) is the only writer: it
    * clears the vector at the top of every frame and repopulates it.
    */
-  msvc8::vector<FormationPreviewSharedPair> gFormationPreviews;
+  msvc8::vector<SFormationPreviewGhost> gFormationPreviews;
 
   // `StrategicIconAuxView` (the real type) and `gStrategicIconAuxiliary`
   // live in the `moho`-scoped anonymous namespace alongside the type's
   // definition (see `CWldSession::RenderStrategicIcons`'s callee cluster) -
   // a plain forward declaration here would name an unrelated, permanently
   // incomplete type in *this* (global-scope) anonymous namespace instead.
-
-  std::uintptr_t gStrategicIconScratchOwnerLane = 0u;
-  std::uint32_t* gStrategicIconScratchDataLane = nullptr;
-  std::uint32_t gStrategicIconScratchCountLane = 0u;
-
-  struct StrategicIconScratchTreeNodeRuntimeView
-  {
-    StrategicIconScratchTreeNodeRuntimeView* mLeft;   // +0x0000
-    StrategicIconScratchTreeNodeRuntimeView* mParent; // +0x0004
-    StrategicIconScratchTreeNodeRuntimeView* mRight;  // +0x0008
-    std::byte mPayload[0x0C3C];                       // +0x000C
-    std::uint8_t mColor;                              // +0x0C48
-    std::uint8_t mIsSentinel;                         // +0x0C49
-  };
-  static_assert(
-    offsetof(StrategicIconScratchTreeNodeRuntimeView, mColor) == 0x0C48,
-    "StrategicIconScratchTreeNodeRuntimeView::mColor offset must be 0x0C48"
-  );
-  static_assert(
-    offsetof(StrategicIconScratchTreeNodeRuntimeView, mIsSentinel) == 0x0C49,
-    "StrategicIconScratchTreeNodeRuntimeView::mIsSentinel offset must be 0x0C49"
-  );
-
-  template <typename TNode>
-  [[nodiscard]] TNode* RotateRuntimeTreeLeft(TNode* const pivot, TNode* const treeHead) noexcept
-  {
-    TNode* const promoted = pivot->mRight;
-    pivot->mRight = promoted->mLeft;
-    if (pivot->mRight->mIsSentinel == 0u) {
-      pivot->mRight->mParent = pivot;
-    }
-
-    promoted->mParent = pivot->mParent;
-    if (pivot == treeHead->mParent) {
-      treeHead->mParent = promoted;
-    } else {
-      TNode* const parent = pivot->mParent;
-      if (pivot == parent->mLeft) {
-        parent->mLeft = promoted;
-      } else {
-        parent->mRight = promoted;
-      }
-    }
-
-    promoted->mLeft = pivot;
-    pivot->mParent = promoted;
-    return promoted;
-  }
-
-  template <typename TNode>
-  [[nodiscard]] TNode* RotateRuntimeTreeRight(TNode* const pivot, TNode* const treeHead) noexcept
-  {
-    TNode* const promoted = pivot->mLeft;
-    pivot->mLeft = promoted->mRight;
-    if (pivot->mLeft->mIsSentinel == 0u) {
-      pivot->mLeft->mParent = pivot;
-    }
-
-    promoted->mParent = pivot->mParent;
-    if (pivot == treeHead->mParent) {
-      treeHead->mParent = promoted;
-    } else {
-      TNode* const parent = pivot->mParent;
-      if (pivot == parent->mRight) {
-        parent->mRight = promoted;
-      } else {
-        parent->mLeft = promoted;
-      }
-    }
-
-    promoted->mRight = pivot;
-    pivot->mParent = promoted;
-    return promoted;
-  }
-
-  /**
-   * Address: 0x0085A070 (FUN_0085A070)
-   *
-   * What it does:
-   * Stores the current formation-preview shared-pair begin pointer lane into
-   * `outValue` and returns that output slot.
-   */
-  [[nodiscard]] std::uintptr_t* StoreFormationPreviewSharedPairsBeginLane(
-    std::uintptr_t* const outValue
-  ) noexcept
-  {
-    *outValue = reinterpret_cast<std::uintptr_t>(gFormationPreviews.begin());
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0085A080 (FUN_0085A080)
-   *
-   * What it does:
-   * Stores the current formation-preview shared-pair end pointer lane into
-   * `outValue` and returns that output slot.
-   */
-  [[nodiscard]] std::uintptr_t* StoreFormationPreviewSharedPairsEndLane(
-    std::uintptr_t* const outValue
-  ) noexcept
-  {
-    *outValue = reinterpret_cast<std::uintptr_t>(gFormationPreviews.end());
-    return outValue;
-  }
-
-  /**
-   * Address: 0x0085A090 (FUN_0085A090)
-   *
-   * What it does:
-   * Returns the active element count in the formation-preview shared-pair lane
-   * (`end - begin`), or zero when storage has not been allocated.
-   */
-  [[nodiscard]] std::int32_t GetFormationPreviewSharedPairCountLane() noexcept
-  {
-    if (gFormationPreviews.begin() == nullptr) {
-      return 0;
-    }
-
-    return static_cast<std::int32_t>(gFormationPreviews.end() - gFormationPreviews.begin());
-  }
-
-  /**
-   * Address: 0x0085A280 (FUN_0085A280)
-   *
-   * What it does:
-   * Hands back the formation-preview container itself (`mov eax, offset
-   * 0x010C4258; retn 4`) - the address of `gFormationPreviews`, not of some
-   * separate owner word.
-   */
-  [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLanePrimary(const int /*unused*/) noexcept
-  {
-    return &gFormationPreviews;
-  }
-
-  /**
-   * Address: 0x0085A630 (FUN_0085A630)
-   *
-   * What it does:
-   * Secondary entrypoint for the same thing (`mov eax, offset 0x010C4258;
-   * retn`) - the formation-preview container's own address.
-   */
-  [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLaneSecondary() noexcept
-  {
-    return &gFormationPreviews;
-  }
-
-  /**
-   * Address: 0x00860F90 (FUN_00860F90)
-   *
-   * What it does:
-   * Reads one dword through the strategic-icon scratch data-pointer lane and
-   * stores it into `outValue`.
-   */
-  [[nodiscard]] std::uint32_t* StoreStrategicIconScratchValueLane(
-    std::uint32_t* const outValue
-  ) noexcept
-  {
-    *outValue = *gStrategicIconScratchDataLane;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x00860FA0 (FUN_00860FA0)
-   *
-   * What it does:
-   * Stores the strategic-icon scratch data-pointer lane itself into `outValue`.
-   */
-  [[nodiscard]] std::uintptr_t* StoreStrategicIconScratchDataPointerLane(
-    std::uintptr_t* const outValue
-  ) noexcept
-  {
-    *outValue = reinterpret_cast<std::uintptr_t>(gStrategicIconScratchDataLane);
-    return outValue;
-  }
-
-  /**
-   * Address: 0x00861650 (FUN_00861650)
-   *
-   * What it does:
-   * Returns the current strategic-icon scratch data-pointer lane.
-   */
-  [[nodiscard]] std::uintptr_t GetStrategicIconScratchDataPointerLaneValue() noexcept
-  {
-    return reinterpret_cast<std::uintptr_t>(gStrategicIconScratchDataLane);
-  }
-
-  /**
-   * Address: 0x00861660 (FUN_00861660, sub_861660)
-   *
-   * What it does:
-   * Performs one left rotation in the strategic-icon scratch red-black tree
-   * lane (nil marker at `+0x0C49`).
-   */
-  [[nodiscard]] StrategicIconScratchTreeNodeRuntimeView* RotateStrategicIconScratchTreeLeft(
-    StrategicIconScratchTreeNodeRuntimeView* const pivot
-  ) noexcept
-  {
-    auto* const treeHead = reinterpret_cast<StrategicIconScratchTreeNodeRuntimeView*>(
-      GetStrategicIconScratchDataPointerLaneValue()
-    );
-    return RotateRuntimeTreeLeft(pivot, treeHead);
-  }
-
-  /**
-   * Address: 0x00861710 (FUN_00861710, sub_861710)
-   *
-   * What it does:
-   * Performs one right rotation in the strategic-icon scratch red-black tree
-   * lane (nil marker at `+0x0C49`).
-   */
-  [[nodiscard]] StrategicIconScratchTreeNodeRuntimeView* RotateStrategicIconScratchTreeRight(
-    StrategicIconScratchTreeNodeRuntimeView* const pivot
-  ) noexcept
-  {
-    auto* const treeHead = reinterpret_cast<StrategicIconScratchTreeNodeRuntimeView*>(
-      GetStrategicIconScratchDataPointerLaneValue()
-    );
-    return RotateRuntimeTreeRight(pivot, treeHead);
-  }
-
-  /**
-   * Address: 0x00861920 (FUN_00861920)
-   *
-   * What it does:
-   * Returns the current strategic-icon scratch count lane.
-   */
-  [[nodiscard]] std::uint32_t GetStrategicIconScratchCountLaneValue() noexcept
-  {
-    return gStrategicIconScratchCountLane;
-  }
-
-  /**
-   * Address: 0x00861CA0 (FUN_00861CA0)
-   *
-   * What it does:
-   * Returns the strategic-icon scratch owner lane slot.
-   */
-  [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryA(const int /*unused*/) noexcept
-  {
-    return &gStrategicIconScratchOwnerLane;
-  }
-
-  /**
-   * Address: 0x00861EB0 (FUN_00861EB0)
-   *
-   * What it does:
-   * Secondary entrypoint returning the strategic-icon scratch owner lane slot.
-   */
-  [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryB(const int /*unused*/) noexcept
-  {
-    return &gStrategicIconScratchOwnerLane;
-  }
-
-  /**
-   * Address: 0x00861F60 (FUN_00861F60)
-   *
-   * What it does:
-   * Third entrypoint returning the strategic-icon scratch owner lane slot.
-   */
-  [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryC(const int /*unused*/) noexcept
-  {
-    return &gStrategicIconScratchOwnerLane;
-  }
-
-  /**
-   * Address: 0x00862080 (FUN_00862080)
-   *
-   * What it does:
-   * Fourth entrypoint returning the strategic-icon scratch owner lane slot.
-   */
-  [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryD(const int /*unused*/) noexcept
-  {
-    return &gStrategicIconScratchOwnerLane;
-  }
 
   [[nodiscard]] gpg::RType* ResolveSessionSaveNodeMapArchiveType()
   {
@@ -457,7 +183,7 @@ namespace
   // members, so the addresses now sit on the template in
   // `legacy/containers/Vector.h` and the call sites just use the container:
   //
-  //   FUN_00859E90  ~FormationPreviewSharedPair (implicit, member order)
+  //   FUN_00859E90  ~SFormationPreviewGhost (implicit, member order)
   //   FUN_0085A1D0  destroy_range
   //   FUN_0085A9F0  copy_or_move_assign, one slot
   //   FUN_0085A130  erase, first..last
@@ -1360,7 +1086,7 @@ namespace moho
     static_assert(offsetof(HashTable<void>, mBucketCount) == 0x24, "HashTable<TNode>::mBucketCount offset must be 0x24");
 
     /**
-     * `mGraphRuntimeTree`'s value: a texture-keyed bucket of orderline edges.
+     * `mCommandGraphTree`'s value: a texture-keyed bucket of orderline edges.
      * The tree is a real msvc8-shaped red-black tree (`mColorOrAllocated` /
      * `mIsSentinel` at the offsets a real `_Tree` node uses) whose nodes carry
      * this pair by value at +0x0C.
@@ -1380,7 +1106,7 @@ namespace moho
     static_assert(sizeof(CommandGraphTreeBucket) == 0x18, "CommandGraphTreeBucket size must be 0x18");
 
     /**
-     * One `mGraphRuntimeTree` node. The bucket used to sit in a 0x18-byte raw
+     * One `mCommandGraphTree` node. The bucket used to sit in a 0x18-byte raw
      * payload array and was reinterpreted in place, which only fits on x86.
      * Nodes are still bought raw (`operator new` + `InitCommandGraphTreeBucketValue`
      * for the bucket) and released raw, as the binary does.
@@ -1410,7 +1136,7 @@ namespace moho
 
     /**
      * One drawn segment of a queued-order "orderline" - the ribbon connecting
-     * two command-graph draw nodes. `mGraphRuntimeTree` buckets these by
+     * two command-graph draw nodes. `mCommandGraphTree` buckets these by
      * texture: each tree node's `mBucket` holds a
      * `{boost::SharedPtrRaw<ID3DTextureSheet>, msvc8::vector<CommandGraphEdge*>}`
      * pair, and the render pass walks the bucket's vector once per texture.
@@ -2043,17 +1769,17 @@ namespace moho
      * `legacy/containers/RbTree.h`'s `rotate_left` (already cited there for
      * this exact tree instantiation).
      */
-    static void PivotLeftGraphRuntimeTreeNode(CommandGraphTree& tree, CommandGraphTreeNode* n) noexcept;
+    static void PivotCommandGraphTreeLeft(CommandGraphTree& tree, CommandGraphTreeNode* n) noexcept;
 
     /**
      * Address: 0x00830080 (FUN_00830080)
      *
      * What it does:
-     * Mirror of `PivotLeftGraphRuntimeTreeNode` - same shape as
+     * Mirror of `PivotCommandGraphTreeLeft` - same shape as
      * `legacy/containers/RbTree.h`'s `rotate_right` (already cited there
      * for this exact tree instantiation).
      */
-    static void PivotRightGraphRuntimeTreeNode(CommandGraphTree& tree, CommandGraphTreeNode* n) noexcept;
+    static void PivotCommandGraphTreeRight(CommandGraphTree& tree, CommandGraphTreeNode* n) noexcept;
 
     /**
      * Address: 0x0082E320 (FUN_0082E320, sub_82E320), buy+link+rebalance half
@@ -2070,7 +1796,7 @@ namespace moho
      * constructor would silently skip the add-ref the binary performs
      * explicitly via `sub_82D330` (`InitCommandGraphTreeBucketValue` above).
      */
-    static CommandGraphTreeNode* AttachGraphRuntimeTreeNodeAt(
+    static CommandGraphTreeNode* AttachCommandGraphNodeAt(
       CommandGraphTree& tree, bool addLeft, CommandGraphTreeNode* where, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
     );
 
@@ -2081,12 +1807,12 @@ namespace moho
      * Plain unique insert: descends comparing the owner-based key (the
      * texture's control-block pointer), confirms uniqueness against the
      * in-order predecessor when the descent bottomed out on a left branch,
-     * and links via `AttachGraphRuntimeTreeNodeAt`. Same shape as
+     * and links via `AttachCommandGraphNodeAt`. Same shape as
      * `legacy/containers/RbTree.h`'s `insert_unique`, already cited there
      * for this map instantiation.
      */
     static CommandGraphTreeNode*
-      AttachGraphRuntimeTreeNodeUnique(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
+      AttachCommandGraphNodeUnique(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
 
     /**
      * Address: 0x0082CC80 (FUN_0082CC80, sub_82CC80)
@@ -2095,13 +1821,13 @@ namespace moho
      * Hinted unique insert: the empty-tree fast path, `hint == leftmost()`
      * check, `hint == end()` check against `rightmost()`, then the
      * decrement/increment straddle checks, each tailing into
-     * `AttachGraphRuntimeTreeNodeAt` with the decided `addLeft`, and a final
-     * fallback to `AttachGraphRuntimeTreeNodeUnique`. Same shape as
+     * `AttachCommandGraphNodeAt` with the decided `addLeft`, and a final
+     * fallback to `AttachCommandGraphNodeUnique`. Same shape as
      * `legacy/containers/RbTree.h`'s `insert_hint`, already cited there for
-     * this exact map instantiation - `mGraphRuntimeTree[texture]`'s
+     * this exact map instantiation - `mCommandGraphTree[texture]`'s
      * `lower_bound` result feeding straight back in as the hint.
      */
-    static CommandGraphTreeNode* AttachGraphRuntimeTreeNodeAtHint(
+    static CommandGraphTreeNode* AttachCommandGraphNodeHinted(
       CommandGraphTree& tree, CommandGraphTreeNode* hint, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
     );
 
@@ -2109,17 +1835,17 @@ namespace moho
      * Address: 0x0082B8B0 (FUN_0082B8B0, sub_82B8B0)
      *
      * What it does:
-     * `mGraphRuntimeTree[texture]` (VC8 `map::operator[]`): descends
+     * `mCommandGraphTree[texture]` (VC8 `map::operator[]`): descends
      * comparing the owner-based key (the texture's control-block pointer,
      * `pi`) against each candidate bucket's own `pi` lane, records the last
      * node the search went left at, and on a miss inserts a fresh bucket
-     * retaining `texture` via `AttachGraphRuntimeTreeNodeAtHint`. Returns
+     * retaining `texture` via `AttachCommandGraphNodeHinted`. Returns
      * the resolved bucket's edge vector - `LinkCommandGraphEdge`
      * (0x00826960) pushes the new edge straight into it via
      * `CommandGraphTreeBucket::mEdges.push_back` (0x0082BCB0).
      */
     static msvc8::vector<CommandGraphEdge*>&
-      FindOrInsertGraphRuntimeTreeBucket(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
+      FindOrInsertCommandGraphBucket(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
 
     /**
      * Address: 0x00824740 (FUN_00824740, func_OnCommandGraphShow)
@@ -2377,7 +2103,7 @@ namespace moho
     HashTable<HashListNode88> mMapAB1;  // +0x0D58
     HashTable<HashListNode2C> mMapC;    // +0x0D80
     HashTable<HashListNode10> mMapD;    // +0x0DA8
-    CommandGraphTree mGraphRuntimeTree; // +0x0DD0
+    CommandGraphTree mCommandGraphTree; // +0x0DD0
   };
 
   static_assert(sizeof(UICommandGraph::CommandGraphNode) == 0x54, "UICommandGraph::CommandGraphNode size must be 0x54");
@@ -4723,7 +4449,7 @@ namespace moho
 
   // Forward declarations: reopens the same file-scope anonymous namespace
   // that defines these two sentinel-headed RB-tree walkers further below,
-  // so `AttachGraphRuntimeTreeNodeUnique`/`AttachGraphRuntimeTreeNodeAtHint`
+  // so `AttachCommandGraphNodeUnique`/`AttachCommandGraphNodeHinted`
   // below - the first command-graph callers that need them - can call them
   // here, ahead of their point of definition (mirrors the later reopening
   // for `DrawCommandGraphMesh`'s own needs).
@@ -4753,7 +4479,7 @@ namespace moho
   /**
    * Address: 0x00830010 (FUN_00830010) - see the declaration's doc comment.
    */
-  void UICommandGraph::PivotLeftGraphRuntimeTreeNode(CommandGraphTree& tree, CommandGraphTreeNode* const n) noexcept
+  void UICommandGraph::PivotCommandGraphTreeLeft(CommandGraphTree& tree, CommandGraphTreeNode* const n) noexcept
   {
     CommandGraphTreeNode* const pivot = n->mRight;
     n->mRight = pivot->mLeft;
@@ -4777,7 +4503,7 @@ namespace moho
   /**
    * Address: 0x00830080 (FUN_00830080) - see the declaration's doc comment.
    */
-  void UICommandGraph::PivotRightGraphRuntimeTreeNode(CommandGraphTree& tree, CommandGraphTreeNode* const n) noexcept
+  void UICommandGraph::PivotCommandGraphTreeRight(CommandGraphTree& tree, CommandGraphTreeNode* const n) noexcept
   {
     CommandGraphTreeNode* const pivot = n->mLeft;
     n->mLeft = pivot->mRight;
@@ -4806,7 +4532,7 @@ namespace moho
    * against this exact instantiation in `legacy/containers/RbTree.h`'s
    * `insert_at` citation.
    */
-  UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachGraphRuntimeTreeNodeAt(
+  UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachCommandGraphNodeAt(
     CommandGraphTree& tree, const bool addLeft, CommandGraphTreeNode* const where,
     const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
@@ -4860,11 +4586,11 @@ namespace moho
         } else {
           if (n == parent->mRight) {
             n = parent;
-            PivotLeftGraphRuntimeTreeNode(tree, n);
+            PivotCommandGraphTreeLeft(tree, n);
           }
           n->mParent->mColorOrAllocated = 1u;
           n->mParent->mParent->mColorOrAllocated = 0u;
-          PivotRightGraphRuntimeTreeNode(tree, n->mParent->mParent);
+          PivotCommandGraphTreeRight(tree, n->mParent->mParent);
         }
       } else {
         CommandGraphTreeNode* const uncle = grand->mLeft;
@@ -4876,11 +4602,11 @@ namespace moho
         } else {
           if (n == parent->mLeft) {
             n = parent;
-            PivotRightGraphRuntimeTreeNode(tree, n);
+            PivotCommandGraphTreeRight(tree, n);
           }
           n->mParent->mColorOrAllocated = 1u;
           n->mParent->mParent->mColorOrAllocated = 0u;
-          PivotLeftGraphRuntimeTreeNode(tree, n->mParent->mParent);
+          PivotCommandGraphTreeLeft(tree, n->mParent->mParent);
         }
       }
     }
@@ -4893,7 +4619,7 @@ namespace moho
    * Address: 0x0082E170 (FUN_0082E170, sub_82E170) - see the declaration's
    * doc comment.
    */
-  UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachGraphRuntimeTreeNodeUnique(
+  UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachCommandGraphNodeUnique(
     CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
@@ -4908,13 +4634,13 @@ namespace moho
     CommandGraphTreeNode* probe = where;
     if (addLeft) {
       if (where == tree.mHead->mLeft) {
-        return AttachGraphRuntimeTreeNodeAt(tree, true, where, texture);
+        return AttachCommandGraphNodeAt(tree, true, where, texture);
       }
       probe = PrevTreeNode(where);
     }
 
     if (probe->mBucket.mTexture.pi < texture.pi) {
-      return AttachGraphRuntimeTreeNodeAt(tree, addLeft, where, texture);
+      return AttachCommandGraphNodeAt(tree, addLeft, where, texture);
     }
     return probe;
   }
@@ -4923,45 +4649,45 @@ namespace moho
    * Address: 0x0082CC80 (FUN_0082CC80, sub_82CC80) - see the declaration's
    * doc comment.
    */
-  UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachGraphRuntimeTreeNodeAtHint(
+  UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachCommandGraphNodeHinted(
     CommandGraphTree& tree, CommandGraphTreeNode* const hint, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
     if (tree.mSize == 0u) {
-      return AttachGraphRuntimeTreeNodeAt(tree, true, tree.mHead, texture);
+      return AttachCommandGraphNodeAt(tree, true, tree.mHead, texture);
     }
 
     if (hint == tree.mHead->mLeft) {
       if (texture.pi < hint->mBucket.mTexture.pi) {
-        return AttachGraphRuntimeTreeNodeAt(tree, true, hint, texture);
+        return AttachCommandGraphNodeAt(tree, true, hint, texture);
       }
     } else if (hint->mIsSentinel != 0u) {
       CommandGraphTreeNode* const rightmost = tree.mHead->mRight;
       if (rightmost->mBucket.mTexture.pi < texture.pi) {
-        return AttachGraphRuntimeTreeNodeAt(tree, false, rightmost, texture);
+        return AttachCommandGraphNodeAt(tree, false, rightmost, texture);
       }
     } else if (texture.pi < hint->mBucket.mTexture.pi) {
       CommandGraphTreeNode* const before = PrevTreeNode(hint);
       if (before->mBucket.mTexture.pi < texture.pi) {
-        return (before->mRight->mIsSentinel != 0u) ? AttachGraphRuntimeTreeNodeAt(tree, false, before, texture)
-                                                     : AttachGraphRuntimeTreeNodeAt(tree, true, hint, texture);
+        return (before->mRight->mIsSentinel != 0u) ? AttachCommandGraphNodeAt(tree, false, before, texture)
+                                                     : AttachCommandGraphNodeAt(tree, true, hint, texture);
       }
     } else if (hint->mBucket.mTexture.pi < texture.pi) {
       CommandGraphTreeNode* const after = NextTreeNode(hint);
       if (after->mIsSentinel != 0u || texture.pi < after->mBucket.mTexture.pi) {
-        return (hint->mRight->mIsSentinel != 0u) ? AttachGraphRuntimeTreeNodeAt(tree, false, hint, texture)
-                                                  : AttachGraphRuntimeTreeNodeAt(tree, true, after, texture);
+        return (hint->mRight->mIsSentinel != 0u) ? AttachCommandGraphNodeAt(tree, false, hint, texture)
+                                                  : AttachCommandGraphNodeAt(tree, true, after, texture);
       }
     }
 
-    return AttachGraphRuntimeTreeNodeUnique(tree, texture);
+    return AttachCommandGraphNodeUnique(tree, texture);
   }
 
   /**
    * Address: 0x0082B8B0 (FUN_0082B8B0, sub_82B8B0) - see the declaration's
    * doc comment.
    */
-  msvc8::vector<UICommandGraph::CommandGraphEdge*>& UICommandGraph::FindOrInsertGraphRuntimeTreeBucket(
+  msvc8::vector<UICommandGraph::CommandGraphEdge*>& UICommandGraph::FindOrInsertCommandGraphBucket(
     CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
@@ -4979,7 +4705,7 @@ namespace moho
       return candidate->mBucket.mEdges;
     }
 
-    CommandGraphTreeNode* const inserted = AttachGraphRuntimeTreeNodeAtHint(tree, candidate, texture);
+    CommandGraphTreeNode* const inserted = AttachCommandGraphNodeHinted(tree, candidate, texture);
     return inserted->mBucket.mEdges;
   }
 
@@ -5404,11 +5130,11 @@ namespace moho
     // Texture-keyed orderline tree: free every bucket, then re-empty the
     // sentinel in place. Unlike `DestroyTree` the head survives - the rebuild
     // pass immediately refills the tree through it.
-    DestroyCommandGraphTreeSubtree(mGraphRuntimeTree.mHead, mGraphRuntimeTree.mHead->mParent);
-    mGraphRuntimeTree.mHead->mParent = mGraphRuntimeTree.mHead;
-    mGraphRuntimeTree.mSize = 0u;
-    mGraphRuntimeTree.mHead->mLeft = mGraphRuntimeTree.mHead;
-    mGraphRuntimeTree.mHead->mRight = mGraphRuntimeTree.mHead;
+    DestroyCommandGraphTreeSubtree(mCommandGraphTree.mHead, mCommandGraphTree.mHead->mParent);
+    mCommandGraphTree.mHead->mParent = mCommandGraphTree.mHead;
+    mCommandGraphTree.mSize = 0u;
+    mCommandGraphTree.mHead->mLeft = mCommandGraphTree.mHead;
+    mCommandGraphTree.mHead->mRight = mCommandGraphTree.mHead;
 
     // Draw nodes survive a rebuild; only the edge lanes they own are dropped,
     // back to inline storage so the common single-edge case never re-allocates.
@@ -6176,7 +5902,7 @@ namespace moho
    * What it does:
    * The per-frame command-graph render pass. Six sub-passes, each under its
    * own primbatcher technique:
-   *   A) "TCommand"        - opaque orderlines, walking `mGraphRuntimeTree`
+   *   A) "TCommand"        - opaque orderlines, walking `mCommandGraphTree`
    *      (a texture-bucketed red-black tree; each node's payload is a
    *      `{texture, msvc8::vector<CommandGraphEdge*>}` pair) and drawing
    *      every edge in every bucket with `isGlow=false`.
@@ -6191,7 +5917,7 @@ namespace moho
    *      `mMapAB0` walk.
    *
    * The two tree walks and three list walks are the decompiler's
-   * `boost::shared_ptr`-shaped traversal of `mGraphRuntimeTree`/`mMapAB0`
+   * `boost::shared_ptr`-shaped traversal of `mCommandGraphTree`/`mMapAB0`
    * respectively (IDA mistyped both containers as chains of
    * `boost::detail::sp_counted_base_vtbl`/`CD3DBatchTexture` because their
    * node layouts happen to alias those types' field shapes at the read
@@ -6213,8 +5939,8 @@ namespace moho
     // Pass A: opaque orderlines, bucketed by texture.
     (void)batcher.Setup("TCommand");
     batcher.SetViewProjMatrix(camera);
-    for (CommandGraphTreeNode* node = mGraphRuntimeTree.mHead->mLeft;
-         node != nullptr && node != mGraphRuntimeTree.mHead; node = NextTreeNode(node)) {
+    for (CommandGraphTreeNode* node = mCommandGraphTree.mHead->mLeft;
+         node != nullptr && node != mCommandGraphTree.mHead; node = NextTreeNode(node)) {
       CommandGraphTreeBucket& bucket = node->mBucket;
       batcher.SetTexture(boost::SharedPtrFromRawRetained(bucket.mTexture));
       for (CommandGraphEdge* const edge : bucket.mEdges) {
@@ -6226,8 +5952,8 @@ namespace moho
     // Pass B: glow overlay for the same orderlines.
     (void)batcher.Setup("TCommandGlow");
     batcher.SetViewProjMatrix(camera);
-    for (CommandGraphTreeNode* node = mGraphRuntimeTree.mHead->mLeft;
-         node != nullptr && node != mGraphRuntimeTree.mHead; node = NextTreeNode(node)) {
+    for (CommandGraphTreeNode* node = mCommandGraphTree.mHead->mLeft;
+         node != nullptr && node != mCommandGraphTree.mHead; node = NextTreeNode(node)) {
       CommandGraphTreeBucket& bucket = node->mBucket;
       batcher.SetTexture(boost::SharedPtrFromRawRetained(bucket.mTexture));
       for (CommandGraphEdge* const edge : bucket.mEdges) {
@@ -6573,13 +6299,13 @@ namespace moho
     , mMapAB1{}
     , mMapC{}
     , mMapD{}
-    , mGraphRuntimeTree{}
+    , mCommandGraphTree{}
   {
     InitMapAB(mMapAB0, this);
     InitMapAB(mMapAB1, this);
     InitMapC(mMapC, this);
     InitMapD(mMapD, this);
-    InitTree(mGraphRuntimeTree);
+    InitTree(mCommandGraphTree);
 
     boost::SharedPtrRaw<CD3DFont> createdFont = CD3DFont::Create(10, "Andale Mono");
     AssignIntrusive(mDebugFont, createdFont.px);
@@ -6597,7 +6323,7 @@ namespace moho
   UICommandGraph::~UICommandGraph()
   {
     OnCommandGraphShow(mSession ? mSession->mState : nullptr, false);
-    DestroyTree(mGraphRuntimeTree);
+    DestroyTree(mCommandGraphTree);
     DestroyMap(mMapD);
     DestroyMap(mMapC);
     DestroyMap(mMapAB1);
@@ -6647,13 +6373,13 @@ namespace moho
 
     /**
      * Predecessor mirror of `NextTreeNode` above - not separately confirmed
-     * against a `mGraphRuntimeTree`-specific `rb_decrement` address (only
+     * against a `mCommandGraphTree`-specific `rb_decrement` address (only
      * its increment sibling, 0x0082EC10, is directly cited for this tree in
      * `legacy/containers/RbTree.h`), but the shape is the generic VC8
      * `_Dec` walk every other instantiation in that file uses - left
      * subtree's rightmost node, or the nearest ancestor whose right
      * subtree contains `node`. Used only by
-     * `AttachGraphRuntimeTreeNodeAtHint`'s straddle checks below, which
+     * `AttachCommandGraphNodeHinted`'s straddle checks below, which
      * never call it on the header sentinel itself, so the `_Dec`-specific
      * "`--end()` yields rightmost" header case does not apply here.
      */
@@ -7360,444 +7086,6 @@ namespace moho
       }
 
       outMask = selectionIds;
-    }
-
-    struct RawPointerTripletRuntimeView
-    {
-      void* mBegin;       // +0x00
-      void* mEnd;         // +0x04
-      void* mCapacityEnd; // +0x08
-      void* mInlineOrMeta; // +0x0C
-    };
-
-    static_assert(sizeof(RawPointerTripletRuntimeView) == 0x10, "RawPointerTripletRuntimeView size must be 0x10");
-    static_assert(
-      offsetof(RawPointerTripletRuntimeView, mInlineOrMeta) == 0x0C,
-      "RawPointerTripletRuntimeView::mInlineOrMeta offset must be 0x0C"
-    );
-
-    struct DwordByteRuntimeView
-    {
-      std::uint32_t mValue; // +0x00
-      std::uint8_t mFlag;   // +0x04
-    };
-
-    static_assert(offsetof(DwordByteRuntimeView, mFlag) == 0x04, "DwordByteRuntimeView::mFlag offset must be 0x04");
-
-    struct TwoDwordByteRuntimeView
-    {
-      std::uint32_t mFirst;  // +0x00
-      std::uint32_t mSecond; // +0x04
-      std::uint8_t mFlag;    // +0x08
-    };
-
-    static_assert(
-      offsetof(TwoDwordByteRuntimeView, mFlag) == 0x08,
-      "TwoDwordByteRuntimeView::mFlag offset must be 0x08"
-    );
-
-    struct PackedTwoWordRuntimeView
-    {
-      std::uint16_t mFirst;  // +0x00
-      std::uint16_t mSecond; // +0x02
-    };
-
-    struct PackedThreeWordRuntimeView
-    {
-      std::uint16_t mFirst;   // +0x00
-      std::uint16_t mUnused;  // +0x02
-      std::uint16_t mSecond;  // +0x04
-    };
-
-    static_assert(
-      offsetof(PackedThreeWordRuntimeView, mSecond) == 0x04,
-      "PackedThreeWordRuntimeView::mSecond offset must be 0x04"
-    );
-
-    [[nodiscard]] std::uint32_t ReadRuntimeDwordAt0(const void* const value) noexcept
-    {
-      if (value == nullptr) {
-        return 0u;
-      }
-      return *static_cast<const std::uint32_t*>(value);
-    }
-
-    [[nodiscard]] std::uint32_t ReadRuntimeDwordAt4(const void* const value) noexcept
-    {
-      if (value == nullptr) {
-        return 0u;
-      }
-      return *(reinterpret_cast<const std::uint32_t*>(value) + 1);
-    }
-
-    /**
-     * Address: 0x00822250 (FUN_00822250, sub_822250)
-     *
-     * What it does:
-     * Returns one first-dword runtime lane from one selection helper payload.
-     */
-    [[nodiscard]] std::uint32_t ReadSelectionRuntimeLane0(const void* const value) noexcept
-    {
-      return ReadRuntimeDwordAt0(value);
-    }
-
-    /**
-     * Address: 0x00822260 (FUN_00822260, sub_822260)
-     *
-     * What it does:
-     * Returns one first-dword runtime lane from one selection helper payload.
-     */
-    [[nodiscard]] std::uint32_t ReadSelectionRuntimeLane0Alt(const void* const value) noexcept
-    {
-      return ReadRuntimeDwordAt0(value);
-    }
-
-    /**
-     * Address: 0x00822340 (FUN_00822340, sub_822340)
-     *
-     * What it does:
-     * Returns one first-dword runtime lane from one command helper payload.
-     */
-    [[nodiscard]] std::uint32_t ReadCommandRuntimeLane0(const void* const value) noexcept
-    {
-      return ReadRuntimeDwordAt0(value);
-    }
-
-    /**
-     * Address: 0x00822350 (FUN_00822350, sub_822350)
-     *
-     * What it does:
-     * Returns one second-dword runtime lane from one command helper payload.
-     */
-    [[nodiscard]] std::uint32_t ReadCommandRuntimeLane4(const void* const value) noexcept
-    {
-      return ReadRuntimeDwordAt4(value);
-    }
-
-    /**
-     * Address: 0x00822390 (FUN_00822390, sub_822390)
-     *
-     * What it does:
-     * Returns one first-dword runtime lane from one command helper payload.
-     */
-    [[nodiscard]] std::uint32_t ReadCommandRuntimeLane0Alt(const void* const value) noexcept
-    {
-      return ReadRuntimeDwordAt0(value);
-    }
-
-    /**
-     * Address: 0x008223A0 (FUN_008223A0, sub_8223A0)
-     *
-     * What it does:
-     * Appends one `UserUnit*` from source lane into one fastvector and returns
-     * the pre-append end pointer lane.
-     */
-    [[nodiscard]] UserUnit**
-    AppendUserUnitPointerLane(gpg::fastvector<UserUnit*>& destination, UserUnit* const* const source)
-    {
-      UserUnit** const previousEnd = destination.end();
-      destination.push_back(source != nullptr ? *source : nullptr);
-      return previousEnd;
-    }
-
-    /**
-     * Address: 0x008223D0 (FUN_008223D0, sub_8223D0)
-     *
-     * What it does:
-     * Initializes one raw pointer-triplet lane with one inline 4-byte storage
-     * fallback and resets begin/end/capacity links.
-     */
-    [[nodiscard]] RawPointerTripletRuntimeView*
-    InitRawPointerTripletInlineLane(RawPointerTripletRuntimeView* const view) noexcept
-    {
-      if (view == nullptr) {
-        return nullptr;
-      }
-
-      // The inline slot sits right behind the four-pointer header (+0x10 on x86).
-      auto* const inlineBase = reinterpret_cast<std::uint8_t*>(view + 1);
-      view->mBegin = inlineBase;
-      view->mEnd = inlineBase;
-      view->mCapacityEnd = inlineBase + 0x4;
-      view->mInlineOrMeta = inlineBase;
-      return view;
-    }
-
-    /**
-     * Address: 0x008223F0 (FUN_008223F0, sub_8223F0)
-     *
-     * What it does:
-     * Resets one raw pointer-triplet lane to inline/meta fallback storage and
-     * releases heap-buffer storage when currently detached from fallback.
-     */
-    [[nodiscard]] void* ResetRawPointerTripletToInlineLane(RawPointerTripletRuntimeView* const view)
-    {
-      if (view == nullptr) {
-        return nullptr;
-      }
-
-      void* result = view->mBegin;
-      if (view->mBegin == view->mInlineOrMeta) {
-        view->mEnd = view->mBegin;
-        return result;
-      }
-
-      ::operator delete[](view->mBegin);
-      auto** const inlineOrMeta = static_cast<void**>(view->mInlineOrMeta);
-      view->mBegin = inlineOrMeta;
-      result = *inlineOrMeta;
-      view->mCapacityEnd = result;
-      view->mEnd = view->mBegin;
-      return result;
-    }
-
-    /**
-     * Address: 0x008225F0 (FUN_008225F0, sub_8225F0)
-     *
-     * What it does:
-     * Seeds one raw pointer-triplet lane from one external buffer and element
-     * count (`begin/end/capacity/meta` share the same base lane).
-     */
-    [[nodiscard]] RawPointerTripletRuntimeView* InitRawPointerTripletFromExternalLane(
-      RawPointerTripletRuntimeView* const view,
-      const std::int32_t elementCount,
-      void* const begin
-    ) noexcept
-    {
-      if (view == nullptr) {
-        return nullptr;
-      }
-
-      view->mBegin = begin;
-      view->mEnd = begin;
-      view->mCapacityEnd =
-        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(begin) + (0x4u * static_cast<std::uintptr_t>(elementCount)));
-      view->mInlineOrMeta = begin;
-      return view;
-    }
-
-    /**
-     * Address: 0x00822820 (FUN_00822820, nullsub_2792)
-     *
-     * What it does:
-     * No-op hook lane retained for binary parity.
-     */
-    void NoOpSelectionHookA() noexcept
-    {}
-
-    /**
-     * Address: 0x008229C0 (FUN_008229C0, sub_8229C0)
-     *
-     * What it does:
-     * Copies one `{dword,flag}` payload from lane pointers to one destination.
-     */
-    [[nodiscard]] DwordByteRuntimeView* CopyDwordByteRuntimeLane(
-      DwordByteRuntimeView* const destination,
-      const std::uint32_t* const valueSource,
-      const std::uint8_t* const flagSource
-    ) noexcept
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-
-      destination->mValue = (valueSource != nullptr) ? *valueSource : 0u;
-      destination->mFlag = (flagSource != nullptr) ? *flagSource : 0u;
-      return destination;
-    }
-
-    /**
-     * Address: 0x008229D0 (FUN_008229D0, sub_8229D0)
-     *
-     * What it does:
-     * Returns one legacy map/set maximum-size guard constant lane.
-     */
-    [[nodiscard]] std::uint32_t GetLegacyMapSetMaxSizeGuard() noexcept
-    {
-      return 0x15555555u;
-    }
-
-    /**
-     * Address: 0x00822A10 (FUN_00822A10, nullsub_2793)
-     *
-     * What it does:
-     * No-op hook lane retained for binary parity.
-     */
-    void NoOpSelectionHookB() noexcept
-    {}
-
-    /**
-     * Address: 0x00822A40 (FUN_00822A40, sub_822A40)
-     *
-     * What it does:
-     * Returns one legacy map/set maximum-size guard constant lane.
-     */
-    [[nodiscard]] std::uint32_t GetLegacyMapSetMaxSizeGuardAlt() noexcept
-    {
-      return 0x15555555u;
-    }
-
-    /**
-     * Address: 0x00822D70 (FUN_00822D70, sub_822D70)
-     *
-     * What it does:
-     * Writes one `{first,second,flag}` payload into destination runtime storage.
-     */
-    [[nodiscard]] TwoDwordByteRuntimeView* InitTwoDwordByteRuntimeLane(
-      TwoDwordByteRuntimeView* const destination,
-      const std::uint32_t first,
-      const std::uint32_t second,
-      const std::uint8_t flag
-    ) noexcept
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-
-      destination->mFirst = first;
-      destination->mSecond = second;
-      destination->mFlag = flag;
-      return destination;
-    }
-
-    /**
-     * Address: 0x00822DF0 (FUN_00822DF0, sub_822DF0)
-     *
-     * What it does:
-     * Copies one `{first,second,flag}` payload from lane pointers into destination.
-     */
-    [[nodiscard]] TwoDwordByteRuntimeView* CopyTwoDwordByteRuntimeLane(
-      TwoDwordByteRuntimeView* const destination,
-      const std::uint32_t* const pairSource,
-      const std::uint8_t* const flagSource
-    ) noexcept
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-
-      destination->mFirst = (pairSource != nullptr) ? pairSource[0] : 0u;
-      destination->mSecond = (pairSource != nullptr) ? pairSource[1] : 0u;
-      destination->mFlag = (flagSource != nullptr) ? *flagSource : 0u;
-      return destination;
-    }
-
-    /**
-     * Address: 0x00822E10 (FUN_00822E10, sub_822E10)
-     *
-     * What it does:
-     * Upcasts one reflected reference to `UserUnit` type lane and returns the
-     * resulting object pointer payload.
-     */
-    [[nodiscard]] void* UpcastRRefToUserUnitObject(gpg::RRef* const sourceRef)
-    {
-      if (sourceRef == nullptr) {
-        return nullptr;
-      }
-
-      static gpg::RType* sCachedUserUnitType = nullptr;
-      if (sCachedUserUnitType == nullptr) {
-        sCachedUserUnitType = gpg::LookupRType(typeid(UserUnit));
-      }
-
-      const gpg::RRef upcastedRef = gpg::REF_UpcastPtr(*sourceRef, sCachedUserUnitType);
-      return upcastedRef.mObj;
-    }
-
-    /**
-     * Address: 0x00822E50 (FUN_00822E50, nullsub_2794)
-     *
-     * What it does:
-     * No-op hook lane retained for binary parity.
-     */
-    void NoOpSelectionHookC() noexcept
-    {}
-
-    /**
-     * Address: 0x00822E60 (FUN_00822E60, sub_822E60)
-     *
-     * What it does:
-     * Returns the high-byte lane from one packed 32-bit value.
-     */
-    [[nodiscard]] std::uint8_t ReadHighByteLaneA(const std::uint32_t value) noexcept
-    {
-      return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
-    }
-
-    /**
-     * Address: 0x00822E90 (FUN_00822E90, nullsub_2795)
-     *
-     * What it does:
-     * No-op hook lane retained for binary parity.
-     */
-    void NoOpSelectionHookD() noexcept
-    {}
-
-    /**
-     * Address: 0x00822EA0 (FUN_00822EA0, sub_822EA0)
-     *
-     * What it does:
-     * Returns the high-byte lane from one packed 32-bit value.
-     */
-    [[nodiscard]] std::uint8_t ReadHighByteLaneB(const std::uint32_t value) noexcept
-    {
-      return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
-    }
-
-    /**
-     * Address: 0x00822ED0 (FUN_00822ED0, sub_822ED0)
-     *
-     * What it does:
-     * Returns one first-dword runtime lane from one packed payload.
-     */
-    [[nodiscard]] std::uint32_t ReadPackedRuntimeLane0(const void* const value) noexcept
-    {
-      return ReadRuntimeDwordAt0(value);
-    }
-
-    /**
-     * Address: 0x00822EE0 (FUN_00822EE0, sub_822EE0)
-     *
-     * What it does:
-     * Copies one `{word0,word2}` pair from one three-word packed source lane.
-     */
-    [[nodiscard]] PackedTwoWordRuntimeView* CopyPackedWordPairSkippingMiddle(
-      PackedTwoWordRuntimeView* const destination,
-      const PackedThreeWordRuntimeView* const source
-    ) noexcept
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-
-      destination->mFirst = (source != nullptr) ? source->mFirst : 0u;
-      destination->mSecond = (source != nullptr) ? source->mSecond : 0u;
-      return destination;
-    }
-
-    /**
-     * Address: 0x00822F20 (FUN_00822F20, sub_822F20)
-     *
-     * What it does:
-     * Copies one 2-float lane (`x`,`y`) to one destination dword payload.
-     */
-    [[nodiscard]] std::uint32_t* CopyPackedFloat2Lane(
-      std::uint32_t* const destination,
-      const float* const source
-    ) noexcept
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-
-      if (source == nullptr) {
-        destination[0] = 0u;
-        destination[1] = 0u;
-        return destination;
-      }
-
-      std::memcpy(destination, source, sizeof(float) * 2u);
-      return destination;
     }
 
     // `UserTarget` (UserTarget.h) is what the three padded "anchor" views that
@@ -9591,8 +8879,8 @@ namespace moho
    * its `mFromNode`/`mToNode`, appends it into both endpoints' dword lanes
    * (`fromNode.mLaneB`, `toNode.mLaneA`), retains its owning command's
    * per-command-type orderline texture (`graph.mNodes[commandType]`) into
-   * `graph.mGraphRuntimeTree[texture]`'s edge bucket
-   * (`FindOrInsertGraphRuntimeTreeBucket`, 0x0082B8B0) and pushes the edge
+   * `graph.mCommandGraphTree[texture]`'s edge bucket
+   * (`FindOrInsertCommandGraphBucket`, 0x0082B8B0) and pushes the edge
    * into it. Every call bumps the edge's touch count and (re)prices its
    * orderline width: `graph.mMapD` caches `CalculateWaypointLineWidth`'s
    * Lua result keyed by touch count, so repeat visits within the same
@@ -9608,8 +8896,8 @@ namespace moho
    * `legacy/containers/RbTree.h`'s already-cited `insert_at` / `insert_hint`
    * / `insert_unique` / `rotate_left` / `rotate_right` shape against
    * `CommandGraphTreeNode`'s own field names for
-   * `AttachGraphRuntimeTreeNodeAt`/`AtHint`/`Unique` and
-   * `PivotLeft`/`PivotRightGraphRuntimeTreeNode` (also in the class body;
+   * `AttachCommandGraphNodeAt`/`AtHint`/`Unique` and
+   * `PivotLeft`/`PivotCommandGraphTreeRight` (also in the class body;
    * kept as a transcription rather than a literal `detail::rb_tree<Traits>`
    * instantiation because `boost::SharedPtrRaw<T>` is an explicit-retain,
    * non-owning view by design - see `BoostWrappers.h` - so `rb_tree`'s
@@ -9655,8 +8943,8 @@ namespace moho
         reinterpret_cast<const boost::SharedPtrRaw<ID3DTextureSheet>&>(style.mOrderlineTexture)
       );
       if (texture) {
-        msvc8::vector<UICommandGraph::CommandGraphEdge*>& bucket = UICommandGraph::FindOrInsertGraphRuntimeTreeBucket(
-          graph.mGraphRuntimeTree, boost::SharedPtrRawFromSharedBorrow(texture)
+        msvc8::vector<UICommandGraph::CommandGraphEdge*>& bucket = UICommandGraph::FindOrInsertCommandGraphBucket(
+          graph.mCommandGraphTree, boost::SharedPtrRawFromSharedBorrow(texture)
         );
         bucket.push_back(edge);
       }
@@ -13582,8 +12870,8 @@ namespace moho
             position.y =
               GetSTIMap()->GetSurface(position) + blueprint->mSizeY + blueprint->Physics.Elevation;
 
-            gFormationPreviews.push_back(FormationPreviewSharedPair{});
-            FormationPreviewSharedPair& preview = gFormationPreviews.back();
+            gFormationPreviews.push_back(SFormationPreviewGhost{});
+            SFormationPreviewGhost& preview = gFormationPreviews.back();
 
             // Only the top LOD is previewed, and only its three texture lanes -
             // the shader is forced to "UnitFormationPreview" and the lookup and
