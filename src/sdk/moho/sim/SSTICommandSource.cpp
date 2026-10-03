@@ -127,54 +127,6 @@ SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRange(
 }
 
 /**
- * Address: 0x007CCF30 (FUN_007CCF30)
- *
- * What it does:
- * Register-shape adapter that forwards one half-open command-source copy
- * assignment range into the canonical rollback-aware lane.
- */
-[[maybe_unused]] SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRangeAdapterA(
-  const SSTICommandSource* const sourceBegin,
-  const SSTICommandSource* const sourceEnd,
-  SSTICommandSource* const destinationBegin
-)
-{
-  return CopyAssignSSTICommandSourceHalfOpenRange(sourceBegin, sourceEnd, destinationBegin);
-}
-
-/**
- * Address: 0x007CDCA0 (FUN_007CDCA0)
- *
- * What it does:
- * Secondary register-shape adapter for the same half-open command-source
- * copy-assignment lane.
- */
-[[maybe_unused]] SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRangeAdapterB(
-  const SSTICommandSource* const sourceBegin,
-  const SSTICommandSource* const sourceEnd,
-  SSTICommandSource* const destinationBegin
-)
-{
-  return CopyAssignSSTICommandSourceHalfOpenRange(sourceBegin, sourceEnd, destinationBegin);
-}
-
-/**
- * Address: 0x007CE850 (FUN_007CE850)
- *
- * What it does:
- * Third adapter lane that forwards to the canonical half-open command-source
- * copy-assignment implementation.
- */
-[[maybe_unused]] SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRangeAdapterC(
-  const SSTICommandSource* const sourceBegin,
-  const SSTICommandSource* const sourceEnd,
-  SSTICommandSource* const destinationBegin
-)
-{
-  return CopyAssignSSTICommandSourceHalfOpenRange(sourceBegin, sourceEnd, destinationBegin);
-}
-
-/**
  * NOT a citation of 0x007BED70 -- corrected. A prior pass attributed
  * `FUN_007BED70` to this function ("copy_SSTICommandSource_range_with_rollback"),
  * but 0x007BED70's own per-element callee (`FUN_007BE4B0`) writes two leading
@@ -227,77 +179,6 @@ SSTICommandSource* CopyAssignSSTICommandSourceHalfOpenRange(
     }
     throw;
   }
-}
-
-/**
- * NOT a citation of 0x007BD930 -- corrected (see the note on
- * `CopySSTICommandSourceRangeWithRollback` above). 0x007BD930 is a
- * register-shape adapter that forwards into 0x007BED70
- * (`msvc8::vector<Moho::SNetCommandArg>::uninit_move_n`, Vector.h), not a
- * `SSTICommandSource` operation. This function has no proven binary address.
- *
- * What it does:
- * Register-shape adapter that normalizes one low-byte-cleared context lane
- * (ignored by the canonical implementation) and forwards source/destination
- * lanes into `CopySSTICommandSourceRangeWithRollback`.
- */
-[[maybe_unused]] SSTICommandSource* CopySSTICommandSourceRangeWithRollbackRegisterContextAdapter(
-  const std::uint32_t adapterContext,
-  SSTICommandSource* const destinationBegin,
-  const SSTICommandSource* const sourceEnd,
-  const SSTICommandSource* const sourceBegin
-)
-{
-  const std::uint32_t ignoredLowByteClearedContext = (adapterContext & 0xFFFFFF00u);
-  (void)ignoredLowByteClearedContext;
-  return CopySSTICommandSourceRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
-}
-
-/**
- * NOT a citation of 0x007BCD00 -- corrected (see the note on
- * `CopySSTICommandSourceRangeWithRollback` above). 0x007BCD00 is the
- * single-element `uninit_move_n` adapter used by
- * `msvc8::vector<Moho::SNetCommandArg>::insert`'s in-place middle-insert
- * branch (cited on `insert`/`uninit_move_n`, Vector.h), not a
- * `SSTICommandSource` operation. This function has no proven binary address.
- *
- * What it does:
- * Secondary register-context adapter for command-source copy-construction range
- * forwarding into `CopySSTICommandSourceRangeWithRollback`.
- */
-[[maybe_unused]] SSTICommandSource* CopySSTICommandSourceRangeWithRollbackRegisterContextAdapterB(
-  const std::uint32_t adapterContext,
-  SSTICommandSource* const destinationBegin,
-  const SSTICommandSource* const sourceEnd,
-  const SSTICommandSource* const sourceBegin
-)
-{
-  const std::uint32_t ignoredLowByteClearedContext = (adapterContext & 0xFFFFFF00u);
-  (void)ignoredLowByteClearedContext;
-  return CopySSTICommandSourceRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
-}
-
-/**
- * NOT a citation of 0x007BEC10 -- corrected (see the note on
- * `CopySSTICommandSourceRangeWithRollback` above). 0x007BEC10 is another
- * register-shape adapter that forwards into 0x007BED70
- * (`msvc8::vector<Moho::SNetCommandArg>::uninit_move_n`, Vector.h), not a
- * `SSTICommandSource` operation. This function has no proven binary address.
- *
- * What it does:
- * Tertiary register-context adapter for command-source copy-construction range
- * forwarding into `CopySSTICommandSourceRangeWithRollback`.
- */
-[[maybe_unused]] SSTICommandSource* CopySSTICommandSourceRangeWithRollbackRegisterContextAdapterC(
-  const std::uint32_t adapterContext,
-  SSTICommandSource* const destinationBegin,
-  const SSTICommandSource* const sourceEnd,
-  const SSTICommandSource* const sourceBegin
-)
-{
-  const std::uint32_t ignoredLowByteClearedContext = (adapterContext & 0xFFFFFF00u);
-  (void)ignoredLowByteClearedContext;
-  return CopySSTICommandSourceRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
 }
 
 /**

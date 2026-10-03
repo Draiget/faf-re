@@ -24,7 +24,7 @@
 //     SFTIM_InitTcode/Ttu, UTY_MemsetDword, mpvcmc_InitMcOiTa,
 //     sfmpvf_IsChkFirst/SetPicUsrBuf — bodies exist in
 //     cri/sofdec/SofdecMpvRuntime.cpp but that TU has ~25 failing
-//     static_asserts on SfmpvHandleRuntimeView + missing helpers
+//     static_asserts on moho::SofdecSfdWorkctrlSubobj + missing helpers
 //     (sfmpv_SkipFrm, sfmpv_ConcatSub). See tmp/sofdec_binary_state.tsv
 //     for the full prioritized list.
 //
@@ -114,7 +114,7 @@ extern "C" {
   // TODO(recovery): MPVCMC_InitMcOiRt, MPVCMC_SetCcnt, MPVUMC_EndOfFrame,
   // MPVUMC_Finish, MPVUMC_InitOutRfb have recovered bodies in
   // cri/sofdec/SofdecMpvRuntime.cpp, but that file has ~25 struct-layout
-  // assertion failures (SfmpvHandleRuntimeView and siblings) and missing
+  // assertion failures (moho::SofdecSfdWorkctrlSubobj and siblings) and missing
   // helpers (sfmpv_SkipFrm, sfmpv_ConcatSub). Keep these as no-op stubs
   // until the Mpv runtime struct layouts are reconciled.
   // REAL BODIES now live in cri/sofdec/SofdecMpvRuntime.cpp (ClCompile):
@@ -298,7 +298,7 @@ extern "C" {
   // mwPlyFinishSfdFx (0x00AC93D0): real body in
   // cri/sofdec/SofdecAdxPlatformRuntime.cpp, next to mwPlySfdFinish. The
   // reference-counted teardown mirror of mwPlyInitSfdFx; while it was a
-  // wrong-signature no-arg void* stub, CMovieManager::ShutdownMovieRuntimeNoDelete's
+  // wrong-signature no-arg void* stub, CMovieManager::deleted overlay's
   // call to it did nothing - none of the up-to-32 open playback handles, the
   // MWSFSVM callback registrations, or any other Sofdec subsystem ADXT_Init
   // brought up ever got torn down when a movie manager shut down.

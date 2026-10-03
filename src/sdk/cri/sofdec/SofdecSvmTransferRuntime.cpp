@@ -5955,8 +5955,8 @@
     const std::int32_t transferParam0
   )
   {
-    auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &runtimeView->lanes[laneIndex];
+    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
 
     const std::int32_t primarySampleBaseAddress = laneView->sourceBufferAddress;
     std::int32_t sampleWindowBytes = laneView->sourceBufferBytes;
@@ -6233,8 +6233,8 @@
     constexpr std::int32_t kSfbufLaneStateAwaitingSupply = 4;
     constexpr std::int32_t kSfbufErrLaneNotAwaitingSupply = -16776183;
 
-    auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &runtimeView->lanes[transferLaneIndex];
+    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufRingLane* const laneView = &sfbuf->lanes[transferLaneIndex];
     if (laneView->laneType != kSfbufLaneStateAwaitingSupply) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrLaneNotAwaitingSupply);
     }
@@ -6285,8 +6285,8 @@
     const std::int32_t* const chunkDescriptorWords
   )
   {
-    auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &runtimeView->lanes[laneIndex];
+    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
     auto* const uochEntry = reinterpret_cast<SfbufUochDescriptor*>(
       &laneView->sourceBufferAddress + (uochSlotIndex * 4)
     );
@@ -6307,8 +6307,8 @@
     std::int32_t* const outChunkDescriptorWords
   )
   {
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &runtimeView->lanes[laneIndex];
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    const SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
     const auto* const uochEntry = reinterpret_cast<const SfbufUochDescriptor*>(
       &laneView->sourceBufferAddress + (uochSlotIndex * 4)
     );
@@ -6328,8 +6328,8 @@
     std::int32_t* const outRingHandleAddress
   )
   {
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    *outRingHandleAddress = runtimeView->lanes[laneIndex].sourceBufferBytes;
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    *outRingHandleAddress = sfbuf->lanes[laneIndex].sourceBufferBytes;
     return sfbufHandleAddress;
   }
 
@@ -6348,8 +6348,8 @@
     outCursor->secondChunk = {};
     outCursor->reservedWords = {0, 0, 0};
 
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
     if ((laneView->isSetup != 0) && (laneView->sourceBufferBytes != 0)) {
       (void)sfbuf_PeekChunk(
         laneView->sourceBufferBytes,
@@ -6374,8 +6374,8 @@
     constexpr std::int32_t kSfbufErrAdvanceMismatch = -16776181;
 
     std::int32_t status = 0;
-    auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
     if ((advanceCount == 0) || (laneView->isSetup == 0) || (laneView->sourceBufferBytes == 0)) {
       return 0;
     }
@@ -6528,8 +6528,8 @@
   )
   {
     SFLIB_LockCs();
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
     *outPrimaryDelimiterAddress = laneView->delimiterPrimaryAddress;
     *outSecondaryDelimiterAddress = laneView->delimiterSecondaryAddress;
     SFLIB_UnlockCs();
@@ -6546,8 +6546,8 @@
   )
   {
     SFLIB_LockCs();
-    auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
     laneView->delimiterPrimaryAddress = primaryDelimiterAddress;
     laneView->delimiterSecondaryAddress = secondaryDelimiterAddress;
     SFLIB_UnlockCs();
@@ -6561,8 +6561,8 @@
     constexpr std::int32_t kSfbufTotalSaturated = 0x7FFFFFFF;
 
     SFLIB_LockCs();
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
 
     std::int32_t totalWriteBytes = laneView->writeTotalBytes;
     const std::int32_t totalReadBytes = laneView->readTotalBytes;
@@ -6592,8 +6592,8 @@
     constexpr std::int32_t kSfbufErrRingNotSetup = -16776191;
 
     *outRingHandleAddress = 0;
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
     if (laneView->isSetup == 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrRingNotSetup);
     }
@@ -6610,8 +6610,8 @@
     const std::int32_t addBytes
   )
   {
-    auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
     if (laneView->readTotalBytes >= 0) {
       laneView->readTotalBytes += addBytes;
     }
@@ -6629,8 +6629,8 @@
   {
     constexpr std::int32_t kSfbufErrRingNotSetup = -16776191;
 
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
     if (laneView->isSetup == 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrRingNotSetup);
     }
@@ -6699,8 +6699,8 @@
       return 0;
     }
 
-    auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
     if (laneView->isSetup == 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrRingNotSetup);
     }
@@ -6740,8 +6740,8 @@
   {
     constexpr std::int32_t kSfbufErrRingNotSetup = -16776191;
 
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    const SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
     if (laneView->isSetup == 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrRingNotSetup);
     }
@@ -6810,8 +6810,8 @@
       return 0;
     }
 
-    auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufRingLane* const laneView = &runtimeView->lanes[ringIndex];
+    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufRingLane* const laneView = &sfbuf->lanes[ringIndex];
     if (laneView->isSetup == 0) {
       return SFLIB_SetErr(sfbufHandleAddress, kSfbufErrRingNotSetup);
     }
@@ -6868,8 +6868,8 @@
     const std::int32_t arg1
   )
   {
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &runtimeView->lanes[laneIndex];
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    const SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
     if (laneView->isSetup != 0) {
       return 0;
     }
@@ -6887,8 +6887,8 @@
   )
   {
     std::int32_t result = 0;
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    const SfbufRingLane* const laneView = &runtimeView->lanes[laneIndex];
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    const SfbufRingLane* const laneView = &sfbuf->lanes[laneIndex];
     if (laneView->isSetup == 0) {
       result = SFTRN_CallTrtTrif(sfbufHandleAddress, laneView->runtimeState0, 12, arg0, arg1);
     }
@@ -6906,8 +6906,8 @@
     const std::int32_t prepFlag
   )
   {
-    auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    runtimeView->lanes[laneIndex].prepFlag = prepFlag;
+    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    sfbuf->lanes[laneIndex].prepFlag = prepFlag;
     return prepFlag;
   }
 
@@ -6916,8 +6916,8 @@
    */
   std::int32_t SFBUF_GetPrepFlg(const std::int32_t sfbufHandleAddress, const std::int32_t laneIndex)
   {
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    return runtimeView->lanes[laneIndex].prepFlag;
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    return sfbuf->lanes[laneIndex].prepFlag;
   }
 
   /**
@@ -6929,8 +6929,8 @@
     const std::int32_t termFlag
   )
   {
-    auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    runtimeView->lanes[laneIndex].termFlag = termFlag;
+    auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    sfbuf->lanes[laneIndex].termFlag = termFlag;
     return termFlag;
   }
 
@@ -6939,8 +6939,8 @@
    */
   std::int32_t SFBUF_GetTermFlg(const std::int32_t sfbufHandleAddress, const std::int32_t laneIndex)
   {
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    return runtimeView->lanes[laneIndex].termFlag;
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    return sfbuf->lanes[laneIndex].termFlag;
   }
 
   /**

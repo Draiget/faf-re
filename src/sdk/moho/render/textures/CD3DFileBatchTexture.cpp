@@ -12,7 +12,6 @@
 #include "moho/resource/ResourceManager.h"
 #include "moho/render/textures/SBatchTextureData.h"
 #include "moho/render/textures/SBatchTextureDataFactory.h"
-#include "moho/render/textures/detail/BatchTextureContainerHelpers.h"
 
 namespace moho
 {
@@ -123,283 +122,6 @@ namespace moho
     TextureLookupMap sTextureMap;
     FileTextureRetainQueue sFileTextures;
 
-    /**
-     * Address: 0x0044B3D0 (FUN_0044B3D0)
-     * Address: 0x0044CC80 (FUN_0044CC80, clone lane)
-     * Address: 0x0044DB00 (FUN_0044DB00, clone lane)
-     * Address: 0x0044DD60 (FUN_0044DD60, clone lane)
-     *
-     * What it does:
-     * Initializes file-texture lookup map storage/sentinel state.
-     * In recovered C++, static storage construction already performs this once.
-     */
-    [[maybe_unused]] [[nodiscard]] TextureLookupMap& InitializeTextureLookupMapStorage()
-    {
-      return sTextureMap;
-    }
-
-    /**
-     * Address: 0x0044C870 (FUN_0044C870)
-     *
-     * What it does:
-     * Returns the leftmost/live iterator lane for the texture-lookup map.
-     */
-    [[maybe_unused]] [[nodiscard]] TextureLookupMap::iterator TextureLookupMapBegin()
-    {
-      return detail::ContainerBegin(sTextureMap);
-    }
-
-    /**
-     * Address: 0x0044C880 (FUN_0044C880)
-     *
-     * What it does:
-     * Returns live entry count for the texture-lookup cache map.
-     */
-    [[maybe_unused]] [[nodiscard]] std::size_t TextureLookupMapSize()
-    {
-      return sTextureMap.size();
-    }
-
-    /**
-     * Address: 0x0044CC20 (FUN_0044CC20)
-     *
-     * What it does:
-     * Returns the first texture-lookup entry whose key is not less than the
-     * requested `(filename,border)` pair.
-     */
-    [[nodiscard]] TextureLookupMap::iterator TextureLookupMapLowerBound(const TextureLookup& lookup)
-    {
-      return detail::MapLowerBound(sTextureMap, lookup);
-    }
-
-    /**
-     * Address: 0x0044B590 (FUN_0044B590)
-     *
-     * What it does:
-     * Returns map sentinel/end iterator lane.
-     */
-    [[maybe_unused]] [[nodiscard]] TextureLookupMap::iterator TextureLookupMapEnd()
-    {
-      return sTextureMap.end();
-    }
-
-    /**
-     * Address: 0x0044DBA0 (FUN_0044DBA0)
-     *
-     * What it does:
-     * Moves one texture-lookup iterator to the previous in-order entry.
-     * `end()` maps to the rightmost entry and `begin()` wraps to `end()`.
-     */
-    [[maybe_unused]] void RetreatTextureLookupIterator(TextureLookupMap::iterator& iterator)
-    {
-      detail::RetreatIterator(sTextureMap, iterator);
-    }
-
-    /**
-     * Address: 0x0044DAC0 (FUN_0044DAC0)
-     *
-     * What it does:
-     * Releases all texture-lookup map nodes and payload ownership lanes.
-     */
-    [[maybe_unused]] void ClearTextureLookupMapStorage()
-    {
-      sTextureMap.clear();
-    }
-
-    /**
-     * Address: 0x0044B810 (FUN_0044B810)
-     *
-     * What it does:
-     * Initializes fixed-capacity retain queue storage for file textures.
-     */
-    [[maybe_unused]] [[nodiscard]] FileTextureRetainQueue& InitializeFileTextureRetainQueueStorage()
-    {
-      return sFileTextures;
-    }
-
-    /**
-     * Address: 0x0044B760 (FUN_0044B760)
-     *
-     * What it does:
-     * Returns retain queue begin lane.
-     */
-    [[maybe_unused]] [[nodiscard]] FileTextureHandle* FileTextureRetainQueueBegin()
-    {
-      return detail::ContainerBegin(sFileTextures);
-    }
-
-    /**
-     * Address: 0x0044B770 (FUN_0044B770)
-     *
-     * What it does:
-     * Returns retain queue end lane.
-     */
-    [[maybe_unused]] [[nodiscard]] FileTextureHandle* FileTextureRetainQueueEnd()
-    {
-      return detail::ContainerEnd(sFileTextures);
-    }
-
-    using FileTextureRetainIterator = FileTextureHandle*;
-
-    /**
-     * Address: 0x0044ED70 (FUN_0044ED70)
-     * Address: 0x00857520 (FUN_00857520)
-     * Address: 0x00784760 (FUN_00784760)
-     *
-     * What it does:
-     * Copies one contiguous retain-queue lane forward, preserving shared_ptr
-     * reference-count semantics.
-     */
-    [[maybe_unused]] FileTextureRetainIterator CopyFileTextureRetainRange(
-      FileTextureRetainIterator destination,
-      FileTextureRetainIterator first,
-      FileTextureRetainIterator last
-    )
-    {
-      return detail::CopyRange(first, last, destination);
-    }
-
-    /**
-     * Address: 0x00784690 (FUN_00784690)
-     * Address: 0x00857130 (FUN_00857130)
-     *
-     * What it does:
-     * Register-shape adapter that forwards one contiguous retain-queue copy
-     * range (`first..last`) into destination storage.
-     */
-    [[maybe_unused]] FileTextureRetainIterator CopyFileTextureRetainRangeRegisterAdapterA(
-      const FileTextureRetainIterator first,
-      const FileTextureRetainIterator last,
-      FileTextureRetainIterator destination
-    )
-    {
-      return CopyFileTextureRetainRange(destination, first, last);
-    }
-
-    /**
-     * Address: 0x0044EF80 (FUN_0044EF80)
-     * Address: 0x0044F000 (FUN_0044F000, clone lane)
-     *
-     * What it does:
-     * Copies one retain-queue lane backward, preserving shared_ptr
-     * reference-count semantics.
-     */
-    [[maybe_unused]] FileTextureRetainIterator CopyFileTextureRetainRangeBackward(
-      FileTextureRetainIterator first,
-      FileTextureRetainIterator last,
-      FileTextureRetainIterator destinationEnd
-    )
-    {
-      return detail::CopyRangeBackward(first, last, destinationEnd);
-    }
-
-    struct LegacyBlockLane16
-    {
-      std::uint32_t word0 = 0;
-      std::uint32_t word1 = 0;
-      std::uint32_t word2 = 0;
-      std::uint32_t word3 = 0;
-    };
-
-    struct LegacyBlockLaneVector
-    {
-      void* proxy = nullptr;
-      LegacyBlockLane16* first = nullptr;
-      LegacyBlockLane16* last = nullptr;
-      LegacyBlockLane16* end = nullptr;
-    };
-
-    static_assert(offsetof(LegacyBlockLaneVector, first) == 0x04, "LegacyBlockLaneVector::first offset must be 0x04");
-    static_assert(offsetof(LegacyBlockLaneVector, last) == 0x08, "LegacyBlockLaneVector::last offset must be 0x08");
-    static_assert(offsetof(LegacyBlockLaneVector, end) == 0x0C, "LegacyBlockLaneVector::end offset must be 0x0C");
-    static_assert(sizeof(LegacyBlockLane16) == 0x10, "LegacyBlockLane16 size must be 0x10");
-    static_assert(sizeof(LegacyBlockLaneVector) == 0x10, "LegacyBlockLaneVector size must be 0x10");
-
-    /**
-     * Address: 0x0044EAB0 (FUN_0044EAB0)
-     *
-     * What it does:
-     * Copies one legacy block-lane vector begin pointer into caller storage.
-     */
-    [[maybe_unused]] LegacyBlockLane16** CopyLegacyBlockLaneBeginCursor(
-      LegacyBlockLane16** const outCursor,
-      const LegacyBlockLaneVector& view
-    )
-    {
-      *outCursor = view.first;
-      return outCursor;
-    }
-
-    /**
-     * Address: 0x0044EAC0 (FUN_0044EAC0)
-     *
-     * What it does:
-     * Copies one legacy block-lane vector end pointer into caller storage.
-     */
-    [[maybe_unused]] LegacyBlockLane16** CopyLegacyBlockLaneEndCursor(
-      LegacyBlockLane16** const outCursor,
-      const LegacyBlockLaneVector& view
-    )
-    {
-      *outCursor = view.last;
-      return outCursor;
-    }
-
-    /**
-     * Address: 0x0044ED10 (FUN_0044ED10)
-     *
-     * What it does:
-     * Copies `count` 16-byte block lanes from source to destination and returns
-     * the advanced destination cursor lane.
-     */
-    [[maybe_unused]] LegacyBlockLane16* CopyLegacyBlockLaneCount(
-      LegacyBlockLane16* destination,
-      const LegacyBlockLane16* source,
-      std::size_t count
-    )
-    {
-      std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-      const LegacyBlockLane16* readCursor = source;
-      while (count != 0u) {
-        if (destinationAddress != 0u) {
-          *reinterpret_cast<LegacyBlockLane16*>(destinationAddress) = *readCursor;
-        }
-        destinationAddress += sizeof(LegacyBlockLane16);
-        ++readCursor;
-        --count;
-      }
-      return reinterpret_cast<LegacyBlockLane16*>(destinationAddress);
-    }
-
-    /**
-     * Address: 0x0044ECA0 (FUN_0044ECA0)
-     * Address: 0x0044ED60 (FUN_0044ED60, clone lane)
-     * Address: 0x0044EE40 (FUN_0044EE40, clone lane)
-     * Address: 0x0044EE90 (FUN_0044EE90, clone lane)
-     * Address: 0x0044EF10 (FUN_0044EF10, clone lane)
-     * Address: 0x0044EF70 (FUN_0044EF70, clone lane)
-     *
-     * What it does:
-     * Returns the high byte lane from one 32-bit input value.
-     */
-    [[maybe_unused]] [[nodiscard]] std::uint8_t ExtractHighByteLane(const std::uint32_t value)
-    {
-      return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
-    }
-
-    /**
-     * Address: 0x0044F090 (FUN_0044F090)
-     * Address: 0x0044F0A0 (FUN_0044F0A0, clone lane)
-     * Address: 0x0044F0B0 (FUN_0044F0B0, clone lane)
-     *
-     * What it does:
-     * Swaps one 32-bit lane between two caller-provided pointers.
-     */
-    [[maybe_unused]] std::uint32_t* SwapWordLane(std::uint32_t* const lhs, std::uint32_t* const rhs)
-    {
-      std::swap(*lhs, *rhs);
-      return lhs;
-    }
 
     /**
      * Address: 0x0044A710 (FUN_0044A710)
@@ -411,20 +133,18 @@ namespace moho
     [[nodiscard]] FileTextureHandle LockFileTextureWeakHandle(const FileTextureWeakHandle& weakTexture)
     {
       const FileTextureHandle outTexture = weakTexture.lock();
-      return detail::CopyResult(outTexture);
+      return outTexture;
     }
 
     [[nodiscard]] TextureLookupMap::iterator FindTextureLookupEntry(const TextureLookup& lookup)
     {
-      (void)TextureLookupMapBegin();
-      (void)TextureLookupMapSize();
-      const TextureLookupMap::iterator it = TextureLookupMapLowerBound(lookup);
-      if (it == TextureLookupMapEnd()) {
+      const TextureLookupMap::iterator it = sTextureMap.lower_bound(lookup);
+      if (it == sTextureMap.end()) {
         return it;
       }
 
       if (IsTextureLookupLess(lookup, it->first) || IsTextureLookupLess(it->first, lookup)) {
-        return TextureLookupMapEnd();
+        return sTextureMap.end();
       }
 
       return it;
@@ -439,21 +159,20 @@ namespace moho
      */
     void AddFileBatchTexture(const FileTextureHandle& fileTexture)
     {
-      (void)InitializeFileTextureRetainQueueStorage();
       if (!fileTexture) {
         return;
       }
 
-      for (FileTextureHandle* it = FileTextureRetainQueueBegin(); it != FileTextureRetainQueueEnd();) {
+      for (FileTextureHandle* it = sFileTextures.begin(); it != sFileTextures.end();) {
         if (it->get() == fileTexture.get()) {
-          it = detail::EraseIterator(sFileTextures, it);
+          it = sFileTextures.erase(it);
           continue;
         }
         ++it;
       }
 
       if (sFileTextures.size() >= kRetainQueueLimit && !sFileTextures.empty()) {
-        detail::EraseIterator(sFileTextures, FileTextureRetainQueueEnd() - 1);
+        (void)sFileTextures.erase(sFileTextures.end() - 1);
       }
 
       sFileTextures.push_back(fileTexture);
@@ -471,9 +190,9 @@ namespace moho
      */
     void RemoveFileBatchTexture(const FileTextureHandle& fileTexture)
     {
-      for (FileTextureHandle* it = FileTextureRetainQueueBegin(); it != FileTextureRetainQueueEnd(); ++it) {
+      for (FileTextureHandle* it = sFileTextures.begin(); it != sFileTextures.end(); ++it) {
         if (it->get() == fileTexture.get()) {
-          detail::EraseIterator(sFileTextures, it);
+          (void)sFileTextures.erase(it);
           break;
         }
       }
@@ -513,18 +232,26 @@ namespace moho
 
   /**
    * Address: 0x00BC43A0 (FUN_00BC43A0, register_mTextureMap)
+   *
+   * What it does:
+   * Static-init registration hook for the file-texture lookup map; the map's
+   * sentinel storage is constructed by its own static initializer.
    */
   void register_mTextureMap()
   {
-    (void)InitializeTextureLookupMapStorage();
+    (void)sTextureMap;
   }
 
   /**
    * Address: 0x00BC43E0 (FUN_00BC43E0, register_sFileTextures)
+   *
+   * What it does:
+   * Static-init registration hook for the deferred-delete retain queue; the
+   * queue's storage is constructed by its own static initializer.
    */
   void register_sFileTextures()
   {
-    (void)InitializeFileTextureRetainQueueStorage();
+    (void)sFileTextures;
   }
 
   /**
@@ -598,8 +325,8 @@ namespace moho
     TextureLookupMap::iterator mapIt = FindTextureLookupEntry(lookup);
 
     if (texture->CanDelete()) {
-      if (mapIt != TextureLookupMapEnd()) {
-        detail::EraseIterator(sTextureMap, mapIt);
+      if (mapIt != sTextureMap.end()) {
+        (void)sTextureMap.erase(mapIt);
       }
       delete texture;
       return;
@@ -609,14 +336,13 @@ namespace moho
     texture->MarkCanDelete();
     AddFileBatchTexture(retainedTexture);
 
-    if (mapIt != TextureLookupMapEnd()) {
+    if (mapIt != sTextureMap.end()) {
       mapIt->second = retainedTexture;
       return;
     }
 
-    detail::MapInsertAtHint(
-      sTextureMap,
-      TextureLookupMapLowerBound(lookup),
+    (void)sTextureMap.insert(
+      sTextureMap.lower_bound(lookup),
       TextureLookupMap::value_type(lookup, FileTextureWeakHandle(retainedTexture))
     );
   }
@@ -629,9 +355,6 @@ namespace moho
    */
   boost::shared_ptr<CD3DBatchTexture> CD3DBatchTexture::FromFile(const gpg::StrArg filename, const std::uint32_t border)
   {
-    (void)InitializeTextureLookupMapStorage();
-    (void)InitializeFileTextureRetainQueueStorage();
-
     boost::shared_ptr<CD3DBatchTexture> outTexture;
     const char* const normalizedPath = filename != nullptr ? filename : "";
 
@@ -639,7 +362,7 @@ namespace moho
 
     const TextureLookup lookup(normalizedPath, border);
     const TextureLookupMap::iterator cachedIt = FindTextureLookupEntry(lookup);
-    if (cachedIt != TextureLookupMapEnd()) {
+    if (cachedIt != sTextureMap.end()) {
       FileTextureHandle cachedFileTexture = LockFileTextureWeakHandle(cachedIt->second);
       if (cachedFileTexture) {
         if (cachedFileTexture->CanDelete()) {
@@ -662,18 +385,17 @@ namespace moho
       new CD3DFileBatchTexture(textureData, border, lookup.mFileName),
       &CD3DFileBatchTexture::OnClose
     );
-    if (cachedIt != TextureLookupMapEnd()) {
+    if (cachedIt != sTextureMap.end()) {
       cachedIt->second = fileTexture;
     } else {
-      detail::MapInsertAtHint(
-        sTextureMap,
-        TextureLookupMapLowerBound(lookup),
+      (void)sTextureMap.insert(
+        sTextureMap.lower_bound(lookup),
         TextureLookupMap::value_type(lookup, FileTextureWeakHandle(fileTexture))
       );
     }
 
     outTexture = fileTexture;
-    return detail::CopyResult(outTexture);
+    return outTexture;
   }
 } // namespace moho
 

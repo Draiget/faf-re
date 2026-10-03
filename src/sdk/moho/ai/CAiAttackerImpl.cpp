@@ -1485,7 +1485,7 @@ void CAiAttackerImpl::ResetReportingState()
  * are the two implicit subobject adjustments this reads as: the task's
  * `ManyToOneListener<EProjectileImpactEvent>` base sits at mdisp=24 and the
  * projectile's `ManyToOneBroadcaster<EProjectileImpactEvent>` lane at 0x270.
- * This used to go through a `ProjectileImpactBroadcasterRuntimeView` - 0x270
+ * This used to go through a deleted overlay - 0x270
  * pad bytes and a bare `WeakPtr<void>` - plus a `BindManyToOneListener`
  * template that `reinterpret_cast`ed the broadcaster to `WeakPtr<void>&` and
  * open-coded the `listener + kOwnerLinkOffset` encoding.

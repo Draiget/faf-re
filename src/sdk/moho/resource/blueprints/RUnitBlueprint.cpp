@@ -68,39 +68,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x00524DD0 (FUN_00524DD0)
-     *
-     * What it does:
-     * Adapts one register-lane caller shape into the canonical counted
-     * `RUnitBlueprintWeapon` copy-with-rollback helper.
-     */
-    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponCountedRangeRegisterAdapter(
-      RUnitBlueprintWeapon* const destination,
-      const int count,
-      const RUnitBlueprintWeapon* const source
-    )
-    {
-      return CopyRUnitBlueprintWeaponCountedRangeWithRollback(count, destination, source);
-    }
-
-    /**
-     * Address: 0x00526220 (FUN_00526220)
-     *
-     * What it does:
-     * Alternate register-shape adapter lane that forwards one counted
-     * `RUnitBlueprintWeapon` copy-with-rollback request into the canonical
-     * helper.
-     */
-    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponCountedRangeRegisterAdapterAlt(
-      RUnitBlueprintWeapon* const destination,
-      const int count,
-      const RUnitBlueprintWeapon* const source
-    )
-    {
-      return CopyRUnitBlueprintWeaponCountedRangeWithRollback(count, destination, source);
-    }
-
-    /**
      * Address: 0x00527D30 (FUN_00527D30, copy_RUnitBlueprintWeapon_range_with_rollback)
      *
      * What it does:
@@ -130,39 +97,6 @@ namespace moho
         }
         throw;
       }
-    }
-
-    /**
-     * Address: 0x00527620 (FUN_00527620)
-     *
-     * What it does:
-     * Register-shape adapter lane that forwards one range-copy request into
-     * `CopyRUnitBlueprintWeaponRangeWithRollback`.
-     */
-    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponRangeWithRollbackRegisterAdapter(
-      const std::uintptr_t /*unusedLane*/,
-      const RUnitBlueprintWeapon* const sourceBegin,
-      RUnitBlueprintWeapon* const destinationBegin,
-      RUnitBlueprintWeapon* const destinationEnd
-    )
-    {
-      return CopyRUnitBlueprintWeaponRangeWithRollback(destinationBegin, destinationEnd, sourceBegin);
-    }
-
-    /**
-     * Address: 0x00527B70 (FUN_00527B70)
-     *
-     * What it does:
-     * Alternate register-shape adapter lane that forwards one range-copy
-     * request into `CopyRUnitBlueprintWeaponRangeWithRollback`.
-     */
-    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponRangeWithRollbackRegisterAdapterAlt(
-      const RUnitBlueprintWeapon* const sourceBegin,
-      RUnitBlueprintWeapon* const destinationBegin,
-      RUnitBlueprintWeapon* const destinationEnd
-    )
-    {
-      return CopyRUnitBlueprintWeaponRangeWithRollback(destinationBegin, destinationEnd, sourceBegin);
     }
 
     [[nodiscard]] RUnitBlueprintWeapon* CopyConstructRUnitBlueprintWeaponIfPresent(
@@ -205,22 +139,6 @@ namespace moho
     )
     {
       return CopyConstructRUnitBlueprintWeaponIfPresent(destination, source);
-    }
-
-    /**
-     * Address: 0x0051E330 (FUN_0051E330)
-     *
-     * What it does:
-     * Reinitializes one destination string lane and copies the full source
-     * payload into it.
-     */
-    [[maybe_unused]] msvc8::string* CopyStringLane(
-      msvc8::string* const destination,
-      const msvc8::string* const source
-    )
-    {
-      destination->assign_owned(source->view());
-      return destination;
     }
 
     /**

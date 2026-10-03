@@ -304,7 +304,7 @@ extern "C" {
    * Seeds MPV CMC interpolation-pointer lanes to the internal table storage
    * block and resets per-lane span words.
    */
-  Mpvcmc* mpvcmc_InitMcOiTa(Mpvcmc* runtimeView);
+  Mpvcmc* mpvcmc_InitMcOiTa(Mpvcmc* mpvcmc);
   /**
    * Address: 0x00AF5FC0 (FUN_00AF5FC0, _MPVCMC_InitMcOiRt)
    *
@@ -312,14 +312,14 @@ extern "C" {
    * Initializes MPV CMC interpolation runtime words from fixed seed lanes in
    * the CMC object.
    */
-  Mpvcmc* MPVCMC_InitMcOiRt(Mpvcmc* runtimeView);
+  Mpvcmc* MPVCMC_InitMcOiRt(Mpvcmc* mpvcmc);
   /**
    * Address: 0x00AF6010 (FUN_00AF6010, _MPVCMC_SetCcnt)
    *
    * What it does:
    * Recomputes CMC count/state lanes from the runtime mode gate.
    */
-  std::int32_t MPVCMC_SetCcnt(Mpvcmc* runtimeView);
+  std::int32_t MPVCMC_SetCcnt(Mpvcmc* mpvcmc);
   /**
    * Address: 0x00AF60F0 (FUN_00AF60F0, _MPVUMC_Finish)
    *
@@ -334,7 +334,7 @@ extern "C" {
    * Computes Y/C output frame-buffer lane addresses and aligned strides for the
    * current decode-frame geometry.
    */
-  std::int32_t MPVUMC_InitOutRfb(Mpvcmc* runtimeView);
+  std::int32_t MPVUMC_InitOutRfb(Mpvcmc* mpvcmc);
   /**
    * Address: 0x00AF61D0 (FUN_00AF61D0, _MPVUMC_EndOfFrame)
    *
@@ -1557,25 +1557,25 @@ std::int32_t MPVM2V_Init()
  * Seeds MPV CMC interpolation-pointer lanes to the internal table storage
  * block and resets per-lane span words.
  */
-Mpvcmc* mpvcmc_InitMcOiTa(Mpvcmc* const runtimeView)
+Mpvcmc* mpvcmc_InitMcOiTa(Mpvcmc* const mc)
 {
-  runtimeView->initWord154 = (runtimeView->initWord1A4 != 0) ? 4 : -1;
+  mc->initWord154 = (mc->initWord1A4 != 0) ? 4 : -1;
 
-  const std::int32_t tableAddress = PointerToAddress(&runtimeView->initWord0D20);
-  runtimeView->initWord158 = tableAddress;
-  runtimeView->initWord160 = tableAddress;
-  runtimeView->initWord168 = tableAddress;
-  runtimeView->initWord170 = tableAddress;
-  runtimeView->initWord178 = tableAddress;
-  runtimeView->initWord180 = tableAddress;
+  const std::int32_t tableAddress = PointerToAddress(&mc->initWord0D20);
+  mc->initWord158 = tableAddress;
+  mc->initWord160 = tableAddress;
+  mc->initWord168 = tableAddress;
+  mc->initWord170 = tableAddress;
+  mc->initWord178 = tableAddress;
+  mc->initWord180 = tableAddress;
 
-  runtimeView->initWord15C = 8;
-  runtimeView->initWord164 = 8;
-  runtimeView->initWord16C = 8;
-  runtimeView->initWord174 = 8;
-  runtimeView->initWord17C = 8;
-  runtimeView->initWord184 = 8;
-  return runtimeView;
+  mc->initWord15C = 8;
+  mc->initWord164 = 8;
+  mc->initWord16C = 8;
+  mc->initWord174 = 8;
+  mc->initWord17C = 8;
+  mc->initWord184 = 8;
+  return mc;
 }
 
 /**
@@ -1585,20 +1585,20 @@ Mpvcmc* mpvcmc_InitMcOiTa(Mpvcmc* const runtimeView)
  * Initializes MPV CMC interpolation runtime words from fixed seed lanes in
  * the CMC object.
  */
-Mpvcmc* MPVCMC_InitMcOiRt(Mpvcmc* const runtimeView)
+Mpvcmc* MPVCMC_InitMcOiRt(Mpvcmc* const mc)
 {
-  runtimeView->initWord120 = (runtimeView->initWord1A4 != 0) ? 4 : -1;
+  mc->initWord120 = (mc->initWord1A4 != 0) ? 4 : -1;
 
-  const std::int32_t seedWord0 = runtimeView->initWord280;
-  runtimeView->initWord128 = seedWord0;
-  runtimeView->initWord130 = seedWord0;
+  const std::int32_t seedWord0 = mc->initWord280;
+  mc->initWord128 = seedWord0;
+  mc->initWord130 = seedWord0;
 
-  const std::int32_t seedWord1 = runtimeView->initWord282;
-  runtimeView->initWord138 = seedWord1;
-  runtimeView->initWord140 = seedWord1;
-  runtimeView->initWord148 = seedWord1;
-  runtimeView->initWord150 = seedWord1;
-  return runtimeView;
+  const std::int32_t seedWord1 = mc->initWord282;
+  mc->initWord138 = seedWord1;
+  mc->initWord140 = seedWord1;
+  mc->initWord148 = seedWord1;
+  mc->initWord150 = seedWord1;
+  return mc;
 }
 
 /**
@@ -1607,11 +1607,11 @@ Mpvcmc* MPVCMC_InitMcOiRt(Mpvcmc* const runtimeView)
  * What it does:
  * Recomputes CMC count/state lanes from the runtime mode gate.
  */
-extern "C" std::int32_t MPVCMC_SetCcnt(Mpvcmc* const runtimeView)
+extern "C" std::int32_t MPVCMC_SetCcnt(Mpvcmc* const mc)
 {
-  const std::int32_t nextCount = (runtimeView->initWord1A4 != 0) ? 4 : -1;
-  runtimeView->initWord154 = nextCount;
-  runtimeView->initWord120 = nextCount;
+  const std::int32_t nextCount = (mc->initWord1A4 != 0) ? 4 : -1;
+  mc->initWord154 = nextCount;
+  mc->initWord120 = nextCount;
   return nextCount;
 }
 
@@ -1632,36 +1632,36 @@ extern "C" void MPVUMC_Finish()
  * Computes Y/C output frame-buffer lane addresses and aligned strides for the
  * current decode-frame geometry.
  */
-extern "C" std::int32_t MPVUMC_InitOutRfb(Mpvcmc* const runtimeView)
+extern "C" std::int32_t MPVUMC_InitOutRfb(Mpvcmc* const mc)
 {
-  std::int32_t widthPixels = runtimeView->outputWidthPixels;
-  std::int32_t heightPixels = runtimeView->outputHeightPixels;
-  const std::int32_t outputRfbBaseAddress = runtimeView->outputRfbBaseAddress;
+  std::int32_t widthPixels = mc->outputWidthPixels;
+  std::int32_t heightPixels = mc->outputHeightPixels;
+  const std::int32_t outputRfbBaseAddress = mc->outputRfbBaseAddress;
 
-  if (runtimeView->umcHalfResMode != 0) {
+  if (mc->umcHalfResMode != 0) {
     widthPixels = RoundUpDivPow2Signed(widthPixels, 3);
     heightPixels = RoundUpDivPow2Signed(heightPixels, 3);
   }
 
-  runtimeView->outputYPlaneBaseAddress = outputRfbBaseAddress;
+  mc->outputYPlaneBaseAddress = outputRfbBaseAddress;
 
   const std::int32_t alignedLumaWidth = RoundUpDivPow2Signed(widthPixels, 4) << 4;
   const std::int32_t lumaStrideUnits = RoundUpDivPow2Signed(alignedLumaWidth, 5);
-  runtimeView->outputLumaStrideBytes = static_cast<std::int16_t>(lumaStrideUnits << 5);
+  mc->outputLumaStrideBytes = static_cast<std::int16_t>(lumaStrideUnits << 5);
 
   const std::int32_t alignedChromaHalfWidth = Div2TowardZero(alignedLumaWidth);
   const std::int32_t chromaStrideUnits = RoundUpDivPow2Signed(alignedChromaHalfWidth, 5);
-  runtimeView->outputChromaStrideBytes = static_cast<std::int16_t>(chromaStrideUnits << 5);
+  mc->outputChromaStrideBytes = static_cast<std::int16_t>(chromaStrideUnits << 5);
 
   const std::int32_t macroblockRows = RoundUpDivPow2Signed(heightPixels, 5);
   const std::int32_t outputYPlaneAddress = outputRfbBaseAddress + ((lumaStrideUnits * macroblockRows) << 10);
-  runtimeView->outputYPlaneAddress = outputYPlaneAddress;
+  mc->outputYPlaneAddress = outputYPlaneAddress;
 
   const std::int32_t macroblockRowBytes = macroblockRows << 5;
   const std::int32_t halfMacroblockRowBytes = Div2TowardZero(macroblockRowBytes);
   const std::int32_t outputCPlaneAddress =
     outputYPlaneAddress + (((halfMacroblockRowBytes * chromaStrideUnits) << 5));
-  runtimeView->outputCPlaneAddress = outputCPlaneAddress;
+  mc->outputCPlaneAddress = outputCPlaneAddress;
   return outputCPlaneAddress;
 }
 

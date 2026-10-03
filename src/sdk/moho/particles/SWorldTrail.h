@@ -36,11 +36,11 @@ namespace moho
      * 0x60-byte record: the float block, then both counted texture handles
      * retained through `CountedPtr`'s copy, then `mTypeTag`/`mBlendMode`;
      * emitted out of line for `msvc8::vector<SWorldTrail>`'s copy steps.
-     * Formerly transcribed as `CopyTrailRuntimeViewForVectorMove` in
+     * Formerly transcribed as the deleted overlay in
      * ParticleRenderBuckets.cpp, removed 2026-09-10.)
      * Address: 0x0049BE90 (FUN_0049BE90 -- the implicit destructor: both
      * `CountedPtr` handles release their texture. Formerly
-     * `DestroyTrailRuntimeViewForVectorTail`, removed.)
+     * the deleted overlay, removed.)
      * Address: 0x0049FBF0 (FUN_0049FBF0 -- the compiler-generated copy assignment as emitted for the `msvc8::vector` instantiation; callers 0x00495850, 0x0049DE60, 0x0049E4E0; formerly `CopyAssignTrailRuntimeAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0049FFB0 (FUN_0049FFB0 -- a second emission of that copy assignment; zero callers, unreachable; formerly `CopyAssignTrailRuntimeIfDestinationPresent`, removed 2026-09-10.)
      * Address: 0x0049FFC0 (FUN_0049FFC0 -- the implicit destructor as emitted for the `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyTrailRuntimeInPlace`, removed 2026-09-10.)

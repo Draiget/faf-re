@@ -19,7 +19,7 @@ namespace moho
    * whole object is 8-aligned (through its `CGeomSolid3`).
    *
    * Address: 0x0080B9A0 (FUN_0080B9A0 -- the constructor, which only stores the vtable; formerly
-   * `InitializeITesselatorVTableThiscall` over an `ITesselatorRuntimeView` in CTesselator.cpp.)
+   * `InitializeITesselatorVTableThiscall` over an `ITesselator` in CTesselator.cpp.)
    * Address: 0x0080EBA0 (FUN_0080EBA0 -- a second emission of it that returns `this`; formerly
    * `InitializeITesselatorVTableReturnLane`.)
    */

@@ -15,7 +15,7 @@ namespace moho
     // 0x007FF7D0 -- MSVC's emission of `IRenTerrain::IRenTerrain()` -- is
     // documented on `TerrainCommon::TerrainCommon` (TerrainCommon.cpp), the one
     // source construct it belongs to. It used to be modelled here as
-    // `InitializeIRenTerrainVTableReturnLane` over an `IRenTerrainRuntimeView`
+    // `InitializeIRenTerrainVTableReturnLane` over an `IRenTerrain`
     // layout stand-in, whose vtable pointer was forged by taking the vptr of an
     // unrelated local probe class -- so had anything ever called it, it would
     // have installed the wrong vtable. Nothing did: the lane was

@@ -155,7 +155,7 @@ namespace moho
      *   another's and handing back the source.)
      *
      * Both are zero-caller and unreachable, and both were transcribed as free
-     * functions over a `BVIntSetEmbeddedOwnerRuntimeView` reach-in in
+     * functions over a deleted overlay reach-in in
      * moho/containers/BVIntSet.cpp (RULE ONE), removed 2026-09-22.
      *
      * The `{4-byte lane, 4-byte gap, BVIntSet at +0x08}` shape they operate on

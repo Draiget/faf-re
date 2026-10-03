@@ -450,8 +450,8 @@ namespace msvc8
          *
          * Address: 0x008A7C80 (FUN_008A7C80, sub_8A7C80) -- `msvc8::map<
          * msvc8::string, moho::TerrainEnvironmentLookupEntry>::operator[]`
-         * -- `Moho::CWldTerrainRes::mEnvLookup` (`TerrainRuntimeView`/
-         * `TerrainVisualResourceRuntimeView` in `moho/sim/CWldMap.cpp`),
+         * -- `Moho::CWldTerrainRes::mEnvLookup` (`Terrain`/
+         * the deleted overlay in `moho/sim/CWldMap.cpp`),
          * isNil@+0x4D (0x50-byte node: 12-byte link triplet + 28-byte
          * `msvc8::string` key + 0x24-byte `TerrainEnvironmentLookupEntry`
          * value + color/isNil). IDA's own inferred listing name for this

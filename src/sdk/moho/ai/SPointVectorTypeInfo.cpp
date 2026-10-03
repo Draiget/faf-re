@@ -96,122 +96,6 @@ namespace
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
     return moho::SPointVector{zero, zero};
   }
-
-  /**
-   * Address: 0x00584CC0 (FUN_00584CC0)
-   * Address: 0x00581E00 (FUN_00581E00)
-   *
-   * What it does:
-   * Copies one contiguous `SPointVector` range `[sourceBegin, sourceEnd)`
-   * into destination storage and returns one-past the copied destination lane.
-   */
-  [[maybe_unused]] moho::SPointVector* CopySPointVectorRangeNullable(
-    moho::SPointVector* destination,
-    const moho::SPointVector* const sourceBegin,
-    const moho::SPointVector* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-    for (const moho::SPointVector* source = sourceBegin; source != sourceEnd; ++source) {
-      if (destinationAddress != 0u) {
-        auto* const out = reinterpret_cast<moho::SPointVector*>(destinationAddress);
-        out->point = source->point;
-        out->vector = source->vector;
-      }
-      destinationAddress += sizeof(moho::SPointVector);
-    }
-
-    return reinterpret_cast<moho::SPointVector*>(destinationAddress);
-  }
-
-  /**
-   * Address: 0x005841D0 (FUN_005841D0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one `SPointVector` range copy lane
-   * into the canonical nullable range-copy helper.
-   */
-  [[maybe_unused]] moho::SPointVector* CopySPointVectorRangeNullableRegisterAdapterA(
-    moho::SPointVector* const destination,
-    const moho::SPointVector* const sourceBegin,
-    const moho::SPointVector* const sourceEnd
-  ) noexcept
-  {
-    return CopySPointVectorRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005848C0 (FUN_005848C0)
-   *
-   * What it does:
-   * Secondary register-shape adapter for nullable `SPointVector` range-copy
-   * dispatch.
-   */
-  [[maybe_unused]] moho::SPointVector* CopySPointVectorRangeNullableRegisterAdapterB(
-    moho::SPointVector* const destination,
-    const moho::SPointVector* const sourceBegin,
-    const moho::SPointVector* const sourceEnd
-  ) noexcept
-  {
-    return CopySPointVectorRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00582140 (FUN_00582140)
-   * Address: 0x00583670 (FUN_00583670)
-   *
-   * What it does:
-   * Source-first register adapter that forwards one nullable `SPointVector`
-   * range-copy lane to the canonical helper.
-   */
-  [[maybe_unused]] moho::SPointVector* CopySPointVectorRangeNullableSourceFirstAdapter(
-    const moho::SPointVector* const sourceBegin,
-    const moho::SPointVector* const sourceEnd,
-    moho::SPointVector* const destination
-  ) noexcept
-  {
-    return CopySPointVectorRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00580080 (FUN_00580080)
-   *
-   * What it does:
-   * Resizes one `vector<SPointVector>` payload to `targetCount`, preserving
-   * existing prefix elements and using the zero point/vector payload on
-   * growth lanes.
-   */
-  [[nodiscard]] unsigned int ResizeSPointVectorStorageToCount(
-    SPointVectorVector& storage,
-    const unsigned int targetCount
-  )
-  {
-    const std::size_t targetSize = static_cast<std::size_t>(targetCount);
-    if (storage.size() < targetSize) {
-      storage.resize(targetSize, ZeroSPointVector());
-    } else if (targetSize < storage.size()) {
-      storage.resize(targetSize);
-    }
-
-    return static_cast<unsigned int>(storage.size());
-  }
-
-  /**
-   * Address: 0x0050C310 (FUN_0050C310)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `SPointVectorTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_SPointVectorTypeInfoRTypeBase(SPointVectorTypeInfo* const typeInfo) noexcept
-  {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
-  }
 } // namespace
 
 gpg::RType* moho::SPointVector::sType = nullptr;
@@ -462,6 +346,9 @@ size_t gpg::RVectorType<moho::SPointVector>::GetCount(void* const obj) const
 
 /**
  * Address: 0x0057E0F0 (FUN_0057E0F0, gpg::RVectorType_SPointVector::SetCount)
+ * Address: 0x00580080 (FUN_00580080, the `resize(n, value)` body this
+ * call emits — grows with the zero point/vector payload, shrinks through
+ * the erase lane)
  *
  * What it does:
  * Resizes one reflected `vector<SPointVector>` payload using zero
@@ -476,7 +363,7 @@ void gpg::RVectorType<moho::SPointVector>::SetCount(void* const obj, const int c
     return;
   }
 
-  (void)ResizeSPointVectorStorageToCount(*storage, static_cast<unsigned int>(count));
+  storage->resize(static_cast<std::size_t>(count), ZeroSPointVector());
 }
 
 /**

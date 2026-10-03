@@ -389,7 +389,7 @@ namespace moho
     // `CAimManipulator::CAimManipulator()` at 0x00632ED7, but this class
     // declared no data members at all, so it inherited only
     // `IAniManipulator`'s 0x80 -- and the constructor, the destructor and
-    // every accessor reach these fields through `CAimManipulatorRuntimeView`,
+    // every accessor reach these fields through `CAimManipulator`,
     // which describes exactly this run. Every one of those writes landed past
     // the end of the heap block, 0x90 bytes of it, once per manipulator: one
     // is created for every turreted unit in the session.

@@ -37,10 +37,10 @@ namespace moho
    * independently by `CStorageManipulatorTypeInfo::Init` (0x00648E10), whose
    * first store is `mov [esi+8], 0xB0`.
    *
-   * The three vectors used to live behind a `CStorageManipulatorVector3RuntimeView`
+   * The three vectors used to live behind a deleted overlay
    * stand-in -- three bare floats, converted to and from `Wm3::Vector3f` by a
    * pair of helpers on every use -- laid over the object together with a
-   * `CStorageManipulatorRuntimeView` that carried the whole 0xB0 layout as
+   * `CStorageManipulator` that carried the whole 0xB0 layout as
    * vtable words and padding. Both are gone: the binary addresses these fields
    * directly (`lea edx, [ebx+0x84]` straight into `WriteArchive::Write` at
    * 0x00649F7D, no temporary), which is only expressible once they are the

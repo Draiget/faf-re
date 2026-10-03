@@ -1497,14 +1497,14 @@ namespace msvc8
          * Address: 0x00935B20 (FUN_00935B20 -- `_Allocate` for a 4-byte element.)
          * Address: 0x00537F80 (FUN_00537F80 -- `_Allocate` for a 4-byte element with the `count == 0 -> operator new(0)` shortcut inlined (`WaveSystem`'s generator vector grow).)
          * Address: 0x0078A5D0 (FUN_0078A5D0 -- `_Allocate` for a 4-byte element with the `count == 0 -> operator new(0)` shortcut inlined (`WaveSystem`'s generator vector grow).)
-         * Address: 0x00946A00 (FUN_00946A00 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
-         * Address: 0x00946AA0 (FUN_00946AA0 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
-         * Address: 0x00946B40 (FUN_00946B40 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
-         * Address: 0x0094F340 (FUN_0094F340 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
-         * Address: 0x005A1DF0 (FUN_005A1DF0 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
-         * Address: 0x005ABB00 (FUN_005ABB00 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
-         * Address: 0x007CC140 (FUN_007CC140 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
-         * Address: 0x008B6AC0 (FUN_008B6AC0 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, `SndVarTreeNodeHeadRuntimeView`).)
+         * Address: 0x00946A00 (FUN_00946A00 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, the deleted overlay).)
+         * Address: 0x00946AA0 (FUN_00946AA0 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, the deleted overlay).)
+         * Address: 0x00946B40 (FUN_00946B40 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, the deleted overlay).)
+         * Address: 0x0094F340 (FUN_0094F340 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, the deleted overlay).)
+         * Address: 0x005A1DF0 (FUN_005A1DF0 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, the deleted overlay).)
+         * Address: 0x005ABB00 (FUN_005ABB00 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, the deleted overlay).)
+         * Address: 0x007CC140 (FUN_007CC140 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, the deleted overlay).)
+         * Address: 0x008B6AC0 (FUN_008B6AC0 -- `_Allocate` for a 24-byte element (tree and list node buyers: `map<CmdId, UserCommandIssueHelper*>`'s `alloc_raw`, `SBuilderRebuildNode`, `RectHistoryNode`, `SoundTreeHeadNode`, the deleted overlay).)
          * Address: 0x00540C40 (FUN_00540C40 -- `_Allocate` for a 8-byte element (`vector<SEjectRequest>`'s `_Insert_n` grow, 0x00540330).)
          * Address: 0x00946E00 (FUN_00946E00 -- calling-convention bridge into the 24-byte `_Allocate`.)
          * Address: 0x00946E60 (FUN_00946E60 -- calling-convention bridge into the 24-byte `_Allocate`.)
@@ -1528,25 +1528,25 @@ namespace msvc8
          * Address: 0x00514640 (FUN_00514640 -- `_Allocate(1)` for that 56-byte node, the `mov ecx,1; jmp` count-1 adapter; no references in the PE, a linker-retained copy nothing runs; formerly `AllocateSingleSRuleFootprintNode` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x0094F2D0 (FUN_0094F2D0 -- `_Allocate` for a 40-byte element.)
          * Address: 0x00931C60 (FUN_00931C60 -- `_Allocate` for a 80-byte element.)
-         * Address: 0x004E4F70 (FUN_004E4F70 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x004E4FF0 (FUN_004E4FF0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x00594170 (FUN_00594170 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x005CA120 (FUN_005CA120 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x005D09C0 (FUN_005D09C0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x0067FC60 (FUN_0067FC60 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x0067FD10 (FUN_0067FD10 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x0069FAF0 (FUN_0069FAF0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x0073A940 (FUN_0073A940 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x00751AA0 (FUN_00751AA0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x00768D50 (FUN_00768D50 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x0076CD90 (FUN_0076CD90 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x007D96C0 (FUN_007D96C0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x0081BDC0 (FUN_0081BDC0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x0084A560 (FUN_0084A560 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x00868990 (FUN_00868990 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x008AFE10 (FUN_008AFE10 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x008C6330 (FUN_008C6330 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
-         * Address: 0x008D7020 (FUN_008D7020 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelRuntimeNode`, `VisionDbIntrusiveListNodeRuntime`, `SndVarRegistryEntryRuntimeView`; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x004E4F70 (FUN_004E4F70 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x004E4FF0 (FUN_004E4FF0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x00594170 (FUN_00594170 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x005CA120 (FUN_005CA120 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x005D09C0 (FUN_005D09C0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x0067FC60 (FUN_0067FC60 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x0067FD10 (FUN_0067FD10 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x0069FAF0 (FUN_0069FAF0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x0073A940 (FUN_0073A940 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x00751AA0 (FUN_00751AA0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x00768D50 (FUN_00768D50 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x0076CD90 (FUN_0076CD90 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x007D96C0 (FUN_007D96C0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x0081BDC0 (FUN_0081BDC0 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x0084A560 (FUN_0084A560 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x00868990 (FUN_00868990 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x008AFE10 (FUN_008AFE10 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x008C6330 (FUN_008C6330 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
+         * Address: 0x008D7020 (FUN_008D7020 -- `_Allocate` for a 12-byte element (list nodes: `SoundListNode`, `SSiloTypeListNode`, `DamageShieldListSentinelNode`, the deleted overlay, the deleted overlay; `vector<OccupySourceBinding>`'s grow).)
          * Address: 0x0073A080 (FUN_0073A080 -- `_Allocate(1)` for a 12-byte node, the count-1 adapter a `_Buynode` reaches.)
          * Address: 0x005D03F0 (FUN_005D03F0 -- `_Allocate(1)` for a 12-byte node, the count-1 adapter a `_Buynode` reaches.)
          * Address: 0x0067E9E0 (FUN_0067E9E0 -- `_Allocate(1)` for a 12-byte node, the count-1 adapter a `_Buynode` reaches.)
@@ -1575,26 +1575,26 @@ namespace msvc8
          * Address: 0x007CC5D0 (FUN_007CC5D0 -- `_Allocate(1)` for a 16-byte node, the count-1 adapter a `_Buynode` reaches.)
          * Address: 0x008308B0 (FUN_008308B0 -- `_Allocate(1)` for a 16-byte node, the count-1 adapter a `_Buynode` reaches.)
          * Address: 0x008B7BE0 (FUN_008B7BE0 -- `_Allocate(1)` for a 16-byte node, the count-1 adapter a `_Buynode` reaches.)
-         * Address: 0x00533710 (FUN_00533710 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x005337B0 (FUN_005337B0 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x00533850 (FUN_00533850 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x005338F0 (FUN_005338F0 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x00533990 (FUN_00533990 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x00533A30 (FUN_00533A30 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x00533AD0 (FUN_00533AD0 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x005942B0 (FUN_005942B0 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x00653A80 (FUN_00653A80 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x006B1420 (FUN_006B1420 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x00736930 (FUN_00736930 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x007BCC10 (FUN_007BCC10 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x007D4490 (FUN_007D4490 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x007F3710 (FUN_007F3710 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x0081A740 (FUN_0081A740 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x008379C0 (FUN_008379C0 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x0083C670 (FUN_0083C670 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x00890080 (FUN_00890080 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x0089B210 (FUN_0089B210 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
-         * Address: 0x008E4100 (FUN_008E4100 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, `BlueprintMapHeadNodeRuntimeView` and their sibling tree/list nodes).)
+         * Address: 0x00533710 (FUN_00533710 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x005337B0 (FUN_005337B0 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x00533850 (FUN_00533850 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x005338F0 (FUN_005338F0 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x00533990 (FUN_00533990 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x00533A30 (FUN_00533A30 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x00533AD0 (FUN_00533AD0 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x005942B0 (FUN_005942B0 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x00653A80 (FUN_00653A80 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x006B1420 (FUN_006B1420 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x00736930 (FUN_00736930 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x007BCC10 (FUN_007BCC10 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x007D4490 (FUN_007D4490 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x007F3710 (FUN_007F3710 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x0081A740 (FUN_0081A740 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x008379C0 (FUN_008379C0 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x0083C670 (FUN_0083C670 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x00890080 (FUN_00890080 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x0089B210 (FUN_0089B210 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
+         * Address: 0x008E4100 (FUN_008E4100 -- `_Allocate` for a 48-byte element (`CartographicDecalNode`, `SkyDomeDecalUploadNode`, the deleted overlay and their sibling tree/list nodes).)
          * Address: 0x007366E0 (FUN_007366E0 -- `_Allocate(1)` for a 48-byte node, the count-1 adapter a `_Buynode` reaches.)
          * Address: 0x0089ABF0 (FUN_0089ABF0 -- `_Allocate(1)` for a 48-byte node, the count-1 adapter a `_Buynode` reaches.)
          * Address: 0x0088FCC0 (FUN_0088FCC0 -- `_Allocate(1)` for a 48-byte node, the count-1 adapter a `_Buynode` reaches.)
@@ -2033,7 +2033,7 @@ namespace msvc8
          *
          * It had been transcribed into
          * `moho/resource/blueprints/RUnitBlueprint.cpp` as a `CopyOccupyRects`
-         * free function driving two `AsVectorRuntimeView` reach-ins, with no
+         * free function driving two `AsVector` reach-ins, with no
          * call site anywhere in the tree.
          * Address: 0x007529A0 (FUN_007529A0 -- copy constructor for an 8-byte element (buy at 0x0074D800); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00752BA0 (FUN_00752BA0 -- copy constructor for the 12-byte `{dword, dword, shared-count control}` element of `SSyncData` (buy at 0x0074D8C0); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
@@ -2308,7 +2308,7 @@ namespace msvc8
          * `AsDeviceD3D9Runtime(device).adapters.push_back(adapter);` in
          * `D3D9Interfaces.cpp`, where `adapters` is
          * `DeviceD3D9BackendObject::adapters` /
-         * `DeviceD3D9RuntimeView::adapters`, both
+         * `DeviceD3D9::adapters`, both
          * `msvc8::vector<gpg::gal::AdapterD3D9>`. Note:
          * `msvc8::vector<AdapterD3D9>::copy_or_move_assign` itself does
          * *not* appear in that object file -- confirming this template's
@@ -2495,7 +2495,7 @@ namespace msvc8
          * Address: 0x0047DD30 (FUN_0047DD30 -- `end()` for the 8-byte `moho::SBandwidthUsageSample` series vector; zero callers, unreachable; formerly `BandwidthSampleEndAlias2` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047DFF0 (FUN_0047DFF0 -- `_Vector_iterator` base + index arithmetic for the `moho::SSendStamp` send-stamp vector (this tree's iterators are raw pointers); zero callers, unreachable; formerly `StampPointerFromVectorBase` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047E020 (FUN_0047E020 -- `_Vector_iterator` base + index arithmetic for the 8-byte `moho::SBandwidthUsageSample` series vector (this tree's iterators are raw pointers); zero callers, unreachable; formerly `BandwidthPointerFromVectorBase` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005046C0 (FUN_005046C0 -- `begin()` through the hidden iterator slot (`first_` at +0x04) for the spatial database's `msvc8::vector<moho::SpatialShard<T>*>` / `msvc8::vector<moho::SpatialShardData<T>*>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot04LaneA` over `PointerSlot04RuntimeView` in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
+         * Address: 0x005046C0 (FUN_005046C0 -- `begin()` through the hidden iterator slot (`first_` at +0x04) for the spatial database's `msvc8::vector<moho::SpatialShard<T>*>` / `msvc8::vector<moho::SpatialShardData<T>*>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot04LaneA` over a deleted overlay in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
          * Address: 0x005046D0 (FUN_005046D0 -- the other of that pair of `begin()` copies; zero callers.)
          */
         T* begin() const noexcept { return first_; }
@@ -2545,12 +2545,12 @@ namespace msvc8
          * Address: 0x00497200 (FUN_00497200 -- `end()` for `msvc8::vector<SWorldParticle>`; zero callers.)
          * Address: 0x004973A0 (FUN_004973A0 -- `end()` for `msvc8::vector<SWorldTrail>`; zero callers.)
          * Address: 0x00495940 (FUN_00495940 -- `end()` for `msvc8::vector<SWorldBeam>`; zero callers.)
-         * Address: 0x005046E0 (FUN_005046E0 -- `end()` through the hidden iterator slot (`last_` at +0x08) for the spatial database's `msvc8::vector<moho::SpatialShard<T>*>` / `msvc8::vector<moho::SpatialShardData<T>*>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot08LaneA` over `PointerSlot08RuntimeView` in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
+         * Address: 0x005046E0 (FUN_005046E0 -- `end()` through the hidden iterator slot (`last_` at +0x08) for the spatial database's `msvc8::vector<moho::SpatialShard<T>*>` / `msvc8::vector<moho::SpatialShardData<T>*>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot08LaneA` over a deleted overlay in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
          * Address: 0x005046F0 (FUN_005046F0 -- the other of that pair of `end()` copies; zero callers.)
          */
         T* end() const noexcept { return last_; }
         /**
-         * Address: 0x0077A060 (FUN_0077A060 -- `empty()` for `msvc8::vector<moho::SDecalInfo>` (null-`first_` guard, then `last_ == first_`). Zero callers, no xrefs, unreachable. Formerly `IsSDecalInfoVectorRuntimeEmpty` over a hand-rolled `SDecalInfoVectorRuntimeView` in moho/render/CDecalTypes.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0077A060 (FUN_0077A060 -- `empty()` for `msvc8::vector<moho::SDecalInfo>` (null-`first_` guard, then `last_ == first_`). Zero callers, no xrefs, unreachable. Formerly the deleted overlay over a hand-rolled the deleted overlay in moho/render/CDecalTypes.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00507980 (FUN_00507980 -- `empty()` for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `IsDelayedSubVizLaneSpanEmpty` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x00836E80 (FUN_00836E80 -- `vector<T>::empty()` for a 48-byte element (`_Myfirst == 0 || size() == 0`; `RebuildFactoryQueueDisplaySnapshot` 0x00835DF0 reads it); callers 0x00835DF0; formerly `IsElement48RangeEmpty` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          * Address: 0x008553A0 (FUN_008553A0 -- `vector<T>::empty()` for a 204-byte element; callers 0x008599D0; formerly `IsElement204VectorEmptyRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
@@ -2650,7 +2650,7 @@ namespace msvc8
          * Address: 0x004A3300 (FUN_004A3300 -- iterator `==` for `msvc8::vector<std::uint8_t, false>` (the registry-path byte vector; these are the iterator and range steps its insert and resize compile to); zero callers, unreachable; formerly `AreUint32SlotsEqual` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004A32A0 (FUN_004A32A0 -- an iterator's index slot assigned for `msvc8::vector<std::uint8_t, false>` (the registry-path byte vector; these are the iterator and range steps its insert and resize compile to); zero callers, unreachable; formerly `AssignUint32Slot` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004A32E0 (FUN_004A32E0 -- a second emission of that slot assignment for `msvc8::vector<std::uint8_t, false>` (the registry-path byte vector; these are the iterator and range steps its insert and resize compile to); zero callers, unreachable; formerly `AssignUint32SlotDuplicate` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x00889FE0 (FUN_00889FE0 -- `size()` for a 0x4C-byte element: `(last_ - first_) / 76` with a null-`first_` guard returning 0; one caller, 0x008895A0; formerly `CountStride76RecordsRuntime` in moho/sim/CWldMap.cpp over a `Stride76RangeRuntimeView` stand-in (RULE ONE), removed 2026-09-18.)
+         * Address: 0x00889FE0 (FUN_00889FE0 -- `size()` for a 0x4C-byte element: `(last_ - first_) / 76` with a null-`first_` guard returning 0; one caller, 0x008895A0; formerly the deleted overlay in moho/sim/CWldMap.cpp over a deleted overlay stand-in (RULE ONE), removed 2026-09-18.)
          * Address: 0x008E8400 (FUN_008E8400 -- `size()`, `(last - first) / 60` through `0x88888889 >> 5`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x0093FFA5, 0x00942C64, 0x00942CBB; formerly `EffectMacroCount` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x008E83A0 (FUN_008E83A0 -- `size()`, `(last - first) / 112` (`0x92492493`, `add`, `sar 6`) with the null-`first` guard, for `msvc8::vector<gpg::gal::AdapterD3D9>` (`DeviceD3D9::mAdapters` at +0x28, the 0x70 element); callers 0x008F1992 (`_Insert_n` 0x008F1890); formerly `CountAdapterVectorElements` over an `AdapterVectorCountRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x004F7070 (FUN_004F7070 -- `size()` specialised to `moho::managedWindows` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>`): the global's `first_`/`last_` (0x010A9B94/0x010A9B98) read directly, `(last_ - first_) >> 3` behind the null-`first_` guard; caller 0x004F8D63 (the registry's `insert`, 0x004F8CA0). Formerly anchored in moho/app/WxRuntimeTypes.cpp.)
@@ -2727,7 +2727,7 @@ namespace msvc8
          * (`FUN_0064E120`), `insert` (`FUN_0064E2F0`) and `_Insert_n`
          * (`FUN_0064E490`) already cited on this file. Zero callers,
          * unreachable; formerly `CountStride72Elements` in
-         * moho/debug/RDebugGrid.cpp over a `Stride72RangeRuntimeView`
+         * moho/debug/RDebugGrid.cpp over a deleted overlay
          * stand-in whose `beginAddress`/`endAddress` lanes were this
          * container's `first_`/`end_` (RULE ONE), removed 2026-09-22.)
          */
@@ -2736,7 +2736,7 @@ namespace msvc8
         }
         /**
          * Address: 0x00549090 (FUN_00549090 -- out-of-line `operator[]` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x004A4870 (FUN_004A4870 -- out-of-line `&first_[i]` for the 20-byte `gpg::RField` (`msvc8::vector<RField>`, `RType::fields_`): `lea eax,[eax+eax*4]; lea eax,[ecx+eax*4]`, `ret 4`; zero callers, no xrefs, and byte-identical twins at 0x008D8870/0x0094EAA0 that /OPT:ICF did not fold: a linker-retained copy nothing runs. Formerly `ResolveFieldVectorElement` over `RFieldVectorRuntimeView` in moho/sim/Sim.cpp (RULE THREE), removed 2026-09-22.)
+         * Address: 0x004A4870 (FUN_004A4870 -- out-of-line `&first_[i]` for the 20-byte `gpg::RField` (`msvc8::vector<RField>`, `RType::fields_`): `lea eax,[eax+eax*4]; lea eax,[ecx+eax*4]`, `ret 4`; zero callers, no xrefs, and byte-identical twins at 0x008D8870/0x0094EAA0 that /OPT:ICF did not fold: a linker-retained copy nothing runs. Formerly `ResolveFieldVectorElement` over a deleted overlay in moho/sim/Sim.cpp (RULE THREE), removed 2026-09-22.)
          * Address: 0x00547730 (FUN_00547730 -- out-of-line `&first_[i]` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00547740 (FUN_00547740 -- out-of-line `&first_[i]` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00507F70 (FUN_00507F70 -- `operator[]` (`first_ + index`) for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `DelayedSubVizLanePointerAt` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
@@ -2754,7 +2754,7 @@ namespace msvc8
          * `~vector` (`FUN_00740700`) and its nine `uninit_copy_n` emissions
          * already cited on this file. Zero callers, unreachable; formerly
          * `ResolveStride712ElementAddress` in moho/debug/RDebugGrid.cpp over
-         * a `Stride712CursorRuntimeView` stand-in whose `baseAddress` lane
+         * a deleted overlay stand-in whose `baseAddress` lane
          * was this container's `first_` (RULE ONE), removed 2026-09-22.)
          * Address: 0x0049BAF0 (FUN_0049BAF0 -- a second copy of that subscript; zero callers.)
          */
@@ -3289,12 +3289,16 @@ namespace msvc8
          * Address: 0x0054CB80 (FUN_0054CB80 -- `resize(n, value)` -- the shrink is a bare `mLast` rebase because the element is trivially destructible for `msvc8::vector<moho::SAniSkelBoneNameIndex>` (`CAniSkel::mBoneNameToIndex`); callers 0x0054A0A0, 0x0054A390, 0x0054C190; formerly `ResizeAniSkelBoneNameIndexVectorWithFill` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004A2FF0 (FUN_004A2FF0 -- `resize(n, value)` for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); callers 0x004A1F10, 0x004A2D40, 0x004A2FE0; formerly `ResizeLegacyByteVectorStorage` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00543910 (FUN_00543910 -- `resize(n, value)` for `msvc8::vector<moho::ArmyLaunchInfo>` (`LaunchInfoNew::mArmies`); callers 0x005430E0, 0x00543310, 0x008765E0; formerly `ResizeArmyLaunchInfoVectorWithFill` in moho/misc/LaunchInfoBase.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00580080 (FUN_00580080 -- `resize(n, value)` for `msvc8::vector<moho::SPointVector>`
+         * (0x18 two-`Vector3f` element, zero-filled on growth); caller 0x0057E0F0
+         * (`gpg::RVectorType_SPointVector::SetCount`'s `storage->resize(count, ZeroSPointVector())`);
+         * formerly `ResizeSPointVectorStorageToCount` in moho/ai/SPointVectorTypeInfo.cpp (RULE ONE), removed 2026-10-03.)
          * Address: 0x005C5DF0 (FUN_005C5DF0 -- `resize(n, value)` -- erase the tail when shrinking, fill with the value when growing for `msvc8::vector<moho::ReconBlip*>` (`CAiReconDBImpl::mBblips`, the by-index blip table); callers 0x005C05A0, 0x005C0C40, 0x005C4230; formerly `ResizeBlipPointerVector` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x005C7780 (FUN_005C7780 -- that resize's grow half, filling the new slots with null for `msvc8::vector<moho::ReconBlip*>` (`CAiReconDBImpl::mBblips`, the by-index blip table); callers 0x005C05A0, 0x005C0C40, 0x005C4AB0; formerly `GrowBlipPointerVector` in moho/ai/CAiReconDBImpl.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00516410 (FUN_00516410 -- `resize(n, value)` -- grow through `_Insert_n` 0x00516970, shrink through the tail erase 0x00516910 (0x0051649C) for `msvc8::vector<moho::REmitterCurveKey>` (`REmitterBlueprintCurve::Keys`; the element is a polymorphic 0x10 `{vptr, X, Y, Z}`, so every element step routes through its virtual destructor or its copy constructor); callers 0x00515D20, 0x00515DE0; formerly `ResizeEmitterCurveKeyVectorWithFill` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00519A10 (FUN_00519A10 -- `resize(n, value)` -- grow through `_Insert_n` 0x00519D90, shrink through the tail `erase` 0x00519D40, then destroy the caller's temporary (0x00519800). Reached from `RVectorType_RMeshBlueprintLOD::SetCount` 0x005193D0, which builds that temporary in its own 0xCC-byte frame: `resize(n)` for `msvc8::vector<moho::RMeshBlueprintLOD>` (`RMeshBlueprint::mLods`; the element is 0xCC and owns seven legacy strings, so every element step routes through its constructor 0x005183D0 or its destructor 0x00519800); callers 0x005193D0, 0x00519540; formerly `ResizeMeshBlueprintLodVectorWithFill` in moho/resource/blueprints/RMeshBlueprintLODTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x008922F0 (FUN_008922F0 -- `resize(n, value)` -- reserve at 1.5x, copy-construct the appended slots from the caller's default entry, or destroy the tail when shrinking; the guard is `0xFFFFFFFF / 0x38`. Reached from `CWldProps::Load` 0x008918E0 for `msvc8::vector<moho::CWldPropEntry>` (`CWldProps` is that head and nothing else; the 0x38 element leads with an 0x1C blueprint-path string, so `max_size()` is 0x04924924); callers 0x008918E0, 0x00892280; formerly `ResizeWldPropsEntries` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x0074D930 (FUN_0074D930 -- `resize(n, value)` for `msvc8::vector<gpg::Rect2i>`: `_Insert_n` 0x0044BB30 when growing, `erase` 0x004493B0 when shrinking, the value passed by value in four stack dwords. Reached twice from `Sim::SerMapData(ReadArchive&)` 0x00745120 (`mLoadedMapRects`, `mCachedMapRects`); formerly `Rect2VectorResizeDefault` over `Rect2iVectorRuntimeView` in moho/sim/Sim.cpp (RULE THREE), removed 2026-09-22.)
+         * Address: 0x0074D930 (FUN_0074D930 -- `resize(n, value)` for `msvc8::vector<gpg::Rect2i>`: `_Insert_n` 0x0044BB30 when growing, `erase` 0x004493B0 when shrinking, the value passed by value in four stack dwords. Reached twice from `Sim::SerMapData(ReadArchive&)` 0x00745120 (`mLoadedMapRects`, `mCachedMapRects`); formerly `Rect2VectorResizeDefault` over a deleted overlay in moho/sim/Sim.cpp (RULE THREE), removed 2026-09-22.)
          * Address: 0x0074BFA0 (FUN_0074BFA0 -- a stdcall adapter that forwards to 0x0074D930 with a zero rectangle; zero callers, no references, a linker-retained copy nothing runs.)
          * Address: 0x005DC810 (FUN_005DC810 -- `resize(n, value)` -- erase the tail when shrinking, append null slots when growing. Reached from that instantiation's `RVectorType::SetCount` for `msvc8::vector<moho::UnitWeapon*>` (the reflected weapon-pointer vector); callers 0x005D85B0, 0x005DBA60, 0x005DBD41; formerly `ResizeUnitWeaponPointerVectorAndReturnBegin` in moho/ai/IAiAttacker.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x005DC9B0 (FUN_005DC9B0 -- `resize(n, value)` for the task pointers -- same shape, growing through `_Insert_n` 0x005DD570. Reached from `RVectorType_CAcquireTargetTask_P::SetCount` for `msvc8::vector<moho::CAcquireTargetTask*>` (the reflected acquire-target-task vector); callers 0x005D85B0, 0x005DBC10, 0x005DBE41; formerly `ResizeCAcquireTargetTaskPointerVector` in moho/ai/IAiAttacker.cpp (RULE ONE), removed 2026-09-11.)
@@ -3416,7 +3420,7 @@ namespace msvc8
          * Address: 0x0078A270 (FUN_0078A270 -- `_Tidy` for a trivially destructible element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007C9310 (FUN_007C9310 -- `_Tidy` for a trivially destructible element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00583B40 (FUN_00583B40 -- `_Tidy` of a `{{count, vector}}` pair inside `CArmyImpl`: zeroes the leading count word, frees the block and nulls the three pointers.)
-         * Address: 0x0055FE70 (FUN_0055FE70 -- `_Tidy` for `msvc8::vector<std::uint32_t>` (`SArmyVectorWithMeta::mWords`): free the block, null the triple; the catch arm of the copy constructor as instantiated by `SSTIArmyVariableData`'s copy constructor 0x0055FF80 and by 0x00764A80 / 0x00764CF0 in Sim.cpp. Formerly `ResetLegacyWordVectorStorage` over a `LegacyWordVectorRuntimeView` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0055FE70 (FUN_0055FE70 -- `_Tidy` for `msvc8::vector<std::uint32_t>` (`SArmyVectorWithMeta::mWords`): free the block, null the triple; the catch arm of the copy constructor as instantiated by `SSTIArmyVariableData`'s copy constructor 0x0055FF80 and by 0x00764A80 / 0x00764CF0 in Sim.cpp. Formerly `ResetLegacyWordVectorStorage` over a deleted overlay in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00580D10 (FUN_00580D10 -- the destroy step of `_Tidy` for `msvc8::vector<SAttackVectorGridRow>` (forwards to `_Destroy_range` 0x005837F0); reached only from the ICF-folded 0x00580D30. Was cited on the same removed CAiBrain.cpp orphan.)
          * Address: 0x005A07A0 (FUN_005A07A0 -- `_Tidy` for `msvc8::vector<moho::WeakPtr<CUnitCommand>>`: `_Destroy_range` 0x005A2270, free, null the triple; the catch arm of the copy constructor 0x005DB610. Formerly `ResetWeakPtrCUnitCommandVectorStorage` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
          * Address: 0x00508050 (FUN_00508050 -- `_Tidy` for `msvc8::vector<moho::SDelayedSubVizInfo>`: free, null the triple; `CIntelGrid::~CIntelGrid` 0x00508D80's member destructor and `operator=` 0x00509010's grow arm. Formerly `ReleaseDelayedSubVizVectorStorage` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
@@ -3577,7 +3581,7 @@ namespace msvc8
          * QueueEntityVariableUpdate (SimDriver.cpp), called from
          * Entity::SyncInterface)
          * Address: 0x005DBD90 (FUN_005DBD90, msvc8::vector<Moho::UnitWeapon*>::push_back
-         * for `CAiAttackerImplRuntimeView::mWeapons` — fast path appends the raw
+         * for `CAiAttackerImpl::mWeapons` — fast path appends the raw
          * pointer in place; capacity-full path tail-calls the insert(end(),1,value)
          * grow body `_Insert_n` (FUN_005DD120, already cited above). Emitted via
          * view->mWeapons.push_back(weapon) in CAiAttackerImpl::CreateWeapon
@@ -3996,7 +4000,7 @@ namespace msvc8
          * there would add a free the binary never performs.
          *
          * Named here so the operation has a verb, instead of call sites
-         * reaching through `AsVectorRuntimeView` to write the pointers by hand.
+         * reaching through `AsVector` to write the pointers by hand.
          * Address: 0x00442B50 (FUN_00442B50 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
          * Address: 0x00443090 (FUN_00443090 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
          * Address: 0x00443290 (FUN_00443290 -- null the three storage pointers and leave the proxy alone, VC8's `_Buy(0)` prologue emitted on its own.)
@@ -4048,6 +4052,7 @@ namespace msvc8
          * Address: 0x00626E10 (FUN_00626E10 -- `push_back` for `msvc8::vector<moho::SPickUpInfo>`: `_Ufill` of one slot when capacity remains, else `insert(end(), value)` 0x00627340; callers 0x00625110 (`CUnitLoadUnits::DoTask`), 0x006270E0 (`SerLoad`); formerly `PushBackSPickUpInfoWithRelink` in moho/ai/SPickUpInfoVectorReflection.cpp, removed 2026-09-30.)
          * Address: 0x007AEB10 (FUN_007AEB10 -- `push_back` for `msvc8::vector<moho::GeomCamera3>`; caller `CAM_GetAllCameras` 0x007AAD20; formerly in moho/render/camera/GeomCamera3.cpp (RULE ONE), removed 2026-09-30 as `AppendGeomCameraViewAndReturnEnd`.)
          * Address: 0x00733480 (FUN_00733480 -- `push_back` for `msvc8::vector<PlatoonUnitSearchEntry>` (8-byte `{Unit*, float}`, `cfunc_CPlatoonFormPlatoonL`'s nearest-first candidates): `uninit_fill_n` 0x00733C40 of one slot when there is room, else `insert(end, v)` 0x007336C0; caller 0x0072D8F0; formerly `AppendPlatoonUnitSearchEntry` in moho/sim/CPlatoon.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x00879070 (FUN_00879070 -- `push_back` for `msvc8::vector<Moho::CWldTerrainDecal*>` (`Moho::CDecalManager::mDecals`): fill-in-place when a slot is spare, else `_Insert_n` 0x0087A830 (cited on `insert`); emitted from `mDecals.push_back(decal)` in `CDecalManager::AddSplat` (CWldSplat.cpp), with the same append inlined into `LoadDecal`/`NewSplat` at 0x008780A0; formerly kept alive by the per-T helper AppendDecal (RULE ONE), removed 2026-10-03.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -4585,23 +4590,21 @@ namespace msvc8
          * push_back is insert(end(),1,value) on the capacity-full path — pos is
          * _Mylast=end() (append, verified), so this per-T 0x20-byte symbol is emitted).
          * Address: 0x0087A830 (FUN_0087A830, msvc8::vector<Moho::CWldTerrainDecal*>::_Insert_n
-         * grow body for Moho::CDecalManager::mDecals @+0x10; the recovered helper
-         * InsertNCopiesCWldTerrainDecalPtrVector (CWldSplat.cpp) invokes
-         * storage.insert(begin()+offset, count, value) by name, and
-         * CDecalManager::LoadDecal / NewSplat route their mDecals append through the
-         * push_back-shape helper AppendDecal which calls it on the capacity-full path
-         * (MSVC8's push_back is insert(end(),1,value) when full), so this per-T 4-byte
-         * pointer symbol is emitted).
+         * grow body for Moho::CDecalManager::mDecals @+0x10; emitted from
+         * CDecalManager::LoadDecal / NewSplat's `mDecals.push_back(decal)` by-name
+         * call (CWldSplat.cpp) — MSVC8's push_back is insert(end(),1,value) when
+         * full, so this per-T 4-byte pointer symbol is emitted. Formerly kept alive
+         * by the per-T helpers InsertNCopiesCWldTerrainDecalPtrVector / AppendDecal
+         * (RULE ONE), removed 2026-10-03.)
          * Address: 0x0087BB40 (FUN_0087BB40, msvc8::vector<Moho::CWldSplat*>::_Insert_n
-         * grow body for Moho::CDecalManager::mSplats @+0x48; the recovered helper
-         * InsertNCopiesCWldSplatPtrVector (CWldSplat.cpp) invokes
-         * storage.insert(begin()+offset, count, value) by name, and
-         * CDecalManager::NewSplat routes its mSplats append through the
-         * push_back-shape helper AppendSplat which calls it on the capacity-full path
-         * (MSVC8's push_back is insert(end(),1,value) when full), so this per-T 4-byte
-         * pointer symbol is emitted. Byte-identical body to the FUN_0087A830 sibling —
-         * both are 4-byte trivially-copyable pointer instantiations sharing this
-         * canonical template method).
+         * grow body for Moho::CDecalManager::mSplats @+0x48; emitted from
+         * CDecalManager::NewSplat's `mSplats.push_back(splat)` by-name call
+         * (CWldSplat.cpp) — MSVC8's push_back is insert(end(),1,value) when full,
+         * so this per-T 4-byte pointer symbol is emitted. Byte-identical body to
+         * the FUN_0087A830 sibling — both are 4-byte trivially-copyable pointer
+         * instantiations sharing this canonical template method. Formerly kept
+         * alive by the per-T helpers InsertNCopiesCWldSplatPtrVector / AppendSplat
+         * (RULE ONE), removed 2026-10-03.)
          * Address: 0x00813900 (FUN_00813900, msvc8::vector<boost::shared_ptr<moho::ShoreCell>>::_Insert_n
          * grow body for Moho::Shoreline::mCells; the recovered caller
          * AppendShoreCellRef (Shoreline.cpp) invokes shorelineCells.push_back(cell)
@@ -7003,7 +7006,7 @@ namespace msvc8
          * `Moho::Clutter::Surface::mSeeds`'s reallocation teardown step.
          * Formerly modeled as a standalone free function in
          * `moho/containers/LegacyContainerFillLanes.cpp`
-         * (`DestroyVirtualRange16`, over a raw `VirtualDtor16RuntimeView`)
+         * (`DestroyVirtualRange16`, over a raw the deleted overlay)
          * with no source-level caller anywhere in `src/sdk/**` -- collapsed
          * into this template instantiation, RULE ONE.)
          * Address: 0x0088A3E0 (FUN_0088A3E0, `msvc8::vector<Moho::
@@ -7029,7 +7032,7 @@ namespace msvc8
          * `WavePattern::mWaves`'s reallocation teardown step. Formerly
          * modeled as a standalone free function in
          * `moho/containers/LegacyContainerFillLanes.cpp`
-         * (`DestroyVirtualRange136`, over a raw `VirtualDtor136RuntimeView`)
+         * (`DestroyVirtualRange136`, over a raw the deleted overlay)
          * with no source-level caller anywhere in `src/sdk/**` -- collapsed
          * into this template instantiation, RULE ONE.)
          * Address: 0x005CC280 (FUN_005CC280, `msvc8::vector<Moho::
@@ -7078,7 +7081,7 @@ namespace msvc8
          * immediately follows an unrelated tiny leaf, e.g. the `max_size`
          * constant-return body at 0x005C85B0) -- not independently cited
          * here pending that attribution. Formerly modeled as a standalone
-         * `Stride28SharedOwnerElementRuntimeView`/
+         * the deleted overlay/
          * `ReleaseSharedOwnerRangeStride28` pair in
          * `moho/containers/LegacyContainerFillLanes.cpp` with no
          * source-level caller anywhere in `src/sdk/**` -- collapsed into
@@ -7314,7 +7317,7 @@ namespace msvc8
          * Address: 0x00510980 (FUN_00510980 -- `destroy_range` for `msvc8::vector<moho::REmitterCurveKey>`
          * (`REmitterBlueprintCurve::Keys`; the 0x10 element is a reflected object, so each step is its
          * deleting destructor through vtable +0x08 with flag 0); first in ESI, last in EDI; callers
-         * 0x00516310 (`reserve`), 0x00516970 (`insert`); formerly `LegacyInvokeVirtualSlot8AcrossStride16RangeRuntimeLaneAlpha` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
+         * 0x00516310 (`reserve`), 0x00516970 (`insert`); formerly the deleted overlay in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
          * Address: 0x004331C0 (FUN_004331C0 -- `_Destroy` through the element's virtual destructor (`push 0; call [vtbl]`) at stride 0x3C, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x004314F1, 0x004322A1, 0x00940045, 0x00940086, 0x00940150, 0x00942C01, 0x00942CA8. It was marked `skip` as a non-engine STL helper; it is this engine instantiation.)
          * Address: 0x004FADE0 (FUN_004FADE0 -- `destroy_range` for `moho::managedWindows` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>`): each slot's `~WeakPtr` unlinks it from its dialog's owner chain; `first` in ECX, `last` in EDX; callers 0x004F8195 (the destructor body 0x004F8180), 0x004F8E1C, 0x004F8E5B and 0x004F8EDC (`insert`, 0x004F8CA0), 0x004F8C95, 0x004FA6B5. Formerly anchored in moho/app/WinApp.cpp.)
          * Address: 0x004FAED0 (FUN_004FAED0 -- the same for `moho::managedFrames` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`); callers 0x004F82E5 (0x004F82D0), 0x004F91CC, 0x004F920B and 0x004F928C (`insert`, 0x004F9050), 0x004F9045, 0x004FA775. Formerly anchored in moho/app/WinApp.cpp.)
@@ -8390,6 +8393,60 @@ namespace msvc8
          * Address: 0x005410C0 (FUN_005410C0 -- a third such adapter; no decoded caller.)
          * Address: 0x0054FF00 (FUN_0054FF00 -- `uninit_copy_n` for `msvc8::vector<moho::SAniSkelBoneNameIndex>`
          * (8-byte element); callers 0x0054D440 (`_Insert_n`), 0x0054E140, 0x0054E9B0, 0x0054F730; formerly `LegacyCopyTwoDwordPairRangeIntoOutRuntimeSlot2` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
+         * Address: 0x00584CC0 (FUN_00584CC0 -- `uninit_copy_n` for `msvc8::vector<moho::SPointVector>`
+         * (0x18 two-`Vector3f` element; placement copy behind a null test on the destination);
+         * callers 0x0057FF70 (`reserve`) and the three adapters below; formerly
+         * `CopySPointVectorRangeNullable` in moho/ai/SPointVectorTypeInfo.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x00581E00 (FUN_00581E00 -- an alias lane of that copy with the same
+         * null-tested shape; formerly cited on `CopySPointVectorRangeNullable` (RULE ONE), removed 2026-10-03.)
+         * Address: 0x005841D0 (FUN_005841D0 -- a register-order adapter over that copy;
+         * zero decoded callers, unreachable; formerly `CopySPointVectorRangeNullableRegisterAdapterA` in moho/ai/SPointVectorTypeInfo.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x005848C0 (FUN_005848C0 -- a second such adapter; zero decoded callers,
+         * unreachable; formerly `CopySPointVectorRangeNullableRegisterAdapterB` in moho/ai/SPointVectorTypeInfo.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x00582140 (FUN_00582140 -- the source-first argument-order adapter over
+         * that copy; zero decoded callers, unreachable; formerly `CopySPointVectorRangeNullableSourceFirstAdapter` in moho/ai/SPointVectorTypeInfo.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x00583670 (FUN_00583670 -- a second source-first adapter; zero decoded
+         * callers, unreachable; formerly cited on `CopySPointVectorRangeNullableSourceFirstAdapter` (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054D880/0x0054D890/0x0054DB10/0x0054DB20/0x0054DD20/0x0054DD40/
+         * 0x0054DD50/0x0054DD60 (FUN_0054D880..FUN_0054DD60 -- the tiny pointer-lane
+         * store/select/advance/count emissions `vector<SAniSkelBone>`/`vector<SAniSkelBoneNameIndex>`
+         * `_Insert_n` (FUN_0054D440, cited on `insert`) inlines at each caller: store one
+         * element pointer, select a pointer, advance a slot by N elements, count the dword
+         * span between two pointers. Zero real callers of their own -- iterator arithmetic
+         * COMDATs, dead-twin class like `front()` above; formerly
+         * `IsAniSkelBoneNameIndexPointerLaneNull`/`SelectAniSkelBone*PointerAt`/
+         * `StoreAniSkelBone*Pointer`/`AdvanceAniSkelBone*PointerLane`/`CountDwordPointerSpanSecondary`
+         * in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054DB30 (FUN_0054DB30 -- the single-element nullable copy lane
+         * (`_Construct`-shaped) for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`);
+         * formerly `CopyAniSkelBone` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054ECD0 (FUN_0054ECD0 -- the non-null single-element copy used by the
+         * forward/backward range walks for `msvc8::vector<moho::SAniSkelBone>`; formerly
+         * `CopyAniSkelBoneNonNull` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054EC00 (FUN_0054EC00 -- `uninit_fill_n`-shaped counted nullable fill for
+         * `msvc8::vector<moho::SAniSkelBone>`; formerly `CopyAniSkelBoneCountedNullable` in
+         * moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054E000 (FUN_0054E000 -- the forward `_Uninit_copy` walk for
+         * `msvc8::vector<moho::SAniSkelBone>`; formerly `CopyAniSkelBoneRangeForwardNonNull`
+         * in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054E090 (FUN_0054E090 -- the backward `copy_backward` walk for
+         * `msvc8::vector<moho::SAniSkelBone>`; formerly `CopyAniSkelBoneRangeBackwardNonNull`
+         * in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054DC60 (FUN_0054DC60 -- the `_Ufill` count-only bridge (null source,
+         * advance by `count`) for `msvc8::vector<moho::SAniSkelBone>`; formerly
+         * `AdvanceAniSkelBoneAfterCountedNullFill` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054FED0 (FUN_0054FED0 -- the half-open `_Uninit_copy` with null-tested
+         * destination for `msvc8::vector<moho::SAniSkelBone>`; formerly `CopyAniSkelBoneRange`
+         * in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054E8E0/0x0054F6E0/0x0054FB30 (FUN_0054E8E0/FUN_0054F6E0/FUN_0054FB30 --
+         * register-order bridges over that bone range copy; zero decoded callers, unreachable;
+         * formerly `CopyAniSkelBoneRangeRegisterAdapterLaneB` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054FB50 (FUN_0054FB50 -- a third register-order bridge, this one over the
+         * `SAniSkelBoneNameIndex` copy already cited at FUN_0054FF00 above; zero decoded callers,
+         * unreachable; formerly `CopyAniSkelBoneNameIndexRangeRegisterAdapter` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
+         * Address: 0x0054E040 (FUN_0054E040 -- a source-first register adapter over the bone
+         * range copy; zero decoded callers, unreachable; formerly `CopyAniSkelBoneRangeRegisterAdapter`
+         * in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-10-03.)
          * Address: 0x009428F0 (FUN_009428F0 -- `_Ucopy`, the member bridge into 0x0093F810, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x00942C8C, 0x00942CDA; formerly `UninitializedCopyEffectMacroRange` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00941C00 (FUN_00941C00 -- `_Uninit_copy`: placement copy-construct each `shared_ptr` (retain), skipping null destinations, for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); callers 0x00941CA1, 0x00941CF7, 0x00941D62, 0x0094242E, 0x009425A5, 0x009425D6; formerly `CopyAssignEffectTechniqueSharedRefRange`, named as an assignment, in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00941C80 (FUN_00941C80 -- a tag-pushing bridge into it for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); zero callers, unreachable; formerly `CopyAssignEffectTechniqueSharedRefRangeDispatchLaneA` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
@@ -9235,22 +9292,21 @@ namespace msvc8
          * CWldTerrainDecal*>::uninit_fill_n` for the 4-byte pointer element
          * (`Moho::CDecalManager::mDecals` @+0x10). Reached from this
          * instantiation's `_Insert_n` grow body `FUN_0087A830` (cited
-         * above); emitted via the recovered helper
-         * `InsertNCopiesCWldTerrainDecalPtrVector` (CWldSplat.cpp) and via
-         * `AppendDecal` on `CDecalManager::LoadDecal`/`NewSplat`'s
-         * capacity-full path.)
+         * above); emitted via `mDecals.push_back(decal)` in
+         * `CDecalManager::LoadDecal`/`NewSplat` (CWldSplat.cpp).)
          * Address: 0x00879ED0 (FUN_00879ED0, `msvc8::vector<Moho::
          * CDecalGroup*>::uninit_fill_n` for the 4-byte pointer element
          * (`Moho::CDecalManager::mDecalGroups`). Reached from this
          * instantiation's `_Insert_n` grow body `FUN_0087B1C0` (cited above
-         * on `uninit_move_n`).)
+         * on `uninit_move_n`), itself emitted from
+         * `mDecalGroups.push_back(group)` in `CDecalManager::LoadDecalGroup`
+         * (CWldSplat.cpp).)
          * Address: 0x0087A310 (FUN_0087A310, `msvc8::vector<Moho::
          * CWldSplat*>::uninit_fill_n` for the 4-byte pointer element
          * (`Moho::CDecalManager::mSplats` @+0x48). Reached from this
          * instantiation's `_Insert_n` grow body `FUN_0087BB40` (cited
-         * above); emitted via the recovered helper
-         * `InsertNCopiesCWldSplatPtrVector` (CWldSplat.cpp) and via
-         * `AppendSplat` on `CDecalManager::NewSplat`'s capacity-full path.)
+         * above); emitted via `mSplats.push_back(splat)` in
+         * `CDecalManager::NewSplat` (CWldSplat.cpp).)
          * Address: 0x0088A2E0 (FUN_0088A2E0, `msvc8::vector<Moho::
          * WaveGenerator*>::uninit_fill_n` for the 4-byte pointer element.
          * Reached from this instantiation's `_Insert_n` grow body
@@ -10971,8 +11027,8 @@ namespace msvc8
          * Address: 0x008A9C60 (FUN_008A9C60, another cross-container reuse
          * with `count=1` -- the single-node allocator for `msvc8::map<
          * msvc8::string, moho::TerrainEnvironmentLookupEntry>`'s node
-         * (`CWldTerrainRes`'s `mEnvLookup`, `TerrainRuntimeView` /
-         * `TerrainVisualResourceRuntimeView` in `CWldMap.cpp`; 0x50-byte
+         * (`CWldTerrainRes`'s `mEnvLookup`, `Terrain` /
+         * the deleted overlay in `CWldMap.cpp`; 0x50-byte
          * node: 3 link fields + `pair<msvc8::string,
          * TerrainEnvironmentLookupEntry>` (0x1C + 0x24 = 0x40) + color/isNil,
          * padded to 0x50). Called directly with a literal `1` from
@@ -12025,7 +12081,7 @@ namespace msvc8
          * Address: 0x005AAF60 (FUN_005AAF60 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for `msvc8::list<gpg::Rect2i>` (the reflected path-finder rect list; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); callers 0x005AA000, 0x005AA310, 0x005AA576; formerly `ClearRect2iListStorage` in moho/ai/CAiPathFinderTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00702BB0 (FUN_00702BB0 -- `clear()` / `_Tidy` -- relink the header, zero the size, then walk the former payload nodes releasing each `shared_ptr`'s control block and freeing the node for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); callers 0x007015C0, 0x007020B0, 0x00704A40; formerly `CArmyStats::ClearTriggerList` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x006874E0 (FUN_006874E0 -- `_Tidy`'s node walk for `msvc8::list<moho::Entity*>` (`EntityDB::mEntList` at +0x20): frees every node and self-links the head; `~EntityDB` 0x006843B0 then frees the head. Formerly `ClearEntityListNodes`/`DestroyEntityListRuntime` over a `CEntityDbEntityListRuntime` view in moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22; the member's own destructor runs it now.)
-         * Address: 0x00739F50 (FUN_00739F50 -- `clear()` / `_Tidy` for `msvc8::list<moho::Shield*>` (`Sim::mShields`, and `SIM_DoDamage`'s snapshot copy of it; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x00736EB0, 0x00739DD0, 0x007434D0, 0x007458E0; formerly `ClearIntrusiveListAndResetHead` over `IntrusiveListStorageRuntimeView` in moho/sim/Sim.cpp (RULE THREE), removed 2026-09-22.)
+         * Address: 0x00739F50 (FUN_00739F50 -- `clear()` / `_Tidy` for `msvc8::list<moho::Shield*>` (`Sim::mShields`, and `SIM_DoDamage`'s snapshot copy of it; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x00736EB0, 0x00739DD0, 0x007434D0, 0x007458E0; formerly `ClearIntrusiveListAndResetHead` over a deleted overlay in moho/sim/Sim.cpp (RULE THREE), removed 2026-09-22.)
          * Address: 0x005CFE10 (FUN_005CFE10 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for `msvc8::list<moho::ESiloType>` (`CAiSiloBuildImpl::mSiloTypes` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x005CED30, 0x005CEDF0, 0x005CF130; formerly `ClearSiloTypeList` in moho/ai/CAiSiloBuildImpl.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x0081A550 (FUN_0081A550 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for `msvc8::list<moho::SkyDomeDecalVertices>` (`SkyDome::mDecalUploads` at +0xB4; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x28 vertex block}` 0x30); callers 0x008149E0, 0x00814CD0, 0x0081A463; formerly `ClearSkyDomeDecalUploadList` in moho/render/SkyDome.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x0077C9A0 (FUN_0077C9A0 -- `clear` for `msvc8::list<Moho::SDecalInfo>` (unlink all, `_Mysize = 0`, then destroy each node's `SDecalInfo` -- its string and two-string array -- and free it); caller `RListType_SDecalInfo::SerLoad` 0x0077B299; formerly `ClearSDecalInfoListStorage` in moho/render/CDecalTypes.cpp (RULE ONE), removed 2026-09-30.)
@@ -12508,7 +12564,7 @@ namespace msvc8
  * Address: 0x008D63F0 (FUN_008D63F0 -- `_Buy_head()` for the element list of
  *   `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp): `_Allocate(1)` (0x008D7020), then `_Next = _Prev = node`, each store null-checked;
  *   caller the set's constructor 0x008D5350. Formerly `CreateSelfLinkedDwordNodeRuntime` over
- *   `SelfLinkedDwordNodeRuntimeView` in moho/misc/StartupHelpers.cpp, removed 2026-09-29.)
+ *   the deleted overlay in moho/misc/StartupHelpers.cpp, removed 2026-09-29.)
          */
         void _Buy_head()
         {

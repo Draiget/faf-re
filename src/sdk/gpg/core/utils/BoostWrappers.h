@@ -396,7 +396,7 @@ namespace boost
          * is dropped, `dispose()` runs at use-count zero and `destroy()` at
          * weak-count zero. Zero callers, unreachable; formerly
          * `ReleaseOwnerSharedCountControlLane` over a
-         * `SharedCountOwnerRuntimeView` stand-in in
+         * the deleted overlay stand-in in
          * gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-18.)
          * Address: 0x0064DFE0 (FUN_0064DFE0 -- another branch-for-branch copy of this release, object in EAX: the `shared_ptr<moho::CIntelGrid>` handle inside RDebugRadar's `ReconCoverageDecalPass` stack block, dropped after every coverage pass by `TraverseRadarCellsRecursive` (eight calls 0x0064DBBA .. 0x0064DEF0) and by its unwind funclets 0x00B9F81B .. 0x00B9F88B; the accessor's own temporary goes through 0x005BE250 right after; formerly `ReleaseSharedCounterOwnerRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          */
@@ -2108,7 +2108,7 @@ namespace boost
     // `const char*` that follows the 0x0C `std::exception` sub-object. Zero
     // callers in the binary and none in source; formerly
     // `GetBadPtrContainerMessage` reading through a
-    // BadPtrContainerOperationRuntimeView copy of that same layout (RULE ONE),
+    // the deleted overlay copy of that same layout (RULE ONE),
     // removed 2026-09-18. Call `what()` on the exception instead.)
 
     /**

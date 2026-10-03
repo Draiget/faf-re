@@ -478,7 +478,7 @@ namespace moho
      * Address: 0x00501A70 (FUN_00501A70 -- the out-of-line copy: two zero
      * stores through `eax`; zero callers, no references, a linker-retained
      * copy nothing runs. Every owner's constructor inlines it. Formerly
-     * `InitializeSpatialDbEntryPairZero` over `SpatialDbEntryPairRuntimeView`
+     * `InitializeSpatialDbEntryPairZero` over a deleted overlay
      * in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
      */
     SpatialDBEntry() noexcept

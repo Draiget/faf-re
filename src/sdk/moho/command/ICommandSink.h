@@ -78,7 +78,7 @@ namespace moho
      * `ICommandSink()` and `CMarshaller`'s implicit destructor both reduce
      * to this same single store, so they are the compiler's out-of-line
      * copies of this family, not source of their own. They were formerly
-     * `ResetICommandSinkBaseVtableLaneA/B` over an `ICommandSinkRuntimeView`,
+     * `ResetICommandSinkBaseVtableLaneA/B` over an `ICommandSink`,
      * which stored the address of a one-byte static where the vftable
      * belongs.
      */

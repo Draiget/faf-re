@@ -755,7 +755,7 @@ namespace moho
      * What it does:
      * Parks the screen-space point the next zoom/spin should pivot around.
      * The whole body is the two-float store `0x007A8246 fstp [ecx+36Ch]` /
-     * `0x007A824F fstp [ecx+370h]`, which is `CameraImplRuntimeView::mPivot`
+     * `0x007A824F fstp [ecx+370h]`, which is `CameraImpl::mPivot`
      * (CameraImpl.cpp). The `Wm3::Vector2f*` return is just the incoming
      * argument left in `eax`; no caller reads it.
      */
@@ -1047,7 +1047,7 @@ namespace moho
     void SetTimeSource(ECamTimeSource timeSource);
 
     // -------------------------------------------------------------------------
-    // Layout. These lanes were reached through a `CameraImplRuntimeView`
+    // Layout. These lanes were reached through a `CameraImpl`
     // reinterpret_cast until 2026-09-21; they are the class's own state and
     // are declared here, with the offsets that cast asserted.
     //

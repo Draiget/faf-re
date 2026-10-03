@@ -320,26 +320,6 @@ namespace
   }
 
   /**
-   * Address: 0x00512E30 (FUN_00512E30)
-   *
-   * What it does:
-   * Adapts one register-lane call shape into the canonical reflected
-   * `vector<string>` resize path using a default-constructed fill string.
-   */
-  [[maybe_unused]] void ResizeStringVectorWithDefaultFillLane(
-    StringVector* const storage,
-    const unsigned int requestedCount
-  )
-  {
-    if (storage == nullptr) {
-      return;
-    }
-
-    msvc8::string fill{};
-    ResizeStringVector(*storage, static_cast<std::size_t>(requestedCount), fill);
-  }
-
-  /**
    * Address: 0x00512E60 (FUN_00512E60, gpg::RVectorType_string::SerLoad)
    *
    * What it does:

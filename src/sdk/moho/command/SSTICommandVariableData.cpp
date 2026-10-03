@@ -162,27 +162,6 @@ namespace
   }
 
   /**
-   * Address: 0x006EC8E0 (FUN_006EC8E0)
-   * Address: 0x006EBBD0 (FUN_006EBBD0)
-   *
-   * What it does:
-   * Fills one uninitialized slot range with repeated copy-constructed
-   * `SSTICommandVariableData` payload lanes taken from `fillValue`.
-   */
-  [[maybe_unused]] SSTICommandVariableDataSlot* FillUninitializedSSTICommandVariableDataSlots(
-    SSTICommandVariableDataSlot* destinationBegin,
-    SSTICommandVariableDataSlot* destinationEnd,
-    const SSTICommandVariableDataSlot& fillValue
-  )
-  {
-    for (SSTICommandVariableDataSlot* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
-      cursor->mHeaderWord0 = fillValue.mHeaderWord0;
-      ::new (&cursor->mVariableData) moho::SSTICommandVariableData(fillValue.mVariableData);
-    }
-    return destinationEnd;
-  }
-
-  /**
    * Address: 0x006ED220 (FUN_006ED220)
    * Address: 0x006EC920 (FUN_006EC920)
    *
@@ -204,22 +183,6 @@ namespace
     }
 
     return destinationCurrent;
-  }
-
-  /**
-   * Address: 0x006EBBE0 (FUN_006EBBE0)
-   *
-   * What it does:
-   * Adapts one legacy call-convention lane into the canonical backward slot
-   * copy helper for `SSTICommandVariableData`.
-   */
-  [[maybe_unused]] SSTICommandVariableDataSlot* CopyBackwardSSTICommandVariableDataSlotsAdapter(
-    SSTICommandVariableDataSlot* sourceCurrent,
-    const SSTICommandVariableDataSlot* const sourceBegin,
-    SSTICommandVariableDataSlot* destinationCurrent
-  ) noexcept
-  {
-    return CopyBackwardSSTICommandVariableDataSlots(sourceCurrent, sourceBegin, destinationCurrent);
   }
 
   [[nodiscard]] SSTICommandVariableDataSlot* CopySSTICommandVariableDataSlotRangeWithRollback(
@@ -258,94 +221,6 @@ namespace
    * before rethrowing if a construction step throws.
    */
   [[maybe_unused]] SSTICommandVariableDataSlot* CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(
-    const SSTICommandVariableDataSlot* sourceBegin,
-    const SSTICommandVariableDataSlot* sourceEnd,
-    SSTICommandVariableDataSlot* destinationBegin
-  )
-  {
-    return CopySSTICommandVariableDataSlotRangeWithRollback(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x005626B0 (FUN_005626B0)
-   *
-   * What it does:
-   * Legacy register-shape adapter lane that forwards contiguous
-   * `SSTICommandVariableData` slot-range copy into the canonical rollback
-   * helper.
-   */
-  [[maybe_unused]] void CopySSTICommandVariableDataSlotRangeWithRollbackAdapterLaneLegacyEntry(
-    [[maybe_unused]] const void* const unusedContext,
-    SSTICommandVariableDataSlot* const destinationBegin,
-    const SSTICommandVariableDataSlot* const sourceBegin,
-    const SSTICommandVariableDataSlot* const sourceEnd
-  )
-  {
-    (void)CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x00562BA0 (FUN_00562BA0)
-   *
-   * What it does:
-   * Primary adapter lane that forwards contiguous
-   * `SSTICommandVariableData` slot-range copy into the canonical rollback
-   * helper.
-   */
-  [[maybe_unused]] void CopySSTICommandVariableDataSlotRangeWithRollbackAdapterLaneA(
-    SSTICommandVariableDataSlot* const destinationBegin,
-    const SSTICommandVariableDataSlot* const sourceBegin,
-    const SSTICommandVariableDataSlot* const sourceEnd
-  )
-  {
-    (void)CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x005630B0 (FUN_005630B0)
-   *
-   * What it does:
-   * Secondary adapter lane that forwards contiguous
-   * `SSTICommandVariableData` slot-range copy into the canonical rollback
-   * helper.
-   */
-  [[maybe_unused]] void CopySSTICommandVariableDataSlotRangeWithRollbackAdapterLaneB(
-    SSTICommandVariableDataSlot* const destinationBegin,
-    const SSTICommandVariableDataSlot* const sourceBegin,
-    const SSTICommandVariableDataSlot* const sourceEnd
-  )
-  {
-    (void)CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x00563280 (FUN_00563280)
-   *
-   * What it does:
-   * Tertiary adapter lane that forwards contiguous
-   * `SSTICommandVariableData` slot-range copy into the canonical rollback
-   * helper.
-   */
-  [[maybe_unused]] void CopySSTICommandVariableDataSlotRangeWithRollbackAdapterLaneC(
-    SSTICommandVariableDataSlot* const destinationBegin,
-    const SSTICommandVariableDataSlot* const sourceBegin,
-    const SSTICommandVariableDataSlot* const sourceEnd
-  )
-  {
-    (void)CopySSTICommandVariableDataSlotRangeWithRollbackLegacy(sourceBegin, sourceEnd, destinationBegin);
-  }
-
-  /**
-   * Address: 0x006ED830 (FUN_006ED830, copy_SSTICommandVariableData_slot_range_with_rollback_alt)
-   * Address: 0x006EBBA0 (FUN_006EBBA0)
-   * Address: 0x006EC8B0 (FUN_006EC8B0)
-   * Address: 0x006ED1F0 (FUN_006ED1F0)
-   * Address: 0x006ED560 (FUN_006ED560)
-   *
-   * What it does:
-   * Alternate call-convention lane for the same guarded slot-range copy helper.
-   */
-  [[maybe_unused]] SSTICommandVariableDataSlot* CopySSTICommandVariableDataSlotRangeWithRollbackLegacyAlt(
     const SSTICommandVariableDataSlot* sourceBegin,
     const SSTICommandVariableDataSlot* sourceEnd,
     SSTICommandVariableDataSlot* destinationBegin

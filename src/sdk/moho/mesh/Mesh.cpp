@@ -199,7 +199,7 @@ namespace moho
 
   // Two dead reach-in lanes and their view structs used to live here.
   // 0x0086AF80 and 0x0086AFC0 both read the owning object through a
-  // `MeshInstanceOwnerRuntimeView` whose only member sat at +0x34 -- which is
+  // the deleted overlay whose only member sat at +0x34 -- which is
   // exactly `CUIWorldMesh::mMeshInstance`. They are `CUIWorldMesh` accessors,
   // not free functions over an offset struct, and they now live there as
   // `GetWorldSphere` / `GetWorldBounds` against real `Wm3::Sphere3f` and

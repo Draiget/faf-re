@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -2470,7 +2470,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\render\d3d\CD3DVertexFormat.h" />
     <ClInclude Include="moho\render\d3d\CD3DVertexSheet.h" />
     <ClInclude Include="moho\render\d3d\CD3DVertexStream.h" />
-    <ClInclude Include="moho\render\textures\detail\BatchTextureContainerHelpers.h" />
     <ClInclude Include="moho\serialization\SBuildReserveInfo.h" />
     <ClInclude Include="moho\serialization\SaveGameFileHeader.h" />
     <ClInclude Include="moho\serialization\SavedGameFileHeader.h" />

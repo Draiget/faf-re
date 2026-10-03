@@ -314,10 +314,10 @@ namespace moho
    * Unlinks this cursor info from the hovered-unit weak-owner chain.
    *
    * All four twin addresses above were formerly duplicated in
-   * `LegacyContainerFillLanes.cpp` as a standalone `IntrusiveOwnerAt10RuntimeView`
-   * offset struct (`{pad[0x10], IntrusiveLinkRuntimeView link}`) plus four
+   * `LegacyContainerFillLanes.cpp` as a standalone the deleted overlay
+   * offset struct (`{pad[0x10], IntrusiveLink link}`) plus four
    * near-identical wrapper functions reaching into "an unidentified owning
-   * class at +0x10" -- that file's own `IntrusiveLinkRuntimeView` citation
+   * class at +0x10" -- that file's own `IntrusiveLink` citation
    * flagged this as the last unresolved dependency blocking its cleanup.
    * `function_sha256` ties three of the four directly to this destructor;
    * the fourth matches by direct `.c` comparison. `mUnitHover` sits at
@@ -13682,7 +13682,7 @@ namespace moho
    *    needed there.
    *  - `StrategicIconAux`'s constructor and `LoadGenericIcons` recovered
    *    (0x0085B2A0 / 0x0085E7F0); `gStrategicIconAuxiliary` retyped from a
-   *    never-defined `StrategicIconAuxRuntimeView` forward declaration to
+   *    never-defined `StrategicIconAux` forward declaration to
    *    the real, complete type.
    *  - `PickUnitStrategicIconTexture` / `PickGenericStrategicIconTexture`
    *    recovered (0x0085D880 / 0x0085CBD0), which required retyping

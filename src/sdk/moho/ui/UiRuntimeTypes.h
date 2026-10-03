@@ -2575,7 +2575,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x198.
     // `cfunc_InternalCreateEditL` calls `operator new(0x198)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through the old `CMauiEditRuntimeView` overlay -- which described
+    // 0x11C and every access through the old `CMauiEdit` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     //
     // +0x11C..+0x123 is the IMauiDragger base; the edit's own state follows.
@@ -2778,7 +2778,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x134.
     // `cfunc_InternalCreateFrameL` calls `operator new(0x134)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through the old `CMauiFrameRuntimeView` overlay -- which described
+    // 0x11C and every access through the old `CMauiFrame` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     boost::weak_ptr<CMauiFrame> mSelfWeak;              // +0x11C
@@ -2973,7 +2973,7 @@ namespace moho
     // `sizeof(CMauiBitmap)` was whatever `CMauiControl` ends at (0x11C) while
     // `cfunc_InternalCreateBitmapL` allocates `operator new(0x18C)` at
     // 0x00780E2B (`push 18Ch`) and the constructor at 0x0077F950 writes as far
-    // out as `[esi+188h]`. Every access through the old `CMauiBitmapRuntimeView` overlay --
+    // out as `[esi+188h]`. Every access through the old `CMauiBitmap` overlay --
     // which describes exactly this run -- therefore wrote past the end of the
     // heap block, which the debug CRT catches on free as
     // "HEAP CORRUPTION DETECTED: after Normal block" inside
@@ -3152,7 +3152,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x134.
     // `cfunc_InternalCreateHistogramL` calls `operator new(0x134)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through the old `CMauiHistogramRuntimeView` overlay -- which described
+    // 0x11C and every access through the old `CMauiHistogram` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     std::int32_t mXIncrement = 0;           // +0x11C
@@ -3366,7 +3366,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x158.
     // `cfunc_InternalCreateItemListL` calls `operator new(0x158)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through the old `CMauiItemListRuntimeView` overlay -- which described
+    // 0x11C and every access through the old `CMauiItemList` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     CD3DFont* mFont = nullptr;                   // +0x11C
@@ -3661,7 +3661,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x168.
     // `cfunc_InternalCreateMovieL` calls `operator new(0x168)` at 0x0079F64B,
     // but this class declared no data members at all, so it inherited only
-    // `CMauiControl`'s 0x11C and every access through the old `CMauiMovieRuntimeView` overlay
+    // `CMauiControl`'s 0x11C and every access through the old `CMauiMovie` overlay
     // -- which describes exactly this run -- wrote past the end of the block.
     // ---------------------------------------------------------------------
     CMovie* mMovie = nullptr;              // +0x11C
@@ -3793,7 +3793,7 @@ namespace moho
     // that starts right after the embedded `IMauiDragger` sub-object.
     // `cfunc_InternalCreateScrollbarL` calls `operator new(0x158)` at
     // 0x007A16F7, but this class stopped at 0x124, so every access through the
-    // old `CMauiScrollbarRuntimeView` overlay -- which described exactly this run -- wrote
+    // old `CMauiScrollbar` overlay -- which described exactly this run -- wrote
     // past the end of the block.
     // ---------------------------------------------------------------------
     /// The control this scrollbar scrolls (`SetScrollable`).
@@ -3911,7 +3911,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x194.
     // `cfunc_InternalCreateTextL` calls `operator new(0x194)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through the old `CMauiTextRuntimeView` overlay -- which described
+    // 0x11C and every access through the old `CMauiText` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     CD3DFont* mFont = nullptr;                     // +0x11C
@@ -4021,7 +4021,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x174.
     // `cfunc_InternalCreateBorderL` calls `operator new(0x174)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through the old `CMauiBorderRuntimeView` overlay -- which described
+    // 0x11C and every access through the old `CMauiBorder` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     boost::shared_ptr<CD3DBatchTexture> mTex1;    // +0x11C
@@ -4138,7 +4138,7 @@ namespace moho
     // `cfunc_InternalCreateMapPreviewL` calls `operator new(0x124)` at
     // 0x00850E2B, but this class declared no data members at all, so it
     // inherited only `CMauiControl`'s 0x11C and every access through the
-    // old `CUIMapPreviewRuntimeView` overlay wrote past the end of the block. This one
+    // old `CUIMapPreview` overlay wrote past the end of the block. This one
     // draws on the loading screen, which is where it showed up.
     // ---------------------------------------------------------------------
     boost::shared_ptr<ID3DTextureSheet> mTexture; // +0x11C

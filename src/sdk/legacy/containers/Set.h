@@ -293,13 +293,13 @@ namespace msvc8
         }
 
         /**
-         * Address: 0x00504380 (FUN_00504380 -- `begin()` through the hidden iterator slot, `_Myhead->_Left`, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot04LaneA`'s "dereferencing shape" over `PointerToPointerSlot04RuntimeView` in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
+         * Address: 0x00504380 (FUN_00504380 -- `begin()` through the hidden iterator slot, `_Myhead->_Left`, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot04LaneA`'s "dereferencing shape" over a deleted overlay in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
          */
         [[nodiscard]] iterator begin() noexcept { return iterator(tree_.leftmost()); }
         [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(tree_.leftmost()); }
 
         /**
-         * Address: 0x00504390 (FUN_00504390 -- `end()` through the hidden iterator slot, `_Myhead` itself, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot04LaneA` over `PointerSlot04RuntimeView` in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
+         * Address: 0x00504390 (FUN_00504390 -- `end()` through the hidden iterator slot, `_Myhead` itself, for `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h); zero callers, no references, a linker-retained copy nothing runs. Formerly `StorePointerSlot04LaneA` over a deleted overlay in moho/mesh/Mesh.cpp (RULE THREE), removed 2026-09-29.)
          */
         [[nodiscard]] iterator end() noexcept { return iterator(tree_.header()); }
         [[nodiscard]] const_iterator end() const noexcept { return const_iterator(tree_.header()); }

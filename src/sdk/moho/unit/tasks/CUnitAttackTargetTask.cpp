@@ -1090,7 +1090,7 @@ namespace moho
     // MemberSerialize only reads through the runtime view below (never
     // writes any of this object's own state) -- const_cast is safe here and
     // avoids touching the pre-existing (already flagged elsewhere as
-    // technical debt) CUnitAttackTargetTask/AsRuntimeView
+    // technical debt) CUnitAttackTargetTask/As
     // machinery just to add a const overload.
     CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     const gpg::RRef ownerRef{};

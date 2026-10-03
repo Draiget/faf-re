@@ -643,13 +643,4 @@ namespace moho
    * increments the owning batch count with VC8 list-overflow protection.
    */
   std::int32_t InsertCartographicDecalBatchCopy(const CartographicDecalBatch& sourceBatch, Cartographic& owner);
-
-  /**
-   * Address: 0x007D1740 (FUN_007D1740)
-   *
-   * What it does:
-   * Unlinks and destroys one decal-batch node (when not sentinel), decrements
-   * count, and returns the successor node.
-   */
-  CartographicListNode* EraseCartographicDecalBatchNode(Cartographic& owner, CartographicListNode* node);
 } // namespace moho

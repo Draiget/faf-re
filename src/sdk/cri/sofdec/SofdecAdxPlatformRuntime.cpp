@@ -880,27 +880,27 @@
       return nullptr;
     }
 
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
-    moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
+    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = tagInfo->sjTagRingHandle;
     const std::int32_t availableAinfBytes = (sjRingHandle != nullptr) ? SJRBF_GetNumData(sjRingHandle, 1) : 0;
     const char* result = reinterpret_cast<const char*>(static_cast<std::intptr_t>(availableAinfBytes));
 
     moho::MwsfTagWindow inputWindow{};
     moho::MwsfTagWindow outputWindow{};
     if (availableAinfBytes != 0) {
-      inputWindow.data = runtimeView->ainfSearchBuffer;
+      inputWindow.data = tagInfo->ainfSearchBuffer;
       inputWindow.size = availableAinfBytes;
       result = SJ_SearchTag(&inputWindow, kSofdecTagCritags, kSofdecTagCritage, &outputWindow);
     }
 
     if (result != nullptr) {
-      if (runtimeView->ainfUserBuffer != nullptr) {
-        std::memcpy(runtimeView->ainfUserBuffer, outputWindow.data, static_cast<std::size_t>(outputWindow.size));
-        runtimeView->ainfTagInfoDataAddress = static_cast<std::int32_t>(
-          reinterpret_cast<std::intptr_t>(runtimeView->ainfUserBuffer)
+      if (tagInfo->ainfUserBuffer != nullptr) {
+        std::memcpy(tagInfo->ainfUserBuffer, outputWindow.data, static_cast<std::size_t>(outputWindow.size));
+        tagInfo->ainfTagInfoDataAddress = static_cast<std::int32_t>(
+          reinterpret_cast<std::intptr_t>(tagInfo->ainfUserBuffer)
         );
-        runtimeView->ainfTagInfoLength = outputWindow.size;
-        runtimeView->ainfTagInfoReady = 1;
+        tagInfo->ainfTagInfoLength = outputWindow.size;
+        tagInfo->ainfTagInfoReady = 1;
 
         moho::SjChunkRange lane1Chunk{};
         SJRBF_GetChunk(sjRingHandle, 1, 0x7FFFFFFF, &lane1Chunk);
@@ -908,19 +908,19 @@
         return reinterpret_cast<const char*>(sjrbf_Reset(sjRingHandle));
       }
 
-      runtimeView->ainfTagInfoDataAddress = static_cast<std::int32_t>(
+      tagInfo->ainfTagInfoDataAddress = static_cast<std::int32_t>(
         reinterpret_cast<std::intptr_t>(outputWindow.data)
       );
-      runtimeView->ainfTagInfoLength = outputWindow.size;
-      runtimeView->ainfTagInfoReady = 1;
+      tagInfo->ainfTagInfoLength = outputWindow.size;
+      tagInfo->ainfTagInfoReady = 1;
       return reinterpret_cast<const char*>(
         static_cast<std::intptr_t>(MWSFTAG_ClearUsrSj(ply))
       );
     }
 
-    runtimeView->ainfTagInfoReady = 1;
-    runtimeView->ainfTagInfoDataAddress = 0;
-    runtimeView->ainfTagInfoLength = 0;
+    tagInfo->ainfTagInfoReady = 1;
+    tagInfo->ainfTagInfoDataAddress = 0;
+    tagInfo->ainfTagInfoLength = 0;
     return result;
   }
 
@@ -997,9 +997,9 @@
    */
   std::int32_t SFX_SetTagInf(void* const sfxHandle, const std::int32_t tagDataAddress, const std::int32_t tagDataLength)
   {
-    auto* const runtimeView = reinterpret_cast<SfxTagInfo*>(sfxHandle);
-    runtimeView->tagDataAddress = tagDataAddress;
-    runtimeView->tagDataLength = tagDataLength;
+    auto* const tagInfo = reinterpret_cast<SfxTagInfo*>(sfxHandle);
+    tagInfo->tagDataAddress = tagDataAddress;
+    tagInfo->tagDataLength = tagDataLength;
 
     moho::MwsfTagWindow sourceWindow{};
     sourceWindow.data = reinterpret_cast<std::int8_t*>(static_cast<std::intptr_t>(tagDataAddress));
@@ -1011,15 +1011,15 @@
     const char* result = nullptr;
     if (searchResult != nullptr) {
       result = SFXZ_SetTagInf(
-        runtimeView->sfxzTagGroup,
+        tagInfo->sfxzTagGroup,
         static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(sfxzWindow.data)),
         sfxzWindow.size
       );
     } else {
-      result = SFXZ_SetTagInf(runtimeView->sfxzTagGroup, 0, 0);
+      result = SFXZ_SetTagInf(tagInfo->sfxzTagGroup, 0, 0);
     }
 
-    runtimeView->tagInfoReady = 1;
+    tagInfo->tagInfoReady = 1;
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(result));
   }
 
@@ -1032,24 +1032,24 @@
    */
   std::int32_t mwsftag_GetSFXinfFromAinf(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
-    if (runtimeView->ainfTagInfoDataAddress == 0) {
-      return SFX_SetTagInf(runtimeView->sfxHandle, 0, 0);
+    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    if (tagInfo->ainfTagInfoDataAddress == 0) {
+      return SFX_SetTagInf(tagInfo->sfxHandle, 0, 0);
     }
 
     moho::MwsfTagWindow inputWindow{};
-    inputWindow.data = reinterpret_cast<std::int8_t*>(static_cast<std::intptr_t>(runtimeView->ainfTagInfoDataAddress));
-    inputWindow.size = runtimeView->ainfTagInfoLength;
+    inputWindow.data = reinterpret_cast<std::int8_t*>(static_cast<std::intptr_t>(tagInfo->ainfTagInfoDataAddress));
+    inputWindow.size = tagInfo->ainfTagInfoLength;
 
     moho::MwsfTagWindow outputWindow{};
     if (SJ_SearchTag(&inputWindow, kSofdecTagSfxinfs, kSofdecTagSfxinfe, &outputWindow) != nullptr) {
       return SFX_SetTagInf(
-        runtimeView->sfxHandle,
+        tagInfo->sfxHandle,
         static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(outputWindow.data)),
         outputWindow.size
       );
     }
-    return SFX_SetTagInf(runtimeView->sfxHandle, 0, 0);
+    return SFX_SetTagInf(tagInfo->sfxHandle, 0, 0);
   }
 
   /**
@@ -1065,9 +1065,9 @@
       return 0;
     }
 
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
-    const std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtimeView->sjTagRingHandle));
-    if (result != 0 && runtimeView->ainfTagInfoReady != 1) {
+    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    const std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(tagInfo->sjTagRingHandle));
+    if (result != 0 && tagInfo->ainfTagInfoReady != 1) {
       (void)mwsftag_GetAinfFromSj(ply);
       return mwsftag_GetSFXinfFromAinf(ply);
     }
@@ -1086,8 +1086,8 @@
       return 0;
     }
 
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
-    const std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtimeView->sjTagRingHandle));
+    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    const std::int32_t result = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(tagInfo->sjTagRingHandle));
     if (result != 0) {
       (void)mwsftag_GetAinfFromSj(ply);
       return mwsftag_GetSFXinfFromAinf(ply);
@@ -1108,8 +1108,8 @@
       return 0;
     }
 
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
-    if (runtimeView->sjTagRingHandle != nullptr) {
+    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    if (tagInfo->sjTagRingHandle != nullptr) {
       return -(SFD_SetUsrSj(static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(ply->handle)), 2, 0, 0) != 0);
     }
     return 0;
@@ -1280,8 +1280,8 @@
    */
   void MWSFTAG_DestroyAinfSj(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
-    moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
+    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = tagInfo->sjTagRingHandle;
     if (sjRingHandle != nullptr) {
       sjrbf_Destroy(sjRingHandle);
     }
@@ -1304,8 +1304,8 @@
       return 0;
     }
 
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
-    moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
+    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = tagInfo->sjTagRingHandle;
     if (sjRingHandle == nullptr) {
       return 0;
     }
@@ -1331,10 +1331,10 @@
    */
   void MWSFTAG_InitTagInf(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
-    runtimeView->ainfTagInfoReady = 0;
-    runtimeView->ainfTagInfoDataAddress = 0;
-    runtimeView->ainfTagInfoLength = 0;
+    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    tagInfo->ainfTagInfoReady = 0;
+    tagInfo->ainfTagInfoDataAddress = 0;
+    tagInfo->ainfTagInfoLength = 0;
     ply->additionalInfoStamp = -1;
   }
 
@@ -1350,8 +1350,8 @@
    */
   std::int32_t MWSFTAG_ResetAinfSj(moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    auto* const runtimeView = reinterpret_cast<MwsfdTagInfo*>(ply);
-    moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
+    auto* const tagInfo = reinterpret_cast<MwsfdTagInfo*>(ply);
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = tagInfo->sjTagRingHandle;
     if (sjRingHandle == nullptr) {
       return 0;
     }
@@ -1374,10 +1374,10 @@
     std::int32_t* const outTagDataLength
   )
   {
-    const auto* const runtimeView = reinterpret_cast<const MwsfdTagInfo*>(ply);
-    *outTagDataAddress = runtimeView->ainfTagInfoDataAddress;
-    *outTagDataLength = runtimeView->ainfTagInfoLength;
-    return runtimeView->ainfTagInfoLength;
+    const auto* const tagInfo = reinterpret_cast<const MwsfdTagInfo*>(ply);
+    *outTagDataAddress = tagInfo->ainfTagInfoDataAddress;
+    *outTagDataLength = tagInfo->ainfTagInfoLength;
+    return tagInfo->ainfTagInfoLength;
   }
 
   /**

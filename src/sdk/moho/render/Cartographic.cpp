@@ -72,18 +72,6 @@ namespace
   }
 
   /**
-   * Address: 0x007D3EC0 (FUN_007D3EC0)
-   *
-   * What it does:
-   * Jump-adapter lane that allocates exactly one cartographic node-storage
-   * element through the checked allocator helper.
-   */
-  [[maybe_unused]] [[nodiscard]] void* AllocateSingleCartographicNodeStorageAdapter()
-  {
-    return AllocateCartographicNodeStorage(1u);
-  }
-
-  /**
    * Address: 0x007D3C90 (FUN_007D3C90, sub_7D3C90)
    *
    * What it does:
@@ -1104,27 +1092,6 @@ namespace moho
     sentinel->mPrev = node;
     node->mPrev->mNext = node;
     return newCount;
-  }
-
-  /**
-   * Address: 0x007D1740 (FUN_007D1740)
-   *
-   * What it does:
-   * Unlinks and destroys one non-sentinel decal-batch node and returns the
-   * successor node used by the legacy iterator-erase lane.
-   */
-  CartographicListNode* EraseCartographicDecalBatchNode(Cartographic& owner, CartographicListNode* const node)
-  {
-    CartographicListNode* const successor = node->mNext;
-    if (node != owner.mListSentinel) {
-      node->mPrev->mNext = successor;
-      successor->mPrev = node->mPrev;
-      node->mBatch.~CartographicDecalBatch();
-      ::operator delete(node);
-      --owner.mBatchCount;
-    }
-
-    return successor;
   }
 
   /**

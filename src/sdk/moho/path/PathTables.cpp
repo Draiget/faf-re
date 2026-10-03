@@ -853,7 +853,7 @@ namespace moho
      *
      * Investigation note (2026-08-25): this class replaces a prior
      * `InstallPathQueueImplSerializerCallbacks` free function operating on a
-     * raw `SerSaveLoadHelperInitRuntimeView` POD (never a real
+     * raw the deleted overlay POD (never a real
      * `gpg::SerHelperBase`, so never spliced into `sNewHelpers`, so never
      * actually dispatched -- the free function that would have invoked it
      * directly, `InstallPathQueueImplSerializerLifecycleCallbacks`, was

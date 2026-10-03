@@ -775,8 +775,8 @@ namespace gpg::core
      * Address: 0x004026F0 (FUN_004026F0, the generic emission: binds all four lanes to a
      * caller-owned buffer)
      * Address: 0x0047F500 (FUN_0047F500, the n64<char> fixed-span alias lane)
-     * Address: 0x00553430 (FUN_00553430 -- `BindInlineStorage` for `unsigned int`: `lea edx,[ecx+edx*4]` -- base in ECX and the slot count in EDX, the by-count form. Zero callers, unreachable; formerly `BindUIntRuntimeViewToExternalStorageLaneA` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
-     * Address: 0x00553500 (FUN_00553500 -- `BindInlineStorage` for `unsigned int`: an ICF-identical second emission of that by-count form. Zero callers, unreachable; formerly `BindUIntRuntimeViewToExternalStorageLaneB` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00553430 (FUN_00553430 -- `BindInlineStorage` for `unsigned int`: `lea edx,[ecx+edx*4]` -- base in ECX and the slot count in EDX, the by-count form. Zero callers, unreachable; formerly the deleted overlay in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00553500 (FUN_00553500 -- `BindInlineStorage` for `unsigned int`: an ICF-identical second emission of that by-count form. Zero callers, unreachable; formerly the deleted overlay in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x0065A340 (FUN_0065A340 -- `BindInlineStorage` for `unsigned int`: the same body with the count folded to 26 (`lea edx,[ecx+0x68]`). Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity26` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x0065F380 (FUN_0065F380 -- `BindInlineStorage` for `unsigned int` with the count folded to 294. Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity294` in moho/render/EmitterTypeTypeInfo.cpp (RULE THREE), removed 2026-09-23.)
      * Address: 0x0065A350 (FUN_0065A350 -- `BindInlineStorage` for `unsigned int`: the same body with the count folded to 2 (`lea edx,[ecx+8]`). Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity2` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
@@ -1282,7 +1282,7 @@ namespace gpg::core
      * Address: 0x0080F030 (FUN_0080F030 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x7EF40`.)
      * Address: 0x0080F1B0 (FUN_0080F1B0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x4E200`.)
      * Address: 0x0059C890 (FUN_0059C890 -- `fastvector_n<CAiFormationInstance*, 10>` default constructor. Zero callers, no xrefs, unreachable: the live instantiation is inlined into `CAiFormationDBImpl`'s constructor (visible in `CAiFormationDBImplTypeInfo::NewRef` 0x0059D390). Formerly `InitializeFormationInstanceInlineStorage` in moho/ai/CAiFormationDBImplTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0059CEB0 (FUN_0059CEB0 -- the inline-arming step of that constructor (`start_ = end_ = originalVec_ = inline; capacity_ = inline + 10`). Zero callers, no xrefs, unreachable. Formerly `BindFormationInstanceInlineRuntimeView`, removed 2026-09-10.)
+     * Address: 0x0059CEB0 (FUN_0059CEB0 -- the inline-arming step of that constructor (`start_ = end_ = originalVec_ = inline; capacity_ = inline + 10`). Zero callers, no xrefs, unreachable. Formerly the deleted overlay, removed 2026-09-10.)
      * Address: 0x00552C40 (FUN_00552C40 -- `FastVectorN<unsigned int, 2>()`: `lea ecx,[eax+0x10]; lea edx,[ecx+8]` -- inline block at this+0x10, capacity 2 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineUIntScratchViewLaneA` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x00552CE0 (FUN_00552CE0 -- `FastVectorN<unsigned int, 2>()`: an ICF-identical second emission of the same 2-word constructor, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineUIntScratchViewLaneB` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x00659980 (FUN_00659980 -- `FastVectorN<unsigned int, 26>()`: `lea ecx,[eax+0x10]; lea edx,[ecx+0x68]` -- 0x68 is 26 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity26` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
@@ -1298,7 +1298,7 @@ namespace gpg::core
      * it -- `CEfxEmitter`'s two constructors inline it for the stack-built fill
      * value at 0x0065BAE6, and `resize(21, value)` copy-constructs the rest.
      * Formerly `InitializeEmbeddedDwordVectorHeaderOffset10Capacity6` over an
-     * `EmbeddedDwordVectorHeaderOffset10RuntimeView` in
+     * the deleted overlay in
      * moho/effects/rendering/CEfxEmitter.cpp (RULE ONE), removed 2026-09-22.)
      *
      * The inline-capacity sentinel is NOT written here. Every emission of this
@@ -2732,7 +2732,7 @@ namespace gpg::core
      * `ResetInlineQwordVectorStorage` in
      * `gpg/core/containers/FastVectorInsertLanes.cpp` -- a RULE ONE
      * hand-rolled duplicate of this exact free function under a raw-offset
-     * `InlineQwordVectorWithTagRuntimeView` struct name; see
+     * `InlineQwordVectorWithTag` struct name; see
      * `Vector.h`'s `push_back` citation for the full evidence chain.
      *
      * The cited binary match is byte-identical only because

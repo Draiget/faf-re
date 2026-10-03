@@ -141,7 +141,7 @@ namespace msvc8
          */
         /**
          * Address: 0x00830060 (FUN_00830060, `Moho::UICommandGraph::
-         * mGraphRuntimeTree`'s leftmost descent -- `map<shared_ptr<
+         * mGraph`'s leftmost descent -- `map<shared_ptr<
          * CD3DBatchTexture>, vector<CommandGraphEdge*>>`, 0x18-byte
          * value_type (`max_size() - 1 == 0xAAAAAA9` in `erase_node`'s
          * sibling `insert_at` emission FUN_0082E320, cited below), isNil@
@@ -149,7 +149,7 @@ namespace msvc8
          * descent (0x007E4E80 above); confirmed a distinct instantiation
          * via direct call from `erase_node`'s emission FUN_0082FD50.
          * `Moho::UICommandGraph::AddCommandQueueToCommandGraph`'s
-         * `mGraphRuntimeTree[texture]` lookup/insert is documented in
+         * `mGraph[texture]` lookup/insert is documented in
          * CWldSession.cpp; that call chain is what reaches this tree.)
          */
         /**
@@ -198,7 +198,7 @@ namespace msvc8
          * path keeps a standalone symbol" shape documented throughout this
          * file. Re-homed here from a hand-rolled
          * `LeftmostCategoryLookupDescendant` free function in
-         * RRuleGameRules.cpp that walked a `CategoryLookupNodeRuntimeView*`
+         * RRuleGameRules.cpp that walked a deleted overlay*`
          * reach-in instead of calling it.)
          */
         /**
@@ -384,7 +384,7 @@ namespace msvc8
          */
         /**
          * Address: 0x00830920 (FUN_00830920, `Moho::UICommandGraph::
-         * mGraphRuntimeTree`'s rightmost descent -- sibling of `rb_min`'s
+         * mGraph`'s rightmost descent -- sibling of `rb_min`'s
          * 0x00830060 above, same map. Byte-identical ICF twin of the
          * mesh-key map's rightmost descent (0x007E4E60 above); confirmed a
          * distinct instantiation via direct call from `erase_node`'s
@@ -440,7 +440,7 @@ namespace msvc8
          * the erased node was the map's rightmost -- sibling of `rb_min`'s
          * 0x0052D960 citation above, same map. Re-homed here from a
          * hand-rolled `RightmostCategoryLookupDescendant` free function in
-         * RRuleGameRules.cpp that walked a `CategoryLookupNodeRuntimeView*`
+         * RRuleGameRules.cpp that walked a deleted overlay*`
          * reach-in instead of calling it.)
          */
         /**
@@ -575,7 +575,7 @@ namespace msvc8
          */
         /**
          * Address: 0x0082EC10 (FUN_0082EC10, `Moho::UICommandGraph::
-         * mGraphRuntimeTree`'s successor walk -- isNil@+0x25, 0x18-byte
+         * mGraph`'s successor walk -- isNil@+0x25, 0x18-byte
          * value_type, byte-identical ICF twin of the mesh-key map's
          * successor walk family. Called at the top of that map's
          * `erase_node` emission (FUN_0082FD50, cited below on `erase_node`)
@@ -720,7 +720,7 @@ namespace msvc8
          * cited below) as the successor-capture step every `erase_node`
          * emission performs before unlinking. Re-homed here from a
          * hand-rolled `AdvanceCategoryLookupNodeSuccessor` free function in
-         * RRuleGameRules.cpp that walked a `CategoryLookupNodeRuntimeView*`
+         * RRuleGameRules.cpp that walked a deleted overlay*`
          * reach-in instead of calling it -- also reached from that file's
          * `PublishCategoriesTable` before the migration, now folded into
          * `mCategoryMap`'s own range-for iteration.)
@@ -1727,7 +1727,7 @@ namespace msvc8
              * bespoke `InitializeCommandDbMapHead`/`InitializeCommandDbMapStorageLaneA`/
              * `...LaneB`/`...LaneC` free functions in Sim.cpp that hand-
              * rolled this same construction over a `CommandDbMapStorageView`/
-             * `CCommandDbRuntimeView` reach-in instead of relying on the
+             * `CCommandDb` reach-in instead of relying on the
              * member's default construction.)
              * Address: 0x007AE180 (FUN_007AE180 -- `rb_tree()` for the command-mode tree (head sentinel bought, size zeroed); callers 0x0081FCD0, 0x00841C10, 0x00863870; formerly `InitializeCommandModeTreeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049F390 (FUN_0049F390 -- `rb_tree()` -- buy the header sentinel and zero the size for `ParticleBucketMap` (`msvc8::map<SParticleBucketKey, SParticleRenderBucket*>`, 0x50-byte node); zero callers, unreachable; formerly `InitializeParticleBucketTreeWithFreshHead` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
@@ -2270,7 +2270,7 @@ namespace msvc8
              * `EntityCategoryLookupTable::
              * ~EntityCategoryLookupTable()` body in
              * RRuleGameRules.cpp that reproduced this exact shape by hand
-             * over a `CategoryLookupNodeRuntimeView*` reach-in; deleted in
+             * over a deleted overlay*` reach-in; deleted in
              * favor of the implicit destructor now that `mCategoryMap` is a
              * real typed member (RULE ONE: member destructors are
              * compiler-emitted, not hand-written source).
@@ -2813,8 +2813,8 @@ namespace msvc8
              * lower_bound(k);`. Re-homed here from a hand-rolled
              * `FindTerrainEnvironmentLowerBound` free function in
              * `moho/sim/CWldMap.cpp` that walked a duplicate
-             * `TerrainEnvironmentLookupMapRuntimeView`/
-             * `TerrainEnvironmentLookupNodeRuntimeView` struct pair over the
+             * `TerrainEnvironmentLookupMap`/
+             * the deleted overlay struct pair over the
              * same node shape instead of calling this member (deleted along
              * with the whole hand-rolled tree it anchored).
              *
@@ -3069,7 +3069,7 @@ namespace msvc8
              * nil-or-key-less rejection this member performs. Re-homed here
              * from a bespoke `FindCommandNode` free function in Sim.cpp
              * (four overloads reaching in through `CommandDbMapStorageView`/
-             * `CommandDbMapNodeView`/`CCommandDbRuntimeView`) that hand-
+             * `CommandDbMapNodeView`/`CCommandDb`) that hand-
              * walked the same real member instead of calling it.
              *
              * `FUN_006E0E90` is a thin wrapper over this same address:
@@ -3144,8 +3144,8 @@ namespace msvc8
              * `moho/sim/CWldMap.cpp` (the second a body-identical forwarder
              * to the first, matching `FUN_008A80F0`/`FUN_008A8150`'s own
              * wrapper relationship) that walked a duplicate
-             * `TerrainEnvironmentLookupMapRuntimeView`/
-             * `TerrainEnvironmentLookupNodeRuntimeView` struct pair instead
+             * `TerrainEnvironmentLookupMap`/
+             * the deleted overlay struct pair instead
              * of calling this member (deleted along with the whole
              * hand-rolled tree it anchored). `IWldTerrainRes::GetEnvLookup`
              * now reaches this member directly as `mEnvLookup.find(key)`.
@@ -3325,13 +3325,13 @@ namespace msvc8
              */
             /**
              * Address: 0x0082E170 (FUN_0082E170, `Moho::UICommandGraph::
-             * mGraphRuntimeTree`'s plain unique insert -- descends comparing
+             * mGraph`'s plain unique insert -- descends comparing
              * the owner-based key at `node+4` against the sought key
              * directly (no separate comparator call for the common case;
              * `sub_8309D0` is called only on the tie-break branch, matching
              * the `owner_before`-style `shared_ptr` compare CWldSession.cpp's
              * `AddCommandQueueToCommandGraph` notes describe for
-             * `mGraphRuntimeTree`'s `0x008B8D0` comparator), then confirms
+             * `mGraph`'s `0x008B8D0` comparator), then confirms
              * uniqueness and links via `insert_at` (0x0082E320, cited
              * above). Called from `insert_hint`'s fallback branch,
              * FUN_0082CC80 (cited below), matching this member's own
@@ -3819,7 +3819,7 @@ namespace msvc8
              */
             /**
              * Address: 0x0082CC80 (FUN_0082CC80, `Moho::UICommandGraph::
-             * mGraphRuntimeTree`'s hinted insert -- matches this member's
+             * mGraph`'s hinted insert -- matches this member's
              * branch structure directly: empty-tree fast path straight to
              * `insert_at`, `hint == leftmost()` check, `rb_is_nil(hint)`
              * (== `end()`) check against `rightmost()`, then the
@@ -3829,7 +3829,7 @@ namespace msvc8
              * (0x0082E170, cited above) taking its `.first`. This is the
              * `map::operator[]`-shaped hinted insert CWldSession.cpp's
              * `AddCommandQueueToCommandGraph` notes already name at this
-             * address, for `mGraphRuntimeTree[texture]`'s `lower_bound`
+             * address, for `mGraph[texture]`'s `lower_bound`
              * result feeding straight back in as the hint. Its own caller,
              * the `lower_bound` descent FUN_0082B8B0, remains unrecovered --
              * `AddCommandQueueToCommandGraph` itself is still blocked on the
@@ -3979,7 +3979,7 @@ namespace msvc8
              * Address: 0x008A8590 (FUN_008A8590, sub_8A8590) --
              * `msvc8::map<msvc8::string, moho::TerrainEnvironmentLookupEntry>
              * ::insert_hint` -- `Moho::CWldTerrainRes::mEnvLookup`
-             * (`TerrainRuntimeView`/`TerrainVisualResourceRuntimeView` in
+             * (`Terrain`/deleted overlay in
              * `moho/sim/CWldMap.cpp`), isNil@+0x4D (0x50-byte node: 12-byte
              * link triplet + 28-byte `msvc8::string` key + 0x24-byte
              * `TerrainEnvironmentLookupEntry` value + color/isNil).
@@ -4388,7 +4388,7 @@ namespace msvc8
              */
             /**
              * Address: 0x0082FD50 (FUN_0082FD50, `Moho::UICommandGraph::
-             * mGraphRuntimeTree`'s erase-with-rebalance -- `map<shared_ptr<
+             * mGraph`'s erase-with-rebalance -- `map<shared_ptr<
              * CD3DBatchTexture>, vector<CommandGraphEdge*>>`, isNil@+0x25,
              * 0x18-byte value_type. Opens with the same `_Isnil` guard
              * throwing `out_of_range("invalid map/set<T> iterator")` seen on
@@ -4595,7 +4595,7 @@ namespace msvc8
              * a hand-rolled `EraseCategoryLookupNode` free function in
              * RRuleGameRules.cpp that performed this identical
              * transplant-and-rebalance over a
-             * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTable&`
+             * deleted overlay*`/`EntityCategoryLookupTable&`
              * reach-in instead of calling it.)
              *
              * Address: 0x0083AA70 (FUN_0083AA70, sub_83AA70) -- CORRECTED:
@@ -5406,7 +5406,7 @@ namespace msvc8
              * from a hand-rolled `EraseCategoryLookupNodeRange` free
              * function in RRuleGameRules.cpp that performed this identical
              * two-shape dispatch over a
-             * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTable&`
+             * deleted overlay*`/`EntityCategoryLookupTable&`
              * reach-in instead of calling it.)
              */
             /**
@@ -5836,7 +5836,7 @@ namespace msvc8
              * empty form with `size=0` -- exactly this member's shape. Zero
              * incoming xrefs in this sweep. Re-homed here from a bespoke
              * `ClearCommandDbMapAndResetHead` free function in Sim.cpp that
-             * hand-rolled this same operation over a `CCommandDbRuntimeView`
+             * hand-rolled this same operation over a `CCommandDb`
              * reach-in instead of calling it.)
              */
             /**
@@ -5917,8 +5917,8 @@ namespace msvc8
              * statically inlining this same address rather than emitting a
              * virtual dispatch. Re-homed here from a hand-rolled
              * `ClearEnvLookup` body that open-coded this exact sequence
-             * against the deleted `TerrainEnvironmentLookupMapRuntimeView`/
-             * `TerrainEnvironmentLookupNodeRuntimeView` struct pair instead
+             * against the deleted `TerrainEnvironmentLookupMap`/
+             * the deleted overlay struct pair instead
              * of calling this member.
              * Address: 0x0077C520 (FUN_0077C520 -- `clear()` for a compact tree (`_Erase(root)`, head relinked, size zeroed); zero callers, unreachable; formerly `ResetCompactTreeStorageHeadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x007F2AC0 (FUN_007F2AC0 -- `clear()` -- teardown, then the header relinked to itself and the size zeroed for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F1990; formerly `ResetBlueprintExtractorTreeStorage` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
@@ -6464,7 +6464,7 @@ namespace msvc8
              * than two. Re-homed here from a hand-rolled
              * `AllocateCategoryLookupHeadNodeRuntime` free function in
              * RRuleGameRules.cpp that already fused the same three steps by
-             * hand over a `CategoryLookupNodeRuntimeView*` reach-in instead
+             * hand over a deleted overlay*` reach-in instead
              * of calling this member -- that helper's own citation already
              * carried this exact evidence and disclosure; it is preserved
              * here verbatim now that the real container performs the fusion
@@ -6693,7 +6693,7 @@ namespace msvc8
              */
             /**
              * Address: 0x00830110 (FUN_00830110, `Moho::UICommandGraph::
-             * mGraphRuntimeTree`'s node buy -- allocates one node via
+             * mGraph`'s node buy -- allocates one node via
              * `sub_831D10(1)`, writes `left`/`parent`/`right` from its first
              * three arguments (the caller passes `where` for both `left` and
              * `right` initially, matching this template's head-initialised
@@ -7183,7 +7183,7 @@ namespace msvc8
              */
             /**
              * Address: 0x0082BEE0 (FUN_0082BEE0, `value_type::~value_type()`
-             * for `Moho::UICommandGraph::mGraphRuntimeTree` --
+             * for `Moho::UICommandGraph::mGraph` --
              * `pair<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>`,
              * isNil@+0x25. Inlined ahead of `operator delete(node)` in the
              * `erase_node` emission FUN_0082FD50 (cited above) rather than
@@ -7505,7 +7505,7 @@ namespace msvc8
              * (`FUN_00535750`, cited below) whole-tree fast path. Re-homed
              * here from a hand-rolled `DestroyCategoryLookupSubtree` free
              * function in RRuleGameRules.cpp that recursed over a
-             * `CategoryLookupNodeRuntimeView*` reach-in instead of calling
+             * deleted overlay*` reach-in instead of calling
              * it.)
              *
              * Address: 0x004E45E0 (FUN_004E45E0, sub_4E45E0) -- `destroy_subtree`
@@ -7914,12 +7914,12 @@ namespace msvc8
              */
             /**
              * Address: 0x00830010 (FUN_00830010, `Moho::UICommandGraph::
-             * mGraphRuntimeTree`'s left rotate -- isNil@+0x25, 0x18-byte
+             * mGraph`'s left rotate -- isNil@+0x25, 0x18-byte
              * value_type. Byte-identical ICF twin of the mesh-key map's left
              * rotate (0x007E4E10 above) and of FUN_0044BF90/FUN_0057F160
              * (unidentified same-layout instantiations, not traced to an
              * owning class in this pass); this address specifically is
-             * confirmed `mGraphRuntimeTree`'s via direct calls from both
+             * confirmed `mGraph`'s via direct calls from both
              * `insert_at`'s emission FUN_0082E320 and `erase_node`'s
              * emission FUN_0082FD50, both cited above/below.)
              */
@@ -7947,7 +7947,7 @@ namespace msvc8
              * recover, not one canonical body and a discardable duplicate;
              * corrected to `recovered` here, matching how every other
              * byte-identical rotate sibling in this file is handled, e.g.
-             * the mesh-key/`mGraphRuntimeTree` pair cited on this member
+             * the mesh-key/`mGraph` pair cited on this member
              * elsewhere.)
              */
             /**
@@ -8026,7 +8026,7 @@ namespace msvc8
              * path. Re-homed here from a hand-rolled
              * `RotateCategoryLookupNodeLeft` free function in
              * RRuleGameRules.cpp that rotated over a
-             * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTable&`
+             * deleted overlay*`/`EntityCategoryLookupTable&`
              * reach-in instead of calling it.)
              */
             /**
@@ -8207,7 +8207,7 @@ namespace msvc8
              */
             /**
              * Address: 0x00830080 (FUN_00830080, `Moho::UICommandGraph::
-             * mGraphRuntimeTree`'s right rotate -- sibling of `rotate_left`'s
+             * mGraph`'s right rotate -- sibling of `rotate_left`'s
              * 0x00830010 above, same map. Byte-identical ICF twin of the
              * mesh-key map's right rotate (0x007E4EA0 above); confirmed via
              * direct calls from `insert_at`'s emission FUN_0082E320 and
@@ -8322,7 +8322,7 @@ namespace msvc8
              * FUN_00536010, both cited above/below). Re-homed here from a
              * hand-rolled `RotateCategoryLookupNodeRight` free function in
              * RRuleGameRules.cpp that rotated over a
-             * `CategoryLookupNodeRuntimeView*`/`EntityCategoryLookupTable&`
+             * deleted overlay*`/`EntityCategoryLookupTable&`
              * reach-in instead of calling it.)
              */
             /**
@@ -8483,7 +8483,7 @@ namespace msvc8
              */
             /**
              * Address: 0x0082E320 (FUN_0082E320, `Moho::UICommandGraph::
-             * mGraphRuntimeTree`'s combined buy-node/link/rebalance emission
+             * mGraph`'s combined buy-node/link/rebalance emission
              * -- `map<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>`,
              * isNil@+0x25. The `_Mysize >= 0xAAAAAA9` guard is exactly this
              * template's `max_size() - 1u <= size_` for a 0x18-byte
@@ -8494,7 +8494,7 @@ namespace msvc8
              * (0x00830010) / `rotate_right` (0x00830080), both cited below.
              * `CWldSession.cpp`'s `AddCommandQueueToCommandGraph` reconstruction
              * notes already name this address `insert_at`, reached via the
-             * hinted insert at 0x0082CC80 for `mGraphRuntimeTree[texture]`
+             * hinted insert at 0x0082CC80 for `mGraph[texture]`
              * (VC8 `map::operator[]`); that hinted-insert caller itself
              * remains unrecovered (`AddCommandQueueToCommandGraph` is still
              * blocked on `LinkCommandGraphEdge`), so this member's
@@ -8608,8 +8608,8 @@ namespace msvc8
              * enumeration order rather than producing the binary's sorted
              * order -- same resulting SET of unique modes, different
              * observable ORDER in the startup options UI. An orphaned,
-             * already-evidenced `*RuntimeView` reimplementation of this
-             * same tree already exists (`AdapterModeSortTreeRuntimeView`
+             * already-evidenced `*deleted overlay reimplementation of this
+             * same tree already exists (the deleted overlay
              * family, `StartupHelpers.cpp:~1234-1330`, several
              * `[[maybe_unused]]`) -- per RULE ONE this should be migrated
              * to a real `T=Resolution` instantiation of this template

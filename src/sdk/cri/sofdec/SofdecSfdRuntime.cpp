@@ -2284,7 +2284,7 @@
   extern "C" std::uint8_t*
   M2S_SearchDelim(std::uint8_t* buffer, std::int32_t sizeBytes, std::int32_t delimiterMask);
   extern "C"
-  std::int32_t parse_PES_packet_sub(M2PesDecodeState* runtimeView, const std::uint8_t* chunkBytes, std::int32_t chunkSize);
+  std::int32_t parse_PES_packet_sub(M2PesDecodeState* pesDecode, const std::uint8_t* chunkBytes, std::int32_t chunkSize);
   struct M2PesHandleInit
   {
     std::int32_t status = 0; // +0x00
@@ -2334,10 +2334,10 @@
   );
   static_assert(sizeof(M2THandleInit) == 0x160, "M2THandleInit size must be 0x160");
 
-  extern "C" M2PesHandleInit* initChunks_m2spes(M2PesHandleInit* runtimeView);
-  extern "C" M2PesHandleInit* initHn_m2spes(M2PesHandleInit* runtimeView);
-  extern "C" M2THandleInit* initChunks(M2THandleInit* runtimeView);
-  extern "C" M2THandleInit* initHn_m2sts(M2THandleInit* runtimeView);
+  extern "C" M2PesHandleInit* initChunks_m2spes(M2PesHandleInit* m2PesHandleInit);
+  extern "C" M2PesHandleInit* initHn_m2spes(M2PesHandleInit* m2PesHandleInit);
+  extern "C" M2THandleInit* initChunks(M2THandleInit* m2THandleInit);
+  extern "C" M2THandleInit* initHn_m2sts(M2THandleInit* m2THandleInit);
   /**
    * Address: 0x00AE0AD0 (FUN_00AE0AD0, _callCbFn)
    *
@@ -2352,11 +2352,11 @@
     const moho::SjChunkRange* firstChunk,
     const moho::SjChunkRange* secondChunk
   );
-  extern "C" std::int32_t destroySub(M2TsdState* runtimeView);
-  extern "C" std::int32_t decodeTs(M2TsdState* runtimeView);
-  extern "C" std::int32_t decodePes(M2TsdState* runtimeView, M2TsdState** ioRuntimeCursor);
+  extern "C" std::int32_t destroySub(M2TsdState* m2TsdState);
+  extern "C" std::int32_t decodeTs(M2TsdState* m2TsdState);
+  extern "C" std::int32_t decodePes(M2TsdState* m2TsdState, M2TsdState** ioRuntimeCursor);
   extern "C" std::int32_t decodePesSub(
-    M2TsdState* runtimeView,
+    M2TsdState* m2TsdState,
     M2TsdLane* laneRuntime,
     std::int32_t chunkAddress,
     std::int32_t chunkBytes,
@@ -2370,13 +2370,13 @@
    * Moves one TS chunk into relay output lane and reports consumed bytes.
    */
   extern "C" std::int32_t movePes(
-    M2TsdState* runtimeView,
+    M2TsdState* m2TsdState,
     std::int32_t chunkAddress,
     std::int32_t chunkBytes,
     std::int32_t* outReadEndAddress
   );
   extern "C" std::int32_t decodeTsSub(
-    M2TsdState* runtimeView,
+    M2TsdState* m2TsdState,
     std::int32_t chunkAddress,
     std::int32_t chunkBytes,
     std::int32_t* outReadEndAddress
@@ -2388,7 +2388,7 @@
    * What it does:
    * Finds lane index for one stream-id filter, or `-1` when absent.
    */
-  extern "C" std::int32_t searchIndex(const M2TsdState* runtimeView, std::int32_t streamIdFilter);
+  extern "C" std::int32_t searchIndex(const M2TsdState* m2TsdState, std::int32_t streamIdFilter);
 
   /**
    * Address: 0x00AE0140 (FUN_00AE0140, _M2TSD_SetInSj)
@@ -2397,10 +2397,10 @@
    * Updates one M2TSD runtime status-gate input lane and mirrors non-zero
    * values into the process-global `m2tsd_insj` lane.
    */
-  extern "C" std::int32_t M2TSD_SetInSj(M2TsdState* const runtimeView, const std::int32_t inSjAddress)
+  extern "C" std::int32_t M2TSD_SetInSj(M2TsdState* const tsdState, const std::int32_t inSjAddress)
   {
-    if (runtimeView != nullptr) {
-      runtimeView->statusGate =
+    if (tsdState != nullptr) {
+      tsdState->statusGate =
         reinterpret_cast<M2TsdStatusGate*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(inSjAddress)));
     }
 
@@ -2419,7 +2419,7 @@
    * mirrors callback addresses into process-global low-lane slots.
    */
   extern "C" std::int32_t M2TSD_SetOutSj(
-    M2TsdState* const runtimeView,
+    M2TsdState* const tsdState,
     const std::int32_t laneIndex,
     const std::int32_t streamIdFilter,
     const std::int32_t relayStreamJoinAddress,
@@ -2427,11 +2427,11 @@
   )
   {
     if (streamIdFilter != -1) {
-      runtimeView->laneEntries[laneIndex].streamIdFilter = streamIdFilter;
-      runtimeView->decodeMode = 0;
+      tsdState->laneEntries[laneIndex].streamIdFilter = streamIdFilter;
+      tsdState->decodeMode = 0;
     }
 
-    M2TsdLane& lane = runtimeView->laneEntries[laneIndex];
+    M2TsdLane& lane = tsdState->laneEntries[laneIndex];
     lane.needsTerminationCheck = relayStreamJoinAddress;
     lane.callbackSinkAddress = outStreamJoinAddress;
 
@@ -2518,16 +2518,16 @@
     constexpr std::int32_t kDelimiterProgramStreamMap = static_cast<std::int32_t>(0x00040000u);
     constexpr std::int32_t kDelimiterSystemEndOrPsm = static_cast<std::int32_t>(0xFFFF0000u);
 
-    auto* const runtimeView = reinterpret_cast<M2PesDecodeState*>(SjAddressToPointer(streamSupplyAddress));
-    if (runtimeView == nullptr) {
+    auto* const pesDecode = reinterpret_cast<M2PesDecodeState*>(SjAddressToPointer(streamSupplyAddress));
+    if (pesDecode == nullptr) {
       return 0;
     }
 
     *outReadEndAddress = 0;
-    (void)initChunks_m2spes(reinterpret_cast<M2PesHandleInit*>(runtimeView));
-    runtimeView->bitScratchWord = 0;
+    (void)initChunks_m2spes(reinterpret_cast<M2PesHandleInit*>(pesDecode));
+    pesDecode->bitScratchWord = 0;
 
-    const std::int32_t status = runtimeView->status;
+    const std::int32_t status = pesDecode->status;
     if (status == 1 || status == 4) {
       return 0;
     }
@@ -2542,7 +2542,7 @@
         if (fallbackAdvance != 0) {
           return 0;
         }
-        (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(runtimeView));
+        (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(pesDecode));
         return 0;
       }
 
@@ -2551,7 +2551,7 @@
     }
 
     if (chunkBytes < 6 || (MPS_CheckDelim(chunkBuffer) & kDelimiterProgramStreamMap) == 0) {
-      (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(runtimeView));
+      (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(pesDecode));
       return 0;
     }
 
@@ -2562,33 +2562,33 @@
       std::uint8_t* const nextDelimiter =
         M2S_SearchDelim(chunkBuffer + 1, chunkBytes - 1, kDelimiterSystemEndOrPsm);
       if (nextDelimiter == nullptr) {
-        (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(runtimeView));
+        (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(pesDecode));
         return 0;
       }
 
       packetPayloadBytes = static_cast<std::int32_t>(nextDelimiter - chunkBuffer) - 6;
-      runtimeView->fallbackPacketPayloadBytes = packetPayloadBytes;
+      pesDecode->fallbackPacketPayloadBytes = packetPayloadBytes;
     }
 
     const std::int32_t packetTotalBytes = packetPayloadBytes + 6;
     if (chunkBytes < packetTotalBytes) {
-      (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(runtimeView));
+      (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(pesDecode));
       return 0;
     }
 
-    if (parse_PES_packet_sub(runtimeView, chunkBuffer, chunkBytes) == -1) {
+    if (parse_PES_packet_sub(pesDecode, chunkBuffer, chunkBytes) == -1) {
       *outReadEndAddress = packetTotalBytes;
       return 0;
     }
 
-    std::int32_t parserAdvanceBytes = runtimeView->parsedPayloadAdvanceBytes;
-    if (parserAdvanceBytes <= runtimeView->parsedHeaderAdvanceBytes) {
-      parserAdvanceBytes = runtimeView->parsedHeaderAdvanceBytes;
+    std::int32_t parserAdvanceBytes = pesDecode->parsedPayloadAdvanceBytes;
+    if (parserAdvanceBytes <= pesDecode->parsedHeaderAdvanceBytes) {
+      parserAdvanceBytes = pesDecode->parsedHeaderAdvanceBytes;
     }
 
     *outReadEndAddress = packetTotalBytes - parserAdvanceBytes;
-    if (runtimeView->status == 2) {
-      runtimeView->status = 3;
+    if (pesDecode->status == 2) {
+      pesDecode->status = 3;
     }
     return 1;
   }
@@ -2759,27 +2759,27 @@
    * Destroys every active M2PES lane for one M2TSD runtime handle, tears down
    * the M2T supply lane, and resets handle state to idle.
    */
-  extern "C" std::int32_t destroySub(M2TsdState* const runtimeView)
+  extern "C" std::int32_t destroySub(M2TsdState* const tsdState)
   {
-    if (runtimeView == nullptr) {
+    if (tsdState == nullptr) {
       return 0;
     }
 
-    for (std::int32_t laneIndex = 0; laneIndex < runtimeView->laneCount; ++laneIndex) {
-      std::int32_t& m2pesSupplyAddress = runtimeView->laneEntries[laneIndex].m2pesSupplyAddress;
+    for (std::int32_t laneIndex = 0; laneIndex < tsdState->laneCount; ++laneIndex) {
+      std::int32_t& m2pesSupplyAddress = tsdState->laneEntries[laneIndex].m2pesSupplyAddress;
       if (m2pesSupplyAddress != 0) {
         (void)M2PES_Destroy(m2pesSupplyAddress);
         m2pesSupplyAddress = 0;
       }
     }
 
-    std::int32_t destroyResult = runtimeView->m2tSupplyAddress;
+    std::int32_t destroyResult = tsdState->m2tSupplyAddress;
     if (destroyResult != 0) {
-      destroyResult = M2T_Destroy(runtimeView->m2tSupplyAddress);
-      runtimeView->m2tSupplyAddress = 0;
+      destroyResult = M2T_Destroy(tsdState->m2tSupplyAddress);
+      tsdState->m2tSupplyAddress = 0;
     }
 
-    runtimeView->status = 1;
+    tsdState->status = 1;
     return destroyResult;
   }
 
@@ -2791,21 +2791,21 @@
    * to the active M2T lane plus each active M2PES lane.
    */
   extern "C" std::int32_t M2TSD_SetErrFn(
-    M2TsdState* const runtimeView,
+    M2TsdState* const tsdState,
     const std::int32_t callbackAddress,
     const std::int32_t callbackObject
   )
   {
-    runtimeView->errorCallbackAddress = callbackAddress;
-    runtimeView->errorCallbackObject = callbackObject;
+    tsdState->errorCallbackAddress = callbackAddress;
+    tsdState->errorCallbackObject = callbackObject;
 
-    if (runtimeView->m2tSupplyAddress != 0) {
-      (void)M2T_SetErrFn(runtimeView->m2tSupplyAddress, callbackAddress, callbackObject);
+    if (tsdState->m2tSupplyAddress != 0) {
+      (void)M2T_SetErrFn(tsdState->m2tSupplyAddress, callbackAddress, callbackObject);
     }
 
-    const std::int32_t laneCount = runtimeView->laneCount;
+    const std::int32_t laneCount = tsdState->laneCount;
     for (std::int32_t laneIndex = 0; laneIndex < laneCount; ++laneIndex) {
-      const std::int32_t laneSupplyAddress = runtimeView->laneEntries[laneIndex].m2pesSupplyAddress;
+      const std::int32_t laneSupplyAddress = tsdState->laneEntries[laneIndex].m2pesSupplyAddress;
       if (laneSupplyAddress != 0) {
         (void)M2PES_SetErrFn(laneSupplyAddress, callbackAddress, callbackObject);
       }
@@ -2822,37 +2822,37 @@
    * active M2T or M2PES supply chain when the controller reports closure, and
    * marks the runtime finished once every lane has drained.
    */
-  std::int32_t updateStat_m2tsd(M2TsdState* const runtimeView, const std::int32_t didDecodeSomething)
+  std::int32_t updateStat_m2tsd(M2TsdState* const tsdState, const std::int32_t didDecodeSomething)
   {
     constexpr std::int32_t kStateReady = 2;
     constexpr std::int32_t kStateClosing = 3;
     constexpr std::int32_t kStateFinished = 4;
 
-    if (runtimeView->status == kStateReady && didDecodeSomething != 0) {
-      runtimeView->status = kStateClosing;
+    if (tsdState->status == kStateReady && didDecodeSomething != 0) {
+      tsdState->status = kStateClosing;
     }
 
-    if (runtimeView->controllerGateEnabled != 0) {
-      if (runtimeView->streamActiveFlag != 0 && runtimeView->statusGate->QueryGate(1) == 0) {
-        for (std::int32_t laneIndex = 0; laneIndex < runtimeView->laneCount; ++laneIndex) {
-          M2PES_TermSupply(runtimeView->laneEntries[laneIndex].m2pesSupplyAddress);
+    if (tsdState->controllerGateEnabled != 0) {
+      if (tsdState->streamActiveFlag != 0 && tsdState->statusGate->QueryGate(1) == 0) {
+        for (std::int32_t laneIndex = 0; laneIndex < tsdState->laneCount; ++laneIndex) {
+          M2PES_TermSupply(tsdState->laneEntries[laneIndex].m2pesSupplyAddress);
         }
       }
     } else {
-      if (runtimeView->streamActiveFlag != 0) {
-        M2T_TermSupply(runtimeView->m2tSupplyAddress);
+      if (tsdState->streamActiveFlag != 0) {
+        M2T_TermSupply(tsdState->m2tSupplyAddress);
       }
 
-      if (M2T_GetStat(runtimeView->m2tSupplyAddress) == kStateFinished) {
-        for (std::int32_t laneIndex = 0; laneIndex < runtimeView->laneCount; ++laneIndex) {
-          M2PES_TermSupply(runtimeView->laneEntries[laneIndex].m2pesSupplyAddress);
+      if (M2T_GetStat(tsdState->m2tSupplyAddress) == kStateFinished) {
+        for (std::int32_t laneIndex = 0; laneIndex < tsdState->laneCount; ++laneIndex) {
+          M2PES_TermSupply(tsdState->laneEntries[laneIndex].m2pesSupplyAddress);
         }
       }
     }
 
     std::int32_t drainedLaneCount = 0;
-    for (std::int32_t laneIndex = 0; laneIndex < runtimeView->laneCount; ++laneIndex) {
-      const auto& lane = runtimeView->laneEntries[laneIndex];
+    for (std::int32_t laneIndex = 0; laneIndex < tsdState->laneCount; ++laneIndex) {
+      const auto& lane = tsdState->laneEntries[laneIndex];
       if (lane.needsTerminationCheck != 0 && M2PES_GetStat(lane.m2pesSupplyAddress) != kStateFinished) {
         break;
       }
@@ -2860,9 +2860,9 @@
       ++drainedLaneCount;
     }
 
-    const std::int32_t laneCount = runtimeView->laneCount;
+    const std::int32_t laneCount = tsdState->laneCount;
     if (drainedLaneCount == laneCount) {
-      runtimeView->status = kStateFinished;
+      tsdState->status = kStateFinished;
     }
 
     return laneCount;
@@ -2877,41 +2877,41 @@
    */
   extern "C" M2TsdState*
   initHn_m2tsd(
-    M2TsdState* const runtimeView,
+    M2TsdState* const tsdState,
     const std::int32_t laneCount,
     const std::int32_t laneEntriesAddress,
     const std::int32_t m2tWorkAddress,
     std::int32_t m2pesWorkAddress
   )
   {
-    std::memset(runtimeView, 0, sizeof(M2TsdState));
-    runtimeView->decodeMode = 1;
-    runtimeView->streamEndCode = -1;
+    std::memset(tsdState, 0, sizeof(M2TsdState));
+    tsdState->decodeMode = 1;
+    tsdState->streamEndCode = -1;
 
-    runtimeView->m2tSupplyAddress = M2T_Create(m2tWorkAddress, 384);
-    if (runtimeView->m2tSupplyAddress == 0) {
+    tsdState->m2tSupplyAddress = M2T_Create(m2tWorkAddress, 384);
+    if (tsdState->m2tSupplyAddress == 0) {
       return nullptr;
     }
 
-    runtimeView->statusGate = nullptr;
-    runtimeView->laneCount = laneCount;
-    runtimeView->laneEntries = reinterpret_cast<M2TsdLane*>(
+    tsdState->statusGate = nullptr;
+    tsdState->laneCount = laneCount;
+    tsdState->laneEntries = reinterpret_cast<M2TsdLane*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(laneEntriesAddress))
     );
-    runtimeView->reservedB8 = 0;
-    runtimeView->controllerGateEnabled = 0;
-    runtimeView->tsMapCallbackAddress = 0;
-    runtimeView->tsMapCallbackObject = 0;
-    runtimeView->pesCallbackAddress = 0;
-    runtimeView->pesCallbackObject = 0;
+    tsdState->reservedB8 = 0;
+    tsdState->controllerGateEnabled = 0;
+    tsdState->tsMapCallbackAddress = 0;
+    tsdState->tsMapCallbackObject = 0;
+    tsdState->pesCallbackAddress = 0;
+    tsdState->pesCallbackObject = 0;
 
     if (laneCount <= 0) {
-      runtimeView->status = 2;
-      return runtimeView;
+      tsdState->status = 2;
+      return tsdState;
     }
 
     for (std::int32_t laneIndex = 0; laneIndex < laneCount; ++laneIndex) {
-      M2TsdLane& lane = runtimeView->laneEntries[laneIndex];
+      M2TsdLane& lane = tsdState->laneEntries[laneIndex];
       lane.laneState = 0;
       lane.streamIdFilter = -1;
       lane.callbackSinkAddress = 0;
@@ -2924,15 +2924,15 @@
 
       lane.m2pesSupplyAddress = M2PES_Create(m2pesWorkAddress, 324);
       if (lane.m2pesSupplyAddress == 0) {
-        destroySub(runtimeView);
+        destroySub(tsdState);
         return nullptr;
       }
 
       m2pesWorkAddress += 324;
     }
 
-    runtimeView->status = 2;
-    return runtimeView;
+    tsdState->status = 2;
+    return tsdState;
   }
 
   /**
@@ -2981,7 +2981,7 @@
     const std::int32_t m2tWorkAddress =
       m2pesWorkAddress + laneCount * static_cast<std::int32_t>(kM2PesWorkBytesPerLane);
 
-    M2TsdState* const runtimeView = initHn_m2tsd(
+    M2TsdState* const tsdState = initHn_m2tsd(
       reinterpret_cast<M2TsdState*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(alignedWorkAddress))),
       laneCount,
       laneEntriesAddress,
@@ -2989,7 +2989,7 @@
       m2pesWorkAddress
     );
 
-    const std::int32_t runtimeAddress = SjPointerToAddress(runtimeView);
+    const std::int32_t runtimeAddress = SjPointerToAddress(tsdState);
     runtimeSlots[freeSlotIndex] = runtimeAddress;
     return runtimeAddress;
   }
@@ -3023,19 +3023,19 @@
    * What it does:
    * Clears the 10-dword decoded-chunk lane used by one M2PES runtime handle.
    */
-  extern "C" M2PesHandleInit* initChunks_m2spes(M2PesHandleInit* const runtimeView)
+  extern "C" M2PesHandleInit* initChunks_m2spes(M2PesHandleInit* const pesInit)
   {
-    runtimeView->chunkLaneWords[0] = 0;
-    runtimeView->chunkLaneWords[1] = 0;
-    runtimeView->chunkLaneWords[2] = 0;
-    runtimeView->chunkLaneWords[3] = 0;
-    runtimeView->chunkLaneWords[4] = 0;
-    runtimeView->chunkLaneWords[5] = 0;
-    runtimeView->chunkLaneWords[6] = 0;
-    runtimeView->chunkLaneWords[7] = 0;
-    runtimeView->chunkLaneWords[8] = 0;
-    runtimeView->chunkLaneWords[9] = 0;
-    return runtimeView;
+    pesInit->chunkLaneWords[0] = 0;
+    pesInit->chunkLaneWords[1] = 0;
+    pesInit->chunkLaneWords[2] = 0;
+    pesInit->chunkLaneWords[3] = 0;
+    pesInit->chunkLaneWords[4] = 0;
+    pesInit->chunkLaneWords[5] = 0;
+    pesInit->chunkLaneWords[6] = 0;
+    pesInit->chunkLaneWords[7] = 0;
+    pesInit->chunkLaneWords[8] = 0;
+    pesInit->chunkLaneWords[9] = 0;
+    return pesInit;
   }
 
   /**
@@ -3044,16 +3044,16 @@
    * What it does:
    * Resets one M2PES runtime handle storage block and marks it ready.
    */
-  extern "C" M2PesHandleInit* initHn_m2spes(M2PesHandleInit* const runtimeView)
+  extern "C" M2PesHandleInit* initHn_m2spes(M2PesHandleInit* const pesInit)
   {
-    std::memset(runtimeView, 0, sizeof(M2PesHandleInit));
-    runtimeView->runtimeWord04 = 0;
-    runtimeView->runtimeWord08 = 0;
-    runtimeView->runtimeWord0C = 0;
-    runtimeView->runtimeWord10 = 0;
-    runtimeView->reservedF8 = 0;
-    M2PesHandleInit* const result = initChunks_m2spes(runtimeView);
-    runtimeView->status = 2;
+    std::memset(pesInit, 0, sizeof(M2PesHandleInit));
+    pesInit->runtimeWord04 = 0;
+    pesInit->runtimeWord08 = 0;
+    pesInit->runtimeWord0C = 0;
+    pesInit->runtimeWord10 = 0;
+    pesInit->reservedF8 = 0;
+    M2PesHandleInit* const result = initChunks_m2spes(pesInit);
+    pesInit->status = 2;
     return result;
   }
 
@@ -3063,18 +3063,18 @@
    * What it does:
    * Clears the 9-dword decoded-chunk lane used by one M2T runtime handle.
    */
-  extern "C" M2THandleInit* initChunks(M2THandleInit* const runtimeView)
+  extern "C" M2THandleInit* initChunks(M2THandleInit* const tsInit)
   {
-    runtimeView->chunkLaneWords[0] = 0;
-    runtimeView->chunkLaneWords[1] = 0;
-    runtimeView->chunkLaneWords[2] = 0;
-    runtimeView->chunkLaneWords[3] = 0;
-    runtimeView->chunkLaneWords[4] = 0;
-    runtimeView->chunkLaneWords[5] = 0;
-    runtimeView->chunkLaneWords[6] = 0;
-    runtimeView->chunkLaneWords[7] = 0;
-    runtimeView->chunkLaneWords[8] = 0;
-    return runtimeView;
+    tsInit->chunkLaneWords[0] = 0;
+    tsInit->chunkLaneWords[1] = 0;
+    tsInit->chunkLaneWords[2] = 0;
+    tsInit->chunkLaneWords[3] = 0;
+    tsInit->chunkLaneWords[4] = 0;
+    tsInit->chunkLaneWords[5] = 0;
+    tsInit->chunkLaneWords[6] = 0;
+    tsInit->chunkLaneWords[7] = 0;
+    tsInit->chunkLaneWords[8] = 0;
+    return tsInit;
   }
 
   /**
@@ -3083,20 +3083,20 @@
    * What it does:
    * Resets one M2T runtime handle storage block and marks it ready.
    */
-  extern "C" M2THandleInit* initHn_m2sts(M2THandleInit* const runtimeView)
+  extern "C" M2THandleInit* initHn_m2sts(M2THandleInit* const tsInit)
   {
-    std::memset(runtimeView, 0, sizeof(M2THandleInit));
-    runtimeView->runtimeWord04 = 0;
-    runtimeView->runtimeWord08 = 0;
-    runtimeView->runtimeWord0C = 0;
-    runtimeView->runtimeWord10 = 0;
-    runtimeView->runtimeWord1C = 0;
-    runtimeView->runtimeWord20 = 0;
-    runtimeView->runtimeWord24 = 0;
-    runtimeView->runtimeWord28 = 0;
-    runtimeView->streamEndMarker = -1;
-    M2THandleInit* const result = initChunks(runtimeView);
-    runtimeView->status = 2;
+    std::memset(tsInit, 0, sizeof(M2THandleInit));
+    tsInit->runtimeWord04 = 0;
+    tsInit->runtimeWord08 = 0;
+    tsInit->runtimeWord0C = 0;
+    tsInit->runtimeWord10 = 0;
+    tsInit->runtimeWord1C = 0;
+    tsInit->runtimeWord20 = 0;
+    tsInit->runtimeWord24 = 0;
+    tsInit->runtimeWord28 = 0;
+    tsInit->streamEndMarker = -1;
+    M2THandleInit* const result = initChunks(tsInit);
+    tsInit->status = 2;
     return result;
   }
 
@@ -3141,27 +3141,27 @@
    * Runs TS and PES decode loops until both make no progress (or decode cursor
    * closure is signaled), then updates M2TSD runtime status.
    */
-  extern "C" void M2TSD_Decode(M2TsdState* const runtimeView)
+  extern "C" void M2TSD_Decode(M2TsdState* const tsdState)
   {
     std::int32_t didDecodeSomething = 0;
-    if (runtimeView == nullptr) {
+    if (tsdState == nullptr) {
       return;
     }
 
-    runtimeView->decodeCycleProgressFlag = 0;
-    if (runtimeView->status == 1 || runtimeView->status == 4) {
+    tsdState->decodeCycleProgressFlag = 0;
+    if (tsdState->status == 1 || tsdState->status == 4) {
       return;
     }
 
-    M2TsdState* decodeCursor = runtimeView;
+    M2TsdState* decodeCursor = tsdState;
     do {
       std::int32_t tsDecodeCount = 0;
-      while (decodeTs(runtimeView) == 1) {
+      while (decodeTs(tsdState) == 1) {
         ++tsDecodeCount;
       }
 
       std::int32_t pesDecodeCount = 0;
-      while (decodePes(runtimeView, &decodeCursor) == 1) {
+      while (decodePes(tsdState, &decodeCursor) == 1) {
         ++pesDecodeCount;
         if (decodeCursor != nullptr) {
           break;
@@ -3175,7 +3175,7 @@
       didDecodeSomething = 1;
     } while (decodeCursor == nullptr);
 
-    (void)updateStat_m2tsd(runtimeView, didDecodeSomething);
+    (void)updateStat_m2tsd(tsdState, didDecodeSomething);
   }
 
   /**
@@ -3186,20 +3186,20 @@
    * PES move or TS decode sub-lane, then commits split chunks back to the
    * stream-join interface.
    */
-  extern "C" std::int32_t decodeTs(M2TsdState* const runtimeView)
+  extern "C" std::int32_t decodeTs(M2TsdState* const tsdState)
   {
     moho::SjChunkRange streamChunk{};
     std::int32_t splitChunkWords[2]{};
     moho::SjChunkRange committedChunk{};
     moho::SjChunkRange splitChunk{};
 
-    auto* const streamJoin = runtimeView->statusGate;
+    auto* const streamJoin = tsdState->statusGate;
     streamJoin->AcquireReadWindow(1, static_cast<std::int32_t>(0x7FFFFFFFu), &streamChunk.bufferAddress);
 
     std::int32_t readEndAddress = 0;
-    const std::int32_t decodeResult = (runtimeView->controllerGateEnabled != 0)
-      ? movePes(runtimeView, streamChunk.bufferAddress, streamChunk.byteCount, &readEndAddress)
-      : decodeTsSub(runtimeView, streamChunk.bufferAddress, streamChunk.byteCount, &readEndAddress);
+    const std::int32_t decodeResult = (tsdState->controllerGateEnabled != 0)
+      ? movePes(tsdState, streamChunk.bufferAddress, streamChunk.byteCount, &readEndAddress)
+      : decodeTsSub(tsdState, streamChunk.bufferAddress, streamChunk.byteCount, &readEndAddress);
 
     const moho::SjChunkRange streamChunkRange{
       streamChunk.bufferAddress,
@@ -3223,7 +3223,7 @@
    * otherwise reports direct pass-through byte count.
    */
   extern "C" std::int32_t movePes(
-    M2TsdState* const runtimeView,
+    M2TsdState* const tsdState,
     const std::int32_t chunkAddress,
     const std::int32_t chunkBytes,
     std::int32_t* const outReadEndAddress
@@ -3235,7 +3235,7 @@
       return 0;
     }
 
-    const std::int32_t relayStreamJoinAddress = runtimeView->laneEntries[0].needsTerminationCheck;
+    const std::int32_t relayStreamJoinAddress = tsdState->laneEntries[0].needsTerminationCheck;
     if (relayStreamJoinAddress != 0) {
       auto* const relayJoin = AsM2TsdChunkIoGate(relayStreamJoinAddress);
       moho::SjChunkRange relayChunk{};
@@ -3265,17 +3265,17 @@
    * lane index, or `-1` when no match exists.
    */
   extern "C" std::int32_t searchIndex(
-    const M2TsdState* const runtimeView,
+    const M2TsdState* const tsdState,
     const std::int32_t streamIdFilter
   )
   {
-    const std::int32_t laneCount = runtimeView->laneCount;
+    const std::int32_t laneCount = tsdState->laneCount;
     if (laneCount <= 0) {
       return -1;
     }
 
     for (std::int32_t laneIndex = 0; laneIndex < laneCount; ++laneIndex) {
-      if (runtimeView->laneEntries[laneIndex].streamIdFilter == streamIdFilter) {
+      if (tsdState->laneEntries[laneIndex].streamIdFilter == streamIdFilter) {
         return laneIndex;
       }
     }
@@ -3291,19 +3291,19 @@
    * lane via `_decodePesSub`, then commits/splits chunk windows back to each
    * lane supply.
    */
-  extern "C" std::int32_t decodePes(M2TsdState* const runtimeView, M2TsdState** const ioRuntimeCursor)
+  extern "C" std::int32_t decodePes(M2TsdState* const tsdState, M2TsdState** const ioRuntimeCursor)
   {
     auto* const outCallbackResult = reinterpret_cast<std::int32_t*>(ioRuntimeCursor);
     *outCallbackResult = 0;
 
     std::int32_t didDecodeLane = 0;
-    const std::int32_t laneCount = runtimeView->laneCount;
+    const std::int32_t laneCount = tsdState->laneCount;
     if (laneCount <= 0) {
       return 0;
     }
 
     for (std::int32_t laneIndex = 0; laneIndex < laneCount; ++laneIndex) {
-      M2TsdLane& laneRuntime = runtimeView->laneEntries[laneIndex];
+      M2TsdLane& laneRuntime = tsdState->laneEntries[laneIndex];
       if (laneRuntime.m2pesSupplyAddress == 0) {
         continue;
       }
@@ -3317,7 +3317,7 @@
       std::int32_t splitAddress = 0;
       if (
         decodePesSub(
-          runtimeView,
+          tsdState,
           &laneRuntime,
           sourceChunk.bufferAddress,
           sourceChunk.byteCount,
@@ -3403,7 +3403,7 @@
    * sink chunks, and emits optional stream-id callback notification.
    */
   extern "C" std::int32_t decodePesSub(
-    M2TsdState* const runtimeView,
+    M2TsdState* const tsdState,
     M2TsdLane* const laneRuntime,
     const std::int32_t chunkAddress,
     const std::int32_t chunkBytes,
@@ -3478,12 +3478,12 @@
     *outCallbackResult = callCbFn(laneRuntime, m2pesSupplyAddress, callbackSinkAddress, &firstChunk, &secondChunk);
     *outReadEndAddress += decodedPayloadBytes;
 
-    if (runtimeView->pesCallbackAddress != 0) {
+    if (tsdState->pesCallbackAddress != 0) {
       using DecodePesNotifyCallback = void(__cdecl*)(std::int32_t callbackObject, std::int32_t streamIdByte);
       auto* const callback = reinterpret_cast<DecodePesNotifyCallback>(
-        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(runtimeView->pesCallbackAddress))
+        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(tsdState->pesCallbackAddress))
       );
-      callback(runtimeView->pesCallbackObject, pesPacketView->streamIdByte);
+      callback(tsdState->pesCallbackObject, pesPacketView->streamIdByte);
     }
 
     return 1;
@@ -5903,8 +5903,8 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleGetMvInfo);
     }
 
-    const auto* const runtimeView = reinterpret_cast<const SfdMvInfoQuery*>(workctrlSubobj);
-    std::memcpy(outMvInfo, runtimeView->mvInfoLane, sizeof(runtimeView->mvInfoLane));
+    const auto* const sfdMvInfoQuery = reinterpret_cast<const SfdMvInfoQuery*>(workctrlSubobj);
+    std::memcpy(outMvInfo, sfdMvInfoQuery->mvInfoLane, sizeof(sfdMvInfoQuery->mvInfoLane));
     return 0;
   }
 
@@ -6393,12 +6393,12 @@
    * Clears the 0xF0-byte history reset lane, resets the write ordinal, and
    * returns the incremented reset-generation counter.
    */
-  std::int32_t sftst_ResetHist(SftstMovingAverage* const runtimeView)
+  std::int32_t sftst_ResetHist(SftstMovingAverage* const history)
   {
-    std::memset(runtimeView->historyValues, 0, kSftstResetHistoryBytes);
-    runtimeView->historyWriteOrdinal = 0;
-    const std::uint32_t nextGeneration = static_cast<std::uint32_t>(runtimeView->historyValues[kSftstHistoryResetGenerationIndex]) + 1u;
-    runtimeView->historyValues[kSftstHistoryResetGenerationIndex] = static_cast<std::int32_t>(nextGeneration);
+    std::memset(history->historyValues, 0, kSftstResetHistoryBytes);
+    history->historyWriteOrdinal = 0;
+    const std::uint32_t nextGeneration = static_cast<std::uint32_t>(history->historyValues[kSftstHistoryResetGenerationIndex]) + 1u;
+    history->historyValues[kSftstHistoryResetGenerationIndex] = static_cast<std::int32_t>(nextGeneration);
     return static_cast<std::int32_t>(nextGeneration);
   }
 
@@ -6408,9 +6408,9 @@
    * What it does:
    * Stores one SFTST test-flag lane and returns the stored value.
    */
-  std::int32_t SFTST_SetTstFlg(SftstFrameStep* const runtimeView, const std::int32_t testFlag)
+  std::int32_t SFTST_SetTstFlg(SftstFrameStep* const frameStep, const std::int32_t testFlag)
   {
-    runtimeView->testFlag = testFlag;
+    frameStep->testFlag = testFlag;
     return testFlag;
   }
 
@@ -6421,12 +6421,12 @@
    * Copies one 4-word tolerance configuration lane to the frame-step runtime.
    */
   SftstFrameStep::SftstConfigLane* SFTST_SetTolerance(
-    SftstFrameStep* const runtimeView,
+    SftstFrameStep* const frameStep,
     const SftstFrameStep::SftstConfigLane* const toleranceConfig
   )
   {
-    runtimeView->toleranceConfig = *toleranceConfig;
-    return &runtimeView->toleranceConfig;
+    frameStep->toleranceConfig = *toleranceConfig;
+    return &frameStep->toleranceConfig;
   }
 
   /**
@@ -6436,12 +6436,12 @@
    * Copies one 4-word excess-error configuration lane to the frame-step runtime.
    */
   SftstFrameStep::SftstConfigLane* SFTST_SetExcessErr(
-    SftstFrameStep* const runtimeView,
+    SftstFrameStep* const frameStep,
     const SftstFrameStep::SftstConfigLane* const excessErrorConfig
   )
   {
-    runtimeView->excessErrorConfig = *excessErrorConfig;
-    return &runtimeView->excessErrorConfig;
+    frameStep->excessErrorConfig = *excessErrorConfig;
+    return &frameStep->excessErrorConfig;
   }
 
   /**
@@ -6451,12 +6451,12 @@
    * Copies one 4-word adjustment-start configuration lane to the frame-step runtime.
    */
   SftstFrameStep::SftstConfigLane* SFTST_SetAdjStart(
-    SftstFrameStep* const runtimeView,
+    SftstFrameStep* const frameStep,
     const SftstFrameStep::SftstConfigLane* const adjustStartConfig
   )
   {
-    runtimeView->adjustStartConfig = *adjustStartConfig;
-    return &runtimeView->adjustStartConfig;
+    frameStep->adjustStartConfig = *adjustStartConfig;
+    return &frameStep->adjustStartConfig;
   }
 
   /**
@@ -6466,12 +6466,12 @@
    * Copies one 4-word adjustment-position-offset lane to the frame-step runtime.
    */
   SftstFrameStep::SftstConfigLane* SFTST_SetAdjPoff(
-    SftstFrameStep* const runtimeView,
+    SftstFrameStep* const frameStep,
     const SftstFrameStep::SftstConfigLane* const adjustPositionOffsetConfig
   )
   {
-    runtimeView->adjustPositionOffsetConfig = *adjustPositionOffsetConfig;
-    return &runtimeView->adjustPositionOffsetConfig;
+    frameStep->adjustPositionOffsetConfig = *adjustPositionOffsetConfig;
+    return &frameStep->adjustPositionOffsetConfig;
   }
 
   /**
@@ -6481,10 +6481,10 @@
    * Updates the moving-average history-window size when the requested range is
    * positive and returns the requested range value.
    */
-  std::int32_t SFTST_SetMovaveRange(SftstMovingAverage* const runtimeView, const std::int32_t historyRange)
+  std::int32_t SFTST_SetMovaveRange(SftstMovingAverage* const history, const std::int32_t historyRange)
   {
     if (historyRange > 0) {
-      runtimeView->historyValueCount = historyRange;
+      history->historyValueCount = historyRange;
     }
     return historyRange;
   }
@@ -6495,9 +6495,9 @@
    * What it does:
    * Stores one pause flag lane on the frame-step runtime and returns it.
    */
-  std::int32_t SFTST_Pause(SftstFrameStep* const runtimeView, const std::int32_t pauseFlag)
+  std::int32_t SFTST_Pause(SftstFrameStep* const frameStep, const std::int32_t pauseFlag)
   {
-    runtimeView->pauseFlag = pauseFlag;
+    frameStep->pauseFlag = pauseFlag;
     return pauseFlag;
   }
 
@@ -6508,9 +6508,9 @@
    * Stores one adjustment/status flag lane on the frame-step runtime and
    * returns the stored value.
    */
-  std::int32_t SFTST_SetAdjFlg(SftstFrameStep* const runtimeView, const std::int32_t adjustFlag)
+  std::int32_t SFTST_SetAdjFlg(SftstFrameStep* const frameStep, const std::int32_t adjustFlag)
   {
-    runtimeView->statusCode = adjustFlag;
+    frameStep->statusCode = adjustFlag;
     return adjustFlag;
   }
 
@@ -6520,13 +6520,13 @@
    * What it does:
    * Computes the integer moving average over the active history lane.
    */
-  std::int32_t sftst_CalcMovAve(SftstMovingAverage* const runtimeView)
+  std::int32_t sftst_CalcMovAve(SftstMovingAverage* const history)
   {
     std::int32_t historySum = 0;
-    const std::int32_t historyValueCount = runtimeView->historyValueCount;
+    const std::int32_t historyValueCount = history->historyValueCount;
     if (historyValueCount > 0) {
       for (std::int32_t index = 0; index < historyValueCount; ++index) {
-        historySum += runtimeView->historyValues[index];
+        historySum += history->historyValues[index];
       }
     }
 
@@ -6540,12 +6540,12 @@
    * Writes one new history sample into the moving-average ring and refreshes
    * both output average lanes.
    */
-  std::int32_t sftst_UpdateMovAve(SftstMovingAverage* const runtimeView, const std::int32_t sampleValue)
+  std::int32_t sftst_UpdateMovAve(SftstMovingAverage* const history, const std::int32_t sampleValue)
   {
-    runtimeView->historyValues[runtimeView->historyWriteOrdinal++ % runtimeView->historyValueCount] = sampleValue;
-    const std::int32_t movingAverage = sftst_CalcMovAve(runtimeView);
-    runtimeView->movingAveragePrimary = movingAverage;
-    runtimeView->movingAverageAdjusted = movingAverage;
+    history->historyValues[history->historyWriteOrdinal++ % history->historyValueCount] = sampleValue;
+    const std::int32_t movingAverage = sftst_CalcMovAve(history);
+    history->movingAveragePrimary = movingAverage;
+    history->movingAverageAdjusted = movingAverage;
     return movingAverage;
   }
 
@@ -6556,14 +6556,14 @@
    * Subtracts one delta value from every history sample and refreshes the
    * adjusted moving-average lane.
    */
-  std::int32_t sftst_ModifyHist(SftstMovingAverage* const runtimeView, const std::int32_t deltaValue)
+  std::int32_t sftst_ModifyHist(SftstMovingAverage* const history, const std::int32_t deltaValue)
   {
-    for (std::int32_t index = 0; index < runtimeView->historyValueCount; ++index) {
-      runtimeView->historyValues[index] -= deltaValue;
+    for (std::int32_t index = 0; index < history->historyValueCount; ++index) {
+      history->historyValues[index] -= deltaValue;
     }
 
-    const std::int32_t movingAverage = sftst_CalcMovAve(runtimeView);
-    runtimeView->movingAverageAdjusted = movingAverage;
+    const std::int32_t movingAverage = sftst_CalcMovAve(history);
+    history->movingAverageAdjusted = movingAverage;
     return movingAverage;
   }
 
@@ -6830,9 +6830,9 @@
   std::int32_t sfsee_ExecHeadAnaly(const std::int32_t workctrlAddress)
   {
     auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
-    auto* const runtimeView = workctrlSubobj->seekState.handle;
+    auto* const sfseeHandle = workctrlSubobj->seekState.handle;
 
-    std::int32_t result = runtimeView->headAnalyzedFlag;
+    std::int32_t result = sfseeHandle->headAnalyzedFlag;
     if (result != 0) {
       return result;
     }
@@ -6840,7 +6840,7 @@
     std::int32_t audioLaneEnabled = 0;
     result = sfsee_IsAudioAnalyzing(
       workctrlSubobj,
-      &runtimeView->audioAnalyzingLane.analyzingComplete,
+      &sfseeHandle->audioAnalyzingLane.analyzingComplete,
       &audioLaneEnabled
     );
     if (result != 0) {
@@ -6850,54 +6850,54 @@
     std::int32_t videoLaneEnabled = 0;
     result = sfsee_IsVideoAnalyzing(
       workctrlSubobj,
-      &runtimeView->videoAnalyzingLane.analyzingComplete,
+      &sfseeHandle->videoAnalyzingLane.analyzingComplete,
       &videoLaneEnabled
     );
     if (result != 0) {
       return result;
     }
 
-    std::int32_t streamTimeMajor = runtimeView->mpsFallbackTimeMajor;
-    std::int32_t streamTimeMinor = runtimeView->mpsFallbackTimeMinor;
+    std::int32_t streamTimeMajor = sfseeHandle->mpsFallbackTimeMajor;
+    std::int32_t streamTimeMinor = sfseeHandle->mpsFallbackTimeMinor;
 
     if (sfsee_IsMpsStream(workctrlSubobj) == 0) {
       if (videoLaneEnabled != 0) {
-        streamTimeMajor = runtimeView->videoAnalyzingLane.analyzedTimeMajor;
-        streamTimeMinor = runtimeView->videoAnalyzingLane.analyzedTimeMinor;
+        streamTimeMajor = sfseeHandle->videoAnalyzingLane.analyzedTimeMajor;
+        streamTimeMinor = sfseeHandle->videoAnalyzingLane.analyzedTimeMinor;
       } else {
         result = audioLaneEnabled;
         if (result == 0) {
           return result;
         }
 
-        streamTimeMajor = runtimeView->audioAnalyzingLane.analyzedTimeMajor;
-        streamTimeMinor = runtimeView->audioAnalyzingLane.analyzedTimeMinor;
+        streamTimeMajor = sfseeHandle->audioAnalyzingLane.analyzedTimeMajor;
+        streamTimeMinor = sfseeHandle->audioAnalyzingLane.analyzedTimeMinor;
       }
     } else {
-      runtimeView->mpsStreamDetected = 1;
-      if (runtimeView->fileHeader.headerValid != 0) {
-        streamTimeMajor = runtimeView->fileHeader.byteRate;
+      sfseeHandle->mpsStreamDetected = 1;
+      if (sfseeHandle->fileHeader.headerValid != 0) {
+        streamTimeMajor = sfseeHandle->fileHeader.byteRate;
         if (streamTimeMajor > 0) {
-          const std::int32_t fileSizeBytes = runtimeView->fileSizeBytes;
-          const std::int32_t maxPlayLengthVideo = runtimeView->fileHeader.maxPlayLengthVideo;
+          const std::int32_t fileSizeBytes = sfseeHandle->fileSizeBytes;
+          const std::int32_t maxPlayLengthVideo = sfseeHandle->fileHeader.maxPlayLengthVideo;
           if (fileSizeBytes > 0 && maxPlayLengthVideo > 0) {
             streamTimeMajor = UTY_MulDiv(fileSizeBytes, 1000, maxPlayLengthVideo);
           }
-          streamTimeMinor = runtimeView->mpsFallbackTimeMinor;
+          streamTimeMinor = sfseeHandle->mpsFallbackTimeMinor;
         } else {
           if (SFHDS_GetMuxVerNum(workctrlAddress) < 108) {
-            streamTimeMajor = (runtimeView->mpsFallbackTimeMajor << 11) / 2018;
+            streamTimeMajor = (sfseeHandle->mpsFallbackTimeMajor << 11) / 2018;
           } else {
-            streamTimeMajor = runtimeView->mpsFallbackTimeMajor;
+            streamTimeMajor = sfseeHandle->mpsFallbackTimeMajor;
           }
-          streamTimeMinor = runtimeView->mpsFallbackTimeMinor;
+          streamTimeMinor = sfseeHandle->mpsFallbackTimeMinor;
         }
       }
     }
 
-    runtimeView->streamByteRateHint = streamTimeMajor;
-    runtimeView->streamTimeMinorHint = streamTimeMinor;
-    runtimeView->headAnalyzedFlag = 1;
+    sfseeHandle->streamByteRateHint = streamTimeMajor;
+    sfseeHandle->streamTimeMinorHint = streamTimeMinor;
+    sfseeHandle->headAnalyzedFlag = 1;
     return sfsee_UpdateEByteRate(workctrlAddress);
   }
 
@@ -6911,8 +6911,8 @@
   std::int32_t SFSEE_ExecServer(const std::int32_t workctrlAddress)
   {
     auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
-    auto* const runtimeView = workctrlSubobj;
-    if (runtimeView->seekState.handle == nullptr) {
+    auto* const workctrl = workctrlSubobj;
+    if (workctrl->seekState.handle == nullptr) {
       return 0;
     }
 
@@ -7120,8 +7120,8 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleIsSeekAble);
     }
 
-    auto* const runtimeView = workctrlSubobj;
-    (void)sfsee_IsSeekAble(runtimeView->seekState.handle, outSeekable);
+    auto* const workctrl = workctrlSubobj;
+    (void)sfsee_IsSeekAble(workctrl->seekState.handle, outSeekable);
     return 0;
   }
 
@@ -7144,11 +7144,11 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleCnvTimeToPos);
     }
 
-    auto* const runtimeView = workctrlSubobj;
+    auto* const workctrl = workctrlSubobj;
     std::int32_t isSeekable = 0;
-    (void)sfsee_IsSeekAble(runtimeView->seekState.handle, &isSeekable);
+    (void)sfsee_IsSeekAble(workctrl->seekState.handle, &isSeekable);
     if (isSeekable != 0) {
-      (void)sfsee_CnvTimeToPos(runtimeView->seekState.handle, timeMajor, timeMinor, outSeekPosition);
+      (void)sfsee_CnvTimeToPos(workctrl->seekState.handle, timeMajor, timeMinor, outSeekPosition);
     }
     return 0;
   }
@@ -7173,11 +7173,11 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleCnvPosToTime);
     }
 
-    auto* const runtimeView = workctrlSubobj;
+    auto* const workctrl = workctrlSubobj;
     std::int32_t isSeekable = 0;
-    (void)sfsee_IsSeekAble(runtimeView->seekState.handle, &isSeekable);
+    (void)sfsee_IsSeekAble(workctrl->seekState.handle, &isSeekable);
     if (isSeekable != 0) {
-      (void)sfsee_CnvPosToTime(runtimeView->seekState.handle, seekPosition, outTimeMajor, outTimeMinor);
+      (void)sfsee_CnvPosToTime(workctrl->seekState.handle, seekPosition, outTimeMajor, outTimeMinor);
     }
     return 0;
   }
@@ -7257,9 +7257,9 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetSeekPos);
     }
 
-    auto* const runtimeView = workctrlSubobj;
-    if (runtimeView->seekState.handle != nullptr) {
-      runtimeView->seekState.handle->seekBaseReadTotalBytes = seekPositionBytes;
+    auto* const workctrl = workctrlSubobj;
+    if (workctrl->seekState.handle != nullptr) {
+      workctrl->seekState.handle->seekBaseReadTotalBytes = seekPositionBytes;
     }
     return 0;
   }
@@ -7410,9 +7410,9 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetFileSize);
     }
 
-    auto* const runtimeView = workctrlSubobj;
-    if (runtimeView->seekState.handle != nullptr) {
-      runtimeView->seekState.handle->fileSizeBytes = fileSizeBytes;
+    auto* const int32_tPtr = workctrlSubobj;
+    if (int32_tPtr->seekState.handle != nullptr) {
+      int32_tPtr->seekState.handle->fileSizeBytes = fileSizeBytes;
 
       const auto workctrlAddress =
         static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
@@ -7440,10 +7440,10 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetTotTime);
     }
 
-    auto* const runtimeView = workctrlSubobj;
-    if (runtimeView->seekState.handle != nullptr) {
-      runtimeView->seekState.handle->configuredTotalTimeMajor = totalTimeMajor;
-      runtimeView->seekState.handle->configuredTotalTimeMinor = totalTimeMinor;
+    auto* const int32_tPtr = workctrlSubobj;
+    if (int32_tPtr->seekState.handle != nullptr) {
+      int32_tPtr->seekState.handle->configuredTotalTimeMajor = totalTimeMajor;
+      int32_tPtr->seekState.handle->configuredTotalTimeMinor = totalTimeMinor;
 
       const auto workctrlAddress =
         static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
@@ -7468,9 +7468,9 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetByteRate);
     }
 
-    auto* const runtimeView = workctrlSubobj;
-    if (runtimeView->seekState.handle != nullptr) {
-      runtimeView->seekState.handle->configuredByteRate = byteRate;
+    auto* const int32_tPtr = workctrlSubobj;
+    if (int32_tPtr->seekState.handle != nullptr) {
+      int32_tPtr->seekState.handle->configuredByteRate = byteRate;
 
       const auto workctrlAddress =
         static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
@@ -7489,7 +7489,7 @@
    */
   std::int32_t sfsee_ExecFinAnaly(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const runtimeView = reinterpret_cast<SfseeFinAnalyControl*>(workctrlSubobj);
+    auto* const finAnaly = reinterpret_cast<SfseeFinAnalyControl*>(workctrlSubobj);
     moho::SfseeHandle* const sfseeHandle = workctrlSubobj->seekState.handle;
 
     const std::int32_t endcodeSkipResult =
@@ -7501,7 +7501,7 @@
     std::int32_t didUpdateInputTotal = 0;
     if (sfseeHandle->inputReadTotalBytes <= 0) {
       std::int32_t baseReadTotalBytes = 0;
-      if (runtimeView->finAnalyMode != -3) {
+      if (finAnaly->finAnalyMode != -3) {
         baseReadTotalBytes = sfseeHandle->seekBaseReadTotalBytes;
         if (baseReadTotalBytes < 0) {
           baseReadTotalBytes = -1;
@@ -7520,10 +7520,10 @@
 
     std::int32_t effectiveTotalMajor = sfseeHandle->effectiveTotalTimeMajor;
     if (effectiveTotalMajor <= 0) {
-      effectiveTotalMajor = runtimeView->stagedTotalTimeMajor;
+      effectiveTotalMajor = finAnaly->stagedTotalTimeMajor;
       if (effectiveTotalMajor > 0) {
         sfseeHandle->effectiveTotalTimeMajor = effectiveTotalMajor;
-        sfseeHandle->effectiveTotalTimeMinor = runtimeView->stagedTotalTimeMinor;
+        sfseeHandle->effectiveTotalTimeMinor = finAnaly->stagedTotalTimeMinor;
         return sfsee_UpdateEByteRate(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
       }
     }
@@ -7597,13 +7597,13 @@
     constexpr std::int32_t kSelectorTableOffset = 0x1360;
     constexpr std::int32_t kInputTotalTableOffset = 0x1F50;
 
-    const auto* const runtimeView = reinterpret_cast<const SfseeInputRouter*>(
+    const auto* const inputRouter = reinterpret_cast<const SfseeInputRouter*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
     );
-    const auto* const bytes = reinterpret_cast<const std::uint8_t*>(runtimeView);
+    const auto* const bytes = reinterpret_cast<const std::uint8_t*>(inputRouter);
     const auto* const selectorEntries = reinterpret_cast<const SfseeInputSelectorEntry*>(bytes + kSelectorTableOffset);
     const auto* const inputTotalLanes = reinterpret_cast<const SfseeInputTotalLane*>(bytes + kInputTotalTableOffset);
-    const std::int32_t selectorIndex = runtimeView->activeSelectorIndex;
+    const std::int32_t selectorIndex = inputRouter->activeSelectorIndex;
     const std::int32_t inputTotalLaneIndex = selectorEntries[selectorIndex].inputTotalLaneIndex;
     const std::int32_t readTotalBytes = inputTotalLanes[inputTotalLaneIndex].inputReadTotalBytes;
     return (readTotalBytes < 0) ? -1 : readTotalBytes;
@@ -7879,9 +7879,9 @@
         return SFLIB_SetErr(0, kSflibErrInvalidHandleSetMpvCond);
       }
 
-      const auto* const runtimeView = workctrlSubobj;
-      if (runtimeView->transferState.transfer.demux.mpvInfoHandle != nullptr) {
-        decoderHandle = runtimeView->transferState.transfer.demux.mpvInfoHandle->decoderHandle;
+      const auto* const workctrl = workctrlSubobj;
+      if (workctrl->transferState.transfer.demux.mpvInfoHandle != nullptr) {
+        decoderHandle = workctrl->transferState.transfer.demux.mpvInfoHandle->decoderHandle;
       }
     }
 
@@ -7914,9 +7914,9 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetVideoUserStream);
     }
 
-    const auto* const runtimeView = workctrlSubobj;
+    const auto* const workctrl = workctrlSubobj;
     (void)MPV_SetUsrSj(
-      runtimeView->transferState.transfer.demux.mpvInfoHandle->decoderHandle,
+      workctrl->transferState.transfer.demux.mpvInfoHandle->decoderHandle,
       streamIndex,
       streamObjectAddress,
       streamCallbackAddress,
@@ -8323,8 +8323,8 @@
    */
   std::int32_t SFBUF_RingGetDataSiz(const std::int32_t sfbufHandleAddress, const std::int32_t ringIndex)
   {
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    return runtimeView->lanes[ringIndex].queuedDataBytes;
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    return sfbuf->lanes[ringIndex].queuedDataBytes;
   }
 
   /**
@@ -8332,8 +8332,8 @@
    */
   std::int32_t SFBUF_GetRTot(const std::int32_t sfbufHandleAddress, const std::int32_t ringIndex)
   {
-    const auto* const runtimeView = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
-    return runtimeView->lanes[ringIndex].readTotalBytes;
+    const auto* const sfbuf = reinterpret_cast<SfbufHandle*>(SjAddressToPointer(sfbufHandleAddress));
+    return sfbuf->lanes[ringIndex].readTotalBytes;
   }
 
   struct SfbufDestroyLane
@@ -8372,8 +8372,8 @@
    */
   std::int32_t sfbuf_DestroySjSub(const std::int32_t sfbufHandleAddress, const std::int32_t laneIndex)
   {
-    auto* const runtimeView = reinterpret_cast<SfbufDestroy*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufDestroyLane* const laneView = &runtimeView->lanes[laneIndex];
+    auto* const sfbufDestroy = reinterpret_cast<SfbufDestroy*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufDestroyLane* const laneView = &sfbufDestroy->lanes[laneIndex];
 
     std::int32_t result = laneView->laneType;
     if (result == 5) {
@@ -14750,9 +14750,9 @@
     const std::int32_t additionalTicks = UTY_MulDiv(timerState->ticksPerSecond, frameTimeMajor, frameTimeMinor);
 
     SFLIB_LockCs();
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
-    runtimeView->vsyncTimeMajor += additionalTicks;
-    runtimeView->takeOffExecTimeMajor += additionalTicks;
+    auto* const workctrl = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
+    workctrl->vsyncTimeMajor += additionalTicks;
+    workctrl->takeOffExecTimeMajor += additionalTicks;
     SFLIB_UnlockCs();
   }
 
@@ -14769,11 +14769,11 @@
     const std::int32_t frameTimeMinor
   )
   {
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
+    auto* const workctrl = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
     const std::int32_t additionalTicks =
-      UTY_MulDiv(runtimeView->externalReportedMinor, frameTimeMajor, frameTimeMinor);
+      UTY_MulDiv(workctrl->externalReportedMinor, frameTimeMajor, frameTimeMinor);
     SFLIB_LockCs();
-    runtimeView->externalPauseAccumulatedMajor += additionalTicks;
+    workctrl->externalPauseAccumulatedMajor += additionalTicks;
     SFLIB_UnlockCs();
   }
 
@@ -14790,8 +14790,8 @@
     std::int32_t* const outFrameTimeMinor
   )
   {
-    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
-    const std::int32_t decodeChannelMode = runtimeView->decodeChannelMode;
+    const auto* const workctrl = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
+    const std::int32_t decodeChannelMode = workctrl->decodeChannelMode;
     if (decodeChannelMode != 0) {
       *outFrameTimeMajor = 1000;
       *outFrameTimeMinor = SFTIM_prate[decodeChannelMode];
@@ -15148,9 +15148,9 @@
   )
   {
     if (SFTIM_ChkRegularTime(workctrlSubobj, outTimeMajor, outTimeMinor) != 0) {
-      const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
+      const auto* const workctrl = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
       const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
-      *outTimeMajor = runtimeView->vsyncTimeMajor;
+      *outTimeMajor = workctrl->vsyncTimeMajor;
       *outTimeMinor = timerState->ticksPerSecond;
     }
     return 0;
@@ -15192,8 +15192,8 @@
       return regularResult;
     }
 
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
-    if (runtimeView->externalTimeCallbackAddress == 0) {
+    auto* const workctrl = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
+    if (workctrl->externalTimeCallbackAddress == 0) {
       *outTimeMajor = -2;
       *outTimeMinor = 1;
       return regularResult;
@@ -15202,22 +15202,22 @@
     std::int32_t externalMajor = 0;
     std::int32_t externalMinor = 0;
     const auto externalTimeCallback = reinterpret_cast<SftimExternalTimeCallback>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(runtimeView->externalTimeCallbackAddress))
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrl->externalTimeCallbackAddress))
     );
-    const std::int32_t callbackResult = externalTimeCallback(runtimeView->externalCallbackContext, &externalMajor, &externalMinor);
+    const std::int32_t callbackResult = externalTimeCallback(workctrl->externalCallbackContext, &externalMajor, &externalMinor);
 
-    if (sftim_IsTimeIncre(workctrlSubobj) != 0 && runtimeView->previousExternalMajor != -5) {
-      std::int32_t externalDelta = externalMajor - runtimeView->previousExternalMajor;
+    if (sftim_IsTimeIncre(workctrlSubobj) != 0 && workctrl->previousExternalMajor != -5) {
+      std::int32_t externalDelta = externalMajor - workctrl->previousExternalMajor;
       if (externalDelta < 0) {
-        externalDelta += runtimeView->externalWrapMinorLimit + 1;
+        externalDelta += workctrl->externalWrapMinorLimit + 1;
       }
-      runtimeView->externalPauseAccumulatedMajor += externalDelta;
+      workctrl->externalPauseAccumulatedMajor += externalDelta;
     }
 
-    runtimeView->previousExternalMajor = externalMajor;
-    runtimeView->externalReportedMinor = externalMinor;
-    *outTimeMajor = runtimeView->externalPauseAccumulatedMajor;
-    *outTimeMinor = runtimeView->externalReportedMinor;
+    workctrl->previousExternalMajor = externalMajor;
+    workctrl->externalReportedMinor = externalMinor;
+    *outTimeMajor = workctrl->externalPauseAccumulatedMajor;
+    *outTimeMinor = workctrl->externalReportedMinor;
     return callbackResult;
   }
 
@@ -15315,8 +15315,8 @@
    */
   std::int32_t SFTIM_GetAudioStartSample(void* const adxtRuntime, const std::int32_t audioSampleRate)
   {
-    const auto* const runtimeView = static_cast<const SftimAudioStartSample*>(adxtRuntime);
-    const std::int64_t audioStartPts = runtimeView->audioStartPts90k;
+    const auto* const audioStart = static_cast<const SftimAudioStartSample*>(adxtRuntime);
+    const std::int64_t audioStartPts = audioStart->audioStartPts90k;
     if (audioStartPts < 0) {
       return -1;
     }
@@ -15339,18 +15339,18 @@
   std::int32_t
   SFTIM_GetVideoStartSample(void* const adxtRuntime, const std::int32_t audioSampleRate, std::int32_t* const outHasExplicitStartTime)
   {
-    const auto* const runtimeView = static_cast<const SftimVideoStartSample*>(adxtRuntime);
-    const std::int32_t hasExplicitStartTime = runtimeView->hasExplicitStartTime;
+    const auto* const videoStart = static_cast<const SftimVideoStartSample*>(adxtRuntime);
+    const std::int32_t hasExplicitStartTime = videoStart->hasExplicitStartTime;
     *outHasExplicitStartTime = hasExplicitStartTime;
 
-    std::int32_t timeMajor = runtimeView->explicitTimeMajor;
-    std::int32_t timeMinor = runtimeView->explicitTimeMinor;
+    std::int32_t timeMajor = videoStart->explicitTimeMajor;
+    std::int32_t timeMinor = videoStart->explicitTimeMinor;
     if (hasExplicitStartTime == 0) {
-      timeMajor = runtimeView->fallbackTimeMajor;
+      timeMajor = videoStart->fallbackTimeMajor;
       if (timeMajor < 0) {
         return -1;
       }
-      timeMinor = runtimeView->fallbackTimeMinor;
+      timeMinor = videoStart->fallbackTimeMinor;
     }
 
     const std::int32_t startSample = UTY_MulDiv(timeMajor, audioSampleRate, timeMinor);
@@ -15386,9 +15386,9 @@
    */
   void SFTIM_GetTime(const std::int32_t workctrlAddress, std::int32_t* const outTimeMajor, std::int32_t* const outTimeMinor)
   {
-    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
-    *outTimeMajor = runtimeView->currentTimeMajor;
-    *outTimeMinor = runtimeView->currentTimeMinor;
+    const auto* const workctrl = reinterpret_cast<const SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
+    *outTimeMajor = workctrl->currentTimeMajor;
+    *outTimeMinor = workctrl->currentTimeMinor;
   }
 
   /**
@@ -15400,8 +15400,8 @@
    */
   std::int32_t SFTIM_SetSpeed(const std::int32_t workctrlAddress, const std::int32_t speedRational)
   {
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
-    runtimeView->timeBaseScale = speedRational;
+    auto* const workctrl = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
+    workctrl->timeBaseScale = speedRational;
     return speedRational;
   }
 
@@ -15413,8 +15413,8 @@
    */
   std::int32_t SFTIM_GetSpeed(const std::int32_t workctrlAddress)
   {
-    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
-    return runtimeView->timeBaseScale;
+    const auto* const workctrl = reinterpret_cast<const SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
+    return workctrl->timeBaseScale;
   }
 
   /**
@@ -15598,19 +15598,19 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleGetTimePerFile);
     }
 
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
-    const std::int32_t timeMinorDenominator = runtimeView->timeSubScaleDenominator;
+    auto* const workctrl = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
+    const std::int32_t timeMinorDenominator = workctrl->timeSubScaleDenominator;
     *outFileHistoryOrdinal = 0;
 
     const std::int32_t timeResult = SFTIM_GetTimeSub(workctrlSubobj, outTimeMajor, outTimeMinor);
-    if (runtimeView->perFileTimeQueueEnabled != 0 && *outTimeMinor != 1) {
+    if (workctrl->perFileTimeQueueEnabled != 0 && *outTimeMinor != 1) {
       SFLIB_LockCs();
-      std::int32_t historyOrdinal = runtimeView->perFileTimeQueueOrdinal;
+      std::int32_t historyOrdinal = workctrl->perFileTimeQueueOrdinal;
       std::int32_t historyTimeMajor = 0;
       for (std::int32_t iteration = 0; iteration < kPerFileHistoryLaneCount; ++iteration) {
         const std::int32_t ringSlot = historyOrdinal % kPerFileHistoryLaneCount;
         const std::size_t queueIndex = static_cast<std::size_t>(ringSlot < 0 ? (ringSlot + kPerFileHistoryLaneCount) : ringSlot);
-        historyTimeMajor = UTY_MulDiv(runtimeView->perFileQueuedTimeMajor[queueIndex], *outTimeMinor, timeMinorDenominator);
+        historyTimeMajor = UTY_MulDiv(workctrl->perFileQueuedTimeMajor[queueIndex], *outTimeMinor, timeMinorDenominator);
         if (historyTimeMajor <= *outTimeMajor) {
           break;
         }
@@ -15642,17 +15642,17 @@
     std::int32_t* const outTimeMinor
   )
   {
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
+    auto* const workctrl = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
     const std::int32_t result = sfdtim_GetTimeAfterSeek(SjPointerToAddress(workctrlSubobj), outTimeMajor, outTimeMinor);
     const std::int32_t timeMinor = *outTimeMinor;
     if (timeMinor != 1) {
-      if (timeMinor == runtimeView->timeSubWrapMinorValue) {
-        *outTimeMajor += runtimeView->timeSubWrapCarryMajor;
+      if (timeMinor == workctrl->timeSubWrapMinorValue) {
+        *outTimeMajor += workctrl->timeSubWrapCarryMajor;
         return result;
       }
-      if (runtimeView->timeSubScaleEnabled != 0) {
+      if (workctrl->timeSubScaleEnabled != 0) {
         *outTimeMajor +=
-          UTY_MulDiv(runtimeView->timeSubScaleNumerator, timeMinor, runtimeView->timeSubScaleDenominator);
+          UTY_MulDiv(workctrl->timeSubScaleNumerator, timeMinor, workctrl->timeSubScaleDenominator);
       }
     }
     return result;
@@ -15695,16 +15695,16 @@
     std::int32_t* const outShouldExecute
   )
   {
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
-    if (runtimeView->takeOffExecTimeMajor >= 0) {
+    auto* const workctrl = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
+    if (workctrl->takeOffExecTimeMajor >= 0) {
       const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
       const std::int32_t compareResult =
-        UTY_CmpTime(currentTimeMajor, currentTimeMinor, runtimeView->takeOffExecTimeMajor, timerState->ticksPerSecond);
+        UTY_CmpTime(currentTimeMajor, currentTimeMinor, workctrl->takeOffExecTimeMajor, timerState->ticksPerSecond);
       *outShouldExecute = (compareResult != 0) ? 1 : 0;
       return *outShouldExecute;
     }
 
-    runtimeView->takeOffExecTimeMajor = 0;
+    workctrl->takeOffExecTimeMajor = 0;
     *outShouldExecute = 1;
     return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(outShouldExecute));
   }
@@ -15723,8 +15723,8 @@
     std::int32_t* const outShouldExecute
   )
   {
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
-    const double executionWindow = static_cast<double>(runtimeView->executionWindowTicks);
+    auto* const workctrl = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
+    const double executionWindow = static_cast<double>(workctrl->executionWindowTicks);
 
     if (static_cast<double>(executionScaledTime) + executionWindow < static_cast<double>(currentScaledTime)) {
       *outShouldExecute = 0;
@@ -15734,26 +15734,26 @@
     if (static_cast<double>(executionScaledTime) - executionWindow < static_cast<double>(currentScaledTime)) {
       const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
       const std::int32_t guardThreshold =
-        (timerState->ticksPerSecond == 59940 && runtimeView->decodeChannelMode <= 2 && runtimeView->timeBaseScale == 1000)
+        (timerState->ticksPerSecond == 59940 && workctrl->decodeChannelMode <= 2 && workctrl->timeBaseScale == 1000)
         ? 1
         : 0;
 
-      if (runtimeView->graceWindowCounter > guardThreshold) {
+      if (workctrl->graceWindowCounter > guardThreshold) {
         *outShouldExecute = (static_cast<double>(executionScaledTime) >= static_cast<double>(currentScaledTime)) ? 1 : 0;
       } else {
-        *outShouldExecute = runtimeView->lastGraceResult;
+        *outShouldExecute = workctrl->lastGraceResult;
       }
 
-      runtimeView->graceWindowCounter = 0;
-      runtimeView->lastUpperSample = currentScaledTime;
-      runtimeView->lastGraceResult = *outShouldExecute;
+      workctrl->graceWindowCounter = 0;
+      workctrl->lastUpperSample = currentScaledTime;
+      workctrl->lastGraceResult = *outShouldExecute;
       return;
     }
 
     *outShouldExecute = 1;
-    if (runtimeView->lastUpperSample != currentScaledTime && runtimeView->lastLowerSample != currentScaledTime) {
-      runtimeView->lastLowerSample = currentScaledTime;
-      ++runtimeView->graceWindowCounter;
+    if (workctrl->lastUpperSample != currentScaledTime && workctrl->lastLowerSample != currentScaledTime) {
+      workctrl->lastLowerSample = currentScaledTime;
+      ++workctrl->graceWindowCounter;
     }
   }
 
@@ -15789,14 +15789,14 @@
       static_cast<double>(targetTimeMajor) * 10000.0 / static_cast<double>(targetTimeMinor)
     );
     const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
+    auto* const workctrl = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
     currentTimeMajor += (frameStepTicks * currentTimeMinor) / timerState->ticksPerSecond;
 
     const float scaledCurrentTime = static_cast<float>(
       static_cast<double>(currentTimeMajor) * 10000.0 / static_cast<double>(currentTimeMinor)
     );
 
-    if (runtimeView->execComparisonMode == 1) {
+    if (workctrl->execComparisonMode == 1) {
       *outShouldExecute = (scaledTargetTime <= scaledCurrentTime) ? 1 : 0;
       return;
     }
@@ -15888,12 +15888,12 @@
     constexpr std::int32_t kVideoTermDisabled = -5;
     constexpr std::int32_t kTimeScaleBase = 2000;
     constexpr std::int32_t kTimeScaleDenominator = 59940;
-    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
+    const auto* const workctrl = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
 
-    if (runtimeView->videoLaneEnabled == 0) {
+    if (workctrl->videoLaneEnabled == 0) {
       return 1;
     }
-    if (runtimeView->videoTermMajor == kVideoTermDisabled) {
+    if (workctrl->videoTermMajor == kVideoTermDisabled) {
       return 0;
     }
 
@@ -15902,8 +15902,8 @@
     SFTIM_GetTime(SjPointerToAddress(workctrlSubobj), &currentTimeMajor, &currentTimeMinor);
 
     const std::int32_t scaledVideoMajor =
-      runtimeView->videoTermMajor + ((kTimeScaleBase * runtimeView->videoTermMinor) / kTimeScaleDenominator);
-    return UTY_CmpTime(scaledVideoMajor, runtimeView->videoTermMinor, currentTimeMajor, currentTimeMinor);
+      workctrl->videoTermMajor + ((kTimeScaleBase * workctrl->videoTermMinor) / kTimeScaleDenominator);
+    return UTY_CmpTime(scaledVideoMajor, workctrl->videoTermMinor, currentTimeMajor, currentTimeMinor);
   }
 
   /**
@@ -16823,26 +16823,26 @@
       "SfplyFpsMeasurement::measuredFramesPerSecond offset must be 0x363C"
     );
 
-    auto* const runtimeView = reinterpret_cast<SfplyFpsMeasurement*>(workctrlSubobj);
+    auto* const sfplyFpsMeasurement = reinterpret_cast<SfplyFpsMeasurement*>(workctrlSubobj);
     const std::int64_t currentTicks = SFTMR_GetTmr();
-    runtimeView->currentMeasureTicksLow = static_cast<std::uint32_t>(currentTicks & 0xFFFFFFFFull);
-    runtimeView->currentMeasureTicksHigh = static_cast<std::uint32_t>(static_cast<std::uint64_t>(currentTicks) >> 32u);
+    sfplyFpsMeasurement->currentMeasureTicksLow = static_cast<std::uint32_t>(currentTicks & 0xFFFFFFFFull);
+    sfplyFpsMeasurement->currentMeasureTicksHigh = static_cast<std::uint32_t>(static_cast<std::uint64_t>(currentTicks) >> 32u);
 
     const std::int64_t timerUnit = SFTMR_GetTmrUnit();
-    runtimeView->timerUnitLow = static_cast<std::uint32_t>(timerUnit & 0xFFFFFFFFull);
-    runtimeView->timerUnitHigh = static_cast<std::uint32_t>(static_cast<std::uint64_t>(timerUnit) >> 32u);
+    sfplyFpsMeasurement->timerUnitLow = static_cast<std::uint32_t>(timerUnit & 0xFFFFFFFFull);
+    sfplyFpsMeasurement->timerUnitHigh = static_cast<std::uint32_t>(static_cast<std::uint64_t>(timerUnit) >> 32u);
 
     const std::uint64_t previousTicksU64 =
-      (static_cast<std::uint64_t>(runtimeView->previousMeasureTicksHigh) << 32u) | runtimeView->previousMeasureTicksLow;
+      (static_cast<std::uint64_t>(sfplyFpsMeasurement->previousMeasureTicksHigh) << 32u) | sfplyFpsMeasurement->previousMeasureTicksLow;
     const std::uint64_t currentTicksU64 =
-      (static_cast<std::uint64_t>(runtimeView->currentMeasureTicksHigh) << 32u) | runtimeView->currentMeasureTicksLow;
+      (static_cast<std::uint64_t>(sfplyFpsMeasurement->currentMeasureTicksHigh) << 32u) | sfplyFpsMeasurement->currentMeasureTicksLow;
     const std::int64_t elapsedTicks = static_cast<std::int64_t>(currentTicksU64 - previousTicksU64);
 
-    runtimeView->sampledFrameCount = runtimeView->measuredFrameCount;
+    sfplyFpsMeasurement->sampledFrameCount = sfplyFpsMeasurement->measuredFrameCount;
     if (elapsedTicks != 0) {
       const std::int64_t scaledFrameTicks =
-        static_cast<std::int64_t>(runtimeView->sampledFrameCount) * timerUnit;
-      runtimeView->measuredFramesPerSecond =
+        static_cast<std::int64_t>(sfplyFpsMeasurement->sampledFrameCount) * timerUnit;
+      sfplyFpsMeasurement->measuredFramesPerSecond =
         static_cast<float>(static_cast<double>(scaledFrameTicks) / static_cast<double>(elapsedTicks));
     }
   }
@@ -17241,14 +17241,14 @@
 
     auto* const lastHandle = gSfdDebugLastHandle;
     if (lastHandle != nullptr && lastHandle->handleState != 0) {
-      const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(lastHandle);
-      if (runtimeView->externalTimeCallbackAddress != 0) {
+      const auto* const workctrl = reinterpret_cast<const SftimWorkctrl*>(lastHandle);
+      if (workctrl->externalTimeCallbackAddress != 0) {
         std::int32_t callbackTimeMajor = 0;
         std::int32_t callbackTimerUnit = 0;
         const auto externalTimeCallback = reinterpret_cast<SftimExternalTimeCallback>(
-          static_cast<std::uintptr_t>(static_cast<std::uint32_t>(runtimeView->externalTimeCallbackAddress))
+          static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrl->externalTimeCallbackAddress))
         );
-        (void)externalTimeCallback(runtimeView->externalCallbackContext, &callbackTimeMajor, &callbackTimerUnit);
+        (void)externalTimeCallback(workctrl->externalCallbackContext, &callbackTimeMajor, &callbackTimerUnit);
 
         sftmr_tmrunit = static_cast<std::int64_t>(callbackTimerUnit);
         return static_cast<std::int64_t>(callbackTimeMajor);
@@ -17801,9 +17801,9 @@
   );
 
   [[nodiscard]] SfuoDescriptor*
-  ResolveSfuoDescriptor(SfdUserOutput* const runtimeView, const std::int32_t descriptorIndex) noexcept
+  ResolveSfuoDescriptor(SfdUserOutput* const userOutput, const std::int32_t descriptorIndex) noexcept
   {
-    auto* const descriptors = reinterpret_cast<SfuoDescriptor*>(runtimeView->uochDescriptorWords + 1);
+    auto* const descriptors = reinterpret_cast<SfuoDescriptor*>(userOutput->uochDescriptorWords + 1);
     return &descriptors[descriptorIndex];
   }
 
@@ -17927,8 +17927,8 @@
       return result;
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdVideoOutputManual*>(SfdAddressToWorkctrl(sfdHandleAddress));
-    result = SFBUF_GetTermFlg(sfdHandleAddress, runtimeView->sfbufLaneIndex);
+    auto* const videoOutput = reinterpret_cast<SfdVideoOutputManual*>(SfdAddressToWorkctrl(sfdHandleAddress));
+    result = SFBUF_GetTermFlg(sfdHandleAddress, videoOutput->sfbufLaneIndex);
     if (result != 1) {
       return result;
     }
@@ -17955,8 +17955,8 @@
       return result;
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdVideoOutputManual*>(SfdAddressToWorkctrl(sfdHandleAddress));
-    result = SFBUF_GetPrepFlg(sfdHandleAddress, runtimeView->sfbufLaneIndex);
+    auto* const videoOutput = reinterpret_cast<SfdVideoOutputManual*>(SfdAddressToWorkctrl(sfdHandleAddress));
+    result = SFBUF_GetPrepFlg(sfdHandleAddress, videoOutput->sfbufLaneIndex);
     if (result != 1) {
       return result;
     }
@@ -18093,10 +18093,10 @@
   {
     const auto* const workctrlSubobj = SfdAddressToWorkctrl(sfdHandleAddress);
     if (workctrlSubobj->handleState == 3 || workctrlSubobj->handleState == 4) {
-      const auto* const runtimeView = reinterpret_cast<const SfdVideoOutputManual*>(workctrlSubobj);
+      const auto* const videoOutput = reinterpret_cast<const SfdVideoOutputManual*>(workctrlSubobj);
       return SFBUF_VfrmGetRead(
         sfdHandleAddress,
-        runtimeView->sfbufLaneIndex,
+        videoOutput->sfbufLaneIndex,
         static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(outChunkWords)),
         maxBytes
       );
@@ -18118,9 +18118,9 @@
     const std::int32_t arg1
   )
   {
-    const auto* const runtimeView =
+    const auto* const videoOutput =
       reinterpret_cast<const SfdVideoOutputManual*>(SfdAddressToWorkctrl(sfdHandleAddress));
-    return SFBUF_VfrmAddRead(sfdHandleAddress, runtimeView->sfbufLaneIndex, arg0, arg1);
+    return SFBUF_VfrmAddRead(sfdHandleAddress, videoOutput->sfbufLaneIndex, arg0, arg1);
   }
 
   /**
@@ -18203,8 +18203,8 @@
       return result;
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdUserOutput*>(SfdAddressToWorkctrl(sfdHandleAddress));
-    result = SFBUF_GetTermFlg(sfdHandleAddress, runtimeView->sfbufLaneIndex);
+    auto* const userOutput = reinterpret_cast<SfdUserOutput*>(SfdAddressToWorkctrl(sfdHandleAddress));
+    result = SFBUF_GetTermFlg(sfdHandleAddress, userOutput->sfbufLaneIndex);
     if (result != 1) {
       return result;
     }
@@ -18231,8 +18231,8 @@
       return result;
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdUserOutput*>(SfdAddressToWorkctrl(sfdHandleAddress));
-    result = SFBUF_GetPrepFlg(sfdHandleAddress, runtimeView->sfbufLaneIndex);
+    auto* const userOutput = reinterpret_cast<SfdUserOutput*>(SfdAddressToWorkctrl(sfdHandleAddress));
+    result = SFBUF_GetPrepFlg(sfdHandleAddress, userOutput->sfbufLaneIndex);
     if (result != 1) {
       return result;
     }
@@ -18290,11 +18290,11 @@
    */
   std::int32_t SFUO_Create(const std::int32_t sfdHandleAddress)
   {
-    auto* const runtimeView = reinterpret_cast<SfdUserOutput*>(
+    auto* const userOutput = reinterpret_cast<SfdUserOutput*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sfdHandleAddress))
     );
-    runtimeView->uochDescriptorWords = &runtimeView->uochInlineHeader;
-    (void)sfuo_InitInf(sfdHandleAddress, runtimeView->uochDescriptorWords, runtimeView->sfbufLaneIndex);
+    userOutput->uochDescriptorWords = &userOutput->uochInlineHeader;
+    (void)sfuo_InitInf(sfdHandleAddress, userOutput->uochDescriptorWords, userOutput->sfbufLaneIndex);
     return 0;
   }
 
@@ -18486,10 +18486,10 @@
   {
     std::int32_t result = SFTRN_GetPrepFlg(workctrlAddress, kSfaoapTransferLane);
     if (result != 1) {
-      const auto* const runtimeView = reinterpret_cast<const SfdAudioOutputAdapter*>(
+      const auto* const audioAdapter = reinterpret_cast<const SfdAudioOutputAdapter*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
       );
-      result = SFBUF_GetPrepFlg(workctrlAddress, runtimeView->sfbufLaneIndex);
+      result = SFBUF_GetPrepFlg(workctrlAddress, audioAdapter->sfbufLaneIndex);
       if (result == 1) {
         return SFTRN_SetPrepFlg(workctrlAddress, kSfaoapTransferLane, 1);
       }
@@ -18507,10 +18507,10 @@
   {
     std::int32_t result = SFTRN_GetTermFlg(workctrlAddress, kSfaoapTransferLane);
     if (result != 1) {
-      const auto* const runtimeView = reinterpret_cast<const SfdAudioOutputAdapter*>(
+      const auto* const audioAdapter = reinterpret_cast<const SfdAudioOutputAdapter*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
       );
-      result = SFBUF_GetTermFlg(workctrlAddress, runtimeView->sfbufLaneIndex);
+      result = SFBUF_GetTermFlg(workctrlAddress, audioAdapter->sfbufLaneIndex);
       if (result == 1) {
         return SFTRN_SetTermFlg(workctrlAddress, kSfaoapTransferLane, 1);
       }
@@ -18587,11 +18587,11 @@
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
     );
     if (SFSET_GetCond(workctrlSubobj, kSfaoapEnabledCondition) != 0) {
-      auto* const runtimeView = reinterpret_cast<SfdAudioOutputAdapter*>(
+      auto* const audioAdapter = reinterpret_cast<SfdAudioOutputAdapter*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
       );
-      runtimeView->outputDescriptorWords = &runtimeView->outputInlineHeader;
-      sfaoap_InitInf(runtimeView->outputDescriptorWords);
+      audioAdapter->outputDescriptorWords = &audioAdapter->outputInlineHeader;
+      sfaoap_InitInf(audioAdapter->outputDescriptorWords);
     }
     return 0;
   }
@@ -18758,16 +18758,16 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetSystemUsrSj);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdUserOutput*>(workctrlSubobj);
-    if (runtimeView->sfbufLaneIndex == kSfbufLaneSentinel) {
+    auto* const userOutput = reinterpret_cast<SfdUserOutput*>(workctrlSubobj);
+    if (userOutput->sfbufLaneIndex == kSfbufLaneSentinel) {
       return SFLIB_SetErr(SfdWorkctrlToAddress(workctrlSubobj), kSflibErrInvalidSfbufLaneForUserOutput);
     }
 
-    SfuoDescriptor* const descriptor = ResolveSfuoDescriptor(runtimeView, uochSlotIndex);
+    SfuoDescriptor* const descriptor = ResolveSfuoDescriptor(userOutput, uochSlotIndex);
     (void)sfuo_SetUoch(descriptor, word0, 0, word2, word3);
     (void)SFBUF_SetUoch(
       SfdWorkctrlToAddress(workctrlSubobj),
-      runtimeView->sfbufLaneIndex,
+      userOutput->sfbufLaneIndex,
       uochSlotIndex,
       &descriptor->word0
     );
@@ -18799,14 +18799,14 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetUsrSj);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdUserOutput*>(workctrlSubobj);
-    if (runtimeView->sfbufLaneIndex == kSfbufLaneSentinel) {
+    auto* const userOutput = reinterpret_cast<SfdUserOutput*>(workctrlSubobj);
+    if (userOutput->sfbufLaneIndex == kSfbufLaneSentinel) {
       return SFLIB_SetErr(sfdHandleAddress, kSflibErrInvalidSfbufLaneForUserOutput);
     }
 
-    SfuoDescriptor* const descriptor = ResolveSfuoDescriptor(runtimeView, uochSlotIndex);
+    SfuoDescriptor* const descriptor = ResolveSfuoDescriptor(userOutput, uochSlotIndex);
     (void)sfuo_SetUoch(descriptor, word0, word1, 0, 0);
-    (void)SFBUF_SetUoch(sfdHandleAddress, runtimeView->sfbufLaneIndex, uochSlotIndex, &descriptor->word0);
+    (void)SFBUF_SetUoch(sfdHandleAddress, userOutput->sfbufLaneIndex, uochSlotIndex, &descriptor->word0);
     return 0;
   }
 
@@ -19232,8 +19232,8 @@
     outPlaybackTimestampWords[3] = 0;
 
     if (workctrlSubobj != nullptr) {
-      const auto* const runtimeView = reinterpret_cast<const SfdPlaybackTimestampSource*>(workctrlSubobj);
-      if (runtimeView->streamDescriptor == &SFD_tr_sd_m2ts) {
+      const auto* const sfdPlaybackTimestampSource = reinterpret_cast<const SfdPlaybackTimestampSource*>(workctrlSubobj);
+      if (sfdPlaybackTimestampSource->streamDescriptor == &SFD_tr_sd_m2ts) {
         const auto* const m2tsdRuntime = reinterpret_cast<const M2TsdState*>(
           SjAddressToPointer(workctrlSubobj->transferState.transfer.demux.demuxInit->m2ts.m2tsdRuntimeAddress)
         );
@@ -19266,8 +19266,8 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleGetPlaybackInfo);
     }
 
-    const auto* const runtimeView = reinterpret_cast<const SfdPlaybackInfo*>(workctrlSubobj);
-    std::memcpy(outPlaybackInfo, &runtimeView->playbackInfo, sizeof(runtimeView->playbackInfo));
+    const auto* const sfdPlaybackInfo = reinterpret_cast<const SfdPlaybackInfo*>(workctrlSubobj);
+    std::memcpy(outPlaybackInfo, &sfdPlaybackInfo->playbackInfo, sizeof(sfdPlaybackInfo->playbackInfo));
     return 0;
   }
 
@@ -19315,8 +19315,8 @@
     }
 
     auto* const mergedTimerInfo = static_cast<moho::SfplyTimerInfo*>(outTimerInfo);
-    const auto* const runtimeView = reinterpret_cast<const SfdTimerInfo*>(workctrlSubobj);
-    std::memcpy(mergedTimerInfo, &runtimeView->timerInfo, sizeof(runtimeView->timerInfo));
+    const auto* const sfdTimerInfo = reinterpret_cast<const SfdTimerInfo*>(workctrlSubobj);
+    std::memcpy(mergedTimerInfo, &sfdTimerInfo->timerInfo, sizeof(sfdTimerInfo->timerInfo));
 
     auto& aggregateSummary = mergedTimerInfo->summaries[0];
     for (std::size_t summaryIndex = 1; summaryIndex < 4; ++summaryIndex) {
@@ -19438,12 +19438,12 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleGetSofdecHeader);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSofdecHeader*>(workctrlSubobj);
-    if (runtimeView->fileHeaderState != 0) {
+    auto* const sofdecHeader = reinterpret_cast<SfdSofdecHeader*>(workctrlSubobj);
+    if (sofdecHeader->fileHeaderState != 0) {
       *outHeaderWordsAddress = static_cast<std::int32_t>(
-        static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&runtimeView->sofdecHeaderWord0))
+        static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&sofdecHeader->sofdecHeaderWord0))
       );
-      *outHeaderWordCount = runtimeView->sofdecHeaderWordCount;
+      *outHeaderWordCount = sofdecHeader->sofdecHeaderWordCount;
     } else {
       *outHeaderWordsAddress = 0;
       *outHeaderWordCount = 0;
@@ -19501,8 +19501,8 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetUsrIsSkipFn);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdUserSkipCallback*>(workctrlSubobj);
-    runtimeView->userSkipCallbackAddress = callbackAddress;
+    auto* const sfdUserSkipCallback = reinterpret_cast<SfdUserSkipCallback*>(workctrlSubobj);
+    sfdUserSkipCallback->userSkipCallbackAddress = callbackAddress;
     return 0;
   }
 
@@ -19546,19 +19546,19 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetExternalClockCallback);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdExternalClock*>(workctrlSubobj);
+    auto* const externalClock = reinterpret_cast<SfdExternalClock*>(workctrlSubobj);
     if (callbackAddress != 0) {
-      runtimeView->externalClockCallbackAddress = callbackAddress;
-      runtimeView->externalClockParam0 = callbackParam0;
-      runtimeView->externalClockParam1 = callbackParam1;
+      externalClock->externalClockCallbackAddress = callbackAddress;
+      externalClock->externalClockParam0 = callbackParam0;
+      externalClock->externalClockParam1 = callbackParam1;
       (void)SFSET_SetCond(workctrlSubobj, 15, 5);
       (void)SFSET_SetCond(workctrlSubobj, 71, 0);
     } else {
       (void)SFSET_SetCond(workctrlSubobj, 71, 1);
       (void)SFSET_SetCond(workctrlSubobj, 15, 1);
-      runtimeView->externalClockParam1 = callbackParam1;
-      runtimeView->externalClockParam0 = callbackParam0;
-      runtimeView->externalClockCallbackAddress = 0;
+      externalClock->externalClockParam1 = callbackParam1;
+      externalClock->externalClockParam0 = callbackParam0;
+      externalClock->externalClockCallbackAddress = 0;
     }
     return 0;
   }

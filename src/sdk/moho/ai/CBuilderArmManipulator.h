@@ -146,7 +146,7 @@ namespace moho
      * The pair the `CBuilderArmManipulatorGetHeadingPitch` /
      * `SetHeadingPitch` Lua binders read and write. MSVC emitted an
      * out-of-line accessor for each, and all three were recovered as free
-     * functions over an `IAniManipulatorScalarPairRuntimeView` -- a pad to
+     * functions over an the deleted overlay -- a pad to
      * `+0x88` plus two floats, laid over this class and over
      * `CBoneEntityManipulator` at the same time. Removed 2026-09-22 (RULE
      * ONE); all three have zero callers and are unreachable.

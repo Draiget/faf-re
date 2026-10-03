@@ -75,7 +75,7 @@ namespace
   // `gpg::fastvector_n<Wm3::Vector3f, 2>`, and the 0x18 it adds for the
   // capacity is two 12-byte keys, not six dwords. It is cited on the container
   // (gpg/core/containers/FastVector.h) and on the curve (SEfxCurve.h); the
-  // `EmbeddedDwordVectorHeaderOffset10RuntimeView` that used to stand in for
+  // the deleted overlay that used to stand in for
   // `SEfxCurve` here, and the `[[maybe_unused]]` initializer written over it,
   // are gone.
 

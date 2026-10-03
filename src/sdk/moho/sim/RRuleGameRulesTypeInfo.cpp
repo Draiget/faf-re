@@ -53,7 +53,7 @@ namespace moho
   // is the confirmation rather than a coincidence: /OPT:ICF would have folded
   // two byte-identical COMDATs onto one address, so two addresses means
   // neither is a COMDAT. Both were previously recovered as a named getter
-  // (`ReadAuxiliaryRuntimeWord`, over an invented `AuxiliaryWordRuntimeView`);
+  // (the deleted overlay, over an invented the deleted overlay);
   // that body has been deleted and both tokens marked skip.
   //
   // The real "read dtrFunc_ back and invoke it" mechanism is recovered and

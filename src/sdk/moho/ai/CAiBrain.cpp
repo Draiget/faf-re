@@ -480,8 +480,8 @@ namespace
     return (row.mOccupancyWords[wordIndex] & (1 << (column & 0x1F))) != 0;
   }
 
-  // `CSquadUnitsRuntimeView` (0x10 pad bytes then `void** mUnitSlotsStart/End`
-  // at +0x10/+0x14) and `CPlatoonLuaRuntimeView` (`mLuaObj` at +0x20, a squad
+  // the deleted overlay (0x10 pad bytes then `void** mUnitSlotsStart/End`
+  // at +0x10/+0x14) and the deleted overlay (`mLuaObj` at +0x20, a squad
   // pointer pair at +0x40/+0x44, `mUniqueName` at +0xAC) used to stand here,
   // together with a `CountSquadUnits`/`CountPlatoonUnits` pair that walked
   // them. Every one of those offsets names a field `CSquad`/`CPlatoon` already

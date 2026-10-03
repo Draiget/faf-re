@@ -660,22 +660,6 @@ namespace
   }
 
   /**
-   * Address: 0x00813DD0 (FUN_00813DD0)
-   *
-   * What it does:
-   * Argument-order adapter that forwards one shoreline-cell shared-pointer
-   * range copy into `CopyShoreCellRefRange`.
-   */
-  [[maybe_unused]] ShoreCellRef* CopyShoreCellRefRangeArgumentOrderAdapter(
-    ShoreCellRef* sourceBegin,
-    ShoreCellRef* const sourceEnd,
-    ShoreCellRef* const destination
-  )
-  {
-    return CopyShoreCellRefRange(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
    * Address: 0x008140F0 (FUN_008140F0, sub_8140F0)
    *
    * What it does:

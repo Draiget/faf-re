@@ -273,25 +273,6 @@ void moho::register_EntityCategorySetVectorTypeStartup()
 
 namespace
 {
-  /**
-   * Tears down a partially-constructed `EntityCategorySet` range during
-   * exception unwind from the container's uninitialized copy. Mirrors
-   * the container's element-destroy lane (the
-   * fastvector resets to inline storage, freeing any heap-backed words).
-   */
-  void DestroyConstructedEntityCategorySetRange(
-    moho::EntityCategorySet* const begin,
-    moho::EntityCategorySet* const end
-  ) noexcept
-  {
-    if (begin == nullptr || end == nullptr || end <= begin) {
-      return;
-    }
-
-    for (moho::EntityCategorySet* cursor = begin; cursor != end; ++cursor) {
-      gpg::core::legacy::ResetStorageToInline(cursor->mBits.mWords);
-    }
-  }
 } // namespace
 
 /**

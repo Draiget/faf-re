@@ -57,38 +57,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x0051A0A0 (FUN_0051A0A0)
-     *
-     * What it does:
-     * Adapts one register-lane caller shape into the canonical counted
-     * `RMeshBlueprintLOD` copy-with-rollback helper.
-     */
-    [[maybe_unused]] RMeshBlueprintLOD* CopyRMeshBlueprintLODCountedRangeRegisterAdapter(
-      RMeshBlueprintLOD* const destination,
-      const int count,
-      const RMeshBlueprintLOD* const source
-    )
-    {
-      return CopyRMeshBlueprintLODCountedRangeWithRollback(destination, count, source);
-    }
-
-    /**
-     * Address: 0x0051A640 (FUN_0051A640)
-     *
-     * What it does:
-     * Alternate register-shape adapter lane that forwards one counted
-     * `RMeshBlueprintLOD` copy-with-rollback request into the canonical helper.
-     */
-    [[maybe_unused]] RMeshBlueprintLOD* CopyRMeshBlueprintLODCountedRangeRegisterAdapterAlt(
-      RMeshBlueprintLOD* const destination,
-      const int count,
-      const RMeshBlueprintLOD* const source
-    )
-    {
-      return CopyRMeshBlueprintLODCountedRangeWithRollback(destination, count, source);
-    }
-
-    /**
      * Address: 0x0051B330 (FUN_0051B330, copy_RMeshBlueprintLOD_range_with_rollback)
      * Address: 0x0051B4A0 (FUN_0051B4A0, sub_51B4A0)
      *
@@ -119,70 +87,6 @@ namespace moho
         }
         throw;
       }
-    }
-
-    /**
-     * Address: 0x0051AE30 (FUN_0051AE30)
-     *
-     * What it does:
-     * Adapter lane that forwards one destination/source range copy request
-     * into the canonical mesh-LOD range copy-with-rollback helper.
-     */
-    [[maybe_unused]] [[nodiscard]] RMeshBlueprintLOD* CopyRMeshBlueprintLODRangeAdapterLaneA(
-      RMeshBlueprintLOD* const destinationBegin,
-      RMeshBlueprintLOD* const destinationEnd,
-      const RMeshBlueprintLOD* const sourceBegin
-    )
-    {
-      return CopyRMeshBlueprintLODRangeWithRollback(destinationBegin, destinationEnd, sourceBegin);
-    }
-
-    /**
-     * Address: 0x0051B020 (FUN_0051B020)
-     *
-     * What it does:
-     * Adapter lane that forwards one destination/source range copy request
-     * into the canonical mesh-LOD range copy-with-rollback helper.
-     */
-    [[maybe_unused]] [[nodiscard]] RMeshBlueprintLOD* CopyRMeshBlueprintLODRangeAdapterLaneB(
-      RMeshBlueprintLOD* const destinationBegin,
-      RMeshBlueprintLOD* const destinationEnd,
-      const RMeshBlueprintLOD* const sourceBegin
-    )
-    {
-      return CopyRMeshBlueprintLODRangeWithRollback(destinationBegin, destinationEnd, sourceBegin);
-    }
-
-    /**
-     * Address: 0x0051B190 (FUN_0051B190)
-     *
-     * What it does:
-     * Adapter lane that forwards one destination/source range copy request
-     * into the canonical mesh-LOD range copy-with-rollback helper.
-     */
-    [[maybe_unused]] [[nodiscard]] RMeshBlueprintLOD* CopyRMeshBlueprintLODRangeAdapterLaneC(
-      RMeshBlueprintLOD* const destinationBegin,
-      RMeshBlueprintLOD* const destinationEnd,
-      const RMeshBlueprintLOD* const sourceBegin
-    )
-    {
-      return CopyRMeshBlueprintLODRangeWithRollback(destinationBegin, destinationEnd, sourceBegin);
-    }
-
-    /**
-     * Address: 0x0051B220 (FUN_0051B220)
-     *
-     * What it does:
-     * Adapter lane that forwards one destination/source range copy request
-     * into the canonical mesh-LOD range copy-with-rollback helper.
-     */
-    [[maybe_unused]] [[nodiscard]] RMeshBlueprintLOD* CopyRMeshBlueprintLODRangeAdapterLaneD(
-      RMeshBlueprintLOD* const destinationBegin,
-      RMeshBlueprintLOD* const destinationEnd,
-      const RMeshBlueprintLOD* const sourceBegin
-    )
-    {
-      return CopyRMeshBlueprintLODRangeWithRollback(destinationBegin, destinationEnd, sourceBegin);
     }
 
     /**

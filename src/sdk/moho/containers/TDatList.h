@@ -153,7 +153,7 @@ namespace moho
      *   0x00409930, 0x0040A860, 0x0040A990, 0x0040AC20, 0x00431E90 ...) that is
      *   what identifies it as one template body rather than twenty hand-written
      *   unlinks; zero callers, unreachable; formerly
-     *   `UnlinkNodeAndRestoreSelfLinks` over an `IntrusiveNodeRuntimeView` in
+     *   `UnlinkNodeAndRestoreSelfLinks` over an `IntrusiveNode` in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      * Address: 0x007C0CA0 (FUN_007C0CA0 -- the `TDatListItem<SPeer, void>`
      *   emission, reached by `jmp` from the funclets that destroy
@@ -221,7 +221,7 @@ namespace moho
      * Address: 0x0063BFF0 (FUN_0063BFF0 -- the `moho::TDatListItem<IAniManipulator, void>`
      *   emission; ICF twin of 0x00442DA0/0x00443020/0x00443230 above, which is
      *   what identifies it. Zero callers, unreachable; formerly
-     *   `InitializeNodeSelfLinks` over an `IntrusiveNodeRuntimeView` in
+     *   `InitializeNodeSelfLinks` over an `IntrusiveNode` in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      * Address: 0x00659950 (FUN_00659950 -- the `moho::TDatListItem<IEffect, void>`
      *   emission, `this` in EAX; ICF twin of 0x00442DA0 above. Zero references in

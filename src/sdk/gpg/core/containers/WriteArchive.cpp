@@ -42,7 +42,7 @@ using TrackedPointerMap = msvc8::map<RRef, WriteArchive::TrackedPointerRecord, R
 class BinaryWriteArchive;
 
 // Defined below `BinaryWriteArchive`, which owns the stream handle these lanes
-// write through. This replaces a `BinaryWriteArchiveFileRuntimeView` reach-in
+// write through. This replaces a deleted overlay reach-in
 // struct that cast the archive to `{ uint8_t[0x28]; FILE* stream; }` and read
 // offset 0x28 directly. That read was out of bounds: the class was 0x24 bytes
 // here (its base was 4 short and the duplicate handle was missing), so the lane

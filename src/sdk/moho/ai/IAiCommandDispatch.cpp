@@ -15,7 +15,7 @@ gpg::RType* IAiCommandDispatch::sType = nullptr;
  * member is its vptr -- so there is no body to write here.
  *
  * `InitializeIAiCommandDispatchInterfaceLane` used to transcribe 0x00599110 as
- * a free function over a `ListenerQueueStatusRuntimeView` stand-in, and
+ * a free function over a deleted overlay stand-in, and
  * `InitializeQueueStatusListenerLane` did the same for 0x00599120. Neither had
  * a caller, and neither was source: 0x00599120 is
  * `Listener<EUnitCommandQueueStatus>::Listener()`, now annotated on the

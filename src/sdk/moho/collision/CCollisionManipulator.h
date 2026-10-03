@@ -148,7 +148,7 @@ namespace moho
      *   dropping bit 16, the per-tick transient the collision pass sets. The
      *   disable half of `EnableCollisionCallbacks` above. Zero callers,
      *   unreachable; formerly `ResetWatchBoneTransientBits` over an
-     *   `IAniManipulatorWatchBoneRuntimeView` in
+     *   the deleted overlay in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      */
     bool mCollisionCallbacksEnabled;    // +0x84

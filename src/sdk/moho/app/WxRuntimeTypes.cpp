@@ -3851,7 +3851,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
     // CameraImpl's own CameraGetView()/UpdateCoords() computed a perfectly
     // sane transform. CameraGetView() is the real, correctly-offset
     // accessor for the embedded GeomCamera3 (CameraImpl.cpp:2007-2010:
-    // `return AsRuntimeView(this)->mCam;`).
+    // `return As(this)->mCam;`).
     moho::CameraImpl* const cameraImpl = worldView->mView->GetCamera();
     mCam = cameraImpl != nullptr
       ? const_cast<moho::GeomCamera3*>(&cameraImpl->CameraGetView())

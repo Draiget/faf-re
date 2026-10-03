@@ -10,7 +10,7 @@ namespace gpg
 	 * Address: 0x00610EB0 (FUN_00610EB0 -- the implicit copy of one `Rect2i`
 	 * into caller storage, four dwords wide: `SNavGoal::mPos2` handed out by a
 	 * guard-task accessor. Zero callers, unreachable; formerly
-	 * `CopySNavGoalTailDwordQuad` over a `SNavGoalTailDwordQuadRuntimeView`
+	 * `CopySNavGoalTailDwordQuad` over a deleted overlay
 	 * stand-in in moho/unit/tasks/CUnitGuardTask.cpp (RULE ONE), removed
 	 * 2026-09-18.)
 	 */

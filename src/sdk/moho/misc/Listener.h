@@ -41,7 +41,7 @@ namespace moho
      *   `InitializePathNavigatorListenerLane` in CAiPathNavigator.cpp.)
      * Address: 0x00865710 (FUN_00865710, Listener<SSelectionEvent> ctor lane,
      *   vtable 0x00E47A10; formerly `InitializeSelectionEventListenerLane`
-     *   over a `SelectionEventListenerRuntimeLane` in CWldSession.cpp.)
+     *   over a deleted overlay in CWldSession.cpp.)
      * Address: 0x00869800 (FUN_00869800, Listener<SPauseEvent> ctor lane,
      *   vtable 0x00E47B30; formerly `InitializePauseEventListenerLane`.)
      * Address: 0x00447460 (FUN_00447460, Listener<SD3DDeviceEvent const&>

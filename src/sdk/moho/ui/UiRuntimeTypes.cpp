@@ -119,7 +119,7 @@ namespace
 {
   /**
    * The UI classes here are thin: their real layout lives in the matching
-   * `*RuntimeView`, so placement-new runs only the vptr-carrying constructors
+   * `*deleted overlay, so placement-new runs only the vptr-carrying constructors
    * and none of the member constructors the binary's real classes have.
    * `operator new` hands back uninitialised bytes, so lanes such as
    * `CScriptObject::cObject` (+0x0C) and `mLuaObj` (+0x20) start as garbage.
@@ -1699,7 +1699,7 @@ namespace
    * allocation site asks for `operator new(0x20)` (0x00870B43 in
    * `CUIWorldView::HandleEvent`), which is the size asserted below.
    *
-   * This was previously modelled as a vtable-less `CameraDraggerRuntimeView`
+   * This was previously modelled as a vtable-less `CameraDragger`
    * aggregate whose helpers were all unreachable. Since `HandleEvent` hands the
    * instance to `func_PostDragger`, which dispatches
    * `OnCurrentDraggerReplaced` through slot +0x0C on the *previous* dragger,
@@ -1799,7 +1799,7 @@ namespace
    * exactly the `operator new(0x24)` the sole allocation site issues
    * (0x00870D8C in `CUIWorldView::HandleEvent`).
    *
-   * The previous `MiniMapDraggerRuntimeView` modelling put a spare dword at
+   * The previous the deleted overlay modelling put a spare dword at
    * +0x08 and the string at +0x0C, which made the object 0x28 bytes; that
    * offset is corrected here against the constructor disassembly.
    */
@@ -2590,7 +2590,7 @@ namespace
     return screenPoint;
   }
 
-  // CUIWorldMeshRuntimeView used to sit here: a pad-to-0x34 struct whose only
+  // CUIWorldMesh used to sit here: a pad-to-0x34 struct whose only
   // member aliased CUIWorldMesh::mMeshInstance. That member is public and
   // typed on the class, at the same offset and with its own static_assert, so
   // the twelve call sites below now read `worldMesh->mMeshInstance` directly
@@ -20486,7 +20486,7 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedSphereL(
 
   // The owner accessor at 0x0086AF80 does exactly this -- refresh the mesh
   // instance's interpolated lanes and hand back its world sphere -- so call it
-  // by name instead of reaching through a CUIWorldMeshRuntimeView at +0x34.
+  // by name instead of reaching through a CUIWorldMesh at +0x34.
   Wm3::Sphere3f sphere{};
   sphere.Center = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
   sphere.Radius = 0.0f;
