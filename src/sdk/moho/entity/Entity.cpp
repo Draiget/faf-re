@@ -257,51 +257,6 @@ namespace
     return &syncData->mNewEntities.back();
   }
 
-  /**
-   * Address: 0x00558EC0 (FUN_00558EC0, sub_558EC0) + 0x00559190 grow lane
-   *
-   * What it does:
-   * Resizes `vector` to exactly `count` `std::uint32_t` slots, filling any newly
-   * created tail slots with `fillValue`. Shrinks in place by moving `mEnd`
-   * (matches the `v6 != a3->end` early-out at 0x00558EC0); grows in place when
-   * spare capacity is sufficient, otherwise reallocates a fresh block via the
-   * grow lane (`sub_559190`) and installs it. The vector is the engine's
-   * `SSTIInlineUIntVector` small-buffer container, so this is typed field access
-   * on its named `mBegin`/`mEnd`/`mCapacityEnd` lanes, not raw offset math.
-   */
-  void ResizeAndFillAuxValueVector(
-    moho::SSTIInlineUIntVector& vector,
-    const std::size_t count,
-    const std::uint32_t fillValue)
-  {
-    const std::size_t current = vector.Size();
-    if (count <= current) {
-      vector.mEnd = vector.mBegin + count;
-      return;
-    }
-
-    if (count > vector.Capacity()) {
-      auto* const newStorage = new std::uint32_t[count];
-      if (vector.mBegin == vector.mInlineBegin) {
-        vector.mInlineStorage0 =
-          static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(vector.mCapacityEnd));
-      } else {
-        delete[] vector.mBegin;
-      }
-      if (current != 0u) {
-        std::memcpy(newStorage, vector.mBegin, current * sizeof(std::uint32_t));
-      }
-      vector.mBegin = newStorage;
-      vector.mCapacityEnd = newStorage + count;
-    }
-
-    std::uint32_t* const newEnd = vector.mBegin + count;
-    for (std::uint32_t* slot = vector.mBegin + current; slot != newEnd; ++slot) {
-      *slot = fillValue;
-    }
-    vector.mEnd = newEnd;
-  }
-
   [[nodiscard]] float ReadLuaNumberArgument(LuaPlus::LuaState* const state, const int stackIndex)
   {
     LuaPlus::LuaStackObject arg(state, stackIndex);
@@ -3280,12 +3235,11 @@ namespace moho
     Entity* const parent = mAttachInfo.GetAttachTargetEntity();
     mVarDat.mAttachmentParentRef = parent ? parent->id_ : kInvalidEntityId;
 
-    ResizeAndFillAuxValueVector(mVarDat.mAuxValueVector, mAttachedEntities.size(), kInvalidEntityId);
+    mVarDat.mAuxValueVector.Resize(mAttachedEntities.size(), kInvalidEntityId);
     for (std::size_t i = 0; i < mAttachedEntities.size(); ++i) {
       Entity* const child = mAttachedEntities[i];
       mVarDat.mAuxValueVector.mBegin[i] = child ? child->id_ : kInvalidEntityId;
     }
-
     // The whole block goes to the client verbatim. It is a plain member now, so
     // this is an ordinary argument rather than the `(char*)this + 0x78` cast the
     // flattened spelling forced.

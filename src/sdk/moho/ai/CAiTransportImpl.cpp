@@ -301,69 +301,6 @@ namespace
     return (dx * dx) + (dy * dy) + (dz * dz);
   }
 
-  [[nodiscard]] SAttachPoint*
-  CopyAttachPointRangeNullable(SAttachPoint* destination, const SAttachPoint* sourceBegin, const SAttachPoint* sourceEnd) noexcept;
-
-  /**
-   * Address: 0x005EE110 (FUN_005EE110, func_CopyAttachDataVector)
-   *
-   * What it does:
-   * Copies one contiguous `SAttachPoint` range into destination storage and
-   * returns the advanced destination cursor.
-   */
-  [[nodiscard]] SAttachPoint*
-  CopyAttachPointRange(SAttachPoint* destination, const SAttachPoint* sourceBegin, const SAttachPoint* sourceEnd) noexcept
-  {
-    return CopyAttachPointRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005EC510 (FUN_005EC510, func_SAttachPointPtr_memcpy)
-   *
-   * What it does:
-   * Adapts the VC8 vector-copy calling lane `(end, start, dest)` into the
-   * typed contiguous attach-point range copy helper call shape.
-   */
-  [[nodiscard]] SAttachPoint* CopyAttachPointRangeAdapter(
-    const SAttachPoint* sourceEnd,
-    const SAttachPoint* sourceBegin,
-    SAttachPoint* destination
-  ) noexcept
-  {
-    return CopyAttachPointRange(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005EF610 (FUN_005EF610, std::vector_SAttachPoint::copy_helper)
-   * Address: 0x005EF660 (FUN_005EF660, func_SAttachPointPtr::memcpy)
-   *
-   * What it does:
-   * Copies one contiguous `SAttachPoint` range into destination storage when
-   * destination is non-null; still advances and returns the destination cursor.
-   */
-  [[nodiscard]] SAttachPoint* CopyAttachPointRangeNullable(
-    SAttachPoint* destination,
-    const SAttachPoint* sourceBegin,
-    const SAttachPoint* sourceEnd
-  ) noexcept
-  {
-    const SAttachPoint* source = sourceBegin;
-    while (source != sourceEnd) {
-      if (destination != nullptr) {
-        destination->index = source->index;
-        destination->localPos.x = source->localPos.x;
-        destination->localPos.y = source->localPos.y;
-        destination->localPos.z = source->localPos.z;
-        destination->distSq = source->distSq;
-      }
-
-      ++source;
-      ++destination;
-    }
-
-    return destination;
-  }
-
   /**
    * Address: 0x00405050 (FUN_00405050, func_max)
    *
@@ -1227,26 +1164,23 @@ bool CAiTransportImpl::TransportValidateType(const RUnitBlueprint* const unitBlu
 /**
  * Address: 0x005E9700 (FUN_005E9700, ??0vector_SAttachPoint@std@@QAE@@Z)
  * Mangled: ??0vector_SAttachPoint@std@@QAE@@Z
+ * Address: 0x005EC510 (FUN_005EC510) / 0x005EE110 (FUN_005EE110) /
+ *   0x005EF610 (FUN_005EF610) / 0x005EF660 (FUN_005EF660) — the VC8
+ *   clear+resize+contiguous-copy emission family for the trivially copyable
+ *   `SAttachPoint` element, all cited on the `msvc8::vector<T>` members in
+ *   legacy/containers/Vector.h; the per-T lane helpers that stood in for
+ *   them are removed.
  *
  * What it does:
- * Rebuilds one destination attach-point vector from source lanes using the
- * same zero-init + resize + copy sequence as the VC8 helper constructor.
+ * Rebuilds one destination attach-point vector from the source vector —
+ * the VC8 helper-constructor shape expressed as `operator=`.
  */
 msvc8::vector<SAttachPoint>* CAiTransportImpl::CopyAttachPointVector(
   const msvc8::vector<SAttachPoint>& source,
   msvc8::vector<SAttachPoint>& destination
 )
 {
-  destination.clear();
-  if (source.empty()) {
-    return &destination;
-  }
-
-  destination.resize(source.size());
-  SAttachPoint* const destinationBegin = destination.begin();
-  const SAttachPoint* const sourceBegin = source.begin();
-  const SAttachPoint* const sourceEnd = source.end();
-  (void)CopyAttachPointRangeAdapter(sourceEnd, sourceBegin, destinationBegin);
+  destination = source;
   return &destination;
 }
 

@@ -2843,6 +2843,22 @@ namespace msvc8
          * Address: 0x0057FF70 (FUN_0057FF70, msvc8::vector<moho::SPointVector>::reserve
          * out-of-line emission — reallocate-to-capacity for the 0x18-byte element;
          * invoked by name from gpg::RVectorType_SPointVector::SerLoad's reserve(count) path)
+         * Address: 0x00513980 (FUN_00513980, msvc8::vector<msvc8::string>::reserve's
+         * typed move-relocate loop body with its EH funclets — for each source string,
+         * default-constructs the destination slot, clears it, and swaps the 7-dword
+         * slot so source is left empty; unwind destroys partially-constructed
+         * destinations. Emitted from gpg::RVectorType_string::Reserve's
+         * `value.reserve(count)` (REntityBlueprintTypeInfo.cpp); formerly
+         * `MoveConstructStringRangeViaSwap` plus an invented empty-range invocation
+         * there (RULE ONE), removed 2026-10-03.)
+         * Address: 0x005EF610/0x005EF660/0x005EC510/0x005EE110 (FUN_005EF610,
+         * FUN_005EF660, FUN_005EC510, FUN_005EE110 -- the contiguous-copy family for
+         * the trivially copyable `SAttachPoint` element (`CAiTransportImpl`'s attach
+         * vectors): null-tested per-element copy, memcpy-shaped clone, and the
+         * `(end, start, dest)` register-order adapters. Emitted from
+         * `CAiTransportImpl::CopyAttachPointVector`'s `destination = source`
+         * (CAiTransportImpl.cpp); formerly `CopyAttachPointRangeNullable`/
+         * `CopyAttachPointRange`/`CopyAttachPointRangeAdapter` (RULE ONE), removed 2026-10-03.)
          * Address: 0x005DCFB0 (FUN_005DCFB0, msvc8::vector<Moho::UnitWeapon*>::reserve
          * out-of-line emission — reallocate-to-capacity for the 4-byte pointer element;
          * invoked by name from gpg::RVectorType_UnitWeapon_P::SerLoad's reserve(count) path)

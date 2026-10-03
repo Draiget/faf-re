@@ -87,6 +87,16 @@ namespace moho
     void ReleaseDynamicStorage() noexcept;
     void AssignFrom(const SSTIInlineUIntVector& rhs);
 
+    /**
+     * Address: 0x00558EC0 (FUN_00558EC0) + 0x00559190 grow lane
+     *
+     * What it does:
+     * Resizes to exactly `count` slots, filling any newly created tail slots
+     * with `fillValue`; grows through a fresh heap block when inline/spare
+     * capacity is insufficient.
+     */
+    void Resize(const std::size_t count, const std::uint32_t fillValue);
+
     [[nodiscard]] std::size_t Size() const noexcept;
     [[nodiscard]] std::size_t Capacity() const noexcept;
   };

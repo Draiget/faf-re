@@ -27,16 +27,6 @@ namespace
   using WeaponPointerVector = msvc8::vector<moho::UnitWeapon*>;
   using AcquireTargetTaskPointerVector = msvc8::vector<moho::CAcquireTargetTask*>;
 
-  template <typename T>
-  void ResizePointerVector(msvc8::vector<T*>& storage, const unsigned int count)
-  {
-    storage.clear();
-    storage.resize(static_cast<std::size_t>(count));
-    for (T*& value : storage) {
-      value = nullptr;
-    }
-  }
-
   [[nodiscard]] gpg::RType* CachedIAiAttackerType()
   {
     gpg::RType* cached = moho::IAiAttacker::sType;
@@ -104,7 +94,7 @@ void CAiAttackerImpl::DeserializePointerVectors(gpg::ReadArchive* const archive,
 
   unsigned int weaponCount = 0;
   archive->ReadUInt(&weaponCount);
-  ResizePointerVector(object->mWeapons, weaponCount);
+  object->mWeapons.assign(static_cast<std::size_t>(weaponCount), nullptr);
 
   for (unsigned int i = 0; i < weaponCount; ++i) {
     gpg::RRef ownerRef{};
@@ -113,7 +103,7 @@ void CAiAttackerImpl::DeserializePointerVectors(gpg::ReadArchive* const archive,
 
   unsigned int taskCount = 0;
   archive->ReadUInt(&taskCount);
-  ResizePointerVector(object->mTasks, taskCount);
+  object->mTasks.assign(static_cast<std::size_t>(taskCount), nullptr);
 
   for (unsigned int i = 0; i < taskCount; ++i) {
     gpg::RRef ownerRef{};

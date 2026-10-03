@@ -103,32 +103,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x00763AC0 (FUN_00763AC0, sub_763AC0)
-   *
-   * What it does:
-   * Adjusts one `vector<HPathCell>` length to `requestedCount`, zero-filling
-   * growth via one caller-provided fill lane and truncating shrink.
-   */
-  [[nodiscard]] std::size_t ResizeHPathCellVector(
-    HPathCellVector& storage,
-    const std::size_t requestedCount,
-    const moho::HPathCell& fillValue
-  )
-  {
-    const std::size_t currentCount = storage.size();
-    if (currentCount < requestedCount) {
-      storage.resize(requestedCount, fillValue);
-      return requestedCount;
-    }
-
-    if (requestedCount < currentCount) {
-      storage.resize(requestedCount);
-    }
-
-    return requestedCount;
-  }
-
   struct HPathCellVectorReflectionBootstrap
   {
     HPathCellVectorReflectionBootstrap()
@@ -253,7 +227,7 @@ void gpg::RVectorType<moho::HPathCell>::SetCount(void* const obj, const int coun
   }
 
   const moho::HPathCell zeroFill{};
-  (void)ResizeHPathCellVector(*storage, static_cast<std::size_t>(count), zeroFill);
+  storage->resize(static_cast<std::size_t>(count), zeroFill);
 }
 
 /**

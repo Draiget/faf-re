@@ -393,28 +393,6 @@ namespace
     return {outputBegin, outputCursor};
   }
 
-  /**
-   * Address: 0x00835AF0 (FUN_00835AF0)
-   *
-   * What it does:
-   * Writes one lowercased copy result into caller-provided result storage and
-   * returns that same storage slot.
-   */
-  [[maybe_unused]]
-  [[nodiscard]]
-  LowercasedCopyResult* CopyLowercasedRangeIntoOutSlot(
-    LowercasedCopyResult* const outResult,
-    char* const outputBegin,
-    const char* const inputBegin,
-    const char* const inputEnd
-  ) noexcept
-  {
-    if (outResult != nullptr) {
-      *outResult = CopyLowercasedRange(outputBegin, inputBegin, inputEnd);
-    }
-    return outResult;
-  }
-
   [[nodiscard]]
   msvc8::string JoinConCommandTokens(const msvc8::vector<msvc8::string>& args, const std::size_t firstTokenIndex)
   {
@@ -933,23 +911,6 @@ namespace
     gpg::Warnf("Duplicate definition of console command \"%s\"", command.mName ? command.mName : "");
   }
 
-  /**
-   * Address: 0x0041F190 (FUN_0041F190, sub_41F190)
-   *
-   * What it does:
-   * Copies one `vector<string>` lane into another.
-   */
-  msvc8::vector<msvc8::string>& CopyStringVector(
-    msvc8::vector<msvc8::string>& dst, const msvc8::vector<msvc8::string>& src
-  )
-  {
-    dst.clear();
-    for (const msvc8::string& token : src) {
-      dst.push_back(token);
-    }
-    return dst;
-  }
-
   [[nodiscard]]
   CConCommand* FindRegisteredConCommand(const std::string_view commandName)
   {
@@ -1144,7 +1105,10 @@ msvc8::vector<msvc8::string> moho::CON_GetFindTextMatches(const char* const pref
   }
 
   msvc8::vector<msvc8::string> out;
-  return CopyStringVector(out, matches);
+  // FUN_0041F190: the clear+copy loop is `vector<string>::operator=`'s
+  // assign-from-source shape (cited on `operator=` in legacy/containers/Vector.h).
+  out = matches;
+  return out;
 }
 
 /**

@@ -528,6 +528,47 @@ namespace moho
     mEnd = mBegin + srcCount;
   }
 
+  /**
+   * Address: 0x00558EC0 (FUN_00558EC0) + 0x00559190 grow lane
+   *
+   * What it does:
+   * Resizes to exactly `count` slots, filling any newly created tail slots
+   * with `fillValue`. Shrinks in place by moving `mEnd` (matches the
+   * `v6 != a3->end` early-out at 0x00558EC0); grows in place when spare
+   * capacity is sufficient, otherwise reallocates a fresh block via the
+   * grow lane (`sub_559190`) and installs it, preserving the binary
+   * small-buffer quirk on `mInlineStorage0`.
+   */
+  void SSTIInlineUIntVector::Resize(const std::size_t count, const std::uint32_t fillValue)
+  {
+    const std::size_t current = Size();
+    if (count <= current) {
+      mEnd = mBegin + count;
+      return;
+    }
+
+    if (count > Capacity()) {
+      std::uint32_t* const newStorage = new std::uint32_t[count];
+      if (mBegin == mInlineBegin) {
+        mInlineStorage0 =
+          static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(mCapacityEnd));
+      } else {
+        delete[] mBegin;
+      }
+      if (current != 0u) {
+        std::memcpy(newStorage, mBegin, current * sizeof(std::uint32_t));
+      }
+      mBegin = newStorage;
+      mCapacityEnd = newStorage + count;
+    }
+
+    std::uint32_t* const newEnd = mBegin + count;
+    for (std::uint32_t* slot = mBegin + current; slot != newEnd; ++slot) {
+      *slot = fillValue;
+    }
+    mEnd = newEnd;
+  }
+
   std::size_t SSTIInlineUIntVector::Size() const noexcept
   {
     if (!mBegin || !mEnd || mEnd < mBegin) {

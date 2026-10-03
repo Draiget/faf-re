@@ -298,31 +298,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x00426DD0 (FUN_00426DD0)
-     *
-     * What it does:
-     * Resizes kerning-pair storage to requested element count.
-     */
-    void ResizeKerningPairStorage(
-      CD3DFont::KerningPairVector& pairs, const std::size_t requestedCount, const CD3DFont::SKerningPair& fillValue
-    )
-    {
-      pairs.resize(requestedCount, fillValue);
-    }
-
-    /**
-     * Address: 0x00426820 (FUN_00426820)
-     *
-     * What it does:
-     * Resizes kerning-pair storage with zero/default fill elements.
-     */
-    void ResizeKerningPairStorageZeroFill(CD3DFont::KerningPairVector& pairs, const std::size_t requestedCount)
-    {
-      const CD3DFont::SKerningPair fill{};
-      ResizeKerningPairStorage(pairs, requestedCount, fill);
-    }
-
-    /**
      * Address: 0x00427270 (FUN_00427270)
      * Address: 0x00427C90 (FUN_00427C90)
      * Address: 0x00429210 (FUN_00429210)
@@ -332,6 +307,9 @@ namespace moho
      *
      * What it does:
      * Initializes one kerning-pair buffer to requested count + fill value.
+     * The two `resize` addresses (FUN_00426DD0 fill form, FUN_00426820
+     * default-fill form) are the `KerningPairVector::resize(n, v)` emission
+     * at its two call shapes, cited on `resize` in legacy/containers/Vector.h.
      */
     [[nodiscard]] bool InitKerningPairBuffer(
       const std::size_t count, CD3DFont::KerningPairVector& out, const CD3DFont::SKerningPair& fillValue
@@ -346,13 +324,7 @@ namespace moho
         ThrowVectorTooLong();
       }
 
-      const CD3DFont::SKerningPair zero{};
-      if (fillValue.mLeft == zero.mLeft && fillValue.mRight == zero.mRight && fillValue.mAmount == zero.mAmount) {
-        ResizeKerningPairStorageZeroFill(out, count);
-      }
-      else {
-        ResizeKerningPairStorage(out, count, fillValue);
-      }
+      out.resize(count, fillValue);
       return true;
     }
 
@@ -366,17 +338,6 @@ namespace moho
     {
       const CD3DFont::SKerningPair fill{};
       (void)InitKerningPairBuffer(count, out, fill);
-    }
-
-    /**
-     * Address: 0x004272F0 (FUN_004272F0)
-     *
-     * What it does:
-     * Releases kerning-pair storage and resets vector lanes to empty.
-     */
-    void ResetKerningPairBuffer(CD3DFont::KerningPairVector& pairs)
-    {
-      pairs = CD3DFont::KerningPairVector{};
     }
 
     /**
@@ -752,7 +713,8 @@ namespace moho
    */
   CD3DFont::~CD3DFont()
   {
-    ResetKerningPairBuffer(mKerningPairs);
+    // FUN_004272F0: the member-empty `operator=` release of the kerning vector.
+    mKerningPairs = CD3DFont::KerningPairVector{};
     DestroyGlyphPageCache(mCharInfo);
 
     if (mFont != nullptr) {
