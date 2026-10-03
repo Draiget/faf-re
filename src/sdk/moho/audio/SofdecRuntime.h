@@ -595,7 +595,8 @@ namespace moho
     std::array<std::int32_t, 2> mUnknown20{};  // +0x20
     std::int32_t decodeStarvedLatch = 0;       // +0x28 (workctrl +0x978)
     std::int32_t frameAllocationFailed = 0;    // +0x2C (workctrl +0x97C)
-    std::array<std::int32_t, 2> mUnknown30{};  // +0x30
+    std::int32_t activeLockedFrameCount = 0;   // +0x30 (workctrl +0x980, SFD_LockFrm)
+    std::int32_t mUnknown34 = 0;             // +0x34
     SfplyFlowCount flowCounter0{};             // +0x38
     SfplyFlowCount flowCounter1{};             // +0x50
     SfplyFlowCount flowCounter2{};             // +0x68
@@ -718,7 +719,7 @@ namespace moho
     std::int32_t entriesBaseAddress = 0; // +0x00 entry array base address
     std::int32_t entryCapacity = 0;      // +0x04
     std::int32_t queuedEntryCount = 0;   // +0x08
-    std::int32_t reserved0C = 0;         // +0x0C
+    std::int32_t writeIndex = 0;         // +0x0C (`_sfpts` producer cursor)
     std::int32_t readCursor = 0;         // +0x10
   };
   static_assert(offsetof(SfptsPtsQueue, entryCapacity) == 0x04, "SfptsPtsQueue::entryCapacity offset must be 0x04");

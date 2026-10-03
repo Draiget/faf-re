@@ -545,14 +545,14 @@
     return 0;
   }
 
-  struct SofdecFeatureFlagRuntimeView
+  struct SofdecFeatureFlag
   {
     std::uint8_t reserved00[0x20];
     std::uint8_t enabledFlag; // +0x20
   };
   static_assert(
-    offsetof(SofdecFeatureFlagRuntimeView, enabledFlag) == 0x20,
-    "SofdecFeatureFlagRuntimeView::enabledFlag offset must be 0x20"
+    offsetof(SofdecFeatureFlag, enabledFlag) == 0x20,
+    "SofdecFeatureFlag::enabledFlag offset must be 0x20"
   );
 
   /**
@@ -564,7 +564,7 @@
    */
   extern "C" std::int32_t isEnableFtr(
     const std::uint32_t streamId,
-    const SofdecFeatureFlagRuntimeView* const featureInfo
+    const SofdecFeatureFlag* const featureInfo
   )
   {
     if (chkStmId(streamId) != 0xE0) {
@@ -587,7 +587,7 @@
    */
   extern "C" std::int32_t isEnableFtr_0(
     const std::uint32_t streamId,
-    const SofdecFeatureFlagRuntimeView* const featureInfo
+    const SofdecFeatureFlag* const featureInfo
   )
   {
     if (chkStmId(streamId) != 0xC0 || featureInfo == nullptr) {
@@ -734,7 +734,7 @@
       return 0;
     }
 
-    const auto* const featureInfo = reinterpret_cast<const SofdecFeatureFlagRuntimeView*>(element);
+    const auto* const featureInfo = reinterpret_cast<const SofdecFeatureFlag*>(element);
     *outHasFeatureInfo =
       (streamClass == 0xC0) ? isEnableFtr_0(streamId, featureInfo) : isEnableFtr(streamId, featureInfo);
     return 1;
@@ -1125,7 +1125,7 @@
       return nullptr;
     }
 
-    const auto* const featureInfo = reinterpret_cast<const SofdecFeatureFlagRuntimeView*>(element);
+    const auto* const featureInfo = reinterpret_cast<const SofdecFeatureFlag*>(element);
     return (isEnableFtr(streamId, featureInfo) != 0) ? element : nullptr;
   }
 
@@ -1404,7 +1404,7 @@
     }
   }
 
-  struct M2TLibraryRuntimeView
+  struct M2TLibrary
   {
     std::uint32_t m2tInitRefCount = 0; // +0x00
     std::uint8_t m2tInitScratch[0x80]{}; // +0x04
@@ -1413,24 +1413,24 @@
     std::array<std::int32_t, 64> m2pesHandleSlots{}; // +0xA4
   };
   static_assert(
-    offsetof(M2TLibraryRuntimeView, m2tInitRefCount) == 0x00,
-    "M2TLibraryRuntimeView::m2tInitRefCount offset must be 0x00"
+    offsetof(M2TLibrary, m2tInitRefCount) == 0x00,
+    "M2TLibrary::m2tInitRefCount offset must be 0x00"
   );
   static_assert(
-    offsetof(M2TLibraryRuntimeView, m2tInitScratch) == 0x04,
-    "M2TLibraryRuntimeView::m2tInitScratch offset must be 0x04"
+    offsetof(M2TLibrary, m2tInitScratch) == 0x04,
+    "M2TLibrary::m2tInitScratch offset must be 0x04"
   );
   static_assert(
-    offsetof(M2TLibraryRuntimeView, m2pesInitRefCount) == 0xA0,
-    "M2TLibraryRuntimeView::m2pesInitRefCount offset must be 0xA0"
+    offsetof(M2TLibrary, m2pesInitRefCount) == 0xA0,
+    "M2TLibrary::m2pesInitRefCount offset must be 0xA0"
   );
   static_assert(
-    offsetof(M2TLibraryRuntimeView, m2pesHandleSlots) == 0xA4,
-    "M2TLibraryRuntimeView::m2pesHandleSlots offset must be 0xA4"
+    offsetof(M2TLibrary, m2pesHandleSlots) == 0xA4,
+    "M2TLibrary::m2pesHandleSlots offset must be 0xA4"
   );
-  static_assert(sizeof(M2TLibraryRuntimeView) == 0x1A4, "M2TLibraryRuntimeView size must be 0x1A4");
+  static_assert(sizeof(M2TLibrary) == 0x1A4, "M2TLibrary size must be 0x1A4");
 
-  extern "C" M2TLibraryRuntimeView M2T_libobj;
+  extern "C" M2TLibrary M2T_libobj;
   extern "C" const char* cri_verstr_ptr_m2t;
   extern "C" const char* cri_verstr_ptr_m2spes;
   extern "C" std::int32_t M2TSD_libobj = 0;
@@ -1677,41 +1677,41 @@
     return 0;
   }
 
-  struct M2TsdSupplyStatusView
+  struct M2TsdSupplyStatus
   {
     std::int32_t status = 0; // +0x00
     std::int32_t terminateFlag = 0; // +0x04
   };
-  static_assert(offsetof(M2TsdSupplyStatusView, status) == 0x00, "M2TsdSupplyStatusView::status offset must be 0x00");
+  static_assert(offsetof(M2TsdSupplyStatus, status) == 0x00, "M2TsdSupplyStatus::status offset must be 0x00");
   static_assert(
-    offsetof(M2TsdSupplyStatusView, terminateFlag) == 0x04,
-    "M2TsdSupplyStatusView::terminateFlag offset must be 0x04"
+    offsetof(M2TsdSupplyStatus, terminateFlag) == 0x04,
+    "M2TsdSupplyStatus::terminateFlag offset must be 0x04"
   );
-  static_assert(sizeof(M2TsdSupplyStatusView) == 0x08, "M2TsdSupplyStatusView size must be 0x08");
+  static_assert(sizeof(M2TsdSupplyStatus) == 0x08, "M2TsdSupplyStatus size must be 0x08");
 
-  struct M2PesSupplyControlView
+  struct M2PesSupplyControl
   {
     std::int32_t status = 0; // +0x00
     std::int32_t terminateEnableFlag = 0; // +0x04
     std::int32_t errorCallbackAddress = 0; // +0x08
     std::int32_t errorCallbackObject = 0; // +0x0C
   };
-  static_assert(offsetof(M2PesSupplyControlView, status) == 0x00, "M2PesSupplyControlView::status offset must be 0x00");
+  static_assert(offsetof(M2PesSupplyControl, status) == 0x00, "M2PesSupplyControl::status offset must be 0x00");
   static_assert(
-    offsetof(M2PesSupplyControlView, terminateEnableFlag) == 0x04,
-    "M2PesSupplyControlView::terminateEnableFlag offset must be 0x04"
+    offsetof(M2PesSupplyControl, terminateEnableFlag) == 0x04,
+    "M2PesSupplyControl::terminateEnableFlag offset must be 0x04"
   );
   static_assert(
-    offsetof(M2PesSupplyControlView, errorCallbackAddress) == 0x08,
-    "M2PesSupplyControlView::errorCallbackAddress offset must be 0x08"
+    offsetof(M2PesSupplyControl, errorCallbackAddress) == 0x08,
+    "M2PesSupplyControl::errorCallbackAddress offset must be 0x08"
   );
   static_assert(
-    offsetof(M2PesSupplyControlView, errorCallbackObject) == 0x0C,
-    "M2PesSupplyControlView::errorCallbackObject offset must be 0x0C"
+    offsetof(M2PesSupplyControl, errorCallbackObject) == 0x0C,
+    "M2PesSupplyControl::errorCallbackObject offset must be 0x0C"
   );
-  static_assert(sizeof(M2PesSupplyControlView) == 0x10, "M2PesSupplyControlView size must be 0x10");
+  static_assert(sizeof(M2PesSupplyControl) == 0x10, "M2PesSupplyControl size must be 0x10");
 
-  struct M2PesDecodeRuntimeView
+  struct M2PesDecodeState
   {
     std::int32_t status = 0; // +0x00
     std::int32_t terminateEnableFlag = 0; // +0x04
@@ -1726,33 +1726,33 @@
     std::uint8_t reserved104_11F[0x1C]{}; // +0x104
     std::int32_t parsedHeaderAdvanceBytes = 0; // +0x120
   };
-  static_assert(offsetof(M2PesDecodeRuntimeView, status) == 0x00, "M2PesDecodeRuntimeView::status offset must be 0x00");
+  static_assert(offsetof(M2PesDecodeState, status) == 0x00, "M2PesDecodeState::status offset must be 0x00");
   static_assert(
-    offsetof(M2PesDecodeRuntimeView, terminateEnableFlag) == 0x04,
-    "M2PesDecodeRuntimeView::terminateEnableFlag offset must be 0x04"
+    offsetof(M2PesDecodeState, terminateEnableFlag) == 0x04,
+    "M2PesDecodeState::terminateEnableFlag offset must be 0x04"
   );
   static_assert(
-    offsetof(M2PesDecodeRuntimeView, errorCallbackAddress) == 0x08,
-    "M2PesDecodeRuntimeView::errorCallbackAddress offset must be 0x08"
+    offsetof(M2PesDecodeState, errorCallbackAddress) == 0x08,
+    "M2PesDecodeState::errorCallbackAddress offset must be 0x08"
   );
   static_assert(
-    offsetof(M2PesDecodeRuntimeView, errorCallbackObject) == 0x0C,
-    "M2PesDecodeRuntimeView::errorCallbackObject offset must be 0x0C"
+    offsetof(M2PesDecodeState, errorCallbackObject) == 0x0C,
+    "M2PesDecodeState::errorCallbackObject offset must be 0x0C"
   );
-  static_assert(offsetof(M2PesDecodeRuntimeView, bitScratchWord) == 0x40, "M2PesDecodeRuntimeView::bitScratchWord offset must be 0x40");
+  static_assert(offsetof(M2PesDecodeState, bitScratchWord) == 0x40, "M2PesDecodeState::bitScratchWord offset must be 0x40");
   static_assert(
-    offsetof(M2PesDecodeRuntimeView, fallbackPacketPayloadBytes) == 0xF8,
-    "M2PesDecodeRuntimeView::fallbackPacketPayloadBytes offset must be 0xF8"
-  );
-  static_assert(
-    offsetof(M2PesDecodeRuntimeView, parsedPayloadAdvanceBytes) == 0x100,
-    "M2PesDecodeRuntimeView::parsedPayloadAdvanceBytes offset must be 0x100"
+    offsetof(M2PesDecodeState, fallbackPacketPayloadBytes) == 0xF8,
+    "M2PesDecodeState::fallbackPacketPayloadBytes offset must be 0xF8"
   );
   static_assert(
-    offsetof(M2PesDecodeRuntimeView, parsedHeaderAdvanceBytes) == 0x120,
-    "M2PesDecodeRuntimeView::parsedHeaderAdvanceBytes offset must be 0x120"
+    offsetof(M2PesDecodeState, parsedPayloadAdvanceBytes) == 0x100,
+    "M2PesDecodeState::parsedPayloadAdvanceBytes offset must be 0x100"
   );
-  static_assert(sizeof(M2PesDecodeRuntimeView) == 0x124, "M2PesDecodeRuntimeView size must be 0x124");
+  static_assert(
+    offsetof(M2PesDecodeState, parsedHeaderAdvanceBytes) == 0x120,
+    "M2PesDecodeState::parsedHeaderAdvanceBytes offset must be 0x120"
+  );
+  static_assert(sizeof(M2PesDecodeState) == 0x124, "M2PesDecodeState size must be 0x124");
 
   /**
    * Address: 0x00AE0130 (FUN_00AE0130, _M2TSD_SetPesSw)
@@ -1835,7 +1835,7 @@
   extern "C" std::int32_t M2TSD_GetStat(const std::int32_t streamSupplyAddress)
   {
     const auto* const supplyView =
-      reinterpret_cast<const M2TsdSupplyStatusView*>(SjAddressToPointer(streamSupplyAddress));
+      reinterpret_cast<const M2TsdSupplyStatus*>(SjAddressToPointer(streamSupplyAddress));
     return supplyView->status;
   }
 
@@ -1849,7 +1849,7 @@
   extern "C" std::int32_t M2TSD_TermSupply(const std::int32_t streamSupplyAddress)
   {
     auto* const supplyView =
-      reinterpret_cast<M2TsdSupplyStatusView*>(SjAddressToPointer(streamSupplyAddress));
+      reinterpret_cast<M2TsdSupplyStatus*>(SjAddressToPointer(streamSupplyAddress));
     supplyView->terminateFlag = 1;
     return streamSupplyAddress;
   }
@@ -2051,9 +2051,9 @@
    * Promotes one M2PES runtime to finished state (`status = 4`) after the
    * terminate-request flag is armed.
    */
-  extern "C" M2PesSupplyControlView* shartSupply(M2PesSupplyControlView* supplyView);
+  extern "C" M2PesSupplyControl* shartSupply(M2PesSupplyControl* supplyView);
 
-  struct M2TsdLaneRuntimeView
+  struct M2TsdLane
   {
     std::int32_t laneState = 0; // +0x00
     std::int32_t streamIdFilter = -1; // +0x04
@@ -2066,38 +2066,38 @@
     std::int32_t payloadDispatchPending = 0; // +0x20
     std::int32_t streamEndMarker = -1; // +0x24
   };
-  static_assert(offsetof(M2TsdLaneRuntimeView, laneState) == 0x00, "M2TsdLaneRuntimeView::laneState offset must be 0x00");
+  static_assert(offsetof(M2TsdLane, laneState) == 0x00, "M2TsdLane::laneState offset must be 0x00");
   static_assert(
-    offsetof(M2TsdLaneRuntimeView, streamIdFilter) == 0x04,
-    "M2TsdLaneRuntimeView::streamIdFilter offset must be 0x04"
+    offsetof(M2TsdLane, streamIdFilter) == 0x04,
+    "M2TsdLane::streamIdFilter offset must be 0x04"
   );
   static_assert(
-    offsetof(M2TsdLaneRuntimeView, callbackSinkAddress) == 0x08,
-    "M2TsdLaneRuntimeView::callbackSinkAddress offset must be 0x08"
+    offsetof(M2TsdLane, callbackSinkAddress) == 0x08,
+    "M2TsdLane::callbackSinkAddress offset must be 0x08"
   );
   static_assert(
-    offsetof(M2TsdLaneRuntimeView, needsTerminationCheck) == 0x0C,
-    "M2TsdLaneRuntimeView::needsTerminationCheck offset must be 0x0C"
+    offsetof(M2TsdLane, needsTerminationCheck) == 0x0C,
+    "M2TsdLane::needsTerminationCheck offset must be 0x0C"
   );
-  static_assert(offsetof(M2TsdLaneRuntimeView, callbackAddress) == 0x10, "M2TsdLaneRuntimeView::callbackAddress offset must be 0x10");
-  static_assert(offsetof(M2TsdLaneRuntimeView, callbackObject) == 0x14, "M2TsdLaneRuntimeView::callbackObject offset must be 0x14");
+  static_assert(offsetof(M2TsdLane, callbackAddress) == 0x10, "M2TsdLane::callbackAddress offset must be 0x10");
+  static_assert(offsetof(M2TsdLane, callbackObject) == 0x14, "M2TsdLane::callbackObject offset must be 0x14");
   static_assert(
-    offsetof(M2TsdLaneRuntimeView, callbackReserved) == 0x18,
-    "M2TsdLaneRuntimeView::callbackReserved offset must be 0x18"
-  );
-  static_assert(
-    offsetof(M2TsdLaneRuntimeView, m2pesSupplyAddress) == 0x1C,
-    "M2TsdLaneRuntimeView::m2pesSupplyAddress offset must be 0x1C"
+    offsetof(M2TsdLane, callbackReserved) == 0x18,
+    "M2TsdLane::callbackReserved offset must be 0x18"
   );
   static_assert(
-    offsetof(M2TsdLaneRuntimeView, payloadDispatchPending) == 0x20,
-    "M2TsdLaneRuntimeView::payloadDispatchPending offset must be 0x20"
+    offsetof(M2TsdLane, m2pesSupplyAddress) == 0x1C,
+    "M2TsdLane::m2pesSupplyAddress offset must be 0x1C"
   );
   static_assert(
-    offsetof(M2TsdLaneRuntimeView, streamEndMarker) == 0x24,
-    "M2TsdLaneRuntimeView::streamEndMarker offset must be 0x24"
+    offsetof(M2TsdLane, payloadDispatchPending) == 0x20,
+    "M2TsdLane::payloadDispatchPending offset must be 0x20"
   );
-  static_assert(sizeof(M2TsdLaneRuntimeView) == 0x28, "M2TsdLaneRuntimeView size must be 0x28");
+  static_assert(
+    offsetof(M2TsdLane, streamEndMarker) == 0x24,
+    "M2TsdLane::streamEndMarker offset must be 0x24"
+  );
+  static_assert(sizeof(M2TsdLane) == 0x28, "M2TsdLane size must be 0x28");
 
   struct M2TsdStatusGate
   {
@@ -2113,16 +2113,7 @@
     virtual std::int32_t QueryGate(std::int32_t queryMode) = 0; // +0x24
   };
 
-  struct SjChunkRuntimeView
-  {
-    std::int32_t chunkAddress = 0; // +0x00
-    std::int32_t chunkBytes = 0; // +0x04
-  };
-  static_assert(offsetof(SjChunkRuntimeView, chunkAddress) == 0x00, "SjChunkRuntimeView::chunkAddress offset must be 0x00");
-  static_assert(offsetof(SjChunkRuntimeView, chunkBytes) == 0x04, "SjChunkRuntimeView::chunkBytes offset must be 0x04");
-  static_assert(sizeof(SjChunkRuntimeView) == 0x08, "SjChunkRuntimeView size must be 0x08");
-
-  struct M2TsdRuntimeView
+  struct M2TsdState
   {
     std::int32_t status = 0; // +0x00
     std::int32_t streamActiveFlag = 0; // +0x04
@@ -2136,7 +2127,7 @@
     std::int32_t m2tSupplyAddress = 0; // +0xA8
     M2TsdStatusGate* statusGate = nullptr; // +0xAC
     std::int32_t laneCount = 0; // +0xB0
-    M2TsdLaneRuntimeView* laneEntries = nullptr; // +0xB4
+    M2TsdLane* laneEntries = nullptr; // +0xB4
     std::int32_t reservedB8 = 0; // +0xB8
     std::int32_t controllerGateEnabled = 0; // +0xBC
     std::int32_t tsMapCallbackAddress = 0; // +0xC0
@@ -2144,34 +2135,34 @@
     std::int32_t pesCallbackAddress = 0; // +0xC8
     std::int32_t pesCallbackObject = 0; // +0xCC
   };
-  static_assert(offsetof(M2TsdRuntimeView, status) == 0x00, "M2TsdRuntimeView::status offset must be 0x00");
-  static_assert(offsetof(M2TsdRuntimeView, streamActiveFlag) == 0x04, "M2TsdRuntimeView::streamActiveFlag offset must be 0x04");
-  static_assert(offsetof(M2TsdRuntimeView, errorCallbackAddress) == 0x08, "M2TsdRuntimeView::errorCallbackAddress offset must be 0x08");
-  static_assert(offsetof(M2TsdRuntimeView, errorCallbackObject) == 0x0C, "M2TsdRuntimeView::errorCallbackObject offset must be 0x0C");
-  static_assert(offsetof(M2TsdRuntimeView, reserved10) == 0x10, "M2TsdRuntimeView::reserved10 offset must be 0x10");
+  static_assert(offsetof(M2TsdState, status) == 0x00, "M2TsdState::status offset must be 0x00");
+  static_assert(offsetof(M2TsdState, streamActiveFlag) == 0x04, "M2TsdState::streamActiveFlag offset must be 0x04");
+  static_assert(offsetof(M2TsdState, errorCallbackAddress) == 0x08, "M2TsdState::errorCallbackAddress offset must be 0x08");
+  static_assert(offsetof(M2TsdState, errorCallbackObject) == 0x0C, "M2TsdState::errorCallbackObject offset must be 0x0C");
+  static_assert(offsetof(M2TsdState, reserved10) == 0x10, "M2TsdState::reserved10 offset must be 0x10");
   static_assert(
-    offsetof(M2TsdRuntimeView, decodeCycleProgressFlag) == 0x14,
-    "M2TsdRuntimeView::decodeCycleProgressFlag offset must be 0x14"
+    offsetof(M2TsdState, decodeCycleProgressFlag) == 0x14,
+    "M2TsdState::decodeCycleProgressFlag offset must be 0x14"
   );
-  static_assert(offsetof(M2TsdRuntimeView, decodeMode) == 0x18, "M2TsdRuntimeView::decodeMode offset must be 0x18");
+  static_assert(offsetof(M2TsdState, decodeMode) == 0x18, "M2TsdState::decodeMode offset must be 0x18");
   static_assert(
-    offsetof(M2TsdRuntimeView, streamEndCode) == 0x1C,
-    "M2TsdRuntimeView::streamEndCode offset must be 0x1C"
+    offsetof(M2TsdState, streamEndCode) == 0x1C,
+    "M2TsdState::streamEndCode offset must be 0x1C"
   );
-  static_assert(offsetof(M2TsdRuntimeView, m2tSupplyAddress) == 0xA8, "M2TsdRuntimeView::m2tSupplyAddress offset must be 0xA8");
-  static_assert(offsetof(M2TsdRuntimeView, statusGate) == 0xAC, "M2TsdRuntimeView::statusGate offset must be 0xAC");
-  static_assert(offsetof(M2TsdRuntimeView, laneCount) == 0xB0, "M2TsdRuntimeView::laneCount offset must be 0xB0");
-  static_assert(offsetof(M2TsdRuntimeView, laneEntries) == 0xB4, "M2TsdRuntimeView::laneEntries offset must be 0xB4");
-  static_assert(offsetof(M2TsdRuntimeView, reservedB8) == 0xB8, "M2TsdRuntimeView::reservedB8 offset must be 0xB8");
+  static_assert(offsetof(M2TsdState, m2tSupplyAddress) == 0xA8, "M2TsdState::m2tSupplyAddress offset must be 0xA8");
+  static_assert(offsetof(M2TsdState, statusGate) == 0xAC, "M2TsdState::statusGate offset must be 0xAC");
+  static_assert(offsetof(M2TsdState, laneCount) == 0xB0, "M2TsdState::laneCount offset must be 0xB0");
+  static_assert(offsetof(M2TsdState, laneEntries) == 0xB4, "M2TsdState::laneEntries offset must be 0xB4");
+  static_assert(offsetof(M2TsdState, reservedB8) == 0xB8, "M2TsdState::reservedB8 offset must be 0xB8");
   static_assert(
-    offsetof(M2TsdRuntimeView, controllerGateEnabled) == 0xBC,
-    "M2TsdRuntimeView::controllerGateEnabled offset must be 0xBC"
+    offsetof(M2TsdState, controllerGateEnabled) == 0xBC,
+    "M2TsdState::controllerGateEnabled offset must be 0xBC"
   );
-  static_assert(offsetof(M2TsdRuntimeView, tsMapCallbackAddress) == 0xC0, "M2TsdRuntimeView::tsMapCallbackAddress offset must be 0xC0");
-  static_assert(offsetof(M2TsdRuntimeView, tsMapCallbackObject) == 0xC4, "M2TsdRuntimeView::tsMapCallbackObject offset must be 0xC4");
-  static_assert(offsetof(M2TsdRuntimeView, pesCallbackAddress) == 0xC8, "M2TsdRuntimeView::pesCallbackAddress offset must be 0xC8");
-  static_assert(offsetof(M2TsdRuntimeView, pesCallbackObject) == 0xCC, "M2TsdRuntimeView::pesCallbackObject offset must be 0xCC");
-  static_assert(sizeof(M2TsdRuntimeView) == 0xD0, "M2TsdRuntimeView size must be 0xD0");
+  static_assert(offsetof(M2TsdState, tsMapCallbackAddress) == 0xC0, "M2TsdState::tsMapCallbackAddress offset must be 0xC0");
+  static_assert(offsetof(M2TsdState, tsMapCallbackObject) == 0xC4, "M2TsdState::tsMapCallbackObject offset must be 0xC4");
+  static_assert(offsetof(M2TsdState, pesCallbackAddress) == 0xC8, "M2TsdState::pesCallbackAddress offset must be 0xC8");
+  static_assert(offsetof(M2TsdState, pesCallbackObject) == 0xCC, "M2TsdState::pesCallbackObject offset must be 0xCC");
+  static_assert(sizeof(M2TsdState) == 0xD0, "M2TsdState size must be 0xD0");
 
   struct M2TsdChunkIoGate
   {
@@ -2187,7 +2178,7 @@
     virtual std::int32_t QueryCapacity(std::int32_t lane) = 0; // +0x24
   };
 
-  struct M2PesPacketRuntimeView
+  struct M2PesPacket
   {
     std::uint8_t reserved00_1F[0x20]{};
     std::uint8_t streamIdByte = 0; // +0x20
@@ -2201,29 +2192,29 @@
     const void* decodedPayload = nullptr; // +0xFC
     std::int32_t decodedPayloadBytes = 0; // +0x100
   };
-  static_assert(offsetof(M2PesPacketRuntimeView, streamIdByte) == 0x20, "M2PesPacketRuntimeView::streamIdByte offset must be 0x20");
-  static_assert(offsetof(M2PesPacketRuntimeView, hasTimestampLane) == 0x40, "M2PesPacketRuntimeView::hasTimestampLane offset must be 0x40");
-  static_assert(offsetof(M2PesPacketRuntimeView, timestampWord26) == 0x68, "M2PesPacketRuntimeView::timestampWord26 offset must be 0x68");
-  static_assert(offsetof(M2PesPacketRuntimeView, timestampWord27) == 0x6C, "M2PesPacketRuntimeView::timestampWord27 offset must be 0x6C");
-  static_assert(offsetof(M2PesPacketRuntimeView, timestampWord28) == 0x70, "M2PesPacketRuntimeView::timestampWord28 offset must be 0x70");
+  static_assert(offsetof(M2PesPacket, streamIdByte) == 0x20, "M2PesPacket::streamIdByte offset must be 0x20");
+  static_assert(offsetof(M2PesPacket, hasTimestampLane) == 0x40, "M2PesPacket::hasTimestampLane offset must be 0x40");
+  static_assert(offsetof(M2PesPacket, timestampWord26) == 0x68, "M2PesPacket::timestampWord26 offset must be 0x68");
+  static_assert(offsetof(M2PesPacket, timestampWord27) == 0x6C, "M2PesPacket::timestampWord27 offset must be 0x6C");
+  static_assert(offsetof(M2PesPacket, timestampWord28) == 0x70, "M2PesPacket::timestampWord28 offset must be 0x70");
   static_assert(
-    offsetof(M2PesPacketRuntimeView, decodedPayload) == 0xFC,
-    "M2PesPacketRuntimeView::decodedPayload offset must be 0xFC"
+    offsetof(M2PesPacket, decodedPayload) == 0xFC,
+    "M2PesPacket::decodedPayload offset must be 0xFC"
   );
   static_assert(
-    offsetof(M2PesPacketRuntimeView, decodedPayloadBytes) == 0x100,
-    "M2PesPacketRuntimeView::decodedPayloadBytes offset must be 0x100"
+    offsetof(M2PesPacket, decodedPayloadBytes) == 0x100,
+    "M2PesPacket::decodedPayloadBytes offset must be 0x100"
   );
-  static_assert(sizeof(M2PesPacketRuntimeView) == 0x104, "M2PesPacketRuntimeView size must be 0x104");
+  static_assert(sizeof(M2PesPacket) == 0x104, "M2PesPacket size must be 0x104");
 
   [[nodiscard]] M2TsdChunkIoGate* AsM2TsdChunkIoGate(const std::int32_t address) noexcept
   {
     return reinterpret_cast<M2TsdChunkIoGate*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(address)));
   }
 
-  [[nodiscard]] M2PesPacketRuntimeView* AsM2PesPacketRuntimeView(const std::int32_t address) noexcept
+  [[nodiscard]] M2PesPacket* AsM2PesPacket(const std::int32_t address) noexcept
   {
-    return reinterpret_cast<M2PesPacketRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(address)));
+    return reinterpret_cast<M2PesPacket*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(address)));
   }
 
   [[nodiscard]] static std::array<std::int32_t, 32>& M2TsdHandleSlots() noexcept
@@ -2293,8 +2284,8 @@
   extern "C" std::uint8_t*
   M2S_SearchDelim(std::uint8_t* buffer, std::int32_t sizeBytes, std::int32_t delimiterMask);
   extern "C"
-  std::int32_t parse_PES_packet_sub(M2PesDecodeRuntimeView* runtimeView, const std::uint8_t* chunkBytes, std::int32_t chunkSize);
-  struct M2PesHandleInitRuntimeView
+  std::int32_t parse_PES_packet_sub(M2PesDecodeState* runtimeView, const std::uint8_t* chunkBytes, std::int32_t chunkSize);
+  struct M2PesHandleInit
   {
     std::int32_t status = 0; // +0x00
     std::int32_t runtimeWord04 = 0; // +0x04
@@ -2305,18 +2296,18 @@
     std::int32_t reservedF8 = 0; // +0xF8
     std::int32_t chunkLaneWords[10]{}; // +0xFC
   };
-  static_assert(offsetof(M2PesHandleInitRuntimeView, runtimeWord04) == 0x04, "M2PesHandleInitRuntimeView::runtimeWord04 offset must be 0x04");
+  static_assert(offsetof(M2PesHandleInit, runtimeWord04) == 0x04, "M2PesHandleInit::runtimeWord04 offset must be 0x04");
   static_assert(
-    offsetof(M2PesHandleInitRuntimeView, reservedF8) == 0xF8,
-    "M2PesHandleInitRuntimeView::reservedF8 offset must be 0xF8"
+    offsetof(M2PesHandleInit, reservedF8) == 0xF8,
+    "M2PesHandleInit::reservedF8 offset must be 0xF8"
   );
   static_assert(
-    offsetof(M2PesHandleInitRuntimeView, chunkLaneWords) == 0xFC,
-    "M2PesHandleInitRuntimeView::chunkLaneWords offset must be 0xFC"
+    offsetof(M2PesHandleInit, chunkLaneWords) == 0xFC,
+    "M2PesHandleInit::chunkLaneWords offset must be 0xFC"
   );
-  static_assert(sizeof(M2PesHandleInitRuntimeView) == 0x124, "M2PesHandleInitRuntimeView size must be 0x124");
+  static_assert(sizeof(M2PesHandleInit) == 0x124, "M2PesHandleInit size must be 0x124");
 
-  struct M2THandleInitRuntimeView
+  struct M2THandleInit
   {
     std::int32_t status = 0; // +0x00
     std::int32_t runtimeWord04 = 0; // +0x04
@@ -2332,21 +2323,21 @@
     std::uint8_t reserved30_13B[0x10C]{};
     std::int32_t chunkLaneWords[9]{}; // +0x13C
   };
-  static_assert(offsetof(M2THandleInitRuntimeView, runtimeWord04) == 0x04, "M2THandleInitRuntimeView::runtimeWord04 offset must be 0x04");
+  static_assert(offsetof(M2THandleInit, runtimeWord04) == 0x04, "M2THandleInit::runtimeWord04 offset must be 0x04");
   static_assert(
-    offsetof(M2THandleInitRuntimeView, streamEndMarker) == 0x2C,
-    "M2THandleInitRuntimeView::streamEndMarker offset must be 0x2C"
+    offsetof(M2THandleInit, streamEndMarker) == 0x2C,
+    "M2THandleInit::streamEndMarker offset must be 0x2C"
   );
   static_assert(
-    offsetof(M2THandleInitRuntimeView, chunkLaneWords) == 0x13C,
-    "M2THandleInitRuntimeView::chunkLaneWords offset must be 0x13C"
+    offsetof(M2THandleInit, chunkLaneWords) == 0x13C,
+    "M2THandleInit::chunkLaneWords offset must be 0x13C"
   );
-  static_assert(sizeof(M2THandleInitRuntimeView) == 0x160, "M2THandleInitRuntimeView size must be 0x160");
+  static_assert(sizeof(M2THandleInit) == 0x160, "M2THandleInit size must be 0x160");
 
-  extern "C" M2PesHandleInitRuntimeView* initChunks_m2spes(M2PesHandleInitRuntimeView* runtimeView);
-  extern "C" M2PesHandleInitRuntimeView* initHn_m2spes(M2PesHandleInitRuntimeView* runtimeView);
-  extern "C" M2THandleInitRuntimeView* initChunks(M2THandleInitRuntimeView* runtimeView);
-  extern "C" M2THandleInitRuntimeView* initHn_m2sts(M2THandleInitRuntimeView* runtimeView);
+  extern "C" M2PesHandleInit* initChunks_m2spes(M2PesHandleInit* runtimeView);
+  extern "C" M2PesHandleInit* initHn_m2spes(M2PesHandleInit* runtimeView);
+  extern "C" M2THandleInit* initChunks(M2THandleInit* runtimeView);
+  extern "C" M2THandleInit* initHn_m2sts(M2THandleInit* runtimeView);
   /**
    * Address: 0x00AE0AD0 (FUN_00AE0AD0, _callCbFn)
    *
@@ -2355,22 +2346,22 @@
    * timestamp lanes reconstructed from the active M2PES packet runtime.
    */
   extern "C" std::int32_t callCbFn(
-    M2TsdLaneRuntimeView* laneRuntime,
+    M2TsdLane* laneRuntime,
     std::int32_t streamSupplyAddress,
     std::int32_t callbackSinkAddress,
     const moho::SjChunkRange* firstChunk,
     const moho::SjChunkRange* secondChunk
   );
-  extern "C" std::int32_t destroySub(M2TsdRuntimeView* runtimeView);
-  extern "C" std::int32_t decodeTs(M2TsdRuntimeView* runtimeView);
-  extern "C" std::int32_t decodePes(M2TsdRuntimeView* runtimeView, M2TsdRuntimeView** ioRuntimeCursor);
+  extern "C" std::int32_t destroySub(M2TsdState* runtimeView);
+  extern "C" std::int32_t decodeTs(M2TsdState* runtimeView);
+  extern "C" std::int32_t decodePes(M2TsdState* runtimeView, M2TsdState** ioRuntimeCursor);
   extern "C" std::int32_t decodePesSub(
-    M2TsdRuntimeView* runtimeView,
-    M2TsdLaneRuntimeView* laneRuntime,
+    M2TsdState* runtimeView,
+    M2TsdLane* laneRuntime,
     std::int32_t chunkAddress,
     std::int32_t chunkBytes,
     std::int32_t* outReadEndAddress,
-    M2TsdRuntimeView** ioRuntimeCursor
+    M2TsdState** ioRuntimeCursor
   );
   /**
    * Address: 0x00AE0390 (FUN_00AE0390, _movePes)
@@ -2379,13 +2370,13 @@
    * Moves one TS chunk into relay output lane and reports consumed bytes.
    */
   extern "C" std::int32_t movePes(
-    M2TsdRuntimeView* runtimeView,
+    M2TsdState* runtimeView,
     std::int32_t chunkAddress,
     std::int32_t chunkBytes,
     std::int32_t* outReadEndAddress
   );
   extern "C" std::int32_t decodeTsSub(
-    M2TsdRuntimeView* runtimeView,
+    M2TsdState* runtimeView,
     std::int32_t chunkAddress,
     std::int32_t chunkBytes,
     std::int32_t* outReadEndAddress
@@ -2397,7 +2388,7 @@
    * What it does:
    * Finds lane index for one stream-id filter, or `-1` when absent.
    */
-  extern "C" std::int32_t searchIndex(const M2TsdRuntimeView* runtimeView, std::int32_t streamIdFilter);
+  extern "C" std::int32_t searchIndex(const M2TsdState* runtimeView, std::int32_t streamIdFilter);
 
   /**
    * Address: 0x00AE0140 (FUN_00AE0140, _M2TSD_SetInSj)
@@ -2406,7 +2397,7 @@
    * Updates one M2TSD runtime status-gate input lane and mirrors non-zero
    * values into the process-global `m2tsd_insj` lane.
    */
-  extern "C" std::int32_t M2TSD_SetInSj(M2TsdRuntimeView* const runtimeView, const std::int32_t inSjAddress)
+  extern "C" std::int32_t M2TSD_SetInSj(M2TsdState* const runtimeView, const std::int32_t inSjAddress)
   {
     if (runtimeView != nullptr) {
       runtimeView->statusGate =
@@ -2428,7 +2419,7 @@
    * mirrors callback addresses into process-global low-lane slots.
    */
   extern "C" std::int32_t M2TSD_SetOutSj(
-    M2TsdRuntimeView* const runtimeView,
+    M2TsdState* const runtimeView,
     const std::int32_t laneIndex,
     const std::int32_t streamIdFilter,
     const std::int32_t relayStreamJoinAddress,
@@ -2440,7 +2431,7 @@
       runtimeView->decodeMode = 0;
     }
 
-    M2TsdLaneRuntimeView& lane = runtimeView->laneEntries[laneIndex];
+    M2TsdLane& lane = runtimeView->laneEntries[laneIndex];
     lane.needsTerminationCheck = relayStreamJoinAddress;
     lane.callbackSinkAddress = outStreamJoinAddress;
 
@@ -2453,7 +2444,7 @@
       }
     }
 
-    return laneIndex * static_cast<std::int32_t>(sizeof(M2TsdLaneRuntimeView));
+    return laneIndex * static_cast<std::int32_t>(sizeof(M2TsdLane));
   }
 
   /**
@@ -2492,7 +2483,7 @@
   extern "C" std::int32_t
   M2PES_SetErrFn(const std::int32_t streamSupplyAddress, const std::int32_t callbackAddress, const std::int32_t callbackObject)
   {
-    auto* const supplyView = reinterpret_cast<M2PesSupplyControlView*>(SjAddressToPointer(streamSupplyAddress));
+    auto* const supplyView = reinterpret_cast<M2PesSupplyControl*>(SjAddressToPointer(streamSupplyAddress));
     supplyView->errorCallbackAddress = callbackAddress;
     supplyView->errorCallbackObject = callbackObject;
     return streamSupplyAddress;
@@ -2506,7 +2497,7 @@
    */
   extern "C" std::int32_t M2PES_GetStat(const std::int32_t streamSupplyAddress)
   {
-    const auto* const supplyView = reinterpret_cast<const M2PesSupplyControlView*>(SjAddressToPointer(streamSupplyAddress));
+    const auto* const supplyView = reinterpret_cast<const M2PesSupplyControl*>(SjAddressToPointer(streamSupplyAddress));
     return supplyView->status;
   }
 
@@ -2527,13 +2518,13 @@
     constexpr std::int32_t kDelimiterProgramStreamMap = static_cast<std::int32_t>(0x00040000u);
     constexpr std::int32_t kDelimiterSystemEndOrPsm = static_cast<std::int32_t>(0xFFFF0000u);
 
-    auto* const runtimeView = reinterpret_cast<M2PesDecodeRuntimeView*>(SjAddressToPointer(streamSupplyAddress));
+    auto* const runtimeView = reinterpret_cast<M2PesDecodeState*>(SjAddressToPointer(streamSupplyAddress));
     if (runtimeView == nullptr) {
       return 0;
     }
 
     *outReadEndAddress = 0;
-    (void)initChunks_m2spes(reinterpret_cast<M2PesHandleInitRuntimeView*>(runtimeView));
+    (void)initChunks_m2spes(reinterpret_cast<M2PesHandleInit*>(runtimeView));
     runtimeView->bitScratchWord = 0;
 
     const std::int32_t status = runtimeView->status;
@@ -2551,7 +2542,7 @@
         if (fallbackAdvance != 0) {
           return 0;
         }
-        (void)shartSupply(reinterpret_cast<M2PesSupplyControlView*>(runtimeView));
+        (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(runtimeView));
         return 0;
       }
 
@@ -2560,7 +2551,7 @@
     }
 
     if (chunkBytes < 6 || (MPS_CheckDelim(chunkBuffer) & kDelimiterProgramStreamMap) == 0) {
-      (void)shartSupply(reinterpret_cast<M2PesSupplyControlView*>(runtimeView));
+      (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(runtimeView));
       return 0;
     }
 
@@ -2571,7 +2562,7 @@
       std::uint8_t* const nextDelimiter =
         M2S_SearchDelim(chunkBuffer + 1, chunkBytes - 1, kDelimiterSystemEndOrPsm);
       if (nextDelimiter == nullptr) {
-        (void)shartSupply(reinterpret_cast<M2PesSupplyControlView*>(runtimeView));
+        (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(runtimeView));
         return 0;
       }
 
@@ -2581,7 +2572,7 @@
 
     const std::int32_t packetTotalBytes = packetPayloadBytes + 6;
     if (chunkBytes < packetTotalBytes) {
-      (void)shartSupply(reinterpret_cast<M2PesSupplyControlView*>(runtimeView));
+      (void)shartSupply(reinterpret_cast<M2PesSupplyControl*>(runtimeView));
       return 0;
     }
 
@@ -2610,7 +2601,7 @@
    */
   extern "C" std::int32_t M2PES_TermSupply(const std::int32_t streamSupplyAddress)
   {
-    auto* const supplyView = reinterpret_cast<M2PesSupplyControlView*>(SjAddressToPointer(streamSupplyAddress));
+    auto* const supplyView = reinterpret_cast<M2PesSupplyControl*>(SjAddressToPointer(streamSupplyAddress));
     supplyView->terminateEnableFlag = 1;
     return streamSupplyAddress;
   }
@@ -2622,7 +2613,7 @@
    * Promotes one M2PES runtime to finished state (`status = 4`) once the
    * terminate-request flag is armed.
    */
-  extern "C" M2PesSupplyControlView* shartSupply(M2PesSupplyControlView* const supplyView)
+  extern "C" M2PesSupplyControl* shartSupply(M2PesSupplyControl* const supplyView)
   {
     if (supplyView->terminateEnableFlag != 0) {
       supplyView->status = 4;
@@ -2666,7 +2657,7 @@
 
     const std::int32_t alignedWorkAddress = Align32ByteAddress(workAddress);
     (void)initHn_m2sts(
-      reinterpret_cast<M2THandleInitRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(alignedWorkAddress)))
+      reinterpret_cast<M2THandleInit*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(alignedWorkAddress)))
     );
     slots[freeSlotIndex] = alignedWorkAddress;
     return alignedWorkAddress;
@@ -2707,7 +2698,7 @@
   extern "C" std::int32_t
   M2T_SetErrFn(const std::int32_t streamSupplyAddress, const std::int32_t callbackAddress, const std::int32_t callbackObject)
   {
-    auto* const supplyView = reinterpret_cast<M2PesSupplyControlView*>(SjAddressToPointer(streamSupplyAddress));
+    auto* const supplyView = reinterpret_cast<M2PesSupplyControl*>(SjAddressToPointer(streamSupplyAddress));
     supplyView->errorCallbackAddress = callbackAddress;
     supplyView->errorCallbackObject = callbackObject;
     return streamSupplyAddress;
@@ -2721,7 +2712,7 @@
    */
   extern "C" std::int32_t M2T_GetStat(const std::int32_t streamSupplyAddress)
   {
-    const auto* const supplyView = reinterpret_cast<const M2TsdSupplyStatusView*>(SjAddressToPointer(streamSupplyAddress));
+    const auto* const supplyView = reinterpret_cast<const M2TsdSupplyStatus*>(SjAddressToPointer(streamSupplyAddress));
     return supplyView->status;
   }
 
@@ -2733,7 +2724,7 @@
    */
   extern "C" std::int32_t M2T_TermSupply(const std::int32_t streamSupplyAddress)
   {
-    auto* const supplyView = reinterpret_cast<M2TsdSupplyStatusView*>(SjAddressToPointer(streamSupplyAddress));
+    auto* const supplyView = reinterpret_cast<M2TsdSupplyStatus*>(SjAddressToPointer(streamSupplyAddress));
     supplyView->terminateFlag = 1;
     return streamSupplyAddress;
   }
@@ -2745,7 +2736,7 @@
    * Marks one supply runtime as finished (`status = 4`) when termination has
    * been requested.
    */
-  extern "C" M2TsdSupplyStatusView* shortSupply(M2TsdSupplyStatusView* const supplyView)
+  extern "C" M2TsdSupplyStatus* shortSupply(M2TsdSupplyStatus* const supplyView)
   {
     if (supplyView->terminateFlag != 0) {
       supplyView->status = 4;
@@ -2768,7 +2759,7 @@
    * Destroys every active M2PES lane for one M2TSD runtime handle, tears down
    * the M2T supply lane, and resets handle state to idle.
    */
-  extern "C" std::int32_t destroySub(M2TsdRuntimeView* const runtimeView)
+  extern "C" std::int32_t destroySub(M2TsdState* const runtimeView)
   {
     if (runtimeView == nullptr) {
       return 0;
@@ -2800,7 +2791,7 @@
    * to the active M2T lane plus each active M2PES lane.
    */
   extern "C" std::int32_t M2TSD_SetErrFn(
-    M2TsdRuntimeView* const runtimeView,
+    M2TsdState* const runtimeView,
     const std::int32_t callbackAddress,
     const std::int32_t callbackObject
   )
@@ -2831,7 +2822,7 @@
    * active M2T or M2PES supply chain when the controller reports closure, and
    * marks the runtime finished once every lane has drained.
    */
-  std::int32_t updateStat_m2tsd(M2TsdRuntimeView* const runtimeView, const std::int32_t didDecodeSomething)
+  std::int32_t updateStat_m2tsd(M2TsdState* const runtimeView, const std::int32_t didDecodeSomething)
   {
     constexpr std::int32_t kStateReady = 2;
     constexpr std::int32_t kStateClosing = 3;
@@ -2884,16 +2875,16 @@
    * Clears one M2TSD runtime handle, creates M2T/M2PES supply lanes, and
    * marks the handle ready once all per-lane decoders are initialized.
    */
-  extern "C" M2TsdRuntimeView*
+  extern "C" M2TsdState*
   initHn_m2tsd(
-    M2TsdRuntimeView* const runtimeView,
+    M2TsdState* const runtimeView,
     const std::int32_t laneCount,
     const std::int32_t laneEntriesAddress,
     const std::int32_t m2tWorkAddress,
     std::int32_t m2pesWorkAddress
   )
   {
-    std::memset(runtimeView, 0, sizeof(M2TsdRuntimeView));
+    std::memset(runtimeView, 0, sizeof(M2TsdState));
     runtimeView->decodeMode = 1;
     runtimeView->streamEndCode = -1;
 
@@ -2904,7 +2895,7 @@
 
     runtimeView->statusGate = nullptr;
     runtimeView->laneCount = laneCount;
-    runtimeView->laneEntries = reinterpret_cast<M2TsdLaneRuntimeView*>(
+    runtimeView->laneEntries = reinterpret_cast<M2TsdLane*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(laneEntriesAddress))
     );
     runtimeView->reservedB8 = 0;
@@ -2920,7 +2911,7 @@
     }
 
     for (std::int32_t laneIndex = 0; laneIndex < laneCount; ++laneIndex) {
-      M2TsdLaneRuntimeView& lane = runtimeView->laneEntries[laneIndex];
+      M2TsdLane& lane = runtimeView->laneEntries[laneIndex];
       lane.laneState = 0;
       lane.streamIdFilter = -1;
       lane.callbackSinkAddress = 0;
@@ -2955,8 +2946,8 @@
   extern "C" std::int32_t
   M2TSD_Create(const std::int32_t workAddress, const std::uint32_t workSizeBytes, const std::int32_t laneCount)
   {
-    constexpr std::uint32_t kRuntimeBytes = static_cast<std::uint32_t>(sizeof(M2TsdRuntimeView)); // 0xD0
-    constexpr std::uint32_t kLaneEntryBytes = static_cast<std::uint32_t>(sizeof(M2TsdLaneRuntimeView)); // 0x28
+    constexpr std::uint32_t kRuntimeBytes = static_cast<std::uint32_t>(sizeof(M2TsdState)); // 0xD0
+    constexpr std::uint32_t kLaneEntryBytes = static_cast<std::uint32_t>(sizeof(M2TsdLane)); // 0x28
     constexpr std::uint32_t kM2PesWorkBytesPerLane = 0x144u;
     constexpr std::uint32_t kPerLaneBytes = 0x16Cu;
     constexpr std::uint32_t kCreateBaseBytes = 0x270u;
@@ -2990,8 +2981,8 @@
     const std::int32_t m2tWorkAddress =
       m2pesWorkAddress + laneCount * static_cast<std::int32_t>(kM2PesWorkBytesPerLane);
 
-    M2TsdRuntimeView* const runtimeView = initHn_m2tsd(
-      reinterpret_cast<M2TsdRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(alignedWorkAddress))),
+    M2TsdState* const runtimeView = initHn_m2tsd(
+      reinterpret_cast<M2TsdState*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(alignedWorkAddress))),
       laneCount,
       laneEntriesAddress,
       m2tWorkAddress,
@@ -3018,7 +3009,7 @@
       if (runtimeSlots[static_cast<std::size_t>(slotIndex)] == runtimeAddress) {
         runtimeSlots[static_cast<std::size_t>(slotIndex)] = 0;
         return destroySub(
-          reinterpret_cast<M2TsdRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(runtimeAddress)))
+          reinterpret_cast<M2TsdState*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(runtimeAddress)))
         );
       }
     }
@@ -3032,7 +3023,7 @@
    * What it does:
    * Clears the 10-dword decoded-chunk lane used by one M2PES runtime handle.
    */
-  extern "C" M2PesHandleInitRuntimeView* initChunks_m2spes(M2PesHandleInitRuntimeView* const runtimeView)
+  extern "C" M2PesHandleInit* initChunks_m2spes(M2PesHandleInit* const runtimeView)
   {
     runtimeView->chunkLaneWords[0] = 0;
     runtimeView->chunkLaneWords[1] = 0;
@@ -3053,15 +3044,15 @@
    * What it does:
    * Resets one M2PES runtime handle storage block and marks it ready.
    */
-  extern "C" M2PesHandleInitRuntimeView* initHn_m2spes(M2PesHandleInitRuntimeView* const runtimeView)
+  extern "C" M2PesHandleInit* initHn_m2spes(M2PesHandleInit* const runtimeView)
   {
-    std::memset(runtimeView, 0, sizeof(M2PesHandleInitRuntimeView));
+    std::memset(runtimeView, 0, sizeof(M2PesHandleInit));
     runtimeView->runtimeWord04 = 0;
     runtimeView->runtimeWord08 = 0;
     runtimeView->runtimeWord0C = 0;
     runtimeView->runtimeWord10 = 0;
     runtimeView->reservedF8 = 0;
-    M2PesHandleInitRuntimeView* const result = initChunks_m2spes(runtimeView);
+    M2PesHandleInit* const result = initChunks_m2spes(runtimeView);
     runtimeView->status = 2;
     return result;
   }
@@ -3072,7 +3063,7 @@
    * What it does:
    * Clears the 9-dword decoded-chunk lane used by one M2T runtime handle.
    */
-  extern "C" M2THandleInitRuntimeView* initChunks(M2THandleInitRuntimeView* const runtimeView)
+  extern "C" M2THandleInit* initChunks(M2THandleInit* const runtimeView)
   {
     runtimeView->chunkLaneWords[0] = 0;
     runtimeView->chunkLaneWords[1] = 0;
@@ -3092,9 +3083,9 @@
    * What it does:
    * Resets one M2T runtime handle storage block and marks it ready.
    */
-  extern "C" M2THandleInitRuntimeView* initHn_m2sts(M2THandleInitRuntimeView* const runtimeView)
+  extern "C" M2THandleInit* initHn_m2sts(M2THandleInit* const runtimeView)
   {
-    std::memset(runtimeView, 0, sizeof(M2THandleInitRuntimeView));
+    std::memset(runtimeView, 0, sizeof(M2THandleInit));
     runtimeView->runtimeWord04 = 0;
     runtimeView->runtimeWord08 = 0;
     runtimeView->runtimeWord0C = 0;
@@ -3104,7 +3095,7 @@
     runtimeView->runtimeWord24 = 0;
     runtimeView->runtimeWord28 = 0;
     runtimeView->streamEndMarker = -1;
-    M2THandleInitRuntimeView* const result = initChunks(runtimeView);
+    M2THandleInit* const result = initChunks(runtimeView);
     runtimeView->status = 2;
     return result;
   }
@@ -3137,7 +3128,7 @@
 
     const std::int32_t alignedWorkAddress = Align32ByteAddress(workAddress);
     (void)initHn_m2spes(
-      reinterpret_cast<M2PesHandleInitRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(alignedWorkAddress)))
+      reinterpret_cast<M2PesHandleInit*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(alignedWorkAddress)))
     );
     pesSlots[freeSlotIndex] = alignedWorkAddress;
     return alignedWorkAddress;
@@ -3150,7 +3141,7 @@
    * Runs TS and PES decode loops until both make no progress (or decode cursor
    * closure is signaled), then updates M2TSD runtime status.
    */
-  extern "C" void M2TSD_Decode(M2TsdRuntimeView* const runtimeView)
+  extern "C" void M2TSD_Decode(M2TsdState* const runtimeView)
   {
     std::int32_t didDecodeSomething = 0;
     if (runtimeView == nullptr) {
@@ -3162,7 +3153,7 @@
       return;
     }
 
-    M2TsdRuntimeView* decodeCursor = runtimeView;
+    M2TsdState* decodeCursor = runtimeView;
     do {
       std::int32_t tsDecodeCount = 0;
       while (decodeTs(runtimeView) == 1) {
@@ -3195,31 +3186,31 @@
    * PES move or TS decode sub-lane, then commits split chunks back to the
    * stream-join interface.
    */
-  extern "C" std::int32_t decodeTs(M2TsdRuntimeView* const runtimeView)
+  extern "C" std::int32_t decodeTs(M2TsdState* const runtimeView)
   {
-    SjChunkRuntimeView streamChunk{};
+    moho::SjChunkRange streamChunk{};
     std::int32_t splitChunkWords[2]{};
     moho::SjChunkRange committedChunk{};
     moho::SjChunkRange splitChunk{};
 
     auto* const streamJoin = runtimeView->statusGate;
-    streamJoin->AcquireReadWindow(1, static_cast<std::int32_t>(0x7FFFFFFFu), &streamChunk.chunkAddress);
+    streamJoin->AcquireReadWindow(1, static_cast<std::int32_t>(0x7FFFFFFFu), &streamChunk.bufferAddress);
 
     std::int32_t readEndAddress = 0;
     const std::int32_t decodeResult = (runtimeView->controllerGateEnabled != 0)
-      ? movePes(runtimeView, streamChunk.chunkAddress, streamChunk.chunkBytes, &readEndAddress)
-      : decodeTsSub(runtimeView, streamChunk.chunkAddress, streamChunk.chunkBytes, &readEndAddress);
+      ? movePes(runtimeView, streamChunk.bufferAddress, streamChunk.byteCount, &readEndAddress)
+      : decodeTsSub(runtimeView, streamChunk.bufferAddress, streamChunk.byteCount, &readEndAddress);
 
     const moho::SjChunkRange streamChunkRange{
-      streamChunk.chunkAddress,
-      streamChunk.chunkBytes,
+      streamChunk.bufferAddress,
+      streamChunk.byteCount,
     };
     (void)SJ_SplitChunk(&streamChunkRange, readEndAddress, &committedChunk, &splitChunk);
-    streamChunk.chunkAddress = committedChunk.bufferAddress;
-    streamChunk.chunkBytes = committedChunk.byteCount;
+    streamChunk.bufferAddress = committedChunk.bufferAddress;
+    streamChunk.byteCount = committedChunk.byteCount;
     splitChunkWords[0] = splitChunk.bufferAddress;
     splitChunkWords[1] = splitChunk.byteCount;
-    streamJoin->CommitReadWindow(0, &streamChunk.chunkAddress);
+    streamJoin->CommitReadWindow(0, &streamChunk.bufferAddress);
     streamJoin->SubmitSplitChunk(1, splitChunkWords);
     return decodeResult;
   }
@@ -3232,7 +3223,7 @@
    * otherwise reports direct pass-through byte count.
    */
   extern "C" std::int32_t movePes(
-    M2TsdRuntimeView* const runtimeView,
+    M2TsdState* const runtimeView,
     const std::int32_t chunkAddress,
     const std::int32_t chunkBytes,
     std::int32_t* const outReadEndAddress
@@ -3274,7 +3265,7 @@
    * lane index, or `-1` when no match exists.
    */
   extern "C" std::int32_t searchIndex(
-    const M2TsdRuntimeView* const runtimeView,
+    const M2TsdState* const runtimeView,
     const std::int32_t streamIdFilter
   )
   {
@@ -3300,7 +3291,7 @@
    * lane via `_decodePesSub`, then commits/splits chunk windows back to each
    * lane supply.
    */
-  extern "C" std::int32_t decodePes(M2TsdRuntimeView* const runtimeView, M2TsdRuntimeView** const ioRuntimeCursor)
+  extern "C" std::int32_t decodePes(M2TsdState* const runtimeView, M2TsdState** const ioRuntimeCursor)
   {
     auto* const outCallbackResult = reinterpret_cast<std::int32_t*>(ioRuntimeCursor);
     *outCallbackResult = 0;
@@ -3312,7 +3303,7 @@
     }
 
     for (std::int32_t laneIndex = 0; laneIndex < laneCount; ++laneIndex) {
-      M2TsdLaneRuntimeView& laneRuntime = runtimeView->laneEntries[laneIndex];
+      M2TsdLane& laneRuntime = runtimeView->laneEntries[laneIndex];
       if (laneRuntime.m2pesSupplyAddress == 0) {
         continue;
       }
@@ -3357,7 +3348,7 @@
    * lanes derived from the active M2PES packet runtime.
    */
   extern "C" std::int32_t callCbFn(
-    M2TsdLaneRuntimeView* const laneRuntime,
+    M2TsdLane* const laneRuntime,
     const std::int32_t streamSupplyAddress,
     const std::int32_t callbackSinkAddress,
     const moho::SjChunkRange* const firstChunk,
@@ -3380,7 +3371,7 @@
       return 0;
     }
 
-    const auto* const packetRuntime = AsM2PesPacketRuntimeView(streamSupplyAddress);
+    const auto* const packetRuntime = AsM2PesPacket(streamSupplyAddress);
     std::int32_t ptsWordLow = -1;
     std::int32_t ptsWordHigh = -1;
     if (packetRuntime->hasTimestampLane != 0) {
@@ -3412,12 +3403,12 @@
    * sink chunks, and emits optional stream-id callback notification.
    */
   extern "C" std::int32_t decodePesSub(
-    M2TsdRuntimeView* const runtimeView,
-    M2TsdLaneRuntimeView* const laneRuntime,
+    M2TsdState* const runtimeView,
+    M2TsdLane* const laneRuntime,
     const std::int32_t chunkAddress,
     const std::int32_t chunkBytes,
     std::int32_t* const outReadEndAddress,
-    M2TsdRuntimeView** const ioRuntimeCursor
+    M2TsdState** const ioRuntimeCursor
   )
   {
     auto* const outCallbackResult = reinterpret_cast<std::int32_t*>(ioRuntimeCursor);
@@ -3425,7 +3416,7 @@
     *outCallbackResult = 0;
 
     const std::int32_t m2pesSupplyAddress = laneRuntime->m2pesSupplyAddress;
-    auto* const pesPacketView = AsM2PesPacketRuntimeView(m2pesSupplyAddress);
+    auto* const pesPacketView = AsM2PesPacket(m2pesSupplyAddress);
 
     if (laneRuntime->payloadDispatchPending == 0) {
       const std::int32_t decodeHeaderResult = M2PES_DecHd(m2pesSupplyAddress, chunkAddress, chunkBytes, outReadEndAddress);
@@ -3506,7 +3497,7 @@
    * land at exactly the offsets that model gave them (0x64/0x68/0x6C), which
    * is the cross-check that the rest of the numbering is right.
    */
-  struct SfcreHeaderRuntimeView
+  struct SfcreHeader
   {
     std::int32_t headerValid = 0;          // +0x00  set to 1 once parsed
     std::int32_t toolVersionMajor = 0;     // +0x04
@@ -3551,31 +3542,31 @@
     std::int32_t copiedHeaderBytes = 0;    // +0x90
     std::uint8_t headerBuffer[0x800]{};    // +0x94
   };
-  static_assert(offsetof(SfcreHeaderRuntimeView, byteRate) == 0x0C, "SfcreHeaderRuntimeView::byteRate offset must be 0x0C");
+  static_assert(offsetof(SfcreHeader, byteRate) == 0x0C, "SfcreHeader::byteRate offset must be 0x0C");
   static_assert(
-    offsetof(SfcreHeaderRuntimeView, streamIdAudio) == 0x44,
-    "SfcreHeaderRuntimeView::streamIdAudio offset must be 0x44"
+    offsetof(SfcreHeader, streamIdAudio) == 0x44,
+    "SfcreHeader::streamIdAudio offset must be 0x44"
   );
-  static_assert(offsetof(SfcreHeaderRuntimeView, videoCodec) == 0x5C, "SfcreHeaderRuntimeView::videoCodec offset must be 0x5C");
-  static_assert(offsetof(SfcreHeaderRuntimeView, widthPixels) == 0x64, "SfcreHeaderRuntimeView::widthPixels offset must be 0x64");
+  static_assert(offsetof(SfcreHeader, videoCodec) == 0x5C, "SfcreHeader::videoCodec offset must be 0x5C");
+  static_assert(offsetof(SfcreHeader, widthPixels) == 0x64, "SfcreHeader::widthPixels offset must be 0x64");
   static_assert(
-    offsetof(SfcreHeaderRuntimeView, heightPixels) == 0x68,
-    "SfcreHeaderRuntimeView::heightPixels offset must be 0x68"
-  );
-  static_assert(
-    offsetof(SfcreHeaderRuntimeView, videoFrameMetric) == 0x6C,
-    "SfcreHeaderRuntimeView::videoFrameMetric offset must be 0x6C"
-  );
-  static_assert(offsetof(SfcreHeaderRuntimeView, featureGopM) == 0x8C, "SfcreHeaderRuntimeView::featureGopM offset must be 0x8C");
-  static_assert(
-    offsetof(SfcreHeaderRuntimeView, copiedHeaderBytes) == 0x90,
-    "SfcreHeaderRuntimeView::copiedHeaderBytes offset must be 0x90"
+    offsetof(SfcreHeader, heightPixels) == 0x68,
+    "SfcreHeader::heightPixels offset must be 0x68"
   );
   static_assert(
-    offsetof(SfcreHeaderRuntimeView, headerBuffer) == 0x94,
-    "SfcreHeaderRuntimeView::headerBuffer offset must be 0x94"
+    offsetof(SfcreHeader, videoFrameMetric) == 0x6C,
+    "SfcreHeader::videoFrameMetric offset must be 0x6C"
   );
-  static_assert(sizeof(SfcreHeaderRuntimeView) == 0x894, "SfcreHeaderRuntimeView size must be 0x894");
+  static_assert(offsetof(SfcreHeader, featureGopM) == 0x8C, "SfcreHeader::featureGopM offset must be 0x8C");
+  static_assert(
+    offsetof(SfcreHeader, copiedHeaderBytes) == 0x90,
+    "SfcreHeader::copiedHeaderBytes offset must be 0x90"
+  );
+  static_assert(
+    offsetof(SfcreHeader, headerBuffer) == 0x94,
+    "SfcreHeader::headerBuffer offset must be 0x94"
+  );
+  static_assert(sizeof(SfcreHeader) == 0x894, "SfcreHeader size must be 0x894");
 
   /**
    * Address: 0x00AE7170 (FUN_00AE7170, _SFHDS_InitFhd)
@@ -3596,7 +3587,7 @@
    * real one-parameter function, so it silently satisfied both call sites and
    * the linker never complained.
    */
-  extern "C" SfcreHeaderRuntimeView* SFHDS_InitFhd(SfcreHeaderRuntimeView* const header)
+  extern "C" SfcreHeader* SFHDS_InitFhd(SfcreHeader* const header)
   {
     header->headerValid = 0;
     header->toolVersionMajor = 0;
@@ -3620,7 +3611,7 @@
    * Unlike `SFHDS_InitFhd` it leaves the tool-version pair alone, because
    * nothing reads those without the valid flag.
    */
-  extern "C" SfcreHeaderRuntimeView* SFHDS_FinishFhd(SfcreHeaderRuntimeView* const header)
+  extern "C" SfcreHeader* SFHDS_FinishFhd(SfcreHeader* const header)
   {
     header->headerValid = 0;
     header->byteRate = 0;
@@ -3678,7 +3669,7 @@
    * Fills the pack-descriptor lanes. A packet length-field width that comes
    * back unavailable is forced to 2, which is the MPEG default.
    */
-  void sfhds_AnlyHead(const SofdecHeaderAnalyzer* const handle, SfcreHeaderRuntimeView* const header)
+  void sfhds_AnlyHead(const SofdecHeaderAnalyzer* const handle, SfcreHeader* const header)
   {
     header->headerSizeBytes = sfhds_CallN(handle, &SFH_AnlyHdrSiz);
     header->packType = sfhds_CallN(handle, &SFH_AnlyPackType);
@@ -3695,7 +3686,7 @@
    * What it does:
    * Fills the system-info lanes: element counts and playback maxima.
    */
-  void sfhds_AnlySys(const SofdecHeaderAnalyzer* const handle, SfcreHeaderRuntimeView* const header)
+  void sfhds_AnlySys(const SofdecHeaderAnalyzer* const handle, SfcreHeader* const header)
   {
     header->elementCountTotal = sfhds_CallN(handle, &SFH_AnlyNumElemTot);
     header->elementCountAudio = sfhds_CallN(handle, &SFH_AnlyNumElemAud);
@@ -3737,7 +3728,7 @@
   void sfhds_AnlyAudio(
     const SofdecHeaderAnalyzer* const handle,
     const std::int32_t audioStreamId,
-    SfcreHeaderRuntimeView* const header
+    SfcreHeader* const header
   )
   {
     if (audioStreamId == 0) {
@@ -3765,7 +3756,7 @@
   void sfhds_AnlyVideo(
     const SofdecHeaderAnalyzer* const handle,
     const std::int32_t videoStreamId,
-    SfcreHeaderRuntimeView* const header
+    SfcreHeader* const header
   )
   {
     const auto streamId = static_cast<std::uint32_t>(videoStreamId);
@@ -3812,7 +3803,7 @@
    */
   std::int32_t sfhds_DoProcessHdr(
     SofdecHeaderAnalyzer* const handle,
-    SfcreHeaderRuntimeView* const header
+    SfcreHeader* const header
   )
   {
     std::uint32_t isSofdecHeader = 0;
@@ -3871,7 +3862,7 @@
     const auto* const workctrlSubobj =
       reinterpret_cast<const moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
     const auto* const header =
-      reinterpret_cast<const SfcreHeaderRuntimeView*>(&workctrlSubobj->frameHeaderHandle);
+      reinterpret_cast<const SfcreHeader*>(&workctrlSubobj->frameHeaderHandle);
 
     if (header->headerValid == 0) {
       return 0;
@@ -3886,7 +3877,7 @@
    * Borrows an analyzer slot for the header bytes `sfcre_ProcessHdr` copied in,
    * runs the analysis, and returns the slot.
    */
-  extern "C" std::int32_t SFHDS_ProcessHdr(SfcreHeaderRuntimeView* const header)
+  extern "C" std::int32_t SFHDS_ProcessHdr(SfcreHeader* const header)
   {
     SofdecHeaderAnalyzer* const handle = SFH_Create(
       static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(header->headerBuffer)),
@@ -3913,7 +3904,7 @@
   extern "C" std::int32_t sfcre_mpv_picrate[];
   extern "C" void SFLIB_LockCs();
   extern "C" void SFLIB_UnlockCs();
-  extern "C" SfcreHeaderRuntimeView sfcre_fhd;
+  extern "C" SfcreHeader sfcre_fhd;
   alignas(4) std::uint8_t sfcre_tmpbuf[2048]{};
   extern "C" std::int32_t UTY_MulDiv(std::int32_t lhs, std::int32_t rhs, std::int32_t divisor);
   extern "C" std::int32_t M2T_IsConformable(char* buffer, std::int32_t sizeBytes);
@@ -3926,59 +3917,59 @@
    */
   extern "C" char*
     M2S_SearchSyncByteGap(char* buffer, std::int32_t sizeBytes, std::int32_t* outSyncGapValue);
-  struct M2TStreamSupplyRuntimeView
+  struct M2TStreamSupply
   {
     std::uint8_t reserved00_37[0x38]{};
     std::int32_t parserStateWord = 0; // +0x38
   };
   static_assert(
-    offsetof(M2TStreamSupplyRuntimeView, parserStateWord) == 0x38,
-    "M2TStreamSupplyRuntimeView::parserStateWord offset must be 0x38"
+    offsetof(M2TStreamSupply, parserStateWord) == 0x38,
+    "M2TStreamSupply::parserStateWord offset must be 0x38"
   );
 
-  struct M2TParserWindowRuntimeView
+  struct M2TParserWindow
   {
     std::int32_t bufferAddress = 0; // +0x00
     std::int32_t bufferOffset = 0; // +0x04
   };
   static_assert(
-    offsetof(M2TParserWindowRuntimeView, bufferAddress) == 0x00,
-    "M2TParserWindowRuntimeView::bufferAddress offset must be 0x00"
+    offsetof(M2TParserWindow, bufferAddress) == 0x00,
+    "M2TParserWindow::bufferAddress offset must be 0x00"
   );
   static_assert(
-    offsetof(M2TParserWindowRuntimeView, bufferOffset) == 0x04,
-    "M2TParserWindowRuntimeView::bufferOffset offset must be 0x04"
+    offsetof(M2TParserWindow, bufferOffset) == 0x04,
+    "M2TParserWindow::bufferOffset offset must be 0x04"
   );
-  static_assert(sizeof(M2TParserWindowRuntimeView) == 0x08, "M2TParserWindowRuntimeView size must be 0x08");
+  static_assert(sizeof(M2TParserWindow) == 0x08, "M2TParserWindow size must be 0x08");
 
-  struct M2TParserGapRuntimeView
+  struct M2TParserGap
   {
     std::uint8_t reserved00_23[0x24]{};
     std::int32_t packetStrideBytes = 0; // +0x24
     std::int32_t nextPacketStrideBytes = 0; // +0x28
     std::int32_t continuitySeed = 0; // +0x2C
     std::uint8_t reserved30_15B[0x12C]{};
-    M2TParserWindowRuntimeView* parserWindow = nullptr; // +0x15C
+    M2TParserWindow* parserWindow = nullptr; // +0x15C
   };
   static_assert(
-    offsetof(M2TParserGapRuntimeView, packetStrideBytes) == 0x24,
-    "M2TParserGapRuntimeView::packetStrideBytes offset must be 0x24"
+    offsetof(M2TParserGap, packetStrideBytes) == 0x24,
+    "M2TParserGap::packetStrideBytes offset must be 0x24"
   );
   static_assert(
-    offsetof(M2TParserGapRuntimeView, nextPacketStrideBytes) == 0x28,
-    "M2TParserGapRuntimeView::nextPacketStrideBytes offset must be 0x28"
+    offsetof(M2TParserGap, nextPacketStrideBytes) == 0x28,
+    "M2TParserGap::nextPacketStrideBytes offset must be 0x28"
   );
   static_assert(
-    offsetof(M2TParserGapRuntimeView, continuitySeed) == 0x2C,
-    "M2TParserGapRuntimeView::continuitySeed offset must be 0x2C"
+    offsetof(M2TParserGap, continuitySeed) == 0x2C,
+    "M2TParserGap::continuitySeed offset must be 0x2C"
   );
   static_assert(
-    offsetof(M2TParserGapRuntimeView, parserWindow) == 0x15C,
-    "M2TParserGapRuntimeView::parserWindow offset must be 0x15C"
+    offsetof(M2TParserGap, parserWindow) == 0x15C,
+    "M2TParserGap::parserWindow offset must be 0x15C"
   );
-  static_assert(sizeof(M2TParserGapRuntimeView) == 0x160, "M2TParserGapRuntimeView size must be 0x160");
+  static_assert(sizeof(M2TParserGap) == 0x160, "M2TParserGap size must be 0x160");
 
-  struct M2TSectionRuntimeView
+  struct M2TSection
   {
     std::uint8_t reserved00_13[0x14]{};
     std::int32_t parserControlBits = 0; // +0x14
@@ -4012,68 +4003,68 @@
     std::int32_t pmapElementaryInfoLength = 0; // +0x134
     std::int32_t pmapTailBits = 0; // +0x138
   };
-  static_assert(offsetof(M2TSectionRuntimeView, parserControlBits) == 0x14, "M2TSectionRuntimeView::parserControlBits offset must be 0x14");
-  static_assert(offsetof(M2TSectionRuntimeView, patTableId) == 0xCC, "M2TSectionRuntimeView::patTableId offset must be 0xCC");
+  static_assert(offsetof(M2TSection, parserControlBits) == 0x14, "M2TSection::parserControlBits offset must be 0x14");
+  static_assert(offsetof(M2TSection, patTableId) == 0xCC, "M2TSection::patTableId offset must be 0xCC");
   static_assert(
-    offsetof(M2TSectionRuntimeView, patSectionLength) == 0xD8,
-    "M2TSectionRuntimeView::patSectionLength offset must be 0xD8"
+    offsetof(M2TSection, patSectionLength) == 0xD8,
+    "M2TSection::patSectionLength offset must be 0xD8"
   );
   static_assert(
-    offsetof(M2TSectionRuntimeView, patTransportStreamId) == 0xDC,
-    "M2TSectionRuntimeView::patTransportStreamId offset must be 0xDC"
+    offsetof(M2TSection, patTransportStreamId) == 0xDC,
+    "M2TSection::patTransportStreamId offset must be 0xDC"
   );
   static_assert(
-    offsetof(M2TSectionRuntimeView, patProgramMapPid) == 0xF8,
-    "M2TSectionRuntimeView::patProgramMapPid offset must be 0xF8"
+    offsetof(M2TSection, patProgramMapPid) == 0xF8,
+    "M2TSection::patProgramMapPid offset must be 0xF8"
   );
-  static_assert(offsetof(M2TSectionRuntimeView, pmapTableId) == 0x100, "M2TSectionRuntimeView::pmapTableId offset must be 0x100");
+  static_assert(offsetof(M2TSection, pmapTableId) == 0x100, "M2TSection::pmapTableId offset must be 0x100");
   static_assert(
-    offsetof(M2TSectionRuntimeView, pmapSectionLength) == 0x10C,
-    "M2TSectionRuntimeView::pmapSectionLength offset must be 0x10C"
-  );
-  static_assert(
-    offsetof(M2TSectionRuntimeView, pmapProgramInfoLength) == 0x128,
-    "M2TSectionRuntimeView::pmapProgramInfoLength offset must be 0x128"
+    offsetof(M2TSection, pmapSectionLength) == 0x10C,
+    "M2TSection::pmapSectionLength offset must be 0x10C"
   );
   static_assert(
-    offsetof(M2TSectionRuntimeView, pmapElementaryPid) == 0x130,
-    "M2TSectionRuntimeView::pmapElementaryPid offset must be 0x130"
+    offsetof(M2TSection, pmapProgramInfoLength) == 0x128,
+    "M2TSection::pmapProgramInfoLength offset must be 0x128"
   );
-  static_assert(offsetof(M2TSectionRuntimeView, pmapTailBits) == 0x138, "M2TSectionRuntimeView::pmapTailBits offset must be 0x138");
-  static_assert(sizeof(M2TSectionRuntimeView) >= 0x13C, "M2TSectionRuntimeView size must cover PMAP lanes");
+  static_assert(
+    offsetof(M2TSection, pmapElementaryPid) == 0x130,
+    "M2TSection::pmapElementaryPid offset must be 0x130"
+  );
+  static_assert(offsetof(M2TSection, pmapTailBits) == 0x138, "M2TSection::pmapTailBits offset must be 0x138");
+  static_assert(sizeof(M2TSection) >= 0x13C, "M2TSection size must cover PMAP lanes");
 
-  struct M2TPatProgramEntryRuntimeView
+  struct M2TPatProgramEntry
   {
     std::uint16_t programNumber = 0; // +0x00
     std::uint16_t programPid = 0; // +0x02
   };
-  static_assert(sizeof(M2TPatProgramEntryRuntimeView) == 0x04, "M2TPatProgramEntryRuntimeView size must be 0x04");
+  static_assert(sizeof(M2TPatProgramEntry) == 0x04, "M2TPatProgramEntry size must be 0x04");
 
-  struct M2TPatTableRuntimeView
+  struct M2TPatTable
   {
     std::int32_t entryCount = 0; // +0x00
-    M2TPatProgramEntryRuntimeView entries[16]{};
+    M2TPatProgramEntry entries[16]{};
   };
-  static_assert(offsetof(M2TPatTableRuntimeView, entryCount) == 0x00, "M2TPatTableRuntimeView::entryCount offset must be 0x00");
-  static_assert(offsetof(M2TPatTableRuntimeView, entries) == 0x04, "M2TPatTableRuntimeView::entries offset must be 0x04");
-  static_assert(sizeof(M2TPatTableRuntimeView) == 0x44, "M2TPatTableRuntimeView size must be 0x44");
+  static_assert(offsetof(M2TPatTable, entryCount) == 0x00, "M2TPatTable::entryCount offset must be 0x00");
+  static_assert(offsetof(M2TPatTable, entries) == 0x04, "M2TPatTable::entries offset must be 0x04");
+  static_assert(sizeof(M2TPatTable) == 0x44, "M2TPatTable size must be 0x44");
 
-  struct M2TPmapStreamEntryRuntimeView
+  struct M2TPmapStreamEntry
   {
     std::uint8_t streamType = 0; // +0x00
     std::uint8_t reserved01 = 0; // +0x01
     std::uint16_t elementaryPid = 0; // +0x02
   };
-  static_assert(sizeof(M2TPmapStreamEntryRuntimeView) == 0x04, "M2TPmapStreamEntryRuntimeView size must be 0x04");
+  static_assert(sizeof(M2TPmapStreamEntry) == 0x04, "M2TPmapStreamEntry size must be 0x04");
 
-  struct M2TPmapTableRuntimeView
+  struct M2TPmapTable
   {
     std::int32_t entryCount = 0; // +0x00
-    M2TPmapStreamEntryRuntimeView entries[16]{};
+    M2TPmapStreamEntry entries[16]{};
   };
-  static_assert(offsetof(M2TPmapTableRuntimeView, entryCount) == 0x00, "M2TPmapTableRuntimeView::entryCount offset must be 0x00");
-  static_assert(offsetof(M2TPmapTableRuntimeView, entries) == 0x04, "M2TPmapTableRuntimeView::entries offset must be 0x04");
-  static_assert(sizeof(M2TPmapTableRuntimeView) == 0x44, "M2TPmapTableRuntimeView size must be 0x44");
+  static_assert(offsetof(M2TPmapTable, entryCount) == 0x00, "M2TPmapTable::entryCount offset must be 0x00");
+  static_assert(offsetof(M2TPmapTable, entries) == 0x04, "M2TPmapTable::entries offset must be 0x04");
+  static_assert(sizeof(M2TPmapTable) == 0x44, "M2TPmapTable size must be 0x44");
 
   class M2TSectionBitReader
   {
@@ -4171,7 +4162,7 @@
    * stream-supply and PAT work buffers.
    */
   extern "C" char* parse_program_association_section(
-    M2TStreamSupplyRuntimeView* streamSupply,
+    M2TStreamSupply* streamSupply,
     char* payload,
     std::int32_t payloadBytes,
     std::int32_t* parserWorkWords
@@ -4184,7 +4175,7 @@
    * into stream-supply and PMAP work buffers.
    */
   extern "C" char* parse_ts_program_map_section(
-    M2TStreamSupplyRuntimeView* streamSupply,
+    M2TStreamSupply* streamSupply,
     char* payload,
     std::int32_t payloadBytes,
     std::int32_t* parserWorkWords
@@ -4206,8 +4197,8 @@
   extern "C" std::int32_t SFADXT_IsHeader(char* buffer, std::int32_t sizeBytes, std::int32_t* outHeaderSizeBytes);
   extern "C" std::int32_t SFHDS_IsSfdHeader(std::int32_t bufferAddress, std::int32_t sizeBytes);
   extern "C" void sfcre_ProcessHdr(std::int32_t bufferAddress, std::int32_t sizeBytes, std::int32_t headerAddress);
-  struct SfcreHeaderRuntimeView;
-  extern "C" std::int32_t SFHDS_ProcessHdr(SfcreHeaderRuntimeView* header);
+  struct SfcreHeader;
+  extern "C" std::int32_t SFHDS_ProcessHdr(SfcreHeader* header);
   extern "C" char* MPS_SearchDelim(char* buffer, std::int32_t sizeBytes, std::int32_t delimiterMask);
   extern "C" char* sfcre_GetPketData(std::int32_t packetAddress, std::int32_t packetWindowBytes);
   extern "C" std::int32_t sfcre_AnalyAdx(char* buffer, std::int32_t sizeBytes, moho::SfdCreInf* createInfo);
@@ -4256,17 +4247,15 @@
    */
   extern "C" std::uint16_t* initPmap(std::int32_t* const parserWorkWords)
   {
-    auto* const parserTable = reinterpret_cast<M2TPmapTableRuntimeView*>(parserWorkWords);
+    auto* const parserTable = reinterpret_cast<M2TPmapTable*>(parserWorkWords);
     parserTable->entryCount = 0;
 
-    auto* entryCursor = reinterpret_cast<std::uint8_t*>(parserWorkWords) + 6;
-    for (std::int32_t index = 0; index < 16; ++index) {
-      entryCursor[-2] = 0;
-      *reinterpret_cast<std::uint16_t*>(entryCursor) = 0xFFFFu;
-      entryCursor += 4;
+    for (auto& entry : parserTable->entries) {
+      entry.streamType = 0;
+      entry.elementaryPid = 0xFFFFu;
     }
 
-    return reinterpret_cast<std::uint16_t*>(entryCursor);
+    return &parserTable->entries[16 - 1].elementaryPid + 1;
   }
 
   /**
@@ -4277,7 +4266,7 @@
    * plus up to sixteen `(program_number, pid)` entries into PAT work lanes.
    */
   extern "C" char* parse_program_association_section(
-    M2TStreamSupplyRuntimeView* const streamSupply,
+    M2TStreamSupply* const streamSupply,
     char* const payload,
     const std::int32_t payloadBytes,
     std::int32_t* const parserWorkWords
@@ -4287,8 +4276,8 @@
       return payload;
     }
 
-    auto* const sectionState = reinterpret_cast<M2TSectionRuntimeView*>(streamSupply);
-    auto* const parserTable = reinterpret_cast<M2TPatTableRuntimeView*>(parserWorkWords);
+    auto* const sectionState = reinterpret_cast<M2TSection*>(streamSupply);
+    auto* const parserTable = reinterpret_cast<M2TPatTable*>(parserWorkWords);
 
     M2TSectionBitReader bitReader(reinterpret_cast<const std::uint8_t*>(payload), payloadBytes);
     sectionState->patTableId = static_cast<std::int32_t>(bitReader.ReadBits(8));
@@ -4342,7 +4331,7 @@
    * lanes, and stores up to sixteen `(stream_type, elementary_pid)` entries.
    */
   extern "C" char* parse_ts_program_map_section(
-    M2TStreamSupplyRuntimeView* const streamSupply,
+    M2TStreamSupply* const streamSupply,
     char* const payload,
     const std::int32_t payloadBytes,
     std::int32_t* const parserWorkWords
@@ -4352,8 +4341,8 @@
       return payload;
     }
 
-    auto* const sectionState = reinterpret_cast<M2TSectionRuntimeView*>(streamSupply);
-    auto* const parserTable = reinterpret_cast<M2TPmapTableRuntimeView*>(parserWorkWords);
+    auto* const sectionState = reinterpret_cast<M2TSection*>(streamSupply);
+    auto* const parserTable = reinterpret_cast<M2TPmapTable*>(parserWorkWords);
 
     M2TSectionBitReader bitReader(reinterpret_cast<const std::uint8_t*>(payload), payloadBytes);
     sectionState->pmapTableId = static_cast<std::int32_t>(bitReader.ReadBits(8));
@@ -4411,8 +4400,8 @@
    */
   extern "C" std::int32_t analyzeGap(std::int32_t* const parserWorkWords, const std::int32_t availableBytes)
   {
-    auto* const parserView = reinterpret_cast<M2TParserGapRuntimeView*>(parserWorkWords);
-    M2TParserWindowRuntimeView* const parserWindow = parserView->parserWindow;
+    auto* const parserView = reinterpret_cast<M2TParserGap*>(parserWorkWords);
+    M2TParserWindow* const parserWindow = parserView->parserWindow;
 
     if (parserWindow == nullptr) {
       parserView->nextPacketStrideBytes = 0;
@@ -4490,7 +4479,7 @@
    * program-association parser when the stream-supply parser state is active.
    */
   extern "C" std::int32_t M2T_DecPat(
-    M2TStreamSupplyRuntimeView* const streamSupply,
+    M2TStreamSupply* const streamSupply,
     const std::uint8_t* const payload,
     const std::int32_t payloadBytes,
     std::int32_t* const parserWorkWords
@@ -4524,7 +4513,7 @@
    * TS program-map parser when the stream-supply parser state is active.
    */
   extern "C" char* M2T_DecPmap(
-    M2TStreamSupplyRuntimeView* const streamSupply,
+    M2TStreamSupply* const streamSupply,
     const std::uint8_t* const payload,
     const std::int32_t payloadBytes,
     std::int32_t* const parserWorkWords
@@ -5249,16 +5238,16 @@
     return searchM_m2s(buffer, sizeBytes, delimiterMask);
   }
 
-  struct SfcreAauHeaderRuntimeView
+  struct SfcreAauHeader
   {
     std::uint8_t word0[4]{}; // +0x00
     std::uint8_t word1[4]{}; // +0x04
     std::uint8_t word2[4]{}; // +0x08
   };
-  static_assert(offsetof(SfcreAauHeaderRuntimeView, word0) == 0x00, "SfcreAauHeaderRuntimeView::word0 offset must be 0x00");
-  static_assert(offsetof(SfcreAauHeaderRuntimeView, word1) == 0x04, "SfcreAauHeaderRuntimeView::word1 offset must be 0x04");
-  static_assert(offsetof(SfcreAauHeaderRuntimeView, word2) == 0x08, "SfcreAauHeaderRuntimeView::word2 offset must be 0x08");
-  static_assert(sizeof(SfcreAauHeaderRuntimeView) == 0x0C, "SfcreAauHeaderRuntimeView size must be 0x0C");
+  static_assert(offsetof(SfcreAauHeader, word0) == 0x00, "SfcreAauHeader::word0 offset must be 0x00");
+  static_assert(offsetof(SfcreAauHeader, word1) == 0x04, "SfcreAauHeader::word1 offset must be 0x04");
+  static_assert(offsetof(SfcreAauHeader, word2) == 0x08, "SfcreAauHeader::word2 offset must be 0x08");
+  static_assert(sizeof(SfcreAauHeader) == 0x0C, "SfcreAauHeader size must be 0x0C");
 
   static constexpr std::array<std::int32_t, 64> kSfcreAauBitrateKbpsByVersionAndIndex{
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -5278,10 +5267,10 @@
    *
    * What it does:
    * Decodes one 4-byte MPA AAU packed header into the expanded 12-byte
-   * `SfcreAauHeaderRuntimeView` lane layout.
+   * `SfcreAauHeader` lane layout.
    */
-  extern "C" SfcreAauHeaderRuntimeView* sfcre_ReadAauHdr(
-    SfcreAauHeaderRuntimeView* const header,
+  extern "C" SfcreAauHeader* sfcre_ReadAauHdr(
+    SfcreAauHeader* const header,
     const std::uint8_t* const headerBytes
   )
   {
@@ -5313,7 +5302,7 @@
    * bytes, and returns the matching cursor when the binary lane accepts it.
    */
   extern "C" std::uint8_t* sfcre_SerachMpaAau(
-    SfcreAauHeaderRuntimeView* const header,
+    SfcreAauHeader* const header,
     std::uint8_t* buffer,
     const std::int32_t sizeBytes
   )
@@ -5350,7 +5339,7 @@
    */
   extern "C" std::int32_t sfcre_AnalyMpaBitrate(std::uint8_t* const buffer, const std::int32_t sizeBytes)
   {
-    SfcreAauHeaderRuntimeView header{};
+    SfcreAauHeader header{};
     if (sfcre_SerachMpaAau(&header, buffer, sizeBytes) == nullptr) {
       return -1;
     }
@@ -5373,7 +5362,7 @@
    */
   extern "C" std::int32_t SFCRE_AnalyAauSiz(std::uint8_t* const buffer, const std::int32_t sizeBytes)
   {
-    SfcreAauHeaderRuntimeView header{};
+    SfcreAauHeader header{};
     if (sfcre_SerachMpaAau(&header, buffer, sizeBytes) == nullptr) {
       return -1;
     }
@@ -5404,11 +5393,11 @@
   )
   {
     std::int32_t copyBytes = sizeBytes;
-    if (copyBytes > static_cast<std::int32_t>(sizeof(SfcreHeaderRuntimeView::headerBuffer))) {
-      copyBytes = static_cast<std::int32_t>(sizeof(SfcreHeaderRuntimeView::headerBuffer));
+    if (copyBytes > static_cast<std::int32_t>(sizeof(SfcreHeader::headerBuffer))) {
+      copyBytes = static_cast<std::int32_t>(sizeof(SfcreHeader::headerBuffer));
     }
 
-    auto* const header = reinterpret_cast<SfcreHeaderRuntimeView*>(
+    auto* const header = reinterpret_cast<SfcreHeader*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(headerAddress))
     );
     (void)MEM_Copy(
@@ -5701,14 +5690,14 @@
     return result;
   }
 
-  struct SfsetUserConditionStateView
+  struct SfsetUserConditionState
   {
     std::uint8_t reserved00_B9B[0xB9C]{}; // +0x00
     std::int32_t userConditions[1]{}; // +0xB9C (indexed by condition id)
   };
   static_assert(
-    offsetof(SfsetUserConditionStateView, userConditions) == 0xB9C,
-    "SfsetUserConditionStateView::userConditions offset must be 0xB9C"
+    offsetof(SfsetUserConditionState, userConditions) == 0xB9C,
+    "SfsetUserConditionState::userConditions offset must be 0xB9C"
   );
 
   /**
@@ -5725,7 +5714,7 @@
   {
     const std::int32_t valid = sfset_IsCondValid(workctrlSubobj, conditionId, value);
     if (valid != 0) {
-      auto* const conditionState = reinterpret_cast<SfsetUserConditionStateView*>(workctrlSubobj);
+      auto* const conditionState = reinterpret_cast<SfsetUserConditionState*>(workctrlSubobj);
       conditionState->userConditions[conditionId] = value;
     }
     return valid;
@@ -5892,13 +5881,13 @@
     return 0;
   }
 
-  struct SfdGetMvInfRuntimeView
+  struct SfdMvInfoQuery
   {
     std::uint8_t mUnknown00[0x90C]{};
     std::uint8_t mvInfoLane[0x40]{};
   };
-  static_assert(offsetof(SfdGetMvInfRuntimeView, mvInfoLane) == 0x90C, "SfdGetMvInfRuntimeView::mvInfoLane offset must be 0x90C");
-  static_assert(sizeof(SfdGetMvInfRuntimeView) >= 0x94C, "SfdGetMvInfRuntimeView size must cover mvInfo lane");
+  static_assert(offsetof(SfdMvInfoQuery, mvInfoLane) == 0x90C, "SfdMvInfoQuery::mvInfoLane offset must be 0x90C");
+  static_assert(sizeof(SfdMvInfoQuery) >= 0x94C, "SfdMvInfoQuery size must cover mvInfo lane");
 
   /**
    * Address: 0x00AD8950 (FUN_00AD8950, _SFD_GetMvInf)
@@ -5914,7 +5903,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleGetMvInfo);
     }
 
-    const auto* const runtimeView = reinterpret_cast<const SfdGetMvInfRuntimeView*>(workctrlSubobj);
+    const auto* const runtimeView = reinterpret_cast<const SfdMvInfoQuery*>(workctrlSubobj);
     std::memcpy(outMvInfo, runtimeView->mvInfoLane, sizeof(runtimeView->mvInfoLane));
     return 0;
   }
@@ -5957,60 +5946,28 @@
     static_assert(offsetof(SfdAudioOutputOps, getOutVol) == 0x10, "SfdAudioOutputOps::getOutVol offset must be 0x10");
     static_assert(sizeof(SfdAudioOutputOps) == 0x14, "SfdAudioOutputOps size must be 0x14");
 
-    struct SfdAudioOutputRuntimeView
+    struct SfdAudioOutput
     {
       std::uint8_t reserved00_2113[0x2114]{};
       SfdAudioOutputOps* audioOutputOps = nullptr; // +0x2114
     };
     static_assert(
-      offsetof(SfdAudioOutputRuntimeView, audioOutputOps) == 0x2114,
-      "SfdAudioOutputRuntimeView::audioOutputOps offset must be 0x2114"
+      offsetof(SfdAudioOutput, audioOutputOps) == 0x2114,
+      "SfdAudioOutput::audioOutputOps offset must be 0x2114"
     );
 
     [[nodiscard]] SfdAudioOutputOps* GetSfdAudioOutputOps(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj) noexcept
     {
-      return reinterpret_cast<SfdAudioOutputRuntimeView*>(workctrlSubobj)->audioOutputOps;
+      return reinterpret_cast<SfdAudioOutput*>(workctrlSubobj)->audioOutputOps;
     }
 
-    struct SfptsQueueRuntimeView
-    {
-      std::int32_t entriesAddress = 0; // +0x00
-      std::int32_t capacity = 0; // +0x04
-      std::int32_t queuedCount = 0; // +0x08
-      std::int32_t writeIndex = 0; // +0x0C
-      std::int32_t readIndex = 0; // +0x10
-      std::uint8_t reserved14_73[0x60]{};
-    };
-    static_assert(offsetof(SfptsQueueRuntimeView, entriesAddress) == 0x00, "SfptsQueueRuntimeView::entriesAddress offset must be 0x00");
-    static_assert(offsetof(SfptsQueueRuntimeView, capacity) == 0x04, "SfptsQueueRuntimeView::capacity offset must be 0x04");
-    static_assert(offsetof(SfptsQueueRuntimeView, queuedCount) == 0x08, "SfptsQueueRuntimeView::queuedCount offset must be 0x08");
-    static_assert(offsetof(SfptsQueueRuntimeView, writeIndex) == 0x0C, "SfptsQueueRuntimeView::writeIndex offset must be 0x0C");
-    static_assert(offsetof(SfptsQueueRuntimeView, readIndex) == 0x10, "SfptsQueueRuntimeView::readIndex offset must be 0x10");
-    static_assert(sizeof(SfptsQueueRuntimeView) == 0x74, "SfptsQueueRuntimeView size must be 0x74");
-
-    struct SfdPtsQueueOwnerRuntimeView
-    {
-      std::uint8_t reserved0000[0x13BC]{};
-      SfptsQueueRuntimeView videoPtsQueue; // +0x13BC
-    };
-    static_assert(
-      offsetof(SfdPtsQueueOwnerRuntimeView, videoPtsQueue) == 0x13BC,
-      "SfdPtsQueueOwnerRuntimeView::videoPtsQueue offset must be 0x13BC"
-    );
-
-    constexpr std::int32_t kSfdPtsQueueBaseOffset = 0x1348;
-    constexpr std::int32_t kSfdPtsQueueStride = 0x74;
-    static_assert(
-      kSfdPtsQueueBaseOffset + kSfdPtsQueueStride == static_cast<std::int32_t>(offsetof(SfdPtsQueueOwnerRuntimeView, videoPtsQueue)),
-      "SFD queue stride/offset mapping must match video queue lane"
-    );
-
-    [[nodiscard]] SfptsQueueRuntimeView*
+    /// The PTS queues are embedded at `supplyLane + 0x28` (workctrl +0x1348
+    /// with the 0x74 lane stride); the video PTS queue is lane 1's.
+    [[nodiscard]] moho::SfptsPtsQueue*
     GetSfptsQueueLane(const std::int32_t workctrlAddress, const std::int32_t queueIndex) noexcept
     {
-      const auto baseAddress = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress));
-      const auto queueAddress = baseAddress + static_cast<std::uintptr_t>(kSfdPtsQueueBaseOffset + queueIndex * kSfdPtsQueueStride);
-      return reinterpret_cast<SfptsQueueRuntimeView*>(queueAddress);
+      auto* const workctrl = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
+      return &workctrl->bufferState.supplyLanes[queueIndex].ptsQueue;
     }
 
     struct SfptsQueueEntryWords
@@ -6022,25 +5979,25 @@
     };
     static_assert(sizeof(SfptsQueueEntryWords) == 0x10, "SfptsQueueEntryWords size must be 0x10");
 
-    struct SfseeHeadAnalyLaneRuntimeView
+    struct SfseeHeadAnalyLane
     {
       std::int32_t analyzingComplete = 0; // +0x00
       std::int32_t analyzedTimeMajor = 0; // +0x04
       std::int32_t analyzedTimeMinor = 0; // +0x08
     };
     static_assert(
-      offsetof(SfseeHeadAnalyLaneRuntimeView, analyzingComplete) == 0x00,
-      "SfseeHeadAnalyLaneRuntimeView::analyzingComplete offset must be 0x00"
+      offsetof(SfseeHeadAnalyLane, analyzingComplete) == 0x00,
+      "SfseeHeadAnalyLane::analyzingComplete offset must be 0x00"
     );
     static_assert(
-      offsetof(SfseeHeadAnalyLaneRuntimeView, analyzedTimeMajor) == 0x04,
-      "SfseeHeadAnalyLaneRuntimeView::analyzedTimeMajor offset must be 0x04"
+      offsetof(SfseeHeadAnalyLane, analyzedTimeMajor) == 0x04,
+      "SfseeHeadAnalyLane::analyzedTimeMajor offset must be 0x04"
     );
     static_assert(
-      offsetof(SfseeHeadAnalyLaneRuntimeView, analyzedTimeMinor) == 0x08,
-      "SfseeHeadAnalyLaneRuntimeView::analyzedTimeMinor offset must be 0x08"
+      offsetof(SfseeHeadAnalyLane, analyzedTimeMinor) == 0x08,
+      "SfseeHeadAnalyLane::analyzedTimeMinor offset must be 0x08"
     );
-    static_assert(sizeof(SfseeHeadAnalyLaneRuntimeView) == 0x0C, "SfseeHeadAnalyLaneRuntimeView size must be 0x0C");
+    static_assert(sizeof(SfseeHeadAnalyLane) == 0x0C, "SfseeHeadAnalyLane size must be 0x0C");
 
   }
 
@@ -6058,7 +6015,7 @@
       /// `SFHDS_InitFhd`, which is what identifies this lane - and the record
       /// is 0x894 bytes, so it ends at 0x8A0 exactly where `mpsStreamDetected`
       /// already sat. That boundary is the cross-check on both models.
-      SfcreHeaderRuntimeView fileHeader{}; // +0x000C
+      SfcreHeader fileHeader{}; // +0x000C
       std::int32_t mpsStreamDetected = 0; // +0x08A0
       std::int32_t mpsFallbackTimeMajor = 0; // +0x08A4
       std::int32_t mpsFallbackTimeMinor = 0; // +0x08A8
@@ -6072,10 +6029,10 @@
       std::int32_t mpsHeaderWord08C8 = 0; // +0x08C8
       std::int32_t mpsHeaderWord08CC = 0; // +0x08CC
       std::uint8_t reserved08D0[0x200]{};
-      SfseeHeadAnalyLaneRuntimeView videoAnalyzingLane; // +0x0AD0
+      SfseeHeadAnalyLane videoAnalyzingLane; // +0x0AD0
       std::uint8_t headAnalyzeTimerState[0x30]{}; // +0x0ADC
       std::uint8_t reserved0B0C[0x200]{};
-      SfseeHeadAnalyLaneRuntimeView audioAnalyzingLane; // +0x0D0C
+      SfseeHeadAnalyLane audioAnalyzingLane; // +0x0D0C
       std::int32_t audioAnalyzeWord0 = 0; // +0x0D18
       std::int32_t audioAnalyzeWord1 = 0; // +0x0D1C
       std::int32_t audioAnalyzeWord2 = 0; // +0x0D20
@@ -6107,11 +6064,11 @@
       "moho::SfseeHandle::fileHeader offset must be 0x000C"
     );
     static_assert(
-      offsetof(moho::SfseeHandle, fileHeader) + offsetof(SfcreHeaderRuntimeView, byteRate) == 0x0018,
+      offsetof(moho::SfseeHandle, fileHeader) + offsetof(SfcreHeader, byteRate) == 0x0018,
       "moho::SfseeHandle::fileHeader.byteRate offset must be 0x0018"
     );
     static_assert(
-      offsetof(moho::SfseeHandle, fileHeader) + offsetof(SfcreHeaderRuntimeView, maxPlayLengthVideo) == 0x0040,
+      offsetof(moho::SfseeHandle, fileHeader) + offsetof(SfcreHeader, maxPlayLengthVideo) == 0x0040,
       "moho::SfseeHandle::fileHeader.maxPlayLengthVideo offset must be 0x0040"
     );
     static_assert(
@@ -6233,42 +6190,7 @@
   namespace
   {
 
-    struct SfdSfseeOwnerRuntimeView
-    {
-      std::uint8_t reserved0000[0x3550]{};
-      moho::SfseeHandle* sfseeHandle = nullptr; // +0x3550
-    };
-    static_assert(
-      offsetof(SfdSfseeOwnerRuntimeView, sfseeHandle) == 0x3550,
-      "SfdSfseeOwnerRuntimeView::sfseeHandle offset must be 0x3550"
-    );
-
-    struct SfdSeekRequestRuntimeView
-    {
-      std::uint8_t reserved0000[0x3550]{};
-      moho::SfseeHandle* sfseeHandle = nullptr; // +0x3550
-      std::int32_t seekRequestWord0 = 0; // +0x3554
-      std::int32_t seekRequestWord1 = 0; // +0x3558
-      std::int32_t seekRequestWord2 = 0; // +0x355C
-    };
-    static_assert(
-      offsetof(SfdSeekRequestRuntimeView, sfseeHandle) == 0x3550,
-      "SfdSeekRequestRuntimeView::sfseeHandle offset must be 0x3550"
-    );
-    static_assert(
-      offsetof(SfdSeekRequestRuntimeView, seekRequestWord0) == 0x3554,
-      "SfdSeekRequestRuntimeView::seekRequestWord0 offset must be 0x3554"
-    );
-    static_assert(
-      offsetof(SfdSeekRequestRuntimeView, seekRequestWord1) == 0x3558,
-      "SfdSeekRequestRuntimeView::seekRequestWord1 offset must be 0x3558"
-    );
-    static_assert(
-      offsetof(SfdSeekRequestRuntimeView, seekRequestWord2) == 0x355C,
-      "SfdSeekRequestRuntimeView::seekRequestWord2 offset must be 0x355C"
-    );
-
-    struct SfseeFinAnalyControlRuntimeView
+    struct SfseeFinAnalyControl
     {
       std::uint8_t reserved0000[0x0DE8]{};
       std::int32_t stagedTotalTimeMajor = 0; // +0x0DE8
@@ -6279,25 +6201,25 @@
       std::int32_t finAnalyMode = 0; // +0x3558
     };
     static_assert(
-      offsetof(SfseeFinAnalyControlRuntimeView, stagedTotalTimeMajor) == 0x0DE8,
-      "SfseeFinAnalyControlRuntimeView::stagedTotalTimeMajor offset must be 0x0DE8"
+      offsetof(SfseeFinAnalyControl, stagedTotalTimeMajor) == 0x0DE8,
+      "SfseeFinAnalyControl::stagedTotalTimeMajor offset must be 0x0DE8"
     );
     static_assert(
-      offsetof(SfseeFinAnalyControlRuntimeView, stagedTotalTimeMinor) == 0x0DEC,
-      "SfseeFinAnalyControlRuntimeView::stagedTotalTimeMinor offset must be 0x0DEC"
+      offsetof(SfseeFinAnalyControl, stagedTotalTimeMinor) == 0x0DEC,
+      "SfseeFinAnalyControl::stagedTotalTimeMinor offset must be 0x0DEC"
     );
     static_assert(
-      offsetof(SfseeFinAnalyControlRuntimeView, sfseeHandle) == 0x3550,
-      "SfseeFinAnalyControlRuntimeView::sfseeHandle offset must be 0x3550"
+      offsetof(SfseeFinAnalyControl, sfseeHandle) == 0x3550,
+      "SfseeFinAnalyControl::sfseeHandle offset must be 0x3550"
     );
     static_assert(
-      offsetof(SfseeFinAnalyControlRuntimeView, finAnalyMode) == 0x3558,
-      "SfseeFinAnalyControlRuntimeView::finAnalyMode offset must be 0x3558"
+      offsetof(SfseeFinAnalyControl, finAnalyMode) == 0x3558,
+      "SfseeFinAnalyControl::finAnalyMode offset must be 0x3558"
     );
   }
 
   extern "C" std::int32_t sfpts_SetupPtsQue(
-    SfptsQueueRuntimeView* ptsQueue,
+    moho::SfptsPtsQueue* ptsQueue,
     std::int32_t ptsQueueSourceAddress,
     std::int32_t ptsEntryCount
   );
@@ -6345,7 +6267,7 @@
    * computes entry capacity in 16-byte units, and resets queue cursors.
    */
   extern "C" std::int32_t sfpts_SetupPtsQue(
-    SfptsQueueRuntimeView* const ptsQueue,
+    moho::SfptsPtsQueue* const ptsQueue,
     const std::int32_t ptsQueueSourceAddress,
     const std::int32_t ptsEntryCount
   )
@@ -6359,15 +6281,15 @@
       static_cast<std::size_t>(queueBytes)
     );
 
-    ptsQueue->entriesAddress = alignedEntriesAddress;
-    ptsQueue->capacity = queueBytes / static_cast<std::int32_t>(sizeof(SfptsQueueEntryWords));
-    ptsQueue->queuedCount = 0;
+    ptsQueue->entriesBaseAddress = alignedEntriesAddress;
+    ptsQueue->entryCapacity = queueBytes / static_cast<std::int32_t>(sizeof(SfptsQueueEntryWords));
+    ptsQueue->queuedEntryCount = 0;
     ptsQueue->writeIndex = 0;
-    ptsQueue->readIndex = 0;
+    ptsQueue->readCursor = 0;
     return 0;
   }
 
-  struct SftstFrameStepRuntimeView
+  struct SftstFrameStep
   {
     std::int32_t testFlag = 0; // +0x00
     std::int32_t pauseFlag = 0; // +0x04
@@ -6388,45 +6310,45 @@
     SftstConfigLane adjustStartConfig{}; // +0x158
     SftstConfigLane adjustPositionOffsetConfig{}; // +0x168
   };
-  static_assert(offsetof(SftstFrameStepRuntimeView, testFlag) == 0x00, "SftstFrameStepRuntimeView::testFlag offset must be 0x00");
-  static_assert(offsetof(SftstFrameStepRuntimeView, pauseFlag) == 0x04, "SftstFrameStepRuntimeView::pauseFlag offset must be 0x04");
+  static_assert(offsetof(SftstFrameStep, testFlag) == 0x00, "SftstFrameStep::testFlag offset must be 0x00");
+  static_assert(offsetof(SftstFrameStep, pauseFlag) == 0x04, "SftstFrameStep::pauseFlag offset must be 0x04");
   static_assert(
-    offsetof(SftstFrameStepRuntimeView, statusCode) == 0x0C,
-    "SftstFrameStepRuntimeView::statusCode offset must be 0x0C"
+    offsetof(SftstFrameStep, statusCode) == 0x0C,
+    "SftstFrameStep::statusCode offset must be 0x0C"
   );
   static_assert(
-    offsetof(SftstFrameStepRuntimeView, accumulatedFrameUnits) == 0x128,
-    "SftstFrameStepRuntimeView::accumulatedFrameUnits offset must be 0x128"
+    offsetof(SftstFrameStep, accumulatedFrameUnits) == 0x128,
+    "SftstFrameStep::accumulatedFrameUnits offset must be 0x128"
   );
   static_assert(
-    offsetof(SftstFrameStepRuntimeView, stepUnitsPerFrame) == 0x130,
-    "SftstFrameStepRuntimeView::stepUnitsPerFrame offset must be 0x130"
+    offsetof(SftstFrameStep, stepUnitsPerFrame) == 0x130,
+    "SftstFrameStep::stepUnitsPerFrame offset must be 0x130"
   );
   static_assert(
-    offsetof(SftstFrameStepRuntimeView, toleranceConfig) == 0x138,
-    "SftstFrameStepRuntimeView::toleranceConfig offset must be 0x138"
+    offsetof(SftstFrameStep, toleranceConfig) == 0x138,
+    "SftstFrameStep::toleranceConfig offset must be 0x138"
   );
   static_assert(
-    offsetof(SftstFrameStepRuntimeView, excessErrorConfig) == 0x148,
-    "SftstFrameStepRuntimeView::excessErrorConfig offset must be 0x148"
+    offsetof(SftstFrameStep, excessErrorConfig) == 0x148,
+    "SftstFrameStep::excessErrorConfig offset must be 0x148"
   );
   static_assert(
-    offsetof(SftstFrameStepRuntimeView, adjustStartConfig) == 0x158,
-    "SftstFrameStepRuntimeView::adjustStartConfig offset must be 0x158"
+    offsetof(SftstFrameStep, adjustStartConfig) == 0x158,
+    "SftstFrameStep::adjustStartConfig offset must be 0x158"
   );
   static_assert(
-    offsetof(SftstFrameStepRuntimeView, adjustPositionOffsetConfig) == 0x168,
-    "SftstFrameStepRuntimeView::adjustPositionOffsetConfig offset must be 0x168"
+    offsetof(SftstFrameStep, adjustPositionOffsetConfig) == 0x168,
+    "SftstFrameStep::adjustPositionOffsetConfig offset must be 0x168"
   );
 
-  struct SftstFrameStepRateRuntimeView
+  struct SftstFrameStepRate
   {
     std::int64_t numerator = 0;
     std::int64_t denominator = 0;
   };
-  static_assert(sizeof(SftstFrameStepRateRuntimeView) == 0x10, "SftstFrameStepRateRuntimeView size must be 0x10");
+  static_assert(sizeof(SftstFrameStepRate) == 0x10, "SftstFrameStepRate size must be 0x10");
 
-  struct SftstMovingAverageRuntimeView
+  struct SftstMovingAverage
   {
     std::uint8_t reserved0000[0x10]{};
     std::int32_t historyValueCount = 0; // +0x10
@@ -6436,32 +6358,32 @@
     std::int32_t movingAverageAdjusted = 0; // +0x1A8
   };
   static_assert(
-    offsetof(SftstMovingAverageRuntimeView, historyValueCount) == 0x10,
-    "SftstMovingAverageRuntimeView::historyValueCount offset must be 0x10"
+    offsetof(SftstMovingAverage, historyValueCount) == 0x10,
+    "SftstMovingAverage::historyValueCount offset must be 0x10"
   );
   static_assert(
-    offsetof(SftstMovingAverageRuntimeView, historyWriteOrdinal) == 0x14,
-    "SftstMovingAverageRuntimeView::historyWriteOrdinal offset must be 0x14"
+    offsetof(SftstMovingAverage, historyWriteOrdinal) == 0x14,
+    "SftstMovingAverage::historyWriteOrdinal offset must be 0x14"
   );
   static_assert(
-    offsetof(SftstMovingAverageRuntimeView, historyValues) == 0x18,
-    "SftstMovingAverageRuntimeView::historyValues offset must be 0x18"
+    offsetof(SftstMovingAverage, historyValues) == 0x18,
+    "SftstMovingAverage::historyValues offset must be 0x18"
   );
   static_assert(
-    offsetof(SftstMovingAverageRuntimeView, movingAveragePrimary) == 0x1A4,
-    "SftstMovingAverageRuntimeView::movingAveragePrimary offset must be 0x1A4"
+    offsetof(SftstMovingAverage, movingAveragePrimary) == 0x1A4,
+    "SftstMovingAverage::movingAveragePrimary offset must be 0x1A4"
   );
   static_assert(
-    offsetof(SftstMovingAverageRuntimeView, movingAverageAdjusted) == 0x1A8,
-    "SftstMovingAverageRuntimeView::movingAverageAdjusted offset must be 0x1A8"
+    offsetof(SftstMovingAverage, movingAverageAdjusted) == 0x1A8,
+    "SftstMovingAverage::movingAverageAdjusted offset must be 0x1A8"
   );
-  static_assert(sizeof(SftstMovingAverageRuntimeView) == 0x1AC, "SftstMovingAverageRuntimeView size must be 0x1AC");
+  static_assert(sizeof(SftstMovingAverage) == 0x1AC, "SftstMovingAverage size must be 0x1AC");
 
   constexpr std::size_t kSftstResetHistoryBytes = 0xF0;
   constexpr std::size_t kSftstHistoryResetGenerationIndex = 97;
   static_assert(
-    offsetof(SftstMovingAverageRuntimeView, historyValues) + (kSftstHistoryResetGenerationIndex * sizeof(std::int32_t)) == 0x19C,
-    "SftstMovingAverageRuntimeView::historyValues[97] offset must be 0x19C"
+    offsetof(SftstMovingAverage, historyValues) + (kSftstHistoryResetGenerationIndex * sizeof(std::int32_t)) == 0x19C,
+    "SftstMovingAverage::historyValues[97] offset must be 0x19C"
   );
 
   /**
@@ -6471,7 +6393,7 @@
    * Clears the 0xF0-byte history reset lane, resets the write ordinal, and
    * returns the incremented reset-generation counter.
    */
-  std::int32_t sftst_ResetHist(SftstMovingAverageRuntimeView* const runtimeView)
+  std::int32_t sftst_ResetHist(SftstMovingAverage* const runtimeView)
   {
     std::memset(runtimeView->historyValues, 0, kSftstResetHistoryBytes);
     runtimeView->historyWriteOrdinal = 0;
@@ -6486,7 +6408,7 @@
    * What it does:
    * Stores one SFTST test-flag lane and returns the stored value.
    */
-  std::int32_t SFTST_SetTstFlg(SftstFrameStepRuntimeView* const runtimeView, const std::int32_t testFlag)
+  std::int32_t SFTST_SetTstFlg(SftstFrameStep* const runtimeView, const std::int32_t testFlag)
   {
     runtimeView->testFlag = testFlag;
     return testFlag;
@@ -6498,9 +6420,9 @@
    * What it does:
    * Copies one 4-word tolerance configuration lane to the frame-step runtime.
    */
-  SftstFrameStepRuntimeView::SftstConfigLane* SFTST_SetTolerance(
-    SftstFrameStepRuntimeView* const runtimeView,
-    const SftstFrameStepRuntimeView::SftstConfigLane* const toleranceConfig
+  SftstFrameStep::SftstConfigLane* SFTST_SetTolerance(
+    SftstFrameStep* const runtimeView,
+    const SftstFrameStep::SftstConfigLane* const toleranceConfig
   )
   {
     runtimeView->toleranceConfig = *toleranceConfig;
@@ -6513,9 +6435,9 @@
    * What it does:
    * Copies one 4-word excess-error configuration lane to the frame-step runtime.
    */
-  SftstFrameStepRuntimeView::SftstConfigLane* SFTST_SetExcessErr(
-    SftstFrameStepRuntimeView* const runtimeView,
-    const SftstFrameStepRuntimeView::SftstConfigLane* const excessErrorConfig
+  SftstFrameStep::SftstConfigLane* SFTST_SetExcessErr(
+    SftstFrameStep* const runtimeView,
+    const SftstFrameStep::SftstConfigLane* const excessErrorConfig
   )
   {
     runtimeView->excessErrorConfig = *excessErrorConfig;
@@ -6528,9 +6450,9 @@
    * What it does:
    * Copies one 4-word adjustment-start configuration lane to the frame-step runtime.
    */
-  SftstFrameStepRuntimeView::SftstConfigLane* SFTST_SetAdjStart(
-    SftstFrameStepRuntimeView* const runtimeView,
-    const SftstFrameStepRuntimeView::SftstConfigLane* const adjustStartConfig
+  SftstFrameStep::SftstConfigLane* SFTST_SetAdjStart(
+    SftstFrameStep* const runtimeView,
+    const SftstFrameStep::SftstConfigLane* const adjustStartConfig
   )
   {
     runtimeView->adjustStartConfig = *adjustStartConfig;
@@ -6543,9 +6465,9 @@
    * What it does:
    * Copies one 4-word adjustment-position-offset lane to the frame-step runtime.
    */
-  SftstFrameStepRuntimeView::SftstConfigLane* SFTST_SetAdjPoff(
-    SftstFrameStepRuntimeView* const runtimeView,
-    const SftstFrameStepRuntimeView::SftstConfigLane* const adjustPositionOffsetConfig
+  SftstFrameStep::SftstConfigLane* SFTST_SetAdjPoff(
+    SftstFrameStep* const runtimeView,
+    const SftstFrameStep::SftstConfigLane* const adjustPositionOffsetConfig
   )
   {
     runtimeView->adjustPositionOffsetConfig = *adjustPositionOffsetConfig;
@@ -6559,7 +6481,7 @@
    * Updates the moving-average history-window size when the requested range is
    * positive and returns the requested range value.
    */
-  std::int32_t SFTST_SetMovaveRange(SftstMovingAverageRuntimeView* const runtimeView, const std::int32_t historyRange)
+  std::int32_t SFTST_SetMovaveRange(SftstMovingAverage* const runtimeView, const std::int32_t historyRange)
   {
     if (historyRange > 0) {
       runtimeView->historyValueCount = historyRange;
@@ -6573,7 +6495,7 @@
    * What it does:
    * Stores one pause flag lane on the frame-step runtime and returns it.
    */
-  std::int32_t SFTST_Pause(SftstFrameStepRuntimeView* const runtimeView, const std::int32_t pauseFlag)
+  std::int32_t SFTST_Pause(SftstFrameStep* const runtimeView, const std::int32_t pauseFlag)
   {
     runtimeView->pauseFlag = pauseFlag;
     return pauseFlag;
@@ -6586,7 +6508,7 @@
    * Stores one adjustment/status flag lane on the frame-step runtime and
    * returns the stored value.
    */
-  std::int32_t SFTST_SetAdjFlg(SftstFrameStepRuntimeView* const runtimeView, const std::int32_t adjustFlag)
+  std::int32_t SFTST_SetAdjFlg(SftstFrameStep* const runtimeView, const std::int32_t adjustFlag)
   {
     runtimeView->statusCode = adjustFlag;
     return adjustFlag;
@@ -6598,7 +6520,7 @@
    * What it does:
    * Computes the integer moving average over the active history lane.
    */
-  std::int32_t sftst_CalcMovAve(SftstMovingAverageRuntimeView* const runtimeView)
+  std::int32_t sftst_CalcMovAve(SftstMovingAverage* const runtimeView)
   {
     std::int32_t historySum = 0;
     const std::int32_t historyValueCount = runtimeView->historyValueCount;
@@ -6618,7 +6540,7 @@
    * Writes one new history sample into the moving-average ring and refreshes
    * both output average lanes.
    */
-  std::int32_t sftst_UpdateMovAve(SftstMovingAverageRuntimeView* const runtimeView, const std::int32_t sampleValue)
+  std::int32_t sftst_UpdateMovAve(SftstMovingAverage* const runtimeView, const std::int32_t sampleValue)
   {
     runtimeView->historyValues[runtimeView->historyWriteOrdinal++ % runtimeView->historyValueCount] = sampleValue;
     const std::int32_t movingAverage = sftst_CalcMovAve(runtimeView);
@@ -6634,7 +6556,7 @@
    * Subtracts one delta value from every history sample and refreshes the
    * adjusted moving-average lane.
    */
-  std::int32_t sftst_ModifyHist(SftstMovingAverageRuntimeView* const runtimeView, const std::int32_t deltaValue)
+  std::int32_t sftst_ModifyHist(SftstMovingAverage* const runtimeView, const std::int32_t deltaValue)
   {
     for (std::int32_t index = 0; index < runtimeView->historyValueCount; ++index) {
       runtimeView->historyValues[index] -= deltaValue;
@@ -6702,8 +6624,8 @@
    * returns the high 32-bit frame lane unless the stepper is paused.
    */
   std::int32_t SFTST_GoNextFrame(
-    SftstFrameStepRuntimeView* const frameStepper,
-    const SftstFrameStepRateRuntimeView* const stepRate
+    SftstFrameStep* const frameStepper,
+    const SftstFrameStepRate* const stepRate
   )
   {
     const std::int32_t statusCode = frameStepper->statusCode;
@@ -6836,8 +6758,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleEntrySeek);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
-    runtimeView->sfseeHandle = reinterpret_cast<moho::SfseeHandle*>(
+    workctrlSubobj->seekState.handle = reinterpret_cast<moho::SfseeHandle*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sfseeHandleAddress))
     );
     return 0;
@@ -6909,7 +6830,7 @@
   std::int32_t sfsee_ExecHeadAnaly(const std::int32_t workctrlAddress)
   {
     auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj)->sfseeHandle;
+    auto* const runtimeView = workctrlSubobj->seekState.handle;
 
     std::int32_t result = runtimeView->headAnalyzedFlag;
     if (result != 0) {
@@ -6990,8 +6911,8 @@
   std::int32_t SFSEE_ExecServer(const std::int32_t workctrlAddress)
   {
     auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
-    if (runtimeView->sfseeHandle == nullptr) {
+    auto* const runtimeView = workctrlSubobj;
+    if (runtimeView->seekState.handle == nullptr) {
       return 0;
     }
 
@@ -7012,8 +6933,8 @@
     const std::int32_t condition6State
   )
   {
-    auto* const ownerView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(SjAddressToPointer(workctrlAddress));
-    moho::SfseeHandle* const sfseeHandle = ownerView->sfseeHandle;
+    auto* const ownerView = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
+    moho::SfseeHandle* const sfseeHandle = ownerView->seekState.handle;
     if (sfseeHandle != nullptr) {
       if (sfseeHandle->keepVideoEnabledOnSeek < 0) {
         sfseeHandle->keepVideoEnabledOnSeek = condition5State;
@@ -7057,8 +6978,8 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetSeekPosTable);
     }
 
-    auto* const ownerView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
-    ownerView->sfseeHandle->seekReadyFlag = seekTableAddress;
+    auto* const ownerView = workctrlSubobj;
+    ownerView->seekState.handle->seekReadyFlag = seekTableAddress;
     return 0;
   }
 
@@ -7098,8 +7019,8 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleIsHeadAnalyEnd);
     }
 
-    auto* const ownerView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
-    (void)sfsee_IsHeadAnalyEnd(ownerView->sfseeHandle, outHeadAnalyzed);
+    auto* const ownerView = workctrlSubobj;
+    (void)sfsee_IsHeadAnalyEnd(ownerView->seekState.handle, outHeadAnalyzed);
     return 0;
   }
 
@@ -7199,8 +7120,8 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleIsSeekAble);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
-    (void)sfsee_IsSeekAble(runtimeView->sfseeHandle, outSeekable);
+    auto* const runtimeView = workctrlSubobj;
+    (void)sfsee_IsSeekAble(runtimeView->seekState.handle, outSeekable);
     return 0;
   }
 
@@ -7223,11 +7144,11 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleCnvTimeToPos);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = workctrlSubobj;
     std::int32_t isSeekable = 0;
-    (void)sfsee_IsSeekAble(runtimeView->sfseeHandle, &isSeekable);
+    (void)sfsee_IsSeekAble(runtimeView->seekState.handle, &isSeekable);
     if (isSeekable != 0) {
-      (void)sfsee_CnvTimeToPos(runtimeView->sfseeHandle, timeMajor, timeMinor, outSeekPosition);
+      (void)sfsee_CnvTimeToPos(runtimeView->seekState.handle, timeMajor, timeMinor, outSeekPosition);
     }
     return 0;
   }
@@ -7252,11 +7173,11 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleCnvPosToTime);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = workctrlSubobj;
     std::int32_t isSeekable = 0;
-    (void)sfsee_IsSeekAble(runtimeView->sfseeHandle, &isSeekable);
+    (void)sfsee_IsSeekAble(runtimeView->seekState.handle, &isSeekable);
     if (isSeekable != 0) {
-      (void)sfsee_CnvPosToTime(runtimeView->sfseeHandle, seekPosition, outTimeMajor, outTimeMinor);
+      (void)sfsee_CnvPosToTime(runtimeView->seekState.handle, seekPosition, outTimeMajor, outTimeMinor);
     }
     return 0;
   }
@@ -7298,8 +7219,8 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSeek);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSeekRequestRuntimeView*>(workctrlSubobj);
-    moho::SfseeHandle* const sfseeHandle = runtimeView->sfseeHandle;
+    auto* const seekLane = &workctrlSubobj->seekState;
+    moho::SfseeHandle* const sfseeHandle = seekLane->handle;
     if (sfseeHandle == nullptr) {
       return 0;
     }
@@ -7317,9 +7238,9 @@
       (void)SFSET_SetCond(workctrlSubobj, kSfsetCondAudioEnable, 0);
     }
 
-    runtimeView->seekRequestWord0 = seekRequestWords[0];
-    runtimeView->seekRequestWord1 = seekRequestWords[1];
-    runtimeView->seekRequestWord2 = seekRequestWords[2];
+    seekLane->requestWords[0] = seekRequestWords[0];
+    seekLane->requestWords[1] = seekRequestWords[1];
+    seekLane->requestWords[2] = seekRequestWords[2];
     return SFTRN_CallTrSetup(SjPointerToAddress(workctrlSubobj), 13);
   }
 
@@ -7336,9 +7257,9 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetSeekPos);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
-    if (runtimeView->sfseeHandle != nullptr) {
-      runtimeView->sfseeHandle->seekBaseReadTotalBytes = seekPositionBytes;
+    auto* const runtimeView = workctrlSubobj;
+    if (runtimeView->seekState.handle != nullptr) {
+      runtimeView->seekState.handle->seekBaseReadTotalBytes = seekPositionBytes;
     }
     return 0;
   }
@@ -7467,8 +7388,7 @@
         return SFLIB_SetErr(0, kSflibErrInvalidHandleSetVideoPts);
       }
 
-      auto* const runtimeView = reinterpret_cast<SfdPtsQueueOwnerRuntimeView*>(workctrlSubobj);
-      sfpts_SetupPtsQue(&runtimeView->videoPtsQueue, ptsQueueSourceAddress, ptsEntryCount);
+      sfpts_SetupPtsQue(&workctrlSubobj->bufferState.supplyLanes[1].ptsQueue, ptsQueueSourceAddress, ptsEntryCount);
     }
 
     return 0;
@@ -7490,9 +7410,9 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetFileSize);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
-    if (runtimeView->sfseeHandle != nullptr) {
-      runtimeView->sfseeHandle->fileSizeBytes = fileSizeBytes;
+    auto* const runtimeView = workctrlSubobj;
+    if (runtimeView->seekState.handle != nullptr) {
+      runtimeView->seekState.handle->fileSizeBytes = fileSizeBytes;
 
       const auto workctrlAddress =
         static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
@@ -7520,10 +7440,10 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetTotTime);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
-    if (runtimeView->sfseeHandle != nullptr) {
-      runtimeView->sfseeHandle->configuredTotalTimeMajor = totalTimeMajor;
-      runtimeView->sfseeHandle->configuredTotalTimeMinor = totalTimeMinor;
+    auto* const runtimeView = workctrlSubobj;
+    if (runtimeView->seekState.handle != nullptr) {
+      runtimeView->seekState.handle->configuredTotalTimeMajor = totalTimeMajor;
+      runtimeView->seekState.handle->configuredTotalTimeMinor = totalTimeMinor;
 
       const auto workctrlAddress =
         static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
@@ -7548,9 +7468,9 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetByteRate);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj);
-    if (runtimeView->sfseeHandle != nullptr) {
-      runtimeView->sfseeHandle->configuredByteRate = byteRate;
+    auto* const runtimeView = workctrlSubobj;
+    if (runtimeView->seekState.handle != nullptr) {
+      runtimeView->seekState.handle->configuredByteRate = byteRate;
 
       const auto workctrlAddress =
         static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
@@ -7569,8 +7489,8 @@
    */
   std::int32_t sfsee_ExecFinAnaly(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const runtimeView = reinterpret_cast<SfseeFinAnalyControlRuntimeView*>(workctrlSubobj);
-    moho::SfseeHandle* const sfseeHandle = runtimeView->sfseeHandle;
+    auto* const runtimeView = reinterpret_cast<SfseeFinAnalyControl*>(workctrlSubobj);
+    moho::SfseeHandle* const sfseeHandle = workctrlSubobj->seekState.handle;
 
     const std::int32_t endcodeSkipResult =
       SFCON_IsEndcodeSkip(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
@@ -7615,39 +7535,39 @@
     return effectiveTotalMajor;
   }
 
-  struct SfseeInputSelectorEntryRuntimeView
+  struct SfseeInputSelectorEntry
   {
     std::int32_t inputTotalLaneIndex = 0; // +0x00
     std::uint8_t reserved04[0x70]{};
   };
   static_assert(
-    offsetof(SfseeInputSelectorEntryRuntimeView, inputTotalLaneIndex) == 0x00,
-    "SfseeInputSelectorEntryRuntimeView::inputTotalLaneIndex offset must be 0x00"
+    offsetof(SfseeInputSelectorEntry, inputTotalLaneIndex) == 0x00,
+    "SfseeInputSelectorEntry::inputTotalLaneIndex offset must be 0x00"
   );
   static_assert(
-    sizeof(SfseeInputSelectorEntryRuntimeView) == 0x74,
-    "SfseeInputSelectorEntryRuntimeView size must be 0x74"
+    sizeof(SfseeInputSelectorEntry) == 0x74,
+    "SfseeInputSelectorEntry size must be 0x74"
   );
 
-  struct SfseeInputTotalLaneRuntimeView
+  struct SfseeInputTotalLane
   {
     std::int32_t inputReadTotalBytes = 0; // +0x00
     std::uint8_t reserved04[0x40]{};
   };
   static_assert(
-    offsetof(SfseeInputTotalLaneRuntimeView, inputReadTotalBytes) == 0x00,
-    "SfseeInputTotalLaneRuntimeView::inputReadTotalBytes offset must be 0x00"
+    offsetof(SfseeInputTotalLane, inputReadTotalBytes) == 0x00,
+    "SfseeInputTotalLane::inputReadTotalBytes offset must be 0x00"
   );
-  static_assert(sizeof(SfseeInputTotalLaneRuntimeView) == 0x44, "SfseeInputTotalLaneRuntimeView size must be 0x44");
+  static_assert(sizeof(SfseeInputTotalLane) == 0x44, "SfseeInputTotalLane size must be 0x44");
 
-  struct SfseeInputRouterRuntimeView
+  struct SfseeInputRouter
   {
     std::uint8_t reserved0000[0x1F44]{};
     std::int32_t activeSelectorIndex = 0; // +0x1F44
   };
   static_assert(
-    offsetof(SfseeInputRouterRuntimeView, activeSelectorIndex) == 0x1F44,
-    "SfseeInputRouterRuntimeView::activeSelectorIndex offset must be 0x1F44"
+    offsetof(SfseeInputRouter, activeSelectorIndex) == 0x1F44,
+    "SfseeInputRouter::activeSelectorIndex offset must be 0x1F44"
   );
 
   /**
@@ -7677,12 +7597,12 @@
     constexpr std::int32_t kSelectorTableOffset = 0x1360;
     constexpr std::int32_t kInputTotalTableOffset = 0x1F50;
 
-    const auto* const runtimeView = reinterpret_cast<const SfseeInputRouterRuntimeView*>(
+    const auto* const runtimeView = reinterpret_cast<const SfseeInputRouter*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
     );
     const auto* const bytes = reinterpret_cast<const std::uint8_t*>(runtimeView);
-    const auto* const selectorEntries = reinterpret_cast<const SfseeInputSelectorEntryRuntimeView*>(bytes + kSelectorTableOffset);
-    const auto* const inputTotalLanes = reinterpret_cast<const SfseeInputTotalLaneRuntimeView*>(bytes + kInputTotalTableOffset);
+    const auto* const selectorEntries = reinterpret_cast<const SfseeInputSelectorEntry*>(bytes + kSelectorTableOffset);
+    const auto* const inputTotalLanes = reinterpret_cast<const SfseeInputTotalLane*>(bytes + kInputTotalTableOffset);
     const std::int32_t selectorIndex = runtimeView->activeSelectorIndex;
     const std::int32_t inputTotalLaneIndex = selectorEntries[selectorIndex].inputTotalLaneIndex;
     const std::int32_t readTotalBytes = inputTotalLanes[inputTotalLaneIndex].inputReadTotalBytes;
@@ -7698,10 +7618,10 @@
    */
   extern "C" std::int32_t sfsee_UpdateEByteRate(const std::int32_t workctrlAddress)
   {
-    auto* const runtimeView = reinterpret_cast<SfdSfseeOwnerRuntimeView*>(
+    auto* const workctrl = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
     );
-    moho::SfseeHandle* const sfseeHandle = runtimeView->sfseeHandle;
+    moho::SfseeHandle* const sfseeHandle = workctrl->seekState.handle;
 
     std::int32_t computedByteRate = sfseeHandle->configuredByteRate;
     if (computedByteRate > 0) {
@@ -7739,18 +7659,6 @@
     sfseeHandle->effectiveByteRate = streamByteRateHint;
     return computedByteRate;
   }
-
-  struct SfmpvInfoRuntimeView
-  {
-    std::int32_t decoderHandle; // +0x00
-  };
-
-  struct SfdMpvHandleRuntimeView
-  {
-    std::uint8_t reserved00[0x1FC0]; // +0x00
-    SfmpvInfoRuntimeView* mpvInfo; // +0x1FC0
-  };
-  static_assert(offsetof(SfdMpvHandleRuntimeView, mpvInfo) == 0x1FC0, "SfdMpvHandleRuntimeView::mpvInfo offset must be 0x1FC0");
 
   extern "C" std::int32_t MPV_SetCond(
     std::int32_t handleAddress,
@@ -7801,7 +7709,7 @@
   extern "C" std::int32_t sfmpv_rfb_adr_tbl[2];
   extern "C" std::int32_t sSofDec_tabs[16];
 
-  struct SfdMpvRfbInfoRuntimeView
+  struct SfdMpvRfbInfo
   {
     std::int32_t lumaPlaneAddress = 0; // +0x00
     std::int32_t chromaPlaneAddress = 0; // +0x04
@@ -7810,26 +7718,26 @@
     std::uint16_t lumaStrideBytes = 0; // +0x0E
   };
   static_assert(
-    offsetof(SfdMpvRfbInfoRuntimeView, lumaPlaneAddress) == 0x00,
-    "SfdMpvRfbInfoRuntimeView::lumaPlaneAddress offset must be 0x00"
+    offsetof(SfdMpvRfbInfo, lumaPlaneAddress) == 0x00,
+    "SfdMpvRfbInfo::lumaPlaneAddress offset must be 0x00"
   );
   static_assert(
-    offsetof(SfdMpvRfbInfoRuntimeView, chromaPlaneAddress) == 0x04,
-    "SfdMpvRfbInfoRuntimeView::chromaPlaneAddress offset must be 0x04"
+    offsetof(SfdMpvRfbInfo, chromaPlaneAddress) == 0x04,
+    "SfdMpvRfbInfo::chromaPlaneAddress offset must be 0x04"
   );
   static_assert(
-    offsetof(SfdMpvRfbInfoRuntimeView, frameBaseAddress) == 0x08,
-    "SfdMpvRfbInfoRuntimeView::frameBaseAddress offset must be 0x08"
+    offsetof(SfdMpvRfbInfo, frameBaseAddress) == 0x08,
+    "SfdMpvRfbInfo::frameBaseAddress offset must be 0x08"
   );
   static_assert(
-    offsetof(SfdMpvRfbInfoRuntimeView, chromaStrideBytes) == 0x0C,
-    "SfdMpvRfbInfoRuntimeView::chromaStrideBytes offset must be 0x0C"
+    offsetof(SfdMpvRfbInfo, chromaStrideBytes) == 0x0C,
+    "SfdMpvRfbInfo::chromaStrideBytes offset must be 0x0C"
   );
   static_assert(
-    offsetof(SfdMpvRfbInfoRuntimeView, lumaStrideBytes) == 0x0E,
-    "SfdMpvRfbInfoRuntimeView::lumaStrideBytes offset must be 0x0E"
+    offsetof(SfdMpvRfbInfo, lumaStrideBytes) == 0x0E,
+    "SfdMpvRfbInfo::lumaStrideBytes offset must be 0x0E"
   );
-  static_assert(sizeof(SfdMpvRfbInfoRuntimeView) == 0x10, "SfdMpvRfbInfoRuntimeView size must be 0x10");
+  static_assert(sizeof(SfdMpvRfbInfo) == 0x10, "SfdMpvRfbInfo size must be 0x10");
 
   /**
    * Address: 0x00AD1790 (FUN_00AD1790, _SFD_MakeRfbInfo)
@@ -7843,7 +7751,7 @@
     void* const outRfbInfoLane
   )
   {
-    auto* const rfbInfo = static_cast<SfdMpvRfbInfoRuntimeView*>(outRfbInfoLane);
+    auto* const rfbInfo = static_cast<SfdMpvRfbInfo*>(outRfbInfoLane);
 
     const std::int32_t alignedWidth16 = 16 * ((parameterSnapshot->field_0x00 + 15) / 16);
     const std::int32_t alignedLumaStrideBytes = 32 * ((alignedWidth16 + 31) / 32);
@@ -7878,10 +7786,10 @@
     const std::uint32_t outConditionCallbackBytes
   )
   {
-    const auto* const runtimeView = reinterpret_cast<const SfdMpvHandleRuntimeView*>(
+    const auto* const workctrl = reinterpret_cast<const moho::SofdecSfdWorkctrlSubobj*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
     );
-    const std::int32_t decoderHandle = runtimeView->mpvInfo->decoderHandle;
+    const std::int32_t decoderHandle = workctrl->transferState.transfer.demux.mpvInfoHandle->decoderHandle;
     if (decoderHandle == 0) {
       return 0;
     }
@@ -7912,10 +7820,10 @@
   )
   {
     std::int32_t result = workctrlAddress;
-    const auto* const runtimeView = reinterpret_cast<const SfdMpvHandleRuntimeView*>(
+    const auto* const workctrl = reinterpret_cast<const moho::SofdecSfdWorkctrlSubobj*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
     );
-    const std::int32_t decoderHandle = runtimeView->mpvInfo->decoderHandle;
+    const std::int32_t decoderHandle = workctrl->transferState.transfer.demux.mpvInfoHandle->decoderHandle;
     if (decoderHandle == 0) {
       return result;
     }
@@ -7971,9 +7879,9 @@
         return SFLIB_SetErr(0, kSflibErrInvalidHandleSetMpvCond);
       }
 
-      const auto* const runtimeView = reinterpret_cast<const SfdMpvHandleRuntimeView*>(workctrlSubobj);
-      if (runtimeView->mpvInfo != nullptr) {
-        decoderHandle = runtimeView->mpvInfo->decoderHandle;
+      const auto* const runtimeView = workctrlSubobj;
+      if (runtimeView->transferState.transfer.demux.mpvInfoHandle != nullptr) {
+        decoderHandle = runtimeView->transferState.transfer.demux.mpvInfoHandle->decoderHandle;
       }
     }
 
@@ -8006,9 +7914,9 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetVideoUserStream);
     }
 
-    const auto* const runtimeView = reinterpret_cast<const SfdMpvHandleRuntimeView*>(workctrlSubobj);
+    const auto* const runtimeView = workctrlSubobj;
     (void)MPV_SetUsrSj(
-      runtimeView->mpvInfo->decoderHandle,
+      runtimeView->transferState.transfer.demux.mpvInfoHandle->decoderHandle,
       streamIndex,
       streamObjectAddress,
       streamCallbackAddress,
@@ -8017,7 +7925,7 @@
     return 0;
   }
 
-  struct SfhdsColorTypeRuntimeView
+  struct SfhdsColorType
   {
     std::uint8_t reserved00_77[0x78]{}; // +0x00
     std::int32_t hasHeaderState = 0; // +0x78
@@ -8026,14 +7934,14 @@
     std::int32_t colorType = 0; // +0xEC
   };
   static_assert(
-    offsetof(SfhdsColorTypeRuntimeView, hasHeaderState) == 0x78,
-    "SfhdsColorTypeRuntimeView::hasHeaderState offset must be 0x78"
+    offsetof(SfhdsColorType, hasHeaderState) == 0x78,
+    "SfhdsColorType::hasHeaderState offset must be 0x78"
   );
   static_assert(
-    offsetof(SfhdsColorTypeRuntimeView, hasColorType) == 0xE8,
-    "SfhdsColorTypeRuntimeView::hasColorType offset must be 0xE8"
+    offsetof(SfhdsColorType, hasColorType) == 0xE8,
+    "SfhdsColorType::hasColorType offset must be 0xE8"
   );
-  static_assert(offsetof(SfhdsColorTypeRuntimeView, colorType) == 0xEC, "SfhdsColorTypeRuntimeView::colorType offset must be 0xEC");
+  static_assert(offsetof(SfhdsColorType, colorType) == 0xEC, "SfhdsColorType::colorType offset must be 0xEC");
 
   /**
    * Address: 0x00AE78A0 (FUN_00AE78A0, _SFHDS_GetColType)
@@ -8045,7 +7953,7 @@
   std::int32_t SFHDS_GetColType(const std::int32_t workctrlAddress)
   {
     const auto* const colorTypeView =
-      reinterpret_cast<const SfhdsColorTypeRuntimeView*>(SjAddressToPointer(workctrlAddress));
+      reinterpret_cast<const SfhdsColorType*>(SjAddressToPointer(workctrlAddress));
     if (colorTypeView->hasHeaderState == 0) {
       return -1;
     }
@@ -8105,7 +8013,7 @@
     return sfmpvf_SetPicUsrBuf(sfdHandleAddress, userBufferAddress, frameSlotCount, bytesPerFrame);
   }
 
-  struct SfdAudioTransportVtableRuntimeView
+  struct SfdAudioTransportVtable
   {
     void(__cdecl* reserved00)() = nullptr; // +0x00
     void(__cdecl* reserved04)() = nullptr; // +0x04
@@ -8113,34 +8021,34 @@
     void(__cdecl* readTotalSamplesProc)() = nullptr; // +0x0C
   };
   static_assert(
-    offsetof(SfdAudioTransportVtableRuntimeView, readTotalSamplesProc) == 0x0C,
-    "SfdAudioTransportVtableRuntimeView::readTotalSamplesProc offset must be 0x0C"
+    offsetof(SfdAudioTransportVtable, readTotalSamplesProc) == 0x0C,
+    "SfdAudioTransportVtable::readTotalSamplesProc offset must be 0x0C"
   );
 
-  struct SfdAudioTransportGateRuntimeView
+  struct SfdAudioTransportGate
   {
-    SfdAudioTransportVtableRuntimeView* vtable = nullptr; // +0x00
+    SfdAudioTransportVtable* vtable = nullptr; // +0x00
     std::uint8_t reserved04_2003[0x2000]{}; // +0x04
     void** adxtRuntimeSlot = nullptr; // +0x2004
   };
   static_assert(
-    offsetof(SfdAudioTransportGateRuntimeView, adxtRuntimeSlot) == 0x2004,
-    "SfdAudioTransportGateRuntimeView::adxtRuntimeSlot offset must be 0x2004"
+    offsetof(SfdAudioTransportGate, adxtRuntimeSlot) == 0x2004,
+    "SfdAudioTransportGate::adxtRuntimeSlot offset must be 0x2004"
   );
 
   [[nodiscard]] static bool IsAdxtAudioTransportLane(
     const moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj
   ) noexcept
   {
-    const auto* const transportView = reinterpret_cast<const SfdAudioTransportGateRuntimeView*>(workctrlSubobj);
+    const auto* const transportView = reinterpret_cast<const SfdAudioTransportGate*>(workctrlSubobj);
     return transportView->vtable != nullptr && transportView->vtable->readTotalSamplesProc == &SFD_tr_ad_adxt;
   }
 
-  [[nodiscard]] static void* ReadAttachedAdxtRuntime(
+  [[nodiscard]] static void* ReadAttachedAdxt(
     moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj
   ) noexcept
   {
-    auto* const transportView = reinterpret_cast<SfdAudioTransportGateRuntimeView*>(workctrlSubobj);
+    auto* const transportView = reinterpret_cast<SfdAudioTransportGate*>(workctrlSubobj);
     return *transportView->adxtRuntimeSlot;
   }
 
@@ -8156,7 +8064,7 @@
     std::int32_t result =
       static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
     if (workctrlSubobj != nullptr && IsAdxtAudioTransportLane(workctrlSubobj)) {
-      void* const adxtRuntime = ReadAttachedAdxtRuntime(workctrlSubobj);
+      void* const adxtRuntime = ReadAttachedAdxt(workctrlSubobj);
       result = static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(adxtRuntime)));
       if (adxtRuntime != nullptr) {
         return ADXT_DetachMpa();
@@ -8177,7 +8085,7 @@
     std::int32_t result =
       static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
     if (workctrlSubobj != nullptr && IsAdxtAudioTransportLane(workctrlSubobj)) {
-      void* const adxtRuntime = ReadAttachedAdxtRuntime(workctrlSubobj);
+      void* const adxtRuntime = ReadAttachedAdxt(workctrlSubobj);
       result = static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(adxtRuntime)));
       if (adxtRuntime != nullptr) {
         return ADXT_DetachMPEG2AAC(adxtRuntime);
@@ -8428,7 +8336,7 @@
     return runtimeView->lanes[ringIndex].readTotalBytes;
   }
 
-  struct SfbufDestroyLaneRuntimeView
+  struct SfbufDestroyLane
   {
     std::int32_t laneType = 0; // +0x00
     std::uint8_t reserved04[0x10]{}; // +0x04
@@ -8436,23 +8344,23 @@
     std::uint8_t reserved18[0x5C]{}; // +0x18
   };
   static_assert(
-    offsetof(SfbufDestroyLaneRuntimeView, laneType) == 0x00,
-    "SfbufDestroyLaneRuntimeView::laneType offset must be 0x00"
+    offsetof(SfbufDestroyLane, laneType) == 0x00,
+    "SfbufDestroyLane::laneType offset must be 0x00"
   );
   static_assert(
-    offsetof(SfbufDestroyLaneRuntimeView, supplyHandle) == 0x14,
-    "SfbufDestroyLaneRuntimeView::supplyHandle offset must be 0x14"
+    offsetof(SfbufDestroyLane, supplyHandle) == 0x14,
+    "SfbufDestroyLane::supplyHandle offset must be 0x14"
   );
-  static_assert(sizeof(SfbufDestroyLaneRuntimeView) == 0x74, "SfbufDestroyLaneRuntimeView size must be 0x74");
+  static_assert(sizeof(SfbufDestroyLane) == 0x74, "SfbufDestroyLane size must be 0x74");
 
-  struct SfbufDestroyRuntimeView
+  struct SfbufDestroy
   {
     std::uint8_t reserved00[0x1310]{}; // +0x00
-    std::array<SfbufDestroyLaneRuntimeView, 8> lanes{}; // +0x1310
+    std::array<SfbufDestroyLane, 8> lanes{}; // +0x1310
   };
   static_assert(
-    offsetof(SfbufDestroyRuntimeView, lanes) == 0x1310,
-    "SfbufDestroyRuntimeView::lanes offset must be 0x1310"
+    offsetof(SfbufDestroy, lanes) == 0x1310,
+    "SfbufDestroy::lanes offset must be 0x1310"
   );
 
   /**
@@ -8464,8 +8372,8 @@
    */
   std::int32_t sfbuf_DestroySjSub(const std::int32_t sfbufHandleAddress, const std::int32_t laneIndex)
   {
-    auto* const runtimeView = reinterpret_cast<SfbufDestroyRuntimeView*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufDestroyLaneRuntimeView* const laneView = &runtimeView->lanes[laneIndex];
+    auto* const runtimeView = reinterpret_cast<SfbufDestroy*>(SjAddressToPointer(sfbufHandleAddress));
+    SfbufDestroyLane* const laneView = &runtimeView->lanes[laneIndex];
 
     std::int32_t result = laneView->laneType;
     if (result == 5) {
@@ -8564,107 +8472,29 @@
     return MWSFSVR_CheckForceSvrBdr(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(ply)));
   }
 
-  struct SfmpvfFrameReadyWindowView
+  struct SfmpvfFrameReadyWindow
   {
     std::uint8_t reserved00[0x38]{}; // +0x00
     float frameStartTime = 0.0f;     // +0x38
     float frameEndTime = 0.0f;       // +0x3C
   };
   static_assert(
-    offsetof(SfmpvfFrameReadyWindowView, frameStartTime) == 0x38,
-    "SfmpvfFrameReadyWindowView::frameStartTime offset must be 0x38"
+    offsetof(SfmpvfFrameReadyWindow, frameStartTime) == 0x38,
+    "SfmpvfFrameReadyWindow::frameStartTime offset must be 0x38"
   );
   static_assert(
-    offsetof(SfmpvfFrameReadyWindowView, frameEndTime) == 0x3C,
-    "SfmpvfFrameReadyWindowView::frameEndTime offset must be 0x3C"
+    offsetof(SfmpvfFrameReadyWindow, frameEndTime) == 0x3C,
+    "SfmpvfFrameReadyWindow::frameEndTime offset must be 0x3C"
   );
 
-  struct SfmpvfDecodeStateView
+  struct SfmpvfDecodeState
   {
     std::uint8_t reserved00[0x48]{}; // +0x00
     std::int32_t decodeState = 0; // +0x48
   };
   static_assert(
-    offsetof(SfmpvfDecodeStateView, decodeState) == 0x48,
-    "SfmpvfDecodeStateView::decodeState offset must be 0x48"
-  );
-
-  struct SfmpvfFrameObjectRuntimeView
-  {
-    std::int32_t decodeState = 0; // +0x00
-    std::int32_t lockReferenceCount = 0; // +0x04
-    std::uint8_t reserved08[0x50]{}; // +0x08
-    std::int32_t frameId = 0; // +0x58
-    std::uint8_t reserved5C[0x8C]{}; // +0x5C
-  };
-  static_assert(
-    offsetof(SfmpvfFrameObjectRuntimeView, decodeState) == 0x00,
-    "SfmpvfFrameObjectRuntimeView::decodeState offset must be 0x00"
-  );
-  static_assert(
-    offsetof(SfmpvfFrameObjectRuntimeView, lockReferenceCount) == 0x04,
-    "SfmpvfFrameObjectRuntimeView::lockReferenceCount offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SfmpvfFrameObjectRuntimeView, frameId) == 0x58,
-    "SfmpvfFrameObjectRuntimeView::frameId offset must be 0x58"
-  );
-  static_assert(sizeof(SfmpvfFrameObjectRuntimeView) == 0xE8, "SfmpvfFrameObjectRuntimeView size must be 0xE8");
-
-  struct SfmpvfInfoRuntimeView
-  {
-    std::uint8_t reserved00[0x7C]{}; // +0x00
-    std::int32_t termDecodeState = 0; // +0x7C
-    std::int32_t allowSingleFrameOutput = 0; // +0x80
-    std::uint8_t reserved84[0xF4]{}; // +0x84
-    std::int32_t frameObjectCount = 0; // +0x178
-    std::uint8_t reserved17C[0x04]{}; // +0x17C
-    std::array<SfmpvfFrameObjectRuntimeView, 16> frameObjects{}; // +0x180
-  };
-  static_assert(
-    offsetof(SfmpvfInfoRuntimeView, termDecodeState) == 0x7C,
-    "SfmpvfInfoRuntimeView::termDecodeState offset must be 0x7C"
-  );
-  static_assert(
-    offsetof(SfmpvfInfoRuntimeView, allowSingleFrameOutput) == 0x80,
-    "SfmpvfInfoRuntimeView::allowSingleFrameOutput offset must be 0x80"
-  );
-  static_assert(
-    offsetof(SfmpvfInfoRuntimeView, frameObjectCount) == 0x178,
-    "SfmpvfInfoRuntimeView::frameObjectCount offset must be 0x178"
-  );
-  // `SFMPVF_SearchFrmObj` (0x00ADC050) returns `*(a1 + 8128) + 384 + 232 * idx`
-  // and `SFMPVF_SearchVfrmData` (0x00ADC0D0) walks from `mpvInfo + 384`, so the
-  // frame-object array starts at +0x180 - one dword past `frameObjectCount`.
-  static_assert(
-    offsetof(SfmpvfInfoRuntimeView, frameObjects) == 0x180,
-    "SfmpvfInfoRuntimeView::frameObjects offset must be 0x180"
-  );
-
-  struct SfmpvfSearchWorkctrlRuntimeView
-  {
-    std::uint8_t reserved00_16B7[0x16B8]{}; // +0x00
-    std::array<std::uint8_t, 0x88> frameSearchLanes[16]{}; // +0x16B8
-    std::uint8_t reserved1F38_1FBF[0x88]{}; // +0x1F38
-    SfmpvfInfoRuntimeView* mpvInfo = nullptr; // +0x1FC0
-  };
-  static_assert(
-    offsetof(SfmpvfSearchWorkctrlRuntimeView, frameSearchLanes) == 0x16B8,
-    "SfmpvfSearchWorkctrlRuntimeView::frameSearchLanes offset must be 0x16B8"
-  );
-  static_assert(
-    offsetof(SfmpvfSearchWorkctrlRuntimeView, mpvInfo) == 0x1FC0,
-    "SfmpvfSearchWorkctrlRuntimeView::mpvInfo offset must be 0x1FC0"
-  );
-
-  struct SfdFrameLockRuntimeView
-  {
-    std::uint8_t reserved00_97F[0x980]{}; // +0x000
-    std::int32_t activeLockedFrameCount = 0; // +0x980
-  };
-  static_assert(
-    offsetof(SfdFrameLockRuntimeView, activeLockedFrameCount) == 0x980,
-    "SfdFrameLockRuntimeView::activeLockedFrameCount offset must be 0x980"
+    offsetof(SfmpvfDecodeState, decodeState) == 0x48,
+    "SfmpvfDecodeState::decodeState offset must be 0x48"
   );
 
   /**
@@ -8677,8 +8507,9 @@
    */
   extern "C" std::int32_t SFMPVF_SearchFrmObj(const std::int32_t workctrlAddress, const std::int32_t frameSearchLaneAddress)
   {
-    auto* const workctrlView = reinterpret_cast<SfmpvfSearchWorkctrlRuntimeView*>(SjAddressToPointer(workctrlAddress));
-    std::uintptr_t laneCursor = reinterpret_cast<std::uintptr_t>(&workctrlView->frameSearchLanes[0]);
+    auto* const workctrl = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
+    std::uintptr_t laneCursor =
+      reinterpret_cast<std::uintptr_t>(&workctrl->bufferState.vfrmDataLanes[0].mUnknown08To87[0]);
     const std::uintptr_t targetLane = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(frameSearchLaneAddress));
 
     std::int32_t frameIndex = 0;
@@ -8690,7 +8521,7 @@
       laneCursor += 0x88;
     }
 
-    return SjPointerToAddress(&workctrlView->mpvInfo->frameObjects[frameIndex]);
+    return SjPointerToAddress(&workctrl->transferState.transfer.demux.mpvInfoHandle->frameObjects[frameIndex]);
   }
 
   /**
@@ -8714,17 +8545,16 @@
     const std::int32_t workctrlAddress = SjPointerToAddress(workctrlSubobj);
     const std::int32_t frameObjectAddress = SFMPVF_SearchFrmObj(workctrlAddress, frameSearchLaneAddress);
     if (frameObjectAddress != 0) {
-      auto* const frameObject = reinterpret_cast<SfmpvfFrameObjectRuntimeView*>(
+      auto* const frameObject = reinterpret_cast<moho::SfmpvfFrameObject*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(frameObjectAddress))
       );
-      ++frameObject->lockReferenceCount;
+      ++frameObject->allocationState;
     } else {
       (void)SFLIB_SetErr(workctrlAddress, kSfmpvErrFrameSearchNotFoundForLock);
     }
 
-    auto* const lockRuntimeView = reinterpret_cast<SfdFrameLockRuntimeView*>(workctrlSubobj);
-    ++lockRuntimeView->activeLockedFrameCount;
-    return lockRuntimeView->activeLockedFrameCount;
+    ++workctrlSubobj->playbackInfo.activeLockedFrameCount;
+    return workctrlSubobj->playbackInfo.activeLockedFrameCount;
   }
 
   /**
@@ -8749,24 +8579,23 @@
     const std::int32_t workctrlAddress = SjPointerToAddress(workctrlSubobj);
     const std::int32_t frameObjectAddress = SFMPVF_SearchFrmObj(workctrlAddress, frameSearchLaneAddress);
     if (frameObjectAddress != 0) {
-      auto* const frameObject = reinterpret_cast<SfmpvfFrameObjectRuntimeView*>(
+      auto* const frameObject = reinterpret_cast<moho::SfmpvfFrameObject*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(frameObjectAddress))
       );
-      --frameObject->lockReferenceCount;
-      if (frameObject->lockReferenceCount < 0) {
-        frameObject->lockReferenceCount = 0;
+      --frameObject->allocationState;
+      if (frameObject->allocationState < 0) {
+        frameObject->allocationState = 0;
       }
     } else {
       (void)SFLIB_SetErr(workctrlAddress, kSfmpvErrFrameSearchNotFoundForUnlock);
     }
 
-    auto* const lockRuntimeView = reinterpret_cast<SfdFrameLockRuntimeView*>(workctrlSubobj);
-    --lockRuntimeView->activeLockedFrameCount;
-    return lockRuntimeView->activeLockedFrameCount;
+    --workctrlSubobj->playbackInfo.activeLockedFrameCount;
+    return workctrlSubobj->playbackInfo.activeLockedFrameCount;
   }
 
   extern "C" std::int32_t
-    sfmpvf_IsChkFirst(const SfmpvfFrameObjectRuntimeView* selectedFrameObject, const SfmpvfFrameObjectRuntimeView* candidateFrameObject);
+    sfmpvf_IsChkFirst(const moho::SfmpvfFrameObject* selectedFrameObject, const moho::SfmpvfFrameObject* candidateFrameObject);
 
   /**
    * Address: 0x00ADC570 (FUN_00ADC570, _sfmpvf_SearchStbyFrm)
@@ -8781,16 +8610,16 @@
     std::int32_t* outSecondStandbyFrameAddress
   )
   {
-    auto* const workctrlView = reinterpret_cast<SfmpvfSearchWorkctrlRuntimeView*>(SjAddressToPointer(workctrlAddress));
-    auto* const mpvInfo = workctrlView->mpvInfo;
+    auto* const workctrl = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
+    auto* const mpvInfo = workctrl->transferState.transfer.demux.mpvInfoHandle;
 
     *outFirstStandbyFrameAddress = 0;
     *outSecondStandbyFrameAddress = 0;
 
     std::int32_t selectableFrameCount = 0;
     if (mpvInfo->frameObjectCount > 0) {
-      auto asFrameObject = [](const std::int32_t frameObjectAddress) -> const SfmpvfFrameObjectRuntimeView* {
-        return reinterpret_cast<const SfmpvfFrameObjectRuntimeView*>(
+      auto asFrameObject = [](const std::int32_t frameObjectAddress) -> const moho::SfmpvfFrameObject* {
+        return reinterpret_cast<const moho::SfmpvfFrameObject*>(
           static_cast<std::uintptr_t>(static_cast<std::uint32_t>(frameObjectAddress))
         );
       };
@@ -8844,13 +8673,13 @@
     SFLIB_LockCs();
     sfmpvf_SearchStbyFrm(workctrlAddress, &firstStandbyFrameAddress, &secondStandbyFrameAddress);
 
-    const auto* const workctrlView = reinterpret_cast<const SfmpvfDecodeStateView*>(SjAddressToPointer(workctrlAddress));
+    const auto* const workctrlView = reinterpret_cast<const SfmpvfDecodeState*>(SjAddressToPointer(workctrlAddress));
     if (workctrlView->decodeState != 4) {
       secondStandbyFrameAddress = 0;
     }
 
     const std::int32_t requiresTimeGate = SFSET_GetCond(
-      reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(const_cast<SfmpvfDecodeStateView*>(workctrlView)),
+      reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(const_cast<SfmpvfDecodeState*>(workctrlView)),
       15
     );
 
@@ -8861,7 +8690,7 @@
       if (requiresTimeGate == 0) {
         return true;
       }
-      const auto* const frameWindow = reinterpret_cast<const SfmpvfFrameReadyWindowView*>(static_cast<std::uintptr_t>(frameAddress));
+      const auto* const frameWindow = reinterpret_cast<const SfmpvfFrameReadyWindow*>(static_cast<std::uintptr_t>(frameAddress));
       return SFTIM_IsGetFrmTimeTunit(workctrlAddress, frameWindow->frameStartTime, frameWindow->frameEndTime) != 0;
     };
 
@@ -8897,7 +8726,7 @@
           SFSET_GetCond(reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(const_cast<std::uint8_t*>(workctrlStorage)), 15)
               != 0) {
         const auto* const frameWindow =
-          reinterpret_cast<const SfmpvfFrameReadyWindowView*>(static_cast<std::uintptr_t>(readyFrameAddress));
+          reinterpret_cast<const SfmpvfFrameReadyWindow*>(static_cast<std::uintptr_t>(readyFrameAddress));
         if (SFTIM_IsGetFrmTimeTunit(workctrlAddress, frameWindow->frameStartTime, frameWindow->frameEndTime) == 0) {
           readyFrameAddress = 0;
         }
@@ -8908,14 +8737,14 @@
     return readyFrameAddress;
   }
 
-  struct SfmpvfReadyFramePictureUserView
+  struct SfmpvfReadyFramePictureUser
   {
     std::uint8_t reserved00_53[0x54]{};
     const std::int32_t* pictureUserWords = nullptr; // +0x54
   };
   static_assert(
-    offsetof(SfmpvfReadyFramePictureUserView, pictureUserWords) == 0x54,
-    "SfmpvfReadyFramePictureUserView::pictureUserWords offset must be 0x54"
+    offsetof(SfmpvfReadyFramePictureUser, pictureUserWords) == 0x54,
+    "SfmpvfReadyFramePictureUser::pictureUserWords offset must be 0x54"
   );
 
   /**
@@ -8939,7 +8768,7 @@
       return result;
     }
 
-    const auto* const readyFrameView = reinterpret_cast<const SfmpvfReadyFramePictureUserView*>(
+    const auto* const readyFrameView = reinterpret_cast<const SfmpvfReadyFramePictureUser*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(result))
     );
     const std::int32_t* const pictureUserWords = readyFrameView->pictureUserWords;
@@ -9159,13 +8988,13 @@
     return 0;
   }
 
-  struct MpslibErrorInfoRuntimeView
+  struct MpslibErrorInfo
   {
     std::int32_t callbackAddress = 0; // +0x00
     std::int32_t callbackObject = 0; // +0x04
     std::int32_t lastErrorCode = 0; // +0x08
   };
-  static_assert(sizeof(MpslibErrorInfoRuntimeView) == 0x0C, "MpslibErrorInfoRuntimeView size must be 0x0C");
+  static_assert(sizeof(MpslibErrorInfo) == 0x0C, "MpslibErrorInfo size must be 0x0C");
 
   /**
    * The MPEG-1 pack header (ISO/IEC 11172-1), as `mpsdec_DecPackHd` parses it.
@@ -9217,11 +9046,11 @@
   };
   static_assert(sizeof(MpsPacketHeader) == 0x28, "MpsPacketHeader size must be 0x28");
 
-  struct MpslibHandleRuntimeView;
+  struct MpslibHandle;
 
   /// `MPSDEC_dechd` selects one of these; this build ships the MPEG-1 decoder.
   using MpsDecodeHeaderFn = std::int32_t(__cdecl*)(
-    MpslibHandleRuntimeView* handle,
+    MpslibHandle* handle,
     const std::uint8_t* data,
     std::int32_t sizeBytes,
     std::int32_t* outConsumedBytes,
@@ -9230,10 +9059,10 @@
   using MpsSystemHeaderCallback = std::int32_t(__cdecl*)(std::int32_t callbackObject, const std::int32_t* summary);
   using MpsPacketCallback = void(__cdecl*)(std::int32_t callbackObject, std::int32_t streamId);
 
-  struct MpslibHandleRuntimeView
+  struct MpslibHandle
   {
     std::int32_t handleState = 1;                   // +0x00  1 = free, 2 = in use
-    MpslibErrorInfoRuntimeView errInfo{};           // +0x04
+    MpslibErrorInfo errInfo{};           // +0x04
     /// Packet-header dialect. `mpslib_InitHn` sets 2, which is the layout that
     /// carries a 16-bit packet_length; `mpsdec_DecPketHd` gates on it.
     std::int32_t packetHeaderMode = 0;              // +0x10
@@ -9261,36 +9090,36 @@
     std::int32_t packetCallbackObject = 0;          // +0xF8
     std::int32_t reservedFC = 0;                    // +0xFC
   };
-  static_assert(offsetof(MpslibHandleRuntimeView, handleState) == 0x00, "MpslibHandleRuntimeView::handleState offset must be 0x00");
-  static_assert(offsetof(MpslibHandleRuntimeView, packetHeaderMode) == 0x10, "MpslibHandleRuntimeView::packetHeaderMode @0x10");
-  static_assert(offsetof(MpslibHandleRuntimeView, packHeader) == 0x18, "MpslibHandleRuntimeView::packHeader @0x18");
-  static_assert(offsetof(MpslibHandleRuntimeView, systemHeaders) == 0x28, "MpslibHandleRuntimeView::systemHeaders @0x28");
-  static_assert(offsetof(MpslibHandleRuntimeView, packetHeader) == 0xA8, "MpslibHandleRuntimeView::packetHeader @0xA8");
-  static_assert(offsetof(MpslibHandleRuntimeView, m2pHandleAddress) == 0xD0, "MpslibHandleRuntimeView::m2pHandleAddress @0xD0");
-  static_assert(offsetof(MpslibHandleRuntimeView, decodeHeader) == 0xD4, "MpslibHandleRuntimeView::decodeHeader @0xD4");
+  static_assert(offsetof(MpslibHandle, handleState) == 0x00, "MpslibHandle::handleState offset must be 0x00");
+  static_assert(offsetof(MpslibHandle, packetHeaderMode) == 0x10, "MpslibHandle::packetHeaderMode @0x10");
+  static_assert(offsetof(MpslibHandle, packHeader) == 0x18, "MpslibHandle::packHeader @0x18");
+  static_assert(offsetof(MpslibHandle, systemHeaders) == 0x28, "MpslibHandle::systemHeaders @0x28");
+  static_assert(offsetof(MpslibHandle, packetHeader) == 0xA8, "MpslibHandle::packetHeader @0xA8");
+  static_assert(offsetof(MpslibHandle, m2pHandleAddress) == 0xD0, "MpslibHandle::m2pHandleAddress @0xD0");
+  static_assert(offsetof(MpslibHandle, decodeHeader) == 0xD4, "MpslibHandle::decodeHeader @0xD4");
   static_assert(
-    offsetof(MpslibHandleRuntimeView, systemHeaderCallback) == 0xE4,
-    "MpslibHandleRuntimeView::systemHeaderCallback @0xE4"
+    offsetof(MpslibHandle, systemHeaderCallback) == 0xE4,
+    "MpslibHandle::systemHeaderCallback @0xE4"
   );
-  static_assert(offsetof(MpslibHandleRuntimeView, packetCallback) == 0xF4, "MpslibHandleRuntimeView::packetCallback @0xF4");
-  static_assert(offsetof(MpslibHandleRuntimeView, elementaryStreamId) == 0xD8, "MpslibHandleRuntimeView::elementaryStreamId @0xD8");
-  static_assert(offsetof(MpslibHandleRuntimeView, pesSwitch) == 0xE0, "MpslibHandleRuntimeView::pesSwitch @0xE0");
-  static_assert(offsetof(MpslibHandleRuntimeView, psMapCallback) == 0xEC, "MpslibHandleRuntimeView::psMapCallback @0xEC");
-  static_assert(sizeof(MpslibHandleRuntimeView) == 0x100, "MpslibHandleRuntimeView size must be 0x100");
+  static_assert(offsetof(MpslibHandle, packetCallback) == 0xF4, "MpslibHandle::packetCallback @0xF4");
+  static_assert(offsetof(MpslibHandle, elementaryStreamId) == 0xD8, "MpslibHandle::elementaryStreamId @0xD8");
+  static_assert(offsetof(MpslibHandle, pesSwitch) == 0xE0, "MpslibHandle::pesSwitch @0xE0");
+  static_assert(offsetof(MpslibHandle, psMapCallback) == 0xEC, "MpslibHandle::psMapCallback @0xEC");
+  static_assert(sizeof(MpslibHandle) == 0x100, "MpslibHandle size must be 0x100");
 
-  struct MpslibRuntimeView
+  struct MpslibState
   {
-    MpslibErrorInfoRuntimeView errInfo{}; // +0x00
+    MpslibErrorInfo errInfo{}; // +0x00
     std::int32_t handleCount = 0; // +0x0C
-    std::array<MpslibHandleRuntimeView, 32> handles{}; // +0x10
+    std::array<MpslibHandle, 32> handles{}; // +0x10
   };
-  static_assert(offsetof(MpslibRuntimeView, errInfo) == 0x00, "MpslibRuntimeView::errInfo offset must be 0x00");
-  static_assert(offsetof(MpslibRuntimeView, handleCount) == 0x0C, "MpslibRuntimeView::handleCount offset must be 0x0C");
-  static_assert(offsetof(MpslibRuntimeView, handles) == 0x10, "MpslibRuntimeView::handles offset must be 0x10");
-  static_assert(sizeof(MpslibRuntimeView) == 0x2010, "MpslibRuntimeView size must be 0x2010");
+  static_assert(offsetof(MpslibState, errInfo) == 0x00, "MpslibState::errInfo offset must be 0x00");
+  static_assert(offsetof(MpslibState, handleCount) == 0x0C, "MpslibState::handleCount offset must be 0x0C");
+  static_assert(offsetof(MpslibState, handles) == 0x10, "MpslibState::handles offset must be 0x10");
+  static_assert(sizeof(MpslibState) == 0x2010, "MpslibState size must be 0x2010");
 
-  MpslibRuntimeView sfmps_libwork{};
-  MpslibRuntimeView* MPSLIB_libwork = nullptr;
+  MpslibState sfmps_libwork{};
+  MpslibState* MPSLIB_libwork = nullptr;
   const char* cri_verstr_ptr_mps = nullptr;
   std::int32_t copy_sj_error = 0;
   std::int32_t mpslib_deb_hn_last = 0;
@@ -9301,7 +9130,7 @@
    * What it does:
    * Clears one MPSLIB error-info lane.
    */
-  MpslibErrorInfoRuntimeView* MPSLIB_InitErrInf(MpslibErrorInfoRuntimeView* const errInfo)
+  MpslibErrorInfo* MPSLIB_InitErrInf(MpslibErrorInfo* const errInfo)
   {
     errInfo->callbackAddress = 0;
     errInfo->callbackObject = 0;
@@ -9315,7 +9144,7 @@
    * What it does:
    * Thunk to `MPSLIB_InitErrInf`.
    */
-  MpslibErrorInfoRuntimeView* mpslib_InitErr(MpslibErrorInfoRuntimeView* const errInfo)
+  MpslibErrorInfo* mpslib_InitErr(MpslibErrorInfo* const errInfo)
   {
     return MPSLIB_InitErrInf(errInfo);
   }
@@ -9332,18 +9161,18 @@
     auto* const workBase = reinterpret_cast<std::uint8_t*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workAddress))
     );
-    MPSLIB_libwork = reinterpret_cast<MpslibRuntimeView*>(workBase);
+    MPSLIB_libwork = reinterpret_cast<MpslibState*>(workBase);
 
     const std::size_t workBytes = (static_cast<std::size_t>(handleCount) << 8u) + 0x10u;
     std::memset(workBase, 0, workBytes);
     (void)mpslib_InitErr(&MPSLIB_libwork->errInfo);
     MPSLIB_libwork->handleCount = handleCount;
 
-    auto* handleSlot = reinterpret_cast<MpslibHandleRuntimeView*>(workBase + 0x10);
+    auto* handleSlot = reinterpret_cast<MpslibHandle*>(workBase + 0x10);
     for (std::int32_t slotIndex = 0; slotIndex < handleCount; ++slotIndex) {
       handleSlot->handleState = 1;
-      handleSlot = reinterpret_cast<MpslibHandleRuntimeView*>(
-        reinterpret_cast<std::uint8_t*>(handleSlot) + sizeof(MpslibHandleRuntimeView)
+      handleSlot = reinterpret_cast<MpslibHandle*>(
+        reinterpret_cast<std::uint8_t*>(handleSlot) + sizeof(MpslibHandle)
       );
     }
 
@@ -9356,7 +9185,7 @@
    * What it does:
    * Stores last MPSLIB error code and dispatches optional callback.
    */
-  void mpslib_SetErrSub(MpslibErrorInfoRuntimeView* const errInfo, const std::int32_t errorCode)
+  void mpslib_SetErrSub(MpslibErrorInfo* const errInfo, const std::int32_t errorCode)
   {
     errInfo->lastErrorCode = errorCode;
     if (errorCode == 0 || errInfo->callbackAddress == 0) {
@@ -9375,8 +9204,8 @@
    * What it does:
    * Stores MPSLIB error callback address/object pair and returns updated lane.
    */
-  MpslibErrorInfoRuntimeView* mpslib_SetErrFnSub(
-    MpslibErrorInfoRuntimeView* const errInfo,
+  MpslibErrorInfo* mpslib_SetErrFnSub(
+    MpslibErrorInfo* const errInfo,
     const std::int32_t callbackAddress,
     const std::int32_t callbackObject
   )
@@ -9393,7 +9222,7 @@
    * Saves last debug handle lane and returns `0` for active handles
    * (`handleState != 1`), `-1` otherwise.
    */
-  std::int32_t MPSLIB_CheckHn(MpslibHandleRuntimeView* const handle)
+  std::int32_t MPSLIB_CheckHn(MpslibHandle* const handle)
   {
     mpslib_deb_hn_last = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(handle));
     if (handle == nullptr) {
@@ -9414,7 +9243,7 @@
       auto* const handle = reinterpret_cast<std::uint8_t*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(mpsHandleAddress))
       );
-      auto* const handleErrInfo = reinterpret_cast<MpslibErrorInfoRuntimeView*>(handle + 4);
+      auto* const handleErrInfo = reinterpret_cast<MpslibErrorInfo*>(handle + 4);
       mpslib_SetErrSub(handleErrInfo, errorCode);
     } else {
       mpslib_SetErrSub(&MPSLIB_libwork->errInfo, errorCode);
@@ -9436,16 +9265,14 @@
   )
   {
     if (mpsHandleAddress != 0) {
-      auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(
+      auto* const handle = reinterpret_cast<MpslibHandle*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(mpsHandleAddress))
       );
       if (MPSLIB_CheckHn(handle) != 0) {
         return MPSLIB_SetErr(0, -16645887);
       }
 
-      auto* const handleErrInfo = reinterpret_cast<MpslibErrorInfoRuntimeView*>(
-        reinterpret_cast<std::uint8_t*>(handle) + 4
-      );
+      auto* const handleErrInfo = &handle->errInfo;
       const auto callbackAddress =
         static_cast<std::int32_t>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(errorCallback)));
       (void)mpslib_SetErrFnSub(handleErrInfo, callbackAddress, errorObjectAddress);
@@ -9467,7 +9294,7 @@
   std::int32_t MPS_GetErrInf(const std::int32_t mpsHandleAddress, std::int32_t* const outErrInfo)
   {
     if (mpsHandleAddress != 0) {
-      auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(
+      auto* const handle = reinterpret_cast<MpslibHandle*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(mpsHandleAddress))
       );
       if (MPSLIB_CheckHn(handle) != 0) {
@@ -9493,7 +9320,7 @@
    * What it does:
    * Scans MPS handle table and returns first free handle (`state == 1`).
    */
-  MpslibHandleRuntimeView* mpslib_SearchFreeHn()
+  MpslibHandle* mpslib_SearchFreeHn()
   {
     auto* handle = &MPSLIB_libwork->handles[0];
     if (MPSLIB_libwork->handleCount <= 0) {
@@ -9679,8 +9506,8 @@
    * Parses one MPEG-1 pack header - system clock reference and mux rate - into
    * the handle's pack lane. Always consumes 12 bytes.
    */
-  MpslibHandleRuntimeView* mpsdec_DecPackHd(
-    MpslibHandleRuntimeView* const handle,
+  MpslibHandle* mpsdec_DecPackHd(
+    MpslibHandle* const handle,
     const std::uint8_t* const packet,
     std::int32_t* const outConsumedBytes
   )
@@ -9742,8 +9569,8 @@
    * installed callback if there is one. Writes the header byte length it
    * consumed, nudged by one when the next delimiter only lines up a byte later.
    */
-  MpslibHandleRuntimeView* mpsdec_DecSysHd(
-    MpslibHandleRuntimeView* const handle,
+  MpslibHandle* mpsdec_DecSysHd(
+    MpslibHandle* const handle,
     const std::uint8_t* const packet,
     std::int32_t* const outConsumedBytes
   )
@@ -9818,7 +9645,7 @@
    * returns the packet length.
    */
   std::int32_t mpsdec_DecPketHd(
-    MpslibHandleRuntimeView* const handle,
+    MpslibHandle* const handle,
     const std::uint8_t* const packet,
     std::int32_t* const outConsumedBytes,
     const std::int32_t packetHeaderMode
@@ -9914,7 +9741,7 @@
    * run - a packet header ends it, because payload comes next.
    */
   std::int32_t mpsdec_DecOneHd(
-    MpslibHandleRuntimeView* const handle,
+    MpslibHandle* const handle,
     const std::uint8_t* const data,
     [[maybe_unused]] const std::int32_t sizeBytes,
     std::int32_t* const outConsumedBytes,
@@ -9956,7 +9783,7 @@
    * content so later packs can be compared against it.
    */
   std::int32_t MPSDEC_DecHdMpeg1(
-    MpslibHandleRuntimeView* const handle,
+    MpslibHandle* const handle,
     const std::uint8_t* const data,
     const std::int32_t sizeBytes,
     std::int32_t* const outConsumedBytes,
@@ -10082,9 +9909,9 @@
    * Clears one MPS handle, marks it in use, invalidates every header lane and
    * installs the MPEG-1 header decoder.
    */
-  MpslibHandleRuntimeView* mpslib_InitHn(MpslibHandleRuntimeView* const handle)
+  MpslibHandle* mpslib_InitHn(MpslibHandle* const handle)
   {
-    constexpr unsigned int kMpslibHandleDwords = sizeof(MpslibHandleRuntimeView) / sizeof(std::uint32_t);
+    constexpr unsigned int kMpslibHandleDwords = sizeof(MpslibHandle) / sizeof(std::uint32_t);
     constexpr std::int32_t kMpslibHandleStateInUse = 2;
 
     (void)UTY_MemsetDword(handle, 0, kMpslibHandleDwords);
@@ -10123,12 +9950,12 @@
    */
   std::int32_t MPS_Create()
   {
-    MpslibHandleRuntimeView* const freeHandle = mpslib_SearchFreeHn();
+    MpslibHandle* const freeHandle = mpslib_SearchFreeHn();
     if (freeHandle == nullptr) {
       return 0;
     }
 
-    MpslibHandleRuntimeView* const handle = mpslib_InitHn(freeHandle);
+    MpslibHandle* const handle = mpslib_InitHn(freeHandle);
 
     const std::int32_t m2pSlot = mpslib_SearchM2pHnWk(0);
     if (m2pSlot >= 0) {
@@ -10148,7 +9975,7 @@
     return reinterpret_cast<std::int32_t>(handle);
   }
 
-  struct MpsElementaryInfoEntryView;
+  struct MpsElementaryInfoEntry;
   void MPSDEC_Finish();
   void MPSGET_Finish();
   std::int32_t M2P_Destroy(std::int32_t m2pHandleAddress);
@@ -10188,7 +10015,7 @@
     *ioParserRuntimeAddress = 0;
     *ioHeaderRuntimeAddress = 0;
 
-    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    auto* const handle = reinterpret_cast<MpslibHandle*>(SjAddressToPointer(mpsHandleAddress));
     if (MPSLIB_CheckHn(handle) != 0) {
       return MPSLIB_SetErr(0, kMpsErrDecHdInvalidHandle);
     }
@@ -10211,7 +10038,7 @@
    */
   std::int32_t MPS_Destroy(const std::int32_t mpsHandleAddress)
   {
-    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    auto* const handle = reinterpret_cast<MpslibHandle*>(SjAddressToPointer(mpsHandleAddress));
     if (MPSLIB_CheckHn(handle) != 0) {
       return MPSLIB_SetErr(0, kMpsErrDestroyInvalidHandle);
     }
@@ -10241,7 +10068,7 @@
     (void)M2P_Finish();
 
     for (std::int32_t slotIndex = 0; slotIndex < MPSLIB_libwork->handleCount; ++slotIndex) {
-      MpslibHandleRuntimeView* const handle = &MPSLIB_libwork->handles[static_cast<std::size_t>(slotIndex)];
+      MpslibHandle* const handle = &MPSLIB_libwork->handles[static_cast<std::size_t>(slotIndex)];
       if (handle->handleState != 1) {
         (void)MPS_Destroy(SjPointerToAddress(handle));
       }
@@ -10262,21 +10089,21 @@
   std::int32_t MPS_GetElementaryInfo(
     const void* const mpsHandle,
     std::int32_t* const outElementaryCount,
-    const MpsElementaryInfoEntryView** const outElementaryEntries
+    const MpsElementaryInfoEntry** const outElementaryEntries
   )
   {
     *outElementaryCount = 0;
     *outElementaryEntries = nullptr;
 
     auto* const handle =
-      static_cast<MpslibHandleRuntimeView*>(const_cast<void*>(mpsHandle));
+      static_cast<MpslibHandle*>(const_cast<void*>(mpsHandle));
     const std::int32_t checkResult = MPSLIB_CheckHn(handle);
     if (checkResult != 0) {
       return checkResult;
     }
 
     *outElementaryCount = handle->elementaryStreamId;
-    *outElementaryEntries = reinterpret_cast<const MpsElementaryInfoEntryView*>(
+    *outElementaryEntries = reinterpret_cast<const MpsElementaryInfoEntry*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->elementaryStreamInfo))
     );
     return checkResult;
@@ -10290,7 +10117,7 @@
    */
   std::int32_t MPS_GetPackHd(const void* const mpsHandle, void* const outPackHeader)
   {
-    auto* const handle = static_cast<MpslibHandleRuntimeView*>(const_cast<void*>(mpsHandle));
+    auto* const handle = static_cast<MpslibHandle*>(const_cast<void*>(mpsHandle));
     if (MPSLIB_CheckHn(handle) != 0) {
       return MPSLIB_SetErr(0, kMpsErrGetPackHdInvalidHandle);
     }
@@ -10309,7 +10136,7 @@
    */
   std::int32_t MPS_GetSysHd(const void* const mpsHandle, void* const outSystemHeader, const std::int32_t headerSlot)
   {
-    auto* const handle = static_cast<MpslibHandleRuntimeView*>(const_cast<void*>(mpsHandle));
+    auto* const handle = static_cast<MpslibHandle*>(const_cast<void*>(mpsHandle));
     if (MPSLIB_CheckHn(handle) != 0) {
       return MPSLIB_SetErr(0, kMpsErrGetSysHdInvalidHandle);
     }
@@ -10328,7 +10155,7 @@
    */
   std::int32_t MPS_GetLastSysHd(const std::int32_t mpsHandleAddress, void* const outLastSystemHeaderProbe)
   {
-    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    auto* const handle = reinterpret_cast<MpslibHandle*>(SjAddressToPointer(mpsHandleAddress));
     if (MPSLIB_CheckHn(handle) != 0) {
       return MPSLIB_SetErr(0, kMpsErrGetSysHdInvalidHandle);
     }
@@ -10345,7 +10172,7 @@
    */
   std::int32_t MPS_GetPketHd(const std::int32_t mpsHandleAddress, void* const outPacketHeader)
   {
-    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    auto* const handle = reinterpret_cast<MpslibHandle*>(SjAddressToPointer(mpsHandleAddress));
     if (MPSLIB_CheckHn(handle) != 0) {
       return MPSLIB_SetErr(0, kMpsErrGetPketHdInvalidHandle);
     }
@@ -10365,7 +10192,7 @@
     const std::int32_t mpsHandleAddress, const std::int32_t pesCondition, const std::int32_t pesAuxCondition
   )
   {
-    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    auto* const handle = reinterpret_cast<MpslibHandle*>(SjAddressToPointer(mpsHandleAddress));
     const std::int32_t checkResult = MPSLIB_CheckHn(handle);
     if (checkResult != 0) {
       return checkResult;
@@ -10386,7 +10213,7 @@
     const std::int32_t mpsHandleAddress, const std::int32_t systemFnCondition, const std::int32_t systemFnAuxCondition
   )
   {
-    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    auto* const handle = reinterpret_cast<MpslibHandle*>(SjAddressToPointer(mpsHandleAddress));
     const std::int32_t checkResult = MPSLIB_CheckHn(handle);
     if (checkResult != 0) {
       return checkResult;
@@ -10407,7 +10234,7 @@
     const std::int32_t mpsHandleAddress, const std::int32_t psMapCondition, const std::int32_t psMapAuxCondition
   )
   {
-    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    auto* const handle = reinterpret_cast<MpslibHandle*>(SjAddressToPointer(mpsHandleAddress));
     const std::int32_t checkResult = MPSLIB_CheckHn(handle);
     if (checkResult != 0) {
       return checkResult;
@@ -10426,7 +10253,7 @@
    */
   std::int32_t MPS_SetPesSw(const std::int32_t mpsHandleAddress, const std::int32_t pesSwitchCondition)
   {
-    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    auto* const handle = reinterpret_cast<MpslibHandle*>(SjAddressToPointer(mpsHandleAddress));
     const std::int32_t checkResult = MPSLIB_CheckHn(handle);
     if (checkResult != 0) {
       return checkResult;
@@ -10525,7 +10352,7 @@
     return 0;
   }
 
-  struct MpsElementaryInfoEntryView;
+  struct MpsElementaryInfoEntry;
 
   moho::SfbufSupplyLane* getSupSj(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t setTermDst(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t termFlag);
@@ -10714,7 +10541,7 @@
   std::int32_t MPS_GetElementaryInfo(
     const void* mpsHandle,
     std::int32_t* outElementaryCount,
-    const MpsElementaryInfoEntryView** outElementaryEntries
+    const MpsElementaryInfoEntry** outElementaryEntries
   );
   std::int32_t SFADXT_SetAudioStreamType(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t elementaryStreamType);
   std::int32_t SFCON_IsEndcodeSkip(std::int32_t workctrlAddress);
@@ -10820,18 +10647,18 @@
    * lanes, and reports whether the queue became full.
    */
   std::int32_t sfpts_WritePtsQueSub(
-    SfptsQueueRuntimeView* const queue,
+    moho::SfptsPtsQueue* const queue,
     const std::int32_t* const ptsInfoWords,
     std::int32_t* const outQueueTag
   )
   {
-    if (queue->queuedCount == queue->capacity) {
+    if (queue->queuedEntryCount == queue->entryCapacity) {
       *outQueueTag = 1;
       return -1;
     }
 
     auto* const entries = reinterpret_cast<SfptsQueueEntryWords*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(queue->entriesAddress))
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(queue->entriesBaseAddress))
     );
 
     SfptsQueueEntryWords& destination = entries[queue->writeIndex];
@@ -10841,10 +10668,10 @@
     destination.word3 = ptsInfoWords[3];
 
     const std::int32_t nextIndex = queue->writeIndex + 1;
-    queue->writeIndex = (nextIndex >= queue->capacity) ? (nextIndex - queue->capacity) : nextIndex;
+    queue->writeIndex = (nextIndex >= queue->entryCapacity) ? (nextIndex - queue->entryCapacity) : nextIndex;
 
-    ++queue->queuedCount;
-    *outQueueTag = queue->queuedCount >= queue->capacity ? 1 : 0;
+    ++queue->queuedEntryCount;
+    *outQueueTag = queue->queuedEntryCount >= queue->entryCapacity ? 1 : 0;
     return 0;
   }
 
@@ -10856,8 +10683,8 @@
    */
   std::int32_t SFPTS_IsPtsQueFull(const std::int32_t workctrlAddress, const std::int32_t queueIndex)
   {
-    const SfptsQueueRuntimeView* const queue = GetSfptsQueueLane(workctrlAddress, queueIndex);
-    return (queue->entriesAddress != 0 && queue->queuedCount >= queue->capacity) ? 1 : 0;
+    const moho::SfptsPtsQueue* const queue = GetSfptsQueueLane(workctrlAddress, queueIndex);
+    return (queue->entriesBaseAddress != 0 && queue->queuedEntryCount >= queue->entryCapacity) ? 1 : 0;
   }
 
   /**
@@ -10878,8 +10705,8 @@
 
     *outQueueTag = 0;
 
-    SfptsQueueRuntimeView* const queue = GetSfptsQueueLane(workctrlAddress, queueIndex);
-    if (ptsInfoWords[1] >= 0 && queue->entriesAddress != 0
+    moho::SfptsPtsQueue* const queue = GetSfptsQueueLane(workctrlAddress, queueIndex);
+    if (ptsInfoWords[1] >= 0 && queue->entriesBaseAddress != 0
         && sfpts_WritePtsQueSub(queue, ptsInfoWords, outQueueTag) == -1) {
       return SFLIB_SetErr(workctrlAddress, kSflibErrSfptsWritePtsQueFailed);
     }
@@ -10998,19 +10825,6 @@
     "M2tsdPlaybackState::condition6BlockFlag offset must be 0x40"
   );
 
-  struct MpsPackHeaderRuntimeView
-  {
-    std::int32_t reserved00 = 0; // +0x00
-    std::int32_t reserved04 = 0; // +0x04
-    std::int32_t reserved08 = 0; // +0x08
-    std::int32_t muxRateUnits50BytesPerSecond = -1; // +0x0C
-  };
-  static_assert(
-    offsetof(MpsPackHeaderRuntimeView, muxRateUnits50BytesPerSecond) == 0x0C,
-    "MpsPackHeaderRuntimeView::muxRateUnits50BytesPerSecond offset must be 0x0C"
-  );
-  static_assert(sizeof(MpsPackHeaderRuntimeView) == 0x10, "MpsPackHeaderRuntimeView size must be 0x10");
-
   /**
    * Address: 0x00ADA250 (FUN_00ADA250, _sfcre_AnalyMuxRate)
    *
@@ -11041,17 +10855,20 @@
 
     std::int32_t result = decodeFlags;
     if ((decodeFlags & 0x10000) != 0) {
-      MpsPackHeaderRuntimeView packHeader{};
+      MpsPackHeader packHeader{};
       (void)MPS_GetPackHd(reinterpret_cast<void*>(static_cast<std::uintptr_t>(mpsHandleAddress)), &packHeader);
       (void)MPS_Destroy(mpsHandleAddress);
-      result = packHeader.muxRateUnits50BytesPerSecond;
-      *outMuxRateUnits50BytesPerSecond = packHeader.muxRateUnits50BytesPerSecond;
+      result = packHeader.muxRate;
+      *outMuxRateUnits50BytesPerSecond = packHeader.muxRate;
     }
 
     return result;
   }
 
-  struct MpsSystemHeaderRuntimeView
+  /// The `MPS_GetSysHd` capture layout (coarser than the parsed
+  /// `MpsSystemHeader`: two cached parser maxima, then the rate bound at
+  /// +0x10).
+  struct MpsSystemHeaderCapture
   {
     std::int32_t reserved00 = 0; // +0x00
     std::int32_t reserved04 = 0; // +0x04
@@ -11063,22 +10880,22 @@
     std::int32_t reserved1C = 0; // +0x1C
   };
   static_assert(
-    offsetof(MpsSystemHeaderRuntimeView, maxSystemField2) == 0x08,
-    "MpsSystemHeaderRuntimeView::maxSystemField2 offset must be 0x08"
+    offsetof(MpsSystemHeaderCapture, maxSystemField2) == 0x08,
+    "MpsSystemHeaderCapture::maxSystemField2 offset must be 0x08"
   );
   static_assert(
-    offsetof(MpsSystemHeaderRuntimeView, maxSystemField3) == 0x0C,
-    "MpsSystemHeaderRuntimeView::maxSystemField3 offset must be 0x0C"
+    offsetof(MpsSystemHeaderCapture, maxSystemField3) == 0x0C,
+    "MpsSystemHeaderCapture::maxSystemField3 offset must be 0x0C"
   );
-  static_assert(offsetof(MpsSystemHeaderRuntimeView, rateBound) == 0x10, "MpsSystemHeaderRuntimeView::rateBound offset must be 0x10");
-  static_assert(sizeof(MpsSystemHeaderRuntimeView) == 0x20, "MpsSystemHeaderRuntimeView size must be 0x20");
+  static_assert(offsetof(MpsSystemHeaderCapture, rateBound) == 0x10, "MpsSystemHeaderCapture::rateBound offset must be 0x10");
+  static_assert(sizeof(MpsSystemHeaderCapture) == 0x20, "MpsSystemHeaderCapture size must be 0x20");
 
-  struct MpsElementaryInfoEntryView
+  struct MpsElementaryInfoEntry
   {
     std::uint8_t streamType = 0; // +0x00
     std::uint8_t streamId = 0; // +0x01
   };
-  static_assert(sizeof(MpsElementaryInfoEntryView) == 0x2, "MpsElementaryInfoEntryView size must be 0x2");
+  static_assert(sizeof(MpsElementaryInfoEntry) == 0x2, "MpsElementaryInfoEntry size must be 0x2");
 
   /// One SFMPS header record inside the SFSEE work's header bank (+0x8A0):
   /// a 0x30 header block followed by the two raw-MPS capture banks
@@ -13015,7 +12832,7 @@
     }
 
     (void)M2TSD_SetErrFn(
-      reinterpret_cast<M2TsdRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(m2tsdHandle))),
+      reinterpret_cast<M2TsdState*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(m2tsdHandle))),
       reinterpret_cast<std::int32_t>(&sfbuf_ErrFn),
       reinterpret_cast<std::int32_t>(workctrlSubobj)
     );
@@ -13047,7 +12864,7 @@
 
     Sfm2tsInitInfo& initInfo = workctrlSubobj->transferState.transfer.demux.demuxInit->m2ts;
     const std::int32_t m2tsdAddress = initInfo.m2tsdRuntimeAddress;
-    auto* const m2tsdRuntime = reinterpret_cast<M2TsdRuntimeView*>(
+    auto* const m2tsdRuntime = reinterpret_cast<M2TsdState*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(m2tsdAddress))
     );
 
@@ -13191,7 +13008,7 @@
     std::int32_t maxSystemField2 = 0;
     std::int32_t maxSystemField3 = 0;
     for (std::int32_t headerIndex = 0; headerIndex < 3; ++headerIndex) {
-      MpsSystemHeaderRuntimeView systemHeader{};
+      MpsSystemHeaderCapture systemHeader{};
       (void)MPS_GetSysHd(parserHandle, &systemHeader, headerIndex);
       if (maxSystemField2 <= systemHeader.maxSystemField2) {
         maxSystemField2 = systemHeader.maxSystemField2;
@@ -13222,13 +13039,13 @@
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(parserRuntime->parserHandleAddress))
     );
 
-    MpsPackHeaderRuntimeView packHeader{};
+    MpsPackHeader packHeader{};
     (void)MPS_GetPackHd(parserHandle, &packHeader);
-    if (packHeader.muxRateUnits50BytesPerSecond > 0) {
-      workctrlSubobj->movieInfo.muxRateUnits50BytesPerSecond = packHeader.muxRateUnits50BytesPerSecond;
+    if (packHeader.muxRate > 0) {
+      workctrlSubobj->movieInfo.muxRateUnits50BytesPerSecond = packHeader.muxRate;
     }
 
-    MpsSystemHeaderRuntimeView systemHeader{};
+    MpsSystemHeader systemHeader{};
     (void)MPS_GetSysHd(parserHandle, &systemHeader, 1);
     std::int32_t result = systemHeader.rateBound;
     if (result != -1) {
@@ -13304,7 +13121,7 @@
     );
 
     std::int32_t elementaryCount = 0;
-    const MpsElementaryInfoEntryView* elementaryEntries = nullptr;
+    const MpsElementaryInfoEntry* elementaryEntries = nullptr;
     (void)MPS_GetElementaryInfo(parserHandle, &elementaryCount, &elementaryEntries);
 
     for (std::int32_t index = 0; index < elementaryCount; ++index) {
@@ -13911,7 +13728,7 @@
     return SFTIM_VbIn();
   }
 
-  struct SflibTimerStateRuntimeView
+  struct SflibTimerState
   {
     std::int32_t verticalBlankCount = 0; // +0x00 (`SFLIB_libwork.time.val1`, 0x011F9070)
     std::int32_t reservedLane04 = 0; // +0x04 (0x011F9074) - zeroed by SFTIM_Init, never read
@@ -13921,9 +13738,9 @@
   // one of the seven functions in the binary that reads this block reads
   // 0x011F9078, i.e. `+0x08`. Nothing anywhere references 0x011F9074, so a read
   // of `reservedLane04` is always a mis-modelled `ticksPerSecond` read.
-  static_assert(sizeof(SflibTimerStateRuntimeView) == 0x0C, "SflibTimerStateRuntimeView size must be 0x0C");
+  static_assert(sizeof(SflibTimerState) == 0x0C, "SflibTimerState size must be 0x0C");
 
-  struct SftimWorkctrlRuntimeView
+  struct SftimWorkctrl
   {
     std::uint8_t mUnknown00_91F[0x920]{}; // +0x000
     std::int32_t decodeChannelMode = 0; // +0x920
@@ -13967,132 +13784,132 @@
     std::int32_t externalWrapMinorLimit = 0; // +0x1014
     std::int32_t externalCallbackContext = 0; // +0x1018
   };
-  static_assert(offsetof(SftimWorkctrlRuntimeView, decodeChannelMode) == 0x920, "SftimWorkctrlRuntimeView::decodeChannelMode offset must be 0x920");
+  static_assert(offsetof(SftimWorkctrl, decodeChannelMode) == 0x920, "SftimWorkctrl::decodeChannelMode offset must be 0x920");
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, execComparisonMode) == 0xA48,
-    "SftimWorkctrlRuntimeView::execComparisonMode offset must be 0xA48"
+    offsetof(SftimWorkctrl, execComparisonMode) == 0xA48,
+    "SftimWorkctrl::execComparisonMode offset must be 0xA48"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, executionWindowTicks) == 0xAC4,
-    "SftimWorkctrlRuntimeView::executionWindowTicks offset must be 0xAC4"
+    offsetof(SftimWorkctrl, executionWindowTicks) == 0xAC4,
+    "SftimWorkctrl::executionWindowTicks offset must be 0xAC4"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, timeSubScaleEnabled) == 0xE48,
-    "SftimWorkctrlRuntimeView::timeSubScaleEnabled offset must be 0xE48"
+    offsetof(SftimWorkctrl, timeSubScaleEnabled) == 0xE48,
+    "SftimWorkctrl::timeSubScaleEnabled offset must be 0xE48"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, timeSubScaleNumerator) == 0xE6C,
-    "SftimWorkctrlRuntimeView::timeSubScaleNumerator offset must be 0xE6C"
+    offsetof(SftimWorkctrl, timeSubScaleNumerator) == 0xE6C,
+    "SftimWorkctrl::timeSubScaleNumerator offset must be 0xE6C"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, timeSubScaleDenominator) == 0xE70,
-    "SftimWorkctrlRuntimeView::timeSubScaleDenominator offset must be 0xE70"
+    offsetof(SftimWorkctrl, timeSubScaleDenominator) == 0xE70,
+    "SftimWorkctrl::timeSubScaleDenominator offset must be 0xE70"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, timeSubWrapCarryMajor) == 0xE74,
-    "SftimWorkctrlRuntimeView::timeSubWrapCarryMajor offset must be 0xE74"
+    offsetof(SftimWorkctrl, timeSubWrapCarryMajor) == 0xE74,
+    "SftimWorkctrl::timeSubWrapCarryMajor offset must be 0xE74"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, timeSubWrapMinorValue) == 0xE78,
-    "SftimWorkctrlRuntimeView::timeSubWrapMinorValue offset must be 0xE78"
+    offsetof(SftimWorkctrl, timeSubWrapMinorValue) == 0xE78,
+    "SftimWorkctrl::timeSubWrapMinorValue offset must be 0xE78"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, perFileTimeQueueEnabled) == 0xE94,
-    "SftimWorkctrlRuntimeView::perFileTimeQueueEnabled offset must be 0xE94"
+    offsetof(SftimWorkctrl, perFileTimeQueueEnabled) == 0xE94,
+    "SftimWorkctrl::perFileTimeQueueEnabled offset must be 0xE94"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, perFileTimeQueueOrdinal) == 0xE98,
-    "SftimWorkctrlRuntimeView::perFileTimeQueueOrdinal offset must be 0xE98"
+    offsetof(SftimWorkctrl, perFileTimeQueueOrdinal) == 0xE98,
+    "SftimWorkctrl::perFileTimeQueueOrdinal offset must be 0xE98"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, perFileQueuedTimeMajor) == 0xE9C,
-    "SftimWorkctrlRuntimeView::perFileQueuedTimeMajor offset must be 0xE9C"
+    offsetof(SftimWorkctrl, perFileQueuedTimeMajor) == 0xE9C,
+    "SftimWorkctrl::perFileQueuedTimeMajor offset must be 0xE9C"
   );
-  static_assert(offsetof(SftimWorkctrlRuntimeView, videoLaneEnabled) == 0x950, "SftimWorkctrlRuntimeView::videoLaneEnabled offset must be 0x950");
-  static_assert(offsetof(SftimWorkctrlRuntimeView, videoTermMajor) == 0xFAC, "SftimWorkctrlRuntimeView::videoTermMajor offset must be 0xFAC");
-  static_assert(offsetof(SftimWorkctrlRuntimeView, videoTermMinor) == 0xFB0, "SftimWorkctrlRuntimeView::videoTermMinor offset must be 0xFB0");
+  static_assert(offsetof(SftimWorkctrl, videoLaneEnabled) == 0x950, "SftimWorkctrl::videoLaneEnabled offset must be 0x950");
+  static_assert(offsetof(SftimWorkctrl, videoTermMajor) == 0xFAC, "SftimWorkctrl::videoTermMajor offset must be 0xFAC");
+  static_assert(offsetof(SftimWorkctrl, videoTermMinor) == 0xFB0, "SftimWorkctrl::videoTermMinor offset must be 0xFB0");
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, currentTimeMajor) == 0xFBC,
-    "SftimWorkctrlRuntimeView::currentTimeMajor offset must be 0xFBC"
-  );
-  static_assert(
-    offsetof(SftimWorkctrlRuntimeView, currentTimeMinor) == 0xFC0,
-    "SftimWorkctrlRuntimeView::currentTimeMinor offset must be 0xFC0"
+    offsetof(SftimWorkctrl, currentTimeMajor) == 0xFBC,
+    "SftimWorkctrl::currentTimeMajor offset must be 0xFBC"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, vsyncTimeMajor) == 0xFD8,
-    "SftimWorkctrlRuntimeView::vsyncTimeMajor offset must be 0xFD8"
-  );
-  static_assert(offsetof(SftimWorkctrlRuntimeView, timeBaseScale) == 0xFDC, "SftimWorkctrlRuntimeView::timeBaseScale offset must be 0xFDC");
-  static_assert(
-    offsetof(SftimWorkctrlRuntimeView, graceWindowCounter) == 0xFEC,
-    "SftimWorkctrlRuntimeView::graceWindowCounter offset must be 0xFEC"
+    offsetof(SftimWorkctrl, currentTimeMinor) == 0xFC0,
+    "SftimWorkctrl::currentTimeMinor offset must be 0xFC0"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, lastLowerSample) == 0xFF0,
-    "SftimWorkctrlRuntimeView::lastLowerSample offset must be 0xFF0"
+    offsetof(SftimWorkctrl, vsyncTimeMajor) == 0xFD8,
+    "SftimWorkctrl::vsyncTimeMajor offset must be 0xFD8"
+  );
+  static_assert(offsetof(SftimWorkctrl, timeBaseScale) == 0xFDC, "SftimWorkctrl::timeBaseScale offset must be 0xFDC");
+  static_assert(
+    offsetof(SftimWorkctrl, graceWindowCounter) == 0xFEC,
+    "SftimWorkctrl::graceWindowCounter offset must be 0xFEC"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, lastGraceResult) == 0xFF4,
-    "SftimWorkctrlRuntimeView::lastGraceResult offset must be 0xFF4"
+    offsetof(SftimWorkctrl, lastLowerSample) == 0xFF0,
+    "SftimWorkctrl::lastLowerSample offset must be 0xFF0"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, lastUpperSample) == 0xFF8,
-    "SftimWorkctrlRuntimeView::lastUpperSample offset must be 0xFF8"
+    offsetof(SftimWorkctrl, lastGraceResult) == 0xFF4,
+    "SftimWorkctrl::lastGraceResult offset must be 0xFF4"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, takeOffExecTimeMajor) == 0xFFC,
-    "SftimWorkctrlRuntimeView::takeOffExecTimeMajor offset must be 0xFFC"
+    offsetof(SftimWorkctrl, lastUpperSample) == 0xFF8,
+    "SftimWorkctrl::lastUpperSample offset must be 0xFF8"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, externalTimeCallbackAddress) == 0x1004,
-    "SftimWorkctrlRuntimeView::externalTimeCallbackAddress offset must be 0x1004"
+    offsetof(SftimWorkctrl, takeOffExecTimeMajor) == 0xFFC,
+    "SftimWorkctrl::takeOffExecTimeMajor offset must be 0xFFC"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, previousExternalMajor) == 0x1008,
-    "SftimWorkctrlRuntimeView::previousExternalMajor offset must be 0x1008"
+    offsetof(SftimWorkctrl, externalTimeCallbackAddress) == 0x1004,
+    "SftimWorkctrl::externalTimeCallbackAddress offset must be 0x1004"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, externalPauseAccumulatedMajor) == 0x100C,
-    "SftimWorkctrlRuntimeView::externalPauseAccumulatedMajor offset must be 0x100C"
+    offsetof(SftimWorkctrl, previousExternalMajor) == 0x1008,
+    "SftimWorkctrl::previousExternalMajor offset must be 0x1008"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, externalReportedMinor) == 0x1010,
-    "SftimWorkctrlRuntimeView::externalReportedMinor offset must be 0x1010"
+    offsetof(SftimWorkctrl, externalPauseAccumulatedMajor) == 0x100C,
+    "SftimWorkctrl::externalPauseAccumulatedMajor offset must be 0x100C"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, externalWrapMinorLimit) == 0x1014,
-    "SftimWorkctrlRuntimeView::externalWrapMinorLimit offset must be 0x1014"
+    offsetof(SftimWorkctrl, externalReportedMinor) == 0x1010,
+    "SftimWorkctrl::externalReportedMinor offset must be 0x1010"
   );
   static_assert(
-    offsetof(SftimWorkctrlRuntimeView, externalCallbackContext) == 0x1018,
-    "SftimWorkctrlRuntimeView::externalCallbackContext offset must be 0x1018"
+    offsetof(SftimWorkctrl, externalWrapMinorLimit) == 0x1014,
+    "SftimWorkctrl::externalWrapMinorLimit offset must be 0x1014"
+  );
+  static_assert(
+    offsetof(SftimWorkctrl, externalCallbackContext) == 0x1018,
+    "SftimWorkctrl::externalCallbackContext offset must be 0x1018"
   );
 
   using SftimGetNowTimeFunction =
     std::int32_t(__cdecl*)(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t* outTimeMajor, std::int32_t* outTimeMinor);
   using SftimExternalTimeCallback =
     std::int32_t(__cdecl*)(std::int32_t callbackContext, std::int32_t* outExternalMajor, std::int32_t* outExternalMinor);
-  struct SftimTimecodeRuntimeView
+  struct SftimTimecodeWords
   {
     std::uint8_t words[0x20]{}; // +0x00
   };
-  static_assert(sizeof(SftimTimecodeRuntimeView) == 0x20, "SftimTimecodeRuntimeView size must be 0x20");
+  static_assert(sizeof(SftimTimecodeWords) == 0x20, "SftimTimecodeWords size must be 0x20");
 
-  struct SftimTtuRuntimeView
+  struct SftimTtu
   {
     std::uint32_t state = 0; // +0x00
-    SftimTimecodeRuntimeView timecode{}; // +0x04
+    SftimTimecodeWords timecode{}; // +0x04
     std::int32_t timeMajor = 0; // +0x24
     std::int32_t timeMinor = 0; // +0x28
   };
-  static_assert(offsetof(SftimTtuRuntimeView, state) == 0x00, "SftimTtuRuntimeView::state offset must be 0x00");
-  static_assert(offsetof(SftimTtuRuntimeView, timecode) == 0x04, "SftimTtuRuntimeView::timecode offset must be 0x04");
-  static_assert(offsetof(SftimTtuRuntimeView, timeMajor) == 0x24, "SftimTtuRuntimeView::timeMajor offset must be 0x24");
-  static_assert(offsetof(SftimTtuRuntimeView, timeMinor) == 0x28, "SftimTtuRuntimeView::timeMinor offset must be 0x28");
-  static_assert(sizeof(SftimTtuRuntimeView) == 0x2C, "SftimTtuRuntimeView size must be 0x2C");
+  static_assert(offsetof(SftimTtu, state) == 0x00, "SftimTtu::state offset must be 0x00");
+  static_assert(offsetof(SftimTtu, timecode) == 0x04, "SftimTtu::timecode offset must be 0x04");
+  static_assert(offsetof(SftimTtu, timeMajor) == 0x24, "SftimTtu::timeMajor offset must be 0x24");
+  static_assert(offsetof(SftimTtu, timeMinor) == 0x28, "SftimTtu::timeMinor offset must be 0x28");
+  static_assert(sizeof(SftimTtu) == 0x2C, "SftimTtu size must be 0x2C");
 
-  struct SftimTimecodeLaneView
+  struct SftimTimecode
   {
     std::int32_t frameRateIndex = 0; // +0x00
     std::int32_t modeIndex = 0; // +0x04
@@ -14105,31 +13922,31 @@
     std::int16_t repeatFieldAccumulated = 0; // +0x1E
   };
   static_assert(
-    offsetof(SftimTimecodeLaneView, frameRateIndex) == 0x00,
-    "SftimTimecodeLaneView::frameRateIndex offset must be 0x00"
+    offsetof(SftimTimecode, frameRateIndex) == 0x00,
+    "SftimTimecode::frameRateIndex offset must be 0x00"
   );
-  static_assert(offsetof(SftimTimecodeLaneView, modeIndex) == 0x04, "SftimTimecodeLaneView::modeIndex offset must be 0x04");
-  static_assert(offsetof(SftimTimecodeLaneView, hours) == 0x08, "SftimTimecodeLaneView::hours offset must be 0x08");
-  static_assert(offsetof(SftimTimecodeLaneView, minutes) == 0x0C, "SftimTimecodeLaneView::minutes offset must be 0x0C");
-  static_assert(offsetof(SftimTimecodeLaneView, seconds) == 0x10, "SftimTimecodeLaneView::seconds offset must be 0x10");
-  static_assert(offsetof(SftimTimecodeLaneView, frameNumber) == 0x14, "SftimTimecodeLaneView::frameNumber offset must be 0x14");
+  static_assert(offsetof(SftimTimecode, modeIndex) == 0x04, "SftimTimecode::modeIndex offset must be 0x04");
+  static_assert(offsetof(SftimTimecode, hours) == 0x08, "SftimTimecode::hours offset must be 0x08");
+  static_assert(offsetof(SftimTimecode, minutes) == 0x0C, "SftimTimecode::minutes offset must be 0x0C");
+  static_assert(offsetof(SftimTimecode, seconds) == 0x10, "SftimTimecode::seconds offset must be 0x10");
+  static_assert(offsetof(SftimTimecode, frameNumber) == 0x14, "SftimTimecode::frameNumber offset must be 0x14");
   static_assert(
-    offsetof(SftimTimecodeLaneView, halfFrameCarry) == 0x18,
-    "SftimTimecodeLaneView::halfFrameCarry offset must be 0x18"
-  );
-  static_assert(
-    offsetof(SftimTimecodeLaneView, repeatFieldCount) == 0x1C,
-    "SftimTimecodeLaneView::repeatFieldCount offset must be 0x1C"
+    offsetof(SftimTimecode, halfFrameCarry) == 0x18,
+    "SftimTimecode::halfFrameCarry offset must be 0x18"
   );
   static_assert(
-    offsetof(SftimTimecodeLaneView, repeatFieldAccumulated) == 0x1E,
-    "SftimTimecodeLaneView::repeatFieldAccumulated offset must be 0x1E"
+    offsetof(SftimTimecode, repeatFieldCount) == 0x1C,
+    "SftimTimecode::repeatFieldCount offset must be 0x1C"
   );
-  static_assert(sizeof(SftimTimecodeLaneView) == 0x20, "SftimTimecodeLaneView size must be 0x20");
+  static_assert(
+    offsetof(SftimTimecode, repeatFieldAccumulated) == 0x1E,
+    "SftimTimecode::repeatFieldAccumulated offset must be 0x1E"
+  );
+  static_assert(sizeof(SftimTimecode) == 0x20, "SftimTimecode size must be 0x20");
 
   using SftimTc2TimeFunction = std::int32_t(__cdecl*)(
     std::int32_t frameRateUnits,
-    SftimTimecodeLaneView* timecodeLane,
+    SftimTimecode* timecodeLane,
     std::int32_t* outTimeMajor,
     std::int32_t* outTimeMinor
   );
@@ -14160,7 +13977,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleGetFps);
     }
 
-    const auto* const timerView = reinterpret_cast<const SftimWorkctrlRuntimeView*>(workctrlSubobj);
+    const auto* const timerView = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
     const std::int32_t frameRateIndex = timerView->decodeChannelMode;
     if (frameRateIndex != 0) {
       *outFramesPerSecond = SFTIM_prate[frameRateIndex];
@@ -14188,7 +14005,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleGetPlayFps);
     }
 
-    const auto* const timerView = reinterpret_cast<const SftimWorkctrlRuntimeView*>(workctrlSubobj);
+    const auto* const timerView = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
     const std::int32_t frameRateIndex = timerView->decodeChannelMode;
     if (frameRateIndex != 0) {
       *outPlayFramesPerSecond = UTY_MulDiv(SFTIM_prate[frameRateIndex], timerView->timeBaseScale, 1000);
@@ -14229,7 +14046,7 @@
     return static_cast<std::int32_t>(product / static_cast<std::int64_t>(divisorValue));
   }
 
-  struct SfdOutputSyncRuntimeView
+  struct SfdOutputSync
   {
     std::uint8_t reserved0000_0043[0x44]{}; // +0x0000
     std::int32_t outputSyncDirtyFlag = 0; // +0x0044
@@ -14241,24 +14058,24 @@
     std::int32_t displaySyncTimeMinor = 0; // +0x0FE8
   };
   static_assert(
-    offsetof(SfdOutputSyncRuntimeView, outputSyncDirtyFlag) == 0x44,
-    "SfdOutputSyncRuntimeView::outputSyncDirtyFlag offset must be 0x44"
+    offsetof(SfdOutputSync, outputSyncDirtyFlag) == 0x44,
+    "SfdOutputSync::outputSyncDirtyFlag offset must be 0x44"
   );
   static_assert(
-    offsetof(SfdOutputSyncRuntimeView, userFrameSyncSequence) == 0xFD4,
-    "SfdOutputSyncRuntimeView::userFrameSyncSequence offset must be 0xFD4"
+    offsetof(SfdOutputSync, userFrameSyncSequence) == 0xFD4,
+    "SfdOutputSync::userFrameSyncSequence offset must be 0xFD4"
   );
   static_assert(
-    offsetof(SfdOutputSyncRuntimeView, displaySyncSequence) == 0xFE0,
-    "SfdOutputSyncRuntimeView::displaySyncSequence offset must be 0xFE0"
+    offsetof(SfdOutputSync, displaySyncSequence) == 0xFE0,
+    "SfdOutputSync::displaySyncSequence offset must be 0xFE0"
   );
   static_assert(
-    offsetof(SfdOutputSyncRuntimeView, displaySyncTimeMajor) == 0xFE4,
-    "SfdOutputSyncRuntimeView::displaySyncTimeMajor offset must be 0xFE4"
+    offsetof(SfdOutputSync, displaySyncTimeMajor) == 0xFE4,
+    "SfdOutputSync::displaySyncTimeMajor offset must be 0xFE4"
   );
   static_assert(
-    offsetof(SfdOutputSyncRuntimeView, displaySyncTimeMinor) == 0xFE8,
-    "SfdOutputSyncRuntimeView::displaySyncTimeMinor offset must be 0xFE8"
+    offsetof(SfdOutputSync, displaySyncTimeMinor) == 0xFE8,
+    "SfdOutputSync::displaySyncTimeMinor offset must be 0xFE8"
   );
 
   /**
@@ -14275,7 +14092,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleOutUserFrameSync);
     }
 
-    auto* const syncView = reinterpret_cast<SfdOutputSyncRuntimeView*>(workctrlSubobj);
+    auto* const syncView = reinterpret_cast<SfdOutputSync*>(workctrlSubobj);
     ++syncView->userFrameSyncSequence;
     syncView->outputSyncDirtyFlag = 1;
     return 0;
@@ -14299,7 +14116,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleOutDisplaySync);
     }
 
-    auto* const syncView = reinterpret_cast<SfdOutputSyncRuntimeView*>(workctrlSubobj);
+    auto* const syncView = reinterpret_cast<SfdOutputSync*>(workctrlSubobj);
     ++syncView->displaySyncSequence;
     syncView->displaySyncTimeMajor = displayTimeMajor;
     syncView->displaySyncTimeMinor = displayTimeMinor;
@@ -14307,7 +14124,7 @@
     return 0;
   }
 
-  struct SftimVblankCounterLaneView
+  struct SftimVblankCounterLane
   {
     std::array<SftimGetNowTimeFunction, 6> nowTimeFunctions{}; // +0x000
     std::uint8_t mUnknown018_28B[0x274]{}; // +0x018
@@ -14331,67 +14148,67 @@
     std::int32_t initScratchWord2 = 0; // +0x5B8
   };
   static_assert(
-    offsetof(SftimVblankCounterLaneView, nowTimeFunctions) == 0x00,
-    "SftimVblankCounterLaneView::nowTimeFunctions offset must be 0x00"
+    offsetof(SftimVblankCounterLane, nowTimeFunctions) == 0x00,
+    "SftimVblankCounterLane::nowTimeFunctions offset must be 0x00"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, lastTimerMajor) == 0x28C,
-    "SftimVblankCounterLaneView::lastTimerMajor offset must be 0x28C"
+    offsetof(SftimVblankCounterLane, lastTimerMajor) == 0x28C,
+    "SftimVblankCounterLane::lastTimerMajor offset must be 0x28C"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, lastTimerMinor) == 0x290,
-    "SftimVblankCounterLaneView::lastTimerMinor offset must be 0x290"
+    offsetof(SftimVblankCounterLane, lastTimerMinor) == 0x290,
+    "SftimVblankCounterLane::lastTimerMinor offset must be 0x290"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, accumulatedTicks) == 0x2A8,
-    "SftimVblankCounterLaneView::accumulatedTicks offset must be 0x2A8"
+    offsetof(SftimVblankCounterLane, accumulatedTicks) == 0x2A8,
+    "SftimVblankCounterLane::accumulatedTicks offset must be 0x2A8"
   );
-  static_assert(offsetof(SftimVblankCounterLaneView, tickStep) == 0x2AC, "SftimVblankCounterLaneView::tickStep offset must be 0x2AC");
+  static_assert(offsetof(SftimVblankCounterLane, tickStep) == 0x2AC, "SftimVblankCounterLane::tickStep offset must be 0x2AC");
   static_assert(
-    offsetof(SftimVblankCounterLaneView, vblankStateTicks) == 0x2CC,
-    "SftimVblankCounterLaneView::vblankStateTicks offset must be 0x2CC"
-  );
-  static_assert(
-    offsetof(SftimVblankCounterLaneView, currentVtimeMajor) == 0x2D0,
-    "SftimVblankCounterLaneView::currentVtimeMajor offset must be 0x2D0"
+    offsetof(SftimVblankCounterLane, vblankStateTicks) == 0x2CC,
+    "SftimVblankCounterLane::vblankStateTicks offset must be 0x2CC"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, externalTimeCallback) == 0x2D4,
-    "SftimVblankCounterLaneView::externalTimeCallback offset must be 0x2D4"
+    offsetof(SftimVblankCounterLane, currentVtimeMajor) == 0x2D0,
+    "SftimVblankCounterLane::currentVtimeMajor offset must be 0x2D0"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, previousExternalMinor) == 0x2D8,
-    "SftimVblankCounterLaneView::previousExternalMinor offset must be 0x2D8"
+    offsetof(SftimVblankCounterLane, externalTimeCallback) == 0x2D4,
+    "SftimVblankCounterLane::externalTimeCallback offset must be 0x2D4"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, externalAccumulatedMajor) == 0x2DC,
-    "SftimVblankCounterLaneView::externalAccumulatedMajor offset must be 0x2DC"
+    offsetof(SftimVblankCounterLane, previousExternalMinor) == 0x2D8,
+    "SftimVblankCounterLane::previousExternalMinor offset must be 0x2D8"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, externalReportedMinor) == 0x2E0,
-    "SftimVblankCounterLaneView::externalReportedMinor offset must be 0x2E0"
+    offsetof(SftimVblankCounterLane, externalAccumulatedMajor) == 0x2DC,
+    "SftimVblankCounterLane::externalAccumulatedMajor offset must be 0x2DC"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, externalWrapMinorLimit) == 0x2E4,
-    "SftimVblankCounterLaneView::externalWrapMinorLimit offset must be 0x2E4"
+    offsetof(SftimVblankCounterLane, externalReportedMinor) == 0x2E0,
+    "SftimVblankCounterLane::externalReportedMinor offset must be 0x2E0"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, externalCallbackContext) == 0x2E8,
-    "SftimVblankCounterLaneView::externalCallbackContext offset must be 0x2E8"
+    offsetof(SftimVblankCounterLane, externalWrapMinorLimit) == 0x2E4,
+    "SftimVblankCounterLane::externalWrapMinorLimit offset must be 0x2E4"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, initScratchWord0) == 0x5B0,
-    "SftimVblankCounterLaneView::initScratchWord0 offset must be 0x5B0"
+    offsetof(SftimVblankCounterLane, externalCallbackContext) == 0x2E8,
+    "SftimVblankCounterLane::externalCallbackContext offset must be 0x2E8"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, initScratchWord1) == 0x5B4,
-    "SftimVblankCounterLaneView::initScratchWord1 offset must be 0x5B4"
+    offsetof(SftimVblankCounterLane, initScratchWord0) == 0x5B0,
+    "SftimVblankCounterLane::initScratchWord0 offset must be 0x5B0"
   );
   static_assert(
-    offsetof(SftimVblankCounterLaneView, initScratchWord2) == 0x5B8,
-    "SftimVblankCounterLaneView::initScratchWord2 offset must be 0x5B8"
+    offsetof(SftimVblankCounterLane, initScratchWord1) == 0x5B4,
+    "SftimVblankCounterLane::initScratchWord1 offset must be 0x5B4"
   );
-  static_assert(sizeof(SftimVblankCounterLaneView) == 0x5BC, "SftimVblankCounterLaneView size must be 0x5BC");
+  static_assert(
+    offsetof(SftimVblankCounterLane, initScratchWord2) == 0x5B8,
+    "SftimVblankCounterLane::initScratchWord2 offset must be 0x5B8"
+  );
+  static_assert(sizeof(SftimVblankCounterLane) == 0x5BC, "SftimVblankCounterLane size must be 0x5BC");
 
   /**
    * Byte offset of the SFTIM VBlank/timer lane inside one SFD workctrl.
@@ -14404,17 +14221,17 @@
    */
   inline constexpr std::size_t kSftimVblankCounterLaneOffset = 0xD30;
 
-  struct SftimInitHandleRuntimeView
+  struct SftimTimerHandle
   {
     std::array<SftimGetNowTimeFunction, 6> nowTimeFunctions{}; // +0x000
     std::int32_t activeTimeMode = 0; // +0x018
-    SftimTimecodeRuntimeView activeTimecode{}; // +0x01C
-    SftimTtuRuntimeView ttuLaneA{}; // +0x03C
-    SftimTtuRuntimeView ttuLaneB{}; // +0x068
-    SftimTtuRuntimeView ttuLaneC{}; // +0x094
-    SftimTtuRuntimeView ttuLaneD{}; // +0x0C0
-    SftimTtuRuntimeView ttuLaneE{}; // +0x0EC
-    SftimTtuRuntimeView ttuLaneF{}; // +0x118
+    SftimTimecodeWords activeTimecode{}; // +0x01C
+    SftimTtu ttuLaneA{}; // +0x03C
+    SftimTtu ttuLaneB{}; // +0x068
+    SftimTtu ttuLaneC{}; // +0x094
+    SftimTtu ttuLaneD{}; // +0x0C0
+    SftimTtu ttuLaneE{}; // +0x0EC
+    SftimTtu ttuLaneF{}; // +0x118
     std::int32_t startTimeMajor = 0; // +0x144
     std::int32_t startTimeMinor = 0; // +0x148
     std::uint8_t reserved14C_14F[0x04]{}; // +0x14C
@@ -14464,58 +14281,58 @@
     std::int32_t initScratchWord1 = 0; // +0x5B4
     std::int32_t initScratchWord2 = 0; // +0x5B8
   };
-  static_assert(offsetof(SftimInitHandleRuntimeView, activeTimeMode) == 0x18, "SftimInitHandleRuntimeView::activeTimeMode offset must be 0x18");
+  static_assert(offsetof(SftimTimerHandle, activeTimeMode) == 0x18, "SftimTimerHandle::activeTimeMode offset must be 0x18");
   static_assert(
-    offsetof(SftimInitHandleRuntimeView, activeTimecode) == 0x1C,
-    "SftimInitHandleRuntimeView::activeTimecode offset must be 0x1C"
+    offsetof(SftimTimerHandle, activeTimecode) == 0x1C,
+    "SftimTimerHandle::activeTimecode offset must be 0x1C"
   );
-  static_assert(offsetof(SftimInitHandleRuntimeView, ttuLaneA) == 0x3C, "SftimInitHandleRuntimeView::ttuLaneA offset must be 0x3C");
-  static_assert(offsetof(SftimInitHandleRuntimeView, ttuLaneD) == 0xC0, "SftimInitHandleRuntimeView::ttuLaneD offset must be 0xC0");
-  static_assert(offsetof(SftimInitHandleRuntimeView, ttuLaneF) == 0x118, "SftimInitHandleRuntimeView::ttuLaneF offset must be 0x118");
+  static_assert(offsetof(SftimTimerHandle, ttuLaneA) == 0x3C, "SftimTimerHandle::ttuLaneA offset must be 0x3C");
+  static_assert(offsetof(SftimTimerHandle, ttuLaneD) == 0xC0, "SftimTimerHandle::ttuLaneD offset must be 0xC0");
+  static_assert(offsetof(SftimTimerHandle, ttuLaneF) == 0x118, "SftimTimerHandle::ttuLaneF offset must be 0x118");
   static_assert(
-    offsetof(SftimInitHandleRuntimeView, accumulatedTicks) == 0x2A8,
-    "SftimInitHandleRuntimeView::accumulatedTicks offset must be 0x2A8"
+    offsetof(SftimTimerHandle, accumulatedTicks) == 0x2A8,
+    "SftimTimerHandle::accumulatedTicks offset must be 0x2A8"
   );
-  static_assert(offsetof(SftimInitHandleRuntimeView, tickStep) == 0x2AC, "SftimInitHandleRuntimeView::tickStep offset must be 0x2AC");
+  static_assert(offsetof(SftimTimerHandle, tickStep) == 0x2AC, "SftimTimerHandle::tickStep offset must be 0x2AC");
   static_assert(
-    offsetof(SftimInitHandleRuntimeView, externalTimeCallback) == 0x2D4,
-    "SftimInitHandleRuntimeView::externalTimeCallback offset must be 0x2D4"
-  );
-  static_assert(
-    offsetof(SftimInitHandleRuntimeView, externalWrapMinorLimit) == 0x2E4,
-    "SftimInitHandleRuntimeView::externalWrapMinorLimit offset must be 0x2E4"
+    offsetof(SftimTimerHandle, externalTimeCallback) == 0x2D4,
+    "SftimTimerHandle::externalTimeCallback offset must be 0x2D4"
   );
   static_assert(
-    offsetof(SftimInitHandleRuntimeView, externalCallbackContext) == 0x2E8,
-    "SftimInitHandleRuntimeView::externalCallbackContext offset must be 0x2E8"
+    offsetof(SftimTimerHandle, externalWrapMinorLimit) == 0x2E4,
+    "SftimTimerHandle::externalWrapMinorLimit offset must be 0x2E4"
   );
   static_assert(
-    offsetof(SftimInitHandleRuntimeView, initScratchWord0) == 0x5B0,
-    "SftimInitHandleRuntimeView::initScratchWord0 offset must be 0x5B0"
+    offsetof(SftimTimerHandle, externalCallbackContext) == 0x2E8,
+    "SftimTimerHandle::externalCallbackContext offset must be 0x2E8"
   );
-  static_assert(sizeof(SftimInitHandleRuntimeView) == 0x5BC, "SftimInitHandleRuntimeView size must be 0x5BC");
+  static_assert(
+    offsetof(SftimTimerHandle, initScratchWord0) == 0x5B0,
+    "SftimTimerHandle::initScratchWord0 offset must be 0x5B0"
+  );
+  static_assert(sizeof(SftimTimerHandle) == 0x5BC, "SftimTimerHandle size must be 0x5BC");
 
-  struct SftimWorkctrlTickFlagsView
+  struct SftimWorkctrlTickFlags
   {
     std::uint8_t mUnknown00_43[0x44]{}; // +0x00
     std::int32_t tickUpdatedFlag = 0;   // +0x44
   };
   static_assert(
-    offsetof(SftimWorkctrlTickFlagsView, tickUpdatedFlag) == 0x44,
-    "SftimWorkctrlTickFlagsView::tickUpdatedFlag offset must be 0x44"
+    offsetof(SftimWorkctrlTickFlags, tickUpdatedFlag) == 0x44,
+    "SftimWorkctrlTickFlags::tickUpdatedFlag offset must be 0x44"
   );
 
-  struct SfdDrawTimeRuntimeView
+  struct SfdDrawTime
   {
     std::uint8_t mUnknown00_4B[0x4C]{}; // +0x00
     std::int32_t playbackStatusLane = 0; // +0x4C
   };
   static_assert(
-    offsetof(SfdDrawTimeRuntimeView, playbackStatusLane) == 0x4C,
-    "SfdDrawTimeRuntimeView::playbackStatusLane offset must be 0x4C"
+    offsetof(SfdDrawTime, playbackStatusLane) == 0x4C,
+    "SfdDrawTime::playbackStatusLane offset must be 0x4C"
   );
 
-  struct SftimStatusGateRuntimeView
+  struct SftimStatusGate
   {
     std::uint8_t mUnknown00_47[0x48]{}; // +0x00
     std::int32_t statusLane = 0; // +0x48
@@ -14525,48 +14342,48 @@
     std::int32_t timerFreezeFlag = 0; // +0x970
   };
   static_assert(
-    offsetof(SftimStatusGateRuntimeView, statusLane) == 0x48,
-    "SftimStatusGateRuntimeView::statusLane offset must be 0x48"
+    offsetof(SftimStatusGate, statusLane) == 0x48,
+    "SftimStatusGate::statusLane offset must be 0x48"
   );
   static_assert(
-    offsetof(SftimStatusGateRuntimeView, phaseLane) == 0x4C,
-    "SftimStatusGateRuntimeView::phaseLane offset must be 0x4C"
+    offsetof(SftimStatusGate, phaseLane) == 0x4C,
+    "SftimStatusGate::phaseLane offset must be 0x4C"
   );
   static_assert(
-    offsetof(SftimStatusGateRuntimeView, startupGateFlag) == 0x50,
-    "SftimStatusGateRuntimeView::startupGateFlag offset must be 0x50"
+    offsetof(SftimStatusGate, startupGateFlag) == 0x50,
+    "SftimStatusGate::startupGateFlag offset must be 0x50"
   );
   static_assert(
-    offsetof(SftimStatusGateRuntimeView, timerFreezeFlag) == 0x970,
-    "SftimStatusGateRuntimeView::timerFreezeFlag offset must be 0x970"
+    offsetof(SftimStatusGate, timerFreezeFlag) == 0x970,
+    "SftimStatusGate::timerFreezeFlag offset must be 0x970"
   );
 
-  struct SftimFrameReadyWindowView
+  struct SftimFrameReadyWindow
   {
     std::uint8_t mUnknown00_13[0x14]{}; // +0x00
     float frameStartTime = 0.0f; // +0x14
     float frameEndTime = 0.0f; // +0x18
   };
   static_assert(
-    offsetof(SftimFrameReadyWindowView, frameStartTime) == 0x14,
-    "SftimFrameReadyWindowView::frameStartTime offset must be 0x14"
+    offsetof(SftimFrameReadyWindow, frameStartTime) == 0x14,
+    "SftimFrameReadyWindow::frameStartTime offset must be 0x14"
   );
   static_assert(
-    offsetof(SftimFrameReadyWindowView, frameEndTime) == 0x18,
-    "SftimFrameReadyWindowView::frameEndTime offset must be 0x18"
+    offsetof(SftimFrameReadyWindow, frameEndTime) == 0x18,
+    "SftimFrameReadyWindow::frameEndTime offset must be 0x18"
   );
 
-  struct SftimAudioStartSampleRuntimeView
+  struct SftimAudioStartSample
   {
     std::uint8_t mUnknown00_157[0x158]{};
     std::int64_t audioStartPts90k = -1; // +0x158
   };
   static_assert(
-    offsetof(SftimAudioStartSampleRuntimeView, audioStartPts90k) == 0x158,
-    "SftimAudioStartSampleRuntimeView::audioStartPts90k offset must be 0x158"
+    offsetof(SftimAudioStartSample, audioStartPts90k) == 0x158,
+    "SftimAudioStartSample::audioStartPts90k offset must be 0x158"
   );
 
-  struct SftimVideoStartSampleRuntimeView
+  struct SftimVideoStartSample
   {
     std::array<std::uint8_t, 0x110> reserved00_10F{};
     std::int32_t fallbackTimeMajor = -1; // +0x110
@@ -14577,26 +14394,26 @@
     std::int32_t explicitTimeMinor = 1; // +0x140
   };
   static_assert(
-    offsetof(SftimVideoStartSampleRuntimeView, fallbackTimeMajor) == 0x110,
-    "SftimVideoStartSampleRuntimeView::fallbackTimeMajor offset must be 0x110"
+    offsetof(SftimVideoStartSample, fallbackTimeMajor) == 0x110,
+    "SftimVideoStartSample::fallbackTimeMajor offset must be 0x110"
   );
   static_assert(
-    offsetof(SftimVideoStartSampleRuntimeView, fallbackTimeMinor) == 0x114,
-    "SftimVideoStartSampleRuntimeView::fallbackTimeMinor offset must be 0x114"
+    offsetof(SftimVideoStartSample, fallbackTimeMinor) == 0x114,
+    "SftimVideoStartSample::fallbackTimeMinor offset must be 0x114"
   );
   static_assert(
-    offsetof(SftimVideoStartSampleRuntimeView, hasExplicitStartTime) == 0x118,
-    "SftimVideoStartSampleRuntimeView::hasExplicitStartTime offset must be 0x118"
+    offsetof(SftimVideoStartSample, hasExplicitStartTime) == 0x118,
+    "SftimVideoStartSample::hasExplicitStartTime offset must be 0x118"
   );
   static_assert(
-    offsetof(SftimVideoStartSampleRuntimeView, explicitTimeMajor) == 0x13C,
-    "SftimVideoStartSampleRuntimeView::explicitTimeMajor offset must be 0x13C"
+    offsetof(SftimVideoStartSample, explicitTimeMajor) == 0x13C,
+    "SftimVideoStartSample::explicitTimeMajor offset must be 0x13C"
   );
   static_assert(
-    offsetof(SftimVideoStartSampleRuntimeView, explicitTimeMinor) == 0x140,
-    "SftimVideoStartSampleRuntimeView::explicitTimeMinor offset must be 0x140"
+    offsetof(SftimVideoStartSample, explicitTimeMinor) == 0x140,
+    "SftimVideoStartSample::explicitTimeMinor offset must be 0x140"
   );
-  static_assert(sizeof(SftimVideoStartSampleRuntimeView) == 0x144, "SftimVideoStartSampleRuntimeView size must be 0x144");
+  static_assert(sizeof(SftimVideoStartSample) == 0x144, "SftimVideoStartSample size must be 0x144");
 
   std::int32_t sftim_CntupHnVbIn(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sftim_UpdateTime(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
@@ -14649,12 +14466,12 @@
   );
   std::int32_t sftim_IsTimeIncre(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t
-  sftim_IsVbinStIncre(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, SftimVblankCounterLaneView* counterLane);
+  sftim_IsVbinStIncre(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, SftimVblankCounterLane* counterLane);
   std::int32_t
-  sftim_ResetVtimeTmr(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, SftimVblankCounterLaneView* counterLane);
+  sftim_ResetVtimeTmr(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, SftimVblankCounterLane* counterLane);
   void sftim_GetVtimeTmr(
     moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
-    SftimVblankCounterLaneView* counterLane,
+    SftimVblankCounterLane* counterLane,
     std::int32_t* outTimeMajor,
     std::int32_t* outTimeMinor
   );
@@ -14693,7 +14510,7 @@
    */
   void SFTIM_Init(void* const timerState, const std::int32_t versionTag)
   {
-    auto* const timerView = static_cast<SflibTimerStateRuntimeView*>(timerState);
+    auto* const timerView = static_cast<SflibTimerState*>(timerState);
     timerView->verticalBlankCount = 0;
     timerView->reservedLane04 = 0;
     timerView->ticksPerSecond = versionTag;
@@ -14719,14 +14536,14 @@
    */
   void sftim_GetVtimeTmr(
     moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj,
-    SftimVblankCounterLaneView* const counterLane,
+    SftimVblankCounterLane* const counterLane,
     std::int32_t* const outTimeMajor,
     std::int32_t* const outTimeMinor
   )
   {
     if (SFSET_GetCond(workctrlSubobj, 71) == 1) {
       *outTimeMajor = counterLane->accumulatedTicks - counterLane->currentVtimeMajor;
-      const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
+      const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
       *outTimeMinor = (timerState != nullptr) ? timerState->ticksPerSecond : 0;
       return;
     }
@@ -14747,14 +14564,14 @@
    *
    * The binary writes `*(a1 + 4 * a3 + 3376)`, i.e. the table lives at
    * `workctrl + 0xD30` - the same base `SFTIM_GetNowTime` (0x00ADB170) reads
-   * its dispatch entry from. The `SftimVblankCounterLaneView` must therefore be
+   * its dispatch entry from. The `SftimVblankCounterLane` must therefore be
    * placed at that offset here too, exactly as every other user of that view
    * does.
    */
   std::int32_t
   SFTIM_SetTimeFn(const std::int32_t workctrlAddress, const std::int32_t callbackAddress, const std::int32_t timeModeIndex)
   {
-    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+    auto* const counterLane = reinterpret_cast<SftimVblankCounterLane*>(
       reinterpret_cast<std::uint8_t*>(SjAddressToPointer(workctrlAddress)) + kSftimVblankCounterLaneOffset
     );
     counterLane->nowTimeFunctions[static_cast<std::size_t>(timeModeIndex)] = reinterpret_cast<SftimGetNowTimeFunction>(
@@ -14778,7 +14595,7 @@
    */
   std::int32_t SFTIM_InitHn(const std::int32_t workctrlAddress, void* const timerHandleAddress)
   {
-    auto* const timerHandle = static_cast<SftimInitHandleRuntimeView*>(timerHandleAddress);
+    auto* const timerHandle = static_cast<SftimTimerHandle*>(timerHandleAddress);
 
     (void)SFTIM_SetTimeFn(workctrlAddress, SftimFunctionAddress(sftim_GetTimeNone), 0);
     (void)SFTIM_SetTimeFn(workctrlAddress, SftimFunctionAddress(sftim_GetTimeVsync), 1);
@@ -14929,11 +14746,11 @@
     const std::int32_t frameTimeMinor
   )
   {
-    const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
+    const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
     const std::int32_t additionalTicks = UTY_MulDiv(timerState->ticksPerSecond, frameTimeMajor, frameTimeMinor);
 
     SFLIB_LockCs();
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrlRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
     runtimeView->vsyncTimeMajor += additionalTicks;
     runtimeView->takeOffExecTimeMajor += additionalTicks;
     SFLIB_UnlockCs();
@@ -14952,7 +14769,7 @@
     const std::int32_t frameTimeMinor
   )
   {
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrlRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
     const std::int32_t additionalTicks =
       UTY_MulDiv(runtimeView->externalReportedMinor, frameTimeMajor, frameTimeMinor);
     SFLIB_LockCs();
@@ -14973,7 +14790,7 @@
     std::int32_t* const outFrameTimeMinor
   )
   {
-    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrlRuntimeView*>(workctrlSubobj);
+    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
     const std::int32_t decodeChannelMode = runtimeView->decodeChannelMode;
     if (decodeChannelMode != 0) {
       *outFrameTimeMajor = 1000;
@@ -15015,7 +14832,7 @@
    */
   std::int32_t sftim_Tc2TimeN(
     const std::int32_t frameRateUnits,
-    SftimTimecodeLaneView* const timecodeLane,
+    SftimTimecode* const timecodeLane,
     std::int32_t* const outTimeMajor,
     std::int32_t* const outTimeMinor
   )
@@ -15040,7 +14857,7 @@
    */
   std::int32_t sftim_Tc2Time23N(
     const std::int32_t requestedMinorRate,
-    SftimTimecodeLaneView* const timecodeLane,
+    SftimTimecode* const timecodeLane,
     std::int32_t* const outTimeMajor,
     std::int32_t* const outTimeMinor
   )
@@ -15059,7 +14876,7 @@
    */
   std::int32_t sftim_Tc2Time29N(
     const std::int32_t requestedMinorRate,
-    SftimTimecodeLaneView* const timecodeLane,
+    SftimTimecode* const timecodeLane,
     std::int32_t* const outTimeMajor,
     std::int32_t* const outTimeMinor
   )
@@ -15078,7 +14895,7 @@
    */
   std::int32_t sftim_Tc2Time59N(
     const std::int32_t requestedMinorRate,
-    SftimTimecodeLaneView* const timecodeLane,
+    SftimTimecode* const timecodeLane,
     std::int32_t* const outTimeMajor,
     std::int32_t* const outTimeMinor
   )
@@ -15097,7 +14914,7 @@
    */
   std::int32_t sftim_Tc2Time23D(
     const std::int32_t requestedMinorRate,
-    SftimTimecodeLaneView* const timecodeLane,
+    SftimTimecode* const timecodeLane,
     std::int32_t* const outTimeMajor,
     std::int32_t* const outTimeMinor
   )
@@ -15122,7 +14939,7 @@
    */
   std::int32_t sftim_Tc2Time29D(
     const std::int32_t requestedMinorRate,
-    SftimTimecodeLaneView* const timecodeLane,
+    SftimTimecode* const timecodeLane,
     std::int32_t* const outTimeMajor,
     std::int32_t* const outTimeMinor
   )
@@ -15147,7 +14964,7 @@
    */
   std::int32_t sftim_Tc2Time59D(
     const std::int32_t requestedMinorRate,
-    SftimTimecodeLaneView* const timecodeLane,
+    SftimTimecode* const timecodeLane,
     std::int32_t* const outTimeMajor,
     std::int32_t* const outTimeMinor
   )
@@ -15217,7 +15034,7 @@
    * exists for the selected pair.
    */
   extern "C" std::int32_t
-  SFTIM_Tc2Time(SftimTimecodeLaneView* const timecodeLane, std::int32_t* const outTimeMajor, std::int32_t* const outTimeMinor)
+  SFTIM_Tc2Time(SftimTimecode* const timecodeLane, std::int32_t* const outTimeMajor, std::int32_t* const outTimeMinor)
   {
     const std::int32_t tableIndex = (2 * timecodeLane->frameRateIndex) + timecodeLane->modeIndex;
     SftimTc2TimeFunction converter = sftim_tc2time[tableIndex];
@@ -15240,7 +15057,7 @@
    */
   std::int32_t SFTIM_VbIn()
   {
-    auto* const timerState = reinterpret_cast<SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
+    auto* const timerState = reinterpret_cast<SflibTimerState*>(gSflibLibWork.timeState);
     ++timerState->verticalBlankCount;
 
     std::int32_t result = -1;
@@ -15286,7 +15103,7 @@
     std::int32_t* const outTimeMinor
   )
   {
-    const auto* const gateView = reinterpret_cast<const SftimStatusGateRuntimeView*>(workctrlSubobj);
+    const auto* const gateView = reinterpret_cast<const SftimStatusGate*>(workctrlSubobj);
     const std::int32_t statusLane = gateView->statusLane;
     if (statusLane == 4 || statusLane == -4 || statusLane == 6 || statusLane == -6) {
       return 1;
@@ -15331,8 +15148,8 @@
   )
   {
     if (SFTIM_ChkRegularTime(workctrlSubobj, outTimeMajor, outTimeMinor) != 0) {
-      const auto* const runtimeView = reinterpret_cast<const SftimWorkctrlRuntimeView*>(workctrlSubobj);
-      const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
+      const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
+      const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
       *outTimeMajor = runtimeView->vsyncTimeMajor;
       *outTimeMinor = timerState->ticksPerSecond;
     }
@@ -15375,7 +15192,7 @@
       return regularResult;
     }
 
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrlRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
     if (runtimeView->externalTimeCallbackAddress == 0) {
       *outTimeMajor = -2;
       *outTimeMinor = 1;
@@ -15420,7 +15237,7 @@
     SFLIB_LockCs();
 
     auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
-    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+    auto* const counterLane = reinterpret_cast<SftimVblankCounterLane*>(
       reinterpret_cast<std::uint8_t*>(workctrlSubobj) + kSftimVblankCounterLaneOffset
     );
     const std::int32_t timerMode = SFSET_GetCond(workctrlSubobj, 15);
@@ -15462,7 +15279,7 @@
    */
   std::int32_t sftim_IsTimeIncre(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    const auto* const gateView = reinterpret_cast<const SftimStatusGateRuntimeView*>(workctrlSubobj);
+    const auto* const gateView = reinterpret_cast<const SftimStatusGate*>(workctrlSubobj);
     if (gateView->statusLane != 4) {
       return 0;
     }
@@ -15480,12 +15297,12 @@
    * handle phase and VBlank gate lane.
    */
   std::int32_t
-  sftim_IsVbinStIncre(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, SftimVblankCounterLaneView* const counterLane)
+  sftim_IsVbinStIncre(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, SftimVblankCounterLane* const counterLane)
   {
     if (counterLane->vblankStateTicks == -1) {
       return 0;
     }
-    const auto* const gateView = reinterpret_cast<const SftimStatusGateRuntimeView*>(workctrlSubobj);
+    const auto* const gateView = reinterpret_cast<const SftimStatusGate*>(workctrlSubobj);
     return (gateView->phaseLane == 4) ? 1 : 0;
   }
 
@@ -15498,7 +15315,7 @@
    */
   std::int32_t SFTIM_GetAudioStartSample(void* const adxtRuntime, const std::int32_t audioSampleRate)
   {
-    const auto* const runtimeView = static_cast<const SftimAudioStartSampleRuntimeView*>(adxtRuntime);
+    const auto* const runtimeView = static_cast<const SftimAudioStartSample*>(adxtRuntime);
     const std::int64_t audioStartPts = runtimeView->audioStartPts90k;
     if (audioStartPts < 0) {
       return -1;
@@ -15522,7 +15339,7 @@
   std::int32_t
   SFTIM_GetVideoStartSample(void* const adxtRuntime, const std::int32_t audioSampleRate, std::int32_t* const outHasExplicitStartTime)
   {
-    const auto* const runtimeView = static_cast<const SftimVideoStartSampleRuntimeView*>(adxtRuntime);
+    const auto* const runtimeView = static_cast<const SftimVideoStartSample*>(adxtRuntime);
     const std::int32_t hasExplicitStartTime = runtimeView->hasExplicitStartTime;
     *outHasExplicitStartTime = hasExplicitStartTime;
 
@@ -15550,7 +15367,7 @@
    * external-clock accumulated lane based on condition `71`.
    */
   std::int32_t
-  sftim_ResetVtimeTmr(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, SftimVblankCounterLaneView* const counterLane)
+  sftim_ResetVtimeTmr(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, SftimVblankCounterLane* const counterLane)
   {
     if (SFSET_GetCond(workctrlSubobj, 71) == 1) {
       counterLane->currentVtimeMajor = counterLane->accumulatedTicks;
@@ -15569,7 +15386,7 @@
    */
   void SFTIM_GetTime(const std::int32_t workctrlAddress, std::int32_t* const outTimeMajor, std::int32_t* const outTimeMinor)
   {
-    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrlRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
     *outTimeMajor = runtimeView->currentTimeMajor;
     *outTimeMinor = runtimeView->currentTimeMinor;
   }
@@ -15583,7 +15400,7 @@
    */
   std::int32_t SFTIM_SetSpeed(const std::int32_t workctrlAddress, const std::int32_t speedRational)
   {
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrlRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
     runtimeView->timeBaseScale = speedRational;
     return speedRational;
   }
@@ -15596,7 +15413,7 @@
    */
   std::int32_t SFTIM_GetSpeed(const std::int32_t workctrlAddress)
   {
-    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrlRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
     return runtimeView->timeBaseScale;
   }
 
@@ -15644,7 +15461,7 @@
    */
   std::int32_t sftim_CntupHnVbIn(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+    auto* const counterLane = reinterpret_cast<SftimVblankCounterLane*>(
       reinterpret_cast<std::uint8_t*>(workctrlSubobj) + kSftimVblankCounterLaneOffset
     );
     if (sftim_IsTimeIncre(workctrlSubobj) != 0) {
@@ -15668,7 +15485,7 @@
    */
   std::int32_t sftim_UpdateTime(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+    auto* const counterLane = reinterpret_cast<SftimVblankCounterLane*>(
       reinterpret_cast<std::uint8_t*>(workctrlSubobj) + kSftimVblankCounterLaneOffset
     );
 
@@ -15683,7 +15500,7 @@
       counterLane->lastTimerMinor = nowMinor;
     }
 
-    auto* const tickFlags = reinterpret_cast<SftimWorkctrlTickFlagsView*>(workctrlSubobj);
+    auto* const tickFlags = reinterpret_cast<SftimWorkctrlTickFlags*>(workctrlSubobj);
     tickFlags->tickUpdatedFlag = 1;
     return result;
   }
@@ -15697,7 +15514,7 @@
   std::int32_t
   SFTIM_SetStartTime(const std::int32_t workctrlAddress, const std::int32_t startTimeMajor, const std::int32_t startTimeMinor)
   {
-    auto* const timerHandle = reinterpret_cast<SftimInitHandleRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    auto* const timerHandle = reinterpret_cast<SftimTimerHandle*>(SjAddressToPointer(workctrlAddress));
     timerHandle->startTimeMajor = startTimeMajor;
     timerHandle->startTimeMinor = startTimeMinor;
     return workctrlAddress;
@@ -15781,7 +15598,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleGetTimePerFile);
     }
 
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrlRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
     const std::int32_t timeMinorDenominator = runtimeView->timeSubScaleDenominator;
     *outFileHistoryOrdinal = 0;
 
@@ -15825,7 +15642,7 @@
     std::int32_t* const outTimeMinor
   )
   {
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrlRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(workctrlSubobj);
     const std::int32_t result = sfdtim_GetTimeAfterSeek(SjPointerToAddress(workctrlSubobj), outTimeMajor, outTimeMinor);
     const std::int32_t timeMinor = *outTimeMinor;
     if (timeMinor != 1) {
@@ -15851,7 +15668,7 @@
   {
     if (frameReadyWindowAddress != 0) {
       const auto* const frameWindow =
-        reinterpret_cast<const SftimFrameReadyWindowView*>(static_cast<std::uintptr_t>(frameReadyWindowAddress));
+        reinterpret_cast<const SftimFrameReadyWindow*>(static_cast<std::uintptr_t>(frameReadyWindowAddress));
       return SFTIM_IsGetFrmTimeTunit(workctrlAddress, frameWindow->frameStartTime, frameWindow->frameEndTime);
     }
     return frameReadyWindowAddress;
@@ -15878,9 +15695,9 @@
     std::int32_t* const outShouldExecute
   )
   {
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrlRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
     if (runtimeView->takeOffExecTimeMajor >= 0) {
-      const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
+      const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
       const std::int32_t compareResult =
         UTY_CmpTime(currentTimeMajor, currentTimeMinor, runtimeView->takeOffExecTimeMajor, timerState->ticksPerSecond);
       *outShouldExecute = (compareResult != 0) ? 1 : 0;
@@ -15906,7 +15723,7 @@
     std::int32_t* const outShouldExecute
   )
   {
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrlRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
     const double executionWindow = static_cast<double>(runtimeView->executionWindowTicks);
 
     if (static_cast<double>(executionScaledTime) + executionWindow < static_cast<double>(currentScaledTime)) {
@@ -15915,7 +15732,7 @@
     }
 
     if (static_cast<double>(executionScaledTime) - executionWindow < static_cast<double>(currentScaledTime)) {
-      const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
+      const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
       const std::int32_t guardThreshold =
         (timerState->ticksPerSecond == 59940 && runtimeView->decodeChannelMode <= 2 && runtimeView->timeBaseScale == 1000)
         ? 1
@@ -15971,8 +15788,8 @@
     const float scaledTargetTime = static_cast<float>(
       static_cast<double>(targetTimeMajor) * 10000.0 / static_cast<double>(targetTimeMinor)
     );
-    const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
-    auto* const runtimeView = reinterpret_cast<SftimWorkctrlRuntimeView*>(SjAddressToPointer(workctrlAddress));
+    const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
+    auto* const runtimeView = reinterpret_cast<SftimWorkctrl*>(SjAddressToPointer(workctrlAddress));
     currentTimeMajor += (frameStepTicks * currentTimeMinor) / timerState->ticksPerSecond;
 
     const float scaledCurrentTime = static_cast<float>(
@@ -16044,7 +15861,7 @@
       return 0;
     }
 
-    const auto* const drawState = reinterpret_cast<const SfdDrawTimeRuntimeView*>(workctrlSubobj);
+    const auto* const drawState = reinterpret_cast<const SfdDrawTime*>(workctrlSubobj);
     if (drawState->playbackStatusLane == 4) {
       SFTIM_IsExecTime(
         SjPointerToAddress(workctrlSubobj),
@@ -16071,7 +15888,7 @@
     constexpr std::int32_t kVideoTermDisabled = -5;
     constexpr std::int32_t kTimeScaleBase = 2000;
     constexpr std::int32_t kTimeScaleDenominator = 59940;
-    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrlRuntimeView*>(workctrlSubobj);
+    const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj);
 
     if (runtimeView->videoLaneEnabled == 0) {
       return 1;
@@ -16107,19 +15924,19 @@
    */
   std::int32_t SFD_IsHnSvrWait(const std::int32_t sfdHandleAddress)
   {
-    struct SfdServerWaitView
+    struct SfdServerWait
     {
       std::uint8_t mUnknown00[0x44]{};
       std::int32_t serverWaitFlag = 0; // +0x44
       std::int32_t serverState = 0; // +0x48
     };
     static_assert(
-      offsetof(SfdServerWaitView, serverWaitFlag) == 0x44,
-      "SfdServerWaitView::serverWaitFlag offset must be 0x44"
+      offsetof(SfdServerWait, serverWaitFlag) == 0x44,
+      "SfdServerWait::serverWaitFlag offset must be 0x44"
     );
-    static_assert(offsetof(SfdServerWaitView, serverState) == 0x48, "SfdServerWaitView::serverState offset must be 0x48");
+    static_assert(offsetof(SfdServerWait, serverState) == 0x48, "SfdServerWait::serverState offset must be 0x48");
 
-    auto* const view = reinterpret_cast<SfdServerWaitView*>(SjAddressToPointer(sfdHandleAddress));
+    auto* const view = reinterpret_cast<SfdServerWait*>(SjAddressToPointer(sfdHandleAddress));
     const std::int32_t state = view->serverState;
     const bool isServerWaitState = (state == 1 || state == 2 || state == 3 || state == 4);
     if (!isServerWaitState) {
@@ -16848,7 +16665,7 @@
 
     std::int32_t vtimeMajor = 0;
     std::int32_t vtimeMinor = 0;
-    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+    auto* const counterLane = reinterpret_cast<SftimVblankCounterLane*>(
       static_cast<std::uint8_t*>(static_cast<void*>(workctrlSubobj)) + kSftimVblankCounterLaneOffset
     );
     sftim_GetVtimeTmr(workctrlSubobj, counterLane, &vtimeMajor, &vtimeMinor);
@@ -16955,7 +16772,7 @@
    */
   void SFPLY_MeasureFps(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    struct SfplyFpsMeasurementRuntimeView
+    struct SfplyFpsMeasurement
     {
       std::uint8_t mUnknown00_967[0x968]; // +0x00
       std::int32_t measuredFrameCount; // +0x968
@@ -16970,43 +16787,43 @@
       float measuredFramesPerSecond; // +0x363C
     };
     static_assert(
-      offsetof(SfplyFpsMeasurementRuntimeView, measuredFrameCount) == 0x968,
-      "SfplyFpsMeasurementRuntimeView::measuredFrameCount offset must be 0x968"
+      offsetof(SfplyFpsMeasurement, measuredFrameCount) == 0x968,
+      "SfplyFpsMeasurement::measuredFrameCount offset must be 0x968"
     );
     static_assert(
-      offsetof(SfplyFpsMeasurementRuntimeView, previousMeasureTicksLow) == 0x3620,
-      "SfplyFpsMeasurementRuntimeView::previousMeasureTicksLow offset must be 0x3620"
+      offsetof(SfplyFpsMeasurement, previousMeasureTicksLow) == 0x3620,
+      "SfplyFpsMeasurement::previousMeasureTicksLow offset must be 0x3620"
     );
     static_assert(
-      offsetof(SfplyFpsMeasurementRuntimeView, previousMeasureTicksHigh) == 0x3624,
-      "SfplyFpsMeasurementRuntimeView::previousMeasureTicksHigh offset must be 0x3624"
+      offsetof(SfplyFpsMeasurement, previousMeasureTicksHigh) == 0x3624,
+      "SfplyFpsMeasurement::previousMeasureTicksHigh offset must be 0x3624"
     );
     static_assert(
-      offsetof(SfplyFpsMeasurementRuntimeView, currentMeasureTicksLow) == 0x3628,
-      "SfplyFpsMeasurementRuntimeView::currentMeasureTicksLow offset must be 0x3628"
+      offsetof(SfplyFpsMeasurement, currentMeasureTicksLow) == 0x3628,
+      "SfplyFpsMeasurement::currentMeasureTicksLow offset must be 0x3628"
     );
     static_assert(
-      offsetof(SfplyFpsMeasurementRuntimeView, currentMeasureTicksHigh) == 0x362C,
-      "SfplyFpsMeasurementRuntimeView::currentMeasureTicksHigh offset must be 0x362C"
+      offsetof(SfplyFpsMeasurement, currentMeasureTicksHigh) == 0x362C,
+      "SfplyFpsMeasurement::currentMeasureTicksHigh offset must be 0x362C"
     );
     static_assert(
-      offsetof(SfplyFpsMeasurementRuntimeView, timerUnitLow) == 0x3630,
-      "SfplyFpsMeasurementRuntimeView::timerUnitLow offset must be 0x3630"
+      offsetof(SfplyFpsMeasurement, timerUnitLow) == 0x3630,
+      "SfplyFpsMeasurement::timerUnitLow offset must be 0x3630"
     );
     static_assert(
-      offsetof(SfplyFpsMeasurementRuntimeView, timerUnitHigh) == 0x3634,
-      "SfplyFpsMeasurementRuntimeView::timerUnitHigh offset must be 0x3634"
+      offsetof(SfplyFpsMeasurement, timerUnitHigh) == 0x3634,
+      "SfplyFpsMeasurement::timerUnitHigh offset must be 0x3634"
     );
     static_assert(
-      offsetof(SfplyFpsMeasurementRuntimeView, sampledFrameCount) == 0x3638,
-      "SfplyFpsMeasurementRuntimeView::sampledFrameCount offset must be 0x3638"
+      offsetof(SfplyFpsMeasurement, sampledFrameCount) == 0x3638,
+      "SfplyFpsMeasurement::sampledFrameCount offset must be 0x3638"
     );
     static_assert(
-      offsetof(SfplyFpsMeasurementRuntimeView, measuredFramesPerSecond) == 0x363C,
-      "SfplyFpsMeasurementRuntimeView::measuredFramesPerSecond offset must be 0x363C"
+      offsetof(SfplyFpsMeasurement, measuredFramesPerSecond) == 0x363C,
+      "SfplyFpsMeasurement::measuredFramesPerSecond offset must be 0x363C"
     );
 
-    auto* const runtimeView = reinterpret_cast<SfplyFpsMeasurementRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SfplyFpsMeasurement*>(workctrlSubobj);
     const std::int64_t currentTicks = SFTMR_GetTmr();
     runtimeView->currentMeasureTicksLow = static_cast<std::uint32_t>(currentTicks & 0xFFFFFFFFull);
     runtimeView->currentMeasureTicksHigh = static_cast<std::uint32_t>(static_cast<std::uint64_t>(currentTicks) >> 32u);
@@ -17159,13 +16976,13 @@
   // layouts are private to this translation unit. These helpers put the names
   // back at the call sites; none of them does offset arithmetic - each one
   // re-types one named member.
-  [[nodiscard]] SfcreHeaderRuntimeView* SfplyFileHeaderOf(moho::SofdecSfdWorkctrlSubobj* const handle) noexcept
+  [[nodiscard]] SfcreHeader* SfplyFileHeaderOf(moho::SofdecSfdWorkctrlSubobj* const handle) noexcept
   {
     static_assert(
-      sizeof(SfcreHeaderRuntimeView) == 0x894,
-      "SFPLY file-header lane must hold one SfcreHeaderRuntimeView"
+      sizeof(SfcreHeader) == 0x894,
+      "SFPLY file-header lane must hold one SfcreHeader"
     );
-    return reinterpret_cast<SfcreHeaderRuntimeView*>(&handle->frameHeaderHandle);
+    return reinterpret_cast<SfcreHeader*>(&handle->frameHeaderHandle);
   }
 
   [[nodiscard]] moho::SflibErrorInfo* SfplyErrorInfoOf(moho::SofdecSfdWorkctrlSubobj* const handle) noexcept
@@ -17424,7 +17241,7 @@
 
     auto* const lastHandle = gSfdDebugLastHandle;
     if (lastHandle != nullptr && lastHandle->handleState != 0) {
-      const auto* const runtimeView = reinterpret_cast<const SftimWorkctrlRuntimeView*>(lastHandle);
+      const auto* const runtimeView = reinterpret_cast<const SftimWorkctrl*>(lastHandle);
       if (runtimeView->externalTimeCallbackAddress != 0) {
         std::int32_t callbackTimeMajor = 0;
         std::int32_t callbackTimerUnit = 0;
@@ -17438,7 +17255,7 @@
       }
     }
 
-    const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
+    const auto* const timerState = reinterpret_cast<const SflibTimerState*>(gSflibLibWork.timeState);
     sftmr_tmrunit = static_cast<std::int64_t>(timerState->ticksPerSecond);
     return static_cast<std::int64_t>(timerState->verticalBlankCount) * 1000ll;
   }
@@ -17667,7 +17484,7 @@
     return result;
   }
 
-  struct SfdPauseRuntimeView
+  struct SfdPause
   {
     std::uint8_t reserved00_43[0x44]{}; // +0x00
     std::int32_t pauseStateDirtyFlag = 0; // +0x44
@@ -17675,15 +17492,15 @@
     std::int32_t pauseRequestedFlag = 0; // +0x50
   };
   static_assert(
-    offsetof(SfdPauseRuntimeView, pauseStateDirtyFlag) == 0x44,
-    "SfdPauseRuntimeView::pauseStateDirtyFlag offset must be 0x44"
+    offsetof(SfdPause, pauseStateDirtyFlag) == 0x44,
+    "SfdPause::pauseStateDirtyFlag offset must be 0x44"
   );
   static_assert(
-    offsetof(SfdPauseRuntimeView, pauseRequestedFlag) == 0x50,
-    "SfdPauseRuntimeView::pauseRequestedFlag offset must be 0x50"
+    offsetof(SfdPause, pauseRequestedFlag) == 0x50,
+    "SfdPause::pauseRequestedFlag offset must be 0x50"
   );
 
-  struct Sfpl2PauseRuntimeView
+  struct Sfpl2Pause
   {
     std::uint8_t reserved00_47[0x48]{}; // +0x00
     std::int32_t statusLane = 0; // +0x48
@@ -17691,13 +17508,13 @@
     std::int32_t pauseRequestedFlag = 0; // +0x50
     std::int32_t pauseDepth = 0; // +0x54
   };
-  static_assert(offsetof(Sfpl2PauseRuntimeView, statusLane) == 0x48, "Sfpl2PauseRuntimeView::statusLane offset must be 0x48");
-  static_assert(offsetof(Sfpl2PauseRuntimeView, phaseLane) == 0x4C, "Sfpl2PauseRuntimeView::phaseLane offset must be 0x4C");
+  static_assert(offsetof(Sfpl2Pause, statusLane) == 0x48, "Sfpl2Pause::statusLane offset must be 0x48");
+  static_assert(offsetof(Sfpl2Pause, phaseLane) == 0x4C, "Sfpl2Pause::phaseLane offset must be 0x4C");
   static_assert(
-    offsetof(Sfpl2PauseRuntimeView, pauseRequestedFlag) == 0x50,
-    "Sfpl2PauseRuntimeView::pauseRequestedFlag offset must be 0x50"
+    offsetof(Sfpl2Pause, pauseRequestedFlag) == 0x50,
+    "Sfpl2Pause::pauseRequestedFlag offset must be 0x50"
   );
-  static_assert(offsetof(Sfpl2PauseRuntimeView, pauseDepth) == 0x54, "Sfpl2PauseRuntimeView::pauseDepth offset must be 0x54");
+  static_assert(offsetof(Sfpl2Pause, pauseDepth) == 0x54, "Sfpl2Pause::pauseDepth offset must be 0x54");
 
   /**
    * Address: 0x00ADD9F0 (FUN_00ADD9F0, _sfpl2_TrPause)
@@ -17719,7 +17536,7 @@
    */
   std::int32_t sfpl2_PauseExec(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, const std::int32_t pauseMode)
   {
-    const auto* const pauseView = reinterpret_cast<const Sfpl2PauseRuntimeView*>(workctrlSubobj);
+    const auto* const pauseView = reinterpret_cast<const Sfpl2Pause*>(workctrlSubobj);
     if (pauseView->phaseLane != 3 && pauseView->phaseLane != 4) {
       return 0;
     }
@@ -17737,7 +17554,7 @@
    */
   std::int32_t SFPL2_Pause(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, const std::int32_t pauseMode)
   {
-    auto* const pauseView = reinterpret_cast<Sfpl2PauseRuntimeView*>(workctrlSubobj);
+    auto* const pauseView = reinterpret_cast<Sfpl2Pause*>(workctrlSubobj);
     if (pauseMode == 0) {
       --pauseView->pauseDepth;
       if (pauseView->pauseDepth == 0) {
@@ -17769,7 +17586,7 @@
    */
   std::int32_t SFPL2_Standby(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const pauseView = reinterpret_cast<Sfpl2PauseRuntimeView*>(workctrlSubobj);
+    auto* const pauseView = reinterpret_cast<Sfpl2Pause*>(workctrlSubobj);
     pauseView->phaseLane = 3;
     return 0;
   }
@@ -17791,7 +17608,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandlePause);
     }
 
-    auto* const pauseView = reinterpret_cast<SfdPauseRuntimeView*>(workctrlSubobj);
+    auto* const pauseView = reinterpret_cast<SfdPause*>(workctrlSubobj);
     std::int32_t pauseMode = 0;
     if (pauseRequested != 0) {
       pauseMode = (pauseView->pauseRequestedFlag != 0) ? 2 : 1;
@@ -17897,7 +17714,7 @@
     return 0;
   }
 
-  struct SfplyGetFrameRuntimeView
+  struct SfplyGetFrame
   {
     std::uint8_t mUnknown00[0x58]{}; // +0x00
     std::int32_t frameApiType = 0; // +0x58
@@ -17908,31 +17725,31 @@
     std::int32_t firstRetainedFrameTimeLow = 0; // +0x3620
     std::int32_t firstRetainedFrameTimeHigh = 0; // +0x3624
   };
-  static_assert(offsetof(SfplyGetFrameRuntimeView, frameApiType) == 0x58, "SfplyGetFrameRuntimeView::frameApiType offset must be 0x58");
+  static_assert(offsetof(SfplyGetFrame, frameApiType) == 0x58, "SfplyGetFrame::frameApiType offset must be 0x58");
   static_assert(
-    offsetof(SfplyGetFrameRuntimeView, retainedFrameCount) == 0x968,
-    "SfplyGetFrameRuntimeView::retainedFrameCount offset must be 0x968"
+    offsetof(SfplyGetFrame, retainedFrameCount) == 0x968,
+    "SfplyGetFrame::retainedFrameCount offset must be 0x968"
   );
   static_assert(
-    offsetof(SfplyGetFrameRuntimeView, releasedFrameCount) == 0x96C,
-    "SfplyGetFrameRuntimeView::releasedFrameCount offset must be 0x96C"
+    offsetof(SfplyGetFrame, releasedFrameCount) == 0x96C,
+    "SfplyGetFrame::releasedFrameCount offset must be 0x96C"
   );
   static_assert(
-    offsetof(SfplyGetFrameRuntimeView, firstRetainedFrameTimeLow) == 0x3620,
-    "SfplyGetFrameRuntimeView::firstRetainedFrameTimeLow offset must be 0x3620"
+    offsetof(SfplyGetFrame, firstRetainedFrameTimeLow) == 0x3620,
+    "SfplyGetFrame::firstRetainedFrameTimeLow offset must be 0x3620"
   );
   static_assert(
-    offsetof(SfplyGetFrameRuntimeView, firstRetainedFrameTimeHigh) == 0x3624,
-    "SfplyGetFrameRuntimeView::firstRetainedFrameTimeHigh offset must be 0x3624"
+    offsetof(SfplyGetFrame, firstRetainedFrameTimeHigh) == 0x3624,
+    "SfplyGetFrame::firstRetainedFrameTimeHigh offset must be 0x3624"
   );
 
   using SfplyRecordGetFrameCallback = void(__cdecl*)(moho::SofdecSfdWorkctrlSubobj*, void*);
 
   extern "C" std::int64_t SFTMR_GetTmr();
 
-  [[nodiscard]] SfplyGetFrameRuntimeView* AsSfplyGetFrameRuntimeView(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj) noexcept
+  [[nodiscard]] SfplyGetFrame* AsSfplyGetFrame(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj) noexcept
   {
-    return reinterpret_cast<SfplyGetFrameRuntimeView*>(workctrlSubobj);
+    return reinterpret_cast<SfplyGetFrame*>(workctrlSubobj);
   }
 
   [[nodiscard]] std::int32_t SfdWorkctrlToAddress(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj) noexcept
@@ -17947,16 +17764,16 @@
     );
   }
 
-  struct SfuoDescriptorView
+  struct SfuoDescriptor
   {
     std::int32_t word0 = 0; // +0x00
     std::int32_t word1 = 0; // +0x04
     std::int32_t word2 = 0; // +0x08
     std::int32_t word3 = 0; // +0x0C
   };
-  static_assert(sizeof(SfuoDescriptorView) == 0x10, "SfuoDescriptorView size must be 0x10");
+  static_assert(sizeof(SfuoDescriptor) == 0x10, "SfuoDescriptor size must be 0x10");
 
-  struct SfdUserOutputRuntimeView
+  struct SfdUserOutput
   {
     std::uint8_t mUnknown00[0x2158]{}; // +0x00
     std::int32_t* uochDescriptorWords = nullptr; // +0x2158
@@ -17964,29 +17781,29 @@
     std::int32_t sfbufLaneIndex = 0; // +0x2160
     std::uint8_t mUnknown2164[0x13B4]{}; // +0x2164
     std::int32_t uochInlineHeader = 0; // +0x3518
-    SfuoDescriptorView uochInlineDescriptors[3]{}; // +0x351C
+    SfuoDescriptor uochInlineDescriptors[3]{}; // +0x351C
   };
   static_assert(
-    offsetof(SfdUserOutputRuntimeView, uochDescriptorWords) == 0x2158,
-    "SfdUserOutputRuntimeView::uochDescriptorWords offset must be 0x2158"
+    offsetof(SfdUserOutput, uochDescriptorWords) == 0x2158,
+    "SfdUserOutput::uochDescriptorWords offset must be 0x2158"
   );
   static_assert(
-    offsetof(SfdUserOutputRuntimeView, sfbufLaneIndex) == 0x2160,
-    "SfdUserOutputRuntimeView::sfbufLaneIndex offset must be 0x2160"
+    offsetof(SfdUserOutput, sfbufLaneIndex) == 0x2160,
+    "SfdUserOutput::sfbufLaneIndex offset must be 0x2160"
   );
   static_assert(
-    offsetof(SfdUserOutputRuntimeView, uochInlineHeader) == 0x3518,
-    "SfdUserOutputRuntimeView::uochInlineHeader offset must be 0x3518"
+    offsetof(SfdUserOutput, uochInlineHeader) == 0x3518,
+    "SfdUserOutput::uochInlineHeader offset must be 0x3518"
   );
   static_assert(
-    offsetof(SfdUserOutputRuntimeView, uochInlineDescriptors) == 0x351C,
-    "SfdUserOutputRuntimeView::uochInlineDescriptors offset must be 0x351C"
+    offsetof(SfdUserOutput, uochInlineDescriptors) == 0x351C,
+    "SfdUserOutput::uochInlineDescriptors offset must be 0x351C"
   );
 
-  [[nodiscard]] SfuoDescriptorView*
-  ResolveSfuoDescriptor(SfdUserOutputRuntimeView* const runtimeView, const std::int32_t descriptorIndex) noexcept
+  [[nodiscard]] SfuoDescriptor*
+  ResolveSfuoDescriptor(SfdUserOutput* const runtimeView, const std::int32_t descriptorIndex) noexcept
   {
-    auto* const descriptors = reinterpret_cast<SfuoDescriptorView*>(runtimeView->uochDescriptorWords + 1);
+    auto* const descriptors = reinterpret_cast<SfuoDescriptor*>(runtimeView->uochDescriptorWords + 1);
     return &descriptors[descriptorIndex];
   }
 
@@ -17997,8 +17814,8 @@
    * Stores four user-output-channel descriptor words and returns descriptor
    * base.
    */
-  SfuoDescriptorView* sfuo_SetUoch(
-    SfuoDescriptorView* const descriptor,
+  SfuoDescriptor* sfuo_SetUoch(
+    SfuoDescriptor* const descriptor,
     const std::int32_t word0,
     const std::int32_t word1,
     const std::int32_t word2,
@@ -18018,7 +17835,7 @@
    * What it does:
    * Clears one user-output-channel descriptor to all-zero words.
    */
-  SfuoDescriptorView* sfuo_InitUoch(SfuoDescriptorView* const descriptor)
+  SfuoDescriptor* sfuo_InitUoch(SfuoDescriptor* const descriptor)
   {
     return sfuo_SetUoch(descriptor, 0, 0, 0, 0);
   }
@@ -18037,7 +17854,7 @@
   )
   {
     descriptorWords[0] = 0;
-    auto* descriptor = reinterpret_cast<SfuoDescriptorView*>(descriptorWords + 1);
+    auto* descriptor = reinterpret_cast<SfuoDescriptor*>(descriptorWords + 1);
 
     std::int32_t* result = nullptr;
     for (std::int32_t slotIndex = 0; slotIndex < 3; ++slotIndex, ++descriptor) {
@@ -18047,14 +17864,14 @@
     return result;
   }
 
-  struct SfdVideoOutputManualRuntimeView
+  struct SfdVideoOutputManual
   {
     std::uint8_t mUnknown00[0x20D8]{}; // +0x00
     std::int32_t sfbufLaneIndex = 0; // +0x20D8
   };
   static_assert(
-    offsetof(SfdVideoOutputManualRuntimeView, sfbufLaneIndex) == 0x20D8,
-    "SfdVideoOutputManualRuntimeView::sfbufLaneIndex offset must be 0x20D8"
+    offsetof(SfdVideoOutputManual, sfbufLaneIndex) == 0x20D8,
+    "SfdVideoOutputManual::sfbufLaneIndex offset must be 0x20D8"
   );
 
   /**
@@ -18110,7 +17927,7 @@
       return result;
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdVideoOutputManualRuntimeView*>(SfdAddressToWorkctrl(sfdHandleAddress));
+    auto* const runtimeView = reinterpret_cast<SfdVideoOutputManual*>(SfdAddressToWorkctrl(sfdHandleAddress));
     result = SFBUF_GetTermFlg(sfdHandleAddress, runtimeView->sfbufLaneIndex);
     if (result != 1) {
       return result;
@@ -18138,7 +17955,7 @@
       return result;
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdVideoOutputManualRuntimeView*>(SfdAddressToWorkctrl(sfdHandleAddress));
+    auto* const runtimeView = reinterpret_cast<SfdVideoOutputManual*>(SfdAddressToWorkctrl(sfdHandleAddress));
     result = SFBUF_GetPrepFlg(sfdHandleAddress, runtimeView->sfbufLaneIndex);
     if (result != 1) {
       return result;
@@ -18276,7 +18093,7 @@
   {
     const auto* const workctrlSubobj = SfdAddressToWorkctrl(sfdHandleAddress);
     if (workctrlSubobj->handleState == 3 || workctrlSubobj->handleState == 4) {
-      const auto* const runtimeView = reinterpret_cast<const SfdVideoOutputManualRuntimeView*>(workctrlSubobj);
+      const auto* const runtimeView = reinterpret_cast<const SfdVideoOutputManual*>(workctrlSubobj);
       return SFBUF_VfrmGetRead(
         sfdHandleAddress,
         runtimeView->sfbufLaneIndex,
@@ -18302,7 +18119,7 @@
   )
   {
     const auto* const runtimeView =
-      reinterpret_cast<const SfdVideoOutputManualRuntimeView*>(SfdAddressToWorkctrl(sfdHandleAddress));
+      reinterpret_cast<const SfdVideoOutputManual*>(SfdAddressToWorkctrl(sfdHandleAddress));
     return SFBUF_VfrmAddRead(sfdHandleAddress, runtimeView->sfbufLaneIndex, arg0, arg1);
   }
 
@@ -18386,7 +18203,7 @@
       return result;
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdUserOutputRuntimeView*>(SfdAddressToWorkctrl(sfdHandleAddress));
+    auto* const runtimeView = reinterpret_cast<SfdUserOutput*>(SfdAddressToWorkctrl(sfdHandleAddress));
     result = SFBUF_GetTermFlg(sfdHandleAddress, runtimeView->sfbufLaneIndex);
     if (result != 1) {
       return result;
@@ -18414,7 +18231,7 @@
       return result;
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdUserOutputRuntimeView*>(SfdAddressToWorkctrl(sfdHandleAddress));
+    auto* const runtimeView = reinterpret_cast<SfdUserOutput*>(SfdAddressToWorkctrl(sfdHandleAddress));
     result = SFBUF_GetPrepFlg(sfdHandleAddress, runtimeView->sfbufLaneIndex);
     if (result != 1) {
       return result;
@@ -18473,7 +18290,7 @@
    */
   std::int32_t SFUO_Create(const std::int32_t sfdHandleAddress)
   {
-    auto* const runtimeView = reinterpret_cast<SfdUserOutputRuntimeView*>(
+    auto* const runtimeView = reinterpret_cast<SfdUserOutput*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sfdHandleAddress))
     );
     runtimeView->uochDescriptorWords = &runtimeView->uochInlineHeader;
@@ -18601,7 +18418,7 @@
   // unchanged and does nothing, which is how a stream without an audio-output
   // adapter passes straight through this lane.
 
-  struct SfdAudioOutputAdapterRuntimeView
+  struct SfdAudioOutputAdapter
   {
     std::uint8_t mUnknown00[0x2114]{};                 // +0x0000
     std::int32_t* outputDescriptorWords = nullptr;     // +0x2114
@@ -18612,16 +18429,16 @@
   };
 
   static_assert(
-    offsetof(SfdAudioOutputAdapterRuntimeView, outputDescriptorWords) == 0x2114,
-    "SfdAudioOutputAdapterRuntimeView::outputDescriptorWords offset must be 0x2114"
+    offsetof(SfdAudioOutputAdapter, outputDescriptorWords) == 0x2114,
+    "SfdAudioOutputAdapter::outputDescriptorWords offset must be 0x2114"
   );
   static_assert(
-    offsetof(SfdAudioOutputAdapterRuntimeView, sfbufLaneIndex) == 0x211C,
-    "SfdAudioOutputAdapterRuntimeView::sfbufLaneIndex offset must be 0x211C"
+    offsetof(SfdAudioOutputAdapter, sfbufLaneIndex) == 0x211C,
+    "SfdAudioOutputAdapter::sfbufLaneIndex offset must be 0x211C"
   );
   static_assert(
-    offsetof(SfdAudioOutputAdapterRuntimeView, outputInlineHeader) == 0x34FC,
-    "SfdAudioOutputAdapterRuntimeView::outputInlineHeader offset must be 0x34FC"
+    offsetof(SfdAudioOutputAdapter, outputInlineHeader) == 0x34FC,
+    "SfdAudioOutputAdapter::outputInlineHeader offset must be 0x34FC"
   );
 
   /// Transfer-lane index this handler owns in the prepare/terminate flag sets.
@@ -18669,7 +18486,7 @@
   {
     std::int32_t result = SFTRN_GetPrepFlg(workctrlAddress, kSfaoapTransferLane);
     if (result != 1) {
-      const auto* const runtimeView = reinterpret_cast<const SfdAudioOutputAdapterRuntimeView*>(
+      const auto* const runtimeView = reinterpret_cast<const SfdAudioOutputAdapter*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
       );
       result = SFBUF_GetPrepFlg(workctrlAddress, runtimeView->sfbufLaneIndex);
@@ -18690,7 +18507,7 @@
   {
     std::int32_t result = SFTRN_GetTermFlg(workctrlAddress, kSfaoapTransferLane);
     if (result != 1) {
-      const auto* const runtimeView = reinterpret_cast<const SfdAudioOutputAdapterRuntimeView*>(
+      const auto* const runtimeView = reinterpret_cast<const SfdAudioOutputAdapter*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
       );
       result = SFBUF_GetTermFlg(workctrlAddress, runtimeView->sfbufLaneIndex);
@@ -18770,7 +18587,7 @@
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
     );
     if (SFSET_GetCond(workctrlSubobj, kSfaoapEnabledCondition) != 0) {
-      auto* const runtimeView = reinterpret_cast<SfdAudioOutputAdapterRuntimeView*>(
+      auto* const runtimeView = reinterpret_cast<SfdAudioOutputAdapter*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
       );
       runtimeView->outputDescriptorWords = &runtimeView->outputInlineHeader;
@@ -18941,12 +18758,12 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetSystemUsrSj);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdUserOutputRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SfdUserOutput*>(workctrlSubobj);
     if (runtimeView->sfbufLaneIndex == kSfbufLaneSentinel) {
       return SFLIB_SetErr(SfdWorkctrlToAddress(workctrlSubobj), kSflibErrInvalidSfbufLaneForUserOutput);
     }
 
-    SfuoDescriptorView* const descriptor = ResolveSfuoDescriptor(runtimeView, uochSlotIndex);
+    SfuoDescriptor* const descriptor = ResolveSfuoDescriptor(runtimeView, uochSlotIndex);
     (void)sfuo_SetUoch(descriptor, word0, 0, word2, word3);
     (void)SFBUF_SetUoch(
       SfdWorkctrlToAddress(workctrlSubobj),
@@ -18982,12 +18799,12 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetUsrSj);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdUserOutputRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SfdUserOutput*>(workctrlSubobj);
     if (runtimeView->sfbufLaneIndex == kSfbufLaneSentinel) {
       return SFLIB_SetErr(sfdHandleAddress, kSflibErrInvalidSfbufLaneForUserOutput);
     }
 
-    SfuoDescriptorView* const descriptor = ResolveSfuoDescriptor(runtimeView, uochSlotIndex);
+    SfuoDescriptor* const descriptor = ResolveSfuoDescriptor(runtimeView, uochSlotIndex);
     (void)sfuo_SetUoch(descriptor, word0, word1, 0, 0);
     (void)SFBUF_SetUoch(sfdHandleAddress, runtimeView->sfbufLaneIndex, uochSlotIndex, &descriptor->word0);
     return 0;
@@ -19015,7 +18832,7 @@
   std::int32_t sfply_CheckGetFrmApi(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, const std::int32_t frameApiType)
   {
     constexpr std::int32_t kSflibErrFrameApiMismatch = static_cast<std::int32_t>(0xFF000207u);
-    auto* const frameView = AsSfplyGetFrameRuntimeView(workctrlSubobj);
+    auto* const frameView = AsSfplyGetFrame(workctrlSubobj);
 
     if (frameView->frameApiType == 0) {
       frameView->frameApiType = frameApiType;
@@ -19069,7 +18886,7 @@
       return 0;
     }
 
-    auto* const frameView = AsSfplyGetFrameRuntimeView(workctrlSubobj);
+    auto* const frameView = AsSfplyGetFrame(workctrlSubobj);
     if (frameView->retainedFrameCount == 0) {
       const std::int64_t currentTime = SFTMR_GetTmr();
       const auto currentTimeU64 = static_cast<std::uint64_t>(currentTime);
@@ -19102,7 +18919,7 @@
       return apiCheckResult;
     }
 
-    ++AsSfplyGetFrameRuntimeView(workctrlSubobj)->releasedFrameCount;
+    ++AsSfplyGetFrame(workctrlSubobj)->releasedFrameCount;
     return SFTRN_CallTrtTrif(sfdHandleAddress, 6, 12, 0, frameId);
   }
 
@@ -19142,7 +18959,7 @@
     );
 
     if (outFrame != nullptr && *outFrame != nullptr) {
-      auto* const frameView = AsSfplyGetFrameRuntimeView(workctrlSubobj);
+      auto* const frameView = AsSfplyGetFrame(workctrlSubobj);
       if (frameView->retainedFrameCount == frameView->releasedFrameCount) {
         if (frameView->retainedFrameCount == 0) {
           const std::int64_t currentTime = SFTMR_GetTmr();
@@ -19181,7 +18998,7 @@
       return;
     }
 
-    auto* const frameView = AsSfplyGetFrameRuntimeView(workctrlSubobj);
+    auto* const frameView = AsSfplyGetFrame(workctrlSubobj);
     if (frameView->releasedFrameCount < frameView->retainedFrameCount) {
       ++frameView->releasedFrameCount;
     }
@@ -19211,7 +19028,7 @@
     }
 
     std::int32_t result = sfmpvf_GetNumFrmOverTime(SfdWorkctrlToAddress(workctrlSubobj));
-    const auto* const frameView = AsSfplyGetFrameRuntimeView(workctrlSubobj);
+    const auto* const frameView = AsSfplyGetFrame(workctrlSubobj);
     if (
       frameView->frameApiType == 1 &&
       frameView->retainedFrameCount > frameView->releasedFrameCount &&
@@ -19345,17 +19162,17 @@
     return workctrlSubobj->handleState;
   }
 
-  struct SfdPlaybackInfoRuntimeView
+  struct SfdPlaybackInfo
   {
     std::uint8_t mUnknown00_94F[0x950]{}; // +0x00
     moho::SfplyPlaybackInfo playbackInfo{}; // +0x950
   };
   static_assert(
-    offsetof(SfdPlaybackInfoRuntimeView, playbackInfo) == 0x950,
-    "SfdPlaybackInfoRuntimeView::playbackInfo offset must be 0x950"
+    offsetof(SfdPlaybackInfo, playbackInfo) == 0x950,
+    "SfdPlaybackInfo::playbackInfo offset must be 0x950"
   );
 
-  struct SfdPlaybackTimestampSourceRuntimeView
+  struct SfdPlaybackTimestampSource
   {
     std::uint8_t reserved00_03[0x04]{};
     const SofdecTransferStrategy* streamDescriptor = nullptr; // +0x04
@@ -19363,15 +19180,15 @@
     moho::SfdDemuxInitBlock* demuxInit = nullptr; // +0x1F7C
   };
   static_assert(
-    offsetof(SfdPlaybackTimestampSourceRuntimeView, streamDescriptor) == 0x04,
-    "SfdPlaybackTimestampSourceRuntimeView::streamDescriptor offset must be 0x04"
+    offsetof(SfdPlaybackTimestampSource, streamDescriptor) == 0x04,
+    "SfdPlaybackTimestampSource::streamDescriptor offset must be 0x04"
   );
   static_assert(
-    offsetof(SfdPlaybackTimestampSourceRuntimeView, demuxInit) == 0x1F7C,
-    "SfdPlaybackTimestampSourceRuntimeView::demuxInit offset must be 0x1F7C"
+    offsetof(SfdPlaybackTimestampSource, demuxInit) == 0x1F7C,
+    "SfdPlaybackTimestampSource::demuxInit offset must be 0x1F7C"
   );
 
-  struct M2TsdPlaybackTimestampLaneView
+  struct M2TsdPlaybackTimestampLane
   {
     std::int32_t timestampMajor = 0; // +0x00
     std::int32_t timestampMinor = 0; // +0x04
@@ -19380,20 +19197,20 @@
     std::int32_t playbackClockMinor = 0; // +0x2C
   };
   static_assert(
-    offsetof(M2TsdPlaybackTimestampLaneView, timestampMajor) == 0x00,
-    "M2TsdPlaybackTimestampLaneView::timestampMajor offset must be 0x00"
+    offsetof(M2TsdPlaybackTimestampLane, timestampMajor) == 0x00,
+    "M2TsdPlaybackTimestampLane::timestampMajor offset must be 0x00"
   );
   static_assert(
-    offsetof(M2TsdPlaybackTimestampLaneView, timestampMinor) == 0x04,
-    "M2TsdPlaybackTimestampLaneView::timestampMinor offset must be 0x04"
+    offsetof(M2TsdPlaybackTimestampLane, timestampMinor) == 0x04,
+    "M2TsdPlaybackTimestampLane::timestampMinor offset must be 0x04"
   );
   static_assert(
-    offsetof(M2TsdPlaybackTimestampLaneView, playbackClockMajor) == 0x28,
-    "M2TsdPlaybackTimestampLaneView::playbackClockMajor offset must be 0x28"
+    offsetof(M2TsdPlaybackTimestampLane, playbackClockMajor) == 0x28,
+    "M2TsdPlaybackTimestampLane::playbackClockMajor offset must be 0x28"
   );
   static_assert(
-    offsetof(M2TsdPlaybackTimestampLaneView, playbackClockMinor) == 0x2C,
-    "M2TsdPlaybackTimestampLaneView::playbackClockMinor offset must be 0x2C"
+    offsetof(M2TsdPlaybackTimestampLane, playbackClockMinor) == 0x2C,
+    "M2TsdPlaybackTimestampLane::playbackClockMinor offset must be 0x2C"
   );
 
   /**
@@ -19415,12 +19232,12 @@
     outPlaybackTimestampWords[3] = 0;
 
     if (workctrlSubobj != nullptr) {
-      const auto* const runtimeView = reinterpret_cast<const SfdPlaybackTimestampSourceRuntimeView*>(workctrlSubobj);
+      const auto* const runtimeView = reinterpret_cast<const SfdPlaybackTimestampSource*>(workctrlSubobj);
       if (runtimeView->streamDescriptor == &SFD_tr_sd_m2ts) {
-        const auto* const m2tsdRuntime = reinterpret_cast<const M2TsdRuntimeView*>(
+        const auto* const m2tsdRuntime = reinterpret_cast<const M2TsdState*>(
           SjAddressToPointer(workctrlSubobj->transferState.transfer.demux.demuxInit->m2ts.m2tsdRuntimeAddress)
         );
-        const auto* const playbackTimestampLane = reinterpret_cast<const M2TsdPlaybackTimestampLaneView*>(
+        const auto* const playbackTimestampLane = reinterpret_cast<const M2TsdPlaybackTimestampLane*>(
           m2tsdRuntime->laneEntries
         );
 
@@ -19449,17 +19266,17 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleGetPlaybackInfo);
     }
 
-    const auto* const runtimeView = reinterpret_cast<const SfdPlaybackInfoRuntimeView*>(workctrlSubobj);
+    const auto* const runtimeView = reinterpret_cast<const SfdPlaybackInfo*>(workctrlSubobj);
     std::memcpy(outPlaybackInfo, &runtimeView->playbackInfo, sizeof(runtimeView->playbackInfo));
     return 0;
   }
 
-  struct SfdTimerInfoRuntimeView
+  struct SfdTimerInfo
   {
     std::uint8_t mUnknown00_355F[0x3560]{}; // +0x00
     moho::SfplyTimerInfo timerInfo{}; // +0x3560
   };
-  static_assert(offsetof(SfdTimerInfoRuntimeView, timerInfo) == 0x3560, "SfdTimerInfoRuntimeView::timerInfo offset must be 0x3560");
+  static_assert(offsetof(SfdTimerInfo, timerInfo) == 0x3560, "SfdTimerInfo::timerInfo offset must be 0x3560");
 
   [[nodiscard]] std::uint64_t PackUnsignedPair64(const std::int32_t lowWord, const std::int32_t highWord) noexcept
   {
@@ -19498,7 +19315,7 @@
     }
 
     auto* const mergedTimerInfo = static_cast<moho::SfplyTimerInfo*>(outTimerInfo);
-    const auto* const runtimeView = reinterpret_cast<const SfdTimerInfoRuntimeView*>(workctrlSubobj);
+    const auto* const runtimeView = reinterpret_cast<const SfdTimerInfo*>(workctrlSubobj);
     std::memcpy(mergedTimerInfo, &runtimeView->timerInfo, sizeof(runtimeView->timerInfo));
 
     auto& aggregateSummary = mergedTimerInfo->summaries[0];
@@ -19528,7 +19345,7 @@
       aggregateSummary.sampleCount += sourceSummary.sampleCount;
     }
 
-    if (reinterpret_cast<const SftimStatusGateRuntimeView*>(workctrlSubobj)->phaseLane == 4) {
+    if (reinterpret_cast<const SftimStatusGate*>(workctrlSubobj)->phaseLane == 4) {
       SFPLY_MeasureFps(workctrlSubobj);
     }
     return 0;
@@ -19582,7 +19399,7 @@
     return 0;
   }
 
-  struct SfdSofdecHeaderRuntimeView
+  struct SfdSofdecHeader
   {
     std::uint8_t reserved00_77[0x78]{}; // +0x00
     std::int32_t fileHeaderState = 0; // +0x78
@@ -19591,16 +19408,16 @@
     std::int32_t sofdecHeaderWord0 = 0; // +0x10C
   };
   static_assert(
-    offsetof(SfdSofdecHeaderRuntimeView, fileHeaderState) == 0x78,
-    "SfdSofdecHeaderRuntimeView::fileHeaderState offset must be 0x78"
+    offsetof(SfdSofdecHeader, fileHeaderState) == 0x78,
+    "SfdSofdecHeader::fileHeaderState offset must be 0x78"
   );
   static_assert(
-    offsetof(SfdSofdecHeaderRuntimeView, sofdecHeaderWordCount) == 0x108,
-    "SfdSofdecHeaderRuntimeView::sofdecHeaderWordCount offset must be 0x108"
+    offsetof(SfdSofdecHeader, sofdecHeaderWordCount) == 0x108,
+    "SfdSofdecHeader::sofdecHeaderWordCount offset must be 0x108"
   );
   static_assert(
-    offsetof(SfdSofdecHeaderRuntimeView, sofdecHeaderWord0) == 0x10C,
-    "SfdSofdecHeaderRuntimeView::sofdecHeaderWord0 offset must be 0x10C"
+    offsetof(SfdSofdecHeader, sofdecHeaderWord0) == 0x10C,
+    "SfdSofdecHeader::sofdecHeaderWord0 offset must be 0x10C"
   );
 
   /**
@@ -19621,7 +19438,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleGetSofdecHeader);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdSofdecHeaderRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SfdSofdecHeader*>(workctrlSubobj);
     if (runtimeView->fileHeaderState != 0) {
       *outHeaderWordsAddress = static_cast<std::int32_t>(
         static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&runtimeView->sofdecHeaderWord0))
@@ -19658,14 +19475,14 @@
     return (versionTag == kSfdVersionTagCompat) ? 1 : 0;
   }
 
-  struct SfdUserSkipCallbackRuntimeView
+  struct SfdUserSkipCallback
   {
     std::uint8_t reserved00_D47[0xD48]{};
     std::int32_t userSkipCallbackAddress = 0; // +0xD48
   };
   static_assert(
-    offsetof(SfdUserSkipCallbackRuntimeView, userSkipCallbackAddress) == 0xD48,
-    "SfdUserSkipCallbackRuntimeView::userSkipCallbackAddress offset must be 0xD48"
+    offsetof(SfdUserSkipCallback, userSkipCallbackAddress) == 0xD48,
+    "SfdUserSkipCallback::userSkipCallbackAddress offset must be 0xD48"
   );
 
   /**
@@ -19684,12 +19501,12 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetUsrIsSkipFn);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdUserSkipCallbackRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SfdUserSkipCallback*>(workctrlSubobj);
     runtimeView->userSkipCallbackAddress = callbackAddress;
     return 0;
   }
 
-  struct SfdExternalClockRuntimeView
+  struct SfdExternalClock
   {
     std::uint8_t mUnknown00_1003[0x1004]{}; // +0x00
     std::int32_t externalClockCallbackAddress = 0; // +0x1004
@@ -19698,16 +19515,16 @@
     std::int32_t externalClockParam1 = 0; // +0x1018
   };
   static_assert(
-    offsetof(SfdExternalClockRuntimeView, externalClockCallbackAddress) == 0x1004,
-    "SfdExternalClockRuntimeView::externalClockCallbackAddress offset must be 0x1004"
+    offsetof(SfdExternalClock, externalClockCallbackAddress) == 0x1004,
+    "SfdExternalClock::externalClockCallbackAddress offset must be 0x1004"
   );
   static_assert(
-    offsetof(SfdExternalClockRuntimeView, externalClockParam0) == 0x1014,
-    "SfdExternalClockRuntimeView::externalClockParam0 offset must be 0x1014"
+    offsetof(SfdExternalClock, externalClockParam0) == 0x1014,
+    "SfdExternalClock::externalClockParam0 offset must be 0x1014"
   );
   static_assert(
-    offsetof(SfdExternalClockRuntimeView, externalClockParam1) == 0x1018,
-    "SfdExternalClockRuntimeView::externalClockParam1 offset must be 0x1018"
+    offsetof(SfdExternalClock, externalClockParam1) == 0x1018,
+    "SfdExternalClock::externalClockParam1 offset must be 0x1018"
   );
 
   /**
@@ -19729,7 +19546,7 @@
       return SFLIB_SetErr(0, kSflibErrInvalidHandleSetExternalClockCallback);
     }
 
-    auto* const runtimeView = reinterpret_cast<SfdExternalClockRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<SfdExternalClock*>(workctrlSubobj);
     if (callbackAddress != 0) {
       runtimeView->externalClockCallbackAddress = callbackAddress;
       runtimeView->externalClockParam0 = callbackParam0;
@@ -19760,27 +19577,27 @@
    * address to `SFPLY_SetPtsInfo` when a packet lands on the audio lane, and
    * `sfply_ResetHn` carries it across a handle rebuild.
    */
-  struct SfplyPtsInfoLaneView
+  struct SfplyPtsInfoLane
   {
     std::int32_t presentationTimeLow = 0;  // +0x00
     std::int32_t presentationTimeHigh = 0; // +0x04
     std::int32_t payloadBytes = 0;         // +0x08
   };
-  static_assert(sizeof(SfplyPtsInfoLaneView) == 0x0C, "SfplyPtsInfoLaneView size must be 0x0C");
+  static_assert(sizeof(SfplyPtsInfoLane) == 0x0C, "SfplyPtsInfoLane size must be 0x0C");
 
-  struct SfplyPtsInfoOwnerRuntimeView
+  struct SfplyPtsInfoOwner
   {
     std::uint8_t reserved0000[0x12E0]{};
-    SfplyPtsInfoLaneView ptsInfoLane{}; // +0x12E0
+    SfplyPtsInfoLane ptsInfoLane{}; // +0x12E0
   };
   static_assert(
-    offsetof(SfplyPtsInfoOwnerRuntimeView, ptsInfoLane) == 0x12E0,
-    "SfplyPtsInfoOwnerRuntimeView::ptsInfoLane offset must be 0x12E0"
+    offsetof(SfplyPtsInfoOwner, ptsInfoLane) == 0x12E0,
+    "SfplyPtsInfoOwner::ptsInfoLane offset must be 0x12E0"
   );
 
-  [[nodiscard]] SfplyPtsInfoLaneView* SfplyPtsInfoLaneOf(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj) noexcept
+  [[nodiscard]] SfplyPtsInfoLane* SfplyPtsInfoLaneOf(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj) noexcept
   {
-    return &reinterpret_cast<SfplyPtsInfoOwnerRuntimeView*>(workctrlSubobj)->ptsInfoLane;
+    return &reinterpret_cast<SfplyPtsInfoOwner*>(workctrlSubobj)->ptsInfoLane;
   }
 
   /// Timer-callback table slot `SFD_SetUsrTimeFn` writes (`SFTIM_SetTimeFn(.., 4)`).
@@ -19848,28 +19665,28 @@
     const std::int32_t savedErrorCallback = reinterpret_cast<std::int32_t>(errorInfo->callback);
     const std::int32_t savedErrorCallbackObject = errorInfo->callbackObject;
 
-    auto* const timerLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+    auto* const timerLane = reinterpret_cast<SftimVblankCounterLane*>(
       reinterpret_cast<std::uint8_t*>(workctrlSubobj) + kSftimVblankCounterLaneOffset
     );
     const std::int32_t savedUserTimeCallback =
       static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(timerLane->nowTimeFunctions[kSftimUserTimeFunctionSlot]));
 
-    const auto* const externalClock = reinterpret_cast<const SfdExternalClockRuntimeView*>(workctrlSubobj);
+    const auto* const externalClock = reinterpret_cast<const SfdExternalClock*>(workctrlSubobj);
     const std::int32_t savedExternalClockCallback = externalClock->externalClockCallbackAddress;
     const std::int32_t savedExternalClockParam0 = externalClock->externalClockParam0;
     const std::int32_t savedExternalClockParam1 = externalClock->externalClockParam1;
 
     const std::int32_t savedUserSkipCallback =
-      reinterpret_cast<const SfdUserSkipCallbackRuntimeView*>(workctrlSubobj)->userSkipCallbackAddress;
+      reinterpret_cast<const SfdUserSkipCallback*>(workctrlSubobj)->userSkipCallbackAddress;
 
     moho::SfseeHandle* const sfseeHandle =
-      reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj)->sfseeHandle;
+      workctrlSubobj->seekState.handle;
 
     const std::int32_t savedSpeedRational =
-      reinterpret_cast<const SftimWorkctrlRuntimeView*>(workctrlSubobj)->timeBaseScale;
+      reinterpret_cast<const SftimWorkctrl*>(workctrlSubobj)->timeBaseScale;
 
     auto* const ptsInfoLane = SfplyPtsInfoLaneOf(workctrlSubobj);
-    SfplyPtsInfoLaneView savedPtsInfo = *ptsInfoLane;
+    SfplyPtsInfoLane savedPtsInfo = *ptsInfoLane;
 
     std::int32_t savedFileSizeBytes = 0;
     std::int32_t savedTotalTimeMajor = 0;
@@ -19884,12 +19701,11 @@
       savedSeekPositionBytes = sfseeHandle->seekBaseReadTotalBytes;
     }
 
-    const SfptsQueueRuntimeView& videoPtsQueue =
-      reinterpret_cast<const SfdPtsQueueOwnerRuntimeView*>(workctrlSubobj)->videoPtsQueue;
-    const std::int32_t savedVideoPtsSource = videoPtsQueue.entriesAddress;
+    const moho::SfptsPtsQueue& videoPtsQueue = workctrlSubobj->bufferState.supplyLanes[1].ptsQueue;
+    const std::int32_t savedVideoPtsSource = videoPtsQueue.entriesBaseAddress;
     // `sfpts_SetupPtsQue` stores a capacity in entries; `SFD_SetVideoPts` takes
     // the same figure in bytes, hence the 16-byte entry stride.
-    const std::int32_t savedVideoPtsBytes = videoPtsQueue.capacity * kSfptsQueueEntryBytes;
+    const std::int32_t savedVideoPtsBytes = videoPtsQueue.entryCapacity * kSfptsQueueEntryBytes;
 
     std::array<std::int32_t, kSfmpvSavedConditionBytes / sizeof(std::int32_t)> savedMpvConditions{};
     const std::int32_t savedMpvConditionCount = SFMPV_SaveCond(
