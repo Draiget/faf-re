@@ -182,7 +182,7 @@ namespace
       return outEdges.end();
     }
 
-    struct InlineByteCursorBuffer200Runtime
+    struct InlineByteCursorBuffer200
     {
         std::uint8_t* lane00;
         std::uint8_t* lane04;
@@ -190,95 +190,95 @@ namespace
         std::uint8_t* lane0C;
         std::uint8_t inlineStorage[200];
     };
-    static_assert(sizeof(InlineByteCursorBuffer200Runtime) == 0xD8, "InlineByteCursorBuffer200Runtime size must be 0xD8");
+    static_assert(sizeof(InlineByteCursorBuffer200) == 0xD8, "InlineByteCursorBuffer200 size must be 0xD8");
     static_assert(
-      offsetof(InlineByteCursorBuffer200Runtime, inlineStorage) == 0x10,
-      "InlineByteCursorBuffer200Runtime::inlineStorage offset must be 0x10"
+      offsetof(InlineByteCursorBuffer200, inlineStorage) == 0x10,
+      "InlineByteCursorBuffer200::inlineStorage offset must be 0x10"
     );
 
-    struct InlineByteCursorBufferRuntime
+    struct InlineByteCursorBuffer
     {
       std::uint8_t* begin;        // +0x00
       std::uint8_t* current;      // +0x04
       std::uint8_t* end;          // +0x08
       std::uint8_t* inlineOrigin; // +0x0C
     };
-    static_assert(sizeof(InlineByteCursorBufferRuntime) == 0x10, "InlineByteCursorBufferRuntime size must be 0x10");
+    static_assert(sizeof(InlineByteCursorBuffer) == 0x10, "InlineByteCursorBuffer size must be 0x10");
     static_assert(
-      offsetof(InlineByteCursorBufferRuntime, inlineOrigin) == 0x0C,
-      "InlineByteCursorBufferRuntime::inlineOrigin offset must be 0x0C"
+      offsetof(InlineByteCursorBuffer, inlineOrigin) == 0x0C,
+      "InlineByteCursorBuffer::inlineOrigin offset must be 0x0C"
     );
 
-    struct InlineByteCursorBuffer64Runtime
+    struct InlineByteCursorBuffer64
     {
-      InlineByteCursorBufferRuntime state;
+      InlineByteCursorBuffer state;
       std::uint8_t inlineStorage[64];
     };
-    static_assert(sizeof(InlineByteCursorBuffer64Runtime) == 0x50, "InlineByteCursorBuffer64Runtime size must be 0x50");
+    static_assert(sizeof(InlineByteCursorBuffer64) == 0x50, "InlineByteCursorBuffer64 size must be 0x50");
     static_assert(
-      offsetof(InlineByteCursorBuffer64Runtime, inlineStorage) == 0x10,
-      "InlineByteCursorBuffer64Runtime::inlineStorage offset must be 0x10"
+      offsetof(InlineByteCursorBuffer64, inlineStorage) == 0x10,
+      "InlineByteCursorBuffer64::inlineStorage offset must be 0x10"
     );
 
-    struct InlineByteCursorBuffer32Runtime
+    struct InlineByteCursorBuffer32
     {
-      InlineByteCursorBufferRuntime state;
+      InlineByteCursorBuffer state;
       std::uint8_t inlineStorage[32];
     };
-    static_assert(sizeof(InlineByteCursorBuffer32Runtime) == 0x30, "InlineByteCursorBuffer32Runtime size must be 0x30");
+    static_assert(sizeof(InlineByteCursorBuffer32) == 0x30, "InlineByteCursorBuffer32 size must be 0x30");
     static_assert(
-      offsetof(InlineByteCursorBuffer32Runtime, inlineStorage) == 0x10,
-      "InlineByteCursorBuffer32Runtime::inlineStorage offset must be 0x10"
+      offsetof(InlineByteCursorBuffer32, inlineStorage) == 0x10,
+      "InlineByteCursorBuffer32::inlineStorage offset must be 0x10"
     );
 
-    struct InlineByteCursorBuffer120Runtime
+    struct InlineByteCursorBuffer120
     {
-      InlineByteCursorBufferRuntime state;
+      InlineByteCursorBuffer state;
       std::uint8_t inlineStorage[120];
     };
-    static_assert(sizeof(InlineByteCursorBuffer120Runtime) == 0x88, "InlineByteCursorBuffer120Runtime size must be 0x88");
+    static_assert(sizeof(InlineByteCursorBuffer120) == 0x88, "InlineByteCursorBuffer120 size must be 0x88");
     static_assert(
-      offsetof(InlineByteCursorBuffer120Runtime, inlineStorage) == 0x10,
-      "InlineByteCursorBuffer120Runtime::inlineStorage offset must be 0x10"
+      offsetof(InlineByteCursorBuffer120, inlineStorage) == 0x10,
+      "InlineByteCursorBuffer120::inlineStorage offset must be 0x10"
     );
 
-    struct IntrusiveRingNodeRuntime
+    struct IntrusiveRingNode
     {
-      IntrusiveRingNodeRuntime* prev;
-      IntrusiveRingNodeRuntime* next;
+      IntrusiveRingNode* prev;
+      IntrusiveRingNode* next;
     };
-    static_assert(sizeof(IntrusiveRingNodeRuntime) == 0x08, "IntrusiveRingNodeRuntime size must be 0x08");
+    static_assert(sizeof(IntrusiveRingNode) == 0x08, "IntrusiveRingNode size must be 0x08");
 
-    struct PathSearchFrontierNodeRuntime
+    struct PathSearchFrontierNode
     {
-      PathSearchFrontierNodeRuntime* prev; // +0x00
-      PathSearchFrontierNodeRuntime* next; // +0x04
+      PathSearchFrontierNode* prev; // +0x00
+      PathSearchFrontierNode* next; // +0x04
       float pathCost;                      // +0x08
       std::uint8_t visitFlags;             // +0x0C
       std::uint8_t packedCell;             // +0x0D
       std::uint8_t pad0E[2];               // +0x0E
     };
-    static_assert(sizeof(PathSearchFrontierNodeRuntime) == 0x10, "PathSearchFrontierNodeRuntime size must be 0x10");
+    static_assert(sizeof(PathSearchFrontierNode) == 0x10, "PathSearchFrontierNode size must be 0x10");
     static_assert(
-      offsetof(PathSearchFrontierNodeRuntime, pathCost) == 0x08,
-      "PathSearchFrontierNodeRuntime::pathCost offset must be 0x08"
+      offsetof(PathSearchFrontierNode, pathCost) == 0x08,
+      "PathSearchFrontierNode::pathCost offset must be 0x08"
     );
     static_assert(
-      offsetof(PathSearchFrontierNodeRuntime, visitFlags) == 0x0C,
-      "PathSearchFrontierNodeRuntime::visitFlags offset must be 0x0C"
+      offsetof(PathSearchFrontierNode, visitFlags) == 0x0C,
+      "PathSearchFrontierNode::visitFlags offset must be 0x0C"
     );
     static_assert(
-      offsetof(PathSearchFrontierNodeRuntime, packedCell) == 0x0D,
-      "PathSearchFrontierNodeRuntime::packedCell offset must be 0x0D"
+      offsetof(PathSearchFrontierNode, packedCell) == 0x0D,
+      "PathSearchFrontierNode::packedCell offset must be 0x0D"
     );
 
-    struct WordTableRuntime
+    struct WordTable
     {
       std::uint16_t* words;
     };
-    static_assert(sizeof(WordTableRuntime) == 0x04, "WordTableRuntime size must be 0x04");
+    static_assert(sizeof(WordTable) == 0x04, "WordTable size must be 0x04");
 
-    struct FourDwordWordRuntime
+    struct FourDwordWord
     {
         std::uint32_t lane00;
         std::uint32_t lane04;
@@ -287,9 +287,9 @@ namespace
         std::uint16_t lane10;
         std::uint16_t pad12;
     };
-    static_assert(sizeof(FourDwordWordRuntime) == 0x14, "FourDwordWordRuntime size must be 0x14");
+    static_assert(sizeof(FourDwordWord) == 0x14, "FourDwordWord size must be 0x14");
 
-    struct FourDwordWordAndTailRuntime
+    struct FourDwordWordAndTail
     {
         std::uint32_t lane00;
         std::uint32_t lane04;
@@ -299,20 +299,20 @@ namespace
         std::uint16_t pad12;
         std::uint32_t lane14;
     };
-    static_assert(sizeof(FourDwordWordAndTailRuntime) == 0x18, "FourDwordWordAndTailRuntime size must be 0x18");
+    static_assert(sizeof(FourDwordWordAndTail) == 0x18, "FourDwordWordAndTail size must be 0x18");
 
-    struct DwordAndByteLanesRuntime
+    struct DwordAndByteLanes
     {
         std::uint32_t lane00;
         std::uint8_t lane04;
     };
 
-    struct ForwardLinkNodeRuntime
+    struct ForwardLinkNode
     {
-        ForwardLinkNodeRuntime* lane00;
-        ForwardLinkNodeRuntime* next;
+        ForwardLinkNode* lane00;
+        ForwardLinkNode* next;
     };
-    static_assert(sizeof(ForwardLinkNodeRuntime) == 0x08, "ForwardLinkNodeRuntime size must be 0x08");
+    static_assert(sizeof(ForwardLinkNode) == 0x08, "ForwardLinkNode size must be 0x08");
 
     /**
      * Address: 0x0092E3C0 (FUN_0092E3C0)
@@ -320,8 +320,8 @@ namespace
      * What it does:
      * Initializes one inline byte-buffer cursor block and returns `state`.
      */
-    InlineByteCursorBuffer200Runtime* InitializeInlineByteCursorBuffer200(
-      InlineByteCursorBuffer200Runtime* const state
+    InlineByteCursorBuffer200* InitializeInlineByteCursorBuffer200(
+      InlineByteCursorBuffer200* const state
     ) noexcept
     {
       std::uint8_t* const inlineOrigin = state->inlineStorage;
@@ -339,7 +339,7 @@ namespace
      * Returns the current cursor lane from one inline byte-buffer state.
      */
     [[nodiscard]] std::uint8_t* InlineByteCursorCurrent(
-      const InlineByteCursorBufferRuntime* const state
+      const InlineByteCursorBuffer* const state
     ) noexcept
     {
       return state->current;
@@ -352,7 +352,7 @@ namespace
      * Returns used-byte count (`current - begin`) for one inline byte-buffer.
      */
     [[nodiscard]] std::ptrdiff_t InlineByteCursorUsedBytes(
-      const InlineByteCursorBufferRuntime* const state
+      const InlineByteCursorBuffer* const state
     ) noexcept
     {
       return state->current - state->begin;
@@ -365,7 +365,7 @@ namespace
      * Returns total capacity in bytes (`end - begin`) for one inline buffer.
      */
     [[nodiscard]] std::ptrdiff_t InlineByteCursorCapacityBytes(
-      const InlineByteCursorBufferRuntime* const state
+      const InlineByteCursorBuffer* const state
     ) noexcept
     {
       return state->end - state->begin;
@@ -378,7 +378,7 @@ namespace
      * Returns `begin + byteOffset` for one inline byte-buffer.
      */
     [[nodiscard]] std::uint8_t* InlineByteCursorAtOffset(
-      const InlineByteCursorBufferRuntime* const state,
+      const InlineByteCursorBuffer* const state,
       const std::ptrdiff_t byteOffset
     ) noexcept
     {
@@ -391,8 +391,8 @@ namespace
      * What it does:
      * Initializes one intrusive ring node as a self-linked singleton.
      */
-    IntrusiveRingNodeRuntime* InitializeIntrusiveRingNode_A(
-      IntrusiveRingNodeRuntime* const node
+    IntrusiveRingNode* InitializeIntrusiveRingNode_A(
+      IntrusiveRingNode* const node
     ) noexcept
     {
       node->prev = node;
@@ -406,12 +406,12 @@ namespace
      * What it does:
      * Unlinks one intrusive ring node from neighbors and re-self-links it.
      */
-    IntrusiveRingNodeRuntime* UnlinkIntrusiveRingNode_A(
-      IntrusiveRingNodeRuntime* const node
+    IntrusiveRingNode* UnlinkIntrusiveRingNode_A(
+      IntrusiveRingNode* const node
     ) noexcept
     {
       node->prev->next = node->next;
-      IntrusiveRingNodeRuntime* const previous = node->next;
+      IntrusiveRingNode* const previous = node->next;
       previous->prev = node->prev;
       node->next = node;
       node->prev = node;
@@ -426,13 +426,13 @@ namespace
      *
      * Orphan: zero xrefs of any kind at this address per the IDA export
      * (xrefs_total: 0), zero callers in the callgraph index, and `words`
-     * (the sole field of `WordTableRuntime`) is not referenced anywhere else
+     * (the sole field of `WordTable`) is not referenced anywhere else
      * in this file. Sits among this file's intrusive-ring-node/byte-cursor
      * helper cluster (0x00954840-0x009548C0) but no caller for this specific
      * lane has been found.
      */
     [[maybe_unused]] [[nodiscard]] std::uint16_t* ResolveWordTableEntryAddress(
-      const WordTableRuntime* const table,
+      const WordTable* const table,
       const std::int32_t wordIndex
     ) noexcept
     {
@@ -445,9 +445,9 @@ namespace
      * What it does:
      * Unlinks `node` and inserts it immediately before `anchor`.
      */
-    IntrusiveRingNodeRuntime* RelinkIntrusiveRingNodeBeforeAnchor(
-      IntrusiveRingNodeRuntime* const node,
-      IntrusiveRingNodeRuntime* const anchor
+    IntrusiveRingNode* RelinkIntrusiveRingNodeBeforeAnchor(
+      IntrusiveRingNode* const node,
+      IntrusiveRingNode* const anchor
     ) noexcept
     {
       node->prev->next = node->next;
@@ -465,8 +465,8 @@ namespace
      * What it does:
      * Alias lane that unlinks one intrusive ring node and re-self-links it.
      */
-    IntrusiveRingNodeRuntime* UnlinkIntrusiveRingNode_B(
-      IntrusiveRingNodeRuntime* const node
+    IntrusiveRingNode* UnlinkIntrusiveRingNode_B(
+      IntrusiveRingNode* const node
     ) noexcept
     {
       return UnlinkIntrusiveRingNode_A(node);
@@ -478,8 +478,8 @@ namespace
      * What it does:
      * Alias lane that initializes one intrusive ring node as self-linked.
      */
-    IntrusiveRingNodeRuntime* InitializeIntrusiveRingNode_B(
-      IntrusiveRingNodeRuntime* const node
+    IntrusiveRingNode* InitializeIntrusiveRingNode_B(
+      IntrusiveRingNode* const node
     ) noexcept
     {
       return InitializeIntrusiveRingNode_A(node);
@@ -491,8 +491,8 @@ namespace
      * What it does:
      * Returns one intrusive node `next` link lane.
      */
-    [[nodiscard]] IntrusiveRingNodeRuntime* GetIntrusiveRingNodeNext(
-      const IntrusiveRingNodeRuntime* const node
+    [[nodiscard]] IntrusiveRingNode* GetIntrusiveRingNodeNext(
+      const IntrusiveRingNode* const node
     ) noexcept
     {
       return node->next;
@@ -505,8 +505,8 @@ namespace
      * Initializes one path-frontier node as self-linked with zero cost/state
      * lanes.
      */
-    PathSearchFrontierNodeRuntime* InitializePathSearchFrontierNode(
-      PathSearchFrontierNodeRuntime* const node
+    PathSearchFrontierNode* InitializePathSearchFrontierNode(
+      PathSearchFrontierNode* const node
     ) noexcept
     {
       node->next = node;
@@ -523,8 +523,8 @@ namespace
      * What it does:
      * Alias lane that unlinks one intrusive ring node and re-self-links it.
      */
-    IntrusiveRingNodeRuntime* UnlinkIntrusiveRingNode_C(
-      IntrusiveRingNodeRuntime* const node
+    IntrusiveRingNode* UnlinkIntrusiveRingNode_C(
+      IntrusiveRingNode* const node
     ) noexcept
     {
       return UnlinkIntrusiveRingNode_A(node);
@@ -536,9 +536,9 @@ namespace
      * What it does:
      * Copies one `(4 dword + 1 word)` lane bundle and binds one external tail lane.
      */
-    FourDwordWordAndTailRuntime* CopyFourDwordWordBundleWithTailLane(
-      FourDwordWordAndTailRuntime* const destination,
-      const FourDwordWordRuntime* const sourceBundle,
+    FourDwordWordAndTail* CopyFourDwordWordBundleWithTailLane(
+      FourDwordWordAndTail* const destination,
+      const FourDwordWord* const sourceBundle,
       const std::uint32_t* const tailLaneSource
     ) noexcept
     {
@@ -605,8 +605,8 @@ namespace
      * What it does:
      * Writes one `(dword, byte)` lane pair into destination storage.
      */
-    DwordAndByteLanesRuntime* WriteDwordAndByteLanes_A(
-      DwordAndByteLanesRuntime* const destination,
+    DwordAndByteLanes* WriteDwordAndByteLanes_A(
+      DwordAndByteLanes* const destination,
       const std::uint32_t* const dwordLaneSource,
       const std::uint8_t* const byteLaneSource
     ) noexcept
@@ -622,8 +622,8 @@ namespace
      * What it does:
      * Alias lane that writes one `(dword, byte)` pair.
      */
-    DwordAndByteLanesRuntime* WriteDwordAndByteLanes_B(
-      DwordAndByteLanesRuntime* const destination,
+    DwordAndByteLanes* WriteDwordAndByteLanes_B(
+      DwordAndByteLanes* const destination,
       const std::uint32_t* const dwordLaneSource,
       const std::uint8_t* const byteLaneSource
     ) noexcept
@@ -633,11 +633,11 @@ namespace
       return destination;
     }
 
-    struct SingleDwordLaneRuntime
+    struct SingleDwordLane
     {
       std::uint32_t value = 0;
     };
-    static_assert(sizeof(SingleDwordLaneRuntime) == 0x04, "SingleDwordLaneRuntime size must be 0x04");
+    static_assert(sizeof(SingleDwordLane) == 0x04, "SingleDwordLane size must be 0x04");
 
     /**
      * Address: 0x00932210 (FUN_00932210)
@@ -645,8 +645,8 @@ namespace
      * What it does:
      * Stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLaneRuntime* StoreSingleDwordLane_A(
-      SingleDwordLaneRuntime* const lane,
+    SingleDwordLane* StoreSingleDwordLane_A(
+      SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
     {
@@ -660,8 +660,8 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLaneRuntime* StoreSingleDwordLane_B(
-      SingleDwordLaneRuntime* const lane,
+    SingleDwordLane* StoreSingleDwordLane_B(
+      SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
     {
@@ -675,8 +675,8 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLaneRuntime* StoreSingleDwordLane_C(
-      SingleDwordLaneRuntime* const lane,
+    SingleDwordLane* StoreSingleDwordLane_C(
+      SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
     {
@@ -690,8 +690,8 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLaneRuntime* StoreSingleDwordLane_D(
-      SingleDwordLaneRuntime* const lane,
+    SingleDwordLane* StoreSingleDwordLane_D(
+      SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
     {
@@ -699,11 +699,11 @@ namespace
       return lane;
     }
 
-    struct VtableProbeRuntime
+    struct VtableProbe
     {
       const std::uint32_t* vtable = nullptr;
     };
-    static_assert(sizeof(VtableProbeRuntime) == 0x04, "VtableProbeRuntime size must be 0x04");
+    static_assert(sizeof(VtableProbe) == 0x04, "VtableProbe size must be 0x04");
 
     /**
      * Address: 0x00932670 (FUN_00932670)
@@ -711,7 +711,7 @@ namespace
      * What it does:
      * Loads the dword lane at vtable slot index 4.
      */
-    int LoadVtableDwordSlot04(const VtableProbeRuntime* const object) noexcept
+    int LoadVtableDwordSlot04(const VtableProbe* const object) noexcept
     {
       return static_cast<int>(object->vtable[4]);
     }
@@ -722,38 +722,38 @@ namespace
      * What it does:
      * Loads the dword lane at vtable slot index 15.
      */
-    int LoadVtableDwordSlot15(const VtableProbeRuntime* const object) noexcept
+    int LoadVtableDwordSlot15(const VtableProbe* const object) noexcept
     {
       return static_cast<int>(object->vtable[15]);
     }
 
-    struct TwoDwordLaneRuntime
+    struct TwoDwordLane
     {
       std::uint32_t lane00 = 0;
       std::uint32_t lane04 = 0;
     };
-    static_assert(sizeof(TwoDwordLaneRuntime) == 0x08, "TwoDwordLaneRuntime size must be 0x08");
-    static_assert(offsetof(TwoDwordLaneRuntime, lane04) == 0x04, "TwoDwordLaneRuntime::lane04 offset must be 0x04");
+    static_assert(sizeof(TwoDwordLane) == 0x08, "TwoDwordLane size must be 0x08");
+    static_assert(offsetof(TwoDwordLane, lane04) == 0x04, "TwoDwordLane::lane04 offset must be 0x04");
 
-    struct TwoDwordAndPointerLaneRuntime
+    struct TwoDwordAndPointerLane
     {
       std::uint32_t lane00 = 0;
       const std::uint32_t* lane04Pointer = nullptr;
     };
     static_assert(
-      offsetof(TwoDwordAndPointerLaneRuntime, lane04Pointer) == 0x04,
-      "TwoDwordAndPointerLaneRuntime::lane04Pointer offset must be 0x04"
+      offsetof(TwoDwordAndPointerLane, lane04Pointer) == 0x04,
+      "TwoDwordAndPointerLane::lane04Pointer offset must be 0x04"
     );
 
-    struct ThreeDwordAndPointerLaneRuntime
+    struct ThreeDwordAndPointerLane
     {
       std::uint32_t lane00 = 0;
       std::uint32_t lane04 = 0;
       const std::uint32_t* lane08Pointer = nullptr;
     };
     static_assert(
-      offsetof(ThreeDwordAndPointerLaneRuntime, lane08Pointer) == 0x08,
-      "ThreeDwordAndPointerLaneRuntime::lane08Pointer offset must be 0x08"
+      offsetof(ThreeDwordAndPointerLane, lane08Pointer) == 0x08,
+      "ThreeDwordAndPointerLane::lane08Pointer offset must be 0x08"
     );
 
     /**
@@ -763,7 +763,7 @@ namespace
      * Stores one dereferenced dword lane from source `+0x04` into output.
      */
     std::uint32_t* StoreDereferencedLane04_A(
-      const TwoDwordAndPointerLaneRuntime* const source,
+      const TwoDwordAndPointerLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -778,7 +778,7 @@ namespace
      * Stores the dword lane at source `+0x04` into output.
      */
     std::uint32_t* StoreLane04_A(
-      const TwoDwordLaneRuntime* const source,
+      const TwoDwordLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -794,7 +794,7 @@ namespace
      * into output.
      */
     std::uint32_t* StoreDereferencedLane04_B(
-      const TwoDwordAndPointerLaneRuntime* const source,
+      const TwoDwordAndPointerLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -809,7 +809,7 @@ namespace
      * Alias lane that stores the dword lane at source `+0x04` into output.
      */
     std::uint32_t* StoreLane04_B(
-      const TwoDwordLaneRuntime* const source,
+      const TwoDwordLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -824,7 +824,7 @@ namespace
      * Alias lane that stores the dword lane at source `+0x04` into output.
      */
     std::uint32_t* StoreLane04_C(
-      const TwoDwordLaneRuntime* const source,
+      const TwoDwordLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -839,7 +839,7 @@ namespace
      * Stores the dword lane at source `+0x08` into output.
      */
     std::uint32_t* StoreLane08_A(
-      const ThreeDwordAndPointerLaneRuntime* const source,
+      const ThreeDwordAndPointerLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -854,7 +854,7 @@ namespace
      * Alias lane that stores the dword lane at source `+0x04` into output.
      */
     std::uint32_t* StoreLane04_D(
-      const TwoDwordLaneRuntime* const source,
+      const TwoDwordLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -869,7 +869,7 @@ namespace
      * Alias lane that stores the dword lane at source `+0x08` into output.
      */
     std::uint32_t* StoreLane08_B(
-      const ThreeDwordAndPointerLaneRuntime* const source,
+      const ThreeDwordAndPointerLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -877,11 +877,11 @@ namespace
       return outValue;
     }
 
-    struct HeadAddressLaneRuntime
+    struct HeadAddressLane
     {
       std::uint32_t headAddress = 0;
     };
-    static_assert(sizeof(HeadAddressLaneRuntime) == 0x04, "HeadAddressLaneRuntime size must be 0x04");
+    static_assert(sizeof(HeadAddressLane) == 0x04, "HeadAddressLane size must be 0x04");
 
     /**
      * Address: 0x00932820 (FUN_00932820)
@@ -891,7 +891,7 @@ namespace
      * `*currentHead`.
      */
     std::uint32_t* PopHeadAddressToOut_A(
-      HeadAddressLaneRuntime* const head,
+      HeadAddressLane* const head,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -910,7 +910,7 @@ namespace
      * head to `*currentHead`.
      */
     std::uint32_t* PopHeadAddressToOut_B(
-      HeadAddressLaneRuntime* const head,
+      HeadAddressLane* const head,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -921,11 +921,11 @@ namespace
       return outValue;
     }
 
-    struct DwordBaseAddressLaneRuntime
+    struct DwordBaseAddressLane
     {
       std::uint32_t baseAddress = 0;
     };
-    static_assert(sizeof(DwordBaseAddressLaneRuntime) == 0x04, "DwordBaseAddressLaneRuntime size must be 0x04");
+    static_assert(sizeof(DwordBaseAddressLane) == 0x04, "DwordBaseAddressLane size must be 0x04");
 
     /**
      * Address: 0x00932840 (FUN_00932840)
@@ -935,7 +935,7 @@ namespace
      * output.
      */
     std::uint32_t* StoreDwordAddressStride4_A(
-      const DwordBaseAddressLaneRuntime* const base,
+      const DwordBaseAddressLane* const base,
       std::uint32_t* const outValue,
       const int index
     ) noexcept
@@ -952,7 +952,7 @@ namespace
      * stores it into output.
      */
     std::uint32_t* StoreDwordAddressStride4_B(
-      const DwordBaseAddressLaneRuntime* const base,
+      const DwordBaseAddressLane* const base,
       std::uint32_t* const outValue,
       const int index
     ) noexcept
@@ -968,7 +968,7 @@ namespace
      * Stores one dereferenced dword lane from source `+0x08` into output.
      */
     std::uint32_t* StoreDereferencedLane08_A(
-      const ThreeDwordAndPointerLaneRuntime* const source,
+      const ThreeDwordAndPointerLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -983,7 +983,7 @@ namespace
      * Stores the dword lane at source `+0x08` into output.
      */
     std::uint32_t* StoreLane08_C(
-      const ThreeDwordAndPointerLaneRuntime* const source,
+      const ThreeDwordAndPointerLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -999,7 +999,7 @@ namespace
      * into output.
      */
     std::uint32_t* StoreDereferencedLane08_B(
-      const ThreeDwordAndPointerLaneRuntime* const source,
+      const ThreeDwordAndPointerLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -1014,7 +1014,7 @@ namespace
      * Alias lane that stores the dword lane at source `+0x08` into output.
      */
     std::uint32_t* StoreLane08_D(
-      const ThreeDwordAndPointerLaneRuntime* const source,
+      const ThreeDwordAndPointerLane* const source,
       std::uint32_t* const outValue
     ) noexcept
     {
@@ -1248,21 +1248,21 @@ namespace
      * `gpg::HaStar::ClusterBuild(const SubclusterData&)` (`FUN_009310E0`)
      * runs its search loop.
      */
-    struct ClusterSearchOpenHeapRuntime
+    struct ClusterSearchOpenHeap
     {
         msvc8::vector<ClusterSearchOpenHeapEntry> mHeap; // +0x00
         msvc8::vector<std::int32_t> mHandleToHeapIndex;         // +0x10
         std::int32_t mFreeHandleHead;                           // +0x20
     };
-    static_assert(sizeof(ClusterSearchOpenHeapRuntime) == 0x24, "ClusterSearchOpenHeapRuntime size must be 0x24");
-    static_assert(offsetof(ClusterSearchOpenHeapRuntime, mHeap) == 0x00, "ClusterSearchOpenHeapRuntime::mHeap offset must be 0x00");
+    static_assert(sizeof(ClusterSearchOpenHeap) == 0x24, "ClusterSearchOpenHeap size must be 0x24");
+    static_assert(offsetof(ClusterSearchOpenHeap, mHeap) == 0x00, "ClusterSearchOpenHeap::mHeap offset must be 0x00");
     static_assert(
-      offsetof(ClusterSearchOpenHeapRuntime, mHandleToHeapIndex) == 0x10,
-      "ClusterSearchOpenHeapRuntime::mHandleToHeapIndex offset must be 0x10"
+      offsetof(ClusterSearchOpenHeap, mHandleToHeapIndex) == 0x10,
+      "ClusterSearchOpenHeap::mHandleToHeapIndex offset must be 0x10"
     );
     static_assert(
-      offsetof(ClusterSearchOpenHeapRuntime, mFreeHandleHead) == 0x20,
-      "ClusterSearchOpenHeapRuntime::mFreeHandleHead offset must be 0x20"
+      offsetof(ClusterSearchOpenHeap, mFreeHandleHead) == 0x20,
+      "ClusterSearchOpenHeap::mFreeHandleHead offset must be 0x20"
     );
 
     /**
@@ -1284,7 +1284,7 @@ namespace
      * goes through `operator[]` instead of a raw `mFirst`-indexed pointer.
      */
     void SwapOpenHeapEntries(
-      ClusterSearchOpenHeapRuntime& openHeap,
+      ClusterSearchOpenHeap& openHeap,
       const std::uint32_t lhsIndex,
       const std::uint32_t rhsIndex
     ) noexcept
@@ -1301,7 +1301,7 @@ namespace
      * Sifts one open-heap entry upward by cost and keeps handle->heap-index
      * reverse mapping synchronized after every swap.
      */
-    void ClusterSearchOpenHeapSiftUp(ClusterSearchOpenHeapRuntime& openHeap, std::uint32_t heapIndex)
+    void ClusterSearchOpenHeapSiftUp(ClusterSearchOpenHeap& openHeap, std::uint32_t heapIndex)
     {
         if (heapIndex == 0u) {
             return;
@@ -1326,7 +1326,7 @@ namespace
      * the next left-child index probe used by the loop.
      */
     [[nodiscard]] std::uint32_t ClusterSearchOpenHeapSiftDown(
-      ClusterSearchOpenHeapRuntime& openHeap,
+      ClusterSearchOpenHeap& openHeap,
       std::uint32_t heapIndex,
       const std::uint32_t heapCount
     )
@@ -1367,7 +1367,7 @@ namespace
      * sifting down or up based on the old/new cost relation.
      */
     void UpdateClusterSearchOpenHeapCost(
-      ClusterSearchOpenHeapRuntime& openHeap,
+      ClusterSearchOpenHeap& openHeap,
       const std::int32_t handle,
       const float newCost
     )
@@ -1394,7 +1394,7 @@ namespace
      * free-handle chain, pops the heap tail, and returns the pre-pop count.
      */
     [[nodiscard]] std::int32_t RemoveClusterSearchOpenHeapEntryAt(
-      ClusterSearchOpenHeapRuntime& openHeap,
+      ClusterSearchOpenHeap& openHeap,
       const std::uint32_t heapIndex
     )
     {
@@ -1429,7 +1429,7 @@ namespace
      * that pops the current heap-head entry.
      */
     [[nodiscard]] std::int32_t RemoveClusterSearchOpenHeapHeadEntry(
-      ClusterSearchOpenHeapRuntime& openHeap
+      ClusterSearchOpenHeap& openHeap
     )
     {
         return RemoveClusterSearchOpenHeapEntryAt(openHeap, 0u);
@@ -1491,27 +1491,27 @@ namespace
      */
     using ClusterSearchEdgeVector = msvc8::vector<ClusterSearchEdge>;
 
-    struct ClusterSearchTraversalContextRuntime
+    struct ClusterSearchTraversalContext
     {
       const gpg::HaStar::SubclusterData* mSubclusterData; // +0x00
     };
-    static_assert(sizeof(ClusterSearchTraversalContextRuntime) == 0x04, "ClusterSearchTraversalContextRuntime size must be 0x04");
+    static_assert(sizeof(ClusterSearchTraversalContext) == 0x04, "ClusterSearchTraversalContext size must be 0x04");
 
-    struct ClusterSearchFrontierStateRuntime
+    struct ClusterSearchFrontierState
     {
       float mAccumulatedCost; // +0x00
       std::uint8_t mNodeX;    // +0x04
       std::uint8_t mNodeZ;    // +0x05
       std::uint8_t pad06[2];  // +0x06
     };
-    static_assert(sizeof(ClusterSearchFrontierStateRuntime) == 0x08, "ClusterSearchFrontierStateRuntime size must be 0x08");
+    static_assert(sizeof(ClusterSearchFrontierState) == 0x08, "ClusterSearchFrontierState size must be 0x08");
     static_assert(
-      offsetof(ClusterSearchFrontierStateRuntime, mNodeX) == 0x04,
-      "ClusterSearchFrontierStateRuntime::mNodeX offset must be 0x04"
+      offsetof(ClusterSearchFrontierState, mNodeX) == 0x04,
+      "ClusterSearchFrontierState::mNodeX offset must be 0x04"
     );
     static_assert(
-      offsetof(ClusterSearchFrontierStateRuntime, mNodeZ) == 0x05,
-      "ClusterSearchFrontierStateRuntime::mNodeZ offset must be 0x05"
+      offsetof(ClusterSearchFrontierState, mNodeZ) == 0x05,
+      "ClusterSearchFrontierState::mNodeZ offset must be 0x05"
     );
 
     using ClusterData = gpg::HaStar::Cluster::Data;
@@ -1594,8 +1594,8 @@ namespace
      * reachable edges into the output edge vector.
      */
     [[nodiscard]] char ExpandClusterSearchFrontierEdges(
-      const ClusterSearchTraversalContextRuntime& context,
-      const ClusterSearchFrontierStateRuntime* const frontier,
+      const ClusterSearchTraversalContext& context,
+      const ClusterSearchFrontierState* const frontier,
       ClusterSearchEdgeVector& outEdges
     )
     {
@@ -1674,7 +1674,7 @@ namespace
      * returns its index as the new handle.
      */
     [[nodiscard]] std::int32_t AcquireOrReuseClusterSearchOpenHandle(
-      ClusterSearchOpenHeapRuntime& openHeap,
+      ClusterSearchOpenHeap& openHeap,
       const std::int32_t heapIndex
     )
     {
@@ -1698,7 +1698,7 @@ namespace
      * handle, and sifts the appended entry upward.
      */
     [[nodiscard]] std::int32_t PushClusterSearchOpenNode(
-      ClusterSearchOpenHeapRuntime& openHeap,
+      ClusterSearchOpenHeap& openHeap,
       const float cost,
       ClusterNodeSearchState* const nodeState
     )
@@ -1716,24 +1716,24 @@ namespace
       return handle;
     }
 
-    struct ClusterSearchNeighborSeedRuntime
+    struct ClusterSearchNeighborSeed
     {
       std::int32_t mOwnerNodeIndex; // +0x00
       std::uint8_t mNodeX;          // +0x04
       std::uint8_t mNodeZ;          // +0x05
       std::uint8_t mPad06[2];       // +0x06
     };
-    static_assert(sizeof(ClusterSearchNeighborSeedRuntime) == 0x08, "ClusterSearchNeighborSeedRuntime size must be 0x08");
+    static_assert(sizeof(ClusterSearchNeighborSeed) == 0x08, "ClusterSearchNeighborSeed size must be 0x08");
     static_assert(
-      offsetof(ClusterSearchNeighborSeedRuntime, mNodeX) == 0x04,
-      "ClusterSearchNeighborSeedRuntime::mNodeX offset must be 0x04"
+      offsetof(ClusterSearchNeighborSeed, mNodeX) == 0x04,
+      "ClusterSearchNeighborSeed::mNodeX offset must be 0x04"
     );
     static_assert(
-      offsetof(ClusterSearchNeighborSeedRuntime, mNodeZ) == 0x05,
-      "ClusterSearchNeighborSeedRuntime::mNodeZ offset must be 0x05"
+      offsetof(ClusterSearchNeighborSeed, mNodeZ) == 0x05,
+      "ClusterSearchNeighborSeed::mNodeZ offset must be 0x05"
     );
 
-    [[nodiscard]] std::uint32_t LoadPackedNodeCoordinateLane(const ClusterSearchNeighborSeedRuntime& seed) noexcept
+    [[nodiscard]] std::uint32_t LoadPackedNodeCoordinateLane(const ClusterSearchNeighborSeed& seed) noexcept
     {
       std::uint32_t packed = 0u;
       std::memcpy(&packed, &seed.mNodeX, sizeof(packed));
@@ -1749,9 +1749,9 @@ namespace
      */
     void RelaxClusterSearchNeighbor(
       ClusterNodeSearchStateMap& stateByCoordinate,
-      ClusterSearchOpenHeapRuntime& openHeap,
+      ClusterSearchOpenHeap& openHeap,
       const void* const unusedContext,
-      const ClusterSearchNeighborSeedRuntime& neighborSeed,
+      const ClusterSearchNeighborSeed& neighborSeed,
       const float pathCost
     )
     {
@@ -1815,8 +1815,8 @@ namespace
      */
     [[nodiscard]] char ProcessClusterSearchOpenFrontier(
       ClusterNodeSearchStateMap& stateByCoordinate,
-      ClusterSearchOpenHeapRuntime& openHeap,
-      const ClusterSearchTraversalContextRuntime& context
+      ClusterSearchOpenHeap& openHeap,
+      const ClusterSearchTraversalContext& context
     )
     {
       // RAII: `edges`'s destructor now performs exactly what the
@@ -1838,7 +1838,7 @@ namespace
 
         const char expandStatus = ExpandClusterSearchFrontierEdges(
           context,
-          reinterpret_cast<const ClusterSearchFrontierStateRuntime*>(currentNode),
+          reinterpret_cast<const ClusterSearchFrontierState*>(currentNode),
           edges
         );
         if (expandStatus != 0) {
@@ -2140,8 +2140,8 @@ namespace
      * What it does:
      * Stores two source dword lanes into one two-dword destination record.
      */
-    TwoDwordLaneRuntime* StoreTwoDwordLanesFromSources_A(
-      TwoDwordLaneRuntime* const destination,
+    TwoDwordLane* StoreTwoDwordLanesFromSources_A(
+      TwoDwordLane* const destination,
       const std::uint32_t* const sourceLane00,
       const std::uint32_t* const sourceLane04
     ) noexcept
@@ -2158,8 +2158,8 @@ namespace
      * Alias lane that stores two source dword lanes into one destination
      * two-dword record.
      */
-    TwoDwordLaneRuntime* StoreTwoDwordLanesFromSources_B(
-      TwoDwordLaneRuntime* const destination,
+    TwoDwordLane* StoreTwoDwordLanesFromSources_B(
+      TwoDwordLane* const destination,
       const std::uint32_t* const sourceLane00,
       const std::uint32_t* const sourceLane04
     ) noexcept
@@ -2559,12 +2559,12 @@ namespace
         }
     }
 
-    struct ClusterNodeCoordinateRuntime
+    struct ClusterNodeCoordinate
     {
       std::uint8_t x;
       std::uint8_t z;
     };
-    static_assert(sizeof(ClusterNodeCoordinateRuntime) == 0x02, "ClusterNodeCoordinateRuntime size must be 0x02");
+    static_assert(sizeof(ClusterNodeCoordinate) == 0x02, "ClusterNodeCoordinate size must be 0x02");
 
     /**
      * Address: 0x0092E2E0 (FUN_0092E2E0, gpg::HaStar::Cluster::Node::CostTo)
@@ -2575,8 +2575,8 @@ namespace
      */
     std::uint8_t* QuantizeClusterNodeEdgeCost(
       std::uint8_t* const out,
-      const ClusterNodeCoordinateRuntime& from,
-      const ClusterNodeCoordinateRuntime& to,
+      const ClusterNodeCoordinate& from,
+      const ClusterNodeCoordinate& to,
       const float traversalCost
     )
     {
@@ -2620,7 +2620,7 @@ namespace
      * binary performs both when popping the open-list head and when re-queuing a
      * relaxed neighbour.
      */
-    void UnlinkFrontierNode(PathSearchFrontierNodeRuntime* const node) noexcept
+    void UnlinkFrontierNode(PathSearchFrontierNode* const node) noexcept
     {
       node->prev->next = node->next;
       node->next->prev = node->prev;
@@ -2633,8 +2633,8 @@ namespace
      * sequence.
      */
     void AppendFrontierNodeToTail(
-      PathSearchFrontierNodeRuntime* const head,
-      PathSearchFrontierNodeRuntime* const node
+      PathSearchFrontierNode* const head,
+      PathSearchFrontierNode* const node
     ) noexcept
     {
       node->prev = head->prev;
@@ -2687,7 +2687,7 @@ namespace
       // eh-vector-ctor over InitializePathSearchFrontierNode, then re-inits the
       // cost/flag/packedCell lanes once per source expansion while leaving the
       // ring links self-linked between sources.
-      std::array<PathSearchFrontierNodeRuntime, kEdgeSearchGridCells> grid;
+      std::array<PathSearchFrontierNode, kEdgeSearchGridCells> grid;
       for (auto& cell : grid) {
         (void)InitializePathSearchFrontierNode(&cell);
       }
@@ -2697,7 +2697,7 @@ namespace
       const std::uint16_t* const layerRows = occupation.mRows;
 
       for (std::uint32_t source = 0u; source + 1u < nodeCount; ++source) {
-        PathSearchFrontierNodeRuntime openListHead{};
+        PathSearchFrontierNode openListHead{};
         openListHead.next = &openListHead;
         openListHead.prev = &openListHead;
 
@@ -2705,7 +2705,7 @@ namespace
         // (row z, col x) encodes packedCell = (z << 4) | x.
         for (std::int32_t row = 0; row < kEdgeSearchGridSpan; ++row) {
           for (std::int32_t col = 0; col < kEdgeSearchGridSpan; ++col) {
-            PathSearchFrontierNodeRuntime& cell = grid[row * kEdgeSearchGridSpan + col];
+            PathSearchFrontierNode& cell = grid[row * kEdgeSearchGridSpan + col];
             cell.pathCost = 0.0f;
             cell.visitFlags = 0u;
             cell.packedCell = static_cast<std::uint8_t>((row << 4) | col);
@@ -2715,7 +2715,7 @@ namespace
         // Seed the source node's cell (grid[z_s][x_s]) into the open list.
         const std::uint8_t sourceX = nodeBytes[2u * source];
         const std::uint8_t sourceZ = nodeBytes[2u * source + 1u];
-        PathSearchFrontierNodeRuntime& seed =
+        PathSearchFrontierNode& seed =
           grid[sourceZ * kEdgeSearchGridSpan + sourceX];
         UnlinkFrontierNode(&seed);
         seed.visitFlags = 1u;
@@ -2723,7 +2723,7 @@ namespace
 
         // Label-correcting drain of the FIFO ring.
         while (openListHead.next != &openListHead) {
-          PathSearchFrontierNodeRuntime* const current = openListHead.next;
+          PathSearchFrontierNode* const current = openListHead.next;
           UnlinkFrontierNode(current);
           current->next = current;
           current->prev = current;
@@ -2749,7 +2749,7 @@ namespace
             const float candidateCost = kOctileStepCost[k] + current->pathCost;
             settledMask |= static_cast<std::uint8_t>(1u << k);
 
-            PathSearchFrontierNodeRuntime& neighbor =
+            PathSearchFrontierNode& neighbor =
               grid[neighborRow * kEdgeSearchGridSpan + neighborCol];
             if (neighbor.visitFlags != 0u && candidateCost >= neighbor.pathCost) {
               continue;
@@ -2767,7 +2767,7 @@ namespace
           const std::uint32_t edgeIndex = TriangularEdgePairIndex(source, target);
           const std::uint8_t targetX = nodeBytes[2u * target];
           const std::uint8_t targetZ = nodeBytes[2u * target + 1u];
-          const PathSearchFrontierNodeRuntime& targetCell =
+          const PathSearchFrontierNode& targetCell =
             grid[targetZ * kEdgeSearchGridSpan + targetX];
 
           if (targetCell.visitFlags == 0u) {
