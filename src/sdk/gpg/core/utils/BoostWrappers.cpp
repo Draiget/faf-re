@@ -62,7 +62,7 @@ namespace
     std::uint32_t lane04 = 0;
   };
 
-  [[noreturn]] void ThrowThreadResourceErrorRuntime()
+  [[noreturn]] void ThrowThreadResourceError()
   {
     throw boost::thread_resource_error();
   }
@@ -83,7 +83,7 @@ namespace boost
   {
     const HANDLE mutexHandle = ::CreateMutexA(nullptr, FALSE, mutexName);
     if (mutexHandle == nullptr || mutexHandle == INVALID_HANDLE_VALUE) {
-      ThrowThreadResourceErrorRuntime();
+      ThrowThreadResourceError();
     }
   }
 
@@ -119,7 +119,7 @@ namespace boost
     outHandle->handle = nullptr;
     const HANDLE mutexHandle = ::CreateMutexA(nullptr, FALSE, nullptr);
     if (mutexHandle == nullptr || mutexHandle == INVALID_HANDLE_VALUE) {
-      ThrowThreadResourceErrorRuntime();
+      ThrowThreadResourceError();
     }
 
     outHandle->handle = mutexHandle;
@@ -146,7 +146,7 @@ namespace boost
 
     const HANDLE mutexHandle = ::CreateMutexA(nullptr, FALSE, nullptr);
     if (mutexHandle == nullptr || mutexHandle == INVALID_HANDLE_VALUE) {
-      ThrowThreadResourceErrorRuntime();
+      ThrowThreadResourceError();
     }
 
     outHandlePair->handle = mutexHandle;
@@ -686,71 +686,6 @@ namespace boost
     *rightLane = *leftLane;
     *leftLane = temp;
     return leftLane;
-  }
-
-  struct RuntimeSharedCountTailRecord20
-  {
-    std::uint32_t lane00;        // +0x00
-    std::uint32_t lane04;        // +0x04
-    std::uint32_t lane08;        // +0x08
-    detail::shared_count lane0C; // +0x0C
-    std::uint32_t lane10;        // +0x10
-  };
-  static_assert(sizeof(RuntimeSharedCountTailRecord20) == 0x14, "RuntimeSharedCountTailRecord20 size must be 0x14");
-  static_assert(offsetof(RuntimeSharedCountTailRecord20, lane0C) == 0x0C, "RuntimeSharedCountTailRecord20::lane0C offset must be 0x0C");
-
-  /**
-   * Address: 0x00950280 (FUN_00950280)
-   *
-   * What it does:
-   * Copy-assigns one five-lane runtime record where lane `+0x0C` is a
-   * `boost::detail::shared_count` payload requiring retained assignment.
-   */
-  RuntimeSharedCountTailRecord20* AssignRuntimeSharedCountTailRecord20(
-    RuntimeSharedCountTailRecord20* const destination,
-    const RuntimeSharedCountTailRecord20* const source
-  )
-  {
-    destination->lane00 = source->lane00;
-    destination->lane04 = source->lane04;
-    destination->lane08 = source->lane08;
-    destination->lane0C = source->lane0C;
-    destination->lane10 = source->lane10;
-    return destination;
-  }
-
-  struct RuntimeSharedCountTripleBlock
-  {
-    std::uint32_t lane00;             // +0x00
-    std::uint32_t lane04;             // +0x04
-    detail::shared_count lane08;      // +0x08
-    std::uint32_t lane0C;             // +0x0C
-    std::uint32_t lane10;             // +0x10
-    detail::shared_count lane14;      // +0x14
-    std::uint32_t lane18;             // +0x18
-    detail::shared_count lane1C;      // +0x1C
-  };
-
-  /**
-   * Address: 0x008E67C0 (FUN_008E67C0)
-   *
-   * What it does:
-   * Copy-assigns one mixed runtime block with three `shared_count` lanes and
-   * five scalar lanes.
-   */
-  RuntimeSharedCountTripleBlock* AssignRuntimeSharedCountTripleBlock(
-    RuntimeSharedCountTripleBlock* const destination,
-    const RuntimeSharedCountTripleBlock* const source
-  )
-  {
-    destination->lane04 = source->lane04;
-    destination->lane08 = source->lane08;
-    destination->lane0C = source->lane0C;
-    destination->lane10 = source->lane10;
-    destination->lane14 = source->lane14;
-    destination->lane18 = source->lane18;
-    destination->lane1C = source->lane1C;
-    return destination;
   }
 
   /**
@@ -1417,7 +1352,7 @@ namespace boost
 
   namespace
   {
-    [[noreturn]] void ThrowBadPointerForNullPushBackRuntime()
+    [[noreturn]] void ThrowBadPointerForNullPushBack()
     {
       throw bad_pointer();
     }
@@ -1435,7 +1370,7 @@ namespace boost
   )
   {
     if (inputPointer == nullptr) {
-      ThrowBadPointerForNullPushBackRuntime();
+      ThrowBadPointerForNullPushBack();
     }
   }
 
@@ -1451,7 +1386,7 @@ namespace boost
   )
   {
     if (inputPointer == nullptr) {
-      ThrowBadPointerForNullPushBackRuntime();
+      ThrowBadPointerForNullPushBack();
     }
   }
 

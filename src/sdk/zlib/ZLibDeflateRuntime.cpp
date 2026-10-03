@@ -45,8 +45,8 @@ extern "C" int deflateEnd(zlib::ZStream* strm);
 
 // compressBound's legacy formula lives in the sibling gpg/core/streams TU
 // (0x0095DF20); deflateBound below calls it exactly as the binary does at
-// 0x0095AC72. Plain C++ linkage (not extern "C"), matching its real definition.
-unsigned int compressBoundRuntime(unsigned int sourceLength);
+// 0x0095AC72. Real zlib entry point: extern "C", signature per zlib.h.
+extern "C" unsigned long compressBound(unsigned long sourceLength);
 
 namespace {
 
@@ -2183,7 +2183,7 @@ extern "C" int deflateEnd(ZStream* strm)
 // zlib public-API bodies that shipped in the binary but are never exercised
 // by this build of the engine. deflateBound (0x0095AC40) is the same
 // situation for its own address, but its body does reach an already-recovered
-// helper (compressBoundRuntime) by real call, so recovering it gives that
+// helper (compressBound) by real call, so recovering it gives that
 // helper a live source-level caller.
 // -----------------------------------------------------------------------------
 
@@ -2295,7 +2295,7 @@ extern "C" int deflateTune(ZStream* strm, int good_length, int max_lazy, int nic
  * returns that conservative bound as-is. Otherwise defers to the tighter
  * compressBound() formula, which only holds for the default-parameters case.
  * Matches the binary exactly, including the call to compressBound at
- * 0x0095AC72 (recovered as compressBoundRuntime, 0x0095DF20).
+ * 0x0095AC72 (recovered as compressBound, 0x0095DF20).
  */
 extern "C" unsigned long deflateBound(ZStream* strm, unsigned long sourceLen)
 {
@@ -2318,5 +2318,5 @@ extern "C" unsigned long deflateBound(ZStream* strm, unsigned long sourceLen)
   }
 
   // Default settings: return the tight bound for that case.
-  return compressBoundRuntime(static_cast<unsigned int>(sourceLen));
+  return compressBound(sourceLen);
 }

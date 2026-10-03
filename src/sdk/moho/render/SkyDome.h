@@ -273,6 +273,37 @@ namespace moho
     void RenderAtmosphere(const GeomCamera3& cam);
 
     /**
+     * Address: 0x008153C0 (FUN_008153C0)
+     *
+     * What it does:
+     * Clears the retained dome vertex-buffer handle, writes the incoming dome
+     * origin/shape lanes, and restores default tessellation lanes (`16x6`) plus
+     * the default start-angle lane (`1.2566371f`).
+     */
+    void ResetDomeShape(const Wm3::Vector3f& domeOrigin, float domeHeight, float domeRadius) noexcept;
+
+    /**
+     * Address: 0x008154A0 (FUN_008154A0)
+     *
+     * IDA signature:
+     * int __userpurge sub_8154A0(float *skyColor@<ebx>, SkyDome *this@<esi>,
+     *     float horizonSize, float *horizonColor);
+     *
+     * What it does:
+     * Clears the retained horizon-lookup texture handle, writes the incoming
+     * horizon size lane, and stores the horizon and sky colour vectors. The
+     * horizon-lookup path string is built/destroyed around this call by
+     * SetupHorizonAndCirrus but is not consumed here (threaded through as an
+     * ignored parameter so the caller keeps the original temporary lifetime).
+     */
+    void ResetHorizonContext(
+      const Wm3::Vector3f& skyColor,
+      float horizonSize,
+      const Wm3::Vector3f& horizonColor,
+      const msvc8::string& horizonLookupPath
+    ) noexcept;
+
+    /**
      * Address: 0x00819650 (FUN_00819650)
      * Mangled: ?RenderCirrus@SkyDome@Moho@@AAEXHMABVGeomCamera3@2@@Z
      *

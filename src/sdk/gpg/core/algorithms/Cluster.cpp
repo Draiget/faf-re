@@ -66,8 +66,6 @@ namespace
         return false;
     }
 
-
-
     constexpr std::uint8_t kClusterSizeLog2ByLevel[] = { 0u, 3u, 5u, 7u };
     constexpr std::size_t kClusterSizeLog2Count = sizeof(kClusterSizeLog2ByLevel) / sizeof(kClusterSizeLog2ByLevel[0]);
     constexpr std::uint8_t kClusterSizeByLevel[] = { 1u, 8u, 32u, 128u };
@@ -361,25 +359,6 @@ namespace
     }
 
     /**
-     * Address: 0x00954210 (FUN_00954210)
-     *
-     * What it does:
-     * Initializes one inline byte-buffer over `[origin, origin + capacity)`.
-     */
-    InlineByteCursorBufferRuntime* InitializeInlineByteCursorBufferRuntime(
-      InlineByteCursorBufferRuntime* const state,
-      std::uint8_t* const origin,
-      const std::int32_t capacityBytes
-    ) noexcept
-    {
-      state->begin = origin;
-      state->current = origin;
-      state->end = origin + capacityBytes;
-      state->inlineOrigin = origin;
-      return state;
-    }
-
-    /**
      * Address: 0x00954230 (FUN_00954230)
      *
      * What it does:
@@ -404,20 +383,6 @@ namespace
     ) noexcept
     {
       return state->begin + byteOffset;
-    }
-
-    /**
-     * Address: 0x00954580 (FUN_00954580)
-     *
-     * What it does:
-     * Initializes one 64-byte embedded inline buffer runtime state.
-     */
-    InlineByteCursorBuffer64Runtime* InitializeInlineByteCursorBuffer64Runtime(
-      InlineByteCursorBuffer64Runtime* const state
-    ) noexcept
-    {
-      (void)InitializeInlineByteCursorBufferRuntime(&state->state, state->inlineStorage, 64);
-      return state;
     }
 
     /**
@@ -563,34 +528,6 @@ namespace
     ) noexcept
     {
       return UnlinkIntrusiveRingNode_A(node);
-    }
-
-    /**
-     * Address: 0x009549A0 (FUN_009549A0)
-     *
-     * What it does:
-     * Initializes one 32-byte embedded inline buffer runtime state.
-     */
-    InlineByteCursorBuffer32Runtime* InitializeInlineByteCursorBuffer32Runtime(
-      InlineByteCursorBuffer32Runtime* const state
-    ) noexcept
-    {
-      (void)InitializeInlineByteCursorBufferRuntime(&state->state, state->inlineStorage, 32);
-      return state;
-    }
-
-    /**
-     * Address: 0x009549F0 (FUN_009549F0)
-     *
-     * What it does:
-     * Initializes one 120-byte embedded inline buffer runtime state.
-     */
-    InlineByteCursorBuffer120Runtime* InitializeInlineByteCursorBuffer120Runtime(
-      InlineByteCursorBuffer120Runtime* const state
-    ) noexcept
-    {
-      (void)InitializeInlineByteCursorBufferRuntime(&state->state, state->inlineStorage, 120);
-      return state;
     }
 
     /**

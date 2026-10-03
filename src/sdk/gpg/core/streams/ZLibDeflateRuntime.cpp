@@ -353,60 +353,6 @@ extern "C" const char* __cdecl zlibVersion()
 }
 
 /**
- * Address: 0x0095D630 (FUN_0095D630)
- *
- * What it does:
- * Combines two packed Adler lanes using the runtime modulo path
- * (`base = 65521`) and returns the merged packed state.
- */
-[[maybe_unused]] std::uint32_t Adler32CombinePackedLaneRuntime(
-  const std::uint32_t adlerA,
-  const std::uint32_t adlerB,
-  const std::uint32_t lengthLane
-) noexcept
-{
-  constexpr std::uint32_t kAdlerBase = 65521u;
-
-  const std::uint32_t s1A = static_cast<std::uint16_t>(adlerA);
-  const std::uint32_t s2A = adlerA >> 16u;
-  const std::uint32_t s1B = static_cast<std::uint16_t>(adlerB);
-  const std::uint32_t s2B = adlerB >> 16u;
-  const std::uint32_t lengthModBase = lengthLane % kAdlerBase;
-
-  const std::uint32_t productLane = lengthModBase * s1A;
-  std::uint32_t sumS1 = s1A + s1B + 65520u;
-  const std::uint32_t laneS2 = s2B + s2A - kAdlerBase * (productLane / kAdlerBase) - lengthModBase;
-  std::uint32_t sumS2 = productLane + laneS2 + kAdlerBase;
-
-  if (sumS1 > kAdlerBase) {
-    sumS1 = s1A + s1B - 1u;
-    if (sumS1 > kAdlerBase) {
-      sumS1 = s1A + s1B - 65522u;
-    }
-  }
-
-  if (sumS2 > 0x1FFE2u) {
-    sumS2 = productLane + laneS2 - kAdlerBase;
-  }
-  if (sumS2 > kAdlerBase) {
-    sumS2 -= kAdlerBase;
-  }
-
-  return sumS1 | (sumS2 << 16u);
-}
-
-/**
- * Address: 0x0095D6D0 (FUN_0095D6D0)
- *
- * What it does:
- * Returns the zlib CRC lookup-table base lane.
- */
-[[maybe_unused]] const uLongf* RuntimeGetZlibCrcTable() noexcept
-{
-  return get_crc_table();
-}
-
-/**
  * Address: 0x0095DC90 (FUN_0095DC90)
  *
  * What it does:
@@ -824,16 +770,17 @@ extern "C" int __cdecl longest_match_fast(
  * Compresses one in-memory source span into a caller-provided destination
  * span using one temporary z_stream lane and returns zlib-style status codes.
  */
-[[maybe_unused]] int DeflateCompressBufferWithRuntimeLevel(
-  std::uint8_t* const destinationBuffer,
-  unsigned int* const inOutDestinationLength,
-  std::uint8_t* const sourceBuffer,
-  const unsigned int sourceLength,
-  const int compressionLevel
+extern "C" [[maybe_unused]] int compress2(
+  unsigned char* destinationBuffer,
+  unsigned long* inOutDestinationLength,
+  const unsigned char* sourceBuffer,
+  unsigned long sourceLength,
+  int compressionLevel
 )
 {
   z_stream stream;
-  stream.next_in = sourceBuffer;
+  // zlib 1.2.3's own compress2 casts the const source exactly like this.
+  stream.next_in = const_cast<unsigned char*>(sourceBuffer);
   stream.avail_in = sourceLength;
   stream.next_out = destinationBuffer;
   stream.avail_out = *inOutDestinationLength;
@@ -877,7 +824,7 @@ extern "C" int __cdecl longest_match_fast(
  * at 0x0095AC72 when the stream is running the library's default window/hash
  * geometry (w_bits == 15 && hash_bits == 15).
  */
-unsigned int compressBoundRuntime(const unsigned int sourceLength)
+extern "C" unsigned long compressBound(unsigned long sourceLength)
 {
   return sourceLength + (sourceLength >> 12u) + (sourceLength >> 14u) + 11u;
 }
