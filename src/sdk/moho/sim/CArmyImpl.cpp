@@ -44,28 +44,13 @@
 
 namespace
 {
-  template <std::size_t SlotIndex>
-  void CallDeletingDestructorSlot(void* object)
-  {
-    if (object == nullptr) {
-      return;
-    }
-
-    auto** const vtable = *reinterpret_cast<void***>(object);
-    if (vtable == nullptr) {
-      return;
-    }
-
-    using DeletingDtor = void(__thiscall*)(void*, int);
-    auto* const dtor = reinterpret_cast<DeletingDtor>(vtable[SlotIndex]);
-    dtor(object, 1);
-  }
-
   void DestroyPlatoonPool(moho::ArmyPool& pool)
   {
     // Address: 0x006FF9A0 (FUN_006FF9A0), platoon-pool destruction prefix.
+    // Binary dispatches the slot-2 scalar deleting destructor per platoon,
+    // which is exactly what `delete` emits through CScriptObject's virtual dtor.
     for (moho::CPlatoon** it = pool.platoons.begin(); it != pool.platoons.end(); ++it) {
-      CallDeletingDestructorSlot<2>(*it);
+      delete *it;
     }
 
     pool.platoons.ResetStorageToInline();
@@ -424,18 +409,6 @@ namespace
     objectRef.mObj = const_cast<TObject*>(object);
     objectRef.mType = (object != nullptr) ? objectType : nullptr;
     gpg::WriteRawPointer(archive, objectRef, trackedState, owner);
-  }
-
-  template <std::size_t SlotIndex, class TObject>
-  void ReplaceDeletingDtorOwnedPointer(TObject*& field, TObject* const value)
-  {
-    TObject* const prior = field;
-    if (prior == value) {
-      return;
-    }
-
-    field = value;
-    CallDeletingDestructorSlot<SlotIndex>(prior);
   }
 
   template <class TObject>
@@ -1158,7 +1131,7 @@ namespace moho
 
     const int mapMaxExtent = ResolveMapMaxExtent(sim);
     ReplaceDeleteOwnedPointer(InfluenceMap, new CInfluenceMap(ResolveInfluenceMapGridSize(mapMaxExtent), sim, this));
-    ReplaceDeletingDtorOwnedPointer<2>(AiBrain, new CAiBrain(this));
+    ReplaceDeleteOwnedPointer(AiBrain, new CAiBrain(this));
 
     // 0x006FEC7C reads the option and hands `GetString()` straight to an inline
     // strlen -- there is no default, and the `compare(0, size, "none", 4)` at
@@ -1171,7 +1144,7 @@ namespace moho
     // whole map -- enemy meshes, blips and build effects alike -- was visible
     // with no intel at all.
     const char* const fogOfWar = GetLuaStringField(scenarioInfoOptions, "FogOfWar");
-    ReplaceDeletingDtorOwnedPointer<0>(AiReconDb, CAiReconDBImpl::Create(this, std::strcmp(fogOfWar, "none") != 0));
+    ReplaceDeleteOwnedPointer(AiReconDb, CAiReconDBImpl::Create(this, std::strcmp(fogOfWar, "none") != 0));
     CopyReconGridsFromDatabase(*this);
 
     if (CPlatoon* const pool = MakePlatoon("Pool", "PoolAI"); pool != nullptr) {
@@ -1251,12 +1224,14 @@ namespace moho
 
     DestroyArmyEconomyInfo(EconomyInfo);
 
-    // Evidence: 0x006FF9A0 calls vtable slot 0 with delete-flag for mReconDB (+0x1F0).
-    CallDeletingDestructorSlot<0>(AiReconDb);
+    // Evidence: 0x006FF9A0 calls the slot-0 scalar deleting destructor for
+    // mReconDB (+0x1F0) — IAiReconDB declares its dtor at slot 0.
+    delete AiReconDb;
     AiReconDb = nullptr;
 
-    // Evidence: 0x006FF9A0 calls vtable slot 2 with delete-flag for mBrain (+0x1EC).
-    CallDeletingDestructorSlot<2>(AiBrain);
+    // Evidence: 0x006FF9A0 calls the slot-2 scalar deleting destructor for
+    // mBrain (+0x1EC) — CScriptObject declares its dtor at slot 2.
+    delete AiBrain;
     AiBrain = nullptr;
   }
 
@@ -1399,8 +1374,8 @@ namespace moho
     archive->Read(SimArmy::StaticGetClass(), static_cast<SimArmy*>(this), owner);
 
     Simulation = ReadPointerTyped<Sim>(archive, owner, ResolveSimType(), false);
-    ReplaceDeletingDtorOwnedPointer<2>(AiBrain, ReadPointerTyped<CAiBrain>(archive, owner, ResolveCAiBrainType(), true));
-    ReplaceDeletingDtorOwnedPointer<0>(
+    ReplaceDeleteOwnedPointer(AiBrain, ReadPointerTyped<CAiBrain>(archive, owner, ResolveCAiBrainType(), true));
+    ReplaceDeleteOwnedPointer(
       AiReconDb, ReadPointerTyped<CAiReconDBImpl>(archive, owner, ResolveCAiReconDBImplType(), true)
     );
     ReplaceEconomyOwnedPointer(EconomyInfo, ReadPointerTyped<CSimArmyEconomyInfo>(archive, owner, ResolveCEconomyType(), true));

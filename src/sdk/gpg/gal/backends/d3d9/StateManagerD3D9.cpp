@@ -1,27 +1,11 @@
 #include "StateManagerD3D9.hpp"
 
 #include <bit>
-// TEMPORARY PROBE (do not commit): log states pushed while TDecals is active (statediag.on).
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include <windows.h>
 #include "gpg/core/utils/Logging.h"
-namespace gpg::gal { extern char gProbeCurrentTechnique[64]; }
-namespace {
-  bool ProbeStateDiagArmed() {
-    static unsigned sCalls = 0; static bool sArmed = false;
-    if ((sCalls++ % 256u) == 0u) {
-      char dir[512] = {}; std::size_t length = 0; sArmed = false;
-      if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u) {
-        char path[600]; (void)std::snprintf(path, sizeof(path), "%s\\statediag.on", dir);
-        sArmed = ::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
-      }
-    }
-    return sArmed && std::strcmp(gpg::gal::gProbeCurrentTechnique, "TDecals") == 0;
-  }
-  int gProbeStateBudget = 400;
-}
 
 namespace gpg::gal
 {
@@ -110,7 +94,6 @@ namespace gpg::gal
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetRenderState(const D3DRENDERSTATETYPE state, const DWORD value)
   {
     const bool changed = renderStateCache_.Update(state, value);
-    if (ProbeStateDiagArmed() && gProbeStateBudget > 0) { --gProbeStateBudget; gpg::Warnf("[STATEDIAG] RS state=%u value=%08X changed=%d", static_cast<unsigned>(state), static_cast<unsigned>(value), changed ? 1 : 0); } // TEMPORARY PROBE
     if (!changed)
     {
       return S_OK;
@@ -144,7 +127,6 @@ namespace gpg::gal
   )
   {
     const bool changed = sampler >= 16 || samplerStateCache_[sampler].Update(type, value);
-    if (ProbeStateDiagArmed() && gProbeStateBudget > 0) { --gProbeStateBudget; gpg::Warnf("[STATEDIAG] SS sampler=%u state=%u value=%08X changed=%d", static_cast<unsigned>(sampler), static_cast<unsigned>(type), static_cast<unsigned>(value), changed ? 1 : 0); } // TEMPORARY PROBE
     if (!changed)
     {
       return S_OK;
@@ -196,13 +178,6 @@ namespace gpg::gal
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetTexture(const DWORD stage, IDirect3DBaseTexture9* const texture)
   {
-    if (ProbeStateDiagArmed() && gProbeStateBudget > 0) { --gProbeStateBudget; gpg::Warnf("[STATEDIAG] TEX stage=%u texture=%p", static_cast<unsigned>(stage), static_cast<void*>(texture)); } // TEMPORARY PROBE
-    { // TEMPORARY PROBE (do not commit): surface SetTexture failures (foreign-device textures etc.)
-      const HRESULT hrTex = device_->SetTexture(stage, texture);
-      static int sFailBudget = 40;
-      if (hrTex != 0 && sFailBudget > 0) { --sFailBudget; gpg::Warnf("[SETTEXFAIL] stage=%u texture=%p hr=%08lX device=%p", static_cast<unsigned>(stage), static_cast<void*>(texture), static_cast<long>(hrTex), static_cast<void*>(device_)); }
-      return hrTex;
-    }
   }
 
   /**

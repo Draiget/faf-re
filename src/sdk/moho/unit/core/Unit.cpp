@@ -1788,22 +1788,6 @@ namespace
     return invalidTarget;
   }
 
-  using NavigatorCanPathToRectVFunc =
-    bool(__thiscall*)(moho::IAiNavigator* navigator, const moho::SAiNavigatorGoal* goal, Wm3::Vector3f* outTargetPos);
-
-  [[nodiscard]] bool InvokeNavigatorCanPathToRect(
-    moho::IAiNavigator* const navigator,
-    const moho::SAiNavigatorGoal& goal,
-    Wm3::Vector3f* const outTargetPos
-  )
-  {
-    // FUN_006CBD70 dispatches slot 15 with an additional out-target vector lane.
-    // Keep this localized ABI shim until IAiNavigator slot typing is fully lifted.
-    auto** const vtable = *reinterpret_cast<void***>(navigator);
-    const auto method = reinterpret_cast<NavigatorCanPathToRectVFunc>(vtable[15]);
-    return method(navigator, &goal, outTargetPos);
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
@@ -10304,7 +10288,7 @@ int moho::cfunc_UnitCanPathToL(LuaPlus::LuaState* const state)
   goal.maxZ = static_cast<std::int32_t>(footprintMinZ) + static_cast<std::int32_t>(footprint.mSizeZ);
 
   Wm3::Vector3f targetPosition = InvalidNavigatorTargetLane();
-  const bool canPath = InvokeNavigatorCanPathToRect(unit->AiNavigator, goal, &targetPosition);
+  const bool canPath = unit->AiNavigator->CanPathTo(&targetPosition, goal);
   lua_pushboolean(rawState, canPath ? 1 : 0);
   (void)lua_gettop(rawState);
 
@@ -10344,7 +10328,7 @@ int moho::cfunc_UnitCanPathToRectL(LuaPlus::LuaState* const state)
   goal.maxZ = RoundGridCoordUp(maxCorner.z);
 
   Wm3::Vector3f targetPos = InvalidNavigatorTargetLane();
-  const bool canPath = InvokeNavigatorCanPathToRect(unit->AiNavigator, goal, &targetPos);
+  const bool canPath = unit->AiNavigator->CanPathTo(&targetPos, goal);
 
   lua_pushboolean(rawState, canPath ? 1 : 0);
   (void)lua_gettop(rawState);

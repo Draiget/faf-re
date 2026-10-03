@@ -403,8 +403,10 @@ bool CAiNavigatorAir::AtGoal() const
 /**
  * Address: 0x005A49E0 (FUN_005A49E0)
  */
-bool CAiNavigatorAir::CanPathTo(const SAiNavigatorGoal&) const
+bool CAiNavigatorAir::CanPathTo(Wm3::Vector3f* outTargetPos, const SAiNavigatorGoal& goal) const
 {
+  (void)outTargetPos;
+  (void)goal;
   return true;
 }
 

@@ -6058,9 +6058,9 @@ namespace
       return;
     }
 
-    using CrtFacetDeletingDtorFn = void*(__thiscall*)(CrtLocaleFacetRef*, int);
-    auto* const deletingDtor = reinterpret_cast<CrtFacetDeletingDtorFn>(owned->vftable[0]);
-    (void)deletingDtor(owned, 1);
+    // CRT shape: the scalar deleting destructor (vftable slot 0, flag 1) is
+    // exactly what `delete` emits through locale::facet's virtual destructor.
+    delete node->facet;
   }
 
   /**

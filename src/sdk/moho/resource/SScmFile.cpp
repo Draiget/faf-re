@@ -18,7 +18,7 @@ namespace moho::scm_file
     const std::uint32_t boneCount = file.mBoneTotalCount;
     outNamePointers.resize(boneCount);
 
-    const char* cursor = reinterpret_cast<const char*>(&file) + 0x40;
+    const char* cursor = GetBoneNames(file);
     for (std::uint32_t boneIndex = 0; boneIndex < boneCount; ++boneIndex) {
       outNamePointers.begin()[boneIndex] = cursor;
       cursor += std::strlen(cursor) + 1;

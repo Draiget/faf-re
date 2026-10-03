@@ -3,20 +3,11 @@
 
 namespace
 {
-  using DeletingDestructorFn = int(__thiscall*)(void*, int);
-
-  void DeleteSimResourcesViaVTable(moho::CSimResources* resources) noexcept
+  void DeleteSimResourcesOwned(moho::CSimResources* resources) noexcept
   {
-    if (resources == nullptr) {
-      return;
-    }
-
-    auto* const vftable = *reinterpret_cast<DeletingDestructorFn**>(resources);
-    if (vftable == nullptr || vftable[0] == nullptr) {
-      return;
-    }
-
-    vftable[0](resources, 1);
+    // Binary invokes the scalar deleting destructor through vtable slot 0,
+    // which is exactly what `delete` compiles to for this virtual hierarchy.
+    delete resources;
   }
 
   class SimResourcesSharedControl final : public boost::detail::sp_counted_base
@@ -28,7 +19,7 @@ namespace
 
     void dispose() noexcept override
     {
-      DeleteSimResourcesViaVTable(resources_);
+      DeleteSimResourcesOwned(resources_);
       resources_ = nullptr;
     }
 
@@ -74,7 +65,7 @@ namespace moho::detail
     try {
       return new SimResourcesSharedControl(resources);
     } catch (...) {
-      DeleteSimResourcesViaVTable(resources);
+      DeleteSimResourcesOwned(resources);
       throw;
     }
   }

@@ -754,8 +754,6 @@ namespace boost
     }
   }
 
-  using SpCountedDeletingDtorFn = int (__thiscall*)(detail::sp_counted_base*, int);
-
   /**
    * Address: 0x00545490 (FUN_00545490)
    *
@@ -769,9 +767,11 @@ namespace boost
       return 0;
     }
 
-    auto** const vtable = *reinterpret_cast<void***>(control);
-    auto* const deletingDtor = reinterpret_cast<SpCountedDeletingDtorFn>(vtable[0]);
-    return deletingDtor(control, 1);
+    // Binary dispatches the slot-0 scalar deleting destructor with delete
+    // flag 1 -- exactly what `delete` emits through sp_counted_base's
+    // virtual destructor.
+    delete control;
+    return 0;
   }
 
   /**
@@ -2137,8 +2137,6 @@ namespace boost
 
   namespace
   {
-    using deleting_dtor_fn = int(__thiscall*)(void*, int);
-
     template <class TObject>
     [[nodiscard]] int DeletePolymorphicSharedCountCtorPointeeOnUnwind(
       TObject* const pointer
@@ -2148,9 +2146,10 @@ namespace boost
         return 0;
       }
 
-      auto** const vtable = *reinterpret_cast<void***>(pointer);
-      auto* const deletingDtor = reinterpret_cast<deleting_dtor_fn>(vtable[0]);
-      return deletingDtor(pointer, 1);
+      // `TObject` is polymorphic (virtual dtor at slot 0), so `delete`
+      // reproduces the binary's slot-0 deleting-destructor dispatch.
+      delete pointer;
+      return 0;
     }
   } // namespace
 

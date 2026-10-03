@@ -152,7 +152,7 @@ namespace moho
      * VFTable SLOT: 15
      */
     [[nodiscard]]
-    bool CanPathTo(const SAiNavigatorGoal& goal) const override;
+    bool CanPathTo(Wm3::Vector3f* outTargetPos, const SAiNavigatorGoal& goal) const override;
 
     /**
      * Address: 0x005A3E80 (FUN_005A3E80)

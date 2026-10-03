@@ -464,7 +464,7 @@ bool CAiNavigatorLand::AtGoal() const
 /**
  * Address: 0x005A3CD0 (FUN_005A3CD0)
  */
-bool CAiNavigatorLand::CanPathTo(const SAiNavigatorGoal& goal) const
+bool CAiNavigatorLand::CanPathTo(Wm3::Vector3f* outTargetPos, const SAiNavigatorGoal& goal) const
 {
   if (!mUnit) {
     return false;
@@ -472,8 +472,7 @@ bool CAiNavigatorLand::CanPathTo(const SAiNavigatorGoal& goal) const
 
   CAiPathNavigator tempPathNavigator{mUnit};
   tempPathNavigator.SetCurrentPosition(mUnit->GetPosition());
-  Wm3::Vector3f scratchTarget{};
-  return tempPathNavigator.CanPathTo(goal, &scratchTarget);
+  return tempPathNavigator.CanPathTo(goal, outTargetPos);
 }
 
 /**

@@ -105,6 +105,15 @@ namespace moho
       return reinterpret_cast<const std::uint16_t*>(fileBase + file.mIndexDataOffset);
     }
 
+    /// Base pointer of the packed SCM bone-name string block, which starts
+    /// immediately after the fixed 0x40-byte on-disk header. File-image blob
+    /// access, same as `GetVertices`/`GetIndices`.
+    [[nodiscard]] inline const char* GetBoneNames(const SScmFile& file) noexcept
+    {
+      const auto* const fileBase = reinterpret_cast<const std::uint8_t*>(&file);
+      return reinterpret_cast<const char*>(fileBase + 0x40);
+    }
+
     /**
      * Address: 0x005379D0 (FUN_005379D0)
      *

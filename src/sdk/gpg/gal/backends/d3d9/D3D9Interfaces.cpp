@@ -20,7 +20,6 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/Error.hpp"
-#include "gpg/core/utils/Logging.h" // TEMPORARY PROBE (do not commit)
 #include "gpg/gal/EffectMacro.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/CubeRenderTarget.hpp"
@@ -52,26 +51,6 @@
 
 namespace gpg::gal
 {
-// TEMPORARY PROBE (do not commit): current technique name for the state-manager log.
-char gProbeCurrentTechnique[64] = {}; // already inside namespace gpg::gal
-int gProbeFrameSeq = 0; int gProbeFrameDiagLeft = 0; // TEMPORARY PROBE (do not commit)
-extern "C" int FafProbeFrameSeq() { return gProbeFrameSeq; }
-extern "C" int FafProbeFrameDiag() { return gProbeFrameDiagLeft; }
-namespace { // TEMPORARY PROBE (do not commit)
-    bool ProbeTexSetArmed()
-    {
-        static unsigned sCalls = 0; static bool sArmed = false;
-        if ((sCalls++ % 256u) == 0u) {
-            char dir[512] = {}; std::size_t length = 0; sArmed = false;
-            if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u) {
-                char path[600]; (void)std::snprintf(path, sizeof(path), "%s/statediag.on", dir);
-                sArmed = ::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
-            }
-        }
-        return sArmed;
-    }
-    int gProbeTexSetBudget = 300;
-}
 
     /**
      * Address: 0x008F3820 (FUN_008F3820)
@@ -2674,7 +2653,6 @@ namespace { // TEMPORARY PROBE (do not commit)
 
                 IDirect3DTexture9* texture;
                 const HRESULT createResult = D3DXCreateTextureFromFileInMemoryEx(mDevice, sourceData, sourceBytes, width, height, D3DX_DEFAULT, 0U, static_cast<D3DFORMAT>(FormatGalToD3D(context->format_)), D3DPOOL_MANAGED, D3DX_DEFAULT, mipFilter, 0U, nullptr, nullptr, &texture);
-                { static int sDevBudget = 60; if (sDevBudget > 0) { --sDevBudget; ::gpg::Warnf("[TEXCREATE] tid=%lu device=%p bytes=%u skip=%u mipFilter=%08X w=%u h=%u loc=%s", ::GetCurrentThreadId(), mDevice, static_cast<unsigned>(sourceBytes), context->reserved0x44_, mipFilter, context->width_, context->height_, context->location_.c_str()); } } // TEMPORARY PROBE (do not commit)
                 if (createResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 377, createResult);
@@ -3329,54 +3307,6 @@ namespace { // TEMPORARY PROBE (do not commit)
         {
         }
 
-        { // TEMPORARY PROBE (do not commit): per-frame sequence + framediag.on arming
-            ++gProbeFrameSeq;
-            if (gProbeFrameDiagLeft > 0) { ::gpg::Warnf("[FD] present f=%d", gProbeFrameSeq); --gProbeFrameDiagLeft; }
-            else { char dirF[512] = {}; std::size_t lenF = 0;
-              if (::getenv_s(&lenF, dirF, sizeof(dirF), "FAF_TOGGLE_DIR") == 0 && lenF != 0u) {
-                char fpath[600]; (void)std::snprintf(fpath, sizeof(fpath), "%s/framediag.on", dirF);
-                if (::GetFileAttributesA(fpath) != INVALID_FILE_ATTRIBUTES) { gProbeFrameDiagLeft = 8; ::DeleteFileA(fpath); }
-              } }
-        }
-        { // TEMPORARY PROBE (do not commit): dump two consecutive presents while dumpframe2.on exists
-            static int sPairState = 0;
-            char dir2[512] = {}; std::size_t len2 = 0;
-            if (::getenv_s(&len2, dir2, sizeof(dir2), "FAF_TOGGLE_DIR") == 0 && len2 != 0u) {
-                char tpath[600]; (void)std::snprintf(tpath, sizeof(tpath), "%s/dumpframe2.on", dir2);
-                const bool armed = ::GetFileAttributesA(tpath) != INVALID_FILE_ATTRIBUTES;
-                if (armed && sPairState < 2) {
-                    IDirect3DSurface9* bb = nullptr;
-                    if (mDevice->GetBackBuffer(0U, 0U, D3DBACKBUFFER_TYPE_MONO, &bb) >= 0 && bb != nullptr) {
-                        char out[600]; (void)std::snprintf(out, sizeof(out), "%s/frame_%c.bmp", dir2, sPairState == 0 ? 'A' : 'B');
-                        const HRESULT sh = D3DXSaveSurfaceToFileA(out, D3DXIFF_BMP, bb, nullptr, nullptr);
-                        bb->Release();
-                        ::gpg::Warnf("[FRAMEDUMP2] %d hr=%08lX %s", sPairState, static_cast<long>(sh), out);
-                    }
-                    ++sPairState;
-                    if (sPairState == 2) { ::DeleteFileA(tpath); }
-                } else if (!armed) {
-                    sPairState = 0;
-                }
-            }
-        }
-        { // TEMPORARY PROBE (do not commit): dump the back buffer while dumpframe.on exists
-            static unsigned sPresentCalls = 0;
-            if ((sPresentCalls++ % 64u) == 0u) {
-                char dir[512] = {}; std::size_t length = 0;
-                if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u) {
-                    char path[600]; (void)std::snprintf(path, sizeof(path), "%s/dumpframe.on", dir);
-                    if (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) {
-                        IDirect3DSurface9* bb = nullptr;
-                        if (mDevice->GetBackBuffer(0U, 0U, D3DBACKBUFFER_TYPE_MONO, &bb) >= 0 && bb != nullptr) {
-                            char out[600]; (void)std::snprintf(out, sizeof(out), "%s/frame.bmp", dir);
-                            const HRESULT sh = D3DXSaveSurfaceToFileA(out, D3DXIFF_BMP, bb, nullptr, nullptr);
-                            bb->Release();
-                            ::gpg::Warnf("[FRAMEDUMP] hr=%08lX %s", static_cast<long>(sh), out);
-                        }
-                    }
-                }
-            }
-        }
         const HRESULT result = mDevice->Present(nullptr, nullptr, nullptr, nullptr);
         if (result < 0)
         {
@@ -4569,15 +4499,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             }
         }
 
-        if (ProbeTexSetArmed() && gProbeTexSetBudget > 0) { // TEMPORARY PROBE (do not commit)
-            D3DXPARAMETER_DESC desc{};
-            ID3DXEffect* const dx = effect->GetDxEffect();
-            const HRESULT dr = dx->GetParameterDesc(handle_, &desc);
-            if (dr >= 0 && desc.Name != nullptr && std::strstr(desc.Name, "Decal") != nullptr) {
-                --gProbeTexSetBudget;
-                ::gpg::Warnf("[TEXSET] tech='%s' name='%s' native=%p", gProbeCurrentTechnique, desc.Name, static_cast<void*>(textureHandle));
-            }
-        }
         const HRESULT result = effect->GetDxEffect()->SetTexture(handle_, textureHandle);
         if (result < 0)
         {
@@ -4744,124 +4665,10 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 97);
-        std::strncpy(gProbeCurrentTechnique, name_.c_str(), 63); gProbeCurrentTechnique[63] = 0; // TEMPORARY PROBE (do not commit)
         const HRESULT result = effect->GetDxEffect()->BeginPass(static_cast<unsigned int>(pass));
-        if (std::strcmp(gProbeCurrentTechnique, "TDecals") == 0) { // TEMPORARY PROBE (do not commit): force no mip filtering on decal samplers
-            static unsigned sMipCalls = 0; static int sMipLevel = -1;
-            if ((sMipCalls++ % 64u) == 0u) {
-                char dir[512] = {}; std::size_t length = 0; sMipLevel = -1;
-                if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u) {
-                    for (int lv = 0; lv < 8 && sMipLevel < 0; ++lv) {
-                        char path[600]; (void)std::snprintf(path, sizeof(path), "%s/decalmip%d.on", dir, lv);
-                        if (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) sMipLevel = lv;
-                    }
-                }
-            }
-            { // TEMPORARY PROBE (do not commit): device cooperative level while decals draw
-                static unsigned sCoopCalls = 0;
-                if ((sCoopCalls++ % 128u) == 0u) {
-                    void* const nd = ActiveDeviceD3D9().mDevice;
-                    using test_coop_fn = HRESULT(STDMETHODCALLTYPE*)(void*);
-                    const HRESULT coop = reinterpret_cast<test_coop_fn>((*reinterpret_cast<void***>(nd))[3])(nd);
-                    if (coop != 0 || sCoopCalls <= 128u) { ::gpg::Warnf("[COOP] TestCooperativeLevel=%08lX", static_cast<long>(coop)); }
-                }
-            }
-            if (sMipLevel >= 0) {
-                PipelineStateD3D9* const ps = ActiveDeviceD3D9().mPipelineState.get();
-                if (ps != nullptr) {
-                    for (unsigned s = 0; s < 8; ++s) {
-                        static_cast<void>(ps->GetStateManager()->SetSamplerState(s, static_cast<D3DSAMPLERSTATETYPE>(7U), 0U));
-                        static_cast<void>(ps->GetStateManager()->SetSamplerState(s, static_cast<D3DSAMPLERSTATETYPE>(9U), static_cast<unsigned>(sMipLevel)));
-                    }
-                }
-            }
-        }
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 102, result);
-        }
-        // TEMPORARY PROBE (do not commit): dark-mesh triage. "<FAF_TOGGLE_DIR>\cullnone.on",
-        // "cullcw.on" or "cullccw.on" force the cull mode after every pass begin.
-        {
-            static int sForcedCull = -1;
-            static unsigned sCullToggleCalls = 0;
-            if ((sCullToggleCalls++ % 300u) == 0u)
-            {
-                sForcedCull = -1;
-                char dir[512] = {};
-                std::size_t length = 0;
-                if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u)
-                {
-                    char path[600];
-                    (void)std::snprintf(path, sizeof(path), "%s\\cullnone.on", dir);
-                    if (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) sForcedCull = 1;
-                    (void)std::snprintf(path, sizeof(path), "%s\\cullcw.on", dir);
-                    if (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) sForcedCull = 2;
-                    (void)std::snprintf(path, sizeof(path), "%s\\cullccw.on", dir);
-                    if (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) sForcedCull = 3;
-                }
-            }
-            if (sForcedCull >= 0)
-            {
-                PipelineStateD3D9* const pipelineState = ActiveDeviceD3D9().mPipelineState.get();
-                if (pipelineState != nullptr)
-                {
-                    static_cast<void>(pipelineState->GetStateManager()->SetRenderState(
-                        static_cast<D3DRENDERSTATETYPE>(0x16U), static_cast<unsigned int>(sForcedCull)));
-                }
-            }
-            // Technique bisect: log each distinct technique once; "skip_<name>.on" turns
-            // off colour writes for that technique's passes so its draws vanish.
-            {
-                static char sSeen[64][64];
-                static int sSeenCount = 0;
-                static int sSkipMask[64];
-                static unsigned sSkipToggleCalls = 0;
-                const char* const name = name_.c_str();
-                int slot = -1;
-                for (int i = 0; i < sSeenCount; ++i)
-                {
-                    if (std::strncmp(sSeen[i], name, 63) == 0)
-                    {
-                        slot = i;
-                        break;
-                    }
-                }
-                if (slot < 0 && sSeenCount < 64)
-                {
-                    slot = sSeenCount++;
-                    std::strncpy(sSeen[slot], name, 63);
-                    sSeen[slot][63] = 0;
-                    sSkipMask[slot] = 0;
-                    ::gpg::Warnf("[TECHDIAG] technique '%s' first pass", name);
-                }
-                if (slot >= 0)
-                {
-                    if ((sSkipToggleCalls++ % 400u) == 0u)
-                    {
-                        char dir[512] = {};
-                        std::size_t length = 0;
-                        if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u)
-                        {
-                            for (int i = 0; i < sSeenCount; ++i)
-                            {
-                                char path[640];
-                                (void)std::snprintf(path, sizeof(path), "%s\\skip_%s.on", dir, sSeen[i]);
-                                sSkipMask[i] = (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) ? 1 : 0;
-                            }
-                        }
-                    }
-                    if (sSkipMask[slot] != 0)
-                    {
-                        PipelineStateD3D9* const pipelineState = ActiveDeviceD3D9().mPipelineState.get();
-                        if (pipelineState != nullptr)
-                        {
-                            static_cast<void>(pipelineState->GetStateManager()->SetRenderState(
-                                static_cast<D3DRENDERSTATETYPE>(0xA8U), 0U));
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -6406,11 +6213,6 @@ long gpg::gal::DebugSaveSurfaceToFileA(const char* const filePath, const unsigne
     ));
 }
 
-// TEMPORARY PROBE (do not commit): texture twin of the surface dump hook.
-namespace gpg::gal
-{
-    long DebugSaveTextureToFileA(const char* filePath, unsigned int fileFormat, void* sourceTexture);
-}
 
 long gpg::gal::DebugSaveTextureToFileA(const char* const filePath, const unsigned int fileFormat, void* const sourceTexture)
 {

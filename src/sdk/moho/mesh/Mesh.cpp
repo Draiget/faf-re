@@ -49,39 +49,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 
-extern "C" int FafProbeFrameSeq(); extern "C" int FafProbeFrameDiag(); // TEMPORARY PROBE (do not commit)
-namespace { // TEMPORARY PROBE (do not commit)
-  // TEMPORARY PROBE (do not commit): describe a native IDirect3DTexture9 (level 0).
-  void ProbeLogTextureDesc(const char* const tag, IDirect3DTexture9* const nativeTexture)
-  {
-    if (nativeTexture == nullptr) { gpg::Warnf("[TEXDESC] %s native=null", tag); return; }
-    D3DSURFACE_DESC desc{};
-    const HRESULT hr = nativeTexture->GetLevelDesc(0U, &desc);
-    const DWORD levels = nativeTexture->GetLevelCount();
-    gpg::Warnf("[TEXDESC] %s native=%p hr=%08lX fmt=%u type=%u usage=%08lX pool=%u %ux%u levels=%lu",
-               tag, static_cast<void*>(nativeTexture), static_cast<unsigned long>(hr), static_cast<unsigned>(desc.Format),
-               static_cast<unsigned>(desc.Type), static_cast<unsigned long>(desc.Usage), static_cast<unsigned>(desc.Pool),
-               desc.Width, desc.Height, static_cast<unsigned long>(levels));
-  }
-
-  // TEMPORARY PROBE (do not commit): the native texture behind a gal texture,
-  // or null when it is not a D3D9 one (these probes only speak D3D9).
-  IDirect3DTexture9* ProbeNativeTexture1(gpg::gal::Texture* const texture)
-  {
-    const auto* const d3d9 = dynamic_cast<const gpg::gal::TextureD3D9*>(texture);
-    return d3d9 != nullptr ? d3d9->GetTexture1() : nullptr;
-  }
-  // TEMPORARY PROBE (do not commit): the native texture behind a gal texture,
-  // or null when it is not a D3D9 one (these probes only speak D3D9).
-  IDirect3DVolumeTexture9* ProbeNativeTexture3(gpg::gal::Texture* const texture)
-  {
-    const auto* const d3d9 = dynamic_cast<const gpg::gal::TextureD3D9*>(texture);
-    return d3d9 != nullptr ? d3d9->GetTexture3() : nullptr;
-  }
-}
 namespace moho
 {
-  static int gPropSeen = 0, gPropLod = 0, gPropFrustum = 0, gPropPushed = 0; // TEMPORARY PROBE (do not commit)
 
   class IWldTerrainRes;
 
@@ -2774,39 +2743,17 @@ namespace moho
    * What it does:
    * Advances the global mesh frame counter and snapshots the current render
    * frame interpolation value.
-   */
-  // TEMPORARY PROBE (do not commit)
-  static std::set<const void*>& ProbePreviewMeshSet();
 
   void MeshInstance::SetCurrentInterpolant()
   {
     ++sFrameCounter;
     sCurrentInterpolant = REN_GetSimDeltaSeconds();
 
-    { // TEMPORARY PROBE (do not commit) -- roll call of every live preview/ghost mesh
-      static unsigned frames = 0;
-      if ((++frames % 300u) == 0u && !ProbePreviewMeshSet().empty()) {
-        for (const void* const entry : ProbePreviewMeshSet()) {
-          auto* const inst = static_cast<MeshInstance*>(const_cast<void*>(entry));
-          inst->UpdateInterpolatedFields();
-          gpg::Warnf("[PVLIVE] inst=%p color=%08X hidden=%d pos=(%.1f,%.1f,%.1f)", entry,
-                     static_cast<unsigned>(inst->color), static_cast<int>(inst->isHidden),
-                     inst->interpolatedPosition.x, inst->interpolatedPosition.y, inst->interpolatedPosition.z);
-        }
-      }
-    }
   }
 
   /**
    * Address: 0x007DE060 (FUN_007DE060,
    * ??0MeshInstance@Moho@@QAE@PAV?$SpatialDB@VMeshInstance@Moho@@@1@HIV?$shared_ptr@VMesh@Moho@@@boost@@ABV?$Vector3@M@Wm3@@_N@Z)
-   */
-  // TEMPORARY PROBE (do not commit)
-  static std::set<const void*>& ProbePreviewMeshSet()
-  {
-    static std::set<const void*> sSet;
-    return sSet;
-  }
 
   MeshInstance::MeshInstance(
     const Wm3::Vec3f& scaleArg,
@@ -2876,13 +2823,6 @@ namespace moho
     db.Register(spatialDbStorage, this, kMeshSpatialDbRoutingMask);
     const float dissolveCutoff = ComputeSpatialDissolveCutoff(meshArg);
     db.UpdateDissolveCutoff(dissolveCutoff);
-
-    // TEMPORARY PROBE (do not commit)
-    if (colorArg == static_cast<std::int32_t>(0xD800D800u) || colorArg == static_cast<std::int32_t>(0xFF00FF00u)) {
-      ProbePreviewMeshSet().insert(this);
-      gpg::Warnf("[PVMESH] + inst=%p color=%08X live=%u", static_cast<void*>(this),
-                 static_cast<unsigned>(colorArg), static_cast<unsigned>(ProbePreviewMeshSet().size()));
-    }
   }
 
   /**
@@ -2894,11 +2834,6 @@ namespace moho
    */
   MeshInstance::~MeshInstance()
   {
-    // TEMPORARY PROBE (do not commit)
-    if (ProbePreviewMeshSet().erase(this) != 0) {
-      gpg::Warnf("[PVMESH] - inst=%p color=%08X live=%u", static_cast<void*>(this),
-                 static_cast<unsigned>(color), static_cast<unsigned>(ProbePreviewMeshSet().size()));
-    }
     // The rest is member destruction, as 0x007DE550 is: the pose and mesh
     // shared_ptrs in reverse order, `db` (its inlined `if (mDb)` unregister at
     // 0x007DE663), then the TDatListItem base's unlink.
@@ -3932,7 +3867,6 @@ namespace moho
     }
     if (!meshEnvironmentTex) {
       resources->GetTexture(meshEnvironmentTex, meshEnvironment.mCubeMapPath.c_str(), 0, true);
-      { ID3DTextureSheet::TextureHandle h{}; if (meshEnvironmentTex) { meshEnvironmentTex->GetTexture(h); } gpg::Warnf("[ENVDIAG] cube path='%s' res=%p tex=%p native1=%p native3=%p", meshEnvironment.mCubeMapPath.c_str(), static_cast<void*>(meshEnvironmentTex.get()), static_cast<void*>(h.get()), h ? ProbeNativeTexture1(h.get()) : nullptr, h ? ProbeNativeTexture3(h.get()) : nullptr); } // TEMPORARY PROBE (do not commit)
     }
     if (!anisotropiclookupTex) {
       resources->GetTexture(anisotropiclookupTex, "/textures/engine/anisotropiclookup.dds", 0, true);
@@ -4077,19 +4011,6 @@ namespace moho
       const Wm3::Vector3f shadowFillColor = terrainRes->GetShadowFillColor();
       if (sv.shadowFill.Exists()) {
         SetShaderVarMem(sv.shadowFill, 3, &shadowFillColor.x);
-      }
-      // TEMPORARY PROBE -- black-unit lighting triage, delete when resolved.
-      {
-        static int sLightCount = 0;
-        static int sSeenMirrored[2] = {0, 0};
-        ++sLightCount;
-        if (sSeenMirrored[mirrored ? 1 : 0]++ < 2 || (sLightCount % 997) == 0) {
-          gpg::Warnf("[LIGHTDIAG] mesh exists: mult=%d dir=%d diff=%d amb=%d fill=%d | mult=%.2f dir=(%.2f,%.2f,%.2f) diff=(%.2f,%.2f,%.2f) amb=(%.2f,%.2f,%.2f) fill=(%.2f,%.2f,%.2f) mirrored=%d n=%d",
-                     sv.lightMultiplier.Exists() ? 1 : 0, sv.sunDirection.Exists() ? 1 : 0, sv.sunDiffuse.Exists() ? 1 : 0,
-                     sv.sunAmbient.Exists() ? 1 : 0, sv.shadowFill.Exists() ? 1 : 0, lightingMultiplier, sunDirection.x, sunDirection.y,
-                     sunDirection.z, sunColor.x, sunColor.y, sunColor.z, sunAmbience.x, sunAmbience.y, sunAmbience.z, shadowFillColor.x,
-                     shadowFillColor.y, shadowFillColor.z, mirrored ? 1 : 0, sLightCount);
-        }
       }
 
       CWaterShaderProperties* const waterProperties = terrainRes->GetWaterShaderProperties();
@@ -4638,20 +4559,6 @@ namespace moho
     MeshBatchBucketTree& meshMap
   )
   {
-    // Nothing to draw when the batch tree is empty (binary: `if (map->_Mysize)`).
-    // TEMPORARY PROBE -- invisible-commander triage, delete when resolved.
-    {
-      static int sRenderCount = 0;
-      if ((sRenderCount++ % 61) == 0 || FafProbeFrameDiag() > 0) {
-        int skinned = 0;
-        int total = 0;
-        for (const MeshBatchBucket& bucket : meshMap) {
-          ++total;
-          skinned += MeshBatchEntryIsSkinned(bucket) ? 1 : 0;
-        }
-        gpg::Warnf("[SKINDIAG] f=%d Render flags=%d buckets=%d skinned=%d n=%d", FafProbeFrameSeq(), meshFlags, total, skinned, sRenderCount);
-      }
-    }
     if (meshMap.empty()) {
       return;
     }
@@ -4698,33 +4605,6 @@ namespace moho
         continue;
       }
 
-      // Select this material's technique for the pass.
-      // TEMPORARY PROBE (do not commit): "<FAF_TOGGLE_DIR>\albedopreview.on" /
-      // "normalspreview.on" / "lightingpreview.on" swap the unit techniques for the
-      // mesh.fx debug previews so albedo/UV, normals and lighting can be judged apart.
-      {
-        static int sPreviewMode = 0;
-        static unsigned sPreviewToggleCalls = 0;
-        if ((sPreviewToggleCalls++ % 200u) == 0u) {
-          sPreviewMode = 0;
-          char dir[512] = {};
-          std::size_t length = 0;
-          if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u) {
-            char path[600];
-            (void)std::snprintf(path, sizeof(path), "%s\\albedopreview.on", dir);
-            if (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) sPreviewMode = 1;
-            (void)std::snprintf(path, sizeof(path), "%s\\normalspreview.on", dir);
-            if (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) sPreviewMode = 2;
-            (void)std::snprintf(path, sizeof(path), "%s\\lightingpreview.on", dir);
-            if (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) sPreviewMode = 3;
-          }
-        }
-        if (sPreviewMode != 0 && meshFlags != 2 && material.mShaderAnnotation.view().find("Unit") != std::string_view::npos) {
-          device->SelectTechnique(sPreviewMode == 1 ? "AlbedoPreview" : sPreviewMode == 2 ? "NormalsPreview" : "LightingPreview");
-        } else {
-          device->SelectTechnique(material.mShaderAnnotation.c_str());
-        }
-      }
 
       // Lazily resolve the environment texture sheet the first time this
       // material is drawn. When a terrain resource is present the sheet is the
@@ -4743,40 +4623,6 @@ namespace moho
         }
       }
 
-      // TEMPORARY PROBE (do not commit): dark-unit triage - do the texture vars resolve?
-      {
-        static int sTexVarBudget = 0;
-        if (sTexVarBudget < 12) {
-          ++sTexVarBudget;
-          const auto dimsOf = [](const boost::shared_ptr<ID3DTextureSheet>& sheet) {
-            Wm3::Vector2i dims{0, 0};
-            if (sheet) {
-              (void)sheet->GetOriginalDimensions(&dims);
-            }
-            return dims;
-          };
-          const Wm3::Vector2i albedoDims = dimsOf(material.mAlbedoSheet);
-          const Wm3::Vector2i specDims = dimsOf(material.mSpecularSheet);
-          const Wm3::Vector2i normalsDims = dimsOf(material.mNormalsSheet);
-          { // TEMPORARY PROBE (do not commit): pool/usage of a unit albedo for comparison with decals
-            static int sDescBudget = 0;
-            if (sDescBudget < 2 && material.mAlbedoSheet) {
-              ++sDescBudget;
-              ID3DTextureSheet::TextureHandle h{};
-              material.mAlbedoSheet->GetTexture(h);
-              ProbeLogTextureDesc("unit-albedo", h ? ProbeNativeTexture1(h.get()) : nullptr);
-            }
-          }
-          gpg::Warnf("[TEXVARDIAG] exists env=%d albedo=%d spec=%d lookup=%d secondary=%d normals=%d | albedo=%p %dx%d spec=%p %dx%d normals=%p %dx%d tech=%s",
-                     tv.environmentTexture.Exists() ? 1 : 0, tv.albedoTexture.Exists() ? 1 : 0,
-                     tv.specularTexture.Exists() ? 1 : 0, tv.lookupTexture.Exists() ? 1 : 0,
-                     tv.secondaryTexture.Exists() ? 1 : 0, tv.normalsTexture.Exists() ? 1 : 0,
-                     static_cast<const void*>(material.mAlbedoSheet.get()), albedoDims.X(), albedoDims.Y(),
-                     static_cast<const void*>(material.mSpecularSheet.get()), specDims.X(), specDims.Y(),
-                     static_cast<const void*>(material.mNormalsSheet.get()), normalsDims.X(), normalsDims.Y(),
-                     material.mShaderAnnotation.c_str());
-        }
-      }
       // Bind the six per-material texture samplers, in binary bind order.
       tv.environmentTexture.GetTexture(material.mEnvironmentSheet);
       tv.albedoTexture.GetTexture(material.mAlbedoSheet);
@@ -4793,28 +4639,6 @@ namespace moho
         lod->GetSkinnedBatch(batchHandle);
       } else {
         lod->GetStaticBatch(batchHandle);
-      }
-      // TEMPORARY PROBE -- invisible-commander triage, delete when resolved.
-      {
-        static int sBucketCount = 0;
-        if ((sBucketCount++ % 61) == 0) {
-          auto handleOf = [](const boost::shared_ptr<ID3DTextureSheet>& sheet) -> const void* {
-            if (!sheet) {
-              return nullptr;
-            }
-            ID3DTextureSheet::TextureHandle h{};
-            sheet->GetTexture(h);
-            return static_cast<const void*>(h.get());
-          };
-          gpg::Warnf("[SKINDIAG] bucket skinned=%d handle=%p verts=%d idx=%d instances=%d stage=%d flags=%d technique=%s albedo=%p/%p normals=%p/%p spec=%p/%p lookup=%p/%p env=%p n=%d",
-                     MeshBatchEntryIsSkinned(bucket) ? 1 : 0, static_cast<const void*>(batchHandle.get()), batchHandle ? batchHandle->mVertexCount : -1, batchHandle ? batchHandle->mIndexCount : -1, static_cast<int>(bucket.second.size()), renderStage,
-                     meshFlags, material.mShaderAnnotation.c_str(),
-                     static_cast<const void*>(material.mAlbedoSheet.get()), handleOf(material.mAlbedoSheet),
-                     static_cast<const void*>(material.mNormalsSheet.get()), handleOf(material.mNormalsSheet),
-                     static_cast<const void*>(material.mSpecularSheet.get()), handleOf(material.mSpecularSheet),
-                     static_cast<const void*>(material.mLookupSheet.get()), handleOf(material.mLookupSheet),
-                     static_cast<const void*>(material.mEnvironmentSheet.get()), sBucketCount);
-        }
       }
       if (batchHandle) {
         batchHandle->Render(bucket.second, mirrored);
@@ -5014,7 +4838,6 @@ namespace moho
   )
   {
     // Clear last frame's buckets and reset the renderer frame lanes.
-    gPropSeen = 0; gPropLod = 0; gPropFrustum = 0; gPropPushed = 0; // TEMPORARY PROBE (do not commit)
     RecycleBatchBuckets(meshes);
     // Binary stores `gameTick` (param0) into +0x94 and clears the batched-count
     // lane at +0x9C; both are reused by this pass as frame-scoped scratch.
@@ -5038,50 +4861,11 @@ namespace moho
       collected, &const_cast<GeomCamera3&>(camera).solid2, cameraForward, fadePlane
     );
 
-    // TEMPORARY PROBE (do not commit) -- transport-flight bad_alloc triage.
-    // The failing allocation is a bucket vector's growth a few lines below, so
-    // the question is whether `collected` came back implausibly large (a
-    // spatial-DB tree that is cyclic or accumulating duplicates) or stayed
-    // normal (in which case the allocator/address space is the problem, not
-    // this pass). Unthrottled and unconditional, but only past a bound no sane
-    // frame reaches, so it costs one compare per frame until it matters.
-    {
-      constexpr std::size_t kImplausibleCollectCount = 100000u;
-      static bool sReportedImplausible = false;
-      if (collected.size() > kImplausibleCollectCount && !sReportedImplausible) {
-        sReportedImplausible = true;
-        char probe[160];
-        sprintf_s(probe, sizeof(probe), "[COLLECTDIAG] collected=%Iu tick=%d -- spatial DB is returning too much\n",
-                  collected.size(), gameTick);
-        ::OutputDebugStringA(probe);
-      }
-    }
 
-    // TEMPORARY PROBE -- invisible-commander triage, delete when resolved.
-    {
-      static int sCollectCount = 0;
-      if ((sCollectCount++ % 61) == 0) {
-        int skinnedCollected = 0;
-        for (MeshInstance* const e : collected) {
-          skinnedCollected += e->isStaticPose != 0u ? 1 : 0;
-        }
-        gpg::Warnf("[SKINDIAG] Batch collected=%d skinned=%d tick=%d n=%d", static_cast<int>(collected.size()),
-                   skinnedCollected, gameTick, sCollectCount);
-      }
-    }
     for (MeshInstance* const instance : collected) {
 
       // Skinned/static inclusion gates plus the hidden flag.
       const bool isStatic = instance->isStaticPose != 0u;
-      // TEMPORARY PROBE -- invisible-commander triage, delete when resolved.
-      if (isStatic) {
-        static int sSkinTop = 0;
-        if ((sSkinTop++ % 31) == 0) {
-          gpg::Warnf("[SKINDIAG] skinned inst=%p hidden=%u tickFilter=%d tick=%d renSkinned=%d n=%d",
-                     static_cast<const void*>(instance), static_cast<unsigned>(instance->isHidden), instance->unk24, gameTick,
-                     ren_MeshSkinned ? 1 : 0, sSkinTop);
-        }
-      }
       if ((!ren_MeshSkinned && isStatic) || (!ren_MeshStatic && !isStatic) || instance->isHidden != 0u) {
         continue;
       }
@@ -5121,37 +4905,7 @@ namespace moho
 
       const boost::shared_ptr<Mesh> mesh = instance->GetMesh();
       const MeshLOD* const lod = mesh->ComputeLOD(distance);
-      if (instance->isStaticPose == 0u) { ++gPropSeen; if (lod != nullptr) { ++gPropLod; } if (camera.solid2.Intersects(instance->sphere)) { ++gPropFrustum; } } // TEMPORARY PROBE (do not commit)
 
-      // TEMPORARY PROBE -- invisible-commander triage, delete when resolved.
-      {
-        static int sLodBudget = 0;
-        if (sLodBudget < 16 && instance->isStaticPose != 0u) {
-          ++sLodBudget;
-          char probe[320];
-          (void)std::snprintf(
-            probe, sizeof(probe),
-            "[LODDIAG] inst=%p pos=(%.1f,%.1f,%.1f) camq=(%.3f,%.3f,%.3f,%.3f) campos=(%.1f,%.1f,%.1f) "
-            "dist=%.1f lod=%p cutoff=%.1f dissolve=%.1f hidden=%u\n",
-            static_cast<const void*>(instance), worldPos.x, worldPos.y, worldPos.z,
-            plane.m_afTuple[0], plane.m_afTuple[1], plane.m_afTuple[2], plane.m_afTuple[3],
-            camera.tranform.pos_.x, camera.tranform.pos_.y, camera.tranform.pos_.z,
-            distance, static_cast<const void*>(lod), mesh->GetMaxCutoff(), ren_MeshDissolve,
-            static_cast<unsigned>(instance->isHidden));
-          ::OutputDebugStringA(probe);
-        }
-      }
-      // TEMPORARY PROBE -- invisible-commander triage, delete when resolved.
-      if (instance->isStaticPose != 0u) {
-        static int sSkinCount = 0;
-        if ((sSkinCount++ % 31) == 0 || FafProbeFrameDiag() > 0) {
-          gpg::Warnf("[SKINDIAG] f=%d Batch inst=%p pos=(%.1f,%.1f,%.1f) dist=%.1f lod=%p maxCutoff=%.1f frustum=%d sphere=(%.1f,%.1f,%.1f r=%.1f) n=%d q=(%.3f,%.3f,%.3f,%.3f)",
-                     FafProbeFrameSeq(), static_cast<const void*>(instance), worldPos.x, worldPos.y, worldPos.z, distance,
-                     static_cast<const void*>(lod), mesh->GetMaxCutoff(),
-                     camera.solid2.Intersects(instance->sphere) ? 1 : 0, instance->sphere.Center.X(), instance->sphere.Center.Y(),
-                     instance->sphere.Center.Z(), instance->sphere.Radius, sSkinCount, instance->endTransform.orient_.w, instance->endTransform.orient_.x, instance->endTransform.orient_.y, instance->endTransform.orient_.z);
-        }
-      }
       if (lod == nullptr || distance > (mesh->GetMaxCutoff() + ren_MeshDissolve)) {
         continue;
       }
@@ -5198,7 +4952,6 @@ namespace moho
         ++instanceListStateFlags;
       }
     }
-    { static int sF = 0; if ((sF++ % 20) == 0) { gpg::Warnf("[PROPFUNNEL] seen=%d lod=%d frustum=%d cam=(%.1f,%.1f,%.1f)", gPropSeen, gPropLod, gPropFrustum, camera.tranform.pos_.x, camera.tranform.pos_.y, camera.tranform.pos_.z); } } // TEMPORARY PROBE (do not commit)
 
     // FAF: the bones of this map's skinned instances, written once for every
     // pass that is about to draw it.

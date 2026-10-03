@@ -991,10 +991,12 @@ int moho::cfunc_CAiNavigatorImplCanPathToGoalL(LuaPlus::LuaState* const state)
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
 
   const LuaPlus::LuaObject goalPosObject(LuaPlus::LuaStackObject(state, 2));
-  const Wm3::Vector3f goalPos = SCR_FromLuaCopy<Wm3::Vector3<float>>(goalPosObject);
+  Wm3::Vector3f goalPos = SCR_FromLuaCopy<Wm3::Vector3<float>>(goalPosObject);
   const SAiNavigatorGoal goal = BuildSingleCellGoalFromWorldPos(goalPos, navigator->GetUnit()->GetFootprint());
 
-  lua_pushboolean(rawState, navigator->CanPathTo(goal) ? 1 : 0);
+  // Slot-15 lane writes its target-lane probe back into the goal-position
+  // scratch slot; the value itself is discarded (only the bool is returned).
+  lua_pushboolean(rawState, navigator->CanPathTo(&goalPos, goal) ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
 }
