@@ -10,47 +10,6 @@ using namespace moho;
 
 namespace
 {
-  struct ConVarInstanceBaseRuntimeView
-  {
-    void* vftable;
-    const char* name;
-  };
-
-  class ConVarInstanceBaseVtableProbe final : public moho::CSimConVarInstanceBase
-  {
-  public:
-    int HandleConsoleCommand(void*) override
-    {
-      return 0;
-    }
-
-    void* GetValueStorage() override
-    {
-      return nullptr;
-    }
-
-    gpg::RRef* GetValueRef(gpg::RRef* const outRef) override
-    {
-      return outRef;
-    }
-  };
-
-  [[nodiscard]] void* ConVarInstanceBaseVtable() noexcept
-  {
-    static ConVarInstanceBaseVtableProbe probe;
-    return *reinterpret_cast<void**>(&probe);
-  }
-
-  void ResetConVarInstanceBaseVtableLane(moho::CSimConVarInstanceBase* const instance) noexcept
-  {
-    if (instance == nullptr) {
-      return;
-    }
-
-    auto* const runtime = reinterpret_cast<ConVarInstanceBaseRuntimeView*>(instance);
-    runtime->vftable = ConVarInstanceBaseVtable();
-  }
-
   [[nodiscard]] const std::string*
   GetArgToken(const moho::CSimConCommand::ParsedCommandArgs& args, const std::size_t index) noexcept
   {
@@ -300,73 +259,6 @@ CSimConVarInstanceBase::CSimConVarInstanceBase() = default;
 CSimConVarInstanceBase::~CSimConVarInstanceBase() = default;
 
 /**
- * Address: 0x0057FC40 (FUN_0057FC40)
- *
- * What it does:
- * Constructs one `TSimConVarInstance<bool>` in-place from `(name, value)`.
- */
-[[maybe_unused]] moho::TSimConVarInstance<bool>* ConstructTSimConVarInstanceBool(
-  moho::TSimConVarInstance<bool>* const instance,
-  const char* const name,
-  const bool value
-) noexcept
-{
-  if (instance == nullptr) {
-    return nullptr;
-  }
-
-  ::new (static_cast<void*>(instance)) moho::TSimConVarInstance<bool>();
-  instance->mName = name;
-  instance->mValue = value;
-  return instance;
-}
-
-/**
- * Address: 0x0057FCB0 (FUN_0057FCB0)
- *
- * What it does:
- * Constructs one `TSimConVarInstance<int>` in-place from `(name, value)`.
- */
-[[maybe_unused]] moho::TSimConVarInstance<int>* ConstructTSimConVarInstanceInt(
-  moho::TSimConVarInstance<int>* const instance,
-  const char* const name,
-  const int value
-) noexcept
-{
-  if (instance == nullptr) {
-    return nullptr;
-  }
-
-  ::new (static_cast<void*>(instance)) moho::TSimConVarInstance<int>();
-  instance->mName = name;
-  instance->mValue = value;
-  return instance;
-}
-
-/**
- * Address: 0x00735980 (FUN_00735980, Moho::TSimConVarInstance_uint8::TSimConVarInstance_uint8)
- *
- * What it does:
- * Constructs one `TSimConVarInstance<std::uint8_t>` in-place from
- * `(name, value)`.
- */
-[[maybe_unused]] moho::TSimConVarInstance<std::uint8_t>* ConstructTSimConVarInstanceUInt8(
-  moho::TSimConVarInstance<std::uint8_t>* const instance,
-  const std::uint8_t value,
-  const char* const name
-) noexcept
-{
-  if (instance == nullptr) {
-    return nullptr;
-  }
-
-  ::new (static_cast<void*>(instance)) moho::TSimConVarInstance<std::uint8_t>();
-  instance->mName = name;
-  instance->mValue = value;
-  return instance;
-}
-
-/**
  * Address: 0x00735A30 (FUN_00735A30, Moho::TSimConVarInstance_string::TSimConVarInstance_string)
  *
  * What it does:
@@ -380,7 +272,7 @@ CSimConVarInstanceBase::~CSimConVarInstanceBase() = default;
  * allocate-and-copy-default-value wrapper plus this inner placement
  * constructor -- the same two-symbol shape `TSimConVarInstance_uint8`
  * shows between 0x00735400 (its `CreateInstance`) and 0x00735980 (its own
- * constructor, cited on `ConstructTSimConVarInstanceUInt8` above).
+ * constructor).
  */
 moho::TSimConVarInstance<msvc8::string>* moho::ConstructTSimConVarInstanceString(
   moho::TSimConVarInstance<msvc8::string>* const instance,
@@ -395,132 +287,6 @@ moho::TSimConVarInstance<msvc8::string>* moho::ConstructTSimConVarInstanceString
   ::new (static_cast<void*>(instance)) moho::TSimConVarInstance<msvc8::string>();
   instance->mName = name;
   instance->mValue = std::move(value);
-  return instance;
-}
-
-/**
- * Address: 0x0057FDC0 (FUN_0057FDC0)
- *
- * What it does:
- * Restores the base `CSimConVarInstanceBase` vtable lane on one
- * bool-instance storage block.
- */
-[[maybe_unused]] moho::CSimConVarInstanceBase* ResetConVarInstanceBaseVtableFromBool(
-  moho::TSimConVarInstance<bool>* const instance
-) noexcept
-{
-  if (instance == nullptr) {
-    return nullptr;
-  }
-
-  auto* const base = static_cast<moho::CSimConVarInstanceBase*>(instance);
-  ResetConVarInstanceBaseVtableLane(base);
-  return base;
-}
-
-/**
- * Address: 0x0057FDD0 (FUN_0057FDD0)
- *
- * What it does:
- * Restores the base `CSimConVarInstanceBase` vtable lane on one int-instance
- * storage block.
- */
-[[maybe_unused]] moho::CSimConVarInstanceBase* ResetConVarInstanceBaseVtableFromInt(
-  moho::TSimConVarInstance<int>* const instance
-) noexcept
-{
-  if (instance == nullptr) {
-    return nullptr;
-  }
-
-  auto* const base = static_cast<moho::CSimConVarInstanceBase*>(instance);
-  ResetConVarInstanceBaseVtableLane(base);
-  return base;
-}
-
-/**
- * Address: 0x00735B70 (FUN_00735B70)
- *
- * What it does:
- * Restores the base `CSimConVarInstanceBase` vtable lane on one convar
- * instance storage block.
- */
-[[maybe_unused]] moho::CSimConVarInstanceBase* ResetConVarInstanceBaseVtableLaneAlias(
-  moho::CSimConVarInstanceBase* const instance
-) noexcept
-{
-  if (instance == nullptr) {
-    return nullptr;
-  }
-
-  ResetConVarInstanceBaseVtableLane(instance);
-  return instance;
-}
-
-/**
- * Address: 0x00735B10 (FUN_00735B10, Moho::TSimConVarInstance_uint8::scalar deleting dtr)
- *
- * What it does:
- * Runs one scalar-deleting destructor thunk for
- * `TSimConVarInstance<std::uint8_t>`.
- */
-[[maybe_unused]] moho::TSimConVarInstance<std::uint8_t>* DestroyTSimConVarInstanceUInt8(
-  moho::TSimConVarInstance<std::uint8_t>* const instance,
-  const unsigned char deleteFlag
-) noexcept
-{
-  if (instance == nullptr) {
-    return nullptr;
-  }
-
-  instance->~TSimConVarInstance<std::uint8_t>();
-  if ((deleteFlag & 1u) != 0u) {
-    ::operator delete(static_cast<void*>(instance));
-  }
-  return instance;
-}
-
-/**
- * Address: 0x00735B80 (FUN_00735B80, Moho::TSimConVarInstance_string non-deleting dtor body)
- *
- * What it does:
- * Tears down one `TSimConVarInstance<msvc8::string>` object in-place by
- * releasing the embedded legacy string lane and then running the base
- * `CSimConVarInstanceBase` destructor lane.
- */
-[[maybe_unused]] int DestroyTSimConVarInstanceStringInPlace(
-  moho::TSimConVarInstance<msvc8::string>* const instance
-) noexcept
-{
-  if (instance == nullptr) {
-    return 0;
-  }
-
-  instance->mValue.tidy(true, 0U);
-  static_cast<moho::CSimConVarInstanceBase*>(instance)->~CSimConVarInstanceBase();
-  return 0;
-}
-
-/**
- * Address: 0x00735B30 (FUN_00735B30, Moho::TSimConVarInstance_string::scalar deleting dtr)
- *
- * What it does:
- * Runs one scalar-deleting destructor thunk for
- * `TSimConVarInstance<msvc8::string>`.
- */
-[[maybe_unused]] moho::TSimConVarInstance<msvc8::string>* DestroyTSimConVarInstanceString(
-  moho::TSimConVarInstance<msvc8::string>* const instance,
-  const unsigned char deleteFlag
-) noexcept
-{
-  if (instance == nullptr) {
-    return nullptr;
-  }
-
-  (void)DestroyTSimConVarInstanceStringInPlace(instance);
-  if ((deleteFlag & 1u) != 0u) {
-    ::operator delete(static_cast<void*>(instance));
-  }
   return instance;
 }
 

@@ -377,9 +377,7 @@ namespace moho
    * into `mValue`, matching the binary's by-value default-value parameter
    * (the caller builds a copy of the convar's default before this runs,
    * and this callee's copy is what gets consumed). Wired from
-   * `TSimConVar<msvc8::string>::CreateInstance()` (CSimConVarBase.cpp),
-   * mirroring the `ConstructTSimConVarInstance{Bool,Int,UInt8}` siblings
-   * above.
+   * `TSimConVar<msvc8::string>::CreateInstance()` (CSimConVarBase.cpp).
    */
   [[nodiscard]] TSimConVarInstance<msvc8::string>* ConstructTSimConVarInstanceString(
     TSimConVarInstance<msvc8::string>* instance,
