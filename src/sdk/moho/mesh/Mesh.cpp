@@ -4606,6 +4606,12 @@ namespace moho
       }
 
 
+      // Select this material's technique for the pass (FUN_007E0C30
+      // @0x007E0DAD..0x007E0DB7: virtual slot 21 `SelectTechnique` with the
+      // material's shader-annotation technique name, before the environment
+      // lane and every draw of the bucket).
+      device->SelectTechnique(material.mShaderAnnotation.c_str());
+
       // Lazily resolve the environment texture sheet the first time this
       // material is drawn. When a terrain resource is present the sheet is the
       // terrain's per-environment lookup (keyed by the material's "environment"
