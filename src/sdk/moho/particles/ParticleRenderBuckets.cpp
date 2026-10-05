@@ -460,7 +460,9 @@ namespace moho
     // through the attach matrix. Delete when resolved.
     {
       static int sProbeUpload = 0;
+      static int sProbeUploadSeen = 0;
       if (sProbeUpload < 30) {
+        ++sProbeUploadSeen;
         for (std::size_t probeIdx = 0U; probeIdx < maxUploadCount; ++probeIdx) {
           const SWorldParticle& candidate = pendingParticles[probeIdx];
           const float dirLenSq =
@@ -468,6 +470,9 @@ namespace moho
             (candidate.mDir.z * candidate.mDir.z);
           if (dirLenSq <= 0.001f) {
             continue;
+          }
+          if ((sProbeUploadSeen % 100) != 0) {
+            break;
           }
           std::FILE* const sink = std::fopen("faf_diag.log", "a");
           if (sink != nullptr) {

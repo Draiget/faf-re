@@ -382,12 +382,14 @@ namespace moho
     // resolved.
     {
       static int sProbeTop = 0;
+      static int sProbeTopSeen = 0;
       const bool moving =
         attachedEntity != nullptr &&
         (std::fabs(attachedEntity->mPendingTransform.pos_.x - attachedEntity->mVarDat.mCurTransform.pos_.x) > 0.01f ||
          std::fabs(attachedEntity->mPendingTransform.pos_.y - attachedEntity->mVarDat.mCurTransform.pos_.y) > 0.01f ||
          std::fabs(attachedEntity->mPendingTransform.pos_.z - attachedEntity->mVarDat.mCurTransform.pos_.z) > 0.01f);
-      if (sProbeTop < 30 && effect->mEntityInfo.mParentBoneIndex >= 0 && moving) {
+      ++sProbeTopSeen;
+      if (sProbeTop < 30 && (sProbeTopSeen % 200) == 0 && effect->mEntityInfo.mParentBoneIndex >= 0 && moving) {
         ++sProbeTop;
         FxAttachDiagLine(
           "[FXATTACH] top n=%d eff=%p ent=%p has=%d bone=%d newAtt=%d tick=%d",
@@ -459,11 +461,13 @@ namespace moho
     // ("pointing up" shows as ~(0,1,0)). Delete when resolved.
     {
       static int sProbeOut = 0;
+      static int sProbeOutSeen = 0;
       const bool outMoving =
         std::fabs(attachedEntity->mPendingTransform.pos_.x - attachedEntity->mVarDat.mCurTransform.pos_.x) > 0.01f ||
         std::fabs(attachedEntity->mPendingTransform.pos_.y - attachedEntity->mVarDat.mCurTransform.pos_.y) > 0.01f ||
         std::fabs(attachedEntity->mPendingTransform.pos_.z - attachedEntity->mVarDat.mCurTransform.pos_.z) > 0.01f;
-      if (sProbeOut < 30 && effect->mEntityInfo.mParentBoneIndex >= 0 && outMoving) {
+      ++sProbeOutSeen;
+      if (sProbeOut < 30 && (sProbeOutSeen % 200) == 0 && effect->mEntityInfo.mParentBoneIndex >= 0 && outMoving) {
         ++sProbeOut;
         FxAttachDiagLine(
           "[FXATTACH] out n=%d ent=%p bone=%d axis2=(%.2f,%.2f,%.2f) axis1=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f) "
@@ -1120,7 +1124,9 @@ namespace moho
         // resolved.
         if (mParams.start_[EFFECT_USE_LOCAL_VELOCITY] > 0.0f) {
           static int sProbeDir = 0;
-          if (sProbeDir < 30) {
+          static int sProbeDirSeen = 0;
+          ++sProbeDirSeen;
+          if (sProbeDir < 30 && (sProbeDirSeen % 400) == 0) {
             ++sProbeDir;
             FxAttachDiagLine(
               "[FXDIR] n=%d dir=(%.2f,%.2f,%.2f) axis0=(%.2f,%.2f,%.2f) axis1=(%.2f,%.2f,%.2f) "
