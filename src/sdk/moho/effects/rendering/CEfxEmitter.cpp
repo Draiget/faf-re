@@ -376,11 +376,18 @@ namespace moho
     // TEMPORARY PROBE -- attached-emitter triage ("engine flames point up /
     // trail the transport"). The earlier probe sat below the null early-return
     // and a full session logged nothing, so this one runs first and reports
-    // the raw link state whether or not the attach resolves. Delete when
+    // the raw link state whether or not the attach resolves. Only counts while
+    // the attached entity is MOVING (pending != cur) so the flight case owns
+    // the sample budget instead of at-rest creation calls. Delete when
     // resolved.
     {
       static int sProbeTop = 0;
-      if (sProbeTop < 30 && effect->mEntityInfo.mParentBoneIndex >= 0) {
+      const bool moving =
+        attachedEntity != nullptr &&
+        (std::fabs(attachedEntity->mPendingTransform.pos_.x - attachedEntity->mVarDat.mCurTransform.pos_.x) > 0.01f ||
+         std::fabs(attachedEntity->mPendingTransform.pos_.y - attachedEntity->mVarDat.mCurTransform.pos_.y) > 0.01f ||
+         std::fabs(attachedEntity->mPendingTransform.pos_.z - attachedEntity->mVarDat.mCurTransform.pos_.z) > 0.01f);
+      if (sProbeTop < 30 && effect->mEntityInfo.mParentBoneIndex >= 0 && moving) {
         ++sProbeTop;
         FxAttachDiagLine(
           "[FXATTACH] top n=%d eff=%p ent=%p has=%d bone=%d newAtt=%d tick=%d",
@@ -455,18 +462,22 @@ namespace moho
       if (sProbeOut < 30 && effect->mEntityInfo.mParentBoneIndex >= 0) {
         ++sProbeOut;
         FxAttachDiagLine(
-          "[FXATTACH] out n=%d ent=%p bone=%d axis2=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f) "
-          "cur=(%.1f,%.1f,%.1f) pend=(%.1f,%.1f,%.1f) velScale=%.3f",
+          "[FXATTACH] out n=%d ent=%p bone=%d axis2=(%.2f,%.2f,%.2f) axis1=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f) "
+          "cur=(%.1f,%.1f,%.1f) pend=(%.1f,%.1f,%.1f) velScale=%.3f lv=%.0f ab=%.0f flat=%.0f",
           sProbeOut,
           static_cast<void*>(attachedEntity),
           effect->mEntityInfo.mParentBoneIndex,
           outMatrix->r[2].x, outMatrix->r[2].y, outMatrix->r[2].z,
+          outMatrix->r[1].x, outMatrix->r[1].y, outMatrix->r[1].z,
           outMatrix->r[3].x, outMatrix->r[3].y, outMatrix->r[3].z,
           attachedEntity->mVarDat.mCurTransform.pos_.x, attachedEntity->mVarDat.mCurTransform.pos_.y,
           attachedEntity->mVarDat.mCurTransform.pos_.z,
           attachedEntity->mPendingTransform.pos_.x, attachedEntity->mPendingTransform.pos_.y,
           attachedEntity->mPendingTransform.pos_.z,
-          attachedEntity->mPendingVelocityScale
+          attachedEntity->mPendingVelocityScale,
+          effect->mParams.start_[EFFECT_USE_LOCAL_VELOCITY],
+          effect->mParams.start_[EFFECT_ALIGN_TO_BONE],
+          effect->mParams.start_[EFFECT_FLAT]
         );
       }
     }
