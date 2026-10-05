@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -2764,6 +2765,29 @@ namespace moho
 
     if (Entity* const attachTarget = mAttachInfo.GetAttachTargetEntity(); attachTarget != nullptr) {
       if (attachTarget->mLastTickProcessed == mLastTickProcessed) {
+        // TEMPORARY PROBE -- attached-unit freeze triage (hive drones stop
+        // moving): reports, strided, both sides of the skip gate plus the
+        // attach info so a frozen-drone session shows whether the parent ever
+        // advances its processed-tick lane. Delete when resolved.
+        {
+          static int sProbeAttachSeen = 0;
+          ++sProbeAttachSeen;
+          if ((sProbeAttachSeen % 400) == 0) {
+            if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+              std::fprintf(
+                sink,
+                "[ATTACHSKIP] self=%p isUnit=%d ownTick=%u parentTick=%u parent=%p bone=%d\n",
+                static_cast<void*>(this),
+                IsUnit() != nullptr ? 1 : 0,
+                mLastTickProcessed,
+                attachTarget->mLastTickProcessed,
+                static_cast<void*>(attachTarget),
+                mAttachInfo.mParentBoneIndex
+              );
+              std::fclose(sink);
+            }
+          }
+        }
         return -4;
       }
 
