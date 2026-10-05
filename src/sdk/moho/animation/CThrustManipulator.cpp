@@ -316,6 +316,38 @@ namespace moho
     localDesired.z = std::min(mCapMax.z, std::max(mCapMin.z, localDesired.z));
     (void)Wm3::Vector3f::Normalize(&localDesired);
 
+    // TEMPORARY PROBE -- thrust-nozzle triage, stage 2: the aim lanes after
+    // the caps, the tilt target, the blended orientation, and the bone's
+    // current local orientation before Rotate. If the tilt target itself is
+    // the 78-degree-up pose the fault is the input (composite/force); if the
+    // target is sane but the bone local diverges, the accumulation diverges.
+    // Delete when resolved.
+    {
+      static int sProbeAim = 0;
+      static int sProbeAimSeen = 0;
+      ++sProbeAimSeen;
+      if (sProbeAim < 30 && (sProbeAimSeen % 20) == 0) {
+        ++sProbeAim;
+        std::FILE* const sink = std::fopen("faf_diag.log", "a");
+        if (sink != nullptr) {
+          std::fprintf(
+            sink,
+            "[FXAIM] n=%d local=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f) mOrient=(%.2f,%.2f,%.2f,%.2f) "
+            "boneLocal=(%.2f,%.2f,%.2f,%.2f)\n",
+            sProbeAim,
+            localDesired.x, localDesired.y, localDesired.z,
+            mRestDirection.x, mRestDirection.y, mRestDirection.z,
+            mOrientation.w, mOrientation.x, mOrientation.y, mOrientation.z,
+            watchedBone->mLocalTransform.orient_.w,
+            watchedBone->mLocalTransform.orient_.x,
+            watchedBone->mLocalTransform.orient_.y,
+            watchedBone->mLocalTransform.orient_.z
+          );
+          std::fclose(sink);
+        }
+      }
+    }
+
     Wm3::Quaternionf targetOrientation{};
     (void)BuildTiltShortestArcDelta(localDesired, &targetOrientation, mRestDirection);
 
