@@ -3,6 +3,7 @@
 #include <boost/bind.hpp>
 
 #include <cstdint>
+#include <cstdio>
 #include <mutex>
 #include <new>
 
@@ -154,7 +155,16 @@ void CReplayClient::Process(CMessage& msg)
     CMessage ackMessage(EClientMsg::CLIMSG_Ack);
     CMessageStream ackStream(ackMessage);
 
-    const auto localClientIndex = static_cast<std::uint8_t>(mIndex);
+    // Binary 0x0053D9F0..0x0053DA5E: the ack index byte comes from the
+    // manager's *local* client (`GetLocalClient()->mIndex`), not this replay
+    // client's own index. The replay client credits the local client's beat
+    // progress on its own ack ledger; with the replay client's own index the
+    // lane for the local peer never advances, `EveryoneResponsiveSince`
+    // never unlocks `mAvailableBeat`, and replay playback deadlocks on beat 0.
+    const IClient* const localClient = mManager->GetLocalClient();
+    const auto localClientIndex = static_cast<std::uint8_t>(
+      localClient != nullptr ? localClient->GetIndex() : mIndex
+    );
     ackStream.Write(localClientIndex);
 
     std::int32_t ackBeat = beatDelta;
@@ -201,6 +211,25 @@ void CReplayClient::Process(CMessage& msg)
  */
 void CReplayClient::Start()
 {
+  // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+  {
+    static int sProbeStart = 0;
+    if ((++sProbeStart % 50) == 1) {
+      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+        std::fprintf(
+          sink,
+          "[BEATPIPE] replayStart n=%d poll=%d stream=%p queued=%u dispatched=%u\n",
+          sProbeStart,
+          static_cast<int>(mReplayPollRequested),
+          static_cast<void*>(mReplayStream),
+          static_cast<unsigned>(mQueuedBeat),
+          static_cast<unsigned>(mDispatchedBeat)
+        );
+        std::fclose(sink);
+      }
+    }
+  }
+
   if (mReplayPollRequested || mReplayStream == nullptr ||
       static_cast<std::int32_t>(mQueuedBeat - mDispatchedBeat) > 0) {
     return;
@@ -215,9 +244,42 @@ void CReplayClient::Start()
       std::uint8_t sourceId = 0;
       reader.ReadExact(sourceId);
       mCurrentSourceAllowed = mValidCommandSources.Contains(sourceId);
+
+      // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+      {
+        static int sProbeSrc = 0;
+        if ((sProbeSrc++ % 20) == 0) {
+          if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+            std::fprintf(
+              sink,
+              "[BEATPIPE] setSource src=%u allowed=%d\n",
+              static_cast<unsigned>(sourceId),
+              static_cast<int>(mCurrentSourceAllowed)
+            );
+            std::fclose(sink);
+          }
+        }
+      }
     }
 
     if (replayType != static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+      // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+      {
+        static int sProbeCmd = 0;
+        if ((sProbeCmd++ % 20) == 0) {
+          if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+            std::fprintf(
+              sink,
+              "[BEATPIPE] replayCmd type=%u allowed=%d queued=%u dispatched=%u\n",
+              static_cast<unsigned>(replayType),
+              static_cast<int>(mCurrentSourceAllowed),
+              static_cast<unsigned>(mQueuedBeat),
+              static_cast<unsigned>(mDispatchedBeat)
+            );
+            std::fclose(sink);
+          }
+        }
+      }
       if (mCurrentSourceAllowed) {
         CClientBase::Process(mReplayMessage);
       }
