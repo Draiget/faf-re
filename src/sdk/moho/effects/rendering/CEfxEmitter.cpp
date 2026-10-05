@@ -471,7 +471,7 @@ namespace moho
         ++sProbeOut;
         FxAttachDiagLine(
           "[FXATTACH] out n=%d ent=%p bone=%d axis2=(%.2f,%.2f,%.2f) axis1=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f) "
-          "cur=(%.1f,%.1f,%.1f) pend=(%.1f,%.1f,%.1f) velScale=%.3f lv=%.0f ab=%.0f flat=%.0f",
+          "cur=(%.1f,%.1f,%.1f) pend=(%.1f,%.1f,%.1f) curQ=(%.2f,%.2f,%.2f,%.2f) velScale=%.3f lv=%.0f ab=%.0f flat=%.0f",
           sProbeOut,
           static_cast<void*>(attachedEntity),
           effect->mEntityInfo.mParentBoneIndex,
@@ -482,6 +482,10 @@ namespace moho
           attachedEntity->mVarDat.mCurTransform.pos_.z,
           attachedEntity->mPendingTransform.pos_.x, attachedEntity->mPendingTransform.pos_.y,
           attachedEntity->mPendingTransform.pos_.z,
+          attachedEntity->mVarDat.mCurTransform.orient_.w,
+          attachedEntity->mVarDat.mCurTransform.orient_.x,
+          attachedEntity->mVarDat.mCurTransform.orient_.y,
+          attachedEntity->mVarDat.mCurTransform.orient_.z,
           attachedEntity->mPendingVelocityScale,
           effect->mParams.start_[EFFECT_USE_LOCAL_VELOCITY],
           effect->mParams.start_[EFFECT_ALIGN_TO_BONE],
