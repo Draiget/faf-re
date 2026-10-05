@@ -279,15 +279,22 @@ namespace moho
    * The scalar term is positive in lane 0, so this is an ordinary scalar-first
    * product - the identical emission to `CAniPoseBone::Rotate` (0x0054BC00).
    *
-   * Operand order re-decoded 2026-10-05 from the prologue and vector lanes:
-   * `eax` = lhs, `ebp` = rhs (the pushed second argument), and the scalar
-   * lane is `lhs[0]*rhs[0] - lhs[4]*rhs[4] - lhs[8]*rhs[8] - lhs[0xC]*rhs[0xC]`
-   * -- `lhs.orient_ * rhs.orient_`, NOT `rhs * lhs` as a prior revision read
-   * it. The two only commute for yaw-only rotations, which is exactly why the
-   * at-rest and pure-yaw probes never caught it while the tilted
-   * engine-bone fold (thrust manipulator ~105 degrees about X) came out as
-   * its own conjugate: exhaust effects attached to the engine bones rendered
-   * with the negated tilt - flames pointing up and trailing.
+   * Operand order, re-established 2026-10-05 by decoding ALL FOUR output lanes
+   * of 0x00549C20 register-by-register (the scalar lane alone is symmetric
+   * under operand swap and cannot decide the order - a premature read of only
+   * that lane produced an incorrect 'lhs*rhs' fix that visibly broke wing
+   * attachments, drone tethers and bomber effects, and was reverted):
+   *
+   *   prologue: eax = lhs, ebp = rhs;
+   *   xmm6=[eax+0]  xmm0=[eax+8]  xmm3=[eax+0xC]  (lhs lanes)
+   *   xmm5=[ebp+0]  xmm7=[ebp+4]  xmm1=[ebp+8]  xmm2=[ebp+0xC]  (rhs lanes)
+   *
+   *   [edi+4] = lhs3*rhs2 + lhs0*rhs1 + lhs1*rhs0 - lhs2*rhs3
+   *   [edi+8] = rhs2*lhs0 + rhs0*lhs2 + rhs3*lhs1 - rhs1*lhs3
+   *   [edi+C] = lhs2*rhs1 + lhs3*rhs0 + lhs0*rhs3 - rhs2*lhs1
+   *
+   * which is the Hamilton product `rhs.orient_ * lhs.orient_`, with the
+   * right-hand transform as the left operand.
    *
    * The position half was already right and is unchanged: ground truth rotates
    * `lhs.pos_` by `rhs.orient_` through `Moho::MultQuadVec` (0x00549D73..
@@ -297,7 +304,7 @@ namespace moho
   {
     VTransform out{};
 
-    out.orient_ = MultiplyQuat(lhs.orient_, rhs.orient_);
+    out.orient_ = MultiplyQuat(rhs.orient_, lhs.orient_);
 
     Wm3::Vec3f rotatedPosition{};
     MultQuadVec(&rotatedPosition, &lhs.pos_, &rhs.orient_);
