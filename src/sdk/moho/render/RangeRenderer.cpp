@@ -747,20 +747,29 @@ namespace
    * selection, so a UI mod can answer "what would this unit cover if it stood
    * there" with the profile's own colours and zoom-scaled thickness.
    *
-   * Exactly one ring is drawn, no matter how many profiles are registered: the
-   * "Miscellaneous" / OVERLAYMISC profile, which the menu calls "Build Range".
+   * Two rings, at most, answer that for a whole selection:
    *
-   * It used to draw the selection's widest weapon ring alongside it. That was
-   * wrong: this pass is what the Shift modifier raises, and Shift's whole job is
-   * the build/assist radius - weapon range belongs to Alt, which has its own two
-   * passes. The stray attack ring put a red circle under the cursor whenever
-   * Shift was held over an armed selection, including the tiny red dot a unit
-   * with a minimum range draws at its inner edge, and there was no way to ask
-   * for the assist radius without it.
+   *  - the assist ring: the "Miscellaneous" / OVERLAYMISC profile, which the
+   *    menu calls "Build Range", drawn with its own colour and thickness;
+   *  - the attack ring: the widest weapon profile the selection actually
+   *    carries, one ring for the whole selection (`KeepWiderAttackRing`'s
+   *    DirectFire-first rule), drawn in the military red the range-overlay
+   *    menu gives attack ranges (`FindMilitaryStyleProfile`).
    *
-   * Across a multi-unit selection the widest payload wins, so a mixed group
-   * shows the reach of whichever unit reaches furthest rather than a stack of
-   * overlapping rings.
+   * The attack ring is here because Shift is the modifier a player holds with a
+   * unit selected, and the attack-move lane cannot answer for the selection:
+   * that pair draws the selection's *reclaim* reach - which only units with a
+   * `MaxBuildDistance` have, so an engineer, a factory and an ACU - plus the
+   * attack range of whatever unit is *hovered*, which over open ground, where
+   * an attack-move is usually issued, is nothing. A normal combat unit
+   * therefore got no ring at all, and an ACU got only its reclaim ring, which
+   * reads as the wrong answer to "how far does this thing shoot".
+   *
+   * Across a multi-unit selection each lane keeps a single widest payload, so a
+   * mixed group shows the reach of whichever unit reaches furthest rather than
+   * a stack of overlapping rings. A unit with a minimum range still draws the
+   * inner edge of its band: the small ring at the min-radius is the truthful
+   * "dead zone" answer, not an artifact.
    */
   void RenderSelectionRingsUnderCursor(
     moho::CWldSession& session,
@@ -789,8 +798,15 @@ namespace
     const moho::SRangeRenderProfile* assistProfile = nullptr;
     moho::SRangeExtractionPayload assistPayload{};
 
+    // Widest weapon payload seen, with the profile whose ring geometry should
+    // draw it - one attack ring for the whole selection, not one per weapon
+    // category.
+    const moho::SRangeRenderProfile* attackProfile = nullptr;
+    moho::SRangeExtractionPayload attackPayload{};
+
     for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
-      if (profile.mExtractorName != "Miscellaneous") {
+      const bool isAssistProfile = profile.mExtractorName == "Miscellaneous";
+      if (!isAssistProfile && !IsAttackRangeProfile(profile)) {
         continue;
       }
 
@@ -837,23 +853,42 @@ namespace
         // unconditionally and only special-cases `innerRadius <= 0` for the
         // fill. Left exactly as the extractor built it.
 
-        if (assistProfile == nullptr || payload.outerRadius > assistPayload.outerRadius) {
-          assistPayload = payload;
-          assistProfile = &profile;
+        if (isAssistProfile) {
+          if (assistProfile == nullptr || payload.outerRadius > assistPayload.outerRadius) {
+            assistPayload = payload;
+            assistProfile = &profile;
+          }
+        } else {
+          KeepWiderAttackRing(attackProfile, attackPayload, profile, payload);
         }
       }
     }
 
-    if (assistProfile == nullptr) {
-      return;
+    if (assistProfile != nullptr) {
+      scratchPayload.clear();
+      scratchPayload.push_back(assistPayload);
+      RenderRingBatch(
+        assistProfile->mOuterRingParams, camera, rangeRenderer, headIndex, assistProfile->mBuildRingColor,
+        assistProfile->mInnerRingParams, scratchPayload
+      );
     }
 
-    scratchPayload.clear();
-    scratchPayload.push_back(assistPayload);
-    RenderRingBatch(
-      assistProfile->mOuterRingParams, camera, rangeRenderer, headIndex, assistProfile->mBuildRingColor,
-      assistProfile->mInnerRingParams, scratchPayload
-    );
+    if (attackProfile != nullptr) {
+      // Geometry from the weapon profile that produced the radius, colour from
+      // "AllMilitary" so the ring reads as attack range whichever weapon
+      // category won - the same styling rule `RenderHoveredUnitAttackRange`
+      // uses, for the same reason: the weapon categories do not share one
+      // colour, and attack range is the red one.
+      const moho::SRangeRenderProfile* const militaryStyle = FindMilitaryStyleProfile(rangeRenderer);
+      const moho::SRangeRenderProfile& style = (militaryStyle != nullptr) ? *militaryStyle : *attackProfile;
+
+      scratchPayload.clear();
+      scratchPayload.push_back(attackPayload);
+      RenderRingBatch(
+        attackProfile->mOuterRingParams, camera, rangeRenderer, headIndex, style.mBuildRingColor,
+        attackProfile->mInnerRingParams, scratchPayload
+      );
+    }
   }
 
   /**
