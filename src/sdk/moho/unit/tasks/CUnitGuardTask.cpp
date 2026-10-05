@@ -1594,7 +1594,10 @@ namespace moho
 
       if (shouldIssueRepairTask) {
         (void)moho::CUnitRepairTask::Allocate(dispatchTask, targetUnit, false);
-      } else if (targetUnit->AiBuilder != nullptr && targetUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
+      } else if (targetUnit->AiSiloBuild != nullptr && targetUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
+        // Binary 0x00613C03 tests [target+0x558] (AiSiloBuild), not AiBuilder
+        // (+0x554): a strategic launcher owns a silo-build impl but no builder
+        // impl, so testing AiBuilder made hive silo-assist never dispatch.
         (void)moho::CUnitRepairTask::Allocate(dispatchTask, targetUnit, true);
       }
       return;
