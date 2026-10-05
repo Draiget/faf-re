@@ -882,9 +882,18 @@ namespace moho
           break;
 
         case 3:
+          // Jump table (PE @ 0x005F3FE0, index 2 -> 0x005F3F71..0x005F3F8A):
+          // ready -> `mov [edi-0x10], 2` = TASKSTATE_Starting, not ready ->
+          // `mov [edi-0x10], 4` = TASKSTATE_Complete. There is no dispatch
+          // result write in either arm. "Cannot attack right now" (a bomber
+          // sitting inside its bomb MinRadius over the target is exactly
+          // this) must send the task back through Starting to re-navigate and
+          // re-approach; the fail/abort this recovery had here ended the
+          // attack order instead, so the bomber parked over its target with
+          // no desired target, never re-entered an attack run, and never
+          // dropped bombs again until the player re-issued the order.
           if (ownerStateReady()) {
-            *commandTask->mDispatchResult = static_cast<EAiResult>(2);
-            commandTask->mTaskState = TASKSTATE_5;
+            commandTask->mTaskState = TASKSTATE_Starting;
           } else {
             commandTask->mTaskState = TASKSTATE_Complete;
           }
