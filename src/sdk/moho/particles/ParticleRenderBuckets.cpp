@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -450,6 +451,32 @@ namespace moho
       instance->resistance = particle.mResistance;
       instance->inverseResistance = 1.0f / particle.mResistance;
       instance->inverseResistanceSq = instance->inverseResistance * instance->inverseResistance;
+    }
+
+    // TEMPORARY PROBE -- attached-emitter triage: the exact instances handed
+    // to the GPU. If posX/Y/Z already trail the entity here the fault is
+    // upstream (sim interpolation); if correct here but wrong on screen it is
+    // downstream (shader time / camera state). Delete when resolved.
+    {
+      static int sProbeUpload = 0;
+      if (sProbeUpload < 30) {
+        const SWorldParticle& sample = pendingParticles[0];
+        std::FILE* const sink = std::fopen("faf_diag.log", "a");
+        if (sink != nullptr) {
+          ++sProbeUpload;
+          std::fprintf(
+            sink,
+            "[FXATTACH] upload n=%d tag=%s pos=(%.1f,%.1f,%.1f) dir=(%.2f,%.2f,%.2f) "
+            "interop=%.3f life=%.1f frameDelta=%.3f\n",
+            sProbeUpload,
+            sample.mTypeTag.c_str(),
+            sample.mPos.x, sample.mPos.y, sample.mPos.z,
+            sample.mDir.x, sample.mDir.y, sample.mDir.z,
+            sample.mInterop, sample.mLifetime, frameDelta
+          );
+          std::fclose(sink);
+        }
+      }
     }
 
     workItem.mRenderStartIndex += static_cast<std::uint32_t>(maxUploadCount);

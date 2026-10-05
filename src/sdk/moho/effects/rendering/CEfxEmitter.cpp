@@ -3,6 +3,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstdarg>
 #include <limits>
 #include <typeinfo>
 
@@ -47,6 +49,23 @@ namespace
 {
   // Engine-stat handle for "Render_ActiveEmitters", resolved once on first tick.
   moho::StatItem* sEngineStatRenderActiveEmitters = nullptr;
+
+  // TEMPORARY PROBE SINK -- attached-emitter triage, delete when resolved.
+  // gpg::Warnf only reaches an active /log target, so the probes below append
+  // here instead. The file lands beside the executable.
+  void FxAttachDiagLine(const char* const fmt, ...)
+  {
+    std::FILE* const sink = std::fopen("faf_diag.log", "a");
+    if (sink == nullptr) {
+      return;
+    }
+    std::va_list args;
+    va_start(args, fmt);
+    (void)std::vfprintf(sink, fmt, args);
+    va_end(args);
+    (void)std::fputc(0x0A, sink);
+    (void)std::fclose(sink);
+  }
 
   /**
    * Reproduces the binary's ceil-of-peak idiom (frndint + underflow correction):
@@ -363,7 +382,7 @@ namespace moho
       static int sProbeTop = 0;
       if (sProbeTop < 30) {
         ++sProbeTop;
-        gpg::Warnf(
+        FxAttachDiagLine(
           "[FXATTACH] top n=%d eff=%p ent=%p has=%d bone=%d newAtt=%d tick=%d",
           sProbeTop,
           static_cast<const void*>(effect),
@@ -435,13 +454,19 @@ namespace moho
       static int sProbeOut = 0;
       if (sProbeOut < 30) {
         ++sProbeOut;
-        gpg::Warnf(
-          "[FXATTACH] out n=%d ent=%p bone=%d axis2=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f)",
+        FxAttachDiagLine(
+          "[FXATTACH] out n=%d ent=%p bone=%d axis2=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f) "
+          "cur=(%.1f,%.1f,%.1f) pend=(%.1f,%.1f,%.1f) velScale=%.3f",
           sProbeOut,
           static_cast<void*>(attachedEntity),
           effect->mEntityInfo.mParentBoneIndex,
           outMatrix->r[2].x, outMatrix->r[2].y, outMatrix->r[2].z,
-          outMatrix->r[3].x, outMatrix->r[3].y, outMatrix->r[3].z
+          outMatrix->r[3].x, outMatrix->r[3].y, outMatrix->r[3].z,
+          attachedEntity->mVarDat.mCurTransform.pos_.x, attachedEntity->mVarDat.mCurTransform.pos_.y,
+          attachedEntity->mVarDat.mCurTransform.pos_.z,
+          attachedEntity->mPendingTransform.pos_.x, attachedEntity->mPendingTransform.pos_.y,
+          attachedEntity->mPendingTransform.pos_.z,
+          attachedEntity->mPendingVelocityScale
         );
       }
     }

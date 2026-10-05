@@ -419,7 +419,7 @@ namespace moho
       static int sProbeCreate = 0;
       if (sProbeCreate < 20) {
         ++sProbeCreate;
-        gpg::Warnf(
+        DiagLine(
           "[FXATTACH] create n=%d eff=%p ent=%p bone=%d resolved=%p",
           sProbeCreate,
           static_cast<void*>(effect),
