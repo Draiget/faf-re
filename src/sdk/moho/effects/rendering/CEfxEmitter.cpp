@@ -459,7 +459,11 @@ namespace moho
     // ("pointing up" shows as ~(0,1,0)). Delete when resolved.
     {
       static int sProbeOut = 0;
-      if (sProbeOut < 30 && effect->mEntityInfo.mParentBoneIndex >= 0) {
+      const bool outMoving =
+        std::fabs(attachedEntity->mPendingTransform.pos_.x - attachedEntity->mVarDat.mCurTransform.pos_.x) > 0.01f ||
+        std::fabs(attachedEntity->mPendingTransform.pos_.y - attachedEntity->mVarDat.mCurTransform.pos_.y) > 0.01f ||
+        std::fabs(attachedEntity->mPendingTransform.pos_.z - attachedEntity->mVarDat.mCurTransform.pos_.z) > 0.01f;
+      if (sProbeOut < 30 && effect->mEntityInfo.mParentBoneIndex >= 0 && outMoving) {
         ++sProbeOut;
         FxAttachDiagLine(
           "[FXATTACH] out n=%d ent=%p bone=%d axis2=(%.2f,%.2f,%.2f) axis1=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f) "
@@ -1108,6 +1112,29 @@ namespace moho
         particle.mDir.x *= velocity;
         particle.mDir.y *= velocity;
         particle.mDir.z *= velocity;
+
+        // TEMPORARY PROBE -- exhaust direction triage: the final velocity
+        // vector handed to the particle, with the attach rows it was (or was
+        // not) rotated through. Only counts when local velocity is enabled,
+        // which is the exhaust blueprint's configuration. Delete when
+        // resolved.
+        if (mParams.start_[EFFECT_USE_LOCAL_VELOCITY] > 0.0f) {
+          static int sProbeDir = 0;
+          if (sProbeDir < 30) {
+            ++sProbeDir;
+            FxAttachDiagLine(
+              "[FXDIR] n=%d dir=(%.2f,%.2f,%.2f) axis0=(%.2f,%.2f,%.2f) axis1=(%.2f,%.2f,%.2f) "
+              "axis2=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f) tick=%d",
+              sProbeDir,
+              particle.mDir.x, particle.mDir.y, particle.mDir.z,
+              attachMatrix.r[0].x, attachMatrix.r[0].y, attachMatrix.r[0].z,
+              attachMatrix.r[1].x, attachMatrix.r[1].y, attachMatrix.r[1].z,
+              attachMatrix.r[2].x, attachMatrix.r[2].y, attachMatrix.r[2].z,
+              particle.mPos.x, particle.mPos.y, particle.mPos.z,
+              tick
+            );
+          }
+        }
 
         particle.mResistance = mCurves[EMITTER_RESISTANCE_CURVE].GetValue(curvePhase);
         particle.mInterop = emissionCursor - tickFloat;
