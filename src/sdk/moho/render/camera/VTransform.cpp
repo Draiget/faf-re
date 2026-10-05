@@ -277,16 +277,17 @@ namespace moho
    *   0x00549D30..0x00549D5C  [edi+0C] = a2*b1 + a0*b3 + a3*b0 - a1*b2
    *
    * The scalar term is positive in lane 0, so this is an ordinary scalar-first
-   * product - the identical emission to `CAniPoseBone::Rotate` (0x0054BC00) -
-   * and its cross-term signs make it `rhs.orient_ * lhs.orient_`, with the
-   * right-hand transform as the left operand.
+   * product - the identical emission to `CAniPoseBone::Rotate` (0x0054BC00).
    *
-   * A prior revision took the correct textbook formula and cyclically
-   * relabelled every lane (`.x -> .y -> .z -> .w -> .x`) on the theory that
-   * `.x` was the scalar, citing `VMatrix4::Set`/`QuatToMatrix` as the anchors.
-   * Both of those have since been read off their own disassembly and are
-   * scalar-first as well - neither computes a `ww` term at all - so the
-   * relabel is undone here.
+   * Operand order re-decoded 2026-10-05 from the prologue and vector lanes:
+   * `eax` = lhs, `ebp` = rhs (the pushed second argument), and the scalar
+   * lane is `lhs[0]*rhs[0] - lhs[4]*rhs[4] - lhs[8]*rhs[8] - lhs[0xC]*rhs[0xC]`
+   * -- `lhs.orient_ * rhs.orient_`, NOT `rhs * lhs` as a prior revision read
+   * it. The two only commute for yaw-only rotations, which is exactly why the
+   * at-rest and pure-yaw probes never caught it while the tilted
+   * engine-bone fold (thrust manipulator ~105 degrees about X) came out as
+   * its own conjugate: exhaust effects attached to the engine bones rendered
+   * with the negated tilt - flames pointing up and trailing.
    *
    * The position half was already right and is unchanged: ground truth rotates
    * `lhs.pos_` by `rhs.orient_` through `Moho::MultQuadVec` (0x00549D73..
@@ -296,7 +297,7 @@ namespace moho
   {
     VTransform out{};
 
-    out.orient_ = MultiplyQuat(rhs.orient_, lhs.orient_);
+    out.orient_ = MultiplyQuat(lhs.orient_, rhs.orient_);
 
     Wm3::Vec3f rotatedPosition{};
     MultQuadVec(&rotatedPosition, &lhs.pos_, &rhs.orient_);
