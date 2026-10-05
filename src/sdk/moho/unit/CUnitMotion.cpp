@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -3608,6 +3609,32 @@ namespace moho
               rollNewTurn = false;
             } else if (combatState < ACS_NormalTurn || combatState > ACS_Realign) {
               rollNewTurn = false;
+            }
+          }
+
+          // TEMPORARY PROBE -- T3 bomber no-drop triage: the combat-tactics
+          // decision inputs at the align branch. If winged bombers sit in a
+          // non-Combat state with heading never crossing the 0.866 align dot,
+          // the entry conditions (not CanFire) are what cancel the order.
+          // Delete when resolved.
+          {
+            static int sProbeTacSeen = 0;
+            ++sProbeTacSeen;
+            if ((sProbeTacSeen % 800) == 0) {
+              if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+                std::fprintf(
+                  sink,
+                  "[TACTICS] state=%d align=%.3f horzDot=%.3f dist=%.1f breakTrig=%.1f winged=%d run=%d\n",
+                  static_cast<int>(mCombatState),
+                  isHeadingAlignedWithTarget ? 1.0f : 0.0f,
+                  (horzTargetDirNorm.x * currentHeading.x) + (horzTargetDirNorm.z * currentHeading.z),
+                  targetDist,
+                  breakOffTrigger,
+                  air.Winged,
+                  unit->IsUnitState(UNITSTATE_MakingAttackRun) ? 1 : 0
+                );
+                std::fclose(sink);
+              }
             }
           }
 
