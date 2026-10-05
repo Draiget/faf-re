@@ -279,6 +279,24 @@ namespace moho
 
     effect->SetBone(entity, boneIndex);
 
+    // TEMPORARY PROBE -- attach-creation triage: what the weak link resolves
+    // to immediately after SetBone on the CreateAttachedEmitter lane. Delete
+    // when resolved.
+    {
+      static int sProbeCreateAttached = 0;
+      if (sProbeCreateAttached < 20) {
+        ++sProbeCreateAttached;
+        DiagLine(
+          "[FXATTACH] createA n=%d eff=%p ent=%p bone=%d resolved=%p",
+          sProbeCreateAttached,
+          static_cast<void*>(effect),
+          static_cast<void*>(entity),
+          boneIndex,
+          static_cast<void*>(effect->mEntityInfo.GetAttachTargetEntity())
+        );
+      }
+    }
+
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {
       DestroyEffect(effect);
     }

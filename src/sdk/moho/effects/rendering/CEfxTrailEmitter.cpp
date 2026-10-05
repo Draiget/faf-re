@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstdarg>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -41,6 +43,23 @@ namespace
   // Engine-stat handle for "Render_ActiveEmitters", resolved once on first tick
   // (mirrors the binary's sEngineStat_Render_ActiveEmitters_1 global).
   moho::StatItem* sEngineStatRenderActiveEmitters = nullptr;
+
+  // TEMPORARY PROBE SINK -- attached-trail triage, delete when resolved.
+  // gpg::Warnf only reaches an active /log target, so the probes below append
+  // here instead. The file lands beside the executable.
+  void TrailDiagLine(const char* const fmt, ...)
+  {
+    std::FILE* const sink = std::fopen("faf_diag.log", "a");
+    if (sink == nullptr) {
+      return;
+    }
+    std::va_list args;
+    va_start(args, fmt);
+    (void)std::vfprintf(sink, fmt, args);
+    va_end(args);
+    (void)std::fputc(0x0A, sink);
+    (void)std::fclose(sink);
+  }
 
   [[nodiscard]] gpg::RType* CachedVector3fType()
   {
@@ -455,6 +474,39 @@ namespace moho
     trail.mEndPos.z = curZ;
     trail.mStartTangent = startTangent;
     trail.mEndTangent = direction;
+
+    // TEMPORARY PROBE -- attached-trail triage: the ribbon end positions the
+    // GPU receives, with the entity lanes they were interpolated from. If
+    // mEndPos already trails the entity's pending position on the final tick,
+    // the fault is in this interpolation; if it matches but the ribbon still
+    // draws behind, the fault is downstream (upload/shader). Delete when
+    // resolved.
+    {
+      static int sProbeTrail = 0;
+      if (sProbeTrail < 40) {
+        ++sProbeTrail;
+        const Entity* const attachedForProbe = mEntityInfo.GetAttachTargetEntity();
+        TrailDiagLine(
+          "[FXTRAIL] n=%d tick=%d interpScale=%.3f start=(%.1f,%.1f,%.1f) end=(%.1f,%.1f,%.1f) "
+          "ent=%s cur=(%.1f,%.1f,%.1f) pend=(%.1f,%.1f,%.1f) velScale=%.3f startAge=%.2f endAge=%.2f",
+          sProbeTrail,
+          tick,
+          interpScale,
+          prevX, prevY, prevZ,
+          curX, curY, curZ,
+          attachedForProbe != nullptr ? "yes" : "no",
+          attachedForProbe != nullptr ? attachedForProbe->mVarDat.mCurTransform.pos_.x : 0.0f,
+          attachedForProbe != nullptr ? attachedForProbe->mVarDat.mCurTransform.pos_.y : 0.0f,
+          attachedForProbe != nullptr ? attachedForProbe->mVarDat.mCurTransform.pos_.z : 0.0f,
+          attachedForProbe != nullptr ? attachedForProbe->mPendingTransform.pos_.x : 0.0f,
+          attachedForProbe != nullptr ? attachedForProbe->mPendingTransform.pos_.y : 0.0f,
+          attachedForProbe != nullptr ? attachedForProbe->mPendingTransform.pos_.z : 0.0f,
+          attachedForProbe != nullptr ? attachedForProbe->mPendingVelocityScale : 0.0f,
+          trail.mStartAge,
+          trail.mEndAge
+        );
+      }
+    }
 
     // Advance running trail state to the new segment endpoint.
     const float previousLength = mLength;

@@ -380,7 +380,7 @@ namespace moho
     // resolved.
     {
       static int sProbeTop = 0;
-      if (sProbeTop < 30) {
+      if (sProbeTop < 30 && effect->mEntityInfo.mParentBoneIndex >= 0) {
         ++sProbeTop;
         FxAttachDiagLine(
           "[FXATTACH] top n=%d eff=%p ent=%p has=%d bone=%d newAtt=%d tick=%d",
@@ -452,7 +452,7 @@ namespace moho
     // ("pointing up" shows as ~(0,1,0)). Delete when resolved.
     {
       static int sProbeOut = 0;
-      if (sProbeOut < 30) {
+      if (sProbeOut < 30 && effect->mEntityInfo.mParentBoneIndex >= 0) {
         ++sProbeOut;
         FxAttachDiagLine(
           "[FXATTACH] out n=%d ent=%p bone=%d axis2=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f) "
