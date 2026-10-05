@@ -745,10 +745,12 @@ namespace moho
     SWorldTrail* const trailEnd = pendingTrails.begin() + maxUploadCount;
 
     for (SWorldTrail* trail = pendingTrails.begin(); trail != trailEnd; ++trail) {
-      // The work-item interval opens at the older of the two ends and runs for
-      // one frame past the segment's lifetime.
+      // The work-item interval opens at the older of the two ends and runs
+      // one frame past the segment's lifetime. The binary's constant at
+      // 0x00DFEB0C is 2.0f: the interval is `mLifetime + 2`, not `+ 1`
+      // (0x00493EA2: `movss xmm0, [trail+0x38]; addss xmm0, [0xDFEB0C]`).
       const float beginFrame = std::max(trail->mStartAge, trail->mEndAge) + frameDelta;
-      const float lifeFrames = trail->mLifetime + 1.0f;
+      const float lifeFrames = trail->mLifetime + 2.0f;
       (void)AppendInterval(workItem, beginFrame, lifeFrames);
 
       // Age the segment by this frame before it is packed: both ribbon ends and
