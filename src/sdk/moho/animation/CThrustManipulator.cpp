@@ -356,6 +356,42 @@ namespace moho
 
     watchedBone->Rotate(blendedOrientation);
     mOrientation = blendedOrientation;
+
+    // TEMPORARY PROBE -- thrust-nozzle triage, stage 3: what the bone
+    // actually holds immediately after this tick's Rotate: the local
+    // orientation and the composite forward axis (row 2 of the expanded
+    // matrix). The exhaust FX attach to CHILD bones of this engine bone, so
+    // if the engine aims down here while the exhaust renders up, the fault is
+    // in the child-composite path (GetBoneLocalTransform/InterpolatePosition
+    // compose), not the aim. Delete when resolved.
+    {
+      static int sProbePost = 0;
+      if (sProbePost < 20) {
+        ++sProbePost;
+        const VTransform& composite = watchedBone->GetCompositeTransform();
+        const float fwdY = (2.0f * ((composite.orient_.y * composite.orient_.z) -
+                                     (composite.orient_.w * composite.orient_.x)));
+        const float fwdZ = 1.0f - (2.0f * ((composite.orient_.x * composite.orient_.x) +
+                                           (composite.orient_.y * composite.orient_.y)));
+        const float fwdX = (2.0f * ((composite.orient_.x * composite.orient_.z) +
+                                     (composite.orient_.w * composite.orient_.y)));
+        std::FILE* const sink = std::fopen("faf_diag.log", "a");
+        if (sink != nullptr) {
+          std::fprintf(
+            sink,
+            "[FXPOST] n=%d localQ=(%.2f,%.2f,%.2f,%.2f) compQ=(%.2f,%.2f,%.2f,%.2f) fwd=(%.2f,%.2f,%.2f)\n",
+            sProbePost,
+            watchedBone->mLocalTransform.orient_.w,
+            watchedBone->mLocalTransform.orient_.x,
+            watchedBone->mLocalTransform.orient_.y,
+            watchedBone->mLocalTransform.orient_.z,
+            composite.orient_.w, composite.orient_.x, composite.orient_.y, composite.orient_.z,
+            fwdX, fwdY, fwdZ
+          );
+          std::fclose(sink);
+        }
+      }
+    }
     return true;
   }
 
