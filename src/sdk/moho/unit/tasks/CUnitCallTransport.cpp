@@ -245,17 +245,6 @@ namespace moho
           return 3;
         }
 
-        static DiagnosticBudget sCallTransportWaitProbe;
-        if ((sCallTransportWaitProbe.Next() % 60) == 0) {
-          gpg::Warnf(
-            "[XPORTDIAG] CallTransport wait: unit=%p xport=%p loading=%d holding=%d headsMatch=%d assist=%d",
-            static_cast<void*>(mUnit), static_cast<void*>(transportUnit),
-            transportUnit->IsUnitState(UNITSTATE_TransportLoading) ? 1 : 0,
-            transportUnit->IsUnitState(UNITSTATE_HoldingPattern) ? 1 : 0,
-            commandHeadsMatch ? 1 : 0, transportAssistMoving ? 1 : 0
-          );
-        }
-
         return 10;
       }
 

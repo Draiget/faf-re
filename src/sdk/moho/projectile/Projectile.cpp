@@ -1107,14 +1107,6 @@ namespace moho
       impactObject = LuaPlus::LuaObject(scriptState);
     }
 
-    {
-      static DiagnosticBudget sImpactProbe;
-      if (sImpactProbe.Take(20)) {
-        gpg::Warnf("[IMPACTDIAG] Projectile::Impact this=%p type='%s' collided=%p",
-                   static_cast<void*>(this), impactTypeString != nullptr ? impactTypeString : "<null>",
-                   static_cast<void*>(collidedEntity));
-      }
-    }
     this->LuaPCall("OnImpact", impactArgs, &impactObject);
 
     // Target/army accounting: only when the projectile had a real target entity.
@@ -1446,7 +1438,16 @@ namespace moho
     }
 
     // --- Branch B: terrain-surface intersection ---
-    {
+    // Gated by mCollideSurface in the binary: the branch lives inside the same
+    // `cmp byte [this+0x2A8], 0; je 0x0069D627` block as the water branches
+    // (asm 0x0069D281-0x0069D28D jumps past it to the mDoCollision test at
+    // 0x0069D627). A projectile with CollideSurface=false never tests terrain,
+    // which is what keeps the scripted build/nuke-effect dummy projectiles
+    // (UEFBuild01, UEFNukeFlavorPlume01, ...) alive while they skim or lift
+    // off the ground. Running it ungated made those projectiles detonate on
+    // their first tick near terrain, killing the ACU/engineer build beams and
+    // the nuke plume effect scripts.
+    if (mCollideSurface) {
       const GeomLine3 terrainLine{
         Wm3::Vec3f(curPos.x, curPos.y, curPos.z),
         Wm3::Vec3f(segment.Direction.x, segment.Direction.y, segment.Direction.z),

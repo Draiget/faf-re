@@ -7463,9 +7463,6 @@ namespace moho
           }
         }
 
-        gpg::Warnf("[DRAGDIAG] cached-entity arm: cachedTarget=%p closest=%p candidates=%u clamped=(%.1f,%.1f,%.1f)",
-                   static_cast<void*>(cachedTargetEntity), static_cast<void*>(closest),
-                   static_cast<unsigned>(candidates.size()), clampedPos.x, clampedPos.y, clampedPos.z);
         if (closest != nullptr) {
           const UserTarget entityTarget(closest);
           ISSUE_SetCommandTarget(helper, entityTarget);
@@ -7510,10 +7507,6 @@ namespace moho
       UserTarget positionTarget{};
       positionTarget.targetType = UserTargetType::Position;
       positionTarget.position = clampedPos;
-      gpg::Warnf("[DRAGDIAG] default arm: mouse=(%.1f,%.1f,%.1f) clamped=(%.1f,%.1f,%.1f) rect=(%d,%d)-(%d,%d) map=%p",
-                 mouse.x, mouse.y, mouse.z, clampedPos.x, clampedPos.y, clampedPos.z,
-                 map->mPlayableRect.x0, map->mPlayableRect.z0, map->mPlayableRect.x1, map->mPlayableRect.z1,
-                 static_cast<const void*>(map));
       ISSUE_SetCommandTarget(helper, positionTarget);
     }
 
@@ -10054,7 +10047,6 @@ namespace moho
       OrphanEntity(LookupEntityId(erasedId));
     }
 
-    { static int sBeatCount = 0; ++sBeatCount; if (sBeatCount <= 5 || (sBeatCount % 50) == 0) { gpg::Warnf("[POSEDIAG] beat=%d poseUpdates=%u entityUpdates=%u unitUpdates=%u", sBeatCount, static_cast<unsigned>(beat.mPoseUpdates.size()), static_cast<unsigned>(beat.mEntityUpdates.size()), static_cast<unsigned>(beat.mUnitUpdates.size())); } } // TEMPORARY PROBE (do not commit)
     // TEMPORARY PROBE -- input-free attack-order harness, delete when resolved.
     // The game window is not enumerable from the agent's session, so synthetic
     // clicks never arrive; this issues the order the test needs from inside the
@@ -10437,29 +10429,7 @@ namespace moho
       }
     }
 
-    // TEMPORARY PROBE -- "clicking an enemy issues no command" triage.
-    // This is the engine side of that click: the UI Lua calls
-    // GetValidAttackingUnits() and issues nothing when it comes back empty, so
-    // the failure is silent and invisible from the sim logs. Reports whether a
-    // target was hovered at all, how many units were selected, and how many
-    // passed CanAttackTarget -- which separates "hover never resolved to an
-    // entity" from "hover resolved but every weapon rejected it".
-    // Delete once resolved.
-    {
-      static int sProbe = 0;
-      if (sProbe++ < 40) {
-        const std::size_t selected = mSelection.Size();
-        gpg::Warnf(
-          "[CLICKDIAG] GetValidAttackingUnits hovered=%p hoveredIsUnit=%d selected=%u valid=%u",
-          static_cast<const void*>(hoveredTarget),
-          (hoveredTarget != nullptr && const_cast<UserEntity*>(hoveredTarget)->IsUserUnit() != nullptr) ? 1 : 0,
-          static_cast<unsigned>(selected),
-          static_cast<unsigned>(outUnits.size())
-        );
-      }
-    }
   }
-
   /**
    * Address: 0x008B0C80 (FUN_008B0C80)
    * Mangled: ?ISSUE_IncreaseCommandCount@Moho@@YAXPAVUserCommand@1@H@Z
@@ -12194,12 +12164,6 @@ namespace moho
 
     UserEntity* const hoveredEntity = this->GetHoveredUserEntity();
     UserUnit* const hoveredUnit = hoveredEntity != nullptr ? hoveredEntity->IsUserUnit() : nullptr;
-    // TEMPORARY PROBE (do not commit): click-select triage.
-    gpg::Warnf("[CLICKDIAG] ReleaseDrag mods=0x%X hovered=%p unit=%p selectable=%d army=%p focus=%p canSelect=%d",
-               static_cast<unsigned>(modifierBits), static_cast<void*>(hoveredEntity), static_cast<void*>(hoveredUnit),
-               hoveredEntity != nullptr ? (hoveredEntity->IsSelectable() ? 1 : 0) : -1,
-               hoveredEntity != nullptr ? static_cast<void*>(hoveredEntity->mArmy) : nullptr,
-               static_cast<void*>(GetFocusUserArmy()), CanSelectUnit(hoveredUnit) ? 1 : 0);
 
     if (ui_DebugAltClick && (modifierBits & kAltMask) != 0u && hoveredEntity != nullptr) {
       UserArmy* const hoveredArmy = hoveredEntity->mArmy;

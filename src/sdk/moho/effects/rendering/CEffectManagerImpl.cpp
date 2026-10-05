@@ -131,28 +131,32 @@ namespace moho
       return sim->mRules->GetTrailBlueprint(trailId);
     }
 
-    void SetEffectWorldPosition(IEffect& effect, const Wm3::Vector3f& position)
-    {
-      const float positionValues[3] = {position.x, position.y, position.z};
-      effect.SetNParam(0, positionValues, 3);
-    }
-
-    // (The former ApplyEmitterBlueprintParams helper is gone: the emitter blueprint
-    // param seeding now lives in the recovered CEfxEmitter create-params ctor
-    // (0x0065BA80), which the 5 CreateEmitter* factories construct through.)
-
     /**
      * Address: 0x00659390 (FUN_00659390)
      *
      * What it does:
-     * Fetches one entity bone world transform, copies its position into the
-     * effect payload, rebuilds the effect matrix from the same transform, and
+     * Fetches one entity bone world transform (local pose bone composed with
+     * the entity's current transform) into the effect's world matrix and
      * advances interpolation once.
+     *
+     * Binary fidelity note: this lane writes ONLY `mMatrix` - the
+     * quaternion-to-matrix helper (0x004EE980) builds the rotation from the
+     * composed transform and stores its translation lane into `effect+0x150` -
+     * and then tail-jumps `Interpolate` (vtable +0x50). There is no
+     * `SetNParam(0, pos, 3)` here: that is the *entity* variant's shape
+     * (0x00659300), which writes the position into param slot 0 and leaves the
+     * matrix identity. `CEfxEmitter::Interpolate` computes
+     * `mPos = mMatrix * params[0..2]`, and the blueprint ctor leaves slots 0..2
+     * as the emitter's local (zero) offset, so the bone-position ring lands at
+     * the bone's own world position. Writing the world position into the slot
+     * *as well* made Interpolate transform the bone position by the bone
+     * matrix - doubling the map coordinates and putting every
+     * `CreateEmitterAtBone` emitter (mass-storage blinking lights most
+     * visibly) high in the air, far from its unit.
      */
     void ApplyBoneTransformToEffect(CEffectImpl& effect, Entity* const entity, const int boneIndex)
     {
       const VTransform boneTransform = entity->GetBoneWorldTransform(boneIndex);
-      SetEffectWorldPosition(effect, boneTransform.pos_);
       effect.mMatrix.Set(boneTransform.orient_, boneTransform.pos_);
       effect.Interpolate();
     }
@@ -443,6 +447,30 @@ namespace moho
     constexpr std::int32_t kNoEmitters = 0;
     (void)sEngineStatRenderActiveEmitters->SetInt(&kNoEmitters);
 
+    // TEMPORARY PROBE -- effect-accumulation triage (assist lag), delete when
+    // resolved. Active effect list growth without bound means leaks (beams
+    // whose owning script threw before adding them to a TrashBag never get
+    // destroyed); sampled every 100 ticks.
+    {
+      static std::uint32_t sSampleMod = 0;
+      if ((++sSampleMod % 100u) == 0u) {
+        static int sSampleCount = 0;
+        if (sSampleCount++ < 600) {
+          std::size_t activeCount = 0;
+          for (IEffect* const effect : mActiveEffects.owners_safe()) {
+            (void)effect;
+            ++activeCount;
+          }
+          std::size_t destroyedCount = 0;
+          for (IEffect* const effect : mDestroyedEffects.owners_safe()) {
+            (void)effect;
+            ++destroyedCount;
+          }
+          DiagLine("[EFXDIAG] EffectCount active=%zu destroyedPending=%zu", activeCount, destroyedCount);
+        }
+      }
+    }
+
     // The successor is read before each OnTick, as the binary does: an effect
     // that destroys itself relinks into mDestroyedEffects mid-walk.
     for (IEffect* const effect : mActiveEffects.owners_safe()) {
@@ -611,17 +639,6 @@ namespace moho
     const int armyIndex
   )
   {
-    // TEMPORARY PROBE -- enemy build-beam triage, delete when resolved.
-    // If an enemy ACU/engineer build produces no line at all, this says which
-    // of the two it is: no line here means the sim never asked for the beam;
-    // a line here plus a culled [EFXDIAG] CanSeeCam means it was created and
-    // then hidden by the recon probe.
-    DiagLine(
-      "[EFXDIAG] AttachBeam: army=%d src=%p srcBone=%d dst=%p dstBone=%d",
-      armyIndex, static_cast<void*>(sourceEntity), sourceBoneIndex,
-      static_cast<void*>(targetEntity), targetBoneIndex
-    );
-
     CEfxBeam* const effect = new (std::nothrow) CEfxBeam(this, beamBlueprint, armyIndex);
     if (effect == nullptr) {
       return nullptr;

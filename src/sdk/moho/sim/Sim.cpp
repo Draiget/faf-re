@@ -1,5 +1,6 @@
 #include "Sim.h"
 #include "legacy/math/X87Math.h"
+#include "moho/misc/DiagnosticBudget.h"
 #include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "SimDriver.h"
@@ -879,6 +880,10 @@ namespace
   constexpr const char* kSessionGetLocalCommandSourceHelpText =
     "Return the local command source.  Returns 0 if the local client can't issue commands.";
   constexpr const char* kSessionIsReplayUserHelpText = "Return true iff the active session is a replay session.";
+  constexpr const char* kSetFocusArmySimHelpText = "SetFocusArmy(armyIndex or -1)";
+  constexpr const char* kGetTimeForProfileSimHelpText = "(OriginTime)";
+  constexpr const char* kGetDepositsAroundPointHelpText = "(X, Z, Radius, Type)";
+  constexpr const char* kSetCommandSourceSimHelpText = "(targetArmyIndex, sourceHumanIndex, Set or Unset)";
   constexpr const char* kSessionIsBeingRecordedHelpText = "Return true iff the active session is a being recorded.";
   constexpr const char* kSessionIsMultiplayerHelpText = "Return true iff the active session is a multiplayer session.";
   constexpr const char* kSessionIsObservingAllowedHelpText =
@@ -2729,23 +2734,6 @@ namespace
     return currentCommand->mUnit.GetObjectPtr();
   }
 
-  // TEMPORARY PROBE SINK -- transport triage, delete when resolved.
-  // gpg::Warnf reaches nothing until `/log <name>` installs a target, so the
-  // probe below appends here instead. The file lands beside the executable.
-  void DiagLine(const char* const fmt, ...)
-  {
-    std::FILE* const sink = std::fopen("faf_diag.log", "a");
-    if (sink == nullptr) {
-      return;
-    }
-    std::va_list args;
-    va_start(args, fmt);
-    (void)std::vfprintf(sink, fmt, args);
-    va_end(args);
-    (void)std::fputc(0x0A, sink);
-    (void)std::fclose(sink);
-  }
-
   [[nodiscard]] bool HasCommandCap(const Unit* const unit, const ERuleBPUnitCommandCaps commandCap) noexcept
   {
     return unit != nullptr && (unit->GetAttributes().commandCapsMask & static_cast<std::uint32_t>(commandCap)) != 0u;
@@ -3467,22 +3455,6 @@ namespace
 
     // TEMPORARY PROBE -- transport-load triage, delete when resolved.
     // Covers the half the dispatch probe cannot see: whether the order was
-    // issued at all, what target id rode with it, and how many of the selected
-    // units actually took it. A TransportLoadUnits (22) line with queued=0, or
-    // with a target id that resolves to nothing, says the failure is here
-    // rather than in the task.
-    if (commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits
-        || commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits
-        || commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_Dock) {
-      DiagLine(
-        "[XPORTDIAG] Issue: cmd=%d targetType=%d targetId=0x%08x cmdObj=%p queued=%d",
-        static_cast<int>(commandIssueData.mCommandType),
-        static_cast<int>(commandIssueData.mTarget.mType),
-        static_cast<unsigned int>(commandIssueData.mTarget.mEntityId),
-        static_cast<void*>(issuedCommand), queuedAtLeastOnce ? 1 : 0
-      );
-    }
-
     if (issuedCommand == nullptr || !queuedAtLeastOnce) {
       ReleaseCommandIdIfUnconsumed(sim->mCommandDB, commandIssueData.nextCommandId);
     }
@@ -5558,7 +5530,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // swapped over like the lanes below. `Sim::mSyncCamShake` (Sim+0x09C8) was
   // declared `msvc8::vector<void*> mSyncSerializeGroup1` and had no users at
   // all; the `ShakeCamera` Lua binding reached the same storage through a
-  // `reinterpret_cast<SimCameraShakeQueueOwnerRuntimeView*>(sim)` whose
+  // `reinterpret_cast<the deleted owner-overlay*>(sim)` whose
   // `pad_0000[0x09C8]` pinned the offset. Both sides are `SCamShakeParams` now.
   mSyncCamShake.swap(outSyncData->mCamShakeParams);
 
@@ -6840,21 +6812,6 @@ void Sim::Logf(const char* fmt, ...)
   va_end(args);
 }
 
-namespace
-{
-  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-  void ProbeTerrainOccupancy(const moho::COGrid* const grid, const char* const stage)
-  {
-    if (grid == nullptr) { return; }
-    const gpg::BitArray2D& occ = grid->terrainOccupation;
-    int setBits = 0;
-    for (int i = 0; i < occ.size; ++i) { std::uint32_t w = static_cast<std::uint32_t>(occ.ptr[i]); while (w != 0u) { w &= w - 1u; ++setBits; } }
-    gpg::Warnf("[OCCDIAG] %s terrainOcc setBits=%d ptr=%p size=%d grid=%p gridSim=%p water=%p occ=%p", stage, setBits,
-               static_cast<const void*>(occ.ptr), occ.size, static_cast<const void*>(grid), static_cast<const void*>(grid->sim),
-               static_cast<const void*>(grid->waterOccupation.ptr), static_cast<const void*>(grid->mOccupation.ptr));
-  }
-} // namespace
-
 /**
  * Address: 0x007462A0 (FUN_007462A0, ?Printf@Sim@Moho@@QAAXPBDZZ)
  *
@@ -7011,7 +6968,6 @@ Sim::Sim(LaunchInfoBase* const info)
       delete previousGrid;
     }
     ogridScope.Emit();
-    ProbeTerrainOccupancy(mOGrid, "after COGrid ctor");
   }
 
   // Allocate the path tables sized to the interior of the heightfield.
@@ -7028,7 +6984,6 @@ Sim::Sim(LaunchInfoBase* const info)
     }
   }
 
-  ProbeTerrainOccupancy(mOGrid, "after PathTables ctor");
   // Seed the rolling sim checksum from the rules and log the initial digest.
   mRules->UpdateChecksum(&mContext, mLog);
   const gpg::MD5Digest digest = mContext.Digest();
@@ -7115,7 +7070,6 @@ void Sim::Setup(LaunchInfoNew* const info)
     } catch (const msvc8::runtime_error& error) {
       gpg::Warnf("Error running SetupSession in SimInit.lua: %s", error.what());
     }
-    ProbeTerrainOccupancy(mOGrid, "after SetupSession");
   }
 
   // Refresh heightfield bounds to the full grid.
@@ -7183,9 +7137,7 @@ void Sim::Setup(LaunchInfoNew* const info)
   }
 
   // Create the armies from the scenario launch info.
-  ProbeTerrainOccupancy(mOGrid, "before CreateArmies");
   CreateArmies(info->mArmyLaunchInfo, armySetupObjects, scenarioInfoOptions);
-  ProbeTerrainOccupancy(mOGrid, "after CreateArmies");
 
   // Optional sound manager: only when a non-empty engine list is configured and
   // sound is not disabled.
@@ -7207,22 +7159,12 @@ void Sim::Setup(LaunchInfoNew* const info)
     int propCount = 0;
     if (props != nullptr && !props->mEntries.empty()) {
       propCount = static_cast<int>(props->mEntries.size());
-      // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-      const void* probeOccPtr = mOGrid ? static_cast<const void*>(mOGrid->terrainOccupation.ptr) : nullptr;
-      int probeIndex = 0;
-      for (const CWldPropEntry* entry = props->mEntries.begin(); entry != props->mEntries.end(); ++entry, ++probeIndex) {
+      for (const CWldPropEntry* entry = props->mEntries.begin(); entry != props->mEntries.end(); ++entry) {
         (void)PROP_Create(this, entry->mTransform, entry->mBlueprintPath.c_str());
-        if (mOGrid && static_cast<const void*>(mOGrid->terrainOccupation.ptr) != probeOccPtr) {
-          gpg::Warnf("[OCCDIAG] terrainOcc.ptr changed after prop #%d %s at (%.1f,%.1f,%.1f): %p -> %p", probeIndex,
-                     entry->mBlueprintPath.c_str(), entry->mTransform.pos_.x, entry->mTransform.pos_.y, entry->mTransform.pos_.z,
-                     probeOccPtr, static_cast<const void*>(mOGrid->terrainOccupation.ptr));
-          probeOccPtr = static_cast<const void*>(mOGrid->terrainOccupation.ptr);
-        }
       }
     }
     gpg::Warnf(" NUM PROPS = %d", propCount);
   }
-  ProbeTerrainOccupancy(mOGrid, "after props");
 
   // BeginSession() Lua callback: lookup and call are both guarded
   // (std::exception, FuncInfo 0x00F29640 try states 22..26, handler 0x007448AA).
@@ -7232,11 +7174,9 @@ void Sim::Setup(LaunchInfoNew* const info)
   } catch (const std::exception& error) {
     gpg::Warnf("BeginSession() failed: %s", error.what());
   }
-  ProbeTerrainOccupancy(mOGrid, "after BeginSession");
 
   // Final post-initialization pass (prebuilt units, etc.).
   PostInitialize(scenarioInfoOptions);
-  ProbeTerrainOccupancy(mOGrid, "end of Sim::Setup");
 }
 
 /**
@@ -8068,7 +8008,7 @@ void Sim::SingleStep()
  * `mCommandDB->mCommands` and rejects only when the found node is real and
  * its value is non-null (`a1 == head || !a1->_Myval.cmd` -> allow). It does
  * not null-check `mCommandDB` or the map head first -- both guards were a
- * `CCommandDbRuntimeView` reach-in artifact; `mCommandDB->commands` is
+ * `CCommandDb` reach-in artifact; `mCommandDB->commands` is
  * `CCommandDB`'s own real typed member (`CCommandDb.h`) and is always valid
  * once `Sim` is constructed.
  */
@@ -8588,16 +8528,6 @@ void Sim::IssueCommand(
 
   auto collectUnit = [this, &selectedUnits](const EntId entId) {
     Entity* entity = FindEntityById(mEntityDB, entId);
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    {
-      const bool okay = entity != nullptr && OkayToMessWith(entity);
-      auto* const armyImpl = entity != nullptr ? static_cast<CArmyImpl*>(static_cast<SimArmy*>(entity->ArmyRef)) : nullptr;
-      DiagLine("[ORDERDIAG]   collect id=0x%08X entity=%p army=%p okay=%d curSrc=%d outOfGame=%d validSrcCount=%d isUnit=%p",
-                 static_cast<unsigned>(entId), static_cast<void*>(entity), static_cast<void*>(armyImpl), okay ? 1 : 0,
-                 static_cast<int>(mCurCommandSource), armyImpl != nullptr ? (armyImpl->mVarDat.mIsOutOfGame ? 1 : 0) : -1,
-                 armyImpl != nullptr ? static_cast<int>(reinterpret_cast<const BVIntSet&>(armyImpl->mVarDat.mValidCommandSources).Count()) : -1,
-                 entity != nullptr ? static_cast<void*>(entity->IsUnit()) : nullptr);
-    }
     if (!entity || !OkayToMessWith(entity)) {
       return;
     }
@@ -8613,13 +8543,6 @@ void Sim::IssueCommand(
   entities.ForEachValue([&collectUnit](const unsigned int value) {
     collectUnit(static_cast<EntId>(value));
   });
-
-  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-  DiagLine("[ORDERDIAG] Sim::IssueCommand type=%d id=0x%08X targetType=%d pos=(%.1f,%.1f,%.1f) selectedEmpty=%d clear=%d",
-             static_cast<int>(commandIssueData.mCommandType), static_cast<unsigned>(commandIssueData.nextCommandId),
-             static_cast<int>(commandIssueData.mTarget.mType), commandIssueData.mTarget.mPos.x,
-             commandIssueData.mTarget.mPos.y, commandIssueData.mTarget.mPos.z, selectedUnits.Empty() ? 1 : 0,
-             clearQueue ? 1 : 0);
 
   if (selectedUnits.Empty()) {
     ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
@@ -8939,6 +8862,18 @@ void Sim::LuaSimCallback(
     doCallback(callbackName, args, selectedUnits);
     lua_settop(state, oldTop);
   } catch (const lua_RuntimeError& error) {
+    // TEMPORARY PROBE -- lua_RuntimeError storm triage; mirrors the /log-only
+    // warning into faf_diag.log (bounded) so repro sessions without /log keep
+    // the callback name and message.
+    {
+      static DiagnosticBudget sSimCallbackErrorBudget;
+      if (sSimCallbackErrorBudget.Take(200)) {
+        if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+          std::fprintf(sink, "[LUADIAG] sim callback '%s': %s\n", callbackName, error.what());
+          std::fclose(sink);
+        }
+      }
+    }
     gpg::Warnf("Error running sim lua callback function '%s':\n%s", callbackName, error.what());
   }
 }
@@ -10650,21 +10585,6 @@ void Sim::AdvanceBeat(const int amt)
     TickTaskStage(&mDiskWatcherTaskStage);
     TickTaskStage(&mTaskStageA);
     RefreshBlips();
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    if (mOGrid != nullptr) {
-      static int sLastCount = -1;
-      const gpg::BitArray2D& occ = mOGrid->terrainOccupation;
-      int setBits = 0;
-      for (int i = 0; i < occ.size; ++i) {
-        std::uint32_t w = static_cast<std::uint32_t>(occ.ptr[i]);
-        while (w != 0u) { w &= w - 1u; ++setBits; }
-      }
-      if (setBits != sLastCount) {
-        gpg::Warnf("[OCCDIAG] tick=%u terrainOcc setBits=%d (was %d) ptr=%p size=%d w=%d h=%d", mCurTick, setBits, sLastCount,
-                   static_cast<const void*>(occ.ptr), occ.size, occ.width, occ.height);
-        sLastCount = setBits;
-      }
-    }
 
     // TEMPORARY PROBE -- delete once resolved.
     //
@@ -23662,6 +23582,86 @@ moho::CScrLuaInitForm* moho::func_SessionIsReplaySim_LuaFuncDef()
 }
 
 /**
+ * What it does:
+ * Publishes the sim-lane Lua binder definition for global `SetFocusArmy`.
+ * The shipped build binds this through the `.exxt` patch def chain (node
+ * 0x0128EA38, function slot 0x0128BBFC) rather than a `func_*_LuaFuncDef`
+ * factory, so only the bound worker has an address.
+ */
+moho::CScrLuaInitForm* moho::func_SetFocusArmySim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetFocusArmy",
+    &moho::cfunc_SetFocusArmySim,
+    nullptr,
+    "<global>",
+    kSetFocusArmySimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * What it does:
+ * Publishes the sim-lane Lua binder definition for global
+ * `GetTimeForProfile` (`.exxt` def chain node 0x0128EA70, function slot
+ * 0x0128B0BF).
+ */
+moho::CScrLuaInitForm* moho::func_GetTimeForProfileSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetTimeForProfile",
+    &moho::cfunc_GetTimeForProfileSim,
+    nullptr,
+    "<global>",
+    kGetTimeForProfileSimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * What it does:
+ * Publishes the sim-lane Lua binder definition for global
+ * `GetDepositsAroundPoint` (`.exxt` def chain node 0x0128EA8C, function
+ * slot 0x0128B884).
+ */
+moho::CScrLuaInitForm* moho::func_GetDepositsAroundPoint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetDepositsAroundPoint",
+    &moho::cfunc_GetDepositsAroundPoint,
+    nullptr,
+    "<global>",
+    kGetDepositsAroundPointHelpText
+  );
+  return &binder;
+}
+
+/**
+ * What it does:
+ * Publishes the sim-lane Lua binder definition for global
+ * `SetCommandSource` (`.exxt` def chain node 0x0128EAA8, function slot
+ * 0x0128BB51). `/lua/sim/victorycondition/abstractvictorycondition.lua`
+ * calls it from `ToObserver` while processing a defeated army; leaving it
+ * unregistered aborted that pass, so the victory flow never removed the
+ * defeated players' command sources and the session never concluded.
+ */
+moho::CScrLuaInitForm* moho::func_SetCommandSourceSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetCommandSource",
+    &moho::cfunc_SetCommandSourceSim,
+    nullptr,
+    "<global>",
+    kSetCommandSourceSimHelpText
+  );
+  return &binder;
+}
+
+/**
  * Address: 0x0128BBFC (FUN_0128BBFC, cfunc_SetFocusArmySim)
  *
  * What it does:
@@ -26377,19 +26377,6 @@ namespace moho
     // recovered 3-arg driver IssueCommand returns void, so nothing is discarded.
     BVSet<EntId, EntIdUniverse> issuedEntitySet{};
     func_DecodeEntIdSet(issuedEntitySet, units);
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    DiagLine("[ORDERDIAG] ISSUE_Command type=%d targetType=%d pos=(%.1f,%.1f,%.1f) units=%u clear=%d id=0x%08X driver=%p",
-               static_cast<int>(data.mCommandType), static_cast<int>(data.mTarget.mType),
-               data.mTarget.mPos.x, data.mTarget.mPos.y, data.mTarget.mPos.z,
-               static_cast<unsigned>(units.size()), clearQueue ? 1 : 0,
-               static_cast<unsigned>(data.nextCommandId), static_cast<void*>(WLD_GetDriver()));
-    issuedEntitySet.ForEachValue([](const unsigned int value) {
-      DiagLine("[ORDERDIAG]   sent id=0x%08X", value);
-    });
-    for (moho::UserUnit* const unit : units) {
-      DiagLine("[ORDERDIAG]   user unit=%p entityId=0x%08X", static_cast<void*>(unit),
-                 reinterpret_cast<const moho::UserEntity*>(unit)->mParams.mEntityId);
-    }
 
     if (ISTIDriver* const simDriver = WLD_GetDriver()) {
       simDriver->IssueCommand(issuedEntitySet, data, clearQueue);
@@ -27121,6 +27108,10 @@ namespace
       (void)::moho::func_SessionGetLocalCommandSource_LuaFuncDef();
       (void)::moho::func_SessionIsReplayUser_LuaFuncDef();
       (void)::moho::func_SessionIsReplaySim_LuaFuncDef();
+      (void)::moho::func_SetFocusArmySim_LuaFuncDef();
+      (void)::moho::func_GetTimeForProfileSim_LuaFuncDef();
+      (void)::moho::func_GetDepositsAroundPoint_LuaFuncDef();
+      (void)::moho::func_SetCommandSourceSim_LuaFuncDef();
       (void)::moho::func_SessionIsBeingRecorded_LuaFuncDef();
       (void)::moho::func_SessionIsMultiplayer_LuaFuncDef();
       (void)::moho::func_SessionIsObservingAllowed_LuaFuncDef();

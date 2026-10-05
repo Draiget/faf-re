@@ -19310,9 +19310,7 @@ void moho::CLuaWldUIProvider::UpdateLoadingDialog(
  */
 void moho::CLuaWldUIProvider::StopLoadingDialog()
 {
-  ::OutputDebugStringA("[FRAMEDIAG] StopLoadingDialog: before RunScript\n");
   (void)static_cast<CScriptObject*>(this)->RunScript("StopLoadingDialog");
-  ::OutputDebugStringA("[FRAMEDIAG] StopLoadingDialog: after RunScript\n");
 }
 
 /**
@@ -20768,15 +20766,6 @@ void moho::CUIWorldView::DoRender(
         // `bottom - top` gave the minimap a 228x19 viewport - a sliver a few pixels
         // tall - instead of its real 253x211.
         camera->CameraSetViewport(Wm3::Vector2f(left, top), Wm3::Vector2f(width, height));
-        gpg::Warnf(
-          "[MMDIAG] DoRender PUSHED this=%p isMiniMap=%d viewport=(%.1f,%.1f,%.1f,%.1f)",
-          static_cast<const void*>(this),
-          static_cast<int>(this->IsMiniMap()),
-          left,
-          top,
-          width,
-          height
-        );
       }
     }
     return;
@@ -21327,22 +21316,6 @@ bool moho::CUIWorldView::HandleEvent(
   const SMauiEventData& eventData
 )
 {
-  if (
-    eventData.mEventType == MET_ButtonPress || eventData.mEventType == MET_ButtonRelease ||
-    eventData.mEventType == MET_ButtonDClick
-  ) {
-    gpg::Warnf(
-      "[EVTDIAG] worldview=%p type=%d key=%d mods=%d pos=(%.0f,%.0f) minimap=%d",
-      static_cast<void*>(this),
-      static_cast<int>(eventData.mEventType),
-      eventData.mKeyCode,
-      eventData.mModifiers,
-      eventData.mMousePos.x,
-      eventData.mMousePos.y,
-      IsMiniMap() ? 1 : 0
-    );
-  }
-
   // --- cursor enter / exit ------------------------------------------------
   if (eventData.mEventType == MET_MouseEnter) {
     mCursorInside = 1u;

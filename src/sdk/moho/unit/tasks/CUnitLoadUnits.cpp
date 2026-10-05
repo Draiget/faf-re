@@ -38,19 +38,6 @@ namespace moho
 
 namespace
 {
-  void DiagLine(const char* const fmt, ...)
-  {
-    std::FILE* const sink = std::fopen("faf_diag.log", "a");
-    if (sink == nullptr) {
-      return;
-    }
-    std::va_list args;
-    va_start(args, fmt);
-    (void)std::vfprintf(sink, fmt, args);
-    va_end(args);
-    (void)std::fputc('\n', sink);
-    (void)std::fclose(sink);
-  }
   constexpr std::uint64_t kUnitStateMaskTransportLoading = (1ull << static_cast<std::uint32_t>(moho::UNITSTATE_TransportLoading));
   constexpr std::uint64_t kUnitStateMaskHoldingPattern = (1ull << static_cast<std::uint32_t>(moho::UNITSTATE_HoldingPattern));
   constexpr int kPickupTimeoutTicks = 300;
@@ -557,14 +544,6 @@ namespace moho
             CUnitCommand* const candidateHeadCommand =
               candidate->CommandQueue != nullptr ? candidate->CommandQueue->GetCurrentCommand() : nullptr;
             if (candidateHeadCommand != ownerHeadCommand) {
-              static moho::DiagnosticBudget sHeadMismatchProbe;
-              if ((sHeadMismatchProbe.Next() % 60) == 0) {
-                DiagLine(
-                  "[XPORTDIAG] LoadUnits head mismatch: transport=%p ownerHead=%p candidate=%p candHead=%p",
-                  static_cast<void*>(mUnit), static_cast<void*>(ownerHeadCommand),
-                  static_cast<void*>(candidate), static_cast<void*>(candidateHeadCommand)
-                );
-              }
               return 1;
             }
           }
@@ -573,11 +552,6 @@ namespace moho
         }
 
         DoTask();
-        DiagLine(
-          "[XPORTDIAG] LoadUnits DoTask: transport=%p requested=%u ready=%d loaded=%d",
-          static_cast<void*>(mUnit), static_cast<unsigned int>(mRequestedUnits.Size()),
-          static_cast<int>(mReadyUnitCount), static_cast<int>(mLoadedUnitCount)
-        );
         mTaskState = NextTaskState(mTaskState);
         return 0;
       }
