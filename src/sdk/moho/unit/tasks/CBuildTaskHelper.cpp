@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <typeinfo>
@@ -304,6 +305,28 @@ namespace moho
       }
       perSecond.energy *= resourceConsumed;
       perSecond.mass *= resourceConsumed;
+
+      // TEMPORARY PROBE -- silo assist triage: confirms the guard task
+      // dispatches the silo-assist repair task and what per-second value it
+      // contributes. Delete when resolved.
+      {
+        static int sProbeSiloSeen = 0;
+        ++sProbeSiloSeen;
+        if ((sProbeSiloSeen % 200) == 0) {
+          if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+            std::fprintf(
+              sink,
+              "[SILOASSIST] owner=%p focus=%p e=%.2f m=%.2f consumed=%.3f\n",
+              static_cast<void*>(ownerUnit),
+              static_cast<void*>(focusUnit),
+              perSecond.energy,
+              perSecond.mass,
+              resourceConsumed
+            );
+            std::fclose(sink);
+          }
+        }
+      }
 
       focusUnit->AiSiloBuild->SiloAssistWithResource(perSecond);
       ownerUnit->mUnitVarDat.mWorkProgress = focusUnit->mUnitVarDat.mWorkProgress;
