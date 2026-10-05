@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <cstdlib>
+#include <cstdio>
 #include <limits>
 #include <new>
 #include <stdexcept>
@@ -441,6 +442,31 @@ namespace
     const float time = static_cast<float>(tick) + frameDelta;
     if (moho::shaderVarParticleTime.Exists()) {
       moho::shaderVarParticleTime.mEffectVariable->SetFloat(time);
+    }
+
+    // TEMPORARY PROBE -- particle draw-time constant triage: everything the
+    // sim produces is verified correct (FXTRAIL/FXATTACH), so an on-screen
+    // offset must come from these binds. Reports, once per session, whether
+    // each particle shader variable resolved and what time value it received.
+    // Delete when resolved.
+    {
+      static bool sReported = false;
+      if (!sReported) {
+        sReported = true;
+        std::FILE* const sink = std::fopen("faf_diag.log", "a");
+        if (sink != nullptr) {
+          std::fprintf(
+            sink,
+            "[FXBIND] time=%.3f view=%d proj=%d vp=%d invView=%d\n",
+            time,
+            moho::shaderVarParticleViewMatrix.Exists() ? 1 : 0,
+            moho::shaderVarParticleProjection.Exists() ? 1 : 0,
+            moho::shaderVarParticleWorldToProjection.Exists() ? 1 : 0,
+            moho::shaderVarParticleInverseViewMatrix.Exists() ? 1 : 0
+          );
+          std::fclose(sink);
+        }
+      }
     }
   }
 
