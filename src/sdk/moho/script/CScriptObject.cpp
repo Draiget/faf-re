@@ -1,6 +1,7 @@
 #include "CScriptObject.h"
 
 #include <cstdint>
+#include <cstdio>
 #include <exception>
 #include <string>
 #include <typeinfo>
@@ -14,9 +15,11 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/DiagnosticBudget.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/unit/core/UnitWeapon.h"
+#include "moho/sim/ReconBlip.h"
 #include "moho/entity/Prop.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -793,6 +796,23 @@ void CScriptObject::LogScriptWarning(CScriptObject* obj, const char* which, cons
   if (obj) {
     description = obj->GetErrorDescription();
     where = description.c_str();
+  }
+
+  // TEMPORARY PROBE -- lua_RuntimeError storm triage. Without a `/log` target
+  // this warning is formatted and dropped, so sessions that reproduce the
+  // storm ship no evidence at all. Mirror it into faf_diag.log (bounded) so
+  // the failing script name and message survive every session.
+  {
+    static DiagnosticBudget sScriptErrorBudget;
+    if (sScriptErrorBudget.Take(200)) {
+      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+        std::fprintf(
+          sink, "[LUADIAG] Error running %s script in %s: %s\n",
+          which ? which : "<unknown>", where, message ? message : ""
+        );
+        std::fclose(sink);
+      }
+    }
   }
 
   gpg::Warnf("Error running %s script in %s: %s", which ? which : "<unknown>", where, message ? message : "");
@@ -2371,7 +2391,16 @@ void CScriptObject::RunScriptOnIntelChange(
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    fn(mLuaObj, blip, intelSenseName, gained);
+    // The blip must cross as its Lua object, not its C++ pointer: the binary
+    // builds one LuaObject for the blip lane (0x005C9344..0x005C9356) before
+    // the functor call, exactly like every other entity crossing into Lua.
+    // Pushing the raw `ReconBlip*` handed Lua a nil, so every
+    // `OnIntelChange(self, blip, ...)` callback that dared touch the blip
+    // (jammermanagerbraincomponent.lua's `blip:GetSource()`) died with
+    // "attempt to call method 'GetSource' (a nil value)" - 200+ logged
+    // exceptions per session, and the jammer reset logic never ran.
+    const LuaPlus::LuaObject blipObject = blip->mLuaObj;
+    fn(mLuaObj, blipObject, intelSenseName, gained);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.GetObjectPtr(), kOnIntelChange, ex.what());
   } catch (...) {
