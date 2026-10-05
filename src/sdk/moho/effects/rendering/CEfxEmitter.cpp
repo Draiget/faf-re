@@ -407,6 +407,34 @@ namespace moho
       *outMatrix = composed;
     }
 
+    // TEMPORARY PROBE -- attached-emitter orientation triage ("engine flames
+    // point up / trail the transport"). Dumps the first few attached-emitter
+    // matrices with the lanes they were built from: bone index, entity
+    // cur/pending position + orientation, bone-local orientation/offset, and
+    // the composed frame's axis rows. If the sim-side matrix is already wrong
+    // the bone lane is the culprit; if it is right the fault is downstream
+    // (particle fill or client render). Delete when resolved.
+    {
+      static int sProbeCount = 0;
+      if (sProbeCount < 24) {
+        ++sProbeCount;
+        const Wm3::Quaternionf& curQ = attachedEntity->mVarDat.mCurTransform.orient_;
+        const Wm3::Quaternionf& boneQ =
+          (boneIndex != -1) ? attachedEntity->GetBoneLocalTransform(boneIndex).orient_ : Wm3::Quaternionf{};
+        gpg::Warnf(
+          "[FXATTACH] n=%d bone=%d tick=%d cur=(%.1f,%.1f,%.1f)q(%.2f,%.2f,%.2f,%.2f) "
+          "pend=(%.1f,%.1f,%.1f) boneQ=(%.2f,%.2f,%.2f,%.2f) axis2=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f)",
+          sProbeCount, boneIndex, tick,
+          attachedEntity->mVarDat.mCurTransform.pos_.x, attachedEntity->mVarDat.mCurTransform.pos_.y,
+          attachedEntity->mVarDat.mCurTransform.pos_.z, curQ.w, curQ.x, curQ.y, curQ.z,
+          attachedEntity->mPendingTransform.pos_.x, attachedEntity->mPendingTransform.pos_.y,
+          attachedEntity->mPendingTransform.pos_.z, boneQ.w, boneQ.x, boneQ.y, boneQ.z,
+          outMatrix->r[2].x, outMatrix->r[2].y, outMatrix->r[2].z,
+          outMatrix->r[3].x, outMatrix->r[3].y, outMatrix->r[3].z
+        );
+      }
+    }
+
     return true;
   }
 
