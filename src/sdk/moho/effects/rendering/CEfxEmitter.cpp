@@ -354,6 +354,27 @@ namespace moho
   {
     Entity* const attachedEntity = effect->mEntityInfo.GetAttachTargetEntity();
 
+    // TEMPORARY PROBE -- attached-emitter triage ("engine flames point up /
+    // trail the transport"). The earlier probe sat below the null early-return
+    // and a full session logged nothing, so this one runs first and reports
+    // the raw link state whether or not the attach resolves. Delete when
+    // resolved.
+    {
+      static int sProbeTop = 0;
+      if (sProbeTop < 30) {
+        ++sProbeTop;
+        gpg::Warnf(
+          "[FXATTACH] top n=%d eff=%p ent=%p has=%d bone=%d newAtt=%d tick=%d",
+          sProbeTop,
+          static_cast<const void*>(effect),
+          static_cast<void*>(attachedEntity),
+          effect->mEntityInfo.HasAttachTarget() ? 1 : 0,
+          effect->mEntityInfo.mParentBoneIndex,
+          effect->mNewAttachment,
+          tick
+        );
+      }
+    }
 
     if (attachedEntity == nullptr) {
       *outMatrix = effect->mMatrix;
@@ -407,28 +428,18 @@ namespace moho
       *outMatrix = composed;
     }
 
-    // TEMPORARY PROBE -- attached-emitter orientation triage ("engine flames
-    // point up / trail the transport"). Dumps the first few attached-emitter
-    // matrices with the lanes they were built from: bone index, entity
-    // cur/pending position + orientation, bone-local orientation/offset, and
-    // the composed frame's axis rows. If the sim-side matrix is already wrong
-    // the bone lane is the culprit; if it is right the fault is downstream
-    // (particle fill or client render). Delete when resolved.
+    // TEMPORARY PROBE -- the composed matrix the engine actually hands the
+    // particle lane: entity frame + bone local. axis2 = emitter forward row
+    // ("pointing up" shows as ~(0,1,0)). Delete when resolved.
     {
-      static int sProbeCount = 0;
-      if (sProbeCount < 24) {
-        ++sProbeCount;
-        const Wm3::Quaternionf& curQ = attachedEntity->mVarDat.mCurTransform.orient_;
-        const Wm3::Quaternionf& boneQ =
-          (boneIndex != -1) ? attachedEntity->GetBoneLocalTransform(boneIndex).orient_ : Wm3::Quaternionf{};
+      static int sProbeOut = 0;
+      if (sProbeOut < 30) {
+        ++sProbeOut;
         gpg::Warnf(
-          "[FXATTACH] n=%d bone=%d tick=%d cur=(%.1f,%.1f,%.1f)q(%.2f,%.2f,%.2f,%.2f) "
-          "pend=(%.1f,%.1f,%.1f) boneQ=(%.2f,%.2f,%.2f,%.2f) axis2=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f)",
-          sProbeCount, boneIndex, tick,
-          attachedEntity->mVarDat.mCurTransform.pos_.x, attachedEntity->mVarDat.mCurTransform.pos_.y,
-          attachedEntity->mVarDat.mCurTransform.pos_.z, curQ.w, curQ.x, curQ.y, curQ.z,
-          attachedEntity->mPendingTransform.pos_.x, attachedEntity->mPendingTransform.pos_.y,
-          attachedEntity->mPendingTransform.pos_.z, boneQ.w, boneQ.x, boneQ.y, boneQ.z,
+          "[FXATTACH] out n=%d ent=%p bone=%d axis2=(%.2f,%.2f,%.2f) pos=(%.1f,%.1f,%.1f)",
+          sProbeOut,
+          static_cast<void*>(attachedEntity),
+          effect->mEntityInfo.mParentBoneIndex,
           outMatrix->r[2].x, outMatrix->r[2].y, outMatrix->r[2].z,
           outMatrix->r[3].x, outMatrix->r[3].y, outMatrix->r[3].z
         );

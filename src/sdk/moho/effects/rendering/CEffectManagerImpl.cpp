@@ -412,6 +412,24 @@ namespace moho
 
     effect->SetBone(entity, boneIndex);
 
+    // TEMPORARY PROBE -- attach-creation triage: proves the Lua lane reaches
+    // SetBone, and what the weak link resolves to one call later. Delete when
+    // resolved.
+    {
+      static int sProbeCreate = 0;
+      if (sProbeCreate < 20) {
+        ++sProbeCreate;
+        gpg::Warnf(
+          "[FXATTACH] create n=%d eff=%p ent=%p bone=%d resolved=%p",
+          sProbeCreate,
+          static_cast<void*>(effect),
+          static_cast<void*>(entity),
+          boneIndex,
+          static_cast<void*>(effect->mEntityInfo.GetAttachTargetEntity())
+        );
+      }
+    }
+
     if (blueprint != nullptr && !IsBlueprintEnabledForCurrentFidelity(blueprint)) {
       DestroyEffect(effect);
     }
