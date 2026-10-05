@@ -8539,7 +8539,7 @@ namespace msvc8
     public:
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
-                std::memcpy(dst, src, n * sizeof(T));
+                std::copy_n(src, n, dst);
             } else {
                 std::size_t i = 0;
                 try {
@@ -10227,7 +10227,7 @@ namespace msvc8
          */
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
-                std::memcpy(dst, src, n * sizeof(T));
+                std::copy_n(src, n, dst);
             } else {
                 std::size_t i = 0;
                 try {
@@ -11555,7 +11555,7 @@ namespace msvc8
                 std::is_trivially_copyable_v<T> ||
                 (!std::is_move_constructible_v<T> && !std::is_copy_constructible_v<T>)
             ) {
-                std::memcpy(newFirst, first_, n * sizeof(T));
+                std::copy_n(first_, n, newFirst);
                 newLast = newFirst + n;
             } else {
                 std::size_t i = 0;

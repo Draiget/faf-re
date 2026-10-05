@@ -1,5 +1,5 @@
 #include "CNetTCPConnector.h"
-
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
 #include <new>
@@ -84,7 +84,8 @@ namespace moho
         if (static_cast<size_t>(received) > capacity) {
           mStream.VirtWrite(buffer, static_cast<size_t>(received));
         } else {
-          std::memcpy(writeHead, buffer, static_cast<size_t>(received));
+          // Raw TCP receive blob into the stream buffer.
+          std::copy_n(buffer, static_cast<size_t>(received), writeHead);
           mStream.mWriteHead += received;
         }
 

@@ -4248,6 +4248,7 @@
   std::uint32_t __cdecl
   m2asjd_copy(void* const destinationBytes, const void* const sourceBytes, const std::uint32_t byteCount)
   {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(destinationBytes, sourceBytes, byteCount);
     return byteCount;
   }
@@ -4388,9 +4389,11 @@
       case 4: {
         for (std::int32_t index = 0; index < elementCount; ++index) {
           std::uint32_t sourceWord = 0;
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
           std::memcpy(&sourceWord, inputBytes + (index * 4), sizeof(sourceWord));
           const std::uint32_t swappedWord =
             (sourceWord >> 24) | ((sourceWord >> 8) & 0x0000FF00u) | ((sourceWord << 8) & 0x00FF0000u) | (sourceWord << 24);
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
           std::memcpy(destinationBytes + (index * 4), &swappedWord, sizeof(swappedWord));
         }
         break;
@@ -4398,13 +4401,16 @@
       case 2: {
         for (std::int32_t index = 0; index < elementCount; ++index) {
           std::uint16_t sourceHalfword = 0;
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
           std::memcpy(&sourceHalfword, inputBytes + (index * 2), sizeof(sourceHalfword));
           const std::uint16_t swappedHalfword = static_cast<std::uint16_t>((sourceHalfword >> 8) | (sourceHalfword << 8));
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
           std::memcpy(destinationBytes + (index * 2), &swappedHalfword, sizeof(swappedHalfword));
         }
         break;
       }
       case 1: {
+        // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
         std::memcpy(destinationBytes, inputBytes, static_cast<std::uint16_t>(elementCount));
         break;
       }
@@ -8106,6 +8112,7 @@
                 if (chunkBytes < mirroredBytes) {
                   mirroredBytes = chunkBytes;
                 }
+                // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
                 std::memcpy(
                   chunkBuffer + handle->bufferSize, chunkBuffer, static_cast<std::size_t>(mirroredBytes)
                 );
@@ -8118,6 +8125,7 @@
                 if (spillCopyBytes >= requiredBytes) {
                   spillCopyBytes = requiredBytes;
                 }
+                // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
                 std::memcpy(
                   handle->bufferBase,
                   chunkBuffer + (chunkBytes - spillCopyBytes),

@@ -1,5 +1,5 @@
 #include "moho/render/ScreenQuadVertexSheet.h"
-
+#include <algorithm>
 #include <cstring>
 
 #include "moho/render/ID3DVertexSheet.h"
@@ -34,7 +34,8 @@ namespace moho
     auto* const vertices =
       static_cast<ScreenQuadVertex*>(vertexStream->Lock(0, kScreenQuadVertexCount, false, false));
 
-    std::memcpy(vertices, kUnitScreenQuad, sizeof(kUnitScreenQuad));
+    // Raw GPU upload: static screen-quad vertex blob into the locked stream.
+    std::copy(std::begin(kUnitScreenQuad), std::end(kUnitScreenQuad), vertices);
 
     for (int index = 0; index < kScreenQuadVertexCount; ++index) {
       ScreenQuadVertex& vertex = vertices[index];

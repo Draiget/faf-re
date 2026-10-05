@@ -692,6 +692,7 @@
     *outAinfLength = static_cast<std::int32_t>(ReadAdxBigEndianU32(sourceBytes + offset));
     offset += 4;
 
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(outDataIdBytes, sourceBytes + offset, 16);
     offset += 16;
 
@@ -2213,6 +2214,7 @@
           const void* const sourceBytes = reinterpret_cast<const void*>(
             static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sourceChunk.bufferAddress))
           );
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
           std::memcpy(channelSamplePlanes[channelIndex] + samplesRead, sourceBytes, sourceChunk.byteCount);
 
           samplesRead += static_cast<std::int16_t>(sourceChunk.byteCount >> 1);
@@ -3003,6 +3005,7 @@
     }
 
     std::memset(encoder->ainfDataIdBytes, 0, sizeof(encoder->ainfDataIdBytes));
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(encoder->ainfDataIdBytes, *sourceDataIdBytes, sizeof(encoder->ainfDataIdBytes));
     return encoder->ainfDataIdBytes;
   }

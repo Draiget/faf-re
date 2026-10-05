@@ -5,6 +5,7 @@
 #include "legacy/exceptions/StdExcept.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstring>
 #include <initializer_list>
@@ -596,12 +597,10 @@ namespace
     for (;;) {
       const std::int32_t observedValueBits = AtomicLoadStatValueBits(valueBits);
 
-      float observedValue = 0.0f;
-      std::memcpy(&observedValue, &observedValueBits, sizeof(observedValue));
+      const float observedValue = std::bit_cast<float>(observedValueBits);
       const float nextValue = observedValue + delta;
 
-      std::int32_t nextValueBits = 0;
-      std::memcpy(&nextValueBits, &nextValue, sizeof(nextValueBits));
+      const std::int32_t nextValueBits = std::bit_cast<std::int32_t>(nextValue);
 
       const std::int32_t exchangedValueBits = static_cast<std::int32_t>(InterlockedCompareExchange(
         reinterpret_cast<volatile long*>(valueBits),
@@ -710,13 +709,11 @@ namespace
     if (moho::CArmyStatItem* const statItem = ResolveCachedArmyStatPath(armyStats, statPath); statItem != nullptr) {
       statItem->SynchronizeAsFloat();
 
-      std::int32_t candidateBits = 0;
-      std::memcpy(&candidateBits, &candidate, sizeof(candidateBits));
+      const std::int32_t candidateBits = std::bit_cast<std::int32_t>(candidate);
 
       for (;;) {
         const std::int32_t observedBits = AtomicLoadStatValueBits(&statItem->mPrimaryValueBits);
-        float observed = 0.0f;
-        std::memcpy(&observed, &observedBits, sizeof(observed));
+        const float observed = std::bit_cast<float>(observedBits);
         if (candidate <= observed) {
           return;
         }
@@ -3333,8 +3330,7 @@ int moho::cfunc_CAiBrainSetArmyStatL(LuaPlus::LuaState* const state)
     if (CArmyStatItem* const statItem = ResolveCachedArmyStatPath(armyStats, statName); statItem != nullptr) {
       statItem->SynchronizeAsFloat();
 
-      std::int32_t floatValueBits = 0;
-      std::memcpy(&floatValueBits, &floatValue, sizeof(floatValueBits));
+      const std::int32_t floatValueBits = std::bit_cast<std::int32_t>(floatValue);
       AtomicStoreStatValueBits(&statItem->mPrimaryValueBits, floatValueBits);
     }
   }

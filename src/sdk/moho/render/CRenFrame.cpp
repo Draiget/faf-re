@@ -1,6 +1,6 @@
 #include "moho/render/CRenFrame.h"
 
-#include <Windows.h>
+#include <algorithm>
 #include <d3d9.h>
 
 #include <cstdint>
@@ -230,7 +230,8 @@ namespace moho
     ID3DVertexStream* const vertexStream = mVertexSheet->GetVertStream(0U);
     const int vertexCount = mVertexSheet->Func5();
     void* const lockedVertices = vertexStream->Lock(0, vertexCount, false, false);
-    std::memcpy(lockedVertices, quadVertices, sizeof(quadVertices));
+    // Raw GPU upload: frame quad vertex blob into the locked stream.
+    std::copy(std::begin(quadVertices), std::end(quadVertices), static_cast<RenFrameTransformedVertex*>(lockedVertices));
     mVertexSheet->GetVertStream(0U)->Unlock();
   }
 

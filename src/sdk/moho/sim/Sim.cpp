@@ -3619,9 +3619,7 @@ namespace
 
   std::uint32_t FloatBits(const float value)
   {
-    std::uint32_t bits = 0;
-    std::memcpy(&bits, &value, sizeof(bits));
-    return bits;
+    return std::bit_cast<std::uint32_t>(value);
   }
 
   void ReadEntityVelocity(Entity* entity, Wm3::Vec3f* outVelocity)

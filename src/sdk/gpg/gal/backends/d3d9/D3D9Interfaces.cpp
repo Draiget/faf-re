@@ -39,6 +39,7 @@
 #include <d3dx9.h>
 
 #include <bit>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -3085,7 +3086,8 @@ namespace gpg::gal
             {
                 *outBuffer = gpg::AllocMemBuffer(fileBuffer->GetBufferSize());
             }
-            std::memcpy(outBuffer->GetPtr(0U, 0U), fileBuffer->GetBufferPointer(), fileBuffer->GetBufferSize());
+            // Raw shader/effect blob copy from the D3DX file buffer.
+            std::copy_n(static_cast<const char*>(fileBuffer->GetBufferPointer()), fileBuffer->GetBufferSize(), outBuffer->GetPtr(0U, 0U));
             fileBuffer->Release();
         }
         else
@@ -3197,16 +3199,18 @@ namespace gpg::gal
         const char* const sourceBytesPtr = static_cast<const char*>(lockedRect.pBits);
         if (static_cast<std::size_t>(lockedRect.Pitch) == bytesPerRow)
         {
-            std::memcpy(destinationBytes, sourceBytesPtr, totalBytes);
+            // Raw texture blob copy from the locked surface.
+            std::copy_n(sourceBytesPtr, totalBytes, destinationBytes);
         }
         else
         {
+            // Raw texture row blob copies from the locked, pitched surface.
             for (std::size_t rowIndex = 0; rowIndex < rowCount; ++rowIndex)
             {
-                std::memcpy(
-                    destinationBytes + (rowIndex * bytesPerRow),
+                std::copy_n(
                     sourceBytesPtr + (rowIndex * static_cast<std::size_t>(lockedRect.Pitch)),
-                    bytesPerRow
+                    bytesPerRow,
+                    destinationBytes + (rowIndex * bytesPerRow)
                 );
             }
         }
@@ -5635,7 +5639,8 @@ namespace gpg::gal
         {
             *outBuffer = gpg::AllocMemBuffer(fileBuffer->GetBufferSize());
         }
-        std::memcpy(outBuffer->GetPtr(0U, 0U), fileBuffer->GetBufferPointer(), fileBuffer->GetBufferSize());
+        // Raw shader/effect blob copy from the D3DX file buffer.
+        std::copy_n(static_cast<const char*>(fileBuffer->GetBufferPointer()), fileBuffer->GetBufferSize(), outBuffer->GetPtr(0U, 0U));
 
         surface->Release();
         fileBuffer->Release();
@@ -6204,6 +6209,7 @@ namespace gpg::gal
 namespace gpg::gal
 {
     long DebugSaveSurfaceToFileA(const char* filePath, unsigned int fileFormat, void* sourceSurface);
+    long DebugSaveTextureToFileA(const char* filePath, unsigned int fileFormat, void* sourceTexture);
 }
 
 long gpg::gal::DebugSaveSurfaceToFileA(const char* const filePath, const unsigned int fileFormat, void* const sourceSurface)

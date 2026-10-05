@@ -1,5 +1,5 @@
 #include "FileStream.h"
-
+#include <algorithm>
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
@@ -257,7 +257,8 @@ size_t FileStream::VirtRead(char* buf, size_t len)
     size_t available = static_cast<size_t>(mReadEnd - mReadHead);
 
     if (available >= remaining) {
-        std::memcpy(buf, mReadHead, remaining);
+        // Raw byte-stream IO through the file read/write buffer.
+        std::copy_n(mReadHead, remaining, buf);
         mReadHead += remaining;
         return remaining;
     }
@@ -265,7 +266,8 @@ size_t FileStream::VirtRead(char* buf, size_t len)
     while (true)
     {
         if (available != 0) {
-            std::memcpy(buf, mReadHead, available);
+            // Raw byte-stream IO through the file read/write buffer.
+            std::copy_n(mReadHead, available, buf);
             mReadHead += available;
             copied += available;
             buf += available;
@@ -285,7 +287,8 @@ size_t FileStream::VirtRead(char* buf, size_t len)
             mReadEnd = begin + fetched;
             available = static_cast<size_t>(mReadEnd - mReadHead);
             if (available >= remaining) {
-                std::memcpy(buf, mReadHead, remaining);
+                // Raw byte-stream IO through the file read/write buffer.
+                std::copy_n(mReadHead, remaining, buf);
                 mReadHead += remaining;
                 return copied + remaining;
             }
@@ -302,7 +305,8 @@ size_t FileStream::VirtRead(char* buf, size_t len)
         remaining -= directRead;
         available = static_cast<size_t>(mReadEnd - mReadHead);
         if (available >= remaining) {
-            std::memcpy(buf, mReadHead, remaining);
+            // Raw byte-stream IO through the file read/write buffer.
+            std::copy_n(mReadHead, remaining, buf);
             mReadHead += remaining;
             return copied + remaining;
         }
@@ -350,7 +354,8 @@ void FileStream::VirtWrite(const char* data, size_t size)
     if (size > available) {
         const size_t capacity = mBuff.Size();
         if (available != 0 && (size - available) < capacity) {
-            std::memcpy(writeHead, data, available);
+            // Raw byte-stream IO through the file read/write buffer.
+            std::copy_n(data, available, writeHead);
             mWriteHead += available;
             data += available;
             size -= available;
@@ -365,7 +370,8 @@ void FileStream::VirtWrite(const char* data, size_t size)
         writeHead = mWriteHead;
     }
 
-    std::memcpy(writeHead, data, size);
+    // Raw byte-stream IO through the file read/write buffer.
+    std::copy_n(data, size, writeHead);
     mWriteHead += size;
 }
 

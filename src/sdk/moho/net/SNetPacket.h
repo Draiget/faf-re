@@ -221,6 +221,7 @@ namespace moho
     {
       auto& self = *static_cast<Derived*>(this);
       static_assert(sizeof(T) <= kNetPacketMaxPayload, "Body too large for packet");
+      // Wire-format blob write: the typed body is serialized raw into the packet payload.
       std::memcpy(self.data, &b, sizeof(T));
       SetPayloadSize(static_cast<std::uint16_t>(sizeof(T)));
     }

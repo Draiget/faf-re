@@ -1,6 +1,6 @@
 #include "moho/render/RangeRenderer.h"
 
-#include <array>
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -390,7 +390,8 @@ namespace
         void* lockedWritePtr = nullptr;
         std::uint32_t previousVertexCount = 0u;
         if (ReserveDynamicRingVertexSlice(batchCount, &lockedWritePtr, rangeRenderer, &previousVertexCount)) {
-          std::memcpy(lockedWritePtr, payloads.begin() + drawn, sizeof(moho::SRangeExtractionPayload) * batchCount);
+          // Raw GPU upload: range payload blob into the dynamic ring buffer.
+          std::copy_n(payloads.begin() + drawn, batchCount, static_cast<moho::SRangeExtractionPayload*>(lockedWritePtr));
           rangeRenderer.mDynamicVertexBuffer->Unlock();
           DrawRangeRingBatch(cameraView, rangeRenderer, batchCount, static_cast<int>(previousVertexCount));
         }

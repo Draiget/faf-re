@@ -1,10 +1,11 @@
 #include "SSTIArmyVariableData.h"
-
+#include <algorithm>
 #include <cstdlib>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include <iterator>
 #include <new>
 #include <typeinfo>
 
@@ -178,12 +179,13 @@ namespace moho
     , mHandicapValue(other.mHandicapValue)
     , mHandicapExtra(other.mHandicapExtra)
   {
-    std::memcpy(mPad_0039_0040, other.mPad_0039_0040, sizeof(mPad_0039_0040));
-    std::memcpy(mPad_00A1_00A8, other.mPad_00A1_00A8, sizeof(mPad_00A1_00A8));
-    std::memcpy(mPad_00F1_00F4, other.mPad_00F1_00F4, sizeof(mPad_00F1_00F4));
-    std::memcpy(mRuntimePad_0109_0110, other.mRuntimePad_0109_0110, sizeof(mRuntimePad_0109_0110));
-    std::memcpy(mPad_0139_013C, other.mPad_0139_013C, sizeof(mPad_0139_013C));
-    std::memcpy(mPad_015C_0160, other.mPad_015C_0160, sizeof(mPad_015C_0160));
+    // Opaque layout pad bytes: preserved bit-for-bit, no typed meaning to copy.
+    std::copy_n(other.mPad_0039_0040, std::size(other.mPad_0039_0040), mPad_0039_0040);
+    std::copy_n(other.mPad_00A1_00A8, std::size(other.mPad_00A1_00A8), mPad_00A1_00A8);
+    std::copy_n(other.mPad_00F1_00F4, std::size(other.mPad_00F1_00F4), mPad_00F1_00F4);
+    std::copy_n(other.mRuntimePad_0109_0110, std::size(other.mRuntimePad_0109_0110), mRuntimePad_0109_0110);
+    std::copy_n(other.mPad_0139_013C, std::size(other.mPad_0139_013C), mPad_0139_013C);
+    std::copy_n(other.mPad_015C_0160, std::size(other.mPad_015C_0160), mPad_015C_0160);
   }
 
   /**

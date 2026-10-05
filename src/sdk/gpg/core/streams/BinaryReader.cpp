@@ -1,5 +1,5 @@
 #include "BinaryReader.h"
-
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -45,7 +45,8 @@ void BinaryReader::Read(char* buf, const size_t size) const
             throw PrematureEOF();
         }
     } else if (size != 0) {
-        std::memcpy(buf, readHead, size);
+        // Raw byte-stream read from the buffered read head.
+        std::copy_n(readHead, size, buf);
         stream->mReadHead += size;
     }
 }
@@ -135,6 +136,7 @@ int* BinaryReader::ReadInt(int* const outValue) const
         return outValue;
     }
 
+    // Raw byte-stream read from the buffered read head.
     std::memcpy(outValue, stream->mReadHead, sizeof(*outValue));
     stream->mReadHead += sizeof(*outValue);
     return outValue;

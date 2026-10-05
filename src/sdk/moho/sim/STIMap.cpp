@@ -2407,7 +2407,8 @@ namespace moho
     if (src && sourceField && copiedField && sourceField->data && copiedField->data) {
       const std::size_t sampleCount =
         static_cast<std::size_t>(sourceField->width) * static_cast<std::size_t>(sourceField->height);
-      std::memcpy(copiedField->data, sourceField->data, sampleCount * sizeof(std::uint16_t));
+      // Raw u16 sample-grid blob copy between shadow-map field buffers.
+      std::copy_n(sourceField->data, sampleCount, copiedField->data);
     }
 
     std::memset(mBlocking, 0, sizeof(mBlocking));

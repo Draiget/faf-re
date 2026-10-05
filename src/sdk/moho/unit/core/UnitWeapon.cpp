@@ -2,6 +2,7 @@
 #include "legacy/math/X87Math.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdio>
@@ -3556,8 +3557,7 @@ namespace moho
       item->SynchronizeAsFloat();
 
       volatile long* const counter = reinterpret_cast<volatile long*>(&item->mPrimaryValueBits);
-      std::int32_t desiredBits = 0;
-      std::memcpy(&desiredBits, &value, sizeof(desiredBits));
+      const std::int32_t desiredBits = std::bit_cast<std::int32_t>(value);
       for (;;) {
         const std::int32_t observed = _InterlockedCompareExchange(counter, 0, 0);
         const std::int32_t result = _InterlockedCompareExchange(counter, desiredBits, observed);

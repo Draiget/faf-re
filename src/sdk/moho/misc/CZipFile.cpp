@@ -605,7 +605,8 @@ namespace moho
     }
 
     if (sourceSize != 0) {
-      std::memcpy(copiedBytes.data(), sourceBytes.data(), sourceSize);
+      // Raw zip entry byte-blob copy between memory buffers.
+      std::copy_n(sourceBytes.data(), sourceSize, copiedBytes.data());
     }
     return copiedBytes;
   }

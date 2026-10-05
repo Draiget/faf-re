@@ -3154,11 +3154,13 @@ extern "C" char* __cdecl strcpy(char* const destination, const char* const sourc
   }
 
   for (;;) {
+    // Raw 4-byte word step over an unaligned char buffer (alignment-safe load/store).
     std::uint32_t chunk = 0u;
     std::memcpy(&chunk, input, sizeof(chunk));
 
     const std::uint32_t probe = (chunk + 0x7EFEFEFFu) ^ ~chunk;
     if ((probe & 0x81010100u) == 0u) {
+      // Raw 4-byte word step over an unaligned char buffer (alignment-safe store).
       std::memcpy(output, &chunk, sizeof(chunk));
       input += 4u;
       output += 4u;
@@ -5439,8 +5441,9 @@ extern "C" void __cdecl setSBCS(CrtThreadMbcInfoCase* const threadMbcInfo)
   std::memset(threadMbcInfo->mbulinfo, 0, sizeof(threadMbcInfo->mbulinfo));
 
   const auto* const initialInfo = reinterpret_cast<const CrtThreadMbcInfoCase*>(&__initialmbcinfo);
-  std::memcpy(threadMbcInfo->mbctype, initialInfo->mbctype, sizeof(threadMbcInfo->mbctype));
-  std::memcpy(threadMbcInfo->mbcasemap, initialInfo->mbcasemap, sizeof(threadMbcInfo->mbcasemap));
+  // Raw CRT byte-classification table copies (mbctype/mbcasemap char arrays).
+  std::copy_n(initialInfo->mbctype, sizeof(threadMbcInfo->mbctype), threadMbcInfo->mbctype);
+  std::copy_n(initialInfo->mbcasemap, sizeof(threadMbcInfo->mbcasemap), threadMbcInfo->mbcasemap);
 }
 
 /**
@@ -7484,7 +7487,8 @@ extern "C" CrtCtypeVec* __cdecl EngineGetCtypeVec(CrtCtypeVec* const out)
   out->table = copy;
 
   if (copy != nullptr) {
-    std::memcpy(copy, __pctype_func(), 0x200u);
+    // Raw CRT ctype table blob copy (0x100 uint16 classification entries).
+    std::copy_n(__pctype_func(), 0x100u, copy);
     out->ownsCopiedTable = 1;
   } else {
     out->ownsCopiedTable = 0;
@@ -7862,6 +7866,8 @@ extern "C" void __cdecl __copytlocinfo_nolock(
     return;
   }
 
+  // CRT-fidelity raw copy: VC8's __copytlocinfo_nolock block-copies the threadlocinfo
+  // payload (0xD8) before rebinding refcounts; the payload holds a volatile member.
   std::memcpy(destination, source, sizeof(CrtThreadLocInfoData));
   destination->refcount = 0;
   __addlocaleref(destination);
@@ -8212,7 +8218,7 @@ extern "C" int __cdecl _init_numeric(CrtThreadLocInfo* const locinfo)
       return 1;
     }
 
-    std::memcpy(newLocaleConv, localeInfo->localeConv, sizeof(lconv));
+    *newLocaleConv = *localeInfo->localeConv;
 
     newIntlRefcount = static_cast<int*>(std::malloc(sizeof(int)));
     if (newIntlRefcount == nullptr) {
@@ -8332,7 +8338,7 @@ extern "C" int __cdecl __init_monetary(CrtThreadLocInfo* const locinfo)
     *newIntlRefcount = 0;
 
     if (localeInfo->lcHandle[kLocaleMonetaryCategory] == 0) {
-      std::memcpy(newLocaleConv, &__lconv_c, sizeof(lconv));
+      *newLocaleConv = __lconv_c;
       newLocaleConv->decimal_point = localeInfo->localeConv->decimal_point;
       newLocaleConv->thousands_sep = localeInfo->localeConv->thousands_sep;
       newLocaleConv->grouping = localeInfo->localeConv->grouping;
@@ -11896,8 +11902,7 @@ namespace moho::runtime
    */
   extern "C" int __cdecl _finite(const double value)
   {
-    std::uint64_t bitPattern = 0u;
-    std::memcpy(&bitPattern, &value, sizeof(bitPattern));
+    const std::uint64_t bitPattern = std::bit_cast<std::uint64_t>(value);
     const std::uint16_t highWord = static_cast<std::uint16_t>(bitPattern >> 48u);
     return ((highWord & 0x7FF0u) != 0x7FF0u) ? 1 : 0;
   }
@@ -13003,8 +13008,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   extern "C" int __cdecl EngineIsnan(const double value)
   {
-    std::uint64_t bits = 0;
-    std::memcpy(&bits, &value, sizeof(bits));
+    const std::uint64_t bits = std::bit_cast<std::uint64_t>(value);
 
     const std::uint16_t hiWord = static_cast<std::uint16_t>(bits >> 48);
     const std::uint32_t hiDword = static_cast<std::uint32_t>(bits >> 32);
@@ -13025,8 +13029,7 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
    */
   extern "C" int __cdecl EngineFpclass(const double value)
   {
-    std::uint64_t bits = 0;
-    std::memcpy(&bits, &value, sizeof(bits));
+    const std::uint64_t bits = std::bit_cast<std::uint64_t>(value);
     const std::uint32_t lowDword = static_cast<std::uint32_t>(bits);
     const std::uint32_t highDword = static_cast<std::uint32_t>(bits >> 32u);
 
@@ -14202,7 +14205,8 @@ extern "C" int __cdecl EngineRaiseMxcsrExceptionFlags(const char flags)
       ) + sizeof(wchar_t);
       wchar_t* const copy = static_cast<wchar_t*>(std::malloc(byteCount));
       if (copy != nullptr) {
-        std::memcpy(copy, nativeBlock, byteCount);
+        // Raw OS environment-strings block copy (byte length, not element count).
+        std::copy_n(nativeBlock, byteCount / sizeof(wchar_t), copy);
       }
       ::FreeEnvironmentStringsW(nativeBlock);
       return copy;

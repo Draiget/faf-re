@@ -1,5 +1,5 @@
 #include "BinaryWriter.h"
-
+#include <algorithm>
 #include <cstring>
 
 #include "Stream.h"
@@ -22,7 +22,8 @@ void BinaryWriter::Write(const char* const data, const std::size_t size) const
   }
 
   if (size != 0u) {
-    std::memcpy(targetStream->mWriteHead, data, size);
+    // Raw byte-stream write into the buffered write head.
+    std::copy_n(data, size, targetStream->mWriteHead);
     targetStream->mWriteHead += size;
   }
 }

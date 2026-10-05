@@ -25,7 +25,9 @@ namespace moho
 
     [[nodiscard]] std::uint32_t ReadU32(const std::uint8_t* const bytes)
     {
+      // Unaligned u32 load from the DXT block byte stream.
       std::uint32_t value = 0;
+      // Unaligned u32 load from the DXT block byte stream.
       std::memcpy(&value, bytes, sizeof(value));
       return value;
     }

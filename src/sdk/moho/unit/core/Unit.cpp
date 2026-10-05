@@ -5,6 +5,8 @@
 #include "moho/ai/CAiNavigatorImpl.h"
 
 #include <algorithm>
+#include <bit>
+#include <iterator>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -6906,8 +6908,7 @@ int moho::cfunc_UnitSetStatL(LuaPlus::LuaState* const state)
   if (lua_type(rawState, 3) == LUA_TNUMBER) {
     const LuaPlus::LuaStackObject valueArg(state, 3);
     const float value = static_cast<float>(valueArg.ToNumber());
-    std::int32_t valueBits = 0;
-    std::memcpy(&valueBits, &value, sizeof(valueBits));
+    std::int32_t valueBits = std::bit_cast<std::int32_t>(value);
     (void)StorePrimaryStatBitsAtomic(statItem, &valueBits);
     return 0;
   }
@@ -12264,7 +12265,8 @@ SSTIUnitVariableData& SSTIUnitVariableData::AssignFrom(const SSTIUnitVariableDat
   mTargetBlip = other.mTargetBlip;
   mPriorSharedPose = other.mPriorSharedPose;
   mSharedPose = other.mSharedPose;
-  std::memcpy(mPad094_097, other.mPad094_097, sizeof(mPad094_097));
+  // Opaque layout pad bytes: preserved bit-for-bit, no typed meaning to copy.
+  std::copy_n(other.mPad094_097, std::size(other.mPad094_097), mPad094_097);
   CopyUnitCommandSnapshotVector(mCommands, other.mCommands);
   CopyUnitCommandSnapshotVector(mBuildQueue, other.mBuildQueue);
   CopyFastVectorN(mWeaponInfo, other.mWeaponInfo);
@@ -12273,7 +12275,8 @@ SSTIUnitVariableData& SSTIUnitVariableData::AssignFrom(const SSTIUnitVariableDat
   mUnitStates = other.mUnitStates;
   mDidRefresh = other.mDidRefresh;
   mOverchargePaused = other.mOverchargePaused;
-  std::memcpy(mPad222_227, other.mPad222_227, sizeof(mPad222_227));
+  // Opaque layout pad bytes: preserved bit-for-bit, no typed meaning to copy.
+  std::copy_n(other.mPad222_227, std::size(other.mPad222_227), mPad222_227);
   return *this;
 }
 

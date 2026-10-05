@@ -98,6 +98,7 @@ namespace gpg
       if (need > len)
         need = len;
 
+      // Raw hash block IO: stash input bytes into the 64-byte working block.
       std::memcpy(&block.vals[pos], src, need);
       pos += need;
       src += need;
@@ -118,6 +119,7 @@ namespace gpg
 
     // Stash remainder into the working block
     if (len) {
+      // Raw hash block IO: carry remaining input bytes into the next block.
       std::memcpy(&block.vals[0], src, len);
       pos = len;
     }

@@ -910,6 +910,7 @@ namespace moho
       }
 
       std::uint32_t lanes[2] = {0u, 0u};
+      // Diagnostic byte-image lane: raw {px, pi} of mEngine for the shadow check.
       std::memcpy(lanes, &params->mEngine, sizeof(lanes));
       const std::uint32_t policy = params->mResolvePolicy;
       const std::uint32_t control = lanes[1];
@@ -919,6 +920,7 @@ namespace moho
       const auto seen = sShadow.find(params);
       if (seen == sShadow.end()) {
         Shadow fresh{policy, lanes[0], control, {}, params->mBank};
+        // Diagnostic byte-image snapshot of the whole object.
         std::memcpy(fresh.image, params, sizeof(fresh.image));
         sShadow.emplace(params, std::move(fresh));
         if (bad) {
@@ -936,6 +938,7 @@ namespace moho
       }
 
       if (bad) {
+        // Diagnostic byte-image snapshot of the whole object.
         std::uint8_t current[sizeof(CSndParams)];
         std::memcpy(current, params, sizeof(current));
 
@@ -967,6 +970,7 @@ namespace moho
       previous.policy = policy;
       previous.px = lanes[0];
       previous.pi = control;
+      // Diagnostic byte-image snapshot of the whole object.
       std::memcpy(previous.image, params, sizeof(previous.image));
     }
   }

@@ -473,7 +473,7 @@ namespace gpg::core
       // Trivially copyable path
       if constexpr (std::is_trivially_copyable_v<T>) {
         if (oldSize)
-          std::memcpy(newBuf, start_, oldSize * elem_);
+          std::copy_n(start_, oldSize, newBuf);
       } else {
         for (size_t i = 0; i < oldSize; ++i)
           ::new (static_cast<void*>(newBuf + i)) T(std::move(start_[i]));
@@ -2607,7 +2607,7 @@ namespace gpg::core
       // empty and every slot written below is raw storage to construct into.
       if (count <= N) {
         if constexpr (std::is_trivially_copyable_v<T>) {
-          std::memcpy(this->start_, src, count * ElemSize);
+          std::copy_n(src, count, this->start_);
         } else {
           (void)detail::ConstructRangeForward(this->start_, src, src + count);
         }
@@ -2618,7 +2618,7 @@ namespace gpg::core
       // Need heap buffer of exact count (matches engine's "capacity_ = start_ + count")
       T* p = detail::AllocateElements<T>(count);
       if constexpr (std::is_trivially_copyable_v<T>) {
-        std::memcpy(p, src, count * ElemSize);
+        std::copy_n(src, count, p);
       } else {
         try {
           (void)detail::ConstructRangeForward(p, src, src + count);
@@ -2648,7 +2648,7 @@ namespace gpg::core
 
       if constexpr (std::is_trivially_copyable_v<T>) {
         if (sz)
-          std::memcpy(newBuf, this->start_, sz * ElemSize);
+          std::copy_n(this->start_, sz, newBuf);
       } else {
         for (size_t i = 0; i < sz; ++i)
           ::new (static_cast<void*>(newBuf + i)) T(std::move(this->start_[i]));

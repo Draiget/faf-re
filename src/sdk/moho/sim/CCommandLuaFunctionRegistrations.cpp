@@ -946,12 +946,9 @@ namespace
 
     // FUN_006F2CE0 / FUN_006F5430 write the first three lanes at +0x24:
     // formation index + first two quaternion lanes.
-    const std::uint32_t packedFormLanes[3] = {
-      static_cast<std::uint32_t>(formationScriptIndex),
-      std::bit_cast<std::uint32_t>(orientationLanes[0]),
-      std::bit_cast<std::uint32_t>(orientationLanes[1]),
-    };
-    std::memcpy(&commandIssueData.mTarget2, packedFormLanes, sizeof(packedFormLanes));
+    commandIssueData.mTarget2.mType = static_cast<moho::EAiTargetType>(formationScriptIndex);
+    commandIssueData.mTarget2.mEntityId = std::bit_cast<std::uint32_t>(orientationLanes[0]);
+    commandIssueData.mTarget2.mPos.x = orientationLanes[1];
 
     // The same binaries then overwrite the first three lanes at +0x3C:
     // remaining two quaternion lanes plus literal 1.0f.

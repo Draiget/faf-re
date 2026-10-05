@@ -436,6 +436,7 @@ namespace
     // pi_, and the whole question is whether it is a real control block, so
     // read the lane rather than trusting the type.
     std::uint32_t engineLane[2] = {0u, 0u};
+    // Diagnostic byte-image lane: raw control-word read for the shadow check.
     std::memcpy(engineLane, &params->mEngine, sizeof(engineLane));
 
     const std::uint32_t policy = params->mResolvePolicy;

@@ -282,6 +282,7 @@ int updatewindow(zlib::ZStream* strm, unsigned int out)
   const unsigned int copied = out - strm->avail_out;  // bytes produced this call
   if (copied >= state->wsize)
   {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(state->window, strm->next_out - state->wsize, state->wsize);
     state->wnext = 0;
     state->whave = state->wsize;
@@ -293,10 +294,12 @@ int updatewindow(zlib::ZStream* strm, unsigned int out)
     {
       dist = copied;
     }
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(state->window + state->wnext, strm->next_out - copied, dist);
     const unsigned int rest = copied - dist;
     if (rest != 0)
     {
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
       std::memcpy(state->window, strm->next_out - rest, rest);
       state->wnext = rest;
       state->whave = state->wsize;
@@ -1123,6 +1126,7 @@ extern "C" int inflate(zlib::ZStream* strm, int flush)
               {
                 copy = state->head->extra_max - len;
               }
+              // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
               std::memcpy(state->head->extra + len, next, copy);
             }
             if ((state->flags & 0x0200) != 0)
@@ -1325,6 +1329,7 @@ extern "C" int inflate(zlib::ZStream* strm, int flush)
           if (copy > have)  { copy = have; }
           if (copy > left)  { copy = left; }
           if (copy == 0)  { goto inf_leave; }
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
           std::memcpy(put, next, copy);
           have -= copy;
           next += copy;

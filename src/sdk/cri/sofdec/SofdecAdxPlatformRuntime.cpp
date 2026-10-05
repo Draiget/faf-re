@@ -895,6 +895,7 @@
 
     if (result != nullptr) {
       if (tagInfo->ainfUserBuffer != nullptr) {
+        // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
         std::memcpy(tagInfo->ainfUserBuffer, outputWindow.data, static_cast<std::size_t>(outputWindow.size));
         tagInfo->ainfTagInfoDataAddress = static_cast<std::int32_t>(
           reinterpret_cast<std::intptr_t>(tagInfo->ainfUserBuffer)
@@ -7214,6 +7215,7 @@
           std::uint8_t* lumaWrite = lumaCurrent;
           const std::uint8_t* lumaRead = lumaPrevious;
           for (std::int32_t row = 0; row < 16; ++row) {
+            // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
             std::memcpy(lumaWrite, lumaRead, 16u);
             lumaWrite += lumaRowAdvance;
             lumaRead += lumaRowAdvance;
@@ -7222,6 +7224,7 @@
           std::uint8_t* chromaUWrite = chromaUCurrent;
           const std::uint8_t* chromaURead = chromaUPrevious;
           for (std::int32_t row = 0; row < 8; ++row) {
+            // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
             std::memcpy(chromaUWrite, chromaURead, 8u);
             chromaUWrite += chromaRowAdvance;
             chromaURead += chromaRowAdvance;
@@ -7230,6 +7233,7 @@
           std::uint8_t* chromaVWrite = chromaVCurrent;
           const std::uint8_t* chromaVRead = chromaVPrevious;
           for (std::int32_t row = 0; row < 8; ++row) {
+            // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
             std::memcpy(chromaVWrite, chromaVRead, 8u);
             chromaVWrite += chromaRowAdvance;
             chromaVRead += chromaRowAdvance;
@@ -11250,6 +11254,7 @@
         if (copyBytes > 64) {
           copyBytes = 64;
         }
+        // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
         std::memcpy(
           runtime->spsdInfoState,
           SjAddressToPointer(runtime->outputWriteChunks[0].bufferAddress),
@@ -20792,6 +20797,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     const std::int32_t frameType =
       mwsffrm_DecideFrmType(ply, sfdFrame, outFrameInfo->subtitleDataAddress, outFrameInfo->subtitleDataBytes);
     outFrameInfo->frameFieldType = frameType;
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(outFrameInfo->trailingDetail, sfdFrame->TrailingDetail(), sizeof(outFrameInfo->trailingDetail));
   }
 

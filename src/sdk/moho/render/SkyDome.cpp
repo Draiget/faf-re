@@ -1,5 +1,5 @@
 #include "moho/render/SkyDome.h"
-
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -691,7 +691,8 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
     mDecalVertBuf1 = device->CreateVertexBuffer(&quadContext);
 
     void* const quadVertices = mDecalVertBuf1->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
-    std::memcpy(quadVertices, kDecalBillboardQuadVertices.data(), sizeof(kDecalBillboardQuadVertices));
+    // Raw GPU upload: static billboard quad vertex blob into the locked buffer.
+    std::copy(kDecalBillboardQuadVertices.begin(), kDecalBillboardQuadVertices.end(), static_cast<float*>(quadVertices));
     mDecalVertBuf1->Unlock();
 
     gpg::gal::VertexBufferContext cumulusContext{};
@@ -730,7 +731,8 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
     mDecalIndexBuf = device->CreateIndexBuffer(&context);
 
     std::int16_t* const indices = mDecalIndexBuf->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
-    std::memcpy(indices, kDecalQuadIndices.data(), sizeof(kDecalQuadIndices));
+    // Raw GPU upload: static quad index blob into the locked buffer.
+    std::copy(kDecalQuadIndices.begin(), kDecalQuadIndices.end(), indices);
     mDecalIndexBuf->Unlock();
   }
 
@@ -751,7 +753,8 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
       static_cast<std::uint8_t*>(mDecalVertBuf2->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0)));
 
     for (const SkyDomeDecalVertices& vertices : mDecalUploads) {
-      std::memcpy(writeCursor, vertices.mBytes, sizeof(vertices.mBytes));
+      // Raw GPU upload: per-decal vertex blob into the locked dynamic buffer.
+      std::copy(std::begin(vertices.mBytes), std::end(vertices.mBytes), writeCursor);
       writeCursor += sizeof(vertices.mBytes);
     }
 
@@ -918,7 +921,8 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
 
     // Upload the per-cloud instance records into the instanced cumulus stream.
     void* const instanceData = mDecalVertBuf3->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
-    std::memcpy(instanceData, cumulusVertices.data(), cloudCount * sizeof(CumulusVertex));
+    // Raw GPU upload: instance vertex blob into the locked stream.
+    std::copy_n(cumulusVertices.data(), cloudCount, static_cast<CumulusVertex*>(instanceData));
     mDecalVertBuf3->Unlock();
 
     device->SetVertexDeclaration(mDecalFormat2->mFormat);

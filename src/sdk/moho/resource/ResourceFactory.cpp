@@ -1,5 +1,6 @@
 #include "moho/resource/ResourceFactory.h"
 
+#include <algorithm>
 #include <cstring>
 
 #include "moho/misc/FileWaitHandleSet.h"
@@ -61,7 +62,8 @@ namespace moho
     }
 
     auto* const scmBytes = new char[byteCount];
-    std::memcpy(scmBytes, fileBytes.mBegin, byteCount);
+    // Raw SCM file blob copy from the loaded buffer.
+    std::copy_n(fileBytes.mBegin, byteCount, scmBytes);
     const boost::shared_ptr<const SScmFile> scmFile(
       reinterpret_cast<const SScmFile*>(scmBytes), &DeleteScmFileBuffer
     );

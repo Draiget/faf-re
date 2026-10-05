@@ -856,13 +856,15 @@ namespace moho
 
       if (rectCacheCount > 0) {
         void* const lockedVertices = mTerrainVertexSheet->GetVertStream(0U)->Lock(0, rectCacheCount, false, true);
-        std::memcpy(lockedVertices, mTesselator->GetRectCacheData(), sizeof(CTesselator::Rect16) * rectCacheCount);
+        // Raw GPU upload: tessellator rect blob into the locked stream.
+        std::copy_n(mTesselator->GetRectCacheData(), rectCacheCount, static_cast<CTesselator::Rect16*>(lockedVertices));
         mTerrainVertexSheet->GetVertStream(0U)->Unlock();
       }
 
       if (collisionIndexCount > 0) {
         std::int16_t* const lockedIndices = mTerrainIndexSheet->Lock(0, collisionIndexCount, false, true);
-        std::memcpy(lockedIndices, mTesselator->GetCollisionIndexData(), sizeof(std::uint16_t) * collisionIndexCount);
+        // Raw GPU upload: collision index blob into the locked sheet.
+        std::copy_n(mTesselator->GetCollisionIndexData(), collisionIndexCount, lockedIndices);
         mTerrainIndexSheet->Unlock();
       }
     }
@@ -1164,7 +1166,7 @@ namespace moho
 
     void* const lockedVertices =
       mDynamicVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
-    std::memcpy(lockedVertices, splatVertices.data(), sizeof(CWldSplat::SplatVertex) * splatVertexCount);
+    std::copy_n(splatVertices.data(), splatVertexCount, static_cast<CWldSplat::SplatVertex*>(lockedVertices));
     mDynamicVertexSheet->GetVertStream(0U)->Unlock();
 
     D3D_GetDevice()->SelectTechnique("TSplats");

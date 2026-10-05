@@ -323,6 +323,7 @@
 
     std::memset(outToolBanner, 0, kSofdecToolBannerBytes);
     outToolBanner[kSofdecToolBannerBytes] = '\0';
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(outToolBanner, bannerSource, kSofdecToolBannerBytes);
     return 1;
   }
@@ -753,6 +754,7 @@
     }
 
     std::int32_t value = 0;
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(&value, pack, sizeof(value));
     *outHeaderSize = value;
     return 1;
@@ -783,6 +785,7 @@
     }
 
     std::int16_t value = 0;
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(&value, pack + 8, sizeof(value));
     *outLengthFieldWidth = value;
     return 1;
@@ -799,6 +802,7 @@
     }
 
     std::int32_t value = 0;
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(&value, pack + 12, sizeof(value));
     *outPackSize = value;
     return 1;
@@ -873,6 +877,7 @@
     }
 
     std::int32_t value = 0;
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(&value, systemInfo + wordIndex * 4, sizeof(value));
     *outValue = value;
     return 1;
@@ -901,6 +906,7 @@
     }
 
     std::int32_t value = 0;
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(&value, systemInfo + 4, sizeof(value));
     *outByteRate = value;
     return 1;
@@ -1020,6 +1026,7 @@
     }
 
     std::int32_t value = 0;
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(&value, element + 28, sizeof(value));
     *outSampleRateHz = value;
     return 1;
@@ -1061,6 +1068,7 @@
     }
 
     std::uint16_t raw = 0;
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(&raw, element + 26, sizeof(raw));
     *outBitRate = (raw == 0xFFFFu) ? 0 : static_cast<std::int32_t>(raw);
     return 1;
@@ -1286,6 +1294,7 @@
    */
   extern "C" void* MEM_Copy(void* const destination, const void* const source, const std::uint32_t sizeBytes)
   {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(destination, source, sizeBytes);
     return destination;
   }
@@ -1298,6 +1307,7 @@
    */
   extern "C" void* MEM_Copy4(void* const destination, const void* const source, const std::uint32_t sizeBytes)
   {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(destination, source, sizeBytes);
     return destination;
   }
@@ -1310,6 +1320,7 @@
    */
   extern "C" void* MEM_Copy8(void* const destination, const void* const source, const std::uint32_t sizeBytes)
   {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(destination, source, sizeBytes);
     return destination;
   }
@@ -1322,6 +1333,7 @@
    */
   extern "C" void* MEM_Copy32(void* const destination, const void* const source, const std::uint32_t sizeBytes)
   {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(destination, source, sizeBytes);
     return destination;
   }
@@ -3457,6 +3469,7 @@
       firstCopyBytes = decodedPayloadBytes;
     }
 
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(
       reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(firstChunk.bufferAddress))),
       pesPacketView->decodedPayload,
@@ -3467,6 +3480,7 @@
     moho::SjChunkRange secondChunk{};
     if (firstCopyBytes < decodedPayloadBytes) {
       callbackSink->AcquireChunk(0, decodedPayloadBytes - firstCopyBytes, &secondChunk);
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
       std::memcpy(
         reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(secondChunk.bufferAddress))),
         static_cast<const std::uint8_t*>(pesPacketView->decodedPayload) + firstCopyBytes,
@@ -5596,6 +5610,7 @@
       copyBytes = 2048;
     }
 
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(sfcre_tmpbuf, buffer, static_cast<std::size_t>(copyBytes));
     char* const scanCursor = reinterpret_cast<char*>(sfcre_tmpbuf);
     if (copyBytes <= 0) {
@@ -5904,6 +5919,7 @@
     }
 
     const auto* const sfdMvInfoQuery = reinterpret_cast<const SfdMvInfoQuery*>(workctrlSubobj);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(outMvInfo, sfdMvInfoQuery->mvInfoLane, sizeof(sfdMvInfoQuery->mvInfoLane));
     return 0;
   }
@@ -13619,6 +13635,7 @@
     auto* const outErrorInfo = static_cast<SflibErrorInfo*>(outErrInfo);
 
     if (errorObjectAddress == 0) {
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
       std::memcpy(outErrorInfo, &gSflibLibWork.errInfo, sizeof(SflibErrorInfo));
       return 0;
     }
@@ -13631,6 +13648,7 @@
 
     auto* const errorOwner =
       reinterpret_cast<SflibErrorOwner*>(SjAddressToPointer(errorObjectAddress));
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(outErrorInfo, &errorOwner->errInfo, sizeof(SflibErrorInfo));
     return 0;
   }
@@ -15676,9 +15694,7 @@
 
   [[nodiscard]] static std::int32_t SftimFloatBitsAsInt(const float value)
   {
-    std::int32_t bitPattern = 0;
-    std::memcpy(&bitPattern, &value, sizeof(bitPattern));
-    return bitPattern;
+    return std::bit_cast<std::int32_t>(value);
   }
 
   /**
@@ -19267,6 +19283,7 @@
     }
 
     const auto* const sfdPlaybackInfo = reinterpret_cast<const SfdPlaybackInfo*>(workctrlSubobj);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(outPlaybackInfo, &sfdPlaybackInfo->playbackInfo, sizeof(sfdPlaybackInfo->playbackInfo));
     return 0;
   }
@@ -19316,6 +19333,7 @@
 
     auto* const mergedTimerInfo = static_cast<moho::SfplyTimerInfo*>(outTimerInfo);
     const auto* const sfdTimerInfo = reinterpret_cast<const SfdTimerInfo*>(workctrlSubobj);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(mergedTimerInfo, &sfdTimerInfo->timerInfo, sizeof(sfdTimerInfo->timerInfo));
 
     auto& aggregateSummary = mergedTimerInfo->summaries[0];

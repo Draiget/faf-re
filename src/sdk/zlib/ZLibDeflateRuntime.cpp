@@ -935,6 +935,7 @@ unsigned int ReadBuf(ZStream* strm, std::uint8_t* buf, unsigned int size)
   {
     strm->adler = crc32(strm->adler, strm->next_in, len);
   }
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(buf, strm->next_in, len);
   strm->next_in += len;
   strm->total_in += len;
@@ -961,6 +962,7 @@ void FillWindow(DeflateState* s)
     // If the window is (almost) full and the read cursor is deep enough, slide.
     if (s->strstart >= wsize + (wsize - zc::kMinLookahead))
     {
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
       std::memcpy(s->window, s->window + wsize, wsize);
       s->match_start -= wsize;
       s->strstart -= wsize;
@@ -1164,6 +1166,7 @@ void FlushPending(ZStream* strm)
     return;
   }
 
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(strm->next_out, s->pending_out, len);
   strm->next_out += len;
   s->pending_out += len;

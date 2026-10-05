@@ -2,6 +2,7 @@
 #include "legacy/math/X87Math.h"
 
 #include <algorithm>
+#include <bit>
 #include <array>
 #include <climits>
 #include <cmath>
@@ -1735,7 +1736,10 @@ namespace
 
     [[nodiscard]] std::uint32_t LoadPackedNodeCoordinateLane(const ClusterSearchNeighborSeed& seed) noexcept
     {
+      // Byte-packed lane load: the 4-byte word at mNodeX spans both coordinate
+      // bytes plus the trailing pad, so a raw word load is the honest form.
       std::uint32_t packed = 0u;
+      // Raw byte lane (see comment above): packed-word load / flat node-edge blob assembly.
       std::memcpy(&packed, &seed.mNodeX, sizeof(packed));
       return packed;
     }
@@ -1795,9 +1799,7 @@ namespace
 
     [[nodiscard]] std::int32_t FloatToRawI32Bits(const float value) noexcept
     {
-      std::int32_t rawBits = 0;
-      std::memcpy(&rawBits, &value, sizeof(rawBits));
-      return rawBits;
+      return std::bit_cast<std::int32_t>(value);
     }
 
     [[nodiscard]] std::int32_t PointerToRawI32Bits(ClusterNodeSearchState* const node) noexcept
@@ -2130,6 +2132,7 @@ namespace
     [[nodiscard]] OccupationCacheKey MakeOccupationCacheKey(const gpg::HaStar::OccupationData& occupationData)
     {
         OccupationCacheKey key{};
+        // Hash-key blob flatten: the cache key is the raw byte image of the occupation payload.
         std::memcpy(key.mBytes.data(), &occupationData, key.mBytes.size());
         return key;
     }
@@ -3068,10 +3071,13 @@ void Cluster::SetData(
 
     // Node array begins at `mNodes` (0x0D on x86); edges follow it.
     auto* const nodeBase = reinterpret_cast<std::byte*>(&payload->mNodes[0]);
+    // Flat node/edge blob assembly: payload is a byte-packed node array followed by edges.
     if (nodes != nullptr && nodeBytes != 0u) {
+        // Raw byte lane (see comment above): packed-word load / flat node-edge blob assembly.
         std::memcpy(nodeBase, nodes, nodeBytes);
     }
     if (edges != nullptr && edgeBytes != 0u) {
+        // Raw byte lane (see comment above): packed-word load / flat node-edge blob assembly.
         std::memcpy(nodeBase + nodeBytes, edges, edgeBytes);
     }
 }

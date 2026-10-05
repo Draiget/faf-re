@@ -1,5 +1,5 @@
 ﻿#include "moho/render/d3d/CD3DEffectTechnique.h"
-
+#include <algorithm>
 #include <cstring>
 #include <cstdlib>
 #include <exception>
@@ -461,18 +461,12 @@ namespace moho
       const std::size_t effectByteCount = effectSourceBuffer.Size();
       gpg::MemBuffer<char> mergedBuffer = gpg::AllocMemBuffer(compatByteCount + effectByteCount);
       if (compatByteCount > 0U) {
-        std::memcpy(
-          mergedBuffer.GetPtr(0U, 0U),
-          compatStateBuffer.GetPtr(0U, 0U),
-          compatByteCount
-        );
+        // Raw effect-code blob copy into the merged buffer.
+        std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
       }
       if (effectByteCount > 0U) {
-        std::memcpy(
-          mergedBuffer.GetPtr(compatByteCount, 0U),
-          effectSourceBuffer.GetPtr(0U, 0U),
-          effectByteCount
-        );
+        // Raw effect-code blob copy into the merged buffer.
+        std::copy_n(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount, mergedBuffer.GetPtr(compatByteCount, 0U));
       }
 
       // Builds the effect, from its compiled copy in the cache when that is at

@@ -1,9 +1,9 @@
 #include "LuaObject.h"
 #include "legacy/math/X87Math.h"
-
 #include <Windows.h>
-
 #include <array>
+#include <bit>
+#include <algorithm>
 #include <cerrno>
 #include <cctype>
 #include <clocale>
@@ -197,9 +197,7 @@ namespace
 
 	[[nodiscard]] std::uint32_t LuaFloatBitPattern(const float value)
 	{
-		std::uint32_t bits = 0u;
-		std::memcpy(&bits, &value, sizeof(bits));
-		return bits;
+		return std::bit_cast<std::uint32_t>(value);
 	}
 
 	[[nodiscard]] constexpr int LuaInstructionSignedOffset(const Instruction instruction)
@@ -1843,7 +1841,9 @@ extern "C"
 	{
 		char* const source = const_cast<char*>(lua_tostring(state, idx));
 		const size_t length = lua_strlen(state, idx);
-		return static_cast<char*>(std::memcpy(destination, source, length + 1u));
+		// Raw Lua string blob copy including the trailing NUL.
+		std::copy_n(source, length + 1u, static_cast<char*>(destination));
+		return static_cast<char*>(destination);
 	}
 
 	/**
@@ -2089,7 +2089,8 @@ extern "C"
 		stringObject->reserved = 0;
 
 		if (length != 0 && source != nullptr) {
-			std::memcpy(stringObject->str, source, length);
+			// Raw char blob copy into Lua string storage.
+			std::copy_n(source, length, stringObject->str);
 		}
 		stringObject->str[length] = '\0';
 
@@ -9784,9 +9785,12 @@ namespace
 				std::memset(item + 1, 0, 8u);
 
 				const char packWidth = *specifier++;
+				// Pack lanes: scalar bits written into the byte scratch item for
+				// luaL_addlstring — raw buffer IO by design.
 				switch (packWidth) {
 				case 'F': {
 					const double packed = static_cast<double>(luaL_checknumber(state, argumentIndex));
+					// Pack lane: scalar bits written into the byte scratch item for luaL_addlstring.
 					std::memcpy(item, &packed, sizeof(packed));
 					luaL_addlstring(buffer, item, sizeof(packed));
 					break;
@@ -9794,6 +9798,7 @@ namespace
 
 				case 'f': {
 					const float packed = static_cast<float>(luaL_checknumber(state, argumentIndex));
+					// Pack lane: scalar bits written into the byte scratch item for luaL_addlstring.
 					std::memcpy(item, &packed, sizeof(packed));
 					luaL_addlstring(buffer, item, sizeof(packed));
 					break;
@@ -9802,6 +9807,7 @@ namespace
 				case 'd': {
 					const std::int32_t packed =
 						static_cast<std::int32_t>(static_cast<std::int64_t>(luaL_checknumber(state, argumentIndex)));
+					// Pack lane: scalar bits written into the byte scratch item for luaL_addlstring.
 					std::memcpy(item, &packed, sizeof(packed));
 					luaL_addlstring(buffer, item, sizeof(packed));
 					break;
@@ -9810,6 +9816,7 @@ namespace
 				case 'w': {
 					const std::int16_t packed =
 						static_cast<std::int16_t>(static_cast<int>(luaL_checknumber(state, argumentIndex)));
+					// Pack lane: scalar bits written into the byte scratch item for luaL_addlstring.
 					std::memcpy(item, &packed, sizeof(packed));
 					luaL_addlstring(buffer, item, sizeof(packed));
 					break;
@@ -13440,7 +13447,8 @@ extern "C"
 			return;
 		}
 
-		std::memcpy(buffer->p, lua_tostring(state, -1), valueLength);
+		// Raw blob append of a Lua string into the growable marshal buffer.
+		std::copy_n(lua_tostring(state, -1), valueLength, buffer->p);
 		buffer->p += valueLength;
 		lua_settop(state, -2);
 	}
@@ -14143,7 +14151,8 @@ extern "C"
 
 			// Unsigned, as the binary's `cmp ebx, edi` / `ja` at 0x0092BA9D is.
 			const size_t chunk = (n <= stream->remainingBytes) ? n : stream->remainingBytes;
-			std::memcpy(buffer, stream->cursor, chunk);
+			// Byte-stream chunk copy from the reader cursor.
+			std::copy_n(static_cast<const char*>(stream->cursor), chunk, static_cast<char*>(buffer));
 
 			stream->remainingBytes -= chunk;
 			stream->cursor += chunk;
@@ -14961,7 +14970,8 @@ extern "C"
 				size_t written = 0;
 				for (int index = handled; index > 0; --index) {
 					const TString* const piece = static_cast<TString*>(top[-index].value.p);
-					std::memcpy(buffer + written, piece->str, piece->len);
+					// Raw concat lane: string pieces appended byte-wise into one buffer.
+					std::copy_n(piece->str, piece->len, buffer + written);
 					written += piece->len;
 				}
 

@@ -932,7 +932,8 @@ std::streamsize PipeBuf::xsputn(const char* const src, const std::streamsize cou
         const std::streamsize writable = static_cast<std::streamsize>(epptr() - pptr());
         if (writable > 0) {
             const std::streamsize chunk = (remaining < writable) ? remaining : writable;
-            std::memcpy(pptr(), cursor, static_cast<std::size_t>(chunk));
+            // Raw streambuf blob copy into the put area.
+            std::copy_n(cursor, static_cast<std::size_t>(chunk), pptr());
             pbump(static_cast<int>(chunk));
             cursor += chunk;
             remaining -= chunk;
@@ -1070,7 +1071,8 @@ std::streamsize PipeBuf::xsgetn(char* const dst, const std::streamsize count)
         const std::streamsize available = static_cast<std::streamsize>(readEnd - readNext);
         if (available > 0) {
             const std::streamsize chunk = ((count - copied) < available) ? (count - copied) : available;
-            std::memcpy(dst + copied, readNext, static_cast<std::size_t>(chunk));
+            // Raw streambuf blob copy from the get area.
+            std::copy_n(readNext, static_cast<std::size_t>(chunk), dst + copied);
             gbump(static_cast<int>(chunk));
             copied += chunk;
             if (copied >= count) {

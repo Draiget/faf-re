@@ -275,7 +275,7 @@ void msvc8::string::assign_owned(const std::string_view value) {
 
     if (boundedSize <= 15U) {
         if (boundedSize != 0U) {
-            std::memcpy(bx.buf, value.data(), boundedSize);
+            std::copy_n(value.data(), boundedSize, bx.buf);
         }
         myRes = 15U;
         eos(static_cast<uint32_t>(boundedSize));
@@ -283,7 +283,7 @@ void msvc8::string::assign_owned(const std::string_view value) {
     }
 
     auto* const ownedBuffer = static_cast<char*>(::operator new(boundedSize + 1U));
-    std::memcpy(ownedBuffer, value.data(), boundedSize);
+    std::copy_n(value.data(), boundedSize, ownedBuffer);
     ownedBuffer[boundedSize] = '\0';
 
     bx.ptr = ownedBuffer;
@@ -303,12 +303,12 @@ void msvc8::string::assign_owned_strong(const std::string_view value) {
     if (value.size() <= 15U) {
         char inlineCopy[16]{};
         if (!value.empty()) {
-            std::memcpy(inlineCopy, value.data(), value.size());
+            std::copy_n(value.data(), value.size(), inlineCopy);
         }
 
         tidy(true, 0U);
         if (!value.empty()) {
-            std::memcpy(bx.buf, inlineCopy, value.size());
+            std::copy_n(inlineCopy, value.size(), bx.buf);
         }
         mySize = static_cast<uint32_t>(value.size());
         myRes = 15U;
@@ -317,7 +317,7 @@ void msvc8::string::assign_owned_strong(const std::string_view value) {
     }
 
     auto* const replacement = static_cast<char*>(::operator new(value.size() + 1U));
-    std::memcpy(replacement, value.data(), value.size());
+    std::copy_n(value.data(), value.size(), replacement);
     replacement[value.size()] = '\0';
 
     tidy(true, 0U);
@@ -440,7 +440,7 @@ bool msvc8::string::ensure_capacity(const std::size_t need) noexcept {
 
     const char* const old = raw_data_unsafe();
     if (mySize != 0U) {
-        std::memcpy(grown, old, mySize);
+        std::copy_n(old, mySize, grown);
     }
     grown[mySize] = '\0';
 
@@ -480,7 +480,7 @@ bool msvc8::string::append(const char* s, const std::size_t n) noexcept {
         return false;
     }
     char* p = raw_data_mut_unsafe();
-    std::memcpy(p + mySize, s, n);
+    std::copy_n(s, n, p + mySize);
     mySize += n;
     p[mySize] = '\0';
     return true;
@@ -607,7 +607,7 @@ bool msvc8::string::replace(const std::size_t pos, std::size_t count, const std:
         std::memmove(p + pos + repl.size(), p + pos + count, tail);
     }
     if (!repl.empty()) {
-        std::memcpy(p + pos, repl.data(), repl.size());
+        std::copy_n(repl.data(), repl.size(), p + pos);
     }
     mySize = static_cast<uint32_t>(newSize);
     p[mySize] = '\0';
@@ -623,7 +623,7 @@ bool msvc8::string::assign_inplace(const std::string_view src) noexcept {
     }
     char* p = raw_data_mut_unsafe();
     if (!src.empty()) {
-        std::memcpy(p, src.data(), src.size());
+        std::copy_n(src.data(), src.size(), p);
     }
     mySize = src.size();
     p[mySize] = '\0';
@@ -647,7 +647,7 @@ msvc8::string& msvc8::string::operator=(const char* s) noexcept {
         }
 
         char* p = raw_data_mut_unsafe();
-        if (n) std::memcpy(p, s, n);
+        if (n) std::copy_n(s, n, p);
         mySize = static_cast<uint32_t>(n);
         p[mySize] = '\0';
         return *this;
@@ -761,7 +761,7 @@ msvc8::string& msvc8::string::assign(const char* data, const std::size_t size) n
 
     // Small-String Optimization (≤15): copy into inline buffer and NUL-terminate.
     if (size <= 15) {
-        std::memcpy(bx.buf, data, size);
+        std::copy_n(data, size, bx.buf);
         bx.buf[size] = '\0';
         mySize = size;
         myRes = 15;

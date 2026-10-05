@@ -1,4 +1,5 @@
 #include "PipeStream.h"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -103,7 +104,8 @@ void PipeStream::VirtWrite(const char* data, size_t size)
     const size_t available = static_cast<size_t>(mWriteEnd - mWriteHead);
     if (available < size) {
         if (available != 0) {
-            std::memcpy(mWriteHead, data, available);
+            // Raw byte-stream IO through the pipe buffer chain.
+            std::copy_n(data, available, mWriteHead);
             data += available;
             size -= available;
         }
@@ -111,19 +113,22 @@ void PipeStream::VirtWrite(const char* data, size_t size)
         while (size >= PipeStreamBuffer::kSize) {
             auto* const chunk = new PipeStreamBuffer{};
             mBuff.push_back(chunk);
-            std::memcpy(chunk->begin(), data, PipeStreamBuffer::kSize);
+            // Raw byte-stream IO through the pipe buffer chain.
+            std::copy_n(data, PipeStreamBuffer::kSize, chunk->begin());
             data += PipeStreamBuffer::kSize;
             size -= PipeStreamBuffer::kSize;
         }
 
         auto* const tail = new PipeStreamBuffer{};
         mBuff.push_back(tail);
-        std::memcpy(tail->begin(), data, size);
+        // Raw byte-stream IO through the pipe buffer chain.
+        std::copy_n(data, size, tail->begin());
         mWriteHead = tail->begin() + size;
         mWriteStart = mWriteHead;
         mWriteEnd = tail->end();
     } else {
-        std::memcpy(mWriteHead, data, size);
+        // Raw byte-stream IO through the pipe buffer chain.
+        std::copy_n(data, size, mWriteHead);
         mWriteHead += size;
         mWriteStart = mWriteHead;
     }
@@ -236,7 +241,8 @@ size_t PipeStream::DoRead(char* dst, size_t len, const bool doWait)
 
     while (available < len) {
         if (available != 0) {
-            std::memcpy(dst, mReadHead, available);
+            // Raw byte-stream IO through the pipe buffer chain.
+            std::copy_n(mReadHead, available, dst);
             dst += available;
             copied += available;
             len -= available;
@@ -275,7 +281,8 @@ size_t PipeStream::DoRead(char* dst, size_t len, const bool doWait)
     }
 
     if (len != 0) {
-        std::memcpy(dst, mReadHead, len);
+        // Raw byte-stream IO through the pipe buffer chain.
+        std::copy_n(mReadHead, len, dst);
         mReadHead += len;
     }
 

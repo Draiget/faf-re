@@ -523,6 +523,7 @@ namespace moho
     }
 
     if (srcCount != 0u) {
+      // Trivially copyable u32 element array copy inside the owning inline vector.
       std::memcpy(mBegin, rhs.mBegin, srcCount * sizeof(std::uint32_t));
     }
     mEnd = mBegin + srcCount;
@@ -556,6 +557,7 @@ namespace moho
         delete[] mBegin;
       }
       if (current != 0u) {
+        // Trivially copyable u32 element array copy inside the owning inline vector.
         std::memcpy(newStorage, mBegin, current * sizeof(std::uint32_t));
       }
       mBegin = newStorage;

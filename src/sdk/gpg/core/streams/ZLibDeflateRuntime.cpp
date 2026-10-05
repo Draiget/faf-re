@@ -258,6 +258,7 @@ extern "C" int __cdecl deflateSetDictionary(
       dictionaryTail = dictionary + (dictionaryLength - maxDictionaryBytes);
     }
 
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(state->window, dictionaryTail, copyLength);
     state->strstart = copyLength;
     state->block_start = static_cast<std::int32_t>(copyLength);
@@ -297,6 +298,7 @@ extern "C" int __cdecl deflateCopy(
     return Z_STREAM_ERROR;
   }
 
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(destination, source, sizeof(z_stream));
   auto* const copiedState = static_cast<zlib::DeflateState*>(
     destination->zalloc(destination->opaque, 1u, static_cast<uInt>(sizeof(zlib::DeflateState)))
@@ -306,6 +308,7 @@ extern "C" int __cdecl deflateCopy(
   }
 
   destination->state = reinterpret_cast<internal_state*>(copiedState);
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(copiedState, sourceState, sizeof(zlib::DeflateState));
   copiedState->strm = destination;
 
@@ -324,9 +327,13 @@ extern "C" int __cdecl deflateCopy(
     return Z_MEM_ERROR;
   }
 
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(copiedState->window, sourceState->window, 2u * static_cast<std::size_t>(sourceState->w_size));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(copiedState->prev, sourceState->prev, 2u * static_cast<std::size_t>(sourceState->w_size));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(copiedState->head, sourceState->head, 2u * static_cast<std::size_t>(sourceState->hash_size));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(copiedState->pending_buf, sourceState->pending_buf, sourceState->pending_buf_size);
 
   copiedState->pending_out = copiedState->pending_buf + (sourceState->pending_out - sourceState->pending_buf);
@@ -558,6 +565,7 @@ extern "C" DeflateState* __cdecl putShortMSB(
   }
 
   if (pendingBytes != 0u) {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(stream->next_out, state->pending_out, pendingBytes);
     stream->next_out += pendingBytes;
     state->pending_out += pendingBytes;

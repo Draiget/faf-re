@@ -1,5 +1,5 @@
 #include "CMessageStream.h"
-
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
 #include <stdexcept>
@@ -35,7 +35,8 @@ size_t CMessageStream::VirtRead(char* buff, size_t len)
     len = readable;
   }
 
-  std::memcpy(buff, mReadHead, len);
+  // Raw message-stream blob copy.
+  std::copy_n(mReadHead, len, buff);
   mReadHead += len;
   return len;
 }
@@ -71,7 +72,8 @@ void CMessageStream::VirtWrite(const char* data, const size_t size)
   }
 
   if (writeSize != 0) {
-    std::memcpy(mWriteHead, data, writeSize);
+    // Raw message-stream blob copy.
+    std::copy_n(data, writeSize, mWriteHead);
     mWriteHead += writeSize;
   }
 

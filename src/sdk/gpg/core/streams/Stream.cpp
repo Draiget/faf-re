@@ -1,4 +1,5 @@
 #include "Stream.h"
+#include <algorithm>
 #include <cstddef>
 #include <cstdarg>
 #include <cstring>
@@ -300,7 +301,8 @@ void Stream::Write(const char* buf, const size_t size)
     return;
   }
 
-  memcpy(mWriteHead, buf, size);
+  // Raw byte-stream IO through the read/write head.
+  std::copy_n(buf, size, mWriteHead);
   mWriteHead += size;
 }
 
@@ -366,7 +368,8 @@ size_t Stream::Read(char* buf, size_t size)
   if (size > BytesRead()) {
     size = VirtRead(buf, size);
   } else if (size) {
-    memcpy(buf, mReadHead, size);
+    // Raw byte-stream IO through the read/write head.
+    std::copy_n(mReadHead, size, buf);
     mReadHead += size;
   }
   return size;
@@ -427,7 +430,8 @@ size_t Stream::ReadNonBlocking(char* buf, size_t size)
   if (size > BytesRead()) {
     size = VirtReadNonBlocking(buf, size);
   } else if (size) {
-    memcpy(buf, mReadHead, size);
+    // Raw byte-stream IO through the read/write head.
+    std::copy_n(mReadHead, size, buf);
     mReadHead += size;
   }
   return size;

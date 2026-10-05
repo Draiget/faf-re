@@ -863,6 +863,7 @@ void CNetUDPConnector::ReceivePacket(const u_long address, const u_short port, c
   }
 
   SNetPacket* const packet = NewPacket();
+  // Raw datagram blob copy into the packet header.
   memcpy(&packet->header, dat, size);
   packet->mSize = static_cast<int32_t>(size);
   const SReceivePacket r{packet, address, port};

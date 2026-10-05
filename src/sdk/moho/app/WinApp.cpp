@@ -1897,7 +1897,8 @@ namespace
       return false;
     }
 
-    std::memcpy(destination, selectedPath.c_str(), payloadBytes);
+    // Raw clipboard blob copy (wchar path text incl. NUL) into the HGLOBAL.
+    std::copy_n(selectedPath.c_str(), payloadBytes / sizeof(wchar_t), destination);
     (void)::GlobalUnlock(globalText);
     return true;
   }
@@ -2562,7 +2563,8 @@ bool moho::WIN_CopyToClipboard(const wchar_t* const text)
     return false;
   }
 
-  std::memcpy(targetBuffer, text, payloadBytes);
+  // Raw clipboard blob copy (text payload incl. NUL) into the HGLOBAL.
+  std::copy_n(text, payloadBytes / sizeof(wchar_t), static_cast<wchar_t*>(targetBuffer));
   ::GlobalUnlock(globalBlock);
 
   if (::SetClipboardData(CF_UNICODETEXT, globalBlock) == nullptr) {

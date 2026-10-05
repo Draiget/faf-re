@@ -34,6 +34,7 @@
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -2354,7 +2355,8 @@ namespace gpg::gal
       *outBuffer = resizedBuffer;
     }
 
-    std::memcpy(outBuffer->GetPtr(0U, 0U), encodedBlob->GetBufferPointer(), encodedSize);
+    // Raw encoded blob copy from the D3DX buffer.
+    std::copy_n(static_cast<const char*>(encodedBlob->GetBufferPointer()), encodedSize, outBuffer->GetPtr(0U, 0U));
 
     SafeRelease(scratchBlob);
   }
@@ -4328,7 +4330,8 @@ namespace gpg::gal
         *outBuffer = resizedBuffer;
       }
 
-      std::memcpy(outBuffer->GetPtr(0U, 0U), encodedBlob->GetBufferPointer(), encodedBytes);
+      // Raw encoded blob copy from the D3DX buffer.
+      std::copy_n(static_cast<const char*>(encodedBlob->GetBufferPointer()), encodedBytes, outBuffer->GetPtr(0U, 0U));
     }
 
     if (encodedBlob == createBlobScratch) {
@@ -4427,11 +4430,13 @@ namespace gpg::gal
     char* const destinationBytes = outTextureData->GetPtr(0U, 0U);
     const auto* const sourceBytesPtr = reinterpret_cast<const std::uint8_t*>(mappedTexture.pData);
     if (static_cast<unsigned int>(mappedTexture.RowPitch) == rowBytes) {
-      std::memcpy(destinationBytes, sourceBytesPtr, requiredBytes);
+      // Raw texture blob copy from the mapped subresource.
+      std::copy_n(sourceBytesPtr, requiredBytes, destinationBytes);
     } else {
+      // Raw texture row blob copies from the mapped, pitched subresource.
       char* writeCursor = destinationBytes;
       for (std::uint32_t row = 0U; row < rowCount; ++row) {
-        std::memcpy(writeCursor, sourceBytesPtr + (static_cast<std::size_t>(mappedTexture.RowPitch) * row), rowBytes);
+        std::copy_n(sourceBytesPtr + (static_cast<std::size_t>(mappedTexture.RowPitch) * row), rowBytes, writeCursor);
         writeCursor += rowBytes;
       }
     }

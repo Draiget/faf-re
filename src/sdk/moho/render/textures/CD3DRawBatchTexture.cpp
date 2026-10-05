@@ -1,6 +1,6 @@
 #include "moho/render/textures/CD3DRawBatchTexture.h"
 
-#include <cstring>
+#include <algorithm>
 
 #include "moho/render/textures/DXTCodec.h"
 #include "moho/render/textures/SBatchTextureData.h"
@@ -40,8 +40,9 @@ namespace moho
     const std::uint8_t* sourceRow = mData->mDxt5Blocks.begin();
     std::uint8_t* destinationRow = static_cast<std::uint8_t*>(destination);
 
+    // Raw GPU upload: DXT row blobs into the locked, pitched texture.
     for (std::size_t row = 0; row < encodedRows; ++row) {
-      std::memcpy(destinationRow, sourceRow, encodedRowBytes);
+      std::copy_n(sourceRow, encodedRowBytes, destinationRow);
       destinationRow += destinationPitchBytes;
       sourceRow += encodedRowBytes;
     }

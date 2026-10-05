@@ -27,6 +27,7 @@ namespace
 {
   float GetBottleneckUiTimestampMs(const CClientManagerImpl& manager)
   {
+    // Low-dword float pun over Timer::mTime (binary reads only 4 of the 8 bytes).
     float out = 0.0f;
     std::memcpy(&out, &manager.mTimer2.mTime, sizeof(out));
     return out;
@@ -34,6 +35,7 @@ namespace
 
   void SetBottleneckUiTimestampMs(CClientManagerImpl& manager, const float value)
   {
+    // Low-dword float pun over Timer::mTime (binary writes only 4 of the 8 bytes).
     std::memcpy(&manager.mTimer2.mTime, &value, sizeof(value));
   }
 

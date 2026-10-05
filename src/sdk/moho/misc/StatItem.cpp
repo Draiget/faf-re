@@ -1,6 +1,7 @@
 #include "StatItem.h"
 
 #include <algorithm>
+#include <bit>
 #include <cfloat>
 #include <cstddef>
 #include <cstdint>
@@ -611,9 +612,7 @@ namespace
 
   [[nodiscard]] float AsFloatBits(const std::int32_t value)
   {
-    float out = 0.0f;
-    std::memcpy(&out, &value, sizeof(out));
-    return out;
+    return std::bit_cast<float>(value);
   }
 
   void EnsureStatSampleCapacity(moho::StatSampleBuffer& sampleBuffer, const std::size_t requiredCount)
@@ -633,6 +632,8 @@ namespace
 
     auto* const newStorage = static_cast<moho::StatSamplePoint*>(operator new(targetCapacity * sizeof(moho::StatSamplePoint)));
     if (currentCount != 0u && sampleBuffer.begin != nullptr) {
+      // Raw array move is required: StatSamplePoint is trivially relocatable and this is the
+      // buffer's own capacity-growth path (no per-element source operation exists).
       std::memcpy(newStorage, sampleBuffer.begin, currentCount * sizeof(moho::StatSamplePoint));
     }
 
@@ -1510,9 +1511,7 @@ namespace moho
       }
     }
     if (sPrintStatsBoogersFarts) {
-      const float value = 1.0f;
-      std::int32_t bits = 0;
-      std::memcpy(&bits, &value, sizeof(bits));
+      const std::int32_t bits = std::bit_cast<std::int32_t>(1.0f);
       (void)StorePrimaryValueBits_FloatPath(sPrintStatsBoogersFarts, &bits);
     }
 
@@ -1556,9 +1555,7 @@ namespace moho
       }
     }
     if (sPrintStatsAnother) {
-      const float value = 15.0f;
-      std::int32_t bits = 0;
-      std::memcpy(&bits, &value, sizeof(bits));
+      const std::int32_t bits = std::bit_cast<std::int32_t>(15.0f);
       (void)StorePrimaryValueBits_FloatPath(sPrintStatsAnother, &bits);
     }
 
@@ -1594,9 +1591,7 @@ namespace moho
       }
     }
     {
-      const float value = 15.0f;
-      std::int32_t bits = 0;
-      std::memcpy(&bits, &value, sizeof(bits));
+      const std::int32_t bits = std::bit_cast<std::int32_t>(15.0f);
       (void)StorePrintStatsDoubleSlotBits(&bits);
     }
 
@@ -2078,8 +2073,8 @@ namespace moho
       float realtime = 0.0f;
       archive->ReadFloat(&primary);
       archive->ReadFloat(&realtime);
-      std::memcpy(const_cast<std::int32_t*>(&mPrimaryValueBits), &primary, sizeof(primary));
-      std::memcpy(const_cast<std::int32_t*>(&mRealtimeValueBits), &realtime, sizeof(realtime));
+      mPrimaryValueBits = std::bit_cast<std::int32_t>(primary);
+      mRealtimeValueBits = std::bit_cast<std::int32_t>(realtime);
       break;
     }
     case EStatType::kInt: {
@@ -2234,8 +2229,7 @@ namespace moho
       const std::int32_t observedBits = ReadAtomicI32(pCounter);
       const float currentValue = AsFloatBits(observedBits);
       const float nextValue = currentValue + *delta;
-      std::int32_t nextBits = 0;
-      std::memcpy(&nextBits, &nextValue, sizeof(nextBits));
+      const std::int32_t nextBits = std::bit_cast<std::int32_t>(nextValue);
       const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
         reinterpret_cast<volatile long*>(pCounter), static_cast<long>(nextBits), static_cast<long>(observedBits)
       ));
@@ -2248,8 +2242,7 @@ namespace moho
       const std::int32_t observedBits = *pCounter;
       const float currentValue = AsFloatBits(observedBits);
       const float nextValue = currentValue + *delta;
-      std::int32_t nextBits = 0;
-      std::memcpy(&nextBits, &nextValue, sizeof(nextBits));
+      const std::int32_t nextBits = std::bit_cast<std::int32_t>(nextValue);
       if (*pCounter == observedBits) {
         *pCounter = nextBits;
         return observedBits;

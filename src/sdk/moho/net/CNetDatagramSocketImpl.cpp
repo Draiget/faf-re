@@ -1,5 +1,5 @@
 #include "CNetDatagramSocketImpl.h"
-
+#include <algorithm>
 #include <cstring>
 
 #include "CMessage.h"
@@ -88,7 +88,8 @@ void CNetDatagramSocketImpl::Pull()
     CMessage msg{};
     do {
       msg.mBuff.Resize(bytesRead, 0);
-      std::memcpy(msg.mBuff.start_, recvBuffer, static_cast<size_t>(bytesRead));
+      // Raw datagram receive blob into the message buffer.
+      std::copy_n(recvBuffer, static_cast<size_t>(bytesRead), msg.mBuff.start_);
 
       const u_short peerPort = ntohs(from.sin_port);
       const u_long peerAddress = ntohl(from.sin_addr.s_addr);

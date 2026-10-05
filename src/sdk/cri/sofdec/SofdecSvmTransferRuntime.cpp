@@ -2944,6 +2944,7 @@
                 _mm_add_pi16(chromaSum, lumaTable[lumaRows[quadRow][lumaColumn + quadColumn]]), 6
               );
               const std::int32_t packed = _mm_cvtsi64_si32(_mm_packs_pu16(pixel, pixel));
+              // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
               std::memcpy(targetRows[quadRow] + (4 * (lumaColumn + quadColumn)), &packed, sizeof(packed));
             }
           }
@@ -7056,6 +7057,7 @@
   {
     auto* const outEntryList = reinterpret_cast<SftrnEntryList*>(outTransferEntryTable);
     auto* const sourceEntryList = reinterpret_cast<SftrnEntryList*>(transferEntryTable);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(outEntryList, sourceEntryList, sizeof(SftrnEntryList));
     return sftrn_CallTrEntry(sourceEntryList, kSftrnEntrySelectorInit);
   }

@@ -227,6 +227,8 @@ namespace moho
     void ResetToEmpty(const std::uint32_t universeBits) noexcept
     {
       static_assert(std::is_trivially_copyable_v<U>, "BVSet<T,U>::U must be trivially copyable.");
+      // Raw universe-word reinterpret: U may be narrower than 4 bytes, so the
+      // low bytes of the caller's word are loaded into the typed lane.
       std::memcpy(&mUniverse, &universeBits, sizeof(U));
       mReserved04 = 0u;
       mBits = BVIntSet{};

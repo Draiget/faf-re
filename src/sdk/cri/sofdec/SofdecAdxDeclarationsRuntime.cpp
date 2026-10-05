@@ -6949,6 +6949,7 @@ namespace
       }
 
       scratch[coefficientIndex] = decodedCoefficients[coefficientIndex - 1];
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
       std::memcpy(coefficients, scratch, static_cast<std::size_t>(coefficientIndex + 1) * sizeof(float));
     }
   }

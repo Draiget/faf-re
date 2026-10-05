@@ -4,6 +4,7 @@
 #include <d3d9.h>
 
 #include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -66,9 +67,7 @@ namespace
 
   [[nodiscard]] std::int32_t FloatToBits(const float value) noexcept
   {
-    std::uint32_t bits = 0;
-    std::memcpy(&bits, &value, sizeof(bits));
-    return static_cast<std::int32_t>(bits);
+    return static_cast<std::int32_t>(std::bit_cast<std::uint32_t>(value));
   }
 
   void PublishFloatStat(moho::StatItem* item, const float value)

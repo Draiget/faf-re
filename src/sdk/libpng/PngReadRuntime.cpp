@@ -10,6 +10,7 @@
 #include "libpng/PngStructLayout.h"
 #include "libpng/PngStructRuntime.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <csetjmp>
 #include <cstdlib>
@@ -242,7 +243,8 @@ extern "C" void png_format_buffer(png_structp png_ptr, char* buffer, const char*
   } else {
     buffer[iout++] = ':';
     buffer[iout++] = ' ';
-    std::memcpy(buffer + iout, error_message, 0x40);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+    std::copy_n(error_message, 0x40, buffer + iout);
     buffer[iout + 0x3F] = '\0';
   }
 }
@@ -426,7 +428,8 @@ extern "C" void png_set_unknown_chunks(png_structp png_ptr, png_infop info_ptr,
     return;
   }
 
-  std::memcpy(np, info_ptr->unknown_chunks, 0x14u * old_num);
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(info_ptr->unknown_chunks, old_num, np);
   png_free(png_ptr, info_ptr->unknown_chunks);
   info_ptr->unknown_chunks = nullptr;
 
@@ -436,7 +439,8 @@ extern "C" void png_set_unknown_chunks(png_structp png_ptr, png_infop info_ptr,
     std::strcpy(reinterpret_cast<char*>(dest->name), reinterpret_cast<const char*>(src.name));
     dest->data = static_cast<std::uint8_t*>(png_malloc(png_ptr, src.size));
     if (dest->data != nullptr) {
-      std::memcpy(dest->data, src.data, src.size);
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+      std::copy_n(src.data, src.size, dest->data);
       dest->size = src.size;
       dest->location = static_cast<std::uint8_t>(Mode(png_ptr));
     } else {
@@ -592,7 +596,8 @@ extern "C" void png_read_filter_row(png_structp png_ptr, void* row_info_raw,
 extern "C" void png_memcpy_check(png_structp png_ptr, void* dst, void* src, std::uint32_t length)
 {
   (void)png_ptr;
-  std::memcpy(dst, src, length);
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(static_cast<char*>(src), length, static_cast<char*>(dst));
 }
 
 /**
@@ -1431,7 +1436,8 @@ extern "C" std::uint32_t png_read_transform_info(png_structp png_ptr, png_infop 
   if ((transformations & 0x80) != 0) {  // PNG_BACKGROUND
     info_ptr->color_type &= ~4;         // clear PNG_COLOR_MASK_ALPHA
     info_ptr->num_trans = 0;
-    std::memcpy(info_ptr->background, Background(png_ptr), sizeof(info_ptr->background));
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+    std::copy_n(Background(png_ptr), sizeof(info_ptr->background), info_ptr->background);
   }
 
   if ((transformations & 0x2000) != 0) {  // PNG_GAMMA
@@ -1721,9 +1727,11 @@ extern "C" void png_do_read_interlace(png_structp png_ptr)
       std::uint8_t* dp = row + bytes_per_pixel * (final_width - 1);
       std::uint8_t pixel[8];  // scratch: up to a 64-bit (RGBA16) pixel
       for (std::uint32_t i = 0; i < width; ++i) {
-        std::memcpy(pixel, sp, bytes_per_pixel);
+        // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+        std::copy_n(sp, bytes_per_pixel, pixel);
         for (std::uint32_t j = 0; j < pass_inc; ++j) {
-          std::memcpy(dp, pixel, bytes_per_pixel);
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+          std::copy_n(pixel, bytes_per_pixel, dp);
           dp -= bytes_per_pixel;
         }
         sp -= bytes_per_pixel;
@@ -1759,7 +1767,8 @@ extern "C" void png_combine_row(png_structp png_ptr, std::uint8_t* row, int mask
   if (mask == 255) {
     const std::uint32_t width = Field<std::uint32_t>(png_ptr, kOffWidth);
     std::uint8_t* const sp = Field<std::uint8_t*>(png_ptr, kOffRowBuf) + 1;
-    std::memcpy(row, sp, (width * pixel_depth + 7) >> 3);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+    std::copy_n(sp, (width * pixel_depth + 7) >> 3, row);
     return;
   }
 
@@ -1830,7 +1839,8 @@ extern "C" void png_combine_row(png_structp png_ptr, std::uint8_t* row, int mask
       std::uint8_t m = 0x80;
       for (std::uint32_t i = 0; i < width; ++i) {
         if (mask & m) {
-          std::memcpy(dp, sp, bytes_per_pixel);
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+          std::copy_n(sp, bytes_per_pixel, dp);
         }
         sp += bytes_per_pixel;
         dp += bytes_per_pixel;
@@ -1965,7 +1975,8 @@ extern "C" void png_read_init_2(
   }
 
   std::uint8_t preservedPrefix[0x40]{};
-  std::memcpy(preservedPrefix, png_ptr, sizeof(preservedPrefix));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(reinterpret_cast<const std::uint8_t*>(png_ptr), sizeof(preservedPrefix), preservedPrefix);
 
   if (png_struct_size < kPngStructSize) {
     png_destroy_struct(png_ptr);
@@ -1974,7 +1985,8 @@ extern "C" void png_read_init_2(
   }
 
   std::memset(png_ptr, 0, kPngStructSize);
-  std::memcpy(png_ptr, preservedPrefix, sizeof(preservedPrefix));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(preservedPrefix, sizeof(preservedPrefix), reinterpret_cast<std::uint8_t*>(png_ptr));
 
   Field<std::uint32_t>(png_ptr, kOffZbufSize) = 0x2000;
   Field<void*>(png_ptr, kOffZbuf) = png_malloc(png_ptr, 0x2000);
@@ -2839,7 +2851,8 @@ char* png_decompress_chunk(png_structp png_ptr, int comp_type, char* chunkdata,
             png_free(png_ptr, chunkdata);
             png_error(png_ptr, "Not enough memory to decompress chunk");
           }
-          std::memcpy(text, chunkdata, prefix_size);
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+          std::copy_n(chunkdata, prefix_size, text);
         }
         text[text_size - 1] = 0x00;
 
@@ -2849,7 +2862,8 @@ char* png_decompress_chunk(png_structp png_ptr, int comp_type, char* chunkdata,
                         - reinterpret_cast<std::uintptr_t>(text))
                     + chunklength - 1;
         text_size = sizeof(msg) > text_size ? text_size : sizeof(msg);
-        std::memcpy(text + prefix_size, msg, text_size + 1);
+        // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+        std::copy_n(msg, text_size + 1, text + prefix_size);
         break;
       }
       if (Field<std::uint32_t>(png_ptr, kOffZstreamAvailOut) == 0 || ret == 1) {
@@ -2862,9 +2876,10 @@ char* png_decompress_chunk(png_structp png_ptr, int comp_type, char* chunkdata,
             png_free(png_ptr, chunkdata);
             png_error(png_ptr, "Not enough memory to decompress chunk.");
           }
-          std::memcpy(text + prefix_size, Field<std::uint8_t*>(png_ptr, kOffZbuf),
-                      text_size - prefix_size);
-          std::memcpy(text, chunkdata, prefix_size);
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+          std::copy_n(Field<std::uint8_t*>(png_ptr, kOffZbuf), text_size - prefix_size, text + prefix_size);
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+          std::copy_n(chunkdata, prefix_size, text);
           text[text_size] = 0x00;
         } else {
           char* const tmp = text;
@@ -2874,9 +2889,11 @@ char* png_decompress_chunk(png_structp png_ptr, int comp_type, char* chunkdata,
             png_free(png_ptr, chunkdata);
             png_error(png_ptr, "Not enough memory to decompress chunk..");
           }
-          std::memcpy(text, tmp, text_size);
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+          std::copy_n(tmp, text_size, text);
           png_free(png_ptr, tmp);
-          std::memcpy(text + text_size, Field<std::uint8_t*>(png_ptr, kOffZbuf), produced);
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+          std::copy_n(Field<std::uint8_t*>(png_ptr, kOffZbuf), produced, text + text_size);
           text_size += produced;
           text[text_size] = 0x00;
         }
@@ -2911,7 +2928,8 @@ char* png_decompress_chunk(png_structp png_ptr, int comp_type, char* chunkdata,
           png_free(png_ptr, chunkdata);
           png_error(png_ptr, "Not enough memory for text.");
         }
-        std::memcpy(text, chunkdata, prefix_size);
+        // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+        std::copy_n(chunkdata, prefix_size, text);
       }
       text[text_size] = 0x00;
     }
@@ -4211,7 +4229,8 @@ extern "C" void png_read_destroy(png_structp png_ptr, png_infop info_ptr, png_in
 
   // Save the four field groups that survive the reset.
   std::uint8_t  jmp_block[64];
-  std::memcpy(jmp_block, png_ptr, sizeof(jmp_block));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(reinterpret_cast<const std::uint8_t*>(png_ptr), sizeof(jmp_block), jmp_block);
   const std::uint32_t saved_err16 = field32(16);  // error_ptr
   const std::uint32_t saved_err17 = field32(17);  // error_fn
   const std::uint32_t saved_err18 = field32(18);  // warning_fn
@@ -4224,7 +4243,8 @@ extern "C" void png_read_destroy(png_structp png_ptr, png_infop info_ptr, png_in
   fieldp(147) = saved_freefn;
   field32(16) = saved_err16;
 
-  std::memcpy(png_ptr, jmp_block, sizeof(jmp_block));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(jmp_block, sizeof(jmp_block), reinterpret_cast<std::uint8_t*>(png_ptr));
 }
 
 /**

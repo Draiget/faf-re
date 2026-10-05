@@ -1,6 +1,6 @@
 #include "moho/render/textures/SBatchTextureData.h"
 
-#include <cstring>
+#include <algorithm>
 
 namespace moho
 {
@@ -33,13 +33,15 @@ namespace moho
     const std::uint8_t* sourceRow = static_cast<const std::uint8_t*>(sourceBlocks);
 
     if (sourcePitchBytes == encodedRowBytes) {
-      std::memcpy(destination, sourceRow, totalEncodedBytes);
+      // Raw texture blob copy from the locked, unpitched source.
+      std::copy_n(sourceRow, totalEncodedBytes, destination);
       return true;
     }
 
     std::uint8_t* destinationRow = destination;
+    // Raw texture row blob copies from the locked, pitched source.
     for (std::size_t row = 0; row < encodedRows; ++row) {
-      std::memcpy(destinationRow, sourceRow, encodedRowBytes);
+      std::copy_n(sourceRow, encodedRowBytes, destinationRow);
       destinationRow += encodedRowBytes;
       sourceRow += sourcePitchBytes;
     }
@@ -57,7 +59,8 @@ namespace moho
 
     const std::size_t sourceBytes = sourceBuffer.Size();
     outData.mDxt5Blocks.resize(sourceBytes);
-    std::memcpy(outData.mDxt5Blocks.begin(), sourceBuffer.mBegin, sourceBytes);
+    // Raw DXT block blob copy from the source memory buffer.
+    std::copy_n(sourceBuffer.mBegin, sourceBytes, outData.mDxt5Blocks.begin());
     return true;
   }
 }

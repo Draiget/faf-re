@@ -1,6 +1,6 @@
 #include "moho/render/VisionRenderer.h"
 
-#include <array>
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -377,11 +377,8 @@ namespace moho
       if (LockVisionInstanceRange(
             renderer, static_cast<std::uint32_t>(batchSize), mappedInstances, baseInstance
           )) {
-        std::memcpy(
-          mappedInstances,
-          visibleCircles.begin() + emitted,
-          sizeof(Wm3::Circle2f) * static_cast<std::size_t>(batchSize)
-        );
+        // Raw GPU upload: circle instance blob into the mapped instances buffer.
+        std::copy_n(visibleCircles.begin() + emitted, static_cast<std::size_t>(batchSize), mappedInstances);
         static_cast<void>(renderer.mVertexBuffer2->Unlock());
 
         device->SetVertexBuffer(1u, renderer.mVertexBuffer2, 1, static_cast<int>(baseInstance));

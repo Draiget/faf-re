@@ -1,5 +1,5 @@
 #include "moho/render/SParticleBuffer.h"
-
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -240,7 +240,8 @@ namespace moho
 
     void* const quadVertexData =
       mQuadVertexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None);
-    std::memcpy(quadVertexData, kParticleQuadVertexLane.data(), sizeof(kParticleQuadVertexLane));
+    // Raw GPU upload: static particle quad vertex blob into the locked buffer.
+    std::copy(kParticleQuadVertexLane.begin(), kParticleQuadVertexLane.end(), static_cast<decltype(kParticleQuadVertexLane)::value_type*>(quadVertexData));
     (void)mQuadVertexBuffer->Unlock();
 
     gpg::gal::VertexBufferContext instanceVertexContext{};

@@ -715,6 +715,7 @@ namespace
       AllocateAudioEngineRefArrayChecked(static_cast<std::uint32_t>(targetCapacity))
     );
     if (currentCount != 0u) {
+      // Trivially relocatable element array copy in the owning array's growth path.
       std::memcpy(newStorage, engines.mStart, currentCount * sizeof(moho::AudioEngineRef));
     }
 
@@ -1656,6 +1657,7 @@ namespace moho
       [[nodiscard]] std::uint16_t VariableId() const noexcept
       {
         std::uint16_t value = 0;
+        // Unaligned scalar load from the packed notification byte fields.
         std::memcpy(&value, mVariableId.data(), sizeof(value));
         return value;
       }
@@ -1663,6 +1665,7 @@ namespace moho
       [[nodiscard]] float VariableValue() const noexcept
       {
         float value = 0.0f;
+        // Unaligned scalar load from the packed notification byte fields.
         std::memcpy(&value, mVariableValue.data(), sizeof(value));
         return value;
       }
@@ -1670,6 +1673,7 @@ namespace moho
       [[nodiscard]] std::uint32_t WaveBankId() const noexcept
       {
         std::uint32_t value = 0;
+        // Unaligned scalar load from the packed notification byte fields.
         std::memcpy(&value, mWaveBankToken.data(), sizeof(value));
         return value;
       }

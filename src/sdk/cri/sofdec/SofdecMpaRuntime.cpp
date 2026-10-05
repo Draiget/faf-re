@@ -1032,7 +1032,9 @@
       wrapChunkBytes = endOffset - capacity;
     }
 
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(destinationBytes, ringBuffer->data + readOffset, firstChunkBytes);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(destinationBytes + firstChunkBytes, ringBuffer->data, wrapChunkBytes);
 
     ringBuffer->dataBytes -= readBytes;
@@ -1078,7 +1080,9 @@
       wrapChunkBytes = endOffset - capacity;
     }
 
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(ringBuffer->data + writeOffset, sourceBytes, firstChunkBytes);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(ringBuffer->data, sourceBytes + firstChunkBytes, wrapChunkBytes);
 
     ringBuffer->dataBytes += writeBytes;

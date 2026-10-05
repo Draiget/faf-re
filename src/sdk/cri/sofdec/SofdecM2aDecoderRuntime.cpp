@@ -1993,6 +1993,7 @@
    */
   std::uint32_t m2adec_copy(void* const destination, const void* const source, const std::size_t byteCount)
   {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(destination, source, byteCount);
     return static_cast<std::uint32_t>(byteCount);
   }

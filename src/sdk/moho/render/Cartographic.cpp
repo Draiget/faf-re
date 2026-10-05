@@ -544,9 +544,7 @@ namespace
    */
   [[nodiscard]] std::uint16_t PackFloat32AsHalfFloat(const float value) noexcept
   {
-    std::uint32_t bits = 0U;
-    static_assert(sizeof(bits) == sizeof(value), "float/uint32_t size mismatch");
-    std::memcpy(&bits, &value, sizeof(bits));
+    const std::uint32_t bits = std::bit_cast<std::uint32_t>(value);
 
     const std::uint32_t sign = (bits >> 16U) & 0x8000U;
     const std::int32_t exponent = static_cast<std::int32_t>((bits >> 23U) & 0xFFU) - 127 + 15;
@@ -1297,7 +1295,8 @@ namespace moho
     mQuadVertexBuffer = quadVertexBuffer;
 
     void* const quadVertexData = mQuadVertexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None);
-    std::memcpy(quadVertexData, kCartographicQuadVertices.data(), sizeof(kCartographicQuadVertices));
+    // Raw GPU upload: static quad vertex blob into the locked buffer.
+    std::copy(kCartographicQuadVertices.begin(), kCartographicQuadVertices.end(), static_cast<float*>(quadVertexData));
     (void)mQuadVertexBuffer->Unlock();
 
     gpg::gal::VertexBufferContext instanceVertexContext{};
@@ -1322,7 +1321,8 @@ namespace moho
     auto* const indexWords = reinterpret_cast<std::uint32_t*>(
       mIndexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None)
     );
-    std::memcpy(indexWords, kCartographicQuadIndexWords.data(), sizeof(kCartographicQuadIndexWords));
+    // Raw GPU upload: static quad index blob into the locked buffer.
+    std::copy(kCartographicQuadIndexWords.begin(), kCartographicQuadIndexWords.end(), indexWords);
     (void)mIndexBuffer->Unlock();
   }
 
@@ -1365,7 +1365,8 @@ namespace moho
     float* writeCursor = static_cast<float*>(mInstanceVertexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None));
     CartographicDecalNode* const sentinel = mDecals.mDecalSentinel;
     for (CartographicDecalNode* node = sentinel->mNext; node != sentinel; node = node->mNext) {
-      std::memcpy(writeCursor, node->mDecal.mVertexData, sizeof(node->mDecal.mVertexData));
+      // Raw GPU upload: per-decal vertex blob into the locked instance buffer.
+      std::copy(std::begin(node->mDecal.mVertexData), std::end(node->mDecal.mVertexData), writeCursor);
       writeCursor += kCartographicInstanceFloatCount;
     }
 
@@ -1490,7 +1491,8 @@ namespace moho
     auto* const indexWords = reinterpret_cast<std::uint32_t*>(
       mQuadIndexBuffer->Lock(0U, sizeof(kCartographicQuadIndexWords), gpg::gal::MohoD3DLockFlags::None)
     );
-    std::memcpy(indexWords, kCartographicQuadIndexWords.data(), sizeof(kCartographicQuadIndexWords));
+    // Raw GPU upload: static quad index blob into the locked buffer.
+    std::copy(kCartographicQuadIndexWords.begin(), kCartographicQuadIndexWords.end(), indexWords);
     (void)mQuadIndexBuffer->Unlock();
   }
 
@@ -1786,7 +1788,8 @@ namespace moho
     void* const vertexData = mTerrainVertexBuffer->Lock(
       0U, sizeof(terrainQuadVertices), gpg::gal::MohoD3DLockFlags::None
     );
-    std::memcpy(vertexData, terrainQuadVertices.data(), sizeof(terrainQuadVertices));
+    // Raw GPU upload: terrain quad vertex blob into the locked buffer.
+    std::copy(terrainQuadVertices.begin(), terrainQuadVertices.end(), static_cast<std::int16_t*>(vertexData));
     (void)mTerrainVertexBuffer->Unlock();
   }
 
@@ -2033,7 +2036,8 @@ namespace moho
     void* const vertexData = mFrameVertexBuffer->Lock(
       0U, kCartographicFrameVertexByteSize, gpg::gal::MohoD3DLockFlags::Discard
     );
-    std::memcpy(vertexData, frameQuad.data(), kCartographicFrameVertexByteSize);
+    // Raw GPU upload: frame quad vertex blob into the locked buffer.
+    std::copy(frameQuad.begin(), frameQuad.end(), static_cast<float*>(vertexData));
     (void)mFrameVertexBuffer->Unlock();
 
     const boost::shared_ptr<gpg::gal::Effect> effect = GetEffect();

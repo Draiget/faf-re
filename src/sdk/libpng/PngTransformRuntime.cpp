@@ -11,6 +11,7 @@
 
 #include "libpng/PngTransformRuntime.h"
 
+#include <algorithm>
 #include <cstring>  // memcpy
 
 namespace {
@@ -2364,7 +2365,7 @@ extern "C" void png_do_background(png_row_infop row_info, std::uint8_t* row,
         const std::uint16_t a16 = static_cast<std::uint16_t>((src[6] << 8) | src[7]);
         if (a16 == 0xFFFF) {
           // Binary path: memcpy 6 bytes from src..src+5 to dst.
-          std::memcpy(dst, src, 6);
+          std::copy_n(src, 6, dst);
           dst += 6;
           src += 8;
           continue;
@@ -2536,7 +2537,8 @@ extern "C" void png_do_write_interlace(png_row_infop row_info, std::uint8_t* row
       for (std::uint32_t i = kPngPassStart[pass]; i < rowWidth; i += kPngPassInc[pass]) {
         const std::uint8_t* sp = row + static_cast<std::size_t>(i) * pixelBytes;
         if (dp != sp) {
-          std::memcpy(dp, sp, pixelBytes);
+          // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+          std::copy_n(sp, pixelBytes, dp);
         }
         dp += pixelBytes;
       }

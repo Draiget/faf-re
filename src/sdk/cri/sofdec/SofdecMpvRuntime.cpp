@@ -2398,6 +2398,7 @@ std::int32_t sfmpv_NeedSafeDlmRefresh(
       && primaryAddress < (secondAddress + static_cast<std::uint32_t>(secondLength))
       && static_cast<std::int32_t>(primaryAddress - secondAddress - static_cast<std::uint32_t>(secondLength) + 4u) <= 0
     ) {
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
       std::memcpy(delimiterProbe, primaryDelimiter, sizeof(delimiterProbe));
     } else {
       return 1;
@@ -2406,13 +2407,16 @@ std::int32_t sfmpv_NeedSafeDlmRefresh(
     const std::int32_t seamBytes =
       static_cast<std::int32_t>(primaryAddress - firstAddress - static_cast<std::uint32_t>(firstLength) + 4u);
     if (seamBytes <= 0) {
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
       std::memcpy(delimiterProbe, primaryDelimiter, sizeof(delimiterProbe));
     } else {
       if (seamBytes > secondLength) {
         return 1;
       }
       const std::int32_t firstBytes = 4 - seamBytes;
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
       std::memcpy(delimiterProbe, primaryDelimiter, static_cast<std::size_t>(firstBytes));
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
       std::memcpy(delimiterProbe + firstBytes, secondBase, static_cast<std::size_t>(seamBytes));
     }
   }
@@ -2513,11 +2517,13 @@ std::uint8_t* sfmpv_SearchDelim(
   const std::int32_t secondBridgeBytes = (ringCursor->secondChunk.byteCount >= 3) ? 3 : ringCursor->secondChunk.byteCount;
 
   std::uint8_t seamWindow[8]{};
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(
     seamWindow,
     ringCursor->firstChunk.bufferAddress + ringCursor->firstChunk.byteCount - firstBridgeBytes,
     static_cast<std::size_t>(firstBridgeBytes)
   );
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(
     seamWindow + firstBridgeBytes,
     ringCursor->secondChunk.bufferAddress,
@@ -2576,11 +2582,13 @@ std::uint8_t* sfmpv_BsearchDelim(
     const std::int32_t secondBridgeBytes = (ringCursor->secondChunk.byteCount >= 3) ? 3 : ringCursor->secondChunk.byteCount;
 
     std::uint8_t seamWindow[8]{};
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(
       seamWindow,
       ringCursor->firstChunk.bufferAddress + ringCursor->firstChunk.byteCount - firstBridgeBytes,
       static_cast<std::size_t>(firstBridgeBytes)
     );
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(
       seamWindow + firstBridgeBytes,
       ringCursor->secondChunk.bufferAddress,
@@ -2782,6 +2790,7 @@ void sfmpv_FixedForSeek(const std::int32_t workctrlAddress)
   }
 
   if (workctrl->timingLane.seekFixedBaselineTtu.timeMajor < 0) {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(
       &workctrl->timingLane.seekFixedBaselineTtu,
       &workctrl->timingLane.concatAudioTimeUnit[0],
@@ -3645,6 +3654,7 @@ std::int32_t sfmpv_SetHeadTtu(const std::int32_t workctrlAddress)
   std::int32_t result = static_cast<std::int32_t>(timingLane->concatVideoTimeUnit[0]);
   if (result == 0) {
     moho::SfmpvPackedTimecode headTimecode{};
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(&headTimecode, &timingLane->repeatFieldTimecode, sizeof(headTimecode));
     headTimecode.halfFrameCarry = 0;
 
@@ -3653,6 +3663,7 @@ std::int32_t sfmpv_SetHeadTtu(const std::int32_t workctrlAddress)
     (void)SFTIM_Tc2Time(&headTimecode, &headTimeMajor, &headTimeMinor);
 
     timingLane->concatVideoTimeUnit[9] = static_cast<std::uint32_t>(headTimeMajor);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(&timingLane->concatVideoTimeUnit[1], &headTimecode, sizeof(headTimecode));
     timingLane->concatVideoTimeUnit[10] = static_cast<std::uint32_t>(headTimeMinor);
     timingLane->concatVideoTimeUnit[0] = 1;
@@ -3675,6 +3686,7 @@ std::int32_t sfmpv_SetDecTtu(const std::int32_t workctrlAddress)
   auto* const timingLane = &workctrl->timingLane;
 
   moho::SfmpvPackedTimecode decodeTimecode{};
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(&decodeTimecode, &timingLane->repeatFieldTimecode, sizeof(decodeTimecode));
 
   std::int32_t decodeTimeMajor = 0;
@@ -3682,6 +3694,7 @@ std::int32_t sfmpv_SetDecTtu(const std::int32_t workctrlAddress)
   (void)SFTIM_Tc2Time(&decodeTimecode, &decodeTimeMajor, &decodeTimeMinor);
 
   auto* const pendingStartTtu = AddressToPointer<moho::SfmpvTtu>(PointerToAddress(&timingLane->pendingStartTtu));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(pendingStartTtu->packedTimecodeWords, &decodeTimecode, sizeof(decodeTimecode));
   pendingStartTtu->timeMajor = decodeTimeMajor - static_cast<std::int32_t>(timingLane->concatVideoTimeUnit[9]);
   pendingStartTtu->timeMinor = decodeTimeMinor;
@@ -3742,6 +3755,7 @@ std::int32_t sfmpv_CalcFrmTtu(const std::int32_t workctrlAddress, const std::int
   frameTiming->frameTtu.state = 1;
 
   if (static_cast<std::int32_t>(workctrl->timingLane.concatAudioTimeUnit[9]) <= frameTiming->frameTtu.timeMajor) {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(
       &workctrl->timingLane.concatAudioTimeUnit[0],
       &frameTiming->frameTtu,
@@ -3877,6 +3891,7 @@ std::int32_t sfmpv_SetFrmPara(
   }
 
   auto* const frameObject = AddressToPointer<moho::SfmpvfFrameObject>(frameObjectAddress);
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(&frameObject->pictureDecodeLane, pictureDecodeLane, sizeof(moho::SfmpvPictureDecodeLane));
   frameObject->referenceErrorSeedMajor = mpvInfo->referenceErrorSeedMajor;
   frameObject->referenceErrorSeedMinor = mpvInfo->referenceErrorSeedMinor;
@@ -4015,6 +4030,7 @@ std::int32_t sfmpv_SetStartTtu(const std::int32_t workctrlAddress)
   }
 
   moho::SfmpvPackedTimecode startTimecode{};
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(&startTimecode, timingLane->pendingStartTtu.packedTimecodeWords, sizeof(startTimecode));
 
   if (sfmpv_IsDefect(workctrlAddress, 3) == 0 && sfmpv_IsPtypeSkip(workctrlAddress, 3) == 0) {
@@ -4025,6 +4041,7 @@ std::int32_t sfmpv_SetStartTtu(const std::int32_t workctrlAddress)
   std::int32_t startTimeMinor = 0;
   (void)SFTIM_Tc2Time(&startTimecode, &startTimeMajor, &startTimeMinor);
 
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(timingLane->activeStartTimecodeWords, &startTimecode, sizeof(startTimecode));
 
   result = startTimeMajor - static_cast<std::int32_t>(timingLane->concatVideoTimeUnit[9]);
@@ -4045,6 +4062,7 @@ std::int32_t sfmpv_SetFrmTime(const std::int32_t workctrlAddress, const std::int
 {
   const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
   auto* const frameTiming = AddressToPointer<SfmpvfFrameTiming>(frameObjectAddress);
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(&frameTiming->frameTtu, &workctrl->timingLane.pendingStartTtu, sizeof(moho::SfmpvTtu));
   return sfmpv_CalcFrmTime(workctrlAddress, frameObjectAddress);
 }
@@ -4444,6 +4462,7 @@ std::int32_t sfmpv_DetectTcErr(
   }
 
   moho::SfmpvPackedTimecode currentTimecode{};
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(&currentTimecode, &timingLane->repeatFieldTimecode, sizeof(currentTimecode));
 
   std::int32_t currentMajor = 0;
@@ -4830,6 +4849,7 @@ std::int32_t sfmpv_SetMpvHd(
     }
 
     const auto* const workctrl = AddressToPointer<moho::SofdecSfdWorkctrlSubobj>(workctrlAddress);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(header->concatTimeSeedWords, workctrl->timingLane.concatVideoTimeUnit, sizeof(header->concatTimeSeedWords));
     header->hasHeader = 1;
   }
@@ -4996,6 +5016,7 @@ std::int32_t sfmpv_CopyPicUsrInf(const std::int32_t destinationInfoAddress, cons
   auto* const destinationInfo = AddressToPointer<SfbufRingChunk>(destinationInfoAddress);
   const auto* const sourceInfo = AddressToPointer<SfbufRingChunk>(sourceInfoAddress);
 
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
   std::memcpy(
     destinationInfo->bufferAddress,
     sourceInfo->bufferAddress,
@@ -5811,6 +5832,7 @@ std::int32_t sfmpv_ReprocessShc(
   const std::int32_t headerAddress = sfmpv_GetHd(workctrlAddress);
   auto* const header = AddressToPointer<SfmpvHeader>(headerAddress);
   if (header != nullptr && header->hasHeader != 0) {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(workctrl->timingLane.concatVideoTimeUnit, header->concatTimeSeedWords, sizeof(header->concatTimeSeedWords));
 
     SfbufRingChunk pictureRange{};

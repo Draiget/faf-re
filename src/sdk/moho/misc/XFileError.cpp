@@ -20,7 +20,8 @@ XFileError::XFileError(const std::string& message, const std::uint32_t* const ca
     if (mTopStack != 0) {
         const std::uint32_t copyCount =
             std::min<std::uint32_t>(mTopStack, static_cast<std::uint32_t>(mCallstack.size()));
-        std::memcpy(mCallstack.data(), callstack, copyCount * sizeof(std::uint32_t));
+        // Raw u32 callstack-array blob copy.
+        std::copy_n(callstack, copyCount, mCallstack.data());
     }
 }
 

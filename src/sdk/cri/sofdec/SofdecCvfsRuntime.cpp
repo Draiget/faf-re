@@ -1187,6 +1187,7 @@
     const std::size_t bytesToCopy = (nameLength + 1u < gCvFsDefaultDeviceName.size())
       ? (nameLength + 1u)
       : gCvFsDefaultDeviceName.size();
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(gCvFsDefaultDeviceName.data(), upperName.data(), bytesToCopy);
     return static_cast<std::int32_t>(nameLength + 1u);
   }
@@ -1348,6 +1349,7 @@
     const char firstChar = gCvFsDefaultDeviceName[0];
     if (firstChar != '\0') {
       const std::size_t byteCount = std::strlen(gCvFsDefaultDeviceName.data()) + 1u;
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
       std::memcpy(outDeviceName, gCvFsDefaultDeviceName.data(), byteCount);
       return firstChar;
     }

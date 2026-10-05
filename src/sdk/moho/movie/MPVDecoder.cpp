@@ -770,7 +770,12 @@ namespace
 
   inline void CopyDwordsToAddress(const int destinationAddress, const void* source, const std::size_t dwordCount)
   {
-    std::memcpy(AddressToMutablePointer(destinationAddress), source, dwordCount * sizeof(std::uint32_t));
+    // Codec scratch IO: dword blob into decoded-address scratch memory.
+    std::copy_n(
+      static_cast<const std::uint32_t*>(source),
+      dwordCount,
+      reinterpret_cast<std::uint32_t*>(AddressToMutablePointer(destinationAddress))
+    );
   }
 
   inline MPVUserDataSink* AsUserDataSinkView(const int sinkObjectAddress)
@@ -1333,6 +1338,7 @@ namespace
 
   inline void WriteTableDword(std::uint16_t* table, const std::size_t dwordIndex, const std::uint32_t value)
   {
+    // Codec table IO: unaligned dword store into packed table bytes.
     std::memcpy(AsMutableTableBytes(table) + dwordIndex * sizeof(std::uint32_t), &value, sizeof(value));
   }
 
@@ -1347,6 +1353,7 @@ namespace
 
   inline void WriteTableWord(std::uint16_t* table, const std::size_t byteOffset, const std::uint16_t value)
   {
+    // Codec table IO: unaligned word store into packed table bytes.
     std::memcpy(AsMutableTableBytes(table) + byteOffset, &value, sizeof(value));
   }
 
@@ -1463,7 +1470,7 @@ extern "C" int MPV_GetErrInf(const int handleAddress, void* const outErrorInfoAd
     return MPVERR_SetCode(0, kMpvErrInvalidGetErrInfoHandle);
   }
 
-  std::memcpy(outErrorInfoAddress, ResolveHandleErrorInfo(handleAddress), sizeof(MPVErrorInfo));
+  *static_cast<MPVErrorInfo*>(outErrorInfoAddress) = *ResolveHandleErrorInfo(handleAddress);
   return 0;
 }
 
@@ -2521,6 +2528,8 @@ static int CopyM2vPictureAttributesToHandle(const int handleAddress)
   M2V_GetLinkFlg(handle->m2vDecoderHandle, &gopLinkFlag, &gopLinkState);
 
   handle->sequenceBitRateCode = bitRateCode;
+  // Raw overlay write: the 0x74-byte export block (attributes + reserved tail)
+  // is installed over the handle storage beginning at pictureAttributes.
   std::memcpy(&handle->pictureAttributes, &pictureAttributeBlock, sizeof(pictureAttributeBlock));
   handle->sequenceVbvBufferCode = vbvBufferSize / 2048;
   handle->gopClosedFlag = gopLinkFlag;
@@ -3124,7 +3133,8 @@ extern "C" int mpvhdec_AnalyUd(std::int32_t* const handleWords, std::uint8_t* co
       UserDataSinkRequestChunk(userLane.streamObjectAddress, consumedBytes, sinkChunk);
 
       const int firstCopyBytes = std::min(sinkChunk.size, consumedBytes);
-      std::memcpy(sinkChunk.data, userDataStart, static_cast<std::size_t>(firstCopyBytes));
+      // Bitstream IO: user-data bytes into the sink chunk.
+      std::copy_n(userDataStart, static_cast<std::size_t>(firstCopyBytes), sinkChunk.data);
       sinkChunk.size = firstCopyBytes;
       UserDataSinkSubmitChunk(userLane.streamObjectAddress, sinkChunk);
 
@@ -3133,7 +3143,8 @@ extern "C" int mpvhdec_AnalyUd(std::int32_t* const handleWords, std::uint8_t* co
         const int remainingBytes = consumedBytes - firstCopyBytes;
         UserDataSinkRequestChunk(userLane.streamObjectAddress, remainingBytes, tailSinkChunk);
         const int tailCopyBytes = std::min(tailSinkChunk.size, remainingBytes);
-        std::memcpy(tailSinkChunk.data, userDataStart + firstCopyBytes, static_cast<std::size_t>(tailCopyBytes));
+        // Bitstream IO: user-data tail bytes into the wrapped sink chunk.
+        std::copy_n(userDataStart + firstCopyBytes, static_cast<std::size_t>(tailCopyBytes), tailSinkChunk.data);
         tailSinkChunk.size = tailCopyBytes;
         UserDataSinkSubmitChunk(userLane.streamObjectAddress, tailSinkChunk);
       }
@@ -3147,7 +3158,8 @@ extern "C" int mpvhdec_AnalyUd(std::int32_t* const handleWords, std::uint8_t* co
 
   if (currentHeaderContext == 3 && handle->pictureUserBufferAddress != 0) {
     const int userCopyBytes = std::max(0, std::min(consumedBytes, handle->pictureUserContextAddress));
-    std::memcpy(AddressToMutablePointer(handle->pictureUserBufferAddress), userDataStart, static_cast<std::size_t>(userCopyBytes));
+    // Bitstream IO: user-data bytes into the caller picture buffer.
+    std::copy_n(userDataStart, static_cast<std::size_t>(userCopyBytes), static_cast<std::uint8_t*>(AddressToMutablePointer(handle->pictureUserBufferAddress)));
     handle->pictureUserDecodeState = userCopyBytes;
   }
 
@@ -4070,6 +4082,7 @@ extern "C" int MPV_DecodeFrmSj(const int handleAddress, MPVSjStream* const strea
   const int recoverEventCounterBefore = handle->recoverEventCounter;
   const int recoverConditionCounterBefore = handle->recoverConditionCounter;
 
+  // Raw handle-storage install: frame session block over the reserved lane.
   std::memcpy(handle->reserved_264, frameSession, sizeof(*frameSession));
   MPVUMC_InitOutRfb(handleAddress);
   MPVCMC_InitMcOiRt(handleAddress);
@@ -4084,6 +4097,7 @@ extern "C" int MPV_DecodeFrmSj(const int handleAddress, MPVSjStream* const strea
   );
   const auto* const handlePictureAttributes =
     reinterpret_cast<const MPVPictureAttributeExportBlock*>(&handle->pictureAttributes);
+  // Raw export write: attribute block image out to caller storage.
   std::memcpy(outPictureAttributes, handlePictureAttributes, sizeof(*handlePictureAttributes));
 
   if (handle->conditionCallbacks[10] != 0) {
@@ -4150,7 +4164,8 @@ extern "C" int MPVABDEC_Init(const int handleAddress)
     UTY_MemcpyDword(setup->forwardMaskLut, kMpvAbdecForwardMaskLut, 8u);
   }
 
-  std::memcpy(setup->thresholdLut, kMpvAbdecThresholdLut, sizeof(setup->thresholdLut));
+  // Codec table blob install: static threshold LUT into setup storage.
+  std::copy_n(kMpvAbdecThresholdLut, kMpvAbdecThresholdCount, setup->thresholdLut);
 
   setup->runLevelLanes[0].tableBaseMinusBias = PointerToAddress(mpvvlc_run_level_4) - 0x10;
   setup->runLevelLanes[0].bitLength = 0x15;
@@ -5025,6 +5040,7 @@ extern "C" void initB0Tbl()
 {
   const std::uintptr_t alignedAddress = (reinterpret_cast<std::uintptr_t>(gFsriB0AlignedStorage + 0x0F) & ~std::uintptr_t(0x0F));
   gFsriB0AlignedAddress = static_cast<std::uint32_t>(alignedAddress);
+  // Codec table blob install: packed table into aligned static storage.
   std::memcpy(reinterpret_cast<void*>(alignedAddress), kFsriB0TablePacked, kFsriB0TableByteCount);
 }
 
@@ -6052,8 +6068,10 @@ namespace moho::movie
 
     for (int row = 0; row < 8; ++row) {
       const int rowOffset = row * chromaStride;
-      std::memcpy(dstChromaU + rowOffset, srcChromaU + rowOffset, 8);
-      std::memcpy(dstChromaV + rowOffset, srcChromaV + rowOffset, 8);
+      // Codec scratch IO: 8-byte chroma-U macroblock row.
+      std::copy_n(srcChromaU + rowOffset, 8, dstChromaU + rowOffset);
+      // Codec scratch IO: 8-byte chroma-V macroblock row.
+      std::copy_n(srcChromaV + rowOffset, 8, dstChromaV + rowOffset);
     }
 
     const int lumaDelta = mbDelta.chroma;
@@ -6063,7 +6081,8 @@ namespace moho::movie
 
     for (int row = 0; row < 16; ++row) {
       const int rowOffset = row * lumaStride;
-      std::memcpy(dstLuma + rowOffset, srcLuma + rowOffset, 16);
+      // Codec scratch IO: 16-byte luma macroblock row.
+      std::copy_n(srcLuma + rowOffset, 16, dstLuma + rowOffset);
     }
 
     return lumaStride;
@@ -6428,7 +6447,8 @@ namespace moho::movie
           block,
           [&](std::uint8_t* dst)
           {
-            std::memcpy(dst, forwardSamples, 8);
+            // Codec scratch IO: 8-byte sample row.
+            std::copy_n(forwardSamples, 8, dst);
             forwardSamples += 8;
           }
         );

@@ -38,6 +38,7 @@ BitArray2D::BitArray2D(const BitArray2D& other)
 {
   Reset(static_cast<unsigned int>(other.width), static_cast<unsigned int>(other.height));
   if (size > 0 && ptr != nullptr && other.ptr != nullptr) {
+    // Owning-type storage copy: trivially copyable i32 word array.
     std::memcpy(ptr, other.ptr, static_cast<std::size_t>(size) * sizeof(std::int32_t));
   }
 }

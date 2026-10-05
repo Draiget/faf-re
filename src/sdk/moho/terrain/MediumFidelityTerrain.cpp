@@ -1021,7 +1021,8 @@ namespace moho
     // Copy the whole splat lane into the overlay vertex sheet's stream buffer.
     void* const lockedVertices =
       mOverlayVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
-    std::memcpy(lockedVertices, mSplatVertices.data(), sizeof(CWldSplat::SplatVertex) * splatVertexCount);
+    // Raw GPU upload: splat vertex blob into the locked stream.
+    std::copy_n(mSplatVertices.data(), splatVertexCount, static_cast<CWldSplat::SplatVertex*>(lockedVertices));
     mOverlayVertexSheet->GetVertStream(0U)->Unlock();
 
     D3D_GetDevice()->SelectTechnique("TSplats");
@@ -1704,13 +1705,15 @@ namespace moho
 
       if (rectCacheCount > 0) {
         void* const lockedVertices = mTerrainVertexSheet->GetVertStream(0U)->Lock(0, rectCacheCount, false, true);
-        std::memcpy(lockedVertices, mTesselator->GetRectCacheData(), sizeof(CTesselator::Rect16) * rectCacheCount);
+        // Raw GPU upload: tessellator rect blob into the locked stream.
+        std::copy_n(mTesselator->GetRectCacheData(), rectCacheCount, static_cast<CTesselator::Rect16*>(lockedVertices));
         mTerrainVertexSheet->GetVertStream(0U)->Unlock();
       }
 
       if (collisionIndexCount > 0) {
         std::int16_t* const lockedIndices = mTerrainIndexSheet->Lock(0, collisionIndexCount, false, true);
-        std::memcpy(lockedIndices, mTesselator->GetCollisionIndexData(), sizeof(std::uint16_t) * collisionIndexCount);
+        // Raw GPU upload: collision index blob into the locked sheet.
+        std::copy_n(mTesselator->GetCollisionIndexData(), collisionIndexCount, lockedIndices);
         mTerrainIndexSheet->Unlock();
       }
     }

@@ -1,4 +1,4 @@
-﻿#include "CAnimationManipulator.h"
+#include "CAnimationManipulator.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1410,11 +1410,15 @@ namespace moho
           );
           keyTransform.orient_ = blended;
         } else {
+          // Raw SCA key floats (on-disk float arrays) loaded into the math types.
           std::memcpy(&keyTransform.pos_, key1.position, sizeof(keyTransform.pos_));
+          // Raw SCA key floats (on-disk float arrays) loaded into the math types.
           std::memcpy(&keyTransform.orient_, key1.rotation, sizeof(keyTransform.orient_));
         }
       } else {
+        // Raw SCA key floats (on-disk float arrays) loaded into the math types.
         std::memcpy(&keyTransform.pos_, key0.position, sizeof(keyTransform.pos_));
+        // Raw SCA key floats (on-disk float arrays) loaded into the math types.
         std::memcpy(&keyTransform.orient_, key0.rotation, sizeof(keyTransform.orient_));
       }
 

@@ -1,5 +1,5 @@
 #include "moho/render/BoxRenderer.h"
-
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -91,7 +91,8 @@ namespace moho
       void* const vertexStorage =
         mGeometry.mVertexBuffer->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
       if (vertexStorage) {
-        std::memcpy(vertexStorage, kUnitBoxVertices.data(), sizeof(kUnitBoxVertices));
+        // Raw GPU upload: static unit-box vertex blob into the locked buffer.
+        std::copy(kUnitBoxVertices.begin(), kUnitBoxVertices.end(), static_cast<decltype(kUnitBoxVertices)::value_type*>(vertexStorage));
       }
       mGeometry.mVertexBuffer->Unlock();
     }
@@ -100,7 +101,8 @@ namespace moho
       std::int16_t* const indexStorage =
         mGeometry.mIndexBuffer->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
       if (indexStorage) {
-        std::memcpy(indexStorage, kUnitBoxIndices.data(), sizeof(kUnitBoxIndices));
+        // Raw GPU upload: static unit-box index blob into the locked buffer.
+        std::copy(kUnitBoxIndices.begin(), kUnitBoxIndices.end(), indexStorage);
       }
       mGeometry.mIndexBuffer->Unlock();
     }

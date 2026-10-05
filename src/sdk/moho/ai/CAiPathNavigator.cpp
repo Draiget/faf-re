@@ -2,6 +2,7 @@
 #include "moho/ai/CAiPathNavigator.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -263,9 +264,7 @@ namespace
 
   [[nodiscard]] std::uint32_t PackCell(const SOCellPos& cell) noexcept
   {
-    std::uint32_t packed = 0;
-    std::memcpy(&packed, &cell, sizeof(packed));
-    return packed;
+    return std::bit_cast<std::uint32_t>(cell);
   }
 
   /**
@@ -1697,7 +1696,8 @@ void CAiPathNavigator::MemberDeserialize(gpg::ReadArchive* const archive, const 
 
   HPathCell blockedCell{};
   archive->Read(CachedHPathCellType(), &blockedCell, owner);
-  std::memcpy(&mLastBlockedCell, &blockedCell, sizeof(blockedCell));
+  // Raw cell-word pun: the 4-byte HPathCell image is stored in the u32 lane.
+  std::memcpy(&mLastBlockedCell, &blockedCell, sizeof(mLastBlockedCell));
 
   archive->Read(CachedNavGoalType(), &mGoal, owner);
   archive->Read(CachedLayerType(), &mLastPathLayerToken, owner);
@@ -1764,6 +1764,7 @@ void CAiPathNavigator::MemberSerialize(gpg::WriteArchive* const archive, const i
   archive->Write(CachedHPathCellType(), &mTargetPos, owner);
 
   HPathCell blockedCell{};
+  // Raw cell-word pun: rebuild the 4-byte HPathCell image from the u32 lane.
   std::memcpy(&blockedCell, &mLastBlockedCell, sizeof(blockedCell));
   archive->Write(CachedHPathCellType(), &blockedCell, owner);
 

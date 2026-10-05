@@ -1,6 +1,7 @@
 #include "moho/audio/SofdecRuntime.h"
 
 #include <array>
+#include <algorithm>
 #include <bit>
 #include <cstdarg>
 #include <cstdlib>

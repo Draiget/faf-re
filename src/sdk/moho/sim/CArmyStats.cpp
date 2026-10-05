@@ -6,6 +6,7 @@
 // parsed.
 #include "platform/WxWidgets.h"
 #include "platform/X87Precision.h"
+#include <bit>
 #include <wx/dirdlg.h>
 
 #include "CArmyStats.h"
@@ -133,16 +134,12 @@ namespace
 
   [[nodiscard]] float IntBitsToFloat(const std::int32_t bits) noexcept
   {
-    float value = 0.0f;
-    std::memcpy(&value, &bits, sizeof(value));
-    return value;
+    return std::bit_cast<float>(bits);
   }
 
   [[nodiscard]] std::int32_t FloatToIntBits(const float value) noexcept
   {
-    std::int32_t bits = 0;
-    std::memcpy(&bits, &value, sizeof(bits));
-    return bits;
+    return std::bit_cast<std::int32_t>(value);
   }
 
   [[nodiscard]] moho::CArmyStatItem* FindArmyChildByName(moho::CArmyStatItem* parent, const msvc8::string& token)

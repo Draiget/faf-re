@@ -284,7 +284,8 @@ MemBuffer<const char> gpg::CopyMemBuffer(
 
   MemBuffer<char> mutableBuffer = AllocMemBuffer(size);
   if (size != 0 && mutableBuffer.mBegin != nullptr) {
-    std::memcpy(mutableBuffer.mBegin, source, size);
+    // Raw byte-buffer stream IO.
+    std::copy_n(static_cast<const char*>(source), size, mutableBuffer.mBegin);
   }
 
   return MemBuffer<const char>(mutableBuffer);
@@ -307,7 +308,8 @@ MemBuffer<char> gpg::CopyMemBuffer(
 
   MemBuffer<char> copied = AllocMemBuffer(sourceSize);
   if (sourceSize != 0 && copied.mBegin != nullptr) {
-    std::memcpy(copied.mBegin, source.mBegin, sourceSize);
+    // Raw byte-buffer stream IO.
+    std::copy_n(source.mBegin, sourceSize, copied.mBegin);
   }
 
   return copied;
@@ -477,7 +479,8 @@ size_t MemBufferStream::VirtRead(
     (mReadEnd != nullptr && mReadHead != nullptr) ? static_cast<std::size_t>(mReadEnd - mReadHead) : 0u;
   const std::size_t bytesToRead = std::min(available, len);
   if (bytesToRead != 0) {
-    std::memcpy(buf, mReadHead, bytesToRead);
+    // Raw byte-buffer stream IO.
+    std::copy_n(mReadHead, bytesToRead, buf);
     mReadHead += bytesToRead;
   }
 
@@ -636,7 +639,8 @@ void MemBufferStream::Resize(
     : ((mReadEnd != nullptr && mReadStart != nullptr) ? static_cast<std::size_t>(mReadEnd - mReadStart) : 0u);
 
   if (usedBytes != 0) {
-    std::memcpy(resized.begin(), mInput.begin(), usedBytes);
+    // Raw byte-buffer stream IO.
+    std::copy_n(mInput.begin(), usedBytes, resized.begin());
   }
 
   mInput = resized;
@@ -765,7 +769,8 @@ void MemBufferStream::VirtWrite(
     HandleAssertFailure(kWriteWindowAssertExpr, kWriteWindowAssertLine, kWriteWindowAssertSource);
   }
 
-  std::memcpy(mWriteHead, data, size);
+  // Raw byte-buffer stream IO.
+  std::copy_n(data, size, mWriteHead);
   mWriteHead += size;
   if (mWriteHead > mReadEnd) {
     mReadEnd = mWriteHead;

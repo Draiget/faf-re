@@ -150,7 +150,9 @@ namespace
 
     auto* const newStorage = static_cast<TValue*>(::operator new(sizeof(TValue) * queueLimit));
     if (count != 0u && vector.mFirst != nullptr) {
-      std::memcpy(newStorage, vector.mFirst, sizeof(TValue) * count);
+      // Raw array move is required: capacity-growth relocation of trivially
+      // relocatable elements inside the owning queue's storage helper.
+      std::copy_n(vector.mFirst, count, newStorage);
     }
 
     if (vector.mFirst != nullptr) {
@@ -357,9 +359,9 @@ namespace moho
     runtime->mP1y = 1.0f;
 
     const VMatrix4 identity = VMatrix4::Identity();
-    std::memcpy(&runtime->mViewMatrix, &identity, sizeof(runtime->mViewMatrix));
-    std::memcpy(&runtime->mProjectionMatrix, &identity, sizeof(runtime->mProjectionMatrix));
-    std::memcpy(&runtime->mComposite, &identity, sizeof(runtime->mComposite));
+    runtime->mViewMatrix = identity;
+    runtime->mProjectionMatrix = identity;
+    runtime->mComposite = identity;
 
     runtime->mResetComposite = 0u;
     runtime->mRebuildComposite = 0u;
@@ -457,7 +459,7 @@ namespace moho
       Flush();
     }
 
-    std::memcpy(&runtime->mViewMatrix, &matrix, sizeof(runtime->mViewMatrix));
+    runtime->mViewMatrix = matrix;
     runtime->mResetComposite = 1;
   }
 
@@ -475,7 +477,7 @@ namespace moho
       Flush();
     }
 
-    std::memcpy(&runtime->mProjectionMatrix, &matrix, sizeof(runtime->mProjectionMatrix));
+    runtime->mProjectionMatrix = matrix;
     runtime->mResetComposite = 1;
   }
 
@@ -493,8 +495,8 @@ namespace moho
       Flush();
     }
 
-    std::memcpy(&runtime->mViewMatrix, &camera.view, sizeof(runtime->mViewMatrix));
-    std::memcpy(&runtime->mProjectionMatrix, &camera.projection, sizeof(runtime->mProjectionMatrix));
+    runtime->mViewMatrix = camera.view;
+    runtime->mProjectionMatrix = camera.projection;
     runtime->mResetComposite = 1;
   }
 
@@ -1220,12 +1222,14 @@ namespace moho
     ID3DVertexStream* const vertexStream = runtime->mVertexSheets[runtime->mCurVertexSheet]->GetVertStream(0);
     const std::uint32_t vertexCount = LegacyVectorCount(runtime->mVertices);
     void* const lockedVertices = vertexStream->Lock(0, static_cast<int>(vertexCount), false, true);
-    std::memcpy(lockedVertices, runtime->mVertices.mFirst, sizeof(Vertex) * vertexCount);
+    // Raw GPU upload: vertex blob into the locked D3D stream.
+    std::copy_n(runtime->mVertices.mFirst, vertexCount, static_cast<Vertex*>(lockedVertices));
     vertexStream->Unlock();
 
     const std::uint32_t primitiveCount = LegacyVectorCount(runtime->mPrimitives);
     std::int16_t* const lockedPrimitives = runtime->mIndexSheet->Lock(0, primitiveCount, false, true);
-    std::memcpy(lockedPrimitives, runtime->mPrimitives.mFirst, sizeof(std::int16_t) * primitiveCount);
+    // Raw GPU upload: index blob into the locked D3D sheet.
+    std::copy_n(runtime->mPrimitives.mFirst, primitiveCount, lockedPrimitives);
     runtime->mIndexSheet->Unlock();
 
     SD3DIndexRange indexSheetView{};

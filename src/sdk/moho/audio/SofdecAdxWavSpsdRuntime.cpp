@@ -627,6 +627,7 @@ extern "C"
    */
   std::uint32_t __cdecl heapmng_copy(void* destination, const void* source, const std::uint32_t byteCount)
   {
+    // CRI heap API contract: raw byte copy, count returned verbatim.
     std::memcpy(destination, source, byteCount);
     return byteCount;
   }

@@ -3060,7 +3060,8 @@ namespace moho
     const auto* sourceRow = reinterpret_cast<const std::uint8_t*>(sourcePixels);
 
     for (std::int32_t row = 0; row < height; ++row) {
-      std::memcpy(destinationRow, sourceRow, bytesPerRow);
+      // Raw GPU upload: pixel row blob into the pitched locked surface.
+      std::copy_n(reinterpret_cast<const std::uint32_t*>(sourceRow), bytesPerRow / sizeof(std::uint32_t), reinterpret_cast<std::uint32_t*>(destinationRow));
       destinationRow += pitchBytes;
       sourceRow += bytesPerRow;
     }

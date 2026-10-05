@@ -1,5 +1,6 @@
 #include "moho/effects/rendering/CEffectImpl.h"
 
+#include <algorithm>
 #include <cstring>
 #include <new>
 #include <typeinfo>
@@ -233,7 +234,8 @@ namespace moho
    */
   void CEffectImpl::SetNParam(const std::int32_t paramIndex, const float* const values, const std::int32_t valueCount)
   {
-    std::memcpy(&mParams.start_[paramIndex], values, static_cast<std::size_t>(valueCount) * sizeof(float));
+    // Raw float-lane blob write into the effect parameter array slice.
+    std::copy_n(values, static_cast<std::size_t>(valueCount), &mParams.start_[paramIndex]);
     Invalidate(paramIndex, valueCount);
   }
 

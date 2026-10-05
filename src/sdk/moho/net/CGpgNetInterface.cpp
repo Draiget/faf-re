@@ -2,7 +2,7 @@
 #include "platform/X87Precision.h"
 
 #include <boost/bind.hpp>
-
+#include <algorithm>
 #include <cstring>
 #include <cstdint>
 #include <limits>
@@ -1917,7 +1917,8 @@ void CGpgNetInterface::ConnectThread(
 
   std::vector<char> launchCommandBuffer(launchCommand.size() + 1u, '\0');
   if (!launchCommand.empty()) {
-    std::memcpy(launchCommandBuffer.data(), launchCommand.data(), launchCommand.size());
+    // Raw command-string blob into the launch buffer.
+    std::copy_n(launchCommand.data(), launchCommand.size(), launchCommandBuffer.data());
   }
 
   const BOOL launchOk = ::CreateProcessA(

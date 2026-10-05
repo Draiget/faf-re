@@ -331,6 +331,7 @@ namespace moho
     if (buffered < static_cast<std::size_t>(kSofdecHeaderProbeBytes)) {
       (void)stream->VirtRead(headerBuffer, static_cast<std::size_t>(kSofdecHeaderProbeBytes));
     } else {
+      // Raw byte-stream read of the SOFDEC header probe from the buffer head.
       std::memcpy(headerBuffer, stream->mReadHead, static_cast<std::size_t>(kSofdecHeaderProbeBytes));
       stream->mReadHead += kSofdecHeaderProbeBytes;
     }

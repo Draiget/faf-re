@@ -2130,6 +2130,7 @@ extern "C" void* __cdecl realloc_0(void* pblock, size_t newsize)
             return nullptr;
         }
 
+        // Raw realloc-grow blob copy (malloc-backed block move).
         std::memcpy(grown, pblock, previousSize);
         free(pblock);
         return grown;
@@ -2141,6 +2142,7 @@ extern "C" void* __cdecl realloc_0(void* pblock, size_t newsize)
             return nullptr;
         }
 
+        // Raw realloc-shrink blob copy (malloc-backed block move).
         std::memcpy(shrunk, pblock, newsize);
         free(pblock);
         return shrunk;

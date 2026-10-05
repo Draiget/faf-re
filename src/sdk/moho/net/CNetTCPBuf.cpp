@@ -1,5 +1,5 @@
 #include "CNetTCPBuf.h"
-
+#include <algorithm>
 #include <cstring>
 #include <stdexcept>
 
@@ -142,7 +142,8 @@ void CNetTCPBuf::VirtWrite(const char* data, size_t size)
   const size_t pendingSpace = static_cast<size_t>(mWriteEnd - writeHead);
   if (size > pendingSpace) {
     if (pendingSpace != 0) {
-      std::memcpy(writeHead, data, pendingSpace);
+      // Raw TCP send-buffer blob copy.
+      std::copy_n(data, pendingSpace, writeHead);
       mWriteHead += pendingSpace;
       data += pendingSpace;
       size -= pendingSpace;
@@ -151,13 +152,15 @@ void CNetTCPBuf::VirtWrite(const char* data, size_t size)
     VirtFlush();
 
     if (size < kChunkSize) {
-      std::memcpy(mBuffer + kChunkSize, data, size);
+      // Raw TCP send-buffer blob copy.
+      std::copy_n(data, size, mBuffer + kChunkSize);
       mWriteHead = mBuffer + kChunkSize + size;
     } else if (send(mSocket, data, static_cast<int>(size), 0) == SOCKET_ERROR) {
       gpg::Logf("CNetTCPBuf::Write(): send() failed: %s", NET_GetWinsockErrorString());
     }
   } else {
-    std::memcpy(writeHead, data, size);
+    // Raw TCP send-buffer blob copy.
+    std::copy_n(data, size, writeHead);
     mWriteHead += size;
   }
 }
@@ -267,7 +270,8 @@ size_t CNetTCPBuf::Read(char* buf, size_t len, const bool isBlocking)
   if (len > bufferedSize) {
     while (true) {
       if (bufferedSize != 0) {
-        std::memcpy(buf, mReadHead, bufferedSize);
+        // Raw TCP recv-buffer blob copy.
+        std::copy_n(mReadHead, bufferedSize, buf);
         buf += bufferedSize;
         len -= bufferedSize;
         copiedFromBuffer += bufferedSize;
@@ -333,14 +337,16 @@ size_t CNetTCPBuf::Read(char* buf, size_t len, const bool isBlocking)
       mReadEnd = mBuffer + received;
       bufferedSize = static_cast<size_t>(mReadEnd - mReadHead);
       if (len <= bufferedSize) {
-        std::memcpy(buf, mReadHead, len);
+        // Raw TCP recv-buffer blob copy.
+        std::copy_n(mReadHead, len, buf);
         mReadHead += len;
         return copiedFromBuffer + len;
       }
     }
   }
 
-  std::memcpy(buf, mReadHead, len);
+  // Raw TCP recv-buffer blob copy.
+  std::copy_n(mReadHead, len, buf);
   mReadHead += len;
   return len;
 }

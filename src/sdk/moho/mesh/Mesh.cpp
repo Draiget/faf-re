@@ -2743,18 +2743,17 @@ namespace moho
    * What it does:
    * Advances the global mesh frame counter and snapshots the current render
    * frame interpolation value.
-
+   */
   void MeshInstance::SetCurrentInterpolant()
   {
     ++sFrameCounter;
     sCurrentInterpolant = REN_GetSimDeltaSeconds();
-
   }
 
   /**
    * Address: 0x007DE060 (FUN_007DE060,
    * ??0MeshInstance@Moho@@QAE@PAV?$SpatialDB@VMeshInstance@Moho@@@1@HIV?$shared_ptr@VMesh@Moho@@@boost@@ABV?$Vector3@M@Wm3@@_N@Z)
-
+   */
   MeshInstance::MeshInstance(
     const Wm3::Vec3f& scaleArg,
     SpatialDB<MeshInstance>* const spatialDbStorage,
@@ -3942,8 +3941,7 @@ namespace moho
     // Copy the camera view matrix; when mirrored, reflect it about the water
     // plane (translate row along the up axis by 2*surfaceElevation and negate
     // the up-axis row). Row layout: r[row].{x,y,z,w}.
-    VMatrix4 viewMatrixCopy;
-    std::memcpy(&viewMatrixCopy, &camera.view, sizeof(viewMatrixCopy));
+    VMatrix4 viewMatrixCopy = camera.view;
     if (mirrored) {
       const float translate = surfaceElevation * 2.0f; // flt_DFEB0C = 2.0
       viewMatrixCopy.r[3].x += (viewMatrixCopy.r[2].x + viewMatrixCopy.r[0].x) * 0.0f + viewMatrixCopy.r[1].x * translate;
@@ -4604,7 +4602,6 @@ namespace moho
       if (!passesStageFilter) {
         continue;
       }
-
 
       // Select this material's technique for the pass (FUN_007E0C30
       // @0x007E0DAD..0x007E0DB7: virtual slot 21 `SelectTechnique` with the

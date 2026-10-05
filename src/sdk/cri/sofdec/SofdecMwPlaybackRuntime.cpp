@@ -587,6 +587,7 @@
     const std::uint32_t byteCount
   )
   {
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
     std::memcpy(destination, source, byteCount);
     return byteCount;
   }

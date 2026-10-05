@@ -5,6 +5,7 @@
 
 #include "libpng/PngSetRuntime.h"
 
+#include <algorithm>
 #include <cstring>
 
 extern "C" {
@@ -356,7 +357,8 @@ extern "C" void png_set_sBIT(png_structp png_ptr, png_infop info_ptr, const std:
   if (png_ptr == nullptr || info_ptr == nullptr) {
     return;
   }
-  std::memcpy(info_ptr->sig_bit, sig_bit, 5);
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(sig_bit, 5, info_ptr->sig_bit);
   info_ptr->valid |= kPngInfoSbit;
 }
 
@@ -412,7 +414,8 @@ extern "C" void png_set_tIME(png_structp png_ptr, png_infop info_ptr, const std:
   if (png_ptr == nullptr || info_ptr == nullptr || (Mode(png_ptr) & kPngWroteTime) != 0) {
     return;
   }
-  std::memcpy(info_ptr->mod_time, mod_time, sizeof(info_ptr->mod_time));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(mod_time, sizeof(info_ptr->mod_time), info_ptr->mod_time);
   info_ptr->valid |= kPngInfoTime;
 }
 
@@ -428,7 +431,8 @@ extern "C" void png_set_bKGD(png_structp png_ptr, png_infop info_ptr, const std:
   if (png_ptr == nullptr || info_ptr == nullptr) {
     return;
   }
-  std::memcpy(info_ptr->background, background, sizeof(info_ptr->background));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(background, sizeof(info_ptr->background), info_ptr->background);
   info_ptr->valid |= kPngInfoBkgd;
 }
 
@@ -539,7 +543,8 @@ extern "C" void png_set_PLTE(png_structp png_ptr, png_infop info_ptr,
   if (pal == nullptr) {
     png_error(png_ptr, "Unable to malloc palette");
   }
-  std::memcpy(pal, palette, 3u * static_cast<std::uint32_t>(num_palette));
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(palette, 3u * static_cast<std::uint32_t>(num_palette), pal);
 
   info_ptr->palette = pal;
   Field<std::uint16_t>(png_ptr, kOffNumPalette) = static_cast<std::uint16_t>(num_palette);
@@ -572,12 +577,14 @@ extern "C" void png_set_tRNS(png_structp png_ptr, png_infop info_ptr,
     auto* const t = static_cast<std::uint8_t*>(png_malloc(png_ptr, 0x100u));
     info_ptr->trans = t;
     Field<std::uint8_t*>(png_ptr, kOffTrans) = t;
-    std::memcpy(info_ptr->trans, trans, static_cast<std::uint32_t>(num_trans));
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+    std::copy_n(trans, static_cast<std::uint32_t>(num_trans), info_ptr->trans);
     info_ptr->free_me |= 0x2000u;  // PNG_FREE_TRNS
   }
 
   if (trans_values != nullptr) {
-    std::memcpy(info_ptr->trans_values, trans_values, sizeof(info_ptr->trans_values));
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+    std::copy_n(trans_values, sizeof(info_ptr->trans_values), info_ptr->trans_values);
     if (num_trans == 0) {
       num_trans = 1;
     }
@@ -654,7 +661,8 @@ extern "C" int png_set_text_2(png_structp png_ptr, png_infop info_ptr,
         png_free(png_ptr, old);
         return 1;
       }
-      std::memcpy(grown, old, 16u * static_cast<std::uint32_t>(old_max));
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+      std::copy_n(old, old_max, grown);
       png_free(png_ptr, old);
     } else {
       info_ptr->num_text = 0;
@@ -695,11 +703,13 @@ extern "C" int png_set_text_2(png_structp png_ptr, png_infop info_ptr,
     if (buf == nullptr) {
       return 1;
     }
-    std::memcpy(buf, src.key, key_len);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+    std::copy_n(src.key, key_len, buf);
     buf[key_len] = '\0';
     dest->text = buf + key_len + 1;
     if (text_len != 0) {
-      std::memcpy(dest->text, src.text, text_len);
+      // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+      std::copy_n(src.text, text_len, dest->text);
     }
     dest->text[text_len] = '\0';
     dest->text_length = static_cast<std::uint32_t>(text_len);
@@ -751,7 +761,8 @@ extern "C" void png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
     png_warning(png_ptr, "Insufficient memory for pCAL purpose.");
     return;
   }
-  std::memcpy(info_ptr->pcal_purpose, purpose, length);
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(purpose, length, info_ptr->pcal_purpose);
 
   info_ptr->pcal_X0      = X0;
   info_ptr->pcal_X1      = X1;
@@ -764,7 +775,8 @@ extern "C" void png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
     png_warning(png_ptr, "Insufficient memory for pCAL units.");
     return;
   }
-  std::memcpy(info_ptr->pcal_units, units, length);
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(units, length, info_ptr->pcal_units);
 
   info_ptr->pcal_params = static_cast<char**>(
       png_malloc_warn(png_ptr, 4u * static_cast<std::uint32_t>(nparams) + 4u));
@@ -782,7 +794,8 @@ extern "C" void png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
       png_warning(png_ptr, "Insufficient memory for pCAL parameter.");
       return;
     }
-    std::memcpy(info_ptr->pcal_params[i], params[i], length);
+    // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+    std::copy_n(params[i], length, info_ptr->pcal_params[i]);
   }
 
   info_ptr->valid   |= 0x400u;  // PNG_INFO_pCAL
@@ -810,7 +823,8 @@ extern "C" void png_set_iCCP(png_structp png_ptr, png_infop info_ptr,
       png_malloc(png_ptr, static_cast<std::uint32_t>(std::strlen(name)) + 1));
   std::strcpy(new_name, name);
   void* const new_profile = png_malloc(png_ptr, proflen);
-  std::memcpy(new_profile, profile, proflen);
+  // Codec blob IO: vendored codec port keeps raw byte copies 1:1.
+  std::copy_n(static_cast<const std::uint8_t*>(profile), proflen, static_cast<std::uint8_t*>(new_profile));
 
   png_free_data(png_ptr, info_ptr, 0x10u, 0);  // PNG_FREE_ICCP
 

@@ -3,6 +3,7 @@
 #include "MeshBatch.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -369,10 +370,11 @@ namespace moho
         for (std::uint32_t row = 0; row < rows; ++row) {
           const std::size_t firstTexel = static_cast<std::size_t>(row) * kWidth;
           const std::size_t texels = std::min<std::size_t>(kWidth, mTexels.size() - firstTexel);
-          std::memcpy(
-            destination + static_cast<std::size_t>(row) * static_cast<std::size_t>(lock.pitch),
+          // Raw GPU upload: texel row blob into the locked, pitched texture.
+          std::copy_n(
             &mTexels[firstTexel],
-            texels * sizeof(SkinPaletteEntry)
+            texels,
+            reinterpret_cast<SkinPaletteEntry*>(destination + static_cast<std::size_t>(row) * static_cast<std::size_t>(lock.pitch))
           );
         }
         (void)mTexture->Unlock(lock);
@@ -487,7 +489,8 @@ namespace moho
         }
 
         void* const destination = mBuffer->Lock(mCursor * stride, count * stride, flags);
-        std::memcpy(destination, records, static_cast<std::size_t>(count) * stride);
+        // Raw GPU upload: instance record blob into the locked buffer.
+        std::copy_n(static_cast<const std::uint8_t*>(records), static_cast<std::size_t>(count) * stride, static_cast<std::uint8_t*>(destination));
         mBuffer->Unlock();
 
         const std::uint32_t first = mCursor;
@@ -652,7 +655,8 @@ namespace moho
 
       const std::size_t indexBytes = static_cast<std::size_t>(mIndexCount) * sizeof(std::uint16_t);
       std::int16_t* const mappedIndices = mIndexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None);
-      std::memcpy(mappedIndices, scm_file::GetIndices(*mesh), indexBytes);
+      // Raw GPU upload: index blob into the locked index buffer.
+      std::copy_n(scm_file::GetIndices(*mesh), indexBytes / sizeof(std::int16_t), mappedIndices);
       mIndexBuffer->Unlock();
     }
 
@@ -781,9 +785,7 @@ namespace moho
             } else {
               bits = sign | ((exponent + 127u - 15u) << 23) | (mantissa << 13);
             }
-            float out;
-            std::memcpy(&out, &bits, sizeof(out));
-            return out;
+            return std::bit_cast<float>(bits);
           };
           const std::uint32_t stride = formatter->GetVertexStride(0, 0);
           const auto* const packed = static_cast<const std::uint8_t*>(
@@ -796,6 +798,7 @@ namespace moho
           for (int v = 0; v < 3 && packed != nullptr; ++v) {
             const std::uint8_t* const rec = packed + static_cast<std::size_t>(v) * stride;
             std::uint16_t h[4];
+            // Unaligned half-word load from the packed vertex record.
             std::memcpy(h, rec, sizeof(h));
             const SScmVertex& src = sourceVertices[v];
             w += std::snprintf(rb + w, sizeof(rb) - static_cast<std::size_t>(w),
@@ -815,6 +818,7 @@ namespace moho
             for (std::int32_t v = 0; v < mVertexCount; ++v) {
               const std::uint8_t* const rec = packed + static_cast<std::size_t>(v) * stride;
               std::uint16_t h[3];
+              // Unaligned half-word load from the packed vertex record.
               std::memcpy(h, rec, sizeof(h));
               const SScmVertex& src = sourceVertices[v];
               const float srcPos[3] = {src.mLocalPositionX, src.mLocalPositionY, src.mLocalPositionZ};

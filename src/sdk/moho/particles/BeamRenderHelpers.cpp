@@ -551,11 +551,8 @@ namespace moho
           break;
         }
 
-        std::memcpy(
-          mappedVertices,
-          sourceVertices + vertexOffset,
-          static_cast<std::size_t>(batchVertices) * sizeof(SBeamVertex)
-        );
+        // Raw GPU upload: beam vertex blob into the locked stream.
+        std::copy_n(sourceVertices + vertexOffset, static_cast<std::size_t>(batchVertices), static_cast<SBeamVertex*>(mappedVertices));
         vertexStream->Unlock();
 
         SD3DVertexRange vertexSheetView{};

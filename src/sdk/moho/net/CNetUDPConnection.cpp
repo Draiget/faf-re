@@ -1,6 +1,6 @@
 ﻿// ReSharper disable CppTooWideScope
 #include "CNetUDPConnection.h"
-
+#include <algorithm>
 #include <cstdint>
 
 #include "CLobby.h"
@@ -466,7 +466,7 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
   case kNetStateAnswering: // 2
   {
     // Copy remote nonce and adopt compression.
-    std::memcpy(mNonceB, pConnect.senderNonce, sizeof(mNonceB));
+    std::copy_n(pConnect.senderNonce, 32, mNonceB);
     mHandshakeTime = pConnect.time;
     mReceivedCompressionMethod = pConnect.comp;
 
@@ -476,7 +476,8 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
   }
   case kNetStateConnecting: // 1 (Connecting)
   {
-    std::memcpy(mNonceB, pConnect.senderNonce, sizeof(mNonceB));
+    // Crypto nonce blob copy (opaque 32-byte handshake field).
+    std::copy_n(pConnect.senderNonce, 32, mNonceB);
     mHandshakeTime = pConnect.time;
     mReceivedCompressionMethod = pConnect.comp;
 
@@ -597,7 +598,8 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
 
   // Refresh peer time and negotiated params.
   mLastRecv = packet->mSentTime;
-  std::memcpy(mNonceB, pAnswer.senderNonce, sizeof(mNonceB));
+  // Crypto nonce blob copy (opaque 32-byte handshake field).
+  std::copy_n(pAnswer.senderNonce, 32, mNonceB);
   mHandshakeTime = pAnswer.time;
   mReceivedCompressionMethod = pAnswer.comp;
 
@@ -1169,7 +1171,8 @@ SNetPacket* CNetUDPConnection::ReadPacket()
 
     // fast path if contiguous
     if (len <= static_cast<unsigned int>(mPendingOutputData.mReadEnd - mPendingOutputData.mReadHead)) {
-      std::memcpy(dst, mPendingOutputData.mReadHead, len);
+      // Raw pending-output stream blob copy.
+      std::copy_n(mPendingOutputData.mReadHead, len, dst);
       mPendingOutputData.mReadHead += len;
     } else {
       mPendingOutputData.Read(dst, len); // virtual read
@@ -1220,7 +1223,8 @@ SNetPacket* CNetUDPConnection::NewConnectPacket() const
   connectPacket.time = mConnector->GetTime();
   connectPacket.comp = mOurCompressionMethod;
 
-  std::memcpy(connectPacket.senderNonce, mNonceA, 32);
+  // Crypto nonce blob copy (opaque 32-byte handshake field).
+  std::copy_n(mNonceA, 32, connectPacket.senderNonce);
   return packet;
 }
 
@@ -1246,8 +1250,10 @@ SNetPacket* CNetUDPConnection::NewAnswerPacket() const
   answerPacket.time = mConnector->GetTime();
   answerPacket.comp = mOurCompressionMethod;
 
-  std::memcpy(answerPacket.senderNonce, mNonceA, 32);
-  std::memcpy(answerPacket.receiverNonce, mNonceB, 32);
+  // Crypto nonce blob copy (opaque 32-byte handshake field).
+  std::copy_n(mNonceA, 32, answerPacket.senderNonce);
+  // Crypto nonce blob copy (opaque 32-byte handshake field).
+  std::copy_n(mNonceB, 32, answerPacket.receiverNonce);
   return packet;
 }
 
