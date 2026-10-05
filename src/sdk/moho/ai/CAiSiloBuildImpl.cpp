@@ -236,13 +236,24 @@ namespace
     return static_cast<float>(result.GetNumber());
   }
 
+  /**
+   * What it does:
+   * Runs one script callback on the unit, passing the weapon as its bound
+   * Lua object. The binary helper (0x005D06B0) pushes the weapon's LuaObject
+   * payload (0x14 bytes at weapon+0x20) onto the stack - a full userdata with
+   * the UnitWeapon metatable, so Lua methods like GetProjectileBlueprint
+   * resolve. Passing a raw pointer instead made the argument a light
+   * userdata with no metatable: OnSiloBuildStart's weapon:GetProjectileBlueprint()
+   * raised "attempt to call method (a nil value)", aborting the silo
+   * progress chain every missile build.
+   */
   void DispatchWeaponCallback(Unit* const unit, const char* const callbackName, UnitWeapon* const weapon)
   {
     if (!unit || !weapon || !callbackName || !*callbackName) {
       return;
     }
 
-    (void)unit->RunScript(callbackName, static_cast<void*>(weapon));
+    (void)unit->RunScript(callbackName, weapon->mLuaObj);
   }
 } // namespace
 
