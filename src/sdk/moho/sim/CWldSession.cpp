@@ -9868,7 +9868,7 @@ namespace moho
      */
     [[nodiscard]] UserArmy* ArmyAtIndexOrNull(const msvc8::vector<UserArmy*>& armies, const std::int32_t index)
     {
-      if (index < 0) {
+      if (index < 0 || static_cast<std::size_t>(index) >= armies.size()) {
         return nullptr;
       }
       return armies[static_cast<std::size_t>(index)];

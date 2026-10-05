@@ -5,11 +5,14 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <exception>
 #include <limits>
 #include <new>
 #include <vector>
+
+#include <dbghelp.h>
 
 #include "boost/function.hpp"
 #include <boost/bind.hpp>
@@ -37,6 +40,7 @@
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/misc/LaunchInfoBase.h"
 #include "Sim.h"
 
 using namespace moho;
@@ -44,6 +48,9 @@ using namespace moho;
 namespace
 {
   bool gSimInterlocked = false;
+
+  // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+  DWORD gSimThreadOsIdForWatchdog = 0;
 
   // Issue-thread pacing, from CSimDriver::ThreadRun (0x0073BDF0).
   constexpr unsigned int kCurrentThreadId = 0xFFFFFFFFu;
@@ -645,8 +652,15 @@ CSimDriver::CSimDriver(
   , mSimSpeedSamples{}
   , mCurrentSimRate(10)
 {
-  mPendingSyncFilter.focusArmy = static_cast<int32_t>(commandSourceId);
-  mActiveSyncFilter.focusArmy = static_cast<int32_t>(commandSourceId);
+  // Binary 0x0073B7CC..0x0073B7DC seeds ONLY the pending filter, and from
+  // `mLaunchInfo->mCommandSources.mOriginalSource` (LaunchInfoBase+0x54,
+  // SLaunchCommandSources+0x14), not from this driver's command-source id.
+  // Replay sessions carry mOriginalSource = -1 (spectator); seeding with the
+  // command-source id instead put 255 into the sync filter, which DoBeat then
+  // stored as the session focus army and every userArmies[255] reader crashed
+  // on. The active filter stays default (-1) until the first sync adopts it.
+  const std::int32_t originalSource = launchInfo ? launchInfo->mCommandSources.mOriginalSource : -1;
+  mPendingSyncFilter.focusArmy = originalSource;
 
   mConnectionEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
   mSyncDataAvailableEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
@@ -811,6 +825,25 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
 
   const int32_t currentBeat = static_cast<int32_t>(mSim->mCurBeat);
   const int32_t syncBeat = syncData->mCurBeat;
+
+  // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+  {
+    static int sProbeSync = 0;
+    if ((++sProbeSync % 50) == 0) {
+      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+        std::fprintf(
+          sink,
+          "[BEATPIPE] syncProduced cur=%d syncBeat=%d pausedBy=%d gameOver=%d\n",
+          static_cast<int>(currentBeat),
+          static_cast<int>(syncBeat),
+          static_cast<int>(syncData->mPausedBy),
+          static_cast<int>(syncData->mGameOver)
+        );
+        std::fclose(sink);
+      }
+    }
+  }
+
   const int32_t oldestRetainedBeat = currentBeat - 128;
   if (syncBeat >= oldestRetainedBeat && syncBeat < currentBeat) {
     const gpg::MD5Digest& expectedDigest = mSim->mSimHashes[syncBeat & 0x7F];
@@ -845,6 +878,17 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
 {
   const int32_t beatToDispatch = mDispatchBeat;
   ++mDispatchBeat;
+
+  // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+  {
+    static int sProbeStep = 0;
+    if ((++sProbeStep % 50) == 1) {
+      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+        std::fprintf(sink, "[BEATPIPE] dispatchStep n=%d beat=%d\n", sProbeStep, static_cast<int>(beatToDispatch));
+        std::fclose(sink);
+      }
+    }
+  }
 
   gpg::time::Timer dispatchTimer;
 
@@ -1057,6 +1101,10 @@ void CSimDriver::ThreadCreateSim()
 {
   PinThisThreadToOneNumaNodeIfRequested();
 
+  // TEMPORARY PROBE -- replay beat-pipeline triage: remember the sim thread's
+  // OS id so the issue-thread watchdog can suspend/dump it on stalls.
+  gSimThreadOsIdForWatchdog = ::GetCurrentThreadId();
+
   // The sim runs at reduced x87 precision so its arithmetic is bit-identical
   // on every machine in the game.
   platform::SetX87PrecisionControl(_PC_24);
@@ -1169,7 +1217,125 @@ void CSimDriver::ThreadRun()
   }
 
   while (!mStopSimThread) {
+    // TEMPORARY PROBE -- replay beat-pipeline triage: watchdog that dumps the
+    // sim thread's stack when dispatch stalls. Delete when resolved.
+    {
+      static int sWatchdogArmed = 0;
+      static std::int32_t sLastProgressBeat = -1;
+      static std::int64_t sLastProgressCycles = 0;
+      static int sDumpsTaken = 0;
+      const std::int32_t progressBeat = mDispatchBeat;
+      const std::int64_t nowCycles = mTimer.ElapsedCycles();
+      if (progressBeat != sLastProgressBeat || sLastProgressCycles == 0) {
+        sLastProgressBeat = progressBeat;
+        sLastProgressCycles = nowCycles;
+      } else if (
+        sDumpsTaken < 3 && mSimThread != nullptr
+        && gpg::time::CyclesToMilliseconds(nowCycles - sLastProgressCycles) > 15000.0f
+      ) {
+        ++sDumpsTaken;
+        sLastProgressCycles = nowCycles;
+        HANDLE simThread = nullptr;
+        if (gSimThreadOsIdForWatchdog != 0) {
+          simThread = ::OpenThread(THREAD_ALL_ACCESS, FALSE, gSimThreadOsIdForWatchdog);
+        }
+        if (simThread != nullptr && ::SuspendThread(simThread) != 0xFFFFFFFF) {
+          CONTEXT ctx{};
+          ctx.ContextFlags = CONTEXT_FULL;
+          if (::GetThreadContext(simThread, &ctx)) {
+            STACKFRAME frame{};
+            frame.AddrPC.Mode = AddrModeFlat;
+            frame.AddrPC.Offset = ctx.Eip;
+            frame.AddrStack.Mode = AddrModeFlat;
+            frame.AddrStack.Offset = ctx.Esp;
+            frame.AddrFrame.Mode = AddrModeFlat;
+            frame.AddrFrame.Offset = ctx.Ebp;
+            if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+              std::fprintf(
+                sink,
+                "[SIMSTALL] dispatchBeat=%d state=%d eip=0x%08x\n",
+                static_cast<int>(mDispatchBeat),
+                static_cast<int>(mState),
+                ctx.Eip
+              );
+              for (int i = 0; i < 40; ++i) {
+                if (::StackWalk(
+                      IMAGE_FILE_MACHINE_I386,
+                      ::GetCurrentProcess(),
+                      simThread,
+                      &frame,
+                      &ctx,
+                      nullptr,
+                      ::SymFunctionTableAccess,
+                      ::SymGetModuleBase,
+                      nullptr
+                    )
+                    == FALSE) {
+                  break;
+                }
+                if (frame.AddrPC.Offset == 0) {
+                  continue;
+                }
+                DWORD64 pc = frame.AddrPC.Offset;
+                if (i != 0) {
+                  pc -= 5;
+                }
+                char symbolText[300] = {};
+                unsigned char storage[sizeof(SYMBOL_INFO) + 256] = {};
+                auto* const symbol = reinterpret_cast<SYMBOL_INFO*>(storage);
+                symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+                symbol->MaxNameLen = 255;
+                DWORD64 displacement = 0;
+                if (::SymFromAddr(::GetCurrentProcess(), pc, &displacement, symbol) != FALSE) {
+                  (void)std::snprintf(
+                    symbolText, sizeof(symbolText), " %s+0x%llx", symbol->Name, static_cast<unsigned long long>(displacement)
+                  );
+                }
+                std::fprintf(sink, "[SIMSTALL]   #%d 0x%08llx%s\n", i, static_cast<unsigned long long>(pc), symbolText);
+              }
+              std::fclose(sink);
+            }
+          }
+          ::ResumeThread(simThread);
+        }
+        if (simThread != nullptr) {
+          ::CloseHandle(simThread);
+        }
+      }
+      sWatchdogArmed = 1;
+      (void)sWatchdogArmed;
+    }
+
     mClientManager->DoBeat();
+
+    // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+    {
+      static int sProbePass = 0;
+      if ((++sProbePass % 100) == 0) {
+        int partiallyQueuedBeat = 0;
+        int availableBeat = 0;
+        mClientManager->GetPartiallyQueuedBeat(partiallyQueuedBeat);
+        mClientManager->GetAvailableBeat(availableBeat);
+        if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+          std::fprintf(
+            sink,
+            "[BEATPIPE] issueThread lastSync=%lld outstanding=%u syncQ=%u nextIssue=%d lastDeq=%d "
+            "partialQ=%d avail=%d simBusy=%d state=%d\n",
+            static_cast<long long>(mLastSyncCycleTime),
+            static_cast<unsigned>(mOutstandingRequests),
+            static_cast<unsigned>(mSyncDataQueue.Size()),
+            mNextIssueBeat,
+            mLastDequeuedBeat,
+            partiallyQueuedBeat,
+            availableBeat,
+            static_cast<int>(mSimBusy),
+            static_cast<int>(mState)
+          );
+          mClientManager->DumpClientLanesForProbe(sink);
+          std::fclose(sink);
+        }
+      }
+    }
 
     int waitMilliseconds = kIssueThreadIdleWaitMs;
     const std::int64_t now = mTimer.ElapsedCycles();
@@ -1470,7 +1636,27 @@ void CSimDriver::PromoteToDispatchingWhenBeatAvailable(const int beatQuerySeed)
 {
   int availableBeat = beatQuerySeed;
   mClientManager->GetAvailableBeat(availableBeat);
-  if (availableBeat >= mDispatchBeat) {
+  const bool willPromote = availableBeat >= mDispatchBeat;
+
+  // TEMPORARY PROBE -- replay beat-pipeline triage. Delete when resolved.
+  {
+    static int sProbePromote = 0;
+    if ((++sProbePromote % 50) == 0 || willPromote) {
+      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+        std::fprintf(
+          sink,
+          "[BEATPIPE] promote n=%d avail=%d dispatchBeat=%d promote=%d\n",
+          sProbePromote,
+          availableBeat,
+          static_cast<int>(mDispatchBeat),
+          static_cast<int>(willPromote)
+        );
+        std::fclose(sink);
+      }
+    }
+  }
+
+  if (willPromote) {
     SetStateAndNotify(EDriverState::Dispatching);
   }
 }
