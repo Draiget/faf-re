@@ -2793,6 +2793,27 @@ namespace moho
 
       const VTransform attachedTransform = CalculateAttachedTransform();
       SetPendingTransform(attachedTransform, 1.0f);
+    } else if (mAttachInfo.HasAttachTarget()) {
+      // TEMPORARY PROBE -- attached-unit freeze triage, second shape: if the
+      // weak slot is set but resolves null the follow never runs and a unit
+      // with no motion task of its own freezes exactly where it spawned.
+      // Strided; delete when resolved.
+      {
+        static int sProbeDeadSeen = 0;
+        ++sProbeDeadSeen;
+        if ((sProbeDeadSeen % 100) == 0) {
+          if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+            std::fprintf(
+              sink,
+              "[ATTACHDEAD] self=%p isUnit=%d bone=%d\n",
+              static_cast<void*>(this),
+              IsUnit() != nullptr ? 1 : 0,
+              mAttachInfo.mParentBoneIndex
+            );
+            std::fclose(sink);
+          }
+        }
+      }
     }
 
     mLastTickProcessed = SimulationRef->mCurTick;
