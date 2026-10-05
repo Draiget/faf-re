@@ -445,19 +445,23 @@ namespace
     }
 
     // TEMPORARY PROBE -- particle draw-time constant triage: everything the
-    // sim produces is verified correct (FXTRAIL/FXATTACH), so an on-screen
-    // offset must come from these binds. Reports, once per session, whether
-    // each particle shader variable resolved and what time value it received.
+    // sim produces is verified correct (FXTRAIL/FXATTACH/FXPOST), so an
+    // on-screen offset must come from these binds. The trail shader slides
+    // ribbon vertices by (time - age); a frozen time freezes the ribbon end at
+    // its beat position while the mesh interpolates ahead -- lag proportional
+    // to speed, aligning at rest. Strided samples show whether time advances.
     // Delete when resolved.
     {
-      static bool sReported = false;
-      if (!sReported) {
-        sReported = true;
+      static int sProbeBindSeen = 0;
+      ++sProbeBindSeen;
+      if ((sProbeBindSeen % 1000) == 0) {
         std::FILE* const sink = std::fopen("faf_diag.log", "a");
         if (sink != nullptr) {
           std::fprintf(
             sink,
-            "[FXBIND] time=%.3f view=%d proj=%d vp=%d invView=%d\n",
+            "[FXBIND] tick=%d alpha=%.3f time=%.3f view=%d proj=%d vp=%d invView=%d\n",
+            tick,
+            frameDelta,
             time,
             moho::shaderVarParticleViewMatrix.Exists() ? 1 : 0,
             moho::shaderVarParticleProjection.Exists() ? 1 : 0,
