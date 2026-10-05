@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <memory>
 #include <new>
@@ -232,6 +233,39 @@ namespace moho
    */
   bool CThrustManipulator::ManipulatorUpdate()
   {
+    // TEMPORARY PROBE -- thrust-nozzle triage: the flying transport's exhaust
+    // bones sit ~78 degrees up (the takeoff animation's end pose), which is
+    // exactly what they look like when this override never runs or bails at a
+    // guard. Logs entry and each early-exit, then the aim lanes. Delete when
+    // resolved.
+    {
+      static int sProbeThrust = 0;
+      static int sProbeThrustSeen = 0;
+      ++sProbeThrustSeen;
+      if (sProbeThrust < 40 && (sProbeThrustSeen % 50) == 0) {
+        ++sProbeThrust;
+        Unit* const probeUnit = mUnit.GetObjectPtr();
+        CAniPoseBone* const probeBone = ResolveWatchedThrustBone(this);
+        const char* const probeUnitName = (probeUnit != nullptr) ? "unit" : "null";
+        std::FILE* const sink = std::fopen("faf_diag.log", "a");
+        if (sink != nullptr) {
+          std::fprintf(
+            sink,
+            "[FXTHRUST] n=%d unit=%s built=%d bone=%d motion=%d force=(%.2f,%.2f,%.2f)\n",
+            sProbeThrust,
+            probeUnitName,
+            probeUnit != nullptr ? (probeUnit->IsBeingBuilt() ? 1 : 0) : -1,
+            probeBone != nullptr ? mThrustBoneIndex : -1,
+            (probeUnit != nullptr && probeUnit->UnitMotion != nullptr) ? 1 : 0,
+            (probeUnit != nullptr && probeUnit->UnitMotion != nullptr) ? probeUnit->UnitMotion->mForce.x : 0.0f,
+            (probeUnit != nullptr && probeUnit->UnitMotion != nullptr) ? probeUnit->UnitMotion->mForce.y : 0.0f,
+            (probeUnit != nullptr && probeUnit->UnitMotion != nullptr) ? probeUnit->UnitMotion->mForce.z : 0.0f
+          );
+          std::fclose(sink);
+        }
+      }
+    }
+
     Unit* const unit = mUnit.GetObjectPtr();
     if (unit == nullptr || unit->IsBeingBuilt()) {
       return false;
