@@ -11,6 +11,8 @@ namespace moho
   extern TSimConVar<float> gSimConVar_tree_UprootFactor;
   extern TSimConVar<bool> gSimConVar_ShowRaisedPlatforms;
   extern TSimConVar<bool> gSimConVar_AI_RenderBombDropZone;
+  extern TSimConVar<float> gSimConVar_RandomElevationOffset;
+  extern TSimConVar<float> gSimConVar_AirLookAheadMult;
 
   class CScrLuaInitForm;
 

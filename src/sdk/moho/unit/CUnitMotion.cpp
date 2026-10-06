@@ -33,6 +33,7 @@
 #include "moho/sim/SimConVarAccess.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimStartupRegistrations.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
@@ -888,10 +889,8 @@ namespace moho
     // offset inside +/- the RandomElevationOffset con-var so a group of them
     // does not stack at one altitude.
     if (mUnit->mIsAir && !mUnit->IsInCategory("POD")) {
-      float elevationOffset = 0.0f;
-      if (ReadSimConVarValue<float>(mUnit->SimulationRef, "RandomElevationOffset", elevationOffset)) {
-        mRandomElevation = mUnit->SimulationRef->mRngState->FRand(-elevationOffset, elevationOffset);
-      }
+      const float elevationOffset = ReadSimConVar(mUnit->SimulationRef, gSimConVar_RandomElevationOffset);
+      mRandomElevation = mUnit->SimulationRef->mRngState->FRand(-elevationOffset, elevationOffset);
     }
   }
 
@@ -3935,16 +3934,15 @@ namespace moho
       const float maxAirSpeed = unit->GetAttributes().moveSpeedMult * air.MaxAirspeed * 5.0f;
       const float lookAheadSpeed = std::min(maxAirSpeed, horizontalDistance);
 
-      float airLookAheadMult = 1.0f;
-      (void)ReadSimConVarValue<float>(sim, "AirLookAheadMult", airLookAheadMult);
+      const float airLookAheadMult = ReadSimConVar(sim, gSimConVar_AirLookAheadMult);
       float lookAheadElevation =
         mapData->LookAheadForMaxTerrain(outTransform.pos_, air.FlyInWater != 0, airLookAheadMult * lookAheadSpeed);
       const float liftClearance = std::max(lookAheadElevation - outTransform.pos_.y, 0.0f);
 
       if (liftClearance > air.LiftFactor && lookAheadSpeed > 1.0f) {
         const float halfSpeed = lookAheadSpeed * 0.5f;
-        float airLookAheadMult2 = 1.0f;
-        (void)ReadSimConVarValue<float>(sim, "AirLookAheadMult", airLookAheadMult2);
+        // 0x006BF8C5 re-reads the con-var instead of reusing the first value.
+        const float airLookAheadMult2 = ReadSimConVar(sim, gSimConVar_AirLookAheadMult);
         const float lookAhead2 =
           mapData->LookAheadForMaxTerrain(outTransform.pos_, air.FlyInWater != 0, halfSpeed * airLookAheadMult2) * 1.5f;
         const float liftClearance2 = std::max(lookAhead2 - outTransform.pos_.y, 0.0f);

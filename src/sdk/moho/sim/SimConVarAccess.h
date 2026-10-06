@@ -63,4 +63,16 @@ namespace moho
     outValue = *static_cast<const TValue*>(valueStorage);
     return true;
   }
+
+  /**
+   * Reads one con-var's value for `sim` straight through its registered
+   * global, the way engine code does: `Sim::GetSimVar` creates the
+   * per-simulation instance on first use, so no hop can come up empty and no
+   * by-name registry search is involved.
+   */
+  template <typename TValue>
+  [[nodiscard]] TValue ReadSimConVar(Sim* const sim, TSimConVar<TValue>& conVar)
+  {
+    return *static_cast<const TValue*>(sim->GetSimVar(&conVar)->GetValueStorage());
+  }
 } // namespace moho
