@@ -6094,6 +6094,7 @@ bool moho::ren_NewPipeline = true;
 bool moho::ren_Refraction = true;
 bool moho::ren_RegenShore = false;
 bool moho::ren_ShowBoneNames = false;
+bool moho::ren_ShowSkeletons = false;
 bool moho::ren_TTerrainGlow = false;
 int moho::ren_TeamColorLookupCount = 32;
 bool moho::ren_Trees = false;

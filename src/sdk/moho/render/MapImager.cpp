@@ -241,8 +241,9 @@ void MapImager::UpdateMeshStances()
  */
 void REN_ShowSkeletons()
 {
-  const bool showSkeletons = !moho::ren_ShowSkeletons;
-  moho::ren_ShowSkeletons = showSkeletons;
+  extern bool ren_ShowSkeletons;
+  const bool showSkeletons = !ren_ShowSkeletons;
+  ren_ShowSkeletons = showSkeletons;
 
   if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
     activeDriver->SetSyncFilterOptionFlag(showSkeletons);

@@ -131,6 +131,7 @@ namespace moho
   extern bool ren_Refraction;
   extern bool ren_RegenShore;
   extern bool ren_ShowBoneNames;
+  extern bool ren_ShowSkeletons;
   extern bool ren_TTerrainGlow;
   extern int ren_TeamColorLookupCount;
   extern bool ren_Trees;
