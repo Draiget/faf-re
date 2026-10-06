@@ -3368,7 +3368,7 @@ float moho::ui_FootprintMinThickness = 2.0f;
 float moho::cam_DefaultMiniLOD = 1.8f;
 bool moho::ui_WindowedAlwaysShowsCursor = false;
 bool moho::ui_DragSelect2D = true;
-bool moho::ui_AttackGroundIgnoresFireState = false; // not in the binary; see the declaration
+bool moho::ui_AttackGroundIgnoresFireState = true; // not in the binary; see the declaration
 // Byte-verified shipped defaults, read straight out of bin/external/ForgedAlliance.exe
 // at the addresses in the header doc blocks (0x00F57AA4/A8/AC/B0, 0x00F57A8C, 0x00F57887).
 float moho::ui_KeyboardPanSpeed = 90.0f;
